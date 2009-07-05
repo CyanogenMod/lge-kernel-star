@@ -30,7 +30,7 @@ MODULE_ALIAS("arpt_NFQUEUE");
 static u32 jhash_initval __read_mostly;
 
 static unsigned int
-nfqueue_tg(struct sk_buff *skb, const struct xt_target_param *par)
+nfqueue_tg(struct sk_buff *skb, const struct xt_action_param *par)
 {
 	const struct xt_NFQ_info *tinfo = par->targinfo;
 

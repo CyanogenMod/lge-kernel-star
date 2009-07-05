@@ -37,7 +37,7 @@ static const struct xt_table nat_table = {
 
 /* Source NAT */
 static unsigned int
-ipt_snat_target(struct sk_buff *skb, const struct xt_target_param *par)
+ipt_snat_target(struct sk_buff *skb, const struct xt_action_param *par)
 {
 	struct nf_conn *ct;
 	enum ip_conntrack_info ctinfo;
@@ -56,7 +56,7 @@ ipt_snat_target(struct sk_buff *skb, const struct xt_target_param *par)
 }
 
 static unsigned int
-ipt_dnat_target(struct sk_buff *skb, const struct xt_target_param *par)
+ipt_dnat_target(struct sk_buff *skb, const struct xt_action_param *par)
 {
 	struct nf_conn *ct;
 	enum ip_conntrack_info ctinfo;
