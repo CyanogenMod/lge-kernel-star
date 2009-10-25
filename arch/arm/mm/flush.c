@@ -51,7 +51,6 @@ void flush_cache_mm(struct mm_struct *mm)
 		    :
 		    : "r" (0)
 		    : "cc");
-		__flush_icache_all();
 	}
 }
 
