@@ -978,8 +978,8 @@ void ieee80211_unregister_hw(struct ieee80211_hw *hw)
 	rate_control_deinitialize(local);
 	debugfs_hw_del(local);
 
-	if (skb_queue_len(&local->skb_queue)
-			|| skb_queue_len(&local->skb_queue_unreliable))
+	if (skb_queue_len(&local->skb_queue) ||
+	    skb_queue_len(&local->skb_queue_unreliable))
 		printk(KERN_WARNING "%s: skb_queue not empty\n",
 		       wiphy_name(local->hw.wiphy));
 	skb_queue_purge(&local->skb_queue);

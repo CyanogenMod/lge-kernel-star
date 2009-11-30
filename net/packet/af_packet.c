@@ -1045,9 +1045,10 @@ static int tpacket_snd(struct packet_sock *po, struct msghdr *msg)
 		}
 		packet_increment_head(&po->tx_ring);
 		len_sum += tp_len;
-	} while (likely((ph != NULL) || ((!(msg->msg_flags & MSG_DONTWAIT))
-					&& (atomic_read(&po->tx_ring.pending))))
-	      );
+	} while (likely((ph != NULL) ||
+			((!(msg->msg_flags & MSG_DONTWAIT)) &&
+			 (atomic_read(&po->tx_ring.pending))))
+		);
 
 	err = len_sum;
 	goto out_put;
