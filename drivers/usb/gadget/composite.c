@@ -834,7 +834,9 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 			goto unknown;
 		if (!cdev->config || w_index >= MAX_CONFIG_INTERFACES)
 			break;
-		f = cdev->config->interface[intf];
+		f = NULL;
+		if (cdev->config)
+			f = cdev->config->interface[intf];
 		if (!f)
 			break;
 		if (w_value && !f->set_alt)
