@@ -16,6 +16,7 @@ struct mmc_cid {
 	unsigned int		manfid;
 	char			prod_name[8];
 	unsigned int		serial;
+	unsigned char		cbx:2;
 	unsigned short		oemid;
 	unsigned short		year;
 	unsigned char		hwrev;
@@ -123,6 +124,7 @@ struct mmc_card {
 #define mmc_card_mmc(c)		((c)->type == MMC_TYPE_MMC)
 #define mmc_card_sd(c)		((c)->type == MMC_TYPE_SD)
 #define mmc_card_sdio(c)	((c)->type == MMC_TYPE_SDIO)
+#define mmc_card_has_boot(c)	((c)->cid.cbx != 0)
 
 #define mmc_card_present(c)	((c)->state & MMC_STATE_PRESENT)
 #define mmc_card_readonly(c)	((c)->state & MMC_STATE_READONLY)
