@@ -126,6 +126,26 @@ config YAFFS_DISABLE_WIDE_TNODES
 
 	  If unsure, say N.
 
+config YAFFS2_TAG_NO_ECC
+	bool "Do not include the ECC data structure in packed tags"
+	depends on YAFFS_YAFFS2 && !YAFFS_DOES_ECC
+	default n
+	help
+	  This makes the packedtags structure in yaffs2 not contain the
+	  ECC descriptor. This saves 8 bytes in the OOB on systems with HW ECC.
+
+	  Note: Care must be taken to ensure that a kernel with this option
+	  does not attempt to mount an existing file system in flash that was
+	  created with the larger tag. If the HW performs error-checking on the
+	  tag area, it will fail and the file system could be rendered
+	  unmountable.
+
+	  If you will be mounting a brand new filesystem and the tools have
+	  written the correct OOB data, it is recommended to say 'Y' here.
+
+	  If unsure, say N.
+
+
 config YAFFS_ALWAYS_CHECK_CHUNK_ERASED
 	bool "Force chunk erase check"
 	depends on YAFFS_FS
