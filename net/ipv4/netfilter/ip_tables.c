@@ -553,13 +553,14 @@ mark_source_chains(struct xt_table_info *newinfo,
 }
 
 static int
-cleanup_match(struct ipt_entry_match *m, unsigned int *i)
+cleanup_match(struct ipt_entry_match *m, struct net *net, unsigned int *i)
 {
 	struct xt_mtdtor_param par;
 
 	if (i && (*i)-- == 0)
 		return 1;
 
+	par.net       = net;
 	par.match     = m->u.kernel.match;
 	par.matchinfo = m->data;
 	par.family    = NFPROTO_IPV4;
@@ -704,7 +705,7 @@ find_check_entry(struct ipt_entry *e, const char *name, unsigned int size,
  err:
 	module_put(t->u.kernel.target->me);
  cleanup_matches:
-	IPT_MATCH_ITERATE(e, cleanup_match, &j);
+	IPT_MATCH_ITERATE(e, cleanup_match, net, &j);
 	return ret;
 }
 
@@ -774,7 +775,7 @@ check_entry_size_and_hooks(struct ipt_entry *e,
 }
 
 static int
-cleanup_entry(struct ipt_entry *e, unsigned int *i)
+cleanup_entry(struct ipt_entry *e, struct net *net, unsigned int *i)
 {
 	struct xt_tgdtor_param par;
 	struct ipt_entry_target *t;
@@ -783,7 +784,7 @@ cleanup_entry(struct ipt_entry *e, unsigned int *i)
 		return 1;
 
 	/* Cleanup all matches */
-	IPT_MATCH_ITERATE(e, cleanup_match, NULL);
+	IPT_MATCH_ITERATE(e, cleanup_match, net, NULL);
 	t = ipt_get_target(e);
 
 	par.target   = t->u.kernel.target;
@@ -864,7 +865,7 @@ translate_table(const char *name,
 
 	if (ret != 0) {
 		IPT_ENTRY_ITERATE(entry0, newinfo->size,
-				cleanup_entry, &i);
+				cleanup_entry, net, &i);
 		return ret;
 	}
 
@@ -1258,7 +1259,7 @@ __do_replace(struct net *net, const char *name, unsigned int valid_hooks,
 	/* Decrease module usage counts and free resource */
 	loc_cpu_old_entry = oldinfo->entries[raw_smp_processor_id()];
 	IPT_ENTRY_ITERATE(loc_cpu_old_entry, oldinfo->size, cleanup_entry,
-			  NULL);
+			  net, NULL);
 	xt_free_table_info(oldinfo);
 	if (copy_to_user(counters_ptr, counters,
 			 sizeof(struct xt_counters) * num_counters) != 0)
@@ -1319,7 +1320,7 @@ do_replace(struct net *net, void __user *user, unsigned int len)
 	return 0;
 
  free_newinfo_untrans:
-	IPT_ENTRY_ITERATE(loc_cpu_entry, newinfo->size, cleanup_entry, NULL);
+	IPT_ENTRY_ITERATE(loc_cpu_entry, newinfo->size, cleanup_entry, net, NULL);
  free_newinfo:
 	xt_free_table_info(newinfo);
 	return ret;
@@ -1680,7 +1681,7 @@ compat_check_entry(struct ipt_entry *e, const char *name,
 	return 0;
 
  cleanup_matches:
-	IPT_MATCH_ITERATE(e, cleanup_match, &j);
+	IPT_MATCH_ITERATE(e, cleanup_match, net, &j);
 	return ret;
 }
 
@@ -1779,7 +1780,7 @@ translate_compat_table(const char *name,
 		j -= i;
 		COMPAT_IPT_ENTRY_ITERATE_CONTINUE(entry0, newinfo->size, i,
 						  compat_release_entry, &j);
-		IPT_ENTRY_ITERATE(entry1, newinfo->size, cleanup_entry, &i);
+		IPT_ENTRY_ITERATE(entry1, newinfo->size, cleanup_entry, net, &i);
 		xt_free_table_info(newinfo);
 		return ret;
 	}
@@ -1851,7 +1852,7 @@ compat_do_replace(struct net *net, void __user *user, unsigned int len)
 	return 0;
 
  free_newinfo_untrans:
-	IPT_ENTRY_ITERATE(loc_cpu_entry, newinfo->size, cleanup_entry, NULL);
+	IPT_ENTRY_ITERATE(loc_cpu_entry, newinfo->size, cleanup_entry, net, NULL);
  free_newinfo:
 	xt_free_table_info(newinfo);
 	return ret;
@@ -2111,7 +2112,7 @@ out:
 	return ERR_PTR(ret);
 }
 
-void ipt_unregister_table(struct xt_table *table)
+void ipt_unregister_table(struct net *net, struct xt_table *table)
 {
 	struct xt_table_info *private;
 	void *loc_cpu_entry;
@@ -2121,7 +2122,7 @@ void ipt_unregister_table(struct xt_table *table)
 
 	/* Decrease module usage counts and free resources */
 	loc_cpu_entry = private->entries[raw_smp_processor_id()];
-	IPT_ENTRY_ITERATE(loc_cpu_entry, private->size, cleanup_entry, NULL);
+	IPT_ENTRY_ITERATE(loc_cpu_entry, private->size, cleanup_entry, net, NULL);
 	if (private->number > private->initial_entries)
 		module_put(table_owner);
 	xt_free_table_info(private);
