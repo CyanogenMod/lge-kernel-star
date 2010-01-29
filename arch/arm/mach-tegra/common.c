@@ -40,5 +40,6 @@ void __init tegra_init_cache(void)
 
 void __init tegra_common_init(void)
 {
+	tegra_init_clock();
 	tegra_init_cache();
 }
