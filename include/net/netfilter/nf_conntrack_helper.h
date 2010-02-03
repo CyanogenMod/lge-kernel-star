@@ -41,7 +41,7 @@ struct nf_conntrack_helper
 };
 
 extern struct nf_conntrack_helper *
-__nf_conntrack_helper_find_byname(const char *name);
+__nf_conntrack_helper_find(const char *name, u16 l3num, u8 protonum);
 
 extern struct nf_conntrack_helper *
 nf_conntrack_helper_try_module_get(const char *name, u16 l3num, u8 protonum);
