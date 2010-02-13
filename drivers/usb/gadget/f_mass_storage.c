@@ -2912,6 +2912,8 @@ static int __init fsg_probe(struct platform_device *pdev)
 	fsg->pdev = pdev;
 	printk(KERN_INFO "fsg_probe pdata: %p\n", pdata);
 
+	fsg->buf_size = BULK_BUFFER_SIZE;
+
 	if (pdata) {
 		if (pdata->vendor)
 			fsg->vendor = pdata->vendor;
@@ -2922,6 +2924,9 @@ static int __init fsg_probe(struct platform_device *pdev)
 		if (pdata->release)
 			fsg->release = pdata->release;
 		fsg->nluns = pdata->nluns;
+
+		if (pdata->bulk_size)
+			fsg->buf_size = pdata->bulk_size;
 	}
 
 	return 0;
@@ -2948,7 +2953,6 @@ int mass_storage_bind_config(struct usb_configuration *c)
 	kref_init(&fsg->ref);
 	init_completion(&fsg->thread_notifier);
 
-	the_fsg->buf_size = BULK_BUFFER_SIZE;
 	the_fsg->sdev.name = DRIVER_NAME;
 	the_fsg->sdev.print_name = print_switch_name;
 	the_fsg->sdev.print_state = print_switch_state;
