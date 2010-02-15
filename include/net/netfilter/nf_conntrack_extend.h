@@ -9,6 +9,7 @@ enum nf_ct_ext_id
 	NF_CT_EXT_NAT,
 	NF_CT_EXT_ACCT,
 	NF_CT_EXT_ECACHE,
+	NF_CT_EXT_ZONE,
 	NF_CT_EXT_NUM,
 };
 
@@ -16,6 +17,7 @@ enum nf_ct_ext_id
 #define NF_CT_EXT_NAT_TYPE struct nf_conn_nat
 #define NF_CT_EXT_ACCT_TYPE struct nf_conn_counter
 #define NF_CT_EXT_ECACHE_TYPE struct nf_conntrack_ecache
+#define NF_CT_EXT_ZONE_TYPE struct nf_conntrack_zone
 
 /* Extensions: optional stuff which isn't permanently in struct. */
 struct nf_ct_ext {
