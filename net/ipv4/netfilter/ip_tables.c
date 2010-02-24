@@ -359,15 +359,20 @@ ipt_do_table(struct sk_buff *skb,
 
 	do {
 		const struct ipt_entry_target *t;
+		const struct xt_entry_match *ematch;
 
 		IP_NF_ASSERT(e);
 		IP_NF_ASSERT(back);
 		if (!ip_packet_match(ip, indev, outdev,
-		    &e->ip, mtpar.fragoff) ||
-		    IPT_MATCH_ITERATE(e, do_match, skb, &mtpar) != 0) {
+		    &e->ip, mtpar.fragoff)) {
+ no_match:
 			e = ipt_next_entry(e);
 			continue;
 		}
+
+		xt_ematch_foreach(ematch, e)
+			if (do_match(ematch, skb, &mtpar) != 0)
+				goto no_match;
 
 		ADD_COUNTER(e->counters, ntohs(ip->tot_len), 1);
 
@@ -679,6 +684,7 @@ find_check_entry(struct ipt_entry *e, struct net *net, const char *name,
 	int ret;
 	unsigned int j;
 	struct xt_mtchk_param mtpar;
+	struct xt_entry_match *ematch;
 
 	ret = check_entry(e, name);
 	if (ret)
@@ -690,7 +696,11 @@ find_check_entry(struct ipt_entry *e, struct net *net, const char *name,
 	mtpar.entryinfo = &e->ip;
 	mtpar.hook_mask = e->comefrom;
 	mtpar.family    = NFPROTO_IPV4;
-	ret = IPT_MATCH_ITERATE(e, find_check_match, &mtpar, &j);
+	xt_ematch_foreach(ematch, e) {
+		ret = find_check_match(ematch, &mtpar, &j);
+		if (ret != 0)
+			break;
+	}
 	if (ret != 0)
 		goto cleanup_matches;
 
@@ -715,7 +725,9 @@ find_check_entry(struct ipt_entry *e, struct net *net, const char *name,
  err:
 	module_put(t->u.kernel.target->me);
  cleanup_matches:
-	IPT_MATCH_ITERATE(e, cleanup_match, net, &j);
+	xt_ematch_foreach(ematch, e)
+		if (cleanup_match(ematch, net, &j) != 0)
+			break;
 	return ret;
 }
 
@@ -789,12 +801,15 @@ cleanup_entry(struct ipt_entry *e, struct net *net, unsigned int *i)
 {
 	struct xt_tgdtor_param par;
 	struct ipt_entry_target *t;
+	struct xt_entry_match *ematch;
 
 	if (i && (*i)-- == 0)
 		return 1;
 
 	/* Cleanup all matches */
-	IPT_MATCH_ITERATE(e, cleanup_match, net, NULL);
+	xt_ematch_foreach(ematch, e)
+		if (cleanup_match(ematch, net, NULL) != 0)
+			break;
 	t = ipt_get_target(e);
 
 	par.net      = net;
@@ -1080,13 +1095,16 @@ static int compat_calc_entry(const struct ipt_entry *e,
 			     const struct xt_table_info *info,
 			     const void *base, struct xt_table_info *newinfo)
 {
+	const struct xt_entry_match *ematch;
 	const struct ipt_entry_target *t;
 	unsigned int entry_offset;
 	int off, i, ret;
 
 	off = sizeof(struct ipt_entry) - sizeof(struct compat_ipt_entry);
 	entry_offset = (void *)e - base;
-	IPT_MATCH_ITERATE(e, compat_calc_match, &off);
+	xt_ematch_foreach(ematch, e)
+		if (compat_calc_match(ematch, &off) != 0)
+			break;
 	t = ipt_get_target_c(e);
 	off += xt_compat_target_offset(t->u.kernel.target);
 	newinfo->size -= off;
@@ -1476,7 +1494,8 @@ compat_copy_entry_to_user(struct ipt_entry *e, void __user **dstptr,
 	struct compat_ipt_entry __user *ce;
 	u_int16_t target_offset, next_offset;
 	compat_uint_t origsize;
-	int ret;
+	const struct xt_entry_match *ematch;
+	int ret = 0;
 
 	ret = -EFAULT;
 	origsize = *size;
@@ -1490,7 +1509,11 @@ compat_copy_entry_to_user(struct ipt_entry *e, void __user **dstptr,
 	*dstptr += sizeof(struct compat_ipt_entry);
 	*size -= sizeof(struct ipt_entry) - sizeof(struct compat_ipt_entry);
 
-	ret = IPT_MATCH_ITERATE(e, xt_compat_match_to_user, dstptr, size);
+	xt_ematch_foreach(ematch, e) {
+		ret = xt_compat_match_to_user(ematch, dstptr, size);
+		if (ret != 0)
+			break;
+	}
 	target_offset = e->target_offset - (origsize - *size);
 	if (ret)
 		goto out;
@@ -1549,12 +1572,15 @@ static int
 compat_release_entry(struct compat_ipt_entry *e, unsigned int *i)
 {
 	struct ipt_entry_target *t;
+	struct xt_entry_match *ematch;
 
 	if (i && (*i)-- == 0)
 		return 1;
 
 	/* Cleanup all matches */
-	COMPAT_IPT_MATCH_ITERATE(e, compat_release_match, NULL);
+	xt_ematch_foreach(ematch, e)
+		if (compat_release_match(ematch, NULL) != 0)
+			break;
 	t = compat_ipt_get_target(e);
 	module_put(t->u.kernel.target->me);
 	return 0;
@@ -1571,6 +1597,7 @@ check_compat_entry_size_and_hooks(struct compat_ipt_entry *e,
 				  unsigned int *i,
 				  const char *name)
 {
+	struct xt_entry_match *ematch;
 	struct ipt_entry_target *t;
 	struct xt_target *target;
 	unsigned int entry_offset;
@@ -1599,8 +1626,12 @@ check_compat_entry_size_and_hooks(struct compat_ipt_entry *e,
 	off = sizeof(struct ipt_entry) - sizeof(struct compat_ipt_entry);
 	entry_offset = (void *)e - (void *)base;
 	j = 0;
-	ret = COMPAT_IPT_MATCH_ITERATE(e, compat_find_calc_match, name,
-				       &e->ip, e->comefrom, &off, &j);
+	xt_ematch_foreach(ematch, e) {
+		ret = compat_find_calc_match(ematch, name,
+		      &e->ip, e->comefrom, &off, &j);
+		if (ret != 0)
+			break;
+	}
 	if (ret != 0)
 		goto release_matches;
 
@@ -1641,7 +1672,9 @@ check_compat_entry_size_and_hooks(struct compat_ipt_entry *e,
 out:
 	module_put(t->u.kernel.target->me);
 release_matches:
-	IPT_MATCH_ITERATE(e, compat_release_match, &j);
+	xt_ematch_foreach(ematch, e)
+		if (compat_release_match(ematch, &j) != 0)
+			break;
 	return ret;
 }
 
@@ -1655,6 +1688,7 @@ compat_copy_entry_from_user(struct compat_ipt_entry *e, void **dstptr,
 	struct ipt_entry *de;
 	unsigned int origsize;
 	int ret, h;
+	struct xt_entry_match *ematch;
 
 	ret = 0;
 	origsize = *size;
@@ -1665,8 +1699,11 @@ compat_copy_entry_from_user(struct compat_ipt_entry *e, void **dstptr,
 	*dstptr += sizeof(struct ipt_entry);
 	*size += sizeof(struct ipt_entry) - sizeof(struct compat_ipt_entry);
 
-	ret = COMPAT_IPT_MATCH_ITERATE(e, xt_compat_match_from_user,
-				       dstptr, size);
+	xt_ematch_foreach(ematch, e) {
+		ret = xt_compat_match_from_user(ematch, dstptr, size);
+		if (ret != 0)
+			break;
+	}
 	if (ret)
 		return ret;
 	de->target_offset = e->target_offset - (origsize - *size);
@@ -1688,9 +1725,10 @@ static int
 compat_check_entry(struct ipt_entry *e, struct net *net, const char *name,
 				     unsigned int *i)
 {
+	struct xt_entry_match *ematch;
 	struct xt_mtchk_param mtpar;
 	unsigned int j;
-	int ret;
+	int ret = 0;
 
 	j = 0;
 	mtpar.net	= net;
@@ -1698,7 +1736,11 @@ compat_check_entry(struct ipt_entry *e, struct net *net, const char *name,
 	mtpar.entryinfo = &e->ip;
 	mtpar.hook_mask = e->comefrom;
 	mtpar.family    = NFPROTO_IPV4;
-	ret = IPT_MATCH_ITERATE(e, check_match, &mtpar, &j);
+	xt_ematch_foreach(ematch, e) {
+		ret = check_match(ematch, &mtpar, &j);
+		if (ret != 0)
+			break;
+	}
 	if (ret)
 		goto cleanup_matches;
 
@@ -1710,7 +1752,9 @@ compat_check_entry(struct ipt_entry *e, struct net *net, const char *name,
 	return 0;
 
  cleanup_matches:
-	IPT_MATCH_ITERATE(e, cleanup_match, net, &j);
+	xt_ematch_foreach(ematch, e)
+		if (cleanup_match(ematch, net, &j) != 0)
+			break;
 	return ret;
 }
 
