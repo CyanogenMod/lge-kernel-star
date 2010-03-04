@@ -2034,11 +2034,15 @@ static int do_scsi_command(struct fsg_dev *fsg)
 static int received_cbw(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 {
 	struct usb_request	*req = bh->outreq;
-	struct bulk_cb_wrap	*cbw = req->buf;
+	struct bulk_cb_wrap	*cbw;
+
+	WARN_ON(!req);
 
 	/* Was this a real packet? */
-	if (req->status)
+	if (!req || req->status)
 		return -EINVAL;
+
+	cbw = req->buf;
 
 	/* Is the CBW valid? */
 	if (req->actual != USB_BULK_CB_WRAP_LEN ||
