@@ -862,6 +862,19 @@ if !MMU
 source "arch/arm/Kconfig-nommu"
 endif
 
+config TEGRA_ERRATA_657451
+	bool "Store bit 20 of CP15 TLS register c13,3 in bit 0"
+	depends on ARCH_TEGRA_2x_SOC && HAS_TLS_REG
+	default y
+	help
+	  This option enables a workaround for the 657451 Tegra 2 errata
+	  which causes unreliable reads from bit 20 of the thread storage
+	  register c13, 3 (used by the __set_tls system call). It stores the
+	  value intended for bit 20 into bit 0 instead; in most user-space
+	  environments, the value saved by __set_tls is an aligned address,
+	  so repurposing bit 0 will not cause ill effects.
+
+
 config ARM_ERRATA_411920
 	bool "ARM errata: Invalidation of the Instruction Cache operation can fail"
 	depends on CPU_V6 && !SMP

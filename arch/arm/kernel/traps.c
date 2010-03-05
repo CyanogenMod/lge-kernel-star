@@ -504,7 +504,13 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 	case NR(set_tls):
 		thread->tp_value = regs->ARM_r0;
 #if defined(CONFIG_HAS_TLS_REG)
+#if defined(CONFIG_TEGRA_ERRATA_657451)
+		BUG_ON(regs->ARM_r0 & 0x1);
+		asm ("mcr p15, 0, %0, c13, c0, 3" : :
+			"r" ((regs->ARM_r0) | ((regs->ARM_r0>>20) & 0x1)));
+#else
 		asm ("mcr p15, 0, %0, c13, c0, 3" : : "r" (regs->ARM_r0) );
+#endif
 #elif !defined(CONFIG_TLS_REG_EMUL)
 		/*
 		 * User space must never try to access this directly.
