@@ -764,6 +764,7 @@ void cgroup_lock(void)
 {
 	mutex_lock(&cgroup_mutex);
 }
+EXPORT_SYMBOL_GPL(cgroup_lock);
 
 /**
  * cgroup_unlock - release lock on cgroup changes
@@ -774,6 +775,7 @@ void cgroup_unlock(void)
 {
 	mutex_unlock(&cgroup_mutex);
 }
+EXPORT_SYMBOL_GPL(cgroup_unlock);
 
 /*
  * A couple of forward declarations required, due to cyclic reference loop:
@@ -1682,6 +1684,7 @@ int cgroup_path(const struct cgroup *cgrp, char *buf, int buflen)
 	memmove(buf, start, buf + buflen - start);
 	return 0;
 }
+EXPORT_SYMBOL_GPL(cgroup_path);
 
 /**
  * cgroup_attach_task - attach task 'tsk' to cgroup 'cgrp'
@@ -1872,6 +1875,7 @@ bool cgroup_lock_live_group(struct cgroup *cgrp)
 	}
 	return true;
 }
+EXPORT_SYMBOL_GPL(cgroup_lock_live_group);
 
 static int cgroup_release_agent_write(struct cgroup *cgrp, struct cftype *cft,
 				      const char *buffer)
@@ -4368,6 +4372,7 @@ void __css_put(struct cgroup_subsys_state *css, int count)
 	rcu_read_unlock();
 	WARN_ON_ONCE(val < 1);
 }
+EXPORT_SYMBOL_GPL(__css_put);
 
 /*
  * Notify userspace when a cgroup is released, by running the
@@ -4483,6 +4488,7 @@ unsigned short css_id(struct cgroup_subsys_state *css)
 		return cssid->id;
 	return 0;
 }
+EXPORT_SYMBOL_GPL(css_id);
 
 unsigned short css_depth(struct cgroup_subsys_state *css)
 {
@@ -4492,6 +4498,7 @@ unsigned short css_depth(struct cgroup_subsys_state *css)
 		return cssid->depth;
 	return 0;
 }
+EXPORT_SYMBOL_GPL(css_depth);
 
 bool css_is_ancestor(struct cgroup_subsys_state *child,
 		    const struct cgroup_subsys_state *root)
@@ -4528,6 +4535,7 @@ void free_css_id(struct cgroup_subsys *ss, struct cgroup_subsys_state *css)
 	spin_unlock(&ss->id_lock);
 	call_rcu(&id->rcu_head, __free_css_id_cb);
 }
+EXPORT_SYMBOL_GPL(free_css_id);
 
 /*
  * This is called by init or create(). Then, calls to this function are
@@ -4644,6 +4652,7 @@ struct cgroup_subsys_state *css_lookup(struct cgroup_subsys *ss, int id)
 
 	return rcu_dereference(cssid->css);
 }
+EXPORT_SYMBOL_GPL(css_lookup);
 
 /**
  * css_get_next - lookup next cgroup under specified hierarchy.
