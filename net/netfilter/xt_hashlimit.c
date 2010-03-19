@@ -663,7 +663,7 @@ hashlimit_mt(const struct sk_buff *skb, const struct xt_match_param *par)
 	return false;
 }
 
-static bool hashlimit_mt_check_v0(const struct xt_mtchk_param *par)
+static int hashlimit_mt_check_v0(const struct xt_mtchk_param *par)
 {
 	struct xt_hashlimit_info *r = par->matchinfo;
 
@@ -704,7 +704,7 @@ static bool hashlimit_mt_check_v0(const struct xt_mtchk_param *par)
 	return true;
 }
 
-static bool hashlimit_mt_check(const struct xt_mtchk_param *par)
+static int hashlimit_mt_check(const struct xt_mtchk_param *par)
 {
 	struct xt_hashlimit_mtinfo1 *info = par->matchinfo;
 

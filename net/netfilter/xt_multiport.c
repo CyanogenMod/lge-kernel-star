@@ -158,7 +158,7 @@ check(u_int16_t proto,
 		&& count <= XT_MULTI_PORTS;
 }
 
-static bool multiport_mt_check_v0(const struct xt_mtchk_param *par)
+static int multiport_mt_check_v0(const struct xt_mtchk_param *par)
 {
 	const struct ipt_ip *ip = par->entryinfo;
 	const struct xt_multiport *multiinfo = par->matchinfo;
@@ -167,7 +167,7 @@ static bool multiport_mt_check_v0(const struct xt_mtchk_param *par)
 		     multiinfo->count);
 }
 
-static bool multiport_mt_check(const struct xt_mtchk_param *par)
+static int multiport_mt_check(const struct xt_mtchk_param *par)
 {
 	const struct ipt_ip *ip = par->entryinfo;
 	const struct xt_multiport_v1 *multiinfo = par->matchinfo;
@@ -176,7 +176,7 @@ static bool multiport_mt_check(const struct xt_mtchk_param *par)
 		     multiinfo->count);
 }
 
-static bool multiport_mt6_check_v0(const struct xt_mtchk_param *par)
+static int multiport_mt6_check_v0(const struct xt_mtchk_param *par)
 {
 	const struct ip6t_ip6 *ip = par->entryinfo;
 	const struct xt_multiport *multiinfo = par->matchinfo;
@@ -185,7 +185,7 @@ static bool multiport_mt6_check_v0(const struct xt_mtchk_param *par)
 		     multiinfo->count);
 }
 
-static bool multiport_mt6_check(const struct xt_mtchk_param *par)
+static int multiport_mt6_check(const struct xt_mtchk_param *par)
 {
 	const struct ip6t_ip6 *ip = par->entryinfo;
 	const struct xt_multiport_v1 *multiinfo = par->matchinfo;
