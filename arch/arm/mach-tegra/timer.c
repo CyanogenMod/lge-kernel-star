@@ -31,6 +31,7 @@
 #include <asm/localtimer.h>
 
 #include <mach/iomap.h>
+#include <mach/irqs.h>
 
 #include "board.h"
 #include "clock.h"
@@ -47,11 +48,6 @@
 #define TIMER_PTV 0x0
 #define TIMER_PCR 0x4
 
-#define TIMER1_IRQ 32
-#define TIMER2_IRQ 33
-#define TIMER3_IRQ 41
-#define TIMER4_IRQ 42
-
 struct tegra_timer;
 
 static void __iomem *timer_reg_base = IO_ADDRESS(TEGRA_TMR1_BASE);
@@ -67,7 +63,7 @@ static int tegra_timer_set_next_event(unsigned long cycles,
 	u32 reg;
 
 	reg = 0x80000000 | ((1000000/HZ)*(cycles+1)-1);
-	timer_writel(reg, TIMER1_BASE + TIMER_PTV);
+	timer_writel(reg, TIMER3_BASE + TIMER_PTV);
 
 	return 0;
 }
@@ -77,12 +73,12 @@ static void tegra_timer_set_mode(enum clock_event_mode mode,
 {
 	u32 reg;
 
-	timer_writel(0, TIMER1_BASE + TIMER_PTV);
+	timer_writel(0, TIMER3_BASE + TIMER_PTV);
 
 	switch (mode) {
 	case CLOCK_EVT_MODE_PERIODIC:
 		reg = 0xC0000000 | ((1000000/HZ)-1);
-		timer_writel(reg, TIMER1_BASE + TIMER_PTV);
+		timer_writel(reg, TIMER3_BASE + TIMER_PTV);
 		break;
 	case CLOCK_EVT_MODE_ONESHOT:
 		break;
@@ -101,7 +97,7 @@ static cycle_t tegra_clocksource_read(struct clocksource *cs)
 static struct clock_event_device tegra_clockevent = {
 	.name		= "timer0",
 	.rating         = 300,
-	.features       = CLOCK_EVT_FEAT_ONESHOT, CLOCK_EVT_FEAT_PERIODIC,
+	.features       = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
 	.mult           = 16777,
 	.shift		= 24,
 	.set_next_event	= tegra_timer_set_next_event,
@@ -121,7 +117,7 @@ static struct clocksource tegra_clocksource = {
 static irqreturn_t tegra_timer_interrupt(int irq, void *dev_id)
 {
 	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
-	timer_writel(1<<30, TIMER1_BASE + TIMER_PCR);
+	timer_writel(1<<30, TIMER3_BASE + TIMER_PCR);
 	evt->event_handler(evt);
 	return IRQ_HANDLED;
 }
@@ -131,7 +127,7 @@ static struct irqaction tegra_timer_irq = {
 	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_TRIGGER_HIGH,
 	.handler	= tegra_timer_interrupt,
 	.dev_id		= &tegra_clockevent,
-	.irq            = TIMER1_IRQ,
+	.irq            = INT_TMR3,
 };
 
 static void __init tegra_init_timer(void)
@@ -176,7 +172,7 @@ static void __init tegra_init_timer(void)
 	tegra_clockevent.max_delta_ns =
 		clockevent_delta2ns(0x1, &tegra_clockevent);
 	tegra_clockevent.cpumask = cpu_all_mask;
-	tegra_clockevent.irq = TIMER1_IRQ;
+	tegra_clockevent.irq = tegra_timer_irq.irq;
 	clockevents_register_device(&tegra_clockevent);
 
 	return;
