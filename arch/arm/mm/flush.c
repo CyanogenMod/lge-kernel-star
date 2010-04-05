@@ -146,6 +146,8 @@ void copy_to_user_page(struct vm_area_struct *vma, struct page *page,
 
 void __flush_dcache_page(struct address_space *mapping, struct page *page)
 {
+	void *addr = page_address(page);
+
 	/*
 	 * Writeback any data associated with the kernel mapping of this
 	 * page.  This ensures that data in the physical page is mutually
@@ -156,9 +158,9 @@ void __flush_dcache_page(struct address_space *mapping, struct page *page)
 	 * kmap_atomic() doesn't set the page virtual address, and
 	 * kunmap_atomic() takes care of cache flushing already.
 	 */
-	if (page_address(page))
+	if (addr)
 #endif
-		__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
+		__cpuc_flush_dcache_area(addr, PAGE_SIZE);
 
 	/*
 	 * If this is a page cache page, and we have an aliasing VIPT cache,
