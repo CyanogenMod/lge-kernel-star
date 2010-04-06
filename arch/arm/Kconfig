@@ -537,6 +537,17 @@ config ARCH_W90X900
 	  <http://www.nuvoton.com/hq/enu/ProductAndSales/ProductLines/
 		ConsumerElectronicsIC/ARMMicrocontroller/ARMMicrocontroller>
 
+config ARCH_TEGRA
+	bool "NVIDIA Tegra"
+	select GENERIC_TIME
+	select GENERIC_CLOCKEVENTS
+	select GENERIC_GPIO
+	select HAVE_CLK
+	select ARCH_HAS_BARRIERS if CACHE_L2X0
+	help
+	  This enables support for NVIDIA Tegra based systems (Tegra APX,
+	  Tegra 6xx and Tegra 2 series).
+
 config ARCH_PNX4008
 	bool "Philips Nexperia PNX4008 Mobile"
 	select CPU_ARM926T
@@ -779,6 +790,7 @@ source "arch/arm/mach-h720x/Kconfig"
 source "arch/arm/mach-versatile/Kconfig"
 
 source "arch/arm/mach-aaec2000/Kconfig"
+source "arch/arm/mach-tegra/Kconfig"
 
 source "arch/arm/mach-realview/Kconfig"
 
