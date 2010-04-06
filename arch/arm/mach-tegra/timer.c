@@ -36,6 +36,8 @@
 #include "board.h"
 #include "clock.h"
 
+#define CLK_RST_OSC_CTRL 0x50
+
 #define TIMERUS_CNTR_1US 0x10
 #define TIMERUS_USEC_CFG 0x14
 #define TIMERUS_CNTR_FREEZE 0x4c
@@ -130,31 +132,33 @@ static struct irqaction tegra_timer_irq = {
 	.irq            = INT_TMR3,
 };
 
+static unsigned long measure_input_freq(unsigned int *m, unsigned int *n)
+{
+	void __iomem *clk_rst = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
+	unsigned long osc = readl(clk_rst + CLK_RST_OSC_CTRL);
+	osc >>= 30;
+
+	switch (osc) {
+	case 0: if (m && n) { *m=1; *n=13; } return 13000;
+	case 1: if (m && n) { *m=5; *n=96; } return 19200;
+	case 2: if (m && n) { *m=1; *n=12; } return 12000;
+	case 3: if (m && n) { *m=1; *n=26; } return 26000;
+	}
+	return 0;
+}
+
 static void __init tegra_init_timer(void)
 {
-	unsigned long rate = clk_measure_input_freq();
+	unsigned long rate;
+	unsigned int m, n;
 	int ret;
 
 #ifdef CONFIG_HAVE_ARM_TWD
 	twd_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x600);
 #endif
 
-	switch (rate) {
-	case 12000000:
-		timer_writel(0x000b, TIMERUS_USEC_CFG);
-		break;
-	case 13000000:
-		timer_writel(0x000c, TIMERUS_USEC_CFG);
-		break;
-	case 19200000:
-		timer_writel(0x045f, TIMERUS_USEC_CFG);
-		break;
-	case 26000000:
-		timer_writel(0x0019, TIMERUS_USEC_CFG);
-		break;
-	default:
-		WARN(1, "Unknown clock rate");
-	}
+	rate = measure_input_freq(&m, &n);
+	timer_writel(((m-1)<<8 | (n-1)), TIMERUS_USEC_CFG);
 
 	if (clocksource_register(&tegra_clocksource)) {
 		printk(KERN_ERR "Failed to register clocksource\n");
