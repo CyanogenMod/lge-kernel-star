@@ -51,4 +51,8 @@ config TEGRA_DEBUG_UARTE
 
 endchoice
 
+config MACH_TEGRA_GENERIC
+       bool
+       default y
+
 endif
