@@ -291,6 +291,13 @@ config KEYBOARD_NEWTON
 	  To compile this driver as a module, choose M here: the
 	  module will be called newtonkbd.
 
+config KEYBOARD_TEGRA
+	boolean "NVIDIA Tegra internal matrix keyboard controller support"
+	depends on ARCH_TEGRA
+	help
+	  Say Y here if you want to use a matrix keyboard connected directly
+	  to the internal keyboard controller on Tegra SoCs
+
 config KEYBOARD_OPENCORES
 	tristate "OpenCores Keyboard Controller"
 	help
