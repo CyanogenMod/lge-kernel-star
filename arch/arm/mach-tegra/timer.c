@@ -132,6 +132,20 @@ static struct irqaction tegra_timer_irq = {
 	.irq            = INT_TMR3,
 };
 
+static irqreturn_t tegra_lp2wake_interrupt(int irq, void *dev_id)
+{
+	timer_writel(1<<30, TIMER4_BASE + TIMER_PCR);
+	return IRQ_HANDLED;
+}
+
+static struct irqaction tegra_lp2wake_irq = {
+	.name		= "timer_lp2wake",
+	.flags		= IRQF_DISABLED,
+	.handler	= tegra_lp2wake_interrupt,
+	.dev_id		= NULL,
+	.irq		= INT_TMR4,
+};
+
 static unsigned long measure_input_freq(unsigned int *m, unsigned int *n)
 {
 	void __iomem *clk_rst = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
@@ -185,3 +199,13 @@ static void __init tegra_init_timer(void)
 struct sys_timer tegra_timer = {
 	.init = tegra_init_timer,
 };
+
+void tegra_lp2_set_trigger(unsigned long cycles)
+{
+	timer_writel(0, TIMER4_BASE + TIMER_PTV);
+	if (cycles) {
+		u32 reg = 0x80000000ul | min(0x1ffffffful, cycles);
+		timer_writel(reg, TIMER4_BASE + TIMER_PTV);
+	}
+}
+EXPORT_SYMBOL(tegra_lp2_set_trigger);
