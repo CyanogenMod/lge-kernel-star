@@ -143,6 +143,18 @@ static inline void l2x0_inv_all(void)
 	l2x0_unlock(&l2x0_lock, flags);
 }
 
+static inline void l2x0_flush_all(void)
+{
+	unsigned long flags;
+
+	/* flush all ways */
+	l2x0_lock(&l2x0_lock, flags);
+	writel(0xff, l2x0_base + L2X0_CLEAN_INV_WAY);
+	cache_wait_always(l2x0_base + L2X0_CLEAN_INV_WAY, 0xff);
+	cache_sync();
+	l2x0_unlock(&l2x0_lock, flags);
+}
+
 static void l2x0_inv_range(unsigned long start, unsigned long end)
 {
 	void __iomem *base = l2x0_base;
@@ -234,6 +246,29 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
 	l2x0_unlock(&l2x0_lock, flags);
 }
 
+static void l2x0_shutdown(void)
+{
+	if (l2x0_disabled)
+		return;
+
+	if (readl(l2x0_base + L2X0_CTRL) & 1) {
+		int m;
+		/* lockdown all ways, all masters to prevent new line
+		 * allocation during maintenance */
+		for (m=0; m<8; m++) {
+			writel(0xffff, l2x0_base + L2X0_LOCKDOWN_WAY_D + (m*8));
+			writel(0xffff, l2x0_base + L2X0_LOCKDOWN_WAY_I + (m*8));
+		}
+		l2x0_flush_all();
+		writel(0, l2x0_base + L2X0_CTRL);
+		/* unlock cache ways */
+		for (m=0; m<8; m++) {
+			writel(0, l2x0_base + L2X0_LOCKDOWN_WAY_D + (m*8));
+			writel(0, l2x0_base + L2X0_LOCKDOWN_WAY_I + (m*8));
+		}
+	}
+}
+
 void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
 {
 	__u32 aux;
@@ -269,6 +304,7 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
 	outer_cache.clean_range = l2x0_clean_range;
 	outer_cache.flush_range = l2x0_flush_range;
 	outer_cache.sync = l2x0_cache_sync;
+	outer_cache.shutdown = l2x0_shutdown;
 
 	pr_info(L2CC_TYPE " cache controller enabled\n");
 }

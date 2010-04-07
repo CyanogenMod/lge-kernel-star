@@ -25,6 +25,7 @@ struct outer_cache_fns {
 	void (*inv_range)(unsigned long, unsigned long);
 	void (*clean_range)(unsigned long, unsigned long);
 	void (*flush_range)(unsigned long, unsigned long);
+	void (*shutdown)(void);
 #ifdef CONFIG_OUTER_CACHE_SYNC
 	void (*sync)(void);
 #endif
@@ -50,6 +51,12 @@ static inline void outer_flush_range(unsigned long start, unsigned long end)
 		outer_cache.flush_range(start, end);
 }
 
+static inline void outer_shutdown(void)
+{
+	if (outer_cache.shutdown)
+		outer_cache.shutdown();
+}
+
 #else
 
 static inline void outer_inv_range(unsigned long start, unsigned long end)
@@ -57,6 +64,8 @@ static inline void outer_inv_range(unsigned long start, unsigned long end)
 static inline void outer_clean_range(unsigned long start, unsigned long end)
 { }
 static inline void outer_flush_range(unsigned long start, unsigned long end)
+{ }
+static inline void outer_shutdown(void)
 { }
 
 #endif
