@@ -21,10 +21,22 @@
 #include <linux/io.h>
 
 #include <asm/hardware/cache-l2x0.h>
+#include <asm/cacheflush.h>
+#include <asm/outercache.h>
 
 #include <mach/iomap.h>
 
 #include "board.h"
+
+extern int disable_nonboot_cpus(void);
+
+static void tegra_machine_restart(char mode, const char *cmd)
+{
+	disable_nonboot_cpus();
+	flush_cache_all();
+	outer_shutdown();
+	arm_machine_restart(mode, cmd);
+}
 
 void __init tegra_init_cache(void)
 {
@@ -42,4 +54,5 @@ void __init tegra_common_init(void)
 {
 	tegra_init_clock();
 	tegra_init_cache();
+	arm_pm_restart = tegra_machine_restart;
 }
