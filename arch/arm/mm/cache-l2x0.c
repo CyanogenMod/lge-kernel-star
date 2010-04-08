@@ -126,9 +126,9 @@ static void l2x0_cache_sync(void)
 {
 	unsigned long flags;
 
-	spin_lock_irqsave(&l2x0_lock, flags);
+	l2x0_lock(&l2x0_lock, flags);
 	cache_sync();
-	spin_unlock_irqrestore(&l2x0_lock, flags);
+	l2x0_unlock(&l2x0_lock, flags);
 }
 
 static inline void l2x0_inv_all(void)
