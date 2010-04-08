@@ -30,6 +30,22 @@ unsigned int __init scu_get_core_count(void __iomem *scu_base)
 }
 
 /*
+ * Invalidate tag data associated with a CPU
+ */
+void scu_inv_cpu(void __iomem *scu_base, int cpu)
+{
+	if (cpu >= NR_CPUS)
+		return;
+
+	if (likely(cpu>=0)) {
+		/* this should be done before a processor is online */
+		WARN_ON_ONCE(cpu_online(cpu));
+		writel(0xf<<(4*cpu), scu_base + SCU_INVALIDATE);
+	} else
+		writel(0xffff, scu_base + SCU_INVALIDATE);
+}
+
+/*
  * Enable the SCU
  */
 void __init scu_enable(void __iomem *scu_base)
