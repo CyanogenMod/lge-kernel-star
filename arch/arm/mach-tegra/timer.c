@@ -64,7 +64,7 @@ static int tegra_timer_set_next_event(unsigned long cycles,
 {
 	u32 reg;
 
-	reg = 0x80000000 | ((1000000/HZ)*(cycles+1)-1);
+	reg = 0x80000000 | ((cycles > 1) ? (cycles-1) : 0);
 	timer_writel(reg, TIMER3_BASE + TIMER_PTV);
 
 	return 0;
