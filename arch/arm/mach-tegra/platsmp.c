@@ -32,14 +32,15 @@
 #include <asm/smp_scu.h>
 #include <asm/cpu.h>
 #include <asm/mmu_context.h>
+#include <asm/pgalloc.h>
 
 #include <mach/iomap.h>
 
 extern void tegra_secondary_startup(void);
-extern struct secondary_data secondary_data;
 
 static DEFINE_SPINLOCK(boot_lock);
 static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
+extern void __cortex_a9_restore(void);
 
 #ifdef CONFIG_HOTPLUG_CPU
 static DEFINE_PER_CPU(struct completion, cpu_killed);
@@ -58,6 +59,9 @@ const struct cpumask *const cpu_init_mask = to_cpumask(cpu_init_bits);
 	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x340)
 #define CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR \
 	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x344)
+
+unsigned long tegra_pgd_phys;  /* pgd used by hotplug & LP2 bootup */
+static pgd_t *tegra_pgd;
 
 void __cpuinit platform_secondary_init(unsigned int cpu)
 {
@@ -87,9 +91,6 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 	 */
 	spin_lock(&boot_lock);
 
-	scu_inv_cpu(scu_base, cpu);
-
-
 	/* set the reset vector to point to the secondary_startup routine */
 #ifdef CONFIG_HOTPLUG_CPU
 	if (cpumask_test_cpu(cpu, cpu_init_mask))
@@ -98,7 +99,6 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 #endif
 		boot_vector = virt_to_phys(tegra_secondary_startup);
 
-	flush_cache_all();
 	smp_wmb();
 
 	old_boot_vector = readl(EVP_CPU_RESET_VECTOR);
@@ -158,6 +158,44 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	 */
 	if (max_cpus > ncores)
 		max_cpus = ncores;
+
+	if (max_cpus > 1) {
+		pmd_t *pmd;
+		/* arrays of virtual-to-physical mappings which must be
+		 * present to safely boot hotplugged / LP2-idled CPUs.
+		 * tegra_hotplug_startup (hotplug reset vector) is mapped
+		 * VA=PA so that the translation post-MMU is the same as
+		 * pre-MMU */
+		unsigned long addr_v[] = {
+			PHYS_OFFSET,
+			(unsigned long)virt_to_phys(tegra_hotplug_startup),
+			(unsigned long)__cortex_a9_restore,
+		};
+		unsigned long addr_p[] = {
+			PHYS_OFFSET,
+			(unsigned long)virt_to_phys(tegra_hotplug_startup),
+			(unsigned long)virt_to_phys(__cortex_a9_restore),
+		};
+		unsigned int flags = PMD_TYPE_SECT | PMD_SECT_AP_WRITE;
+		int i;
+
+		tegra_pgd = pgd_alloc(&init_mm);
+		BUG_ON(!tegra_pgd);
+
+		for (i=0; i<ARRAY_SIZE(addr_p); i++) {
+			unsigned long v = addr_v[i];
+			pmd = pmd_offset(tegra_pgd + pgd_index(v), v);
+			*pmd = __pmd((addr_p[i] & PGDIR_MASK) | flags);
+			flush_pmd_entry(pmd);
+			outer_clean_range(__pa(pmd), __pa(pmd + 1));
+		}
+
+		tegra_pgd_phys = virt_to_phys(tegra_pgd);
+		__cpuc_flush_dcache_area(&tegra_pgd_phys,
+			sizeof(tegra_pgd_phys));
+		outer_clean_range(__pa(&tegra_pgd_phys),
+			__pa(&tegra_pgd_phys+1));
+	}
 
 	/*
 	 * Initialise the present map, which describes the set of CPUs
@@ -229,15 +267,10 @@ void platform_cpu_die(unsigned int cpu)
 	}
 #endif
 
-	vfp_sync_state(task_thread_info(current));
 	gic_cpu_exit(0);
 	barrier();
 	complete(&per_cpu(cpu_killed, cpu));
 	flush_cache_all();
-	dsb();
-	barrier();
-	local_flush_tlb_all();
-	dsb();
 	barrier();
 	__cortex_a9_save();
 

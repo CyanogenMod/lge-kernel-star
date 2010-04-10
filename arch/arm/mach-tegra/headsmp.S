@@ -30,7 +30,8 @@
 
 #include <mach/iomap.h>
 #include <mach/io.h>
-        .section ".text.head", "ax"
+
+        .section ".cpuinit.text", "ax"
 
 .macro	cpu_id, rd
 	mrc	p15, 0, \rd, c0, c0, 5
@@ -99,6 +100,8 @@ __invalidate_cpu_state:
 	mcr	p15, 0, r0, c7, c5, 0	@ invalidate BTAC, i-cache
 	mcr	p15, 0, r0, c7, c5, 6	@ invalidate branch pred array
 	mcr	p15, 0, r0, c8, c7, 0	@ invalidate unified TLB
+	dsb
+	isb
 
 	cpu_id	r0
 	ldr	r1, =(TEGRA_ARM_PERIF_BASE + 0xC)
@@ -199,9 +202,9 @@ ENDPROC(__turn_mmu_on_again)
  *	tegra_hotplug_startup
  *
  *	  Secondary CPU boot vector when restarting a CPU following a
- *	  hot-unplug. Uses the page table created by _cpu_up and stored
- *	  in secondary_data as the safe page table for __return_to_virtual,
- *	  and jumps directly to __cortex_a9_restore.
+ *	  hot-unplug. Uses the page table created by smp_prepare_cpus and
+ *	  stored in tegra_pgd_phys as the safe page table for
+ *	  __return_to_virtual, and jumps directly to __cortex_a9_restore.
  */
 	.align L1_CACHE_SHIFT
 ENTRY(tegra_hotplug_startup)
@@ -227,7 +230,7 @@ ENDPROC(tegra_hotplug_startup)
 	.type	__tegra_hotplug_data, %object
 __tegra_hotplug_data:
 	.long	.
-	.long	secondary_data
+	.long	tegra_pgd_phys
 	.long	__cortex_a9_restore
 	.size	__tegra_hotplug_data, . - __tegra_hotplug_data
 #endif

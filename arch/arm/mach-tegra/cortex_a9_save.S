@@ -32,13 +32,13 @@
 #include <mach/iomap.h>
 #include <mach/io.h>
 
-        .section ".text.head", "ax"
+	.section ".cpuinit.text", "ax"
 
-#define CONTEXT_SIZE_WORDS_SHIFT 6
+#define CONTEXT_SIZE_WORDS_SHIFT 7
 #define CONTEXT_SIZE_WORDS (1<<CONTEXT_SIZE_WORDS_SHIFT)
 
 /*
- * spooled CPU context is 256B / CPU
+ * spooled CPU context is 512B / CPU
  */
 #define CTX_SP		0
 #define CTX_CPSR	4
@@ -65,8 +65,8 @@
 #define CTX_TPIDRURO	88
 #define CTX_TPIDRPRW	92
 
-#define CTX_VFP_REGS	128
-#define CTX_VFP_SIZE	(32 * 4)
+#define CTX_VFP_REGS	256
+#define CTX_VFP_SIZE	(32 * 8)
 
 .macro	cpu_id, rd
 	mrc	p15, 0, \rd, c0, c0, 5
@@ -84,7 +84,7 @@
  *
  *	 spools out the volatile processor state to memory, so that
  *	 the CPU may be safely powered down. does not preserve:
- *	 - CP15 c0 registers (any)
+ *	 - CP15 c0 registers (except cache size select 2,c0/c0,0)
  *	 - CP15 c1 secure registers (c1/c1, 0-3)
  *	 - CP15 c5 fault status registers (c5/c0 0&1, c5/c1 0&1)
  *	 - CP15 c6 fault address registers (c6/c0 0&2)
@@ -108,6 +108,8 @@ ENTRY(__cortex_a9_save)
 	dsb
 
 	ctx_ptr	r8, r9
+
+	/* zero-out context area */
 	mov	r9, r8
 	add	r10, r8, #(CONTEXT_SIZE_WORDS*4)
 	mov	r0, #0
@@ -118,10 +120,10 @@ ENTRY(__cortex_a9_save)
 	mov	r5, #0
 	mov	r6, #0
 	mov	r7, #0
-wipe_ctx:
-	stmia	r9!, {r0-r7}
+2:	stmia	r9!, {r0-r7}
 	cmp	r9, r10
-	blo	wipe_ctx
+	blo	2b
+
 	mov	r0, sp
 	mrs	r1, cpsr
 	mrs	r2, spsr
@@ -146,7 +148,7 @@ wipe_ctx:
 	isb
 	add	r9, r8, #CTX_VFP_REGS
 	
-	VFPFSTMIA r9, r12	@ save out (16 or 32)*4B of FPU registers
+	VFPFSTMIA r9, r12	@ save out (16 or 32)*8B of FPU registers
 	VFPFMXR	FPEXC, r2
 	mrc	p15, 0, r3, c1, c0, 2	@ restore original FPEXC/CPACR
 #endif
@@ -168,39 +170,57 @@ wipe_ctx:
 	stmia	r9!, {r0-r3}
 	
 	mov	r9, #(CONTEXT_SIZE_WORDS*4)
-2:	mcr	p15, 0, r8, c7, c10, 1	@ clean out data processor data area
+3:	mcr	p15, 0, r8, c7, c10, 1	@ clean out data processor data area
 	add	r8, r8, #L1_CACHE_BYTES
 	subs	r9, r9, #L1_CACHE_BYTES
-	bhi	2b
+	bhi	3b
 	dsb
 
 	mov	r0, #0
 	mcr	p15, 0, r0, c1, c0, 1	@ exit coherency
 	isb
 	cpu_id	r0
+	ldr	r1, =(TEGRA_ARM_PERIF_BASE-IO_CPU_PHYS+IO_CPU_VIRT+0xC)
+	mov	r3, r0, lsl #2
+	mov	r2, #0xf
+	mov	r2, r2, lsl r3
+	str	r2, [r1]		@ invalidate SCU tags for CPU
+
 	cmp	r0, #0
-	beq	__tear_down_master
-
-__tear_down_slave:
-	sub	r1, r0, #1
-	mov	r1, r1, lsl #3
-	add	r1, r1, #0x14
-	ldr	r7, =(TEGRA_FLOW_CTRL_BASE-IO_PPSB_PHYS+IO_PPSB_VIRT)
-	mov	r2, #0x2
-	str	r2, [r7, r1]		@ put flow controller in wait event mode
-
-	ldr	r1, =0x1111
-	mov	r1, r1, lsl r0
-	ldr	r7, =(TEGRA_CLK_RESET_BASE-IO_PPSB_PHYS+IO_PPSB_VIRT)
-	str	r1, [r7, #0x340]	@ put slave CPU in reset
-	dsb
-	b	.
+	bne	__put_cpu_in_reset
+	b	__tear_down_master
 ENDPROC(__cortex_a9_save)
 
 	/* master tear-down not yet implemented */
 __tear_down_master:
 	b	.
 ENDPROC(__tear_down_master)
+
+/*
+ *	__put_cpu_in_reset(cpu_nr)
+ *
+ *	 puts the specified CPU in wait-for-event mode on the flow controller
+ *	 and puts the CPU in reset
+ */
+__put_cpu_in_reset:
+	cmp	r0, #0
+	subne	r1, r0, #1
+	movne	r1, r1, lsl #3
+	addne	r1, r1, #0x14
+	moveq	r1, #0			@ r1 = CPUx_HALT_EVENTS register offset
+	ldr	r7, =(TEGRA_FLOW_CTRL_BASE-IO_PPSB_PHYS+IO_PPSB_VIRT)
+	mov	r2, #0x2
+	str	r2, [r7, r1]		@ put flow controller in wait event mode
+	isb
+	dsb
+	ldr	r1, =0x1111
+	mov	r1, r1, lsl r0
+	ldr	r7, =(TEGRA_CLK_RESET_BASE-IO_PPSB_PHYS+IO_PPSB_VIRT)
+	str	r1, [r7, #0x340]	@ put slave CPU in reset
+	isb
+	dsb
+	b	.
+ENDPROC(__put_cpu_in_reset)
 
 
 /*
@@ -270,7 +290,6 @@ ENTRY(__cortex_a9_restore)
 	mcr	p15, 0, r5, c13, c0, 2	@ TPIDRURW
 	mcr	p15, 0, r6, c13, c0, 3	@ TPIDRURO
 	mcr	p15, 0, r7, c13, c0, 4	@ TPIDRPRW
-
 	/* finally, restore the stack and return */
 	ldmfd	sp!, {r4-r12, lr}
 	mov	pc, lr
@@ -281,4 +300,4 @@ ENDPROC(__cortex_a9_restore)
 	.align L1_CACHE_SHIFT
 	.type __cortex_a9_context_area, %object
 __cortex_a9_context_area:
-	.space (CONTEXT_SIZE_WORDS * CONFIG_NR_CPUS)
+	.space (CONTEXT_SIZE_WORDS * CONFIG_NR_CPUS * 4)
