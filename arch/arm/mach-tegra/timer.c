@@ -185,6 +185,12 @@ static void __init tegra_init_timer(void)
 		BUG();
 	}
 
+	ret = setup_irq(tegra_lp2wake_irq.irq, &tegra_lp2wake_irq);
+	if (ret) {
+		printk(KERN_ERR "Failed to register LP2 timer IRQ: %d\n", ret);
+		BUG();
+	}
+
 	tegra_clockevent.max_delta_ns =
 		clockevent_delta2ns(0x1fffffff, &tegra_clockevent);
 	tegra_clockevent.max_delta_ns =
