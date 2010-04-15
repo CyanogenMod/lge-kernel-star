@@ -175,20 +175,14 @@ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
 	set_irq_chained_handler(irq, gic_handle_cascade_irq);
 }
 
-void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
-			  unsigned int irq_start)
+static unsigned int _gic_dist_init(unsigned int gic_nr)
 {
 	unsigned int max_irq, i;
+	void __iomem *base = gic_data[gic_nr].dist_base;
 	u32 cpumask = 1 << smp_processor_id();
-
-	if (gic_nr >= MAX_GIC_NR)
-		BUG();
 
 	cpumask |= cpumask << 8;
 	cpumask |= cpumask << 16;
-
-	gic_data[gic_nr].dist_base = base;
-	gic_data[gic_nr].irq_offset = (irq_start - 1) & ~31;
 
 	writel(0, base + GIC_DIST_CTRL);
 
@@ -230,6 +224,49 @@ void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
 	for (i = 0; i < max_irq; i += 32)
 		writel(0xffffffff, base + GIC_DIST_ENABLE_CLEAR + i * 4 / 32);
 
+	return max_irq;
+}
+
+#ifdef CONFIG_PM
+void gic_dist_restore(unsigned int gic_nr)
+{
+	unsigned int max_irq, i;
+
+	if (gic_nr >= MAX_GIC_NR)
+		BUG();
+
+	max_irq = _gic_dist_init(gic_nr);
+
+	writel(1, gic_data[gic_nr].dist_base + GIC_DIST_CTRL);
+	writel(0xf0, gic_data[gic_nr].cpu_base + GIC_CPU_PRIMASK);
+	writel(1, gic_data[gic_nr].cpu_base + GIC_CPU_CTRL);
+
+	/* unmask all enabled IRQs, to restore the system to a sane state */
+	for (i = 0; i < max_irq; i++) {
+		if (get_irq_chip_data(i)==&gic_data[gic_nr]) {
+			struct irq_desc *desc = irq_to_desc(i);
+			if (desc && !(desc->status & IRQ_DISABLED))
+				gic_unmask_irq(i);
+		}
+	}
+
+}
+#endif
+
+
+void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
+			  unsigned int irq_start)
+{
+	unsigned int max_irq, i;
+
+	if (gic_nr >= MAX_GIC_NR)
+		BUG();
+
+	gic_data[gic_nr].dist_base = base;
+	gic_data[gic_nr].irq_offset = (irq_start - 1) & ~31;
+
+	max_irq = _gic_dist_init(gic_nr);
+
 	/*
 	 * Setup the Linux IRQ subsystem.
 	 */
@@ -241,6 +278,14 @@ void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,
 	}
 
 	writel(1, base + GIC_DIST_CTRL);
+}
+
+void gic_dist_exit(unsigned int gic_nr)
+{
+	if (gic_nr >= MAX_GIC_NR)
+		BUG();
+
+	writel(0, gic_data[gic_nr].dist_base + GIC_DIST_CTRL);
 }
 
 void __cpuinit gic_cpu_init(unsigned int gic_nr, void __iomem *base)
