@@ -68,6 +68,14 @@ void *tegra_context_area = NULL;
 
 void __cpuinit platform_secondary_init(unsigned int cpu)
 {
+#ifdef CONFIG_CPU_V7
+	/* enable dynamic clock gating */
+	unsigned int reg;
+	asm volatile ("mrc p15, 0, %0, c15, c0, 0" : "=r" (reg) : : "cc");
+	reg |= 1;
+	asm volatile ("mcr p15, 0, %0, c15, c0, 0" : : "r" (reg) : "cc");
+#endif
+
 	trace_hardirqs_off();
 	gic_cpu_init(0, IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x100);
 	/*
