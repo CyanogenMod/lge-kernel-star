@@ -120,6 +120,7 @@
 #define CTX_L2_AUX	228
 #define CTX_L2_TAG_CTRL	232
 #define CTX_L2_DAT_CTRL	236
+#define CTX_L2_PREFETCH 240
 #endif
 
 #define CTX_VFP_REGS	256
@@ -278,7 +279,8 @@ ENTRY(__cortex_a9_save)
 	ldr	r1, [r4, #L2X0_AUX_CTRL]
 	ldr	r2, [r4, #L2X0_TAG_LATENCY_CTRL]
 	ldr	r3, [r4, #L2X0_DATA_LATENCY_CTRL]
-	stmia	r9, {r0-r3}
+	ldr	r4, [r4, #L2X0_PREFETCH_OFFSET]
+	stmia	r9, {r0-r4}
 #endif
 	
 
@@ -324,10 +326,11 @@ ENTRY(__cortex_a9_l2x0_restart)
 	ctx_ptr	r8, r9
 	ldr	r9, =(TEGRA_ARM_PL310_BASE-IO_CPU_PHYS+IO_CPU_VIRT)
 	add	r10, r8, #CTX_L2_CTRL
-	ldmia	r10, {r4-r7}
-	str	r6, [r9, #L2X0_TAG_LATENCY_CTRL]
-	str	r7, [r9, #L2X0_DATA_LATENCY_CTRL]
-	str	r5, [r9, #L2X0_AUX_CTRL]
+	ldmia	r10, {r3-r7}
+	str	r5, [r9, #L2X0_TAG_LATENCY_CTRL]
+	str	r6, [r9, #L2X0_DATA_LATENCY_CTRL]
+	str	r7, [r9, #L2X0_PREFETCH_OFFSET]
+	str	r4, [r9, #L2X0_AUX_CTRL]
 	cmp	r0, #0
 
 	beq	__reenable_l2x0
@@ -346,7 +349,7 @@ __reenable_l2x0:
 	mcr	p15, 0, r5, c7, c5, 0	@ flush instruction cache
 	dsb
 	isb
-	str	r4, [r9, #L2X0_CTRL]
+	str	r3, [r9, #L2X0_CTRL]
 #endif
 	b	__cortex_a9_restore
 
