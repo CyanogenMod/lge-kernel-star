@@ -25,6 +25,7 @@
 #include <asm/outercache.h>
 
 #include <mach/iomap.h>
+#include <mach/dma.h>
 
 #include "board.h"
 
@@ -62,5 +63,6 @@ void __init tegra_common_init(void)
 #endif
 	tegra_init_clock();
 	tegra_init_cache();
+	tegra_dma_init();
 	arm_pm_restart = tegra_machine_restart;
 }

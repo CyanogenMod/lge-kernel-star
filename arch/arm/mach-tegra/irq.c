@@ -51,7 +51,7 @@ static void (*gic_unmask_irq)(unsigned int irq) = NULL;
 
 #define irq_to_ictlr(irq) (((irq)-32) >> 5)
 static void __iomem *tegra_ictlr_base = IO_ADDRESS(TEGRA_PRIMARY_ICTLR_BASE);
-static void __iomem *tegra_apbdma_base = IO_ADDRESS(TEGRA_APBDMA_BASE);
+static void __iomem *tegra_apbdma_base = IO_ADDRESS(TEGRA_APB_DMA_BASE);
 #define ictlr_to_virt(ictlr) (tegra_ictlr_base + (ictlr)*0x100)
 
 static void tegra_mask(unsigned int irq)
