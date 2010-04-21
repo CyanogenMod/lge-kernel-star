@@ -237,6 +237,10 @@ static void tegra_rx_dma_threshold_callback(struct tegra_dma_req *req, int err)
 	if (t->rts_active)
 		set_rts(t, false);
 	tegra_dma_dequeue(t->rx_dma);
+
+	/* enqueue the request again */
+	tegra_start_dma_rx(t);
+
 	if (t->rts_active)
 		set_rts(t, true);
 
@@ -276,8 +280,6 @@ static void tegra_rx_dma_complete_callback(struct tegra_dma_req *req, int err)
 	spin_unlock(&u->lock);
 	tty_flip_buffer_push(u->state->port.tty);
 	spin_lock(&u->lock);
-
-	tegra_start_dma_rx(t);
 }
 
 /* Lock already taken */
@@ -286,6 +288,8 @@ static void do_handle_rx_dma(struct tegra_uart_port *t)
 	if (t->rts_active)
 		set_rts(t, false);
 	tegra_dma_dequeue(t->rx_dma);
+	/* enqueue the request again */
+	tegra_start_dma_rx(t);
 	if (t->rts_active)
 		set_rts(t, true);
 }
@@ -506,6 +510,20 @@ static void tegra_uart_hw_deinit(struct tegra_uart_port *t)
 	t->baud = 0;
 }
 
+static void tegra_uart_free_rx_dma(struct tegra_uart_port *t)
+{
+	if (!t->use_rx_dma)
+		return;
+
+	tegra_dma_free_channel(t->rx_dma);
+
+	if (likely(t->rx_dma_req.dest_addr))
+		dma_free_coherent(t->uport.dev, t->rx_dma_req.size,
+			t->rx_dma_req.virt_addr, t->rx_dma_req.dest_addr);
+
+	t->use_rx_dma = false;
+}
+
 static int tegra_uart_hw_init(struct tegra_uart_port *t)
 {
 	unsigned char fcr;
@@ -561,9 +579,22 @@ static int tegra_uart_hw_init(struct tegra_uart_port *t)
 	t->fcr_shadow |= UART_FCR_T_TRIG_01;
 	uart_writeb(t, t->fcr_shadow, UART_FCR);
 
-	if (t->use_rx_dma)
+	if (t->use_rx_dma) {
+		/* initialize the UART for a simple default configuration
+		 * so that the receive DMA buffer may be enqueued */
+		t->lcr_shadow = 3;  /* no parity, stop, 8 data bits */
+		tegra_set_baudrate(t, 9600);
 		t->fcr_shadow |= UART_FCR_DMA_SELECT;
-	uart_writeb(t, t->fcr_shadow, UART_FCR);
+		uart_writeb(t, t->fcr_shadow, UART_FCR);
+		if (tegra_start_dma_rx(t)) {
+			dev_err(t->uport.dev, "Rx DMA enqueue failed\n");
+			tegra_uart_free_rx_dma(t);
+			t->fcr_shadow &= ~UART_FCR_DMA_SELECT;
+			uart_writeb(t, t->fcr_shadow, UART_FCR);
+		}
+	}
+	else
+		uart_writeb(t, t->fcr_shadow, UART_FCR);
 
 	/*
 	 *  Enable IE_RXS for the receive status interrupts like line errros.
@@ -632,10 +663,7 @@ static int tegra_uart_init_rx_dma(struct tegra_uart_port *t)
 
 	return 0;
 fail:
-	tegra_dma_free_channel(t->rx_dma);
-	if (t->rx_dma_req.dest_addr)
-		dma_free_coherent(t->uport.dev, t->rx_dma_req.size,
-			t->rx_dma_req.virt_addr, t->rx_dma_req.dest_addr);
+	tegra_uart_free_rx_dma(t);
 	return -ENODEV;
 }
 
@@ -683,9 +711,6 @@ static int tegra_startup(struct uart_port *u)
 	if (ret)
 		goto fail;
 
-	if (t->use_rx_dma)
-		tegra_start_dma_rx(t);
-
 	dev_dbg(u->dev, "Requesting IRQ %d\n", u->irq);
 	msleep(1);
 
@@ -714,12 +739,8 @@ static void tegra_shutdown(struct uart_port *u)
 
 	tegra_uart_hw_deinit(t);
 	spin_unlock_irqrestore(&u->lock, flags);
-	if (t->use_rx_dma) {
-		tegra_dma_free_channel(t->rx_dma);
-		dma_free_coherent(u->dev, t->rx_dma_req.size,
-			t->rx_dma_req.virt_addr, t->rx_dma_req.dest_addr);
-	}
 
+	tegra_uart_free_rx_dma(t);
 	if (t->use_tx_dma)
 		tegra_dma_free_channel(t->tx_dma);
 
@@ -902,6 +923,10 @@ static void tegra_set_termios(struct uart_port *u, struct ktermios *termios,
 
 	spin_lock_irqsave(&u->lock, flags);
 
+	/* Changing configuration, it is safe to stop any rx now */
+	if (t->rts_active)
+		set_rts(t, false);
+
 	/* Baud rate */
 	baud = uart_get_baud_rate(u, termios, oldtermios, 200, 4000000);
 	tegra_set_baudrate(t, baud);
@@ -957,6 +982,10 @@ static void tegra_set_termios(struct uart_port *u, struct ktermios *termios,
 		t->mcr_shadow = mcr;
 		uart_writeb(t, mcr, UART_MCR);
 		t->use_cts_control = true;
+
+		/* if top layer has asked to set rts active then do so here */
+		if (t->rts_active)
+			set_rts(t, true);
 	} else {
 		mcr = t->mcr_shadow;
 		mcr &= ~UART_MCR_CTS_EN;
@@ -965,6 +994,9 @@ static void tegra_set_termios(struct uart_port *u, struct ktermios *termios,
 		uart_writeb(t, mcr, UART_MCR);
 		t->use_cts_control = false;
 	}
+
+	/* update the port timeout based on new settings */
+	uart_update_timeout(u, termios->c_cflag, baud);
 
 	spin_unlock_irqrestore(&u->lock, flags);
 	dev_vdbg(t->uport.dev, "-tegra_set_termios\n");
@@ -1117,6 +1149,7 @@ static int __init tegra_uart_probe(struct platform_device *pdev)
 	u->line = pdev->id;
 	u->ops = &tegra_uart_ops;
 	u->type = ~PORT_UNKNOWN;
+	u->fifosize = 32;
 	u->mapbase = pdata->mapbase;
 	u->membase = pdata->membase;
 	u->irq = pdata->irq;
