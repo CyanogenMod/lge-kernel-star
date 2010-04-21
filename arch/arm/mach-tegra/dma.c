@@ -238,9 +238,14 @@ int tegra_dma_dequeue_req(struct tegra_dma_channel *ch,
 	status = readl(ch->addr + APB_DMA_CHAN_STA);
 	to_transfer = (status & STA_COUNT_MASK) >> STA_COUNT_SHIFT;
 	req_transfer_count = (ch->csr & CSR_WCOUNT_MASK) >> CSR_WCOUNT_SHIFT;
+	req_transfer_count += 1;
+	to_transfer += 1;
 
-	req->bytes_transferred = req_transfer_count - to_transfer;
-	req->bytes_transferred *= 4;
+	req->bytes_transferred = req_transfer_count;
+
+	if (status & STA_BUSY)
+		req->bytes_transferred -= to_transfer;
+
 	/* In continous transfer mode, DMA only tracks the count of the
 	 * half DMA buffer. So, if the DMA already finished half the DMA
 	 * then add the half buffer to the completed count.
@@ -251,7 +256,9 @@ int tegra_dma_dequeue_req(struct tegra_dma_channel *ch,
 	 */
 	if (ch->mode & TEGRA_DMA_MODE_CONTINOUS)
 		if (req->buffer_status == TEGRA_DMA_REQ_BUF_STATUS_HALF_FULL)
-			req->bytes_transferred += 4 * req_transfer_count;
+			req->bytes_transferred += req_transfer_count;
+
+	req->bytes_transferred *= 4;
 
 	tegra_dma_stop(ch);
 	if (!list_empty(&ch->list)) {
