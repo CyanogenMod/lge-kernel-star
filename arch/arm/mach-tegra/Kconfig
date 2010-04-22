@@ -55,11 +55,24 @@ config MACH_TEGRA_GENERIC
 	bool
 	default y
 
+config TEGRA_IOVMM_GART
+	bool "Enable I/O virtual memory manager for GART"
+	depends on ARCH_TEGRA_2x_SOC
+	default y
+	select TEGRA_IOVMM
+	help
+	  Enables support for remapping discontiguous physical memory
+	  shared with the operating system into contiguous I/O virtual
+	  space through the GART hardware included on Tegra SoCs
+
 config TEGRA_SYSTEM_DMA
 	bool "Enable system DMA driver for NVIDIA Tegra SoCs"
 	default y
 	help
 	  Adds system DMA functionality for NVIDIA Tegra SoCs, used by
 	  several Tegra device drivers
+
+config TEGRA_IOVMM
+	bool
 
 endif
