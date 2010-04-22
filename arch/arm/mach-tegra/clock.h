@@ -22,7 +22,7 @@
 
 #include <asm/clkdev.h>
 
-#define ENABLE_ON_INIT	0x00000001
+#define DIV_BUS		0x00000001
 #define DIV_U71		0x00000002
 #define DIV_U71_FIXED	0x00000004
 #define DIV_2		0x00000008
@@ -30,7 +30,10 @@
 #define PLL_HAS_CPCON	0x00000020
 #define MUX		0x00000040
 #define PLLD		0x00000080
-
+#define PERIPH_NO_RESET	0x00000100
+#define PERIPH_NO_ENB	0x00000200
+#define PERIPH_EMC_ENB	0x00000400
+#define ENABLE_ON_INIT	0x10000000
 struct clk;
 
 struct clk_mux_sel {
@@ -59,6 +62,12 @@ struct clk_ops {
 	unsigned long	(*recalculate_rate)(struct clk *);
 };
 
+enum clk_state {
+	UNINITIALIZED = 0,
+	ON,
+	OFF,
+};
+
 struct clk {
 	/* node for master clocks list */
 	struct list_head		node;
@@ -66,6 +75,7 @@ struct clk {
 	struct list_head		sibling;	/* node for children */
 #ifdef CONFIG_DEBUG_FS
 	struct dentry 			*dent;
+	struct dentry 			*parent_dent;
 #endif
 	struct clk_ops			*ops;
 	struct clk			*parent;
@@ -77,7 +87,10 @@ struct clk {
 	u32				reg;
 	u32				reg_shift;
 	unsigned int			clk_num;
-	spinlock_t			lock;
+	enum clk_state			state;
+#ifdef CONFIG_DEBUG_FS
+	bool				set;
+#endif
 
 	/* PLL */
 	unsigned long			input_min;
@@ -94,6 +107,7 @@ struct clk {
 
 	/* DIV */
 	u32				div;
+	u32				mul;
 
 	/* MUX */
 	const struct clk_mux_sel	*inputs;
@@ -110,7 +124,10 @@ struct clk_duplicate {
 void tegra2_init_clocks(void);
 void clk_init(struct clk *clk);
 struct clk *get_tegra_clock_by_name(const char *name);
-
 unsigned long clk_measure_input_freq(void);
+void clk_disable_locked(struct clk *c);
+int clk_enable_locked(struct clk *c);
+int clk_set_parent_locked(struct clk *c, struct clk *parent);
+int clk_reparent(struct clk *c, struct clk *parent);
 
 #endif
