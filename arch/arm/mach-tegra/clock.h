@@ -29,6 +29,7 @@
 #define PLL_FIXED	0x00000010
 #define PLL_HAS_CPCON	0x00000020
 #define MUX		0x00000040
+#define PLLD		0x00000080
 
 struct clk;
 
@@ -55,18 +56,24 @@ struct clk_ops {
 	int		(*set_rate)(struct clk *, unsigned long);
 	unsigned long	(*get_rate)(struct clk *);
 	long		(*round_rate)(struct clk *, unsigned long);
+	unsigned long	(*recalculate_rate)(struct clk *);
 };
 
 struct clk {
+	/* node for master clocks list */
 	struct list_head		node;
+	struct list_head		children;	/* list of children */
+	struct list_head		sibling;	/* node for children */
+#ifdef CONFIG_DEBUG_FS
+	struct dentry 			*dent;
+#endif
 	struct clk_ops			*ops;
 	struct clk			*parent;
+	struct clk_lookup		lookup;
 	unsigned long			rate;
 	u32				flags;
 	u32				refcnt;
 	const char			*name;
-	const char			*dev_id;
-	const char			*con_id;
 	u32				reg;
 	u32				reg_shift;
 	unsigned int			clk_num;
@@ -86,6 +93,7 @@ struct clk {
 	const struct clk_pll_table	*pll_table;
 
 	/* DIV */
+	u32				div;
 
 	/* MUX */
 	const struct clk_mux_sel	*inputs;
@@ -93,10 +101,15 @@ struct clk {
 	u32				reg_mask;
 };
 
-extern struct clk_lookup tegra_clk_lookups[];
-extern struct clk tegra_periph_clks[];
-extern struct clk_lookup tegra_periph_clk_lookups[];
-extern const int tegra_num_periph_clks;
+
+struct clk_duplicate {
+	const char *name;
+	struct clk_lookup lookup;
+};
+
+void tegra2_init_clocks(void);
+void clk_init(struct clk *clk);
+struct clk *get_tegra_clock_by_name(const char *name);
 
 unsigned long clk_measure_input_freq(void);
 
