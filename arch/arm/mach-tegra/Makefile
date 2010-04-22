@@ -10,4 +10,7 @@ obj-$(CONFIG_SMP)                       += platsmp.o localtimer.o headsmp.o
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= cortex_a9_save.o
 obj-$(CONFIG_MACH_TEGRA_GENERIC)	+= board-generic.o
 obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
+obj-$(CONFIG_TEGRA_IOVMM)		+= iovmm.o
+obj-$(CONFIG_TEGRA_IOVMM_GART)		+= iovmm-gart.o
 obj-$(CONFIG_TEGRA_SYSTEM_DMA)		+= dma.o
+
