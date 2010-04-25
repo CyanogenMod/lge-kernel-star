@@ -167,6 +167,9 @@ config ARCH_MTD_XIP
 config GENERIC_HARDIRQS_NO__DO_IRQ
 	def_bool y
 
+config ARCH_PROVIDES_UDELAY
+  bool
+
 if OPROFILE
 
 config OPROFILE_ARMV6
