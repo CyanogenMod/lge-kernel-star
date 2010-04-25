@@ -7,6 +7,7 @@ obj-y                                   += timer.o
 obj-y                                   += gpio.o
 obj-y                                   += pinmux.o
 obj-y                                   += devices.o
+obj-y                                   += delay.o
 obj-y                                   += powergate.o
 obj-$(CONFIG_PM_SLEEP)			+= pm.o
 obj-$(CONFIG_PM_SLEEP)			+= pm-irq.o
