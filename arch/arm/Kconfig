@@ -183,6 +183,9 @@ config FIQ
 config ARCH_MTD_XIP
 	bool
 
+config ARCH_PROVIDES_UDELAY
+  bool
+
 config VECTORS_BASE
 	hex
 	default 0xffff0000 if MMU || CPU_HIGH_VECTOR
