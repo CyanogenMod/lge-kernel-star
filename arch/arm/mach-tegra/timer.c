@@ -25,6 +25,7 @@
 #include <linux/clocksource.h>
 #include <linux/clk.h>
 #include <linux/io.h>
+#include <linux/cnt32_to_63.h>
 
 #include <asm/mach/time.h>
 #include <asm/mach/time.h>
@@ -93,7 +94,7 @@ static void tegra_timer_set_mode(enum clock_event_mode mode,
 
 static cycle_t tegra_clocksource_read(struct clocksource *cs)
 {
-	return timer_readl(TIMERUS_CNTR_1US);
+	return cnt32_to_63(timer_readl(TIMERUS_CNTR_1US));
 }
 
 static struct clock_event_device tegra_clockevent = {
@@ -110,11 +111,17 @@ static struct clocksource tegra_clocksource = {
 	.name	= "timer_us",
 	.rating	= 300,
 	.read	= tegra_clocksource_read,
-	.mask	= 0xFFFFFFFFUL,
+	.mask	= 0x7FFFFFFFFFFFFFFFULL,
 	.mult	= 1000,
 	.shift	= 0,
 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
 };
+
+unsigned long long sched_clock(void)
+{
+        return clocksource_cyc2ns(tegra_clocksource.read(&tegra_clocksource),
+		tegra_clocksource.mult, tegra_clocksource.shift);
+}
 
 static irqreturn_t tegra_timer_interrupt(int irq, void *dev_id)
 {
