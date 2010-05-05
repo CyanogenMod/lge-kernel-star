@@ -238,6 +238,7 @@ struct tegra_pingroup_config {
 	tegra_tristate_t	tristate;
 };
 
+int tegra_pinmux_cancel_func(tegra_pingroup_t pg, tegra_mux_func_t func);
 int tegra_pinmux_set_func(tegra_pingroup_t pg, tegra_mux_func_t func);
 int tegra_pinmux_set_tristate(tegra_pingroup_t pg, tegra_tristate_t tristate);
 int tegra_pinmux_set_pullupdown(tegra_pingroup_t pg, tegra_pullupdown_t pupd);
@@ -248,6 +249,13 @@ void tegra_pinmux_config_pingroup(tegra_pingroup_t pingroup,
 				  tegra_tristate_t tristate);
 
 void tegra_pinmux_config_table(struct tegra_pingroup_config *config, int len);
+
+void tegra_pinmux_config_pinmux_table(const struct tegra_pingroup_config *config,
+				      int len, bool is_set);
+void tegra_pinmux_config_tristate_table(const struct tegra_pingroup_config *config,
+					int len, tegra_tristate_t tristate);
+void tegra_pinmux_config_pullupdown_table(const struct tegra_pingroup_config *config,
+					  int len, tegra_pullupdown_t pupd);
 
 #endif
 

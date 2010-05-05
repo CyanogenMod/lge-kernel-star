@@ -257,6 +257,8 @@ static char *tegra_mux_names[TEGRA_MAX_MUX] = {
 
 static DEFINE_SPINLOCK(mux_lock);
 
+static int tristate_refcount[TEGRA_MAX_PINGROUP];
+
 static const char *pingroup_name(tegra_pingroup_t pg)
 {
 	if (pg < 0 || pg >=  TEGRA_MAX_PINGROUP)
@@ -322,6 +324,63 @@ static inline void pg_writel(unsigned long value, unsigned long offset)
 	writel(value, IO_TO_VIRT(TEGRA_APB_MISC_BASE + offset));
 }
 
+int tegra_pinmux_cancel_func(tegra_pingroup_t pg, tegra_mux_func_t func)
+{
+	int mux = -1;
+	int mux_safe = -1;
+	int i;
+	unsigned long reg;
+	unsigned long flags;
+
+	if (pg < 0 || pg >=  TEGRA_MAX_PINGROUP)
+		return -ERANGE;
+
+	if (pingroups[pg].mux_reg == REG_N)
+		return -EINVAL;
+
+	if (func < 0)
+		return -ERANGE;
+
+	if (func & TEGRA_MUX_RSVD) {
+		return 0;
+	}
+
+	for (i = 0; i < 4; i++) {
+		if (pingroups[pg].funcs[i] == func) {
+			mux = i;
+			break;
+		}
+	}
+
+	if (pingroups[pg].func_safe & TEGRA_MUX_RSVD) {
+		mux_safe = pingroups[pg].func_safe & 3;
+	} else {
+		for (i = 0; i < 4; i++) {
+			if (pingroups[pg].funcs[i] == pingroups[pg].func_safe) {
+				mux_safe = i;
+				break;
+			}
+		}
+	}
+
+	if (mux < 0 || mux_safe < 0)
+		return -EINVAL;
+
+	spin_lock_irqsave(&mux_lock, flags);
+
+	reg = pg_readl(TEGRA_PP_MUX_CTL(pingroups[pg].mux_reg));
+
+	if (((reg >> pingroups[pg].mux_bit) & 0x3) == mux) {
+		reg &= ~(0x3 << pingroups[pg].mux_bit);
+		reg |= mux_safe << pingroups[pg].mux_bit;
+		pg_writel(reg, TEGRA_PP_MUX_CTL(pingroups[pg].mux_reg));
+	}
+
+	spin_unlock_irqrestore(&mux_lock, flags);
+
+	return 0;
+}
+
 int tegra_pinmux_set_func(tegra_pingroup_t pg, tegra_mux_func_t func)
 {
 	int mux = -1;
@@ -384,6 +443,7 @@ int tegra_pinmux_set_tristate(tegra_pingroup_t pg, tegra_tristate_t tristate)
 {
 	unsigned long reg;
 	unsigned long flags;
+	bool is_update  = false;
 
 	if (pg < 0 || pg >=  TEGRA_MAX_PINGROUP)
 		return -ERANGE;
@@ -393,14 +453,24 @@ int tegra_pinmux_set_tristate(tegra_pingroup_t pg, tegra_tristate_t tristate)
 
 	spin_lock_irqsave(&mux_lock, flags);
 
-	reg = pg_readl(TEGRA_TRI_STATE(pingroups[pg].tri_reg));
-	reg &= ~(0x1 << pingroups[pg].tri_bit);
-	if (tristate)
-		reg |= 1 << pingroups[pg].tri_bit;
-	pg_writel(reg, TEGRA_TRI_STATE(pingroups[pg].tri_reg));
+	if (tristate == TEGRA_TRI_NORMAL) {
+		is_update = (tristate_refcount[pg] == 0);
+		tristate_refcount[pg]++;
+	} else {
+		is_update = (tristate_refcount[pg] == 1);
+		if (tristate_refcount[pg] > 0) {
+			tristate_refcount[pg]--;
+		}
+	}
+	if (is_update) {
+		reg = pg_readl(TEGRA_TRI_STATE(pingroups[pg].tri_reg));
+		reg &= ~(0x1 << pingroups[pg].tri_bit);
+		if (tristate)
+			reg |= 1 << pingroups[pg].tri_bit;
+		pg_writel(reg, TEGRA_TRI_STATE(pingroups[pg].tri_reg));
+	}
 
 	spin_unlock_irqrestore(&mux_lock, flags);
-
 	return 0;
 }
 
@@ -475,9 +545,79 @@ void tegra_pinmux_config_table(struct tegra_pingroup_config *config, int len)
 					     config[i].tristate);
 }
 
+void tegra_pinmux_config_pinmux_table(const struct tegra_pingroup_config *config,
+				      int len, bool is_set)
+{
+	int i;
+	int err;
+	tegra_pingroup_t pingroup;
+	tegra_mux_func_t func;
+
+	for (i = 0; i < len; i++) {
+		pingroup = config[i].pingroup;
+		func = config[i].func;
+		if (pingroups[pingroup].mux_reg != REG_N) {
+			if (is_set)
+				err = tegra_pinmux_set_func(pingroup, func);
+			else
+				err = tegra_pinmux_cancel_func(pingroup, func);
+			if (err < 0)
+				pr_err("pinmux: can't set pingroup %s func"
+					" to %s: %d\n",	pingroup_name(pingroup),
+					func_name(func), err);
+		}
+	}
+}
+
+void tegra_pinmux_config_tristate_table(const struct tegra_pingroup_config *config,
+					int len, tegra_tristate_t tristate)
+{
+	int i;
+	int err;
+	tegra_pingroup_t pingroup;
+
+	for (i = 0; i < len; i++) {
+		pingroup = config[i].pingroup;
+		if (pingroups[pingroup].tri_reg != REG_N) {
+			err = tegra_pinmux_set_tristate(pingroup, tristate);
+			if (err < 0)
+				pr_err("pinmux: can't set pingroup %s tristate"
+					" to %s: %d\n",	pingroup_name(pingroup),
+					tri_name(tristate), err);
+		}
+	}
+}
 
 
+void tegra_pinmux_config_pullupdown_table(const struct tegra_pingroup_config *config,
+					  int len, tegra_pullupdown_t pupd)
+{
+	int i;
+	int err;
+	tegra_pingroup_t pingroup;
 
+	for (i = 0; i < len; i++) {
+		pingroup = config[i].pingroup;
+		if (pingroups[pingroup].pupd_reg != REG_N) {
+			err = tegra_pinmux_set_pullupdown(pingroup, pupd);
+			if (err < 0)
+				pr_err("pinmux: can't set pingroup %s pullupdown"
+					" to %s: %d\n",	pingroup_name(pingroup),
+					pupd_name(pupd), err);
+		}
+	}
+}
+
+static int __init tegra_pinmux_init_tristate_refcount(void)
+{
+	int i;
+	for (i = TEGRA_PINGROUP_ATA; i < TEGRA_MAX_PINGROUP; ++i) {
+		tristate_refcount[i] = tegra_pinmux_get_tristate(i);
+	}
+
+	return 0;
+}
+late_initcall(tegra_pinmux_init_tristate_refcount);
 
 #ifdef	CONFIG_DEBUG_FS
 
