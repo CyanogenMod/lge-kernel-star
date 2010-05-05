@@ -25,6 +25,7 @@
 #include <linux/gpio.h>
 
 #include <mach/iomap.h>
+#include <mach/pinmux.h>
 
 #define GPIO_BANK(x)		((x) >> 5)
 #define GPIO_PORT(x)		(((x) >> 3) & 0x3)
@@ -56,6 +57,8 @@
 #define GPIO_INT_LVL_EDGE_BOTH		0x010100
 #define GPIO_INT_LVL_LEVEL_HIGH		0x000001
 #define GPIO_INT_LVL_LEVEL_LOW		0x000000
+
+extern int gpio_get_pinmux_group(int gpio_nr);
 
 struct tegra_gpio_bank {
 	int bank;
@@ -106,6 +109,45 @@ void tegra_gpio_disable(int gpio)
 	tegra_gpio_mask_write(GPIO_MSK_CNF(gpio), gpio, 0);
 }
 
+static void tegra_set_gpio_tristate(int gpio_nr, tegra_tristate_t ts)
+{
+	tegra_pingroup_t pg;
+	int err;
+
+	pg = gpio_get_pinmux_group(gpio_nr);
+	if (pg >= 0) {
+		err = tegra_pinmux_set_tristate(pg, ts);
+		if (err < 0)
+			printk(KERN_ERR "pinmux: can't set pingroup %d tristate"
+					" to %d: %d\n", pg, ts, err);
+	}
+}
+
+static int tegra_gpio_request(struct gpio_chip *chip, unsigned offset)
+{
+	int port;
+	int pin;
+
+	port = GPIO_BANK(offset) * 4 + GPIO_PORT(offset);
+	pin = GPIO_BIT(offset);
+
+	tegra_gpio_mask_write(GPIO_MSK_CNF(offset), offset, 1);
+	tegra_set_gpio_tristate(offset, TEGRA_TRI_NORMAL);
+	return 0;
+}
+
+static void tegra_gpio_free(struct gpio_chip *chip, unsigned offset)
+{
+	int port;
+	int pin;
+
+	port = GPIO_BANK(offset) * 4 + GPIO_PORT(offset);
+	pin = GPIO_BIT(offset);
+
+	tegra_gpio_mask_write(GPIO_MSK_CNF(offset), offset, 0);
+	tegra_set_gpio_tristate(offset, TEGRA_TRI_TRISTATE);
+}
+
 static void tegra_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
 {
 	tegra_gpio_mask_write(GPIO_MSK_OUT(offset), offset, value);
@@ -138,6 +180,8 @@ static struct gpio_chip tegra_gpio_chip = {
 	.get			= tegra_gpio_get,
 	.direction_output	= tegra_gpio_direction_output,
 	.set			= tegra_gpio_set,
+	.request		= tegra_gpio_request,
+	.free			= tegra_gpio_free,
 	.base			= 0,
 	.ngpio			= ARCH_NR_GPIOS,
 };
