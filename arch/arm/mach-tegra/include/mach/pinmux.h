@@ -219,6 +219,18 @@ typedef enum {
 	TEGRA_TRI_TRISTATE = 1,
 } tegra_tristate_t;
 
+typedef enum {
+	TEGRA_VDDIO_BB = 0,
+	TEGRA_VDDIO_LCD,
+	TEGRA_VDDIO_VI,
+	TEGRA_VDDIO_UART,
+	TEGRA_VDDIO_DDR,
+	TEGRA_VDDIO_NAND,
+	TEGRA_VDDIO_SYS,
+	TEGRA_VDDIO_AUDIO,
+	TEGRA_VDDIO_SD,
+} tegra_vddio_t;
+
 struct tegra_pingroup_config {
 	tegra_pingroup_t	pingroup;
 	tegra_mux_func_t	func;
