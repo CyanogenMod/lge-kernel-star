@@ -30,6 +30,531 @@
 #include <mach/pinmux.h>
 #include "gpio-names.h"
 
+#define _mux(pg_name, f)				\
+	{						\
+		.pingroup = TEGRA_PINGROUP_ ## pg_name,	\
+		.func = TEGRA_MUX_ ## f,		\
+	}
+
+struct tegra_pingroup_list {
+	const struct tegra_pingroup_config *config;
+	size_t len;
+};
+
+#define pinmux_func(_module, _hasreset, _tbls)			     \
+static const struct tegra_pingroup_config  *pinmux_##_module ( \
+	int config, size_t *len)				     \
+{								     \
+	_tbls							     \
+	return_config((_hasreset) ? 0 : 1);			     \
+}
+
+#define _config(ent)					\
+	{						\
+		.config = c_ ## ent,			\
+		.len = ARRAY_SIZE(c_ ## ent )		\
+	}
+
+#define return_config(_min)					\
+	do {							\
+		int _idx = config - (_min);			\
+		if (_idx<0 || _idx>=ARRAY_SIZE(list))		\
+			return NULL;				\
+		if (len) {					\
+			*len = list[_idx].len;			\
+		} 						\
+		return list[_idx].config;			\
+	} while (0);
+
+#define def_config(ent, ...)						\
+	static const struct tegra_pingroup_config c_##ent [] = { \
+		__VA_ARGS__ }
+
+#define def_list(...) \
+	static const struct tegra_pingroup_list list[]  = { \
+		__VA_ARGS__ }
+
+pinmux_func(uart1, true,
+	def_config(off, _mux(IRRX,UARTA), _mux(IRTX,UARTA),
+		_mux(UAA,UARTA), _mux(UAB,UARTA),
+		_mux(SDB,UARTA), _mux(SDD,UARTA));
+	def_config(1, _mux(UAA,UARTA), _mux(UAB,UARTA));
+	def_config(2, _mux(GPU,UARTA));
+	def_config(3, _mux(IRRX,UARTA), _mux(IRTX,UARTA),
+		_mux(UAD,UARTA));
+	def_config(4, _mux(IRRX,UARTA), _mux(IRTX,UARTA));
+	def_config(5, _mux(SDD,UARTA), _mux(SDB,UARTA));
+	def_config(6, _mux(UAA,UARTA));
+	def_config(7, _mux(SDIO1,UARTA));
+	def_list(_config(off), _config(1), _config(2), _config(3),
+		_config(4), _config(5),	_config(6), _config(7));
+)
+
+pinmux_func(uart2, true,
+	def_config(off, _mux(UAD,IRDA));
+	def_config(1, _mux(IRRX,UARTB), _mux(IRTX,UARTB), _mux(UAD,IRDA));
+	def_config(2,_mux(UAD,IRDA));
+	def_list(_config(off), _config(1), _config(2));
+)
+
+pinmux_func(uart3, true,
+	def_config(off, _mux(UCA,UARTC),_mux(UCB,UARTC));
+	def_config(1, _mux(UCA,UARTC),_mux(UCB,UARTC));
+	def_config(2, _mux(UCA,UARTC));
+	def_list(_config(off), _config(1), _config(2));
+)
+
+pinmux_func(uart4, true,
+	def_config(off, _mux(GMC,UARTD));
+	def_config(1, _mux(UDA,UARTD));
+	def_config(2, _mux(GMC,UARTD));
+	def_list(_config(off), _config(1), _config(2));
+)
+
+pinmux_func(uart5, true,
+	def_config(off, _mux(GMA,UARTE));
+	def_config(1, _mux(SDIO1,UARTE));
+	def_config(2, _mux(GMA,UARTE));
+	def_list(_config(off), _config(1), _config(2));
+)
+
+pinmux_func(spi1, true,
+	def_config(off, _mux(UDA,SPI1), _mux(SPIA,SPI1),
+		_mux(SPIB,SPI1), _mux(SPIC,SPI1));
+	def_config(1, _mux(UDA,SPI1));
+	def_config(2, _mux(DTE,SPI1), _mux(DTB,SPI1));
+	def_config(3, _mux(SPIC,SPI1), _mux(SPIB,SPI1), _mux(SPIA,SPI1));
+	def_config(4, _mux(SPIE,SPI1), _mux(SPIF,SPI1), _mux(SPID,SPI1));
+	def_list(_config(off), _config(1), _config(2), _config(3), _config(4));
+)
+
+pinmux_func(spi2, true,
+	def_config(off, _mux(UAB,SPI2),
+		_mux(SPID,SPI2), _mux(SPIE,SPI2));
+	def_config(1, _mux(UAB,SPI2));
+	def_config(2, _mux(SPIC,SPI2), _mux(SPIB,SPI2),
+		_mux(SPIA,SPI2), _mux(SPIG,SPI2), _mux(SPIH,SPI2));
+	def_config(3, _mux(SPIE,SPI2_ALT), _mux(SPIF,SPI2), _mux(SPID,SPI2_ALT),
+		_mux(SPIG,SPI2_ALT), _mux(SPIH,SPI2_ALT));
+	def_config(4, _mux(SPIC,SPI2), _mux(SPIB,SPI2), _mux(SPIA,SPI2));
+	def_config(5,_mux(SPIE,SPI2_ALT), _mux(SPIF,SPI2), _mux(SPID,SPI2_ALT));
+	def_list(_config(off), _config(1), _config(2),
+		_config(3), _config(4), _config(5));
+)
+
+pinmux_func(spi3, true,
+	def_config(off, _mux(UAA,SPI3), _mux(SPIF,SPI3),
+		_mux(SPIG,SPI3), _mux(SPIH,SPI3));
+	def_config(1, _mux(UAA,SPI3));
+	def_config(2, _mux(LSC1,SPI3), _mux(LPW2,SPI3),
+		_mux(LPW0,SPI3), _mux(LM0,SPI3));
+	def_config(3, _mux(LSCK,SPI3), _mux(LSDI,SPI3),
+		_mux(LSDA,SPI3), _mux(LCSN,SPI3));
+	def_config(4, _mux(GMA,SPI3));
+	def_config(5, _mux(SPIC,SPI3), _mux(SPIB,SPI3), _mux(SPIA,SPI3));
+	def_config(6, _mux(SDC,SPI3), _mux(SDD,SPI3));
+	def_config(7, _mux(SPIA,SPI3), _mux(SPIF,SPI3),
+		_mux(SPIG,SPI3), _mux(SPIH,SPI3));
+	def_list(_config(off), _config(1), _config(2), _config(3),
+		_config(4), _config(5), _config(6), _config(7));
+)
+
+pinmux_func(spi4, false,
+	def_config(1, _mux(UAD,SPI4), _mux(IRRX,SPI4), _mux(IRTX,SPI4));
+	def_config(2, _mux(GMC,SPI4));
+	def_config(3, _mux(SLXC,SPI4), _mux(SLXK,SPI4),
+		_mux(SLXA,SPI4), _mux(SLXD,SPI4));
+	def_list(_config(1), _config(2), _config(3));
+)
+
+pinmux_func(sflash, false,
+	def_config(1, _mux(GMD,SFLASH), _mux(GMC,SFLASH));
+	def_list(_config(1));
+)
+
+pinmux_func(twc, false,
+	def_config(1, _mux(DAP2,TWC));
+	def_config(2, _mux(SDC,TWC));
+	def_list(_config(1), _config(2));
+)
+
+pinmux_func(i2c1, true,
+	def_config(off, _mux(RM,I2C));
+	def_config(1, _mux(RM,I2C));
+	def_config(2, _mux(SPDI,I2C), _mux(SPDO,I2C));
+	def_config(3, _mux(SPIG,I2C), _mux(SPIH,I2C));
+	def_list(_config(off), _config(1), _config(2), _config(3));
+)
+
+pinmux_func(i2c2, true,
+	def_config(off, _mux(PTA,I2C2), _mux(DDC,I2C2));
+	def_config(1, _mux(DDC,I2C2));
+	def_config(2, _mux(PTA,I2C2));
+	def_list(_config(off), _config(1), _config(2));
+)
+
+pinmux_func(i2c3, true,
+	def_config(off, _mux(DTF,I2C3));
+	def_config(1, _mux(DTF,I2C3));
+	def_list(_config(off), _config(1));
+)
+
+pinmux_func(i2cp, true,
+	def_config(off, _mux(I2CP,I2C));
+	def_config(1, _mux(I2CP,I2C));
+	def_list(_config(off), _config(1));
+)
+
+pinmux_func(ulpi, false,
+	def_config(1, _mux(UAA,ULPI), _mux(UAB,ULPI), _mux(UDA,ULPI));
+	def_list(_config(1));
+)
+
+pinmux_func(sdio1, true,
+	def_config(off, _mux(SDIO1,SDIO1));
+	def_config(1, _mux(SDIO1,SDIO1));
+	def_list(_config(off), _config(1));
+)
+
+pinmux_func(sdio2, false,
+	def_config(1, _mux(KBCD,SDIO2), _mux(KBCB,SDIO2));
+	def_config(2, _mux(KBCD,SDIO2), _mux(KBCB,SDIO2), _mux(KBCA,SDIO2));
+	def_config(3, _mux(DAP1,SDIO2), _mux(SPDI,SDIO2), _mux(SPDO,SDIO2));
+	def_config(4, _mux(DTA,SDIO2), _mux(DTD,SDIO2));
+	def_config(5, _mux(DTA,SDIO2), _mux(DTD,SDIO2));
+	def_list(_config(1), _config(2), _config(3), _config(4), _config(5));
+)
+
+pinmux_func(sdio3, false,
+	def_config(1, _mux(SDD,SDIO3), _mux(SDC,SDIO3), _mux(SDB,SDIO3),
+		_mux(SLXK,SDIO3), _mux(SLXC,SDIO3),
+		_mux(SLXD,SDIO3), _mux(SLXA,SDIO3));
+	def_config(2, _mux(SDD,SDIO3), _mux(SDC,SDIO3), _mux(SDB,SDIO3));
+	def_list(_config(1), _config(2));
+)
+
+pinmux_func(sdio4, false,
+	def_config(1, _mux(ATC,SDIO4), _mux(ATD,SDIO4));
+	def_config(2, _mux(ATB,SDIO4), _mux(GMA,SDIO4), _mux(GME,SDIO4));
+	def_config(3, _mux(ATB,SDIO4), _mux(GMA,SDIO4));
+	def_list(_config(1), _config(2), _config(3));
+)
+
+pinmux_func(spdif, true,
+	def_config(off, _mux(SPDO,SPDIF), _mux(SPDI,SPDIF),
+		_mux(SLXD,SPDIF), _mux(SLXC,SPDIF));
+	def_config(1, _mux(SPDO,SPDIF), _mux(SPDI,SPDIF));
+	def_config(2, _mux(SLXD,SPDIF), _mux(SLXC,SPDIF));
+	def_config(3, _mux(UAD,SPDIF));
+	def_list(_config(off), _config(1), _config(2), _config(3));
+)
+
+pinmux_func(hsi, false,
+	def_config(1, _mux(UAA,MIPI_HS), _mux(UAB,MIPI_HS));
+	def_list(_config(1));
+)
+
+pinmux_func(hdmi, true,
+	def_config(off, _mux(HDINT,HDMI));
+	def_config(1, _mux(HDINT,HDMI));
+	def_list(_config(off), _config(1));
+)
+
+pinmux_func(pwm, true,
+	def_config(off, _mux(GPU,PWM), _mux(SDC,PWM));
+	def_config(1, _mux(GPU,PWM));
+	def_config(2, _mux(UCB,PWM), _mux(SDD,PWM));
+	def_config(3, _mux(UCB,PWM));
+	def_config(4, _mux(SDD,PWM));
+	def_config(5, _mux(SDC,PWM), _mux(SDD,PWM));
+	def_config(6, _mux(SDC,PWM));
+	def_list(_config(off), _config(1), _config(2), _config(3),
+		_config(4), _config(5), _config(6));
+)
+
+pinmux_func(ata, false,
+	def_config(1, _mux(ATA,IDE), _mux(ATB,IDE), _mux(ATC,IDE),
+		_mux(ATD,IDE), _mux(ATE,IDE), _mux(GMB,IDE));
+	def_list(_config(1));
+)
+
+pinmux_func(nand, true,
+	def_config(off, _mux(ATA,NAND), _mux(ATB,NAND), _mux(ATC,NAND),
+		_mux(ATD,NAND), _mux(ATE,NAND));
+	def_config(1, _mux(ATA,NAND), _mux(ATB,NAND), _mux(ATC,NAND),
+		_mux(ATD,NAND), _mux(ATE,NAND));
+	def_config(2, _mux(ATA,NAND), _mux(ATB,NAND), _mux(ATC,NAND));
+	def_config(3, _mux(KBCA,NAND), _mux(KBCB,NAND), _mux(KBCC,NAND),
+		_mux(KBCD,NAND), _mux(KBCE,NAND), _mux(KBCF,NAND));
+	def_config(4, _mux(ATC,NAND));
+	def_list(_config(off), _config(1), _config(2), _config(3), _config(4));
+)
+
+pinmux_func(dap1, false,
+	def_config(1, _mux(DAP1,DAP1));
+	def_list(_config(1));
+)
+
+pinmux_func(dap2, false,
+	def_config(1, _mux(DAP2,DAP2));
+	def_list(_config(1));
+)
+
+pinmux_func(dap3, false,
+	def_config(1, _mux(DAP3,DAP3));
+	def_list(_config(1));
+)
+
+pinmux_func(dap4, false,
+	def_config(1, _mux(DAP4,DAP4));
+	def_list(_config(1));
+)
+
+pinmux_func(dap5, false,
+	def_config(1, _mux(GME,DAP5));
+	def_list(_config(1));
+)
+
+pinmux_func(kbc, false,
+	def_config(1, _mux(KBCA,KBC), _mux(KBCB,KBC), _mux(KBCC,KBC),
+		_mux(KBCF,KBC),	_mux(KBCD,KBC), _mux(KBCB,KBC));
+	def_config(2, _mux(KBCA,KBC), _mux(KBCB,KBC), _mux(KBCC,KBC),
+		_mux(KBCF,KBC), _mux(KBCD,KBC));
+	def_config(3, _mux(KBCA,KBC), _mux(KBCB,KBC),
+		_mux(KBCC,KBC), _mux(KBCF,KBC));
+	def_config(4, _mux(KBCA,KBC), _mux(KBCB,KBC),
+		_mux(KBCC,KBC), _mux(KBCF,KBC));
+	def_list(_config(1), _config(2), _config(3), _config(4));
+)
+
+pinmux_func(hdcp, false,
+	def_config(1, _mux(PTA,HDMI));
+	def_config(2, _mux(LSCK,HDMI), _mux(LSDA,HDMI));
+	def_config(3, _mux(LPW2,HDMI), _mux(LPW0,HDMI));
+	def_config(4, _mux(LSC1,HDMI), _mux(LPW0,HDMI));
+	def_list(_config(1), _config(2), _config(3), _config(4));
+)
+
+#define snor_common							\
+	_mux(DAP4,GMI), _mux(DAP2,GMI), _mux(SPIA,GMI), _mux(SPIB,GMI), \
+	_mux(SPIC,GMI), _mux(SPID,GMI), _mux(SPIE,GMI), _mux(ATA,GMI),  \
+	_mux(ATC,GMI), _mux(ATD,GMI), _mux(ATE,GMI), _mux(GMD,GMI)
+
+pinmux_func(snor, false,
+	def_config(1, snor_common, _mux(GMB,GMI), _mux(ATB,GMI),
+		_mux(GMC,GMI), _mux(GMA,GMI), _mux(GME,GMI), _mux(DAP1,GMI),
+		_mux(IRRX,GMI), _mux(IRTX,GMI), _mux(UCA,GMI),
+		_mux(UCB,GMI), _mux(GPU,GMI));
+	def_config(2, snor_common, _mux(GMB,GMI), _mux(ATB,GMI),
+		_mux(GMC,GMI), _mux(GMA,GMI), _mux(GME,GMI), _mux(DAP1,GMI));
+	def_config(3, snor_common, _mux(GMB,GMI), _mux(ATB,GMI));
+	def_config(4,snor_common, _mux(GMA,GMI), _mux(ATB,GMI),
+		_mux(IRRX,GMI), _mux(IRTX,GMI), _mux(UCA,GMI),
+		_mux(UCB,GMI), _mux(GPU,GMI));
+	def_config(5,snor_common, _mux(GMB,GMI_INT), _mux(GMC,SFLASH));
+	def_list(_config(1), _config(2), _config(3), _config(4), _config(5));
+)
+
+pinmux_func(mio, false,
+	def_config(1, _mux(KBCF,MIO), _mux(KBCD,MIO), _mux(KBCB,MIO));
+	def_list(_config(1));
+)
+
+pinmux_func(ext_clock1, false,
+	def_config(1, _mux(CDEV1,PLLA_OUT));
+	def_config(2, _mux(CDEV1,OSC));
+	def_list(_config(1), _config(2));
+)
+
+pinmux_func(ext_clock2, false,
+	def_config(1, _mux(CDEV2,AHB_CLK));
+	def_config(2, _mux(CDEV2,OSC));
+	def_config(3, _mux(CDEV2,PLLP_OUT4));
+	def_list(_config(1), _config(2), _config(3));
+)
+
+pinmux_func(ext_clock3, false,
+	def_config(1, _mux(CSUS,VI_SENSOR_CLK));
+	def_list(_config(1));
+)
+
+pinmux_func(vi, false,
+	def_config(1, _mux(DTA,VI), _mux(DTB,VI), _mux(DTC,VI),
+		_mux(DTD,VI), _mux(DTE,VI), _mux(DTF,VI));
+	def_config(2, _mux(DTA,VI), _mux(DTB,VI), _mux(DTC,VI),
+		_mux(DTD,VI), _mux(DTE,VI));
+	def_list(_config(1), _config(2));
+)
+
+#define disp_common(_x)							\
+	_mux(LD0,_x), _mux(LD1,_x), _mux(LD2,_x), _mux(LD3,_x), _mux(LD4,_x), \
+	_mux(LD5,_x), _mux(LD6,_x), _mux(LD7,_x), _mux(LD8,_x), _mux(LD9,_x), \
+	_mux(LD10,_x), _mux(LD11,_x), _mux(LD12,_x), _mux(LD13,_x), \
+	_mux(LD14,_x), _mux(LD15,_x), _mux(LD16,_x), _mux(LD17,_x), _mux(LSC0,_x)
+
+pinmux_func(displaya, false,
+	def_config(1, disp_common(DISPLAYA), _mux(LVS,DISPLAYA),
+		_mux(LHS,DISPLAYA), _mux(LSPI,DISPLAYA), _mux(LHP1,DISPLAYA),
+		_mux(LHP2,DISPLAYA), _mux(LVP1,DISPLAYA), _mux(LHP0,DISPLAYA),
+		_mux(LDI,DISPLAYA), _mux(LPP,DISPLAYA));
+	def_config(2, disp_common(DISPLAYA), _mux(LVS,DISPLAYA),
+		_mux(LHS,DISPLAYA), _mux(LSPI,DISPLAYA));
+	def_config(3, _mux(LHP1,DISPLAYA), _mux(LHP2,DISPLAYA),
+		_mux(LVP1,DISPLAYA), _mux(LHP0,DISPLAYA), _mux(LDI,DISPLAYA),
+		_mux(LPP,DISPLAYA), _mux(LPW0,DISPLAYA), _mux(LPW1,DISPLAYA),
+		_mux(LPW2,DISPLAYA), _mux(LSC1,DISPLAYA),
+		_mux(LM1,DISPLAYA), _mux(LVP0,DISPLAYA));
+	def_config(4, _mux(LPW0,DISPLAYA), _mux(LPW2,DISPLAYA),
+		_mux(LSC1,DISPLAYA), _mux(LM0,DISPLAYA), _mux(LVP0,DISPLAYA));
+	def_config(5, disp_common(DISPLAYA), _mux(LSC1,DISPLAYA),
+		_mux(LM1,DISPLAYA));
+	def_config(6, disp_common(DISPLAYA), _mux(LDC,DISPLAYA),
+		_mux(LSPI,DISPLAYA));
+	def_list(_config(1), _config(2), _config(3), _config(4),
+		_config(5), _config(6));
+)
+
+pinmux_func(displayb, false,
+	def_config(1, disp_common(DISPLAYB), _mux(LVS,DISPLAYB),
+		_mux(LHS,DISPLAYB), _mux(LSPI,DISPLAYB), _mux(LHP1,DISPLAYB),
+		_mux(LHP2,DISPLAYB), _mux(LVP1,DISPLAYB), _mux(LHP0,DISPLAYB),
+		_mux(LDI,DISPLAYB), _mux(LPP,DISPLAYB));
+	def_config(2, disp_common(DISPLAYB), _mux(LVS,DISPLAYB),
+		_mux(LHS,DISPLAYB), _mux(LSPI,DISPLAYB));
+	def_config(3, _mux(LHP1,DISPLAYB), _mux(LHP2,DISPLAYB),
+		_mux(LVP1,DISPLAYB), _mux(LHP0,DISPLAYB), _mux(LDI,DISPLAYB),
+		_mux(LPP,DISPLAYB), _mux(LPW0,DISPLAYB), _mux(LPW1,DISPLAYB),
+		_mux(LPW2,DISPLAYB), _mux(LSC1,DISPLAYB),
+		_mux(LM1,DISPLAYB), _mux(LVP0,DISPLAYB));
+	def_config(4, _mux(LPW0,DISPLAYB), _mux(LPW2,DISPLAYB),
+		_mux(LSC1,DISPLAYB), _mux(LM0,DISPLAYB), _mux(LVP0,DISPLAYB));
+	def_config(5, disp_common(DISPLAYB), _mux(LSC1,DISPLAYB),
+		_mux(LM1,DISPLAYB));
+	def_config(6, disp_common(DISPLAYB), _mux(LDC,DISPLAYB),
+		_mux(LSPI,DISPLAYB));
+	def_list(_config(1), _config(2), _config(3), _config(4),
+		_config(5), _config(6));
+)
+
+pinmux_func(crt, false,
+	def_config(1, _mux(CRTP,CRT));
+	def_list(_config(1));
+)
+
+pinmux_func(etm, false,
+	def_config(1, _mux(KBCF,TRACE), _mux(KBCB,SDIO2), _mux(KBCC,TRACE));
+	def_list(_config(1));
+)
+
+pinmux_func(owr, true,
+	def_config(off, _mux(OWC,OWR), _mux(UAC,OWR), _mux(GPU,PWM));
+	def_config(1, _mux(OWC,OWR), _mux(UAC,OWR));
+	def_config(2, _mux(OWC,OWR), _mux(GPU,PWM));
+	def_config(3, _mux(OWC,OWR), _mux(KBCE,OWR));
+	def_list(_config(off), _config(1), _config(2), _config(3));
+)
+
+pinmux_func(pcie, false,
+	def_config(1, _mux(GPV,PCIE), _mux(SDC,PWM),
+		_mux(SLXK,PCIE), _mux(SLXA,PCIE));
+	def_list(_config(1));
+)
+
+pinmux_func(blight_d1p0, false,
+	def_config(1, _mux(LPW0,DISPLAYA));
+	def_config(2, _mux(LPW2,DISPLAYA));
+	def_config(3, _mux(LM0,DISPLAYA));
+	def_list(_config(1), _config(2), _config(3));
+)
+
+pinmux_func(blight_d1p1, false,
+	def_config(1, _mux(LM1,DISPLAYA));
+	def_config(2, _mux(LDC,DISPLAYA));
+	def_config(3, _mux(LPW1,DISPLAYA));
+	def_list(_config(1), _config(2), _config(3));
+)
+
+pinmux_func(blight_d2p0, false,
+	def_config(1, _mux(LPW0,DISPLAYB));
+	def_config(2, _mux(LPW2,DISPLAYB));
+	def_config(3, _mux(LM0,DISPLAYB));
+	def_list(_config(1), _config(2), _config(3));
+)
+
+
+pinmux_func(blight_d2p1, false,
+	def_config(1, _mux(LM1,DISPLAYB));
+	def_config(2, _mux(LDC,DISPLAYB));
+	def_config(3, _mux(LPW1,DISPLAYB));
+	def_list(_config(1), _config(2), _config(3));
+)
+
+struct module_pinmux {
+	const char *name;
+	const char *dev_id;
+	const struct tegra_pingroup_config *(*pin_func)(int, size_t*);
+};
+
+#define PIN_MODULE(_name, _devid) 		\
+	{			  		\
+		.name = #_name,			\
+		.dev_id = _devid,		\
+		.pin_func = pinmux_ ## _name,	\
+	}
+
+static const struct module_pinmux module_list[] = {
+	PIN_MODULE(uart1, "serial8250.0"), PIN_MODULE(uart1, "tegra_uart.0"),
+	PIN_MODULE(uart2, "serial8250.1"), PIN_MODULE(uart2, "tegra_uart.1"),
+	PIN_MODULE(uart3, "serial8250.2"), PIN_MODULE(uart3, "tegra_uart.2"),
+	PIN_MODULE(uart4, "serial8250.3"), PIN_MODULE(uart4, "tegra_uart.3"),
+	PIN_MODULE(uart5, "serial8250.4"), PIN_MODULE(uart5, "tegra_uart.4"),
+	PIN_MODULE(i2cp, "tegra_i2c.0"),
+	PIN_MODULE(i2c1, "tegra_i2c.1"),
+	PIN_MODULE(i2c2, "tegra_i2c.2"), PIN_MODULE(i2c2, "nvec"),
+	PIN_MODULE(i2c3, "tegra_i2c.3"),
+	PIN_MODULE(nand, "tegra_nand"),
+	PIN_MODULE(owr, "tegra_w1"),
+	PIN_MODULE(spi1, "tegra_spi.0"),
+	PIN_MODULE(spi2, "tegra_spi.1"),
+	PIN_MODULE(spi3, "tegra_spi.2"),
+	PIN_MODULE(spi4, "tegra_spi.3"),
+	PIN_MODULE(sflash, "tegra_spi.4"),
+	PIN_MODULE(pcie, "tegra_pcie"),
+	PIN_MODULE(kbc, "tegra_kbc"),
+	PIN_MODULE(sdio1, "tegra-sdhci.0"),
+	PIN_MODULE(sdio2, "tegra-sdhci.1"),
+	PIN_MODULE(sdio3, "tegra-sdhci.2"),
+	PIN_MODULE(sdio4, "tegra-sdhci.3"),
+	PIN_MODULE(ulpi, "tegra-ehci.1"),
+	/* no drivers exist yet for modules below this line */
+	PIN_MODULE(displaya, "displaya"),
+	PIN_MODULE(displayb, "displayb"),
+	PIN_MODULE(hdcp, "hdcp"),
+	PIN_MODULE(etm, "etm"),
+	PIN_MODULE(snor, "snor"),
+	PIN_MODULE(dap1, "i2s.0"),
+	PIN_MODULE(dap2, "i2s.1"),
+	PIN_MODULE(dap3, "i2s.2"),
+	PIN_MODULE(dap4, "i2s.3"),
+	PIN_MODULE(dap5, "i2s.4"),
+	PIN_MODULE(vi, "vi"),
+	PIN_MODULE(ata, "ide"),
+	PIN_MODULE(twc, "twc"),
+	PIN_MODULE(crt, "crt"),
+	PIN_MODULE(hdmi, "hdmi"),
+	PIN_MODULE(mio, "mio"),
+	PIN_MODULE(hsi, "hsi"),
+	PIN_MODULE(pwm, "pwm"),
+	PIN_MODULE(spdif, "spdif"),
+	PIN_MODULE(ext_clock1, "extclk.0"),
+	PIN_MODULE(ext_clock2, "extclk.1"),
+	PIN_MODULE(ext_clock3, "extclk.2"),
+	PIN_MODULE(blight_d1p0, "blight.d1.p0"),
+	PIN_MODULE(blight_d1p1, "blight.d1.p1"),
+	PIN_MODULE(blight_d2p0, "blight.d2.p0"),
+	PIN_MODULE(blight_d2p1, "blight.d2.p1"),
+};
+
 #define gpio_pingroup(port, pin, pingroup) \
         [TEGRA_GPIO_P##port##pin]= TEGRA_PINGROUP_##pingroup
 
@@ -288,11 +813,24 @@ static const int gpio_pin_pingroup[] = {
 	gpio_pingroup(BB, 5, DTE)
 };
 
+const struct tegra_pingroup_config *tegra_pinmux_get(const char *dev_id,
+	int config, int *len)
+{
+	unsigned int i;
+
+	for (i=0; i<ARRAY_SIZE(module_list); i++) {
+		if (!strncmp(dev_id, module_list[i].dev_id,
+		    strlen(module_list[i].dev_id))) {
+			return module_list[i].pin_func(config, len);
+		}
+	}
+	return NULL;
+}
+
 int gpio_get_pinmux_group(int gpio_nr)
 {
 	WARN_ON(gpio_nr >= ARRAY_SIZE(gpio_pin_pingroup) || gpio_nr < 0);
 	if (gpio_nr >= ARRAY_SIZE(gpio_pin_pingroup) || gpio_nr < 0)
 		return -EINVAL;
-
 	return gpio_pin_pingroup[gpio_nr];
 }
