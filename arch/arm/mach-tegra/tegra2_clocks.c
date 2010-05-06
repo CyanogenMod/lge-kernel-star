@@ -150,16 +150,16 @@ unsigned long clk_measure_input_freq(void) {
 	}
 }
 
-static int clk_div71_possible_rate(struct clk *c, unsigned long rate)
+static int clk_div71_get_divider(struct clk *c, unsigned long rate)
 {
-	unsigned long input_rate = c->rate;
-	int divider_u71;
+	unsigned long divider_u71;
 
-	divider_u71 = (input_rate*2)/rate;
-	if (rate * divider_u71 == input_rate*2)
-		return divider_u71 - 2;
-	else
+	divider_u71 = DIV_ROUND_UP(c->rate * 2, rate);
+
+	if (divider_u71 - 2 > 255 || divider_u71 - 2 < 0)
 		return -EINVAL;
+
+	return divider_u71 - 2;
 }
 
 static unsigned long tegra2_clk_recalculate_rate(struct clk* c)
@@ -544,7 +544,7 @@ static int tegra2_pll_div_clk_set_rate(struct clk *c, unsigned long rate)
 	int divider_u71;
 	pr_debug("%s: %s %lu\n", __func__, c->name, rate);
 	if (c->flags & DIV_U71) {
-		divider_u71 = clk_div71_possible_rate(c->parent, rate);
+		divider_u71 = clk_div71_get_divider(c->parent, rate);
 		if (divider_u71 >= 0) {
 			val = clk_readl(c->reg);
 			new_val = val >> c->reg_shift;
@@ -557,7 +557,9 @@ static int tegra2_pll_div_clk_set_rate(struct clk *c, unsigned long rate)
 			val &= ~(0xFFFF << c->reg_shift);
 			val |= new_val << c->reg_shift;
 			clk_writel(val, c->reg);
-			c->rate = rate;
+			c->div = divider_u71 + 2;
+			c->mul = 2;
+			tegra2_clk_recalculate_rate(c);
 			return 0;
 		}
 	} else if (c->flags & DIV_2) {
@@ -676,27 +678,18 @@ static int tegra2_periph_clk_set_rate(struct clk *c, unsigned long rate)
 {
 	u32 val;
 	int divider_u71;
-	const struct clk_mux_sel *sel;
 	pr_debug("%s: %lu\n", __func__, rate);
-	for (sel = c->inputs; sel->input != NULL; sel++) {
-		if (c->flags & DIV_U71) {
-			divider_u71 = clk_div71_possible_rate(sel->input, rate);
-			if (divider_u71 >= 0) {
-				/* FIXME: ensure we don't go through a too-high rate */
-				clk_set_parent_locked(c, sel->input);
-				udelay(1);
-				val = clk_readl(c->reg);
-				val &= ~PERIPH_CLK_SOURCE_DIV_MASK;
-				val |= divider_u71;
-				clk_writel(val, c->reg);
-				c->rate = rate;
-				return 0;
-			}
-		} else {
-			if (sel->input->rate == rate) {
-				clk_set_parent_locked(c, sel->input);
-				return 0;
-			}
+	if (c->flags & DIV_U71) {
+		divider_u71 = clk_div71_get_divider(c->parent, rate);
+		if (divider_u71 >= 0) {
+			val = clk_readl(c->reg);
+			val &= ~PERIPH_CLK_SOURCE_DIV_MASK;
+			val |= divider_u71;
+			clk_writel(val, c->reg);
+			c->div = divider_u71 + 2;
+			c->mul = 2;
+			tegra2_clk_recalculate_rate(c);
+			return 0;
 		}
 	}
 	return -EINVAL;
