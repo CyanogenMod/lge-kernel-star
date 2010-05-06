@@ -169,11 +169,8 @@
 #define INT_GPIO_BASE			(INT_QUAD_BASE + 32)
 #define INT_GPIO_NR			(28 * 8)
 
-#define INT_APBDMA_BASE	 		(INT_GPIO_BASE + INT_GPIO_NR)
-#define INT_APBDMA_NR			(16)
-
 #endif
 
-#define NR_IRQS				(INT_APBDMA_BASE + INT_APBDMA_NR)
+#define NR_IRQS				(INT_GPIO_BASE + INT_GPIO_NR)
 
 #endif

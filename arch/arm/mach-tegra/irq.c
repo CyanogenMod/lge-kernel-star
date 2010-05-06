@@ -51,7 +51,6 @@ static void (*gic_unmask_irq)(unsigned int irq) = NULL;
 
 #define irq_to_ictlr(irq) (((irq)-32) >> 5)
 static void __iomem *tegra_ictlr_base = IO_ADDRESS(TEGRA_PRIMARY_ICTLR_BASE);
-static void __iomem *tegra_apbdma_base = IO_ADDRESS(TEGRA_APB_DMA_BASE);
 #define ictlr_to_virt(ictlr) (tegra_ictlr_base + (ictlr)*0x100)
 
 static void tegra_mask(unsigned int irq)
@@ -85,47 +84,6 @@ static struct irq_chip tegra_irq = {
 #endif
 };
 
-static DEFINE_SPINLOCK(apbdma_lock);
-
-static void apbdma_ack(unsigned int irq) { }
-
-static void apbdma_mask(unsigned int irq)
-{
-	irq -= INT_APBDMA_BASE;
-	writel(1<<irq, tegra_apbdma_base + APBDMA_IRQ_MASK_CLR);
-}
-
-static void apbdma_unmask(unsigned int irq)
-{
-	irq -= INT_APBDMA_BASE;
-	writel(1<<irq, tegra_apbdma_base + APBDMA_IRQ_MASK_SET);
-}
-
-static void apbdma_cascade(unsigned int irq, struct irq_desc *desc)
-{
-	struct irq_chip *pri = get_irq_chip(irq);
-	u32 reg, ch=0;
-
-	pri->ack(irq);
-	spin_lock(&apbdma_lock);
-	reg = readl(tegra_apbdma_base + APBDMA_IRQ_STA_CPU);
-	if (reg) {
-		reg = __fls(reg);
-		writel(1<<reg, tegra_apbdma_base + APBDMA_IRQ_STA_CPU);
-		ch = INT_APBDMA_BASE + reg;
-	}
-	spin_unlock(&apbdma_lock);
-	if (ch)	generic_handle_irq(ch);
-	pri->unmask(irq);
-}
-
-static struct irq_chip apbdma_irq = {
-	.name	= "APBDMA",
-	.ack	= apbdma_ack,
-	.mask	= apbdma_mask,
-	.unmask	= apbdma_unmask,
-};
-
 void __init tegra_init_irq(void)
 {
 	struct irq_chip *gic;
@@ -152,13 +110,6 @@ void __init tegra_init_irq(void)
 		set_irq_handler(i, handle_level_irq);
 		set_irq_flags(i, IRQF_VALID);
 	}
-
-	for (i=INT_APBDMA_BASE; i<INT_APBDMA_NR+INT_APBDMA_BASE; i++) {
-		set_irq_chip(i, &apbdma_irq);
-		set_irq_handler(i, handle_level_irq);
-		set_irq_flags(i, IRQF_VALID);
-	}
-	set_irq_chained_handler(INT_APB_DMA, apbdma_cascade);
 }
 
 #ifdef CONFIG_PM
@@ -169,9 +120,6 @@ void tegra_irq_suspend(void)
 {
 	unsigned long flags;
 	int i;
-
-	for (i=0; i<INT_APBDMA_NR; i++)
-		disable_irq(INT_APBDMA_BASE + i);
 
 	for (i=INT_PRI_BASE; i<INT_GPIO_BASE; i++) {
 		struct irq_desc *desc = irq_to_desc(i);
@@ -213,8 +161,5 @@ void tegra_irq_resume(void)
 		if (!desc || (desc->status & IRQ_WAKEUP)) continue;
 		enable_irq(i);
 	}
-
-	for (i=0; i<INT_APBDMA_NR; i++)
-		enable_irq(INT_APBDMA_BASE + i);
 }
 #endif
