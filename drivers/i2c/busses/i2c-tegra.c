@@ -26,6 +26,9 @@
 #include <linux/slab.h>
 #include <asm/unaligned.h>
 
+#include <mach/i2c.h>
+#include <mach/pinmux.h>
+
 #define TEGRA_I2C_TIMEOUT (msecs_to_jiffies(1000))
 #define BYTES_PER_FIFO_WORD 4
 
@@ -88,9 +91,18 @@
 #define I2C_HEADER_MASTER_ADDR_SHIFT		12
 #define I2C_HEADER_SLAVE_ADDR_SHIFT		1
 
+struct tegra_i2c_dev;
+
+struct tegra_i2c_bus {
+	struct tegra_i2c_dev *dev;
+	struct mutex *bus_lock;
+	const struct tegra_pingroup_config *mux;
+	int mux_len;
+	struct i2c_adapter adapter;
+};
+
 struct tegra_i2c_dev {
 	struct device *dev;
-	struct i2c_adapter adapter;
 	struct clk *clk;
 	struct clk *i2c_clk;
 	struct resource *iomem;
@@ -104,6 +116,8 @@ struct tegra_i2c_dev {
 	size_t msg_buf_remaining;
 	int msg_read;
 	int msg_transfer_complete;
+	int bus_count;
+	struct tegra_i2c_bus busses[1];
 };
 
 static void dvc_writel(struct tegra_i2c_dev *i2c_dev, u32 val, unsigned long reg)
@@ -456,16 +470,64 @@ static int tegra_i2c_xfer_msg(struct tegra_i2c_dev *i2c_dev,
 	return -EIO;
 }
 
+static int tegra_i2c_lock(struct tegra_i2c_bus *i2c_bus)
+{
+	if (likely(i2c_bus->bus_lock == &i2c_bus->adapter.bus_lock))
+		return 0;
+
+	if (in_atomic() || irqs_disabled()) {
+		if (!mutex_trylock(i2c_bus->bus_lock))
+			return -EAGAIN;
+	} else {
+		mutex_lock_nested(i2c_bus->bus_lock, i2c_bus->adapter.level);
+	}
+	return 0;
+}
+
+static void tegra_i2c_unlock(struct tegra_i2c_bus *i2c_bus)
+{
+	if (likely(i2c_bus->bus_lock == &i2c_bus->adapter.bus_lock))
+		return;
+
+	mutex_unlock(i2c_bus->bus_lock);
+}
+
 static int tegra_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 {
-	struct tegra_i2c_dev *i2c_dev = i2c_get_adapdata(adap);
+	struct tegra_i2c_bus *i2c_bus = i2c_get_adapdata(adap);
+	struct tegra_i2c_dev *i2c_dev = i2c_bus->dev;
 	int i;
+
+	if (i2c_bus->mux && i2c_bus->mux_len) {
+		if (i2c_dev->bus_count > 1) {
+			if (tegra_i2c_lock(i2c_bus))
+				return -EAGAIN;
+			tegra_pinmux_config_pinmux_table(i2c_bus->mux,
+				i2c_bus->mux_len, true);
+		}
+
+		tegra_pinmux_config_tristate_table(i2c_bus->mux,
+			i2c_bus->mux_len, TEGRA_TRI_NORMAL);
+	}
+
 	clk_enable(i2c_dev->clk);
 	for (i = 0; i < num; i++) {
 		int stop = (i == (num - 1)) ? 1  : 0;
 		tegra_i2c_xfer_msg(i2c_dev, &msgs[i], stop);
 	}
 	clk_disable(i2c_dev->clk);
+
+	if (i2c_bus->mux && i2c_bus->mux_len) {
+		tegra_pinmux_config_tristate_table(i2c_bus->mux,
+			i2c_bus->mux_len, TEGRA_TRI_TRISTATE);
+
+		if (i2c_dev->bus_count > 1) {
+			tegra_pinmux_config_pinmux_table(i2c_bus->mux,
+				i2c_bus->mux_len, false);
+			tegra_i2c_unlock(i2c_bus);
+		}
+	}
+
 	return num;
 }
 
@@ -484,6 +546,7 @@ static const struct i2c_algorithm tegra_i2c_algo = {
 static int tegra_i2c_probe(struct platform_device *pdev)
 {
 	struct tegra_i2c_dev *i2c_dev;
+	struct tegra_i2c_plat_parms *plat = pdev->dev.platform_data;
 	/*struct tegra_i2c_platform_data *pdata = pdev->dev.platform_data;*/
 	struct resource *res;
 	struct resource *iomem;
@@ -491,7 +554,22 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 	struct clk *i2c_clk;
 	void *base;
 	int irq;
+	int nbus;
+	int i = 0;
 	int ret = 0;
+
+	if (!plat) {
+		dev_err(&pdev->dev, "no platform data?\n");
+		return -ENODEV;
+	}
+
+	if (plat->bus_count <= 0 || plat->adapter_nr < 0) {
+		dev_err(&pdev->dev, "invalid platform data?\n");
+		return -ENODEV;
+	}
+
+	WARN_ON(plat->bus_count > TEGRA_I2C_MAX_BUS);
+	nbus = min(TEGRA_I2C_MAX_BUS, plat->bus_count);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
@@ -530,7 +608,8 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 		goto err_clk_put;
 	}
 
-	i2c_dev = kzalloc(sizeof(struct tegra_i2c_dev), GFP_KERNEL);
+	i2c_dev = kzalloc(sizeof(struct tegra_i2c_dev) +
+			  (nbus-1) * sizeof(struct tegra_i2c_bus), GFP_KERNEL);
 	if (!i2c_dev) {
 		ret = -ENOMEM;
 		goto err_i2c_clk_put;
@@ -540,12 +619,10 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 	i2c_dev->clk = clk;
 	i2c_dev->i2c_clk = i2c_clk;
 	i2c_dev->iomem = iomem;
-	i2c_dev->adapter.algo = &tegra_i2c_algo;
 	i2c_dev->irq = irq;
 	i2c_dev->cont_id = pdev->id;
 	i2c_dev->dev = &pdev->dev;
-	if (pdev->id == 3)
-		i2c_dev->is_dvc = 1;
+	i2c_dev->is_dvc = plat->is_dvc;
 	init_completion(&i2c_dev->msg_complete);
 
 	platform_set_drvdata(pdev, i2c_dev);
@@ -563,23 +640,35 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 
 	clk_enable(i2c_dev->i2c_clk);
 
-	i2c_set_adapdata(&i2c_dev->adapter, i2c_dev);
-	i2c_dev->adapter.owner = THIS_MODULE;
-	i2c_dev->adapter.class = I2C_CLASS_HWMON;
-	strlcpy(i2c_dev->adapter.name, "Tegra I2C adapter",
-		sizeof(i2c_dev->adapter.name));
-	i2c_dev->adapter.algo = &tegra_i2c_algo;
-	i2c_dev->adapter.dev.parent = &pdev->dev;
-	i2c_dev->adapter.nr = pdev->id;
+	for (i=0; i<nbus; i++) {
+		struct tegra_i2c_bus *i2c_bus = &i2c_dev->busses[i];
 
-	ret = i2c_add_numbered_adapter(&i2c_dev->adapter);
-	if (ret) {
-		dev_err(&pdev->dev, "Failed to add I2C adapter\n");
-		goto err_free_irq;
+		i2c_bus->dev = i2c_dev;
+		i2c_bus->mux = plat->bus_mux[i];
+		i2c_bus->mux_len = plat->bus_mux_len[i];
+		i2c_bus->bus_lock = &i2c_dev->busses[0].adapter.bus_lock;
+
+		i2c_bus->adapter.algo = &tegra_i2c_algo;
+		i2c_set_adapdata(&i2c_bus->adapter, i2c_bus);
+		i2c_bus->adapter.owner = THIS_MODULE;
+		i2c_bus->adapter.class = I2C_CLASS_HWMON;
+		strlcpy(i2c_bus->adapter.name, "Tegra I2C adapter",
+			sizeof(i2c_bus->adapter.name));
+		i2c_bus->adapter.dev.parent = &pdev->dev;
+		i2c_bus->adapter.nr = plat->adapter_nr + i;
+		ret = i2c_add_numbered_adapter(&i2c_bus->adapter);
+		if (ret) {
+			dev_err(&pdev->dev, "Failed to add I2C adapter\n");
+			goto err_free_irq;
+		}
+		i2c_dev->bus_count++;
 	}
 
 	return 0;
 err_free_irq:
+	while (i2c_dev->bus_count--)
+		i2c_del_adapter(&i2c_dev->busses[i2c_dev->bus_count].adapter);
+
 	free_irq(i2c_dev->irq, i2c_dev);
 err_free:
 	kfree(i2c_dev);
@@ -597,7 +686,9 @@ err_iounmap:
 static int tegra_i2c_remove(struct platform_device *pdev)
 {
 	struct tegra_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
-	i2c_del_adapter(&i2c_dev->adapter);
+	while (i2c_dev->bus_count--)
+		i2c_del_adapter(&i2c_dev->busses[i2c_dev->bus_count].adapter);
+
 	free_irq(i2c_dev->irq, i2c_dev);
 	clk_put(i2c_dev->i2c_clk);
 	clk_put(i2c_dev->clk);
