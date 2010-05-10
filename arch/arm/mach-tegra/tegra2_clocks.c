@@ -633,7 +633,7 @@ static int tegra2_periph_clk_enable(struct clk *c)
 		val = pmc_readl(PMC_CONTROL);
 		val &= ~(1 << PMC_CLK_ENB_TO_RESET(c));
 		pmc_writel(val, PMC_CONTROL);
-	} else if (!(c->flags & PERIPH_NO_RESET))
+	} else if (!(c->flags & PERIPH_NO_RESET) && !(c->flags & PERIPH_MANUAL_RESET))
 		clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
 			RST_DEVICES_CLR + PERIPH_CLK_TO_ENB_SET_REG(c));
 	if (c->flags & PERIPH_EMC_ENB) {
@@ -653,6 +653,23 @@ static void tegra2_periph_clk_disable(struct clk *c)
 	clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
 		CLK_OUT_ENB_CLR + PERIPH_CLK_TO_ENB_SET_REG(c));
 }
+
+void tegra2_periph_reset_deassert(struct clk *c)
+{
+	pr_debug("%s on clock %s\n", __func__, c->name);
+	if (!(c->flags & PERIPH_NO_RESET))
+		clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
+			   RST_DEVICES_CLR + PERIPH_CLK_TO_ENB_SET_REG(c));
+}
+
+void tegra2_periph_reset_assert(struct clk *c)
+{
+	pr_debug("%s on clock %s\n", __func__, c->name);
+	if (!(c->flags & PERIPH_NO_RESET))
+		clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
+			   RST_DEVICES_SET + PERIPH_CLK_TO_ENB_SET_REG(c));
+}
+
 
 static int tegra2_periph_clk_set_parent(struct clk *c, struct clk *p)
 {
@@ -1223,7 +1240,7 @@ struct clk tegra_periph_clks[] = {
 	PERIPH_CLK("uartc",     "uart.2",     NULL,   55, 0x1a0, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
 	PERIPH_CLK("uartd",     "uart.3",     NULL,   65, 0x1c0, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
 	PERIPH_CLK("uarte",     "uart.4",     NULL,   66, 0x1c4, mux_pllp_pllc_pllm_clkm,        MUX | DIV_U71),
-	PERIPH_CLK("3d",        "3d",         NULL,   24, 0x158, mux_pllm_pllc_pllp_plla,        MUX | DIV_U71),
+	PERIPH_CLK("3d",        "3d",         NULL,   24, 0x158, mux_pllm_pllc_pllp_plla,        MUX | DIV_U71 | PERIPH_MANUAL_RESET),
 	PERIPH_CLK("2d",        "2d",         NULL,   21, 0x15c, mux_pllm_pllc_pllp_plla,        MUX | DIV_U71),
 	/* FIXME: vi and vi_sensor share an enable */
 	PERIPH_CLK("vi",        "vi",         NULL,   20, 0x148, mux_pllm_pllc_pllp_plla,        MUX | DIV_U71),

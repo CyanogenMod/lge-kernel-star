@@ -22,19 +22,22 @@
 
 #include <asm/clkdev.h>
 
-#define DIV_BUS		0x00000001
-#define DIV_U71		0x00000002
-#define DIV_U71_FIXED	0x00000004
-#define DIV_2		0x00000008
-#define PLL_FIXED	0x00000010
-#define PLL_HAS_CPCON	0x00000020
-#define MUX		0x00000040
-#define PLLD		0x00000080
-#define PERIPH_NO_RESET	0x00000100
-#define PERIPH_NO_ENB	0x00000200
-#define PERIPH_EMC_ENB	0x00000400
-#define PERIPH_PMC_RESET 0x00000800
-#define ENABLE_ON_INIT	0x10000000
+#define DIV_BUS			(1 << 0)
+#define DIV_U71			(1 << 1)
+#define DIV_U71_FIXED		(1 << 2)
+#define DIV_2			(1 << 3)
+#define PLL_FIXED		(1 << 4)
+#define PLL_HAS_CPCON		(1 << 5)
+#define MUX			(1 << 6)
+#define PLLD			(1 << 7)
+#define PERIPH_NO_RESET		(1 << 8)
+#define PERIPH_NO_ENB		(1 << 9)
+#define PERIPH_EMC_ENB		(1 << 10)
+#define PERIPH_MANUAL_RESET	(1 << 11)
+#define PERIPH_PMC_RESET	(1 << 12)
+#define PLL_ALT_MISC_REG	(1 << 13)
+#define ENABLE_ON_INIT		(1 << 28)
+
 struct clk;
 
 struct clk_mux_sel {
@@ -137,6 +140,8 @@ struct clk_duplicate {
 };
 
 void tegra2_init_clocks(void);
+void tegra2_periph_reset_deassert(struct clk *c);
+void tegra2_periph_reset_assert(struct clk *c);
 void clk_init(struct clk *clk);
 struct clk *get_tegra_clock_by_name(const char *name);
 unsigned long clk_measure_input_freq(void);

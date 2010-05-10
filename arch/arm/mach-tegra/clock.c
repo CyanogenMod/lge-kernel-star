@@ -235,6 +235,18 @@ unsigned long clk_get_rate(struct clk *c)
 }
 EXPORT_SYMBOL(clk_get_rate);
 
+void tegra_periph_reset_deassert(struct clk *c)
+{
+	tegra2_periph_reset_deassert(c);
+}
+EXPORT_SYMBOL(tegra_periph_reset_deassert);
+
+void tegra_periph_reset_assert(struct clk *c)
+{
+	tegra2_periph_reset_assert(c);
+}
+EXPORT_SYMBOL(tegra_periph_reset_assert);
+
 int __init tegra_init_clock(void)
 {
 	tegra2_init_clocks();
