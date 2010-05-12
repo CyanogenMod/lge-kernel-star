@@ -21,7 +21,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-//#define RM_SUPPORT
+/* #define RM_SUPPORT */
 
 #include <linux/module.h>
 #include <linux/input.h>
@@ -30,15 +30,8 @@
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/interrupt.h>
-#include <linux/regulator/consumer.h>
 #include <linux/clk.h>
 #include <mach/kbc.h>
-
-#ifdef RM_SUPPORT
-#include <linux/tegra_devices.h>
-#include <mach/nvrm_linux.h>
-#include "nvrm_power.h"
-#endif
 
 #define KBC_CONTROL_0	0
 #define KBC_INT_0	4
@@ -59,107 +52,9 @@ struct tegra_kbc {
 	unsigned int repoll_time;
 	struct tegra_kbc_plat *pdata;
 	struct work_struct key_repeat;
-#ifdef RM_SUPPORT
-	NvU32 client_id;
-#else
+	struct workqueue_struct *kbc_work_queue;
 	struct clk *clk;
-	struct regulator *reg;
-#endif
 };
-
-#ifdef RM_SUPPORT
-static int alloc_resource(struct tegra_kbc *kbc, struct platform_device *pdev)
-{
-	NvError e = NvRmPowerRegister(s_hRmGlobal, NULL, &kbc->client_id);
-	if (e!=NvSuccess) return -ENXIO;
-	return 0;
-}
-
-static void free_resource(struct tegra_kbc *kbc)
-{
-	NvRmPowerUnRegister(s_hRmGlobal, kbc->client_id);
-}
-
-static void enable_power(struct tegra_kbc *kbc)
-{
-	NvError e;
-	e = NvRmPowerVoltageControl(s_hRmGlobal,
-		NVRM_MODULE_ID(NvRmModuleID_Kbc, 0),
-		kbc->client_id, NvRmVoltsUnspecified,
-		NvRmVoltsUnspecified, NULL, 0, NULL);
-	BUG_ON(e!=NvSuccess);
-}
-
-static void disable_power(struct tegra_kbc *kbc)
-{
-	NvError e;
-	e = NvRmPowerVoltageControl(s_hRmGlobal,
-		NVRM_MODULE_ID(NvRmModuleID_Kbc, 0),
-		kbc->client_id, NvRmVoltsOff,
-		NvRmVoltsOff, NULL, 0, NULL);
-	BUG_ON(e!=NvSuccess);
-}
-
-static void enable_clock(struct tegra_kbc *kbc)
-{
-	NvError e;
-	e = NvRmPowerModuleClockControl(s_hRmGlobal,
-		NVRM_MODULE_ID(NvRmModuleID_Kbc,0), 0, NV_TRUE);
-	BUG_ON(e!=NvSuccess);
-	NvRmModuleReset(s_hRmGlobal, NVRM_MODULE_ID(NvRmModuleID_Kbc, 0));
-}
-
-static void disable_clock(struct tegra_kbc *kbc)
-{
-	NvRmPowerModuleClockControl(s_hRmGlobal,
-		NVRM_MODULE_ID(NvRmModuleID_Kbc,0), 0, NV_FALSE);
-}
-
-#else
-static int alloc_resource(struct tegra_kbc *kbc, struct platform_device *pdev)
-{
-	kbc->clk = clk_get(&pdev->dev, NULL);
-	if (IS_ERR(kbc->clk)) {
-		int err;
-		dev_err(&pdev->dev, "failed to get keypad clock\n");
-		err = PTR_ERR(kbc->clk);
-		kbc->clk = NULL;
-		return err;
-	}
-	kbc->reg = regulator_get(&pdev->dev, "Vcc");
-	if (IS_ERR(kbc->reg)) {
-		dev_err(&pdev->dev, "no regulator support\n");
-		kbc->reg = NULL;
-	}
-	return 0;
-}
-
-static void free_resource(struct tegra_kbc *kbc)
-{
-	if (kbc->clk) clk_put(kbc->clk);
-	if (kbc->reg) regulator_put(kbc->reg);
-}
-
-static void enable_power(struct tegra_kbc *kbc)
-{
-	if (kbc->reg) regulator_enable(kbc->reg);
-}
-
-static void disable_power(struct tegra_kbc *kbc)
-{
-	if (kbc->reg) regulator_disable(kbc->reg);
-}
-
-static void enable_clock(struct tegra_kbc *kbc)
-{
-	clk_enable(kbc->clk);
-}
-
-static void disable_clock(struct tegra_kbc *kbc)
-{
-	clk_disable(kbc->clk);
-}
-#endif
 
 static int tegra_kbc_keycode(const struct tegra_kbc *kbc, int r, int c) {
 	unsigned int i = kbc_indexof(r,c);
@@ -182,7 +77,6 @@ static int tegra_kbc_suspend(struct platform_device *pdev, pm_message_t state)
 	if (device_may_wakeup(&pdev->dev)) {
 		tegra_kbc_setup_wakekeys(kbc, true);
 		enable_irq_wake(kbc->irq);
-		disable_power(kbc);
 	} else {
 		tegra_kbc_close(kbc->idev);
 	}
@@ -195,7 +89,6 @@ static int tegra_kbc_resume(struct platform_device *pdev)
 	struct tegra_kbc *kbc = platform_get_drvdata(pdev);
 
 	if (device_may_wakeup(&pdev->dev)) {
-		enable_power(kbc);
 		disable_irq_wake(kbc->irq);
 		tegra_kbc_setup_wakekeys(kbc, false);
 	} else if (kbc->idev->users)
@@ -208,7 +101,7 @@ static int tegra_kbc_resume(struct platform_device *pdev)
 static void tegra_kbc_report_keys(struct tegra_kbc *kbc, int *fifo)
 {
 	int curr_fifo[KBC_MAX_KPENT];
-	u32 kp_ent_val[(KBC_MAX_KPENT*8 + 3) / 4];
+	u32 kp_ent_val[(KBC_MAX_KPENT + 3) / 4];
 	u32 *kp_ents = kp_ent_val;
 	u32 kp_ent;
 	unsigned long flags;
@@ -273,13 +166,13 @@ static void tegra_kbc_key_repeat(struct work_struct *work)
 		if (!val) {
 			/* release any pressed keys and exit the loop */
 			for (i=0; i<ARRAY_SIZE(fifo); i++) {
-				if (fifo[i]==-1) continue;
+				if (fifo[i] == -1)
+					continue;
 				input_report_key(kbc->idev, fifo[i], 0);
 			}
 			break;
 		}
 		tegra_kbc_report_keys(kbc, fifo);
-		/* FIXME: why is this here? */
 		msleep((val==1) ? kbc->repoll_time : 1);
 	}
 
@@ -296,18 +189,15 @@ static void tegra_kbc_close(struct input_dev *dev)
 	unsigned long flags;
 	u32 val;
 
+	spin_lock_irqsave(&kbc->lock, flags);
 	val = readl(kbc->mmio + KBC_CONTROL_0);
 	val &= ~1;
 	writel(val, kbc->mmio + KBC_CONTROL_0);
 	spin_unlock_irqrestore(&kbc->lock, flags);
 
-	disable_clock(kbc);
-	disable_power(kbc);
+	clk_disable(kbc->clk);
 }
 
-#ifdef CONFIG_ARCH_TEGRA_1x_SOC
-#define tegra_kbc_setup_wakekeys(kbc, filter) do { } while (0)
-#else
 static void tegra_kbc_setup_wakekeys(struct tegra_kbc *kbc, bool filter)
 {
 	int i;
@@ -329,7 +219,6 @@ static void tegra_kbc_setup_wakekeys(struct tegra_kbc *kbc, bool filter)
 		}
 	}
 }
-#endif
 
 static void tegra_kbc_config_pins(struct tegra_kbc *kbc)
 {
@@ -367,23 +256,10 @@ static int tegra_kbc_open(struct input_dev *dev)
 	unsigned long flags;
 	u32 val = 0;
 
-	enable_power(kbc);
-	enable_clock(kbc);
+	clk_enable(kbc->clk);
 
 	tegra_kbc_config_pins(kbc);
 	tegra_kbc_setup_wakekeys(kbc, false);
-
-	/* atomically clear out any remaining entries in the key FIFO
-	 * and enable keyboard interrupts */
-	spin_lock_irqsave(&kbc->lock, flags);
-	val = readl(kbc->mmio + KBC_INT_0);
-	val >>= 4;
-	if (val) {
-		val = readl(kbc->mmio + KBC_KP_ENT0_0);
-		val = readl(kbc->mmio + KBC_KP_ENT1_0);
-	}
-	writel(0x7, kbc->mmio + KBC_INT_0);
-	spin_unlock_irqrestore(&kbc->lock, flags);
 
 	writel(kbc->pdata->repeat_cnt, kbc->mmio + KBC_RPT_DLY_0);
 
@@ -392,6 +268,22 @@ static int tegra_kbc_open(struct input_dev *dev)
 	val |= 1<<3;  /* interrupt on FIFO threshold reached */
 	val |= 1;     /* enable */
 	writel(val, kbc->mmio + KBC_CONTROL_0);
+
+	/* atomically clear out any remaining entries in the key FIFO
+	 * and enable keyboard interrupts */
+	spin_lock_irqsave(&kbc->lock, flags);
+	while(1) {
+		val = readl(kbc->mmio + KBC_INT_0);
+		val >>= 4;
+		if (val) {
+			val = readl(kbc->mmio + KBC_KP_ENT0_0);
+			val = readl(kbc->mmio + KBC_KP_ENT1_0);
+		} else {
+			break;
+		}
+	}
+	writel(0x7, kbc->mmio + KBC_INT_0);
+	spin_unlock_irqrestore(&kbc->lock, flags);
 
 	return 0;
 }
@@ -403,13 +295,13 @@ static int __devexit tegra_kbc_remove(struct platform_device *pdev)
 	struct resource *res;
 
 	free_irq(kbc->irq, pdev);
-	disable_clock(kbc);
-	disable_power(kbc);
-	free_resource(kbc);
+	clk_disable(kbc->clk);
+	clk_put(kbc->clk);
 
 	input_unregister_device(kbc->idev);
 	input_free_device(kbc->idev);
 	iounmap(kbc->mmio);
+	destroy_workqueue(kbc->kbc_work_queue);
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	release_mem_region(res->start, res_size(res));
 
@@ -438,8 +330,7 @@ static irqreturn_t tegra_kbc_isr(int irq, void *args)
 		writel(ctl, kbc->mmio + KBC_CONTROL_0);
 		return IRQ_HANDLED;
 	}
-
-	schedule_work(&kbc->key_repeat);
+	queue_work(kbc->kbc_work_queue, &kbc->key_repeat);
 	return IRQ_HANDLED;
 }
 
@@ -454,6 +345,7 @@ static int __init tegra_kbc_probe(struct platform_device *pdev)
 	int cols[KBC_MAX_COL];
 	int i, j;
 	int nr = 0;
+	char name[64];
 
 	if (!pdata) return -EINVAL;
 
@@ -496,8 +388,13 @@ static int __init tegra_kbc_probe(struct platform_device *pdev)
 		err = -ENXIO;
 		goto fail;
 	}
-	err = alloc_resource(kbc, pdev);
-	if (err) goto fail;
+	kbc->clk = clk_get(&pdev->dev, NULL);
+	if (IS_ERR_OR_NULL(kbc->clk)) {
+		dev_err(&pdev->dev, "failed to get keypad clock\n");
+		err = (kbc->clk) ? PTR_ERR(kbc->clk) : -ENODEV;
+		kbc->clk = NULL;
+		goto fail;
+	}
 
 	platform_set_drvdata(pdev, kbc);
 
@@ -534,8 +431,9 @@ static int __init tegra_kbc_probe(struct platform_device *pdev)
 		}
 	}
 
+	pdata->debounce_cnt = min_t(unsigned int, pdata->debounce_cnt, 0x3fful);
 	kbc->repoll_time = 5 + (16+pdata->debounce_cnt)*nr + pdata->repeat_cnt;
-	kbc->repoll_time = (kbc->repoll_time*1000 + 16384) / 32768;
+	kbc->repoll_time = (kbc->repoll_time + 31) / 32;
 
 	kbc->idev->evbit[0] = BIT_MASK(EV_KEY);
 
@@ -550,9 +448,20 @@ static int __init tegra_kbc_probe(struct platform_device *pdev)
 		}
 	}
 
+
+	/* create the workqueue for the kbc path */
+	snprintf(name, sizeof(name), "tegra-kbc");
+	kbc->kbc_work_queue = create_singlethread_workqueue(name);
+	if (kbc->kbc_work_queue == NULL) {
+		dev_err(&pdev->dev, "Failed to create work queue\n");
+		err = -ENODEV;
+		goto fail;
+	}
+
 	/* keycode FIFO needs to be read atomically; leave local
 	 * interrupts disabled when handling KBC interrupt */
 	INIT_WORK(&kbc->key_repeat, tegra_kbc_key_repeat);
+
 	err = request_irq(irq, tegra_kbc_isr, IRQF_DISABLED, pdev->name, kbc);
 	if (err) {
 		dev_err(&pdev->dev, "failed to request keypad IRQ\n");
@@ -572,8 +481,9 @@ static int __init tegra_kbc_probe(struct platform_device *pdev)
 fail:
 	if (kbc->irq >= 0) free_irq(kbc->irq, pdev);
 	if (kbc->idev) input_free_device(kbc->idev);
-	free_resource(kbc);
+	if (kbc->clk) clk_put(kbc->clk);
 	if (kbc->mmio) iounmap(kbc->mmio);
+	if (kbc->kbc_work_queue) destroy_workqueue(kbc->kbc_work_queue);
 	kfree(kbc);
 	return err;
 }
@@ -586,7 +496,7 @@ static struct platform_driver tegra_kbc_driver = {
 	.resume		= tegra_kbc_resume,
 #endif
 	.driver	= {
-		.name	= "tegra_kbc"
+		.name	= "tegra-kbc"
 	}
 };
 
