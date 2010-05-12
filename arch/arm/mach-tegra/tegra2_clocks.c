@@ -30,6 +30,8 @@
 
 #include "clock.h"
 
+#define PMC_CONTROL			0x000
+
 #define RST_DEVICES			0x004
 #define RST_DEVICES_SET			0x300
 #define RST_DEVICES_CLR			0x304
@@ -91,6 +93,8 @@
 #define PLLD_MISC_DIV_RST		(1<<23)
 #define PLLD_MISC_DCCON_SHIFT		12
 
+#define PMC_CLK_ENB_TO_RESET(c)		(c->reg_shift ^ 0x3)
+
 #define PERIPH_CLK_TO_ENB_REG(c)	((c->clk_num / 32) * 4)
 #define PERIPH_CLK_TO_ENB_SET_REG(c)	((c->clk_num / 32) * 8)
 #define PERIPH_CLK_TO_ENB_BIT(c)	(1 << (c->clk_num % 32))
@@ -115,7 +119,12 @@
 #define BUS_CLK_DIV_MASK		0x3
 
 static void __iomem *reg_clk_base = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
+static void __iomem *reg_pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
 
+#define pmc_writel(value, reg) \
+	__raw_writel(value, (u32)reg_pmc_base + (reg))
+#define pmc_readl(reg) \
+	__raw_readl((u32)reg_pmc_base + (reg))
 #define clk_writel(value, reg) \
 	__raw_writel(value, (u32)reg_clk_base + (reg))
 #define clk_readl(reg) \
@@ -601,7 +610,10 @@ static void tegra2_periph_clk_init(struct clk *c)
 	if (!(clk_readl(CLK_OUT_ENB + PERIPH_CLK_TO_ENB_REG(c)) &
 			PERIPH_CLK_TO_ENB_BIT(c)))
 		c->state = OFF;
-	if (!(c->flags & PERIPH_NO_RESET))
+	if (c->flags & PERIPH_PMC_RESET) {
+		if ((pmc_readl(PMC_CONTROL) >> PMC_CLK_ENB_TO_RESET(c)) & 0x1)
+			c->state = OFF;
+	} else if (!(c->flags & PERIPH_NO_RESET))
 		if (clk_readl(RST_DEVICES + PERIPH_CLK_TO_ENB_REG(c)) &
 				PERIPH_CLK_TO_ENB_BIT(c))
 			c->state = OFF;
@@ -615,7 +627,11 @@ static int tegra2_periph_clk_enable(struct clk *c)
 
 	clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
 		CLK_OUT_ENB_SET + PERIPH_CLK_TO_ENB_SET_REG(c));
-	if (!(c->flags & PERIPH_NO_RESET))
+	if (c->flags & PERIPH_PMC_RESET) {
+		val = pmc_readl(PMC_CONTROL);
+		val &= ~(1 << PMC_CLK_ENB_TO_RESET(c));
+		pmc_writel(val, PMC_CONTROL);
+	} else if (!(c->flags & PERIPH_NO_RESET))
 		clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
 			RST_DEVICES_CLR + PERIPH_CLK_TO_ENB_SET_REG(c));
 	if (c->flags & PERIPH_EMC_ENB) {
@@ -1154,8 +1170,24 @@ static struct clk_mux_sel mux_clk_32k[] = {
 		.flags     = _flags,			\
 	}
 
+#define PMC_PERIPH_CLK(_name, _dev, _con, _clk_num, _shift) \
+	{						\
+		.name      = _name,			\
+		.lookup    = {				\
+			.dev_id    = _dev,		\
+			.con_id	   = _con,		\
+		},					\
+		.ops       = &tegra_periph_clk_ops,	\
+		.clk_num   = _clk_num,			\
+		 .reg_shift = _shift,			\
+		.reg       = 0,				\
+		.inputs    = mux_clk_32k,		\
+		.flags     = PERIPH_PMC_RESET,		\
+	}
+
 struct clk tegra_periph_clks[] = {
-	PERIPH_CLK("rtc",       "rtc-tegra",  NULL,   4,  0,     mux_clk_32k,                    PERIPH_NO_RESET),
+	PMC_PERIPH_CLK("rtc",       "rtc-tegra",  NULL,   4,  1),
+	PMC_PERIPH_CLK("kbc",       "tegra-kbc",  NULL,   36, 0),
 	PERIPH_CLK("timer",     "timer",      NULL,   5,  0,     mux_clk_m,                      0),
 	PERIPH_CLK("i2s1",      "i2s.0",      NULL,   11, 0x100, mux_plla_audio_pllp_clkm,       MUX | DIV_U71),
 	PERIPH_CLK("i2s2",      "i2s.1",      NULL,   18, 0x104, mux_plla_audio_pllp_clkm,       MUX | DIV_U71),
