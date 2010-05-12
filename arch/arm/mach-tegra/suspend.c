@@ -27,6 +27,7 @@
 #include <linux/smp.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
+#include <linux/clk.h>
 
 #include <asm/cacheflush.h>
 #include <asm/hardware/gic.h>
@@ -79,12 +80,26 @@ static void __iomem *tmrus = IO_ADDRESS(TEGRA_TMRUS_BASE);
 #define FLOW_CTRL_CPU_CSR	0x8
 #define FLOW_CTRL_CPU1_CSR	0x18
 
-static unsigned int powergood_time(unsigned int us, unsigned int hz)
+static void set_powergood_time(unsigned int us)
 {
-	unsigned long long ticks = us;
-	ticks *= hz;
-	do_div(ticks, 1000000);
-	return (unsigned int)ticks;
+	static int last_pclk = 0;
+	static struct clk *clk = NULL;
+	unsigned long long ticks;
+	unsigned long long pclk;
+
+	if (!clk) {
+		clk = clk_get_sys(NULL, "pclk");
+		BUG_ON(!clk);
+	}
+
+	pclk = clk_get_rate(clk);
+	if (pclk != last_pclk) {
+		ticks = (us * pclk) + 999999ull;
+		do_div(ticks, 1000000);
+		writel((unsigned int)ticks, pmc + PMC_CPUPWRGOOD_TIMER);
+		wmb();
+	}
+	last_pclk = pclk;
 }
 
 /*
@@ -169,9 +184,10 @@ unsigned int tegra_suspend_lp2(unsigned int us)
 	mode = TEGRA_POWER_CPU_PWRREQ_OE;
 	orig = readl(evp_reset);
 	writel(virt_to_phys(tegra_lp2_startup), evp_reset);
-	/* FIXME: power good time and APB clock rate should not be
-	 * hard-coded here. */
-	writel(powergood_time(2000, 13500000), pmc + PMC_CPUPWRGOOD_TIMER);
+
+	/* FIXME: power good time (in us) should come from the board file,
+	 * not hard-coded here. */
+	set_powergood_time(2000);
 
 	tegra_lp2_set_trigger(us);
 	suspend_cpu_complex();
