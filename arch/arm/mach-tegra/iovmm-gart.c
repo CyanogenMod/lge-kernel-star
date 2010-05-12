@@ -86,8 +86,6 @@ static struct platform_driver tegra_iovmm_gart_drv = {
 	},
 };
 
-#define gart_barrier(_g) (void)readl((_g)->regs + GART_ENTRY_DATA)
-
 static int gart_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct gart_device *gart = platform_get_drvdata(pdev);
@@ -105,6 +103,7 @@ static int gart_suspend(struct platform_device *pdev, pm_message_t state)
 	for (i=0; i<gart->page_count; i++) {
 		writel(reg, gart->regs + GART_ENTRY_ADDR);
 		gart->savedata[i] = readl(gart->regs + GART_ENTRY_DATA);
+		dmb();
 		reg += 1 << GART_PAGE_SHIFT;
 	}
 	spin_unlock(&gart->pte_lock);
@@ -122,7 +121,7 @@ static void do_gart_setup(struct gart_device *gart, const u32 *data)
 	for (i=0; i<gart->page_count; i++) {
 		writel(reg, gart->regs + GART_ENTRY_ADDR);
 		writel((data) ? data[i] : 0, gart->regs + GART_ENTRY_DATA);
-		gart_barrier(gart);
+		wmb();
 		reg += 1 << GART_PAGE_SHIFT;
 	}
 	wmb();
@@ -284,7 +283,7 @@ static int gart_map(struct tegra_iovmm_device *dev,
 
 		writel(gart_page, gart->regs + GART_ENTRY_ADDR);
 		writel(GART_PTE(pfn), gart->regs + GART_ENTRY_DATA);
-		gart_barrier(gart);
+		wmb();
 		gart_page += 1 << GART_PAGE_SHIFT;
 
 		spin_unlock(&gart->pte_lock);
@@ -299,7 +298,7 @@ fail:
 		gart_page -= 1 << GART_PAGE_SHIFT;
 		writel(gart_page, gart->regs + GART_ENTRY_ADDR);
 		writel(0, gart->regs + GART_ENTRY_DATA);
-		gart_barrier(gart);
+		wmb();
 	}
 	spin_unlock(&gart->pte_lock);
 	wmb();
@@ -323,7 +322,7 @@ static void gart_unmap(struct tegra_iovmm_device *dev,
 
 		writel(gart_page, gart->regs + GART_ENTRY_ADDR);
 		writel(0, gart->regs + GART_ENTRY_DATA);
-		gart_barrier(gart);
+		wmb();
 		gart_page += 1 << GART_PAGE_SHIFT;
 	}
 	spin_unlock(&gart->pte_lock);
@@ -340,7 +339,7 @@ static void gart_map_pfn(struct tegra_iovmm_device *dev,
 	spin_lock(&gart->pte_lock);
 	writel(offs, gart->regs + GART_ENTRY_ADDR);
 	writel(GART_PTE(pfn), gart->regs + GART_ENTRY_DATA);
-	gart_barrier(gart);
+	wmb();
 	spin_unlock(&gart->pte_lock);
 	wmb();
 }
