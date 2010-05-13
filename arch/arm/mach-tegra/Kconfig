@@ -55,6 +55,12 @@ config MACH_TEGRA_GENERIC
 	bool
 	default y
 
+config TEGRA_NVOS
+	bool "Include Tegra NvOS interfaces"
+	default y
+	help
+	  Adds the Tegra NvOS driver layer and associated user-space
+	  interfaces
 config TEGRA_IOVMM_GART
 	bool "Enable I/O virtual memory manager for GART"
 	depends on ARCH_TEGRA_2x_SOC
