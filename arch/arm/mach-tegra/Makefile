@@ -17,3 +17,9 @@ obj-$(CONFIG_TEGRA_IOVMM)		+= iovmm.o
 obj-$(CONFIG_TEGRA_IOVMM_GART)		+= iovmm-gart.o
 obj-$(CONFIG_TEGRA_SYSTEM_DMA)		+= dma.o
 
+ccflags-$(CONFIG_TEGRA_NVOS)		+= -DNV_DEBUG=0
+ccflags-$(CONFIG_TEGRA_NVOS)		+= -DNV_OAL=0
+ccflags-$(CONFIG_TEGRA_NVOS)		+= -DNV_IS_AVP=0
+ccflags-$(CONFIG_TEGRA_NVOS)		+= -DNV_USE_FUSE_CLOCK_ENABLE=0
+obj-$(CONFIG_TEGRA_NVOS)		+= nvos_user.o
+obj-$(CONFIG_TEGRA_NVOS)		+= nvos/
