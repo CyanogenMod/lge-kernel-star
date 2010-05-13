@@ -439,6 +439,7 @@ int tegra_pinmux_get_tristate(tegra_pingroup_t pg)
 	else
 		return 1;
 }
+
 int tegra_pinmux_set_tristate(tegra_pingroup_t pg, tegra_tristate_t tristate)
 {
 	unsigned long reg;
@@ -588,6 +589,20 @@ void tegra_pinmux_config_tristate_table(const struct tegra_pingroup_config *conf
 	}
 }
 
+void tegra_pinmux_set_vddio_tristate(tegra_vddio_t vddio,
+				     tegra_tristate_t tristate)
+{
+	int pg;
+	for (pg = TEGRA_PINGROUP_ATA; pg < TEGRA_MAX_PINGROUP; ++pg) {
+		if (pingroups[pg].vddio == vddio &&
+		    pingroups[pg].tri_reg != REG_N) {
+			if (tegra_pinmux_set_tristate(pg, tristate)<0)
+				pr_err("pinmux: can't set pingroup %s tristate"
+				       " to %s\n", pingroup_name(pg),
+				       tri_name(tristate));
+		}
+	}
+}
 
 void tegra_pinmux_config_pullupdown_table(const struct tegra_pingroup_config *config,
 					  int len, tegra_pullupdown_t pupd)

@@ -256,6 +256,7 @@ void tegra_pinmux_config_tristate_table(const struct tegra_pingroup_config *conf
 					int len, tegra_tristate_t tristate);
 void tegra_pinmux_config_pullupdown_table(const struct tegra_pingroup_config *config,
 					  int len, tegra_pullupdown_t pupd);
-
+void tegra_pinmux_set_vddio_tristate(tegra_vddio_t vddio,
+				     tegra_tristate_t tristate);
 #endif
 
