@@ -42,6 +42,9 @@
 #include <asm/tlbflush.h>
 #include <mach/iovmm.h>
 #include <mach/nvmem.h>
+#include "nvcommon.h"
+#include "nvrm_memmgr.h"
+#include "nvbootargs.h"
 
 #ifndef NVMAP_BASE
 #define NVMAP_BASE 0xFEE00000
@@ -1469,6 +1472,32 @@ static int _nvmap_handle_unpin(struct nvmap_handle *h)
  * is available to complete the list pin. no intervening pin operations
  * will interrupt this, and no validation is performed on the handles
  * that are provided. */
+static int _nvmap_handle_pin_fast(unsigned int nr, struct nvmap_handle **h)
+{
+	unsigned int i;
+	int ret = 0;
+
+	mutex_lock(&nvmap_pin_lock);
+	for (i=0; i<nr && !ret; i++) {
+		ret = wait_event_interruptible(nvmap_pin_wait,
+			!_nvmap_handle_pin_locked(h[i]));
+	}
+	mutex_unlock(&nvmap_pin_lock);
+
+	if (ret) {
+		int do_wake = 0;
+		while (i--) do_wake |= _nvmap_handle_unpin(h[i]);
+		if (do_wake) wake_up(&nvmap_pin_wait);
+		return -EINTR;
+	} else {
+		for (i=0; i<nr; i++)
+			if (h[i]->heap_pgalloc && h[i]->pgalloc.dirty)
+				_nvmap_handle_iovmm_map(h[i]);
+	}
+
+	return 0;
+}
+
 static int _nvmap_do_global_unpin(unsigned long ref)
 {
 	struct nvmap_handle *h;
@@ -2683,6 +2712,33 @@ static int _nvmap_try_create_preserved(struct nvmap_carveout *co,
 	return (h->carveout.co_heap == NULL) ? -ENXIO : 0;
 }
 
+static void _nvmap_create_nvos_preserved(struct nvmap_carveout *co)
+{
+	unsigned int i, key;
+	NvBootArgsPreservedMemHandle mem;
+	static int was_created[NvBootArgKey_PreservedMemHandle_Num -
+		NvBootArgKey_PreservedMemHandle_0] = { 0 };
+
+	for (i=0, key=NvBootArgKey_PreservedMemHandle_0;
+	     i<ARRAY_SIZE(was_created); i++, key++) {
+		struct nvmap_handle *h;
+
+		if (was_created[i]) continue;
+
+		if (NvOsBootArgGet(key, &mem, sizeof(mem))!=NvSuccess) continue;
+		if (!mem.Address || !mem.Size) continue;
+
+		h = _nvmap_handle_create(NULL, mem.Size);
+		if (!h) continue;
+
+		if (!_nvmap_try_create_preserved(co, h, mem.Address,
+		    mem.Size, key))
+			was_created[i] = 1;
+		else
+			_nvmap_handle_put(h);
+	}
+}
+
 int nvmap_add_carveout_heap(unsigned long base, size_t size,
 	const char *name, unsigned int bitmask)
 {
@@ -2705,6 +2761,7 @@ int nvmap_add_carveout_heap(unsigned long base, size_t size,
 
 	/* called inside the list_sem lock to ensure that the was_created
 	 * array is protected against simultaneous access */
+	_nvmap_create_nvos_preserved(&n->carveout);
 	_nvmap_create_heap_attrs(n);
 
 	list_for_each_entry(l, &nvmap_context.heaps, heap_list) {
@@ -2813,3 +2870,431 @@ static int nvmap_split_carveout_heap(struct nvmap_carveout *co, size_t size,
 	return 0;
 }
 
+/* NvRmMemMgr APIs implemented on top of nvmap */
+
+#include <linux/freezer.h>
+
+NvU32 NvRmMemGetAddress(NvRmMemHandle hMem, NvU32 Offset)
+{
+	struct nvmap_handle *h = (struct nvmap_handle *)hMem;
+	unsigned long addr;
+
+	if (unlikely(!atomic_add_return(0, &h->pin) || !h->alloc ||
+	    Offset >= h->orig_size)) {
+		WARN_ON(1);
+		return ~0ul;
+	}
+
+	if (h->heap_pgalloc && h->pgalloc.contig)
+		addr = page_to_phys(h->pgalloc.pages[0]);
+	else if (h->heap_pgalloc) {
+		BUG_ON(!h->pgalloc.area);
+		addr = h->pgalloc.area->iovm_start;
+	} else
+		addr = h->carveout.base;
+
+	return (NvU32)addr+Offset;
+
+}
+
+void NvRmMemPinMult(NvRmMemHandle *hMems, NvU32 *addrs, NvU32 Count)
+{
+	struct nvmap_handle **h = (struct nvmap_handle **)hMems;
+	unsigned int i;
+	int ret;
+
+	do {
+		ret = _nvmap_handle_pin_fast(Count, h);
+		if (ret && !try_to_freeze()) {
+			pr_err("%s: failed to pin handles\n", __func__);
+			dump_stack();
+		}
+	} while (ret);
+
+	for (i=0; i<Count; i++) {
+		addrs[i] = NvRmMemGetAddress(hMems[i], 0);
+		BUG_ON(addrs[i]==~0ul);
+	}
+}
+
+void NvRmMemUnpinMult(NvRmMemHandle *hMems, NvU32 Count)
+{
+	int do_wake = 0;
+	unsigned int i;
+
+	for (i=0; i<Count; i++) {
+		struct nvmap_handle *h = (struct nvmap_handle *)hMems[i];
+		if (h) {
+			BUG_ON(atomic_add_return(0, &h->pin)==0);
+			do_wake |= _nvmap_handle_unpin(h);
+		}
+	}
+
+	if (do_wake) wake_up(&nvmap_pin_wait);
+}
+
+NvU32 NvRmMemPin(NvRmMemHandle hMem)
+{
+	NvU32 addr;
+	NvRmMemPinMult(&hMem, &addr, 1);
+	return addr;
+}
+
+void NvRmMemUnpin(NvRmMemHandle hMem)
+{
+	NvRmMemUnpinMult(&hMem, 1);
+}
+
+void NvRmMemHandleFree(NvRmMemHandle hMem)
+{
+	_nvmap_do_free(&nvmap_context.init_data, (unsigned long)hMem);
+}
+
+NvError NvRmMemMap(NvRmMemHandle hMem, NvU32 Offset, NvU32 Size,
+	NvU32 Flags, void **pVirtAddr)
+{
+	struct nvmap_handle *h = (struct nvmap_handle *)hMem;
+	pgprot_t prot = _nvmap_flag_to_pgprot(h->flags, pgprot_kernel);
+
+	BUG_ON(!h->alloc);
+
+	if (Offset+Size > h->size)
+		return NvError_BadParameter;
+
+	if (!h->kern_map && h->heap_pgalloc) {
+		BUG_ON(h->size & ~PAGE_MASK);
+		h->kern_map = vm_map_ram(h->pgalloc.pages,
+			h->size>>PAGE_SHIFT, -1, prot);
+	} else if (!h->kern_map) {
+		unsigned int size;
+		unsigned long addr;
+
+		addr = h->carveout.base;
+		size = h->size + (addr & ~PAGE_MASK);
+		addr &= PAGE_MASK;
+		size = (size + PAGE_SIZE - 1) & PAGE_MASK;
+
+		h->kern_map = ioremap_wc(addr, size);
+		if (h->kern_map) {
+			addr = h->carveout.base - addr;
+			h->kern_map += addr;
+		}
+	}
+
+	if (h->kern_map) {
+		*pVirtAddr = (h->kern_map + Offset);
+		return NvSuccess;
+	}
+
+	return NvError_InsufficientMemory;
+}
+
+void NvRmMemUnmap(NvRmMemHandle hMem, void *pVirtAddr, NvU32 Size)
+{
+	return;
+}
+
+NvU32 NvRmMemGetId(NvRmMemHandle hMem)
+{
+	struct nvmap_handle *h = (struct nvmap_handle *)hMem;
+	if (!h->owner) h->global = true;
+	return (NvU32)h;
+}
+
+NvError NvRmMemHandleFromId(NvU32 id, NvRmMemHandle *hMem)
+{
+	struct nvmap_handle_ref *r;
+
+	int err = _nvmap_do_create(&nvmap_context.init_data,
+		NVMEM_IOC_FROM_ID, id, true, &r);
+
+	if (err || !r) return NvError_NotInitialized;
+
+	*hMem = (NvRmMemHandle)r->h;
+	return NvSuccess;
+}
+
+NvError NvRmMemHandleClaimPreservedHandle(NvRmDeviceHandle hRm,
+	NvU32 Key, NvRmMemHandle *hMem)
+{
+	struct nvmap_handle_ref *r;
+
+	int err = _nvmap_do_create(&nvmap_context.init_data,
+		NVMEM_IOC_CLAIM, (unsigned long)Key, true, &r);
+
+	if (err || !r) return NvError_NotInitialized;
+
+	*hMem = (NvRmMemHandle)r->h;
+	return NvSuccess;
+}
+
+NvError NvRmMemHandleCreate(NvRmDeviceHandle hRm,
+	NvRmMemHandle *hMem, NvU32 Size)
+{
+	struct nvmap_handle_ref *r;
+	int err = _nvmap_do_create(&nvmap_context.init_data,
+		NVMEM_IOC_CREATE, (unsigned long)Size, true, &r);
+
+	if (err || !r) return NvError_InsufficientMemory;
+	*hMem = (NvRmMemHandle)r->h;
+	return NvSuccess;
+}
+
+NvError NvRmMemAlloc(NvRmMemHandle hMem, const NvRmHeap *Heaps,
+	NvU32 NumHeaps, NvU32 Alignment, NvOsMemAttribute Coherency)
+{
+	unsigned int flags = pgprot_kernel;
+	int err = -ENOMEM;
+
+	BUG_ON(Alignment & (Alignment-1));
+
+	if (Coherency == NvOsMemAttribute_WriteBack)
+		flags = NVMEM_HANDLE_INNER_CACHEABLE;
+	else
+		flags = NVMEM_HANDLE_WRITE_COMBINE;
+
+	if (!NumHeaps || !Heaps) {
+		err = _nvmap_do_alloc(&nvmap_context.init_data,
+				  (unsigned long)hMem, NVMAP_KERNEL_DEFAULT_HEAPS,
+				  (size_t)Alignment, flags);
+	}
+	else {
+		unsigned int i;
+		for (i = 0; i < NumHeaps; i++) {
+			unsigned int heap;
+			switch (Heaps[i]) {
+			case NvRmHeap_GART:
+				heap = NVMEM_HEAP_IOVMM;
+				break;
+			case NvRmHeap_External:
+				heap = NVMEM_HEAP_SYSMEM;
+				break;
+			case NvRmHeap_ExternalCarveOut:
+				heap = NVMEM_HEAP_CARVEOUT_GENERIC;
+				break;
+			case NvRmHeap_IRam:
+				heap = NVMEM_HEAP_CARVEOUT_IRAM;
+				break;
+			default:
+				heap = 0;
+				break;
+			}
+			if (heap) {
+				err = _nvmap_do_alloc(&nvmap_context.init_data,
+						  (unsigned long)hMem, heap,
+						  (size_t)Alignment, flags);
+				if (!err) break;
+			}
+		}
+	}
+
+	return (err ? NvError_InsufficientMemory : NvSuccess);
+}
+
+void NvRmMemReadStrided(NvRmMemHandle hMem, NvU32 Offset, NvU32 SrcStride,
+	void *pDst, NvU32 DstStride, NvU32 ElementSize, NvU32 Count)
+{
+	ssize_t bytes = 0;
+
+	bytes = _nvmap_do_rw_handle((struct nvmap_handle *)hMem, true,
+		false, Offset, (unsigned long)pDst, SrcStride,
+		DstStride, ElementSize, Count);
+
+	BUG_ON(bytes != (ssize_t)(Count*ElementSize));
+}
+
+void NvRmMemWriteStrided(NvRmMemHandle hMem, NvU32 Offset, NvU32 DstStride,
+	const void *pSrc, NvU32 SrcStride, NvU32 ElementSize, NvU32 Count)
+{
+	ssize_t bytes = 0;
+
+	bytes = _nvmap_do_rw_handle((struct nvmap_handle *)hMem, false,
+		false, Offset, (unsigned long)pSrc, DstStride,
+		SrcStride, ElementSize, Count);
+
+	BUG_ON(bytes != (ssize_t)(Count*ElementSize));
+}
+
+NvU32 NvRmMemGetSize(NvRmMemHandle hMem)
+{
+	struct nvmap_handle *h = (struct nvmap_handle *)hMem;
+	return h->orig_size;
+}
+
+NvRmHeap NvRmMemGetHeapType(NvRmMemHandle hMem, NvU32 *BaseAddr)
+{
+	struct nvmap_handle *h = (struct nvmap_handle *)hMem;
+	NvRmHeap heap;
+
+	if (!h->alloc) {
+		*BaseAddr = ~0ul;
+		return (NvRmHeap)0;
+	}
+
+	if (h->heap_pgalloc && !h->pgalloc.contig)
+		heap = NvRmHeap_GART;
+	else if (h->heap_pgalloc)
+		heap = NvRmHeap_External;
+	else if ((h->carveout.base & 0xf0000000ul) == 0x40000000ul)
+		heap = NvRmHeap_IRam;
+	else
+		heap = NvRmHeap_ExternalCarveOut;
+
+	if (h->heap_pgalloc && h->pgalloc.contig)
+		*BaseAddr = (NvU32)page_to_phys(h->pgalloc.pages[0]);
+	else if (h->heap_pgalloc && atomic_add_return(0, &h->pin))
+		*BaseAddr = h->pgalloc.area->iovm_start;
+	else if (h->heap_pgalloc)
+		*BaseAddr = ~0ul;
+	else
+		*BaseAddr = (NvU32)h->carveout.base;
+
+	return heap;
+}
+
+void NvRmMemCacheMaint(NvRmMemHandle hMem, void *pMapping,
+	NvU32 Size, NvBool Writeback, NvBool Inv)
+{
+	struct nvmap_handle *h = (struct nvmap_handle *)hMem;
+	unsigned long start;
+	unsigned int op;
+
+	if (!h->kern_map || h->flags==NVMEM_HANDLE_UNCACHEABLE ||
+		h->flags==NVMEM_HANDLE_WRITE_COMBINE) return;
+
+	if (!Writeback && !Inv) return;
+
+	if (Writeback && Inv) op = NVMEM_CACHE_OP_WB_INV;
+	else if (Writeback) op = NVMEM_CACHE_OP_WB;
+	else op = NVMEM_CACHE_OP_INV;
+
+	start = (unsigned long)pMapping - (unsigned long)h->kern_map;
+
+	_nvmap_do_cache_maint(h, start, start+Size, op, true);
+	return;
+}
+
+NvU32 NvRmMemGetAlignment(NvRmMemHandle hMem)
+{
+	struct nvmap_handle *h = (struct nvmap_handle *)hMem;
+	return _nvmap_do_get_param(h, NVMEM_HANDLE_PARAM_ALIGNMENT);
+}
+
+NvError NvRmMemGetStat(NvRmMemStat Stat, NvS32 *Result)
+{
+	unsigned long total_co = 0;
+	unsigned long free_co = 0;
+	unsigned long max_free = 0;
+	struct nvmap_carveout_node *n;
+
+	down_read(&nvmap_context.list_sem);
+	list_for_each_entry(n, &nvmap_context.heaps, heap_list) {
+
+		if (!(n->heap_bit & NVMEM_HEAP_CARVEOUT_GENERIC)) continue;
+			total_co += _nvmap_carveout_blockstat(&n->carveout,
+					CARVEOUT_STAT_TOTAL_SIZE);
+			free_co += _nvmap_carveout_blockstat(&n->carveout,
+					CARVEOUT_STAT_FREE_SIZE);
+			max_free = max(max_free,
+				_nvmap_carveout_blockstat(&n->carveout,
+				    CARVEOUT_STAT_LARGEST_FREE));
+	}
+	up_read(&nvmap_context.list_sem);
+
+	if (Stat==NvRmMemStat_TotalCarveout) {
+		*Result = (NvU32)total_co;
+		return NvSuccess;
+	} else if (Stat==NvRmMemStat_UsedCarveout) {
+		*Result = (NvU32)total_co - (NvU32)free_co;
+		return NvSuccess;
+	} else if (Stat==NvRmMemStat_LargestFreeCarveoutBlock) {
+		*Result = (NvU32)max_free;
+		return NvSuccess;
+	}
+
+	return NvError_BadParameter;
+}
+
+NvU8 NvRmMemRd08(NvRmMemHandle hMem, NvU32 Offset)
+{
+	NvU8 val;
+	NvRmMemRead(hMem, Offset, &val, sizeof(val));
+	return val;
+}
+
+NvU16 NvRmMemRd16(NvRmMemHandle hMem, NvU32 Offset)
+{
+	NvU16 val;
+	NvRmMemRead(hMem, Offset, &val, sizeof(val));
+	return val;
+}
+
+NvU32 NvRmMemRd32(NvRmMemHandle hMem, NvU32 Offset)
+{
+	NvU32 val;
+	NvRmMemRead(hMem, Offset, &val, sizeof(val));
+	return val;
+}
+
+void NvRmMemWr08(NvRmMemHandle hMem, NvU32 Offset, NvU8 Data)
+{
+	NvRmMemWrite(hMem, Offset, &Data, sizeof(Data));
+}
+
+void NvRmMemWr16(NvRmMemHandle hMem, NvU32 Offset, NvU16 Data)
+{
+	NvRmMemWrite(hMem, Offset, &Data, sizeof(Data));
+}
+
+void NvRmMemWr32(NvRmMemHandle hMem, NvU32 Offset, NvU32 Data)
+{
+	NvRmMemWrite(hMem, Offset, &Data, sizeof(Data));
+}
+
+void NvRmMemRead(NvRmMemHandle hMem, NvU32 Offset, void *pDst, NvU32 Size)
+{
+	NvRmMemReadStrided(hMem, Offset, Size, pDst, Size, Size, 1);
+}
+
+void NvRmMemWrite(NvRmMemHandle hMem, NvU32 Offset,
+	const void *pSrc, NvU32 Size)
+{
+	NvRmMemWriteStrided(hMem, Offset, Size, pSrc, Size, Size, 1);
+}
+
+void NvRmMemMove(NvRmMemHandle dstHMem, NvU32 dstOffset,
+	NvRmMemHandle srcHMem, NvU32 srcOffset, NvU32 Size)
+{
+	while (Size--) {
+		NvU8 tmp = NvRmMemRd08(srcHMem, srcOffset);
+		NvRmMemWr08(dstHMem, dstOffset, tmp);
+		dstOffset++;
+		srcOffset++;
+	}
+}
+
+NvU32 NvRmMemGetCacheLineSize(void)
+{
+	return 32;
+}
+
+void *NvRmHostAlloc(size_t size)
+{
+	return NvOsAlloc(size);
+}
+
+void NvRmHostFree(void *ptr)
+{
+	NvOsFree(ptr);
+}
+
+NvError NvRmMemMapIntoCallerPtr(NvRmMemHandle hMem, void *pCallerPtr,
+	NvU32 Offset, NvU32 Size)
+{
+	return NvError_NotSupported;
+}
+
+NvError NvRmMemHandlePreserveHandle(NvRmMemHandle hMem, NvU32 *pKey)
+{
+	return NvError_NotSupported;
+}

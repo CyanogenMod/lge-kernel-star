@@ -57,10 +57,20 @@ config MACH_TEGRA_GENERIC
 
 config TEGRA_NVOS
 	bool "Include Tegra NvOS interfaces"
+	depends on MACH_TEGRA_GENERIC
 	default y
 	help
 	  Adds the Tegra NvOS driver layer and associated user-space
 	  interfaces
+
+config TEGRA_NVRM
+	bool "Include Tegra NvRM interfaces"
+	depends on TEGRA_NVOS
+	default n
+	help
+	  Adds the Tegra NVRM driver layer and associated user-space
+	  interfaces.
+
 config TEGRA_IOVMM_GART
 	bool "Enable I/O virtual memory manager for GART"
 	depends on ARCH_TEGRA_2x_SOC
@@ -80,5 +90,9 @@ config TEGRA_SYSTEM_DMA
 
 config TEGRA_IOVMM
 	bool
+
+if TEGRA_NVRM
+source "arch/arm/mach-tegra/odm_kit/Kconfig"
+endif
 
 endif

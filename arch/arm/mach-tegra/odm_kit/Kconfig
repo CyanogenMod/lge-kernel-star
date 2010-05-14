@@ -1,0 +1,16 @@
+if MACH_TEGRA_GENERIC
+
+choice
+	prompt "Select ODM kit target board"
+
+config TEGRA_ODM_HARMONY
+	bool "NVIDIA Harmony development system"
+	depends on ARCH_TEGRA_2x_SOC
+
+config TEGRA_ODM_WHISTLER
+	bool "NVIDIA Whistler development system"
+	depends on ARCH_TEGRA_2x_SOC
+
+endchoice
+
+endif

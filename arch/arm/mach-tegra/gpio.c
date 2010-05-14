@@ -20,12 +20,18 @@
 #include <linux/init.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
+#include <linux/delay.h>
 
 #include <linux/io.h>
 #include <linux/gpio.h>
 
 #include <mach/iomap.h>
 #include <mach/pinmux.h>
+
+#include <mach/nvrm_linux.h>
+#include "nvcommon.h"
+#include "nvrm_pmu.h"
+#include "nvodm_query_discovery.h"
 
 #define GPIO_BANK(x)		((x) >> 5)
 #define GPIO_PORT(x)		(((x) >> 3) & 0x3)
@@ -59,6 +65,7 @@
 #define GPIO_INT_LVL_LEVEL_LOW		0x000000
 
 extern int gpio_get_pinmux_group(int gpio_nr);
+int tegra_gpio_io_power_config(int gpio_nr, unsigned int enable);
 
 struct tegra_gpio_bank {
 	int bank;
@@ -99,16 +106,6 @@ static void tegra_gpio_mask_write(u32 reg, int gpio, int value)
 	__raw_writel(val, reg);
 }
 
-void tegra_gpio_enable(int gpio)
-{
-	tegra_gpio_mask_write(GPIO_MSK_CNF(gpio), gpio, 1);
-}
-
-void tegra_gpio_disable(int gpio)
-{
-	tegra_gpio_mask_write(GPIO_MSK_CNF(gpio), gpio, 0);
-}
-
 static void tegra_set_gpio_tristate(int gpio_nr, tegra_tristate_t ts)
 {
 	tegra_pingroup_t pg;
@@ -123,29 +120,29 @@ static void tegra_set_gpio_tristate(int gpio_nr, tegra_tristate_t ts)
 	}
 }
 
+void tegra_gpio_enable(int gpio)
+{
+	WARN_ON(tegra_gpio_io_power_config(gpio, 1) != 0);
+	tegra_gpio_mask_write(GPIO_MSK_CNF(gpio), gpio, 1);
+	tegra_set_gpio_tristate(gpio, TEGRA_TRI_NORMAL);
+}
+
+void tegra_gpio_disable(int gpio)
+{
+	tegra_gpio_mask_write(GPIO_MSK_CNF(gpio), gpio, 0);
+	tegra_set_gpio_tristate(gpio, TEGRA_TRI_TRISTATE);
+	WARN_ON(tegra_gpio_io_power_config(gpio, 0) != 0);
+}
+
 static int tegra_gpio_request(struct gpio_chip *chip, unsigned offset)
 {
-	int port;
-	int pin;
-
-	port = GPIO_BANK(offset) * 4 + GPIO_PORT(offset);
-	pin = GPIO_BIT(offset);
-
-	tegra_gpio_mask_write(GPIO_MSK_CNF(offset), offset, 1);
-	tegra_set_gpio_tristate(offset, TEGRA_TRI_NORMAL);
+	tegra_gpio_enable(offset);
 	return 0;
 }
 
 static void tegra_gpio_free(struct gpio_chip *chip, unsigned offset)
 {
-	int port;
-	int pin;
-
-	port = GPIO_BANK(offset) * 4 + GPIO_PORT(offset);
-	pin = GPIO_BIT(offset);
-
-	tegra_gpio_mask_write(GPIO_MSK_CNF(offset), offset, 0);
-	tegra_set_gpio_tristate(offset, TEGRA_TRI_TRISTATE);
+	tegra_gpio_disable(offset);
 }
 
 static void tegra_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
@@ -385,6 +382,47 @@ static struct irq_chip tegra_gpio_irq_chip = {
  */
 static struct lock_class_key gpio_lock_class;
 
+struct gpio_power_rail_info {
+	NvU64 guid;
+	NvU32 address;
+	NvU32 mv;
+};
+
+static struct gpio_power_rail_info gpio_power_rail_table[] = {
+	[TEGRA_VDDIO_BB]    =  {.guid = NV_VDD_BB_ODM_ID,},
+	[TEGRA_VDDIO_LCD]   =  {.guid = NV_VDD_LCD_ODM_ID,},
+	[TEGRA_VDDIO_VI]    =  {.guid = NV_VDD_VI_ODM_ID,},
+	[TEGRA_VDDIO_UART]  =  {.guid = NV_VDD_UART_ODM_ID,},
+	[TEGRA_VDDIO_DDR]   =  {.guid = NV_VDD_DDR_ODM_ID,},
+	[TEGRA_VDDIO_NAND]  =  {.guid = NV_VDD_NAND_ODM_ID,},
+	[TEGRA_VDDIO_SYS]   =  {.guid = NV_VDD_SYS_ODM_ID,},
+	[TEGRA_VDDIO_AUDIO] =  {.guid = NV_VDD_AUD_ODM_ID,},
+	[TEGRA_VDDIO_SD]    =  {.guid = NV_VDD_SDIO_ODM_ID,},
+};
+
+static void gpio_rail_init(void)
+{
+	unsigned int i;
+
+	if (!s_hRmGlobal)
+		return;
+
+	for (i = 0; i < NV_ARRAY_SIZE(gpio_power_rail_table); i++) {
+		struct gpio_power_rail_info *rail = &gpio_power_rail_table[i];
+		const NvOdmPeripheralConnectivity *conn;
+		NvRmPmuVddRailCapabilities caps;
+
+		conn = NvOdmPeripheralGetGuid(rail->guid);
+		if (!conn || !conn->NumAddress)
+			continue;
+
+		rail->address = conn->AddressList[0].Address;
+
+		NvRmPmuGetCapabilities(NULL, rail->address, &caps);
+		rail->mv = (caps.RmProtected) ? 0 : caps.requestMilliVolts;
+	}
+}
+
 static int __init tegra_gpio_init(void)
 {
 	struct tegra_gpio_bank *bank;
@@ -420,6 +458,7 @@ static int __init tegra_gpio_init(void)
 			spin_lock_init(&bank->lvl_lock[j]);
 	}
 
+	gpio_rail_init();
 	return 0;
 }
 
@@ -472,3 +511,33 @@ static int __init tegra_gpio_debuginit(void)
 }
 late_initcall(tegra_gpio_debuginit);
 #endif
+
+int tegra_gpio_io_power_config(int gpio_nr, unsigned int enable)
+{
+	struct gpio_power_rail_info *rail;
+	tegra_pingroup_t pg;
+	NvU32 settle;
+	int vddio_id;
+
+	pg = gpio_get_pinmux_group(gpio_nr);
+	if (pg < 0)
+		return pg;
+	vddio_id = tegra_pinmux_get_vddio(pg);
+	if(vddio_id < 0)
+		return vddio_id;
+
+	if (unlikely(!s_hRmGlobal))
+		return 0;
+
+	rail = &gpio_power_rail_table[vddio_id];
+	if (!rail->address || !rail->mv)
+		return 0;
+
+	NvRmPmuSetVoltage(s_hRmGlobal, rail->address,
+		(enable) ? rail->mv : ODM_VOLTAGE_OFF, &settle);
+
+	if (settle)
+		udelay(settle);
+
+	return 0;
+}

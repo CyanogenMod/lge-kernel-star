@@ -381,6 +381,13 @@ int tegra_pinmux_cancel_func(tegra_pingroup_t pg, tegra_mux_func_t func)
 	return 0;
 }
 
+int tegra_pinmux_get_vddio(tegra_pingroup_t pg)
+{
+	if (pg < 0 || pg >=  TEGRA_MAX_PINGROUP)
+		return -EINVAL;
+	return pingroups[pg].vddio;
+}
+
 int tegra_pinmux_set_func(tegra_pingroup_t pg, tegra_mux_func_t func)
 {
 	int mux = -1;
