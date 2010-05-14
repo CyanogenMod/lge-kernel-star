@@ -123,6 +123,35 @@ config BFIN_JTAG_COMM_CONSOLE
 	bool "Console on Blackfin JTAG"
 	depends on BFIN_JTAG_COMM=y
 
+config DEVNVMAP
+	bool "/dev/nvmap device support"
+	depends on ARCH_TEGRA && MACH_TEGRA_GENERIC
+	default y
+	help
+	  Say Y here if you want to support the /dev/nvmap device. This device
+	  is used by NVIDIA Tegra graphics and multimedia drivers for managing
+	  graphics memory.
+
+config DEVNVMAP_PARANOID
+	bool "Validate all user-provided /dev/nvmap object references"
+	depends on DEVNVMAP
+	default n
+	help
+	  Say Y here to enable additional process-level validations and
+	  permissions for /dev/nvmap object references provided via ioctls.
+	  May result in a decrease in performance.
+
+config DEVNVMAP_RECLAIM_UNPINNED_VM
+	bool "Allow /dev/nvmap to reclaim unpinned I/O virtual memory"
+	depends on DEVNVMAP && TEGRA_IOVMM
+	default y
+	help
+	  Say Y here to enable /dev/nvmap to reclaim I/O virtual memory after
+	  it has been unpinned, and re-use it for other objects. This can
+	  allow a larger virtual I/O VM space than would normally be
+	  supported by the hardware, at a slight cost in performance.
+
+
 config SERIAL_NONSTANDARD
 	bool "Non-standard serial port support"
 	depends on HAS_IOMEM
