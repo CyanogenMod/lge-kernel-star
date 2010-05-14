@@ -24,10 +24,12 @@
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
+
 #include <asm/unaligned.h>
 
 #include <mach/i2c.h>
 #include <mach/pinmux.h>
+#include <mach/clk.h>
 
 #define TEGRA_I2C_TIMEOUT (msecs_to_jiffies(1000))
 #define BYTES_PER_FIFO_WORD 4
@@ -303,6 +305,11 @@ static int tegra_i2c_init(struct tegra_i2c_dev *i2c_dev)
 	u32 val;
 	int err = 0;
 
+	tegra_periph_reset_assert(i2c_dev->clk);
+	msleep(1);
+	tegra_periph_reset_deassert(i2c_dev->clk);
+	msleep(1);
+
 	clk_enable(i2c_dev->clk);
 
 	dev_dbg(i2c_dev->dev, "init\n");
@@ -449,8 +456,7 @@ static int tegra_i2c_xfer_msg(struct tegra_i2c_dev *i2c_dev,
 	dev_dbg(i2c_dev->dev, "after transfer: %08x fifo %02x\n", i2c_readl(i2c_dev, I2C_PACKET_TRANSFER_STATUS), i2c_readl(i2c_dev, I2C_FIFO_STATUS));
 	if (ret == 0) {
 		dev_err(i2c_dev->dev, "i2c transfer timed out\n");
-		dev_err(i2c_dev->dev, "");
-		BUG();
+
 		tegra_i2c_init(i2c_dev);
 		return -ETIMEDOUT;
 	}
@@ -459,7 +465,7 @@ static int tegra_i2c_xfer_msg(struct tegra_i2c_dev *i2c_dev,
 
 	if (likely(i2c_dev->msg_err == I2C_ERR_NONE))
 		return 0;
-	BUG();
+
 	tegra_i2c_init(i2c_dev);
 	if (i2c_dev->msg_err == I2C_ERR_NO_ACK) {
 		if (msg->flags & I2C_M_IGNORE_NAK)
@@ -496,6 +502,7 @@ static int tegra_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int n
 {
 	struct tegra_i2c_bus *i2c_bus = i2c_get_adapdata(adap);
 	struct tegra_i2c_dev *i2c_dev = i2c_bus->dev;
+	int ret = 0;
 	int i;
 
 	if (i2c_bus->mux && i2c_bus->mux_len) {
@@ -513,7 +520,9 @@ static int tegra_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int n
 	clk_enable(i2c_dev->clk);
 	for (i = 0; i < num; i++) {
 		int stop = (i == (num - 1)) ? 1  : 0;
-		tegra_i2c_xfer_msg(i2c_dev, &msgs[i], stop);
+		ret = tegra_i2c_xfer_msg(i2c_dev, &msgs[i], stop);
+		if (ret)
+			break;
 	}
 	clk_disable(i2c_dev->clk);
 
@@ -528,7 +537,7 @@ static int tegra_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int n
 		}
 	}
 
-	return num;
+	return i;
 }
 
 static u32 tegra_i2c_func(struct i2c_adapter *adap)
