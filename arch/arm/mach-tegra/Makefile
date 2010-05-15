@@ -27,4 +27,6 @@ obj-$(CONFIG_TEGRA_NVOS)		+= nvos/
 obj-$(CONFIG_TEGRA_NVRM)		+= nvrm/
 obj-$(CONFIG_TEGRA_NVRM)		+= nvodm/
 obj-$(CONFIG_TEGRA_NVRM)		+= odm_kit/
+obj-$(CONFIG_TEGRA_NVRM)		+= nvreftrack/
 obj-$(CONFIG_TEGRA_NVRM)		+= nvrm_user.o
+
