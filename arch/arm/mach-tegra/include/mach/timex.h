@@ -23,4 +23,12 @@
 
 #define CLOCK_TICK_RATE		1000000
 
+#ifdef CONFIG_USE_ARM_TWD_PRESCALER
+void local_timer_rescale(unsigned long cpu_freq_khz);
+#else
+static inline void local_timer_rescale(unsigned long cpu_freq_khz)
+{
+}
+#endif
+
 #endif
