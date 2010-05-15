@@ -38,8 +38,28 @@
 #define TWD_TIMER_CONTROL_PERIODIC	(1 << 1)
 #define TWD_TIMER_CONTROL_IT_ENABLE	(1 << 2)
 
+#define TWD_TIMER_CONTROL_PRESCALER_LSB		8
+#define TWD_TIMER_CONTROL_PRESCALER_MASK	0xFF
+#define TWD_TIMER_CONTROL_PRESCALER_FIELD \
+       (TWD_TIMER_CONTROL_PRESCALER_MASK << TWD_TIMER_CONTROL_PRESCALER_LSB)
+
 /* set up by the platform code */
 void __iomem *twd_base;
+
+#ifdef CONFIG_USE_ARM_TWD_PRESCALER
+static DEFINE_SPINLOCK(twd_lock);
+unsigned long twd_prescaler = 0;
+#define twd_locked(_expr)					\
+	do {							\
+		unsigned long flags;				\
+		spin_lock_irqsave(&twd_lock, flags);		\
+		_expr						\
+		spin_unlock_irqrestore(&twd_lock, flags);	\
+	} while (0)
+#else
+#define twd_prescaler 0
+#define twd_locked(_expr) _expr
+#endif
 
 static unsigned long twd_timer_rate;
 
@@ -64,21 +84,52 @@ static void twd_set_mode(enum clock_event_mode mode,
 		ctrl = 0;
 	}
 
-	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
+	twd_locked(
+		ctrl |= (twd_prescaler << TWD_TIMER_CONTROL_PRESCALER_LSB);
+		__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
+	);
 }
 
 static int twd_set_next_event(unsigned long evt,
 			struct clock_event_device *unused)
 {
-	unsigned long ctrl = __raw_readl(twd_base + TWD_TIMER_CONTROL);
+	unsigned long ctrl;
 
-	ctrl |= TWD_TIMER_CONTROL_ENABLE;
+	twd_locked(
+		ctrl = __raw_readl(twd_base + TWD_TIMER_CONTROL);
+		ctrl &= ~(TWD_TIMER_CONTROL_PRESCALER_FIELD);
+		ctrl |= (twd_prescaler << TWD_TIMER_CONTROL_PRESCALER_LSB);
 
-	__raw_writel(evt, twd_base + TWD_TIMER_COUNTER);
-	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
+		ctrl |= TWD_TIMER_CONTROL_ENABLE;
+
+		__raw_writel(evt, twd_base + TWD_TIMER_COUNTER);
+		__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
+	);
 
 	return 0;
 }
+
+#ifdef CONFIG_USE_ARM_TWD_PRESCALER
+/*
+ * Loads prescaler settings into control register
+ */
+void twd_set_prescaler(void* unused)
+{
+	unsigned long ctrl;
+	unsigned long flags;
+
+	local_irq_save(flags);
+
+	ctrl = __raw_readl(twd_base + TWD_TIMER_CONTROL);
+	ctrl &= (~TWD_TIMER_CONTROL_PRESCALER_FIELD);
+	ctrl |= (twd_prescaler << TWD_TIMER_CONTROL_PRESCALER_LSB);
+	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
+
+	local_irq_restore(flags);
+}
+
+
+#endif
 
 /*
  * local_timer_ack: checks for a local timer interrupt.
@@ -118,7 +169,8 @@ static void __cpuinit twd_calibrate_rate(void)
 		waitjiffies += 5;
 
 				 /* enable, no interrupt or reload */
-		__raw_writel(0x1, twd_base + TWD_TIMER_CONTROL);
+		load = (twd_prescaler << TWD_TIMER_CONTROL_PRESCALER_LSB);
+		__raw_writel(0x1 | load, twd_base + TWD_TIMER_CONTROL);
 
 				 /* maximum value */
 		__raw_writel(0xFFFFFFFFU, twd_base + TWD_TIMER_COUNTER);

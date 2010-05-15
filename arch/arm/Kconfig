@@ -1027,6 +1027,13 @@ config HAVE_ARM_TWD
 	help
 	  This options enables support for the ARM timer and watchdog unit
 
+config USE_ARM_TWD_PRESCALER
+	bool
+	depends on HAVE_ARM_TWD
+	default y if (CPU_FREQ || ARCH_TEGRA)
+	help
+	  This options enables support for the ARM timer and watchdog unit
+
 choice
 	prompt "Memory split"
 	default VMSPLIT_3G

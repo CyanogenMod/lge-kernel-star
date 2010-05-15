@@ -8,5 +8,8 @@ extern void __iomem *twd_base;
 void twd_timer_stop(void);
 int twd_timer_ack(void);
 void twd_timer_setup(struct clock_event_device *);
+#ifdef CONFIG_USE_ARM_TWD_PRESCALER
+void twd_set_prescaler(void*);
+#endif
 
 #endif
