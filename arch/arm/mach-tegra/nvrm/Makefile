@@ -15,3 +15,4 @@ obj-y += io/common/
 obj-y += io/ap15/
 obj-y += io/ap20/
 
+obj-y += dispatch/
