@@ -49,6 +49,31 @@
 #include "devices.h"
 #include "gpio-names.h"
 
+/* NVidia bootloader tags */
+#define ATAG_NVIDIA		0x41000801
+
+#define ATAG_NVIDIA_RM			0x1
+#define ATAG_NVIDIA_DISPLAY		0x2
+#define ATAG_NVIDIA_FRAMEBUFFER		0x3
+#define ATAG_NVIDIA_CHIPSHMOO		0x4
+#define ATAG_NVIDIA_CHIPSHMOOPHYS	0x5
+#define ATAG_NVIDIA_PRESERVED_MEM_0	0x10000
+#define ATAG_NVIDIA_PRESERVED_MEM_N	2
+#define ATAG_NVIDIA_FORCE_32		0x7fffffff
+
+struct tag_tegra {
+	__u32 bootarg_key;
+	__u32 bootarg_len;
+	char bootarg[1];
+};
+
+static int __init parse_tag_nvidia(const struct tag *tag)
+{
+
+	return 0;
+}
+__tagtable(ATAG_NVIDIA, parse_tag_nvidia);
+
 static struct tegra_nand_chip_parms nand_chip_parms[] = {
 	/* Samsung K5E2G1GACM */
 	[0] = {
@@ -309,6 +334,14 @@ static struct platform_device *harmony_devices[] __initdata = {
 	&tegra_nand_device,
 	&tegra_otg,
 	&pda_power_device,
+	&tegra_i2c_device1,
+	&tegra_i2c_device2,
+	&tegra_i2c_device3,
+	&tegra_i2c_device4,
+	&tegra_spi_device1,
+	&tegra_spi_device2,
+	&tegra_spi_device3,
+	&tegra_spi_device4,
 };
 
 static void __init tegra_harmony_fixup(struct machine_desc *desc,
@@ -364,6 +397,8 @@ static void __init tegra_harmony_init(void)
 	platform_add_devices(harmony_devices, ARRAY_SIZE(harmony_devices));
 	harmony_i2c_init();
 	harmony_regulator_init();
+	harmony_panel_init();
+	harmony_sdhci_init();
 }
 
 MACHINE_START(HARMONY, "harmony")

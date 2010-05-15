@@ -16,12 +16,13 @@
 
 #include <linux/kernel.h>
 #include <linux/gpio.h>
+#include <linux/init.h>
 #include <mach/pinmux.h>
 
 #include "gpio-names.h"
 #include "board-harmony.h"
 
-static struct tegra_pingroup_config harmony_pinmux[] = {
+static __initdata struct tegra_pingroup_config harmony_pinmux[] = {
 	{TEGRA_PINGROUP_ATA,   TEGRA_MUX_IDE,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
 	{TEGRA_PINGROUP_ATB,   TEGRA_MUX_SDIO4,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
 	{TEGRA_PINGROUP_ATC,   TEGRA_MUX_NAND,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
@@ -153,7 +154,7 @@ static struct tegra_gpio_table gpio_table[] = {
 	{ .gpio = TEGRA_GPIO_EXT_MIC_EN,	.enable = true	},
 };
 
-void harmony_pinmux_init(void)
+void __init harmony_pinmux_init(void)
 {
 	tegra_pinmux_config_table(harmony_pinmux, ARRAY_SIZE(harmony_pinmux));
 
