@@ -69,6 +69,16 @@ enum clk_state {
 	OFF,
 };
 
+#ifdef CONFIG_TEGRA_NVRM
+struct clk {
+	struct list_head	node;
+	struct clk_ops		*ops;
+	struct clk_lookup	lookup;
+	const char		*name;
+	u32			module;
+	u32			flags;
+};	
+#else
 struct clk {
 	/* node for master clocks list */
 	struct list_head		node;
@@ -115,6 +125,7 @@ struct clk {
 	u32				sel;
 	u32				reg_mask;
 };
+#endif
 
 
 struct clk_duplicate {
