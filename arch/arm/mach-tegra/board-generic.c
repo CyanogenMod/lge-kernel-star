@@ -35,32 +35,6 @@
 
 #include "board.h"
 
-/* NVidia bootloader tags */
-#define ATAG_NVIDIA		0x41000801
-
-#define ATAG_NVIDIA_RM			0x1
-#define ATAG_NVIDIA_DISPLAY		0x2
-#define ATAG_NVIDIA_FRAMEBUFFER		0x3
-#define ATAG_NVIDIA_CHIPSHMOO		0x4
-#define ATAG_NVIDIA_CHIPSHMOOPHYS	0x5
-#define ATAG_NVIDIA_PRESERVED_MEM_0	0x10000
-#define ATAG_NVIDIA_PRESERVED_MEM_N	2
-#define ATAG_NVIDIA_FORCE_32		0x7fffffff
-
-struct tag_tegra {
-	__u32 bootarg_key;
-	__u32 bootarg_len;
-	char bootarg[1];
-};
-
-static int __init parse_tag_nvidia(const struct tag *tag)
-{
-
-	return 0;
-}
-__tagtable(ATAG_NVIDIA, parse_tag_nvidia);
-
-
 #if defined(CONFIG_TEGRA_DEBUG_UARTA)
 #define DEBUG_UART_BASE TEGRA_UARTA_BASE
 #define DEBUG_UART_INT INT_UARTA
