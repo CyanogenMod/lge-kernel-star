@@ -134,6 +134,7 @@
 #include "nvassert.h"
 #include "nvrm_priv_ap_general.h"
 #include "mach/nvrm_linux.h"
+#include <mach/irqs.h>
 
 /* FIXME move these to some header file */
 NvError NvRmPrivDmaInit(NvRmDeviceHandle hDevice);
@@ -971,7 +972,6 @@ static void ApbDmaIsr(void *args)
  */
 static NvError RegisterAllDmaInterrupt(NvRmDeviceHandle hDevice)
 {
-    NvRmModuleID ModuleId = NvRmPrivModuleID_ApbDma;
     NvError Error = NvSuccess;
     NvOsInterruptHandler DmaIntHandler = ApbDmaIsr;
     NvU32 Irq = 0;
@@ -987,7 +987,7 @@ static NvError RegisterAllDmaInterrupt(NvRmDeviceHandle hDevice)
     /* Register same interrupt hanlder for all APB DMA channels. */
     for (i=0; i < NvRmDmaUnreservedChannels(); i++)
     {
-        Irq = NvRmGetIrqForLogicalInterrupt(hDevice, ModuleId, i);
+        Irq = INT_APB_DMA_CH0 + i;
         Error = NvRmInterruptRegister(hDevice, 1, &Irq,
             &DmaIntHandler, &s_DmaInfo.pListApbDmaChannel[i], 
             &(s_DmaInfo.pListApbDmaChannel[i].hIntrHandle), NV_TRUE);
