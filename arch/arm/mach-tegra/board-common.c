@@ -192,6 +192,27 @@ static struct platform_device tegra_kbc_device = {
 };
 #endif
 
+#ifdef CONFIG_TEGRA_IOVMM_GART
+static struct resource tegra_gart_resources[] = {
+	[0] = {
+		.start = TEGRA_MC_BASE,
+		.end = TEGRA_MC_BASE + TEGRA_MC_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	[1] = {
+		.start = TEGRA_GART_BASE,
+		.end = TEGRA_GART_BASE + TEGRA_GART_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+};
+static struct platform_device tegra_gart_device = {
+	.name = "tegra_gart",
+	.id = -1,
+	.resource = tegra_gart_resources,
+	.num_resources = ARRAY_SIZE(tegra_gart_resources),
+};
+#endif
+
 static struct platform_device *tegra_devices[] __initdata = {
 #ifndef CONFIG_TEGRA_DEBUG_UART_NONE
 	&debug_uart,
@@ -204,6 +225,9 @@ static struct platform_device *tegra_devices[] __initdata = {
 #endif
 #ifdef CONFIG_KEYBOARD_TEGRA
 	&tegra_kbc_device,
+#endif
+#ifdef CONFIG_TEGRA_IOVMM_GART
+	&tegra_gart_device,
 #endif
 };
 

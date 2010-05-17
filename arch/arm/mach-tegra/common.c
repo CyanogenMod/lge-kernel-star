@@ -26,6 +26,7 @@
 
 #include <mach/iomap.h>
 #include <mach/dma.h>
+#include <mach/nvmem.h>
 
 #include "board.h"
 
@@ -61,6 +62,9 @@ void __init tegra_common_init(void)
 	reg |= 1;
 	asm volatile ("mcr p15, 0, %0, c15, c0, 0" : : "r" (reg) : "cc");
 #endif
+
+	nvmap_add_carveout_heap(TEGRA_IRAM_BASE, TEGRA_IRAM_SIZE,
+				"iram", NVMEM_HEAP_CARVEOUT_IRAM);
 	tegra_init_clock();
 	tegra_init_cache();
 	tegra_dma_init();
