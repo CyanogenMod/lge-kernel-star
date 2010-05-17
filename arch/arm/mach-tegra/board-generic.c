@@ -35,67 +35,7 @@
 
 #include "board.h"
 
-#if defined(CONFIG_TEGRA_DEBUG_UARTA)
-#define DEBUG_UART_BASE TEGRA_UARTA_BASE
-#define DEBUG_UART_INT INT_UARTA
-#define DEBUG_UART_CLK "uart.0"
-#elif defined(CONFIG_TEGRA_DEBUG_UARTB)
-#define DEBUG_UART_BASE TEGRA_UARTB_BASE
-#define DEBUG_UART_INT INT_UARTB
-#define DEBUG_UART_CLK "uart.1"
-#elif defined(CONFIG_TEGRA_DEBUG_UARTC)
-#define DEBUG_UART_BASE TEGRA_UARTC_BASE
-#define DEBUG_UART_INT INT_UARTC
-#define DEBUG_UART_CLK "uart.2"
-#elif defined(CONFIG_TEGRA_DEBUG_UARTD)
-#define DEBUG_UART_BASE TEGRA_UARTD_BASE
-#define DEBUG_UART_INT INT_UARTD
-#define DEBUG_UART_CLK "uart.3"
-#elif defined(CONFIG_TEGRA_DEBUG_UARTE)
-#define DEBUG_UART_BASE TEGRA_UARTE_BASE
-#define DEBUG_UART_INT INT_UARTE
-#define DEBUG_UART_CLK "uart.4"
-#else
-#define DEBUG_UART_BASE NULL
-#define DEBUG_UART_INT NO_IRQ
-#define DEBUG_UART_CLK ""
-#endif
-
-static struct plat_serial8250_port debug_uart_platform_data[] = {
-	{
-		.membase	= IO_ADDRESS(DEBUG_UART_BASE),
-		.mapbase	= DEBUG_UART_BASE,
-		.irq		= DEBUG_UART_INT,
-		.flags		= UPF_BOOT_AUTOCONF,
-		.iotype		= UPIO_MEM,
-		.regshift	= 2,
-		.uartclk	= 216000000/16 * 16,
-	}, {
-		.flags		= 0
-	}
-};
-
-static struct platform_device debug_uart = {
-	.name = "serial8250",
-	.id = PLAT8250_DEV_PLATFORM,
-	.dev = {
-		.platform_data = debug_uart_platform_data,
-	},
-};
-
 #ifdef CONFIG_KEYBOARD_TEGRA
-static struct resource tegra_kbc_resources[] = {
-	[0] = {
-		.start = TEGRA_KBC_BASE,
-		.end   = TEGRA_KBC_BASE + TEGRA_KBC_SIZE - 1,
-		.flags = IORESOURCE_MEM,
-	},
-	[1] = {
-		.start = INT_KBC,
-		.end   = INT_KBC,
-		.flags = IORESOURCE_IRQ,
-	},
-};
 #define kbc_row(x)				\
 	{					\
 		.is_row = true,			\
@@ -110,7 +50,7 @@ static struct resource tegra_kbc_resources[] = {
 	}
 
 
-static struct tegra_kbc_plat harmony_kbc = {
+struct tegra_kbc_plat tegra_kbc_platform = {
 	.debounce_cnt = 2,
 	.repeat_cnt = 5,
 	.wake_cnt = 0,
@@ -131,45 +71,14 @@ static struct tegra_kbc_plat harmony_kbc = {
 	.keymap = NULL,
 	.wake_cfg = NULL,
 };
-static struct platform_device tegra_kbc = {
-	.name = "tegra-kbc",
-	.id = -1,
-	.dev = {
-		.platform_data = &harmony_kbc,
-	},
-	.resource = tegra_kbc_resources,
-	.num_resources = ARRAY_SIZE(tegra_kbc_resources),
-};
 #endif
 
-static struct platform_device *harmony_devices[] __initdata = {
-#if !defined(CONFIG_TEGRA_DEBUG_UART_NONE)
-	&debug_uart,
-#endif
-#ifdef CONFIG_KEYBOARD_TEGRA
-	&tegra_kbc,
-#endif
-};
+extern void __init tegra_register_socdev(void);
 
 static void __init tegra_generic_init(void)
 {
-	struct clk *clk;
-
 	tegra_common_init();
-
-	clk = clk_get_sys(NULL, "pll_p");
-	clk_enable(clk);
-	clk_set_rate(clk, 216000000);
-	clk_put(clk);
-
-#if !defined(CONFIG_TEGRA_DEBUG_UART_NONE)
-	clk = clk_get_sys(DEBUG_UART_CLK, NULL);
-	clk_set_rate(clk, 216000000);
-	clk_enable(clk);
-	clk_put(clk);
-#endif
-
-	platform_add_devices(harmony_devices, ARRAY_SIZE(harmony_devices));
+	tegra_register_socdev();
 }
 
 MACHINE_START(TEGRA_GENERIC, "Tegra Generic")

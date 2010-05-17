@@ -1,4 +1,5 @@
 obj-y                                   += common.o
+obj-y					+= board-common.o
 obj-y                                   += io.o
 obj-y                                   += irq.o
 ifneq ($(CONFIG_TEGRA_NVRM),y)
