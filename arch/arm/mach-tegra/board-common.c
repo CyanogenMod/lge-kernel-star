@@ -27,6 +27,8 @@
 #include <linux/serial_8250.h>
 #include <linux/io.h>
 #include <linux/ctype.h>
+#include <linux/dma-mapping.h>
+#include <linux/fsl_devices.h>
 
 #include <mach/iomap.h>
 #include <mach/irqs.h>
@@ -213,6 +215,37 @@ static struct platform_device tegra_gart_device = {
 };
 #endif
 
+#ifdef CONFIG_USB_GADGET_TEGRA
+static u64 tegra_udc_dma_mask = DMA_BIT_MASK(32);
+static struct fsl_usb2_platform_data tegra_udc_platform = {
+	.phy_mode = FSL_USB2_PHY_UTMI,
+	.operating_mode = FSL_USB2_DR_DEVICE,
+};
+static struct resource tegra_udc_resources[] = {
+	[0] = {
+		.start = TEGRA_USB_BASE,
+		.end = TEGRA_USB_BASE + TEGRA_USB_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	[1] = {
+		.start = INT_USB,
+		.end = INT_USB,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+static struct platform_device tegra_udc_device = {
+	.name = "tegra-udc",
+	.id = 0,
+	.dev = {
+		.platform_data = &tegra_udc_platform,
+		.coherent_dma_mask = DMA_BIT_MASK(32),
+		.dma_mask = &tegra_udc_dma_mask,
+	},
+	.resource = tegra_udc_resources,
+	.num_resources = ARRAY_SIZE(tegra_udc_resources),
+};
+#endif
+
 static struct platform_device *tegra_devices[] __initdata = {
 #ifndef CONFIG_TEGRA_DEBUG_UART_NONE
 	&debug_uart,
@@ -225,6 +258,9 @@ static struct platform_device *tegra_devices[] __initdata = {
 #endif
 #ifdef CONFIG_KEYBOARD_TEGRA
 	&tegra_kbc_device,
+#endif
+#ifdef CONFIG_USB_GADGET_TEGRA
+	&tegra_udc_device,
 #endif
 #ifdef CONFIG_TEGRA_IOVMM_GART
 	&tegra_gart_device,

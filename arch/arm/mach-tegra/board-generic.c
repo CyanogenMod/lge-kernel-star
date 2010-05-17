@@ -22,6 +22,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/pda_power.h>
 #include <linux/io.h>
+#include <linux/usb/android_composite.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -73,12 +74,74 @@ struct tegra_kbc_plat tegra_kbc_platform = {
 };
 #endif
 
+#ifdef CONFIG_USB_ANDROID
+static char *tegra_android_functions[] = {
+#ifdef CONFIG_USB_ANDROID_ADB
+	"adb",
+#endif
+#ifdef CONFIG_USB_ANDROID_MASS_STORAGE
+	"usb_mass_storage",
+#endif
+};
+
+static struct android_usb_product tegra_android_products[] = {
+	[0] = {
+		.product_id = 0x7100,
+		.num_functions = ARRAY_SIZE(tegra_android_functions),
+		.functions = tegra_android_functions,
+	},
+};
+static struct android_usb_platform_data tegra_android_platform = {
+	.vendor_id = 0x955,
+	.product_id = 0x7100,
+	.manufacturer_name = "NVIDIA",
+	.product_name = "Harmony",
+	.num_products = ARRAY_SIZE(tegra_android_products),
+	.products = tegra_android_products,
+	.num_functions = ARRAY_SIZE(tegra_android_functions),
+	.functions = tegra_android_functions,
+};
+static struct platform_device tegra_android_device = {
+	.name = "android_usb",
+	.id = -1,
+	.dev = {
+		.platform_data = &tegra_android_platform,
+	},
+};
+#ifdef CONFIG_USB_ANDROID_MASS_STORAGE
+static struct usb_mass_storage_platform_data tegra_usb_fsg_platform = {
+	.vendor = "NVIDIA",
+	.product = "Tegra 2",
+	.nluns = 1,
+	.bulk_size = 16384,
+};
+static struct platform_device tegra_usb_fsg_device = {
+	.name = "usb_mass_storage",
+	.id = -1,
+	.dev = {
+		.platform_data = &tegra_usb_fsg_platform,
+	},
+};
+#endif
+#endif
+
+static struct platform_device *platform_devices[] = {
+#ifdef CONFIG_USB_ANDROID
+#ifdef CONFIG_USB_ANDROID_MASS_STORAGE
+	&tegra_usb_fsg_device,
+#endif
+	&tegra_android_device,
+#endif
+};
+
+
 extern void __init tegra_register_socdev(void);
 
 static void __init tegra_generic_init(void)
 {
 	tegra_common_init();
 	tegra_register_socdev();
+	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
 }
 
 MACHINE_START(TEGRA_GENERIC, "Tegra Generic")
