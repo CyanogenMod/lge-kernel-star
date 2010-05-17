@@ -514,6 +514,8 @@ struct fsl_udc {
 	u32 ep0_dir;		/* Endpoint zero direction: can be
 				   USB_DIR_IN or USB_DIR_OUT */
 	u8 device_address;	/* Device USB address */
+	struct regulator *vbus_regulator;	/* regulator for drawing VBUS */
+	struct delayed_work work; /* delayed work for charger detection */
 	struct work_struct irq_work; /* irq work for controling the usb power*/
 };
 
