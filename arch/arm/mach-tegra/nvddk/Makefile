@@ -4,3 +4,8 @@ ccflags-y += -DNV_USE_FUSE_CLOCK_ENABLE=0
 ccflags-y += -DNV_DEBUG=0
 
 obj-$(CONFIG_MTD_NAND_TEGRA)	+= nvddk_nand.o
+
+ifeq (y,$(CONFIG_USB_TEGRA))
+obj-y	+= nvddk_usbphy.o
+obj-y	+= nvddk_usbphy_ap20.o
+endif

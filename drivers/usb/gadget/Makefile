@@ -18,6 +18,8 @@ obj-$(CONFIG_USB_S3C2410)	+= s3c2410_udc.o
 obj-$(CONFIG_USB_AT91)		+= at91_udc.o
 obj-$(CONFIG_USB_ATMEL_USBA)	+= atmel_usba_udc.o
 obj-$(CONFIG_USB_FSL_USB2)	+= fsl_usb2_udc.o
+obj-$(CONFIG_USB_TEGRA)		+= fsl_udc_core.o
+obj-$(CONFIG_USB_TEGRA)		+= tegra_udc.o
 fsl_usb2_udc-objs		:= fsl_udc_core.o
 ifeq ($(CONFIG_ARCH_MXC),y)
 fsl_usb2_udc-objs		+= fsl_mx3_udc.o
