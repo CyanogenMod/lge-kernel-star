@@ -35,7 +35,7 @@
  * <b>NVIDIA APX ODM Kit::
  *         Implementation of the ODM Peripheral Discovery API</b>
  *
- * @b Description: Specifies the peripheral connectivity 
+ * @b Description: Specifies the peripheral connectivity
  *                 database Peripheral entries for the E1116
  *                 power module.
  */
@@ -51,8 +51,7 @@
     NV_ARRAY_SIZE(s_ffaPllU1Addresses),
     NvOdmPeripheralClass_Other
 },
-// -------- END WHISTLER_AP16_ONLY -------- 
-
+// -------- END WHISTLER_AP16_ONLY --------
 
 // RTC (NV reserved)
 {
@@ -208,6 +207,13 @@
     NvOdmPeripheralClass_Other
 },
 
+//  Fuse
+{
+    NV_VDD_FUSE_ODM_ID,
+    s_ffaVddFuseAddresses,
+    NV_ARRAY_SIZE(s_ffaVddFuseAddresses),
+    NvOdmPeripheralClass_Other
+},
 
 // HDMI VDD (NV reserved)
 {

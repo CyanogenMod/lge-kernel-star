@@ -44,3 +44,5 @@ obj-y					+= nvddk/
 
 obj-$(CONFIG_TEGRA_NVEC)		+= nvec_user.o
 obj-$(CONFIG_TEGRA_NVEC)		+= nvec/
+
+obj-$(CONFIG_TEGRA_FUSE)		+= sysfs-fuse.o

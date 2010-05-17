@@ -105,6 +105,14 @@ config TEGRA_PCI
 	help
 		Adds PCIe Host controller driver for tegra2 based systems
 
+config TEGRA_FUSE
+	boolean "Support reading and writing hardware fuses"
+	depends on TEGRA_NVRM
+	help
+	  Adds support for reading and writing (blowing) internal fuses
+	  through sysfs
+
+
 if TEGRA_NVRM
 source "arch/arm/mach-tegra/odm_kit/Kconfig"
 endif
