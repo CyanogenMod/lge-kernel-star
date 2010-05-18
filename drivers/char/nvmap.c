@@ -20,6 +20,8 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+#define NV_DEBUG 0
+
 #include <linux/vmalloc.h>
 #include <linux/module.h>
 #include <linux/bitmap.h>
@@ -262,17 +264,18 @@ static unsigned long _nvmap_carveout_blockstat(struct nvmap_carveout *co,
 static int _nvmap_init_carveout(struct nvmap_carveout *co,
 	const char *name, unsigned long base_address, size_t len)
 {
-	const unsigned int min_blocks = 16;
+	unsigned int num_blocks;
 	struct nvmap_mem_block *blocks = NULL;
 	int i;
 
-	blocks = kzalloc(sizeof(*blocks)*min_blocks, GFP_KERNEL);
+	num_blocks = min_t(unsigned int, len/1024, 1024);
+	blocks = vmalloc(sizeof(*blocks)*num_blocks);
 
 	if (!blocks) goto fail;
 	co->name = kstrdup(name, GFP_KERNEL);
 	if (!co->name) goto fail;
 
-	for (i=1; i<min_blocks; i++) {
+	for (i=1; i<num_blocks; i++) {
 		blocks[i].next = i+1;
 		blocks[i].prev = i-1;
 		blocks[i].next_free = -1;
@@ -286,7 +289,7 @@ static int _nvmap_init_carveout(struct nvmap_carveout *co,
 	blocks[0].base = base_address;
 	blocks[0].size = len;
 	co->blocks = blocks;
-	co->num_blocks = min_blocks;
+	co->num_blocks = num_blocks;
 	spin_lock_init(&co->lock);
 	co->block_index = 0;
 	co->spare_index = 1;
@@ -298,39 +301,12 @@ fail:
 	return -ENOMEM;
 }
 
-static int nvmap_grow_blocks(struct nvmap_carveout *co)
-{
-	struct nvmap_mem_block *blocks;
-	unsigned int i;
-
-	if (co->num_blocks >= 1<<(8*sizeof(co->free_index)-1)) return -ENOMEM;
-	blocks = kzalloc(sizeof(*blocks)*(co->num_blocks*2), GFP_KERNEL);
-	if (!blocks) return -ENOMEM;
-
-	memcpy(blocks, co->blocks, sizeof(*blocks)*(co->num_blocks));
-	kfree(co->blocks);
-	co->blocks = blocks;
-	for (i=co->num_blocks; i<co->num_blocks*2; i++) {
-		blocks[i].next = i+1;
-		blocks[i].prev = i-1;
-		blocks[i].next_free = -1;
-		blocks[i].prev_free = -1;
-	}
-	blocks[co->num_blocks].prev = -1;
-	blocks[i-1].next = -1;
-	co->spare_index = co->num_blocks;
-	co->num_blocks *= 2;
-	return 0;
-}
-
 static int nvmap_get_spare(struct nvmap_carveout *co) {
 	int idx;
 
 	if (co->spare_index == -1)
-		if (nvmap_grow_blocks(co))
-			return -1;
+		return -1;
 
-	BUG_ON(co->spare_index == -1);
 	idx = co->spare_index;
 	co->spare_index = co->blocks[idx].next;
 	co->blocks[idx].next = -1;
@@ -2039,10 +2015,8 @@ static int _nvmap_do_create(struct nvmap_file_priv *priv,
 
 	BUG_ON(!h);
 
-	spin_lock(&priv->ref_lock);
 	r = kzalloc(sizeof(*r), GFP_KERNEL);
 	if (!r) {
-		spin_unlock(&priv->ref_lock);
 		if (h) _nvmap_handle_put(h);
 		return -ENOMEM;
 	}
@@ -2051,6 +2025,7 @@ static int _nvmap_do_create(struct nvmap_file_priv *priv,
 	r->h = h;
 	atomic_set(&r->pin, 0);
 
+	spin_lock(&priv->ref_lock);
 	p = &priv->handle_refs.rb_node;
 	while (*p) {
 		struct nvmap_handle_ref *l;
