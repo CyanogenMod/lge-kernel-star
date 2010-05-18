@@ -248,8 +248,14 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
 
 static void l2x0_shutdown(void)
 {
+	unsigned long flags;
+
 	if (l2x0_disabled)
 		return;
+
+	BUG_ON(num_online_cpus() > 1);
+
+	local_irq_save(flags);
 
 	if (readl(l2x0_base + L2X0_CTRL) & 1) {
 		int m;
@@ -267,6 +273,8 @@ static void l2x0_shutdown(void)
 			writel(0, l2x0_base + L2X0_LOCKDOWN_WAY_I + (m*8));
 		}
 	}
+
+	local_irq_restore(flags);
 }
 
 void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
