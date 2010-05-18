@@ -36,52 +36,6 @@
 #include <mach/kbc.h>
 #include <mach/nand.h>
 
-#if defined(CONFIG_TEGRA_DEBUG_UARTA)
-#define DEBUG_UART_BASE TEGRA_UARTA_BASE
-#define DEBUG_UART_INT INT_UARTA
-#define DEBUG_UART_CLK "uart.0"
-#elif defined(CONFIG_TEGRA_DEBUG_UARTB)
-#define DEBUG_UART_BASE TEGRA_UARTB_BASE
-#define DEBUG_UART_INT INT_UARTB
-#define DEBUG_UART_CLK "uart.1"
-#elif defined(CONFIG_TEGRA_DEBUG_UARTC)
-#define DEBUG_UART_BASE TEGRA_UARTC_BASE
-#define DEBUG_UART_INT INT_UARTC
-#define DEBUG_UART_CLK "uart.2"
-#elif defined(CONFIG_TEGRA_DEBUG_UARTD)
-#define DEBUG_UART_BASE TEGRA_UARTD_BASE
-#define DEBUG_UART_INT INT_UARTD
-#define DEBUG_UART_CLK "uart.3"
-#elif defined(CONFIG_TEGRA_DEBUG_UARTE)
-#define DEBUG_UART_BASE TEGRA_UARTE_BASE
-#define DEBUG_UART_INT INT_UARTE
-#define DEBUG_UART_CLK "uart.4"
-#endif
-
-#ifndef CONFIG_TEGRA_DEBUG_UART_NONE
-static struct plat_serial8250_port debug_uart_platform_data[] = {
-	{
-		.membase	= IO_ADDRESS(DEBUG_UART_BASE),
-		.mapbase	= DEBUG_UART_BASE,
-		.irq		= DEBUG_UART_INT,
-		.flags		= UPF_BOOT_AUTOCONF,
-		.iotype		= UPIO_MEM,
-		.regshift	= 2,
-		.uartclk	= 216000000/16 * 16,
-	}, {
-		.flags		= 0
-	}
-};
-
-static struct platform_device debug_uart = {
-	.name = "serial8250",
-	.id = PLAT8250_DEV_PLATFORM,
-	.dev = {
-		.platform_data = debug_uart_platform_data,
-	},
-};
-#endif
-
 #ifdef CONFIG_MTD_NAND_TEGRA
 #define MAX_MTD_PARTNR 8
 static struct mtd_partition tegra_mtd_partitions[MAX_MTD_PARTNR];
@@ -247,9 +201,6 @@ static struct platform_device tegra_udc_device = {
 #endif
 
 static struct platform_device *tegra_devices[] __initdata = {
-#ifndef CONFIG_TEGRA_DEBUG_UART_NONE
-	&debug_uart,
-#endif
 #ifdef CONFIG_MTD_NAND_TEGRA
 	&tegra_nand_device,
 #endif
@@ -269,13 +220,5 @@ static struct platform_device *tegra_devices[] __initdata = {
 
 void __init tegra_register_socdev(void)
 {
-#if !defined(CONFIG_TEGRA_DEBUG_UART_NONE)
-	struct clk *clk;
-
-	clk = clk_get_sys(DEBUG_UART_CLK, NULL);
-	clk_set_rate(clk, 216000000);
-	clk_enable(clk);
-	clk_put(clk);
-#endif
 	platform_add_devices(tegra_devices, ARRAY_SIZE(tegra_devices));
 }
