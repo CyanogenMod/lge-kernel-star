@@ -135,11 +135,13 @@ static struct platform_device *platform_devices[] = {
 };
 
 
+extern void __init tegra_setup_nvodm(void);
 extern void __init tegra_register_socdev(void);
 
 static void __init tegra_generic_init(void)
 {
 	tegra_common_init();
+	tegra_setup_nvodm();
 	tegra_register_socdev();
 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
 }

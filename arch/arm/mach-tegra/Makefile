@@ -27,6 +27,7 @@ ccflags-$(CONFIG_TEGRA_NVOS)		+= -DNV_USE_FUSE_CLOCK_ENABLE=0
 obj-$(CONFIG_TEGRA_NVOS)		+= nvos_user.o
 obj-$(CONFIG_TEGRA_NVOS)		+= nvos/
 
+obj-$(CONFIG_TEGRA_NVRM)		+= board-nvodm.o
 obj-$(CONFIG_TEGRA_NVRM)		+= nvrm/
 obj-$(CONFIG_TEGRA_NVRM)		+= nvodm/
 obj-$(CONFIG_TEGRA_NVRM)		+= odm_kit/

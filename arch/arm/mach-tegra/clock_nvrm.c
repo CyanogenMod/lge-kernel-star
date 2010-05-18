@@ -68,14 +68,18 @@ static int tegra_periph_clk_enable(struct clk *c)
 	e = NvRmPowerVoltageControl(s_hRmGlobal, c->module, clk_pwr_client,
 		NvRmVoltsUnspecified, NvRmVoltsUnspecified, NULL, 0, NULL);
 
-	if (e!=NvSuccess)
+	if (e!=NvSuccess) {
+		pr_err("%s: failed to voltage control %s\n", __func__, c->name);
 		return -ENXIO;
+	}
 
 	e = NvRmPowerModuleClockControl(s_hRmGlobal, c->module,
 		clk_pwr_client, NV_TRUE);
 
-	if (e!=NvSuccess)
+	if (e!=NvSuccess) {
+		pr_err("%s: failed to clock control %s\n", __func__, c->name);
 		return -ENXIO;
+	}
 
 	return 0;
 }
@@ -101,9 +105,13 @@ static int tegra_periph_clk_set_rate(struct clk *c, unsigned long rate)
 {
 	NvError e;
 	NvRmFreqKHz freq = rate / 1000;
+	NvRmFreqKHz min, max;
+
+	min = freq - (freq>>4);
+	max = freq + (freq>>4);
 
 	e = NvRmPowerModuleClockConfig(s_hRmGlobal, c->module, clk_pwr_client,
-		NvRmFreqUnspecified, NvRmFreqUnspecified, &freq, 1, &freq, 0);
+		min, max, &freq, 1, &freq, 0);
 
 	if (e!=NvSuccess) {
 		pr_debug("%s: failed to configure %s to %luHz\n",
@@ -182,10 +190,10 @@ static struct clk tegra_periph_clk[] = {
 	PERIPH_CLK("rtc", "rtc-tegra", Rtc, 0),
 	PERIPH_CLK("kbc", "tegra-kbc", Kbc, 0),
 	PERIPH_CLK("uarta", "uart.0", Uart, 0),
-	PERIPH_CLK("uartb", "uart.1", Uart, 0),
-	PERIPH_CLK("uartc", "uart.2", Uart, 0),
-	PERIPH_CLK("uartd", "uart.3", Uart, 0),
-	PERIPH_CLK("uarte", "uart.4", Uart, 0),
+	PERIPH_CLK("uartb", "uart.1", Uart, 1),
+	PERIPH_CLK("uartc", "uart.2", Uart, 2),
+	PERIPH_CLK("uartd", "uart.3", Uart, 3),
+	PERIPH_CLK("uarte", "uart.4", Uart, 4),
 };
 
 static struct clk tegra_clk_cpu = {
