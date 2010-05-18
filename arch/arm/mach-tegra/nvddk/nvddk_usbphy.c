@@ -673,7 +673,8 @@ NvDdkUsbPhyPowerUp(
         hUsbPhy->RestoreContext(hUsbPhy);
     }
 
-    if (hUsbPhy->IsHostMode == IsHostMode)
+    hUsbPhy->IsHostMode = IsHostMode;
+    if (IsHostMode)
     {
         UsbPrivEnableVbus(hUsbPhy, NV_TRUE);
     }
@@ -715,7 +716,8 @@ NvDdkUsbPhyPowerDown(
     }
 
     /* Turn on/off the vbus for host mode */
-    if (hUsbPhy->IsHostMode == IsHostMode)
+    hUsbPhy->IsHostMode = IsHostMode;
+    if (IsHostMode)
     {
         UsbPrivEnableVbus(hUsbPhy, NV_FALSE);
     }
