@@ -890,12 +890,11 @@ static struct nvmap_handle *_nvmap_validate_get(unsigned long handle, bool su)
 #endif
 }
 
+/*  nvmap_mru_vma_lock should be acquired by the caller before calling this */
 static inline void _nvmap_insert_mru_vma(struct nvmap_handle *h)
 {
 #ifdef CONFIG_DEVNVMAP_RECLAIM_UNPINNED_VM
-	spin_lock(&nvmap_mru_vma_lock);
 	list_add(&h->pgalloc.mru_list, _nvmap_list(h->pgalloc.area->iovm_length));
-	spin_unlock(&nvmap_mru_vma_lock);
 #endif
 }
 
@@ -923,9 +922,8 @@ static struct tegra_iovmm_area *_nvmap_get_vm(struct nvmap_handle *h)
 	struct tegra_iovmm_area *vm = NULL;
 	unsigned int i, idx;
 
-	spin_lock(&nvmap_mru_vma_lock);
-
 	if (h->pgalloc.area) {
+		spin_lock(&nvmap_mru_vma_lock);
 		BUG_ON(list_empty(&h->pgalloc.mru_list));
 		list_del(&h->pgalloc.mru_list);
 		INIT_LIST_HEAD(&h->pgalloc.mru_list);
@@ -938,7 +936,6 @@ static struct tegra_iovmm_area *_nvmap_get_vm(struct nvmap_handle *h)
 
 	if (vm) {
 		INIT_LIST_HEAD(&h->pgalloc.mru_list);
-		spin_unlock(&nvmap_mru_vma_lock);
 		return vm;
 	}
 	/* attempt to re-use the most recently unpinned IOVMM area in the
@@ -946,6 +943,7 @@ static struct tegra_iovmm_area *_nvmap_get_vm(struct nvmap_handle *h)
 	 * evict handles (starting from the current bin) until an allocation
 	 * succeeds or no more areas can be evicted */
 
+	spin_lock(&nvmap_mru_vma_lock);
 	mru = _nvmap_list(h->size);
 	if (!list_empty(mru))
 		evict = list_first_entry(mru, struct nvmap_handle,
@@ -973,14 +971,15 @@ static struct tegra_iovmm_area *_nvmap_get_vm(struct nvmap_handle *h)
 			BUG_ON(!evict->pgalloc.area);
 			list_del(&evict->pgalloc.mru_list);
 			INIT_LIST_HEAD(&evict->pgalloc.mru_list);
+			spin_unlock(&nvmap_mru_vma_lock);
 			tegra_iovmm_free_vm(evict->pgalloc.area);
 			evict->pgalloc.area = NULL;
 			vm = tegra_iovmm_create_vm(nvmap_vm_client,
 				NULL, h->size,
 				_nvmap_flag_to_pgprot(h->flags, pgprot_kernel));
+			spin_lock(&nvmap_mru_vma_lock);
 		}
 	}
-
 	spin_unlock(&nvmap_mru_vma_lock);
 	return vm;
 #endif
@@ -1427,6 +1426,9 @@ static int _nvmap_handle_unpin(struct nvmap_handle *h)
 	}
 
 	BUG_ON(!h->alloc);
+#ifdef CONFIG_DEVNVMAP_RECLAIM_UNPINNED_VM
+	spin_lock(&nvmap_mru_vma_lock);
+#endif
 	if (!atomic_dec_return(&h->pin)) {
 		if (h->heap_pgalloc && h->pgalloc.area) {
 			/* if a secure handle is clean (i.e., mapped into
@@ -1439,6 +1441,9 @@ static int _nvmap_handle_unpin(struct nvmap_handle *h)
 			ret=1;
 		}
 	}
+#ifdef CONFIG_DEVNVMAP_RECLAIM_UNPINNED_VM
+	spin_unlock(&nvmap_mru_vma_lock);
+#endif
 	_nvmap_handle_put(h);
 	return ret;
 }
