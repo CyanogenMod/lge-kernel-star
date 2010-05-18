@@ -33,5 +33,5 @@ obj-$(CONFIG_TEGRA_NVRM)		+= odm_kit/
 obj-$(CONFIG_TEGRA_NVRM)		+= nvreftrack/
 obj-$(CONFIG_TEGRA_NVRM)		+= nvrm_user.o
 obj-$(CONFIG_TEGRA_NVRM)		+= clock_nvrm.o
-
+obj-$(CONFIG_TEGRA_NVRM)		+= nvrpc_user.o
 obj-y					+= nvddk/
