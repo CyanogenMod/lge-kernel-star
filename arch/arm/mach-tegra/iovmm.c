@@ -231,12 +231,16 @@ static void iovmm_free_block(struct tegra_iovmm_domain *domain,
 static void iovmm_split_free_block(struct tegra_iovmm_domain *domain,
 	struct tegra_iovmm_block *block, unsigned long size)
 {
-	struct rb_node **p = &domain->free_blocks.rb_node;
+	struct rb_node **p;
 	struct rb_node *parent = NULL;
-	struct tegra_iovmm_block *rem = kzalloc(sizeof(*rem), GFP_KERNEL);
+	struct tegra_iovmm_block *rem;
 	struct tegra_iovmm_block *b;
 
+	rem = kzalloc(sizeof(*rem), GFP_KERNEL);
 	if (!rem) return;
+
+	spin_lock(&domain->block_lock);
+	p = &domain->free_blocks.rb_node;
 
 	iovmm_start(rem) = iovmm_start(block) + size;
 	iovmm_length(rem) = iovmm_length(block) - size;
@@ -267,6 +271,7 @@ static void iovmm_split_free_block(struct tegra_iovmm_domain *domain,
 	}
 	rb_link_node(&rem->all_node, parent, p);
 	rb_insert_color(&rem->all_node, &domain->all_blocks);
+	spin_unlock(&domain->block_lock);
 }
 
 static struct tegra_iovmm_block *iovmm_alloc_block(
@@ -296,12 +301,13 @@ static struct tegra_iovmm_block *iovmm_alloc_block(
 		return NULL;
 	}
 	rb_erase(&best->free_node, &domain->free_blocks);
-	if (iovmm_length(best) >= size+MIN_SPLIT_BYTES(domain))
-		iovmm_split_free_block(domain, best, size);
-
 	clear_bit(BK_free, &best->flags);
 	atomic_inc(&best->ref);
 	spin_unlock(&domain->block_lock);
+
+	if (iovmm_length(best) >= size+MIN_SPLIT_BYTES(domain))
+		iovmm_split_free_block(domain, best, size);
+
 	return best;
 }
 
