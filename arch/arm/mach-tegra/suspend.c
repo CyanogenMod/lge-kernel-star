@@ -80,19 +80,21 @@ static void __iomem *tmrus = IO_ADDRESS(TEGRA_TMRUS_BASE);
 #define FLOW_CTRL_CPU_CSR	0x8
 #define FLOW_CTRL_CPU1_CSR	0x18
 
+static struct clk *tegra_pclk = NULL;
+
+void __init tegra_init_suspend(void)
+{
+	tegra_pclk = clk_get_sys(NULL, "pclk");
+	BUG_ON(!tegra_pclk);
+}
+
 static void set_powergood_time(unsigned int us)
 {
 	static int last_pclk = 0;
-	static struct clk *clk = NULL;
 	unsigned long long ticks;
 	unsigned long long pclk;
 
-	if (!clk) {
-		clk = clk_get_sys(NULL, "pclk");
-		BUG_ON(!clk);
-	}
-
-	pclk = clk_get_rate(clk);
+	pclk = clk_get_rate(tegra_pclk);
 	if (pclk != last_pclk) {
 		ticks = (us * pclk) + 999999ull;
 		do_div(ticks, 1000000);

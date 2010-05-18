@@ -27,6 +27,7 @@ void __init tegra_common_init(void);
 void __init tegra_map_common_io(void);
 void __init tegra_init_irq(void);
 void __init tegra_init_clock(void);
+void __init tegra_init_suspend(void);
 
 extern struct sys_timer tegra_timer;
 #endif
