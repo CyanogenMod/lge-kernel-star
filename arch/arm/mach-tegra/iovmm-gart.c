@@ -63,8 +63,8 @@ static void gart_map_pfn(struct tegra_iovmm_device *,
 static struct tegra_iovmm_domain *gart_alloc_domain(
 	struct tegra_iovmm_device *, struct tegra_iovmm_client *);
 
-static int __init gart_probe(struct platform_device *);
-static int __devexit gart_remove(struct platform_device *);
+static int gart_probe(struct platform_device *);
+static int gart_remove(struct platform_device *);
 static int gart_suspend(struct platform_device *, pm_message_t);
 static int gart_resume(struct platform_device *);
 
@@ -144,7 +144,7 @@ static int gart_resume(struct platform_device *pdev)
 	return 0;
 }
 
-static int __devexit gart_remove(struct platform_device *pdev)
+static int gart_remove(struct platform_device *pdev)
 {
 	struct gart_device *gart = platform_get_drvdata(pdev);
 
@@ -165,7 +165,7 @@ static int __devexit gart_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static int __init gart_probe(struct platform_device *pdev)
+static int gart_probe(struct platform_device *pdev)
 {
 	struct gart_device *gart = NULL;
 	struct resource *res, *res_remap;
