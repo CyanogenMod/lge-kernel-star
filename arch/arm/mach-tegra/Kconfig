@@ -91,6 +91,14 @@ config TEGRA_SYSTEM_DMA
 config TEGRA_IOVMM
 	bool
 
+config TEGRA_NVEC
+	bool "Include driver for Tegra NvEC embedded controller interface"
+	depends on TEGRA_NVRM
+	help
+	  Adds support for the NVIDIA Tegra NvEC I2C-slave based protocol
+	  for communicating to embedded controllers.
+
+
 if TEGRA_NVRM
 source "arch/arm/mach-tegra/odm_kit/Kconfig"
 endif

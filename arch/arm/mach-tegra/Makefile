@@ -37,3 +37,6 @@ obj-$(CONFIG_TEGRA_NVRM)		+= clock_nvrm.o
 obj-$(CONFIG_TEGRA_NVRM)		+= nvrpc_user.o
 obj-$(CONFIG_TEGRA_NVRM)		+= tegra_exports.o
 obj-y					+= nvddk/
+
+obj-$(CONFIG_TEGRA_NVEC)		+= nvec_user.o
+obj-$(CONFIG_TEGRA_NVEC)		+= nvec/
