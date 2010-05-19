@@ -886,6 +886,8 @@ static void tegra_set_baudrate(struct tegra_uart_port *t, unsigned int baud)
 	if (t->baud == baud)
 		return;
 
+	rate = baud * 16;
+	clk_set_rate(t->clk, rate);
 	rate = clk_get_rate(t->clk);
 
 	divisor = rate;
