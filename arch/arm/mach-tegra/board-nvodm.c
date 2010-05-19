@@ -368,9 +368,24 @@ static void __init tegra_setup_hcd(void)
 static inline void tegra_setup_hcd(void) { }
 #endif
 
+#ifdef CONFIG_RTC_DRV_TEGRA_ODM
+static struct platform_device tegra_rtc_device =
+{
+	.name = "tegra_rtc",
+	.id   = -1,
+};
+#endif
+
+static struct platform_device *nvodm_devices[] __initdata = {
+#ifdef CONFIG_RTC_DRV_TEGRA_ODM
+	&tegra_rtc_device,
+#endif
+};
+
 void __init tegra_setup_nvodm(void)
 {
 	tegra_setup_debug_uart();
 	tegra_setup_hcd();
 	tegra_setup_hsuart();
+	platform_add_devices(nvodm_devices, ARRAY_SIZE(nvodm_devices));
 }
