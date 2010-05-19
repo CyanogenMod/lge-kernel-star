@@ -31,6 +31,7 @@
 #include <mach/io.h>
 #include <mach/pinmux.h>
 #include <mach/usb-hcd.h>
+#include <mach/usb-otg.h>
 #include <mach/serial.h>
 
 #include "nvodm_query.h"
@@ -329,6 +330,39 @@ static struct platform_device tegra_hcd[] = {
 		.num_resources = ARRAY_SIZE(tegra_hcd_resources[2]),
 	},
 };
+
+#ifdef CONFIG_USB_TEGRA_OTG
+#define otg_is_okay(_instance) ((_instance)==0)
+static struct tegra_otg_platform_data tegra_otg_platform = {
+	.instance = 0,
+};
+static struct resource tegra_otg_resources[] = {
+	[0] = {
+		.start = TEGRA_USB_BASE,
+		.end = TEGRA_USB_BASE + TEGRA_USB_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	[1] = {
+		.start = INT_USB,
+		.end = INT_USB,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+static struct platform_device tegra_otg = {
+	.name = "tegra-otg",
+	.id = 0,
+	.resource = tegra_otg_resources,
+	.num_resources = ARRAY_SIZE(tegra_otg_resources),
+	.dev = {
+		.platform_data = &tegra_otg_platform,
+		.coherent_dma_mask = DMA_BIT_MASK(32),
+		.dma_mask = &tegra_hcd_dma_mask,
+	},
+};
+#else
+#define otg_is_okay(_instance) (0)
+#endif
+
 static void __init tegra_setup_hcd(void)
 {
 	int i;
@@ -343,6 +377,18 @@ static void __init tegra_setup_hcd(void)
 			continue;
 
 		plat->otg_mode = (p->UsbMode == NvOdmUsbModeType_OTG);
+		if (plat->otg_mode && !otg_is_okay(i)) {
+			pr_err("%s: OTG not enabled in kernel for USB "
+			       "controller %d, but ODM kit specifes OTG\n",
+			       __func__, i);
+			continue;
+		}
+#ifdef CONFIG_USB_TEGRA_OTG
+		if (plat->otg_mode && otg_is_okay(i)) {
+			tegra_otg_platform.usb_property = p;
+			platform_device_register(&tegra_otg);
+		}
+#endif
 		if (p->IdPinDetectionType == NvOdmUsbIdPinType_Gpio) {
 			const NvOdmGpioPinInfo *gpio;
 			NvU32 count;
