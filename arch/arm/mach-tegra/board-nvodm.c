@@ -31,6 +31,7 @@
 #include <mach/io.h>
 #include <mach/pinmux.h>
 #include <mach/usb-hcd.h>
+#include <mach/serial.h>
 
 #include "nvodm_query.h"
 #include "nvodm_query_pinmux.h"
@@ -125,6 +126,122 @@ static void __init tegra_setup_debug_uart(void)
 
 	platform_device_register(&debug_uart);
 }
+
+#ifdef CONFIG_SERIAL_TEGRA
+static struct tegra_serial_platform_data tegra_uart_platform[] = {
+	{
+		.p = {
+			.membase = IO_ADDRESS(TEGRA_UARTA_BASE),
+			.mapbase = TEGRA_UARTA_BASE,
+			.irq = INT_UARTA,
+		},
+	},
+	{
+		.p = {
+			.membase = IO_ADDRESS(TEGRA_UARTB_BASE),
+			.mapbase = TEGRA_UARTB_BASE,
+			.irq = INT_UARTB,
+		},
+	},
+	{
+		.p = {
+			.membase = IO_ADDRESS(TEGRA_UARTC_BASE),
+			.mapbase = TEGRA_UARTC_BASE,
+			.irq = INT_UARTC,
+		},
+	},
+	{
+		.p = {
+			.membase = IO_ADDRESS(TEGRA_UARTD_BASE),
+			.mapbase = TEGRA_UARTD_BASE,
+			.irq = INT_UARTD,
+		},
+	},
+	{
+		.p = {
+			.membase = IO_ADDRESS(TEGRA_UARTE_BASE),
+			.mapbase = TEGRA_UARTE_BASE,
+			.irq = INT_UARTE,
+		},
+	},
+};
+static struct platform_device tegra_uart[] = {
+	{
+		.name = "tegra_uart",
+		.id = 0,
+		.dev = {
+			.platform_data = &tegra_uart_platform[0],
+		},
+	},
+	{
+		.name = "tegra_uart",
+		.id = 1,
+		.dev = {
+			.platform_data = &tegra_uart_platform[1],
+		},
+	},
+	{
+		.name = "tegra_uart",
+		.id = 2,
+		.dev = {
+			.platform_data = &tegra_uart_platform[2],
+		},
+	},
+	{
+		.name = "tegra_uart",
+		.id = 3,
+		.dev = {
+			.platform_data = &tegra_uart_platform[3],
+		},
+	},
+	{
+		.name = "tegra_uart",
+		.id = 4,
+		.dev = {
+			.platform_data = &tegra_uart_platform[4],
+		},
+	},
+
+};
+static void __init tegra_setup_hsuart(void)
+{
+	NvOdmDebugConsole uart = NvOdmQueryDebugConsole();
+	int dbg_id = (int)uart - (int)NvOdmDebugConsole_UartA;
+	const NvU32 *odm_table;
+	NvU32 odm_nr;
+	int i;
+
+	NvOdmQueryPinMux(NvOdmIoModule_Uart, &odm_table, &odm_nr);
+
+	for (i=0; i<ARRAY_SIZE(tegra_uart); i++) {
+		struct tegra_serial_platform_data *plat;
+		char name[16];
+
+		if (i==dbg_id)
+			continue;
+
+		plat = &tegra_uart_platform[i];
+
+		snprintf(name, sizeof(name), "%s.%d",
+			 tegra_uart[i].name, tegra_uart[i].id);
+
+		if (i < odm_nr) {
+			plat->pinmux = tegra_pinmux_get(name,
+				odm_table[i], &plat->nr_pins);
+		} else {
+			plat->pinmux = NULL;
+			plat->nr_pins = 0;
+		}
+
+		if (platform_device_register(&tegra_uart[i])) {
+			pr_err("%s: failed to register %s.%d\n",
+			       __func__, tegra_uart[i].name, tegra_uart[i].id);
+		}
+	}
+}
+#else
+static void __init tegra_setup_hsuart(void) { }
+#endif
 
 #ifdef CONFIG_USB_TEGRA_HCD
 static u64 tegra_hcd_dma_mask = DMA_BIT_MASK(32);
@@ -255,4 +372,5 @@ void __init tegra_setup_nvodm(void)
 {
 	tegra_setup_debug_uart();
 	tegra_setup_hcd();
+	tegra_setup_hsuart();
 }
