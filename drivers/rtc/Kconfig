@@ -220,6 +220,14 @@ config RTC_DRV_X1205
 	  This driver can also be built as a module. If so, the module
 	  will be called rtc-x1205.
 
+config RTC_DRV_TEGRA_ODM
+	boolean "NVIDIA Tegra ODM kit PMU adaptation RTC driver"
+	depends on ARCH_TEGRA && TEGRA_NVRM
+	default RTC_CLASS
+	help
+	  RTC (Realtime Clock) driver for the RTC functionality implemented by
+	  the development system's ODM kit
+
 config RTC_DRV_PCF8563
 	tristate "Philips PCF8563/Epson RTC8564"
 	help
