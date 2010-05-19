@@ -415,16 +415,24 @@ static inline void tegra_setup_hcd(void) { }
 #endif
 
 #ifdef CONFIG_RTC_DRV_TEGRA_ODM
-static struct platform_device tegra_rtc_device =
-{
+static struct platform_device tegra_rtc_device = {
 	.name = "tegra_rtc",
 	.id   = -1,
+};
+#endif
+#ifdef CONFIG_TEGRA_NVEC
+static struct platform_device tegra_nvec_device = {
+	.name = "nvec",
+	.id = -1,
 };
 #endif
 
 static struct platform_device *nvodm_devices[] __initdata = {
 #ifdef CONFIG_RTC_DRV_TEGRA_ODM
 	&tegra_rtc_device,
+#endif
+#ifdef CONFIG_TEGRA_NVEC
+	&tegra_nvec_device,
 #endif
 };
 
