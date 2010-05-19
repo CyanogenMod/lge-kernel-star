@@ -41,6 +41,8 @@
 #include <linux/debugfs.h>
 #include <linux/slab.h>
 #include <mach/dma.h>
+#include <mach/pinmux.h>
+#include <mach/serial.h>
 
 #define TX_EMPTY_STATUS (UART_LSR_TEMT | UART_LSR_THRE)
 
@@ -96,6 +98,9 @@ struct tegra_uart_port {
 	unsigned int		tx_bytes;
 
 	dma_addr_t		xmit_dma_addr;
+
+	const struct tegra_pingroup_config *pinmux;
+	int			nr_pins;
 
 	/* Rm DMA handles */
 	struct tegra_dma_req	tx_dma_req;
@@ -536,6 +541,9 @@ static int tegra_uart_hw_init(struct tegra_uart_port *t)
 	t->lcr_shadow = 0;
 	t->ier_shadow = 0;
 	t->baud = 0;
+
+	if (t->pinmux)
+		tegra_pinmux_config_tristate_table(t->pinmux, t->nr_pins, true);
 
 	clk_enable(t->clk);
 	msleep(10);
@@ -1090,6 +1098,9 @@ static int tegra_uart_suspend(struct platform_device *pdev, pm_message_t state)
 	dev_err(t->uport.dev, "tegra_uart_suspend called\n");
 	u = &t->uport;
 	uart_suspend_port(&tegra_uart_driver, u);
+	if (t->pinmux)
+		tegra_pinmux_config_tristate_table(t->pinmux, t->nr_pins, false);
+
 	return 0;
 }
 
@@ -1103,6 +1114,8 @@ static int tegra_uart_resume(struct platform_device *pdev)
 
 	u = &t->uport;
 	dev_err(t->uport.dev, "tegra_uart_resume called\n");
+	if (t->pinmux)
+		tegra_pinmux_config_tristate_table(t->pinmux, t->nr_pins, true);
 	uart_resume_port(&tegra_uart_driver, u);
 	return 0;
 }
@@ -1131,7 +1144,7 @@ static int __devexit tegra_uart_remove(struct platform_device *pdev)
 static int __init tegra_uart_probe(struct platform_device *pdev)
 {
 	struct tegra_uart_port *t;
-	struct plat_serial8250_port *pdata = pdev->dev.platform_data;
+	struct tegra_serial_platform_data *pdata = pdev->dev.platform_data;
 	struct uart_port *u;
 	int ret;
 	char name[64];
@@ -1152,10 +1165,12 @@ static int __init tegra_uart_probe(struct platform_device *pdev)
 	u->ops = &tegra_uart_ops;
 	u->type = ~PORT_UNKNOWN;
 	u->fifosize = 32;
-	u->mapbase = pdata->mapbase;
-	u->membase = pdata->membase;
-	u->irq = pdata->irq;
+	u->mapbase = pdata->p.mapbase;
+	u->membase = pdata->p.membase;
+	u->irq = pdata->p.irq;
 	u->regshift = 2;
+	t->pinmux = pdata->pinmux;
+	t->nr_pins = pdata->nr_pins;
 
 	t->clk = clk_get(&pdev->dev, NULL);
 	if (!t->clk) {
