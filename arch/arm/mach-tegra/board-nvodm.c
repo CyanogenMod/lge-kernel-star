@@ -25,13 +25,16 @@
 #include <linux/clk.h>
 #include <linux/platform_device.h>
 #include <linux/serial_8250.h>
+#include <linux/dma-mapping.h>
 
 #include <mach/iomap.h>
 #include <mach/io.h>
 #include <mach/pinmux.h>
+#include <mach/usb-hcd.h>
 
 #include "nvodm_query.h"
 #include "nvodm_query_pinmux.h"
+#include "nvodm_query_gpio.h"
 
 extern const struct tegra_pingroup_config *tegra_pinmux_get(const char *dev_id,
 	int config, int *len);
@@ -123,8 +126,133 @@ static void __init tegra_setup_debug_uart(void)
 	platform_device_register(&debug_uart);
 }
 
+#ifdef CONFIG_USB_TEGRA_HCD
+static u64 tegra_hcd_dma_mask = DMA_BIT_MASK(32);
+static struct tegra_hcd_platform_data tegra_hcd_platform[] = {
+	[0] = {
+		.instance = 0,
+	},
+	[1] = {
+		.instance = 1,
+	},
+	[2] = {
+		.instance = 2,
+	},
+};
+static struct resource tegra_hcd_resources[][2] = {
+	[0] = {
+		[0] = {
+			.flags = IORESOURCE_MEM,
+			.start = TEGRA_USB_BASE,
+			.end = TEGRA_USB_BASE + TEGRA_USB_SIZE - 1,
+		},
+		[1] = {
+			.flags = IORESOURCE_IRQ,
+			.start = INT_USB,
+			.end = INT_USB,
+		},
+	},
+	[1] = {
+		[0] = {
+			.flags = IORESOURCE_MEM,
+			.start = TEGRA_USB1_BASE,
+			.end = TEGRA_USB1_BASE + TEGRA_USB1_SIZE - 1,
+		},
+		[1] = {
+			.flags = IORESOURCE_IRQ,
+			.start = INT_USB2,
+			.end = INT_USB2,
+		},
+	},
+	[2] = {
+		[0] = {
+			.flags = IORESOURCE_MEM,
+			.start = TEGRA_USB2_BASE,
+			.end = TEGRA_USB2_BASE + TEGRA_USB2_SIZE - 1,
+		},
+		[1] = {
+			.flags = IORESOURCE_IRQ,
+			.start = INT_USB3,
+			.end = INT_USB3,
+		},
+	},
+};
+static struct platform_device tegra_hcd[] = {
+	[0] = {
+		.name = "tegra-ehci",
+		.id = 0,
+		.dev = {
+			.platform_data = &tegra_hcd_platform[0],
+			.coherent_dma_mask = DMA_BIT_MASK(32),
+			.dma_mask = &tegra_hcd_dma_mask,
+		},
+		.resource = tegra_hcd_resources[0],
+		.num_resources = ARRAY_SIZE(tegra_hcd_resources[0]),
+	},
+	[1] = {
+		.name = "tegra-ehci",
+		.id = 1,
+		.dev = {
+			.platform_data = &tegra_hcd_platform[1],
+			.coherent_dma_mask = DMA_BIT_MASK(32),
+			.dma_mask = &tegra_hcd_dma_mask,
+		},
+		.resource = tegra_hcd_resources[1],
+		.num_resources = ARRAY_SIZE(tegra_hcd_resources[1]),
+	},
+	[2] = {
+		.name = "tegra-ehci",
+		.id = 2,
+		.dev = {
+			.platform_data = &tegra_hcd_platform[2],
+			.coherent_dma_mask = DMA_BIT_MASK(32),
+			.dma_mask = &tegra_hcd_dma_mask,
+		},
+		.resource = tegra_hcd_resources[2],
+		.num_resources = ARRAY_SIZE(tegra_hcd_resources[2]),
+	},
+};
+static void __init tegra_setup_hcd(void)
+{
+	int i;
+
+	for (i=0; i<ARRAY_SIZE(tegra_hcd_platform); i++) {
+		const NvOdmUsbProperty *p;
+		struct tegra_hcd_platform_data *plat = &tegra_hcd_platform[i];
+
+		p = NvOdmQueryGetUsbProperty(NvOdmIoModule_Usb, i);
+
+		if (p->UsbMode == NvOdmUsbModeType_Device)
+			continue;
+
+		plat->otg_mode = (p->UsbMode == NvOdmUsbModeType_OTG);
+		if (p->IdPinDetectionType == NvOdmUsbIdPinType_Gpio) {
+			const NvOdmGpioPinInfo *gpio;
+			NvU32 count;
+
+			gpio = NvOdmQueryGpioPinMap(NvOdmGpioPinGroup_Usb,
+						    i, &count);
+			if (!gpio || (count<=NvOdmGpioPin_UsbCableId)) {
+				pr_err("%s: invalid ODM query for controller "
+				       "%d\n", __func__, i);
+				WARN_ON(1);
+				continue;
+			}
+			plat->id_detect = ID_PIN_GPIO;
+			gpio += NvOdmGpioPin_UsbCableId;
+			plat->gpio_nr = gpio->Port*8 + gpio->Pin;
+		} else if (p->IdPinDetectionType == NvOdmUsbIdPinType_CableId) {
+			plat->id_detect = ID_PIN_CABLE_ID;
+		}
+		platform_device_register(&tegra_hcd[i]);
+	}
+}
+#else
+static inline void tegra_setup_hcd(void) { }
+#endif
 
 void __init tegra_setup_nvodm(void)
 {
 	tegra_setup_debug_uart();
+	tegra_setup_hcd();
 }
