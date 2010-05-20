@@ -1106,9 +1106,11 @@ Ap15DisplayClockConfigure(
      */
     if (flags & NvRmClockConfig_MipiSync)
     {
-        // PLLD requested
+        // PLLD requested - use it as a source, and reconfigure,
+        //  unless it is also routed to the pads
         SourceId = NvRmClockSource_PllD0;
-        Ap15PllDConfigure(hRmDevice, TargetFreq);
+        if (!(flags & NvRmClockConfig_InternalClockForPads))
+            Ap15PllDConfigure(hRmDevice, TargetFreq);
     }
     else if (NvRmIsFreqRangeReachable(
         SourceClockFreq, MinFreq, MaxFreq, NVRM_DISPLAY_DIVIDER_MAX))

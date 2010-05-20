@@ -94,6 +94,7 @@ typedef struct NvBootArgsCarveoutRec
  */
 typedef struct NvBootArgsWarmbootRec
 {
+    /* The key used for accessing the preserved memory handle */
     NvU32 MemHandleKey;
 } NvBootArgsWarmboot;
 
@@ -111,7 +112,6 @@ typedef struct NvBootArgsPreservedMemHandleRec
     NvUPtr  Address;
     NvU32   Size;
 } NvBootArgsPreservedMemHandle;
-
 
 /**
  * Display boot args, indexed by NvBootArgKey_Display.
@@ -162,6 +162,16 @@ typedef struct NvBootArgsFramebufferRec
      *  assumed to begin at Pitch * Height bytes from the
      *  previous surface.  */
     NvU8  NumSurfaces;
+    /* Flags for future expandability.
+     * Current allowable flags are:
+     * zero - default
+     * NV_BOOT_ARGS_FB_FLAG_TEARING_EFFECT - use a tearing effect signal in
+     *      combination with a trigger from the display software to generate
+     *      a frame of pixels for the display device.
+     */
+    NvU32 Flags;
+#define NVBOOTARG_FB_FLAG_TEARING_EFFECT (0x1)
+
 } NvBootArgsFramebuffer;
 
 /**
@@ -210,8 +220,8 @@ typedef struct NvBootArgsChipShmooPhysRec
     NvU32 Size;
 } NvBootArgsChipShmooPhys;
 
-#define NVBOOTARG_NUM_PRESERVED_HANDLES (NvBootArgKey_PreservedMemHandle_Num - \
-                                         NvBootArgKey_PreservedMemHandle_0)
+#define NVBOOTARG_NUM_PRESERVED_HANDLES \
+    (NvBootArgKey_PreservedMemHandle_Num - NvBootArgKey_PreservedMemHandle_0)
 
 /**
  * OS-agnostic bootarg structure.

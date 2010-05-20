@@ -3,7 +3,7 @@
  *
  * Dumb framebuffer driver for NVIDIA Tegra SoCs
  *
- * Copyright (C) 2009 NVIDIA Corporation
+ * Copyright (C) 2009 - 2010 NVIDIA Corporation
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -37,6 +37,7 @@
 #include "nvbootargs.h"
 #include "nvrm_module.h"
 #include "nvrm_memmgr.h"
+#include "nvrm_power.h"
 #include "nvrm_ioctls.h"
 
 static struct fb_info tegra_fb_info = {
@@ -50,6 +51,8 @@ static struct fb_info tegra_fb_info = {
 		.line_length	= 800 * 2,
 	},
 
+	// these values are just defaults. they will be over-written with the
+	// correct values from the boot args.
 	.var = {
 		.xres		= 800,
 		.yres		= 480,
@@ -74,12 +77,19 @@ static struct fb_info tegra_fb_info = {
 	},
 };
 
-unsigned long s_fb_addr;
-unsigned long s_fb_size;
-unsigned long s_fb_width;
-unsigned long s_fb_height;
-int s_fb_Bpp;
-NvRmMemHandle s_fb_hMem;
+static unsigned long s_fb_addr;
+static unsigned long s_fb_size;
+static unsigned long s_fb_width;
+static unsigned long s_fb_height;
+static int s_fb_Bpp;
+static NvRmMemHandle s_fb_hMem;
+static unsigned long *s_fb_regs;
+static unsigned short s_use_tearing_effect;
+static unsigned long s_power_id = (unsigned long)-1;
+
+#define DISPLAY_BASE    (0x54200000)
+#define REGW( reg, val ) \
+    *(s_fb_regs + (reg)) = (val)
 
 /* palette attary used by the fbcon */
 u32 pseudo_palette[16];
@@ -159,6 +169,85 @@ int tegra_fb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	return 0;
 }
 
+static NvBool tegra_fb_power_register( void )
+{
+	if( s_power_id != (unsigned long)-1 )
+	{
+		return NV_TRUE;
+	}
+
+	if( NvRmPowerRegister( s_hRmGlobal, 0, &s_power_id ) != NvSuccess )
+	{
+		printk( "nvtegrafb: unable to load power manager\n" );
+		return NV_FALSE;
+	}
+
+	return NV_TRUE;
+}
+
+static NvBool tegra_fb_power_on( void )
+{
+	if( NvRmPowerVoltageControl( s_hRmGlobal,
+		NVRM_MODULE_ID( NvRmModuleID_GraphicsHost, 0 ),
+		s_power_id, NvRmVoltsUnspecified, NvRmVoltsUnspecified,
+		NULL, 0, NULL ) != NvSuccess )
+	{
+		printk( "nvtegrafb: unable to enable graphics host power\n" );
+		return NV_FALSE;
+	}
+
+	if( NvRmPowerVoltageControl( s_hRmGlobal,
+		NVRM_MODULE_ID( NvRmModuleID_Display, 0 ),
+		s_power_id, NvRmVoltsUnspecified, NvRmVoltsUnspecified,
+		NULL, 0, NULL ) != NvSuccess )
+	{
+		printk( "nvtegrafb: unable to enable display power\n" );
+		return NV_FALSE;
+	}
+
+	NvRmPowerModuleClockControl( s_hRmGlobal, NvRmModuleID_GraphicsHost,
+		s_power_id, NV_TRUE );
+
+	return NV_TRUE;
+}
+
+static void tegra_fb_power_off( void )
+{
+	// this will most likely not actually disable power to the display,
+	// but will make it such that the power reference count is correct
+	NvRmPowerVoltageControl( s_hRmGlobal,
+		NVRM_MODULE_ID( NvRmModuleID_GraphicsHost, 0 ),
+		s_power_id, NvRmVoltsOff, NvRmVoltsOff,
+		NULL, 0, NULL );
+
+	NvRmPowerVoltageControl( s_hRmGlobal,
+		NVRM_MODULE_ID( NvRmModuleID_Display, 0 ),
+		s_power_id, NvRmVoltsOff, NvRmVoltsOff,
+		NULL, 0, NULL );
+
+	NvRmPowerModuleClockControl( s_hRmGlobal, NvRmModuleID_GraphicsHost,
+		s_power_id, NV_FALSE );
+}
+
+static void tegra_fb_trigger_frame( void )
+{
+	if( !s_use_tearing_effect )
+	{
+		return;
+	}
+
+	if( !tegra_fb_power_on() )
+	{
+		return;
+	}
+
+	// state control: write the host trigger bit (24) along with a general
+	// activation request (bit 0)
+	REGW( 0x41, (1 << 24) | 1 );
+
+	tegra_fb_power_off();
+}
+
 int tegra_fb_blank(int blank, struct fb_info *info)
 {
 	return 0;
@@ -167,16 +256,19 @@ int tegra_fb_blank(int blank, struct fb_info *info)
 void tegra_fb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 {
 	cfb_fillrect(info, rect);
+	tegra_fb_trigger_frame();
 }
 
 void tegra_fb_copyarea(struct fb_info *info, const struct fb_copyarea *region)
 {
 	cfb_copyarea(info, region);
+	tegra_fb_trigger_frame();
 }
 
 void tegra_fb_imageblit(struct fb_info *info, const struct fb_image *image)
 {
 	cfb_imageblit(info, image);
+	tegra_fb_trigger_frame();
 }
 
 int tegra_fb_cursor(struct fb_info *info, struct fb_cursor *cursor)
@@ -196,22 +288,33 @@ static int tegra_plat_probe( struct platform_device *d )
 
 	e = NvOsBootArgGet(NvBootArgKey_Framebuffer, &boot_fb, sizeof(boot_fb));
 	if (e != NvSuccess || !boot_fb.MemHandleKey) {
-		printk("tegrafb: bootargs not found\n");
+		printk("nvtegrafb: bootargs not found\n");
 		return -1;
 	}
 
 	e = NvRmMemHandleClaimPreservedHandle(s_hRmGlobal, boot_fb.MemHandleKey,
 		&s_fb_hMem );
 	if (e != NvSuccess) {
-		printk("tegrafb: Unable to query bootup framebuffer memory.\n");
+		printk("nvtegrafb: Unable to query bootup framebuffer memory.\n");
 		return -1;
 	}
+
+	tegra_fb_power_register();
 
 	s_fb_width = boot_fb.Width;
 	s_fb_height = boot_fb.Height * boot_fb.NumSurfaces;
 	s_fb_size = boot_fb.Size;
 	s_fb_addr = NvRmMemPin(s_fb_hMem);
 	s_fb_Bpp = NV_COLOR_GET_BPP(boot_fb.ColorFormat) >> 3;
+
+	/* need to poke a trigger register if the tearing effect signal is
+	 * used
+	 */
+	if( boot_fb.Flags & NVBOOTARG_FB_FLAG_TEARING_EFFECT )
+	{
+		s_fb_regs = ioremap_nocache( DISPLAY_BASE, 256 * 1024 );
+		s_use_tearing_effect = 1;
+	}
 
 	tegra_fb_info.fix.smem_start = s_fb_addr;
 	tegra_fb_info.fix.smem_len = s_fb_size;
@@ -281,6 +384,10 @@ static int __init tegra_fb_init(void)
 
 static void __exit tegra_exit( void )
 {
+	tegra_fb_power_off();
+
+	NvRmPowerUnRegister( s_hRmGlobal, s_power_id );
+
 	unregister_framebuffer(&tegra_fb_info);
 }
 module_exit(tegra_exit);

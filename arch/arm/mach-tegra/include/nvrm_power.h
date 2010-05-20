@@ -175,7 +175,13 @@ typedef enum
     /// - Target SPDIF: configure SPDIFIN only
         NvRmClockConfig_SubConfig = 0x20,
  
-    /// Use MIPI PLL as Display clock source
+    /// Select MIPI PLL as clock source
+    /// - Target Display:
+    ///  (a) NvRmClockConfig_InternalClockForPads is also specified -
+    ///      use MIPI PLL for pixel clock source, preserve PLL configuration
+    ///  (b) NvRmClockConfig_InternalClockForPads is not specified -
+    ///      use MIPI PLL for pixel clock source, re-configure it if necessary
+    /// - Target HDMI: use MIPI PLL as HDMI clock source
         NvRmClockConfig_MipiSync = 0x40,
  
     /// Adjust Audio PLL to match requested I2S or SPDIF frequency
