@@ -1372,6 +1372,12 @@ struct nvmap_handle_ref *_nvmap_ref_lookup_locked(
 	struct nvmap_file_priv *priv, unsigned long ref)
 {
 	struct rb_node *n = priv->handle_refs.rb_node;
+	struct nvmap_handle *h = (struct nvmap_handle *)ref;
+
+	if (unlikely(h->poison != NVDA_POISON)) {
+		pr_err("%s: handle is poisoned\n", __func__);
+		return NULL;
+	}
 
 	while (n) {
 		struct nvmap_handle_ref *r;
@@ -1551,16 +1557,19 @@ static int _nvmap_do_pin(struct nvmap_file_priv *priv,
 	spin_lock(&priv->ref_lock);
 	for (i=0; i<nr && !ret; i++) {
 		r = _nvmap_ref_lookup_locked(priv, refs[i]);
-		if (!r && (!(priv->su || h[i]->global ||
-		    current->group_leader == h[i]->owner)))
-			ret = -EPERM;
-		else if (r) atomic_inc(&r->pin);
+		if (r) atomic_inc(&r->pin);
 		else {
-			pr_err("%s: %s pinning %s's %uB handle without "
-				"local context\n", __func__,
-				current->group_leader->comm,
-				h[i]->owner->comm, h[i]->orig_size);
-                }
+			if ((h[i]->poison != NVDA_POISON) ||
+			    (!(priv->su || h[i]->global ||
+			    current->group_leader == h[i]->owner)))
+				ret = -EPERM;
+			else {
+				pr_err("%s: %s pinning %s's %uB handle without "
+					"local context\n", __func__,
+					current->group_leader->comm,
+					h[i]->owner->comm, h[i]->orig_size);
+			}
+		}
 	}
 
 	while (ret && i--) {
