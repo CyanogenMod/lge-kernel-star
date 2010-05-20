@@ -34,9 +34,14 @@
 #include <mach/usb-otg.h>
 #include <mach/serial.h>
 
+#include <mach/nvrm_linux.h>
+
+#include "nvrm_gpio.h"
 #include "nvodm_query.h"
 #include "nvodm_query_pinmux.h"
 #include "nvodm_query_gpio.h"
+
+NvRmGpioHandle s_hGpioGlobal;
 
 extern const struct tegra_pingroup_config *tegra_pinmux_get(const char *dev_id,
 	int config, int *len);
@@ -447,6 +452,7 @@ static struct platform_device *nvodm_devices[] __initdata = {
 
 void __init tegra_setup_nvodm(void)
 {
+	NvRmGpioOpen(s_hRmGlobal, &s_hGpioGlobal);
 	tegra_setup_debug_uart();
 	tegra_setup_hcd();
 	tegra_setup_hsuart();
