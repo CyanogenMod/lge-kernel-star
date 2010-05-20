@@ -426,6 +426,12 @@ static struct platform_device tegra_nvec_device = {
 	.id = -1,
 };
 #endif
+#ifdef CONFIG_TEGRA_BATTERY_NVEC
+static struct platform_device tegra_battery_device = {
+	.name = "tegra_battery",
+	.id = -1,
+};
+#endif
 
 static struct platform_device *nvodm_devices[] __initdata = {
 #ifdef CONFIG_RTC_DRV_TEGRA_ODM
@@ -433,6 +439,9 @@ static struct platform_device *nvodm_devices[] __initdata = {
 #endif
 #ifdef CONFIG_TEGRA_NVEC
 	&tegra_nvec_device,
+#endif
+#ifdef CONFIG_TEGRA_BATTERY_NVEC
+	&tegra_battery_device,
 #endif
 };
 
