@@ -64,6 +64,7 @@
 #define SDHCI_HOST_CONTROL 	0x28
 #define  SDHCI_CTRL_LED		0x01
 #define  SDHCI_CTRL_4BITBUS	0x02
+#define  SDHCI_CTRL_8BITBUS	0x20
 #define  SDHCI_CTRL_HISPD	0x04
 #define  SDHCI_CTRL_DMA_MASK	0x18
 #define   SDHCI_CTRL_SDMA	0x00
@@ -301,6 +302,7 @@ struct sdhci_host {
 #ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
 	unsigned int		start_offset;	/* Zero-offset for MBR */
 #endif
+	unsigned int		data_width;	/* Width of data transfers */
 
 	unsigned long		private[0] ____cacheline_aligned;
 };
