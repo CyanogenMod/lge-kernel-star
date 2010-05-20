@@ -104,6 +104,13 @@ config BATTERY_MAX17040
 	  in handheld and portable equipment. The MAX17040 is configured
 	  to operate with a single lithium cell
 
+config TEGRA_BATTERY_NVEC
+	boolean "Battery connected to NVIDIA Tegra NvEc embedded controller"
+	depends on ARCH_TEGRA && TEGRA_NVEC
+	help
+	  Say Y to include battery support for batteries connected to an
+	  NVIDIA Tegra NvEc-compliant embedded controller
+
 config CHARGER_PCF50633
 	tristate "NXP PCF50633 MBC"
 	depends on MFD_PCF50633
