@@ -55,6 +55,14 @@ config MMC_SDHCI_PCI
 
 	  If unsure, say N.
 
+config MMC_SDHCI_TEGRA
+	boolean "SDHCI support on NVIDIA Tegra SoCs"
+	depends on MMC_SDHCI && ARCH_TEGRA
+	default MMC_SDHCI
+	help
+	  This enables the internal SDHCI-compatible interfaces in NVIDIA
+	  Tegra SoCs
+
 config MMC_RICOH_MMC
 	tristate "Ricoh MMC Controller Disabler  (EXPERIMENTAL)"
 	depends on MMC_SDHCI_PCI

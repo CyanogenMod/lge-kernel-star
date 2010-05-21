@@ -1,0 +1,445 @@
+/*
+ * drivers/mmc/host/sdhci-tegra.c
+ *
+ * SDHCI-compatible driver for NVIDIA Tegra SoCs
+ *
+ * Copyright (c) 2009-2010, NVIDIA Corporation.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ */
+
+#define NV_DEBUG 0
+
+#include <linux/mmc/host.h>
+#include <linux/platform_device.h>
+#include <linux/dma-mapping.h>
+#include <linux/irq.h>
+#include <linux/mmc/card.h>
+#include <linux/clk.h>
+#include <linux/gpio.h>
+
+#include <mach/sdhci.h>
+#include <mach/pinmux.h>
+#include <nvodm_sdio.h>
+#include "sdhci.h"
+
+#define DRIVER_DESC "NVIDIA Tegra SDHCI compliant driver"
+#define DRIVER_NAME "tegra-sdhci"
+
+struct tegra_sdhci {
+	struct platform_device	*pdev;
+	struct clk		*clk;
+	NvOdmSdioHandle		hOdmSdio;
+	const struct tegra_pingroup_config *pinmux;
+	int			nr_pins;
+	int			gpio_cd;
+	int			gpio_polarity_cd;
+	int			irq_cd;
+	int			gpio_wp;
+	int			gpio_polarity_wp;
+	unsigned int		debounce;
+	unsigned long		max_clk;
+	bool			card_present;
+	bool			clk_enable;
+};
+
+static inline unsigned long res_size(struct resource *res)
+{
+	return res->end - res->start + 1;
+}
+
+static int tegra_sdhci_enable_dma(struct sdhci_host *sdhost)
+{
+	return 0;
+}
+
+static irqreturn_t card_detect_isr(int irq, void *dev_id)
+{
+	struct sdhci_host *sdhost = dev_id;
+	struct tegra_sdhci *host = sdhci_priv(sdhost);
+
+	host->card_present =
+		(gpio_get_value(host->gpio_cd)==host->gpio_polarity_cd);
+	smp_wmb();
+	sdhci_card_detect_callback(sdhost);
+
+	return IRQ_HANDLED;
+}
+
+static bool tegra_sdhci_card_detect(struct sdhci_host *sdhost)
+{
+	struct tegra_sdhci *host = sdhci_priv(sdhost);
+	smp_rmb();
+	return host->card_present;
+}
+
+static int tegra_sdhci_get_ro(struct sdhci_host *sdhost)
+{
+	struct tegra_sdhci *host = sdhci_priv(sdhost);
+
+	BUG_ON(host->gpio_wp == -1);
+	return (gpio_get_value(host->gpio_wp)==host->gpio_polarity_wp);
+}
+
+static void tegra_sdhci_set_clock(struct sdhci_host *sdhost,
+	unsigned int clock)
+{
+	struct tegra_sdhci *host = sdhci_priv(sdhost);
+
+	if (clock) {
+		clk_set_rate(host->clk, clock);
+		sdhost->max_clk = clk_get_rate(host->clk);
+		dev_dbg(&host->pdev->dev, "clock request: %uKHz. currently "
+			"%uKHz\n", clock/1000, sdhost->max_clk/1000);
+	}
+
+	if (clock && !host->clk_enable) {
+		clk_enable(host->clk);
+		host->clk_enable = true;
+	} else if (!clock && host->clk_enable) {
+		clk_disable(host->clk);
+		host->clk_enable = false;
+	}
+}
+
+static struct sdhci_ops tegra_sdhci_wp_cd_ops = {
+	.enable_dma		= tegra_sdhci_enable_dma,
+	.get_ro			= tegra_sdhci_get_ro,
+	.card_detect		= tegra_sdhci_card_detect,
+	.set_clock		= tegra_sdhci_set_clock,
+};
+
+static struct sdhci_ops tegra_sdhci_cd_ops = {
+	.enable_dma		= tegra_sdhci_enable_dma,
+	.card_detect		= tegra_sdhci_card_detect,
+	.set_clock		= tegra_sdhci_set_clock,
+};
+
+static struct sdhci_ops tegra_sdhci_wp_ops = {
+	.enable_dma		= tegra_sdhci_enable_dma,
+	.get_ro			= tegra_sdhci_get_ro,
+	.set_clock		= tegra_sdhci_set_clock,
+};
+
+static struct sdhci_ops tegra_sdhci_ops = {
+	.enable_dma		= tegra_sdhci_enable_dma,
+	.set_clock		= tegra_sdhci_set_clock,
+};
+
+int __init tegra_sdhci_probe(struct platform_device *pdev)
+{
+	struct sdhci_host *sdhost;
+	struct tegra_sdhci *host;
+	struct tegra_sdhci_platform_data *plat = pdev->dev.platform_data;
+	struct resource *res;
+	int ret = -ENODEV;
+
+	if (pdev->id == -1) {
+		dev_err(&pdev->dev, "dynamic instance assignment not allowed\n");
+		return -ENODEV;
+	}
+
+	sdhost  = sdhci_alloc_host(&pdev->dev, sizeof(struct tegra_sdhci));
+	if (IS_ERR_OR_NULL(sdhost)) {
+		dev_err(&pdev->dev, "unable to allocate driver structure\n");
+		return (!sdhost) ? -ENOMEM : PTR_ERR(sdhost);
+	}
+	sdhost->hw_name = dev_name(&pdev->dev);
+
+	host = sdhci_priv(sdhost);
+
+	host->hOdmSdio = NvOdmSdioOpen(pdev->id);
+	if (!host->hOdmSdio)
+		dev_info(&pdev->dev, "no ODM SDIO adaptation\n");
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res) {
+		dev_err(&pdev->dev, "no memory I/O resource provided\n");
+		ret = -ENODEV;
+		goto err_sdhci_alloc;
+	}
+	if (!request_mem_region(res->start, res_size(res),
+				dev_name(&pdev->dev))) {
+		dev_err(&pdev->dev, "memory in use\n");
+		ret = -EBUSY;
+		goto err_sdhci_alloc;
+	}
+	sdhost->ioaddr = ioremap(res->start, res_size(res));
+	if (!sdhost->ioaddr) {
+		dev_err(&pdev->dev, "failed to map registers\n");
+		ret = -ENXIO;
+		goto err_request_mem;
+	}
+	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+	if (!res) {
+		dev_err(&pdev->dev, "no IRQ resource provided\n");
+		ret = -ENODEV;
+		goto err_ioremap;
+	}
+	sdhost->irq = res->start;
+	host->clk = clk_get(&pdev->dev, NULL);
+	if (!host->clk) {
+		dev_err(&pdev->dev, "unable to get clock\n");
+		ret = -ENODEV;
+		goto err_ioremap;
+	}
+
+	host->pdev = pdev;
+	host->pinmux = plat->pinmux;
+	host->nr_pins = plat->nr_pins;
+	host->gpio_cd = plat->gpio_nr_cd;
+	host->gpio_polarity_cd = plat->gpio_polarity_cd;
+	host->gpio_wp = plat->gpio_nr_wp;
+	host->gpio_polarity_wp = plat->gpio_polarity_wp;
+	dev_dbg(&pdev->dev, "write protect: %d card detect: %d\n",
+		host->gpio_wp, host->gpio_cd);
+	host->irq_cd = -1;
+	host->debounce = plat->debounce;
+	if (plat->max_clk)
+		host->max_clk = min_t(unsigned int, 52000000, plat->max_clk);
+	else {
+		dev_info(&pdev->dev, "no max_clk specified, default to 52MHz\n");
+		host->max_clk = 52000000;
+	}
+
+#ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
+	sdhost->start_offset = plat->offset;
+#endif
+
+	if (host->gpio_cd != -1) {
+		ret = gpio_request(host->gpio_cd, "card_detect");
+		if (ret < 0) {
+			dev_err(&pdev->dev, "request cd gpio failed\n");
+			host->gpio_cd = -1;
+			goto skip_gpio_cd;
+		}
+		host->irq_cd = gpio_to_irq(host->gpio_cd);
+		if (host->irq_cd < 0) {
+			/* fall back to non-GPIO card detect mode */
+			dev_err(&pdev->dev, "invalid card detect GPIO\n");
+			host->gpio_cd = -1;
+			host->irq_cd = -1;
+			goto skip_gpio_cd;
+		} 
+		ret = gpio_direction_input(host->gpio_cd);
+		if (ret < 0) {
+			dev_err(&pdev->dev, "failed to configure GPIO\n");
+			gpio_free(host->gpio_cd);
+			host->gpio_cd = -1;
+			goto skip_gpio_cd;
+		}
+		ret = request_irq(host->irq_cd, card_detect_isr,
+			IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+			mmc_hostname(sdhost->mmc), sdhost);
+		if (ret) {
+			dev_err(&pdev->dev, "unable to request IRQ\n");
+			gpio_free(host->gpio_cd);
+			host->gpio_cd = -1;
+			host->irq_cd = -1;
+			goto skip_gpio_cd;
+		}
+		host->card_present =
+			(gpio_get_value(host->gpio_cd)==host->gpio_polarity_cd);
+	}
+skip_gpio_cd:
+	ret = 0;
+	if (host->gpio_wp != -1) {
+		ret = gpio_request(host->gpio_wp, "write_protect");
+		if (ret < 0) {
+			dev_err(&pdev->dev, "request wp gpio failed\n");
+			host->gpio_wp = -1;
+			goto skip_gpio_wp;
+		}
+		ret = gpio_direction_input(host->gpio_wp);
+		if (ret < 0) {
+			dev_err(&pdev->dev, "configure wp gpio failed\n");
+			gpio_free(host->gpio_wp);
+			host->gpio_wp = -1;
+		}
+	}
+skip_gpio_wp:
+	ret = 0;
+	if (host->pinmux && host->nr_pins)
+		tegra_pinmux_config_tristate_table(host->pinmux,
+			host->nr_pins, TEGRA_TRI_NORMAL);
+	clk_set_rate(host->clk, host->max_clk);
+	clk_enable(host->clk);
+	host->max_clk = clk_get_rate(host->clk);
+	host->clk_enable = true;
+
+	if (host->gpio_wp != -1 && host->gpio_cd != -1)
+		sdhost->ops = &tegra_sdhci_wp_cd_ops;
+	else if (host->gpio_wp != -1)
+		sdhost->ops = &tegra_sdhci_wp_ops;
+	else if (host->gpio_cd != -1)
+		sdhost->ops = &tegra_sdhci_cd_ops;
+	else
+		sdhost->ops = &tegra_sdhci_ops;
+
+	sdhost->quirks =
+		SDHCI_QUIRK_BROKEN_TIMEOUT_VAL |
+		SDHCI_QUIRK_SINGLE_POWER_WRITE |
+		SDHCI_QUIRK_ENABLE_INTERRUPT_AT_BLOCK_GAP |
+		SDHCI_QUIRK_BROKEN_WRITE_PROTECT |
+		SDHCI_QUIRK_BROKEN_CARD_DETECTION |
+		SDHCI_QUIRK_BROKEN_CTRL_HISPD;
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	sdhost->quirks |= SDHCI_QUIRK_BROKEN_SPEC_VERSION |
+		SDHCI_QUIRK_NO_64KB_ADMA;
+	sdhost->version = SDHCI_SPEC_200;
+#endif
+
+	sdhost->data_width = plat->bus_width;
+	sdhost->dma_mask = DMA_BIT_MASK(32);
+	ret = sdhci_add_host(sdhost);
+	if (ret)
+		goto fail;
+
+	platform_set_drvdata(pdev, sdhost);
+
+	dev_info(&pdev->dev, "probe complete\n");
+
+	return  0;
+
+fail:
+	if (host->irq_cd != -1)
+		free_irq(host->irq_cd, sdhost);
+	if (host->gpio_cd != -1)
+		gpio_free(host->gpio_cd);
+	if (host->gpio_wp != -1)
+		gpio_free(host->gpio_wp);
+
+	if (host->pinmux && host->nr_pins)
+		tegra_pinmux_config_tristate_table(host->pinmux,
+			host->nr_pins, TEGRA_TRI_TRISTATE);
+
+	clk_disable(host->clk);
+	clk_put(host->clk);
+err_ioremap:
+	iounmap(sdhost->ioaddr);
+err_request_mem:
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	release_mem_region(res->start, res_size(res));
+err_sdhci_alloc:
+	if (host->hOdmSdio)
+		NvOdmSdioClose(host->hOdmSdio);
+	sdhci_free_host(sdhost);
+	dev_err(&pdev->dev, "probe failed\n");
+	return ret;
+}
+
+
+static int tegra_sdhci_remove(struct platform_device *pdev)
+{
+	struct sdhci_host *sdhost = platform_get_drvdata(pdev);
+	struct tegra_sdhci *host = sdhci_priv(sdhost);
+
+	if (host->irq_cd != -1)
+		free_irq(host->irq_cd, sdhost);
+
+	if (host->gpio_cd != -1)
+		gpio_free(host->gpio_cd);
+
+	if (host->gpio_wp != -1)
+		gpio_free(host->gpio_wp);
+
+	if (host->pinmux && host->nr_pins)
+		tegra_pinmux_config_tristate_table(host->pinmux,
+			host->nr_pins, TEGRA_TRI_TRISTATE);
+
+	if (host->clk_enable)
+		clk_disable(host->clk);
+
+	clk_put(host->clk);
+	iounmap(sdhost->ioaddr);
+	sdhost->ioaddr = NULL;
+
+	if (host->hOdmSdio)
+		NvOdmSdioClose(host->hOdmSdio);
+
+	sdhci_free_host(sdhost);
+	return 0;
+}
+
+#if defined(CONFIG_PM)
+#define is_sdio_card(_card) \
+	((_card) && ((_card)->type == MMC_TYPE_SDIO))
+
+static int tegra_sdhci_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	struct sdhci_host *sdhost = platform_get_drvdata(pdev);
+	struct tegra_sdhci *host = sdhci_priv(sdhost);
+
+	if (!is_sdio_card(sdhost->mmc->card)) {
+		int ret = sdhci_suspend_host(sdhost,state);
+		if (ret) {
+			dev_err(&pdev->dev, "failed to suspend host\n");
+			return ret;
+		}
+		if (host->hOdmSdio)
+			NvOdmSdioSuspend(host->hOdmSdio);
+		clk_disable(host->clk);
+		host->clk_enable = false;
+	}
+
+	return 0;
+}
+
+static int tegra_sdhci_resume(struct platform_device *pdev)
+{
+	struct sdhci_host *sdhost = platform_get_drvdata(pdev);
+	struct tegra_sdhci *host = sdhci_priv(sdhost);
+
+	if (!is_sdio_card(sdhost->mmc->card)) {
+		clk_enable(host->clk);
+		host->clk_enable = true;
+		if (host->hOdmSdio)
+			NvOdmSdioResume(host->hOdmSdio);
+
+		return sdhci_resume_host(sdhost);
+	}
+
+	return 0;
+}
+#endif
+
+struct platform_driver tegra_sdhci_driver = {
+	.probe		= tegra_sdhci_probe,
+	.remove		= tegra_sdhci_remove,
+#if defined(CONFIG_PM)
+	.suspend	= tegra_sdhci_suspend,
+	.resume		= tegra_sdhci_resume,
+#endif
+	.driver		= {
+		.name	= "tegra-sdhci",
+		.owner	= THIS_MODULE,
+	},
+};
+
+static int __init tegra_sdhci_init(void)
+{
+	return platform_driver_register(&tegra_sdhci_driver);
+}
+
+static void __exit tegra_sdhci_exit(void)
+{
+	platform_driver_unregister(&tegra_sdhci_driver);
+}
+
+module_init(tegra_sdhci_init);
+module_exit(tegra_sdhci_exit);
+
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION(DRIVER_DESC);
