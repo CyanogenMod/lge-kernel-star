@@ -35,12 +35,13 @@
 
 #include <mach/kbc.h>
 #include <mach/nand.h>
+#include <mach/sdhci.h>
 
-#ifdef CONFIG_MTD_NAND_TEGRA
+#if defined(CONFIG_MTD_NAND_TEGRA) || defined(CONFIG_EMBEDDED_MMC_START_OFFSET)
 #define MAX_MTD_PARTNR 8
 static struct mtd_partition tegra_mtd_partitions[MAX_MTD_PARTNR];
 
-static struct tegra_nand_platform tegra_nand_plat = {
+struct tegra_nand_platform tegra_nand_plat = {
 	.parts = tegra_mtd_partitions,
 	.nr_parts = 0,
 };
@@ -103,6 +104,8 @@ static int __init tegrapart_setup(char *options)
 	return 0;
 }
 __setup("tegrapart=", tegrapart_setup);
+#endif
+#ifdef CONFIG_MTD_NAND_TEGRA
 
 static struct platform_device tegra_nand_device = {
 	.name = "tegra_nand",

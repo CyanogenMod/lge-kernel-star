@@ -33,6 +33,8 @@
 #include <mach/usb-hcd.h>
 #include <mach/usb-otg.h>
 #include <mach/serial.h>
+#include <mach/sdhci.h>
+#include <mach/nand.h>
 
 #include <mach/nvrm_linux.h>
 
@@ -40,8 +42,12 @@
 #include "nvodm_query.h"
 #include "nvodm_query_pinmux.h"
 #include "nvodm_query_gpio.h"
+#include "nvrm_pinmux.h"
+#include "nvrm_module.h"
 
 NvRmGpioHandle s_hGpioGlobal;
+
+static u64 tegra_dma_mask = DMA_BIT_MASK(32);
 
 extern const struct tegra_pingroup_config *tegra_pinmux_get(const char *dev_id,
 	int config, int *len);
@@ -133,6 +139,201 @@ static void __init tegra_setup_debug_uart(void)
 	platform_device_register(&debug_uart);
 }
 
+#ifdef CONFIG_MMC_SDHCI_TEGRA
+extern struct tegra_nand_platform tegra_nand_plat;
+static struct tegra_sdhci_platform_data tegra_sdhci_platform[] = {
+	[0] = {
+		.bus_width = 4,
+		.debounce = 5,
+	},
+	[1] = {
+		.bus_width = 4,
+		.debounce = 5,
+	},
+	[2] = {
+		.bus_width = 4,
+		.debounce = 5,
+	},
+	[3] = {
+		.bus_width = 4,
+		.debounce = 5,
+	},
+};
+static struct resource tegra_sdhci_resources[][2] = {
+	[0] = {
+		[0] = {
+			.start = TEGRA_SDMMC1_BASE,
+			.end = TEGRA_SDMMC1_BASE + TEGRA_SDMMC1_SIZE - 1,
+			.flags = IORESOURCE_MEM,
+		},
+		[1] = {
+			.start = INT_SDMMC1,
+			.end = INT_SDMMC1,
+			.flags = IORESOURCE_IRQ,
+		},
+	},
+	[1] = {
+		[0] = {
+			.start = TEGRA_SDMMC2_BASE,
+			.end = TEGRA_SDMMC2_BASE + TEGRA_SDMMC2_SIZE - 1,
+			.flags = IORESOURCE_MEM,
+		},
+		[1] = {
+			.start = INT_SDMMC2,
+			.end = INT_SDMMC2,
+			.flags = IORESOURCE_IRQ,
+		},
+	},
+	[2] = {
+		[0] = {
+			.start = TEGRA_SDMMC3_BASE,
+			.end = TEGRA_SDMMC3_BASE + TEGRA_SDMMC3_SIZE - 1,
+			.flags = IORESOURCE_MEM,
+		},
+		[1] = {
+			.start = INT_SDMMC3,
+			.end = INT_SDMMC3,
+			.flags = IORESOURCE_IRQ,
+		},
+	},
+	[3] = {
+		[0] = {
+			.start = TEGRA_SDMMC4_BASE,
+			.end = TEGRA_SDMMC4_BASE + TEGRA_SDMMC4_SIZE - 1,
+			.flags = IORESOURCE_MEM,
+		},
+		[1] = {
+			.start = INT_SDMMC4,
+			.end = INT_SDMMC4,
+			.flags = IORESOURCE_IRQ,
+		},
+	},
+};
+static struct platform_device tegra_sdhci_devices[] = {
+	[0] = {
+		.id = 0,
+		.name = "tegra-sdhci",
+		.resource = tegra_sdhci_resources[0],
+		.num_resources = ARRAY_SIZE(tegra_sdhci_resources[0]),
+		.dev = {
+			.platform_data = &tegra_sdhci_platform[0],
+			.coherent_dma_mask = DMA_BIT_MASK(32),
+			.dma_mask = &tegra_dma_mask,
+		},
+	},
+	[1] = {
+		.id = 1,
+		.name = "tegra-sdhci",
+		.resource = tegra_sdhci_resources[1],
+		.num_resources = ARRAY_SIZE(tegra_sdhci_resources[1]),
+		.dev = {
+			.platform_data = &tegra_sdhci_platform[1],
+			.coherent_dma_mask = DMA_BIT_MASK(32),
+			.dma_mask = &tegra_dma_mask,
+		},
+	},
+	[2] = {
+		.id = 2,
+		.name = "tegra-sdhci",
+		.resource = tegra_sdhci_resources[2],
+		.num_resources = ARRAY_SIZE(tegra_sdhci_resources[2]),
+		.dev = {
+			.platform_data = &tegra_sdhci_platform[2],
+			.coherent_dma_mask = DMA_BIT_MASK(32),
+			.dma_mask = &tegra_dma_mask,
+		},
+	},
+	[3] = {
+		.id = 3,
+		.name = "tegra-sdhci",
+		.resource = tegra_sdhci_resources[3],
+		.num_resources = ARRAY_SIZE(tegra_sdhci_resources[3]),
+		.dev = {
+			.platform_data = &tegra_sdhci_platform[3],
+			.coherent_dma_mask = DMA_BIT_MASK(32),
+			.dma_mask = &tegra_dma_mask,
+		},
+	},
+};
+
+#define active_high(_pin) ((_pin)->activeState == NvOdmGpioPinActiveState_High ? 1 : 0)
+
+static void __init tegra_setup_sdhci(void) {
+	const NvOdmGpioPinInfo *gpio;
+	struct tegra_sdhci_platform_data *plat;
+	const NvU32 *clock_limits;
+	const NvU32 *pinmux;
+	NvU32 nr_pinmux;
+	NvU32 clock_count;
+	NvU32 gpio_count;
+	NvRmModuleSdmmcInterfaceCaps caps;
+	int i;
+
+	NvOdmQueryClockLimits(NvOdmIoModule_Sdio, &clock_limits, &clock_count);
+	NvOdmQueryPinMux(NvOdmIoModule_Sdio, &pinmux, &nr_pinmux);
+
+#ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
+	/* check if an "MBR" partition was parsed from the tegra partition
+	 * command line, and store it in sdhci.3's offset field */
+	for (i=0; i<tegra_nand_plat.nr_parts; i++) {
+		plat = &tegra_sdhci_platform[3];
+		if (strcmp("mbr", tegra_nand_plat.parts[i].name))
+			continue;
+		plat->offset = tegra_nand_plat.parts[i].offset;
+	}
+#endif
+
+	for (i=0; i<ARRAY_SIZE(tegra_sdhci_platform); i++) {
+		const NvOdmQuerySdioInterfaceProperty *prop;
+		prop = NvOdmQueryGetSdioInterfaceProperty(i);
+		if (!i || prop->usage==NvOdmQuerySdioSlotUsage_unused)
+			continue;
+
+		plat = &tegra_sdhci_platform[i];
+		gpio = NvOdmQueryGpioPinMap(NvOdmGpioPinGroup_Sdio,
+			i, &gpio_count);
+		if (!gpio)
+			gpio_count = 0;
+		switch (gpio_count) {
+		case 2:
+			plat->gpio_nr_wp = 8*gpio[1].Port + gpio[1].Pin;
+			plat->gpio_nr_cd = 8*gpio[0].Port + gpio[0].Pin;
+			plat->gpio_polarity_wp = active_high(&gpio[1]);
+			plat->gpio_polarity_cd = active_high(&gpio[0]);
+			break;
+		case 1:
+			plat->gpio_nr_wp = -1;
+			plat->gpio_nr_cd = 8*gpio[0].Port + gpio[0].Pin;
+			plat->gpio_polarity_cd = active_high(&gpio[0]);
+			break;
+		case 0:
+			plat->gpio_nr_wp = -1;
+			plat->gpio_nr_cd = -1;
+			break;
+		}
+
+		if (NvRmGetModuleInterfaceCapabilities(s_hRmGlobal,
+			NVRM_MODULE_ID(NvRmModuleID_Sdio, i),
+			sizeof(caps), &caps)==NvSuccess)
+			plat->bus_width = caps.MmcInterfaceWidth;
+
+		if (clock_limits && i<clock_count)
+			plat->max_clk = clock_limits[i] * 1000;
+
+		if (pinmux && i<nr_pinmux) {
+			char name[20];
+			snprintf(name, sizeof(name), "tegra-sdhci.%d", i);
+			plat->pinmux = tegra_pinmux_get(name,
+				pinmux[i], &plat->nr_pins);
+		}
+
+		platform_device_register(&tegra_sdhci_devices[i]);
+	}
+}
+#else
+static void __init tegra_setup_sdhci(void) { }
+#endif
+
 #ifdef CONFIG_SERIAL_TEGRA
 static struct tegra_serial_platform_data tegra_uart_platform[] = {
 	{
@@ -177,6 +378,8 @@ static struct platform_device tegra_uart[] = {
 		.id = 0,
 		.dev = {
 			.platform_data = &tegra_uart_platform[0],
+			.coherent_dma_mask = DMA_BIT_MASK(32),
+			.dma_mask = &tegra_dma_mask,
 		},
 	},
 	{
@@ -184,6 +387,8 @@ static struct platform_device tegra_uart[] = {
 		.id = 1,
 		.dev = {
 			.platform_data = &tegra_uart_platform[1],
+			.coherent_dma_mask = DMA_BIT_MASK(32),
+			.dma_mask = &tegra_dma_mask,
 		},
 	},
 	{
@@ -191,6 +396,8 @@ static struct platform_device tegra_uart[] = {
 		.id = 2,
 		.dev = {
 			.platform_data = &tegra_uart_platform[2],
+			.coherent_dma_mask = DMA_BIT_MASK(32),
+			.dma_mask = &tegra_dma_mask,
 		},
 	},
 	{
@@ -198,6 +405,8 @@ static struct platform_device tegra_uart[] = {
 		.id = 3,
 		.dev = {
 			.platform_data = &tegra_uart_platform[3],
+			.coherent_dma_mask = DMA_BIT_MASK(32),
+			.dma_mask = &tegra_dma_mask,
 		},
 	},
 	{
@@ -205,6 +414,8 @@ static struct platform_device tegra_uart[] = {
 		.id = 4,
 		.dev = {
 			.platform_data = &tegra_uart_platform[4],
+			.coherent_dma_mask = DMA_BIT_MASK(32),
+			.dma_mask = &tegra_dma_mask,
 		},
 	},
 
@@ -250,7 +461,6 @@ static void __init tegra_setup_hsuart(void) { }
 #endif
 
 #ifdef CONFIG_USB_TEGRA_HCD
-static u64 tegra_hcd_dma_mask = DMA_BIT_MASK(32);
 static struct tegra_hcd_platform_data tegra_hcd_platform[] = {
 	[0] = {
 		.instance = 0,
@@ -307,7 +517,7 @@ static struct platform_device tegra_hcd[] = {
 		.dev = {
 			.platform_data = &tegra_hcd_platform[0],
 			.coherent_dma_mask = DMA_BIT_MASK(32),
-			.dma_mask = &tegra_hcd_dma_mask,
+			.dma_mask = &tegra_dma_mask,
 		},
 		.resource = tegra_hcd_resources[0],
 		.num_resources = ARRAY_SIZE(tegra_hcd_resources[0]),
@@ -318,7 +528,7 @@ static struct platform_device tegra_hcd[] = {
 		.dev = {
 			.platform_data = &tegra_hcd_platform[1],
 			.coherent_dma_mask = DMA_BIT_MASK(32),
-			.dma_mask = &tegra_hcd_dma_mask,
+			.dma_mask = &tegra_dma_mask,
 		},
 		.resource = tegra_hcd_resources[1],
 		.num_resources = ARRAY_SIZE(tegra_hcd_resources[1]),
@@ -329,7 +539,7 @@ static struct platform_device tegra_hcd[] = {
 		.dev = {
 			.platform_data = &tegra_hcd_platform[2],
 			.coherent_dma_mask = DMA_BIT_MASK(32),
-			.dma_mask = &tegra_hcd_dma_mask,
+			.dma_mask = &tegra_dma_mask,
 		},
 		.resource = tegra_hcd_resources[2],
 		.num_resources = ARRAY_SIZE(tegra_hcd_resources[2]),
@@ -361,7 +571,7 @@ static struct platform_device tegra_otg = {
 	.dev = {
 		.platform_data = &tegra_otg_platform,
 		.coherent_dma_mask = DMA_BIT_MASK(32),
-		.dma_mask = &tegra_hcd_dma_mask,
+		.dma_mask = &tegra_dma_mask,
 	},
 };
 #else
@@ -456,5 +666,6 @@ void __init tegra_setup_nvodm(void)
 	tegra_setup_debug_uart();
 	tegra_setup_hcd();
 	tegra_setup_hsuart();
+	tegra_setup_sdhci();
 	platform_add_devices(nvodm_devices, ARRAY_SIZE(nvodm_devices));
 }
