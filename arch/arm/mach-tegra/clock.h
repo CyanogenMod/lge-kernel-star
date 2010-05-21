@@ -77,6 +77,9 @@ struct clk {
 	const char		*name;
 	u32			module;
 	u32			flags;
+	unsigned long		rate_min;
+	u8			rate_tolerance;
+	bool			power;
 };	
 #else
 struct clk {

@@ -65,12 +65,16 @@ static int tegra_periph_clk_enable(struct clk *c)
 {
 	NvError e;
 
-	e = NvRmPowerVoltageControl(s_hRmGlobal, c->module, clk_pwr_client,
-		NvRmVoltsUnspecified, NvRmVoltsUnspecified, NULL, 0, NULL);
+	if (c->power) {
+		e = NvRmPowerVoltageControl(s_hRmGlobal, c->module,
+			clk_pwr_client, NvRmVoltsUnspecified,
+			NvRmVoltsUnspecified, NULL, 0, NULL);
 
-	if (e!=NvSuccess) {
-		pr_err("%s: failed to voltage control %s\n", __func__, c->name);
-		return -ENXIO;
+		if (e!=NvSuccess) {
+			pr_err("%s: failed to voltage control %s\n",
+			       __func__, c->name);
+			return -ENXIO;
+		}
 	}
 
 	e = NvRmPowerModuleClockControl(s_hRmGlobal, c->module,
@@ -94,11 +98,13 @@ static void tegra_periph_clk_disable(struct clk *c)
 	if (e!=NvSuccess)
 		pr_err("%s: failed to disable %s\n", __func__, c->name);
 
-	e = NvRmPowerVoltageControl(s_hRmGlobal, c->module, clk_pwr_client,
-		NvRmVoltsOff, NvRmVoltsOff, NULL, 0, NULL);
+	if (c->power) {
+		e = NvRmPowerVoltageControl(s_hRmGlobal, c->module,
+		clk_pwr_client,	NvRmVoltsOff, NvRmVoltsOff, NULL, 0, NULL);
 
-	if (e!=NvSuccess)
-		pr_err("%s: failed to disable %s\n", __func__, c->name);
+		if (e!=NvSuccess)
+			pr_err("%s: failed to disable %s\n", __func__, c->name);
+	}
 }
 
 static int tegra_periph_clk_set_rate(struct clk *c, unsigned long rate)
@@ -107,17 +113,28 @@ static int tegra_periph_clk_set_rate(struct clk *c, unsigned long rate)
 	NvRmFreqKHz freq = rate / 1000;
 	NvRmFreqKHz min, max;
 
-	min = freq - (freq>>4);
-	max = freq + (freq>>4);
+	if (c->rate_tolerance) {
+		NvRmFreqKHz temp = freq * c->rate_tolerance / 100;
+		min = freq - temp;
+		max = freq + temp;
+	} else if (c->rate_min) {
+		max = NvRmFreqMaximum;
+		min = c->rate_min;
+		freq = max_t(NvRmFreqKHz, c->rate_min, freq);
+	} else {
+		max = min = freq;
+	}
 
 	e = NvRmPowerModuleClockConfig(s_hRmGlobal, c->module, clk_pwr_client,
 		min, max, &freq, 1, &freq, 0);
 
 	if (e!=NvSuccess) {
-		pr_debug("%s: failed to configure %s to %luHz\n",
+		pr_err("%s: failed to configure %s to %luHz\n",
 			 __func__, c->name, rate);
 		return -EIO;
 	}
+
+	pr_debug("%s: requested %luKHz, got %uKHz\n", c->name, rate/1000, freq);
 
 	return 0;
 }
@@ -176,24 +193,31 @@ static struct clk_ops dfs_clk_ops = {
 	.get_rate = tegra_dfs_clk_get_rate,
 };
 
-#define PERIPH_CLK(_name, _dev, _modname, _instance)	\
-	{						\
-		.name = _name,				\
-		.lookup = {				\
-			.dev_id = _dev,			\
-		},					\
+#define PERIPH_CLK(_name, _dev, _modname, _instance, _tol, _min, _pow)	\
+	{								\
+		.name = _name,						\
+		.lookup = {						\
+			.dev_id = _dev,					\
+		},							\
 		.module = NVRM_MODULE_ID(NvRmModuleID_##_modname, _instance), \
-		.ops = &tegra_periph_clk_ops,		\
+		.ops = &tegra_periph_clk_ops,				\
+		.rate_min = _min,					\
+		.rate_tolerance = _tol,					\
+		.power = _pow,						\
 	}
 
 static struct clk tegra_periph_clk[] = {
-	PERIPH_CLK("rtc", "rtc-tegra", Rtc, 0),
-	PERIPH_CLK("kbc", "tegra-kbc", Kbc, 0),
-	PERIPH_CLK("uarta", "uart.0", Uart, 0),
-	PERIPH_CLK("uartb", "uart.1", Uart, 1),
-	PERIPH_CLK("uartc", "uart.2", Uart, 2),
-	PERIPH_CLK("uartd", "uart.3", Uart, 3),
-	PERIPH_CLK("uarte", "uart.4", Uart, 4),
+	PERIPH_CLK("rtc", "rtc-tegra", Rtc, 0, 0, 0, false),
+	PERIPH_CLK("kbc", "tegra-kbc", Kbc, 0, 0, 0, false),
+	PERIPH_CLK("uarta", "uart.0", Uart, 0, 5, 0, true),
+	PERIPH_CLK("uartb", "uart.1", Uart, 1, 5, 0, true),
+	PERIPH_CLK("uartc", "uart.2", Uart, 2, 5, 0, true),
+	PERIPH_CLK("uartd", "uart.3", Uart, 3, 5, 0, true),
+	PERIPH_CLK("uarte", "uart.4", Uart, 4, 5, 0, true),
+	PERIPH_CLK("sdmmc1", "tegra-sdhci.0", Sdio, 0, 0, 400, false),
+	PERIPH_CLK("sdmmc2", "tegra-sdhci.1", Sdio, 1, 0, 400, false),
+	PERIPH_CLK("sdmmc3", "tegra-sdhci.2", Sdio, 2, 0, 400, false),
+	PERIPH_CLK("sdmmc4", "tegra-sdhci.3", Sdio, 3, 0, 400, false),
 };
 
 static struct clk tegra_clk_cpu = {
