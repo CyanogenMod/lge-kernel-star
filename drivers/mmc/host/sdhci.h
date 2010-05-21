@@ -327,6 +327,7 @@ struct sdhci_ops {
 	/* returns card read-only status in a host-specific way if
 	 * SDHCI_QUIRK_BROKEN_WRITE_PROTECT is set */
 	int		(*get_ro)(struct sdhci_host *host);
+	bool		(*card_detect)(struct sdhci_host *host);
 };
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
