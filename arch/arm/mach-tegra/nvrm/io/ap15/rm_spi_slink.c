@@ -799,7 +799,7 @@ RegisterSpiSlinkInterrupt(
             &hIntHandlers, hRmSpiSlink, &hRmSpiSlink->SpiInterruptHandle, NV_TRUE));
 }
 // Boosting the Emc/Ahb/Apb/Cpu frequency
-static void BoostFrequency(NvRmSpiHandle hRmSpiSlink, NvBool IsBoost, NvU32 TransactionSize)
+static void BoostFrequency(NvRmSpiHandle hRmSpiSlink, NvBool IsBoost, NvU32 TransactionSize, NvU32 ClockSpeedInKHz)
 {
     if (IsBoost)
     {
@@ -808,10 +808,18 @@ static void BoostFrequency(NvRmSpiHandle hRmSpiSlink, NvBool IsBoost, NvU32 Tran
             if (!((hRmSpiSlink->IsPmuInterface) &&
                    (hRmSpiSlink->PmuChipSelectId == hRmSpiSlink->CurrTransferChipSelId)))
             {
-                hRmSpiSlink->BusyHints[0].BoostKHz = 80000; // Emc
-                hRmSpiSlink->BusyHints[1].BoostKHz = 80000; // Ahb
-                hRmSpiSlink->BusyHints[2].BoostKHz = 80000; // Apb
-                hRmSpiSlink->BusyHints[3].BoostKHz = 240000; // Cpu
+                hRmSpiSlink->BusyHints[0].BoostKHz = 150000; // Emc
+                hRmSpiSlink->BusyHints[0].BoostDurationMs
+                    = 10 + ((4 * (TransactionSize * 8))) / ClockSpeedInKHz;
+                hRmSpiSlink->BusyHints[1].BoostKHz = 150000; // Ahb
+                hRmSpiSlink->BusyHints[1].BoostDurationMs
+                    = 10 + ((4 * (TransactionSize * 8))) / ClockSpeedInKHz;
+                hRmSpiSlink->BusyHints[2].BoostKHz = 150000; // Apb
+                hRmSpiSlink->BusyHints[2].BoostDurationMs
+                    = 10 + ((4 * (TransactionSize * 8))) / ClockSpeedInKHz;
+                hRmSpiSlink->BusyHints[3].BoostKHz = 600000; // Cpu
+                hRmSpiSlink->BusyHints[3].BoostDurationMs
+                    = 10 + ((4 * (TransactionSize * 8))) / ClockSpeedInKHz;
                 NvRmPowerBusyHintMulti(hRmSpiSlink->hDevice, hRmSpiSlink->RmPowerClientId,
                                        hRmSpiSlink->BusyHints, 4,
                                        NvRmDfsBusyHintSyncMode_Async);
@@ -894,7 +902,7 @@ static void DestroySpiSlinkChannelHandle(NvRmSpiHandle hRmSpiSlink)
 #if NV_OAL
 
     // Resetting the Emc/Ahb/Apb/Cpu frequency
-    BoostFrequency(hRmSpiSlink, NV_FALSE, 0);
+    BoostFrequency(hRmSpiSlink, NV_FALSE, 0, 0);
     (void)SetPowerControl(hRmSpiSlink, NV_FALSE);
 #endif
 
@@ -2463,7 +2471,7 @@ void NvRmSpiMultipleTransactions(
         TotalTransByte += pTrans->len;
     }
 
-    BoostFrequency(hRmSpi, NV_TRUE, TotalTransByte);
+    BoostFrequency(hRmSpi, NV_TRUE, TotalTransByte, ClockSpeedInKHz);
 
     hRmSpi->CurrTransInfo.PacketsPerWord = PacketsPerWord;
     if (SpiPinMap)
@@ -2594,7 +2602,6 @@ cleanup:
         hRmSpi->IsApbDmaAllocated = NV_FALSE;
     }
 
-    BoostFrequency(hRmSpi, NV_FALSE, 0);
     SetPowerControl(hRmSpi, NV_FALSE);
     NvOsMutexUnlock(hRmSpi->hChannelAccessMutex);
     NV_ASSERT(Error == NvSuccess);
@@ -2657,7 +2664,7 @@ void NvRmSpiTransaction(
     Error = SetPowerControl(hRmSpi, NV_TRUE);
     if (Error != NvSuccess)
         goto cleanup;
-    BoostFrequency(hRmSpi, NV_TRUE, BytesRequested);
+    BoostFrequency(hRmSpi, NV_TRUE, BytesRequested, ClockSpeedInKHz);
 
 #else
     hRmSpi->CurrTransferChipSelId = ChipSelectId;
@@ -2785,7 +2792,6 @@ cleanup:
     }
 
 #if !NV_OAL
-    BoostFrequency(hRmSpi, NV_FALSE, 0);
     SetPowerControl(hRmSpi, NV_FALSE);
     NvOsMutexUnlock(hRmSpi->hChannelAccessMutex);
 #endif
@@ -2875,7 +2881,7 @@ NvError NvRmSpiStartTransaction(
     // Enable Power/Clock.
     Error = SetPowerControl(hRmSpi, NV_TRUE);
     if (!Error)
-        BoostFrequency(hRmSpi, NV_TRUE, BytesRequested);
+        BoostFrequency(hRmSpi, NV_TRUE, BytesRequested, ClockSpeedInKHz);
 
     if (!Error)
         Error = SetChipSelectSignalLevel(hRmSpi, ChipSelectId, ClockSpeedInKHz,
@@ -2927,7 +2933,6 @@ cleanup:
     if (hRmSpi->IsIdleSignalTristate)
         NvRmPinMuxConfigSetTristate(hRmSpi->hDevice,hRmSpi->RmIoModuleId,
             hRmSpi->InstanceId, hRmSpi->SpiPinMap, NV_TRUE);
-    BoostFrequency(hRmSpi, NV_FALSE, 0);
     SetPowerControl(hRmSpi, NV_FALSE);
     NvOsMutexUnlock(hRmSpi->hChannelAccessMutex);
     return Error;
@@ -2959,8 +2964,6 @@ NvRmSpiGetTransactionData(
     if (hRmSpiSlink->IsIdleSignalTristate)
         NvRmPinMuxConfigSetTristate(hRmSpiSlink->hDevice,hRmSpiSlink->RmIoModuleId,
             hRmSpiSlink->InstanceId, hRmSpiSlink->SpiPinMap, NV_TRUE);
-
-    BoostFrequency(hRmSpiSlink, NV_FALSE, 0);
 
     // Disable Power/Clock.
     SetPowerControl(hRmSpiSlink, NV_FALSE);
