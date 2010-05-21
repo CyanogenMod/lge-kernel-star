@@ -141,6 +141,10 @@ static int mmc_decode_csd(struct mmc_card *card)
 	e = UNSTUFF_BITS(resp, 47, 3);
 	m = UNSTUFF_BITS(resp, 62, 12);
 	csd->capacity	  = (1 + m) << (e + 2);
+#ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
+	/* for sector-addressed cards, this will cause csd->capacity to wrap */
+	csd->capacity -= card->host->ops->get_host_offset(card->host);
+#endif
 
 	csd->read_blkbits = UNSTUFF_BITS(resp, 80, 4);
 	csd->read_partial = UNSTUFF_BITS(resp, 79, 1);
@@ -221,8 +225,17 @@ static int mmc_read_ext_csd(struct mmc_card *card)
 			ext_csd[EXT_CSD_SEC_CNT + 1] << 8 |
 			ext_csd[EXT_CSD_SEC_CNT + 2] << 16 |
 			ext_csd[EXT_CSD_SEC_CNT + 3] << 24;
-		if (card->ext_csd.sectors)
+		if (card->ext_csd.sectors) {
+#ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
+			unsigned offs;
+			offs = card->host->ops->get_host_offset(card->host);
+			offs >>= 9;
+			BUG_ON(offs >= card->ext_csd.sectors);
+			card->ext_csd.sectors -= offs;
+#endif
 			mmc_card_set_blockaddr(card);
+		}
+
 	}
 
 	switch (ext_csd[EXT_CSD_CARD_TYPE]) {

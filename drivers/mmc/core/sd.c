@@ -110,6 +110,11 @@ static int mmc_decode_csd(struct mmc_card *card)
 		e = UNSTUFF_BITS(resp, 47, 3);
 		m = UNSTUFF_BITS(resp, 62, 12);
 		csd->capacity	  = (1 + m) << (e + 2);
+#ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
+		BUG_ON(card->host->ops->get_host_offset(card->host) >=
+			csd->capacity);
+		csd->capacity -= card->host->ops->get_host_offset(card->host);
+#endif
 
 		csd->read_blkbits = UNSTUFF_BITS(resp, 80, 4);
 		csd->read_partial = UNSTUFF_BITS(resp, 79, 1);
@@ -138,6 +143,12 @@ static int mmc_decode_csd(struct mmc_card *card)
 
 		m = UNSTUFF_BITS(resp, 48, 22);
 		csd->capacity     = (1 + m) << 10;
+#ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
+		BUG_ON((card->host->ops->get_host_offset(card->host) >> 9) >=
+			csd->capacity);
+		csd->capacity -=
+			(card->host->ops->get_host_offset(card->host) >> 9);
+#endif
 
 		csd->read_blkbits = 9;
 		csd->read_partial = 0;

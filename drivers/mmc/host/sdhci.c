@@ -900,7 +900,17 @@ static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 
 	sdhci_prepare_data(host, cmd->data);
 
+#ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
+	if (cmd->data) {
+		/* It is assumed that the device is block addressed. */
+		sdhci_writel(host, cmd->arg + (host->start_offset >> 9),
+			SDHCI_ARGUMENT);
+	} else {
+		sdhci_writel(host, cmd->arg, SDHCI_ARGUMENT);
+	}
+#else
 	sdhci_writel(host, cmd->arg, SDHCI_ARGUMENT);
+#endif
 
 	sdhci_set_transfer_mode(host, cmd->data);
 
@@ -1216,11 +1226,22 @@ out:
 	spin_unlock_irqrestore(&host->lock, flags);
 }
 
+#ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
+static unsigned int sdhci_get_host_offset(struct mmc_host *mmc) {
+	struct sdhci_host *host;
+	host = mmc_priv(mmc);
+	return host->start_offset;
+}
+#endif
+
 static const struct mmc_host_ops sdhci_ops = {
 	.request	= sdhci_request,
 	.set_ios	= sdhci_set_ios,
 	.get_ro		= sdhci_get_ro,
 	.enable_sdio_irq = sdhci_enable_sdio_irq,
+#ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
+	.get_host_offset = sdhci_get_host_offset,
+#endif
 };
 
 /*****************************************************************************\
