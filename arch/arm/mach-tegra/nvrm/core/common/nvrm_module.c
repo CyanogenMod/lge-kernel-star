@@ -400,9 +400,9 @@ NvRmModuleGetBaseAddress( NvRmDeviceHandle hDevice,
     );
 
     if (pBaseAddress)
-        *pBaseAddress = inst->PhysAddr;
+        *pBaseAddress = inst ? inst->PhysAddr : 0;
     if (pSize)
-        *pSize = inst->Length;
+        *pSize = inst ? inst->Length : 0;
 }
 
 NvU32
