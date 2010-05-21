@@ -234,6 +234,18 @@ struct sdhci_host {
 #define SDHCI_QUIRK_DELAY_AFTER_POWER			(1<<23)
 /* Controller uses SDCLK instead of TMCLK for data timeouts */
 #define SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK		(1<<24)
+/* Controller write protect bit is broken. Assume no write protection */
+#define SDHCI_QUIRK_BROKEN_WRITE_PROTECT		(1<<25)
+/* Controller needs INTERRUPT_AT_BLOCK_GAP enabled to detect card interrupts */
+#define SDHCI_QUIRK_ENABLE_INTERRUPT_AT_BLOCK_GAP	(1<<26)
+/* Controller should not program HIGH_SPEED_EN after switching to high speed */
+#define SDHCI_QUIRK_BROKEN_CTRL_HISPD			(1<<27)
+/* Controller handles ADMA descriptor with length 0000h incorrectly */
+#define SDHCI_QUIRK_NO_64KB_ADMA			(1<<28)
+/* Version reported in HOST_VERSION is incorrect */
+#define SDHCI_QUIRK_BROKEN_SPEC_VERSION			(1<<29)
+/* Controller should not use SDIO IRQ */
+#define SDHCI_QUIRK_NO_SDIO_IRQ				(1<<30)
 
 	int			irq;		/* Device IRQ */
 	void __iomem *		ioaddr;		/* Mapped address */
@@ -310,6 +322,9 @@ struct sdhci_ops {
 	unsigned int	(*get_max_clock)(struct sdhci_host *host);
 	unsigned int	(*get_min_clock)(struct sdhci_host *host);
 	unsigned int	(*get_timeout_clock)(struct sdhci_host *host);
+	/* returns card read-only status in a host-specific way if
+	 * SDHCI_QUIRK_BROKEN_WRITE_PROTECT is set */
+	int		(*get_ro)(struct sdhci_host *host);
 };
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
