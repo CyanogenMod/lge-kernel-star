@@ -56,6 +56,18 @@ struct clk *get_tegra_clock_by_name(const char *name)
 	return ret;
 }
 
+void tegra_periph_reset_deassert(struct clk *c)
+{
+	NvRmModuleResetWithHold(s_hRmGlobal, c->module, NV_FALSE);
+}
+EXPORT_SYMBOL(tegra_periph_reset_deassert);
+
+void tegra_periph_reset_assert(struct clk *c)
+{
+	NvRmModuleResetWithHold(s_hRmGlobal, c->module, NV_TRUE);
+}
+EXPORT_SYMBOL(tegra_periph_reset_assert);
+
 static void tegra_periph_clk_init(struct clk *c)
 {
 	NvRmModuleReset(s_hRmGlobal, c->module);
