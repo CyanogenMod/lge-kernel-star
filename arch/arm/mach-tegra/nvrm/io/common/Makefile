@@ -15,3 +15,4 @@ ccflags-y += -Iarch/arm/mach-tegra/nvrm/core
 obj-y += nvrm_i2c.o
 obj-y += nvrm_gpioi2c.o
 obj-y += nvrm_owr.o
+obj-y += nvrm_dma.o
