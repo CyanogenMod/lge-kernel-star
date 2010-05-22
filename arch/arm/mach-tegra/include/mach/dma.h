@@ -58,7 +58,7 @@ struct tegra_dma_channel;
 
 enum tegra_dma_mode {
 	TEGRA_DMA_SHARED = 1,
-	TEGRA_DMA_MODE_CONTINOUS = 2,
+	TEGRA_DMA_MODE_CONTINUOUS = 2,
 	TEGRA_DMA_MODE_ONESHOT = 4,
 };
 
@@ -75,7 +75,6 @@ enum tegra_dma_req_buff_status {
 
 struct tegra_dma_req {
 	struct list_head node;
-	unsigned int modid;
 	int instance;
 
 	/* Called when the req is complete and from the DMA ISR context.
@@ -139,6 +138,9 @@ int tegra_dma_dequeue_req(struct tegra_dma_channel *ch,
 	struct tegra_dma_req *req);
 void tegra_dma_dequeue(struct tegra_dma_channel *ch);
 void tegra_dma_flush(struct tegra_dma_channel *ch);
+
+unsigned int tegra_dma_transferred_req(struct tegra_dma_channel *ch,
+	struct tegra_dma_req *req);
 
 bool tegra_dma_is_req_inflight(struct tegra_dma_channel *ch,
 	struct tegra_dma_req *req);

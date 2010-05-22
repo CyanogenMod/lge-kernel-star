@@ -95,8 +95,9 @@
 #define APB_SEQ_WRAP_SHIFT			16
 #define APB_SEQ_WRAP_MASK			(0x7<<APB_SEQ_WRAP_SHIFT)
 
+#define TEGRA_SYSTEM_DMA_AVP_CH_NUM		3
 #define TEGRA_SYSTEM_DMA_CH_MIN			0
-#define TEGRA_SYSTEM_DMA_CH_MAX			15
+#define TEGRA_SYSTEM_DMA_CH_MAX			(15 - TEGRA_SYSTEM_DMA_AVP_CH_NUM)
 
 #define NV_DMA_MAX_TRASFER_SIZE 0x10000
 
@@ -193,18 +194,81 @@ int tegra_dma_cancel(struct tegra_dma_channel *ch)
 	return 0;
 }
 
+/* should be called with the channel lock held */
+static unsigned int dma_active_count(struct tegra_dma_channel *ch,
+	struct tegra_dma_req *req)
+{
+	unsigned int status;
+
+	unsigned int to_transfer;
+	unsigned int req_transfer_count;
+
+	unsigned int bytes_transferred;
+
+	/* Get the transfer count */
+	status = readl(ch->addr + APB_DMA_CHAN_STA);
+	to_transfer = (status & STA_COUNT_MASK) >> STA_COUNT_SHIFT;
+	req_transfer_count = (ch->csr & CSR_WCOUNT_MASK) >> CSR_WCOUNT_SHIFT;
+	req_transfer_count += 1;
+	to_transfer += 1;
+
+	bytes_transferred = req_transfer_count;
+
+	if (status & STA_BUSY)
+		bytes_transferred -= to_transfer;
+
+	/* In continuous transfer mode, DMA only tracks the count of the
+	 * half DMA buffer. So, if the DMA already finished half the DMA
+	 * then add the half buffer to the completed count.
+	 *
+	 *	FIXME: There can be a race here. What if the req to
+	 *	dequue happens at the same time as the DMA just moved to
+	 *	the new buffer and SW didn't yet received the interrupt?
+	 */
+	if (ch->mode & TEGRA_DMA_MODE_CONTINUOUS)
+		if (req->buffer_status == TEGRA_DMA_REQ_BUF_STATUS_HALF_FULL)
+			bytes_transferred += req_transfer_count;
+
+	bytes_transferred *= 4;
+
+	return bytes_transferred;
+}
+
+unsigned int tegra_dma_transferred_req(struct tegra_dma_channel *ch,
+       struct tegra_dma_req *req)
+{
+	unsigned long irq_flags;
+	unsigned int bytes_transferred;
+
+	spin_lock_irqsave(&ch->lock, irq_flags);
+
+	if (list_entry(ch->list.next, struct tegra_dma_req, node)!=req) {
+		spin_unlock_irqrestore(&ch->lock, irq_flags);
+		return req->bytes_transferred;
+	}
+
+	bytes_transferred = dma_active_count(ch, req);
+
+	spin_unlock_irqrestore(&ch->lock, irq_flags);
+
+	return bytes_transferred;
+}
+EXPORT_SYMBOL(tegra_dma_transferred_req);
+
 int tegra_dma_dequeue_req(struct tegra_dma_channel *ch,
 	struct tegra_dma_req *_req)
 {
-	unsigned int csr;
-	unsigned int status;
 	struct tegra_dma_req *req = NULL;
 	int found = 0;
+	unsigned int csr;
 	unsigned long irq_flags;
-	int to_transfer;
-	int req_transfer_count;
+	int stop = 0;
 
 	spin_lock_irqsave(&ch->lock, irq_flags);
+
+	if (list_entry(ch->list.next, struct tegra_dma_req, node)==_req)
+		stop = 1;
+
 	list_for_each_entry(req, &ch->list, node) {
 		if (req == _req) {
 			list_del(&req->node);
@@ -216,6 +280,9 @@ int tegra_dma_dequeue_req(struct tegra_dma_channel *ch,
 		spin_unlock_irqrestore(&ch->lock, irq_flags);
 		return 0;
 	}
+
+	if (!stop)
+		goto skip_status;
 
 	/* STOP the DMA and get the transfer count.
 	 * Getting the transfer count is tricky.
@@ -234,31 +301,7 @@ int tegra_dma_dequeue_req(struct tegra_dma_channel *ch,
 	csr |= CSR_ENB;
 	writel(csr, ch->addr + APB_DMA_CHAN_CSR);
 
-	/* Get the transfer count */
-	status = readl(ch->addr + APB_DMA_CHAN_STA);
-	to_transfer = (status & STA_COUNT_MASK) >> STA_COUNT_SHIFT;
-	req_transfer_count = (ch->csr & CSR_WCOUNT_MASK) >> CSR_WCOUNT_SHIFT;
-	req_transfer_count += 1;
-	to_transfer += 1;
-
-	req->bytes_transferred = req_transfer_count;
-
-	if (status & STA_BUSY)
-		req->bytes_transferred -= to_transfer;
-
-	/* In continous transfer mode, DMA only tracks the count of the
-	 * half DMA buffer. So, if the DMA already finished half the DMA
-	 * then add the half buffer to the completed count.
-	 *
-	 *	FIXME: There can be a race here. What if the req to
-	 *	dequue happens at the same time as the DMA just moved to
-	 *	the new buffer and SW didn't yet received the interrupt?
-	 */
-	if (ch->mode & TEGRA_DMA_MODE_CONTINOUS)
-		if (req->buffer_status == TEGRA_DMA_REQ_BUF_STATUS_HALF_FULL)
-			req->bytes_transferred += req_transfer_count;
-
-	req->bytes_transferred *= 4;
+	req->bytes_transferred = dma_active_count(ch, req);
 
 	tegra_dma_stop(ch);
 	if (!list_empty(&ch->list)) {
@@ -268,6 +311,7 @@ int tegra_dma_dequeue_req(struct tegra_dma_channel *ch,
 			typeof(*next_req), node);
 		tegra_dma_update_hw(ch, next_req);
 	}
+skip_status:
 	req->status = -TEGRA_DMA_REQ_ERROR_ABORTED;
 
 	spin_unlock_irqrestore(&ch->lock, irq_flags);

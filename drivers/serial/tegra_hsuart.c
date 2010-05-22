@@ -642,7 +642,7 @@ static int tegra_uart_init_rx_dma(struct tegra_uart_port *t)
 	dma_addr_t rx_dma_phys;
 	void *rx_dma_virt;
 
-	t->rx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_CONTINOUS);
+	t->rx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_CONTINUOUS);
 	if (IS_ERR_OR_NULL(t->rx_dma))
 		return -ENODEV;
 
