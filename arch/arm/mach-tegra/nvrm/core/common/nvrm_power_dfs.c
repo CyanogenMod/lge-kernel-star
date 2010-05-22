@@ -3276,7 +3276,6 @@ NvRmDfsGetClockUtilization(
     NV_ASSERT(pClockUsage);
     NV_ASSERT((0 < ClockId) && (ClockId < NvRmDfsClockId_Num));
 
-    NvRmPrivLockSharedPll();
     DfsClockFreqGet(hRmDeviceHandle, &DfsKHz);
 
     NvOsIntrMutexLock(pDfs->hIntrMutex);
@@ -3297,7 +3296,6 @@ NvRmDfsGetClockUtilization(
     pClockUsage->AverageKHz = pDfs->Samplers[ClockId].AverageKHz; 
 
     NvOsIntrMutexUnlock(pDfs->hIntrMutex);
-    NvRmPrivUnlockSharedPll();
     return NvSuccess;
 }
 
