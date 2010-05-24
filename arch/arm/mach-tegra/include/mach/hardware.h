@@ -21,4 +21,8 @@
 #ifndef __MACH_TEGRA_HARDWARE_H
 #define __MACH_TEGRA_HARDWARE_H
 
+#define pcibios_assign_all_busses()	0
+#define PCIBIOS_MIN_IO			0x83000000ul
+#define PCIBIOS_MIN_MEM			0x90000000ul
+
 #endif

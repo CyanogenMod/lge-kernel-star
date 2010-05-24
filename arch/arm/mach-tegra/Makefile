@@ -19,6 +19,9 @@ obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
 obj-$(CONFIG_TEGRA_IOVMM)		+= iovmm.o
 obj-$(CONFIG_TEGRA_IOVMM_GART)		+= iovmm-gart.o
 obj-$(CONFIG_TEGRA_SYSTEM_DMA)		+= dma.o
+obj-$(CONFIG_TEGRA_PCI)			+= pci.o
+obj-$(CONFIG_TEGRA_PCI)			+= pci-enum.o
+
 
 ccflags-$(CONFIG_TEGRA_NVOS)		+= -DNV_DEBUG=0
 ccflags-$(CONFIG_TEGRA_NVOS)		+= -DNV_OAL=0

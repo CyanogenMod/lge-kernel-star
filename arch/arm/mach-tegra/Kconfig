@@ -98,6 +98,12 @@ config TEGRA_NVEC
 	  Adds support for the NVIDIA Tegra NvEC I2C-slave based protocol
 	  for communicating to embedded controllers.
 
+config TEGRA_PCI
+	boolean "PCIe host controller driver"
+	select PCI
+	default n
+	help
+		Adds PCIe Host controller driver for tegra2 based systems
 
 if TEGRA_NVRM
 source "arch/arm/mach-tegra/odm_kit/Kconfig"
