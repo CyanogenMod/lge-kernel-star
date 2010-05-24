@@ -9,6 +9,7 @@
 #include <linux/memory.h>
 #include <linux/node.h>
 #include <linux/hugetlb.h>
+#include <linux/compaction.h>
 #include <linux/cpumask.h>
 #include <linux/topology.h>
 #include <linux/nodemask.h>
@@ -196,6 +197,8 @@ int register_node(struct node *node, int num, struct node *parent)
 		sysdev_create_file(&node->sysdev, &attr_distance);
 
 		scan_unevictable_register_node(node);
+
+		compaction_register_node(node);
 	}
 	return error;
 }
