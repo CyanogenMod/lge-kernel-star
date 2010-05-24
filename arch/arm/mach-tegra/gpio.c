@@ -112,6 +112,7 @@ static void tegra_set_gpio_tristate(int gpio_nr, tegra_tristate_t ts)
 	int err;
 
 	pg = gpio_get_pinmux_group(gpio_nr);
+	WARN_ON(pg < 0);
 	if (pg >= 0) {
 		err = tegra_pinmux_set_tristate(pg, ts);
 		if (err < 0)
@@ -122,27 +123,27 @@ static void tegra_set_gpio_tristate(int gpio_nr, tegra_tristate_t ts)
 
 void tegra_gpio_enable(int gpio)
 {
-	WARN_ON(tegra_gpio_io_power_config(gpio, 1) != 0);
 	tegra_gpio_mask_write(GPIO_MSK_CNF(gpio), gpio, 1);
-	tegra_set_gpio_tristate(gpio, TEGRA_TRI_NORMAL);
 }
 
 void tegra_gpio_disable(int gpio)
 {
 	tegra_gpio_mask_write(GPIO_MSK_CNF(gpio), gpio, 0);
-	tegra_set_gpio_tristate(gpio, TEGRA_TRI_TRISTATE);
-	WARN_ON(tegra_gpio_io_power_config(gpio, 0) != 0);
 }
 
 static int tegra_gpio_request(struct gpio_chip *chip, unsigned offset)
 {
+	WARN_ON(tegra_gpio_io_power_config(offset, 1) != 0);
 	tegra_gpio_enable(offset);
+	tegra_set_gpio_tristate(offset, TEGRA_TRI_NORMAL);
 	return 0;
 }
 
 static void tegra_gpio_free(struct gpio_chip *chip, unsigned offset)
 {
 	tegra_gpio_disable(offset);
+	tegra_set_gpio_tristate(offset, TEGRA_TRI_TRISTATE);
+	WARN_ON(tegra_gpio_io_power_config(offset, 0) != 0);
 }
 
 static void tegra_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
@@ -213,7 +214,7 @@ static int tegra_gpio_irq_set_type(unsigned int irq, unsigned int type)
 	int val;
 	unsigned long flags;
 
-	switch (type) {
+	switch (type & IRQ_TYPE_SENSE_MASK) {
 	case IRQ_TYPE_EDGE_RISING:
 		lvl_type = GPIO_INT_LVL_EDGE_RISING;
 		break;
@@ -404,8 +405,13 @@ static void gpio_rail_init(void)
 {
 	unsigned int i;
 
-	if (!s_hRmGlobal)
-		return;
+	if (!s_hRmGlobal) {
+		NvError e = NvRmOpenNew(&s_hRmGlobal);
+		if (e != NvSuccess) {
+			WARN_ON(1);
+			return;
+		}
+	}
 
 	for (i = 0; i < NV_ARRAY_SIZE(gpio_power_rail_table); i++) {
 		struct gpio_power_rail_info *rail = &gpio_power_rail_table[i];
@@ -418,8 +424,8 @@ static void gpio_rail_init(void)
 
 		rail->address = conn->AddressList[0].Address;
 
-		NvRmPmuGetCapabilities(NULL, rail->address, &caps);
-		rail->mv = (caps.RmProtected) ? 0 : caps.requestMilliVolts;
+		NvRmPmuGetCapabilities(s_hRmGlobal, rail->address, &caps);
+		rail->mv = caps.requestMilliVolts;
 	}
 }
 
