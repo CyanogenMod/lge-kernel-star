@@ -286,6 +286,14 @@ config MOUSE_GPIO
 	  To compile this driver as a module, choose M here: the
 	  module will be called gpio_mouse.
 
+config MOUSE_TEGRA_NVEC
+	boolean "NVIDIA Tegra NvEc compliant mouse/touchpad device"
+	depends on TEGRA_NVEC
+	default y
+	help
+	  Say Y here to enable mouse support for mouse and touchpad devices
+	  connected to an NvEc-compliant embedded controller
+
 config MOUSE_PXA930_TRKBALL
 	tristate "PXA930 Trackball mouse"
 	depends on CPU_PXA930 || CPU_PXA935
