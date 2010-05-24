@@ -26,6 +26,7 @@
 #include <linux/platform_device.h>
 #include <linux/serial_8250.h>
 #include <linux/dma-mapping.h>
+#include <linux/regulator/machine.h>
 
 #include <mach/iomap.h>
 #include <mach/io.h>
@@ -35,12 +36,14 @@
 #include <mach/serial.h>
 #include <mach/sdhci.h>
 #include <mach/nand.h>
+#include <mach/regulator.h>
 
 #include <mach/nvrm_linux.h>
 
 #include "nvrm_gpio.h"
 #include "nvodm_query.h"
 #include "nvodm_query_pinmux.h"
+#include "nvodm_query_discovery.h"
 #include "nvodm_query_gpio.h"
 #include "nvrm_pinmux.h"
 #include "nvrm_module.h"
@@ -647,6 +650,33 @@ static struct platform_device tegra_battery_device = {
 	.id = -1,
 };
 #endif
+#ifdef CONFIG_REGULATOR_TEGRA
+static struct regulator_consumer_supply pex_clk_consumers[] = {
+	[0] = {
+		.supply = "pex_clk",
+	},
+};
+static struct tegra_regulator_entry tegra_regulators[] = {
+	[0] = {
+		.guid = NV_VDD_PEX_CLK_ODM_ID,
+		.name = "pex_clk",
+		.id = 0,
+		.consumers = pex_clk_consumers,
+		.nr_consumers = ARRAY_SIZE(pex_clk_consumers),
+	},
+};
+static struct tegra_regulator_platform_data tegra_regulator_platform = {
+	.regs = tegra_regulators,
+	.nr_regs = ARRAY_SIZE(tegra_regulators),
+};
+static struct platform_device tegra_regulator_device = {
+	.name = "tegra_regulator",
+	.id = -1,
+	.dev = {
+		.platform_data = &tegra_regulator_platform,
+	},
+};
+#endif
 
 static struct platform_device *nvodm_devices[] __initdata = {
 #ifdef CONFIG_RTC_DRV_TEGRA_ODM
@@ -658,7 +688,32 @@ static struct platform_device *nvodm_devices[] __initdata = {
 #ifdef CONFIG_TEGRA_BATTERY_NVEC
 	&tegra_battery_device,
 #endif
+#ifdef CONFIG_REGULATOR_TEGRA
+	&tegra_regulator_device,
+#endif
 };
+
+#ifdef CONFIG_TEGRA_PCI
+extern void __init tegra_pcie_init(void);
+static int tegra_setup_pcie(void)
+{
+	const struct tegra_pingroup_config *pinmux = NULL;
+	const NvU32 *odmpinmux;
+	NvU32 nr_configs;
+	int nr_pins;
+
+	NvOdmQueryPinMux(NvOdmIoModule_PciExpress, &odmpinmux, &nr_configs);
+	if (!odmpinmux || !nr_configs) {
+		pr_info("%s: PCIE not supported on platform\n", __func__);
+		return 0;
+	}
+	pinmux = tegra_pinmux_get("tegra_pcie",	odmpinmux[0], &nr_pins);
+	tegra_pinmux_config_tristate_table(pinmux, nr_pins, TEGRA_TRI_NORMAL);
+	tegra_pcie_init();
+	return 0;
+}
+late_initcall(tegra_setup_pcie);
+#endif
 
 void __init tegra_setup_nvodm(void)
 {
