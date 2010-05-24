@@ -81,7 +81,6 @@ static int tegra_periph_clk_enable(struct clk *c)
 		e = NvRmPowerVoltageControl(s_hRmGlobal, c->module,
 			clk_pwr_client, NvRmVoltsUnspecified,
 			NvRmVoltsUnspecified, NULL, 0, NULL);
-
 		if (e!=NvSuccess) {
 			pr_err("%s: failed to voltage control %s\n",
 			       __func__, c->name);
@@ -205,6 +204,10 @@ static struct clk_ops dfs_clk_ops = {
 	.get_rate = tegra_dfs_clk_get_rate,
 };
 
+#define NvRmModuleID_Pcie NvRmPrivModuleID_Pcie
+#define NvRmModuleID_Afi NvRmPrivModuleID_Afi
+#define NvRmModuleID_PcieXclk NvRmPrivModuleID_PcieXclk
+
 #define PERIPH_CLK(_name, _dev, _modname, _instance, _tol, _min, _pow)	\
 	{								\
 		.name = _name,						\
@@ -230,6 +233,8 @@ static struct clk tegra_periph_clk[] = {
 	PERIPH_CLK("sdmmc2", "tegra-sdhci.1", Sdio, 1, 0, 400, false),
 	PERIPH_CLK("sdmmc3", "tegra-sdhci.2", Sdio, 2, 0, 400, false),
 	PERIPH_CLK("sdmmc4", "tegra-sdhci.3", Sdio, 3, 0, 400, false),
+	PERIPH_CLK("pcie", "tegra_pcie", Pcie, 0, 0, 0, true),
+	PERIPH_CLK("pcie_xclk", "tegra_pcie_xclk", PcieXclk, 0, 0, 0, false),
 };
 
 static struct clk tegra_clk_cpu = {
@@ -347,6 +352,9 @@ void clk_init(struct clk *c)
 
 int clk_enable(struct clk *c)
 {
+	if (!c)
+		return -ENODEV;
+
 	if (c->ops && c->ops->enable)
 		return c->ops->enable(c);
 
