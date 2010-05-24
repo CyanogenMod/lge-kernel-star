@@ -700,6 +700,8 @@ NvDdkUsbPhyPowerDown(
     NvBool IsDpd)
 {
     NvError e = NvSuccess;
+    NvDdkUsbPhyIoctl_VBusStatusOutputArgs VBusStatus;
+    NvU32 TimeOut = USB_PHY_HW_TIMEOUT_US;
 
     NV_ASSERT(hUsbPhy);
 
@@ -720,6 +722,16 @@ NvDdkUsbPhyPowerDown(
     if (IsHostMode)
     {
         UsbPrivEnableVbus(hUsbPhy, NV_FALSE);
+        /* Wait till Vbus is turned off */
+        do
+        {
+            NvOsWaitUS(1000);
+            TimeOut -= 1000;
+            e = hUsbPhy->Ioctl(hUsbPhy,
+                    NvDdkUsbPhyIoctlType_VBusStatus,
+                    NULL,
+                    &VBusStatus);
+        } while (VBusStatus.VBusDetected && TimeOut);
     }
     // Power down the USB Phy
     NV_CHECK_ERROR_CLEANUP(hUsbPhy->PowerDown(hUsbPhy));
