@@ -261,6 +261,14 @@ config UID_STAT
 	bool "UID based statistics tracking exported to /proc/uid_stat"
 	default n
 
+config LBEE9QMB_RFKILL
+	tristate "Bluetooth power control driver for Murata lbee9qmbc"
+	depends on RFKILL
+	default n
+	---help---
+	 Creates an rfkill entry in sysfs for power control of
+	 Murata lbee9qmbc Bluetooth+WiFi chips.
+
 config WL127X_RFKILL
 	tristate "Bluetooth power control driver for TI wl127x"
 	depends on RFKILL
