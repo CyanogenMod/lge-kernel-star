@@ -27,6 +27,7 @@
 #include <linux/serial_8250.h>
 #include <linux/dma-mapping.h>
 #include <linux/regulator/machine.h>
+#include <linux/lbee9qmb-rfkill.h>
 
 #include <mach/iomap.h>
 #include <mach/io.h>
@@ -656,6 +657,12 @@ static struct regulator_consumer_supply pex_clk_consumers[] = {
 		.supply = "pex_clk",
 	},
 };
+static struct regulator_consumer_supply lbee9qmb_consumers[] = {
+	[0] = {
+		.supply = "Vdd",
+		.dev_name = "lbee9qmb-rfkill.0",
+	},
+};
 static struct tegra_regulator_entry tegra_regulators[] = {
 	[0] = {
 		.guid = NV_VDD_PEX_CLK_ODM_ID,
@@ -663,6 +670,13 @@ static struct tegra_regulator_entry tegra_regulators[] = {
 		.id = 0,
 		.consumers = pex_clk_consumers,
 		.nr_consumers = ARRAY_SIZE(pex_clk_consumers),
+	},
+	[1] = {
+		.guid = NV_ODM_GUID('b','l','u','t','o','o','t','h'),
+		.name = "lbee9qmb_vdd",
+		.id = 1,
+		.consumers = lbee9qmb_consumers,
+		.nr_consumers = ARRAY_SIZE(lbee9qmb_consumers),
 	},
 };
 static struct tegra_regulator_platform_data tegra_regulator_platform = {
@@ -676,6 +690,37 @@ static struct platform_device tegra_regulator_device = {
 		.platform_data = &tegra_regulator_platform,
 	},
 };
+#endif
+#ifdef CONFIG_LBEE9QMB_RFKILL
+static struct lbee9qmb_platform_data lbee9qmb_platform;
+static struct platform_device lbee9qmb_device = {
+	.name = "lbee9qmb-rfkill",
+	.dev = {
+		.platform_data = &lbee9qmb_platform,
+	},
+};
+static void tegra_setup_rfkill(void)
+{
+	const NvOdmPeripheralConnectivity *con;
+	unsigned int i;
+
+	con = NvOdmPeripheralGetGuid(NV_ODM_GUID('b','l','u','t','o','o','t','h'));
+	if (!con)
+		return;
+
+	for (i=0; i<con->NumAddress; i++) {
+		if (con->AddressList[i].Interface == NvOdmIoModule_Gpio) {
+			int nr_gpio = con->AddressList[i].Instance * 8 +
+				con->AddressList[i].Address;
+			lbee9qmb_platform.gpio_reset = nr_gpio;
+			if (platform_device_register(&lbee9qmb_device))
+				pr_err("%s: registration failed\n", __func__);
+			return;
+		}
+	}
+}
+#else
+static void tegra_setup_rfkill(void) { }
 #endif
 
 static struct platform_device *nvodm_devices[] __initdata = {
@@ -722,5 +767,6 @@ void __init tegra_setup_nvodm(void)
 	tegra_setup_hcd();
 	tegra_setup_hsuart();
 	tegra_setup_sdhci();
+	tegra_setup_rfkill();
 	platform_add_devices(nvodm_devices, ARRAY_SIZE(nvodm_devices));
 }
