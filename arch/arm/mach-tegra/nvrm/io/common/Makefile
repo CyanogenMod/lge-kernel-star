@@ -16,3 +16,4 @@ obj-y += nvrm_i2c.o
 obj-y += nvrm_gpioi2c.o
 obj-y += nvrm_owr.o
 obj-y += nvrm_dma.o
+obj-y += nvrm_gpio.o

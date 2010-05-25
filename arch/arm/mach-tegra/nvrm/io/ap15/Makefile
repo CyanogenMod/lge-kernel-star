@@ -18,7 +18,6 @@ obj-y += rm_common_slink_hw_private.o
 obj-y += ap15rm_i2c.o
 obj-y += ap15rm_pwm.o
 obj-y += ap15rm_gpio_vi.o
-obj-y += nvrm_gpio.o
 obj-y += nvrm_gpio_stub_helper.o
 obj-y += rm_spi_hw_private.o
 obj-y += rm_spi_slink.o
