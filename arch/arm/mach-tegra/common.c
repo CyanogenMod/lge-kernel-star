@@ -47,9 +47,8 @@ void __init tegra_init_cache(void)
 
 	writel(0x331, p + L2X0_TAG_LATENCY_CTRL);
 	writel(0x441, p + L2X0_DATA_LATENCY_CTRL);
-	writel(8, p + L2X0_PREFETCH_OFFSET);
 
-	l2x0_init(p, 0x7C080001, 0x8200c3fe);
+	l2x0_init(p, 0x6C080001, 0x8200c3fe);
 #endif
 }
 
