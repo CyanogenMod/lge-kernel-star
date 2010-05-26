@@ -24,19 +24,12 @@
 #include <linux/proc_fs.h>
 #include <linux/miscdevice.h>
 #include <linux/uaccess.h>
-#include <linux/cpumask.h>
-#include <linux/sched.h>
-#include <linux/cpu.h>
 #include <linux/platform_device.h>
-#include <linux/freezer.h>
 #include <linux/suspend.h>
 #include <linux/percpu.h>
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #endif
-#include <linux/smp.h>
-#include <asm/smp_twd.h>
-#include <asm/cpu.h>
 #include "nvcommon.h"
 #include "nvassert.h"
 #include "nvos.h"
@@ -45,9 +38,8 @@
 #include "nvrm/core/common/nvrm_message.h"
 #include "mach/nvrm_linux.h"
 #include "nvos_ioctl.h"
-#include "nvrm_power_private.h"
 #include "nvreftrack.h"
-#include "mach/timex.h"
+#include "board.h"
 
 NvRmDeviceHandle s_hRmGlobal = NULL;
 pid_t s_nvrm_daemon_pid = 0;
@@ -70,7 +62,6 @@ extern NvRmDeviceHandle s_hRmGlobal;
 static NvRmMemHandle s_IramMemHandle;
 static NvRmTransportHandle s_AvpSuspendPort;
 
-static NvOsThreadHandle s_DfsThread = NULL;
 static NvRtHandle s_RtHandle = NULL;
 
 #define DEVICE_NAME "nvrm"
@@ -90,71 +81,6 @@ static struct miscdevice nvrm_dev =
     .fops = &nvrm_fops,
     .minor = MISC_DYNAMIC_MINOR,
 };
-
-static void NvRmDfsThread(void *args)
-{
-    NvRmDeviceHandle hRm = (NvRmDeviceHandle)args;
-    struct cpumask cpu_mask;
-
-    //Ensure that only cpu0 is in the affinity mask
-    cpumask_clear(&cpu_mask);
-    cpumask_set_cpu(0, &cpu_mask);
-    if (sched_setaffinity(0, &cpu_mask))
-    {
-        panic("Unable to setaffinity of DFS thread!\n");
-    }
-
-    //Confirm that only CPU0 can run this thread
-    if (!cpumask_test_cpu(0, &cpu_mask) || cpumask_weight(&cpu_mask) != 1)
-    {
-        panic("Unable to setaffinity of DFS thread!\n");
-    }
-
-    set_freezable_with_signal();
-
-    if (NvRmDfsGetState(hRm) > NvRmDfsRunState_Disabled)
-    {
-        NvRmFreqKHz CpuKHz, f;
-        CpuKHz = NvRmPrivDfsGetCurrentKHz(NvRmDfsClockId_Cpu);
-        local_timer_rescale(CpuKHz);
-
-        NvRmDfsSetState(hRm, NvRmDfsRunState_ClosedLoop);
-
-        for (;;)
-        {
-            NvRmPmRequest Request = NvRmPrivPmThread();
-            f = NvRmPrivDfsGetCurrentKHz(NvRmDfsClockId_Cpu);
-            if (CpuKHz != f)
-            {
-                CpuKHz = f;
-                local_timer_rescale(CpuKHz);
-                twd_set_prescaler(NULL);
-                smp_call_function(twd_set_prescaler, NULL, NV_TRUE);
-            }
-            if (Request & NvRmPmRequest_ExitFlag)
-            {
-                break;
-            }
-            if (Request & NvRmPmRequest_CpuOnFlag)
-            {
-#ifdef CONFIG_HOTPLUG_CPU
-                printk("DFS requested CPU1 ON\n");
-                preset_lpj = per_cpu(cpu_data, 0).loops_per_jiffy;
-                cpu_up(1);
-                smp_call_function(twd_set_prescaler, NULL, NV_TRUE);
-#endif
-            }
-
-            if (Request & NvRmPmRequest_CpuOffFlag)
-            {
-#ifdef CONFIG_HOTPLUG_CPU
-                printk("DFS requested CPU1 OFF\n");
-                cpu_down(1);
-#endif
-            }
-        }
-    }
-}
 
 static void client_detach(NvRtClientHandle client)
 {
@@ -299,16 +225,7 @@ long nvrm_unlocked_ioctl(struct file *file,
         printk( "NvRmIoctls_NvRmMemMapIntoCallerPtr: not supported\n" );
         goto fail;
     case NvRmIoctls_NvRmBootDone:
-        if (!s_DfsThread)
-        {
-            if (NvOsInterruptPriorityThreadCreate(NvRmDfsThread,
-                    (void*)s_hRmGlobal, &s_DfsThread)!=NvSuccess)
-            {
-                NvOsDebugPrintf("Failed to create DFS processing thread\n");
-                goto fail;
-            }
-        }
-        break;
+        return tegra_start_dvfsd();
     case NvRmIoctls_NvRmGetClientId:
 		err = NvOsCopyIn(&p, (void*)arg, sizeof(p));
 		if (err != NvSuccess)
