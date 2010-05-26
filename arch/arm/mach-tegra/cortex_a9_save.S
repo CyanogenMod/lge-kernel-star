@@ -605,10 +605,10 @@ __cclk_burst_set:
 	dsb
 	str	r0, [r6, #FLOW_CTRL_HALT_CPU_EVENTS]
 	dsb
-	ldr	r0, [r6, #FLOW_CTRL_HALT_CPU_EVENTS]
+	ldr	r0, [r6, #FLOW_CTRL_HALT_CPU_EVENTS] /* memory barrier */
 
 halted:	dsb
-	wfi
+	wfe	/* CPU should be power gated here */
 	isb
 	b	halted
 ENDPROC(__tear_down_master_pll_cpu)

@@ -131,7 +131,9 @@ static noinline void restore_cpu_complex(void)
 
 	/* do not power-gate the CPU when flow controlled */
 	reg = readl(flow_ctrl + FLOW_CTRL_CPU_CSR);
-	writel(reg & ~1, flow_ctrl + FLOW_CTRL_CPU_CSR);
+	reg &= ~((1<<14) | (1<<5) | (1<<4) | 1); /* clear WFE bitmask */
+	writel(reg, flow_ctrl + FLOW_CTRL_CPU_CSR);
+	wmb();
 
 	writel(tegra_sctx.twd_ctrl, twd_base + 0x8);
 	writel(tegra_sctx.twd_load, twd_base + 0);
@@ -166,12 +168,16 @@ static noinline void suspend_cpu_complex(void)
 	reg = readl(flow_ctrl + FLOW_CTRL_CPU_CSR);
 	/* clear any pending events, set the WFE bitmap to specify just
 	 * CPU0, and clear any pending events for this CPU */
-	writel(reg | 1, flow_ctrl + FLOW_CTRL_CPU_CSR);
+	reg &= ~(1<<5); /* clear CPU1 WFE */
+	reg |= (1<<14) | (1<<4) | 1; /* enable CPU0 WFE */
+	writel(reg, flow_ctrl + FLOW_CTRL_CPU_CSR);
+	wmb();
 
-	for (i=1; i<num_possible_cpus(); i++) {
+	for (i=1; i<num_present_cpus(); i++) {
 		unsigned int offs = FLOW_CTRL_CPU1_CSR + (i-1)*8;
 		reg = readl(flow_ctrl + offs);
 		writel(reg | (1<<14), flow_ctrl + offs);
+		wmb();
 	}
 
 	gic_cpu_exit(0);
