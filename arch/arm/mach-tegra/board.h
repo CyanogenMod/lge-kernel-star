@@ -29,5 +29,11 @@ void __init tegra_init_irq(void);
 void __init tegra_init_clock(void);
 void __init tegra_init_suspend(void);
 
+#ifdef CONFIG_CPU_FREQ
+int tegra_start_dvfsd(void);
+#else
+#define tegra_start_dvfsd() (0)
+#endif
+
 extern struct sys_timer tegra_timer;
 #endif
