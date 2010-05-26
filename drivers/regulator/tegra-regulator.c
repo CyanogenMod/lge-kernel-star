@@ -188,6 +188,12 @@ static int tegra_regulator_register(struct platform_device *pdev,
 	reg->init.consumer_supplies = entry->consumers;
 	reg->init.num_consumer_supplies = entry->nr_consumers;
 	reg->rdesc.id = entry->id;
+
+	if (entry->guid == NV_VDD_SoC_ODM_ID) {
+		reg->init.constraints.boot_on = true;
+		reg->enable = true;
+	}
+
 	if (cnt>1 || cap.RmProtected) {
 		reg->rdesc.ops = &tegra_soc_fixed_vdd_ops;
 		reg->init.constraints.min_uV = reg->vdd_list[0].request_uV;
