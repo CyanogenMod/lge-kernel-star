@@ -38,6 +38,7 @@
 #include <mach/sdhci.h>
 #include <mach/nand.h>
 #include <mach/regulator.h>
+#include <mach/kbc.h>
 
 #include <mach/nvrm_linux.h>
 
@@ -48,6 +49,9 @@
 #include "nvodm_query_gpio.h"
 #include "nvrm_pinmux.h"
 #include "nvrm_module.h"
+#include "nvodm_kbc.h"
+#include "nvodm_query_kbc.h"
+#include "nvodm_kbc_keymapping.h"
 
 NvRmGpioHandle s_hGpioGlobal;
 
@@ -633,6 +637,108 @@ static void __init tegra_setup_hcd(void)
 static inline void tegra_setup_hcd(void) { }
 #endif
 
+#ifdef CONFIG_KEYBOARD_TEGRA
+struct tegra_kbc_plat tegra_kbc_platform;
+
+static void tegra_setup_kbc(void)
+{
+	struct tegra_kbc_plat *pdata = &tegra_kbc_platform;
+	const NvOdmPeripheralConnectivity *conn;
+	NvOdmPeripheralSearch srch_attr = NvOdmPeripheralSearch_IoModule;
+	const struct NvOdmKeyVirtTableDetail **vkeys;
+	NvU32 srch_val = NvOdmIoModule_Kbd;
+	NvU32 temp;
+	NvU64 guid;
+	NvU32 i, j, k;
+	NvU32 cols=0;
+	NvU32 rows=0;
+	NvU32 *wake_row;
+	NvU32 *wake_col;
+	NvU32 wake_num;
+	NvU32 vnum;
+
+	pdata->keymap = kzalloc(sizeof(*pdata->keymap)*KBC_MAX_KEY, GFP_KERNEL);
+	if (!pdata->keymap) {
+		pr_err("%s: out of memory for key mapping\n", __func__);
+		return;
+	}
+	if (NvOdmKbcIsSelectKeysWkUpEnabled(&wake_row, &wake_col, &wake_num)) {
+		BUG_ON(!wake_num || wake_num>=KBC_MAX_KEY);
+		pdata->wake_cfg = kzalloc(sizeof(*pdata->wake_cfg)*wake_num,
+			GFP_KERNEL);
+		if (pdata->wake_cfg) {
+			pdata->wake_cnt = (int)wake_num;
+			for (i=0; i<wake_num; i++) {
+				pdata->wake_cfg[i].row=wake_row[i];
+				pdata->wake_cfg[i].col=wake_col[i];
+			}
+		} else
+			pr_err("disabling wakeup key filtering due to "
+				"out-of-memory error\n");
+	}
+
+	NvOdmKbcGetParameter(NvOdmKbcParameter_DebounceTime, 1, &temp);
+
+	/* debounce time is reported from ODM in terms of clock ticks. */
+	pdata->debounce_cnt = temp;
+
+	/* repeat cycle is reported from ODM in milliseconds,
+	 * but needs to be specified in 32KHz ticks */
+	NvOdmKbcGetParameter(NvOdmKbcParameter_RepeatCycleTime, 1, &temp);
+	pdata->repeat_cnt = temp * 32;
+
+	temp = NvOdmPeripheralEnumerate(&srch_attr, &srch_val, 1, &guid, 1);
+	if (!temp) {
+		kfree(pdata->keymap);
+		pr_err("%s: failed to find keyboard module\n", __func__);
+		return;
+	}
+	conn = NvOdmPeripheralGetGuid(guid);
+	if (!conn) {
+		kfree(pdata->keymap);
+		pr_err("%s: failed to find keyboard\n", __func__);
+		return;
+	}
+
+	for (i=0; i<conn->NumAddress; i++) {
+		NvU32 addr = conn->AddressList[i].Address;
+
+		if (conn->AddressList[i].Interface!=NvOdmIoModule_Kbd) continue;
+
+		if (conn->AddressList[i].Instance) {
+			pdata->pin_cfg[addr].num = cols++;
+			pdata->pin_cfg[addr].is_col = true;
+		} else {
+			pdata->pin_cfg[addr].num = rows++;
+			pdata->pin_cfg[addr].is_row = true;
+		}
+	}
+
+	for (i=0; i<KBC_MAX_KEY; i++)
+		pdata->keymap[i] = -1;
+
+	vnum = NvOdmKbcKeyMappingGetVirtualKeyMappingList(&vkeys);
+
+	for (i=0; i<rows; i++) {
+		for (j=0; j<cols; j++) {
+			NvU32 sc = NvOdmKbcGetKeyCode(i, j, rows, cols);
+			for (k=0; k<vnum; k++) {
+				if (sc >= vkeys[k]->StartScanCode &&
+				    sc <= vkeys[k]->EndScanCode) {
+					sc -= vkeys[k]->StartScanCode;
+					sc = vkeys[k]->pVirtualKeyTable[sc];
+					if (!sc) continue;
+					pdata->keymap[kbc_indexof(i,j)]=sc;
+				}
+
+                        }
+		}
+	}
+}
+#else
+static void tegra_setup_kbc(void) { }
+#endif
+
 #ifdef CONFIG_RTC_DRV_TEGRA_ODM
 static struct platform_device tegra_rtc_device = {
 	.name = "tegra_rtc",
@@ -799,6 +905,7 @@ void __init tegra_setup_nvodm(void)
 	tegra_setup_hsuart();
 	tegra_setup_sdhci();
 	tegra_setup_rfkill();
+	tegra_setup_kbc();
 	platform_add_devices(nvodm_devices, ARRAY_SIZE(nvodm_devices));
 	pm_power_off = tegra_system_power_off;
 }
