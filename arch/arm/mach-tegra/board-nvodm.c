@@ -663,6 +663,11 @@ static struct regulator_consumer_supply lbee9qmb_consumers[] = {
 		.dev_name = "lbee9qmb-rfkill.0",
 	},
 };
+static struct regulator_consumer_supply tegra_soc_consumers[] = {
+	[0] = {
+		.supply = "soc_main",
+	},
+};
 static struct tegra_regulator_entry tegra_regulators[] = {
 	[0] = {
 		.guid = NV_VDD_PEX_CLK_ODM_ID,
@@ -677,6 +682,13 @@ static struct tegra_regulator_entry tegra_regulators[] = {
 		.id = 1,
 		.consumers = lbee9qmb_consumers,
 		.nr_consumers = ARRAY_SIZE(lbee9qmb_consumers),
+	},
+	[2] = {
+		.guid = NV_VDD_SoC_ODM_ID,
+		.name = "soc_main",
+		.id = 2,
+		.consumers = tegra_soc_consumers,
+		.nr_consumers = ARRAY_SIZE(tegra_soc_consumers),
 	},
 };
 static struct tegra_regulator_platform_data tegra_regulator_platform = {
@@ -760,6 +772,25 @@ static int tegra_setup_pcie(void)
 late_initcall(tegra_setup_pcie);
 #endif
 
+static void tegra_system_power_off(void)
+{
+	struct regulator *regulator = regulator_get(NULL, "soc_main");
+
+	if (!IS_ERR(regulator)) {
+		int rc;
+		regulator_enable(regulator);
+		rc = regulator_disable(regulator);
+		pr_err("%s: regulator_disable returned %d\n", __func__, rc);
+	} else {
+		pr_err("%s: regulator_get returned %ld\n", __func__,
+		       PTR_ERR(regulator));
+	}
+	local_irq_disable();
+	while (1) {
+		__asm__ ("wfi");
+	}
+}
+
 void __init tegra_setup_nvodm(void)
 {
 	NvRmGpioOpen(s_hRmGlobal, &s_hGpioGlobal);
@@ -769,4 +800,5 @@ void __init tegra_setup_nvodm(void)
 	tegra_setup_sdhci();
 	tegra_setup_rfkill();
 	platform_add_devices(nvodm_devices, ARRAY_SIZE(nvodm_devices));
+	pm_power_off = tegra_system_power_off;
 }
