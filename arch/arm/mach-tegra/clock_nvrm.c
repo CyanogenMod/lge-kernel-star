@@ -25,10 +25,14 @@
 #include <linux/spinlock.h>
 #include <linux/delay.h>
 #include <linux/io.h>
+#include <linux/err.h>
+#include <linux/clk.h>
 
 #include <asm/clkdev.h>
+#include <asm/smp_twd.h>
 
 #include <mach/iomap.h>
+#include <mach/timex.h>
 
 #include <mach/nvrm_linux.h>
 #include "nvrm/core/common/nvrm_clocks.h"
@@ -389,9 +393,21 @@ EXPORT_SYMBOL(clk_get_rate);
 void __init tegra_init_clock(void)
 {
 	NvError e;
+	struct clk *cpu_clk = NULL;
+	unsigned long rate = 0;
 
 	e = NvRmOpenNew(&s_hRmGlobal);
 	BUG_ON(e!=NvSuccess);
 	NvRmPowerRegister(s_hRmGlobal, 0, &clk_pwr_client);
 	tegra2_init_clocks();
+
+#ifdef CONFIG_USE_ARM_TWD_PRESCALER
+	cpu_clk = clk_get_sys(NULL, "cpu");
+	BUG_ON(IS_ERR(cpu_clk));
+
+	rate = clk_get_rate(cpu_clk);
+	local_timer_rescale(rate / 1000);
+	clk_put(cpu_clk);
+	on_each_cpu(twd_set_prescaler, NULL, true);
+#endif
 }
