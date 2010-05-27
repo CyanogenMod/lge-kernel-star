@@ -411,3 +411,101 @@ void __init tegra_init_clock(void)
 	on_each_cpu(twd_set_prescaler, NULL, true);
 #endif
 }
+
+#ifdef CONFIG_PM
+#define CLK_RESET_RST_DEVICES_L		0x04
+#define CLK_RESET_RST_DEVICES_NUM	3
+
+#define CLK_RESET_CLK_OUT_ENB_L		0x10
+#define CLK_RESET_CLK_OUT_ENB_H		0x14
+#define CLK_RESET_CLK_OUT_ENB_U		0x18
+#define CLK_RESET_CLK_OUT_ENB_L_ALL	0xbffffff9ul
+#define CLK_RESET_CLK_OUT_ENB_H_ALL	0xfefffff7ul
+#define CLK_RESET_CLK_OUT_ENB_U_ALL	0x77f01bfful
+#define CLK_RESET_CLK_OUT_ENB_NUM	3
+
+#define CLK_RESET_CLK_MASK_ARM		0x44
+#define CLK_RESET_MISC_CLK_ENB		0x48
+#define CLK_RESET_OSC_CTRL		0x50
+#define CLK_RESET_OSC_CTRL_MASK		0x3f2	/* drive strength & bypass */
+
+#define CLK_RESET_CLK_SOURCE_I2S1	0x100
+#define CLK_RESET_CLK_SOURCE_EMC	0x19c
+#define CLK_RESET_CLK_SOURCE_OSC	0x1fc
+#define CLK_RESET_CLK_SOURCE_NUM \
+	(((CLK_RESET_CLK_SOURCE_OSC - CLK_RESET_CLK_SOURCE_I2S1) / 4) + 1 - 1)
+
+static u32 clk_rst[CLK_RESET_RST_DEVICES_NUM + CLK_RESET_CLK_OUT_ENB_NUM +
+		   CLK_RESET_CLK_SOURCE_NUM + 3];
+
+void tegra_clk_suspend(void)
+{
+	void __iomem *car = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
+	unsigned long offs, i;
+	u32 *ctx = clk_rst;
+
+	*ctx++ = readl(car + CLK_RESET_OSC_CTRL) & CLK_RESET_OSC_CTRL_MASK;
+
+	for (offs=CLK_RESET_CLK_SOURCE_I2S1;
+	     offs<=CLK_RESET_CLK_SOURCE_OSC; offs+=4) {
+
+		if (offs==CLK_RESET_CLK_SOURCE_EMC)
+			continue;
+
+		*ctx++ = readl(car + offs);
+	}
+
+	offs = CLK_RESET_RST_DEVICES_L;
+	for (i=0; i<CLK_RESET_RST_DEVICES_NUM; i++)
+		*ctx++ = readl(car + offs + i*4);
+
+	offs = CLK_RESET_CLK_OUT_ENB_L;
+	for (i=0; i<CLK_RESET_CLK_OUT_ENB_NUM; i++)
+		*ctx++ = readl(car + offs + i*4);
+
+	*ctx++ = readl(car + CLK_RESET_MISC_CLK_ENB);
+	*ctx++ = readl(car + CLK_RESET_CLK_MASK_ARM);
+
+	BUG_ON(ctx-clk_rst != ARRAY_SIZE(clk_rst));
+}
+
+void tegra_clk_resume(void)
+{
+	void __iomem *car = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
+	unsigned long offs, i;
+	u32 *ctx = clk_rst;
+	u32 temp;
+
+	temp = readl(car + CLK_RESET_OSC_CTRL) & ~CLK_RESET_OSC_CTRL_MASK;
+	temp |= *ctx++;
+	writel(temp, car + CLK_RESET_OSC_CTRL);
+
+	writel(CLK_RESET_CLK_OUT_ENB_L_ALL, car + CLK_RESET_CLK_OUT_ENB_L);
+	writel(CLK_RESET_CLK_OUT_ENB_H_ALL, car + CLK_RESET_CLK_OUT_ENB_H);
+	writel(CLK_RESET_CLK_OUT_ENB_U_ALL, car + CLK_RESET_CLK_OUT_ENB_U);
+	wmb();
+
+	for (offs=CLK_RESET_CLK_SOURCE_I2S1;
+	     offs<=CLK_RESET_CLK_SOURCE_OSC; offs+=4) {
+		if (offs==CLK_RESET_CLK_SOURCE_EMC)
+			continue;
+		writel(*ctx++, car + offs);
+	}
+	wmb();
+
+	offs = CLK_RESET_RST_DEVICES_L;
+	for (i=0; i<CLK_RESET_RST_DEVICES_NUM; i++)
+		writel(*ctx++, car + offs + i*4);
+	wmb();
+
+	offs = CLK_RESET_CLK_OUT_ENB_L;
+	for (i=0; i<CLK_RESET_CLK_OUT_ENB_NUM; i++)
+		writel(*ctx++, car + offs + i*4);
+	wmb();
+
+	writel(*ctx++, car + CLK_RESET_MISC_CLK_ENB);
+	writel(*ctx++, car + CLK_RESET_CLK_MASK_ARM);
+	BUG_ON(ctx-clk_rst != ARRAY_SIZE(clk_rst));
+}
+
+#endif
