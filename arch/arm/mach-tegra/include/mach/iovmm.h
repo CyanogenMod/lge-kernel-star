@@ -112,6 +112,8 @@ struct tegra_iovmm_device_ops {
 		struct tegra_iovmm_client *client);
 	void (*free_domain)(struct tegra_iovmm_device *dev,
 		struct tegra_iovmm_domain *domain);
+	int (*suspend)(struct tegra_iovmm_device *dev);
+	void (*resume)(struct tegra_iovmm_device *dev);
 };
 
 struct tegra_iovmm_area_ops {
@@ -190,7 +192,11 @@ int tegra_iovmm_register(struct tegra_iovmm_device *dev);
 /* called by drivers to remove an I/O VMM device from the system */
 int tegra_iovmm_unregister(struct tegra_iovmm_device *dev);
 
+/* called by platform suspend code to save IOVMM context */
+int tegra_iovmm_suspend(void);
 
+/* restores IOVMM context */
+void tegra_iovmm_resume(void);
 
 #else /* CONFIG_TEGRA_IOVMM */
 
@@ -267,6 +273,13 @@ static inline int tegra_iovmm_unregister(struct tegra_iovmm_device *dev)
 {
 	return 0;
 }
+
+static inline int tegra_iovmm_suspend(void)
+{
+	return 0;
+}
+
+static inline void tegra_iovmm_resume(void) { }
 #endif /* CONFIG_TEGRA_IOVMM */
 
 

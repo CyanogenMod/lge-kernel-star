@@ -65,8 +65,8 @@ static struct tegra_iovmm_domain *gart_alloc_domain(
 
 static int gart_probe(struct platform_device *);
 static int gart_remove(struct platform_device *);
-static int gart_suspend(struct platform_device *, pm_message_t);
-static int gart_resume(struct platform_device *);
+static int gart_suspend(struct tegra_iovmm_device *dev);
+static void gart_resume(struct tegra_iovmm_device *dev);
 
 
 static struct tegra_iovmm_device_ops tegra_iovmm_gart_ops = {
@@ -74,21 +74,21 @@ static struct tegra_iovmm_device_ops tegra_iovmm_gart_ops = {
 	.unmap		= gart_unmap,
 	.map_pfn	= gart_map_pfn,
 	.alloc_domain	= gart_alloc_domain,
+	.suspend	= gart_suspend,
+	.resume		= gart_resume,
 };
 
 static struct platform_driver tegra_iovmm_gart_drv = {
 	.probe		= gart_probe,
 	.remove		= gart_remove,
-	.suspend	= gart_suspend,
-	.resume		= gart_resume,
 	.driver		= {
 		.name	= DRIVER_NAME,
 	},
 };
 
-static int gart_suspend(struct platform_device *pdev, pm_message_t state)
+static int gart_suspend(struct tegra_iovmm_device *dev)
 {
-	struct gart_device *gart = platform_get_drvdata(pdev);
+	struct gart_device *gart = container_of(dev, struct gart_device, iovmm);
 	unsigned int i;
 	unsigned long reg;
 
@@ -127,21 +127,16 @@ static void do_gart_setup(struct gart_device *gart, const u32 *data)
 	wmb();
 }
 
-static int gart_resume(struct platform_device *pdev)
+static void gart_resume(struct tegra_iovmm_device *dev)
 {
-	struct gart_device *gart = platform_get_drvdata(pdev);
+	struct gart_device *gart = container_of(dev, struct gart_device, iovmm);
 
-	if (!gart || (gart->enable && !gart->savedata))
-		return -ENODEV;
-
-	if (!gart->enable)
-		return 0;
+	if (!gart || !gart->enable || (gart->enable && !gart->savedata))
+		return;
 
 	spin_lock(&gart->pte_lock);
 	do_gart_setup(gart, gart->savedata);
 	spin_unlock(&gart->pte_lock);
-
-	return 0;
 }
 
 static int gart_remove(struct platform_device *pdev)

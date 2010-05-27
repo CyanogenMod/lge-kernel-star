@@ -709,6 +709,43 @@ int tegra_iovmm_register(struct tegra_iovmm_device *dev)
 	return 0;
 }
 
+int tegra_iovmm_suspend(void)
+{
+	int rc = 0;
+	struct tegra_iovmm_device *dev;
+
+	mutex_lock(&iovmm_list_lock);
+	list_for_each_entry(dev, &iovmm_devices, list) {
+
+		if (!dev->ops->suspend)
+			continue;
+
+		rc = dev->ops->suspend(dev);
+		if (rc) {
+			pr_err("%s: %s suspend returned %d\n",
+			       __func__, dev->name, rc);
+			mutex_unlock(&iovmm_list_lock);
+			return rc;
+		}
+	}
+	mutex_unlock(&iovmm_list_lock);
+	return 0;	
+}
+
+void tegra_iovmm_resume(void)
+{
+	struct tegra_iovmm_device *dev;
+
+	mutex_lock(&iovmm_list_lock);
+
+	list_for_each_entry(dev, &iovmm_devices, list) {
+		if (dev->ops->resume)
+			dev->ops->resume(dev);
+	}
+
+	mutex_unlock(&iovmm_list_lock);
+}
+
 int tegra_iovmm_unregister(struct tegra_iovmm_device *dev)
 {
 	mutex_lock(&iovmm_list_lock);
