@@ -38,6 +38,8 @@
 
 #define APB_DMA_CNTRL				0x010
 
+#define APB_DMA_IRQ_MASK			0x01c
+
 #define APB_DMA_IRQ_MASK_SET			0x020
 
 #define APB_DMA_CHAN_CSR			0x000
@@ -95,9 +97,11 @@
 #define APB_SEQ_WRAP_SHIFT			16
 #define APB_SEQ_WRAP_MASK			(0x7<<APB_SEQ_WRAP_SHIFT)
 
+#define TEGRA_SYSTEM_DMA_CH_NR			16
 #define TEGRA_SYSTEM_DMA_AVP_CH_NUM		3
 #define TEGRA_SYSTEM_DMA_CH_MIN			0
-#define TEGRA_SYSTEM_DMA_CH_MAX			(15 - TEGRA_SYSTEM_DMA_AVP_CH_NUM)
+#define TEGRA_SYSTEM_DMA_CH_MAX	\
+	(TEGRA_SYSTEM_DMA_CH_NR - TEGRA_SYSTEM_DMA_AVP_CH_NUM - 1)
 
 #define NV_DMA_MAX_TRASFER_SIZE 0x10000
 
@@ -730,3 +734,54 @@ fail:
 	}
 	return ret;
 }
+
+#ifdef CONFIG_PM
+static u32 apb_dma[6*TEGRA_SYSTEM_DMA_CH_NR + 3];
+
+void tegra_dma_suspend(void)
+{
+	void __iomem *addr = IO_ADDRESS(TEGRA_APB_DMA_BASE);
+	u32 *ctx = apb_dma;
+	int i;
+
+	*ctx++ = readl(addr + APB_DMA_GEN);
+	*ctx++ = readl(addr + APB_DMA_CNTRL);
+	*ctx++ = readl(addr + APB_DMA_IRQ_MASK);
+
+	for (i=0; i<TEGRA_SYSTEM_DMA_CH_NR; i++) {
+		addr = IO_ADDRESS(TEGRA_APB_DMA_CH0_BASE +
+				  TEGRA_APB_DMA_CH0_SIZE * i);
+
+		*ctx++ = readl(addr + APB_DMA_CHAN_CSR);
+		*ctx++ = readl(addr + APB_DMA_CHAN_STA);
+		*ctx++ = readl(addr + APB_DMA_CHAN_AHB_PTR);
+		*ctx++ = readl(addr + APB_DMA_CHAN_AHB_SEQ);
+		*ctx++ = readl(addr + APB_DMA_CHAN_APB_PTR);
+		*ctx++ = readl(addr + APB_DMA_CHAN_APB_SEQ);
+	}
+}
+
+void tegra_dma_resume(void)
+{
+	void __iomem *addr = IO_ADDRESS(TEGRA_APB_DMA_BASE);
+	u32 *ctx = apb_dma;
+	int i;
+
+	writel(*ctx++, addr + APB_DMA_GEN);
+	writel(*ctx++, addr + APB_DMA_CNTRL);
+	writel(*ctx++, addr + APB_DMA_IRQ_MASK);
+
+	for (i=0; i<TEGRA_SYSTEM_DMA_CH_NR; i++) {
+		addr = IO_ADDRESS(TEGRA_APB_DMA_CH0_BASE +
+				  TEGRA_APB_DMA_CH0_SIZE * i);
+
+		writel(*ctx++, addr + APB_DMA_CHAN_CSR);
+		writel(*ctx++, addr + APB_DMA_CHAN_STA);
+		writel(*ctx++, addr + APB_DMA_CHAN_AHB_PTR);
+		writel(*ctx++, addr + APB_DMA_CHAN_AHB_SEQ);
+		writel(*ctx++, addr + APB_DMA_CHAN_APB_PTR);
+		writel(*ctx++, addr + APB_DMA_CHAN_APB_SEQ);
+	}
+}
+
+#endif
