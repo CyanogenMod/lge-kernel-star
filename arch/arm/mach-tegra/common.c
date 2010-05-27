@@ -65,7 +65,6 @@ void __init tegra_common_init(void)
 	nvmap_add_carveout_heap(TEGRA_IRAM_BASE, TEGRA_IRAM_SIZE,
 				"iram", NVMEM_HEAP_CARVEOUT_IRAM);
 	tegra_init_clock();
-	tegra_init_suspend();
 	tegra_init_cache();
 	tegra_dma_init();
 	arm_pm_restart = tegra_machine_restart;

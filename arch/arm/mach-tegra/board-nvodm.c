@@ -28,6 +28,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/regulator/machine.h>
 #include <linux/lbee9qmb-rfkill.h>
+#include <linux/gpio.h>
 
 #include <mach/iomap.h>
 #include <mach/io.h>
@@ -52,6 +53,9 @@
 #include "nvodm_kbc.h"
 #include "nvodm_query_kbc.h"
 #include "nvodm_kbc_keymapping.h"
+#include "gpio-names.h"
+#include "power.h"
+#include "board.h"
 
 NvRmGpioHandle s_hGpioGlobal;
 
@@ -897,6 +901,82 @@ static void tegra_system_power_off(void)
 	}
 }
 
+static struct tegra_suspend_platform_data tegra_suspend_platform = {
+	.cpu_timer = 2000,
+};
+
+static void __init tegra_setup_suspend(void)
+{
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	const int wakepad_irq[] = {
+		gpio_to_irq(TEGRA_GPIO_PO5), gpio_to_irq(TEGRA_GPIO_PV3),
+		gpio_to_irq(TEGRA_GPIO_PL1), gpio_to_irq(TEGRA_GPIO_PB6),
+		gpio_to_irq(TEGRA_GPIO_PN7), gpio_to_irq(TEGRA_GPIO_PA0),
+		gpio_to_irq(TEGRA_GPIO_PU5), gpio_to_irq(TEGRA_GPIO_PU6),
+		gpio_to_irq(TEGRA_GPIO_PC7), gpio_to_irq(TEGRA_GPIO_PS2),
+		gpio_to_irq(TEGRA_GPIO_PAA1), gpio_to_irq(TEGRA_GPIO_PW3),
+		gpio_to_irq(TEGRA_GPIO_PW2), gpio_to_irq(TEGRA_GPIO_PY6),
+		gpio_to_irq(TEGRA_GPIO_PV6), gpio_to_irq(TEGRA_GPIO_PJ7),
+		INT_RTC, INT_KBC, INT_EXTERNAL_PMU,
+		/* FIXME: USB wake pad interrupt mapping may be wrong */
+		INT_USB, INT_USB3, INT_USB, INT_USB3,
+		gpio_to_irq(TEGRA_GPIO_PI5), gpio_to_irq(TEGRA_GPIO_PV2),
+		gpio_to_irq(TEGRA_GPIO_PS4), gpio_to_irq(TEGRA_GPIO_PS5),
+		gpio_to_irq(TEGRA_GPIO_PS0), gpio_to_irq(TEGRA_GPIO_PQ6),
+		gpio_to_irq(TEGRA_GPIO_PQ7), gpio_to_irq(TEGRA_GPIO_PN2),
+	};
+#endif
+	const NvOdmWakeupPadInfo *w;
+	const NvOdmSocPowerStateInfo *lp;
+	struct tegra_suspend_platform_data *plat = &tegra_suspend_platform;
+	NvOdmPmuProperty pmu;
+	NvBool has_pmu;
+	NvU32 nr_wake;
+
+	lp = NvOdmQueryLowestSocPowerState();
+	w = NvOdmQueryGetWakeupPadTable(&nr_wake);
+	has_pmu = NvOdmQueryGetPmuProperty(&pmu);
+
+	if (!has_pmu) {
+		pr_info("%s: no PMU property, ignoring all suspend state\n",
+			__func__);
+		goto do_register;
+	}
+
+	if (lp->LowestPowerState==NvOdmSocPowerState_Suspend) {
+		plat->dram_suspend = true;
+		plat->core_off = false;
+	} else if (lp->LowestPowerState==NvOdmSocPowerState_DeepSleep) {
+		plat->dram_suspend = true;
+		plat->core_off = true;
+	}
+
+	if (has_pmu) {
+		plat->cpu_timer = pmu.CpuPowerGoodUs;
+		plat->core_timer = pmu.PowerGoodCount;
+		plat->separate_req = !pmu.CombinedPowerReq;
+		plat->corereq_high =
+			(pmu.CorePowerReqPolarity ==
+			 NvOdmCorePowerReqPolarity_High);
+		plat->sysclkreq_high =
+			(pmu.SysClockReqPolarity ==
+			 NvOdmCorePowerReqPolarity_High);
+	}
+
+	if (!w || !nr_wake)
+		goto do_register;
+
+	while (nr_wake--) {
+		unsigned int pad = w->WakeupPadNumber;
+		if (pad < ARRAY_SIZE(wakepad_irq) && w->enable)
+			enable_irq_wake(wakepad_irq[w->WakeupPadNumber]);
+		w++;
+	}
+
+do_register:
+	tegra_init_suspend(plat);
+}
+
 void __init tegra_setup_nvodm(void)
 {
 	NvRmGpioOpen(s_hRmGlobal, &s_hGpioGlobal);
@@ -908,4 +988,5 @@ void __init tegra_setup_nvodm(void)
 	tegra_setup_kbc();
 	platform_add_devices(nvodm_devices, ARRAY_SIZE(nvodm_devices));
 	pm_power_off = tegra_system_power_off;
+	tegra_setup_suspend();
 }

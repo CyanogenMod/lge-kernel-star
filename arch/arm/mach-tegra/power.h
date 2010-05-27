@@ -33,12 +33,25 @@
 #define TEGRA_POWER_EFFECT_LP0		0x40  /* enter LP0 when CPU pwr gated */
 #define TEGRA_POWER_CPU_PWRREQ_POLARITY 0x80  /* CPU power request polarity */
 #define TEGRA_POWER_CPU_PWRREQ_OE	0x100 /* CPU power request enable */
+#define TEGRA_POWER_PMC_SHIFT		8
+#define TEGRA_POWER_PMC_MASK		0x1ff
 
 
 #ifndef __ASSEMBLY__
 void tegra_lp2_set_trigger(unsigned long cycles);
 void __cortex_a9_save(unsigned int mode);
 void tegra_lp2_startup(void);
+
+struct tegra_suspend_platform_data {
+	unsigned long cpu_timer;   /* CPU power good time in us, LP2 */
+	unsigned long core_timer;  /* core power good time in ticks, LP0/LP1 */
+	bool dram_suspend;         /* platform supports DRAM self-refresh */
+	bool core_off;             /* platform supports core voltage off */
+	bool corereq_high;         /* Core power request active-high */
+	bool sysclkreq_high;       /* System clock request is active-high */
+	bool separate_req;         /* Core & CPU power request are separate */
+};
+
 #endif
 
 #endif

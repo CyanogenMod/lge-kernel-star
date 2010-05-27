@@ -23,11 +23,13 @@
 
 #include <linux/types.h>
 
+struct tegra_suspend_platform_data;
+
 void __init tegra_common_init(void);
 void __init tegra_map_common_io(void);
 void __init tegra_init_irq(void);
 void __init tegra_init_clock(void);
-void __init tegra_init_suspend(void);
+void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat);
 
 #ifdef CONFIG_CPU_FREQ
 int tegra_start_dvfsd(void);

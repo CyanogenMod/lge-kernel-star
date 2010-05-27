@@ -28,6 +28,9 @@
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/clk.h>
+#include <linux/err.h>
+#include <linux/delay.h>
+#include <linux/suspend.h>
 
 #include <asm/cacheflush.h>
 #include <asm/hardware/gic.h>
@@ -37,6 +40,10 @@
 
 #include <mach/iomap.h>
 #include <mach/irqs.h>
+#include <mach/nvrm_linux.h>
+
+#include <nvrm_memmgr.h>
+#include "nvrm/core/common/nvrm_message.h"
 
 #include "power.h"
 
@@ -62,6 +69,7 @@ static void __iomem *evp_reset = IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE)+0x100;
 static void __iomem *tmrus = IO_ADDRESS(TEGRA_TMRUS_BASE);
 
 #define PMC_CTRL		0x0
+#define PMC_COREPWRGOOD_TIMER	0x3c
 #define PMC_SCRATCH1		0x54
 #define PMC_CPUPWRGOOD_TIMER	0xc8
 #define PMC_SCRATCH38		0x134
@@ -81,12 +89,7 @@ static void __iomem *tmrus = IO_ADDRESS(TEGRA_TMRUS_BASE);
 #define FLOW_CTRL_CPU1_CSR	0x18
 
 static struct clk *tegra_pclk = NULL;
-
-void __init tegra_init_suspend(void)
-{
-	tegra_pclk = clk_get_sys(NULL, "pclk");
-	BUG_ON(!tegra_pclk);
-}
+static const struct tegra_suspend_platform_data *pdata = NULL;
 
 static void set_powergood_time(unsigned int us)
 {
@@ -195,9 +198,10 @@ unsigned int tegra_suspend_lp2(unsigned int us)
 
 	/* FIXME: power good time (in us) should come from the board file,
 	 * not hard-coded here. */
-	set_powergood_time(2000);
+	set_powergood_time(pdata->cpu_timer);
 
-	tegra_lp2_set_trigger(us);
+	if (us)
+		tegra_lp2_set_trigger(us);
 	suspend_cpu_complex();
 	flush_cache_all();
 	/* structure is written by reset code, so the L2 lines
@@ -214,4 +218,201 @@ unsigned int tegra_suspend_lp2(unsigned int us)
 	entry = readl(pmc + PMC_SCRATCH38);
 	exit = readl(pmc + PMC_SCRATCH39);
 	return exit - entry;
+}
+
+#ifdef CONFIG_PM
+static int tegra_suspend_prepare_late(void)
+{
+#ifdef CONFIG_TEGRA_NVRM
+	static NvRmTransportHandle port = NULL;
+	static NvRmMemHandle iram_area = NULL;
+	static unsigned long iram_area_pa = 0;
+	static void __iomem *barrier = NULL;
+
+	NvRmMessage_InitiateLP0 msg;
+	unsigned long timeout;
+	NvError e;
+
+	if (!s_hRmGlobal)
+		return 0;
+
+	if (!port) {
+		e = NvRmTransportOpen(s_hRmGlobal, "RPC_AVP_PORT", NULL, &port);
+		if (e != NvSuccess) {
+			pr_err("%s: aborting suspend due to TransportOpen "
+			       "returning 0x%08x\n", __func__, e);
+			return -ENOSYS;
+		}
+	}
+
+	if (!iram_area) {
+		NvRmHeap h = NvRmHeap_ExternalCarveOut;
+
+		e = NvRmMemHandleCreate(s_hRmGlobal, &iram_area,
+				TEGRA_IRAM_SIZE + PAGE_SIZE);
+		if (e != NvSuccess) {
+			pr_err("%s: MemHandleCreate returned 0x%08x\n",
+			       __func__, e);
+			return -ENOMEM;
+		}
+		e = NvRmMemAlloc(iram_area, &h, 1, PAGE_SIZE,
+				 NvOsMemAttribute_Uncached);
+		if (e != NvSuccess) {
+			pr_err("%s: NvRmMemAlloc returned 0x%08x\n",
+			       __func__, e);
+			NvRmMemHandleFree(iram_area);
+			iram_area = NULL;
+			return -ENOMEM;
+		}
+
+		iram_area_pa = NvRmMemPin(iram_area);
+
+	}
+
+	BUG_ON(iram_area_pa == ~0ul);
+
+	if (!barrier) {
+		barrier = ioremap(iram_area_pa + TEGRA_IRAM_SIZE, PAGE_SIZE);
+		if (IS_ERR_OR_NULL(barrier)) {
+			pr_err("%s: failed to map barrier\n", __func__);
+			barrier = NULL;
+			return -ENOMEM;
+		}
+	}
+
+	/* the AVP will write a non-zero value to PMC_SCRATCH38 once it has
+	 * suspended itself */
+	msg.msg = NvRmMsg_InitiateLP0;
+	msg.sourceAddr = TEGRA_IRAM_BASE;
+	msg.bufferAddr = iram_area_pa;
+	msg.bufferSize = TEGRA_IRAM_SIZE;
+
+	writel(0, barrier);
+	wmb();
+
+	e = NvRmTransportSendMsgInLP0(port, &msg, sizeof(msg));
+	if (e != NvSuccess) {
+		pr_err("%s: aborting suspend due to SendMsgInLP0 returning "
+		       "0x%08x\n", __func__, e);
+		return -EIO;
+	}
+	timeout = jiffies + msecs_to_jiffies(1000);
+
+	while (time_before(jiffies, timeout)) {
+		if (readl(barrier))
+			break;
+		udelay(10);
+		rmb();
+	}
+
+	/* FIXME: reset the AVP, don't abort suspend */
+	if (!readl(barrier)) {
+		pr_err("%s: aborting suspend due to AVP timeout\n", __func__);
+		return -EIO;
+	}
+	e = NvRmKernelPowerSuspend(s_hRmGlobal);
+	if (e != NvSuccess) {
+		pr_err("%s: aborting suspend due to RM failure 0x%08x\n",
+		       __func__, e);
+		return -EIO;
+	}
+#endif
+	return 0;
+}
+
+static void tegra_suspend_wake(void)
+{
+#ifdef CONFIG_TEGRA_NVRM
+	NvError e;
+
+	e = NvRmKernelPowerResume(s_hRmGlobal);
+	if (e != NvSuccess)
+		panic("%s: RM resume failed 0x%08x!\n", __func__, e);
+#endif
+}
+
+extern void tegra_pinmux_suspend(void);
+extern void tegra_irq_suspend(void);
+extern void tegra_gpio_suspend(void);
+
+extern void tegra_pinmux_resume(void);
+extern void tegra_irq_resume(void);
+extern void tegra_gpio_resume(void);
+
+static int tegra_suspend_enter(suspend_state_t state)
+{
+	struct irq_desc *desc;
+	unsigned long flags;
+	int irq;
+
+	local_irq_save(flags);
+	tegra_irq_suspend();
+	tegra_pinmux_suspend();
+	tegra_gpio_suspend();
+
+	for_each_irq_desc(irq, desc) {
+		if ((desc->status & IRQ_WAKEUP) &&
+		    (desc->status & IRQ_SUSPENDED)) {
+			get_irq_chip(irq)->unmask(irq);
+		}
+	}
+
+	tegra_suspend_lp2(0);
+
+	for_each_irq_desc(irq, desc) {
+		if ((desc->status & IRQ_WAKEUP) &&
+		    (desc->status & IRQ_SUSPENDED)) {
+			get_irq_chip(irq)->mask(irq);
+		}
+	}
+
+	tegra_gpio_resume();
+	tegra_pinmux_resume();
+	tegra_irq_resume();
+
+	local_irq_restore(flags);
+
+	return 0;
+}
+
+static struct platform_suspend_ops tegra_suspend_ops = {
+	.valid		= suspend_valid_only_mem,
+	.prepare_late	= tegra_suspend_prepare_late,
+	.wake		= tegra_suspend_wake,
+	.enter		= tegra_suspend_enter,
+};
+#endif
+
+void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
+{
+	tegra_pclk = clk_get_sys(NULL, "pclk");
+	BUG_ON(!tegra_pclk);
+	pdata = plat;
+
+	if (pdata->core_off) {
+		u32 reg = 0, mode;
+
+		writel(pdata->core_timer, pmc + PMC_COREPWRGOOD_TIMER);
+		reg = readl(pmc + PMC_CTRL);
+		mode = (reg >> TEGRA_POWER_PMC_SHIFT) & TEGRA_POWER_PMC_MASK;
+
+		mode &= ~TEGRA_POWER_SYSCLK_POLARITY;
+		mode &= ~TEGRA_POWER_PWRREQ_POLARITY;
+
+		if (!pdata->sysclkreq_high)
+			mode |= TEGRA_POWER_SYSCLK_POLARITY;
+		if (!pdata->corereq_high)
+			mode |= TEGRA_POWER_PWRREQ_POLARITY;
+
+		/* configure output inverters while the request is tristated */
+		reg |= (mode << TEGRA_POWER_PMC_SHIFT);
+		writel(reg, pmc + PMC_CTRL);
+		wmb();
+		udelay(2000); /* 32KHz domain delay */
+		reg |= (TEGRA_POWER_SYSCLK_OE << TEGRA_POWER_PMC_SHIFT);
+		writel(reg, pmc + PMC_CTRL);
+	}
+#ifdef CONFIG_PM
+	suspend_set_ops(&tegra_suspend_ops);
+#endif
 }
