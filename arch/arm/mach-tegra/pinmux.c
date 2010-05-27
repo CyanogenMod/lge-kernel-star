@@ -630,16 +630,47 @@ void tegra_pinmux_config_pullupdown_table(const struct tegra_pingroup_config *co
 	}
 }
 
-static int __init tegra_pinmux_init_tristate_refcount(void)
-{
-	int i;
-	for (i = TEGRA_PINGROUP_ATA; i < TEGRA_MAX_PINGROUP; ++i) {
-		tristate_refcount[i] = tegra_pinmux_get_tristate(i);
-	}
+#ifdef CONFIG_PM
+#define TRISTATE_REG_A		0x14
+#define TRISTATE_REG_NUM	4
+#define PIN_MUX_CTL_REG_A	0x80
+#define PIN_MUX_CTL_REG_NUM	8
+#define PULLUPDOWN_REG_A	0xa0
+#define PULLUPDOWN_REG_NUM	5
 
-	return 0;
+static u32 pinmux_reg[TRISTATE_REG_NUM + PIN_MUX_CTL_REG_NUM +
+		      PULLUPDOWN_REG_NUM];
+
+void tegra_pinmux_suspend(void)
+{
+	unsigned int i;
+	u32 *ctx = pinmux_reg;
+
+	for (i=0; i<TRISTATE_REG_NUM; i++)
+		*ctx++ = pg_readl(TRISTATE_REG_A + i*4);
+
+	for (i=0; i<PIN_MUX_CTL_REG_NUM; i++)
+		*ctx++ = pg_readl(PIN_MUX_CTL_REG_A + i*4);
+
+	for (i=0; i<PULLUPDOWN_REG_NUM; i++)
+		*ctx++ = pg_readl(PULLUPDOWN_REG_A + i*4);
 }
-late_initcall(tegra_pinmux_init_tristate_refcount);
+
+void tegra_pinmux_resume(void)
+{
+	unsigned int i;
+	u32 *ctx = pinmux_reg;
+
+	for (i=0; i<TRISTATE_REG_NUM; i++)
+		pg_writel(*ctx++, TRISTATE_REG_A + i*4);
+
+	for (i=0; i<PIN_MUX_CTL_REG_NUM; i++)
+		pg_writel(*ctx++, PIN_MUX_CTL_REG_A + i*4);
+
+	for (i=0; i<PULLUPDOWN_REG_NUM; i++)
+		pg_writel(*ctx++, PULLUPDOWN_REG_A + i*4);
+}
+#endif
 
 #ifdef	CONFIG_DEBUG_FS
 
