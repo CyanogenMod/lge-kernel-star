@@ -35,7 +35,6 @@
 #include "nvos.h"
 #include "nvrm_memmgr.h"
 #include "nvrm_ioctls.h"
-#include "nvrm/core/common/nvrm_message.h"
 #include "mach/nvrm_linux.h"
 #include "nvos_ioctl.h"
 #include "nvreftrack.h"
@@ -59,8 +58,6 @@ extern void reset_cpu(unsigned int cpu, unsigned int reset);
 
 //Variables for AVP suspend operation
 extern NvRmDeviceHandle s_hRmGlobal;
-static NvRmMemHandle s_IramMemHandle;
-static NvRmTransportHandle s_AvpSuspendPort;
 
 static NvRtHandle s_RtHandle = NULL;
 
@@ -383,110 +380,10 @@ static int nvrm_remove(struct platform_device *pdev)
 	return 0;
 }
 
-NvError NvRmAvpSuspend(NvRmDeviceHandle hRmDeviceHandle)
-{
-	NvRmMessage_InitiateLP0 Msg;
-	NvError e = NvSuccess;
-	NvRmHeap Heaps[2];
-	NvU32 iramSize, iramAddr, numInstances, instSize;
-	volatile NvU32 *syncVal = NULL;
-	volatile NvU32 *bar;
-
-	if (!s_AvpSuspendPort)
-	{
-		e = NvRmTransportOpen(hRmDeviceHandle, "RPC_AVP_PORT",
-				NULL, &s_AvpSuspendPort);
-		if (e)
-			goto fail;
-	}
-
-	Heaps[0] = NvRmHeap_ExternalCarveOut;
-
-	NvRmModuleGetBaseAddress(hRmDeviceHandle,
-	    NVRM_MODULE_ID(NvRmPrivModuleID_Iram, 0),&iramAddr, &instSize);
-
-	numInstances = NvRmModuleGetNumInstances(hRmDeviceHandle,
-	    NVRM_MODULE_ID(NvRmPrivModuleID_Iram, 0));
-
-	iramSize = instSize * numInstances;
-	if (s_IramMemHandle == NULL)
-	{
-		NV_CHECK_ERROR_CLEANUP(
-			NvRmMemHandleCreate(hRmDeviceHandle, &s_IramMemHandle,
-			iramSize + sizeof(NvU32))
-		);
-
-		NV_CHECK_ERROR_CLEANUP(
-			NvRmMemAlloc(s_IramMemHandle, Heaps, 1, 16,
-			NvOsMemAttribute_Uncached)
-		);
-	}
-
-	Msg.msg = NvRmMsg_InitiateLP0;
-	Msg.sourceAddr = iramAddr;
-	Msg.bufferAddr = NvRmMemPin(s_IramMemHandle);
-	Msg.bufferSize = iramSize;
-
-	NV_CHECK_ERROR_CLEANUP(
-		NvRmMemMap(s_IramMemHandle, iramSize,
-		sizeof(NvU32), NVOS_MEM_READ_WRITE, (void**)&syncVal)
-	);
-
-	*syncVal = 0;
-
-	//Make sure write lands in memory before AVP reads it.
-	bar = (volatile NvU32*)syncVal;
-	(void)(*bar);
-
-	//SendMsgInLP0 should never return an error in this scenario.
-	//If it does, something is seriously wrong with LP0.
-	//(No one else should be talking to the AVP at this moment)
-	NV_CHECK_ERROR_CLEANUP(
-		NvRmTransportSendMsgInLP0(s_AvpSuspendPort, &Msg, sizeof(Msg))
-	);
-
-	//Wait for the AVP to acknowledge that LP0 call
-	while (!*syncVal);
-
-	return NvSuccess;
-fail:
-    if (s_IramMemHandle)
-    {
-		NvRmMemHandleFree(s_IramMemHandle);
-		s_IramMemHandle = NULL;
-    }
-
-	return e;
-}
-
-static int nvrm_suspend(struct platform_device *pdev, pm_message_t state)
-{
-	if (NvRmAvpSuspend(s_hRmGlobal))
-		return -1;
-
-	if(NvRmKernelPowerSuspend(s_hRmGlobal)) {
-		printk(KERN_INFO "%s : FAILED\n", __func__);
-		return -1;
-	}
-	return 0;
-}
-
-static int nvrm_resume(struct platform_device *pdev)
-{
-	if(NvRmKernelPowerResume(s_hRmGlobal)) {
-		printk(KERN_INFO "%s : FAILED\n", __func__);
-		return -1;
-	}
-	return 0;
-
-}
-
 static struct platform_driver nvrm_driver =
 {
 	.probe	 = nvrm_probe,
 	.remove	 = nvrm_remove,
-	.suspend = nvrm_suspend,
-	.resume	 = nvrm_resume,
 	.driver	 = { .name = "nvrm" }
 };
 
