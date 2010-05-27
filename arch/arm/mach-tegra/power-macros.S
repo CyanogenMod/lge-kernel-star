@@ -26,6 +26,12 @@
 	and	\rd, \rd, #0xF
 .endm
 
+
+.macro mov32, reg, val
+	movw	\reg, #:lower16:\val
+	movt	\reg, #:upper16:\val
+.endm
+
 /* waits until the microsecond counter (base) ticks, for exact timing loops */
 .macro	wait_for_us, rd, base, tmp
 	ldr	\rd, [\base]

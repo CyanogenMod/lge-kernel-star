@@ -61,10 +61,10 @@ __invalidate_l1:
 	mcr	p15, 2, r0, c0, c0, 0
 	mrc	p15, 1, r0, c0, c0, 0
 
-	ldr	r1, =0x7fff
+	movw	r1, #0x7fff
 	and	r2, r1, r0, lsr #13
 
-	ldr	r1, =0x3ff
+	movw	r1, #0x3ff
 
 	and	r3, r1, r0, lsr #3  @ NumWays - 1
 	add	r2, r2, #1	@ NumSets
@@ -110,7 +110,7 @@ __invalidate_cpu_state:
 
 	cpu_id	r0
 	cmp	r0, #0
-	ldrne	r1, =(TEGRA_ARM_PERIF_BASE + 0xC)
+	mov32	r1, (TEGRA_ARM_PERIF_BASE + 0xC)
 	movne	r0, r0, lsl #2
 	movne	r2, #0xf
 	movne	r2, r2, lsl r0
@@ -159,14 +159,14 @@ __return_to_virtual:
 	mov	r0, #0x1f
 	mcr	p15, 0, r0, c3, c0, 0	@ domain access register
 
-	ldr	r0, =0xff0a81a8
-	ldr	r1, =0x40e040e0
+	mov32	r0, 0xff0a89a8
+	mov32	r1, 0x40e044e0
 	mcr	p15, 0, r0, c10, c2, 0	@ PRRR
 	mcr	p15, 0, r1, c10, c2, 1	@ NMRR
 	mrc	p15, 0, r0, c1, c0, 0
-	ldr	r1, =0x0120c302
+	mov32	r1, 0x0120c302
 	bic	r0, r0, r1
-	ldr	r1, =0x10c03c7d
+	mov32	r1, 0x10c03c7d
 	orr	r0, r0, r1
 
 #ifdef CONFIG_ALIGNMENT_TRAP
@@ -236,8 +236,8 @@ ENDPROC(__restart_pllx)
  */
 	.align L1_CACHE_SHIFT
 __enable_coresite_access:
-	ldr	r0, =(TEGRA_CLK_RESET_BASE + RST_DEVICES_U)
-	ldr	r2, =(TEGRA_TMRUS_BASE)
+	mov32	r0, (TEGRA_CLK_RESET_BASE + RST_DEVICES_U)
+	mov32	r2, (TEGRA_TMRUS_BASE)
 
 	/* assert reset for 2usec */
 	ldr	r1, [r0]
@@ -246,8 +246,8 @@ __enable_coresite_access:
 	wait_for_us r3, r2, r4
 	add	r3, r3, #2
 	bic	r1, r1, #(1<<9)
-	ldr	r5, =0xC5ACCE55
-	ldr	r6, =(TEGRA_CSITE_BASE + 0x10fb0)	@ CPUDBG0_LAR
+	mov32	r5, 0xC5ACCE55
+	mov32	r6, (TEGRA_CSITE_BASE + 0x10fb0)	@ CPUDBG0_LAR
 	mov	r7, #CONFIG_NR_CPUS
 	wait_until r3, r2, r4
 	str	r1, [r0]
@@ -268,9 +268,9 @@ ENDPROC(__enable_coresite_access)
 ENTRY(tegra_lp2_startup)
 	setmode PSR_F_BIT | PSR_I_BIT | SVC_MODE, r9
 
-	ldr	r0, =TEGRA_TMRUS_BASE
+	mov32	r0, TEGRA_TMRUS_BASE
 	ldr	r1, [r0]
-	ldr	r0, =TEGRA_PMC_BASE
+	mov32	r0, TEGRA_PMC_BASE
 	str	r1, [r0, #PMC_SCRATCH39]	@ save off exact lp2 exit time
 	mov	r1, #0
 	str	r1, [r0, #PMC_DPD_SAMPLE]
@@ -284,7 +284,7 @@ ENTRY(tegra_lp2_startup)
 	mcr	p15, 0, r0, c1, c0, 1
 
 	/* enable SCU */
-	ldr	r0, =TEGRA_ARM_PERIF_BASE
+	mov32	r0, TEGRA_ARM_PERIF_BASE
 	ldr	r1, [r0]
 	orr	r1, r1, #1
 	str	r1, [r0]
