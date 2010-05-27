@@ -327,6 +327,8 @@ void NvRmPinMuxConfigSelect(
 {
     struct tegra_pingroup_config *pin_config;
     int len = 0;
+    NvU32 newConfiguration = Configuration;
+    int isNonMultiplexed = true;
 
     NV_ASSERT(hDevice);
     if (!hDevice)
@@ -334,13 +336,21 @@ void NvRmPinMuxConfigSelect(
     if (Instance >= iomodule_devlist[IoModule].t_inst)
 	return;
 
+    /* For multiplexed config, get the 0 configuration and
+       Cancel the current setting */
+    if (Configuration == NVODM_QUERY_PINMAP_MULTIPLEXED)
+    {
+         newConfiguration = 0;
+         isNonMultiplexed = false;
+    }
+
     if (iomodule_devlist[IoModule].dev_list[Instance] != NULL)
     {
         pin_config = tegra_pinmux_get(iomodule_devlist[IoModule].dev_list[Instance],
-                            Configuration, &len);
+                            newConfiguration, &len);
         if (pin_config != NULL)
         {
-            tegra_pinmux_config_pinmux_table(pin_config, len, true);
+            tegra_pinmux_config_pinmux_table(pin_config, len, isNonMultiplexed);
         }
     }
 }
