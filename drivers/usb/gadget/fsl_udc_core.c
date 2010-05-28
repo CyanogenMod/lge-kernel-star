@@ -2545,9 +2545,6 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
 	int ret = -ENODEV;
 	unsigned int i;
 	u32 dccparams;
-#if defined(CONFIG_ARCH_TEGRA)
-	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
-#endif
 
 	if (strcmp(pdev->name, driver_name)) {
 		VDBG("Wrong device");
@@ -2692,16 +2689,13 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
 #else
 	udc_controller->transceiver = NULL;
 #endif
-	/* Get the regulator for drawing the vbus current in udc driver */
-	if (pdata->regulator_dev) {
-		udc_controller->vbus_regulator =
-				regulator_get(&pdata->regulator_dev->dev, "vbus_draw");
-		if (IS_ERR(udc_controller->vbus_regulator)) {
-			dev_err(&pdev->dev, "can't get vbus_draw regulator, err: %ld\n",
-				PTR_ERR(udc_controller->vbus_regulator));
-			udc_controller->vbus_regulator = NULL;
-		}
+	udc_controller->vbus_regulator = regulator_get(&pdev->dev, "vbus_draw");
+	if (IS_ERR(udc_controller->vbus_regulator)) {
+		dev_err(&pdev->dev, "vbus_draw regulator error %ld; charging "
+			"disabled\n", PTR_ERR(udc_controller->vbus_regulator));
+		udc_controller->vbus_regulator = NULL;
 	}
+
 	/* Power down the phy if cable is not connected */
 	if (!(fsl_readl(&usb_sys_regs->vbus_wakeup) & USB_SYS_VBUS_STATUS))
 		platform_udc_clk_suspend();
