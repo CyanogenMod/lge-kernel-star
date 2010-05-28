@@ -112,6 +112,12 @@ config TEGRA_FUSE
 	  Adds support for reading and writing (blowing) internal fuses
 	  through sysfs
 
+config TEGRA_USB_CHARGE
+	boolean "Enable USB charging support"
+	depends on REGULATOR_TEGRA
+	help
+	  Enables charging over USB
+
 
 if TEGRA_NVRM
 source "arch/arm/mach-tegra/odm_kit/Kconfig"

@@ -58,6 +58,7 @@
 #include "gpio-names.h"
 #include "power.h"
 #include "board.h"
+#include "nvrm_pmu.h"
 
 NvRmGpioHandle s_hGpioGlobal;
 
@@ -780,6 +781,14 @@ static struct regulator_consumer_supply tegra_soc_consumers[] = {
 		.supply = "soc_main",
 	},
 };
+#ifdef CONFIG_TEGRA_USB_CHARGE
+static struct regulator_consumer_supply tegra_vbus_consumers[] = {
+	[0] = {
+		.supply = "vbus_draw",
+		.dev_name = "tegra-udc.0",
+	},
+};
+#endif
 static struct tegra_regulator_entry tegra_regulators[] = {
 	[0] = {
 		.guid = NV_VDD_PEX_CLK_ODM_ID,
@@ -802,6 +811,16 @@ static struct tegra_regulator_entry tegra_regulators[] = {
 		.consumers = tegra_soc_consumers,
 		.nr_consumers = ARRAY_SIZE(tegra_soc_consumers),
 	},
+#ifdef CONFIG_TEGRA_USB_CHARGE
+	[3] = {
+		.charging_path = NvRmPmuChargingPath_UsbBus,
+		.name = "vbus_draw",
+		.id = 3,
+		.consumers = tegra_vbus_consumers,
+		.nr_consumers = ARRAY_SIZE(tegra_vbus_consumers),
+		.is_charger = true,
+	},
+#endif
 };
 static struct tegra_regulator_platform_data tegra_regulator_platform = {
 	.regs = tegra_regulators,
