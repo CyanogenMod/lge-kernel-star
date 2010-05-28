@@ -29,7 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
- 
+
 #ifndef INCLUDED_MAX8907B_SUPPLY_INFO_HEADER
 #define INCLUDED_MAX8907B_SUPPLY_INFO_HEADER
 
@@ -86,7 +86,7 @@ extern "C"
 // Defines common for all supplies I2C (s/w) sequencer selection
 #define MAX8907B_SEQSEL_I2CEN_LXX           7   /* I2CEN (s/w) */
 
-// Defines sequencer count default values 
+// Defines sequencer count default values
 #define MAX8907B_SEQCNT_DEFAULT_LX_V1       0x1C
 #define MAX8907B_SEQCNT_DEFAULT_LX_V2       0x1C
 
@@ -156,7 +156,7 @@ typedef enum
     Max8907bPmuSupply_EXT_DCDC_3_USB1, //USB1 VBUS
     Max8907bPmuSupply_EXT_DCDC_3_USB3, // USB3 VBUS
 
-    /** Secondary PMU MIC2826 Rails  **/    
+    /** Secondary PMU MIC2826 Rails  **/
     MIC2826PmuSupply_BUCK,
     MIC2826PmuSupply_LDO1,
     MIC2826PmuSupply_LDO2,
@@ -165,6 +165,9 @@ typedef enum
     // External DCDC controlled by LX_V1, and scaled by digital
     // potentiometer (DPM) AD5258
     Max8907bLxV1_Ad5258_DPM_EXT_DCDC_7,
+
+    //Temp for enabling fuse using p2 of i0 expander
+    Max8907bPmuSupply_VBAT_FUSE,
 
     Max8907bPmuSupply_Num,
     Max8907bPmuSupply_Force32 = 0x7FFFFFFF
@@ -192,6 +195,5 @@ typedef struct Max8907bPmuSupplyInfoRec
 #if defined(__cplusplus)
 }
 #endif
-
 #endif //INCLUDED_MAX8907B_SUPPLY_INFO_HEADER
 

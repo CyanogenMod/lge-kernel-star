@@ -141,7 +141,7 @@ static const NvU32 VoltageTable_VOUT_02[] = {
 // Specifies the time between each sequencer event.
 
 // Disable temporarily to keep the compiler happy.
-//static const NvU32 SequencerPeriod[] = { 20, 40, 80, 160, 320, 640, 1280, 2560 };
+//static const NvU32 SequencerPeriod[] = {20, 40, 80, 160, 320, 640, 1280, 2560};
 
 /*-- Voltage translation functions --*/
 
@@ -1055,6 +1055,25 @@ const Max8907bPmuSupplyInfo Max8907bSupplyInfoTable[] =
             AD5258_VMAX,
             MAX8907B_REQUESTVOLTAGE_LX_V1
         },
+    },
+
+    // FUSE Vcc is wired from VBAT.
+    {
+        Max8907bPmuSupply_VBAT_FUSE,
+        TCA6416_CONFIG_PORT_0,
+        TCA6416_INVALID_PORT,
+        TCA6416_INVALID_PORT,
+        TCA6416_PORT_0,
+        TCA6416_PIN_2,
+        NULL,
+        NULL,
+        {
+            NV_FALSE,
+            FAN5355_MIN_OUTPUT_VOLTAGE_x10/10,
+            FAN5355_OUTPUT_VOLTAGE_INCREMENT_x10/10,
+            FAN5355_MAX_OUTPUT_VOLTAGE_x10/10,
+            MAX8907B_REQUESTVOLTAGE_EXT_DCDC_3
+        },
     }
 };
 
@@ -1786,6 +1805,39 @@ Tca6416UsbVbusControl(
     return NV_TRUE;
 }
 
+static NvBool
+Tca6416FuseControl(
+    NvOdmPmuDeviceHandle hDevice,
+    NvU32 vddRail,
+    NvU32 MilliVolts)
+{
+    const Max8907bPmuSupplyInfo *pSupplyInfo = &Max8907bSupplyInfoTable[vddRail];
+    NvU32 PortNo;
+    NvU32 PinNo;
+
+    // Get port number and pin number
+    PortNo = pSupplyInfo->OutputPort;
+    PinNo = pSupplyInfo->PmuGpio;
+
+    // Configure port pin as output
+    if (!Tca6416ConfigPortPin(hDevice, PortNo, PinNo, GpioPinMode_Output))
+        return NV_FALSE;
+
+    if (MilliVolts == ODM_VOLTAGE_OFF)  // to disable FUSE voltage
+    {
+        // Set Low  on pin
+        if (!Tca6416WritePortPin(hDevice, PortNo, PinNo, GpioPinState_Low))
+            return NV_FALSE;
+    }
+    else  // to Enable FUSE voltage
+    {
+        // Set high  on pin
+        if (!Tca6416WritePortPin(hDevice, PortNo, PinNo, GpioPinState_High))
+            return NV_FALSE;
+    }
+    return NV_TRUE;
+}
+
 NvBool
 Max8907bSetVoltage(
     NvOdmPmuDeviceHandle hDevice,
@@ -1800,6 +1852,15 @@ Max8907bSetVoltage(
     {
         NVODMPMU_PRINTF(("The voltage is protected and cannot be set.\n"));
         return NV_TRUE;
+    }
+
+    if (vddRail == Max8907bPmuSupply_VBAT_FUSE)
+    {
+        // Enable  fuse voltage
+       if (!Tca6416FuseControl(hDevice, vddRail, MilliVolts))
+            return NV_FALSE;
+
+       return NV_TRUE;
     }
 
     if ((MilliVolts == ODM_VOLTAGE_ENABLE_EXT_ONOFF) ||
