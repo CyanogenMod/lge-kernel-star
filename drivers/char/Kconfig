@@ -125,7 +125,7 @@ config BFIN_JTAG_COMM_CONSOLE
 
 config DEVNVMAP
 	bool "/dev/nvmap device support"
-	depends on ARCH_TEGRA && MACH_TEGRA_GENERIC
+	depends on ARCH_TEGRA
 	default y
 	help
 	  Say Y here if you want to support the /dev/nvmap device. This device

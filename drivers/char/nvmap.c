@@ -2694,6 +2694,7 @@ static int _nvmap_try_create_preserved(struct nvmap_carveout *co,
 
 static void _nvmap_create_nvos_preserved(struct nvmap_carveout *co)
 {
+#ifdef CONFIG_TEGRA_NVOS
 	unsigned int i, key;
 	NvBootArgsPreservedMemHandle mem;
 	static int was_created[NvBootArgKey_PreservedMemHandle_Num -
@@ -2717,6 +2718,7 @@ static void _nvmap_create_nvos_preserved(struct nvmap_carveout *co)
 		else
 			_nvmap_handle_put(h);
 	}
+#endif
 }
 
 int nvmap_add_carveout_heap(unsigned long base, size_t size,
@@ -2852,6 +2854,7 @@ static int nvmap_split_carveout_heap(struct nvmap_carveout *co, size_t size,
 
 /* NvRmMemMgr APIs implemented on top of nvmap */
 
+#ifdef CONFIG_TEGRA_NVRM
 #include <linux/freezer.h>
 
 NvU32 NvRmMemGetAddress(NvRmMemHandle hMem, NvU32 Offset)
@@ -3278,3 +3281,4 @@ NvError NvRmMemHandlePreserveHandle(NvRmMemHandle hMem, NvU32 *pKey)
 {
 	return NvError_NotSupported;
 }
+#endif
