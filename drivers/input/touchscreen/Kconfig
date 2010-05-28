@@ -277,6 +277,14 @@ config TOUCHSCREEN_SYNAPTICS_I2C_RMI
 	help
 	  This enables support for Synaptics RMI over I2C based touchscreens.
 
+config TOUCHSCREEN_TEGRA_ODM
+	boolean "NVIDIA Tegra ODM-kit based touchscreen driver"
+	depends on ARCH_TEGRA && TEGRA_NVRM
+	default n
+	help
+	  Adds a touchscreen input device for drivers written using NVIDIA's
+	  Tegra ODM kit interface
+
 config TOUCHSCREEN_TOUCHRIGHT
 	tristate "Touchright serial touchscreen"
 	select SERIO
