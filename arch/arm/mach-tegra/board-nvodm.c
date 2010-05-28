@@ -41,6 +41,7 @@
 #include <mach/regulator.h>
 #include <mach/kbc.h>
 #include <mach/i2c.h>
+#include <mach/spi.h>
 
 #include <mach/nvrm_linux.h>
 
@@ -645,7 +646,7 @@ static inline void tegra_setup_hcd(void) { }
 #ifdef CONFIG_KEYBOARD_TEGRA
 struct tegra_kbc_plat tegra_kbc_platform;
 
-static void tegra_setup_kbc(void)
+static noinline void __init tegra_setup_kbc(void)
 {
 	struct tegra_kbc_plat *pdata = &tegra_kbc_platform;
 	const NvOdmPeripheralConnectivity *conn;
@@ -822,7 +823,7 @@ static struct platform_device lbee9qmb_device = {
 		.platform_data = &lbee9qmb_platform,
 	},
 };
-static void tegra_setup_rfkill(void)
+static noinline void __init tegra_setup_rfkill(void)
 {
 	const NvOdmPeripheralConnectivity *con;
 	unsigned int i;
@@ -860,6 +861,120 @@ static struct platform_device *nvodm_devices[] __initdata = {
 	&tegra_regulator_device,
 #endif
 };
+
+#ifdef CONFIG_SPI_TEGRA
+static struct tegra_spi_platform_data tegra_spi_platform[] = {
+	[0] = {
+		.is_slink = true,
+	},
+	[1] = {
+		.is_slink = true,
+	},
+	[2] = {
+		.is_slink = true,
+	},
+	[3] = {
+		.is_slink = true,
+	},
+	[4] = {
+		.is_slink = false,
+	},
+};
+static struct platform_device tegra_spi_devices[] = {
+	[0] = {
+		.name = "tegra_spi",
+		.id = 0,
+		.dev = {
+			.platform_data = &tegra_spi_platform[0],
+		},
+	},
+	[1] = {
+		.name = "tegra_spi",
+		.id = 1,
+		.dev = {
+			.platform_data = &tegra_spi_platform[1],
+		},
+	},
+	[2] = {
+		.name = "tegra_spi",
+		.id = 2,
+		.dev = {
+			.platform_data = &tegra_spi_platform[2],
+		},
+	},
+	[3] = {
+		.name = "tegra_spi",
+		.id = 3,
+		.dev = {
+			.platform_data = &tegra_spi_platform[3],
+		},
+	},
+	[4] = {
+		.name = "tegra_spi",
+		.id = 4,
+		.dev = {
+			.platform_data = &tegra_spi_platform[4],
+		},
+	},
+};
+static noinline void __init tegra_setup_spi(void)
+{
+	const NvU32 *spi_mux;
+	const NvU32 *sflash_mux;
+	NvU32 spi_mux_nr;
+	NvU32 sflash_mux_nr;
+	int i;
+
+	NvOdmQueryPinMux(NvOdmIoModule_Spi, &spi_mux, &spi_mux_nr);
+	NvOdmQueryPinMux(NvOdmIoModule_Sflash, &sflash_mux, &sflash_mux_nr);
+
+	for (i=0; i<ARRAY_SIZE(tegra_spi_devices); i++) {
+		struct platform_device *pdev = &tegra_spi_devices[i];
+		struct tegra_spi_platform_data *plat = &tegra_spi_platform[i];
+ 
+		const NvOdmQuerySpiDeviceInfo *info = NULL;
+		NvU32 mux = 0;
+		int rc;
+
+		if (plat->is_slink && pdev->id<spi_mux_nr)
+			mux = spi_mux[pdev->id];
+		else if (!plat->is_slink)
+			mux = sflash_mux[0];
+
+		if (!mux)
+			continue;
+
+		if (mux == NVODM_QUERY_PINMAP_MULTIPLEXED) {
+			pr_err("%s: not registering multiplexed SPI master "
+			       "%s.%d\n", __func__, pdev->name, pdev->id);
+			WARN_ON(1);
+			continue;
+		}
+
+		if (plat->is_slink) {
+			info = NvOdmQuerySpiGetDeviceInfo(NvOdmIoModule_Spi,
+							  pdev->id, 0);
+		} else {
+			info = NvOdmQuerySpiGetDeviceInfo(NvOdmIoModule_Sflash,
+							  0, 0);
+		}
+
+		if (info && info->IsSlave) {
+			pr_info("%s: not registering SPI slave %s.%d\n",
+				__func__, pdev->name, pdev->id);
+			continue;
+		}
+
+		rc = platform_device_register(pdev);
+		if (rc) {
+			pr_err("%s: registration of %s.%d failed\n",
+			       __func__, pdev->name, pdev->id);
+		}
+	}
+}
+#else
+static void tegra_setup_spi(void) { }
+#endif
 
 #ifdef CONFIG_I2C_TEGRA
 static struct tegra_i2c_plat_parms tegra_i2c_platform[] = {
@@ -922,7 +1037,7 @@ static struct platform_device tegra_i2c_devices[] = {
 		},
 	},
 };
-static void tegra_setup_i2c(void)
+static noinline void __init tegra_setup_i2c(void)
 {
 	const NvOdmPeripheralConnectivity *smbus;
 	const NvOdmIoAddress *smbus_addr = NULL;
@@ -1120,7 +1235,7 @@ do_register:
 	tegra_init_suspend(plat);
 }
 
-void __init tegra_setup_nvodm(bool standard_i2c)
+void __init tegra_setup_nvodm(bool standard_i2c, bool standard_spi)
 {
 	NvRmGpioOpen(s_hRmGlobal, &s_hGpioGlobal);
 	tegra_setup_debug_uart();
@@ -1131,6 +1246,8 @@ void __init tegra_setup_nvodm(bool standard_i2c)
 	tegra_setup_kbc();
 	if (standard_i2c)
 		tegra_setup_i2c();
+	if (standard_spi)
+		tegra_setup_spi();
 	platform_add_devices(nvodm_devices, ARRAY_SIZE(nvodm_devices));
 	pm_power_off = tegra_system_power_off;
 	tegra_setup_suspend();

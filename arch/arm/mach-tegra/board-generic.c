@@ -97,13 +97,13 @@ static struct platform_device *platform_devices[] = {
 #endif
 };
 
-extern void __init tegra_setup_nvodm(bool standard_i2c);
+extern void __init tegra_setup_nvodm(bool standard_i2c, bool standard_spi);
 extern void __init tegra_register_socdev(void);
 
 static void __init tegra_generic_init(void)
 {
 	tegra_common_init();
-	tegra_setup_nvodm(true);
+	tegra_setup_nvodm(true, true);
 	tegra_register_socdev();
 	tegra_android_platform.product_name = harmony_dev;
 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
