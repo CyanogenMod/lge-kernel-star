@@ -48,6 +48,13 @@ config W1_MASTER_DS1WM
 	  in HP iPAQ devices like h5xxx, h2200, and ASIC3-based like
 	  hx4700.
 
+config W1_MASTER_TEGRA
+	boolean "NVIDIA Tegra internal 1-wire controller"
+	depends on W1 && ARCH_TEGRA && TEGRA_NVRM
+	help
+	  If you say yes to this option, support will be included for the
+	  1-wire controller embedded in NVIDIA Tegra SOCs
+
 config W1_MASTER_GPIO
 	tristate "GPIO 1-wire busmaster"
 	depends on GENERIC_GPIO
