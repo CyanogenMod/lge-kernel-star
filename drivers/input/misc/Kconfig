@@ -333,6 +333,13 @@ config INPUT_PCAP
 	  To compile this driver as a module, choose M here: the
 	  module will be called pcap_keys.
 
+config INPUT_TEGRA_ODM_ACCEL
+	boolean "Accelerometer for NVIDIA Tegra ODM kit"
+	depends on ARCH_TEGRA && TEGRA_ODM_KIT
+	help
+	  Say Y here if you want to enable an accelerometer input device node
+	  using the NVIDIA Tegra ODM kit accelerometer adaptation interface
+
 config INPUT_TEGRA_ODM_SCROLL
 	tristate "Scrollwheel for NVIDIA Tegra ODM kit"
 	depends on ARCH_TEGRA && TEGRA_ODM_KIT

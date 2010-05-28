@@ -32,5 +32,5 @@ obj-$(CONFIG_INPUT_WINBOND_CIR)		+= winbond-cir.o
 obj-$(CONFIG_INPUT_WISTRON_BTNS)	+= wistron_btns.o
 obj-$(CONFIG_INPUT_WM831X_ON)		+= wm831x-on.o
 obj-$(CONFIG_INPUT_YEALINK)		+= yealink.o
+obj-$(CONFIG_INPUT_TEGRA_ODM_ACCEL)	+= tegra_odm_accel.o
 obj-$(CONFIG_INPUT_TEGRA_ODM_SCROLL)	+= tegra_odm_scroll.o
-
