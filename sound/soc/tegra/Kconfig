@@ -1,0 +1,20 @@
+config TEGRA_SND_SOC
+	tristate "Soc alsa driver for Tegra"
+	depends on ARCH_TEGRA
+	select TEGRA_PCM
+	select TEGRA_I2S
+	select TEGRA_GENERIC_CODEC
+	help
+	  Say Y to support ALSA SoC for TEGRA
+
+config TEGRA_PCM
+	depends on TEGRA_SND_SOC
+	tristate "Tegra pcm callbacks"
+
+config TEGRA_I2S
+	depends on TEGRA_SND_SOC
+	tristate "Tegra I2S"
+
+config TEGRA_GENERIC_CODEC
+	depends on TEGRA_SND_SOC
+	tristate "Tegra Generic Audio Codec"
