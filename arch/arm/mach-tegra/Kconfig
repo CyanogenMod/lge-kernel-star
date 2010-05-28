@@ -20,12 +20,18 @@ endchoice
 choice
 	prompt "Select Tegra-based product"
 
-config MACH_HARMONY
-	bool "Harmony board"
+config MACH_TEGRA_GENERIC
+	bool "Tegra 2 Development System (Whistler, Harmony, Tango)"
+	select TEGRA_ODM_KIT
 	help
-	  Support for nVidia Harmony development platform
+	  Support for NVIDIA Tegra 2 development platforms; requires
+	  selection of an appropriate ODM kit for your specific development
+	  system
 
 endchoice
+
+config TEGRA_ODM_KIT
+	bool
 
 choice
 	prompt "Low-level debug console UART"
@@ -51,13 +57,8 @@ config TEGRA_DEBUG_UARTE
 
 endchoice
 
-config MACH_TEGRA_GENERIC
-	bool
-	default y
-
 config TEGRA_NVOS
 	bool "Include Tegra NvOS interfaces"
-	depends on MACH_TEGRA_GENERIC
 	default y
 	help
 	  Adds the Tegra NvOS driver layer and associated user-space
@@ -65,11 +66,11 @@ config TEGRA_NVOS
 
 config TEGRA_NVRM
 	bool "Include Tegra NvRM interfaces"
-	depends on TEGRA_NVOS
+	depends on TEGRA_NVOS && TEGRA_ODM_KIT
 	default n
 	help
 	  Adds the Tegra NVRM driver layer and associated user-space
-	  interfaces.
+	  interfaces; requires a platform with an ODM kit implementation
 
 config TEGRA_IOVMM_GART
 	bool "Enable I/O virtual memory manager for GART"
@@ -119,7 +120,7 @@ config TEGRA_USB_CHARGE
 	  Enables charging over USB
 
 
-if TEGRA_NVRM
+if TEGRA_ODM_KIT
 source "arch/arm/mach-tegra/odm_kit/Kconfig"
 endif
 
