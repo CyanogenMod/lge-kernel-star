@@ -1320,10 +1320,26 @@ static void __init tegra_setup_suspend(void)
 	if (!w || !nr_wake)
 		goto do_register;
 
+	plat->wake_enb = 0;
+	plat->wake_low = 0;
+	plat->wake_high = 0;
+	plat->wake_any = 0;
+
 	while (nr_wake--) {
 		unsigned int pad = w->WakeupPadNumber;
 		if (pad < ARRAY_SIZE(wakepad_irq) && w->enable)
-			enable_irq_wake(wakepad_irq[w->WakeupPadNumber]);
+			enable_irq_wake(wakepad_irq[pad]);
+
+		if (w->enable) {
+			plat->wake_enb |= (1 << pad);
+
+			if (w->Polarity == NvOdmWakeupPadPolarity_Low)
+				plat->wake_low |= (1 << pad);
+			else if (w->Polarity == NvOdmWakeupPadPolarity_High)
+				plat->wake_high |= (1 << pad);
+			else if (w->Polarity == NvOdmWakeupPadPolarity_AnyEdge)
+				plat->wake_any |= (1 << pad);
+		}
 		w++;
 	}
 

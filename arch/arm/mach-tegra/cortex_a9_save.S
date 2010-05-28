@@ -42,9 +42,18 @@
 #define CONTEXT_SIZE_WORDS_SHIFT 7
 #define CONTEXT_SIZE_WORDS (1<<CONTEXT_SIZE_WORDS_SHIFT)
 
+#define EMC_CFG				0xc
+#define EMC_ADR_CFG			0x10
+#define EMC_REFRESH			0x70
+#define EMC_NOP				0xdc
+#define EMC_SELF_REF			0xe0
+#define EMC_REQ_CTRL			0x2b0
+#define EMC_EMC_STATUS			0x2b4
+
 #define PMC_CTRL			0x0
 #define PMC_CTRL_BFI_SHIFT		8
 #define PMC_CTRL_BFI_WIDTH		9
+#define PMC_SCRATCH1			0x54
 #define PMC_SCRATCH38			0x134
 
 #define CLK_RESET_CCLK_BURST		0x20
@@ -145,6 +154,14 @@
 	and	\tmp, \va, \tmp
 	orr	\pa, \pa, \tmp
 .endm
+
+.macro emc_device_mask, rd, base
+	ldr	\rd, [\base, #EMC_ADR_CFG]
+	tst	\rd, #(0x3<<24)
+	moveq	\rd, #(0x1<<8)		@ just 1 device
+	movne	\rd, #(0x3<<8)		@ 2 devices
+.endm
+
 
 /*
  *	__cortex_a9_save(unsigned int mode)
@@ -481,7 +498,10 @@ __tear_down_master:
 	 * cause the cache state to get invalidated (although LP1 & LP2
 	 * preserve the data in the L2, the control words (L2X0_CTRL,
 	 * L2X0_AUX_CTRL, etc.) need to be cleaned to L3 so that they
-	 * will be visible on reboot */
+	 * will be visible on reboot.  skip this for LP0, since the L2 cache
+	 * will be shutdown before we reach this point */
+	tst	sp, #TEGRA_POWER_EFFECT_LP0
+	bne	__l2_clean_done
 	mov32	r0, (TEGRA_ARM_PL310_BASE-IO_CPU_PHYS+IO_CPU_VIRT)
 	add	r3, r8, #(CONTEXT_SIZE_WORDS*4)
 	bic	r8, r8, #0x1f
@@ -498,6 +518,7 @@ __tear_down_master:
 13:	ldr	r1, [r0, #L2X0_CACHE_SYNC]
 	tst	r1, #1
 	bne	13b
+__l2_clean_done:
 #endif
 
 	tst	sp, #TEGRA_POWER_SDRAM_SELFREFRESH
@@ -532,7 +553,11 @@ __tear_down_master:
 	isb
 	mcr	p15, 0, r3, c2, c0, 0	@ TTB 0
 	isb
-	mov32	r3, (IO_IRAM_PHYS)	@ __tear_down_master_sdram, in IRAM
+	mov32	r2, __tegra_lp1_reset
+	mov32	r3, __tear_down_master_sdram
+	sub	r2, r3, r2
+	mov32	r3, (TEGRA_IRAM_CODE_AREA)
+	add	r3, r2, r3
 	movne	pc, r3
 ENDPROC(__tear_down_master)
 	.type	__tear_down_master_data, %object
@@ -541,17 +566,164 @@ __tear_down_master_data:
 	.size	__tear_down_master_data, . - __tear_down_master_data
 
 /*  START OF ROUTINES COPIED TO IRAM  */
-	.align 5
+/*
+ *	__tegra_lp1_reset
+ *
+ *	  reset vector for LP1 restore; copied into IRAM during suspend.
+ *	  brings the system back up to a safe starting point (SDRAM out of
+ *	  self-refresh, PLLC, PLLM and PLLP reenabled, CPU running on PLLP,
+ *	  system clock running on the same PLL that it suspended at), and
+ *	  jumps to tegra_lp2_startup to restore PLLX and virtual addressing.
+ *	  physical address of tegra_lp2_startup expected to be stored in
+ *	  PMC_SCRATCH1
+ */
+	.align L1_CACHE_SHIFT
+ENTRY(__tegra_lp1_reset)
+__tegra_lp1_reset:
+	/* the CPU and system bus are running at 32KHz and executing from
+	 * IRAM when this code is executed; immediately switch to CLKM and
+	 * enable PLLP. */
+	mov32	r0, TEGRA_CLK_RESET_BASE
+	mov	r1, #(1<<28)
+	str	r1, [r0, #CLK_RESET_SCLK_BURST]
+	str	r1, [r0, #CLK_RESET_CCLK_BURST]
+	mov	r1, #0
+	str	r1, [r0, #CLK_RESET_SCLK_DIVIDER]
+	str	r1, [r0, #CLK_RESET_CCLK_DIVIDER]
+
+	ldr	r1, [r0, #CLK_RESET_PLLM_BASE]
+	tst	r1, #(1<<30)
+	orreq	r1, r1, #(1<<30)
+	streq	r1, [r0, #CLK_RESET_PLLM_BASE]
+	ldr	r1, [r0, #CLK_RESET_PLLP_BASE]
+	tst	r1, #(1<<30)
+	orreq	r1, r1, #(1<<30)
+	streq	r1, [r0, #CLK_RESET_PLLP_BASE]
+	ldr	r1, [r0, #CLK_RESET_PLLC_BASE]
+	tst	r1, #(1<<30)
+	orreq	r1, r1, #(1<<30)
+	streq	r1, [r0, #CLK_RESET_PLLC_BASE]
+	mov32	r7, TEGRA_TMRUS_BASE
+	ldr	r1, [r7]
+
+	/* since the optimized settings are still in SDRAM, there is
+	 * no need to store them back into the IRAM-local __lp1_pad_area */
+	add	r2, pc, #__lp1_pad_area-(.+8)
+padload:ldmia	r2!, {r3-r4}
+	cmp	r3, #0
+	beq	padload_done
+	str	r4, [r3]
+	b	padload
+padload_done:
+	ldr	r2, [r7]
+	add	r2, r2, #0x4	@ 4uS delay for DRAM pad restoration
+	wait_until r2, r7, r3
+	add	r1, r1, #0xff	@ 255uS delay for PLL stabilization
+	wait_until r1, r7, r3
+
+	str	r4, [r0, #CLK_RESET_SCLK_BURST]
+	mov32	r4, ((1<<28) | (4))	@ burst policy is PLLP
+	str	r4, [r0, #CLK_RESET_CCLK_BURST]
+
+	mov32	r0, TEGRA_EMC_BASE
+	ldr	r1, [r0, #EMC_CFG]
+	bic	r1, r1, #(1<<31)	@ disable DRAM_CLK_STOP
+	str	r1, [r0, #EMC_CFG]
+
+	mov	r1, #0
+	str	r1, [r0, #EMC_SELF_REF]	@ take DRAM out of self refresh
+	mov	r1, #1
+	str	r1, [r0, #EMC_NOP]
+	str	r1, [r0, #EMC_NOP]
+	str	r1, [r0, #EMC_REFRESH]
+
+	emc_device_mask r1, r0
+
+exit_selfrefresh_loop:
+	ldr	r2, [r0, #EMC_EMC_STATUS]
+	ands	r2, r2, r1
+	bne	exit_selfrefresh_loop
+
+	mov	r1, #0
+	str	r1, [r0, #EMC_REQ_CTRL]
+
+	mov32	r0, TEGRA_PMC_BASE
+	ldr	r0, [r0, #PMC_SCRATCH1]
+	mov	pc, r0
+ENDPROC(__tegra_lp1_reset)
+
+/*
+ *	__tear_down_master_sdram
+ *
+ *	  disables MMU, data cache, and puts SDRAM into self-refresh.
+ *	  must execute from IRAM.
+ */
+	.align L1_CACHE_SHIFT
 __tear_down_master_sdram:
 	mrc	p15, 0, r3, c1, c0, 0
-	bic	r3, r3, #(1<<0)
-	mcr	p15, 0, r3, c1, c0, 0	@ disable MMU to prevent page misses
-	/* FIXME: save off DDR pad settings, put SDRAM in self refresh,
-	 * jump to tear_down_master_pll_cpu */
-	b	.
+	bic	r3, r3, #((1<<0) | (1<<2))	@ disable MMU and data-cache
+	mcr	p15, 0, r3, c1, c0, 0		@ to avoid page faults & races
+	dsb
+	isb
+
+	mov32	r1, TEGRA_EMC_BASE
+	mov	r2, #3
+	str	r2, [r1, #EMC_REQ_CTRL]		@ stall incoming DRAM requests
+
+emcidle:ldr	r2, [r1, #EMC_EMC_STATUS]
+	tst	r2, #4
+	beq	emcidle
+
+	mov	r2, #1
+	str	r2, [r1, #EMC_SELF_REF]
+
+	emc_device_mask r2, r1
+
+emcself:ldr	r3, [r1, #EMC_EMC_STATUS]
+	and	r3, r3, r2
+	cmp	r3, r2
+	bne	emcself				@ loop until DDR in self-refresh
+
+	add	r2, pc, #__lp1_pad_area-(.+8)
+
+padsave:ldm	r2, {r0-r1}
+	cmp	r0, #0
+	beq	padsave_done
+	ldr	r3, [r0]
+	str	r1, [r0]
+	str	r3, [r2, #4]
+	add	r2, r2, #8
+	b	padsave
+padsave_done:
+
+	ldr	r0, [r5, #CLK_RESET_SCLK_BURST]
+	str	r0, [r2, #4]
+	dsb
+	b	__tear_down_master_pll_cpu
 ENDPROC(__tear_down_master_sdram)
 
-	.align 5
+	.align	L1_CACHE_SHIFT
+	.type	__lp1_pad_area, %object
+__lp1_pad_area:
+	.word	TEGRA_APB_MISC_BASE + 0x8c8 /* XM2CFGCPADCTRL */
+	.word	0x8
+	.word	TEGRA_APB_MISC_BASE + 0x8cc /* XM2CFGDPADCTRL */
+	.word	0x8
+	.word	TEGRA_APB_MISC_BASE + 0x8d0 /* XM2CLKCFGPADCTRL */
+	.word	0x0
+	.word	TEGRA_APB_MISC_BASE + 0x8d4 /* XM2COMPPADCTRL */
+	.word	0x8
+	.word	TEGRA_APB_MISC_BASE + 0x8d8 /* XM2VTTGENPADCTRL */
+	.word	0x5500
+	.word	TEGRA_APB_MISC_BASE + 0x8e4 /* XM2CFGCPADCTRL2 */
+	.word	0x08080040
+	.word	TEGRA_APB_MISC_BASE + 0x8e8 /* XM2CFGDPADCTRL2 */
+	.word	0x0
+	.word	0x0	/* end of list */
+	.word	0x0	/* sclk_burst_policy */
+	.size	__lp1_pad_area, . - __lp1_pad_area
+
+	.align L1_CACHE_SHIFT
 __tear_down_master_pll_cpu:
 	ldr	r0, [r4, #PMC_CTRL]
 	bfi	r0, sp, #PMC_CTRL_BFI_SHIFT, #PMC_CTRL_BFI_WIDTH
@@ -575,9 +747,6 @@ __tear_down_master_pll_cpu:
 	mov	r0, #0
 	str	r0, [r5, #CLK_RESET_CCLK_DIVIDER]
 	str	r0, [r5, #CLK_RESET_SCLK_DIVIDER]
-	mov	r0, #0		/* burst policy = 32KHz */
-	str	r0, [r5, #CLK_RESET_SCLK_BURST]
-	str	r0, [r5, #CLK_RESET_SCLK_DIVIDER]
 
 	/* 2 us delay between changing sclk and disabling PLLs */
 	wait_for_us r1, r7, r9
@@ -585,8 +754,8 @@ __tear_down_master_pll_cpu:
 	wait_until r1, r7, r9
 
 	/* switch to CLKS */
+	mov	r0, #0	/* burst policy = 32KHz */
 	str	r0, [r5, #CLK_RESET_SCLK_BURST]
-	str	r0, [r5, #CLK_RESET_CCLK_BURST]
 
 	/* disable PLLP, PLLM, PLLC in LP0 and LP1 states */
 	ldr	r0, [r5, #CLK_RESET_PLLM_BASE]
@@ -641,8 +810,9 @@ __put_cpu_in_reset:
 	b	.
 ENDPROC(__put_cpu_in_reset)
 
-
-/*
- */
-
-/*  END OF ROUTINES COPIED TO IRAM  */
+/* dummy symbol for end of IRAM */
+	.align L1_CACHE_SHIFT
+ENTRY(__tegra_iram_end)
+__tegra_iram_end:
+	b	.
+ENDPROC(__tegra_iram_end)
