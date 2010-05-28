@@ -847,6 +847,13 @@ static noinline void __init tegra_setup_rfkill(void)
 static void tegra_setup_rfkill(void) { }
 #endif
 
+#ifdef CONFIG_TOUCHSCREEN_TEGRA_ODM
+static struct platform_device tegra_touch_device = {
+	.name = "tegra_touch",
+	.id = -1,
+};
+#endif
+
 static struct platform_device *nvodm_devices[] __initdata = {
 #ifdef CONFIG_RTC_DRV_TEGRA_ODM
 	&tegra_rtc_device,
@@ -859,6 +866,9 @@ static struct platform_device *nvodm_devices[] __initdata = {
 #endif
 #ifdef CONFIG_REGULATOR_TEGRA
 	&tegra_regulator_device,
+#endif
+#ifdef CONFIG_TOUCHSCREEN_TEGRA_ODM
+	&tegra_touch_device,
 #endif
 };
 
