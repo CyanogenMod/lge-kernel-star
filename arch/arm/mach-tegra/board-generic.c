@@ -32,6 +32,8 @@
 
 #include <mach/iomap.h>
 #include <mach/irqs.h>
+#include <mach/nvrm_linux.h>
+#include <nvrm_module.h>
 
 #include "board.h"
 
@@ -102,9 +104,17 @@ extern void __init tegra_register_socdev(void);
 
 static void __init tegra_generic_init(void)
 {
+	unsigned int chip_id[2];
+	char serial[17];
+
 	tegra_common_init();
 	tegra_setup_nvodm(true, true);
 	tegra_register_socdev();
+
+	NvRmQueryChipUniqueId(s_hRmGlobal, sizeof(chip_id), (void*)chip_id);
+	snprintf(serial, sizeof(serial), "%08x%08x", chip_id[1], chip_id[0]);
+	tegra_android_platform.serial_number = kstrdup(serial, GFP_KERNEL);
+
 	tegra_android_platform.product_name = harmony_dev;
 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
 }
