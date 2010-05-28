@@ -24,11 +24,13 @@
 #define __MACH_TEGRA_REGULATOR_H
 
 struct tegra_regulator_entry {
+	unsigned int charging_path;
 	unsigned long long guid;
 	const char *name;
 	struct regulator_consumer_supply *consumers;
 	int nr_consumers;
 	int id;
+	bool is_charger;
 };
 
 struct tegra_regulator_platform_data {

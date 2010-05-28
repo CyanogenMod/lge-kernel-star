@@ -43,6 +43,17 @@ struct tegra_vdd {
 	unsigned long request_uV;
 };
 
+struct tegra_charger {
+	struct regulator_desc rdesc;
+	struct regulator_init_data init;
+	struct regulator_dev *rdev;
+	struct device *dev;
+	struct work_struct work;
+	struct list_head node;
+	NvRmPmuChargingPath path;
+	unsigned long request_uA;
+};
+
 struct tegra_regulator {
 	struct regulator_desc rdesc;
 	struct regulator_init_data init;
@@ -55,8 +66,29 @@ struct tegra_regulator {
 };
 
 struct tegra_regulator_drv {
-	struct list_head list;
+	struct list_head list_reg;
+	struct list_head list_chg;
 };
+
+static void tegra_charger_work(struct work_struct *w)
+{
+	struct tegra_charger *c= container_of(w, struct tegra_charger, work);
+
+	NvRmPmuSetChargingCurrentLimit(s_hRmGlobal, c->path,
+		       c->request_uA/1000, NvOdmUsbChargerType_SE0);
+}
+
+static int tegra_charger_set_current_limit(struct regulator_dev *rdev,
+					    int min_uA, int max_uA)
+
+{
+	struct tegra_charger *c = rdev_get_drvdata(rdev);
+
+	c->request_uA = max_uA;
+	schedule_work(&c->work);
+
+	return 0;
+}
 
 static int tegra_regulator_enable(struct regulator_dev *rdev)
 {
@@ -130,6 +162,53 @@ static struct regulator_ops tegra_soc_fixed_vdd_ops = {
 	.enable = tegra_regulator_enable,
 	.disable = tegra_regulator_disable,
 };
+
+static struct regulator_ops tegra_charger_ops = {
+	.set_current_limit = tegra_charger_set_current_limit,
+};
+
+static int tegra_charger_register(struct platform_device *pdev,
+				  struct tegra_regulator_entry *entry)
+{
+	struct tegra_charger *chg;
+	struct regulator_dev *rdev;
+	struct tegra_regulator_drv *drv;
+
+	drv = platform_get_drvdata(pdev);
+
+	chg = kzalloc(sizeof(*chg), GFP_KERNEL);
+	if (!chg) {
+		dev_err(&pdev->dev, "out of memory\n");
+		return -ENOMEM;
+	}
+
+	chg->path = entry->charging_path;
+
+	chg->rdesc.type = REGULATOR_CURRENT;
+	chg->rdesc.name = kstrdup(entry->name, GFP_KERNEL);
+	chg->rdesc.owner = THIS_MODULE;
+	chg->dev = &pdev->dev;
+	chg->init.consumer_supplies = entry->consumers;
+	chg->init.num_consumer_supplies = entry->nr_consumers;
+	chg->rdesc.id = entry->id;
+	chg->init.constraints.valid_ops_mask = REGULATOR_CHANGE_CURRENT;
+	chg->rdesc.ops = &tegra_charger_ops;
+	chg->init.constraints.min_uA = 0;
+	chg->init.constraints.max_uA = 1800000;
+	INIT_WORK(&chg->work, tegra_charger_work);
+
+	rdev = regulator_register(&chg->rdesc, &pdev->dev, &chg->init, chg);
+	if (IS_ERR(rdev)) {
+		dev_err(&pdev->dev, "unable to register %s\n", entry->name);
+		kfree(chg);
+		return PTR_ERR(chg);
+	}
+	chg->rdev = rdev;
+
+	list_add_tail(&chg->node, &drv->list_chg);
+
+	return 0;
+}
 
 static int tegra_regulator_register(struct platform_device *pdev,
 				    struct tegra_regulator_entry *entry)
@@ -215,7 +294,7 @@ static int tegra_regulator_register(struct platform_device *pdev,
 	}
 	reg->rdev = rdev;
 
-	list_add_tail(&reg->node, &drv->list);
+	list_add_tail(&reg->node, &drv->list_reg);
 
 	return 0;
 }
@@ -230,11 +309,16 @@ static int tegra_regulator_probe(struct platform_device *pdev)
 	if (!drv)
 		return -ENOMEM;
 
-	INIT_LIST_HEAD(&drv->list);
+	INIT_LIST_HEAD(&drv->list_reg);
+	INIT_LIST_HEAD(&drv->list_chg);
 	platform_set_drvdata(pdev, drv);
 
-	for (i=0; i<plat->nr_regs; i++)
-		tegra_regulator_register(pdev, &plat->regs[i]);
+	for (i=0; i<plat->nr_regs; i++) {
+		if (plat->regs[i].is_charger)
+			tegra_charger_register(pdev, &plat->regs[i]);
+		else
+			tegra_regulator_register(pdev, &plat->regs[i]);
+	}
 
 	return 0;
 }
@@ -243,11 +327,19 @@ static int tegra_regulator_remove(struct platform_device *pdev)
 {
 	struct tegra_regulator_drv *drv = platform_get_drvdata(pdev);
 
-	while (!list_empty(&drv->list)) {
+	while (!list_empty(&drv->list_reg)) {
 		struct tegra_regulator *reg;
-		reg = list_first_entry(&drv->list, struct tegra_regulator, node);
-		list_del_init(&drv->list);
+		reg = list_first_entry(&drv->list_reg, struct tegra_regulator, node);
+		list_del_init(&drv->list_reg);
 		regulator_unregister(reg->rdev);
+		kfree(reg);
+	}
+	while (!list_empty(&drv->list_chg)) {
+		struct tegra_charger *reg;
+		reg = list_first_entry(&drv->list_chg, struct tegra_charger, node);
+		list_del_init(&drv->list_chg);
+		regulator_unregister(reg->rdev);
+		cancel_work_sync(&reg->work);
 		kfree(reg);
 	}
 
