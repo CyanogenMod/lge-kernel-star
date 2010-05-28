@@ -42,6 +42,7 @@
 #include <mach/kbc.h>
 #include <mach/i2c.h>
 #include <mach/spi.h>
+#include <mach/w1.h>
 
 #include <mach/nvrm_linux.h>
 
@@ -1147,6 +1148,35 @@ static noinline void __init tegra_setup_i2c(void)
 static void tegra_setup_i2c(void) { }
 #endif
 
+#ifdef CONFIG_W1_MASTER_TEGRA
+static struct tegra_w1_platform_data tegra_w1_platform;
+static struct platform_device tegra_w1_device = {
+	.name = "tegra_w1",
+	.id = 0,
+	.dev = {
+		.platform_data = &tegra_w1_platform,
+	},
+};
+static noinline void __init tegra_setup_w1(void)
+{
+	const NvU32 *pinmux;
+	NvU32 nr_pinmux;
+
+	NvOdmQueryPinMux(NvOdmIoModule_OneWire, &pinmux, &nr_pinmux);
+	if (!nr_pinmux || !pinmux[0]) {
+		pr_info("%s: no one-wire device\n", __func__);
+		return;
+	}
+	tegra_w1_platform.pinmux = pinmux[0];
+	if (platform_device_register(&tegra_w1_device)) {
+		pr_err("%s: failed to register %s.%d\n",
+		       __func__, tegra_w1_device.name, tegra_w1_device.id);
+	}
+}
+#else
+static void tegra_setup_w1(void) { }
+#endif
+
 #ifdef CONFIG_TEGRA_PCI
 extern void __init tegra_pcie_init(void);
 static int tegra_setup_pcie(void)
@@ -1277,6 +1307,7 @@ void __init tegra_setup_nvodm(bool standard_i2c, bool standard_spi)
 		tegra_setup_i2c();
 	if (standard_spi)
 		tegra_setup_spi();
+	tegra_setup_w1();
 	platform_add_devices(nvodm_devices, ARRAY_SIZE(nvodm_devices));
 	pm_power_off = tegra_system_power_off;
 	tegra_setup_suspend();
