@@ -39,10 +39,12 @@
 #include <asm/cacheflush.h>
 
 #include <mach/iomap.h>
+#include <mach/iovmm.h>
 #include <mach/irqs.h>
 #include <mach/nvrm_linux.h>
 
 #include <nvrm_memmgr.h>
+#include <nvrm_power_private.h>
 #include "nvrm/core/common/nvrm_message.h"
 
 #include "power.h"
@@ -317,38 +319,58 @@ static int tegra_suspend_prepare_late(void)
 		return -EIO;
 	}
 #endif
-	return 0;
+	disable_irq(INT_SYS_STATS_MON);
+	return tegra_iovmm_suspend();
 }
 
 static void tegra_suspend_wake(void)
 {
-#ifdef CONFIG_TEGRA_NVRM
-	NvError e;
+	tegra_iovmm_resume();
+	enable_irq(INT_SYS_STATS_MON);
 
-	e = NvRmKernelPowerResume(s_hRmGlobal);
-	if (e != NvSuccess)
-		panic("%s: RM resume failed 0x%08x!\n", __func__, e);
+#ifdef CONFIG_TEGRA_NVRM
+	{
+		NvError e;
+
+		e = NvRmKernelPowerResume(s_hRmGlobal);
+		if (e != NvSuccess)
+			panic("%s: RM resume failed 0x%08x!\n", __func__, e);
+	}
 #endif
 }
 
 extern void tegra_pinmux_suspend(void);
 extern void tegra_irq_suspend(void);
 extern void tegra_gpio_suspend(void);
+extern void tegra_clk_suspend(void);
+extern void tegra_dma_suspend(void);
 
 extern void tegra_pinmux_resume(void);
 extern void tegra_irq_resume(void);
 extern void tegra_gpio_resume(void);
+extern void tegra_clk_resume(void);
+extern void tegra_dma_resume(void);
+
+#define MC_SECURITY_START	0x6c
+#define MC_SECURITY_SIZE	0x70
 
 static int tegra_suspend_enter(suspend_state_t state)
 {
 	struct irq_desc *desc;
+	void __iomem *mc = IO_ADDRESS(TEGRA_MC_BASE);
 	unsigned long flags;
+	u32 mc_data[2];
 	int irq;
 
 	local_irq_save(flags);
 	tegra_irq_suspend();
+	tegra_dma_suspend();
 	tegra_pinmux_suspend();
 	tegra_gpio_suspend();
+	tegra_clk_suspend();
+
+	mc_data[0] = readl(mc + MC_SECURITY_START);
+	mc_data[1] = readl(mc + MC_SECURITY_SIZE);
 
 	for_each_irq_desc(irq, desc) {
 		if ((desc->status & IRQ_WAKEUP) &&
@@ -357,6 +379,8 @@ static int tegra_suspend_enter(suspend_state_t state)
 		}
 	}
 
+	/* lie about the power state so that the RM restarts DVFS */
+	NvRmPrivPowerSetState(s_hRmGlobal, NvRmPowerState_LP1);
 	tegra_suspend_lp2(0);
 
 	for_each_irq_desc(irq, desc) {
@@ -366,8 +390,13 @@ static int tegra_suspend_enter(suspend_state_t state)
 		}
 	}
 
+	writel(mc_data[0], mc + MC_SECURITY_START);
+	writel(mc_data[1], mc + MC_SECURITY_SIZE);
+
+	tegra_clk_resume();
 	tegra_gpio_resume();
 	tegra_pinmux_resume();
+	tegra_dma_resume();
 	tegra_irq_resume();
 
 	local_irq_restore(flags);
