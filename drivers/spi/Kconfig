@@ -150,6 +150,12 @@ config SPI_MPC8xxx
 	  This driver uses a simple set of shift registers for data (opposed
 	  to the CPM based descriptor model).
 
+config SPI_TEGRA
+	boolean "SPI driver for NVIDIA Tegra SoCs"
+	depends on ARCH_TEGRA
+	help
+	  Enables the integrated SPI controllers on NVIDIA Tegra SoCs
+
 config SPI_OMAP_UWIRE
 	tristate "OMAP1 MicroWire"
 	depends on ARCH_OMAP1
