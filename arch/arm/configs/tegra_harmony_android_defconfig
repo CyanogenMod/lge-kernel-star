@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.32.9
-# Tue May 25 18:19:40 2010
+# Thu May 27 19:41:02 2010
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -1041,6 +1041,7 @@ CONFIG_SPI_MASTER=y
 #
 # CONFIG_SPI_BITBANG is not set
 # CONFIG_SPI_GPIO is not set
+CONFIG_SPI_TEGRA=y
 
 #
 # SPI Protocol Masters
