@@ -28,7 +28,8 @@
 struct tegra_i2c_plat_parms {
 	int adapter_nr;
 	int bus_count;
-	const struct tegra_pingroup_config *bus_mux[TEGRA_I2C_MAX_BUS];
+	unsigned int bus_mux[TEGRA_I2C_MAX_BUS];
+	unsigned long bus_clk[TEGRA_I2C_MAX_BUS];
 	int bus_mux_len[TEGRA_I2C_MAX_BUS];
 	bool is_dvc;
 };
