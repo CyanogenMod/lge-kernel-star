@@ -1,7 +1,8 @@
 /*
- * arch/arm/mach-tegra/board-harmony.c
+ * arch/arm/mach-tegra/board-generic.c
  *
  * Copyright (C) 2010 Google, Inc.
+ * Copyright (C) 2010 NVIDIA Corporation
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -51,11 +52,13 @@ static struct android_usb_product tegra_android_products[] = {
 		.functions = tegra_android_functions,
 	},
 };
+
+static char *harmony_dev = "Harmony ADB";
+
 static struct android_usb_platform_data tegra_android_platform = {
 	.vendor_id = 0x955,
 	.product_id = 0x7100,
 	.manufacturer_name = "NVIDIA",
-	.product_name = "Harmony",
 	.num_products = ARRAY_SIZE(tegra_android_products),
 	.products = tegra_android_products,
 	.num_functions = ARRAY_SIZE(tegra_android_functions),
@@ -94,19 +97,19 @@ static struct platform_device *platform_devices[] = {
 #endif
 };
 
-
-extern void __init tegra_setup_nvodm(void);
+extern void __init tegra_setup_nvodm(bool standard_i2c);
 extern void __init tegra_register_socdev(void);
 
 static void __init tegra_generic_init(void)
 {
 	tegra_common_init();
-	tegra_setup_nvodm();
+	tegra_setup_nvodm(true);
 	tegra_register_socdev();
+	tegra_android_platform.product_name = harmony_dev;
 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
 }
 
-MACHINE_START(TEGRA_GENERIC, "Tegra Generic")
+MACHINE_START(TEGRA_GENERIC, "Tegra 2 Development System")
 	.boot_params  = 0x00000100,
 	.phys_io        = IO_APB_PHYS,
 	.io_pg_offst    = ((IO_APB_VIRT) >> 18) & 0xfffc,

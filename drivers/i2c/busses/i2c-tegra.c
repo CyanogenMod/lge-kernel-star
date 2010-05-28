@@ -309,8 +309,7 @@ static struct platform_driver tegra_i2c_driver = {
 	.remove  = tegra_i2c_remove,
 	.suspend = tegra_i2c_suspend,
 	.resume  = tegra_i2c_resume,
-	.driver  =
-	{
+	.driver  = {
 		.name  = "tegra_i2c",
 		.owner = THIS_MODULE,
 	},

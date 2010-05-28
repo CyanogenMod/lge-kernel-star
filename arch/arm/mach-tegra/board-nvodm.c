@@ -40,6 +40,7 @@
 #include <mach/nand.h>
 #include <mach/regulator.h>
 #include <mach/kbc.h>
+#include <mach/i2c.h>
 
 #include <mach/nvrm_linux.h>
 
@@ -860,6 +861,148 @@ static struct platform_device *nvodm_devices[] __initdata = {
 #endif
 };
 
+#ifdef CONFIG_I2C_TEGRA
+static struct tegra_i2c_plat_parms tegra_i2c_platform[] = {
+	[0] = {
+		.adapter_nr = 0,
+		.bus_count = 1,
+		.bus_mux = { 0, 0 },
+		.bus_clk = { 100000, 0 }, /* default to 100KHz */
+		.is_dvc = false,
+	},
+	[1] = {
+		.adapter_nr = 1,
+		.bus_count = 1,
+		.bus_mux = { 0, 0 },
+		.bus_clk = { 100000, 0 },
+		.is_dvc = false,
+	},
+	[2] = {
+		.adapter_nr = 2,
+		.bus_count = 1,
+		.bus_mux = { 0, 0 },
+		.bus_clk = { 100000, 0 },
+		.is_dvc = false,
+	},
+	[3] = {
+		.adapter_nr = 3,
+		.bus_count = 1,
+		.bus_mux = { 0, 0 },
+		.bus_clk = { 100000, 0 },
+		.is_dvc = true,
+	},
+};
+static struct platform_device tegra_i2c_devices[] = {
+	[0] = {
+		.name = "tegra_i2c",
+		.id = 0,
+		.dev = {
+			.platform_data = &tegra_i2c_platform[0],
+		},
+	},
+	[1] = {
+		.name = "tegra_i2c",
+		.id = 1,
+		.dev = {
+			.platform_data = &tegra_i2c_platform[1],
+		},
+	},
+	[2] = {
+		.name = "tegra_i2c",
+		.id = 2,
+		.dev = {
+			.platform_data = &tegra_i2c_platform[2],
+		},
+	},
+	[3] = {
+		.name = "tegra_i2c",
+		.id = 3,
+		.dev = {
+			.platform_data = &tegra_i2c_platform[3],
+		},
+	},
+};
+static void tegra_setup_i2c(void)
+{
+	const NvOdmPeripheralConnectivity *smbus;
+	const NvOdmIoAddress *smbus_addr = NULL;
+	const NvU32 *odm_mux_i2c = NULL;
+	const NvU32 *odm_clk_i2c = NULL;
+	const NvU32 *odm_mux_i2cp = NULL;
+	const NvU32 *odm_clk_i2cp = NULL;
+	NvU32 odm_mux_i2c_nr;
+	NvU32 odm_clk_i2c_nr;
+	NvU32 odm_mux_i2cp_nr;
+	NvU32 odm_clk_i2cp_nr;
+	int i;
+
+	smbus = NvOdmPeripheralGetGuid(NV_ODM_GUID('I','2','c','S','m','B','u','s'));
+
+	if (smbus) {
+		unsigned int j;
+		smbus_addr = smbus->AddressList;
+		for (j=0; j<smbus->NumAddress; j++, smbus_addr++) {
+			if ((smbus_addr->Interface == NvOdmIoModule_I2c) ||
+			    (smbus_addr->Interface == NvOdmIoModule_I2c_Pmu))
+				break;
+		}
+		if (j==smbus->NumAddress)
+			smbus_addr = NULL;
+	}
+
+	NvOdmQueryPinMux(NvOdmIoModule_I2c, &odm_mux_i2c, &odm_mux_i2c_nr);
+	NvOdmQueryPinMux(NvOdmIoModule_I2c_Pmu, &odm_mux_i2cp, &odm_mux_i2cp_nr);
+	NvOdmQueryClockLimits(NvOdmIoModule_I2c, &odm_clk_i2c, &odm_clk_i2c_nr);
+	NvOdmQueryClockLimits(NvOdmIoModule_I2c_Pmu, &odm_clk_i2cp, &odm_clk_i2cp_nr);
+
+	for (i=0; i<ARRAY_SIZE(tegra_i2c_devices); i++) {
+
+		struct platform_device *dev = &tegra_i2c_devices[i];
+		struct tegra_i2c_plat_parms *plat = &tegra_i2c_platform[i];
+		NvU32 mux, clk;
+
+		if (smbus_addr) {
+			if (smbus_addr->Interface == NvOdmIoModule_I2c &&
+			    smbus_addr->Instance == dev->id && !plat->is_dvc) {
+				pr_info("%s: skipping %s.%d (SMBUS)\n",
+					__func__, dev->name, dev->id);
+				continue;
+			}
+		}
+
+		if (plat->is_dvc) {
+			mux = (odm_mux_i2cp_nr) ? odm_mux_i2cp[0] : 0;
+			clk = (odm_clk_i2cp_nr) ? odm_clk_i2cp[0] : 100;
+		} else if (dev->id < odm_mux_i2c_nr) {
+			mux = odm_mux_i2c[dev->id];
+			clk = (dev->id < odm_clk_i2c_nr) ? odm_clk_i2c[0] : 100;
+		} else {
+			mux = 0;
+			clk = 0;
+		}
+
+		if (!mux)
+			continue;
+
+		if (mux == NVODM_QUERY_PINMAP_MULTIPLEXED) {
+			pr_err("%s: unable to register %s.%d (multiplexed)\n",
+			       __func__, dev->name, dev->id);
+			WARN_ON(1);
+			continue;
+		}
+
+		if (clk)
+			plat->bus_clk[0] = clk*1000;
+
+		if (platform_device_register(dev))
+			pr_err("%s: failed to register %s.%d\n",
+			       __func__, dev->name, dev->id);
+	}
+}
+#else
+static void tegra_setup_i2c(void) { }
+#endif
+
 #ifdef CONFIG_TEGRA_PCI
 extern void __init tegra_pcie_init(void);
 static int tegra_setup_pcie(void)
@@ -977,7 +1120,7 @@ do_register:
 	tegra_init_suspend(plat);
 }
 
-void __init tegra_setup_nvodm(void)
+void __init tegra_setup_nvodm(bool standard_i2c)
 {
 	NvRmGpioOpen(s_hRmGlobal, &s_hGpioGlobal);
 	tegra_setup_debug_uart();
@@ -986,6 +1129,8 @@ void __init tegra_setup_nvodm(void)
 	tegra_setup_sdhci();
 	tegra_setup_rfkill();
 	tegra_setup_kbc();
+	if (standard_i2c)
+		tegra_setup_i2c();
 	platform_add_devices(nvodm_devices, ARRAY_SIZE(nvodm_devices));
 	pm_power_off = tegra_system_power_off;
 	tegra_setup_suspend();
