@@ -119,6 +119,14 @@ config TEGRA_USB_CHARGE
 	help
 	  Enables charging over USB
 
+config TEGRA_ODM_VIBRATE
+	boolean "System vibrator device driver using NVIDIA Tegra ODM kit"
+	depends on ANDROID_TIMED_OUTPUT && TEGRA_ODM_KIT
+	default n
+	help
+	  Adds a timed output vibrator device node for an NVIDIA Tegra ODM kit
+	  vibrator driver
+
 
 if TEGRA_ODM_KIT
 source "arch/arm/mach-tegra/odm_kit/Kconfig"
