@@ -61,6 +61,8 @@
 #include <asm/cacheflush.h>
 #include <mach/irqs.h>
 #include <linux/freezer.h>
+#include <linux/rbtree.h>
+#include <linux/rwsem.h>
 
 #define ATAG_NVIDIA_TEGRA 0x41000801
 struct tag_nvidia_tegra {
@@ -140,6 +142,9 @@ struct tag_nvidia_tegra {
 #define NVOS_IRQ_IS_USER          (0x3 << NVOS_IRQ_TYPE_SHIFT)
 
 static spinlock_t gs_NvOsSpinLock;
+
+/* this semaphore lives forever and is used to protect the rb tree*/
+static DECLARE_RWSEM(s_sem);
 
 typedef struct NvOsIrqHandlerRec
 {
@@ -790,17 +795,94 @@ void NvOsSpinMutexDestroy(NvOsSpinMutexHandle mutex)
         kfree(mutex);
 }
 
+struct sem_node
+{
+    struct rb_node node;
+    NvOsSemaphoreHandle h;
+};
+
 typedef struct NvOsSemaphoreRec
 {
     struct semaphore sem;
     atomic_t refcount;
+    NvU32 id; /* identifier to track the handle in rb tree */
+    struct rb_root root;
 } NvOsSemaphore;
+
+static struct sem_node *sem_handle_search(NvOsSemaphoreHandle h)
+{
+    struct rb_node **node = &(h->root.rb_node);
+
+    down_read(&s_sem);
+    while (*node) {
+        struct sem_node *data = rb_entry(*node, struct sem_node, node);
+
+        if (h < data->h)
+            node = &((*node)->rb_left);
+        else if (h > data->h)
+            node = &((*node)->rb_right);
+        else
+            up_read(&s_sem);
+            return data;
+    }
+    up_read(&s_sem);
+    return NULL;
+}
+
+static int sem_handle_insert(NvOsSemaphoreHandle h)
+{
+    struct rb_node **new = &(h->root.rb_node);
+    struct rb_node *parent = NULL;
+    struct sem_node *data;
+
+    down_write(&s_sem);
+    /* Figure out where to put the new node */
+    while (*new) {
+        data = rb_entry(*new, struct sem_node, node);
+        parent = *new;
+
+        if (h < data->h) {
+            new = &((*new)->rb_left);
+        } else if (h > data->h) {
+            new = &((*new)->rb_right);
+        } else
+            /* It already is in the tree */
+            up_write(&s_sem);
+            return -EALREADY;
+    }
+
+    /* Add the new node and rebalance the tree. */
+    data = kzalloc(sizeof(struct sem_node), GFP_KERNEL);
+    if (!data) {
+        pr_err("Could not allocate sema handle\n");
+        up_write(&s_sem);
+        return -ENOMEM;
+    }
+
+    data->h = h;
+    rb_link_node(&data->node, parent, new);
+    rb_insert_color(&data->node, &(h->root));
+    up_write(&s_sem);
+    return 0;
+}
+
+static int sem_handle_remove(struct sem_node *data, NvOsSemaphoreHandle h)
+{
+    down_write(&s_sem);
+    rb_erase(&data->node, &(h->root));
+    up_write(&s_sem);
+    kfree(data);
+    return 0;
+}
 
 NvError NvOsSemaphoreCreate(
     NvOsSemaphoreHandle *semaphore,
     NvU32 value)
 {
     NvOsSemaphore *s;
+
+    if (!semaphore)
+        return NvError_BadParameter;
 
     s = kzalloc( sizeof(NvOsSemaphore), GFP_KERNEL );
     if( !s )
@@ -809,6 +891,8 @@ NvError NvOsSemaphoreCreate(
     sema_init( &s->sem, value );
     atomic_set( &s->refcount, 1 );
 
+    /* start tracking the handle */
+    sem_handle_insert(s);
     *semaphore = s;
 
     return NvSuccess;
@@ -821,7 +905,16 @@ NvError NvOsSemaphoreClone(
     NV_ASSERT( orig );
     NV_ASSERT( semaphore );
 
+    if (!orig || !semaphore)
+        return NvError_BadParameter;
+
     atomic_inc( &orig->refcount );
+
+    /* track the handle if we are not already tracking it */
+    if (sem_handle_search(orig) == NULL) {
+        sem_handle_insert(orig);
+    }
+
     *semaphore = orig;
 
     return NvSuccess;
@@ -834,7 +927,15 @@ NvError NvOsSemaphoreUnmarshal(
     NV_ASSERT( hClientSema );
     NV_ASSERT( phDriverSema );
 
+    if (!hClientSema || !phDriverSema)
+        return NvError_BadParameter;
+
     atomic_inc( &hClientSema->refcount );
+
+    /* track the handle if we are not already tracking it */
+    if (sem_handle_search(hClientSema) == NULL) {
+        sem_handle_insert(hClientSema);
+    }
     *phDriverSema = hClientSema;
 
     return NvSuccess;
@@ -845,29 +946,34 @@ int NvOsSemaphoreWaitInterruptible(NvOsSemaphoreHandle semaphore)
 {
     NV_ASSERT(semaphore);
 
+    if (sem_handle_search(semaphore) == NULL)
+        return -EINVAL;
+
     return down_interruptible(&semaphore->sem);
 }
 
 void NvOsSemaphoreWait(NvOsSemaphoreHandle semaphore)
 {
     int ret;
-    
+
     NV_ASSERT(semaphore);
 
-    do
-    {
-        /* FIXME: We should split the implementation into two parts -
-         * one for semaphore that were created by users ioctl'ing into
-         * the nvos device (which need down_interruptible), and others that
-         * are created and used by the kernel drivers, which do not */
-        ret = down_interruptible(&semaphore->sem);
-        /* The kernel doesn't reschedule tasks
-         * that have pending signals. If a signal
-         * is pending, forcibly reschedule the task.
-         */
-        if (ret && !try_to_freeze())
-            schedule();
-    } while (ret);
+    if (sem_handle_search(semaphore) != NULL) {
+        do
+        {
+            /* FIXME: We should split the implementation into two parts -
+             * one for semaphore that were created by users ioctl'ing into
+             * the nvos device (which need down_interruptible), and others that
+             * are created and used by the kernel drivers, which do not */
+            ret = down_interruptible(&semaphore->sem);
+            /* The kernel doesn't reschedule tasks
+             * that have pending signals. If a signal
+             * is pending, forcibly reschedule the task.
+             */
+            if (ret && !try_to_freeze())
+                schedule();
+        } while (ret);
+    }
 }
 
 NvError NvOsSemaphoreWaitTimeout(
@@ -879,6 +985,9 @@ NvError NvOsSemaphoreWaitTimeout(
     NV_ASSERT( semaphore );
 
     if (!semaphore)
+        return NvError_Timeout;
+
+    if (sem_handle_search(semaphore) == NULL)
         return NvError_Timeout;
 
     if (msec==NV_WAIT_INFINITE)
@@ -912,16 +1021,31 @@ void NvOsSemaphoreSignal(NvOsSemaphoreHandle semaphore)
 {
     NV_ASSERT( semaphore );
 
-    up( &semaphore->sem );
+    if (semaphore) {
+        if (!in_interrupt()) {
+            if (sem_handle_search(semaphore) != NULL)
+                up( &semaphore->sem );
+        }
+        else
+            up( &semaphore->sem );
+    }
 }
 
 void NvOsSemaphoreDestroy(NvOsSemaphoreHandle semaphore)
 {
-    if (!semaphore)
-        return;
+    struct sem_node *data = NULL;
 
-    if( atomic_dec_return( &semaphore->refcount ) == 0 )
-        kfree( semaphore );
+    if (semaphore) {
+        /* check if the node exists */
+        data = sem_handle_search(semaphore);
+        if (data) {
+            if( atomic_dec_return( &semaphore->refcount ) == 0 ) {
+                if ( sem_handle_remove( data, semaphore ) == 0 ) {
+                    kfree( semaphore );
+                }
+            }
+        }
+    }
 }
 
 NvError NvOsThreadMode(int coop)

@@ -41,8 +41,6 @@ static long nvos_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 int nvos_mmap(struct file *file, struct vm_area_struct *vma);
 int NvOsSemaphoreWaitInterruptible(NvOsSemaphoreHandle semaphore);
 
-#define DEVICE_NAME "nvos"
-
 static const struct file_operations nvos_fops =
 {
     .owner = THIS_MODULE,
@@ -54,8 +52,24 @@ static const struct file_operations nvos_fops =
 
 static struct miscdevice nvosDevice =
 {
-    .name = DEVICE_NAME,
+    .name = "nvos",
     .fops = &nvos_fops,
+    .minor = MISC_DYNAMIC_MINOR,
+};
+
+static const struct file_operations knvos_fops =
+{
+    .owner = THIS_MODULE,
+    .open = nvos_open,
+    .release = nvos_close,
+    .unlocked_ioctl = nvos_ioctl,
+    .mmap = nvos_mmap
+};
+
+static struct miscdevice knvosDevice =
+{
+    .name = "knvos",
+    .fops = &knvos_fops,
     .minor = MISC_DYNAMIC_MINOR,
 };
 
@@ -74,20 +88,26 @@ typedef struct NvOsInstanceRec
     spinlock_t             Lock;
     struct list_head       IrqHandles;
     int                    pid;
+    bool                   su;
 } NvOsInstance;
 
 static int __init nvos_init( void )
 {
-    int retVal = 0;
+    int ret;
 
-    retVal = misc_register(&nvosDevice);
-
-    if (retVal < 0)
-    {
-        printk("nvos init failure\n" );
+    ret = misc_register(&nvosDevice);
+    if (ret != 0) {
+        pr_err("%s error 0x%x registering %s\n", __func__, ret, nvosDevice.name);
+        return ret;
     }
 
-    return retVal;    
+    ret = misc_register(&knvosDevice);
+    if (ret != 0) {
+        pr_err("%s error 0x%x registering %s\n", __func__, ret, knvosDevice.name);
+        return ret;
+    }
+
+    return 0;
 }
 
 static void __exit nvos_deinit( void )
@@ -111,6 +131,7 @@ int nvos_open(struct inode *inode, struct file *filp)
     Instance->tsk = current;
     Instance->pid = current->group_leader->pid;
     Instance->MemRange = NULL;
+    Instance->su = (filp->f_op == &knvos_fops);
     spin_lock_init(&Instance->Lock);
     INIT_LIST_HEAD(&Instance->IrqHandles);
     filp->private_data = (void*)Instance;
@@ -394,7 +415,7 @@ static long nvos_ioctl(struct file *filp,
         );
 
         NvOsSemaphoreSignal(kernelSem);
-        break;           
+        break;
     case NV_IOCTL_SEMAPHORE_WAIT:
         DO_CLEANUP(
             NvOsCopyIn( &kernelSem, (void *)arg, sizeof(kernelSem) )
@@ -427,6 +448,9 @@ static long nvos_ioctl(struct file *filp,
         break;
     }
     case NV_IOCTL_INTERRUPT_REGISTER:
+        if (filp->f_op != &knvos_fops)
+            return -EACCES;
+
         lock_kernel();
         e = interrupt_register(Instance, arg);
         unlock_kernel();
@@ -436,6 +460,9 @@ static long nvos_ioctl(struct file *filp,
     case NV_IOCTL_INTERRUPT_DONE:
     case NV_IOCTL_INTERRUPT_ENABLE:
     case NV_IOCTL_INTERRUPT_MASK:
+        if (filp->f_op != &knvos_fops)
+            return -EACCES;
+
         lock_kernel();
         e = interrupt_op(Instance, cmd, arg);
         unlock_kernel();
@@ -444,6 +471,9 @@ static long nvos_ioctl(struct file *filp,
     case NV_IOCTL_MEMORY_RANGE:
     {
         NvOsMemRangeParams *p;
+
+        if (filp->f_op != &knvos_fops)
+            return -EACCES;
 
         p = NvOsAlloc( sizeof(NvOsMemRangeParams) );
         if( !p )
