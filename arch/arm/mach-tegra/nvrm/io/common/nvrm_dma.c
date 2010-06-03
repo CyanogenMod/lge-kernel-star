@@ -63,9 +63,11 @@ static void dma_complete_work(struct work_struct *work)
 	list_del(&action->node);
 	spin_unlock(&action->dma->lock);
 
-	if (action->req.status==TEGRA_DMA_REQ_SUCCESS)
-		NvOsSemaphoreSignal(action->dma_sem);
-	NvOsSemaphoreDestroy(action->dma_sem);
+	if (action->dma_sem) {
+		if (action->req.status==TEGRA_DMA_REQ_SUCCESS)
+			NvOsSemaphoreSignal(action->dma_sem);
+		NvOsSemaphoreDestroy(action->dma_sem);
+	}
 	kfree(action);
 }
 
@@ -149,8 +151,15 @@ NvError NvRmDmaAllocate(NvRmDeviceHandle rm, NvRmDmaHandle *rm_dma,
 	NvError e;
 	int mode;
 
-	if (!dma)
-		return NvError_InsufficientMemory;
+	if (!dma) {
+		e = NvError_InsufficientMemory;
+		goto fail;
+	}
+
+	if (!rm_dma) {
+		e = NvError_BadParameter;
+		goto fail;
+	}
 
 	dma->mod_sel = dma_req_sel(requester, instance, &dma->mod_width);
 	if (dma->mod_sel == TEGRA_DMA_REQ_SEL_INVALID) {
@@ -172,6 +181,9 @@ NvError NvRmDmaAllocate(NvRmDeviceHandle rm, NvRmDmaHandle *rm_dma,
 		goto fail;
 	}
 	INIT_LIST_HEAD(&dma->req_list);
+	spin_lock_init(&dma->lock);
+
+	*rm_dma = (NvRmDmaHandle)dma;
 
 	return NvSuccess;
 fail:
@@ -180,6 +192,8 @@ fail:
 			tegra_dma_free_channel(dma->ch);
 		kfree(dma);
 	}
+	if (rm_dma)
+		*rm_dma = NULL;
 	return e;
 }
 
@@ -187,29 +201,38 @@ NvError NvRmDmaStartDmaTransfer(NvRmDmaHandle dma, NvRmDmaClientBuffer *b,
 	NvRmDmaDirection dir, NvU32 timeout, NvOsSemaphoreHandle wakeup)
 {
 	bool periph_src, periph_dst;
+	unsigned long src, dst;
 	struct dma_action *action;
 	NvError e = NvSuccess;
 	DECLARE_COMPLETION_ONSTACK(dma_done);
 
-	printk("NvRmDma: %d\n", dma->mod_sel);
-
-	if ((b->SourceBufferPhyAddress | b->DestinationBufferPhyAddress) & 3)
+	if ((b->SourceBufferPhyAddress | b->DestinationBufferPhyAddress) & 3) {
+		pr_debug("%s: invalid address\n", __func__);
 		return NvError_InvalidAddress;
+	}
 
-	if (!b->TransferSize || (b->TransferSize & 3))
+	if (!b->TransferSize || (b->TransferSize & 3)) {
+		pr_debug("%s: invalid size\n", __func__);
 		return NvError_InvalidSize;
+	}
 
-	if (!timeout && !wakeup)
-		return NvError_BadParameter;
+	src = b->SourceBufferPhyAddress;
+	dst = b->DestinationBufferPhyAddress;
 
-	periph_src = (b->SourceBufferPhyAddress - IO_APB_PHYS < IO_APB_SIZE);
-	periph_dst = (b->DestinationBufferPhyAddress - IO_APB_PHYS < IO_APB_SIZE);
-	if (!(periph_src ^ periph_dst))
+	WARN_ON_ONCE((src < PAGE_SIZE) || (dst < PAGE_SIZE));
+
+	periph_src = (src - IO_APB_PHYS < IO_APB_SIZE);
+	periph_dst = (dst - IO_APB_PHYS < IO_APB_SIZE);
+	if (!(periph_src ^ periph_dst)) {
+		pr_debug("%s: not supported\n", __func__);
 		return NvError_NotSupported;
+	}
 
 	action = kmalloc(sizeof(*action), GFP_KERNEL);
-	if (!action)
+	if (!action) {
+		pr_debug("%s: insufficient memory\n", __func__);
 		return NvError_InsufficientMemory;
+	}
 
 	action->req.size = b->TransferSize;
 	action->req.req_sel = dma->mod_sel;
@@ -227,13 +250,13 @@ NvError NvRmDmaStartDmaTransfer(NvRmDmaHandle dma, NvRmDmaClientBuffer *b,
 	}
 
 	if (dir==NvRmDmaDirection_Forward) {
-		action->req.dest_addr = b->DestinationBufferPhyAddress;
-		action->req.source_addr = b->SourceBufferPhyAddress;
+		action->req.dest_addr = dst;
+		action->req.source_addr = src;
 		action->req.dest_wrap = b->DestinationAddressWrapSize;
 		action->req.source_wrap = b->SourceAddressWrapSize;
 	} else {
-		action->req.dest_addr = b->SourceBufferPhyAddress;
-		action->req.source_addr = b->DestinationBufferPhyAddress;
+		action->req.dest_addr = src;
+		action->req.source_addr = dst;
 		action->req.dest_wrap = b->SourceAddressWrapSize;
 		action->req.source_wrap = b->DestinationAddressWrapSize;
 	}
@@ -241,13 +264,21 @@ NvError NvRmDmaStartDmaTransfer(NvRmDmaHandle dma, NvRmDmaClientBuffer *b,
 	if (timeout) {
 		action->dma_done = &dma_done;
 		action->req.complete = dma_complete_sync;
-	} else {
+	} else if (wakeup) {
 		NvError e;
 		e = NvOsSemaphoreClone(wakeup,
 				       (NvOsSemaphoreHandle *)&action->dma_sem);
-		if (e != NvSuccess)
+		if (e != NvSuccess) {
+			kfree(action);
+			pr_debug("%s: SemaphoreClone returned 0x%x\n",
+			       __func__, e);
 			return e;
+		}
 
+		INIT_WORK(&action->work, dma_complete_work);
+		action->req.complete = dma_complete_async;
+	} else {
+		action->dma_sem = NULL;
 		INIT_WORK(&action->work, dma_complete_work);
 		action->req.complete = dma_complete_async;
 	}
@@ -259,7 +290,8 @@ NvError NvRmDmaStartDmaTransfer(NvRmDmaHandle dma, NvRmDmaClientBuffer *b,
 		list_del(&action->node);
 		spin_unlock(&dma->lock);
 		pr_debug("%s: failed to enqueue DMA request\n", __func__);
-		NvOsSemaphoreDestroy(action->dma_sem);
+		if (action->dma_sem)
+			NvOsSemaphoreDestroy(action->dma_sem);
 		return NvError_BadParameter;
 	}
 
