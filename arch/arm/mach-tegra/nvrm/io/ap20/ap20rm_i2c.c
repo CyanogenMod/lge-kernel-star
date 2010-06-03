@@ -1497,13 +1497,13 @@ NvError AP20RmI2cOpen(NvRmI2cControllerHandle hRmI2cCont)
     {
         hRmI2cCont->DmaBufferSize = DEFAULT_I2C_DMA_BUFFER_SIZE;
         
-        hRmI2cCont->RxDmaReq.SourceBufferPhyAddress= RxFifoPhyAddress;
+        hRmI2cCont->RxDmaReq.SourceBufferPhyAddress= RxFifoPhyAddress + hRmI2cCont->ControllerAdd;
         hRmI2cCont->RxDmaReq.DestinationBufferPhyAddress = hRmI2cCont->DmaBuffPhysAdd;
         hRmI2cCont->RxDmaReq.SourceAddressWrapSize = 4;
         hRmI2cCont->RxDmaReq.DestinationAddressWrapSize = 0;
         
         hRmI2cCont->TxDmaReq.SourceBufferPhyAddress= hRmI2cCont->DmaBuffPhysAdd;
-        hRmI2cCont->TxDmaReq.DestinationBufferPhyAddress = TxFifoPhyAddress;
+        hRmI2cCont->TxDmaReq.DestinationBufferPhyAddress = TxFifoPhyAddress + hRmI2cCont->ControllerAdd;
         hRmI2cCont->TxDmaReq.SourceAddressWrapSize = 0;
         hRmI2cCont->TxDmaReq.DestinationAddressWrapSize = 4;
     }

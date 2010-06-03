@@ -211,6 +211,9 @@ typedef struct NvRmI2cControllerRec
     // Dma buffer physical address.
     NvRmPhysAddr DmaBuffPhysAdd;
 
+    // Controller physical address
+    NvRmPhysAddr ControllerAdd;
+
     // Virtual pointer to the dma buffer.
     NvU32 *pDmaBuffer;
 
