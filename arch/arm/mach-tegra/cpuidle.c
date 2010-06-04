@@ -31,8 +31,10 @@
 #include <linux/tick.h>
 #include <linux/interrupt.h>
 #include <mach/iomap.h>
+#include <linux/suspend.h>
 
 static unsigned int latency_factor __read_mostly = 2;
+static unsigned int system_is_suspending = 0;
 module_param(latency_factor, uint, 0644);
 
 struct cpuidle_driver tegra_idle = {
@@ -96,7 +98,8 @@ static int tegra_idle_enter_lp2(struct cpuidle_device *dev,
 	/* LP2 not possible when running in SMP mode */
 	smp_rmb();
 	request = ktime_to_us(tick_nohz_get_sleep_length());
-	if (!lp2_supported || request <= state->exit_latency) {
+	if (!lp2_supported || request <= state->exit_latency ||
+			system_is_suspending) {
 		dev->last_state = &dev->states[0];
 		return tegra_idle_enter_lp3(dev, &dev->states[0]);
 	}
@@ -133,6 +136,28 @@ static int tegra_idle_lp2_allowed(struct notifier_block *nfb,
 	}
 
 	return NOTIFY_OK;
+}
+
+static int tegra_cpuidle_notifier(struct notifier_block *nfb,
+	unsigned long event, void *data)
+{
+	int notification = NOTIFY_OK;
+
+	switch (event) {
+	case PM_SUSPEND_PREPARE:
+		system_is_suspending = 1;
+		smp_wmb();
+		break;
+	case PM_POST_SUSPEND:
+		system_is_suspending = 0;
+		smp_wmb();
+		break;
+	default:
+		printk(KERN_ERR "%s: unknown event %ld\n", __func__, event);
+		notification = NOTIFY_DONE;
+	}
+
+	return notification;
 }
 
 static int tegra_idle_enter(unsigned int cpu)
@@ -193,6 +218,7 @@ static int __init tegra_cpuidle_init(void)
 	mask_arm = IO_ADDRESS(TEGRA_CLK_RESET_BASE) + CLK_RESET_CLK_MASK_ARM;
 	lp2_supported = (num_online_cpus()==1);
 	hotcpu_notifier(tegra_idle_lp2_allowed, 0);
+	pm_notifier(tegra_cpuidle_notifier, 0);
 
 	reg = readl(mask_arm);
 	writel(reg | (1<<31), mask_arm);
