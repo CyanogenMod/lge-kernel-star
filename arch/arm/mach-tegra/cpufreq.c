@@ -33,6 +33,7 @@
 #include <linux/kthread.h>
 #include <linux/workqueue.h>
 #include <linux/smp_lock.h>
+#include <linux/suspend.h>
 
 #include <asm/system.h>
 #include <asm/smp_twd.h>
@@ -50,11 +51,19 @@ static struct clk *clk_cpu = NULL;
 
 static DEFINE_MUTEX(init_mutex);
 
+#ifdef CONFIG_HOTPLUG_CPU
+static int disable_hotplug = 0;
+#endif
+
 static void tegra_cpufreq_hotplug(NvRmPmRequest req)
 {
 	int rc = 0;
 #ifdef CONFIG_HOTPLUG_CPU
 	unsigned int cpu;
+
+	smp_rmb();
+	if (disable_hotplug)
+		return;
 
 	if (req & NvRmPmRequest_CpuOnFlag) {
 		struct cpumask m;
@@ -77,6 +86,28 @@ static void tegra_cpufreq_hotplug(NvRmPmRequest req)
 		       __func__, rc);
 	
 }
+
+#ifdef CONFIG_HOTPLUG_CPU
+static int tegra_cpufreq_pm_notifier(struct notifier_block *nfb,
+				     unsigned long event, void *data)
+{
+	switch (event) {
+	case PM_SUSPEND_PREPARE:
+		disable_hotplug = 1;
+		smp_wmb();
+		break;
+	case PM_POST_SUSPEND:
+		disable_hotplug = 0;
+		smp_wmb();
+		break;
+	default:
+		pr_err("%s: unknown event %lu\n", __func__, event);
+		return NOTIFY_DONE;
+	}
+
+	return NOTIFY_OK;
+}
+#endif
 
 static int tegra_cpufreq_dfsd(void *arg)
 {
@@ -250,6 +281,9 @@ static struct cpufreq_driver s_tegra_cpufreq_driver = {
 
 static int __init tegra_cpufreq_init(void)
 {
+#ifdef CONFIG_HOTPLUG_CPU
+	pm_notifier(tegra_cpufreq_pm_notifier, 0);
+#endif
 	return cpufreq_register_driver(&s_tegra_cpufreq_driver);
 }
 
