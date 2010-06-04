@@ -321,7 +321,7 @@ skip_status:
 	spin_unlock_irqrestore(&ch->lock, irq_flags);
 
 	/* Callback should be called without any lock */
-	req->complete(req, req->status);
+	req->complete(req);
 	return 0;
 }
 EXPORT_SYMBOL(tegra_dma_dequeue_req);
@@ -585,7 +585,7 @@ static void handle_oneshot_dma(struct tegra_dma_channel *ch)
 		/* Callback should be called without any lock */
 		pr_debug("%s: transferred %d bytes\n", __func__,
 			req->bytes_transferred);
-		req->complete(req, TEGRA_DMA_REQ_SUCCESS);
+		req->complete(req);
 		spin_lock(&ch->lock);
 	}
 
@@ -622,9 +622,10 @@ static void handle_continuous_dma(struct tegra_dma_channel *ch)
 				tegra_dma_update_hw_partial(ch, next_req);
 			}
 			req->buffer_status = TEGRA_DMA_REQ_BUF_STATUS_HALF_FULL;
+			req->status = TEGRA_DMA_REQ_SUCCESS;
 			/* DMA lock is NOT held when callback is called */
 			spin_unlock(&ch->lock);
-			req->threshold(req, TEGRA_DMA_REQ_SUCCESS);
+			req->threshold(req);
 			return;
 
 		} else if (req->buffer_status ==
@@ -645,7 +646,7 @@ static void handle_continuous_dma(struct tegra_dma_channel *ch)
 
 			/* DMA lock is NOT held when callbak is called */
 			spin_unlock(&ch->lock);
-			req->complete(req, TEGRA_DMA_REQ_SUCCESS);
+			req->complete(req);
 			return;
 
 		} else {
