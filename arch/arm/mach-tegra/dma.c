@@ -432,6 +432,8 @@ static void tegra_dma_update_hw_partial(struct tegra_dma_channel *ch,
 	}
 	writel(ch->apb_ptr, ch->addr + APB_DMA_CHAN_APB_PTR);
 	writel(ch->ahb_ptr, ch->addr + APB_DMA_CHAN_AHB_PTR);
+
+	req->status = TEGRA_DMA_REQ_INFLIGHT;
 	return;
 }
 
@@ -544,6 +546,8 @@ static void tegra_dma_update_hw(struct tegra_dma_channel *ch,
 
 	csr = ch->csr | CSR_ENB;
 	writel(csr, ch->addr + APB_DMA_CHAN_CSR);
+
+	req->status = TEGRA_DMA_REQ_INFLIGHT;
 }
 
 static void tegra_dma_init_hw(struct tegra_dma_channel *ch)
@@ -587,7 +591,10 @@ static void handle_oneshot_dma(struct tegra_dma_channel *ch)
 
 	if (!list_empty(&ch->list)) {
 		req = list_entry(ch->list.next, typeof(*req), node);
-		tegra_dma_update_hw(ch, req);
+		/* the complete function we just called may have enqueued another
+		   req, in which case dma has already started */
+		if (req->status != TEGRA_DMA_REQ_INFLIGHT)
+			tegra_dma_update_hw(ch, req);
 	}
 	spin_unlock(&ch->lock);
 }
