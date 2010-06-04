@@ -38,7 +38,7 @@
 1001:	ldr	\tmp, [\base]
 	cmp	\rd, \tmp
 	beq	1001b
-	mov	\tmp, \rd
+	mov	\rd, \tmp
 .endm
 
 /* waits until the microsecond counter (base) is >= rn */
