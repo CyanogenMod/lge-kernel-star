@@ -10,6 +10,7 @@ endif
 obj-y                                   += timer.o
 obj-y                                   += gpio.o
 obj-y					+= suspend.o
+obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= suspend-t2.o
 obj-y					+= pinmux.o
 obj-y					+= pinmux-t2-tables.o
 obj-y                                   += delay.o
