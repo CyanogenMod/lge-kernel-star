@@ -860,6 +860,10 @@ typedef enum
   /// is gated, plus DDR is in self-refresh. Wake up by any enabled interrupt.
   NvOdmSocPowerState_Suspend,
 
+  /// State where the CPU is halted by the flow controller and
+  /// power is gated. Wake up by any enabled interrupt
+  NvOdmSocPowerState_SimpleSuspend,
+
   /// Specifies to disable the SOC power state.
   NvOdmSocPowerState_Active,
 
