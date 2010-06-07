@@ -1570,6 +1570,10 @@ NvRmKernelPowerResume( NvRmDeviceHandle hRmDeviceHandle )
     NvOdmSocPowerState state =
         NvOdmQueryLowestSocPowerState()->LowestPowerState;
 
+    NvOsMutexLock(s_hPowerClientMutex);
+    ReportRmPowerState(hRmDeviceHandle);
+    NvOsMutexUnlock(s_hPowerClientMutex);
+
     NvRmPrivPmuLPxStateConfig(hRmDeviceHandle, state, NV_FALSE);
     if (state ==  NvOdmSocPowerState_Suspend)
         NvRmPrivPowerGroupResume(hRmDeviceHandle);
