@@ -302,7 +302,7 @@ static void __init tegra_setup_sdhci(void) {
 	for (i=0; i<ARRAY_SIZE(tegra_sdhci_platform); i++) {
 		const NvOdmQuerySdioInterfaceProperty *prop;
 		prop = NvOdmQueryGetSdioInterfaceProperty(i);
-		if (!i || prop->usage==NvOdmQuerySdioSlotUsage_unused)
+		if (!prop || prop->usage==NvOdmQuerySdioSlotUsage_unused)
 			continue;
 
 		plat = &tegra_sdhci_platform[i];
