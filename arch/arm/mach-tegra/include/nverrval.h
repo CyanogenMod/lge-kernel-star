@@ -323,6 +323,8 @@ NVERROR(Nv3pBadReturnData,                  0x00120004, "bad return data")
 NVERROR(AesClearSbkFailed,                  0x00130000, "AES clear Secure Boot Key Failed")
 NVERROR(AesLockSskFailed,                   0x00130001, "AES Lock Secure Storage Key Failed")
 NVERROR(AesDisableCryptoFailed,             0x00130002, "AES disable crypto failed")
+NVERROR(AesKeyUnWrapFailed,                 0x00130003, "AES key UnWrap failed")
+NVERROR(AesPermissionDenied,                0x00130004, "AES Permission denied")
 
 /* Block Driver error codes */
 /* generic error codes */

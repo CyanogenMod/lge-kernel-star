@@ -11,3 +11,9 @@ obj-y	+= nvddk_usbphy_ap20.o
 endif
 
 obj-$(CONFIG_TEGRA_FUSE)	+= nvddk_fuse_ap20.o
+
+obj-$(CONFIG_TEGRA_AES)		+= nvddk_aes_intf_ap20.o
+obj-$(CONFIG_TEGRA_AES_USER)	+= NvDdkAES_Dispatch.o
+obj-$(CONFIG_TEGRA_AES)		+= nvddk_aes_core_ap20.o
+obj-$(CONFIG_TEGRA_AES)		+= nvddk_aes.o
+obj-$(CONFIG_TEGRA_AES_USER)	+= nvddk_aes_dispatch.o

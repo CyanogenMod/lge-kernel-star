@@ -113,6 +113,20 @@ config TEGRA_FUSE
 	  Adds support for reading and writing (blowing) internal fuses
 	  through sysfs
 
+config TEGRA_AES
+	boolean "Tegra cryptographic engine (AES) driver interface"
+	depends on TEGRA_NVRM
+	help
+	  Includes driver support for the hardware cryptographic engine
+	  in Tegra SoCs
+
+config TEGRA_AES_USER
+	boolean "Support user-land access to cryptographic engine"
+	depends on TEGRA_AES
+	help
+	  Allows user processes to access the crytographic hardware through
+	  /dev/nvaes
+
 config TEGRA_USB_CHARGE
 	boolean "Enable USB charging support"
 	depends on REGULATOR_TEGRA

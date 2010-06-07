@@ -185,6 +185,16 @@ typedef enum
     NvRtObjType_NvDispMgr_ForceWord = 0x7FFFFFFF
 } NvRtObjType_NvDispMgr;
 
+/**
+ * Tracked object types for package NvDdkAes
+ * \ingroup objtype
+ */
+typedef enum
+{
+    NvRtObjType_NvDdkAes_NvDdkAesHandle = 0,
+    NvRtObjType_NvDdkAes_Num,
+    NvRtObjType_NvDdkAes_ForceWord = 0x7FFFFFFF
+} NvRtObjType_NvDdkAes;
 
 /*---------------------------------------------------------*/
 /** \defgroup os_driver Public interface for os driver */
