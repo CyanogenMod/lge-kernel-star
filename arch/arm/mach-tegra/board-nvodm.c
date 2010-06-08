@@ -604,7 +604,8 @@ static void __init tegra_setup_hcd(void)
 
 		p = NvOdmQueryGetUsbProperty(NvOdmIoModule_Usb, i);
 
-		if (p->UsbMode == NvOdmUsbModeType_Device)
+		if ((p->UsbMode == NvOdmUsbModeType_Device) ||
+		    (p->UsbMode == NvOdmUsbModeType_None))
 			continue;
 
 		plat->otg_mode = (p->UsbMode == NvOdmUsbModeType_OTG);
