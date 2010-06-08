@@ -521,12 +521,14 @@ static int tegra_ehci_probe(struct platform_device *pdev)
 		e = -ENXIO;
 		goto fail_phy;
 	}
-	res = request_mem_region(res->start, resource_size(res),
-				 dev_name(&pdev->dev));
-	if (!res) {
-		dev_err(&pdev->dev, "resource in use\n");
-		e = -EBUSY;
-		goto fail_phy;
+	if (!pdata->otg_mode) {
+		res = request_mem_region(res->start, resource_size(res),
+					 dev_name(&pdev->dev));
+		if (!res) {
+			dev_err(&pdev->dev, "resource in use\n");
+			e = -EBUSY;
+			goto fail_phy;
+		}
 	}
 	hcd->rsrc_start = res->start;
 	hcd->rsrc_len = resource_size(res);
