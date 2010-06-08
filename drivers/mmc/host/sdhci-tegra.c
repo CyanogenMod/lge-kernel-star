@@ -375,57 +375,56 @@ static int tegra_sdhci_remove(struct platform_device *pdev)
 }
 
 #if defined(CONFIG_PM)
-#define is_sdio_card(_card) \
-	((_card) && ((_card)->type == MMC_TYPE_SDIO))
+#define dev_to_host(_dev) platform_get_drvdata(to_platform_device(_dev))
 
-static int tegra_sdhci_suspend(struct platform_device *pdev, pm_message_t state)
+static int tegra_sdhci_suspend(struct device *dev)
 {
-	struct sdhci_host *sdhost = platform_get_drvdata(pdev);
+	struct sdhci_host *sdhost = dev_to_host(dev);
 	struct tegra_sdhci *host = sdhci_priv(sdhost);
+	struct pm_message event = { PM_EVENT_SUSPEND };
 
-	if (!is_sdio_card(sdhost->mmc->card)) {
-		int ret = sdhci_suspend_host(sdhost,state);
-		if (ret) {
-			dev_err(&pdev->dev, "failed to suspend host\n");
-			return ret;
-		}
-		if (host->hOdmSdio)
-			NvOdmSdioSuspend(host->hOdmSdio);
-		clk_disable(host->clk);
-		host->clk_enable = false;
+	int ret = sdhci_suspend_host(sdhost, event);
+	if (ret) {
+		dev_err(dev, "failed to suspend host\n");
+		return ret;
 	}
+	if (host->hOdmSdio)
+		NvOdmSdioSuspend(host->hOdmSdio);
 
 	return 0;
 }
 
-static int tegra_sdhci_resume(struct platform_device *pdev)
+static int tegra_sdhci_resume(struct device *dev)
 {
-	struct sdhci_host *sdhost = platform_get_drvdata(pdev);
+	struct sdhci_host *sdhost = dev_to_host(dev);
 	struct tegra_sdhci *host = sdhci_priv(sdhost);
 
-	if (!is_sdio_card(sdhost->mmc->card)) {
+	if (!host->clk_enable) {
 		clk_enable(host->clk);
 		host->clk_enable = true;
-		if (host->hOdmSdio)
-			NvOdmSdioResume(host->hOdmSdio);
-
-		return sdhci_resume_host(sdhost);
 	}
 
-	return 0;
+	if (host->hOdmSdio)
+		NvOdmSdioResume(host->hOdmSdio);
+
+	return sdhci_resume_host(sdhost);
 }
+static struct dev_pm_ops tegra_sdhci_pm = {
+	.suspend = tegra_sdhci_suspend,
+	.resume = tegra_sdhci_resume,
+};
+#define tegra_sdhci_pm_ops &tegra_sdhci_pm
+#else
+#define tegra_sdhci_pm_ops NULL
 #endif
 
 struct platform_driver tegra_sdhci_driver = {
 	.probe		= tegra_sdhci_probe,
 	.remove		= tegra_sdhci_remove,
-#if defined(CONFIG_PM)
-	.suspend	= tegra_sdhci_suspend,
-	.resume		= tegra_sdhci_resume,
-#endif
 	.driver		= {
 		.name	= "tegra-sdhci",
 		.owner	= THIS_MODULE,
+		.pm	= tegra_sdhci_pm_ops,
 	},
 };
 
