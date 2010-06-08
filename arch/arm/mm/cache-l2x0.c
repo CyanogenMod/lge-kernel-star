@@ -277,16 +277,12 @@ static void l2x0_shutdown(void)
 	local_irq_restore(flags);
 }
 
-void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+static void l2x0_enable(__u32 aux_val, __u32 aux_mask)
 {
-	__u32 aux;
+	u32 aux;
 
-	if (l2x0_disabled) {
-		pr_info(L2CC_TYPE " cache controller disabled\n");
+	if (l2x0_disabled)
 		return;
-	}
-
-	l2x0_base = base;
 
 	/*
 	 * Check if l2x0 controller is already enabled.
@@ -307,12 +303,30 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
 		/* enable L2X0 */
 		writel(1, l2x0_base + L2X0_CTRL);
 	}
+}
+
+static void l2x0_restart(void)
+{
+	l2x0_enable(0, ~0ul);
+}
+
+void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+{
+	if (l2x0_disabled) {
+		pr_info(L2CC_TYPE " cache controller disabled\n");
+		return;
+	}
+
+	l2x0_base = base;
+
+	l2x0_enable(aux_val, aux_mask);
 
 	outer_cache.inv_range = l2x0_inv_range;
 	outer_cache.clean_range = l2x0_clean_range;
 	outer_cache.flush_range = l2x0_flush_range;
 	outer_cache.sync = l2x0_cache_sync;
 	outer_cache.shutdown = l2x0_shutdown;
+	outer_cache.restart = l2x0_restart;
 
 	pr_info(L2CC_TYPE " cache controller enabled\n");
 }
