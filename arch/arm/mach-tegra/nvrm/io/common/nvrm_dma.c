@@ -71,7 +71,7 @@ static void dma_complete_work(struct work_struct *work)
 	kfree(action);
 }
 
-static void dma_complete_async(struct tegra_dma_req *req, int err)
+static void dma_complete_async(struct tegra_dma_req *req)
 {
 	struct dma_action *action = container_of(req, struct dma_action, req);
 
@@ -79,7 +79,7 @@ static void dma_complete_async(struct tegra_dma_req *req, int err)
 	schedule_work(&action->work);
 }
 
-static void dma_complete_sync(struct tegra_dma_req *req, int err)
+static void dma_complete_sync(struct tegra_dma_req *req)
 {
 	struct dma_action *action = container_of(req, struct dma_action, req);
 
