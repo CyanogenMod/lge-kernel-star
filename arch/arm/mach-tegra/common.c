@@ -68,5 +68,6 @@ void __init tegra_common_init(void)
 	tegra_init_clock();
 	tegra_init_cache();
 	tegra_dma_init();
+	tegra_mc_init();
 	arm_pm_restart = tegra_machine_restart;
 }
