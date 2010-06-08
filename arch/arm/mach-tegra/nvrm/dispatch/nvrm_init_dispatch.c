@@ -140,15 +140,7 @@ typedef struct NvRmOpen_params_t
 
 static NvError NvRmClose_dispatch_( void *InBuffer, NvU32 InSize, void *OutBuffer, NvU32 OutSize, NvDispatchCtx* Ctx )
 {
-    NvError err_ = NvSuccess;
-    NvRmClose_in *p_in;
-
-    p_in = (NvRmClose_in *)InBuffer;
-
-
-    NvRmClose( p_in->hDevice );
-
-    return err_;
+    return NvSuccess;
 }
 
 static NvError NvRmOpenNew_dispatch_( void *InBuffer, NvU32 InSize, void *OutBuffer, NvU32 OutSize, NvDispatchCtx* Ctx )
@@ -160,8 +152,8 @@ static NvError NvRmOpenNew_dispatch_( void *InBuffer, NvU32 InSize, void *OutBuf
     p_in = (NvRmOpenNew_in *)InBuffer;
     p_out = (NvRmOpenNew_out *)((NvU8 *)OutBuffer + OFFSET(NvRmOpenNew_params, out) - OFFSET(NvRmOpenNew_params, inout));
 
-
-    p_out->ret_ = NvRmOpenNew( &p_out->pHandle );
+    p_out->pHandle = g_NvRmHandle;
+    p_out->ret_ = err_;
 
     return err_;
 }

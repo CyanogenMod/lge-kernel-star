@@ -48,6 +48,11 @@ NvError NvRm_Dispatch(void *InBuffer,
                       void *OutBuffer,
                       NvU32 OutSize,
                       NvDispatchCtx* Ctx);
+NvError NvRm_Dispatch_Others(void *InBuffer,
+                      NvU32 InSize,
+                      void *OutBuffer,
+                      NvU32 OutSize,
+                      NvDispatchCtx* Ctx);
 
 static int nvrm_open(struct inode *inode, struct file *file);
 static int nvrm_close(struct inode *inode, struct file *file);
@@ -79,6 +84,28 @@ static struct miscdevice nvrm_dev =
     .minor = MISC_DYNAMIC_MINOR,
 };
 
+static const struct file_operations knvrm_fops =
+{
+    .owner = THIS_MODULE,
+    .open = nvrm_open,
+    .release = nvrm_close,
+    .unlocked_ioctl = nvrm_unlocked_ioctl,
+    .mmap = nvrm_mmap
+};
+
+static struct miscdevice knvrm_dev =
+{
+    .name = "knvrm",
+    .fops = &knvrm_fops,
+    .minor = MISC_DYNAMIC_MINOR,
+};
+
+
+struct nvrm_file_priv {
+    NvRtClientHandle rt_client;
+    bool su;
+};
+
 static void client_detach(NvRtClientHandle client)
 {
     if (NvRtUnregisterClient(s_RtHandle, client))
@@ -105,21 +132,28 @@ static void client_detach(NvRtClientHandle client)
 
 int nvrm_open(struct inode *inode, struct file *file)
 {
-    NvRtClientHandle Client;
+    struct nvrm_file_priv *priv;
 
-    if (NvRtRegisterClient(s_RtHandle, &Client) != NvSuccess)
+    priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+    if (!priv) return -ENOMEM;
+
+    if (NvRtRegisterClient(s_RtHandle, &priv->rt_client) != NvSuccess)
     {
         return -ENOMEM;
     }
 
-    file->private_data = (void*)Client;
+    priv->su = (file->f_op == &knvrm_fops);
+    file->private_data = priv;
 
     return 0;
 }
 
 int nvrm_close(struct inode *inode, struct file *file)
 {
-    client_detach((NvRtClientHandle)file->private_data);
+    struct nvrm_file_priv *priv = file->private_data;
+
+    client_detach(priv->rt_client);
+    kfree(priv);
     return 0;
 }
 
@@ -133,6 +167,7 @@ long nvrm_unlocked_ioctl(struct file *file,
     void *ptr = 0;
     long e;
     NvBool bAlloc = NV_FALSE;
+    struct nvrm_file_priv *priv = file->private_data;
 
     switch( cmd ) {
     case NvRmIoctls_Generic:
@@ -140,7 +175,7 @@ long nvrm_unlocked_ioctl(struct file *file,
         NvDispatchCtx dctx;
 
         dctx.Rt         = s_RtHandle;
-        dctx.Client     = (NvRtClientHandle)file->private_data;
+        dctx.Client     = priv->rt_client;
         dctx.PackageIdx = 0;
 
         err = NvOsCopyIn( &p, (void *)arg, sizeof(p) );
@@ -179,9 +214,15 @@ long nvrm_unlocked_ioctl(struct file *file,
             goto fail;
         }
 
-        err = NvRm_Dispatch( ptr, p.InBufferSize + p.InOutBufferSize,
-            ((NvU8 *)ptr) + p.InBufferSize, p.InOutBufferSize +
-            p.OutBufferSize, &dctx );
+        if (priv->su) {
+            err = NvRm_Dispatch( ptr, p.InBufferSize + p.InOutBufferSize,
+                ((NvU8 *)ptr) + p.InBufferSize, p.InOutBufferSize +
+                p.OutBufferSize, &dctx );
+        } else {
+            err = NvRm_Dispatch_Others( ptr, p.InBufferSize + p.InOutBufferSize,
+                ((NvU8 *)ptr) + p.InBufferSize, p.InOutBufferSize +
+                p.OutBufferSize, &dctx );
+        }
         if( err != NvSuccess )
         {
             printk( "NvRmIoctls_Generic: dispatch failure\n" );
@@ -236,7 +277,7 @@ long nvrm_unlocked_ioctl(struct file *file,
 		NV_ASSERT(p.InOutBufferSize == 0);
 
 		if (NvOsCopyOut(p.pBuffer,
-						&file->private_data,
+						&priv->rt_client,
 						sizeof(NvRtClientHandle)) != NvSuccess)
 		{
 			NvOsDebugPrintf("Failed to copy client id\n");
@@ -268,7 +309,7 @@ long nvrm_unlocked_ioctl(struct file *file,
 
 		NV_ASSERT(Client || !"Bad client");
 
-		if (Client == (NvRtClientHandle)file->private_data)
+		if (Client == priv->rt_client)
 		{
 			// The daemon is attaching to itself, no need to add refcount
 			break;
@@ -305,7 +346,7 @@ long nvrm_unlocked_ioctl(struct file *file,
 
 		NV_ASSERT(Client || !"Bad client");
 
-		if (Client == (NvRtClientHandle)file->private_data)
+		if (Client == priv->rt_client)
 		{
 			// The daemon is detaching from itself, no need to dec refcount
 			break;
@@ -359,6 +400,11 @@ static int nvrm_probe(struct platform_device *pdev)
 		e = misc_register( &nvrm_dev );
 	}
 
+	if (e == 0)
+	{
+		e = misc_register( &knvrm_dev );
+	}
+
 	if( e < 0 )
 	{
 		if (s_RtHandle)
@@ -375,6 +421,7 @@ static int nvrm_probe(struct platform_device *pdev)
 static int nvrm_remove(struct platform_device *pdev)
 {
 	misc_deregister( &nvrm_dev );
+	misc_deregister( &knvrm_dev );
 	NvRtDestroy(s_RtHandle);
 	s_RtHandle = NULL;
 	return 0;

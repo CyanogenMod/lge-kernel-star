@@ -778,6 +778,11 @@ static NvError NvRmModuleGetCapabilities_dispatch_( void *InBuffer, NvU32 InSize
     p_in = (NvRmModuleGetCapabilities_in *)InBuffer;
     p_out = (NvRmModuleGetCapabilities_out *)((NvU8 *)OutBuffer + OFFSET(NvRmModuleGetCapabilities_params, out) - OFFSET(NvRmModuleGetCapabilities_params, inout));
 
+    if (!NvRmIsValidRmHandle(p_in->hDeviceHandle))
+    {
+        err_ = NvError_BadParameter;
+        goto clean;
+    }
     if( p_in->NumCaps && p_in->pCaps )
     {
         pCaps = (NvRmModuleCapability  *)NvOsAlloc( p_in->NumCaps * sizeof( NvRmModuleCapability  ) );
@@ -839,7 +844,8 @@ static NvError NvRmModuleGetNumInstances_dispatch_( void *InBuffer, NvU32 InSize
     p_in = (NvRmModuleGetNumInstances_in *)InBuffer;
     p_out = (NvRmModuleGetNumInstances_out *)((NvU8 *)OutBuffer + OFFSET(NvRmModuleGetNumInstances_params, out) - OFFSET(NvRmModuleGetNumInstances_params, inout));
 
-
+    if (!NvRmIsValidRmHandle(p_in->hRmDeviceHandle))
+        return NvError_BadParameter;
     p_out->ret_ = NvRmModuleGetNumInstances( p_in->hRmDeviceHandle, p_in->Module );
 
     return err_;

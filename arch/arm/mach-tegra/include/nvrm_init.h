@@ -49,6 +49,8 @@ extern "C"
 
 typedef struct NvRmDeviceRec *NvRmDeviceHandle;
 
+extern NvRmDeviceHandle g_NvRmHandle;
+
 /**
  * A physical address type sized such that it matches the addressing support of
  * the hardware modules RM typically interfaces with.  May be smaller than an
@@ -132,6 +134,16 @@ typedef NvU32 NvRmPhysAddr;
 
  void NvRmClose( 
     NvRmDeviceHandle hDevice );
+
+/**
+ * Validates the handle passed.
+ *
+ * @param hDevice The RM handle.
+ */
+static inline NvBool NvRmIsValidRmHandle(NvRmDeviceHandle hDevice)
+{
+    return ((hDevice == g_NvRmHandle) ? NV_TRUE : NV_FALSE);
+}
 
 /** @} */
 

@@ -59,6 +59,7 @@
 #include "nvbootargs.h"
 
 static NvRmDevice gs_Rm;
+NvRmDeviceHandle g_NvRmHandle = &gs_Rm;
 
 extern NvRmCfgMap g_CfgMap[];
 

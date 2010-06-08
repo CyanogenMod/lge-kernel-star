@@ -1023,6 +1023,8 @@ static NvError NvRmDfsGetLowVoltageThreshold_dispatch_( void *InBuffer, NvU32 In
     p_in = (NvRmDfsGetLowVoltageThreshold_in *)InBuffer;
     p_out = (NvRmDfsGetLowVoltageThreshold_out *)((NvU8 *)OutBuffer + OFFSET(NvRmDfsGetLowVoltageThreshold_params, out) - OFFSET(NvRmDfsGetLowVoltageThreshold_params, inout));
 
+    if (!NvRmIsValidRmHandle(p_in->hRmDeviceHandle))
+        return NvError_BadParameter;
 
     NvRmDfsGetLowVoltageThreshold( p_in->hRmDeviceHandle, p_in->RailId, &p_out->pLowMv, &p_out->pPresentMv );
 
@@ -1191,6 +1193,11 @@ static NvError NvRmDfsGetProfileData_dispatch_( void *InBuffer, NvU32 InSize, vo
     p_in = (NvRmDfsGetProfileData_in *)InBuffer;
     p_out = (NvRmDfsGetProfileData_out *)((NvU8 *)OutBuffer + OFFSET(NvRmDfsGetProfileData_params, out) - OFFSET(NvRmDfsGetProfileData_params, inout));
 
+    if (!NvRmIsValidRmHandle(p_in->hRmDeviceHandle))
+    {
+        err_ = NvError_BadParameter;
+        goto clean;
+    }
     if( p_in->DfsProfileCount && p_in->pSamplesNoList )
     {
         pSamplesNoList = (NvU32  *)NvOsAlloc( p_in->DfsProfileCount * sizeof( NvU32  ) );
@@ -1390,6 +1397,8 @@ static NvError NvRmDfsGetClockUtilization_dispatch_( void *InBuffer, NvU32 InSiz
     p_in = (NvRmDfsGetClockUtilization_in *)InBuffer;
     p_out = (NvRmDfsGetClockUtilization_out *)((NvU8 *)OutBuffer + OFFSET(NvRmDfsGetClockUtilization_params, out) - OFFSET(NvRmDfsGetClockUtilization_params, inout));
 
+    if (!NvRmIsValidRmHandle(p_in->hRmDeviceHandle))
+        return NvError_BadParameter;
 
     p_out->ret_ = NvRmDfsGetClockUtilization( p_in->hRmDeviceHandle, p_in->ClockId, &p_out->pClockUsage );
 
@@ -1405,7 +1414,8 @@ static NvError NvRmDfsGetState_dispatch_( void *InBuffer, NvU32 InSize, void *Ou
     p_in = (NvRmDfsGetState_in *)InBuffer;
     p_out = (NvRmDfsGetState_out *)((NvU8 *)OutBuffer + OFFSET(NvRmDfsGetState_params, out) - OFFSET(NvRmDfsGetState_params, inout));
 
-
+    if (!NvRmIsValidRmHandle(p_in->hRmDeviceHandle))
+        return NvError_BadParameter;
     p_out->ret_ = NvRmDfsGetState( p_in->hRmDeviceHandle );
 
     return err_;
@@ -1487,6 +1497,12 @@ static NvError NvRmPowerBusyHintMulti_dispatch_( void *InBuffer, NvU32 InSize, v
     p_in = (NvRmPowerBusyHintMulti_in *)InBuffer;
     p_out = (NvRmPowerBusyHintMulti_out *)((NvU8 *)OutBuffer + OFFSET(NvRmPowerBusyHintMulti_params, out) - OFFSET(NvRmPowerBusyHintMulti_params, inout));
 
+    if (!NvRmIsValidRmHandle(p_in->hRmDeviceHandle))
+    {
+        err_ = NvError_BadParameter;
+        goto clean;
+    }
+
     if( p_in->NumHints && p_in->pMultiHint )
     {
         pMultiHint = (NvRmDfsBusyHint  *)NvOsAlloc( p_in->NumHints * sizeof( NvRmDfsBusyHint  ) );
@@ -1522,6 +1538,8 @@ static NvError NvRmPowerBusyHint_dispatch_( void *InBuffer, NvU32 InSize, void *
     p_in = (NvRmPowerBusyHint_in *)InBuffer;
     p_out = (NvRmPowerBusyHint_out *)((NvU8 *)OutBuffer + OFFSET(NvRmPowerBusyHint_params, out) - OFFSET(NvRmPowerBusyHint_params, inout));
 
+    if (!NvRmIsValidRmHandle(p_in->hRmDeviceHandle))
+        return NvError_BadParameter;
 
     p_out->ret_ = NvRmPowerBusyHint( p_in->hRmDeviceHandle, p_in->ClockId, p_in->ClientId, p_in->BoostDurationMs, p_in->BoostKHz );
 
@@ -1714,7 +1732,8 @@ static NvError NvRmPowerGetState_dispatch_( void *InBuffer, NvU32 InSize, void *
     p_in = (NvRmPowerGetState_in *)InBuffer;
     p_out = (NvRmPowerGetState_out *)((NvU8 *)OutBuffer + OFFSET(NvRmPowerGetState_params, out) - OFFSET(NvRmPowerGetState_params, inout));
 
-
+    if (!NvRmIsValidRmHandle(p_in->hRmDeviceHandle))
+        return NvError_BadParameter;
     p_out->ret_ = NvRmPowerGetState( p_in->hRmDeviceHandle, &p_out->pState );
 
     return err_;
@@ -1742,6 +1761,8 @@ static NvError NvRmPowerGetEvent_dispatch_( void *InBuffer, NvU32 InSize, void *
     p_in = (NvRmPowerGetEvent_in *)InBuffer;
     p_out = (NvRmPowerGetEvent_out *)((NvU8 *)OutBuffer + OFFSET(NvRmPowerGetEvent_params, out) - OFFSET(NvRmPowerGetEvent_params, inout));
 
+    if (!NvRmIsValidRmHandle(p_in->hRmDeviceHandle))
+        return NvError_BadParameter;
 
     p_out->ret_ = NvRmPowerGetEvent( p_in->hRmDeviceHandle, p_in->ClientId, &p_out->pEvent );
 
@@ -1755,6 +1776,8 @@ static NvError NvRmPowerUnRegister_dispatch_( void *InBuffer, NvU32 InSize, void
 
     p_in = (NvRmPowerUnRegister_in *)InBuffer;
 
+    if (!NvRmIsValidRmHandle(p_in->hRmDeviceHandle))
+        return NvError_BadParameter;
 
     NvRmPowerUnRegister( p_in->hRmDeviceHandle, p_in->ClientId );
 
@@ -1773,6 +1796,12 @@ static NvError NvRmPowerRegister_dispatch_( void *InBuffer, NvU32 InSize, void *
     p_in = (NvRmPowerRegister_in *)InBuffer;
     p_inout = (NvRmPowerRegister_inout *)((NvU8 *)InBuffer + OFFSET(NvRmPowerRegister_params, inout));
     p_out = (NvRmPowerRegister_out *)((NvU8 *)OutBuffer + OFFSET(NvRmPowerRegister_params, out) - OFFSET(NvRmPowerRegister_params, inout));
+
+    if (!NvRmIsValidRmHandle(p_in->hRmDeviceHandle))
+    {
+        err_ = NvError_BadParameter;
+        goto clean;
+    }
 
     (void)inout;
     if( p_in->hEventSemaphore )
