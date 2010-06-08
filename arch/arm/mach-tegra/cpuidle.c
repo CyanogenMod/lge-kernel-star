@@ -50,6 +50,7 @@ static int lp2_supported = 0;
 #define FLOW_CTRL_JTAG_RESUME (1<<28)
 #define FLOW_CTRL_HALT_CPUx_EVENTS(cpu) ((cpu)?((cpu-1)*0x8 + 0x14) : 0x0)
 
+#define PMC_SCRATCH_21 0xA4
 #define PMC_SCRATCH_38 0x134
 #define PMC_SCRATCH_39 0x138
 
@@ -93,6 +94,8 @@ static int tegra_idle_enter_lp2(struct cpuidle_device *dev,
 {
 	ktime_t enter, exit;
 	s64 request, us, latency;
+	unsigned long log_us;
+	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
 	unsigned int last_sample = (unsigned int)cpuidle_get_statedata(state);
 
 	/* LP2 not possible when running in SMP mode */
@@ -114,6 +117,9 @@ static int tegra_idle_enter_lp2(struct cpuidle_device *dev,
 	latency += 2000;
 	cpuidle_set_statedata(state, (void*)(unsigned int)(latency));
 	state->exit_latency = (12*latency + 4*last_sample) >> 4;
+
+	log_us = (unsigned long)us + __raw_readl(pmc + PMC_SCRATCH_21);
+	__raw_writel(log_us, pmc + PMC_SCRATCH_21);
 
 	state->target_residency = latency_factor*state->exit_latency;
 	local_irq_enable();
