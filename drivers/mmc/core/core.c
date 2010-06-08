@@ -1152,7 +1152,7 @@ out:
 		wake_unlock(&mmc_delayed_work_wake_lock);
 
 	if (host->caps & MMC_CAP_NEEDS_POLL)
-		mmc_schedule_delayed_work(&host->detect, HZ);
+		queue_delayed_work(workqueue, &host->detect, HZ);
 }
 
 void mmc_start_host(struct mmc_host *host)
