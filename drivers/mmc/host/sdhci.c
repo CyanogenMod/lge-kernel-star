@@ -22,6 +22,7 @@
 #include <linux/leds.h>
 
 #include <linux/mmc/host.h>
+#include <linux/mmc/card.h>
 
 #include "sdhci.h"
 
@@ -183,6 +184,8 @@ static void sdhci_init(struct sdhci_host *host)
 		SDHCI_INT_DATA_CRC | SDHCI_INT_DATA_TIMEOUT | SDHCI_INT_INDEX |
 		SDHCI_INT_END_BIT | SDHCI_INT_CRC | SDHCI_INT_TIMEOUT |
 		SDHCI_INT_DATA_END | SDHCI_INT_RESPONSE);
+
+	host->last_clk = 0;
 }
 
 static void sdhci_reinit(struct sdhci_host *host)
@@ -1013,6 +1016,8 @@ static void sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
 	if (clock == 0)
 		goto out;
 
+	host->last_clk = clock;
+
 	for (div = 1;div < 256;div *= 2) {
 		if ((host->max_clk / div) <= clock)
 			break;
@@ -1267,6 +1272,29 @@ out:
 	spin_unlock_irqrestore(&host->lock, flags);
 }
 
+int sdhci_enable(struct mmc_host *mmc)
+{
+	struct sdhci_host *host = mmc_priv(mmc);
+
+	if (!mmc->card || mmc->card->type==MMC_TYPE_SDIO)
+		return 0;
+
+	if (host->last_clk)
+		sdhci_set_clock(host, host->last_clk);
+	return 0;
+}
+
+int sdhci_disable(struct mmc_host *mmc, int lazy)
+{
+	struct sdhci_host *host = mmc_priv(mmc);
+
+	if (!mmc->card || mmc->card->type==MMC_TYPE_SDIO)
+		return 0;
+
+	sdhci_set_clock(host, 0);
+	return 0;
+}
+
 #ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
 static unsigned int sdhci_get_host_offset(struct mmc_host *mmc) {
 	struct sdhci_host *host;
@@ -1279,6 +1307,8 @@ static const struct mmc_host_ops sdhci_ops = {
 	.request	= sdhci_request,
 	.set_ios	= sdhci_set_ios,
 	.get_ro		= sdhci_get_ro,
+	.enable		= sdhci_enable,
+	.disable	= sdhci_disable,
 	.enable_sdio_irq = sdhci_enable_sdio_irq,
 #ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
 	.get_host_offset = sdhci_get_host_offset,
@@ -1839,6 +1869,11 @@ int sdhci_add_host(struct sdhci_host *host)
 	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION) {
 		if (!host->ops->card_detect)
 			mmc->caps |= MMC_CAP_NEEDS_POLL;
+	}
+
+	if (host->quirks & SDHCI_QUIRK_RUNTIME_DISABLE) {
+		mmc->caps |= MMC_CAP_DISABLE;
+		mmc_set_disable_delay(mmc, msecs_to_jiffies(50));
 	}
 
 	if (host->data_width >= 8)

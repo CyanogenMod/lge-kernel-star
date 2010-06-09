@@ -247,6 +247,8 @@ struct sdhci_host {
 #define SDHCI_QUIRK_BROKEN_SPEC_VERSION			(1<<29)
 /* Controller should not use SDIO IRQ */
 #define SDHCI_QUIRK_NO_SDIO_IRQ				(1<<30)
+/* Controller allows runtime enable / disable */
+#define SDHCI_QUIRK_RUNTIME_DISABLE			(1<<31)
 
 	int			irq;		/* Device IRQ */
 	void __iomem *		ioaddr;		/* Mapped address */
@@ -272,6 +274,7 @@ struct sdhci_host {
 
 	unsigned int		version;	/* SDHCI spec. version */
 
+	unsigned int		last_clk;	/* Last configured clock */
 	unsigned int		max_clk;	/* Max possible freq (MHz) */
 	unsigned int		timeout_clk;	/* Timeout freq (KHz) */
 
