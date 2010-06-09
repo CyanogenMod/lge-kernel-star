@@ -104,6 +104,34 @@ typedef enum
 } NvRmPmRequest;
 
 /**
+ * Defines RM power manager policies for turning CPU power Off
+ * when it is idle (LP2 state)
+ */
+typedef enum
+{
+    // LP2 entry is disabled
+    NvRmLp2Policy_Disabled = 0,
+
+    // LP2 is entered and DVFS tick interrupt is masked only when DVFS
+    // is in low corner
+    NvRmLp2Policy_EnterInLowCorner,
+
+    // LP2 is entered independently of DVFS low corner, but DVFS tick
+    // interrupt is masked only in low corner
+    NvRmLp2Policy_MaskInLowCorner,
+
+    // LP2 is entered and DVFS tick interrupt is masked independently
+    // of DVFS low corner
+    NvRmLp2Policy_IgnoreLowCorner,
+
+    NvRmLp2Policy_Num,
+    NvRmLp2Policy_Force32 = 0x7FFFFFFF
+} NvRmLp2Policy;
+
+#define NVRM_DEFAULT_LP2POLICY (NvRmLp2Policy_IgnoreLowCorner)
+extern NvRmLp2Policy g_Lp2Policy;
+
+/**
  * NVRM PM function called within OS shim high priority thread
  */
 NvRmPmRequest NvRmPrivPmThread(void);

@@ -87,6 +87,7 @@ static int tegra_idle_enter_lp3(struct cpuidle_device *dev,
 	return (int)us;
 }
 
+extern bool tegra_nvrm_lp2_allowed(void);
 extern unsigned int tegra_suspend_lp2(unsigned int);
 
 static int tegra_idle_enter_lp2(struct cpuidle_device *dev,
@@ -102,7 +103,7 @@ static int tegra_idle_enter_lp2(struct cpuidle_device *dev,
 	smp_rmb();
 	request = ktime_to_us(tick_nohz_get_sleep_length());
 	if (!lp2_supported || request <= state->exit_latency ||
-			system_is_suspending) {
+		system_is_suspending || (!tegra_nvrm_lp2_allowed())) {
 		dev->last_state = &dev->states[0];
 		return tegra_idle_enter_lp3(dev, &dev->states[0]);
 	}

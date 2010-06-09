@@ -35,6 +35,7 @@
 #include "nvos.h"
 #include "nvrm_memmgr.h"
 #include "nvrm_ioctls.h"
+#include "nvrm_power_private.h"
 #include "mach/nvrm_linux.h"
 #include "nvos_ioctl.h"
 #include "nvreftrack.h"
@@ -586,6 +587,34 @@ static struct early_suspend tegra_display_power =
 	.level = EARLY_SUSPEND_LEVEL_DISABLE_FB
 };
 #endif
+
+/*
+ * NVRM CPU power gating (LP2) policy
+ */
+static ssize_t
+nvrm_lp2policy_show(struct kobject *kobj, struct kobj_attribute *attr,
+			char *buf)
+{
+	return sprintf(buf, "%u\n", g_Lp2Policy);
+}
+
+static ssize_t
+nvrm_lp2policy_store(struct kobject *kobj, struct kobj_attribute *attr,
+			const char *buf, size_t count)
+{
+	unsigned int n, policy;
+
+	n = sscanf(buf, "%u", &policy);
+	if ((n != 1) || (policy >= NvRmLp2Policy_Num))
+		return -1;
+
+	g_Lp2Policy = policy;
+	return count;
+}
+
+static struct kobj_attribute nvrm_lp2policy_attribute =
+	__ATTR(lp2policy, 0644, nvrm_lp2policy_show, nvrm_lp2policy_store);
+
 #endif
 
 static int __init nvrm_init(void)
@@ -605,6 +634,7 @@ static int __init nvrm_init(void)
 
 	// Create /sys/power/nvrm/notifier.
 	nvrm_kobj = kobject_create_and_add("nvrm", power_kobj);
+	sysfs_create_file(nvrm_kobj, &nvrm_lp2policy_attribute.attr);
 	sysfs_create_file(nvrm_kobj, &nvrm_notifier_attribute.attr);
 	sys_nvrm_notifier = NULL;
 	init_waitqueue_head(&sys_nvrm_notifier_wait);

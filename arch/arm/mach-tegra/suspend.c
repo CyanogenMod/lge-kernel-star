@@ -93,6 +93,34 @@ static void __iomem *tmrus = IO_ADDRESS(TEGRA_TMRUS_BASE);
 static struct clk *tegra_pclk = NULL;
 static const struct tegra_suspend_platform_data *pdata = NULL;
 
+bool tegra_nvrm_lp2_allowed(void)
+{
+	bool ret_value = true;
+
+#ifdef CONFIG_TEGRA_NVRM
+	if (s_hRmGlobal) {
+		if (g_Lp2Policy == NvRmLp2Policy_Disabled)
+			ret_value = false;
+		else if(g_Lp2Policy == NvRmLp2Policy_EnterInLowCorner)
+			ret_value = NvRmPrivGetDfsFlags(s_hRmGlobal) &
+					NvRmDfsStatusFlags_Pause;
+	}
+#endif
+	return ret_value;
+}
+
+static bool tegra_nvrm_lp2_persist(void)
+{
+	bool ret_value = true;
+
+#ifdef CONFIG_TEGRA_NVRM
+	if (s_hRmGlobal && (g_Lp2Policy == NvRmLp2Policy_MaskInLowCorner))
+		ret_value = NvRmPrivGetDfsFlags(s_hRmGlobal) &
+				NvRmDfsStatusFlags_Pause;
+#endif
+	return ret_value;
+}
+
 static void set_powergood_time(unsigned int us)
 {
 	static int last_pclk = 0;
@@ -146,7 +174,8 @@ static noinline void restore_cpu_complex(void)
 	gic_dist_restore(0);
 	get_irq_chip(IRQ_LOCALTIMER)->unmask(IRQ_LOCALTIMER);
 
-	enable_irq(INT_SYS_STATS_MON);
+	if(tegra_nvrm_lp2_persist())
+		enable_irq(INT_SYS_STATS_MON);
 }
 
 extern unsigned long tegra_pgd_phys;
@@ -156,7 +185,8 @@ static noinline void suspend_cpu_complex(void)
 	unsigned int reg;
 	int i;
 
-	disable_irq(INT_SYS_STATS_MON);
+	if(tegra_nvrm_lp2_persist())
+		disable_irq(INT_SYS_STATS_MON);
 
 	/* switch coresite to clk_m, save off original source */
 	tegra_sctx.clk_csite_src = readl(clk_rst + CLK_RESET_SOURCE_CSITE);
