@@ -99,8 +99,8 @@ static const NvOdmTouchCapabilities TPK_Capabilities =
     15, //MaxNumberOfWidthReported
     255, //MaxNumberOfPressureReported
     (NvU32)NvOdmTouchGesture_Not_Supported, //Gesture
-    1, //IsWidthSupported
-    1, //IsPressureSupported
+    0, //IsWidthSupported
+    0, //IsPressureSupported
     1, //IsFingersSupported
     0, //XMinPosition
     0, //YMinPosition

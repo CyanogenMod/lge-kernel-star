@@ -36,6 +36,8 @@
 
 #define TOOL_PRESSURE	100
 #define TOOL_WIDTH	8
+/* the kernel supports 5 fingers only as of now */
+#define MAX_FINGERS	5
 
 struct tegra_touch_driver_data
 {
@@ -115,13 +117,13 @@ static int tegra_touch_thread(void *pdata)
 	struct tegra_touch_driver_data *touch =
 		(struct tegra_touch_driver_data*)pdata;
 	NvOdmTouchCoordinateInfo c = {0};
-	NvU32 x[2] = {0}, y[2] = {0}, i = 0;
-	NvU32 Pressure = TOOL_PRESSURE, Width = TOOL_WIDTH;
-	static NvU32 prev_x[2] = {0}, prev_y[2] = {0};
+	NvU32 x[MAX_FINGERS] = {0}, y[MAX_FINGERS] = {0}, i = 0;
+	NvU32 Pressure[MAX_FINGERS] = {TOOL_PRESSURE};
+	NvU32 Width[MAX_FINGERS] = {TOOL_WIDTH};
+	static NvU32 prev_x0 = 0, prev_y0 = 0;
 	NvBool bKeepReadingSamples = NV_FALSE;
-	NvU32 fingers = 0;
+	NvU32 fingers = 0, index, offset;
 	NvOdmTouchCapabilities *caps = &touch->caps;
-	NvU32 max_fingers = caps->MaxNumberOfFingerCoordReported;
 
 	/* touch event thread should be frozen before suspend */
 	set_freezable_with_signal();
@@ -142,94 +144,102 @@ static int tegra_touch_thread(void *pdata)
 
 			fingers = c.additionalInfo.Fingers;
 
-			switch (fingers) {
-			case 0:
-				x[0] = prev_x[0];
-				y[0] = prev_y[0];
-				Pressure = 0;
-				break;
-			case 1:
+			if (fingers == 0) {
+				x[0] = prev_x0;
+				y[0] = prev_y0;
+				Pressure[0] = 0;
+				Width[0] = 0;
+			}
+			else if (fingers == 1) {
 				x[0] = c.xcoord;
 				y[0] = c.ycoord;
-				Pressure = TOOL_PRESSURE;
-				break;
-			case 2:
+				if (caps->IsPressureSupported)
+					Pressure[0] = c.additionalInfo.Pressure[0];
+				else
+					Pressure[0] = TOOL_PRESSURE;
+				if (caps->IsWidthSupported)
+					Width[0] = c.additionalInfo.width[0];
+				else
+					Width[0] = TOOL_WIDTH;
+			}
+			else if ((fingers >= 2) && (fingers <= MAX_FINGERS)) {
 				for (i = 0; i < fingers; i++) {
 					x[i] = c.additionalInfo.multi_XYCoords[i][0];
 					y[i] = c.additionalInfo.multi_XYCoords[i][1];
+					if (caps->IsPressureSupported)
+						Pressure[i] = c.additionalInfo.Pressure[i];
+					else
+						Pressure[i] = TOOL_PRESSURE;
+					if (caps->IsWidthSupported)
+						Width[i] = c.additionalInfo.width[i];
+					else
+						Width[i] = TOOL_WIDTH;
 				}
-				Pressure = TOOL_PRESSURE;
-				break;
-			default:
+			}
+			else {
 				/* can occur because of sensor errors */
-				x[0] = prev_x[0];
-				y[0] = prev_y[0];
+				x[0] = prev_x0;
+				y[0] = prev_y0;
 				fingers = 1;
 			}
 
 			/* transformation from touch to screen orientation */
 			if (caps->Orientation & NvOdmTouchOrientation_V_FLIP) {
-				y[0] = caps->YMaxPosition +
-					caps->YMinPosition - y[0];
-				y[1] = caps->YMaxPosition +
-					caps->YMinPosition - y[1];
+				for (i = 0; i < fingers; i++) {
+					y[i] = caps->YMaxPosition +
+						caps->YMinPosition - y[i];
+				}
 			}
 			if (caps->Orientation & NvOdmTouchOrientation_H_FLIP) {
-				x[0] = caps->XMaxPosition +
-					caps->XMinPosition - x[0];
-				x[1] = caps->XMaxPosition +
-					caps->XMinPosition - x[1];
+				for (i = 0; i < fingers; i++) {
+					x[i] = caps->XMaxPosition +
+						caps->XMinPosition - x[i];
+				}
 			}
-
 			if (caps->Orientation & NvOdmTouchOrientation_XY_SWAP) {
-				for (i = 0; i < max_fingers; i++)
+				for (i = 0; i < fingers; i++)
 					swapv(x[i],y[i]);
 			}
-
-			/* report 1st finger's co-ordinates */
-			input_report_abs(touch->input_dev, ABS_X, x[0]);
-			input_report_abs(touch->input_dev, ABS_Y, y[0]);
-			prev_x[0] = x[0];
-			prev_y[0] = y[0];
 
 			/* Report number of fingers */
 			input_report_key(touch->input_dev,
 					BTN_TOUCH, fingers);
-			input_report_key(touch->input_dev,
-				BTN_2, fingers == 2);
-
-			/* report co-ordinates for the 2nd finger */
-			if (fingers == 2) {
-				input_report_abs(touch->input_dev,
-					ABS_HAT0X, x[1]); // x
-				input_report_abs(touch->input_dev,
-					ABS_HAT0Y, y[1]); // y
-				prev_x[1] = x[1];
-				prev_y[1] = y[1];
+			for (i = 0; i < (MAX_FINGERS - 1); i++) {
+				input_report_key(touch->input_dev,
+					BTN_2 + i, fingers >= (i + 2));
 			}
 
-			input_report_abs(touch->input_dev,
-				ABS_MT_TOUCH_MAJOR, Pressure);
-			input_report_abs(touch->input_dev,
-				ABS_MT_WIDTH_MAJOR, Width);
-			input_report_abs(touch->input_dev,
-				ABS_MT_POSITION_X, x[0]);
-			input_report_abs(touch->input_dev,
-				ABS_MT_POSITION_Y, y[0]);
-			input_mt_sync(touch->input_dev);
+			if (fingers <= 1) {
+				input_report_abs(touch->input_dev, ABS_X, x[0]);
+				input_report_abs(touch->input_dev, ABS_Y, y[0]);
+				prev_x0 = x[0];
+				prev_y0 = y[0];
+			}
+			else if ((fingers >= 2) && (fingers <= MAX_FINGERS)) {
+				index = 1;
+				for (offset = 0; offset < (ABS_HAT3Y-ABS_HAT0X); offset + 2) {
+					input_report_abs(touch->input_dev,
+						ABS_HAT0X + offset, x[index]); // x
+					input_report_abs(touch->input_dev,
+						ABS_HAT0Y + offset, y[index]); // y
+					index++;
+				}
+			}
 
-			/* report co-ordinates for the 2nd finger */
-			if (fingers == 2) {
+			/* report co-ordinates to the multi-touch stack */
+			i = 0;
+			do {
 				input_report_abs(touch->input_dev,
-					ABS_MT_TOUCH_MAJOR, Pressure);
+					ABS_MT_TOUCH_MAJOR, Pressure[i]);
 				input_report_abs(touch->input_dev,
-					ABS_MT_WIDTH_MAJOR, Width);
+					ABS_MT_WIDTH_MAJOR, Width[i]);
 				input_report_abs(touch->input_dev,
-					ABS_MT_POSITION_X, x[1]);
+					ABS_MT_POSITION_X, x[i]);
 				input_report_abs(touch->input_dev,
-					ABS_MT_POSITION_Y, y[1]);
+					ABS_MT_POSITION_Y, y[i]);
 				input_mt_sync(touch->input_dev);
-			}
+				i++;
+			} while (i < fingers);
 			input_sync(touch->input_dev);
 
 			bKeepReadingSamples = NV_FALSE;
@@ -248,7 +258,7 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 {
 	struct tegra_touch_driver_data *touch = NULL;
 	struct input_dev *input_dev = NULL;
-	int err;
+	int err, i = 0, offset = 0;
 	NvOdmTouchCapabilities *caps;
 
 	touch = kzalloc(sizeof(struct tegra_touch_driver_data), GFP_KERNEL);
@@ -298,10 +308,11 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 	set_bit(EV_KEY, touch->input_dev->evbit);
 	/* Input values are in absoulte values */
 	set_bit(EV_ABS, touch->input_dev->evbit);
-	/* virtual key is BTN_TOUCH */
+	/* supported virtual keys */
 	set_bit(BTN_TOUCH, touch->input_dev->keybit);
-	/* virtual key is BTN_2 */
-	set_bit(BTN_2, touch->input_dev->keybit);
+	for (i = 0; i < (MAX_FINGERS - 1); i++) {
+		set_bit(BTN_2 + i, touch->input_dev->keybit);
+	}
 
 	/* expose multi-touch capabilities */
 	set_bit(ABS_MT_TOUCH_MAJOR, touch->input_dev->keybit);
@@ -331,10 +342,12 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 		touch->MaxX, 0, 0);
 	input_set_abs_params(touch->input_dev, ABS_Y, touch->MinY,
 		touch->MaxY, 0, 0);
-	input_set_abs_params(touch->input_dev, ABS_HAT0X, touch->MinX,
-		touch->MaxX, 0, 0);
-	input_set_abs_params(touch->input_dev, ABS_HAT0Y, touch->MinY,
-		touch->MaxY, 0, 0);
+	for (offset = 0; offset < (ABS_HAT3Y-ABS_HAT0X); offset + 2) {
+		input_set_abs_params(touch->input_dev, ABS_HAT0X + offset, touch->MinX,
+			touch->MaxX, 0, 0);
+		input_set_abs_params(touch->input_dev, ABS_HAT0Y + offset, touch->MinY,
+			touch->MaxY, 0, 0);
+	}
 	input_set_abs_params(touch->input_dev, ABS_MT_POSITION_X,
 		touch->MinX, touch->MaxX, 0, 0);
 	input_set_abs_params(touch->input_dev, ABS_MT_POSITION_Y,
@@ -346,12 +359,23 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 		input_set_abs_params(touch->input_dev, ABS_PRESSURE, 0,
 			caps->MaxNumberOfPressureReported, 0, 0);
 	}
-
+	else {
+		input_set_abs_params(touch->input_dev, ABS_MT_TOUCH_MAJOR,
+			0, TOOL_PRESSURE, 0, 0);
+		input_set_abs_params(touch->input_dev, ABS_PRESSURE, 0,
+			TOOL_PRESSURE, 0, 0);
+	}
 	if (caps->IsWidthSupported) {
 		input_set_abs_params(touch->input_dev, ABS_TOOL_WIDTH, 0,
 			caps->MaxNumberOfWidthReported, 0, 0);
 		input_set_abs_params(touch->input_dev, ABS_MT_WIDTH_MAJOR, 0,
 			caps->MaxNumberOfWidthReported, 0, 0);
+	}
+	else {
+		input_set_abs_params(touch->input_dev, ABS_TOOL_WIDTH, 0,
+			TOOL_WIDTH, 0, 0);
+		input_set_abs_params(touch->input_dev, ABS_MT_WIDTH_MAJOR, 0,
+			TOOL_WIDTH, 0, 0);
 	}
 
 	platform_set_drvdata(pdev, touch);
