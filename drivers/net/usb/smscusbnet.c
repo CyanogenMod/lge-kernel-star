@@ -1563,7 +1563,11 @@ int smscusbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,18))
 #if defined(CONFIG_PM) && defined(CONFIG_USB_SUSPEND)
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,31))
+    if(atomic_read(&dev->uintf->pm_usage_cnt)<=0){
+#else
     if(dev->uintf->pm_usage_cnt <= 0){
+#endif
 	netif_stop_queue (net);
         smscusbnet_defer_myevent(dev, EVENT_IDLE_RESUME);
         return NET_XMIT_DROP;
