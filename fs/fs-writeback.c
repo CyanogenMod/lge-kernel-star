@@ -1199,11 +1199,16 @@ static void wait_sb_inodes(struct super_block *sb)
  * for IO completion of submitted IO. The number of pages submitted is
  * returned.
  */
+#define freezing_or_frozen(x) (freezing(x) || frozen(x))
+
 void writeback_inodes_sb(struct super_block *sb)
 {
 	unsigned long nr_dirty = global_page_state(NR_FILE_DIRTY);
 	unsigned long nr_unstable = global_page_state(NR_UNSTABLE_NFS);
 	long nr_to_write;
+
+	if (unlikely(freezing_or_frozen(default_backing_dev_info.wb.task)))
+		return;
 
 	nr_to_write = nr_dirty + nr_unstable +
 			(inodes_stat.nr_inodes - inodes_stat.nr_unused);
@@ -1221,6 +1226,9 @@ EXPORT_SYMBOL(writeback_inodes_sb);
  */
 void sync_inodes_sb(struct super_block *sb)
 {
+	if (unlikely(freezing_or_frozen(default_backing_dev_info.wb.task)))
+		return;
+
 	bdi_sync_writeback(sb->s_bdi, sb);
 	wait_sb_inodes(sb);
 }
