@@ -75,6 +75,12 @@ Max8907bPrivData *hMax8907bPmu;
 // sequencer 2 because of the bug in the silicon.
 #define MAX8907B_II2RR_PWREN_WAR (0x12)
 
+// Power up AVDD_USB on exit from deep sleep mode together with core rail,
+// before boot code starts, and keep it On during resume until USB driver
+// takes over
+#define WAR_AVDD_USB_EARLY_PWR_UP 1
+#define WAR_AVDD_USB_RESUME_KEEP_ON 1
+
 /**
 *   The FAN5355 is used to scale the voltage of an external
 *   DC/DC voltage rail (for PCIE).  However, voltage scaling is
@@ -1269,6 +1275,8 @@ Max8907bPwrEnAttach(
     Max8907bPmuSupply Supply,
     NvBool Attach)
 {
+    static NvU8 s_ResumeSeqSelLdo4 = MAX8907B_SEQSEL_DEFAULT_LDO4;
+
     NvU8 CtlAddr, CtlData, CntAddr, CntData, SeqSel;
 
     switch (Supply)
@@ -1290,10 +1298,23 @@ Max8907bPwrEnAttach(
             if (!Max8907bI2cWrite8(hDevice, CntAddr, CntData))
                 return NV_FALSE;
 
+#if WAR_AVDD_USB_EARLY_PWR_UP
+            // Attach USB rail to sequencer 2 as well, when core is attached
+            // (= entry to LP0), and dettach it respectively.
+            if (!Max8907bPwrEnAttach(hDevice, Max8907bPmuSupply_LDO4, Attach))
+                return NV_FALSE;
+#endif
             CntData = Attach ?  MAX8907B_SEQCNT_PWREN_LX_V2 :
                                 MAX8907B_SEQCNT_DEFAULT_LX_V2;
             SeqSel = Attach ? MAX8907B_SEQSEL_PWREN_LXX :
                               MAX8907B_SEQSEL_DEFAULT_LX_V2;
+            break;
+
+        case Max8907bPmuSupply_LDO4:    // USB
+            CntData = Attach ?  MAX8907B_SEQCNT_PWREN_LD04 :
+                                MAX8907B_SEQCNT_DEFAULT_LDO4;
+            SeqSel = Attach ? MAX8907B_SEQSEL_PWREN_LXX :
+                              s_ResumeSeqSelLdo4;
             break;
 
         default:
@@ -1306,6 +1327,18 @@ Max8907bPwrEnAttach(
     // Read control refgister, and select target sequencer
     if (!Max8907bI2cRead8(hDevice, CtlAddr, &CtlData))
         return NV_FALSE;
+
+    if (Supply == Max8907bPmuSupply_LDO4)
+    {
+        NvU8 seq = (CtlData >> MAX8907B_CTL_SEQ_SHIFT) & MAX8907B_CTL_SEQ_MASK;
+        NvOdmOsPrintf("[NVODM PMU] AVDD_USB switching sequencer from %d to %d,"
+                        " (control was = 0x%x)\n", seq, SeqSel, CtlData);
+#if !WAR_AVDD_USB_RESUME_KEEP_ON
+        if (Attach)
+            s_ResumeSeqSelLdo4 = seq;  // save to restore on LP0 resume
+#endif
+    }
+
     CtlData &= (~(MAX8907B_CTL_SEQ_MASK << MAX8907B_CTL_SEQ_SHIFT ));
     CtlData |= ((SeqSel & MAX8907B_CTL_SEQ_MASK) << MAX8907B_CTL_SEQ_SHIFT );
 

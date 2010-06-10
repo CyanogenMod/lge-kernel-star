@@ -79,6 +79,7 @@ extern "C"
 // Defines default sequencer selection
 #define MAX8907B_SEQSEL_DEFAULT_LX_V1       0   /* SEQ1 (SYSEN) */
 #define MAX8907B_SEQSEL_DEFAULT_LX_V2       0   /* SEQ1 (SYSEN) */
+#define MAX8907B_SEQSEL_DEFAULT_LDO4        0   /* SEQ1 (SYSEN) */
 
 // Defines common for all supplies PWREN  sequencer selection
 #define MAX8907B_SEQSEL_PWREN_LXX           1   /* SEQ2 (PWREN) */
@@ -89,6 +90,7 @@ extern "C"
 // Defines sequencer count default values
 #define MAX8907B_SEQCNT_DEFAULT_LX_V1       0x1C
 #define MAX8907B_SEQCNT_DEFAULT_LX_V2       0x1C
+#define MAX8907B_SEQCNT_DEFAULT_LDO4        0x72
 
 // Defines sequencer count PWREN control values (these settings applied
 // togeteher, when both CPU/V1 and CORE/V2 rails are attached to PWREN;
@@ -97,6 +99,7 @@ extern "C"
 // B[3:0] - power down delay in 20us taps
 #define MAX8907B_SEQCNT_PWREN_LX_V1         0xC0    /* 240us up delay */
 #define MAX8907B_SEQCNT_PWREN_LX_V2         0x00    /* no delay */
+#define MAX8907B_SEQCNT_PWREN_LD04          0x00    /* no delay */
 
 // Defines PMU output timing parameters. Scaling up time is dynamically
 // calculated based on the slew rate maintained by MAX8907B. Turn On delay

@@ -414,6 +414,28 @@ static void tegra_suspend_dram(bool lp0_ok)
 	wmb();
 }
 
+static int tegra_suspend_prepare(void)
+{
+#ifdef CONFIG_TEGRA_NVRM
+	NvOdmSocPowerState state =
+		NvOdmQueryLowestSocPowerState()->LowestPowerState;
+
+	NvRmPrivDfsSuspend(state);
+	NvRmPrivPmuLPxStateConfig(s_hRmGlobal, state, NV_TRUE);
+#endif
+	return 0;
+}
+
+static void tegra_suspend_finish(void)
+{
+#ifdef CONFIG_TEGRA_NVRM
+	NvOdmSocPowerState state =
+		NvOdmQueryLowestSocPowerState()->LowestPowerState;
+
+	NvRmPrivPmuLPxStateConfig(s_hRmGlobal, state, NV_FALSE);
+#endif
+}
+
 static int tegra_suspend_prepare_late(void)
 {
 #ifdef CONFIG_TEGRA_NVRM
@@ -610,6 +632,8 @@ static int tegra_suspend_enter(suspend_state_t state)
 
 static struct platform_suspend_ops tegra_suspend_ops = {
 	.valid		= suspend_valid_only_mem,
+	.prepare	= tegra_suspend_prepare,
+	.finish 	= tegra_suspend_finish,
 	.prepare_late	= tegra_suspend_prepare_late,
 	.wake		= tegra_suspend_wake,
 	.enter		= tegra_suspend_enter,
