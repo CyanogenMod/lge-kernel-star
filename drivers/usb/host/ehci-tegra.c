@@ -662,7 +662,8 @@ static int tegra_ehci_resume(struct platform_device * pdev)
 
 	if (!ehci->host_resumed) {
 		tegra_ehci_power_up(hcd);
-		tegra_ehci_restart(hcd);
+		if(!pdata->fast_wakeup)
+			tegra_ehci_restart(hcd);
 	}
 
 	return 0;
