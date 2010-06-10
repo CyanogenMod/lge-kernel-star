@@ -970,12 +970,16 @@ AesCoreSetKey(
                 // It is not dedicated slot => obfuscate the key
                 // Wrap the key using RFC3394 key wrapping algorithm
                 // The wrapped key and RFCwrapped IV will be stored in client handle
-                NV_CHECK_ERROR_CLEANUP(AesCoreWrapKey(
+                AesCoreRequestHwAccess();
+                e = AesCoreWrapKey(
                     pAesClient,
                     pKeyData,
                     gs_OriginalIV,
                     pAesClient->Key,
-                    pAesClient->WrappedIv));
+                    pAesClient->WrappedIv);
+                AesCoreReleaseHwAccess();
+                if (NvSuccess != e)
+                    goto fail;
                 goto done;
             }
             // It is dedicated slot
@@ -1225,6 +1229,7 @@ NvBool AesCoreIsSbkCleared(
     pAesHwCtxt->ppEngineCaps[Engine]->pAesInterf->AesHwClearIv(Engine, DecryptSlot, pAesHwCtxt);
 
     // Clear the DMA buffer before we leave from this operation.
+    NV_ASSERT(pAesHwCtxt->pDmaVirAddr[Engine]);
     NvOsMemset(pAesHwCtxt->pDmaVirAddr[Engine], 0, AES_HW_DMA_BUFFER_SIZE_BYTES);
 
     for (i = 0; i < NvDdkAesConst_BlockLengthBytes; i++)
@@ -1239,6 +1244,7 @@ NvBool AesCoreIsSbkCleared(
 
 fail:
     // Clear the DMA buffer before we leave from this operation
+    NV_ASSERT(pAesHwCtxt->pDmaVirAddr[Engine]);
     NvOsMemset(pAesHwCtxt->pDmaVirAddr[Engine], 0, AES_HW_DMA_BUFFER_SIZE_BYTES);
     AesCoreReleaseHwAccess();
     NvOsMutexUnlock(gs_hAesCoreEngineMutex);
@@ -1414,6 +1420,7 @@ AesCoreIsSskLocked(
     pAesHwCtxt->ppEngineCaps[Engine]->pAesInterf->AesHwClearIv(Engine, DecryptSlot, pAesHwCtxt);
 
     // Clear the DMA buffer before we leave from this operation.
+    NV_ASSERT(pAesHwCtxt->pDmaVirAddr[Engine]);
     NvOsMemset(pAesHwCtxt->pDmaVirAddr[Engine], 0, AES_HW_DMA_BUFFER_SIZE_BYTES);
 
     // Check encrypt and decrypt output is same before and after zero key set to SSK
@@ -1430,6 +1437,7 @@ AesCoreIsSskLocked(
 
 fail:
     // Clear the DMA buffer before we leave from this operation.
+    NV_ASSERT(pAesHwCtxt->pDmaVirAddr[Engine]);
     NvOsMemset(pAesHwCtxt->pDmaVirAddr[Engine], 0, AES_HW_DMA_BUFFER_SIZE_BYTES);
     AesCoreReleaseHwAccess();
     NvOsMutexUnlock(gs_hAesCoreEngineMutex);
@@ -2095,6 +2103,7 @@ AesCoreProcessBuffer(
     }
 
     // Clear the DMA buffer before we leave from this operation
+    NV_ASSERT(pAesHwCtxt->pDmaVirAddr[pAesClient->Engine]);
     NvOsMemset(pAesHwCtxt->pDmaVirAddr[pAesClient->Engine], 0, AES_HW_DMA_BUFFER_SIZE_BYTES);
     NvOsMutexUnlock(gs_hAesCoreEngineMutex);
     return NvSuccess;
@@ -2103,6 +2112,7 @@ fail:
     // Release the H/W semaphore
     AesCoreReleaseHwAccess();
     // Clear the DMA buffer before we leave from this operation
+    NV_ASSERT(pAesHwCtxt->pDmaVirAddr[pAesClient->Engine]);
     NvOsMemset(pAesHwCtxt->pDmaVirAddr[pAesClient->Engine], 0, AES_HW_DMA_BUFFER_SIZE_BYTES);
     NvOsMutexUnlock(gs_hAesCoreEngineMutex);
     return e;
@@ -2240,6 +2250,7 @@ AesCoreIsUserKeyCleared(
     AesCoreReleaseHwAccess();
 
     // Clear the DMA buffer before we leave from this operation
+    NV_ASSERT(pAesHwCtxt->pDmaVirAddr[Engine]);
     NvOsMemset(pAesHwCtxt->pDmaVirAddr[Engine], 0, AES_HW_DMA_BUFFER_SIZE_BYTES);
 
     for (i = 0; i < NvDdkAesConst_BlockLengthBytes; i++)
@@ -2253,6 +2264,7 @@ AesCoreIsUserKeyCleared(
 
 fail:
     // Clear the DMA buffer before we leave from this operation
+    NV_ASSERT(pAesHwCtxt->pDmaVirAddr[Engine]);
     NvOsMemset(pAesHwCtxt->pDmaVirAddr[Engine], 0, AES_HW_DMA_BUFFER_SIZE_BYTES);
     NvOsMutexUnlock(gs_hAesCoreEngineMutex);
     return NV_FALSE;
@@ -2352,6 +2364,7 @@ fail:
 
 /**
  * Encrypt/Decrypt the given input buffer using Electronic CodeBook (ECB) mode.
+ * Prerequisite:It is caller responsibility to acquire hardware lock before using this function.
  *
  * @param pAesClient Pointer to AES client.
  * @param pInputBuffer Pointer to input bufffer.
@@ -2387,8 +2400,6 @@ AesCoreEcbProcessBuffer(
 
     NVDDK_AES_CHECK_INTERFACE(pAesHwCtxt, SskEngine);
 
-    AesCoreRequestHwAccess();
-
     // Select SSK key for processing
     NVDDK_AES_CHECK_INTERFACE_FUNC(pAesHwCtxt, SskEngine, AesHwSelectKeyIvSlot);
     pAesHwCtxt->ppEngineCaps[SskEngine]->pAesInterf->AesHwSelectKeyIvSlot(SskEngine, SskKeySlot, pAesHwCtxt);
@@ -2404,7 +2415,10 @@ AesCoreEcbProcessBuffer(
         pOutputBuffer,
         pAesHwCtxt);
 
-    AesCoreReleaseHwAccess();
+    // Clear the DMA buffer
+    NV_ASSERT(pAesHwCtxt->pDmaVirAddr[SskEngine]);
+    NvOsMemset(pAesHwCtxt->pDmaVirAddr[SskEngine], 0, AES_HW_DMA_BUFFER_SIZE_BYTES);
+
     return e;
 }
 
