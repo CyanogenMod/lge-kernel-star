@@ -191,9 +191,6 @@ static struct Ap20CpuConfigRec
     // PLLX frequency steps table pointer 
     const NvRmFreqKHz* pPllXStepsKHz;
 
-    // CPU power good delay in microseconds
-    NvU32 CpuPowerGoodUs;
-
     // Core over CPU voltage dependency parameters:
     // Vcore >= CoreOverCpuSlope * Vcpu + CoreOverCpuOffset
     NvU32 CoreOverCpuOffset;
@@ -1160,22 +1157,6 @@ Ap20SystemBusClockConfigure(
         hRmDevice, pCinfo, MaxKHz, pDomainKHz, &SourceId));
 }
 
-static void
-Ap20SetCpuPowerGoodDelay(
-    NvRmDeviceHandle hRmDevice,
-    NvRmFreqKHz ApbKHz)
-{
-    NvU32 reg;
-    NV_ASSERT(s_Ap20CpuConfig.CpuPowerGoodUs);
-
-    // AP20 CPU power good delay is counted by h/w in APB clocks (use 
-    // 1/1000 ~ 17/16384 with 3% margin)
-    reg = ((ApbKHz * 17) >> 14) * s_Ap20CpuConfig.CpuPowerGoodUs;
-    reg = NV_DRF_NUM(APBDEV_PMC, CPUPWRGOOD_TIMER, DATA, reg);
-    NV_REGW(hRmDevice, NvRmModuleID_Pmif, 0,
-            APBDEV_PMC_CPUPWRGOOD_TIMER_0, reg);
-}
-
 /*****************************************************************************/
 
 // Fixed point calculation bits
@@ -1196,13 +1177,11 @@ static void Ap20CpuConfigInit(NvRmDeviceHandle hRmDevice)
     // parameters based on PMU property.
     if (!NvOdmQueryGetPmuProperty(&PmuProperty))
     {
-        PmuProperty.CpuPowerGoodUs = NVRM_DEFAULT_CPU_PWRGOOD_US;
         PmuProperty.AccuracyPercent = NVRM_DEFAULT_PMU_ACCURACY_PCT;
     }
-    NV_ASSERT(PmuProperty.CpuPowerGoodUs && PmuProperty.AccuracyPercent);
+    NV_ASSERT(PmuProperty.AccuracyPercent);
     NV_ASSERT(PmuProperty.AccuracyPercent < 5);  // 5% is a must for PMU
 
-    s_Ap20CpuConfig.CpuPowerGoodUs = PmuProperty.CpuPowerGoodUs;
     s_Ap20CpuConfig.CoreOverCpuOffset = (NV_AP20_CORE_OVER_CPU_MV * 100) /
                                         (100 - PmuProperty.AccuracyPercent);
     s_Ap20CpuConfig.CoreOverCpuSlope =
@@ -1421,7 +1400,6 @@ NvBool NvRmPrivAp20DfsClockConfigure(
         &pDfsKHz->Domains[NvRmDfsClockId_Ahb],
         &pDfsKHz->Domains[NvRmDfsClockId_Apb],
         pMaxKHz->Domains[NvRmDfsClockId_Apb]);
-    Ap20SetCpuPowerGoodDelay(hRmDevice, pDfsKHz->Domains[NvRmDfsClockId_Apb]);
     Ap20VdeClockConfigure(hRmDevice,
         pMaxKHz->Domains[NvRmDfsClockId_Vpipe],
         &pDfsKHz->Domains[NvRmDfsClockId_Vpipe],
@@ -1636,8 +1614,6 @@ NvRmPrivAp20FastClockConfig(NvRmDeviceHandle hRmDevice)
             NvRmClockSource_PllC1, 0, 0);
     }
     NvRmPrivBusClockInit(hRmDevice, SclkKHz);
-    Ap20SetCpuPowerGoodDelay(
-        hRmDevice, NvRmPrivGetClockSourceFreq(NvRmClockSource_Apb));
 
     // Set VDE maximum clock (VDE is disabled after basic reset - need to
     // temporary enable it for configuration)

@@ -74,6 +74,8 @@ static void __iomem *tmrus = IO_ADDRESS(TEGRA_TMRUS_BASE);
 #define PMC_COREPWRGOOD_TIMER	0x3c
 #define PMC_SCRATCH1		0x54
 #define PMC_CPUPWRGOOD_TIMER	0xc8
+#define PMC_CPUPWROFF_TIMER	0xcc
+#define PMC_COREPWROFF_TIMER	0xe0
 #define PMC_SCRATCH38		0x134
 #define PMC_SCRATCH39		0x138
 
@@ -121,7 +123,7 @@ static bool tegra_nvrm_lp2_persist(void)
 	return ret_value;
 }
 
-static void set_powergood_time(unsigned int us)
+static void set_power_timers(unsigned long us_on, unsigned long us_off)
 {
 	static int last_pclk = 0;
 	unsigned long long ticks;
@@ -129,9 +131,13 @@ static void set_powergood_time(unsigned int us)
 
 	pclk = clk_get_rate(tegra_pclk);
 	if (pclk != last_pclk) {
-		ticks = (us * pclk) + 999999ull;
+		ticks = (us_on * pclk) + 999999ull;
 		do_div(ticks, 1000000);
-		writel((unsigned int)ticks, pmc + PMC_CPUPWRGOOD_TIMER);
+		writel((unsigned long)ticks, pmc + PMC_CPUPWRGOOD_TIMER);
+
+		ticks = (us_off * pclk) + 999999ull;
+		do_div(ticks, 1000000);
+		writel((unsigned long)ticks, pmc + PMC_CPUPWROFF_TIMER);
 		wmb();
 	}
 	last_pclk = pclk;
@@ -228,9 +234,7 @@ unsigned int tegra_suspend_lp2(unsigned int us)
 	orig = readl(evp_reset);
 	writel(virt_to_phys(tegra_lp2_startup), evp_reset);
 
-	/* FIXME: power good time (in us) should come from the board file,
-	 * not hard-coded here. */
-	set_powergood_time(pdata->cpu_timer);
+	set_power_timers(pdata->cpu_timer, pdata->cpu_off_timer);
 
 	if (us)
 		tegra_lp2_set_trigger(us);
@@ -452,6 +456,7 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 		u32 reg = 0, mode;
 
 		writel(pdata->core_timer, pmc + PMC_COREPWRGOOD_TIMER);
+		writel(pdata->core_off_timer, pmc + PMC_COREPWROFF_TIMER);
 		reg = readl(pmc + PMC_CTRL);
 		mode = (reg >> TEGRA_POWER_PMC_SHIFT) & TEGRA_POWER_PMC_MASK;
 

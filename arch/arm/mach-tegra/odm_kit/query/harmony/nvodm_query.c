@@ -677,6 +677,8 @@ NvBool NvOdmQueryGetPmuProperty(NvOdmPmuProperty* pPmuProperty)
     pPmuProperty->CpuPowerGoodUs = 2000;
     pPmuProperty->AccuracyPercent = 3;
     pPmuProperty->VCpuOTPOnWakeup = NV_FALSE;
+    pPmuProperty->PowerOffCount = 0;
+    pPmuProperty->CpuPowerOffUs = 0;
     return NV_TRUE;
 }
 

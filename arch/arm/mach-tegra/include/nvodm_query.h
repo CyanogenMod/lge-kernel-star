@@ -844,6 +844,15 @@ typedef struct NvOdmPmuPropertyRec
     /// Specifies PMU Core and CPU voltage regulation accuracy in percent
     NvU32 AccuracyPercent;
 
+    /// Specifies the minimum time required for core power request to be
+    /// inactive (in 32 kHz counts).
+    NvU32 PowerOffCount;
+
+    /// Specifies the minimum time required for CPU power request to be
+    /// inactive (in US). Relevant for SoC with separate CPU and core power
+    /// request outputs.
+    NvU32 CpuPowerOffUs;
+
 } NvOdmPmuProperty;
 
 /**

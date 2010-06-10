@@ -1303,7 +1303,10 @@ static void __init tegra_setup_suspend(void)
 
 	if (has_pmu) {
 		plat->cpu_timer = pmu.CpuPowerGoodUs;
+		plat->cpu_off_timer = pmu.CpuPowerOffUs;
 		plat->core_timer = pmu.PowerGoodCount;
+		plat->core_off_timer = pmu.PowerOffCount;
+
 		plat->separate_req = !pmu.CombinedPowerReq;
 		plat->corereq_high =
 			(pmu.CorePowerReqPolarity ==
