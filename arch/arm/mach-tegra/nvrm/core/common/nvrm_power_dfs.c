@@ -3283,16 +3283,19 @@ NvRmDfsGetClockUtilization(
     NV_ASSERT(pClockUsage);
     NV_ASSERT((0 < ClockId) && (ClockId < NvRmDfsClockId_Num));
 
-    DfsClockFreqGet(hRmDeviceHandle, &DfsKHz);
-
-    NvOsIntrMutexLock(pDfs->hIntrMutex);
-
     // If DFS is not running - update current frequencies directly from h/w
     if (pDfs->DfsRunState <= NvRmDfsRunState_Stopped)
     {
+        DfsClockFreqGet(hRmDeviceHandle, &DfsKHz);
+
+        NvOsIntrMutexLock(pDfs->hIntrMutex);
         pDfs->CurrentKHz = DfsKHz;
         if (pDfs->Samplers[ClockId].MonitorPresent)
             pDfs->Samplers[ClockId].AverageKHz = DfsKHz.Domains[ClockId];
+    }
+    else
+    {
+        NvOsIntrMutexLock(pDfs->hIntrMutex);
     }
     // Update clock info
     pClockUsage->MinKHz = pDfs->DfsParameters[ClockId].MinKHz;
