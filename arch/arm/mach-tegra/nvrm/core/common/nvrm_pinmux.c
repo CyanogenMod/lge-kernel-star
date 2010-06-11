@@ -178,31 +178,18 @@ typedef struct
     (*pfnSetDefaultTristate)(
         NvRmDeviceHandle hDevice);
 } NvPinmuxPrivMethods;
-
-static NvPinmuxPrivMethods* NvRmPrivGetPinmuxMethods(NvRmDeviceHandle hDevice)
-{
-    static NvPinmuxPrivMethods *p;
-    static NvPinmuxPrivMethods s_Ap20Methods =
+    static NvPinmuxPrivMethods s_PinmuxMethods =
     {
-        NvRmPrivAp20EnableExternalClockSource,
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+    NvRmPrivAp20EnableExternalClockSource,
         NvRmPrivAp20GetExternalClockSourceFreq,
         NvRmPrivAp20GetModuleInterfaceCaps,
         NvRmAp20GetStraps,
         NvRmAp20SetDefaultTristate
-    };
-
-    NV_ASSERT(hDevice);
-    if (hDevice->ChipId.Id == 0x20)
-    {
-        p = &s_Ap20Methods;
-    }
-    else
-    {
-        NV_ASSERT(!"Unsupported chip ID");
-        p = NULL;
-    }
-    return p;
-}
+#else
+#error "Unsupported Tegra architecture"
+#endif
+};
 
 static void NvRmPrivApplyAllModuleTypePinMuxes(
     NvRmDeviceHandle hDevice,
@@ -307,13 +294,12 @@ void NvRmInitPinMux(
     NvRmDeviceHandle hDevice,
     NvBool First)
 {
-    NvPinmuxPrivMethods *p = NvRmPrivGetPinmuxMethods(hDevice);
-    if (First)
-        (p->pfnSetDefaultTristate)(hDevice);
+    if (First) {
+        tegra_pinmux_init_pingroups();
+        (s_PinmuxMethods.pfnSetDefaultTristate)(hDevice);
+    }
 
-#if (!NVOS_IS_WINDOWS_CE || NV_OAL)
     NvRmPrivApplyAllPinMuxes(hDevice, First);
-#endif
 }
 
 /* RmPinMuxConfigSelect sets a specific module to a specific configuration.
@@ -636,7 +622,6 @@ NvU32 NvRmExternalClockConfig(
     struct tegra_pingroup_config *pin_config;
     int len = 0;
     tegra_tristate_t tristate;
-    NvPinmuxPrivMethods *p = NvRmPrivGetPinmuxMethods(hDevice);
 
 
     NV_ASSERT(hDevice);
@@ -673,8 +658,8 @@ NvU32 NvRmExternalClockConfig(
     {
         tristate = (EnableTristate)?TEGRA_TRI_TRISTATE: TEGRA_TRI_NORMAL;
         tegra_pinmux_config_tristate_table(pin_config, len, tristate);
-        (p->pfnEnableExtClock)(hDevice, pin_config, len, !EnableTristate);
-        ret = (p->pfnGetExtClockFreq)(hDevice, pin_config, len);
+        (s_PinmuxMethods.pfnEnableExtClock)(hDevice, pin_config, len, !EnableTristate);
+        ret = (s_PinmuxMethods.pfnGetExtClockFreq)(hDevice, pin_config, len);
     }
     return ret;
 }
@@ -690,7 +675,6 @@ NvError NvRmGetModuleInterfaceCapabilities(
     NvOdmIoModule OdmModules[4];
     NvU32 OdmInstances[4];
     NvU32 NumOdmModules;
-    NvPinmuxPrivMethods *p = NvRmPrivGetPinmuxMethods(hRm);
 
     NV_ASSERT(hRm);
     NV_ASSERT(pCaps);
@@ -746,7 +730,7 @@ NvError NvRmGetModuleInterfaceCapabilities(
     if (OdmInstances[0]>=NumOdmConfigs || !OdmConfigs[OdmInstances[0]])
         return NvError_NotSupported;
 
-    return (p->pfnInterfaceCaps)(OdmModules[0],OdmInstances[0],
+    return (s_PinmuxMethods.pfnInterfaceCaps)(OdmModules[0],OdmInstances[0],
                             OdmConfigs[OdmInstances[0]],pCaps);
 }
 
@@ -755,11 +739,10 @@ NvError NvRmGetStraps(
     NvRmStrapGroup StrapGroup,
     NvU32* pStrapValue)
 {
-    NvPinmuxPrivMethods *p = NvRmPrivGetPinmuxMethods(hDevice);
     NV_ASSERT(hDevice && pStrapValue);
 
     if (!hDevice || !pStrapValue)
         return NvError_BadParameter;
-    return (p->pfnGetStraps)(hDevice, StrapGroup, pStrapValue);
+    return (s_PinmuxMethods.pfnGetStraps)(hDevice, StrapGroup, pStrapValue);
 }
 
