@@ -452,7 +452,19 @@ static void tegra_dma_update_hw(struct tegra_dma_channel *ch,
 	ch->csr &= ~CSR_REQ_SEL_MASK;
 	ch->csr |= req->req_sel << CSR_REQ_SEL_SHIFT;
 	ch->ahb_seq &= ~AHB_SEQ_BURST_MASK;
-	ch->ahb_seq |= AHB_SEQ_BURST_1;
+
+	/* If slink is the requestor then set burst size based on
+	 * transfer size i.e. if multiple of 16 bytes then busrt is
+	 * 4 word else burst size is 1 word */
+	if ((TEGRA_DMA_REQ_SEL_SL2B1 <= req->req_sel) &&
+		(req->req_sel <= TEGRA_DMA_REQ_SEL_SL2B4)) {
+		if (req->size & 0xF)
+			ch->ahb_seq |= AHB_SEQ_BURST_1;
+		else
+			ch->ahb_seq |= AHB_SEQ_BURST_4;
+	} else {
+		ch->ahb_seq |= AHB_SEQ_BURST_1;
+	}
 
 	/* One shot mode is always single buffered,
 	 * continuous mode is always double buffered
