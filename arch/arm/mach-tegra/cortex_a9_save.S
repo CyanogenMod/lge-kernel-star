@@ -130,7 +130,7 @@
 
 .macro	ctx_ptr, rd, tmp
 	cpu_id	\tmp
-	ldr	\rd, =tegra_context_area
+	mov32	\rd, tegra_context_area
 	ldr	\rd, [\rd]
 	add	\rd, \rd, \tmp, lsl #(CONTEXT_SIZE_WORDS_SHIFT+2)
 .endm
@@ -219,12 +219,12 @@ ENTRY(__cortex_a9_save)
 	str	r1, [r8, #CTX_FPSCR]
 	isb
 	add	r9, r8, #CTX_VFP_REGS
-	
+
 	VFPFSTMIA r9, r12	@ save out (16 or 32)*8B of FPU registers
 	VFPFMXR	FPEXC, r2
 	mrc	p15, 0, r3, c1, c0, 2	@ restore original FPEXC/CPACR
 #endif
-	
+
 	add	r9, r8, #CTX_TTBR0
 	mrc	p15, 0, r0, c2, c0, 0	@ TTBR0
 	mrc	p15, 0, r1, c2, c0, 1	@ TTBR1
@@ -273,7 +273,7 @@ ENTRY(__cortex_a9_save)
 	cpu_id	r4
 	cmp	r4, #0
 	bne	__cortex_a9_save_clean_cache
-	ldr	r4, =(TEGRA_ARM_PL310_BASE-IO_CPU_PHYS+IO_CPU_VIRT)
+	mov32	r4, (TEGRA_ARM_PL310_BASE-IO_CPU_PHYS+IO_CPU_VIRT)
 	add	r9, r8, #CTX_L2_CTRL
 	ldr	r0, [r4, #L2X0_CTRL]
 	ldr	r1, [r4, #L2X0_AUX_CTRL]
@@ -282,7 +282,7 @@ ENTRY(__cortex_a9_save)
 	ldr	r4, [r4, #L2X0_PREFETCH_OFFSET]
 	stmia	r9, {r0-r4}
 #endif
-	
+
 
 __cortex_a9_save_clean_cache:
 	mov	r10, r8
@@ -303,7 +303,7 @@ __cortex_a9_save_clean_cache:
 	mcr	p15, 0, r0, c1, c0, 1	@ exit coherency
 	isb
 	cpu_id	r0
-	ldr	r1, =(TEGRA_ARM_PERIF_BASE-IO_CPU_PHYS+IO_CPU_VIRT+0xC)
+	mov32	r1, (TEGRA_ARM_PERIF_BASE-IO_CPU_PHYS+IO_CPU_VIRT+0xC)
 	mov	r3, r0, lsl #2
 	mov	r2, #0xf
 	mov	r2, r2, lsl r3
@@ -324,7 +324,7 @@ ENDPROC(__cortex_a9_save)
 ENTRY(__cortex_a9_l2x0_restart)
 #ifdef CONFIG_CACHE_L2X0
 	ctx_ptr	r8, r9
-	ldr	r9, =(TEGRA_ARM_PL310_BASE-IO_CPU_PHYS+IO_CPU_VIRT)
+	mov32	r9, (TEGRA_ARM_PL310_BASE-IO_CPU_PHYS+IO_CPU_VIRT)
 	add	r10, r8, #CTX_L2_CTRL
 	ldmia	r10, {r3-r7}
 	str	r5, [r9, #L2X0_TAG_LATENCY_CTRL]

@@ -44,7 +44,7 @@
 /*        .section ".cpuinit.text", "ax"*/
 
 .macro	poke_ev, val, tmp
-	ldr	\tmp, =(TEGRA_EXCEPTION_VECTORS_BASE + 0x100)
+	mov32	\tmp, (TEGRA_EXCEPTION_VECTORS_BASE + 0x100)
 	str	\val, [\tmp]
 .endm
 
@@ -115,7 +115,7 @@ __invalidate_cpu_state:
 	movne	r2, #0xf
 	movne	r2, r2, lsl r0
 	strne	r2, [r1]		@ invalidate SCU tags for CPU
-	
+
 	dsb
 	mov	r0, #0x1800
 	mcr	p15, 0, r0, c1, c0, 0	@ enable branch prediction, i-cache
@@ -153,7 +153,7 @@ __return_to_virtual:
 	mov	lr, r1			@ "return" to ctx_restore
 	mov	r3, #0
 	mcr	p15, 0, r3, c2, c0, 2	@ TTB control register
-	
+
 	mcr	p15, 0, r8, c2, c0, 1	@ load TTBR1
 
 	mov	r0, #0x1f
@@ -213,11 +213,11 @@ ENDPROC(__turn_mmu_on_again)
  */
 	.align L1_CACHE_SHIFT
 __restart_pllx:
-	ldr	r0, =tegra_sctx
+	mov32	r0, tegra_sctx
 	ldr	r1, [r0, #0x8]	@ pllx_base
 	ldr	r2, [r0, #0xC]	@ pllx_misc
-	ldr	r3, =(TEGRA_CLK_RESET_BASE-IO_PPSB_PHYS+IO_PPSB_VIRT)
-	ldr	r4, =(TEGRA_TMRUS_BASE-IO_PPSB_PHYS+IO_PPSB_VIRT)
+	mov32	r3, (TEGRA_CLK_RESET_BASE-IO_PPSB_PHYS+IO_PPSB_VIRT)
+	mov32	r4, (TEGRA_TMRUS_BASE-IO_PPSB_PHYS+IO_PPSB_VIRT)
 	str	r2, [r3, #0xe4]	@ pllx_misc
 	str	r1, [r3, #0xe0] @ pllx_base
 	/* record the time that PLLX will be stable */
