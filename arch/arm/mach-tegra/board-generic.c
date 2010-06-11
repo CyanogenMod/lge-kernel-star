@@ -113,9 +113,10 @@ static void __init tegra_generic_init(void)
 
 	NvRmQueryChipUniqueId(s_hRmGlobal, sizeof(chip_id), (void*)chip_id);
 	snprintf(serial, sizeof(serial), "%08x%08x", chip_id[1], chip_id[0]);
+#ifdef CONFIG_USB_ANDROID
 	tegra_android_platform.serial_number = kstrdup(serial, GFP_KERNEL);
-
 	tegra_android_platform.product_name = harmony_dev;
+#endif
 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
 }
 
