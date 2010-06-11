@@ -19,6 +19,7 @@
 
 #include <linux/linkage.h>
 #include <asm/assembler.h>
+#include <asm/cache.h>
 #include <mach/iomap.h>
 #include <mach/io.h>
 
@@ -43,6 +44,7 @@ ENDPROC(__udelay)
 
 
 @ Delay routine
+    .align L1_CACHE_SHIFT
 ENTRY(__delay)
     subs  r0, r0, #1
     bhi __delay
