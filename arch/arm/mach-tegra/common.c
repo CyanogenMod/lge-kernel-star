@@ -19,6 +19,7 @@
 
 #include <linux/init.h>
 #include <linux/io.h>
+#include <linux/cpu.h>
 
 #include <asm/hardware/cache-l2x0.h>
 #include <asm/cacheflush.h>
@@ -29,8 +30,6 @@
 #include <mach/nvmem.h>
 
 #include "board.h"
-
-extern int disable_nonboot_cpus(void);
 
 static void tegra_machine_restart(char mode, const char *cmd)
 {
