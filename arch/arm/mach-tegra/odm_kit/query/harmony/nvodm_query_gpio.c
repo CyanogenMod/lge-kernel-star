@@ -33,9 +33,14 @@
 #include "nvodm_query_gpio.h"
 #include "nvodm_services.h"
 #include "nvrm_drf.h"
+#include "nvodm_query_discovery.h"
+
+#include "linux/input.h"
 
 #define NVODM_ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #define NVODM_PORT(x) ((x) - 'a')
+
+#define EEPROM_ID_E1206      0x0C06
 
 static const NvOdmGpioPinInfo s_vi[] = {
     {NVODM_PORT('t'), 3, NvOdmGpioPinActiveState_High}, // EN_VDDIO_SD
@@ -153,6 +158,27 @@ static const NvOdmGpioPinInfo s_WakeFromKeyBoard[] = {
     {NVODM_PORT('a'), 0, NvOdmGpioPinActiveState_Low}   // EC Keyboard Wakeup
 };
 
+// Gpio based keypad
+static const NvOdmGpioPinKeyInfo s_GpioPinKeyInfo[] = {
+    {KEY_MENU, 10, NV_TRUE},
+    {KEY_HOME, 10, NV_TRUE},
+    {KEY_BACK, 10, NV_TRUE},
+    {KEY_F3, 10, NV_TRUE},
+    {KEY_F4, 10, NV_TRUE},
+    {KEY_MENU, 10, NV_TRUE},
+};
+
+
+// Gpio based keypad
+static const NvOdmGpioPinInfo s_GpioKeyBoard[] = {
+    {NVODM_PORT('q'), 0, NvOdmGpioPinActiveState_Low, (void *)&s_GpioPinKeyInfo[0]},
+    {NVODM_PORT('q'), 1, NvOdmGpioPinActiveState_Low, (void *)&s_GpioPinKeyInfo[1]},
+    {NVODM_PORT('q'), 2, NvOdmGpioPinActiveState_Low, (void *)&s_GpioPinKeyInfo[2]},
+    {NVODM_PORT('q'), 3, NvOdmGpioPinActiveState_Low, (void *)&s_GpioPinKeyInfo[3]},
+    {NVODM_PORT('q'), 4, NvOdmGpioPinActiveState_Low, (void *)&s_GpioPinKeyInfo[4]},
+    {NVODM_PORT('v'), 2, NvOdmGpioPinActiveState_Low, (void *)&s_GpioPinKeyInfo[5]},
+};
+
 static const NvOdmGpioPinInfo s_Battery[] = {
     // Low Battery
     {NVODM_PORT('w'), 3, NvOdmGpioPinActiveState_Low},
@@ -161,6 +187,7 @@ static const NvOdmGpioPinInfo s_Battery[] = {
 const NvOdmGpioPinInfo *NvOdmQueryGpioPinMap(NvOdmGpioPinGroup Group,
     NvU32 Instance, NvU32 *pCount)
 {
+    NvOdmBoardInfo BoardInfo;
     switch (Group)
     {
         case NvOdmGpioPinGroup_Display:
@@ -228,6 +255,15 @@ const NvOdmGpioPinInfo *NvOdmQueryGpioPinMap(NvOdmGpioPinGroup Group,
         case NvOdmGpioPinGroup_WakeFromECKeyboard:
             *pCount = NVODM_ARRAY_SIZE(s_WakeFromKeyBoard);
             return s_WakeFromKeyBoard;
+
+        case NvOdmGpioPinGroup_keypadMisc:
+            if (NvOdmPeripheralGetBoardInfo(EEPROM_ID_E1206, &BoardInfo))
+            {
+                *pCount = NVODM_ARRAY_SIZE(s_GpioKeyBoard);
+                return s_GpioKeyBoard;
+            }
+            *pCount = 0;
+            return NULL;
 
         case NvOdmGpioPinGroup_Battery:
             *pCount = NVODM_ARRAY_SIZE(s_Battery);

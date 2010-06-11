@@ -61,6 +61,13 @@
 #include "board.h"
 #include "nvrm_pmu.h"
 
+#ifdef CONFIG_KEYBOARD_GPIO
+#include "nvodm_query_gpio.h"
+#include <linux/gpio_keys.h>
+#include <linux/input.h>
+#endif
+
+
 NvRmGpioHandle s_hGpioGlobal;
 
 static u64 tegra_dma_mask = DMA_BIT_MASK(32);
@@ -750,6 +757,58 @@ static noinline void __init tegra_setup_kbc(void)
 static void tegra_setup_kbc(void) { }
 #endif
 
+#ifdef CONFIG_KEYBOARD_GPIO
+struct gpio_keys_platform_data tegra_button_data;
+static char *gpio_key_names = "gpio_keys";
+static noinline void __init tegra_setup_gpio_key(void)
+{
+	struct gpio_keys_button *tegra_buttons = NULL;
+	int ngpiokeys = 0;
+	const NvOdmGpioPinInfo *gpio_key_info;
+	int i;
+	NvOdmGpioPinKeyInfo *gpio_pin_info = NULL;
+
+	gpio_key_info = NvOdmQueryGpioPinMap(NvOdmGpioPinGroup_keypadMisc, 0,
+						 &ngpiokeys);
+
+	if (!ngpiokeys) {
+		pr_info("No gpio is configured as buttons\n");
+		return;
+	}
+
+	tegra_buttons = kzalloc(ngpiokeys * sizeof(struct gpio_keys_button),
+				 GFP_KERNEL);
+	if (!tegra_buttons) {
+		pr_err("Memory allocation failed for tegra_buttons\n");
+		return;
+	}
+
+	for (i = 0; i < ngpiokeys; ++i) {
+		tegra_buttons[i].gpio =
+			(int)(gpio_key_info[i].Port*8 + gpio_key_info[i].Pin);
+		gpio_pin_info = gpio_key_info[i].GpioPinSpecificData;
+		tegra_buttons[i].code = (int)gpio_pin_info->Code;
+		tegra_buttons[i].desc = gpio_key_names;
+
+		if (gpio_key_info[i].activeState == NvOdmGpioPinActiveState_Low)
+			tegra_buttons[i].active_low = 1;
+		else
+			tegra_buttons[i].active_low = 0;
+		tegra_buttons[i].type = EV_KEY;
+		tegra_buttons[i].wakeup = (gpio_pin_info->Wakeup)? 1: 0;
+		tegra_buttons[i].debounce_interval =
+				 gpio_pin_info->DebounceTimeMs;
+	}
+
+	tegra_button_data.buttons = tegra_buttons;
+	tegra_button_data.nbuttons = ngpiokeys;
+	return;
+}
+#else
+static void tegra_setup_gpio_key(void) { }
+#endif
+
+
 #ifdef CONFIG_RTC_DRV_TEGRA_ODM
 static struct platform_device tegra_rtc_device = {
 	.name = "tegra_rtc",
@@ -1356,6 +1415,7 @@ void __init tegra_setup_nvodm(bool standard_i2c, bool standard_spi)
 	tegra_setup_sdhci();
 	tegra_setup_rfkill();
 	tegra_setup_kbc();
+	tegra_setup_gpio_key();
 	if (standard_i2c)
 		tegra_setup_i2c();
 	if (standard_spi)

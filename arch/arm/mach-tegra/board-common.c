@@ -151,6 +151,18 @@ static struct platform_device tegra_kbc_device = {
 };
 #endif
 
+#ifdef CONFIG_KEYBOARD_GPIO
+extern struct gpio_keys_platform_data tegra_button_data;
+static struct platform_device tegra_button_device = {
+	.name   = "gpio-keys",
+	.id     = 3,
+	.dev    = {
+		.platform_data  = &tegra_button_data,
+	}
+};
+#endif
+
+
 #ifdef CONFIG_TEGRA_IOVMM_GART
 static struct resource tegra_gart_resources[] = {
 	[0] = {
@@ -212,6 +224,9 @@ static struct platform_device *tegra_devices[] __initdata = {
 #endif
 #ifdef CONFIG_KEYBOARD_TEGRA
 	&tegra_kbc_device,
+#endif
+#ifdef CONFIG_KEYBOARD_GPIO
+	&tegra_button_device,
 #endif
 #ifdef CONFIG_USB_GADGET_TEGRA
 	&tegra_udc_device,
