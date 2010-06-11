@@ -756,7 +756,7 @@ fail:
 }
 
 #ifdef CONFIG_PM
-static u32 apb_dma[6*TEGRA_SYSTEM_DMA_CH_NR + 3];
+static u32 apb_dma[5*TEGRA_SYSTEM_DMA_CH_NR + 3];
 
 void tegra_dma_suspend(void)
 {
@@ -773,7 +773,6 @@ void tegra_dma_suspend(void)
 				  TEGRA_APB_DMA_CH0_SIZE * i);
 
 		*ctx++ = readl(addr + APB_DMA_CHAN_CSR);
-		*ctx++ = readl(addr + APB_DMA_CHAN_STA);
 		*ctx++ = readl(addr + APB_DMA_CHAN_AHB_PTR);
 		*ctx++ = readl(addr + APB_DMA_CHAN_AHB_SEQ);
 		*ctx++ = readl(addr + APB_DMA_CHAN_APB_PTR);
@@ -796,7 +795,6 @@ void tegra_dma_resume(void)
 				  TEGRA_APB_DMA_CH0_SIZE * i);
 
 		writel(*ctx++, addr + APB_DMA_CHAN_CSR);
-		writel(*ctx++, addr + APB_DMA_CHAN_STA);
 		writel(*ctx++, addr + APB_DMA_CHAN_AHB_PTR);
 		writel(*ctx++, addr + APB_DMA_CHAN_AHB_SEQ);
 		writel(*ctx++, addr + APB_DMA_CHAN_APB_PTR);
