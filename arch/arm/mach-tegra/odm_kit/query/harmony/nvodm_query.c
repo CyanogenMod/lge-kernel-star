@@ -322,7 +322,7 @@ static NvOdmWakeupPadInfo s_NvOdmWakeupPadInfo[] =
     {NV_FALSE, 21, NvOdmWakeupPadPolarity_Low},     // Wake Event 21 - usb_iddig[0]
     {NV_FALSE, 22, NvOdmWakeupPadPolarity_Low},     // Wake Event 22 - usb_iddig[1]
     {NV_TRUE,  23, NvOdmWakeupPadPolarity_AnyEdge}, // Wake Event 23 - gmi_iordy (HSMMC_CLK)
-    {NV_FALSE, 24, NvOdmWakeupPadPolarity_High},    // Wake Event 24 - gp3_pv[2] (BB_MOD, MODEM WAKEUP_AP15, SPI-SS)
+    {NV_TRUE,  24, NvOdmWakeupPadPolarity_Low},     // Wake Event 24 - gp3_pv[2]
     {NV_FALSE, 25, NvOdmWakeupPadPolarity_High},    // Wake Event 25 - gp3_ps[4] (KB_COL12)
     {NV_FALSE, 26, NvOdmWakeupPadPolarity_High},    // Wake Event 26 - gp3_ps[5] (KB_COL10)
     {NV_FALSE, 27, NvOdmWakeupPadPolarity_High},    // Wake Event 27 - gp3_ps[0] (KB_COL8)
