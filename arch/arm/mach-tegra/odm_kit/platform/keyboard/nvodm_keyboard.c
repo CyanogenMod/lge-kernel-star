@@ -47,17 +47,14 @@
 #define NVODM_PRINTF(x)
 #endif
 
-// wake from keyboard disabled for now
+// wake from keyboard
 #define WAKE_FROM_KEYBOARD	1
 
-/* command main category */
-#define EC_KBC_COMMAND 0x5
+// enable/disable keyboard scanning in suspend
+#define KEYBOARD_SCANNING_DISABLED_IN_SUSPEND 0
 
 /* number of LEDS on the keyboard */
 enum {NUM_OF_LEDS = 3};
-
-/* Keyboard specific sub-commands */
-#define KBD_RESET_COMMAND 0xFF
 
 /* Special Scan Code set 1 codes */
 #define SC1_LSHIFT (0x2A)
@@ -468,6 +465,35 @@ NvBool NvOdmKeyboardToggleLights(NvU32 LedId)
 
 NvBool NvOdmKeyboardPowerHandler(NvBool PowerDown)
 {
+#if KEYBOARD_SCANNING_DISABLED_IN_SUSPEND
+	NvEcRequest Request = {0};
+	NvEcResponse Response = {0};
+	NvError err = NvError_Success;
+
+	/* disable keyboard scanning */
+	Request.PacketType = NvEcPacketType_Request;
+	Request.RequestType = NvEcRequestResponseType_Keyboard;
+	if (PowerDown)
+		Request.RequestSubtype =
+			(NvEcRequestResponseSubtype)NvEcKeyboardSubtype_Disable;
+	else
+		Request.RequestSubtype =
+			(NvEcRequestResponseSubtype)NvEcKeyboardSubtype_Enable;
+	Request.NumPayloadBytes = 0;
+
+	err = NvEcSendRequest(s_NvEcHandle,	&Request, &Response,
+		sizeof(Request),
+		sizeof(Response));
+	if (err != NvError_Success) {
+		NvOsDebugPrintf("%s: scanning enable/disable request send fail\n", __func__);
+		return NV_FALSE;
+	}
+
+	if (Response.Status != NvEcStatus_Success) {
+		NvOsDebugPrintf("%s: scanning could not be enabled/disabled\n", __func__);
+		return NV_FALSE;
+	}
+#endif
     return NV_TRUE;
 }
 
