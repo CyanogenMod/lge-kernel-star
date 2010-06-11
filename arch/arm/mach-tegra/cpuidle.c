@@ -73,9 +73,9 @@ static int tegra_idle_enter_lp3(struct cpuidle_device *dev,
 
 	enter = ktime_get();
 	if (!need_resched()) {
-		dsb();
 		__raw_writel(reg, flow_ctrl);
 		reg = __raw_readl(flow_ctrl);
+		dsb();
 		__asm__ volatile ("wfi");
 		__raw_writel(0, flow_ctrl);
 		reg = __raw_readl(flow_ctrl);

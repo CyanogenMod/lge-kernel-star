@@ -994,7 +994,7 @@ static noinline void __init tegra_setup_spi(void)
 	for (i=0; i<ARRAY_SIZE(tegra_spi_devices); i++) {
 		struct platform_device *pdev = &tegra_spi_devices[i];
 		struct tegra_spi_platform_data *plat = &tegra_spi_platform[i];
- 
+
 		const NvOdmQuerySpiDeviceInfo *info = NULL;
 		NvU32 mux = 0;
 		int rc;
@@ -1247,6 +1247,7 @@ static void tegra_system_power_off(void)
 	}
 	local_irq_disable();
 	while (1) {
+		dsb();
 		__asm__ ("wfi");
 	}
 }
