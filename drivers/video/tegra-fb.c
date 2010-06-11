@@ -85,7 +85,7 @@ static int s_fb_Bpp;
 static NvRmMemHandle s_fb_hMem;
 static unsigned long *s_fb_regs;
 static unsigned short s_use_tearing_effect;
-static unsigned long s_power_id = (unsigned long)-1;
+static NvU32 s_power_id = -1ul;
 
 #define DISPLAY_BASE    (0x54200000)
 #define REGW( reg, val ) \
@@ -171,7 +171,7 @@ int tegra_fb_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 static NvBool tegra_fb_power_register( void )
 {
-	if( s_power_id != (unsigned long)-1 )
+	if( s_power_id != -1ul )
 	{
 		return NV_TRUE;
 	}
