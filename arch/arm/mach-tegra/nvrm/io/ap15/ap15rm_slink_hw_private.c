@@ -254,6 +254,15 @@ SlinkHwSetChipSelectLevelBasedOnPacket(
     return NV_TRUE;
 }
 
+static void
+SlinkHwSetCsSetupHoldTime(
+    SerialHwRegisters *pSlinkHwRegs,
+    NvU32 CsSetupTimeInClocks,
+    NvU32 CsHoldTimeInClocks)
+{
+    NV_ASSERT(0);
+}
+
 /**
  * Write into the transmit fifo register.
  * returns the number of words written.
@@ -307,6 +316,7 @@ void NvRmPrivSpiSlinkInitSlinkInterface_v1_0(HwInterface *pSlinkInterface)
     pSlinkInterface->HwSetChipSelectDefaultLevelFxn = SlinkHwSetChipSelectDefaultLevelFxn;
     pSlinkInterface->HwSetChipSelectLevelFxn = SlinkHwSetChipSelectLevel;
     pSlinkInterface->HwSetChipSelectLevelBasedOnPacketFxn = SlinkHwSetChipSelectLevelBasedOnPacket;
+    pSlinkInterface->HwSetCsSetupHoldTime    = SlinkHwSetCsSetupHoldTime;
     pSlinkInterface->HwWriteInTransmitFifoFxn = SlinkHwWriteInTransmitFifo;
     pSlinkInterface->HwReadFromReceiveFifoFxn =  SlinkHwReadFromReceiveFifo;
 }

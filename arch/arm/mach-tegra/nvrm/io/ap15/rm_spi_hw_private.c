@@ -363,6 +363,15 @@ SpiHwSetChipSelectLevelBasedOnPacket(
     return NV_TRUE;
 }
 
+static void
+SlinkHwSetCsSetupHoldTime(
+    SerialHwRegisters *pSlinkHwRegs,
+    NvU32 CsSetupTimeInClocks,
+    NvU32 CsHoldTimeInClocks)
+{
+    NV_ASSERT(0);
+}
+
 /**
  * Set the packet length and packed mode.
  */
@@ -622,6 +631,7 @@ void NvRmPrivSpiSlinkInitSpiInterface(HwInterface *pSpiInterface)
     pSpiInterface->HwSetChipSelectDefaultLevelFxn = SpiHwSetChipSelectDefaultLevelFxn;
     pSpiInterface->HwSetChipSelectLevelFxn = SpiHwSetChipSelectLevel;
     pSpiInterface->HwSetChipSelectLevelBasedOnPacketFxn = SpiHwSetChipSelectLevelBasedOnPacket;
+    pSpiInterface->HwSetCsSetupHoldTime    = SlinkHwSetCsSetupHoldTime;
     pSpiInterface->HwSetPacketLengthFxn = SpiHwSetPacketLength;
     pSpiInterface->HwSetDmaTransferSizeFxn = SpiHwSetDmaTransferSize;
     pSpiInterface->HwGetTransferdCountFxn = SpiHwGetTransferdCount;
