@@ -1740,11 +1740,16 @@ NvError AesCoreInitEngine(const NvRmDeviceHandle hRmDevice)
         pAesHwCtxt->ppEngineCaps[0]->pAesInterf->AesHwGetUsedSlots(gs_pAesCoreEngine);
     }
 
-    // Get the Iv read permissions
     for (Engine = AesHwEngine_A; Engine < AesHwEngine_Num; Engine++)
     {
         NVDDK_AES_CHECK_INTERFACE(pAesHwCtxt, Engine);
         NVDDK_AES_CHECK_INTERFACE_FUNC(pAesHwCtxt, Engine, GetIvReadPermissions);
+        pAesHwCtxt->ppEngineCaps[Engine]->pAesInterf->AesHwDisableAllKeyRead(
+            pAesHwCtxt,
+            Engine,
+            pAesHwCtxt->ppEngineCaps[Engine]->NumSlotsSupported);
+
+        // Get the Iv read permissions
         pAesHwCtxt->ppEngineCaps[Engine]->pAesInterf->AesHwGetIvReadPermissions(Engine, pAesHwCtxt);
     }
 

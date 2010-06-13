@@ -118,6 +118,11 @@ Ap20AesHwSetIv(
     const AesHwKeySlot Slot,
     const AesHwIv *const pIv,
     AesHwContext *const pAesHwCtxt);
+static void
+Ap20AesHwDisableAllKeyRead(
+    const AesHwContext *const pAesHwCtxt,
+    const AesHwEngine Engine,
+    const AesHwKeySlot NumSlotsSupported);
 
 /**
  * Set the Setup Table command required for the AES engine.
@@ -303,6 +308,9 @@ Ap20AesHwSetKeyAndIv(
 
     // Wait till engine becomes IDLE
     NvAesCoreAp20WaitTillEngineIdle(Engine, pAesHwCtxt->pVirAdr[Engine]);
+
+    // Disable read access to the key slot
+    NvAesCoreAp20KeyReadDisable(Engine, Slot, pAesHwCtxt->pVirAdr[Engine]);
 
     NvAesCoreAp20ControlKeyScheduleGeneration(Engine, pAesHwCtxt->pVirAdr[Engine], NV_TRUE);
 
@@ -681,6 +689,35 @@ void Ap20AesHwGetIvReadPermissions(const AesHwEngine Engine, AesHwContext *const
     NvOsMutexUnlock(pAesHwCtxt->Mutex[Engine]);
 }
 
+/**
+ * Disables read access to all key slots for the given engine.
+ *
+ * @param pAesHwCtxt Pointer to the AES H/W context
+ * @param Engine AES engine for which key reads needs to be disabled
+ * @param NumSlotsSupported Number of key slots supported in the engine
+ *
+ * @retval None
+ */
+void
+Ap20AesHwDisableAllKeyRead(
+    const AesHwContext *const pAesHwCtxt,
+    const AesHwEngine Engine,
+    const AesHwKeySlot NumSlotsSupported)
+{
+    AesHwKeySlot Slot;
+    NV_ASSERT(pAesHwCtxt);
+
+    NvOsMutexLock(pAesHwCtxt->Mutex[Engine]);
+    NvAesCoreAp20WaitTillEngineIdle(Engine, pAesHwCtxt->pVirAdr[Engine]);
+
+    // Disable read access to key slots
+    for(Slot = AesHwKeySlot_0; Slot < NumSlotsSupported; Slot++)
+    {
+        NvAesCoreAp20KeyReadDisable(Engine, Slot, pAesHwCtxt->pVirAdr[Engine]);
+    }
+    NvOsMutexUnlock(pAesHwCtxt->Mutex[Engine]);
+}
+
 void NvAesIntfAp20GetHwInterface(AesHwInterface *const pAp20AesHw)
 {
     NV_ASSERT(pAp20AesHw);
@@ -698,4 +735,5 @@ void NvAesIntfAp20GetHwInterface(AesHwInterface *const pAp20AesHw)
     pAp20AesHw->AesHwGetUsedSlots = Ap20AesHwGetUsedSlots;
     pAp20AesHw->AesHwIsEngineDisabled = Ap20AesHwIsEngineDisabled;
     pAp20AesHw->AesHwGetIvReadPermissions = Ap20AesHwGetIvReadPermissions;
+    pAp20AesHw->AesHwDisableAllKeyRead = Ap20AesHwDisableAllKeyRead;
 }

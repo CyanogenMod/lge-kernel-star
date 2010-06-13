@@ -386,6 +386,20 @@ struct AesHwInterfaceRec
      * @retval None.
      */
     void (*AesHwGetIvReadPermissions)(const AesHwEngine Engine, AesHwContext *const pAesHwCtxt);
+
+    /**
+     * Disables read access to all key slots for the given engine.
+     *
+     * @param pAesHwCtxt Pointer to the AES H/W context
+     * @param Engine AES engine for which key reads needs to be disabled
+     * @param NumSlotsSupported Number of key slots supported in the engine
+     *
+     * @retval None
+     */
+    void (*AesHwDisableAllKeyRead)(
+        const AesHwContext *const pAesHwCtxt,
+        const AesHwEngine Engine,
+        const AesHwKeySlot NumSlotsSupported);
 };
 
 // AES client state: this structure is common to all clients

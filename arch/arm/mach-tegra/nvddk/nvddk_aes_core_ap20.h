@@ -222,6 +222,22 @@ NvAesCoreAp20GetIvReadPermissions(
     const NvU32 *const pEngineVirAddr,
     NvBool *const pReadPermissions);
 
+/**
+ * Disables read access to the given key slot
+ *
+ * @param Engine AES engine for which read access needs to be disabled
+ *               for the given key slot
+ * @param Slot Key slot number for which read access needs to be disabled.
+ * @param pEngineVirAddr AES engine virtual address.
+ *
+ * @retval None
+ */
+void
+NvAesCoreAp20KeyReadDisable(
+    const AesHwEngine Engine,
+    const AesHwKeySlot Slot,
+    const NvU32 *const pEngineVirAddr);
+
 #ifdef __cplusplus
 };
 #endif

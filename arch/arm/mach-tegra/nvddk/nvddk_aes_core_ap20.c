@@ -93,15 +93,27 @@
 #define SECURE_DRF_NUM(engine, reg, field, num) \
     NV_DRF_NUM(ARVDE_BSEV, reg, field, num) \
 
-#define SECURE_INDEXED_REGR(engine, viraddr, reg, index,value) \
+#define SECURE_INDEXED_REGR(engine, viraddr, index, value) \
 { \
     if (AesHwEngine_A == engine) \
     { \
-        (value) = NV_READ32((NvU32)(viraddr) + (ARVDE_BSEV_##reg##_##0) + index * 4); \
+        (value) = NV_READ32((NvU32)(viraddr) + ARVDE_BSEV_SECURE_SEC_SEL0_0 + ((index) * 4)); \
     } \
     else if (AesHwEngine_B == engine) \
     { \
-        (value) = NV_READ32((NvU32)(viraddr) + (AVPBSEA_##reg##_##0) + index * 4 ); \
+        (value) = NV_READ32((NvU32)(viraddr) + AVPBSEA_SECURE_SEC_SEL0_0 + ((index) * 4)); \
+    } \
+}
+
+#define SECURE_INDEXED_REGW(engine, viraddr, index, value) \
+{ \
+    if (AesHwEngine_A == engine) \
+    { \
+        NV_WRITE32((NvU32)(viraddr) + (ARVDE_BSEV_SECURE_SEC_SEL0_0 + ((index) * 4)), (value)); \
+    } \
+    else if (AesHwEngine_B == engine) \
+    { \
+        NV_WRITE32((NvU32)(viraddr) + (AVPBSEA_SECURE_SEC_SEL0_0 + ((index) * 4)), (value)); \
     } \
 }
 
@@ -611,7 +623,19 @@ NvAesCoreAp20GetIvReadPermissions(
 
     for (KeySlot = AesHwKeySlot_0; KeySlot < AesHwKeySlot_NumExt; KeySlot++)
     {
-        SECURE_INDEXED_REGR(Engine, pEngineVirAddr, SECURE_SEC_SEL0, KeySlot,RegValue);
+        SECURE_INDEXED_REGR(Engine, pEngineVirAddr, KeySlot, RegValue);
         SECURE_DRF_READ_VAL(Engine, SECURE_SEC_SEL0, IVREAD_ENB0, RegValue, pReadPermissions[KeySlot]);
     }
+}
+
+void NvAesCoreAp20KeyReadDisable(
+    const AesHwEngine Engine,
+    const AesHwKeySlot Slot,
+    const NvU32 *const pEngineVirAddr)
+{
+    NvU32 RegValue = 0;
+
+    SECURE_INDEXED_REGR(Engine, pEngineVirAddr, Slot, RegValue);
+    RegValue = NV_FLD_SET_DRF_NUM(ARVDE_BSEV, SECURE_SEC_SEL0, KEYREAD_ENB0, 0, RegValue);
+    SECURE_INDEXED_REGW(Engine, pEngineVirAddr, Slot, RegValue);
 }
