@@ -51,7 +51,6 @@
 #define CSR_FLOW				(1<<21)
 #define CSR_REQ_SEL_SHIFT			16
 #define CSR_REQ_SEL_MASK			(0x1F<<CSR_REQ_SEL_SHIFT)
-#define CSR_REQ_SEL_INVALID			(31<<CSR_REQ_SEL_SHIFT)
 #define CSR_WCOUNT_SHIFT			2
 #define CSR_WCOUNT_MASK				0xFFFC
 
@@ -141,7 +140,6 @@ static void tegra_dma_update_hw(struct tegra_dma_channel *ch,
 static void tegra_dma_update_hw_partial(struct tegra_dma_channel *ch,
 	struct tegra_dma_req *req);
 static void tegra_dma_init_hw(struct tegra_dma_channel *ch);
-static void tegra_dma_stop(struct tegra_dma_channel *ch);
 
 void tegra_dma_flush(struct tegra_dma_channel *ch)
 {
@@ -177,20 +175,11 @@ void tegra_dma_stop(struct tegra_dma_channel *ch)
 
 int tegra_dma_cancel(struct tegra_dma_channel *ch)
 {
-	unsigned int csr;
 	unsigned long irq_flags;
 
 	spin_lock_irqsave(&ch->lock, irq_flags);
 	while (!list_empty(&ch->list))
 		list_del(ch->list.next);
-
-	csr = ch->csr;
-	csr &= ~CSR_REQ_SEL_MASK;
-	csr |= CSR_REQ_SEL_INVALID;
-
-	/* Set the enable as that is not shadowed */
-	csr |= CSR_ENB;
-	writel(csr, ch->addr + APB_DMA_CHAN_CSR);
 
 	tegra_dma_stop(ch);
 
@@ -200,17 +189,13 @@ int tegra_dma_cancel(struct tegra_dma_channel *ch)
 
 /* should be called with the channel lock held */
 static unsigned int dma_active_count(struct tegra_dma_channel *ch,
-	struct tegra_dma_req *req)
+	struct tegra_dma_req *req, unsigned int status)
 {
-	unsigned int status;
-
 	unsigned int to_transfer;
 	unsigned int req_transfer_count;
 
 	unsigned int bytes_transferred;
 
-	/* Get the transfer count */
-	status = readl(ch->addr + APB_DMA_CHAN_STA);
 	to_transfer = (status & STA_COUNT_MASK) >> STA_COUNT_SHIFT;
 	req_transfer_count = (ch->csr & CSR_WCOUNT_MASK) >> CSR_WCOUNT_SHIFT;
 	req_transfer_count += 1;
@@ -224,14 +209,14 @@ static unsigned int dma_active_count(struct tegra_dma_channel *ch,
 	/* In continuous transfer mode, DMA only tracks the count of the
 	 * half DMA buffer. So, if the DMA already finished half the DMA
 	 * then add the half buffer to the completed count.
-	 *
-	 *	FIXME: There can be a race here. What if the req to
-	 *	dequue happens at the same time as the DMA just moved to
-	 *	the new buffer and SW didn't yet received the interrupt?
 	 */
-	if (ch->mode & TEGRA_DMA_MODE_CONTINUOUS)
+	if (ch->mode & TEGRA_DMA_MODE_CONTINUOUS) {
 		if (req->buffer_status == TEGRA_DMA_REQ_BUF_STATUS_HALF_FULL)
 			bytes_transferred += req_transfer_count;
+	}
+
+	if (status & STA_ISE_EOC)
+		bytes_transferred += req_transfer_count;
 
 	bytes_transferred *= 4;
 
@@ -243,6 +228,7 @@ unsigned int tegra_dma_transferred_req(struct tegra_dma_channel *ch,
 {
 	unsigned long irq_flags;
 	unsigned int bytes_transferred;
+	unsigned int status;
 
 	spin_lock_irqsave(&ch->lock, irq_flags);
 
@@ -251,7 +237,8 @@ unsigned int tegra_dma_transferred_req(struct tegra_dma_channel *ch,
 		return req->bytes_transferred;
 	}
 
-	bytes_transferred = dma_active_count(ch, req);
+	status = readl(ch->addr + APB_DMA_CHAN_STA);
+	bytes_transferred = dma_active_count(ch, req, status);
 
 	spin_unlock_irqrestore(&ch->lock, irq_flags);
 
@@ -262,11 +249,13 @@ EXPORT_SYMBOL(tegra_dma_transferred_req);
 int tegra_dma_dequeue_req(struct tegra_dma_channel *ch,
 	struct tegra_dma_req *_req)
 {
+	static DEFINE_SPINLOCK(enable_lock);
 	struct tegra_dma_req *req = NULL;
 	int found = 0;
-	unsigned int csr;
+	unsigned int status;
 	unsigned long irq_flags;
 	int stop = 0;
+	void __iomem *addr = IO_ADDRESS(TEGRA_APB_DMA_BASE);
 
 	spin_lock_irqsave(&ch->lock, irq_flags);
 
@@ -290,24 +279,22 @@ int tegra_dma_dequeue_req(struct tegra_dma_channel *ch,
 
 	/* STOP the DMA and get the transfer count.
 	 * Getting the transfer count is tricky.
-	 *  - Change the source selector to invalid to stop the DMA from
-	 *    FIFO to memory.
-	 *  - Read the status register to know the number of pending
+	 *  - Globally disable DMA on all channels
+	 *  - Read the channel's status register to know the number of pending
 	 *    bytes to be transfered.
-	 *  - Finally stop or program the DMA to the next buffer in the
-	 *    list.
+	 *  - Stop the dma channel
+	 *  - Globally re-enable DMA to resume other transfers
 	 */
-	csr = ch->csr;
-	csr &= ~CSR_REQ_SEL_MASK;
-	csr |= CSR_REQ_SEL_INVALID;
 
-	/* Set the enable as that is not shadowed */
-	csr |= CSR_ENB;
-	writel(csr, ch->addr + APB_DMA_CHAN_CSR);
-
-	req->bytes_transferred = dma_active_count(ch, req);
-
+	spin_lock(&enable_lock);
+	writel(0, addr + APB_DMA_GEN);
+	status = readl(ch->addr + APB_DMA_CHAN_STA);
 	tegra_dma_stop(ch);
+	writel(GEN_ENABLE, addr + APB_DMA_GEN);
+	spin_unlock(&enable_lock);
+
+	req->bytes_transferred = dma_active_count(ch, req, status);
+
 	if (!list_empty(&ch->list)) {
 		/* if the list is not empty, queue the next request */
 		struct tegra_dma_req *next_req;
@@ -446,7 +433,6 @@ static void tegra_dma_update_hw(struct tegra_dma_channel *ch,
 	int apb_bus_width;
 	int index;
 	unsigned long csr;
-
 
 	ch->csr |= CSR_FLOW;
 	ch->csr &= ~CSR_REQ_SEL_MASK;
