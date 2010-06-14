@@ -880,6 +880,7 @@ NvOdmQueryDapPortGetProperty(
     switch (NV_DRF_VAL(TEGRA_DEVKIT, BCT_CUSTOPT, RIL, CustOpt))
     {
     case TEGRA_DEVKIT_BCT_CUSTOPT_0_RIL_EMP_RAINBOW:
+    case TEGRA_DEVKIT_BCT_CUSTOPT_0_RIL_EMP_RAINBOW_ULPI:
     case TEGRA_DEVKIT_BCT_CUSTOPT_0_RIL_IFX:
         if (DapPortId && DapPortId<NV_ARRAY_SIZE(s_Property_Ril_Emp_Rainbow))
             return &s_Property_Ril_Emp_Rainbow[DapPortId];
@@ -926,6 +927,7 @@ NvOdmQueryDapPortGetConnectionTable(
     switch (NV_DRF_VAL(TEGRA_DEVKIT, BCT_CUSTOPT, RIL, CustOpt))
     {
     case TEGRA_DEVKIT_BCT_CUSTOPT_0_RIL_EMP_RAINBOW:
+    case TEGRA_DEVKIT_BCT_CUSTOPT_0_RIL_EMP_RAINBOW_ULPI:
     case TEGRA_DEVKIT_BCT_CUSTOPT_0_RIL_IFX:
         {
             for( TableIndex = 0;

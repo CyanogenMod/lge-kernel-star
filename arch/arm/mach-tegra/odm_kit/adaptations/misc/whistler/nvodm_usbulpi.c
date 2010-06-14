@@ -185,10 +185,10 @@ static void ste_u3xx_turn_on_modem(struct ste_u3xx_info *info)
 	NvOdmOsSleepMS(300);
 	NvOdmGpioSetState(ste_u3xx_gpio, ste_u3xx_reset_gpio_pin, 1);
 
-	/* pulse modem power on for 300 ms */
+	/* pulse modem power on for 1200 ms */
 	NvOdmOsSleepMS(300);
 	NvOdmGpioSetState(ste_u3xx_gpio, ste_u3xx_power_gpio_pin, 1);
-	NvOdmOsSleepMS(300);
+	NvOdmOsSleepMS(1200);
 	NvOdmGpioSetState(ste_u3xx_gpio, ste_u3xx_power_gpio_pin, 0);
 	NvOdmOsSleepMS(100);
 
