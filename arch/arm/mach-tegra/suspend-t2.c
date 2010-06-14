@@ -73,7 +73,7 @@ static const struct pmc_scratch_field pllx[] __initdata = {
 	field(CLK_RESET, 0xe4, 7:4, 21:18), /* PLLX_LFCON */
 	field(APB_MISC, 0x8e4, 27:24, 30:27), /* XM2CFGC_VREF_DQ */
 	field(APB_MISC, 0x8c8, 3:3, 26:26), /* XM2CFGC_SCHMT_EN */
-	field(APB_MISC, 0x8c8, 2:2, 31:31), /* XM2CLKCFG_PREEMP_EN */
+	field(APB_MISC, 0x8d0, 2:2, 31:31), /* XM2CLKCFG_PREEMP_EN */
 };
 
 static const struct pmc_scratch_field emc_0[] __initdata = {
@@ -148,7 +148,7 @@ static const struct pmc_scratch_field emc_6[] __initdata = {
 	field(EMC, 0xac, 3:0, 25:22), /* QUSE_EXTRA */
 	field(EMC, 0x98, 5:0, 21:16), /* TFAW */
 	field(APB_MISC, 0x8e4, 5:5, 30:30), /* XM2CFGC_VREF_DQ_EN */
-	field(APB_MISC, 0x8e4, 7:7, 29:26), /* XM2CFGC_VREF_DQS */
+	field(APB_MISC, 0x8e4, 19:16, 29:26), /* XM2CFGC_VREF_DQS */
 };
 
 static const struct pmc_scratch_field emc_dqsib_dly[] __initdata = {
@@ -180,7 +180,7 @@ static const struct pmc_scratch_field emc_autocal_fbio[] __initdata = {
 };
 
 static const struct pmc_scratch_field emc_autocal_interval[] __initdata = {
-	field(EMC, 0x2a8, 27:0, 27:8), /* AUTOCAL_INTERVAL */
+	field(EMC, 0x2a8, 27:0, 27:0), /* AUTOCAL_INTERVAL */
 	field(EMC, 0x2b8, 1:1, 29:29), /* CLKCHANGE_PD_ENABLE */
 	field(EMC, 0x2b8, 0:0, 28:28), /* CLKCHANGE_REQ_ENABLE */
 	field(EMC, 0x2b8, 9:8, 31:30), /* PIN_CONFIG */
