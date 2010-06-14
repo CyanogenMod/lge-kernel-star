@@ -293,6 +293,8 @@ static int tegra_nand_read(struct mtd_info *mtd, loff_t from, size_t len,
 	memset(page_list, 0xff, sizeof(page_list));
 
 	mutex_lock(&info->lock);
+	if (retlen)
+		*retlen = 0;
 
 	NvDdkNandResumeClocks(info->ddk);
 	while (len) {
@@ -329,11 +331,11 @@ static int tegra_nand_read(struct mtd_info *mtd, loff_t from, size_t len,
 		from += count;
 		len -= count;
 		buf += count;
-		*retlen += count;
+		if (retlen)
+			*retlen += count;
 	}
 
 	NvDdkNandSuspendClocks(info->ddk);
-	*retlen = len;
 	mutex_unlock(&info->lock);
 	return (len) ? -EIO : 0;
 }
