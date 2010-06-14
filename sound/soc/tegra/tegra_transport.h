@@ -390,11 +390,11 @@ struct pcm_runtime_data {
 	int timeout;
 	int state;
 	int stream;
-	int shutdown_thrd;
 	unsigned int audiofx_frames;
 	struct completion thread_comp;
 	wait_queue_head_t buf_wait;
 	struct semaphore buf_done_sem;
+	struct semaphore stop_done_sem;
 	StandardPath* stdoutpath;
 	StandardPath* stdinpath;
 	u64 cur_pos;
@@ -410,6 +410,8 @@ struct tegra_audio_data {
 	unsigned int mapped_buf_size;
 	NvAudioFxMixBufferHandle mixer_buffer[2];
 	NvRmMemHandle mem_handle[2];
+	NvAudioFxObjectHandle mvolume;
+	int i2s1volume;
 	struct mutex lock;
 };
 

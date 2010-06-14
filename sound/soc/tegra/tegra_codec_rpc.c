@@ -28,6 +28,75 @@
 
 #include "tegra_transport.h"
 
+extern struct tegra_audio_data* tegra_snd_cx;
+
+static int tegra_master_volume_info(struct snd_kcontrol *kcontrol,
+				    struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 2;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = NvAudioFxVolumeMax;
+	return 0;
+}
+
+static int tegra_master_volume_get(struct snd_kcontrol *kcontrol,
+				   struct snd_ctl_elem_value *ucontrol)
+{
+	if (tegra_snd_cx) {
+		ucontrol->value.integer.value[0] = tegra_snd_cx->i2s1volume;
+		ucontrol->value.integer.value[1] = tegra_snd_cx->i2s1volume;
+	}
+	else {
+		ucontrol->value.integer.value[0] = NvAudioFxVolumeDefault;
+		ucontrol->value.integer.value[1] = NvAudioFxVolumeDefault;
+	}
+
+	return 0;
+}
+
+static int tegra_master_volume_put(struct snd_kcontrol *kcontrol,
+				   struct snd_ctl_elem_value *ucontrol)
+{
+	int change = 0, val;
+	NvAudioFxVolumeDescriptor vd;
+	val = ucontrol->value.integer.value[0] & 0xffff;
+	vd.LeftVolume = val;
+	vd.RightVolume = val;
+	if(val) {
+		vd.Mute = 0;
+	}
+	else {
+		vd.Mute = 1;
+	}
+
+	if (tegra_snd_cx && tegra_snd_cx->mixer_handle) {
+		if(tegra_snd_cx->i2s1volume != val) {
+			tegra_snd_cx->i2s1volume = val;
+			tegra_snd_cx->xrt_fxn.SetProperty(
+				tegra_snd_cx->mvolume,
+				NvAudioFxVolumeProperty_Volume,
+				sizeof(NvAudioFxVolumeDescriptor),
+				&vd);
+			change = 1;
+			snd_printk(KERN_ERR "Put Volume Change = 1\n");
+		}
+	}
+
+	return change;
+}
+
+static struct snd_kcontrol_new tegra_codec_control =
+{
+	.access = SNDRV_CTL_ELEM_ACCESS_READWRITE,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Master Playback Volume",
+	.private_value = 0xffff,
+	.info = tegra_master_volume_info,
+	.get = tegra_master_volume_get,
+	.put = tegra_master_volume_put
+};
+
 static int tegra_generic_codec_hw_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params,
 				struct snd_soc_dai *dai)
@@ -140,7 +209,8 @@ static int codec_soc_probe(struct platform_device *pdev)
 		goto card_err;
 	}
 
-	return ret;
+	return snd_ctl_add(codec->card,
+			   snd_ctl_new1(&tegra_codec_control, codec));
 
 card_err:
 	snd_soc_free_pcms(socdev);

@@ -22,7 +22,7 @@
 
 #include "tegra_transport.h"
 
-static struct tegra_audio_data* tegra_snd_cx = NULL;
+struct tegra_audio_data* tegra_snd_cx = NULL;
 
 static const struct snd_pcm_hardware tegra_pcm_hardware = {
 	.info = SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_PAUSE |\
@@ -96,6 +96,8 @@ static int play_thread( void *arg)
 						 NvAudioFxProperty_State,
 						 sizeof(NvAudioFxState),
 						 &state);
+			down(&prtd->stop_done_sem);
+			buffer_in_queue = 0;
 			prtd->state = NVALSA_INVALID_STATE;
 		default:
 			;
@@ -170,17 +172,12 @@ static int play_thread( void *arg)
 			if (period_offset >= runtime->period_size) {
 				prtd->last_pos = prtd->cur_pos;
 				snd_pcm_period_elapsed(substream);
-
 			}
 
 			if (prtd->cur_pos >= runtime->buffer_size) {
 				prtd->cur_pos -= runtime->buffer_size;
 			}
 		}
-	}
-	while (buffer_in_queue > 0) {
-		down(&prtd->buf_done_sem);
-		buffer_in_queue--;
 	}
 	return 0;
 }
@@ -204,7 +201,7 @@ static int rec_thread( void *arg )
 	rtbuffersize = frames_to_bytes(runtime, runtime->buffer_size);
 	buffer_to_prime  = (rtbuffersize / TEGRA_DEFAULT_BUFFER_SIZE);
 
-	while (!prtd->shutdown_thrd ) {
+	for (;;) {
 		switch (prtd->state) {
 		case SNDRV_PCM_TRIGGER_START:
 			pin_format.Format.FormatTag = 1;
@@ -242,17 +239,14 @@ static int rec_thread( void *arg )
 			prtd->state = NVALSA_INVALID_STATE;
 			break;
 		case SNDRV_PCM_TRIGGER_STOP:
-			while (buffer_in_queue > 0) {
-				down(&prtd->buf_done_sem);
-				buffer_in_queue--;
-			}
-
 			state = NvAudioFxState_Stop;
 			tegra_snd_cx->xrt_fxn.SetProperty(
 						 prtd->stdinpath->Stream,
 						 NvAudioFxProperty_State,
 						 sizeof(NvAudioFxState),
 						 &state);
+			down(&prtd->stop_done_sem);
+			buffer_in_queue = 0;
 			prtd->state = NVALSA_INVALID_STATE;
 			goto EXIT;
 		default:
@@ -439,6 +433,11 @@ static int init_mixer(struct snd_pcm_substream *substream)
 		if (!tegra_snd_cx->mixer_buffer[1]) {
 			snd_printk(KERN_ERR"TransportMixerMapBuffer failed!\n");
 		}
+
+		tegra_snd_cx->mvolume = tegra_snd_cx->xrt_fxn.MixerCreateObject(
+						tegra_snd_cx->mixer_handle,
+						NvAudioFxI2s1VolumeId);
+		tegra_snd_cx->i2s1volume = NvAudioFxVolumeDefault;
 	}
 
 	return 0;
@@ -482,13 +481,10 @@ static int pcm_common_close(struct snd_pcm_substream *substream)
 	if (prtd->rec_thread)
 		kthread_stop(prtd->rec_thread);
 
-	prtd->shutdown_thrd = 1;
-	up(&prtd->buf_done_sem);
-
-	if (tegra_snd_cx->m_FxNotifier.Event & NvAudioFxEventBufferDone) {
+	if (tegra_snd_cx->m_FxNotifier.Event) {
 
 		memset(&message, 0, sizeof(NvAudioFxMessage));
-		message.Event = NvAudioFxEventBufferDone;
+		message.Event = NvAudioFxEventAll;
 		message.pContext = NULL;
 		if(substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 			message.hFx = (NvAudioFxHandle)prtd->stdoutpath->Stream;
@@ -501,7 +497,7 @@ static int pcm_common_close(struct snd_pcm_substream *substream)
 		    sizeof(NvAudioFxMessage),
 		    &message);
 
-		tegra_snd_cx->m_FxNotifier.Event &= ~(NvAudioFxEventBufferDone);
+		tegra_snd_cx->m_FxNotifier.Event &= ~NvAudioFxEventAll;
 	}
 
 	if (prtd->stdoutpath) {
@@ -540,7 +536,6 @@ static int tegra_pcm_open(struct snd_pcm_substream *substream)
 	prtd->stdinpath = 0;
 	prtd->state = NVALSA_INVALID_STATE;
 	prtd->stream = substream->stream;
-	prtd->shutdown_thrd = 0;
 
 	ret = init_mixer(substream);
 	if (ret)
@@ -549,6 +544,7 @@ static int tegra_pcm_open(struct snd_pcm_substream *substream)
 	init_completion(&prtd->thread_comp);
 	init_waitqueue_head(&prtd->buf_wait);
 	sema_init(&prtd->buf_done_sem, 0);
+	sema_init(&prtd->stop_done_sem, 0);
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK){
 		prtd->mixer_buffer = tegra_snd_cx->mixer_buffer[0];
@@ -570,7 +566,8 @@ static int tegra_pcm_open(struct snd_pcm_substream *substream)
 		}
 
 		memset(&message, 0, sizeof(NvAudioFxMessage));
-		message.Event = NvAudioFxEventBufferDone;
+		message.Event = (NvAudioFxEventBufferDone |
+				 NvAudioFxEventStateChange);
 		message.hFx = (NvAudioFxHandle)prtd->stdoutpath->Stream;
 		message.pContext = prtd;
 
@@ -586,7 +583,8 @@ static int tegra_pcm_open(struct snd_pcm_substream *substream)
 			goto fail;
 		}
 
-		tegra_snd_cx->m_FxNotifier.Event |= (NvAudioFxEventBufferDone);
+		tegra_snd_cx->m_FxNotifier.Event |= (NvAudioFxEventBufferDone |
+						     NvAudioFxEventStateChange);
 
 		prtd->play_thread = kthread_run(play_thread,
 						substream,
@@ -617,7 +615,8 @@ static int tegra_pcm_open(struct snd_pcm_substream *substream)
 		}
 
 		memset(&message, 0, sizeof(NvAudioFxMessage));
-		message.Event = NvAudioFxEventBufferDone;
+		message.Event = (NvAudioFxEventBufferDone |
+				 NvAudioFxEventStateChange);
 		message.hFx = (NvAudioFxHandle)prtd->stdinpath->Stream;
 		message.pContext = prtd;
 
@@ -631,7 +630,8 @@ static int tegra_pcm_open(struct snd_pcm_substream *substream)
 			ret = -EFAULT;
 			goto fail;
 		}
-		tegra_snd_cx->m_FxNotifier.Event |= (NvAudioFxEventBufferDone);
+		tegra_snd_cx->m_FxNotifier.Event |= (NvAudioFxEventBufferDone |
+						     NvAudioFxEventStateChange);
 
 		prtd->rec_thread = kthread_run(rec_thread,
 						substream,

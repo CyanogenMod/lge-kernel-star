@@ -281,6 +281,29 @@ typedef struct NvAudioFxSpreaderDescriptorRec
     NvU32 SpeakerWidth;
 } NvAudioFxSpreaderDescriptor;
 
+// I2S inputs.
+
+typedef NvS32 NvAudioFxI2sInputSelect;
+
+// Default is configurable based on the device.
+#define NvAudioFxI2sInputSelect_Default (0x0)
+#define NvAudioFxI2sInputSelect_Bluetooth (0x1)
+#define NvAudioFxI2sInputSelect_BuiltinMic (0x2)
+#define NvAudioFxI2sInputSelect_LineIn (0x3)
+#define NvAudioFxI2sInputSelect_Mic (0x4)
+#define NvAudioFxI2sInputSelect_Phone (0x5)
+#define NvAudioFxI2sInputSelect_Radio (0x6)
+
+// Description of the NvAudioFxI2sProperty_AllocChannel property.
+
+typedef struct NvAudioFxI2sChannelDescriptorRec
+{
+    NvAudioFxPin Pin;
+    NvU32 Id;
+} NvAudioFxI2sChannelDescriptor;
+
+// Parameteric EQ Filter types.
+
 typedef enum
 {
     NvAudioFxIirFilter_Undefined,
@@ -394,14 +417,6 @@ typedef struct NvAudioFxNotifierConnectionDescriptorRec
 {
     NvU8 PortName[16];
 } NvAudioFxNotifierConnectionDescriptor;
-
-// Description of the NvAudioFxI2sProperty_AllocChannel property.
-
-typedef struct NvAudioFxI2sChannelDescriptorRec
-{
-    NvAudioFxPin Pin;
-    NvU32 Id;
-} NvAudioFxI2sChannelDescriptor;
 
 // Description of the NvAudioFxProperty_AddEvent and
 // NvAudioFxProperty_RemoveEvent properties.
