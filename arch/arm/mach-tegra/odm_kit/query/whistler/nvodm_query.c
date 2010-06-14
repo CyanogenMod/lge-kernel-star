@@ -82,7 +82,7 @@ s_NvOdmQueryDownloadTransportSetting = NvOdmDownloadTransport_None;
 static NvOdmQuerySdioInterfaceProperty s_NvOdmQuerySdioInterfaceProperty_Whistler[4] =
 {
     { NV_FALSE, 10, NV_FALSE, 0x6, NvOdmQuerySdioSlotUsage_unused },
-    {  NV_TRUE, 10,  NV_TRUE, 0xF, NvOdmQuerySdioSlotUsage_wlan   },
+    {  NV_TRUE, 10,  NV_TRUE, 0xC, NvOdmQuerySdioSlotUsage_wlan   },
     { NV_FALSE, 10, NV_FALSE, 0x4, NvOdmQuerySdioSlotUsage_Media  },
     {  NV_TRUE, 10,  NV_TRUE, 0x6, NvOdmQuerySdioSlotUsage_Boot   },
 };
