@@ -60,6 +60,7 @@ struct suspend_context
 	u32 pllx_timeout;
 	u32 twd_ctrl;
 	u32 twd_load;
+	u32 cclk_divider;
 };
 
 volatile struct suspend_context tegra_sctx;
@@ -85,6 +86,7 @@ static void __iomem *tmrus = IO_ADDRESS(TEGRA_TMRUS_BASE);
 #define PMC_SCRATCH39		0x138
 
 #define CLK_RESET_CCLK_BURST	0x20
+#define CLK_RESET_CCLK_DIVIDER  0x24
 #define CLK_RESET_PLLX_BASE	0xe0
 #define CLK_RESET_PLLX_MISC	0xe4
 #define CLK_RESET_SOURCE_CSITE	0x1d4
@@ -170,12 +172,14 @@ static noinline void restore_cpu_complex(void)
 		while (readl(tmrus)-tegra_sctx.pllx_timeout >= 0x80000000UL)
 			cpu_relax();
 	}
+	writel(tegra_sctx.cclk_divider, clk_rst + CLK_RESET_CCLK_DIVIDER);
 	writel(tegra_sctx.cpu_burst, clk_rst + CLK_RESET_CCLK_BURST);
 	writel(tegra_sctx.clk_csite_src, clk_rst + CLK_RESET_SOURCE_CSITE);
 
 	/* do not power-gate the CPU when flow controlled */
 	reg = readl(flow_ctrl + FLOW_CTRL_CPU_CSR);
-	reg &= ~((1<<14) | (1<<5) | (1<<4) | 1); /* clear WFE bitmask */
+	reg &= ~((1<<5) | (1<<4) | 1); /* clear WFE bitmask */
+	reg |= (1<<14); /* write-1-clear event flag */
 	writel(reg, flow_ctrl + FLOW_CTRL_CPU_CSR);
 	wmb();
 
@@ -206,6 +210,7 @@ static noinline void suspend_cpu_complex(void)
 	tegra_sctx.cpu_burst = readl(clk_rst + CLK_RESET_CCLK_BURST);
 	tegra_sctx.pllx_base = readl(clk_rst + CLK_RESET_PLLX_BASE);
 	tegra_sctx.pllx_misc = readl(clk_rst + CLK_RESET_PLLX_MISC);
+	tegra_sctx.cclk_divider = readl(clk_rst + CLK_RESET_CCLK_DIVIDER);
 
 	tegra_sctx.twd_ctrl = readl(twd_base + 0x8);
 	tegra_sctx.twd_load = readl(twd_base + 0);
@@ -253,6 +258,8 @@ unsigned int tegra_suspend_lp2(unsigned int us)
 	__cortex_a9_save(mode);
 	/* return from __cortex_a9_restore */
 	restore_cpu_complex();
+	if (us)
+		tegra_lp2_set_trigger(0);
 
 	writel(orig, evp_reset);
 
