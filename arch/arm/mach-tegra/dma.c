@@ -706,7 +706,8 @@ int __init tegra_dma_init(void)
 	addr = IO_ADDRESS(TEGRA_APB_DMA_BASE);
 	writel(GEN_ENABLE, addr + APB_DMA_GEN);
 	writel(0, addr + APB_DMA_CNTRL);
-	writel(0xFFFF, addr + APB_DMA_IRQ_MASK_SET);
+	writel(0xFFFFFFFFul >> (31 - TEGRA_SYSTEM_DMA_CH_MAX),
+	       addr + APB_DMA_IRQ_MASK_SET);
 
 	memset(channel_usage, 0, sizeof(channel_usage));
 	memset(dma_channels, 0, sizeof(dma_channels));
@@ -788,7 +789,7 @@ void tegra_dma_resume(void)
 
 	writel(*ctx++, addr + APB_DMA_GEN);
 	writel(*ctx++, addr + APB_DMA_CNTRL);
-	writel(*ctx++, addr + APB_DMA_IRQ_MASK);
+	writel(*ctx++, addr + APB_DMA_IRQ_MASK_SET);
 
 	for (i=0; i<TEGRA_SYSTEM_DMA_CH_NR; i++) {
 		addr = IO_ADDRESS(TEGRA_APB_DMA_CH0_BASE +
