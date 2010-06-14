@@ -38,20 +38,69 @@
 #include "board.h"
 
 #ifdef CONFIG_USB_ANDROID
-static char *tegra_android_functions[] = {
+
+static char *tegra_android_functions_ums[] = {
+#ifdef CONFIG_USB_ANDROID_MASS_STORAGE
+	"usb_mass_storage",
+#endif
+};
+
+static char *tegra_android_functions_ums_adb[] = {
+#ifdef CONFIG_USB_ANDROID_MASS_STORAGE
+	"usb_mass_storage",
+#endif
 #ifdef CONFIG_USB_ANDROID_ADB
 	"adb",
 #endif
+};
+
+static char *tegra_android_functions_rndis[] = {
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	"rndis",
+#endif
+};
+
+static char *tegra_android_functions_rndis_adb[] = {
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	"rndis",
+#endif
+#ifdef CONFIG_USB_ANDROID_ADB
+	"adb",
+#endif
+};
+
+static char *tegra_android_functions_all[] = {
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	"rndis",
+#endif
 #ifdef CONFIG_USB_ANDROID_MASS_STORAGE
 	"usb_mass_storage",
+#endif
+#ifdef CONFIG_USB_ANDROID_ADB
+	"adb",
 #endif
 };
 
 static struct android_usb_product tegra_android_products[] = {
 	[0] = {
 		.product_id = 0x7100,
-		.num_functions = ARRAY_SIZE(tegra_android_functions),
-		.functions = tegra_android_functions,
+		.num_functions = ARRAY_SIZE(tegra_android_functions_ums),
+		.functions = tegra_android_functions_ums,
+	},
+	[1] = {
+		.product_id = 0x7100,
+		.num_functions = ARRAY_SIZE(tegra_android_functions_ums_adb),
+		.functions = tegra_android_functions_ums_adb,
+	},
+	[2] = {
+		.product_id = 0x7102,
+		.num_functions = ARRAY_SIZE(tegra_android_functions_rndis),
+		.functions = tegra_android_functions_rndis,
+	},
+	[3] = {
+		.product_id = 0x7103,
+		.num_functions = ARRAY_SIZE(tegra_android_functions_rndis_adb),
+		.functions = tegra_android_functions_rndis_adb,
 	},
 };
 
@@ -63,8 +112,8 @@ static struct android_usb_platform_data tegra_android_platform = {
 	.manufacturer_name = "NVIDIA",
 	.num_products = ARRAY_SIZE(tegra_android_products),
 	.products = tegra_android_products,
-	.num_functions = ARRAY_SIZE(tegra_android_functions),
-	.functions = tegra_android_functions,
+	.num_functions = ARRAY_SIZE(tegra_android_functions_all),
+	.functions = tegra_android_functions_all,
 };
 static struct platform_device tegra_android_device = {
 	.name = "android_usb",
@@ -88,10 +137,29 @@ static struct platform_device tegra_usb_fsg_device = {
 	},
 };
 #endif
+#ifdef CONFIG_USB_ANDROID_RNDIS
+static struct usb_ether_platform_data tegra_usb_rndis_platform = {
+	.ethaddr = {
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+	},
+	.vendorID = 0x7100,
+	.vendorDescr = "Tegra 2 RNDIS",
+};
+static struct platform_device tegra_usb_rndis_device = {
+	.name = "rndis",
+	.id = -1,
+	.dev = {
+		.platform_data = &tegra_usb_rndis_platform,
+	},
+};
+#endif
 #endif
 
 static struct platform_device *platform_devices[] = {
 #ifdef CONFIG_USB_ANDROID
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	&tegra_usb_rndis_device,
+#endif
 #ifdef CONFIG_USB_ANDROID_MASS_STORAGE
 	&tegra_usb_fsg_device,
 #endif
