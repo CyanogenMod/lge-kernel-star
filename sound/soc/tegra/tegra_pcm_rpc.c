@@ -65,7 +65,7 @@ static int play_thread( void *arg)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct pcm_runtime_data *prtd = substream->runtime->private_data;
 	NvError e;
-	int size;
+	int size = 0;
 	int offset = 0;
 	int period_offset = 0;
 	int rtbuffersize = 0;
@@ -90,15 +90,17 @@ static int play_thread( void *arg)
 			prtd->state = NVALSA_INVALID_STATE;
 			break;
 		case SNDRV_PCM_TRIGGER_STOP:
-			state = NvAudioFxState_Stop;
-			tegra_snd_cx->xrt_fxn.SetProperty(
+			if (state != NvAudioFxState_Stop) {
+				state = NvAudioFxState_Stop;
+				tegra_snd_cx->xrt_fxn.SetProperty(
 						 prtd->stdoutpath->Stream,
 						 NvAudioFxProperty_State,
 						 sizeof(NvAudioFxState),
 						 &state);
-			down(&prtd->stop_done_sem);
-			buffer_in_queue = 0;
-			prtd->state = NVALSA_INVALID_STATE;
+				down(&prtd->stop_done_sem);
+				buffer_in_queue = 0;
+				prtd->state = NVALSA_INVALID_STATE;
+			}
 		default:
 			;
 		}
@@ -107,7 +109,7 @@ static int play_thread( void *arg)
 			break;
 
 		if ((prtd->audiofx_frames < runtime->control->appl_ptr) &&
-			(state != SNDRV_PCM_TRIGGER_STOP)) {
+			(state != NvAudioFxState_Stop)) {
 			memset(&abd, 0, sizeof(NvAudioFxBufferDescriptor));
 
 			size = TEGRA_DEFAULT_BUFFER_SIZE;
@@ -188,7 +190,7 @@ static int rec_thread( void *arg )
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct pcm_runtime_data *prtd = substream->runtime->private_data;
 	NvError e;
-	int size;
+	int size = 0;
 	int offset = 0;
 	int period_offset = 0;
 	int rtbuffersize = 0;
@@ -239,15 +241,17 @@ static int rec_thread( void *arg )
 			prtd->state = NVALSA_INVALID_STATE;
 			break;
 		case SNDRV_PCM_TRIGGER_STOP:
-			state = NvAudioFxState_Stop;
-			tegra_snd_cx->xrt_fxn.SetProperty(
+			if (state != NvAudioFxState_Stop) {
+				state = NvAudioFxState_Stop;
+				tegra_snd_cx->xrt_fxn.SetProperty(
 						 prtd->stdinpath->Stream,
 						 NvAudioFxProperty_State,
 						 sizeof(NvAudioFxState),
 						 &state);
-			down(&prtd->stop_done_sem);
-			buffer_in_queue = 0;
-			prtd->state = NVALSA_INVALID_STATE;
+				down(&prtd->stop_done_sem);
+				buffer_in_queue = 0;
+				prtd->state = NVALSA_INVALID_STATE;
+			}
 			goto EXIT;
 		default:
 			;
