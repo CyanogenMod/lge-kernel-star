@@ -169,7 +169,7 @@ static NvU32 s_DataSize[] =
     sizeof(NvBool), // FuseDataType_JtagDisable
     sizeof(NvBool), // FuseDataType_KeyProgrammed
     sizeof(NvBool), // FuseDataType_OdmProductionEnable
-    sizeof(NvU32),  // FuseDataType_SecBootDeviceConfig
+    sizeof(NvU16),  // FuseDataType_SecBootDeviceConfig
     sizeof(NvU32),  // FuseDataType_SecBootDeviceSelect
     NVDDK_SECURE_BOOT_KEY_BYTES, // FuseDataType_SecureBootKey
     sizeof(NvU32),  // FuseDataType_Sku
@@ -1099,11 +1099,13 @@ NvError NvDdkFuseGet(NvDdkFuseDataType Type, void *pData, NvU32 *pSize)
         case NvDdkFuseDataType_SecBootDeviceConfig:
             RegData = FUSE_NV_READ32(FUSE_BOOT_DEVICE_INFO_0);
             RegData = NV_DRF_VAL(FUSE,
-                                 BOOT_DEVICE_INFO,
-                                 BOOT_DEVICE_CONFIG,
-                                 RegData);
+                            BOOT_DEVICE_INFO,
+                            BOOT_DEVICE_CONFIG,
+                            RegData);
 
-            *((NvU32*)pData) = RegData;
+            *((NvU8 *)pData) = (RegData >> 0x8) & 0xFF;
+            *((NvU8 *)pData + 1) = RegData & 0xFF;
+
             break;
 
         case NvDdkFuseDataType_SecBootDeviceSelect:
