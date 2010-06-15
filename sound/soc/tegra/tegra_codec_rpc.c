@@ -73,7 +73,7 @@ static struct snd_soc_dai_ops dit_stub_ops = {
 	.set_sysclk = tegra_generic_codec_set_dai_sysclk,
 };
 
-struct snd_soc_dai dit_stub_dai = {
+struct snd_soc_dai tegra_generic_codec_dai = {
 	.name = "tegra-codec-rpc",
 	.playback = {
 		.stream_name    = "Playback",
@@ -91,16 +91,16 @@ struct snd_soc_dai dit_stub_dai = {
 	},
 	.ops = &dit_stub_ops,
 };
-EXPORT_SYMBOL_GPL(dit_stub_dai);
+EXPORT_SYMBOL_GPL(tegra_generic_codec_dai);
 
 static int __init dit_modinit(void)
 {
-	return snd_soc_register_dai(&dit_stub_dai);
+	return snd_soc_register_dai(&tegra_generic_codec_dai);
 }
 
 static void __exit dit_exit(void)
 {
-	snd_soc_unregister_dai(&dit_stub_dai);
+	snd_soc_unregister_dai(&tegra_generic_codec_dai);
 }
 
 module_init(dit_modinit);
@@ -121,7 +121,7 @@ static int codec_soc_probe(struct platform_device *pdev)
 
 	codec->name = "tegra-generic-codec";
 	codec->owner = THIS_MODULE;
-	codec->dai = &dit_stub_dai;
+	codec->dai = &tegra_generic_codec_dai;
 	codec->num_dai = 1;
 	codec->write = NULL;
 	codec->read = NULL;
