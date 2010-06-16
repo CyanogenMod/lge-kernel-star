@@ -204,7 +204,7 @@ static int tegra_touch_thread(void *pdata)
 			/* Report number of fingers */
 			input_report_key(touch->input_dev,
 					BTN_TOUCH, fingers);
-			for (i = 0; i < (MAX_FINGERS - 1); i++) {
+			for (i = 0; i < (caps->MaxNumberOfFingerCoordReported - 1); i++) {
 				input_report_key(touch->input_dev,
 					BTN_2 + i, fingers >= (i + 2));
 			}
@@ -214,15 +214,17 @@ static int tegra_touch_thread(void *pdata)
 				input_report_abs(touch->input_dev, ABS_Y, y[0]);
 				prev_x0 = x[0];
 				prev_y0 = y[0];
-			}
-			else if ((fingers >= 2) && (fingers <= MAX_FINGERS)) {
-				index = 1;
-				for (offset = 0; offset < (ABS_HAT3Y-ABS_HAT0X); offset + 2) {
+			} else if ((fingers >= 2) && (fingers <= MAX_FINGERS)) {
+				index = 1; offset = 0;
+				for (i = 0;
+				     i < caps->MaxNumberOfFingerCoordReported;
+				     i++) {
 					input_report_abs(touch->input_dev,
-						ABS_HAT0X + offset, x[index]); // x
+						ABS_HAT0X + offset, x[index]);
 					input_report_abs(touch->input_dev,
-						ABS_HAT0Y + offset, y[index]); // y
+						ABS_HAT0Y + offset, y[index]);
 					index++;
+					offset += 2;
 				}
 			}
 
@@ -244,7 +246,7 @@ static int tegra_touch_thread(void *pdata)
 
 			bKeepReadingSamples = NV_FALSE;
 			if (!touch->bPollingMode &&
-				!NvOdmTouchHandleInterrupt(touch->hTouchDevice)) {
+			    !NvOdmTouchHandleInterrupt(touch->hTouchDevice)) {
 				/* Some more data to read keep going */
 				bKeepReadingSamples = NV_TRUE;
 			}
@@ -302,6 +304,10 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 	touch->input_dev = input_dev;
 	touch->input_dev->name = NVODM_TOUCH_NAME;
 
+	/* get hardware capabilities */
+	NvOdmTouchDeviceGetCapabilities(touch->hTouchDevice, &touch->caps);
+	caps = &touch->caps;
+
 	/* Will generate sync at the end of all input */
 	set_bit(EV_SYN, touch->input_dev->evbit);
 	/* Event is key input type */
@@ -310,7 +316,7 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 	set_bit(EV_ABS, touch->input_dev->evbit);
 	/* supported virtual keys */
 	set_bit(BTN_TOUCH, touch->input_dev->keybit);
-	for (i = 0; i < (MAX_FINGERS - 1); i++) {
+	for (i = 0; i < (caps->MaxNumberOfFingerCoordReported - 1); i++) {
 		set_bit(BTN_2 + i, touch->input_dev->keybit);
 	}
 
@@ -320,10 +326,6 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 	set_bit(ABS_MT_POSITION_Y, touch->input_dev->keybit);
 	set_bit(ABS_X, touch->input_dev->keybit);
 	set_bit(ABS_Y, touch->input_dev->keybit);
-
-	NvOdmTouchDeviceGetCapabilities(touch->hTouchDevice, &touch->caps);
-
-	caps = &touch->caps;
 
 	if (caps->Orientation & NvOdmTouchOrientation_XY_SWAP) {
 		touch->MaxY = caps->XMaxPosition;
@@ -342,11 +344,12 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 		touch->MaxX, 0, 0);
 	input_set_abs_params(touch->input_dev, ABS_Y, touch->MinY,
 		touch->MaxY, 0, 0);
-	for (offset = 0; offset < (ABS_HAT3Y-ABS_HAT0X); offset + 2) {
+	for (i = 0; i < caps->MaxNumberOfFingerCoordReported; i++) {
 		input_set_abs_params(touch->input_dev, ABS_HAT0X + offset, touch->MinX,
 			touch->MaxX, 0, 0);
 		input_set_abs_params(touch->input_dev, ABS_HAT0Y + offset, touch->MinY,
 			touch->MaxY, 0, 0);
+		offset += 2;
 	}
 	input_set_abs_params(touch->input_dev, ABS_MT_POSITION_X,
 		touch->MinX, touch->MaxX, 0, 0);
