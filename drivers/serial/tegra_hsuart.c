@@ -537,6 +537,8 @@ static void tegra_uart_hw_deinit(struct tegra_uart_port *t)
 
 	clk_disable(t->clk);
 	t->baud = 0;
+	if (t->pinmux)
+		tegra_pinmux_config_tristate_table(t->pinmux, t->nr_pins, TEGRA_TRI_TRISTATE);
 }
 
 static void tegra_uart_free_rx_dma(struct tegra_uart_port *t)
@@ -567,7 +569,7 @@ static int tegra_uart_hw_init(struct tegra_uart_port *t)
 	t->baud = 0;
 
 	if (t->pinmux)
-		tegra_pinmux_config_tristate_table(t->pinmux, t->nr_pins, true);
+		tegra_pinmux_config_tristate_table(t->pinmux, t->nr_pins, TEGRA_TRI_NORMAL);
 
 	clk_enable(t->clk);
 	msleep(10);
@@ -1123,7 +1125,7 @@ static int tegra_uart_suspend(struct platform_device *pdev, pm_message_t state)
 	u = &t->uport;
 	uart_suspend_port(&tegra_uart_driver, u);
 	if (t->pinmux)
-		tegra_pinmux_config_tristate_table(t->pinmux, t->nr_pins, false);
+		tegra_pinmux_config_tristate_table(t->pinmux, t->nr_pins, TEGRA_TRI_TRISTATE);
 
 	return 0;
 }
@@ -1139,7 +1141,7 @@ static int tegra_uart_resume(struct platform_device *pdev)
 	u = &t->uport;
 	dev_err(t->uport.dev, "tegra_uart_resume called\n");
 	if (t->pinmux)
-		tegra_pinmux_config_tristate_table(t->pinmux, t->nr_pins, true);
+		tegra_pinmux_config_tristate_table(t->pinmux, t->nr_pins, TEGRA_TRI_NORMAL);
 	uart_resume_port(&tegra_uart_driver, u);
 	return 0;
 }
