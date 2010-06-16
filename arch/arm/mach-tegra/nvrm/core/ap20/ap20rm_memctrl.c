@@ -44,7 +44,6 @@
 NvError NvRmPrivAp20McErrorMonitorStart(NvRmDeviceHandle hRm);
 void NvRmPrivAp20McErrorMonitorStop(NvRmDeviceHandle hRm);
 void NvRmPrivAp20SetupMc(NvRmDeviceHandle hRm);
-static void McErrorIntHandler(void* args);
 
 void
 McStatAp20_Start(
@@ -60,10 +59,6 @@ McStatAp20_Stop(
         NvU32 *llc_client_cycles,
         NvU32 *llc_client_clocks,
         NvU32 *mc_clocks);
-
-void McErrorIntHandler(void* args)
-{
-}
 
 NvError NvRmPrivAp20McErrorMonitorStart(NvRmDeviceHandle hRm)
 {
@@ -81,13 +76,13 @@ void NvRmPrivAp20McErrorMonitorStop(NvRmDeviceHandle hRm)
 void NvRmPrivAp20SetupMc(NvRmDeviceHandle hRm)
 {
     NvU32   reg, mask;
-    reg = NV_REGR(hRm, NvRmPrivModuleID_MemoryController, 0, 
+    reg = NV_REGR(hRm, NvRmPrivModuleID_MemoryController, 0,
               MC_LOWLATENCY_CONFIG_0);
     mask = NV_DRF_DEF(MC, LOWLATENCY_CONFIG, MPCORER_LL_CTRL, ENABLE) |
            NV_DRF_DEF(MC, LOWLATENCY_CONFIG, MPCORER_LL_SEND_BOTH, ENABLE);
     if ( mask != (reg & mask) )
         NV_ASSERT(!"MC LL Path not enabled!");
-    // For AP20, no need to program any MC timeout registers here. Default 
+    // For AP20, no need to program any MC timeout registers here. Default
     // values should be good enough.
 }
 
