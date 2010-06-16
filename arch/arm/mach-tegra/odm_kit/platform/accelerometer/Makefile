@@ -8,5 +8,8 @@ ccflags-y += -DNV_DEBUG=0
 endif
 
 obj-$(CONFIG_TEGRA_ODM_CONCORDE)	+= nvodm_accelerometer_adi340.o
-obj-$(CONFIG_TEGRA_ODM_HARMONY)		+= nvodm_accelerometer_bma150.o
 obj-$(CONFIG_TEGRA_ODM_WHISTLER)	+= nvodm_accelerometer_adi340.o
+obj-$(CONFIG_TEGRA_ODM_HARMONY)		+= nvodm_priv_accelerometer.o
+obj-$(CONFIG_TEGRA_ODM_HARMONY)		+= nvodm_accelerometer_bma150.o
+obj-$(CONFIG_TEGRA_ODM_HARMONY)		+= nvodm_accelerometer_kxtf9.o
+

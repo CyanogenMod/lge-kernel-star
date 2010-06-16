@@ -425,4 +425,8 @@ static const NvOdmIoAddress s_AcceleroAddresses[] =
     { NvOdmIoModule_Gpio, (NvU32)'c'-'a', 0x03 }, /* Gpio port C and Pin 3 */
 };
 
-
+static const NvOdmIoAddress s_KXTFAcceleroAddresses[] =
+{
+	{ NvOdmIoModule_I2c_Pmu, 0x00, 0x1E }, /* I2C address (7-bit) 0xF<<1 = 0x1E(8-bit) */
+	{ NvOdmIoModule_Gpio, (NvU32)'c'-'a', 0x03 }, /* Gpio port C and Pin 3 */
+};

@@ -450,4 +450,12 @@
     NvOdmPeripheralClass_Other,
 },
 
+// Kionix Accelerometer Module
+{
+    NV_ODM_GUID('k','x','t','f','9','-','4','0'),
+    s_KXTFAcceleroAddresses,
+    NV_ARRAY_SIZE(s_KXTFAcceleroAddresses),
+    NvOdmPeripheralClass_Other,
+},
+
 // NOTE: This list *must* end with a trailing comma.

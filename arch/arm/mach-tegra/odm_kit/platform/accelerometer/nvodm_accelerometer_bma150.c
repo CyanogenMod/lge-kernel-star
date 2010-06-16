@@ -34,12 +34,68 @@
  *  WinCE Accelerometer Driver
  */
 
-#include "nvodm_accelerometer_bma150.h"
-#include "nvodm_services.h"
-#include "nvodm_query_discovery.h"
-#include "nvos.h"
+#include "nvodm_priv_accelerometer.h"
+
+/* BMA150 register address */
+#define CHIP_ID_REG             0x00
+#define VERSION_REG             0x01
+#define X_AXIS_LSB_REG          0x02
+#define X_AXIS_MSB_REG          0x03
+#define Y_AXIS_LSB_REG          0x04
+#define Y_AXIS_MSB_REG          0x05
+#define Z_AXIS_LSB_REG          0x06
+#define Z_AXIS_MSB_REG          0x07
+#define TEMP_RD_REG             0x08
+#define SMB150_STATUS_REG       0x09
+#define SMB150_CTRL_REG         0x0a
+#define SMB150_CONF1_REG        0x0b
+#define LG_THRESHOLD_REG        0x0c
+#define LG_DURATION_REG         0x0d
+#define HG_THRESHOLD_REG        0x0e
+#define HG_DURATION_REG         0x0f
+#define MOTION_THRS_REG         0x10
+#define HYSTERESIS_REG          0x11
+#define CUSTOMER1_REG           0x12
+#define CUSTOMER2_REG           0x13
+#define RANGE_BWIDTH_REG        0x14
+#define SMB150_CONF2_REG        0x15
+
+#define OFFS_GAIN_X_REG         0x16
+#define OFFS_GAIN_Y_REG         0x17
+#define OFFS_GAIN_Z_REG         0x18
+#define OFFS_GAIN_T_REG         0x19
+#define OFFSET_X_REG            0x1a
+#define OFFSET_Y_REG            0x1b
+#define OFFSET_Z_REG            0x1c
+#define OFFSET_T_REG            0x1d
+/* BMA150 register address ends here*/
+
+/* range and bandwidth */
+#define BMA_RANGE_2G            0
+#define BMA_RANGE_4G            1
+#define BMA_RANGE_8G            2
+
+#define BMA_BW_25HZ             0
+#define BMA_BW_50HZ             1
+#define BMA_BW_100HZ            2
+#define BMA_BW_190HZ            3
+#define BMA_BW_375HZ            4
+#define BMA_BW_750HZ            5
+#define BMA_BW_1500HZ           6
+
+/* mode settings */
+#define BMA_MODE_NORMAL         0
+#define BMA_MODE_SLEEP          1
+
+#define BMA150_CHIP_ID      0x02        // RO - device identification
+
+#define INT_EVENT_TIMEOUT 100
+#define NV_ACCELEROMETER_BUS_I2C 0
+#define NV_ACCELEROMETER_BUS_SPI_3 1
+#define NV_ACCELEROMETER_BUS_SPI_4 2
 
 #define NVODMACCELEROMETER_ENABLE_PRINTF 0
+#define EEPROM_ID_E1206 0x0C06
 
 #if NVODMACCELEROMETER_ENABLE_PRINTF
     #define NVODMACCELEROMETER_PRINTF(x) \
@@ -53,11 +109,45 @@
 #define NV_BMA150_MAX_FORCE_IN_REG 512 // It indicates force register length.
 #define NV_DEBOUNCE_TIME_MS 0
 
-#define ENABLE_XYZ_POLLING 0
+#define ENABLE_XYZ_POLLING 1
+#define NV_BMA150_MAX_SAMPLE_RATE   12000 //Hz
+#define NV_BMA150_MIN_SAMPLE_RATE   50 //Hz
+// sw polling time is slower than hw sample rate 225 time
+#define NV_BMA150_POLLING_FACTOR    225
+static NvU32 CurrSampleRate = 2*375; // Current Sample Rate
+static NvU32 PollingTime = 300; // (1000 * 225)/2*375(ms)
+
+typedef struct BmaSampleRateRec
+{
+    // Range register value
+    NvU8 RangeReg;
+    // Bandwidth register value
+    NvU8 BandWidthReg;
+    // SampleRate(Hz) = Full scale acceleration range * BandWidth(in Hz)
+    NvU32 SampleRate;
+} BmaSampleRate;
+
+BmaSampleRate OutputRate[] = {
+    {0, 0, 2*25},
+    {0, 1, 2*50},
+    {0, 2, 2*100},
+    {0, 3, 2*190},
+    {1, 2, 4*100},
+    {0, 4, 2*375},
+    {1, 3, 4*190},
+    {2, 2, 8*100},
+    {0, 5, 2*750},
+    {2, 3, 8*190},
+    {0, 6, 2*1500},
+    {1, 6, 4*1500},
+    {2, 6, 8*1500}
+};
 
 //FIXME: protect this variable using spinlock.
 static volatile int g_WaitCounter = 0;
-static void BMA150_ResetInterrupt(NvOdmAccelHandle hDevice);
+
+static NvU8 s_ReadBuffer[I2C_ACCELRATOR_PACKET_SIZE];
+static NvU8 s_WriteBuffer[I2C_ACCELRATOR_PACKET_SIZE];
 
 static void
 SetPowerRail(
@@ -83,74 +173,6 @@ SetPowerRail(
         }
         NvOdmOsWaitUS(settletime);
     }
-}
-
-static void GpioInterruptHandler(void *arg)
-{
-    NvU32 pinValue;
-    NvOdmAccelHandle hDevice =  (NvOdmAccelHandle)arg;
-
-    NvOdmGpioGetState(hDevice->hGpioINT, hDevice->hPinINT, &pinValue);
-    if (pinValue == 1)
-    {
-        NVODMACCELEROMETER_PRINTF(("\r\nBMA150 Interrupt"));
-        g_WaitCounter = 10;
-        BMA150_ResetInterrupt(hDevice);
-    } else
-        NVODMACCELEROMETER_PRINTF(("\r\nBMA150 non-Interrupt"));
-
-    if (pinValue == 1)
-    {
-        NvOdmOsSemaphoreSignal(hDevice->SemaphoreForINT);
-    }
-    NvOdmGpioInterruptDone(hDevice->hGpioInterrupt);
-    return;
-}
-
-static NvBool ConnectSemaphore(NvOdmAccelHandle hDevice)
-{
-    NvOdmGpioPinMode mode;
-    NvOdmInterruptHandler callback =
-        (NvOdmInterruptHandler)GpioInterruptHandler;
-
-    hDevice->hGpioINT = (NvOdmServicesGpioHandle)NvOdmGpioOpen();
-    if (!(hDevice->hGpioINT))
-    {
-        NVODMACCELEROMETER_PRINTF((
-            "NvOdm Accelerometer : NvOdmGpioOpen Error \n"));
-        return NV_FALSE;
-    }
-
-    hDevice->hPinINT = NvOdmGpioAcquirePinHandle(hDevice->hGpioINT,
-                           hDevice->GPIOPortINT,
-                           hDevice->GPIOPinINT);
-    hDevice->SemaphoreForINT = NvOdmOsSemaphoreCreate(0);
-
-    if (!(hDevice->SemaphoreForINT))
-    {
-        NVODMACCELEROMETER_PRINTF((
-            "NvOdm Accelerometer : NvOdmOsSemaphoreCreate Error \n"));
-        NvOdmGpioClose(hDevice->hGpioINT);
-        return NV_FALSE;
-    }
-
-    mode = NvOdmGpioPinMode_InputInterruptHigh;
-    if (NvOdmGpioInterruptRegister(hDevice->hGpioINT,
-        &hDevice->hGpioInterrupt, hDevice->hPinINT, mode, callback,
-        hDevice, NV_DEBOUNCE_TIME_MS) == NV_FALSE)
-    {
-        return NV_FALSE;
-    }
-
-    if (!(hDevice->hGpioInterrupt))
-    {
-        NVODMACCELEROMETER_PRINTF((
-            "NvOdm Accelerometer : NvOdmGpioInterruptRegister Error \n"));
-        NvOdmGpioClose(hDevice->hGpioINT);
-        NvOdmOsSemaphoreDestroy(hDevice->SemaphoreForINT);
-        return NV_FALSE;
-    }
-    return NV_TRUE;
 }
 
 static NvBool
@@ -231,6 +253,81 @@ ReadReg(
     return NV_TRUE;
 }
 
+static void BMA150_ResetInterrupt(NvOdmAccelHandle hDevice)
+{
+    NvU8 Data = (1 << 6);
+
+    WriteReg(hDevice, SMB150_CTRL_REG, &Data, 1);
+}
+
+static void GpioInterruptHandler(void *arg)
+{
+    NvU32 pinValue;
+    NvOdmAccelHandle hDevice =  (NvOdmAccelHandle)arg;
+
+    NvOdmGpioGetState(hDevice->hGpioINT, hDevice->hPinINT, &pinValue);
+    if (pinValue == 1)
+    {
+        NVODMACCELEROMETER_PRINTF(("\r\nBMA150 Interrupt"));
+        g_WaitCounter = 10;
+        BMA150_ResetInterrupt(hDevice);
+    } else
+        NVODMACCELEROMETER_PRINTF(("\r\nBMA150 non-Interrupt"));
+
+    if (pinValue == 1)
+    {
+        NvOdmOsSemaphoreSignal(hDevice->SemaphoreForINT);
+    }
+    NvOdmGpioInterruptDone(hDevice->hGpioInterrupt);
+    return;
+}
+
+static NvBool ConnectSemaphore(NvOdmAccelHandle hDevice)
+{
+    NvOdmGpioPinMode mode;
+    NvOdmInterruptHandler callback =
+        (NvOdmInterruptHandler)GpioInterruptHandler;
+
+    hDevice->hGpioINT = (NvOdmServicesGpioHandle)NvOdmGpioOpen();
+    if (!(hDevice->hGpioINT))
+    {
+        NVODMACCELEROMETER_PRINTF((
+            "NvOdm Accelerometer : NvOdmGpioOpen Error \n"));
+        return NV_FALSE;
+    }
+
+    hDevice->hPinINT = NvOdmGpioAcquirePinHandle(hDevice->hGpioINT,
+                           hDevice->GPIOPortINT,
+                           hDevice->GPIOPinINT);
+    hDevice->SemaphoreForINT = NvOdmOsSemaphoreCreate(0);
+
+    if (!(hDevice->SemaphoreForINT))
+    {
+        NVODMACCELEROMETER_PRINTF((
+            "NvOdm Accelerometer : NvOdmOsSemaphoreCreate Error \n"));
+        NvOdmGpioClose(hDevice->hGpioINT);
+        return NV_FALSE;
+    }
+
+    mode = NvOdmGpioPinMode_InputInterruptHigh;
+    if (NvOdmGpioInterruptRegister(hDevice->hGpioINT,
+        &hDevice->hGpioInterrupt, hDevice->hPinINT, mode, callback,
+        hDevice, NV_DEBOUNCE_TIME_MS) == NV_FALSE)
+    {
+        return NV_FALSE;
+    }
+
+    if (!(hDevice->hGpioInterrupt))
+    {
+        NVODMACCELEROMETER_PRINTF((
+            "NvOdm Accelerometer : NvOdmGpioInterruptRegister Error \n"));
+        NvOdmGpioClose(hDevice->hGpioINT);
+        NvOdmOsSemaphoreDestroy(hDevice->SemaphoreForINT);
+        return NV_FALSE;
+    }
+    return NV_TRUE;
+}
+
 static NvBool BMA150_Init(NvOdmAccelHandle hAccel)
 {
     NvU8 TestVal;
@@ -251,12 +348,15 @@ static NvBool BMA150_Init(NvOdmAccelHandle hAccel)
     if (!WriteReg(hAccel, RANGE_BWIDTH_REG, &TestVal, 1))
         goto error;
 
+#if !(ENABLE_XYZ_POLLING)
     if (!ReadReg(hAccel, SMB150_CONF2_REG, &TestVal, 1))
         goto error;
     // Enable Advanced interrupt(6), latch int(4)
     TestVal |= (0 << 3) | (1 << 6) | (1 << 4);
     if (!WriteReg(hAccel, SMB150_CONF2_REG, &TestVal, 1))
         goto error;
+#endif
+
     // Init Hw end
     // Set mode
     if (!ReadReg(hAccel, SMB150_CTRL_REG, &TestVal, 1))
@@ -317,20 +417,247 @@ BMA150_ReadXYZ(
     return NewData;
 }
 
-static void BMA150_ResetInterrupt(NvOdmAccelHandle hDevice)
+void BMA150_deInit(NvOdmAccelHandle hDevice)
 {
-    NvU8 Data = (1 << 6);
+    if (hDevice)
+    {
+        if (hDevice->SemaphoreForINT && hDevice->hGpioINT &&
+            hDevice->hPinINT && hDevice->hGpioInterrupt)
+        {
+            NvOdmGpioInterruptUnregister(hDevice->hGpioINT,
+                hDevice->hPinINT, hDevice->hGpioInterrupt);
+            NvOdmOsSemaphoreDestroy(hDevice->SemaphoreForINT);
+            NvOdmGpioReleasePinHandle(hDevice->hGpioINT, hDevice->hPinINT);
+            NvOdmGpioClose(hDevice->hGpioINT);
+        }
+        NvOdmI2cClose(hDevice->hOdmI2C);
 
-    WriteReg(hDevice, SMB150_CTRL_REG, &Data, 1);
+        // Power off accelermeter
+        SetPowerRail(hDevice->hPmu, hDevice->VddId, NV_FALSE);
+        if (hDevice->hPmu)
+        {
+            //NvAccelerometerSetPowerOn(0);
+            NvOdmServicesPmuClose(hDevice->hPmu);
+        }
+    }
 }
 
-NvBool NvOdmAccelOpen(NvOdmAccelHandle* hDevice)
+NvBool
+BMA150_SetIntForceThreshold(
+    NvOdmAccelHandle  hDevice,
+    NvOdmAccelIntType IntType,
+    NvU32             IntNum,
+    NvU32             Threshold)
+{
+    return NV_TRUE;
+}
+
+NvBool
+BMA150_SetIntTimeThreshold(
+    NvOdmAccelHandle  hDevice,
+    NvOdmAccelIntType IntType,
+    NvU32             IntNum,
+    NvU32             Threshold)
+{
+    return NV_TRUE;
+}
+
+NvBool
+BMA150_SetIntEnable(
+    NvOdmAccelHandle  hDevice,
+    NvOdmAccelIntType  IntType,
+    NvOdmAccelAxisType IntAxis,
+    NvU32              IntNum,
+    NvBool             Toggle)
+{
+    return NV_TRUE;
+}
+
+void
+BMA150_WaitInt(
+    NvOdmAccelHandle    hDevice,
+    NvOdmAccelIntType  *IntType,
+    NvOdmAccelAxisType *IntMotionAxis,
+    NvOdmAccelAxisType *IntTapAxis)
+{
+    NV_ASSERT(hDevice);
+    NV_ASSERT(IntType);
+    NV_ASSERT(IntMotionAxis);
+    NV_ASSERT(IntTapAxis);
+
+    if ((g_WaitCounter > 0) || ENABLE_XYZ_POLLING)
+    {
+        NvOdmOsSemaphoreWaitTimeout( hDevice->SemaphoreForINT, PollingTime);
+        g_WaitCounter--;
+    }
+    else
+        NvOdmOsSemaphoreWait( hDevice->SemaphoreForINT);
+}
+
+void BMA150_Signal(NvOdmAccelHandle hDevice)
+{
+    NvOdmOsSemaphoreSignal(hDevice->SemaphoreForINT);
+}
+
+NvBool
+BMA150_GetAcceleration(
+    NvOdmAccelHandle hDevice,
+    NvS32           *AccelX,
+    NvS32           *AccelY,
+    NvS32           *AccelZ)
+{
+    NvS32 data;
+    NvBool NewData = 0;
+    NvS32 TempAccelX = 0;
+    NvS32 TempAccelY = 0;
+    NvS32 TempAccelZ = 0;
+
+    NV_ASSERT(NULL != hDevice);
+    NV_ASSERT(NULL != AccelX);
+    NV_ASSERT(NULL != AccelY);
+    NV_ASSERT(NULL != AccelZ);
+    NewData = BMA150_ReadXYZ(hDevice, &TempAccelX, &TempAccelY, &TempAccelZ);
+
+    data = (((NvS32)(hDevice->Caption.MaxForceInGs))*TempAccelX+
+            (NvS32)(NV_BMA150_MAX_FORCE_IN_REG/2))/
+             (NvS32)NV_BMA150_MAX_FORCE_IN_REG;
+    switch(hDevice->AxisXMapping)
+    {
+        case NvOdmAccelAxis_X:
+            *AccelX = data*hDevice->AxisXDirection;
+            break;
+        case NvOdmAccelAxis_Y:
+            *AccelY = data*hDevice->AxisYDirection;
+            break;
+        case NvOdmAccelAxis_Z:
+            *AccelZ = data*hDevice->AxisZDirection;
+            break;
+        default:
+            return NV_FALSE;
+    }
+
+    data = (((NvS32)(hDevice->Caption.MaxForceInGs))*TempAccelY+
+            (NvS32)(NV_BMA150_MAX_FORCE_IN_REG/2))/
+             (NvS32)NV_BMA150_MAX_FORCE_IN_REG;
+    switch(hDevice->AxisYMapping)
+    {
+        case NvOdmAccelAxis_X:
+            *AccelX = data*hDevice->AxisXDirection;
+            break;
+        case NvOdmAccelAxis_Y:
+            *AccelY = data*hDevice->AxisYDirection;
+            break;
+        case NvOdmAccelAxis_Z:
+            *AccelZ = data*hDevice->AxisZDirection;
+            break;
+        default:
+            return NV_FALSE;
+    }
+
+    data = (((NvS32)(hDevice->Caption.MaxForceInGs))*TempAccelZ+
+            (NvS32)(NV_BMA150_MAX_FORCE_IN_REG/2))/
+             (NvS32)NV_BMA150_MAX_FORCE_IN_REG;
+    switch(hDevice->AxisZMapping)
+    {
+        case NvOdmAccelAxis_X:
+            *AccelX = data*hDevice->AxisXDirection;
+            break;
+        case NvOdmAccelAxis_Y:
+            *AccelY = data*hDevice->AxisYDirection;
+            break;
+        case NvOdmAccelAxis_Z:
+            *AccelZ = data*hDevice->AxisZDirection;
+            break;
+        default:
+            return NV_FALSE;
+    }
+
+    NVODMACCELEROMETER_PRINTF(("\naccel output, x=%d,y=%d,z=%d, NewData=%d",
+        *AccelX, *AccelY, *AccelZ, NewData));
+    return NewData;
+}
+
+NvOdmAccelerometerCaps BMA150_GetCaps(NvOdmAccelHandle hDevice)
+{
+    NV_ASSERT(NULL != hDevice);
+    return hDevice->Caption;
+}
+
+NvBool BMA150_SetSampleRate(NvOdmAccelHandle hDevice, NvU32 SampleRate)
+{
+    NvU8 BandWidthReg, RangeReg, Val;
+    NvU32 i;
+    NvS32 index;
+
+    if (!ReadReg(hDevice, RANGE_BWIDTH_REG, &Val, 1))
+        goto error;
+
+    index = -1;
+    if (SampleRate <= NV_BMA150_MIN_SAMPLE_RATE)
+    {
+        index = 0;
+    }
+    else if (SampleRate >= NV_BMA150_MAX_SAMPLE_RATE)
+    {
+        index = NV_ARRAY_SIZE(OutputRate)-1;
+    }
+    else
+    {
+        for (i = 0; i < NV_ARRAY_SIZE(OutputRate); i++)
+        {
+            if ((SampleRate >= OutputRate[i].SampleRate) &&
+                (SampleRate < OutputRate[i+1].SampleRate))
+            {
+                index = i;
+                break;
+            }
+        }
+    }
+
+    if (index != -1)
+    {
+        BandWidthReg = OutputRate[index].BandWidthReg;
+        RangeReg = OutputRate[index].RangeReg;
+        Val = Val & 0xE0;
+        Val = Val | BandWidthReg | (RangeReg << 3);
+        if (!WriteReg(hDevice, RANGE_BWIDTH_REG, &Val, 1))
+            goto error;
+        CurrSampleRate = OutputRate[index].SampleRate;
+        PollingTime = (1000 * NV_BMA150_POLLING_FACTOR)/CurrSampleRate; //ms
+        return NV_TRUE;
+    }
+error:
+    return NV_FALSE;
+}
+
+NvBool BMA150_GetSampleRate(NvOdmAccelHandle hDevice, NvU32 *pSampleRate)
+{
+    *pSampleRate = CurrSampleRate;
+    return NV_TRUE;
+}
+
+NvBool
+BMA150_SetPowerState(
+    NvOdmAccelHandle hDevice,
+    NvOdmAccelPowerType PowerState)
+{
+    return NV_TRUE;
+}
+
+NvBool bma150_init(NvOdmAccelHandle* hDevice)
 {
     NvU32 i;
     NvOdmAccelHandle  hAccel;
     NvOdmIoModule IoModule = NvOdmIoModule_I2c;
     const NvOdmPeripheralConnectivity *pConnectivity;
     NvBool FoundGpio = NV_FALSE, FoundI2cModule = NV_FALSE;
+    NvOdmBoardInfo BoardInfo;
+    // Accelerometer is supported only on E1206.
+    if (!NvOdmPeripheralGetBoardInfo(EEPROM_ID_E1206, &BoardInfo))
+    {
+        NVODMACCELEROMETER_PRINTF(("\n Accelerometer is not supported \n"));
+        return NV_FALSE;
+    }
 
     hAccel = NvOdmOsAlloc(sizeof(NvOdmAccel));
     if (hAccel == NULL)
@@ -339,6 +666,7 @@ NvBool NvOdmAccelOpen(NvOdmAccelHandle* hDevice)
         return NV_FALSE;
     }
     NvOdmOsMemset(hAccel, 0, sizeof(NvOdmAccel));
+
     hAccel->nBusType = NV_ACCELEROMETER_BUS_I2C;
 
     // Info of accelerometer with current setting.
@@ -421,202 +749,34 @@ NvBool NvOdmAccelOpen(NvOdmAccelHandle* hDevice)
     if (!ConnectSemaphore(hAccel))
         goto error;
 
+    hAccel->AccelClose = BMA150_deInit;
+    hAccel->AccelSetIntForceThreshold = BMA150_SetIntForceThreshold;
+    hAccel->AccelSetIntTimeThreshold = BMA150_SetIntTimeThreshold;
+    hAccel->AccelSetIntEnable = BMA150_SetIntEnable;
+    hAccel->AccelWaitInt = BMA150_WaitInt;
+    hAccel->AccelSignal = BMA150_Signal;
+    hAccel->AccelGetAcceleration = BMA150_GetAcceleration;
+    hAccel->AccelGetCaps = BMA150_GetCaps;
+    hAccel->AccelSetPowerState = BMA150_SetPowerState;
+    hAccel->AccelSetSampleRate = BMA150_SetSampleRate;
+    hAccel->AccelGetSampleRate = BMA150_GetSampleRate;
+
     *hDevice = hAccel;
+    NVODMACCELEROMETER_PRINTF(("BMA150 NvOdmAccelOpen success\n"));
     return NV_TRUE;
-    error:
-        NVODMACCELEROMETER_PRINTF(("Error during BMA150 NvOdmAccelOpen\n"));
-        // Release all of resources requested.
-        if (hAccel)
-        {
-            SetPowerRail(hAccel->hPmu, hAccel->VddId, NV_FALSE);
-            NvOdmServicesPmuClose(hAccel->hPmu);
-            hAccel->hPmu = NULL;
-            NvOdmI2cClose(hAccel->hOdmI2C);
-            hAccel->hOdmI2C = NULL;
-            NvOdmOsFree(hAccel);
-            *hDevice = NULL;
-        }
-        return NV_FALSE;
-}
-
-void NvOdmAccelClose(NvOdmAccelHandle hDevice)
-{
-    if (hDevice)
+error:
+    NVODMACCELEROMETER_PRINTF(("Error during BMA150 NvOdmAccelOpen\n"));
+    // Release all of resources requested.
+    if (hAccel)
     {
-        if (hDevice->SemaphoreForINT && hDevice->hGpioINT &&
-            hDevice->hPinINT && hDevice->hGpioInterrupt)
-        {
-            NvOdmGpioInterruptUnregister(hDevice->hGpioINT,
-                hDevice->hPinINT, hDevice->hGpioInterrupt);
-            NvOdmOsSemaphoreDestroy(hDevice->SemaphoreForINT);
-            NvOdmGpioReleasePinHandle(hDevice->hGpioINT, hDevice->hPinINT);
-            NvOdmGpioClose(hDevice->hGpioINT);
-        }
-        NvOdmI2cClose(hDevice->hOdmI2C);
-
-        // Power off accelermeter
-        SetPowerRail(hDevice->hPmu, hDevice->VddId, NV_FALSE);
-        if (hDevice->hPmu)
-        {
-            //NvAccelerometerSetPowerOn(0);
-            NvOdmServicesPmuClose(hDevice->hPmu);
-        }
+        SetPowerRail(hAccel->hPmu, hAccel->VddId, NV_FALSE);
+        NvOdmServicesPmuClose(hAccel->hPmu);
+        hAccel->hPmu = NULL;
+        NvOdmI2cClose(hAccel->hOdmI2C);
+        hAccel->hOdmI2C = NULL;
+        NvOdmOsFree(hAccel);
+        *hDevice = NULL;
     }
-}
-
-NvBool
-NvOdmAccelSetIntForceThreshold(
-    NvOdmAccelHandle  hDevice,
-    NvOdmAccelIntType IntType,
-    NvU32             IntNum,
-    NvU32             Threshold)
-{
-    return NV_TRUE;
-}
-
-NvBool
-NvOdmAccelSetIntTimeThreshold(
-    NvOdmAccelHandle  hDevice,
-    NvOdmAccelIntType IntType,
-    NvU32             IntNum,
-    NvU32             Threshold)
-{
-    return NV_TRUE;
-}
-
-NvBool
-NvOdmAccelSetIntEnable(
-    NvOdmAccelHandle  hDevice,
-    NvOdmAccelIntType  IntType,
-    NvOdmAccelAxisType IntAxis,
-    NvU32              IntNum,
-    NvBool             Toggle)
-{
-    return NV_TRUE;
-}
-
-void
-NvOdmAccelWaitInt(
-    NvOdmAccelHandle    hDevice,
-    NvOdmAccelIntType  *IntType,
-    NvOdmAccelAxisType *IntMotionAxis,
-    NvOdmAccelAxisType *IntTapAxis)
-{
-    NV_ASSERT(hDevice);
-    NV_ASSERT(IntType);
-    NV_ASSERT(IntMotionAxis);
-    NV_ASSERT(IntTapAxis);
-
-    if ((g_WaitCounter > 0) || ENABLE_XYZ_POLLING)
-    {
-        NvOdmOsSemaphoreWaitTimeout( hDevice->SemaphoreForINT, 300);
-        g_WaitCounter--;
-    }
-    else
-        NvOdmOsSemaphoreWait( hDevice->SemaphoreForINT);
-}
-
-void NvOdmAccelSignal(NvOdmAccelHandle hDevice)
-{
-    NvOdmOsSemaphoreSignal(hDevice->SemaphoreForINT);
-}
-
-NvBool
-NvOdmAccelGetAcceleration(
-    NvOdmAccelHandle hDevice,
-    NvS32           *AccelX,
-    NvS32           *AccelY,
-    NvS32           *AccelZ)
-{
-    NvS32 data;
-    NvBool NewData = 0;
-    NvS32 TempAccelX = 0;
-    NvS32 TempAccelY = 0;
-    NvS32 TempAccelZ = 0;
-
-    NV_ASSERT(NULL != hDevice);
-    NV_ASSERT(NULL != AccelX);
-    NV_ASSERT(NULL != AccelY);
-    NV_ASSERT(NULL != AccelZ);
-    NewData = BMA150_ReadXYZ(hDevice, &TempAccelX, &TempAccelY, &TempAccelZ);
-
-    data = (((NvS32)(hDevice->Caption.MaxForceInGs))*TempAccelX+(NvS32)(NV_BMA150_MAX_FORCE_IN_REG/2))/
-             (NvS32)NV_BMA150_MAX_FORCE_IN_REG;
-    switch(hDevice->AxisXMapping)
-    {
-        case NvOdmAccelAxis_X:
-            *AccelX = data*hDevice->AxisXDirection;
-            break;
-        case NvOdmAccelAxis_Y:
-            *AccelY = data*hDevice->AxisYDirection;
-            break;
-        case NvOdmAccelAxis_Z:
-            *AccelZ = data*hDevice->AxisZDirection;
-            break;
-        default:
-            return NV_FALSE;
-    }
-
-    data = (((NvS32)(hDevice->Caption.MaxForceInGs))*TempAccelY+(NvS32)(NV_BMA150_MAX_FORCE_IN_REG/2))/
-             (NvS32)NV_BMA150_MAX_FORCE_IN_REG;
-    switch(hDevice->AxisYMapping)
-    {
-        case NvOdmAccelAxis_X:
-            *AccelX = data*hDevice->AxisXDirection;
-            break;
-        case NvOdmAccelAxis_Y:
-            *AccelY = data*hDevice->AxisYDirection;
-            break;
-        case NvOdmAccelAxis_Z:
-            *AccelZ = data*hDevice->AxisZDirection;
-            break;
-        default:
-            return NV_FALSE;
-    }
-
-    data = (((NvS32)(hDevice->Caption.MaxForceInGs))*TempAccelZ+(NvS32)(NV_BMA150_MAX_FORCE_IN_REG/2))/
-             (NvS32)NV_BMA150_MAX_FORCE_IN_REG;
-    switch(hDevice->AxisZMapping)
-    {
-        case NvOdmAccelAxis_X:
-            *AccelX = data*hDevice->AxisXDirection;
-            break;
-        case NvOdmAccelAxis_Y:
-            *AccelY = data*hDevice->AxisYDirection;
-            break;
-        case NvOdmAccelAxis_Z:
-            *AccelZ = data*hDevice->AxisZDirection;
-            break;
-        default:
-            return NV_FALSE;
-    }
-
-    NVODMACCELEROMETER_PRINTF(("\naccel output, x=%d,y=%d,z=%d, NewData=%d",
-        *AccelX, *AccelY, *AccelZ, NewData));
-    return NewData;
-}
-
-NvOdmAccelerometerCaps NvOdmAccelGetCaps(NvOdmAccelHandle hDevice)
-{
-    NV_ASSERT(NULL != hDevice);
-    return hDevice->Caption;
-}
-
-NvBool NvOdmAccelSetSampleRate(NvOdmAccelHandle hDevice, NvU32 SampleRate)
-{
-    return NV_TRUE;
-}
-
-NvBool NvOdmAccelGetSampleRate(NvOdmAccelHandle hDevice, NvU32 *pSampleRate)
-{
-    return NV_TRUE;
-}
-
-NvBool
-NvOdmAccelSetPowerState(
-    NvOdmAccelHandle hDevice,
-    NvOdmAccelPowerType PowerState)
-{
-    return NV_TRUE;
+    return NV_FALSE;
 }
 
