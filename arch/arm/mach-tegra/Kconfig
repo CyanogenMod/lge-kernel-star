@@ -23,12 +23,20 @@ choice
 config MACH_TEGRA_GENERIC
 	bool "Tegra 2 Development System (Whistler, Harmony, Tango)"
 	select TEGRA_ODM_KIT
+	select MACH_HARMONY
+	select MACH_VENTANA
 	help
 	  Support for NVIDIA Tegra 2 development platforms; requires
 	  selection of an appropriate ODM kit for your specific development
 	  system
 
 endchoice
+
+config MACH_HARMONY
+	bool
+
+config MACH_VENTANA
+	bool
 
 config TEGRA_ODM_KIT
 	bool

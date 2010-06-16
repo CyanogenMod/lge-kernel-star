@@ -104,7 +104,9 @@ static struct android_usb_product tegra_android_products[] = {
 	},
 };
 
-static char *harmony_dev = "Harmony ADB";
+static char *harmony_dev = "NVIDIA Harmony";
+static char *ventana_dev = "NVIDIA Ventana";
+static char *generic_dev = "NVIDIA Tegra 2";
 
 static struct android_usb_platform_data tegra_android_platform = {
 	.vendor_id = 0x955,
@@ -170,7 +172,7 @@ static struct platform_device *platform_devices[] = {
 extern void __init tegra_setup_nvodm(bool standard_i2c, bool standard_spi);
 extern void __init tegra_register_socdev(void);
 
-static void __init tegra_generic_init(void)
+static void __init do_system_init(bool standard_i2c, bool standard_spi)
 {
 	unsigned int chip_id[2];
 	char serial[17];
@@ -183,10 +185,54 @@ static void __init tegra_generic_init(void)
 	snprintf(serial, sizeof(serial), "%08x%08x", chip_id[1], chip_id[0]);
 #ifdef CONFIG_USB_ANDROID
 	tegra_android_platform.serial_number = kstrdup(serial, GFP_KERNEL);
-	tegra_android_platform.product_name = harmony_dev;
 #endif
 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
 }
+
+static void __init tegra_harmony_init(void)
+{
+#ifdef CONFIG_USB_ANDROID
+	tegra_android_platform.product_name = harmony_dev;
+#endif
+	do_system_init(true, true);
+}
+
+static void __init tegra_ventana_init(void)
+{
+#ifdef CONFIG_USB_ANDROID
+	tegra_android_platform.product_name = ventana_dev;
+#endif
+	do_system_init(false, true);
+}
+
+static void __init tegra_generic_init(void)
+{
+#ifdef CONFIG_USB_ANDROID
+	tegra_android_platform.product_name = generic_dev;
+#endif
+	do_system_init(true, true);
+}
+
+MACHINE_START(VENTANA, "NVIDIA Ventana Development System")
+	.boot_params  = 0x00000100,
+	.phys_io        = IO_APB_PHYS,
+	.io_pg_offst    = ((IO_APB_VIRT) >> 18) & 0xfffc,
+	.init_irq       = tegra_init_irq,
+	.init_machine   = tegra_ventana_init,
+	.map_io         = tegra_map_common_io,
+	.timer          = &tegra_timer,
+MACHINE_END
+
+MACHINE_START(HARMONY, "NVIDIA Harmony Development System")
+	.boot_params  = 0x00000100,
+	.phys_io        = IO_APB_PHYS,
+	.io_pg_offst    = ((IO_APB_VIRT) >> 18) & 0xfffc,
+	.init_irq       = tegra_init_irq,
+	.init_machine   = tegra_harmony_init,
+	.map_io         = tegra_map_common_io,
+	.timer          = &tegra_timer,
+MACHINE_END
+
 
 MACHINE_START(TEGRA_GENERIC, "Tegra 2 Development System")
 	.boot_params  = 0x00000100,
