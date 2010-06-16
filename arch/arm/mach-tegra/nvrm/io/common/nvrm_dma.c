@@ -236,6 +236,7 @@ NvError NvRmDmaStartDmaTransfer(NvRmDmaHandle dma, NvRmDmaClientBuffer *b,
 
 	action->req.size = b->TransferSize;
 	action->req.req_sel = dma->mod_sel;
+	action->req.threshold = NULL;
 	action->dma = dma;
 
 	if ((periph_src && dir==NvRmDmaDirection_Forward) ||
