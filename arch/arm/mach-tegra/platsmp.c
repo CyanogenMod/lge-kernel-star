@@ -43,6 +43,7 @@ extern void tegra_secondary_startup(void);
 static DEFINE_SPINLOCK(boot_lock);
 static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
 extern void __cortex_a9_restore(void);
+extern void __shut_off_mmu(void);
 
 #ifdef CONFIG_HOTPLUG_CPU
 static DEFINE_PER_CPU(struct completion, cpu_killed);
@@ -172,6 +173,7 @@ static int create_suspend_pgtable(void)
 		(unsigned long)tegra_context_area,
 		(unsigned long)virt_to_phys(tegra_hotplug_startup),
 		(unsigned long)__cortex_a9_restore,
+		(unsigned long)virt_to_phys(__shut_off_mmu),
 	};
 	unsigned long addr_p[] = {
 		PHYS_OFFSET,
@@ -179,6 +181,7 @@ static int create_suspend_pgtable(void)
 		(unsigned long)virt_to_phys(tegra_context_area),
 		(unsigned long)virt_to_phys(tegra_hotplug_startup),
 		(unsigned long)virt_to_phys(__cortex_a9_restore),
+		(unsigned long)virt_to_phys(__shut_off_mmu),
 	};
 	unsigned int flags = PMD_TYPE_SECT | PMD_SECT_AP_WRITE |
 		PMD_SECT_WBWA | PMD_SECT_S;

@@ -28,6 +28,7 @@
 #include <asm/ptrace.h>
 #include <asm/cache.h>
 #include <asm/vfpmacros.h>
+#include <asm/memory.h>
 #include <asm/hardware/cache-l2x0.h>
 
 #include <mach/iomap.h>
@@ -531,19 +532,13 @@ __l2_clean_done:
 	 * memory access due to page table walks */
 	mov32	r0, (IO_APB_VIRT-IO_APB_PHYS)
 	mov32	r4, TEGRA_PMC_BASE
-	addeq	r4, r4, r0
 	mov32	r0, (IO_PPSB_VIRT-IO_PPSB_PHYS)
 	mov32	r5, TEGRA_CLK_RESET_BASE
 	mov32	r6, TEGRA_FLOW_CTRL_BASE
 	mov32	r7, TEGRA_TMRUS_BASE
-	addeq	r5, r5, r0
-	addeq	r6, r6, r0
-	addeq	r7, r7, r0
-
-	beq	__tear_down_master_pll_cpu
 
 	/* change page table pointer to tegra_pgd_phys, so that IRAM
-	 * will be mapped virtual == physical */
+	 * and MMU shut-off will be mapped virtual == physical */
 	adr	r3, __tear_down_master_data
 	ldr	r3, [r3]		@ &tegra_pgd_phys
 	ldr	r3, [r3]
@@ -553,17 +548,42 @@ __l2_clean_done:
 	isb
 	mcr	p15, 0, r3, c2, c0, 0	@ TTB 0
 	isb
+
+	/* Obtain LP1 information.
+	 * R10 = LP1 branch target */
 	mov32	r2, __tegra_lp1_reset
 	mov32	r3, __tear_down_master_sdram
 	sub	r2, r3, r2
 	mov32	r3, (TEGRA_IRAM_CODE_AREA)
-	add	r3, r2, r3
-	movne	pc, r3
+	add	r10, r2, r3
+
+	mov32	r3, __shut_off_mmu
+
+	/* R9 = LP2 branch target */
+	mov32	r9, __tear_down_master_pll_cpu
+
+	/* Convert the branch targets
+	 * to physical addresses */
+	sub	r3, r3, #(PAGE_OFFSET - PHYS_OFFSET)
+	sub	r9, r9, #(PAGE_OFFSET - PHYS_OFFSET)
+	movne	r9, r10
+	mov	pc, r3
 ENDPROC(__tear_down_master)
 	.type	__tear_down_master_data, %object
 __tear_down_master_data:
 	.long	tegra_pgd_phys
 	.size	__tear_down_master_data, . - __tear_down_master_data
+
+	.align L1_CACHE_SHIFT
+ENTRY(__shut_off_mmu)
+	mrc	p15, 0, r3, c1, c0, 0
+	movw	r2, #(1<<12) | (1<<11) | (1<<2) | (1<<0)
+	bic	r3, r3, r2
+	dsb
+	mcr	p15, 0, r3, c1, c0, 0
+	isb
+	mov	pc, r9
+ENDPROC(__shut_off_mmu)
 
 /*  START OF ROUTINES COPIED TO IRAM  */
 /*
@@ -660,12 +680,6 @@ ENDPROC(__tegra_lp1_reset)
  */
 	.align L1_CACHE_SHIFT
 __tear_down_master_sdram:
-	mrc	p15, 0, r3, c1, c0, 0
-	bic	r3, r3, #((1<<0) | (1<<2))	@ disable MMU and data-cache
-	mcr	p15, 0, r3, c1, c0, 0		@ to avoid page faults & races
-	dsb
-	isb
-
 	mov32	r1, TEGRA_EMC_BASE
 	mov	r2, #3
 	str	r2, [r1, #EMC_REQ_CTRL]		@ stall incoming DRAM requests
