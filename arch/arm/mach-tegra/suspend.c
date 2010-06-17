@@ -589,9 +589,9 @@ static struct platform_suspend_ops tegra_suspend_ops = {
 	.wake		= tegra_suspend_wake,
 	.enter		= tegra_suspend_enter,
 };
-#endif
 
 extern void __init lp0_suspend_init(void);
+#endif
 
 void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 {
@@ -599,6 +599,7 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 	BUG_ON(!tegra_pclk);
 	pdata = plat;
 
+#ifdef CONFIG_PM
 	iram_save_size = (unsigned long)__tegra_iram_end;
 	iram_save_size -= (unsigned long)__tegra_lp1_reset;
 
@@ -633,7 +634,6 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 
 		lp0_suspend_init();
 	}
-#ifdef CONFIG_PM
 	suspend_set_ops(&tegra_suspend_ops);
 #endif
 }
