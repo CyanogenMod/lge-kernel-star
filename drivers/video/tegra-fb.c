@@ -331,6 +331,18 @@ static int tegra_plat_probe( struct platform_device *d )
 	tegra_fb_info.var.xres_virtual = s_fb_width;
 	tegra_fb_info.var.yres_virtual = s_fb_height;
 
+	if (boot_fb.ColorFormat == NvColorFormat_A8R8G8B8)
+	{
+		tegra_fb_info.var.bits_per_pixel = 32;
+		tegra_fb_info.var.transp.offset = 24;
+		tegra_fb_info.var.transp.length = 8;
+		tegra_fb_info.var.red.offset = 16;
+		tegra_fb_info.var.red.length = 8;
+		tegra_fb_info.var.green.offset = 8;
+		tegra_fb_info.var.green.length = 8;
+		tegra_fb_info.var.blue.offset = 0;
+		tegra_fb_info.var.blue.length = 8;
+	}
 	if( tegra_fb_info.screen_base == 0 ) {
 		printk("framebuffer map failure\n");
 		NvRmMemHandleFree(s_fb_hMem);
