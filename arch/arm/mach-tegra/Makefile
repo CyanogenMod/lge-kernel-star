@@ -1,5 +1,6 @@
 obj-y                                   += common.o
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += common-t2.o
+obj-y					+= cortex-a9.o
 obj-y					+= board-common.o
 obj-y                                   += io.o
 obj-y                                   += irq.o
