@@ -141,6 +141,10 @@ config TEGRA_ODM_VIBRATE
 	  Adds a timed output vibrator device node for an NVIDIA Tegra ODM kit
 	  vibrator driver
 
+config TEGRA_USB_VBUS_DETECT_BY_PMU
+	boolean "VBUS detection by PMU"
+	help
+		Enables USB VBUS detection by PMU
 
 if TEGRA_ODM_KIT
 source "arch/arm/mach-tegra/odm_kit/Kconfig"
