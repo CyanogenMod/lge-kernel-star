@@ -24,6 +24,7 @@
 
 #include <linux/types.h>
 #include <linux/serial_8250.h>
+#include <linux/serial_core.h>
 
 #include <mach/pinmux.h>
 
@@ -32,5 +33,19 @@ struct tegra_serial_platform_data {
 	const struct tegra_pingroup_config *pinmux;
 	int nr_pins;
 };
+
+/* Switch off the clock of the uart controller. */
+void tegra_uart_request_clock_off(struct uart_port *uport);
+
+/* Switch on the clock of the uart controller */
+void tegra_uart_request_clock_on(struct uart_port *uport);
+
+/* Set the modem control signals state of uart controller. */
+void tegra_uart_set_mctrl(struct uart_port *uport, unsigned int mctrl);
+
+/* Return the status of the transmit fifo whether empty or not.
+ * Return 0 if tx fifo is not empty.
+ * Return TIOCSER_TEMT if tx fifo is empty */
+int tegra_uart_is_tx_empty(struct uart_port *uport);
 
 #endif
