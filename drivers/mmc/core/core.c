@@ -65,6 +65,7 @@ static int mmc_schedule_delayed_work(struct delayed_work *work,
 static void mmc_flush_scheduled_work(void)
 {
 	flush_workqueue(workqueue);
+	wake_unlock(&mmc_delayed_work_wake_lock);
 }
 
 /**
@@ -1304,6 +1305,7 @@ int mmc_suspend_host(struct mmc_host *host, pm_message_t state)
 		}
 	}
 	mmc_bus_put(host);
+	mmc_flush_scheduled_work();
 
 	if (!err)
 		mmc_power_off(host);
