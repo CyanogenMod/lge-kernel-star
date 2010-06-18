@@ -35,6 +35,7 @@ struct tegra_sdhci_platform_data {
 	int gpio_nr_wp;		/* write protect gpio, -1 if unused */
 	int gpio_polarity_wp;	/* active high write protect */
 	int bus_width;		/* bus width in bits */
+	int is_removable;	/* card can be removed */
 	unsigned int debounce;	/* debounce time in milliseconds */
 	unsigned long max_clk;	/* maximum card clock */
 #ifdef CONFIG_EMBEDDED_MMC_START_OFFSET

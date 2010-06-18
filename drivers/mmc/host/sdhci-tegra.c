@@ -279,11 +279,11 @@ skip_gpio_wp:
 	host->max_clk = clk_get_rate(host->clk);
 	host->clk_enable = true;
 
-	if (host->gpio_wp != -1 && host->gpio_cd != -1)
+	if (host->gpio_wp != -1 && (host->gpio_cd != -1 || !plat->is_removable))
 		sdhost->ops = &tegra_sdhci_wp_cd_ops;
 	else if (host->gpio_wp != -1)
 		sdhost->ops = &tegra_sdhci_wp_ops;
-	else if (host->gpio_cd != -1)
+	else if (host->gpio_cd != -1 || !plat->is_removable)
 		sdhost->ops = &tegra_sdhci_cd_ops;
 	else
 		sdhost->ops = &tegra_sdhci_ops;
@@ -301,6 +301,9 @@ skip_gpio_wp:
 		SDHCI_QUIRK_NO_64KB_ADMA;
 	sdhost->version = SDHCI_SPEC_200;
 #endif
+
+	if (!plat->is_removable)
+		host->card_present = true;
 
 	sdhost->data_width = plat->bus_width;
 	sdhost->dma_mask = DMA_BIT_MASK(32);
