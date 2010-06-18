@@ -315,6 +315,8 @@ static void __init tegra_setup_sdhci(void) {
 		plat = &tegra_sdhci_platform[i];
 		gpio = NvOdmQueryGpioPinMap(NvOdmGpioPinGroup_Sdio,
 			i, &gpio_count);
+
+		plat->is_removable = prop->IsCardRemovable;
 		if (!gpio)
 			gpio_count = 0;
 		switch (gpio_count) {
