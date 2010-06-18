@@ -144,7 +144,8 @@ static int mmc_decode_csd(struct mmc_card *card)
 	csd->capacity	  = (1 + m) << (e + 2);
 #ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
 	/* for sector-addressed cards, this will cause csd->capacity to wrap */
-	csd->capacity -= card->host->ops->get_host_offset(card->host);
+	if (mmc_card_blockaddr(card))
+		csd->capacity -= card->host->ops->get_host_offset(card->host);
 #endif
 
 	csd->read_blkbits = UNSTUFF_BITS(resp, 80, 4);
@@ -234,7 +235,6 @@ static int mmc_read_ext_csd(struct mmc_card *card)
 			BUG_ON(offs >= card->ext_csd.sectors);
 			card->ext_csd.sectors -= offs;
 #endif
-			mmc_card_set_blockaddr(card);
 		}
 
 	}
@@ -320,6 +320,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	int err;
 	u32 cid[4];
 	unsigned int max_dtr;
+	u32 rocr;
 
 	BUG_ON(!host);
 	WARN_ON(!host->claimed);
@@ -333,10 +334,9 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	mmc_go_idle(host);
 
 	/* The extra bit indicates that we support high capacity */
-	err = mmc_send_op_cond(host, ocr | (1 << 30), NULL);
+	err = mmc_send_op_cond(host, ocr | (1 << 30), &rocr);
 	if (err)
 		goto err;
-
 	/*
 	 * For SPI, enable CRC as appropriate.
 	 */
@@ -376,6 +376,13 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		card->type = MMC_TYPE_MMC;
 		card->rca = 1;
 		memcpy(card->raw_cid, cid, sizeof(card->raw_cid));
+		/*
+		 * Set addressing mode of the card based on
+		 * access mode bit in OCR register
+		 */
+		if (rocr & MMC_CARD_ACCESS_MODE)
+			mmc_card_set_blockaddr(card);
+		host->card = card;
 	}
 
 	/*
@@ -488,14 +495,13 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		}
 	}
 
-	if (!oldcard)
-		host->card = card;
 
 	return 0;
 
 free_card:
 	if (!oldcard)
 		mmc_remove_card(card);
+	host->card = NULL;
 err:
 
 	return err;

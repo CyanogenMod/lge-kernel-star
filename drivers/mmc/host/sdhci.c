@@ -924,9 +924,10 @@ static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 
 #ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
 	if (cmd->data) {
-		/* It is assumed that the device is block addressed. */
-		sdhci_writel(host, cmd->arg + (host->start_offset >> 9),
-			SDHCI_ARGUMENT);
+		unsigned long offset = host->start_offset;
+		if (likely(mmc_card_blockaddr(host->mmc->card)))
+			offset >>= 9;
+		sdhci_writel(host, cmd->arg + offset, SDHCI_ARGUMENT);
 	} else {
 		sdhci_writel(host, cmd->arg, SDHCI_ARGUMENT);
 	}

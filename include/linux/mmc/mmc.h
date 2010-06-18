@@ -202,6 +202,7 @@ struct _mmc_csd {
  * OCR bits are mostly in host.h
  */
 #define MMC_CARD_BUSY	0x80000000	/* Card Power up status bit */
+#define MMC_CARD_ACCESS_MODE	0x40000000	/* Card Access Mode bit */
 
 /*
  * Card Command Classes (CCC)
