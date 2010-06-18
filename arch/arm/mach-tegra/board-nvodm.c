@@ -1408,6 +1408,7 @@ static void __init tegra_setup_suspend(void)
 
 do_register:
 	tegra_init_suspend(plat);
+	tegra_init_idle(plat);
 }
 
 void __init tegra_setup_nvodm(bool standard_i2c, bool standard_spi)

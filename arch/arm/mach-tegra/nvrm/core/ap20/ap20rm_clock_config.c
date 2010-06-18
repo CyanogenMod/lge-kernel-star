@@ -300,7 +300,7 @@ static NvRmFreqKHz Ap20CpuToEmcRatio(NvRmFreqKHz Emc2xKHz)
         7,  10, 11, 13, 14, 15, 17, 18, 18, 19, 20, 21, 22, 22, 23, 24,
         24, 25, 25, 26, 26, 27, 27, 28, 28, 29, 29, 30, 30, 31, 31, 32
     };
-    #define CPU_TO_EMC_MAX_RATIO (10)
+    #define CPU_TO_EMC_MAX_RATIO (12)
     
     NvRmFreqKHz CpuKHz;
     NvRmFreqKHz CpuMaxKHz = NvRmPrivGetSocClockLimits(NvRmModuleID_Cpu)->MaxKHz;

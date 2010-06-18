@@ -58,7 +58,7 @@ extern "C"
  */
 #define NVRM_DFS_PARAM_CPU_AP20 \
     NvRmFreqMaximum, /* Maximum domain frequency set to h/w limit */ \
-    40000,  /* Minimum domain frequency 40 MHz */ \
+    216000, /* Minimum domain frequency 216 MHz */ \
     1000,   /* Frequency change upper band 1 MHz */ \
     1000,   /* Frequency change lower band 1 MHz */ \
     {          /* RT starvation control parameters */ \
@@ -71,7 +71,7 @@ extern "C"
         255,   /* Proportional frequency boost increase 255/256 ~ 100% */ \
         32,    /* Proportional frequency boost decrease 32/256 ~ 12% */  \
     },\
-    3,      /* Relative adjustement of average freqiency 1/2^3 ~ 12% */ \
+    2,      /* Relative adjustement of average freqiency 1/2^2 ~ 25% */ \
     1,      /* Number of smaple intervals with NRT to trigger boost = 2 */ \
     1       /* NRT idle cycles threshold = 1 */ 
 

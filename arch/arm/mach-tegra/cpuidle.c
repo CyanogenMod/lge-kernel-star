@@ -33,7 +33,12 @@
 #include <mach/iomap.h>
 #include <linux/suspend.h>
 
-static unsigned int latency_factor __read_mostly = 2;
+#include "power.h"
+
+#define LATENCY_FACTOR_SHIFT 8
+
+static unsigned int latency_factor __read_mostly = 80;	// factor ~ 0.3
+static unsigned int pwrgood_latency = 2000;
 static unsigned int system_is_suspending = 0;
 module_param(latency_factor, uint, 0644);
 
@@ -55,6 +60,11 @@ static int lp2_supported = 0;
 #define PMC_SCRATCH_39 0x138
 
 #define CLK_RESET_CLK_MASK_ARM 0x44
+
+void __init tegra_init_idle(struct tegra_suspend_platform_data *plat)
+{
+	pwrgood_latency = plat->cpu_timer;
+}
 
 static int tegra_idle_enter_lp3(struct cpuidle_device *dev,
 	struct cpuidle_state *state)
@@ -93,16 +103,17 @@ extern unsigned int tegra_suspend_lp2(unsigned int);
 static int tegra_idle_enter_lp2(struct cpuidle_device *dev,
 	struct cpuidle_state *state)
 {
-	ktime_t enter, exit;
-	s64 request, us, latency;
+	ktime_t enter;
+	s64 request, us, latency, idle_us;
 	unsigned long log_us;
 	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
 	unsigned int last_sample = (unsigned int)cpuidle_get_statedata(state);
 
 	/* LP2 not possible when running in SMP mode */
 	smp_rmb();
+	idle_us = state->exit_latency + state->target_residency;
 	request = ktime_to_us(tick_nohz_get_sleep_length());
-	if (!lp2_supported || request <= state->exit_latency ||
+	if (!lp2_supported || request <= idle_us ||
 		system_is_suspending || (!tegra_nvrm_lp2_allowed())) {
 		dev->last_state = &dev->states[0];
 		return tegra_idle_enter_lp3(dev, &dev->states[0]);
@@ -112,19 +123,19 @@ static int tegra_idle_enter_lp2(struct cpuidle_device *dev,
 	enter = ktime_get();
 	request -= state->exit_latency;
 	us = tegra_suspend_lp2((unsigned int)max_t(s64, 200, request));
-	exit = ktime_sub(ktime_get(), enter);
-	latency = ktime_to_us(exit) - us;
-	/* FIXME: un-hardcode the powergood timer latency */
-	latency += 2000;
+	idle_us = ktime_to_us(ktime_sub(ktime_get(), enter));
+
+	latency = pwrgood_latency + idle_us - us;
 	cpuidle_set_statedata(state, (void*)(unsigned int)(latency));
 	state->exit_latency = (12*latency + 4*last_sample) >> 4;
+	state->target_residency = (latency_factor*state->exit_latency) >>
+		LATENCY_FACTOR_SHIFT;
 
 	log_us = (unsigned long)us + __raw_readl(pmc + PMC_SCRATCH_21);
 	__raw_writel(log_us, pmc + PMC_SCRATCH_21);
 
-	state->target_residency = latency_factor*state->exit_latency;
 	local_irq_enable();
-	return (int)us;
+	return (int)idle_us;
 }
 
 static int tegra_idle_lp2_allowed(struct notifier_block *nfb,
@@ -183,7 +194,7 @@ static int tegra_idle_enter(unsigned int cpu)
 	snprintf(state->name, CPUIDLE_NAME_LEN, "LP3");
 	snprintf(state->desc, CPUIDLE_DESC_LEN, "CPU flow-controlled");
 	state->exit_latency = 10;
-	state->target_residency = 10;
+	state->target_residency = 0;
 	state->power_usage = 600;
 	state->flags = CPUIDLE_FLAG_SHALLOW | CPUIDLE_FLAG_TIME_VALID;
 	state->enter = tegra_idle_enter_lp3;
@@ -196,7 +207,8 @@ static int tegra_idle_enter(unsigned int cpu)
 		snprintf(state->desc, CPUIDLE_DESC_LEN, "CPU power-gate");
 		state->exit_latency = 2500;
 
-		state->target_residency = state->exit_latency * latency_factor;
+		state->target_residency = (state->exit_latency *
+			latency_factor) >> LATENCY_FACTOR_SHIFT;
 		state->power_usage = 0;
 		state->flags = CPUIDLE_FLAG_BALANCED | CPUIDLE_FLAG_TIME_VALID;
 		state->enter = tegra_idle_enter_lp2;

@@ -32,6 +32,12 @@ void __init tegra_init_irq(void);
 void __init tegra_init_clock(void);
 void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat);
 
+#ifdef CONFIG_CPU_IDLE
+void __init tegra_init_idle(struct tegra_suspend_platform_data *plat);
+#else
+#define tegra_init_idle(plat) (0)
+#endif
+
 #ifdef CONFIG_CPU_FREQ
 int tegra_start_dvfsd(void);
 #else
