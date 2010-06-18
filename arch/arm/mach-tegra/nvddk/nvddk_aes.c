@@ -1736,20 +1736,21 @@ NvError AesCoreInitEngine(const NvRmDeviceHandle hRmDevice)
         // The slots already dedicated don't depend on which engine is being used but
         // on the capabilities the engines can provide. Basic assumption: both engines have
         // same capabilities.
-        NVDDK_AES_CHECK_INTERFACE_FUNC(pAesHwCtxt, 0, AesGetUsedSlots);
+        NVDDK_AES_CHECK_INTERFACE_FUNC(pAesHwCtxt, 0, AesHwGetUsedSlots);
         pAesHwCtxt->ppEngineCaps[0]->pAesInterf->AesHwGetUsedSlots(gs_pAesCoreEngine);
     }
 
     for (Engine = AesHwEngine_A; Engine < AesHwEngine_Num; Engine++)
     {
         NVDDK_AES_CHECK_INTERFACE(pAesHwCtxt, Engine);
-        NVDDK_AES_CHECK_INTERFACE_FUNC(pAesHwCtxt, Engine, GetIvReadPermissions);
+        NVDDK_AES_CHECK_INTERFACE_FUNC(pAesHwCtxt, Engine, AesHwDisableAllKeyRead);
         pAesHwCtxt->ppEngineCaps[Engine]->pAesInterf->AesHwDisableAllKeyRead(
             pAesHwCtxt,
             Engine,
             pAesHwCtxt->ppEngineCaps[Engine]->NumSlotsSupported);
 
         // Get the Iv read permissions
+        NVDDK_AES_CHECK_INTERFACE_FUNC(pAesHwCtxt, Engine, AesHwGetIvReadPermissions);
         pAesHwCtxt->ppEngineCaps[Engine]->pAesInterf->AesHwGetIvReadPermissions(Engine, pAesHwCtxt);
     }
 

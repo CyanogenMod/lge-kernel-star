@@ -510,6 +510,8 @@ NvAesCoreAp20ProcessBuffer(
     NvU32 BytesToProcess = 0;
     NvU32 *pSrcVirAddr = NULL;
     NvU32 *pDestVirAddr = NULL;
+    NvU32 *pSrcVirAddrTmp = NULL;
+    NvU32 *pDestVirAddrTmp = NULL;
     NvU32 *pDmaVirAddr = NULL;
     NvU32 NumBlocks = 0;
     NvError e = NvRmPhysicalMemMap(
@@ -540,6 +542,8 @@ NvAesCoreAp20ProcessBuffer(
         NvOsMemAttribute_Uncached,
         (void **)&pDmaVirAddr));
 
+    pSrcVirAddrTmp = pSrcVirAddr;
+    pDestVirAddrTmp = pDestVirAddr;
     while (TotalBytes)
     {
         if (TotalBytes > AES_HW_DMA_BUFFER_SIZE_BYTES)
@@ -548,23 +552,23 @@ NvAesCoreAp20ProcessBuffer(
             BytesToProcess = TotalBytes;
 
         // Copy data to the DMA buffer from the client buffer
-        NvOsMemcpy((void *)pDmaVirAddr, (void *)pSrcVirAddr, BytesToProcess);
+        NvOsMemcpy((void *)pDmaVirAddr, (void *)pSrcVirAddrTmp, BytesToProcess);
 
         NumBlocks = BytesToProcess / NvDdkAesConst_BlockLengthBytes;
 
         AesHwPrivProcessBuffer(Engine, pEngineVirAddr, DmaPhyAddr, DmaPhyAddr, NumBlocks, IsEncryption, OpMode);
 
         // Copy data from the DMA buffer to the client buffer
-        NvOsMemcpy((void *)pDestVirAddr, (void *)pDmaVirAddr, BytesToProcess);
+        NvOsMemcpy((void *)pDestVirAddrTmp, (void *)pDmaVirAddr, BytesToProcess);
 
         // Increment the buffer pointer
-        pSrcVirAddr += BytesToProcess;
-        pDestVirAddr += BytesToProcess;
+        pSrcVirAddrTmp += BytesToProcess;
+        pDestVirAddrTmp += BytesToProcess;
         TotalBytes -= BytesToProcess;
     }
 
     // UnMap the virtual address
-    NvRmPhysicalMemUnmap(pDmaVirAddr, DataSize);
+    NvRmPhysicalMemUnmap(pDmaVirAddr, AES_HW_DMA_BUFFER_SIZE_BYTES);
 
 fail:
     NvRmPhysicalMemUnmap(pDestVirAddr, DataSize);
