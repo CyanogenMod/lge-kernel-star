@@ -188,19 +188,6 @@ NvRmPrivAp20EmcMonitorsRead(
 
 /*****************************************************************************/
 
-// AP20 Thermal policy definitions
-
-#define NVRM_DTT_DEGREES_HIGH           (85L)
-#define NVRM_DTT_DEGREES_LOW            (60L)
-#define NVRM_DTT_DEGREES_HYSTERESIS     (5L)
-
-#define NVRM_DTT_VOLTAGE_THROTTLE_MV    (900UL)
-#define NVRM_DTT_CPU_DELTA_KHZ          (100000UL)
-
-#define NVRM_DTT_POLL_MS_SLOW           (2000UL)
-#define NVRM_DTT_POLL_MS_FAST           (1000UL)
-#define NVRM_DTT_POLL_MS_CRITICAL       (500UL)
-
 typedef enum
 {
     NvRmDttAp20PolicyRange_Unknown = 0,
@@ -249,7 +236,8 @@ NvRmPrivAp20DttPolicyUpdate(
         s_CpuThrottleMaxKHz = NV_MIN(
             NvRmPrivGetSocClockLimits(NvRmModuleID_Cpu)->MaxKHz, p[steps-1]);
         s_CpuThrottleMinKHz =
-            NvRmPrivGetSocClockLimits(NvRmModuleID_Cpu)->MaxKHz / 2;
+            NvRmPrivGetSocClockLimits(NvRmModuleID_Cpu)->MaxKHz /
+            NVRM_DTT_RATIO_MAX;
         NV_ASSERT(s_CpuThrottleMaxKHz > s_CpuThrottleMinKHz); 
         NV_ASSERT(s_CpuThrottleMinKHz > NVRM_DTT_CPU_DELTA_KHZ); 
 

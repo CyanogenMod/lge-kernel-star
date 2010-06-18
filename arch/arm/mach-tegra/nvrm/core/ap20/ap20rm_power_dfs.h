@@ -248,6 +248,37 @@ extern "C"
 #define NVRM_CPU1_ON_PENDING_CNT (250)
 #define NVRM_CPU1_OFF_PENDING_CNT (100)
 
+/**
+ * Defines AP20 Thermal policy parameters.
+ *
+ * Low and high thresholds specify 3 temperature ranges.
+ * If temperature is below low threshold:
+ *   - no throttling,
+ *   - slow polling (if interrupt mode is not supported by ODM)
+ * If temperature is above low threshold, but below high threshold:
+ *   - limit CPU voltage to THROTTLE_MV (no throttling if set to
+ *     NvRmVoltsMaximum)
+ *   - fast polling (if interrupt mode is not supported by ODM)
+ * If temperature is above high threshold:
+ *   - throttle CPU frequency with CPU_DELTA_KHZ/POLL_MS_CRITICAL
+ *     gradient until maximum throttling ratio is reached
+ *   - critical polling (if interrupt mode is not supported by ODM)
+ *
+ * ODM should also set a critical threshold to trigger h/w shutdown
+ * mechanism.
+ */
+#define NVRM_DTT_DEGREES_HIGH           (90L)
+#define NVRM_DTT_DEGREES_LOW            (60L)
+#define NVRM_DTT_DEGREES_HYSTERESIS     (5L)
+
+#define NVRM_DTT_VOLTAGE_THROTTLE_MV    (NvRmVoltsMaximum)
+#define NVRM_DTT_CPU_DELTA_KHZ          (100000UL)
+#define NVRM_DTT_RATIO_MAX              (2)
+
+#define NVRM_DTT_POLL_MS_CRITICAL       (2000UL)
+#define NVRM_DTT_POLL_MS_FAST           (4000UL)
+#define NVRM_DTT_POLL_MS_SLOW           (8000UL)
+
 /// Default low corners for core and dedicated CPU voltages
 #define NVRM_AP20_LOW_CORE_MV (950)
 #define NVRM_AP20_LOW_CPU_MV (750)
