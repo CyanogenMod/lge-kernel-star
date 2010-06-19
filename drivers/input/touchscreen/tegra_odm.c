@@ -35,7 +35,19 @@
 #include <nvodm_touch.h>
 
 #define TOOL_PRESSURE	100
-#define TOOL_WIDTH	8
+
+#define TOOL_WIDTH_MAX		8
+
+/* Ratio TOOL_WIDTH_FINGER / TOOL_WIDTH_MAX must be < 0.6f to be considered
+ * "finger" press.
+ */
+#define TOOL_WIDTH_FINGER	1
+
+/* Ratio TOOL_WIDTH_CHEEK / TOOL_WIDTH_MAX must be > 0.6f to be considered
+ * "cheek" press.  (Cheek presses are ignored in phone mode, under assumption
+ * that user accidentally pressed cheek against touch screen.)
+ */
+
 /* the kernel supports 5 fingers only as of now */
 #define MAX_FINGERS	5
 
@@ -119,7 +131,7 @@ static int tegra_touch_thread(void *pdata)
 	NvOdmTouchCoordinateInfo c = {0};
 	NvU32 x[MAX_FINGERS] = {0}, y[MAX_FINGERS] = {0}, i = 0;
 	NvU32 Pressure[MAX_FINGERS] = {TOOL_PRESSURE};
-	NvU32 Width[MAX_FINGERS] = {TOOL_WIDTH};
+	NvU32 Width[MAX_FINGERS] = {TOOL_WIDTH_FINGER};
 	static NvU32 prev_x0 = 0, prev_y0 = 0;
 	NvBool bKeepReadingSamples = NV_FALSE;
 	NvU32 fingers = 0, index, offset;
@@ -160,7 +172,7 @@ static int tegra_touch_thread(void *pdata)
 				if (caps->IsWidthSupported)
 					Width[0] = c.additionalInfo.width[0];
 				else
-					Width[0] = TOOL_WIDTH;
+					Width[0] = TOOL_WIDTH_FINGER;
 			}
 			else if ((fingers >= 2) && (fingers <= MAX_FINGERS)) {
 				for (i = 0; i < fingers; i++) {
@@ -173,7 +185,7 @@ static int tegra_touch_thread(void *pdata)
 					if (caps->IsWidthSupported)
 						Width[i] = c.additionalInfo.width[i];
 					else
-						Width[i] = TOOL_WIDTH;
+						Width[i] = TOOL_WIDTH_FINGER;
 				}
 			}
 			else {
@@ -376,9 +388,9 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 	}
 	else {
 		input_set_abs_params(touch->input_dev, ABS_TOOL_WIDTH, 0,
-			TOOL_WIDTH, 0, 0);
+			TOOL_WIDTH_MAX, 0, 0);
 		input_set_abs_params(touch->input_dev, ABS_MT_WIDTH_MAJOR, 0,
-			TOOL_WIDTH, 0, 0);
+			TOOL_WIDTH_MAX, 0, 0);
 	}
 
 	platform_set_drvdata(pdev, touch);
