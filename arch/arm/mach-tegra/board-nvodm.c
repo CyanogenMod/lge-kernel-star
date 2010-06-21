@@ -535,14 +535,16 @@ static struct resource tegra_hcd_resources[][2] = {
 		},
 	},
 };
+/* EHCI transfers must be 32B aligned */
+static u64 tegra_ehci_dma_mask = DMA_BIT_MASK(32) & ~0x1f;
 static struct platform_device tegra_hcd[] = {
 	[0] = {
 		.name = "tegra-ehci",
 		.id = 0,
 		.dev = {
 			.platform_data = &tegra_hcd_platform[0],
-			.coherent_dma_mask = DMA_BIT_MASK(32),
-			.dma_mask = &tegra_dma_mask,
+			.coherent_dma_mask = DMA_BIT_MASK(32) & ~0x1f,
+			.dma_mask = &tegra_ehci_dma_mask,
 		},
 		.resource = tegra_hcd_resources[0],
 		.num_resources = ARRAY_SIZE(tegra_hcd_resources[0]),
@@ -552,8 +554,8 @@ static struct platform_device tegra_hcd[] = {
 		.id = 1,
 		.dev = {
 			.platform_data = &tegra_hcd_platform[1],
-			.coherent_dma_mask = DMA_BIT_MASK(32),
-			.dma_mask = &tegra_dma_mask,
+			.coherent_dma_mask = DMA_BIT_MASK(32) & ~0x1f,
+			.dma_mask = &tegra_ehci_dma_mask,
 		},
 		.resource = tegra_hcd_resources[1],
 		.num_resources = ARRAY_SIZE(tegra_hcd_resources[1]),
@@ -563,8 +565,8 @@ static struct platform_device tegra_hcd[] = {
 		.id = 2,
 		.dev = {
 			.platform_data = &tegra_hcd_platform[2],
-			.coherent_dma_mask = DMA_BIT_MASK(32),
-			.dma_mask = &tegra_dma_mask,
+			.coherent_dma_mask = DMA_BIT_MASK(32) & ~0x1f,
+			.dma_mask = &tegra_ehci_dma_mask,
 		},
 		.resource = tegra_hcd_resources[2],
 		.num_resources = ARRAY_SIZE(tegra_hcd_resources[2]),
