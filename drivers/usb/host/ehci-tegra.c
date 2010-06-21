@@ -563,13 +563,21 @@ static int tegra_ehci_probe(struct platform_device *pdev)
 	}
 	platform_set_drvdata(pdev, hcd);
 
+#ifdef CONFIG_DMABOUNCE
+	e = dmabounce_register_dev(&pdev->dev, 1024, 32768);
+	if (e != 0) {
+		dev_err(&pdev->dev, "failed to register DMA bounce\n");
+		goto fail_add;
+	}
+#endif
+
 #ifdef CONFIG_USB_OTG_UTILS
 	if (pdata->otg_mode) {
 		ehci->transceiver = otg_get_transceiver();
 		if (!ehci->transceiver) {
 			dev_err(&pdev->dev, "Failed to get OTG transceiver\n");
 			e = -ENODEV;
-			goto fail_add;
+			goto fail_dmabounce;
 		}
 
 		otg_set_host(ehci->transceiver, (struct usb_bus *)hcd);
@@ -610,6 +618,10 @@ static int tegra_ehci_probe(struct platform_device *pdev)
 
 	return 0;
 
+fail_dmabounce:
+#ifdef CONFIG_DMABOUNCE
+	dmabounce_unregister_dev(&pdev->dev);
+#endif
 fail_add:
 	usb_remove_hcd(hcd);
 fail_iomap:
@@ -713,12 +725,17 @@ static int tegra_ehci_remove(struct platform_device *pdev)
 	if (pdata == NULL || hcd == NULL)
 		return -EINVAL;
 
+	usb_remove_hcd(hcd);
+	usb_put_hcd(hcd);
+
+#ifdef CONFIG_DMABOUNCE
+	dmabounce_unregister_dev(&pdev->dev);
+#endif
+
 	NvDdkUsbPhyClose(pdata->hUsbPhy);
 
 	iounmap(hcd->regs);
 
-	usb_remove_hcd(hcd);
-	usb_put_hcd(hcd);
 
 	if (pdata->gpio_nr)
 		gpio_free(pdata->gpio_nr);
