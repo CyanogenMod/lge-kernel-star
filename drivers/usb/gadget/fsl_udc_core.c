@@ -99,6 +99,25 @@ static void fsl_ep_fifo_flush(struct usb_ep *_ep);
 #define fsl_writel(val32, addr) writel(val32, addr)
 #endif
 
+/**
+ * High speed test mode packet(53 bytes).
+ * See USB 2.0 spec, section 7.1.20.
+ */
+static const u8 fsl_udc_test_packet[53] = {
+	/* JKJKJKJK x9 */
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	/* JJKKJJKK x8 */
+	0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa,
+	/* JJJJKKKK x8 */
+	0xee, 0xee, 0xee, 0xee, 0xee, 0xee, 0xee, 0xee,
+	/* JJJJJJJKKKKKKK x8 */
+	0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+	/* JJJJJJJK x8 */
+	0x7f, 0xbf, 0xdf, 0xef, 0xf7, 0xfb, 0xfd,
+	/* JKKKKKKK x10, JK */
+	0xfc, 0x7e, 0xbf, 0xdf, 0xef, 0xf7, 0xfb, 0xfd, 0x7e
+};
+
 /********************************************************************
  *	Internal Used Function
 ********************************************************************/
@@ -1366,6 +1385,125 @@ stall:
 	ep0stall(udc);
 }
 
+static void udc_test_mode(struct fsl_udc *udc, u32 test_mode)
+{
+	struct fsl_req *req;
+	struct fsl_ep *ep;
+	u32 portsc, bitmask;
+	unsigned long timeout;
+
+	/* Ack the ep0 IN */
+	if (ep0_prime_status(udc, EP_DIR_IN))
+		ep0stall(udc);
+
+	/* get the ep0 */
+	ep = &udc->eps[0];
+	bitmask = ep_is_in(ep)
+		? (1 << (ep_index(ep) + 16))
+		: (1 << (ep_index(ep)));
+
+	timeout = jiffies + HZ;
+	/* Wait until ep0 IN endpoint txfr is complete */
+	while (!(fsl_readl(&dr_regs->endptcomplete) && bitmask)) {
+		if (time_after(jiffies, timeout)) {
+			printk("Timeout for Ep0 IN Ack\n");
+			break;
+		}
+		cpu_relax();
+	}
+
+	switch (test_mode << PORTSCX_PTC_BIT_POS) {
+	case PORTSCX_PTC_JSTATE:
+		VDBG("TEST_J\n");
+		/* TEST_J */
+		break;
+	case PORTSCX_PTC_KSTATE:
+		/* TEST_K */
+		VDBG("TEST_K\n");
+		break;
+	case PORTSCX_PTC_SEQNAK:
+		/* TEST_SE0_NAK */
+		VDBG("TEST_SE0_NAK\n");
+		break;
+	case PORTSCX_PTC_PACKET:
+	{
+		/* TEST_PACKET */
+		VDBG("TEST_PACKET\n");
+
+		/* get the ep and configure for IN direction */
+		ep = &udc->eps[0];
+		udc->ep0_dir = USB_DIR_IN;
+
+		/* Initialize ep0 status request structure */
+		req = container_of(fsl_alloc_request(NULL, GFP_KERNEL),
+				struct fsl_req, req);
+		/* allocate a small amount of memory to get valid address */
+		req->req.buf = kmalloc(sizeof(fsl_udc_test_packet), GFP_KERNEL);
+		req->req.dma = virt_to_phys(req->req.buf);
+
+		/* Fill in the reqest structure */
+		memcpy(req->req.buf, fsl_udc_test_packet, sizeof(fsl_udc_test_packet));
+		req->ep = ep;
+		req->req.length = sizeof(fsl_udc_test_packet);
+		req->req.status = -EINPROGRESS;
+		req->req.actual = 0;
+		req->req.complete = NULL;
+		req->dtd_count = 0;
+
+		/* map virtual address to hardware */
+		if (req->req.dma == DMA_ADDR_INVALID) {
+			req->req.dma = dma_map_single(ep->udc->gadget.dev.parent,
+						req->req.buf,
+						req->req.length, ep_is_in(ep)
+							? DMA_TO_DEVICE
+							: DMA_FROM_DEVICE);
+			req->mapped = 1;
+		} else {
+			dma_sync_single_for_device(ep->udc->gadget.dev.parent,
+						req->req.dma, req->req.length,
+						ep_is_in(ep)
+							? DMA_TO_DEVICE
+							: DMA_FROM_DEVICE);
+			req->mapped = 0;
+		}
+
+		/* prime the data phase */
+		if ((fsl_req_to_dtd(req) == 0))
+			fsl_queue_td(ep, req);
+		else			/* no mem */
+			goto stall;
+
+		list_add_tail(&req->queue, &ep->queue);
+		udc->ep0_state = DATA_STATE_XMIT;
+	} break;
+	case PORTSCX_PTC_FORCE_EN:
+		/* TEST_FORCE_EN */
+		VDBG("TEST_FORCE_EN\n");
+		break;
+	default:
+		ERR("udc unknown test mode[%d]!\n", test_mode);
+		goto stall;
+	}
+
+	/* read the portsc register */
+	portsc = fsl_readl(&dr_regs->portsc1);
+	/* set the test mode selector */
+	portsc |= test_mode << PORTSCX_PTC_BIT_POS;
+	fsl_writel(portsc, &dr_regs->portsc1);
+
+	/**
+	 * The device must have its power cycled to exit test mode.
+	 * See USB 2.0 spec, section 9.4.9 for test modes operation in "Set Feature"
+	 * See USB 2.0 spec, section 7.1.20 for test modes.
+	 */
+	printk("udc entering the test mode, power cycle to exit test mode\n");
+
+	return;
+
+stall:
+	ep0stall(udc);
+}
+
 static void setup_received_irq(struct fsl_udc *udc,
 		struct usb_ctrlrequest *setup)
 {
@@ -1399,7 +1537,17 @@ static void setup_received_irq(struct fsl_udc *udc,
 	{
 		int rc = -EOPNOTSUPP;
 
-		if ((setup->bRequestType & (USB_RECIP_MASK | USB_TYPE_MASK))
+		if ((setup->bRequestType == USB_RECIP_DEVICE) &&
+			(wValue == USB_DEVICE_TEST_MODE)) {
+			/**
+			 * If the feature selector is TEST_MODE, then the most
+			 * significant byte of wIndex is used to specify the specific
+			 * test mode and the lower byte of wIndex must be zero.
+			 */
+			udc_test_mode(udc, (wIndex >> 8));
+			return;
+
+		} else if ((setup->bRequestType & (USB_RECIP_MASK | USB_TYPE_MASK))
 				== (USB_RECIP_ENDPOINT | USB_TYPE_STANDARD)) {
 			int pipe = get_pipe_by_windex(wIndex);
 			struct fsl_ep *ep;
