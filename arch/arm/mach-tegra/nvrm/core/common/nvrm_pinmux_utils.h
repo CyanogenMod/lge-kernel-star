@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2009 NVIDIA Corporation.
+ * Copyright (c) 2008-2010 NVIDIA Corporation.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -322,5 +322,3 @@ void NvRmAp20SetDefaultTristate (NvRmDeviceHandle hDevice);
 #endif  /* __cplusplus */
 
 #endif // NVRM_PINMUX_UTILS_H
-
-

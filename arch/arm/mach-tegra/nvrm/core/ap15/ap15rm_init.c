@@ -384,7 +384,7 @@ NvRmOpenNew(NvRmDeviceHandle *pHandle)
         }
 
         // WAR for bug 600821
-        if ((rm->ChipId.Id == 0x20) && 
+        if ((rm->ChipId.Id == 0x20) &&
             (rm->ChipId.Major == 0x1) && (rm->ChipId.Minor == 0x2))
         {
             err = NvRmQueryChipUniqueId(rm, sizeof (NvU64), &Uid);
@@ -679,5 +679,3 @@ void NvRmPrivMcErrorMonitorStop( NvRmDeviceHandle rm )
         break;
     }
 }
-
-

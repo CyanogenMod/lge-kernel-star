@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2009 NVIDIA Corporation.
+ * Copyright (c) 2007-2010 NVIDIA Corporation.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -233,15 +233,14 @@ NvRmQueryChipUniqueId(NvRmDeviceHandle hDevHandle, NvU32 IdSize, void* pId)
         return NvError_BadParameter;
     }
 
+    NvOsMemset(pId, 0, Size);
     switch (hDevHandle->ChipId.Id)
     {
     case 0x15:
     case 0x16:      // ap16 should use same space of ap15 for fuse info.
-        NvOsMemset(pId, 0, Size);
         err = NvRmPrivAp15ChipUniqueId(hDevHandle,pId);
         break;
     case 0x20:
-        NvOsMemset(pId, 0, Size);
         err = NvRmPrivAp20ChipUniqueId(hDevHandle,pId);
         break;
     default:

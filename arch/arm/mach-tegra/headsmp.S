@@ -228,6 +228,7 @@ __restart_pllx:
 	mov	r0, #0
 	b	__cortex_a9_l2x0_restart
 ENDPROC(__restart_pllx)
+
 /*
  *	__enable_coresite_access
  *
@@ -257,6 +258,7 @@ access:	str	r5, [r6]
 	bhi	access
 	mov	pc, lr
 ENDPROC(__enable_coresite_access)
+
 /*
  *	tegra_lp2_startup
  *
@@ -303,7 +305,7 @@ __tegra_lp2_data:
 	.long	__restart_pllx
 	.size	__tegra_lp2_data, . - __tegra_lp2_data
 
-#ifdef CONFIG_HOTPLUG_CPU
+
 /*
  *	tegra_hotplug_startup
  *
@@ -339,4 +341,3 @@ __tegra_hotplug_data:
 	.long	tegra_pgd_phys
 	.long	__cortex_a9_restore
 	.size	__tegra_hotplug_data, . - __tegra_hotplug_data
-#endif

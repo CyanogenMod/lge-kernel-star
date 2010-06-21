@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2009 NVIDIA Corporation.
+ * Copyright (c) 2007-2010 NVIDIA Corporation.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -506,6 +506,3 @@ NvRmPrivCheckBondOut( NvRmDeviceHandle hDevice )
         }
     }
 }
-
-/*****************************************************************************/
-

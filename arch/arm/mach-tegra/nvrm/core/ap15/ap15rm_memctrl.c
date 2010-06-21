@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2009 NVIDIA Corporation.
+ * Copyright (c) 2007-2010 NVIDIA Corporation.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -59,8 +59,8 @@ typedef struct ObsInfoRec
     APB_MISC_GP_OBSCTRL_0_OBS_PART_SEL_##partition \
     }
 
-// static table correspond to enum NvRmModuleID in \include\nvrm_module.idl    
-// Expand this table to add more moduleID - partition map entries. 
+// static table correspond to enum NvRmModuleID in \include\nvrm_module.idl
+// Expand this table to add more moduleID - partition map entries.
 static const ObsInfo ObsInfoTable[] =
 {
   OBS_INFO_FIELD(Cpu, CPU),
@@ -86,16 +86,16 @@ McStatAp1x_Start(
         NvU32 client_id_1,
         NvU32 llc_client_id)
 {
-    NvU32 emc_ctrl = 
+    NvU32 emc_ctrl =
       (AREMC_STAT_CONTROL_MODE_BANDWIDTH << AREMC_STAT_CONTROL_MODE_SHIFT) |
       (AREMC_STAT_CONTROL_EVENT_QUALIFIED << AREMC_STAT_CONTROL_EVENT_SHIFT) |
-      (AREMC_STAT_CONTROL_CLIENT_TYPE_CMCR << 
+      (AREMC_STAT_CONTROL_CLIENT_TYPE_CMCR <<
          AREMC_STAT_CONTROL_CLIENT_TYPE_SHIFT) |  // default is CMC Read client
-      (AREMC_STAT_CONTROL_FILTER_CLIENT_ENABLE << 
+      (AREMC_STAT_CONTROL_FILTER_CLIENT_ENABLE <<
          AREMC_STAT_CONTROL_FILTER_CLIENT_SHIFT) |
-      (AREMC_STAT_CONTROL_FILTER_ADDR_DISABLE << 
+      (AREMC_STAT_CONTROL_FILTER_ADDR_DISABLE <<
          AREMC_STAT_CONTROL_FILTER_ADDR_SHIFT);
-    
+
     NvU32 mc_filter_client_0 = (ARMC_STAT_CONTROL_FILTER_CLIENT_ENABLE <<
                    ARMC_STAT_CONTROL_FILTER_CLIENT_SHIFT);
 
@@ -117,40 +117,40 @@ McStatAp1x_Start(
     }
 
     if(llc_client_id == 1)
-        emc_ctrl |= AREMC_STAT_CONTROL_CLIENT_TYPE_MPCORER << 
-                    AREMC_STAT_CONTROL_CLIENT_TYPE_SHIFT; 
+        emc_ctrl |= AREMC_STAT_CONTROL_CLIENT_TYPE_MPCORER <<
+                    AREMC_STAT_CONTROL_CLIENT_TYPE_SHIFT;
                     // overwrite with MPCore read
-        NV_REGW(rm, NvRmPrivModuleID_ExternalMemoryController, 
-                0, EMC_STAT_CONTROL_0, 
+        NV_REGW(rm, NvRmPrivModuleID_ExternalMemoryController,
+                0, EMC_STAT_CONTROL_0,
                 NV_DRF_DEF(EMC, STAT_CONTROL, LLMC_GATHER,DISABLE));
-        NV_REGW(rm, NvRmPrivModuleID_ExternalMemoryController, 
+        NV_REGW(rm, NvRmPrivModuleID_ExternalMemoryController,
                 0, EMC_STAT_LLMC_CLOCK_LIMIT_0, 0xffffffff);
-        NV_REGW(rm, NvRmPrivModuleID_ExternalMemoryController, 
+        NV_REGW(rm, NvRmPrivModuleID_ExternalMemoryController,
                 0, EMC_STAT_LLMC_CONTROL_0_0, emc_ctrl);
-        NV_REGW(rm, NvRmPrivModuleID_ExternalMemoryController, 
-                0, EMC_STAT_CONTROL_0, 
+        NV_REGW(rm, NvRmPrivModuleID_ExternalMemoryController,
+                0, EMC_STAT_CONTROL_0,
                 NV_DRF_DEF(EMC, STAT_CONTROL, LLMC_GATHER, CLEAR));
         NV_REGW(rm, NvRmPrivModuleID_ExternalMemoryController,
-                0, EMC_STAT_CONTROL_0, 
+                0, EMC_STAT_CONTROL_0,
                 NV_DRF_DEF(EMC, STAT_CONTROL, LLMC_GATHER, ENABLE));
         NV_REGW(rm, NvRmPrivModuleID_MemoryController,
-                0, MC_STAT_CONTROL_0, 
+                0, MC_STAT_CONTROL_0,
                 NV_DRF_DEF(MC, STAT_CONTROL, EMC_GATHER, DISABLE));
         NV_REGW(rm, NvRmPrivModuleID_MemoryController,
                 0, MC_STAT_EMC_CLOCK_LIMIT_0, 0xffffffff);
         NV_REGW(rm, NvRmPrivModuleID_MemoryController,
                 0, MC_STAT_EMC_CONTROL_0_0,
-                (ARMC_STAT_CONTROL_MODE_BANDWIDTH << 
+                (ARMC_STAT_CONTROL_MODE_BANDWIDTH <<
                    ARMC_STAT_CONTROL_MODE_SHIFT) |
                 (client_id_0 << ARMC_STAT_CONTROL_CLIENT_ID_SHIFT) |
-                (ARMC_STAT_CONTROL_EVENT_QUALIFIED << 
+                (ARMC_STAT_CONTROL_EVENT_QUALIFIED <<
                    ARMC_STAT_CONTROL_EVENT_SHIFT) |
                 mc_filter_client_0 |
-                (ARMC_STAT_CONTROL_FILTER_ADDR_DISABLE << 
+                (ARMC_STAT_CONTROL_FILTER_ADDR_DISABLE <<
                    ARMC_STAT_CONTROL_FILTER_ADDR_SHIFT) |
                 (ARMC_STAT_CONTROL_FILTER_PRI_DISABLE <<
                    ARMC_STAT_CONTROL_FILTER_PRI_SHIFT) |
-                (ARMC_STAT_CONTROL_FILTER_COALESCED_DISABLE << 
+                (ARMC_STAT_CONTROL_FILTER_COALESCED_DISABLE <<
                    ARMC_STAT_CONTROL_FILTER_COALESCED_SHIFT));
         NV_REGW(rm, NvRmPrivModuleID_MemoryController,
                 0, MC_STAT_EMC_CONTROL_1_0,
@@ -168,9 +168,9 @@ McStatAp1x_Start(
                    ARMC_STAT_CONTROL_FILTER_COALESCED_SHIFT));
 
         NV_REGW(rm, NvRmPrivModuleID_MemoryController,
-                0, MC_STAT_CONTROL_0, 
+                0, MC_STAT_CONTROL_0,
                 NV_DRF_DEF(MC, STAT_CONTROL, EMC_GATHER, CLEAR));
-        NV_REGW(rm, NvRmPrivModuleID_MemoryController, 
+        NV_REGW(rm, NvRmPrivModuleID_MemoryController,
                 0, MC_STAT_CONTROL_0,
                 NV_DRF_DEF(MC, STAT_CONTROL, EMC_GATHER, ENABLE));
 }
@@ -206,15 +206,15 @@ McStatAp1x_Stop(
         NvU32 *llc_client_clocks,
         NvU32 *mc_clocks)
 {
-    *llc_client_cycles = NV_REGR(rm, NvRmPrivModuleID_ExternalMemoryController, 
+    *llc_client_cycles = NV_REGR(rm, NvRmPrivModuleID_ExternalMemoryController,
                            0, EMC_STAT_LLMC_COUNT_0_0);
-    *llc_client_clocks = NV_REGR(rm, NvRmPrivModuleID_ExternalMemoryController, 
+    *llc_client_clocks = NV_REGR(rm, NvRmPrivModuleID_ExternalMemoryController,
                            0, EMC_STAT_LLMC_CLOCKS_0);
-    *client_0_cycles = NV_REGR(rm, NvRmPrivModuleID_MemoryController, 
+    *client_0_cycles = NV_REGR(rm, NvRmPrivModuleID_MemoryController,
                          0, MC_STAT_EMC_COUNT_0_0);
     *client_1_cycles = NV_REGR(rm, NvRmPrivModuleID_MemoryController,
                          0, MC_STAT_EMC_COUNT_1_0);
-    *mc_clocks = NV_REGR(rm, NvRmPrivModuleID_MemoryController, 
+    *mc_clocks = NV_REGR(rm, NvRmPrivModuleID_MemoryController,
                    0, MC_STAT_EMC_CLOCKS_0);
 }
 
@@ -254,7 +254,7 @@ McStat_Report(
         NvU32 llc_client_cycles,
         NvU32 mc_clocks)
 {
-    NvOsDebugPrintf("LLC Client %d Count:  0x%.8X, %u\n", 
+    NvOsDebugPrintf("LLC Client %d Count:  0x%.8X, %u\n",
       llc_client_id, llc_client_cycles, llc_client_cycles);
     NvOsDebugPrintf("LLC Client %d Clocks: 0x%.8X, %u\n",
       llc_client_id, llc_client_clocks, llc_client_clocks);
@@ -266,7 +266,7 @@ McStat_Report(
 }
 
 //API to read data from OBS bus
-// The OBS_PART_SEL is mapped to the specified modID by obsInfoTable which is public in this file. 
+// The OBS_PART_SEL is mapped to the specified modID by obsInfoTable which is public in this file.
 
 NvError
 ReadObsData(
@@ -290,16 +290,16 @@ ReadObsData(
         }
     }
     if (i == ObsInfoTableSize)
-    {  
+    {
         return NvError_BadParameter;
     }
 
     for(offset = 0; offset < length; offset++)
     {
         index = start_index + offset;
-        temp = NV_DRF_DEF(APB_MISC_GP, OBSCTRL, OBS_EN, ENABLE) | 
-            NV_DRF_NUM(APB_MISC_GP, OBSCTRL, OBS_MOD_SEL, modID) | 
-            NV_DRF_NUM(APB_MISC_GP, OBSCTRL, OBS_PART_SEL, partID) | 
+        temp = NV_DRF_DEF(APB_MISC_GP, OBSCTRL, OBS_EN, ENABLE) |
+            NV_DRF_NUM(APB_MISC_GP, OBSCTRL, OBS_MOD_SEL, modID) |
+            NV_DRF_NUM(APB_MISC_GP, OBSCTRL, OBS_PART_SEL, partID) |
             NV_DRF_NUM(APB_MISC_GP, OBSCTRL, OBS_SIG_SEL, index) ;
         NV_REGW(rm, NvRmModuleID_Misc, 0, APB_MISC_GP_OBSCTRL_0, temp);
         value1 = NV_REGR(rm, NvRmModuleID_Misc, 0, APB_MISC_GP_OBSCTRL_0);
@@ -309,7 +309,7 @@ ReadObsData(
             value1 = NV_REGR(rm, NvRmModuleID_Misc, 0, APB_MISC_GP_OBSDATA_0);
             timeout --;
         } while (value1 != value2 && timeout);
-        NvOsDebugPrintf("OBS bus modID 0x%x index 0x%x = value 0x%x", 
+        NvOsDebugPrintf("OBS bus modID 0x%x index 0x%x = value 0x%x",
                 modID, index, value1);
         value[offset] = value1;
     }
@@ -491,39 +491,39 @@ static void McErrorIntHandler(void* args)
     NvU32 IntStatus;
     NvU32 IntClear = 0;
     NvRmDeviceHandle hRm = (NvRmDeviceHandle)args;
-    
+
     IntStatus = NV_REGR(hRm, NvRmPrivModuleID_MemoryController, 0, MC_INTSTATUS_0);
     if ( NV_DRF_VAL(MC, INTSTATUS, DECERR_AXI_INT, IntStatus) )
     {
         IntClear |= NV_DRF_DEF(MC, INTSTATUS, DECERR_AXI_INT, SET);
-        RegVal = NV_REGR(hRm, NvRmPrivModuleID_MemoryController, 0, 
+        RegVal = NV_REGR(hRm, NvRmPrivModuleID_MemoryController, 0,
                      MC_DECERR_AXI_ADR_0);
         NvOsDebugPrintf("AXI DecErrAddress=0x%x ", RegVal);
-        RegVal = NV_REGR(hRm, NvRmPrivModuleID_MemoryController, 0, 
+        RegVal = NV_REGR(hRm, NvRmPrivModuleID_MemoryController, 0,
                      MC_DECERR_AXI_STATUS_0);
         NvOsDebugPrintf("AXI DecErrStatus=0x%x ", RegVal);
     }
     if ( NV_DRF_VAL(MC, INTSTATUS, DECERR_EMEM_OTHERS_INT, IntStatus) )
     {
         IntClear |= NV_DRF_DEF(MC, INTSTATUS, DECERR_EMEM_OTHERS_INT, SET);
-        RegVal = NV_REGR(hRm, NvRmPrivModuleID_MemoryController, 0, 
+        RegVal = NV_REGR(hRm, NvRmPrivModuleID_MemoryController, 0,
                      MC_DECERR_EMEM_OTHERS_ADR_0);
         NvOsDebugPrintf("EMEM DecErrAddress=0x%x ", RegVal);
-        RegVal = NV_REGR(hRm, NvRmPrivModuleID_MemoryController, 0, 
+        RegVal = NV_REGR(hRm, NvRmPrivModuleID_MemoryController, 0,
                      MC_DECERR_EMEM_OTHERS_STATUS_0);
         NvOsDebugPrintf("EMEM DecErrStatus=0x%x ", RegVal);
     }
     if ( NV_DRF_VAL(MC, INTSTATUS, INVALID_GART_PAGE_INT, IntStatus) )
     {
         IntClear |= NV_DRF_DEF(MC, INTSTATUS, INVALID_GART_PAGE_INT, SET);
-        RegVal = NV_REGR(hRm, NvRmPrivModuleID_MemoryController, 0, 
+        RegVal = NV_REGR(hRm, NvRmPrivModuleID_MemoryController, 0,
                      MC_GART_ERROR_ADDR_0);
         NvOsDebugPrintf("GART DecErrAddress=0x%x ", RegVal);
-        RegVal = NV_REGR(hRm, NvRmPrivModuleID_MemoryController, 0, 
+        RegVal = NV_REGR(hRm, NvRmPrivModuleID_MemoryController, 0,
                      MC_GART_ERROR_REQ_0);
         NvOsDebugPrintf("GART DecErrStatus=0x%x ", RegVal);
     }
-    
+
     NV_ASSERT(!"MC Decode Error ");
     // Clear the interrupt.
     NV_REGW(hRm, NvRmPrivModuleID_MemoryController, 0, MC_INTSTATUS_0, IntClear);
@@ -536,14 +536,14 @@ NvError NvRmPrivAp15McErrorMonitorStart(NvRmDeviceHandle hRm)
     NvU32 IrqList;
     NvError e = NvSuccess;
     NvOsInterruptHandler handler;
-    
+
     if (s_McInterruptHandle == NULL)
     {
         // Install an interrupt handler.
         handler = McErrorIntHandler;
         IrqList = NvRmGetIrqForLogicalInterrupt(hRm,
                       NvRmPrivModuleID_MemoryController, 0);
-        NV_CHECK_ERROR( NvRmInterruptRegister(hRm, 1, &IrqList,  &handler, 
+        NV_CHECK_ERROR( NvRmInterruptRegister(hRm, 1, &IrqList,  &handler,
             hRm, &s_McInterruptHandle, NV_TRUE) );
         // Enable Dec Err interrupts in memory Controller.
         val = NV_DRF_DEF(MC, INTMASK, DECERR_AXI_INTMASK, UNMASKED) |
@@ -567,7 +567,7 @@ void NvRmPrivAp15McErrorMonitorStop(NvRmDeviceHandle hRm)
 void NvRmPrivAp15SetupMc(NvRmDeviceHandle hRm)
 {
     NvU32   reg, mask;
-    reg = NV_REGR(hRm, NvRmPrivModuleID_MemoryController, 0, 
+    reg = NV_REGR(hRm, NvRmPrivModuleID_MemoryController, 0,
               MC_LOWLATENCY_CONFIG_0);
     mask = NV_DRF_DEF(MC, LOWLATENCY_CONFIG, CMCR_LL_CTRL, ENABLE) |
            NV_DRF_DEF(MC, LOWLATENCY_CONFIG, CMCR_LL_SEND_BOTH, ENABLE) |
@@ -597,15 +597,13 @@ void NvRmPrivAp15SetupMc(NvRmDeviceHandle hRm)
 
     /* 2) Command Queue values should be 2,2,6 for better performance. */
     NV_REGW(hRm, NvRmPrivModuleID_ExternalMemoryController, 0, EMC_CMDQ_0,   0x00002206);
-    
+
     /* 3) MC_EMEM_ARB_CFG0_0 Should have optimal values for 166Mhz DRAM.
      *    27:22 EMEM_BANKCNT_NSP_TH (0xC seems to be better for 166Mhz)
      *    21:16 EMEM_BANKCNT_TH     (0x8 seems to be better for 166Mhz)
      *
-     *    MC_EMEM_ARB_CFG0_0 <= 0x0308_1010 
+     *    MC_EMEM_ARB_CFG0_0 <= 0x0308_1010
      */
-    
+
     NV_REGW(hRm, NvRmPrivModuleID_MemoryController, 0, MC_EMEM_ARB_CFG0_0,    0x03081010);
 }
-
-/******************************************************************************/

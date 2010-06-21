@@ -154,4 +154,3 @@ int tegra_pinmux_get_vddio(tegra_pingroup_t pg);
 void tegra_pinmux_set_vddio_tristate(tegra_vddio_t vddio,
 				     tegra_tristate_t tristate);
 #endif
-

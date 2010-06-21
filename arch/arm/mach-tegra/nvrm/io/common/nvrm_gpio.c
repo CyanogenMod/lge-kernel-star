@@ -118,7 +118,7 @@ NvError NvRmGpioAcquirePinHandle(NvRmGpioHandle gpio, NvU32 nr_port,
 	char gpio_name[12];
 	int ret;
 
-#if CONFIG_ARCH_TEGRA_2x_SOC
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 	if (nr_port == NVRM_GPIO_CAMERA_PORT) {
 		if (nr_pin>=0 && nr_pin<=4) {
 			nr_gpio = TEGRA_GPIO_PBB1 + nr_pin;
@@ -130,7 +130,7 @@ NvError NvRmGpioAcquirePinHandle(NvRmGpioHandle gpio, NvU32 nr_port,
 			pr_err("%s: invalid cam gpio %u\n", __func__, nr_pin);
 			return NvError_BadParameter;
 		}
-	} else 
+	} else
 #endif
 	{
 		nr_gpio = nr_port*8 + nr_pin;
@@ -268,7 +268,6 @@ NvError NvRmGpioConfigPins(NvRmGpioHandle gpio, NvRmGpioPinHandle *hpins,
 			default:
 				break;
 			}
-			
 		}
 	}
 

@@ -205,12 +205,12 @@ typedef struct NvRmTransportRec
     NvU32               RemotePort;
 
     // save a copy of the rm handle.
-    NvRmDeviceHandle hRmDevice; 
+    NvRmDeviceHandle hRmDevice;
 
     struct NvRmTransportRec *pNext;
 
     // unlikely to be used members at the end
-    
+
     // to be signalled when someone waits for a connector.
     NvOsSemaphoreHandle hOnConnectSem;
 
@@ -380,7 +380,7 @@ HandleConnectMessage(NvRmDeviceHandle hDevice, volatile NvU32 *pMessage)
     char PortName[MAX_PORT_NAME_LENGTH+1];
     NvU32 RemotePort;
     NvRmTransportHandle hPort;
-    
+
     RemotePort = pMessage[1];
     NvOsMemcpy(PortName, (void*)&pMessage[2], MAX_PORT_NAME_LENGTH);
     PortName[MAX_PORT_NAME_LENGTH] = 0;
@@ -416,7 +416,7 @@ HandleConnectMessage(NvRmDeviceHandle hDevice, volatile NvU32 *pMessage)
  *  [ Local Handle ]
  *
  * Response:
- *   [ Local Handle ] <- 0 
+ *   [ Local Handle ] <- 0
  */
 static void
 HandleDisconnectMessage(NvRmDeviceHandle hDevice, volatile NvU32 *pMessage)
@@ -443,7 +443,7 @@ HandleDisconnectMessage(NvRmDeviceHandle hDevice, volatile NvU32 *pMessage)
  *  [ Message ]
  *
  * Response:
- *   [ Message Length ] <- NvSuccess 
+ *   [ Message Length ] <- NvSuccess
  *   [ Transport Command ] <- When we can accept a new message
  */
 
@@ -472,7 +472,7 @@ HandlePortMessage(NvRmDeviceHandle hDevice, volatile NvU32 *pMessage)
     // !!! For sanity we should walk the list of open ports to make sure this is a valid port!
     // Queue the message even if in the open state as presumably this should only have happened if
     // due to a race condition with the transport connected messages.
-    if (hPort && (hPort->State == PortState_Connected || hPort->State == PortState_Open))    
+    if (hPort && (hPort->State == PortState_Connected || hPort->State == PortState_Open))
     {
         bSuccess = InsertMessage(hPort, (NvU8*)&pMessage[3], MessageLength);
         if (bSuccess)
@@ -488,11 +488,11 @@ HandlePortMessage(NvRmDeviceHandle hDevice, volatile NvU32 *pMessage)
     }
 }
 
-static void 
+static void
 HandleAVPResetMessage(NvRmDeviceHandle hDevice)
 {
     NvRmTransportHandle hPort;
-    
+
     hPort = FindPort(hDevice,(char*)"RPC_CPU_PORT");
     if (hPort && (hPort->State == PortState_Connected || hPort->State == PortState_Open))
     {
@@ -566,7 +566,7 @@ InboxFullIsr(void *args)
     case  TransportCmd_Connect:
         HandleConnectMessage(hDevice, pMessage);
         break;
-        
+
     case  TransportCmd_Disconnect:
         HandleDisconnectMessage(hDevice, pMessage);
         break;
@@ -574,7 +574,7 @@ InboxFullIsr(void *args)
     case TransportCmd_Message:
         HandlePortMessage(hDevice, pMessage);
         break;
-            
+
     default:
         NV_ASSERT(0);
     }
@@ -643,7 +643,7 @@ RegisterTransportInterrupt(NvRmDeviceHandle hDevice)
      * one interrupt i.e. InboxFullIsr  */
     DmaIntHandlers[0] = InboxFullIsr;
     DmaIntHandlers[1] = OutboxEmptyIsr;
-    return NvRmInterruptRegister(hDevice, 1, IrqList, DmaIntHandlers, 
+    return NvRmInterruptRegister(hDevice, 1, IrqList, DmaIntHandlers,
             hDevice, &s_TransportInterruptHandle, NV_TRUE);
 }
 
@@ -685,7 +685,7 @@ NvRmPrivTransportAllocBuffers(NvRmDeviceHandle hRmDevice)
     }
     else
     {
-        s_TransportInfo.pReceiveMem  = (void *) (((NvUPtr)s_TransportInfo.pTransmitMem) + 
+        s_TransportInfo.pReceiveMem  = (void *) (((NvUPtr)s_TransportInfo.pTransmitMem) +
                                                               MAX_MESSAGE_LENGTH + MAX_COMMAND_SIZE);
     }
 
@@ -695,7 +695,7 @@ NvRmPrivTransportAllocBuffers(NvRmDeviceHandle hRmDevice)
 
     NvRmPrivXpcSendMessage(s_TransportInfo.hXpc, s_TransportInfo.MessageMemPhysAddr);
     return;
-    
+
 
 fail:
     NvRmMemHandleFree(hNewMemHandle);
@@ -727,12 +727,12 @@ NvError NvRmTransportInit(NvRmDeviceHandle hRmDevice)
 
     NvOsMemset(&s_TransportInfo, 0, sizeof(s_TransportInfo));
     s_TransportInfo.hDevice = hRmDevice;
-   
+
     err = NvOsMutexCreate(&s_TransportInfo.mutex);
     if (err)
         goto fail;
 
-#if !NVOS_IS_WINDOWS || NVOS_IS_WINDOWS_CE 
+#if !NVOS_IS_WINDOWS || NVOS_IS_WINDOWS_CE
     err = NvRmPrivXpcCreate(hRmDevice, &s_TransportInfo.hXpc);
     if (err)
         goto fail;
@@ -751,7 +751,7 @@ NvError NvRmTransportInit(NvRmDeviceHandle hRmDevice)
     {
         NvU32             TimerAddr;
         NvU32             TimerSize;
-        
+
         NvRmModuleGetBaseAddress(hRmDevice, NvRmModuleID_TimerUs, &TimerAddr, &TimerSize);
         // map the us counter
         err = NvRmPhysicalMemMap(TimerAddr, TimerSize, NVOS_MEM_READ_WRITE,
@@ -759,10 +759,10 @@ NvError NvRmTransportInit(NvRmDeviceHandle hRmDevice)
         if (err)
             goto fail;
     }
-    
+
 #endif
 
-#if !NVOS_IS_WINDOWS || NVOS_IS_WINDOWS_CE 
+#if !NVOS_IS_WINDOWS || NVOS_IS_WINDOWS_CE
     err = RegisterTransportInterrupt(hRmDevice);
     if (err)
         goto fail;
@@ -772,7 +772,7 @@ NvError NvRmTransportInit(NvRmDeviceHandle hRmDevice)
 
 
 fail:
-#if !NVOS_IS_WINDOWS || NVOS_IS_WINDOWS_CE 
+#if !NVOS_IS_WINDOWS || NVOS_IS_WINDOWS_CE
     NvRmPrivXpcDestroy(s_TransportInfo.hXpc);
     NvRmPrivTransportFreeBuffers(hRmDevice);
 #endif
@@ -787,7 +787,7 @@ fail:
 void NvRmTransportDeInit(NvRmDeviceHandle hRmDevice)
 {
     // Unregister the interrupts.
-#if !NVOS_IS_WINDOWS || NVOS_IS_WINDOWS_CE 
+#if !NVOS_IS_WINDOWS || NVOS_IS_WINDOWS_CE
     NvRmPrivXpcDestroy(s_TransportInfo.hXpc);
     NvRmPrivTransportFreeBuffers(hRmDevice);
     NvRmInterruptUnregister(hRmDevice, s_TransportInterruptHandle);
@@ -832,7 +832,7 @@ static void
 DeletePort(NvRmDeviceHandle hRmDevice, const NvRmTransportHandle hPort)
 {
     // Pointer to the pointer alleviates all special cases in linked list walking.
-    // I wish I was clever enough to have figured this out myself. 
+    // I wish I was clever enough to have figured this out myself.
 
     NvRmTransportHandle *hIter;
 
@@ -903,9 +903,9 @@ NvRmTransportOpen(
 
     // check if this is one of the special RPC ports used by the rm
     if ( NvOsStrcmp(pPortName, "RPC_AVP_PORT") == 0)
-    {        
+    {
         //If someone else wants to open this port
-        //just return the one already created.        
+        //just return the one already created.
         if (hPartner)
         {
             hPort = hPartner;
@@ -959,7 +959,7 @@ NvRmTransportOpen(
 
 
     // !!! loopback info
-#if LOOPBACK_PROFILE 
+#if LOOPBACK_PROFILE
     if (NvOsStrcmp(hPort->PortName, "LOOPTEST") == 0)
         hPort->bLoopTest = 1;
 #endif
@@ -997,7 +997,7 @@ void NvRmTransportClose(NvRmTransportHandle hPort)
     // Look and see if this port exists anywhere.
     NV_ASSERT(hPort);
 
-    
+
     NvOsMutexLock(s_TransportInfo.mutex);
     DeletePort(hPort->hRmDevice, hPort);  // unlink this port
 
@@ -1024,7 +1024,7 @@ void NvRmTransportClose(NvRmTransportHandle hPort)
         // unlink this port from the other side of the connection.
         hPort->hConnectedPort->hConnectedPort = NULL;
     }
-    
+
     if (hPort->RemotePort)
     {
         RemoteMessage[0] = TransportCmd_Disconnect;
@@ -1078,7 +1078,7 @@ NvRmTransportWaitForConnect(
         NvOsMutexUnlock(s_TransportInfo.mutex);
         goto exit_gracefully;
     }
-    
+
     hPort->hOnConnectSem = hSem;
     hPort->State = PortState_Waiting;
     NvOsMutexUnlock(s_TransportInfo.mutex);
@@ -1161,7 +1161,7 @@ NvRmPrivTransportWaitResponse(NvRmDeviceHandle hDevice, NvU32 *response, NvU32 R
             CurrentTime = NvOsGetTimeMS();
         }
     }
-    
+
     if ( pXpcMessage && GotResponse )
     {
         err = NvSuccess;
@@ -1234,9 +1234,9 @@ NvError NvRmTransportSendMsgInLP0(NvRmTransportHandle hPort,
     MessageHdr[0] = TransportCmd_Message;
     MessageHdr[1] = hPort->RemotePort;
     MessageHdr[2] = MessageSize;
-   
+
     ReadData = ((volatile NvU32*)s_TransportInfo.pTransmitMem)[0];
-    
+
     // Check for clear to send
     if ( ReadData != 0)
         return NvError_TransportMessageBoxFull;  // someone else is sending a message
@@ -1283,7 +1283,7 @@ NvError NvRmTransportConnect(NvRmTransportHandle hPort, NvU32 TimeoutMS)
     NvU32               CurrentTime;
     NvU32               ConnectMessage[ MAX_PORT_NAME_LENGTH/4 + 3];
     NvError             err;
-    
+
 
     // Look and see if there is a local port with the same name that is currently waiting, if there is
     // mark both ports as connected.
@@ -1319,7 +1319,7 @@ NvError NvRmTransportConnect(NvRmTransportHandle hPort, NvU32 TimeoutMS)
             ConnectMessage[0] = TransportCmd_Connect;
             ConnectMessage[1] = (NvU32)hPort;
             NvOsMemcpy(&ConnectMessage[2], hPort->PortName, MAX_PORT_NAME_LENGTH);
-            
+
             err = NvRmPrivTransportSendMessage(hPort->hRmDevice,
                       ConnectMessage, sizeof(ConnectMessage), NULL, 0);
             if (!err)
@@ -1356,7 +1356,7 @@ NvError NvRmTransportConnect(NvRmTransportHandle hPort, NvU32 TimeoutMS)
         CurrentTime = NvOsGetTimeMS();
         if ( (CurrentTime - StartTime) > TimeoutMS )
             return NvError_Timeout;
-        
+
         NvOsSleepMS(10);
     }
 
@@ -1401,7 +1401,7 @@ NvError NvRmTransportSetQueueDepth(
         {
             return NvSuccess;
         }
-        
+
         NV_ASSERT(!" Illegal meesage length or queue depth. ");
     }
 
@@ -1440,7 +1440,7 @@ NvRmPrivTransportSendRemoteMsg(
     MessageHdr[0] = TransportCmd_Message;
     MessageHdr[1] = hPort->RemotePort;
     MessageHdr[2] = MessageSize;
-   
+
     for (;;)
     {
         NvOsMutexLock(s_TransportInfo.mutex);
@@ -1502,7 +1502,7 @@ NvRmPrivTransportSendLocalMsg(
                 NvOsSemaphoreSignal(hRemotePort->hOnPushMsgSem);
             break;
         }
-        
+
         // The destination port is full.
         if (TimeoutMS == 0)
         {
@@ -1617,7 +1617,7 @@ NvRmTransportRecvMsg(
         NvOsMutexUnlock(s_TransportInfo.mutex);
         return NvError_TransportMessageBoxEmpty;
     }
-    
+
     ExtractMessage(hPort, (NvU8*)pMessageBuffer, pMessageSize, MaxSize);
     if (*pMessageSize > MaxSize)
     {
@@ -1637,7 +1637,7 @@ NvRmTransportRecvMsg(
         if (s_TransportInfo.pReceiveMem == NULL)
         {
             /* QT/EMUTRANS takes this path. */
-            NvRmMemRead(s_TransportInfo.hMessageMem, 
+            NvRmMemRead(s_TransportInfo.hMessageMem,
                         MAX_MESSAGE_LENGTH + MAX_COMMAND_SIZE,
                         TmpMessage,
                         MAX_MESSAGE_LENGTH);
@@ -1669,8 +1669,8 @@ NvRmTransportRecvMsg(
     return NvSuccess;
 }
 
-void 
-NvRmTransportGetPortName( 
+void
+NvRmTransportGetPortName(
     NvRmTransportHandle hPort,
     NvU8 *PortName,
     NvU32 PortNameSize )
@@ -1688,4 +1688,3 @@ NvRmTransportGetPortName(
 
     NvOsStrncpy((char *)PortName, hPort->PortName, PortNameSize);
 }
-

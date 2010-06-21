@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2009 NVIDIA Corporation.
+ * Copyright (c) 2007-2010 NVIDIA Corporation.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -204,7 +204,7 @@ NvRmPrivClockLimitsInit(NvRmDeviceHandle hRmDevice)
     }
 
     // Set AVP upper clock boundary with combined Absolute/Scaled limit;
-    // Sync System clock with AVP (System is not in relocation table) 
+    // Sync System clock with AVP (System is not in relocation table)
     s_ClockRangeLimits[NvRmModuleID_Avp].MaxKHz = AvpMaxKHz;
     s_ClockRangeLimits[NvRmPrivModuleID_System].MaxKHz =
         s_ClockRangeLimits[NvRmModuleID_Avp].MaxKHz;
@@ -239,7 +239,7 @@ NvRmPrivClockLimitsInit(NvRmDeviceHandle hRmDevice)
     }
     else if (hRmDevice->ChipId.Id == 0x20)
     {
-        // No CMC; TODO: Mselect/CPU <= 1/4? 
+        // No CMC; TODO: Mselect/CPU <= 1/4?
         s_ClockRangeLimits[NvRmPrivModuleID_Mselect].MaxKHz = CpuMaxKHz >> 2;
     }
     else
@@ -497,7 +497,7 @@ NvRmPrivModuleVscaleAttach(
         s_VoltageStepRefCounts[vstep1]--;
         if ((pCinfo->Module == NvRmModuleID_Usb2Otg) &&
             (hRmDevice->ChipId.Id == 0x16))
-        {   
+        {
             // Two AP16 USB modules share clock enable control
             NV_ASSERT(s_VoltageStepRefCounts[vstep1]);
             s_VoltageStepRefCounts[vstep1]--;
@@ -564,7 +564,7 @@ NvRmPrivModuleVscaleReAttach(
     }
 
     // Find voltage step for using the target source, and select maximum
-    // step required for both module and its source to operate 
+    // step required for both module and its source to operate
     pScale = s_pClockScales[NvRmClkLimitsExtID_ClkSrc];
     NV_ASSERT(pScale);
     for (j = 0; j < s_ChipFlavor.pSocShmoo->ShmooVmaxIndex; j++)
@@ -771,7 +771,7 @@ static NvError NvRmBootArgChipShmooGet(
     {
         err = NvRmMemHandleClaimPreservedHandle(
             hRmDevice, BootArgSh.MemHandleKey, &hMem);
-        if (err != NvSuccess) 
+        if (err != NvSuccess)
         {
             goto fail;
         }
@@ -821,7 +821,7 @@ static NvError NvRmBootArgChipShmooGet(
             err = NvError_InsufficientMemory;
             goto fail;
         }
-        
+
         // Map the physical shmoo address passed by the backdoor loader
         err = NvOsPhysicalMemMap(BootArgShPhys.PhysShmooPtr, TotalSize,
             NvOsMemAttribute_WriteBack, 0, &pBootShmooData);
@@ -848,7 +848,7 @@ static NvError NvRmBootArgChipShmooGet(
     size = BootArgSh.CoreShmooVoltagesListSize;
     NV_ASSERT (offset + size <= TotalSize);
     s_SocShmoo.ShmooVoltages = (const NvU32*)((NvUPtr)s_pShmooData + offset);
-    size /= sizeof(*s_SocShmoo.ShmooVoltages); 
+    size /= sizeof(*s_SocShmoo.ShmooVoltages);
     NV_ASSERT((size * sizeof(*s_SocShmoo.ShmooVoltages) ==
               BootArgSh.CoreShmooVoltagesListSize) && (size > 1));
     s_SocShmoo.ShmooVmaxIndex = size - 1;
@@ -934,7 +934,7 @@ NvError NvRmBootArgChipShmooSet(NvRmDeviceHandle hRmDevice)
 #define NVRM_BOOT_MEM_ALIGNMENT (0x1 << 12)
 #define NVRM_BOOT_MEM_SIZE (0x1 << 13)
 
-    static const NvRmHeap s_heaps[] = 
+    static const NvRmHeap s_heaps[] =
     {
         NvRmHeap_ExternalCarveOut,
     };
@@ -951,13 +951,13 @@ NvError NvRmBootArgChipShmooSet(NvRmDeviceHandle hRmDevice)
     // Pack shmoo arrays and structures (all members are of NvU32 type).
     // Start with core domain.
     BootArgSh.CoreShmooVoltagesListOffset = size;
-    BootArgSh.CoreShmooVoltagesListSize = 
+    BootArgSh.CoreShmooVoltagesListSize =
         (pChipFlavor->pSocShmoo->ShmooVmaxIndex + 1) *
         sizeof(*pChipFlavor->pSocShmoo->ShmooVoltages);
     size += BootArgSh.CoreShmooVoltagesListSize;
 
     BootArgSh.CoreScaledLimitsListOffset = size;
-    BootArgSh.CoreScaledLimitsListSize = 
+    BootArgSh.CoreScaledLimitsListSize =
         pChipFlavor->pSocShmoo->ScaledLimitsListSize *
         sizeof(*pChipFlavor->pSocShmoo->ScaledLimitsList);
     size += BootArgSh.CoreScaledLimitsListSize;
@@ -969,7 +969,7 @@ NvError NvRmBootArgChipShmooSet(NvRmDeviceHandle hRmDevice)
     size += BootArgSh.OscDoublerListSize;
 
     BootArgSh.SKUedLimitsOffset = size;
-    BootArgSh.SKUedLimitsSize = 
+    BootArgSh.SKUedLimitsSize =
         sizeof(*pChipFlavor->pSocShmoo->pSKUedLimits);
     size += BootArgSh.SKUedLimitsSize;
 
@@ -977,13 +977,13 @@ NvError NvRmBootArgChipShmooSet(NvRmDeviceHandle hRmDevice)
     {
         // Add data for dedicated CPU domain
         BootArgSh.CpuShmooVoltagesListOffset = size;
-        BootArgSh.CpuShmooVoltagesListSize = 
+        BootArgSh.CpuShmooVoltagesListSize =
             (pChipFlavor->pCpuShmoo->ShmooVmaxIndex + 1) *
             sizeof(*pChipFlavor->pCpuShmoo->ShmooVoltages);
         size += BootArgSh.CpuShmooVoltagesListSize;
 
         BootArgSh.CpuScaledLimitsOffset = size;
-        BootArgSh.CpuScaledLimitsSize = 
+        BootArgSh.CpuScaledLimitsSize =
             sizeof(*pChipFlavor->pCpuShmoo->pScaledCpuLimits);
         size += BootArgSh.CpuScaledLimitsSize;
     }
@@ -1031,10 +1031,10 @@ NvError NvRmBootArgChipShmooSet(NvRmDeviceHandle hRmDevice)
     if (pChipFlavor->pCpuShmoo)
     {
         NvRmMemWrite(hMem, BootArgSh.CpuShmooVoltagesListOffset,
-            pChipFlavor->pCpuShmoo->ShmooVoltages, 
+            pChipFlavor->pCpuShmoo->ShmooVoltages,
             BootArgSh.CpuShmooVoltagesListSize);
         NvRmMemWrite(hMem, BootArgSh.CpuScaledLimitsOffset,
-            pChipFlavor->pCpuShmoo->pScaledCpuLimits, 
+            pChipFlavor->pCpuShmoo->pScaledCpuLimits,
             BootArgSh.CpuScaledLimitsSize);
     }
 
@@ -1065,6 +1065,3 @@ fail:
     return NvSuccess;
 #endif
 }
-
-/*****************************************************************************/
-

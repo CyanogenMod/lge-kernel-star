@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2009 NVIDIA Corporation.
+ * Copyright (c) 2007-2010 NVIDIA Corporation.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -216,7 +216,7 @@ NvRmPrivModuleClockAttach(
     }
 
     NV_ASSERT(cinfo->ClkEnableOffset);
-    reg = NV_REGR(hDevice, NvRmPrivModuleID_ClockAndReset, 0, 
+    reg = NV_REGR(hDevice, NvRmPrivModuleID_ClockAndReset, 0,
                   cinfo->ClkEnableOffset);
     Enabled = ((reg & cinfo->ClkEnableField) == cinfo->ClkEnableField);
     if (Enabled == Enable)
@@ -383,7 +383,7 @@ NvRmPrivMemoryClockReAttach(
 }
 
 void
-NvRmPrivExternalClockAttach( 
+NvRmPrivExternalClockAttach(
     NvRmDeviceHandle hDevice,
     NvRmClockSource SourceId,
     NvBool Enable)
@@ -430,7 +430,7 @@ NvRmPrivExternalClockAttach(
 
 /*****************************************************************************/
 
-void 
+void
 NvRmPrivEnableModuleClock(
     NvRmDeviceHandle hRmDevice,
     NvRmModuleID ModuleId,
@@ -440,10 +440,10 @@ NvRmPrivEnableModuleClock(
     {
         case 0x15:
         case 0x16:
-            Ap15EnableModuleClock(hRmDevice, ModuleId, ClockState); 
+            Ap15EnableModuleClock(hRmDevice, ModuleId, ClockState);
             break;
         case 0x20:
-            Ap20EnableModuleClock(hRmDevice, ModuleId, ClockState); 
+            Ap20EnableModuleClock(hRmDevice, ModuleId, ClockState);
             break;
         default:
             NV_ASSERT(!"Unsupported chip ID");
@@ -924,7 +924,7 @@ static void ModuleClockStateInit(NvRmDeviceHandle hRmDevice)
         {
             const NvRmCoreClockInfo* pCore =
                 NvRmPrivGetClockSourceHandle(cinfo->Sources[0])->pInfo.pCore;
-            NvRmClockSource SourceId = 
+            NvRmClockSource SourceId =
                 NvRmPrivCoreClockSourceGet(hRmDevice, pCore);
             NvRmPrivCoreClockReAttach(hRmDevice, pCore->SourceId, SourceId);
         }
@@ -976,7 +976,7 @@ NvRmPrivClocksInit(NvRmDeviceHandle hRmDevice)
     {
         s_moduleClockTable = g_Ap15ModuleClockTable;
         s_moduleClockTableSize = g_Ap15ModuleClockTableSize;
-        NvRmPrivAp15PllReferenceTableInit(&s_PllReferencesTable, 
+        NvRmPrivAp15PllReferenceTableInit(&s_PllReferencesTable,
                 &s_PllReferencesTableSize);
         s_ClockSourceTable = NvRmPrivAp15ClockSourceTableInit();
         fpgaModuleFreq = FPGA_MODULE_KHZ_AP15;
@@ -985,7 +985,7 @@ NvRmPrivClocksInit(NvRmDeviceHandle hRmDevice)
     {
         s_moduleClockTable = g_Ap20ModuleClockTable;
         s_moduleClockTableSize = g_Ap20ModuleClockTableSize;
-        NvRmPrivAp20PllReferenceTableInit(&s_PllReferencesTable, 
+        NvRmPrivAp20PllReferenceTableInit(&s_PllReferencesTable,
                 &s_PllReferencesTableSize);
         s_ClockSourceTable = NvRmPrivAp20ClockSourceTableInit();
         fpgaModuleFreq = FPGA_MODULE_KHZ_AP20;
@@ -1092,7 +1092,7 @@ NvRmPrivClocksInit(NvRmDeviceHandle hRmDevice)
     if (env == ExecPlatform_Fpga)
     {
         for (i = 0; i < s_moduleClockTableSize; i++)
-        {                        
+        {
             s_moduleClockState[i].actual_freq = fpgaModuleFreq;
         }
     }
@@ -1346,7 +1346,7 @@ NvRmPrivGetInterfaceMaxClock(NvRmDeviceHandle hRmDevice, NvRmModuleID ModuleId)
 {
 
     NvU32 OdmModules[4];
-    NvU32 OdmInstances[4];        
+    NvU32 OdmInstances[4];
     NvU32* pMaxClockSpeed = NULL;
     NvU32 count = 0;
     NvU32 i = 0;
@@ -1364,12 +1364,12 @@ NvRmPrivGetInterfaceMaxClock(NvRmDeviceHandle hRmDevice, NvRmModuleID ModuleId)
         instance = OdmInstances[i];
         NvOdmQueryClockLimits(OdmModules[i], (const NvU32 **)&pMaxClockSpeed, &count);
         if ((pMaxClockSpeed) && (instance < count))
-        {       
+        {
             MaxFreq = pMaxClockSpeed[instance];
-        }            
+        }
     }
 
-    return MaxFreq;    
+    return MaxFreq;
 }
 
 NvRmFreqKHz
@@ -1543,7 +1543,7 @@ NvRmPowerModuleClockConfig (
     {
         if (env == ExecPlatform_Fpga || env == ExecPlatform_Qt)
         {
-            // Clock configuration only supported for the i2s, VI, i2c, 
+            // Clock configuration only supported for the i2s, VI, i2c,
             // dvc and HSMMC on this environment
             if (!(ModuleName == NvRmModuleID_I2s ||
                     ModuleName == NvRmModuleID_Vi ||
@@ -1640,7 +1640,7 @@ NvRmPowerModuleClockConfig (
             // for the i2s recording, the clock source to i2s should be less than
             // the system clock frequency 8.33MHz for the fpga, so dividing by 2
             // if its more than
-            if ((hDevice->ChipId.Id == 0x15 || hDevice->ChipId.Id == 0x16) && 
+            if ((hDevice->ChipId.Id == 0x15 || hDevice->ChipId.Id == 0x16) &&
                     (env == ExecPlatform_Fpga) && (ModuleName == NvRmModuleID_I2s))
             {
                 reg = NV_REGR(hDevice, NvRmPrivModuleID_ClockAndReset, 0,
@@ -1727,15 +1727,15 @@ NvRmPowerModuleClockConfig (
             hDevice, ModuleName, cinfo->ClkSourceOffset, flags);
 
 
-        /* 
+        /*
          * SDMMC internal feedback tap delay adjustment
          * This is required for the ap20 based boards.
-        */            
-        if ((PrefFreqListCount) && (hDevice->ChipId.Id == 0x20) && 
+        */
+        if ((PrefFreqListCount) && (hDevice->ChipId.Id == 0x20) &&
                 (ModuleName == NvRmModuleID_Sdio))
         {
             NvRmPrivAp20SdioTapDelayConfigure(hDevice, ModuleId,
-                    cinfo->ClkSourceOffset, state->actual_freq); 
+                    cinfo->ClkSourceOffset, state->actual_freq);
         }
     }
 
@@ -1838,15 +1838,15 @@ CoreClockSwitch(
     NvRmFreqKHz CoreFreq)
 {
     NvU32 reg;
-    
+
     // Construct core source control register settings.
     // Always use Idle clock mode; mode field = 2 ^ (Mode - 1)
     NV_ASSERT(pCinfo->SelectorOffset);
     NV_ASSERT(SourceIndex <= pCinfo->SourceFieldMasks[NvRmCoreClockMode_Idle]);
-        
+
     reg = ( ((0x1 << (NvRmCoreClockMode_Idle - 1)) << pCinfo->ModeFieldShift) |
-            (SourceIndex << pCinfo->SourceFieldShifts[NvRmCoreClockMode_Idle]) );    
-    
+            (SourceIndex << pCinfo->SourceFieldShifts[NvRmCoreClockMode_Idle]) );
+
     if (reg != NV_REGR(
         hRmDevice, NvRmPrivModuleID_ClockAndReset, 0, pCinfo->SelectorOffset))
     {
@@ -1856,14 +1856,14 @@ CoreClockSwitch(
     }
 
     // Switch source and divider according to specified order. This guarantees
-    // that core frequency stays below maximum of "old" and "new" settings. 
+    // that core frequency stays below maximum of "old" and "new" settings.
     // Configure EMC LL path before and after clock switch.
     if (pCinfo->SourceId == NvRmClockSource_CpuBus)
         if ((hRmDevice->ChipId.Id == 0x15) || (hRmDevice->ChipId.Id == 0x16))
             NvRmPrivAp15SetEmcForCpuSrcSwitch(hRmDevice);
     if (SrcFirst)
     {
-        NV_REGW(hRmDevice, NvRmPrivModuleID_ClockAndReset, 0, 
+        NV_REGW(hRmDevice, NvRmPrivModuleID_ClockAndReset, 0,
                 pCinfo->SelectorOffset, reg);
         NvOsWaitUS(NVRM_CLOCK_CHANGE_DELAY);
     }
@@ -2055,13 +2055,13 @@ NvRmPrivCoreClockSet(
     NvRmFreqKHz CoreFreq = 0;
     NvU32 SrcIndex = NvRmClockSource_Num; // source index out of valid range
     ExecPlatform env;
-    
+
 
     NV_ASSERT(hRmDevice);
     NV_ASSERT(pCinfo);
-    
+
     env = NvRmPrivGetExecPlatform(hRmDevice);
-    
+
     if (env == ExecPlatform_Fpga)
         return;
 
@@ -2167,7 +2167,7 @@ GetSystemBusComplexHandle(NvRmDeviceHandle hRmDevice)
             s_SystemBusComplex.VclkDividendFieldSize = i;
         }
     }
-    return &s_SystemBusComplex; 
+    return &s_SystemBusComplex;
 }
 
 void
@@ -2270,7 +2270,7 @@ NvRmPrivBusClockFreqSet(
             *pVclkFreq = 0;
         s_ClockSourceFreq[NvRmClockSource_Vbus] = 0;
     }
-    
+
     /*
      * Set bus clocks dividers in bus rate control register.
      * Always enable all bus clocks.
@@ -2339,7 +2339,7 @@ NvRmPrivBusClockFreqGet(
     if (pCinfo->VclkDividendFieldMask)
     {
         NV_ASSERT(pVclkFreq);
-        *pVclkFreq = 
+        *pVclkFreq =
         (SystemFreq * (VclkDividend + 1)) >> pCinfo->VclkDividendFieldSize;
     }
     else if (pVclkFreq)
@@ -2742,7 +2742,7 @@ void NvRmPrivUnlockModuleClockState(void)
 
 // PLLC may be selected as a source only for Display, TVO, GPU, and VDE
 // modules. (It is also used for CPU and System/Avp core clocks, controlled
-// by DFS with its own configuration path - no need to specify here) 
+// by DFS with its own configuration path - no need to specify here)
 static const NvRmModuleID s_Ap15PllC0UsagePolicy[] =
 {
     NvRmModuleID_Display,
@@ -2766,7 +2766,7 @@ static const NvRmModuleID s_Ap20PllC0UsagePolicy[] =
 
 // PLLM may be selected as a source for GPU, UART and VDE modules. (It is also
 // used for EMC, CPU and System/Avp core clocks, controlled by DFS with its
-// own configuration path - no need to specify here) 
+// own configuration path - no need to specify here)
 static const NvRmModuleID s_Ap15PllM0UsagePolicy[] =
 {
     NvRmModuleID_GraphicsHost,
@@ -2925,7 +2925,7 @@ static void BackupClockSource(
     NvU32 reg, SourceIndex;
     NvRmModuleID ModuleId;
 
-    NV_ASSERT(pCinfo); 
+    NV_ASSERT(pCinfo);
     ModuleId = NVRM_MODULE_ID(pCinfo->Module, pCinfo->Instance);
 
     // Check if currently clock is disabled
@@ -2971,7 +2971,7 @@ static void RestoreClockSource(
     NvBool Disabled;
     NvRmModuleID ModuleId;
 
-    NV_ASSERT(pCinfo && pCstate); 
+    NV_ASSERT(pCinfo && pCstate);
     ModuleId = NVRM_MODULE_ID(pCinfo->Module, pCinfo->Instance);
 
     // Check if currently clock is disabled
@@ -3144,7 +3144,7 @@ PllCRestoreCpuClock(
     NvRmFreqKHz OldCpuFreq)
 {
     // Restore CPU clock as high as new PLLC0 output allows, provoded PLLC0
-    // was used as a source for CPU 
+    // was used as a source for CPU
     if (OldCpuFreq != 0)
     {
         NvRmClockSource SourceId = NvRmClockSource_PllC0;
@@ -3202,7 +3202,7 @@ PllCRestoreSystemClock(
     NvRmPrivDividerSet(hRmDevice, pSrcCinfo->pInfo.pDivider, divc1);
 
     // Restore System clock as high as new PLLC1 output allows, provoded PLLC1
-    // was used as a source for System clock 
+    // was used as a source for System clock
     if (OldSysFreq != 0)
     {
         SysFreq = NV_MIN(SysFreq, OldSysFreq);
@@ -3224,12 +3224,12 @@ NvRmFreqKHz NvRmPrivGetMaxFreqPllC(NvRmDeviceHandle hRmDevice)
 }
 
 /*
- * PLLC is reconfigured:  
+ * PLLC is reconfigured:
  * (a) when RM is setting fast clocks during boot/resume from deep sleep,
  *     provided PLLC is not already in use by any of the display heads
  * (b) when DDK/ODM is reconfiguring display clock (typically PLLC is required
  *     for CRT)
- * 
+ *
  * In both cases core voltage is set at nominal - reconfiguration is DVS-save.
  * Core clocks that use PLLC: CPU and System bus (starting with AP20) - are
  * switched to PLLP during reconfiguration and restored afterwards. Module
@@ -3304,8 +3304,3 @@ void NvRmPrivBoostPllC(NvRmDeviceHandle hRmDevice)
         )
         NvRmPrivReConfigurePllC(hRmDevice, NvRmFreqMaximum);
 }
-
-/*****************************************************************************/
-
-
-

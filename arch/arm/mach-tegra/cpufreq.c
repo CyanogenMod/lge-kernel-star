@@ -84,7 +84,6 @@ static void tegra_cpufreq_hotplug(NvRmPmRequest req)
 	if (rc)
 		pr_err("%s: error %d servicing hot plug request\n",
 		       __func__, rc);
-	
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
@@ -185,7 +184,6 @@ int tegra_start_dvfsd(void) {
 	mutex_unlock(&init_mutex);
 
 	return rc;
-
 }
 
 static int tegra_cpufreq_init_once(void)

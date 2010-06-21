@@ -444,5 +444,3 @@ __reenable_l2x0:
 	str	r3, [r9, #L2X0_CTRL]
 #endif
 	b	__cortex_a9_restore
-
-

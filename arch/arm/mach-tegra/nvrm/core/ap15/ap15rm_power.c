@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2009 NVIDIA Corporation.
+ * Copyright (c) 2007-2010 NVIDIA Corporation.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -485,7 +485,7 @@ void NvRmPrivIoPowerDetectStart(
     if ((hRmDeviceHandle->ChipId.Id == 0x15) ||
         (hRmDeviceHandle->ChipId.Id == 0x16))
     {
-        // On AP15/AP16 set/clear reset bit in PMC scratch0 
+        // On AP15/AP16 set/clear reset bit in PMC scratch0
         NvRmPrivAp15IoPowerDetectReset(hRmDeviceHandle);
 
         // For AP15 A01 chip the above reset does nothing, therefore
@@ -658,6 +658,3 @@ void NvRmPrivCoreVoltageInit(NvRmDeviceHandle hRmDevice)
     if (NvOdmPeripheralGetGuid(NV_VDD_DDR_RX_ODM_ID))
         NvRmPrivPmuRailControl(hRmDevice, NV_VDD_DDR_RX_ODM_ID, NV_TRUE);
 }
-
-/*****************************************************************************/
-

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2009 NVIDIA Corporation.
+ * Copyright (c) 2008-2010 NVIDIA Corporation.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -178,6 +178,7 @@ typedef struct
     (*pfnSetDefaultTristate)(
         NvRmDeviceHandle hDevice);
 } NvPinmuxPrivMethods;
+
     static NvPinmuxPrivMethods s_PinmuxMethods =
     {
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
@@ -411,13 +412,13 @@ NvU32 NvRmPrivRmModuleToOdmModule(
 
     NV_ASSERT(pOdmModules && pOdmInstances);
 
-    if (ChipId==0x20)
-    {
-        Result = NvRmPrivAp20RmModuleToOdmModule(RmModule,
-             pOdmModules, pOdmInstances, &Cnt);
-    } else {
-        return 0;
-    }
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
+    NV_ASSERT(ChipId==0x20);
+    Result = NvRmPrivAp20RmModuleToOdmModule(RmModule,
+         pOdmModules, pOdmInstances, &Cnt);
+#else
+#error "Unsupported Tegra architecture"
+#endif
 
     /*  A default mapping is provided for all standard I/O controllers,
      *  if the chip-specific implementation does not implement a mapping */
@@ -745,4 +746,3 @@ NvError NvRmGetStraps(
         return NvError_BadParameter;
     return (s_PinmuxMethods.pfnGetStraps)(hDevice, StrapGroup, pStrapValue);
 }
-

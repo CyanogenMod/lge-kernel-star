@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2009 NVIDIA Corporation.
+ * Copyright (c) 2007-2010 NVIDIA Corporation.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -63,7 +63,7 @@ typedef struct DiagModuleMappingRec
     // respective module clock information structure
     NvU32 BaseIndex;
 
-    // Total number of the module instances 
+    // Total number of the module instances
     NvU32 InstancesNum;
 } DiagModuleMapping;
 
@@ -94,7 +94,7 @@ typedef struct NvRmDiagSourcesRec
     NvU32 ClockSourcesNum;
 
     // Map between clock source IDs and handles
-    NvRmDiagClockSourceHandle hSources[NvRmClockSource_Num]; 
+    NvRmDiagClockSourceHandle hSources[NvRmClockSource_Num];
 } NvRmDiagSources;
 
 // RM handle for diagnostic mode
@@ -106,7 +106,7 @@ NvRmDeviceHandle s_hDiagRm = NULL;
  */
 typedef struct NvRmDiagPowerRailRec
 {
-    // Power rail GUID 
+    // Power rail GUID
     NvU64 PowerRailId;
 
     // List of power group IDs mapped to this rail, terminated
@@ -149,7 +149,7 @@ static const NvRmDiagPowerRail s_Ap15PowerRailsTable[] =
             NV_POWERGROUP_NPG,
             NV_POWERGROUP_CPU,
             NV_POWERGROUP_TD,
-            NV_POWERGROUP_VE, 
+            NV_POWERGROUP_VE,
             NV_POWERGROUP_INVALID
         }
     },
@@ -305,7 +305,7 @@ static const NvRmDiagPowerRail s_Ap20PowerRailsTable[] =
         {
             NV_POWERGROUP_NPG,
             NV_POWERGROUP_TD,
-            NV_POWERGROUP_VE, 
+            NV_POWERGROUP_VE,
             NV_POWERGROUP_INVALID
         }
     },
@@ -550,7 +550,7 @@ NvRmDiagEnable(NvRmDeviceHandle hRmDevice)
     {
         NvRmDiagModuleID id = s_Modules.ModuleClockTable[i].DiagModuleID;
         NV_ASSERT((0 < id) && (id < NvRmDiagModuleID_Num));
-        s_Modules.InstancesMap[id].InstancesNum++; 
+        s_Modules.InstancesMap[id].InstancesNum++;
     }
 
     // 2nd pass - fill in mapping indexes
@@ -650,7 +650,7 @@ NvRmDiagListClockSources(
     NvRmDiagClockSourceHandle* phSourceList)
 {
     NvU32 SourcesNum, i;
-    NV_ASSERT(pListSize);    
+    NV_ASSERT(pListSize);
     NV_ASSERT(phSourceList);
 
     if (s_hDiagRm == NULL)
@@ -694,7 +694,7 @@ NvRmDiagModuleListClockSources(
     NvU32 Instance = NVRM_DIAG_MODULE_INSTANCE(id);
     NvRmDiagModuleID Module = NVRM_DIAG_MODULE_ID(id);
 
-    NV_ASSERT(pListSize);    
+    NV_ASSERT(pListSize);
     NV_ASSERT(phSourceList);
 
     if (s_hDiagRm == NULL)
@@ -783,7 +783,7 @@ NvRmDiagModuleClockConfigure(
     {
         return NvError_NotInitialized;
     }
-    
+
     // Verify source handle, module id, and get module info
     NV_ASSERT((hSource != NULL) &&
         (Module < NvRmDiagModuleID_Num) &&
@@ -804,7 +804,7 @@ NvRmDiagModuleClockConfigure(
     NV_ASSERT(SrcIndex != NvRmClockSource_Num);
     if ((pCinfo->SourceFieldMask == 0) && (pCinfo->DivisorFieldMask == 0))
     {
-        return NvSuccess; 
+        return NvSuccess;
     }
     NV_ASSERT(SrcIndex <= pCinfo->SourceFieldMask);
 
@@ -967,7 +967,7 @@ NvRmDiagClockSourceGetScaler(NvRmDiagClockSourceHandle hSource)
 }
 
 NvError
-NvRmDiagClockSourceListSources( 
+NvRmDiagClockSourceListSources(
     NvRmDiagClockSourceHandle hSource,
     NvU32* pListSize,
     NvRmDiagClockSourceHandle * phSourceList)
@@ -975,7 +975,7 @@ NvRmDiagClockSourceListSources(
     NvRmClockSource source = NvRmClockSource_Invalid;
     NvRmClockSource* Sources = NULL;
 
-    NV_ASSERT(pListSize);    
+    NV_ASSERT(pListSize);
     NV_ASSERT(phSourceList);
 
     if (s_hDiagRm == NULL)
@@ -1016,7 +1016,7 @@ NvRmDiagClockSourceListSources(
     {
         // Return total number of input sources if no room for the output list,
         // otherwise return sources list (min of requested and total size)
-        NvU32 SourcesNum, i; 
+        NvU32 SourcesNum, i;
         for (SourcesNum = 0, i = 0; i < NvRmClockSource_Num; i++)
         {
             NvRmClockSource source = Sources[i];
@@ -1068,7 +1068,7 @@ NvU32 NvRmDiagOscillatorGetFreq(NvRmDiagClockSourceHandle hOscillator)
 }
 
 NvError
-NvRmDiagPllConfigure( 
+NvRmDiagPllConfigure(
     NvRmDiagClockSourceHandle hPll,
     NvU32 M,
     NvU32 N,
@@ -1088,7 +1088,7 @@ NvRmDiagPllConfigure(
 }
 
 NvError
-NvRmDiagClockScalerConfigure( 
+NvRmDiagClockScalerConfigure(
     NvRmDiagClockSourceHandle hScaler,
     NvRmDiagClockSourceHandle hInput,
     NvU32 M,
@@ -1236,7 +1236,7 @@ NvRmDiagModuleListPowerRails(
     NvU32 Instance = NVRM_DIAG_MODULE_INSTANCE(id);
     NvRmDiagModuleID Module = NVRM_DIAG_MODULE_ID(id);
 
-    NV_ASSERT(pListSize);    
+    NV_ASSERT(pListSize);
     NV_ASSERT(phRailList);
 
     if (s_hDiagRm == NULL)
@@ -1358,7 +1358,7 @@ NvBool NvRmPrivIsDiagMode(NvRmModuleID ModuleId)
 
     if (ModuleId == NvRmModuleID_Invalid)
         return NV_TRUE;     // Report diagnostic is in progress
-    
+
     // Report diagnostic is in progress for any module except PMU bus host
     return (ModuleId != s_Rails.PmuBusHostRmId);
 }
@@ -1371,6 +1371,3 @@ NvBool NvRmDiagIsLockSupported(void)
     return NV_FALSE;
 #endif
 }
-
-/*****************************************************************************/
-
