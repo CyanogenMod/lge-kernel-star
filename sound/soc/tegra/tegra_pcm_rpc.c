@@ -81,13 +81,14 @@ static int play_thread( void *arg)
 	for (;;) {
 		switch (prtd->state) {
 		case SNDRV_PCM_TRIGGER_START:
-			state = NvAudioFxState_Run;
-			tegra_snd_cx->xrt_fxn.SetProperty(
+			if (state != NvAudioFxState_Run) {
+				state = NvAudioFxState_Run;
+				tegra_snd_cx->xrt_fxn.SetProperty(
 						 prtd->stdoutpath->Stream,
 						 NvAudioFxProperty_State,
 						 sizeof(NvAudioFxState),
 						 &state);
-			prtd->state = NVALSA_INVALID_STATE;
+			}
 			break;
 		case SNDRV_PCM_TRIGGER_STOP:
 			if (state != NvAudioFxState_Stop) {
@@ -99,8 +100,8 @@ static int play_thread( void *arg)
 						 &state);
 				down(&prtd->stop_done_sem);
 				buffer_in_queue = 0;
-				prtd->state = NVALSA_INVALID_STATE;
 			}
+			break;
 		default:
 			;
 		}
@@ -206,39 +207,40 @@ static int rec_thread( void *arg )
 	for (;;) {
 		switch (prtd->state) {
 		case SNDRV_PCM_TRIGGER_START:
-			pin_format.Format.FormatTag = 1;
-			pin_format.Format.SampleRate = runtime->rate;
-			pin_format.Format.BitsPerSample = runtime->sample_bits;
-			pin_format.Format.Channels = runtime->channels;
-			pin_format.Format.ChannelMask = 0;
-			pin_format.Format.ValidBitsPerSample = 0;
-			pin_format.Pin = NvAudioFxSourcePin;
+			if (state != NvAudioFxState_Run) {
+				pin_format.Format.FormatTag = 1;
+				pin_format.Format.SampleRate = runtime->rate;
+				pin_format.Format.BitsPerSample = runtime->sample_bits;
+				pin_format.Format.Channels = runtime->channels;
+				pin_format.Format.ChannelMask = 0;
+				pin_format.Format.ValidBitsPerSample = 0;
+				pin_format.Pin = NvAudioFxSourcePin;
 
-			e = tegra_snd_cx->xrt_fxn.SetProperty(
-					   prtd->stdinpath->Convert,
-					   NvAudioFxPinProperty_Format,
-					   sizeof(NvAudioFxPinFormatDescriptor),
-					   &pin_format);
-			if (e != NvSuccess) {
-				snd_printk(KERN_ERR"set_property failed!\n");
-			}
+				e = tegra_snd_cx->xrt_fxn.SetProperty(
+						 prtd->stdinpath->Convert,
+						 NvAudioFxPinProperty_Format,
+						 sizeof(NvAudioFxPinFormatDescriptor),
+						 &pin_format);
+				if (e != NvSuccess) {
+					snd_printk(KERN_ERR"set_property failed!\n");
+				}
 
-			e = tegra_snd_cx->xrt_fxn.SetProperty(
-						prtd->stdinpath->Src,
-						NvAudioFxProperty_SampleRate,
-						sizeof(NvS32),
-						&pin_format.Format.SampleRate);
-			if (e != NvSuccess) {
-				snd_printk(KERN_ERR "set_property failed!\n");
-			}
+				e = tegra_snd_cx->xrt_fxn.SetProperty(
+						 prtd->stdinpath->Src,
+						 NvAudioFxProperty_SampleRate,
+						 sizeof(NvS32),
+						 &pin_format.Format.SampleRate);
+				if (e != NvSuccess) {
+					snd_printk(KERN_ERR "set_property failed!\n");
+				}
 
-			state = NvAudioFxState_Run;
-			tegra_snd_cx->xrt_fxn.SetProperty(
+				state = NvAudioFxState_Run;
+				tegra_snd_cx->xrt_fxn.SetProperty(
 						 prtd->stdinpath->Stream,
 						 NvAudioFxProperty_State,
 						 sizeof(NvAudioFxState),
 						 &state);
-			prtd->state = NVALSA_INVALID_STATE;
+			}
 			break;
 		case SNDRV_PCM_TRIGGER_STOP:
 			if (state != NvAudioFxState_Stop) {
@@ -250,7 +252,6 @@ static int rec_thread( void *arg )
 						 &state);
 				down(&prtd->stop_done_sem);
 				buffer_in_queue = 0;
-				prtd->state = NVALSA_INVALID_STATE;
 			}
 			goto EXIT;
 		default:
@@ -332,9 +333,9 @@ static int tegra_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	int ret = 0;
 	int state = prtd->state;
 
-	prtd->state = cmd;
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
+		prtd->state = cmd;
 		prtd->cur_pos = 0;
 		prtd->last_pos = 0;
 		prtd->audiofx_frames = 0;
@@ -357,6 +358,7 @@ static int tegra_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 		}
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
+		prtd->state = cmd;
 		break;
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
