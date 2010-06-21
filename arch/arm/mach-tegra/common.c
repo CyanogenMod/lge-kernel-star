@@ -31,6 +31,13 @@
 
 #include "board.h"
 
+#ifdef CONFIG_DMABOUNCE
+int dma_needs_bounce(struct device *dev, dma_addr_t addr, size_t size)
+{
+	return 0;
+}
+#endif
+
 static void tegra_machine_restart(char mode, const char *cmd)
 {
 	disable_nonboot_cpus();
