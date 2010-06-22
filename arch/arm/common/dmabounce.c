@@ -235,6 +235,7 @@ static inline dma_addr_t map_single(struct device *dev, void *ptr, size_t size,
 		unsigned long mask = *dev->dma_mask;
 		unsigned long limit;
 
+		mask = (mask - 1) | mask;
 		limit = (mask + 1) & ~mask;
 		if (limit && size > limit) {
 			dev_err(dev, "DMA mapping too big (requested %#x "
@@ -455,10 +456,17 @@ EXPORT_SYMBOL(dmabounce_sync_for_device);
 static int dmabounce_init_pool(struct dmabounce_pool *pool, struct device *dev,
 		const char *name, unsigned long size)
 {
+	unsigned int align = 0;
+	if (!(*dev->dma_mask & 0x1))
+		align = 1 << ffs(*dev->dma_mask);
+
+	if (align & (align-1)) {
+		dev_warn(dev, "invalid DMA mask %#llx\n", *dev->dma_mask);
+		return -ENOMEM;
+	}
 	pool->size = size;
 	DO_STATS(pool->allocs = 0);
-	pool->pool = dma_pool_create(name, dev, size,
-				     0 /* byte alignment */,
+	pool->pool = dma_pool_create(name, dev, size, align,
 				     0 /* no page-crossing issues */);
 
 	return pool->pool ? 0 : -ENOMEM;

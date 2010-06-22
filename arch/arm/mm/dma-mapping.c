@@ -42,6 +42,7 @@ static u64 get_coherent_dma_mask(struct device *dev)
 
 	if (dev) {
 		mask = dev->coherent_dma_mask;
+		mask = (mask - 1) | mask;
 
 		/*
 		 * Sanity check the DMA mask - it must be non-zero, and
