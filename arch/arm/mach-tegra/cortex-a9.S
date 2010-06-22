@@ -444,3 +444,14 @@ __reenable_l2x0:
 	str	r3, [r9, #L2X0_CTRL]
 #endif
 	b	__cortex_a9_restore
+
+	.align L1_CACHE_SHIFT
+ENTRY(__shut_off_mmu)
+	mrc	p15, 0, r3, c1, c0, 0
+	movw	r2, #(1<<12) | (1<<11) | (1<<2) | (1<<0)
+	bic	r3, r3, r2
+	dsb
+	mcr	p15, 0, r3, c1, c0, 0
+	isb
+	bx	r9
+ENDPROC(__shut_off_mmu)
