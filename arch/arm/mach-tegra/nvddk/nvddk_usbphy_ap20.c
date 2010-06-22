@@ -360,6 +360,44 @@ Ap20UsbPhyUlpiViewPortProgramData(
 }
 
 static NvError
+Ap20UsbPhySuspendPort(
+    NvDdkUsbPhy *pUsbPhy)
+{
+    NvU32 RegVal = 0x0;
+    NvU32 TimeOut = USB_PHY_HW_TIMEOUT_US;
+
+    // Set the SUSP bit (7:7) in the PORTSC1 reg to suspend the port.
+    //This bit is RW in host mode only.
+    if (pUsbPhy->pProperty->UsbMode != NvOdmUsbModeType_Host)
+    {
+        return NvError_NotSupported;
+    }
+
+    // Do nothing if port is disabled
+    if (!USB_REG_READ_VAL(PORTSC1, PE))
+    {
+        return NvError_NotSupported;
+    }
+
+    RegVal = USB_REG_RD(PORTSC1);
+    RegVal = USB_FLD_SET_DRF_DEF(PORTSC1, SUSP, SUSPEND, RegVal);
+    USB_REG_WR(PORTSC1, RegVal);
+    // Wait until port suspend completes
+    do
+    {
+        if (USB_REG_READ_VAL(PORTSC1, SUSP))
+        {
+            return NvSuccess;
+        }
+
+        NvOsWaitUS(1);
+        TimeOut--;
+    } while (TimeOut);
+
+    return NvError_Timeout;
+}
+
+static NvError
 Ap20UsbPhyUtmiConfigure(
     NvDdkUsbPhy *pUsbPhy)
 {
@@ -563,6 +601,8 @@ Ap20UsbPhyUtmiPowerControl(
         // Put the Phy in the suspend mode
         if (pUsbPhy->Instance == 2)
         {
+            // Suspend port before setting PHCD bit
+            Ap20UsbPhySuspendPort(pUsbPhy);
             RegVal = USB_REG_RD(PORTSC1);
             RegVal = USB_FLD_SET_DRF_DEF(PORTSC1, PHCD, ENABLE, RegVal); 
             USB_REG_WR(PORTSC1, RegVal);
@@ -875,6 +915,8 @@ Ap20UsbPhyUlpiPowerControl(
         else
         {
             // Put the Phy in the suspend mode
+            // Suspend port before setting PHCD bit
+            Ap20UsbPhySuspendPort(pUsbPhy);
             RegVal = USB_REG_RD(PORTSC1);
             RegVal = USB_FLD_SET_DRF_DEF(PORTSC1, PHCD, ENABLE, RegVal); 
             USB_REG_WR(PORTSC1, RegVal);
@@ -1497,17 +1539,9 @@ Ap20PhyRestoreContext(
         NvOsWaitUS(1);
         TimeOut--;
     } while (TimeOut);
-    TimeOut = USB_PHY_HW_TIMEOUT_US;
+
     // Put controller in suspend mode by writing 1 to SUSP bit of PORTSC
-    USB_REG_UPDATE_DEF(PORTSC1, SUSP, SUSPEND);
-    // Wait until port suspend completes
-    do
-    {
-        if (USB_REG_READ_VAL(PORTSC1, SUSP))
-            break;
-        NvOsWaitUS(1);
-        TimeOut--;
-    } while (TimeOut);
+    Ap20UsbPhySuspendPort(pUsbPhy);
 
     if (pUsbPhy->pProperty->UsbInterfaceType == NvOdmUsbInterfaceType_UlpiExternalPhy)
     {
