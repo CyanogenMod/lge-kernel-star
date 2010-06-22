@@ -689,7 +689,6 @@ static int tegra_ehci_suspend(struct platform_device *pdev, pm_message_t state)
 		else {
 			ehci->transceiver->state = OTG_STATE_UNDEFINED;
 			ehci->host_reinited = 0;
-			ehci_halt(ehci);
 			/* indicate hcd flags, that hardware is not accessable now */
 			clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
 		}
@@ -697,6 +696,8 @@ static int tegra_ehci_suspend(struct platform_device *pdev, pm_message_t state)
 #endif
 
 	if (ehci->host_resumed) {
+		/* halt the controller before powering down the phy */
+		ehci_halt(ehci);
 		tegra_ehci_power_down(hcd);
 	}
 
