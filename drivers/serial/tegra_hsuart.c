@@ -154,8 +154,12 @@ static void fill_tx_fifo(struct tegra_uart_port *t, int max_bytes)
 {
 	int i;
 	struct circ_buf *xmit = &t->uport.state->xmit;
+	int count;
+	int xmit_nr;
+	count = CIRC_CNT_TO_END(xmit->head, xmit->tail, UART_XMIT_SIZE);
+	xmit_nr = min_t(int, count, max_bytes);
 
-	for (i = 0; i < max_bytes; i++) {
+	for (i = 0; i < xmit_nr; i++) {
 		BUG_ON(uart_circ_empty(xmit));
 		uart_writeb(t, xmit->buf[xmit->tail], UART_TX);
 		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
