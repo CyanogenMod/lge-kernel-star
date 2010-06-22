@@ -66,6 +66,9 @@ struct suspend_context
 
 volatile struct suspend_context tegra_sctx;
 
+extern void tegra_board_nvodm_suspend(void);
+extern void tegra_board_nvodm_resume(void);
+
 static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
 static void __iomem *clk_rst = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
 static void __iomem *flow_ctrl = IO_ADDRESS(TEGRA_FLOW_CTRL_BASE);
@@ -534,6 +537,9 @@ static int tegra_suspend_prepare_late(void)
 		pr_err("%s: aborting suspend due to AVP timeout\n", __func__);
 		return -EIO;
 	}
+
+	tegra_board_nvodm_suspend();
+
 	e = NvRmKernelPowerSuspend(s_hRmGlobal);
 	if (e != NvSuccess) {
 		pr_err("%s: aborting suspend due to RM failure 0x%08x\n",
@@ -563,6 +569,7 @@ static void tegra_suspend_wake(void)
 		if (e != NvSuccess)
 			panic("%s: RM resume failed 0x%08x!\n", __func__, e);
 	}
+	tegra_board_nvodm_resume();
 #endif
 }
 

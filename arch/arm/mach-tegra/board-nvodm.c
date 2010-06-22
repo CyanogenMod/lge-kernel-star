@@ -29,6 +29,7 @@
 #include <linux/regulator/machine.h>
 #include <linux/lbee9qmb-rfkill.h>
 #include <linux/gpio.h>
+#include <linux/console.h>
 
 #include <mach/iomap.h>
 #include <mach/io.h>
@@ -70,7 +71,18 @@
 
 NvRmGpioHandle s_hGpioGlobal;
 
+struct debug_port_data {
+	NvOdmDebugConsole port;
+	const struct tegra_pingroup_config *pinmux;
+	struct clk *clk_data;
+	int nr_pins;
+};
+
 static u64 tegra_dma_mask = DMA_BIT_MASK(32);
+
+static struct debug_port_data uart_debug_port = {
+			.port = NvOdmDebugConsole_None,
+};
 
 extern const struct tegra_pingroup_config *tegra_pinmux_get(const char *dev_id,
 	int config, int *len);
@@ -157,9 +169,31 @@ static void __init tegra_setup_debug_uart(void)
 	clk_set_rate(c, 115200*16);
 	clk_enable(c);
 	debug_uart_platform[0].uartclk = clk_get_rate(c);
-	clk_put(c);
 
 	platform_device_register(&debug_uart);
+
+	uart_debug_port.port = uart;
+	uart_debug_port.pinmux = pinmux;
+	uart_debug_port.nr_pins = nr_pins;
+	uart_debug_port.clk_data = c;
+}
+
+static void tegra_debug_port_suspend(void)
+{
+	if (uart_debug_port.port == NvOdmDebugConsole_None)
+		return;
+	clk_disable(uart_debug_port.clk_data);
+	tegra_pinmux_config_tristate_table(uart_debug_port.pinmux,
+				uart_debug_port.nr_pins, TEGRA_TRI_TRISTATE);
+}
+
+static void tegra_debug_port_resume(void)
+{
+	if (uart_debug_port.port == NvOdmDebugConsole_None)
+		return;
+	clk_enable(uart_debug_port.clk_data);
+	tegra_pinmux_config_tristate_table(uart_debug_port.pinmux,
+				uart_debug_port.nr_pins, TEGRA_TRI_NORMAL);
 }
 
 #ifdef CONFIG_MMC_SDHCI_TEGRA
@@ -1544,4 +1578,16 @@ void __init tegra_setup_nvodm(bool standard_i2c, bool standard_spi)
 	tegra_setup_w1();
 	pm_power_off = tegra_system_power_off;
 	tegra_setup_suspend();
+}
+
+void tegra_board_nvodm_suspend(void)
+{
+	if (console_suspend_enabled)
+		tegra_debug_port_suspend();
+}
+
+void tegra_board_nvodm_resume(void)
+{
+	if (console_suspend_enabled)
+		tegra_debug_port_resume();
 }
