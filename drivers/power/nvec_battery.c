@@ -42,16 +42,19 @@
 /* This defines the manufacturer name and model name length */
 #define BATTERY_INFO_NAME_LEN 30
 
-#define NVBATTERY_POLLING_INTERVAL 30000 /* 30 Seconds */
+/* This macro indicates the default battery status polling interval.
+ * This value can be changed run-time by writing desired
+ * value to /sys/devices/nvec/nvec_battery/status_poll_period
+ */
+#define NVBATTERY_POLLING_INTERVAL_MILLISECS 30000
 
 typedef enum
 {
-	NvCharger_Type_Battery = 0,
-	NvCharger_Type_USB,
-	NvCharger_Type_AC,
-	NvCharger_Type_Num,
-	NvCharger_Type_Force32 = 0x7FFFFFFF
-} NvCharger_Type;
+	NvPowerSupply_TypeBattery = 0,
+	NvPowerSupply_TypeAC,
+	NvPowerSupply_TypeNum,
+	NvPowerSupply_TypeForce32 = 0x7FFFFFFF
+} NvPowerSupply_Type;
 
 typedef enum
 {
@@ -74,9 +77,6 @@ static enum power_supply_property tegra_battery_properties[] = {
 	POWER_SUPPLY_PROP_CHARGE_FULL,
 	POWER_SUPPLY_PROP_CHARGE_EMPTY,
 	POWER_SUPPLY_PROP_TEMP,
-/*    POWER_SUPPLY_PROP_MODEL_NAME, */
-/*    POWER_SUPPLY_PROP_MANUFACTURER, */
-
 };
 
 static enum power_supply_property tegra_power_properties[] = {
@@ -100,15 +100,6 @@ static struct power_supply tegra_power_supplies[] = {
 		.properties = tegra_battery_properties,
 		.num_properties = ARRAY_SIZE(tegra_battery_properties),
 		.get_property = tegra_battery_get_property,
-	},
-	{
-		.name = "usb",
-		.type = POWER_SUPPLY_TYPE_USB,
-		.supplied_to = supply_list,
-		.num_supplicants = ARRAY_SIZE(supply_list),
-		.properties = tegra_power_properties,
-		.num_properties = ARRAY_SIZE(tegra_power_properties),
-		.get_property = tegra_power_get_property,
 	},
 	{
 		.name = "ac",
@@ -141,7 +132,6 @@ struct tegra_battery_dev {
 	NvU32	lifetime;
 	NvU32	consumed;
 	NvU32	batt_status_poll_period;
-	NvBool	ac_status;
 	NvBool	present;
 	NvBool	exitThread;
 };
@@ -209,9 +199,8 @@ void NvBatteryEventHandlerThread(void *args)
 				}
 			} else {
 				/* Update the battery and power supply info for other events */
-				power_supply_changed(&tegra_power_supplies[NvCharger_Type_Battery]);
-				power_supply_changed(&tegra_power_supplies[NvCharger_Type_USB]);
-				power_supply_changed(&tegra_power_supplies[NvCharger_Type_AC]);
+				power_supply_changed(&tegra_power_supplies[NvPowerSupply_TypeBattery]);
+				power_supply_changed(&tegra_power_supplies[NvPowerSupply_TypeAC]);
 			}
 		}
 	}
@@ -312,37 +301,20 @@ static NvBool tegra_battery_data(NvOdmBatteryInstance NvBatteryInst)
 static int tegra_power_get_property(struct power_supply *psy,
 	enum power_supply_property psp, union power_supply_propval *val)
 {
-	NvCharger_Type charger = 0;
-	NvOdmBatteryAcLineStatus status = NvOdmBatteryAcLine_Offline;
-
-	/* Need to find out the way which tell the charger source */
-
 	switch (psp) {
-
 	case POWER_SUPPLY_PROP_ONLINE:
-		if (!NvOdmBatteryGetAcLineStatus(batt_dev->hOdmBattDev,
-			&status))
-			return -ENODEV;
+		if (psy->type == POWER_SUPPLY_TYPE_MAINS) {
+			NvOdmBatteryAcLineStatus status;
+			if (!NvOdmBatteryGetAcLineStatus(batt_dev->hOdmBattDev,
+				&status))
+				return -ENODEV;
 
-		if (status == NvOdmBatteryAcLine_Offline) {
-			batt_dev->ac_status = NV_FALSE;
+			val->intval = (status == NvOdmBatteryAcLine_Online); 
 		}
-		else if (status == NvOdmBatteryAcLine_Online) {
-			batt_dev->ac_status = NV_TRUE;
-			charger = NvCharger_Type_AC;
+		else {
+			printk(KERN_INFO "Only AC mains is used as external power\n");
 		}
-		else
-			batt_dev->ac_status = NV_FALSE;
-
-		if (psy->type == POWER_SUPPLY_TYPE_MAINS)
-			val->intval = (charger == NvCharger_Type_AC);
-		else if (psy->type == POWER_SUPPLY_TYPE_USB)
-			val->intval = (charger == NvCharger_Type_USB);
-		else
-			val->intval = 0;
-
 		break;
-
 	default:
 		return -EINVAL;
 	}
@@ -501,9 +473,8 @@ static int tegra_battery_get_property(struct power_supply *psy,
 
 static void tegra_battery_poll_timer_func(unsigned long unused)
 {
-	power_supply_changed(&tegra_power_supplies[NvCharger_Type_Battery]);
-	power_supply_changed(&tegra_power_supplies[NvCharger_Type_USB]);
-	power_supply_changed(&tegra_power_supplies[NvCharger_Type_AC]);
+	power_supply_changed(&tegra_power_supplies[NvPowerSupply_TypeBattery]);
+	power_supply_changed(&tegra_power_supplies[NvPowerSupply_TypeAC]);
 
 	mod_timer(&(batt_dev->battery_poll_timer),
 		jiffies + msecs_to_jiffies(batt_dev->batt_status_poll_period));
@@ -548,7 +519,7 @@ static int nvec_battery_probe(struct nvec_device *pdev)
 			pr_err("Failed to register power supply\n");
 	}
 
-	batt_dev->batt_status_poll_period = NVBATTERY_POLLING_INTERVAL;
+	batt_dev->batt_status_poll_period = NVBATTERY_POLLING_INTERVAL_MILLISECS;
 	setup_timer(&(batt_dev->battery_poll_timer), tegra_battery_poll_timer_func, 0);
 	mod_timer(&(batt_dev->battery_poll_timer),
 		jiffies + msecs_to_jiffies(batt_dev->batt_status_poll_period));
