@@ -240,7 +240,6 @@ NvEcPrivPingThread(void *args)
 	NvEcRequest req;
 	NvEcResponse resp;
 	NvEcPrivState *ec = (NvEcPrivState *)args;
-	int timeout = 0;
 
 	set_freezable_with_signal();
 
