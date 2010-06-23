@@ -362,14 +362,6 @@ NvRmOpenNew(NvRmDeviceHandle *pHandle)
 
         // set the mc & emc tuning parameters
         NvRmPrivSetupMc(rm);
-        if (!NvRmIsSimulation())
-        {
-            // Configure PLL rails, boost core power and clocks
-            // Initialize and start temperature monitoring
-            NvRmPrivPllRailsInit(rm);
-            NvRmPrivBoostClocks(rm);
-            NvRmPrivDttInit(rm);
-        }
 
         // Asynchronous interrupts must be disabled until the very end of
         // RmOpen. They can be enabled just before releasing rm mutex after
@@ -414,6 +406,24 @@ fail:
     NV_DEBUG_PRINTF(("RM init failed\n"));
     rm->refcount = 0;
     return err;
+}
+
+void
+NvRmPrivPostRegulatorInit(NvRmDeviceHandle hDevice)
+{
+    NV_ASSERT(hDevice);
+
+    if (!NVOS_IS_WINDOWS_X86)
+    {
+        if (!NvRmIsSimulation())
+        {
+            // Configure PLL rails, boost core power and clocks
+            // Initialize and start temperature monitoring
+            NvRmPrivPllRailsInit(hDevice);
+            NvRmPrivBoostClocks(hDevice);
+            NvRmPrivDttInit(hDevice);
+        }
+    }
 }
 
 void

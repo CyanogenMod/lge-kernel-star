@@ -848,6 +848,52 @@ static struct regulator_consumer_supply tegra_soc_consumers[] = {
 		.supply = "soc_main",
 	},
 };
+static struct regulator_consumer_supply tegra_vdd_bb_consumers[] = {
+	[0] = {
+		.supply   = "vddio bb",
+	},
+};
+static struct regulator_consumer_supply tegra_vdd_lcd_consumers[] = {
+	[0] = {
+		.supply   = "vddio lcd",
+	},
+};
+static struct regulator_consumer_supply tegra_vdd_vi_consumers[] = {
+	[0] = {
+		.supply   = "vddio vi",
+	},
+};
+static struct regulator_consumer_supply tegra_vdd_uart_consumers[] = {
+	[0] = {
+		.supply   = "vddio uart",
+	},
+};
+static struct regulator_consumer_supply tegra_vdd_ddr_consumers[] = {
+	[0] = {
+		.supply   = "vddio ddr",
+	},
+};
+static struct regulator_consumer_supply tegra_vdd_nand_consumers[] = {
+	[0] = {
+		.supply   = "vddio nand",
+	},
+};
+static struct regulator_consumer_supply tegra_vdd_sys_consumers[] = {
+	[0] = {
+		.supply   = "vdd_ldo4",
+	},
+};
+static struct regulator_consumer_supply tegra_vdd_audio_consumers[] = {
+	[0] = {
+		.supply   = "vddio audio",
+	},
+};
+static struct regulator_consumer_supply tegra_vdd_sd_consumers[] = {
+	[0] = {
+		.supply   = "vddio sd",
+	},
+};
+
 #ifdef CONFIG_TEGRA_USB_CHARGE
 static struct regulator_consumer_supply tegra_vbus_consumers[] = {
 	[0] = {
@@ -878,11 +924,74 @@ static struct tegra_regulator_entry tegra_regulators[] = {
 		.consumers = tegra_soc_consumers,
 		.nr_consumers = ARRAY_SIZE(tegra_soc_consumers),
 	},
-#ifdef CONFIG_TEGRA_USB_CHARGE
 	[3] = {
+		.guid = NV_VDD_BB_ODM_ID,
+		.name = "vddio bb",
+		.id = 3,
+		.consumers = tegra_vdd_bb_consumers,
+		.nr_consumers = ARRAY_SIZE(tegra_vdd_bb_consumers),
+	},
+	[4] = {
+		.guid = NV_VDD_LCD_ODM_ID,
+		.name = "vddio lcd",
+		.id = 4,
+		.consumers = tegra_vdd_lcd_consumers,
+		.nr_consumers = ARRAY_SIZE(tegra_vdd_lcd_consumers),
+	},
+	[5] = {
+		.guid = NV_VDD_VI_ODM_ID,
+		.name = "vddio vi",
+		.id = 5,
+		.consumers = tegra_vdd_vi_consumers,
+		.nr_consumers = ARRAY_SIZE(tegra_vdd_vi_consumers),
+	},
+	[6] = {
+		.guid = NV_VDD_UART_ODM_ID,
+		.name = "vddio uart",
+		.id = 6,
+		.consumers = tegra_vdd_uart_consumers,
+		.nr_consumers = ARRAY_SIZE(tegra_vdd_uart_consumers),
+	},
+	[7] = {
+		.guid = NV_VDD_DDR_ODM_ID,
+		.name = "vddio ddr",
+		.id = 7,
+		.consumers = tegra_vdd_ddr_consumers,
+		.nr_consumers = ARRAY_SIZE(tegra_vdd_ddr_consumers),
+	},
+	[8] = {
+		.guid = NV_VDD_NAND_ODM_ID,
+		.name = "vddio nand",
+		.id = 8,
+		.consumers = tegra_vdd_nand_consumers,
+		.nr_consumers = ARRAY_SIZE(tegra_vdd_nand_consumers),
+	},
+	[9] = {
+		.guid = NV_VDD_SYS_ODM_ID,
+		.name = "vddio sys",
+		.id = 9,
+		.consumers = tegra_vdd_sys_consumers,
+		.nr_consumers = ARRAY_SIZE(tegra_vdd_sys_consumers),
+	},
+	[10] = {
+		.guid = NV_VDD_AUD_ODM_ID,
+		.name = "vddio audio",
+		.id = 10,
+		.consumers = tegra_vdd_audio_consumers,
+		.nr_consumers = ARRAY_SIZE(tegra_vdd_audio_consumers),
+	},
+	[11] = {
+		.guid = NV_VDD_SDIO_ODM_ID,
+		.name = "vddio sd",
+		.id = 11,
+		.consumers = tegra_vdd_sd_consumers,
+		.nr_consumers = ARRAY_SIZE(tegra_vdd_sd_consumers),
+	},
+#ifdef CONFIG_TEGRA_USB_CHARGE
+	[12] = {
 		.charging_path = NvRmPmuChargingPath_UsbBus,
 		.name = "vbus_draw",
-		.id = 3,
+		.id = 12,
 		.consumers = tegra_vbus_consumers,
 		.nr_consumers = ARRAY_SIZE(tegra_vbus_consumers),
 		.is_charger = true,
@@ -1411,6 +1520,12 @@ do_register:
 	tegra_init_idle(plat);
 }
 
+void __init tegra_setup_data(void)
+{
+	platform_add_devices(nvodm_devices, ARRAY_SIZE(nvodm_devices));
+}
+postcore_initcall(tegra_setup_data);
+
 void __init tegra_setup_nvodm(bool standard_i2c, bool standard_spi)
 {
 	NvRmGpioOpen(s_hRmGlobal, &s_hGpioGlobal);
@@ -1426,7 +1541,6 @@ void __init tegra_setup_nvodm(bool standard_i2c, bool standard_spi)
 	if (standard_spi)
 		tegra_setup_spi();
 	tegra_setup_w1();
-	platform_add_devices(nvodm_devices, ARRAY_SIZE(nvodm_devices));
 	pm_power_off = tegra_system_power_off;
 	tegra_setup_suspend();
 }

@@ -360,7 +360,7 @@ static int __init tegra_regulator_init(void)
 {
 	return platform_driver_register(&tegra_regulator_driver);
 }
-module_init(tegra_regulator_init);
+postcore_initcall_sync(tegra_regulator_init);
 
 static void __exit tegra_regulator_exit(void)
 {

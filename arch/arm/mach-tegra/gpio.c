@@ -24,6 +24,7 @@
 
 #include <linux/io.h>
 #include <linux/gpio.h>
+#include <linux/regulator/consumer.h>
 
 #include <mach/iomap.h>
 #include <mach/pinmux.h>
@@ -383,52 +384,6 @@ static struct irq_chip tegra_gpio_irq_chip = {
  */
 static struct lock_class_key gpio_lock_class;
 
-struct gpio_power_rail_info {
-	NvU64 guid;
-	NvU32 address;
-	NvU32 mv;
-};
-
-static struct gpio_power_rail_info gpio_power_rail_table[] = {
-	[TEGRA_VDDIO_BB]    =  {.guid = NV_VDD_BB_ODM_ID,},
-	[TEGRA_VDDIO_LCD]   =  {.guid = NV_VDD_LCD_ODM_ID,},
-	[TEGRA_VDDIO_VI]    =  {.guid = NV_VDD_VI_ODM_ID,},
-	[TEGRA_VDDIO_UART]  =  {.guid = NV_VDD_UART_ODM_ID,},
-	[TEGRA_VDDIO_DDR]   =  {.guid = NV_VDD_DDR_ODM_ID,},
-	[TEGRA_VDDIO_NAND]  =  {.guid = NV_VDD_NAND_ODM_ID,},
-	[TEGRA_VDDIO_SYS]   =  {.guid = NV_VDD_SYS_ODM_ID,},
-	[TEGRA_VDDIO_AUDIO] =  {.guid = NV_VDD_AUD_ODM_ID,},
-	[TEGRA_VDDIO_SD]    =  {.guid = NV_VDD_SDIO_ODM_ID,},
-};
-
-static void gpio_rail_init(void)
-{
-	unsigned int i;
-
-	if (!s_hRmGlobal) {
-		NvError e = NvRmOpenNew(&s_hRmGlobal);
-		if (e != NvSuccess) {
-			WARN_ON(1);
-			return;
-		}
-	}
-
-	for (i = 0; i < NV_ARRAY_SIZE(gpio_power_rail_table); i++) {
-		struct gpio_power_rail_info *rail = &gpio_power_rail_table[i];
-		const NvOdmPeripheralConnectivity *conn;
-		NvRmPmuVddRailCapabilities caps;
-
-		conn = NvOdmPeripheralGetGuid(rail->guid);
-		if (!conn || !conn->NumAddress)
-			continue;
-
-		rail->address = conn->AddressList[0].Address;
-
-		NvRmPmuGetCapabilities(s_hRmGlobal, rail->address, &caps);
-		rail->mv = caps.requestMilliVolts;
-	}
-}
-
 static int __init tegra_gpio_init(void)
 {
 	struct tegra_gpio_bank *bank;
@@ -464,7 +419,6 @@ static int __init tegra_gpio_init(void)
 			spin_lock_init(&bank->lvl_lock[j]);
 	}
 
-	gpio_rail_init();
 	return 0;
 }
 
@@ -518,12 +472,25 @@ static int __init tegra_gpio_debuginit(void)
 late_initcall(tegra_gpio_debuginit);
 #endif
 
+static char *tegra_gpio_rail_names[] = {
+	[TEGRA_VDDIO_BB]    = "vddio bb",
+	[TEGRA_VDDIO_LCD]   = "vddio lcd",
+	[TEGRA_VDDIO_VI]    = "vddio vi",
+	[TEGRA_VDDIO_UART]  = "vddio uart",
+	[TEGRA_VDDIO_DDR]   = "vddio ddr",
+	[TEGRA_VDDIO_NAND]  = "vddio nand",
+	[TEGRA_VDDIO_SYS]   = "vddio sys",
+	[TEGRA_VDDIO_AUDIO] = "vddio audio",
+	[TEGRA_VDDIO_SD]    = "vddio sd",
+};
+
 int tegra_gpio_io_power_config(int gpio_nr, unsigned int enable)
 {
-	struct gpio_power_rail_info *rail;
+	struct regulator *regulator = NULL;
 	tegra_pingroup_t pg;
-	NvU32 settle;
+	const char*  railName;
 	int vddio_id;
+
 
 	pg = gpio_get_pinmux_group(gpio_nr);
 	if (pg < 0)
@@ -532,18 +499,19 @@ int tegra_gpio_io_power_config(int gpio_nr, unsigned int enable)
 	if(vddio_id < 0)
 		return vddio_id;
 
-	if (unlikely(!s_hRmGlobal))
-		return 0;
+	railName = tegra_gpio_rail_names[vddio_id];
 
-	rail = &gpio_power_rail_table[vddio_id];
-	if (!rail->address || !rail->mv)
-		return 0;
+	regulator = regulator_get(NULL, railName);
+	if (IS_ERR_OR_NULL(regulator)) {
+		printk(KERN_ERR "Unable to get regulator for %s, vddid 0x%x\n",
+		       railName, vddio_id);
+		return PTR_ERR(regulator);
+	}
 
-	NvRmPmuSetVoltage(s_hRmGlobal, rail->address,
-		(enable) ? rail->mv : ODM_VOLTAGE_OFF, &settle);
-
-	if (settle)
-		udelay(settle);
+	if (enable)
+		regulator_enable(regulator);
+	else
+		regulator_disable(regulator);
 
 	return 0;
 }

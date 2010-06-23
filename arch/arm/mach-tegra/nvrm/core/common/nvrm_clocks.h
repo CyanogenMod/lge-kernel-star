@@ -1380,6 +1380,13 @@ NvRmPrivModuleClockSet(
     const NvRmModuleClockInfo* pCinfo,
     const NvRmModuleClockState* pCstate);
 
+/*
+ * Init PLL rail, boost pll and power, and init DTT. This function can
+ * be called only after GPIO and regulator module is installed.
+ */
+void NvRmPrivPostRegulatorInit(
+    NvRmDeviceHandle hRmDevice);
+
 #ifdef __cplusplus
 }
 #endif  /* __cplusplus */

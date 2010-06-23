@@ -398,6 +398,8 @@ void __init tegra_init_clock(void)
 
 	e = NvRmOpenNew(&s_hRmGlobal);
 	BUG_ON(e!=NvSuccess);
+
+	NvRmPrivPostRegulatorInit(s_hRmGlobal);
 	NvRmPowerRegister(s_hRmGlobal, 0, &clk_pwr_client);
 	tegra2_init_clocks();
 

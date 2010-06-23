@@ -101,8 +101,9 @@ NvError
 NvRmPrivAp15ChipUniqueId(
     NvRmDeviceHandle hDevHandle,
     void* pId);
-
-// Initialize/deinitialize for various RM submodules.
+/**
+ * Initialize/deinitialize for various RM submodules.
+ */
 NvError NvRmPrivDmaInit(NvRmDeviceHandle hDevice);
 void NvRmPrivDmaDeInit(void);
 
