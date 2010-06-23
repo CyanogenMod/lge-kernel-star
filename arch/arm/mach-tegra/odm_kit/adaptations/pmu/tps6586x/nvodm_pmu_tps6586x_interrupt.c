@@ -128,9 +128,6 @@ void Tps6586xInterruptHandler_int(NvOdmPmuDeviceHandle  hDevice,
         if (data&0xc0)
         {
             pmuStatus->mChgPresent = NV_TRUE;
-#if !defined(CONFIG_TEGRA_ODM_HARMONY)
-            NvOdmEnableOtgCircuitry(NV_TRUE);
-#endif
         }
     }
 

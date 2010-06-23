@@ -245,6 +245,26 @@ static const NvOdmIoAddress s_Pmu0Addresses[] =
     { NvOdmIoModule_I2c_Pmu, 0x00, 0x68 },
 };
 
+static const NvOdmIoAddress s_Vddio_Vid_En[] = {
+    { NvOdmIoModule_Gpio, 't'-'a', 2 },
+};
+
+static const NvOdmIoAddress s_Vddio_Sd_En[] = {
+    { NvOdmIoModule_Gpio, 't'-'a', 3 },
+};
+
+static const NvOdmIoAddress s_Vddio_Sdmmc_En[] = {
+    { NvOdmIoModule_Gpio, 'i'-'a', 6 },
+};
+
+static const NvOdmIoAddress s_Vddio_Bl_En[] = {
+    { NvOdmIoModule_Gpio, 'w'-'a', 0 },
+};
+
+static const NvOdmIoAddress s_Vddio_Pnl_En[] = {
+    { NvOdmIoModule_Gpio, 'c'-'a', 6 },
+};
+
 // SPI1 for Spi Ethernet Kitl only
 static const NvOdmIoAddress s_SpiEthernetAddresses[] =
 {
@@ -262,6 +282,8 @@ static const NvOdmIoAddress s_UlpiUsbAddresses[] =
 static const NvOdmIoAddress s_LvdsDisplayAddresses[] = 
 {
     { NvOdmIoModule_Display, 0, 0 },
+    { NvOdmIoModule_I2c, 0x00, 0xA0 },
+    { NvOdmIoModule_Pwm, 0x00, 0 },
     { NvOdmIoModule_Vdd, 0x00, TPS6586xPmuSupply_LDO4},     /* VDDIO_LCD (AON:VDD_1V8) */
     { NvOdmIoModule_Vdd, 0x00, TPS6586xPmuSupply_LDO3 },    /* VDD_LVDS (VDD_3V3) */
 };
@@ -278,12 +300,24 @@ static const NvOdmIoAddress s_HdmiAddresses[] =
     // HDCP ROM
     { NvOdmIoModule_I2c, 0x01, 0x74 },
 
-    /* AVDD_HDMI */
-    { NvOdmIoModule_Vdd, 0x00, Ext_TPS2051BPmuSupply_VDDIO_VID },   // VDDIO_HDMI
-    { NvOdmIoModule_Vdd, 0x00, TPS6586xPmuSupply_LDO8 },            // AVDD_HDMI_PLL
+    // AVDD_HDMI
+    { NvOdmIoModule_Vdd, 0x00, TPS6586xPmuSupply_LDO7 },
+    // AVDD_HDMI_PLL
+    { NvOdmIoModule_Vdd, 0x00, TPS6586xPmuSupply_LDO8 },
 
-    /* lcd i/o rail (for hot plug pin) */
-    { NvOdmIoModule_Vdd, 0x00, TPS6586xPmuSupply_LDO4 },    // VDDIO_LCD (VDD_1V8)
+    // Power for DDC (VDDIO_LCD (VDD_1V8))
+    { NvOdmIoModule_Vdd, 0x00, TPS6586xPmuSupply_LDO4 },
+    // HDMI +5V for the pull-up for DDC (VDDIO_VID)
+    { NvOdmIoModule_Vdd, 0x00, Ext_TPS2051BPmuSupply_VDDIO_VID },
+};
+
+//  Power for HDMI Hotplug
+static const NvOdmIoAddress s_HdmiHotplug[] =
+{
+    // Power for Hotplug GPIO
+    { NvOdmIoModule_Vdd, 0x00, TPS6586xPmuSupply_LDO4 },
+    // HDMI +5V for hotplug
+    { NvOdmIoModule_Vdd, 0x00, Ext_TPS2051BPmuSupply_VDDIO_VID },
 };
 
 // CRT address based on Concorde 2 design
@@ -402,6 +436,7 @@ static const NvOdmIoAddress s_AudioCodecAddresses[] =
     { NvOdmIoModule_ExternalClock, 0, 0 },       /* Codec MCLK -> APxx DAP_MCLK1 */
     { NvOdmIoModule_I2c_Pmu, 0x00, 0x34 },       /* Codec I2C ->  APxx PMU I2C, segment 0 */
                                                  /* Codec I2C address is 0x34 */
+    { NvOdmIoModule_Gpio, (NvU32)'w'-'a', 0x02 }, /* GPIO Port W and Pin 2 for HP_DET */
 };
 
 // Audio Codec on GEN1_I2C (I2C_1)

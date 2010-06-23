@@ -305,12 +305,51 @@
     NvOdmPeripheralClass_Other
 },
 
+// Power for HDMI Hotplug
+{
+    NV_VDD_HDMI_INT_ID,
+    s_HdmiHotplug,
+    NV_ARRAY_SIZE(s_HdmiHotplug),
+    NvOdmPeripheralClass_Other
+},
+
 //  PMU0
 {
     NV_ODM_GUID('t','p','s','6','5','8','6','x'),
     s_Pmu0Addresses,
     NV_ARRAY_SIZE(s_Pmu0Addresses),
     NvOdmPeripheralClass_Other
+},
+// PMU voltage rails enabled by AP GPIOs
+{
+    TPS_EXT_GUID(Ext_TPS2051BPmuSupply_VDDIO_VID),
+    s_Vddio_Vid_En,
+    NV_ARRAY_SIZE(s_Vddio_Vid_En),
+    NvOdmPeripheralClass_Other,
+},
+{
+    TPS_EXT_GUID(Ext_SWITCHPmuSupply_VDDIO_SD),
+    s_Vddio_Sd_En,
+    NV_ARRAY_SIZE(s_Vddio_Sd_En),
+    NvOdmPeripheralClass_Other,
+},
+{
+    TPS_EXT_GUID(Ext_SWITCHPmuSupply_VDDIO_SDMMC),
+    s_Vddio_Sdmmc_En,
+    NV_ARRAY_SIZE(s_Vddio_Sdmmc_En),
+    NvOdmPeripheralClass_Other,
+},
+{
+    TPS_EXT_GUID(Ext_SWITCHPmuSupply_VDD_BL),
+    s_Vddio_Bl_En,
+    NV_ARRAY_SIZE(s_Vddio_Bl_En),
+    NvOdmPeripheralClass_Other,
+},
+{
+    TPS_EXT_GUID(Ext_SWITCHPmuSupply_VDD_PNL),
+    s_Vddio_Pnl_En,
+    NV_ARRAY_SIZE(s_Vddio_Pnl_En),
+    NvOdmPeripheralClass_Other,
 },
 
 //  ENC28J60 SPI Ethernet module

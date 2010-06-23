@@ -102,7 +102,6 @@ extern "C"
 #define TPS6586x_R5D_GPIOSET1               0x5D
 #define TPS6586x_R5E_GPIOSET2               0x5E
 
-#if defined(CONFIG_TEGRA_ODM_HARMONY)
 /*-- GPIO Register Bit Shifts/Masks --*/
 // GPIO1
 #define TPS6586x_R5D_GPIOSET1_GPIO1_MODE_SHIFT  0x0
@@ -140,7 +139,6 @@ extern "C"
 #define TPS6586x_R5D_GPIO_MODE_OUTPUT       0x1
 #define TPS6586x_R5D_GPIO_MODE_INPUT_ADC    0x2
 #define TPS6586x_R5D_GPIO_MODE_INPUT_LDO    0x3
-#endif
 
 /* ADC0 Engine Setup */
 #define TPS6586x_R60_ADCANLG                0x60

@@ -142,6 +142,8 @@ extern "C"
 
 #define NV_VDD_FUSE_ODM_ID (NV_ODM_GUID('N','V','D','D','F','U','S','E'))
 
+#define NV_VDD_HDMI_INT_ID      (NV_ODM_GUID('N','V','D','D','H','P','D','0'))
+
 /**
  * Some of the NVIDIA driver libraries enumerate peripherals based on the
  * logical functionality that the peripheral performs, rather than by the

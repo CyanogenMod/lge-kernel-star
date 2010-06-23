@@ -40,41 +40,8 @@ extern "C"
 
 #define PMUGUID NV_ODM_GUID('t','p','s','6','5','8','6','x')
 
-#if defined(CONFIG_TEGRA_ODM_HARMONY)
-
-/// The total number of external supplies (which use both AP and PMU GPIOs)
-#define TPS6586x_EXTERNAL_SUPPLY_NUM \
-    (NvU32)(TPS6586xPmuSupply_Num - Ext_TPS62290PmuSupply_BUCK)
-
-/// Macro for converting a vddRail to AP GPIO pin index.
-#define NVODM_EXT_AP_GPIO_RAIL(x) ((x) - Ext_TPS2051BPmuSupply_VDDIO_VID)
-
-/// The total number of external supplies which use AP GPIO pins for enable
-#define TPS6586x_EXTERNAL_SUPPLY_AP_GPIO_NUM \
-    (NvU32)NVODM_EXT_AP_GPIO_RAIL(TPS6586xPmuSupply_Num)
-
-#else
-
-/* FIXME: modify this table according to your schematics */
-#define V_CORE      TPS6586xPmuSupply_DCD0      
-#define V_1V8       TPS6586xPmuSupply_DCD1      
-#define LCD_2V8     TPS6586xPmuSupply_LDO0      
-#define V_1V2       TPS6586xPmuSupply_LDO1      
-#define V_RTC       TPS6586xPmuSupply_LDO2      
-#define V_CAM_1V8   TPS6586xPmuSupply_LDO3      
-#define V_CODEC_1V8 TPS6586xPmuSupply_LDO4      
-#define V_CAM_2V8   TPS6586xPmuSupply_LDO5      
-#define V_3V3       TPS6586xPmuSupply_LDO6      
-#define V_SDIO      TPS6586xPmuSupply_LDO7      
-#define V_2V8       TPS6586xPmuSupply_LDO8      
-#define V_2V5       TPS6586xPmuSupply_LDO9      
-#define V_25V       TPS6586xPmuSupply_WHITE_LED
-#define V_CHARGE    TPS6586xPmuSupply_DCD2
-#define V_MODEM     V_1V8   /* Alias for V_1V8 */
-#define V_GND       TPS6586xPmuSupply_Invalid
-#define V_INVALID   TPS6586xPmuSupply_Invalid
-#define VRAILCOUNT  TPS6586xPmuSupply_Num
-#endif
+#define TPS_EXT_GUID(supply) \
+    (NV_ODM_GUID('t','p','s','e','x','t',0,0) | ((supply) & 0xff))
 
 typedef enum
 {
@@ -149,7 +116,7 @@ typedef enum
 
     //White LED(SW3)
     TPS6586xPmuSupply_WHITE_LED,
-#if defined(CONFIG_TEGRA_ODM_HARMONY)
+
     //SOC
     TPS6586xPmuSupply_SoC,
 
@@ -180,11 +147,22 @@ typedef enum
     // AP GPIO(C,6): VDD_PNL
     // FIXME: This is already supplied by nvodm_query_gpio in the display GPIO settings.
     Ext_SWITCHPmuSupply_VDD_PNL,
-#endif
 
     TPS6586xPmuSupply_Num,
+
     TPS6586xPmuSupply_Force32 = 0x7FFFFFFF
 } TPS6586xPmuSupply;
+
+/// The total number of external supplies (which use both AP and PMU GPIOs)
+#define TPS6586x_EXTERNAL_SUPPLY_NUM \
+    (NvU32)(TPS6586xPmuSupply_Num - Ext_TPS62290PmuSupply_BUCK)
+
+/// Macro for converting a vddRail to AP GPIO pin index.
+#define NVODM_EXT_AP_GPIO_RAIL(x) ((x) - Ext_TPS2051BPmuSupply_VDDIO_VID)
+
+/// The total number of external supplies which use AP GPIO pins for enable
+#define TPS6586x_EXTERNAL_SUPPLY_AP_GPIO_NUM \
+    (NvU32)NVODM_EXT_AP_GPIO_RAIL(TPS6586xPmuSupply_Num)
 
 #if defined(__cplusplus)
 }
