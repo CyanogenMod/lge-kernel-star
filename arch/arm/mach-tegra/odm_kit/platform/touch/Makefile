@@ -19,6 +19,10 @@ ifeq ($(CONFIG_TEGRA_ODM_HARMONY),y)
   is_panjit_touch := y
 endif
 
+ifeq ($(CONFIG_TEGRA_ODM_VENTANA),y)
+  is_panjit_touch := y
+endif
+
 ccflags-$(is_tpk_touch) += -DNV_TOUCH_TPK
 ccflags-$(is_panjit_touch) += -DNV_TOUCH_PANJIT
 
