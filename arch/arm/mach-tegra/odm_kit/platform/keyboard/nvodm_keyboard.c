@@ -138,9 +138,8 @@ NvBool NvOdmKeyboardInit(void)
 	}
 
 	/* Check the supported GPIOs */
-	hOdm->GpioPinInfo = NvOdmQueryGpioPinMap(NvOdmGpioPinGroup_WakeFromECKeyboard,
-					0,
-					&hOdm->PinCount);
+	hOdm->GpioPinInfo = NvOdmQueryGpioPinMap(NvOdmGpioPinGroup_EmbeddedController,
+					0, &hOdm->PinCount);
 
 	NvRmGpioAcquirePinHandle(s_hGpioGlobal,
 		hOdm->GpioPinInfo->Port,

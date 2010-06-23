@@ -252,7 +252,7 @@ const NvOdmGpioPinInfo *NvOdmQueryGpioPinMap(NvOdmGpioPinGroup Group,
             *pCount = NVODM_ARRAY_SIZE(s_Power);
             return s_Power;
 
-        case NvOdmGpioPinGroup_WakeFromECKeyboard:
+        case NvOdmGpioPinGroup_EmbeddedController:
             *pCount = NVODM_ARRAY_SIZE(s_WakeFromKeyBoard);
             return s_WakeFromKeyBoard;
 

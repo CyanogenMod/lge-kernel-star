@@ -145,7 +145,7 @@ typedef enum
     NvOdmGpioPinGroup_Power,
 
     /// Specifies a group for keys used to resume from EC keyboard.
-    NvOdmGpioPinGroup_WakeFromECKeyboard,
+    NvOdmGpioPinGroup_EmbeddedController,
 
     /// Specifies a group for Battery
     NvOdmGpioPinGroup_Battery,
