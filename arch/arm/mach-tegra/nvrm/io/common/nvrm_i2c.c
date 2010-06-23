@@ -315,7 +315,8 @@ fail_2:
     c->I2cPowerClientId = 0;
 
 fail_1:
-    (c->close)(c);
+    if (c->close)
+        (c->close)(c);
     *phI2c = 0;
     NvRmGpioReleasePinHandles(c->hGpio, &c->hSclPin, 1);
     NvRmGpioReleasePinHandles(c->hGpio, &c->hSdaPin, 1);
