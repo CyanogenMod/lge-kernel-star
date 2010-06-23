@@ -24,6 +24,8 @@
 #include <linux/init.h>
 #include <asm/io.h>
 #include <mach/iomap.h>
+#include "nvbootargs.h"
+#include <nvrm_memmgr.h>
 
 #define PMC_SCRATCH3	0x5c
 #define PMC_SCRATCH5	0x64
@@ -49,6 +51,7 @@
 #define PMC_SCRATCH35	0x128
 #define PMC_SCRATCH36	0x12c
 #define PMC_SCRATCH40	0x13c
+#define PMC_SCRATCH41	0x140
 
 struct pmc_scratch_field {
 	void __iomem *addr;
@@ -328,9 +331,16 @@ static const struct pmc_scratch_reg scratch[] __initdata = {
 	scratch(PMC_SCRATCH40, xm2_cfgd),
 };
 
+extern void tegra_lp2_startup(void);
+extern NvRmDeviceHandle s_hRmGlobal;
+unsigned int s_AvpWarmbootEntry;
+static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
+
 void __init lp0_suspend_init(void)
 {
 	int i;
+	NvBootArgsWarmboot WarmbootArgs;
+	NvRmMemHandle s_hWarmboot = NULL;
 
 	for (i=0; i<ARRAY_SIZE(scratch); i++) {
 		unsigned int r = 0;
@@ -346,4 +356,17 @@ void __init lp0_suspend_init(void)
 
 		writel(r, scratch[i].scratch_addr);
 	}
+
+	NvOsBootArgGet(NvBootArgKey_WarmBoot,
+			&WarmbootArgs, sizeof(NvBootArgsWarmboot));
+	if (NvRmMemHandleClaimPreservedHandle(s_hRmGlobal,
+			WarmbootArgs.MemHandleKey, &s_hWarmboot)) {
+		printk("Could not locate Warm booloader!\n");
+	}
+	else {
+		s_AvpWarmbootEntry = NvRmMemPin(s_hWarmboot);
+	}
+
+	//Write the CPU LP0 reset vector address in SCRATCH41
+	writel(virt_to_phys(tegra_lp2_startup), pmc + PMC_SCRATCH41);
 }

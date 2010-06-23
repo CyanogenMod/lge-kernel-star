@@ -69,6 +69,9 @@
 
 #define FLOW_CTRL_HALT_CPU_EVENTS	0x0
 
+#define DEBUG_FORCE_RTC_WAKEUP_SEC 0
+#define RTC_PA_BASE 0x7000e000
+
 #include "power-macros.S"
 
 .macro emc_device_mask, rd, base
@@ -365,6 +368,33 @@ __tear_down_master_pll_cpu:
 	ldr	r0, [r5, #CLK_RESET_PLLC_BASE]
 	bic	r0, r0, #(1<<30)
 	str	r0, [r5, #CLK_RESET_PLLC_BASE]
+
+#if DEBUG_FORCE_RTC_WAKEUP_SEC
+	//r0 = RTC_BASE
+	mov32	r0, RTC_PA_BASE
+	//setup rtc wake
+	ldr	r2, [r0, #0x10]	/* milli */
+	ldr	r2, [r0, #0x8]	/* shadow */
+
+	add	r2, r2, #DEBUG_FORCE_RTC_WAKEUP_SEC
+rtc_idle1:
+	ldr	r1, [r0, #0x4]
+	tst	r1, #0x1
+	bne	rtc_idle1
+	str	r2, [r0, #0x14]
+rtc_idle2:
+	ldr	r1, [r0, #0x4]
+	tst	r1, #0x1
+	bne	rtc_idle2
+	/* intr mask alarm0 */
+	mov	r2, #1
+	str	r2, [r0, #0x28]
+	str	r2, [r0, #0x2c]
+rtc_idle3:
+	ldr	r1, [r0, #0x4]
+	tst	r1, #0x1
+	bne	rtc_idle3
+#endif
 
 __cclk_burst_set:
 	mov	r0, #(4<<29)			/* STOP_UNTIL_IRQ */

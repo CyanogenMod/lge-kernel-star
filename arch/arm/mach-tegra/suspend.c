@@ -78,6 +78,7 @@ static void __iomem *tmrus = IO_ADDRESS(TEGRA_TMRUS_BASE);
 
 #define PMC_SW_WAKE_STATUS	0x18
 #define PMC_COREPWRGOOD_TIMER	0x3c
+#define PMC_SCRATCH0		0x50
 #define PMC_SCRATCH1		0x54
 #define PMC_CPUPWRGOOD_TIMER	0xc8
 #define PMC_CPUPWROFF_TIMER	0xcc
@@ -194,6 +195,7 @@ static noinline void restore_cpu_complex(void)
 }
 
 extern unsigned long tegra_pgd_phys;
+extern unsigned int s_AvpWarmbootEntry;
 
 static noinline void suspend_cpu_complex(void)
 {
@@ -279,6 +281,19 @@ static void pmc_32kwritel(u32 val, unsigned long offs)
 	udelay(130);
 }
 
+static void tegra_setup_warmboot(void)
+{
+	u32 scratch0;
+
+	//Turn the WARMBOOT flag on in scratch0
+	scratch0 = readl(pmc + PMC_SCRATCH0);
+	scratch0 |= 1;
+	pmc_32kwritel(scratch0, PMC_SCRATCH0);
+
+	//Write the AVP warmboot entry address in SCRATCH1
+	pmc_32kwritel(s_AvpWarmbootEntry, PMC_SCRATCH1);
+}
+
 static void tegra_setup_wakepads(bool lp0_ok)
 {
 	u32 temp, status, lvl;
@@ -290,10 +305,9 @@ static void tegra_setup_wakepads(bool lp0_ok)
 	pmc_32kwritel(0, PMC_SW_WAKE_STATUS);
 	temp = readl(pmc + PMC_CTRL);
 	temp |= PMC_CTRL_LATCH_WAKEUPS;
-	pmc_32kwritel(0, PMC_CTRL);
+	pmc_32kwritel(temp, PMC_CTRL);
 	temp &= ~PMC_CTRL_LATCH_WAKEUPS;
-	pmc_32kwritel(0, PMC_CTRL);
-
+	pmc_32kwritel(temp, PMC_CTRL);
 	status = readl(pmc + PMC_SW_WAKE_STATUS);
 	lvl = readl(pmc + PMC_WAKE_LEVEL);
 
@@ -304,8 +318,8 @@ static void tegra_setup_wakepads(bool lp0_ok)
 	lvl |= pdata->wake_high;
 	lvl ^= status;
 
-	writel(lvl, PMC_WAKE_LEVEL);
-	writel(pdata->wake_enb, PMC_WAKE_MASK);
+	writel(lvl, pmc + PMC_WAKE_LEVEL);
+	writel(pdata->wake_enb, pmc + PMC_WAKE_MASK);
 }
 
 extern void __tegra_lp1_reset(void);
@@ -314,6 +328,7 @@ extern void __tegra_iram_end(void);
 static u8 *iram_save = NULL;
 static unsigned int iram_save_size = 0;
 static void __iomem *iram_code = IO_ADDRESS(TEGRA_IRAM_CODE_AREA);
+static void __iomem *iram_avp_resume = IO_ADDRESS(TEGRA_IRAM_BASE);
 
 static void tegra_suspend_dram(bool lp0_ok)
 {
@@ -344,6 +359,7 @@ static void tegra_suspend_dram(bool lp0_ok)
 	} else {
 		NvRmPrivPowerSetState(s_hRmGlobal, NvRmPowerState_LP0);
 		set_power_timers(pdata->cpu_timer, pdata->cpu_off_timer);
+		tegra_setup_warmboot();
 		mode |= TEGRA_POWER_SYSCLK_OE;
 		mode |= TEGRA_POWER_PWRREQ_OE;
 		mode |= TEGRA_POWER_EFFECT_LP0;
@@ -365,6 +381,8 @@ static void tegra_suspend_dram(bool lp0_ok)
 		reg |= ((mode & TEGRA_POWER_PMC_MASK) << TEGRA_POWER_PMC_SHIFT);
 		pmc_32kwritel(reg, PMC_CTRL);
 	}
+	else
+		mode |= TEGRA_POWER_CPU_PWRREQ_OE;
 
 	tegra_setup_wakepads(lp0_ok);
 	suspend_cpu_complex();
@@ -390,7 +408,9 @@ static void tegra_suspend_dram(bool lp0_ok)
 	} else if (!lp0_ok)
 		writel(lp2_timer, pmc + PMC_CPUPWRGOOD_TIMER);
 
-	memcpy(iram_code, iram_save, iram_save_size);
+	if (!lp0_ok)
+		memcpy(iram_code, iram_save, iram_save_size);
+
 	wmb();
 }
 
@@ -489,6 +509,11 @@ static int tegra_suspend_prepare_late(void)
 		       __func__, e);
 		return -EIO;
 	}
+
+	//The AVP stores its resume address in the first word of IRAM
+	//Write this resume address to SCRATCH39, where the warmboot
+	//code can later find it
+	writel(*(volatile unsigned int *)iram_avp_resume, pmc + PMC_SCRATCH39);
 #endif
 	disable_irq(INT_SYS_STATS_MON);
 	return tegra_iovmm_suspend();
