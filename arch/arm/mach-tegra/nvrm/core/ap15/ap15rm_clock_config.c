@@ -1245,11 +1245,15 @@ NvRmPrivAp15IsModuleClockException(
         case NvRmModuleID_Hdmi:
             /*
              * Complete HDMI configuration; choose among possible sources:
-             * PLLP, PLLD, PLLC in the same order as for display (PLLD or
-             * PLLC should be already configured properly for display)
+             * Osc, PLLP, PLLD, PLLC in the same order as for display (PLLD
+             * or PLLC should be already configured properly for display)
              */
             if (flags & NvRmClockConfig_MipiSync)
                 SourceId = NvRmClockSource_PllD0;
+            else if (NvRmIsFreqRangeReachable(
+                         NvRmPrivGetClockSourceFreq(NvRmClockSource_ClkM),
+                         MinFreq, MaxFreq, NVRM_DISPLAY_DIVIDER_MAX))
+                SourceId = NvRmClockSource_ClkM;
             else if (NvRmIsFreqRangeReachable(NVRM_PLLP_FIXED_FREQ_KHZ,
                          MinFreq, MaxFreq, NVRM_DISPLAY_DIVIDER_MAX))
                 SourceId = NvRmClockSource_PllP0;
