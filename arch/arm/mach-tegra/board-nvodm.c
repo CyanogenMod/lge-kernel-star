@@ -1325,7 +1325,7 @@ static noinline void __init tegra_setup_i2c(void)
 			clk = (odm_clk_i2cp_nr) ? odm_clk_i2cp[0] : 100;
 		} else if (dev->id < odm_mux_i2c_nr) {
 			mux = odm_mux_i2c[dev->id];
-			clk = (dev->id < odm_clk_i2c_nr) ? odm_clk_i2c[0] : 100;
+			clk = (dev->id < odm_clk_i2c_nr) ? odm_clk_i2c[dev->id] : 100;
 		} else {
 			mux = 0;
 			clk = 0;
