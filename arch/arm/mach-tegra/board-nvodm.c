@@ -61,7 +61,7 @@
 #include "board.h"
 #include "nvrm_pmu.h"
 
-#ifdef CONFIG_KEYBOARD_GPIO
+#if defined(CONFIG_KEYBOARD_GPIO)
 #include "nvodm_query_gpio.h"
 #include <linux/gpio_keys.h>
 #include <linux/input.h>
@@ -761,7 +761,7 @@ static noinline void __init tegra_setup_kbc(void)
 static void tegra_setup_kbc(void) { }
 #endif
 
-#ifdef CONFIG_KEYBOARD_GPIO
+#if defined(CONFIG_KEYBOARD_GPIO)
 struct gpio_keys_platform_data tegra_button_data;
 static char *gpio_key_names = "gpio_keys";
 static noinline void __init tegra_setup_gpio_key(void)

@@ -316,7 +316,6 @@ static void nvec_keyboard_close(struct input_dev *dev)
 static int __devinit nvec_keyboard_probe(struct nvec_device *pdev)
 {
 	int error;
-	NvError nverr;
 	struct nvec_keyboard *keyboard;
 	struct input_dev *input_dev;
 	int i;
