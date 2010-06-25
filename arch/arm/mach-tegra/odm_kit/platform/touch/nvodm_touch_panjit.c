@@ -54,7 +54,11 @@
 #define TP_TOUCH_STATE_BYTE                         0
 #define TP_FINGER_ONE_MASK                          0x01
 #define TP_FINGER_TWO_MASK                          0x02
-#define TP_SPECIAL_FUNCTION_BYTE                    9
+#define TP_SPECIAL_FUNCTION_BYTE                    (TP_DATA_LENGTH-1)
+#define TP_FINGER_POSITION                          (TP_SPECIAL_FUNCTION_BYTE-1)
+
+static NvBool ResumeInProgress = NV_FALSE;
+static NvBool IsResetSupported = NV_FALSE;
 
 static const
 NvOdmTouchCapabilities PANJIT_Capabilities =
@@ -159,6 +163,23 @@ static void PANJIT_ClearInterrupt(PANJIT_TouchDevice* hTouch)
     PANJIT_WriteRegister(hTouch, 0, buff, 2);
 }
 
+static void PANJIT_ToggleSleepMode(PANJIT_TouchDevice* hTouch, NvBool IsSleep)
+{
+    NvU8 buff[4];
+
+    buff[0] = 0;
+    if (IsSleep)
+        buff[1] = 0x0;
+    else
+        buff[1] = 0;
+    PANJIT_WriteRegister(hTouch, 0, buff, 2);
+
+    buff[0] = 0;
+    if (IsSleep) {
+        buff[1] = 0x80;
+        PANJIT_WriteRegister(hTouch, 0, buff, 2);
+    }
+}
 static NvBool PANJIT_Configure(PANJIT_TouchDevice* hTouch)
 {
 
@@ -195,7 +216,7 @@ PANJIT_GetSample(
         TouchData[10], TouchData[11]));
 
     /* Ignore No finger */
-    coord->fingerstate = (TouchData[10] & (TP_FINGER_ONE_MASK | TP_FINGER_TWO_MASK)) ?
+    coord->fingerstate = (TouchData[TP_FINGER_POSITION] & (TP_FINGER_ONE_MASK | TP_FINGER_TWO_MASK)) ?
         NvOdmTouchSampleValidFlag : NvOdmTouchSampleIgnore;
 
     if (coord->fingerstate == NvOdmTouchSampleIgnore)
@@ -209,7 +230,7 @@ PANJIT_GetSample(
     }
 
     // get the finger count
-    coord->additionalInfo.Fingers = TouchData[10];
+    coord->additionalInfo.Fingers = TouchData[TP_FINGER_POSITION];
     if (coord->additionalInfo.Fingers > hTouch->Caps.MaxNumberOfFingerCoordReported)
         coord->additionalInfo.Fingers = hTouch->Caps.MaxNumberOfFingerCoordReported;
 
@@ -236,6 +257,12 @@ PANJIT_GetSample(
 static void PANJIT_GpioIsr(void *arg)
 {
     PANJIT_TouchDevice *hTouch = (PANJIT_TouchDevice *)arg;
+    if (ResumeInProgress == NV_TRUE)
+    {
+        //Skip this interrupt as this is a spurious interrupt
+        NvOdmGpioInterruptDone(hTouch->hGpioIntr);
+        return;
+    }
 
     /* Signal the touch thread to read the sample. After it is done reading the
      * sample it should re-enable the interrupt. */
@@ -258,7 +285,7 @@ PANJIT_ReadCoordinate(
 
     NvOdmGpioGetState(hTouch->hGpio, hTouch->hPin, &pinValue);
     if (pinValue != INT_PIN_ACTIVE_STATE)
-        return NV_FALSE;
+        goto fail;
 
     CurrentSampleTime = NvOdmOsGetTimeMS();
     if (prevSamleTime)
@@ -279,6 +306,9 @@ PANJIT_ReadCoordinate(
 #if PANJIT_BENCHMARK_SAMPLE
     NvOdmOsDebugPrintf("Touch sample time %d\r\n", NvOdmOsGetTimeMS() - time);
 #endif
+fail:
+    if (status == NV_FALSE)
+        NvOdmGpioInterruptDone(hTouch->hGpioIntr);
     return status;
 }
 
@@ -312,6 +342,11 @@ void PANJIT_Close (NvOdmTouchDeviceHandle hDevice)
             {
                 NvOdmGpioReleasePinHandle(hTouch->hGpio, hTouch->hPin);
                 hTouch->hPin = NULL;
+            }
+            if (hTouch->hResetPin)
+            {
+                NvOdmGpioReleasePinHandle(hTouch->hGpio, hTouch->hResetPin);
+                hTouch->hResetPin = NULL;
             }
 
             NvOdmGpioClose(hTouch->hGpio);
@@ -351,9 +386,9 @@ NvBool PANJIT_Open(NvOdmTouchDeviceHandle *hDevice)
 {
     PANJIT_TouchDevice *hTouch = NULL;
     NvU32 i = 0;
-    NvU32 found = 0;
-    NvU32 GpioPort = 0;
-    NvU32 GpioPin = 0;
+    NvU32 found = 0, gpiofound = 0;
+    NvU32 GpioPort = 0, ResetPort = 0;
+    NvU32 GpioPin = 0, ResetPin = 0;
     NvU32 I2cInstance = 0;
     NvOdmIoModule IoModule = NvOdmIoModule_I2c;
     const NvOdmPeripheralConnectivity *pConnectivity = NULL;
@@ -393,14 +428,22 @@ NvBool PANJIT_Open(NvOdmTouchDeviceHandle *hDevice)
             case NvOdmIoModule_I2c_Pmu:
                 hTouch->DeviceAddr = pConnectivity->AddressList[i].Address;
                 I2cInstance = pConnectivity->AddressList[i].Instance;
-                found |= 1;
+                found++;
                 IoModule = pConnectivity->AddressList[i].Interface;
                 break;
 
             case NvOdmIoModule_Gpio:
-                GpioPort = pConnectivity->AddressList[i].Instance;
-                GpioPin = pConnectivity->AddressList[i].Address;
-                found |= 2;
+                if (gpiofound == 0)
+                {
+                    GpioPort = pConnectivity->AddressList[i].Instance;
+                    GpioPin = pConnectivity->AddressList[i].Address;
+                }
+                else
+                {
+                    ResetPort = pConnectivity->AddressList[i].Instance;
+                    ResetPin = pConnectivity->AddressList[i].Address;
+                }
+                gpiofound++;
                 break;
 
             default:
@@ -408,11 +451,23 @@ NvBool PANJIT_Open(NvOdmTouchDeviceHandle *hDevice)
         }
     }
 
-    // see if we found the bus and GPIO used by the hardware
-    if ((found & 3) != 3)
+    if ((found == 0) || (gpiofound == 0))
     {
-        NVODMTOUCH_PRINTF(("NvOdm Touch:peripheral connectivity problem \r\n"));
+        NVODMTOUCH_PRINTF(("NvOdm Touch:peripheral connectivity problem\n"));
         goto fail;
+    }
+    // see if we found the bus, GPIO and reset GPIO used by the hardware
+    if (gpiofound != 2)
+    {
+        // No information about reset pin available, so don't reset
+        // Suspend and resume will not work in this configuration
+        IsResetSupported = NV_FALSE;
+        NVODMTOUCH_PRINTF(("NvOdm Touch: Suspend/resume are not supported\n"));
+    }
+    else
+    {
+        // Reset pin available
+        IsResetSupported = NV_TRUE;
     }
 
     // allocate I2C instance
@@ -439,6 +494,23 @@ NvBool PANJIT_Open(NvOdmTouchDeviceHandle *hDevice)
     }
 
     NvOdmGpioConfig(hTouch->hGpio, hTouch->hPin, NvOdmGpioPinMode_InputData);
+
+    if (IsResetSupported)
+    {
+        /* Configure the reset GPIO */
+        hTouch->hResetPin = NvOdmGpioAcquirePinHandle(hTouch->hGpio, ResetPort, ResetPin);
+        if (!hTouch->hResetPin)
+        {
+            NVODMTOUCH_PRINTF(("NvOdm Touch : Couldn't get Reset GPIO pin \r\n"));
+            goto fail;
+        }
+        NvOdmGpioConfig(hTouch->hGpio, hTouch->hResetPin, NvOdmGpioPinMode_Output);
+        /* Send reset pulse to touch HW */
+        NvOdmGpioSetState(hTouch->hGpio, hTouch->hResetPin, 1);
+        NvOsWaitUS(50);
+        NvOdmGpioSetState(hTouch->hGpio, hTouch->hResetPin, 0);
+        NvOsSleepMS(50);
+    }
 
     /* set default capabilities */
     NvOdmOsMemcpy(&hTouch->Caps, &PANJIT_Capabilities,
@@ -509,6 +581,7 @@ NvBool PANJIT_HandleInterrupt(NvOdmTouchDeviceHandle hDevice)
             NvOdmGpioInterruptDone(hTouch->hGpioIntr);
             return NV_TRUE;
         }
+        NvOdmGpioInterruptDone(hTouch->hGpioIntr);
     }
     return NV_FALSE;
 }
@@ -541,6 +614,36 @@ NvBool PANJIT_SetSampleRate(NvOdmTouchDeviceHandle hDevice, NvU32 rate)
     return NV_TRUE;
 }
 
+static NvBool
+PANJIT_SetSleepMode(
+    NvOdmTouchDeviceHandle hDevice,
+        NvU8 mode)
+{
+    PANJIT_TouchDevice *hTouch = (PANJIT_TouchDevice *)hDevice;
+    if (IsResetSupported == NV_FALSE)
+        return NV_TRUE;
+    if (mode == SLEEP_MODE_SENSOR_SLEEP)
+    {
+        PANJIT_ToggleSleepMode(hTouch, NV_TRUE);
+    }
+    else if (mode == SLEEP_MODE_NORMAL)
+    {
+        ResumeInProgress = NV_TRUE;
+        NvOdmGpioInterruptMask(hTouch->hGpioIntr, NV_TRUE);
+        NvOdmGpioSetState(hTouch->hGpio, hTouch->hResetPin, 1);
+        NvOsSleepMS(50);
+        NvOdmGpioSetState(hTouch->hGpio, hTouch->hResetPin, 0);
+        NvOsSleepMS(50);
+        PANJIT_EnableScanMode(hTouch);
+        PANJIT_ClearInterrupt(hTouch);
+        NvOdmGpioInterruptMask(hTouch->hGpioIntr, NV_FALSE);
+        ResumeInProgress = NV_FALSE;
+    }
+    else
+        return NV_FALSE;
+    return NV_TRUE;
+}
+
 NvBool
 PANJIT_PowerControl(
     NvOdmTouchDeviceHandle hDevice,
@@ -562,7 +665,7 @@ PANJIT_PowerControl(
         default:
             return NV_FALSE;
     }
-
+    PANJIT_SetSleepMode(hDevice, SleepMode);
     if (hTouch->SleepMode == SleepMode)
         return NV_TRUE;
     hTouch->SleepMode = SleepMode;

@@ -49,6 +49,7 @@ typedef struct PANJIT_TouchDevice_Rec
     NvOdmServicesGpioHandle hGpio;
     NvOdmServicesPmuHandle hPmu;
     NvOdmGpioPinHandle hPin;
+    NvOdmGpioPinHandle hResetPin;
     NvOdmServicesGpioIntrHandle hGpioIntr;
     NvOdmOsSemaphoreHandle hIntSema;
     NvU32 PrevFingers;
