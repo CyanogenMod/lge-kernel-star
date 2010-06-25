@@ -388,82 +388,6 @@ tegra_pcm_pointer(struct snd_pcm_substream *substream)
 	return (size);
 }
 
-static int init_mixer(struct snd_pcm_substream *substream)
-{
-	NvError e = NvSuccess;
-	int ret = 0;
-
-	if (!tegra_snd_cx->mixer_handle) {
-		mutex_lock(&tegra_snd_cx->lock);
-		e = tegra_transport_init(&tegra_snd_cx->xrt_fxn);
-		mutex_unlock(&tegra_snd_cx->lock);
-
-		if (e != NvSuccess) {
-			snd_printk(KERN_ERR "tegra_transport_init failed \n");
-			return -EFAULT;
-		}
-
-		tegra_snd_cx->mixer_handle =
-					tegra_snd_cx->xrt_fxn.MixerOpen();
-
-		if (!tegra_snd_cx->mixer_handle) {
-			ret = -EFAULT;
-			goto fail;
-		}
-
-		e = tegra_audiofx_createfx(tegra_snd_cx);
-		if (e != NvSuccess) {
-			snd_printk(KERN_ERR "tegra_audiofx_createfx failed \n");
-			ret = -EFAULT;
-			goto fail;
-		}
-
-		tegra_snd_cx->mixer_buffer[0] =
-			tegra_snd_cx->xrt_fxn.MixerMapBuffer(
-			tegra_snd_cx->mixer_handle,
-			NvRmMemGetId(tegra_snd_cx->mem_handle[0]),
-			0,
-			tegra_snd_cx->mapped_buf_size);
-
-		if (!tegra_snd_cx->mixer_buffer[0]) {
-			snd_printk(KERN_ERR"TransportMixerMapBuffer failed!\n");
-		}
-
-		tegra_snd_cx->mixer_buffer[1] =
-			tegra_snd_cx->xrt_fxn.MixerMapBuffer(
-			tegra_snd_cx->mixer_handle,
-			NvRmMemGetId(tegra_snd_cx->mem_handle[1]),
-			0,
-			tegra_snd_cx->mapped_buf_size);
-
-		if (!tegra_snd_cx->mixer_buffer[1]) {
-			snd_printk(KERN_ERR"TransportMixerMapBuffer failed!\n");
-		}
-
-		tegra_snd_cx->mvolume = tegra_snd_cx->xrt_fxn.MixerCreateObject(
-						tegra_snd_cx->mixer_handle,
-						NvAudioFxI2s1VolumeId);
-		tegra_snd_cx->i2s1volume = NvAudioFxVolumeDefault;
-	}
-
-	return 0;
-fail:
-	snd_printk(KERN_ERR "init mixer failed \n");
-	if (tegra_snd_cx->mixer_handle) {
-		tegra_audiofx_destroyfx(tegra_snd_cx);
-
-		if (tegra_snd_cx->mixer_handle) {
-			tegra_snd_cx->xrt_fxn.MixerClose(
-					tegra_snd_cx->mixer_handle);
-		}
-	}
-	mutex_lock(&tegra_snd_cx->lock);
-	tegra_transport_deinit();
-	mutex_unlock(&tegra_snd_cx->lock);
-
-	return ret;
-}
-
 static int pcm_common_close(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
@@ -543,9 +467,11 @@ static int tegra_pcm_open(struct snd_pcm_substream *substream)
 	prtd->state = NVALSA_INVALID_STATE;
 	prtd->stream = substream->stream;
 
-	ret = init_mixer(substream);
-	if (ret)
-		goto fail;
+	if (!tegra_snd_cx->mixer_handle) {
+		ret = tegra_audiofx_init(tegra_snd_cx);
+		if (ret)
+			goto fail;
+	}
 
 	init_completion(&prtd->thread_comp);
 	init_waitqueue_head(&prtd->buf_wait);

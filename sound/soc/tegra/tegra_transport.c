@@ -477,6 +477,91 @@ EXIT:
 	return;
 }
 
+int tegra_audiofx_init(struct tegra_audio_data* tegra_snd_cx)
+{
+	NvError e = NvSuccess;
+	int ret = 0;
+
+	if (!tegra_snd_cx->mixer_handle) {
+		mutex_lock(&tegra_snd_cx->lock);
+		e = tegra_transport_init(&tegra_snd_cx->xrt_fxn);
+		mutex_unlock(&tegra_snd_cx->lock);
+
+		if (e != NvSuccess) {
+			snd_printk(KERN_ERR "tegra_transport_init failed \n");
+			return -EFAULT;
+		}
+
+		tegra_snd_cx->mixer_handle =
+					tegra_snd_cx->xrt_fxn.MixerOpen();
+
+		if (!tegra_snd_cx->mixer_handle) {
+			ret = -EFAULT;
+			goto fail;
+		}
+
+		e = tegra_audiofx_createfx(tegra_snd_cx);
+		if (e != NvSuccess) {
+			snd_printk(KERN_ERR "tegra_audiofx_createfx failed \n");
+			ret = -EFAULT;
+			goto fail;
+		}
+
+		tegra_snd_cx->mixer_buffer[0] =
+			tegra_snd_cx->xrt_fxn.MixerMapBuffer(
+			tegra_snd_cx->mixer_handle,
+			NvRmMemGetId(tegra_snd_cx->mem_handle[0]),
+			0,
+			tegra_snd_cx->mapped_buf_size);
+
+		if (!tegra_snd_cx->mixer_buffer[0]) {
+			snd_printk(KERN_ERR"TransportMixerMapBuffer failed!\n");
+			ret = -EFAULT;
+			goto fail;
+		}
+
+		tegra_snd_cx->mixer_buffer[1] =
+			tegra_snd_cx->xrt_fxn.MixerMapBuffer(
+			tegra_snd_cx->mixer_handle,
+			NvRmMemGetId(tegra_snd_cx->mem_handle[1]),
+			0,
+			tegra_snd_cx->mapped_buf_size);
+
+		if (!tegra_snd_cx->mixer_buffer[1]) {
+			snd_printk(KERN_ERR"TransportMixerMapBuffer failed!\n");
+			ret = -EFAULT;
+			goto fail;
+		}
+
+		tegra_snd_cx->mvolume = tegra_snd_cx->xrt_fxn.MixerCreateObject(
+						tegra_snd_cx->mixer_handle,
+						NvAudioFxI2s1VolumeId);
+		tegra_snd_cx->i2s1volume = NvAudioFxVolumeDefault;
+
+		tegra_snd_cx->mroute = tegra_snd_cx->xrt_fxn.MixerCreateObject(
+						tegra_snd_cx->mixer_handle,
+						NvAudioFxSpdifId);
+		tegra_snd_cx->spdif_plugin = 0;
+	}
+
+	return 0;
+fail:
+	snd_printk(KERN_ERR "tegra_audiofx_init failed \n");
+	if (tegra_snd_cx->mixer_handle) {
+		tegra_audiofx_destroyfx(tegra_snd_cx);
+
+		if (tegra_snd_cx->mixer_handle) {
+			tegra_snd_cx->xrt_fxn.MixerClose(
+					tegra_snd_cx->mixer_handle);
+		}
+	}
+	mutex_lock(&tegra_snd_cx->lock);
+	tegra_transport_deinit();
+	mutex_unlock(&tegra_snd_cx->lock);
+
+	return ret;
+}
+
 static void tegra_audiofx_notifier_thread(void *arg)
 {
 	struct tegra_audio_data *audio_context = (struct tegra_audio_data *)arg;

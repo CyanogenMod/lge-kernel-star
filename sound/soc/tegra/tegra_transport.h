@@ -411,11 +411,13 @@ struct tegra_audio_data {
 	NvAudioFxMixBufferHandle mixer_buffer[2];
 	NvRmMemHandle mem_handle[2];
 	NvAudioFxObjectHandle mvolume;
+	NvAudioFxObjectHandle mroute;
+	int spdif_plugin;
 	int i2s1volume;
 	struct mutex lock;
 };
 
-
+int tegra_audiofx_init(struct tegra_audio_data* tegra_snd_cx);
 NvError tegra_audiofx_createfx(struct tegra_audio_data *audio_context);
 void tegra_audiofx_destroyfx(struct tegra_audio_data *audio_context);
 NvError tegra_audiofx_create_output(NvRmDeviceHandle,

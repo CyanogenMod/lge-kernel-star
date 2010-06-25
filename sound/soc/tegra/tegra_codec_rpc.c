@@ -43,15 +43,17 @@ static int tegra_master_volume_info(struct snd_kcontrol *kcontrol,
 static int tegra_master_volume_get(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
-	if (tegra_snd_cx) {
-		ucontrol->value.integer.value[0] = tegra_snd_cx->i2s1volume;
-		ucontrol->value.integer.value[1] = tegra_snd_cx->i2s1volume;
-	}
-	else {
-		ucontrol->value.integer.value[0] = NvAudioFxVolumeDefault;
-		ucontrol->value.integer.value[1] = NvAudioFxVolumeDefault;
-	}
+	int rval = NvAudioFxVolumeDefault;
+	int lval = NvAudioFxVolumeDefault;
 
+	if (tegra_snd_cx) {
+		if (!tegra_audiofx_init(tegra_snd_cx)) {
+			rval = tegra_snd_cx->i2s1volume;
+			lval = tegra_snd_cx->i2s1volume;
+		}
+	}
+	ucontrol->value.integer.value[0] = rval;
+	ucontrol->value.integer.value[1] = lval;
 	return 0;
 }
 
@@ -70,23 +72,24 @@ static int tegra_master_volume_put(struct snd_kcontrol *kcontrol,
 		vd.Mute = 1;
 	}
 
-	if (tegra_snd_cx && tegra_snd_cx->mixer_handle) {
-		if(tegra_snd_cx->i2s1volume != val) {
-			tegra_snd_cx->i2s1volume = val;
-			tegra_snd_cx->xrt_fxn.SetProperty(
-				tegra_snd_cx->mvolume,
-				NvAudioFxVolumeProperty_Volume,
-				sizeof(NvAudioFxVolumeDescriptor),
-				&vd);
-			change = 1;
-			snd_printk(KERN_ERR "Put Volume Change = 1\n");
+	if (tegra_snd_cx) {
+		if (!tegra_audiofx_init(tegra_snd_cx)) {
+			if(tegra_snd_cx->i2s1volume != val) {
+				tegra_snd_cx->i2s1volume = val;
+				tegra_snd_cx->xrt_fxn.SetProperty(
+					tegra_snd_cx->mvolume,
+					NvAudioFxVolumeProperty_Volume,
+					sizeof(NvAudioFxVolumeDescriptor),
+					&vd);
+				change = 1;
+			}
 		}
 	}
 
 	return change;
 }
 
-static struct snd_kcontrol_new tegra_codec_control =
+static struct snd_kcontrol_new tegra_codec_ctrl_volume =
 {
 	.access = SNDRV_CTL_ELEM_ACCESS_READWRITE,
 	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
@@ -95,6 +98,64 @@ static struct snd_kcontrol_new tegra_codec_control =
 	.info = tegra_master_volume_info,
 	.get = tegra_master_volume_get,
 	.put = tegra_master_volume_put
+};
+
+static int tegra_master_route_info(struct snd_kcontrol *kcontrol,
+				   struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 1;
+	return 0;
+}
+
+static int tegra_master_route_get(struct snd_kcontrol *kcontrol,
+				  struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] = 0;
+	if (tegra_snd_cx) {
+		if (!tegra_audiofx_init(tegra_snd_cx)) {
+			ucontrol->value.integer.value[0] =
+						tegra_snd_cx->spdif_plugin;
+		}
+	}
+	return 0;
+}
+
+static int tegra_master_route_put(struct snd_kcontrol *kcontrol,
+				   struct snd_ctl_elem_value *ucontrol)
+{
+	int change = 0, val;
+	NvAudioFxIoDevice ioDevice = 0;
+	val = ucontrol->value.integer.value[0] & 0xffff;
+	if (val) {
+		ioDevice = NvAudioFxIoDevice_BuiltInSpeaker;
+	}
+
+	if (tegra_snd_cx) {
+		if (!tegra_audiofx_init(tegra_snd_cx)) {
+			tegra_snd_cx->spdif_plugin = val;
+			tegra_snd_cx->xrt_fxn.SetProperty(
+				tegra_snd_cx->mroute,
+				NvAudioFxIoProperty_OutputSelect,
+				sizeof(NvAudioFxIoDevice),
+				&ioDevice);
+			change = 1;
+		}
+	}
+	return change;
+}
+
+static struct snd_kcontrol_new tegra_codec_ctrl_route =
+{
+	.access = SNDRV_CTL_ELEM_ACCESS_READWRITE,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "SPDIF Playback Switch",
+	.private_value = 0xffff,
+	.info = tegra_master_route_info,
+	.get = tegra_master_route_get,
+	.put = tegra_master_route_put
 };
 
 static int tegra_generic_codec_hw_params(struct snd_pcm_substream *substream,
@@ -208,9 +269,16 @@ static int codec_soc_probe(struct platform_device *pdev)
 		printk(KERN_ERR "codec: failed to register card\n");
 		goto card_err;
 	}
-
+	/* Add volume control */
+	ret = snd_ctl_add(codec->card,
+			   snd_ctl_new1(&tegra_codec_ctrl_volume, codec));
+	if (ret < 0) {
+		printk(KERN_ERR "codec: failed to add control\n");
+		goto card_err;
+	}
+	/* Add route control */
 	return snd_ctl_add(codec->card,
-			   snd_ctl_new1(&tegra_codec_control, codec));
+			   snd_ctl_new1(&tegra_codec_ctrl_route, codec));
 
 card_err:
 	snd_soc_free_pcms(socdev);
