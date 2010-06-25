@@ -107,7 +107,7 @@ NvBool open_def_odm_accl(void)
 	}
 
 	err = NvOdmAccelSetIntForceThreshold(accel_dev->hOdmAcr,
-		 NvOdmAccelInt_MotionThreshold, 0, 2);
+		 NvOdmAccelInt_MotionThreshold, 0, 900);
 	if (!err) {
 		pr_err("open_def_odm_accl: Set Motion Thresold failed\n");
 		return err;
@@ -130,7 +130,7 @@ NvBool open_def_odm_accl(void)
 	}
 
 	err = NvOdmAccelSetIntForceThreshold(accel_dev->hOdmAcr,
-		NvOdmAccelInt_TapThreshold, 0, 10);
+		NvOdmAccelInt_TapThreshold, 0, 120);
 
 	if (!err) {
 		pr_err("open_def_odm_accl: Set Tap Threshold failed\n");
@@ -163,8 +163,8 @@ void change_nvodm_accelerometer_settings(NvU32 command, NvS32 value)
 				accel_dev->freq = value;
 			}
 		} else {
-//			NvOdmAccelSetSampleRate(accel_dev->hOdmAcr,
-//				NvOdmAccelPower_Fullrun);
+			NvOdmAccelSetSampleRate(accel_dev->hOdmAcr,
+				NvOdmAccelPower_Fullrun);
 			if (NvOdmAccelSetSampleRate(accel_dev->hOdmAcr, value)) {
 				accel_dev->freq = value;
 			}
