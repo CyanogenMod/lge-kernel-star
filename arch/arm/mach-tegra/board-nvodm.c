@@ -1064,7 +1064,7 @@ static noinline void __init tegra_setup_spi(void)
 
 		if (plat->is_slink && pdev->id<spi_mux_nr)
 			mux = spi_mux[pdev->id];
-		else if (!plat->is_slink)
+		else if (sflash_mux_nr && !plat->is_slink)
 			mux = sflash_mux[0];
 
 		if (!mux)
