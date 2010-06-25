@@ -1518,10 +1518,8 @@ NvRmKernelPowerSuspend( NvRmDeviceHandle hRmDeviceHandle )
     NvOdmSocPowerState state =
         NvOdmQueryLowestSocPowerState()->LowestPowerState;
 
-    NvRmPrivDfsSuspend(state);
     if (state ==  NvOdmSocPowerState_Suspend)
         NvRmPrivPowerGroupSuspend(hRmDeviceHandle);
-    NvRmPrivPmuLPxStateConfig(hRmDeviceHandle, state, NV_TRUE);
 
 #if NVRM_POWER_DEBUG_SUSPEND_ENTRY
     NvOsMutexLock(s_hPowerClientMutex);
@@ -1549,7 +1547,7 @@ NvRmKernelPowerSuspend( NvRmDeviceHandle hRmDeviceHandle )
                         if (pVoltageReq->MaxVolts != NvRmVoltsOff)
                         {
                             // could also set some bad e = NvError_Bad???
-                            NvOsDebugPrintf("Active Module: 0x%x",
+                            NvOsDebugPrintf("Active Module: 0x%x\n",
                                                 pVoltageReq->ModuleId);
                         }
                         pVoltageReq = pVoltageReq->pNext;
@@ -1574,7 +1572,6 @@ NvRmKernelPowerResume( NvRmDeviceHandle hRmDeviceHandle )
     ReportRmPowerState(hRmDeviceHandle);
     NvOsMutexUnlock(s_hPowerClientMutex);
 
-    NvRmPrivPmuLPxStateConfig(hRmDeviceHandle, state, NV_FALSE);
     if (state ==  NvOdmSocPowerState_Suspend)
         NvRmPrivPowerGroupResume(hRmDeviceHandle);
     return NvSuccess;

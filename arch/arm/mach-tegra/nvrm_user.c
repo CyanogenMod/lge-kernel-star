@@ -545,22 +545,28 @@ static void notify_daemon(const char* notice)
 int tegra_pm_notifier(struct notifier_block *nb,
 			  unsigned long event, void *nouse)
 {
+	NvOdmSocPowerState state =
+		NvOdmQueryLowestSocPowerState()->LowestPowerState;
 	printk(KERN_INFO "%s: start processing event=%lx\n", __func__, event);
 
 	// Notify the event to nvrm_daemon.
-	if (event == PM_SUSPEND_PREPARE) {
+	switch (event) {
+	case PM_SUSPEND_PREPARE:
 #ifndef CONFIG_HAS_EARLYSUSPEND
 		notify_daemon(STRING_PM_DISPLAY_OFF);
 #endif
 		notify_daemon(STRING_PM_SUSPEND_PREPARE);
-	}
-	else if (event == PM_POST_SUSPEND) {
+		NvRmPrivDfsSuspend(state);
+		NvRmPrivPmuLPxStateConfig(s_hRmGlobal, state, NV_TRUE);
+		break;
+	case PM_POST_SUSPEND:
+		NvRmPrivPmuLPxStateConfig(s_hRmGlobal, state, NV_FALSE);
 		notify_daemon(STRING_PM_POST_SUSPEND);
 #ifndef CONFIG_HAS_EARLYSUSPEND
 		notify_daemon(STRING_PM_DISPLAY_ON);
 #endif
-	}
-	else {
+		break;
+	default:
 		printk(KERN_ERR "%s: unknown event %ld\n", __func__, event);
 		return NOTIFY_DONE;
 	}

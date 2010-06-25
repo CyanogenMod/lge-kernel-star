@@ -82,18 +82,6 @@ void
 NvRmPrivPmuDeinit(NvRmDeviceHandle hRmDevice);
 
 /**
- * Configures PMU on entry/exit to/from low power state.
- *
- * @param hRmDevice The RM device handle
- * @param state - Low Power state the SoC is entering to, or exiting from
- * @param enter - Set NV_TRUE on entry, and NV_FALSE on exit
- */
-void NvRmPrivPmuLPxStateConfig(
-    NvRmDeviceHandle hRmDevice,
-    NvOdmSocPowerState state,
-    NvBool enter);
-
-/**
  * Sets new voltage level for the specified PMU voltage rail.
  * Private interface for diagnostic mode only.
  *

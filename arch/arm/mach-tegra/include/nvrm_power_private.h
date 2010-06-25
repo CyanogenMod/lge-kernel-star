@@ -445,6 +445,18 @@ void NvRmPrivPowerGroupSuspend(NvRmDeviceHandle hRmDeviceHandle);
 void NvRmPrivPowerGroupResume(NvRmDeviceHandle hRmDeviceHandle);
 
 /**
+ * Configures PMU on entry/exit to/from low power state.
+ *
+ * @param hRmDevice The RM device handle
+ * @param state - Low Power state the SoC is entering to, or exiting from
+ * @param enter - Set NV_TRUE on entry, and NV_FALSE on exit
+ */
+void NvRmPrivPmuLPxStateConfig(
+    NvRmDeviceHandle hRmDevice,
+    NvOdmSocPowerState state,
+    NvBool enter);
+
+/**
  * Controls power state and clamping for PCIEXCLK/PLLE (chip-specific).
  *
  * @param hRmDevice The RM device handle.
