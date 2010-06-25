@@ -90,6 +90,17 @@ typedef struct AesIvContextRec
     AesHwKeySlot CurKeySlot;
 } AesIvContext;
 
+// Wrapped key slot information context
+typedef struct AesWrappedKeyContextRec
+{
+    // Wrapped key for dedicated slot
+    NvU8 WrappedKey[NvDdkAesConst_MaxKeyLengthBytes];
+    // Wrapped Iv for dedicated slot
+    NvU8 WrappedIv[AES_RFC_IV_LENGTH_BYTES];
+    // KeySlot used for encrypiton or decryption
+    NvBool IsEncryption;
+} AesWrappedKeyContext;
+
 typedef struct AesHwInterfaceRec AesHwInterface;
 
 // AES engine capabilities
@@ -153,6 +164,8 @@ typedef struct AesHwContextRec
 // AES Core Engine record
 typedef struct AesCoreEngineRec
 {
+    // Dedicated slot Key Information
+    AesWrappedKeyContext DedicatedSlotKeyInfo[AesHwEngine_Num][AesHwKeySlot_NumExt];
     // Keeps the count of open handles
     NvU32 OpenCount;
     // Id returned from driver's registration with Power Manager

@@ -279,6 +279,29 @@ typedef struct NvDdkAesRec *NvDdkAesHandle;
  NvError NvDdkAesDisableCrypto(
     NvDdkAesHandle hAes );
 
+#ifdef CONFIG_PM
+/**
+ * @brief This function waits till AES engine completes its operation if any thing is already running.
+ *
+ * @param none.
+ *
+ * @retval none
+ */
+
+ void NvDdkAesSuspend(void);
+
+/**
+ * @brief This function restores dedicated key slot information back in the hardware by unwrapping
+ * the key using RFC-3394 key unwrapping.
+ *
+ * @param none.
+ *
+ * @retval none
+ */
+
+ void NvDdkAesResume(void);
+#endif
+
 #if defined(__cplusplus)
 }
 #endif

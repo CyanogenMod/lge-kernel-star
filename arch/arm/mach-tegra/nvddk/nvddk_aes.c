@@ -55,8 +55,8 @@ static void AesCoreRequestHwAccess(void);
 static void AesCoreReleaseHwAccess(void);
 static void AesCoreDeAllocateRmMemory(AesHwContext *const pAesHwCtxt);
 static void AesCoreFreeUpEngine(AesCoreEngine *const pAesCoreEngine);
-static void AesCorePowerUp(const AesCoreEngine *const pAesCoreEngine);
-static void AesCorePowerDown(const AesCoreEngine *const pAesCoreEngine);
+static void AesCorePowerUp(const AesCoreEngine *const pAesCoreEngine, const NvBool SetDfsBusyHints);
+static void AesCorePowerDown(const AesCoreEngine *const pAesCoreEngine, const NvBool SetDfsBusyHints);
 static void AesCoreDeInitializeEngineSpace(const AesHwContext *const pAesHwCtxt);
 
 static NvError AesCoreAllocateRmMemory(AesHwContext *const pAesHwCtxt);
@@ -68,14 +68,14 @@ static NvError AesCoreGetCapabilities(const NvRmDeviceHandle hRmDevice, AesHwCap
 static NvError AesCoreClearUserKey(const NvDdkAes *const pAesClient);
 static NvError
 AesCoreWrapKey(
-    const NvDdkAes *const pAesClient,
+    const AesCoreEngine *const pAesCoreEngine,
     const NvU8 *const pOrgKey,
     const NvU8 *const pOrgIv,
     NvU8 *const pWrappedKey,
     NvU8 *const pWrappedIv);
 static NvError
 AesCoreUnWrapKey(
-    const NvDdkAes *const pAesClient,
+    const AesCoreEngine *const pAesCoreEngine,
     const NvU8 *const pWrappedKey,
     const NvU8 *const pWrappedIv,
     NvU8 *const pOrgKey,
@@ -101,7 +101,7 @@ AesCoreProcessBuffer(
     NvU8 *pDestBuffer);
 static NvError
 AesCoreEcbProcessBuffer(
-    const NvDdkAes *const pAesClient,
+    const AesCoreEngine *const pAesCoreEngine,
     const NvU8 *const pInputBuffer,
     const NvU32 BufSize,
     const NvBool IsEncrypt,
@@ -172,6 +172,111 @@ extern NvRmDeviceHandle s_hRmGlobal;
         NV_ASSERT(ctxt->ppEngineCaps[engine]->pAesInterf->func); \
     } while (0)
 
+#ifdef CONFIG_PM
+void NvDdkAesSuspend(void)
+{
+    if (gs_hAesCoreEngineMutex)
+    {
+        NvOsMutexLock(gs_hAesCoreEngineMutex);
+        if (gs_pAesCoreEngine)
+            AesCorePowerDown(gs_pAesCoreEngine, NV_FALSE);
+        NvOsMutexUnlock(gs_hAesCoreEngineMutex);
+    }
+}
+
+void NvDdkAesResume(void)
+{
+    NvU8 UnWrappedRFCIv[AES_RFC_IV_LENGTH_BYTES];
+    NvU8 Iv[NvDdkAesConst_IVLengthBytes];
+    AesHwEngine Engine;
+    AesHwKeySlot KeySlot;
+    AesHwContext *pAesHwCtxt;
+    NvError e;
+
+    if ((!gs_hAesCoreEngineMutex) ||(!gs_pAesCoreEngine))
+        return;
+
+    NvOsMutexLock(gs_hAesCoreEngineMutex);
+    AesCorePowerUp(gs_pAesCoreEngine, NV_FALSE);
+
+    // Get the AES H/W context
+    pAesHwCtxt = &gs_pAesCoreEngine->AesHwCtxt;
+    NvOsMemset(Iv, 0, sizeof(Iv));
+
+    // Get the dedicated slot
+    for (Engine = AesHwEngine_A; Engine < AesHwEngine_Num; Engine++)
+    {
+        NVDDK_AES_CHECK_INTERFACE(pAesHwCtxt, Engine);
+        NVDDK_AES_CHECK_INTERFACE_FUNC(pAesHwCtxt, Engine, AesHwDisableAllKeyRead);
+        pAesHwCtxt->ppEngineCaps[Engine]->pAesInterf->AesHwDisableAllKeyRead(
+            pAesHwCtxt,
+            Engine,
+            pAesHwCtxt->ppEngineCaps[Engine]->NumSlotsSupported);
+    }
+
+    // Get the dedicated slot
+    for (Engine = AesHwEngine_A; Engine < AesHwEngine_Num; Engine++)
+    {
+        for (KeySlot = AesHwKeySlot_0;
+            KeySlot < (pAesHwCtxt->ppEngineCaps[Engine]->NumSlotsSupported);
+            KeySlot++)
+        {
+            if ((gs_pAesCoreEngine->IsKeySlotUsed[Engine][KeySlot]) &&
+                (gs_pAesCoreEngine->SbkEncryptSlot != KeySlot) &&
+                (gs_pAesCoreEngine->SbkDecryptSlot != KeySlot) &&
+                (gs_pAesCoreEngine->SskEncryptSlot != KeySlot) &&
+                (gs_pAesCoreEngine->SskDecryptSlot != KeySlot))
+            {
+                AesCoreRequestHwAccess();
+
+                // This is dedicated slot. Load key in slot
+                e = (AesCoreUnWrapKey(
+                    gs_pAesCoreEngine,
+                    gs_pAesCoreEngine->DedicatedSlotKeyInfo[Engine][KeySlot].WrappedKey,
+                    gs_pAesCoreEngine->DedicatedSlotKeyInfo[Engine][KeySlot].WrappedIv,
+                    pAesHwCtxt->pKeyTableVirAddr[Engine] + pAesHwCtxt->KeyTableSize[Engine],
+                    UnWrappedRFCIv));
+                if (e != NvSuccess)
+                    goto fail;
+
+                // Check whether the key unwrap is success or not by comparing
+                // the unwrapped RFC IV with original RFC IV
+                if (NvOsMemcmp(UnWrappedRFCIv, gs_OriginalIV, sizeof(gs_OriginalIV)))
+                {
+                    // Unwrap key failed
+                    NV_ASSERT(!"fail to unwrap key");
+                    goto fail;
+                }
+
+                // Setup Key table
+                NVDDK_AES_CHECK_INTERFACE_FUNC(pAesHwCtxt, Engine, AesHwSetKeyAndIv);
+                pAesHwCtxt->ppEngineCaps[Engine]->pAesInterf->AesHwSetKeyAndIv(
+                    Engine,
+                    KeySlot,
+                    (AesHwKey *)(pAesHwCtxt->pKeyTableVirAddr[Engine] + pAesHwCtxt->KeyTableSize[Engine]),
+                    (AesHwIv *)Iv,
+                    gs_pAesCoreEngine->DedicatedSlotKeyInfo[Engine][KeySlot].IsEncryption,
+                    pAesHwCtxt);
+
+                // Memset the local variable to zeros where the key is stored
+                NvOsMemset(
+                    (pAesHwCtxt->pKeyTableVirAddr[Engine] + pAesHwCtxt->KeyTableSize[Engine]),
+                    0,
+                    NvDdkAesKeySize_128Bit);
+                AesCoreReleaseHwAccess();
+            }
+        }
+    }
+    AesCorePowerDown(gs_pAesCoreEngine, NV_FALSE);
+    NvOsMutexUnlock(gs_hAesCoreEngineMutex);
+    return;
+fail:
+    AesCorePowerDown(gs_pAesCoreEngine, NV_FALSE);
+    AesCoreReleaseHwAccess();
+    NvOsMutexUnlock(gs_hAesCoreEngineMutex);
+}
+#endif
+
 NvError NvDdkAesOpen(NvU32 InstanceId, NvDdkAesHandle *phAes)
 {
     NvError e = NvSuccess;
@@ -206,8 +311,6 @@ NvError NvDdkAesOpen(NvU32 InstanceId, NvDdkAesHandle *phAes)
     {
         // Init engine
         NV_CHECK_ERROR_CLEANUP(AesCoreInitEngine(s_hRmGlobal));
-        // Power up
-        AesCorePowerUp(gs_pAesCoreEngine);
     }
 
     // Add client
@@ -247,12 +350,14 @@ void NvDdkAesClose(NvDdkAesHandle hAes)
         if ((NV_TRUE == pAesClient->IsDedicatedSlot) &&
             (NvDdkAesKeyType_UserSpecified == pAesClient->KeyType))
         {
+            AesCorePowerUp(gs_pAesCoreEngine, NV_TRUE);
             // Client is using USER key with dedicated slot. So
             // clear the key in hardware slot and free the associated client slot
             if (!AesCoreClearUserKey(pAesClient))
             {
                 NV_ASSERT(!"Failed to clear User Key");
             }
+            AesCorePowerDown(gs_pAesCoreEngine, NV_TRUE);
             pAesClient->pAesCoreEngine->IsKeySlotUsed[pAesClient->Engine][pAesClient->KeySlot] = NV_FALSE;
         }
 
@@ -264,9 +369,6 @@ void NvDdkAesClose(NvDdkAesHandle hAes)
 
             if (0 == pAesClient->pAesCoreEngine->OpenCount)
             {
-                // Power down
-                AesCorePowerDown(pAesClient->pAesCoreEngine);
-
                 // Free up resources
                 AesCoreFreeUpEngine(pAesClient->pAesCoreEngine);
 
@@ -395,6 +497,7 @@ NvError NvDdkAesClearSecureBootKey(NvDdkAesHandle hAes)
     NVDDK_AES_CHECK_ROOT_PERMISSION;
 
     NvOsMutexLock(gs_hAesCoreEngineMutex);
+    AesCorePowerUp(gs_pAesCoreEngine, NV_TRUE);
 
     // Get the AES H/W context
     NV_ASSERT(pAesClient->pAesCoreEngine);
@@ -428,7 +531,7 @@ NvError NvDdkAesClearSecureBootKey(NvDdkAesHandle hAes)
             }
         }
     }
-
+    AesCorePowerDown(gs_pAesCoreEngine, NV_TRUE);
     NvOsMutexUnlock(gs_hAesCoreEngineMutex);
     return e;
 }
@@ -448,6 +551,7 @@ NvError NvDdkAesLockSecureStorageKey(NvDdkAesHandle hAes)
     NVDDK_AES_CHECK_ROOT_PERMISSION;
 
     NvOsMutexLock(gs_hAesCoreEngineMutex);
+    AesCorePowerUp(gs_pAesCoreEngine, NV_TRUE);
 
     // Get the AES H/W context
     NV_ASSERT(pAesClient->pAesCoreEngine);
@@ -483,6 +587,7 @@ NvError NvDdkAesLockSecureStorageKey(NvDdkAesHandle hAes)
     }
 
 fail:
+    AesCorePowerDown(gs_pAesCoreEngine, NV_TRUE);
     NvOsMutexUnlock(gs_hAesCoreEngineMutex);
     return e;
 }
@@ -516,6 +621,7 @@ NvDdkAesSetAndLockSecureStorageKey(
     }
 
     NvOsMutexLock(gs_hAesCoreEngineMutex);
+    AesCorePowerUp(gs_pAesCoreEngine, NV_TRUE);
 
     // Get the AES H/W context
     NV_ASSERT(pAesClient->pAesCoreEngine);
@@ -573,6 +679,7 @@ NvDdkAesSetAndLockSecureStorageKey(
     }
 
 fail:
+    AesCorePowerDown(gs_pAesCoreEngine, NV_TRUE);
     NvOsMutexUnlock(gs_hAesCoreEngineMutex);
     return e;
 }
@@ -592,6 +699,7 @@ NvError NvDdkAesDisableCrypto(NvDdkAesHandle hAes)
     NVDDK_AES_CHECK_ROOT_PERMISSION;
 
     NvOsMutexLock(gs_hAesCoreEngineMutex);
+    AesCorePowerUp(gs_pAesCoreEngine, NV_TRUE);
 
     // Get the AES H/W context
     NV_ASSERT(pAesClient->pAesCoreEngine);
@@ -616,6 +724,7 @@ NvError NvDdkAesDisableCrypto(NvDdkAesHandle hAes)
         pAesClient->pAesCoreEngine->IsEngineDisabled = NV_TRUE;
     }
 
+    AesCorePowerDown(gs_pAesCoreEngine, NV_TRUE);
     NvOsMutexUnlock(gs_hAesCoreEngineMutex);
     return e;
 }
@@ -753,7 +862,7 @@ fail:
  *
  * @retval None.
  */
-void AesCoreDeAllocateRmMemory(AesHwContext *const pAesHwCtxt);
+void AesCoreDeAllocateRmMemory(AesHwContext *const pAesHwCtxt)
 {
     NV_ASSERT(pAesHwCtxt);
 
@@ -946,6 +1055,7 @@ AesCoreSetKey(
     pAesClient->IsDedicatedSlot = NV_FALSE;
 
     NvOsMutexLock(gs_hAesCoreEngineMutex);
+    AesCorePowerUp(gs_pAesCoreEngine, NV_TRUE);
 
     // Get the AES H/W context
     NV_ASSERT(pAesClient->pAesCoreEngine);
@@ -965,29 +1075,33 @@ AesCoreSetKey(
             break;
         case NvDdkAesKeyType_UserSpecified:
             pAesClient->IsDedicatedSlot = IsDedicatedSlot;
+            // Wrap the key using RFC3394 key wrapping algorithm
+            // The wrapped key and RFCwrapped IV will be stored in client handle
+            AesCoreRequestHwAccess();
+            e = AesCoreWrapKey(
+                pAesClient->pAesCoreEngine,
+                pKeyData,
+                gs_OriginalIV,
+                pAesClient->Key,
+                pAesClient->WrappedIv);
+            AesCoreReleaseHwAccess();
+            if (NvSuccess != e)
+                goto fail;
             if (!IsDedicatedSlot)
-            {
-                // It is not dedicated slot => obfuscate the key
-                // Wrap the key using RFC3394 key wrapping algorithm
-                // The wrapped key and RFCwrapped IV will be stored in client handle
-                AesCoreRequestHwAccess();
-                e = AesCoreWrapKey(
-                    pAesClient,
-                    pKeyData,
-                    gs_OriginalIV,
-                    pAesClient->Key,
-                    pAesClient->WrappedIv);
-                AesCoreReleaseHwAccess();
-                if (NvSuccess != e)
-                    goto fail;
-                goto done;
-            }
+               break;
             // It is dedicated slot
             NV_CHECK_ERROR_CLEANUP(AesCoreGetFreeSlot(pAesClient->pAesCoreEngine, &Engine, &KeySlot));
             pAesClient->pAesCoreEngine->IsKeySlotUsed[Engine][KeySlot] = NV_TRUE;
             pAesClient->Engine = Engine;
             pAesClient->KeySlot = KeySlot;
-
+            // Store the dedicated slot key info in wrapped form to use in LP0 resume
+            gs_pAesCoreEngine->DedicatedSlotKeyInfo[Engine][KeySlot].IsEncryption = pAesClient->IsEncryption;
+            NvOsMemcpy(gs_pAesCoreEngine->DedicatedSlotKeyInfo[Engine][KeySlot].WrappedKey,
+                pAesClient->Key,
+                NvDdkAesConst_MaxKeyLengthBytes);
+            NvOsMemcpy(gs_pAesCoreEngine->DedicatedSlotKeyInfo[Engine][KeySlot].WrappedIv,
+                pAesClient->WrappedIv,
+                AES_RFC_IV_LENGTH_BYTES);
             // Initialize IV to zeros
             NvOsMemset(pAesClient->Iv, 0, NvDdkAesConst_IVLengthBytes);
             NVDDK_AES_CHECK_INTERFACE(pAesHwCtxt, Engine);
@@ -1010,6 +1124,8 @@ AesCoreSetKey(
             goto fail;
     }
 
+    if ((KeyType == NvDdkAesKeyType_UserSpecified) && (!IsDedicatedSlot))
+        goto done;
     NVDDK_AES_CHECK_INTERFACE(pAesHwCtxt, pAesClient->Engine);
 
     AesCoreRequestHwAccess();
@@ -1036,6 +1152,7 @@ done:
     pAesClient->KeyType = KeyType;
 
 fail:
+    AesCorePowerDown(gs_pAesCoreEngine, NV_TRUE);
     NvOsMutexUnlock(gs_hAesCoreEngineMutex);
     return e;
 }
@@ -1826,10 +1943,11 @@ void AesCoreFreeUpEngine(AesCoreEngine *const pAesCoreEngine)
  * Power up the AES core engine.
  *
  * @param pAesCoreEngine Pointer to the AesCoreEngine argument.
+ * @param SetDfsBusyHints If set to NV_TRUE, DFS busy hints will be set to ON
  *
  * @retval None.
  */
-void AesCorePowerUp(const AesCoreEngine *const pAesCoreEngine)
+void AesCorePowerUp(const AesCoreEngine *const pAesCoreEngine, const NvBool SetDfsBusyHints)
 {
     AesHwEngine Engine;
     const AesHwContext *pAesHwCtxt;
@@ -1841,8 +1959,11 @@ void AesCorePowerUp(const AesCoreEngine *const pAesCoreEngine)
 
     for (Engine = AesHwEngine_A; Engine < AesHwEngine_Num; Engine++)
     {
-        // DFS busy hints On
-        NV_ASSERT_SUCCESS(AesCoreDfsBusyHint(pAesHwCtxt->hRmDevice, pAesCoreEngine->RmPwrClientId[Engine], NV_TRUE));
+        if (SetDfsBusyHints)
+        {
+            // DFS busy hints On
+            NV_ASSERT_SUCCESS(AesCoreDfsBusyHint(pAesHwCtxt->hRmDevice, pAesCoreEngine->RmPwrClientId[Engine], NV_TRUE));
+        }
 
         // Enable the voltage
         NV_ASSERT_SUCCESS(NvRmPowerVoltageControl(
@@ -1868,10 +1989,11 @@ void AesCorePowerUp(const AesCoreEngine *const pAesCoreEngine)
  * Power down the AES core engine.
  *
  * @param pAesCoreEngine Pointer to the AesCoreEngine argument.
+ * @param SetDfsBusyHints If set to NV_TRUE, DFS busy hints will be set to OFF
  *
  * @retval None.
  */
-void AesCorePowerDown(const AesCoreEngine *const pAesCoreEngine)
+void AesCorePowerDown(const AesCoreEngine *const pAesCoreEngine, const NvBool SetDfsBusyHints)
 {
     AesHwEngine Engine;
     const AesHwContext *pAesHwCtxt;
@@ -1900,9 +2022,11 @@ void AesCorePowerDown(const AesCoreEngine *const pAesCoreEngine)
             NULL,
             0,
             NULL));
-
-        // DFS busy hints Off
-        NV_ASSERT_SUCCESS(AesCoreDfsBusyHint(pAesHwCtxt->hRmDevice, pAesCoreEngine->RmPwrClientId[Engine], NV_FALSE));
+        if (SetDfsBusyHints)
+        {
+            // DFS busy hints Off
+            NV_ASSERT_SUCCESS(AesCoreDfsBusyHint(pAesHwCtxt->hRmDevice, pAesCoreEngine->RmPwrClientId[Engine], NV_FALSE));
+        }
     }
 }
 
@@ -1965,6 +2089,7 @@ AesCoreProcessBuffer(
     TotalBytesToProcess = DestBufferSize;
 
     NvOsMutexLock(gs_hAesCoreEngineMutex);
+    AesCorePowerUp(gs_pAesCoreEngine, NV_TRUE);
 
     NVDDK_AES_CHECK_INTERFACE(pAesHwCtxt, pAesClient->Engine);
 
@@ -1998,7 +2123,7 @@ AesCoreProcessBuffer(
 
             // Unwrap the key
             NV_CHECK_ERROR_CLEANUP(AesCoreUnWrapKey(
-                pAesClient,
+                pAesClient->pAesCoreEngine,
                 pAesClient->Key,
                 pAesClient->WrappedIv,
                 pAesHwCtxt->pKeyTableVirAddr[Engine] + pAesHwCtxt->KeyTableSize[Engine],
@@ -2111,6 +2236,7 @@ AesCoreProcessBuffer(
     // Clear the DMA buffer before we leave from this operation
     NV_ASSERT(pAesHwCtxt->pDmaVirAddr[pAesClient->Engine]);
     NvOsMemset(pAesHwCtxt->pDmaVirAddr[pAesClient->Engine], 0, AES_HW_DMA_BUFFER_SIZE_BYTES);
+    AesCorePowerDown(gs_pAesCoreEngine, NV_TRUE);
     NvOsMutexUnlock(gs_hAesCoreEngineMutex);
     return NvSuccess;
 
@@ -2120,6 +2246,7 @@ fail:
     // Clear the DMA buffer before we leave from this operation
     NV_ASSERT(pAesHwCtxt->pDmaVirAddr[pAesClient->Engine]);
     NvOsMemset(pAesHwCtxt->pDmaVirAddr[pAesClient->Engine], 0, AES_HW_DMA_BUFFER_SIZE_BYTES);
+    AesCorePowerDown(gs_pAesCoreEngine, NV_TRUE);
     NvOsMutexUnlock(gs_hAesCoreEngineMutex);
     return e;
 }
@@ -2158,6 +2285,13 @@ NvError AesCoreClearUserKey(const NvDdkAes *const pAesClient)
     AesCoreReleaseHwAccess();
 
     IsSuccess = AesCoreIsUserKeyCleared(pAesClient->Engine, pAesClient->KeySlot, pAesHwCtxt);
+    // Clear dedicated slot wrapped key info in local buffer
+    NvOsMemset(gs_pAesCoreEngine->DedicatedSlotKeyInfo[pAesClient->Engine][pAesClient->KeySlot].WrappedKey,
+        0,
+        NvDdkAesConst_MaxKeyLengthBytes);
+    NvOsMemset(gs_pAesCoreEngine->DedicatedSlotKeyInfo[pAesClient->Engine][pAesClient->KeySlot].WrappedIv,
+        0,
+        AES_RFC_IV_LENGTH_BYTES);
 
     NvOsMutexUnlock(gs_hAesCoreEngineMutex);
     return IsSuccess;
@@ -2372,7 +2506,7 @@ fail:
  * Encrypt/Decrypt the given input buffer using Electronic CodeBook (ECB) mode.
  * Prerequisite:It is caller responsibility to acquire hardware lock before using this function.
  *
- * @param pAesClient Pointer to AES client.
+ * @param pAesCoreEngine Pointer to AES core engine.
  * @param pInputBuffer Pointer to input bufffer.
  * @param BufSize Buffer size.
  * @param IsEncrypt If set to NV_TRUE, encrypt the input buffer else decrypt it.
@@ -2382,7 +2516,7 @@ fail:
  */
 NvError
 AesCoreEcbProcessBuffer(
-    const NvDdkAes *const pAesClient,
+    const AesCoreEngine *const pAesCoreEngine,
     const NvU8 *const pInputBuffer,
     const NvU32 BufSize,
     const NvBool IsEncrypt,
@@ -2393,16 +2527,15 @@ AesCoreEcbProcessBuffer(
     AesHwKeySlot SskKeySlot;
     AesHwContext *pAesHwCtxt;
 
-    NV_ASSERT(pAesClient);
+    NV_ASSERT(pAesCoreEngine);
     NV_ASSERT(pInputBuffer);
     NV_ASSERT(pOutputBuffer);
 
     // Get the AES H/W context
-    NV_ASSERT(pAesClient->pAesCoreEngine);
-    pAesHwCtxt = &pAesClient->pAesCoreEngine->AesHwCtxt;
+    pAesHwCtxt = (AesHwContext *)&pAesCoreEngine->AesHwCtxt;
 
-    SskEngine = pAesClient->pAesCoreEngine->SskEngine[0];
-    SskKeySlot = (IsEncrypt ? pAesClient->pAesCoreEngine->SskEncryptSlot : pAesClient->pAesCoreEngine->SskDecryptSlot);
+    SskEngine = pAesCoreEngine->SskEngine[0];
+    SskKeySlot = (IsEncrypt ? pAesCoreEngine->SskEncryptSlot : pAesCoreEngine->SskDecryptSlot);
 
     NVDDK_AES_CHECK_INTERFACE(pAesHwCtxt, SskEngine);
 
@@ -2451,7 +2584,7 @@ AesCoreEcbProcessBuffer(
  *        For i = 1 to n
  *            C[i] = R[i]
  *
- * @param pAesClient Pointer to AES client.
+ * @param pAesCoreEngine Pointer to AES core engine.
  * @param pOrgKey Pointer to Original Key.
  * @param pOrgIv Pointer to Original Iv which is used in RFC3394 algorithm.
  * @param pWrappedKey Pointer to wrapped key.
@@ -2460,7 +2593,7 @@ AesCoreEcbProcessBuffer(
  */
 NvError
 AesCoreWrapKey(
-    const NvDdkAes *const pAesClient,
+    const AesCoreEngine *const pAesCoreEngine,
     const NvU8 *const pOrgKey,
     const NvU8 *const pOrgIv,
     NvU8 *const pWrappedKey,
@@ -2470,17 +2603,16 @@ AesCoreWrapKey(
     NvU8 n = AES_RFC_3394_NUM_OF_BLOCKS_FOR_128BIT_KEY, i, j, k, t;
     NvU8 *A, *B;
     NvU8 **R;
-    AesHwContext *pAesHwCtxt;
+    const AesHwContext *pAesHwCtxt;
 
-    NV_ASSERT(pAesClient);
+    NV_ASSERT(pAesCoreEngine);
     NV_ASSERT(pOrgKey);
     NV_ASSERT(pOrgIv);
     NV_ASSERT(pWrappedKey);
     NV_ASSERT(pWrappedIv);
 
     // Get the AES H/W context
-    NV_ASSERT(pAesClient->pAesCoreEngine);
-    pAesHwCtxt = &pAesClient->pAesCoreEngine->AesHwCtxt;
+    pAesHwCtxt = &pAesCoreEngine->AesHwCtxt;
 
     // Local buffers which are used for processing should be in IRAM.
     // Use KeyTable buffer which is in IRAM.
@@ -2526,7 +2658,7 @@ AesCoreWrapKey(
                 B[k] = A[k];
                 B[AES_RFC_3394_KEY_WRAP_BLOCK_SIZE_BYTES+k] = R[i][k];
             }
-            NV_CHECK_ERROR(AesCoreEcbProcessBuffer(pAesClient, B, NvDdkAesKeySize_128Bit, NV_TRUE, B));
+            NV_CHECK_ERROR(AesCoreEcbProcessBuffer(pAesCoreEngine, B, NvDdkAesKeySize_128Bit, NV_TRUE, B));
             for (k = 0; k < AES_RFC_3394_KEY_WRAP_BLOCK_SIZE_BYTES; k++)
             {
                 A[k] =  B[k];
@@ -2583,7 +2715,7 @@ AesCoreWrapKey(
  *    Else
  *        Return an error
  *
- * @param pAesClient Pointer to AES client.
+ * @param pAesCoreEngine Pointer to AES core engine.
  * @param pWrappedKey Pointer to wrapped key
  * @param pWrappedIv Pointer to wrapped Iv
  * @param pOrgKey Pointer to Original Key.
@@ -2592,7 +2724,7 @@ AesCoreWrapKey(
  */
 NvError
 AesCoreUnWrapKey(
-    const NvDdkAes *const pAesClient,
+    const AesCoreEngine *const pAesCoreEngine,
     const NvU8 *const pWrappedKey,
     const NvU8 *const pWrappedIv,
     NvU8 *const pOrgKey,
@@ -2602,17 +2734,16 @@ AesCoreUnWrapKey(
     NvS32 n = AES_RFC_3394_NUM_OF_BLOCKS_FOR_128BIT_KEY, i, j, k, t;
     NvU8 *A, *B;
     NvU8 **R;
-    AesHwContext *pAesHwCtxt;
+    const AesHwContext *pAesHwCtxt;
 
-    NV_ASSERT(pAesClient);
+    NV_ASSERT(pAesCoreEngine);
     NV_ASSERT(pWrappedKey);
     NV_ASSERT(pWrappedIv);
     NV_ASSERT(pOrgKey);
     NV_ASSERT(pOrgIv);
 
     // Get the AES H/W context
-    NV_ASSERT(pAesClient->pAesCoreEngine);
-    pAesHwCtxt = &pAesClient->pAesCoreEngine->AesHwCtxt;
+    pAesHwCtxt = &pAesCoreEngine->AesHwCtxt;
 
     // Local buffers which are used for processing should in IRAM.
     // Use KeyTable buffer which is in IRAM.
@@ -2658,7 +2789,7 @@ AesCoreUnWrapKey(
                 B[k] = A[k];
                 B[AES_RFC_3394_KEY_WRAP_BLOCK_SIZE_BYTES+k] = R[i-1][k];
             }
-            NV_CHECK_ERROR(AesCoreEcbProcessBuffer(pAesClient, B, NvDdkAesKeySize_128Bit, NV_FALSE, B));
+            NV_CHECK_ERROR(AesCoreEcbProcessBuffer(pAesCoreEngine, B, NvDdkAesKeySize_128Bit, NV_FALSE, B));
             for (k = 0; k < AES_RFC_3394_KEY_WRAP_BLOCK_SIZE_BYTES; k++)
             {
                 A[k] =  B[k];

@@ -535,7 +535,7 @@ Ap20AesHwStartEngine(
 
     NvOsMemcpy((NvU8 *)pSrcBufferVirtAddr, pSrc, DataSize);
 
-    if (DataSize && (!IsEncryption))
+    if (DataSize && (!IsEncryption) && (OpMode == NvDdkAesOperationalMode_Cbc))
     {
         NvOsMemcpy(&pAesHwCtxt->IvContext[Engine].CurIv[pAesHwCtxt->IvContext[Engine].CurKeySlot],
             (pSrc + DataSize - NvDdkAesConst_BlockLengthBytes),
@@ -559,7 +559,7 @@ Ap20AesHwStartEngine(
      * For an encryption operation, the current Iv will be the last block of
      * ciphertext.
      */
-    if (DataSize && IsEncryption)
+    if (DataSize && IsEncryption && (OpMode == NvDdkAesOperationalMode_Cbc))
     {
         NvOsMemcpy(&pAesHwCtxt->IvContext[Engine].CurIv[pAesHwCtxt->IvContext[Engine].CurKeySlot],
             (pDest + DataSize - NvDdkAesConst_BlockLengthBytes),
