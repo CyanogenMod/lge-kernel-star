@@ -25,6 +25,7 @@
 #include <linux/proc_fs.h>
 #include <linux/sched.h>
 #include <linux/string.h>
+#include <linux/slab.h>
 
 #include <mach/iovmm.h>
 
@@ -69,6 +70,7 @@ struct iovmm_share_group {
 static LIST_HEAD(iovmm_devices);
 static LIST_HEAD(iovmm_groups);
 static DEFINE_MUTEX(iovmm_list_lock);
+static struct kmem_cache *iovmm_cache;
 
 static tegra_iovmm_addr_t iovmm_align_up(struct tegra_iovmm_device *dev,
 	tegra_iovmm_addr_t addr)
@@ -159,7 +161,7 @@ static void iovmm_block_put(struct tegra_iovmm_block *b)
 	BUG_ON(atomic_read(&b->ref)==0);
 	if (!atomic_dec_return(&b->ref)) {
 		b->poison = 0xa5a5a5a5;
-		kfree(b);
+		kmem_cache_free(iovmm_cache, b);
 	}
 }
 
@@ -236,7 +238,7 @@ static void iovmm_split_free_block(struct tegra_iovmm_domain *domain,
 	struct tegra_iovmm_block *rem;
 	struct tegra_iovmm_block *b;
 
-	rem = kzalloc(sizeof(*rem), GFP_KERNEL);
+	rem = kmem_cache_zalloc(iovmm_cache, GFP_KERNEL);
 	if (!rem) return;
 
 	spin_lock(&domain->block_lock);
@@ -271,7 +273,6 @@ static void iovmm_split_free_block(struct tegra_iovmm_domain *domain,
 	}
 	rb_link_node(&rem->all_node, parent, p);
 	rb_insert_color(&rem->all_node, &domain->all_blocks);
-	spin_unlock(&domain->block_lock);
 }
 
 static struct tegra_iovmm_block *iovmm_alloc_block(
@@ -279,10 +280,17 @@ static struct tegra_iovmm_block *iovmm_alloc_block(
 {
 	struct rb_node *n;
 	struct tegra_iovmm_block *b, *best;
+        static int splitting = 0;
 
 	BUG_ON(!size);
 	size = iovmm_align_up(domain->dev, size);
-	spin_lock(&domain->block_lock);
+        for (;;) {
+		spin_lock(&domain->block_lock);
+		if (!splitting)
+			break;
+		spin_unlock(&domain->block_lock);
+		schedule();
+	}
 	n = domain->free_blocks.rb_node;
 	best = NULL;
 	while (n) {
@@ -303,10 +311,14 @@ static struct tegra_iovmm_block *iovmm_alloc_block(
 	rb_erase(&best->free_node, &domain->free_blocks);
 	clear_bit(BK_free, &best->flags);
 	atomic_inc(&best->ref);
-	spin_unlock(&domain->block_lock);
-
-	if (iovmm_length(best) >= size+MIN_SPLIT_BYTES(domain))
+	if (iovmm_length(best) >= size+MIN_SPLIT_BYTES(domain)) {
+		splitting = 1;
+		spin_unlock(&domain->block_lock);
 		iovmm_split_free_block(domain, best, size);
+		splitting = 0;
+	}
+
+	spin_unlock(&domain->block_lock);
 
 	return best;
 }
@@ -315,7 +327,9 @@ int tegra_iovmm_domain_init(struct tegra_iovmm_domain *domain,
 	struct tegra_iovmm_device *dev, tegra_iovmm_addr_t start,
 	tegra_iovmm_addr_t end)
 {
-	struct tegra_iovmm_block *b = kzalloc(sizeof(*b), GFP_KERNEL);
+	struct tegra_iovmm_block *b;
+
+	b = kmem_cache_zalloc(iovmm_cache, GFP_KERNEL);
 	if (!b) return -ENOMEM;
 
 	domain->dev = dev;
@@ -700,6 +714,12 @@ int tegra_iovmm_register(struct tegra_iovmm_device *dev)
 	BUG_ON(!dev);
 	mutex_lock(&iovmm_list_lock);
 	if (list_empty(&iovmm_devices)) {
+		iovmm_cache = KMEM_CACHE(tegra_iovmm_block, 0);
+		if (!iovmm_cache) {
+			pr_err("%s: failed to make kmem cache\n", __func__);
+			mutex_unlock(&iovmm_list_lock);
+			return -ENOMEM;
+		}
 		create_proc_read_entry("iovmminfo", S_IRUGO, NULL,
 			tegra_iovmm_read_proc, NULL);
 	}
