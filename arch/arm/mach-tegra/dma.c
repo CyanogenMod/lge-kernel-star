@@ -424,6 +424,35 @@ static void tegra_dma_update_hw_partial(struct tegra_dma_channel *ch,
 	return;
 }
 
+static void set_burst_size(struct tegra_dma_channel *ch,
+	struct tegra_dma_req *req)
+{
+	ch->ahb_seq &= ~AHB_SEQ_BURST_MASK;
+	switch(req->req_sel) {
+	case TEGRA_DMA_REQ_SEL_SL2B1:
+	case TEGRA_DMA_REQ_SEL_SL2B2:
+	case TEGRA_DMA_REQ_SEL_SL2B3:
+	case TEGRA_DMA_REQ_SEL_SL2B4:
+	case TEGRA_DMA_REQ_SEL_SPI:
+		/* For spi/slink the burst size based on transfer size
+		 * i.e. if multiple of 16 bytes then busrt is
+		 * 4 word else burst size is 1 word */
+		if (req->size & 0xF)
+			ch->ahb_seq |= AHB_SEQ_BURST_1;
+		else
+			ch->ahb_seq |= AHB_SEQ_BURST_4;
+		break;
+	case TEGRA_DMA_REQ_SEL_I2S_2:
+	case TEGRA_DMA_REQ_SEL_I2S_1:
+	case TEGRA_DMA_REQ_SEL_I2S2_2:
+	case TEGRA_DMA_REQ_SEL_I2S2_1:
+		ch->ahb_seq |= AHB_SEQ_BURST_4;
+		break;
+	default:
+		ch->ahb_seq |= AHB_SEQ_BURST_1;
+		break;
+	}
+}
 static void tegra_dma_update_hw(struct tegra_dma_channel *ch,
 	struct tegra_dma_req *req)
 {
@@ -437,20 +466,8 @@ static void tegra_dma_update_hw(struct tegra_dma_channel *ch,
 	ch->csr |= CSR_FLOW;
 	ch->csr &= ~CSR_REQ_SEL_MASK;
 	ch->csr |= req->req_sel << CSR_REQ_SEL_SHIFT;
-	ch->ahb_seq &= ~AHB_SEQ_BURST_MASK;
 
-	/* If slink is the requestor then set burst size based on
-	 * transfer size i.e. if multiple of 16 bytes then busrt is
-	 * 4 word else burst size is 1 word */
-	if ((TEGRA_DMA_REQ_SEL_SL2B1 <= req->req_sel) &&
-		(req->req_sel <= TEGRA_DMA_REQ_SEL_SL2B4)) {
-		if (req->size & 0xF)
-			ch->ahb_seq |= AHB_SEQ_BURST_1;
-		else
-			ch->ahb_seq |= AHB_SEQ_BURST_4;
-	} else {
-		ch->ahb_seq |= AHB_SEQ_BURST_1;
-	}
+	set_burst_size(ch, req);
 
 	/* One shot mode is always single buffered,
 	 * continuous mode is always double buffered
