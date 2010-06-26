@@ -911,9 +911,8 @@ NvOdmQueryDapPortGetConnectionTable(
 
         // Voicecall without Bluetooth
         { NvOdmDapConnectionIndex_VoiceCall_NoBlueTooth,
-          3, { {NvOdmDapPort_Dap3, NvOdmDapPort_Dap2, NV_FALSE},
-               {NvOdmDapPort_Dap2, NvOdmDapPort_Dap3, NV_TRUE},
-               {NvOdmDapPort_Dap2, NvOdmDapPort_I2s2, NV_TRUE} } },
+          2, { {NvOdmDapPort_Dap3, NvOdmDapPort_Dap2, NV_FALSE},
+               {NvOdmDapPort_Dap2, NvOdmDapPort_Dap3, NV_TRUE} } },
 
         // Voicecall with Bluetooth
         { NvOdmDapConnectionIndex_VoiceCall_WithBlueTooth,
