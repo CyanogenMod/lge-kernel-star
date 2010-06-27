@@ -79,7 +79,8 @@ static void tegra_i2c_unlock(struct tegra_i2c_bus *i2c_bus)
 	({								\
 		typeof(buff[0]) *bptr = buff;				\
 		if (num > ARRAY_SIZE(buff))				\
-			bptr = kzalloc(sizeof(*bptr)*num, GFP_ATOMIC);	\
+			bptr = kmalloc(sizeof(*bptr)*num, GFP_ATOMIC);	\
+		memset(bptr, 0, num*sizeof(*bptr));			\
 		bptr;							\
 	})
 
