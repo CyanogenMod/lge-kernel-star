@@ -33,6 +33,7 @@ obj-$(CONFIG_USB_SUPPORT)		+= usb_phy.o
 obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
 
 obj-${CONFIG_MACH_HARMONY}              += board-harmony.o
+obj-${CONFIG_MACH_HARMONY}              += board-harmony-panel.o
 obj-${CONFIG_MACH_HARMONY}              += board-harmony-pinmux.o
 obj-${CONFIG_MACH_HARMONY}              += board-harmony-pcie.o
 obj-${CONFIG_MACH_HARMONY}              += board-harmony-power.o
