@@ -880,7 +880,7 @@ static struct regulator_consumer_supply tegra_vdd_nand_consumers[] = {
 };
 static struct regulator_consumer_supply tegra_vdd_sys_consumers[] = {
 	[0] = {
-		.supply   = "vdd_ldo4",
+		.supply   = "vddio sys",
 	},
 };
 static struct regulator_consumer_supply tegra_vdd_audio_consumers[] = {
@@ -1520,9 +1520,10 @@ do_register:
 	tegra_init_idle(plat);
 }
 
-void __init tegra_setup_data(void)
+static int __init tegra_setup_data(void)
 {
 	platform_add_devices(nvodm_devices, ARRAY_SIZE(nvodm_devices));
+	return 0;
 }
 postcore_initcall(tegra_setup_data);
 
