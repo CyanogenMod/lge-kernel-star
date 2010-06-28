@@ -750,7 +750,7 @@ static int __devinit tegra_nand_probe(struct platform_device *pdev)
 	err = parse_mtd_partitions(mtd, part_probes, &info->parts, 0);
 
 	if (err > 0) {
-		add_mtd_partitions(mtd, info->parts, err);
+		err = add_mtd_partitions(mtd, info->parts, err);
 	} else if (err <= 0 && plat && plat->nr_parts) {
 		err = add_mtd_partitions(mtd, plat->parts, plat->nr_parts);
 	} else
