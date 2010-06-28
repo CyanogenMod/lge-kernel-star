@@ -316,7 +316,7 @@ static NvOdmWakeupPadInfo s_NvOdmWakeupPadInfo[] =
 #else
     {NV_FALSE, 17, NvOdmWakeupPadPolarity_High},
 #endif
-    {NV_FALSE, 18, NvOdmWakeupPadPolarity_Low},     // Wake Event 18 - pwr_int (PMIC_INT)
+    {NV_TRUE,  18, NvOdmWakeupPadPolarity_Low},     // Wake Event 18 - pwr_int (PMIC_INT)
     {NV_FALSE, 19, NvOdmWakeupPadPolarity_AnyEdge}, // Wake Event 19 - usb_vbus_wakeup[0]
     {NV_FALSE, 20, NvOdmWakeupPadPolarity_High},    // Wake Event 20 - usb_vbus_wakeup[1]
     {NV_FALSE, 21, NvOdmWakeupPadPolarity_Low},     // Wake Event 21 - usb_iddig[0]
@@ -668,7 +668,7 @@ NvOdmQueryPinAttributes(const NvOdmPinAttrib** pPinAttributes)
 
 NvBool NvOdmQueryGetPmuProperty(NvOdmPmuProperty* pPmuProperty)
 {
-    pPmuProperty->IrqConnected = NV_FALSE;
+    pPmuProperty->IrqConnected = NV_TRUE;
     pPmuProperty->PowerGoodCount = 0x7E7E;
     pPmuProperty->IrqPolarity = NvOdmInterruptPolarity_Low;
     pPmuProperty->CorePowerReqPolarity = NvOdmCorePowerReqPolarity_Low;

@@ -63,6 +63,8 @@ typedef void   (*pfnPmuInterruptHandler)(NvOdmPmuDeviceHandle);
 typedef NvBool (*pfnPmuReadRtc)(NvOdmPmuDeviceHandle, NvU32*);
 typedef NvBool (*pfnPmuWriteRtc)(NvOdmPmuDeviceHandle, NvU32);
 typedef NvBool (*pfnPmuIsRtcInitialized)(NvOdmPmuDeviceHandle);
+typedef NvBool (*pfnPmuReadAlarm)(NvOdmPmuDeviceHandle, NvU32*);
+typedef NvBool (*pfnPmuWriteAlarm)(NvOdmPmuDeviceHandle, NvU32);
 
 typedef struct NvOdmPmuDeviceRec
 { 
@@ -80,6 +82,8 @@ typedef struct NvOdmPmuDeviceRec
     pfnPmuInterruptHandler       pfnInterruptHandler;
     pfnPmuReadRtc                pfnReadRtc;
     pfnPmuWriteRtc               pfnWriteRtc;
+    pfnPmuReadAlarm              pfnReadAlarm;
+    pfnPmuWriteAlarm             pfnWriteAlarm;
     pfnPmuIsRtcInitialized       pfnIsRtcInitialized;
     void                        *pPrivate;
     NvBool                       Hal;

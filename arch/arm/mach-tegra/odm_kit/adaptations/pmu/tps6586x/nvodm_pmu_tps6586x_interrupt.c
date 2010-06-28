@@ -37,13 +37,17 @@
 #include "nvodm_services.h"
 #include "nvodm_pmu_tps6586x_batterycharger.h"
 
+/* INT_MASK3 */
 #define TPS6586X_INT_BATT_INST 0x01
 #define TPS6586X_INT_PACK_COLD_DET 0x02
 #define TPS6586X_INT_PACK_HOT_DET 0x04
-
-#define TPS6586X_INT_USB_DETECTION 0x04
-#define TPS6586X_INT_AC_DETECTION  0x08
-#define TPS6586X_INT_LOWSYS_DETECTION 0x40
+/* INT_MASK4 */
+#define TPS6586X_INT_ALM2_INST          0x02
+/* INT_MASK5 */
+#define TPS6586X_INT_USB_DETECTION      0x04
+#define TPS6586X_INT_AC_DETECTION       0x08
+#define TPS6586X_INT_ALM1_DETECTION     0x10
+#define TPS6586X_INT_LOWSYS_DETECTION   0x40
 
 NvBool Tps6586xSetupInterrupt(NvOdmPmuDeviceHandle  hDevice,
                               TPS6586xStatus *pmuStatus)
@@ -114,31 +118,43 @@ void Tps6586xInterruptHandler_int(NvOdmPmuDeviceHandle  hDevice,
     pmuStatus->powerGood |= ((data & 0xFF)<<8);
 
     /* INT_ACK3 */
-    /* LOW SYS */
     if (!Tps6586xI2cRead8(hDevice, TPS6586x_RB7_INT_ACK3, &data))
     {
         return;
     }
     if (data != 0)
     {
+        /* ACK_RTCALM1 */
+        if (data&0x01)
+        {
+        /* printk("%s ACK_RTC_ALM_1 detect!!!\n", __func__); */
+        }
+
+        /* ACK_CHGTEMP */
         if (data&0x40)
         {
             pmuStatus->highTemp = NV_TRUE;
         }
-        if (data&0xc0)
+        /* ACK_ACDET & ACK_USBDET */
+        if (data&0x0C)
         {
             pmuStatus->mChgPresent = NV_TRUE;
         }
     }
 
     /* INT_ACK4 */
-    /* CHG TEMP */
     if (!Tps6586xI2cRead8(hDevice, TPS6586x_RB8_INT_ACK4, &data))
     {
         return;
     }
     if (data != 0)
     {
+        /* ACK_RTCALM2 */
+        if (data&0x04)
+        {
+        /* printk("%s ACK_RTC_ALM_2 detect!!!\n", __func__); */
+        }
+        /* LOW SYS */
         if (data&0x02)
         {
             pmuStatus->lowBatt = NV_TRUE;

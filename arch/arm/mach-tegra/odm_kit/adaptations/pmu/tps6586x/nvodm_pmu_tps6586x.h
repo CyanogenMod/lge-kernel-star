@@ -86,6 +86,8 @@ NvBool Tps6586xSetChargingCurrent( NvOdmPmuDeviceHandle hDevice, NvOdmPmuChargin
 void Tps6586xInterruptHandler( NvOdmPmuDeviceHandle  hDevice);
 NvBool Tps6586xReadRtc( NvOdmPmuDeviceHandle  hDevice, NvU32 *Count);
 NvBool Tps6586xWriteRtc( NvOdmPmuDeviceHandle  hDevice, NvU32 Count);
+NvBool Tps6586xReadAlarm( NvOdmPmuDeviceHandle  hDevice, NvU32 *Count);
+NvBool Tps6586xWriteAlarm( NvOdmPmuDeviceHandle  hDevice, NvU32 Count);
 NvBool Tps6586xIsRtcInitialized( NvOdmPmuDeviceHandle  hDevice);
 
 #if defined(__cplusplus)

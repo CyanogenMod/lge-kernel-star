@@ -1808,6 +1808,17 @@ NvBool Tps6586xWriteRtc( NvOdmPmuDeviceHandle  hDevice, NvU32 Count)
     return (Tps6586xRtcCountWrite(hDevice, Count));
 }
 
+NvBool Tps6586xReadAlarm( NvOdmPmuDeviceHandle  hDevice, NvU32 *Count)
+{
+    *Count = 0;
+    return (Tps6586xRtcAlarmCountRead(hDevice, Count));
+}
+
+NvBool Tps6586xWriteAlarm( NvOdmPmuDeviceHandle  hDevice, NvU32 Count)
+{
+    return (Tps6586xRtcAlarmCountWrite(hDevice, Count));
+}
+
 NvBool Tps6586xIsRtcInitialized( NvOdmPmuDeviceHandle  hDevice)
 {
     return ((Tps6586xRtcWasStartUpFromNoPower(hDevice))? NV_FALSE: NV_TRUE);

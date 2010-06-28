@@ -41,8 +41,14 @@
 #define OFFSET_BASE_YEAR 1
 #if OFFSET_BASE_YEAR
 static unsigned long epoch = 2009;
+#define epoch_end            2037L
 static unsigned long epoch_sec = 0;
 #endif
+
+#define RTC_LIMITED                     1
+
+static NvBool rtc_alarm_active = NV_FALSE;      /* RTC_ALARM_ACTIVE */
+static NvBool ALARM1_used = NV_FALSE;
 
 static NvBool bRtcNotInitialized = NV_TRUE;
 
@@ -61,8 +67,13 @@ Tps6586xRtcCountRead(
 
     if (Tps6586xRtcWasStartUpFromNoPower(hDevice) && bRtcNotInitialized)
     {
+#if RTC_LIMITED
+         Tps6586xRtcCountWrite(hDevice, (NvU32)mktime(epoch,1,1,0,0,0));
+        *Count = 0;
+#else   /* RTC_LIMITED */
         Tps6586xRtcCountWrite(hDevice, 0);
         *Count = 0;
+#endif  /* RTC_LIMITED */
     }
     else
     {
@@ -81,7 +92,7 @@ Tps6586xRtcCountRead(
     // calculate epoch_sec once
     if (!epoch_sec)
         epoch_sec = mktime(epoch,1,1,0,0,0);
-    *Count += epoch_sec;
+    *Count += (NvU32)epoch_sec;
 #endif
 
     return NV_TRUE;
@@ -105,11 +116,20 @@ Tps6586xRtcCountWrite(
         pr_warning("\n Date being set cannot be earlier than least "
             "year=%d. Setting as least year. ", (int)epoch);
         // base year seconds count is 0
+#if RTC_LIMITED
+        Count = (NvU32)epoch_sec; //reset RTC count to 2010/01/01 00:00:00
+#else   /* RTC_LIMITED */
         Count = 0;
+#endif  /* RTC_LIMITED */
     }
     else
         Count -= (NvU32)epoch_sec;
-#endif
+#if RTC_LIMITED
+    if (Count > (NvU32)mktime(epoch_end,12,31,23,59,59))
+        Count = (NvU32)epoch_sec; //reset RTC count to 2010/01/01 00:00:00
+#endif  /* RTC_LIMITED */
+
+#endif  /*OFFSET_BASE_YEAR */
 
     // Switch to 32KHz crystal oscillator
     // POR_SRC_SEL=1 and OSC_SRC_SEL=1
@@ -147,7 +167,30 @@ Tps6586xRtcAlarmCountRead(
     NvOdmPmuDeviceHandle hDevice,
     NvU32* Count)
 {
-    return NV_FALSE;
+    NvU32 Counter;
+    NvU32 ReadBuffer[3];
+
+    if ( rtc_alarm_active ) {
+
+        if ( ALARM1_used ) {
+            Tps6586xI2cRead8(hDevice, TPS6586x_RC3_RTC_ALARM1_LO,       &ReadBuffer[2]);
+            Tps6586xI2cRead8(hDevice, TPS6586x_RC2_RTC_ALARM1_MID,      &ReadBuffer[1]);
+            Tps6586xI2cRead8(hDevice, TPS6586x_RC1_RTC_ALARM1_HI,       &ReadBuffer[0]);
+            Counter = (ReadBuffer[0] << 16) + (ReadBuffer[1] << 8) + ReadBuffer[2];
+            *Count = Counter >> 10;
+        } else {        //( ALARM1_used )
+            Tps6586xI2cRead8(hDevice, TPS6586x_RC5_RTC_ALARM2_LO,       &ReadBuffer[1]);
+            Tps6586xI2cRead8(hDevice, TPS6586x_RC4_RTC_ALARM2_HI,       &ReadBuffer[0]);
+            Counter = (ReadBuffer[0]<<8) + ReadBuffer[1];
+            *Count = Counter << 2;
+        }               //( ALARM1_used )
+
+        return NV_TRUE;
+
+    } else {    // ( rtc_alarm_active )
+        return NV_FALSE;
+    }           // ( rtc_alarm_active )
+
 }
 
 /* Write RTC alarm count register */
@@ -157,7 +200,74 @@ Tps6586xRtcAlarmCountWrite(
     NvOdmPmuDeviceHandle hDevice,
     NvU32 Count)
 {
-    return NV_FALSE;
+    NvU32 ReadBuffer32;
+    NvU32 Counter;
+    NvU32 temp;
+
+    NvU32 alarm1_start_sec;
+    NvU32 alarm1_end_sec;
+    NvU32 alarm2_start_sec;
+    NvU32 alarm2_end_sec;
+
+    alarm1_start_sec = 0;       //2^(10-10)-1 = 2^0-1 = 0
+    alarm1_end_sec = 16384;     //2^(24-10) = 2^14 =16384 sec = 273 min 4 sec = 4 hr 33min 4 sec
+
+    alarm2_start_sec = 3;       //2^(12-10)-1 = 2^2-1 = 3
+    alarm2_end_sec = 262144;    //2^(28-10)= 2^18 = 262144sec = 4369min 4sec = 72hr 49min 4sec = 3day 0hr 49min 4sec
+
+    if ( Count < alarm2_end_sec && Count > alarm1_start_sec ) {
+        rtc_alarm_active = NV_TRUE;
+        if ( Count < alarm1_end_sec )
+            ALARM1_used = NV_TRUE;
+        else
+            ALARM1_used = NV_FALSE;
+    }
+
+    if ( rtc_alarm_active ) {
+
+        if ( ALARM1_used ) {
+
+            if (Count >= alarm1_end_sec || Count <= alarm1_start_sec)
+                return NV_FALSE;
+
+                Tps6586xI2cRead32(hDevice, TPS6586x_RC6_RTC_COUNT4, &ReadBuffer32);
+                Tps6586xI2cRead8(hDevice,  TPS6586x_RCA_RTC_COUNT0, &temp);
+                ReadBuffer32 &= 0x0000ffff;     //bit[23:08]
+                Counter = (ReadBuffer32<<8)+ temp;
+                Counter += Count << 10;
+
+                Tps6586xI2cWrite8(hDevice, TPS6586x_RC3_RTC_ALARM1_LO,  ((Counter >> 0) & 0xFF));
+                Tps6586xI2cWrite8(hDevice, TPS6586x_RC2_RTC_ALARM1_MID, ((Counter >> 8) & 0xFF));
+                Tps6586xI2cWrite8(hDevice, TPS6586x_RC1_RTC_ALARM1_HI,  ((Counter >> 16) & 0xFF));
+        //FIXME:
+            Tps6586xI2cRead8(hDevice, TPS6586x_RB4_INT_MASK5, &temp);
+            temp = temp & 0xEF;
+            Tps6586xI2cWrite8(hDevice, TPS6586x_RB4_INT_MASK5, temp);
+
+        } else {        //( ALARM1_used )
+
+            if (Count >= alarm2_end_sec || Count <= alarm2_start_sec)
+                return NV_FALSE;
+
+                Tps6586xI2cRead32(hDevice, TPS6586x_RC6_RTC_COUNT4, &ReadBuffer32);
+                Tps6586xI2cRead8(hDevice,  TPS6586x_RCA_RTC_COUNT0, &temp);
+                ReadBuffer32 &= 0x000ffff0;     //bit[27:12]
+                Counter = ReadBuffer32 >> 4;
+                Counter += Count >>2; //(Count*4sec)
+
+                Tps6586xI2cWrite8(hDevice, TPS6586x_RC5_RTC_ALARM2_LO,  ((Counter >> 0) & 0xFF));
+                Tps6586xI2cWrite8(hDevice, TPS6586x_RC4_RTC_ALARM2_HI,  ((Counter >> 8) & 0xFF));
+        //FIXME:
+            Tps6586xI2cRead8(hDevice, TPS6586x_RB3_INT_MASK4, &temp);
+            temp = temp & 0xFD;
+            Tps6586xI2cWrite8(hDevice, TPS6586x_RB3_INT_MASK4, temp);
+
+        }               //( ALARM1_used )
+        return NV_TRUE;
+    } else {    // ( rtc_alarm_active )
+        return NV_FALSE;
+    }           // ( rtc_alarm_active )
+
 }
 
 /* Reads RTC alarm interrupt mask status */

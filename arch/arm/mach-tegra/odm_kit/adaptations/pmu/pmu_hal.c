@@ -70,6 +70,8 @@ GetPmuInstance(NvOdmPmuDeviceHandle hDevice)
             Pmu.pfnInterruptHandler = Tps6586xInterruptHandler;
             Pmu.pfnReadRtc = Tps6586xReadRtc;
             Pmu.pfnWriteRtc = Tps6586xWriteRtc;
+            Pmu.pfnReadAlarm = Tps6586xReadAlarm;
+            Pmu.pfnWriteAlarm = Tps6586xWriteAlarm;
             Pmu.pfnIsRtcInitialized = Tps6586xIsRtcInitialized;
         }
         else if (NvOdmPeripheralGetGuid(NV_ODM_GUID('p','c','f','_','p','m','u','0')))
@@ -89,6 +91,8 @@ GetPmuInstance(NvOdmPmuDeviceHandle hDevice)
             Pmu.pfnInterruptHandler       = Pcf50626InterruptHandler;
             Pmu.pfnReadRtc                = Pcf50626RtcCountRead;
             Pmu.pfnWriteRtc               = Pcf50626RtcCountWrite;
+            Pmu.pfnReadAlarm              = NULL;
+            Pmu.pfnWriteAlarm             = NULL;
             Pmu.pfnIsRtcInitialized       = Pcf50626IsRtcInitialized;
             Pmu.pPrivate                  = NULL;            
             Pmu.Hal                       = NV_TRUE;  
@@ -111,6 +115,8 @@ GetPmuInstance(NvOdmPmuDeviceHandle hDevice)
             Pmu.pfnInterruptHandler       = Max8907bInterruptHandler;
             Pmu.pfnReadRtc                = Max8907bRtcCountRead;
             Pmu.pfnWriteRtc               = Max8907bRtcCountWrite;
+            Pmu.pfnReadAlarm              = NULL;
+            Pmu.pfnWriteAlarm             = NULL;
             Pmu.pfnIsRtcInitialized       = Max8907bIsRtcInitialized;
             Pmu.pPrivate                  = NULL;
             Pmu.Hal                       = NV_TRUE;  
@@ -338,6 +344,28 @@ NvBool NvOdmPmuWriteRtc(
 
     if (pmu && pmu->pfnWriteRtc)
         return pmu->pfnWriteRtc(pmu, Count);
+    return NV_FALSE;
+}
+
+NvBool NvOdmPmuReadAlarm(
+    NvOdmPmuDeviceHandle  hDevice,
+    NvU32 *Count)
+{
+    NvOdmPmuDevice *pmu = GetPmuInstance(hDevice);
+
+    if (pmu && pmu->pfnReadAlarm)
+        return pmu->pfnReadAlarm(pmu, Count);
+    return NV_FALSE;
+}
+
+NvBool NvOdmPmuWriteAlarm(
+    NvOdmPmuDeviceHandle  hDevice,
+    NvU32 Count)
+{
+    NvOdmPmuDevice *pmu = GetPmuInstance(hDevice);
+
+    if (pmu && pmu->pfnWriteAlarm)
+        return pmu->pfnWriteAlarm(pmu, Count);
     return NV_FALSE;
 }
 
