@@ -573,3 +573,23 @@ struct platform_device tegra_pcm_device = {
 	.name = "tegra-pcm-audio",
 	.id = -1,
 };
+
+static struct resource w1_resources[] = {
+	[0] = {
+		.start = INT_OWR,
+		.end   = INT_OWR,
+		.flags = IORESOURCE_IRQ
+	},
+	[1] = {
+		.start = TEGRA_OWR_BASE,
+		.end = TEGRA_OWR_BASE + TEGRA_OWR_SIZE - 1,
+		.flags = IORESOURCE_MEM
+	}
+};
+
+struct platform_device tegra_w1_device = {
+	.name          = "tegra_w1",
+	.id            = -1,
+	.resource      = w1_resources,
+	.num_resources = ARRAY_SIZE(w1_resources),
+};

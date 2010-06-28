@@ -1,5 +1,11 @@
 /*
+<<<<<<< HEAD
  * Copyright (C) 2010,2011 Google, Inc.
+=======
+ * arch/arm/mach-tegra/devices.h
+ *
+ * Copyright (C) 2010 Google, Inc.
+>>>>>>> w1: master: tegra_w1: Adds generic mach-tegra w1 support.
  *
  * Author:
  *	Colin Cross <ccross@android.com>
@@ -46,5 +52,6 @@ extern struct platform_device tegra_i2s_device1;
 extern struct platform_device tegra_i2s_device2;
 extern struct platform_device tegra_das_device;
 extern struct platform_device tegra_pcm_device;
+extern struct platform_device tegra_w1_device;
 
 #endif
