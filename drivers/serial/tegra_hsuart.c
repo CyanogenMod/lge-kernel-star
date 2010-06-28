@@ -43,7 +43,7 @@
 #include <mach/dma.h>
 #include <mach/pinmux.h>
 #include <mach/serial.h>
-
+#include "nvodm_uart.h"
 #define TX_EMPTY_STATUS (UART_LSR_TEMT | UART_LSR_THRE)
 
 #define BYTES_TO_ALIGN(x) ((unsigned long)(ALIGN((x), sizeof(u32))) - \
@@ -118,6 +118,7 @@ struct tegra_uart_port {
 
 	bool			rx_timeout;
 	int uart_state;
+	NvOdmUartHandle         odm_uart_handle;
 };
 
 static inline u8 uart_readb(struct tegra_uart_port *t, unsigned long reg)
@@ -1134,6 +1135,10 @@ static int tegra_uart_suspend(struct platform_device *pdev, pm_message_t state)
 		pr_err("Invalid Uart instance (%d)\n", pdev->id);
 
 	dev_err(t->uport.dev, "tegra_uart_suspend called\n");
+
+	if (t->odm_uart_handle)
+		NvOdmUartSuspend(t->odm_uart_handle);
+
 	u = &t->uport;
 
 	/* Enable clock before calling suspend so that controller
@@ -1167,6 +1172,8 @@ static int tegra_uart_resume(struct platform_device *pdev)
 		uart_resume_port(&tegra_uart_driver, u);
 		t->uart_state = TEGRA_UART_OPENED;
 	}
+	if (t->odm_uart_handle)
+		NvOdmUartResume(t->odm_uart_handle);
 	return 0;
 }
 
@@ -1182,6 +1189,8 @@ static int __devexit tegra_uart_remove(struct platform_device *pdev)
 
 	u = &t->uport;
 	uart_remove_one_port(&tegra_uart_driver, u);
+	if (t->odm_uart_handle)
+		NvOdmUartClose(t->odm_uart_handle);
 
 	platform_set_drvdata(pdev, NULL);
 
@@ -1221,6 +1230,7 @@ static int __init tegra_uart_probe(struct platform_device *pdev)
 	u->regshift = 2;
 	t->pinmux = pdata->pinmux;
 	t->nr_pins = pdata->nr_pins;
+	t->odm_uart_handle = NvOdmUartOpen(pdev->id);
 
 	t->clk = clk_get(&pdev->dev, NULL);
 	if (!t->clk) {
@@ -1244,6 +1254,8 @@ static int __init tegra_uart_probe(struct platform_device *pdev)
 	t->uart_state = TEGRA_UART_CLOSED;
 	return ret;
 fail:
+	if (t->odm_uart_handle)
+		NvOdmUartClose(t->odm_uart_handle);
 	kfree(t);
 	return -ENODEV;
 }
