@@ -815,9 +815,10 @@ static void set_rts(struct tegra_uart_port *t, bool active)
 	unsigned char mcr;
 	mcr = t->mcr_shadow;
 	if (active)
-		mcr |= UART_MCR_RTS;
+		mcr |= UART_MCR_RTS_EN;
 	else
-		mcr &= ~UART_MCR_RTS;
+		mcr &= ~UART_MCR_RTS_EN;
+
 	if (mcr != t->mcr_shadow) {
 		uart_writeb(t, mcr, UART_MCR);
 		t->mcr_shadow = mcr;
