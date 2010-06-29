@@ -485,9 +485,11 @@ NvOdmPeripheralGetBoardInfo(
     static NvBool s_ReadBoardInfoDone = NV_FALSE;
 
     if (!s_ReadBoardInfoDone)
+        hOdmI2c = NvOdmI2cOpen(NvOdmIoModule_I2c_Pmu, 0);
+
+    if (!s_ReadBoardInfoDone)
     {
         s_ReadBoardInfoDone = NV_TRUE;
-        hOdmI2c = NvOdmI2cOpen(NvOdmIoModule_I2c_Pmu, 0);
         if (!hOdmI2c)
         {
             // Exit
@@ -502,8 +504,9 @@ NvOdmPeripheralGetBoardInfo(
             if (RetVal == NV_TRUE)
                 NumBoards++;
         }
-        NvOdmI2cClose(hOdmI2c);
     }
+    if (hOdmI2c)
+        NvOdmI2cClose(hOdmI2c);
 
     if (NumBoards)
     {
