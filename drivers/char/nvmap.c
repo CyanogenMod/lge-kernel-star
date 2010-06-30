@@ -405,6 +405,9 @@ static void nvmap_split_block(struct nvmap_carveout *co,
 		(_co)->_list##_index = (_idx);				\
 	} while (0);
 
+#define are_blocks_contiguous(_b_first, _b_next) \
+	(_b_first->base + _b_first->size == _b_next->base)
+
 static void nvmap_carveout_free(struct nvmap_carveout *co, int idx)
 {
 	struct nvmap_mem_block *b;
@@ -413,7 +416,9 @@ static void nvmap_carveout_free(struct nvmap_carveout *co, int idx)
 
 	b = BLOCK(co, idx);
 
-	if (b->next!=-1 && co_is_free(co, b->next)) {
+	if (b->next!=-1 &&
+		co_is_free(co, b->next) &&
+		are_blocks_contiguous(b,BLOCK(co, b->next))) {
 		int zap = b->next;
 		struct nvmap_mem_block *n = BLOCK(co, zap);
 		b->size += n->size;
@@ -425,7 +430,9 @@ static void nvmap_carveout_free(struct nvmap_carveout *co, int idx)
 		nvmap_insert_block(spare, co, zap);
 	}
 
-	if (b->prev!=-1 && co_is_free(co, b->prev)) {
+	if (b->prev!=-1 &&
+		co_is_free(co, b->prev) &&
+		are_blocks_contiguous(BLOCK(co, b->prev),b)) {
 		int zap = b->prev;
 		struct nvmap_mem_block *p = BLOCK(co, zap);
 
