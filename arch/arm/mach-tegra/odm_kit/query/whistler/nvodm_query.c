@@ -1216,7 +1216,7 @@ const NvOdmSocPowerStateInfo* NvOdmQueryLowestSocPowerState(void)
             LPStateSelection = NV_DRF_VAL(TEGRA_DEVKIT, BCT_CUSTOPT, LPSTATE, LPStateSelection);
         }
         // Lowest power state controlled by the flashed custom option.
-        PowerStateInfo.LowestPowerState = NvOdmSocPowerState_SimpleSuspend;
+        PowerStateInfo.LowestPowerState = NvOdmSocPowerState_Suspend;
         pPowerStateInfo = (const NvOdmSocPowerStateInfo*) &PowerStateInfo;
     }
     return (pPowerStateInfo);
