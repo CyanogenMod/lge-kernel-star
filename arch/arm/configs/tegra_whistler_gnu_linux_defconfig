@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.32.9
-# Fri Jun 25 12:06:14 2010
+# Wed Jun 30 14:21:49 2010
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -802,7 +802,7 @@ CONFIG_INPUT_MISC=y
 CONFIG_INPUT_UINPUT=y
 # CONFIG_INPUT_GPIO is not set
 # CONFIG_INPUT_GPIO_ROTARY_ENCODER is not set
-CONFIG_INPUT_TEGRA_ODM_ACCEL=y
+# CONFIG_INPUT_TEGRA_ODM_ACCEL is not set
 CONFIG_INPUT_TEGRA_ODM_SCROLL=y
 
 #
