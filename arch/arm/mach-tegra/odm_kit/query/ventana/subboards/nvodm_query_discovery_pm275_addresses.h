@@ -383,6 +383,7 @@ static const NvOdmIoAddress s_TouchPanelAddresses[] =
 {
     { NvOdmIoModule_I2c, 0x00, 0x06 }, /* I2C address (7-bit) 0x03<<1=0x06(8-bit)  */
     { NvOdmIoModule_Gpio, (NvU32)'v'-'a', 0x06 }, /* GPIO Port v and Pin 6 */
+    { NvOdmIoModule_Gpio, (NvU32)'q'-'a', 0x07 }, /* GPIO Port Q and Pin 7 -> TOUCH XRES*/
 };
 
 static const NvOdmIoAddress s_AcceleroAddresses[] =
