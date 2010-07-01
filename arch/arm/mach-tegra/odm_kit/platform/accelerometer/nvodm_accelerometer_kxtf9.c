@@ -96,23 +96,11 @@
 // I2C clock speed.
 #define I2C_CLK_SPEED 400
 
-#define kxtf9_GUID NV_ODM_GUID('k','x','t','f','9','-','4','0')
-
 #define EEPROM_ID_E1206 0x0C06
-#define NVODMACCELEROMETER_ENABLE_PRINTF 0
-
-#if NVODMACCELEROMETER_ENABLE_PRINTF
-    #define NVODMACCELEROMETER_PRINTF(x) \
-    do { \
-        NvOdmOsPrintf x; \
-    } while (0)
-#else
-    #define NVODMACCELEROMETER_PRINTF(x)
-#endif
-
 #define NV_DEBOUNCE_TIME_MS 0
-
 #define ENABLE_XYZ_POLLING 0
+
+#define kxtf9_GUID NV_ODM_GUID('k','x','t','f','9','-','4','0')
 
 static NvU8 s_ReadBuffer[I2C_ACCELRATOR_PACKET_SIZE];
 static NvU8 s_WriteBuffer[I2C_ACCELRATOR_PACKET_SIZE];
@@ -339,6 +327,10 @@ CloseGpioHandle:
     return NV_FALSE;
 }
 
+// For 12 bit resolution, Max reading possible with msb left for sign bit.
+static NvS32 s_MaxAccelReading = 1 << 11;
+// Considering g variation to be +/-2g, Max g value in milli g's.
+static NvS32 s_MaxGValInMilliGs = 2000;
 static NvBool kxtf9_Init(NvOdmAccelHandle hDevice)
 {
     NvU8 TestVal;
@@ -370,14 +362,14 @@ static NvBool kxtf9_Init(NvOdmAccelHandle hDevice)
         NVODMACCELEROMETER_PRINTF(("\n Int Set failed\n"));
     }
 
-    // set ODR to 200 Hz
-    RegVal = 0x3;
+    // set ODR to 25 Hz
+    RegVal = 0x0;
     if (!WriteReg(hDevice, kxtf9_CTRL_REG3, &RegVal, 1))
     {
         NVODMACCELEROMETER_PRINTF(("\n LPF freq set failed\n"));
     }
-    // Set WUF_TIMER to 1 ODR clock
-    RegVal = 0x1;
+    // Set WUF_TIMER to 2 ODR clock
+    RegVal = 2;
     if (!WriteReg(hDevice, kxtf9_WUF_TIMER, &RegVal, 1))
     {
         NVODMACCELEROMETER_PRINTF(("\n LPF freq set failed\n"));
@@ -397,7 +389,7 @@ static NvBool kxtf9_Init(NvOdmAccelHandle hDevice)
 
 #if MOTION_ONLY_ENABLE
     //set PC1, RES & WUFE to 1.
-    RegVal |= 0xC2;
+    RegVal |= 0XE2; // 0xC2;
 #endif
     if(!WRITE_VERIFY(hDevice, kxtf9_CTRL_REG1, RegVal))
         goto error;
@@ -423,6 +415,13 @@ kxtf9_ReadXYZ(
     *X = ((Data[1] << 4) | (Data[0] >> 4));
     *Y = ((Data[3] << 4) | (Data[2] >> 4));
     *Z = ((Data[5] << 4) | (Data[4] >> 4));
+
+    if (*X & 0x800)
+        *X |= 0xFFFFF000;
+    if (*Y & 0x800)
+        *Y |= 0xFFFFF000;
+    if (*Z & 0x800)
+        *Z |= 0xFFFFF000;
 }
 
 void kxtf9_deInit(NvOdmAccelHandle hDevice)
@@ -481,7 +480,9 @@ kxtf9_SetIntForceThreshold(
     NvU32             IntNum,
     NvU32             Threshold)
 {
-    NvU8 RegVal = Threshold;
+    NvU8 RegVal;
+    NvU32 Reading;
+
     // If not motion Threshold, return from here
     if (IntType != NvOdmAccelInt_MotionThreshold)
         return NV_TRUE;
@@ -489,16 +490,18 @@ kxtf9_SetIntForceThreshold(
     if(!SetAccelerometerActive(hDevice, NV_FALSE))
         return NV_FALSE;
 
+    Reading = (Threshold * s_MaxAccelReading)/ (s_MaxGValInMilliGs);
+    RegVal = (NvU8) Reading;
     // To set requested Threshold Value.
     if(!WRITE_VERIFY(hDevice, kxtf9_WUF_THRESH, RegVal))
     {
-        NVODMACCELEROMETER_PRINTF(("\nkxtf9:Set WUF_Threshold failed\n"));
+        NvOdmOsPrintf("\nkxtf9:Set WUF_Threshold failed\n");
         return NV_FALSE;
     }
 
     if(!SetAccelerometerActive(hDevice, NV_TRUE))
         return NV_FALSE;
-    NVODMACCELEROMETER_PRINTF(("\nkxtf9: set WUF_Threshold val:%d",Threshold));
+    NvOdmOsPrintf("\nkxtf9: set WUF_Threshold val:%d",Threshold);
     return NV_TRUE;
 }
 
@@ -542,34 +545,10 @@ void kxtf9_Signal(NvOdmAccelHandle hDevice)
     NvOdmOsSemaphoreSignal(hDevice->SemaphoreForINT);
 }
 
-static NvU16 Get2sComplement(NvU16 Val, NvU16 Mask)
+#if NVODMACCELEROMETER_ENABLE_PRINTF
+static PrintAccelEventInfo(NvOdmAccelHandle hDevice)
 {
-    Val = ((~(Val) + 0x01) & Mask);
-	Val = -(Val);
-	return Val;
-}
-NvBool
-kxtf9_GetAcceleration(
-    NvOdmAccelHandle hDevice,
-    NvS32           *AccelX,
-    NvS32           *AccelY,
-    NvS32           *AccelZ)
-{
-    NvS32 data;
-    NvS32 TempAccelX = 0;
-    NvS32 TempAccelY = 0;
-    NvS32 TempAccelZ = 0;
     NvU8 RegVal = 0;
-    NvU8 Gvalue = 0;
-    NvU32 GValVariation = 0;
-    NvU32 MaxAccelReading = 0;
-    NvBool Is12BitResolution = NV_FALSE;
-
-    NV_ASSERT(NULL != hDevice);
-    NV_ASSERT(NULL != AccelX);
-    NV_ASSERT(NULL != AccelY);
-    NV_ASSERT(NULL != AccelZ);
-
     if (s_IntSrcReg2 & 1)
     {
         NVODMACCELEROMETER_PRINTF(("\nkxtf9 Tilt Int set"));
@@ -611,7 +590,7 @@ kxtf9_GetAcceleration(
     }
     if ((s_IntSrcReg2 >> 1) & 1)
     {
-//        NVODMACCELEROMETER_PRINTF(("\n kxtf9 Motion event (WUFS) Int set"));
+        NVODMACCELEROMETER_PRINTF(("\n kxtf9 Motion event (WUFS) Int set"));
     }
     if ((s_IntSrcReg2 >> 4) & 1)
     {
@@ -642,52 +621,39 @@ kxtf9_GetAcceleration(
     {
         NVODMACCELEROMETER_PRINTF(("\nkxtf9 Tap In X- direction"));
     }
+}
+#endif
 
-    ReadReg(hDevice, kxtf9_CTRL_REG1, &RegVal, 1);
-    if (RegVal & 0x40) // 12 bit resolution
-    {
-        Is12BitResolution = NV_TRUE;
-        MaxAccelReading = 1 << 12;
-    }
-    else // 8 bit resolution
-    {
-        MaxAccelReading = 1 << 8;
-    }
+NvBool
+kxtf9_GetAcceleration(
+    NvOdmAccelHandle hDevice,
+    NvS32           *AccelX,
+    NvS32           *AccelY,
+    NvS32           *AccelZ)
+{
+    NvS32 data;
+    NvS32 TempAccelX = 0;
+    NvS32 TempAccelY = 0;
+    NvS32 TempAccelZ = 0;
 
-    Gvalue = (RegVal >> 3) & 0x3;
+#if NVODMACCELEROMETER_ENABLE_PRINTF
+    static NvU32 PrintCount;
+    // Print once only in every PRINT_FREQUENCY iterations.
+    #define PRINT_FREQUENCY 50
+#endif
 
-    if (Gvalue == 3)
-        NV_ASSERT(0);
-    else
-        GValVariation = 4 << Gvalue;
-    // To avoid floating point numbers, get g-Value in milli-g's
-    GValVariation *= 1000;
+    NV_ASSERT(NULL != hDevice);
+    NV_ASSERT(NULL != AccelX);
+    NV_ASSERT(NULL != AccelY);
+    NV_ASSERT(NULL != AccelZ);
+
+#if NVODMACCELEROMETER_ENABLE_PRINTF
+    PrintAccelEventInfo(hDevice);
+#endif
 
     kxtf9_ReadXYZ(hDevice, &TempAccelX, &TempAccelY, &TempAccelZ);
 
-    if (Is12BitResolution)
-    {
-        if (TempAccelX & 0x800)
-            TempAccelX = Get2sComplement(TempAccelX, 0xFFF);
-        if (TempAccelY & 0x800)
-            TempAccelY = Get2sComplement(TempAccelY, 0xFFF);
-        if (TempAccelZ & 0x800)
-            TempAccelZ = Get2sComplement(TempAccelZ, 0xFFF);
-    }
-    else
-    {
-        // In case of 8 bit resolution, accel data is stored in MSB reg only.
-        TempAccelX >>= 4;
-        TempAccelY >>= 4;
-        TempAccelZ >>= 4;
-        if (TempAccelX & 0x80)
-            TempAccelX = Get2sComplement(TempAccelX, 0xFF);
-        if (TempAccelY & 0x80)
-            TempAccelY = Get2sComplement(TempAccelY, 0xFF);
-        if (TempAccelZ & 0x80)
-            TempAccelZ = Get2sComplement(TempAccelZ, 0xFF);
-    }
-    data = (TempAccelX * GValVariation) / MaxAccelReading;
+    data = (TempAccelX * s_MaxGValInMilliGs) / s_MaxAccelReading;
     switch(hDevice->AxisXMapping)
     {
         case NvOdmAccelAxis_X:
@@ -703,7 +669,7 @@ kxtf9_GetAcceleration(
             return NV_FALSE;
     }
 
-    data = (TempAccelY * GValVariation) / MaxAccelReading;
+    data = (TempAccelY * s_MaxGValInMilliGs) / s_MaxAccelReading;
     switch(hDevice->AxisYMapping)
     {
         case NvOdmAccelAxis_X:
@@ -719,7 +685,7 @@ kxtf9_GetAcceleration(
             return NV_FALSE;
     }
 
-    data = (TempAccelZ * GValVariation) / MaxAccelReading;
+    data = (TempAccelZ * s_MaxGValInMilliGs) / s_MaxAccelReading;
     switch(hDevice->AxisZMapping)
     {
         case NvOdmAccelAxis_X:
@@ -735,15 +701,17 @@ kxtf9_GetAcceleration(
             return NV_FALSE;
     }
 
-    *AccelX = (*AccelX * 98)/10000;
-    *AccelY = (*AccelY * 98)/10000;
-    *AccelZ = (*AccelZ * 98)/10000;
-
-    NVODMACCELEROMETER_PRINTF(("\nkxtf9 milli g-Vals, x=%d,y=%d,z=%d",
-        *AccelX, *AccelY, *AccelZ));
-
     if (s_IntSrcReg2)
+    {
+#if NVODMACCELEROMETER_ENABLE_PRINTF
+        if (!(PrintCount++ % PRINT_FREQUENCY))
+        {
+            NVODMACCELEROMETER_PRINTF(("\nkxtf9 milli g-Vals, x=%d,y=%d, z=%d",
+            *AccelX, *AccelY, *AccelZ));
+        }
+#endif
         return NV_TRUE;
+    }
     else
         return NV_FALSE;
 }
@@ -829,13 +797,24 @@ NvBool kxtf9_init(NvOdmAccelHandle* hDevice)
     hAccel->Caption.MaxSampleRate = 100;
     hAccel->Caption.MinSampleRate = 3;
     hAccel->PowerState = NvOdmAccelPower_Fullrun;
+#if AXES_MAPPING_FOR_PROPER_DISPLAY_ALIGNMENT
+// Axes mapping for display orientation aligning correctly in 3 orientations
+// (0, 90 & 270 degrees) on Tango with (froyo + K32).
     hAccel->AxisXMapping = NvOdmAccelAxis_Y;
-    hAccel->AxisXDirection = -1;
+    hAccel->AxisXDirection = 1;
     hAccel->AxisYMapping = NvOdmAccelAxis_X;
-    hAccel->AxisYDirection = 1;
+    hAccel->AxisYDirection = -1;
     hAccel->AxisZMapping = NvOdmAccelAxis_Z;
-    hAccel->AxisZDirection = 1;
-
+    hAccel->AxisZDirection = -1;
+#else
+// Axes mapping for matching acceleration on all axes with android mobile phones
+    hAccel->AxisXMapping = NvOdmAccelAxis_X;
+    hAccel->AxisXDirection = -1;
+    hAccel->AxisYMapping = NvOdmAccelAxis_Y;
+    hAccel->AxisYDirection = -1;
+    hAccel->AxisZMapping = NvOdmAccelAxis_Z;
+    hAccel->AxisZDirection = -1;
+#endif
     hAccel->hPmu = NvOdmServicesPmuOpen();
     if (!hAccel->hPmu)
     {

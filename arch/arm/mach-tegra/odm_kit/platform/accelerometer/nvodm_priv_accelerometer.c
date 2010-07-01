@@ -31,16 +31,6 @@
  */
 
 #include "nvodm_priv_accelerometer.h"
-#define NVODMACCELEROMETER_ENABLE_PRINTF 0
-
-#if NVODMACCELEROMETER_ENABLE_PRINTF
-    #define NVODMACCELEROMETER_PRINTF(x) \
-    do { \
-        NvOdmOsPrintf x; \
-    } while (0)
-#else
-    #define NVODMACCELEROMETER_PRINTF(x)
-#endif
 
 NvBool NvOdmAccelOpen(NvOdmAccelHandle* hDevice)
 {
@@ -50,7 +40,7 @@ NvBool NvOdmAccelOpen(NvOdmAccelHandle* hDevice)
     }
     else
     {
-        NVODMACCELEROMETER_PRINTF(("\n BMA150 accelerometer found"));
+        NvOdmOsPrintf("\n Bosch accelerometer found");
         return NV_TRUE;
     }
 
@@ -60,7 +50,7 @@ NvBool NvOdmAccelOpen(NvOdmAccelHandle* hDevice)
     }
     else
     {
-        NVODMACCELEROMETER_PRINTF(("\n KXTF9 accelerometer found"));
+        NvOdmOsPrintf("\n Kionix accelerometer found");
         return NV_TRUE;
     }
 

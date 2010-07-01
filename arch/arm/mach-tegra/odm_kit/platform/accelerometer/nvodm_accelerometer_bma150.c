@@ -94,17 +94,7 @@
 #define NV_ACCELEROMETER_BUS_SPI_3 1
 #define NV_ACCELEROMETER_BUS_SPI_4 2
 
-#define NVODMACCELEROMETER_ENABLE_PRINTF 0
 #define EEPROM_ID_E1206 0x0C06
-
-#if NVODMACCELEROMETER_ENABLE_PRINTF
-    #define NVODMACCELEROMETER_PRINTF(x) \
-    do { \
-        NvOdmOsPrintf x; \
-    } while (0)
-#else
-    #define NVODMACCELEROMETER_PRINTF(x)
-#endif
 
 #define NV_BMA150_MAX_FORCE_IN_REG 512 // It indicates force register length.
 #define NV_DEBOUNCE_TIME_MS 0
@@ -677,9 +667,15 @@ NvBool bma150_init(NvOdmAccelHandle* hDevice)
     hAccel->Caption.MaxSampleRate = 100;
     hAccel->Caption.MinSampleRate = 3;
     hAccel->PowerState = NvOdmAccelPower_Fullrun;
+#if AXES_MAPPING_FOR_PROPER_DISPLAY_ALIGNMENT
     hAccel->AxisXMapping = NvOdmAccelAxis_Y;
     hAccel->AxisXDirection = -1;
     hAccel->AxisYMapping = NvOdmAccelAxis_X;
+#else
+    hAccel->AxisXMapping = NvOdmAccelAxis_X;
+    hAccel->AxisXDirection = 1;
+    hAccel->AxisYMapping = NvOdmAccelAxis_Y;
+#endif
     hAccel->AxisYDirection = 1;
     hAccel->AxisZMapping = NvOdmAccelAxis_Z;
     hAccel->AxisZDirection = -1;

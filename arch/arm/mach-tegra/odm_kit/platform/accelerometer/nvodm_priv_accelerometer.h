@@ -52,6 +52,23 @@ extern "C"
 #include "nvodm_query_discovery.h"
 #include "nvos.h"
 
+#define NVODMACCELEROMETER_ENABLE_PRINTF 0
+
+#if NVODMACCELEROMETER_ENABLE_PRINTF
+    #define NVODMACCELEROMETER_PRINTF(x) \
+    do { \
+        NvOdmOsPrintf x; \
+    } while (0)
+#else
+    #define NVODMACCELEROMETER_PRINTF(x)
+#endif
+
+// Set 1 to have display orientation aligning correctly in 3 orientations
+// (0, 90 & 270 degrees) on Tango with (froyo + K32).
+// set 0 to have acceleration values on different axes matching to android
+// phones, but display orientation not changing properly.
+#define AXES_MAPPING_FOR_PROPER_DISPLAY_ALIGNMENT 1
+
 /*
  * Defines the threshold source for the accelerometer.
  */
