@@ -32,6 +32,8 @@
 #include <linux/interrupt.h>
 #include <linux/clk.h>
 #include <mach/kbc.h>
+#include <mach/pmc.h>
+#include <mach/clk.h>
 
 #define KBC_CONTROL_0	0
 #define KBC_INT_0	4
@@ -48,6 +50,8 @@ struct tegra_kbc {
 	void __iomem *mmio;
 	struct input_dev *idev;
 	int irq;
+	unsigned int wake_enable_rows;
+	unsigned int wake_enable_cols;
 	spinlock_t lock;
 	unsigned int repoll_time;
 	struct tegra_kbc_plat *pdata;
@@ -77,6 +81,10 @@ static int tegra_kbc_suspend(struct platform_device *pdev, pm_message_t state)
 	if (device_may_wakeup(&pdev->dev)) {
 		tegra_kbc_setup_wakekeys(kbc, true);
 		enable_irq_wake(kbc->irq);
+		tegra_configure_dpd_kbc(kbc->wake_enable_rows, kbc->wake_enable_cols);
+		/* Forcefully clear the interrupt status */
+		writel(0x7, kbc->mmio + KBC_INT_0);
+		msleep(30);
 	} else {
 		tegra_kbc_close(kbc->idev);
 	}
@@ -91,6 +99,7 @@ static int tegra_kbc_resume(struct platform_device *pdev)
 	if (device_may_wakeup(&pdev->dev)) {
 		disable_irq_wake(kbc->irq);
 		tegra_kbc_setup_wakekeys(kbc, false);
+		tegra_configure_dpd_kbc(0, 0);
 	} else if (kbc->idev->users)
 		return tegra_kbc_open(kbc->idev);
 
@@ -257,6 +266,12 @@ static int tegra_kbc_open(struct input_dev *dev)
 	u32 val = 0;
 
 	clk_enable(kbc->clk);
+
+	/* Reset the KBC controller to clear all previous status.*/
+	tegra_periph_reset_assert(kbc->clk);
+	udelay(100);
+	tegra_periph_reset_deassert(kbc->clk);
+	udelay(100);
 
 	tegra_kbc_config_pins(kbc);
 	tegra_kbc_setup_wakekeys(kbc, false);
@@ -429,6 +444,13 @@ static int __init tegra_kbc_probe(struct platform_device *pdev)
 			}
 			cols[pdata->pin_cfg[i].num] = 1;
 		}
+	}
+	kbc->wake_enable_rows = 0;
+	kbc->wake_enable_cols = 0;
+
+	for (i=0; i<pdata->wake_cnt; i++) {
+		kbc->wake_enable_rows |= (1 << kbc->pdata->wake_cfg[i].row);
+		kbc->wake_enable_cols |= (1 << kbc->pdata->wake_cfg[i].col);
 	}
 
 	pdata->debounce_cnt = min_t(unsigned int, pdata->debounce_cnt, 0x3fful);
