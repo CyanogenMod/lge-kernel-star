@@ -39,8 +39,8 @@
 
 #include "nvodm_query_kbc.h"
 
-static NvU32 *RowNumbers = NULL;
-static NvU32 *ColNumbers = NULL;
+static NvU32 RowNumbers[] = {0, 1, 1, 2, 2};
+static NvU32 ColNumbers[] = {0, 0, 1, 0, 1};
 
 void
 NvOdmKbcGetParameter(
@@ -80,9 +80,9 @@ NvOdmKbcIsSelectKeysWkUpEnabled(
     NvU32 **pColNumber,
     NvU32 *NumOfKeys)
 {
-    *pRowNumber = RowNumbers;
-    *pColNumber = ColNumbers;
-    *NumOfKeys = 0;
-    return NV_FALSE;
+    *pRowNumber = &RowNumbers[0];
+    *pColNumber = &ColNumbers[0];
+    *NumOfKeys = 5;
+    return NV_TRUE;
 }
 

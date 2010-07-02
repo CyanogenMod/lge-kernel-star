@@ -1187,8 +1187,8 @@ NvBool NvOdmQueryGetPmuProperty(NvOdmPmuProperty* pPmuProperty)
         pPmuProperty->VCpuOTPOnWakeup = NV_FALSE;
     else
         pPmuProperty->VCpuOTPOnWakeup = NV_TRUE;
-
-    pPmuProperty->PowerOffCount = 0;
+    /* Setting Power off count for 100 ms  -32KHz clock rate*/
+    pPmuProperty->PowerOffCount = 0xc00;
     pPmuProperty->CpuPowerOffUs = 0;
     return NV_TRUE;
 }
