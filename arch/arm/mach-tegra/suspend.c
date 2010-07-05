@@ -42,6 +42,7 @@
 #include <mach/iovmm.h>
 #include <mach/irqs.h>
 #include <mach/nvrm_linux.h>
+#include <mach/pmc.h>
 
 #include <nvrm_memmgr.h>
 #include <nvrm_power_private.h>
@@ -75,6 +76,9 @@ static void __iomem *tmrus = IO_ADDRESS(TEGRA_TMRUS_BASE);
 #define PMC_CTRL_LATCH_WAKEUPS	(1 << 5)
 #define PMC_WAKE_MASK		0xc
 #define PMC_WAKE_LEVEL		0x10
+#define PMC_DPAD_ORIDE		0x1C
+#define PMC_WAKE_DELAY		0xe0
+#define PMC_DPD_SAMPLE  	0x20
 
 #define PMC_SW_WAKE_STATUS	0x18
 #define PMC_COREPWRGOOD_TIMER	0x3c
@@ -82,7 +86,7 @@ static void __iomem *tmrus = IO_ADDRESS(TEGRA_TMRUS_BASE);
 #define PMC_SCRATCH1		0x54
 #define PMC_CPUPWRGOOD_TIMER	0xc8
 #define PMC_CPUPWROFF_TIMER	0xcc
-#define PMC_COREPWROFF_TIMER	0xe0
+#define PMC_COREPWROFF_TIMER	PMC_WAKE_DELAY
 #define PMC_SCRATCH38		0x134
 #define PMC_SCRATCH39		0x138
 
@@ -319,7 +323,12 @@ static void tegra_setup_wakepads(bool lp0_ok)
 	lvl ^= status;
 
 	writel(lvl, pmc + PMC_WAKE_LEVEL);
+	/* Enable DPD sample to trigger sampling pads data and direction
+	 * in which pad will be driven during lp0 mode*/
+	writel(0x1, pmc + PMC_DPD_SAMPLE);
+
 	writel(pdata->wake_enb, pmc + PMC_WAKE_MASK);
+
 }
 
 extern void __tegra_lp1_reset(void);
@@ -614,6 +623,9 @@ static int tegra_suspend_enter(suspend_state_t state)
 		}
 	}
 
+	/* Clear DPD sample */
+	writel(0x0, pmc + PMC_DPD_SAMPLE);
+
 	if (pdata->core_off) {
 		writel(mc_data[0], mc + MC_SECURITY_START);
 		writel(mc_data[1], mc + MC_SECURITY_SIZE);
@@ -685,4 +697,9 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 	}
 	suspend_set_ops(&tegra_suspend_ops);
 #endif
+}
+
+void tegra_configure_dpd_kbc(unsigned int kbc_rows, unsigned int kbc_cols)
+{
+	writel((kbc_rows & 0xFFFF), pmc + PMC_DPAD_ORIDE);
 }
