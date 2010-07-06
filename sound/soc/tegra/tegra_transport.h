@@ -411,6 +411,7 @@ struct tegra_audio_data {
 	NvAudioFxMixBufferHandle mixer_buffer[2];
 	NvRmMemHandle mem_handle[2];
 	NvAudioFxObjectHandle mvolume;
+	NvAudioFxObjectHandle mi2s1;
 	NvAudioFxObjectHandle mroute;
 	int spdif_plugin;
 	int i2s1volume;

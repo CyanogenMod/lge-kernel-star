@@ -102,6 +102,8 @@ typedef NvS32 NvObjectId;
 #define NvAudioFxPlaybackSplitId (0x11300001)
 #define NvAudioFxRecordMixId (0x11300002)
 #define NvAudioFxRecordSplitId (0x11300003)
+#define NvAudioFxLoopbackMixId (0x1130000D)
+#define NvAudioFxLoopbackSplitId (0x1130000E)
 #define NvAudioFxSpdifPlaybackMixId (0x11300004)
 #define NvAudioFxSpdifRecordSplitId (0x11300005)
 #define NvAudioFxSpdifLoopbackSplitId (0x11300006)
@@ -212,7 +214,7 @@ typedef struct NvAudioFxFormatRec
 
 typedef NvS32 NvAudioFxMode;
 #define NvAudioFxMode_Normal (0x0)
-#define NvAudioFxMode_Bluetooth (0x1)
+#define NvAudioFxMode_Bluetooth_Sco (0x1)
 #define NvAudioFxMode_Ringtone (0x2)
 #define NvAudioFxMode_InCall (0x4)
 #define NvAudioFxMode_Radio (0x8)
@@ -311,12 +313,13 @@ typedef NvS32 NvAudioFxIoDevice;
 #define NvAudioFxIoDevice_EarSpeaker (0x200)
 #define NvAudioFxIoDevice_LineOut (0x400)
 #define NvAudioFxIoDevice_HeadphoneOut (0x800)
+#define NvAudioFxIoDevice_Bluetooth_A2dp (0x1000)
 
 // Both
 #define NvAudioFxIoDevice_Aux (0x10000)
 #define NvAudioFxIoDevice_Phone (0x20000)
 #define NvAudioFxIoDevice_Radio (0x40000)
-#define NvAudioFxIoDevice_Bluetooth (0x80000)
+#define NvAudioFxIoDevice_Bluetooth_Sco (0x80000)
 
 typedef struct NvAudioFxPeqDescriptorRec
 {

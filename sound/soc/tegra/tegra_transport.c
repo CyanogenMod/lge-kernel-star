@@ -481,6 +481,7 @@ int tegra_audiofx_init(struct tegra_audio_data* tegra_snd_cx)
 {
 	NvError e = NvSuccess;
 	int ret = 0;
+	NvAudioFxMessage message;
 
 	if (!tegra_snd_cx->mixer_handle) {
 		mutex_lock(&tegra_snd_cx->lock);
@@ -541,7 +542,47 @@ int tegra_audiofx_init(struct tegra_audio_data* tegra_snd_cx)
 		tegra_snd_cx->mroute = tegra_snd_cx->xrt_fxn.MixerCreateObject(
 						tegra_snd_cx->mixer_handle,
 						NvAudioFxSpdifId);
-		tegra_snd_cx->spdif_plugin = 0;
+		tegra_snd_cx->spdif_plugin = 1;
+
+		tegra_snd_cx->mi2s1 = tegra_snd_cx->xrt_fxn.MixerCreateObject(
+						tegra_snd_cx->mixer_handle,
+						NvAudioFxI2s1Id);
+
+		memset(&message, 0, sizeof(NvAudioFxMessage));
+		message.Event = NvAudioFxEventControlChange;
+		message.hFx = (NvAudioFxHandle)tegra_snd_cx->mi2s1;
+		message.pContext = tegra_snd_cx;
+
+		e = tegra_snd_cx->xrt_fxn.SetProperty(
+		    (NvAudioFxObjectHandle)tegra_snd_cx->m_FxNotifier.hNotifier,
+		    NvAudioFxIoProperty_AddEvent,
+		    sizeof(NvAudioFxMessage),
+		    &message);
+
+		if (e != NvSuccess) {
+			snd_printk(KERN_ERR "TransportSetProperty failed\n");
+			ret = -EFAULT;
+			goto fail;
+		}
+
+		memset(&message, 0, sizeof(NvAudioFxMessage));
+		message.Event = NvAudioFxEventControlChange;
+		message.hFx = (NvAudioFxHandle)tegra_snd_cx->mroute;
+		message.pContext = tegra_snd_cx;
+
+		e = tegra_snd_cx->xrt_fxn.SetProperty(
+		    (NvAudioFxObjectHandle)tegra_snd_cx->m_FxNotifier.hNotifier,
+		    NvAudioFxIoProperty_AddEvent,
+		    sizeof(NvAudioFxMessage),
+		    &message);
+
+		if (e != NvSuccess) {
+			snd_printk(KERN_ERR "TransportSetProperty failed\n");
+			ret = -EFAULT;
+			goto fail;
+		}
+
+		tegra_snd_cx->m_FxNotifier.Event |= NvAudioFxEventControlChange;
 	}
 
 	return 0;
@@ -614,6 +655,72 @@ static void tegra_audiofx_notifier_thread(void *arg)
 				struct pcm_runtime_data* prtd =
 				      (struct pcm_runtime_data*)scm->m.pContext;
 				up(&prtd->stop_done_sem);
+			}
+			break;
+
+			case NvAudioFxEventControlChange:{
+				NvAudioFxControlChangeMessage* ccm =
+					(NvAudioFxControlChangeMessage*)message;
+
+				if (message->hFx ==
+					(NvAudioFxHandle)audio_context->mi2s1)
+				{
+					if (ccm->Property == NvAudioFxIoProperty_OutputAvailable)
+					{
+						NvAudioFxIoDeviceControlChangeMessage* iccm =
+							(NvAudioFxIoDeviceControlChangeMessage*)message;
+						NvAudioFxIoDevice device_available = iccm->IoDevice;
+						NvAudioFxIoDevice device_select = device_available;
+
+						if (device_available &
+							NvAudioFxIoDevice_HeadphoneOut)
+						{
+							device_select = NvAudioFxIoDevice_HeadphoneOut;
+						}
+						else if (device_available &
+							NvAudioFxIoDevice_BuiltInSpeaker)
+						{
+							device_select = NvAudioFxIoDevice_BuiltInSpeaker;
+						}
+
+						audio_context->xrt_fxn.SetProperty(
+							audio_context->mi2s1,
+							NvAudioFxIoProperty_OutputSelect,
+							sizeof(NvAudioFxIoDevice),
+							&device_select);
+					}
+
+				}
+				else if (message->hFx ==
+					(NvAudioFxHandle)audio_context->mroute)
+				{
+					if (ccm->Property == NvAudioFxIoProperty_OutputAvailable)
+					{
+						NvAudioFxIoDeviceControlChangeMessage* iccm =
+							(NvAudioFxIoDeviceControlChangeMessage*)message;
+						NvAudioFxIoDevice device_available = iccm->IoDevice;
+						NvAudioFxIoDevice device_select = 0;
+
+						if ((device_available &
+							NvAudioFxIoDevice_Aux) &&
+							audio_context->spdif_plugin)
+						{
+							device_select = NvAudioFxIoDevice_Aux;
+						}
+						else if ((device_available &
+							NvAudioFxIoDevice_BuiltInSpeaker) &&
+							audio_context->spdif_plugin)
+						{
+							device_select = NvAudioFxIoDevice_BuiltInSpeaker;
+						}
+
+						audio_context->xrt_fxn.SetProperty(
+							audio_context->mroute,
+							NvAudioFxIoProperty_OutputSelect,
+							sizeof(NvAudioFxIoDevice),
+							&device_select);
+					}
+				}
 			}
 			break;
 
