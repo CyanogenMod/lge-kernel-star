@@ -3269,6 +3269,7 @@ fail:
     PRINT_ALL(("\nNand ddk open err:0x%x\n", e));
     if (s_pNandRec)
     {
+        NvDdkNandSuspend(s_pNandRec);
         NvRmInterruptUnregister(s_pNandRec->RmDevHandle,
             s_pNandRec->InterruptHandle);
         s_pNandRec->InterruptHandle = NULL;
@@ -3308,7 +3309,7 @@ void NvDdkNandClose(NvDdkNandHandle hNand)
         NvOsMutexUnlock(hNand->hMutex);
         return;
     }
-        
+    NvDdkNandSuspend(hNand);
     // Disable interrupts
     NvRmInterruptUnregister(hNand->RmDevHandle, hNand->InterruptHandle);
     hNand->InterruptHandle = NULL;
