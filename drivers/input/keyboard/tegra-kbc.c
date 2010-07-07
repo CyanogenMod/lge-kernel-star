@@ -34,6 +34,7 @@
 #include <mach/kbc.h>
 #include <mach/pmc.h>
 #include <mach/clk.h>
+#include <nvodm_kbc.h>
 
 #define KBC_CONTROL_0	0
 #define KBC_INT_0	4
@@ -110,9 +111,10 @@ static int tegra_kbc_resume(struct platform_device *pdev)
 static void tegra_kbc_report_keys(struct tegra_kbc *kbc, int *fifo)
 {
 	int curr_fifo[KBC_MAX_KPENT];
+	int rows_val[KBC_MAX_KPENT], cols_val[KBC_MAX_KPENT];
 	u32 kp_ent_val[(KBC_MAX_KPENT + 3) / 4];
 	u32 *kp_ents = kp_ent_val;
-	u32 kp_ent;
+	u32 kp_ent = 0;
 	unsigned long flags;
 	int i, j, valid=0;
 
@@ -121,17 +123,25 @@ static void tegra_kbc_report_keys(struct tegra_kbc *kbc, int *fifo)
 		kp_ent_val[i] = readl(kbc->mmio + KBC_KP_ENT0_0 + (i*4));
 	local_irq_restore(flags);
 
+	valid = 0;
 	for (i=0; i<KBC_MAX_KPENT; i++) {
 		if (!(i&3)) kp_ent=*kp_ents++;
 
 		if (kp_ent & 0x80) {
-			int c = kp_ent & 0x7;
-			int r = (kp_ent >> 3) & 0xf;
-			int k = tegra_kbc_keycode(kbc, r, c);
-			if (likely(k!=-1)) curr_fifo[valid++] = k;
+			cols_val[valid] = kp_ent & 0x7;
+			rows_val[valid++] = (kp_ent >> 3) & 0xf;
 		}
 		kp_ent >>= 8;
 	}
+
+	valid = NvOdmKbcFilterKeys(rows_val, cols_val, valid);
+
+	j = 0;
+	for (i=0; i<valid; i++) {
+		int k = tegra_kbc_keycode(kbc, rows_val[i], cols_val[i]);
+		if (likely(k!=-1)) curr_fifo[j++] = k;
+	}
+	valid = j;
 
 	for (i=0; i<KBC_MAX_KPENT; i++) {
 		if (fifo[i]==-1) continue;
