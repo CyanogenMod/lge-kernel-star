@@ -124,7 +124,7 @@ static const NvU32 s_NvOdmPinMuxConfig_Mio[] = {
 
 static const NvU32 s_NvOdmPinMuxConfig_ExternalClock[] = {
     NvOdmExternalClockPinMap_Config2,
-    NvOdmExternalClockPinMap_Config2,
+    NvOdmExternalClockPinMap_Config3,
     NvOdmExternalClockPinMap_Config1
 };
 
