@@ -372,6 +372,11 @@ __tear_down_master_pll_cpu:
 #if DEBUG_FORCE_RTC_WAKEUP_SEC
 	//r0 = RTC_BASE
 	mov32	r0, RTC_PA_BASE
+        /*Clear all RTC interrupts*/
+        mov	r2, #0x1f
+	str	r2, [r0, #0x2c]
+        mov	r2, #0x0
+        str	r2, [r0, #0x28]
 	//setup rtc wake
 	ldr	r2, [r0, #0x10]	/* milli */
 	ldr	r2, [r0, #0x8]	/* shadow */
@@ -389,7 +394,6 @@ rtc_idle2:
 	/* intr mask alarm0 */
 	mov	r2, #1
 	str	r2, [r0, #0x28]
-	str	r2, [r0, #0x2c]
 rtc_idle3:
 	ldr	r1, [r0, #0x4]
 	tst	r1, #0x1
