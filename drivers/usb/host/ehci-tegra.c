@@ -35,6 +35,7 @@
 #include "nvrm_power.h"
 #include "nvrm_hardware_access.h"
 #include "nvddk_usbphy.h"
+#include "../core/usb.h"
 
 #define TEGRA_USB_ID_INT_ENABLE			(1 << 0)
 #define TEGRA_USB_ID_INT_STATUS			(1 << 1)
@@ -58,7 +59,7 @@ static void tegra_ehci_busy_hint_work(struct work_struct* work)
 	struct tegra_hcd_platform_data *pdata =
 				container_of(work, struct tegra_hcd_platform_data, work);
 	NvDdkUsbPhyIoctl_UsbBusyHintsOnOffInputArgs busyhint;
-	busyhint.OnOff = NV_TRUE;
+	busyhint.OnOff = true;
 
 	/* USB transfers will be done with in 1 sec, this need to be *
 	* fine tuned (if required). with safe limit set to 2 sec    */
@@ -76,7 +77,7 @@ static void tegra_ehci_power_up(struct usb_hcd *hcd)
 
 	pdata = hcd->self.controller->platform_data;
 
-	NV_ASSERT_SUCCESS(NvDdkUsbPhyPowerUp(pdata->hUsbPhy, NV_TRUE, 0));
+	NV_ASSERT_SUCCESS(NvDdkUsbPhyPowerUp(pdata->hUsbPhy, true, 0));
 	ehci->host_resumed = 1;
 }
 
@@ -87,7 +88,7 @@ static void tegra_ehci_power_down(struct usb_hcd *hcd)
 
 	pdata = hcd->self.controller->platform_data;
 
-	NV_ASSERT_SUCCESS(NvDdkUsbPhyPowerDown(pdata->hUsbPhy, NV_TRUE, 0));
+	NV_ASSERT_SUCCESS(NvDdkUsbPhyPowerDown(pdata->hUsbPhy, true, 0));
 	ehci->host_resumed = 0;
 }
 
@@ -142,6 +143,7 @@ static int tegra_ehci_hub_control (
 				&& ehci->host_reinited) {
 				/* indicate hcd flags, that hardware is not accessable now */
 				clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+				ehci_halt(ehci);
 				tegra_ehci_power_down(hcd);
 				ehci->transceiver->state = OTG_STATE_UNDEFINED;
 				ehci->host_reinited = 0;
@@ -215,6 +217,7 @@ static void tegra_ehci_irq_work(struct work_struct* irq_work)
 	struct usb_hcd *hcd = ehci_to_hcd(ehci);
 	struct tegra_hcd_platform_data *pdata;
 	u32 status;
+	bool kick_rhub = false;
 
 	pdata = hcd->self.controller->platform_data;
 
@@ -224,6 +227,8 @@ static void tegra_ehci_irq_work(struct work_struct* irq_work)
 			if (!ehci->host_reinited) {
 				ehci->host_reinited = 1;
 				tegra_ehci_power_up(hcd);
+				if (hcd->state == HC_STATE_SUSPENDED)
+					kick_rhub = true;
 				tegra_ehci_restart(hcd);
 			}
 		}
@@ -238,8 +243,17 @@ static void tegra_ehci_irq_work(struct work_struct* irq_work)
 				tegra_ehci_power_down(hcd);
 			} else {
 				tegra_ehci_power_up(hcd);
+				if (hcd->state == HC_STATE_SUSPENDED)
+					kick_rhub = true;
 			}
 		}
+	}
+
+	if (kick_rhub && hcd->rh_registered) {
+		hcd->poll_rh = 0;
+		usb_set_device_state (hcd->self.root_hub, USB_STATE_ADDRESS);
+		hcd->state = HC_STATE_RUNNING;
+		usb_kick_khubd (hcd->self.root_hub);
 	}
 }
 
@@ -260,6 +274,8 @@ static irqreturn_t tegra_ehci_irq (struct usb_hcd *hcd)
 		if (ehci->transceiver->state == OTG_STATE_A_HOST) {
 			if (!ehci->host_reinited) {
 				schedule_work(&ehci->irq_work);
+				spin_unlock (&ehci->lock);
+				return IRQ_HANDLED;
 			}
 		} else if (ehci->transceiver->state == OTG_STATE_A_SUSPEND) {
 			if (!ehci->host_reinited) {
@@ -281,6 +297,8 @@ static irqreturn_t tegra_ehci_irq (struct usb_hcd *hcd)
 			/* Check if there is any ID pin interrupt */
 			if (status & TEGRA_USB_ID_INT_STATUS) {
 				schedule_work(&ehci->irq_work);
+				spin_unlock (&ehci->lock);
+				return IRQ_HANDLED;
 			}
 		}
 	}

@@ -81,7 +81,6 @@ static irqreturn_t tegra_otg_irq(int irq, void *data)
 				tegra_otg->otg.state = OTG_STATE_A_SUSPEND;
 			} else {
 				tegra_otg->otg.state = OTG_STATE_A_HOST;
-				hcd->state = HC_STATE_RUNNING;
 				/* set HCD flags to start host ISR */
 				set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
 			}
