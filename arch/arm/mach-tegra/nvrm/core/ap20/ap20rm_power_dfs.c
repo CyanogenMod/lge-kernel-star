@@ -68,14 +68,18 @@ void NvRmPrivAp20EmcParametersAdjust(NvRmDfs* pDfs)
     NvU32 RegValue = NV_REGR(pDfs->hRm,
         NvRmPrivModuleID_ExternalMemoryController, 0, EMC_FBIO_CFG5_0);
 
+    // Overwrite default EMC parameters and LP2 policy with SDRAM type specific
+    // settings
     switch (NV_DRF_VAL(EMC, FBIO_CFG5, DRAM_TYPE, RegValue))
     {
         case EMC_FBIO_CFG5_0_DRAM_TYPE_LPDDR2:
             pDfs->DfsParameters[NvRmDfsClockId_Emc] = EmcParamLpDddr2;
+            g_Lp2Policy = NVRM_AP20_LPDDR2_LP2POLICY;
             break;
 
         case EMC_FBIO_CFG5_0_DRAM_TYPE_DDR2:
             pDfs->DfsParameters[NvRmDfsClockId_Emc] = EmcParamDddr2;
+            g_Lp2Policy = NVRM_AP20_DDR2_LP2POLICY;
             break;
 
         default:

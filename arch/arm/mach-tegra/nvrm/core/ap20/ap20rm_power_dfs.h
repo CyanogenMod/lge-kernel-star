@@ -233,6 +233,10 @@ extern "C"
 
 #define NVRM_DFS_PARAM_EMC_AP20 NVRM_DFS_PARAM_EMC_AP20_LPDDR2
 
+// Defines LP2 entry policy each supported SDRAM type
+#define NVRM_AP20_DDR2_LP2POLICY (NvRmLp2Policy_IgnoreLowCorner)
+#define NVRM_AP20_LPDDR2_LP2POLICY (NvRmLp2Policy_MaskInLowCorner)
+
 /**
  * Defines CPU frequency threshold for slave CPU1 power management:
  * - CPU1 is turned Off when cpu clock is below ON_MIN for
