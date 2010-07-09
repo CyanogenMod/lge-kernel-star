@@ -363,6 +363,7 @@ static void nvmap_split_block(struct nvmap_carveout *co,
 			if (block->prev != -1) {
 				spare = BLOCK(co, block->prev);
 				spare->size += start - block->base;
+				block->size -= (start - block->base);
 				block->base = start;
 			}
 		}
