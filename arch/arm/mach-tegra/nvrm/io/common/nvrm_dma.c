@@ -202,6 +202,8 @@ NvError NvRmDmaStartDmaTransfer(NvRmDmaHandle dma, NvRmDmaClientBuffer *b,
 {
 	bool periph_src, periph_dst;
 	unsigned long src, dst;
+	unsigned long src_width, dst_width, periph_width;
+	unsigned long src_wrap, dst_wrap;
 	struct dma_action *action;
 	NvError e = NvSuccess;
 	DECLARE_COMPLETION_ONSTACK(dma_done);
@@ -218,6 +220,12 @@ NvError NvRmDmaStartDmaTransfer(NvRmDmaHandle dma, NvRmDmaClientBuffer *b,
 
 	src = b->SourceBufferPhyAddress;
 	dst = b->DestinationBufferPhyAddress;
+
+	src_wrap = b->SourceAddressWrapSize & 0xFFFF;
+	dst_wrap = b->DestinationAddressWrapSize & 0xFFFF;
+
+	src_width = (b->SourceAddressWrapSize >> 16) & 0xFFFF;
+	dst_width = (b->DestinationAddressWrapSize >> 16) & 0xFFFF;
 
 	WARN_ON_ONCE((src < PAGE_SIZE) || (dst < PAGE_SIZE));
 
@@ -239,27 +247,34 @@ NvError NvRmDmaStartDmaTransfer(NvRmDmaHandle dma, NvRmDmaClientBuffer *b,
 	action->req.threshold = NULL;
 	action->dma = dma;
 
+	if (periph_src && src_width)
+		periph_width = src_width*8;
+	else if (periph_dst && dst_width)
+		periph_width = dst_width*8;
+	else
+		periph_width = dma->mod_width;
+
 	if ((periph_src && dir==NvRmDmaDirection_Forward) ||
 	    (periph_dst && dir==NvRmDmaDirection_Reverse)) {
 		action->req.to_memory = 1;
 		action->req.dest_bus_width = 32;
-		action->req.source_bus_width = dma->mod_width;
+		action->req.source_bus_width = periph_width;
 	} else {
 		action->req.to_memory = 0;
-		action->req.dest_bus_width = dma->mod_width;
+		action->req.dest_bus_width = periph_width;
 		action->req.source_bus_width = 32;
 	}
 
 	if (dir==NvRmDmaDirection_Forward) {
 		action->req.dest_addr = dst;
 		action->req.source_addr = src;
-		action->req.dest_wrap = b->DestinationAddressWrapSize;
-		action->req.source_wrap = b->SourceAddressWrapSize;
+		action->req.dest_wrap = dst_wrap;
+		action->req.source_wrap = src_wrap;
 	} else {
 		action->req.dest_addr = src;
 		action->req.source_addr = dst;
-		action->req.dest_wrap = b->SourceAddressWrapSize;
-		action->req.source_wrap = b->DestinationAddressWrapSize;
+		action->req.dest_wrap = src_wrap;
+		action->req.source_wrap = dst_wrap;
 	}
 
 	if (timeout) {

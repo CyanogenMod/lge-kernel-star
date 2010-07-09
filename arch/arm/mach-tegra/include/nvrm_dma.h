@@ -95,6 +95,8 @@ typedef struct NvRmDmaCapabilitiesRec
         NvU32 DmaAddressAlignmentSize;
 } NvRmDmaCapabilities;
 
+#define ADDRESS_WRAP(bus_width_bits, wrap_size_byte) \
+                     (((bus_width_bits/8) << 16) | (wrap_size_byte & 0xFFFF))
 /**
  * @brief Defines the DMA client buffer information which is transferred 
  * recently. The direction of data transfer decides based on this address. The 
@@ -111,14 +113,24 @@ typedef struct NvRmDmaClientBufferRec
     /// Specifies the dma destination buffer physical address for dma transfer.
         NvRmPhysAddr DestinationBufferPhyAddress;
 
-    /// Source address wrap size in bytes. It tells that after how much bytes, 
-    /// it will be wrapped.
+    /// Source address wrap size in bytes and source bus width.
+    /// The lower 16 bytes tells that after how much bytes, it will be wrapped.
     /// If it is zero then wrapping for source address is disabled.
+    /// The upper 16 bytes tells that what is the bus width of the source side.
+    /// The value of 0 is for default, 1 for 8 bit, 2 for 16 bit and 4 for 32 bit.
+    /// The default bus width of memory side is 32 bit and
+    /// for apb side: 8 bit for uart client and 32 bit for other client.
+    /// Use macro ADDRESS_WRAP to set this parameter.
         NvU32 SourceAddressWrapSize;
 
-    /// Destination address wrap size in bytes. It tells that after how much 
-    /// bytes, it will be wrapped. If it is zero then wrapping for destination 
-    /// address is disabled.
+    /// Destination address wrap size in bytes and source bus width.
+    /// The lower 16 bytes tells that after how much bytes, it will be wrapped.
+    /// If it is zero then wrapping for destination address is disabled.
+    /// The upper 16 bytes tells that what is the bus width of the source side.
+    /// The value of 0 is for default, 1 for 8 bit, 2 for 16 bit and 4 for 32 bit.
+    /// The default bus width of memory side is 32 bit and
+    /// for apb side: 8 bit for uart client and 32 bit for other client.
+    /// Use macro ADDRESS_WRAP to set this parameter.
         NvU32 DestinationAddressWrapSize;
 
     /// Specifies the size of the buffer in bytes which is requested for
