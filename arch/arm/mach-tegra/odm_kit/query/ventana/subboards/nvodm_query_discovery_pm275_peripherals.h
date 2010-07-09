@@ -435,7 +435,7 @@
 
 // Accelerometer Module
 {
-    NV_ODM_GUID('k','x','t','f','9','-','4','0'),
+    NV_ODM_GUID('k','x','t','f','9','v','n','t'),
     s_AcceleroAddresses,
     NV_ARRAY_SIZE(s_AcceleroAddresses),
     NvOdmPeripheralClass_Other,

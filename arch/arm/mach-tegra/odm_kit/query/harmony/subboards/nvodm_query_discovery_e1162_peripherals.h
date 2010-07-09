@@ -489,9 +489,9 @@
     NvOdmPeripheralClass_Other,
 },
 
-// Kionix Accelerometer Module
+// Kionix Accelerometer on Tango
 {
-    NV_ODM_GUID('k','x','t','f','9','-','4','0'),
+    NV_ODM_GUID('k','x','t','f','9','t','n','g'),
     s_KXTFAcceleroAddresses,
     NV_ARRAY_SIZE(s_KXTFAcceleroAddresses),
     NvOdmPeripheralClass_Other,

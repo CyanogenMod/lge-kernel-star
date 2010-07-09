@@ -96,6 +96,8 @@
 // I2C clock speed.
 #define I2C_CLK_SPEED 400
 
+#define ACCEL_TANGO_GUID NV_ODM_GUID('k','x','t','f','9','t','n','g')
+#define ACCEL_VENTANA_GUID NV_ODM_GUID('k','x','t','f','9','v','n','t')
 #define EEPROM_ID_E1206 0x0C06
 #define NV_DEBOUNCE_TIME_MS 0
 #define ENABLE_XYZ_POLLING 0
@@ -546,7 +548,7 @@ void kxtf9_Signal(NvOdmAccelHandle hDevice)
 }
 
 #if NVODMACCELEROMETER_ENABLE_PRINTF
-static PrintAccelEventInfo(NvOdmAccelHandle hDevice)
+static void PrintAccelEventInfo(NvOdmAccelHandle hDevice)
 {
     NvU8 RegVal = 0;
     if (s_IntSrcReg2 & 1)
@@ -797,24 +799,6 @@ NvBool kxtf9_init(NvOdmAccelHandle* hDevice)
     hAccel->Caption.MaxSampleRate = 100;
     hAccel->Caption.MinSampleRate = 3;
     hAccel->PowerState = NvOdmAccelPower_Fullrun;
-#if AXES_MAPPING_FOR_PROPER_DISPLAY_ALIGNMENT
-// Axes mapping for display orientation aligning correctly in 3 orientations
-// (0, 90 & 270 degrees) on Tango with (froyo + K32).
-    hAccel->AxisXMapping = NvOdmAccelAxis_Y;
-    hAccel->AxisXDirection = 1;
-    hAccel->AxisYMapping = NvOdmAccelAxis_X;
-    hAccel->AxisYDirection = -1;
-    hAccel->AxisZMapping = NvOdmAccelAxis_Z;
-    hAccel->AxisZDirection = -1;
-#else
-// Axes mapping for matching acceleration on all axes with android mobile phones
-    hAccel->AxisXMapping = NvOdmAccelAxis_X;
-    hAccel->AxisXDirection = -1;
-    hAccel->AxisYMapping = NvOdmAccelAxis_Y;
-    hAccel->AxisYDirection = -1;
-    hAccel->AxisZMapping = NvOdmAccelAxis_Z;
-    hAccel->AxisZDirection = -1;
-#endif
     hAccel->hPmu = NvOdmServicesPmuOpen();
     if (!hAccel->hPmu)
     {
@@ -822,11 +806,47 @@ NvBool kxtf9_init(NvOdmAccelHandle* hDevice)
         goto error;
     }
 
-    pConnectivity = NvOdmPeripheralGetGuid(kxtf9_GUID);
+    pConnectivity = NvOdmPeripheralGetGuid(ACCEL_TANGO_GUID);
     if (!pConnectivity)
     {
-        NVODMACCELEROMETER_PRINTF(("\nkxtf9: GetGuid Failed"));
+        NVODMACCELEROMETER_PRINTF(("\nkxtf9: GetGuid Failed for Tango"));
+    }
+    else
+    {
+    #if AXES_MAPPING_FOR_PROPER_DISPLAY_ALIGNMENT
+    // Axes mapping for display orientation aligning correctly in 3 orientations
+    // (0, 90 & 270 degrees) on Tango with (froyo + K32).
+        hAccel->AxisXMapping = NvOdmAccelAxis_Y;
+        hAccel->AxisXDirection = 1;
+        hAccel->AxisYMapping = NvOdmAccelAxis_X;
+        hAccel->AxisYDirection = -1;
+        hAccel->AxisZMapping = NvOdmAccelAxis_Z;
+        hAccel->AxisZDirection = -1;
+    #else
+    // Axes mapping for matching acceleration on all axes with android mobile phones
+        hAccel->AxisXMapping = NvOdmAccelAxis_X;
+        hAccel->AxisXDirection = -1;
+        hAccel->AxisYMapping = NvOdmAccelAxis_Y;
+        hAccel->AxisYDirection = -1;
+        hAccel->AxisZMapping = NvOdmAccelAxis_Z;
+        hAccel->AxisZDirection = -1;
+    #endif
+    }
+
+    pConnectivity = NvOdmPeripheralGetGuid(ACCEL_VENTANA_GUID);
+    if (!pConnectivity)
+    {
+        NVODMACCELEROMETER_PRINTF(("\nkxtf9: GetGuid Failed for Ventana"));
         goto error;
+    }
+    else
+    {
+        hAccel->AxisXMapping = NvOdmAccelAxis_X;
+        hAccel->AxisXDirection = 1;
+        hAccel->AxisYMapping = NvOdmAccelAxis_Y;
+        hAccel->AxisYDirection = -1;
+        hAccel->AxisZMapping = NvOdmAccelAxis_Z;
+        hAccel->AxisZDirection = 1;
     }
 
     if (pConnectivity->Class != NvOdmPeripheralClass_Other)
