@@ -645,6 +645,10 @@ typedef enum
     /// Specifies a custom type connection.
     NvOdmDapConnectionIndex_Custom,
 
+    /// Specifies a Reserved type connection used with Test application.
+    /// This index should be used in the nvodm query table.
+    NvOdmDapConnectionIndex_TestReserved,
+
     /// Specifies unknown.
     NvOdmDapConnectionIndex_Unknown,
     /// Ignore -- Forces compilers to make 32-bit enums.
