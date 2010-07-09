@@ -154,23 +154,23 @@ static int tegra_i2c_xfer(struct i2c_adapter *adap,
 		break;
 	case NvError_I2cDeviceNotFound:
 		dev_err(i2c_dev->dev, "no slave found on adapter %d at "
-			"address 0x%x\n", i2c_bus->adapter.nr, msgs[i].addr);
+			"address 0x%x\n", i2c_bus->adapter.nr, msgs[0].addr);
 		rc = -ENXIO;
 		break;
 	case NvError_I2cReadFailed:
 	case NvError_I2cWriteFailed:
 		dev_err(i2c_dev->dev, "read/write failed on adapter %d at "
-			"address 0x%x\n", i2c_bus->adapter.nr, msgs[i].addr);
+			"address 0x%x\n", i2c_bus->adapter.nr, msgs[0].addr);
 		rc = -EIO;
 		break;
 	case NvError_Timeout:
 		dev_err(i2c_dev->dev, "i2c timeout on adapter %d at "
-			"address 0x%x\n", i2c_bus->adapter.nr, msgs[i].addr);
+			"address 0x%x\n", i2c_bus->adapter.nr, msgs[0].addr);
 		rc = -EIO;
 		break;
 	default:
 		dev_err(i2c_dev->dev, "unknown error on adapter %d at "
-			"address 0x%x\n", i2c_bus->adapter.nr, msgs[i].addr);
+			"address 0x%x\n", i2c_bus->adapter.nr, msgs[0].addr);
 		rc = -ENXIO;
 		break;
 	}
