@@ -95,6 +95,8 @@ static void __iomem *tmrus = IO_ADDRESS(TEGRA_TMRUS_BASE);
 
 #define CLK_RESET_CCLK_BURST	0x20
 #define CLK_RESET_CCLK_DIVIDER  0x24
+#define CLK_RESET_PLLC_BASE	0x80
+#define CLK_RESET_PLLM_BASE	0x90
 #define CLK_RESET_PLLX_BASE	0xe0
 #define CLK_RESET_PLLX_MISC	0xe4
 #define CLK_RESET_SOURCE_CSITE	0x1d4
@@ -138,6 +140,34 @@ static bool tegra_nvrm_lp2_persist(void)
 	return ret_value;
 }
 
+static inline void disable_pll(unsigned long base)
+{
+	unsigned long reg = readl(clk_rst + base);
+	reg &= ~(1<<30);
+	writel(reg, clk_rst + base);
+}
+
+static bool tegra_nvrm_suspend_plls(void)
+{
+	bool ret_value = false;
+
+#ifdef CONFIG_TEGRA_NVRM
+	if (s_hRmGlobal) {
+		unsigned long dfs_flags = NvRmPrivGetDfsFlags(s_hRmGlobal);
+
+		if (dfs_flags & NvRmDfsStatusFlags_StopPllC0) {
+			disable_pll(CLK_RESET_PLLC_BASE);
+			ret_value = true;
+		}
+		if (dfs_flags & NvRmDfsStatusFlags_StopPllM0) {
+			disable_pll(CLK_RESET_PLLM_BASE);
+			ret_value = true;
+		}
+	}
+#endif
+	return ret_value;
+}
+
 static void set_power_timers(unsigned long us_on, unsigned long us_off)
 {
 	static int last_pclk = 0;
@@ -166,17 +196,17 @@ static void set_power_timers(unsigned long us_on, unsigned long us_off)
  *
  *
  */
-static noinline void restore_cpu_complex(void)
+static noinline void restore_cpu_complex(bool wait_plls)
 {
 	unsigned int reg;
 
 	/* restore original burst policy setting; PLLX state restored
 	 * by CPU boot-up code - wait for PLL stabilization if PLLX
-	 * was enabled */
+	 * was enabled, or if explicitly requested by caller */
 
 	BUG_ON(readl(clk_rst + CLK_RESET_PLLX_BASE) != tegra_sctx.pllx_base);
 
-	if (tegra_sctx.pllx_base & (1<<30)) {
+	if ((tegra_sctx.pllx_base & (1<<30)) || wait_plls) {
 		while (readl(tmrus)-tegra_sctx.pllx_timeout >= 0x80000000UL)
 			cpu_relax();
 	}
@@ -248,6 +278,7 @@ unsigned int tegra_suspend_lp2(unsigned int us)
 {
 	unsigned int mode, entry, exit;
 	unsigned long orig, reg, lp2time, lp2timelast;
+	bool wait_plls = false;
 
 	reg = readl(pmc + PMC_CTRL);
 	mode = (reg >> TEGRA_POWER_PMC_SHIFT) & TEGRA_POWER_PMC_MASK;
@@ -263,8 +294,10 @@ unsigned int tegra_suspend_lp2(unsigned int us)
 
 	set_power_timers(pdata->cpu_timer, pdata->cpu_off_timer);
 
-	if (us)
+	if (us) {
+		wait_plls = tegra_nvrm_suspend_plls();
 		tegra_lp2_set_trigger(us);
+	}
 	suspend_cpu_complex();
 	flush_cache_all();
 	/* structure is written by reset code, so the L2 lines
@@ -274,7 +307,7 @@ unsigned int tegra_suspend_lp2(unsigned int us)
 
 	__cortex_a9_save(mode);
 	/* return from __cortex_a9_restore */
-	restore_cpu_complex();
+	restore_cpu_complex(wait_plls);
 	if (us)
 		tegra_lp2_set_trigger(0);
 
@@ -416,7 +449,7 @@ static void tegra_suspend_dram(bool lp0_ok)
 	outer_shutdown();
 
 	__cortex_a9_save(mode);
-	restore_cpu_complex();
+	restore_cpu_complex(false);
 
 	writel(orig, evp_reset);
 	outer_restart();

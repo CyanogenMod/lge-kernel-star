@@ -36,6 +36,9 @@
 #define PMC_DPD_ENABLE	0x24
 #define PMC_SCRATCH39	0x138
 
+#define CLK_RESET_PLLC_BASE	0x80
+#define CLK_RESET_PLLM_BASE	0x90
+
 /*        .section ".cpuinit.text", "ax"*/
 
 /*
@@ -43,7 +46,8 @@
  *
  *	  Secondary CPU boot vector when restarting the master CPU following
  *	  an LP2 idle transition. Re-enable coresight access, re-enable
- *	  MMU, re-start PLLX, restore processor context.
+ *	  MMU, re-start PLLX, and PLLM, PLLC (if not running), restore
+ *	  processor context.
  */
 	.align L1_CACHE_SHIFT
 ENTRY(tegra_lp2_startup)
@@ -56,6 +60,16 @@ ENTRY(tegra_lp2_startup)
 	mov	r1, #0
 	str	r1, [r0, #PMC_DPD_SAMPLE]
 	str	r1, [r0, #PMC_DPD_ENABLE]
+
+	mov32	r0, TEGRA_CLK_RESET_BASE
+	ldr	r1, [r0, #CLK_RESET_PLLM_BASE]
+	tst	r1, #(1<<30)
+	orreq	r1, r1, #(1<<30)
+	streq	r1, [r0, #CLK_RESET_PLLM_BASE]
+	ldr	r1, [r0, #CLK_RESET_PLLC_BASE]
+	tst	r1, #(1<<30)
+	orreq	r1, r1, #(1<<30)
+	streq	r1, [r0, #CLK_RESET_PLLC_BASE]
 
 	bl	__invalidate_cpu_state
 	bl	__enable_coresite_access
