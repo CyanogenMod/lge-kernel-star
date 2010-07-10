@@ -2519,11 +2519,17 @@ void NvRmPrivDvsRequest(NvRmMilliVolts TargetMv)
     if (!pDvs->RtcRailAddress || !pDvs->CoreRailAddress)
         return;
 
+    // Just set update flag if voltage can be lowered
+    if (TargetMv <= pDvs->LowCornerCoreMv)
+    {
+        if (pDvs->LowCornerCoreMv < pDvs->CurrentCoreMv)
+             pDvs->UpdateFlag = NV_TRUE;
+        return;
+    }
+
     // Clip new target voltage to core voltage limits
     if (TargetMv > pDvs->NominalCoreMv)
         TargetMv = pDvs->NominalCoreMv;
-    else if (TargetMv < pDvs->LowCornerCoreMv)
-        TargetMv = pDvs->LowCornerCoreMv;
 
     // If new target voltage is above current - update immediately. If target
     // is below current voltage - just set update flag, so that next DFS ISR
