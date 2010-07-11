@@ -247,9 +247,17 @@ static noinline void suspend_cpu_complex(void)
 unsigned int tegra_suspend_lp2(unsigned int us)
 {
 	unsigned int mode, entry, exit;
-	unsigned long orig;
+	unsigned long orig, reg;
 
-	mode = TEGRA_POWER_CPU_PWRREQ_OE;
+	reg = readl(pmc + PMC_CTRL);
+	mode = (reg >> TEGRA_POWER_PMC_SHIFT) & TEGRA_POWER_PMC_MASK;
+	mode |= TEGRA_POWER_CPU_PWRREQ_OE;
+	if (pdata->separate_req)
+		mode |= TEGRA_POWER_PWRREQ_OE;
+	else
+		mode &= ~TEGRA_POWER_PWRREQ_OE;
+	mode &= ~TEGRA_POWER_EFFECT_LP0;
+
 	orig = readl(evp_reset);
 	writel(virt_to_phys(tegra_lp2_startup), evp_reset);
 
@@ -347,7 +355,7 @@ static void tegra_suspend_dram(bool lp0_ok)
 	static unsigned long cpu_timer_32k = 0;
 	unsigned int lp2_timer;
 	unsigned int mode = TEGRA_POWER_SDRAM_SELFREFRESH;
-	unsigned long orig;
+	unsigned long orig, reg;
 
 	orig = readl(evp_reset);
 	/* copy the reset vector and SDRAM shutdown code into IRAM */
@@ -360,41 +368,39 @@ static void tegra_suspend_dram(bool lp0_ok)
 		cpu_timer_32k = temp;
 	}
 
+	reg = readl(pmc + PMC_CTRL);
+	mode |= ((reg >> TEGRA_POWER_PMC_SHIFT) & TEGRA_POWER_PMC_MASK);
+
 	if (!lp0_ok) {
 		writel(TEGRA_IRAM_CODE_AREA, evp_reset);
 		NvRmPrivPowerSetState(s_hRmGlobal, NvRmPowerState_LP1);
 		lp2_timer = readl(pmc + PMC_CPUPWRGOOD_TIMER);
 		writel(cpu_timer_32k, pmc + PMC_CPUPWRGOOD_TIMER);
+
 		mode |= TEGRA_POWER_CPU_PWRREQ_OE;
-		if (pdata->core_off)
-			mode |= TEGRA_POWER_SYSCLK_OE;
+		if (pdata->separate_req)
+			mode |= TEGRA_POWER_PWRREQ_OE;
+		else
+			mode &= ~TEGRA_POWER_PWRREQ_OE;
+		mode &= ~TEGRA_POWER_EFFECT_LP0;
 	} else {
 		NvRmPrivPowerSetState(s_hRmGlobal, NvRmPowerState_LP0);
 		set_power_timers(pdata->cpu_timer, pdata->cpu_off_timer);
 		tegra_setup_warmboot();
-		mode |= TEGRA_POWER_SYSCLK_OE;
+		mode |= TEGRA_POWER_CPU_PWRREQ_OE;
 		mode |= TEGRA_POWER_PWRREQ_OE;
 		mode |= TEGRA_POWER_EFFECT_LP0;
 	}
 
-	if (!pdata->corereq_high)
-		mode |= TEGRA_POWER_PWRREQ_POLARITY;
-	if (!pdata->sysclkreq_high)
-		mode |= TEGRA_POWER_SYSCLK_POLARITY;
-
 	/* for platforms where the core & CPU power requests are combined as
-	 * a single request to the PMU, transition from the current state to
-	 * the desired state by temporarily enabling both requests (if the
-	 * previous state does not match the new state)
+	 * a single request to the PMU, transition to LP0 state by temporarily
+	 * enabling both requests
 	 */
-
-	if (!pdata->separate_req) {
-		u32 reg = readl(pmc + PMC_CTRL);
+	if (lp0_ok && !pdata->separate_req) {
 		reg |= ((mode & TEGRA_POWER_PMC_MASK) << TEGRA_POWER_PMC_SHIFT);
 		pmc_32kwritel(reg, PMC_CTRL);
+		mode &= ~TEGRA_POWER_CPU_PWRREQ_OE;
 	}
-	else
-		mode |= TEGRA_POWER_CPU_PWRREQ_OE;
 
 	tegra_setup_wakepads(lp0_ok);
 	suspend_cpu_complex();
@@ -407,13 +413,13 @@ static void tegra_suspend_dram(bool lp0_ok)
 	writel(orig, evp_reset);
 	outer_restart();
 
-	/* restore to CPU power request, assuming that the next transition
-	 * will be into LP2 */
+	/* for platforms where the core & CPU power requests are combined as
+	 * a single request to the PMU, transition out of LP0 state by
+	 * temporarily enabling both requests (= restoring CPU request)
+	 */
 	if (lp0_ok && !pdata->separate_req) {
-		u32 reg = readl(pmc + PMC_CTRL);
-		mode &= TEGRA_POWER_PMC_MASK;
-		mode |= TEGRA_POWER_CPU_PWRREQ_OE;
-		reg |= (mode << TEGRA_POWER_PMC_SHIFT);
+		reg = readl(pmc + PMC_CTRL);
+		reg |= (TEGRA_POWER_CPU_PWRREQ_OE << TEGRA_POWER_PMC_SHIFT);
 		pmc_32kwritel(reg, PMC_CTRL);
 		reg &= ~(TEGRA_POWER_PWRREQ_OE << TEGRA_POWER_PMC_SHIFT);
 		writel(reg, pmc + PMC_CTRL);
@@ -663,6 +669,9 @@ extern void __init lp0_suspend_init(void);
 
 void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 {
+#ifdef CONFIG_PM
+	u32 reg;
+#endif
 	tegra_pclk = clk_get_sys(NULL, "pclk");
 	BUG_ON(!tegra_pclk);
 	pdata = plat;
@@ -678,8 +687,16 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 	}
 	writel(virt_to_phys(tegra_lp2_startup), pmc + PMC_SCRATCH1);
 
+	/* Always enable CPU power request; just normal polarity is supported */
+	reg = readl(pmc + PMC_CTRL);
+	BUG_ON(reg & TEGRA_POWER_CPU_PWRREQ_POLARITY);
+	reg |= (TEGRA_POWER_CPU_PWRREQ_OE << TEGRA_POWER_PMC_SHIFT);
+	pmc_32kwritel(reg, PMC_CTRL);
+
+	/* Configure core power request and system clock control if LP0
+	   is supported */
 	if (pdata->core_off) {
-		u32 reg = 0, mode;
+		u32 mode;
 
 		writel(pdata->core_timer, pmc + PMC_COREPWRGOOD_TIMER);
 		writel(pdata->core_off_timer, pmc + PMC_COREPWROFF_TIMER);
@@ -697,7 +714,11 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 		/* configure output inverters while the request is tristated */
 		reg |= (mode << TEGRA_POWER_PMC_SHIFT);
 		pmc_32kwritel(reg, PMC_CTRL);
+
+		/* now enable requests */
 		reg |= (TEGRA_POWER_SYSCLK_OE << TEGRA_POWER_PMC_SHIFT);
+		if (pdata->separate_req)
+			reg |= (TEGRA_POWER_PWRREQ_OE << TEGRA_POWER_PMC_SHIFT);
 		writel(reg, pmc + PMC_CTRL);
 
 		lp0_suspend_init();
