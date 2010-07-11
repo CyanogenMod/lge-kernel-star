@@ -426,19 +426,8 @@ static void tegra_tx_dma_complete_callback(struct tegra_dma_req *req)
 	struct circ_buf *xmit = &t->uport.state->xmit;
 	int count = req->bytes_transferred;
 	unsigned long flags;
-	int timeout = 20;
 
 	dev_vdbg(t->uport.dev, "%s: %d\n", __func__, count);
-
-	while ((uart_readb(t, UART_LSR) & TX_EMPTY_STATUS) != TX_EMPTY_STATUS) {
-		timeout--;
-		if (timeout == 0) {
-			dev_err(t->uport.dev,
-				"timed out waiting for TX FIFO to empty\n");
-			return;
-		}
-		msleep(1);
-	}
 
 	spin_lock_irqsave(&t->uport.lock, flags);
 	xmit->tail = (xmit->tail + count) & (UART_XMIT_SIZE - 1);
@@ -895,13 +884,17 @@ static unsigned int tegra_tx_empty(struct uart_port *u)
 	struct tegra_uart_port *t;
 	unsigned int ret = 0;
 	unsigned long flags;
+	unsigned char lsr;
 
 	t = container_of(u, struct tegra_uart_port, uport);
 	dev_vdbg(u->dev, "+tegra_tx_empty\n");
 
 	spin_lock_irqsave(&u->lock, flags);
-	if (!t->tx_in_progress)
-		ret = TIOCSER_TEMT;
+	if (!t->tx_in_progress) {
+		lsr = uart_readb(t, UART_LSR);
+		if ((lsr & TX_EMPTY_STATUS) == TX_EMPTY_STATUS)
+			ret = TIOCSER_TEMT;
+	}
 	spin_unlock_irqrestore(&u->lock, flags);
 
 	dev_vdbg(u->dev, "-tegra_tx_empty\n");
