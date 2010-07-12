@@ -63,7 +63,7 @@ struct pmc_scratch_field {
 #define field(module, offs, field, dst)					\
 	{								\
 		.addr = IO_ADDRESS(TEGRA_##module##_BASE) + offs,	\
-		.mask = 0xfffffffful >> (31 - (1?field - 0?field)), 	\
+		.mask = 0xfffffffful >> (31 - ((1?field) - (0?field))), 	\
 		.shift_src = 0?field,					\
 		.shift_dst = 0?dst,					\
 	}
