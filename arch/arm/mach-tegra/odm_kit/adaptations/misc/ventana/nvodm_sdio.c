@@ -71,14 +71,30 @@ static void NvOdmSetPowerOnSdio(NvOdmSdioHandle pDevice, NvBool enable)
 
 static NvBool SdioOdmWlanPower(NvOdmSdioHandle hOdmSdio, NvBool IsEnable)
 {
+    NvU32 RequestedPeriod, ReturnedPeriod;
+    NvOdmServicesPwmHandle hOdmPwm = NULL;
     if (IsEnable)
     {
         // Wlan Power On Reset Sequence
         NvOdmGpioSetState(hOdmSdio->hGpio, hOdmSdio->hPwrPin, 0x0);
         NvOdmGpioSetState(hOdmSdio->hGpio, hOdmSdio->hResetPin, 0x0);
-        NvOdmOsWaitUS(2000);
+        NvOdmOsSleepMS(200);
         NvOdmGpioSetState(hOdmSdio->hGpio, hOdmSdio->hPwrPin, 0x1);
         NvOdmGpioSetState(hOdmSdio->hGpio, hOdmSdio->hResetPin, 0x1);
+        NvOdmOsSleepMS(200);
+
+        // Enable 32KHz clock out
+        hOdmPwm = NvOdmPwmOpen();
+        if (!hOdmPwm)
+        {
+            NvOsDebugPrintf("sdio_odm:  NvOdmPwmOpen failed\n");
+            return NV_FALSE;
+        }
+        RequestedPeriod = 0;
+        NvOdmPwmConfig(hOdmPwm, NvOdmPwmOutputId_Blink,
+                       NvOdmPwmMode_Blink_32KHzClockOutput,
+                       0, &RequestedPeriod, &ReturnedPeriod);
+        NvOdmPwmClose(hOdmPwm);
      }
      else
      {
