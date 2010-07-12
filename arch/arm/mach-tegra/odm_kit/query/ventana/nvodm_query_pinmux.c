@@ -105,7 +105,7 @@ static const NvU32 s_NvOdmPinMuxConfig_Ata[] = {
 static const NvU32 s_NvOdmPinMuxConfig_Dap[] = {
     NvOdmDapPinMap_Config1,
     NvOdmDapPinMap_Config1,
-    NvOdmDapPinMap_Config1,
+    0,
     NvOdmDapPinMap_Config1,
     0
 };
