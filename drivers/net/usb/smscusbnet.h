@@ -23,10 +23,6 @@
 #ifndef	__SMSCUSBNET_H
 #define	__SMSCUSBNET_H
 
-#ifndef DEBUG
-#define DEBUG
-#endif
-
 typedef unsigned char BOOLEAN;
 #define TRUE	((BOOLEAN)1)
 #define FALSE	((BOOLEAN)0)
