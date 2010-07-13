@@ -300,12 +300,12 @@ static void tegra_setup_warmboot(void)
 {
 	u32 scratch0;
 
-	//Turn the WARMBOOT flag on in scratch0
+	/* Turn the WARMBOOT flag on in scratch0 */
 	scratch0 = readl(pmc + PMC_SCRATCH0);
 	scratch0 |= 1;
 	pmc_32kwritel(scratch0, PMC_SCRATCH0);
 
-	//Write the AVP warmboot entry address in SCRATCH1
+	/* Write the AVP warmboot entry address in SCRATCH1 */
 	pmc_32kwritel(s_AvpWarmbootEntry, PMC_SCRATCH1);
 }
 
@@ -553,9 +553,9 @@ static int tegra_suspend_prepare_late(void)
 		return -EIO;
 	}
 
-	//The AVP stores its resume address in the first word of IRAM
-	//Write this resume address to SCRATCH39, where the warmboot
-	//code can later find it
+	/* The AVP stores its resume address in the first word of IRAM
+	 * Write this resume address to SCRATCH39, where the warmboot
+	 * code can later find it */
 	writel(*(volatile unsigned int *)iram_avp_resume, pmc + PMC_SCRATCH39);
 #endif
 	disable_irq(INT_SYS_STATS_MON);
@@ -669,12 +669,13 @@ extern void __init lp0_suspend_init(void);
 
 void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 {
-#ifdef CONFIG_PM
-	u32 reg;
-#endif
+	u32 reg, mode;
+
 	tegra_pclk = clk_get_sys(NULL, "pclk");
 	BUG_ON(!tegra_pclk);
 	pdata = plat;
+	(void)reg;
+	(void)mode;
 
 #ifdef CONFIG_PM
 	iram_save_size = (unsigned long)__tegra_iram_end;
@@ -695,34 +696,32 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 
 	/* Configure core power request and system clock control if LP0
 	   is supported */
-	if (pdata->core_off) {
-		u32 mode;
+	writel(pdata->core_timer, pmc + PMC_COREPWRGOOD_TIMER);
+	writel(pdata->core_off_timer, pmc + PMC_COREPWROFF_TIMER);
+	reg = readl(pmc + PMC_CTRL);
+	mode = (reg >> TEGRA_POWER_PMC_SHIFT) & TEGRA_POWER_PMC_MASK;
 
-		writel(pdata->core_timer, pmc + PMC_COREPWRGOOD_TIMER);
-		writel(pdata->core_off_timer, pmc + PMC_COREPWROFF_TIMER);
-		reg = readl(pmc + PMC_CTRL);
-		mode = (reg >> TEGRA_POWER_PMC_SHIFT) & TEGRA_POWER_PMC_MASK;
+	mode &= ~TEGRA_POWER_SYSCLK_POLARITY;
+	mode &= ~TEGRA_POWER_PWRREQ_POLARITY;
 
-		mode &= ~TEGRA_POWER_SYSCLK_POLARITY;
-		mode &= ~TEGRA_POWER_PWRREQ_POLARITY;
+	if (!pdata->sysclkreq_high)
+		mode |= TEGRA_POWER_SYSCLK_POLARITY;
+	if (!pdata->corereq_high)
+		mode |= TEGRA_POWER_PWRREQ_POLARITY;
 
-		if (!pdata->sysclkreq_high)
-			mode |= TEGRA_POWER_SYSCLK_POLARITY;
-		if (!pdata->corereq_high)
-			mode |= TEGRA_POWER_PWRREQ_POLARITY;
+	/* configure output inverters while the request is tristated */
+	reg |= (mode << TEGRA_POWER_PMC_SHIFT);
+	pmc_32kwritel(reg, PMC_CTRL);
 
-		/* configure output inverters while the request is tristated */
-		reg |= (mode << TEGRA_POWER_PMC_SHIFT);
-		pmc_32kwritel(reg, PMC_CTRL);
+	/* now enable requests */
+	reg |= (TEGRA_POWER_SYSCLK_OE << TEGRA_POWER_PMC_SHIFT);
+	if (pdata->separate_req)
+		reg |= (TEGRA_POWER_PWRREQ_OE << TEGRA_POWER_PMC_SHIFT);
+	writel(reg, pmc + PMC_CTRL);
 
-		/* now enable requests */
-		reg |= (TEGRA_POWER_SYSCLK_OE << TEGRA_POWER_PMC_SHIFT);
-		if (pdata->separate_req)
-			reg |= (TEGRA_POWER_PWRREQ_OE << TEGRA_POWER_PMC_SHIFT);
-		writel(reg, pmc + PMC_CTRL);
-
+	if (pdata->core_off)
 		lp0_suspend_init();
-	}
+
 	suspend_set_ops(&tegra_suspend_ops);
 #endif
 }
