@@ -24,6 +24,8 @@
 
 struct lbee9qmb_platform_data {
 	int gpio_reset;
+	int gpio_pwr;
+	int delay;
 };
 
 #endif

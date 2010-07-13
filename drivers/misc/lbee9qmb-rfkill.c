@@ -44,7 +44,11 @@ static int lbee9qmb_rfkill_set_power(void *data, bool blocked)
 	if (!blocked) {
 		regulator_enable(regulator);
 		gpio_set_value(plat->gpio_reset, 0);
-		msleep(5);
+		if (plat->gpio_pwr!=-1)
+			gpio_set_value(plat->gpio_pwr, 0);
+		msleep(plat->delay);
+		if (plat->gpio_pwr!=-1)
+			gpio_set_value(plat->gpio_pwr, 1);
 		gpio_set_value(plat->gpio_reset, 1);
 	} else {
 		gpio_set_value(plat->gpio_reset, 0);
@@ -76,6 +80,11 @@ static int lbee9qmb_rfkill_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "gpio_request failed\n");
 		return rc;
 	}
+	if (plat->gpio_pwr!=-1)
+	{
+		rc = gpio_request(plat->gpio_pwr, "lbee9qmb_pwr");
+		gpio_direction_output(plat->gpio_pwr,0);
+	}
 
 	rfkill = rfkill_alloc("lbee9qmb-rfkill", &pdev->dev,
 			RFKILL_TYPE_BLUETOOTH, &lbee9qmb_rfkill_ops, pdev);
@@ -96,6 +105,8 @@ fail_alloc:
 	rfkill_destroy(rfkill);
 fail_gpio:
 	gpio_free(plat->gpio_reset);
+	if (plat->gpio_pwr!=-1)
+		gpio_free(plat->gpio_pwr);
 	return rc;
 		
 }
@@ -108,7 +119,8 @@ static int lbee9qmb_rfkill_remove(struct platform_device *pdev)
 	rfkill_unregister(rfkill);
 	rfkill_destroy(rfkill);
 	gpio_free(plat->gpio_reset);
-
+	if (plat->gpio_pwr!=-1)
+		gpio_free(plat->gpio_pwr);
 	return 0;
 	
 }
