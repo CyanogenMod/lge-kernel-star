@@ -46,57 +46,57 @@
 
 static const NvOdmIoAddress s_ffaHdmiAddresses[] =
 {
-    { NvOdmIoModule_Hdmi, 0, 0 },
+    { NvOdmIoModule_Hdmi, 0, 0, 0 },
 
     /* Display Data Channel (DDC) for Extended Display Identification
      * Data (EDID)
      */
-    { NvOdmIoModule_I2c, 0x01, 0xA0 },
+    { NvOdmIoModule_I2c, 0x01, 0xA0, 0 },
 
     /* HDCP downstream */
-    { NvOdmIoModule_I2c, 0x01, 0x74 },
+    { NvOdmIoModule_I2c, 0x01, 0x74, 0 },
 
     /* AVDD_HDMI -> D1REG */
-    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LDO11 },
+    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LDO11, 0 },
 
     /* MIPI PLL */
-    { NvOdmIoModule_Vdd, 0, Max8907bPmuSupply_LDO6 },
+    { NvOdmIoModule_Vdd, 0, Max8907bPmuSupply_LDO6, 0 },
 
     /* lcd i/o rail (for hot plug pin) */
-    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LX_V3 },
+    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LX_V3, 0 },
 };
 
 static const NvOdmIoAddress s_ffaCrtAddresses[] =
 {
-    { NvOdmIoModule_Crt, 0, 0 },
+    { NvOdmIoModule_Crt, 0, 0, 0 },
 
     /* Display Data Channel (DDC) for Extended Display Identification
      * Data (EDID)
      */
-    { NvOdmIoModule_I2c, 0x01, 0xA0 },
+    { NvOdmIoModule_I2c, 0x01, 0xA0, 0 },
 
     /* tvdac rail (required) */
-    { NvOdmIoModule_Vdd, 0x00,  Max8907bPmuSupply_LDO14 },
+    { NvOdmIoModule_Vdd, 0x00,  Max8907bPmuSupply_LDO14, 0 },
 
     /* lcd i/o rail (for hot plug pin) */
-    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LX_V3 },
+    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LX_V3, 0 },
 };
 
 static const NvOdmIoAddress s_ffaVideoDacAddresses[] =
 {
-    { NvOdmIoModule_Tvo, 0x00, 0x00 },
+    { NvOdmIoModule_Tvo, 0x00, 0x00, 0 },
     /* tvdac rail */
-    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LDO14 },
+    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LDO14, 0 },
 };
 
 static const NvOdmIoAddress s_Tmon0Addresses[] = 
 {
-    { NvOdmIoModule_I2c_Pmu, 0x00, 0x98 }, /* I2C bus */
-    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LDO15 }, /* TMON pwer rail -> D4REG */
-    { NvOdmIoModule_Gpio, 0x08, 0x02 },                   /* GPIO Port I and Pin 2 */
+    { NvOdmIoModule_I2c_Pmu, 0x00, 0x98, 0 }, /* I2C bus */
+    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LDO15, 0 }, /* TMON pwer rail -> D4REG */
+    { NvOdmIoModule_Gpio, 0x08, 0x02, 0 },                   /* GPIO Port I and Pin 2 */
 
     /* Temperature zone mapping */
-    { NvOdmIoModule_Tsense, NvOdmTmonZoneID_Core, ADT7461ChannelID_Remote },   /* TSENSOR */
-    { NvOdmIoModule_Tsense, NvOdmTmonZoneID_Ambient, ADT7461ChannelID_Local }, /* TSENSOR */
+    { NvOdmIoModule_Tsense, NvOdmTmonZoneID_Core, ADT7461ChannelID_Remote, 0 },   /* TSENSOR */
+    { NvOdmIoModule_Tsense, NvOdmTmonZoneID_Ambient, ADT7461ChannelID_Local, 0 }, /* TSENSOR */
 };
 

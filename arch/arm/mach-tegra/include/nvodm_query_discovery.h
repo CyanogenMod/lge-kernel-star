@@ -210,6 +210,15 @@ typedef struct
      *       address 0 should refer to the main panel, and 1 to the sub-panel.
      */
     NvU32 Address;
+
+    /**
+     * Specifies purpose of address definition as an adaptation local ID.
+     * ODM adaptations can use this member to parse connectivity tables
+     * from ODM query, by enumerating all addresses they expect under their
+     * GUID, and populating this member with an enum value. Use is optional.
+     */
+    NvU32 Purpose;
+
 } NvOdmIoAddress;
 
 /**

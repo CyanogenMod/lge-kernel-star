@@ -49,21 +49,21 @@ static const NvOdmIoAddress s_KeyPadAddresses[] =
     // address holds KBC pin number used for row/column.
 
     // All Row info has to be defined contiguously from 0 to max.
-    { NvOdmIoModule_Kbd,0x00, NvOdmKbcGpioPin_KBRow0}, // Row 0
-    { NvOdmIoModule_Kbd,0x00, NvOdmKbcGpioPin_KBRow1}, // Row 1
-    { NvOdmIoModule_Kbd,0x00 ,NvOdmKbcGpioPin_KBRow2}, // Row 2
+    { NvOdmIoModule_Kbd,0x00, NvOdmKbcGpioPin_KBRow0, 0}, // Row 0
+    { NvOdmIoModule_Kbd,0x00, NvOdmKbcGpioPin_KBRow1, 0}, // Row 1
+    { NvOdmIoModule_Kbd,0x00 ,NvOdmKbcGpioPin_KBRow2, 0}, // Row 2
 
     // All Column info has to be defined contiguously from 0 to max.
-    { NvOdmIoModule_Kbd,0x01, NvOdmKbcGpioPin_KBCol0}, // Column 0
-    { NvOdmIoModule_Kbd,0x01, NvOdmKbcGpioPin_KBCol1}, // Column 1
+    { NvOdmIoModule_Kbd,0x01, NvOdmKbcGpioPin_KBCol0, 0}, // Column 0
+    { NvOdmIoModule_Kbd,0x01, NvOdmKbcGpioPin_KBCol1, 0}, // Column 1
 };
 
 // s_ffa ScrollWheel...  only supported for personality 1
 static const NvOdmIoAddress s_ffaScrollWheelAddresses[] =
 {
-    { NvOdmIoModule_Gpio, 0x10, 0x3 }, // GPIO Port q - Pin3
-    { NvOdmIoModule_Gpio, 0x11, 0x3 }, // GpIO Port r - Pin 3
-    { NvOdmIoModule_Gpio, 0x10, 0x5 }, // GPIO Port q - Pin 5
-    { NvOdmIoModule_Gpio, 0x10, 0x4 }, // GPIO Port q - Pin 4
+    { NvOdmIoModule_Gpio, 0x10, 0x3, 0 }, // GPIO Port q - Pin3
+    { NvOdmIoModule_Gpio, 0x11, 0x3, 0 }, // GpIO Port r - Pin 3
+    { NvOdmIoModule_Gpio, 0x10, 0x5, 0 }, // GPIO Port q - Pin 5
+    { NvOdmIoModule_Gpio, 0x10, 0x4, 0 }, // GPIO Port q - Pin 4
 };
 

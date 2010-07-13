@@ -994,8 +994,7 @@ Tps6586xSetExternalSupply(
         GpioPort = vdd->AddressList[0].Instance;
         GpioPin = vdd->AddressList[0].Address;
 
-        NV_ASSERT((NVODM_EXT_AP_GPIO_RAIL(vddRail) >= 0) &&
-                  (NVODM_EXT_AP_GPIO_RAIL(vddRail) < TPS6586x_EXTERNAL_SUPPLY_AP_GPIO_NUM));
+        NV_ASSERT((NVODM_EXT_AP_GPIO_RAIL(vddRail) < TPS6586x_EXTERNAL_SUPPLY_AP_GPIO_NUM));
 
         // Acquire Pin Handle
         if (!hPmu->hPin[NVODM_EXT_AP_GPIO_RAIL(vddRail)])

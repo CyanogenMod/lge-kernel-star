@@ -45,13 +45,13 @@
 // Audio Codec
 static const NvOdmIoAddress s_AudioCodecAddresses[] =
 {
-    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LDO7},  /* AUDIO_PLL etc -> DCD2 */
-    { NvOdmIoModule_ExternalClock, 0, 0 },                  // connected to CDEV1
+    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LDO7, 0},  /* AUDIO_PLL etc -> DCD2 */
+    { NvOdmIoModule_ExternalClock, 0, 0, 0 },                  // connected to CDEV1
 #if 1
-    { NvOdmIoModule_Spi, 2,     1 },                      /* FFA Audio codec on SP3- CS1*/
+    { NvOdmIoModule_Spi, 2,     1, 0 },                      /* FFA Audio codec on SP3- CS1*/
 #else
-    { NvOdmIoModule_I2c_Pmu, 0, 0x34},          /* FFA Audio codec on DVC*/
+    { NvOdmIoModule_I2c_Pmu, 0, 0x34, 0},          /* FFA Audio codec on DVC*/
 
 #endif
-    { NvOdmIoModule_Dap, 0, 0 },                            /* Dap port Index 0 is used for codec*/
+    { NvOdmIoModule_Dap, 0, 0, 0 },                            /* Dap port Index 0 is used for codec*/
 };

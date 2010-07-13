@@ -45,11 +45,11 @@
 // Main LCD
 static const NvOdmIoAddress s_ffaMainDisplayAddresses[] = 
 {
-    { NvOdmIoModule_Display, 0, 0 },
-    { NvOdmIoModule_Spi, 0x2, 0x2 },                        // TBD (this is a guess)
-    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LX_V3 },   /* VDDIO_LCD -> V3 */
-    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LDO5 },    /* AVDD_LCD_1 -> VOUT5 */
-    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LDO19  },  /* AVDD_LCD_2 -> VOUT19 */
+    { NvOdmIoModule_Display, 0, 0, 0 },
+    { NvOdmIoModule_Spi, 0x2, 0x2, 0 },                        // TBD (this is a guess)
+    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LX_V3, 0 },   /* VDDIO_LCD -> V3 */
+    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LDO5, 0 },    /* AVDD_LCD_1 -> VOUT5 */
+    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LDO19, 0  },  /* AVDD_LCD_2 -> VOUT19 */
 };
 
 // DSI LCD
@@ -57,20 +57,20 @@ static const NvOdmIoAddress s_ffaMainDisplayAddresses[] =
 // reset gpio pin to work
 static const NvOdmIoAddress s_DsiAddresses[] = 
 {
-    { NvOdmIoModule_Display, 0, 0 },
+    { NvOdmIoModule_Display, 0, 0, 0 },
 
-    { NvOdmIoModule_Gpio, (NvU32)('c' - 'a'), 1 },
+    { NvOdmIoModule_Gpio, (NvU32)('c' - 'a'), 1, 0 },
 
-    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LX_V3 },   /* VDDIO_LCD -> V3 */
-    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LDO5 },    /* AVDD_LCD_1 -> VOUT5 */
-    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LDO19  },  /* AVDD_LCD_2 -> VOUT19 */
-    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LDO17  },  /* MIPI DSI 1.2V */
+    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LX_V3, 0 },   /* VDDIO_LCD -> V3 */
+    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LDO5, 0 },    /* AVDD_LCD_1 -> VOUT5 */
+    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LDO19, 0  },  /* AVDD_LCD_2 -> VOUT19 */
+    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LDO17, 0  },  /* MIPI DSI 1.2V */
 };
 
 // TouchPanel
 static const NvOdmIoAddress s_ffaTouchPanelAddresses[] = 
 {
-    { NvOdmIoModule_I2c, 0x00, 0x20 },/* I2C device address is 0x20 */
-    { NvOdmIoModule_Gpio, 'c' - 'a', 6}, /* GPIO Port V and Pin 3 */
-    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LDO19 }
+    { NvOdmIoModule_I2c, 0x00, 0x20, 0 },/* I2C device address is 0x20 */
+    { NvOdmIoModule_Gpio, 'c' - 'a', 6, 0}, /* GPIO Port V and Pin 3 */
+    { NvOdmIoModule_Vdd, 0x00, Max8907bPmuSupply_LDO19, 0 }
 };
