@@ -373,6 +373,12 @@ Ap20UsbPhySuspendPort(
         return NvError_NotSupported;
     }
 
+    // If port power(PP) is 0, SUSP bit is 0. We should not try to set it to 1.
+    if (!USB_REG_READ_VAL(PORTSC1, PP))
+    {
+        return NvError_NotSupported;
+    }
+
     // Do nothing if port is disabled
     if (!USB_REG_READ_VAL(PORTSC1, PE))
     {
