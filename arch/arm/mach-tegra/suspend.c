@@ -66,6 +66,7 @@ struct suspend_context
 
 volatile struct suspend_context tegra_sctx;
 
+#ifdef CONFIG_HOTPLUG_CPU
 extern void tegra_board_nvodm_suspend(void);
 extern void tegra_board_nvodm_resume(void);
 
@@ -74,6 +75,7 @@ static void __iomem *clk_rst = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
 static void __iomem *flow_ctrl = IO_ADDRESS(TEGRA_FLOW_CTRL_BASE);
 static void __iomem *evp_reset = IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE)+0x100;
 static void __iomem *tmrus = IO_ADDRESS(TEGRA_TMRUS_BASE);
+#endif
 
 #define PMC_CTRL		0x0
 #define PMC_CTRL_LATCH_WAKEUPS	(1 << 5)
@@ -128,6 +130,7 @@ bool tegra_nvrm_lp2_allowed(void)
 	return ret_value;
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
 static bool tegra_nvrm_lp2_persist(void)
 {
 	bool ret_value = true;
@@ -231,9 +234,6 @@ static noinline void restore_cpu_complex(bool wait_plls)
 		enable_irq(INT_SYS_STATS_MON);
 }
 
-extern unsigned long tegra_pgd_phys;
-extern unsigned int s_AvpWarmbootEntry;
-
 static noinline void suspend_cpu_complex(void)
 {
 	unsigned int reg;
@@ -325,8 +325,11 @@ unsigned int tegra_suspend_lp2(unsigned int us)
 #endif
 	return lp2time;
 }
+#endif
 
-#ifdef CONFIG_PM
+#ifdef	CONFIG_PM
+
+extern unsigned int s_AvpWarmbootEntry;
 
 /* ensures that sufficient time is passed for a register write to
  * serialize into the 32KHz domain */
@@ -620,6 +623,8 @@ static void tegra_suspend_wake(void)
 #endif
 }
 
+extern void __init lp0_suspend_init(void);
+
 extern void tegra_pinmux_suspend(void);
 extern void tegra_irq_suspend(void);
 extern void tegra_gpio_suspend(void);
@@ -704,8 +709,6 @@ static struct platform_suspend_ops tegra_suspend_ops = {
 	.wake		= tegra_suspend_wake,
 	.enter		= tegra_suspend_enter,
 };
-
-extern void __init lp0_suspend_init(void);
 #endif
 
 void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
@@ -767,7 +770,9 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 #endif
 }
 
+#ifdef CONFIG_PM
 void tegra_configure_dpd_kbc(unsigned int kbc_rows, unsigned int kbc_cols)
 {
 	writel((kbc_rows & 0xFFFF), pmc + PMC_DPAD_ORIDE);
 }
+#endif

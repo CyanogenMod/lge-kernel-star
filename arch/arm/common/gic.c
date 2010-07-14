@@ -227,7 +227,6 @@ static unsigned int _gic_dist_init(unsigned int gic_nr)
 	return max_irq;
 }
 
-#ifdef CONFIG_PM
 void gic_dist_restore(unsigned int gic_nr)
 {
 	unsigned int max_irq, i;
@@ -251,7 +250,6 @@ void gic_dist_restore(unsigned int gic_nr)
 	}
 
 }
-#endif
 
 
 void __init gic_dist_init(unsigned int gic_nr, void __iomem *base,

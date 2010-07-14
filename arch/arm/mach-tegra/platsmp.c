@@ -64,7 +64,9 @@ const struct cpumask *const cpu_init_mask = to_cpumask(cpu_init_bits);
 	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x344)
 
 unsigned long tegra_pgd_phys;  /* pgd used by hotplug & LP2 bootup */
+#if defined(CONFIG_PM) || defined(CONFIG_HOTPLUG_CPU)
 static pgd_t *tegra_pgd;
+#endif
 void *tegra_context_area = NULL;
 
 void __cpuinit platform_secondary_init(unsigned int cpu)
@@ -157,6 +159,7 @@ void __init smp_init_cpus(void)
 		cpu_set(i, cpu_possible_map);
 }
 
+#if defined(CONFIG_PM) || defined(CONFIG_HOTPLUG_CPU)
 static int create_suspend_pgtable(void)
 {
 	int i;
@@ -211,6 +214,7 @@ static int create_suspend_pgtable(void)
 
 	return 0;
 }
+#endif
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
@@ -226,12 +230,14 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	if (max_cpus > ncores)
 		max_cpus = ncores;
 
+#if defined(CONFIG_PM) || defined(CONFIG_HOTPLUG_CPU)
 	tegra_context_area = kzalloc(512 * ncores, GFP_KERNEL);
 
 	if (tegra_context_area && create_suspend_pgtable()) {
 		kfree(tegra_context_area);
 		tegra_context_area = NULL;
 	}
+#endif
 
 	/*
 	 * Initialise the present map, which describes the set of CPUs
