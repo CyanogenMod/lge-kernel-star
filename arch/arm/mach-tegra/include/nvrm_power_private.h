@@ -151,6 +151,19 @@ typedef enum
 extern NvRmLp2Policy g_Lp2Policy;
 
 /**
+ * Gets lowest power state, taking into the account run-time core lock.
+ */
+extern bool core_lock_on;
+static inline NvOdmSocPowerState NvRmPowerLowestStateGet(void)
+{
+    NvOdmSocPowerState state =
+        NvOdmQueryLowestSocPowerState()->LowestPowerState;
+    if ((state == NvOdmSocPowerState_DeepSleep) && core_lock_on)
+        state = NvOdmSocPowerState_Suspend;
+    return state;
+}
+
+/**
  * NVRM PM function called within OS shim high priority thread
  */
 NvRmPmRequest NvRmPrivPmThread(void);

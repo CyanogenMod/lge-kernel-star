@@ -1515,8 +1515,7 @@ NvRmPowerActivityHint (
 NvError
 NvRmKernelPowerSuspend( NvRmDeviceHandle hRmDeviceHandle )
 {
-    NvOdmSocPowerState state =
-        NvOdmQueryLowestSocPowerState()->LowestPowerState;
+    NvOdmSocPowerState state = NvRmPowerLowestStateGet();
 
     if (state ==  NvOdmSocPowerState_Suspend)
         NvRmPrivPowerGroupSuspend(hRmDeviceHandle);
@@ -1565,8 +1564,7 @@ NvRmKernelPowerSuspend( NvRmDeviceHandle hRmDeviceHandle )
 NvError
 NvRmKernelPowerResume( NvRmDeviceHandle hRmDeviceHandle )
 {
-    NvOdmSocPowerState state =
-        NvOdmQueryLowestSocPowerState()->LowestPowerState;
+    NvOdmSocPowerState state = NvRmPowerLowestStateGet();
 
     NvOsMutexLock(s_hPowerClientMutex);
     ReportRmPowerState(hRmDeviceHandle);

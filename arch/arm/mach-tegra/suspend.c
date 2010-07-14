@@ -66,6 +66,7 @@ struct suspend_context
 };
 
 volatile struct suspend_context tegra_sctx;
+bool core_lock_on = false;
 
 #ifdef CONFIG_HOTPLUG_CPU
 extern void tegra_board_nvodm_suspend(void);
@@ -95,6 +96,7 @@ static void __iomem *tmrus = IO_ADDRESS(TEGRA_TMRUS_BASE);
 #define PMC_COREPWROFF_TIMER	PMC_WAKE_DELAY
 #define PMC_SCRATCH38		0x134
 #define PMC_SCRATCH39		0x138
+#define PMC_SCRATCH41		0x140
 
 #define CLK_RESET_CCLK_BURST	0x20
 #define CLK_RESET_CCLK_DIVIDER  0x24
@@ -341,24 +343,33 @@ static void pmc_32kwritel(u32 val, unsigned long offs)
 	udelay(130);
 }
 
-static void tegra_setup_warmboot(void)
+static void tegra_setup_warmboot(bool lp0_ok)
 {
-	u32 scratch0;
+	if (lp0_ok) {
+		u32 scratch0;
 
-	scratch0 = readl(pmc + PMC_SCRATCH0);
-	/* lp0 restore is broken in the ap20 a03 boot rom, so fake the
-	 * bootrom into performing a regular boot, but pass a flag to the
-	 * bootloader to bypass the kernel reload and jump to the lp0
-	 * restore sequence */
-	if (tegra_is_ap20_a03())
-		scratch0 |= (1<<5);
-	else
-		scratch0 |= 1;
+		scratch0 = readl(pmc + PMC_SCRATCH0);
+		/* lp0 restore is broken in the ap20 a03 boot rom, so fake the
+		 * bootrom into performing a regular boot, but pass a flag to the
+		 * bootloader to bypass the kernel reload and jump to the lp0
+		 * restore sequence */
+		if (tegra_is_ap20_a03())
+			scratch0 |= (1<<5);
+		else
+			scratch0 |= 1;
 
-	pmc_32kwritel(scratch0, PMC_SCRATCH0);
+		pmc_32kwritel(scratch0, PMC_SCRATCH0);
 
-	/* Write the AVP warmboot entry address in SCRATCH1 */
-	pmc_32kwritel(s_AvpWarmbootEntry, PMC_SCRATCH1);
+		/* Write the AVP warmboot entry address in SCRATCH1 */
+		pmc_32kwritel(s_AvpWarmbootEntry, PMC_SCRATCH1);
+
+		/* Write the CPU LP0 reset vector address in SCRATCH41 */
+		writel(virt_to_phys(tegra_lp2_startup), pmc + PMC_SCRATCH41);
+	} else {
+		/* Setup LP1 start addresses */
+		writel(TEGRA_IRAM_CODE_AREA, evp_reset);
+		writel(virt_to_phys(tegra_lp2_startup), pmc + PMC_SCRATCH1);
+	}
 }
 
 static void tegra_setup_wakepads(bool lp0_ok)
@@ -434,7 +445,6 @@ static void tegra_suspend_dram(bool lp0_ok)
 	mode |= ((reg >> TEGRA_POWER_PMC_SHIFT) & TEGRA_POWER_PMC_MASK);
 
 	if (!lp0_ok) {
-		writel(TEGRA_IRAM_CODE_AREA, evp_reset);
 		NvRmPrivPowerSetState(s_hRmGlobal, NvRmPowerState_LP1);
 
 		mode |= TEGRA_POWER_CPU_PWRREQ_OE;
@@ -445,7 +455,7 @@ static void tegra_suspend_dram(bool lp0_ok)
 		mode &= ~TEGRA_POWER_EFFECT_LP0;
 	} else {
 		NvRmPrivPowerSetState(s_hRmGlobal, NvRmPowerState_LP0);
-		tegra_setup_warmboot();
+
 		mode |= TEGRA_POWER_CPU_PWRREQ_OE;
 		mode |= TEGRA_POWER_PWRREQ_OE;
 		mode |= TEGRA_POWER_EFFECT_LP0;
@@ -462,6 +472,7 @@ static void tegra_suspend_dram(bool lp0_ok)
 		}
 	}
 
+	tegra_setup_warmboot(lp0_ok);
 	tegra_setup_wakepads(lp0_ok);
 	suspend_cpu_complex();
 	flush_cache_all();
@@ -497,8 +508,7 @@ static void tegra_suspend_dram(bool lp0_ok)
 static int tegra_suspend_prepare(void)
 {
 #ifdef CONFIG_TEGRA_NVRM
-	NvOdmSocPowerState state =
-		NvOdmQueryLowestSocPowerState()->LowestPowerState;
+	NvOdmSocPowerState state = NvRmPowerLowestStateGet();
 
 	NvRmPrivDfsSuspend(state);
 	NvRmPrivPmuLPxStateConfig(s_hRmGlobal, state, NV_TRUE);
@@ -509,8 +519,7 @@ static int tegra_suspend_prepare(void)
 static void tegra_suspend_finish(void)
 {
 #ifdef CONFIG_TEGRA_NVRM
-	NvOdmSocPowerState state =
-		NvOdmQueryLowestSocPowerState()->LowestPowerState;
+	NvOdmSocPowerState state = NvRmPowerLowestStateGet();
 
 	NvRmPrivPmuLPxStateConfig(s_hRmGlobal, state, NV_FALSE);
 #endif
@@ -665,10 +674,11 @@ static int tegra_suspend_enter(suspend_state_t state)
 	unsigned long flags;
 	u32 mc_data[2];
 	int irq;
+	bool lp0_ok = (pdata->core_off && (!core_lock_on));
 
 	local_irq_save(flags);
 
-	if (pdata->core_off) {
+	if (lp0_ok) {
 		tegra_irq_suspend();
 		tegra_dma_suspend();
 		tegra_pinmux_suspend();
@@ -691,7 +701,7 @@ static int tegra_suspend_enter(suspend_state_t state)
 		NvRmPrivPowerSetState(s_hRmGlobal, NvRmPowerState_LP1);
 		tegra_suspend_lp2(0);
 	} else
-		tegra_suspend_dram(pdata->core_off);
+		tegra_suspend_dram(lp0_ok);
 
 	for_each_irq_desc(irq, desc) {
 		if ((desc->status & IRQ_WAKEUP) &&
@@ -703,7 +713,7 @@ static int tegra_suspend_enter(suspend_state_t state)
 	/* Clear DPD sample */
 	writel(0x0, pmc + PMC_DPD_SAMPLE);
 
-	if (pdata->core_off) {
+	if (lp0_ok) {
 		writel(mc_data[0], mc + MC_SECURITY_START);
 		writel(mc_data[1], mc + MC_SECURITY_SIZE);
 

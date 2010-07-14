@@ -616,6 +616,33 @@ nvrm_lp2policy_store(struct kobject *kobj, struct kobj_attribute *attr,
 static struct kobj_attribute nvrm_lp2policy_attribute =
 	__ATTR(lp2policy, 0644, nvrm_lp2policy_show, nvrm_lp2policy_store);
 
+/*
+ * NVRM lowest power state run-time selection
+ */
+static ssize_t
+nvrm_core_lock_show(struct kobject *kobj, struct kobj_attribute *attr,
+			char *buf)
+{
+	return sprintf(buf, "%u\n", core_lock_on);
+}
+
+static ssize_t
+nvrm_core_lock_store(struct kobject *kobj, struct kobj_attribute *attr,
+			const char *buf, size_t count)
+{
+	unsigned int n, lock;
+
+	n = sscanf(buf, "%u", &lock);
+	if (n != 1)
+		return -1;
+
+	core_lock_on = (bool)lock;
+	return count;
+}
+
+static struct kobj_attribute nvrm_core_lock_attribute =
+	__ATTR(core_lock, 0666, nvrm_core_lock_show, nvrm_core_lock_store);
+
 #endif
 
 static int __init nvrm_init(void)
@@ -635,6 +662,7 @@ static int __init nvrm_init(void)
 
 	// Create /sys/power/nvrm/notifier.
 	nvrm_kobj = kobject_create_and_add("nvrm", power_kobj);
+	sysfs_create_file(nvrm_kobj, &nvrm_core_lock_attribute.attr);
 	sysfs_create_file(nvrm_kobj, &nvrm_lp2policy_attribute.attr);
 	sysfs_create_file(nvrm_kobj, &nvrm_notifier_attribute.attr);
 	sys_nvrm_notifier = NULL;

@@ -40,7 +40,7 @@
  */
 
 #include "nvrm_pinmux.h"
-#include "nvrm_power.h"
+#include "nvrm_power_private.h"
 #include "nvrm_pmu.h"
 #include "nvrm_hardware_access.h"
 #include "nvddk_usbphy_priv.h"
@@ -634,7 +634,7 @@ NvDdkUsbPhyPowerUp(
     NvBool IsDpd)
 {
     NvError e = NvSuccess;
-    NvOdmSocPowerStateInfo *pLowPowerState = NvOdmQueryLowestSocPowerState();
+    NvOdmSocPowerState state = NvRmPowerLowestStateGet();
 
     NV_ASSERT(hUsbPhy);
 
@@ -672,7 +672,7 @@ NvDdkUsbPhyPowerUp(
     /* Allow restoring register context for the USB host if it is a ULPI
        interface or if the lowest power state is LP1 */
     if ((hUsbPhy->pProperty->UsbMode == NvOdmUsbModeType_Host) &&
-        ((pLowPowerState->LowestPowerState != NvOdmSocPowerState_DeepSleep) ||
+        ((state != NvOdmSocPowerState_DeepSleep) ||
         (hUsbPhy->pProperty->UsbInterfaceType == NvOdmUsbInterfaceType_UlpiExternalPhy)))
     {
         hUsbPhy->RestoreContext(hUsbPhy);
@@ -707,7 +707,7 @@ NvDdkUsbPhyPowerDown(
     NvError e = NvSuccess;
     NvDdkUsbPhyIoctl_VBusStatusOutputArgs VBusStatus;
     NvU32 TimeOut = USB_PHY_HW_TIMEOUT_US;
-    NvOdmSocPowerStateInfo *pLowPowerState = NvOdmQueryLowestSocPowerState();
+    NvOdmSocPowerState state = NvRmPowerLowestStateGet();
 
     NV_ASSERT(hUsbPhy);
 
@@ -721,7 +721,7 @@ NvDdkUsbPhyPowerDown(
     /* Allow saving register context for the USB host if it is a ULPI
        interface or if the lowest power state is LP1 */
     if ((hUsbPhy->pProperty->UsbMode == NvOdmUsbModeType_Host) &&
-        ((pLowPowerState->LowestPowerState != NvOdmSocPowerState_DeepSleep) ||
+        ((state != NvOdmSocPowerState_DeepSleep) ||
         (hUsbPhy->pProperty->UsbInterfaceType == NvOdmUsbInterfaceType_UlpiExternalPhy)))
     {
         hUsbPhy->SaveContext(hUsbPhy);
