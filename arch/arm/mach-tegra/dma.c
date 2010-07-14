@@ -617,6 +617,7 @@ static void handle_oneshot_dma(struct tegra_dma_channel *ch)
 static void handle_continuous_dma(struct tegra_dma_channel *ch)
 {
 	static struct tegra_dma_req *req;
+	struct tegra_dma_req *next_req;
 
 	spin_lock(&ch->lock);
 	if (list_empty(&ch->list)) {
@@ -630,8 +631,6 @@ static void handle_continuous_dma(struct tegra_dma_channel *ch)
 			/* Load the next request into the hardware, if available
 			 * */
 			if (!list_is_last(&req->node, &ch->list)) {
-				struct tegra_dma_req *next_req;
-
 				next_req = list_entry(req->node.next,
 					typeof(*next_req), node);
 				tegra_dma_update_hw_partial(ch, next_req);
@@ -658,6 +657,21 @@ static void handle_continuous_dma(struct tegra_dma_channel *ch)
 			req->buffer_status = TEGRA_DMA_REQ_BUF_STATUS_FULL;
 			req->bytes_transferred = bytes_transferred;
 			req->status = TEGRA_DMA_REQ_SUCCESS;
+			if (list_is_last(&req->node, &ch->list)) {
+				tegra_dma_stop(ch);
+			} else {
+				/* It may be possible that req came after
+				 * half dma complete so it need to start
+				 * immediately */
+				next_req = list_entry(req->node.next,
+						typeof(*next_req), node);
+				if (next_req->status !=
+						TEGRA_DMA_REQ_INFLIGHT) {
+					tegra_dma_stop(ch);
+					tegra_dma_update_hw(ch, next_req);
+				}
+			}
+
 			list_del(&req->node);
 
 			/* DMA lock is NOT held when callbak is called */
@@ -666,6 +680,8 @@ static void handle_continuous_dma(struct tegra_dma_channel *ch)
 			return;
 
 		} else {
+			tegra_dma_stop(ch);
+			/* Dma should be stop much earlier */
 			BUG();
 		}
 	}
