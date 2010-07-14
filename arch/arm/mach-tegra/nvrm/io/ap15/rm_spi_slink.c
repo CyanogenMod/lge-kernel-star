@@ -661,11 +661,12 @@ WaitForTransferCompletion(
         {
             if (hRmSpiSlink->CurrentDirection & SerialHwDataFlow_Rx)
             {
+                NvError DmaError;
                 // Get the Rx transfer count transferred by Dma.
-                Error = NvRmDmaGetTransferredCount(hRmSpiSlink->hRmRxDma,
+                DmaError = NvRmDmaGetTransferredCount(hRmSpiSlink->hRmRxDma,
                             &DmaRxTransferCountBytes, NV_TRUE);
-                NV_ASSERT(Error == NvSuccess);
-                if (Error != NvSuccess)
+                NV_ASSERT(DmaError == NvSuccess);
+                if (DmaError != NvSuccess)
                     DmaRxTransferCountBytes = 0;
                 PacketTransferedFromFifoYet = (DmaRxTransferCountBytes >> 2) *
                                                 hRmSpiSlink->CurrTransInfo.PacketsPerWord;
