@@ -84,8 +84,8 @@
 // Mutex for thread-safe access to PMC scratch fields
 static NvOsSpinMutexHandle s_hPmcScratchMutex = NULL;
 
-// Pointer to LP2 Time storage
-static NvUPtr s_pLp2Time = 0;
+// LP2 Time storage
+static NvU32 s_Lp2Time = 0;
 
 NvError NvRmPrivOalIntfInit(NvRmDeviceHandle hRmDeviceHandle)
 {
@@ -93,7 +93,7 @@ NvError NvRmPrivOalIntfInit(NvRmDeviceHandle hRmDeviceHandle)
     NV_ASSERT(hRmDeviceHandle);
 
     // Create PMC scratch register access mutex
-    s_pLp2Time = 0;
+    s_Lp2Time = 0;
     s_hPmcScratchMutex = NULL;
     NV_CHECK_ERROR_CLEANUP(NvOsSpinMutexCreate(&s_hPmcScratchMutex));
 
@@ -288,7 +288,7 @@ void NvRmPrivAp15IoPowerDetectReset(NvRmDeviceHandle hRmDeviceHandle)
 /*****************************************************************************/
 
 /*
- * PMC scratch register 21 is dedicated as LP2 time storage.
+ * LP2 time storage.
  * Write synchronization with the OAL is responsibility of the OAL, i.e., OAL
  * calls access this register only in single-thread environment.
  */
@@ -297,37 +297,21 @@ NvRmPrivSetLp2TimeUS(
     NvRmDeviceHandle hRmDeviceHandle,
     NvU32 TimeUS)
 {
-    if (NvRmIsSimulation())
-        return;
-
+    if (!NvRmIsSimulation())
     {
-        if (s_pLp2Time == 0)
-        {
-            NvRmModuleTable* tbl = NvRmPrivGetModuleTable(hRmDeviceHandle);
-            s_pLp2Time = ((NvUPtr)(tbl->ModInst + 
-                tbl->Modules[NvRmModuleID_Pmif].Index)->VirtAddr) +
-                APBDEV_PMC_SCRATCH21_0;
-        }
-        NV_WRITE32(s_pLp2Time, TimeUS);
+        s_Lp2Time = TimeUS;
     }
 }
 
 NvU32
 NvRmPrivGetLp2TimeUS(NvRmDeviceHandle hRmDeviceHandle)
 {
-    if (NvRmIsSimulation())
-        return 0;
-
+    if (!NvRmIsSimulation())
     {
-        if (s_pLp2Time == 0)
-        {
-            NvRmModuleTable* tbl = NvRmPrivGetModuleTable(hRmDeviceHandle);
-            s_pLp2Time = ((NvUPtr)(tbl->ModInst + 
-                tbl->Modules[NvRmModuleID_Pmif].Index)->VirtAddr) +
-                APBDEV_PMC_SCRATCH21_0;
-        }
-        return NV_READ32(s_pLp2Time);
+        return s_Lp2Time;
     }
+
+    return 0;
 }
 
 /*****************************************************************************/

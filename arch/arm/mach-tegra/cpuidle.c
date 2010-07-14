@@ -105,8 +105,6 @@ static int tegra_idle_enter_lp2(struct cpuidle_device *dev,
 {
 	ktime_t enter;
 	s64 request, us, latency, idle_us;
-	unsigned long log_us;
-	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
 	unsigned int last_sample = (unsigned int)cpuidle_get_statedata(state);
 
 	/* LP2 not possible when running in SMP mode */
@@ -130,9 +128,6 @@ static int tegra_idle_enter_lp2(struct cpuidle_device *dev,
 	state->exit_latency = (12*latency + 4*last_sample) >> 4;
 	state->target_residency = (latency_factor*state->exit_latency) >>
 		LATENCY_FACTOR_SHIFT;
-
-	log_us = (unsigned long)us + __raw_readl(pmc + PMC_SCRATCH_21);
-	__raw_writel(log_us, pmc + PMC_SCRATCH_21);
 
 	local_irq_enable();
 	return (int)idle_us;

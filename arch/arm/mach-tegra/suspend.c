@@ -247,7 +247,7 @@ static noinline void suspend_cpu_complex(void)
 unsigned int tegra_suspend_lp2(unsigned int us)
 {
 	unsigned int mode, entry, exit;
-	unsigned long orig, reg;
+	unsigned long orig, reg, lp2time, lp2timelast;
 
 	reg = readl(pmc + PMC_CTRL);
 	mode = (reg >> TEGRA_POWER_PMC_SHIFT) & TEGRA_POWER_PMC_MASK;
@@ -282,7 +282,15 @@ unsigned int tegra_suspend_lp2(unsigned int us)
 
 	entry = readl(pmc + PMC_SCRATCH38);
 	exit = readl(pmc + PMC_SCRATCH39);
-	return exit - entry;
+	lp2time = (exit - entry);
+
+#ifdef CONFIG_TEGRA_NVRM
+	if (us)	{
+		lp2timelast = NvRmPrivGetLp2TimeUS(s_hRmGlobal);
+		NvRmPrivSetLp2TimeUS(s_hRmGlobal,(lp2timelast + lp2time));
+	}
+#endif
+	return lp2time;
 }
 
 #ifdef CONFIG_PM
