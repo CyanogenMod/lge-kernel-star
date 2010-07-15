@@ -86,12 +86,18 @@ static NvRmMemHandle s_fb_hMem;
 static unsigned long *s_fb_regs;
 static unsigned short s_use_tearing_effect;
 static NvU32 s_power_id = -1ul;
+static NvBool tegra_fb_power_on( void );
+static void tegra_fb_trigger_frame( void );
+static void tegra_fb_power_off( void );
 
 #define DISPLAY_BASE    (0x54200000)
 #define REGW( reg, val ) \
-    *(s_fb_regs + (reg)) = (val)
+	do { \
+		writel( (val), s_fb_regs + (reg) ); \
+		wmb(); \
+	} while( 0 )
 
-/* palette attary used by the fbcon */
+/* palette array used by the fbcon */
 u32 pseudo_palette[16];
 
 /* fb_ops kernel interface */
@@ -102,6 +108,7 @@ int tegra_fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info);
 int tegra_fb_set_par(struct fb_info *info);
 int tegra_fb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	unsigned blue, unsigned transp, struct fb_info *info);
+int tegra_fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info);
 int tegra_fb_blank(int blank, struct fb_info *info);
 void tegra_fb_fillrect(struct fb_info *info, const struct fb_fillrect *rect);
 void tegra_fb_copyarea(struct fb_info *info, const struct fb_copyarea *region);
@@ -116,6 +123,7 @@ static struct fb_ops tegra_fb_ops = {
 	.fb_check_var	= tegra_fb_check_var,
 	.fb_set_par	= tegra_fb_set_par,
 	.fb_setcolreg	= tegra_fb_setcolreg,
+	.fb_pan_display = tegra_fb_pan_display,
 	.fb_blank	= tegra_fb_blank,
 	.fb_fillrect	= tegra_fb_fillrect,
 	.fb_copyarea	= tegra_fb_copyarea,
@@ -141,6 +149,7 @@ int tegra_fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 
 int tegra_fb_set_par(struct fb_info *info)
 {
+	tegra_fb_trigger_frame();
 	return 0;
 }
 
@@ -149,22 +158,48 @@ int tegra_fb_setcolreg(unsigned regno, unsigned red, unsigned green,
 {
 	struct fb_var_screeninfo *var = &info->var;
 
-	if( info->fix.visual == FB_VISUAL_TRUECOLOR ||
-		info->fix.visual == FB_VISUAL_DIRECTCOLOR )
-	{
+	if ((info->fix.visual == FB_VISUAL_TRUECOLOR) ||
+	    (info->fix.visual == FB_VISUAL_DIRECTCOLOR)) {
 		u32 v;
 
-		if( regno >= 16 )
-		{
+		if( regno >= 16 ) {
 			return -EINVAL;
 		}
 
-		v = (red << var->red.offset) |
-			(green << var->green.offset) |
+		v = (red << var->red.offset) | (green << var->green.offset) |
 			(blue << var->blue.offset);
 
 		((u32 *)info->pseudo_palette)[regno] = v;
 	}
+
+	return 0;
+}
+
+int tegra_fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
+{
+	u32 addr;
+
+	if( !tegra_fb_power_on() ) {
+		return -EINVAL;
+	}
+
+	info->var.xoffset = var->xoffset;
+	info->var.yoffset = var->yoffset;
+
+	addr = s_fb_addr + (var->yoffset * s_fb_width * s_fb_Bpp) +
+		(var->xoffset * s_fb_Bpp );
+
+	// window header - select Window A
+	REGW( 0x42, (1 << 4) );
+	// window surface base address
+	REGW( 0x800, addr );
+	// state control - general update - Window A
+	REGW( 0x41, (1 << 8) | (1 << 9) );
+	// state control - general activate - Window A
+	REGW( 0x41, (1 << 0) | (1 << 1) );
+
+	tegra_fb_trigger_frame();
+	tegra_fb_power_off();
 
 	return 0;
 }
@@ -306,13 +341,13 @@ static int tegra_plat_probe( struct platform_device *d )
 	s_fb_size = boot_fb.Size;
 	s_fb_addr = NvRmMemPin(s_fb_hMem);
 	s_fb_Bpp = NV_COLOR_GET_BPP(boot_fb.ColorFormat) >> 3;
+	s_fb_regs = ioremap_nocache( DISPLAY_BASE, 256 * 1024 );
 
 	/* need to poke a trigger register if the tearing effect signal is
 	 * used
 	 */
 	if( boot_fb.Flags & NVBOOTARG_FB_FLAG_TEARING_EFFECT )
 	{
-		s_fb_regs = ioremap_nocache( DISPLAY_BASE, 256 * 1024 );
 		s_use_tearing_effect = 1;
 	}
 
@@ -349,11 +384,16 @@ static int tegra_plat_probe( struct platform_device *d )
 		s_fb_hMem = NULL;
 		return -1;
 	}
+	if( boot_fb.NumSurfaces > 1 ) {
+		tegra_fb_info.fix.ypanstep = 1;
+	}
 
-	printk("nvtegrafb: base address: %x\n",
-		(unsigned int)tegra_fb_info.screen_base );
+	printk("nvtegrafb: base address: %x physical: %x\n",
+		(unsigned int)tegra_fb_info.screen_base,
+		(unsigned int)s_fb_addr );
 
 	register_framebuffer(&tegra_fb_info);
+
 	return 0;
 }
 
