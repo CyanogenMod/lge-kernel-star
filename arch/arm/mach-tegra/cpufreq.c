@@ -34,6 +34,7 @@
 #include <linux/workqueue.h>
 #include <linux/smp_lock.h>
 #include <linux/suspend.h>
+#include <linux/reboot.h>
 
 #include <asm/system.h>
 #include <asm/smp_twd.h>
@@ -107,6 +108,26 @@ static int tegra_cpufreq_pm_notifier(struct notifier_block *nfb,
 	return NOTIFY_OK;
 }
 #endif
+
+static int dfs_reboot_notify(struct notifier_block *nb,
+			     unsigned long event, void *data)
+{
+	switch (event) {
+	case SYS_RESTART:
+	case SYS_HALT:
+	case SYS_POWER_OFF:
+		/* Warm boot setting at max voltages works for any reboot */
+		NvRmPrivDfsSuspend(NvOdmSocPowerState_DeepSleep);
+		return NOTIFY_OK;
+	}
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block dfs_reboot_nb = {
+	.notifier_call = dfs_reboot_notify,
+	.next = NULL,
+	.priority = 0
+};
 
 static int tegra_cpufreq_dfsd(void *arg)
 {
@@ -209,6 +230,12 @@ static int tegra_cpufreq_init_once(void)
 		goto clean;
 	}
 
+	rc = register_reboot_notifier(&dfs_reboot_nb);
+	if (rc) {
+		pr_err("%s: unable to regsiter DVFS reboot notifier\n", __func__);
+		goto clean;
+	}
+
 	cpufreq_dfsd = kthread_create(tegra_cpufreq_dfsd, NULL, "cpufreq-dvfsd");
 	if (IS_ERR(cpufreq_dfsd)) {
 		pr_err("%s: unable to start DVFS daemon\n", __func__);
@@ -229,6 +256,7 @@ clean:
 			clk_put(clk_cpu);
 		clk_cpu = NULL;
 		rm_cpufreq = NULL;
+		unregister_reboot_notifier(&dfs_reboot_nb);
 	}
 
 	mutex_unlock(&init_mutex);
@@ -289,6 +317,7 @@ static void __exit tegra_cpufreq_exit(void)
 {
 	kthread_stop(cpufreq_dfsd);
 	clk_put(clk_cpu);
+	unregister_reboot_notifier(&dfs_reboot_nb);
 
 	cpufreq_unregister_driver(&s_tegra_cpufreq_driver);
 }

@@ -30,10 +30,11 @@ static inline void arch_idle(void)
 
 static inline void arch_reset(char mode, const char *cmd)
 {
-	void __iomem *reset = IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x04);
+	void __iomem *reset = IO_ADDRESS(TEGRA_PMC_BASE + 0x00);
 	u32 reg = readl(reset);
-	reg |= 0x04;
+	reg |= 0x10;
 	writel(reg, reset);
+	while(1);
 }
 
 #endif

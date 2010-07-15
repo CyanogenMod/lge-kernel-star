@@ -30,6 +30,7 @@
 #include <linux/lbee9qmb-rfkill.h>
 #include <linux/gpio.h>
 #include <linux/console.h>
+#include <linux/reboot.h>
 
 #include <mach/iomap.h>
 #include <mach/io.h>
@@ -1554,6 +1555,34 @@ do_register:
 	tegra_init_idle(plat);
 }
 
+static int tegra_reboot_notify(struct notifier_block *nb,
+				unsigned long event, void *data)
+{
+	switch (event) {
+	case SYS_RESTART:
+	case SYS_HALT:
+	case SYS_POWER_OFF:
+		/* USB power rail must be enabled during boot */
+		NvOdmEnableUsbPhyPowerRail(NV_TRUE);
+		return NOTIFY_OK;
+	}
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block tegra_reboot_nb = {
+	.notifier_call = tegra_reboot_notify,
+	.next = NULL,
+	.priority = 0
+};
+
+static void __init tegra_setup_reboot(void)
+{
+	int rc = register_reboot_notifier(&tegra_reboot_nb);
+	if (rc)
+		pr_err("%s: failed to regsiter platform reboot notifier\n",
+			__func__);
+}
+
 static int __init tegra_setup_data(void)
 {
 	platform_add_devices(nvodm_devices, ARRAY_SIZE(nvodm_devices));
@@ -1578,6 +1607,7 @@ void __init tegra_setup_nvodm(bool standard_i2c, bool standard_spi)
 	tegra_setup_w1();
 	pm_power_off = tegra_system_power_off;
 	tegra_setup_suspend();
+	tegra_setup_reboot();
 }
 
 void tegra_board_nvodm_suspend(void)
