@@ -59,8 +59,6 @@ static int lp2_supported = 0;
 #define PMC_SCRATCH_38 0x134
 #define PMC_SCRATCH_39 0x138
 
-#define CLK_RESET_CLK_MASK_ARM 0x44
-
 void __init tegra_init_idle(struct tegra_suspend_platform_data *plat)
 {
 	pwrgood_latency = plat->cpu_timer;
@@ -225,17 +223,12 @@ static int tegra_idle_enter(unsigned int cpu)
 static int __init tegra_cpuidle_init(void)
 {
 	unsigned int cpu = smp_processor_id();
-	void __iomem *mask_arm;
 	unsigned int reg;
 	int ret;
 
-	mask_arm = IO_ADDRESS(TEGRA_CLK_RESET_BASE) + CLK_RESET_CLK_MASK_ARM;
 	lp2_supported = (num_online_cpus()==1);
 	hotcpu_notifier(tegra_idle_lp2_allowed, 0);
 	pm_notifier(tegra_cpuidle_notifier, 0);
-
-	reg = readl(mask_arm);
-	writel(reg | (1<<31), mask_arm);
 
 	ret = cpuidle_register_driver(&tegra_idle);
 
