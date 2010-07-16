@@ -112,7 +112,7 @@ static int tegra_ehci_hub_control (
 	pdata = hcd->self.controller->platform_data;
 
 	/* if hardware is not accessable then don't read the registers */
-	if (!test_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags)) {
+	if (!test_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags) || !ehci->host_resumed) {
 		if (buf)
 			memset (buf, 0, wLength);
 		return retval;
