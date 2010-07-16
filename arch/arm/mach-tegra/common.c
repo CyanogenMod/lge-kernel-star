@@ -31,6 +31,21 @@
 
 #include "board.h"
 
+#define APB_MISC_HIDREV		0x804
+
+bool tegra_chip_compare(u32 chip, u32 major_rev, u32 minor_rev)
+{
+	void __iomem *misc = IO_ADDRESS(TEGRA_APB_MISC_BASE);
+	u32 val = readl(misc + APB_MISC_HIDREV);
+	u32 id = (val>>8) & 0xff;
+	u32 minor = (val>>16) & 0xf;
+	u32 major = (val>>4) & 0xf;
+
+	return (chip==id) &&
+		(minor_rev==minor || minor_rev==TEGRA_ALL_REVS) &&
+		(major_rev==major || major_rev==TEGRA_ALL_REVS);
+}
+
 #ifdef CONFIG_DMABOUNCE
 int dma_needs_bounce(struct device *dev, dma_addr_t addr, size_t size)
 {

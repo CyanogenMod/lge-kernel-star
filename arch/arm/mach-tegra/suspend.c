@@ -49,6 +49,7 @@
 #include "nvrm/core/common/nvrm_message.h"
 
 #include "power.h"
+#include "board.h"
 
 /* NOTE: only add elements to the end of this structure, since the assembly
  * code uses hard-coded offsets */
@@ -344,9 +345,16 @@ static void tegra_setup_warmboot(void)
 {
 	u32 scratch0;
 
-	/* Turn the WARMBOOT flag on in scratch0 */
 	scratch0 = readl(pmc + PMC_SCRATCH0);
-	scratch0 |= 1;
+	/* lp0 restore is broken in the ap20 a03 boot rom, so fake the
+	 * bootrom into performing a regular boot, but pass a flag to the
+	 * bootloader to bypass the kernel reload and jump to the lp0
+	 * restore sequence */
+	if (tegra_is_ap20_a03())
+		scratch0 |= (1<<5);
+	else
+		scratch0 |= 1;
+
 	pmc_32kwritel(scratch0, PMC_SCRATCH0);
 
 	/* Write the AVP warmboot entry address in SCRATCH1 */

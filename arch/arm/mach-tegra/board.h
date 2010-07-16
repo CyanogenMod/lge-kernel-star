@@ -44,5 +44,10 @@ int tegra_start_dvfsd(void);
 #define tegra_start_dvfsd() (0)
 #endif
 
+#define TEGRA_ALL_REVS (~0ul)
+bool tegra_chip_compare(u32 chip, u32 major_rev, u32 minor_rev);
+
+#define tegra_is_ap20_a03() tegra_chip_compare(0x20, 0x1, 0x3)
+
 extern struct sys_timer tegra_timer;
 #endif
