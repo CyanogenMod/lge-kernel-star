@@ -370,6 +370,10 @@ static void dr_controller_stop(struct fsl_udc *udc)
 {
 	unsigned int tmp;
 
+	/* Clear pending interrupt status bits */
+	tmp = fsl_readl(&dr_regs->usbsts);
+	fsl_writel(tmp, &dr_regs->usbsts);
+
 	/* disable all INTR */
 	fsl_writel(0, &dr_regs->usbintr);
 
@@ -2929,8 +2933,6 @@ static int fsl_udc_suspend(struct platform_device *pdev, pm_message_t state)
 		if (udc_controller->transceiver->state != OTG_STATE_B_PERIPHERAL) {
 			/* we are not in device mode, return */
 			return 0;
-		} else {
-			udc_controller->transceiver->state = OTG_STATE_UNDEFINED;
 		}
 	}
 	if (udc_controller->vbus_active)
@@ -2944,6 +2946,9 @@ static int fsl_udc_suspend(struct platform_device *pdev, pm_message_t state)
 	}
 	/* stop the controller and turn off the clocks */
 	dr_controller_stop(udc_controller);
+	if (udc_controller->transceiver) {
+		udc_controller->transceiver->state = OTG_STATE_UNDEFINED;
+	}
 	platform_udc_clk_suspend();
 	return 0;
 }
