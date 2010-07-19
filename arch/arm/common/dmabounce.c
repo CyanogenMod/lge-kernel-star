@@ -241,6 +241,25 @@ static inline dma_addr_t map_single_or_page(struct device *dev, void *ptr,
 	else
 		dma_addr = virt_to_dma(dev, ptr);
 
+	if (dev->dma_mask) {
+		unsigned long mask = *dev->dma_mask;
+		unsigned long limit;
+
+		limit = (mask - 1) | mask;
+		limit = (limit + 1) & ~limit;
+		if (limit && size > limit) {
+			dev_err(dev, "DMA mapping too big (requested %#x "
+				"mask %#Lx)\n", size, *dev->dma_mask);
+			return ~0;
+		}
+
+		/*
+		 * Figure out if we need to bounce from the DMA mask.
+		 */
+		needs_bounce = (dma_addr & ~mask) ||
+				(limit && (dma_addr + size > limit));
+	}
+
 	if (device_info && (needs_bounce || dma_needs_bounce(dev, dma_addr, size))) {
 		struct safe_buffer *buf;
 
