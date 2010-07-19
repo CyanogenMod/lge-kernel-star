@@ -24,11 +24,15 @@
 #include <linux/pda_power.h>
 #include <linux/io.h>
 #include <linux/usb/android_composite.h>
+#include <linux/i2c.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/time.h>
 #include <asm/setup.h>
+
+#include <mach/gpio.h>
+#include <gpio-names.h>
 
 #include <mach/iomap.h>
 #include <mach/irqs.h>
@@ -169,6 +173,35 @@ static struct platform_device *platform_devices[] = {
 #endif
 };
 
+static struct i2c_board_info bus0_i2c_devices[] = {
+#ifdef CONFIG_SENSORS_ISL29018
+	{
+		I2C_BOARD_INFO("isl29018", 0x44),
+		.irq = (INT_GPIO_BASE + TEGRA_GPIO_PZ2),
+	},
+#endif
+};
+
+static struct i2c_board_info bus3_i2c_devices[] = {
+#ifdef CONFIG_SENSORS_AK8975
+	{
+		I2C_BOARD_INFO("mm_ak8975", 0x0C),
+		.irq = (INT_GPIO_BASE + TEGRA_GPIO_PN5),
+	},
+#endif
+};
+
+void __init i2c_device_setup(void)
+{
+	if (ARRAY_SIZE(bus0_i2c_devices))
+		i2c_register_board_info(0, bus0_i2c_devices,
+					ARRAY_SIZE(bus0_i2c_devices));
+
+	if (ARRAY_SIZE(bus3_i2c_devices))
+		i2c_register_board_info(3, bus3_i2c_devices,
+					ARRAY_SIZE(bus3_i2c_devices));
+}
+
 extern void __init tegra_setup_nvodm(bool standard_i2c, bool standard_spi);
 extern void __init tegra_register_socdev(void);
 
@@ -203,6 +236,7 @@ static void __init tegra_ventana_init(void)
 	tegra_android_platform.product_name = ventana_dev;
 #endif
 	do_system_init(false, true);
+	i2c_device_setup();
 }
 
 static void __init tegra_generic_init(void)
