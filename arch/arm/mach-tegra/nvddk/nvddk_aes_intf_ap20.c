@@ -420,8 +420,7 @@ Ap20AesHwLockSskReadWrites(
 }
 
 /**
- * Encrypt/Decrypt a specified number of blocks of cyphertext using
- * Cipher Block Chaining (CBC) mode.  A block is 16 bytes.
+ * Encrypt/Decrypt a specified number of blocks of data. A block is 16 bytes.
  * This is non-blocking API and need to call AesHwEngineIdle()
  * to check the engine status to confirm the AES engine operation is
  * done and comes out of the BUSY state.
@@ -453,13 +452,11 @@ Ap20AesHwStartEngine(
     NvU8 *const pDest,
     AesHwContext *const pAesHwCtxt)
 {
-    NvRmMemHandle hSrcMemBuf = NULL;
-    NvRmMemHandle hDestMemBuf = NULL;
-    NvRmPhysAddr SrcBufferPhyAddr = 0;
-    NvRmPhysAddr DestBufferPhyAddr = 0;
-    NvU32 *pSrcBufferVirtAddr = NULL;
-    NvU32 *pDestBufferVirtAddr = NULL;
-    NvError e;
+    NvU32 TotalBytes = DataSize;
+    NvU32 NumBlocks = 0;
+    NvU32 BytesToProcess = 0;
+    NvU8 *pSourceBuffer = (NvU8 *)pSrc;
+    NvU8 *pDestBuffer = pDest;
 
     NV_ASSERT(pAesHwCtxt);
     NV_ASSERT(pSrc);
@@ -482,58 +479,7 @@ Ap20AesHwStartEngine(
             return NvError_InvalidState;
     }
 
-    NV_CHECK_ERROR_CLEANUP(NvRmMemHandleCreate(pAesHwCtxt->hRmDevice, &hSrcMemBuf, DataSize));
-    if (!hSrcMemBuf)
-    {
-        goto fail;
-    }
-
-    e = NvRmMemHandleCreate(pAesHwCtxt->hRmDevice, &hDestMemBuf, DataSize);
-    if (!hDestMemBuf || (e != NvSuccess))
-    {
-        goto fail1;
-    }
-
-    e = NvRmMemAlloc(hSrcMemBuf,0, 0, 4, NvOsMemAttribute_Uncached);
-    if (e != NvSuccess)
-    {
-        goto fail2;
-    }
-
-    e = NvRmMemAlloc(hDestMemBuf,0, 0, 4, NvOsMemAttribute_Uncached);
-    if (e != NvSuccess)
-    {
-        goto fail2;
-    }
-
-    SrcBufferPhyAddr = NvRmMemPin(hSrcMemBuf);
-    DestBufferPhyAddr = NvRmMemPin(hDestMemBuf);
-
-    e = NvRmPhysicalMemMap(
-        SrcBufferPhyAddr,
-        DataSize,
-        NVOS_MEM_READ_WRITE,
-        NvOsMemAttribute_Uncached,
-        (void **)&pSrcBufferVirtAddr);
-    if (e != NvSuccess)
-    {
-        goto fail3;
-    }
-
-    e = NvRmPhysicalMemMap(
-        DestBufferPhyAddr,
-        DataSize,
-        NVOS_MEM_READ_WRITE,
-        NvOsMemAttribute_Uncached,
-        (void **)&pDestBufferVirtAddr);
-    if (e != NvSuccess)
-    {
-        goto fail4;
-    }
-
     NvOsMutexLock(pAesHwCtxt->Mutex[Engine]);
-
-    NvOsMemcpy((NvU8 *)pSrcBufferVirtAddr, pSrc, DataSize);
 
     if (DataSize && (!IsEncryption) && (OpMode == NvDdkAesOperationalMode_Cbc))
     {
@@ -542,17 +488,41 @@ Ap20AesHwStartEngine(
             NvDdkAesConst_BlockLengthBytes);
     }
 
-    NvAesCoreAp20ProcessBuffer(
-        Engine,
-        pAesHwCtxt->pVirAdr[Engine],
-        SrcBufferPhyAddr,
-        DestBufferPhyAddr,
-        DataSize,
-        pAesHwCtxt->DmaPhyAddr[Engine],
-        IsEncryption,
-        OpMode);
+    while (TotalBytes)
+    {
+        if (TotalBytes > AES_HW_DMA_BUFFER_SIZE_BYTES)
+        {
+            BytesToProcess = AES_HW_DMA_BUFFER_SIZE_BYTES;
+        }
+        else
+        {
+            BytesToProcess = TotalBytes;
+        }
 
-    NvOsMemcpy(pDest, (NvU8 *)pDestBufferVirtAddr, DataSize);
+        // Copy data to DMA buffer from the client buffer
+        NvOsMemcpy(pAesHwCtxt->pDmaVirAddr[Engine], (void *)pSourceBuffer, BytesToProcess);
+        NvOsFlushWriteCombineBuffer();
+
+        NumBlocks = BytesToProcess / NvDdkAesConst_BlockLengthBytes;
+
+        NvAesCoreAp20ProcessBuffer(
+            Engine,
+            pAesHwCtxt->pVirAdr[Engine],
+            pAesHwCtxt->DmaPhyAddr[Engine],
+            pAesHwCtxt->DmaPhyAddr[Engine],
+            NumBlocks,
+            IsEncryption,
+            OpMode);
+        NvOsFlushWriteCombineBuffer();
+
+        // Copy data from DMA buffer to the client buffer
+        NvOsMemcpy(pDestBuffer, pAesHwCtxt->pDmaVirAddr[Engine], BytesToProcess);
+
+        // Increment the buffer pointer
+        pSourceBuffer += BytesToProcess;
+        pDestBuffer += BytesToProcess;
+        TotalBytes -= BytesToProcess;
+    }
 
     /**
      * If DataSize is zero, Iv would remain unchanged.
@@ -565,31 +535,9 @@ Ap20AesHwStartEngine(
             (pDest + DataSize - NvDdkAesConst_BlockLengthBytes),
              NvDdkAesConst_BlockLengthBytes);
     }
-
     NvOsMutexUnlock(pAesHwCtxt->Mutex[Engine]);
 
-    NvOsMemset(pSrcBufferVirtAddr, 0, DataSize);
-    NvOsMemset(pDestBufferVirtAddr, 0, DataSize);
-
-    // Unpinning the Memory
-    NvRmPhysicalMemUnmap(pDestBufferVirtAddr, DataSize);
-
-fail4:
-    NvRmPhysicalMemUnmap(pSrcBufferVirtAddr, DataSize);
-
-fail3:
-    // Unpinning the Memory
-    NvRmMemUnpin(hSrcMemBuf);
-
-    // Unpinning the Memory
-    NvRmMemUnpin(hDestMemBuf);
-
-fail2:
-    NvRmMemHandleFree(hDestMemBuf);
-fail1:
-    NvRmMemHandleFree(hSrcMemBuf);
-fail:
-    return e;
+    return NvSuccess;
 }
 
 /**

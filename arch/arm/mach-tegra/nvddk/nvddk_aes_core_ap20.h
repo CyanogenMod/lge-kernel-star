@@ -174,8 +174,7 @@ void NvAesCoreAp20LockSskReadWrites(const AesHwEngine Engine, const NvU32 *const
  * @param pEngineVirAddr AES engine virtual address.
  * @param SrcPhyAddress The physical address of source buffer.
  * @param DestPhyAddress The physical address of destination buffer.
- * @param DataSize The size of buffer.
- * @param DmaPhyAddr The physical address of the DMA.
+ * @param NumBlocks Number of blocks in Source buffer
  * @param IsEncryption NV_TRUE if encryption else NV_FALSE.
  * @param OpMode Specifies the AES operational mode.
  *
@@ -187,10 +186,9 @@ NvAesCoreAp20ProcessBuffer(
     const NvU32 *const pEngineVirAddr,
     const NvU32 SrcPhyAddress,
     const NvU32 DestPhyAddress,
-    const NvU32 DataSize,
-    const NvU32 DmaPhyAddr,
+    const NvU32 NumBlocks,
     const NvBool IsEncryption,
-    const NvU32 OpMode);
+    const NvDdkAesOperationalMode OpMode);
 
 /**
  * Load the SSK key into secure scratch resgister and disables the write permissions.
