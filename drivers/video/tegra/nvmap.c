@@ -41,9 +41,9 @@
 #include <linux/rbtree.h>
 #include <linux/proc_fs.h>
 #include <linux/ctype.h>
+#include <linux/nvmap.h>
 #include <asm/tlbflush.h>
 #include <mach/iovmm.h>
-#include <mach/nvmem.h>
 #include "nvcommon.h"
 #include "nvrm_memmgr.h"
 #include "nvbootargs.h"
@@ -100,6 +100,9 @@ static struct backing_dev_info nvmap_bdi = {
 #define NUM_NVMAP_PTES (NVMAP_SIZE >> PGDIR_SHIFT)
 #define NVMAP_END (NVMAP_BASE + NVMAP_SIZE)
 #define NVMAP_PAGES (NVMAP_SIZE >> PAGE_SHIFT)
+
+/* private nvmap_handle flag for pinning duplicate detection */
+#define NVMEM_HANDLE_VISITED (0x1ul << 31)
 
 /* Heaps to use for kernel allocs when no heap list supplied */
 #define NVMAP_KERNEL_DEFAULT_HEAPS (NVMEM_HEAP_SYSMEM | NVMEM_HEAP_CARVEOUT_GENERIC)
@@ -251,7 +254,7 @@ static unsigned long _nvmap_carveout_blockstat(struct nvmap_carveout *co,
 			val = max_t(unsigned long, val, co->blocks[idx].size);
 			idx = co->blocks[idx].next_free;
 			break;
-            }
+	    }
 	}
 
 	spin_unlock(&co->lock);
@@ -1102,10 +1105,10 @@ static int nvmap_pagealloc(struct nvmap_handle *h, bool contiguous)
 		for (i=0; i<cnt; i++) {
 			pages[i] = alloc_page(nvmap_gfp);
 			if (!pages[i]) {
-                            pr_err("failed to allocate %u pages after %u entries\n",
-                                   cnt, i);
-                            goto fail;
-                        }
+			    pr_err("failed to allocate %u pages after %u entries\n",
+				   cnt, i);
+			    goto fail;
+			}
 		}
 	}
 
@@ -2567,7 +2570,7 @@ static void _nvmap_create_heap_attrs(struct nvmap_carveout_node *n)
 		pr_err("%s: failed to create heap-%s device\n",
 			__func__, n->carveout.name);
 		return;
-        }
+	}
 	if (sysfs_create_group(&n->dev.kobj, &nvmap_heap_defattr_group))
 		pr_err("%s: failed to create attribute group for heap-%s "
 			"device\n", __func__, n->carveout.name);
@@ -2871,7 +2874,7 @@ static int nvmap_split_carveout_heap(struct nvmap_carveout *co, size_t size,
 
 /* NvRmMemMgr APIs implemented on top of nvmap */
 
-#ifdef CONFIG_TEGRA_NVRM
+#if defined(CONFIG_TEGRA_NVRM)
 #include <linux/freezer.h>
 
 NvU32 NvRmMemGetAddress(NvRmMemHandle hMem, NvU32 Offset)
@@ -3298,4 +3301,229 @@ NvError NvRmMemHandlePreserveHandle(NvRmMemHandle hMem, NvU32 *pKey)
 {
 	return NvError_NotSupported;
 }
+
 #endif
+
+static u32 nvmap_get_physaddr(struct nvmap_handle *h)
+{
+	u32 addr;
+
+	if (h->heap_pgalloc && h->pgalloc.contig) {
+		addr = page_to_phys(h->pgalloc.pages[0]);
+	} else if (h->heap_pgalloc) {
+		BUG_ON(!h->pgalloc.area);
+		addr = h->pgalloc.area->iovm_start;
+	} else {
+		addr = h->carveout.base;
+	}
+
+	return addr;
+}
+
+struct nvmap_handle *nvmap_alloc(
+	size_t size, size_t align,
+	unsigned int flags, void **map)
+{
+	struct nvmap_handle_ref *r = NULL;
+	struct nvmap_handle *h;
+	int err;
+
+	err = _nvmap_do_create(&nvmap_context.init_data,
+			NVMEM_IOC_CREATE, (unsigned long)size, true, &r);
+	if (err || !r)
+		return ERR_PTR(err);
+	h = r->h;
+
+	err = _nvmap_do_alloc(&nvmap_context.init_data,
+			(unsigned long)h, NVMAP_KERNEL_DEFAULT_HEAPS,
+			align, flags);
+	if (err) {
+		_nvmap_do_free(&nvmap_context.init_data, (unsigned long)h);
+		return ERR_PTR(err);
+	}
+
+	if (!map)
+		return h;
+
+	if (h->heap_pgalloc) {
+		*map = vm_map_ram(h->pgalloc.pages, h->size >> PAGE_SHIFT, -1,
+				_nvmap_flag_to_pgprot(h->flags, pgprot_kernel));
+	} else {
+		size_t mapaddr = h->carveout.base;
+		size_t mapsize = h->size;
+
+		mapsize += (mapaddr & ~PAGE_MASK);
+		mapaddr &= PAGE_MASK;
+		mapsize = (mapsize + PAGE_SIZE - 1) & PAGE_MASK;
+
+		/* TODO: [ahatala 2010-06-21] honor coherency flag? */
+		*map = ioremap_wc(mapaddr, mapsize);
+		if (*map)
+			*map += (h->carveout.base - mapaddr);
+	}
+	if (!*map) {
+		_nvmap_do_free(&nvmap_context.init_data, (unsigned long)h);
+		return ERR_PTR(-ENOMEM);
+	}
+	/* TODO: [ahatala 2010-06-22] get rid of kern_map */
+	h->kern_map = *map;
+	return h;
+}
+
+void nvmap_free(struct nvmap_handle *h, void *map)
+{
+	if (map) {
+		BUG_ON(h->kern_map != map);
+
+		if (h->heap_pgalloc) {
+			vm_unmap_ram(map, h->size >> PAGE_SHIFT);
+		} else {
+			unsigned long addr = (unsigned long)map;
+			addr &= ~PAGE_MASK;
+			iounmap((void *)addr);
+		}
+		h->kern_map = NULL;
+	}
+	_nvmap_do_free(&nvmap_context.init_data, (unsigned long)h);
+}
+
+u32 nvmap_pin_single(struct nvmap_handle *h)
+{
+	int ret;
+	do {
+		ret = _nvmap_handle_pin_fast(1, &h);
+		if (ret) {
+			pr_err("%s: failed to pin handle\n", __func__);
+			dump_stack();
+		}
+	} while (ret);
+
+	return nvmap_get_physaddr(h);
+}
+
+int nvmap_pin_array(struct file *filp,
+		struct nvmap_pinarray_elem *arr, int num_elems,
+		struct nvmap_handle **unique_arr, int *num_unique, bool wait)
+{
+	struct nvmap_pinarray_elem *elem;
+	struct nvmap_file_priv *priv = filp->private_data;
+	int i, unique_idx = 0;
+	unsigned long pfn = 0;
+	void *pteaddr = NULL;
+	int ret = 0;
+
+	mutex_lock(&nvmap_pin_lock);
+
+	/* find unique handles, pin them and collect into unpin array */
+	for (elem = arr, i = num_elems; i && !ret; i--, elem++) {
+		struct nvmap_handle *to_pin = elem->pin_mem;
+		if (to_pin->poison != NVDA_POISON) {
+			pr_err("%s: handle is poisoned\n", __func__);
+			ret = -EFAULT;
+		}
+		else if (!(to_pin->flags & NVMEM_HANDLE_VISITED)) {
+			if (!priv->su && !to_pin->global) {
+				struct nvmap_handle_ref *r;
+				spin_lock(&priv->ref_lock);
+				r = _nvmap_ref_lookup_locked(priv,
+							(unsigned long)to_pin);
+				spin_unlock(&priv->ref_lock);
+				if (!r) {
+					pr_err("%s: handle access failure\n", __func__);
+					ret = -EPERM;
+					break;
+				}
+			}
+			if (wait) {
+				ret = wait_event_interruptible(
+					nvmap_pin_wait,
+					!_nvmap_handle_pin_locked(to_pin));
+			}
+			else
+				ret = _nvmap_handle_pin_locked(to_pin);
+			if (!ret) {
+				to_pin->flags |= NVMEM_HANDLE_VISITED;
+				unique_arr[unique_idx++] = to_pin;
+			}
+		}
+	}
+
+	/* clear visited flags before releasing mutex */
+	i = unique_idx;
+	while (i--)
+		unique_arr[i]->flags &= ~NVMEM_HANDLE_VISITED;
+
+	mutex_unlock(&nvmap_pin_lock);
+
+	if (!ret)
+		ret = nvmap_map_pte(pfn, pgprot_kernel, &pteaddr);
+
+	if (unlikely(ret)) {
+		int do_wake = 0;
+		i = unique_idx;
+		while (i--)
+			do_wake |= _nvmap_handle_unpin(unique_arr[i]);
+		if (do_wake)
+			wake_up(&nvmap_pin_wait);
+		return ret;
+	}
+
+	for (elem = arr, i = num_elems; i; i--, elem++) {
+		struct nvmap_handle *h_patch = elem->patch_mem;
+		struct nvmap_handle *h_pin = elem->pin_mem;
+		struct page *page = NULL;
+		u32* patch_addr;
+
+		/* commit iovmm mapping */
+		if (h_pin->heap_pgalloc && h_pin->pgalloc.dirty)
+			_nvmap_handle_iovmm_map(h_pin);
+
+		/* patch */
+		if (h_patch->kern_map) {
+			patch_addr = (u32*)((unsigned long)h_patch->kern_map +
+					elem->patch_offset);
+		} else {
+			unsigned long phys, new_pfn;
+			if (h_patch->heap_pgalloc) {
+				page = h_patch->pgalloc.pages[elem->patch_offset >> PAGE_SHIFT];
+				get_page(page);
+				phys = page_to_phys(page) + (elem->patch_offset & ~PAGE_MASK);
+			} else {
+				phys = h_patch->carveout.base + elem->patch_offset;
+			}
+			new_pfn = __phys_to_pfn(phys);
+			if (new_pfn != pfn) {
+				_nvmap_set_pte_at((unsigned long)pteaddr, new_pfn,
+						_nvmap_flag_to_pgprot(h_patch->flags, pgprot_kernel));
+				pfn = new_pfn;
+			}
+			patch_addr = (u32*)((unsigned long)pteaddr + (phys & ~PAGE_MASK));
+		}
+
+		*patch_addr = nvmap_get_physaddr(h_pin) + elem->pin_offset;
+
+		if (page)
+			put_page(page);
+	}
+	nvmap_unmap_pte(pteaddr);
+	*num_unique = unique_idx;
+	return 0;
+}
+
+void nvmap_unpin(struct nvmap_handle **h, int num_handles)
+{
+	int do_wake = 0;
+
+	while (num_handles--) {
+		BUG_ON(!*h);
+		do_wake |= _nvmap_handle_unpin(*h);
+		h++;
+	}
+
+	if (do_wake) wake_up(&nvmap_pin_wait);
+}
+
+int nvmap_validate_file(struct file *f)
+{
+	return (f->f_op==&knvmap_fops || f->f_op==&nvmap_fops) ? 0 : -EFAULT;
+}

@@ -1,0 +1,54 @@
+config FB_TEGRA
+	boolean "NVIDIA Tegra graphics support"
+	depends on FB && ARCH_TEGRA
+        default FB
+	help
+	  Graphics services for NVIDIA Tegra products
+
+config FB_TEGRA_DUMMY
+	boolean "Tegra dummy framebuffer driver"
+	depends on FB_TEGRA
+	select FB_CFB_FILLRECT
+	select FB_CFB_COPYAREA
+	select FB_CFB_IMAGEBLIT
+        default FB
+	help
+	  This driver implements a dummy framebuffer device for systems based
+	  on the NVIDIA Tegra family of SoCs. Display initialization is
+	  expected to happen prior to the kernel start-up for this driver to
+	  function.
+
+config FB_TEGRA_GRHOST
+	tristate "Tegra graphics host driver"
+	depends on FB_TEGRA && TEGRA_IOVMM
+        default n
+	help
+	  Driver for the Tegra graphics host hardware.
+
+config DEVNVMAP
+	bool "/dev/nvmap device support"
+	depends on ARCH_TEGRA
+	default y
+	help
+	  Say Y here if you want to support the /dev/nvmap device. This device
+	  is used by NVIDIA Tegra graphics and multimedia drivers for managing
+	  graphics memory.
+
+config DEVNVMAP_PARANOID
+	bool "Validate all user-provided /dev/nvmap object references"
+	depends on DEVNVMAP
+	default n
+	help
+	  Say Y here to enable additional process-level validations and
+	  permissions for /dev/nvmap object references provided via ioctls.
+	  May result in a decrease in performance.
+
+config DEVNVMAP_RECLAIM_UNPINNED_VM
+	bool "Allow /dev/nvmap to reclaim unpinned I/O virtual memory"
+	depends on DEVNVMAP && TEGRA_IOVMM
+	default y
+	help
+	  Say Y here to enable /dev/nvmap to reclaim I/O virtual memory after
+	  it has been unpinned, and re-use it for other objects. This can
+	  allow a larger virtual I/O VM space than would normally be
+	  supported by the hardware, at a slight cost in performance.

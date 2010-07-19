@@ -20,6 +20,7 @@
 #include <linux/init.h>
 #include <linux/io.h>
 #include <linux/cpu.h>
+#include <linux/nvmap.h>
 
 #include <asm/hardware/cache-l2x0.h>
 #include <asm/cacheflush.h>
@@ -27,7 +28,6 @@
 
 #include <mach/iomap.h>
 #include <mach/dma.h>
-#include <mach/nvmem.h>
 
 #include "board.h"
 

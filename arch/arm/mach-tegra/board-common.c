@@ -184,6 +184,65 @@ static struct platform_device tegra_gart_device = {
 };
 #endif
 
+#ifdef CONFIG_FB_TEGRA_GRHOST
+static struct resource tegra_grhost_resources[] = {
+	[0] = {
+		.name = "host1x",
+		.start = TEGRA_HOST1X_BASE,
+		.end = TEGRA_HOST1X_BASE + TEGRA_HOST1X_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	[1] = {
+		.name = "display",
+		.start = TEGRA_DISPLAY_BASE,
+		.end = TEGRA_DISPLAY_BASE + TEGRA_DISPLAY_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	[2] = {
+		.name = "display2",
+		.start = TEGRA_DISPLAY2_BASE,
+		.end = TEGRA_DISPLAY2_BASE + TEGRA_DISPLAY2_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	[3] = {
+		.name = "vi",
+		.start = TEGRA_VI_BASE,
+		.end = TEGRA_VI_BASE + TEGRA_VI_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	[4] = {
+		.name = "isp",
+		.start = TEGRA_ISP_BASE,
+		.end = TEGRA_ISP_BASE + TEGRA_ISP_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	[5] = {
+		.name = "mpe",
+		.start = TEGRA_MPE_BASE,
+		.end = TEGRA_MPE_BASE + TEGRA_MPE_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	[6] = {
+		.name = "syncpt_thresh",
+		.start = INT_SYNCPT_THRESH_BASE,
+		.end = INT_SYNCPT_THRESH_BASE + INT_SYNCPT_THRESH_NR - 1,
+		.flags = IORESOURCE_IRQ,
+	},
+	[7] = {
+		.name = "host1x_mpcore_general",
+		.start = INT_HOST1X_MPCORE_GENERAL,
+		.end = INT_HOST1X_MPCORE_GENERAL,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+static struct platform_device tegra_grhost_device = {
+	.name = "tegra_grhost",
+	.id = -1,
+	.resource = tegra_grhost_resources,
+	.num_resources = ARRAY_SIZE(tegra_grhost_resources),
+};
+#endif
+
 #ifdef CONFIG_USB_GADGET_TEGRA
 static u64 tegra_udc_dma_mask = DMA_BIT_MASK(32);
 static struct fsl_usb2_platform_data tegra_udc_platform = {
@@ -233,6 +292,9 @@ static struct platform_device *tegra_devices[] __initdata = {
 #endif
 #ifdef CONFIG_TEGRA_IOVMM_GART
 	&tegra_gart_device,
+#endif
+#ifdef CONFIG_FB_TEGRA_GRHOST
+	&tegra_grhost_device,
 #endif
 };
 

@@ -100,12 +100,22 @@ static int tegra_periph_clk_enable(struct clk *c)
 		return -ENXIO;
 	}
 
+	/* max out emc when 3d is on */
+	if (NVRM_MODULE_ID_MODULE(c->module) == NvRmModuleID_3D) {
+		NvRmPowerBusyHint(s_hRmGlobal, NvRmDfsClockId_Emc, clk_pwr_client,
+				0xffffffff, NvRmFreqMaximum);
+	}
+
 	return 0;
 }
 
 static void tegra_periph_clk_disable(struct clk *c)
 {
 	NvError e;
+
+	if (NVRM_MODULE_ID_MODULE(c->module) == NvRmModuleID_3D) {
+		NvRmPowerBusyHint(s_hRmGlobal, NvRmDfsClockId_Emc, clk_pwr_client, 0, 0);
+	}
 
 	e = NvRmPowerModuleClockControl(s_hRmGlobal, c->module,
 		clk_pwr_client, NV_FALSE);
@@ -170,6 +180,16 @@ static unsigned long tegra_periph_clk_get_rate(struct clk *c)
 	return (unsigned long)freq * 1000;
 }
 
+static long tegra_periph_clk_round_rate(struct clk *c, unsigned long rate)
+{
+	NvRmFreqKHz max;
+	/* TODO: rm reports an unachievable max rate for host */
+	if (c->module == NvRmModuleID_GraphicsHost)
+		max = 111000;
+	else
+		max = NvRmPowerModuleGetMaxFrequency(s_hRmGlobal, c->module);
+	return min(((unsigned long)max) * 1000, rate);
+}
 
 static struct clk_ops tegra_periph_clk_ops = {
 	.init = tegra_periph_clk_init,
@@ -177,6 +197,7 @@ static struct clk_ops tegra_periph_clk_ops = {
 	.disable = tegra_periph_clk_disable,
 	.set_rate = tegra_periph_clk_set_rate,
 	.get_rate = tegra_periph_clk_get_rate,
+	.round_rate = tegra_periph_clk_round_rate,
 };
 
 static unsigned long tegra_clksrc_clk_get_rate(struct clk *c)
@@ -212,11 +233,12 @@ static struct clk_ops dfs_clk_ops = {
 #define NvRmModuleID_Afi NvRmPrivModuleID_Afi
 #define NvRmModuleID_PcieXclk NvRmPrivModuleID_PcieXclk
 
-#define PERIPH_CLK(_name, _dev, _modname, _instance, _tol, _min, _pow)	\
+#define PERIPH_CLK(_name, _dev, _con, _modname, _instance, _tol, _min, _pow) \
 	{								\
 		.name = _name,						\
 		.lookup = {						\
 			.dev_id = _dev,					\
+			.con_id = _con,					\
 		},							\
 		.module = NVRM_MODULE_ID(NvRmModuleID_##_modname, _instance), \
 		.ops = &tegra_periph_clk_ops,				\
@@ -226,19 +248,23 @@ static struct clk_ops dfs_clk_ops = {
 	}
 
 static struct clk tegra_periph_clk[] = {
-	PERIPH_CLK("rtc", "rtc-tegra", Rtc, 0, 0, 0, false),
-	PERIPH_CLK("kbc", "tegra-kbc", Kbc, 0, 0, 0, false),
-	PERIPH_CLK("uarta", "uart.0", Uart, 0, 5, 0, true),
-	PERIPH_CLK("uartb", "uart.1", Uart, 1, 5, 0, true),
-	PERIPH_CLK("uartc", "uart.2", Uart, 2, 5, 0, true),
-	PERIPH_CLK("uartd", "uart.3", Uart, 3, 5, 0, true),
-	PERIPH_CLK("uarte", "uart.4", Uart, 4, 5, 0, true),
-	PERIPH_CLK("sdmmc1", "tegra-sdhci.0", Sdio, 0, 0, 400, false),
-	PERIPH_CLK("sdmmc2", "tegra-sdhci.1", Sdio, 1, 0, 400, false),
-	PERIPH_CLK("sdmmc3", "tegra-sdhci.2", Sdio, 2, 0, 400, false),
-	PERIPH_CLK("sdmmc4", "tegra-sdhci.3", Sdio, 3, 0, 400, false),
-	PERIPH_CLK("pcie", "tegra_pcie", Pcie, 0, 0, 0, true),
-	PERIPH_CLK("pcie_xclk", "tegra_pcie_xclk", PcieXclk, 0, 0, 0, false),
+	PERIPH_CLK("rtc", "rtc-tegra", NULL, Rtc, 0, 0, 0, false),
+	PERIPH_CLK("kbc", "tegra-kbc", NULL, Kbc, 0, 0, 0, false),
+	PERIPH_CLK("uarta", "uart.0", NULL, Uart, 0, 5, 0, true),
+	PERIPH_CLK("uartb", "uart.1", NULL, Uart, 1, 5, 0, true),
+	PERIPH_CLK("uartc", "uart.2", NULL, Uart, 2, 5, 0, true),
+	PERIPH_CLK("uartd", "uart.3", NULL, Uart, 3, 5, 0, true),
+	PERIPH_CLK("uarte", "uart.4", NULL, Uart, 4, 5, 0, true),
+	PERIPH_CLK("sdmmc1", "tegra-sdhci.0", NULL, Sdio, 0, 0, 400, false),
+	PERIPH_CLK("sdmmc2", "tegra-sdhci.1", NULL, Sdio, 1, 0, 400, false),
+	PERIPH_CLK("sdmmc3", "tegra-sdhci.2", NULL, Sdio, 2, 0, 400, false),
+	PERIPH_CLK("sdmmc4", "tegra-sdhci.3", NULL, Sdio, 3, 0, 400, false),
+	PERIPH_CLK("pcie", "tegra_pcie", NULL, Pcie, 0, 0, 0, true),
+	PERIPH_CLK("pcie_xclk", "tegra_pcie_xclk", NULL, PcieXclk, 0, 0, 0, false),
+	PERIPH_CLK("gr3d", "tegra_grhost", "gr3d", 3D, 0, 0, 0, true),
+	PERIPH_CLK("gr2d", "tegra_grhost", "gr2d", 2D, 0, 0, 0, true),
+	PERIPH_CLK("host1x", "tegra_grhost", "host1x", GraphicsHost, 0, 0, 0, true),
+	PERIPH_CLK("epp", "tegra_grhost", "epp", Epp, 0, 0, 0, true),
 };
 
 static struct clk tegra_clk_cpu = {
@@ -389,6 +415,16 @@ unsigned long clk_get_rate(struct clk *c)
 	return c->ops->get_rate(c);
 }
 EXPORT_SYMBOL(clk_get_rate);
+
+long clk_round_rate(struct clk *c, unsigned long rate)
+{
+	if (c->ops && c->ops->round_rate)
+		return c->ops->round_rate(c, rate);
+
+	return -ENOSYS;
+}
+EXPORT_SYMBOL(clk_round_rate);
+
 
 void __init tegra_init_clock(void)
 {
