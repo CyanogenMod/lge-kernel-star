@@ -84,8 +84,6 @@ typedef struct AesIvContextRec
 {
     // Updated/current Iv for each key slot
     NvU32 CurIv[AesHwKeySlot_NumExt][AES_HW_IV_LENGTH];
-    // Iv read permissions for each key slot
-    NvBool IsIvReadable[AesHwKeySlot_NumExt];
     // The current key slot in use
     AesHwKeySlot CurKeySlot;
 } AesIvContext;
@@ -157,8 +155,6 @@ typedef struct AesHwContextRec
     NvU32 CommandQueueData[AesHwEngine_Num][AES_HW_MAX_ICQ_LENGTH];
     // Iv Context for each AES engine
     AesIvContext IvContext[AesHwEngine_Num];
-    // Indicates whether X9.31 operations are allowed or not
-    NvBool IsX931OpsDisallowed;
 } AesHwContext;
 
 // AES Core Engine record
@@ -389,16 +385,6 @@ struct AesHwInterfaceRec
      * @return NV_TRUE if engine is disabled else NV_FALSE.
      */
     NvBool (*AesHwIsEngineDisabled)(const AesHwContext *const pAesHwCtxt, const AesHwEngine Engine);
-
-    /**
-     * Get the read permissions for IV for each key slot of an engine.
-     *
-     * @param Engine AES Engine for which Iv permissions for an engine are sought.
-     * @param pAesHwCtxt Pointer to the AES H/W context.
-     *
-     * @retval None.
-     */
-    void (*AesHwGetIvReadPermissions)(const AesHwEngine Engine, AesHwContext *const pAesHwCtxt);
 
     /**
      * Disables read access to all key slots for the given engine.

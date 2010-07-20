@@ -90,7 +90,6 @@ Ap20AesHwLoadSskToSecureScratchAndLock(
     const AesHwKey *const pKey,
     const size_t Size);
 static void Ap20AesHwGetUsedSlots(AesCoreEngine *const pAesCoreEngine);
-static void Ap20AesHwGetIvReadPermissions(const AesHwEngine Engine, AesHwContext *const pAesHwCtxt);
 static void
 Ap20AesHwSetKeyAndIv(
     const AesHwEngine Engine,
@@ -172,9 +171,6 @@ Ap20AesHwSelectKeyIvSlot(
 
     // Wait till engine becomes IDLE
     NvAesCoreAp20WaitTillEngineIdle(Engine, pAesHwCtxt->pVirAdr[Engine]);
-
-    // Allow or disallow X9.31 operations
-    pAesHwCtxt->IsX931OpsDisallowed = !pAesHwCtxt->IvContext[Engine].IsIvReadable[Slot];
 
     // Select the KEY slot for updating the IV vectors
     NvAesCoreAp20SelectKeyIvSlot(Engine, pAesHwCtxt->pVirAdr[Engine], Slot);
@@ -465,13 +461,6 @@ Ap20AesHwStartEngine(
     switch (OpMode)
     {
         case NvDdkAesOperationalMode_AnsiX931:
-        {
-            // If Iv is not readable, don't allow operations to be performed.
-            // Since setting the Iv also uses this API, it should be enough to
-            // disallow operations here.
-            if (pAesHwCtxt->IsX931OpsDisallowed)
-                return NvError_InvalidState;
-        }
         case NvDdkAesOperationalMode_Cbc:
         case NvDdkAesOperationalMode_Ecb:
             break;
@@ -535,6 +524,37 @@ Ap20AesHwStartEngine(
             (pDest + DataSize - NvDdkAesConst_BlockLengthBytes),
              NvDdkAesConst_BlockLengthBytes);
     }
+    else if (DataSize && (OpMode == NvDdkAesOperationalMode_AnsiX931))
+    {
+        // For X931 operation, get the updated IV by following steps:
+        // 1. Perform CBC encryption on zero data to get A=CBC(encrypt, plaintext=zeroes)
+        // 2. Perform ECB decryption on A. This will result in Updated IV. UpdatedIV = ECB(decrypt, A)
+        NvOsMemset(pAesHwCtxt->pDmaVirAddr[Engine], 0, NvDdkAesKeySize_128Bit);
+        NvOsFlushWriteCombineBuffer();
+        NvAesCoreAp20ProcessBuffer(
+            Engine,
+            pAesHwCtxt->pVirAdr[Engine],
+            pAesHwCtxt->DmaPhyAddr[Engine],
+            pAesHwCtxt->DmaPhyAddr[Engine],
+            1,
+            NV_TRUE,
+            NvDdkAesOperationalMode_Cbc);
+        NvOsFlushWriteCombineBuffer();
+
+        NvAesCoreAp20ProcessBuffer(
+            Engine,
+            pAesHwCtxt->pVirAdr[Engine],
+            pAesHwCtxt->DmaPhyAddr[Engine],
+            pAesHwCtxt->DmaPhyAddr[Engine],
+            1,
+            NV_FALSE,
+            NvDdkAesOperationalMode_Ecb);
+        NvOsFlushWriteCombineBuffer();
+        NvOsMemcpy(&pAesHwCtxt->IvContext[Engine].CurIv[pAesHwCtxt->IvContext[Engine].CurKeySlot],
+            pAesHwCtxt->pDmaVirAddr[Engine],
+            NvDdkAesConst_BlockLengthBytes);
+    }
+
     NvOsMutexUnlock(pAesHwCtxt->Mutex[Engine]);
 
     return NvSuccess;
@@ -615,29 +635,6 @@ NvBool Ap20AesHwIsEngineDisabled(const AesHwContext *const pAesHwCtxt, const Aes
 }
 
 /**
- * Get the read permissions for IV for each key slot of an engine.
- *
- * @param Engine AES Engine for which Iv permissions for an engine are sought.
- * @param pAesHwCtxt Pointer to the AES H/W context.
- *
- * @retval None.
- *
- */
-void Ap20AesHwGetIvReadPermissions(const AesHwEngine Engine, AesHwContext *const pAesHwCtxt)
-{
-    NV_ASSERT(pAesHwCtxt);
-
-    NvOsMutexLock(pAesHwCtxt->Mutex[Engine]);
-
-    NvAesCoreAp20GetIvReadPermissions(
-        Engine,
-        pAesHwCtxt->pVirAdr[Engine],
-        &pAesHwCtxt->IvContext[Engine].IsIvReadable[0]);
-
-    NvOsMutexUnlock(pAesHwCtxt->Mutex[Engine]);
-}
-
-/**
  * Disables read access to all key slots for the given engine.
  *
  * @param pAesHwCtxt Pointer to the AES H/W context
@@ -682,6 +679,5 @@ void NvAesIntfAp20GetHwInterface(AesHwInterface *const pAp20AesHw)
     pAp20AesHw->AesHwLoadSskToSecureScratchAndLock = Ap20AesHwLoadSskToSecureScratchAndLock;
     pAp20AesHw->AesHwGetUsedSlots = Ap20AesHwGetUsedSlots;
     pAp20AesHw->AesHwIsEngineDisabled = Ap20AesHwIsEngineDisabled;
-    pAp20AesHw->AesHwGetIvReadPermissions = Ap20AesHwGetIvReadPermissions;
     pAp20AesHw->AesHwDisableAllKeyRead = Ap20AesHwDisableAllKeyRead;
 }

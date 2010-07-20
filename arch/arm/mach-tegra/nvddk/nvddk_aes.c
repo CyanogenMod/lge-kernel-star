@@ -203,7 +203,6 @@ void NvDdkAesResume(void)
     pAesHwCtxt = &gs_pAesCoreEngine->AesHwCtxt;
     NvOsMemset(Iv, 0, sizeof(Iv));
 
-    // Get the dedicated slot
     for (Engine = AesHwEngine_A; Engine < AesHwEngine_Num; Engine++)
     {
         NVDDK_AES_CHECK_INTERFACE(pAesHwCtxt, Engine);
@@ -1865,10 +1864,6 @@ NvError AesCoreInitEngine(const NvRmDeviceHandle hRmDevice)
             pAesHwCtxt,
             Engine,
             pAesHwCtxt->ppEngineCaps[Engine]->NumSlotsSupported);
-
-        // Get the Iv read permissions
-        NVDDK_AES_CHECK_INTERFACE_FUNC(pAesHwCtxt, Engine, AesHwGetIvReadPermissions);
-        pAesHwCtxt->ppEngineCaps[Engine]->pAesInterf->AesHwGetIvReadPermissions(Engine, pAesHwCtxt);
     }
 
     // Release the H/W semaphore

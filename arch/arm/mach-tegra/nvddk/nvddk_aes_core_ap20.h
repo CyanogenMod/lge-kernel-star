@@ -206,21 +206,6 @@ NvAesCoreAp20LoadSskToSecureScratchAndLock(
     const size_t Size);
 
 /**
- * Get the read permissions for IV for each key slot of an engine.
- *
- * @param Engine AES Engine for which Iv permissions for an engine are sought.
- * @param pEngineVirAddr AES engine virtual address.
- * @param pReadPermissions Pointer to read permissions.
- *
- * @retval None.
- */
-void
-NvAesCoreAp20GetIvReadPermissions(
-    const AesHwEngine Engine,
-    const NvU32 *const pEngineVirAddr,
-    NvBool *const pReadPermissions);
-
-/**
  * Disables read access to the given key slot
  *
  * @param Engine AES engine for which read access needs to be disabled

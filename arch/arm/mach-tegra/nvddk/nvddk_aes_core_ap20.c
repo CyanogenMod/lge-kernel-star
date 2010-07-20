@@ -534,24 +534,6 @@ NvAesCoreAp20LoadSskToSecureScratchAndLock(
     NvRmPhysicalMemUnmap(pPmicBaseAddr, Size);
 }
 
-void
-NvAesCoreAp20GetIvReadPermissions(
-    const AesHwEngine Engine,
-    const NvU32 *const pEngineVirAddr,
-    NvBool *const pReadPermissions)
-{
-    AesHwKeySlot KeySlot;
-    NvU32 RegValue = 0;
-
-    NV_ASSERT(pReadPermissions);
-
-    for (KeySlot = AesHwKeySlot_0; KeySlot < AesHwKeySlot_NumExt; KeySlot++)
-    {
-        SECURE_INDEXED_REGR(Engine, pEngineVirAddr, KeySlot, RegValue);
-        SECURE_DRF_READ_VAL(Engine, SECURE_SEC_SEL0, IVREAD_ENB0, RegValue, pReadPermissions[KeySlot]);
-    }
-}
-
 void NvAesCoreAp20KeyReadDisable(
     const AesHwEngine Engine,
     const AesHwKeySlot Slot,
