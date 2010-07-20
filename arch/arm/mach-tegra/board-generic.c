@@ -32,7 +32,7 @@
 #include <asm/setup.h>
 
 #include <mach/gpio.h>
-#include <gpio-names.h>
+#include "gpio-names.h"
 
 #include <mach/iomap.h>
 #include <mach/irqs.h>
