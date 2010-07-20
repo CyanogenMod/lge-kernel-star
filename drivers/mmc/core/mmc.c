@@ -166,6 +166,7 @@ static int mmc_read_ext_csd(struct mmc_card *card)
 {
 	int err;
 	u8 *ext_csd;
+	unsigned offs;
 
 	BUG_ON(!card);
 
@@ -229,12 +230,14 @@ static int mmc_read_ext_csd(struct mmc_card *card)
 			ext_csd[EXT_CSD_SEC_CNT + 3] << 24;
 		if (card->ext_csd.sectors) {
 #ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
-			unsigned offs;
 			offs = card->host->ops->get_host_offset(card->host);
 			offs >>= 9;
 			BUG_ON(offs >= card->ext_csd.sectors);
 			card->ext_csd.sectors -= offs;
 #endif
+			offs = ext_csd[EXT_CSD_BOOT_SIZE_MULTI] * SZ_256K / 512;
+			card->ext_csd.sectors -= offs;
+
 		}
 
 	}
