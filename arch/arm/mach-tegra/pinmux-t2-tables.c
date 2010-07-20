@@ -986,14 +986,14 @@ void tegra_pinmux_suspend(void)
        unsigned int i;
        u32 *ctx = pinmux_reg;
 
-       for (i=0; i<TRISTATE_REG_NUM; i++)
-               *ctx++ = pg_readl(TRISTATE_REG_A + i*4);
-
        for (i=0; i<PIN_MUX_CTL_REG_NUM; i++)
                *ctx++ = pg_readl(PIN_MUX_CTL_REG_A + i*4);
 
        for (i=0; i<PULLUPDOWN_REG_NUM; i++)
                *ctx++ = pg_readl(PULLUPDOWN_REG_A + i*4);
+
+       for (i=0; i<TRISTATE_REG_NUM; i++)
+               *ctx++ = pg_readl(TRISTATE_REG_A + i*4);
 }
 
 void tegra_pinmux_resume(void)
@@ -1001,13 +1001,13 @@ void tegra_pinmux_resume(void)
        unsigned int i;
        u32 *ctx = pinmux_reg;
 
-       for (i=0; i<TRISTATE_REG_NUM; i++)
-               pg_writel(*ctx++, TRISTATE_REG_A + i*4);
-
        for (i=0; i<PIN_MUX_CTL_REG_NUM; i++)
                pg_writel(*ctx++, PIN_MUX_CTL_REG_A + i*4);
 
        for (i=0; i<PULLUPDOWN_REG_NUM; i++)
                pg_writel(*ctx++, PULLUPDOWN_REG_A + i*4);
+
+       for (i=0; i<TRISTATE_REG_NUM; i++)
+               pg_writel(*ctx++, TRISTATE_REG_A + i*4);
 }
 #endif
