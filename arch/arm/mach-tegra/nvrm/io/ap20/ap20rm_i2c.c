@@ -186,12 +186,6 @@ CreateDmaBufferMemoryHandle(
 {
     NvError Error = NvSuccess;
     NvRmMemHandle hNewMemHandle = NULL;
-    static const NvRmHeap HeapProperty[] =
-    {
-        NvRmHeap_ExternalCarveOut,
-        NvRmHeap_External,
-        NvRmHeap_GART,
-    };
 
     // Initialize the memory handle with NULL
     *phNewMemHandle = NULL;
@@ -201,8 +195,8 @@ CreateDmaBufferMemoryHandle(
 
     // Allocates the memory from the sdram
     if (!Error)
-        Error = NvRmMemAlloc(hNewMemHandle, HeapProperty,
-                        NV_ARRAY_SIZE(HeapProperty), 4, NvOsMemAttribute_Uncached);
+        Error = NvRmMemAlloc(hNewMemHandle, NULL,
+                        0, 4, NvOsMemAttribute_Uncached);
 
     // Pin the memory allocation so that it should not move by memory manager.
     if (!Error)
