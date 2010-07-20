@@ -138,18 +138,19 @@ static const NvOdmGpioPinKeyInfo s_GpioPinKeyInfo[] = {
     {KEY_MENU, 10, NV_TRUE},
     {KEY_HOME, 10, NV_TRUE},
     {KEY_BACK, 10, NV_TRUE},
-    {KEY_VOLUMEUP, 10, NV_TRUE},
     {KEY_VOLUMEDOWN, 10, NV_TRUE},
+    {KEY_VOLUMEUP, 10, NV_TRUE},
 };
 
 
 // Gpio based keypad
 static const NvOdmGpioPinInfo s_GpioKeyBoard[] = {
-    {NVODM_PORT('q'), 0, NvOdmGpioPinActiveState_Low, (void *)&s_GpioPinKeyInfo[0]},
+    {NVODM_PORT('c'), 7, NvOdmGpioPinActiveState_Low, (void *)&s_GpioPinKeyInfo[0]},
     {NVODM_PORT('q'), 1, NvOdmGpioPinActiveState_Low, (void *)&s_GpioPinKeyInfo[1]},
     {NVODM_PORT('q'), 2, NvOdmGpioPinActiveState_Low, (void *)&s_GpioPinKeyInfo[2]},
-    {NVODM_PORT('q'), 3, NvOdmGpioPinActiveState_Low, (void *)&s_GpioPinKeyInfo[3]},
-    {NVODM_PORT('q'), 4, NvOdmGpioPinActiveState_Low, (void *)&s_GpioPinKeyInfo[4]},
+    {NVODM_PORT('q'), 4, NvOdmGpioPinActiveState_Low, (void *)&s_GpioPinKeyInfo[3]},
+    {NVODM_PORT('q'), 5, NvOdmGpioPinActiveState_Low, (void *)&s_GpioPinKeyInfo[4]},
+    {NVODM_PORT('v'), 2, NvOdmGpioPinActiveState_Low, (void *)&s_GpioPinKeyInfo[0]},
 };
 
 static const NvOdmGpioPinInfo s_Battery[] = {
