@@ -46,6 +46,7 @@
 #include "nvrm_hardware_access.h"
 #include "nvassert.h"
 #include "nvos.h"
+#include "linux/kernel.h"
 
 #define SLINK_REG_READ32(pSlinkHwRegsVirtBaseAdd, reg) \
         NV_READ32((pSlinkHwRegsVirtBaseAdd) + ((SLINK_##reg##_0)/4))
@@ -395,15 +396,19 @@ static NvError SlinkHwGetTransferStatus(SerialHwRegisters *pSlinkHwRegs,
     // Check for the receive error 
     if (DataFlow & SerialHwDataFlow_Rx)
     {
-        if (StatusReg & RX_ERROR_STATUS)
+        if (StatusReg & RX_ERROR_STATUS) {
+		pr_err("SPI RX ERROR Status 0x%x\n",StatusReg);
              return NvError_SpiReceiveError;
+	}
     }
 
     // Check for the transmit error 
     if (DataFlow & SerialHwDataFlow_Tx)
     {
-        if (StatusReg & TX_ERROR_STATUS)
+        if (StatusReg & TX_ERROR_STATUS) {
+		pr_err("SPI TX ERROR Status 0x%x\n",StatusReg);
             return NvError_SpiTransmitError;
+	}
     }
     return NvSuccess;
 }

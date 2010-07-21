@@ -306,6 +306,14 @@ SlinkHwReadFromReceiveFifo(
     return WordRequested;
 }
 
+static NvBool
+SlinkHwClearFifosForNewTransfer(
+    SerialHwRegisters *pSlinkHwRegs,
+    SerialHwDataFlow DataDirection)
+{
+    return NV_FALSE;
+}
+
 /**
  * Initialize the slink intterface for the hw access.
  */
@@ -319,4 +327,5 @@ void NvRmPrivSpiSlinkInitSlinkInterface_v1_0(HwInterface *pSlinkInterface)
     pSlinkInterface->HwSetCsSetupHoldTime    = SlinkHwSetCsSetupHoldTime;
     pSlinkInterface->HwWriteInTransmitFifoFxn = SlinkHwWriteInTransmitFifo;
     pSlinkInterface->HwReadFromReceiveFifoFxn =  SlinkHwReadFromReceiveFifo;
+    pSlinkInterface->HwClearFifosForNewTransferFxn =  SlinkHwClearFifosForNewTransfer;
 }

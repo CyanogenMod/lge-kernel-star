@@ -614,6 +614,14 @@ static NvBool SpiHwIsTransferCompleted(SerialHwRegisters *pSpiHwRegs)
     return NV_TRUE;
 }
 
+static NvBool
+SpiHwClearFifosForNewTransfer(
+    SerialHwRegisters *pSpiHwRegs,
+    SerialHwDataFlow DataDirection)
+{
+    return NV_FALSE;
+}
+
 /**
  * Initialize the spi intterface for the hw access.
  */
@@ -642,4 +650,5 @@ void NvRmPrivSpiSlinkInitSpiInterface(HwInterface *pSpiInterface)
     pSpiInterface->HwClearTransferStatusFxn = SpiHwClearTransferStatus;
     pSpiInterface->HwGetTransferStatusFxn = SpiHwGetTransferStatus;
     pSpiInterface->HwIsTransferCompletedFxn = SpiHwIsTransferCompleted;
+    pSpiInterface->HwClearFifosForNewTransferFxn = SpiHwClearFifosForNewTransfer;
 }

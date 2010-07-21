@@ -371,6 +371,16 @@ typedef struct
         SerialHwRegisters *pHwRegs,
         SerialHwDataFlow DataDirection);
 
+
+    /**
+     * Clear the fifos before starting new transfer to make sure there is no
+     * residuals from past.
+     */
+    NvBool
+    (* HwClearFifosForNewTransferFxn)(
+        SerialHwRegisters *pHwRegs,
+        SerialHwDataFlow DataDirection);
+
     /**
      * Check whether transfer is completed or not. 
      */

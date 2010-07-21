@@ -422,6 +422,34 @@ SlinkHwReadFromReceiveFifo(
     return WordsRead;
 }
 
+static NvBool
+SlinkHwClearFifosForNewTransfer(
+    SerialHwRegisters *pSlinkHwRegs,
+    SerialHwDataFlow DataDirection)
+{
+    NvU32 ResetBits = 0;
+    NvU32 StatusReg = SLINK_REG_READ32(pSlinkHwRegs->pRegsBaseAdd, STATUS);
+
+    if (!(StatusReg & NV_DRF_DEF(SLINK, STATUS, TX_EMPTY, EMPTY)))
+        ResetBits |= NV_DRF_NUM(SLINK, STATUS, TX_FLUSH, 1);
+
+    if (!(StatusReg & NV_DRF_DEF(SLINK, STATUS, RX_EMPTY, EMPTY)))
+        ResetBits |= NV_DRF_NUM(SLINK, STATUS, RX_FLUSH, 1);
+
+    if (!ResetBits)
+        return NV_FALSE;
+
+    StatusReg |= ResetBits;
+    SLINK_REG_WRITE32(pSlinkHwRegs->pRegsBaseAdd, STATUS, StatusReg);
+
+    // Now wait till the flush bits become 0
+    do
+    {
+        StatusReg = SLINK_REG_READ32(pSlinkHwRegs->pRegsBaseAdd, STATUS);
+    } while (StatusReg & ResetBits);
+    return NV_TRUE;
+}
+
 /**
  * Initialize the slink intterface for the hw access.
  */
@@ -435,4 +463,5 @@ void NvRmPrivSpiSlinkInitSlinkInterface_v1_1(HwInterface *pSlinkInterface)
     pSlinkInterface->HwSetCsSetupHoldTime    = SlinkHwSetCsSetupHoldTime;
     pSlinkInterface->HwWriteInTransmitFifoFxn = SlinkHwWriteInTransmitFifo;
     pSlinkInterface->HwReadFromReceiveFifoFxn =  SlinkHwReadFromReceiveFifo;
+    pSlinkInterface->HwClearFifosForNewTransferFxn =  SlinkHwClearFifosForNewTransfer;
 }

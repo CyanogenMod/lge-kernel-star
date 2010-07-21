@@ -1971,6 +1971,7 @@ static NvError MasterModeReadWriteDma(
     NvU8 *pWriteReqCpuBuffer = NULL;
     NvU32 WrittenWord;
     NvBool IsOnlyUseSWCS;
+    NvBool IsFlushRequired;
 
     hRmSpiSlink->IsUsingApbDma = NV_TRUE;
     hRmSpiSlink->hHwInterface->HwSetInterruptSourceFxn(&hRmSpiSlink->HwRegs,
@@ -2043,6 +2044,12 @@ static NvError MasterModeReadWriteDma(
             hRmSpiSlink->IsChipSelConfigured = NV_TRUE;
         }
 
+        IsFlushRequired = hRmSpiSlink->hHwInterface->HwClearFifosForNewTransferFxn(
+                              &hRmSpiSlink->HwRegs, hRmSpiSlink->CurrentDirection);
+        if (IsFlushRequired)
+        {
+            WARN_ON(1);
+        }
         hRmSpiSlink->hHwInterface->HwSetDmaTransferSizeFxn(&hRmSpiSlink->HwRegs,
                                             CurrentTransPacket);
 
@@ -2225,6 +2232,7 @@ static NvError SlaveModeSpiStartReadWriteDma(
     NvU32 TriggerLevel;
     NvU32 TotalWordsRequested;
     NvU32 NewBufferSize;
+    NvBool IsFlushRequired;
 
     BytesPerPacket = (PacketBitLength + 7)/8;
     PacketsPerWord = (IsPackedMode)? 4/BytesPerPacket: 1;
@@ -2283,6 +2291,13 @@ static NvError SlaveModeSpiStartReadWriteDma(
     hRmSpiSlink->CurrTransInfo.pTxBuff = NULL;
 
     CurrentTransWord = (CurrentTransPacket + PacketsPerWord -1)/PacketsPerWord;
+
+    IsFlushRequired = hRmSpiSlink->hHwInterface->HwClearFifosForNewTransferFxn(
+                            &hRmSpiSlink->HwRegs, hRmSpiSlink->CurrentDirection);
+    if (IsFlushRequired)
+    {
+        WARN_ON(1);
+    }
 
     TriggerLevel = (CurrentTransWord  & 0x3)? 4: 16;
     hRmSpiSlink->hHwInterface->HwSetTriggerLevelFxn(&hRmSpiSlink->HwRegs,
