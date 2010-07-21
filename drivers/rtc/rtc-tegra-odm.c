@@ -72,46 +72,6 @@ static int tegra_rtc_set_time(struct device *dev, struct rtc_time *tm)
 }
 
 #if (PMU_IOCTL_ENABLE)
-static int tegra_rtc_ioctl(struct device *dev, unsigned int cmd, unsigned long arg)
-{
-	void __user *argp = (void __user *)arg;
-	struct rtc_wkalrm	wkalrm;
-	NvU32 count = 0;
-
-	switch (cmd) {
-	case RTC_ALM_READ:
-		if(NvOdmPmuReadAlarm(hPmu, &count))
-		{
-			wkalrm.time.tm_hour 	= count / 3600;
-		    wkalrm.time.tm_min 	= (count - (wkalrm.time.tm_hour * 3600)) / 60;
-		    wkalrm.time.tm_sec	= (count - (wkalrm.time.tm_min * 60) - (wkalrm.time.tm_hour * 3600) );
-		    if (copy_to_user(argp, &count, sizeof(count)))
-				return -EFAULT;
-		}
-		else
-		{
-			pr_debug("NvOdmPmuReadRtc failed\n");
-			return -EINVAL;
-		}
-		break;
-
-	case RTC_ALM_SET:
-		if (copy_from_user(&wkalrm, argp, sizeof(wkalrm)))
-			return -EFAULT;
-		count = wkalrm.time.tm_hour * 3600 + wkalrm.time.tm_min * 60 + wkalrm.time.tm_sec;
-		if(!NvOdmPmuWriteAlarm(hPmu, count))
-		{
-			pr_debug("NvOdmPmuWriteRtc failed\n");
-			return -EINVAL;
-		}
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
 static int tegra_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *wkalrm)
 {
 
@@ -170,7 +130,6 @@ static struct rtc_class_ops tegra_rtc_ops = {
 	.read_time	= tegra_rtc_read_time,
 	.set_time	= tegra_rtc_set_time,
 #if (PMU_IOCTL_ENABLE)
-	.ioctl		= tegra_rtc_ioctl,
 	.read_alarm	= tegra_rtc_read_alarm,
 	.set_alarm	= tegra_rtc_set_alarm,
 #endif
@@ -238,7 +197,7 @@ static void tegra_rtc_shutdown(struct platform_device *pdev)
 {
 }
 
-MODULE_ALIAS("platform:tegra_rtc");
+MODULE_ALIAS("platform:tegra_rtc_odm");
 
 static struct platform_driver tegra_rtc_driver = {
 	.remove		= __exit_p(tegra_rtc_remove),
@@ -248,7 +207,7 @@ static struct platform_driver tegra_rtc_driver = {
 	.resume		= tegra_rtc_resume,
 #endif
 	.driver		=  {
-		.name  = "tegra_rtc",
+		.name  = "tegra_rtc_odm",
 		.owner = THIS_MODULE,
 	},
 };

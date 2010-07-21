@@ -111,7 +111,7 @@ static void __init tegra_setup_debug_uart(void)
 	NvOdmDebugConsole uart = NvOdmQueryDebugConsole();
 	const struct tegra_pingroup_config *pinmux = NULL;
 	const NvU32 *odm_table;
-	struct clk *c;
+	struct clk *c = NULL;
 	NvU32 odm_nr;
 	int nr_pins;
 
@@ -847,13 +847,35 @@ static noinline void __init tegra_setup_gpio_key(void)
 static void tegra_setup_gpio_key(void) { }
 #endif
 
+#ifdef CONFIG_RTC_DRV_TEGRA
+static struct resource tegra_rtc_resources[] = {
+	[0] = {
+		.start = TEGRA_RTC_BASE,
+		.end = TEGRA_RTC_BASE + TEGRA_RTC_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	[1] = {
+		.start = INT_RTC,
+		.end = INT_RTC,
+		.flags = IORESOURCE_IRQ,
+	},
+};
 
-#ifdef CONFIG_RTC_DRV_TEGRA_ODM
 static struct platform_device tegra_rtc_device = {
 	.name = "tegra_rtc",
 	.id   = -1,
+	.resource = tegra_rtc_resources,
+	.num_resources = ARRAY_SIZE(tegra_rtc_resources),
 };
 #endif
+
+#ifdef CONFIG_RTC_DRV_TEGRA_ODM
+static struct platform_device tegra_rtc_odm_device = {
+	.name = "tegra_rtc_odm",
+	.id   = -1,
+};
+#endif
+
 #ifdef CONFIG_TEGRA_NVEC
 static struct platform_device tegra_nvec_device = {
 	.name = "nvec",
@@ -1106,8 +1128,11 @@ static struct platform_device tegra_vibrator_device = {
 #endif
 
 static struct platform_device *nvodm_devices[] __initdata = {
-#ifdef CONFIG_RTC_DRV_TEGRA_ODM
+#ifdef CONFIG_RTC_DRV_TEGRA
 	&tegra_rtc_device,
+#endif
+#ifdef CONFIG_RTC_DRV_TEGRA_ODM
+	&tegra_rtc_odm_device,
 #endif
 #ifdef CONFIG_TEGRA_NVEC
 	&tegra_nvec_device,
