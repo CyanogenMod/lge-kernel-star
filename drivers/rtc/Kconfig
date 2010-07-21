@@ -228,6 +228,17 @@ config RTC_DRV_TEGRA_ODM
 	  RTC (Realtime Clock) driver for the RTC functionality implemented by
 	  the development system's ODM kit
 
+config RTC_DRV_TEGRA
+	tristate "NVIDIA Tegra Internal RTC driver"
+	depends on ARCH_TEGRA && TEGRA_NVRM
+	default RTC_CLASS
+	help
+	  If you say yes here you get support for the
+	  Tegra 200 series internal RTC module.
+
+	  This drive can also be built as a module. If so, the module
+	  will be called rtc-tegra.
+
 config RTC_DRV_PCF8563
 	tristate "Philips PCF8563/Epson RTC8564"
 	help
