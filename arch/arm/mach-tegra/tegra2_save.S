@@ -40,10 +40,6 @@
 
 #define TTB_FLAGS 0x6A	@ IRGN_WBWA, OC_RGN_WBWA, S, NOS
 
-#define CONTEXT_SIZE_WORDS_SHIFT 7
-#define CONTEXT_SIZE_WORDS (1<<CONTEXT_SIZE_WORDS_SHIFT)
-
-
 #define EMC_CFG				0xc
 #define EMC_ADR_CFG			0x10
 #define EMC_REFRESH			0x70
@@ -102,7 +98,7 @@ __tear_down_master:
 	tst	sp, #TEGRA_POWER_EFFECT_LP0
 	bne	__l2_clean_done
 	mov32	r0, (TEGRA_ARM_PL310_BASE-IO_CPU_PHYS+IO_CPU_VIRT)
-	add	r3, r8, #(CONTEXT_SIZE_WORDS*4)
+	add	r3, r8, #(CONTEXT_SIZE_BYTES)
 	bic	r8, r8, #0x1f
 	add	r3, r3, #0x1f
 11:	str	r8, [r0, #L2X0_CLEAN_LINE_PA]

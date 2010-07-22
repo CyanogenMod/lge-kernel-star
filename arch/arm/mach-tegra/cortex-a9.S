@@ -35,11 +35,8 @@
 
 /*	.section ".cpuinit.text", "ax"*/
 
-#define CONTEXT_SIZE_WORDS_SHIFT 7
-#define CONTEXT_SIZE_WORDS (1<<CONTEXT_SIZE_WORDS_SHIFT)
-
 /*
- * spooled CPU context is 512B / CPU
+ * spooled CPU context is 1KB / CPU
  */
 #define CTX_SP		0
 #define CTX_CPSR	4
@@ -106,13 +103,34 @@
 #define CTX_VFP_REGS	256
 #define CTX_VFP_SIZE	(32 * 8)
 
+#define CTX_CP14_REGS	512
+#define CTS_CP14_DSCR	512
+#define CTX_CP14_WFAR	516
+#define CTX_CP14_VCR	520
+#define CTX_CP14_CLAIM	524
+
+/* Each of the folowing is 2 32-bit registers */
+#define CTS_CP14_BKPT_0	528
+#define CTS_CP14_BKPT_1	536
+#define CTS_CP14_BKPT_2	544
+#define CTS_CP14_BKPT_3	552
+#define CTS_CP14_BKPT_4	560
+#define CTS_CP14_BKPT_5	568
+
+/* Each of the folowing is 2 32-bit registers */
+#define CTS_CP14_WPT_0	576
+#define CTS_CP14_WPT_1	584
+#define CTS_CP14_WPT_2	592
+#define CTS_CP14_WPT_3	600
+
+#include "power.h"
 #include "power-macros.S"
 
 .macro	ctx_ptr, rd, tmp
 	cpu_id	\tmp
 	mov32	\rd, tegra_context_area
 	ldr	\rd, [\rd]
-	add	\rd, \rd, \tmp, lsl #(CONTEXT_SIZE_WORDS_SHIFT+2)
+	add	\rd, \rd, \tmp, lsl #(CONTEXT_SIZE_BYTES_SHIFT)
 .endm
 
 .macro	translate, pa, va, tmp
@@ -161,7 +179,7 @@ ENTRY(__cortex_a9_save)
 
 	/* zero-out context area */
 	mov	r9, r8
-	add	r10, r8, #(CONTEXT_SIZE_WORDS*4)
+	add	r10, r8, #(CONTEXT_SIZE_BYTES)
 	mov	r0, #0
 	mov	r1, #0
 	mov	r2, #0
@@ -249,6 +267,48 @@ ENTRY(__cortex_a9_save)
 	cps	0x13			@ back to SVC
 	mov	r8, r0
 
+	/* Save CP14 debug controller context */
+	add	r9, r8, #CTX_CP14_REGS
+	mrc     p14, 0, r0, c0, c1, 0	@ DSCR
+	mrc	p14, 0, r1, c0, c6, 0	@ WFAR
+	mrc	p14, 0, r2, c0, c7, 0	@ VCR
+	mrc	p14, 0, r3, c7, c9, 6	@ CLAIM
+	stmia	r9, {r0-r3}
+
+	add	r9, r8, #CTS_CP14_BKPT_0
+	mrc	p14, 0, r2, c0, c0, 4
+	mrc	p14, 0, r3, c0, c0, 5
+	stmia	r9!, {r2-r3}     	@ BRKPT_0
+	mrc	p14, 0, r2, c0, c1, 4
+	mrc	p14, 0, r3, c0, c1, 5
+	stmia	r9!, {r2-r3}     	@ BRKPT_0
+	mrc	p14, 0, r2, c0, c2, 4
+	mrc	p14, 0, r3, c0, c2, 5
+	stmia	r9!, {r2-r3}     	@ BRKPT_0
+	mrc	p14, 0, r2, c0, c3, 4
+	mrc	p14, 0, r3, c0, c3, 5
+	stmia	r9!, {r2-r3}     	@ BRKPT_0
+	mrc	p14, 0, r2, c0, c4, 4
+	mrc	p14, 0, r3, c0, c4, 5
+	stmia	r9!, {r2-r3}     	@ BRKPT_0
+	mrc	p14, 0, r2, c0, c5, 4
+	mrc	p14, 0, r3, c0, c5, 5
+	stmia	r9!, {r2-r3}     	@ BRKPT_0
+
+	add	r9, r8, #CTS_CP14_WPT_0
+	mrc	p14, 0, r2, c0, c0, 6
+	mrc	p14, 0, r3, c0, c0, 7
+	stmia	r9!, {r2-r3}     	@ WPT_0
+	mrc	p14, 0, r2, c0, c1, 6
+	mrc	p14, 0, r3, c0, c1, 7
+	stmia	r9!, {r2-r3}     	@ WPT_0
+	mrc	p14, 0, r2, c0, c2, 6
+	mrc	p14, 0, r3, c0, c2, 7
+	stmia	r9!, {r2-r3}     	@ WPT_0
+	mrc	p14, 0, r2, c0, c3, 6
+	mrc	p14, 0, r3, c0, c3, 7
+	stmia	r9!, {r2-r3}     	@ WPT_0
+
 #ifdef CONFIG_CACHE_L2X0
 	cpu_id	r4
 	cmp	r4, #0
@@ -266,7 +326,7 @@ ENTRY(__cortex_a9_save)
 
 __cortex_a9_save_clean_cache:
 	mov	r10, r8
-	add	r9, r10, #(CONTEXT_SIZE_WORDS*4)
+	add	r9, r10, #(CONTEXT_SIZE_BYTES)
 	add	r9, r9, #(L1_CACHE_BYTES-1)
 	bic	r10, r10, #(L1_CACHE_BYTES-1)
 	bic	r9, r9, #(L1_CACHE_BYTES-1)
@@ -386,6 +446,50 @@ ENTRY(__cortex_a9_restore)
 	mov	sp, r5
 	msr	cpsr_cxsf, r6
 	msr	spsr_cxsf, r7
+
+	/* Restore CP14 debug controller context */
+	add	r9, r8, #CTX_CP14_REGS
+	ldmia	r9, {r0-r3}
+	mcr	p14, 0, r1, c0, c6, 0	@ WFAR
+	mcr	p14, 0, r2, c0, c7, 0	@ VCR
+	mcr	p14, 0, r3, c7, c8, 6	@ CLAIM
+
+	add	r9, r8, #CTS_CP14_BKPT_0
+	ldmia	r9!, {r2-r3}		@ BRKPT_0
+	mcr	p14, 0, r2, c0, c0, 4
+	mcr	p14, 0, r3, c0, c0, 5
+	ldmia	r9!, {r2-r3}		@ BRKPT_0
+	mcr	p14, 0, r2, c0, c1, 4
+	mcr	p14, 0, r3, c0, c1, 5
+	ldmia	r9!, {r2-r3}		@ BRKPT_0
+	mcr	p14, 0, r2, c0, c2, 4
+	mcr	p14, 0, r3, c0, c2, 5
+	ldmia	r9!, {r2-r3}		@ BRKPT_0
+	mcr	p14, 0, r2, c0, c3, 4
+	mcr	p14, 0, r3, c0, c3, 5
+	ldmia	r9!, {r2-r3}		@ BRKPT_0
+	mcr	p14, 0, r2, c0, c4, 4
+	mcr	p14, 0, r3, c0, c4, 5
+	ldmia	r9!, {r2-r3}		@ BRKPT_0
+	mcr	p14, 0, r2, c0, c5, 4
+	mcr	p14, 0, r3, c0, c5, 5
+
+	add	r9, r8, #CTS_CP14_WPT_0
+	ldmia	r9!, {r2-r3}		@ WPT_0
+	mcr	p14, 0, r2, c0, c0, 6
+	mcr	p14, 0, r3, c0, c0, 7
+	ldmia	r9!, {r2-r3}		@ WPT_0
+	mcr	p14, 0, r2, c0, c1, 6
+	mcr	p14, 0, r3, c0, c1, 7
+	ldmia	r9!, {r2-r3}		@ WPT_0
+	mcr	p14, 0, r2, c0, c2, 6
+	mcr	p14, 0, r3, c0, c2, 7
+	ldmia	r9!, {r2-r3}		@ WPT_0
+	mcr	p14, 0, r2, c0, c3, 6
+	mcr	p14, 0, r3, c0, c3, 7
+	isb
+	mcr	p14, 0, r0, c0, c2, 2	@ DSCR
+	isb
 
 #ifdef CONFIG_VFPv3
 	orr	r4, lr, #0xF00000

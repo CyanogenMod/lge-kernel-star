@@ -231,7 +231,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		max_cpus = ncores;
 
 #if defined(CONFIG_PM) || defined(CONFIG_HOTPLUG_CPU)
-	tegra_context_area = kzalloc(512 * ncores, GFP_KERNEL);
+	tegra_context_area = kzalloc(CONTEXT_SIZE_BYTES * ncores, GFP_KERNEL);
 
 	if (tegra_context_area && create_suspend_pgtable()) {
 		kfree(tegra_context_area);

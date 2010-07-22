@@ -38,6 +38,10 @@
 #define TEGRA_POWER_PMC_SHIFT		8
 #define TEGRA_POWER_PMC_MASK		0x1ff
 
+/* CPU Context area (1KB per CPU) */
+#define CONTEXT_SIZE_BYTES_SHIFT 10
+#define CONTEXT_SIZE_BYTES (1<<CONTEXT_SIZE_BYTES_SHIFT)
+
 /* layout of IRAM used for LP1 save & restore */
 #define TEGRA_IRAM_CODE_AREA		TEGRA_IRAM_BASE + SZ_4K
 #define TEGRA_IRAM_CODE_SIZE		SZ_4K
