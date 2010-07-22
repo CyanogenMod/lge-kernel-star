@@ -257,12 +257,32 @@ static int __exit tegra_otg_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#if defined(CONFIG_PM)
+static int tegra_otg_resume(struct platform_device * pdev)
+{
+	struct tegra_otg_data *tegra_otg = platform_get_drvdata(pdev);
+	unsigned int temp;
+
+	/* enable the cable ID and VBUS interrupts */
+	temp = readl(tegra_otg->regs + TEGRA_USB_WAKEUP_REG_OFFSET);
+	temp |= (TEGRA_USB_ID_INT_ENABLE | TEGRA_USB_ID_PIN_WAKEUP_ENABLE);
+	temp |= (TEGRA_USB_VBUS_INT_ENABLE | TEGRA_USB_VBUS_WAKEUP_ENABLE);
+	temp &= ~TEGRA_USB_VBUS_INT_STATUS;
+	writel(temp, (tegra_otg->regs + TEGRA_USB_WAKEUP_REG_OFFSET));
+
+	return 0;
+}
+#endif
+
 static struct platform_driver tegra_otg_driver = {
 	.driver = {
 		.name  = driver_name,
 	},
 	.remove  = __exit_p(tegra_otg_remove),
 	.probe   = tegra_otg_probe,
+#if defined(CONFIG_PM)
+	.resume = tegra_otg_resume,
+#endif
 };
 
 static int __init tegra_otg_init(void)
