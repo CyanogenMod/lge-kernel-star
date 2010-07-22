@@ -63,6 +63,9 @@
 #include "board.h"
 #include "nvrm_pmu.h"
 
+# define BT_RESET 0
+# define BT_SHUTDOWN 1
+
 #if defined(CONFIG_KEYBOARD_GPIO)
 #include "nvodm_query_gpio.h"
 #include <linux/gpio_keys.h>
@@ -968,7 +971,7 @@ static struct tegra_regulator_entry tegra_regulators[] = {
 		.nr_consumers = ARRAY_SIZE(pex_clk_consumers),
 	},
 	[1] = {
-		.guid = NV_ODM_GUID('b','l','u','t','o','o','t','h'),
+		.guid = NV_ODM_GUID('b','c','m','_','4','3','2','9'),
 		.name = "lbee9qmb_vdd",
 		.id = 1,
 		.consumers = lbee9qmb_consumers,
@@ -1044,11 +1047,18 @@ static struct tegra_regulator_entry tegra_regulators[] = {
 		.consumers = tegra_vdd_sd_consumers,
 		.nr_consumers = ARRAY_SIZE(tegra_vdd_sd_consumers),
 	},
-#ifdef CONFIG_TEGRA_USB_CHARGE
 	[12] = {
+		.guid = NV_ODM_GUID('l','b','e','e','9','q','m','b'),
+		.name = "lbee9qmb_vdd",
+		.id = 12,
+		.consumers = lbee9qmb_consumers,
+		.nr_consumers = ARRAY_SIZE(lbee9qmb_consumers),
+	},
+#ifdef CONFIG_TEGRA_USB_CHARGE
+	[13] = {
 		.charging_path = NvRmPmuChargingPath_UsbBus,
 		.name = "vbus_draw",
-		.id = 12,
+		.id = 13,
 		.consumers = tegra_vbus_consumers,
 		.nr_consumers = ARRAY_SIZE(tegra_vbus_consumers),
 		.is_charger = true,
@@ -1079,21 +1089,45 @@ static noinline void __init tegra_setup_rfkill(void)
 {
 	const NvOdmPeripheralConnectivity *con;
 	unsigned int i;
-
-	con = NvOdmPeripheralGetGuid(NV_ODM_GUID('b','l','u','t','o','o','t','h'));
-	if (!con)
-		return;
-
-	for (i=0; i<con->NumAddress; i++) {
-		if (con->AddressList[i].Interface == NvOdmIoModule_Gpio) {
-			int nr_gpio = con->AddressList[i].Instance * 8 +
-				con->AddressList[i].Address;
-			lbee9qmb_platform.gpio_reset = nr_gpio;
-			if (platform_device_register(&lbee9qmb_device))
-				pr_err("%s: registration failed\n", __func__);
-			return;
+	lbee9qmb_platform.delay=5;
+	lbee9qmb_platform.gpio_pwr=-1;
+	if ((con = NvOdmPeripheralGetGuid(NV_ODM_GUID('l','b','e','e','9','q','m','b'))))
+	{
+		for (i=0; i<con->NumAddress; i++) {
+			if (con->AddressList[i].Interface == NvOdmIoModule_Gpio
+					&& con->AddressList[i].Purpose == BT_RESET ){
+				int nr_gpio = con->AddressList[i].Instance * 8 +
+					con->AddressList[i].Address;
+				lbee9qmb_platform.gpio_reset = nr_gpio;
+				if (platform_device_register(&lbee9qmb_device))
+					pr_err("%s: registration failed\n", __func__);
+				return;
+			}
 		}
 	}
+	else if ((con = NvOdmPeripheralGetGuid(NV_ODM_GUID('b','c','m','_','4','3','2','9'))))
+	{
+		int nr_gpio;
+		for (i=0; i<con->NumAddress; i++) {
+                        if (con->AddressList[i].Interface == NvOdmIoModule_Gpio
+						&& con->AddressList[i].Purpose == BT_RESET){
+					nr_gpio = con->AddressList[i].Instance * 8 +
+						con->AddressList[i].Address;
+					lbee9qmb_platform.gpio_reset = nr_gpio;
+				}
+			else if (con->AddressList[i].Interface == NvOdmIoModule_Gpio
+						&& con->AddressList[i].Purpose == BT_SHUTDOWN ){
+					nr_gpio = con->AddressList[i].Instance * 8 +
+						 con->AddressList[i].Address;
+					lbee9qmb_platform.gpio_pwr = nr_gpio;
+				}
+		}
+		lbee9qmb_platform.delay=200;
+                if (platform_device_register(&lbee9qmb_device))
+			pr_err("%s: registration failed\n", __func__);
+                return;
+        }
+        return;
 }
 #else
 static void tegra_setup_rfkill(void) { }
