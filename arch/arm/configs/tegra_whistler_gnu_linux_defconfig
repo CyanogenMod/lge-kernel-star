@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.32.9
-# Mon Jul 19 14:21:33 2010
+# Wed Jul 21 11:01:50 2010
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -1317,7 +1317,7 @@ CONFIG_USB_GADGET_DUALSPEED=y
 # CONFIG_USB_G_PRINTER is not set
 CONFIG_USB_ANDROID=y
 # CONFIG_USB_ANDROID_ACM is not set
-# CONFIG_USB_ANDROID_ADB is not set
+CONFIG_USB_ANDROID_ADB=y
 # CONFIG_USB_ANDROID_MASS_STORAGE is not set
 # CONFIG_USB_ANDROID_RNDIS is not set
 # CONFIG_USB_CDC_COMPOSITE is not set
