@@ -1012,7 +1012,7 @@ Tps6586xSetExternalSupply(
             {
                 NvOdmGpioConfig(hPmu->hGpio,
                                 hPmu->hPin[NVODM_EXT_AP_GPIO_RAIL(vddRail)],
-                                NvOdmGpioPinMode_Tristate);
+                                NvOdmGpioPinMode_InputData);
             }
             else
             {
