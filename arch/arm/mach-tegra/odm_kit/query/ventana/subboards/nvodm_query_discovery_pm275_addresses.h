@@ -357,6 +357,7 @@ static const NvOdmIoAddress s_p1162BluetoothAddresses[] =
 {
     { NvOdmIoModule_Uart, 0x2,  0x0, 0 },                  // FIXME: Is this used?
     { NvOdmIoModule_Gpio, (NvU32)'u'-'a', 0, 0 },          /* BT_RST#: GPIO Port U and Pin 0 */
+    { NvOdmIoModule_Gpio, (NvU32)'k'-'a', 2, 1 },          /* BT_SHUTDOWN#: GPIO Port K and Pin 2 */
     { NvOdmIoModule_Vdd, 0x00, TPS6586xPmuSupply_LDO4, 0 } /* VDDHOSTIF_BT -> LDO4 (AON:VDD_1V8) */
 };
 

@@ -443,7 +443,7 @@
 
 // Bluetooth
 {
-    NV_ODM_GUID('b','l','u','t','o','o','t','h'),
+    NV_ODM_GUID('l','b','e','e','9','q','m','b'),
     s_p1162BluetoothAddresses,
     NV_ARRAY_SIZE(s_p1162BluetoothAddresses),
     NvOdmPeripheralClass_Other

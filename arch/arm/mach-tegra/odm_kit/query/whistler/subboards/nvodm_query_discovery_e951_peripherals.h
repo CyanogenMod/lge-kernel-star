@@ -41,7 +41,7 @@
  */
 // Bluetooth on COMMs Module
 {
-     NV_ODM_GUID('b','l','u','t','o','o','t','h'),
+     NV_ODM_GUID('l','b','e','e','9','q','m','b'),
      ffaBluetoothAddresses,
      NV_ARRAY_SIZE(ffaBluetoothAddresses),
      NvOdmPeripheralClass_Other

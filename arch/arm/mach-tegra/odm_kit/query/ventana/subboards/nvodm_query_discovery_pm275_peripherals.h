@@ -402,9 +402,9 @@
     NvOdmPeripheralClass_Other
 },
 
-// Bluetooth
+// Broadcom Bluetooth bcm4329
 {
-    NV_ODM_GUID('b','l','u','t','o','o','t','h'),
+    NV_ODM_GUID('b','c','m','_','4','3','2','9'),
     s_p1162BluetoothAddresses,
     NV_ARRAY_SIZE(s_p1162BluetoothAddresses),
     NvOdmPeripheralClass_Other
