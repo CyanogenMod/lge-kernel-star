@@ -199,6 +199,7 @@ static int __init tegra_spi_probe(struct platform_device *pdev)
 	master->cleanup = tegra_spi_cleanup;
 	master->num_chipselect = 4;
 	master->bus_num = pdev->id;
+	master->mode_bits = NV_SUPPORTED_MODE_BITS;
 
 	dev_set_drvdata(&pdev->dev, master);
 	spi = spi_master_get_devdata(master);
