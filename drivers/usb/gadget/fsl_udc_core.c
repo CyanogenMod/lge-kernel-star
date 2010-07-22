@@ -2970,6 +2970,9 @@ static int fsl_udc_resume(struct platform_device *pdev)
 			/* if there is no VBUS then power down the clocks and return */
 			platform_udc_clk_suspend();
 			return 0;
+		} else {
+			/* Detected VBUS set the transceiver state to device mode */
+			udc_controller->transceiver->state = OTG_STATE_B_PERIPHERAL;
 		}
 	} else {
 		/* enable the clocks to the controller */
