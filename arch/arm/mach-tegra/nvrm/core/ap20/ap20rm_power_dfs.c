@@ -74,12 +74,10 @@ void NvRmPrivAp20EmcParametersAdjust(NvRmDfs* pDfs)
     {
         case EMC_FBIO_CFG5_0_DRAM_TYPE_LPDDR2:
             pDfs->DfsParameters[NvRmDfsClockId_Emc] = EmcParamLpDddr2;
-            g_Lp2Policy = NVRM_AP20_LPDDR2_LP2POLICY;
             break;
 
         case EMC_FBIO_CFG5_0_DRAM_TYPE_DDR2:
             pDfs->DfsParameters[NvRmDfsClockId_Emc] = EmcParamDddr2;
-            g_Lp2Policy = NVRM_AP20_DDR2_LP2POLICY;
             break;
 
         default:

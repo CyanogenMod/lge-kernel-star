@@ -128,7 +128,26 @@ typedef enum
     NvRmLp2Policy_Force32 = 0x7FFFFFFF
 } NvRmLp2Policy;
 
+#ifdef CONFIG_TEGRA_LP2POLICY_DISABLED
+#define NVRM_DEFAULT_LP2POLICY (NvRmLp2Policy_Disabled)
+#endif
+
+#ifdef CONFIG_TEGRA_LP2POLICY_ENTER_IN_LC
+#define NVRM_DEFAULT_LP2POLICY (NvRmLp2Policy_EnterInLowCorner)
+#endif
+
+#ifdef CONFIG_TEGRA_LP2POLICY_PERSIST_IN_LC
+#define NVRM_DEFAULT_LP2POLICY (NvRmLp2Policy_MaskInLowCorner)
+#endif
+
+#ifdef CONFIG_TEGRA_LP2POLICY_IGNORE_LC
 #define NVRM_DEFAULT_LP2POLICY (NvRmLp2Policy_IgnoreLowCorner)
+#endif
+
+#ifndef NVRM_DEFAULT_LP2POLICY
+#define NVRM_DEFAULT_LP2POLICY (NvRmLp2Policy_IgnoreLowCorner)
+#endif
+
 extern NvRmLp2Policy g_Lp2Policy;
 
 /**

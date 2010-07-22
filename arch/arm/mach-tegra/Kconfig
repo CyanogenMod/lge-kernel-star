@@ -154,6 +154,41 @@ config TEGRA_USB_VBUS_DETECT_BY_PMU
 	help
 		Enables USB VBUS detection by PMU
 
+choice
+	prompt "Tegra CPU power off [LP2 state] policy"
+	depends on TEGRA_NVRM
+	default TEGRA_LP2POLICY_IGNORE_LC
+	help
+	  Selects additional DVFS qualification policy for the CPU idle
+	  governor decision to put CPU into LP2 state
+
+config TEGRA_LP2POLICY_DISABLED
+	bool "LP2 is not allowed"
+	help
+	  Disregards CPU idle governor LP2 requests, never enters LP2 state
+
+config TEGRA_LP2POLICY_ENTER_IN_LC
+	bool "LP2 is allowed in DVFS low corner"
+	help
+	  Carries on CPU idle governor LP2 request and disables DVFS wake
+	  interrupt only if all DVFS clock loads are under low frequency
+	  thresholds, and none of DVFS clients is busy
+
+config TEGRA_LP2POLICY_PERSIST_IN_LC
+	bool "LP2 is persistent in DVFS low corner"
+	help
+	  Always carries on CPU idle governor LP2 request, but disables DVFS
+	  wake interrupt only if all DVFS clock loads are under low frequency
+	  thresholds, or DVFS clients busy request floors are reached
+
+config TEGRA_LP2POLICY_IGNORE_LC
+	bool "LP2 is always allowed and persistent"
+	help
+	  Always carries on CPU idle governor LP2 request, and disables DVFS
+	  wake interrupt regardless of DVFS clock activities
+
+endchoice
+
 if TEGRA_ODM_KIT
 source "arch/arm/mach-tegra/odm_kit/Kconfig"
 endif
