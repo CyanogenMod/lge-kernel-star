@@ -575,7 +575,7 @@ static void tegra_dma_init_hw(struct tegra_dma_channel *ch)
 
 static void handle_oneshot_dma(struct tegra_dma_channel *ch)
 {
-	static struct tegra_dma_req *req;
+	struct tegra_dma_req *req;
 
 	spin_lock(&ch->lock);
 	if (list_empty(&ch->list)) {
@@ -616,7 +616,7 @@ static void handle_oneshot_dma(struct tegra_dma_channel *ch)
 
 static void handle_continuous_dma(struct tegra_dma_channel *ch)
 {
-	static struct tegra_dma_req *req;
+	struct tegra_dma_req *req;
 	struct tegra_dma_req *next_req;
 
 	spin_lock(&ch->lock);
