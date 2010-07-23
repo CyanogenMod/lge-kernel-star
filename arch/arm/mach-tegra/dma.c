@@ -628,6 +628,39 @@ static void handle_continuous_dma(struct tegra_dma_channel *ch)
 	req = list_entry(ch->list.next, typeof(*req), node);
 	if (req) {
 		if (req->buffer_status == TEGRA_DMA_REQ_BUF_STATUS_EMPTY) {
+			bool is_dma_ping_complete;
+			is_dma_ping_complete = (readl(ch->addr + APB_DMA_CHAN_STA)
+						& STA_PING_PONG) ? true : false;
+			if( req->to_memory )
+				is_dma_ping_complete = !is_dma_ping_complete;
+			/* Out of sync - Release current buffer */
+			if( !is_dma_ping_complete ) {
+				int bytes_transferred;
+
+				bytes_transferred =
+				(ch->csr & CSR_WCOUNT_MASK) >> CSR_WCOUNT_SHIFT;
+				bytes_transferred += 1;
+				bytes_transferred <<= 3;
+				req->buffer_status = TEGRA_DMA_REQ_BUF_STATUS_FULL;
+				req->bytes_transferred = bytes_transferred;
+				req->status = TEGRA_DMA_REQ_SUCCESS;
+				tegra_dma_stop(ch);
+
+				if (!list_is_last(&req->node, &ch->list)) {
+					struct tegra_dma_req *next_req;
+
+					next_req = list_entry(req->node.next,
+						typeof(*next_req), node);
+					tegra_dma_update_hw(ch, next_req);
+				}
+
+				list_del(&req->node);
+
+				/* DMA lock is NOT held when callbak is called */
+				spin_unlock(&ch->lock);
+				req->complete(req);
+				return;
+			}
 			/* Load the next request into the hardware, if available
 			 * */
 			if (!list_is_last(&req->node, &ch->list)) {
