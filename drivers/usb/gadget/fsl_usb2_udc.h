@@ -517,6 +517,8 @@ struct fsl_udc {
 	struct regulator *vbus_regulator;	/* regulator for drawing VBUS */
 	struct delayed_work work; /* delayed work for charger detection */
 	struct work_struct irq_work; /* irq work for controling the usb power*/
+	struct work_struct vbus_work; /* vbus work for enabling clocks and D+ lines*/
+	u32 current_limit_ma; /* stores current limit in mA */
 };
 
 /*-------------------------------------------------------------------------*/
