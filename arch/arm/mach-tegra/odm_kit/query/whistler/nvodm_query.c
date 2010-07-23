@@ -1683,9 +1683,6 @@ NvOdmQueryGetUsbProperty(NvOdmIoModule OdmIoModule,
 
 const NvOdmQuerySdioInterfaceProperty* NvOdmQueryGetSdioInterfaceProperty(NvU32 Instance)
 {
-    NvU32 CustomerOption = 0;
-    NvU32 Personality = 0;
-    NvOdmServicesKeyListHandle hKeyList;
     static NvBool s_IsVoyagerBoard = NV_FALSE;
     NvOdmBoardInfo BoardInfo;
     static NvBool s_IsBoardInfoDone = NV_FALSE;
@@ -1698,28 +1695,8 @@ const NvOdmQuerySdioInterfaceProperty* NvOdmQueryGetSdioInterfaceProperty(NvU32 
         s_IsBoardInfoDone = NV_TRUE;
     }
 
-    hKeyList = NvOdmServicesKeyListOpen();
-    if (hKeyList)
-    {
-        CustomerOption =
-            NvOdmServicesGetKeyValue(hKeyList,
-                                     NvOdmKeyListId_ReservedBctCustomerOption);
-        NvOdmServicesKeyListClose(hKeyList);
-        Personality =
-            NV_DRF_VAL(TEGRA_DEVKIT, BCT_CUSTOPT, PERSONALITY, CustomerOption);
-    }
-
-    if (!Personality)
-        Personality = TEGRA_DEVKIT_DEFAULT_PERSONALITY;
-
     if (s_IsVoyagerBoard)
         return &s_NvOdmQuerySdioInterfaceProperty_Voyager[Instance];
-
-    if (Personality == TEGRA_DEVKIT_BCT_CUSTOPT_0_PERSONALITY_75 ||
-        Personality == TEGRA_DEVKIT_BCT_CUSTOPT_0_PERSONALITY_15 ||
-        Personality == TEGRA_DEVKIT_BCT_CUSTOPT_0_PERSONALITY_05 ||
-        Personality == TEGRA_DEVKIT_BCT_CUSTOPT_0_PERSONALITY_C3)
-        s_NvOdmQuerySdioInterfaceProperty_Whistler[2].IsCardRemovable = NV_TRUE;
 
     return &s_NvOdmQuerySdioInterfaceProperty_Whistler[Instance];
 }
