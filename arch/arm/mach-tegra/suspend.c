@@ -417,6 +417,10 @@ static void tegra_suspend_dram(bool lp0_ok)
 		do_div(temp, 1000000ul);
 		cpu_off_timer_32k = temp;
 	}
+	on_timer = readl(pmc + PMC_CPUPWRGOOD_TIMER);
+	writel(cpu_timer_32k, pmc + PMC_CPUPWRGOOD_TIMER);
+	off_timer = readl(pmc + PMC_CPUPWROFF_TIMER);
+	writel(cpu_off_timer_32k, pmc + PMC_CPUPWROFF_TIMER);
 
 	reg = readl(pmc + PMC_CTRL);
 	mode |= ((reg >> TEGRA_POWER_PMC_SHIFT) & TEGRA_POWER_PMC_MASK);
@@ -424,10 +428,6 @@ static void tegra_suspend_dram(bool lp0_ok)
 	if (!lp0_ok) {
 		writel(TEGRA_IRAM_CODE_AREA, evp_reset);
 		NvRmPrivPowerSetState(s_hRmGlobal, NvRmPowerState_LP1);
-		on_timer = readl(pmc + PMC_CPUPWRGOOD_TIMER);
-		writel(cpu_timer_32k, pmc + PMC_CPUPWRGOOD_TIMER);
-		off_timer = readl(pmc + PMC_CPUPWROFF_TIMER);
-		writel(cpu_off_timer_32k, pmc + PMC_CPUPWROFF_TIMER);
 
 		mode |= TEGRA_POWER_CPU_PWRREQ_OE;
 		if (pdata->separate_req)
@@ -465,10 +465,10 @@ static void tegra_suspend_dram(bool lp0_ok)
 
 	writel(orig, evp_reset);
 	outer_restart();
+	writel(on_timer, pmc + PMC_CPUPWRGOOD_TIMER);
+	writel(off_timer, pmc + PMC_CPUPWROFF_TIMER);
 
 	if (!lp0_ok) {
-		writel(on_timer, pmc + PMC_CPUPWRGOOD_TIMER);
-		writel(off_timer, pmc + PMC_CPUPWROFF_TIMER);
 		memcpy(iram_code, iram_save, iram_save_size);
 	} else {
 		/* for platforms where the core & CPU power requests are
