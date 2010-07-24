@@ -437,7 +437,6 @@ static void tegra_suspend_dram(bool lp0_ok)
 		mode &= ~TEGRA_POWER_EFFECT_LP0;
 	} else {
 		NvRmPrivPowerSetState(s_hRmGlobal, NvRmPowerState_LP0);
-		set_power_timers(pdata->cpu_timer, pdata->cpu_off_timer);
 		tegra_setup_warmboot();
 		mode |= TEGRA_POWER_CPU_PWRREQ_OE;
 		mode |= TEGRA_POWER_PWRREQ_OE;
