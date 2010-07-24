@@ -35,6 +35,7 @@
 #include <linux/smp_lock.h>
 #include <linux/suspend.h>
 #include <linux/reboot.h>
+#include <linux/delay.h>
 
 #include <asm/system.h>
 #include <asm/smp_twd.h>
@@ -136,6 +137,7 @@ static int tegra_cpufreq_dfsd(void *arg)
 
 	BUG_ON(!clk_cpu);
 
+	preset_lpj = loops_per_jiffy;
 	rate = clk_get_rate(clk_cpu);
 	last_rate = rate;
 
