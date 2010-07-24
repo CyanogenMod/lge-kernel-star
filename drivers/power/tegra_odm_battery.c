@@ -35,6 +35,7 @@
 #include "nvcommon.h"
 #include "nvos.h"
 #include "nvrm_pmu.h"
+#include "nvodm_battery.h"
 #include "mach/nvrm_linux.h" // for s_hRmGlobal
 
 #define NVBATTERY_POLLING_INTERVAL 30000 /* 30 Seconds */
@@ -121,6 +122,7 @@ typedef struct tegra_battery_dev {
 	NvU32	ACLineStatus;
 	NvU32	batt_status_poll_period;
 	NvBool	present;
+	NvOdmBatteryDeviceHandle hOdmBattDev;
 } tegra_battery_dev;
 
 static tegra_battery_dev *batt_dev;
@@ -381,7 +383,7 @@ static void tegra_battery_poll_timer_func(unsigned long unused)
 static int tegra_battery_probe(struct platform_device *pdev)
 {
 	int i, rc;
-
+	NvBool result;
 
 	batt_dev = kzalloc(sizeof(*batt_dev), GFP_KERNEL);
 	if (!batt_dev) {
@@ -405,9 +407,12 @@ static int tegra_battery_probe(struct platform_device *pdev)
 			return rc;
 		}
 	}
-
 	printk(KERN_INFO "%s: battery driver registered\n", pdev->name);
-
+	result = NvOdmBatteryDeviceOpen(&(batt_dev->hOdmBattDev), NULL);
+	if (!result) {
+		pr_err("NvOdmBatteryDeviceOpen FAILED\n");
+		goto err;
+	}
 	batt_dev->batt_status_poll_period = NVBATTERY_POLLING_INTERVAL;
 	setup_timer(&(batt_dev->battery_poll_timer), tegra_battery_poll_timer_func, 0);
 	mod_timer(&(batt_dev->battery_poll_timer),
@@ -426,6 +431,12 @@ static int tegra_battery_probe(struct platform_device *pdev)
 	}
 
 	return 0;
+err:
+	if (batt_dev) {
+		kfree(batt_dev);
+		batt_dev = NULL;
+	}
+	return -1;
 }
 
 static int tegra_battery_remove(struct platform_device *pdev)
@@ -440,10 +451,13 @@ static int tegra_battery_remove(struct platform_device *pdev)
 		device_remove_file(&pdev->dev, &tegra_battery_attr);
 
 		del_timer_sync(&(batt_dev->battery_poll_timer));
+                if (batt_dev->hOdmBattDev) {
+                        NvOdmBatteryDeviceClose(batt_dev->hOdmBattDev);
+                        batt_dev->hOdmBattDev = NULL;
+                }
 		kfree(batt_dev);
 		batt_dev = NULL;
 	}
-
 	return 0;
 }
 

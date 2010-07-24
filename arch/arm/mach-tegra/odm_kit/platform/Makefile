@@ -5,4 +5,4 @@ obj-$(CONFIG_TOUCHSCREEN_TEGRA_ODM)	+= touch/
 obj-$(CONFIG_TEGRA_ODM_VIBRATE)		+= vibrate/
 obj-$(CONFIG_MOUSE_TEGRA_NVEC)		+= mouse/
 obj-$(CONFIG_TEGRA_BATTERY_NVEC)	+= battery/
-obj-$(CONFIG_BATTERY_TEGRA_ODM)		+= battery/
+obj-$(CONFIG_TEGRA_BATTERY_ODM)		+= battery/

@@ -156,6 +156,7 @@ static const NvOdmGpioPinInfo s_GpioKeyBoard[] = {
 static const NvOdmGpioPinInfo s_Battery[] = {
     // Low Battery
     {NVODM_PORT('w'), 3, NvOdmGpioPinActiveState_Low},
+    {NVODM_PORT('r'), 6, NvOdmGpioPinActiveState_Low},
 };
 const NvOdmGpioPinInfo *NvOdmQueryGpioPinMap(NvOdmGpioPinGroup Group,
     NvU32 Instance, NvU32 *pCount)
