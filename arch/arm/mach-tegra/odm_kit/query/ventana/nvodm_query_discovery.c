@@ -44,10 +44,132 @@ static NvOdmPeripheralConnectivity s_Peripherals_Default[] =
 #include "subboards/nvodm_query_discovery_pm275_peripherals.h"
 };
 
+#define PROCESSOR_BOARD_ID_I2C_ADDRESS ((0x56)<<1)
+
+#define NVODM_QUERY_I2C_CLOCK_SPEED      100    // kHz
+#define NVODM_QUERY_BOARD_HEADER_START   0x04   // Offset to Part Number in EERPOM
+#define NVODM_QUERY_I2C_EEPROM_ADDRESS   0xA0   // I2C device base address for EEPROM (7'h50)
+
+#define EEPROM_ID_PM275 0x024B
+#define VENTANA_REV_C_ACCEL NV_ODM_GUID('k','x','t','9','-','0','0','0')
+#define VENTANA_REV_A_ACCEL NV_ODM_GUID('k','x','t','9','-','0','9','0')
+
+static NvOdmI2cStatus NvOdmPeripheralI2cRead8(
+    NvOdmServicesI2cHandle hOdmI2c,
+    NvU8 I2cAddr,
+    NvU8 Offset,
+    NvU8 *pData)
+{
+    NvU8 ReadBuffer[1];
+    NvOdmI2cStatus Error;
+    NvOdmI2cTransactionInfo TransactionInfo;
+
+    ReadBuffer[0] = Offset;
+
+    TransactionInfo.Address = I2cAddr;
+    TransactionInfo.Buf = ReadBuffer;
+    TransactionInfo.Flags = NVODM_I2C_IS_WRITE;
+    TransactionInfo.NumBytes = 1;
+
+    Error = NvOdmI2cTransaction(
+        hOdmI2c, &TransactionInfo, 1, NVODM_QUERY_I2C_CLOCK_SPEED, NV_WAIT_INFINITE);
+    if (Error != NvOdmI2cStatus_Success)
+    {
+        return Error;
+    }
+
+    NvOdmOsMemset(ReadBuffer, 0, sizeof(ReadBuffer));
+
+    TransactionInfo.Address = (I2cAddr | 0x1);
+    TransactionInfo.Buf = ReadBuffer;
+    TransactionInfo.Flags = 0;
+    TransactionInfo.NumBytes = 1;
+
+    // Read data from ROM at the specified offset
+    Error = NvOdmI2cTransaction(
+        hOdmI2c, &TransactionInfo, 1, NVODM_QUERY_I2C_CLOCK_SPEED, NV_WAIT_INFINITE);
+    if (Error != NvOdmI2cStatus_Success)
+    {
+        return Error;
+    }
+    *pData = ReadBuffer[0];
+    return Error;
+}
+
+static NvBool NvOdmPeripheralReadPartNumber(
+    NvOdmServicesI2cHandle hOdmI2c,
+    NvU8 EepromInst,
+    NvOdmBoardInfo *pBoardInfo)
+{
+    NvOdmI2cStatus Error;
+    NvU32 i;
+    NvU8 I2cAddr, Offset;
+    NvU8 ReadBuffer[sizeof(NvOdmBoardInfo)];
+
+    NvOdmOsMemset(ReadBuffer, 0, sizeof(ReadBuffer));
+
+    // EepromInst*2, since 7-bit addressing
+    I2cAddr = NVODM_QUERY_I2C_EEPROM_ADDRESS + (EepromInst << 1);
+
+    /**
+     * Offset to the board number entry in EEPROM.
+     */
+    Offset = NVODM_QUERY_BOARD_HEADER_START;
+
+    for (i=0; i<sizeof(NvOdmBoardInfo); i++)
+    {
+        Error = NvOdmPeripheralI2cRead8(
+            hOdmI2c, I2cAddr, Offset+i, (NvU8 *)&ReadBuffer[i]);
+        if (Error != NvOdmI2cStatus_Success)
+        {
+            return NV_FALSE;
+        }
+    }
+    NvOdmOsMemcpy(pBoardInfo, &ReadBuffer[0], sizeof(NvOdmBoardInfo));
+    return NV_TRUE;
+}
+
 NvBool NvOdmPeripheralGetBoardInfo(
     NvU16 BoardId,
     NvOdmBoardInfo *pBoardInfo)
 {
+    NvBool RetVal = NV_FALSE;
+    NvOdmServicesI2cHandle hOdmI2c = NULL;
+    NvU8 EepromInst=0;
+    NvOdmBoardInfo BoardModuleTable;
+    static NvBool s_ReadBoardInfoDone = NV_FALSE;
+
+    if (!s_ReadBoardInfoDone)
+        hOdmI2c = NvOdmI2cOpen(NvOdmIoModule_I2c_Pmu, 0);
+
+    if (!s_ReadBoardInfoDone)
+    {
+        s_ReadBoardInfoDone = NV_TRUE;
+        if (!hOdmI2c)
+        {
+            // Exit
+            pBoardInfo = NULL;
+            return NV_FALSE;
+        }
+        RetVal = NvOdmPeripheralReadPartNumber(
+                   hOdmI2c, EepromInst, &BoardModuleTable);
+    }
+    if (hOdmI2c)
+        NvOdmI2cClose(hOdmI2c);
+
+        // Linear search for given BoardId; if found, return entry
+    if (BoardModuleTable.BoardID == BoardId)
+    {
+        // Match found
+        pBoardInfo->BoardID  = BoardModuleTable.BoardID;
+        pBoardInfo->SKU      = BoardModuleTable.SKU;
+        pBoardInfo->Fab      = BoardModuleTable.Fab;
+        pBoardInfo->Revision = BoardModuleTable.Revision;
+        pBoardInfo->MinorRevision = BoardModuleTable.MinorRevision;
+        return NV_TRUE;
+    }
+
+    // Match not found
     pBoardInfo = NULL;
     return NV_FALSE;
 }
@@ -56,6 +178,26 @@ static const NvOdmPeripheralConnectivity *NvApGetAllPeripherals(NvU32 *pNum)
 {
     *pNum = NV_ARRAY_SIZE(s_Peripherals_Default);
     return s_Peripherals_Default;
+}
+
+static NvU32 ReadBoardFabVersion(void)
+{
+    NvOdmBoardInfo BoardInfo;
+    NvBool IsBoardPresent;
+    static NvBool s_IsFabRead = NV_FALSE;
+    static NvU32 BoardFabNumber = -1;
+
+    if (!s_IsFabRead)
+    {
+        IsBoardPresent = NvOdmPeripheralGetBoardInfo(EEPROM_ID_PM275, &BoardInfo);
+        if (!IsBoardPresent)
+        {
+            return BoardFabNumber;
+        }
+        s_IsFabRead = NV_TRUE;
+        BoardFabNumber = BoardInfo.Fab;
+    }
+    return BoardFabNumber;
 }
 
 // This implements a simple linear search across the entire set of currently-
@@ -68,18 +210,26 @@ const NvOdmPeripheralConnectivity *NvOdmPeripheralGetGuid(NvU64 SearchGuid)
     const NvOdmPeripheralConnectivity *pAllPeripherals;
     NvU32 NumPeripherals;
     NvU32 i;
+    NvU32 BoardFabNum;
 
     pAllPeripherals = NvApGetAllPeripherals(&NumPeripherals);
 
     if (!pAllPeripherals || !NumPeripherals)
         return NULL;
+    BoardFabNum = ReadBoardFabVersion();
+    if ((SearchGuid == VENTANA_REV_A_ACCEL) && (BoardFabNum != 0))
+        return NULL;
 
-    for (i=0; i<NumPeripherals; i++)
+    if ((SearchGuid == VENTANA_REV_C_ACCEL) && (BoardFabNum != 2))
+        return NULL;
+
+    for (i = 0; i < NumPeripherals; i++)
     {
         if (SearchGuid == pAllPeripherals[i].Guid)
+        {
             return &pAllPeripherals[i];
+        }
     }
-
     return NULL;
 }
 

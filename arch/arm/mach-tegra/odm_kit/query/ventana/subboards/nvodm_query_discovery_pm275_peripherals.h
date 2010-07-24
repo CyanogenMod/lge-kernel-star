@@ -433,12 +433,19 @@
     NvOdmPeripheralClass_HCI
 },
 
-// Accelerometer Module
+// Accelerometer Module for Ventana C
 {
-    NV_ODM_GUID('k','x','t','f','9','v','n','t'),
+    NV_ODM_GUID('k','x','t','9','-','0','0','0'),
     s_AcceleroAddresses,
     NV_ARRAY_SIZE(s_AcceleroAddresses),
     NvOdmPeripheralClass_Other,
 },
 
+// Accelerometer Module for Ventana A
+{
+    NV_ODM_GUID('k','x','t','9','-','0','9','0'),
+    s_AcceleroAddresses,
+    NV_ARRAY_SIZE(s_AcceleroAddresses),
+    NvOdmPeripheralClass_Other,
+},
 // NOTE: This list *must* end with a trailing comma.

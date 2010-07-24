@@ -96,18 +96,28 @@
 // I2C clock speed.
 #define I2C_CLK_SPEED 400
 
-#define ACCEL_TANGO_GUID NV_ODM_GUID('k','x','t','f','9','t','n','g')
-#define ACCEL_VENTANA_GUID NV_ODM_GUID('k','x','t','f','9','v','n','t')
-#define EEPROM_ID_E1206 0x0C06
+#define ACCEL_VER0_GUID NV_ODM_GUID('k','x','t','9','-','0','0','0')
+#define ACCEL_VER1_GUID NV_ODM_GUID('k','x','t','9','-','0','9','0')
+
 #define NV_DEBOUNCE_TIME_MS 0
 #define ENABLE_XYZ_POLLING 0
-
-#define kxtf9_GUID NV_ODM_GUID('k','x','t','f','9','-','4','0')
 
 static NvU8 s_ReadBuffer[I2C_ACCELRATOR_PACKET_SIZE];
 static NvU8 s_WriteBuffer[I2C_ACCELRATOR_PACKET_SIZE];
 static NvU8 s_IntSrcReg1;
 static NvU8 s_IntSrcReg2;
+
+typedef struct discovery_entry_rec
+{
+   NvU64 guid;
+   NvU32 axesmapping;
+} discovery_entry;
+
+static discovery_entry disc_entry[] = {
+    {ACCEL_VER0_GUID, 1},
+    {ACCEL_VER1_GUID, 2},
+};
+
 
 static void
 ConfigPowerRail(
@@ -776,13 +786,7 @@ NvBool kxtf9_init(NvOdmAccelHandle* hDevice)
     NvOdmIoModule IoModule = NvOdmIoModule_I2c;
     const NvOdmPeripheralConnectivity *pConnectivity;
     NvBool FoundGpio = NV_FALSE, FoundI2cModule = NV_FALSE;
-    NvOdmBoardInfo BoardInfo;
-    // Accelerometer is supported only on E1206.
-    if (!NvOdmPeripheralGetBoardInfo(EEPROM_ID_E1206, &BoardInfo))
-    {
-        NVODMACCELEROMETER_PRINTF(("\nkxtf9: Accelerometer not supported"));
-        return NV_FALSE;
-    }
+    NvU32 AxesMapping = 0;
     hAccel = NvOdmOsAlloc(sizeof(NvOdmAccel));
     if (hAccel == NULL)
     {
@@ -805,15 +809,20 @@ NvBool kxtf9_init(NvOdmAccelHandle* hDevice)
         NVODMACCELEROMETER_PRINTF(("kxtf9 NvOdmServicesPmuOpen Error \n"));
         goto error;
     }
-
-    pConnectivity = NvOdmPeripheralGetGuid(ACCEL_TANGO_GUID);
-    if (!pConnectivity)
+    for ( i = 0 ; i < NV_ARRAY_SIZE(disc_entry); ++i )
     {
-        NVODMACCELEROMETER_PRINTF(("\nkxtf9: GetGuid Failed for Tango"));
+        pConnectivity = NvOdmPeripheralGetGuid(disc_entry[i].guid);
+        if (pConnectivity)
+        {
+            AxesMapping = disc_entry[i].axesmapping;
+            break;
+        }
     }
-    else
+    if (!pConnectivity)
+        goto error;
+
+    if (AxesMapping == 1)
     {
-    #if AXES_MAPPING_FOR_PROPER_DISPLAY_ALIGNMENT
     // Axes mapping for display orientation aligning correctly in 3 orientations
     // (0, 90 & 270 degrees) on Tango with (froyo + K32).
         hAccel->AxisXMapping = NvOdmAccelAxis_Y;
@@ -822,22 +831,6 @@ NvBool kxtf9_init(NvOdmAccelHandle* hDevice)
         hAccel->AxisYDirection = -1;
         hAccel->AxisZMapping = NvOdmAccelAxis_Z;
         hAccel->AxisZDirection = -1;
-    #else
-    // Axes mapping for matching acceleration on all axes with android mobile phones
-        hAccel->AxisXMapping = NvOdmAccelAxis_X;
-        hAccel->AxisXDirection = -1;
-        hAccel->AxisYMapping = NvOdmAccelAxis_Y;
-        hAccel->AxisYDirection = -1;
-        hAccel->AxisZMapping = NvOdmAccelAxis_Z;
-        hAccel->AxisZDirection = -1;
-    #endif
-    }
-
-    pConnectivity = NvOdmPeripheralGetGuid(ACCEL_VENTANA_GUID);
-    if (!pConnectivity)
-    {
-        NVODMACCELEROMETER_PRINTF(("\nkxtf9: GetGuid Failed for Ventana"));
-        goto error;
     }
     else
     {

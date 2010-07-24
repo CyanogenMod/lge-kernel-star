@@ -491,7 +491,7 @@
 
 // Kionix Accelerometer on Tango
 {
-    NV_ODM_GUID('k','x','t','f','9','t','n','g'),
+    NV_ODM_GUID('k','x','t','9','-','0','0','0'),
     s_KXTFAcceleroAddresses,
     NV_ARRAY_SIZE(s_KXTFAcceleroAddresses),
     NvOdmPeripheralClass_Other,

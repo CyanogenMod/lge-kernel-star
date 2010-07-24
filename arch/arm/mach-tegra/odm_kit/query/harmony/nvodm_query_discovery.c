@@ -62,7 +62,6 @@ static NvOdmPeripheralConnectivity s_Peripherals_Default[] =
 #define NVODM_QUERY_MAX_EEPROMS         8   // Maximum number of EEPROMs per bus segment
 
 #define NVODM_QUERY_ERASED_EEPROM_VALUE 0xFF
-
 #define PROCESSOR_BOARD_ID_I2C_ADDRESS ((0x56)<<1)
 #define PROCESSOR_BOARD_ID_I2C_SEGMENT (0x00)
 
@@ -80,7 +79,8 @@ static NvOdmBoardInfo s_BoardModuleTable[NVODM_QUERY_MAX_EEPROMS];
 
 #define NVODM_QUERY_PERIPH_CONN_STRUCT_COMPRESSED   10  // See EEPROM_format.txt
 #define NVODM_PERIPH_IO_ADDR_STRUCT_SZ_COMPRESSED   2   // See EEPROM_format.txt
-
+#define EEPROM_ID_E1206 0x0C06
+#define ACCEL_TANGO_GUID NV_ODM_GUID('k','x','t','9','-','0','0','0')
 
 static NvOdmI2cStatus
 NvOdmPeripheralI2cRead8(
@@ -621,6 +621,20 @@ NvApGetAllPeripherals (NvU32 *pNum)
     return (const NvOdmPeripheralConnectivity *)s_Peripherals;
 }
 
+static NvBool IsBoardTango(void)
+{
+    NvOdmBoardInfo BoardInfo;
+    static NvBool s_IsBoardIdRead = NV_FALSE;
+    static NvBool IsBoardTango = NV_FALSE;
+
+    if (!s_IsBoardIdRead)
+    {
+        IsBoardTango = NvOdmPeripheralGetBoardInfo(EEPROM_ID_E1206, &BoardInfo);
+        s_IsBoardIdRead = NV_TRUE;
+    }
+    return IsBoardTango;
+}
+
 // This implements a simple linear search across the entire set of currently-
 // connected peripherals to find the set of GUIDs that Match the search
 // criteria.  More clever implementations are possible, but given the
@@ -632,12 +646,15 @@ NvOdmPeripheralGetGuid(NvU64 SearchGuid)
     const NvOdmPeripheralConnectivity *pAllPeripherals;
     NvU32 NumPeripherals;
     NvU32 i;
+    NvBool IsE1206Board;
 
     pAllPeripherals = NvApGetAllPeripherals(&NumPeripherals);
 
+    IsE1206Board = IsBoardTango();
     if (!pAllPeripherals || !NumPeripherals)
         return NULL;
-
+    if ((SearchGuid == ACCEL_TANGO_GUID) && (!IsE1206Board))
+        return NULL;
     for (i=0; i<NumPeripherals; i++) 
     {
         if (SearchGuid == pAllPeripherals[i].Guid)
@@ -647,7 +664,6 @@ NvOdmPeripheralGetGuid(NvU64 SearchGuid)
             return &pAllPeripherals[i];
         }
     }
-
     return NULL;
 }
 
