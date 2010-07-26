@@ -29,6 +29,7 @@
 #include <linux/mmc/card.h>
 #include <linux/clk.h>
 #include <linux/gpio.h>
+#include <linux/delay.h>
 
 #include <mach/sdhci.h>
 #include <mach/pinmux.h>
@@ -53,6 +54,7 @@ struct tegra_sdhci {
 	unsigned long		max_clk;
 	bool			card_present;
 	bool			clk_enable;
+	bool			card_always_on;
 };
 
 static inline unsigned long res_size(struct resource *res)
@@ -203,6 +205,7 @@ int __init tegra_sdhci_probe(struct platform_device *pdev)
 	host->gpio_polarity_cd = plat->gpio_polarity_cd;
 	host->gpio_wp = plat->gpio_nr_wp;
 	host->gpio_polarity_wp = plat->gpio_polarity_wp;
+	host->card_always_on = plat->is_always_on;
 	dev_dbg(&pdev->dev, "write protect: %d card detect: %d\n",
 		host->gpio_wp, host->gpio_cd);
 	host->irq_cd = -1;
@@ -377,24 +380,100 @@ static int tegra_sdhci_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#define is_card_sdio(_card) \
+((_card) && ((_card)->type == MMC_TYPE_SDIO))
+
 #if defined(CONFIG_PM)
 #define dev_to_host(_dev) platform_get_drvdata(to_platform_device(_dev))
+
+static void tegra_sdhci_configure_interrupts(struct sdhci_host *sdhost, bool enable)
+{
+	u32 ierr;
+	u32 clear = SDHCI_INT_ALL_MASK;
+	u32 set;
+
+	if (enable) {
+		/* enable required MMC INTs */
+		set = SDHCI_INT_BUS_POWER | SDHCI_INT_DATA_END_BIT |
+		SDHCI_INT_DATA_CRC | SDHCI_INT_DATA_TIMEOUT | SDHCI_INT_INDEX |
+		SDHCI_INT_END_BIT | SDHCI_INT_CRC | SDHCI_INT_TIMEOUT |
+		SDHCI_INT_DATA_END | SDHCI_INT_RESPONSE;
+
+		ierr = sdhci_readl(sdhost, SDHCI_INT_ENABLE);
+		ierr &= clear;
+		ierr |= set;
+		sdhci_writel(sdhost, ierr, SDHCI_INT_ENABLE);
+		sdhci_writel(sdhost, ierr, SDHCI_SIGNAL_ENABLE);
+	} else {
+		/* disable the interrupts */
+		ierr = sdhci_readl(sdhost, SDHCI_INT_ENABLE);
+		/* Card interrupt masking is done by sdio client driver */
+		ierr &= SDHCI_INT_CARD_INT;
+		sdhci_writel(sdhost, ierr, SDHCI_INT_ENABLE);
+		sdhci_writel(sdhost, ierr, SDHCI_SIGNAL_ENABLE);
+	}
+}
+
+static int tegra_sdhci_restore(struct sdhci_host *sdhost)
+{
+	unsigned long timeout;
+	u8 mask = SDHCI_RESET_ALL;
+
+	sdhci_writeb(sdhost, mask, SDHCI_SOFTWARE_RESET);
+
+	sdhost->clock = 0;
+
+	/* Wait max 100 ms */
+	timeout = 100;
+
+	/* hw clears the bit when it's done */
+	while (sdhci_readb(sdhost, SDHCI_SOFTWARE_RESET) & mask) {
+		if (timeout == 0) {
+			printk(KERN_ERR "%s: Reset 0x%x never completed.\n",
+				mmc_hostname(sdhost->mmc), (int)mask);
+			return -EIO;
+		}
+		timeout--;
+		mdelay(1);
+	}
+
+	tegra_sdhci_configure_interrupts(sdhost, true);
+	sdhost->last_clk = 0;
+	return 0;
+}
 
 static int tegra_sdhci_suspend(struct device *dev)
 {
 	struct sdhci_host *sdhost = dev_to_host(dev);
 	struct tegra_sdhci *host = sdhci_priv(sdhost);
 	struct pm_message event = { PM_EVENT_SUSPEND };
+	int ret = 0;
 
-	int ret = sdhci_suspend_host(sdhost, event);
+	if(host->card_always_on && is_card_sdio(sdhost->mmc->card)) {
+		struct mmc_ios ios;
+		ios.clock = 0;
+		ios.vdd = 0;
+		ios.power_mode = MMC_POWER_OFF;
+		ios.bus_width = MMC_BUS_WIDTH_1;
+		ios.timing = MMC_TIMING_LEGACY;
+		sdhost->mmc->ops->set_ios(sdhost->mmc, &ios);
+
+		/* Disable the interrupts */
+		tegra_sdhci_configure_interrupts(sdhost, false);
+
+		return ret;
+	}
+
+	ret = sdhci_suspend_host(sdhost, event);
 	if (ret) {
 		dev_err(dev, "failed to suspend host\n");
 		return ret;
 	}
+
 	if (host->hOdmSdio)
 		NvOdmSdioSuspend(host->hOdmSdio);
 
-	return 0;
+	return ret;
 }
 
 static int tegra_sdhci_resume(struct device *dev)
@@ -407,7 +486,22 @@ static int tegra_sdhci_resume(struct device *dev)
 		host->clk_enable = true;
 	}
 
-	if (host->hOdmSdio)
+	if(host->card_always_on && is_card_sdio(sdhost->mmc->card)) {
+		int ret = 0;
+
+		/* soft reset SD host controller and enable MMC INTs */
+		ret = tegra_sdhci_restore(sdhost);
+		if (ret) {
+			dev_err(dev, "failed to resume host\n");
+			return ret;
+		}
+
+		mmiowb();
+		sdhost->mmc->ops->set_ios(sdhost->mmc, &sdhost->mmc->ios);
+		return 0;
+	}
+
+	if(host->hOdmSdio)
 		NvOdmSdioResume(host->hOdmSdio);
 
 	return sdhci_resume_host(sdhost);
