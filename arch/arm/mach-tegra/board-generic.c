@@ -38,7 +38,10 @@
 #include <mach/irqs.h>
 #include <mach/nvrm_linux.h>
 #include <nvrm_module.h>
+#include <linux/spi/spi.h>
 
+#include "nvodm_query.h"
+#include "nvodm_query_discovery.h"
 #include "board.h"
 
 #ifdef CONFIG_USB_ANDROID
@@ -205,6 +208,54 @@ void __init i2c_device_setup(void)
 extern void __init tegra_setup_nvodm(bool standard_i2c, bool standard_spi);
 extern void __init tegra_register_socdev(void);
 
+static struct spi_board_info tegra_spi_ipc_devices[] __initdata = {
+	{
+		.modalias = "spi_ipc",
+		.bus_num = 0,
+		.chip_select = 0,
+		.mode = SPI_MODE_1,
+		.max_speed_hz = 12000000,
+		.platform_data = NULL,
+		.irq = 0,
+	},
+};
+
+static void __init register_spi_ipc_devices(void)
+{
+	unsigned long instance = 0xFFFF;
+	unsigned long cs = 0xFFFF;
+	const NvOdmPeripheralConnectivity *pConnectivity = NULL;
+	int i;
+
+	pConnectivity =
+		NvOdmPeripheralGetGuid(NV_ODM_GUID('s','p','i',' ','_','i','p','c'));
+	if (!pConnectivity)
+		return;
+
+	for (i = 0; i < pConnectivity->NumAddress; i++) {
+		switch (pConnectivity->AddressList[i].Interface) {
+		case NvOdmIoModule_Spi:
+			instance = pConnectivity->AddressList[i].Instance;
+			cs = pConnectivity->AddressList[i].Address;
+			break;
+		default:
+			break;
+		}
+	}
+
+	if (instance == 0xffff || cs == 0xffff) {
+		pr_err("%s: SPI IPC Protocol driver: Instance and CS are Invalid\n", __func__);
+		return;
+	}
+
+	tegra_spi_ipc_devices[0].bus_num = instance;
+	tegra_spi_ipc_devices[0].chip_select = cs;
+	if (spi_register_board_info(tegra_spi_ipc_devices, ARRAY_SIZE(tegra_spi_ipc_devices)) != 0) {
+		pr_err("%s: spi_register_board_info returned error\n", __func__);
+	}
+}
+
+
 static void __init do_system_init(bool standard_i2c, bool standard_spi)
 {
 	unsigned int chip_id[2];
@@ -245,6 +296,7 @@ static void __init tegra_generic_init(void)
 	tegra_android_platform.product_name = generic_dev;
 #endif
 	do_system_init(true, true);
+        register_spi_ipc_devices();
 }
 
 MACHINE_START(VENTANA, "NVIDIA Ventana Development System")
