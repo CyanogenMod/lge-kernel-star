@@ -651,6 +651,9 @@ static void tegra_audiofx_notifier_thread(void *arg)
 			}
 			break;
 
+			case NvAudioFxEventEndOfStream:
+			break;
+
 			case NvAudioFxEventStateChange:{
 				NvAudioFxStateChangeMessage* scm =
 				      (NvAudioFxStateChangeMessage*)message;
@@ -689,7 +692,7 @@ static void tegra_audiofx_notifier_thread(void *arg)
 			break;
 
 			default:
-				snd_printk(KERN_ERR"Unhandled event\n");
+				pr_debug("Unhandled event 0x%08x\n", message->Event);
 				break;
 			}
 		}
