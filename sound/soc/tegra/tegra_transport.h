@@ -413,6 +413,8 @@ struct tegra_audio_data {
 	NvAudioFxObjectHandle mvolume;
 	NvAudioFxObjectHandle mi2s1;
 	NvAudioFxObjectHandle mroute;
+	NvAudioFxIoDevice mi2s1_device_available;
+	NvAudioFxIoDevice mspdif_device_available;
 	int spdif_plugin;
 	int i2s1volume;
 	struct mutex lock;
@@ -430,6 +432,7 @@ NvError tegra_audiofx_create_input(NvRmDeviceHandle hRmDevice,
 				StandardPath* pPath,
 				InputSelection InputSelect);
 NvError tegra_audiofx_destroy_input(StandardPath* pPath);
+NvError tegra_audiofx_route(struct tegra_audio_data* tegra_snd_cx);
 NvError tegra_transport_init(NvddkAudioFxFxnTable* FxTransportFxFxnTable);
 void tegra_transport_deinit(void);
 

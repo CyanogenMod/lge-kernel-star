@@ -543,10 +543,12 @@ int tegra_audiofx_init(struct tegra_audio_data* tegra_snd_cx)
 						tegra_snd_cx->mixer_handle,
 						NvAudioFxSpdifId);
 		tegra_snd_cx->spdif_plugin = 1;
+		tegra_snd_cx->mspdif_device_available = NvAudioFxIoDevice_Default;
 
 		tegra_snd_cx->mi2s1 = tegra_snd_cx->xrt_fxn.MixerCreateObject(
 						tegra_snd_cx->mixer_handle,
 						NvAudioFxI2s1Id);
+		tegra_snd_cx->mi2s1_device_available = NvAudioFxIoDevice_Default;
 
 		memset(&message, 0, sizeof(NvAudioFxMessage));
 		message.Event = NvAudioFxEventControlChange;
@@ -663,62 +665,24 @@ static void tegra_audiofx_notifier_thread(void *arg)
 					(NvAudioFxControlChangeMessage*)message;
 
 				if (message->hFx ==
-					(NvAudioFxHandle)audio_context->mi2s1)
-				{
-					if (ccm->Property == NvAudioFxIoProperty_OutputAvailable)
-					{
+					(NvAudioFxHandle)audio_context->mi2s1) {
+					if (ccm->Property == NvAudioFxIoProperty_OutputAvailable) {
 						NvAudioFxIoDeviceControlChangeMessage* iccm =
 							(NvAudioFxIoDeviceControlChangeMessage*)message;
-						NvAudioFxIoDevice device_available = iccm->IoDevice;
-						NvAudioFxIoDevice device_select = device_available;
 
-						if (device_available &
-							NvAudioFxIoDevice_HeadphoneOut)
-						{
-							device_select = NvAudioFxIoDevice_HeadphoneOut;
-						}
-						else if (device_available &
-							NvAudioFxIoDevice_BuiltInSpeaker)
-						{
-							device_select = NvAudioFxIoDevice_BuiltInSpeaker;
-						}
-
-						audio_context->xrt_fxn.SetProperty(
-							audio_context->mi2s1,
-							NvAudioFxIoProperty_OutputSelect,
-							sizeof(NvAudioFxIoDevice),
-							&device_select);
+						audio_context->mi2s1_device_available = iccm->IoDevice;
+						tegra_audiofx_route(audio_context);
 					}
 
 				}
 				else if (message->hFx ==
-					(NvAudioFxHandle)audio_context->mroute)
-				{
-					if (ccm->Property == NvAudioFxIoProperty_OutputAvailable)
-					{
+					(NvAudioFxHandle)audio_context->mroute) {
+					if (ccm->Property == NvAudioFxIoProperty_OutputAvailable) {
 						NvAudioFxIoDeviceControlChangeMessage* iccm =
 							(NvAudioFxIoDeviceControlChangeMessage*)message;
-						NvAudioFxIoDevice device_available = iccm->IoDevice;
-						NvAudioFxIoDevice device_select = 0;
 
-						if ((device_available &
-							NvAudioFxIoDevice_Aux) &&
-							audio_context->spdif_plugin)
-						{
-							device_select = NvAudioFxIoDevice_Aux;
-						}
-						else if ((device_available &
-							NvAudioFxIoDevice_BuiltInSpeaker) &&
-							audio_context->spdif_plugin)
-						{
-							device_select = NvAudioFxIoDevice_BuiltInSpeaker;
-						}
-
-						audio_context->xrt_fxn.SetProperty(
-							audio_context->mroute,
-							NvAudioFxIoProperty_OutputSelect,
-							sizeof(NvAudioFxIoDevice),
-							&device_select);
+						audio_context->mspdif_device_available = iccm->IoDevice;
+						tegra_audiofx_route(audio_context);
 					}
 				}
 			}
@@ -733,6 +697,48 @@ static void tegra_audiofx_notifier_thread(void *arg)
 
 EXIT:
 	return;
+}
+
+NvError tegra_audiofx_route(struct tegra_audio_data *audio_context)
+{
+	NvAudioFxIoDevice i2s1_device_select = NvAudioFxIoDevice_Default;
+	NvAudioFxIoDevice spdif_device_select = NvAudioFxIoDevice_Default;
+	NvError e;
+
+	if ((audio_context->mspdif_device_available &
+		NvAudioFxIoDevice_Aux) &&
+		audio_context->spdif_plugin) {
+		spdif_device_select = NvAudioFxIoDevice_Aux;
+	}
+	else if(audio_context->mi2s1_device_available &
+		NvAudioFxIoDevice_HeadphoneOut) {
+		i2s1_device_select = NvAudioFxIoDevice_HeadphoneOut;
+	}
+	else if(audio_context->mi2s1_device_available &
+		NvAudioFxIoDevice_BuiltInSpeaker) {
+		i2s1_device_select = NvAudioFxIoDevice_BuiltInSpeaker;
+	}
+	else {
+		i2s1_device_select = audio_context->mi2s1_device_available;
+	}
+
+	e = audio_context->xrt_fxn.SetProperty(
+			audio_context->mroute,
+			NvAudioFxIoProperty_OutputSelect,
+			sizeof(NvAudioFxIoDevice),
+			&spdif_device_select);
+
+	e |= audio_context->xrt_fxn.SetProperty(
+			audio_context->mi2s1,
+			NvAudioFxIoProperty_OutputSelect,
+			sizeof(NvAudioFxIoDevice),
+			&i2s1_device_select);
+
+	if (e != NvSuccess) {
+		snd_printk(KERN_ERR "SetProperty failed!\n");
+	}
+
+	return e;
 }
 
 NvError tegra_audiofx_createfx(struct tegra_audio_data *audio_context)

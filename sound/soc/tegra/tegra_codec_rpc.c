@@ -127,20 +127,12 @@ static int tegra_master_route_put(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
 	int change = 0, val;
-	NvAudioFxIoDevice ioDevice = 0;
 	val = ucontrol->value.integer.value[0] & 0xffff;
-	if (val) {
-		ioDevice = NvAudioFxIoDevice_BuiltInSpeaker;
-	}
 
 	if (tegra_snd_cx) {
 		if (!tegra_audiofx_init(tegra_snd_cx)) {
 			tegra_snd_cx->spdif_plugin = val;
-			tegra_snd_cx->xrt_fxn.SetProperty(
-				tegra_snd_cx->mroute,
-				NvAudioFxIoProperty_OutputSelect,
-				sizeof(NvAudioFxIoDevice),
-				&ioDevice);
+			tegra_audiofx_route(tegra_snd_cx);
 			change = 1;
 		}
 	}

@@ -319,7 +319,6 @@ typedef NvS32 NvAudioFxIoDevice;
 #define NvAudioFxIoDevice_Aux (0x10000)
 #define NvAudioFxIoDevice_Phone (0x20000)
 #define NvAudioFxIoDevice_Radio (0x40000)
-#define NvAudioFxIoDevice_Bluetooth (0x80000)
 #define NvAudioFxIoDevice_Bluetooth_Sco (0x80000)
 
 typedef struct NvAudioFxPeqDescriptorRec
