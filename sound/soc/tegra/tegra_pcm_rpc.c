@@ -780,6 +780,22 @@ static int tegra_pcm_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int tegra_pcm_suspend(struct snd_soc_dai *dai)
+{
+	return 0;
+}
+
+static int tegra_pcm_resume(struct snd_soc_dai *dai)
+{
+	return 0;
+}
+
+#else
+#define tegra_pcm_suspend	NULL
+#define tegra_pcm_resume	NULL
+#endif
+
 struct snd_soc_platform tegra_soc_platform = {
 	.name = "tegra-audio",
 	.probe = tegra_pcm_probe,
@@ -787,6 +803,8 @@ struct snd_soc_platform tegra_soc_platform = {
 	.pcm_ops = &tegra_pcm_ops,
 	.pcm_new = tegra_pcm_new,
 	.pcm_free = tegra_pcm_free_dma_buffers,
+	.suspend = tegra_pcm_suspend,
+	.resume = tegra_pcm_resume,
 };
 
 EXPORT_SYMBOL_GPL(tegra_soc_platform);
