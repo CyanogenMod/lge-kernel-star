@@ -23,7 +23,6 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/partitions.h>
 #include <linux/dma-mapping.h>
-#include <linux/fsl_devices.h>
 #include <linux/pda_power.h>
 #include <linux/io.h>
 #include <linux/gpio.h>
@@ -305,7 +304,7 @@ static struct platform_device *harmony_devices[] __initdata = {
 	&tegra_pcm_device,
 	&harmony_audio_device,
 	&tegra_nand_device,
-	&tegra_otg,
+	&tegra_udc_device,
 	&pda_power_device,
 	&tegra_i2c_device1,
 	&tegra_i2c_device2,
