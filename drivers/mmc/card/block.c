@@ -516,11 +516,30 @@ static struct mmc_blk_data *mmc_blk_alloc(struct mmc_card *card)
 {
 	struct mmc_blk_data *md;
 	int devidx, ret;
+#ifdef CONFIG_MMC_BLOCK_DEVICE_NUMBERING
+	int idx;
+	const char *mmc_blk_name;
+#endif
 
 	devidx = find_first_zero_bit(dev_use, MMC_NUM_MINORS);
 	if (devidx >= MMC_NUM_MINORS)
 		return ERR_PTR(-ENOSPC);
 	__set_bit(devidx, dev_use);
+
+#ifdef CONFIG_MMC_BLOCK_DEVICE_NUMBERING
+	mmc_blk_name = kobject_name(&card->host->parent->kobj);
+	mmc_blk_name = mmc_blk_name ? strrchr(mmc_blk_name, '.') : mmc_blk_name;
+	if (mmc_blk_name) {
+		mmc_blk_name++;
+		idx = simple_strtol(mmc_blk_name, NULL, 10);
+		if ( (idx >= 0) && (idx != devidx) &&
+			(!test_bit(idx, dev_use)) && (idx < MMC_NUM_MINORS) ) {
+			__set_bit(idx, dev_use);
+			__clear_bit(devidx, dev_use);
+			devidx = idx;
+		}
+	}
+#endif
 
 	md = kzalloc(sizeof(struct mmc_blk_data), GFP_KERNEL);
 	if (!md) {
