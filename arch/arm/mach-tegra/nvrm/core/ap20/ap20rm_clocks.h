@@ -60,16 +60,19 @@ extern const NvU32 g_Ap20ModuleClockTableSize;
 // Defines graphics Host frequency
 #define NVRM_AP20_HOST_KHZ (108000)
 
+// Defines main clock doubler support
+#define NVRM_AP20_USE_OSC_DOUBLER (0)
+
 /**
  * Defines frequency steps derived from PLLP0 fixed output to be used as System
  * clock source frequency. The frequency specified in kHz, and it will be rounded
  * up to the closest divider output. 
  */
 #define NVRM_AP20_PLLP_POLICY_SYSTEM_CLOCK \
+    PLLP_POLICY_ENTRY(24000)   /* PLLP divider 16, output frequency  24,000kHz */ \
     PLLP_POLICY_ENTRY(54000)   /* PLLP divider  6, output frequency  54,000kHz */ \
     PLLP_POLICY_ENTRY(72000)   /* PLLP divider  4, output frequency  72,000kHz */ \
     PLLP_POLICY_ENTRY(108000)  /* PLLP divider  2, output frequency 108,000kHz */ \
-    PLLP_POLICY_ENTRY(144000)  /* PLLP divider  1, output frequency 144,000kHz */ \
     PLLP_POLICY_ENTRY(216000)  /* PLLP divider  0, output frequency 216,000kHz */
 
 /**

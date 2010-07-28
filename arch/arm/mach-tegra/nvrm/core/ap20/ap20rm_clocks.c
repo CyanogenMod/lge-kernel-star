@@ -1206,7 +1206,11 @@ NvRmPrivAp20OscDoublerConfigure(
     NvRmFreqKHz OscKHz)
 {
     NvU32 reg, Taps;
+#if NVRM_AP20_USE_OSC_DOUBLER
     NvError error = NvRmPrivGetOscDoublerTaps(hRmDevice, OscKHz, &Taps);
+#else
+    NvError error = NvError_NotSupported;
+#endif
 
     if (error == NvSuccess)
     {
