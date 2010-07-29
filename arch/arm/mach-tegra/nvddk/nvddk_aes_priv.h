@@ -184,6 +184,8 @@ typedef struct AesCoreEngineRec
     AesHwContext AesHwCtxt;
     // Indicates whether engine is disabled or not
     NvBool IsEngineDisabled;
+    // Indicates whether ssk update is allowed or not
+    NvBool SskUpdateAllowed;
 } AesCoreEngine;
 
 // Set of function pointers to be used to access the hardware interface for
@@ -399,6 +401,14 @@ struct AesHwInterfaceRec
         const AesHwContext *const pAesHwCtxt,
         const AesHwEngine Engine,
         const AesHwKeySlot NumSlotsSupported);
+
+    /**
+     * Queries whether SSK update is allowed or not
+     *
+     * @retval NV_TRUE if SSK update is allowed
+     * @retval NV_FALSE if SSK update is not allowed
+     */
+    NvBool (*AesHwIsSskUpdateAllowed)(void);
 };
 
 // AES client state: this structure is common to all clients

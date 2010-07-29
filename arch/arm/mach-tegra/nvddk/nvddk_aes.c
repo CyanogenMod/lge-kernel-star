@@ -603,6 +603,14 @@ NvDdkAesSetAndLockSecureStorageKey(
     AesHwIv Iv;
     AesHwEngine Engine;
 
+    NvOsMutexLock(gs_hAesCoreEngineMutex);
+    if (!gs_pAesCoreEngine->SskUpdateAllowed)
+    {
+        NvOsMutexUnlock(gs_hAesCoreEngineMutex);
+        return NvError_NotSupported;
+    }
+    NvOsMutexUnlock(gs_hAesCoreEngineMutex);
+
     NVDDK_AES_CHECK_INPUT_PARAMS(pSecureStorageKey);
 
     NVDDK_AES_CHECK_USER_IDENTITY;
@@ -1892,6 +1900,8 @@ NvError AesCoreInitEngine(const NvRmDeviceHandle hRmDevice)
             0,
             NULL));
     }
+    gs_pAesCoreEngine->SskUpdateAllowed =
+            pAesHwCtxt->ppEngineCaps[AesHwEngine_A]->pAesInterf->AesHwIsSskUpdateAllowed();
     return e;
 }
 

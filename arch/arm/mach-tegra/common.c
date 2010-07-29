@@ -32,6 +32,11 @@
 #include "board.h"
 
 #define APB_MISC_HIDREV		0x804
+#define FUSE_VISIBILITY_REG_OFFSET		0x48
+#define FUSE_VISIBILITY_BIT_POS		28
+#define FUSE_SPARE_BIT_18_REG_OFFSET		0x248
+#define FUSE_SPARE_BIT_19_REG_OFFSET		0x24c
+
 
 bool tegra_chip_compare(u32 chip, u32 major_rev, u32 minor_rev)
 {
@@ -44,6 +49,28 @@ bool tegra_chip_compare(u32 chip, u32 major_rev, u32 minor_rev)
 	return (chip==id) &&
 		(minor_rev==minor || minor_rev==TEGRA_ALL_REVS) &&
 		(major_rev==major || major_rev==TEGRA_ALL_REVS);
+}
+
+bool tegra_is_ap20_a03p(void)
+{
+	if (tegra_is_ap20_a03()) {
+		void __iomem *clk = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
+		void __iomem *fuse = IO_ADDRESS(TEGRA_FUSE_BASE);
+		u32 clk_val = readl(clk + FUSE_VISIBILITY_REG_OFFSET);
+		u32 fuse_18_val = 0;
+		u32 fuse_19_val = 0;
+
+		clk_val |= (1 << FUSE_VISIBILITY_BIT_POS);
+		writel(clk_val, (clk + FUSE_VISIBILITY_REG_OFFSET));
+		fuse_18_val = readl(fuse + FUSE_SPARE_BIT_18_REG_OFFSET);
+		fuse_19_val = readl(fuse + FUSE_SPARE_BIT_19_REG_OFFSET);
+		clk_val &= ~(1 << FUSE_VISIBILITY_BIT_POS);
+		writel(clk_val, (clk + FUSE_VISIBILITY_REG_OFFSET));
+		return (((fuse_18_val|fuse_19_val)&1)? true:false);
+	}
+	else {
+		return false;
+	}
 }
 
 #ifdef CONFIG_DMABOUNCE

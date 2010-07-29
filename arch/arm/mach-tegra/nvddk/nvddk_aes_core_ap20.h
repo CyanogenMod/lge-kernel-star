@@ -221,6 +221,14 @@ NvAesCoreAp20KeyReadDisable(
     const AesHwKeySlot Slot,
     const NvU32 *const pEngineVirAddr);
 
+/**
+ * Queries whether SSK update is allowed or not
+ *
+ * @retval NV_TRUE if SSK update is allowed
+ * @retval NV_FALSE if SSK update is not allowed
+ */
+NvBool NvAesCoreAp20IsSskUpdateAllowed(void);
+
 #ifdef __cplusplus
 };
 #endif

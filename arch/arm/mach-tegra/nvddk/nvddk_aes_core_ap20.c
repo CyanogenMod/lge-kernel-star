@@ -41,6 +41,8 @@
 #include "nvddk_aes_priv.h"
 #include "nvddk_aes_hw.h"
 #include "nvddk_aes_core_ap20.h"
+#include <linux/interrupt.h>
+#include "../board.h"
 
 #define SECURE_HW_REGR(engine, viraddr, reg, value) \
 { \
@@ -544,4 +546,18 @@ void NvAesCoreAp20KeyReadDisable(
     SECURE_INDEXED_REGR(Engine, pEngineVirAddr, Slot, RegValue);
     RegValue = NV_FLD_SET_DRF_NUM(ARVDE_BSEV, SECURE_SEC_SEL0, KEYREAD_ENB0, 0, RegValue);
     SECURE_INDEXED_REGW(Engine, pEngineVirAddr, Slot, RegValue);
+}
+
+NvBool NvAesCoreAp20IsSskUpdateAllowed(void)
+{
+    if (tegra_is_ap20_a03())
+    {
+        // It is AO3 chip
+        // Check whether it is AO3P or not
+        // SSK update is not supported on AO3 board
+        if (!tegra_is_ap20_a03p())
+            return NV_FALSE;
+    }
+    // Except AO3, all other chips support SSK update
+    return NV_TRUE;
 }

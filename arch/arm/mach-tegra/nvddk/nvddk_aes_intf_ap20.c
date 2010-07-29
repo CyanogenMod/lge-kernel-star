@@ -122,6 +122,7 @@ Ap20AesHwDisableAllKeyRead(
     const AesHwContext *const pAesHwCtxt,
     const AesHwEngine Engine,
     const AesHwKeySlot NumSlotsSupported);
+static NvBool Ap20AesIsSskUpdateAllowed(void);
 
 /**
  * Set the Setup Table command required for the AES engine.
@@ -663,6 +664,17 @@ Ap20AesHwDisableAllKeyRead(
     NvOsMutexUnlock(pAesHwCtxt->Mutex[Engine]);
 }
 
+/**
+ * Queries whether SSK update is allowed or not
+ *
+ * @retval NV_TRUE if SSK update is allowed
+ * @retval NV_FALSE if SSK update is not allowed
+ */
+NvBool Ap20AesIsSskUpdateAllowed(void)
+{
+    return NvAesCoreAp20IsSskUpdateAllowed();
+}
+
 void NvAesIntfAp20GetHwInterface(AesHwInterface *const pAp20AesHw)
 {
     NV_ASSERT(pAp20AesHw);
@@ -680,4 +692,5 @@ void NvAesIntfAp20GetHwInterface(AesHwInterface *const pAp20AesHw)
     pAp20AesHw->AesHwGetUsedSlots = Ap20AesHwGetUsedSlots;
     pAp20AesHw->AesHwIsEngineDisabled = Ap20AesHwIsEngineDisabled;
     pAp20AesHw->AesHwDisableAllKeyRead = Ap20AesHwDisableAllKeyRead;
+    pAp20AesHw->AesHwIsSskUpdateAllowed = Ap20AesIsSskUpdateAllowed;
 }
