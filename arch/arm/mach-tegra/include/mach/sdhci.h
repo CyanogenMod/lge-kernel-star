@@ -38,6 +38,7 @@ struct tegra_sdhci_platform_data {
 	int is_removable;	/* card can be removed */
 	unsigned int debounce;	/* debounce time in milliseconds */
 	unsigned long max_clk;	/* maximum card clock */
+	int is_always_on;	/* card is not powered down in suspend */
 #ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
 	unsigned long offset;	/* offset in blocks to MBR */
 #endif

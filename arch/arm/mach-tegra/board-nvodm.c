@@ -355,6 +355,7 @@ static void __init tegra_setup_sdhci(void) {
 			i, &gpio_count);
 
 		plat->is_removable = prop->IsCardRemovable;
+		plat->is_always_on = prop->AlwaysON;
 		if (!gpio)
 			gpio_count = 0;
 		switch (gpio_count) {
