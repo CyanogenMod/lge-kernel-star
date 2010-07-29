@@ -150,12 +150,12 @@ static const char *pupd_name(unsigned long val)
 
 static inline unsigned long pg_readl(unsigned long offset)
 {
-	return readl(IO_TO_VIRT(TEGRA_APB_MISC_BASE + offset));
+	return readl(IO_TO_VIRT(TEGRA_APB_MISC_BASE) + offset);
 }
 
 static inline void pg_writel(unsigned long value, unsigned long offset)
 {
-	writel(value, IO_TO_VIRT(TEGRA_APB_MISC_BASE + offset));
+	writel(value, IO_TO_VIRT(TEGRA_APB_MISC_BASE) + offset);
 }
 
 static int tegra_pinmux_cancel_func(const struct tegra_pingroup_config *config)
@@ -511,7 +511,7 @@ static int dbg_pinmux_show(struct seq_file *s, void *unused)
 		}
 		dbg_pad_field(s, 13-len);
 
-		if (pingroups[i].mux_reg < 0) {
+		if (pingroups[i].pupd_reg < 0) {
 			seq_printf(s, "TEGRA_PUPD_NORMAL");
 			len = strlen("NORMAL");
 		} else {
