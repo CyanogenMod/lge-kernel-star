@@ -1433,6 +1433,11 @@ static NvRmPmRequest DfsThread(NvRmDfs* pDfs)
             {
                 DfsHwDeinit(pDfs);
                 NV_ASSERT_SUCCESS(DfsHwInit(pDfs));
+
+                // Some PMUs do not restore core voltage after LP0
+                NvRmPmuGetVoltage(pDfs->hRm,
+                    pDfs->VoltageScaler.CoreRailAddress,
+                    &pDfs->VoltageScaler.CurrentCoreMv);
             }
             // Re-initialize samplers if DVFS was running, but stopped on
             // entry to LPx; keep sampling history, if DVFS was not stopped;

@@ -690,6 +690,14 @@ Ap20Emc2xClockSourceFind(
             break;
     }
 
+    // In case, when boot EMC configuration does not match any entry in
+    // EMC sorted table switch to undivided PLLM0 first
+    if ((i != 0) && (s_Ap20EmcConfig.Index >= NVRM_AP20_DFS_EMC_FREQ_STEPS))
+    {
+        i = 0;
+        FinalStep = NV_FALSE;
+    }
+
     // Target can be reached in one step, provided: 
     // - either current or target entry is PLLM0     OR
     // - current and target entries have same source OR
@@ -1557,6 +1565,8 @@ void
 NvRmPrivAp20FastClockConfig(NvRmDeviceHandle hRmDevice)
 {
 #if !NV_OAL
+    static NvBool resume = NV_FALSE;
+
     NvU32 divc1, divm1, divp2;
     NvRmFreqKHz SclkKHz, CpuKHz, PllP2KHz, PllM1KHz, PllC1KHz;
     NvRmDfsSource VdeSource;
@@ -1567,21 +1577,26 @@ NvRmPrivAp20FastClockConfig(NvRmDeviceHandle hRmDevice)
 
     // Set fastest EMC/MC configuration provided PLLM0 boot frequency matches
     // one of the pre-defined configurations, i.e, it is the first entry in the
-    // sorted table
+    // sorted table. Preserve warm boot EMC configuration during resume.
     if ((s_Ap20EmcConfigSortedTable[0].Emc2xKHz == FreqKHz) &&
-        (s_Ap20EmcConfig.Index != 0))
+        (s_Ap20EmcConfig.Index != 0) && (!resume))
     {
         Ap20EmcSwitchToUndividedPllM0(hRmDevice, s_Ap20EmcConfigSortedTable);
         s_Ap20EmcConfig.Index = 0;
     }
 
-    // Set AVP/System Bus clock (now, with nominal core voltage it can be up
-    // to SoC maximum). First determine settings for PLLP/PLLM/PLLC secondary
-    // dividers to get maximum possible frequency on PLLP_OUT2, or PLLM_OUT1
-    // or PLLC_OUT1 outputs.
-    SclkKHz = NvRmPrivGetSocClockLimits(NvRmModuleID_Avp)->MaxKHz;
+    // Set AVP/System Bus clock to maximum during initialization (core voltage
+    // is already nominal). During resume core voltage maybe below nominal,
+    // hence, preserve system bus frequency set by the warm boot code, but
+    // re-arrange source selection, and dividers settings per RM convention.
+    if (!resume)
+        SclkKHz = NvRmPrivGetSocClockLimits(NvRmModuleID_Avp)->MaxKHz;
+    else
+        SclkKHz = NvRmPrivGetClockSourceFreq(NvRmClockSource_SystemBus);
     NV_ASSERT(SclkKHz);
 
+    // First determine settings for PLLP/PLLM/PLLC secondary dividers to get
+    // closest target approximation from below
     FreqKHz = NvRmPrivGetClockSourceFreq(NvRmClockSource_PllP0);
     PllP2KHz = SclkKHz;
     divp2 = NvRmPrivFindFreqMaxBelow(
@@ -1632,16 +1647,20 @@ NvRmPrivAp20FastClockConfig(NvRmDeviceHandle hRmDevice)
     }
     NvRmPrivBusClockInit(hRmDevice, SclkKHz);
 
-    // Set VDE maximum clock (VDE is disabled after basic reset - need to
-    // temporary enable it for configuration)
-    FreqKHz = NvRmPrivGetSocClockLimits(NvRmModuleID_Vde)->MaxKHz;
-    NvRmPowerModuleClockControl(hRmDevice, NvRmModuleID_Vde, 0, NV_TRUE);
-    Ap20VdeClockSourceFind(hRmDevice, FreqKHz, FreqKHz, &VdeSource);
-    Ap20VdeClockConfigure(hRmDevice, FreqKHz, &FreqKHz, &VdeSource);
-    NvRmPowerModuleClockControl(hRmDevice, NvRmModuleID_Vde, 0, NV_FALSE);
+    // No need for VDE re-configurations during resume.
+    if (!resume)
+    {
+        // Set VDE maximum clock during initialization (VDE is disabled
+        // after basic reset - need to temporary enable it for configuration)
+        FreqKHz = NvRmPrivGetSocClockLimits(NvRmModuleID_Vde)->MaxKHz;
+        NvRmPowerModuleClockControl(hRmDevice, NvRmModuleID_Vde, 0, NV_TRUE);
+        Ap20VdeClockSourceFind(hRmDevice, FreqKHz, FreqKHz, &VdeSource);
+        Ap20VdeClockConfigure(hRmDevice, FreqKHz, &FreqKHz, &VdeSource);
+        NvRmPowerModuleClockControl(hRmDevice, NvRmModuleID_Vde, 0, NV_FALSE);
+    }
 
-    // Set PLLX0 and CPU clock to SoC maximum (can be done now, when core
-    // voltage is guaranteed to be nominal)
+    // Set PLLX0 and CPU clock to SoC maximum (cpu voltage is guaranteed to
+    // be nominal during initialization and resume as well)
     CpuKHz = NvRmPrivGetSocClockLimits(NvRmModuleID_Cpu)->MaxKHz;
     FreqKHz = NvRmPrivGetClockSourceFreq(NvRmClockSource_PllX0);
     if (CpuKHz != FreqKHz)
@@ -1657,6 +1676,8 @@ NvRmPrivAp20FastClockConfig(NvRmDeviceHandle hRmDevice)
         hRmDevice,
         NvRmPrivGetClockSourceHandle(NvRmClockSource_PllP4)->pInfo.pDivider,
         NVRM_AP20_FIXED_PLLP4_SETTING);
+
+    resume = NV_TRUE;
 #endif
 }
 
