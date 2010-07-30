@@ -361,7 +361,7 @@ NvError NvRmPwmConfig(
     NvError status = NvSuccess;
     NvU32 RegValue = 0, ResultFreqKHz = 0;
     NvU8 PwmMode = 0;
-    NvU32 ClockFreqKHz = 0, DCycle = 0, DataOn = 0, DataOff = 0;
+    NvU32 ClockFreqKHz = 0, DCycle = 0;
     NvU32 PmcCtrlReg = 0, PmcDpdPadsReg = 0, PmcBlinkTimerReg = 0;
     NvU32 RequestPeriod = 0, ResultPeriod = 0;
     NvU32 DataOnRegVal = 0, DataOffRegVal = 0;
@@ -500,25 +500,22 @@ NvError NvRmPwmConfig(
     }
     else
     {
-        RequestPeriod = RequestedFreqHzOrPeriod;
+        ResultPeriod = RequestedFreqHzOrPeriod;
+        if (ResultPeriod > MAX_SUPPORTED_PERIOD)
+            ResultPeriod = MAX_SUPPORTED_PERIOD;
+        RequestPeriod = ResultPeriod * DATA_FACTOR;
+
         DCycle = DutyCycle>>16;
-        DataOn = (RequestPeriod * DCycle)/100;
-        if (DataOn > MAX_SUPPORTED_PERIOD)
-        {
-            ResultPeriod = (MAX_SUPPORTED_PERIOD * 100)/DCycle;
-            DataOn = MAX_SUPPORTED_PERIOD;
-        }
-        else
-        {
-            ResultPeriod = RequestPeriod;
-        }
-        DataOff = ResultPeriod - DataOn;
-        DataOnRegVal = DataOn * DATA_ON_FACTOR;
-        if (DataOnRegVal >= MAX_DATA_ON)
+        if(DCycle > 100)
+            DCycle = 100;
+
+        DataOnRegVal = (RequestPeriod * DCycle)/100;
+        if(DataOnRegVal > MAX_DATA_ON)
             DataOnRegVal = MAX_DATA_ON;
-        DataOffRegVal = DataOff * DATA_ON_FACTOR;
-        if (DataOffRegVal >= MAX_DATA_ON)
-            DataOffRegVal = MAX_DATA_ON;
+
+        DataOffRegVal = RequestPeriod - DataOnRegVal;
+        if(DataOffRegVal > MAX_DATA_OFF)
+            DataOffRegVal = MAX_DATA_OFF;
 
         PmcCtrlReg = PMC_REGR(hPwm->VirtualAddress[OutputId-1],
                                 APBDEV_PMC_CNTRL_0);

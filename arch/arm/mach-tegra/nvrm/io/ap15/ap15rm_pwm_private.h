@@ -46,8 +46,9 @@
 #define PWM_BANK_SIZE           16
 #define PMC_BANK_SIZE           192
 #define MAX_SUPPORTED_PERIOD    16
-#define MAX_DATA_ON             0xFFFF
-#define DATA_ON_FACTOR          8194 // 8194 = 1/(4 * 30.51us)
+#define MAX_DATA_ON             0x7FFF
+#define MAX_DATA_OFF            0xFFFF
+#define DATA_FACTOR             2048 // 1s / (16 * 30.51us)
 
 typedef struct NvRmPwmRec
 {
