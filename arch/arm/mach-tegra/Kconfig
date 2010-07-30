@@ -10,6 +10,7 @@ config ARCH_TEGRA_2x_SOC
 	select CPU_V7
 	select ARM_GIC
 	select ARCH_REQUIRE_GPIOLIB
+	select ARM_ERRATA_742230
 	help
 	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
@@ -40,6 +41,10 @@ config MACH_VENTANA
 
 config TEGRA_ODM_KIT
 	bool
+
+config ARM_ERRATA_742230
+	bool
+	depends on CPU_V7
 
 choice
 	prompt "Low-level debug console UART"

@@ -612,6 +612,11 @@ ENDPROC(__invalidate_l1)
  */
 ENTRY(__invalidate_cpu_state)
 	clrex
+#ifdef CONFIG_ARM_ERRATA_742230
+	mrc	p15, 0, r0, c15, c0, 1
+	orr	r0, r0, #(1<<4)
+	mcr	p15, 0, r0, c15, c0, 1
+#endif
 	mov	r0, #0
 	mcr	p15, 0, r0, c1, c0, 1	@ disable SMP, prefetch, broadcast
 	isb
@@ -633,9 +638,7 @@ ENTRY(__invalidate_cpu_state)
 	mov	r0, #0x1800
 	mcr	p15, 0, r0, c1, c0, 0	@ enable branch prediction, i-cache
 	isb
-	mov	r10, lr			@ preserve lr of caller
-	bl	__invalidate_l1		@ invalidate data cache
-	bx	r10			@ return
+	b	__invalidate_l1		@ invalidate data cache
 ENDPROC(__invalidate_cpu_state)
 
 /*

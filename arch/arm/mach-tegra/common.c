@@ -77,8 +77,13 @@ void __init tegra_init_cache(void)
 void __init tegra_common_init(void)
 {
 #ifdef CONFIG_CPU_V7
-	/* enable dynamic clock gating */
 	unsigned int reg;
+#ifdef CONFIG_ARM_ERRATA_742230
+	asm volatile ("mrc p15, 0, %0, c15, c0, 1" : "=r" (reg) : : "cc");
+	reg |= 1<<4;
+	asm volatile ("mcr p15, 0, %0, c15, c0, 1" : : "r" (reg) : "cc");
+#endif
+	/* enable dynamic clock gating */
 	asm volatile ("mrc p15, 0, %0, c15, c0, 0" : "=r" (reg) : : "cc");
 	reg |= 1;
 	asm volatile ("mcr p15, 0, %0, c15, c0, 0" : : "r" (reg) : "cc");
