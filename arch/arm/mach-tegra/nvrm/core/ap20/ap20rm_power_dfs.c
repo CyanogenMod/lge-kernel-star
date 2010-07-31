@@ -405,13 +405,11 @@ NvRmPrivAp20GetPmRequest(
     /*
      * Request OS kernel to turn CPU1 Off if all of the following is true:
      * (a) CPU frequency is below OnMin threshold, 
-     * (b) Last request was CPU1 On request
-     * (c) CPU1 is actually On
+     * (b) CPU1 is actually On
      *
      * Request OS kernel to turn CPU1 On if all of the following is true:
      * (a) CPU frequency is above OffMax threshold 
-     * (b) Last request was CPU1 Off request
-     * (c) CPU1 is actually Off
+     * (b) CPU1 is actually Off
      */
     if (CpuLoadGaugeKHz < s_Cpu1OnMinKHz)
     {
@@ -424,8 +422,11 @@ NvRmPrivAp20GetPmRequest(
         if ((t - s_Cpu1OffPendingCnt) < (NVRM_CPU1_OFF_PENDING_MS * 1000))
             return PmRequest;
 
-        if ((s_LastPmRequest & NvRmPmRequest_CpuOnFlag) && (!Cpu1Off))
+        if (!Cpu1Off)
+        {
             s_LastPmRequest = PmRequest = (NvRmPmRequest_CpuOffFlag | 0x1);
+            s_Cpu1OffPendingCnt = 0;   // re-start delay after request
+        }
 #if NVRM_TEST_PMREQUEST_UP_MODE
         NV_REGW(hRmDevice, NvRmPrivModuleID_ClockAndReset, 0,
             CLK_RST_CONTROLLER_RST_CPU_CMPLX_SET_0,
@@ -443,10 +444,11 @@ NvRmPrivAp20GetPmRequest(
         if ((t - s_Cpu1OnPendingCnt) < (NVRM_CPU1_ON_PENDING_MS * 1000))
             return PmRequest;
 
-        if ((s_LastPmRequest & NvRmPmRequest_CpuOffFlag) && Cpu1Off)
+        if (Cpu1Off)
         {
             s_LastPmRequest = PmRequest = (NvRmPmRequest_CpuOnFlag | 0x1);
             *pCpuKHz = NvRmPrivGetSocClockLimits(NvRmModuleID_Cpu)->MaxKHz;
+            s_Cpu1OnPendingCnt = 0;  // re-start delay after request
         }
 #if NVRM_TEST_PMREQUEST_UP_MODE
         NV_REGW(hRmDevice, NvRmPrivModuleID_ClockAndReset, 0,
