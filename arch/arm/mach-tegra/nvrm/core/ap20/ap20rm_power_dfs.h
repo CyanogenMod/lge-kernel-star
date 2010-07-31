@@ -236,17 +236,17 @@ extern "C"
 /**
  * Defines CPU frequency threshold for slave CPU1 power management:
  * - CPU1 is turned Off when cpu clock is below ON_MIN for
- *   ON_PENDING DFS ticks (10ms) in a row
+ *   ON_PENDING time in a row
  * - CPU1 is turned On when cpu clock is above OFF_MAX for
- *   OFF_PENDING DFS ticks (10ms) in a row
+ *   OFF_PENDING time in a row
  * If thresholds are set to 0, the values are derived at run time from the
  * characterization data
  */
 #define NVRM_CPU1_ON_MIN_KHZ (0)
 #define NVRM_CPU1_OFF_MAX_KHZ (0)
 
-#define NVRM_CPU1_ON_PENDING_CNT (250)
-#define NVRM_CPU1_OFF_PENDING_CNT (100)
+#define NVRM_CPU1_ON_PENDING_MS (1500)
+#define NVRM_CPU1_OFF_PENDING_MS (1000)
 
 /**
  * Defines AP20 Thermal policy parameters.

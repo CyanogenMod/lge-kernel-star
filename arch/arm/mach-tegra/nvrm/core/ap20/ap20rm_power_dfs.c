@@ -56,6 +56,10 @@
 // TODO: Always Disable before check-in
 #define NVRM_TEST_PMREQUEST_UP_MODE (0)
 
+// Microsecond timer access
+static void* s_pTimerUs = NULL;
+extern void* NvRmPrivAp15GetTimerUsVirtAddr(NvRmDeviceHandle hRm);
+
 /*****************************************************************************/
 // EMC MODULE INTERFACES
 /*****************************************************************************/
@@ -369,6 +373,7 @@ NvRmPrivAp20GetPmRequest(
     static NvRmFreqKHz s_Cpu1OnMinKHz = 0, s_Cpu1OffMaxKHz = 0;
     static NvU32 s_Cpu1OnPendingCnt = 0, s_Cpu1OffPendingCnt = 0;
 
+    NvU32 t;
     NvRmPmRequest PmRequest = NvRmPmRequest_None;
     NvBool Cpu1Off =
         (0 != NV_DRF_VAL(CLK_RST_CONTROLLER, RST_CPU_CMPLX_SET, SET_CPURESET1,
@@ -392,6 +397,11 @@ NvRmPrivAp20GetPmRequest(
         NV_ASSERT(s_Cpu1OnMinKHz < s_Cpu1OffMaxKHz);
     }
 
+    // Timestamp
+    if (s_pTimerUs == NULL)
+        s_pTimerUs = NvRmPrivAp15GetTimerUsVirtAddr(hRmDevice);
+    t = NV_READ32(s_pTimerUs);
+
     /*
      * Request OS kernel to turn CPU1 Off if all of the following is true:
      * (a) CPU frequency is below OnMin threshold, 
@@ -406,11 +416,14 @@ NvRmPrivAp20GetPmRequest(
     if (CpuLoadGaugeKHz < s_Cpu1OnMinKHz)
     {
         s_Cpu1OnPendingCnt = 0;
-        if (s_Cpu1OffPendingCnt < NVRM_CPU1_OFF_PENDING_CNT)
+        if ((s_Cpu1OffPendingCnt & 0x1) == 0)
         {
-            s_Cpu1OffPendingCnt++;
+            s_Cpu1OffPendingCnt = t | 0x1;  // Use LSb as a delay start flag
             return PmRequest;
         }
+        if ((t - s_Cpu1OffPendingCnt) < (NVRM_CPU1_OFF_PENDING_MS * 1000))
+            return PmRequest;
+
         if ((s_LastPmRequest & NvRmPmRequest_CpuOnFlag) && (!Cpu1Off))
             s_LastPmRequest = PmRequest = (NvRmPmRequest_CpuOffFlag | 0x1);
 #if NVRM_TEST_PMREQUEST_UP_MODE
@@ -422,11 +435,14 @@ NvRmPrivAp20GetPmRequest(
     else if (CpuLoadGaugeKHz > s_Cpu1OffMaxKHz)
     {
         s_Cpu1OffPendingCnt = 0;
-        if (s_Cpu1OnPendingCnt < NVRM_CPU1_ON_PENDING_CNT)
+        if ((s_Cpu1OnPendingCnt & 0x1) == 0)
         {
-            s_Cpu1OnPendingCnt++;
+            s_Cpu1OnPendingCnt = t | 0x1;  // Use LSb as a delay start flag
             return PmRequest;
         }
+        if ((t - s_Cpu1OnPendingCnt) < (NVRM_CPU1_ON_PENDING_MS * 1000))
+            return PmRequest;
+
         if ((s_LastPmRequest & NvRmPmRequest_CpuOffFlag) && Cpu1Off)
         {
             s_LastPmRequest = PmRequest = (NvRmPmRequest_CpuOnFlag | 0x1);
@@ -437,6 +453,11 @@ NvRmPrivAp20GetPmRequest(
             CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR_0,
             CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR_0_CLR_CPURESET1_FIELD);
 #endif
+    }
+    else
+    {   // Re-start both delays inside hysteresis loop
+        s_Cpu1OnPendingCnt = 0;
+        s_Cpu1OffPendingCnt = 0;
     }
     return PmRequest;
 }
