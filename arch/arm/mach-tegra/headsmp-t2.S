@@ -136,6 +136,7 @@ ENDPROC(__restart_pllx)
 ENTRY(tegra_hotplug_startup)
 	setmode	PSR_F_BIT | PSR_I_BIT | SVC_MODE, r9
 	bl	__invalidate_cpu_state
+	enable_coresite r1
 
 	/* most of the below is a retread of what happens in __v7_setup and
 	 * secondary_startup, to get the MMU re-enabled and to branch

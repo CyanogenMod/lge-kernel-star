@@ -49,3 +49,9 @@
 	dmb
 	bne	1002b
 .endm
+
+/* Enable Coresight access on cpu */
+.macro	enable_coresite, tmp
+	mov32	\tmp, 0xC5ACCE55
+	mcr	p14, 0, \tmp, c7, c12, 6
+.endm

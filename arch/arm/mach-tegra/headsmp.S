@@ -50,6 +50,7 @@ ENTRY(tegra_secondary_startup)
 	msr	cpsr_fsxc, #0xd3
 	bl	__invalidate_cpu_state
 	cpu_id	r0
+	enable_coresite r1
 	poke_ev	r0, r1
 	b	secondary_startup
 ENDPROC(tegra_secondary_startup)
@@ -57,8 +58,8 @@ ENDPROC(tegra_secondary_startup)
 /*
  *	__enable_coresite_access
  *
- *	  Takes the coresite debug interface out of reset, enables
- *	  access to all CPUs. Called with MMU disabled.
+ *	  Called only on CPU0 to take the CoreSight debug interface out of
+ *	  reset. Called with MMU disabled.
  */
 	.align L1_CACHE_SHIFT
 ENTRY(__enable_coresite_access)
@@ -72,14 +73,9 @@ ENTRY(__enable_coresite_access)
 	wait_for_us r3, r2, r4
 	add	r3, r3, #2
 	bic	r1, r1, #(1<<9)
-	mov32	r5, 0xC5ACCE55
-	mov32	r6, (TEGRA_CSITE_BASE + 0x10fb0)	@ CPUDBG0_LAR
-	mov	r7, #CONFIG_NR_CPUS
 	wait_until r3, r2, r4
 	str	r1, [r0]
-access:	str	r5, [r6]
-	add	r6, r6, #0x2000
-	subs	r7, r7, #1
-	bhi	access
+	/* Enable CoreSight */
+	enable_coresite r3
 	bx	lr
 ENDPROC(__enable_coresite_access)
