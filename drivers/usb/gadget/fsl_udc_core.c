@@ -2082,8 +2082,7 @@ static void fsl_udc_irq_work(struct work_struct* irq_work)
 		/* set vbus active  and enable the usb clocks */
 		udc->vbus_active = 1;
 		platform_udc_clk_resume();
-		if (udc->transceiver)
-			fsl_udc_restart(udc);
+		fsl_udc_restart(udc);
 		/* Schedule work to wait for 1000 msec and check for
 		 * charger if setup packet is not received */
 		schedule_delayed_work(&udc->work, USB_CHARGER_DETECTION_WAIT_TIME_MS);
