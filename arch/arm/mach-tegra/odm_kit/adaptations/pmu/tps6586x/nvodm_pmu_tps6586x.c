@@ -1176,6 +1176,17 @@ Tps6586xWriteVoltageReg(
                         pSupplyInfo->supply, NV_TRUE);
 
                     status = Tps6586xSetExternalSupply(hDevice, vddRail, NV_TRUE);
+                    /* EDID read will fail if power rail HDMI 5V DDC is not stable
+                     * after enable. After measured from scope, there is required
+                     * at least 500us to make this power rail stable.
+                     */
+                    if (vddRail == Ext_TPS2051BPmuSupply_VDDIO_VID)
+                    {
+                        if (pSettleMicroSeconds)
+                            *pSettleMicroSeconds = 500;
+                        else
+                            NvOdmOsWaitUS(500);
+                    }
                 }
             }
             else
