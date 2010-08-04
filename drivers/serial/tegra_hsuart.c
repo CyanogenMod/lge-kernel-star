@@ -80,6 +80,13 @@ const int dma_req_sel[] = {
 #define TEGRA_UART_CLOCK_OFF 2
 #define TEGRA_UART_SUSPEND   3
 
+/* Tx fifo trigger level setting in tegra uart is in
+ * reverse way then conventional uart */
+#define TEGRA_UART_TX_TRIG_16B 0x00
+#define TEGRA_UART_TX_TRIG_8B  0x10
+#define TEGRA_UART_TX_TRIG_4B  0x20
+#define TEGRA_UART_TX_TRIG_1B  0x30
+
 struct tegra_uart_port {
 	struct uart_port	uport;
 	char			port_name[32];
@@ -174,7 +181,7 @@ static void tegra_start_pio_tx(struct tegra_uart_port *t, unsigned int bytes)
 		bytes = TEGRA_UART_FIFO_SIZE;
 
 	t->fcr_shadow &= ~UART_FCR_T_TRIG_11;
-	t->fcr_shadow |= UART_FCR_T_TRIG_10;
+	t->fcr_shadow |= TEGRA_UART_TX_TRIG_8B;
 	uart_writeb(t, t->fcr_shadow, UART_FCR);
 	t->tx_in_progress = TEGRA_TX_PIO;
 	t->tx_bytes = bytes;
@@ -191,7 +198,7 @@ static void tegra_start_dma_tx(struct tegra_uart_port *t, unsigned long bytes)
 		UART_XMIT_SIZE, DMA_TO_DEVICE);
 
 	t->fcr_shadow &= ~UART_FCR_T_TRIG_11;
-	t->fcr_shadow |= UART_FCR_T_TRIG_01;
+	t->fcr_shadow |= TEGRA_UART_TX_TRIG_4B;
 	uart_writeb(t, t->fcr_shadow, UART_FCR);
 
 	t->tx_bytes = bytes & ~(sizeof(u32)-1);
@@ -586,7 +593,7 @@ static int tegra_uart_hw_init(struct tegra_uart_port *t)
 	uart_writeb(t, fcr, UART_FCR);
 
 	udelay(100);
-	uart_writeb(t, fcr, UART_FCR);
+	uart_writeb(t, t->fcr_shadow, UART_FCR);
 	udelay(100);
 
 	/* Set the trigger level
@@ -611,7 +618,7 @@ static int tegra_uart_hw_init(struct tegra_uart_port *t)
 	 *  programmed in the DMA registers.
 	 * */
 	t->fcr_shadow |= UART_FCR_R_TRIG_01;
-	t->fcr_shadow |= UART_FCR_T_TRIG_10;
+	t->fcr_shadow |= TEGRA_UART_TX_TRIG_8B;
 	uart_writeb(t, t->fcr_shadow, UART_FCR);
 
 	if (t->use_rx_dma) {
@@ -822,7 +829,7 @@ static void set_dtr(struct tegra_uart_port *t, bool active)
 	if (active)
 		mcr |= UART_MCR_DTR;
 	else
-		mcr &= UART_MCR_DTR;
+		mcr &= ~UART_MCR_DTR;
 	if (mcr != t->mcr_shadow) {
 		uart_writeb(t, mcr, UART_MCR);
 		t->mcr_shadow = mcr;
