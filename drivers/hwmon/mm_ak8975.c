@@ -92,6 +92,8 @@ struct mm_ak8975_data {
 static int mm_ak8975_probe(struct i2c_client *client,
 			   const struct i2c_device_id *id);
 static int mm_ak8975_remove(struct i2c_client *client);
+static int mm_ak8975_suspend(struct i2c_client *client, pm_message_t mesg);
+static int mm_ak8975_resume(struct i2c_client *client);
 
 static const struct i2c_device_id mm_ak8975_id[] = {
 	{"mm_ak8975", 0},
@@ -107,6 +109,8 @@ static struct i2c_driver mm_ak8975_driver = {
 	},
 	.probe		= mm_ak8975_probe,
 	.remove		= mm_ak8975_remove,
+	.resume         = mm_ak8975_resume,
+	.suspend        = mm_ak8975_suspend,
 	.id_table	= mm_ak8975_id,
 };
 
@@ -459,6 +463,45 @@ static int mm_ak8975_remove(struct i2c_client *client)
 	sysfs_remove_group(&client->dev.kobj, &data->attrs);
 	gpio_free(data->eoc_gpio);
 	kfree(data);
+	return 0;
+}
+
+static int mm_ak8975_suspend(struct i2c_client *client, pm_message_t mesg)
+{
+	struct mm_ak8975_data *data = i2c_get_clientdata(client);
+	bool status;
+
+	dev_dbg(&client->dev, "%s()\n", __func__);
+
+	mutex_lock(&data->lock);
+	status = ak8975_write_data(client, AK_8975_REG_ADD_CNTL,
+					   0x0, REG_CNTL_MODE_MASK,
+					   REG_CNTL_MODE_SHIFT);
+	if (!status) {
+		dev_err(&client->dev, "Error in setting fuse access mode\n");
+		mutex_unlock(&data->lock);
+		return -EBUSY;
+	}
+	mutex_unlock(&data->lock);
+	return 0;
+}
+static int mm_ak8975_resume(struct i2c_client *client)
+{
+	struct mm_ak8975_data *data = i2c_get_clientdata(client);
+	bool status;
+
+	dev_dbg(&client->dev, "%s()\n", __func__);
+
+	mutex_lock(&data->lock);
+	status = ak8975_write_data(client, AK_8975_REG_ADD_CNTL,
+					   data->mode, REG_CNTL_MODE_MASK,
+					   REG_CNTL_MODE_SHIFT);
+	if (!status) {
+		dev_err(&client->dev, "Error in setting fuse access mode\n");
+		mutex_unlock(&data->lock);
+		return -EBUSY;
+	}
+	mutex_unlock(&data->lock);
 	return 0;
 }
 
