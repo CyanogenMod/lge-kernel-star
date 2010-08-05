@@ -1102,9 +1102,11 @@ NvError NvDdkFuseGet(NvDdkFuseDataType Type, void *pData, NvU32 *pSize)
                             BOOT_DEVICE_INFO,
                             BOOT_DEVICE_CONFIG,
                             RegData);
-
+/*  FixMe: Need to properly fix below code, for matching sysfs read with GfShell.
             *((NvU8 *)pData) = (RegData >> 0x8) & 0xFF;
             *((NvU8 *)pData + 1) = RegData & 0xFF;
+*/
+            *((NvU32 *)pData) = RegData;
 
             break;
 
@@ -1296,7 +1298,7 @@ NvError NvDdkFuseSet(NvDdkFuseDataType Type, void *pData, NvU32 *pSize)
         if (e != NvSuccess) \
         {\
             NvOsDebugPrintf("\r\n Err returned from Fuse Get:0x%x in Set",e); \
-            return e; \
+            goto fail; \
         }\
         /* check consistency between existing and desired fuse values. */ \
         /* fuses cannot be unburned, so desired value cannot specify   */ \
@@ -1308,7 +1310,7 @@ NvError NvDdkFuseSet(NvDdkFuseDataType Type, void *pData, NvU32 *pSize)
                     e = NvError_InvalidState;                     \
                     NvOsDebugPrintf("\n p[%d] = 0x%x, pDataptr[%d] = 0x%x",i, p[i],i,*(NvU32*)pDataPtr); \
                     NvOsDebugPrintf("\r\n Consistency check failure in Fuse Set:0x%x",e); \
-                    return e; \
+                    goto fail; \
             } \
         /* consistency check passed; schedule fuses to be burned */       \
         fusememcpy(&(s_FuseData.name), (void *)pDataPtr, Size);                    \
