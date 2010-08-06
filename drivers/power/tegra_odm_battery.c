@@ -397,6 +397,12 @@ static int tegra_battery_probe(struct platform_device *pdev)
 	batt_dev->charging_source = NvCharger_Type_AC;
 	batt_dev->charging_enabled = NvCharge_Control_Charging_Enable;
 
+	result = NvOdmBatteryDeviceOpen(&(batt_dev->hOdmBattDev), NULL);
+	if (!result) {
+		pr_err("NvOdmBatteryDeviceOpen FAILED\n");
+		goto err;
+	}
+
 	for (i = 0; i < ARRAY_SIZE(tegra_supplies); i++) {
 		rc = power_supply_register(&pdev->dev, &tegra_supplies[i]);
 		if (rc) {
@@ -408,11 +414,7 @@ static int tegra_battery_probe(struct platform_device *pdev)
 		}
 	}
 	printk(KERN_INFO "%s: battery driver registered\n", pdev->name);
-	result = NvOdmBatteryDeviceOpen(&(batt_dev->hOdmBattDev), NULL);
-	if (!result) {
-		pr_err("NvOdmBatteryDeviceOpen FAILED\n");
-		goto err;
-	}
+
 	batt_dev->batt_status_poll_period = NVBATTERY_POLLING_INTERVAL;
 	setup_timer(&(batt_dev->battery_poll_timer), tegra_battery_poll_timer_func, 0);
 	mod_timer(&(batt_dev->battery_poll_timer),
