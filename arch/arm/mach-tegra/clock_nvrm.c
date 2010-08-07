@@ -147,7 +147,9 @@ static int tegra_periph_clk_set_rate(struct clk *c, unsigned long rate)
 		min = c->rate_min;
 		freq = max_t(NvRmFreqKHz, c->rate_min, freq);
 	} else {
-		max = min = freq;
+		/* If no tolerance, and no low limit - let RM find the
+		   best approximation to the target */
+		max = min = NvRmFreqUnspecified;
 	}
 
 	e = NvRmPowerModuleClockConfig(s_hRmGlobal, c->module, clk_pwr_client,
@@ -183,9 +185,9 @@ static unsigned long tegra_periph_clk_get_rate(struct clk *c)
 static long tegra_periph_clk_round_rate(struct clk *c, unsigned long rate)
 {
 	NvRmFreqKHz max;
-	/* TODO: rm reports an unachievable max rate for host */
+	/* Keep Host on low power PLLP */
 	if (c->module == NvRmModuleID_GraphicsHost)
-		max = 111000;
+		max = NVRM_PLLP_FIXED_FREQ_KHZ / 2;
 	else
 		max = NvRmPowerModuleGetMaxFrequency(s_hRmGlobal, c->module);
 	return min(((unsigned long)max) * 1000, rate);
