@@ -353,7 +353,7 @@ static void tegra_setup_warmboot(bool lp0_ok)
 		 * bootrom into performing a regular boot, but pass a flag to the
 		 * bootloader to bypass the kernel reload and jump to the lp0
 		 * restore sequence */
-		if (tegra_is_ap20_a03())
+		if (tegra_is_ap20_a03() && (!tegra_is_ap20_a03p()))
 			scratch0 |= (1<<5);
 		else
 			scratch0 |= 1;
