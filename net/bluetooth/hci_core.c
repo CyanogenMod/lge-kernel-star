@@ -1164,6 +1164,9 @@ static int hci_send_frame(struct sk_buff *skb)
 	/* Get rid of skb owner, prior to sending to the driver. */
 	skb_orphan(skb);
 
+	/* Notify the registered devices about a new send */
+	hci_notify(hdev, HCI_DEV_WRITE);
+
 	return hdev->send(skb);
 }
 
