@@ -76,8 +76,6 @@ static int tegra_idle_enter_lp3(struct cpuidle_device *dev,
 	local_irq_disable();
 
 	smp_rmb();
-	if (lp2_supported)
-		hrtimer_peek_ahead_timers();
 
 	enter = ktime_get();
 	if (!need_resched()) {
@@ -103,13 +101,14 @@ static int tegra_idle_enter_lp2(struct cpuidle_device *dev,
 {
 	ktime_t enter;
 	s64 request, us, latency, idle_us;
+	struct tick_sched *ts = tick_get_tick_sched(dev->cpu);
 	unsigned int last_sample = (unsigned int)cpuidle_get_statedata(state);
 
 	/* LP2 not possible when running in SMP mode */
 	smp_rmb();
 	idle_us = state->exit_latency + state->target_residency;
 	request = ktime_to_us(tick_nohz_get_sleep_length());
-	if (!lp2_supported || request <= idle_us ||
+	if (!lp2_supported || request <= idle_us || (!ts->tick_stopped) ||
 		system_is_suspending || (!tegra_nvrm_lp2_allowed())) {
 		dev->last_state = &dev->states[0];
 		return tegra_idle_enter_lp3(dev, &dev->states[0]);
@@ -126,6 +125,9 @@ static int tegra_idle_enter_lp2(struct cpuidle_device *dev,
 	state->exit_latency = (12*latency + 4*last_sample) >> 4;
 	state->target_residency = (latency_factor*state->exit_latency) >>
 		LATENCY_FACTOR_SHIFT;
+
+	/* adjust kernel timers */
+	hrtimer_peek_ahead_timers();
 
 	local_irq_enable();
 	return (int)idle_us;
