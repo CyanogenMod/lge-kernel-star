@@ -295,6 +295,62 @@ static void __init do_system_init(bool standard_i2c, bool standard_spi)
 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
 }
 
+#ifdef CONFIG_BT_BLUESLEEP
+static noinline void __init tegra_setup_bluesleep(void)
+{
+	struct platform_device *pdev = NULL;
+	struct resource *res;
+
+	pdev = platform_device_alloc("bluesleep", 0);
+	if (!pdev) {
+		pr_err("unable to allocate platform device for bluesleep");
+		return;
+	}
+
+	res = kzalloc(sizeof(struct resource) * 3, GFP_KERNEL);
+	if (!res) {
+		pr_err("unable to allocate resource for bluesleep\n");
+		goto err_free_dev;
+	}
+
+	res[0].name   = "gpio_host_wake";
+	res[0].start  = TEGRA_GPIO_PU6;
+	res[0].end    = TEGRA_GPIO_PU6;
+	res[0].flags  = IORESOURCE_IO;
+
+	res[1].name   = "gpio_ext_wake";
+	res[1].start  = TEGRA_GPIO_PU1;
+	res[1].end    = TEGRA_GPIO_PU1;
+	res[1].flags  = IORESOURCE_IO;
+
+	res[2].name   = "host_wake";
+	res[2].start  = gpio_to_irq(TEGRA_GPIO_PU6);
+	res[2].end    = gpio_to_irq(TEGRA_GPIO_PU6);
+	res[2].flags  = IORESOURCE_IRQ;
+
+	if (platform_device_add_resources(pdev, res, 3)) {
+		pr_err("unable to add resources to bluesleep device\n");
+		goto err_free_res;
+	}
+
+	if (platform_device_add(pdev)) {
+		pr_err("unable to add bluesleep device\n");
+		goto err_free_res;
+	}
+	return;
+
+err_free_res:
+	kfree(res);
+err_free_dev:
+	platform_device_put(pdev);
+	return;
+}
+#else
+static inline void tegra_setup_bluesleep(void) { }
+#endif
+
+
+
 static void __init tegra_harmony_init(void)
 {
 #ifdef CONFIG_USB_ANDROID
@@ -311,6 +367,7 @@ static void __init tegra_ventana_init(void)
 	do_system_init(false, true);
 	i2c_device_setup();
 	tegra_setup_32khz_clock();
+	tegra_setup_bluesleep();
 }
 
 static void __init tegra_generic_init(void)
