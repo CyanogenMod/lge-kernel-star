@@ -400,8 +400,9 @@ static NvBool kxtf9_Init(NvOdmAccelHandle hDevice)
 #endif
 
 #if MOTION_ONLY_ENABLE
+    // For getting continuous data from accelerometer, set DRDY = 1.
     //set PC1, RES & WUFE to 1.
-    RegVal |= 0XE2; // 0xC2;
+    RegVal |= 0XC2;
 #endif
     if(!WRITE_VERIFY(hDevice, kxtf9_CTRL_REG1, RegVal))
         goto error;
@@ -776,7 +777,17 @@ kxtf9_SetPowerState(
     NvOdmAccelHandle hDevice,
     NvOdmAccelPowerType PowerState)
 {
-    return NV_TRUE;
+    if (PowerState == NvOdmAccelPower_Fullrun)
+    {
+        NVODMACCELEROMETER_PRINTF(("\nkxtf9: Resume"));
+        return SetAccelerometerActive(hDevice, NV_TRUE);
+
+    }
+    else  // any other case, set accelerometer to standby.
+    {
+        NVODMACCELEROMETER_PRINTF(("\nkxtf9: Suspend"));
+        return SetAccelerometerActive(hDevice, NV_FALSE);
+    }
 }
 
 NvBool kxtf9_init(NvOdmAccelHandle* hDevice)

@@ -403,9 +403,27 @@ static NvS32 tegra_acc_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int tegra_acc_suspend(struct platform_device *pAccel, pm_message_t state)
+{
+	if (NvOdmAccelSetPowerState(accel_dev->hOdmAcr, NvOdmAccelPower_Standby))
+		return 0;
+	else
+		return -EIO;
+}
+
+static int tegra_acc_resume(struct platform_device *pAccel)
+{
+	if (NvOdmAccelSetPowerState(accel_dev->hOdmAcr, NvOdmAccelPower_Fullrun))
+		return 0;
+	else
+		return -EIO;
+}
+
 static struct platform_driver tegra_acc_driver = {
 	.probe	= tegra_acc_probe,
 	.remove	= tegra_acc_remove,
+	.suspend	= tegra_acc_suspend,
+	.resume	= tegra_acc_resume,
 	.driver	= {
 		.name = "tegra_accelerometer",
 	},
