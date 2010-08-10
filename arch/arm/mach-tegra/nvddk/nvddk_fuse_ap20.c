@@ -101,7 +101,7 @@ typedef struct NvDdkFuseDataRec
     NvU32  SecBootDeviceSelectRaw;
 
     // Specifies the device configuration value (right aligned).
-    NvU32  SecBootDeviceConfig;
+    NvU16  SecBootDeviceConfig;
 
     // Specifies the SwReserved value.
     NvU32  SwReserved;
@@ -1099,15 +1099,11 @@ NvError NvDdkFuseGet(NvDdkFuseDataType Type, void *pData, NvU32 *pSize)
         case NvDdkFuseDataType_SecBootDeviceConfig:
             RegData = FUSE_NV_READ32(FUSE_BOOT_DEVICE_INFO_0);
             RegData = NV_DRF_VAL(FUSE,
-                            BOOT_DEVICE_INFO,
-                            BOOT_DEVICE_CONFIG,
-                            RegData);
-/*  FixMe: Need to properly fix below code, for matching sysfs read with GfShell.
+                                 BOOT_DEVICE_INFO,
+                                 BOOT_DEVICE_CONFIG,
+                                 RegData);
             *((NvU8 *)pData) = (RegData >> 0x8) & 0xFF;
             *((NvU8 *)pData + 1) = RegData & 0xFF;
-*/
-            *((NvU32 *)pData) = RegData;
-
             break;
 
         case NvDdkFuseDataType_SecBootDeviceSelect:
@@ -1295,11 +1291,17 @@ NvError NvDdkFuseSet(NvDdkFuseDataType Type, void *pData, NvU32 *pSize)
         NvError e = NvSuccess;  \
         /* read existing fuse value */                                    \
         e = NvDdkFuseGet(NvDdkFuseDataType_##name, p, &Size);   \
-        if (e != NvSuccess) \
-        {\
-            NvOsDebugPrintf("\r\n Err returned from Fuse Get:0x%x in Set",e); \
-            goto fail; \
-        }\
+        if (e != NvSuccess)     \
+        {       \
+            NvOsDebugPrintf("\r\n Err returned from Fuse Get:0x%x in Set",e);   \
+            goto fail;  \
+        }       \
+        if (Type == NvDdkFuseDataType_SecBootDeviceConfig)      \
+        {   \
+            Data = *(NvU16 *)p;     \
+            *p = (Data >> 0x8)  & 0xFF;     \
+            *(p + 1) = Data & 0xFF;     \
+        }   \
         /* check consistency between existing and desired fuse values. */ \
         /* fuses cannot be unburned, so desired value cannot specify   */ \
         /* any unburned (0x0) bits where the existing value already    */ \
@@ -1325,6 +1327,7 @@ NvError NvDdkFuseSet(NvDdkFuseDataType Type, void *pData, NvU32 *pSize)
     NvU32 DataSizeArrayLen;
     NvDdkFuseData p_FuseData;
     volatile NvU8* pDataPtr = (volatile NvU8*)pData;
+    NvU16 Data;
     if(!s_pFuseRec)
     {
         // NV_ASSERT(0);
@@ -1390,6 +1393,13 @@ NvError NvDdkFuseSet(NvDdkFuseDataType Type, void *pData, NvU32 *pSize)
         NvOsDebugPrintf("\r\n only reserved odm fuses are allowed to burn \
          in secure mode");
         goto fail;
+    }
+
+    if (Type == NvDdkFuseDataType_SecBootDeviceConfig)
+    {
+        Data = *(NvU16 *)pData;
+        *((NvU8 *)pDataPtr) = (Data >> 0x8) & 0xFF;
+        *((NvU8 *)pDataPtr + 1) = Data & 0xFF;
     }
 
     switch (Type)
