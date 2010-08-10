@@ -971,13 +971,15 @@ static void tegra_enable_ms(struct uart_port *u)
 {
 }
 
-#define UART_CLOCK_ACCURACY 5
+#define UART_BAUD_ACCURACY 5
 
 static void tegra_set_baudrate(struct tegra_uart_port *t, unsigned int baud)
 {
 	unsigned long rate;
 	unsigned int divisor;
 	unsigned char lcr;
+	unsigned int baud_actual;
+	unsigned int baud_delta;
 
 	if (t->baud == baud)
 		return;
@@ -990,6 +992,13 @@ static void tegra_set_baudrate(struct tegra_uart_port *t, unsigned int baud)
 	do_div(divisor, 16);
 	divisor += baud/2;
 	do_div(divisor, baud);
+
+	/* The allowable baudrate error from desired baudrate is 5% */
+	baud_actual = divisor ? rate / (16 * divisor) : 0;
+	baud_delta = abs(baud_actual - baud);
+	if (WARN_ON(baud_delta * 20 > baud)) {
+		dev_err(t->uport.dev, "requested baud %lu, actual %lu\n", baud, baud_actual);
+	}
 
 	lcr = t->lcr_shadow;
 	lcr |= UART_LCR_DLAB;
