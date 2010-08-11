@@ -47,6 +47,7 @@ struct nvhost_channel_userctx {
 	u32 syncpt_incrs;
 	u32 cmdbufs_pending;
 	u32 relocs_pending;
+	u32 null_kickoff;
 	struct nvmap_handle *gather_mem;
 	struct nvhost_op_pair *gathers;
 	int num_gathers;
@@ -206,6 +207,7 @@ static int nvhost_ioctl_channel_flush(
 	u32 syncval;
 	int num_unpin;
 	int err;
+	int nulled_incrs = ctx->null_kickoff ? ctx->syncpt_incrs : 0;
 
 	if (ctx->relocs_pending || ctx->cmdbufs_pending) {
 		reset_submit(ctx);
@@ -285,8 +287,9 @@ static int nvhost_ioctl_channel_flush(
 	ctxsw.syncpt_val += syncval - ctx->syncpt_incrs;
 
 	nvhost_channel_submit(ctx->ch, &ctx->gathers[gather_idx],
-			ctx->num_gathers - gather_idx, &ctxsw, num_intrs,
-			ctx->unpinarray, num_unpin, ctx->syncpt_id, syncval);
+		(ctx->null_kickoff ? 2 : ctx->num_gathers) - gather_idx,
+		&ctxsw, num_intrs, ctx->unpinarray, num_unpin, ctx->syncpt_id,
+		syncval, nulled_incrs);
 
 	/* schedule a submit complete interrupt */
 	nvhost_intr_add_action(&ctx->ch->dev->intr, ctx->syncpt_id, syncval,

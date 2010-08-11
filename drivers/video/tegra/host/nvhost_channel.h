@@ -85,7 +85,8 @@ void nvhost_channel_submit(
 	struct nvmap_handle **unpins,
 	int num_unpins,
 	u32 syncpt_id,
-	u32 syncpt_val);
+	u32 syncpt_val,
+	int num_nulled_incrs);
 
 struct nvhost_channel *nvhost_getchannel(struct nvhost_channel *ch);
 void nvhost_putchannel(struct nvhost_channel *ch, struct nvhost_hwctx *ctx);
