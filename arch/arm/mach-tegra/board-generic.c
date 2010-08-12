@@ -192,6 +192,11 @@ static struct i2c_board_info bus3_i2c_devices[] = {
 		.irq = (INT_GPIO_BASE + TEGRA_GPIO_PN5),
 	},
 #endif
+#ifdef CONFIG_SENSORS_LM90
+	{
+		I2C_BOARD_INFO("nct1008", 0x4C),
+	},
+#endif
 };
 
 void __init i2c_device_setup(void)
