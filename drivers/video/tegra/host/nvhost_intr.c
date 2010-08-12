@@ -182,6 +182,7 @@ static void action_ctxsave(struct nvhost_waitlist *waiter)
 	struct nvhost_channel *channel = hwctx->channel;
 
 	channel->ctxhandler.save_service(hwctx);
+	channel->ctxhandler.put(hwctx);
 }
 
 static void action_wakeup(struct nvhost_waitlist *waiter)

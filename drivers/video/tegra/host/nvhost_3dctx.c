@@ -399,15 +399,21 @@ static void __init setup_save(
 
 /*** ctx3d ***/
 
-static int ctx3d_init(struct nvhost_hwctx *ctx)
+static struct nvhost_hwctx *ctx3d_alloc(struct nvhost_channel *ch)
 {
+	struct nvhost_hwctx *ctx;
+	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
+	if (!ctx)
+		return NULL;
 	ctx->restore = nvmap_alloc(context_restore_size * 4, 32,
 				NVMEM_HANDLE_WRITE_COMBINE,
 				(void**)&ctx->save_cpu_data);
-	if (IS_ERR_OR_NULL(ctx->restore))
-		return PTR_ERR(ctx->restore);
-
+	if (IS_ERR_OR_NULL(ctx->restore)) {
+		kfree(ctx);
+		return NULL;
+	}
 	setup_restore(ctx->save_cpu_data, NVWAITBASE_3D);
+	ctx->channel = ch;
 	ctx->restore_phys = nvmap_pin_single(ctx->restore);
 	ctx->restore_size = context_restore_size;
 	ctx->save = context_save_buf;
@@ -416,12 +422,25 @@ static int ctx3d_init(struct nvhost_hwctx *ctx)
 	ctx->save_incrs = 3;
 	ctx->restore_incrs = 1;
 	ctx->valid = false;
-	return 0;
+	kref_init(&ctx->ref);
+	return ctx;
 }
 
-static void ctx3d_deinit(struct nvhost_hwctx *ctx)
+static void ctx3d_free(struct kref *ref)
 {
+	struct nvhost_hwctx *ctx = container_of(ref, struct nvhost_hwctx, ref);
 	nvmap_free(ctx->restore, ctx->save_cpu_data);
+	kfree(ctx);
+}
+
+static void ctx3d_get(struct nvhost_hwctx *ctx)
+{
+	kref_get(&ctx->ref);
+}
+
+static void ctx3d_put(struct nvhost_hwctx *ctx)
+{
+	kref_put(&ctx->ref, ctx3d_free);
 }
 
 static void ctx3d_save_service(struct nvhost_hwctx *ctx)
@@ -477,8 +496,9 @@ int __init nvhost_3dctx_handler_init(struct nvhost_hwctx_handler *h)
 	context_save_phys = nvmap_pin_single(context_save_buf);
 	setup_save(context_save_ptr, NULL, NULL, NVSYNCPT_3D, NVWAITBASE_3D);
 
-	h->init = ctx3d_init;
-	h->deinit = ctx3d_deinit;
+	h->alloc = ctx3d_alloc;
+	h->get = ctx3d_get;
+	h->put = ctx3d_put;
 	h->save_service = ctx3d_save_service;
 	return 0;
 }

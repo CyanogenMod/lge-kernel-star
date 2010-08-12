@@ -53,7 +53,6 @@ struct nvhost_channel_userctx {
 	int pinarray_size;
 	struct nvmap_pinarray_elem pinarray[NVHOST_MAX_HANDLES];
 	struct nvmap_handle *unpinarray[NVHOST_MAX_HANDLES];
-	/* hw context (if needed) */
 };
 
 struct nvhost_ctrl_userctx {
@@ -67,13 +66,8 @@ static int nvhost_channelrelease(struct inode *inode, struct file *filp)
 	filp->private_data = NULL;
 
 	nvhost_putchannel(priv->ch, priv->hwctx);
-	if (priv->hwctx) {
-		if (priv->hwctx->valid)
-			nvhost_syncpt_wait(&priv->ch->dev->syncpt,
-					priv->hwctx->last_access_id,
-					priv->hwctx->last_access_value);
-		priv->ch->ctxhandler.deinit(priv->hwctx);
-	}
+	if (priv->hwctx)
+		priv->ch->ctxhandler.put(priv->hwctx);
 	if (priv->gather_mem)
 		nvmap_free(priv->gather_mem, priv->gathers);
 	if (priv->nvmapctx)
@@ -86,20 +80,13 @@ static int nvhost_channelopen(struct inode *inode, struct file *filp)
 {
 	struct nvhost_channel_userctx *priv;
 	struct nvhost_channel *ch;
-	size_t hwctx_mem = 0;
-	size_t alloc_size = 0;
 
 	ch = container_of(inode->i_cdev, struct nvhost_channel, cdev);
 	ch = nvhost_getchannel(ch);
 	if (IS_ERR(ch))
 		return PTR_ERR(ch);
 
-	alloc_size += sizeof(*priv);
-	if (ch->ctxhandler.init) {
-		hwctx_mem = alloc_size;
-		alloc_size += sizeof(struct nvhost_hwctx);
-	}
-	priv = kzalloc(alloc_size, GFP_KERNEL);
+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	if (!priv) {
 		nvhost_putchannel(ch, NULL);
 		return -ENOMEM;
@@ -111,13 +98,10 @@ static int nvhost_channelopen(struct inode *inode, struct file *filp)
 		NVMEM_HANDLE_CACHEABLE, (void**)&priv->gathers);
 	if (IS_ERR_OR_NULL(priv->gather_mem))
 		goto fail;
-	if (ch->ctxhandler.init) {
-		priv->hwctx = (struct nvhost_hwctx *)(((u8*)priv) + hwctx_mem);
-		priv->hwctx->channel = ch;
-		if (ch->ctxhandler.init(priv->hwctx) < 0) {
-			priv->hwctx = NULL;
+	if (ch->ctxhandler.alloc) {
+		priv->hwctx = ch->ctxhandler.alloc(ch);
+		if (!priv->hwctx)
 			goto fail;
-		}
 	}
 
 	return 0;
@@ -275,7 +259,10 @@ static int nvhost_ioctl_channel_flush(
 			num_intrs = 1;
 			ctxsw.syncpt_val = hw->save_incrs - 1;
 			ctxsw.intr_data = hw;
+			hw->valid = true;
+			ctx->ch->ctxhandler.get(hw);
 		}
+		ctx->ch->cur_ctx = ctx->hwctx;
 	}
 
 	/* add a setclass for modules that require it */
@@ -305,19 +292,6 @@ static int nvhost_ioctl_channel_flush(
 	nvhost_intr_add_action(&ctx->ch->dev->intr, ctx->syncpt_id, syncval,
 			NVHOST_INTR_ACTION_SUBMIT_COMPLETE, ctx->ch, NULL);
 
-	/* update current context */
-	if (ctx->ch->cur_ctx != ctx->hwctx) {
-		struct nvhost_hwctx *hw = ctx->ch->cur_ctx;
-		if (hw) {
-			hw->last_access_id = ctx->syncpt_id;
-			hw->last_access_value = syncval;
-			hw->valid = true;
-		}
-		hw = ctx->hwctx;
-		hw->last_access_id = ctx->syncpt_id;
-		hw->last_access_value = syncval;
-		ctx->ch->cur_ctx = hw;
-	}
 	mutex_unlock(&ctx->ch->submitlock);
 	args->value = syncval;
 	return 0;

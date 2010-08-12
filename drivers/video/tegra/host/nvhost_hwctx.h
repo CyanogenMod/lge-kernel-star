@@ -26,13 +26,14 @@
 #include <linux/string.h>
 #include <linux/nvhost.h>
 #include <linux/nvmap.h>
+#include <linux/kref.h>
 
 struct nvhost_channel;
 
 struct nvhost_hwctx {
+	struct kref ref;
+
 	struct nvhost_channel *channel;
-	u32 last_access_id;
-	u32 last_access_value;
 	bool valid;
 
 	struct nvmap_handle *save;
@@ -48,8 +49,9 @@ struct nvhost_hwctx {
 };
 
 struct nvhost_hwctx_handler {
-	int (*init) (struct nvhost_hwctx *ctx);
-	void (*deinit) (struct nvhost_hwctx *ctx);
+	struct nvhost_hwctx * (*alloc) (struct nvhost_channel *ch);
+	void (*get) (struct nvhost_hwctx *ctx);
+	void (*put) (struct nvhost_hwctx *ctx);
 	void (*save_service) (struct nvhost_hwctx *ctx);
 };
 

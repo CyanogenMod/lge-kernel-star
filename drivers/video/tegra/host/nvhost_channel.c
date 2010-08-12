@@ -74,8 +74,8 @@ static const struct nvhost_channeldesc channelmap[] = {
 	/* channel 4 */
 	.name	       = "vi",
 	.syncpts       = BIT(NVSYNCPT_VI_ISP_0) | BIT(NVSYNCPT_VI_ISP_1) |
-		         BIT(NVSYNCPT_VI_ISP_2) | BIT(NVSYNCPT_VI_ISP_3) |
-		         BIT(NVSYNCPT_VI_ISP_4) | BIT(NVSYNCPT_VI_ISP_5),
+			 BIT(NVSYNCPT_VI_ISP_2) | BIT(NVSYNCPT_VI_ISP_3) |
+			 BIT(NVSYNCPT_VI_ISP_4) | BIT(NVSYNCPT_VI_ISP_5),
 	.modulemutexes = BIT(NVMODMUTEX_VI),
 	.exclusive     = true,
 },
@@ -228,11 +228,10 @@ static void power_3d(struct nvhost_module *mod, enum nvhost_power_action action)
 			save.op2 = ch->cur_ctx->save_phys;
 			ctxsw.intr_data = ch->cur_ctx;
 			ctxsw.syncpt_val = syncval - 1;
-			nvhost_channel_submit(ch, &save, 1, &ctxsw, 1, NULL, 0, NVSYNCPT_3D, syncval);
-			ch->cur_ctx->last_access_id = NVSYNCPT_3D;
-			ch->cur_ctx->last_access_value = syncval;
 			ch->cur_ctx->valid = true;
+			ch->ctxhandler.get(ch->cur_ctx);
 			ch->cur_ctx = NULL;
+			nvhost_channel_submit(ch, &save, 1, &ctxsw, 1, NULL, 0, NVSYNCPT_3D, syncval);
 			nvhost_intr_add_action(&ch->dev->intr, NVSYNCPT_3D, syncval,
 					NVHOST_INTR_ACTION_WAKEUP, &wq, NULL);
 			wait_event(wq, nvhost_syncpt_min_cmp(&ch->dev->syncpt, NVSYNCPT_3D, syncval));
