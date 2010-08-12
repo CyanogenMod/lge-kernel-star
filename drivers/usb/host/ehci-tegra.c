@@ -35,7 +35,6 @@
 #include "nvrm_power.h"
 #include "nvrm_hardware_access.h"
 #include "nvddk_usbphy.h"
-#include "../core/usb.h"
 
 #define TEGRA_USB_ID_INT_ENABLE			(1 << 0)
 #define TEGRA_USB_ID_INT_STATUS			(1 << 1)
@@ -249,11 +248,9 @@ static void tegra_ehci_irq_work(struct work_struct* irq_work)
 		}
 	}
 
-	if (kick_rhub && hcd->rh_registered) {
-		hcd->poll_rh = 0;
-		usb_set_device_state (hcd->self.root_hub, USB_STATE_ADDRESS);
-		hcd->state = HC_STATE_RUNNING;
-		usb_kick_khubd (hcd->self.root_hub);
+	if (kick_rhub) {
+		hcd->state = HC_STATE_SUSPENDED;
+		usb_hcd_resume_root_hub(hcd);
 	}
 }
 
@@ -364,6 +361,9 @@ static int tegra_ehci_bus_suspend(struct usb_hcd *hcd)
 		if (ehci->transceiver->state != OTG_STATE_A_HOST) {
 			/* we are not in host mode, return */
 			return 0;
+		} else {
+			ehci->transceiver->state = OTG_STATE_A_SUSPEND;
+			ehci->host_reinited = 0;
 		}
 	}
 #endif
