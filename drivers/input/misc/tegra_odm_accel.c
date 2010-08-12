@@ -103,47 +103,8 @@ NvBool open_def_odm_accl(void)
 	err = NvOdmAccelOpen(&(accel_dev->hOdmAcr));
 	if (!err) {
 		pr_err("open_def_odm_accl: NvOdmAccelOpen failed\n");
-		return err;
 	}
 
-	err = NvOdmAccelSetIntForceThreshold(accel_dev->hOdmAcr,
-		 NvOdmAccelInt_MotionThreshold, 0, 900);
-	if (!err) {
-		pr_err("open_def_odm_accl: Set Motion Thresold failed\n");
-		return err;
-	}
-
-	err = NvOdmAccelSetIntEnable(accel_dev->hOdmAcr,
-		NvOdmAccelInt_MotionThreshold, NvOdmAccelAxis_All, 0, NV_TRUE);
-
-	if (!err) {
-		pr_err("open_def_odm_accl: Enable Motion Thresold failed\n");
-		return err;
-	}
-
-	err = NvOdmAccelSetIntEnable(accel_dev->hOdmAcr,
-		NvOdmAccelInt_TapThreshold, NvOdmAccelAxis_All, 0, NV_TRUE);
-
-	if (!err) {
-		pr_err("open_def_odm_accl: Enable Tap Threshold failed\n");
-		return err;
-	}
-
-	err = NvOdmAccelSetIntForceThreshold(accel_dev->hOdmAcr,
-		NvOdmAccelInt_TapThreshold, 0, 120);
-
-	if (!err) {
-		pr_err("open_def_odm_accl: Set Tap Threshold failed\n");
-		return err;
-	}
-
-	err = NvOdmAccelSetIntTimeThreshold(accel_dev->hOdmAcr,
-		NvOdmAccelInt_TapThreshold, 0, 2);
-
-	if (!err) {
-		pr_err("open_def_odm_accl: SetIntTimeThreshold failed\n");
-		return err;
-	}
 	return err;
 }
 
