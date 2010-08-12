@@ -179,6 +179,7 @@ static const struct i2c_device_id lm90_id[] = {
 	{ "max6659", max6657 },
 	{ "max6680", max6680 },
 	{ "max6681", max6680 },
+	{ "nct1008", adt7461 },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, lm90_id);
