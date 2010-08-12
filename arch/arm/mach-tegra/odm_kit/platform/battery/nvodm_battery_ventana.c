@@ -73,6 +73,7 @@ NvBool NvOdmBatteryDeviceOpen(NvOdmBatteryDeviceHandle *hDevice,
     NvOdmBatteryDevice *pBattContext = NULL;
     NvU32 i;
     NvError NvStatus = NvError_Success;
+    NvU32 PinState;
 
     pBattContext = NvOdmOsAlloc(sizeof(NvOdmBatteryDevice));
     if (!pBattContext)
@@ -113,6 +114,8 @@ NvBool NvOdmBatteryDeviceOpen(NvOdmBatteryDeviceHandle *hDevice,
                 goto Cleanup;
             }
             NvRmGpioConfigPins(pBattContext->hGpio, &pBattContext->hPin, 1, NvRmGpioPinMode_Output);
+            PinState = NvRmGpioPinState_Low;
+            NvRmGpioWritePins(pBattContext->hGpio, &pBattContext->hPin, &PinState,1);
         }
     }
     *hDevice = pBattContext;
