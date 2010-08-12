@@ -159,6 +159,9 @@ static int lm90_probe(struct i2c_client *client,
 static void lm90_init_client(struct i2c_client *client);
 static int lm90_remove(struct i2c_client *client);
 static struct lm90_data *lm90_update_device(struct device *dev);
+static int lm90_suspend(struct i2c_client *client, pm_message_t mesg);
+static int lm90_resume(struct i2c_client *client);
+
 
 /*
  * Driver data (common to all clients)
@@ -191,6 +194,8 @@ static struct i2c_driver lm90_driver = {
 	},
 	.probe		= lm90_probe,
 	.remove		= lm90_remove,
+	.resume         = lm90_resume,
+	.suspend        = lm90_suspend,
 	.id_table	= lm90_id,
 	.detect		= lm90_detect,
 	.address_data	= &addr_data,
@@ -220,6 +225,7 @@ struct lm90_data {
 			   4: local input */
 	u8 temp_hyst;
 	u8 alarms; /* bitvector */
+	u8 config;
 };
 
 /*
@@ -905,6 +911,7 @@ static void lm90_init_client(struct i2c_client *client)
 	config &= 0xBF;	/* run */
 	if (config != config_orig) /* Only write if changed */
 		i2c_smbus_write_byte_data(client, LM90_REG_W_CONFIG1, config);
+	data->config = config;
 }
 
 static int lm90_remove(struct i2c_client *client)
@@ -919,6 +926,23 @@ static int lm90_remove(struct i2c_client *client)
 				   &sensor_dev_attr_temp2_offset.dev_attr);
 
 	kfree(data);
+	return 0;
+}
+
+static int lm90_suspend(struct i2c_client *client, pm_message_t mesg)
+{
+	struct lm90_data *data = i2c_get_clientdata(client);
+	/* Configure to suspend if it is adt7461 type device */
+	if (data->kind == adt7461)
+		i2c_smbus_write_byte_data(client, LM90_REG_W_CONFIG1, 40);
+	return 0;
+}
+
+static int lm90_resume(struct i2c_client *client)
+{
+	struct lm90_data *data = i2c_get_clientdata(client);
+	if (data->kind == adt7461)
+		i2c_smbus_write_byte_data(client, LM90_REG_W_CONFIG1, data->config);
 	return 0;
 }
 
