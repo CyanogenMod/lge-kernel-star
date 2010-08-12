@@ -52,6 +52,8 @@
 typedef struct NvOdmUsbUlpiRec
 {
      NvU64    CurrentGUID;
+     NvOdmServicesGpioHandle hGpio;
+     NvOdmGpioPinHandle hResetPin;
 } NvOdmUsbUlpi;
 
 NvOdmUsbUlpiHandle NvOdmUsbUlpiOpen(NvU32 Instance)
@@ -60,8 +62,6 @@ NvOdmUsbUlpiHandle NvOdmUsbUlpiOpen(NvU32 Instance)
     NvU32 ClockInstances[MAX_CLOCKS];
     NvU32 ClockFrequencies[MAX_CLOCKS];
     NvU32 NumClocks;
-    NvOdmServicesGpioHandle hGpio;
-    NvOdmGpioPinHandle hResetPin;
     NvU32 Port = NVODM_PORT('v');
     NvU32 Pin = 1;
 
@@ -77,15 +77,15 @@ NvOdmUsbUlpiHandle NvOdmUsbUlpiOpen(NvU32 Instance)
     }
     NvOdmOsSleepMS(10);
     // Pull high on RESETB ( 22nd pin of smsc3315)
-    hGpio = NvOdmGpioOpen();
-    hResetPin = NvOdmGpioAcquirePinHandle(hGpio, Port, Pin);
+    pDevice->hGpio = NvOdmGpioOpen();
+    pDevice->hResetPin = NvOdmGpioAcquirePinHandle(pDevice->hGpio, Port, Pin);
     // config as out put pin
-    NvOdmGpioConfig(hGpio,hResetPin, NvOdmGpioPinMode_Output);
+    NvOdmGpioConfig(pDevice->hGpio, pDevice->hResetPin, NvOdmGpioPinMode_Output);
     // Set low to write high on ULPI_RESETB pin
-    NvOdmGpioSetState(hGpio, hResetPin, 0x01);
-    NvOdmGpioSetState(hGpio, hResetPin, 0x0);
+    NvOdmGpioSetState(pDevice->hGpio, pDevice->hResetPin, 0x01);
+    NvOdmGpioSetState(pDevice->hGpio, pDevice->hResetPin, 0x0);
     NvOdmOsSleepMS(5);
-    NvOdmGpioSetState(hGpio, hResetPin, 0x01);
+    NvOdmGpioSetState(pDevice->hGpio, pDevice->hResetPin, 0x01);
 
     pDevice->CurrentGUID = SMSC3317GUID;
     return pDevice;
@@ -97,10 +97,20 @@ ExitUlpiOdm:
 
 void NvOdmUsbUlpiClose(NvOdmUsbUlpiHandle hOdmUlpi)
 {
+    if (hOdmUlpi->hResetPin)
+    {
+        NvOdmGpioSetState(hOdmUlpi->hGpio, hOdmUlpi->hResetPin, 0x0);
+        NvOdmGpioReleasePinHandle(hOdmUlpi->hGpio, hOdmUlpi->hResetPin);
+        hOdmUlpi->hResetPin = NULL;
+    }
+    if (hOdmUlpi->hGpio)
+    {
+        NvOdmGpioClose(hOdmUlpi->hGpio);
+        hOdmUlpi->hGpio = NULL;
+    }
     if (hOdmUlpi)
     {
         NvOdmOsFree(hOdmUlpi);
-        hOdmUlpi = NULL;
     }
 }
 
