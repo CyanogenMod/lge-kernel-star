@@ -65,6 +65,7 @@ static NvOdmPeripheralConnectivity s_Peripherals_Default[] =
 #define PROCESSOR_BOARD_ID_I2C_ADDRESS ((0x56)<<1)
 #define PROCESSOR_BOARD_ID_I2C_SEGMENT (0x00)
 
+NvBool IsBoardTango(void);
 // The following are used to store entries read from EEPROMs at runtime.
 static NvOdmPeripheralConnectivity s_Peripherals[NVODM_QUERY_MAX_PERIPHERALS];
 static NvOdmIoAddress s_Peripheral_IoAddresses[NVODM_QUERY_MAX_IO_ADDRESSES];
@@ -621,7 +622,7 @@ NvApGetAllPeripherals (NvU32 *pNum)
     return (const NvOdmPeripheralConnectivity *)s_Peripherals;
 }
 
-static NvBool IsBoardTango(void)
+NvBool IsBoardTango(void)
 {
     NvOdmBoardInfo BoardInfo;
     static NvBool s_IsBoardIdRead = NV_FALSE;

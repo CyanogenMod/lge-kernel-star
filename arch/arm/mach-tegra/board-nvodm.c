@@ -72,7 +72,7 @@
 #include <linux/input.h>
 #endif
 
-
+extern NvBool IsBoardTango(void);
 NvRmGpioHandle s_hGpioGlobal;
 
 struct debug_port_data {
@@ -1594,6 +1594,14 @@ static void __init tegra_setup_suspend(void)
 
 	while (nr_wake--) {
 		unsigned int pad = w->WakeupPadNumber;
+
+#ifdef CONFIG_TEGRA_BATTERY_NVEC
+		// pad 24 (gpio_pv2) on harmony should not be enabled as wake-up event
+		// as battery charging current causes spurious events on this line and
+		// thus causes un-expected wake-up from LP0
+		if ((pad == 24) && !IsBoardTango())
+			continue;
+#endif
 		if (pad < ARRAY_SIZE(wakepad_irq) && w->enable)
 			enable_irq_wake(wakepad_irq[pad]);
 
