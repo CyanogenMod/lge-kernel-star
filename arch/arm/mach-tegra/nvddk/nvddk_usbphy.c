@@ -634,7 +634,6 @@ NvDdkUsbPhyPowerUp(
     NvBool IsDpd)
 {
     NvError e = NvSuccess;
-    NvOdmSocPowerState state = NvRmPowerLowestStateGet();
 
     NV_ASSERT(hUsbPhy);
 
@@ -671,9 +670,7 @@ NvDdkUsbPhyPowerUp(
 
     /* Allow restoring register context for the USB host if it is a ULPI
        interface or if the lowest power state is LP1 */
-    if ((hUsbPhy->pProperty->UsbMode == NvOdmUsbModeType_Host) &&
-        ((state != NvOdmSocPowerState_DeepSleep) ||
-        (hUsbPhy->pProperty->UsbInterfaceType == NvOdmUsbInterfaceType_UlpiExternalPhy)))
+    if (hUsbPhy->pProperty->UsbMode == NvOdmUsbModeType_Host)
     {
         hUsbPhy->RestoreContext(hUsbPhy);
     }
@@ -707,7 +704,6 @@ NvDdkUsbPhyPowerDown(
     NvError e = NvSuccess;
     NvDdkUsbPhyIoctl_VBusStatusOutputArgs VBusStatus;
     NvU32 TimeOut = USB_PHY_HW_TIMEOUT_US;
-    NvOdmSocPowerState state = NvRmPowerLowestStateGet();
 
     NV_ASSERT(hUsbPhy);
 
@@ -720,9 +716,7 @@ NvDdkUsbPhyPowerDown(
 
     /* Allow saving register context for the USB host if it is a ULPI
        interface or if the lowest power state is LP1 */
-    if ((hUsbPhy->pProperty->UsbMode == NvOdmUsbModeType_Host) &&
-        ((state != NvOdmSocPowerState_DeepSleep) ||
-        (hUsbPhy->pProperty->UsbInterfaceType == NvOdmUsbInterfaceType_UlpiExternalPhy)))
+    if (hUsbPhy->pProperty->UsbMode == NvOdmUsbModeType_Host)
     {
         hUsbPhy->SaveContext(hUsbPhy);
     }
