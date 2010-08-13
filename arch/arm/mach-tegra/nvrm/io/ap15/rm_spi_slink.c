@@ -632,6 +632,7 @@ static NvBool HandleTransferCompletion(NvRmSpiHandle hRmSpiSlink)
         CurrPacketSize = NV_MIN(hRmSpiSlink->CurrTransInfo.PacketsPerWord * WordsWritten,
                             hRmSpiSlink->CurrTransInfo.TxPacketsRemaining);
         hHwInt->HwSetDmaTransferSizeFxn(&hRmSpiSlink->HwRegs, CurrPacketSize);
+        hRmSpiSlink->IsIntDoneDue = NV_FALSE;
         hHwInt->HwStartTransferFxn(&hRmSpiSlink->HwRegs,
                                                 NV_FALSE);
         hRmSpiSlink->CurrTransInfo.CurrPacketCount = CurrPacketSize;
@@ -650,6 +651,7 @@ static NvBool HandleTransferCompletion(NvRmSpiHandle hRmSpiSlink)
                                     hRmSpiSlink->CurrTransInfo.PacketsPerWord));
         hRmSpiSlink->CurrTransInfo.CurrPacketCount = CurrPacketSize;
         hHwInt->HwSetDmaTransferSizeFxn(&hRmSpiSlink->HwRegs, CurrPacketSize);
+        hRmSpiSlink->IsIntDoneDue = NV_FALSE;
         hHwInt->HwStartTransferFxn(&hRmSpiSlink->HwRegs, NV_FALSE);
         return NV_FALSE;
     }
@@ -666,16 +668,16 @@ static void SpiSlinkIsr(void *args)
     /* If apb dma is used then postpone the handling in caller context */
     if (hRmSpiSlink->IsUsingApbDma)
     {
-        NvOsSemaphoreSignal(hRmSpiSlink->hSynchSema);
         hRmSpiSlink->IsIntDoneDue = NV_TRUE;
+        NvOsSemaphoreSignal(hRmSpiSlink->hSynchSema);
         return;
     }
 
     /* Handle the transfer completion here only for non dma transfer */
     IsTransferCompleted = HandleTransferCompletion(hRmSpiSlink);
+    hRmSpiSlink->IsIntDoneDue = NV_FALSE;
     if (IsTransferCompleted)
         NvOsSemaphoreSignal(hRmSpiSlink->hSynchSema);
-    hRmSpiSlink->IsIntDoneDue = NV_FALSE;
     NvRmInterruptDone(hRmSpiSlink->SpiInterruptHandle);
 }
 
@@ -834,8 +836,10 @@ WaitForTransferCompletion(
         NvRmModuleReset(hRmSpiSlink->hDevice,
                     NVRM_MODULE_ID(hRmSpiSlink->RmModuleId, hRmSpiSlink->InstanceId));
         hRmSpiSlink->CurrentDirection = SerialHwDataFlow_None;
-        if ((!IsPoll) && (hRmSpiSlink->IsIntDoneDue))
+        if ((!IsPoll) && (hRmSpiSlink->IsIntDoneDue)) {
+        	hRmSpiSlink->IsIntDoneDue = NV_FALSE;
                 NvRmInterruptDone(hRmSpiSlink->SpiInterruptHandle);
+        }
 
         return Error;
     }
@@ -908,8 +912,10 @@ WaitForTransferCompletion(
         Error = (hRmSpiSlink->RxTransferStatus)? hRmSpiSlink->RxTransferStatus:
                                     hRmSpiSlink->TxTransferStatus;
     }
-    if ((!IsPoll) && (hRmSpiSlink->IsIntDoneDue))
+    if ((!IsPoll) && (hRmSpiSlink->IsIntDoneDue)) {
+            hRmSpiSlink->IsIntDoneDue = NV_FALSE;
             NvRmInterruptDone(hRmSpiSlink->SpiInterruptHandle);
+    }
     return Error;
 }
 
@@ -1923,6 +1929,7 @@ MasterModeReadWriteCpu(
         
         hRmSpiSlink->hHwInterface->HwSetDmaTransferSizeFxn(&hRmSpiSlink->HwRegs,
                                     hRmSpiSlink->CurrTransInfo.CurrPacketCount);
+        hRmSpiSlink->IsIntDoneDue = NV_FALSE;
         hRmSpiSlink->hHwInterface->HwStartTransferFxn(&hRmSpiSlink->HwRegs, NV_TRUE);
 
         WaitForTransferCompletion(hRmSpiSlink, NV_WAIT_INFINITE, IsPolling);
@@ -2108,6 +2115,7 @@ static NvError MasterModeReadWriteDma(
             }
         }
 
+        hRmSpiSlink->IsIntDoneDue = NV_FALSE;
         if (!Error)
             hRmSpiSlink->hHwInterface->HwStartTransferFxn(&hRmSpiSlink->HwRegs, NV_TRUE);
 
@@ -2211,6 +2219,7 @@ static NvError SlaveModeSpiStartReadWriteCpu(
     hRmSpiSlink->hHwInterface->HwSetDmaTransferSizeFxn(&hRmSpiSlink->HwRegs,
                     hRmSpiSlink->CurrTransInfo.CurrPacketCount);
 
+    hRmSpiSlink->IsIntDoneDue = NV_FALSE;
     hRmSpiSlink->hHwInterface->HwStartTransferFxn(&hRmSpiSlink->HwRegs, NV_TRUE);
 
     return Error;
@@ -2337,6 +2346,7 @@ static NvError SlaveModeSpiStartReadWriteDma(
         }
     }
 
+    hRmSpiSlink->IsIntDoneDue = NV_FALSE;
     if (!Error)
         hRmSpiSlink->hHwInterface->HwStartTransferFxn(&hRmSpiSlink->HwRegs, NV_TRUE);
     return Error;
