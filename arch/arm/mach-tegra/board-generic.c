@@ -210,6 +210,23 @@ void __init i2c_device_setup(void)
 					ARRAY_SIZE(bus3_i2c_devices));
 }
 
+// enable 32Khz clock used by bcm4329 wifi, bluetooth and gps
+static void __init tegra_setup_32khz_clock(void)
+{
+	int RequestedPeriod, ReturnedPeriod;
+	NvOdmServicesPwmHandle hOdmPwm = NULL;
+
+	hOdmPwm = NvOdmPwmOpen();
+	if (!hOdmPwm) {
+		pr_err("%s: failed to open NvOdmPwmOpen\n", __func__);
+		return;
+	}
+	RequestedPeriod = 0;
+	NvOdmPwmConfig(hOdmPwm, NvOdmPwmOutputId_Blink,
+		NvOdmPwmMode_Blink_32KHzClockOutput, 0, &RequestedPeriod, &ReturnedPeriod);
+	NvOdmPwmClose(hOdmPwm);
+}
+
 extern void __init tegra_setup_nvodm(bool standard_i2c, bool standard_spi);
 extern void __init tegra_register_socdev(void);
 
@@ -293,6 +310,7 @@ static void __init tegra_ventana_init(void)
 #endif
 	do_system_init(false, true);
 	i2c_device_setup();
+	tegra_setup_32khz_clock();
 }
 
 static void __init tegra_generic_init(void)
