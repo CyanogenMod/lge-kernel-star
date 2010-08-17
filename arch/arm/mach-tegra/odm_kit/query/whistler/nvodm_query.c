@@ -1391,9 +1391,11 @@ const NvOdmWakeupPadInfo *NvOdmQueryGetWakeupPadTable(NvU32 *pSize)
     {
     case TEGRA_DEVKIT_BCT_CUSTOPT_0_RIL_EMP_RAINBOW:
         s_NvOdmWakeupPadInfo[24].enable = NV_TRUE;
+        s_NvOdmWakeupPadInfo[24].Polarity = NvOdmWakeupPadPolarity_Low;
         break;
     case TEGRA_DEVKIT_BCT_CUSTOPT_0_RIL_IFX:
         s_NvOdmWakeupPadInfo[13].enable = NV_TRUE;
+        s_NvOdmWakeupPadInfo[13].Polarity = NvOdmWakeupPadPolarity_High;
         break;
     default:
         break;
