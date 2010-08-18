@@ -967,9 +967,11 @@ const struct tegra_pingroup_desc* tegra_pinmux_get_pingroups(void) {
 #define PIN_MUX_CTL_REG_NUM    8
 #define PULLUPDOWN_REG_A       0xa0
 #define PULLUPDOWN_REG_NUM     5
+#define PADCTRL_REG            0x868
+#define PADCTRL_REG_NUM        42
 
 static u32 pinmux_reg[TRISTATE_REG_NUM + PIN_MUX_CTL_REG_NUM +
-                     PULLUPDOWN_REG_NUM];
+                     PULLUPDOWN_REG_NUM + PADCTRL_REG_NUM];
 
 static inline unsigned long pg_readl(unsigned long offset)
 {
@@ -994,6 +996,9 @@ void tegra_pinmux_suspend(void)
 
        for (i=0; i<TRISTATE_REG_NUM; i++)
                *ctx++ = pg_readl(TRISTATE_REG_A + i*4);
+
+       for (i=0; i<PADCTRL_REG_NUM; i++)
+               *ctx++ = pg_readl(PADCTRL_REG + i*4);
 }
 
 void tegra_pinmux_resume(void)
@@ -1009,5 +1014,13 @@ void tegra_pinmux_resume(void)
 
        for (i=0; i<TRISTATE_REG_NUM; i++)
                pg_writel(*ctx++, TRISTATE_REG_A + i*4);
+
+       for (i=PADCTRL_REG; i< PADCTRL_REG + 4 * PADCTRL_REG_NUM; i+=4, ctx++) {
+               /* Skip DRAM pads */
+               if (i == 0x8c8 || i == 0x8cc || i == 0x8d0 || i == 0x8d4 ||
+                   i == 0x8d8 || i == 0x8e4 || i == 0x8e8)
+                      continue;
+               pg_writel(*ctx, i);
+       }
 }
 #endif
