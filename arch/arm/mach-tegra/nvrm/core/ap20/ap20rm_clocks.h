@@ -101,7 +101,15 @@ typedef struct NvRmAp20EmcTimingConfigRec
     NvU32 Emc2xDivisor;
     NvU32 Emc2xUndividedIndex;
     NvRmFreqKHz CpuLimitKHz;
+    NvU32 EmcDigDll;
 } NvRmAp20EmcTimingConfig;
+
+// Digital DLL override equation parameters within packed dqsib
+// characterization data
+#define EMC_DIG_DLL_OVERRIDE_0_LOW_KHZ_MULT_RANGE    7:0
+#define EMC_DIG_DLL_OVERRIDE_0_LOW_KHZ_OFFS_RANGE   15:8
+#define EMC_DIG_DLL_OVERRIDE_0_HIGH_KHZ_MULT_RANGE  23:16
+#define EMC_DIG_DLL_OVERRIDE_0_HIGH_KHZ_OFFS_RANGE  31:24
 
 /*****************************************************************************/
 

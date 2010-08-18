@@ -146,6 +146,8 @@ static const NvU32 s_EmcTimingRegAddrRev20[] =
     EMC_CFG_CLKTRIM_2_0,        /* CFG_CLKTRIM_2 */
 };
 
+#define EMC_CFG_DIG_DLL_INDEX (37)
+
 // Sorted list of timing parameters for discrete set of EMC frequencies used
 // by DFS; entry 0 specifies timing parameters for PLLM0 output frequency.
 static NvRmAp20EmcTimingConfig
@@ -318,10 +320,49 @@ static NvRmFreqKHz Ap20CpuToEmcRatio(NvRmFreqKHz Emc2xKHz)
 #endif
 }
 
+static NvU32 Ap20EmcDigDllUpdate(
+    NvRmDeviceHandle hRmDevice,
+    NvRmFreqKHz PllM0KHz,
+    NvRmFreqKHz PllP0KHz,
+    NvRmFreqKHz Emc2xKHz,
+    NvU32 OdmDigDll)
+{
+    NvU32 mult, offset, d;
+    NvU32 dqsib = NvRmPrivGetEmcDqsibOffset(hRmDevice);
+    NV_ASSERT(PllP0KHz < PllM0KHz);
+
+    /* Equation to determine digital dll override value based on dqsib
+     * characterization data:
+     * d = b - (m * (Emc2xMHz - PllP0MHz) / 2 / 100)), if Emc2xMHz > PllP0MHz
+     * d = b if Emc2xMHz <= PllP0Mhz
+     * Dqsib value packs 2 pairs of slope m/offset b settings. One pair ("high
+     * m, b") is applied only when undivided PLLM0 is used as a clock source.
+     * The other ("low m, b") is applied to all other clock sources.
+     */
+    if (Emc2xKHz < PllM0KHz)
+    {
+        mult = NV_DRF_VAL(EMC, DIG_DLL_OVERRIDE, LOW_KHZ_MULT, dqsib);
+        offset = NV_DRF_VAL(EMC, DIG_DLL_OVERRIDE, LOW_KHZ_OFFS, dqsib);
+    }
+    else
+    {
+        mult = NV_DRF_VAL(EMC, DIG_DLL_OVERRIDE, HIGH_KHZ_MULT, dqsib);
+        offset = NV_DRF_VAL(EMC, DIG_DLL_OVERRIDE, HIGH_KHZ_OFFS, dqsib);
+    }
+    if (Emc2xKHz < PllP0KHz)
+        Emc2xKHz = PllP0KHz;
+
+    d = ((Emc2xKHz - PllP0KHz) + 500) / 1000;
+    d = offset - (mult * d + 100) / 200;
+    d = NV_FLD_SET_DRF_NUM(EMC, CFG_DIG_DLL, CFG_DLL_OVERRIDE_VAL,
+                            d, OdmDigDll);
+    return d;
+}
+
 static void Ap20EmcConfigInit(NvRmDeviceHandle hRmDevice)
 {
     NvRmFreqKHz Emc2xKHz, SourceKHz;
-    NvU32 i, j, k, Source, ConfigurationsCount, UndividedIndex;
+    NvU32 i, j, k, Source, ConfigurationsCount, UndividedIndex, dll;
     NvU32 Revision = 0;
     
     NvRmFreqKHz PllM0KHz = NvRmPrivGetClockSourceFreq(NvRmClockSource_PllM0);
@@ -421,6 +462,13 @@ static void Ap20EmcConfigInit(NvRmDeviceHandle hRmDevice)
                          UndividedIndex;
                      s_Ap20EmcConfigSortedTable[i].Emc2xKHz = Emc2xKHz;
 
+                    // Update digital dll settings
+                    dll =  pEmcConfigurations[j].EmcTimingParameters[
+                            EMC_CFG_DIG_DLL_INDEX];
+                    s_Ap20EmcConfigSortedTable[i].EmcDigDll =
+                        Ap20EmcDigDllUpdate(hRmDevice, PllM0KHz, PllP0KHz,
+                                            Emc2xKHz, dll);
+
                      /*
                       * The undivided table entry specifies parameters for
                       * EMC2xKHz = SourceKHz; the EMC divisor field is set to
@@ -492,7 +540,10 @@ Ap20EmcTimingSet(
 
     for (i = 0; i < s_Ap20EmcConfig.EmcTimingRegNum; i++)
     {
-        d = pEmcConfig->pOdmEmcConfig->EmcTimingParameters[i];
+        if (i == EMC_CFG_DIG_DLL_INDEX)
+            d = pEmcConfig->EmcDigDll;
+        else
+            d = pEmcConfig->pOdmEmcConfig->EmcTimingParameters[i];
         a = (((NvU32)(s_pEmcBaseReg)) + s_Ap20EmcConfig.pEmcTimingReg[i]);
         NV_WRITE32(a, d);
     }
