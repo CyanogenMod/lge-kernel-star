@@ -42,8 +42,8 @@
 
 #define NV_ACCELEROMETER_REGISTER_RANGE 8
 // When acc is put in horizontal, the max value from acc.
-#define NV_ADI340_ACCELEROMETER_NORMAL_THRESHOLD 30
-#define NV_ADI340_ACCELEROMETER_TAP_THRESHOLD 40
+#define NV_ADI340_ACCELEROMETER_NORMAL_THRESHOLD 57
+#define NV_ADI340_ACCELEROMETER_TAP_THRESHOLD 7
 #define NV_ADI340_LOW_POWER_SAMPLERATE 3
 #define NV_ADI340_FULL_RUN_SAMPLERATE  100
 #define NV_ADI340_FORCE_FACTOR 1000
@@ -550,9 +550,9 @@ NvOdmAccelOpen(NvOdmAccelHandle* hDevice)
     hAccel->CtrlRegsList[7].RegAddr = XLR_THRESHC; //0x1D
     hAccel->CtrlRegsList[7].RegValue = NV_ADI340_ACCELEROMETER_TAP_THRESHOLD;
     hAccel->CtrlRegsList[8].RegAddr = XLR_DUR; //0x21
-    hAccel->CtrlRegsList[8].RegValue = 0x40;
+    hAccel->CtrlRegsList[8].RegValue = 0x2;
     hAccel->CtrlRegsList[9].RegAddr = XLR_LATENT; //0x22
-    hAccel->CtrlRegsList[9].RegValue = 0xff;
+    hAccel->CtrlRegsList[9].RegValue = 0x0;
     hAccel->CtrlRegsList[10].RegAddr = XLR_INTVL; //0x23
     hAccel->CtrlRegsList[10].RegValue = 0;
     hAccel->CtrlRegsList[11].RegAddr = XLR_INTCONTROL2; //0x14
