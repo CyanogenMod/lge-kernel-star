@@ -133,6 +133,9 @@ struct tegra_uart_port {
 	int			rx_in_progress;
 	struct work_struct	rx_work;
 	struct workqueue_struct	*rx_work_queue;
+	int			last_read_index;
+	int			already_read_bytecount;
+	int			last_transfer_count;
 };
 
 static inline u8 uart_readb(struct tegra_uart_port *t, unsigned long reg)
@@ -161,7 +164,7 @@ static inline void uart_writel(struct tegra_uart_port *t, u32 val,
 
 static void tegra_set_baudrate(struct tegra_uart_port *t, unsigned int baud);
 static void tegra_set_mctrl(struct uart_port *u, unsigned int mctrl);
-static void do_handle_rx_pio(struct tegra_uart_port *t);
+static int do_handle_rx_pio(struct tegra_uart_port *t);
 static void set_rts(struct tegra_uart_port *t, bool active);
 static void set_dtr(struct tegra_uart_port *t, bool active);
 
@@ -260,6 +263,61 @@ static void tegra_start_tx(struct uart_port *u)
 		tegra_start_next_tx(t);
 }
 
+static int copy_dma_buffer_to_tty_buffer(struct tegra_uart_port *t,
+			int new_trans_count)
+{
+	int copied_count;
+	unsigned char *dma_virt_buf = (char *)t->rx_dma_req.virt_addr;
+	struct uart_port *u = &t->uport;
+	int ret_copied;
+
+	if (new_trans_count < t->last_transfer_count) {
+		/* dma buffer roundoff */
+		copied_count = UART_RX_DMA_BUFFER_SIZE - t->last_transfer_count;
+		ret_copied = tty_insert_flip_string(u->state->port.tty,
+					dma_virt_buf + t->last_read_index,
+					copied_count);
+		if (copied_count != ret_copied) {
+			dev_err(u->dev, "dma_to_tty lost data(1): Trying"
+					" %x got %x lost %x\n",
+					copied_count,ret_copied,
+					copied_count - ret_copied);
+		}
+		if (new_trans_count) {
+			copied_count += new_trans_count;
+			ret_copied = tty_insert_flip_string(u->state->port.tty,
+					dma_virt_buf, new_trans_count);
+			if (new_trans_count != ret_copied) {
+				dev_err(u->dev, "dma_to_tty lost data(2):Trying"
+						" %x got %x lost %x\n",
+						copied_count,ret_copied,
+						copied_count - ret_copied);
+			}
+		}
+		t->uport.icount.rx += copied_count;
+		t->last_read_index = new_trans_count;
+		t->last_transfer_count = new_trans_count;
+	} else {
+		copied_count = new_trans_count - t->last_transfer_count;
+		if (copied_count) {
+			ret_copied = tty_insert_flip_string(u->state->port.tty,
+					dma_virt_buf + t->last_read_index,
+					copied_count);
+			if (copied_count != ret_copied) {
+				dev_err(u->dev, "Lost some data last data(3):"
+						" Trying %x got %x lost %x\n",
+					copied_count,ret_copied,
+					copied_count - ret_copied);
+			}
+			t->uport.icount.rx += copied_count;
+			t->last_read_index += copied_count;
+			t->last_transfer_count = new_trans_count;
+		}
+	}
+	dev_dbg(u->dev, "Received %d bytes\n", copied_count);
+	return copied_count;
+}
+
 static int tegra_start_dma_rx(struct tegra_uart_port *t)
 {
 	wmb();
@@ -292,43 +350,78 @@ static void tegra_rx_dma_complete_callback(struct tegra_dma_req *req)
 {
 	struct tegra_uart_port *t = req->dev;
 	struct uart_port *u = &t->uport;
-	struct tty_struct *tty = u->state->port.tty;
+	int dma_read_count = 0;
+	int pio_read_count = 0;
 
 	/* If we are here, DMA is stopped */
-
 	dev_dbg(t->uport.dev, "%s: %d %d\n", __func__, req->bytes_transferred,
 		req->status);
-	if (req->bytes_transferred) {
-		t->uport.icount.rx += req->bytes_transferred;
-		tty_insert_flip_string(tty,
-			((unsigned char *)(req->virt_addr)),
-			req->bytes_transferred);
-	}
 
-	do_handle_rx_pio(t);
+
+	dma_read_count = copy_dma_buffer_to_tty_buffer(t, req->bytes_transferred);
+	pio_read_count = do_handle_rx_pio(t);
 
 	/* Push the read data later in caller place. */
 	if (req->status == -TEGRA_DMA_REQ_ERROR_ABORTED)
 		return;
 
-	spin_unlock(&u->lock);
-	tty_flip_buffer_push(u->state->port.tty);
-	spin_lock(&u->lock);
+	if ((dma_read_count > 0) || pio_read_count) {
+		tty_flip_buffer_push(u->state->port.tty);
+	}
 }
 
 /* Lock already taken */
 static void do_handle_rx_dma(struct tegra_uart_port *t)
 {
+	unsigned char lsr;
+	bool is_dma_stopped = false;
+	int dma_trans_count;
+	int dma_read_count = 0;
+	int pio_read_count = 0;
+	int start_status;
 	struct uart_port *u = &t->uport;
-	if (t->rts_active)
-		set_rts(t, false);
-	udelay(WAITTIME_DMA_BURST_COMPLETE);
-	tegra_dma_dequeue(t->rx_dma);
-	tty_flip_buffer_push(u->state->port.tty);
-	/* enqueue the request again */
-	tegra_start_dma_rx(t);
-	if (t->rts_active)
-		set_rts(t, true);
+
+	lsr = uart_readb(t, UART_LSR);
+	if (lsr & UART_LSR_DR) {
+		/* Data available in fifo */
+		if (t->rts_active)
+			set_rts(t, false);
+		/* Wait for dma to update status on current burst */
+		udelay(WAITTIME_DMA_BURST_COMPLETE);
+
+		is_dma_stopped = true;
+		dma_trans_count = tegra_dma_get_transfer_count(t->rx_dma,
+					&t->rx_dma_req, true);
+		if (dma_trans_count < 0) {
+			return;
+		}
+
+		dma_read_count = copy_dma_buffer_to_tty_buffer(t, dma_trans_count);
+		pio_read_count = do_handle_rx_pio(t);
+		t->last_read_index = 0;
+		t->already_read_bytecount = 0;
+		t->last_transfer_count = 0;
+		start_status = tegra_dma_start_dma(t->rx_dma, &t->rx_dma_req);
+		if (start_status < 0) {
+			return;
+		}
+		/* enable the rts now */
+		if (t->rts_active)
+			set_rts(t, true);
+	} else {
+		is_dma_stopped = false;
+		dma_trans_count = tegra_dma_get_transfer_count(t->rx_dma,
+					&t->rx_dma_req, false);
+		if (dma_trans_count < 0) {
+			return;
+		}
+		dma_read_count = copy_dma_buffer_to_tty_buffer(t, dma_trans_count);
+	}
+
+	if (dma_read_count || pio_read_count) {
+		tty_flip_buffer_push(u->state->port.tty);
+	}
+	return;
 }
 
 static char do_decode_rx_error(struct tegra_uart_port *t, u8 lsr)
@@ -364,7 +457,7 @@ static char do_decode_rx_error(struct tegra_uart_port *t, u8 lsr)
 	return flag;
 }
 
-static void do_handle_rx_pio(struct tegra_uart_port *t)
+static int do_handle_rx_pio(struct tegra_uart_port *t)
 {
 	int count = 0;
 	do {
@@ -387,8 +480,7 @@ static void do_handle_rx_pio(struct tegra_uart_port *t)
 	} while (1);
 
 	dev_dbg(t->uport.dev, "PIO received %d bytes\n", count);
-
-	return;
+	return count;
 }
 static void tegra_rx_dma_workqueue(struct work_struct *w)
 {
@@ -666,6 +758,9 @@ static int tegra_uart_hw_init(struct tegra_uart_port *t)
 	t->fcr_shadow |= UART_FCR_R_TRIG_01;
 	t->fcr_shadow |= TEGRA_UART_TX_TRIG_8B;
 	uart_writeb(t, t->fcr_shadow, UART_FCR);
+	t->last_read_index = 0;
+	t->already_read_bytecount = 0;
+	t->last_transfer_count = 0;
 
 	if (t->use_rx_dma) {
 		/* initialize the UART for a simple default configuration
@@ -750,6 +845,7 @@ static int tegra_uart_init_rx_dma(struct tegra_uart_port *t)
 	t->rx_dma_req.req_sel = dma_req_sel[t->uport.line];
 	t->rx_dma_req.complete = tegra_rx_dma_complete_callback;
 	t->rx_dma_req.threshold = tegra_rx_dma_threshold_callback;
+	t->rx_dma_req.is_repeat_req = true;
 	t->rx_dma_req.dev = t;
 
 	return 0;
@@ -786,6 +882,7 @@ static int tegra_startup(struct uart_port *u)
 		t->tx_dma_req.req_sel = dma_req_sel[t->uport.line];
 		t->tx_dma_req.dev = t;
 		t->tx_dma_req.size = 0;
+		t->tx_dma_req.is_repeat_req = false;
 		t->xmit_dma_addr = dma_map_single(t->uport.dev,
 			t->uport.state->xmit.buf, UART_XMIT_SIZE,
 			DMA_TO_DEVICE);
