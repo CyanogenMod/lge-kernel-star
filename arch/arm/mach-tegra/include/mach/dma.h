@@ -66,6 +66,7 @@ enum tegra_dma_req_error {
 	TEGRA_DMA_REQ_SUCCESS = 0,
 	TEGRA_DMA_REQ_ERROR_ABORTED,
 	TEGRA_DMA_REQ_INFLIGHT,
+	TEGRA_DMA_REQ_STOPPED,
 };
 
 enum tegra_dma_req_buff_status {
@@ -129,6 +130,9 @@ struct tegra_dma_req {
 	/* DMA completion tracking information */
 	int buffer_status;
 
+	/* Repeat same buffer provided on this request*/
+	bool is_repeat_req;
+
 	/* Client specific data */
 	void *dev;
 };
@@ -142,6 +146,11 @@ void tegra_dma_flush(struct tegra_dma_channel *ch);
 
 unsigned int tegra_dma_transferred_req(struct tegra_dma_channel *ch,
 	struct tegra_dma_req *req);
+
+int tegra_dma_get_transfer_count(struct tegra_dma_channel *ch,
+	struct tegra_dma_req *_req, bool is_stop_dma);
+int tegra_dma_start_dma(struct tegra_dma_channel *ch,
+	struct tegra_dma_req *_req);
 
 bool tegra_dma_is_req_inflight(struct tegra_dma_channel *ch,
 	struct tegra_dma_req *req);
