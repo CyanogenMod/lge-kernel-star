@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.32.9
-# Tue Aug 10 12:51:21 2010
+# Fri Aug 20 12:01:33 2010
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -1051,7 +1051,7 @@ CONFIG_HWMON=y
 # CONFIG_SENSORS_LM83 is not set
 # CONFIG_SENSORS_LM85 is not set
 # CONFIG_SENSORS_LM87 is not set
-# CONFIG_SENSORS_LM90 is not set
+CONFIG_SENSORS_LM90=y
 # CONFIG_SENSORS_LM92 is not set
 # CONFIG_SENSORS_LM93 is not set
 # CONFIG_SENSORS_LTC4215 is not set
