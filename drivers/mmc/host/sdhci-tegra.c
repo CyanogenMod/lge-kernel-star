@@ -55,6 +55,7 @@ struct tegra_sdhci {
 	bool			card_present;
 	bool			clk_enable;
 	bool			card_always_on;
+	u32			sdhci_ints;
 };
 
 static inline unsigned long res_size(struct resource *res)
@@ -386,31 +387,24 @@ static int tegra_sdhci_remove(struct platform_device *pdev)
 #if defined(CONFIG_PM)
 #define dev_to_host(_dev) platform_get_drvdata(to_platform_device(_dev))
 
-static void tegra_sdhci_configure_interrupts(struct sdhci_host *sdhost, bool enable)
+static void tegra_sdhci_restore_interrupts(struct sdhci_host *sdhost)
 {
 	u32 ierr;
 	u32 clear = SDHCI_INT_ALL_MASK;
-	u32 set;
+	struct tegra_sdhci *host = sdhci_priv(sdhost);
 
-	if (enable) {
-		/* enable required MMC INTs */
-		set = SDHCI_INT_BUS_POWER | SDHCI_INT_DATA_END_BIT |
-		SDHCI_INT_DATA_CRC | SDHCI_INT_DATA_TIMEOUT | SDHCI_INT_INDEX |
-		SDHCI_INT_END_BIT | SDHCI_INT_CRC | SDHCI_INT_TIMEOUT |
-		SDHCI_INT_DATA_END | SDHCI_INT_RESPONSE;
+	/* enable required interrupts */
+	ierr = sdhci_readl(sdhost, SDHCI_INT_ENABLE);
+	ierr &= ~clear;
+	ierr |= host->sdhci_ints;
+	sdhci_writel(sdhost, ierr, SDHCI_INT_ENABLE);
+	sdhci_writel(sdhost, ierr, SDHCI_SIGNAL_ENABLE);
 
-		ierr = sdhci_readl(sdhost, SDHCI_INT_ENABLE);
-		ierr &= clear;
-		ierr |= set;
-		sdhci_writel(sdhost, ierr, SDHCI_INT_ENABLE);
-		sdhci_writel(sdhost, ierr, SDHCI_SIGNAL_ENABLE);
-	} else {
-		/* disable the interrupts */
-		ierr = sdhci_readl(sdhost, SDHCI_INT_ENABLE);
-		/* Card interrupt masking is done by sdio client driver */
-		ierr &= SDHCI_INT_CARD_INT;
-		sdhci_writel(sdhost, ierr, SDHCI_INT_ENABLE);
-		sdhci_writel(sdhost, ierr, SDHCI_SIGNAL_ENABLE);
+	if ( (host->sdhci_ints & SDHCI_INT_CARD_INT) &&
+		(sdhost->quirks & SDHCI_QUIRK_ENABLE_INTERRUPT_AT_BLOCK_GAP)) {
+		u8 gap_ctrl = sdhci_readb(sdhost, SDHCI_BLOCK_GAP_CONTROL);
+		gap_ctrl |= 0x8;
+		sdhci_writeb(sdhost, gap_ctrl, SDHCI_BLOCK_GAP_CONTROL);
 	}
 }
 
@@ -437,7 +431,7 @@ static int tegra_sdhci_restore(struct sdhci_host *sdhost)
 		mdelay(1);
 	}
 
-	tegra_sdhci_configure_interrupts(sdhost, true);
+	tegra_sdhci_restore_interrupts(sdhost);
 	sdhost->last_clk = 0;
 	return 0;
 }
@@ -449,17 +443,30 @@ static int tegra_sdhci_suspend(struct device *dev)
 	struct pm_message event = { PM_EVENT_SUSPEND };
 	int ret = 0;
 
-	if(host->card_always_on && is_card_sdio(sdhost->mmc->card)) {
+	if (host->card_always_on && is_card_sdio(sdhost->mmc->card)) {
 		struct mmc_ios ios;
 		ios.clock = 0;
 		ios.vdd = 0;
 		ios.power_mode = MMC_POWER_OFF;
 		ios.bus_width = MMC_BUS_WIDTH_1;
 		ios.timing = MMC_TIMING_LEGACY;
-		sdhost->mmc->ops->set_ios(sdhost->mmc, &ios);
 
-		/* Disable the interrupts */
-		tegra_sdhci_configure_interrupts(sdhost, false);
+		/* save interrupt status before suspending */
+		host->sdhci_ints = sdhci_readl(sdhost, SDHCI_INT_ENABLE);
+		sdhost->mmc->ops->set_ios(sdhost->mmc, &ios);
+		/* keep CARD_INT enabled - if used as wakeup source */
+		if (host->sdhci_ints & SDHCI_INT_CARD_INT) {
+			u32 ier = sdhci_readl(host, SDHCI_INT_ENABLE);
+			ier |= SDHCI_INT_CARD_INT;
+			sdhci_writel(host, ier, SDHCI_INT_ENABLE);
+			sdhci_writel(host, ier, SDHCI_SIGNAL_ENABLE);
+
+			if (sdhost->quirks & SDHCI_QUIRK_ENABLE_INTERRUPT_AT_BLOCK_GAP) {
+				u8 gap_ctrl = sdhci_readb(sdhost, SDHCI_BLOCK_GAP_CONTROL);
+				gap_ctrl |= 0x8;
+				sdhci_writeb(sdhost, gap_ctrl, SDHCI_BLOCK_GAP_CONTROL);
+			}
+		}
 
 		return ret;
 	}
@@ -489,7 +496,7 @@ static int tegra_sdhci_resume(struct device *dev)
 	if(host->card_always_on && is_card_sdio(sdhost->mmc->card)) {
 		int ret = 0;
 
-		/* soft reset SD host controller and enable MMC INTs */
+		/* soft reset SD host controller and enable interrupts */
 		ret = tegra_sdhci_restore(sdhost);
 		if (ret) {
 			dev_err(dev, "failed to resume host\n");
