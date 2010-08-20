@@ -47,6 +47,8 @@
 #include <nvrm_power.h>
 #include <nvrm_power_private.h>
 
+#define KTHREAD_IRQ_PRIO (MAX_RT_PRIO>>1)
+
 static NvRmDeviceHandle rm_cpufreq = NULL;
 static struct task_struct *cpufreq_dfsd = NULL;
 static struct clk *clk_cpu = NULL;
@@ -246,7 +248,7 @@ static int tegra_cpufreq_init_once(void)
 		goto clean;
 	}
 
-	sp.sched_priority = DEFAULT_PRIO - 1;
+	sp.sched_priority = KTHREAD_IRQ_PRIO + 1;
 	if (sched_setscheduler_nocheck(cpufreq_dfsd, SCHED_FIFO, &sp) < 0)
 		pr_err("%s: unable to elevate DVFS daemon priority\n",__func__);
 
