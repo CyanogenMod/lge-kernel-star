@@ -1442,10 +1442,16 @@ SetChipSelectSignalLevel(
         if (hRmSpiSlink->IsMasterMode != hRmSpiSlink->HwRegs.IsMasterMode)
             hHwIntf->HwSetFunctionalModeFxn(&hRmSpiSlink->HwRegs, hRmSpiSlink->IsMasterMode);
 
-        if ((hRmSpiSlink->IsMasterMode) && ((IsOnlyUseSWCS) || (!hRmSpiSlink->HwRegs.IsHwChipSelectSupported) ||
-                                          (!pDevInfo->CanUseHwBasedCs)))
+        IsHigh = (pDevInfo->ChipSelectActiveLow)? NV_FALSE: NV_TRUE;
+        if (!hRmSpiSlink->IsMasterMode)
         {
-            IsHigh = (pDevInfo->ChipSelectActiveLow)? NV_FALSE: NV_TRUE;
+                hHwIntf->HwSetSlaveCsIdFxn(&hRmSpiSlink->HwRegs, ChipSelectId, IsHigh);
+                return NvSuccess;
+        }
+
+        if ((IsOnlyUseSWCS) || (!hRmSpiSlink->HwRegs.IsHwChipSelectSupported) ||
+                                          (!pDevInfo->CanUseHwBasedCs))
+        {
             hHwIntf->HwSetChipSelectLevelFxn(&hRmSpiSlink->HwRegs, ChipSelectId, IsHigh);
             hRmSpiSlink->IsChipSelConfigured = NV_TRUE;
             hRmSpiSlink->IsCurrentlySwBasedChipSel = NV_TRUE;
@@ -1458,9 +1464,14 @@ SetChipSelectSignalLevel(
     }
     else
     {
+        IsHigh = (pDevInfo->ChipSelectActiveLow)? NV_TRUE: NV_FALSE;
+        if (!hRmSpiSlink->IsMasterMode)
+        {
+                hHwIntf->HwSetSlaveCsIdFxn(&hRmSpiSlink->HwRegs, ChipSelectId, IsHigh);
+                return NvSuccess;
+        }
         if (IsOnlyUseSWCS || hRmSpiSlink->IsCurrentlySwBasedChipSel)
         {
-            IsHigh = (pDevInfo->ChipSelectActiveLow)? NV_TRUE: NV_FALSE;
             hHwIntf->HwSetChipSelectLevelFxn(&hRmSpiSlink->HwRegs, ChipSelectId, IsHigh);
             if (hRmSpiSlink->HwRegs.IdleSignalMode != hRmSpiSlink->HwRegs.CurrSignalMode)
                 hHwIntf->HwSetSignalModeFxn(&hRmSpiSlink->HwRegs, hRmSpiSlink->HwRegs.IdleSignalMode);

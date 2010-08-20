@@ -364,10 +364,19 @@ SpiHwSetChipSelectLevelBasedOnPacket(
 }
 
 static void
-SlinkHwSetCsSetupHoldTime(
+SpiHwSetCsSetupHoldTime(
     SerialHwRegisters *pSlinkHwRegs,
     NvU32 CsSetupTimeInClocks,
     NvU32 CsHoldTimeInClocks)
+{
+    NV_ASSERT(0);
+}
+
+static void
+SpiHwSetSlaveCsId(
+    SerialHwRegisters *pSlinkHwRegs,
+    NvU32 CsId,
+    NvBool IsHigh)
 {
     NV_ASSERT(0);
 }
@@ -639,7 +648,8 @@ void NvRmPrivSpiSlinkInitSpiInterface(HwInterface *pSpiInterface)
     pSpiInterface->HwSetChipSelectDefaultLevelFxn = SpiHwSetChipSelectDefaultLevelFxn;
     pSpiInterface->HwSetChipSelectLevelFxn = SpiHwSetChipSelectLevel;
     pSpiInterface->HwSetChipSelectLevelBasedOnPacketFxn = SpiHwSetChipSelectLevelBasedOnPacket;
-    pSpiInterface->HwSetCsSetupHoldTime    = SlinkHwSetCsSetupHoldTime;
+    pSpiInterface->HwSetCsSetupHoldTime    = SpiHwSetCsSetupHoldTime;
+    pSpiInterface->HwSetSlaveCsIdFxn    = SpiHwSetSlaveCsId;
     pSpiInterface->HwSetPacketLengthFxn = SpiHwSetPacketLength;
     pSpiInterface->HwSetDmaTransferSizeFxn = SpiHwSetDmaTransferSize;
     pSpiInterface->HwGetTransferdCountFxn = SpiHwGetTransferdCount;

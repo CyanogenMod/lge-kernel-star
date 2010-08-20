@@ -295,6 +295,15 @@ typedef struct
         NvU32 CsHoldTimeInClocks);
 
     /**
+     * Set active CS id for slave.
+     */
+    void
+    (* HwSetSlaveCsIdFxn)(
+        SerialHwRegisters *pHwRegs,
+        NvU32 CsId,
+        NvBool IsHigh);
+
+    /**
      * Set the packet length.
      */
     void

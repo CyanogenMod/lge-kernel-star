@@ -211,6 +211,55 @@ SlinkHwSetDataFlow(
                             pSlinkHwRegs->HwRegs.SlinkRegs.Command2);
 }
 
+/**
+ * Set CS for slave communication.
+ */
+static void
+SlinkHwSetSlaveCsId(
+    SerialHwRegisters *pSlinkHwRegs,
+    NvU32 CsId,
+    NvBool IsHigh)
+{
+    NvU32 CommandReg1 = pSlinkHwRegs->HwRegs.SlinkRegs.Command1;
+    NvU32 CommandReg2 = pSlinkHwRegs->HwRegs.SlinkRegs.Command2;
+
+    // Set the chip select level.
+    if (IsHigh)
+        CommandReg1 = NV_FLD_SET_DRF_DEF(SLINK, COMMAND,  CS_VALUE, LOW, CommandReg1);
+    else
+        CommandReg1 = NV_FLD_SET_DRF_DEF(SLINK, COMMAND,  CS_VALUE, HIGH, CommandReg1);
+
+    switch (CsId)
+    {
+        case 0:
+            CommandReg2 = NV_FLD_SET_DRF_DEF(SLINK, COMMAND2, SS_EN, CS0, CommandReg2);
+            break;
+
+        case 1:
+            CommandReg2 = NV_FLD_SET_DRF_DEF(SLINK, COMMAND2, SS_EN, CS1, CommandReg2);
+            break;
+
+        case 2:
+            CommandReg2 = NV_FLD_SET_DRF_DEF(SLINK, COMMAND2, SS_EN, CS2, CommandReg2);
+            break;
+
+        case 3:
+            CommandReg2 = NV_FLD_SET_DRF_DEF(SLINK, COMMAND2, SS_EN, CS3, CommandReg2);
+            break;
+
+        default:
+            NV_ASSERT(!"Invalid ChipSelectId");
+    }
+    pSlinkHwRegs->HwRegs.SlinkRegs.Command1 = CommandReg1;
+    pSlinkHwRegs->HwRegs.SlinkRegs.Command2 = CommandReg2;
+
+    SLINK_REG_WRITE32(pSlinkHwRegs->pRegsBaseAdd, COMMAND2,
+                            pSlinkHwRegs->HwRegs.SlinkRegs.Command2);
+    SLINK_REG_WRITE32(pSlinkHwRegs->pRegsBaseAdd, COMMAND,
+                            pSlinkHwRegs->HwRegs.SlinkRegs.Command1);
+}
+
+
 
 /**
  * Set the packet length and packed mode.
@@ -459,6 +508,7 @@ void NvRmPrivSpiSlinkInitSlinkInterface(HwInterface *pSlinkInterface)
     pSlinkInterface->HwIsTransmitFifoFull = SlinkHwIsTransmitFifoFull;
     pSlinkInterface->HwSetTransferBitOrderFxn = SlinkHwSetTransferBitOrder;
     pSlinkInterface->HwStartTransferFxn = SlinkHwStartTransfer;
+    pSlinkInterface->HwSetSlaveCsIdFxn = SlinkHwSetSlaveCsId;
     pSlinkInterface->HwSetDataFlowFxn = SlinkHwSetDataFlow;
     pSlinkInterface->HwSetPacketLengthFxn = SlinkHwSetPacketLength;
     pSlinkInterface->HwSetDmaTransferSizeFxn = SlinkHwSetDmaTransferSize;
