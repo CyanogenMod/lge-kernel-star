@@ -3,6 +3,7 @@ obj-y                                   += devices.o
 obj-y                                   += apbio.o
 obj-y                                   += io.o
 obj-y                                   += irq.o
+obj-y					+= syncpt.o
 obj-y                                   += clock.o
 obj-y                                   += timer.o
 obj-y                                   += gpio.o
