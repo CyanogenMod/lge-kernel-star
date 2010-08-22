@@ -455,6 +455,7 @@ void __init tegra_init_clock(void)
 #ifdef CONFIG_PM
 #define CLK_RESET_RST_DEVICES_L		0x04
 #define CLK_RESET_RST_DEVICES_NUM	3
+#define CLK_RESET_PROPAGATION_US	10
 
 #define CLK_RESET_CLK_OUT_ENB_L		0x10
 #define CLK_RESET_CLK_OUT_ENB_H		0x14
@@ -469,6 +470,17 @@ void __init tegra_init_clock(void)
 #define CLK_RESET_OSC_CTRL		0x50
 #define CLK_RESET_OSC_CTRL_MASK		0x3f2	/* drive strength & bypass */
 
+#define CLK_RESET_PLLC_BASE		0x80
+#define CLK_RESET_PLLC_MISC		0x8C
+#define CLK_RESET_PLLA_BASE		0xB0
+#define CLK_RESET_PLLA_MISC		0xBC
+#define CLK_RESET_PLLD_BASE		0xD0
+#define CLK_RESET_PLLD_MISC		0xDC
+#define CLK_RESET_NON_BOOT_PLLS_NUM	3
+#define CLK_RESET_PLL_ENABLE_MASK	(0x1 << 30)
+#define CLK_RESET_PLL_STAB_US		300
+#define CLK_RESET_PLL_STAB_LONG_US	1000
+
 #define CLK_RESET_CLK_SOURCE_I2S1	0x100
 #define CLK_RESET_CLK_SOURCE_EMC	0x19c
 #define CLK_RESET_CLK_SOURCE_OSC	0x1fc
@@ -476,6 +488,7 @@ void __init tegra_init_clock(void)
 	(((CLK_RESET_CLK_SOURCE_OSC - CLK_RESET_CLK_SOURCE_I2S1) / 4) + 1 - 1)
 
 static u32 clk_rst[CLK_RESET_RST_DEVICES_NUM + CLK_RESET_CLK_OUT_ENB_NUM +
+		   (CLK_RESET_NON_BOOT_PLLS_NUM * 2) +
 		   CLK_RESET_CLK_SOURCE_NUM + 3];
 
 void tegra_clk_suspend(void)
@@ -485,6 +498,13 @@ void tegra_clk_suspend(void)
 	u32 *ctx = clk_rst;
 
 	*ctx++ = readl(car + CLK_RESET_OSC_CTRL) & CLK_RESET_OSC_CTRL_MASK;
+
+	*ctx++ = readl(car + CLK_RESET_PLLC_MISC);
+	*ctx++ = readl(car + CLK_RESET_PLLC_BASE);
+	*ctx++ = readl(car + CLK_RESET_PLLA_MISC);
+	*ctx++ = readl(car + CLK_RESET_PLLA_BASE);
+	*ctx++ = readl(car + CLK_RESET_PLLD_MISC);
+	*ctx++ = readl(car + CLK_RESET_PLLD_BASE);
 
 	for (offs=CLK_RESET_CLK_SOURCE_I2S1;
 	     offs<=CLK_RESET_CLK_SOURCE_OSC; offs+=4) {
@@ -519,6 +539,30 @@ void tegra_clk_resume(void)
 	temp = readl(car + CLK_RESET_OSC_CTRL) & ~CLK_RESET_OSC_CTRL_MASK;
 	temp |= *ctx++;
 	writel(temp, car + CLK_RESET_OSC_CTRL);
+	wmb();
+
+	writel(*ctx++, car + CLK_RESET_PLLC_MISC);
+	temp = *ctx & (~CLK_RESET_PLL_ENABLE_MASK);
+	writel(temp, car + CLK_RESET_PLLC_BASE);
+	wmb();
+	writel(*ctx++, car + CLK_RESET_PLLC_BASE);
+
+	writel(*ctx++, car + CLK_RESET_PLLA_MISC);
+	temp = *ctx & (~CLK_RESET_PLL_ENABLE_MASK);
+	writel(temp, car + CLK_RESET_PLLA_BASE);
+	wmb();
+	writel(*ctx++, car + CLK_RESET_PLLA_BASE);
+
+	writel(*ctx++, car + CLK_RESET_PLLD_MISC);
+	temp = *ctx & (~CLK_RESET_PLL_ENABLE_MASK);
+	writel(temp, car + CLK_RESET_PLLD_BASE);
+	wmb();
+	temp = *ctx++;
+	if (temp & CLK_RESET_PLL_ENABLE_MASK) {
+		writel(temp, car + CLK_RESET_PLLD_BASE);
+		udelay(CLK_RESET_PLL_STAB_LONG_US);
+	} else
+		udelay(CLK_RESET_PLL_STAB_US);
 
 	writel(CLK_RESET_CLK_OUT_ENB_L_ALL, car + CLK_RESET_CLK_OUT_ENB_L);
 	writel(CLK_RESET_CLK_OUT_ENB_H_ALL, car + CLK_RESET_CLK_OUT_ENB_H);
@@ -532,6 +576,7 @@ void tegra_clk_resume(void)
 		writel(*ctx++, car + offs);
 	}
 	wmb();
+	udelay(CLK_RESET_PROPAGATION_US);
 
 	offs = CLK_RESET_RST_DEVICES_L;
 	for (i=0; i<CLK_RESET_RST_DEVICES_NUM; i++)
