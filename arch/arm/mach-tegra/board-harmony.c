@@ -281,6 +281,7 @@ static struct platform_device *harmony_devices[] __initdata = {
 	&tegra_das_device,
 	&tegra_pcm_device,
 	&harmony_audio_device,
+	&tegra_pmu_device,
 	&tegra_nand_device,
 	&tegra_udc_device,
 	&pda_power_device,
