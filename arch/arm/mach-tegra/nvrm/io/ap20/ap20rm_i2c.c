@@ -435,10 +435,20 @@ GetPacketHeaders(
 static void StartI2cPacketMode(NvRmI2cControllerHandle hRmI2cCont)
 {
     NvU32 I2cConfig;
+    NvU32 I2cSlaveConfig;
     // PACKET_MODE_TRANSFER_EN field of I2C Controller configuration Register
     I2cConfig = NV_DRF_DEF(I2C, I2C_CNFG, NEW_MASTER_FSM, ENABLE);
     I2cConfig = NV_FLD_SET_DRF_DEF(I2C, I2C_CNFG, PACKET_MODE_EN, GO, I2cConfig);
     I2C_REGW(hRmI2cCont, I2C_CNFG, I2cConfig);
+
+    // Configuring the new slave to avoid any instability when doing
+    // master communciation.
+    if (hRmI2cCont->ModuleId == NvRmModuleID_I2c)
+    {
+        I2cSlaveConfig = I2C2_REGR(hRmI2cCont, I2C_SL_CNFG);
+        I2cSlaveConfig = NV_FLD_SET_DRF_DEF(I2C, I2C_SL_CNFG, NEWSL, ENABLE, I2cSlaveConfig);
+        I2C2_REGW(hRmI2cCont, I2C_SL_CNFG, I2cSlaveConfig);
+    }
 }
 
 static void 
