@@ -873,9 +873,12 @@ Tps6586xSetExternalSupply(
             if (!Tps6586xI2cWrite8(hDevice, TPS6586x_R5D_GPIOSET1, data))
                 return NV_FALSE;
 
-            if (Enable)
+            /* To enable the external power rail, it is require to make
+               the gpio output low. And to disable the external power
+               rail, it is require to make the gpio output high. */
+            if (!Enable)
             {
-                // Enable output
+                // Make gpio output to High for disabling external supply.
                 if (!Tps6586xI2cRead8(hDevice, TPS6586x_R5E_GPIOSET2, &data))
                     return NV_FALSE;
 
@@ -886,7 +889,7 @@ Tps6586xSetExternalSupply(
             }
             else
             {
-                // Disable output
+                // Make gpio output to Low for enable external supply.
                 if (!Tps6586xI2cRead8(hDevice, TPS6586x_R5E_GPIOSET2, &data))
                     return NV_FALSE;
 
@@ -1485,6 +1488,12 @@ NvBool Tps6586xSetup(NvOdmPmuDeviceHandle hDevice)
     {
         pmuStatus.batFull = NV_FALSE;
     }
+
+    // By default some of external rails are ON, making them OFF.
+    hPmu->supplyRefCntTable[Ext_TPS74201PmuSupply_LDO] = 1;
+    if (NV_FALSE == Tps6586xWriteVoltageReg(hDevice, Ext_TPS74201PmuSupply_LDO,
+						ODM_VOLTAGE_OFF, NULL))
+         NVODMPMU_PRINTF(("TPS: Fail to set Ext_TPS74201PmuSupply_LDO OFF\n"));
 
     return NV_TRUE;
 
