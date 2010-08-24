@@ -8,5 +8,5 @@ ccflags-y += -DNV_DEBUG=0
 endif
 
 obj-$(CONFIG_TEGRA_ODM_HARMONY)		+= nvodm_battery.o
-obj-$(CONFIG_TEGRA_ODM_WHISTLER)	+= nvodm_battery_whistler.o
+obj-$(CONFIG_TEGRA_ODM_WHISTLER)		+= nvodm_battery_stub.o
 obj-$(CONFIG_TEGRA_ODM_VENTANA)		+= nvodm_battery_ventana.o

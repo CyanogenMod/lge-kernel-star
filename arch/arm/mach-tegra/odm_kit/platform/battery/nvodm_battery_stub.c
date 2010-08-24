@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009 NVIDIA Corporation.
+ * Copyright (c) 2009-2010 NVIDIA Corporation.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -61,7 +61,7 @@ NvBool NvOdmBatteryDeviceOpen(NvOdmBatteryDeviceHandle *hDevice,
                               NvOdmOsSemaphoreHandle *hOdmSemaphore)
 {
     *hDevice = NULL;
-    return NV_FALSE;
+    return NV_TRUE;
 }
 
 void NvOdmBatteryDeviceClose(NvOdmBatteryDeviceHandle hDevice)
@@ -82,7 +82,7 @@ NvBool NvOdmBatteryGetAcLineStatus(
        NvOdmBatteryAcLineStatus *pStatus)
 {
     *pStatus = NvOdmBatteryAcLine_Offline;
-    return NV_FALSE;
+    return NV_TRUE;
 }
 
 
@@ -102,7 +102,7 @@ NvBool NvOdmBatteryGetBatteryStatus(
        NvU8 *pStatus)
 {
     *pStatus = NVODM_BATTERY_STATUS_UNKNOWN;
-    return NV_FALSE;
+    return NV_TRUE;
 }
 
 /**
@@ -132,7 +132,7 @@ NvBool NvOdmBatteryGetBatteryData(
     BatteryData.BatteryVoltage         = NVODM_BATTERY_DATA_UNKNOWN;
 
     *pData = BatteryData;
-    return NV_FALSE;
+    return NV_TRUE;
 }
 
 /**
