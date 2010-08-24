@@ -947,8 +947,7 @@ static void BoostFrequency(NvRmSpiHandle hRmSpiSlink, NvBool IsBoost, NvU32 Tran
     {
         if (TransactionSize > hRmSpiSlink->HwRegs.MaxWordTransfer)
         {
-            if (!((hRmSpiSlink->IsPmuInterface) &&
-                   (hRmSpiSlink->PmuChipSelectId == hRmSpiSlink->CurrTransferChipSelId)))
+            if (!(hRmSpiSlink->IsPmuInterface))
             {
                 hRmSpiSlink->BusyHints[0].BoostKHz = 150000; // Emc
                 hRmSpiSlink->BusyHints[0].BoostDurationMs
@@ -973,8 +972,7 @@ static void BoostFrequency(NvRmSpiHandle hRmSpiSlink, NvBool IsBoost, NvU32 Tran
     {
         if (hRmSpiSlink->IsFreqBoosted)
         {
-            if (!((hRmSpiSlink->IsPmuInterface) &&
-                   (hRmSpiSlink->PmuChipSelectId == hRmSpiSlink->CurrTransferChipSelId)))
+            if (!(hRmSpiSlink->IsPmuInterface))
             {
                 hRmSpiSlink->BusyHints[0].BoostKHz = 0; // Emc
                 hRmSpiSlink->BusyHints[1].BoostKHz = 0; // Ahb

@@ -146,7 +146,7 @@ extern "C"
  */
 #define NVRM_DFS_PARAM_APB_AP20 \
     NVRM_AP20_APB_MAX_KHZ, /* AP20 APB limit is lower than other buses */ \
-    24000,  /* Minimum domain frequency 24 MHz */ \
+    36000,  /* Minimum domain frequency 36 MHz */ \
     1000,   /* Frequency change upper band 1 MHz */ \
     1000,   /* Frequency change lower band 1 MHz */ \
     {          /* RT starvation control parameters */ \
