@@ -1427,8 +1427,8 @@ SetChipSelectSignalLevel(
             PrefClockFreqInKHz = (hRmSpiSlink->RmModuleId == NvRmModuleID_Slink)?
                                 (ClockSpeedInKHz << 2): (ClockSpeedInKHz);
             Error = NvRmPowerModuleClockConfig(hRmSpiSlink->hDevice,
-                                          ModuleId, 0, PrefClockFreqInKHz,
-                                          NvRmFreqUnspecified, &PrefClockFreqInKHz,
+                                          ModuleId, 0, NvRmFreqUnspecified,
+                                          PrefClockFreqInKHz, &PrefClockFreqInKHz,
                                           1, &ConfiguredClockFreqInKHz, 0);
             if (Error)
                 return Error;
