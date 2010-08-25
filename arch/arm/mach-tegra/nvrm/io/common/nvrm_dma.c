@@ -176,8 +176,8 @@ NvError NvRmDmaAllocate(NvRmDeviceHandle rm, NvRmDmaHandle *rm_dma,
 		mode = TEGRA_DMA_MODE_ONESHOT;
 
 	dma->ch = tegra_dma_allocate_channel(mode);
-	if (!dma->ch) {
-		e = NvError_Busy;
+	if (IS_ERR_OR_NULL(dma->ch)) {
+		e = NvError_DmaChannelNotAvailable;
 		goto fail;
 	}
 	INIT_LIST_HEAD(&dma->req_list);
@@ -188,7 +188,7 @@ NvError NvRmDmaAllocate(NvRmDeviceHandle rm, NvRmDmaHandle *rm_dma,
 	return NvSuccess;
 fail:
 	if (dma) {
-		if (dma->ch)
+		if (!IS_ERR_OR_NULL(dma->ch))
 			tegra_dma_free_channel(dma->ch);
 		kfree(dma);
 	}
@@ -277,6 +277,7 @@ NvError NvRmDmaStartDmaTransfer(NvRmDmaHandle dma, NvRmDmaClientBuffer *b,
 		action->req.source_wrap = dst_wrap;
 	}
 
+	action->dma_sem = NULL;
 	if (timeout) {
 		action->dma_done = &dma_done;
 		action->req.complete = dma_complete_sync;
@@ -342,6 +343,10 @@ void NvRmDmaAbort(NvRmDmaHandle dma)
 		req = &action->req;
 		spin_unlock(&dma->lock);
 		tegra_dma_dequeue_req(dma->ch, req);
+		if (action->dma_sem)
+			NvOsSemaphoreDestroy(action->dma_sem);
+		list_del(&action->node);
+		kfree(action);
 		spin_lock(&dma->lock);
 	}
 	spin_unlock(&dma->lock);
