@@ -793,7 +793,8 @@ ReportRmPowerState(NvRmDeviceHandle hRmDeviceHandle)
     switch (OldRmState)
     {
         case NvRmPowerState_LP0:
-            NvOsDebugPrintf("*** Wakeup from LP0 ***\n");
+            NvOsDebugPrintf("*** Wakeup from LP0 *** wake-source: 0x%x\n",
+                    NV_REGR(hRmDeviceHandle, NvRmModuleID_Pmif, 0, 0x14));
             PowerEventNotify(hRmDeviceHandle, NvRmPowerEvent_WakeLP0);
             break;
         case NvRmPowerState_LP1:
