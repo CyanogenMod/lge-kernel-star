@@ -102,8 +102,10 @@ static int tegra_periph_clk_enable(struct clk *c)
 
 	/* max out emc when 3d is on */
 	if (NVRM_MODULE_ID_MODULE(c->module) == NvRmModuleID_3D) {
-		NvRmPowerBusyHint(s_hRmGlobal, NvRmDfsClockId_Emc, clk_pwr_client,
-				0xffffffff, NvRmFreqMaximum);
+		NvRmDfsBusyHint hint =
+			{NvRmDfsClockId_Emc, 0xffffffff, NvRmFreqMaximum, true};
+		NvRmPowerBusyHintMulti(s_hRmGlobal, clk_pwr_client, &hint, 1,
+			NvRmDfsBusyHintSyncMode_Async);
 	}
 
 	return 0;
@@ -114,7 +116,9 @@ static void tegra_periph_clk_disable(struct clk *c)
 	NvError e;
 
 	if (NVRM_MODULE_ID_MODULE(c->module) == NvRmModuleID_3D) {
-		NvRmPowerBusyHint(s_hRmGlobal, NvRmDfsClockId_Emc, clk_pwr_client, 0, 0);
+		NvRmDfsBusyHint hint = {NvRmDfsClockId_Emc, 0, 0, true};
+		NvRmPowerBusyHintMulti(s_hRmGlobal, clk_pwr_client, &hint, 1,
+			NvRmDfsBusyHintSyncMode_Async);
 	}
 
 	e = NvRmPowerModuleClockControl(s_hRmGlobal, c->module,
