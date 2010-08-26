@@ -132,6 +132,8 @@ struct tegra_dma_channel {
 
 #define  NV_DMA_MAX_CHANNELS  32
 
+static DEFINE_SPINLOCK(global_dma_lock);
+
 static DECLARE_BITMAP(channel_usage, NV_DMA_MAX_CHANNELS);
 static struct tegra_dma_channel dma_channels[NV_DMA_MAX_CHANNELS];
 
@@ -471,6 +473,9 @@ struct tegra_dma_channel *tegra_dma_allocate_channel(int mode)
 {
 	int channel;
 	struct tegra_dma_channel *ch;
+	unsigned long irq_flags;
+
+	spin_lock_irqsave(&global_dma_lock, irq_flags);
 
 	/* first channel is the shared channel */
 	if (mode & TEGRA_DMA_SHARED) {
@@ -478,10 +483,14 @@ struct tegra_dma_channel *tegra_dma_allocate_channel(int mode)
 	} else {
 		channel = find_first_zero_bit(channel_usage,
 			ARRAY_SIZE(dma_channels));
-		if (channel >= ARRAY_SIZE(dma_channels))
-			return ERR_PTR(ENODEV);
+		if (channel >= ARRAY_SIZE(dma_channels)) {
+			spin_unlock_irqrestore(&global_dma_lock, irq_flags);
+			return ERR_PTR(-ENODEV);
+		}
 	}
 	__set_bit(channel, channel_usage);
+	spin_unlock_irqrestore(&global_dma_lock, irq_flags);
+
 	ch = &dma_channels[channel];
 	ch->mode = mode;
 	return ch;
@@ -490,10 +499,14 @@ EXPORT_SYMBOL(tegra_dma_allocate_channel);
 
 void tegra_dma_free_channel(struct tegra_dma_channel *ch)
 {
+	unsigned long irq_flags;
 	if (ch->mode & TEGRA_DMA_SHARED)
 		return;
 	tegra_dma_cancel(ch);
+	spin_lock_irqsave(&global_dma_lock, irq_flags);
 	__clear_bit(ch->id, channel_usage);
+	spin_unlock_irqrestore(&global_dma_lock, irq_flags);
+
 }
 EXPORT_SYMBOL(tegra_dma_free_channel);
 

@@ -57,7 +57,7 @@
 
 #include "linux/module.h"
 #include "mach/dma.h"
-
+#include "linux/err.h"
 
 // Combined maximum spi/slink controllers
 #define MAX_SPI_SLINK_INSTANCE (MAX_SLINK_CONTROLLERS + MAX_SPI_CONTROLLERS)
@@ -513,10 +513,10 @@ static NvError AllocateDmas(NvRmSpiHandle hRmSpiSlink)
     hRmSpiSlink->hTxDma = NULL;
 
     hRmSpiSlink->hRxDma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT);
-    if (hRmSpiSlink->hRxDma)
+    if (!IS_ERR_OR_NULL(hRmSpiSlink->hRxDma))
     {
         hRmSpiSlink->hTxDma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT);
-        if (!hRmSpiSlink->hTxDma)
+        if (IS_ERR_OR_NULL(hRmSpiSlink->hTxDma))
         {
             tegra_dma_free_channel(hRmSpiSlink->hRxDma);
             hRmSpiSlink->hRxDma = NULL;
