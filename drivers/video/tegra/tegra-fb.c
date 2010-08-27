@@ -186,7 +186,7 @@ int tegra_fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 	info->var.xoffset = var->xoffset;
 	info->var.yoffset = var->yoffset;
 
-	addr = s_fb_addr + (var->yoffset * s_fb_width * s_fb_Bpp) +
+	addr = s_fb_addr + (var->yoffset * tegra_fb_info.fix.line_length ) +
 		(var->xoffset * s_fb_Bpp );
 
 	// window header - select Window A
