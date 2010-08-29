@@ -198,10 +198,15 @@ typedef struct NvRmPllFixedConfigRec
  * This difference in source frequency is will be taken care by Display and
  * HDMI clock dividers.
  */
-#define NVRM_PLLHD_AT_12MHZ { 594000, 12, 594, 0, 0}
+#define NVRM_PLLHD_AT_12MHZ { 594000,  4, 198, 0, 0}
 #define NVRM_PLLHD_AT_13MHZ { 594000, 13, 594, 0, 0}
 #define NVRM_PLLHD_AT_19MHZ { 594000, 16, 495, 0, 0}
-#define NVRM_PLLHD_AT_26MHZ { 594000, 26, 594, 0, 0}
+#define NVRM_PLLHD_AT_26MHZ { 594000, 13, 297, 0, 0}
+
+#define NVRM_PLLHC_AT_12MHZ { 594000, 12, 594, 0, 0}
+#define NVRM_PLLHC_AT_13MHZ { 594000, 13, 594, 0, 0}
+#define NVRM_PLLHC_AT_19MHZ { 594000, 16, 495, 0, 0}
+#define NVRM_PLLHC_AT_26MHZ { 594000, 26, 594, 0, 0}
 
 // Display divider is part of the display module and it is not described
 // in central module clock information table. Hence, need this define.
