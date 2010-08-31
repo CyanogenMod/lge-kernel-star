@@ -50,8 +50,7 @@ static void powerdown_handler(struct work_struct *work)
 	struct nvhost_module *mod;
 	mod = container_of(to_delayed_work(work), struct nvhost_module, powerdown);
 	mutex_lock(&mod->lock);
-	BUG_ON(!mod->powered);
-	if (atomic_read(&mod->refcount) == 0) {
+	if ((atomic_read(&mod->refcount) == 0) && mod->powered){
 		int i;
 		if (mod->func)
 			mod->func(mod, NVHOST_POWER_ACTION_OFF);
