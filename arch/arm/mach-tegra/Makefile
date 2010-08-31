@@ -14,6 +14,7 @@ obj-$(CONFIG_PM_SLEEP)			+= pm-irq.o
 obj-$(CONFIG_PM_SLEEP)			+= sleep.o
 obj-y					+= fuse.o
 obj-y					+= tegra_i2s_audio.o
+obj-$(CONFIG_USB_SUPPORT)               += usb_phy.o
 obj-$(CONFIG_FIQ)                       += fiq.o
 
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clock.o
