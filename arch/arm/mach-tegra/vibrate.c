@@ -64,7 +64,7 @@ static int vibrator_get_time(struct timed_output_dev *dev)
 
 
 static struct timed_output_dev tegra_vibrator = {
-	.name		= "tegra_vibrator",
+	.name		= "vibrator",
 	.get_time	= vibrator_get_time,
 	.enable		= vibrator_enable,
 };

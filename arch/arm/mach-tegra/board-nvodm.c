@@ -1155,13 +1155,6 @@ static struct platform_device tegra_scrollwheel_device = {
 };
 #endif
 
-#ifdef CONFIG_TEGRA_ODM_VIBRATE
-static struct platform_device tegra_vibrator_device = {
-	.name = "tegra_vibrator",
-	.id = -1,
-};
-#endif
-
 static struct platform_device *nvodm_devices[] __initdata = {
 #ifdef CONFIG_RTC_DRV_TEGRA
 	&tegra_rtc_device,
@@ -1186,9 +1179,6 @@ static struct platform_device *nvodm_devices[] __initdata = {
 #endif
 #ifdef CONFIG_INPUT_TEGRA_ODM_ACCEL
 	&tegra_accelerometer_device,
-#endif
-#ifdef CONFIG_TEGRA_ODM_VIBRATE
-	&tegra_vibrator_device,
 #endif
 };
 
