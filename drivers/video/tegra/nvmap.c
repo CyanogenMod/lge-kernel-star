@@ -271,7 +271,7 @@ static int _nvmap_init_carveout(struct nvmap_carveout *co,
 	struct nvmap_mem_block *blocks = NULL;
 	int i;
 
-	num_blocks = min_t(unsigned int, len/1024, 1024);
+	num_blocks = min_t(unsigned int, len/1024, 2048);
 	blocks = vmalloc(sizeof(*blocks)*num_blocks);
 
 	if (!blocks) goto fail;
@@ -338,7 +338,7 @@ static void nvmap_zap_free(struct nvmap_carveout *co, int idx)
 	block->next_free = -1;
 }
 
-static void nvmap_split_block(struct nvmap_carveout *co,
+static int nvmap_split_block(struct nvmap_carveout *co,
 	int idx, size_t start, size_t size)
 {
 	if (BLOCK(co, idx)->base < start) {
@@ -363,12 +363,9 @@ static void nvmap_split_block(struct nvmap_carveout *co,
 				co->blocks[co->free_index].prev_free = spare_idx;
 			co->free_index = spare_idx;
 		} else {
-			if (block->prev != -1) {
-				spare = BLOCK(co, block->prev);
-				spare->size += start - block->base;
-				block->size -= (start - block->base);
-				block->base = start;
-			}
+			/* not being able to split is fatal here, because we need
+			 * to realign block->base */
+			return -ENOMEM;
 		}
 	}
 
@@ -394,6 +391,8 @@ static void nvmap_split_block(struct nvmap_carveout *co,
 	}
 
 	nvmap_zap_free(co, idx);
+
+	return 0;
 }
 
 #define next_spare next
@@ -482,16 +481,19 @@ static int nvmap_carveout_alloc(struct nvmap_carveout *co,
 		r_max = max_t(size_t, rjust - b->base, end - (rjust + size));
 
 		if (b->base + b->size >= ljust + size) {
-			if (l_max >= r_max)
-				nvmap_split_block(co, idx, ljust, size);
-			else
-				nvmap_split_block(co, idx, rjust, size);
-			break;
+			if (l_max >= r_max) {
+				if (!nvmap_split_block(co, idx, ljust, size))
+					break;
+			} else {
+				if (!nvmap_split_block(co, idx, rjust, size))
+					break;
+			}
 		}
 		idx = b->next_free;
 	}
 
 	spin_unlock(&co->lock);
+
 	return idx;
 }
 
@@ -2698,12 +2700,13 @@ static int _nvmap_try_create_preserved(struct nvmap_carveout *co,
 		struct nvmap_mem_block *b = BLOCK(co, idx);
 		unsigned long blk_end = b->base + b->size;
 		if (b->base <= base && blk_end >= end) {
-			nvmap_split_block(co, idx, base, size);
-			h->carveout.block_idx = idx;
-			h->carveout.base = co->blocks[idx].base;
-			h->carveout.co_heap = co;
-			h->alloc = true;
-			break;
+			if (!nvmap_split_block(co, idx, base, size)) {
+				h->carveout.block_idx = idx;
+				h->carveout.base = co->blocks[idx].base;
+				h->carveout.co_heap = co;
+				h->alloc = true;
+				break;
+			}
 		}
 		idx = b->next_free;
 	}
