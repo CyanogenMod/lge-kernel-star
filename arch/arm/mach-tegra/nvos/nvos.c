@@ -176,6 +176,40 @@ static NvOsInterruptBlock *s_pIrqList[NVOS_MAX_SYSTEM_IRQS] = { NULL };
 
 static NvBootArgs s_BootArgs = { {0}, {0}, {0}, {0}, {0}, {0}, {{0}} };
 
+
+NvError NvOsLinuxErrnoToNvError(int err)
+{
+    switch (err)
+    {
+    case EROFS:  return NvError_ReadOnlyAttribute;
+    case ENOENT: return NvError_FileNotFound;
+    case EACCES: return NvError_AccessDenied;
+    case ENOTDIR: return NvError_DirOperationFailed;
+    case EFAULT: return NvError_InvalidAddress;
+    case ENFILE: return NvError_NotSupported;
+    case EMFILE: return NvError_NotSupported;
+    case EIO: return NvError_ResourceError;
+    case EADDRINUSE: return NvError_AlreadyAllocated;
+    case EBADF: return NvError_FileOperationFailed;
+    case EAGAIN: return NvError_Busy;
+    case EADDRNOTAVAIL: return NvError_InvalidAddress;
+    case EFBIG: return NvError_InvalidSize;
+    case EINTR: return NvError_Timeout;
+    case EALREADY: return NvError_AlreadyAllocated;
+    // case ENOTSUP: *e = NvError_NotSupported;
+    case ENOSPC: return NvError_InvalidSize;
+    case EPERM: return NvError_AccessDenied;
+    case ETIME: return NvError_Timeout;
+    case ETIMEDOUT: return NvError_Timeout;
+    case ELOOP: return NvError_InvalidState;
+    case ENXIO: return NvError_ModuleNotPresent;
+    case ENOMEM: return NvError_InsufficientMemory;
+    default:
+        return NvError_BadParameter;
+    }
+}
+
+
 /*  The tasklet "data" parameter is a munging of the s_pIrqList index
  *  (just the IRQ number), and the InterruptBlock's IrqList index, to
  *  make interrupt handler lookups O(n)
@@ -185,7 +219,7 @@ static void NvOsTaskletWrapper(
 {
     NvOsInterruptBlock *pBlock = s_pIrqList[(data&0xffff)];
     if (pBlock)
-        (*pBlock->IrqList[data>>16].pHandler)(pBlock->pArg);    
+        (*pBlock->IrqList[data>>16].pHandler)(pBlock->pArg);
 }
 
 /*  The thread "pdata" parameter is a munging of the s_pIrqList index
@@ -201,7 +235,7 @@ static int NvOsInterruptThreadWrapper(
     if (!pBlock)
     {
         return 0;
-    } 
+    }
     while (!pBlock->Shutdown)
     {
         int t;
@@ -371,7 +405,8 @@ NvError NvOsCopyIn(void *pDst, const void *pSrc, size_t Bytes)
 
     if( access_ok( VERIFY_READ, pSrc, Bytes ) )
     {
-        __copy_from_user(pDst, pSrc, Bytes);
+        if (__copy_from_user(pDst, pSrc, Bytes))
+            return NvError_InvalidSize;
         return NvSuccess;
     }
 
@@ -385,7 +420,8 @@ NvError NvOsCopyOut(void *pDst, const void *pSrc, size_t Bytes)
 
     if( access_ok( VERIFY_WRITE, pDst, Bytes ) )
     {
-        __copy_to_user(pDst, pSrc, Bytes);
+        if (__copy_to_user(pDst, pSrc, Bytes))
+            return NvError_InvalidSize;
         return NvSuccess;
     }
 
@@ -586,7 +622,7 @@ void NvOsSharedMemUnmap(void *ptr, size_t size)
 
 void NvOsSharedMemFree(NvOsSharedMemHandle descriptor)
 {
-}    
+}
 
 NvError NvOsPhysicalMemMap(
     NvOsPhysAddr phys,
@@ -813,6 +849,10 @@ static struct sem_node *sem_handle_search(NvOsSemaphoreHandle h)
 {
     struct rb_node **node = &(h->root.rb_node);
 
+    if (IS_ERR_OR_NULL(h->root.rb_node)) {
+        return NULL;
+    }
+
     down_read(&s_sem);
     while (*node) {
         struct sem_node *data = rb_entry(*node, struct sem_node, node);
@@ -880,6 +920,7 @@ NvError NvOsSemaphoreCreate(
     NvU32 value)
 {
     NvOsSemaphore *s;
+    NvError e;
 
     if (!semaphore)
         return NvError_BadParameter;
@@ -892,16 +933,26 @@ NvError NvOsSemaphoreCreate(
     atomic_set( &s->refcount, 1 );
 
     /* start tracking the handle */
-    sem_handle_insert(s);
-    *semaphore = s;
-
-    return NvSuccess;
+    e = sem_handle_insert(s);
+    if (!e)
+    {
+        *semaphore = s;
+        return NvSuccess;
+    }
+    else
+    {
+        kfree(s);
+        *semaphore = NULL;
+        return NvOsLinuxErrnoToNvError(-e);
+    }
 }
 
 NvError NvOsSemaphoreClone(
     NvOsSemaphoreHandle orig,
     NvOsSemaphoreHandle *semaphore)
 {
+    NvError e;
+
     NV_ASSERT( orig );
     NV_ASSERT( semaphore );
 
@@ -911,12 +962,16 @@ NvError NvOsSemaphoreClone(
     atomic_inc( &orig->refcount );
 
     /* track the handle if we are not already tracking it */
-    if (sem_handle_search(orig) == NULL) {
-        sem_handle_insert(orig);
+    if (sem_handle_search(orig) == NULL) 
+    {
+        if ((e = sem_handle_insert(orig)) != 0)
+        {
+            *semaphore  = NULL;
+            return NvOsLinuxErrnoToNvError(-e);
+        }
     }
 
     *semaphore = orig;
-
     return NvSuccess;
 }
 
@@ -1021,6 +1076,8 @@ void NvOsSemaphoreSignal(NvOsSemaphoreHandle semaphore)
 {
     NV_ASSERT( semaphore );
 
+    BUG_ON( (unsigned long)semaphore < PAGE_SIZE );
+
     if (semaphore) {
         if (!in_interrupt()) {
             if (sem_handle_search(semaphore) != NULL)
@@ -1113,7 +1170,7 @@ static NvError NvOsThreadCreateInternal(
     if (sched_setscheduler_nocheck( t->task, scheduler, &sched ) < 0)
         NvOsDebugPrintf("Failed to set task priority to %d\n",
             sched.sched_priority);
-    
+
     *thread = t;
     wake_up_process( t->task );
     e = NvSuccess;
@@ -1315,7 +1372,7 @@ NvError NvOsInterruptRegisterInternal(
             e = NvError_AlreadyAllocated;
             goto clean_fail;
         }
-        snprintf(pNewBlock->IrqList[i].IrqName, 
+        snprintf(pNewBlock->IrqList[i].IrqName,
             sizeof(pNewBlock->IrqList[i].IrqName),
             "NvOsIrq%s%04d", (IsUser)?"User":"Kern", pIrqList[i]);
 
@@ -1335,15 +1392,15 @@ NvError NvOsInterruptRegisterInternal(
             else
                 pNewBlock->Flags |= NVOS_IRQ_IS_TASKLET;
         }
-    
+
         if ((pNewBlock->Flags & NVOS_IRQ_TYPE_MASK)==NVOS_IRQ_IS_KERNEL_THREAD)
         {
             struct sched_param p;
             p.sched_priority = KTHREAD_IRQ_PRIO;
             sema_init(&(pNewBlock->IrqList[i].sem), 0);
-            pNewBlock->IrqList[i].task = 
+            pNewBlock->IrqList[i].task =
                 kthread_create(NvOsInterruptThreadWrapper,
-                    (void *)((pIrqList[i]&0xffff) | ((i&0xffff)<<16)), 
+                    (void *)((pIrqList[i]&0xffff) | ((i&0xffff)<<16)),
                     pNewBlock->IrqList[i].IrqName);
             if (sched_setscheduler(pNewBlock->IrqList[i].task,
                     SCHED_FIFO, &p)<0)
@@ -1355,7 +1412,7 @@ NvError NvOsInterruptRegisterInternal(
         if ((pNewBlock->Flags & NVOS_IRQ_TYPE_MASK)==NVOS_IRQ_IS_TASKLET)
         {
             tasklet_init(&pNewBlock->IrqList[i].Tasklet, NvOsTaskletWrapper,
-                (pIrqList[i]&0xffff) | ((i&0xffff)<<16)); 
+                (pIrqList[i]&0xffff) | ((i&0xffff)<<16));
         }
 
         /* NvOs specifies that the interrupt handler is responsible for
@@ -1365,7 +1422,7 @@ NvError NvOsInterruptRegisterInternal(
          */
         set_irq_flags(pIrqList[i], IRQF_VALID | IRQF_NOAUTOEN);
 
-        if (request_irq(pIrqList[i], NvOsIrqWrapper, 
+        if (request_irq(pIrqList[i], NvOsIrqWrapper,
                 0, pNewBlock->IrqList[i].IrqName, (void*)i)!=0)
         {
             e = NvError_ResourceError;
@@ -1394,7 +1451,7 @@ NvError NvOsInterruptRegisterInternal(
         }
         if ((pNewBlock->Flags & NVOS_IRQ_TYPE_MASK) == NVOS_IRQ_IS_TASKLET)
         {
-            tasklet_kill(&pNewBlock->IrqList[i].Tasklet); 
+            tasklet_kill(&pNewBlock->IrqList[i].Tasklet);
         }
         free_irq(pIrqList[i], (void*)i);
         set_irq_flags(pIrqList[i], IRQF_VALID);
@@ -1416,7 +1473,7 @@ NvError NvOsInterruptRegister(
     NvBool InterruptEnable)
 {
     return NvOsInterruptRegisterInternal(IrqListSize, pIrqList,
-               (const void*)pIrqHandlerList, context, handle, 
+               (const void*)pIrqHandlerList, context, handle,
                InterruptEnable, NV_FALSE);
 }
 
@@ -1443,7 +1500,7 @@ void NvOsInterruptUnregister(NvOsInterruptHandle handle)
         }
         if ((pBlock->Flags & NVOS_IRQ_TYPE_MASK) == NVOS_IRQ_IS_TASKLET)
         {
-            tasklet_kill(&pBlock->IrqList[i].Tasklet); 
+            tasklet_kill(&pBlock->IrqList[i].Tasklet);
         }
         set_irq_flags(pBlock->IrqList[i].Irq, IRQF_VALID);
     }
@@ -1553,7 +1610,7 @@ NvError NvOsBootArgGet(NvU32 key, void *arg, NvU32 size)
             src = &s_BootArgs.DisplayArgs;
             size_src = sizeof(NvBootArgsDisplay);
             break;
-        case NvBootArgKey_Rm:            
+        case NvBootArgKey_Rm:
             src = &s_BootArgs.RmArgs;
             size_src = sizeof(NvBootArgsRm);
             break;
