@@ -97,6 +97,12 @@ config TEGRA_SYSTEM_DMA
 	  Adds system DMA functionality for NVIDIA Tegra SoCs, used by
 	  several Tegra device drivers
 
+config TEGRA_PWM
+	tristate "Enable PWM driver"
+	select HAVE_PWM
+	help
+	  Enable support for the Tegra PWM controller(s).
+
 config TEGRA_EMC_SCALING_ENABLE
 	bool "Enable scaling the memory frequency"
 
