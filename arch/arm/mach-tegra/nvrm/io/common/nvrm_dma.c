@@ -236,7 +236,7 @@ NvError NvRmDmaStartDmaTransfer(NvRmDmaHandle dma, NvRmDmaClientBuffer *b,
 		return NvError_NotSupported;
 	}
 
-	action = kmalloc(sizeof(*action), GFP_KERNEL);
+	action = kzalloc(sizeof(*action), GFP_KERNEL);
 	if (!action) {
 		pr_debug("%s: insufficient memory\n", __func__);
 		return NvError_InsufficientMemory;
