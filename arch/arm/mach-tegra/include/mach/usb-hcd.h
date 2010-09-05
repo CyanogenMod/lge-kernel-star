@@ -38,7 +38,6 @@ struct tegra_hcd_platform_data {
 	unsigned int		id_detect;
 	int			gpio_nr;
 	bool			otg_mode;
-	bool			fast_wakeup;
 	NvU32			powerClientId;
 	NvU32			vBusPowerRail;
 	/* USB PHY power rail. Tegra has integrated UTMI (USB transciver

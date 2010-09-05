@@ -700,8 +700,6 @@ static void __init tegra_setup_hcd(void)
 		} else if (p->IdPinDetectionType == NvOdmUsbIdPinType_CableId) {
 			plat->id_detect = ID_PIN_CABLE_ID;
 		}
-		plat->fast_wakeup =
-		(p->UsbInterfaceType == NvOdmUsbInterfaceType_UlpiExternalPhy);
 		platform_device_register(&tegra_hcd[i]);
 	}
 }
