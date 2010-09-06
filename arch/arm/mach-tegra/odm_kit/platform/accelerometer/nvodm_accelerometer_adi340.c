@@ -42,7 +42,7 @@
 
 #define NV_ACCELEROMETER_REGISTER_RANGE 8
 // When acc is put in horizontal, the max value from acc.
-#define NV_ADI340_ACCELEROMETER_NORMAL_THRESHOLD 57
+#define NV_ADI340_ACCELEROMETER_NORMAL_THRESHOLD 38
 #define NV_ADI340_ACCELEROMETER_TAP_THRESHOLD 7
 #define NV_ADI340_LOW_POWER_SAMPLERATE 3
 #define NV_ADI340_FULL_RUN_SAMPLERATE  100
@@ -536,7 +536,8 @@ NvOdmAccelOpen(NvOdmAccelHandle* hDevice)
     hAccel->CtrlRegsList[0].RegAddr = XLR_CTL; //0x12
     hAccel->CtrlRegsList[0].RegValue = 0x20;
     hAccel->CtrlRegsList[1].RegAddr = XLR_INTCONTROL; //0x13
-    hAccel->CtrlRegsList[1].RegValue = 0xF3;  // modify so that sw is compatible
+    // Ignore Z-axis interrupt, as it is getting fired continuously.
+    hAccel->CtrlRegsList[1].RegValue = 0xD3;  // modify so that sw is compatible,
     hAccel->CtrlRegsList[2].RegAddr = XLR_INTCONTROL2; //0x14
     hAccel->CtrlRegsList[2].RegValue = 0xe0;
     hAccel->CtrlRegsList[3].RegAddr = XLR_THRESHG; //0x1C
@@ -657,8 +658,8 @@ NvOdmAccelOpen(NvOdmAccelHandle* hDevice)
      *  Write to INTCONTROL register to disable genetration of the interrupts.
      *  Write to INTCONTROL2 to clear the already latched interrupts.
      */
-    NvOdmAccelerometerSetParameter(hAccel, XLR_ATTR_INTCONTROL, 0x0);
-    NvOdmAccelerometerSetParameter(hAccel, XLR_ATTR_INTCONTROL2, 0x1);
+    NvOdmAccelerometerSetParameter(hAccel, XLR_INTCONTROL, 0x0);
+    NvOdmAccelerometerSetParameter(hAccel, XLR_INTCONTROL2, 0x1);
     if(NV_FALSE == NvAccelerometerConnectSemaphore(hAccel))
     {
         goto error;
@@ -880,17 +881,16 @@ NvOdmAccelSetIntEnable(NvOdmAccelHandle  hDevice,
                 }
                 case NvOdmAccelAxis_All:
                 {
+                    // Z-axis interrupt is ignored so do not enable or disable it
                     if(Toggle == NV_TRUE)
                     {
                         uTemp |= XLR_INTCONTROL_COM_SRC_X;
                         uTemp |= XLR_INTCONTROL_COM_SRC_Y;
-                        uTemp |= XLR_INTCONTROL_COM_SRC_Z;
                     }
                     else
                     {
                         uTemp &= XLR_INTCONTROL_COM_SRC_X_MASK;
                         uTemp &= XLR_INTCONTROL_COM_SRC_Y_MASK;
-                        uTemp &= XLR_INTCONTROL_COM_SRC_Z_MASK;
                     }
                     break;
                 }
