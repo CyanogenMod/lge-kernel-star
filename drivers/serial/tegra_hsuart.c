@@ -44,6 +44,7 @@
 #include <mach/dma.h>
 #include <mach/pinmux.h>
 #include <mach/serial.h>
+#include <mach/clk.h>
 #include "nvodm_uart.h"
 #define TX_EMPTY_STATUS (UART_LSR_TEMT | UART_LSR_THRE)
 
@@ -653,7 +654,7 @@ static void tegra_stop_rx(struct uart_port *u)
 		t->rx_in_progress = 0;
 	}
 
-	if (t->rx_dma) {
+	if ((t->use_rx_dma) && !IS_ERR_OR_NULL(t->rx_dma)) {
 		tegra_dma_dequeue(t->rx_dma);
 		tty_flip_buffer_push(u->state->port.tty);
 	}
@@ -676,7 +677,7 @@ static void tegra_uart_hw_deinit(struct tegra_uart_port *t)
 	fcr |= UART_FCR_CLEAR_XMIT | UART_FCR_CLEAR_RCVR;
 	uart_writeb(t, fcr, UART_FCR);
 
-	udelay(2000);
+	udelay(200);
 
 	clk_disable(t->clk);
 	t->baud = 0;
@@ -691,10 +692,13 @@ static void tegra_uart_free_rx_dma(struct tegra_uart_port *t)
 		return;
 
 	tegra_dma_free_channel(t->rx_dma);
+	t->rx_dma = NULL;
 
 	if (likely(t->rx_dma_req.dest_addr))
 		dma_free_coherent(t->uport.dev, t->rx_dma_req.size,
 			t->rx_dma_req.virt_addr, t->rx_dma_req.dest_addr);
+	t->rx_dma_req.dest_addr = 0;
+	t->rx_dma_req.virt_addr = NULL;
 
 	t->use_rx_dma = false;
 }
@@ -716,7 +720,12 @@ static int tegra_uart_hw_init(struct tegra_uart_port *t)
 		tegra_pinmux_config_tristate_table(t->pinmux, t->nr_pins, TEGRA_TRI_NORMAL);
 
 	clk_enable(t->clk);
-	msleep(10);
+
+	/* Reset the UART controller to clear all previous status.*/
+	tegra_periph_reset_assert(t->clk);
+	udelay(100);
+	tegra_periph_reset_deassert(t->clk);
+	udelay(100);
 
 	t->rx_in_progress = 0;
 
@@ -820,11 +829,10 @@ static int tegra_uart_init_rx_dma(struct tegra_uart_port *t)
 	dma_addr_t rx_dma_phys;
 	void *rx_dma_virt;
 
+	memset(&t->rx_dma_req, 0, sizeof(t->rx_dma_req));
 	t->rx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_CONTINUOUS);
 	if (IS_ERR_OR_NULL(t->rx_dma))
 		return -ENODEV;
-
-	memset(&t->rx_dma_req, 0, sizeof(t->rx_dma_req));
 
 	t->rx_dma_req.size = UART_RX_DMA_BUFFER_SIZE;
 	rx_dma_virt = dma_alloc_coherent(t->uport.dev,
@@ -863,29 +871,32 @@ static int tegra_startup(struct uart_port *u)
 	t = container_of(u, struct tegra_uart_port, uport);
 	sprintf(t->port_name, "tegra_uart_%d", u->line);
 
+	memset(&t->tx_dma_req, 0, sizeof(t->tx_dma_req));
 	t->use_tx_dma = false;
 	if (!TX_FORCE_PIO) {
 		t->tx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT);
 		if (!IS_ERR_OR_NULL(t->tx_dma))
 			t->use_tx_dma = true;
-	}
-	if (t->use_tx_dma) {
-		t->tx_dma_req.instance = u->line;
-		t->tx_dma_req.complete = tegra_tx_dma_complete_callback;
-		t->tx_dma_req.to_memory = 0;
+		if (t->use_tx_dma) {
+			t->tx_dma_req.instance = u->line;
+			t->tx_dma_req.complete = tegra_tx_dma_complete_callback;
+			t->tx_dma_req.to_memory = 0;
 
-		t->tx_dma_req.dest_addr = (unsigned long)t->uport.mapbase;
-		t->tx_dma_req.dest_wrap = 4;
-		t->tx_dma_req.source_wrap = 0;
-		t->tx_dma_req.source_bus_width = 32;
-		t->tx_dma_req.dest_bus_width = 8;
-		t->tx_dma_req.req_sel = dma_req_sel[t->uport.line];
-		t->tx_dma_req.dev = t;
-		t->tx_dma_req.size = 0;
-		t->tx_dma_req.is_repeat_req = false;
-		t->xmit_dma_addr = dma_map_single(t->uport.dev,
-			t->uport.state->xmit.buf, UART_XMIT_SIZE,
-			DMA_TO_DEVICE);
+			t->tx_dma_req.dest_addr =
+						(unsigned long)t->uport.mapbase;
+			t->tx_dma_req.dest_wrap = 4;
+			t->tx_dma_req.source_wrap = 0;
+			t->tx_dma_req.source_bus_width = 32;
+			t->tx_dma_req.dest_bus_width = 8;
+			t->tx_dma_req.req_sel = dma_req_sel[t->uport.line];
+			t->tx_dma_req.dev = t;
+			t->tx_dma_req.size = 0;
+			t->tx_dma_req.is_repeat_req = false;
+			t->xmit_dma_addr = dma_map_single(t->uport.dev,
+						t->uport.state->xmit.buf,
+						UART_XMIT_SIZE,
+						DMA_TO_DEVICE);
+		}
 	}
 	t->tx_in_progress = 0;
 
@@ -928,12 +939,18 @@ static void tegra_shutdown(struct uart_port *u)
 	tegra_uart_hw_deinit(t);
 	spin_unlock_irqrestore(&u->lock, flags);
 
-	tegra_uart_free_rx_dma(t);
-	if (t->use_tx_dma)
-		tegra_dma_free_channel(t->tx_dma);
+	t->rx_in_progress = 0;
+	t->tx_in_progress = 0;
 
-	dma_unmap_single(t->uport.dev, t->xmit_dma_addr, UART_XMIT_SIZE,
-		DMA_TO_DEVICE);
+	tegra_uart_free_rx_dma(t);
+	if (t->use_tx_dma) {
+		tegra_dma_free_channel(t->tx_dma);
+		t->tx_dma = NULL;
+		dma_unmap_single(t->uport.dev, t->xmit_dma_addr, UART_XMIT_SIZE,
+				DMA_TO_DEVICE);
+		t->xmit_dma_addr = 0;
+	}
+
 	free_irq(u->irq, t);
 	dev_vdbg(u->dev, "-tegra_shutdown\n");
 }
@@ -1059,8 +1076,9 @@ static void tegra_stop_tx(struct uart_port *u)
 
 	t = container_of(u, struct tegra_uart_port, uport);
 
-	if (t->use_tx_dma)
+	if ((t->use_tx_dma) && !IS_ERR_OR_NULL(t->tx_dma))
 		tegra_dma_dequeue_req(t->tx_dma, &t->tx_dma_req);
+	t->tx_in_progress  = 0;
 	return;
 }
 
@@ -1219,7 +1237,7 @@ static void tegra_flush_buffer(struct uart_port *u)
 
 	t = container_of(u, struct tegra_uart_port, uport);
 
-	if (t->use_tx_dma) {
+	if (t->use_tx_dma && !IS_ERR_OR_NULL(t->tx_dma)) {
 		tegra_dma_dequeue_req(t->tx_dma, &t->tx_dma_req);
 		t->tx_dma_req.size = 0;
 	}
@@ -1325,7 +1343,6 @@ static int tegra_uart_resume(struct platform_device *pdev)
 
 	if (t->uart_state == TEGRA_UART_SUSPEND) {
 		uart_resume_port(&tegra_uart_driver, u);
-		t->uart_state = TEGRA_UART_OPENED;
 	}
 	if (t->odm_uart_handle)
 		NvOdmUartResume(t->odm_uart_handle);
@@ -1437,6 +1454,9 @@ void tegra_uart_request_clock_off(struct uart_port *uport)
 	unsigned long flags;
 	struct tegra_uart_port *t;
 
+	if (IS_ERR_OR_NULL(uport))
+		BUG();
+
 	dev_vdbg(uport->dev, "tegra_uart_request_clock_off");
 
 	t = container_of(uport, struct tegra_uart_port, uport);
@@ -1454,6 +1474,9 @@ void tegra_uart_request_clock_on(struct uart_port *uport)
 {
 	unsigned long flags;
 	struct tegra_uart_port *t;
+
+	if (IS_ERR_OR_NULL(uport))
+		BUG();
 
 	t = container_of(uport, struct tegra_uart_port, uport);
 	spin_lock_irqsave(&uport->lock, flags);

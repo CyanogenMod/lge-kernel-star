@@ -152,6 +152,12 @@ void tegra_dma_dequeue(struct tegra_dma_channel *ch)
 {
 	struct tegra_dma_req *req;
 
+	if (IS_ERR_OR_NULL(ch))
+		BUG();
+
+	if (tegra_dma_is_empty(ch))
+		return;
+
 	req = list_entry(ch->list.next, typeof(*req), node);
 
 	tegra_dma_dequeue_req(ch, req);
@@ -162,6 +168,9 @@ void tegra_dma_stop(struct tegra_dma_channel *ch)
 {
 	unsigned int csr;
 	unsigned int status;
+
+	if (IS_ERR_OR_NULL(ch))
+		BUG();
 
 	csr = ch->csr;
 	csr &= ~CSR_IE_EOC;
@@ -178,6 +187,9 @@ void tegra_dma_stop(struct tegra_dma_channel *ch)
 int tegra_dma_cancel(struct tegra_dma_channel *ch)
 {
 	unsigned long irq_flags;
+
+	if (IS_ERR_OR_NULL(ch))
+		BUG();
 
 	spin_lock_irqsave(&ch->lock, irq_flags);
 	while (!list_empty(&ch->list))
@@ -271,6 +283,9 @@ unsigned int tegra_dma_transferred_req(struct tegra_dma_channel *ch,
 	unsigned int bytes_transferred;
 	unsigned int status;
 
+	if (IS_ERR_OR_NULL(ch))
+		BUG();
+
 	spin_lock_irqsave(&ch->lock, irq_flags);
 
 	if (list_entry(ch->list.next, struct tegra_dma_req, node)!=req) {
@@ -293,6 +308,9 @@ int tegra_dma_get_transfer_count(struct tegra_dma_channel *ch,
 	unsigned int status;
 	unsigned long irq_flags;
 	int bytes_transferred = 0;
+
+	if (IS_ERR_OR_NULL(ch))
+		BUG();
 
 	spin_lock_irqsave(&ch->lock, irq_flags);
 
@@ -319,6 +337,12 @@ int tegra_dma_start_dma(struct tegra_dma_channel *ch, struct tegra_dma_req *req)
 	unsigned int csr;
 	unsigned int status;
 	unsigned long irq_flags;
+
+	if (IS_ERR_OR_NULL(ch))
+		BUG();
+
+	if (IS_ERR_OR_NULL(req))
+		BUG();
 
 	spin_lock_irqsave(&ch->lock, irq_flags);
 
@@ -363,6 +387,9 @@ int tegra_dma_dequeue_req(struct tegra_dma_channel *ch,
 	unsigned int status;
 	unsigned long irq_flags;
 	int stop = 0;
+
+	if (IS_ERR_OR_NULL(ch))
+		BUG();
 
 	spin_lock_irqsave(&ch->lock, irq_flags);
 
@@ -410,6 +437,9 @@ bool tegra_dma_is_empty(struct tegra_dma_channel *ch)
 	unsigned long irq_flags;
 	bool is_empty;
 
+	if (IS_ERR_OR_NULL(ch))
+		BUG();
+
 	spin_lock_irqsave(&ch->lock, irq_flags);
 	if (list_empty(&ch->list))
 		is_empty = true;
@@ -425,6 +455,9 @@ bool tegra_dma_is_req_inflight(struct tegra_dma_channel *ch,
 {
 	unsigned long irq_flags;
 	struct tegra_dma_req *req;
+
+	if (IS_ERR_OR_NULL(ch))
+		BUG();
 
 	spin_lock_irqsave(&ch->lock, irq_flags);
 	list_for_each_entry(req, &ch->list, node) {
@@ -443,6 +476,12 @@ int tegra_dma_enqueue_req(struct tegra_dma_channel *ch,
 {
 	unsigned long irq_flags;
 	int start_dma = 0;
+
+	if (IS_ERR_OR_NULL(ch))
+		BUG();
+
+	if (IS_ERR_OR_NULL(req))
+		BUG();
 
 	if (req->size > NV_DMA_MAX_TRASFER_SIZE ||
 		req->source_addr & 0x3 || req->dest_addr & 0x3) {
@@ -500,6 +539,10 @@ EXPORT_SYMBOL(tegra_dma_allocate_channel);
 void tegra_dma_free_channel(struct tegra_dma_channel *ch)
 {
 	unsigned long irq_flags;
+
+	if (IS_ERR_OR_NULL(ch))
+		BUG();
+
 	if (ch->mode & TEGRA_DMA_SHARED)
 		return;
 	tegra_dma_cancel(ch);
