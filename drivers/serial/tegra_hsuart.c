@@ -240,7 +240,7 @@ static void tegra_start_next_tx(struct tegra_uart_port *t)
 	if (count == 0)
 		goto out;
 
-	if (TX_FORCE_PIO || count < TEGRA_UART_MIN_DMA)
+	if (TX_FORCE_PIO || count < TEGRA_UART_MIN_DMA || !t->use_tx_dma)
 		tegra_start_pio_tx(t, count);
 	else if (BYTES_TO_ALIGN(tail) > 0)
 		tegra_start_pio_tx(t, BYTES_TO_ALIGN(tail));
@@ -896,6 +896,8 @@ static int tegra_startup(struct uart_port *u)
 						t->uport.state->xmit.buf,
 						UART_XMIT_SIZE,
 						DMA_TO_DEVICE);
+		} else {
+			dev_info(u->dev, "Dma allocation failed for Tx\n");
 		}
 	}
 	t->tx_in_progress = 0;
@@ -904,6 +906,9 @@ static int tegra_startup(struct uart_port *u)
 	if (!RX_FORCE_PIO) {
 		if (!tegra_uart_init_rx_dma(t))
 			t->use_rx_dma = true;
+		else
+			dev_info(u->dev, "Dma allocation failed for Rx\n");
+
 	}
 
 	ret = tegra_uart_hw_init(t);
