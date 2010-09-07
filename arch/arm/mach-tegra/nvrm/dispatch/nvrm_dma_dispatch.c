@@ -260,7 +260,6 @@ static NvError NvRmDmaAbort_dispatch_( void *InBuffer, NvU32 InSize, void *OutBu
 
     p_in = (NvRmDmaAbort_in *)InBuffer;
 
-
     NvRmDmaAbort( p_in->hDma );
 
     return err_;
@@ -300,6 +299,7 @@ static NvError NvRmDmaFree_dispatch_( void *InBuffer, NvU32 InSize, void *OutBuf
 
     p_in = (NvRmDmaFree_in *)InBuffer;
 
+    if (p_in->hDma != NULL) NvRtFreeObjRef(Ctx, NvRtObjType_NvRm_NvRmDmaHandle, p_in->hDma);
 
     NvRmDmaFree( p_in->hDma );
 
@@ -311,12 +311,25 @@ static NvError NvRmDmaAllocate_dispatch_( void *InBuffer, NvU32 InSize, void *Ou
     NvError err_ = NvSuccess;
     NvRmDmaAllocate_in *p_in;
     NvRmDmaAllocate_out *p_out;
+    NvRtObjRefHandle ref_phDma = 0;
 
     p_in = (NvRmDmaAllocate_in *)InBuffer;
     p_out = (NvRmDmaAllocate_out *)((NvU8 *)OutBuffer + OFFSET(NvRmDmaAllocate_params, out) - OFFSET(NvRmDmaAllocate_params, inout));
 
+    err_ = NvRtAllocObjRef(Ctx, &ref_phDma);
+    if (err_ != NvSuccess)
+    {
+        goto clean;
+    }
 
     p_out->ret_ = NvRmDmaAllocate( p_in->hRmDevice, &p_out->phDma, p_in->Enable32bitSwap, p_in->Priority, p_in->DmaRequestorModuleId, p_in->DmaRequestorInstanceId );
+    if ( p_out->ret_ == NvSuccess )
+    {
+        NvRtStoreObjRef(Ctx, ref_phDma, NvRtObjType_NvRm_NvRmDmaHandle, p_out->phDma);
+        ref_phDma = 0;
+    }
+clean:
+    if (ref_phDma) NvRtDiscardObjRef(Ctx, ref_phDma);
 
     return err_;
 }
@@ -329,7 +342,6 @@ static NvError NvRmDmaGetCapabilities_dispatch_( void *InBuffer, NvU32 InSize, v
 
     p_in = (NvRmDmaGetCapabilities_in *)InBuffer;
     p_out = (NvRmDmaGetCapabilities_out *)((NvU8 *)OutBuffer + OFFSET(NvRmDmaGetCapabilities_params, out) - OFFSET(NvRmDmaGetCapabilities_params, inout));
-
 
     p_out->ret_ = NvRmDmaGetCapabilities( p_in->hDevice, &p_in->pRmDmaCaps );
 

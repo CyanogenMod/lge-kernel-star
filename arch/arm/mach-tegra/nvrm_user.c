@@ -34,6 +34,7 @@
 #include "nvassert.h"
 #include "nvos.h"
 #include "nvrm_memmgr.h"
+#include "nvrm_dma.h"
 #include "nvrm_ioctls.h"
 #include "nvrm_power_private.h"
 #include "mach/nvrm_linux.h"
@@ -109,6 +110,8 @@ struct nvrm_file_priv {
 
 static void client_detach(NvRtClientHandle client)
 {
+    void *ptr;
+
     if (NvRtUnregisterClient(s_RtHandle, client))
     {
         NvDispatchCtx dctx;
@@ -116,15 +119,29 @@ static void client_detach(NvRtClientHandle client)
         dctx.Rt = s_RtHandle;
         dctx.Client = client;
         dctx.PackageIdx = 0;
-
         for (;;)
         {
-            void* ptr = NvRtFreeObjRef(&dctx,
-                                       NvRtObjType_NvRm_NvRmMemHandle,
-                                       NULL);
-            if (!ptr) break;
-            NVRT_LEAK("NvRm", "NvRmMemHandle", ptr);
-            NvRmMemHandleFree(ptr);
+            NvBool found = NV_FALSE;
+
+            if ((ptr = NvRtFreeObjRef(&dctx,
+                                      NvRtObjType_NvRm_NvRmMemHandle,
+                                      NULL)) != NULL)
+            {
+                NVRT_LEAK("NvRm", "NvRmMemHandle", ptr);
+                NvRmMemHandleFree(ptr);
+                found = NV_TRUE;
+            }
+            if ((ptr = NvRtFreeObjRef(&dctx,
+                                      NvRtObjType_NvRm_NvRmDmaHandle,
+                                      NULL)) != NULL)
+            {
+                NVRT_LEAK("NvRm", "NvRmDmaHandle", ptr);
+                NvRmDmaFree(ptr);
+                found = NV_TRUE;
+            }
+
+            if (found == NV_FALSE)
+                break;
         }
 
         NvRtUnregisterClient(s_RtHandle, client);
