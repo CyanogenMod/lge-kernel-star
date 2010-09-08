@@ -247,6 +247,7 @@ static void power_3d(struct nvhost_module *mod, enum nvhost_power_action action)
 			struct nvhost_op_pair save;
 			struct nvhost_cpuinterrupt ctxsw;
 			u32 syncval;
+			void *ref;
 			syncval = nvhost_syncpt_incr_max(&ch->dev->syncpt,
 							NVSYNCPT_3D,
 							ch->cur_ctx->save_incrs);
@@ -259,8 +260,9 @@ static void power_3d(struct nvhost_module *mod, enum nvhost_power_action action)
 			ch->cur_ctx = NULL;
 			nvhost_channel_submit(ch, &save, 1, &ctxsw, 1, NULL, 0, NVSYNCPT_3D, syncval, 0);
 			nvhost_intr_add_action(&ch->dev->intr, NVSYNCPT_3D, syncval,
-					NVHOST_INTR_ACTION_WAKEUP, &wq, NULL);
+				NVHOST_INTR_ACTION_WAKEUP, &wq, &ref);
 			wait_event(wq, nvhost_syncpt_min_cmp(&ch->dev->syncpt, NVSYNCPT_3D, syncval));
+			nvhost_intr_put_ref(&ch->dev->intr, ref);
 			nvhost_cdma_update(&ch->cdma);
 		}
 		mutex_unlock(&ch->submitlock);

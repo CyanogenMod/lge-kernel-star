@@ -552,7 +552,20 @@ void nvhost_intr_stop(struct nvhost_intr *intr)
 	for (id = 0, syncpt = intr->syncpt;
 	     id < NV_HOST1X_SYNCPT_NB_PTS;
 	     ++id, ++syncpt) {
-		BUG_ON(!list_empty(&syncpt->wait_head));
+		struct nvhost_waitlist *waiter, *next;
+		list_for_each_entry_safe(waiter, next, &syncpt->wait_head, list) {
+			if (atomic_cmpxchg(&waiter->state, WLS_CANCELLED, WLS_HANDLED)
+				== WLS_CANCELLED) {
+				list_del(&waiter->list);
+				kref_put(&waiter->refcount, waiter_release);
+			}
+		}
+
+		if(!list_empty(&syncpt->wait_head)) {  // output diagnostics
+			printk("%s id=%d\n",__func__,id);
+			BUG_ON(1);
+		}
+
 		free_syncpt_irq(syncpt);
 	}
 
