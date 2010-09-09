@@ -72,11 +72,15 @@ GetPmuInstance(NvOdmPmuDeviceHandle hDevice)
             Pmu.pfnWriteRtc = Tps6586xWriteRtc;
             Pmu.pfnReadAlarm = Tps6586xReadAlarm;
             Pmu.pfnWriteAlarm = Tps6586xWriteAlarm;
+            Pmu.pfnAlarmInterrupt = NULL;
+            Pmu.pfnEnableRtcInt = NULL;
+            Pmu.pfnSuspendRtc = NULL;
+            Pmu.pfnResumeRtc = NULL;
             Pmu.pfnIsRtcInitialized = Tps6586xIsRtcInitialized;
         }
         else if (NvOdmPeripheralGetGuid(NV_ODM_GUID('p','c','f','_','p','m','u','0')))
         {
-            
+
             Pmu.pfnSetup                  = Pcf50626Setup;
             Pmu.pfnRelease                = Pcf50626Release;
             Pmu.pfnGetCaps                = Pcf50626GetCapabilities;
@@ -93,9 +97,13 @@ GetPmuInstance(NvOdmPmuDeviceHandle hDevice)
             Pmu.pfnWriteRtc               = Pcf50626RtcCountWrite;
             Pmu.pfnReadAlarm              = NULL;
             Pmu.pfnWriteAlarm             = NULL;
+            Pmu.pfnAlarmInterrupt         = NULL;
+            Pmu.pfnEnableRtcInt           = NULL;
+            Pmu.pfnSuspendRtc             = NULL;
+            Pmu.pfnResumeRtc              = NULL;
             Pmu.pfnIsRtcInitialized       = Pcf50626IsRtcInitialized;
-            Pmu.pPrivate                  = NULL;            
-            Pmu.Hal                       = NV_TRUE;  
+            Pmu.pPrivate                  = NULL;
+            Pmu.Hal                       = NV_TRUE;
             Pmu.Init                      = NV_FALSE;
         }
         else if (NvOdmPeripheralGetGuid(NV_ODM_GUID('m','a','x','8','9','0','7','b')))
@@ -115,11 +123,15 @@ GetPmuInstance(NvOdmPmuDeviceHandle hDevice)
             Pmu.pfnInterruptHandler       = Max8907bInterruptHandler;
             Pmu.pfnReadRtc                = Max8907bRtcCountRead;
             Pmu.pfnWriteRtc               = Max8907bRtcCountWrite;
-            Pmu.pfnReadAlarm              = NULL;
-            Pmu.pfnWriteAlarm             = NULL;
+            Pmu.pfnReadAlarm              = Max8907bRtcAlarmCountRead;
+            Pmu.pfnWriteAlarm             = Max8907bRtcAlarmCountWrite;
+            Pmu.pfnAlarmInterrupt         = NULL;
+            Pmu.pfnEnableRtcInt           = Max8907bRtcAlarmIntEnable;
+            Pmu.pfnSuspendRtc             = Max8907bRtcSuspend;
+            Pmu.pfnResumeRtc              = Max8907bRtcResume;
             Pmu.pfnIsRtcInitialized       = Max8907bIsRtcInitialized;
             Pmu.pPrivate                  = NULL;
-            Pmu.Hal                       = NV_TRUE;  
+            Pmu.Hal                       = NV_TRUE;
             Pmu.Init                      = NV_FALSE;
         }
     }
@@ -376,7 +388,34 @@ NvOdmPmuIsRtcInitialized(NvOdmPmuDeviceHandle hDevice)
 
     if (pmu && pmu->pfnIsRtcInitialized)
         return pmu->pfnIsRtcInitialized(pmu);
-        
+
     return NV_FALSE;
 }
 
+NvBool
+NvOdmPmuAlarmHandlerSet(NvOdmPmuDeviceHandle hDevice, pfnPmuAlarmInterrupt func)
+{
+    NvOdmPmuDevice *pmu = GetPmuInstance(hDevice);
+    if (!pmu)
+	return NV_FALSE;
+    pmu->pfnAlarmInterrupt = func;
+    return NV_TRUE;
+}
+
+NvBool
+NvOdmPmuSuspendRtc(NvOdmPmuDeviceHandle hDevice)
+{
+    NvOdmPmuDevice *pmu = GetPmuInstance(hDevice);
+    if (pmu && pmu->pfnSuspendRtc)
+        return pmu->pfnSuspendRtc(pmu);
+    return NV_FALSE;
+}
+
+NvBool
+NvOdmPmuResumeRtc(NvOdmPmuDeviceHandle hDevice)
+{
+    NvOdmPmuDevice *pmu = GetPmuInstance(hDevice);
+    if (pmu && pmu->pfnResumeRtc)
+        return pmu->pfnResumeRtc(pmu);
+    return NV_FALSE;
+}

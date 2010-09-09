@@ -73,6 +73,15 @@ NvBool Max8907bRtcI2cReadTime(
    NvU8 Addr,
    NvU32 *Data);
 
+NvBool Max8907bRtcI2cWrite8(
+   NvOdmPmuDeviceHandle hDevice,
+   NvU8 Addr,
+   NvU8 Data);
+
+NvBool Max8907bRtcI2cRead8(
+   NvOdmPmuDeviceHandle hDevice,
+   NvU8 Addr,
+   NvU8 *Data);
 #if defined(__cplusplus)
 }
 #endif

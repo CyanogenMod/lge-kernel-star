@@ -39,6 +39,7 @@
 #include "max8907b_i2c.h"
 #include "max8907b_interrupt.h"
 #include "max8907b_batterycharger.h"
+#include "max8907b_rtc.h"
 #include "max8907b_supply_info_table.h"
 #include "fan5355_buck_reg.h"
 #include "fan5355_buck_i2c.h"
@@ -2248,6 +2249,20 @@ void Max8907bInterruptHandler( NvOdmPmuDeviceHandle  hDevice)
     ((Max8907bPrivData*)hDevice->pPrivate)->pmuInterruptSupported = NV_TRUE;
 
     Max8907bInterruptHandler_int(hDevice, &((Max8907bPrivData*)hDevice->pPrivate)->pmuStatus);
+}
+
+NvBool
+Max8907bRtcSuspend(
+    NvOdmPmuDeviceHandle hDevice)
+{
+    return Max8907bRtcAlarmIntEnable(hDevice, 1);
+}
+
+NvBool
+Max8907bRtcResume(
+    NvOdmPmuDeviceHandle hDevice)
+{
+    return Max8907bRtcAlarmIntEnable(hDevice, 0);
 }
 
 /****************   Secondary PMU MIC2826 Programming  */

@@ -65,9 +65,13 @@ typedef NvBool (*pfnPmuWriteRtc)(NvOdmPmuDeviceHandle, NvU32);
 typedef NvBool (*pfnPmuIsRtcInitialized)(NvOdmPmuDeviceHandle);
 typedef NvBool (*pfnPmuReadAlarm)(NvOdmPmuDeviceHandle, NvU32*);
 typedef NvBool (*pfnPmuWriteAlarm)(NvOdmPmuDeviceHandle, NvU32);
+typedef NvBool (*pfnPmuAlarmInterrupt)(NvOdmPmuDeviceHandle);
+typedef NvBool (*pfnPmuEnableRtcInt)(NvOdmPmuDeviceHandle, NvBool);
+typedef NvBool (*pfnPmuSuspendRtc)(NvOdmPmuDeviceHandle);
+typedef NvBool (*pfnPmuResumeRtc)(NvOdmPmuDeviceHandle);
 
 typedef struct NvOdmPmuDeviceRec
-{ 
+{
     pfnPmuSetup                  pfnSetup;
     pfnPmuRelease                pfnRelease;
     pfnPmuGetCaps                pfnGetCaps;
@@ -84,6 +88,10 @@ typedef struct NvOdmPmuDeviceRec
     pfnPmuWriteRtc               pfnWriteRtc;
     pfnPmuReadAlarm              pfnReadAlarm;
     pfnPmuWriteAlarm             pfnWriteAlarm;
+    pfnPmuAlarmInterrupt         pfnAlarmInterrupt;
+    pfnPmuEnableRtcInt           pfnEnableRtcInt;
+    pfnPmuSuspendRtc             pfnSuspendRtc;
+    pfnPmuResumeRtc              pfnResumeRtc;
     pfnPmuIsRtcInitialized       pfnIsRtcInitialized;
     void                        *pPrivate;
     NvBool                       Hal;

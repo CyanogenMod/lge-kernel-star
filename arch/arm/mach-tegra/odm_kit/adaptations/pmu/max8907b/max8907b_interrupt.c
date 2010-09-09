@@ -34,20 +34,21 @@
 #include "max8907b_interrupt.h"
 #include "max8907b_i2c.h"
 #include "max8907b_reg.h"
+#include "max8907b_rtc.h"
 #include "max8907b_batterycharger.h"
 #include "nvodm_services.h"
 
-NvBool 
+NvBool
 Max8907bSetupInterrupt(
     NvOdmPmuDeviceHandle hDevice,
     Max8907bStatus *pmuStatus)
 {
     NvBool status = NV_FALSE;
-    NvU8   data   = 0;    
+    NvU8   data   = 0;
 
     NV_ASSERT(hDevice);
     NV_ASSERT(pmuStatus);
-    
+
     /* Init Pmu Status */
     pmuStatus->lowBatt       = NV_FALSE;
     pmuStatus->highTemp      = NV_FALSE;
@@ -81,15 +82,31 @@ Max8907bSetupInterrupt(
     if (!Max8907bI2cWrite8(hDevice, MAX8907B_ON_OFF_IRQ2, data))
         return NV_FALSE;
 
-    // RTC_IRQ
+    // disable ALARM0
     data = 0;
-    if (!Max8907bI2cWrite8(hDevice, MAX8907B_RTC_IRQ, data))
+    if (!Max8907bRtcI2cWrite8(hDevice, MAX8907B_ALARM0_CNTL, data))
+        return NV_FALSE;
+
+    // disable ALARM1
+    data = 0;
+    if (!Max8907bRtcI2cWrite8(hDevice, MAX8907B_ALARM1_CNTL, data))
+        return NV_FALSE;
+
+    // clear RTC_IRQ
+    if (!Max8907bRtcI2cRead8(hDevice, MAX8907B_RTC_IRQ, &data))
+        return NV_FALSE;
+
+    // RTC_IRQ_MASK - disable ALARM0 and ALARM1
+    data =
+        ( MAX8907B_RTC_IRQ_ALARM0_R_MASK << MAX8907B_RTC_IRQ_ALARM0_R_SHIFT ) |
+        ( MAX8907B_RTC_IRQ_ALARM1_R_MASK << MAX8907B_RTC_IRQ_ALARM1_R_SHIFT );
+    if (!Max8907bRtcI2cWrite8(hDevice, MAX8907B_RTC_IRQ_MASK, data))
         return NV_FALSE;
 
     return NV_TRUE;
 }
 
-void 
+void
 Max8907bInterruptHandler_int(
     NvOdmPmuDeviceHandle hDevice,
     Max8907bStatus *pmuStatus)
@@ -161,12 +178,29 @@ Max8907bInterruptHandler_int(
         return;
     }
 
-    // RTC_IRQ
-    if (!Max8907bI2cRead8(hDevice, MAX8907B_RTC_IRQ, &data))
+
+    // RTC_STATUS
+    if (!Max8907bRtcI2cRead8(hDevice, MAX8907B_RTC_STATUS, &data))
     {
         return;
     }
 
+    // RTC_IRQ
+    if (!Max8907bRtcI2cRead8(hDevice, MAX8907B_RTC_IRQ, &data))
+    {
+        return;
+    }
+    if (data)
+    {
+        if (data &
+           (MAX8907B_RTC_IRQ_ALARM1_R_MASK << MAX8907B_RTC_IRQ_ALARM1_R_SHIFT))
+        {
+	    /* disable further alarms from this source. */
+	    Max8907bRtcAlarmIntEnable(hDevice, 0);
+	    if(hDevice->pfnAlarmInterrupt)
+		hDevice->pfnAlarmInterrupt(hDevice);
+	}
+    }
+
     return;
 }
-

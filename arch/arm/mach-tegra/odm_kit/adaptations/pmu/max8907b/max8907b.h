@@ -149,7 +149,15 @@ Max8907bSetChargingCurrent(
     NvOdmPmuDeviceHandle hDevice,
     NvOdmPmuChargingPath chargingPath,
     NvU32 chargingCurrentLimitMa,
-    NvOdmUsbChargerType ChargerType); 
+    NvOdmUsbChargerType ChargerType);
+
+NvBool
+Max8907bRtcSuspend(
+    NvOdmPmuDeviceHandle hDevice);
+
+NvBool
+Max8907bRtcResume(
+    NvOdmPmuDeviceHandle hDevice);
 
 void Max8907bInterruptHandler( NvOdmPmuDeviceHandle  hDevice);
 

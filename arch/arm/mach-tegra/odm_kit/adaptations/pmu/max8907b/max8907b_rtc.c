@@ -68,10 +68,11 @@
 
 static NvBool bRtcNotInitialized = NV_TRUE;
 
-NvBool
-Max8907bRtcCountRead(
+static NvBool
+Max8907bRtcTimeRead(
     NvOdmPmuDeviceHandle hDevice,
-    NvU32* Count)
+    NvU8 Addr,
+    NvU32 *Count)
 {
     NvU32 data = 0;
     NvU32 BcdHours, BcdMinutes, BcdSeconds;
@@ -84,7 +85,7 @@ Max8907bRtcCountRead(
 
     *Count = 0;
     // Read seconds, minute, hour and weekday data from RTC registers
-    if (Max8907bRtcI2cReadTime(hDevice, MAX8907B_RTC_SEC, &data))
+    if (Max8907bRtcI2cReadTime(hDevice, Addr, &data))
     {
         NVODMPMU_PRINTF(("\n Read time data-sec=0x%x ", data));
         // Extract seconds, minute and hour data from RTC registers read
@@ -98,7 +99,7 @@ Max8907bRtcCountRead(
         Seconds = BCD_TO_DECIMAL(BcdSeconds);
 
         // Read day, month, yy1 and yy2 data from RTC registers
-        if (Max8907bRtcI2cReadTime(hDevice, MAX8907B_RTC_DATE, &data))
+        if (Max8907bRtcI2cReadTime(hDevice, Addr + MAX8907B_RTC_DATE, &data))
         {
             NVODMPMU_PRINTF(("\n Read time data-year=0x%x ", data));
             // Extract day, month, yy1 and yy2 data from RTC registers read
@@ -132,13 +133,13 @@ Max8907bRtcCountRead(
         }
         else
         {
-            NVODMPMU_PRINTF(("\n Max8907bRtcCountRead() error. "));
+            NVODMPMU_PRINTF(("\n Max8907bRtcTimeRead() error. "));
             return NV_FALSE;
         }
     }
     else
     {
-        NVODMPMU_PRINTF(("\n Max8907bRtcCountRead() error. "));
+        NVODMPMU_PRINTF(("\n Max8907bRtcTimeRead() error. "));
         return NV_FALSE;
     }
     NVODMPMU_PRINTF(("\n *Count=0x%x ", *Count));
@@ -146,16 +147,28 @@ Max8907bRtcCountRead(
 }
 
 NvBool
+Max8907bRtcCountRead(
+    NvOdmPmuDeviceHandle hDevice,
+    NvU32* Count)
+{
+    return Max8907bRtcTimeRead(hDevice, MAX8907B_RTC_SEC, Count);
+}
+
+NvBool
 Max8907bRtcAlarmCountRead(
     NvOdmPmuDeviceHandle hDevice,
     NvU32* Count)
 {
-    return NV_FALSE;
+    if (!Max8907bRtcTimeRead(hDevice, MAX8907B_ALARM1_SEC, Count))
+	return NV_FALSE;
+    return NV_TRUE;
 }
 
-NvBool
-Max8907bRtcCountWrite(
+/* write time and date in a BCD format */
+static NvBool
+Max8907bRtcTimeWrite(
     NvOdmPmuDeviceHandle hDevice,
+    NvU8 Addr,
     NvU32 Count)
 {
     NvU32 BcdHours, BcdMinutes, BcdSeconds;
@@ -167,7 +180,7 @@ Max8907bRtcCountWrite(
     NvU32 data1;
 #endif
 
-    NVODMPMU_PRINTF(("\n Rtc write count=0x%x ", Count));
+    NVODMPMU_PRINTF(("\n Rtc write count=0x%x to addr=0x%x", Count, Addr));
     // convert seconds since reference time into date
     // NOTE: using linux specific convert function rtc_time_to_tm
     rtc_time_to_tm(Count, &tm);
@@ -176,6 +189,22 @@ Max8907bRtcCountWrite(
         (tm.tm_mon + 1), tm.tm_mday,
         tm.tm_hour, tm.tm_min, tm.tm_sec, Count));
 
+    // set the day, month, year
+
+    // convert date to bcd format
+    BcdDD = DECIMAL_TO_BCD((NvU8)tm.tm_mday);
+    BcdMM = DECIMAL_TO_BCD((NvU8)tm.tm_mon);
+    YYYY = (NvU16)tm.tm_year + LINUX_RTC_BASE_YEAR;
+    BcdYY1 = DECIMAL_TO_BCD((NvU8)(YYYY % 100));
+    BcdYY2 = DECIMAL_TO_BCD((NvU8)(YYYY / 100));
+    data = (NvU32)((BcdDD << 24) | (BcdMM << 16) | (BcdYY1 << 8) | BcdYY2);
+    // write date - day, month, and year to RTC registers
+    if (!(Max8907bRtcI2cWriteTime(hDevice, Addr + MAX8907B_RTC_DATE, data)))
+    {
+	NVODMPMU_PRINTF(("\n Max8907bRtcTimeWrite() error. "));
+	return NV_FALSE;
+    }
+
     // Convert time to bcd format
     BcdHours   = DECIMAL_TO_BCD(tm.tm_hour);
     BcdMinutes = DECIMAL_TO_BCD(tm.tm_min);
@@ -183,64 +212,67 @@ Max8907bRtcCountWrite(
 
     data = (BcdSeconds << 24) | (BcdMinutes << 16) | (BcdHours << 8);
     // write time - seconds, minutes and hours in a day to RTC registers
-    if (Max8907bRtcI2cWriteTime(hDevice, MAX8907B_RTC_SEC, data))
+    if (!Max8907bRtcI2cWriteTime(hDevice, Addr, data))
     {
-        // set the day, month, year
-        // Assuming we get the days since 1 Jan 1970
-
-        // convert date to bcd format
-        BcdDD = DECIMAL_TO_BCD((NvU8)tm.tm_mday);
-        BcdMM = DECIMAL_TO_BCD((NvU8)tm.tm_mon);
-        YYYY = (NvU16)tm.tm_year + LINUX_RTC_BASE_YEAR;
-        BcdYY1 = DECIMAL_TO_BCD((NvU8)(YYYY % 100));
-        BcdYY2 = DECIMAL_TO_BCD((NvU8)(YYYY / 100));
-        data = (NvU32)((BcdDD << 24) | (BcdMM << 16) | (BcdYY1 << 8) | BcdYY2);
-        // write date - day, month, and year to RTC registers
-        if (!(Max8907bRtcI2cWriteTime(hDevice, MAX8907B_RTC_DATE, data)))
-        {
-            NVODMPMU_PRINTF(("\n Max8907bRtcCountWrite() error. "));
-            return NV_FALSE;
-        }
-#if NV_DEBUG
-        // verify that read back values from RTC matches written values
-        if (!(Max8907bRtcI2cReadTime(hDevice, MAX8907B_RTC_DATE, &data1)))
-        {
-            NVODMPMU_PRINTF(("\n Max8907bRtcCountRead() error. "));
-            return NV_FALSE;
-        }
-        if (data1 == data)
-        {
-            NVODMPMU_PRINTF(("\n Write read Success. "));
-            return NV_TRUE;
-        }
-        else
-        {
-            // return error when read data does not match written data
-            NVODMPMU_PRINTF(("\n Error: write data=0x%x, rd data=0x%x. ", data, data1));
-            return NV_FALSE;
-        }
-#endif
-    }
-    else
-    {
-        NVODMPMU_PRINTF(("\n Max8907bRtcCountWrite() error. "));
+        NVODMPMU_PRINTF(("\n Max8907bRtcTimeWrite() error. "));
         return NV_FALSE;
     }
 
     return NV_TRUE;
 }
 
+
+NvBool
+Max8907bRtcCountWrite(
+    NvOdmPmuDeviceHandle hDevice,
+    NvU32 Count)
+{
+    return Max8907bRtcTimeWrite(hDevice, MAX8907B_RTC_SEC, Count);
+}
+
+/**
+ * Set the RTC alarm.
+ * @param hDevice handle to the PMU.
+ * @param Count seconds in the future, treat 0 as disable.
+ * @return NV_TRUE if successful, or NV_FALSE on failure.
+ */
 NvBool
 Max8907bRtcAlarmCountWrite(
     NvOdmPmuDeviceHandle hDevice,
     NvU32 Count)
 {
-    return NV_FALSE;
+    NvBool alarm_int;
+
+    /* disable alarms while setting */
+    if (!Max8907bRtcAlarmIntEnable(hDevice, 0))
+        return NV_FALSE;
+
+    if (!Max8907bRtcTimeWrite(hDevice, MAX8907B_ALARM1_SEC, Count))
+	return NV_FALSE;
+
+    /* enable alarms if Count is non-zero. */
+    if (!Max8907bRtcAlarmIntEnable(hDevice, Count != 0))
+        return NV_FALSE;
+
+#if NV_DEBUG
+    NVODMPMU_PRINTF(("\n Max8907bRtcAlarmCountWrite() wrote count=0x%x. ", Count));
+    if (!Max8907bRtcTimeRead(hDevice, MAX8907B_ALARM1_SEC, &Count))
+	return NV_FALSE;
+    NVODMPMU_PRINTF(("\n Max8907bRtcAlarmCountWrite() read back count=0x%x. ", Count));
+#endif
+    return NV_TRUE;
 }
 
 NvBool
 Max8907bRtcIsAlarmIntEnabled(NvOdmPmuDeviceHandle hDevice)
 {
+    NvU8 data;
+    if (Max8907bRtcI2cRead8(hDevice, MAX8907B_RTC_IRQ_MASK, &data))
+        if ((data >> MAX8907B_RTC_IRQ_ALARM1_R_SHIFT)
+	& MAX8907B_RTC_IRQ_ALARM1_R_MASK)
+        {
+            return NV_TRUE;
+        }
     return NV_FALSE;
 }
 
@@ -249,7 +281,44 @@ Max8907bRtcAlarmIntEnable(
     NvOdmPmuDeviceHandle hDevice,
     NvBool Enable)
 {
-    return NV_FALSE;
+    NvU8 cntl_data, mask_data;
+    NvU8 tmp;
+
+    if (Enable)
+    {
+	/* Alarm check of HOUR, MIN, SEC, YEAR, MONTH, DATE */
+	cntl_data = 0x77;
+	/* mask everything except ALARM1. */
+        mask_data = ~(MAX8907B_RTC_IRQ_ALARM1_R_MASK << MAX8907B_RTC_IRQ_ALARM1_R_SHIFT);
+    }
+    else
+    {
+	/* disable alarm comparisons. */
+	cntl_data = 0;
+	/* mask everything, including ALARM1 */
+        mask_data = ~0;
+    }
+
+    if (!Max8907bRtcI2cWrite8(hDevice, MAX8907B_RTC_IRQ_MASK, mask_data))
+    {
+        NVODMPMU_PRINTF(("\n Max8907bRtcAlarmIntEnable() error. "));
+        return NV_FALSE;
+    }
+
+    if (!Max8907bRtcI2cWrite8(hDevice, MAX8907B_ALARM1_CNTL, cntl_data))
+    {
+        NVODMPMU_PRINTF(("\n Max8907bRtcAlarmIntEnable() error. "));
+        return NV_FALSE;
+    }
+
+    /* always force ALARM0 off */
+    if (!Max8907bRtcI2cWrite8(hDevice, MAX8907B_ALARM0_CNTL, 0))
+    {
+        NVODMPMU_PRINTF(("\n Max8907bRtcAlarmIntEnable() error. "));
+        return NV_FALSE;
+    }
+
+    return NV_TRUE;
 }
 
 NvBool
