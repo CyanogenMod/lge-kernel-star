@@ -1832,6 +1832,14 @@ static int _nvmap_do_alloc(struct nvmap_file_priv *priv,
 		heap_mask &= NVMAP_SECURE_HEAPS;
 		if (!heap_mask) return -EINVAL;
 	}
+	else if ((numpages == 1) &&
+		(heap_mask & (NVMEM_HEAP_CARVEOUT_MASK | NVMEM_HEAP_IOVMM) !=
+		NVMEM_HEAP_CARVEOUT_IRAM)) {
+		// Non-secure single page iovmm and carveout allocations
+		// should be allowed to go to sysmem
+		heap_mask |= NVMEM_HEAP_SYSMEM;
+	}
+
 	/* can't do greater than page size alignment with page alloc */
 	if (align > PAGE_SIZE)
 		heap_mask &= NVMEM_HEAP_CARVEOUT_MASK;
