@@ -668,8 +668,8 @@ static void tegra_uart_hw_deinit(struct tegra_uart_port *t)
 	/* Disable interrupts */
 	uart_writeb(t, 0, UART_IER);
 
-	while ((uart_readb(t, UART_LSR) & UART_LSR_TEMT) != UART_LSR_TEMT);
-		udelay(2000);
+	/* TBD: why this delay is needed */
+	udelay(200);
 
 	/* Reset the Rx and Tx FIFOs */
 	fcr = t->fcr_shadow;
