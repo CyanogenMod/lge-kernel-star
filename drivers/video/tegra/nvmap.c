@@ -2415,12 +2415,19 @@ static ssize_t _nvmap_do_rw_handle(struct nvmap_handle *h, int is_read,
 	}
 
 	while (count--) {
-		size_t ret = _nvmap_do_one_rw_handle(h, is_read,
+		size_t ret;
+		if (is_read)
+			_nvmap_do_cache_maint(h, h_offs, h_offs + elem_size,
+					NVMEM_CACHE_OP_INV, false);
+		ret = _nvmap_do_one_rw_handle(h, is_read,
 			is_user, h_offs, sys_addr, elem_size, &addr);
 		if (ret < 0) {
 			if (!bytes_copied) bytes_copied = ret;
 			break;
 		}
+		if (!is_read)
+			_nvmap_do_cache_maint(h, h_offs, h_offs + ret,
+					NVMEM_CACHE_OP_WB, false);
 		bytes_copied += ret;
 		if (ret < elem_size) break;
 		sys_addr += sys_stride;
