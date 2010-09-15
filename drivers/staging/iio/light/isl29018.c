@@ -1,5 +1,5 @@
 /*
- * A hwmon driver for the light sensor ISL 29018.
+ * A iio driver for the light sensor ISL 29018.
  *
  * Hwmon driver for monitoring ambient light intensity in luxi, proximity
  * sensing and infrared sensing.
@@ -23,11 +23,10 @@
 
 #include <linux/module.h>
 #include <linux/i2c.h>
-#include <linux/hwmon.h>
-#include <linux/hwmon-sysfs.h>
 #include <linux/err.h>
 #include <linux/mutex.h>
 #include <linux/delay.h>
+#include "../iio.h"
 
 /*#define DEBUG			1*/
 /*#define VERBOSE_DEBUG		1*/
@@ -56,9 +55,9 @@
 #define ISL29018_REG_ADD_DATA_MSB	0x03
 #define ISL29018_MAX_REGS		ISL29018_REG_ADD_DATA_MSB
 
-struct isl29018_data {
-	struct device		*hwmon_dev;
-	struct attribute_group	attrs;
+struct isl29018_chip {
+	struct iio_dev		*indio_dev;
+	struct i2c_client	*client;
 	struct mutex		lock;
 	unsigned int		range;
 	unsigned int		adc_bit;
@@ -71,9 +70,9 @@ static bool isl29018_write_data(struct i2c_client *client, u8 reg,
 {
 	u8 regval;
 	int ret = 0;
-	struct isl29018_data *data = i2c_get_clientdata(client);
+	struct isl29018_chip *chip = i2c_get_clientdata(client);
 
-	regval = data->reg_cache[reg];
+	regval = chip->reg_cache[reg];
 	regval &= ~mask;
 	regval |= val << shift;
 
@@ -82,7 +81,7 @@ static bool isl29018_write_data(struct i2c_client *client, u8 reg,
 		dev_err(&client->dev, "Write to device fails status %x\n", ret);
 		return false;
 	}
-	data->reg_cache[reg] = regval;
+	chip->reg_cache[reg] = regval;
 	return true;
 }
 
@@ -148,11 +147,11 @@ static int isl29018_read_sensor_input(struct i2c_client *client, int mode)
 static bool isl29018_read_lux(struct i2c_client *client, int *lux)
 {
 	int lux_data;
-	struct isl29018_data *data = i2c_get_clientdata(client);
+	struct isl29018_chip *chip = i2c_get_clientdata(client);
 
 	lux_data = isl29018_read_sensor_input(client, COMMMAND1_OPMODE_ALS_ONCE);
 	if (lux_data > 0) {
-		*lux = (lux_data * data->range) >> data->adc_bit;
+		*lux = (lux_data * chip->range) >> chip->adc_bit;
 		return true;
 	}
 	return false;
@@ -207,16 +206,17 @@ static bool isl29018_read_proximity_ir(struct i2c_client *client, int scheme,
 
 static ssize_t get_sensor_data(struct device *dev, char *buf, int mode)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct isl29018_data *data = i2c_get_clientdata(client);
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct isl29018_chip *chip = indio_dev->dev_data;
+	struct i2c_client *client = chip->client;
 	int value = 0;
 	bool status;
 
-	mutex_lock(&data->lock);
+	mutex_lock(&chip->lock);
 	switch (mode) {
 		case COMMMAND1_OPMODE_PROX_ONCE:
 			status = isl29018_read_proximity_ir(client,
-					data->prox_scheme, &value);
+					chip->prox_scheme, &value);
 			break;
 
 		case COMMMAND1_OPMODE_ALS_ONCE:
@@ -229,16 +229,16 @@ static ssize_t get_sensor_data(struct device *dev, char *buf, int mode)
 
 		default:
 			dev_err(&client->dev,"Mode %d is not supported\n",mode);
-			mutex_unlock(&data->lock);
+			mutex_unlock(&chip->lock);
 			return -EBUSY;
 	}
 	if (!status) {
 		dev_err(&client->dev, "Error in Reading data");
-		mutex_unlock(&data->lock);
+		mutex_unlock(&chip->lock);
 		return -EBUSY;
 	}
 
-	mutex_unlock(&data->lock);
+	mutex_unlock(&chip->lock);
 	return sprintf(buf, "%d\n", value);
 }
 
@@ -247,18 +247,19 @@ static ssize_t get_sensor_data(struct device *dev, char *buf, int mode)
 static ssize_t show_range(struct device *dev,
 			struct device_attribute *attr, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct isl29018_data *data = i2c_get_clientdata(client);
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct isl29018_chip *chip = indio_dev->dev_data;
 
 	dev_vdbg(dev, "%s()\n", __func__);
-	return sprintf(buf, "%u\n", data->range);
+	return sprintf(buf, "%u\n", chip->range);
 }
 
 static ssize_t store_range(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct isl29018_data *data = i2c_get_clientdata(client);
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct isl29018_chip *chip = indio_dev->dev_data;
+	struct i2c_client *client = chip->client;
 	bool status;
 	unsigned long lval;
 	unsigned int new_range;
@@ -274,15 +275,15 @@ static ssize_t store_range(struct device *dev,
 		return -EINVAL;
 	}
 
-	mutex_lock(&data->lock);
+	mutex_lock(&chip->lock);
 	status = isl29018_set_range(client, lval, &new_range);
 	if (!status) {
-		mutex_unlock(&data->lock);
+		mutex_unlock(&chip->lock);
 		dev_err(dev, "Error in setting max range\n");
 		return -EINVAL;
 	}
-	data->range = new_range;
-	mutex_unlock(&data->lock);
+	chip->range = new_range;
+	mutex_unlock(&chip->lock);
 	return count;
 }
 
@@ -290,18 +291,19 @@ static ssize_t store_range(struct device *dev,
 static ssize_t show_resolution(struct device *dev,
 			struct device_attribute *attr, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct isl29018_data *data = i2c_get_clientdata(client);
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct isl29018_chip *chip = indio_dev->dev_data;
 
 	dev_vdbg(dev, "%s()\n", __func__);
-	return sprintf(buf, "%u\n", data->adc_bit);
+	return sprintf(buf, "%u\n", chip->adc_bit);
 }
 
 static ssize_t store_resolution(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct isl29018_data *data = i2c_get_clientdata(client);
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct isl29018_chip *chip = indio_dev->dev_data;
+	struct i2c_client *client = chip->client;
 	bool status;
 	unsigned long lval;
 	unsigned int new_adc_bit;
@@ -315,15 +317,15 @@ static ssize_t store_resolution(struct device *dev,
 		return -EINVAL;
 	}
 
-	mutex_lock(&data->lock);
+	mutex_lock(&chip->lock);
 	status = isl29018_set_resolution(client, lval, &new_adc_bit);
 	if (!status) {
-		mutex_unlock(&data->lock);
+		mutex_unlock(&chip->lock);
 		dev_err(dev, "Error in setting resolution\n");
 		return -EINVAL;
 	}
-	data->adc_bit = new_adc_bit;
-	mutex_unlock(&data->lock);
+	chip->adc_bit = new_adc_bit;
+	mutex_unlock(&chip->lock);
 	return count;
 }
 
@@ -331,18 +333,18 @@ static ssize_t store_resolution(struct device *dev,
 static ssize_t show_prox_scheme(struct device *dev,
 			struct device_attribute *attr, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct isl29018_data *data = i2c_get_clientdata(client);
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct isl29018_chip *chip = indio_dev->dev_data;
 
 	dev_vdbg(dev, "%s()\n", __func__);
-	return sprintf(buf, "%d\n", data->prox_scheme);
+	return sprintf(buf, "%d\n", chip->prox_scheme);
 }
 
 static ssize_t store_prox_scheme(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct isl29018_data *data = i2c_get_clientdata(client);
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct isl29018_chip *chip = indio_dev->dev_data;
 	unsigned long lval;
 
 	dev_vdbg(dev, "%s()\n", __func__);
@@ -354,9 +356,9 @@ static ssize_t store_prox_scheme(struct device *dev,
 		return -EINVAL;
 	}
 
-	mutex_lock(&data->lock);
-	data->prox_scheme = (int)lval;
-	mutex_unlock(&data->lock);
+	mutex_lock(&chip->lock);
+	chip->prox_scheme = (int)lval;
+	mutex_unlock(&chip->lock);
 	return count;
 }
 
@@ -381,42 +383,56 @@ static ssize_t show_proxim_ir(struct device *dev,
 	return get_sensor_data(dev, buf, COMMMAND1_OPMODE_PROX_ONCE);
 }
 
-static SENSOR_DEVICE_ATTR(range, S_IRUGO | S_IWUSR,
-				show_range, store_range, 0);
-static SENSOR_DEVICE_ATTR(resolution, S_IRUGO | S_IWUSR,
-				show_resolution, store_resolution, 1);
-static SENSOR_DEVICE_ATTR(proximity_scheme, S_IRUGO | S_IWUSR,
-				show_prox_scheme, store_prox_scheme, 2);
-static SENSOR_DEVICE_ATTR(lux, S_IRUGO, show_lux, NULL, 3);
-static SENSOR_DEVICE_ATTR(ir, S_IRUGO, show_ir, NULL, 4);
-static SENSOR_DEVICE_ATTR(proxim_ir, S_IRUGO, show_proxim_ir, NULL, 5);
+/* Read name */
+static ssize_t show_name(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+	struct isl29018_chip *chip = indio_dev->dev_data;
+	return sprintf(buf, "%s\n", chip->client->name);
+}
 
-static struct attribute *isl29018_attr[] = {
-	&sensor_dev_attr_range.dev_attr.attr,
-	&sensor_dev_attr_resolution.dev_attr.attr,
-	&sensor_dev_attr_proximity_scheme.dev_attr.attr,
-	&sensor_dev_attr_lux.dev_attr.attr,
-	&sensor_dev_attr_ir.dev_attr.attr,
-	&sensor_dev_attr_proxim_ir.dev_attr.attr,
+static IIO_DEVICE_ATTR(range, S_IRUGO | S_IWUSR, show_range, store_range, 0);
+static IIO_DEVICE_ATTR(resolution, S_IRUGO | S_IWUSR,
+					show_resolution, store_resolution, 0);
+static IIO_DEVICE_ATTR(proximity_scheme, S_IRUGO | S_IWUSR,
+					show_prox_scheme, store_prox_scheme, 0);
+static IIO_DEVICE_ATTR(lux, S_IRUGO, show_lux, NULL, 0);
+static IIO_DEVICE_ATTR(ir, S_IRUGO, show_ir, NULL, 0);
+static IIO_DEVICE_ATTR(proxim_ir, S_IRUGO, show_proxim_ir, NULL, 0);
+static IIO_DEVICE_ATTR(name, S_IRUGO, show_name, NULL, 0);
+
+static struct attribute *isl29018_attributes[] = {
+	&iio_dev_attr_name.dev_attr.attr,
+	&iio_dev_attr_range.dev_attr.attr,
+	&iio_dev_attr_resolution.dev_attr.attr,
+	&iio_dev_attr_proximity_scheme.dev_attr.attr,
+	&iio_dev_attr_lux.dev_attr.attr,
+	&iio_dev_attr_ir.dev_attr.attr,
+	&iio_dev_attr_proxim_ir.dev_attr.attr,
 	NULL
 };
 
-static int isl29018_init_client(struct i2c_client *client)
+static const struct attribute_group isl29108_group = {
+	.attrs = isl29018_attributes,
+};
+
+static int isl29018_chip_init(struct i2c_client *client)
 {
-	struct isl29018_data *data = i2c_get_clientdata(client);
+	struct isl29018_chip *chip = i2c_get_clientdata(client);
 	bool status;
 	int i;
 	int new_adc_bit;
 	unsigned int new_range;
 
-	for (i = 0; i < ARRAY_SIZE(data->reg_cache); i++) {
-		data->reg_cache[i] = 0;
+	for (i = 0; i < ARRAY_SIZE(chip->reg_cache); i++) {
+		chip->reg_cache[i] = 0;
 	}
 
 	/* set defaults */
-	status = isl29018_set_range(client, data->range, &new_range);
+	status = isl29018_set_range(client, chip->range, &new_range);
 	if (status)
-		status = isl29018_set_resolution(client, data->adc_bit,
+		status = isl29018_set_resolution(client, chip->adc_bit,
 							&new_adc_bit);
 	if (!status) {
 		dev_err(&client->dev, "Init of isl29018 fails\n");
@@ -428,56 +444,59 @@ static int isl29018_init_client(struct i2c_client *client)
 static int __devinit isl29018_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
-	struct isl29018_data *data;
+	struct isl29018_chip *chip;
 	int err;
 
-	data = kzalloc(sizeof (struct isl29018_data), GFP_KERNEL);
-	if (!data) {
+	chip = kzalloc(sizeof (struct isl29018_chip), GFP_KERNEL);
+	if (!chip) {
 		dev_err(&client->dev, "Memory allocation fails\n");
 		err = -ENOMEM;
 		goto exit;
 	}
 
-	i2c_set_clientdata(client, data);
-	mutex_init(&data->lock);
+	i2c_set_clientdata(client, chip);
+	chip->client = client;
 
-	data->range = 1000;
-	data->adc_bit = 16;
+	mutex_init(&chip->lock);
 
-	err = isl29018_init_client(client);
+	chip->range = 1000;
+	chip->adc_bit = 16;
+
+	err = isl29018_chip_init(client);
 	if (err)
 		goto exit_free;
 
-	/* Register sysfs hooks */
-	data->attrs.attrs = isl29018_attr;
-	err = sysfs_create_group(&client->dev.kobj, &data->attrs);
-	if (err) {
-		dev_err(&client->dev, "Not able to create the sysfs\n");
+	chip->indio_dev = iio_allocate_device();
+	if (!chip->indio_dev) {
+		dev_err(&client->dev, "iio allocation fails\n");
 		goto exit_free;
 	}
-	data->hwmon_dev = hwmon_device_register(&client->dev);
-	if (IS_ERR(data->hwmon_dev)) {
-		dev_err(&client->dev, "hwmon registration fails\n");
-		err = PTR_ERR(data->hwmon_dev);
-		goto exit_remove;
+	chip->indio_dev->attrs = &isl29108_group;
+	chip->indio_dev->dev.parent = &client->dev;
+	chip->indio_dev->dev_data = (void *)(chip);
+	chip->indio_dev->driver_module = THIS_MODULE;
+	chip->indio_dev->modes = INDIO_DIRECT_MODE;
+	err = iio_device_register(chip->indio_dev);
+	if (err) {
+		dev_err(&client->dev, "iio registration fails\n");
+		goto exit_iio_free;
 	}
 	return 0;
-exit_remove:
-	sysfs_remove_group(&client->dev.kobj, &data->attrs);
+exit_iio_free:
+	iio_free_device(chip->indio_dev);
 exit_free:
-	kfree(data);
+	kfree(chip);
 exit:
 	return err;
 }
 
 static int __devexit isl29018_remove(struct i2c_client *client)
 {
-	struct isl29018_data *data = i2c_get_clientdata(client);
+	struct isl29018_chip *chip = i2c_get_clientdata(client);
 
 	dev_dbg(&client->dev, "%s()\n", __func__);
-	hwmon_device_unregister(data->hwmon_dev);
-	sysfs_remove_group(&client->dev.kobj, &data->attrs);
-	kfree(data);
+	iio_device_unregister(chip->indio_dev);
+	kfree(chip);
 	return 0;
 }
 
