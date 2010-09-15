@@ -63,7 +63,7 @@ enum {USB_HW_MIN_SYSTEM_FREQ_KH = 100000};
 /**
  * Minimum cpu frequency required for USB for optimal performance
  */
-enum {USB_HW_MIN_CPU_FREQ_KH = 200000};
+enum {USB_HW_MIN_CPU_FREQ_KH = 300000};
 
 /**
  * Wait time(1 second) for controller H/W status to change before giving up.

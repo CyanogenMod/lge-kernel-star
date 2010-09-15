@@ -567,7 +567,10 @@ static void power_host(struct nvhost_module *mod, enum nvhost_power_action actio
 
 	if (action == NVHOST_POWER_ACTION_ON) {
 		nvhost_intr_start(&dev->intr, clk_get_rate(mod->clk[0]));
-		nvhost_syncpt_reset(&dev->syncpt);
+		/* don't do it, as display may have changed syncpt
+		 * after the last save
+		 * nvhost_syncpt_reset(&dev->syncpt);
+		 */
 	} else if (action == NVHOST_POWER_ACTION_OFF) {
 		int i;
 		for (i = 0; i < NVHOST_NUMCHANNELS; i++)
@@ -723,13 +726,28 @@ static int nvhost_suspend(struct platform_device *pdev, pm_message_t state)
 	struct nvhost_dev *host = platform_get_drvdata(pdev);
 	dev_info(&pdev->dev, "suspending\n");
 	nvhost_module_suspend(&host->mod);
+	clk_enable(host->mod.clk[0]);
+	nvhost_syncpt_save(&host->syncpt);
+	clk_disable(host->mod.clk[0]);
 	dev_info(&pdev->dev, "suspended\n");
+	return 0;
+}
+
+static int nvhost_resume(struct platform_device *pdev)
+{
+	struct nvhost_dev *host = platform_get_drvdata(pdev);
+	dev_info(&pdev->dev, "resuming\n");
+	clk_enable(host->mod.clk[0]);
+	nvhost_syncpt_reset(&host->syncpt);
+	clk_disable(host->mod.clk[0]);
+	dev_info(&pdev->dev, "resumed\n");
 	return 0;
 }
 
 static struct platform_driver nvhost_driver = {
 	.remove = __exit_p(nvhost_remove),
 	.suspend = nvhost_suspend,
+	.resume = nvhost_resume,
 	.driver = {
 		.owner = THIS_MODULE,
 		.name = DRIVER_NAME

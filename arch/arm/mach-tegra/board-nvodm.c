@@ -501,6 +501,9 @@ static void __init tegra_setup_hsuart(void)
 		if (i==dbg_id)
 			continue;
 
+		if (odm_table[i] == 0)
+			continue;
+
 		plat = &tegra_uart_platform[i];
 
 		snprintf(name, sizeof(name), "%s.%d",
