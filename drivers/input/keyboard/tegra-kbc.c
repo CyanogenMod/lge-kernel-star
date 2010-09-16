@@ -79,7 +79,7 @@ static int tegra_kbc_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct tegra_kbc *kbc = platform_get_drvdata(pdev);
 
-	if (device_may_wakeup(&pdev->dev)) {
+	if (device_may_wakeup(&pdev->dev) && kbc->pdata->wake_cnt) {
 		tegra_kbc_setup_wakekeys(kbc, true);
 		enable_irq_wake(kbc->irq);
 		tegra_configure_dpd_kbc(kbc->wake_enable_rows, kbc->wake_enable_cols);
@@ -97,7 +97,7 @@ static int tegra_kbc_resume(struct platform_device *pdev)
 {
 	struct tegra_kbc *kbc = platform_get_drvdata(pdev);
 
-	if (device_may_wakeup(&pdev->dev)) {
+	if (device_may_wakeup(&pdev->dev) && kbc->pdata->wake_cnt) {
 		disable_irq_wake(kbc->irq);
 		tegra_kbc_setup_wakekeys(kbc, false);
 		tegra_configure_dpd_kbc(0, 0);

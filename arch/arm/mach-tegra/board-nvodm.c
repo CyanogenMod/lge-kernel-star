@@ -726,6 +726,7 @@ static noinline void __init tegra_setup_kbc(void)
 		pr_err("%s: out of memory for key mapping\n", __func__);
 		return;
 	}
+	pdata->wake_cnt = 0;
 	if (NvOdmKbcIsSelectKeysWkUpEnabled(&wake_row, &wake_col, &wake_num)) {
 		BUG_ON(!wake_num || wake_num>=KBC_MAX_KEY);
 		pdata->wake_cfg = kzalloc(sizeof(*pdata->wake_cfg)*wake_num,
