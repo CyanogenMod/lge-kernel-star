@@ -43,6 +43,8 @@
 static LIST_HEAD(clocks);
 static DEFINE_SPINLOCK(clock_lock);
 static NvU32 clk_pwr_client;
+static NvU32 busy_pwr_client_2d;
+static NvU32 busy_pwr_client_3d;
 
 struct clk *get_tegra_clock_by_name(const char *name)
 {
@@ -100,11 +102,16 @@ static int tegra_periph_clk_enable(struct clk *c)
 		return -ENXIO;
 	}
 
-	/* max out emc when 3d is on */
+	/* max out emc when 2d or 3d is on */
 	if (NVRM_MODULE_ID_MODULE(c->module) == NvRmModuleID_3D) {
 		NvRmDfsBusyHint hint =
 			{NvRmDfsClockId_Emc, 0xffffffff, NvRmFreqMaximum, true};
-		NvRmPowerBusyHintMulti(s_hRmGlobal, clk_pwr_client, &hint, 1,
+		NvRmPowerBusyHintMulti(s_hRmGlobal, busy_pwr_client_3d, &hint, 1,
+			NvRmDfsBusyHintSyncMode_Async);
+	} else if (NVRM_MODULE_ID_MODULE(c->module) == NvRmModuleID_2D) {
+		NvRmDfsBusyHint hint =
+			{NvRmDfsClockId_Emc, 0xffffffff, NvRmFreqMaximum, true};
+		NvRmPowerBusyHintMulti(s_hRmGlobal, busy_pwr_client_2d, &hint, 1,
 			NvRmDfsBusyHintSyncMode_Async);
 	}
 
@@ -117,7 +124,11 @@ static void tegra_periph_clk_disable(struct clk *c)
 
 	if (NVRM_MODULE_ID_MODULE(c->module) == NvRmModuleID_3D) {
 		NvRmDfsBusyHint hint = {NvRmDfsClockId_Emc, 0, 0, true};
-		NvRmPowerBusyHintMulti(s_hRmGlobal, clk_pwr_client, &hint, 1,
+		NvRmPowerBusyHintMulti(s_hRmGlobal, busy_pwr_client_3d, &hint, 1,
+			NvRmDfsBusyHintSyncMode_Async);
+	} else if (NVRM_MODULE_ID_MODULE(c->module) == NvRmModuleID_2D) {
+		NvRmDfsBusyHint hint = {NvRmDfsClockId_Emc, 0, 0, true};
+		NvRmPowerBusyHintMulti(s_hRmGlobal, busy_pwr_client_2d, &hint, 1,
 			NvRmDfsBusyHintSyncMode_Async);
 	}
 
@@ -443,6 +454,8 @@ void __init tegra_init_clock(void)
 
 	NvRmPrivPostRegulatorInit(s_hRmGlobal);
 	NvRmPowerRegister(s_hRmGlobal, 0, &clk_pwr_client);
+	NvRmPowerRegister(s_hRmGlobal, 0, &busy_pwr_client_2d);
+	NvRmPowerRegister(s_hRmGlobal, 0, &busy_pwr_client_3d);
 	tegra2_init_clocks();
 
 #ifdef CONFIG_USE_ARM_TWD_PRESCALER
