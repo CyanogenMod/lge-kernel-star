@@ -571,7 +571,7 @@ NvOdmAccelOpen(NvOdmAccelHandle* hDevice)
     hAccel->Caption.MinSampleRate = 3;
     hAccel->PowerState = NvOdmAccelPower_Fullrun;
     hAccel->AxisXMapping = NvOdmAccelAxis_X;
-    hAccel->AxisXDirection = 1;
+    hAccel->AxisXDirection = -1;
     hAccel->AxisYMapping = NvOdmAccelAxis_Y;
     hAccel->AxisYDirection = 1;
     hAccel->AxisZMapping = NvOdmAccelAxis_Z;
