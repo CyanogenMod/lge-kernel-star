@@ -707,6 +707,7 @@ static const NvRmPllFixedConfig s_Ap15HdmiPllC_Configurations[] =
     NVRM_PLLHC_AT_26MHZ
 };
 
+#define NVRM_HDMI_CPCON (8)
 
 void
 NvRmPrivAp15PllConfigureHdmi(
@@ -734,7 +735,7 @@ NvRmPrivAp15PllConfigureHdmi(
         return;
     }
     NvRmPrivAp15PllSet(hRmDevice, pCinfo, HdmiConfig.M, HdmiConfig.N,
-                       HdmiConfig.P, (NvU32)-1, 0, 0, NV_TRUE, 0);
+        HdmiConfig.P, (NvU32)-1, NVRM_HDMI_CPCON, 0, NV_FALSE, 0);
     *pPllOutKHz = NvRmPrivGetClockSourceFreq(pCinfo->SourceId);
 }
 
