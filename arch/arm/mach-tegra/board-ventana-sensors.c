@@ -20,6 +20,7 @@
 
 #include <linux/i2c.h>
 #include <mach/gpio.h>
+#include <linux/i2c/nct1008.h>
 #include "gpio-names.h"
 
 #define ISL29018_IRQ_GPIO	TEGRA_GPIO_PZ2
@@ -44,6 +45,19 @@ static const struct i2c_board_info ventana_i2c2_board_info[] = {
 	},
 };
 
+struct nct1008_platform_data ventana_nct1008_pdata = {
+	.conv_rate = 5,
+	.config = NCT1008_CONFIG_ALERT_DISABLE,
+	.thermal_threshold = 110,
+};
+
+static struct i2c_board_info ventana_i2c4_board_info[] = {
+	{
+		I2C_BOARD_INFO("nct1008", 0x4C),
+		.platform_data = &ventana_nct1008_pdata,
+	},
+};
+
 int __init ventana_sensors_init(void)
 {
 	ventana_isl29018_init();
@@ -53,6 +67,9 @@ int __init ventana_sensors_init(void)
 
 	i2c_register_board_info(2, ventana_i2c2_board_info,
 		ARRAY_SIZE(ventana_i2c2_board_info));
+
+	i2c_register_board_info(4, ventana_i2c4_board_info,
+		ARRAY_SIZE(ventana_i2c4_board_info));
 
 	return 0;
 }
