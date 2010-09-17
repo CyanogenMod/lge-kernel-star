@@ -28,6 +28,7 @@
 #include <mach/gpio.h>
 #include <mach/iomap.h>
 #include <mach/pinmux.h>
+#include <mach/powergate.h>
 #include <mach/system.h>
 
 #include "board.h"
@@ -87,6 +88,12 @@ void tegra_init_cache(void)
 
 }
 
+static void __init tegra_init_power(void)
+{
+	tegra_powergate_power_off(TEGRA_POWERGATE_MPE);
+	tegra_powergate_power_off(TEGRA_POWERGATE_3D);
+}
+
 void __init tegra_init_early(void)
 {
 	tegra_init_fuse();
@@ -94,6 +101,7 @@ void __init tegra_init_early(void)
 	tegra_init_clock();
 	tegra_init_pinmux();
 	tegra_clk_init_from_table(common_clk_init_table);
+	tegra_init_power();
 	tegra_init_cache();
 }
 
