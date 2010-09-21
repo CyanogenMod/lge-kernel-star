@@ -109,8 +109,8 @@ static int play_thread( void *arg)
 		if (kthread_should_stop())
 			break;
 
-		if ((prtd->audiofx_frames < runtime->control->appl_ptr) &&
-			(state != NvAudioFxState_Stop)) {
+		if ((prtd->state != SNDRV_PCM_TRIGGER_STOP) &&
+			 (runtime->status->state != SNDRV_PCM_STATE_DRAINING )) {
 			memset(&abd, 0, sizeof(NvAudioFxBufferDescriptor));
 
 			size = TEGRA_DEFAULT_BUFFER_SIZE;
@@ -148,8 +148,8 @@ static int play_thread( void *arg)
 			continue;
 		}
 
-		if ((buffer_to_prime == buffer_in_queue) ||
-			(prtd->audiofx_frames >= runtime->control->appl_ptr)) {
+		if ((buffer_to_prime == buffer_in_queue) &&
+				(prtd->state != SNDRV_PCM_TRIGGER_STOP))  {
 			down(&prtd->buf_done_sem);
 
 			buffer_in_queue--;
