@@ -177,7 +177,7 @@ static struct platform_device *platform_devices[] = {
 };
 
 static struct i2c_board_info bus0_i2c_devices[] = {
-#ifdef CONFIG_SENSORS_ISL29018
+#ifdef CONFIG_ISL29018
 	{
 		I2C_BOARD_INFO("isl29018", 0x44),
 		.irq = (INT_GPIO_BASE + TEGRA_GPIO_PZ2),
