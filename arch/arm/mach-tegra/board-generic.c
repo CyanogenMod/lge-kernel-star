@@ -359,6 +359,7 @@ static void __init tegra_harmony_init(void)
 	do_system_init(true, true);
 }
 
+
 static void __init tegra_ventana_init(void)
 {
 #ifdef CONFIG_USB_ANDROID
@@ -368,6 +369,7 @@ static void __init tegra_ventana_init(void)
 	i2c_device_setup();
 	tegra_setup_32khz_clock();
 	tegra_setup_bluesleep();
+	ventana_setup_wifi();
 }
 
 static void __init tegra_generic_init(void)

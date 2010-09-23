@@ -200,6 +200,7 @@ static void tegra_debug_port_resume(void)
 				uart_debug_port.nr_pins, TEGRA_TRI_NORMAL);
 }
 
+
 #ifdef CONFIG_MMC_SDHCI_TEGRA
 extern struct tegra_nand_platform tegra_nand_plat;
 static struct tegra_sdhci_platform_data tegra_sdhci_platform[] = {
@@ -356,6 +357,13 @@ static void __init tegra_setup_sdhci(void) {
 
 		plat->is_removable = prop->IsCardRemovable;
 		plat->is_always_on = prop->AlwaysON;
+
+#ifdef CONFIG_MACH_VENTANA
+		if (prop->usage == NvOdmQuerySdioSlotUsage_wlan)
+			plat->register_status_notify =
+				ventana_wifi_status_register;
+#endif
+
 		if (!gpio)
 			gpio_count = 0;
 		switch (gpio_count) {

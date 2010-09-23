@@ -42,6 +42,9 @@ struct tegra_sdhci_platform_data {
 #ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
 	unsigned long offset;	/* offset in blocks to MBR */
 #endif
+	/* card detect callback registration function*/
+	int (*register_status_notify)(void (*callback)(int card_present,
+		void *dev_id), void *dev_id);
 };
 
 

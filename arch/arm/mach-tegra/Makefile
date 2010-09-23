@@ -54,3 +54,4 @@ obj-$(CONFIG_TEGRA_NVEC)		+= nvec/
 obj-$(CONFIG_TEGRA_FUSE)		+= sysfs-fuse.o
 obj-$(CONFIG_TEGRA_ODM_VIBRATE)		+= vibrate.o
 obj-$(CONFIG_TEGRA_AES_USER)		+= nvaes_user.o
+obj-$(CONFIG_MACH_VENTANA)		+= board-ventana-wifi.o

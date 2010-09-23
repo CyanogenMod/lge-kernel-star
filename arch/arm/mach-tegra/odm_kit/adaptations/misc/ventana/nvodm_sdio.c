@@ -15,8 +15,6 @@
 #include "nvodm_pmu.h"
 #include "nvos.h"
 
-#define WLAN_GUID   NV_ODM_GUID('s','d','i','o','w','l','a','n')
-
 typedef struct NvOdmSdioRec
 {
     // NvODM PMU device handle
@@ -69,38 +67,15 @@ static void NvOdmSetPowerOnSdio(NvOdmSdioHandle pDevice, NvBool enable)
     }
 }
 
-static NvBool SdioOdmWlanPower(NvOdmSdioHandle hOdmSdio, NvBool IsEnable)
-{
-    if (IsEnable)
-    {
-        // Wlan Power On Reset Sequence
-        NvOdmGpioSetState(hOdmSdio->hGpio, hOdmSdio->hPwrPin, 0x0);
-        NvOdmGpioSetState(hOdmSdio->hGpio, hOdmSdio->hResetPin, 0x0);
-        NvOdmOsSleepMS(200);
-        NvOdmGpioSetState(hOdmSdio->hGpio, hOdmSdio->hPwrPin, 0x1);
-        NvOdmGpioSetState(hOdmSdio->hGpio, hOdmSdio->hResetPin, 0x1);
-        NvOdmOsSleepMS(200);
-     }
-     else
-     {
-         // Power Off sequence
-         NvOdmGpioSetState(hOdmSdio->hGpio, hOdmSdio->hPwrPin, 0x0);
-     }
-
-    return NV_TRUE;
-}
-
 NvOdmSdioHandle NvOdmSdioOpen(NvU32 Instance)
 {
     static NvOdmSdio *pDevice = NULL;
-    NvOdmServicesGpioHandle hGpioTemp = NULL;
     const NvOdmPeripheralConnectivity *pConnectivity;
     NvU32 NumOfGuids = 1;
     NvU64 guid;
     NvU32 searchVals[2];
     const NvU32 *pOdmConfigs;
     NvU32 NumOdmConfigs;
-    NvBool Status = NV_TRUE;
     const NvOdmPeripheralSearch searchAttrs[] =
     {
         NvOdmPeripheralSearch_IoModule,
@@ -144,52 +119,6 @@ NvOdmSdioHandle NvOdmSdioOpen(NvU32 Instance)
     pDevice->pConnectivity = pConnectivity;
     NvOdmSetPowerOnSdio(pDevice, NV_TRUE);
 
-    if (pConnectivity->Guid == WLAN_GUID)
-    {
-        // Getting the OdmGpio Handle
-        hGpioTemp = NvOdmGpioOpen();
-        if (hGpioTemp == NULL)
-        {
-            NvOdmOsFree(pDevice);
-            pDevice = NULL;
-            return (pDevice);
-        }
-
-        // Search for the Vdd rail and set the proper volage to the rail.
-        if (pConnectivity->AddressList[1].Interface == NvOdmIoModule_Gpio)
-        {
-             // Acquiring Pin Handles for Power Pin
-             pDevice->hPwrPin= NvOdmGpioAcquirePinHandle(hGpioTemp,
-                   pConnectivity->AddressList[1].Instance,
-                   pConnectivity->AddressList[1].Address);
-        }
-
-        if (pConnectivity->AddressList[2].Interface == NvOdmIoModule_Gpio)
-        {
-             // Acquiring Pin Handles for Reset Pin
-             pDevice->hResetPin= NvOdmGpioAcquirePinHandle(hGpioTemp,
-                   pConnectivity->AddressList[2].Instance,
-                   pConnectivity->AddressList[2].Address);
-        }
-
-        // Setting the ON/OFF pin to output mode.
-        NvOdmGpioConfig(hGpioTemp, pDevice->hPwrPin, NvOdmGpioPinMode_Output);
-        NvOdmGpioConfig(hGpioTemp, pDevice->hResetPin, NvOdmGpioPinMode_Output);
-
-        // Setting the Output Pin to Low
-        NvOdmGpioSetState(hGpioTemp, pDevice->hPwrPin, 0x0);
-        NvOdmGpioSetState(hGpioTemp, pDevice->hResetPin, 0x0);
-
-        pDevice->hGpio = hGpioTemp;
-
-        Status = SdioOdmWlanPower(pDevice, NV_TRUE);
-        if (Status != NV_TRUE)
-        {
-            NvOdmOsFree(pDevice);
-            pDevice = NULL;
-            return (pDevice);
-        }
-    }
     pDevice->PoweredOn = NV_TRUE;
     pDevice->Instance = Instance;
     return pDevice;
@@ -197,15 +126,6 @@ NvOdmSdioHandle NvOdmSdioOpen(NvU32 Instance)
 
 void NvOdmSdioClose(NvOdmSdioHandle hOdmSdio)
 {
-    if (hOdmSdio->pConnectivity->Guid == WLAN_GUID)
-    {
-        // Call Turn off power when close is Called
-        (void)SdioOdmWlanPower(hOdmSdio, NV_FALSE);
-
-        NvOdmGpioReleasePinHandle(hOdmSdio->hGpio, hOdmSdio->hPwrPin);
-        NvOdmGpioReleasePinHandle(hOdmSdio->hGpio, hOdmSdio->hResetPin);
-        NvOdmGpioClose(hOdmSdio->hGpio);
-    }
     NvOdmSetPowerOnSdio(hOdmSdio, NV_FALSE);
     if (hOdmSdio->hPmu != NULL)
     {
@@ -225,9 +145,6 @@ NvBool NvOdmSdioSuspend(NvOdmSdioHandle hOdmSdio)
 
     NvOdmSetPowerOnSdio(hOdmSdio, NV_FALSE);
 
-    if (hOdmSdio->pConnectivity->Guid == WLAN_GUID)
-        Status = SdioOdmWlanPower(hOdmSdio, NV_FALSE);
-
     hOdmSdio->PoweredOn = NV_FALSE;
     return Status;
 
@@ -241,9 +158,6 @@ NvBool NvOdmSdioResume(NvOdmSdioHandle hOdmSdio)
         return NV_TRUE;
 
     NvOdmSetPowerOnSdio(hOdmSdio, NV_TRUE);
-
-    if (hOdmSdio->pConnectivity->Guid == WLAN_GUID)
-        Status = SdioOdmWlanPower(hOdmSdio, NV_TRUE);
 
     hOdmSdio->PoweredOn = NV_TRUE;
     return Status;

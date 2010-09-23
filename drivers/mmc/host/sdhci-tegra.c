@@ -74,7 +74,7 @@ static irqreturn_t card_detect_isr(int irq, void *dev_id)
 	struct tegra_sdhci *host = sdhci_priv(sdhost);
 
 	host->card_present =
-		(gpio_get_value(host->gpio_cd)==host->gpio_polarity_cd);
+		(gpio_get_value(host->gpio_cd) == host->gpio_polarity_cd);
 	smp_wmb();
 	sdhci_card_detect_callback(sdhost);
 
@@ -88,12 +88,24 @@ static bool tegra_sdhci_card_detect(struct sdhci_host *sdhost)
 	return host->card_present;
 }
 
+static void tegra_sdhci_status_notify_cb(int card_present, void *dev_id)
+{
+	struct sdhci_host *sdhost = dev_id;
+	struct tegra_sdhci *host = sdhci_priv(sdhost);
+
+	dev_dbg(&host->pdev->dev, "%s: card_present %d\n",
+		mmc_hostname(sdhost->mmc), card_present);
+
+	host->card_present = card_present;
+	sdhci_card_detect_callback(sdhost);
+}
+
 static int tegra_sdhci_get_ro(struct sdhci_host *sdhost)
 {
 	struct tegra_sdhci *host = sdhci_priv(sdhost);
 
 	BUG_ON(host->gpio_wp == -1);
-	return (gpio_get_value(host->gpio_wp)==host->gpio_polarity_wp);
+	return (gpio_get_value(host->gpio_wp) == host->gpio_polarity_wp);
 }
 
 static void tegra_sdhci_set_clock(struct sdhci_host *sdhost,
@@ -236,7 +248,7 @@ int __init tegra_sdhci_probe(struct platform_device *pdev)
 			host->gpio_cd = -1;
 			host->irq_cd = -1;
 			goto skip_gpio_cd;
-		} 
+		}
 		ret = gpio_direction_input(host->gpio_cd);
 		if (ret < 0) {
 			dev_err(&pdev->dev, "failed to configure GPIO\n");
@@ -255,7 +267,8 @@ int __init tegra_sdhci_probe(struct platform_device *pdev)
 			goto skip_gpio_cd;
 		}
 		host->card_present =
-			(gpio_get_value(host->gpio_cd)==host->gpio_polarity_cd);
+			(gpio_get_value(host->gpio_cd) ==
+				host->gpio_polarity_cd);
 	}
 skip_gpio_cd:
 	ret = 0;
@@ -308,6 +321,10 @@ skip_gpio_wp:
 
 	if (!plat->is_removable)
 		host->card_present = true;
+
+	if (plat->register_status_notify)
+		plat->register_status_notify(tegra_sdhci_status_notify_cb,
+			sdhost);
 
 	sdhost->data_width = plat->bus_width;
 	sdhost->dma_mask = DMA_BIT_MASK(32);
@@ -400,7 +417,7 @@ static void tegra_sdhci_restore_interrupts(struct sdhci_host *sdhost)
 	sdhci_writel(sdhost, ierr, SDHCI_INT_ENABLE);
 	sdhci_writel(sdhost, ierr, SDHCI_SIGNAL_ENABLE);
 
-	if ( (host->sdhci_ints & SDHCI_INT_CARD_INT) &&
+	if ((host->sdhci_ints & SDHCI_INT_CARD_INT) &&
 		(sdhost->quirks & SDHCI_QUIRK_ENABLE_INTERRUPT_AT_BLOCK_GAP)) {
 		u8 gap_ctrl = sdhci_readb(sdhost, SDHCI_BLOCK_GAP_CONTROL);
 		gap_ctrl |= 0x8;
@@ -493,7 +510,7 @@ static int tegra_sdhci_resume(struct device *dev)
 		host->clk_enable = true;
 	}
 
-	if(host->card_always_on && is_card_sdio(sdhost->mmc->card)) {
+	if (host->card_always_on && is_card_sdio(sdhost->mmc->card)) {
 		int ret = 0;
 
 		/* soft reset SD host controller and enable interrupts */
@@ -508,7 +525,7 @@ static int tegra_sdhci_resume(struct device *dev)
 		return 0;
 	}
 
-	if(host->hOdmSdio)
+	if (host->hOdmSdio)
 		NvOdmSdioResume(host->hOdmSdio);
 
 	return sdhci_resume_host(sdhost);
@@ -517,7 +534,7 @@ static struct dev_pm_ops tegra_sdhci_pm = {
 	.suspend = tegra_sdhci_suspend,
 	.resume = tegra_sdhci_resume,
 };
-#define tegra_sdhci_pm_ops &tegra_sdhci_pm
+#define tegra_sdhci_pm_ops (&tegra_sdhci_pm)
 #else
 #define tegra_sdhci_pm_ops NULL
 #endif

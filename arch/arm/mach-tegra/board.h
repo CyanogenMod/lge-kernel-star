@@ -52,4 +52,12 @@ bool tegra_chip_compare(u32 chip, u32 major_rev, u32 minor_rev);
 bool tegra_is_ap20_a03p(void);
 
 extern struct sys_timer tegra_timer;
+
+#ifdef CONFIG_MACH_VENTANA
+extern int __init ventana_setup_wifi(void);
+int ventana_wifi_status_register(void (*callback)(int card_present,
+	void  *dev_id), void *dev_id);
+#endif
+
+
 #endif
