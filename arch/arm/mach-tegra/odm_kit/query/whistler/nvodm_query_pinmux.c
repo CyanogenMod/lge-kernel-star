@@ -55,6 +55,14 @@ static const NvU32 s_NvOdmPinMuxConfig_Uart_Hsi_Ulpi[] = {
     0, // UART-E function disabled: pins used by WiFi (SDIO1)
 };
 
+static const NvU32 s_NvOdmPinMuxConfig_Uart_Ril_Emp[] = {
+    NvOdmUartPinMap_Config6,    // Instance 0: UART-A is mapped to UAA pin group.
+    NvOdmUartPinMap_Config1,    // Instance 1: UART-B
+    NvOdmUartPinMap_Config1,    // Instance 2: UART-C
+    0, // UART-D function disabled: pins used by BB (SPI1)
+    0, // UART-E function disabled: pins used by WiFi (SDIO1)
+};
+
 
 static const NvU32 s_NvOdmPinMuxConfig_Uart[] = {
     NvOdmUartPinMap_Config1,
@@ -335,6 +343,11 @@ NvOdmQueryPinMux(
         {
             *pPinMuxConfigTable = s_NvOdmPinMuxConfig_Uart_Hsi_Ulpi;
             *pCount = NV_ARRAY_SIZE(s_NvOdmPinMuxConfig_Uart_Hsi_Ulpi);
+        }
+        else if (Ril == TEGRA_DEVKIT_BCT_CUSTOPT_0_RIL_EMP_RAINBOW)
+        {
+            *pPinMuxConfigTable = s_NvOdmPinMuxConfig_Uart_Ril_Emp;
+            *pCount = NV_ARRAY_SIZE(s_NvOdmPinMuxConfig_Uart_Ril_Emp);
         }
         else
         {
