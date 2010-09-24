@@ -19,6 +19,24 @@
  */
 
 #include <linux/i2c.h>
+#include <mach/gpio.h>
+#include "gpio-names.h"
+
+#define ISL29018_IRQ_GPIO	TEGRA_GPIO_PZ2
+
+static void ventana_isl29018_init(void)
+{
+	tegra_gpio_enable(ISL29018_IRQ_GPIO);
+	gpio_request(ISL29018_IRQ_GPIO, "isl29018");
+	gpio_direction_input(ISL29018_IRQ_GPIO);
+}
+
+static const struct i2c_board_info ventana_i2c0_board_info[] = {
+	{
+		I2C_BOARD_INFO("isl29018", 0x44),
+		.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PZ2),
+	},
+};
 
 static const struct i2c_board_info ventana_i2c2_board_info[] = {
 	{
@@ -28,6 +46,11 @@ static const struct i2c_board_info ventana_i2c2_board_info[] = {
 
 int __init ventana_sensors_init(void)
 {
+	ventana_isl29018_init();
+
+	i2c_register_board_info(0, ventana_i2c0_board_info,
+		ARRAY_SIZE(ventana_i2c0_board_info));
+
 	i2c_register_board_info(2, ventana_i2c2_board_info,
 		ARRAY_SIZE(ventana_i2c2_board_info));
 
