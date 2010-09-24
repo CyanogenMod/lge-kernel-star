@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.32.9
-# Thu Sep 23 19:40:15 2010
+# Fri Sep 24 17:11:17 2010
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -1568,7 +1568,30 @@ CONFIG_ANDROID_TIMED_GPIO=y
 # RAR Register Driver
 #
 # CONFIG_RAR_REGISTER is not set
-# CONFIG_IIO is not set
+CONFIG_IIO=y
+# CONFIG_IIO_RING_BUFFER is not set
+# CONFIG_IIO_TRIGGER is not set
+
+#
+# Accelerometers
+#
+# CONFIG_KXSD9 is not set
+# CONFIG_LIS3L02DQ is not set
+
+#
+# Analog to digital convertors
+#
+# CONFIG_MAX1363 is not set
+
+#
+# Light sensors
+#
+# CONFIG_TSL2561 is not set
+CONFIG_ISL29018=y
+
+#
+# Triggers - standalone
+#
 
 #
 # File systems
