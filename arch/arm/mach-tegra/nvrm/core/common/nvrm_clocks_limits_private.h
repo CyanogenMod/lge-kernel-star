@@ -44,7 +44,7 @@ extern "C"
 #define NVRM_PROCESS_CORNERS (4)
 
 // Maximum supported core and/or CPU voltage characterization steps
-#define NVRM_VOLTAGE_STEPS (7)
+#define NVRM_VOLTAGE_STEPS (8)
 
 // Minimum required core voltage resolution
 #define NVRM_CORE_RESOLUTION_MV (25)
