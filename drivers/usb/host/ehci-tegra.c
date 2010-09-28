@@ -177,6 +177,12 @@ static void tegra_ehci_restart (struct usb_hcd *hcd)
 	ehci->command |= CMD_RUN;
 	ehci_writel(ehci, ehci->command, &ehci->regs->command);
 
+	/* Enable the root Port Power */
+	if (HCS_PPC (ehci->hcs_params)) {
+		temp = ehci_readl(ehci, &ehci->regs->port_status[0]);
+		ehci_writel(ehci, temp | PORT_POWER, &ehci->regs->port_status[0]);
+	}
+
 	down_write(&ehci_cf_port_reset_rwsem);
 	hcd->state = HC_STATE_RUNNING;
 	/* unblock posted writes */
