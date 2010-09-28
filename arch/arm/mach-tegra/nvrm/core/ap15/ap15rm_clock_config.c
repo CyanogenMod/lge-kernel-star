@@ -314,6 +314,7 @@ NvRmPrivAp15PllSet(
     NvU32 old_base, old_misc;
     NvU32 delay = 0;
     NvU32 override = 0;
+    NvBool diff_clock = NV_FALSE;
 
     NV_ASSERT(hRmDevice);
     NV_ASSERT(pCinfo);
@@ -442,15 +443,32 @@ NvRmPrivAp15PllSet(
     }
 
     // If PLL is not bypassed, and new configurations is the same as the old
-    // one - exit without overwriting h/w. Otherwise, bypass PLL before
-    // changing configuration.
+    // one - exit without overwriting h/w. Otherwise, bypass and disable PLL
+    // outputs before changing configuration.
     if ((base == old_base) && (misc == old_misc))
     {
         NvRmPrivPllFreqUpdate(hRmDevice, pCinfo);
         return;
     }
+    if (pCinfo->SourceId == NvRmClockSource_PllD0)
+    {
+        old_misc = NV_FLD_SET_DRF_NUM(
+            CLK_RST_CONTROLLER, PLLD_MISC, PLLD_CLKENABLE, 0, old_misc);
+        NV_REGW(hRmDevice, NvRmPrivModuleID_ClockAndReset, 0,
+                pCinfo->PllMiscOffset, old_misc);
+        if (NV_DRF_VAL(CLK_RST_CONTROLLER, PLLD_MISC, PLLD_CLKENABLE, misc))
+        {
+            diff_clock = NV_TRUE;
+            misc = NV_FLD_SET_DRF_NUM(
+                CLK_RST_CONTROLLER, PLLD_MISC, PLLD_CLKENABLE, 0, misc);
+        }
+    }
     old_base = NV_FLD_SET_DRF_DEF(
         CLK_RST_CONTROLLER, PLLP_BASE, PLLP_BYPASS, ENABLE, old_base);
+    NV_REGW(hRmDevice, NvRmPrivModuleID_ClockAndReset, 0,
+            pCinfo->PllBaseOffset, old_base);
+    old_base = NV_FLD_SET_DRF_DEF(
+        CLK_RST_CONTROLLER, PLLP_BASE, PLLP_ENABLE, DISABLE, old_base);
     NV_REGW(hRmDevice, NvRmPrivModuleID_ClockAndReset, 0,
             pCinfo->PllBaseOffset, old_base);
 
@@ -474,6 +492,13 @@ NvRmPrivAp15PllSet(
         StableDelayUs = delay;
     NvOsWaitUS(StableDelayUs);
 
+    if (diff_clock)
+    {
+        misc = NV_FLD_SET_DRF_NUM(
+            CLK_RST_CONTROLLER, PLLD_MISC, PLLD_CLKENABLE, 1, misc);
+        NV_REGW(hRmDevice, NvRmPrivModuleID_ClockAndReset, 0,
+            pCinfo->PllMiscOffset, misc);
+    }
     base = NV_FLD_SET_DRF_DEF(
         CLK_RST_CONTROLLER, PLLP_BASE, PLLP_BYPASS, DISABLE, base);
     NV_REGW(hRmDevice, NvRmPrivModuleID_ClockAndReset, 0,
