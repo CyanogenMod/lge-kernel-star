@@ -99,6 +99,34 @@ static void UsbPrivEnableVbus(NvDdkUsbPhy *pUsbPhy, NvBool Enable)
                             pConnectivity->AddressList[i].Address, ODM_VOLTAGE_OFF, NULL);
                 }
             }
+            else if (pConnectivity->AddressList[i].Interface == NvOdmIoModule_Gpio)
+            {
+                if ((!pUsbPhy->hGpio))
+                {
+                    pUsbPhy->hGpio = (NvOdmServicesGpioHandle)NvOdmGpioOpen();
+                    if (!pUsbPhy->hGpio)
+                    {
+                        return;
+                    }
+                }
+                if (!pUsbPhy->hPin)
+                {
+                    NvU32 GpioPort = 0, GpioPin = 0;
+                    GpioPort = pConnectivity->AddressList[0].Instance;
+                    GpioPin = pConnectivity->AddressList[0].Address;
+                    pUsbPhy->hPin = NvOdmGpioAcquirePinHandle(pUsbPhy->hGpio, GpioPort, GpioPin);
+                    if (!pUsbPhy->hPin)
+                    {
+                        NvOdmGpioClose(pUsbPhy->hGpio);
+                        return;
+                    }
+                }
+                NvOdmGpioConfig(pUsbPhy->hGpio, pUsbPhy->hPin, NvOdmGpioPinMode_Output);
+                if (!Enable)
+                    NvOdmGpioSetState(pUsbPhy->hGpio, pUsbPhy->hPin, 0);
+                else
+                    NvOdmGpioSetState(pUsbPhy->hGpio, pUsbPhy->hPin, 1);
+            }
         }
     }
 }
@@ -615,6 +643,17 @@ NvDdkUsbPhyClose(
     }
 
     NvOdmEnableUsbPhyPowerRail(NV_FALSE);
+
+    if (hUsbPhy->hGpio)
+    {
+        if (hUsbPhy->hPin)
+        {
+            NvOdmGpioReleasePinHandle(hUsbPhy->hGpio, hUsbPhy->hPin);
+            hUsbPhy->hPin = NULL;
+        }
+        NvOdmGpioClose(hUsbPhy->hGpio);
+        hUsbPhy->hGpio = NULL;
+    }
 
     NvRmPhysicalMemUnmap(
         (void*)hUsbPhy->UsbVirAdr, hUsbPhy->UsbBankSize);

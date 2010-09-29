@@ -448,4 +448,14 @@
     NV_ARRAY_SIZE(s_AcceleroAddresses),
     NvOdmPeripheralClass_Other,
 },
+
+//  VBUS for USB3
+{
+    NV_VDD_USB3_VBUS_ODM_ID,
+    s_ffaVddUsb3VBusAddresses,
+    NV_ARRAY_SIZE(s_ffaVddUsb3VBusAddresses),
+    NvOdmPeripheralClass_Other
+},
+
+
 // NOTE: This list *must* end with a trailing comma.

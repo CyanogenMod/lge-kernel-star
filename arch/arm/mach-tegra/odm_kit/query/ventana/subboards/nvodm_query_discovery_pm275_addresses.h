@@ -393,3 +393,9 @@ static const NvOdmIoAddress s_AcceleroAddresses[] =
     { NvOdmIoModule_Gpio, (NvU32)'n'-'a', 0x04, 0 }, /* Gpio port N and Pin 4 */
 };
 
+// USB3 VBus voltage rail
+static const NvOdmIoAddress s_ffaVddUsb3VBusAddresses[] =
+{
+    { NvOdmIoModule_Gpio, (NvU32)'d'-'a', 0x03, 0 }, /* Gpio port D and Pin 3 */
+};
+

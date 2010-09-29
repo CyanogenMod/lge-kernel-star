@@ -49,6 +49,8 @@
 #include "nvrm_power.h"
 #include "nvassert.h"
 #include "nvrm_memmgr.h"
+#include "nvodm_query_gpio.h"
+#include "nvrm_gpio.h"
 
 #if defined(__cplusplus)
 extern "C"
@@ -178,6 +180,10 @@ typedef struct NvDdkUsbPhyRec
     NvBool TurnOffPowerRail;
     // Indicates phy powered up for the host mode
     NvBool IsHostMode;
+    // Handle to the GPIO
+    NvOdmServicesGpioHandle hGpio;
+    // Handle to the Pin
+    NvOdmGpioPinHandle hPin;
     // Set of function pointers to access the usb phy hardware interface.
     // Pointer to the h/w specific PowerUp function.
     NvError (*PowerUp)(NvDdkUsbPhyHandle hUsbPhy);
