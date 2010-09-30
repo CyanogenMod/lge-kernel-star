@@ -801,6 +801,12 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 #ifdef CONFIG_PM
 void tegra_configure_dpd_kbc(unsigned int kbc_rows, unsigned int kbc_cols)
 {
-	writel((kbc_rows & 0xFFFF), pmc + PMC_DPAD_ORIDE);
+        unsigned long dpd_oride;
+
+	/* Only need to configure the enabled rows */
+	dpd_oride = readl(pmc + PMC_DPAD_ORIDE);
+	dpd_oride &= 0x00300000;
+	dpd_oride |= (kbc_rows & 0xFFFF);
+	writel(dpd_oride, pmc + PMC_DPAD_ORIDE);
 }
 #endif
