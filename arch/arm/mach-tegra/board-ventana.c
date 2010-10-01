@@ -73,10 +73,50 @@ static struct platform_device debug_uart = {
 	},
 };
 
+#ifdef CONFIG_BCM4329_RFKILL
+
+static struct resource ventana_bcm4329_rfkill_resources[] = {
+	{
+		.name   = "bcm4329_nreset_gpio",
+		.start  = TEGRA_GPIO_PU0,
+		.end    = TEGRA_GPIO_PU0,
+		.flags  = IORESOURCE_IO,
+	},
+	{
+		.name   = "bcm4329_nshutdown_gpio",
+		.start  = TEGRA_GPIO_PK2,
+		.end    = TEGRA_GPIO_PK2,
+		.flags  = IORESOURCE_IO,
+	},
+};
+
+static struct platform_device ventana_bcm4329_rfkill_device = {
+	.name = "bcm4329_rfkill",
+	.id             = -1,
+	.num_resources  = ARRAY_SIZE(ventana_bcm4329_rfkill_resources),
+	.resource       = ventana_bcm4329_rfkill_resources,
+};
+
+static noinline void __init ventana_bt_rfkill(void)
+{
+	/*Add Clock Resource*/
+	clk_add_alias("bcm4329_32k_clk", ventana_bcm4329_rfkill_device.name, \
+				"blink", NULL);
+
+	platform_device_register(&ventana_bcm4329_rfkill_device);
+
+	return;
+}
+#else
+static inline void ventana_bt_rfkill(void) { }
+#endif
+
 static __initdata struct tegra_clk_init_table ventana_clk_init_table[] = {
 	/* name		parent		rate		enabled */
 	{ "uartd",	"pll_p",	216000000,	true},
 	{ "pll_m",	"clk_m",	600000000,	true},
+	{ "uartc",      "pll_m",        600000000,      false},
+	{ "blink",      "clk_32k",      32768,          false},
 	{ "pwm",	"clk_32k",	32768,		false},
 	{ NULL,		NULL,		0,		0},
 };
@@ -167,6 +207,7 @@ static struct platform_device ventana_keys_device = {
 static struct platform_device *ventana_devices[] __initdata = {
 	&tegra_otg_device,
 	&debug_uart,
+	&tegra_uart2_device,
 	&pmu_device,
 	&tegra_udc_device,
 	&tegra_gart_device,
@@ -220,6 +261,7 @@ static void __init tegra_ventana_init(void)
 	ventana_keys_init();
 	ventana_panel_init();
 	ventana_sensors_init();
+	ventana_bt_rfkill();
 }
 
 MACHINE_START(VENTANA, "ventana")
