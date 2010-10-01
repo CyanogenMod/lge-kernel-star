@@ -636,6 +636,7 @@ static void tegra_stop_rx(struct uart_port *u)
 {
 	struct tegra_uart_port *t;
 	unsigned char ier;
+	int read_count;
 
 	t = container_of(u, struct tegra_uart_port, uport);
 
@@ -652,13 +653,19 @@ static void tegra_stop_rx(struct uart_port *u)
 		t->ier_shadow = ier;
 		uart_writeb(t, ier, UART_IER);
 		t->rx_in_progress = 0;
-	}
 
-	if ((t->use_rx_dma) && !IS_ERR_OR_NULL(t->rx_dma)) {
-		tegra_dma_dequeue(t->rx_dma);
-		tty_flip_buffer_push(u->state->port.tty);
+		/* read data from fifo/dma buffer */
+		if ((t->use_rx_dma) && !IS_ERR_OR_NULL(t->rx_dma)) {
+			/* Wait for complete current burst transfer */
+	                udelay(100);
+			tegra_dma_dequeue(t->rx_dma);
+			tty_flip_buffer_push(u->state->port.tty);
+		} else {
+                        read_count = do_handle_rx_pio(t);
+                        if (read_count)
+                                tty_flip_buffer_push(u->state->port.tty);
+		}
 	}
-
 	return;
 }
 
