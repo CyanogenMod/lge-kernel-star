@@ -26,7 +26,7 @@
 #include <linux/err.h>
 #include <linux/device.h>
 
-#define ACM_TIMEOUT_MSEC 2
+#define ACM_TIMEOUT_MSEC 25
 
 void nvhost_module_busy(struct nvhost_module *mod)
 {
