@@ -136,7 +136,7 @@ NvBool NvOdmPeripheralGetBoardInfo(
     NvBool RetVal = NV_FALSE;
     NvOdmServicesI2cHandle hOdmI2c = NULL;
     NvU8 EepromInst=0;
-    NvOdmBoardInfo BoardModuleTable;
+    static NvOdmBoardInfo BoardModuleTable;
     static NvBool s_ReadBoardInfoDone = NV_FALSE;
 
     if (!s_ReadBoardInfoDone)
@@ -144,7 +144,6 @@ NvBool NvOdmPeripheralGetBoardInfo(
 
     if (!s_ReadBoardInfoDone)
     {
-        s_ReadBoardInfoDone = NV_TRUE;
         if (!hOdmI2c)
         {
             // Exit
@@ -153,6 +152,8 @@ NvBool NvOdmPeripheralGetBoardInfo(
         }
         RetVal = NvOdmPeripheralReadPartNumber(
                    hOdmI2c, EepromInst, &BoardModuleTable);
+        if (RetVal)
+            s_ReadBoardInfoDone = NV_TRUE;
     }
     if (hOdmI2c)
         NvOdmI2cClose(hOdmI2c);
