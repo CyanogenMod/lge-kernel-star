@@ -78,13 +78,26 @@ static void tegra_kbc_setup_wakekeys(struct tegra_kbc *kbc, bool filter);
 static int tegra_kbc_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct tegra_kbc *kbc = platform_get_drvdata(pdev);
+	unsigned long flags;
+	unsigned long val;
 
 	if (device_may_wakeup(&pdev->dev) && kbc->pdata->wake_cnt) {
+		spin_lock_irqsave(&kbc->lock, flags);
+		/* Disable the kbc to stop key scanning */
+		val = readl(kbc->mmio + KBC_CONTROL_0);
+		val &= ~1;
+		writel(val, kbc->mmio + KBC_CONTROL_0);
+
 		tegra_kbc_setup_wakekeys(kbc, true);
 		enable_irq_wake(kbc->irq);
 		tegra_configure_dpd_kbc(kbc->wake_enable_rows, kbc->wake_enable_cols);
 		/* Forcefully clear the interrupt status */
 		writel(0x7, kbc->mmio + KBC_INT_0);
+
+		/* Enable the kbc to wakeup from key event */
+		val |= 1;
+		writel(val, kbc->mmio + KBC_CONTROL_0);
+		spin_unlock_irqrestore(&kbc->lock, flags);
 		msleep(30);
 	} else {
 		tegra_kbc_close(kbc->idev);
