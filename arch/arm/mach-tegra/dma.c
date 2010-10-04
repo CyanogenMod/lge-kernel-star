@@ -252,7 +252,7 @@ int tegra_dma_dequeue_req(struct tegra_dma_channel *ch,
 	 *	dequue happens at the same time as the DMA just moved to
 	 *	the new buffer and SW didn't yet received the interrupt?
 	 */
-	if (ch->mode & TEGRA_DMA_MODE_CONTINOUS)
+	if (ch->mode & TEGRA_DMA_MODE_CONTINUOUS)
 		if (req->buffer_status == TEGRA_DMA_REQ_BUF_STATUS_HALF_FULL)
 			req->bytes_transferred += req_transfer_count;
 

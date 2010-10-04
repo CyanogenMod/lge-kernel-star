@@ -58,7 +58,7 @@ struct tegra_dma_channel;
 
 enum tegra_dma_mode {
 	TEGRA_DMA_SHARED = 1,
-	TEGRA_DMA_MODE_CONTINOUS = 2,
+	TEGRA_DMA_MODE_CONTINUOUS = 2,
 	TEGRA_DMA_MODE_ONESHOT = 4,
 };
 
