@@ -59,87 +59,142 @@ static int tegra_pcm_prepare(struct snd_pcm_substream *substream)
 	return 0;
 }
 
-static int play_thread( void *arg)
+static inline NvAudioFxState play_state(struct pcm_runtime_data *prtd,
+					NvAudioFxState cur_state)
 {
-	struct snd_pcm_substream *substream = arg;
+	NvAudioFxState state = cur_state;
+
+	switch (prtd->state) {
+	case SNDRV_PCM_TRIGGER_START:
+		if (state != NvAudioFxState_Run) {
+			state = NvAudioFxState_Run;
+			tegra_snd_cx->xrt_fxn.SetProperty(
+					 prtd->stdoutpath->Stream,
+					 NvAudioFxProperty_State,
+					 sizeof(NvAudioFxState),
+					 &state);
+		}
+		break;
+	case SNDRV_PCM_TRIGGER_STOP:
+		if (state != NvAudioFxState_Stop) {
+			state = NvAudioFxState_Stop;
+			tegra_snd_cx->xrt_fxn.SetProperty(
+					 prtd->stdoutpath->Stream,
+					 NvAudioFxProperty_State,
+					 sizeof(NvAudioFxState),
+					 &state);
+			down(&prtd->stop_done_sem);
+		}
+		break;
+	default:
+		;
+	}
+
+	return state;
+}
+
+static inline int queue_next_buffer(void *arg, int cur_offset)
+{
+	struct snd_pcm_substream *substream = (struct snd_pcm_substream *)arg;
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct pcm_runtime_data *prtd = substream->runtime->private_data;
-	NvError e;
-	int size = 0;
+	int offset = cur_offset;
+	int size, rtbuffersize;
+	NvAudioFxBufferDescriptor abd;
+
+	rtbuffersize = frames_to_bytes(runtime, runtime->buffer_size);
+	memset(&abd, 0, sizeof(NvAudioFxBufferDescriptor));
+	size = TEGRA_DEFAULT_BUFFER_SIZE;
+	if ((offset + size) > rtbuffersize) {
+		size = rtbuffersize - offset;
+	}
+
+	abd.hMixBuffer = prtd->mixer_buffer;
+	abd.Offset = offset;
+	abd.Size = size;
+	abd.Format.FormatTag = 1;
+	abd.Format.SampleRate = runtime->rate;
+	abd.Format.BitsPerSample = runtime->sample_bits;
+	abd.Format.Channels = runtime->channels;
+	abd.Format.ChannelMask = 0;
+	abd.Format.ValidBitsPerSample = 0;
+
+	tegra_snd_cx->xrt_fxn.StreamAddBuffer(
+		(NvAudioFxStreamHandle)prtd->stdoutpath->Stream,
+		&abd);
+
+	offset += size;
+	if (offset >= rtbuffersize)
+		offset =0;
+
+	prtd->audiofx_frames += bytes_to_frames(runtime, size);
+
+	return offset;
+}
+
+static inline void play_buffer_done (void *arg)
+{
+	struct snd_pcm_substream *substream = (struct snd_pcm_substream *)arg;
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct pcm_runtime_data *prtd = substream->runtime->private_data;
+	int size, period_offset, rtbuffersize;
+
+	rtbuffersize = frames_to_bytes(runtime, runtime->buffer_size);
+	down(&prtd->buf_done_sem);
+
+	if ((frames_to_bytes(runtime, prtd->cur_pos) +
+		TEGRA_DEFAULT_BUFFER_SIZE) > rtbuffersize) {
+		size = rtbuffersize -
+			frames_to_bytes(runtime, prtd->cur_pos);
+	} else {
+		size = TEGRA_DEFAULT_BUFFER_SIZE;
+	}
+
+	prtd->cur_pos += bytes_to_frames(runtime, size);
+
+	if (prtd->cur_pos < prtd->last_pos) {
+		period_offset = (runtime->buffer_size +
+				prtd->cur_pos) - prtd->last_pos;
+	} else {
+		period_offset = prtd->cur_pos - prtd->last_pos;
+	}
+
+	if (period_offset >= runtime->period_size) {
+		prtd->last_pos = prtd->cur_pos;
+		snd_pcm_period_elapsed(substream);
+	}
+
+	if (prtd->cur_pos >= runtime->buffer_size) {
+		prtd->cur_pos -= runtime->buffer_size;
+	}
+}
+
+static int play_thread( void *arg)
+{
+	struct snd_pcm_substream *substream = (struct snd_pcm_substream *)arg;
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct pcm_runtime_data *prtd = substream->runtime->private_data;
 	int offset = 0;
-	int period_offset = 0;
 	int rtbuffersize = 0;
 	int buffer_to_prime = 0, buffer_in_queue = 0;
-	NvAudioFxBufferDescriptor abd;
 	NvAudioFxState state = NVALSA_INVALID_STATE;
 
 	wait_for_completion(&prtd->thread_comp);
-
 	rtbuffersize = frames_to_bytes(runtime, runtime->buffer_size);
 	buffer_to_prime  = (rtbuffersize / TEGRA_DEFAULT_BUFFER_SIZE);
 
+	if (runtime->control->appl_ptr)
 	for (;;) {
-		switch (prtd->state) {
-		case SNDRV_PCM_TRIGGER_START:
-			if (state != NvAudioFxState_Run) {
-				state = NvAudioFxState_Run;
-				tegra_snd_cx->xrt_fxn.SetProperty(
-						 prtd->stdoutpath->Stream,
-						 NvAudioFxProperty_State,
-						 sizeof(NvAudioFxState),
-						 &state);
-			}
-			break;
-		case SNDRV_PCM_TRIGGER_STOP:
-			if (state != NvAudioFxState_Stop) {
-				state = NvAudioFxState_Stop;
-				tegra_snd_cx->xrt_fxn.SetProperty(
-						 prtd->stdoutpath->Stream,
-						 NvAudioFxProperty_State,
-						 sizeof(NvAudioFxState),
-						 &state);
-				down(&prtd->stop_done_sem);
-				buffer_in_queue = 0;
-			}
-			break;
-		default:
-			;
-		}
-
+		state = play_state(prtd, state);
+		if (state == SNDRV_PCM_TRIGGER_STOP)
+			buffer_in_queue = 0;
 		if (kthread_should_stop())
-			break;
-
-		if ((prtd->state != SNDRV_PCM_TRIGGER_STOP) &&
-			 (runtime->status->state != SNDRV_PCM_STATE_DRAINING )) {
-			memset(&abd, 0, sizeof(NvAudioFxBufferDescriptor));
-
-			size = TEGRA_DEFAULT_BUFFER_SIZE;
-			if ((offset + size) > rtbuffersize) {
-				size = rtbuffersize - offset;
-			}
-
-			abd.hMixBuffer = prtd->mixer_buffer;
-			abd.Offset = offset;
-			abd.Size = size;
-			abd.Format.FormatTag = 1;
-			abd.Format.SampleRate = runtime->rate;
-			abd.Format.BitsPerSample = runtime->sample_bits;
-			abd.Format.Channels = runtime->channels;
-			abd.Format.ChannelMask = 0;
-			abd.Format.ValidBitsPerSample = 0;
-
-			e = tegra_snd_cx->xrt_fxn.StreamAddBuffer(
-				(NvAudioFxStreamHandle)prtd->stdoutpath->Stream,
-				&abd);
+			return 0;
+		if ((prtd->audiofx_frames < runtime->control->appl_ptr) &&
+				(state != NvAudioFxState_Stop)) {
+			offset = queue_next_buffer(substream, offset);
 			buffer_in_queue++;
-			offset += size;
-			if (offset >= rtbuffersize)
-				offset =0;
-
-			prtd->audiofx_frames += bytes_to_frames(runtime,
-								size);
 		}
-
 		if (buffer_in_queue == 0) {
 			DEFINE_WAIT(wq);
 			prepare_to_wait(&prtd->buf_wait, &wq, TASK_INTERRUPTIBLE);
@@ -147,39 +202,35 @@ static int play_thread( void *arg)
 			finish_wait(&prtd->buf_wait, &wq);
 			continue;
 		}
-
-		if ((buffer_to_prime == buffer_in_queue) &&
-				(prtd->state != SNDRV_PCM_TRIGGER_STOP))  {
-			down(&prtd->buf_done_sem);
-
+		if ((buffer_to_prime == buffer_in_queue) ||
+			(prtd->audiofx_frames >= runtime->control->appl_ptr)) {
+			play_buffer_done(substream);
 			buffer_in_queue--;
+		}
+	}
 
-			if ((frames_to_bytes(runtime, prtd->cur_pos) +
-				TEGRA_DEFAULT_BUFFER_SIZE) > rtbuffersize) {
-				size = rtbuffersize -
-					frames_to_bytes(runtime, prtd->cur_pos);
-			} else {
-				size = TEGRA_DEFAULT_BUFFER_SIZE;
-			}
-
-			prtd->cur_pos += bytes_to_frames(runtime, size);
-
-			if (prtd->cur_pos < prtd->last_pos) {
-				period_offset = (runtime->buffer_size +
-						prtd->cur_pos) - prtd->last_pos;
-
-			} else {
-				period_offset = prtd->cur_pos - prtd->last_pos;
-			}
-
-			if (period_offset >= runtime->period_size) {
-				prtd->last_pos = prtd->cur_pos;
-				snd_pcm_period_elapsed(substream);
-			}
-
-			if (prtd->cur_pos >= runtime->buffer_size) {
-				prtd->cur_pos -= runtime->buffer_size;
-			}
+	for (;;) {
+		state = play_state(prtd, state);
+		if (state == SNDRV_PCM_TRIGGER_STOP)
+			buffer_in_queue = 0;
+		if (kthread_should_stop())
+			break;
+		if ((prtd->state != SNDRV_PCM_TRIGGER_STOP) &&
+			 (runtime->status->state != SNDRV_PCM_STATE_DRAINING)) {
+			offset = queue_next_buffer(substream, offset);
+			buffer_in_queue++;
+		}
+		if (buffer_in_queue == 0) {
+			DEFINE_WAIT(wq);
+			prepare_to_wait(&prtd->buf_wait, &wq, TASK_INTERRUPTIBLE);
+			schedule();
+			finish_wait(&prtd->buf_wait, &wq);
+			continue;
+		}
+		if ((buffer_to_prime == buffer_in_queue) &&
+			(prtd->state != SNDRV_PCM_TRIGGER_STOP)) {
+			play_buffer_done(substream);
+			buffer_in_queue--;
 		}
 	}
 	return 0;
@@ -353,7 +404,7 @@ static int tegra_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 			prtd->timeout = PLAY_TIMEOUT;
-		}else{
+		} else {
 			prtd->timeout = REC_TIMEOUT;
 		}
 		break;
@@ -416,7 +467,7 @@ static int pcm_common_close(struct snd_pcm_substream *substream)
 		memset(&message, 0, sizeof(NvAudioFxMessage));
 		message.Event = NvAudioFxEventAll;
 		message.pContext = NULL;
-		if(substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 			message.hFx = (NvAudioFxHandle)prtd->stdoutpath->Stream;
 		else
 			message.hFx = (NvAudioFxHandle)prtd->stdinpath->Stream;
