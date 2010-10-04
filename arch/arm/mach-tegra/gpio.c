@@ -28,6 +28,7 @@
 
 #include <mach/iomap.h>
 #include <mach/pinmux.h>
+#include <mach/suspend.h>
 
 #include <mach/nvrm_linux.h>
 #include "nvcommon.h"
