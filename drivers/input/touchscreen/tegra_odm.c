@@ -66,6 +66,7 @@ struct tegra_touch_driver_data
 	NvU32			MinY;
 	int			shutdown;
 	struct early_suspend	early_suspend;
+	NvBool bIsSuspended;
 };
 
 #define NVODM_TOUCH_NAME "nvodm_touch"
@@ -75,11 +76,13 @@ struct tegra_touch_driver_data
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void tegra_touch_early_suspend(struct early_suspend *es)
 {
-        struct tegra_touch_driver_data *touch;
-        touch = container_of(es, struct tegra_touch_driver_data, early_suspend);
-
+	struct tegra_touch_driver_data *touch;
+	touch = container_of(es, struct tegra_touch_driver_data, early_suspend);
 	if (touch && touch->hTouchDevice) {
-		NvOdmTouchPowerOnOff(touch->hTouchDevice, NV_FALSE);
+		if (!touch->bIsSuspended) {
+			NvOdmTouchPowerOnOff(touch->hTouchDevice, NV_FALSE);
+			touch->bIsSuspended = NV_TRUE;
+		}
 	}
 	else {
 		pr_err("tegra_touch_early_suspend: NULL handles passed\n");
@@ -88,24 +91,34 @@ static void tegra_touch_early_suspend(struct early_suspend *es)
 
 static void tegra_touch_late_resume(struct early_suspend *es)
 {
-        struct tegra_touch_driver_data *touch;
-        touch = container_of(es, struct tegra_touch_driver_data, early_suspend);
-
+	struct tegra_touch_driver_data *touch;
+	touch = container_of(es, struct tegra_touch_driver_data, early_suspend);
 	if (touch && touch->hTouchDevice) {
-		NvOdmTouchPowerOnOff(touch->hTouchDevice, NV_TRUE);
+		if (touch->bIsSuspended) {
+			NvOdmTouchPowerOnOff(touch->hTouchDevice, NV_TRUE);
+			touch->bIsSuspended = NV_FALSE;
+		}
 	}
 	else {
 		pr_err("tegra_touch_late_resume: NULL handles passed\n");
 	}
 }
-#else
+
+#endif
+
 static int tegra_touch_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct tegra_touch_driver_data *touch = platform_get_drvdata(pdev);
-
 	if (touch && touch->hTouchDevice) {
-		NvOdmTouchPowerOnOff(touch->hTouchDevice, NV_FALSE);
-		return 0;
+		if (!touch->bIsSuspended) {
+			NvOdmTouchPowerOnOff(touch->hTouchDevice, NV_FALSE);
+			touch->bIsSuspended = NV_TRUE;
+			return 0;
+		}
+		else {
+			// device is already suspended
+			return 0;
+		}
 	}
 	pr_err("tegra_touch_suspend: NULL handles passed\n");
 	return -1;
@@ -114,15 +127,19 @@ static int tegra_touch_suspend(struct platform_device *pdev, pm_message_t state)
 static int tegra_touch_resume(struct platform_device *pdev)
 {
 	struct tegra_touch_driver_data *touch = platform_get_drvdata(pdev);
-
 	if (touch && touch->hTouchDevice) {
-		NvOdmTouchPowerOnOff(touch->hTouchDevice, NV_TRUE);
-		return 0;
+		if (touch->bIsSuspended) {
+			NvOdmTouchPowerOnOff(touch->hTouchDevice, NV_TRUE);
+			touch->bIsSuspended = NV_FALSE;
+			return 0;
+		}
+		else {
+			return 0;
+		}
 	}
 	pr_err("tegra_touch_resume: NULL handles passed\n");
 	return -1;
 }
-#endif
 
 static int tegra_touch_thread(void *pdata)
 {
@@ -331,7 +348,7 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 	for (i = 0; i < (caps->MaxNumberOfFingerCoordReported - 1); i++) {
 		set_bit(BTN_2 + i, touch->input_dev->keybit);
 	}
-
+	touch->bIsSuspended = NV_FALSE;
 	/* expose multi-touch capabilities */
 	set_bit(ABS_MT_TOUCH_MAJOR, touch->input_dev->keybit);
 	set_bit(ABS_MT_POSITION_X, touch->input_dev->keybit);
@@ -443,10 +460,8 @@ static int tegra_touch_remove(struct platform_device *pdev)
 static struct platform_driver tegra_touch_driver = {
 	.probe	  = tegra_touch_probe,
 	.remove	 = tegra_touch_remove,
-#ifndef CONFIG_HAS_EARLYSUSPEND
 	.suspend = tegra_touch_suspend,
 	.resume	 = tegra_touch_resume,
-#endif
 	.driver	 = {
 		.name   = "tegra_touch",
 	},
