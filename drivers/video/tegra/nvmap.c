@@ -1030,7 +1030,7 @@ void _nvmap_handle_free(struct nvmap_handle *h)
 			vm_unmap_ram(h->kern_map, h->size>>PAGE_SHIFT);
 		else {
 			unsigned long addr = (unsigned long)h->kern_map;
-			addr &= ~PAGE_MASK;
+			addr &= PAGE_MASK;
 			iounmap((void *)addr);
 		}
 	}
@@ -3397,7 +3397,7 @@ void nvmap_free(struct nvmap_handle *h, void *map)
 			vm_unmap_ram(map, h->size >> PAGE_SHIFT);
 		} else {
 			unsigned long addr = (unsigned long)map;
-			addr &= ~PAGE_MASK;
+			addr &= PAGE_MASK;
 			iounmap((void *)addr);
 		}
 		h->kern_map = NULL;
