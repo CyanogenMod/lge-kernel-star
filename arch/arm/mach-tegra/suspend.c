@@ -522,6 +522,7 @@ static void tegra_suspend_finish(void)
 	NvOdmSocPowerState state = NvRmPowerLowestStateGet();
 
 	NvRmPrivPmuLPxStateConfig(s_hRmGlobal, state, NV_FALSE);
+	NvRmPrivDfsResume();
 #endif
 }
 

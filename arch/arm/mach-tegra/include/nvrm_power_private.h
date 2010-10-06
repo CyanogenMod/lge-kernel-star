@@ -574,6 +574,7 @@ void NvRmPrivDfsResync(void);
  *
  */
 void NvRmPrivDfsSuspend(NvOdmSocPowerState state);
+void NvRmPrivDfsResume(void);
 
 /**
  * Restore clock sources after exit from low power state.

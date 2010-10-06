@@ -1385,7 +1385,6 @@ static NvRmPmRequest DfsThread(NvRmDfs* pDfs)
 {
     static NvRmDfsFrequencies LastKHz = {{0}};
 
-    NvRmPowerEvent PowerEvent;
     NvRmDfsRunState DfsRunState;
     NvRmDfsFrequencies DfsKHz, HighKHz;
     NvBool LowCornerHit, LowCornerReport, NeedClockUpdate;
@@ -1418,51 +1417,6 @@ static NvRmPmRequest DfsThread(NvRmDfs* pDfs)
         PmRequest = pDfs->PmRequest;
         pDfs->PmRequest = NvRmPmRequest_None;
         NvOsIntrMutexUnlock(pDfs->hIntrMutex);
-
-        /*
-         * On exit from low power state re-initialize DFS h/w, samplers, and
-         * start monitors provided DFS is running. If DFS is stopped just get
-         * DFS h/w ready.
-         */
-        NV_ASSERT_SUCCESS(NvRmPowerGetEvent(
-            pDfs->hRm, pDfs->PowerClientId, &PowerEvent));
-        if (PowerEvent != NvRmPowerEvent_NoEvent)
-        {
-            // Full h/w re-initialization after LP0
-            if (PowerEvent == NvRmPowerEvent_WakeLP0)
-            {
-                DfsHwDeinit(pDfs);
-                NV_ASSERT_SUCCESS(DfsHwInit(pDfs));
-
-                // Some PMUs do not restore core voltage after LP0
-                NvRmPmuGetVoltage(pDfs->hRm,
-                    pDfs->VoltageScaler.CoreRailAddress,
-                    &pDfs->VoltageScaler.CurrentCoreMv);
-            }
-            // Re-initialize samplers if DVFS was running, but stopped on
-            // entry to LPx; keep sampling history, if DVFS was not stopped;
-            // restart monitors in either case
-            NvRmPrivLockSharedPll();
-            if (pDfs->DfsLPxSavedState > NvRmDfsRunState_Stopped)
-            {
-                DfsClockFreqGet(pDfs->hRm, &DfsKHz);
-
-                NvOsIntrMutexLock(pDfs->hIntrMutex);
-                if (pDfs->DfsRunState <= NvRmDfsRunState_Stopped)
-                {
-                    pDfs->DfsRunState = pDfs->DfsLPxSavedState;
-                    DfsSamplersInit(&DfsKHz, pDfs);
-                }
-                NV_ASSERT(pDfs->DfsRunState == pDfs->DfsLPxSavedState);
-                pDfs->CurrentKHz = DfsKHz;
-                DfsStartMonitors(
-                    pDfs, &DfsKHz, pDfs->SamplingWindow.MinIntervalMs);
-                NvOsIntrMutexUnlock(pDfs->hIntrMutex);
-            }
-            NvRmPrivDvsRun();   // enable v-scaling even if DFS is stopped
-            NvRmPrivUnlockSharedPll();
-            return PmRequest;
-        }
 
         /*
          * Advance busy hint state machine if DFS thread has been signaled by
@@ -1948,7 +1902,7 @@ NvError NvRmPrivDfsInit(NvRmDeviceHandle hRmDeviceHandle)
         goto failed;
     }
     // Register DFS as power client and obtain client id
-    error = NvRmPowerRegister(hRmDeviceHandle, pDfs->hSemaphore, &pDfs->PowerClientId);
+    error = NvRmPowerRegister(hRmDeviceHandle, NULL, &pDfs->PowerClientId);
     if (error != NvSuccess)
     {
         goto failed;
@@ -2602,6 +2556,55 @@ static void NvRmPrivDvsRun(void)
     pDvs->StopFlag = NV_FALSE;
 }
 
+void NvRmPrivDfsResume(void)
+{
+    NvRmDfs* pDfs = &s_Dfs;
+    NvRmPowerEvent PowerEvent;
+    NvRmDfsFrequencies DfsKHz;
+
+    /*
+     * On exit from low power state re-initialize DFS h/w, samplers, and
+     * start monitors provided DFS is running. If DFS is stopped just get
+     * DFS h/w ready.
+     */
+    NV_ASSERT_SUCCESS(NvRmPowerGetEvent(
+        pDfs->hRm, pDfs->PowerClientId, &PowerEvent));
+
+    // Full h/w re-initialization after LP0
+    if (PowerEvent == NvRmPowerEvent_WakeLP0)
+    {
+        DfsHwDeinit(pDfs);
+        NV_ASSERT_SUCCESS(DfsHwInit(pDfs));
+
+        // Some PMUs do not restore core voltage after LP0
+        NvRmPmuGetVoltage(pDfs->hRm,
+            pDfs->VoltageScaler.CoreRailAddress,
+            &pDfs->VoltageScaler.CurrentCoreMv);
+    }
+
+    // After LPx or aborted suspend re-initialize samplers if DFS was
+    // running
+    NvRmPrivLockSharedPll();
+    DfsClockFreqGet(pDfs->hRm, &DfsKHz);
+
+    NvOsIntrMutexLock(pDfs->hIntrMutex);
+    pDfs->DfsRunState = pDfs->DfsLPxSavedState;
+    pDfs->CurrentKHz = DfsKHz;
+    if (pDfs->DfsLPxSavedState > NvRmDfsRunState_Stopped)
+    {
+        DfsSamplersInit(&DfsKHz, pDfs);
+        DfsStartMonitors(pDfs, &DfsKHz, pDfs->SamplingWindow.MinIntervalMs);
+    }
+    NvRmPrivDvsRun();   // enable v-scaling even if DFS is stopped
+    NvOsIntrMutexUnlock(pDfs->hIntrMutex);
+
+    // Resume thermal monitoring
+    if (pDfs->ThermalThrottler.hOdmTcore)
+        NvOdmTmonResume(pDfs->ThermalThrottler.hOdmTcore);
+
+    NvRmPrivUnlockSharedPll();
+}
+
 void NvRmPrivDfsSuspend(NvOdmSocPowerState state)
 {
     NvRmDfs* pDfs = &s_Dfs;
@@ -2637,7 +2640,7 @@ void NvRmPrivDfsSuspend(NvOdmSocPowerState state)
         NvRmPrivDvsStopAtNominal();
         pDfs->VoltageScaler.StopFlag = NV_TRUE;
     }
-    else if (state == NvOdmSocPowerState_Suspend)
+    else// if (state == NvOdmSocPowerState_Suspend): any other treat as LP1
     {
         // On entry to suspend (LP1): set target frequencies for all DFS
         // clock domains, stop DFS monitors, and then configure clocks and
@@ -2688,6 +2691,11 @@ void NvRmPrivDfsSuspend(NvOdmSocPowerState state)
 
         pDfs->VoltageScaler.StopFlag = NV_TRUE;
     }
+
+    // Suspend thermal monitoring
+    if (pDfs->ThermalThrottler.hOdmTcore)
+        NvOdmTmonSuspend(pDfs->ThermalThrottler.hOdmTcore);
+
     NvRmPrivUnlockSharedPll();
 }
 
