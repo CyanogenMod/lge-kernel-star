@@ -21,6 +21,7 @@
  */
 
 #define NV_DEBUG 0
+#define NVMAP_DEBUG_FS 1
 
 #include <linux/vmalloc.h>
 #include <linux/module.h>
@@ -42,6 +43,8 @@
 #include <linux/proc_fs.h>
 #include <linux/ctype.h>
 #include <linux/nvmap.h>
+#include <linux/debugfs.h>
+#include <linux/seq_file.h>
 #include <asm/tlbflush.h>
 #include <mach/iovmm.h>
 #include "nvcommon.h"
@@ -52,6 +55,21 @@
 #define NVMAP_BASE 0xFEE00000
 #define NVMAP_SIZE SZ_2M
 #endif
+
+static unsigned int trace_mask = 0;
+
+#define NVMAP_TRACE_NONE	0
+#define NVMAP_TRACE_ALLOC	1
+#define NVMAP_TRACE_FREE	2
+#define NVMAP_TRACE_LFB 	4
+#define NVMAP_TRACE_FREE_SIZE	8
+
+module_param_named(trace_mask, trace_mask, int, 0600);
+#define NVMAP_TRACE(x, args...)	\
+	do { \
+		if (x & trace_mask) \
+			printk(args); \
+	} while (0)
 
 static void nvmap_vma_open(struct vm_area_struct *vma);
 
@@ -161,13 +179,26 @@ static unsigned int _nvmap_heap_policy (unsigned int heaps, int numpages)
 
 /* first-fit linear allocator carveout heap manager */
 struct nvmap_mem_block {
+	struct nvmap_handle *h; /* backlink to handle for compaction */
 	unsigned long	base;
 	size_t		size;
+	size_t		align; /* alignment for compaction */
+	int             mapcount; /* how often mapped */
 	short		next; /* next absolute (address-order) block */
 	short		prev; /* previous absolute (address-order) block */
 	short		next_free;
 	short		prev_free;
+
+	/* debugfs realted */
+	ktime_t		time;
+	char comm[TASK_COMM_LEN];       /* executable name */
+	struct nvmap_carveout *co_heap;	/* Back link to heap */
+	struct dentry *debugfs_file;
 };
+
+
+ /* this is larger than any possible alignment for a carveout allocation */
+#define NVMAP_BLOCK_ALIGN_PINNED 0x80000000
 
 struct nvmap_carveout {
 	unsigned short		num_blocks;
@@ -188,6 +219,7 @@ enum {
 	CARVEOUT_STAT_LARGEST_FREE,
 	CARVEOUT_STAT_BASE,
 };
+
 
 static inline pgprot_t _nvmap_flag_to_pgprot(unsigned long flag, pgprot_t base)
 {
@@ -275,6 +307,7 @@ static int _nvmap_init_carveout(struct nvmap_carveout *co,
 	blocks = vmalloc(sizeof(*blocks)*num_blocks);
 
 	if (!blocks) goto fail;
+	memset(blocks, 0, num_blocks * sizeof(blocks));
 	co->name = kstrdup(name, GFP_KERNEL);
 	if (!co->name) goto fail;
 
@@ -283,6 +316,7 @@ static int _nvmap_init_carveout(struct nvmap_carveout *co,
 		blocks[i].prev = i-1;
 		blocks[i].next_free = -1;
 		blocks[i].prev_free = -1;
+		blocks[i].co_heap = co;
 	}
 	blocks[i-1].next = -1;
 	blocks[1].prev = -1;
@@ -291,6 +325,9 @@ static int _nvmap_init_carveout(struct nvmap_carveout *co,
 	blocks[0].next_free = blocks[0].prev_free = -1;
 	blocks[0].base = base_address;
 	blocks[0].size = len;
+	blocks[0].align = 1;
+	blocks[0].mapcount = 0;
+	blocks[0].co_heap = co;
 	co->blocks = blocks;
 	co->num_blocks = num_blocks;
 	spin_lock_init(&co->lock);
@@ -339,14 +376,18 @@ static void nvmap_zap_free(struct nvmap_carveout *co, int idx)
 }
 
 static int nvmap_split_block(struct nvmap_carveout *co,
-	int idx, size_t start, size_t size)
+	int idx, size_t start, size_t size, size_t align)
 {
-	if (BLOCK(co, idx)->base < start) {
+	struct nvmap_mem_block *block = BLOCK(co, idx);
+
+	if (block->base < start) {
 		int spare_idx = nvmap_get_spare(co);
 		struct nvmap_mem_block *spare = BLOCK(co, spare_idx);
-		struct nvmap_mem_block *block = BLOCK(co, idx);
 		if (spare) {
+			spare->h = NULL;
 			spare->size = start - block->base;
+			spare->align = 1;
+			spare->mapcount = 0;
 			spare->base = block->base;
 			block->size -= (start - block->base);
 			block->base = start;
@@ -363,19 +404,21 @@ static int nvmap_split_block(struct nvmap_carveout *co,
 				co->blocks[co->free_index].prev_free = spare_idx;
 			co->free_index = spare_idx;
 		} else {
-			/* not being able to split is fatal here, because we need
-			 * to realign block->base */
+			/* not being able to split is fatal here, because we
+			 * need to realign block->base */
 			return -ENOMEM;
 		}
 	}
 
-	if (BLOCK(co, idx)->size > size) {
+	if (block->size > size) {
 		int spare_idx = nvmap_get_spare(co);
 		struct nvmap_mem_block *spare = BLOCK(co, spare_idx);
-		struct nvmap_mem_block *block = BLOCK(co, idx);
 		if (spare) {
+			spare->h = NULL;
 			spare->base = block->base + size;
 			spare->size = block->size - size;
+			spare->align = 1;
+			spare->mapcount = 0;
 			block->size = size;
 			spare->prev = idx;
 			spare->next = block->next;
@@ -389,6 +432,9 @@ static int nvmap_split_block(struct nvmap_carveout *co,
 			co->free_index = spare_idx;
 		}
 	}
+
+	block->align = align;
+	block->mapcount = 0;
 
 	nvmap_zap_free(co, idx);
 
@@ -411,13 +457,21 @@ static int nvmap_split_block(struct nvmap_carveout *co,
 #define are_blocks_contiguous(_b_first, _b_next) \
 	(_b_first->base + _b_first->size == _b_next->base)
 
-static void nvmap_carveout_free(struct nvmap_carveout *co, int idx)
+static void nvmap_carveout_free(struct nvmap_carveout *co, int idx, bool lock)
 {
 	struct nvmap_mem_block *b;
 
-	spin_lock(&co->lock);
+	if (lock) spin_lock(&co->lock);
 
 	b = BLOCK(co, idx);
+	b->h = NULL;
+
+#if NVMAP_DEBUG_FS
+	if (b->debugfs_file)
+		debugfs_remove(b->debugfs_file);
+	b->comm[0] = '\0';
+	b->debugfs_file = NULL;
+#endif
 
 	if (b->next!=-1 &&
 		co_is_free(co, b->next) &&
@@ -452,29 +506,48 @@ static void nvmap_carveout_free(struct nvmap_carveout *co, int idx)
 	}
 
 	nvmap_insert_block(free, co, idx);
-	spin_unlock(&co->lock);
+	if (lock) spin_unlock(&co->lock);
 }
 
-static int nvmap_carveout_alloc(struct nvmap_carveout *co,
-	size_t align, size_t size)
+struct nvmap_carveout_node;
+#if NVMAP_DEBUG_FS
+static void nvmap_add_debug_fs_node(struct nvmap_carveout_node *n,
+	struct nvmap_carveout* co, int idx);
+#endif
+
+static int nvmap_carveout_alloc_locked(struct nvmap_carveout_node *n,
+	struct nvmap_carveout *co, size_t align, size_t size, int idx_last)
 {
-	short idx;
+	int idx;
 
-	spin_lock(&co->lock);
-
-	idx = co->free_index;
+	/* if idx_last is passed in as not -1, we'd want bottom_up
+	 * allocation */
+	idx = (idx_last != -1) ? co->block_index : co->free_index;
 
 	while (idx != -1) {
+		size_t end;
+		size_t ljust;
+		size_t rjust;
+		size_t l_max, r_max;
+
 		struct nvmap_mem_block *b = BLOCK(co, idx);
+
+		if (idx == idx_last) {
+			return -1;
+		}
+
+		if (!co_is_free(co, idx)) {
+			goto next;
+		}
+
 		/* try to be a bit more clever about generating block-
 		 * droppings by comparing the results of a left-justified vs
 		 * right-justified block split, and choosing the
 		 * justification style which yields the largest remaining
 		 * block */
-		size_t end = b->base + b->size;
-		size_t ljust = (b->base + align - 1) & ~(align-1);
-		size_t rjust = (end - size) & ~(align-1);
-		size_t l_max, r_max;
+		end = b->base + b->size;
+		ljust = (b->base + align - 1) & ~(align-1);
+		rjust = (end - size) & ~(align-1);
 
 		if (rjust < b->base) rjust = ljust;
 		l_max = max_t(size_t, ljust - b->base, end - (ljust + size));
@@ -482,18 +555,27 @@ static int nvmap_carveout_alloc(struct nvmap_carveout *co,
 
 		if (b->base + b->size >= ljust + size) {
 			if (l_max >= r_max) {
-				if (!nvmap_split_block(co, idx, ljust, size))
+				if (!nvmap_split_block(co,
+						       idx, ljust, size,
+						       align))
 					break;
 			} else {
-				if (!nvmap_split_block(co, idx, rjust, size))
+				if (!nvmap_split_block(co,
+						       idx, rjust, size,
+						       align))
 					break;
 			}
 		}
-		idx = b->next_free;
+
+	next:
+		idx = (idx_last != -1) ? b->next : b->next_free;
 	}
 
-	spin_unlock(&co->lock);
-
+#if NVMAP_DEBUG_FS
+	if (idx != -1)  {
+		nvmap_add_debug_fs_node(n, co, idx);
+	}
+#endif
 	return idx;
 }
 
@@ -558,6 +640,7 @@ struct nvmap_carveout_node {
 	struct list_head	heap_list;
 	unsigned int		heap_bit;
 	struct nvmap_carveout	carveout;
+	struct dentry 		*debugfs_root;
 };
 
 /* the master structure for all nvmap-managed carveouts and all handle_ref
@@ -698,13 +781,14 @@ static ssize_t _nvmap_sysfs_show_heap_total_size(struct device *d,
 			CARVEOUT_STAT_TOTAL_SIZE));
 }
 
-static int nvmap_split_carveout_heap(struct nvmap_carveout *co, size_t size,
+static int nvmap_split_carveout_heap(struct nvmap_carveout_node *n,
+	struct nvmap_carveout *co, size_t size,
 	const char *name, unsigned int new_bitmask);
 
 static ssize_t _nvmap_sysfs_set_heap_split(struct device *d,
 	struct device_attribute *attr, const char * buf, size_t count)
 {
-	struct nvmap_carveout_node *c = container_of(d,
+	struct nvmap_carveout_node *n = container_of(d,
 		struct nvmap_carveout_node, dev);
 	char *tmp, *local = kzalloc(count+1, GFP_KERNEL);
 	char *sizestr = NULL, *bitmaskstr = NULL, *name = NULL;
@@ -757,7 +841,7 @@ static ssize_t _nvmap_sysfs_set_heap_split(struct device *d,
 		return -EINVAL;
 	}
 
-	err = nvmap_split_carveout_heap(&c->carveout, size, name, bitmask);
+	err = nvmap_split_carveout_heap(n, &n->carveout, size, name, bitmask);
 
 	if (err) pr_err("%s: failed to create split heap %s\n", __func__, name);
 	kfree(tmp);
@@ -792,6 +876,58 @@ static struct attribute *nvmap_heap_default_attrs[] = {
 static struct attribute_group nvmap_heap_defattr_group = {
 	.attrs = nvmap_heap_default_attrs
 };
+
+#if NVMAP_DEBUG_FS
+static int nvmap_debugfs_show(struct seq_file *s, void *unused)
+{
+	struct nvmap_mem_block *b = s->private;
+	struct nvmap_carveout *co_heap;
+	unsigned long nanosec_rem;
+	unsigned long t;
+
+	if (b == NULL) return 0;
+	co_heap = b->co_heap;
+
+	if (co_heap == NULL) return 0;
+
+	spin_lock(&co_heap->lock);
+	t = ktime_to_ns(b->time);
+	nanosec_rem = do_div(t, 1000000000);
+	seq_printf(s, "%s t=%5lu.%06lu o=0x%lx s=0x%x p=%d\n",
+			b->comm, (unsigned long) t,
+			nanosec_rem / 1000, b->base, b->size,
+			(b->align & NVMAP_BLOCK_ALIGN_PINNED) ? 1 : 0);
+	spin_unlock(&co_heap->lock);
+	return 0;
+}
+
+static int nvmap_debugfs_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, nvmap_debugfs_show, inode->i_private);
+}
+
+static const struct file_operations nvmap_debugfs_fops = {
+	.owner          = THIS_MODULE,
+	.open           = nvmap_debugfs_open,
+	.read           = seq_read,
+	.release        = single_release,
+};
+
+static void nvmap_add_debug_fs_node(struct nvmap_carveout_node *n,
+	struct nvmap_carveout* co, int idx)
+{
+	char debugfs_file_name[32];
+	co->blocks[idx].time = ktime_get();
+	strncpy(co->blocks[idx].comm, current->comm,
+		sizeof(co->blocks[idx].comm));
+	snprintf(debugfs_file_name, sizeof(debugfs_file_name), "%u", idx);
+	if (n && n->debugfs_root)
+		co->blocks[idx].debugfs_file =
+			debugfs_create_file(debugfs_file_name, S_IRUGO,
+			n->debugfs_root, &(co->blocks[idx]),
+			&nvmap_debugfs_fops);
+}
+#endif
 
 static struct device *__nvmap_heap_parent_dev(void);
 #define _nvmap_heap_parent_dev __nvmap_heap_parent_dev()
@@ -1037,15 +1173,44 @@ void _nvmap_handle_free(struct nvmap_handle *h)
 
 	/* ensure that no stale data remains in the cache for this handle */
 	if (h->alloc)
-		e = _nvmap_do_cache_maint(h, 0, h->size, 
+		e = _nvmap_do_cache_maint(h, 0, h->size,
 			NVMEM_CACHE_OP_WB_INV, false);
 
-	if (h->alloc && !h->heap_pgalloc)
-		nvmap_carveout_free(h->carveout.co_heap, h->carveout.block_idx);
+	if (h->alloc && !h->heap_pgalloc) {
+		struct nvmap_carveout *co = h->carveout.co_heap;
+		spin_lock(&co->lock);
+		NVMAP_TRACE(NVMAP_TRACE_FREE,
+			"nvmap: Free CO - %s freeing %s's %s idx=%d %u\n",
+			current->comm,
+			(h->owner) ? h->owner->comm : "kernel",
+			(h->global) ? "global" : "private",
+			h->carveout.block_idx,
+			h->size);
+		nvmap_carveout_free(h->carveout.co_heap, h->carveout.block_idx, false);
+		spin_unlock(&co->lock);
+		NVMAP_TRACE(NVMAP_TRACE_LFB,
+				"nvmap: lfb after freeing %lu\n",
+				_nvmap_carveout_blockstat(co,
+				CARVEOUT_STAT_LARGEST_FREE));
+		NVMAP_TRACE(NVMAP_TRACE_FREE_SIZE,
+				"nvmap: Free size after freeing %lu\n",
+				_nvmap_carveout_blockstat(co,
+				CARVEOUT_STAT_FREE_SIZE));
+	}
 	else if (h->alloc) {
 		unsigned int i;
+
 		BUG_ON(h->size & ~PAGE_MASK);
 		BUG_ON(!h->pgalloc.pages);
+
+		NVMAP_TRACE(NVMAP_TRACE_FREE,
+			"nvmap: Free - %s freeing %s's pinned %s %s %uB handle\n",
+			current->comm,
+			(h->owner) ? h->owner->comm : "kernel",
+			(h->global) ? "global" : "private",
+				(h->alloc && h->heap_pgalloc) ? "page-alloc" :
+				(h->alloc) ? "carveout" : "unallocated",
+				h->size);
 		_nvmap_remove_mru_vma(h);
 		if (h->pgalloc.area) tegra_iovmm_free_vm(h->pgalloc.area);
 		for (i=0; i<h->size>>PAGE_SHIFT; i++) {
@@ -1153,12 +1318,16 @@ fail:
 static struct nvmap_handle *_nvmap_handle_create(
 	struct task_struct *owner, size_t size)
 {
-	struct nvmap_handle *h = kzalloc(sizeof(*h), GFP_KERNEL);
+	struct nvmap_handle *h;
 	struct nvmap_handle *b;
 	struct rb_node **p;
 	struct rb_node *parent = NULL;
 
+	if (!size) return NULL;
+
+	h = kzalloc(sizeof(*h), GFP_KERNEL);
 	if (!h) return NULL;
+
 	atomic_set(&h->ref, 1);
 	atomic_set(&h->pin, 0);
 	h->owner = owner;
@@ -1274,7 +1443,15 @@ static void nvmap_vma_close(struct vm_area_struct *vma) {
 	struct nvmap_vma_priv *priv = vma->vm_private_data;
 
 	if (priv && !atomic_dec_return(&priv->ref)) {
-		if (priv->h) _nvmap_handle_put(priv->h);
+		struct nvmap_handle *h = priv->h;
+		if (h) {
+			if (!h->alloc && !h->heap_pgalloc) {
+				spin_lock(&h->carveout.co_heap->lock);
+				BLOCK(h->carveout.co_heap, h->carveout.block_idx)->mapcount--;
+				spin_unlock(&h->carveout.co_heap->lock);
+			}
+			_nvmap_handle_put(h);
+		}
 		kfree(priv);
 	}
 	vma->vm_private_data = NULL;
@@ -1429,6 +1606,12 @@ static int _nvmap_handle_pin_locked(struct nvmap_handle *h)
 				h->pgalloc.dirty = true;
 			h->pgalloc.area = area;
 		}
+		if (h->alloc && !h->heap_pgalloc) {
+			spin_lock(&h->carveout.co_heap->lock);
+			BLOCK(h->carveout.co_heap, h->carveout.block_idx)->align
+				|= NVMAP_BLOCK_ALIGN_PINNED;
+			spin_unlock(&h->carveout.co_heap->lock);
+		}
 	}
 	return 0;
 }
@@ -1461,7 +1644,14 @@ static int _nvmap_handle_unpin(struct nvmap_handle *h)
 			_nvmap_insert_mru_vma(h);
 			ret=1;
 		}
+		if (!h->heap_pgalloc) {
+			spin_lock(&h->carveout.co_heap->lock);
+			BLOCK(h->carveout.co_heap, h->carveout.block_idx)->align
+				&= ~NVMAP_BLOCK_ALIGN_PINNED;
+			spin_unlock(&h->carveout.co_heap->lock);
+		}
 	}
+
 #ifdef CONFIG_DEVNVMAP_RECLAIM_UNPINNED_VM
 	spin_unlock(&nvmap_mru_vma_lock);
 #endif
@@ -1802,6 +1992,185 @@ static int nvmap_ioctl_getid(struct file *filp, void __user *arg)
 	return -EPERM;
 }
 
+static int _nvmap_carveout_relocate( struct nvmap_carveout_node *n,
+	struct nvmap_carveout *co, int idx, int idx_last, void *addr_d,
+	void *addr_s, pgprot_t prot)
+{
+	struct nvmap_mem_block *b_d;
+	struct nvmap_mem_block *b_s = BLOCK(co, idx);
+	int idx_relocate;
+	unsigned long offset, size;
+
+	spin_lock(&nvmap_handle_lock);
+
+	if (!b_s->h ||
+	    (b_s->align & NVMAP_BLOCK_ALIGN_PINNED) ||
+	    b_s->mapcount)
+	{
+		spin_unlock(&nvmap_handle_lock);
+		return -EINVAL;
+	}
+
+	idx_relocate = nvmap_carveout_alloc_locked(n, co, b_s->align,
+		b_s->size, idx_last);
+	if (idx_relocate == -1) {
+		spin_unlock(&nvmap_handle_lock);
+		return -ENOMEM;
+	}
+
+	b_d = BLOCK(co, idx_relocate);
+
+	offset = 0;
+	size = b_s->size;
+
+	while (offset < size) {
+		unsigned long phys_d, phys_s;
+		unsigned long count;
+		void *dst, *src;
+
+		phys_d = b_d->base + offset;
+		phys_s = b_s->base + offset;
+
+		count = min_t(size_t,
+			      size-offset,
+			      min_t(size_t,
+				    PAGE_SIZE-(phys_d&~PAGE_MASK),
+				    PAGE_SIZE-(phys_s&~PAGE_MASK)));
+
+		_nvmap_set_pte_at((unsigned long)addr_d,
+				  __phys_to_pfn(phys_d), prot);
+		_nvmap_set_pte_at((unsigned long)addr_s,
+				  __phys_to_pfn(phys_s), prot);
+
+		dst = addr_d + (phys_d & ~PAGE_MASK);
+		src = addr_s + (phys_s & ~PAGE_MASK);
+
+		memcpy(dst, src, count);
+
+		offset += count;
+	}
+
+	b_s->h->carveout.block_idx = idx_relocate;
+	b_s->h->carveout.base = co->blocks[idx_relocate].base;
+	co->blocks[idx_relocate].h = b_s->h;
+	spin_unlock(&nvmap_handle_lock);
+	nvmap_carveout_free(co, idx, false);
+
+	return 0;
+}
+
+#define NVMAP_NRELOCATE_LIMIT 64
+
+static void _nvmap_carveout_do_alloc(struct nvmap_handle *h,
+	unsigned int heap_type, size_t align)
+{
+	struct nvmap_carveout_node *n;
+	pgprot_t prot = _nvmap_flag_to_pgprot(NVMEM_HANDLE_WRITE_COMBINE,
+					      pgprot_kernel);
+	void *addr_d = NULL;
+	void *addr_s = NULL;
+
+	down_read(&nvmap_context.list_sem);
+	list_for_each_entry(n, &nvmap_context.heaps, heap_list) {
+		if (heap_type & n->heap_bit) {
+			struct nvmap_carveout* co = &n->carveout;
+			int idx;
+
+			spin_lock(&co->lock);
+			idx = nvmap_carveout_alloc_locked(n, co, align, h->size, -1);
+			if (idx != -1) {
+				h->carveout.co_heap = co;
+				h->carveout.block_idx = idx;
+				h->carveout.base = co->blocks[idx].base;
+				co->blocks[idx].h = h;
+				h->heap_pgalloc = false;
+				h->alloc = true;
+				spin_unlock(&co->lock);
+				break;
+			}
+			spin_unlock(&co->lock);
+		}
+	}
+
+	if (h->alloc) {
+		goto done;
+	}
+
+	if (nvmap_map_pte(__phys_to_pfn(0), prot, &addr_d)) {
+		goto fail;
+	}
+
+	if (nvmap_map_pte(__phys_to_pfn(0), prot, &addr_s)) {
+		goto fail;
+	}
+
+	mutex_lock(&nvmap_pin_lock);
+
+	list_for_each_entry(n, &nvmap_context.heaps, heap_list) {
+		if (heap_type & n->heap_bit) {
+			struct nvmap_carveout* co = &n->carveout;
+			int idx;
+			int nrelocate = 0;
+
+			spin_lock(&co->lock);
+			idx = co->block_index;
+
+			while (idx!=-1 && nrelocate<=NVMAP_NRELOCATE_LIMIT) {
+				if (co_is_free(co, idx)) {
+					int idx_prev, idx_next;
+
+					idx_prev = BLOCK(co, idx)->prev;
+					idx_next = BLOCK(co, idx)->next;
+
+					if ((idx_prev != -1) &&
+					    !_nvmap_carveout_relocate(n, co,
+						 idx_prev, idx, addr_d,
+						 addr_s, prot))
+					{
+						idx = idx_prev;
+						nrelocate++;
+						continue;
+					}
+
+					if ((idx_next != -1) &&
+					    !_nvmap_carveout_relocate(n, co,
+						 idx_next, idx, addr_d,
+						 addr_s, prot))
+					{
+						idx = idx_next;
+						nrelocate++;
+						continue;
+					}
+				}
+
+				idx = co->blocks[idx].next;
+			}
+
+			idx = nvmap_carveout_alloc_locked(n, co, align, h->size, -1);
+			if (idx != -1) {
+				h->carveout.co_heap = co;
+				h->carveout.block_idx = idx;
+				h->carveout.base = co->blocks[idx].base;
+				co->blocks[idx].h = h;
+				h->heap_pgalloc = false;
+				h->alloc = true;
+				spin_unlock(&co->lock);
+				break;
+			}
+			spin_unlock(&co->lock);
+		}
+	}
+
+	mutex_unlock(&nvmap_pin_lock);
+
+fail:
+	if (addr_d) nvmap_unmap_pte(addr_d);
+	if (addr_s) nvmap_unmap_pte(addr_s);
+
+done:
+	up_read(&nvmap_context.list_sem);
+}
+
 static int _nvmap_do_alloc(struct nvmap_file_priv *priv,
 	unsigned long href, unsigned int heap_mask, size_t align,
 	unsigned int flags)
@@ -1835,7 +2204,7 @@ static int _nvmap_do_alloc(struct nvmap_file_priv *priv,
 		if (!heap_mask) return -EINVAL;
 	}
 	else if ((numpages == 1) &&
-		(heap_mask & (NVMEM_HEAP_CARVEOUT_MASK | NVMEM_HEAP_IOVMM) !=
+		((heap_mask & (NVMEM_HEAP_CARVEOUT_MASK | NVMEM_HEAP_IOVMM)) !=
 		NVMEM_HEAP_CARVEOUT_IRAM)) {
 		// Non-secure single page iovmm and carveout allocations
 		// should be allowed to go to sysmem
@@ -1850,26 +2219,27 @@ static int _nvmap_do_alloc(struct nvmap_file_priv *priv,
 		unsigned int heap_type = _nvmap_heap_policy(heap_mask, numpages);
 
 		if (heap_type & NVMEM_HEAP_CARVEOUT_MASK) {
-			struct nvmap_carveout_node *n;
+			_nvmap_carveout_do_alloc(h, heap_type, align);
 
-			down_read(&nvmap_context.list_sem);
-			list_for_each_entry(n, &nvmap_context.heaps, heap_list) {
-				if (heap_type & n->heap_bit) {
-					struct nvmap_carveout* co = &n->carveout;
-					int idx = nvmap_carveout_alloc(co, align, h->size);
-					if (idx != -1) {
-						h->carveout.co_heap = co;
-						h->carveout.block_idx = idx;
-						spin_lock(&co->lock);
-						h->carveout.base = co->blocks[idx].base;
-						spin_unlock(&co->lock);
-						h->heap_pgalloc = false;
-						h->alloc = true;
-						break;
-					}
-				}
+			NVMAP_TRACE(NVMAP_TRACE_ALLOC,
+				"nvmap: CO Req - %s,%u,0x%lx,0x%lx,%d,%d,%d\n",
+				current->comm, (unsigned int)h->size,
+				h->carveout.base, h->flags,
+				(int)h->pin.counter, (int)h->ref.counter,
+				h->carveout.block_idx);
+			if (h->alloc) {
+				NVMAP_TRACE(NVMAP_TRACE_LFB,
+					"nvmap: lfb after alloc %lu\n",
+					_nvmap_carveout_blockstat(
+						h->carveout.co_heap, 
+						CARVEOUT_STAT_LARGEST_FREE));
+
+				NVMAP_TRACE(NVMAP_TRACE_FREE_SIZE,
+					"nvmap: Free size after alloc %lu\n", 
+					_nvmap_carveout_blockstat(
+						h->carveout.co_heap,
+						CARVEOUT_STAT_FREE_SIZE));
 			}
-			up_read(&nvmap_context.list_sem);
 		}
 		else if (heap_type & NVMEM_HEAP_IOVMM) {
 			int ret;
@@ -1886,6 +2256,11 @@ static int _nvmap_do_alloc(struct nvmap_file_priv *priv,
 			}
 			else ret = -ENOMEM;
 
+			NVMAP_TRACE(NVMAP_TRACE_ALLOC,
+				"nvmap: IOVMM-Req - %s,%u,0x%lx,%d,%d,%d,%d\n",
+				current->comm, (unsigned int)h->size, h->flags,
+				(int)h->pin.counter, (int)h->ref.counter,
+				(int)priv->iovm_commit.counter, (int)ret);
 			if (ret) {
 				atomic_sub(numpages << PAGE_SHIFT, &priv->iovm_commit);
 			}
@@ -1900,7 +2275,16 @@ static int _nvmap_do_alloc(struct nvmap_file_priv *priv,
 				BUG_ON(!h->pgalloc.contig);
 				h->heap_pgalloc = true;
 				h->alloc = true;
+				NVMAP_TRACE(NVMAP_TRACE_ALLOC,
+					"nvmap: Ext-Req - %s,%u,0x%lx,%d,%d\n",
+					current->comm, (unsigned int)h->size, h->flags,
+					(int)h->pin.counter, (int)h->ref.counter);
 			}
+			else
+				NVMAP_TRACE(NVMAP_TRACE_ALLOC,
+					"nvmap: Ext-Req: fail:%s,%u,0x%lx,%d,%d\n",
+					current->comm, (unsigned int)h->size, h->flags,
+					(int)h->pin.counter, (int)h->ref.counter);
 		}
 		else break;
 
@@ -2177,6 +2561,12 @@ static int nvmap_map_into_caller_ptr(struct file *filp, void __user *arg)
 		goto out;
 	}
 
+	if (h->alloc && !h->heap_pgalloc) {
+		spin_lock(&h->carveout.co_heap->lock);
+		BLOCK(h->carveout.co_heap, h->carveout.block_idx)->mapcount++;
+		spin_unlock(&h->carveout.co_heap->lock);
+	}
+
 	vpriv->h = h;
 	vpriv->offs = op.offset;
 
@@ -2191,6 +2581,7 @@ out:
 	if (err) _nvmap_handle_put(h);
 	return err;
 }
+
 /* Initially, the nvmap mmap system call is used to allocate an inaccessible
  * region of virtual-address space in the client.  A subsequent
  * NVMAP_IOC_MMAP ioctl will associate each
@@ -2263,6 +2654,12 @@ static int _nvmap_do_cache_maint(struct nvmap_handle *h,
 
 	prot = _nvmap_flag_to_pgprot(h->flags, pgprot_kernel);
 
+	if (!h->heap_pgalloc) {
+		spin_lock(&h->carveout.co_heap->lock);
+		BLOCK(h->carveout.co_heap, h->carveout.block_idx)->mapcount++;
+		spin_unlock(&h->carveout.co_heap->lock);
+	}
+
 	while (start < end) {
 		struct page *page = NULL;
 		unsigned long phys;
@@ -2296,6 +2693,12 @@ static int _nvmap_do_cache_maint(struct nvmap_handle *h,
 		if (outer_maint) outer_maint(phys, phys+count);
 		start += count;
 		if (page) put_page(page);
+	}
+
+	if (!h->heap_pgalloc) {
+		spin_lock(&h->carveout.co_heap->lock);
+		BLOCK(h->carveout.co_heap, h->carveout.block_idx)->mapcount--;
+		spin_unlock(&h->carveout.co_heap->lock);
 	}
 
 out:
@@ -2424,6 +2827,12 @@ static ssize_t _nvmap_do_rw_handle(struct nvmap_handle *h, int is_read,
 		count = 1;
 	}
 
+	if (!h->heap_pgalloc) {
+		spin_lock(&h->carveout.co_heap->lock);
+		BLOCK(h->carveout.co_heap, h->carveout.block_idx)->mapcount++;
+		spin_unlock(&h->carveout.co_heap->lock);
+	}
+
 	while (count--) {
 		size_t ret;
 		if (is_read)
@@ -2442,6 +2851,12 @@ static ssize_t _nvmap_do_rw_handle(struct nvmap_handle *h, int is_read,
 		if (ret < elem_size) break;
 		sys_addr += sys_stride;
 		h_offs += h_stride;
+	}
+
+	if (!h->heap_pgalloc) {
+		spin_lock(&h->carveout.co_heap->lock);
+		BLOCK(h->carveout.co_heap, h->carveout.block_idx)->mapcount--;
+		spin_unlock(&h->carveout.co_heap->lock);
 	}
 
 	if (addr) nvmap_unmap_pte(addr);
@@ -2580,19 +2995,31 @@ static struct device *__nvmap_heap_parent_dev(void)
  */
 static void _nvmap_create_heap_attrs(struct nvmap_carveout_node *n)
 {
+	char heap_name[50];
+
 	if (!_nvmap_heap_parent_dev) return;
-	dev_set_name(&n->dev, "heap-%s", n->carveout.name);
+
+	snprintf(heap_name, sizeof(heap_name), "heap-%s", n->carveout.name);
+	dev_set_name(&n->dev, heap_name);
 	n->dev.parent = _nvmap_heap_parent_dev;
 	n->dev.driver = NULL;
 	n->dev.release = NULL;
 	if (device_register(&n->dev)) {
-		pr_err("%s: failed to create heap-%s device\n",
-			__func__, n->carveout.name);
+		pr_err("%s: failed to create %s device\n",
+			__func__, heap_name);
 		return;
 	}
 	if (sysfs_create_group(&n->dev.kobj, &nvmap_heap_defattr_group))
-		pr_err("%s: failed to create attribute group for heap-%s "
-			"device\n", __func__, n->carveout.name);
+		pr_err("%s: failed to create attribute group for %s "
+			"device\n", __func__, heap_name);
+#if NVMAP_DEBUG_FS
+	n->debugfs_root = debugfs_create_dir(heap_name, NULL);
+	if (!IS_ERR(n->debugfs_root) && !n->debugfs_root) {
+		pr_err("%s: failed to create debugfs directory for %s "
+			"device\n", __func__, heap_name);
+	}
+#endif
+
 }
 
 static int __init nvmap_dev_init(void)
@@ -2700,12 +3127,13 @@ static int __init nvmap_heap_arg(char *options)
 }
 __setup("nvmem=", nvmap_heap_arg);
 
-static int _nvmap_try_create_preserved(struct nvmap_carveout *co,
+static int _nvmap_try_create_preserved(struct nvmap_carveout_node *n,
 	struct nvmap_handle *h, unsigned long base,
 	size_t size, unsigned int key)
 {
 	unsigned long end = base + size;
 	short idx;
+	struct nvmap_carveout *co = &n->carveout;
 
 	h->carveout.base = ~0;
 	h->carveout.key = key;
@@ -2717,11 +3145,15 @@ static int _nvmap_try_create_preserved(struct nvmap_carveout *co,
 		struct nvmap_mem_block *b = BLOCK(co, idx);
 		unsigned long blk_end = b->base + b->size;
 		if (b->base <= base && blk_end >= end) {
-			if (!nvmap_split_block(co, idx, base, size)) {
+			if (!nvmap_split_block(co, idx, base, size, 1)) {
 				h->carveout.block_idx = idx;
 				h->carveout.base = co->blocks[idx].base;
+				co->blocks[idx].h = NULL;
 				h->carveout.co_heap = co;
 				h->alloc = true;
+#if NVMAP_DEBUG_FS
+				nvmap_add_debug_fs_node(n, co, idx);
+#endif
 				break;
 			}
 		}
@@ -2732,7 +3164,7 @@ static int _nvmap_try_create_preserved(struct nvmap_carveout *co,
 	return (h->carveout.co_heap == NULL) ? -ENXIO : 0;
 }
 
-static void _nvmap_create_nvos_preserved(struct nvmap_carveout *co)
+static void _nvmap_create_nvos_preserved(struct nvmap_carveout_node *n)
 {
 #ifdef CONFIG_TEGRA_NVOS
 	unsigned int i, key;
@@ -2752,7 +3184,7 @@ static void _nvmap_create_nvos_preserved(struct nvmap_carveout *co)
 		h = _nvmap_handle_create(NULL, mem.Size);
 		if (!h) continue;
 
-		if (!_nvmap_try_create_preserved(co, h, mem.Address,
+		if (!_nvmap_try_create_preserved(n, h, mem.Address,
 		    mem.Size, key))
 			was_created[i] = 1;
 		else
@@ -2783,8 +3215,8 @@ int nvmap_add_carveout_heap(unsigned long base, size_t size,
 
 	/* called inside the list_sem lock to ensure that the was_created
 	 * array is protected against simultaneous access */
-	_nvmap_create_nvos_preserved(&n->carveout);
 	_nvmap_create_heap_attrs(n);
+	_nvmap_create_nvos_preserved(n);
 
 	list_for_each_entry(l, &nvmap_context.heaps, heap_list) {
 		if (n->heap_bit > l->heap_bit) {
@@ -2809,8 +3241,7 @@ int nvmap_create_preserved_handle(unsigned long base, size_t size,
 
 	down_read(&nvmap_context.list_sem);
 	list_for_each_entry(i, &nvmap_context.heaps, heap_list) {
-		struct nvmap_carveout *co = &i->carveout;
-		if (!_nvmap_try_create_preserved(co, h, base, size, key))
+		if (!_nvmap_try_create_preserved(i, h, base, size, key))
 			break;
 	}
 	up_read(&nvmap_context.list_sem);
@@ -2826,8 +3257,9 @@ int nvmap_create_preserved_handle(unsigned long base, size_t size,
 
 /* attempts to create a new carveout heap with a new usage bitmask by
  * taking an allocation from a previous carveout with a different bitmask */
-static int nvmap_split_carveout_heap(struct nvmap_carveout *co, size_t size,
-	const char *name, unsigned int new_bitmask)
+static int nvmap_split_carveout_heap( struct nvmap_carveout_node *n_parent,
+	struct nvmap_carveout *co, size_t size, const char *name,
+	unsigned int new_bitmask)
 {
 	struct nvmap_carveout_node *i, *n;
 	int idx = -1;
@@ -2839,17 +3271,21 @@ static int nvmap_split_carveout_heap(struct nvmap_carveout *co, size_t size,
 	n->heap_bit = new_bitmask;
 
 	/* align split carveouts to 1M */
-	idx = nvmap_carveout_alloc(co, SZ_1M, size);
+
+	spin_lock(&co->lock);
+	idx = nvmap_carveout_alloc_locked(n_parent, co, SZ_1M, size, -1);
 	if (idx != -1) {
 		/* take the spin lock to avoid race conditions with
 		 * intervening allocations triggering grow_block operations */
-		spin_lock(&co->lock);
 		blkbase = co->blocks[idx].base;
 		blksize = co->blocks[idx].size;
+		co->blocks[idx].h = NULL;
+		/* cannot relocate a block that is a carveout itself */
+		co->blocks[idx].align |= NVMAP_BLOCK_ALIGN_PINNED;
 		spin_unlock(&co->lock);
 
 		if (_nvmap_init_carveout(&n->carveout,name, blkbase, blksize)) {
-			nvmap_carveout_free(co, idx);
+			nvmap_carveout_free(co, idx, true);
 			idx = -1;
 		} else {
 			spin_lock(&co->lock);
@@ -2871,6 +3307,8 @@ static int nvmap_split_carveout_heap(struct nvmap_carveout *co, size_t size,
 			co->spare_index = idx;
 			spin_unlock(&co->lock);
 		}
+	} else {
+		spin_unlock(&co->lock);
 	}
 
 	if (idx==-1) {
@@ -2988,19 +3426,27 @@ NvError NvRmMemMap(NvRmMemHandle hMem, NvU32 Offset, NvU32 Size,
 		BUG_ON(h->size & ~PAGE_MASK);
 		h->kern_map = vm_map_ram(h->pgalloc.pages,
 			h->size>>PAGE_SHIFT, -1, prot);
-	} else if (!h->kern_map) {
-		unsigned int size;
-		unsigned long addr;
+	} else {
+		if (!h->heap_pgalloc) {
+			spin_lock(&h->carveout.co_heap->lock);
+			BLOCK(h->carveout.co_heap, h->carveout.block_idx)->mapcount++;
+			spin_unlock(&h->carveout.co_heap->lock);
+		}
 
-		addr = h->carveout.base;
-		size = h->size + (addr & ~PAGE_MASK);
-		addr &= PAGE_MASK;
-		size = (size + PAGE_SIZE - 1) & PAGE_MASK;
+		if (!h->kern_map) {
+			unsigned int size;
+			unsigned long addr;
 
-		h->kern_map = ioremap_wc(addr, size);
-		if (h->kern_map) {
-			addr = h->carveout.base - addr;
-			h->kern_map += addr;
+			addr = h->carveout.base;
+			size = h->size + (addr & ~PAGE_MASK);
+			addr &= PAGE_MASK;
+			size = (size + PAGE_SIZE - 1) & PAGE_MASK;
+
+			h->kern_map = ioremap_wc(addr, size);
+			if (h->kern_map) {
+				addr = h->carveout.base - addr;
+				h->kern_map += addr;
+			}
 		}
 	}
 
@@ -3014,6 +3460,14 @@ NvError NvRmMemMap(NvRmMemHandle hMem, NvU32 Offset, NvU32 Size,
 
 void NvRmMemUnmap(NvRmMemHandle hMem, void *pVirtAddr, NvU32 Size)
 {
+	struct nvmap_handle *h = (struct nvmap_handle *)hMem;
+
+	if (h->alloc && !h->heap_pgalloc) {
+		spin_lock(&h->carveout.co_heap->lock);
+		BLOCK(h->carveout.co_heap, h->carveout.block_idx)->mapcount--;
+		spin_unlock(&h->carveout.co_heap->lock);
+	}
+
 	return;
 }
 
@@ -3372,6 +3826,10 @@ struct nvmap_handle *nvmap_alloc(
 		size_t mapaddr = h->carveout.base;
 		size_t mapsize = h->size;
 
+		spin_lock(&h->carveout.co_heap->lock);
+		BLOCK(h->carveout.co_heap, h->carveout.block_idx)->mapcount++;
+		spin_unlock(&h->carveout.co_heap->lock);
+
 		mapsize += (mapaddr & ~PAGE_MASK);
 		mapaddr &= PAGE_MASK;
 		mapsize = (mapsize + PAGE_SIZE - 1) & PAGE_MASK;
@@ -3399,6 +3857,11 @@ void nvmap_free(struct nvmap_handle *h, void *map)
 			vm_unmap_ram(map, h->size >> PAGE_SHIFT);
 		} else {
 			unsigned long addr = (unsigned long)map;
+
+			spin_lock(&h->carveout.co_heap->lock);
+			BLOCK(h->carveout.co_heap, h->carveout.block_idx)->mapcount--;
+			spin_unlock(&h->carveout.co_heap->lock);
+
 			addr &= PAGE_MASK;
 			iounmap((void *)addr);
 		}
