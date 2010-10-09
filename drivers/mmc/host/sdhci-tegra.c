@@ -113,19 +113,19 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhost,
 {
 	struct tegra_sdhci *host = sdhci_priv(sdhost);
 
-	if (clock) {
-		clk_set_rate(host->clk, clock);
-		sdhost->max_clk = clk_get_rate(host->clk);
-		dev_dbg(&host->pdev->dev, "clock request: %uKHz. currently "
-			"%uKHz\n", clock/1000, sdhost->max_clk/1000);
-	}
-
 	if (clock && !host->clk_enable) {
 		clk_enable(host->clk);
 		host->clk_enable = true;
 	} else if (!clock && host->clk_enable) {
 		clk_disable(host->clk);
 		host->clk_enable = false;
+	}
+
+	if (clock) {
+		clk_set_rate(host->clk, clock);
+		sdhost->max_clk = clk_get_rate(host->clk);
+		dev_dbg(&host->pdev->dev, "clock request: %uKHz. currently "
+			"%uKHz\n", clock/1000, sdhost->max_clk/1000);
 	}
 }
 
@@ -291,8 +291,8 @@ skip_gpio_wp:
 	if (host->pinmux && host->nr_pins)
 		tegra_pinmux_config_tristate_table(host->pinmux,
 			host->nr_pins, TEGRA_TRI_NORMAL);
-	clk_set_rate(host->clk, host->max_clk);
 	clk_enable(host->clk);
+	clk_set_rate(host->clk, host->max_clk);
 	host->max_clk = clk_get_rate(host->clk);
 	host->clk_enable = true;
 

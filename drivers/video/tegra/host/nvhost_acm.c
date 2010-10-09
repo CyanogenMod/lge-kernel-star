@@ -108,7 +108,9 @@ int nvhost_module_init(struct nvhost_module *mod, const char *name,
 				__func__, name);
 			break;
 		}
+		clk_enable(mod->clk[i]);
 		clk_set_rate(mod->clk[i], rate);
+		clk_disable(mod->clk[i]);
 		i++;
 	}
 

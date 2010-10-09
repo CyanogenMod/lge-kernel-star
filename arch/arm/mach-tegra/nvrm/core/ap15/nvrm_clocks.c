@@ -600,6 +600,8 @@ ExecPlatform NvRmPrivGetExecPlatform(NvRmDeviceHandle hRmDeviceHandle)
 
 /*****************************************************************************/
 
+#define NVRM_DEBUG_MODULE_CLOCK_SET (1)
+
 /* Sets module clock source/divider register */
 void NvRmPrivModuleClockSet(
     NvRmDeviceHandle hDevice,
@@ -608,6 +610,16 @@ void NvRmPrivModuleClockSet(
 {
     NvU32 reg, divisor;
 
+#if NVRM_DEBUG_MODULE_CLOCK_SET
+    if(cinfo->ClkEnableOffset != 0)
+    {
+        reg = NV_REGR(hDevice,
+            NvRmPrivModuleID_ClockAndReset, 0, cinfo->ClkEnableOffset);
+        if ((reg & cinfo->ClkEnableField) != cinfo->ClkEnableField)
+            NvOsDebugPrintf("tegra: configuring disabled clock ( module %d, "
+                "instance %d )\n", cinfo->Module, cinfo->Instance);
+    }
+#endif
     NV_ASSERT(cinfo->ClkSourceOffset);
     reg = NV_REGR(hDevice, NvRmPrivModuleID_ClockAndReset, 0, cinfo->ClkSourceOffset);
     divisor = (reg >> cinfo->DivisorFieldShift) & cinfo->DivisorFieldMask;
