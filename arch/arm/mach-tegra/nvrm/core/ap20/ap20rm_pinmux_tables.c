@@ -324,5 +324,7 @@ NvRmAp20GetStraps(
 void NvRmAp20SetDefaultTristate(NvRmDeviceHandle hDevice)
 {
     tegra_pinmux_set_vddio_tristate(TEGRA_VDDIO_NAND, TEGRA_TRI_TRISTATE);
+    tegra_pinmux_set_tristate(TEGRA_PINGROUP_PTA, TEGRA_TRI_NORMAL);
+    tegra_pinmux_set_tristate(TEGRA_PINGROUP_PTA, TEGRA_TRI_TRISTATE);
 }
 
