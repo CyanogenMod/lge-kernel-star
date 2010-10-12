@@ -214,7 +214,7 @@ static const NvOdmIoAddress s_VddVdacAddresses[] =
 // VI voltage rail
 static const NvOdmIoAddress s_VddViAddresses[] =
 {
-    { NvOdmIoModule_Vdd, 0x00, TPS6586xPmuSupply_LDO3, 0 } /* VDDIO_VI -> derived from LDO3 (VDD_3V3) */
+    { NvOdmIoModule_Vdd, 0x00, TPS6586xPmuSupply_LDO6, 0 } /* VDDIO_VI -> derived from LDO6 (VDD_3V3) */
 };
 
 // BB voltage rail
