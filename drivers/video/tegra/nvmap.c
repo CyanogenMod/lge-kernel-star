@@ -1036,7 +1036,7 @@ void _nvmap_handle_free(struct nvmap_handle *h)
 	}
 
 	/* ensure that no stale data remains in the cache for this handle */
-	if (h->alloc || h->pgalloc)
+	if (h->alloc)
 		e = _nvmap_do_cache_maint(h, 0, h->size, 
 			NVMEM_CACHE_OP_WB_INV, false);
 
