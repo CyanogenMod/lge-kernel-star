@@ -195,6 +195,7 @@ static NvError NvRmI2cClose_dispatch_( void *InBuffer, NvU32 InSize, void *OutBu
 
     p_in = (NvRmI2cClose_in *)InBuffer;
 
+    NvRtFreeObjRef(Ctx, NvRtObjType_NvRm_NvRmI2cHandle, p_in->hI2c);
 
     NvRmI2cClose( p_in->hI2c );
 
@@ -206,13 +207,28 @@ static NvError NvRmI2cOpen_dispatch_( void *InBuffer, NvU32 InSize, void *OutBuf
     NvError err_ = NvSuccess;
     NvRmI2cOpen_in *p_in;
     NvRmI2cOpen_out *p_out;
+    NvRtObjRefHandle ref_phI2c = 0;
 
     p_in = (NvRmI2cOpen_in *)InBuffer;
     p_out = (NvRmI2cOpen_out *)((NvU8 *)OutBuffer + OFFSET(NvRmI2cOpen_params, out) - OFFSET(NvRmI2cOpen_params, inout));
 
-
     p_out->ret_ = NvRmI2cOpen( p_in->hDevice, p_in->IoModule, p_in->instance, &p_out->phI2c );
+    if (p_out->ret_ != NvSuccess)
+    {
+        err_ = p_out->ret_;
+        goto clean;
+    }
+    err_ = NvRtAllocObjRef(Ctx, &ref_phI2c);
+    if (err_ == NvSuccess)
+    {
+        NvRtStoreObjRef(Ctx, ref_phI2c, NvRtObjType_NvRm_NvRmI2cHandle, p_out->phI2c);
+    }
+    else
+    {
+        NvRmI2cClose(p_out->phI2c);
+    }
 
+clean:
     return err_;
 }
 

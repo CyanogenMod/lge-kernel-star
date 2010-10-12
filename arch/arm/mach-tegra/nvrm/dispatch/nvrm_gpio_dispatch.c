@@ -452,6 +452,7 @@ clean:
 
 static NvError NvRmGpioReleasePinHandles_dispatch_( void *InBuffer, NvU32 InSize, void *OutBuffer, NvU32 OutSize, NvDispatchCtx* Ctx )
 {
+    NvU32 cnt = 0;
     NvError err_ = NvSuccess;
     NvRmGpioReleasePinHandles_in *p_in;
     NvRmGpioPinHandle *hPin = NULL;
@@ -478,6 +479,10 @@ static NvError NvRmGpioReleasePinHandles_dispatch_( void *InBuffer, NvU32 InSize
     }
 
     NvRmGpioReleasePinHandles( p_in->hGpio, hPin, p_in->pinCount );
+    for (cnt=0; cnt<p_in->pinCount; cnt++)
+    {
+        NvRtFreeObjRef(Ctx, NvRtObjType_NvRm_GpioHandle, (void *)hPin[cnt]);
+    }
 
 clean:
     NvOsFree( hPin );
@@ -487,6 +492,7 @@ clean:
 static NvError NvRmGpioAcquirePinHandle_dispatch_( void *InBuffer, NvU32 InSize, void *OutBuffer, NvU32 OutSize, NvDispatchCtx* Ctx )
 {
     NvError err_ = NvSuccess;
+    NvRtObjRefHandle ref_phGpio = 0;
     NvRmGpioAcquirePinHandle_in *p_in;
     NvRmGpioAcquirePinHandle_out *p_out;
 
@@ -494,8 +500,12 @@ static NvError NvRmGpioAcquirePinHandle_dispatch_( void *InBuffer, NvU32 InSize,
     p_out = (NvRmGpioAcquirePinHandle_out *)((NvU8 *)OutBuffer + OFFSET(NvRmGpioAcquirePinHandle_params, out) - OFFSET(NvRmGpioAcquirePinHandle_params, inout));
 
 
+    if (NvSuccess != (err_ = NvRtAllocObjRef(Ctx, &ref_phGpio)))
+        goto clean;
     p_out->ret_ = NvRmGpioAcquirePinHandle( p_in->hGpio, p_in->port, p_in->pin, &p_out->phPin );
+    NvRtStoreObjRef(Ctx, ref_phGpio, NvRtObjType_NvRm_GpioHandle, (void *)p_out->phPin);
 
+clean:
     return err_;
 }
 

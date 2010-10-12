@@ -99,6 +99,8 @@ typedef enum
 {
     NvRtObjType_NvRm_NvRmMemHandle = 0,
     NvRtObjType_NvRm_NvRmDmaHandle,
+    NvRtObjType_NvRm_NvRmI2cHandle,
+    NvRtObjType_NvRm_GpioHandle,
     NvRtObjType_NvRm_Num,
     NvRtObjType_NvRm_ForceWord = 0x7FFFFFFF
 } NvRtObjType_NvRm;
