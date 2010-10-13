@@ -26,6 +26,7 @@ enum tegra_revision {
 };
 
 unsigned long long tegra_chip_uid(void);
+unsigned int tegra_spare_fuse(int bit);
 int tegra_sku_id(void);
 int tegra_cpu_process_id(void);
 int tegra_core_process_id(void);
