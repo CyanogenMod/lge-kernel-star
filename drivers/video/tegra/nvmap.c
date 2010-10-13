@@ -1445,7 +1445,7 @@ static void nvmap_vma_close(struct vm_area_struct *vma) {
 	if (priv && !atomic_dec_return(&priv->ref)) {
 		struct nvmap_handle *h = priv->h;
 		if (h) {
-			if (!h->alloc && !h->heap_pgalloc) {
+			if (h->alloc && !h->heap_pgalloc) {
 				spin_lock(&h->carveout.co_heap->lock);
 				BLOCK(h->carveout.co_heap, h->carveout.block_idx)->mapcount--;
 				spin_unlock(&h->carveout.co_heap->lock);
@@ -1644,7 +1644,7 @@ static int _nvmap_handle_unpin(struct nvmap_handle *h)
 			_nvmap_insert_mru_vma(h);
 			ret=1;
 		}
-		if (!h->heap_pgalloc) {
+		if (h->alloc && !h->heap_pgalloc) {
 			spin_lock(&h->carveout.co_heap->lock);
 			BLOCK(h->carveout.co_heap, h->carveout.block_idx)->align
 				&= ~NVMAP_BLOCK_ALIGN_PINNED;
@@ -2654,7 +2654,7 @@ static int _nvmap_do_cache_maint(struct nvmap_handle *h,
 
 	prot = _nvmap_flag_to_pgprot(h->flags, pgprot_kernel);
 
-	if (!h->heap_pgalloc) {
+	if (h->alloc && !h->heap_pgalloc) {
 		spin_lock(&h->carveout.co_heap->lock);
 		BLOCK(h->carveout.co_heap, h->carveout.block_idx)->mapcount++;
 		spin_unlock(&h->carveout.co_heap->lock);
@@ -2695,7 +2695,7 @@ static int _nvmap_do_cache_maint(struct nvmap_handle *h,
 		if (page) put_page(page);
 	}
 
-	if (!h->heap_pgalloc) {
+	if (h->alloc && !h->heap_pgalloc) {
 		spin_lock(&h->carveout.co_heap->lock);
 		BLOCK(h->carveout.co_heap, h->carveout.block_idx)->mapcount--;
 		spin_unlock(&h->carveout.co_heap->lock);
@@ -2827,7 +2827,7 @@ static ssize_t _nvmap_do_rw_handle(struct nvmap_handle *h, int is_read,
 		count = 1;
 	}
 
-	if (!h->heap_pgalloc) {
+	if (h->alloc && !h->heap_pgalloc) {
 		spin_lock(&h->carveout.co_heap->lock);
 		BLOCK(h->carveout.co_heap, h->carveout.block_idx)->mapcount++;
 		spin_unlock(&h->carveout.co_heap->lock);
@@ -2853,7 +2853,7 @@ static ssize_t _nvmap_do_rw_handle(struct nvmap_handle *h, int is_read,
 		h_offs += h_stride;
 	}
 
-	if (!h->heap_pgalloc) {
+	if (h->alloc && !h->heap_pgalloc) {
 		spin_lock(&h->carveout.co_heap->lock);
 		BLOCK(h->carveout.co_heap, h->carveout.block_idx)->mapcount--;
 		spin_unlock(&h->carveout.co_heap->lock);
@@ -3427,7 +3427,7 @@ NvError NvRmMemMap(NvRmMemHandle hMem, NvU32 Offset, NvU32 Size,
 		h->kern_map = vm_map_ram(h->pgalloc.pages,
 			h->size>>PAGE_SHIFT, -1, prot);
 	} else {
-		if (!h->heap_pgalloc) {
+		if (h->alloc && !h->heap_pgalloc) {
 			spin_lock(&h->carveout.co_heap->lock);
 			BLOCK(h->carveout.co_heap, h->carveout.block_idx)->mapcount++;
 			spin_unlock(&h->carveout.co_heap->lock);
@@ -3826,9 +3826,11 @@ struct nvmap_handle *nvmap_alloc(
 		size_t mapaddr = h->carveout.base;
 		size_t mapsize = h->size;
 
-		spin_lock(&h->carveout.co_heap->lock);
-		BLOCK(h->carveout.co_heap, h->carveout.block_idx)->mapcount++;
-		spin_unlock(&h->carveout.co_heap->lock);
+		if (h->alloc && !h->heap_pgalloc) {
+			spin_lock(&h->carveout.co_heap->lock);
+			BLOCK(h->carveout.co_heap, h->carveout.block_idx)->mapcount++;
+			spin_unlock(&h->carveout.co_heap->lock);
+		}
 
 		mapsize += (mapaddr & ~PAGE_MASK);
 		mapaddr &= PAGE_MASK;
@@ -3858,9 +3860,11 @@ void nvmap_free(struct nvmap_handle *h, void *map)
 		} else {
 			unsigned long addr = (unsigned long)map;
 
-			spin_lock(&h->carveout.co_heap->lock);
-			BLOCK(h->carveout.co_heap, h->carveout.block_idx)->mapcount--;
-			spin_unlock(&h->carveout.co_heap->lock);
+			if (h->alloc && !h->heap_pgalloc) {
+				spin_lock(&h->carveout.co_heap->lock);
+				BLOCK(h->carveout.co_heap, h->carveout.block_idx)->mapcount--;
+				spin_unlock(&h->carveout.co_heap->lock);
+			}
 
 			addr &= PAGE_MASK;
 			iounmap((void *)addr);
