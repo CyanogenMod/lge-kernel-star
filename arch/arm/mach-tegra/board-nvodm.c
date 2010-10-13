@@ -1692,10 +1692,18 @@ void tegra_board_nvodm_suspend(void)
 {
 	if (console_suspend_enabled)
 		tegra_debug_port_suspend();
+#ifdef CONFIG_TEGRA_ODM_VENTANA
+        tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_SDC, TEGRA_PUPD_NORMAL);
+        tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_SDD, TEGRA_PUPD_NORMAL);
+#endif
 }
 
 void tegra_board_nvodm_resume(void)
 {
 	if (console_suspend_enabled)
 		tegra_debug_port_resume();
+#ifdef CONFIG_TEGRA_ODM_VENTANA
+        tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_SDC, TEGRA_PUPD_PULL_UP);
+        tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_SDD, TEGRA_PUPD_PULL_UP);
+#endif
 }
