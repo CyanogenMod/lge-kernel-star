@@ -429,6 +429,7 @@ static struct nvhost_hwctx *ctx3d_alloc(struct nvhost_channel *ch)
 static void ctx3d_free(struct kref *ref)
 {
 	struct nvhost_hwctx *ctx = container_of(ref, struct nvhost_hwctx, ref);
+	nvmap_unpin(&ctx->restore, 1);
 	nvmap_free(ctx->restore, ctx->save_cpu_data);
 	kfree(ctx);
 }
