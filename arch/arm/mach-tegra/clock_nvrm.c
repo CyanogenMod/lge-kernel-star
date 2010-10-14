@@ -111,6 +111,7 @@ static int tegra_periph_clk_enable(struct clk *c)
 	} else if (NVRM_MODULE_ID_MODULE(c->module) == NvRmModuleID_2D) {
 		NvRmDfsBusyHint hint =
 			{NvRmDfsClockId_Emc, 0xffffffff, NvRmFreqMaximum, true};
+		hint.BoostKHz = NvRmPrivDfsGetMaxKHz(NvRmDfsClockId_Emc) / 2;
 		NvRmPowerBusyHintMulti(s_hRmGlobal, busy_pwr_client_2d, &hint, 1,
 			NvRmDfsBusyHintSyncMode_Async);
 	}
