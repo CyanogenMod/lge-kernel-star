@@ -418,7 +418,6 @@ static int tegra_rtc_suspend(struct platform_device *pdev, pm_message_t state)
 static int tegra_rtc_resume(struct platform_device *pdev)
 {
 	struct device *dev=&pdev->dev;
-	unsigned long sl_irq_flags;
 	unsigned int intr_status;
 
 	/* clear */

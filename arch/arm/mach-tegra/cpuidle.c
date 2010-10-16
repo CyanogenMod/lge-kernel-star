@@ -225,7 +225,6 @@ static int tegra_idle_enter(unsigned int cpu)
 static int __init tegra_cpuidle_init(void)
 {
 	unsigned int cpu = smp_processor_id();
-	unsigned int reg;
 	int ret;
 
 	lp2_supported = (num_online_cpus()==1);

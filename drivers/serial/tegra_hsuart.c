@@ -1124,7 +1124,7 @@ static void tegra_set_baudrate(struct tegra_uart_port *t, unsigned int baud)
 	baud_actual = divisor ? rate / (16 * divisor) : 0;
 	baud_delta = abs(baud_actual - baud);
 	if (WARN_ON(baud_delta * 20 > baud)) {
-		dev_err(t->uport.dev, "requested baud %lu, actual %lu\n", baud, baud_actual);
+		dev_err(t->uport.dev, "requested baud %u, actual %u\n", baud, baud_actual);
 	}
 
 	lcr = t->lcr_shadow;
