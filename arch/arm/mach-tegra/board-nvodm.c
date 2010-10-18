@@ -753,8 +753,18 @@ static noinline void __init tegra_setup_kbc(void)
 	/* debounce time is reported from ODM in terms of clock ticks. */
 	pdata->debounce_cnt = temp;
 
+	/* Get the scanning timeout in terms of MilliSeconds.*/
+	temp = 0;
+	NvOdmKbcGetParameter(NvOdmKbcParameter_KeyScanTimeout, 1, &temp);
+	/* If value is 0 then set it to 5 second as default */
+	if (!temp)
+		temp = 5000;
+	/* Convert Milliseconds to clock count of 32Kz */
+	pdata->scan_timeout_cnt = temp*32;
+
 	/* repeat cycle is reported from ODM in milliseconds,
 	 * but needs to be specified in 32KHz ticks */
+	temp = 0;
 	NvOdmKbcGetParameter(NvOdmKbcParameter_RepeatCycleTime, 1, &temp);
 	pdata->repeat_cnt = temp * 32;
 

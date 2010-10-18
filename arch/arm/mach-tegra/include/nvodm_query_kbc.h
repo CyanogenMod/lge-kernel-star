@@ -62,6 +62,9 @@ typedef enum
     NvOdmKbcParameter_NumOfColumns,
     NvOdmKbcParameter_DebounceTime,
     NvOdmKbcParameter_RepeatCycleTime,
+    /* Amount of time in MilliSecond to continue the scanning of key
+     * once key is pressed. */
+    NvOdmKbcParameter_KeyScanTimeout,
     NvOdmKbcParameter_Force32 = 0x7FFFFFFF
 } NvOdmKbcParameter;
 

@@ -52,6 +52,9 @@ struct tegra_kbc_wake_key {
 struct tegra_kbc_plat {
 	unsigned int debounce_cnt;
 	unsigned int repeat_cnt;
+	/* Number of clock count (32KHz) to keep scanning of key after
+	 * Key is pressed. */
+	unsigned int scan_timeout_cnt;
 	int wake_cnt; /* 0:wake on any key >1:wake on wake_cfg */
 	struct tegra_kbc_pin_cfg pin_cfg[KBC_MAX_GPIO];
 	struct tegra_kbc_wake_key *wake_cfg;
