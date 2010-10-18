@@ -999,12 +999,20 @@ NvError NvOsSemaphoreUnmarshal(
 int NvOsSemaphoreWaitInterruptible(NvOsSemaphoreHandle semaphore);
 int NvOsSemaphoreWaitInterruptible(NvOsSemaphoreHandle semaphore)
 {
+    int ret;
+
     NV_ASSERT(semaphore);
 
     if (sem_handle_search(semaphore) == NULL)
         return -EINVAL;
 
-    return down_interruptible(&semaphore->sem);
+    do {
+        ret = down_interruptible(&semaphore->sem);
+        if ( (ret != -EINTR) || ((ret == -EINTR) && (!try_to_freeze())) ) {
+            return ret;
+        }
+        schedule();
+    } while (1);
 }
 
 void NvOsSemaphoreWait(NvOsSemaphoreHandle semaphore)
