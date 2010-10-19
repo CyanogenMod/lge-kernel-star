@@ -94,7 +94,9 @@ extern const struct tegra_pingroup_config *tegra_pinmux_get(const char *dev_id,
 
 static struct plat_serial8250_port debug_uart_platform[] = {
 	{
-		.flags = UPF_BOOT_AUTOCONF,
+		/* Force the debug console UART port type to PORT_TEGRA.*/
+		.flags = UPF_BOOT_AUTOCONF | UPF_FIXED_TYPE,
+		.type = PORT_TEGRA,
 		.iotype = UPIO_MEM,
 		.regshift = 2,
 	}, {

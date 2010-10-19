@@ -299,6 +299,14 @@ static const struct serial8250_config uart_config[] = {
 		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_00,
 		.flags		= UART_CAP_FIFO | UART_CAP_AFE,
 	},
+	[PORT_TEGRA] = {
+		.name		= "Tegra",
+		.fifo_size	= 32,
+		.tx_loadsz	= 8,
+		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_T_TRIG_01 |
+				  UART_FCR_R_TRIG_01,
+		.flags		= UART_CAP_FIFO,
+	},
 };
 
 #if defined (CONFIG_SERIAL_8250_AU1X00)
@@ -1381,6 +1389,23 @@ static void serial8250_enable_ms(struct uart_port *port)
 	up->ier |= UART_IER_MSI;
 	serial_out(up, UART_IER, up->ier);
 }
+/* Clear the rx fifo */
+static void clear_rx_fifo(struct uart_8250_port *up)
+{
+	unsigned int status, tmout = 10000;
+	do {
+		status = serial_in(up, UART_LSR);
+		if (status & (UART_LSR_FIFOE | UART_LSR_BRK_ERROR_BITS))
+			status = serial_in(up, UART_RX);
+		else
+			break;
+		if (--tmout == 0)
+			break;
+		udelay(1);
+	} while (1);
+}
+
+
 
 static void
 receive_chars(struct uart_8250_port *up, unsigned int *status)
@@ -1416,6 +1441,12 @@ receive_chars(struct uart_8250_port *up, unsigned int *status)
 			if (lsr & UART_LSR_BI) {
 				lsr &= ~(UART_LSR_FE | UART_LSR_PE);
 				up->port.icount.brk++;
+				/*
+				 * If tegra port then clear the rx fifo to
+				 * accept another break/character.
+				 */
+				if (up->port.type == PORT_TEGRA)
+					clear_rx_fifo(up);
 				/*
 				 * We do the SysRQ and SAK checking
 				 * here because otherwise the break
@@ -2152,6 +2183,9 @@ dont_test_tx_en:
 	 * anyway, so we don't enable them here.
 	 */
 	up->ier = UART_IER_RLSI | UART_IER_RDI;
+	/* Use the receive timeout interrupt for tegra port*/
+	if (up->port.type == PORT_TEGRA)
+		up->ier |= UART_IER_RTOIE;
 	serial_outp(up, UART_IER, up->ier);
 
 	if (up->port.flags & UPF_FOURPORT) {
