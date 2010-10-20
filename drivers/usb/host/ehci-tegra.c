@@ -236,6 +236,15 @@ static void tegra_ehci_irq_work(struct work_struct* irq_work)
 					kick_rhub = true;
 				tegra_ehci_restart(hcd);
 			}
+		} else if (ehci->transceiver->state == OTG_STATE_A_SUSPEND) {
+			if (ehci->host_reinited) {
+				/* indicate hcd flags, that hardware is not accessible now */
+				clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+				ehci_halt(ehci);
+				tegra_ehci_power_down(hcd);
+				ehci->transceiver->state = OTG_STATE_UNDEFINED;
+				ehci->host_reinited = 0;
+			}
 		}
 	} else
 #endif
@@ -282,6 +291,10 @@ static irqreturn_t tegra_ehci_irq (struct usb_hcd *hcd)
 			}
 		} else if (ehci->transceiver->state == OTG_STATE_A_SUSPEND) {
 			if (!ehci->host_reinited) {
+				spin_unlock (&ehci->lock);
+				return IRQ_HANDLED;
+			} else {
+				schedule_work(&ehci->irq_work);
 				spin_unlock (&ehci->lock);
 				return IRQ_HANDLED;
 			}
