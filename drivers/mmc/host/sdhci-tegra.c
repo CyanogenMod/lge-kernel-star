@@ -473,10 +473,10 @@ static int tegra_sdhci_suspend(struct device *dev)
 		sdhost->mmc->ops->set_ios(sdhost->mmc, &ios);
 		/* keep CARD_INT enabled - if used as wakeup source */
 		if (host->sdhci_ints & SDHCI_INT_CARD_INT) {
-			u32 ier = sdhci_readl(host, SDHCI_INT_ENABLE);
+			u32 ier = sdhci_readl(sdhost, SDHCI_INT_ENABLE);
 			ier |= SDHCI_INT_CARD_INT;
-			sdhci_writel(host, ier, SDHCI_INT_ENABLE);
-			sdhci_writel(host, ier, SDHCI_SIGNAL_ENABLE);
+			sdhci_writel(sdhost, ier, SDHCI_INT_ENABLE);
+			sdhci_writel(sdhost, ier, SDHCI_SIGNAL_ENABLE);
 
 			if (sdhost->quirks & SDHCI_QUIRK_ENABLE_INTERRUPT_AT_BLOCK_GAP) {
 				u8 gap_ctrl = sdhci_readb(sdhost, SDHCI_BLOCK_GAP_CONTROL);
