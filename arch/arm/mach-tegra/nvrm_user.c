@@ -697,6 +697,7 @@ static int __init nvrm_init(void)
 
     // Create /sys/power/nvrm/notifier.
     nvrm_kobj = kobject_create_and_add("nvrm", power_kobj);
+    sysfs_create_file(nvrm_kobj, &nvrm_core_lock_attribute.attr);
     sysfs_create_file(nvrm_kobj, &nvrm_lp2policy_attribute.attr);
     sysfs_create_file(nvrm_kobj, &nvrm_notifier_attribute.attr);
     sys_nvrm_notifier = NULL;
