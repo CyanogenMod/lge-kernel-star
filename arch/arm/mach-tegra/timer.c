@@ -37,6 +37,7 @@
 
 #include "board.h"
 #include "clock.h"
+#include "power.h"
 
 #define CLK_RST_OSC_CTRL 0x50
 
@@ -106,12 +107,15 @@ static cycle_t tegra_clocksource_us_read(struct clocksource *cs)
 
 void tegra_clocksource_us_suspend(struct clocksource *cs)
 {
-	tegra_us_resume_offset = tegra_clocksource_us_read(cs);
+	tegra_us_resume_offset = tegra_clocksource_us_read(cs) -
+		tegra_rtc_read_ms() * 1000;
 }
 
 void tegra_clocksource_us_resume(struct clocksource *cs)
 {
-	tegra_us_clocksource_offset = tegra_us_resume_offset;
+	tegra_us_clocksource_offset += tegra_us_resume_offset +
+		tegra_rtc_read_ms() * 1000 -
+		tegra_clocksource_us_read(cs);
 }
 
 static struct clock_event_device tegra_clockevent = {
@@ -192,20 +196,6 @@ static struct irqaction tegra_timer_irq = {
 	.handler	= tegra_timer_interrupt,
 	.dev_id		= &tegra_clockevent,
 	.irq            = INT_TMR3,
-};
-
-static irqreturn_t tegra_lp2wake_interrupt(int irq, void *dev_id)
-{
-	timer_writel(1<<30, TIMER4_BASE + TIMER_PCR);
-	return IRQ_HANDLED;
-}
-
-static struct irqaction tegra_lp2wake_irq = {
-	.name		= "timer_lp2wake",
-	.flags		= IRQF_DISABLED,
-	.handler	= tegra_lp2wake_interrupt,
-	.dev_id		= NULL,
-	.irq		= INT_TMR4,
 };
 
 static unsigned long measure_input_freq(unsigned int *m, unsigned int *n)
