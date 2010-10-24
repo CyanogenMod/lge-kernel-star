@@ -44,6 +44,8 @@ static u32 tegra_lp0_wake_level;
 static u32 tegra_lp0_wake_level_any;
 static int tegra_prevent_lp0;
 
+static unsigned int tegra_wake_irq_count[32];
+
 static bool debug_lp0;
 module_param(debug_lp0, bool, S_IRUGO | S_IWUSR);
 
@@ -143,6 +145,8 @@ static void tegra_pm_irq_syscore_resume(void)
 		pr_info("Resume caused by WAKE%d, %s\n", wake,
 			desc->action->name);
 
+		tegra_wake_irq_count[wake]++;
+
 		generic_handle_irq(irq);
 	}
 }
@@ -201,3 +205,60 @@ static int tegra_pm_irq_syscore_init(void)
 	return 0;
 }
 subsys_initcall(tegra_pm_irq_syscore_init);
+
+#ifdef CONFIG_DEBUG_FS
+static int tegra_pm_irq_debug_show(struct seq_file *s, void *data)
+{
+	int wake;
+	int irq;
+	struct irq_desc *desc;
+	const char *irq_name;
+
+	seq_printf(s, "wake  irq  count  name\n");
+	seq_printf(s, "----------------------\n");
+	for (wake = 0; wake < 32; wake++) {
+		irq = tegra_wake_to_irq(wake);
+		if (irq < 0)
+			continue;
+
+		desc = irq_to_desc(irq);
+		if (tegra_wake_irq_count[wake] == 0 && desc->action == NULL)
+			continue;
+
+		irq_name = (desc->action && desc->action->name) ?
+			desc->action->name : "???";
+
+		seq_printf(s, "%4d  %3d  %5d  %s\n",
+			wake, irq, tegra_wake_irq_count[wake], irq_name);
+	}
+	return 0;
+}
+
+static int tegra_pm_irq_debug_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, tegra_pm_irq_debug_show, NULL);
+}
+
+static const struct file_operations tegra_pm_irq_debug_fops = {
+	.open		= tegra_pm_irq_debug_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static int __init tegra_pm_irq_debug_init(void)
+{
+	struct dentry *d;
+
+	d = debugfs_create_file("wake_irq", S_IRUGO, NULL, NULL,
+		&tegra_pm_irq_debug_fops);
+	if (!d) {
+		pr_err("Failed to create suspend_mode debug file\n");
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
+late_initcall(tegra_pm_irq_debug_init);
+#endif
