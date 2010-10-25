@@ -372,7 +372,7 @@ static int __init pci_tegra_setup(int nr, struct pci_sys_data *data)
 	pci_tegra_pads_writel(reg, NV_PROJ__PCIE2_PADS_CTL_1);
 
 	irq = INT_PCIE_INTR;
-	if (request_irq(irq, pci_tegra_isr, 0, "PCIE", NULL)) {
+	if (request_irq(irq, pci_tegra_isr, IRQF_SHARED, "PCIE", s_hRmGlobal)) {
 		pr_err("%s: Cannot register IRQ %u: %d\n",
 		       __func__, irq, ret);
 		goto done;
