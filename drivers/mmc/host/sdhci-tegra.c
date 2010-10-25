@@ -510,6 +510,10 @@ static int tegra_sdhci_resume(struct device *dev)
 		host->clk_enable = true;
 	}
 
+	if (host->gpio_cd != -1)
+		host->card_present =
+			(gpio_get_value(host->gpio_cd) == host->gpio_polarity_cd);
+
 	if (host->card_always_on && is_card_sdio(sdhost->mmc->card)) {
 		int ret = 0;
 
