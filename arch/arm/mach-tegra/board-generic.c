@@ -326,7 +326,7 @@ static noinline void __init tegra_setup_bluesleep(void)
 	res[2].name   = "host_wake";
 	res[2].start  = gpio_to_irq(TEGRA_GPIO_PU6);
 	res[2].end    = gpio_to_irq(TEGRA_GPIO_PU6);
-	res[2].flags  = IORESOURCE_IRQ;
+	res[2].flags  = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE ;
 
 	if (platform_device_add_resources(pdev, res, 3)) {
 		pr_err("unable to add resources to bluesleep device\n");
@@ -348,7 +348,54 @@ err_free_dev:
 #else
 static inline void tegra_setup_bluesleep(void) { }
 #endif
+#ifdef CONFIG_BT_BLUESLEEP
+static noinline void __init tegra_setup_bluesleep_csr(void)
+{
+	struct platform_device *pdev = NULL;
+	struct resource *res;
 
+	pdev = platform_device_alloc("bluesleep", 0);
+	if (!pdev) {
+		pr_err("unable to allocate platform device for bluesleep");
+		return;
+	}
+
+	res = kzalloc(sizeof(struct resource) * 2, GFP_KERNEL);
+	if (!res) {
+		pr_err("unable to allocate resource for bluesleep\n");
+		goto err_free_dev;
+	}
+
+	res[0].name   = "gpio_host_wake";
+	res[0].start  = TEGRA_GPIO_PU6;
+	res[0].end    = TEGRA_GPIO_PU6;
+	res[0].flags  = IORESOURCE_IO;
+
+	res[1].name   = "host_wake";
+	res[1].start  = gpio_to_irq(TEGRA_GPIO_PU6);
+	res[1].end    = gpio_to_irq(TEGRA_GPIO_PU6);
+	res[1].flags  = IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE;
+
+	if (platform_device_add_resources(pdev, res, 2)) {
+		pr_err("unable to add resources to bluesleep device\n");
+		goto err_free_res;
+	}
+
+	if (platform_device_add(pdev)) {
+		pr_err("unable to add bluesleep device\n");
+		goto err_free_res;
+	}
+	return;
+
+err_free_res:
+	kfree(res);
+err_free_dev:
+	platform_device_put(pdev);
+	return;
+}
+#else
+static inline void tegra_setup_bluesleep_csr(void) { }
+#endif
 
 
 static void __init tegra_harmony_init(void)
@@ -357,6 +404,7 @@ static void __init tegra_harmony_init(void)
 	tegra_android_platform.product_name = harmony_dev;
 #endif
 	do_system_init(true, true);
+	tegra_setup_bluesleep_csr();
 }
 
 
@@ -379,6 +427,7 @@ static void __init tegra_generic_init(void)
 #endif
 	do_system_init(true, true);
         register_spi_ipc_devices();
+	tegra_setup_bluesleep_csr();
 }
 
 MACHINE_START(VENTANA, "NVIDIA Ventana Development System")
