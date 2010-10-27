@@ -146,6 +146,7 @@ static __initdata struct tegra_clk_init_table ventana_clk_init_table[] = {
 	{ "blink",	"clk_32k",	32768,		false},
 	{ "pll_p_out4",	"pll_p",	24000000,	true },
 	{ "pwm",	"clk_32k",	32768,		false},
+	{ "kbc",	"clk_32k",	32768,		true},
 	{ NULL,		NULL,		0,		0},
 };
 
@@ -210,6 +211,8 @@ static void ventana_i2c_init(void)
 	platform_device_register(&tegra_i2c_device4);
 }
 
+
+#ifdef CONFIG_KEYBOARD_GPIO
 #define GPIO_KEY(_id, _gpio, _iswake)		\
 	{					\
 		.code = _id,			\
@@ -243,6 +246,15 @@ static struct platform_device ventana_keys_device = {
 	},
 };
 
+static void ventana_keys_init(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(ventana_keys); i++)
+		tegra_gpio_enable(ventana_keys[i].gpio);
+}
+#endif
+
 static struct platform_device tegra_camera = {
 	.name = "tegra_camera",
 	.id = -1,
@@ -258,19 +270,14 @@ static struct platform_device *ventana_devices[] __initdata = {
 	&tegra_ehci2_device,
 	&tegra_gart_device,
 	&tegra_aes_device,
+#ifdef CONFIG_KEYBOARD_GPIO
 	&ventana_keys_device,
+#endif
 	&tegra_wdt_device,
 	&tegra_avp_device,
 	&tegra_camera,
 };
 
-static void ventana_keys_init(void)
-{
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(ventana_keys); i++)
-		tegra_gpio_enable(ventana_keys[i].gpio);
-}
 
 static struct panjit_i2c_ts_platform_data panjit_data = {
 	.gpio_reset = TEGRA_GPIO_PQ7,
@@ -391,7 +398,14 @@ static void __init tegra_ventana_init(void)
 	ventana_charge_init();
 	ventana_regulator_init();
 	ventana_touch_init();
+
+#ifdef CONFIG_KEYBOARD_GPIO
 	ventana_keys_init();
+#endif
+#ifdef CONFIG_KEYBOARD_TEGRA
+	ventana_kbc_init();
+#endif
+
 	ventana_usb_init();
 	ventana_gps_init();
 	ventana_panel_init();

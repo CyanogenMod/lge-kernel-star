@@ -95,6 +95,7 @@ obj-${CONFIG_MACH_VENTANA}              += board-ventana-sdhci.o
 obj-${CONFIG_MACH_VENTANA}              += board-ventana-power.o
 obj-${CONFIG_MACH_VENTANA}              += board-ventana-panel.o
 obj-${CONFIG_MACH_VENTANA}              += board-ventana-sensors.o
+obj-${CONFIG_MACH_VENTANA}              += board-ventana-kbc.o
 
 # Aruba
 
