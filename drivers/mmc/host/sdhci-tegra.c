@@ -23,6 +23,8 @@
 #define NV_DEBUG 0
 
 #include <linux/mmc/host.h>
+#include <linux/mmc/sdio_func.h>
+
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
 #include <linux/irq.h>
@@ -461,29 +463,26 @@ static int tegra_sdhci_suspend(struct device *dev)
 	int ret = 0;
 
 	if (host->card_always_on && is_card_sdio(sdhost->mmc->card)) {
-		struct mmc_ios ios;
-		ios.clock = 0;
-		ios.vdd = 0;
-		ios.power_mode = MMC_POWER_OFF;
-		ios.bus_width = MMC_BUS_WIDTH_1;
-		ios.timing = MMC_TIMING_LEGACY;
+		int div;
+		u16 clk;
+		unsigned int clock = 100000;
 
 		/* save interrupt status before suspending */
 		host->sdhci_ints = sdhci_readl(sdhost, SDHCI_INT_ENABLE);
-		sdhost->mmc->ops->set_ios(sdhost->mmc, &ios);
-		/* keep CARD_INT enabled - if used as wakeup source */
-		if (host->sdhci_ints & SDHCI_INT_CARD_INT) {
-			u32 ier = sdhci_readl(sdhost, SDHCI_INT_ENABLE);
-			ier |= SDHCI_INT_CARD_INT;
-			sdhci_writel(sdhost, ier, SDHCI_INT_ENABLE);
-			sdhci_writel(sdhost, ier, SDHCI_SIGNAL_ENABLE);
 
-			if (sdhost->quirks & SDHCI_QUIRK_ENABLE_INTERRUPT_AT_BLOCK_GAP) {
-				u8 gap_ctrl = sdhci_readb(sdhost, SDHCI_BLOCK_GAP_CONTROL);
-				gap_ctrl |= 0x8;
-				sdhci_writeb(sdhost, gap_ctrl, SDHCI_BLOCK_GAP_CONTROL);
-			}
+		/* reduce host controller clk and card clk to 100 KHz */
+		tegra_sdhci_set_clock(sdhost, clock);
+		sdhci_writew(sdhost, 0, SDHCI_CLOCK_CONTROL);
+
+		for (div = 1;div < 256;div *= 2) {
+			if ((sdhost->max_clk / div) <= clock)
+				break;
 		}
+		div >>= 1;
+
+		clk = div << SDHCI_DIVIDER_SHIFT;
+		clk |= SDHCI_CLOCK_INT_EN | SDHCI_CLOCK_CARD_EN;
+		sdhci_writew(sdhost, clk, SDHCI_CLOCK_CONTROL);
 
 		return ret;
 	}
