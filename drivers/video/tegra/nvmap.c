@@ -149,6 +149,9 @@ static struct rb_root nvmap_handles = RB_ROOT;
 
 static struct tegra_iovmm_client *nvmap_vm_client = NULL;
 
+extern void v7_flush_kern_cache_all(void);
+extern void v7_clean_kern_cache_all(void);
+
 /* default heap order policy */
 static unsigned int _nvmap_heap_policy (unsigned int heaps, int numpages)
 {
@@ -2831,6 +2834,16 @@ static int _nvmap_do_cache_maint(struct nvmap_handle *h,
 			outer_maint = NULL;
 	}
 
+	if (end - start > PAGE_SIZE * 3) {
+		if (op == NVMEM_CACHE_OP_WB) {
+			v7_clean_kern_cache_all();
+			inner_maint = NULL;
+		} else if (op == NVMEM_CACHE_OP_WB_INV) {
+			v7_flush_kern_cache_all();
+			inner_maint = NULL;
+		}
+	}
+
 	prot = _nvmap_flag_to_pgprot(h->flags, pgprot_kernel);
 
 	if (h->alloc && !h->heap_pgalloc) {
@@ -2839,7 +2852,7 @@ static int _nvmap_do_cache_maint(struct nvmap_handle *h,
 		spin_unlock(&h->carveout.co_heap->lock);
 	}
 
-	while (start < end) {
+	while (start < end && (inner_maint || outer_maint)) {
 		struct page *page = NULL;
 		unsigned long phys;
 		void *src;
@@ -2868,7 +2881,7 @@ static int _nvmap_do_cache_maint(struct nvmap_handle *h,
 		src = addr + (phys & ~PAGE_MASK);
 		count = min_t(size_t, end-start, PAGE_SIZE-(phys&~PAGE_MASK));
 
-		inner_maint(src, src+count);
+		if (inner_maint) inner_maint(src, src+count);
 		if (outer_maint) outer_maint(phys, phys+count);
 		start += count;
 		if (page) put_page(page);
@@ -3013,19 +3026,12 @@ static ssize_t _nvmap_do_rw_handle(struct nvmap_handle *h, int is_read,
 	}
 
 	while (count--) {
-		size_t ret;
-		if (is_read)
-			_nvmap_do_cache_maint(h, h_offs, h_offs + elem_size,
-					NVMEM_CACHE_OP_INV, false);
-		ret = _nvmap_do_one_rw_handle(h, is_read,
+		size_t ret = _nvmap_do_one_rw_handle(h, is_read,
 			is_user, h_offs, sys_addr, elem_size, &addr);
 		if (ret < 0) {
 			if (!bytes_copied) bytes_copied = ret;
 			break;
 		}
-		if (!is_read)
-			_nvmap_do_cache_maint(h, h_offs, h_offs + ret,
-					NVMEM_CACHE_OP_WB, false);
 		bytes_copied += ret;
 		if (ret < elem_size) break;
 		sys_addr += sys_stride;
