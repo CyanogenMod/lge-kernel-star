@@ -188,8 +188,6 @@ static irqreturn_t tegra_otg_irq(int irq, void *data)
 	struct tegra_otg_data *tegra = data;
 	unsigned long val;
 
-	clk_enable(tegra->clk);
-
 	spin_lock(&tegra->lock);
 	val = otg_readl(tegra, USB_PHY_WAKEUP);
 	otg_writel(tegra, val, USB_PHY_WAKEUP);
@@ -200,8 +198,6 @@ static irqreturn_t tegra_otg_irq(int irq, void *data)
 	tegra->int_status |= val;
 
 	spin_unlock(&tegra->lock);
-
-	clk_disable(tegra->clk);
 
 	return (val) ? IRQ_WAKE_THREAD : IRQ_NONE;
 }
