@@ -236,8 +236,8 @@ PowerGroupPowerControl(
      * - enable clocks to all modules in power group
      * - reset propagation delay
      * - remove clamping
-     * - de-assert reset to all modules in power group
      * - disable clocks to all modules in power group
+     * - de-assert reset to all modules in power group
      *
      * Special note on toggle timers( shared with OAL which does CPU power
      * gating): per convention with OAL default settings are never changed.
@@ -275,8 +275,8 @@ PowerGroupPowerControl(
             if (reg == 0)
                 break;
         }
-        PowerGroupResetControl(hRmDeviceHandle, PowerGroup, NV_FALSE);
         PowerGroupClockControl(hRmDeviceHandle, PowerGroup, NV_FALSE);
+        PowerGroupResetControl(hRmDeviceHandle, PowerGroup, NV_FALSE);
     }
 }
 
