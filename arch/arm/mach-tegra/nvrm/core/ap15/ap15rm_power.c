@@ -66,7 +66,7 @@
 /*****************************************************************************/
 /*****************************************************************************/
 
-#define NV_POWER_GATE_TD    (1)
+#define NV_POWER_GATE_TD    (0)
 #define NV_POWER_GATE_PCIE  (1)
 //  TODO: check VDE/BSEV/NSEA voltage control calls before enabling
 #define NV_POWER_GATE_VDE   (0)
