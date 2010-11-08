@@ -51,17 +51,17 @@
 #include "nvrm_pinmux.h"
 #include "nvrm_chiplib.h"
 #include "nvrm_hwintf.h"
+#include "linux/err.h"
 
 /* Register access Macros */
 #define I2C_REGR(c, reg) NV_REGR((c)->hRmDevice, (c)->ModuleId, (c)->Instance,  \
-        (c)->I2cRegisterOffset + (((c)->ModuleId == NvRmModuleID_Dvc) ? DVC_##reg##_0 : \
-                                                I2C_##reg##_0)) 
+        ((c)->ModuleId == NvRmModuleID_Dvc) ? DVC_##reg##_0 : I2C_##reg##_0)
 
 #define I2C_REGW(c, reg, val) \
         do { \
             NV_REGW((c)->hRmDevice, (c)->ModuleId, (c)->Instance, \
-                ((c)->I2cRegisterOffset + (((c)->ModuleId == NvRmModuleID_Dvc) ? DVC_##reg##_0 : \
-                                            I2C_##reg##_0)), (val)); \
+                ((((c)->ModuleId == NvRmModuleID_Dvc) ? DVC_##reg##_0 : \
+                                                    I2C_##reg##_0)), (val)); \
         } while(0)
 
 #define DVC_REGR(c, reg)    NV_REGR((c)->hRmDevice, NvRmModuleID_Dvc, (c)->Instance, \
@@ -74,13 +74,13 @@
 
 
 /* Register access Macros */
-#define I2C2_REGR(c, reg) NV_REGR((c)->hRmDevice, (c)->ModuleId, (c)->Instance,  \
-                    (c)->I2cRegisterOffset + I2C_##reg##_0 )
+#define I2C2_REGR(c, reg) NV_REGR((c)->hRmDevice, (c)->ModuleId, (c)->Instance, \
+                                    I2C_##reg##_0 )
 
 #define I2C2_REGW(c, reg, val) \
         do {    \
                 NV_REGW((c)->hRmDevice, (c)->ModuleId, (c)->Instance, \
-                    ((c)->I2cRegisterOffset + I2C_##reg##_0), (val) ); \
+                                        (I2C_##reg##_0), (val) ); \
         } while(0);
                     
 
@@ -124,6 +124,17 @@
 #define DEBUG_I2C_TRACE(Expr, Format)
 #endif
 
+
+static const NvU32 s_I2cDma_Trigger[] = {
+    TEGRA_DMA_REQ_SEL_I2C,
+    TEGRA_DMA_REQ_SEL_I2C2,
+    TEGRA_DMA_REQ_SEL_I2C3,
+};
+
+static const NvU32 s_DvcI2cDma_Trigger[] = {
+    TEGRA_DMA_REQ_SEL_DVC_I2C,
+};
+
 // The maximum transfer size by one transaction.
 enum {MAX_I2C_ONE_TRANSACTION_SIZE = 0x1000}; // 4KB
 
@@ -158,18 +169,8 @@ enum {HOLDING_DMA_TRANSACTION_COUNT = 15};
      NV_DRF_DEF(I2C, INTERRUPT_MASK_REGISTER, RFIFO_UNF_INT_EN, ENABLE) | \
      NV_DRF_DEF(I2C, INTERRUPT_MASK_REGISTER, ARB_LOST_INT_EN, ENABLE))
 
-#if NV_OAL
-#define USE_POLLING_METHOD 1
-#else
-#define USE_POLLING_METHOD 0
-#endif
-
-#if USE_POLLING_METHOD
-#define RESET_SEMA_COUNT(hSema) 
-#else
 #define RESET_SEMA_COUNT(hSema) \
     while(NvOsSemaphoreWaitTimeout(hSema, 0) != NvError_Timeout)
-#endif
 
 // Convert the number of bytes to word.
 #define BYTES_TO_WORD(ReqSize) (((ReqSize) + 3) >> 2)
@@ -291,6 +292,50 @@ DestroyDmaTransferBuffer(
         DestroyDmaBufferMemoryHandle(hRmMemory);
     }
 }
+static NvError AllocateDma(NvRmI2cControllerHandle hRmI2cCont)
+{
+    hRmI2cCont->TransCountFromLastDmaUsage = 0;
+    hRmI2cCont->IsApbDmaAllocated = NV_FALSE;
+    hRmI2cCont->hDmaChan = NULL;
+
+    hRmI2cCont->hDmaChan = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT);
+    if (IS_ERR_OR_NULL(hRmI2cCont->hDmaChan))
+    {
+        hRmI2cCont->hDmaChan = NULL;
+        return NvError_DmaChannelNotAvailable;
+    }
+    return NvSuccess;
+}
+
+static void FreeDma(NvRmI2cControllerHandle hRmI2cCont)
+{
+    if (hRmI2cCont->hDmaChan)
+        tegra_dma_free_channel(hRmI2cCont->hDmaChan);
+    hRmI2cCont->TransCountFromLastDmaUsage = 0;
+    hRmI2cCont->IsApbDmaAllocated = NV_FALSE;
+    hRmI2cCont->hDmaChan = NULL;
+}
+static NvError StartDma(struct tegra_dma_channel *ch, struct tegra_dma_req *req)
+{
+    if (tegra_dma_enqueue_req(ch, req))
+    {
+        pr_debug("Could not enqueue Rx DMA req\n");
+        return NvError_BadParameter;
+    }
+    return NvSuccess;
+}
+static void AbortDma(struct tegra_dma_channel *ch)
+{
+    tegra_dma_dequeue(ch);
+}
+
+static void I2cDmaCompleteCallback(struct tegra_dma_req *req)
+{
+    NvRmI2cControllerHandle hRmI2cCont = req->dev;
+    if (req->status == -TEGRA_DMA_REQ_ERROR_ABORTED)
+        return;
+    NvOsSemaphoreSignal(hRmI2cCont->I2cDmaSyncSemaphore);
+}
 
 static void SetTxFifoTriggerLevel(NvRmI2cControllerHandle hRmI2cCont, NvU32 TrigLevel)
 {
@@ -300,7 +345,7 @@ static void SetTxFifoTriggerLevel(NvRmI2cControllerHandle hRmI2cCont, NvU32 Trig
     if (!ActualTriggerLevel)
         return;
     
-    FifoControlReg = I2C_REGR (hRmI2cCont, FIFO_CONTROL);
+    FifoControlReg = I2C_REGR(hRmI2cCont, FIFO_CONTROL);
     FifoControlReg = NV_FLD_SET_DRF_NUM(I2C, FIFO_CONTROL, TX_FIFO_TRIG, 
                                                 ActualTriggerLevel - 1, FifoControlReg);
     DEBUG_I2C_SEND(1, ("Tx Fifo Control  0x%08x\n", FifoControlReg));
@@ -470,9 +515,7 @@ DoTxFifoEmpty(
 
 static void WriteIntMaksReg(NvRmI2cControllerHandle hRmI2cCont)
 {
-#if !USE_POLLING_METHOD
     I2C_REGW (hRmI2cCont, INTERRUPT_MASK_REGISTER, hRmI2cCont->IntMaskReg);
-#endif
 }
 static void I2cIsr(void* args)
 {
@@ -633,50 +676,22 @@ Done:
     NvRmInterruptDone(hRmI2cCont->I2CInterruptHandle);
 }
 
-#if USE_POLLING_METHOD
-static NvError WaitForTransactionCompletesPolling(
-    NvRmI2cControllerHandle hRmI2cCont, 
-    NvU32 Timeout)
-{
-    NvU32 RemainingTime;
-    RemainingTime = (Timeout == NV_WAIT_INFINITE)?Timeout:Timeout*1000;
-    do {
-        NvOsWaitUS(I2C_POLLING_TIMEOUT_STEP_USEC);
-
-        // Read the Interrupt status register & PKT_STATUS
-        hRmI2cCont->ControllerStatus = I2C_REGR(hRmI2cCont, INTERRUPT_STATUS_REGISTER);
-        if (hRmI2cCont->ControllerStatus & hRmI2cCont->IntMaskReg)
-        {
-            I2cIsr(hRmI2cCont);
-            if (hRmI2cCont->IsTransferCompleted)
-                break;
-        }
-
-        if (Timeout != NV_WAIT_INFINITE)
-            RemainingTime = (RemainingTime > I2C_POLLING_TIMEOUT_STEP_USEC)? 
-                                    (RemainingTime - I2C_POLLING_TIMEOUT_STEP_USEC): 0;
-    } while(RemainingTime);
-
-    if (!RemainingTime)
-        return NvError_Timeout;
-
-    return NvSuccess;
-}
-#endif
-
 static NvError WaitForTransactionCompletes(
     NvRmI2cControllerHandle hRmI2cCont, 
     NvU32 Timeout)
 {
     NvError Error;
-
-#if USE_POLLING_METHOD
-    hRmI2cCont->IsTransferCompleted = NV_FALSE;
-    Error = WaitForTransactionCompletesPolling(hRmI2cCont, hRmI2cCont->timeout);
-#else
     // Wait for the  Transfer completes
     Error = NvOsSemaphoreWaitTimeout(hRmI2cCont->I2cSyncSemaphore, Timeout);
-#endif
+
+    // If dma based transfer then wait for the dma complete.
+    if (hRmI2cCont->IsUsingApbDma)
+    {
+         if (!Error)
+              Error = NvOsSemaphoreWaitTimeout(hRmI2cCont->I2cDmaSyncSemaphore, Timeout);
+         if (Error)
+              AbortDma(hRmI2cCont->hDmaChan);
+    }
     return Error;
 }
 
@@ -696,9 +711,7 @@ DoOneReceiveTransaction(
     NvU32 PacketHeader2;
     NvU32 PacketHeader3;
     NvU32 IntMaskReg;
-    NvRmDmaModuleID DmaModuleId = NvRmDmaModuleID_I2c;
     NvU32 BytesRead;
-
 
     hRmI2cCont->WordTransferred = 0;
     hRmI2cCont->WordRemaining = 0;
@@ -724,6 +737,7 @@ DoOneReceiveTransaction(
     hRmI2cCont->WordRemaining = WordsToRead;
 
     hRmI2cCont->IsTransferCompleted = NV_FALSE;
+    RESET_SEMA_COUNT(hRmI2cCont->I2cDmaSyncSemaphore);
 
     // If requested size is more than cpu transaction thresold then use dma.
     if ((hRmI2cCont->DmaBufferSize) && 
@@ -731,12 +745,7 @@ DoOneReceiveTransaction(
     {
         if (!hRmI2cCont->IsApbDmaAllocated)
         {
-            if (hRmI2cCont->ModuleId == NvRmModuleID_Dvc)
-                DmaModuleId =NvRmDmaModuleID_Dvc;
-                
-            Error = NvRmDmaAllocate(hRmI2cCont->hRmDevice, &hRmI2cCont->hRmDma,
-                             NV_FALSE, NvRmDmaPriority_High, DmaModuleId,
-                             hRmI2cCont->Instance);
+            Error = AllocateDma(hRmI2cCont);
             if (!Error)
                 hRmI2cCont->IsApbDmaAllocated = NV_TRUE;
             Error = NvSuccess;
@@ -746,22 +755,9 @@ DoOneReceiveTransaction(
         
         hRmI2cCont->IsUsingApbDma = NV_TRUE;
         hRmI2cCont->TransCountFromLastDmaUsage = 0;
-        hRmI2cCont->RxDmaReq.TransferSize = hRmI2cCont->WordRemaining << 2;
+        hRmI2cCont->RxDmaReq.size = hRmI2cCont->WordRemaining << 2;
         SetRxFifoTriggerLevel(hRmI2cCont, 1);
-        if (hRmI2cCont->IsCurrentTransferNoStop)
-        {
-#if USE_POLLING_METHOD
-            goto CpuBasedReading;
-#else
-            Error = NvRmDmaStartDmaTransfer(hRmI2cCont->hRmDma, &hRmI2cCont->RxDmaReq,
-                    NvRmDmaDirection_Forward, 0, hRmI2cCont->I2cSyncSemaphore);
-#endif                    
-        }
-        else
-        {
-            Error = NvRmDmaStartDmaTransfer(hRmI2cCont->hRmDma, &hRmI2cCont->RxDmaReq,
-                    NvRmDmaDirection_Forward, 0, NULL);
-        }
+        Error = StartDma(hRmI2cCont->hDmaChan, &hRmI2cCont->RxDmaReq);
         if (!Error)
         {
             hRmI2cCont->ControllerStatus = 0;
@@ -843,7 +839,7 @@ WaitForCompletion:
             if (hRmI2cCont->IsUsingApbDma)
             {
                 BytesRead = NV_MIN(pTransaction->NumBytes, 
-                                        hRmI2cCont->RxDmaReq.TransferSize);
+                                        hRmI2cCont->RxDmaReq.size);
                 NvOsMemcpy(pBuffer, (NvU8* )hRmI2cCont->pDmaBuffer, BytesRead);
             }
             else
@@ -873,16 +869,13 @@ WaitForCompletion:
     }
 
 ReadExitWithReset:
-    // If we reach here then there is something wrong in transfer, reset the module.
-    if (hRmI2cCont->IsUsingApbDma)
-        NvRmDmaAbort(hRmI2cCont->hRmDma);
 
     // If there is NACK error, then there is possibilty that i2c controller is 
     // still busy to send the stop signal.
     // Wait for 2x of i2c clock period is recommended, waiting for 1 ms to use 
     // the NvOsMsSleep api.
     NvOsSleepMS(1);
-        
+
     NvRmModuleReset(hRmI2cCont->hRmDevice, 
                 NVRM_MODULE_ID(hRmI2cCont->ModuleId, hRmI2cCont->Instance));
     RESET_SEMA_COUNT(hRmI2cCont->I2cSyncSemaphore);
@@ -893,8 +886,8 @@ ReadExit:
     if ((hRmI2cCont->IsApbDmaAllocated) && 
         (hRmI2cCont->TransCountFromLastDmaUsage > HOLDING_DMA_TRANSACTION_COUNT))
     {
-        NvRmDmaFree(hRmI2cCont->hRmDma);
-        hRmI2cCont->hRmDma = NULL;
+        FreeDma(hRmI2cCont);
+        hRmI2cCont->hDmaChan = NULL;
         hRmI2cCont->IsApbDmaAllocated = NV_FALSE;
     }
     return hRmI2cCont->I2cTransferStatus;
@@ -917,7 +910,6 @@ DoOneSendTransaction(
     NvU32 PacketHeader3;
     NvU32 IntMaskReg;
     NvU32 WordCount;
-    NvRmDmaModuleID DmaModuleId = NvRmDmaModuleID_I2c;
 
     hRmI2cCont->WordTransferred = 0;
     hRmI2cCont->WordRemaining = 0;
@@ -942,17 +934,13 @@ DoOneSendTransaction(
     hRmI2cCont->WordRemaining = WordsToSend;
     hRmI2cCont->IsTransferCompleted = NV_FALSE;
 
+    RESET_SEMA_COUNT(hRmI2cCont->I2cDmaSyncSemaphore);
     if ((hRmI2cCont->DmaBufferSize) && 
             (hRmI2cCont->WordRemaining > I2C_MAX_WORD_TO_USE_CPU))
     {
         if (!hRmI2cCont->IsApbDmaAllocated)
         {
-            if (hRmI2cCont->ModuleId == NvRmModuleID_Dvc)
-                DmaModuleId =NvRmDmaModuleID_Dvc;
-                
-            Error = NvRmDmaAllocate(hRmI2cCont->hRmDevice, &hRmI2cCont->hRmDma,
-                             NV_FALSE, NvRmDmaPriority_High, DmaModuleId,
-                             hRmI2cCont->Instance);
+            Error = AllocateDma(hRmI2cCont);
             if (!Error)
                 hRmI2cCont->IsApbDmaAllocated = NV_TRUE;
             Error = NvSuccess;
@@ -965,11 +953,10 @@ DoOneSendTransaction(
         hRmI2cCont->pDmaBuffer[0] = PacketHeader1;
         hRmI2cCont->pDmaBuffer[1] = PacketHeader2;
         hRmI2cCont->pDmaBuffer[2] = PacketHeader3;
-        hRmI2cCont->TxDmaReq.TransferSize = (hRmI2cCont->WordRemaining + 3) << 2;
+        hRmI2cCont->TxDmaReq.size= (hRmI2cCont->WordRemaining + 3) << 2;
         NvOsMemcpy(hRmI2cCont->pDmaBuffer + 3, (void *)pBuffer, pTransaction->NumBytes);
-        SetTxFifoTriggerLevel(hRmI2cCont, 8);
-        Error = NvRmDmaStartDmaTransfer(hRmI2cCont->hRmDma, &hRmI2cCont->TxDmaReq,
-                NvRmDmaDirection_Forward, 0, NULL);
+        SetTxFifoTriggerLevel(hRmI2cCont, 1);
+        Error = StartDma(hRmI2cCont->hDmaChan, &hRmI2cCont->TxDmaReq);
         if (!Error)
         {
             hRmI2cCont->WordRemaining = 0;
@@ -1081,8 +1068,6 @@ WaitForCompletion:
     }
     
 WriteExitWithReset:
-    if (hRmI2cCont->IsUsingApbDma)
-        NvRmDmaAbort(hRmI2cCont->hRmDma);
 
     // If there is NACK error, then there is possibilty that i2c controller is 
     // still busy to send the stop signal.
@@ -1101,8 +1086,8 @@ WriteExit:
     if ((hRmI2cCont->IsApbDmaAllocated) && 
         (hRmI2cCont->TransCountFromLastDmaUsage > HOLDING_DMA_TRANSACTION_COUNT))
     {
-        NvRmDmaFree(hRmI2cCont->hRmDma);
-        hRmI2cCont->hRmDma = NULL;
+        FreeDma(hRmI2cCont);
+        hRmI2cCont->hDmaChan = NULL;
         hRmI2cCont->IsApbDmaAllocated = NV_FALSE;
     }
     
@@ -1402,11 +1387,11 @@ static void AP20RmI2cClose(NvRmI2cControllerHandle hRmI2cCont)
 
     if (hRmI2cCont->I2cSyncSemaphore)
     {
-#if !USE_POLLING_METHOD
         NvRmInterruptUnregister(hRmI2cCont->hRmDevice, hRmI2cCont->I2CInterruptHandle);
-#endif
         NvOsSemaphoreDestroy(hRmI2cCont->I2cSyncSemaphore);
+        NvOsSemaphoreDestroy(hRmI2cCont->I2cDmaSyncSemaphore);
         hRmI2cCont->I2cSyncSemaphore = NULL;
+        hRmI2cCont->I2cDmaSyncSemaphore = NULL;
         hRmI2cCont->I2CInterruptHandle = NULL;
     }
 
@@ -1417,16 +1402,15 @@ static void AP20RmI2cClose(NvRmI2cControllerHandle hRmI2cCont)
         hRmI2cCont->pDataBuffer = NULL;
     }
 
-    if (hRmI2cCont->hRmDma)
+    if (hRmI2cCont->hDmaChan)
     {
-        NvRmDmaAbort(hRmI2cCont->hRmDma);
-        NvRmDmaFree(hRmI2cCont->hRmDma);
+        AbortDma(hRmI2cCont->hDmaChan);
+        FreeDma(hRmI2cCont);
     }
-    
     DestroyDmaTransferBuffer(hRmI2cCont->hRmMemory, hRmI2cCont->pDmaBuffer,
                 hRmI2cCont->DmaBufferSize);
 
-    hRmI2cCont->hRmDma = NULL;
+    hRmI2cCont->hDmaChan = NULL;
     hRmI2cCont->hRmMemory = NULL;
     hRmI2cCont->DmaBuffPhysAdd = 0;
     hRmI2cCont->pDmaBuffer = NULL;
@@ -1441,12 +1425,11 @@ static void AP20RmI2cClose(NvRmI2cControllerHandle hRmI2cCont)
 NvError AP20RmI2cOpen(NvRmI2cControllerHandle hRmI2cCont)
 {
     NvError Error = NvSuccess;
-#if !USE_POLLING_METHOD
     NvU32 IrqList;
     NvOsInterruptHandler IntHandlers = I2cIsr;
-#endif
     NvU32 RxFifoPhyAddress;
     NvU32 TxFifoPhyAddress;
+    int DmaReq;
     
     NV_ASSERT(hRmI2cCont);
     DEBUG_I2C_TRACE(1, ("AP20RmI2cOpen\n"));
@@ -1457,10 +1440,10 @@ NvError AP20RmI2cOpen(NvRmI2cControllerHandle hRmI2cCont)
     hRmI2cCont->repeatStart = AP20RmI2cRepeatStartTransaction;
     hRmI2cCont->close = AP20RmI2cClose;
     hRmI2cCont->GetGpioPins =  AP20RmI2cGetGpioPins;
-    hRmI2cCont->I2cRegisterOffset = I2C_I2C_CNFG_0;
+    hRmI2cCont->I2cRegisterOffset = 0;
     hRmI2cCont->ControllerId = hRmI2cCont->Instance;
 
-    hRmI2cCont->hRmDma = NULL;
+    hRmI2cCont->hDmaChan = NULL;
     hRmI2cCont->hRmMemory = NULL;
     hRmI2cCont->DmaBuffPhysAdd = 0;
     hRmI2cCont->pDmaBuffer = NULL;
@@ -1468,22 +1451,22 @@ NvError AP20RmI2cOpen(NvRmI2cControllerHandle hRmI2cCont)
     hRmI2cCont->pCpuBuffer = NULL;
     hRmI2cCont->pDataBuffer = NULL;
     hRmI2cCont->I2cSyncSemaphore = NULL;
+    hRmI2cCont->I2cDmaSyncSemaphore = NULL;
     hRmI2cCont->I2CInterruptHandle = NULL;
     hRmI2cCont->TransCountFromLastDmaUsage = 0;
 
-    TxFifoPhyAddress = hRmI2cCont->I2cRegisterOffset + I2C_I2C_TX_PACKET_FIFO_0;
-    RxFifoPhyAddress = hRmI2cCont->I2cRegisterOffset + I2C_I2C_RX_FIFO_0;
+    TxFifoPhyAddress = I2C_I2C_TX_PACKET_FIFO_0;
+    RxFifoPhyAddress = I2C_I2C_RX_FIFO_0;
     
     if (hRmI2cCont->ModuleId == NvRmModuleID_Dvc)
     {
-        hRmI2cCont->I2cRegisterOffset = 0;
         hRmI2cCont->ControllerId = 3;
         RxFifoPhyAddress = DVC_I2C_RX_FIFO_0;
         TxFifoPhyAddress = DVC_I2C_TX_PACKET_FIFO_0;
     }    
 
     hRmI2cCont->IsApbDmaAllocated = NV_FALSE;
-    hRmI2cCont->hRmDma = NULL;
+    hRmI2cCont->hDmaChan = NULL;
 
     // Allocate the dma buffer 
     hRmI2cCont->DmaBufferSize = 0;
@@ -1500,16 +1483,39 @@ NvError AP20RmI2cOpen(NvRmI2cControllerHandle hRmI2cCont)
     else
     {
         hRmI2cCont->DmaBufferSize = DEFAULT_I2C_DMA_BUFFER_SIZE;
-        
-        hRmI2cCont->RxDmaReq.SourceBufferPhyAddress= RxFifoPhyAddress + hRmI2cCont->ControllerAdd;
-        hRmI2cCont->RxDmaReq.DestinationBufferPhyAddress = hRmI2cCont->DmaBuffPhysAdd;
-        hRmI2cCont->RxDmaReq.SourceAddressWrapSize = 4;
-        hRmI2cCont->RxDmaReq.DestinationAddressWrapSize = 0;
-        
-        hRmI2cCont->TxDmaReq.SourceBufferPhyAddress= hRmI2cCont->DmaBuffPhysAdd;
-        hRmI2cCont->TxDmaReq.DestinationBufferPhyAddress = TxFifoPhyAddress + hRmI2cCont->ControllerAdd;
-        hRmI2cCont->TxDmaReq.SourceAddressWrapSize = 0;
-        hRmI2cCont->TxDmaReq.DestinationAddressWrapSize = 4;
+        DmaReq = (hRmI2cCont->ModuleId == NvRmModuleID_Dvc)?
+                      s_DvcI2cDma_Trigger[hRmI2cCont->Instance]:
+                                        s_I2cDma_Trigger[hRmI2cCont->Instance];
+
+        NvOsMemset(&hRmI2cCont->RxDmaReq, 0, sizeof(hRmI2cCont->RxDmaReq));
+        hRmI2cCont->RxDmaReq.source_addr =
+                (unsigned long) (RxFifoPhyAddress + hRmI2cCont->ControllerAdd);
+        hRmI2cCont->RxDmaReq.source_wrap = 4;
+        hRmI2cCont->RxDmaReq.dest_addr = (unsigned long)hRmI2cCont->DmaBuffPhysAdd;
+        hRmI2cCont->RxDmaReq.dest_wrap = 0;
+        hRmI2cCont->RxDmaReq.virt_addr = hRmI2cCont->pDmaBuffer;
+        hRmI2cCont->RxDmaReq.to_memory = 1;
+        hRmI2cCont->RxDmaReq.source_bus_width = 32;
+        hRmI2cCont->RxDmaReq.dest_bus_width = 32;
+        hRmI2cCont->RxDmaReq.req_sel = DmaReq;
+        hRmI2cCont->RxDmaReq.complete = I2cDmaCompleteCallback;
+        hRmI2cCont->RxDmaReq.threshold = NULL;
+        hRmI2cCont->RxDmaReq.dev = hRmI2cCont;
+
+        NvOsMemset(&hRmI2cCont->TxDmaReq, 0, sizeof(hRmI2cCont->TxDmaReq));
+        hRmI2cCont->TxDmaReq.source_addr = (unsigned long)hRmI2cCont->DmaBuffPhysAdd;
+        hRmI2cCont->TxDmaReq.source_wrap = 0;
+        hRmI2cCont->TxDmaReq.dest_addr =
+                (unsigned long) (TxFifoPhyAddress + hRmI2cCont->ControllerAdd);
+        hRmI2cCont->TxDmaReq.dest_wrap = 4;
+        hRmI2cCont->TxDmaReq.virt_addr = hRmI2cCont->pDmaBuffer;
+        hRmI2cCont->TxDmaReq.to_memory = 0;
+        hRmI2cCont->TxDmaReq.source_bus_width = 32;
+        hRmI2cCont->TxDmaReq.dest_bus_width = 32;
+        hRmI2cCont->TxDmaReq.req_sel = DmaReq;
+        hRmI2cCont->TxDmaReq.complete = I2cDmaCompleteCallback;
+        hRmI2cCont->TxDmaReq.threshold = NULL;
+        hRmI2cCont->TxDmaReq.dev = hRmI2cCont;
     }
 
     if (!Error)
@@ -1526,7 +1532,9 @@ NvError AP20RmI2cOpen(NvRmI2cControllerHandle hRmI2cCont)
     if (!Error)
         Error = NvOsSemaphoreCreate( &hRmI2cCont->I2cSyncSemaphore, 0);
 
-#if !USE_POLLING_METHOD
+    if (!Error)
+        Error = NvOsSemaphoreCreate(&hRmI2cCont->I2cDmaSyncSemaphore, 0);
+
     if (!Error)
     {
         IrqList = NvRmGetIrqForLogicalInterrupt(
@@ -1535,7 +1543,6 @@ NvError AP20RmI2cOpen(NvRmI2cControllerHandle hRmI2cCont)
         Error = NvRmInterruptRegister(hRmI2cCont->hRmDevice, 1, &IrqList, &IntHandlers, 
                 hRmI2cCont, &hRmI2cCont->I2CInterruptHandle, NV_TRUE);
     }
-#endif
     // Packet mode initialization
     hRmI2cCont->RsTransfer =  NV_FALSE;
 

@@ -43,9 +43,11 @@
 #include "nvrm_gpio.h"
 #include "nvrm_i2c.h"
 #include "nvrm_memmgr.h"
-#include "nvrm_dma.h"
+
 #include "nvrm_priv_ap_general.h"
 
+#include "linux/module.h"
+#include "mach/dma.h"
 
 #define MAX_I2C_CLOCK_SPEED_KHZ 400
 
@@ -88,6 +90,10 @@ typedef struct NvRmI2cControllerRec
     NvU32 NumberOfClientsOpened;
     /* Contains the semaphore id to block the synchronous i2c client calls */
     NvOsSemaphoreHandle I2cSyncSemaphore;
+
+    /* Contains the semaphore id to synchronise the dma transfer complete*/
+    NvOsSemaphoreHandle I2cDmaSyncSemaphore;
+
     /* Contains the mutex for providing the thread safety */
     NvOsMutexHandle I2cThreadSafetyMutex;
     /* Power clinet ID */
@@ -202,8 +208,14 @@ typedef struct NvRmI2cControllerRec
     // Tells whether the dma mode is supported or not.
     NvBool IsApbDmaAllocated;
 
-    // Dma handle for the read/write.
-    NvRmDmaHandle hRmDma;
+    // Dma channel handle.
+    struct tegra_dma_channel *hDmaChan;
+
+    // Rx Dma request for i2c transfer
+    struct tegra_dma_req    RxDmaReq;
+
+    // Tx Dma request for i2c transfer
+    struct tegra_dma_req    TxDmaReq;
 
     // Memory handle to create the uncached memory.
     NvRmMemHandle hRmMemory;
@@ -219,12 +231,6 @@ typedef struct NvRmI2cControllerRec
 
     // Current Dma transfer size for the Rx and tx
     NvU32 DmaBufferSize;
-
-    // Dma request for read transaction
-    NvRmDmaClientBuffer RxDmaReq;
-
-    // Dma request for write transaction
-    NvRmDmaClientBuffer TxDmaReq;
 
     // Tell whether it is using the apb dma for the transfer or not.
     NvBool IsUsingApbDma;
