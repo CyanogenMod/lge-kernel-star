@@ -1317,6 +1317,38 @@ static void tegra_setup_spi(void) { }
 #endif
 
 #ifdef CONFIG_I2C_TEGRA
+#ifdef CONFIG_TEGRA_ODM_VENTANA
+static struct tegra_i2c_plat_parms tegra_i2c_platform[] = {
+	[0] = {
+		.adapter_nr = 0,
+		.bus_count = 1,
+		.bus_mux = { 0, 0 },
+		.bus_clk = { 100000, 0 }, /* default to 100KHz */
+		.is_dvc = false,
+	},
+	[1] = {
+		.adapter_nr = 1,
+		.bus_count = 2,
+		.bus_mux = { NvOdmI2cPinMap_Config1, NvOdmI2cPinMap_Config2},
+		.bus_clk = { 100000, 100000 },
+		.is_dvc = false,
+	},
+	[2] = {
+		.adapter_nr = 3,
+		.bus_count = 1,
+		.bus_mux = { 0, 0 },
+		.bus_clk = { 100000, 0 },
+		.is_dvc = false,
+	},
+	[3] = {
+		.adapter_nr = 4,
+		.bus_count = 1,
+		.bus_mux = { 0, 0 },
+		.bus_clk = { 100000, 0 },
+		.is_dvc = true,
+	},
+};
+#else
 static struct tegra_i2c_plat_parms tegra_i2c_platform[] = {
 	[0] = {
 		.adapter_nr = 0,
@@ -1347,6 +1379,7 @@ static struct tegra_i2c_plat_parms tegra_i2c_platform[] = {
 		.is_dvc = true,
 	},
 };
+#endif
 static struct platform_device tegra_i2c_devices[] = {
 	[0] = {
 		.name = "tegra_i2c",
@@ -1439,12 +1472,14 @@ static noinline void __init tegra_setup_i2c(void)
 		if (!mux)
 			continue;
 
+#ifndef CONFIG_TEGRA_ODM_VENTANA
 		if (mux == NVODM_QUERY_PINMAP_MULTIPLEXED) {
 			pr_err("%s: unable to register %s.%d (multiplexed)\n",
 			       __func__, dev->name, dev->id);
 			WARN_ON(1);
 			continue;
 		}
+#endif
 
 		if (clk)
 			plat->bus_clk[0] = clk*1000;

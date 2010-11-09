@@ -185,7 +185,7 @@ static struct i2c_board_info bus0_i2c_devices[] = {
 #endif
 };
 
-static struct i2c_board_info bus3_i2c_devices[] = {
+static struct i2c_board_info bus4_i2c_devices[] = {
 #ifdef CONFIG_SENSORS_AK8975
 	{
 		I2C_BOARD_INFO("mm_ak8975", 0x0C),
@@ -205,9 +205,9 @@ void __init i2c_device_setup(void)
 		i2c_register_board_info(0, bus0_i2c_devices,
 					ARRAY_SIZE(bus0_i2c_devices));
 
-	if (ARRAY_SIZE(bus3_i2c_devices))
-		i2c_register_board_info(3, bus3_i2c_devices,
-					ARRAY_SIZE(bus3_i2c_devices));
+	if (ARRAY_SIZE(bus4_i2c_devices))
+		i2c_register_board_info(4, bus4_i2c_devices,
+					ARRAY_SIZE(bus4_i2c_devices));
 }
 
 // enable 32Khz clock used by bcm4329 wifi, bluetooth and gps
