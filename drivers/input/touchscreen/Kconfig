@@ -321,6 +321,19 @@ config TOUCHSCREEN_ATMEL_TSADCC
 	  To compile this driver as a module, choose M here: the
 	  module will be called atmel_tsadcc.
 
+config TOUCHSCREEN_PANJIT_I2C
+	tristate "PANJIT I2C touchscreen driver"
+	depends on I2C
+	default n
+	help
+	  Say Y here to enable PANJIT I2C capacitive touchscreen support,
+	  covering devices such as the MGG1010AI06 and EGG1010AI06
+
+	  If unsure, say N
+
+	  To compile this driver as a module, choose M here: the module will
+	  be called panjit_i2c.
+
 config TOUCHSCREEN_UCB1400
 	tristate "Philips UCB1400 touchscreen"
 	depends on AC97_BUS
