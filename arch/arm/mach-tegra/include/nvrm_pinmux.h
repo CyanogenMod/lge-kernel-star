@@ -114,6 +114,15 @@ extern "C"
     NvU32 Config,
     NvBool EnableTristate );
 
+/* maximum number of external clocks */
+#define NVRM_EXT_CLK_CNT 3
+
+typedef struct NvRmExternalClockObjRec
+{
+    NvU32 Instance;
+    NvU32 Config;
+} NvRmExternalClockObj;
+
 typedef struct NvRmModuleSdmmcInterfaceCapsRec
 {
 

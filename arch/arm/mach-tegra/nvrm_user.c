@@ -120,47 +120,69 @@ static void client_detach(NvRtClientHandle client)
         dctx.Rt = s_RtHandle;
         dctx.Client = client;
         dctx.PackageIdx = 0;
+
         for (;;)
         {
-            NvBool found = NV_FALSE;
 
-            if ((ptr = NvRtFreeObjRef(&dctx,
-                                      NvRtObjType_NvRm_GpioHandle,
-                                      NULL)) != NULL)
-            {
-                printk(KERN_INFO "close gpio handle in case something is wrong, GPIO handle: 0x%x\n", (NvU32)ptr);
-                NvRmGpioReleasePinHandles((NvRmGpioHandle)s_hRmGlobal, (NvRmGpioPinHandle *)&ptr, 1);
-                found = NV_TRUE;
-            }
+            ptr = NvRtFreeObjRef(&dctx,
+                                 NvRtObjType_NvRm_GpioHandle,
+                                 NULL);
+            if (!ptr) break;
+            NVRT_LEAK("NvRm", "GpioHandle", (NvU32)ptr);
+            NvRmGpioReleasePinHandles((NvRmGpioHandle)s_hRmGlobal, (NvRmGpioPinHandle *)&ptr, 1);
+        }
 
-            if ((ptr = NvRtFreeObjRef(&dctx,
-                                      NvRtObjType_NvRm_NvRmMemHandle,
-                                      NULL)) != NULL)
-            {
-                NVRT_LEAK("NvRm", "NvRmMemHandle", ptr);
-                NvRmMemHandleFree(ptr);
-                found = NV_TRUE;
-            }
-            if ((ptr = NvRtFreeObjRef(&dctx,
-                                      NvRtObjType_NvRm_NvRmI2cHandle,
-                                      NULL)) != NULL)
-            {
-                printk(KERN_INFO "close i2c in client_detach\n");
-                NvRmI2cClose((NvRmI2cHandle)ptr);
-                found = NV_TRUE;
-            }
+        for (;;)
+        {
+            ptr = NvRtFreeObjRef(&dctx,
+                                 NvRtObjType_NvRm_NvRmMemHandle,
+                                 NULL);
+            if (!ptr) break;
+            NVRT_LEAK("NvRm", "NvRmMemHandle", (NvU32)ptr);
+            NvRmMemHandleFree(ptr);
+        }
 
-            if ((ptr = NvRtFreeObjRef(&dctx,
-                                      NvRtObjType_NvRm_NvRmDmaHandle,
-                                      NULL)) != NULL)
-            {
-                NVRT_LEAK("NvRm", "NvRmDmaHandle", ptr);
-                NvRmDmaFree(ptr);
-                found = NV_TRUE;
-            }
+        for(;;)
+        {
+            ptr = NvRtFreeObjRef(&dctx,
+                                 NvRtObjType_NvRm_NvRmI2cHandle,
+                                 NULL);
+            if (!ptr) break;
+            NVRT_LEAK("NvRm", "NvRmI2cHandle", (NvU32)ptr);
+            NvRmI2cClose((NvRmI2cHandle)ptr);
+        }
 
-            if (found == NV_FALSE)
-                break;
+        for(;;)
+        {
+            ptr = NvRtFreeObjRef(&dctx,
+                                 NvRtObjType_NvRm_NvRmDmaHandle,
+                                 NULL);
+            if(!ptr) break;
+            NVRT_LEAK("NvRm", "NvRmDmaHandle", (NvU32)ptr);
+            NvRmDmaFree(ptr);
+        }
+
+        for(;;)
+        {
+            NvRmExternalClockObj *obj = NULL;
+            ptr = NvRtFreeObjRef(&dctx,
+                                 NvRtObjType_NvRm_PinmuxClkHandle,
+                                 NULL);
+            if(!ptr) break;
+            NVRT_LEAK("NvRm", "PinmuxClkHandle", (NvU32)ptr);
+
+            obj = (NvRmExternalClockObj *)ptr;
+            NvRmExternalClockConfig(g_NvRmHandle,
+                                    NvOdmIoModule_ExternalClock,
+                                    obj->Instance,
+                                    obj->Config,
+                                    NV_TRUE);
+            /*
+             * this "obj" is a static struct in nvrm_pinmux_dispatch.c
+             * reset Instance number so it can be reused for next clock
+             * config
+             */
+            obj->Instance = NVRM_EXT_CLK_CNT;
         }
 
         NvRtUnregisterClient(s_RtHandle, client);

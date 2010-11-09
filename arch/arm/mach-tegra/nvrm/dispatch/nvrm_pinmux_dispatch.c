@@ -32,6 +32,7 @@
 
 #define NV_IDL_IS_DISPATCH
 
+#include <linux/kernel.h>
 #include "nvcommon.h"
 #include "nvos.h"
 #include "nvassert.h"
@@ -237,6 +238,56 @@ static NvError NvRmExternalClockConfig_dispatch_( void *InBuffer, NvU32 InSize, 
 
 
     p_out->ret_ = NvRmExternalClockConfig( p_in->hDevice, p_in->IoModule, p_in->Instance, p_in->Config, p_in->EnableTristate );
+    printk(KERN_INFO "ioModule=%d, instance=%d, config=%d, enable=%d\n",
+        p_in->IoModule, p_in->Instance, p_in->Config, p_in->EnableTristate);
+
+    if ((p_out->ret_ > 0)
+        && (p_in->IoModule == NvOdmIoModule_ExternalClock))
+    {
+        NvRtObjRefHandle ref_pClk;
+        static NvRmExternalClockObj objs[NVRM_EXT_CLK_CNT] =
+                                        {
+                                            {NVRM_EXT_CLK_CNT,0},
+                                            {NVRM_EXT_CLK_CNT,0},
+                                            {NVRM_EXT_CLK_CNT,0}
+                                        };
+        if (p_in->EnableTristate == NV_FALSE)
+        {
+            if (objs[p_in->Instance].Instance == p_in->Instance)
+            {
+                /* If the instance number matches, this has already been
+                 * added to reftrack, so we just update value "Config"
+                 */
+                objs[p_in->Instance].Config = p_in->Config;
+            }
+            else
+            {
+                /* If the instance number doesn't match, there is only one
+                 * possibility: the objs[p_in->Instance] is NVRM_EXT_CLK_CNT.
+                 * In this case, we need to add a new ref tracking obj.
+                 */
+                if (NvSuccess == (err_ = NvRtAllocObjRef(Ctx, &ref_pClk)))
+                {
+                    objs[p_in->Instance].Instance = p_in->Instance;
+                    objs[p_in->Instance].Config = p_in->Config;
+                    NvRtStoreObjRef(Ctx,
+                        ref_pClk,
+                        NvRtObjType_NvRm_PinmuxClkHandle,
+                        &objs[p_in->Instance]);
+                }
+            }
+        }
+        else
+        {
+            /* When tristating clock pins, we blindly remove it from nvreftrack
+             * obj store
+             */
+            NvRtFreeObjRef(Ctx,
+                NvRtObjType_NvRm_PinmuxClkHandle,
+                &objs[p_in->Instance]);
+            objs[p_in->Instance].Instance = NVRM_EXT_CLK_CNT;
+        }
+    }
 
     return err_;
 }
