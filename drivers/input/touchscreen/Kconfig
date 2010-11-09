@@ -334,6 +334,13 @@ config TOUCHSCREEN_PANJIT_I2C
 	  To compile this driver as a module, choose M here: the module will
 	  be called panjit_i2c.
 
+config TOUCHSCREEN_ATMEL_MT_T9
+	tristate "Atmel Touchscreen Interface"
+	depends on I2C
+	help
+	  To compile this driver as a module, choose M here: the
+	  module will be called atmel_tsadcc.
+
 config TOUCHSCREEN_UCB1400
 	tristate "Philips UCB1400 touchscreen"
 	depends on AC97_BUS
