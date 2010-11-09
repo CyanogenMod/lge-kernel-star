@@ -31,6 +31,16 @@
 #include <linux/gpio.h>
 #include <linux/console.h>
 #include <linux/reboot.h>
+#include <linux/delay.h>
+#include <linux/i2c.h>
+
+#ifdef CONFIG_TOUCHSCREEN_PANJIT_I2C
+#include <linux/i2c/panjit_ts.h>
+#endif
+
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MT_T9
+#include <linux/i2c/atmel_maxtouch.h>
+#endif
 
 #include <mach/iomap.h>
 #include <mach/io.h>
@@ -1163,6 +1173,82 @@ static struct platform_device tegra_touch_device = {
 };
 #endif
 
+#ifdef CONFIG_TOUCHSCREEN_PANJIT_I2C
+static struct panjit_i2c_ts_platform_data panjit_data = {
+	.gpio_reset = TEGRA_GPIO_PQ7,
+};
+
+static const struct i2c_board_info ventana_i2c_bus1_touch_info[] = {
+	{
+	 I2C_BOARD_INFO("panjit_touch", 0x3),
+	 .irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PV6),
+	 .platform_data = &panjit_data,
+	 },
+};
+
+static int __init ventana_touch_init_panjit(void)
+{
+	tegra_gpio_enable(TEGRA_GPIO_PV6);	/* FIXME:  Ventana-specific GPIO assignment	*/
+	tegra_gpio_enable(TEGRA_GPIO_PQ7);	/* FIXME:  Ventana-specific GPIO assignment	*/
+	i2c_register_board_info(0, ventana_i2c_bus1_touch_info, 1);
+
+	return 0;
+}
+#endif
+
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MT_T9
+/* Atmel MaxTouch touchscreen              Driver data */
+/*-----------------------------------------------------*/
+/*
+ * Reads the CHANGELINE state; interrupt is valid if the changeline
+ * is low.
+ */
+static u8 read_chg()
+{
+	return gpio_get_value(TEGRA_GPIO_PV6);
+}
+
+static u8 valid_interrupt()
+{
+	return !read_chg();
+}
+
+static struct mxt_platform_data Atmel_mxt_info = {
+	/* Maximum number of simultaneous touches to report. */
+	.numtouch = 10,
+	// TODO: no need for any hw-specific things at init/exit?
+	.init_platform_hw = NULL,
+	.exit_platform_hw = NULL,
+	.max_x = 1366,
+	.max_y = 768,
+	.valid_interrupt = &valid_interrupt,
+	.read_chg = &read_chg,
+};
+
+static struct i2c_board_info __initdata i2c_info[] = {
+	{
+	 I2C_BOARD_INFO("maXTouch", MXT_I2C_ADDRESS),
+	 .irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PV6),
+	 .platform_data = &Atmel_mxt_info,
+	 },
+};
+
+static int __init ventana_touch_init_atmel(void)
+{
+	tegra_gpio_enable(TEGRA_GPIO_PV6);	/* FIXME:  Ventana-specific GPIO assignment	*/
+	tegra_gpio_enable(TEGRA_GPIO_PQ7);	/* FIXME:  Ventana-specific GPIO assignment	*/
+
+	gpio_set_value(TEGRA_GPIO_PQ7, 0);
+	msleep(1);
+	gpio_set_value(TEGRA_GPIO_PQ7, 1);
+	msleep(100);
+
+	i2c_register_board_info(0, i2c_info, 1);
+
+	return 0;
+}
+#endif
+
 #ifdef CONFIG_INPUT_TEGRA_ODM_ACCEL
 static struct platform_device tegra_accelerometer_device = {
 	.name = "tegra_accelerometer",
@@ -1711,6 +1797,11 @@ postcore_initcall(tegra_setup_data);
 
 void __init tegra_setup_nvodm(bool standard_i2c, bool standard_spi)
 {
+#if	defined(CONFIG_TOUCHSCREEN_PANJIT_I2C) && \
+	defined(CONFIG_TOUCHSCREEN_ATMEL_MT_T9)
+	NvOdmBoardInfo	BoardInfo;
+#endif
+
 	NvRmGpioOpen(s_hRmGlobal, &s_hGpioGlobal);
 	tegra_setup_debug_uart();
 	tegra_setup_hcd();
@@ -1723,6 +1814,31 @@ void __init tegra_setup_nvodm(bool standard_i2c, bool standard_spi)
 		tegra_setup_i2c();
 	if (standard_spi)
 		tegra_setup_spi();
+#if	defined(CONFIG_TOUCHSCREEN_PANJIT_I2C) && \
+	defined(CONFIG_TOUCHSCREEN_ATMEL_MT_T9)
+#define NVODM_ATMEL_TOUCHSCREEN    0x0A00
+#define NVODM_PANJIT_TOUCHSCREEN   0x0000
+#define BOARD_VENTANA              0x024B
+	if (NvOdmPeripheralGetBoardInfo(BOARD_VENTANA, &BoardInfo)) {
+		/* Diagnostics print messages to print Board SKU
+		   printk("\n\nRRC:  Board ID:  %04X\n\n", BoardInfo.SKU);
+		 */
+		switch (BoardInfo.SKU & 0xFF00) {
+		case NVODM_ATMEL_TOUCHSCREEN:
+			ventana_touch_init_atmel();
+			break;
+
+		default:
+			ventana_touch_init_panjit();
+			break;
+		}
+	} else
+		ventana_touch_init_panjit();
+#elif defined(CONFIG_TOUCHSCREEN_ATMEL_MT_T9)
+	ventana_touch_init_atmel();
+#elif defined(CONFIG_TOUCHSCREEN_PANJIT_I2C)
+	ventana_touch_init_panjit();
+#endif
 	tegra_setup_w1();
 	pm_power_off = tegra_system_power_off;
 	tegra_setup_suspend();
