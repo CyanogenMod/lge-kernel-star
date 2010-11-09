@@ -33,6 +33,7 @@
 #include <linux/gpio.h>
 #include <linux/gpio_keys.h>
 #include <linux/input.h>
+#include <linux/tegra_usb.h>
 
 #include <mach/clk.h>
 #include <mach/iomap.h>
@@ -43,6 +44,7 @@
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
+#include <mach/usb_phy.h>
 
 #include "board.h"
 #include "clock.h"
@@ -71,6 +73,32 @@ static struct platform_device debug_uart = {
 	.dev = {
 		.platform_data = debug_uart_platform_data,
 	},
+};
+
+static struct tegra_utmip_config utmi_phy_config[] = {
+	[0] = {
+			.hssync_start_delay = 0,
+			.idle_wait_delay = 17,
+			.elastic_limit = 16,
+			.term_range_adj = 6,
+			.xcvr_setup = 15,
+			.xcvr_lsfslew = 2,
+			.xcvr_lsrslew = 2,
+	},
+	[1] = {
+			.hssync_start_delay = 0,
+			.idle_wait_delay = 17,
+			.elastic_limit = 16,
+			.term_range_adj = 6,
+			.xcvr_setup = 8,
+			.xcvr_lsfslew = 2,
+			.xcvr_lsrslew = 2,
+	},
+};
+
+static struct tegra_ulpi_config ulpi_phy_config = {
+	.reset_gpio = TEGRA_GPIO_PG2,
+	.clk = "cdev2",
 };
 
 #ifdef CONFIG_BCM4329_RFKILL
@@ -246,6 +274,31 @@ static int __init ventana_touch_init(void)
 	return 0;
 }
 
+
+static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
+	[0] = {
+			.phy_config = &utmi_phy_config[0],
+			.operating_mode = TEGRA_USB_HOST,
+			.power_down_on_bus_suspend = 0,
+	},
+	[1] = {
+			.phy_config = &ulpi_phy_config,
+			.operating_mode = TEGRA_USB_HOST,
+			.power_down_on_bus_suspend = 1,
+	},
+	[2] = {
+			.phy_config = &utmi_phy_config[1],
+			.operating_mode = TEGRA_USB_HOST,
+			.power_down_on_bus_suspend = 0,
+	},
+};
+
+static void ventana_usb_init()
+{
+	tegra_ehci3_device.dev.platform_data=&tegra_ehci_pdata[2];
+	platform_device_register(&tegra_ehci3_device);
+}
+
 static void __init tegra_ventana_init(void)
 {
 	tegra_common_init();
@@ -259,6 +312,7 @@ static void __init tegra_ventana_init(void)
 	ventana_regulator_init();
 	ventana_touch_init();
 	ventana_keys_init();
+	ventana_usb_init();
 	ventana_panel_init();
 	ventana_sensors_init();
 	ventana_bt_rfkill();
