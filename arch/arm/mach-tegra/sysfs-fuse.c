@@ -34,6 +34,8 @@
 #include <linux/kernel.h>
 #include <linux/sysfs.h>
 #include <linux/kobject.h>
+#include <linux/mm.h>
+#include <mach/fuse.h>
 #include "nvddk_fuse.h"
 #include "mach/nvrm_linux.h"
 
@@ -67,12 +69,27 @@ typedef enum
 } TegraFuseSizeInBytes;
 
 
+static ssize_t nvfuse_raw_read(struct kobject *kobj,
+    struct bin_attribute *attr, char *buf, loff_t off, size_t count);
+
+static int nvfuse_raw_mmap(struct kobject *kobj,
+    struct bin_attribute *attr, struct vm_area_struct *vma);
+
 static ssize_t sysfsfuse_show(struct kobject *kobj,
         struct kobj_attribute *attr, char *buf);
 
 static ssize_t sysfsfuse_store(struct kobject *kobj,
     struct kobj_attribute *attr, const char *buf, size_t count);
 
+
+static struct bin_attribute nvfuse_raw_attr = {
+        .attr = {
+                .name = "kfuse_raw",
+                .mode = 0440,
+        },
+        .read = &nvfuse_raw_read,
+        .mmap = &nvfuse_raw_mmap,
+};
 
 static struct kobj_attribute nvfuse_DeviceKey_attr =
     __ATTR(DeviceKey, 0440, sysfsfuse_show, sysfsfuse_store);
@@ -113,7 +130,20 @@ static struct kobj_attribute nvfuse_SecBootDeviceSelectRaw_attr =
 static struct kobj_attribute nvfuse_ReservedOdm_attr =
     __ATTR(ReservedOdm, 0440, sysfsfuse_show, sysfsfuse_store);
 
+static ssize_t nvfuse_raw_read(struct kobject *kobj, struct bin_attribute *attr, char *buf, loff_t off, size_t count)
+{
+    memcpy(buf, attr->private + off, count);
+    return count;
+}
 
+static int nvfuse_raw_mmap(struct kobject *kobj, struct bin_attribute *attr, struct vm_area_struct *vma)
+{
+    if(remap_pfn_range(vma, vma->vm_start, virt_to_phys(attr->private) >> PAGE_SHIFT, attr->size, vma->vm_page_prot)) {
+        printk(KERN_ERR "nvfuse_raw_mmap failed\n");
+        return -EIO;
+    }
+    return 0;
+}
 
 // return the fuse type based on the fuse name.
 NvDdkFuseDataType GetFuseType(const char *str, unsigned int* pSize)
@@ -441,6 +471,8 @@ static int __init sysfsfuse_init(void)
         sysfs_chmod_file(nvfuse_kobj, &nvfuse_OdmProduction_attr.attr, 0640);
     }
 
+    nvfuse_raw_attr.private = tegra_kfuse_cache_get(&nvfuse_raw_attr.size);
+    CHK_ERR(sysfs_create_bin_file(nvfuse_kobj, &nvfuse_raw_attr));
     CHK_ERR(sysfs_create_file(nvfuse_kobj, &nvfuse_DeviceKey_attr.attr));
     CHK_ERR(sysfs_create_file(nvfuse_kobj, &nvfuse_JtagDisable_attr.attr));
     CHK_ERR(sysfs_create_file(nvfuse_kobj, &nvfuse_KeyProgrammed_attr.attr));
