@@ -61,13 +61,13 @@ static void dma_complete_work(struct work_struct *work)
 
 	spin_lock(&action->dma->lock);
 	list_del(&action->node);
-	spin_unlock(&action->dma->lock);
 
 	if (action->dma_sem) {
 		if (action->req.status==TEGRA_DMA_REQ_SUCCESS)
 			NvOsSemaphoreSignal(action->dma_sem);
 		NvOsSemaphoreDestroy(action->dma_sem);
 	}
+	spin_unlock(&action->dma->lock);
 	kfree(action);
 }
 
@@ -328,29 +328,31 @@ NvError NvRmDmaStartDmaTransfer(NvRmDmaHandle dma, NvRmDmaClientBuffer *b,
 	return e;
 }
 
+
 void NvRmDmaAbort(NvRmDmaHandle dma)
 {
 	if (!dma)
 		return;
 
+	tegra_dma_flush(dma->ch);
+
 	spin_lock(&dma->lock);
 	while (!list_empty(&dma->req_list)) {
 		struct dma_action *action;
-		struct tegra_dma_req *req;
 
 		action = list_first_entry(&dma->req_list,
 					  struct dma_action, node);
-		req = &action->req;
-		spin_unlock(&dma->lock);
-		tegra_dma_dequeue_req(dma->ch, req);
+
 		if (action->dma_sem)
 			NvOsSemaphoreDestroy(action->dma_sem);
+
 		list_del(&action->node);
 		kfree(action);
-		spin_lock(&dma->lock);
 	}
 	spin_unlock(&dma->lock);
 }
+
+
 
 NvError NvRmDmaGetCapabilities(NvRmDeviceHandle rm, NvRmDmaCapabilities *caps)
 {

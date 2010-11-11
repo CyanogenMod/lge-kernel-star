@@ -143,10 +143,6 @@ static void tegra_dma_update_hw_partial(struct tegra_dma_channel *ch,
 	struct tegra_dma_req *req);
 static void tegra_dma_init_hw(struct tegra_dma_channel *ch);
 
-void tegra_dma_flush(struct tegra_dma_channel *ch)
-{
-}
-EXPORT_SYMBOL(tegra_dma_flush);
 
 void tegra_dma_dequeue(struct tegra_dma_channel *ch)
 {
@@ -184,6 +180,7 @@ void tegra_dma_stop(struct tegra_dma_channel *ch)
 		writel(status, ch->addr + APB_DMA_CHAN_STA);
 }
 
+
 int tegra_dma_cancel(struct tegra_dma_channel *ch)
 {
 	unsigned long irq_flags;
@@ -200,6 +197,13 @@ int tegra_dma_cancel(struct tegra_dma_channel *ch)
 	spin_unlock_irqrestore(&ch->lock, irq_flags);
 	return 0;
 }
+
+void tegra_dma_flush(struct tegra_dma_channel *ch)
+{
+	tegra_dma_cancel(ch);
+}
+EXPORT_SYMBOL(tegra_dma_flush);
+
 
 /* should be called with the channel lock held */
 static unsigned int dma_active_count(struct tegra_dma_channel *ch,
