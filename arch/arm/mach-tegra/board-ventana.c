@@ -254,6 +254,7 @@ static struct platform_device *ventana_devices[] __initdata = {
 	&tegra_aes_device,
 	&ventana_keys_device,
 	&tegra_wdt_device,
+	&tegra_avp_device,
 };
 
 static void ventana_keys_init(void)
