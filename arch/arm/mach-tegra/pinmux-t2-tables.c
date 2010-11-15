@@ -567,7 +567,7 @@ static const int gpio_pin_pingroup[] = {
 	gpio_pingroup(A, 4, DAP2),
 	gpio_pingroup(A, 5, DAP2),
 	gpio_pingroup(A, 6, SDD),
-	gpio_pingroup(A, 7, SDD),
+	gpio_pingroup(A, 7, SDB),
 
 	gpio_pingroup(B, 0, GMC),
 	gpio_pingroup(B, 1, GMC),
