@@ -1367,6 +1367,11 @@ static NvError CreateSpiSlinkChannelHandle(
 
         // Set chip select to non active state.
         hRmSpiSlink->hHwInterface->HwControllerInitializeFxn(&hRmSpiSlink->HwRegs);
+
+        // Set functional mode.
+        hRmSpiSlink->hHwInterface->HwSetFunctionalModeFxn(&hRmSpiSlink->HwRegs,
+                      hRmSpiSlink->IsMasterMode);
+
         for (ChipSelIndex = 0; ChipSelIndex < MAX_CHIPSELECT_PER_INSTANCE; ++ChipSelIndex)
         {
             hRmSpiSlink->IsCurrentChipSelStateHigh[ChipSelIndex] = NV_TRUE;
