@@ -51,7 +51,7 @@
 #define BYTES_TO_ALIGN(x) ((unsigned long)(ALIGN((x), sizeof(u32))) - \
 	(unsigned long)(x))
 
-#define UART_RX_DMA_BUFFER_SIZE    (2048*4)
+#define UART_RX_DMA_BUFFER_SIZE    (2048*16)
 
 #define UART_LSR_FIFOE		0x80
 #define UART_IER_EORD		0x20
@@ -411,11 +411,21 @@ static void do_handle_rx_dma(struct tegra_uart_port *t)
 			set_rts(t, true);
 	} else {
 		is_dma_stopped = false;
+		/* Want to get the transfer count by dma so dont want more
+		 * data to be in at this time.*/
+		if (t->rts_active)
+			set_rts(t, false);
+		/* Wait for dma to update status on current burst */
+		udelay(WAITTIME_DMA_BURST_COMPLETE);
+
 		dma_trans_count = tegra_dma_get_transfer_count(t->rx_dma,
 					&t->rx_dma_req, false);
 		if (dma_trans_count < 0) {
 			return;
 		}
+		/* enable the rts now */
+		if (t->rts_active)
+			set_rts(t, true);
 		dma_read_count = copy_dma_buffer_to_tty_buffer(t, dma_trans_count);
 	}
 
