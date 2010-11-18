@@ -371,6 +371,8 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 
 	val = readl(base + UTMIP_TX_CFG0);
 	val &= ~UTMIP_FS_PREABMLE_J;
+	if (phy->instance == 2)
+		val |= UTMIP_HS_DISCON_DISABLE;
 	writel(val, base + UTMIP_TX_CFG0);
 
 	val = readl(base + UTMIP_HSRX_CFG0);
