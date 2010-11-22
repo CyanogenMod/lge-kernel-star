@@ -1700,6 +1700,10 @@ static void __init tegra_setup_reboot(void)
 
 static int __init tegra_setup_data(void)
 {
+	NvError e = NvSuccess;
+	if (!s_hRmGlobal)
+		e = NvRmOpenNew(&s_hRmGlobal);
+	BUG_ON(e!=NvSuccess);
 	platform_add_devices(nvodm_devices, ARRAY_SIZE(nvodm_devices));
 	return 0;
 }

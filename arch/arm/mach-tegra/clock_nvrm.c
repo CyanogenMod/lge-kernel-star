@@ -446,11 +446,12 @@ EXPORT_SYMBOL(clk_round_rate);
 
 void __init tegra_init_clock(void)
 {
-	NvError e;
+	NvError e = NvSuccess;
 	struct clk *cpu_clk = NULL;
 	unsigned long rate = 0;
 
-	e = NvRmOpenNew(&s_hRmGlobal);
+	if (!s_hRmGlobal)
+		e = NvRmOpenNew(&s_hRmGlobal);
 	BUG_ON(e!=NvSuccess);
 
 	NvRmPrivPostRegulatorInit(s_hRmGlobal);
