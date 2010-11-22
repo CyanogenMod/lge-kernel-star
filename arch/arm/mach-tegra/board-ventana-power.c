@@ -68,7 +68,7 @@ static struct regulator_consumer_supply tps658621_ldo5_supply[] = {
 	REGULATOR_SUPPLY("vcore_mmc", "sdhci-tegra.3"),
 };
 static struct regulator_consumer_supply tps658621_ldo6_supply[] = {
-	REGULATOR_SUPPLY("vddio_vi", NULL),
+	REGULATOR_SUPPLY("vcsi", "tegra_camera"),
 };
 static struct regulator_consumer_supply tps658621_ldo7_supply[] = {
 	REGULATOR_SUPPLY("avdd_hdmi", NULL),
@@ -107,7 +107,7 @@ static struct regulator_init_data ldo2_data = REGULATOR_INIT(ldo2, 725, 1500);
 static struct regulator_init_data ldo3_data = REGULATOR_INIT(ldo3, 1250, 3300);
 static struct regulator_init_data ldo4_data = REGULATOR_INIT(ldo4, 1700, 2475);
 static struct regulator_init_data ldo5_data = REGULATOR_INIT(ldo5, 1250, 3300);
-static struct regulator_init_data ldo6_data = REGULATOR_INIT(ldo6, 1250, 3300);
+static struct regulator_init_data ldo6_data = REGULATOR_INIT(ldo6, 1250, 1800);
 static struct regulator_init_data ldo7_data = REGULATOR_INIT(ldo7, 1250, 3300);
 static struct regulator_init_data ldo8_data = REGULATOR_INIT(ldo8, 1250, 3300);
 static struct regulator_init_data ldo9_data = REGULATOR_INIT(ldo9, 1250, 3300);
