@@ -24,9 +24,45 @@
 #include <linux/akm8975.h>
 
 #include "gpio-names.h"
+#include <linux/i2c/pca954x.h>
+#include <linux/i2c/pca953x.h>
+#include <media/ov5650.h>
 
 #define ISL29018_IRQ_GPIO	TEGRA_GPIO_PZ2
 #define AKM8975_IRQ_GPIO	TEGRA_GPIO_PN5
+
+#define CAMERA_POWER_GPIO	TEGRA_GPIO_PV4
+#define CAMERA_CSI_MUX_SEL_GPIO	TEGRA_GPIO_PBB4
+
+static int ventana_camera_init(void)
+{
+	tegra_gpio_enable(CAMERA_POWER_GPIO);
+	gpio_request(CAMERA_POWER_GPIO, "camera_power_en");
+	gpio_direction_output(CAMERA_POWER_GPIO, 1);
+	gpio_export(CAMERA_POWER_GPIO, false);
+
+	tegra_gpio_enable(CAMERA_CSI_MUX_SEL_GPIO);
+	gpio_request(CAMERA_CSI_MUX_SEL_GPIO, "camera_csi_sel");
+	gpio_direction_output(CAMERA_CSI_MUX_SEL_GPIO, 0);
+	gpio_export(CAMERA_CSI_MUX_SEL_GPIO, false);
+
+	return 0;
+}
+
+static int ventana_ov5650_power_on(void)
+{
+	return 0;
+}
+
+static int ventana_ov5650_power_off(void)
+{
+	return 0;
+}
+
+struct ov5650_platform_data ventana_ov5650_data = {
+	.power_on = ventana_ov5650_power_on,
+	.power_off = ventana_ov5650_power_off,
+};
 
 static void ventana_isl29018_init(void)
 {
@@ -61,6 +97,32 @@ static const struct i2c_board_info ventana_i2c2_board_info[] = {
 	},
 };
 
+static struct pca953x_platform_data ventana_tca6416_data = {
+	.gpio_base      = TEGRA_NR_GPIOS + 4, /* 4 gpios are already requested by tps6586x */
+};
+
+static struct pca954x_platform_mode ventana_pca9546_modes[] = {
+	{ .adap_id = 6, }, /* REAR CAM1 */
+	{ .adap_id = 7, }, /* REAR CAM2 */
+	{ .adap_id = 8, }, /* FRONT CAM3 */
+};
+
+static struct pca954x_platform_data ventana_pca9546_data = {
+	.modes          = ventana_pca9546_modes,
+	.num_modes      = ARRAY_SIZE(ventana_pca9546_modes),
+};
+
+static const struct i2c_board_info ventana_i2c3_board_info[] = {
+	{
+		I2C_BOARD_INFO("tca6416", 0x20),
+		.platform_data = &ventana_tca6416_data,
+	},
+	{
+		I2C_BOARD_INFO("pca9546", 0x70),
+		.platform_data = &ventana_pca9546_data,
+	},
+};
+
 static struct i2c_board_info ventana_i2c4_board_info[] = {
 	{
 		I2C_BOARD_INFO("nct1008", 0x4C),
@@ -69,13 +131,21 @@ static struct i2c_board_info ventana_i2c4_board_info[] = {
 	{
 		I2C_BOARD_INFO("akm8975", 0x0C),
 		.irq = TEGRA_GPIO_TO_IRQ(AKM8975_IRQ_GPIO),
-	}
+	},
+};
+
+static struct i2c_board_info ventana_i2c7_board_info[] = {
+	{
+		I2C_BOARD_INFO("ov5650", 0x36),
+		.platform_data = &ventana_ov5650_data,
+	},
 };
 
 int __init ventana_sensors_init(void)
 {
 	ventana_isl29018_init();
 	ventana_akm8975_init();
+	ventana_camera_init();
 
 	i2c_register_board_info(0, ventana_i2c0_board_info,
 		ARRAY_SIZE(ventana_i2c0_board_info));
@@ -83,8 +153,14 @@ int __init ventana_sensors_init(void)
 	i2c_register_board_info(2, ventana_i2c2_board_info,
 		ARRAY_SIZE(ventana_i2c2_board_info));
 
+	i2c_register_board_info(3, ventana_i2c3_board_info,
+		ARRAY_SIZE(ventana_i2c3_board_info));
+
 	i2c_register_board_info(4, ventana_i2c4_board_info,
 		ARRAY_SIZE(ventana_i2c4_board_info));
+
+	i2c_register_board_info(7, ventana_i2c7_board_info,
+		ARRAY_SIZE(ventana_i2c7_board_info));
 
 	return 0;
 }
