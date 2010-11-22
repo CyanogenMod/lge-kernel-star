@@ -274,6 +274,12 @@ static void tps6586x_gpio_set(struct gpio_chip *chip, unsigned offset,
 			 value << offset);
 }
 
+static int tps6586x_gpio_input(struct gpio_chip *gc, unsigned offset)
+{
+	/* FIXME: add handling of GPIOs as dedicated inputs */
+	return -ENOSYS;
+}
+
 static int tps6586x_gpio_output(struct gpio_chip *gc, unsigned offset,
 				int value)
 {
@@ -300,7 +306,7 @@ static int tps6586x_gpio_init(struct tps6586x *tps6586x, int gpio_base)
 	tps6586x->gpio.ngpio		= 4;
 	tps6586x->gpio.can_sleep	= 1;
 
-	/* FIXME: add handling of GPIOs as dedicated inputs */
+	tps6586x->gpio.direction_input	= tps6586x_gpio_input;
 	tps6586x->gpio.direction_output	= tps6586x_gpio_output;
 	tps6586x->gpio.set		= tps6586x_gpio_set;
 	tps6586x->gpio.get		= tps6586x_gpio_get;
