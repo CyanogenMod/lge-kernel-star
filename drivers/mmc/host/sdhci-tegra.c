@@ -124,6 +124,8 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhost,
 	}
 
 	if (clock) {
+		if (clock > host->max_clk)
+			clock = host->max_clk;
 		clk_set_rate(host->clk, clock);
 		sdhost->max_clk = clk_get_rate(host->clk);
 		dev_dbg(&host->pdev->dev, "clock request: %uKHz. currently "
