@@ -39,8 +39,6 @@
 #include "nvassert.h"
 #include "tegra_transport.h"
 
-extern struct snd_soc_dai tegra_i2s_rpc_dai;
-
 static int tegra_i2s_rpc_hw_params(struct snd_pcm_substream *substream,
 				   struct snd_pcm_hw_params *params,
 				   struct snd_soc_dai *dai)
@@ -72,35 +70,55 @@ static struct snd_soc_dai_ops tegra_dai_ops = {
 	.hw_params = tegra_i2s_rpc_hw_params,
 };
 
-struct snd_soc_dai tegra_i2s_rpc_dai = {
-	.name = "tegra-i2s-rpc",
-	.id = 0,
-	.probe = tegra_i2s_rpc_probe,
-	.playback = {
-		.channels_min = 1,
-		.channels_max = 2,
-		.rates = TEGRA_SAMPLE_RATES,
-		.formats = TEGRA_SAMPLE_FORMATS,
+struct snd_soc_dai tegra_i2s_rpc_dai[] = {
+	{
+		.name = "tegra-i2s-rpc",
+		.id = 0,
+		.probe = tegra_i2s_rpc_probe,
+		.playback = {
+			.channels_min = 1,
+			.channels_max = 2,
+			.rates = TEGRA_SAMPLE_RATES,
+			.formats = TEGRA_SAMPLE_FORMATS,
+		},
+		.capture = {
+			.channels_min = 1,
+			.channels_max = 2,
+			.rates = TEGRA_SAMPLE_RATES,
+			.formats = TEGRA_SAMPLE_FORMATS,
+		},
+		.ops = &tegra_dai_ops,
 	},
-	.capture = {
-		.channels_min = 1,
-		.channels_max = 2,
-		.rates = TEGRA_SAMPLE_RATES,
-		.formats = TEGRA_SAMPLE_FORMATS,
+	{
+		.name = "tegra-i2s-rpc",
+		.id = 1,
+		.probe = tegra_i2s_rpc_probe,
+		.playback = {
+			.channels_min = 1,
+			.channels_max = 2,
+			.rates = TEGRA_SAMPLE_RATES,
+			.formats = TEGRA_SAMPLE_FORMATS,
+		},
+		.capture = {
+			.channels_min = 1,
+			.channels_max = 2,
+			.rates = TEGRA_SAMPLE_RATES,
+			.formats = TEGRA_SAMPLE_FORMATS,
+		},
+		.ops = &tegra_dai_ops,
 	},
-	.ops = &tegra_dai_ops,
 };
 EXPORT_SYMBOL_GPL(tegra_i2s_rpc_dai);
 
 static int __init tegra_i2s_rpc_init(void)
 {
-	return snd_soc_register_dai(&tegra_i2s_rpc_dai);
+	return snd_soc_register_dais(tegra_i2s_rpc_dai, ARRAY_SIZE(tegra_i2s_rpc_dai));
 }
 module_init(tegra_i2s_rpc_init);
 
 static void __exit tegra_i2s_rpc_exit(void)
 {
-	snd_soc_unregister_dai(&tegra_i2s_rpc_dai);
+	snd_soc_unregister_dais(tegra_i2s_rpc_dai, ARRAY_SIZE(tegra_i2s_rpc_dai));
 }
 module_exit(tegra_i2s_rpc_exit);
 

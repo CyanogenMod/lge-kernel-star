@@ -550,6 +550,10 @@ int tegra_audiofx_init(struct tegra_audio_data* tegra_snd_cx)
 						NvAudioFxI2s1Id);
 		tegra_snd_cx->mi2s1_device_available = NvAudioFxIoDevice_Default;
 
+		tegra_snd_cx->mi2s2 = tegra_snd_cx->xrt_fxn.MixerCreateObject(
+						tegra_snd_cx->mixer_handle,
+						NvAudioFxI2s2Id);
+
 		memset(&message, 0, sizeof(NvAudioFxMessage));
 		message.Event = NvAudioFxEventControlChange;
 		message.hFx = (NvAudioFxHandle)tegra_snd_cx->mi2s1;
@@ -872,7 +876,8 @@ void tegra_audiofx_destroyfx(struct tegra_audio_data *audio_context)
 
 NvError tegra_audiofx_create_output(NvRmDeviceHandle hRmDevice,
                              NvAudioFxMixerHandle hMixer,
-                             StandardPath* pPath)
+                             StandardPath* pPath,
+			     NvAudioFxObjectHandle hSource)
 {
 	NvError e = NvSuccess;
 	NvAudioFxConnectionDescriptor connection;
@@ -896,7 +901,7 @@ NvError tegra_audiofx_create_output(NvRmDeviceHandle hRmDevice,
 
 	connection.hSource = (NvAudioFxHandle)pPath->Volume;
 	connection.SourcePin = NvAudioFxSourcePin;
-	connection.hSink = 0;
+	connection.hSink = (NvAudioFxHandle)hSource;
 	connection.SinkPin = NvAudioFxSinkPin;
 	e = tegra_transport_set_property(pPath->Volume,
 	                             NvAudioFxProperty_Attach,
@@ -951,7 +956,8 @@ NvError tegra_audiofx_destroy_output(StandardPath* pPath)
 NvError tegra_audiofx_create_input(NvRmDeviceHandle hRmDevice,
                             NvAudioFxMixerHandle hMixer,
                             StandardPath* pInput,
-                            InputSelection InputSelect)
+                            InputSelection InputSelect,
+			    NvAudioFxObjectHandle hSource)
 {
 	NvError e = NvSuccess;
 	NvAudioFxConnectionDescriptor connection;
@@ -994,12 +1000,11 @@ NvError tegra_audiofx_create_input(NvRmDeviceHandle hRmDevice,
 	audiofx_path_connect(pInput->Src, pInput->Convert);
 
 	/* Wire 5 */
-	connection.hSource = 0;
 	connection.SourcePin = (InputSelect == NvAudioInputSelect_Record) ?
 				NvAudioFxSourcePin :  NvAudioFxLoopbackPin;
 	connection.hSink = (NvAudioFxHandle)pInput->Src;
 	connection.SinkPin = NvAudioFxSinkPin;
-	e = tegra_transport_set_property(0,
+	e = tegra_transport_set_property(hSource,
 	                             NvAudioFxProperty_Attach,
 	                             sizeof(NvAudioFxConnectionDescriptor),
 	                             &connection);

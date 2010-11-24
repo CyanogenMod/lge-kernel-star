@@ -28,7 +28,7 @@
 
 #include "tegra_transport.h"
 
-extern struct tegra_audio_data* tegra_snd_cx;
+extern struct tegra_audio_data* tegra_snd_cx[];
 
 static int tegra_master_volume_info(struct snd_kcontrol *kcontrol,
 				    struct snd_ctl_elem_info *uinfo)
@@ -45,11 +45,12 @@ static int tegra_master_volume_get(struct snd_kcontrol *kcontrol,
 {
 	int rval = NvAudioFxVolumeDefault;
 	int lval = NvAudioFxVolumeDefault;
+	struct tegra_audio_data *ptscx = tegra_snd_cx[I2S1];
 
-	if (tegra_snd_cx) {
-		if (!tegra_audiofx_init(tegra_snd_cx)) {
-			rval = tegra_snd_cx->i2s1volume;
-			lval = tegra_snd_cx->i2s1volume;
+	if (ptscx) {
+		if (!tegra_audiofx_init(ptscx)) {
+			rval = ptscx->i2s1volume;
+			lval = ptscx->i2s1volume;
 		}
 	}
 	ucontrol->value.integer.value[0] = rval;
@@ -62,6 +63,8 @@ static int tegra_master_volume_put(struct snd_kcontrol *kcontrol,
 {
 	int change = 0, val;
 	NvAudioFxVolumeDescriptor vd;
+	struct tegra_audio_data *ptscx = tegra_snd_cx[I2S1];
+
 	val = ucontrol->value.integer.value[0] & 0xffff;
 	vd.LeftVolume = val;
 	vd.RightVolume = val;
@@ -72,12 +75,12 @@ static int tegra_master_volume_put(struct snd_kcontrol *kcontrol,
 		vd.Mute = 1;
 	}
 
-	if (tegra_snd_cx) {
-		if (!tegra_audiofx_init(tegra_snd_cx)) {
-			if(tegra_snd_cx->i2s1volume != val) {
-				tegra_snd_cx->i2s1volume = val;
-				tegra_snd_cx->xrt_fxn.SetProperty(
-					tegra_snd_cx->mvolume,
+	if (ptscx) {
+		if (!tegra_audiofx_init(ptscx)) {
+			if(ptscx->i2s1volume != val) {
+				ptscx->i2s1volume = val;
+				ptscx->xrt_fxn.SetProperty(
+					ptscx->mvolume,
 					NvAudioFxVolumeProperty_Volume,
 					sizeof(NvAudioFxVolumeDescriptor),
 					&vd);
@@ -113,11 +116,13 @@ static int tegra_master_route_info(struct snd_kcontrol *kcontrol,
 static int tegra_master_route_get(struct snd_kcontrol *kcontrol,
 				  struct snd_ctl_elem_value *ucontrol)
 {
+	struct tegra_audio_data *ptscx = tegra_snd_cx[I2S1];
+
 	ucontrol->value.integer.value[0] = 0;
-	if (tegra_snd_cx) {
-		if (!tegra_audiofx_init(tegra_snd_cx)) {
+	if (ptscx) {
+		if (!tegra_audiofx_init(ptscx)) {
 			ucontrol->value.integer.value[0] =
-						tegra_snd_cx->spdif_plugin;
+						ptscx->spdif_plugin;
 		}
 	}
 	return 0;
@@ -127,12 +132,14 @@ static int tegra_master_route_put(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
 	int change = 0, val;
+	struct tegra_audio_data *ptscx = tegra_snd_cx[I2S1];
+
 	val = ucontrol->value.integer.value[0] & 0xffff;
 
-	if (tegra_snd_cx) {
-		if (!tegra_audiofx_init(tegra_snd_cx)) {
-			tegra_snd_cx->spdif_plugin = val;
-			tegra_audiofx_route(tegra_snd_cx);
+	if (ptscx) {
+		if (!tegra_audiofx_init(ptscx)) {
+			ptscx->spdif_plugin = val;
+			tegra_audiofx_route(ptscx);
 			change = 1;
 		}
 	}
@@ -195,34 +202,56 @@ static struct snd_soc_dai_ops dit_stub_ops = {
 	.set_sysclk = tegra_generic_codec_set_dai_sysclk,
 };
 
-struct snd_soc_dai tegra_generic_codec_dai = {
-	.name = "tegra-codec-rpc",
-	.playback = {
-		.stream_name    = "Playback",
-		.channels_min   = 1,
-		.channels_max   = 2,
-		.rates          = TEGRA_SAMPLE_RATES,
-		.formats        = TEGRA_SAMPLE_FORMATS,
+struct snd_soc_dai tegra_generic_codec_dai[] = {
+	{
+		.name = "tegra-codec-rpc",
+		.id = 0,
+		.playback = {
+			.stream_name    = "Playback",
+			.channels_min   = 1,
+			.channels_max   = 2,
+			.rates          = TEGRA_SAMPLE_RATES,
+			.formats        = TEGRA_SAMPLE_FORMATS,
+		},
+		.capture = {
+			.stream_name    = "Capture",
+			.channels_min   = 1,
+			.channels_max   = 2,
+			.rates          = TEGRA_SAMPLE_RATES,
+			.formats        = TEGRA_SAMPLE_FORMATS,
+		},
+		.ops = &dit_stub_ops,
 	},
-	.capture = {
-		.stream_name    = "Capture",
-		.channels_min   = 1,
-		.channels_max   = 2,
-		.rates          = TEGRA_SAMPLE_RATES,
-		.formats        = TEGRA_SAMPLE_FORMATS,
-	},
-	.ops = &dit_stub_ops,
+	{
+		.name = "tegra-codec-bluetooth",
+		.id = 1,
+		.playback = {
+			.stream_name    = "Playback",
+			.channels_min   = 1,
+			.channels_max   = 2,
+			.rates          = TEGRA_SAMPLE_RATES,
+			.formats        = TEGRA_SAMPLE_FORMATS,
+		},
+		.capture = {
+			.stream_name    = "Capture",
+			.channels_min   = 1,
+			.channels_max   = 2,
+			.rates          = TEGRA_SAMPLE_RATES,
+			.formats        = TEGRA_SAMPLE_FORMATS,
+		},
+		.ops = &dit_stub_ops,
+	}
 };
 EXPORT_SYMBOL_GPL(tegra_generic_codec_dai);
 
 static int __init dit_modinit(void)
 {
-	return snd_soc_register_dai(&tegra_generic_codec_dai);
+	return snd_soc_register_dais(tegra_generic_codec_dai, ARRAY_SIZE(tegra_generic_codec_dai));
 }
 
 static void __exit dit_exit(void)
 {
-	snd_soc_unregister_dai(&tegra_generic_codec_dai);
+	snd_soc_unregister_dais(tegra_generic_codec_dai, ARRAY_SIZE(tegra_generic_codec_dai));
 }
 
 module_init(dit_modinit);
@@ -243,12 +272,13 @@ static int codec_soc_probe(struct platform_device *pdev)
 
 	codec->name = "tegra-generic-codec";
 	codec->owner = THIS_MODULE;
-	codec->dai = &tegra_generic_codec_dai;
-	codec->num_dai = 1;
+	codec->dai = tegra_generic_codec_dai;
+	codec->num_dai = ARRAY_SIZE(tegra_generic_codec_dai);
 	codec->write = NULL;
 	codec->read = NULL;
 	INIT_LIST_HEAD(&codec->dapm_widgets);
 	INIT_LIST_HEAD(&codec->dapm_paths);
+
 	/* Register PCMs. */
 	ret = snd_soc_new_pcms(socdev, SNDRV_DEFAULT_IDX1, SNDRV_DEFAULT_STR1);
 	if (ret < 0) {

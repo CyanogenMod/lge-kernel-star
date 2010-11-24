@@ -48,7 +48,7 @@ struct codec_setup_data {
 };
 
 extern struct snd_soc_codec_device soc_codec_dev_tegra_generic_codec;
-extern struct snd_soc_dai tegra_generic_codec_dai;
+extern struct snd_soc_dai tegra_generic_codec_dai[];
 
 static struct platform_device *tegra_snd_device;
 NvU64 codec_guid;
@@ -110,20 +110,30 @@ static int tegra_codec_init(struct snd_soc_codec *codec)
 extern struct snd_soc_dai tegra_i2s_rpc_dai;
 extern struct snd_soc_platform tegra_soc_platform;
 
-static struct snd_soc_dai_link tegra_board_dai = {
-	.name = "tegra-generic-codec",
-	.stream_name = "tegra-codec-rpc",
-	.cpu_dai = &tegra_i2s_rpc_dai,
-	.codec_dai = &tegra_generic_codec_dai,
-	.init = tegra_codec_init,
-	.ops = &tegra_hifi_ops,
+static struct snd_soc_dai_link tegra_board_dai[] = {
+	{
+		.name = "tegra-generic-codec",
+		.stream_name = "tegra-codec-rpc",
+		.cpu_dai = &tegra_i2s_rpc_dai,
+		.codec_dai = &tegra_generic_codec_dai[I2S1],
+		.init = tegra_codec_init,
+		.ops = &tegra_hifi_ops,
+	},
+	{
+		.name = "tegra-bluetooth",
+		.stream_name = "tegra-codec-bluetooth",
+		.cpu_dai = &tegra_i2s_rpc_dai,
+		.codec_dai = &tegra_generic_codec_dai[I2S2],
+		.init = tegra_codec_init,
+		.ops = &tegra_hifi_ops,
+	}
 };
 
 static struct snd_soc_card tegra_board = {
 	.name = "tegra",
 	.platform = &tegra_soc_platform,
-	.dai_link = &tegra_board_dai,
-	.num_links = 1,
+	.dai_link = tegra_board_dai,
+	.num_links = ARRAY_SIZE(tegra_board_dai),
 };
 
 static struct snd_soc_device tegra_board_snd_devdata = {
