@@ -112,7 +112,6 @@ static NvBool IsSuspendPowerGateForced(NvU32 PowerGroup)
     // now check s/w support
     switch (PowerGroup)
     {
-        case NV_POWERGROUP_TD:
         case NV_POWERGROUP_PCIE:
         case NV_POWERGROUP_VDE:
         case NV_POWERGROUP_VE:
