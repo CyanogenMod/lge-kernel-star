@@ -63,6 +63,8 @@ static long nvrm_unlocked_ioctl(struct file *file,
     unsigned int cmd, unsigned long arg);
 static int nvrm_mmap(struct file *file, struct vm_area_struct *vma);
 extern void reset_cpu(unsigned int cpu, unsigned int reset);
+extern void NvRmPrivDvsStop(void);
+extern void NvRmPrivDvsRun(void);
 
 //Variables for AVP suspend operation
 extern NvRmDeviceHandle s_hRmGlobal;
@@ -611,12 +613,14 @@ int tegra_pm_notifier(struct notifier_block *nb,
         notify_daemon(STRING_PM_DISPLAY_OFF);
 #endif
         notify_daemon(STRING_PM_SUSPEND_PREPARE);
+        NvRmPrivDvsStop();
         break;
     case PM_POST_SUSPEND:
         notify_daemon(STRING_PM_POST_SUSPEND);
 #ifndef CONFIG_HAS_EARLYSUSPEND
         notify_daemon(STRING_PM_DISPLAY_ON);
 #endif
+        NvRmPrivDvsRun();
         break;
     default:
         printk(KERN_ERR "%s: unknown event %ld\n", __func__, event);
