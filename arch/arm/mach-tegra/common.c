@@ -21,6 +21,7 @@
 #include <linux/io.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
+#include <linux/memblock.h>
 
 #include <asm/hardware/cache-l2x0.h>
 
@@ -32,6 +33,10 @@
 #include "board.h"
 #include "clock.h"
 #include "fuse.h"
+#include "pm.h"
+
+unsigned long tegra_lp0_vec_start;
+unsigned long tegra_lp0_vec_size;
 
 void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
 
@@ -63,7 +68,7 @@ static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 	{ NULL,		NULL,		0,		0},
 };
 
-void __init tegra_init_cache(void)
+void tegra_init_cache(void)
 {
 #ifdef CONFIG_CACHE_L2X0
 	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
@@ -84,4 +89,29 @@ void __init tegra_init_early(void)
 	tegra_init_pinmux();
 	tegra_clk_init_from_table(common_clk_init_table);
 	tegra_init_cache();
+}
+
+static int __init tegra_lp0_vec_arg(char *options)
+{
+	char *p = options;
+
+	tegra_lp0_vec_size = memparse(p, &p);
+	if (*p == '@')
+		tegra_lp0_vec_start = memparse(p+1, &p);
+
+	return 0;
+}
+early_param("lp0_vec", tegra_lp0_vec_arg);
+
+void __init tegra_reserve(void)
+{
+	if (tegra_lp0_vec_size)
+		if (memblock_reserve(tegra_lp0_vec_start, tegra_lp0_vec_size))
+			pr_err("Failed to reserve lp0_vec %08lx@%08lx\n",
+				tegra_lp0_vec_size, tegra_lp0_vec_start);
+
+	pr_info("Tegra reserved memory:\n"
+		"LP0:                    %08lx - %08lx\n",
+		tegra_lp0_vec_start,
+		tegra_lp0_vec_start + tegra_lp0_vec_size - 1);
 }
