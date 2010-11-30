@@ -32,7 +32,7 @@
 #include <linux/clk.h>
 #include <linux/gpio.h>
 #include <linux/delay.h>
-
+#include <linux/bitops.h>
 #include <mach/sdhci.h>
 #include <mach/pinmux.h>
 #include <nvodm_sdio.h>
@@ -465,7 +465,7 @@ static int tegra_sdhci_suspend(struct device *dev)
 	int ret = 0;
 
 	if (host->card_always_on && is_card_sdio(sdhost->mmc->card)) {
-		int div;
+		int div = 0;
 		u16 clk;
 		unsigned int clock = 100000;
 
@@ -476,11 +476,11 @@ static int tegra_sdhci_suspend(struct device *dev)
 		tegra_sdhci_set_clock(sdhost, clock);
 		sdhci_writew(sdhost, 0, SDHCI_CLOCK_CONTROL);
 
-		for (div = 1;div < 256;div *= 2) {
-			if ((sdhost->max_clk / div) <= clock)
-				break;
+		if (sdhost->max_clk > clock) {
+			div =  1 << (fls(sdhost->max_clk / clock) - 2);
+			if (div > 128)
+				div = 128;
 		}
-		div >>= 1;
 
 		clk = div << SDHCI_DIVIDER_SHIFT;
 		clk |= SDHCI_CLOCK_INT_EN | SDHCI_CLOCK_CARD_EN;
