@@ -204,10 +204,10 @@ static void ventana_i2c_init(void)
 	tegra_i2c_device3.dev.platform_data = &ventana_i2c3_platform_data;
 	tegra_i2c_device4.dev.platform_data = &ventana_dvc_platform_data;
 
-	platform_device_register(&tegra_i2c_device4);
-	platform_device_register(&tegra_i2c_device3);
-	platform_device_register(&tegra_i2c_device2);
 	platform_device_register(&tegra_i2c_device1);
+	platform_device_register(&tegra_i2c_device2);
+	platform_device_register(&tegra_i2c_device3);
+	platform_device_register(&tegra_i2c_device4);
 }
 
 #define GPIO_KEY(_id, _gpio, _iswake)		\

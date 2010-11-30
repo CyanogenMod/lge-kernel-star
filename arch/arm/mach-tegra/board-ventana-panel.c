@@ -40,6 +40,10 @@
 #define ventana_hdmi_hpd	TEGRA_GPIO_PN7
 #define ventana_hdmi_enb	TEGRA_GPIO_PV5
 
+static struct regulator *ventana_hdmi_reg = NULL;
+static struct regulator *ventana_hdmi_pll = NULL;
+
+
 static int ventana_backlight_init(struct device *dev) {
 	int ret;
 
@@ -112,12 +116,35 @@ static int ventana_panel_disable(void)
 static int ventana_hdmi_enable(void)
 {
 	gpio_set_value(ventana_hdmi_enb, 1);
+	if (!ventana_hdmi_reg) {
+		ventana_hdmi_reg = regulator_get(NULL, "avdd_hdmi"); /* LD07 */
+		if (IS_ERR_OR_NULL(ventana_hdmi_reg)) {
+			pr_err("hdmi: couldn't get regulator avdd_hdmi\n");
+			ventana_hdmi_reg = NULL;
+			return PTR_ERR(ventana_hdmi_reg);
+		}
+	}
+	regulator_enable(ventana_hdmi_reg);
+
+	if (!ventana_hdmi_pll) {
+		ventana_hdmi_pll = regulator_get(NULL, "avdd_hdmi_pll"); /* LD08 */
+		if (IS_ERR_OR_NULL(ventana_hdmi_pll)) {
+			pr_err("hdmi: couldn't get regulator avdd_hdmi_pll\n");
+			ventana_hdmi_pll = NULL;
+			regulator_disable(ventana_hdmi_reg);
+			ventana_hdmi_reg = NULL;
+			return PTR_ERR(ventana_hdmi_pll);
+		}
+	}
+	regulator_enable(ventana_hdmi_pll);
 	return 0;
 }
 
 static int ventana_hdmi_disable(void)
 {
 	gpio_set_value(ventana_hdmi_enb, 0);
+	regulator_disable(ventana_hdmi_reg);
+	regulator_disable(ventana_hdmi_pll);
 	return 0;
 }
 
@@ -194,8 +221,8 @@ static struct tegra_fb_data ventana_fb_data = {
 
 static struct tegra_fb_data ventana_hdmi_fb_data = {
 	.win		= 0,
-	.xres		= 1280,
-	.yres		= 720,
+	.xres		= 1366,
+	.yres		= 768,
 	.bits_per_pixel	= 16,
 };
 
@@ -233,7 +260,7 @@ static struct tegra_dc_platform_data ventana_disp1_pdata = {
 };
 
 static struct tegra_dc_platform_data ventana_disp2_pdata = {
-	.flags		= TEGRA_DC_FLAG_ENABLED,
+	.flags		= 0,
 	.default_out	= &ventana_disp2_out,
 	.fb		= &ventana_hdmi_fb_data,
 };
@@ -303,13 +330,13 @@ int __init ventana_panel_init(void)
 	gpio_direction_output(ventana_lvds_shutdown, 1);
 	tegra_gpio_enable(ventana_lvds_shutdown);
 
-	gpio_request(ventana_hdmi_enb, "hdmi_5v_en");
-	gpio_direction_output(ventana_hdmi_enb, 0);
 	tegra_gpio_enable(ventana_hdmi_enb);
+	gpio_request(ventana_hdmi_enb, "hdmi_5v_en");
+	gpio_direction_output(ventana_hdmi_enb, 1);
 
+	tegra_gpio_enable(ventana_hdmi_hpd);
 	gpio_request(ventana_hdmi_hpd, "hdmi_hpd");
 	gpio_direction_input(ventana_hdmi_hpd);
-	tegra_gpio_enable(ventana_hdmi_hpd);
 
 	err = platform_add_devices(ventana_gfx_devices,
 				   ARRAY_SIZE(ventana_gfx_devices));
