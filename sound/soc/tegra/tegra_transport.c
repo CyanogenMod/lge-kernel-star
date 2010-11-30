@@ -550,9 +550,21 @@ int tegra_audiofx_init(struct tegra_audio_data* tegra_snd_cx)
 						NvAudioFxI2s1Id);
 		tegra_snd_cx->mi2s1_device_available = NvAudioFxIoDevice_Default;
 
-		tegra_snd_cx->mi2s2 = tegra_snd_cx->xrt_fxn.MixerCreateObject(
+		tegra_snd_cx->i2s1_play_mix = tegra_snd_cx->xrt_fxn.MixerCreateObject(
 						tegra_snd_cx->mixer_handle,
-						NvAudioFxI2s2Id);
+						NvAudioFxI2s1PlaybackMixId);
+
+		tegra_snd_cx->i2s2_play_mix = tegra_snd_cx->xrt_fxn.MixerCreateObject(
+						tegra_snd_cx->mixer_handle,
+						NvAudioFxI2s2PlaybackMixId);
+
+		tegra_snd_cx->i2s1_rec_split = tegra_snd_cx->xrt_fxn.MixerCreateObject(
+						tegra_snd_cx->mixer_handle,
+						NvAudioFxI2s1RecordSplitId);
+
+		tegra_snd_cx->i2s2_rec_split = tegra_snd_cx->xrt_fxn.MixerCreateObject(
+						tegra_snd_cx->mixer_handle,
+						NvAudioFxI2s2RecordSplitId);
 
 		memset(&message, 0, sizeof(NvAudioFxMessage));
 		message.Event = NvAudioFxEventControlChange;

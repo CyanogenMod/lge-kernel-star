@@ -540,10 +540,11 @@ static int tegra_pcm_open(struct snd_pcm_substream *substream)
 	sema_init(&prtd->buf_done_sem, 0);
 	sema_init(&prtd->stop_done_sem, 0);
 
-	if (pcm->device == I2S2)
-		hSource = ptscx->mi2s2;
-
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK){
+		hSource = ptscx->i2s1_play_mix;
+		if (pcm->device == I2S2)
+			hSource = ptscx->i2s2_play_mix;
+
 		prtd->mixer_buffer = ptscx->mixer_buffer[0];
 		prtd->stdoutpath = (StandardPath*)kzalloc(sizeof(StandardPath),
 							  GFP_KERNEL);
@@ -594,6 +595,10 @@ static int tegra_pcm_open(struct snd_pcm_substream *substream)
 			goto fail;
 		}
 	} else {
+		hSource = ptscx->i2s1_rec_split;
+		if (pcm->device == I2S2)
+			hSource = ptscx->i2s2_rec_split;
+
 		prtd->mixer_buffer = ptscx->mixer_buffer[1];
 		prtd->stdinpath = (StandardPath*)kzalloc(sizeof(StandardPath),
 							  GFP_KERNEL);

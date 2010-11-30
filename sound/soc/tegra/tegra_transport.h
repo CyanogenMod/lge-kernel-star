@@ -415,7 +415,10 @@ struct tegra_audio_data {
 	NvRmMemHandle mem_handle[2];
 	NvAudioFxObjectHandle mvolume;
 	NvAudioFxObjectHandle mi2s1;
-	NvAudioFxObjectHandle mi2s2;
+	NvAudioFxObjectHandle i2s1_play_mix;
+	NvAudioFxObjectHandle i2s2_play_mix;
+	NvAudioFxObjectHandle i2s1_rec_split;
+	NvAudioFxObjectHandle i2s2_rec_split;
 	NvAudioFxObjectHandle mroute;
 	NvAudioFxIoDevice mi2s1_device_available;
 	NvAudioFxIoDevice mspdif_device_available;
