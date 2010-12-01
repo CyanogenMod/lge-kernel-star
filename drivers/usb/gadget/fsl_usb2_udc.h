@@ -442,7 +442,7 @@ struct ep_td_struct {
 #define USB_SYS_VBUS_WAKEUP_INT_ENABLE		0x100
 #define USB_SYS_VBUS_WAKEUP_INT_STATUS		0x200
 #define USB_SYS_VBUS_STATUS			0x400
-
+#define USB_SYS_ID_PIN_STATUS       (0x4)
 /*-------------------------------------------------------------------------*/
 
 /* ### driver private data
