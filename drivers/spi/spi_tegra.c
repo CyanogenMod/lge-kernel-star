@@ -197,6 +197,13 @@ static void spi_tegra_go(struct spi_tegra_data *tspi)
 	tegra_dma_enqueue_req(tspi->rx_dma, &tspi->rx_dma_req);
 
 	val |= SLINK_DMA_EN;
+
+	val &= ~SLINK_TX_TRIG_MASK & ~SLINK_RX_TRIG_MASK;
+	if (tspi->rx_dma_req.size & 0xF) {
+		val |= SLINK_TX_TRIG_1 | SLINK_RX_TRIG_1;
+	} else {
+		val |= SLINK_TX_TRIG_4 | SLINK_RX_TRIG_4;
+	}
 	spi_tegra_writel(tspi, val, SLINK_DMA_CTL);
 }
 
