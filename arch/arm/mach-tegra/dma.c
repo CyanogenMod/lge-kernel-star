@@ -479,7 +479,27 @@ static void tegra_dma_update_hw(struct tegra_dma_channel *ch,
 	u32 csr;
 
 	csr = CSR_IE_EOC | CSR_FLOW;
-	ahb_seq = AHB_SEQ_INTR_ENB | AHB_SEQ_BURST_1;
+	ahb_seq = AHB_SEQ_INTR_ENB;
+
+	switch(req->req_sel) {
+	case TEGRA_DMA_REQ_SEL_SL2B1:
+	case TEGRA_DMA_REQ_SEL_SL2B2:
+	case TEGRA_DMA_REQ_SEL_SL2B3:
+	case TEGRA_DMA_REQ_SEL_SL2B4:
+	case TEGRA_DMA_REQ_SEL_SPI:
+		/* For spi/slink the burst size based on transfer size
+		 * i.e. if multiple of 16 bytes then busrt is
+		 * 4 word else burst size is 1 word */
+		if (req->size & 0xF)
+			ahb_seq |= AHB_SEQ_BURST_1;
+		else
+			ahb_seq |= AHB_SEQ_BURST_4;
+		break;
+	default:
+		ahb_seq |= AHB_SEQ_BURST_1;
+		break;
+	}
+
 	apb_seq = 0;
 
 	csr |= req->req_sel << CSR_REQ_SEL_SHIFT;
