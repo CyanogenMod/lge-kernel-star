@@ -36,6 +36,54 @@
 #include "gpio-names.h"
 #include "board.h"
 
+#define whistler_bl_enb		TEGRA_GPIO_PW1
+
+static int whistler_backlight_init(struct device *dev) {
+	int ret;
+
+	ret = gpio_request(whistler_bl_enb, "backlight_enb");
+	if (ret < 0)
+		return ret;
+
+	ret = gpio_direction_output(whistler_bl_enb, 1);
+	if (ret < 0)
+		gpio_free(whistler_bl_enb);
+	else
+		tegra_gpio_enable(whistler_bl_enb);
+
+	return ret;
+};
+
+static void whistler_backlight_exit(struct device *dev) {
+	gpio_set_value(whistler_bl_enb, 0);
+	gpio_free(whistler_bl_enb);
+	tegra_gpio_disable(whistler_bl_enb);
+}
+
+static int whistler_backlight_notify(struct device *unused, int brightness)
+{
+	gpio_set_value(whistler_bl_enb, !!brightness);
+	return brightness;
+}
+
+static struct platform_pwm_backlight_data whistler_backlight_data = {
+	.pwm_id		= 2,
+	.max_brightness	= 255,
+	.dft_brightness	= 224,
+	.pwm_period_ns	= 5000000,
+	.init		= whistler_backlight_init,
+	.exit		= whistler_backlight_exit,
+	.notify		= whistler_backlight_notify,
+};
+
+static struct platform_device whistler_backlight_device = {
+	.name	= "pwm-backlight",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &whistler_backlight_data,
+	},
+};
+
 static struct resource whistler_disp1_resources[] = {
 	{
 		.name	= "irq",
@@ -155,6 +203,8 @@ static struct platform_device whistler_nvmap_device = {
 static struct platform_device *whistler_gfx_devices[] __initdata = {
 	&whistler_nvmap_device,
 	&tegra_grhost_device,
+	&tegra_pwfm2_device,
+	&whistler_backlight_device,
 };
 
 int __init whistler_panel_init(void)
