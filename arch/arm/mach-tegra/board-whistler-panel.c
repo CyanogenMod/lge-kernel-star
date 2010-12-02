@@ -34,6 +34,7 @@
 
 #include "devices.h"
 #include "gpio-names.h"
+#include "board.h"
 
 static struct resource whistler_disp1_resources[] = {
 	{
@@ -50,8 +51,6 @@ static struct resource whistler_disp1_resources[] = {
 	},
 	{
 		.name	= "fbmem",
-		.start	= 0x18012000,
-		.end	= 0x18414000 - 1, /* enough for 1080P 16bpp */
 		.flags	= IORESOURCE_MEM,
 	},
 };
@@ -161,9 +160,18 @@ static struct platform_device *whistler_gfx_devices[] __initdata = {
 int __init whistler_panel_init(void)
 {
 	int err;
+	struct resource *res;
+
+	whistler_carveouts[1].base = tegra_carveout_start;
+	whistler_carveouts[1].size = tegra_carveout_size;
 
 	err = platform_add_devices(whistler_gfx_devices,
 				   ARRAY_SIZE(whistler_gfx_devices));
+
+	res = nvhost_get_resource_byname(&whistler_disp1_device,
+					 IORESOURCE_MEM, "fbmem");
+	res->start = tegra_fb_start;
+	res->end = tegra_fb_start + tegra_fb_size - 1;
 
 	if (!err)
 		err = nvhost_device_register(&whistler_disp1_device);

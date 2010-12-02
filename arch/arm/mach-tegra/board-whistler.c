@@ -33,6 +33,7 @@
 #include <linux/gpio.h>
 #include <linux/gpio_keys.h>
 #include <linux/input.h>
+#include <linux/memblock.h>
 
 #include <mach/clk.h>
 #include <mach/iomap.h>
@@ -144,6 +145,20 @@ static void __init tegra_whistler_init(void)
 	whistler_panel_init();
 }
 
+int __init tegra_whistler_protected_aperture_init(void)
+{
+	tegra_protected_aperture_init(tegra_grhost_aperture);
+	return 0;
+}
+
+void __init tegra_whistler_reserve(void)
+{
+	if (memblock_reserve(0x0, 4096) < 0)
+		pr_warn("Cannot reserve first 4K of memory for safety\n");
+
+	tegra_reserve(SZ_128M, SZ_8M, SZ_16M);
+}
+
 MACHINE_START(WHISTLER, "whistler")
 	.boot_params    = 0x00000100,
 	.phys_io        = IO_APB_PHYS,
@@ -151,5 +166,6 @@ MACHINE_START(WHISTLER, "whistler")
 	.init_irq       = tegra_init_irq,
 	.init_machine   = tegra_whistler_init,
 	.map_io         = tegra_map_common_io,
+	.reserve        = tegra_whistler_reserve,
 	.timer          = &tegra_timer,
 MACHINE_END
