@@ -1640,6 +1640,33 @@ static struct clk tegra_pll_d_out0 = {
 	.max_rate  = 500000000,
 };
 
+static struct clk tegra_pll_d2 = {
+	.name      = "pll_d2",
+	.flags     = PLL_HAS_CPCON | PLL_ALT_MISC_REG | PLLD,
+	.ops       = &tegra_pll_ops,
+	.reg       = 0x4b8,
+	.parent    = &tegra_pll_ref,
+	.max_rate  = 1000000000,
+	.u.pll = {
+		.input_min = 2000000,
+		.input_max = 40000000,
+		.cf_min    = 1000000,
+		.cf_max    = 6000000,
+		.vco_min   = 40000000,
+		.vco_max   = 1000000000,
+		.freq_table = tegra_pll_d_freq_table,
+		.lock_delay = 1000,
+	},
+};
+
+static struct clk tegra_pll_d2_out0 = {
+	.name      = "pll_d2_out0",
+	.ops       = &tegra_plld_div_ops,
+	.flags     = DIV_2 | PLLD,
+	.parent    = &tegra_pll_d2,
+	.max_rate  = 500000000,
+};
+
 static struct clk_pll_freq_table tegra_pll_u_freq_table[] = {
 	{ 12000000, 480000000, 960, 12, 2, 12},
 	{ 13000000, 480000000, 960, 13, 2, 12},
@@ -2005,12 +2032,13 @@ static struct clk_mux_sel mux_pllp_plld_pllc_clkm[] = {
 };
 
 /* FIXME: add plld2 */
-static struct clk_mux_sel mux_pllp_pllm_plld_plla_pllc_clkm[] = {
+static struct clk_mux_sel mux_pllp_pllm_plld_plla_pllc_plld2_clkm[] = {
 	{.input = &tegra_pll_p, .value = 0},
 	{.input = &tegra_pll_m, .value = 1},
 	{.input = &tegra_pll_d_out0, .value = 2},
 	{.input = &tegra_pll_a_out0, .value = 3},
 	{.input = &tegra_pll_c, .value = 4},
+	{.input = &tegra_pll_d2_out0, .value = 5},
 	{.input = &tegra_clk_m, .value = 6},
 	{ 0, 0},
 };
@@ -2152,10 +2180,10 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("host1x",	"host1x",		NULL,	28,	0x180,	166000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
 	PERIPH_CLK("cve",	"cve",			NULL,	49,	0x140,	250000000, mux_pllp_plld_pllc_clkm,	MUX | DIV_U71), /* requires min voltage */
 	PERIPH_CLK("tvo",	"tvo",			NULL,	49,	0x188,	250000000, mux_pllp_plld_pllc_clkm,	MUX | DIV_U71), /* requires min voltage */
-	PERIPH_CLK("hdmi",	"hdmi",			NULL,	51,	0x18c,	600000000, mux_pllp_pllm_plld_plla_pllc_clkm,	MUX8 | DIV_U71), /* requires min voltage */
+	PERIPH_CLK("hdmi",	"hdmi",			NULL,	51,	0x18c,	600000000, mux_pllp_pllm_plld_plla_pllc_plld2_clkm,	MUX8 | DIV_U71), /* requires min voltage */
 	PERIPH_CLK("tvdac",	"tvdac",		NULL,	53,	0x194,	250000000, mux_pllp_plld_pllc_clkm,	MUX | DIV_U71), /* requires min voltage */
-	PERIPH_CLK("disp1",	"tegradc.0",		NULL,	27,	0x138,	600000000, mux_pllp_pllm_plld_plla_pllc_clkm,	MUX8), /* scales with voltage and process_id */
-	PERIPH_CLK("disp2",	"tegradc.1",		NULL,	26,	0x13c,	600000000, mux_pllp_pllm_plld_plla_pllc_clkm,	MUX8), /* scales with voltage and process_id */
+	PERIPH_CLK("disp1",	"tegradc.0",		NULL,	27,	0x138,	600000000, mux_pllp_pllm_plld_plla_pllc_plld2_clkm,	MUX8), /* scales with voltage and process_id */
+	PERIPH_CLK("disp2",	"tegradc.1",		NULL,	26,	0x13c,	600000000, mux_pllp_pllm_plld_plla_pllc_plld2_clkm,	MUX8), /* scales with voltage and process_id */
 	PERIPH_CLK("usbd",	"fsl-tegra-udc",	NULL,	22,	0,	480000000, mux_clk_m,			0), /* requires min voltage */
 	PERIPH_CLK("usb2",	"tegra-ehci.1",		NULL,	58,	0,	480000000, mux_clk_m,			0), /* requires min voltage */
 	PERIPH_CLK("usb3",	"tegra-ehci.2",		NULL,	59,	0,	480000000, mux_clk_m,			0), /* requires min voltage */
@@ -2221,6 +2249,8 @@ struct clk *tegra_ptr_clks[] = {
 	&tegra_pll_a_out0,
 	&tegra_pll_d,
 	&tegra_pll_d_out0,
+	&tegra_pll_d2,
+	&tegra_pll_d2_out0,
 	&tegra_pll_u,
 	&tegra_pll_x,
 	&tegra_pll_x_out0,
