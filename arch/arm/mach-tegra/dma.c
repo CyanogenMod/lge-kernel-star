@@ -488,12 +488,15 @@ static void tegra_dma_update_hw(struct tegra_dma_channel *ch,
 	case TEGRA_DMA_REQ_SEL_SL2B4:
 	case TEGRA_DMA_REQ_SEL_SPI:
 		/* For spi/slink the burst size based on transfer size
-		 * i.e. if multiple of 16 bytes then busrt is
+		 * i.e. if multiple of 32 bytes then busrt is
+		 * 8 word else if multiple of 16 bytes then burst is
 		 * 4 word else burst size is 1 word */
 		if (req->size & 0xF)
 			ahb_seq |= AHB_SEQ_BURST_1;
-		else
+		else if ((req->size >> 4) & 0x1)
 			ahb_seq |= AHB_SEQ_BURST_4;
+		else
+			ahb_seq |= AHB_SEQ_BURST_8;
 		break;
 	default:
 		ahb_seq |= AHB_SEQ_BURST_1;
