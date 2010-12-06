@@ -201,8 +201,10 @@ static void spi_tegra_go(struct spi_tegra_data *tspi)
 	val &= ~SLINK_TX_TRIG_MASK & ~SLINK_RX_TRIG_MASK;
 	if (tspi->rx_dma_req.size & 0xF) {
 		val |= SLINK_TX_TRIG_1 | SLINK_RX_TRIG_1;
-	} else {
+	} else if ((tspi->rx_dma_req.size >> 4) & 0x1){
 		val |= SLINK_TX_TRIG_4 | SLINK_RX_TRIG_4;
+	} else {
+		val |= SLINK_TX_TRIG_8 | SLINK_RX_TRIG_8;
 	}
 	spi_tegra_writel(tspi, val, SLINK_DMA_CTL);
 }
