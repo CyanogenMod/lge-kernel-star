@@ -22,7 +22,9 @@
 #define _MACH_TEGRA_HEADAVP_H
 
 #define AVP_MMU_TLB_BASE		0xF000F000
+
 #define AVP_KERNEL_VIRT_BASE		0x00100000
+#define AVP_KERNEL_FW			"nvrm_avp.bin"
 
 #ifndef __ASSEMBLY__
 

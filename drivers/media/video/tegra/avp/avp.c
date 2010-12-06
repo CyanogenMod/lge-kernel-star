@@ -60,15 +60,21 @@ enum {
 	AVP_DBG_TRACE_LIB	= 1U << 6,
 };
 
-static u32 avp_debug_mask;
+static u32 avp_debug_mask =
+	AVP_DBG_TRACE_XPC	|
+	AVP_DBG_TRACE_XPC_IRQ	|
+	AVP_DBG_TRACE_XPC_MSG	|
+	AVP_DBG_TRACE_XPC_CONN	|
+	AVP_DBG_TRACE_TRPC_MSG	|
+	AVP_DBG_TRACE_TRPC_CONN	|
+	AVP_DBG_TRACE_LIB;
+
 module_param_named(debug_mask, avp_debug_mask, uint, S_IWUSR | S_IRUGO);
 
 #define DBG(flag, args...) \
 	do { if (unlikely(avp_debug_mask & (flag))) pr_info(args); } while (0)
 
 #define TEGRA_AVP_NAME			"tegra-avp"
-
-#define TEGRA_AVP_KERNEL_FW		"nvrm_avp.bin"
 
 #define TEGRA_AVP_RESET_VECTOR_ADDR \
 		(IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x200)
@@ -882,6 +888,9 @@ static int avp_reset(struct tegra_avp_info *avp, unsigned long reset_addr)
 
 	writel(stub_code_phys, TEGRA_AVP_RESET_VECTOR_ADDR);
 
+	pr_err("%s: TEGRA_AVP_RESET_VECTOR=%x\n", __func__, readl(TEGRA_AVP_RESET_VECTOR_ADDR));
+	pr_err("%s: Resetting AVP: reset_addr=%lx\n", __func__, reset_addr);
+
 	tegra_periph_reset_assert(avp->cop_clk);
 	udelay(10);
 	tegra_periph_reset_deassert(avp->cop_clk);
@@ -892,12 +901,16 @@ static int avp_reset(struct tegra_avp_info *avp, unsigned long reset_addr)
 	 * starts, so a dead kernel can be detected by polling this value */
 	timeout = jiffies + msecs_to_jiffies(2000);
 	while (time_before(jiffies, timeout)) {
+		pr_err("%s: TEGRA_AVP_RESET_VECTOR=%x\n", __func__, readl(TEGRA_AVP_RESET_VECTOR_ADDR));
 		if (readl(TEGRA_AVP_RESET_VECTOR_ADDR) != stub_code_phys)
 			break;
 		cpu_relax();
 	}
-	if (readl(TEGRA_AVP_RESET_VECTOR_ADDR) == stub_code_phys)
+	if (readl(TEGRA_AVP_RESET_VECTOR_ADDR) == stub_code_phys) {
+		pr_err("%s: Timed out waiting for AVP kernel to start\n", __func__);
 		ret = -EINVAL;
+	}
+	pr_err("%s: TEGRA_AVP_RESET_VECTOR=%x\n", __func__, readl(TEGRA_AVP_RESET_VECTOR_ADDR));
 	WARN_ON(ret);
 	dma_unmap_single(NULL, stub_data_phys,
 			 sizeof(_tegra_avp_boot_stub_data),
@@ -924,11 +937,12 @@ static void avp_halt(struct tegra_avp_info *avp)
  * of the char dev for receiving replies for managing remote
  * libraries/modules. */
 
-static int avp_init(struct tegra_avp_info *avp, const char *fw_file)
+static int avp_init(struct tegra_avp_info *avp)
 {
 	const struct firmware *avp_fw;
 	int ret;
 	struct trpc_endpoint *ep;
+	const char *fw_file = AVP_KERNEL_FW;
 
 	avp->nvmap_libs = nvmap_create_client(nvmap_dev, "avp_libs");
 	if (IS_ERR(avp->nvmap_libs)) {
@@ -941,19 +955,52 @@ static int avp_init(struct tegra_avp_info *avp, const char *fw_file)
 	 * to read out when its kernel boots. */
 	mbox_writel(avp->msg, MBOX_TO_AVP);
 
+#ifdef CONFIG_TEGRA_AVP_KERNEL_ON_MMU
+	pr_err("%s: Using AVP MMU to relocate AVP kernel\n", __func__);
+#else
+	// Find nvmem carveout.
+	if (!pfn_valid(__phys_to_pfn(0x8e000000))) {
+		fw_file = "nvrm_avp_8e000000.bin";
+		avp->kernel_phys = 0x8e000000;
+	}
+	else if (!pfn_valid(__phys_to_pfn(0x9e000000))) {
+		fw_file = "nvrm_avp_9e000000.bin";
+		avp->kernel_phys = 0x9e000000;
+	}
+	else if (!pfn_valid(__phys_to_pfn(0xbe000000))) {
+		fw_file = "nvrm_avp_be000000.bin";
+		avp->kernel_phys = 0xbe000000;
+	}
+	else {
+		BUG();
+	}
+
+	pr_err("%s: Using carveout at %x to load AVP kernel\n",
+	       __func__, avp->kernel_phys);
+	avp->kernel_data = ioremap(avp->kernel_phys, SZ_1M);
+#endif
+
 	ret = request_firmware(&avp_fw, fw_file, avp->misc_dev.this_device);
 	if (ret) {
 		pr_err("%s: Cannot read firmware '%s'\n", __func__, fw_file);
 		goto err_req_fw;
 	}
-	pr_info("%s: read firmware from '%s' (%d bytes)\n", __func__,
+	pr_info("%s: Read firmware from '%s' (%d bytes)\n", __func__,
 		fw_file, avp_fw->size);
+
+	pr_err("%s: Loading AVP kernel at vaddr=%p paddr=%lx\n",
+	       __func__, avp->kernel_data, avp->kernel_phys);
 	memcpy(avp->kernel_data, avp_fw->data, avp_fw->size);
 	memset(avp->kernel_data + avp_fw->size, 0, SZ_1M - avp_fw->size);
+
 	wmb();
 	release_firmware(avp_fw);
 
+#ifdef CONFIG_TEGRA_AVP_KERNEL_ON_MMU
 	ret = avp_reset(avp, AVP_KERNEL_VIRT_BASE);
+#else
+	ret = avp_reset(avp, avp->kernel_phys);
+#endif
 	if (ret) {
 		pr_err("%s: cannot reset the AVP.. aborting..\n", __func__);
 		goto err_reset;
@@ -1233,6 +1280,7 @@ static int handle_load_lib_ioctl(struct tegra_avp_info *avp, unsigned long arg)
 	struct tegra_avp_lib lib;
 	int ret;
 
+	pr_info("%s: \n", __func__);
 	if (copy_from_user(&lib, (void __user *)arg, sizeof(lib)))
 		return -EFAULT;
 	lib.name[TEGRA_AVP_LIB_MAX_NAME - 1] = '\0';
@@ -1320,7 +1368,7 @@ int tegra_avp_open(struct tegra_avp_info **avp)
 	mutex_lock(&new_avp->open_lock);
 
 	if (!new_avp->refcount)
-		ret = avp_init(new_avp, TEGRA_AVP_KERNEL_FW);
+		ret = avp_init(new_avp);
 
 	if (ret < 0) {
 		new_avp = 0;
@@ -1346,6 +1394,10 @@ static int tegra_avp_open_fops(struct inode *inode, struct file *file)
 int tegra_avp_release(struct tegra_avp_info *avp)
 {
 	int ret = 0;
+
+	// FIXME: Just for now, to test AVP loading.
+	pr_info("%s: FIXME: ignoring release\n", __func__);
+	return 0;
 
 	mutex_lock(&avp->open_lock);
 	if (!avp->refcount) {
