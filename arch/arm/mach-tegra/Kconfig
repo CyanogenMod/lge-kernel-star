@@ -186,6 +186,21 @@ config TEGRA_IOVMM_SMMU
 config TEGRA_IOVMM
 	bool
 
+config TEGRA_AVP_KERNEL_ON_MMU
+	bool "Use AVP MMU to relocate AVP kernel"
+	depends on ARCH_TEGRA_2x_SOC
+	default y
+	help
+	  Use AVP MMU to relocate AVP kernel (nvrm_avp.bin).
+
+config TEGRA_AVP_KERNEL_ON_SMMU
+	bool "Use SMMU to relocate AVP kernel"
+	depends on ARCH_TEGRA_3x_SOC
+	default n
+	help
+	  Use SMMU to relocate AVP kernel (nvrm_avp.bin).
+	  This option is not implemented yet.
+
 config TEGRA_ARB_SEMAPHORE
 	bool
 
