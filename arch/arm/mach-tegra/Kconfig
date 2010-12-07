@@ -89,6 +89,11 @@ config MACH_WARIO
 # Whistler
 
 # Aruba
+config MACH_ARUBA
+       bool "Aruba board"
+       select TEGRA_FPGA_PLATFORM
+       help
+         Support for NVIDIA Aruba2 FPGA development platform
 
 # Cardhu
 
