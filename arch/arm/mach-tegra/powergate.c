@@ -59,7 +59,7 @@ static int tegra_powergate_set(int id, bool new_state)
 
 	spin_lock_irqsave(&tegra_powergate_lock, flags);
 
-	status = pmc_read(PWRGATE_STATUS) & (1 << id);
+	status = !!(pmc_read(PWRGATE_STATUS) & (1 << id));
 
 	if (status == new_state) {
 		spin_unlock_irqrestore(&tegra_powergate_lock, flags);
@@ -107,6 +107,7 @@ int tegra_powergate_remove_clamping(int id)
 	if (id < 0 || id >= TEGRA_NUM_POWERGATE)
 		return -EINVAL;
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	/*
 	 * Tegra 2 has a bug where PCIE and VDE clamping masks are
 	 * swapped relatively to the partition ids
@@ -116,6 +117,7 @@ int tegra_powergate_remove_clamping(int id)
 	else if	(id == TEGRA_POWERGATE_PCIE)
 		mask = (1 << TEGRA_POWERGATE_VDEC);
 	else
+#endif
 		mask = (1 << id);
 
 	pmc_write(mask, REMOVE_CLAMPING);
@@ -183,13 +185,22 @@ err_power:
 #ifdef CONFIG_DEBUG_FS
 
 static const char * const powergate_name[] = {
-	[TEGRA_POWERGATE_CPU]	= "cpu",
-	[TEGRA_POWERGATE_3D]	= "3d",
+	[TEGRA_POWERGATE_CPU]	= "cpu0",
+	[TEGRA_POWERGATE_3D]	= "3d0",
 	[TEGRA_POWERGATE_VENC]	= "venc",
 	[TEGRA_POWERGATE_VDEC]	= "vdec",
 	[TEGRA_POWERGATE_PCIE]	= "pcie",
 	[TEGRA_POWERGATE_L2]	= "l2",
 	[TEGRA_POWERGATE_MPE]	= "mpe",
+#if defined(CONFIG_ARCH_TEGRA_3x_SOC)
+	[TEGRA_POWERGATE_HEG]	= "heg",
+	[TEGRA_POWERGATE_SATA]	= "sata",
+	[TEGRA_POWERGATE_CPU1]	= "cpu1",
+	[TEGRA_POWERGATE_CPU2]	= "cpu2",
+	[TEGRA_POWERGATE_CPU3]	= "cpu3",
+	[TEGRA_POWERGATE_A9LP]	= "a9lp",
+	[TEGRA_POWERGATE_3D1]	= "3d1",
+#endif
 };
 
 static int powergate_show(struct seq_file *s, void *data)

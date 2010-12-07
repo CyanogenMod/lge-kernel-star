@@ -22,8 +22,19 @@
 #define __MACH_TEGRA_MEMORY_H
 
 /* physical offset of RAM */
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 #define PLAT_PHYS_OFFSET		UL(0)
+#elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
+#define PLAT_PHYS_OFFSET		UL(0x80000000)
+#else
+#error "Invalid Tegra SoC family selection"
+#endif
 
+/*
+ * Unaligned DMA causes tegra dma to place data on 4-byte boundary after
+ * expected address. Call to skb_reserve(skb, NET_IP_ALIGN) was causing skb
+ * buffers in usbnet.c to become unaligned.
+ */
 #define NET_IP_ALIGN	0
 #define NET_SKB_PAD	L1_CACHE_BYTES
 

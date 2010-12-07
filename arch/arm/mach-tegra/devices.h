@@ -29,6 +29,9 @@ extern struct platform_device tegra_i2c_device1;
 extern struct platform_device tegra_i2c_device2;
 extern struct platform_device tegra_i2c_device3;
 extern struct platform_device tegra_i2c_device4;
+#if defined(CONFIG_ARCH_TEGRA_3x_SOC)
+extern struct platform_device tegra_i2c_device5;
+#endif
 extern struct platform_device tegra_spi_device1;
 extern struct platform_device tegra_spi_device2;
 extern struct platform_device tegra_spi_device3;
@@ -53,7 +56,22 @@ extern struct platform_device tegra_ehci2_device;
 extern struct platform_device tegra_ehci3_device;
 extern struct platform_device tegra_i2s_device1;
 extern struct platform_device tegra_i2s_device2;
+#if defined(CONFIG_ARCH_TEGRA_3x_SOC)
+extern struct platform_device tegra_i2s_device0;
+extern struct platform_device tegra_i2s_device3;
+extern struct platform_device tegra_i2s_device4;
+extern struct platform_device tegra_apbif0_device;
+extern struct platform_device tegra_apbif1_device;
+extern struct platform_device tegra_apbif2_device;
+extern struct platform_device tegra_apbif3_device;
+extern struct platform_device tegra_hda_device;
+extern struct platform_device tegra_ahub_device;
+#endif
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 extern struct platform_device tegra_gart_device;
+#else
+extern struct platform_device tegra_smmu_device;
+#endif
 extern struct platform_device tegra_wdt_device;
 extern struct platform_device tegra_pwfm0_device;
 extern struct platform_device tegra_pwfm1_device;

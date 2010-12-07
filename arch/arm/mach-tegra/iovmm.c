@@ -282,11 +282,11 @@ static struct tegra_iovmm_block *iovmm_alloc_block(
 {
 	struct rb_node *n;
 	struct tegra_iovmm_block *b, *best;
-        static int splitting = 0;
+	static int splitting = 0;
 
 	BUG_ON(!size);
 	size = iovmm_align_up(domain->dev, size);
-        for (;;) {
+	for (;;) {
 		spin_lock(&domain->block_lock);
 		if (!splitting)
 			break;
@@ -297,8 +297,9 @@ static struct tegra_iovmm_block *iovmm_alloc_block(
 	best = NULL;
 	while (n) {
 		b = rb_entry(n, struct tegra_iovmm_block, free_node);
-		if (iovmm_length(b) < size) n = n->rb_right;
-		else if (iovmm_length(b) == size) {
+		if (iovmm_length(b) < size) {
+			n = n->rb_right;
+		} else if (iovmm_length(b) == size) {
 			best = b;
 			break;
 		} else {
@@ -356,16 +357,16 @@ struct tegra_iovmm_area *tegra_iovmm_create_vm(
 	unsigned long size, pgprot_t pgprot)
 {
 	struct tegra_iovmm_block *b;
-	struct tegra_iovmm_device *dev;
+	struct tegra_iovmm_domain *domain;
 
 	if (!client) return NULL;
 
-	dev = client->domain->dev;
+	domain = client->domain;
 
-	b = iovmm_alloc_block(client->domain, size);
+	b = iovmm_alloc_block(domain, size);
 	if (!b) return NULL;
 
-	b->vm_area.domain = client->domain;
+	b->vm_area.domain = domain;
 	b->vm_area.pgprot = pgprot;
 	b->vm_area.ops = ops;
 
@@ -374,7 +375,7 @@ struct tegra_iovmm_area *tegra_iovmm_create_vm(
 		set_bit(BK_map_dirty, &b->flags);
 		set_bit(DM_map_dirty, &client->domain->flags);
 	} else if (ops) {
-		if (dev->ops->map(dev, &b->vm_area))
+		if (domain->dev->ops->map(domain, &b->vm_area))
 			pr_err("%s failed to map locked domain\n", __func__);
 	}
 	up_read(&b->vm_area.domain->map_lock);
@@ -382,68 +383,66 @@ struct tegra_iovmm_area *tegra_iovmm_create_vm(
 	return &b->vm_area;
 }
 
-void tegra_iovmm_vm_insert_pfn(struct tegra_iovmm_area *area,
+void tegra_iovmm_vm_insert_pfn(struct tegra_iovmm_area *vm,
 	tegra_iovmm_addr_t vaddr, unsigned long pfn)
 {
-	struct tegra_iovmm_device *dev = area->domain->dev;
-	BUG_ON(vaddr & ((1<<dev->pgsize_bits)-1));
-	BUG_ON(vaddr >= area->iovm_start + area->iovm_length);
-	BUG_ON(vaddr < area->iovm_start);
-	BUG_ON(area->ops);
+	struct tegra_iovmm_domain *domain = vm->domain;
+	BUG_ON(vaddr & ((1<<domain->dev->pgsize_bits)-1));
+	BUG_ON(vaddr >= vm->iovm_start + vm->iovm_length);
+	BUG_ON(vaddr < vm->iovm_start);
+	BUG_ON(vm->ops);
 
-	dev->ops->map_pfn(dev, area, vaddr, pfn);
+	domain->dev->ops->map_pfn(domain, vm, vaddr, pfn);
 }
 
 void tegra_iovmm_zap_vm(struct tegra_iovmm_area *vm)
 {
 	struct tegra_iovmm_block *b;
-	struct tegra_iovmm_device *dev;
+	struct tegra_iovmm_domain *domain;
 
 	b = container_of(vm, struct tegra_iovmm_block, vm_area);
-	dev = vm->domain->dev;
+	domain = vm->domain;
 	/* if the vm area mapping was deferred, don't unmap it since
 	 * the memory for the page tables it uses may not be allocated */
-	down_read(&vm->domain->map_lock);
+	down_read(&domain->map_lock);
 	if (!test_and_clear_bit(BK_map_dirty, &b->flags))
-		dev->ops->unmap(dev, vm, false);
-	up_read(&vm->domain->map_lock);
+		domain->dev->ops->unmap(domain, vm, false);
+	up_read(&domain->map_lock);
 }
 
 void tegra_iovmm_unzap_vm(struct tegra_iovmm_area *vm)
 {
 	struct tegra_iovmm_block *b;
-	struct tegra_iovmm_device *dev;
+	struct tegra_iovmm_domain *domain;
 
 	b = container_of(vm, struct tegra_iovmm_block, vm_area);
-	dev = vm->domain->dev;
+	domain = vm->domain;
 	if (!vm->ops) return;
 
-	down_read(&vm->domain->map_lock);
+	down_read(&domain->map_lock);
 	if (vm->ops) {
-		if (atomic_read(&vm->domain->locks))
-			dev->ops->map(dev, vm);
+		if (atomic_read(&domain->locks))
+			domain->dev->ops->map(domain, vm);
 		else {
 			set_bit(BK_map_dirty, &b->flags);
-			set_bit(DM_map_dirty, &vm->domain->flags);
+			set_bit(DM_map_dirty, &domain->flags);
 		}
-        }
-	up_read(&vm->domain->map_lock);
+	}
+	up_read(&domain->map_lock);
 }
 
 void tegra_iovmm_free_vm(struct tegra_iovmm_area *vm)
 {
 	struct tegra_iovmm_block *b;
-	struct tegra_iovmm_device *dev;
 	struct tegra_iovmm_domain *domain;
 
 	if (!vm) return;
 
 	b = container_of(vm, struct tegra_iovmm_block, vm_area);
 	domain = vm->domain;
-	dev = vm->domain->dev;
 	down_read(&domain->map_lock);
 	if (!test_and_clear_bit(BK_map_dirty, &b->flags))
-		dev->ops->unmap(dev, vm, true);
+		domain->dev->ops->unmap(domain, vm, true);
 	iovmm_free_block(domain, b);
 	up_read(&domain->map_lock);
 }
@@ -515,7 +514,7 @@ static int _iovmm_client_lock(struct tegra_iovmm_client *client)
 	/* if the device doesn't export the lock_domain function, the device
 	 * must guarantee that any valid domain will be locked. */
 	if (v==1 && dev->ops->lock_domain) {
-		if (dev->ops->lock_domain(dev, domain)) {
+		if (dev->ops->lock_domain(domain, client)) {
 			atomic_dec(&domain->locks);
 			up_write(&domain->map_lock);
 			return -EAGAIN;
@@ -538,7 +537,7 @@ static int _iovmm_client_lock(struct tegra_iovmm_client *client)
 					pr_err("%s: vm_area ops must exist for lazy maps\n", __func__);
 					continue;
 				}
-				dev->ops->map(dev, &b->vm_area);
+				dev->ops->map(domain, &b->vm_area);
 			}
 		}
 	}
@@ -582,9 +581,9 @@ void tegra_iovmm_client_unlock(struct tegra_iovmm_client *client)
 	domain = client->domain;
 	dev = domain->dev;
         down_write(&domain->map_lock);
-	if (!atomic_dec_return(&client->domain->locks)) {
+	if (!atomic_dec_return(&domain->locks)) {
 		if (dev->ops->unlock_domain)
-			dev->ops->unlock_domain(dev, domain);
+			dev->ops->unlock_domain(domain, client);
 		do_wake = 1;
 	}
 	up_write(&domain->map_lock);
@@ -617,26 +616,28 @@ size_t tegra_iovmm_get_vm_size(struct tegra_iovmm_client *client)
 void tegra_iovmm_free_client(struct tegra_iovmm_client *client)
 {
 	struct tegra_iovmm_device *dev;
+	struct tegra_iovmm_domain *domain;
 	if (!client) return;
 
 	BUG_ON(!client->domain || !client->domain->dev);
 
-	dev = client->domain->dev;
+	domain = client->domain;
+	dev = domain->dev;
 
 	if (test_and_clear_bit(CL_locked, &client->flags)) {
 		pr_err("freeing locked client %s\n", client->name);
-		if (!atomic_dec_return(&client->domain->locks)) {
-			down_write(&client->domain->map_lock);
+		if (!atomic_dec_return(&domain->locks)) {
+			down_write(&domain->map_lock);
 			if (dev->ops->unlock_domain)
-				dev->ops->unlock_domain(dev, client->domain);
-			up_write(&client->domain->map_lock);
-			wake_up(&client->domain->delay_lock);
+				dev->ops->unlock_domain(domain, client);
+			up_write(&domain->map_lock);
+			wake_up(&domain->delay_lock);
 		}
 	}
 	mutex_lock(&iovmm_group_list_lock);
-	if (!atomic_dec_return(&client->domain->clients))
+	if (!atomic_dec_return(&domain->clients))
 		if (dev->ops->free_domain)
-			dev->ops->free_domain(dev, client->domain);
+			dev->ops->free_domain(domain, client);
 	list_del(&client->list);
 	if (list_empty(&client->group->client_list)) {
 		list_del(&client->group->group_list);
@@ -649,7 +650,7 @@ void tegra_iovmm_free_client(struct tegra_iovmm_client *client)
 }
 
 struct tegra_iovmm_client *tegra_iovmm_alloc_client(const char *name,
-	const char *share_group)
+	const char *share_group, struct miscdevice *misc_dev)
 {
 	struct tegra_iovmm_client *c = kzalloc(sizeof(*c), GFP_KERNEL);
 	struct iovmm_share_group *grp = NULL;
@@ -659,6 +660,7 @@ struct tegra_iovmm_client *tegra_iovmm_alloc_client(const char *name,
 	if (!c) return NULL;
 	c->name = kstrdup(name, GFP_KERNEL);
 	if (!c->name) goto fail;
+	c->misc_dev = misc_dev;
 
 	mutex_lock(&iovmm_group_list_lock);
 	if (share_group) {
@@ -689,7 +691,7 @@ struct tegra_iovmm_client *tegra_iovmm_alloc_client(const char *name,
 			kfree(grp);
 			grp = NULL;
 			goto fail_lock;
-                }
+		}
 		spin_lock_init(&grp->lock);
 		INIT_LIST_HEAD(&grp->client_list);
 		list_add_tail(&grp->group_list, &iovmm_groups);

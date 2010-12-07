@@ -96,7 +96,7 @@
 #define APB_SEQ_WRAP_SHIFT			16
 #define APB_SEQ_WRAP_MASK			(0x7<<APB_SEQ_WRAP_SHIFT)
 
-#define TEGRA_SYSTEM_DMA_CH_NR			16
+#define TEGRA_SYSTEM_DMA_CH_NR			16	/* !!!FIXME!!! T30 has 32 channels .............. */
 #define TEGRA_SYSTEM_DMA_AVP_CH_NUM		4
 #define TEGRA_SYSTEM_DMA_CH_MIN			0
 #define TEGRA_SYSTEM_DMA_CH_MAX	\
@@ -887,7 +887,12 @@ int __init tegra_dma_init(void)
 		spin_lock_init(&ch->lock);
 		INIT_LIST_HEAD(&ch->list);
 
-		irq = INT_APB_DMA_CH0 + i;
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+		if (i >= 16)
+			irq = INT_APB_DMA_CH16 + i - 16;
+		else
+#endif
+			irq = INT_APB_DMA_CH0 + i;
 		ret = request_irq(irq, dma_isr, 0, dma_channels[i].name, ch);
 		if (ret) {
 			pr_err("Failed to register IRQ %d for DMA %d\n",

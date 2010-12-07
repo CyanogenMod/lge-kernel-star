@@ -43,8 +43,14 @@
 #include "pm.h"
 #include "sleep.h"
 
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 #define TEGRA_CPUIDLE_BOTH_IDLE		INT_QUAD_RES_24
 #define TEGRA_CPUIDLE_TEAR_DOWN		INT_QUAD_RES_25
+#else
+/* !!!FIXME!!! THIS MODEL IS BROKEN ON T30 -- 4 CPUS BREAKS THE "BOTH" IDLE CONCEPT .....*/
+#define TEGRA_CPUIDLE_BOTH_IDLE		INT_QUINT_RES_24
+#define TEGRA_CPUIDLE_TEAR_DOWN		INT_QUINT_RES_25
+#endif
 
 static bool lp2_in_idle __read_mostly = true;
 module_param(lp2_in_idle, bool, 0644);

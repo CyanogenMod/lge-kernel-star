@@ -26,6 +26,44 @@
 
 #include <mach/iomap.h>
 
+#if defined(CONFIG_TEGRA_DEBUG_UARTA)
+#define DEBUG_UART_CLK_SRC		(TEGRA_CLK_RESET_BASE + 0x178)
+#define DEBUG_UART_CLK_ENB_SET_REG	(TEGRA_CLK_RESET_BASE + 0x320)
+#define DEBUG_UART_CLK_ENB_SET_BIT	(1 << 6)
+#define DEBUG_UART_RST_CLR_REG		(TEGRA_CLK_RESET_BASE + 0x304)
+#define DEBUG_UART_RST_CLR_BIT		(1 << 6)
+#elif defined(CONFIG_TEGRA_DEBUG_UARTB)
+#define DEBUG_UART_CLK_SRC		(TEGRA_CLK_RESET_BASE + 0x17c)
+#define DEBUG_UART_CLK_ENB_SET_REG	(TEGRA_CLK_RESET_BASE + 0x320)
+#define DEBUG_UART_CLK_ENB_SET_BIT	(1 << 7)
+#define DEBUG_UART_RST_CLR_REG		(TEGRA_CLK_RESET_BASE + 0x304)
+#define DEBUG_UART_RST_CLR_BIT		(1 << 7)
+#elif defined(CONFIG_TEGRA_DEBUG_UARTC)
+#define DEBUG_UART_CLK_SRC		(TEGRA_CLK_RESET_BASE + 0x1a0)
+#define DEBUG_UART_CLK_ENB_SET_REG	(TEGRA_CLK_RESET_BASE + 0x328)
+#define DEBUG_UART_CLK_ENB_SET_BIT	(1 << 23)
+#define DEBUG_UART_RST_CLR_REG		(TEGRA_CLK_RESET_BASE + 0x30C)
+#define DEBUG_UART_RST_CLR_BIT		(1 << 23)
+#elif defined(CONFIG_TEGRA_DEBUG_UARTD)
+#define DEBUG_UART_CLK_SRC		(TEGRA_CLK_RESET_BASE + 0x1c0)
+#define DEBUG_UART_CLK_ENB_SET_REG	(TEGRA_CLK_RESET_BASE + 0x330)
+#define DEBUG_UART_CLK_ENB_SET_BIT	(1 << 1)
+#define DEBUG_UART_RST_CLR_REG		(TEGRA_CLK_RESET_BASE + 0x314)
+#define DEBUG_UART_RST_CLR_BIT		(1 << 1)
+#elif defined(CONFIG_TEGRA_DEBUG_UARTE)
+#define DEBUG_UART_CLK_SRC		(TEGRA_CLK_RESET_BASE + 0x1c4)
+#define DEBUG_UART_CLK_ENB_SET_REG	(TEGRA_CLK_RESET_BASE + 0x330)
+#define DEBUG_UART_CLK_ENB_SET_BIT	(1 << 2)
+#define DEBUG_UART_RST_CLR_REG		(TEGRA_CLK_RESET_BASE + 0x314)
+#define DEBUG_UART_RST_CLR_BIT		(1 << 2)
+#else
+#define DEBUG_UART_CLK_SRC		0
+#define DEBUG_UART_CLK_ENB_SET_REG	0
+#define DEBUG_UART_CLK_ENB_SET_BIT	0
+#define DEBUG_UART_RST_CLR_REG		0
+#define DEBUG_UART_RST_CLR_BIT		0
+#endif
+
 static void putc(int c)
 {
 	volatile u8 *uart = (volatile u8 *)TEGRA_DEBUG_UART_BASE;
@@ -43,14 +81,42 @@ static inline void flush(void)
 {
 }
 
+static inline void konk_delay(int delay)
+{
+	int i;
+
+	for (i = 0; i < (1000 * delay); i++) {
+		barrier();
+	}
+}
+
+
 static inline void arch_decomp_setup(void)
 {
 	volatile u8 *uart = (volatile u8 *)TEGRA_DEBUG_UART_BASE;
 	int shift = 2;
+	volatile u32 *addr;
 
 	if (uart == NULL)
 		return;
 
+	/* Debug UART clock source is PLLP_OUT0. */
+	addr = (volatile u32 *)DEBUG_UART_CLK_SRC;
+	*addr = 0;
+
+	/* Enable clock to debug UART. */
+	addr = (volatile u32 *)DEBUG_UART_CLK_ENB_SET_REG;
+	*addr = DEBUG_UART_CLK_ENB_SET_BIT;
+
+	konk_delay(5);
+
+	/* Deassert reset to debug UART. */
+	addr = (volatile u32 *)DEBUG_UART_RST_CLR_REG;
+	*addr = DEBUG_UART_RST_CLR_BIT;
+
+	konk_delay(5);
+
+	/* Set up debug UART. */
 	uart[UART_LCR << shift] |= UART_LCR_DLAB;
 	uart[UART_DLL << shift] = 0x75;
 	uart[UART_DLM << shift] = 0x0;

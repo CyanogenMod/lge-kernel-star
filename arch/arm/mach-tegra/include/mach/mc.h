@@ -20,6 +20,7 @@
 #ifndef __MACH_TEGRA_MC_H
 #define __MACH_TEGRA_MC_H
 
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 #define TEGRA_MC_FPRI_CTRL_AVPC		0x17c
 #define TEGRA_MC_FPRI_CTRL_DC		0x180
 #define TEGRA_MC_FPRI_CTRL_DCB		0x184
@@ -96,5 +97,11 @@
 #define TEGRA_MC_PRIO_MASK		3
 
 void tegra_mc_set_priority(unsigned long client, unsigned long prio);
+
+#elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
+	/* !!!FIXME!!! IMPLEMENT ME */
+#define tegra_mc_set_priority(client, prio) \
+	do { /* nothing for now */ } while (0)
+#endif
 
 #endif

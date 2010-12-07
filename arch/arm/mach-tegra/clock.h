@@ -20,10 +20,12 @@
 #ifndef __MACH_TEGRA_CLOCK_H
 #define __MACH_TEGRA_CLOCK_H
 
-#include <linux/clkdev.h>
-#include <linux/list.h>
-#include <linux/mutex.h>
-#include <linux/spinlock.h>
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+#define USE_PLL_LOCK_BITS 0	/* Never use lock bits on Tegra2 */
+#else
+/* !!!FIXME!!! PLL lock bits should work on Tegra3 */
+#define USE_PLL_LOCK_BITS 0	/* Use lock bits for PLL stabiliation */
+#endif
 
 #define DIV_BUS			(1 << 0)
 #define DIV_U71			(1 << 1)
@@ -40,7 +42,17 @@
 #define PERIPH_MANUAL_RESET	(1 << 12)
 #define PLL_ALT_MISC_REG	(1 << 13)
 #define PLLU			(1 << 14)
+#define PLLX			(1 << 15)
+#define MUX_PWM			(1 << 16)
+#define MUX8			(1 << 17)
 #define ENABLE_ON_INIT		(1 << 28)
+
+#ifndef __ASSEMBLY__
+
+#include <linux/clkdev.h>
+#include <linux/list.h>
+#include <linux/mutex.h>
+#include <linux/spinlock.h>
 
 #define MAX_SAME_LIMIT_SKU_IDS	16
 
@@ -67,6 +79,8 @@ struct clk_ops {
 	int		(*set_parent)(struct clk *, struct clk *);
 	int		(*set_rate)(struct clk *, unsigned long);
 	long		(*round_rate)(struct clk *, unsigned long);
+	unsigned long	(*get_max_rate)(struct clk *);
+	void		(*recalculate_rate)(struct clk *);
 	void		(*reset)(struct clk *, bool);
 };
 
@@ -121,6 +135,7 @@ struct clk {
 			unsigned long			vco_max;
 			const struct clk_pll_freq_table	*freq_table;
 			int				lock_delay;
+			unsigned long			fixed_rate;
 		} pll;
 		struct {
 			u32				sel;
@@ -129,6 +144,7 @@ struct clk {
 		struct {
 			struct clk			*main;
 			struct clk			*backup;
+			unsigned long			lp_max_rate;
 		} cpu;
 		struct {
 			struct list_head		node;
@@ -159,6 +175,7 @@ struct tegra_sku_rate_limit {
 	int sku_ids[MAX_SAME_LIMIT_SKU_IDS];
 };
 
+void tegra_soc_init_clocks(void);
 void tegra2_init_clocks(void);
 void tegra2_periph_reset_deassert(struct clk *c);
 void tegra2_periph_reset_assert(struct clk *c);
@@ -222,4 +239,5 @@ struct tegra_cpufreq_table_data {
 struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void);
 #endif
 
+#endif
 #endif

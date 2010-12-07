@@ -293,7 +293,7 @@ module_param_cb(disable_core, &tegra_dvfs_disable_core_ops,
 module_param_cb(disable_cpu, &tegra_dvfs_disable_cpu_ops,
 	&tegra_dvfs_cpu_disabled, 0644);
 
-void __init tegra2_init_dvfs(void)
+void __init tegra_soc_init_dvfs(void)
 {
 	int i;
 	struct clk *c;

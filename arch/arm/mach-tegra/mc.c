@@ -23,6 +23,7 @@
 #include <mach/iomap.h>
 #include <mach/mc.h>
 
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 static DEFINE_SPINLOCK(tegra_mc_lock);
 
 void tegra_mc_set_priority(unsigned long client, unsigned long prio)
@@ -39,4 +40,8 @@ void tegra_mc_set_priority(unsigned long client, unsigned long prio)
 	val |= prio << field;
 	writel(val, mc_base + reg);
 	spin_unlock_irqrestore(&tegra_mc_lock, flags);
+
 }
+#elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
+	/* !!!FIXME!!! IMPLEMENT ME */
+#endif

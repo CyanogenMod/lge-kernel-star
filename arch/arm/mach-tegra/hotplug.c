@@ -17,6 +17,8 @@
 
 #include "sleep.h"
 
+#define CPU_CLOCK(cpu) (0x1<<(8+cpu))
+
 #define CLK_RST_CONTROLLER_CLK_CPU_CMPLX \
 	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x4c)
 #define CLK_RST_CONTROLLER_RST_CPU_CMPLX_SET \
@@ -24,17 +26,25 @@
 #define CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR \
 	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x344)
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+/* For Tegra2 use the software-written value of the reset register for status.*/
+#define CLK_RST_CONTROLLER_CPU_CMPLX_STATUS CLK_RST_CONTROLLER_RST_CPU_CMPLX_SET
+#else
+#define CLK_RST_CONTROLLER_CPU_CMPLX_STATUS \
+	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x470)
+#endif
+
 int platform_cpu_kill(unsigned int cpu)
 {
 	unsigned int reg;
 
 	do {
-		reg = readl(CLK_RST_CONTROLLER_RST_CPU_CMPLX_SET);
+		reg = readl(CLK_RST_CONTROLLER_CPU_CMPLX_STATUS);
 		cpu_relax();
 	} while (!(reg & (1<<cpu)));
 
 	reg = readl(CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
-	writel(reg | (1<<(8+cpu)), CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
+	writel(reg | CPU_CLOCK(cpu), CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
 
 	return 1;
 }

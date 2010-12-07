@@ -19,17 +19,20 @@
 
 #if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 #include "pinmux-t2.h"
+#elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
+#include "pinmux-t3.h"
 #else
 #error "Undefined Tegra architecture"
 #endif
 
 enum tegra_mux_func {
 	TEGRA_MUX_RSVD = 0x8000,
+	TEGRA_MUX_RSVD0 = TEGRA_MUX_RSVD,
 	TEGRA_MUX_RSVD1 = 0x8000,
 	TEGRA_MUX_RSVD2 = 0x8001,
 	TEGRA_MUX_RSVD3 = 0x8002,
 	TEGRA_MUX_RSVD4 = 0x8003,
-	TEGRA_MUX_NONE = -1,
+	TEGRA_MUX_NONE = 0,
 	TEGRA_MUX_AHB_CLK,
 	TEGRA_MUX_APB_CLK,
 	TEGRA_MUX_AUDIO_SYNC,
@@ -47,6 +50,7 @@ enum tegra_mux_func {
 	TEGRA_MUX_GMI_INT,
 	TEGRA_MUX_HDMI,
 	TEGRA_MUX_I2C,
+	TEGRA_MUX_I2C1 = TEGRA_MUX_I2C,
 	TEGRA_MUX_I2C2,
 	TEGRA_MUX_I2C3,
 	TEGRA_MUX_IDE,
@@ -69,9 +73,13 @@ enum tegra_mux_func {
 	TEGRA_MUX_PWR_ON,
 	TEGRA_MUX_RTCK,
 	TEGRA_MUX_SDIO1,
+	TEGRA_MUX_SDMMC1 = TEGRA_MUX_SDIO1,
 	TEGRA_MUX_SDIO2,
+	TEGRA_MUX_SDMMC2 = TEGRA_MUX_SDIO2,
 	TEGRA_MUX_SDIO3,
+	TEGRA_MUX_SDMMC3 = TEGRA_MUX_SDIO3,
 	TEGRA_MUX_SDIO4,
+	TEGRA_MUX_SDMMC4 = TEGRA_MUX_SDIO4,
 	TEGRA_MUX_SFLASH,
 	TEGRA_MUX_SPDIF,
 	TEGRA_MUX_SPI1,
@@ -90,7 +98,52 @@ enum tegra_mux_func {
 	TEGRA_MUX_VI,
 	TEGRA_MUX_VI_SENSOR_CLK,
 	TEGRA_MUX_XIO,
-	TEGRA_MUX_SAFE,
+#if defined(CONFIG_ARCH_TEGRA_3x_SOC)
+	TEGRA_MUX_BLINK,
+	TEGRA_MUX_CEC,
+	TEGRA_MUX_CLK12,
+	TEGRA_MUX_DAP,
+	TEGRA_MUX_DAPSDMMC2,
+	TEGRA_MUX_DDR,
+	TEGRA_MUX_DEV3,
+	TEGRA_MUX_DTV,
+	TEGRA_MUX_VI_ALT1,
+	TEGRA_MUX_VI_ALT2,
+	TEGRA_MUX_VI_ALT3,
+	TEGRA_MUX_EMC_DLL,
+	TEGRA_MUX_EXTPERIPH1,
+	TEGRA_MUX_EXTPERIPH2,
+	TEGRA_MUX_EXTPERIPH3,
+	TEGRA_MUX_GMI_ALT,
+	TEGRA_MUX_HDA,
+	TEGRA_MUX_HSI,
+	TEGRA_MUX_I2C4,
+	TEGRA_MUX_I2C5,
+	TEGRA_MUX_I2CPWR,
+	TEGRA_MUX_I2S0,
+	TEGRA_MUX_I2S1,
+	TEGRA_MUX_I2S2,
+	TEGRA_MUX_I2S3,
+	TEGRA_MUX_I2S4,
+	TEGRA_MUX_NAND_ALT,
+	TEGRA_MUX_POPSDIO4,
+	TEGRA_MUX_POPSDMMC4,
+	TEGRA_MUX_PWM0,
+	TEGRA_MUX_PWM1,
+	TEGRA_MUX_PWM2,
+	TEGRA_MUX_PWM3,
+	TEGRA_MUX_SATA,
+	TEGRA_MUX_SPI5,
+	TEGRA_MUX_SPI6,
+	TEGRA_MUX_SYSCLK,
+	TEGRA_MUX_VGP1,
+	TEGRA_MUX_VGP2,
+	TEGRA_MUX_VGP3,
+	TEGRA_MUX_VGP4,
+	TEGRA_MUX_VGP5,
+	TEGRA_MUX_VGP6,
+#endif
+        TEGRA_MUX_SAFE,
 	TEGRA_MAX_MUX,
 };
 
@@ -105,6 +158,11 @@ enum tegra_tristate {
 	TEGRA_TRI_TRISTATE = 1,
 };
 
+enum tegra_pin_io {
+	TEGRA_PIN_OUTPUT = 0,
+	TEGRA_PIN_INPUT = 1,
+};
+
 enum tegra_vddio {
 	TEGRA_VDDIO_BB = 0,
 	TEGRA_VDDIO_LCD,
@@ -115,6 +173,14 @@ enum tegra_vddio {
 	TEGRA_VDDIO_SYS,
 	TEGRA_VDDIO_AUDIO,
 	TEGRA_VDDIO_SD,
+#if defined(CONFIG_ARCH_TEGRA_3x_SOC)
+	TEGRA_VDDIO_CAM,
+	TEGRA_VDDIO_GMI,
+	TEGRA_VDDIO_PEXCTL,
+	TEGRA_VDDIO_SDMMC1,
+	TEGRA_VDDIO_SDMMC3,
+	TEGRA_VDDIO_SDMMC4,
+#endif
 };
 
 struct tegra_pingroup_config {
@@ -122,6 +188,7 @@ struct tegra_pingroup_config {
 	enum tegra_mux_func	func;
 	enum tegra_pullupdown	pupd;
 	enum tegra_tristate	tristate;
+	enum tegra_pin_io	io;
 };
 
 enum tegra_slew {
@@ -213,6 +280,7 @@ struct tegra_pingroup_desc {
 	s8 tri_bit; 	/* offset into the TRISTATE_REG_* register bit */
 	s8 mux_bit;	/* offset into the PIN_MUX_CTL_* register bit */
 	s8 pupd_bit;	/* offset into the PULL_UPDOWN_REG_* register bit */
+	s8 io_default;
 };
 
 extern const struct tegra_pingroup_desc tegra_soc_pingroups[];

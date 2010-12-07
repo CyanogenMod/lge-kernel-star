@@ -262,6 +262,17 @@ static void __init tegra_init_timer(void)
 	case 26000000:
 		timer_writel(0x0019, TIMERUS_USEC_CFG);
 		break;
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	case 16800000:
+		timer_writel(0x0453, TIMERUS_USEC_CFG);
+		break;
+	case 38400000:
+		timer_writel(0x04BF, TIMERUS_USEC_CFG);
+		break;
+	case 48000000:
+		timer_writel(0x002F, TIMERUS_USEC_CFG);
+		break;
+#endif
 	default:
 		WARN(1, "Unknown clock rate");
 	}
