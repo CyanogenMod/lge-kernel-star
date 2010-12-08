@@ -23,6 +23,7 @@
 #include "tegra_transport.h"
 
 struct tegra_audio_data* tegra_snd_cx[2];
+struct tegra_audio_state_t tegra_audio_state;
 
 static const struct snd_pcm_hardware tegra_pcm_hardware = {
 	.info = SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_PAUSE |\
@@ -453,6 +454,7 @@ static int pcm_common_close(struct snd_pcm_substream *substream)
 	struct tegra_audio_data *ptscx = tegra_snd_cx[pcm->device];
 	NvAudioFxMessage message;
 	NvError e;
+	NvAudioFxIoDevice io_device;
 
 	if (!prtd)
 		snd_printk(KERN_ERR "pcm_close called with prtd = NULL\n");
@@ -490,13 +492,64 @@ static int pcm_common_close(struct snd_pcm_substream *substream)
 	}
 
 	if (prtd->stdoutpath) {
+		if (pcm->device == I2S2) {
+			io_device = NvAudioFxIoDevice_Bluetooth_Sco;
+			ptscx->xrt_fxn.SetProperty(ptscx->mi2s1,
+				NvAudioFxIoProperty_OutputDisable,
+				sizeof(NvAudioFxIoDevice),
+				&io_device);
+		}
 		tegra_audiofx_destroy_output(prtd->stdoutpath);
 		kfree(prtd->stdoutpath);
 	}
 
 	if (prtd->stdinpath) {
+		if (pcm->device == I2S2) {
+			io_device = NvAudioFxIoDevice_Bluetooth_Sco;
+			ptscx->xrt_fxn.SetProperty(ptscx->mi2s1,
+				NvAudioFxIoProperty_InputDisable,
+				sizeof(NvAudioFxIoDevice),
+				&io_device);
+		}
 		tegra_audiofx_destroy_input(prtd->stdinpath);
 		kfree(prtd->stdinpath);
+	}
+
+	if (pcm->device == I2S2) {
+		ptscx->xrt_fxn.GetProperty(ptscx->mi2s1,
+				NvAudioFxIoProperty_OutputSelect,
+				sizeof(NvAudioFxIoDevice),
+				&io_device);
+		if (io_device & NvAudioFxIoDevice_Bluetooth_Sco) {
+			ptscx->xrt_fxn.GetProperty(ptscx->mi2s1,
+				NvAudioFxIoProperty_InputSelect,
+				sizeof(NvAudioFxIoDevice),
+				&io_device);
+			if (io_device & NvAudioFxIoDevice_Bluetooth_Sco) {
+				mutex_lock(&tegra_audio_state.mutex_lock);
+				tegra_audio_state.devices_available &=
+				~(NvAudioFxIoDevice_Bluetooth_Sco);
+
+				ptscx->xrt_fxn.SetProperty(ptscx->mi2s1,
+					NvAudioFxIoProperty_OutputAvailable,
+					sizeof(NvAudioFxIoDevice),
+					&tegra_audio_state.devices_available);
+
+				ptscx->xrt_fxn.SetProperty(ptscx->mi2s1,
+					NvAudioFxIoProperty_InputAvailable,
+					sizeof(NvAudioFxIoDevice),
+					&tegra_audio_state.devices_available);
+
+				tegra_audio_state.audio_mode &=
+					~(NvAudioFxMode_Bluetooth_Sco);
+				ptscx->xrt_fxn.SetProperty(
+				(NvAudioFxObjectHandle)ptscx->mixer_handle,
+				NvAudioFxMixerProperty_ModeSelect,
+				sizeof(NvAudioFxMode),
+				&tegra_audio_state.audio_mode);
+				mutex_unlock(&tegra_audio_state.mutex_lock);
+			}
+		}
 	}
 
 	if (prtd)
@@ -647,6 +700,48 @@ static int tegra_pcm_open(struct snd_pcm_substream *substream)
 			goto fail;
 		}
 	}
+
+	if (pcm->device == I2S2) {
+		NvAudioFxIoDevice io_device;
+
+		mutex_lock(&tegra_audio_state.mutex_lock);
+		tegra_audio_state.audio_mode |= NvAudioFxMode_Bluetooth_Sco;
+		tegra_audio_state.devices_available |=
+					NvAudioFxIoDevice_Bluetooth_Sco;
+		mutex_unlock(&tegra_audio_state.mutex_lock);
+
+		ptscx->xrt_fxn.SetProperty(
+				(NvAudioFxObjectHandle)ptscx->mixer_handle,
+				NvAudioFxMixerProperty_ModeSelect,
+				sizeof(NvAudioFxMode),
+				&tegra_audio_state.audio_mode);
+
+		ptscx->xrt_fxn.SetProperty(ptscx->mi2s1,
+				NvAudioFxIoProperty_OutputAvailable,
+				sizeof(NvAudioFxIoDevice),
+				&tegra_audio_state.devices_available);
+
+		ptscx->xrt_fxn.SetProperty(ptscx->mi2s1,
+				NvAudioFxIoProperty_InputAvailable,
+				sizeof(NvAudioFxIoDevice),
+				&tegra_audio_state.devices_available);
+
+		io_device = NvAudioFxIoDevice_Bluetooth_Sco;
+
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+			ptscx->xrt_fxn.SetProperty(ptscx->mi2s1,
+				NvAudioFxIoProperty_OutputEnable,
+				sizeof(NvAudioFxIoDevice),
+				&io_device);
+		}
+		else {
+			ptscx->xrt_fxn.SetProperty(ptscx->mi2s1,
+				NvAudioFxIoProperty_InputEnable,
+				sizeof(NvAudioFxIoDevice),
+				&io_device);
+		}
+	}
+
 	return ret;
 fail:
 	snd_printk(KERN_ERR "tegra_pcm_open - failed \n");
@@ -891,6 +986,10 @@ EXPORT_SYMBOL_GPL(tegra_soc_platform);
 
 static int __init tegra_soc_platform_init(void)
 {
+	tegra_audio_state.devices_available = NvAudioFxIoDevice_Default;
+	tegra_audio_state.audio_mode = NvAudioFxMode_Normal;
+	mutex_init(&tegra_audio_state.mutex_lock);
+
 	return snd_soc_register_platform(&tegra_soc_platform);
 }
 
