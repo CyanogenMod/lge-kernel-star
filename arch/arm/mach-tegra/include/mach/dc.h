@@ -91,6 +91,7 @@ struct tegra_dc_out {
 	unsigned		n_out_pins;
 
 	int	(*enable)(void);
+	int	(*postpoweron)(void);
 	int	(*disable)(void);
 };
 
