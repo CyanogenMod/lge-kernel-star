@@ -81,6 +81,7 @@ struct nvhost_submit_hdr {
 	__u32 syncpt_incrs;
 	__u32 num_cmdbufs;
 	__u32 num_relocs;
+	__u32 null_kickoff;
 };
 
 struct nvhost_cmdbuf {
