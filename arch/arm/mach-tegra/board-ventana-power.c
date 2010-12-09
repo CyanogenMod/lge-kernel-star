@@ -37,6 +37,16 @@
 #define PMC_CTRL		0x0
 #define PMC_CTRL_INTR_LOW	(1 << 17)
 
+#define ventana_ac_ok	TEGRA_GPIO_PV3
+
+int __init ventana_charge_init(void)
+{
+	gpio_request(ventana_ac_ok, "ac_ok");
+	gpio_direction_input(ventana_ac_ok);
+	tegra_gpio_enable(ventana_ac_ok);
+	return 0;
+}
+
 static struct regulator_consumer_supply tps658621_sm0_supply[] = {
 	REGULATOR_SUPPLY("vdd_core", NULL),
 };

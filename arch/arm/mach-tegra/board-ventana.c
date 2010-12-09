@@ -375,6 +375,7 @@ static void __init tegra_ventana_init(void)
 	platform_add_devices(ventana_devices, ARRAY_SIZE(ventana_devices));
 	ventana_sdhci_init();
 	ventana_i2c_init();
+	ventana_charge_init();
 	ventana_regulator_init();
 	ventana_touch_init();
 	ventana_keys_init();

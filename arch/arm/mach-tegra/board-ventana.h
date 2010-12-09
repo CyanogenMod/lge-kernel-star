@@ -17,6 +17,7 @@
 #ifndef _MACH_TEGRA_BOARD_VENTANA_H
 #define _MACH_TEGRA_BOARD_VENTANA_H
 
+int ventana_charge_init(void);
 int ventana_regulator_init(void);
 int ventana_sdhci_init(void);
 int ventana_pinmux_init(void);
