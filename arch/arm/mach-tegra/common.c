@@ -67,6 +67,14 @@ void tegra_assert_system_reset(char mode, const char *cmd)
 	writel_relaxed(reg, reset);
 }
 
+static struct board_info tegra_board_info = {
+	.board_id = -1,
+	.sku = -1,
+	.fab = -1,
+	.major_revision = -1,
+	.minor_revision = -1,
+};
+
 static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 	/* name		parent		rate		enabled */
 	{ "clk_m",	NULL,		0,		true },
@@ -179,6 +187,56 @@ static int __init tegra_bootloader_fb_arg(char *options)
 	return 0;
 }
 early_param("tegra_fbmem", tegra_bootloader_fb_arg);
+
+static int __init tegra_board_info_parse(char *info)
+{
+	char *p;
+	int pos = 0;
+	struct board_info *bi = &tegra_board_info;
+
+	while (info && *info) {
+		if ((p = strchr(info, ':')))
+			*p++ = '\0';
+
+		if (strlen(info) > 0) {
+			switch(pos) {
+			case 0:
+				bi->board_id = simple_strtol(info, NULL, 16);
+				break;
+			case 1:
+				bi->sku = simple_strtol(info, NULL, 16);
+				break;
+			case 2:
+				bi->fab = simple_strtol(info, NULL, 16);
+				break;
+			case 3:
+				bi->major_revision = simple_strtol(info, NULL, 16);
+				break;
+			case 4:
+				bi->minor_revision = simple_strtol(info, NULL, 16);
+				break;
+			default:
+				break;
+			}
+		}
+
+		info = p;
+		pos++;
+	}
+
+	pr_info("board info: Id:%d%2d SKU:%d Fab:%d Rev:%c MinRev:%d\n",
+			bi->board_id >> 8 & 0xFF, bi->board_id & 0xFF,
+			bi->sku, bi->fab, bi->major_revision, bi->minor_revision);
+
+	return 1;
+}
+
+__setup("board_info=", tegra_board_info_parse);
+
+void tegra_get_board_info(struct board_info *bi)
+{
+	memcpy(bi, &tegra_board_info, sizeof(*bi));
+}
 
 /*
  * Tegra has a protected aperture that prevents access by most non-CPU

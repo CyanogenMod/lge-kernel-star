@@ -50,4 +50,22 @@ extern unsigned long tegra_lp0_vec_size;
 extern unsigned long tegra_grhost_aperture;
 
 extern struct sys_timer tegra_timer;
+
+enum board_fab {
+	BOARD_FAB_A = 0,
+	BOARD_FAB_B,
+	BOARD_FAB_C,
+	BOARD_FAB_D,
+};
+
+struct board_info {
+	u16 board_id;
+	u16 sku;
+	u8  fab;
+	u8  major_revision;
+	u8  minor_revision;
+};
+
+void tegra_get_board_info(struct board_info *);
+
 #endif
