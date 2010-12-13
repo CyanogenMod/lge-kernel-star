@@ -87,6 +87,10 @@ config MACH_WARIO
          Support for the Wario version of Seaboard
 
 # Whistler
+config MACH_WHISTLER
+       bool "Whistler board"
+       help
+         Support for NVIDIA Whistler development platform
 
 # Aruba
 
