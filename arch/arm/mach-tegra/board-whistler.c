@@ -35,6 +35,7 @@
 #include <linux/input.h>
 #include <linux/platform_data/tegra_usb.h>
 #include <linux/mfd/max8907c.h>
+#include <linux/usb/android_composite.h>
 #include <linux/memblock.h>
 
 #include <mach/clk.h>
@@ -142,6 +143,43 @@ static __initdata struct tegra_clk_init_table whistler_clk_init_table[] = {
 	{ NULL,		NULL,		0,		0},
 };
 
+static char *usb_functions[] = { "mtp" };
+static char *usb_functions_adb[] = { "mtp", "adb" };
+
+static struct android_usb_product usb_products[] = {
+	{
+		.product_id     = 0x7102,
+		.num_functions  = ARRAY_SIZE(usb_functions),
+		.functions      = usb_functions,
+	},
+	{
+		.product_id     = 0x7100,
+		.num_functions  = ARRAY_SIZE(usb_functions_adb),
+		.functions      = usb_functions_adb,
+	},
+};
+
+/* standard android USB platform data */
+static struct android_usb_platform_data andusb_plat = {
+	.vendor_id              = 0x0955,
+	.product_id             = 0x7100,
+	.manufacturer_name      = "NVIDIA",
+	.product_name           = "Whistler",
+	.serial_number          = NULL,
+	.num_products = ARRAY_SIZE(usb_products),
+	.products = usb_products,
+	.num_functions = ARRAY_SIZE(usb_functions_adb),
+	.functions = usb_functions_adb,
+};
+
+static struct platform_device androidusb_device = {
+	.name   = "android_usb",
+	.id     = -1,
+	.dev    = {
+		.platform_data  = &andusb_plat,
+	},
+};
+
 static struct tegra_i2c_platform_data whistler_i2c1_platform_data = {
 	.adapter_nr	= 0,
 	.bus_count	= 1,
@@ -227,6 +265,7 @@ static struct platform_device tegra_camera = {
 };
 
 static struct platform_device *whistler_devices[] __initdata = {
+	&androidusb_device,
 	&tegra_uartb_device,
 	&tegra_uartc_device,
 	&tegra_pmu_device,
@@ -374,6 +413,8 @@ static void __init tegra_whistler_init(void)
 	tegra_clk_init_from_table(whistler_clk_init_table);
 	whistler_pinmux_init();
 	whistler_i2c_init();
+	snprintf(serial, sizeof(serial), "%llx", tegra_chip_uid());
+	andusb_plat.serial_number = kstrdup(serial, GFP_KERNEL);
 	if (is_tegra_debug_uartport_hs() == true)
 		platform_device_register(&tegra_uarta_device);
 	else
