@@ -220,6 +220,10 @@ static int __init ventana_wifi_init(void)
 	gpio_direction_output(VENTANA_WLAN_RST, 0);
 
 	platform_device_register(&ventana_wifi_device);
+
+	device_init_wakeup(&ventana_wifi_device.dev, 1);
+	device_set_wakeup_enable(&ventana_wifi_device.dev, 0);
+
 	return 0;
 }
 int __init ventana_sdhci_init(void)
