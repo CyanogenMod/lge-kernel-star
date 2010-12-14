@@ -23,6 +23,8 @@
 #include <linux/i2c/nct1008.h>
 #include <linux/akm8975.h>
 
+#include <generated/mach-types.h>
+
 #include "gpio-names.h"
 #include <linux/i2c/pca954x.h>
 #include <linux/i2c/pca953x.h>
@@ -122,11 +124,14 @@ static struct pca954x_platform_data ventana_pca9546_data = {
 	.num_modes      = ARRAY_SIZE(ventana_pca9546_modes),
 };
 
-static const struct i2c_board_info ventana_i2c3_board_info[] = {
+static const struct i2c_board_info ventana_i2c3_board_info_tca6416[] = {
 	{
 		I2C_BOARD_INFO("tca6416", 0x20),
 		.platform_data = &ventana_tca6416_data,
 	},
+};
+
+static const struct i2c_board_info ventana_i2c3_board_info_pca9546[] = {
 	{
 		I2C_BOARD_INFO("pca9546", 0x70),
 		.platform_data = &ventana_pca9546_data,
@@ -164,9 +169,6 @@ int __init ventana_sensors_init(void)
 	i2c_register_board_info(2, ventana_i2c2_board_info,
 		ARRAY_SIZE(ventana_i2c2_board_info));
 
-	i2c_register_board_info(3, ventana_i2c3_board_info,
-		ARRAY_SIZE(ventana_i2c3_board_info));
-
 	i2c_register_board_info(4, ventana_i2c4_board_info,
 		ARRAY_SIZE(ventana_i2c4_board_info));
 
@@ -175,3 +177,53 @@ int __init ventana_sensors_init(void)
 
 	return 0;
 }
+
+#ifdef CONFIG_VIDEO_OV5650
+
+#define TPS6586X_GPIO2	TEGRA_NR_GPIOS + 1
+
+#define TCA6416_GPIO4	TEGRA_NR_GPIOS + 4 + 4
+#define TCA6416_GPIO5	TEGRA_NR_GPIOS + 4 + 5
+#define TCA6416_GPIO6	TEGRA_NR_GPIOS + 4 + 6
+#define TCA6416_GPIO7	TEGRA_NR_GPIOS + 4 + 7
+#define TCA6416_GPIO15	TEGRA_NR_GPIOS + 4 + 15
+
+int __init ventana_sensors_late_init()
+{
+
+	if (!machine_is_ventana()) return 0;
+
+	i2c_new_device(i2c_get_adapter(3), ventana_i2c3_board_info_tca6416);
+
+	gpio_request(TPS6586X_GPIO2, "tps6586x_gpio2");
+	gpio_direction_output(TPS6586X_GPIO2, 1);
+	gpio_export(TPS6586X_GPIO2, false);
+
+	gpio_request(TCA6416_GPIO4, "tca6416_gpio4");
+	gpio_direction_output(TCA6416_GPIO4, 0);
+	gpio_export(TCA6416_GPIO4, false);
+
+	gpio_request(TCA6416_GPIO5, "tca6416_gpio5");
+	gpio_direction_output(TCA6416_GPIO5, 1);
+	gpio_export(TCA6416_GPIO5, false);
+
+	gpio_request(TCA6416_GPIO6, "tca6416_gpio6");
+	gpio_direction_output(TCA6416_GPIO6, 0);
+	gpio_export(TCA6416_GPIO6, false);
+
+	gpio_request(TCA6416_GPIO7, "tca6416_gpio7");
+	gpio_direction_output(TCA6416_GPIO7, 1);
+	gpio_export(TCA6416_GPIO7, false);
+
+	gpio_request(TCA6416_GPIO15, "tca6416_gpio15");
+	gpio_direction_output(TCA6416_GPIO15, 1);
+	gpio_export(TCA6416_GPIO15, false);
+
+	i2c_new_device(i2c_get_adapter(3), ventana_i2c3_board_info_pca9546);
+
+	return 0;
+}
+
+late_initcall(ventana_sensors_late_init);
+
+#endif /* CONFIG_VIDEO_OV5650 */
