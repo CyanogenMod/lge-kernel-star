@@ -26,7 +26,7 @@
 #include <linux/clk.h>
 #include <linux/serial_8250.h>
 #include <linux/i2c.h>
-#include <linux/i2c/panjit_ts.h>
+#include <linux/synaptics_i2c_rmi.h>
 #include <linux/dma-mapping.h>
 #include <linux/delay.h>
 #include <linux/i2c-tegra.h>
@@ -292,6 +292,26 @@ static struct platform_device *whistler_devices[] __initdata = {
 	&tegra_camera,
 };
 
+static struct synaptics_i2c_rmi_platform_data synaptics_pdata = {
+	.flags		= SYNAPTICS_FLIP_X | SYNAPTICS_FLIP_Y | SYNAPTICS_SWAP_XY,
+	.irqflags	= IRQF_TRIGGER_LOW,
+};
+
+static const struct i2c_board_info whistler_i2c_touch_info[] = {
+	{
+		I2C_BOARD_INFO("synaptics-rmi-ts", 0x20),
+		.irq		= TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PC6),
+		.platform_data	= &synaptics_pdata,
+	},
+};
+
+static int __init whistler_touch_init(void)
+{
+	i2c_register_board_info(0, whistler_i2c_touch_info, 1);
+
+	return 0;
+}
+
 static int __init whistler_scroll_init(void)
 {
 	int i;
@@ -440,6 +460,7 @@ static void __init tegra_whistler_init(void)
 	whistler_regulator_init();
 	whistler_panel_init();
 	whistler_sensors_init();
+	whistler_touch_init();
 	/*whistler_kbc_init();*/
 	whistler_bt_rfkill();
 	whistler_gps_init();
