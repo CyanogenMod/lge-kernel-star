@@ -188,34 +188,59 @@ int __init ventana_sensors_init(void)
 #define TCA6416_GPIO7	TEGRA_NR_GPIOS + 4 + 7
 #define TCA6416_GPIO15	TEGRA_NR_GPIOS + 4 + 15
 
-int __init ventana_sensors_late_init()
+int __init ventana_sensors_late_init(void)
 {
+	int ret;
 
 	if (!machine_is_ventana()) return 0;
 
 	i2c_new_device(i2c_get_adapter(3), ventana_i2c3_board_info_tca6416);
 
-	gpio_request(TPS6586X_GPIO2, "tps6586x_gpio2");
+	ret = gpio_request(TPS6586X_GPIO2, "tps6586x_gpio2");
+	if (ret < 0) {
+		pr_err("%s failed at line %d with error %d\n", __func__, __LINE__, ret);
+		return ret;
+	}
 	gpio_direction_output(TPS6586X_GPIO2, 1);
 	gpio_export(TPS6586X_GPIO2, false);
 
-	gpio_request(TCA6416_GPIO4, "tca6416_gpio4");
+	ret = gpio_request(TCA6416_GPIO4, "tca6416_gpio4");
+	if (ret < 0) {
+		pr_err("%s failed at line %d with error %d\n", __func__, __LINE__, ret);
+		return ret;
+	}
 	gpio_direction_output(TCA6416_GPIO4, 0);
 	gpio_export(TCA6416_GPIO4, false);
 
-	gpio_request(TCA6416_GPIO5, "tca6416_gpio5");
+	ret = gpio_request(TCA6416_GPIO5, "tca6416_gpio5");
+	if (ret < 0) {
+		pr_err("%s failed at line %d with error %d\n", __func__, __LINE__, ret);
+		return ret;
+	}
 	gpio_direction_output(TCA6416_GPIO5, 1);
 	gpio_export(TCA6416_GPIO5, false);
 
-	gpio_request(TCA6416_GPIO6, "tca6416_gpio6");
+	ret = gpio_request(TCA6416_GPIO6, "tca6416_gpio6");
+	if (ret < 0) {
+		pr_err("%s failed at line %d with error %d\n", __func__, __LINE__, ret);
+		return ret;
+	}
 	gpio_direction_output(TCA6416_GPIO6, 0);
 	gpio_export(TCA6416_GPIO6, false);
 
-	gpio_request(TCA6416_GPIO7, "tca6416_gpio7");
+	ret = gpio_request(TCA6416_GPIO7, "tca6416_gpio7");
+	if (ret < 0) {
+		pr_err("%s failed at line %d with error %d\n", __func__, __LINE__, ret);
+		return ret;
+	}
 	gpio_direction_output(TCA6416_GPIO7, 1);
 	gpio_export(TCA6416_GPIO7, false);
 
-	gpio_request(TCA6416_GPIO15, "tca6416_gpio15");
+	ret = gpio_request(TCA6416_GPIO15, "tca6416_gpio15");
+	if (ret < 0) {
+		pr_err("%s failed at line %d with error %d\n", __func__, __LINE__, ret);
+		return ret;
+	}
 	gpio_direction_output(TCA6416_GPIO15, 1);
 	gpio_export(TCA6416_GPIO15, false);
 
