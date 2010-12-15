@@ -40,16 +40,20 @@ static bool tegra_dvfs_cpu_disabled = true;
 static const int core_millivolts[MAX_DVFS_FREQS] =
 	{950, 1000, 1100, 1200, 1275};
 static const int cpu_millivolts[MAX_DVFS_FREQS] =
-	{750, 775, 800, 825, 875,  900,  925,  975,  1000, 1050, 1100};
+	{750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000, 1025, 1050, 1100, 1125};
+
+static const int cpu_speedo_nominal_millivolts[] =
+/* spedo_id  0,    1,    2 */
+	{ 1100, 1025, 1125 };
 
 #define KHZ 1000
 #define MHZ 1000000
 
 static struct dvfs_rail tegra2_dvfs_rail_vdd_cpu = {
 	.reg_id = "vdd_cpu",
-	.max_millivolts = 1100,
+	.max_millivolts = 1125,
 	.min_millivolts = 750,
-	.nominal_millivolts = 1100,
+	.nominal_millivolts = 1125,
 };
 
 static struct dvfs_rail tegra2_dvfs_rail_vdd_core = {
@@ -120,10 +124,11 @@ static struct dvfs_rail *tegra2_dvfs_rails[] = {
 	&tegra2_dvfs_rail_vdd_aon,
 };
 
-#define CPU_DVFS(_clk_name, _process_id, _mult, _freqs...)	\
+#define CPU_DVFS(_clk_name, _speedo_id, _process_id, _mult, _freqs...)	\
 	{							\
 		.clk_name	= _clk_name,			\
-		.cpu_process_id	= _process_id,			\
+		.speedo_id	= _speedo_id,			\
+		.process_id	= _process_id,			\
 		.freqs		= {_freqs},			\
 		.freqs_mult	= _mult,			\
 		.millivolts	= cpu_millivolts,		\
@@ -134,7 +139,8 @@ static struct dvfs_rail *tegra2_dvfs_rails[] = {
 #define CORE_DVFS(_clk_name, _auto, _mult, _freqs...)		\
 	{							\
 		.clk_name	= _clk_name,			\
-		.cpu_process_id = -1,				\
+		.speedo_id	= -1,				\
+		.process_id	= -1,				\
 		.freqs		= {_freqs},			\
 		.freqs_mult	= _mult,			\
 		.millivolts	= core_millivolts,		\
@@ -143,11 +149,21 @@ static struct dvfs_rail *tegra2_dvfs_rails[] = {
 	}
 
 static struct dvfs dvfs_init[] = {
-	/* Cpu voltages (mV):   750, 775, 800, 825, 875, 900, 925, 975, 1000, 1050, 1100 */
-	CPU_DVFS("cpu", 0, MHZ, 314, 314, 314, 456, 456, 608, 608, 760, 817,  912,  1000),
-	CPU_DVFS("cpu", 1, MHZ, 314, 314, 314, 456, 456, 618, 618, 770, 827,  922,  1000),
-	CPU_DVFS("cpu", 2, MHZ, 494, 675, 675, 675, 817, 817, 922, 1000),
-	CPU_DVFS("cpu", 3, MHZ, 730, 760, 845, 845, 1000),
+	/* Cpu voltages (mV):	   750, 775, 800, 825, 850, 875,  900,  925,  950,  975,  1000, 1025, 1050, 1100, 1125 */
+	CPU_DVFS("cpu", 0, 0, MHZ, 314, 314, 314, 456, 456, 456,  608,  608,  608,  760,  817,  817,  912,  1000),
+	CPU_DVFS("cpu", 0, 1, MHZ, 314, 314, 314, 456, 456, 456,  618,  618,  618,  770,  827,  827,  922,  1000),
+	CPU_DVFS("cpu", 0, 2, MHZ, 494, 494, 494, 675, 675, 817,  817,  922,  922,  1000),
+	CPU_DVFS("cpu", 0, 3, MHZ, 730, 760, 845, 845, 940, 1000),
+
+	CPU_DVFS("cpu", 1, 0, MHZ, 380, 380, 503, 503, 655, 655,  798,  798,  902,  902,  960,  1000),
+	CPU_DVFS("cpu", 1, 1, MHZ, 389, 389, 503, 503, 655, 760,  798,  798,  950,  950,  1000),
+	CPU_DVFS("cpu", 1, 2, MHZ, 598, 598, 750, 750, 893, 893,  1000),
+	CPU_DVFS("cpu", 1, 3, MHZ, 730, 760, 845, 845, 940, 1000),
+
+	CPU_DVFS("cpu", 2, 0, MHZ,   0,   0,   0,   0, 655, 655,  798,  798,  902,  902,  960,  1000, 1100, 1100, 1200),
+	CPU_DVFS("cpu", 2, 1, MHZ,   0,   0,   0,   0, 655, 760,  798,  798,  950,  950,  1015, 1015, 1100, 1200),
+	CPU_DVFS("cpu", 2, 2, MHZ,   0,   0,   0,   0, 769, 769,  902,  902,  1026, 1026, 1140, 1140, 1200),
+	CPU_DVFS("cpu", 2, 3, MHZ,   0,   0,   0,   0, 940, 1000, 1000, 1000, 1130, 1130, 1200),
 
 	/* Core voltages (mV):       950,    1000,   1100,   1200,   1275 */
 	CORE_DVFS("emc",     1, KHZ, 57000,  333000, 333000, 666000, 666000),
@@ -259,8 +275,15 @@ void __init tegra2_init_dvfs(void)
 	int i;
 	struct clk *c;
 	struct dvfs *d;
+	int process_id;
 	int ret;
 	int cpu_process_id = tegra_cpu_process_id();
+	int core_process_id = tegra_core_process_id();
+	int speedo_id = tegra_soc_speedo_id();
+
+	BUG_ON(speedo_id >= ARRAY_SIZE(cpu_speedo_nominal_millivolts));
+	tegra2_dvfs_rail_vdd_cpu.nominal_millivolts =
+		cpu_speedo_nominal_millivolts[speedo_id];
 
 	tegra_dvfs_init_rails(tegra2_dvfs_rails, ARRAY_SIZE(tegra2_dvfs_rails));
 	tegra_dvfs_add_relationships(tegra2_dvfs_relationships,
@@ -272,9 +295,15 @@ void __init tegra2_init_dvfs(void)
 	for (i = 0; i < ARRAY_SIZE(dvfs_init); i++) {
 		d = &dvfs_init[i];
 
-		if (d->cpu_process_id != -1 &&
-				d->cpu_process_id != cpu_process_id)
+		process_id = strcmp(d->clk_name, "cpu") ?
+			core_process_id : cpu_process_id;
+		if ((d->process_id != -1 && d->process_id != process_id) ||
+		    (d->speedo_id != -1 && d->speedo_id != speedo_id)) {
+			pr_debug("tegra_dvfs: rejected %s speedo %d,"
+				" process %d\n", d->clk_name, d->speedo_id,
+				d->process_id);
 			continue;
+		}
 
 		c = tegra_get_clock_by_name(d->clk_name);
 
