@@ -34,7 +34,7 @@
 
 #include "devices.h"
 #include "gpio-names.h"
-
+#define ventana_pnl_pwr_enb	TEGRA_GPIO_PC6
 #define ventana_bl_enb		TEGRA_GPIO_PD4
 #define ventana_lvds_shutdown	TEGRA_GPIO_PB2
 #define ventana_hdmi_hpd	TEGRA_GPIO_PN7
@@ -93,7 +93,7 @@ static struct platform_device ventana_backlight_device = {
 static int ventana_panel_enable(void)
 {
 	static struct regulator *reg = NULL;
-
+	gpio_set_value(ventana_pnl_pwr_enb, 1);
 	if (reg == NULL) {
 		reg = regulator_get(NULL, "avdd_lvds");
 		if (WARN_ON(IS_ERR(reg)))
@@ -102,7 +102,6 @@ static int ventana_panel_enable(void)
 		else
 			regulator_enable(reg);
 	}
-
 	gpio_set_value(ventana_lvds_shutdown, 1);
 	return 0;
 }
@@ -110,6 +109,7 @@ static int ventana_panel_enable(void)
 static int ventana_panel_disable(void)
 {
 	gpio_set_value(ventana_lvds_shutdown, 0);
+	gpio_set_value(ventana_pnl_pwr_enb, 0);
 	return 0;
 }
 
@@ -325,6 +325,9 @@ static struct platform_device *ventana_gfx_devices[] __initdata = {
 int __init ventana_panel_init(void)
 {
 	int err;
+	gpio_request(ventana_pnl_pwr_enb, "pnl_pwr_enb");
+	gpio_direction_output(ventana_pnl_pwr_enb, 1);
+	tegra_gpio_enable(ventana_pnl_pwr_enb);
 
 	gpio_request(ventana_lvds_shutdown, "lvds_shdn");
 	gpio_direction_output(ventana_lvds_shutdown, 1);
