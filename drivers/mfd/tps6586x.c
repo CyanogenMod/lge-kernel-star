@@ -27,6 +27,10 @@
 #include <linux/mfd/core.h>
 #include <linux/mfd/tps6586x.h>
 
+#define TPS6586X_SUPPLYENE  0x14
+#define EXITSLREQ_BIT       BIT(1) /* Exit sleep mode request */
+#define SLEEP_MODE_BIT      BIT(3) /* Sleep mode */
+
 /* GPIO control registers */
 #define TPS6586X_GPIOSET1	0x5d
 #define TPS6586X_GPIOSET2	0x5e
@@ -250,6 +254,28 @@ out:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(tps6586x_update);
+
+static struct i2c_client *tps6586x_i2c_client = NULL;
+int tps6586x_power_off(void)
+{
+	struct device *dev = NULL;
+	int ret = -EINVAL;
+
+	if (!tps6586x_i2c_client)
+		return ret;
+
+	dev = &tps6586x_i2c_client->dev;
+
+	ret = tps6586x_clr_bits(dev, TPS6586X_SUPPLYENE, EXITSLREQ_BIT);
+	if (ret)
+		return ret;
+
+	ret = tps6586x_set_bits(dev, TPS6586X_SUPPLYENE, SLEEP_MODE_BIT);
+	if (ret)
+		return ret;
+
+	return 0;
+}
 
 static int tps6586x_gpio_get(struct gpio_chip *gc, unsigned offset)
 {
@@ -530,6 +556,8 @@ static int __devinit tps6586x_i2c_probe(struct i2c_client *client,
 		dev_err(&client->dev, "add devices failed: %d\n", ret);
 		goto err_add_devs;
 	}
+
+	tps6586x_i2c_client = client;
 
 	return 0;
 
