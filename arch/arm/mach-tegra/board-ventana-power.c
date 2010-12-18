@@ -37,13 +37,13 @@
 #define PMC_CTRL		0x0
 #define PMC_CTRL_INTR_LOW	(1 << 17)
 
-#define ventana_ac_ok	TEGRA_GPIO_PV3
+#define CHARGING_DISABLE	TEGRA_GPIO_PR6
 
 int __init ventana_charge_init(void)
 {
-	gpio_request(ventana_ac_ok, "ac_ok");
-	gpio_direction_input(ventana_ac_ok);
-	tegra_gpio_enable(ventana_ac_ok);
+	gpio_request(CHARGING_DISABLE, "chg_disable");
+	gpio_direction_output(CHARGING_DISABLE, 0);
+	tegra_gpio_enable(CHARGING_DISABLE);
 	return 0;
 }
 
