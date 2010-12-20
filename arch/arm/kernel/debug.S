@@ -154,6 +154,11 @@ ENDPROC(printhex2)
 		.ltorg
 
 ENTRY(printascii)
+#if defined(CONFIG_DEBUG_ICEDCC) && defined(CONFIG_SMP)
+		mrc	p15, 0, r3, c0, c0, 5
+		ands	r3, r3, #3
+		movne	pc, lr
+#endif
 		addruart_current r3, r1, r2
 		b	2f
 1:		waituart r2, r3
@@ -170,6 +175,11 @@ ENTRY(printascii)
 ENDPROC(printascii)
 
 ENTRY(printch)
+#if defined(CONFIG_DEBUG_ICEDCC) && defined(CONFIG_SMP)
+		mrc	p15, 0, r3, c0, c0, 5
+		ands	r3, r3, #3
+		movne	pc, lr
+#endif
 		addruart_current r3, r1, r2
 		mov	r1, r0
 		mov	r0, #0
