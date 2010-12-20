@@ -406,12 +406,11 @@ static void __init tegra_ventana_init(void)
 
 	tegra_clk_init_from_table(ventana_clk_init_table);
 	ventana_pinmux_init();
-
+	ventana_i2c_init();
 	tegra_ehci2_device.dev.platform_data
 		= &ventana_ehci2_ulpi_platform_data;
 	platform_add_devices(ventana_devices, ARRAY_SIZE(ventana_devices));
 	ventana_sdhci_init();
-	ventana_i2c_init();
 	ventana_charge_init();
 	ventana_regulator_init();
 	ventana_touch_init();
