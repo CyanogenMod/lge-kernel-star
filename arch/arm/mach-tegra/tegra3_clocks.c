@@ -162,6 +162,11 @@
 #define PLLD_MISC_DIV_RST		(1<<23)
 #define PLLD_MISC_DCCON_SHIFT		12
 
+#define PLLDU_LFCON_SET_DIVN		600
+
+ /* FIXME: OUT_OF_TABLE_CPCON per pll */
+ #define OUT_OF_TABLE_CPCON		0x8
+
 #define SUPER_CLK_MUX			0x00
 #define SUPER_STATE_SHIFT		28
 #define SUPER_STATE_MASK		(0xF << SUPER_STATE_SHIFT)
@@ -750,7 +755,8 @@ static void tegra3_pll_clk_init(struct clk *c)
 		if (c->flags & PLLU)
 			c->div *= (val & PLLU_BASE_POST_DIV) ? 1 : 2;
 		else
-			c->div *= (val & PLL_BASE_DIVP_MASK) ? 2 : 1;
+			c->div *= (0x1 << ((val & PLL_BASE_DIVP_MASK) >>
+					PLL_BASE_DIVP_SHIFT));
 	}
 }
 
@@ -786,9 +792,10 @@ static void tegra3_pll_clk_disable(struct clk *c)
 
 static int tegra3_pll_clk_set_rate(struct clk *c, unsigned long rate)
 {
-	u32 val;
+	u32 val, p_div, old_base;
 	unsigned long input_rate;
 	const struct clk_pll_freq_table *sel;
+	struct clk_pll_freq_table cfg;
 
 	pr_debug("%s: %s %lu\n", __func__, c->name, rate);
 
@@ -798,47 +805,107 @@ static int tegra3_pll_clk_set_rate(struct clk *c, unsigned long rate)
 			return 0;
 	}
 
-	/* FIXME: out-of-table set rate for PLLs */
+	p_div = 0;
 	input_rate = clk_get_rate(c->parent);
+
+	/* Check if the target rate is tabulated */
 	for (sel = c->u.pll.freq_table; sel->input_rate != 0; sel++) {
 		if (sel->input_rate == input_rate && sel->output_rate == rate) {
-			c->mul = sel->n;
-			c->div = sel->m * sel->p;
-
-			val = clk_readl(c->reg + PLL_BASE);
-			if (c->flags & PLL_FIXED)
-			{
-				BUG();
-				val |= PLL_BASE_OVERRIDE;
-			}
-			val &= ~(PLL_BASE_DIVP_MASK | PLL_BASE_DIVN_MASK |
-				 PLL_BASE_DIVM_MASK);
-			val |= (sel->m << PLL_BASE_DIVM_SHIFT) |
-				(sel->n << PLL_BASE_DIVN_SHIFT);
-			BUG_ON(sel->p < 1 || sel->p > 2);
 			if (c->flags & PLLU) {
+				BUG_ON(sel->p < 1 || sel->p > 2);
 				if (sel->p == 1)
-					val |= PLLU_BASE_POST_DIV;
+					p_div = PLLU_BASE_POST_DIV;
 			} else {
-				if (sel->p == 2)
-					val |= 1 << PLL_BASE_DIVP_SHIFT;
+				BUG_ON(sel->p < 1);
+				for (val = sel->p; val > 1; val >>= 1, p_div++);
+				p_div <<= PLL_BASE_DIVP_SHIFT;
 			}
-			clk_writel(val, c->reg + PLL_BASE);
-
-			if (c->flags & PLL_HAS_CPCON) {
-				val = clk_readl(c->reg + PLL_MISC(c));
-				val &= ~PLL_MISC_CPCON_MASK;
-				val |= sel->cpcon << PLL_MISC_CPCON_SHIFT;
-				clk_writel(val, c->reg + PLL_MISC(c));
-			}
-
-			if (c->state == ON)
-				tegra3_pll_clk_enable(c);
-
-			return 0;
+			break;
 		}
 	}
-	return -EINVAL;
+
+	/* Configure out-of-table rate */
+	if (sel->input_rate == 0) {
+		unsigned long cfreq;
+		BUG_ON(c->flags & PLLU);
+		sel = &cfg;
+
+		switch (input_rate) {
+		case 12000000:
+		case 13000000:
+		case 26000000:
+			cfreq = 1000000;
+			break;
+		case 16800000:
+		case 19200000:
+			cfreq = 1200000;
+			break;
+		default:
+			pr_err("%s: Unexpected reference rate %lu\n", __func__, input_rate);
+			BUG();
+		}
+
+		/* Raise VCO to guarantee 0.5% accuracy */
+		for (cfg.output_rate = rate; cfg.output_rate < 200 * cfreq;
+		      cfg.output_rate <<= 1, p_div++);
+
+		cfg.p = 0x1 << p_div;
+		cfg.m = input_rate / cfreq;
+		cfg.n = cfg.output_rate / cfreq;
+		cfg.cpcon = OUT_OF_TABLE_CPCON;
+
+		if ((cfg.m > (PLL_BASE_DIVM_MASK >> PLL_BASE_DIVM_SHIFT)) ||
+		    (cfg.n > (PLL_BASE_DIVN_MASK >> PLL_BASE_DIVN_SHIFT)) ||
+		    (p_div > (PLL_BASE_DIVP_MASK >> PLL_BASE_DIVP_SHIFT)) ||
+		    (cfg.output_rate > c->u.pll.vco_max)) {
+			pr_err("%s: Failed to set %s out-of-table rate %lu\n",
+			       __func__, c->name, rate);
+			return -EINVAL;
+		}
+		p_div <<= PLL_BASE_DIVP_SHIFT;
+	}
+
+	c->mul = sel->n;
+	c->div = sel->m * sel->p;
+
+	old_base = val = clk_readl(c->reg + PLL_BASE);
+	if (c->flags & PLL_FIXED) {
+		BUG();
+		val |= PLL_BASE_OVERRIDE;
+	}
+	val &= ~(PLL_BASE_DIVM_MASK | PLL_BASE_DIVN_MASK |
+		 ((c->flags & PLLU) ? PLLU_BASE_POST_DIV : PLL_BASE_DIVP_MASK));
+	val |= (sel->m << PLL_BASE_DIVM_SHIFT) |
+		(sel->n << PLL_BASE_DIVN_SHIFT) | p_div;
+	if (val == old_base)
+		return 0;
+
+	if (c->state == ON) {
+		tegra3_pll_clk_disable(c);
+		val &= ~(PLL_BASE_BYPASS | PLL_BASE_ENABLE);
+	}
+	clk_writel(val, c->reg + PLL_BASE);
+
+	if (c->flags & PLL_HAS_CPCON) {
+		val = clk_readl(c->reg + PLL_MISC(c));
+		val &= ~PLL_MISC_CPCON_MASK;
+		val |= sel->cpcon << PLL_MISC_CPCON_SHIFT;
+		if (c->flags & (PLLU | PLLD)) {
+			val &= ~PLL_MISC_LFCON_MASK;
+			if (sel->n >= PLLDU_LFCON_SET_DIVN)
+				val |= 0x1 << PLL_MISC_LFCON_SHIFT;
+		} else if (c->flags & PLLX) {
+			val &= ~(0x1 << PLL_MISC_DCCON_SHIFT);
+			if (rate >= (c->u.pll.vco_max >> 1))
+				val |= 0x1 << PLL_MISC_DCCON_SHIFT;
+		}
+		clk_writel(val, c->reg + PLL_MISC(c));
+	}
+
+	if (c->state == ON)
+		tegra3_pll_clk_enable(c);
+
+	return 0;
 }
 
 static struct clk_ops tegra_pll_ops = {
@@ -1046,7 +1113,6 @@ static void tegra3_periph_clk_init(struct clk *c)
 
 static int tegra3_periph_clk_enable(struct clk *c)
 {
-	u32 val;
 	pr_debug("%s on clock %s\n", __func__, c->name);
 
 	tegra_periph_clk_enable_refcount[c->u.periph.clk_num]++;
@@ -1059,13 +1125,6 @@ static int tegra3_periph_clk_enable(struct clk *c)
 			udelay(5);	/* reset propagation delay */
 			clk_writel(PERIPH_CLK_TO_BIT(c), PERIPH_CLK_TO_RST_CLR_REG(c));
 		}
-	}
-	if (c->flags & PERIPH_EMC_ENB) {
-		/* The EMC peripheral clock has 2 extra enable bits */
-		/* FIXME: Do they need to be disabled? */
-		val = clk_readl(c->reg);
-		val |= 0x3 << 24;
-		clk_writel(val, c->reg);
 	}
 	return 0;
 }
@@ -1695,63 +1754,62 @@ static struct clk tegra_pll_u = {
 	},
 };
 
-/* FIXME: cpcon values */
 static struct clk_pll_freq_table tegra_pll_x_freq_table[] = {
 	/* 1 GHz */
-	{ 12000000, 1000000000, 1000, 12, 1, 12},
-	{ 13000000, 1000000000, 1000, 13, 1, 12},
-	{ 16800000, 1000000000, 952,  16, 1, 12},	/* actual: 999.6 MHz */
+	{ 12000000, 1000000000, 1000, 12, 1, 8},
+	{ 13000000, 1000000000, 1000, 13, 1, 8},
+	{ 16800000, 1000000000, 833,  14, 1, 8},	/* actual: 999.6 MHz */
 	{ 19200000, 1000000000, 625,  12, 1, 8},
-	{ 26000000, 1000000000, 1000, 26, 1, 12},
+	{ 26000000, 1000000000, 1000, 26, 1, 8},
 
 	/* 912 MHz */
-	{ 12000000, 912000000,  912,  12, 1, 12},
-	{ 13000000, 912000000,  912,  13, 1, 12},
+	{ 12000000, 912000000,  912,  12, 1, 8},
+	{ 13000000, 912000000,  912,  13, 1, 8},
 	{ 16800000, 912000000,  760,  14, 1, 8},
 	{ 19200000, 912000000,  760,  16, 1, 8},
-	{ 26000000, 912000000,  912,  26, 1, 12},
+	{ 26000000, 912000000,  912,  26, 1, 8},
 
 	/* 816 MHz */
-	{ 12000000, 816000000,  816,  12, 1, 12},
-	{ 13000000, 816000000,  816,  13, 1, 12},
+	{ 12000000, 816000000,  816,  12, 1, 8},
+	{ 13000000, 816000000,  816,  13, 1, 8},
 	{ 16800000, 816000000,  680,  14, 1, 8},
 	{ 19200000, 816000000,  680,  16, 1, 8},
-	{ 26000000, 816000000,  816,  26, 1, 12},
+	{ 26000000, 816000000,  816,  26, 1, 8},
 
 	/* 760 MHz */
-	{ 12000000, 760000000,  760,  12, 1, 12},
-	{ 13000000, 760000000,  760,  13, 1, 12},
-	{ 16800000, 760000000,  723,  16, 1, 8},	/* actual: 759.15 MHz */
+	{ 12000000, 760000000,  760,  12, 1, 8},
+	{ 13000000, 760000000,  760,  13, 1, 8},
+	{ 16800000, 760000000,  633,  14, 1, 8},	/* actual: 759.6 MHz */
 	{ 19200000, 760000000,  475,  12, 1, 8},
-	{ 26000000, 760000000,  760,  26, 1, 12},
+	{ 26000000, 760000000,  760,  26, 1, 8},
 
 	/* 624 MHz */
-	{ 12000000, 624000000,  624,  12, 1, 12},
-	{ 13000000, 624000000,  624,  13, 1, 12},
+	{ 12000000, 624000000,  624,  12, 1, 8},
+	{ 13000000, 624000000,  624,  13, 1, 8},
 	{ 16800000, 624000000,  520,  14, 1, 8},
 	{ 19200000, 624000000,  520,  16, 1, 8},
-	{ 26000000, 624000000,  624,  26, 1, 12},
+	{ 26000000, 624000000,  624,  26, 1, 8},
 
 	/* 608 MHz */
-	{ 12000000, 608000000,  608,  12, 1, 12},
-	{ 13000000, 608000000,  608,  13, 1, 12},
+	{ 12000000, 608000000,  608,  12, 1, 8},
+	{ 13000000, 608000000,  608,  13, 1, 8},
 	{ 16800000, 608000000,  579,  16, 1, 8},	/* actual: 607.95 MHz */
 	{ 19200000, 608000000,  380,  12, 1, 8},
-	{ 26000000, 608000000,  608,  26, 1, 12},
+	{ 26000000, 608000000,  608,  26, 1, 8},
 
 	/* 456 MHz */
-	{ 12000000, 456000000,  456,  12, 1, 12},
-	{ 13000000, 456000000,  456,  13, 1, 12},
+	{ 12000000, 456000000,  456,  12, 1, 8},
+	{ 13000000, 456000000,  456,  13, 1, 8},
 	{ 16800000, 456000000,  380,  14, 1, 8},
 	{ 19200000, 456000000,  380,  16, 1, 8},
-	{ 26000000, 456000000,  456,  26, 1, 12},
+	{ 26000000, 456000000,  456,  26, 1, 8},
 
 	/* 312 MHz */
-	{ 12000000, 312000000,  312,  12, 1, 12},
-	{ 13000000, 312000000,  312,  13, 1, 12},
+	{ 12000000, 312000000,  312,  12, 1, 8},
+	{ 13000000, 312000000,  312,  13, 1, 8},
 	{ 16800000, 312000000,  260,  14, 1, 8},
 	{ 19200000, 312000000,  260,  16, 1, 8},
-	{ 26000000, 312000000,  312,  26, 1, 12},
+	{ 26000000, 312000000,  312,  26, 1, 8},
 
 	{ 0, 0, 0, 0, 0, 0 },
 };
@@ -2031,7 +2089,6 @@ static struct clk_mux_sel mux_pllp_plld_pllc_clkm[] = {
 	{ 0, 0},
 };
 
-/* FIXME: add plld2 */
 static struct clk_mux_sel mux_pllp_pllm_plld_plla_pllc_plld2_clkm[] = {
 	{.input = &tegra_pll_p, .value = 0},
 	{.input = &tegra_pll_m, .value = 1},
