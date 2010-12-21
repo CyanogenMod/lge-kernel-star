@@ -180,75 +180,70 @@ int __init ventana_sensors_init(void)
 
 #ifdef CONFIG_VIDEO_OV5650
 
-#define TPS6586X_GPIO2	TEGRA_NR_GPIOS + 1
+#define AVDD_DSI_CSI_ENB_GPIO	TEGRA_NR_GPIOS + 1 /* TPS6586X_GPIO2 */
 
-#define TCA6416_GPIO4	TEGRA_NR_GPIOS + 4 + 4
-#define TCA6416_GPIO5	TEGRA_NR_GPIOS + 4 + 5
-#define TCA6416_GPIO6	TEGRA_NR_GPIOS + 4 + 6
-#define TCA6416_GPIO7	TEGRA_NR_GPIOS + 4 + 7
-#define TCA6416_GPIO15	TEGRA_NR_GPIOS + 4 + 15
+#define TCA6416_GPIO_BASE	TEGRA_NR_GPIOS + 4
+#define CAM2_PWR_DN_GPIO	TCA6416_GPIO_BASE + 4 /* TCA6416_GPIO4 */
+#define CAM2_RST_L_GPIO		TCA6416_GPIO_BASE + 5 /* TCA6416_GPIO5 */
+#define CAM2_AF_PWR_DN_L_GPIO	TCA6416_GPIO_BASE + 6 /* TCA6416_GPIO6 */
+#define CAM2_LDO_SHUTDN_L_GPIO	TCA6416_GPIO_BASE + 7 /* TCA6416_GPIO7 */
+#define CAM2_I2C_MUX_RST_GPIO	TCA6416_GPIO_BASE + 15 /* TCA6416_GPIO15 */
 
-int __init ventana_sensors_late_init(void)
+struct ov5650_gpios {
+	const char *name;
+	int gpio;
+	int enabled;
+};
+
+#define OV5650_GPIO(_name, _gpio, _enabled)		\
+	{						\
+		.name = _name,				\
+		.gpio = _gpio,				\
+		.enabled = _enabled,			\
+	}
+
+static struct ov5650_gpios ov5650_gpio_keys[] = {
+	[0] = OV5650_GPIO("en_avdd_csi", AVDD_DSI_CSI_ENB_GPIO, 1),
+	[1] = OV5650_GPIO("cam2_pwdn", CAM2_PWR_DN_GPIO, 0),
+	[2] = OV5650_GPIO("cam2_rst_lo", CAM2_RST_L_GPIO, 1),
+	[3] = OV5650_GPIO("cam2_af_pwdn_lo", CAM2_AF_PWR_DN_L_GPIO, 0),
+	[4] = OV5650_GPIO("cam2_ldo_shdn_lo", CAM2_LDO_SHUTDN_L_GPIO, 1),
+	[5] = OV5650_GPIO("cam2_i2c_mux_rst_lo", CAM2_I2C_MUX_RST_GPIO, 1),
+};
+
+int __init ventana_ov5650_late_init(void)
 {
 	int ret;
+	int i;
 
-	if (!machine_is_ventana()) return 0;
+	if (!machine_is_ventana())
+		return 0;
 
 	i2c_new_device(i2c_get_adapter(3), ventana_i2c3_board_info_tca6416);
 
-	ret = gpio_request(TPS6586X_GPIO2, "tps6586x_gpio2");
-	if (ret < 0) {
-		pr_err("%s failed at line %d with error %d\n", __func__, __LINE__, ret);
-		return ret;
+	for (i = 0; i < ARRAY_SIZE(ov5650_gpio_keys); i++) {
+		ret = gpio_request(ov5650_gpio_keys[i].gpio,
+			ov5650_gpio_keys[i].name);
+		if (ret < 0) {
+			pr_err("%s: gpio_request failed for gpio #%d\n",
+				__func__, i);
+			goto fail;
+		}
+		gpio_direction_output(ov5650_gpio_keys[i].gpio,
+			ov5650_gpio_keys[i].enabled);
+		gpio_export(ov5650_gpio_keys[i].gpio, false);
 	}
-	gpio_direction_output(TPS6586X_GPIO2, 1);
-	gpio_export(TPS6586X_GPIO2, false);
-
-	ret = gpio_request(TCA6416_GPIO4, "tca6416_gpio4");
-	if (ret < 0) {
-		pr_err("%s failed at line %d with error %d\n", __func__, __LINE__, ret);
-		return ret;
-	}
-	gpio_direction_output(TCA6416_GPIO4, 0);
-	gpio_export(TCA6416_GPIO4, false);
-
-	ret = gpio_request(TCA6416_GPIO5, "tca6416_gpio5");
-	if (ret < 0) {
-		pr_err("%s failed at line %d with error %d\n", __func__, __LINE__, ret);
-		return ret;
-	}
-	gpio_direction_output(TCA6416_GPIO5, 1);
-	gpio_export(TCA6416_GPIO5, false);
-
-	ret = gpio_request(TCA6416_GPIO6, "tca6416_gpio6");
-	if (ret < 0) {
-		pr_err("%s failed at line %d with error %d\n", __func__, __LINE__, ret);
-		return ret;
-	}
-	gpio_direction_output(TCA6416_GPIO6, 0);
-	gpio_export(TCA6416_GPIO6, false);
-
-	ret = gpio_request(TCA6416_GPIO7, "tca6416_gpio7");
-	if (ret < 0) {
-		pr_err("%s failed at line %d with error %d\n", __func__, __LINE__, ret);
-		return ret;
-	}
-	gpio_direction_output(TCA6416_GPIO7, 1);
-	gpio_export(TCA6416_GPIO7, false);
-
-	ret = gpio_request(TCA6416_GPIO15, "tca6416_gpio15");
-	if (ret < 0) {
-		pr_err("%s failed at line %d with error %d\n", __func__, __LINE__, ret);
-		return ret;
-	}
-	gpio_direction_output(TCA6416_GPIO15, 1);
-	gpio_export(TCA6416_GPIO15, false);
 
 	i2c_new_device(i2c_get_adapter(3), ventana_i2c3_board_info_pca9546);
 
 	return 0;
+
+fail:
+	while (i--)
+		gpio_free(ov5650_gpio_keys[i].gpio);
+	return ret;
 }
 
-late_initcall(ventana_sensors_late_init);
+late_initcall(ventana_ov5650_late_init);
 
 #endif /* CONFIG_VIDEO_OV5650 */
