@@ -145,13 +145,12 @@ static inline void aruba_bt_rfkill(void) { }
 
 static __initdata struct tegra_clk_init_table aruba_clk_init_table[] = {
 	/* name		parent		rate		enabled */
-	{ "uarta",	"pll_p",	216000000,	true},
-	{ "uartb",	"pll_p",	216000000,	true},
-	{ "uartc",	"pll_p",	216000000,	true},
-	{ "uartd",	"pll_p",	216000000,	true},
-	{ "uarte",	"pll_p",	216000000,	true},
+	{ "uarta",	"clk_m",	13000000,	true},
+	{ "uartb",	"clk_m",	13000000,	true},
+	{ "uartc",	"clk_m",	13000000,	true},
+	{ "uartd",	"clk_m",	13000000,	true},
+	{ "uarte",	"clk_m",	13000000,	true},
 	{ "pll_m",	NULL,		600000000,	true},
-	{ "uartc",      "pll_m",        600000000,      false},
 	{ "blink",      "clk_32k",      32768,          false},
 	{ "pll_p_out4",	"pll_p",	24000000,	true },
 	{ "pwm",	"clk_32k",	32768,		false},
