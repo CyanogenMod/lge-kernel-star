@@ -34,6 +34,7 @@
 #include <mach/powergate.h>
 #include <mach/system.h>
 
+#include "apbio.h"
 #include "board.h"
 #include "clock.h"
 #include "fuse.h"
@@ -151,7 +152,7 @@ void __init tegra_init_early(void)
 	tegra_init_power();
 	tegra_init_cache();
 	tegra_dma_init();
-	tegra_init_fuse_dma();
+	tegra_init_apb_dma();
 }
 
 static int __init tegra_lp0_vec_arg(char *options)
