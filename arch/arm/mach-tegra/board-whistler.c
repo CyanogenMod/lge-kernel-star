@@ -31,7 +31,7 @@
 #include <linux/delay.h>
 #include <linux/i2c-tegra.h>
 #include <linux/gpio.h>
-#include <linux/gpio_keys.h>
+#include <linux/gpio_scrollwheel.h>
 #include <linux/input.h>
 #include <linux/memblock.h>
 
@@ -120,6 +120,35 @@ static void whistler_i2c_init(void)
 	platform_device_register(&tegra_i2c_device1);
 }
 
+#define GPIO_SCROLL(_pinaction, _gpio, _desc)	\
+{	\
+	.pinaction = GPIO_SCROLLWHEEL_PIN_##_pinaction, \
+	.gpio = TEGRA_GPIO_##_gpio,	\
+	.desc = _desc,	\
+	.active_low = 1,	\
+	.debounce_interval = 2,	\
+}
+
+static struct gpio_scrollwheel_button scroll_keys[] = {
+	[0] = GPIO_SCROLL(ONOFF, PR3, "sw_onoff"),
+	[1] = GPIO_SCROLL(PRESS, PQ5, "sw_press"),
+	[2] = GPIO_SCROLL(ROT1, PQ3, "sw_rot1"),
+	[3] = GPIO_SCROLL(ROT2, PQ4, "sw_rot2"),
+};
+
+static struct gpio_scrollwheel_platform_data whistler_scroll_platform_data = {
+	.buttons = scroll_keys,
+	.nbuttons = ARRAY_SIZE(scroll_keys),
+};
+
+static struct platform_device whistler_scroll_device = {
+	.name	= "alps-gpio-scrollwheel",
+	.id	= 0,
+	.dev	= {
+		.platform_data	= &whistler_scroll_platform_data,
+	},
+};
+
 static struct platform_device *whistler_devices[] __initdata = {
 	&tegra_otg_device,
 	&debug_uart,
@@ -128,7 +157,17 @@ static struct platform_device *whistler_devices[] __initdata = {
 	&tegra_gart_device,
 	&tegra_wdt_device,
 	&tegra_avp_device,
+	&whistler_scroll_device,
 };
+
+static int __init whistler_scroll_init(void)
+{
+	int i;
+	for (i = 0; i < ARRAY_SIZE(scroll_keys); i++)
+		tegra_gpio_enable(scroll_keys[i].gpio);
+
+	return 0;
+}
 
 static void __init tegra_whistler_init(void)
 {
@@ -145,6 +184,7 @@ static void __init tegra_whistler_init(void)
 	whistler_regulator_init();
 	whistler_panel_init();
 	whistler_kbc_init();
+	whistler_scroll_init();
 }
 
 int __init tegra_whistler_protected_aperture_init(void)
