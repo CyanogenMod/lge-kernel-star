@@ -107,17 +107,15 @@ int tegra_powergate_remove_clamping(int id)
 	if (id < 0 || id >= TEGRA_NUM_POWERGATE)
 		return -EINVAL;
 
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	/*
-	 * Tegra 2 has a bug where PCIE and VDE clamping masks are
-	 * swapped relatively to the partition ids
+	 * PCIE and VDE clamping masks are swapped with respect to their
+	 * partition ids
 	 */
 	if (id ==  TEGRA_POWERGATE_VDEC)
 		mask = (1 << TEGRA_POWERGATE_PCIE);
-	else if	(id == TEGRA_POWERGATE_PCIE)
+	else if (id == TEGRA_POWERGATE_PCIE)
 		mask = (1 << TEGRA_POWERGATE_VDEC);
 	else
-#endif
 		mask = (1 << id);
 
 	pmc_write(mask, REMOVE_CLAMPING);
