@@ -92,6 +92,11 @@ config MACH_WARIO
 
 # Cardhu
 
+config MACH_CARDHU
+       bool "Cardhu board"
+       help
+         Support for NVIDIA Cardhu development platform
+
 # Enterprise
 
 config TEGRA_FPGA_PLATFORM
