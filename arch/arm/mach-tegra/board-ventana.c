@@ -143,7 +143,6 @@ static inline void ventana_bt_rfkill(void) { }
 static __initdata struct tegra_clk_init_table ventana_clk_init_table[] = {
 	/* name		parent		rate		enabled */
 	{ "uartd",	"pll_p",	216000000,	true},
-	{ "pll_m",	"clk_m",	600000000,	true},
 	{ "uartc",	"pll_m",	600000000,	false},
 	{ "blink",	"clk_32k",	32768,		false},
 	{ "pll_p_out4",	"pll_p",	24000000,	true },
