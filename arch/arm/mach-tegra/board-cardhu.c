@@ -33,6 +33,7 @@
 #include <linux/gpio.h>
 #include <linux/input.h>
 #include <linux/platform_data/tegra_usb.h>
+#include <linux/usb/android_composite.h>
 #include <linux/spi/spi.h>
 #include <mach/clk.h>
 #include <mach/iomap.h>
@@ -185,6 +186,43 @@ static __initdata struct tegra_clk_init_table cardhu_clk_init_table[] = {
 	{ NULL,		NULL,		0,		0},
 };
 
+static char *usb_functions[] = { "mtp" };
+static char *usb_functions_adb[] = { "mtp", "adb" };
+
+static struct android_usb_product usb_products[] = {
+	{
+		.product_id     = 0x7102,
+		.num_functions  = ARRAY_SIZE(usb_functions),
+		.functions      = usb_functions,
+	},
+	{
+		.product_id     = 0x7100,
+		.num_functions  = ARRAY_SIZE(usb_functions_adb),
+		.functions      = usb_functions_adb,
+	},
+};
+
+/* standard android USB platform data */
+static struct android_usb_platform_data andusb_plat = {
+	.vendor_id              = 0x0955,
+	.product_id             = 0x7100,
+	.manufacturer_name      = "NVIDIA",
+	.product_name           = "Aruba",
+	.serial_number          = NULL,
+	.num_products = ARRAY_SIZE(usb_products),
+	.products = usb_products,
+	.num_functions = ARRAY_SIZE(usb_functions_adb),
+	.functions = usb_functions_adb,
+};
+
+static struct platform_device androidusb_device = {
+	.name   = "android_usb",
+	.id     = -1,
+	.dev    = {
+		.platform_data  = &andusb_plat,
+	},
+};
+
 static struct tegra_i2c_platform_data cardhu_i2c1_platform_data = {
 	.adapter_nr	= 0,
 	.bus_count	= 1,
@@ -323,6 +361,7 @@ static struct platform_device tegra_camera = {
 };
 
 static struct platform_device *cardhu_devices[] __initdata = {
+	&androidusb_device,
 	&tegra_pmu_device,
 #if defined(CONFIG_RTC_DRV_TEGRA)
 	&tegra_rtc_device,
@@ -499,6 +538,8 @@ static void cardhu_sata_init(void) { }
 
 static void __init tegra_cardhu_init(void)
 {
+	char serial[20];
+
 	tegra_clk_init_from_table(cardhu_clk_init_table);
 	cardhu_pinmux_init();
 	cardhu_i2c_init();
@@ -507,6 +548,8 @@ static void __init tegra_cardhu_init(void)
 	cardhu_edp_init();
 #endif
 	cardhu_uart_init();
+	snprintf(serial, sizeof(serial), "%llx", tegra_chip_uid());
+	andusb_plat.serial_number = kstrdup(serial, GFP_KERNEL);
 	platform_add_devices(cardhu_devices, ARRAY_SIZE(cardhu_devices));
 	cardhu_sdhci_init();
 	cardhu_regulator_init();
