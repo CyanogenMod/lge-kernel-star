@@ -77,7 +77,6 @@ static struct platform_device debug_uart = {
 static __initdata struct tegra_clk_init_table whistler_clk_init_table[] = {
 	/* name		parent		rate		enabled */
 	{ "uarta",	"pll_p",	216000000,	true},
-	{ "pll_m",	"clk_m",	600000000,	true},
 	{ "pwm",	"clk_32k",	32768,		false},
 	{ "kbc",	"clk_32k",	32768,		true},
 	{ NULL,		NULL,		0,		0},
