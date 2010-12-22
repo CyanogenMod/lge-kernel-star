@@ -78,6 +78,7 @@ static struct board_info tegra_board_info = {
 static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 	/* name		parent		rate		enabled */
 	{ "clk_m",	NULL,		0,		true },
+	{ "pll_m",	"clk_m",	600000000,	true },
 	{ "pll_p",	"clk_m",	216000000,	true },
 	{ "pll_p_out1",	"pll_p",	28800000,	true },
 	{ "pll_p_out2",	"pll_p",	48000000,	true },
