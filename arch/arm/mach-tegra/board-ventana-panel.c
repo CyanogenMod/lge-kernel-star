@@ -92,16 +92,7 @@ static struct platform_device ventana_backlight_device = {
 
 static int ventana_panel_enable(void)
 {
-	static struct regulator *reg = NULL;
 	gpio_set_value(ventana_pnl_pwr_enb, 1);
-	if (reg == NULL) {
-		reg = regulator_get(NULL, "avdd_lvds");
-		if (WARN_ON(IS_ERR(reg)))
-			pr_err("%s: couldn't get regulator avdd_lvds: %ld\n",
-			       __func__, PTR_ERR(reg));
-		else
-			regulator_enable(reg);
-	}
 	gpio_set_value(ventana_lvds_shutdown, 1);
 	return 0;
 }
