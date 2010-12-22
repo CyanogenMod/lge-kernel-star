@@ -43,15 +43,6 @@
 #include "pm.h"
 #include "sleep.h"
 
-#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
-#define TEGRA_CPUIDLE_BOTH_IDLE		INT_QUAD_RES_24
-#define TEGRA_CPUIDLE_TEAR_DOWN		INT_QUAD_RES_25
-#else
-/* !!!FIXME!!! THIS MODEL IS BROKEN ON T30 -- 4 CPUS BREAKS THE "BOTH" IDLE CONCEPT .....*/
-#define TEGRA_CPUIDLE_BOTH_IDLE		INT_QUINT_RES_24
-#define TEGRA_CPUIDLE_TEAR_DOWN		INT_QUINT_RES_25
-#endif
-
 static bool lp2_in_idle __read_mostly = true;
 module_param(lp2_in_idle, bool, 0644);
 
@@ -193,13 +184,13 @@ static int __init tegra_cpuidle_init(void)
 {
 	unsigned int cpu;
 	void __iomem *mask_arm;
-	unsigned int reg;
+	u32 reg;
 	int ret;
 
 	mask_arm = IO_ADDRESS(TEGRA_CLK_RESET_BASE) + CLK_RESET_CLK_MASK_ARM;
 
 	reg = readl(mask_arm);
-	writel(reg | (1<<31), mask_arm);
+	__raw_writel(reg | (1<<31), mask_arm);
 
 	ret = cpuidle_register_driver(&tegra_idle);
 

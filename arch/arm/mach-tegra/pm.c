@@ -577,7 +577,7 @@ static void tegra_pm_set(enum tegra_suspend_mode mode)
 		 * scratch 41 to tegra_resume
 		 */
 		writel(0x0, pmc + PMC_SCRATCH39);
-		writel(virt_to_phys(tegra_resume), pmc + PMC_SCRATCH41);
+		__raw_writel(virt_to_phys(tegra_resume), pmc + PMC_SCRATCH41);
 		reg |= TEGRA_POWER_EFFECT_LP0;
 
 		/* Enable DPD sample to trigger sampling pads data and direction
@@ -592,7 +592,7 @@ static void tegra_pm_set(enum tegra_suspend_mode mode)
 		 */
 		writel(&tegra_lp1_reset - &tegra_iram_start +
 			TEGRA_IRAM_CODE_AREA, evp_reset);
-		writel(virt_to_phys(tegra_resume), pmc + PMC_SCRATCH41);
+		__raw_writel(virt_to_phys(tegra_resume), pmc + PMC_SCRATCH41);
 		break;
 	case TEGRA_SUSPEND_LP2:
 		/*
@@ -741,8 +741,8 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 
 	/* Configure core power request and system clock control if LP0
 	   is supported */
-	writel(pdata->core_timer, pmc + PMC_COREPWRGOOD_TIMER);
-	writel(pdata->core_off_timer, pmc + PMC_COREPWROFF_TIMER);
+	__raw_writel(pdata->core_timer, pmc + PMC_COREPWRGOOD_TIMER);
+	__raw_writel(pdata->core_off_timer, pmc + PMC_COREPWROFF_TIMER);
 
 	reg = readl(pmc + PMC_CTRL);
 

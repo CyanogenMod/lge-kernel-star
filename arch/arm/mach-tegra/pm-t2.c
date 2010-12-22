@@ -351,6 +351,7 @@ void __init tegra2_lp0_suspend_init(void)
 			r |= v;
 		}
 
-		writel(r, scratch[i].scratch_addr);
+		__raw_writel(r, scratch[i].scratch_addr);
 	}
+	wmb();
 }

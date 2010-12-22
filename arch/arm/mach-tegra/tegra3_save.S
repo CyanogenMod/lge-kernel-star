@@ -464,12 +464,12 @@ ENTRY(__put_cpu_in_reset)
 #endif
 
         /* If the WFI doesn't take effect force the CPU into reset. */
-	movw	r1, 0x1011
+	movw	r1, 0x1111
 	mov	r1, r1, lsl r0
 	mov32	r7, (TEGRA_CLK_RESET_BASE-IO_PPSB_PHYS+IO_PPSB_VIRT)
 	str	r1, [r7, #0x340]
-	isb
 	dsb
+	isb
 	b	.			@ should never get here
 ENDPROC(__put_cpu_in_reset)
 

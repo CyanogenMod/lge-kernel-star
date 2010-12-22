@@ -83,4 +83,10 @@ void tegra_cluster_switch_epilog(unsigned int flags);
 unsigned int is_lp_cluster(void);
 #endif
 
+static inline void flowctrl_writel(unsigned long val, unsigned int offs)
+{
+	__raw_writel(val, IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + offs);
+	(void)__raw_readl(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + offs);
+}
+
 #endif /* _MACH_TEGRA_SUSPEND_H_ */

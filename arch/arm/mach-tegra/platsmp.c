@@ -36,8 +36,6 @@
 	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x340)
 #define CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR \
 	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x344)
-#define FLOW_CTRL_HALT_CPUx_EVENTS(cpu)	\
-	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE + ((cpu)?(((cpu)-1)*8 + 0x14) : 0x0)))
 
 #define CPU_CLOCK(cpu)	(0x1<<(8+cpu))
 #define CPU_RESET(cpu)	(0x1111ul<<(cpu))
@@ -80,7 +78,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
 	gic_secondary_init(0);
 }
 
-int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+int boot_secondary(unsigned int cpu, struct task_struct *idle)
 {
 	u32 reg;
 	int status;
@@ -117,8 +115,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 	   CPU this will cause the flow controller to stop driving reset.
 	   The CPU will remain in reset because the clock and reset block
 	   is now driving reset. */
-	writel(0, FLOW_CTRL_HALT_CPUx_EVENTS(cpu));
-	dmb();
+	flowctrl_writel(0, FLOW_CTRL_HALT_CPUx_EVENTS(cpu));
 
 	/* enable cpu clock on cpu */
 	reg = readl(CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
