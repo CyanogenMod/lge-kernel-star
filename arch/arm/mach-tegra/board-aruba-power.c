@@ -19,93 +19,28 @@
 #include <linux/pda_power.h>
 #include <linux/platform_device.h>
 #include <linux/resource.h>
-#include <linux/regulator/machine.h>
-#include <linux/mfd/tps6586x.h>
-#include <linux/gpio.h>
 #include <mach/suspend.h>
 #include <linux/io.h>
 
 #include <mach/iomap.h>
 #include <mach/irqs.h>
 
-#if 0	// !!!FIXME!!! IMPLEMENT ME
-
-#include "gpio-names.h"
 #include "power.h"
-/* !!!FIXME!!! #include "wakeups-t3.h" NEED TO CREATE THIS ................................. */
 #include "board.h"
-
-#define PMC_CTRL		0x0
-#define PMC_CTRL_INTR_LOW	(1 << 17)
-
-static int ac_ok		= TEGRA_GPIO_PV3;
-static int charge_disable	= TEGRA_GPIO_PR6;
-
-static int charge_init(struct device *dev)
-{
-	int ret = gpio_request(charge_disable, "chg_disable");
-	if (ret < 0)
-		return ret;
-
-	ret = gpio_request(ac_ok, "ac_ok");
-	if (ret < 0) {
-		gpio_free(charge_disable);
-		return ret;
-	}
-
-	ret = gpio_direction_output(charge_disable, 0);
-	if (ret < 0)
-		goto cleanup;
-
-	ret = gpio_direction_input(ac_ok);
-	if (ret < 0)
-		goto cleanup;
-
-	tegra_gpio_enable(ac_ok);
-	tegra_gpio_enable(charge_disable);
-
-	return 0;
-
-cleanup:
-	gpio_free(ac_ok);
-	gpio_free(charge_disable);
-	return ret;
-}
-
-static void charge_exit(struct device *dev)
-{
-	gpio_free(charge_disable);
-}
 
 static int ac_online(void)
 {
-	return !gpio_get_value(ac_ok);
-}
-
-static void set_charge(int flags)
-{
-	if (flags == PDA_POWER_CHARGE_AC)
-		gpio_set_value(charge_disable, 0);
-	else if (!flags)
-		gpio_set_value(charge_disable, 1);
-	/* USB charging not supported on Aruba */
+	return 1;
 }
 
 static struct resource aruba_pda_resources[] = {
 	[0] = {
 		.name	= "ac",
-		.start	= TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PV3),
-		.end	= TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PV3),
-		.flags	= (IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE |
-			   IORESOURCE_IRQ_LOWEDGE),
 	},
 };
 
 static struct pda_power_pdata aruba_pda_data = {
 	.is_ac_online	= ac_online,
-	.exit		= charge_exit,
-	.init		= charge_init,
-	.set_charge	= set_charge,
 };
 
 static struct platform_device aruba_pda_power_device = {
@@ -118,130 +53,6 @@ static struct platform_device aruba_pda_power_device = {
 	},
 };
 
-
-static struct regulator_consumer_supply tps658621_sm0_supply[] = {
-	REGULATOR_SUPPLY("vdd_core", NULL),
-};
-static struct regulator_consumer_supply tps658621_sm1_supply[] = {
-	REGULATOR_SUPPLY("vdd_cpu", NULL),
-};
-static struct regulator_consumer_supply tps658621_sm2_supply[] = {
-	REGULATOR_SUPPLY("vdd_sm2", NULL),
-};
-static struct regulator_consumer_supply tps658621_ldo0_supply[] = {
-	REGULATOR_SUPPLY("p_cam_avdd", NULL),
-};
-static struct regulator_consumer_supply tps658621_ldo1_supply[] = {
-	REGULATOR_SUPPLY("avdd_pll", NULL),
-};
-static struct regulator_consumer_supply tps658621_ldo2_supply[] = {
-	REGULATOR_SUPPLY("vdd_rtc", NULL),
-};
-static struct regulator_consumer_supply tps658621_ldo3_supply[] = {
-	REGULATOR_SUPPLY("avdd_usb", NULL),
-	REGULATOR_SUPPLY("avdd_usb_pll", NULL),
-	REGULATOR_SUPPLY("avdd_lvds", NULL),
-};
-static struct regulator_consumer_supply tps658621_ldo4_supply[] = {
-	REGULATOR_SUPPLY("avdd_osc", NULL),
-	REGULATOR_SUPPLY("vddio_sys", "panjit_touch"),
-};
-static struct regulator_consumer_supply tps658621_ldo5_supply[] = {
-	REGULATOR_SUPPLY("vcore_mmc", "sdhci-tegra.1"),
-	REGULATOR_SUPPLY("vcore_mmc", "sdhci-tegra.3"),
-};
-static struct regulator_consumer_supply tps658621_ldo6_supply[] = {
-	REGULATOR_SUPPLY("vddio_vi", NULL),
-};
-static struct regulator_consumer_supply tps658621_ldo7_supply[] = {
-	REGULATOR_SUPPLY("avdd_hdmi", NULL),
-	REGULATOR_SUPPLY("vdd_fuse", NULL),
-};
-static struct regulator_consumer_supply tps658621_ldo8_supply[] = {
-	REGULATOR_SUPPLY("avdd_hdmi_pll", NULL),
-};
-static struct regulator_consumer_supply tps658621_ldo9_supply[] = {
-	REGULATOR_SUPPLY("avdd_2v85", NULL),
-	REGULATOR_SUPPLY("vdd_ddr_rx", NULL),
-	REGULATOR_SUPPLY("avdd_amp", NULL),
-};
-
-#define REGULATOR_INIT(_id, _minmv, _maxmv)				\
-	{								\
-		.constraints = {					\
-			.min_uV = (_minmv)*1000,			\
-			.max_uV = (_maxmv)*1000,			\
-			.valid_modes_mask = (REGULATOR_MODE_NORMAL |	\
-					     REGULATOR_MODE_STANDBY),	\
-			.valid_ops_mask = (REGULATOR_CHANGE_MODE |	\
-					   REGULATOR_CHANGE_STATUS |	\
-					   REGULATOR_CHANGE_VOLTAGE),	\
-		},							\
-		.num_consumer_supplies = ARRAY_SIZE(tps658621_##_id##_supply),\
-		.consumer_supplies = tps658621_##_id##_supply,		\
-	}
-
-static struct regulator_init_data sm0_data = REGULATOR_INIT(sm0, 725, 1500);
-static struct regulator_init_data sm1_data = REGULATOR_INIT(sm1, 725, 1500);
-static struct regulator_init_data sm2_data = REGULATOR_INIT(sm2, 3000, 4550);
-static struct regulator_init_data ldo0_data = REGULATOR_INIT(ldo0, 1250, 3300);
-static struct regulator_init_data ldo1_data = REGULATOR_INIT(ldo1, 725, 1500);
-static struct regulator_init_data ldo2_data = REGULATOR_INIT(ldo2, 725, 1500);
-static struct regulator_init_data ldo3_data = REGULATOR_INIT(ldo3, 1250, 3300);
-static struct regulator_init_data ldo4_data = REGULATOR_INIT(ldo4, 1700, 2475);
-static struct regulator_init_data ldo5_data = REGULATOR_INIT(ldo5, 1250, 3300);
-static struct regulator_init_data ldo6_data = REGULATOR_INIT(ldo6, 1250, 3300);
-static struct regulator_init_data ldo7_data = REGULATOR_INIT(ldo7, 1250, 3300);
-static struct regulator_init_data ldo8_data = REGULATOR_INIT(ldo8, 1250, 3300);
-static struct regulator_init_data ldo9_data = REGULATOR_INIT(ldo9, 1250, 3300);
-
-static struct tps6586x_rtc_platform_data rtc_data = {
-	.irq = TEGRA_NR_IRQS + TPS6586X_INT_RTC_ALM1,
-};
-
-#define TPS_REG(_id, _data)			\
-	{					\
-		.id = TPS6586X_ID_##_id,	\
-		.name = "tps6586x-regulator",	\
-		.platform_data = _data,		\
-	}
-
-static struct tps6586x_subdev_info tps_devs[] = {
-	TPS_REG(SM_0, &sm0_data),
-	TPS_REG(SM_1, &sm1_data),
-	TPS_REG(SM_2, &sm2_data),
-	TPS_REG(LDO_0, &ldo0_data),
-	TPS_REG(LDO_1, &ldo1_data),
-	TPS_REG(LDO_2, &ldo2_data),
-	TPS_REG(LDO_3, &ldo3_data),
-	TPS_REG(LDO_4, &ldo4_data),
-	TPS_REG(LDO_5, &ldo5_data),
-	TPS_REG(LDO_6, &ldo6_data),
-	TPS_REG(LDO_7, &ldo7_data),
-	TPS_REG(LDO_8, &ldo8_data),
-	TPS_REG(LDO_9, &ldo9_data),
-	{
-		.id	= 0,
-		.name	= "tps6586x-rtc",
-		.platform_data = &rtc_data,
-	},
-};
-
-static struct tps6586x_platform_data tps_platform = {
-	.irq_base = TEGRA_NR_IRQS,
-	.num_subdevs = ARRAY_SIZE(tps_devs),
-	.subdevs = tps_devs,
-	.gpio_base = TEGRA_NR_GPIOS,
-};
-
-static struct i2c_board_info __initdata aruba_regulators[] = {
-	{
-		I2C_BOARD_INFO("tps6586x", 0x34),
-		.irq		= INT_EXTERNAL_PMU,
-		.platform_data	= &tps_platform,
-	},
-};
-
 static struct tegra_suspend_platform_data aruba_suspend_data = {
 	.cpu_timer	= 2000,
 	.cpu_off_timer	= 0,
@@ -251,29 +62,15 @@ static struct tegra_suspend_platform_data aruba_suspend_data = {
 	.separate_req	= true,
 	.corereq_high	= false,
 	.sysclkreq_high	= true,
-	.wake_enb	= 0, /* !!!FIXME!!! THIS IS A VENTANA PIN ASSIGNMENT TEGRA_WAKE_GPIO_PV2, */
+	.wake_enb	= 0, /* !!!FIXME!!! VENTANA PIN ASSIGNMENT WAS TEGRA_WAKE_GPIO_PV2, */
 	.wake_high	= 0,
-	.wake_low	= 0, /* !!!FIXME!!! THIS IS A VENTANA PIN ASSIGNMENT TEGRA_WAKE_GPIO_PV2, */
+	.wake_low	= 0, /* !!!FIXME!!! VENTANA PIN ASSIGNMENT WAS TEGRA_WAKE_GPIO_PV2, */
 	.wake_any	= 0,
 };
 
 int __init aruba_regulator_init(void)
 {
-	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
-	u32 pmc_ctrl;
-
-	/* configure the power management controller to trigger PMU
-	 * interrupts when low */
-	pmc_ctrl = readl(pmc + PMC_CTRL);
-	writel(pmc_ctrl | PMC_CTRL_INTR_LOW, pmc + PMC_CTRL);
 	platform_device_register(&aruba_pda_power_device);
-	i2c_register_board_info(4, aruba_regulators, 1);
 	tegra_init_suspend(&aruba_suspend_data);
 	return 0;
 }
-#else
-int __init aruba_regulator_init(void)
-{
-	return 0;
-}
-#endif
