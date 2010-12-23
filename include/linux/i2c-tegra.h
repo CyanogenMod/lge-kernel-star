@@ -34,4 +34,13 @@ struct tegra_i2c_platform_data {
 	u16 slave_addr;
 };
 
+struct tegra_i2c_slave_platform_data {
+	int adapter_nr;
+	const struct tegra_pingroup_config *pinmux;
+	int bus_mux_len;
+	unsigned long bus_clk_rate;
+	int max_rx_buffer_size;
+	int max_tx_buffer_size;
+};
+
 #endif /* _LINUX_I2C_TEGRA_H */
