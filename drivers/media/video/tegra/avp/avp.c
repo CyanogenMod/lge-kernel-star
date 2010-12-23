@@ -111,7 +111,7 @@ struct avp_info {
 
 	struct trpc_node		*rpc_node;
 	struct miscdevice		misc_dev;
-	bool				opened;
+	int 				refcount;
 	struct mutex			open_lock;
 
 	spinlock_t			state_lock;
@@ -1328,16 +1328,13 @@ static int tegra_avp_open(struct inode *inode, struct file *file)
 	nonseekable_open(inode, file);
 
 	mutex_lock(&avp->open_lock);
-	/* only one userspace client at a time */
-	if (avp->opened) {
-		pr_err("%s: already have client, aborting\n", __func__);
-		ret = -EBUSY;
-		goto out;
-	}
 
-	ret = avp_init(avp, TEGRA_AVP_KERNEL_FW);
-	avp->opened = !ret;
-out:
+	if (!avp->refcount)
+		ret = avp_init(avp, TEGRA_AVP_KERNEL_FW);
+
+	if (!ret)
+		avp->refcount++;
+
 	mutex_unlock(&avp->open_lock);
 	return ret;
 }
@@ -1349,15 +1346,16 @@ static int tegra_avp_release(struct inode *inode, struct file *file)
 
 	pr_info("%s: release\n", __func__);
 	mutex_lock(&avp->open_lock);
-	if (!avp->opened) {
+	if (!avp->refcount) {
 		pr_err("%s: releasing while in invalid state\n", __func__);
 		ret = -EINVAL;
 		goto out;
 	}
+	if (avp->refcount > 0)
+		avp->refcount--;
+	if (!avp->refcount)
+		avp_uninit(avp);
 
-	avp_uninit(avp);
-
-	avp->opened = false;
 out:
 	mutex_unlock(&avp->open_lock);
 	return ret;
@@ -1681,12 +1679,11 @@ static int tegra_avp_remove(struct platform_device *pdev)
 		return 0;
 
 	mutex_lock(&avp->open_lock);
-	if (avp->opened) {
+	if (avp->refcount) {
 		mutex_unlock(&avp->open_lock);
 		return -EBUSY;
 	}
 	/* ensure that noone can open while we tear down */
-	avp->opened = true;
 	mutex_unlock(&avp->open_lock);
 
 	misc_deregister(&avp->misc_dev);
