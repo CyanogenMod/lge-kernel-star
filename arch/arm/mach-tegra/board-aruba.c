@@ -150,7 +150,7 @@ static __initdata struct tegra_clk_init_table aruba_clk_init_table[] = {
 	{ "uartc",	"clk_m",	13000000,	true},
 	{ "uartd",	"clk_m",	13000000,	true},
 	{ "uarte",	"clk_m",	13000000,	true},
-	{ "pll_m",	NULL,		600000000,	true},
+	{ "pll_m",	NULL,		0,		true},
 	{ "blink",      "clk_32k",      32768,          false},
 	{ "pll_p_out4",	"pll_p",	24000000,	true },
 	{ "pwm",	"clk_32k",	32768,		false},
