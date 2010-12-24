@@ -33,6 +33,7 @@
 #include "power.h"
 #include "wakeups-t2.h"
 #include "board.h"
+#include "board-ventana.h"
 
 #define PMC_CTRL		0x0
 #define PMC_CTRL_INTR_LOW	(1 << 17)
@@ -209,5 +210,29 @@ int __init ventana_regulator_init(void)
 	writel(pmc_ctrl | PMC_CTRL_INTR_LOW, pmc + PMC_CTRL);
 	i2c_register_board_info(4, ventana_regulators, 1);
 	tegra_init_suspend(&ventana_suspend_data);
+
 	return 0;
 }
+
+static int __init ventana_pcie_init()
+{
+	int ret;
+
+	ret = gpio_request(TPS6586X_GPIO_BASE, "pcie_vdd");
+	if (ret < 0)
+		goto fail;
+
+	ret = gpio_direction_output(TPS6586X_GPIO_BASE, 1);
+	if (ret < 0)
+		goto fail;
+
+	gpio_export(TPS6586X_GPIO_BASE, false);
+	return 0;
+
+fail:
+	pr_err("%s: gpio_request failed #%d\n", __func__, TPS6586X_GPIO_BASE);
+	gpio_free(TPS6586X_GPIO_BASE);
+	return ret;
+}
+
+late_initcall(ventana_pcie_init);
