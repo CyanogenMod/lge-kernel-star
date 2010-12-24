@@ -33,18 +33,31 @@
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 
+/*
+* Scrollwheel is connected to KBC pins but has it's own
+* driver using those pins as gpio.
+* In case of using scrollwheel  Row3 and Col3/4/5
+* should NOT be configured as KBC
+*/
+#ifdef CONFIG_INPUT_ALPS_GPIO_SCROLLWHEEL
+#define KBC_ROWS	3
+#define KBC_COLS	2
+#else
+#define KBC_ROWS	4
+#define KBC_COLS	6
+#endif
 
 static int plain_kbd_keycode[] = {
-	KEY_POWER, KEY_DOWN, KEY_RIGHT, KEY_SELECT,
-		KEY_LEFT, KEY_UP, KEY_RESERVED, KEY_RESERVED,
-	KEY_HOME, KEY_BACK, KEY_NUMERIC_6, KEY_NUMERIC_9,
-		KEY_NUMERIC_8, KEY_NUMERIC_POUND, KEY_DOT, KEY_RESERVED,
-	KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_NUMERIC_3,
-		KEY_NUMERIC_5, KEY_NUMERIC_2, KEY_NUMERIC_7, KEY_RESERVED,
+	KEY_POWER, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
+		KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
+	KEY_HOME, KEY_BACK, KEY_RESERVED, KEY_RESERVED,
+		KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
+	KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
+		KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
 	KEY_VOLUMEDOWN, KEY_VOLUMEUP, KEY_RESERVED, KEY_RESERVED,
-		KEY_RESERVED, KEY_RESERVED, KEY_NUMERIC_4, KEY_RESERVED,
-	KEY_END, KEY_BACK, KEY_RESERVED, KEY_MENU,
-		KEY_RESERVED, KEY_RESERVED, KEY_NUMERIC_1, KEY_RESERVED,
+		KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
+	KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
+		KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
 	KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
 		KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
 	KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
@@ -70,16 +83,16 @@ static int plain_kbd_keycode[] = {
 };
 
 static int fn_kbd_keycode[] = {
-	KEY_POWER, KEY_DOWN, KEY_RIGHT, KEY_SELECT,
-		KEY_LEFT, KEY_UP, KEY_RESERVED, KEY_RESERVED,
-	KEY_HOME, KEY_BACK, KEY_NUMERIC_6, KEY_NUMERIC_9,
-		KEY_NUMERIC_8, KEY_NUMERIC_POUND, KEY_DOT, KEY_RESERVED,
-	KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_NUMERIC_3,
-		KEY_NUMERIC_5, KEY_NUMERIC_2, KEY_NUMERIC_7, KEY_RESERVED,
+	KEY_POWER, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
+		KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
+	KEY_HOME, KEY_BACK, KEY_RESERVED, KEY_RESERVED,
+		KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
+	KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
+		KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
 	KEY_VOLUMEDOWN, KEY_VOLUMEUP, KEY_RESERVED, KEY_RESERVED,
-		KEY_RESERVED, KEY_RESERVED, KEY_NUMERIC_4, KEY_RESERVED,
-	KEY_END, KEY_BACK, KEY_RESERVED, KEY_MENU,
-		KEY_RESERVED, KEY_RESERVED, KEY_NUMERIC_1, KEY_RESERVED,
+		KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
+	KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
+		KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
 	KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
 		KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
 	KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
@@ -159,18 +172,27 @@ int __init whistler_kbc_init(void)
 	 * Setup the pin configuration information.
 	 */
 	for (i = 0; i < KBC_MAX_ROW; i++) {
-		data->pin_cfg[i].num = i;
-		data->pin_cfg[i].is_row = true;
-		data->pin_cfg[i].is_col = false;
+		if (i < KBC_ROWS) {
+			data->pin_cfg[i].num = i;
+			data->pin_cfg[i].is_row = true;
+			data->pin_cfg[i].is_col = false;
+		} else {
+			data->pin_cfg[i].is_row = false;
+			data->pin_cfg[i].is_col = false;
+		}
 	}
 
-	for (j = 0; j < 7/*KBC_MAX_COL*/; j++) {
-		data->pin_cfg[i + j].num = j;
-		data->pin_cfg[i + j].is_row = false;
-		data->pin_cfg[i + j].is_col = true;
+	for (j = 0; j < KBC_MAX_COL; j++) {
+		if (j < KBC_COLS) {
+			data->pin_cfg[i + j].num = j;
+			data->pin_cfg[i + j].is_row = false;
+			data->pin_cfg[i + j].is_col = true;
+		} else {
+			data->pin_cfg[i + j].is_row = false;
+			data->pin_cfg[i + j].is_col = false;
+		}
 	}
 
-	/* tegra-kbc will use default keycodes. */
 	data->plain_keycode = plain_kbd_keycode;
 	data->fn_keycode = fn_kbd_keycode;
 	data->filter_keys = true;
