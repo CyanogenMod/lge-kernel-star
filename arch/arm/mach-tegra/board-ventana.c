@@ -428,6 +428,7 @@ static void __init tegra_ventana_init(void)
 	ventana_sensors_init();
 	ventana_bt_rfkill();
 	ventana_power_off_init();
+	ventana_emc_init();
 }
 
 MACHINE_START(VENTANA, "ventana")

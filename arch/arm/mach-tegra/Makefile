@@ -96,6 +96,7 @@ obj-${CONFIG_MACH_VENTANA}              += board-ventana-power.o
 obj-${CONFIG_MACH_VENTANA}              += board-ventana-panel.o
 obj-${CONFIG_MACH_VENTANA}              += board-ventana-sensors.o
 obj-${CONFIG_MACH_VENTANA}              += board-ventana-kbc.o
+obj-${CONFIG_MACH_VENTANA}              += board-ventana-memory.o
 
 # Aruba
 
