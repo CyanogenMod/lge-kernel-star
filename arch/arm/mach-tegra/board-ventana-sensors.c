@@ -19,23 +19,23 @@
  */
 
 #include <linux/i2c.h>
-#include <mach/gpio.h>
 #include <linux/i2c/nct1008.h>
 #include <linux/akm8975.h>
+#include <linux/i2c/pca954x.h>
+#include <linux/i2c/pca953x.h>
 
+#include <mach/gpio.h>
+
+#include <media/ov5650.h>
 #include <generated/mach-types.h>
 
 #include "gpio-names.h"
-#include <linux/i2c/pca954x.h>
-#include <linux/i2c/pca953x.h>
-#include <media/ov5650.h>
+#include "board-ventana.h"
 
 #define ISL29018_IRQ_GPIO	TEGRA_GPIO_PZ2
 #define AKM8975_IRQ_GPIO	TEGRA_GPIO_PN5
-
 #define CAMERA_POWER_GPIO	TEGRA_GPIO_PV4
 #define CAMERA_CSI_MUX_SEL_GPIO	TEGRA_GPIO_PBB4
-
 #define AC_PRESENT_GPIO		TEGRA_GPIO_PV3
 
 static int ventana_camera_init(void)
@@ -179,15 +179,6 @@ int __init ventana_sensors_init(void)
 }
 
 #ifdef CONFIG_VIDEO_OV5650
-
-#define AVDD_DSI_CSI_ENB_GPIO	TEGRA_NR_GPIOS + 1 /* TPS6586X_GPIO2 */
-
-#define TCA6416_GPIO_BASE	TEGRA_NR_GPIOS + 4
-#define CAM2_PWR_DN_GPIO	TCA6416_GPIO_BASE + 4 /* TCA6416_GPIO4 */
-#define CAM2_RST_L_GPIO		TCA6416_GPIO_BASE + 5 /* TCA6416_GPIO5 */
-#define CAM2_AF_PWR_DN_L_GPIO	TCA6416_GPIO_BASE + 6 /* TCA6416_GPIO6 */
-#define CAM2_LDO_SHUTDN_L_GPIO	TCA6416_GPIO_BASE + 7 /* TCA6416_GPIO7 */
-#define CAM2_I2C_MUX_RST_GPIO	TCA6416_GPIO_BASE + 15 /* TCA6416_GPIO15 */
 
 struct ov5650_gpios {
 	const char *name;
