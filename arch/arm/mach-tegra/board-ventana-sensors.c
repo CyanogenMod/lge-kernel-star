@@ -92,7 +92,8 @@ static void ventana_bq20z75_init(void)
 struct nct1008_platform_data ventana_nct1008_pdata = {
 	.conv_rate = 5,
 	.config = NCT1008_CONFIG_ALERT_DISABLE,
-	.thermal_threshold = 110,
+	.thermal_threshold = 120,
+	.offset = 0,
 };
 
 static const struct i2c_board_info ventana_i2c0_board_info[] = {
