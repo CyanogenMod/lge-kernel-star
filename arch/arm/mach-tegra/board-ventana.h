@@ -25,4 +25,18 @@ int ventana_panel_init(void);
 int ventana_sensors_init(void);
 int ventana_kbc_init(void);
 
+/* external gpios */
+
+/* TPS6586X gpios */
+#define TPS6586X_GPIO_BASE	TEGRA_NR_GPIOS
+#define AVDD_DSI_CSI_ENB_GPIO	TPS6586X_GPIO_BASE + 1 /* gpio2 */
+
+/* TCA6416 gpios */
+#define TCA6416_GPIO_BASE	TEGRA_NR_GPIOS + 4
+#define CAM2_PWR_DN_GPIO	TCA6416_GPIO_BASE + 4 /* gpio4 */
+#define CAM2_RST_L_GPIO		TCA6416_GPIO_BASE + 5 /* gpio5 */
+#define CAM2_AF_PWR_DN_L_GPIO	TCA6416_GPIO_BASE + 6 /* gpio6 */
+#define CAM2_LDO_SHUTDN_L_GPIO	TCA6416_GPIO_BASE + 7 /* gpio7 */
+#define CAM2_I2C_MUX_RST_GPIO	TCA6416_GPIO_BASE + 15 /* gpio15 */
+
 #endif
