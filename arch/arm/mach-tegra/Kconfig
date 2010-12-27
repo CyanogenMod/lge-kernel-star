@@ -91,6 +91,7 @@ config MACH_WARIO
 # Aruba
 config MACH_ARUBA
        bool "Aruba board"
+       depends on ARCH_TEGRA_3x_SOC
        select TEGRA_FPGA_PLATFORM
        help
          Support for NVIDIA Aruba2 FPGA development platform
