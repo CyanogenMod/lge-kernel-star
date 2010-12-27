@@ -45,12 +45,14 @@ comment "Tegra board type"
 
 config MACH_HARMONY
        bool "Harmony board"
+       depends on ARCH_TEGRA_2x_SOC
        select MACH_HAS_SND_SOC_TEGRA_WM8903
        help
          Support for NVIDIA Harmony development platform
 
 config MACH_VENTANA
        bool "Ventana board"
+       depends on ARCH_TEGRA_2x_SOC
        select MACH_HAS_SND_SOC_TEGRA_WM8903
        help
          Support for NVIDIA Ventana development platform
