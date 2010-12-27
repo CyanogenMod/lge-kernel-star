@@ -50,63 +50,88 @@ static struct regulator_consumer_supply max8907c_SD3_supply[] = {
 };
 
 static struct regulator_consumer_supply max8907c_LDO1_supply[] = {
+	REGULATOR_SUPPLY("vddio_rx_ddr", NULL),
 };
 
 static struct regulator_consumer_supply max8907c_LDO2_supply[] = {
+	REGULATOR_SUPPLY("avdd_plla", NULL),
 };
 
 static struct regulator_consumer_supply max8907c_LDO3_supply[] = {
+	REGULATOR_SUPPLY("vdd_vcom_1v8b", NULL),
 };
 
 static struct regulator_consumer_supply max8907c_LDO4_supply[] = {
+	REGULATOR_SUPPLY("avdd_usb", NULL),
+	REGULATOR_SUPPLY("avdd_usb_pll", NULL),
 };
 
 static struct regulator_consumer_supply max8907c_LDO5_supply[] = {
+	REGULATOR_SUPPLY("vdd_vcore_mmc", NULL),
 };
 
 static struct regulator_consumer_supply max8907c_LDO6_supply[] = {
+	REGULATOR_SUPPLY("avdd_hdmi_pll", NULL),
 };
 
 static struct regulator_consumer_supply max8907c_LDO7_supply[] = {
+	REGULATOR_SUPPLY("avddio_audio", NULL),
 };
 
 static struct regulator_consumer_supply max8907c_LDO8_supply[] = {
+	REGULATOR_SUPPLY("vdd_vcom_3v0", NULL),
 };
 
 static struct regulator_consumer_supply max8907c_LDO9_supply[] = {
+	REGULATOR_SUPPLY("vdd_cam1", NULL),
 };
 
 static struct regulator_consumer_supply max8907c_LDO10_supply[] = {
+	REGULATOR_SUPPLY("avdd_usb_ic", NULL),
 };
 
 static struct regulator_consumer_supply max8907c_LDO11_supply[] = {
+	REGULATOR_SUPPLY("vddio_pex_clk", NULL),
+	REGULATOR_SUPPLY("avdd_hdmi", NULL),
 };
 
 static struct regulator_consumer_supply max8907c_LDO12_supply[] = {
+	REGULATOR_SUPPLY("vddio_sdio", NULL),
 };
 
 static struct regulator_consumer_supply max8907c_LDO13_supply[] = {
+	REGULATOR_SUPPLY("vdd_vcore_phtn", NULL),
+	REGULATOR_SUPPLY("vdd_vcore_af", NULL),
 };
 
 static struct regulator_consumer_supply max8907c_LDO14_supply[] = {
+	REGULATOR_SUPPLY("avdd_vdac", NULL),
 };
 
 static struct regulator_consumer_supply max8907c_LDO15_supply[] = {
+	REGULATOR_SUPPLY("vdd_vcore_temp", NULL),
+	REGULATOR_SUPPLY("vdd_vcore_hdcp", NULL),
 };
 
 static struct regulator_consumer_supply max8907c_LDO16_supply[] = {
+	REGULATOR_SUPPLY("vdd_vbrtr", NULL),
 };
 
 static struct regulator_consumer_supply max8907c_LDO17_supply[] = {
+	REGULATOR_SUPPLY("vddio_mipi", NULL),
 };
 
 static struct regulator_consumer_supply max8907c_LDO18_supply[] = {
+	REGULATOR_SUPPLY("vddio_vi", NULL),
 };
 
 static struct regulator_consumer_supply max8907c_LDO19_supply[] = {
+	REGULATOR_SUPPLY("vddio_lx", NULL),
 };
 
 static struct regulator_consumer_supply max8907c_LDO20_supply[] = {
+	REGULATOR_SUPPLY("vddio_ddr_1v2", NULL),
+	REGULATOR_SUPPLY("vddio_hsic", NULL),
 };
 
 #define MAX8907C_REGULATOR_DEVICE(_id, _minmv, _maxmv)			\
