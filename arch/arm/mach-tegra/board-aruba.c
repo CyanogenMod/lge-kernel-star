@@ -54,6 +54,8 @@
 #include "gpio-names.h"
 #include "fuse.h"
 
+#define ENABLE_USB_HOST 0
+
 static struct plat_serial8250_port debug_uart_platform_data[] = {
 	{
 		.membase	= IO_ADDRESS(TEGRA_UARTA_BASE),
@@ -338,7 +340,9 @@ static struct platform_device tegra_rtc_device = {
 };
 
 static struct platform_device *aruba_devices[] __initdata = {
+#if ENABLE_USB_HOST
 	&tegra_otg_device,
+#endif
 	&androidusb_device,
 	&debug_uart,
 	&tegra_uart1_device,
@@ -348,7 +352,9 @@ static struct platform_device *aruba_devices[] __initdata = {
 	&pmu_device,
 	&tegra_rtc_device,
 	&tegra_udc_device,
+#if ENABLE_USB_HOST
 	&tegra_ehci2_device,
+#endif
 #if defined(CONFIG_TEGRA_IOVMM_SMMU)
 	&tegra_smmu_device,
 #endif
@@ -389,11 +395,13 @@ static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
 	},
 };
 
+#if ENABLE_USB_HOST
 static void aruba_usb_init(void)
 {
 	tegra_ehci3_device.dev.platform_data=&tegra_ehci_pdata[2];
 	platform_device_register(&tegra_ehci3_device);
 }
+#endif
 
 struct platform_device *tegra_usb_otg_host_register(void)
 {
@@ -459,7 +467,9 @@ static void __init tegra_aruba_init(void)
 	aruba_regulator_init();
 	aruba_touch_init();
 	aruba_keys_init();
+#if ENABLE_USB_HOST
 	aruba_usb_init();
+#endif
 	aruba_panel_init();
 	aruba_sensors_init();
 	aruba_bt_rfkill();
