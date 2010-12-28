@@ -74,9 +74,37 @@ static struct platform_device debug_uart = {
 	},
 };
 
+#ifdef CONFIG_BCM4329_RFKILL
+
+static struct resource whistler_bcm4329_rfkill_resources[] = {
+	{
+		.name	= "bcm4329_nshutdown_gpio",
+		.start	= TEGRA_GPIO_PU0,
+		.end	= TEGRA_GPIO_PU0,
+		.flags	= IORESOURCE_IO,
+	},
+};
+
+static struct platform_device whistler_bcm4329_rfkill_device = {
+	.name		= "bcm4329_rfkill",
+	.id		= -1,
+	.num_resources	= ARRAY_SIZE(whistler_bcm4329_rfkill_resources),
+	.resource	= whistler_bcm4329_rfkill_resources,
+};
+
+static noinline void __init whistler_bt_rfkill(void)
+{
+	platform_device_register(&whistler_bcm4329_rfkill_device);
+	return;
+}
+#else
+static inline void whistler_bt_rfkill(void) { }
+#endif
+
 static __initdata struct tegra_clk_init_table whistler_clk_init_table[] = {
 	/* name		parent		rate		enabled */
 	{ "uarta",	"pll_p",	216000000,	true},
+	{ "uartc",	"pll_m",	600000000,	false},
 	{ "pwm",	"clk_32k",	32768,		false},
 	{ "kbc",	"clk_32k",	32768,		true},
 	{ NULL,		NULL,		0,		0},
@@ -152,6 +180,7 @@ static struct platform_device whistler_scroll_device = {
 static struct platform_device *whistler_devices[] __initdata = {
 	&tegra_otg_device,
 	&debug_uart,
+	&tegra_uartc_device,
 	&pmu_device,
 	&tegra_udc_device,
 	&tegra_gart_device,
@@ -184,6 +213,7 @@ static void __init tegra_whistler_init(void)
 	whistler_regulator_init();
 	whistler_panel_init();
 	whistler_kbc_init();
+	whistler_bt_rfkill();
 	whistler_scroll_init();
 }
 
