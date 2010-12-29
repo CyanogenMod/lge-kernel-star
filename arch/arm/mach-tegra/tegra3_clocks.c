@@ -182,9 +182,7 @@
 #define	SUPER_IDLE_SOURCE_SHIFT		0
 
 #define SUPER_CLK_DIVIDER		0x04
-#define IS_PLLX_DIV2_BYPASS		(clk_readl(0x370) & (1<<16))
-/* FIXME: replace with global is_lp_cluster() ? */
-#define IS_LP_CLUSTER			(flow_readl(0x2c) & 1)
+#define IS_PLLX_DIV2			(!(clk_readl(0x370) & (1<<16)) && is_lp_cluster())
 
 #define BUS_CLK_DISABLE			(1<<3)
 #define BUS_CLK_DIV_MASK		0x3
@@ -203,7 +201,6 @@
 
 static void __iomem *reg_clk_base = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
 static void __iomem *reg_pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
-static void __iomem *reg_flow_base = IO_ADDRESS(TEGRA_FLOW_CTRL_BASE);
 
 /*
  * Some peripheral clocks share an enable bit, so refcount the enable bits
@@ -219,8 +216,6 @@ static int tegra_periph_clk_enable_refcount[CLK_OUT_ENB_NUM * 32];
 	__raw_writel(value, (u32)reg_pmc_base + (reg))
 #define pmc_readl(reg) \
 	__raw_readl((u32)reg_pmc_base + (reg))
-#define flow_readl(reg) \
-	__raw_readl((u32)reg_flow_base + (reg))
 
 static inline u32 periph_clk_to_reg(
 	struct clk *c, u32 reg_L, u32 reg_V, int offs)
@@ -549,7 +544,7 @@ out:
 
 static unsigned long tegra3_cpu_get_max_rate(struct clk *c)
 {
-	if (IS_LP_CLUSTER)
+	if (is_lp_cluster())
 		return c->u.cpu.lp_max_rate;
 	else
 		return c->max_rate;
@@ -918,30 +913,31 @@ static struct clk_ops tegra_pll_ops = {
 /* Clock divider ops */
 static void tegra3_pll_div_clk_init(struct clk *c)
 {
-	u32 val = clk_readl(c->reg);
-	u32 divu71;
-	val >>= c->reg_shift;
-	c->state = (val & PLL_OUT_CLKEN) ? ON : OFF;
-	if (!(val & PLL_OUT_RESET_DISABLE))
-		c->state = OFF;
-
 	if (c->flags & DIV_U71) {
+		u32 divu71;
+		u32 val = clk_readl(c->reg);
+		val >>= c->reg_shift;
+		c->state = (val & PLL_OUT_CLKEN) ? ON : OFF;
+		if (!(val & PLL_OUT_RESET_DISABLE))
+			c->state = OFF;
+
 		divu71 = (val & PLL_OUT_RATIO_MASK) >> PLL_OUT_RATIO_SHIFT;
 		c->div = (divu71 + 2);
 		c->mul = 2;
 	} else if (c->flags & DIV_2) {
+		c->state = ON;
 		if (c->flags & PLLD) {
 			c->div = 2;
 			c->mul = 1;
 		}
 		else if (c->flags & PLLX) {
-			c->div = (IS_LP_CLUSTER &&
-					(!IS_PLLX_DIV2_BYPASS)) ? 2 : 1;
+			c->div = (IS_PLLX_DIV2) ? 2 : 1;
 			c->mul = 1;
 		}
 		else
 			BUG();
 	} else {
+		c->state = ON;
 		c->div = 1;
 		c->mul = 1;
 	}
@@ -1020,7 +1016,7 @@ static int tegra3_pll_div_clk_set_rate(struct clk *c, unsigned long rate)
 			return clk_set_rate(c->parent, rate * 2);
 		}
 		else if (c->flags & PLLX) {
-			if (IS_LP_CLUSTER && (!IS_PLLX_DIV2_BYPASS))
+			if (IS_PLLX_DIV2)
 				rate *= 2;
 			return clk_set_rate(c->parent, rate);
 		}
@@ -1045,7 +1041,7 @@ static long tegra3_pll_div_clk_round_rate(struct clk *c, unsigned long rate)
 
 static void tegra3_pllx_div_clk_recalculate_rate(struct clk *c)
 {
-	c->div = (IS_LP_CLUSTER && (!IS_PLLX_DIV2_BYPASS)) ? 2 : 1;
+	c->div = (IS_PLLX_DIV2) ? 2 : 1;
 }
 
 static struct clk_ops tegra_pll_div_ops = {
@@ -2207,7 +2203,6 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("bsea",	"tegra-avp",		"bsea",	62,	0,	250000000, mux_clk_m, 			0),
 	PERIPH_CLK("vde",	"tegra-avp",		"vde",	61,	0x1c8,	250000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71), /* scales with voltage and process_id */
 	PERIPH_CLK("csite",	"csite",		NULL,	73,	0x1d4,	144000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71), /* max rate ??? */
-	/* FIXME: what is la? */
 	PERIPH_CLK("la",	"la",			NULL,	76,	0x1f8,	26000000,  mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
 	PERIPH_CLK("owr",	"tegra_w1",		NULL,	71,	0x1cc,	26000000,  mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
 	PERIPH_CLK("nor",	"nor",			NULL,	42,	0x1d0,	92000000,  mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71), /* requires min voltage */
@@ -2244,6 +2239,7 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("usbd",	"fsl-tegra-udc",	NULL,	22,	0,	480000000, mux_clk_m,			0), /* requires min voltage */
 	PERIPH_CLK("usb2",	"tegra-ehci.1",		NULL,	58,	0,	480000000, mux_clk_m,			0), /* requires min voltage */
 	PERIPH_CLK("usb3",	"tegra-ehci.2",		NULL,	59,	0,	480000000, mux_clk_m,			0), /* requires min voltage */
+	/* FIXME: EMC should be separated as shared bus for EMC DVFS */
 	PERIPH_CLK("emc",	"emc",			NULL,	57,	0x19c,	800000000, mux_pllm_pllc_pllp_clkm,	MUX | DIV_U71 | PERIPH_EMC_ENB),
 	PERIPH_CLK("dsi",	"dsi",			NULL,	48,	0,	500000000, mux_plld_out0,		0), /* scales with voltage */
 	PERIPH_CLK("csi",	"tegra_camera",		"csi",	52,	0,	72000000,  mux_pllp_out3,		0),
@@ -2331,7 +2327,6 @@ static void tegra3_init_one_clock(struct clk *c)
 	clkdev_add(&c->lookup);
 }
 
-//FIXME: void __init tegra3_init_clocks(void)
 void __init tegra_soc_init_clocks(void)
 {
 	int i;
@@ -2365,6 +2360,11 @@ void __init tegra_soc_init_clocks(void)
 #ifdef CONFIG_PM
 static u32 clk_rst_suspend[RST_DEVICES_NUM + CLK_OUT_ENB_NUM +
 			   PERIPH_CLK_SOURCE_NUM + 15];
+
+unsigned long tegra_get_lpcpu_max_rate(void)
+{
+	return tegra_clk_virtual_cpu.u.cpu.lp_max_rate;
+}
 
 void tegra_clk_suspend(void)
 {

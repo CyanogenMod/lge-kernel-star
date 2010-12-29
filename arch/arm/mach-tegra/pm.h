@@ -76,11 +76,14 @@ static inline int tegra_cluster_control(unsigned int us, unsigned int flags)
 #define tegra_cluster_switch_epilog(flags) do {} while(0)
 static inline unsigned int is_lp_cluster(void)
 { return 0; }
+static inline unsigned long tegra_get_lpcpu_max_rate(void)
+{ return 0; }
 #else
 int tegra_cluster_control(unsigned int us, unsigned int flags);
 void tegra_cluster_switch_prolog(unsigned int flags);
 void tegra_cluster_switch_epilog(unsigned int flags);
 unsigned int is_lp_cluster(void);
+unsigned long tegra_get_lpcpu_max_rate(void);
 #endif
 
 static inline void flowctrl_writel(unsigned long val, unsigned int offs)

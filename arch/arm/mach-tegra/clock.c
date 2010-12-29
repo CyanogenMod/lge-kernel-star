@@ -115,6 +115,14 @@ static unsigned long clk_predict_rate_from_parent(struct clk *c, struct clk *p)
 	return rate;
 }
 
+static unsigned long clk_get_max_rate(struct clk *c)
+{
+	if (c->ops && c->ops->get_max_rate)
+		return c->ops->get_max_rate(c);
+	else
+		return c->max_rate;
+}
+
 /* Must be called with clk_lock(c) held */
 unsigned long clk_get_rate_locked(struct clk *c)
 {
@@ -319,9 +327,7 @@ int clk_set_rate_locked(struct clk *c, unsigned long rate)
 
 	old_rate = clk_get_rate_locked(c);
 
-	max_rate = c->max_rate;
-	if (c->ops && c->ops->get_max_rate)
-		max_rate = c->ops->get_max_rate(c);
+	max_rate = clk_get_max_rate(c);
 	if (rate > max_rate)
 		rate = max_rate;
 
@@ -408,9 +414,7 @@ long clk_round_rate(struct clk *c, unsigned long rate)
 		goto out;
 	}
 
-	max_rate = c->max_rate;
-	if (c->ops && c->ops->get_max_rate)
-		max_rate = c->ops->get_max_rate(c);
+	max_rate = clk_get_max_rate(c);
 	if (rate > max_rate)
 		rate = max_rate;
 
@@ -690,10 +694,7 @@ static void clock_tree_show_one(struct seq_file *s, struct clk *c, int level)
 	const char *state = "uninit";
 	char div[8] = {0};
 	unsigned long rate = clk_get_rate_all_locked(c);
-	unsigned long max_rate = c->max_rate;
-
-	if (c->ops && c->ops->get_max_rate)
-		max_rate = c->ops->get_max_rate(c);
+	unsigned long max_rate = clk_get_max_rate(c);;
 
 	if (c->state == ON)
 		state = "on";

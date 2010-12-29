@@ -177,9 +177,10 @@ static int cluster_switch_prolog_clock(unsigned int flags)
 
 			struct clk *c = tegra_get_clock_by_name("cpu");
 			unsigned long cur_rate = clk_get_rate(c);
-			unsigned long max_rate = clk_get_rate(c); /* !!!FIXME!!! clk_alt_max_rate(c); */
+			unsigned long max_rate = tegra_get_lpcpu_max_rate();
 			int err;
 
+			BUG_ON(max_rate == 0);
 			if (cur_rate/2 > max_rate) {
 				/* PLLX is running too fast for the LP CPU.
 				   Reduce it to LP maximum rate which must
