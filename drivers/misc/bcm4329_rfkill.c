@@ -44,15 +44,19 @@ static struct bcm4329_rfkill_data *bcm4329_rfkill;
 static int bcm4329_bt_rfkill_set_power(void *data, bool blocked)
 {
 	if (blocked) {
-		gpio_direction_output(bcm4329_rfkill->gpio_shutdown, 0);
-		gpio_direction_output(bcm4329_rfkill->gpio_reset, 0);
+		if (bcm4329_rfkill->gpio_shutdown)
+			gpio_direction_output(bcm4329_rfkill->gpio_shutdown, 0);
+		if (bcm4329_rfkill->gpio_reset)
+			gpio_direction_output(bcm4329_rfkill->gpio_reset, 0);
 		if (bcm4329_rfkill->bt_32k_clk)
 			clk_disable(bcm4329_rfkill->bt_32k_clk);
 	} else {
 		if (bcm4329_rfkill->bt_32k_clk)
 			clk_enable(bcm4329_rfkill->bt_32k_clk);
-		gpio_direction_output(bcm4329_rfkill->gpio_shutdown, 1);
-		gpio_direction_output(bcm4329_rfkill->gpio_reset, 1);
+		if (bcm4329_rfkill->gpio_shutdown)
+			gpio_direction_output(bcm4329_rfkill->gpio_shutdown, 1);
+		if (bcm4329_rfkill->gpio_reset)
+			gpio_direction_output(bcm4329_rfkill->gpio_reset, 1);
 	}
 
 	return 0;
@@ -76,42 +80,45 @@ static int bcm4329_rfkill_probe(struct platform_device *pdev)
 
 	bcm4329_rfkill->bt_32k_clk = clk_get(&pdev->dev, "bcm4329_32k_clk");
 	if (IS_ERR(bcm4329_rfkill->bt_32k_clk)) {
-		pr_warn("can't find bcm4329_32k_clk. assuming clock to chip\n");
+		pr_warn("%s: can't find bcm4329_32k_clk.\
+				assuming 32k clock to chip\n", __func__);
 		bcm4329_rfkill->bt_32k_clk = NULL;
 	}
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_IO,
 						"bcm4329_nreset_gpio");
-	if (!res) {
-		pr_err("couldn't find reset gpio\n");
-		goto free_bcm_32k_clk;
+	if (res) {
+		bcm4329_rfkill->gpio_reset = res->start;
+		tegra_gpio_enable(bcm4329_rfkill->gpio_reset);
+		ret = gpio_request(bcm4329_rfkill->gpio_reset,
+						"bcm4329_nreset_gpio");
+	} else {
+		pr_warn("%s : can't find reset gpio.\n", __func__);
+		bcm4329_rfkill->gpio_reset = 0;
 	}
-	bcm4329_rfkill->gpio_reset = res->start;
-	tegra_gpio_enable(bcm4329_rfkill->gpio_reset);
-	ret = gpio_request(bcm4329_rfkill->gpio_reset,
-					"bcm4329_nreset_gpio");
-	if (unlikely(ret))
-		goto free_bcm_32k_clk;
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_IO,
 						"bcm4329_nshutdown_gpio");
-	if (!res) {
-		pr_err("couldn't find shutdown gpio\n");
-		gpio_free(bcm4329_rfkill->gpio_reset);
-		goto free_bcm_32k_clk;
+	if (res) {
+		bcm4329_rfkill->gpio_shutdown = res->start;
+		tegra_gpio_enable(bcm4329_rfkill->gpio_shutdown);
+		ret = gpio_request(bcm4329_rfkill->gpio_shutdown,
+						"bcm4329_nshutdown_gpio");
+	} else {
+		pr_warn("%s : can't find shutdown gpio.\n", __func__);
+		bcm4329_rfkill->gpio_shutdown = 0;
 	}
-	tegra_gpio_enable(bcm4329_rfkill->gpio_shutdown);
-	ret = gpio_request(bcm4329_rfkill->gpio_shutdown,
-					"bcm4329_nshutdown_gpio");
-	if (unlikely(ret)) {
-		gpio_free(bcm4329_rfkill->gpio_reset);
-		goto free_bcm_32k_clk;
-	}
+
+	/* make sure at-least one of the GPIO is defined */
+	if (!bcm4329_rfkill->gpio_reset && !bcm4329_rfkill->gpio_shutdown)
+		goto free_bcm_res;
 
 	if (bcm4329_rfkill->bt_32k_clk && enable)
 		clk_enable(bcm4329_rfkill->bt_32k_clk);
-	gpio_direction_output(bcm4329_rfkill->gpio_shutdown, enable);
-	gpio_direction_output(bcm4329_rfkill->gpio_reset, enable);
+	if (bcm4329_rfkill->gpio_shutdown)
+		gpio_direction_output(bcm4329_rfkill->gpio_shutdown, enable);
+	if (bcm4329_rfkill->gpio_reset)
+		gpio_direction_output(bcm4329_rfkill->gpio_reset, enable);
 
 	bt_rfkill = rfkill_alloc("bcm4329 Bluetooth", &pdev->dev,
 				RFKILL_TYPE_BLUETOOTH, &bcm4329_bt_rfkill_ops,
@@ -133,9 +140,10 @@ static int bcm4329_rfkill_probe(struct platform_device *pdev)
 	return 0;
 
 free_bcm_res:
-	gpio_free(bcm4329_rfkill->gpio_shutdown);
-	gpio_free(bcm4329_rfkill->gpio_reset);
-free_bcm_32k_clk:
+	if (bcm4329_rfkill->gpio_shutdown)
+		gpio_free(bcm4329_rfkill->gpio_shutdown);
+	if (bcm4329_rfkill->gpio_reset)
+		gpio_free(bcm4329_rfkill->gpio_reset);
 	if (bcm4329_rfkill->bt_32k_clk && enable)
 		clk_disable(bcm4329_rfkill->bt_32k_clk);
 	if (bcm4329_rfkill->bt_32k_clk)
@@ -152,8 +160,10 @@ static int bcm4329_rfkill_remove(struct platform_device *pdev)
 		clk_put(bcm4329_rfkill->bt_32k_clk);
 	rfkill_unregister(bt_rfkill);
 	rfkill_destroy(bt_rfkill);
-	gpio_free(bcm4329_rfkill->gpio_shutdown);
-	gpio_free(bcm4329_rfkill->gpio_reset);
+	if (bcm4329_rfkill->gpio_shutdown)
+		gpio_free(bcm4329_rfkill->gpio_shutdown);
+	if (bcm4329_rfkill->gpio_reset)
+		gpio_free(bcm4329_rfkill->gpio_reset);
 	kfree(bcm4329_rfkill);
 
 	return 0;
