@@ -106,15 +106,9 @@ static struct tegra_ulpi_config ulpi_phy_config = {
 
 static struct resource ventana_bcm4329_rfkill_resources[] = {
 	{
-		.name   = "bcm4329_nreset_gpio",
+		.name   = "bcm4329_nshutdown_gpio",
 		.start  = TEGRA_GPIO_PU0,
 		.end    = TEGRA_GPIO_PU0,
-		.flags  = IORESOURCE_IO,
-	},
-	{
-		.name   = "bcm4329_nshutdown_gpio",
-		.start  = TEGRA_GPIO_PK2,
-		.end    = TEGRA_GPIO_PK2,
 		.flags  = IORESOURCE_IO,
 	},
 };
