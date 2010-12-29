@@ -129,6 +129,7 @@
 
 #define SLINK_TX_FIFO		0x100
 #define SLINK_RX_FIFO		0x180
+#define SLINK_FIFO_DEPTH	0x20
 
 static const unsigned long spi_tegra_req_sels[] = {
 	TEGRA_DMA_REQ_SEL_SL2B1,
@@ -236,6 +237,7 @@ static void spi_tegra_go(struct spi_tegra_data *tspi)
 {
 	unsigned long val;
 	unsigned long test_val;
+	unsigned unused_fifo_size;
 
 	wmb();
 
@@ -264,9 +266,12 @@ static void spi_tegra_go(struct spi_tegra_data *tspi)
 	/*
 	 * TRM 24.1.1.7 wait for the FIFO to be full
 	 */
-	test_val = spi_tegra_readl(tspi, SLINK_STATUS);
-	while (!(test_val & SLINK_TX_FULL))
-		test_val = spi_tegra_readl(tspi, SLINK_STATUS);
+	test_val = spi_tegra_readl(tspi, SLINK_STATUS2);
+	unused_fifo_size = (tspi->tx_dma_req.size/4) >= 0x20 ?
+					0:
+					SLINK_FIFO_DEPTH - (tspi->tx_dma_req.size/4);
+	while (SLINK_TX_FIFO_EMPTY_COUNT(test_val) != (unused_fifo_size))
+		test_val = spi_tegra_readl(tspi, SLINK_STATUS2);
 
 	if (tspi->is_packed) {
 		val = spi_tegra_readl(tspi, SLINK_DMA_CTL);
@@ -315,7 +320,7 @@ static unsigned spi_tegra_fill_tx_fifo(struct spi_tegra_data *tspi,
 		for (i = 0; i < len; i += tspi->cur_bytes_per_word) {
 			val = 0;
 			for (j = 0; j < tspi->cur_bytes_per_word; j++)
-				val |= tx_buf[i + j] << j * 8;
+				val |= tx_buf[i + j] << (tspi->cur_bytes_per_word-j-1) * 8;
 
 			tspi->tx_bb[i / tspi->cur_bytes_per_word] = val;
 		}
@@ -351,7 +356,8 @@ static unsigned spi_tegra_drain_rx_fifo(struct spi_tegra_data *tspi,
 		for (i = 0; i < len; i += tspi->cur_bytes_per_word) {
 			val = tspi->rx_bb[i / tspi->cur_bytes_per_word];
 			for (j = 0; j < tspi->cur_bytes_per_word; j++)
-				rx_buf[i + j] = (val >> (j * 8)) & 0xff;
+				rx_buf[i + j] =
+					(val >> (tspi->cur_bytes_per_word - j - 1) * 8) & 0xff;
 		}
 	}
 
@@ -421,7 +427,7 @@ static void spi_tegra_start_transfer(struct spi_device *spi,
 
 	spi_tegra_clear_status(tspi);
 	val = spi_tegra_readl(tspi, SLINK_COMMAND2);
-	val &= ~SLINK_SS_EN_CS(~0) | SLINK_RXEN | SLINK_TXEN;
+	val &= ~(SLINK_SS_EN_CS(~0) | SLINK_RXEN | SLINK_TXEN);
 	if (t->rx_buf)
 		val |= SLINK_RXEN;
 	if (t->tx_buf)
@@ -581,7 +587,6 @@ static int spi_tegra_setup(struct spi_device *spi)
 		spi->mode & SPI_CPHA ? "" : "~",
 		spi->max_speed_hz);
 
-
 	switch (spi->chip_select) {
 	case 0:
 		cs_bit = SLINK_CS_POLARITY;
@@ -604,6 +609,13 @@ static int spi_tegra_setup(struct spi_device *spi)
 	}
 
 	spin_lock_irqsave(&tspi->lock, flags);
+
+	if (spi->max_speed_hz != tspi->cur_speed)
+		clk_set_rate(tspi->clk, spi->max_speed_hz);
+
+	if (tspi->cur_speed == 0)
+		clk_enable(tspi->clk);
+	tspi->cur_speed = spi->max_speed_hz;
 
 	val = spi_tegra_readl(tspi, SLINK_COMMAND);
 	if (spi->mode & SPI_CS_HIGH)
