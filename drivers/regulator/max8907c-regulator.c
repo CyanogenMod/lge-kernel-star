@@ -17,6 +17,11 @@
 #include <linux/mfd/max8907c.h>
 #include <linux/regulator/max8907c-regulator.h>
 
+#define MAX8907C_II2RR_VERSION_MASK	0xF0
+#define MAX8907C_II2RR_VERSION_REV_A	0x00
+#define MAX8907C_II2RR_VERSION_REV_B	0x10
+#define MAX8907C_II2RR_VERSION_REV_C	0x30
+
 #define MAX8907C_REGULATOR_CNT (ARRAY_SIZE(max8907c_regulators))
 
 struct max8907c_regulator_info {
@@ -362,6 +367,15 @@ static int max8907c_regulator_probe(struct platform_device *pdev)
 {
 	struct max8907c_regulator_info *info;
 	struct regulator_dev *rdev;
+	u8 version;
+
+	/* Backwards compatibility with max8907b, SD1 uses different voltages */
+	version = max8907c_reg_read(pdev->dev.parent, MAX8907C_REG_II2RR);
+	if ((version & MAX8907C_II2RR_VERSION_MASK) == MAX8907C_II2RR_VERSION_REV_B) {
+		max8907c_regulators[MAX8907C_SD1].min_uV = 637500;
+		max8907c_regulators[MAX8907C_SD1].max_uV = 1425000;
+		max8907c_regulators[MAX8907C_SD1].step_uV = 12500;
+	}
 
 	info = &max8907c_regulators[pdev->id];
 
