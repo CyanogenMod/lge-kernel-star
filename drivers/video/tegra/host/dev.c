@@ -30,6 +30,7 @@
 #include <linux/platform_device.h>
 #include <linux/uaccess.h>
 #include <linux/file.h>
+#include <linux/clk.h>
 
 #include <asm/io.h>
 
@@ -726,11 +727,11 @@ static int __devinit nvhost_probe(struct platform_device *pdev)
 	err = nvhost_module_init(&host->mod, "host1x", power_host, NULL, &pdev->dev);
 	if (err) goto fail;
 
+	platform_set_drvdata(pdev, host);
+
 	clk_enable(host->mod.clk[0]);
 	nvhost_syncpt_reset(&host->syncpt);
 	clk_disable(host->mod.clk[0]);
-
-	platform_set_drvdata(pdev, host);
 
 	nvhost_bus_register(host);
 
