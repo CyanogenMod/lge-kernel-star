@@ -145,6 +145,10 @@ static const unsigned long spi_tegra_req_sels[] = {
 	TEGRA_DMA_REQ_SEL_SL2B2,
 	TEGRA_DMA_REQ_SEL_SL2B3,
 	TEGRA_DMA_REQ_SEL_SL2B4,
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+	TEGRA_DMA_REQ_SEL_SL2B5,
+	TEGRA_DMA_REQ_SEL_SL2B6,
+#endif
 };
 
 #define BB_LEN			(16384)

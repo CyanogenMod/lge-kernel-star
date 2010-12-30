@@ -533,6 +533,10 @@ static void tegra_dma_update_hw(struct tegra_dma_channel *ch,
 	case TEGRA_DMA_REQ_SEL_SL2B2:
 	case TEGRA_DMA_REQ_SEL_SL2B3:
 	case TEGRA_DMA_REQ_SEL_SL2B4:
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+	case TEGRA_DMA_REQ_SEL_SL2B5:
+	case TEGRA_DMA_REQ_SEL_SL2B6:
+#endif
 	case TEGRA_DMA_REQ_SEL_SPI:
 		/* For spi/slink the burst size based on transfer size
 		 * i.e. if multiple of 32 bytes then busrt is
