@@ -145,8 +145,9 @@
 #define PLL_OUT_CLKEN			(1<<1)
 #define PLL_OUT_RESET_DISABLE		(1<<0)
 
-#define PLL_MISC(c)			(((c)->flags & PLL_ALT_MISC_REG) ? 0x4 : 0xc)
-#define PLL_MISC_LOCK_ENABLE(c)		\
+#define PLL_MISC(c)			\
+	(((c)->flags & PLL_ALT_MISC_REG) ? 0x4 : 0xc)
+#define PLL_MISC_LOCK_ENABLE(c)	\
 	(((c)->flags & (PLLU | PLLD)) ? (1<<22) : (1<<18))
 
 #define PLL_MISC_DCCON_SHIFT		20
@@ -199,6 +200,47 @@
 #define PMC_BLINK_TIMER_ENB		(1 << 15)
 #define PMC_BLINK_TIMER_DATA_OFF_SHIFT	16
 #define PMC_BLINK_TIMER_DATA_OFF_MASK	0xffff
+
+#define UTMIP_PLL_CFG2					0x488
+#define UTMIP_PLL_CFG2_STABLE_COUNT(x)			(((x) & 0xfff) << 6)
+#define UTMIP_PLL_CFG2_ACTIVE_DLY_COUNT(x)		(((x) & 0x3f) << 18)
+#define UTMIP_PLL_CFG2_FORCE_PD_SAMP_A_POWERDOWN	(1 << 0)
+#define UTMIP_PLL_CFG2_FORCE_PD_SAMP_B_POWERDOWN	(1 << 2)
+#define UTMIP_PLL_CFG2_FORCE_PD_SAMP_C_POWERDOWN	(1 << 4)
+
+#define UTMIP_PLL_CFG1					0x484
+#define UTMIP_PLL_CFG1_ENABLE_DLY_COUNT(x)		(((x) & 0x1f) << 27)
+#define UTMIP_PLL_CFG1_XTAL_FREQ_COUNT(x)		(((x) & 0xfff) << 0)
+#define UTMIP_PLL_CFG1_FORCE_PLL_ENABLE_POWERDOWN	(1 << 14)
+#define UTMIP_PLL_CFG1_FORCE_PLL_ACTIVE_POWERDOWN	(1 << 12)
+#define UTMIP_PLL_CFG1_FORCE_PLLU_POWERDOWN		(1 << 16)
+
+/**
+* Structure defining the fields for USB UTMI clocks Parameters.
+*/
+struct utmi_clk_param
+{
+	/* Oscillator Frequency in KHz */
+	u32 osc_frequency;
+	/* UTMIP PLL Enable Delay Count  */
+	u8 enable_delay_count;
+	/* UTMIP PLL Stable count */
+	u8 stable_count;
+	/*  UTMIP PLL Active delay count */
+	u8 active_delay_count;
+	/* UTMIP PLL Xtal frequency count */
+	u8 xtal_freq_count;
+};
+
+static const struct utmi_clk_param utmi_parameters[] =
+{
+/*	OSC_FREQUENCY, 	ENABLE_DLY, 	STABLE_CNT, 	ACTIVE_DLY, 	XTAL_FREQ_CNT */
+	{13000000,	0x02,		0x33,		0x05,		0x7F},
+	{19200000,	0x03,		0x4B,		0x06,		0xBB},
+	{12000000,	0x02,		0x2F,		0x04,		0x76},
+	{26000000,	0x04,		0x66,		0x09,		0xFE},
+	{16800000,	0x03,		0x41,		0x0A,		0xA4},
+};
 
 static void __iomem *reg_clk_base = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
 static void __iomem *reg_pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
@@ -722,6 +764,64 @@ static int tegra3_pll_clk_wait_for_lock(struct clk *c)
 	return 0;
 }
 
+
+static void tegra3_utmi_param_configure(struct clk *c)
+{
+	u32 reg;
+	int i;
+	unsigned long main_rate =
+		clk_get_rate(c->parent->parent);
+
+	for (i = 0; i < ARRAY_SIZE(utmi_parameters); i++) {
+		if (main_rate == utmi_parameters[i].osc_frequency) {
+			break;
+		}
+	}
+
+	if (i >= ARRAY_SIZE(utmi_parameters)) {
+		pr_err("%s: Unexpected main rate %lu\n", __func__, main_rate);
+		return;
+	}
+
+	reg = clk_readl(UTMIP_PLL_CFG2);
+
+	/* Program UTMIP PLL stable and active counts */
+	/* [FIXME] arclk_rst.h says WRONG! This should be 1ms -> 0x50 Check! */
+	reg &= ~UTMIP_PLL_CFG2_STABLE_COUNT(~0);
+	reg |= UTMIP_PLL_CFG2_STABLE_COUNT(
+			utmi_parameters[i].stable_count);
+
+	reg &= ~UTMIP_PLL_CFG2_ACTIVE_DLY_COUNT(~0);
+
+	reg |= UTMIP_PLL_CFG2_ACTIVE_DLY_COUNT(
+			utmi_parameters[i].active_delay_count);
+
+	/* Remove power downs from UTMIP PLL control bits */
+	reg &= ~UTMIP_PLL_CFG2_FORCE_PD_SAMP_A_POWERDOWN;
+	reg &= ~UTMIP_PLL_CFG2_FORCE_PD_SAMP_B_POWERDOWN;
+	reg &= ~UTMIP_PLL_CFG2_FORCE_PD_SAMP_C_POWERDOWN;
+
+	clk_writel(reg, UTMIP_PLL_CFG2);
+
+	/* Program UTMIP PLL delay and oscillator frequency counts */
+	reg = clk_readl(UTMIP_PLL_CFG1);
+	reg &= ~UTMIP_PLL_CFG1_ENABLE_DLY_COUNT(~0);
+
+	reg |= UTMIP_PLL_CFG1_ENABLE_DLY_COUNT(
+		utmi_parameters[i].enable_delay_count);
+
+	reg &= ~UTMIP_PLL_CFG1_XTAL_FREQ_COUNT(~0);
+	reg |= UTMIP_PLL_CFG1_XTAL_FREQ_COUNT(
+		utmi_parameters[i].xtal_freq_count);
+
+	/* Remove power downs from UTMIP PLL control bits */
+	reg &= ~UTMIP_PLL_CFG1_FORCE_PLL_ENABLE_POWERDOWN;
+	reg &= ~UTMIP_PLL_CFG1_FORCE_PLL_ACTIVE_POWERDOWN;
+	reg &= ~UTMIP_PLL_CFG1_FORCE_PLLU_POWERDOWN;
+
+	clk_writel(reg, UTMIP_PLL_CFG1);
+}
+
 static void tegra3_pll_clk_init(struct clk *c)
 {
 	u32 val = clk_readl(c->reg + PLL_BASE);
@@ -753,6 +853,10 @@ static void tegra3_pll_clk_init(struct clk *c)
 		else
 			c->div *= (0x1 << ((val & PLL_BASE_DIVP_MASK) >>
 					PLL_BASE_DIVP_SHIFT));
+	}
+
+	if (c->flags & PLLU) {
+		tegra3_utmi_param_configure(c);
 	}
 }
 
