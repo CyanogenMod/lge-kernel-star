@@ -498,8 +498,10 @@ static struct platform_driver tegra_rtc_driver = {
 		.name	= "tegra_rtc",
 		.owner	= THIS_MODULE,
 	},
+#ifdef CONFIG_PM
 	.suspend	= tegra_rtc_suspend,
 	.resume		= tegra_rtc_resume,
+#endif
 };
 
 static int __init tegra_rtc_init(void)
