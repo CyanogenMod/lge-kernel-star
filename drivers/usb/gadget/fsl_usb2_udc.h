@@ -9,6 +9,7 @@
 #define USB_MAX_CTRL_PAYLOAD		64
 #define USB_DR_SYS_OFFSET		0x400
 
+#if !defined(CONFIG_ARCH_TEGRA_3x_SOC)
  /* USB DR device mode registers (Little Endian) */
 struct usb_dr_device {
 	/* Capability register */
@@ -82,6 +83,95 @@ struct usb_dr_host {
 	u32 endptcomplete;	/* Endpoint Complete Register */
 	u32 endptctrl[6];	/* Endpoint Control Registers */
 };
+#else
+/* Tegra3 support.
+ * Following changes have been done in tegra3 USB regs:
+ * 1. Registers usbcmd to portsc1 have been shifted up by 16 bytes.
+ * 2. Registers otgsc and usbmode have been shifted down by 80 bytes.
+ * 3. hostpc1devlc register has been added at offset 0x1b4(436).
+ * 4. Registers endptsetupstat to endptctrl have shifted down by 92 bytes.
+ */
+
+/* USB DR device mode registers (Little Endian) */
+struct usb_dr_device {
+	/* Capability register */
+	u8 res1[256];
+	u16 caplength;		/* Capability Register Length */
+	u16 hciversion;		/* Host Controller Interface Version */
+	u32 hcsparams;		/* Host Controller Structual Parameters */
+	u32 hccparams;		/* Host Controller Capability Parameters */
+	u8 res2[20];
+	u32 dciversion;		/* Device Controller Interface Version */
+	u32 dccparams;		/* Device Controller Capability Parameters */
+	u8 res3[8];
+	/* Operation register */
+	u32 usbcmd;		/* USB Command Register */
+	u32 usbsts;		/* USB Status Register */
+	u32 usbintr;		/* USB Interrupt Enable Register */
+	u32 frindex;		/* Frame Index Register */
+	u8 res4[4];
+	u32 deviceaddr;		/* Device Address */
+	u32 endpointlistaddr;	/* Endpoint List Address Register */
+	u8 res5[4];
+	u32 burstsize;		/* Master Interface Data Burst Size Register */
+	u32 txttfilltuning;	/* Transmit FIFO Tuning Controls Register */
+	u8 res6[24];
+	u32 configflag;		/* Configure Flag Register */
+	u32 portsc1;		/* Port 1 Status and Control Register */
+	u8 res7[60];
+	u32 hostpc1devlc;      /* Usb LPM Behavior and Control Register */
+	u8 res8[60];
+	u32 otgsc;		/* On-The-Go Status and Control */
+	u32 usbmode;		/* USB Mode Register */
+	u8 res9[12];
+	u32 endptsetupstat;	/* Endpoint Setup Status Register */
+	u32 endpointprime;	/* Endpoint Initialization Register */
+	u32 endptflush;		/* Endpoint Flush Register */
+	u32 endptstatus;	/* Endpoint Status Register */
+	u32 endptcomplete;	/* Endpoint Complete Register */
+	u32 endptctrl[6];	/* Endpoint Control Registers */
+};
+
+ /* USB DR host mode registers (Little Endian) */
+struct usb_dr_host {
+	/* Capability register */
+	u8 res1[256];
+	u16 caplength;		/* Capability Register Length */
+	u16 hciversion;		/* Host Controller Interface Version */
+	u32 hcsparams;		/* Host Controller Structual Parameters */
+	u32 hccparams;		/* Host Controller Capability Parameters */
+	u8 res2[20];
+	u32 dciversion;		/* Device Controller Interface Version */
+	u32 dccparams;		/* Device Controller Capability Parameters */
+	u8 res3[8];
+	/* Operation register */
+	u32 usbcmd;		/* USB Command Register */
+	u32 usbsts;		/* USB Status Register */
+	u32 usbintr;		/* USB Interrupt Enable Register */
+	u32 frindex;		/* Frame Index Register */
+	u8 res4[4];
+	u32 periodiclistbase;	/* Periodic Frame List Base Address Register */
+	u32 asynclistaddr;	/* Current Asynchronous List Address Register */
+	u8 res5[4];
+	u32 burstsize;		/* Master Interface Data Burst Size Register */
+	u32 txttfilltuning;	/* Transmit FIFO Tuning Controls Register */
+	u8 res6[24];
+	u32 configflag;		/* Configure Flag Register */
+	u32 portsc1;		/* Port 1 Status and Control Register */
+	u8 res7[60];
+	u32 hostpc1devlc;      /* Usb LPM Behavior and Control Register */
+	u8 res8[60];
+	u32 otgsc;		/* On-The-Go Status and Control */
+	u32 usbmode;		/* USB Mode Register */
+	u8 res9[12];
+	u32 endptsetupstat;	/* Endpoint Setup Status Register */
+	u32 endpointprime;	/* Endpoint Initialization Register */
+	u32 endptflush;		/* Endpoint Flush Register */
+	u32 endptstatus;	/* Endpoint Status Register */
+	u32 endptcomplete;	/* Endpoint Complete Register */
+	u32 endptctrl[6];	/* Endpoint Control Registers */
+};
+#endif // if !defined(CONFIG_ARCH_TEGRA_3x_SOC)
 
  /* non-EHCI USB system interface registers (Big Endian) */
 #ifdef CONFIG_ARCH_TEGRA
@@ -208,10 +298,58 @@ struct usb_sys_interface {
 #define  PORTSCX_WAKE_ON_CONNECT_DIS          0x00200000
 #define  PORTSCX_WAKE_ON_OVER_CURRENT         0x00400000
 #define  PORTSCX_PHY_LOW_POWER_SPD            0x00800000
+
+#if !defined(CONFIG_ARCH_TEGRA_3x_SOC)
 #define  PORTSCX_PORT_FORCE_FULL_SPEED        0x01000000
 #define  PORTSCX_PORT_SPEED_MASK              0x0C000000
 #define  PORTSCX_PORT_WIDTH                   0x10000000
 #define  PORTSCX_PHY_TYPE_SEL                 0xC0000000
+
+/* bit 27-26 are port speed */
+#define  PORTSCX_PORT_SPEED_FULL              0x00000000
+#define  PORTSCX_PORT_SPEED_LOW               0x04000000
+#define  PORTSCX_PORT_SPEED_HIGH              0x08000000
+#define  PORTSCX_PORT_SPEED_UNDEF             0x0C000000
+#define  PORTSCX_SPEED_BIT_POS                26
+
+/* bit 28 is parallel transceiver width for UTMI interface */
+#define  PORTSCX_PTW                          0x10000000
+#define  PORTSCX_PTW_8BIT                     0x00000000
+#define  PORTSCX_PTW_16BIT                    0x10000000
+
+/* bit 31-30 are port transceiver select */
+#define  PORTSCX_PTS_UTMI                     0x00000000
+#define  PORTSCX_PTS_ULPI                     0x80000000
+#define  PORTSCX_PTS_FSLS                     0xC0000000
+#define  PORTSCX_PTS_BIT_POS                  30
+#else
+/* In tegra3 the following fields have moved to new HOSTPC1_DEVLC reg and
+ * their offsets have changed.
+ * Keeping the name of bit masks same as before (PORTSCX_*) to have
+ * minimum changes to code */
+#define  PORTSCX_PORT_FORCE_FULL_SPEED    0x00800000
+#define  PORTSCX_PORT_SPEED_MASK          0x06000000
+#define  PORTSCX_PORT_WIDTH               0x08000000
+#define  PORTSCX_PHY_TYPE_SEL             0xE0000000
+
+/* bit 26-25 are port speed */
+#define  PORTSCX_PORT_SPEED_FULL          0x00000000
+#define  PORTSCX_PORT_SPEED_LOW           0x02000000
+#define  PORTSCX_PORT_SPEED_HIGH          0x04000000
+#define  PORTSCX_PORT_SPEED_UNDEF         0x06000000
+#define  PORTSCX_SPEED_BIT_POS            25
+
+/* bit 27 is parallel transceiver width for UTMI interface */
+#define  PORTSCX_PTW                      0x08000000
+#define  PORTSCX_PTW_8BIT                 0x00000000
+#define  PORTSCX_PTW_16BIT                0x08000000
+
+/* bit 31-29 are port transceiver select */
+#define  PORTSCX_PTS_UTMI                 0x00000000
+#define  PORTSCX_PTS_ULPI                 0x40000000
+#define  PORTSCX_PTS_FSLS                 0x60000000
+#define  PORTSCX_PTS_BIT_POS              29
+#endif
 
 /* bit 11-10 are line status */
 #define  PORTSCX_LINE_STATUS_SE0              0x00000000
@@ -235,24 +373,6 @@ struct usb_sys_interface {
 #define  PORTSCX_PTC_PACKET                   0x00040000
 #define  PORTSCX_PTC_FORCE_EN                 0x00050000
 #define  PORTSCX_PTC_BIT_POS                  16
-
-/* bit 27-26 are port speed */
-#define  PORTSCX_PORT_SPEED_FULL              0x00000000
-#define  PORTSCX_PORT_SPEED_LOW               0x04000000
-#define  PORTSCX_PORT_SPEED_HIGH              0x08000000
-#define  PORTSCX_PORT_SPEED_UNDEF             0x0C000000
-#define  PORTSCX_SPEED_BIT_POS                26
-
-/* bit 28 is parallel transceiver width for UTMI interface */
-#define  PORTSCX_PTW                          0x10000000
-#define  PORTSCX_PTW_8BIT                     0x00000000
-#define  PORTSCX_PTW_16BIT                    0x10000000
-
-/* bit 31-30 are port transceiver select */
-#define  PORTSCX_PTS_UTMI                     0x00000000
-#define  PORTSCX_PTS_ULPI                     0x80000000
-#define  PORTSCX_PTS_FSLS                     0xC0000000
-#define  PORTSCX_PTS_BIT_POS                  30
 
 /* otgsc Register Bit Masks */
 #define  OTGSC_CTRL_VUSB_DISCHARGE            0x00000001

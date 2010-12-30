@@ -83,6 +83,7 @@ fsl_ep0_desc = {
 	.wMaxPacketSize =	USB_MAX_CTRL_PAYLOAD,
 };
 
+static u32 *control_reg = NULL;
 static void fsl_ep_fifo_flush(struct usb_ep *_ep);
 static int reset_queues(struct fsl_udc *udc);
 
@@ -116,6 +117,21 @@ static const u8 fsl_udc_test_packet[53] = {
 /********************************************************************
  *	Internal Used Function
 ********************************************************************/
+/*-----------------------------------------------------------------
+ * vbus_enabled() - checks vbus status
+ *--------------------------------------------------------------*/
+static inline bool vbus_enabled(void)
+{
+	bool status = false;
+#ifdef CONFIG_TEGRA_FPGA_PLATFORM
+	/*On FPGA VBUS is detected through VBUS A Session instead of VBUS status. */
+	status = (fsl_readl(&usb_sys_regs->vbus_sensors) & USB_SYS_VBUS_ASESSION);
+#else
+	status = (fsl_readl(&usb_sys_regs->vbus_wakeup) & USB_SYS_VBUS_STATUS);
+#endif
+	return status;
+}
+
 /*-----------------------------------------------------------------
  * done() - retire a request; caller blocked irqs
  * @status : request status to be set, only works when
@@ -243,7 +259,7 @@ static int dr_controller_setup(struct fsl_udc *udc)
 	int status;
 
 	/* Config PHY interface */
-	portctrl = fsl_readl(&dr_regs->portsc1);
+	portctrl = fsl_readl(control_reg);
 	portctrl &= ~(PORTSCX_PHY_TYPE_SEL | PORTSCX_PORT_WIDTH);
 	switch (udc->phy_mode) {
 	case FSL_USB2_PHY_ULPI:
@@ -261,7 +277,7 @@ static int dr_controller_setup(struct fsl_udc *udc)
 	default:
 		return -EINVAL;
 	}
-	fsl_writel(portctrl, &dr_regs->portsc1);
+	fsl_writel(portctrl, control_reg);
 
 	status = dr_controller_reset(udc);
 	if (status)
@@ -330,6 +346,25 @@ static void dr_controller_run(struct fsl_udc *udc)
 	/* Clear stopped bit */
 	udc->stopped = 0;
 
+/* If OTG transceiver is available, then it handles the VBUS detection */
+	if (!udc_controller->transceiver) {
+#ifdef CONFIG_TEGRA_FPGA_PLATFORM
+		/*On FPGA VBUS is detected through VBUS A Session instead of VBUS
+		 * status. */
+		temp = fsl_readl(&usb_sys_regs->vbus_sensors);
+		temp |= USB_SYS_VBUS_ASESSION_INT_EN;
+		temp &= ~USB_SYS_VBUS_ASESSION_CHANGED;
+		fsl_writel(temp, &usb_sys_regs->vbus_sensors);
+#else
+		/* Enable cable detection interrupt, without setting the
+		 * USB_SYS_VBUS_WAKEUP_INT bit. USB_SYS_VBUS_WAKEUP_INT is
+		 * clear on write */
+		temp = fsl_readl(&usb_sys_regs->vbus_wakeup);
+		temp |= (USB_SYS_VBUS_WAKEUP_INT_ENABLE | USB_SYS_VBUS_WAKEUP_ENABLE);
+		temp &= ~USB_SYS_VBUS_WAKEUP_INT_STATUS;
+		fsl_writel(temp, &usb_sys_regs->vbus_wakeup);
+#endif
+	}
 	/* Enable DR irq reg */
 	temp = USB_INTR_INT_EN | USB_INTR_ERR_INT_EN
 		| USB_INTR_PTC_DETECT_EN | USB_INTR_RESET_EN
@@ -621,13 +656,13 @@ static int fsl_ep_disable(struct usb_ep *_ep)
 		return -EINVAL;
 	}
 
-	/* disable ep on controller */
-	ep_num = ep_index(ep);
 #if defined(CONFIG_ARCH_TEGRA)
 	/* Touch the registers if cable is connected and phy is on */
-	if (udc_controller->vbus_active)
+	if (vbus_enabled())
 #endif
 	{
+		/* disable ep on controller */
+		ep_num = ep_index(ep);
 		epctrl = fsl_readl(&dr_regs->endptctrl[ep_num]);
 		if (ep_is_in(ep))
 			epctrl &= ~EPCTRL_TX_ENABLE;
@@ -962,7 +997,7 @@ static int fsl_ep_dequeue(struct usb_ep *_ep, struct usb_request *_req)
 
 #if defined(CONFIG_ARCH_TEGRA)
 	/* Touch the registers if cable is connected and phy is on */
-	if (udc_controller->vbus_active)
+	if(vbus_enabled())
 #endif
 	{
 		epctrl = fsl_readl(&dr_regs->endptctrl[ep_num]);
@@ -1014,10 +1049,10 @@ static int fsl_ep_dequeue(struct usb_ep *_ep, struct usb_request *_req)
 	done(ep, req, -ECONNRESET);
 
 	/* Enable EP */
-out:
+out:;
 #if defined(CONFIG_ARCH_TEGRA)
 	/* Touch the registers if cable is connected and phy is on */
-	if (udc_controller->vbus_active)
+	if(vbus_enabled())
 #endif
 	{
 		epctrl = fsl_readl(&dr_regs->endptctrl[ep_num]);
@@ -1094,9 +1129,9 @@ static void fsl_ep_fifo_flush(struct usb_ep *_ep)
 	unsigned long timeout;
 #define FSL_UDC_FLUSH_TIMEOUT 1000
 
-#if defined(CONFIG_ARCH_TEGRA)
+#ifdef CONFIG_ARCH_TEGRA
 	/* Touch the registers if cable is connected and phy is on */
-	if (!udc_controller->vbus_active)
+	if (!vbus_enabled())
 		return;
 #endif
 
@@ -1852,7 +1887,7 @@ static void port_change_irq(struct fsl_udc *udc)
 	/* Bus resetting is finished */
 	if (!(fsl_readl(&dr_regs->portsc1) & PORTSCX_PORT_RESET)) {
 		/* Get the speed */
-		speed = (fsl_readl(&dr_regs->portsc1)
+		speed = (fsl_readl(control_reg)
 				& PORTSCX_PORT_SPEED_MASK);
 		switch (speed) {
 		case PORTSCX_PORT_SPEED_HIGH:
@@ -2025,7 +2060,14 @@ static irqreturn_t fsl_udc_irq(int irq, void *_udc)
 		spin_unlock_irqrestore(&udc->lock, flags);
 		return IRQ_NONE;
 	}
-
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+	{
+		u32 temp = fsl_readl(&usb_sys_regs->vbus_sensors);
+		udc->vbus_active = (temp & USB_SYS_VBUS_ASESSION) ? true : false;
+		/* write back the register to clear the interrupt */
+		fsl_writel(temp, &usb_sys_regs->vbus_sensors);
+	}
+#endif
 	irq_src = fsl_readl(&dr_regs->usbsts) & fsl_readl(&dr_regs->usbintr);
 	/* Clear notification bits */
 	fsl_writel(irq_src, &dr_regs->usbsts);
@@ -2209,6 +2251,7 @@ static int fsl_proc_read(char *page, char **start, off_t off, int count,
 	unsigned long flags;
 	int t, i;
 	u32 tmp_reg;
+	u32 tmp_reg2;
 	struct fsl_ep *ep = NULL;
 	struct fsl_req *req;
 
@@ -2292,6 +2335,13 @@ static int fsl_proc_read(char *page, char **start, off_t off, int count,
 	next += t;
 
 	tmp_reg = fsl_readl(&dr_regs->portsc1);
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+	/* In Tegra3 the Phy Type Select(PTS) and Port Speed fields are specified in
+	 * hostpc1devlc register instead of portsc1 register. */
+	tmp_reg2 = fsl_readl(&dr_regs->hostpc1devlc);
+#else
+	tmp_reg2 = tmp_reg;
+#endif
 	t = scnprintf(next, size,
 		"USB Port Status&Control Reg:\n"
 		"Port Transceiver Type : %s Port Speed: %s\n"
@@ -2302,7 +2352,7 @@ static int fsl_proc_read(char *page, char **start, off_t off, int count,
 		"Port Enabled/Disabled: %s "
 		"Current Connect Status: %s\n\n", ( {
 			char *s;
-			switch (tmp_reg & PORTSCX_PTS_FSLS) {
+			switch (tmp_reg2 & PORTSCX_PTS_FSLS) {
 			case PORTSCX_PTS_UTMI:
 				s = "UTMI"; break;
 			case PORTSCX_PTS_ULPI:
@@ -2314,7 +2364,7 @@ static int fsl_proc_read(char *page, char **start, off_t off, int count,
 			}
 			s;} ), ( {
 			char *s;
-			switch (tmp_reg & PORTSCX_PORT_SPEED_UNDEF) {
+			switch (tmp_reg2 & PORTSCX_PORT_SPEED_UNDEF) {
 			case PORTSCX_PORT_SPEED_FULL:
 				s = "Full Speed"; break;
 			case PORTSCX_PORT_SPEED_LOW:
@@ -2644,6 +2694,11 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
 	}
 #endif
 
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+	control_reg = &dr_regs->hostpc1devlc;
+#else
+	control_reg = &dr_regs->portsc1;
+#endif
 #if !defined(CONFIG_ARCH_MXC) && !defined(CONFIG_ARCH_TEGRA)
 	usb_sys_regs = (struct usb_sys_interface *)
 			((u32)dr_regs + USB_DR_SYS_OFFSET);
@@ -2750,14 +2805,13 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
 		udc_controller->usb_state = USB_STATE_DEFAULT;
 		otg_set_peripheral(udc_controller->transceiver, &udc_controller->gadget);
 	}
-#else
-#ifdef CONFIG_ARCH_TEGRA
-	/* Power down the phy if cable is not connected */
-	if (!(fsl_readl(&usb_sys_regs->vbus_wakeup) & USB_SYS_VBUS_STATUS))
-		fsl_udc_clk_suspend();
-#endif
 #endif
 
+#ifdef CONFIG_ARCH_TEGRA
+	/* Power down the phy if cable is not connected */
+	if(!vbus_enabled())
+		fsl_udc_clk_suspend();
+#endif
 	return 0;
 
 err_unregister:

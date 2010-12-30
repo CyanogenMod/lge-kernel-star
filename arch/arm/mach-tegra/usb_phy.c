@@ -33,8 +33,10 @@
 #include <mach/usb_phy.h>
 #include <mach/iomap.h>
 #include <mach/pinmux.h>
+#include <mach/clk.h>
 #include "fuse.h"
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 #define USB_USBCMD		0x140
 #define   USB_USBCMD_RS		(1 << 0)
 
@@ -87,36 +89,6 @@
 #define   USB1_VBUS_SENSE_CTL_AB_SESS_VLD	(2 << 1)
 #define   USB1_VBUS_SENSE_CTL_A_SESS_VLD	(3 << 1)
 
-#define ULPIS2S_CTRL		0x418
-#define   ULPIS2S_ENA			(1 << 0)
-#define   ULPIS2S_SUPPORT_DISCONNECT	(1 << 2)
-#define   ULPIS2S_PLLU_MASTER_BLASTER60	(1 << 3)
-#define   ULPIS2S_SPARE(x)		(((x) & 0xF) << 8)
-#define   ULPIS2S_FORCE_ULPI_CLK_OUT	(1 << 12)
-#define   ULPIS2S_DISCON_DONT_CHECK_SE0	(1 << 13)
-#define   ULPIS2S_SUPPORT_HS_KEEP_ALIVE (1 << 14)
-#define   ULPIS2S_DISABLE_STP_PU	(1 << 15)
-
-#define ULPI_TIMING_CTRL_0	0x424
-#define   ULPI_CLOCK_OUT_DELAY(x)	((x) & 0x1F)
-#define   ULPI_OUTPUT_PINMUX_BYP	(1 << 10)
-#define   ULPI_CLKOUT_PINMUX_BYP	(1 << 11)
-#define   ULPI_SHADOW_CLK_LOOPBACK_EN	(1 << 12)
-#define   ULPI_SHADOW_CLK_SEL		(1 << 13)
-#define   ULPI_CORE_CLK_SEL		(1 << 14)
-#define   ULPI_SHADOW_CLK_DELAY(x)	(((x) & 0x1F) << 16)
-#define   ULPI_LBK_PAD_EN		(1 << 26)
-#define   ULPI_LBK_PAD_E_INPUT_OR	(1 << 27)
-#define   ULPI_CLK_OUT_ENA		(1 << 28)
-#define   ULPI_CLK_PADOUT_ENA		(1 << 29)
-
-#define ULPI_TIMING_CTRL_1	0x428
-#define   ULPI_DATA_TRIMMER_LOAD	(1 << 0)
-#define   ULPI_DATA_TRIMMER_SEL(x)	(((x) & 0x7) << 1)
-#define   ULPI_STPDIRNXT_TRIMMER_LOAD	(1 << 16)
-#define   ULPI_STPDIRNXT_TRIMMER_SEL(x)	(((x) & 0x7) << 17)
-#define   ULPI_DIR_TRIMMER_LOAD		(1 << 24)
-#define   ULPI_DIR_TRIMMER_SEL(x)	(((x) & 0x7) << 25)
 
 #define UTMIP_PLL_CFG1		0x804
 #define   UTMIP_XTAL_FREQ_COUNT(x)		(((x) & 0xfff) << 0)
@@ -225,6 +197,106 @@
 #define   UHSIC_CONNECT_DETECT			(1 << 0)
 
 #define UHSIC_SPARE_CFG0			0x82c
+
+#else
+#define ULPI_VIEWPORT		0x160
+#define   ULPI_WAKEUP		(1 << 31)
+#define   ULPI_RUN		(1 << 30)
+#define   ULPI_RD_RW_WRITE	(1 << 29)
+#define   ULPI_RD_RW_READ	(0 << 29)
+#define   ULPI_PORT(x)		(((x) & 0x7) << 24)
+#define   ULPI_ADDR(x)		(((x) & 0xff) << 16)
+#define   ULPI_DATA_RD(x)	(((x) & 0xff) << 8)
+#define   ULPI_DATA_WR(x)	(((x) & 0xff) << 0)
+
+#define USB_PORTSC1		0x174
+#define   USB_PORTSC1_WKOC	(1 << 22)
+#define   USB_PORTSC1_WKDS	(1 << 21)
+#define   USB_PORTSC1_WKCN	(1 << 20)
+#define   USB_PORTSC1_PTC(x)	(((x) & 0xf) << 16)
+#define   USB_PORTSC1_PP	(1 << 12)
+#define   USB_PORTSC1_SUSP	(1 << 7)
+#define   USB_PORTSC1_PE	(1 << 2)
+#define   USB_PORTSC1_CCS	(1 << 0)
+
+#define USB_SUSP_CTRL		0x400
+#define   USB_WAKE_ON_CNNT_EN_DEV	(1 << 3)
+#define   USB_WAKE_ON_DISCON_EN_DEV	(1 << 4)
+#define   USB_SUSP_CLR			(1 << 5)
+#define   USB_PHY_CLK_VALID		(1 << 7)
+
+#define   UTMIP_RESET			(1 << 11)
+#define   UHSIC_RESET			(1 << 14)
+
+#define   UTMIP_PHY_ENABLE		(1 << 12)
+#define   ULPI_PHY_ENABLE		(1 << 13)
+
+#define   USB_WAKEUP_DEBOUNCE_COUNT(x)	(((x) & 0x7) << 16)
+
+#define USB1_LEGACY_CTRL	0x410
+#define   USB1_NO_LEGACY_MODE			(1 << 0)
+#define   USB1_VBUS_SENSE_CTL_MASK		(3 << 1)
+#define   USB1_VBUS_SENSE_CTL_VBUS_WAKEUP	(0 << 1)
+#define   USB1_VBUS_SENSE_CTL_AB_SESS_VLD_OR_VBUS_WAKEUP \
+						(1 << 1)
+#define   USB1_VBUS_SENSE_CTL_AB_SESS_VLD	(2 << 1)
+#define   USB1_VBUS_SENSE_CTL_A_SESS_VLD	(3 << 1)
+
+#define UTMIP_PLL_CFG1		0x804
+#define   UTMIP_XTAL_FREQ_COUNT(x)		(((x) & 0xfff) << 0)
+#define   UTMIP_PLLU_ENABLE_DLY_COUNT(x)	(((x) & 0x1f) << 27)
+
+#define UTMIP_XCVR_CFG0		0x808
+#define   UTMIP_XCVR_SETUP(x)			(((x) & 0xf) << 0)
+#define   UTMIP_XCVR_LSRSLEW(x)			(((x) & 0x3) << 8)
+#define   UTMIP_XCVR_LSFSLEW(x)			(((x) & 0x3) << 10)
+#define   UTMIP_FORCE_PD_POWERDOWN		(1 << 14)
+#define   UTMIP_FORCE_PD2_POWERDOWN		(1 << 16)
+#define   UTMIP_FORCE_PDZI_POWERDOWN		(1 << 18)
+#define   UTMIP_XCVR_HSSLEW_MSB(x)		(((x) & 0x7f) << 25)
+
+#define UTMIP_BIAS_CFG0		0x80c
+#define   UTMIP_OTGPD			(1 << 11)
+#define   UTMIP_BIASPD			(1 << 10)
+
+#define UTMIP_HSRX_CFG0		0x810
+#define   UTMIP_ELASTIC_LIMIT(x)	(((x) & 0x1f) << 10)
+#define   UTMIP_IDLE_WAIT(x)		(((x) & 0x1f) << 15)
+
+#define UTMIP_HSRX_CFG1		0x814
+#define   UTMIP_HS_SYNC_START_DLY(x)	(((x) & 0x1f) << 1)
+
+#define UTMIP_TX_CFG0		0x820
+#define   UTMIP_FS_PREABMLE_J		(1 << 19)
+#define   UTMIP_HS_DISCON_DISABLE	(1 << 8)
+
+#define UTMIP_MISC_CFG0		0x824
+#define   UTMIP_SUSPEND_EXIT_ON_EDGE	(1 << 22)
+
+#define UTMIP_MISC_CFG1		0x828
+#define   UTMIP_PLL_ACTIVE_DLY_COUNT(x)	(((x) & 0x1f) << 18)
+#define   UTMIP_PLLU_STABLE_COUNT(x)	(((x) & 0xfff) << 6)
+
+#define UTMIP_DEBOUNCE_CFG0	0x82c
+#define   UTMIP_BIAS_DEBOUNCE_A(x)	(((x) & 0xffff) << 0)
+
+#define UTMIP_BAT_CHRG_CFG0	0x830
+#define   UTMIP_PD_CHRG			(1 << 0)
+
+#define UTMIP_XCVR_CFG1		0x838
+#define   UTMIP_FORCE_PDDISC_POWERDOWN	(1 << 0)
+#define   UTMIP_FORCE_PDCHRP_POWERDOWN	(1 << 2)
+#define   UTMIP_FORCE_PDDR_POWERDOWN	(1 << 4)
+#define   UTMIP_XCVR_TERM_RANGE_ADJ(x)	(((x) & 0xf) << 18)
+
+#define UTMIP_BIAS_CFG1		0x83c
+#define   UTMIP_BIAS_PDTRK_COUNT(x)	(((x) & 0x1f) << 3)
+
+#define HOSTPC1_DEVLC		0x1b4
+#define   HOSTPC1_DEVLC_PHCD		(1 << 22)
+#define   HOSTPC1_DEVLC_PTS(x)		(((x) & 0x1f) << 29)
+#define   HOSTPC1_DEVLC_STS 		(1 << 28)
+#endif
 
 static DEFINE_SPINLOCK(utmip_pad_lock);
 static int utmip_pad_count;
@@ -379,6 +451,11 @@ static void utmip_pad_power_on(struct tegra_usb_phy *phy)
 
 	clk_enable(phy->pad_clk);
 
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+	tegra_periph_reset_assert(phy->pad_clk);
+	udelay(100);
+	tegra_periph_reset_deassert(phy->pad_clk);
+#endif
 	spin_lock_irqsave(&utmip_pad_lock, flags);
 
 	if (utmip_pad_count++ == 0) {
@@ -435,7 +512,7 @@ static void utmi_phy_clk_disable(struct tegra_usb_phy *phy)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
-
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	if (phy->instance == 0) {
 		val = readl(base + USB_SUSP_CTRL);
 		val |= USB_SUSP_SET;
@@ -453,6 +530,11 @@ static void utmi_phy_clk_disable(struct tegra_usb_phy *phy)
 		val |= USB_PORTSC1_PHCD;
 		writel(val, base + USB_PORTSC1);
 	}
+#else
+	val = readl(base + HOSTPC1_DEVLC);
+	val |= HOSTPC1_DEVLC_PHCD;
+	writel(val, base + HOSTPC1_DEVLC);
+#endif
 
 	if (utmi_wait_register(base + USB_SUSP_CTRL, USB_PHY_CLK_VALID, 0) < 0)
 		pr_err("%s: timeout waiting for phy to stabilize\n", __func__);
@@ -475,11 +557,13 @@ static void utmi_phy_clk_enable(struct tegra_usb_phy *phy)
 		writel(val, base + USB_SUSP_CTRL);
 	}
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	if (phy->instance == 2) {
 		val = readl(base + USB_PORTSC1);
 		val &= ~USB_PORTSC1_PHCD;
 		writel(val, base + USB_PORTSC1);
 	}
+#endif
 
 	if (utmi_wait_register(base + USB_SUSP_CTRL, USB_PHY_CLK_VALID,
 						     USB_PHY_CLK_VALID))
@@ -528,11 +612,13 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 	val |= UTMIP_RESET;
 	writel(val, base + USB_SUSP_CTRL);
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	if (phy->instance == 0) {
 		val = readl(base + USB1_LEGACY_CTRL);
 		val |= USB1_NO_LEGACY_MODE;
 		writel(val, base + USB1_LEGACY_CTRL);
 	}
+#endif
 
 	val = readl(base + UTMIP_TX_CFG0);
 	val &= ~UTMIP_FS_PREABMLE_J;
@@ -558,6 +644,7 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 	val &= ~UTMIP_SUSPEND_EXIT_ON_EDGE;
 	writel(val, base + UTMIP_MISC_CFG0);
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	val = readl(base + UTMIP_MISC_CFG1);
 	val &= ~(UTMIP_PLL_ACTIVE_DLY_COUNT(~0) | UTMIP_PLLU_STABLE_COUNT(~0));
 	val |= UTMIP_PLL_ACTIVE_DLY_COUNT(phy->freq->active_delay) |
@@ -569,6 +656,7 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 	val |= UTMIP_XTAL_FREQ_COUNT(phy->freq->xtal_freq_count) |
 		UTMIP_PLLU_ENABLE_DLY_COUNT(phy->freq->enable_delay);
 	writel(val, base + UTMIP_PLL_CFG1);
+#endif
 
 	if (phy->mode == TEGRA_USB_PHY_MODE_DEVICE) {
 		val = readl(base + USB_SUSP_CTRL);
@@ -603,6 +691,7 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 	val |= UTMIP_BIAS_PDTRK_COUNT(0x5);
 	writel(val, base + UTMIP_BIAS_CFG1);
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	if (phy->instance == 0) {
 		val = readl(base + UTMIP_SPARE_CFG0);
 		if (phy->mode == TEGRA_USB_PHY_MODE_DEVICE)
@@ -617,6 +706,13 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 		val |= UTMIP_PHY_ENABLE;
 		writel(val, base + USB_SUSP_CTRL);
 	}
+#else
+	if (phy->instance == 1) {
+		val = readl(base + USB_SUSP_CTRL);
+		val |= UTMIP_PHY_ENABLE;
+		writel(val, base + USB_SUSP_CTRL);
+	}
+#endif
 
 	val = readl(base + USB_SUSP_CTRL);
 	val &= ~UTMIP_RESET;
@@ -628,18 +724,25 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 		val |= USB1_VBUS_SENSE_CTL_A_SESS_VLD;
 		writel(val, base + USB1_LEGACY_CTRL);
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 		val = readl(base + USB_SUSP_CTRL);
 		val &= ~USB_SUSP_SET;
 		writel(val, base + USB_SUSP_CTRL);
 	}
 
 	utmi_phy_clk_enable(phy);
-
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	if (phy->instance == 2) {
 		val = readl(base + USB_PORTSC1);
 		val &= ~USB_PORTSC1_PTS(~0);
 		writel(val, base + USB_PORTSC1);
 	}
+#else
+	val = readl(base + HOSTPC1_DEVLC);
+	val &= ~HOSTPC1_DEVLC_PTS(~0);
+	val |= HOSTPC1_DEVLC_STS;
+	writel(val, base + HOSTPC1_DEVLC);
+#endif
 	if (phy->mode == TEGRA_USB_PHY_MODE_HOST) {
 		vbus_enable(usb_phy_data[phy->instance].vbus_gpio);
 	}
@@ -683,6 +786,11 @@ static void utmi_phy_power_off(struct tegra_usb_phy *phy)
 	       UTMIP_FORCE_PDDR_POWERDOWN;
 	writel(val, base + UTMIP_XCVR_CFG1);
 
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+	val = readl(base + UTMIP_BIAS_CFG1);
+	val |= UTMIP_BIAS_PDTRK_COUNT(0x5);
+	writel(val, base + UTMIP_BIAS_CFG1);
+#endif
 	utmip_pad_power_off(phy);
 }
 
@@ -900,6 +1008,7 @@ static void ulpi_phy_power_off(struct tegra_usb_phy *phy)
 	/* Clear WKCN/WKDS/WKOC wake-on events that can cause the USB
 	 * Controller to immediately bring the ULPI PHY out of low power
 	 */
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	val = readl(base + USB_PORTSC1);
 	val &= ~(USB_PORTSC1_WKOC | USB_PORTSC1_WKDS | USB_PORTSC1_WKCN);
 	writel(val, base + USB_PORTSC1);
@@ -911,6 +1020,11 @@ static void ulpi_phy_power_off(struct tegra_usb_phy *phy)
 
 	if (utmi_wait_register(base + USB_SUSP_CTRL, USB_PHY_CLK_VALID, 0) < 0)
 		pr_err("%s: timeout waiting for phy to stop\n", __func__);
+#else
+	val = readl(base + HOSTPC1_DEVLC);
+	val &= ~(HOSTPC1_DEVLC_PHCD);
+	writel(val, base + HOSTPC1_DEVLC);
+#endif
 
 	clk_disable(phy->clk);
 }
