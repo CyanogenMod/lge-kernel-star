@@ -120,6 +120,7 @@
 #define PERIPH_CLK_SOURCE_DIVU71_MASK	0xFF
 #define PERIPH_CLK_SOURCE_DIVU16_MASK	0xFFFF
 #define PERIPH_CLK_SOURCE_DIV_SHIFT	0
+#define PERIPH_CLK_UART_DIV_ENB		(1<<24)
 
 #define AUDIO_SYNC_SOURCE_MASK		0x0F
 #define AUDIO_SYNC_DISABLE_BIT		0x10
@@ -1088,6 +1089,10 @@ static void tegra3_periph_clk_init(struct clk *c)
 
 	if (c->flags & DIV_U71) {
 		u32 divu71 = val & PERIPH_CLK_SOURCE_DIVU71_MASK;
+		if ((c->flags & DIV_U71_UART) &&
+		    (!(val & PERIPH_CLK_UART_DIV_ENB))) {
+			divu71 = 0;
+		}
 		c->div = divu71 + 2;
 		c->mul = 2;
 	} else if (c->flags & DIV_U16) {
@@ -1190,6 +1195,12 @@ static int tegra3_periph_clk_set_rate(struct clk *c, unsigned long rate)
 			val = clk_readl(c->reg);
 			val &= ~PERIPH_CLK_SOURCE_DIVU71_MASK;
 			val |= divider;
+			if (c->flags & DIV_U71_UART) {
+				if (divider)
+					val |= PERIPH_CLK_UART_DIV_ENB;
+				else
+					val &= ~PERIPH_CLK_UART_DIV_ENB;
+			}
 			clk_writel(val, c->reg);
 			c->div = divider + 2;
 			c->mul = 2;
@@ -2217,11 +2228,11 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("i2c3_i2c",	"tegra-i2c.2",		"i2c",	0,	0,	72000000,  mux_pllp_out3,		0),
 	PERIPH_CLK("i2c4_i2c",	"tegra-i2c.3",		"i2c",	0,	0,	72000000,  mux_pllp_out3,		0),
 	PERIPH_CLK("i2c5_i2c",	"tegra-i2c.4",		"i2c",	0,	0,	72000000,  mux_pllp_out3,		0),
-	PERIPH_CLK("uarta",	"uart.0",		NULL,	6,	0x178,	600000000, mux_pllp_pllc_pllm_clkm,	MUX),
-	PERIPH_CLK("uartb",	"uart.1",		NULL,	7,	0x17c,	600000000, mux_pllp_pllc_pllm_clkm,	MUX),
-	PERIPH_CLK("uartc",	"uart.2",		NULL,	55,	0x1a0,	600000000, mux_pllp_pllc_pllm_clkm,	MUX),
-	PERIPH_CLK("uartd",	"uart.3",		NULL,	65,	0x1c0,	600000000, mux_pllp_pllc_pllm_clkm,	MUX),
-	PERIPH_CLK("uarte",	"uart.4",		NULL,	66,	0x1c4,	600000000, mux_pllp_pllc_pllm_clkm,	MUX),
+	PERIPH_CLK("uarta",	"uart.0",		NULL,	6,	0x178,	600000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | DIV_U71_UART),
+	PERIPH_CLK("uartb",	"uart.1",		NULL,	7,	0x17c,	600000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | DIV_U71_UART),
+	PERIPH_CLK("uartc",	"uart.2",		NULL,	55,	0x1a0,	600000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | DIV_U71_UART),
+	PERIPH_CLK("uartd",	"uart.3",		NULL,	65,	0x1c0,	600000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | DIV_U71_UART),
+	PERIPH_CLK("uarte",	"uart.4",		NULL,	66,	0x1c4,	600000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | DIV_U71_UART),
 	PERIPH_CLK("3d",	"3d",			NULL,	24,	0x158,	300000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | PERIPH_MANUAL_RESET), /* scales with voltage and process_id */
 	PERIPH_CLK("3d2",       "3d2",			NULL,	98,	0x3b0,	300000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | PERIPH_MANUAL_RESET), /* scales with voltage and process_id */
 	PERIPH_CLK("2d",	"2d",			NULL,	21,	0x15c,	300000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
