@@ -125,7 +125,7 @@ static struct regulator_consumer_supply max8907c_LDO17_supply[] = {
 };
 
 static struct regulator_consumer_supply max8907c_LDO18_supply[] = {
-	REGULATOR_SUPPLY("vddio_vi", NULL),
+	REGULATOR_SUPPLY("vcsi", "tegra_camera"),
 };
 
 static struct regulator_consumer_supply max8907c_LDO19_supply[] = {

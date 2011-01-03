@@ -22,5 +22,5 @@ int whistler_sdhci_init(void);
 int whistler_pinmux_init(void);
 int whistler_panel_init(void);
 int whistler_kbc_init(void);
-
+int whistler_sensors_init(void);
 #endif

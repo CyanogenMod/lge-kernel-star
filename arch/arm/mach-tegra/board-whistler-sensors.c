@@ -20,9 +20,74 @@
 
 #include <linux/i2c.h>
 #include <mach/gpio.h>
+#include <media/ov5650.h>
+
 #include "gpio-names.h"
+
+#define CAMERA_RESET2_SHUTTER_GPIO	TEGRA_GPIO_PBB1
+#define CAMERA_PWNDN1_GPIO			TEGRA_GPIO_PBB4
+#define CAMERA_PWNDN2_STROBE_GPIO	TEGRA_GPIO_PBB5
+#define CAMERA_RESET1_GPIO			TEGRA_GPIO_PD2
+#define CAMERA_FLASH_GPIO			TEGRA_GPIO_PA0
+
+static int whistler_camera_init(void)
+{
+	tegra_gpio_enable(CAMERA_PWNDN1_GPIO);
+	gpio_request(CAMERA_PWNDN1_GPIO, "camera_powerdown");
+	gpio_direction_output(CAMERA_PWNDN1_GPIO, 0);
+	gpio_export(CAMERA_PWNDN1_GPIO, false);
+
+	tegra_gpio_enable(CAMERA_RESET1_GPIO);
+	gpio_request(CAMERA_RESET1_GPIO, "camera_reset1");
+	gpio_direction_output(CAMERA_RESET1_GPIO, 1);
+	gpio_export(CAMERA_RESET1_GPIO, false);
+
+	tegra_gpio_enable(CAMERA_RESET2_SHUTTER_GPIO);
+	gpio_request(CAMERA_RESET2_SHUTTER_GPIO, "camera_reset2_shutter");
+	gpio_direction_output(CAMERA_RESET2_SHUTTER_GPIO, 1);
+	gpio_export(CAMERA_RESET2_SHUTTER_GPIO, false);
+
+	tegra_gpio_enable(CAMERA_PWNDN2_STROBE_GPIO);
+	gpio_request(CAMERA_PWNDN2_STROBE_GPIO, "camera_pwrdwn2_strobe");
+	gpio_direction_output(CAMERA_PWNDN2_STROBE_GPIO, 0);
+	gpio_export(CAMERA_PWNDN2_STROBE_GPIO, false);
+
+	tegra_gpio_enable(CAMERA_FLASH_GPIO);
+	gpio_request(CAMERA_FLASH_GPIO, "camera_flash");
+	gpio_direction_output(CAMERA_FLASH_GPIO, 0);
+	gpio_export(CAMERA_FLASH_GPIO, false);
+
+	return 0;
+}
+
+static int whistler_ov5650_power_on(void)
+{
+	return 0;
+}
+
+static int whistler_ov5650_power_off(void)
+{
+	return 0;
+}
+
+struct ov5650_platform_data whistler_ov5650_data = {
+	.power_on = whistler_ov5650_power_on,
+	.power_off = whistler_ov5650_power_off,
+};
+
+static struct i2c_board_info whistler_i2c3_board_info[] = {
+	{
+		I2C_BOARD_INFO("ov5650", 0x36),
+		.platform_data = &whistler_ov5650_data,
+	},
+};
 
 int __init whistler_sensors_init(void)
 {
+	whistler_camera_init();
+
+	i2c_register_board_info(3, whistler_i2c3_board_info,
+		ARRAY_SIZE(whistler_i2c3_board_info));
+
 	return 0;
 }
