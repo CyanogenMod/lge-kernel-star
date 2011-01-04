@@ -121,6 +121,10 @@
 #define PERIPH_CLK_SOURCE_DIVU16_MASK	0xFFFF
 #define PERIPH_CLK_SOURCE_DIV_SHIFT	0
 #define PERIPH_CLK_UART_DIV_ENB		(1<<24)
+#define PERIPH_CLK_VI_SEL_EX_SHIFT	24
+#define PERIPH_CLK_VI_SEL_EX_MASK	(0x3<<PERIPH_CLK_VI_SEL_EX_SHIFT)
+#define PERIPH_CLK_NAND_DIV_EX_ENB	(1<<8)
+#define PERIPH_CLK_DTV_POLARITY_INV	(1<<25)
 
 #define AUDIO_SYNC_SOURCE_MASK		0x0F
 #define AUDIO_SYNC_DISABLE_BIT		0x10
@@ -1361,6 +1365,71 @@ static struct clk_ops tegra_periph_clk_ops = {
 	.reset			= &tegra3_periph_clk_reset,
 };
 
+
+/* Periph extended clock configuration ops */
+static void tegra3_vi_clk_cfg_ex(struct clk *c, u32 setting)
+{
+	u32 val = clk_readl(c->reg);
+	val &= ~PERIPH_CLK_VI_SEL_EX_MASK;
+	val |= (setting << PERIPH_CLK_VI_SEL_EX_SHIFT) &
+		PERIPH_CLK_VI_SEL_EX_MASK;
+	clk_writel(val, c->reg);
+}
+
+static struct clk_ops tegra_vi_clk_ops = {
+	.init			= &tegra3_periph_clk_init,
+	.enable			= &tegra3_periph_clk_enable,
+	.disable		= &tegra3_periph_clk_disable,
+	.set_parent		= &tegra3_periph_clk_set_parent,
+	.set_rate		= &tegra3_periph_clk_set_rate,
+	.round_rate		= &tegra3_periph_clk_round_rate,
+	.clk_cfg_ex		= &tegra3_vi_clk_cfg_ex,
+	.reset			= &tegra3_periph_clk_reset,
+};
+
+static void tegra3_nand_clk_cfg_ex(struct clk *c, u32 setting)
+{
+	u32 val = clk_readl(c->reg);
+	if (setting)
+		val |= PERIPH_CLK_NAND_DIV_EX_ENB;
+	else
+		val &= ~PERIPH_CLK_NAND_DIV_EX_ENB;
+	clk_writel(val, c->reg);
+}
+
+static struct clk_ops tegra_nand_clk_ops = {
+	.init			= &tegra3_periph_clk_init,
+	.enable			= &tegra3_periph_clk_enable,
+	.disable		= &tegra3_periph_clk_disable,
+	.set_parent		= &tegra3_periph_clk_set_parent,
+	.set_rate		= &tegra3_periph_clk_set_rate,
+	.round_rate		= &tegra3_periph_clk_round_rate,
+	.clk_cfg_ex		= &tegra3_nand_clk_cfg_ex,
+	.reset			= &tegra3_periph_clk_reset,
+};
+
+
+static void tegra3_dtv_clk_cfg_ex(struct clk *c, u32 setting)
+{
+	u32 val = clk_readl(c->reg);
+	if (setting)
+		val |= PERIPH_CLK_DTV_POLARITY_INV;
+	else
+		val &= ~PERIPH_CLK_DTV_POLARITY_INV;
+	clk_writel(val, c->reg);
+}
+
+static struct clk_ops tegra_dtv_clk_ops = {
+	.init			= &tegra3_periph_clk_init,
+	.enable			= &tegra3_periph_clk_enable,
+	.disable		= &tegra3_periph_clk_disable,
+	.set_parent		= &tegra3_periph_clk_set_parent,
+	.set_rate		= &tegra3_periph_clk_set_rate,
+	.round_rate		= &tegra3_periph_clk_round_rate,
+	.clk_cfg_ex		= &tegra3_dtv_clk_cfg_ex,
+	.reset			= &tegra3_periph_clk_reset,
+};
+
 /* Clock doubler ops */
 static void tegra3_clk_double_init(struct clk *c)
 {
@@ -2271,6 +2340,24 @@ static struct clk_mux_sel mux_clk_32k[] = {
 		},					\
 	}
 
+#define PERIPH_CLK_EX(_name, _dev, _con, _clk_num, _reg, _max, _inputs,	\
+			_flags, _ops) 					\
+	{						\
+		.name      = _name,			\
+		.lookup    = {				\
+			.dev_id    = _dev,		\
+			.con_id	   = _con,		\
+		},					\
+		.ops       = _ops,			\
+		.reg       = _reg,			\
+		.inputs    = _inputs,			\
+		.flags     = _flags,			\
+		.max_rate  = _max,			\
+		.u.periph = {				\
+			.clk_num   = _clk_num,		\
+		},					\
+	}
+
 #define SHARED_CLK(_name, _dev, _con, _parent)		\
 	{						\
 		.name      = _name,			\
@@ -2308,7 +2395,7 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("sbc6",	"spi_tegra.5",		NULL,	105,	0x3cc,	160000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
 	PERIPH_CLK("sata_oob",	"sata",			NULL,	123,	0x420,	100000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
 	PERIPH_CLK("sata",	"sata",			NULL,	124,	0x424,	100000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
-	PERIPH_CLK("ndflash",	"tegra_nand",		NULL,	13,	0x160,	164000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71), /* scales with voltage */
+	PERIPH_CLK_EX("ndflash","tegra_nand",		NULL,	13,	0x160,	164000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71,	&tegra_nand_clk_ops), /* scales with voltage */
 	PERIPH_CLK("vfir",	"vfir",			NULL,	7,	0x168,	72000000,  mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
 	PERIPH_CLK("sdmmc1",	"sdhci-tegra.0",	NULL,	14,	0x150,	52000000,  mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71), /* scales with voltage */
 	PERIPH_CLK("sdmmc2",	"sdhci-tegra.1",	NULL,	9,	0x154,	52000000,  mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71), /* scales with voltage */
@@ -2340,13 +2427,14 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("3d",	"3d",			NULL,	24,	0x158,	300000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | PERIPH_MANUAL_RESET), /* scales with voltage and process_id */
 	PERIPH_CLK("3d2",       "3d2",			NULL,	98,	0x3b0,	300000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | PERIPH_MANUAL_RESET), /* scales with voltage and process_id */
 	PERIPH_CLK("2d",	"2d",			NULL,	21,	0x15c,	300000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
-	PERIPH_CLK("vi",	"tegra_camera",		"vi",	20,	0x148,	150000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
+	PERIPH_CLK_EX("vi",	"tegra_camera",		"vi",	20,	0x148,	150000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71,	&tegra_vi_clk_ops), /* scales with voltage and process_id */
 	PERIPH_CLK("vi_sensor",	"tegra_camera",		"vi_sensor",	20,	0x1a8,	150000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | PERIPH_NO_RESET), /* scales with voltage and process_id */
 	PERIPH_CLK("epp",	"epp",			NULL,	19,	0x16c,	300000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
 	PERIPH_CLK("mpe",	"mpe",			NULL,	60,	0x170,	250000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
 	PERIPH_CLK("host1x",	"host1x",		NULL,	28,	0x180,	166000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
 	PERIPH_CLK("cve",	"cve",			NULL,	49,	0x140,	250000000, mux_pllp_plld_pllc_clkm,	MUX | DIV_U71), /* requires min voltage */
 	PERIPH_CLK("tvo",	"tvo",			NULL,	49,	0x188,	250000000, mux_pllp_plld_pllc_clkm,	MUX | DIV_U71), /* requires min voltage */
+	PERIPH_CLK_EX("dtv",	"dtv",			NULL,	79,	0x1dc,	250000000, mux_clk_m,			0,		&tegra_dtv_clk_ops),
 	PERIPH_CLK("hdmi",	"hdmi",			NULL,	51,	0x18c,	600000000, mux_pllp_pllm_plld_plla_pllc_plld2_clkm,	MUX8 | DIV_U71), /* requires min voltage */
 	PERIPH_CLK("tvdac",	"tvdac",		NULL,	53,	0x194,	250000000, mux_pllp_plld_pllc_clkm,	MUX | DIV_U71), /* requires min voltage */
 	PERIPH_CLK("disp1",	"tegradc.0",		NULL,	27,	0x138,	600000000, mux_pllp_pllm_plld_plla_pllc_plld2_clkm,	MUX8), /* scales with voltage and process_id */

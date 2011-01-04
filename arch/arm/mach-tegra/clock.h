@@ -82,6 +82,7 @@ struct clk_ops {
 	long		(*round_rate)(struct clk *, unsigned long);
 	unsigned long	(*get_max_rate)(struct clk *);
 	void		(*recalculate_rate)(struct clk *);
+	void		(*clk_cfg_ex)(struct clk *, u32);
 	void		(*reset)(struct clk *, bool);
 };
 

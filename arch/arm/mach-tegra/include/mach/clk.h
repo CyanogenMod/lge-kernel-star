@@ -30,5 +30,6 @@ int tegra_dvfs_set_rate(struct clk *c, unsigned long rate);
 unsigned long clk_get_rate_all_locked(struct clk *c);
 void tegra_sdmmc_tap_delay(struct clk *c, int delay);
 int tegra_dvfs_rail_disable_by_name(const char *reg_id);
+int tegra_periph_clk_cfg_ex(struct clk *c, u32 setting);
 
 #endif
