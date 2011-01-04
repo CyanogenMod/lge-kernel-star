@@ -94,7 +94,6 @@ unsigned long long tegra_chip_uid(void)
 	return (hi << 32ull) | lo;
 #else
 	u64 uid = 0ull;
-#if 0 // !!!FIXME!!! FOR SOME REASON THIS IS GENERATING BAD CODE .......................................
 	u32 reg;
 	u32 cid;
 	u32 vendor;
@@ -133,7 +132,7 @@ unsigned long long tegra_chip_uid(void)
 
 	/* Get the chip id and encode each chip variant as a unique value. */
 	reg = readl(IO_TO_VIRT(TEGRA_APB_MISC_BASE + 0x804));
-	reg = (reg >> 8) && 0xFF;
+	reg = (reg & 0xFF00) >> 8;
 
 	switch (reg) {
 	case 0x30:
@@ -172,7 +171,6 @@ unsigned long long tegra_chip_uid(void)
 	    | ((unsigned long long)wafer << 18ull)
 	    | ((unsigned long long)x << 9ull)
 	    | ((unsigned long long)y << 0ull);
-#endif
 	return uid;
 #endif
 }
