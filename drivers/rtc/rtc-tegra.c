@@ -479,9 +479,6 @@ static int tegra_rtc_resume(struct platform_device *pdev)
 
 	return 0;
 }
-#else
-#define tegra_rtc_suspend NULL
-#define tegra_rtc_resume  NULL
 #endif
 
 static void tegra_rtc_shutdown(struct platform_device *pdev)
