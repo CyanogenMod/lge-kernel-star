@@ -33,6 +33,7 @@
 #include <linux/gpio.h>
 #include <linux/gpio_scrollwheel.h>
 #include <linux/input.h>
+#include <linux/tegra_usb.h>
 #include <linux/memblock.h>
 
 #include <mach/clk.h>
@@ -44,6 +45,7 @@
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
+#include <mach/usb_phy.h>
 
 #include "board.h"
 #include "clock.h"
@@ -100,6 +102,32 @@ static noinline void __init whistler_bt_rfkill(void)
 #else
 static inline void whistler_bt_rfkill(void) { }
 #endif
+
+static struct tegra_utmip_config utmi_phy_config[] = {
+	[0] = {
+			.hssync_start_delay = 0,
+			.idle_wait_delay = 17,
+			.elastic_limit = 16,
+			.term_range_adj = 6,
+			.xcvr_setup = 15,
+			.xcvr_lsfslew = 2,
+			.xcvr_lsrslew = 2,
+		},
+	[1] = {
+			.hssync_start_delay = 0,
+			.idle_wait_delay = 17,
+			.elastic_limit = 16,
+			.term_range_adj = 6,
+			.xcvr_setup = 8,
+			.xcvr_lsfslew = 2,
+			.xcvr_lsrslew = 2,
+		},
+};
+
+static struct tegra_ulpi_config ulpi_phy_config = {
+	.reset_gpio = TEGRA_GPIO_PG2,
+	.clk = "clk_dev2",
+};
 
 static __initdata struct tegra_clk_init_table whistler_clk_init_table[] = {
 	/* name		parent		rate		enabled */
@@ -203,6 +231,87 @@ static int __init whistler_scroll_init(void)
 	return 0;
 }
 
+
+static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
+	[0] = {
+			.phy_config = &utmi_phy_config[0],
+			.operating_mode = TEGRA_USB_HOST,
+			.power_down_on_bus_suspend = 0,
+		},
+	[1] = {
+			.phy_config = &ulpi_phy_config,
+			.operating_mode = TEGRA_USB_HOST,
+			.power_down_on_bus_suspend = 1,
+		},
+	[2] = {
+			.phy_config = &utmi_phy_config[1],
+			.operating_mode = TEGRA_USB_HOST,
+			.power_down_on_bus_suspend = 0,
+	},
+};
+
+static struct platform_device *tegra_usb_otg_host_register(void)
+{
+	struct platform_device *pdev;
+	void *platform_data;
+	int val;
+
+	pdev = platform_device_alloc(tegra_ehci1_device.name,
+			tegra_ehci1_device.id);
+	if (!pdev)
+		return NULL;
+
+	val = platform_device_add_resources(pdev, tegra_ehci1_device.resource,
+		tegra_ehci1_device.num_resources);
+	if (val)
+		goto error;
+
+	pdev->dev.dma_mask =  tegra_ehci1_device.dev.dma_mask;
+	pdev->dev.coherent_dma_mask = tegra_ehci1_device.dev.coherent_dma_mask;
+
+	platform_data = kmalloc(sizeof(struct tegra_ehci_platform_data),
+				GFP_KERNEL);
+	if (!platform_data)
+		goto error;
+
+	memcpy(platform_data, &tegra_ehci_pdata[0],
+				sizeof(struct tegra_ehci_platform_data));
+	pdev->dev.platform_data = platform_data;
+
+	val = platform_device_add(pdev);
+	if (val)
+		goto error_add;
+
+	return pdev;
+
+error_add:
+	kfree(platform_data);
+error:
+	pr_err("%s: failed to add the host contoller device\n", __func__);
+	platform_device_put(pdev);
+	return NULL;
+}
+
+static void tegra_usb_otg_host_unregister(struct platform_device *pdev)
+{
+	kfree(pdev->dev.platform_data);
+	platform_device_unregister(pdev);
+}
+
+static struct tegra_otg_platform_data tegra_otg_pdata = {
+	.host_register = &tegra_usb_otg_host_register,
+	.host_unregister = &tegra_usb_otg_host_unregister,
+};
+
+static void whistler_usb_init(void)
+{
+	tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
+	platform_device_register(&tegra_otg_device);
+
+	tegra_ehci3_device.dev.platform_data=&tegra_ehci_pdata[2];
+	platform_device_register(&tegra_ehci3_device);
+}
+
 static void __init tegra_whistler_init(void)
 {
 	char serial[20];
@@ -220,6 +329,7 @@ static void __init tegra_whistler_init(void)
 	whistler_sensors_init();
 	whistler_kbc_init();
 	whistler_bt_rfkill();
+	whistler_usb_init();
 	whistler_scroll_init();
 }
 
