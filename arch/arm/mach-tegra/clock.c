@@ -517,7 +517,10 @@ void tegra_sdmmc_tap_delay(struct clk *c, int delay)
 	unsigned long flags;
 
 	clk_lock_save(c, &flags);
+	/* !!FIXME!! add t30 support */
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	tegra2_sdmmc_tap_delay(c, delay);
+#endif
 	clk_unlock_restore(c, &flags);
 }
 
