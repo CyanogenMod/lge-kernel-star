@@ -101,8 +101,8 @@ static struct tegra_dc_mode aruba_panel_modes[] = {
 
 static struct tegra_fb_data aruba_fb_data = {
 	.win		= 0,
-	.xres		= 1366,
-	.yres		= 768,
+	.xres		= 480,
+	.yres		= 640,
 	.bits_per_pixel	= 16,
 };
 
