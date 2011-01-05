@@ -36,15 +36,21 @@
 #define PMC_WAKE_LEVEL		0x10
 #define PMC_WAKE_STATUS		0x14
 #define PMC_SW_WAKE_STATUS	0x18
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+#define PMC_WAKE2_MASK		0x160
+#define PMC_WAKE2_LEVEL		0x164
+#define PMC_WAKE2_STATUS	0x168
+#define PMC_SW_WAKE2_STATUS	0x16C
+#endif
 
 static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
 
-static u32 tegra_lp0_wake_enb;
-static u32 tegra_lp0_wake_level;
-static u32 tegra_lp0_wake_level_any;
+static u64 tegra_lp0_wake_enb;
+static u64 tegra_lp0_wake_level;
+static u64 tegra_lp0_wake_level_any;
 static int tegra_prevent_lp0;
 
-static unsigned int tegra_wake_irq_count[32];
+static unsigned int tegra_wake_irq_count[64];
 
 static bool debug_lp0;
 module_param(debug_lp0, bool, S_IRUGO | S_IWUSR);
@@ -63,6 +69,56 @@ static void pmc_32kwritel(u32 val, unsigned long offs)
 {
 	writel(val, pmc + offs);
 	udelay(130);
+}
+
+static inline void write_pmc_wake_mask(u64 value)
+{
+	writel((u32)value, pmc + PMC_WAKE_MASK);
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	__raw_writel((u32)(value >> 32), pmc + PMC_WAKE2_MASK);
+#endif
+}
+
+static inline u64 read_pmc_wake_level(void)
+{
+	u64 reg;
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	reg = readl(pmc + PMC_WAKE_LEVEL);
+#else
+	reg = __raw_readl(pmc + PMC_WAKE_LEVEL);
+	reg |= ((u64)readl(pmc + PMC_WAKE2_LEVEL)) << 32;
+#endif
+	return reg;
+}
+
+static inline void write_pmc_wake_level(u64 value)
+{
+	writel((u32)value, pmc + PMC_WAKE_LEVEL);
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	__raw_writel((u32)(value >> 32), pmc + PMC_WAKE2_LEVEL);
+#endif
+}
+
+static inline u64 read_pmc_wake_status(void)
+{
+	u64 reg;
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	reg = readl(pmc + PMC_WAKE_STATUS);
+#else
+	reg = __raw_readl(pmc + PMC_WAKE_STATUS);
+	reg |= ((u64)readl(pmc + PMC_WAKE2_STATUS)) << 32;
+#endif
+	return reg;
+}
+
+static inline void clear_pmc_sw_wake_status(void)
+{
+	pmc_32kwritel(0, PMC_SW_WAKE_STATUS);
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	pmc_32kwritel(0, PMC_SW_WAKE2_STATUS);
+#endif
 }
 
 int tegra_pm_irq_set_wake(int irq, int enable)
@@ -85,9 +141,9 @@ int tegra_pm_irq_set_wake(int irq, int enable)
 	}
 
 	if (enable)
-		tegra_lp0_wake_enb |= 1 << wake;
+		tegra_lp0_wake_enb |= 1ull << wake;
 	else
-		tegra_lp0_wake_enb &= ~(1 << wake);
+		tegra_lp0_wake_enb &= ~(1ull << wake);
 
 	return 0;
 }
@@ -122,12 +178,11 @@ int tegra_pm_irq_set_wake_type(int irq, int flow_type)
 }
 
 /* translate lp0 wake sources back into irqs to catch edge triggered wakeups */
-static void tegra_pm_irq_syscore_resume(void)
+static void tegra_pm_irq_syscore_resume_helper(unsigned long wake_status)
 {
 	int wake;
 	int irq;
 	struct irq_desc *desc;
-	unsigned long wake_status = readl(pmc + PMC_WAKE_STATUS);
 
 	for_each_set_bit(wake, &wake_status, sizeof(wake_status) * 8) {
 		irq = tegra_wake_to_irq(wake);
@@ -151,16 +206,26 @@ static void tegra_pm_irq_syscore_resume(void)
 	}
 }
 
+static void tegra_pm_irq_syscore_resume(void)
+{
+	unsigned long long wake_status = read_pmc_wake_status();
+
+	tegra_pm_irq_syscore_resume_helper((unsigned long)wake_status);
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	tegra_pm_irq_syscore_resume_helper((unsigned long)(wake_status >> 32));
+#endif
+}
+
 /* set up lp0 wake sources */
 static int tegra_pm_irq_syscore_suspend(void)
 {
 	u32 temp;
-	u32 status;
-	u32 lvl;
-	u32 wake_level;
-	u32 wake_enb;
+	u64 status;
+	u64 lvl;
+	u64 wake_level;
+	u64 wake_enb;
 
-	pmc_32kwritel(0, PMC_SW_WAKE_STATUS);
+	clear_pmc_sw_wake_status();
 
 	temp = readl(pmc + PMC_CTRL);
 	temp |= PMC_CTRL_LATCH_WAKEUPS;
@@ -169,9 +234,9 @@ static int tegra_pm_irq_syscore_suspend(void)
 	temp &= ~PMC_CTRL_LATCH_WAKEUPS;
 	pmc_32kwritel(temp, PMC_CTRL);
 
-	status = readl(pmc + PMC_SW_WAKE_STATUS);
+	status = read_pmc_wake_status();
 
-	lvl = readl(pmc + PMC_WAKE_LEVEL);
+	lvl = read_pmc_wake_level();
 
 	/* flip the wakeup trigger for any-edge triggered pads
 	 * which are currently asserting as wakeups */
@@ -186,9 +251,9 @@ static int tegra_pm_irq_syscore_suspend(void)
 		wake_enb = 0xffffffff;
 	}
 
-	writel(wake_level, pmc + PMC_WAKE_LEVEL);
+	write_pmc_wake_level(wake_level);
 
-	writel(wake_enb, pmc + PMC_WAKE_MASK);
+	write_pmc_wake_mask(wake_enb);
 
 	return 0;
 }

@@ -23,6 +23,10 @@
 #ifndef __MACH_TEGRA_WAKEUPS_T2_H
 #define __MACH_TEGRA_WAKEUPS_T2_H
 
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+#error "Tegra 2 wakeup sources valid only for CONFIG_ARCH_TEGRA_2x_SOC"
+#endif
+
 int tegra_irq_to_wake(int irq);
 int tegra_wake_to_irq(int wake);
 
