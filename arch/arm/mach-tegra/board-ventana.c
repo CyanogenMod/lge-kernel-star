@@ -262,7 +262,6 @@ static struct platform_device tegra_camera = {
 };
 
 static struct platform_device *ventana_devices[] __initdata = {
-	&tegra_otg_device,
 	&debug_uart,
 	&tegra_uartb_device,
 	&tegra_uartc_device,
@@ -321,13 +320,7 @@ static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
 	},
 };
 
-static void ventana_usb_init(void)
-{
-	tegra_ehci3_device.dev.platform_data=&tegra_ehci_pdata[2];
-	platform_device_register(&tegra_ehci3_device);
-}
-
-struct platform_device *tegra_usb_otg_host_register(void)
+static struct platform_device *tegra_usb_otg_host_register(void)
 {
 	struct platform_device *pdev;
 	void *platform_data;
@@ -367,9 +360,24 @@ error:
 	return NULL;
 }
 
-void tegra_usb_otg_host_unregister(struct platform_device *pdev)
+static void tegra_usb_otg_host_unregister(struct platform_device *pdev)
 {
+	kfree(pdev->dev.platform_data);
 	platform_device_unregister(pdev);
+}
+
+static struct tegra_otg_platform_data tegra_otg_pdata = {
+	.host_register = &tegra_usb_otg_host_register,
+	.host_unregister = &tegra_usb_otg_host_unregister,
+};
+
+static void ventana_usb_init(void)
+{
+	tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
+	platform_device_register(&tegra_otg_device);
+
+	tegra_ehci3_device.dev.platform_data=&tegra_ehci_pdata[2];
+	platform_device_register(&tegra_ehci3_device);
 }
 
 static int __init ventana_gps_init(void)
