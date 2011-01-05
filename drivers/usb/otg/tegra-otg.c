@@ -43,9 +43,6 @@
 #define  USB_VBUS_STATUS	(1 << 10)
 #define  USB_INTS		(USB_VBUS_INT_STATUS | USB_ID_INT_STATUS)
 
-extern struct platform_device *tegra_usb_otg_host_register();
-extern void tegra_usb_otg_host_unregister(struct platform_device *pdev);
-
 struct tegra_otg_data {
 	struct otg_transceiver otg;
 	unsigned long int_status;
@@ -83,15 +80,17 @@ static const char *tegra_state_name(enum usb_otg_state state)
 
 void tegra_start_host(struct tegra_otg_data *tegra)
 {
+	struct tegra_otg_platform_data *pdata = tegra->otg.dev->platform_data;
 	if (!tegra->pdev) {
-		tegra->pdev = tegra_usb_otg_host_register();
+		tegra->pdev = pdata->host_register();
 	}
 }
 
 void tegra_stop_host(struct tegra_otg_data *tegra)
 {
+	struct tegra_otg_platform_data *pdata = tegra->otg.dev->platform_data;
 	if (tegra->pdev) {
-		tegra_usb_otg_host_unregister(tegra->pdev);
+		pdata->host_unregister(tegra->pdev);
 		tegra->pdev = NULL;
 	}
 }
@@ -255,7 +254,6 @@ static int tegra_otg_probe(struct platform_device *pdev)
 	tegra->otg.set_peripheral = tegra_otg_set_peripheral;
 	tegra->otg.set_suspend = tegra_otg_set_suspend;
 	tegra->otg.set_power = tegra_otg_set_power;
-	tegra->host = pdev->dev.platform_data;
 	spin_lock_init(&tegra->lock);
 
 	platform_set_drvdata(pdev, tegra);
