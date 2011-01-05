@@ -27,6 +27,7 @@
 
 #include "power.h"
 #include "board.h"
+#include "wakeups-t3.h"
 
 static int ac_online(void)
 {
@@ -62,9 +63,9 @@ static struct tegra_suspend_platform_data aruba_suspend_data = {
 	.separate_req	= true,
 	.corereq_high	= false,
 	.sysclkreq_high	= true,
-	.wake_enb	= 0, /* !!!FIXME!!! VENTANA PIN ASSIGNMENT WAS TEGRA_WAKE_GPIO_PV2, */
+	.wake_enb	= 0,
 	.wake_high	= 0,
-	.wake_low	= 0, /* !!!FIXME!!! VENTANA PIN ASSIGNMENT WAS TEGRA_WAKE_GPIO_PV2, */
+	.wake_low	= 0,
 	.wake_any	= 0,
 };
 
