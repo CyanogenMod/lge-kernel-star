@@ -30,6 +30,7 @@
 #include <generated/mach-types.h>
 
 #include "gpio-names.h"
+#include "board.h"
 #include "board-ventana.h"
 
 #define ISL29018_IRQ_GPIO	TEGRA_GPIO_PZ2
@@ -159,16 +160,26 @@ static struct i2c_board_info ventana_i2c7_board_info[] = {
 
 int __init ventana_sensors_init(void)
 {
+	struct board_info BoardInfo;
+
 	ventana_isl29018_init();
 	ventana_akm8975_init();
 	ventana_camera_init();
-	ventana_bq20z75_init();
 
 	i2c_register_board_info(0, ventana_i2c0_board_info,
 		ARRAY_SIZE(ventana_i2c0_board_info));
 
-	i2c_register_board_info(2, ventana_i2c2_board_info,
-		ARRAY_SIZE(ventana_i2c2_board_info));
+	tegra_get_board_info(&BoardInfo);
+
+	/*
+	 * battery driver is supported on FAB.D boards and above only,
+	 * since they have the necessary hardware rework
+	 */
+	if (BoardInfo.sku > 0) {
+		ventana_bq20z75_init();
+		i2c_register_board_info(2, ventana_i2c2_board_info,
+			ARRAY_SIZE(ventana_i2c2_board_info));
+	}
 
 	i2c_register_board_info(4, ventana_i2c4_board_info,
 		ARRAY_SIZE(ventana_i2c4_board_info));
