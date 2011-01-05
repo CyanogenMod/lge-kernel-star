@@ -36,6 +36,13 @@ config MAX8925_POWER
 	  Say Y here to enable support for the battery charger in the Maxim
 	  MAX8925 PMIC.
 
+config MAX8907C_CHARGER
+	tristate "MAX8907c charger support"
+	depends on MFD_MAX8907C
+	help
+	  Say Y here to enable support for the charger in the Maxim
+	  MAX8907c PMIC.
+
 config WM831X_BACKUP
 	tristate "WM831X backup battery charger support"
 	depends on MFD_WM831X
