@@ -13,6 +13,7 @@ obj-$(CONFIG_PM_SLEEP)			+= pm.o
 obj-$(CONFIG_PM_SLEEP)			+= pm-irq.o
 obj-$(CONFIG_PM_SLEEP)			+= sleep.o
 obj-y					+= fuse.o
+obj-y                                   += kfuse.o
 obj-y					+= tegra_i2s_audio.o
 obj-y					+= tegra_spdif_audio.o
 obj-y					+= mc.o
