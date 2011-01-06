@@ -164,6 +164,9 @@
 
 #define PLLU_BASE_POST_DIV		(1<<20)
 
+#define PLLD_BASE_CSI_CLKENABLE		(1<<26)
+#define PLLD_BASE_DSIB_MUX_SEL		(1<<25)
+#define PLLD_MISC_DSI_CLKENABLE		(1<<30)
 #define PLLD_MISC_DIV_RST		(1<<23)
 #define PLLD_MISC_DCCON_SHIFT		12
 
@@ -1018,6 +1021,48 @@ static struct clk_ops tegra_pll_ops = {
 	.set_rate		= tegra3_pll_clk_set_rate,
 };
 
+static int
+tegra3_plld_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting)
+{
+	u32 val, mask, reg;
+
+	switch (p) {
+	case TEGRA_CLK_PLLD_CSI_OUT_ENB:
+		mask = PLLD_BASE_CSI_CLKENABLE;
+		reg = c->reg + PLL_BASE;
+		break;
+	case TEGRA_CLK_PLLD_DSI_OUT_ENB:
+		mask = PLLD_MISC_DSI_CLKENABLE;
+		reg = c->reg + PLL_MISC(c);
+		break;
+	case TEGRA_CLK_PLLD_MIPI_MUX_SEL:
+		if (!(c->flags & PLL_ALT_MISC_REG)) {
+			mask = PLLD_BASE_DSIB_MUX_SEL;
+			reg = c->reg + PLL_BASE;
+			break;
+		}
+	/* fall through - error since PLLD2 does not have MUX_SEL control */
+	default:
+		return -EINVAL;
+	}
+
+	val = clk_readl(reg);
+	if (setting)
+		val |= mask;
+	else
+		val &= ~mask;
+	clk_writel(val, reg);
+	return 0;
+}
+
+static struct clk_ops tegra_plld_ops = {
+	.init			= tegra3_pll_clk_init,
+	.enable			= tegra3_pll_clk_enable,
+	.disable		= tegra3_pll_clk_disable,
+	.set_rate		= tegra3_pll_clk_set_rate,
+	.clk_cfg_ex		= tegra3_plld_clk_cfg_ex,
+};
+
 /* Clock divider ops */
 static void tegra3_pll_div_clk_init(struct clk *c)
 {
@@ -1869,7 +1914,7 @@ static struct clk_pll_freq_table tegra_pll_d_freq_table[] = {
 static struct clk tegra_pll_d = {
 	.name      = "pll_d",
 	.flags     = PLL_HAS_CPCON | PLLD,
-	.ops       = &tegra_pll_ops,
+	.ops       = &tegra_plld_ops,
 	.reg       = 0xd0,
 	.parent    = &tegra_pll_ref,
 	.max_rate  = 1000000000,
@@ -1896,7 +1941,7 @@ static struct clk tegra_pll_d_out0 = {
 static struct clk tegra_pll_d2 = {
 	.name      = "pll_d2",
 	.flags     = PLL_HAS_CPCON | PLL_ALT_MISC_REG | PLLD,
-	.ops       = &tegra_pll_ops,
+	.ops       = &tegra_plld_ops,
 	.reg       = 0x4b8,
 	.parent    = &tegra_pll_ref,
 	.max_rate  = 1000000000,
@@ -2473,6 +2518,8 @@ struct clk tegra_list_clks[] = {
 	/* FIXME: EMC should be separated as shared bus for EMC DVFS */
 	PERIPH_CLK("emc",	"emc",			NULL,	57,	0x19c,	800000000, mux_pllm_pllc_pllp_clkm,	MUX | DIV_U71 | PERIPH_EMC_ENB),
 	PERIPH_CLK("dsi",	"dsi",			NULL,	48,	0,	500000000, mux_plld_out0,		0), /* scales with voltage */
+	/* FIXME: double-check that DSIB controller is on PLLD clock (not on PLLD2) */
+	PERIPH_CLK("dsib",	"dsib",			NULL,	82,	0,	500000000, mux_plld_out0,		0), /* scales with voltage */
 	PERIPH_CLK("csi",	"tegra_camera",		"csi",	52,	0,	72000000,  mux_pllp_out3,		0),
 	PERIPH_CLK("isp",	"tegra_camera",		"isp",	23,	0,	150000000, mux_clk_m,			0), /* same frequency as VI */
 	PERIPH_CLK("csus",	"tegra_camera",		"csus",	92,	0,	150000000, mux_clk_m,			PERIPH_NO_RESET),
