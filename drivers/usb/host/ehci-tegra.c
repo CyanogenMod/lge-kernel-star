@@ -160,6 +160,8 @@ static int tegra_ehci_hub_control(
 
 		ehci->reset_done[wIndex-1] = 0;
 
+		ehci->reset_done[wIndex-1] = 0;
+
 		tegra->port_resuming = 1;
 		goto done;
 	}
