@@ -135,6 +135,7 @@ static __initdata struct tegra_clk_init_table whistler_clk_init_table[] = {
 	{ "uartc",	"pll_m",	600000000,	false},
 	{ "pwm",	"clk_32k",	32768,		false},
 	{ "kbc",	"clk_32k",	32768,		true},
+	{ "sdmmc2",	"pll_p",	25000000,	false},
 	{ NULL,		NULL,		0,		0},
 };
 
