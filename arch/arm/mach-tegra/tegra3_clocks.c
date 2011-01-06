@@ -164,7 +164,6 @@
 
 #define PLLU_BASE_POST_DIV		(1<<20)
 
-#define PLLD_MISC_CLKENABLE		(1<<30)
 #define PLLD_MISC_DIV_RST		(1<<23)
 #define PLLD_MISC_DCCON_SHIFT		12
 
@@ -1367,13 +1366,18 @@ static struct clk_ops tegra_periph_clk_ops = {
 
 
 /* Periph extended clock configuration ops */
-static void tegra3_vi_clk_cfg_ex(struct clk *c, u32 setting)
+static int
+tegra3_vi_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting)
 {
-	u32 val = clk_readl(c->reg);
-	val &= ~PERIPH_CLK_VI_SEL_EX_MASK;
-	val |= (setting << PERIPH_CLK_VI_SEL_EX_SHIFT) &
-		PERIPH_CLK_VI_SEL_EX_MASK;
-	clk_writel(val, c->reg);
+	if (p == TEGRA_CLK_VI_INP_SEL) {
+		u32 val = clk_readl(c->reg);
+		val &= ~PERIPH_CLK_VI_SEL_EX_MASK;
+		val |= (setting << PERIPH_CLK_VI_SEL_EX_SHIFT) &
+			PERIPH_CLK_VI_SEL_EX_MASK;
+		clk_writel(val, c->reg);
+		return 0;
+	}
+	return -EINVAL;
 }
 
 static struct clk_ops tegra_vi_clk_ops = {
@@ -1387,14 +1391,19 @@ static struct clk_ops tegra_vi_clk_ops = {
 	.reset			= &tegra3_periph_clk_reset,
 };
 
-static void tegra3_nand_clk_cfg_ex(struct clk *c, u32 setting)
+static int
+tegra3_nand_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting)
 {
-	u32 val = clk_readl(c->reg);
-	if (setting)
-		val |= PERIPH_CLK_NAND_DIV_EX_ENB;
-	else
-		val &= ~PERIPH_CLK_NAND_DIV_EX_ENB;
-	clk_writel(val, c->reg);
+	if (p == TEGRA_CLK_NAND_PAD_DIV2_ENB) {
+		u32 val = clk_readl(c->reg);
+		if (setting)
+			val |= PERIPH_CLK_NAND_DIV_EX_ENB;
+		else
+			val &= ~PERIPH_CLK_NAND_DIV_EX_ENB;
+		clk_writel(val, c->reg);
+		return 0;
+	}
+	return -EINVAL;
 }
 
 static struct clk_ops tegra_nand_clk_ops = {
@@ -1409,14 +1418,19 @@ static struct clk_ops tegra_nand_clk_ops = {
 };
 
 
-static void tegra3_dtv_clk_cfg_ex(struct clk *c, u32 setting)
+static int
+tegra3_dtv_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting)
 {
-	u32 val = clk_readl(c->reg);
-	if (setting)
-		val |= PERIPH_CLK_DTV_POLARITY_INV;
-	else
-		val &= ~PERIPH_CLK_DTV_POLARITY_INV;
-	clk_writel(val, c->reg);
+	if (p == TEGRA_CLK_DTV_INVERT) {
+		u32 val = clk_readl(c->reg);
+		if (setting)
+			val |= PERIPH_CLK_DTV_POLARITY_INV;
+		else
+			val &= ~PERIPH_CLK_DTV_POLARITY_INV;
+		clk_writel(val, c->reg);
+		return 0;
+	}
+	return -EINVAL;
 }
 
 static struct clk_ops tegra_dtv_clk_ops = {

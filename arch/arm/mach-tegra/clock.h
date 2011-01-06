@@ -55,6 +55,7 @@
 #include <linux/mutex.h>
 #include <linux/spinlock.h>
 
+#include <mach/clk.h>
 #define MAX_SAME_LIMIT_SKU_IDS	16
 
 struct clk;
@@ -82,7 +83,7 @@ struct clk_ops {
 	long		(*round_rate)(struct clk *, unsigned long);
 	unsigned long	(*get_max_rate)(struct clk *);
 	void		(*recalculate_rate)(struct clk *);
-	void		(*clk_cfg_ex)(struct clk *, u32);
+	int		(*clk_cfg_ex)(struct clk *, enum tegra_clk_ex_param, u32);
 	void		(*reset)(struct clk *, bool);
 };
 

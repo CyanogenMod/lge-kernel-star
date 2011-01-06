@@ -507,22 +507,19 @@ void __init tegra_init_clock(void)
 	tegra_soc_init_dvfs();
 }
 
-/*
- * The SDMMC controllers have extra bits in the clock source register that
- * adjust the delay between the clock and data to compenstate for delays
- * on the PCB.
- */
-void tegra_sdmmc_tap_delay(struct clk *c, int delay)
-{
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+/* On tegra 2 SoC the SDMMC clock source register have extra bits that
+ * adjust the SDMMC controller delay between the clock and data to
+ * compenstate  for delays on the PCB. */
+void tegra_sdmmc_tap_delay(struct clk *c, int delay) {
 	unsigned long flags;
 
-	clk_lock_save(c, &flags);
-	/* !!FIXME!! add t30 support */
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	clk_lock_save(c, flags);
 	tegra2_sdmmc_tap_delay(c, delay);
-#endif
-	clk_unlock_restore(c, &flags);
+
+	clk_unlock_restore(c, flags);
 }
+#endif
 
 static bool tegra_keep_boot_clocks = false;
 static int __init tegra_keep_boot_clocks_setup(char *__unused)
@@ -567,7 +564,10 @@ static int __init tegra_init_disable_boot_clocks(void)
 }
 late_initcall(tegra_init_disable_boot_clocks);
 
-int tegra_periph_clk_cfg_ex(struct clk *c, u32 setting)
+/* Several extended clock configuration bits (e.g., clock routing, clock
+ * phase control) are included in PLL and peripheral clock source
+ * registers. */
+int tegra_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting)
 {
 	int ret = 0;
 	unsigned long flags;
@@ -578,7 +578,7 @@ int tegra_periph_clk_cfg_ex(struct clk *c, u32 setting)
 		ret = -ENOSYS;
 		goto out;
 	}
-	c->ops->clk_cfg_ex(c, setting);
+	ret = c->ops->clk_cfg_ex(c, p, setting);
 
 out:
 	clk_unlock_restore(c, flags);
