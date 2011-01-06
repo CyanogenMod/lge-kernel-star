@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010 NVIDIA Corporation.
+ * Copyright (c) 2010-2011 NVIDIA Corporation.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,9 +36,10 @@
 #include <linux/sysfs.h>
 #include <linux/workqueue.h>
 #include <linux/kobject.h>
-#include "nvos.h"
+#include <linux/hrtimer.h>
+#include <linux/slab.h>
 
-#define DCC_TIMEOUT_US	    100000 	/* Delay time for DCC timeout (in US) */
+#define DCC_TIMEOUT_US	    100000 	/* Delay time for DCC timeout (in uS) */
 #define CP14_DSCR_WDTRFULL  0x20000000	/* Write Data Transfer Register Full */
 #define SYSFS_DCC_DEBUG_PRINTS 0     	/* Set non-zero to enable debug prints */
 
@@ -65,7 +66,7 @@ static struct kobj_attribute nvdcc_attr =
 
 static int write_to_dcc(u32 c)
 {
-	volatile NvU32 dscr;
+	volatile u32 dscr;
 
 	/* Have we already determined that there is no debugger connected? */
 	if (DebuggerConnected < 0)
@@ -81,10 +82,8 @@ static int write_to_dcc(u32 c)
 	 * period, ignore this write and disable further DCC accesses. */
 	if (dscr & CP14_DSCR_WDTRFULL)
 	{
-		NvU64 start  = NvOsGetTimeUS();
-		NvU64 end    = start + DCC_TIMEOUT_US;
-		NvU64 offset = (end > start) ? 0 : 0 - start;
-		NvU64 now;
+		ktime_t end = ktime_add_ns(ktime_get(), DCC_TIMEOUT_US * 1000);
+		ktime_t now;
 
 		for (;;)
 		{
@@ -94,23 +93,11 @@ static int write_to_dcc(u32 c)
 			/* Previous data still there? */
 			if (dscr & CP14_DSCR_WDTRFULL)
 			{
-				if (end > start)
-				{
-					now = NvOsGetTimeUS();
+				now = ktime_get();
 
-					if ((now >= end) || (now < start))
-					{
-						goto fail;
-					}
-				}
-				else
+				if (ktime_to_ns(now) >= ktime_to_ns(end))
 				{
-					now = offset + NvOsGetTimeUS();
-
-					if (now >= (end + offset))
-					{
-						goto fail;
-					}
+					goto fail;
 				}
 			}
 			else
