@@ -115,7 +115,7 @@ int boot_secondary(unsigned int cpu, struct task_struct *idle)
 	   CPU this will cause the flow controller to stop driving reset.
 	   The CPU will remain in reset because the clock and reset block
 	   is now driving reset. */
-	flowctrl_writel(0, FLOW_CTRL_HALT_CPUx_EVENTS(cpu));
+	flowctrl_writel(0, FLOW_CTRL_HALT_CPU(cpu));
 
 	/* enable cpu clock on cpu */
 	reg = readl(CLK_RST_CONTROLLER_CLK_CPU_CMPLX);

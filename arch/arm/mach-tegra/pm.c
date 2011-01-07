@@ -86,7 +86,6 @@ static void __iomem *iram_code = IO_ADDRESS(TEGRA_IRAM_CODE_AREA);
 static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
 #ifdef CONFIG_PM
 static void __iomem *clk_rst = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
-static void __iomem *flow_ctrl = IO_ADDRESS(TEGRA_FLOW_CTRL_BASE);
 static void __iomem *evp_reset =
 	IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100;
 #endif
@@ -133,9 +132,6 @@ static void __iomem *evp_reset =
 #define CLK_RESET_CCLK_BURST_POLICY_SHIFT 28
 #define CLK_RESET_CCLK_BURST_POLICY_PLLM   3
 #define CLK_RESET_CCLK_BURST_POLICY_PLLX   8
-
-#define FLOW_CTRL_CPU_CSR(cpu)	((cpu) == 0 ? 0x8 : (0x18 + 8 * ((cpu) - 1)))
-#define FLOW_CTRL_HALT_CPU(cpu) ((cpu) == 0 ? 0x0 : (0x4 + cpu * 0x10))
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 #define FLOW_CTRL_CSR_WFE_CPU0		(1 << 4)
@@ -270,7 +266,7 @@ static void tegra_wake_reset_cpu(int cpu)
 	writel(reg, clk_rst + 0x344);
 
 	/* unhalt the cpu */
-	writel(0, flow_ctrl + 0x14);
+	flowctrl_writel(0, FLOW_CTRL_HALT_CPU(1));
 }
 
 #ifdef CONFIG_PM
@@ -330,14 +326,13 @@ static void restore_cpu_complex(void)
 
 	/* do not power-gate the CPU when flow controlled */
 	for (i = 0; i < num_possible_cpus(); i++) {
-		reg = readl(flow_ctrl + FLOW_CTRL_CPU_CSR(i));
+		reg = readl(FLOW_CTRL_CPU_CSR(i));
 		reg &= ~FLOW_CTRL_CSR_WFE_BITMAP;	/* clear wfe bitmap */
 		reg &= ~FLOW_CTRL_CSR_WFI_BITMAP;	/* clear wfi bitmap */
 		reg &= ~FLOW_CTRL_CSR_ENABLE;		/* clear enable */
 		reg |= FLOW_CTRL_CSR_CLEAR_INTR;	/* clear intr */
 		reg |= FLOW_CTRL_CSR_CLEAR_EVENT;	/* clear event */
-		writel(reg, flow_ctrl + FLOW_CTRL_CPU_CSR(i));
-		wmb();
+		flowctrl_writel(reg, FLOW_CTRL_CPU_CSR(i));
 	}
 }
 
@@ -369,7 +364,7 @@ static void suspend_cpu_complex(void)
 	tegra_sctx.pllp_misc = readl(clk_rst + CLK_RESET_PLLP_MISC);
 	tegra_sctx.cclk_divider = readl(clk_rst + CLK_RESET_CCLK_DIVIDER);
 
-	reg = readl(flow_ctrl + FLOW_CTRL_CPU_CSR(cpu));
+	reg = readl(FLOW_CTRL_CPU_CSR(cpu));
 	reg &= ~FLOW_CTRL_CSR_WFE_BITMAP;	/* clear wfe bitmap */
 	reg &= ~FLOW_CTRL_CSR_WFI_BITMAP;	/* clear wfi bitmap */
 	reg |= FLOW_CTRL_CSR_CLEAR_EVENT;	/* clear event flag */
@@ -379,18 +374,16 @@ static void suspend_cpu_complex(void)
 	reg |= FLOW_CTRL_CSR_WFI_CPU0 << cpu;	/* enable power gating on wfi */
 #endif
 	reg |= FLOW_CTRL_CSR_ENABLE;		/* enable power gating */
-	writel(reg, flow_ctrl + FLOW_CTRL_CPU_CSR(cpu));
-	wmb();
+	flowctrl_writel(reg, FLOW_CTRL_CPU_CSR(cpu));
 
 	for (i = 0; i < num_possible_cpus(); i++) {
 		if (i == cpu)
 			continue;
-		reg = readl(flow_ctrl + FLOW_CTRL_CPU_CSR(i));
+		reg = readl(FLOW_CTRL_CPU_CSR(i));
 		reg |= FLOW_CTRL_CSR_CLEAR_EVENT;
 		reg |= FLOW_CTRL_CSR_CLEAR_INTR;
-		writel(reg, flow_ctrl + FLOW_CTRL_CPU_CSR(i));
-		writel(0, flow_ctrl + FLOW_CTRL_HALT_CPU(i));
-		wmb();
+		flowctrl_writel(reg, FLOW_CTRL_CPU_CSR(i));
+		flowctrl_writel(0, FLOW_CTRL_HALT_CPU(i));
 	}
 }
 

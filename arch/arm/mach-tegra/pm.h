@@ -86,10 +86,18 @@ unsigned int is_lp_cluster(void);
 unsigned long tegra_get_lpcpu_max_rate(void);
 #endif
 
-static inline void flowctrl_writel(unsigned long val, unsigned int offs)
+#define FLOW_CTRL_HALT_CPU(cpu)	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + \
+	((cpu) == 0 ? 0x8 : (0x18 + 8 * ((cpu) - 1))))
+#define FLOW_CTRL_CPU_CSR(cpu)	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + \
+	((cpu) == 0 ? 0x0 : (0x4 + cpu * 0x10)))
+
+static inline void flowctrl_writel(unsigned long val, void __iomem *addr)
 {
-	__raw_writel(val, IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + offs);
-	(void)__raw_readl(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + offs);
+	writel(val, addr);
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	wmb();
+#endif
+	(void)__raw_readl(addr);
 }
 
 #endif /* _MACH_TEGRA_SUSPEND_H_ */

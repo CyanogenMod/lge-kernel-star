@@ -94,8 +94,6 @@
 
 #define FLOW_CTRL_CLUSTER_CONTROL \
 	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + 0x2c)
-#define FLOW_CTRL_CPUx_CSR(cpu)	\
-	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE + ((cpu)?(((cpu)-1)*8 + 0x18) : 0x8)))
 #define FLOW_CTRL_CPU_CSR_IMMEDIATE_WAKE	(1<<3)
 #define FLOW_CTRL_CPU_CSR_SWITCH_CLUSTER	(1<<2)
 
@@ -229,7 +227,7 @@ void tegra_cluster_switch_prolog(unsigned int flags)
 	/* Read the flow controler CSR register and clear the CPU switch
 	   and immediate flags. If an actual CPU switch is to be performed,
 	   re-write the CSR register with the desired values. */
-	reg = readl(FLOW_CTRL_CPUx_CSR(0));
+	reg = readl(FLOW_CTRL_CPU_CSR(0));
 	reg &= ~(FLOW_CTRL_CPU_CSR_IMMEDIATE_WAKE |
 		 FLOW_CTRL_CPU_CSR_SWITCH_CLUSTER);
 
@@ -256,7 +254,7 @@ void tegra_cluster_switch_prolog(unsigned int flags)
 	}
 
 done:
-	writel(reg, FLOW_CTRL_CPUx_CSR(0));
+	writel(reg, FLOW_CTRL_CPU_CSR(0));
 }
 
 static void cluster_switch_epilog_gic(void)
@@ -290,10 +288,10 @@ void tegra_cluster_switch_epilog(unsigned int flags)
 	/* Make sure the switch and immediate flags are cleared in
 	   the flow controller to prevent undesirable side-effects
 	   for future users of the flow controller. */
-	reg = readl(FLOW_CTRL_CPUx_CSR(0));
+	reg = readl(FLOW_CTRL_CPU_CSR(0));
 	reg &= ~(FLOW_CTRL_CPU_CSR_IMMEDIATE_WAKE |
 		 FLOW_CTRL_CPU_CSR_SWITCH_CLUSTER);
-	writel(reg, FLOW_CTRL_CPUx_CSR(0));
+	writel(reg, FLOW_CTRL_CPU_CSR(0));
 
 	/* Perform post-switch clean-up of the interrupt distributor */
 	cluster_switch_epilog_gic();
