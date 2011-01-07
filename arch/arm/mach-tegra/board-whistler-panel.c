@@ -37,6 +37,10 @@
 #include "board.h"
 
 #define whistler_bl_enb		TEGRA_GPIO_PW1
+#define whistler_hdmi_hpd	TEGRA_GPIO_PN7
+
+static struct regulator *whistler_hdmi_reg = NULL;
+static struct regulator *whistler_hdmi_pll = NULL;
 
 static int whistler_backlight_init(struct device *dev) {
 	int ret;
@@ -84,6 +88,39 @@ static struct platform_device whistler_backlight_device = {
 	},
 };
 
+static int whistler_hdmi_enable(void)
+{
+	if (!whistler_hdmi_reg) {
+		whistler_hdmi_reg = regulator_get(NULL, "avdd_hdmi"); /* LD011 */
+		if (IS_ERR_OR_NULL(whistler_hdmi_reg)) {
+			pr_err("hdmi: couldn't get regulator avdd_hdmi\n");
+			whistler_hdmi_reg = NULL;
+			return PTR_ERR(whistler_hdmi_reg);
+		}
+	}
+	regulator_enable(whistler_hdmi_reg);
+
+	if (!whistler_hdmi_pll) {
+		whistler_hdmi_pll = regulator_get(NULL, "avdd_hdmi_pll"); /* LD06 */
+		if (IS_ERR_OR_NULL(whistler_hdmi_pll)) {
+			pr_err("hdmi: couldn't get regulator avdd_hdmi_pll\n");
+			whistler_hdmi_pll = NULL;
+			regulator_disable(whistler_hdmi_reg);
+			whistler_hdmi_reg = NULL;
+			return PTR_ERR(whistler_hdmi_pll);
+		}
+	}
+	regulator_enable(whistler_hdmi_pll);
+	return 0;
+}
+
+static int whistler_hdmi_disable(void)
+{
+	regulator_disable(whistler_hdmi_reg);
+	regulator_disable(whistler_hdmi_pll);
+	return 0;
+}
+
 static struct resource whistler_disp1_resources[] = {
 	{
 		.name	= "irq",
@@ -99,6 +136,31 @@ static struct resource whistler_disp1_resources[] = {
 	},
 	{
 		.name	= "fbmem",
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+static struct resource whistler_disp2_resources[] = {
+	{
+		.name	= "irq",
+		.start	= INT_DISPLAY_B_GENERAL,
+		.end	= INT_DISPLAY_B_GENERAL,
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.name	= "regs",
+		.start	= TEGRA_DISPLAY2_BASE,
+		.end	= TEGRA_DISPLAY2_BASE + TEGRA_DISPLAY2_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "fbmem",
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "hdmi_regs",
+		.start	= TEGRA_HDMI_BASE,
+		.end	= TEGRA_HDMI_BASE + TEGRA_HDMI_SIZE - 1,
 		.flags	= IORESOURCE_MEM,
 	},
 };
@@ -145,6 +207,21 @@ static struct tegra_dc_out whistler_disp1_out = {
 
 	.out_pins	= whistler_dc_out_pins,
 	.n_out_pins	= ARRAY_SIZE(whistler_dc_out_pins),
+
+};
+
+static struct tegra_dc_out whistler_disp2_out = {
+	.type		= TEGRA_DC_OUT_HDMI,
+	.flags		= TEGRA_DC_OUT_HOTPLUG_HIGH,
+
+	.dcc_bus	= 1,
+	.hotplug_gpio	= whistler_hdmi_hpd,
+
+	.align		= TEGRA_DC_ALIGN_MSB,
+	.order		= TEGRA_DC_ORDER_RED_BLUE,
+
+	.enable		= whistler_hdmi_enable,
+	.disable	= whistler_hdmi_disable,
 };
 
 static struct tegra_fb_data whistler_fb_data = {
@@ -153,6 +230,14 @@ static struct tegra_fb_data whistler_fb_data = {
 	.yres		= 480,
 	.bits_per_pixel	= 32,
 };
+
+static struct tegra_fb_data whistler_hdmi_fb_data = {
+	.win		= 0,
+	.xres		= 800,
+	.yres		= 480,
+	.bits_per_pixel	= 32,
+};
+
 
 static struct tegra_dc_platform_data whistler_disp1_pdata = {
 	.flags		= TEGRA_DC_FLAG_ENABLED,
@@ -167,6 +252,22 @@ static struct nvhost_device whistler_disp1_device = {
 	.num_resources	= ARRAY_SIZE(whistler_disp1_resources),
 	.dev = {
 		.platform_data = &whistler_disp1_pdata,
+	},
+};
+
+static struct tegra_dc_platform_data whistler_disp2_pdata = {
+	.flags		= 0,
+	.default_out	= &whistler_disp2_out,
+	.fb		= &whistler_hdmi_fb_data,
+};
+
+static struct nvhost_device whistler_disp2_device = {
+	.name		= "tegradc",
+	.id		= 1,
+	.resource	= whistler_disp2_resources,
+	.num_resources	= ARRAY_SIZE(whistler_disp2_resources),
+	.dev = {
+		.platform_data = &whistler_disp2_pdata,
 	},
 };
 
@@ -212,6 +313,10 @@ int __init whistler_panel_init(void)
 	int err;
 	struct resource *res;
 
+	tegra_gpio_enable(whistler_hdmi_hpd);
+	gpio_request(whistler_hdmi_hpd, "hdmi_hpd");
+	gpio_direction_input(whistler_hdmi_hpd);
+
 	whistler_carveouts[1].base = tegra_carveout_start;
 	whistler_carveouts[1].size = tegra_carveout_size;
 
@@ -223,8 +328,16 @@ int __init whistler_panel_init(void)
 	res->start = tegra_fb_start;
 	res->end = tegra_fb_start + tegra_fb_size - 1;
 
+	res = nvhost_get_resource_byname(&whistler_disp2_device,
+					 IORESOURCE_MEM, "fbmem");
+	res->start = tegra_fb2_start;
+	res->end = tegra_fb2_start + tegra_fb2_size - 1;
+
 	if (!err)
 		err = nvhost_device_register(&whistler_disp1_device);
+
+	if (!err)
+		err = nvhost_device_register(&whistler_disp2_device);
 
 	return err;
 }
