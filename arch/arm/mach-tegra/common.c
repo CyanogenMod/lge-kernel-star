@@ -96,6 +96,7 @@ void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
 
 void tegra_assert_system_reset(char mode, const char *cmd)
 {
+#ifndef CONFIG_TEGRA_FPGA_PLATFORM
 	void __iomem *reset = IO_ADDRESS(TEGRA_PMC_BASE + 0x00);
 	u32 reg;
 
@@ -103,6 +104,10 @@ void tegra_assert_system_reset(char mode, const char *cmd)
 	reg = readl_relaxed(reset);
 	reg |= 0x10;
 	writel_relaxed(reg, reset);
+#else
+	printk("tegra_assert_system_reset() call attempted on FPGA target platform.....");
+	do { } while (1);
+#endif
 }
 
 /* WARNING: There is implicit client of pllp_out3 like i2c, uart, dsi
