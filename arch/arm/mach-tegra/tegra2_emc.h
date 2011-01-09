@@ -33,6 +33,4 @@ struct tegra_emc_chip {
 	int table_size;
 };
 
-int tegra_emc_set_rate(unsigned long rate);
-long tegra_emc_round_rate(unsigned long rate);
 void tegra_init_emc(const struct tegra_emc_chip *chips, int chips_size);
