@@ -98,7 +98,12 @@ config MACH_WARIO
 # Enterprise
 
 config TEGRA_FPGA_PLATFORM
-	bool
+        bool "Support for NVIDIA Tegra FPGA platform"
+        default n
+        help
+         This enables the NVIDIA Tegra FPGA platform support.
+         Select this only if you are an NVIDIA developer working on
+         an FPGA platforms. All others must leave this unselected.
 
 choice
         prompt "Low-level debug console UART"
