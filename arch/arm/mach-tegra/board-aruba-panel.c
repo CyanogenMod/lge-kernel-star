@@ -38,6 +38,53 @@
 #define PMC_SCRATCH20	0xa0
 
 #define aruba_lvds_shutdown	TEGRA_GPIO_PB2
+#define aruba_bl_enb		TEGRA_GPIO_PW1
+
+static int aruba_backlight_init(struct device *dev) {
+	int ret;
+
+	ret = gpio_request(aruba_bl_enb, "backlight_enb");
+	if (ret < 0)
+		return ret;
+
+	ret = gpio_direction_output(aruba_bl_enb, 1);
+	if (ret < 0)
+		gpio_free(aruba_bl_enb);
+	else
+		tegra_gpio_enable(aruba_bl_enb);
+
+	return ret;
+};
+
+static void aruba_backlight_exit(struct device *dev) {
+	gpio_set_value(aruba_bl_enb, 0);
+	gpio_free(aruba_bl_enb);
+	tegra_gpio_disable(aruba_bl_enb);
+}
+
+static int aruba_backlight_notify(struct device *unused, int brightness)
+{
+	gpio_set_value(aruba_bl_enb, !!brightness);
+	return brightness;
+}
+
+static struct platform_pwm_backlight_data aruba_backlight_data = {
+	.pwm_id		= 2,
+	.max_brightness	= 255,
+	.dft_brightness	= 224,
+	.pwm_period_ns	= 5000000,
+	.init		= aruba_backlight_init,
+	.exit		= aruba_backlight_exit,
+	.notify		= aruba_backlight_notify,
+};
+
+static struct platform_device aruba_backlight_device = {
+	.name	= "pwm-backlight",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &aruba_backlight_data,
+	},
+};
 
 static int aruba_panel_enable(void)
 {
@@ -168,8 +215,9 @@ static struct platform_device aruba_nvmap_device = {
 static struct platform_device *aruba_gfx_devices[] __initdata = {
 	&aruba_nvmap_device,
 	&tegra_grhost_device,
+	&tegra_pwfm2_device,
+	&aruba_backlight_device,
 };
-
 
 static inline u32 pmc_readl(unsigned long offset)
 {
