@@ -94,6 +94,7 @@ config MACH_WARIO
 
 config MACH_CARDHU
        bool "Cardhu board"
+       depends on ARCH_TEGRA_3x_SOC
        help
          Support for NVIDIA Cardhu development platform
 
