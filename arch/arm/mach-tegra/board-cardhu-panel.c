@@ -38,6 +38,53 @@
 #define PMC_SCRATCH20	0xa0
 
 #define cardhu_lvds_shutdown	TEGRA_GPIO_PB2
+#define cardhu_bl_enb		TEGRA_GPIO_PW1
+
+static int cardhu_backlight_init(struct device *dev) {
+	int ret;
+
+	ret = gpio_request(cardhu_bl_enb, "backlight_enb");
+	if (ret < 0)
+		return ret;
+
+	ret = gpio_direction_output(cardhu_bl_enb, 1);
+	if (ret < 0)
+		gpio_free(cardhu_bl_enb);
+	else
+		tegra_gpio_enable(cardhu_bl_enb);
+
+	return ret;
+};
+
+static void cardhu_backlight_exit(struct device *dev) {
+	gpio_set_value(cardhu_bl_enb, 0);
+	gpio_free(cardhu_bl_enb);
+	tegra_gpio_disable(cardhu_bl_enb);
+}
+
+static int cardhu_backlight_notify(struct device *unused, int brightness)
+{
+	gpio_set_value(cardhu_bl_enb, !!brightness);
+	return brightness;
+}
+
+static struct platform_pwm_backlight_data cardhu_backlight_data = {
+	.pwm_id		= 2,
+	.max_brightness	= 255,
+	.dft_brightness	= 224,
+	.pwm_period_ns	= 5000000,
+	.init		= cardhu_backlight_init,
+	.exit		= cardhu_backlight_exit,
+	.notify		= cardhu_backlight_notify,
+};
+
+static struct platform_device cardhu_backlight_device = {
+	.name	= "pwm-backlight",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &cardhu_backlight_data,
+	},
+};
 
 static int cardhu_panel_enable(void)
 {
@@ -168,6 +215,8 @@ static struct platform_device cardhu_nvmap_device = {
 static struct platform_device *cardhu_gfx_devices[] __initdata = {
 	&cardhu_nvmap_device,
 	&tegra_grhost_device,
+	&tegra_pwfm2_device,
+	&cardhu_backlight_device,
 };
 
 
