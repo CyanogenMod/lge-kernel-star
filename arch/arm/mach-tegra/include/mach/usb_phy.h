@@ -2,6 +2,7 @@
  * arch/arm/mach-tegra/include/mach/usb_phy.h
  *
  * Copyright (C) 2010 Google, Inc.
+ * Copyright (C) 2011 NVIDIA Corporation.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -31,8 +32,9 @@ struct tegra_utmip_config {
 };
 
 enum tegra_ulpi_inf_type {
-        TEGRA_USB_LINK_ULPI = 0,
-        TEGRA_USB_NULL_ULPI,
+	TEGRA_USB_LINK_ULPI = 0,
+	TEGRA_USB_NULL_ULPI,
+	TEGRA_USB_UHSIC,
 };
 
 struct tegra_ulpi_trimmer {
@@ -49,6 +51,14 @@ struct tegra_ulpi_config {
 	const struct tegra_ulpi_trimmer *trimmer;
 	int (*preinit)(void);
 	int (*postinit)(void);
+};
+
+struct tegra_uhsic_config {
+	u8 sync_start_delay;
+	u8 idle_wait_delay;
+	u8 term_range_adj;
+	u8 elastic_underrun_limit;
+	u8 elastic_overrun_limit;
 };
 
 enum tegra_usb_phy_port_speed {
@@ -99,5 +109,13 @@ void tegra_ehci_phy_restore_start(struct tegra_usb_phy *phy,
 void tegra_ehci_phy_restore_end(struct tegra_usb_phy *phy);
 
 void tegra_usb_phy_close(struct tegra_usb_phy *phy);
+
+int tegra_usb_phy_bus_connect(struct tegra_usb_phy *phy);
+
+int tegra_usb_phy_bus_reset(struct tegra_usb_phy *phy);
+
+int tegra_usb_phy_bus_idle(struct tegra_usb_phy *phy);
+
+bool tegra_usb_phy_is_device_connected(struct tegra_usb_phy *phy);
 
 #endif /* __MACH_USB_PHY_H */

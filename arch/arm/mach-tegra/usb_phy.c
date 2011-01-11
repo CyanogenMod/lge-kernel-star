@@ -2,6 +2,7 @@
  * arch/arm/mach-tegra/usb_phy.c
  *
  * Copyright (C) 2010 Google, Inc.
+ * Copyright (C) 2010 - 2011 NVIDIA Corporation
  *
  * Author:
  *	Erik Gilling <konkers@google.com>
@@ -33,6 +34,13 @@
 #include <mach/pinmux.h>
 #include "gpio-names.h"
 
+#define USB_USBCMD		0x140
+#define   USB_USBCMD_RS		(1 << 0)
+
+#define USB_USBSTS		0x144
+#define   USB_USBSTS_PCI	(1 << 2)
+#define   USB_USBSTS_HCH	(1 << 12)
+
 #define ULPI_VIEWPORT		0x170
 #define   ULPI_WAKEUP		(1 << 31)
 #define   ULPI_RUN		(1 << 30)
@@ -47,6 +55,7 @@
 #define   USB_PORTSC1_WKCN	(1 << 20)
 #define   USB_PORTSC1_PTC(x)	(((x) & 0xf) << 16)
 #define   USB_PORTSC1_PP	(1 << 12)
+#define   USB_PORTSC1_LS(x)	(((x) & 0x3) << 10)
 #define   USB_PORTSC1_SUSP	(1 << 7)
 #define   USB_PORTSC1_PE	(1 << 2)
 #define   USB_PORTSC1_CCS	(1 << 0)
@@ -56,9 +65,10 @@
 #define   USB_WAKE_ON_DISCON_EN_DEV	(1 << 4)
 #define   USB_SUSP_CLR		(1 << 5)
 #define   USB_PHY_CLK_VALID	(1 << 7)
-#define   UTMIP_RESET			(1 << 11)
-#define   UHSIC_RESET			(1 << 11)
-#define   UTMIP_PHY_ENABLE		(1 << 12)
+#define   UTMIP_RESET		(1 << 11)
+#define   UHSIC_RESET		(1 << 11)
+#define   UTMIP_PHY_ENABLE	(1 << 12)
+#define   UHSIC_PHY_ENABLE	(1 << 12)
 #define   ULPI_PHY_ENABLE	(1 << 13)
 #define   USB_SUSP_SET		(1 << 14)
 #define   USB_WAKEUP_DEBOUNCE_COUNT(x)	(((x) & 0x7) << 16)
@@ -162,6 +172,55 @@
 #define UTMIP_BIAS_CFG1		0x83c
 #define   UTMIP_BIAS_PDTRK_COUNT(x)	(((x) & 0x1f) << 3)
 
+#define UHSIC_PLL_CFG0				0x800
+
+#define UHSIC_PLL_CFG1				0x804
+#define   UHSIC_XTAL_FREQ_COUNT(x)		(((x) & 0xfff) << 0)
+#define   UHSIC_PLLU_ENABLE_DLY_COUNT(x)	(((x) & 0x1f) << 14)
+
+#define UHSIC_HSRX_CFG0				0x808
+#define   UHSIC_ELASTIC_UNDERRUN_LIMIT(x)	(((x) & 0x1f) << 2)
+#define   UHSIC_ELASTIC_OVERRUN_LIMIT(x)	(((x) & 0x1f) << 8)
+#define   UHSIC_IDLE_WAIT(x)			(((x) & 0x1f) << 13)
+
+#define UHSIC_HSRX_CFG1				0x80c
+#define   UHSIC_HS_SYNC_START_DLY(x)		(((x) & 0x1f) << 1)
+
+#define UHSIC_TX_CFG0				0x810
+#define   UHSIC_HS_POSTAMBLE_OUTPUT_ENABLE	(1 << 6)
+
+#define UHSIC_MISC_CFG0				0x814
+#define   UHSIC_SUSPEND_EXIT_ON_EDGE		(1 << 7)
+#define   UHSIC_DETECT_SHORT_CONNECT		(1 << 8)
+#define   UHSIC_FORCE_XCVR_MODE			(1 << 15)
+
+#define UHSIC_MISC_CFG1				0X818
+#define   UHSIC_PLLU_STABLE_COUNT(x)		(((x) & 0xfff) << 2)
+
+#define UHSIC_PADS_CFG0				0x81c
+#define   UHSIC_TX_RTUNEN			0xf000
+#define   UHSIC_TX_RTUNE(x)			(((x) & 0xf) << 12)
+
+#define UHSIC_PADS_CFG1				0x820
+#define   UHSIC_PD_BG				(1 << 2)
+#define   UHSIC_PD_TX				(1 << 3)
+#define   UHSIC_PD_TRK				(1 << 4)
+#define   UHSIC_PD_RX				(1 << 5)
+#define   UHSIC_PD_ZI				(1 << 6)
+#define   UHSIC_RX_SEL				(1 << 7)
+#define   UHSIC_RPD_DATA			(1 << 9)
+#define   UHSIC_RPD_STROBE			(1 << 10)
+#define   UHSIC_RPU_DATA			(1 << 11)
+#define   UHSIC_RPU_STROBE			(1 << 12)
+
+#define UHSIC_CMD_CFG0				0x824
+#define   UHSIC_PRETEND_CONNECT_DETECT		(1 << 5)
+
+#define UHSIC_STAT_CFG0				0x828
+#define   UHSIC_CONNECT_DETECT			(1 << 0)
+
+#define UHSIC_SPARE_CFG0			0x82c
+
 static DEFINE_SPINLOCK(utmip_pad_lock);
 static int utmip_pad_count;
 
@@ -170,7 +229,7 @@ struct tegra_xtal_freq {
 	u8 enable_delay;
 	u8 stable_count;
 	u8 active_delay;
-	u8 xtal_freq_count;
+	u16 xtal_freq_count;
 	u16 debounce;
 };
 
@@ -209,6 +268,37 @@ static const struct tegra_xtal_freq tegra_freq_table[] = {
 	},
 };
 
+static const struct tegra_xtal_freq tegra_uhsic_freq_table[] = {
+	{
+		.freq = 12000000,
+		.enable_delay = 0x02,
+		.stable_count = 0x2F,
+		.active_delay = 0x0,
+		.xtal_freq_count = 0x1CA,
+	},
+	{
+		.freq = 13000000,
+		.enable_delay = 0x02,
+		.stable_count = 0x33,
+		.active_delay = 0x0,
+		.xtal_freq_count = 0x1F0,
+	},
+	{
+		.freq = 19200000,
+		.enable_delay = 0x03,
+		.stable_count = 0x4B,
+		.active_delay = 0x0,
+		.xtal_freq_count = 0x2DD,
+	},
+	{
+		.freq = 26000000,
+		.enable_delay = 0x04,
+		.stable_count = 0x66,
+		.active_delay = 0x0,
+		.xtal_freq_count = 0x3E0,
+	},
+};
+
 static struct tegra_utmip_config utmip_default[] = {
 	[0] = {
 		.hssync_start_delay = 9,
@@ -228,6 +318,14 @@ static struct tegra_utmip_config utmip_default[] = {
 		.xcvr_lsfslew = 2,
 		.xcvr_lsrslew = 2,
 	},
+};
+
+static struct tegra_uhsic_config uhsic_default = {
+	.sync_start_delay = 9,
+	.idle_wait_delay = 17,
+	.term_range_adj = 0,
+	.elastic_underrun_limit = 16,
+	.elastic_overrun_limit = 16,
 };
 
 static inline bool phy_is_ulpi(struct tegra_usb_phy *phy)
@@ -492,15 +590,15 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 		val &= ~USB_SUSP_SET;
 		writel(val, base + USB_SUSP_CTRL);
 		if (phy->mode == TEGRA_USB_PHY_MODE_HOST) {
-			gpio_status = gpio_request(TEGRA_GPIO_PD0,"VBUS_BUS");
+			gpio_status = gpio_request(TEGRA_GPIO_PD0, "VBUS_BUS");
 			if (gpio_status < 0) {
-				printk("VBUS_USB1 request GPIO FAILED\n");
+				printk(KERN_ERR "VBUS_USB1 request GPIO FAILED\n");
 				WARN_ON(1);
 			}
 			tegra_gpio_enable(TEGRA_GPIO_PD0);
 			gpio_status = gpio_direction_output(TEGRA_GPIO_PD0, 1);
 			if (gpio_status < 0) {
-				printk("VBUS_USB1 request GPIO DIRECTION FAILED \n");
+				printk(KERN_ERR "VBUS_USB1 request GPIO DIRECTION FAILED\n");
 				WARN_ON(1);
 			}
 			gpio_set_value(TEGRA_GPIO_PD0, 1);
@@ -775,7 +873,7 @@ static void ulpi_phy_power_off(struct tegra_usb_phy *phy)
 	clk_disable(phy->clk);
 }
 
-static void null_phy_power_on(struct tegra_usb_phy *phy)
+static int null_phy_power_on(struct tegra_usb_phy *phy)
 {
 	const struct tegra_ulpi_trimmer default_trimmer = {0, 0, 4, 4};
 	unsigned long val;
@@ -819,7 +917,7 @@ static void null_phy_power_on(struct tegra_usb_phy *phy)
 	/* enable null phy mode */
 	val = ULPIS2S_ENA;
 	val |= ULPIS2S_PLLU_MASTER_BLASTER60;
-	val |= ULPIS2S_SPARE((phy->mode == TEGRA_USB_PHY_MODE_HOST)? 3:1);
+	val |= ULPIS2S_SPARE((phy->mode == TEGRA_USB_PHY_MODE_HOST) ? 3 : 1);
 	writel(val, base + ULPIS2S_CTRL);
 
 	/* select ULPI_CORE_CLK_SEL to SHADOW_CLK */
@@ -865,6 +963,8 @@ static void null_phy_power_on(struct tegra_usb_phy *phy)
 
 	if (config->postinit)
 		config->postinit();
+
+	return 0;
 }
 
 static void null_phy_power_off(struct tegra_usb_phy *phy)
@@ -877,6 +977,88 @@ static void null_phy_power_off(struct tegra_usb_phy *phy)
 	writel(val, base + ULPI_TIMING_CTRL_0);
 }
 
+static int uhsic_phy_power_on(struct tegra_usb_phy *phy)
+{
+	unsigned long val;
+	void __iomem *base = phy->regs;
+	struct tegra_uhsic_config *config = &uhsic_default;
+	struct tegra_ulpi_config *ulpi_config = phy->config;
+
+	if (ulpi_config->preinit)
+		ulpi_config->preinit();
+
+	val = readl(base + UHSIC_PADS_CFG1);
+	val &= ~(UHSIC_PD_BG | UHSIC_PD_TX | UHSIC_PD_TRK | UHSIC_PD_RX |
+			UHSIC_PD_ZI | UHSIC_RPD_DATA | UHSIC_RPD_STROBE);
+	val |= UHSIC_RX_SEL;
+	writel(val, base + UHSIC_PADS_CFG1);
+	udelay(2);
+
+	val = readl(base + USB_SUSP_CTRL);
+	val |= UHSIC_RESET;
+	writel(val, base + USB_SUSP_CTRL);
+	udelay(30);
+
+	val = readl(base + USB_SUSP_CTRL);
+	val |= UHSIC_PHY_ENABLE;
+	writel(val, base + USB_SUSP_CTRL);
+
+	val = readl(base + UHSIC_HSRX_CFG0);
+	val |= UHSIC_IDLE_WAIT(config->idle_wait_delay);
+	val |= UHSIC_ELASTIC_UNDERRUN_LIMIT(config->elastic_underrun_limit);
+	val |= UHSIC_ELASTIC_OVERRUN_LIMIT(config->elastic_overrun_limit);
+	writel(val, base + UHSIC_HSRX_CFG0);
+
+	val = readl(base + UHSIC_HSRX_CFG1);
+	val |= UHSIC_HS_SYNC_START_DLY(config->sync_start_delay);
+	writel(val, base + UHSIC_HSRX_CFG1);
+
+	val = readl(base + UHSIC_MISC_CFG0);
+	val |= UHSIC_SUSPEND_EXIT_ON_EDGE;
+	writel(val, base + UHSIC_MISC_CFG0);
+
+	val = readl(base + UHSIC_MISC_CFG1);
+	val |= UHSIC_PLLU_STABLE_COUNT(phy->freq->stable_count);
+	writel(val, base + UHSIC_MISC_CFG1);
+
+	val = readl(base + UHSIC_PLL_CFG1);
+	val |= UHSIC_PLLU_ENABLE_DLY_COUNT(phy->freq->enable_delay);
+	val |= UHSIC_XTAL_FREQ_COUNT(phy->freq->xtal_freq_count);
+	writel(val, base + UHSIC_PLL_CFG1);
+
+	val = readl(base + USB_SUSP_CTRL);
+	val &= ~(UHSIC_RESET);
+	writel(val, base + USB_SUSP_CTRL);
+	udelay(2);
+
+	val = readl(base + USB_PORTSC1);
+	val &= ~USB_PORTSC1_PTS(~0);
+	writel(val, base + USB_PORTSC1);
+
+	val = readl(base + USB_PORTSC1);
+	val &= ~(USB_PORTSC1_WKOC | USB_PORTSC1_WKDS | USB_PORTSC1_WKCN);
+	writel(val, base + USB_PORTSC1);
+
+	val = readl(base + UHSIC_PADS_CFG0);
+	val &= ~(UHSIC_TX_RTUNEN);
+	/* set Rtune impedance to 40 ohm */
+	val |= UHSIC_TX_RTUNE(0);
+	writel(val, base + UHSIC_PADS_CFG0);
+
+	if (utmi_wait_register(base + USB_SUSP_CTRL, USB_PHY_CLK_VALID,
+							USB_PHY_CLK_VALID)) {
+		pr_err("%s: timeout waiting for phy to stabilize\n", __func__);
+	}
+
+	return 0;
+}
+
+static void uhsic_phy_power_off(struct tegra_usb_phy *phy)
+{
+
+	/* Do not do any thing here */
+}
+
 struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 			void *config, enum tegra_usb_phy_mode phy_mode)
 {
@@ -885,6 +1067,7 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 	unsigned long parent_rate;
 	int i;
 	int err;
+	bool hsic = false;
 
 	phy = kmalloc(sizeof(struct tegra_usb_phy), GFP_KERNEL);
 	if (!phy)
@@ -906,6 +1089,11 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 		}
 	}
 
+	if (phy_is_ulpi(phy)) {
+		ulpi_config = config;
+		hsic = (ulpi_config->inf_type == TEGRA_USB_UHSIC);
+	}
+
 	phy->pll_u = clk_get_sys(NULL, "pll_u");
 	if (IS_ERR(phy->pll_u)) {
 		pr_err("Can't get pll_u clock\n");
@@ -915,10 +1103,19 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 	clk_enable(phy->pll_u);
 
 	parent_rate = clk_get_rate(clk_get_parent(phy->pll_u));
-	for (i = 0; i < ARRAY_SIZE(tegra_freq_table); i++) {
-		if (tegra_freq_table[i].freq == parent_rate) {
-			phy->freq = &tegra_freq_table[i];
-			break;
+	if (hsic) {
+		for (i = 0; i < ARRAY_SIZE(tegra_uhsic_freq_table); i++) {
+			if (tegra_uhsic_freq_table[i].freq == parent_rate) {
+				phy->freq = &tegra_uhsic_freq_table[i];
+				break;
+			}
+		}
+	} else {
+		for (i = 0; i < ARRAY_SIZE(tegra_freq_table); i++) {
+			if (tegra_freq_table[i].freq == parent_rate) {
+				phy->freq = &tegra_freq_table[i];
+				break;
+			}
 		}
 	}
 	if (!phy->freq) {
@@ -940,6 +1137,7 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 			tegra_gpio_enable(ulpi_config->reset_gpio);
 			gpio_request(ulpi_config->reset_gpio, "ulpi_phy_reset_b");
 			gpio_direction_output(ulpi_config->reset_gpio, 0);
+
 			phy->ulpi = otg_ulpi_create(&ulpi_viewport_access_ops, 0);
 			phy->ulpi->io_priv = regs + ULPI_VIEWPORT;
 		}
@@ -963,9 +1161,10 @@ int tegra_usb_phy_power_on(struct tegra_usb_phy *phy)
 {
 	if (phy_is_ulpi(phy)) {
 		struct tegra_ulpi_config *ulpi_config = phy->config;
-
 		if (ulpi_config->inf_type == TEGRA_USB_LINK_ULPI)
 			return ulpi_phy_power_on(phy);
+		else if (ulpi_config->inf_type == TEGRA_USB_UHSIC)
+			return uhsic_phy_power_on(phy);
 		else
 			return null_phy_power_on(phy);
 	} else
@@ -976,9 +1175,10 @@ void tegra_usb_phy_power_off(struct tegra_usb_phy *phy)
 {
 	if (phy_is_ulpi(phy)) {
 		struct tegra_ulpi_config *ulpi_config = phy->config;
-
 		if (ulpi_config->inf_type == TEGRA_USB_LINK_ULPI)
 			ulpi_phy_power_off(phy);
+		else if (ulpi_config->inf_type == TEGRA_USB_UHSIC)
+			uhsic_phy_power_off(phy);
 		else
 			null_phy_power_off(phy);
 	} else
@@ -1039,3 +1239,154 @@ void tegra_usb_phy_close(struct tegra_usb_phy *phy)
 	clk_put(phy->pll_u);
 	kfree(phy);
 }
+
+int tegra_usb_phy_bus_connect(struct tegra_usb_phy *phy)
+{
+	unsigned long val;
+	void __iomem *base = phy->regs;
+	struct tegra_ulpi_config *config = phy->config;
+
+	if (phy_is_ulpi(phy) && (config->inf_type == TEGRA_USB_UHSIC)) {
+
+		val = readl(base + UHSIC_MISC_CFG0);
+		val |= UHSIC_DETECT_SHORT_CONNECT;
+		writel(val, base + UHSIC_MISC_CFG0);
+		udelay(1);
+
+		val = readl(base + UHSIC_MISC_CFG0);
+		val |= UHSIC_FORCE_XCVR_MODE;
+		writel(val, base + UHSIC_MISC_CFG0);
+
+		val = readl(base + UHSIC_PADS_CFG1);
+		val &= ~UHSIC_RPD_STROBE;
+		val |= UHSIC_RPU_STROBE;
+		writel(val, base + UHSIC_PADS_CFG1);
+
+		if (utmi_wait_register(base + UHSIC_STAT_CFG0, UHSIC_CONNECT_DETECT, UHSIC_CONNECT_DETECT) < 0) {
+			pr_err("%s: timeout waiting for hsic connect detect\n", __func__);
+			return -ETIMEDOUT;
+		}
+
+		if (utmi_wait_register(base + USB_PORTSC1, USB_PORTSC1_LS(2), USB_PORTSC1_LS(2)) < 0) {
+			pr_err("%s: timeout waiting for dplus state\n", __func__);
+			return -ETIMEDOUT;
+		}
+	}
+
+	return 0;
+}
+
+int tegra_usb_phy_bus_reset(struct tegra_usb_phy *phy)
+{
+	unsigned long val;
+	void __iomem *base = phy->regs;
+	struct tegra_ulpi_config *config = phy->config;
+
+	if (phy_is_ulpi(phy) && (config->inf_type == TEGRA_USB_UHSIC)) {
+
+		val = readl(base + USB_PORTSC1);
+		val |= USB_PORTSC1_PTC(5);
+		writel(val, base + USB_PORTSC1);
+		udelay(2);
+
+		val = readl(base + USB_PORTSC1);
+		val &= ~USB_PORTSC1_PTC(~0);
+		writel(val, base + USB_PORTSC1);
+		udelay(2);
+
+		if (utmi_wait_register(base + USB_PORTSC1, USB_PORTSC1_LS(0), 0) < 0) {
+			pr_err("%s: timeout waiting for SE0\n", __func__);
+			return -ETIMEDOUT;
+		}
+
+		if (utmi_wait_register(base + USB_PORTSC1, USB_PORTSC1_CCS, USB_PORTSC1_CCS) < 0) {
+			pr_err("%s: timeout waiting for connection status\n", __func__);
+			return -ETIMEDOUT;
+		}
+
+		if (utmi_wait_register(base + USB_PORTSC1, USB_PORTSC1_PSPD(2), USB_PORTSC1_PSPD(2)) < 0) {
+			pr_err("%s: timeout waiting hsic high speed configuration\n", __func__);
+			return -ETIMEDOUT;
+		}
+
+		val = readl(base + USB_USBCMD);
+		val &= ~USB_USBCMD_RS;
+		writel(val, base + USB_USBCMD);
+
+		if (utmi_wait_register(base + USB_USBSTS, USB_USBSTS_HCH, USB_USBSTS_HCH) < 0) {
+			pr_err("%s: timeout waiting for stopping the controller\n", __func__);
+			return -ETIMEDOUT;
+		}
+
+		val = readl(base + UHSIC_PADS_CFG1);
+		val &= ~UHSIC_RPU_STROBE;
+		val |= UHSIC_RPD_STROBE;
+		writel(val, base + UHSIC_PADS_CFG1);
+
+		mdelay(50);
+
+		val = readl(base + UHSIC_PADS_CFG1);
+		val &= ~UHSIC_RPD_STROBE;
+		val |= UHSIC_RPU_STROBE;
+		writel(val, base + UHSIC_PADS_CFG1);
+
+		val = readl(base + USB_USBCMD);
+		val |= USB_USBCMD_RS;
+		writel(val, base + USB_USBCMD);
+
+		val = readl(base + UHSIC_PADS_CFG1);
+		val &= ~UHSIC_RPU_STROBE;
+		writel(val, base + UHSIC_PADS_CFG1);
+
+		if (utmi_wait_register(base + USB_USBCMD, USB_USBCMD_RS, USB_USBCMD_RS) < 0) {
+			pr_err("%s: timeout waiting for starting the controller\n", __func__);
+			return -ETIMEDOUT;
+		}
+	}
+
+	return 0;
+}
+
+int tegra_usb_phy_bus_idle(struct tegra_usb_phy *phy)
+{
+	unsigned long val;
+	void __iomem *base = phy->regs;
+	struct tegra_ulpi_config *config = phy->config;
+
+	if (phy_is_ulpi(phy) && (config->inf_type == TEGRA_USB_UHSIC)) {
+
+		val = readl(base + UHSIC_MISC_CFG0);
+		val |= UHSIC_DETECT_SHORT_CONNECT;
+		writel(val, base + UHSIC_MISC_CFG0);
+		udelay(1);
+
+		val = readl(base + UHSIC_MISC_CFG0);
+		val |= UHSIC_FORCE_XCVR_MODE;
+		writel(val, base + UHSIC_MISC_CFG0);
+
+		val = readl(base + UHSIC_PADS_CFG1);
+		val &= ~UHSIC_RPD_STROBE;
+		val |= UHSIC_RPU_STROBE;
+		writel(val, base + UHSIC_PADS_CFG1);
+	}
+	return 0;
+}
+
+bool tegra_usb_phy_is_device_connected(struct tegra_usb_phy *phy)
+{
+	void __iomem *base = phy->regs;
+	struct tegra_ulpi_config *config = phy->config;
+
+	if (phy_is_ulpi(phy) && (config->inf_type == TEGRA_USB_UHSIC)) {
+		if (!((readl(base + UHSIC_STAT_CFG0) & UHSIC_CONNECT_DETECT) == UHSIC_CONNECT_DETECT)) {
+			pr_err("%s: hsic no device connection\n", __func__);
+			return false;
+		}
+		if (utmi_wait_register(base + USB_PORTSC1, USB_PORTSC1_LS(2), USB_PORTSC1_LS(2)) < 0) {
+			pr_err("%s: timeout waiting for dplus state\n", __func__);
+			return false;
+		}
+	}
+	return true;
+}
+
