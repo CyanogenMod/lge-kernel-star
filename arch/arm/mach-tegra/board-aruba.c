@@ -474,6 +474,11 @@ static void __init tegra_aruba_init(void)
 	aruba_bt_rfkill();
 }
 
+static void __init tegra_aruba_reserve(void)
+{
+	tegra_reserve(SZ_32M, SZ_4M, 0);
+}
+
 MACHINE_START(ARUBA, "aruba")
 	.boot_params    = 0x80000100,
 	.phys_io        = IO_APB_PHYS,
@@ -481,5 +486,6 @@ MACHINE_START(ARUBA, "aruba")
 	.init_irq       = tegra_init_irq,
 	.init_machine   = tegra_aruba_init,
 	.map_io         = tegra_map_common_io,
+	.reserve        = tegra_aruba_reserve,
 	.timer          = &tegra_timer,
 MACHINE_END
