@@ -24,12 +24,14 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/spinlock.h>
+#include <linux/slab.h>
+#include <linux/vmalloc.h>
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 #include <linux/sysfs.h>
-#include <linux/slab.h>
-
+#include <linux/device.h>
 #include <asm/io.h>
+#include <asm/cacheflush.h>
 #include <asm/page.h>
 #include <asm/cacheflush.h>
 
@@ -49,15 +51,15 @@
 #define MC_SMMU_CONFIG_0_SMMU_ENABLE_ENABLE		1
 
 #define MC_SMMU_TLB_CONFIG_0				0x14
-#define MC_SMMU_TLB_CONFIG_0_TLB_STATS_enable		(1<<31)
-#define MC_SMMU_TLB_CONFIG_0_TLB_HIT_UNDER_MISS_enable	(1<<29)
-#define MC_SMMU_TLB_CONFIG_0_TLB_ACTIVE_LINES_value	0x10
+#define MC_SMMU_TLB_CONFIG_0_TLB_STATS__ENABLE		(1<<31)
+#define MC_SMMU_TLB_CONFIG_0_TLB_HIT_UNDER_MISS__ENABLE	(1<<29)
+#define MC_SMMU_TLB_CONFIG_0_TLB_ACTIVE_LINES__VALUE	0x10
 #define MC_SMMU_TLB_CONFIG_0_RESET_VAL			0x20000010
 
 #define MC_SMMU_PTC_CONFIG_0				0x18
-#define MC_SMMU_PTC_CONFIG_0_PTC_STATS_enable		(1<<31)
-#define MC_SMMU_PTC_CONFIG_0_PTC_CACHE_enable		(1<<29)
-#define MC_SMMU_PTC_CONFIG_0_PTC_INDEX_MAP_pattern	0x3f
+#define MC_SMMU_PTC_CONFIG_0_PTC_STATS__ENABLE		(1<<31)
+#define MC_SMMU_PTC_CONFIG_0_PTC_CACHE__ENABLE		(1<<29)
+#define MC_SMMU_PTC_CONFIG_0_PTC_INDEX_MAP__PATTERN	0x3f
 #define MC_SMMU_PTC_CONFIG_0_RESET_VAL			0x2000003f
 
 #define MC_SMMU_PTB_ASID_0				0x1c
@@ -115,14 +117,20 @@
 #endif
 
 #define MC_SMMU_NUM_ASIDS	4
-#define MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_GROUP_mask		0xffffc000
-#define MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_GROUP_shift	12	// right shift
+#define MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_SECTION__MASK		0xffc00000
+#define MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_SECTION__SHIFT	12	// right shift
+#define MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_GROUP__MASK		0xffffc000
+#define MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_GROUP__SHIFT	12	// right shift
+#define MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA(iova, which)	\
+	((((iova) & MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_##which##__MASK) >> \
+		MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_##which##__SHIFT) |	\
+	MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_MATCH_##which)
 #define MC_SMMU_PTB_ASID_0_CURRENT_ASID(n)	\
 		((n) << MC_SMMU_PTB_ASID_0_CURRENT_ASID_SHIFT)
 #define MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_ASID_MATCH_disable		\
 		(MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_ASID_MATCH_DISABLE <<	\
 			MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_ASID_MATCH_SHIFT)
-#define MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_ASID_MATCH_enable			\
+#define MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_ASID_MATCH__ENABLE		\
 		(MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_ASID_MATCH_ENABLE <<	\
 			MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_ASID_MATCH_SHIFT)
 
@@ -311,6 +319,7 @@ struct smmu_device {
 		unsigned long _pa_ = VA_PAGE_TO_PA(va, page);		\
 		__cpuc_flush_dcache_area((void *)(va), (size_t)(size));	\
 		outer_flush_range(_pa_, _pa_+(size_t)(size));		\
+		wmb();	\
 	} while (0)
 
 #define FLUSH_SMMU_REGS(smmu)	\
@@ -322,11 +331,12 @@ struct smmu_device {
 //
 static void smmu_flush_regs(struct smmu_device *smmu, int enable)
 {
+	writel(MC_SMMU_PTC_FLUSH_0_PTC_FLUSH_TYPE_ALL,
+		smmu->regs + MC_SMMU_PTC_FLUSH_0);
+	FLUSH_SMMU_REGS(smmu);
 	writel(MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_MATCH_ALL |
 			MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_ASID_MATCH_disable,
 		smmu->regs + MC_SMMU_TLB_FLUSH_0);
-	writel(MC_SMMU_PTC_FLUSH_0_PTC_FLUSH_TYPE_ALL,
-		smmu->regs + MC_SMMU_PTC_FLUSH_0);
 
 	if (enable)
 		writel(MC_SMMU_CONFIG_0_SMMU_ENABLE_ENABLE,
@@ -372,15 +382,15 @@ static void smmu_setup_regs(struct smmu_device *smmu)
 		smmu->regs + MC_SMMU_ASID_SECURITY_0);
 #ifdef HIT_MISS_STAT
 	writel(
-		MC_SMMU_TLB_CONFIG_0_TLB_STATS_enable |
-		MC_SMMU_TLB_CONFIG_0_TLB_HIT_UNDER_MISS_enable |
-		MC_SMMU_TLB_CONFIG_0_TLB_ACTIVE_LINES_value,
+		MC_SMMU_TLB_CONFIG_0_TLB_STATS__ENABLE |
+		MC_SMMU_TLB_CONFIG_0_TLB_HIT_UNDER_MISS__ENABLE |
+		MC_SMMU_TLB_CONFIG_0_TLB_ACTIVE_LINES__VALUE,
 		smmu->regs + MC_SMMU_TLB_CONFIG_0);
 
 	writel(
-		MC_SMMU_PTC_CONFIG_0_PTC_STATS_enable |
-		MC_SMMU_PTC_CONFIG_0_PTC_CACHE_enable |
-		MC_SMMU_PTC_CONFIG_0_PTC_INDEX_MAP_pattern,
+		MC_SMMU_PTC_CONFIG_0_PTC_STATS__ENABLE |
+		MC_SMMU_PTC_CONFIG_0_PTC_CACHE__ENABLE |
+		MC_SMMU_PTC_CONFIG_0_PTC_INDEX_MAP__PATTERN,
 		smmu->regs + MC_SMMU_PTC_CONFIG_0);
 #else
 	writel(MC_SMMU_TLB_CONFIG_0_RESET_VAL,
@@ -421,9 +431,28 @@ static void smmu_resume(struct tegra_iovmm_device *dev)
 	spin_unlock(&smmu->lock);
 }
 
-static void free_ptbl(struct smmu_as *as, unsigned long page_addr)
+static void flush_ptc_and_tlb(struct smmu_device *smmu,
+		struct smmu_as *as, unsigned long iova,
+		pte_t *pte, struct page *ptpage, int is_pde)
 {
-	unsigned long pdn = SMMU_ADDR_TO_PDN(page_addr);
+	unsigned long tlb_flush_va = is_pde
+			?  MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA(iova, SECTION)
+			:  MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA(iova, GROUP);
+
+	writel(MC_SMMU_PTC_FLUSH_0_PTC_FLUSH_TYPE_ADR |
+		VA_PAGE_TO_PA(pte, ptpage),
+		smmu->regs + MC_SMMU_PTC_FLUSH_0);
+	FLUSH_SMMU_REGS(smmu);
+	writel(tlb_flush_va |
+		MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_ASID_MATCH__ENABLE |
+		(as->asid << MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_ASID_SHIFT),
+		smmu->regs + MC_SMMU_TLB_FLUSH_0);
+	FLUSH_SMMU_REGS(smmu);
+}
+
+static void free_ptbl(struct smmu_as *as, unsigned long iova)
+{
+	unsigned long pdn = SMMU_ADDR_TO_PDN(iova);
 	unsigned long *pdir = (unsigned long *)kmap(as->pdir_page);
 
 	if (pdir[pdn] != _PDE_VACANT(pdn)) {
@@ -431,6 +460,8 @@ static void free_ptbl(struct smmu_as *as, unsigned long page_addr)
 		__free_page(SMMU_EX_PTBL_PAGE(pdir[pdn]));
 		pdir[pdn] = _PDE_VACANT(pdn);
 		FLUSH_CPU_DCACHE(&pdir[pdn], as->pdir_page, sizeof pdir[pdn]);
+		flush_ptc_and_tlb(as->smmu, as, iova, &pdir[pdn],
+				as->pdir_page, 1);
 	}
 	kunmap(as->pdir_page);
 }
@@ -483,16 +514,16 @@ static int smmu_remove(struct platform_device *pdev)
 }
 
 //
-// Maps PTBL for given page_addr and returns the PTE address
+// Maps PTBL for given iova and returns the PTE address
 // Caller must unmap the mapped PTBL returned in *ptbl_page_p
 //
 static smmu_pte_t *locate_pte(struct smmu_as *as,
-		unsigned long page_addr, bool allocate,
+		unsigned long iova, bool allocate,
 		struct page **ptbl_page_p,
 		unsigned int **pte_counter)
 {
-	unsigned long ptn = SMMU_ADDR_TO_PFN(page_addr);
-	unsigned long pdn = SMMU_ADDR_TO_PDN(page_addr);
+	unsigned long ptn = SMMU_ADDR_TO_PFN(iova);
+	unsigned long pdn = SMMU_ADDR_TO_PDN(iova);
 	smmu_pde_t *pdir = kmap(as->pdir_page);
 	smmu_pte_t *ptbl;
 
@@ -525,27 +556,13 @@ static smmu_pte_t *locate_pte(struct smmu_as *as,
 		FLUSH_CPU_DCACHE(ptbl, *ptbl_page_p, SMMU_PTBL_SIZE);
 		pdir[pdn] = SMMU_MK_PDE(*ptbl_page_p, _PDE_ATTR_N);
 		FLUSH_CPU_DCACHE(&pdir[pdn], as->pdir_page, sizeof pdir[pdn]);
+		flush_ptc_and_tlb(as->smmu, as, iova, &pdir[pdn],
+				as->pdir_page, 1);
 	}
 	*pte_counter = &as->pte_count[pdn];
 
 	kunmap(as->pdir_page);
 	return &ptbl[ptn % SMMU_PTBL_COUNT];
-}
-
-static void flush_tlb_and_ptc(struct smmu_device *smmu,
-		struct smmu_as *as, unsigned long iova,
-		smmu_pte_t *pte, struct page *ptpage)
-{
-	writel(MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_MATCH_GROUP |
-		((iova & MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_GROUP_mask) >>
-			MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_GROUP_shift) |
-		MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_ASID_MATCH_enable |
-		(as->asid << MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_ASID_SHIFT),
-		smmu->regs + MC_SMMU_TLB_FLUSH_0);
-	writel(MC_SMMU_PTC_FLUSH_0_PTC_FLUSH_TYPE_ADR |
-		VA_PAGE_TO_PA(pte, ptpage),
-		smmu->regs + MC_SMMU_PTC_FLUSH_0);
-	FLUSH_SMMU_REGS(smmu);
 }
 
 static int smmu_map(struct tegra_iovmm_domain *domain,
@@ -555,6 +572,9 @@ static int smmu_map(struct tegra_iovmm_domain *domain,
 	unsigned long addr = iovma->iovm_start;
 	unsigned long pcount = iovma->iovm_length >> SMMU_PAGE_SHIFT;
 	int i;
+
+	// Uncomment this to verify SMMU is in use
+	// printk("%s:%d addr=%lx\n",__FUNCTION__,__LINE__,addr);
 
 	for (i = 0; i < pcount; i++) {
 		unsigned long pfn;
@@ -577,9 +597,9 @@ static int smmu_map(struct tegra_iovmm_domain *domain,
 		if (unlikely((*pte == _PTE_VACANT(addr))))
 			(*pte_counter)--;
 		FLUSH_CPU_DCACHE(pte, ptpage, sizeof *pte);
+		flush_ptc_and_tlb(as->smmu, as, addr, pte, ptpage, 0);
 		kunmap(ptpage);
 		up(&as->sem);
-		flush_tlb_and_ptc(as->smmu, as, addr, pte, ptpage);
 		addr += SMMU_PAGE_SIZE;
 	}
 	return 0;
@@ -599,6 +619,8 @@ fail2:
 			if (*pte != _PTE_VACANT(addr)) {
 				*pte = _PTE_VACANT(addr);
 				FLUSH_CPU_DCACHE(pte, page, sizeof *pte);
+				flush_ptc_and_tlb(as->smmu, as, addr, pte,
+						page, 0);
 				kunmap(page);
 				if (!--(*pte_counter))
 					free_ptbl(as, addr);
@@ -631,6 +653,8 @@ static void smmu_unmap(struct tegra_iovmm_domain *domain,
 			if (*pte != _PTE_VACANT(addr)) {
 				*pte = _PTE_VACANT(addr);
 				FLUSH_CPU_DCACHE(pte, page, sizeof *pte);
+				flush_ptc_and_tlb(as->smmu, as, addr, pte,
+						page, 0);
 				kunmap(page);
 				if (!--(*pte_counter) && decommit) {
 					free_ptbl(as, addr);
@@ -653,6 +677,9 @@ static void smmu_map_pfn(struct tegra_iovmm_domain *domain,
 	unsigned int *pte_counter;
 	struct page *ptpage;
 
+	// Uncomment this to verify SMMU is in use
+	// printk("%s:%d pfn=%lx\n",__FUNCTION__,__LINE__,pfn);
+
 	BUG_ON(!pfn_valid(pfn));
 	down(&as->sem);
 	if ((pte = locate_pte(as, addr, true, &ptpage, &pte_counter))) {
@@ -662,10 +689,8 @@ static void smmu_map_pfn(struct tegra_iovmm_domain *domain,
 		if (unlikely((*pte == _PTE_VACANT(addr))))
 			(*pte_counter)--;
 		FLUSH_CPU_DCACHE(pte, ptpage, sizeof *pte);
-		wmb();
-
+		flush_ptc_and_tlb(smmu, as, addr, pte, ptpage, 0);
 		kunmap(ptpage);
-		flush_tlb_and_ptc(smmu, as, addr, pte, ptpage);
 	}
 	up(&as->sem);
 }
@@ -702,6 +727,15 @@ static int alloc_pdir(struct smmu_as *as)
 	for (pdn = 0; pdn < SMMU_PDIR_COUNT; pdn++)
 		pdir[pdn] = _PDE_VACANT(pdn);
 	FLUSH_CPU_DCACHE(pdir, as->pdir_page, SMMU_PDIR_SIZE);
+	writel(MC_SMMU_PTC_FLUSH_0_PTC_FLUSH_TYPE_ADR |
+		VA_PAGE_TO_PA(pdir, as->pdir_page),
+		as->smmu->regs + MC_SMMU_PTC_FLUSH_0);
+	FLUSH_SMMU_REGS(as->smmu);
+	writel(MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_MATCH_ALL |
+		MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_ASID_MATCH__ENABLE |
+		(as->asid << MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_ASID_SHIFT),
+		as->smmu->regs + MC_SMMU_TLB_FLUSH_0);
+	FLUSH_SMMU_REGS(as->smmu);
 	kunmap(as->pdir_page);
 
 	return 0;
