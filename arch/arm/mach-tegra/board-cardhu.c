@@ -391,6 +391,11 @@ static void __init tegra_cardhu_init(void)
 	cardhu_bt_rfkill();
 }
 
+static void __init tegra_cardhu_reserve(void)
+{
+	tegra_reserve(SZ_128M, SZ_8M, SZ_16M);
+}
+
 MACHINE_START(CARDHU, "cardhu")
 	.boot_params    = 0x80000100,
 	.phys_io        = IO_APB_PHYS,
@@ -398,5 +403,6 @@ MACHINE_START(CARDHU, "cardhu")
 	.init_irq       = tegra_init_irq,
 	.init_machine   = tegra_cardhu_init,
 	.map_io         = tegra_map_common_io,
+	.reserve        = tegra_cardhu_reserve,
 	.timer          = &tegra_timer,
 MACHINE_END

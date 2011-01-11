@@ -32,10 +32,9 @@
 #include <mach/dc.h>
 #include <mach/fb.h>
 
+#include "board.h"
 #include "devices.h"
 #include "gpio-names.h"
-
-#define PMC_SCRATCH20	0xa0
 
 #define cardhu_lvds_shutdown	TEGRA_GPIO_PB2
 #define cardhu_bl_enb		TEGRA_GPIO_PW1
@@ -124,8 +123,8 @@ static struct resource cardhu_disp1_resources[] = {
 	},
 	{
 		.name	= "fbmem",
-		.start	= 0,	/* Filled in by fbmem_set() */
-		.end	= 0,	/* Filled in by fbmem_set() */
+		.start	= 0,	/* Filled in by cardhu_panel_init() */
+		.end	= 0,	/* Filled in by cardhu_panel_init() */
 		.flags	= IORESOURCE_MEM,
 	},
 };
@@ -193,8 +192,8 @@ static struct nvmap_platform_carveout cardhu_carveouts[] = {
 	[1] = {
 		.name		= "generic-0",
 		.usage_mask	= NVMAP_HEAP_CARVEOUT_GENERIC,
-		.base		= 0,	/* Filled in by carveout_set() */
-		.size		= 0,	/* Filled in by carveout_set() */
+		.base		= 0,	/* Filled in by cardhu_panel_init() */
+		.size		= 0,	/* Filled in by cardhu_panel_init() */
 		.buddy_size	= SZ_32K,
 	},
 };
@@ -220,79 +219,21 @@ static struct platform_device *cardhu_gfx_devices[] __initdata = {
 };
 
 
-static inline u32 pmc_readl(unsigned long offset)
-{
-	return readl(IO_TO_VIRT(TEGRA_PMC_BASE + offset));
-}
-
-static void fbmem_set(struct resource *res, int num_res,
-				u32 start, resource_size_t size)
-{
-	int i;
-	for (i = 0; i < num_res ; i++) {
-		if (!strcmp(res[i].name, "fbmem")) {
-			res[i].start = start;
-			res[i].end = start + size - 1;
-			return;
-		}
-	}
-	/* Didn't find a framebuffer memory resource */
-	BUG();
-}
-
-static void carveout_set(struct nvmap_platform_carveout *res, int num_res,
-				u32 base, resource_size_t size)
-{
-	int i;
-	for (i = 0; i < num_res ; i++) {
-		if (!strcmp(res[i].name, "generic-0")) {
-			res[i].base = base;
-			res[i].size = size;
-			return;
-		}
-	}
-	/* Didn't find a carveout memory resource */
-	BUG();
-}
-
 int __init cardhu_panel_init(void)
 {
 	int err;
-	u32 odm_data = pmc_readl(PMC_SCRATCH20);
+	struct resource *res;
 
-	/* !!!FIXME!!!	HAVE TO USE HARD-CODED FRAME BUFFER AND CARVEOUT
-			ADDRESSES FOR NOW -- BUG 769986 */
-	switch (odm_data & 0x70000000) {
-	case 0x10000000:
-		/* 256MB LPDDR2 */
-		fbmem_set(cardhu_disp1_resources,
-				ARRAY_SIZE(cardhu_disp1_resources),
-				0x8E010000,
-				0x0012C3C0);
-		carveout_set(cardhu_carveouts,
-				ARRAY_SIZE(cardhu_carveouts),
-				0x8EC00000, /* 256MB mem - 32MB carveout + 0xC00000 ?*/
-				SZ_32M - 0xC00000);
-		break;
-	case 0x40000000:
-		/* 1GB DDR3 -- NOTE: The bootloader cannot map more than 512MB
-		   of physical memory. Therefore, the frame buffer and carveout
-		   must be completely below the 512MB boundary. */
-		fbmem_set(cardhu_disp1_resources,
-				ARRAY_SIZE(cardhu_disp1_resources),
-				0x9E010000,
-				0x0012C3C0);
-		carveout_set(cardhu_carveouts,
-				ARRAY_SIZE(cardhu_carveouts),
-				0x9EC00000, /* 512MB mem - 32MB carveout + 0xC00000 ?*/
-				SZ_32M - 0xC00000);
-		break;
-	default:
-		BUG();
-	}
+	cardhu_carveouts[1].base = tegra_carveout_start;
+	cardhu_carveouts[1].size = tegra_carveout_size;
 
 	err = platform_add_devices(cardhu_gfx_devices,
-				   ARRAY_SIZE(cardhu_gfx_devices));
+				ARRAY_SIZE(cardhu_gfx_devices));
+
+	res = nvhost_get_resource_byname(&cardhu_disp1_device,
+					 IORESOURCE_MEM, "fbmem");
+	res->start = tegra_fb_start;
+	res->end = tegra_fb_start + tegra_fb_size - 1;
 
 	if (!err)
 		err = nvhost_device_register(&cardhu_disp1_device);
