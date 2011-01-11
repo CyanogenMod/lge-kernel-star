@@ -19,10 +19,10 @@
  */
 
 #include <linux/i2c.h>
-#include <linux/i2c/nct1008.h>
 #include <linux/akm8975.h>
 #include <linux/i2c/pca954x.h>
 #include <linux/i2c/pca953x.h>
+#include <linux/nct1008.h>
 
 #include <mach/gpio.h>
 
@@ -38,6 +38,9 @@
 #define CAMERA_POWER_GPIO	TEGRA_GPIO_PV4
 #define CAMERA_CSI_MUX_SEL_GPIO	TEGRA_GPIO_PBB4
 #define AC_PRESENT_GPIO		TEGRA_GPIO_PV3
+#define NCT1008_THERM2_GPIO	TEGRA_GPIO_PN6
+
+extern void tegra_throttling_enable(bool enable);
 
 static int ventana_camera_init(void)
 {
@@ -90,11 +93,23 @@ static void ventana_bq20z75_init(void)
 	gpio_direction_input(AC_PRESENT_GPIO);
 }
 
-struct nct1008_platform_data ventana_nct1008_pdata = {
-	.conv_rate = 5,
-	.config = NCT1008_CONFIG_ALERT_DISABLE,
-	.thermal_threshold = 120,
+static void ventana_nct1008_init(void)
+{
+	tegra_gpio_enable(NCT1008_THERM2_GPIO);
+	gpio_request(NCT1008_THERM2_GPIO, "temp_alert");
+	gpio_direction_input(NCT1008_THERM2_GPIO);
+}
+
+static struct nct1008_platform_data ventana_nct1008_pdata = {
+	.supported_hwrev = true,
+	.ext_range = false,
+	.conv_rate = 0x08,
 	.offset = 0,
+	.hysteresis = 0,
+	.shutdown_ext_limit = 115,
+	.shutdown_local_limit = 120,
+	.throttling_ext_limit = 90,
+	.alarm_fn = tegra_throttling_enable,
 };
 
 static const struct i2c_board_info ventana_i2c0_board_info[] = {
@@ -165,6 +180,7 @@ int __init ventana_sensors_init(void)
 	ventana_isl29018_init();
 	ventana_akm8975_init();
 	ventana_camera_init();
+	ventana_nct1008_init();
 
 	i2c_register_board_info(0, ventana_i2c0_board_info,
 		ARRAY_SIZE(ventana_i2c0_board_info));
