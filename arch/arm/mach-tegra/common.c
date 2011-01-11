@@ -405,7 +405,7 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 		"LP0:                    %08lx - %08lx\n"
 		"Bootloader framebuffer: %08lx - %08lx\n"
 		"Framebuffer:            %08lx - %08lx\n"
-		"2nd Framebuffer:         %08lx - %08lx\n"
+		"2nd Framebuffer:        %08lx - %08lx\n"
 		"Carveout:               %08lx - %08lx\n",
 		tegra_lp0_vec_start,
 		tegra_lp0_vec_start + tegra_lp0_vec_size - 1,
