@@ -309,6 +309,8 @@ unsigned long clk_measure_input_freq(void)
 static int clk_div71_get_divider(unsigned long parent_rate, unsigned long rate)
 {
 	s64 divider_u71 = parent_rate * 2;
+	if (!rate)
+		return -EINVAL;
 	divider_u71 += rate - 1;
 	do_div(divider_u71, rate);
 
@@ -326,6 +328,8 @@ static int clk_div16_get_divider(unsigned long parent_rate, unsigned long rate)
 	s64 divider_u16;
 
 	divider_u16 = parent_rate;
+	if (!rate)
+		return -EINVAL;
 	divider_u16 += rate - 1;
 	do_div(divider_u16, rate);
 
@@ -1313,6 +1317,10 @@ static int tegra3_periph_clk_set_parent(struct clk *c, struct clk *p)
 	u32 val;
 	const struct clk_mux_sel *sel;
 	pr_debug("%s: %s %s\n", __func__, c->name, p->name);
+
+	if (!(c->flags & (MUX | MUX_PWM | MUX8)))
+		return (p == c->parent) ? 0 : (-EINVAL);
+
 	for (sel = c->inputs; sel->input != NULL; sel++) {
 		if (sel->input == p) {
 			val = clk_readl(c->reg);
