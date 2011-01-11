@@ -266,6 +266,12 @@ static int tegra_periph_clk_enable_refcount[CLK_OUT_ENB_NUM * 32];
 #define pmc_readl(reg) \
 	__raw_readl((u32)reg_pmc_base + (reg))
 
+#define clk_writel_delay(value, reg) 					\
+	do {								\
+		__raw_writel((value), (u32)reg_clk_base + (reg));	\
+		udelay(2);						\
+	} while (0)
+
 static inline u32 periph_clk_to_reg(
 	struct clk *c, u32 reg_L, u32 reg_V, int offs)
 {
@@ -1115,7 +1121,7 @@ static int tegra3_pll_div_clk_enable(struct clk *c)
 
 		val &= ~(0xFFFF << c->reg_shift);
 		val |= new_val << c->reg_shift;
-		clk_writel(val, c->reg);
+		clk_writel_delay(val, c->reg);
 		return 0;
 	} else if (c->flags & DIV_2) {
 		return 0;
@@ -1138,7 +1144,7 @@ static void tegra3_pll_div_clk_disable(struct clk *c)
 
 		val &= ~(0xFFFF << c->reg_shift);
 		val |= new_val << c->reg_shift;
-		clk_writel(val, c->reg);
+		clk_writel_delay(val, c->reg);
 	}
 }
 
@@ -1163,7 +1169,7 @@ static int tegra3_pll_div_clk_set_rate(struct clk *c, unsigned long rate)
 
 			val &= ~(0xFFFF << c->reg_shift);
 			val |= new_val << c->reg_shift;
-			clk_writel(val, c->reg);
+			clk_writel_delay(val, c->reg);
 			c->div = divider_u71 + 2;
 			c->mul = 2;
 			return 0;
@@ -1276,7 +1282,7 @@ static int tegra3_periph_clk_enable(struct clk *c)
 	if (tegra_periph_clk_enable_refcount[c->u.periph.clk_num] > 1)
 		return 0;
 
-	clk_writel(PERIPH_CLK_TO_BIT(c), PERIPH_CLK_TO_ENB_SET_REG(c));
+	clk_writel_delay(PERIPH_CLK_TO_BIT(c), PERIPH_CLK_TO_ENB_SET_REG(c));
 	if (!(c->flags & PERIPH_NO_RESET) && !(c->flags & PERIPH_MANUAL_RESET)) {
 		if (clk_readl(PERIPH_CLK_TO_RST_REG(c)) & PERIPH_CLK_TO_BIT(c)) {
 			udelay(5);	/* reset propagation delay */
@@ -1294,7 +1300,8 @@ static void tegra3_periph_clk_disable(struct clk *c)
 		tegra_periph_clk_enable_refcount[c->u.periph.clk_num]--;
 
 	if (tegra_periph_clk_enable_refcount[c->u.periph.clk_num] == 0)
-		clk_writel(PERIPH_CLK_TO_BIT(c), PERIPH_CLK_TO_ENB_CLR_REG(c));
+		clk_writel_delay(
+			PERIPH_CLK_TO_BIT(c), PERIPH_CLK_TO_ENB_CLR_REG(c));
 }
 
 static void tegra3_periph_clk_reset(struct clk *c, bool assert)
@@ -1330,7 +1337,7 @@ static int tegra3_periph_clk_set_parent(struct clk *c, struct clk *p)
 			if (c->refcnt)
 				clk_enable(p);
 
-			clk_writel(val, c->reg);
+			clk_writel_delay(val, c->reg);
 
 			if (c->refcnt && c->parent)
 				clk_disable(c->parent);
@@ -1361,7 +1368,7 @@ static int tegra3_periph_clk_set_rate(struct clk *c, unsigned long rate)
 				else
 					val &= ~PERIPH_CLK_UART_DIV_ENB;
 			}
-			clk_writel(val, c->reg);
+			clk_writel_delay(val, c->reg);
 			c->div = divider + 2;
 			c->mul = 2;
 			return 0;
@@ -1372,7 +1379,7 @@ static int tegra3_periph_clk_set_rate(struct clk *c, unsigned long rate)
 			val = clk_readl(c->reg);
 			val &= ~PERIPH_CLK_SOURCE_DIVU16_MASK;
 			val |= divider;
-			clk_writel(val, c->reg);
+			clk_writel_delay(val, c->reg);
 			c->div = divider + 1;
 			c->mul = 1;
 			return 0;
@@ -1531,7 +1538,6 @@ static int tegra3_emc_clk_set_rate(struct clk *c, unsigned long rate)
 
 	/* FIXME: update MC clock control here */
 	ret = tegra3_periph_clk_set_rate(c, rate);
-	udelay(1);
 
 	return ret;
 }
