@@ -662,25 +662,33 @@ struct platform_device tegra_audio_device = {
 	.resource	= audio_resource,
 	.num_resources	= ARRAY_SIZE(audio_resource),
 };
+#endif
 
-static struct resource hda_resource[] = {
+#if defined(CONFIG_SND_HDA_TEGRA)
+static u64 tegra_hda_dma_mask = DMA_BIT_MASK(32);
+
+static struct resource tegra_hda_resources[] = {
 	[0] = {
+		.start	= TEGRA_HDA_BASE,
+		.end	= TEGRA_HDA_BASE + TEGRA_HDA_SIZE - 1 ,
+		.flags	= IORESOURCE_MEM
+	},
+	[1] = {
 		.start	= INT_HDA,
 		.end	= INT_HDA,
 		.flags	= IORESOURCE_IRQ
 	},
-	[1] = {
-		.start	= TEGRA_HDA_BASE,
-		.end	= TEGRA_HDA_BASE + TEGRA_HDA_SIZE - 1,
-		.flags	= IORESOURCE_MEM
-	}
 };
 
 struct platform_device tegra_hda_device = {
-	.name		= "hda",
-	.id		= -1,
-	.resource	= hda_resource,
-	.num_resources	= ARRAY_SIZE(hda_resource),
+	.name		= "tegra-hda",
+	.id		= 0,
+	.dev = {
+		.coherent_dma_mask	= DMA_BIT_MASK(32),
+		.dma_mask		= &tegra_hda_dma_mask,
+	},
+	.resource	= tegra_hda_resources,
+	.num_resources	= ARRAY_SIZE(tegra_hda_resources),
 };
 #endif
 
