@@ -30,9 +30,25 @@ struct tegra_utmip_config {
 	u8 xcvr_lsrslew;
 };
 
+enum tegra_ulpi_inf_type {
+        TEGRA_USB_LINK_ULPI = 0,
+        TEGRA_USB_NULL_ULPI,
+};
+
+struct tegra_ulpi_trimmer {
+	u8 shadow_clk_delay;	/* 0 ~ 31 */
+	u8 clock_out_delay;	/* 0 ~ 31 */
+	u8 data_trimmer;	/* 0 ~ 7 */
+	u8 stpdirnxt_trimmer;	/* 0 ~ 7 */
+};
+
 struct tegra_ulpi_config {
+	enum tegra_ulpi_inf_type inf_type;
 	int reset_gpio;
 	const char *clk;
+	const struct tegra_ulpi_trimmer *trimmer;
+	int (*preinit)(void);
+	int (*postinit)(void);
 };
 
 enum tegra_usb_phy_port_speed {

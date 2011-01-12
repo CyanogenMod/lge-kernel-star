@@ -72,9 +72,28 @@
 #define   USB1_VBUS_SENSE_CTL_AB_SESS_VLD	(2 << 1)
 #define   USB1_VBUS_SENSE_CTL_A_SESS_VLD	(3 << 1)
 
+#define ULPIS2S_CTRL		0x418
+#define   ULPIS2S_ENA			(1 << 0)
+#define   ULPIS2S_SUPPORT_DISCONNECT	(1 << 2)
+#define   ULPIS2S_PLLU_MASTER_BLASTER60	(1 << 3)
+#define   ULPIS2S_SPARE(x)		(((x) & 0xF) << 8)
+#define   ULPIS2S_FORCE_ULPI_CLK_OUT	(1 << 12)
+#define   ULPIS2S_DISCON_DONT_CHECK_SE0	(1 << 13)
+#define   ULPIS2S_SUPPORT_HS_KEEP_ALIVE (1 << 14)
+#define   ULPIS2S_DISABLE_STP_PU	(1 << 15)
+
 #define ULPI_TIMING_CTRL_0	0x424
+#define   ULPI_CLOCK_OUT_DELAY(x)	((x) & 0x1F)
 #define   ULPI_OUTPUT_PINMUX_BYP	(1 << 10)
 #define   ULPI_CLKOUT_PINMUX_BYP	(1 << 11)
+#define   ULPI_SHADOW_CLK_LOOPBACK_EN	(1 << 12)
+#define   ULPI_SHADOW_CLK_SEL		(1 << 13)
+#define   ULPI_CORE_CLK_SEL		(1 << 14)
+#define   ULPI_SHADOW_CLK_DELAY(x)	(((x) & 0x1F) << 16)
+#define   ULPI_LBK_PAD_EN		(1 << 26)
+#define   ULPI_LBK_PAD_E_INPUT_OR	(1 << 27)
+#define   ULPI_CLK_OUT_ENA		(1 << 28)
+#define   ULPI_CLK_PADOUT_ENA		(1 << 29)
 
 #define ULPI_TIMING_CTRL_1	0x428
 #define   ULPI_DATA_TRIMMER_LOAD	(1 << 0)
@@ -756,6 +775,108 @@ static void ulpi_phy_power_off(struct tegra_usb_phy *phy)
 	clk_disable(phy->clk);
 }
 
+static void null_phy_power_on(struct tegra_usb_phy *phy)
+{
+	const struct tegra_ulpi_trimmer default_trimmer = {0, 0, 4, 4};
+	unsigned long val;
+	void __iomem *base = phy->regs;
+	struct tegra_ulpi_config *config = phy->config;
+
+	if (config->preinit)
+		config->preinit();
+
+	if (!config->trimmer)
+		config->trimmer = &default_trimmer;
+
+	val = readl(base + USB_SUSP_CTRL);
+	val |= UHSIC_RESET;
+	writel(val, base + USB_SUSP_CTRL);
+
+	val = readl(base + ULPI_TIMING_CTRL_0);
+	val |= ULPI_OUTPUT_PINMUX_BYP | ULPI_CLKOUT_PINMUX_BYP;
+	writel(val, base + ULPI_TIMING_CTRL_0);
+
+	val = readl(base + USB_SUSP_CTRL);
+	val |= ULPI_PHY_ENABLE;
+	writel(val, base + USB_SUSP_CTRL);
+
+	/* set timming parameters */
+	val = readl(base + ULPI_TIMING_CTRL_0);
+	val |= ULPI_SHADOW_CLK_LOOPBACK_EN;
+	val |= ULPI_SHADOW_CLK_SEL;
+	val |= ULPI_OUTPUT_PINMUX_BYP;
+	val |= ULPI_CLKOUT_PINMUX_BYP;
+	val |= ULPI_LBK_PAD_EN;
+	val |= ULPI_SHADOW_CLK_DELAY(config->trimmer->shadow_clk_delay);
+	val |= ULPI_CLOCK_OUT_DELAY(config->trimmer->clock_out_delay);
+	val |= ULPI_LBK_PAD_E_INPUT_OR;
+	writel(val, base + ULPI_TIMING_CTRL_0);
+
+	val = 0;
+	writel(val, base + ULPI_TIMING_CTRL_1);
+	udelay(10);
+
+	/* enable null phy mode */
+	val = ULPIS2S_ENA;
+	val |= ULPIS2S_PLLU_MASTER_BLASTER60;
+	val |= ULPIS2S_SPARE((phy->mode == TEGRA_USB_PHY_MODE_HOST)? 3:1);
+	writel(val, base + ULPIS2S_CTRL);
+
+	/* select ULPI_CORE_CLK_SEL to SHADOW_CLK */
+	val = readl(base + ULPI_TIMING_CTRL_0);
+	val |= ULPI_CORE_CLK_SEL;
+	writel(val, base + ULPI_TIMING_CTRL_0);
+	udelay(10);
+
+	/* enable ULPI null clocks - can't set the trimmers before this */
+	val = readl(base + ULPI_TIMING_CTRL_0);
+	val |= ULPI_CLK_OUT_ENA;
+	writel(val, base + ULPI_TIMING_CTRL_0);
+	udelay(10);
+
+	val = ULPI_DATA_TRIMMER_SEL(config->trimmer->data_trimmer);
+	val |= ULPI_STPDIRNXT_TRIMMER_SEL(config->trimmer->stpdirnxt_trimmer);
+	val |= ULPI_DIR_TRIMMER_SEL(4);
+	writel(val, base + ULPI_TIMING_CTRL_1);
+	udelay(10);
+
+	val |= ULPI_DATA_TRIMMER_LOAD;
+	val |= ULPI_STPDIRNXT_TRIMMER_LOAD;
+	val |= ULPI_DIR_TRIMMER_LOAD;
+	writel(val, base + ULPI_TIMING_CTRL_1);
+
+	val = readl(base + ULPI_TIMING_CTRL_0);
+	val |= ULPI_CLK_PADOUT_ENA;
+	writel(val, base + ULPI_TIMING_CTRL_0);
+	udelay(10);
+
+	val = readl(base + USB_SUSP_CTRL);
+	val |= USB_SUSP_CLR;
+	writel(val, base + USB_SUSP_CTRL);
+	udelay(100);
+
+	val = readl(base + USB_SUSP_CTRL);
+	val &= ~USB_SUSP_CLR;
+	writel(val, base + USB_SUSP_CTRL);
+
+	if (utmi_wait_register(base + USB_SUSP_CTRL, USB_PHY_CLK_VALID,
+						     USB_PHY_CLK_VALID))
+		pr_err("%s: timeout waiting for phy to stabilize\n", __func__);
+
+	if (config->postinit)
+		config->postinit();
+}
+
+static void null_phy_power_off(struct tegra_usb_phy *phy)
+{
+	unsigned long val;
+	void __iomem *base = phy->regs;
+
+	val = readl(base + ULPI_TIMING_CTRL_0);
+	val &= ~ULPI_CLK_PADOUT_ENA;
+	writel(val, base + ULPI_TIMING_CTRL_0);
+}
+
 struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 			void *config, enum tegra_usb_phy_mode phy_mode)
 {
@@ -808,17 +929,20 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 
 	if (phy_is_ulpi(phy)) {
 		ulpi_config = config;
-		phy->clk = clk_get_sys(NULL, ulpi_config->clk);
-		if (IS_ERR(phy->clk)) {
-			pr_err("%s: can't get ulpi clock\n", __func__);
-			err = -ENXIO;
-			goto err1;
+
+		if (ulpi_config->inf_type == TEGRA_USB_LINK_ULPI) {
+			phy->clk = clk_get_sys(NULL, ulpi_config->clk);
+			if (IS_ERR(phy->clk)) {
+				pr_err("%s: can't get ulpi clock\n", __func__);
+				err = -ENXIO;
+				goto err1;
+			}
+			tegra_gpio_enable(ulpi_config->reset_gpio);
+			gpio_request(ulpi_config->reset_gpio, "ulpi_phy_reset_b");
+			gpio_direction_output(ulpi_config->reset_gpio, 0);
+			phy->ulpi = otg_ulpi_create(&ulpi_viewport_access_ops, 0);
+			phy->ulpi->io_priv = regs + ULPI_VIEWPORT;
 		}
-		tegra_gpio_enable(ulpi_config->reset_gpio);
-		gpio_request(ulpi_config->reset_gpio, "ulpi_phy_reset_b");
-		gpio_direction_output(ulpi_config->reset_gpio, 0);
-		phy->ulpi = otg_ulpi_create(&ulpi_viewport_access_ops, 0);
-		phy->ulpi->io_priv = regs + ULPI_VIEWPORT;
 	} else {
 		err = utmip_pad_open(phy);
 		if (err < 0)
@@ -837,17 +961,27 @@ err0:
 
 int tegra_usb_phy_power_on(struct tegra_usb_phy *phy)
 {
-	if (phy_is_ulpi(phy))
-		return ulpi_phy_power_on(phy);
-	else
+	if (phy_is_ulpi(phy)) {
+		struct tegra_ulpi_config *ulpi_config = phy->config;
+
+		if (ulpi_config->inf_type == TEGRA_USB_LINK_ULPI)
+			return ulpi_phy_power_on(phy);
+		else
+			return null_phy_power_on(phy);
+	} else
 		return utmi_phy_power_on(phy);
 }
 
 void tegra_usb_phy_power_off(struct tegra_usb_phy *phy)
 {
-	if (phy_is_ulpi(phy))
-		ulpi_phy_power_off(phy);
-	else
+	if (phy_is_ulpi(phy)) {
+		struct tegra_ulpi_config *ulpi_config = phy->config;
+
+		if (ulpi_config->inf_type == TEGRA_USB_LINK_ULPI)
+			ulpi_phy_power_off(phy);
+		else
+			null_phy_power_off(phy);
+	} else
 		utmi_phy_power_off(phy);
 }
 
@@ -894,9 +1028,12 @@ void tegra_usb_phy_clk_enable(struct tegra_usb_phy *phy)
 
 void tegra_usb_phy_close(struct tegra_usb_phy *phy)
 {
-	if (phy_is_ulpi(phy))
-		clk_put(phy->clk);
-	else
+	if (phy_is_ulpi(phy)) {
+		struct tegra_ulpi_config *ulpi_config = phy->config;
+
+		if (ulpi_config->inf_type == TEGRA_USB_LINK_ULPI)
+			clk_put(phy->clk);
+	} else
 		utmip_pad_close(phy);
 	clk_disable(phy->pll_u);
 	clk_put(phy->pll_u);
