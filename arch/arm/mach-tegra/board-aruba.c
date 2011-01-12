@@ -359,6 +359,9 @@ static struct platform_device *aruba_devices[] __initdata = {
 #endif
 	&aruba_keys_device,
 	&tegra_wdt_device,
+#if defined(CONFIG_SND_HDA_TEGRA)
+	&tegra_hda_device,
+#endif
 	&tegra_avp_device,
 };
 

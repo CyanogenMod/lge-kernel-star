@@ -246,11 +246,19 @@ static __initdata struct tegra_pingroup_config aruba_pinmux[] = {
 	DEFAULT_PINMUX(CLK_32K_OUT,     BLINK,           NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(SYS_CLK_REQ,     SYSCLK,          NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(OWR,             OWR,             NORMAL,    NORMAL,     INPUT),
+#ifdef CONFIG_SND_HDA_TEGRA
+	DEFAULT_PINMUX(DAP1_FS,         HDA,             NORMAL,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(DAP1_DIN,        HDA,             NORMAL,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(DAP1_DOUT,       HDA,             NORMAL,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(DAP1_SCLK,       HDA,             NORMAL,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(CLK1_REQ,        DAP1,            NORMAL,    NORMAL,     INPUT),
+#else
 	DEFAULT_PINMUX(DAP1_FS,         I2S0,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(DAP1_DIN,        I2S0,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(DAP1_DOUT,       I2S0,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(DAP1_SCLK,       I2S0,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(CLK1_REQ,        DAP,             NORMAL,    NORMAL,     INPUT),
+#endif
 	DEFAULT_PINMUX(CLK1_OUT,        EXTPERIPH1,      NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SPDIF_IN,        SPDIF,           NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SPDIF_OUT,       SPDIF,           NORMAL,    NORMAL,     OUTPUT),
