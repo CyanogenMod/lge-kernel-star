@@ -23,4 +23,6 @@ int whistler_pinmux_init(void);
 int whistler_panel_init(void);
 int whistler_kbc_init(void);
 int whistler_sensors_init(void);
+int whistler_baseband_init(void);
+
 #endif
