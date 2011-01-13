@@ -46,7 +46,7 @@
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <mach/usb_phy.h>
-
+#include <mach/nand.h>
 #include "board.h"
 #include "clock.h"
 #include "board-aruba.h"
@@ -338,6 +338,76 @@ static struct platform_device tegra_rtc_device = {
 	.num_resources = ARRAY_SIZE(tegra_rtc_resources),
 };
 
+#if defined(CONFIG_MTD_NAND_TEGRA)
+static struct resource nand_resources[] = {
+	[0] = {
+		.start = INT_NANDFLASH,
+		.end   = INT_NANDFLASH,
+		.flags = IORESOURCE_IRQ
+	},
+	[1] = {
+		.start = TEGRA_NAND_BASE,
+		.end = TEGRA_NAND_BASE + TEGRA_NAND_SIZE - 1,
+		.flags = IORESOURCE_MEM
+	}
+};
+
+static struct tegra_nand_chip_parms nand_chip_parms[] = {
+	/* Samsung K5E2G1GACM */
+	[0] = {
+		.vendor_id   = 0xEC,
+		.device_id   = 0xAA,
+		.capacity    = 256,
+		.timing      = {
+			.trp		= 21,
+			.trh		= 15,
+			.twp		= 21,
+			.twh		= 15,
+			.tcs		= 31,
+			.twhr		= 60,
+			.tcr_tar_trr	= 20,
+			.twb		= 100,
+			.trp_resp	= 30,
+			.tadl		= 100,
+		},
+	},
+	/* Hynix H5PS1GB3EFR */
+	[1] = {
+		.vendor_id   = 0xAD,
+		.device_id   = 0xDC,
+		.capacity    = 512,
+		.timing      = {
+			.trp		= 12,
+			.trh		= 10,
+			.twp		= 12,
+			.twh		= 10,
+			.tcs		= 20,
+			.twhr		= 80,
+			.tcr_tar_trr	= 20,
+			.twb		= 100,
+			.trp_resp	= 20,
+			.tadl		= 70,
+		},
+	},
+};
+
+struct tegra_nand_platform nand_data = {
+	.max_chips	= 8,
+	.chip_parms	= nand_chip_parms,
+	.nr_chip_parms  = ARRAY_SIZE(nand_chip_parms),
+};
+
+struct platform_device tegra_nand_device = {
+	.name          = "tegra_nand",
+	.id            = -1,
+	.resource      = nand_resources,
+	.num_resources = ARRAY_SIZE(nand_resources),
+	.dev            = {
+		.platform_data = &nand_data,
+	},
+};
+#endif
+
 static struct platform_device *aruba_devices[] __initdata = {
 #if ENABLE_USB_HOST
 	&tegra_otg_device,
@@ -363,6 +433,9 @@ static struct platform_device *aruba_devices[] __initdata = {
 	&tegra_hda_device,
 #endif
 	&tegra_avp_device,
+#if defined(CONFIG_MTD_NAND_TEGRA)
+	&tegra_nand_device,
+#endif
 };
 
 static void aruba_keys_init(void)
