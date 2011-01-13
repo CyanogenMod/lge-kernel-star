@@ -26,6 +26,7 @@
 #include <mach/irqs.h>
 #include <mach/iomap.h>
 #include <mach/dma.h>
+#include <mach/sata.h>
 
 static struct resource i2c_resource1[] = {
 	[0] = {
@@ -770,6 +771,42 @@ struct platform_device tegra_spdif_device = {
 	.resource	= spdif_resource,
 	.num_resources	= ARRAY_SIZE(spdif_resource),
 };
+
+#ifdef CONFIG_SATA_AHCI_TEGRA
+static u64 tegra_sata_dma_mask = DMA_BIT_MASK(32);
+
+static struct tegra_sata_platform_data tegra_sata_pdata;
+
+static struct resource tegra_sata_resources[] = {
+	[0] = {
+		.start = TEGRA_SATA_BAR5_BASE,
+		.end = TEGRA_SATA_BAR5_BASE + TEGRA_SATA_BAR5_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	[1] = {
+		.start = TEGRA_SATA_CONFIG_BASE,
+		.end = TEGRA_SATA_CONFIG_BASE + TEGRA_SATA_CONFIG_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	[2] = {
+		.start = INT_SATA_CTL,
+		.end = INT_SATA_CTL,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+
+struct platform_device tegra_sata_device = {
+	.name 	= "tegra-sata",
+	.id 	= 0,
+	.dev 	= {
+		.platform_data = &tegra_sata_pdata,
+		.coherent_dma_mask = DMA_BIT_MASK(32),
+		.dma_mask = &tegra_sata_dma_mask,
+	},
+	.resource = tegra_sata_resources,
+	.num_resources = ARRAY_SIZE(tegra_sata_resources),
+};
+#endif
 
 #if defined(CONFIG_TEGRA_IOVMM_GART)
 static struct resource tegra_gart_resources[] = {
