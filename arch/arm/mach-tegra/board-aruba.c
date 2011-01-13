@@ -535,6 +535,15 @@ void tegra_usb_otg_host_unregister(struct platform_device *pdev)
 	platform_device_unregister(pdev);
 }
 
+#ifdef CONFIG_SATA_AHCI_TEGRA
+static void aruba_sata_init(void)
+{
+	platform_device_register(&tegra_sata_device);
+}
+#else
+static void aruba_sata_init(void) { }
+#endif
+
 static void __init tegra_aruba_init(void)
 {
 	char serial[20];
@@ -561,6 +570,7 @@ static void __init tegra_aruba_init(void)
 	aruba_panel_init();
 	aruba_sensors_init();
 	aruba_bt_rfkill();
+	aruba_sata_init();
 }
 
 static void __init tegra_aruba_reserve(void)
