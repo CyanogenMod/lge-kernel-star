@@ -52,7 +52,7 @@ unsigned long tegra_carveout_start;
 unsigned long tegra_carveout_size;
 unsigned long tegra_lp0_vec_start;
 unsigned long tegra_lp0_vec_size;
-unsigned long tegra_grhost_aperture;
+unsigned long tegra_grhost_aperture = ~0ul;
 static   bool is_tegra_debug_uart_hsport;
 
 void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
@@ -195,6 +195,10 @@ static int __init tegra_lp0_vec_arg(char *options)
 	tegra_lp0_vec_size = memparse(p, &p);
 	if (*p == '@')
 		tegra_lp0_vec_start = memparse(p+1, &p);
+	if (!tegra_lp0_vec_size || !tegra_lp0_vec_start) {
+		tegra_lp0_vec_size = 0;
+		tegra_lp0_vec_start = 0;
+	}
 
 	return 0;
 }
@@ -203,6 +207,8 @@ early_param("lp0_vec", tegra_lp0_vec_arg);
 static int __init tegra_bootloader_fb_arg(char *options)
 {
 	char *p = options;
+	unsigned long start;
+	unsigned long size;
 
 	tegra_bootloader_fb_size = memparse(p, &p);
 	if (*p == '@')
@@ -353,34 +359,49 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 	unsigned long fb2_size)
 {
 	if (tegra_lp0_vec_size)
-		if (memblock_reserve(tegra_lp0_vec_start, tegra_lp0_vec_size))
+		if (memblock_reserve(tegra_lp0_vec_start, tegra_lp0_vec_size)) {
 			pr_err("Failed to reserve lp0_vec %08lx@%08lx\n",
 				tegra_lp0_vec_size, tegra_lp0_vec_start);
+			tegra_lp0_vec_start = 0;
+			tegra_lp0_vec_size = 0;
+		}
 
+	if (carveout_size) {
+		tegra_carveout_start = memblock_end_of_DRAM() - carveout_size;
+		if (memblock_remove(tegra_carveout_start, carveout_size)) {
+			pr_err("Failed to remove carveout %08lx@%08lx "
+				"from memory map\n",
+				tegra_carveout_start, carveout_size);
+			tegra_carveout_start = 0;
+			tegra_carveout_size = 0;
+		}
+		else
+			tegra_carveout_size = carveout_size;
+	}
 
-	tegra_carveout_start = memblock_end_of_DRAM() - carveout_size;
-	if (memblock_remove(tegra_carveout_start, carveout_size))
-		pr_err("Failed to remove carveout %08lx@%08lx from memory "
-			"map\n",
-			tegra_carveout_start, carveout_size);
-	else
-		tegra_carveout_size = carveout_size;
+	if (fb2_size) {
+		tegra_fb2_start = memblock_end_of_DRAM() - fb2_size;
+		if (memblock_remove(tegra_fb2_start, fb2_size)) {
+			pr_err("Failed to remove second framebuffer %08lx@%08lx "
+				"from memory map\n",
+				tegra_fb2_start, fb2_size);
+			tegra_fb2_start = 0;
+			tegra_fb2_size = 0;
+		} else
+			tegra_fb2_size = fb2_size;
+	}
 
-	tegra_fb2_start = memblock_end_of_DRAM() - fb2_size;
-	if (memblock_remove(tegra_fb2_start, fb2_size))
-		pr_err("Failed to remove second framebuffer %08lx@%08lx from "
-			"memory map\n",
-			tegra_fb2_start, fb2_size);
-	else
-		tegra_fb2_size = fb2_size;
-
-	tegra_fb_start = memblock_end_of_DRAM() - fb_size;
-	if (memblock_remove(tegra_fb_start, fb_size))
-		pr_err("Failed to remove framebuffer %08lx@%08lx from memory "
-			"map\n",
-			tegra_fb_start, fb_size);
-	else
-		tegra_fb_size = fb_size;
+	if (fb_size) {
+		tegra_fb_start = memblock_end_of_DRAM() - fb_size;
+		if (memblock_remove(tegra_fb_start, fb_size)) {
+			pr_err("Failed to remove framebuffer %08lx@%08lx "
+				"from memory map\n",
+				tegra_fb_start, fb_size);
+			tegra_fb_start = 0;
+			tegra_fb_size = 0;
+		} else
+			tegra_fb_size = fb_size;
+	}
 
 	if (tegra_fb_size)
 		tegra_grhost_aperture = tegra_fb_start;
@@ -397,9 +418,12 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 	 */
 	if (tegra_bootloader_fb_size)
 		if (memblock_reserve(tegra_bootloader_fb_start,
-				tegra_bootloader_fb_size))
-			pr_err("Failed to reserve lp0_vec %08lx@%08lx\n",
-				tegra_lp0_vec_size, tegra_lp0_vec_start);
+				tegra_bootloader_fb_size)) {
+			pr_err("Failed to reserve bootloader frame buffer %08lx@%08lx\n",
+				tegra_bootloader_fb_size, tegra_bootloader_fb_start);
+			tegra_bootloader_fb_start = 0;
+			tegra_bootloader_fb_size = 0;
+		}
 
 	pr_info("Tegra reserved memory:\n"
 		"LP0:                    %08lx - %08lx\n"
@@ -408,13 +432,18 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 		"2nd Framebuffer:        %08lx - %08lx\n"
 		"Carveout:               %08lx - %08lx\n",
 		tegra_lp0_vec_start,
-		tegra_lp0_vec_start + tegra_lp0_vec_size - 1,
+		tegra_lp0_vec_size ?
+			tegra_lp0_vec_start + tegra_lp0_vec_size - 1 : 0,
 		tegra_bootloader_fb_start,
-		tegra_bootloader_fb_start + tegra_bootloader_fb_size - 1,
+		tegra_bootloader_fb_size ?
+			tegra_bootloader_fb_start + tegra_bootloader_fb_size - 1 : 0,
 		tegra_fb_start,
-		tegra_fb_start + tegra_fb_size - 1,
+		tegra_fb_size ?
+			tegra_fb_start + tegra_fb_size - 1 : 0,
 		tegra_fb2_start,
-		tegra_fb2_start + tegra_fb2_size - 1,
+		tegra_fb2_size ?
+			tegra_fb2_start + tegra_fb2_size - 1 : 0,
 		tegra_carveout_start,
-		tegra_carveout_start + tegra_carveout_size - 1);
+		tegra_carveout_size ?
+			tegra_carveout_start + tegra_carveout_size - 1 : 0);
 }
