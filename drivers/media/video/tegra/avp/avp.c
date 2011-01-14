@@ -975,7 +975,7 @@ static int avp_init(struct tegra_avp_info *avp)
 		BUG();
 	}
 
-	pr_err("%s: Using carveout at %x to load AVP kernel\n",
+	pr_err("%s: Using carveout at %lx to load AVP kernel\n",
 	       __func__, avp->kernel_phys);
 	avp->kernel_data = ioremap(avp->kernel_phys, SZ_1M);
 #endif
