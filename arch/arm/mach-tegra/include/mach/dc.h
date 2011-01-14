@@ -66,6 +66,12 @@ enum {
 	TEGRA_DC_OUT_PIN_POL_HIGH,
 };
 
+enum {
+	TEGRA_DC_DISABLE_DITHER = 1,
+	TEGRA_DC_ORDERED_DITHER,
+	TEGRA_DC_ERRDIFF_DITHER,
+};
+
 struct tegra_dc_out {
 	int			type;
 	unsigned		flags;
@@ -80,6 +86,7 @@ struct tegra_dc_out {
 	unsigned		order;
 	unsigned		align;
 	unsigned		depth;
+	unsigned		dither;
 
 	unsigned		height; /* mm */
 	unsigned		width; /* mm */
