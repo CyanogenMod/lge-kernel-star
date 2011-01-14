@@ -203,13 +203,11 @@ static struct platform_device androidusb_device = {
 	},
 };
 
-#if 0 // !!!CHECKME !!!
 static struct i2c_board_info __initdata aruba_i2c_bus1_board_info[] = {
 	{
 		I2C_BOARD_INFO("wm8903", 0x1a),
 	},
 };
-#endif
 
 static struct tegra_ulpi_config aruba_ehci2_ulpi_phy_config = {
 	.reset_gpio = TEGRA_GPIO_PV1,
@@ -268,6 +266,17 @@ static struct tegra_i2c_platform_data aruba_i2c5_platform_data = {
 	.bus_clk_rate	= { 100000, 0 },
 };
 
+static struct tegra_audio_platform_data tegra_audio_pdata[] = {
+	[0] = {
+		.dma_on		= true,  /* use dma by default */
+		.i2s_clk_rate	= 240000000,
+		.dap_clk	= "clk_dev1",
+		.audio_sync_clk = "audio_2x",
+		.mode		= I2S_BIT_FORMAT_I2S,
+		.fifo_fmt	= I2S_FIFO_16_LSB,
+		.bit_size	= I2S_BIT_SIZE_16,
+	},
+};
 
 static void aruba_i2c_init(void)
 {
@@ -276,6 +285,8 @@ static void aruba_i2c_init(void)
 	tegra_i2c_device3.dev.platform_data = &aruba_i2c3_platform_data;
 	tegra_i2c_device4.dev.platform_data = &aruba_i2c4_platform_data;
 	tegra_i2c_device5.dev.platform_data = &aruba_i2c5_platform_data;
+
+	i2c_register_board_info(0, aruba_i2c_bus1_board_info, 1);
 
 	platform_device_register(&tegra_i2c_device5);
 	platform_device_register(&tegra_i2c_device4);
@@ -429,6 +440,7 @@ static struct platform_device *aruba_devices[] __initdata = {
 #endif
 	&aruba_keys_device,
 	&tegra_wdt_device,
+	&tegra_audio_device,
 #if defined(CONFIG_SND_HDA_TEGRA)
 	&tegra_hda_device,
 #endif
@@ -533,6 +545,7 @@ static void __init tegra_aruba_init(void)
 
 	snprintf(serial, sizeof(serial), "%llx", tegra_chip_uid());
 	andusb_plat.serial_number = kstrdup(serial, GFP_KERNEL);
+	tegra_audio_device.dev.platform_data = &tegra_audio_pdata[0];
 	tegra_ehci2_device.dev.platform_data
 		= &aruba_ehci2_ulpi_platform_data;
 	platform_add_devices(aruba_devices, ARRAY_SIZE(aruba_devices));
