@@ -96,7 +96,11 @@
 #define APB_SEQ_WRAP_SHIFT			16
 #define APB_SEQ_WRAP_MASK			(0x7<<APB_SEQ_WRAP_SHIFT)
 
-#define TEGRA_SYSTEM_DMA_CH_NR			16	/* !!!FIXME!!! T30 has 32 channels .............. */
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+#define TEGRA_SYSTEM_DMA_CH_NR			16
+#else
+#define TEGRA_SYSTEM_DMA_CH_NR			32
+#endif
 #define TEGRA_SYSTEM_DMA_AVP_CH_NUM		4
 #define TEGRA_SYSTEM_DMA_CH_MIN			0
 #define TEGRA_SYSTEM_DMA_CH_MAX	\
