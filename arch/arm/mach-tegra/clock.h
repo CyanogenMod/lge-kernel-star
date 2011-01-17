@@ -42,6 +42,8 @@
 #define PLLU			(1 << 14)
 #define ENABLE_ON_INIT		(1 << 28)
 
+#define MAX_SAME_LIMIT_SKU_IDS	16
+
 struct clk;
 
 struct clk_mux_sel {
@@ -149,6 +151,12 @@ struct tegra_clk_init_table {
 	const char *parent;
 	unsigned long rate;
 	bool enabled;
+};
+
+struct tegra_sku_rate_limit {
+	const char *clk_name;
+	unsigned long max_rate;
+	int sku_ids[MAX_SAME_LIMIT_SKU_IDS];
 };
 
 void tegra2_init_clocks(void);

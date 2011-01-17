@@ -729,21 +729,6 @@ static struct clk_ops tegra_pll_ops = {
 	.set_rate		= tegra2_pll_clk_set_rate,
 };
 
-static void tegra2_pllx_clk_init(struct clk *c)
-{
-	tegra2_pll_clk_init(c);
-
-	if (tegra_sku_id() == 7)
-		c->max_rate = 750000000;
-}
-
-static struct clk_ops tegra_pllx_ops = {
-	.init     = tegra2_pllx_clk_init,
-	.enable   = tegra2_pll_clk_enable,
-	.disable  = tegra2_pll_clk_disable,
-	.set_rate = tegra2_pll_clk_set_rate,
-};
-
 static int tegra2_plle_clk_enable(struct clk *c)
 {
 	u32 val;
@@ -1728,6 +1713,12 @@ static struct clk tegra_pll_u = {
 };
 
 static struct clk_pll_freq_table tegra_pll_x_freq_table[] = {
+	/* 1.2 GHz */
+	{ 12000000, 1200000000, 600,  6,  1, 12},
+	{ 13000000, 1200000000, 923,  10, 1, 12},
+	{ 19200000, 1200000000, 750,  12, 1, 8},
+	{ 26000000, 1200000000, 600,  13, 1, 12},
+
 	/* 1 GHz */
 	{ 12000000, 1000000000, 1000, 12, 1, 12},
 	{ 13000000, 1000000000, 1000, 13, 1, 12},
@@ -1751,6 +1742,12 @@ static struct clk_pll_freq_table tegra_pll_x_freq_table[] = {
 	{ 13000000, 760000000,  760,  13, 1, 12},
 	{ 19200000, 760000000,  950,  24, 1, 8},
 	{ 26000000, 760000000,  760,  26, 1, 12},
+
+	/* 750 MHz */
+	{ 12000000, 750000000,  750,  12, 1, 12},
+	{ 13000000, 750000000,  750,  13, 1, 12},
+	{ 19200000, 750000000,  625,  16, 1, 8},
+	{ 26000000, 750000000,  750,  26, 1, 12},
 
 	/* 608 MHz */
 	{ 12000000, 608000000,  608,  12, 1, 12},
@@ -1776,7 +1773,7 @@ static struct clk_pll_freq_table tegra_pll_x_freq_table[] = {
 static struct clk tegra_pll_x = {
 	.name      = "pll_x",
 	.flags     = PLL_HAS_CPCON | PLL_ALT_MISC_REG,
-	.ops       = &tegra_pllx_ops,
+	.ops       = &tegra_pll_ops,
 	.reg       = 0xe0,
 	.parent    = &tegra_clk_m,
 	.max_rate  = 1000000000,
@@ -2298,6 +2295,65 @@ struct clk *tegra_ptr_clks[] = {
 	&tegra_clk_twd,
 };
 
+/* For some clocks maximum rate limits depend on tegra2 SKU */
+#define RATE_LIMIT(_name, _max_rate, _skus...)	\
+	{					\
+		.clk_name 	= _name,	\
+		.max_rate 	= _max_rate,	\
+		.sku_ids	= {_skus}	\
+	}
+
+static struct tegra_sku_rate_limit sku_limits[] =
+{
+	RATE_LIMIT("cpu",	750000000, 0x07, 0x10),
+	RATE_LIMIT("cclk",	750000000, 0x07, 0x10),
+	RATE_LIMIT("pll_x",	750000000, 0x07, 0x10),
+
+	RATE_LIMIT("cpu",	1000000000, 0x04, 0x08, 0x0F),
+	RATE_LIMIT("cclk",	1000000000, 0x04, 0x08, 0x0F),
+	RATE_LIMIT("pll_x",	1000000000, 0x04, 0x08, 0x0F),
+
+	RATE_LIMIT("cpu",	1200000000, 0x14, 0x17, 0x18, 0x1B, 0x1C),
+	RATE_LIMIT("cclk",	1200000000, 0x14, 0x17, 0x18, 0x1B, 0x1C),
+	RATE_LIMIT("pll_x",	1200000000, 0x14, 0x17, 0x18, 0x1B, 0x1C),
+
+	RATE_LIMIT("sclk",	240000000, 0x04, 0x7, 0x08, 0x0F, 0x10),
+	RATE_LIMIT("hclk",	240000000, 0x04, 0x7, 0x08, 0x0F, 0x10),
+	RATE_LIMIT("avp.sclk",	240000000, 0x04, 0x7, 0x08, 0x0F, 0x10),
+	RATE_LIMIT("vde",	240000000, 0x04, 0x7, 0x08, 0x0F, 0x10),
+	RATE_LIMIT("3d",	300000000, 0x04, 0x7, 0x08, 0x0F, 0x10),
+
+	RATE_LIMIT("sclk",	300000000, 0x14, 0x17, 0x18, 0x1B, 0x1C),
+	RATE_LIMIT("hclk",	300000000, 0x14, 0x17, 0x18, 0x1B, 0x1C),
+	RATE_LIMIT("avp.sclk",	300000000, 0x14, 0x17, 0x18, 0x1B, 0x1C),
+	RATE_LIMIT("vde",	300000000, 0x14, 0x17, 0x18, 0x1B, 0x1C),
+	RATE_LIMIT("3d",	400000000, 0x14, 0x17, 0x18, 0x1B, 0x1C),
+};
+
+static void tegra2_init_sku_limits(void)
+{
+	int i, j;
+	struct clk *c;
+	int sku_id = tegra_sku_id();
+
+	for (i = 0; i < ARRAY_SIZE(sku_limits); i++) {
+		struct tegra_sku_rate_limit *limit = &sku_limits[i];
+
+		for (j = 0; (j < MAX_SAME_LIMIT_SKU_IDS) &&
+		      (limit->sku_ids[j] != 0); j++) {
+			if (limit->sku_ids[j] == sku_id) {
+				c = tegra_get_clock_by_name(limit->clk_name);
+				if (!c) {
+					pr_err("%s: Unknown sku clock %s\n",
+					       __func__, limit->clk_name);
+					continue;
+				}
+				c->max_rate = limit->max_rate;
+			}
+		}
+	}
+}
+
 static void tegra2_init_one_clock(struct clk *c)
 {
 	clk_init(c);
@@ -2528,6 +2584,7 @@ void __init tegra2_init_clocks(void)
 	}
 
 	init_audio_sync_clock_mux();
+	tegra2_init_sku_limits();
 
 	register_syscore_ops(&tegra_clk_syscore_ops);
 }
