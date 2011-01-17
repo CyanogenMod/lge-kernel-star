@@ -327,11 +327,10 @@ static void __init tegra_whistler_init(void)
 	tegra_common_init();
 	tegra_clk_init_from_table(whistler_clk_init_table);
 	whistler_pinmux_init();
-
+	whistler_i2c_init();
 	platform_add_devices(whistler_devices, ARRAY_SIZE(whistler_devices));
 
 	whistler_sdhci_init();
-	whistler_i2c_init();
 	whistler_regulator_init();
 	whistler_panel_init();
 	whistler_sensors_init();
