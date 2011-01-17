@@ -101,6 +101,7 @@ obj-${CONFIG_MACH_VENTANA}              += board-ventana-panel.o
 
 # Cardhu
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu.o
+obj-${CONFIG_MACH_CARDHU}               += board-cardhu-kbc.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-panel.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-pinmux.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-power.o

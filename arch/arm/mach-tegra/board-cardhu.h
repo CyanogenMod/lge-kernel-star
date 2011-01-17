@@ -23,5 +23,6 @@ int cardhu_sdhci_init(void);
 int cardhu_pinmux_init(void);
 int cardhu_panel_init(void);
 int cardhu_sensors_init(void);
+int cardhu_kbc_init(void);
 
 #endif
