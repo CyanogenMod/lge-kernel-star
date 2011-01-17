@@ -36,21 +36,9 @@
 #include <mach/hardware.h>
 #include <mach/clk.h>
 
-/*
- * Frequency table index must be sequential starting at 0 and frequencies
- * must be ascending.
- */
-static struct cpufreq_frequency_table freq_table[] = {
-	{ 0, 216000 },
-	{ 1, 312000 },
-	{ 2, 456000 },
-	{ 3, 608000 },
-	{ 4, 760000 },
-	{ 5, 816000 },
-	{ 6, 912000 },
-	{ 7, 1000000 },
-	{ 8, CPUFREQ_TABLE_END },
-};
+#include "clock.h"
+
+static struct cpufreq_frequency_table *freq_table;
 
 #define NUM_CPUS	2
 
@@ -67,11 +55,11 @@ static unsigned long tegra_cpu_highest_speed(void);
 
 #ifdef CONFIG_TEGRA_THERMAL_THROTTLE
 /* CPU frequency is gradually lowered when throttling is enabled */
-#define THROTTLE_LOWEST_INDEX	2 /* 456000 */
-#define THROTTLE_HIGHEST_INDEX	6 /* 912000 */
 #define THROTTLE_DELAY		msecs_to_jiffies(2000)
 
 static bool is_throttling;
+static int throttle_lowest_index;
+static int throttle_highest_index;
 static int throttle_index;
 static int throttle_next_index;
 static struct delayed_work throttle_work;
@@ -90,7 +78,7 @@ static void tegra_throttle_work_func(struct work_struct *work)
 	if (freq_table[throttle_index].frequency < current_freq)
 		tegra_update_cpu_speed(freq_table[throttle_index].frequency);
 
-	if (throttle_index > THROTTLE_LOWEST_INDEX) {
+	if (throttle_index > throttle_lowest_index) {
 		throttle_next_index = throttle_index - 1;
 		queue_delayed_work(workqueue, &throttle_work, THROTTLE_DELAY);
 	}
@@ -111,14 +99,14 @@ void tegra_throttling_enable(bool enable)
 
 		is_throttling = true;
 
-		for (throttle_index = THROTTLE_HIGHEST_INDEX;
-		     throttle_index >= THROTTLE_LOWEST_INDEX;
+		for (throttle_index = throttle_highest_index;
+		     throttle_index >= throttle_lowest_index;
 		     throttle_index--)
 			if (freq_table[throttle_index].frequency
 			    < current_freq)
 				break;
 
-		throttle_index = max(throttle_index, THROTTLE_LOWEST_INDEX);
+		throttle_index = max(throttle_index, throttle_lowest_index);
 		throttle_next_index = throttle_index;
 		queue_delayed_work(workqueue, &throttle_work, 0);
 	} else if (!enable && is_throttling) {
@@ -383,6 +371,10 @@ static struct cpufreq_driver tegra_cpufreq_driver = {
 
 static int __init tegra_cpufreq_init(void)
 {
+	struct tegra_cpufreq_table_data *table_data =
+		tegra_cpufreq_table_get();
+	BUG_ON(!table_data);
+
 #ifdef CONFIG_TEGRA_THERMAL_THROTTLE
 	/*
 	 * High-priority, others flags default: not bound to a specific
@@ -394,7 +386,11 @@ static int __init tegra_cpufreq_init(void)
 	if (!workqueue)
 		return -ENOMEM;
 	INIT_DELAYED_WORK(&throttle_work, tegra_throttle_work_func);
+
+	throttle_lowest_index = table_data->throttle_lowest_index;
+	throttle_highest_index = table_data->throttle_highest_index;
 #endif
+	freq_table = table_data->freq_table;
 	return cpufreq_register_driver(&tegra_cpufreq_driver);
 }
 

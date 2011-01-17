@@ -203,4 +203,15 @@ static inline void clk_lock_init(struct clk *c)
 	spin_lock_init(&c->spinlock);
 }
 
+#ifdef CONFIG_CPU_FREQ
+struct cpufreq_frequency_table;
+
+struct tegra_cpufreq_table_data {
+	struct cpufreq_frequency_table *freq_table;
+	int throttle_lowest_index;
+	int throttle_highest_index;
+};
+struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void);
+#endif
+
 #endif
