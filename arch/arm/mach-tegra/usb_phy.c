@@ -294,8 +294,12 @@
 
 #define HOSTPC1_DEVLC		0x1b4
 #define   HOSTPC1_DEVLC_PHCD		(1 << 22)
-#define   HOSTPC1_DEVLC_PTS(x)		(((x) & 0x1f) << 29)
+#define   HOSTPC1_DEVLC_PTS(x)		(((x) & 0x7) << 29)
 #define   HOSTPC1_DEVLC_STS 		(1 << 28)
+
+#define TEGRA_USB_USBMODE_REG_OFFSET	0x1f8
+#define   TEGRA_USB_USBMODE_HOST		(3 << 0)
+
 #endif
 
 static DEFINE_SPINLOCK(utmip_pad_lock);
@@ -902,14 +906,30 @@ static int ulpi_phy_power_on(struct tegra_usb_phy *phy)
 
 	if (!phy->initialized) {
 		phy->initialized = 1;
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 		gpio_direction_output(config->reset_gpio, 0);
 		msleep(5);
 		gpio_direction_output(config->reset_gpio, 1);
+#endif
 	}
 
 	val = readl(base + USB_SUSP_CTRL);
 	val |= UHSIC_RESET;
 	writel(val, base + USB_SUSP_CTRL);
+
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+	val = readl(base + USB_SUSP_CTRL);
+	val |= UTMIP_RESET;
+	writel(val, base + USB_SUSP_CTRL);
+
+	val = readl(base + TEGRA_USB_USBMODE_REG_OFFSET);
+	writel((val | TEGRA_USB_USBMODE_HOST),
+			(base + TEGRA_USB_USBMODE_REG_OFFSET));
+
+	val = readl(base + HOSTPC1_DEVLC);
+	val |= HOSTPC1_DEVLC_PTS(2);
+	writel(val, base + HOSTPC1_DEVLC);
+#endif
 
 	val = readl(base + ULPI_TIMING_CTRL_0);
 	val |= ULPI_OUTPUT_PINMUX_BYP | ULPI_CLKOUT_PINMUX_BYP;
@@ -1337,9 +1357,11 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 				err = -ENXIO;
 				goto err1;
 			}
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 			tegra_gpio_enable(ulpi_config->reset_gpio);
 			gpio_request(ulpi_config->reset_gpio, "ulpi_phy_reset_b");
 			gpio_direction_output(ulpi_config->reset_gpio, 0);
+#endif
 
 			phy->ulpi = otg_ulpi_create(&ulpi_viewport_access_ops, 0);
 			phy->ulpi->io_priv = regs + ULPI_VIEWPORT;

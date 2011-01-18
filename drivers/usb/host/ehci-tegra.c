@@ -467,6 +467,10 @@ static int tegra_ehci_setup(struct usb_hcd *hcd)
 	/* cache this readonly data; minimize chip reads */
 	ehci->hcs_params = readl(&ehci->caps->hcs_params);
 
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	ehci->has_hostpc = 1;
+#endif
+
 	/* switch to host mode */
 	hcd->has_tt = 1;
 	ehci_reset(ehci);
