@@ -170,7 +170,7 @@ static struct dvfs dvfs_init[] = {
 	CPU_DVFS("cpu", 2, 3, MHZ,   0,   0,   0,   0, 940, 1000, 1000, 1000, 1130, 1130, 1200),
 
 	/* Core voltages (mV):       950,    1000,   1100,   1200,   1275,   1300 */
-	CORE_DVFS("emc", -1,  1, KHZ, 57000,  333000, 333000, 666000, 666000, 760000),
+	CORE_DVFS("emc", -1,  1, KHZ, 57000,  333000, 380000, 666000, 666000, 760000),
 
 #if 0
 	/*
@@ -207,17 +207,32 @@ static struct dvfs dvfs_init[] = {
 	CORE_DVFS("hdmi",    -1, 0, KHZ, 0,      0,      0,      148500, 148500, 148500),
 
 	/*
-	 * These clocks technically depend on the core process id,
-	 * but just use the worst case value for now
+	 * Clocks below depend on the core process id. Define per process_id
+	 * tables for SCLK/VDE/3D clocks (maximum rate for these clocks is
+	 * increased depending on tegra2 sku). Use the worst case value for
+	 * other clocks for now.
 	 */
 	CORE_DVFS("host1x", -1, 1, KHZ, 104500, 133000, 166000, 166000, 166000, 166000),
 	CORE_DVFS("epp",    -1, 1, KHZ, 133000, 171000, 247000, 300000, 300000, 300000),
 	CORE_DVFS("2d",     -1, 1, KHZ, 133000, 171000, 247000, 300000, 300000, 300000),
-	CORE_DVFS("3d",     -1, 1, KHZ, 114000, 161500, 247000, 300000, 300000, 300000),
+
+	CORE_DVFS("3d",      0, 1, KHZ, 114000, 161500, 247000, 304000, 333500, 333500),
+	CORE_DVFS("3d",      1, 1, KHZ, 161500, 209000, 285000, 333500, 361000, 361000),
+	CORE_DVFS("3d",      2, 1, KHZ, 218500, 256500, 323000, 380000, 400000, 400000),
+	CORE_DVFS("3d",      3, 1, KHZ, 247000, 285000, 351500, 400000, 400000, 400000),
+
 	CORE_DVFS("mpe",    -1, 1, KHZ, 104500, 152000, 228000, 250000, 250000, 250000),
 	CORE_DVFS("vi",     -1, 1, KHZ, 85000,  100000, 150000, 150000, 150000, 150000),
-	CORE_DVFS("sclk",   -1, 1, KHZ, 95000,  133000, 190000, 250000, 250000, 250000),
-	CORE_DVFS("vde",    -1, 1, KHZ, 95000,  123500, 209000, 250000, 250000, 250000),
+
+	CORE_DVFS("sclk",    0, 1, KHZ, 95000,  133000, 190000, 240000, 247000, 262000),
+	CORE_DVFS("sclk",    1, 1, KHZ, 123500, 159500, 207000, 240000, 264000, 277500),
+	CORE_DVFS("sclk",    2, 1, KHZ, 152000, 180500, 229500, 260000, 285000, 300000),
+	CORE_DVFS("sclk",    3, 1, KHZ, 171000, 218500, 256500, 292500, 300000, 300000),
+
+	CORE_DVFS("vde",     0, 1, KHZ, 95000,  123500, 209000, 275500, 300000, 300000),
+	CORE_DVFS("vde",     1, 1, KHZ, 123500, 152000, 237500, 300000, 300000, 300000),
+	CORE_DVFS("vde",     2, 1, KHZ, 152000, 209000, 285000, 300000, 300000, 300000),
+	CORE_DVFS("vde",     3, 1, KHZ, 171000, 218500, 300000, 300000, 300000, 300000),
 	/* What is this? */
 	CORE_DVFS("NVRM_DEVID_CLK_SRC", -1, 1, MHZ, 480, 600, 800, 1067, 1067, 1067),
 };
