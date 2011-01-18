@@ -54,7 +54,7 @@
 #include "gpio-names.h"
 #include "fuse.h"
 
-#define ENABLE_USB_HOST 0
+#define ENABLE_OTG 0
 
 static struct plat_serial8250_port debug_uart_platform_data[] = {
 	{
@@ -103,7 +103,6 @@ static struct tegra_utmip_config utmi_phy_config[] = {
 
 /* !!!FIXME!!! THESE ARE VENTANA SETTINGS */
 static struct tegra_ulpi_config ulpi_phy_config = {
-	.reset_gpio = TEGRA_GPIO_PG2,	// !!!FIXME!!! CABLE DETECT? if so GPIO_PC7 on aruba
 	.clk = "clk_dev2",
 };
 
@@ -207,17 +206,6 @@ static struct i2c_board_info __initdata aruba_i2c_bus1_board_info[] = {
 	{
 		I2C_BOARD_INFO("wm8903", 0x1a),
 	},
-};
-
-static struct tegra_ulpi_config aruba_ehci2_ulpi_phy_config = {
-	.reset_gpio = TEGRA_GPIO_PV1,
-	.clk = "clk_dev2",
-};
-
-static struct tegra_ehci_platform_data aruba_ehci2_ulpi_platform_data = {
-	.operating_mode = TEGRA_USB_HOST,
-	.power_down_on_bus_suspend = 0,
-	.phy_config = &aruba_ehci2_ulpi_phy_config,
 };
 
 static struct tegra_i2c_platform_data aruba_i2c1_platform_data = {
@@ -420,7 +408,7 @@ struct platform_device tegra_nand_device = {
 #endif
 
 static struct platform_device *aruba_devices[] __initdata = {
-#if ENABLE_USB_HOST
+#if ENABLE_OTG
 	&tegra_otg_device,
 #endif
 	&androidusb_device,
@@ -432,9 +420,6 @@ static struct platform_device *aruba_devices[] __initdata = {
 	&pmu_device,
 	&tegra_rtc_device,
 	&tegra_udc_device,
-#if ENABLE_USB_HOST
-	&tegra_ehci2_device,
-#endif
 #if defined(CONFIG_TEGRA_IOVMM_SMMU)
 	&tegra_smmu_device,
 #endif
@@ -482,13 +467,12 @@ static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
 	},
 };
 
-#if ENABLE_USB_HOST
+
 static void aruba_usb_init(void)
 {
-	tegra_ehci3_device.dev.platform_data=&tegra_ehci_pdata[2];
-	platform_device_register(&tegra_ehci3_device);
+	tegra_ehci2_device.dev.platform_data=&tegra_ehci_pdata[1];
+	platform_device_register(&tegra_ehci2_device);
 }
-#endif
 
 struct platform_device *tegra_usb_otg_host_register(void)
 {
@@ -555,8 +539,6 @@ static void __init tegra_aruba_init(void)
 	snprintf(serial, sizeof(serial), "%llx", tegra_chip_uid());
 	andusb_plat.serial_number = kstrdup(serial, GFP_KERNEL);
 	tegra_audio_device.dev.platform_data = &tegra_audio_pdata[0];
-	tegra_ehci2_device.dev.platform_data
-		= &aruba_ehci2_ulpi_platform_data;
 	platform_add_devices(aruba_devices, ARRAY_SIZE(aruba_devices));
 
 	aruba_sdhci_init();
@@ -564,9 +546,7 @@ static void __init tegra_aruba_init(void)
 	aruba_regulator_init();
 	aruba_touch_init();
 	aruba_keys_init();
-#if ENABLE_USB_HOST
 	aruba_usb_init();
-#endif
 	aruba_panel_init();
 	aruba_sensors_init();
 	aruba_bt_rfkill();
