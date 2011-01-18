@@ -17,6 +17,13 @@
 #ifndef _MACH_TEGRA_BOARD_CARDHU_H
 #define _MACH_TEGRA_BOARD_CARDHU_H
 
+/* PCA954x I2C bus expander bus addresses */
+#define PCA954x_I2C_BUS_BASE	6
+#define PCA954x_I2C_BUS0	(PCA954x_I2C_BUS_BASE + 0)
+#define PCA954x_I2C_BUS1	(PCA954x_I2C_BUS_BASE + 1)
+#define PCA954x_I2C_BUS2	(PCA954x_I2C_BUS_BASE + 2)
+#define PCA954x_I2C_BUS3	(PCA954x_I2C_BUS_BASE + 3)
+
 int cardhu_charge_init(void);
 int cardhu_regulator_init(void);
 int cardhu_sdhci_init(void);

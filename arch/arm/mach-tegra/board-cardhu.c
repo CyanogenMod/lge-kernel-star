@@ -178,32 +178,31 @@ static struct tegra_ehci_platform_data cardhu_ehci2_ulpi_platform_data = {
 static struct tegra_i2c_platform_data cardhu_i2c1_platform_data = {
 	.adapter_nr	= 0,
 	.bus_count	= 1,
-	.bus_clk_rate	= { 400000, 0 },
+	.bus_clk_rate	= { 100000, 0 },
 };
 
 static struct tegra_i2c_platform_data cardhu_i2c2_platform_data = {
 	.adapter_nr	= 1,
 	.bus_count	= 1,
-	.bus_clk_rate	= { 400000, 0 },
+	.bus_clk_rate	= { 100000, 0 },
 };
 
 static struct tegra_i2c_platform_data cardhu_i2c3_platform_data = {
 	.adapter_nr	= 2,
 	.bus_count	= 1,
-	.bus_clk_rate	= { 400000, 0 },
+	.bus_clk_rate	= { 100000, 0 },
 };
 
 static struct tegra_i2c_platform_data cardhu_i2c4_platform_data = {
 	.adapter_nr	= 3,
 	.bus_count	= 1,
-	.bus_clk_rate	= { 400000, 0 },
-	.is_dvc		= true,
+	.bus_clk_rate	= { 100000, 0 },
 };
 
 static struct tegra_i2c_platform_data cardhu_i2c5_platform_data = {
 	.adapter_nr	= 4,
 	.bus_count	= 1,
-	.bus_clk_rate	= { 400000, 0 },
+	.bus_clk_rate	= { 100000, 0 },
 };
 
 
