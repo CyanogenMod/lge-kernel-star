@@ -403,10 +403,8 @@ static void spi_tegra_start_transfer(struct spi_device *spi,
 
 	tspi->cur_bytes_per_word = (bits_per_word - 1) / 8 + 1;
 
-	if (bits_per_word == 8 || bits_per_word == 16)
-		tspi->is_packed = 1;
-	else
-		tspi->is_packed = 0;
+	/* !!! fix me: Packed mode disabled */
+	tspi->is_packed = 0;
 
 	tspi->packed_size = spi_tegra_get_packed_size(tspi, t);
 	if (tspi->is_packed) {
