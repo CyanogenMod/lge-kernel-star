@@ -186,6 +186,9 @@ void __init tegra_init_early(void)
 	tegra_clk_init_from_table(common_clk_init_table);
 	tegra_init_power();
 	tegra_init_cache();
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	tegra_mc_init(); /* !!!FIXME!!! Change Tegra3 behavior to match Tegra2 */
+#endif
 }
 
 static int __init tegra_lp0_vec_arg(char *options)
