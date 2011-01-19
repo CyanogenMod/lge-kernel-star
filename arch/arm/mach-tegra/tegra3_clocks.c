@@ -1925,8 +1925,6 @@ static struct clk tegra_pll_p_out4 = {
 static struct clk_pll_freq_table tegra_pll_a_freq_table[] = {
 	{ 28800000, 56448000, 49, 25, 1, 1},
 	{ 28800000, 73728000, 64, 25, 1, 1},
-	{ 28800000, 11289600, 49, 25, 1, 1},	/* actual: 56.448MHz */
-	{ 28800000, 12288000, 64, 25, 1, 1},	/* actual: 73.728MHz */
 	{ 28800000, 24000000,  5,  6, 1, 1},
 	{ 0, 0, 0, 0, 0, 0 },
 };
@@ -1937,7 +1935,7 @@ static struct clk tegra_pll_a = {
 	.ops       = &tegra_pll_ops,
 	.reg       = 0xb0,
 	.parent    = &tegra_pll_p_out1,
-	.max_rate  = 56448000,
+	.max_rate  = 100000000,
 	.u.pll = {
 		.input_min = 2000000,
 		.input_max = 31000000,
@@ -1957,7 +1955,7 @@ static struct clk tegra_pll_a_out0 = {
 	.parent    = &tegra_pll_a,
 	.reg       = 0xb4,
 	.reg_shift = 0,
-	.max_rate  = 56448000,
+	.max_rate  = 100000000,
 };
 
 static struct clk_pll_freq_table tegra_pll_d_freq_table[] = {
