@@ -24,6 +24,7 @@
 
 #include "gpio-names.h"
 
+#define ADXL34X_IRQ_GPIO			TEGRA_GPIO_PAA1
 #define CAMERA_RESET2_SHUTTER_GPIO	TEGRA_GPIO_PBB1
 #define CAMERA_PWNDN1_GPIO			TEGRA_GPIO_PBB4
 #define CAMERA_PWNDN2_STROBE_GPIO	TEGRA_GPIO_PBB5
@@ -82,9 +83,28 @@ static struct i2c_board_info whistler_i2c3_board_info[] = {
 	},
 };
 
+static void whistler_adxl34x_init(void)
+{
+	tegra_gpio_enable(ADXL34X_IRQ_GPIO);
+	gpio_request(ADXL34X_IRQ_GPIO, "adxl34x");
+	gpio_direction_input(ADXL34X_IRQ_GPIO);
+}
+
+static struct i2c_board_info whistler_i2c1_board_info[] = {
+	{
+		I2C_BOARD_INFO("adxl34x", 0x1D),
+		.irq = TEGRA_GPIO_TO_IRQ(ADXL34X_IRQ_GPIO),
+	},
+};
+
 int __init whistler_sensors_init(void)
 {
 	whistler_camera_init();
+
+	whistler_adxl34x_init();
+
+	i2c_register_board_info(0, whistler_i2c1_board_info,
+		ARRAY_SIZE(whistler_i2c1_board_info));
 
 	i2c_register_board_info(3, whistler_i2c3_board_info,
 		ARRAY_SIZE(whistler_i2c3_board_info));
