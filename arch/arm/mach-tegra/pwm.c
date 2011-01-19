@@ -87,6 +87,9 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
 
 	if (rate >> PWM_SCALE_WIDTH)
 		return -EINVAL;
+        /* Due to the PWM divider is zero-based, we need to minus 1 to get desired frequency*/
+	if (rate>0)
+	    rate--;
 
 	val |= (rate << PWM_SCALE_SHIFT);
 
