@@ -31,5 +31,7 @@ int cardhu_pinmux_init(void);
 int cardhu_panel_init(void);
 int cardhu_sensors_init(void);
 int cardhu_kbc_init(void);
+int cardhu_scroll_init(void);
+int cardhu_keys_init(void);
 
 #endif

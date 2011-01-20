@@ -363,6 +363,15 @@ static void __init tegra_cardhu_init(void)
 #ifdef CONFIG_KEYBOARD_TEGRA
 	cardhu_kbc_init();
 #endif
+
+#ifdef CONFIG_INPUT_ALPS_GPIO_SCROLLWHEEL
+	cardhu_scroll_init();
+#endif
+
+#ifdef CONFIG_KEYBOARD_GPIO
+	cardhu_keys_init();
+#endif
+
 	cardhu_panel_init();
 	cardhu_sensors_init();
 	cardhu_bt_rfkill();

@@ -251,12 +251,17 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux[] = {
 	DEFAULT_PINMUX(PWR_I2C_SDA,     I2CPWR,          NORMAL,    NORMAL,     INPUT),
 
 	/*  KBC keys */
-	DEFAULT_PINMUX(KB_ROW0,         KBC,             PULL_UP,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(KB_ROW1,         KBC,             PULL_UP,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(KB_COL0,         KBC,             PULL_UP,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(KB_COL1,         KBC,             PULL_UP,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(KB_COL2,         KBC,             PULL_UP,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(KB_COL3,         KBC,             PULL_UP,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(KB_ROW0,         KBC,             PULL_UP,   NORMAL,     INPUT),
+	DEFAULT_PINMUX(KB_ROW1,         KBC,             PULL_UP,   NORMAL,     INPUT),
+	DEFAULT_PINMUX(KB_ROW2,         KBC,             PULL_UP,   NORMAL,     INPUT),
+	DEFAULT_PINMUX(KB_ROW3,         KBC,             PULL_UP,   NORMAL,     INPUT),
+	DEFAULT_PINMUX(KB_COL0,         KBC,             PULL_UP,   NORMAL,     INPUT),
+	DEFAULT_PINMUX(KB_COL1,         KBC,             PULL_UP,   NORMAL,     INPUT),
+	DEFAULT_PINMUX(KB_COL2,         KBC,             PULL_UP,   NORMAL,     INPUT),
+	DEFAULT_PINMUX(KB_COL3,         KBC,             PULL_UP,   NORMAL,     INPUT),
+	DEFAULT_PINMUX(KB_COL4,         KBC,             PULL_UP,   NORMAL,     INPUT),
+	DEFAULT_PINMUX(KB_COL5,         KBC,             PULL_UP,   NORMAL,     INPUT),
+	DEFAULT_PINMUX(GPIO_PV0,        RSVD,            NORMAL,    NORMAL,     OUTPUT),
 
 	DEFAULT_PINMUX(CLK_32K_OUT,     BLINK,           NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(SYS_CLK_REQ,     SYSCLK,          NORMAL,    NORMAL,     OUTPUT),

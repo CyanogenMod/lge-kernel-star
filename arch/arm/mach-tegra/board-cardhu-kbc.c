@@ -1,6 +1,6 @@
 /*
  * arch/arm/mach-tegra/board-cardhu-kbc.c
- * KBC configuration for Nvidia tegra3 cardhu platform.
+ * Keys configuration for Nvidia tegra3 cardhu platform.
  *
  * Copyright (C) 2011 NVIDIA, Inc.
  *
@@ -23,19 +23,46 @@
 #include <linux/platform_device.h>
 #include <linux/input.h>
 #include <linux/device.h>
+#include <linux/gpio.h>
+#include <linux/gpio_keys.h>
+#include <linux/gpio_scrollwheel.h>
 
 #include <mach/irqs.h>
 #include <mach/io.h>
 #include <mach/iomap.h>
 #include <mach/kbc.h>
 
-#define CARDHU_ROW_COUNT	2
-#define CARDHU_COL_COUNT	4
+#include "gpio-names.h"
 
+#ifdef CONFIG_KEYBOARD_TEGRA
+#ifdef CONFIG_INPUT_ALPS_GPIO_SCROLLWHEEL
+#define CARDHU_ROW_COUNT	3
+#define CARDHU_COL_COUNT	2
+#else
+#define CARDHU_ROW_COUNT	4
+#define CARDHU_COL_COUNT	6
+#endif
+
+#ifdef CONFIG_INPUT_ALPS_GPIO_SCROLLWHEEL
 static int plain_kbd_keycode[] = {
-	KEY_WAKEUP, KEY_RESERVED, KEY_VOLUMEDOWN, KEY_VOLUMEUP,
-	KEY_HOME,   KEY_MENU,     KEY_BACK,       KEY_SEARCH};
-
+	KEY_POWER,	KEY_RESERVED,
+	KEY_HOME,	KEY_BACK,
+	KEY_RESERVED,	KEY_RESERVED,
+};
+#else
+static int plain_kbd_keycode[] = {
+	KEY_POWER,	KEY_RESERVED,	KEY_RESERVED,	KEY_RESERVED,
+			KEY_RESERVED,	KEY_RESERVED,	KEY_RESERVED,
+	KEY_HOME,	KEY_BACK,	KEY_RESERVED,	KEY_RESERVED,
+			KEY_RESERVED,	KEY_RESERVED,	KEY_RESERVED,
+	KEY_CAMERA,	KEY_CAMERA,	KEY_RESERVED,	KEY_RESERVED,
+			KEY_RESERVED,	KEY_RESERVED,	KEY_RESERVED,
+	KEY_VOLUMEDOWN,	KEY_VOLUMEUP,	KEY_RESERVED,	KEY_RESERVED,
+			KEY_RESERVED,	KEY_RESERVED,	KEY_PAUSE,
+	KEY_END,	KEY_BACK,	KEY_RESERVED,	KEY_RESERVED,
+			KEY_RESERVED,	KEY_PLAY,	KEY_PHONE,
+};
+#endif
 static struct tegra_kbc_wake_key cardhu_wake_cfg[] = {
 	[0] = {
 		.row = 0,
@@ -103,3 +130,126 @@ int __init cardhu_kbc_init(void)
 	platform_device_register(&cardhu_kbc_device);
 	return 0;
 }
+#else
+int __init cardhu_kbc_init(void)
+{
+}
+#endif
+
+#ifdef CONFIG_INPUT_ALPS_GPIO_SCROLLWHEEL
+#define GPIO_SCROLL(_pinaction, _gpio, _desc)		\
+{							\
+	.pinaction = GPIO_SCROLLWHEEL_PIN_##_pinaction,	\
+	.gpio = TEGRA_GPIO_##_gpio,			\
+	.desc = _desc,					\
+	.active_low = 1,				\
+	.debounce_interval = 2,				\
+}
+
+static struct gpio_scrollwheel_button scroll_keys[] = {
+	[0] = GPIO_SCROLL(ONOFF, PR3, "sw_onoff"),
+	[1] = GPIO_SCROLL(PRESS, PQ5, "sw_press"),
+	[2] = GPIO_SCROLL(ROT1, PQ3, "sw_rot1"),
+	[3] = GPIO_SCROLL(ROT2, PQ4, "sw_rot2"),
+};
+
+static struct gpio_scrollwheel_platform_data cardhu_scroll_platform_data = {
+	.buttons = scroll_keys,
+	.nbuttons = ARRAY_SIZE(scroll_keys),
+};
+
+static struct platform_device cardhu_scroll_device = {
+	.name	= "alps-gpio-scrollwheel",
+	.id	= 0,
+	.dev	= {
+		.platform_data = &cardhu_scroll_platform_data,
+	},
+};
+
+int __init cardhu_scroll_init(void)
+{
+	int i;
+	/* Setting pins to gpio mode */
+	for (i = 0; i < ARRAY_SIZE(scroll_keys); i++)
+		tegra_gpio_enable(scroll_keys[i].gpio);
+
+	platform_device_register(&cardhu_scroll_device);
+	return 0;
+}
+#else
+int __init cardhu_scroll_init(void)
+{
+	return 0;
+}
+#endif
+
+#ifdef CONFIG_KEYBOARD_GPIO
+#define GPIO_KEY(_id, _gpio, _iswake)		\
+	{					\
+		.code = _id,			\
+		.gpio = TEGRA_GPIO_##_gpio,	\
+		.active_low = 1,		\
+		.desc = #_id,			\
+		.type = EV_KEY,			\
+		.wakeup = _iswake,		\
+		.debounce_interval = 10,	\
+	}
+
+static struct gpio_keys_button cardhu_keys[] = {
+	[0] = GPIO_KEY(KEY_HOME, PQ0, 0),
+	[1] = GPIO_KEY(KEY_MENU, PQ1, 0),
+	[2] = GPIO_KEY(KEY_SEARCH, PQ2, 0),
+	[3] = GPIO_KEY(KEY_BACK, PQ3, 0),
+	[4] = GPIO_KEY(KEY_VOLUMEUP, PR0, 0),
+	[5] = GPIO_KEY(KEY_VOLUMEDOWN, PR1, 0),
+	[6] = GPIO_KEY(KEY_POWER, PV0, 1),
+};
+
+static struct gpio_keys_platform_data cardhu_keys_platform_data = {
+	.buttons	= cardhu_keys,
+	.nbuttons       = ARRAY_SIZE(cardhu_keys),
+};
+
+static struct platform_device cardhu_keys_device = {
+	.name   = "gpio-keys",
+	.id     = 0,
+	.dev    = {
+		.platform_data  = &cardhu_keys_platform_data,
+	},
+};
+
+int __init cardhu_keys_init(void)
+{
+	int i;
+	int ret;
+
+	/* Set KB_ROW2 to 0 for capcitive switch to be in scan mode */
+	ret = gpio_request(TEGRA_GPIO_PR2, "cap_sw_sl_scan");
+	if (ret < 0) {
+		pr_err("%s: gpio_request failed #%d\n",
+					__func__, TEGRA_GPIO_PR2);
+		return ret;
+	}
+	ret = gpio_direction_output(TEGRA_GPIO_PR2, 0);
+	if (ret < 0) {
+		pr_err("%s: gpio_direction_output failed #%d\n",
+					__func__, TEGRA_GPIO_PR2);
+		gpio_free(TEGRA_GPIO_PR2);
+		return ret;
+	}
+
+	tegra_gpio_enable(TEGRA_GPIO_PR2);
+
+	/* Enable gpio mode for other pins */
+	for (i = 0; i < ARRAY_SIZE(cardhu_keys); i++)
+		tegra_gpio_enable(cardhu_keys[i].gpio);
+
+	platform_device_register(&cardhu_keys_device);
+	return 0;
+}
+#else
+int __init cardhu_keys_init(void)
+{
+	return 0;
+}
+#endif
