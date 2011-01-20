@@ -65,8 +65,6 @@ struct cpuidle_driver tegra_idle = {
 
 static DEFINE_PER_CPU(struct cpuidle_device *, idle_devices);
 
-#define CLK_RESET_CLK_MASK_ARM 0x44
-
 static inline unsigned int time_to_bin(unsigned int time)
 {
 	return fls(time);
@@ -183,14 +181,7 @@ static int tegra_idle_enter(unsigned int cpu)
 static int __init tegra_cpuidle_init(void)
 {
 	unsigned int cpu;
-	void __iomem *mask_arm;
-	u32 reg;
 	int ret;
-
-	mask_arm = IO_ADDRESS(TEGRA_CLK_RESET_BASE) + CLK_RESET_CLK_MASK_ARM;
-
-	reg = readl(mask_arm);
-	__raw_writel(reg | (1<<31), mask_arm);
 
 	ret = cpuidle_register_driver(&tegra_idle);
 
