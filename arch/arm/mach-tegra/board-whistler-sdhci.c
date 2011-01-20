@@ -25,6 +25,8 @@
 
 #include "board.h"
 
+#define WHISTLER_EXT_SDCARD_DETECT	TEGRA_GPIO_PI5
+
 static struct resource sdhci_resource0[] = {
 	[0] = {
 		.start  = INT_SDMMC1,
@@ -75,7 +77,7 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data0 = {
 static struct tegra_sdhci_platform_data tegra_sdhci_platform_data2 = {
 	.clk_id = NULL,
 	.force_hs = 0,
-	.cd_gpio = -1,
+	.cd_gpio = WHISTLER_EXT_SDCARD_DETECT,
 	.wp_gpio = -1,
 	.power_gpio = -1,
 };
@@ -120,6 +122,18 @@ static struct platform_device tegra_sdhci_device3 = {
 
 int __init whistler_sdhci_init(void)
 {
+	int ret;
+
+	ret = gpio_request(WHISTLER_EXT_SDCARD_DETECT, "card_detect");
+	if (ret < 0) {
+		tegra_sdhci_platform_data2.cd_gpio = -1;
+		pr_err("card_detect gpio not found\n");
+	}
+	else {
+		tegra_gpio_enable(WHISTLER_EXT_SDCARD_DETECT);
+		gpio_direction_input(WHISTLER_EXT_SDCARD_DETECT);
+	}
+
 	platform_device_register(&tegra_sdhci_device3);
 	platform_device_register(&tegra_sdhci_device2);
 	platform_device_register(&tegra_sdhci_device0);
