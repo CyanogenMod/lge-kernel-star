@@ -164,34 +164,64 @@ static __initdata struct tegra_clk_init_table ventana_clk_init_table[] = {
 	{ NULL,		NULL,		0,		0},
 };
 
-static char *usb_functions[] = { "mtp", "usb_mass_storage" };
-static char *usb_functions_adb[] = { "mtp", "adb", "usb_mass_storage" };
+#define USB_MANUFACTURER_NAME		"NVIDIA"
+#define USB_PRODUCT_NAME		"Ventana"
+#define USB_PRODUCT_ID_MTP_ADB		0x7100
+#define USB_PRODUCT_ID_MTP		0x7102
+#define USB_PRODUCT_ID_RNDIS		0x7103
+#define USB_VENDOR_ID			0x0955
 
+static char *usb_functions_mtp_ums[] = { "mtp", "usb_mass_storage" };
+static char *usb_functions_mtp_adb_ums[] = { "mtp", "adb", "usb_mass_storage" };
+#ifdef CONFIG_USB_ANDROID_RNDIS
+static char *usb_functions_rndis[] = { "rndis" };
+static char *usb_functions_rndis_adb[] = { "rndis", "adb" };
+#endif
+static char *usb_functions_all[] = {
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	"rndis",
+#endif
+	"mtp",
+	"adb",
+	"usb_mass_storage"
+};
 
 static struct android_usb_product usb_products[] = {
 	{
-		.product_id     = 0x7102,
-		.num_functions  = ARRAY_SIZE(usb_functions),
-		.functions      = usb_functions,
+		.product_id     = USB_PRODUCT_ID_MTP,
+		.num_functions  = ARRAY_SIZE(usb_functions_mtp_ums),
+		.functions      = usb_functions_mtp_ums,
 	},
 	{
-		.product_id     = 0x7100,
-		.num_functions  = ARRAY_SIZE(usb_functions_adb),
-		.functions      = usb_functions_adb,
+		.product_id     = USB_PRODUCT_ID_MTP_ADB,
+		.num_functions  = ARRAY_SIZE(usb_functions_mtp_adb_ums),
+		.functions      = usb_functions_mtp_adb_ums,
 	},
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	{
+		.product_id     = USB_PRODUCT_ID_RNDIS,
+		.num_functions  = ARRAY_SIZE(usb_functions_rndis),
+		.functions      = usb_functions_rndis,
+	},
+	{
+		.product_id     = USB_PRODUCT_ID_RNDIS,
+		.num_functions  = ARRAY_SIZE(usb_functions_rndis_adb),
+		.functions      = usb_functions_rndis_adb,
+	},
+#endif
 };
 
 /* standard android USB platform data */
 static struct android_usb_platform_data andusb_plat = {
-	.vendor_id              = 0x0955,
-	.product_id             = 0x7100,
-	.manufacturer_name      = "NVIDIA",
-	.product_name           = "Ventana",
+	.vendor_id              = USB_VENDOR_ID,
+	.product_id             = USB_PRODUCT_ID_MTP_ADB,
+	.manufacturer_name      = USB_MANUFACTURER_NAME,
+	.product_name           = USB_PRODUCT_NAME,
 	.serial_number          = NULL,
 	.num_products = ARRAY_SIZE(usb_products),
 	.products = usb_products,
-	.num_functions = ARRAY_SIZE(usb_functions_adb),
-	.functions = usb_functions_adb,
+	.num_functions = ARRAY_SIZE(usb_functions_all),
+	.functions = usb_functions_all,
 };
 
 static struct platform_device androidusb_device = {
@@ -201,6 +231,22 @@ static struct platform_device androidusb_device = {
 		.platform_data  = &andusb_plat,
 	},
 };
+
+#ifdef CONFIG_USB_ANDROID_RNDIS
+static struct usb_ether_platform_data rndis_pdata = {
+	.ethaddr = {0, 0, 0, 0, 0, 0},
+	.vendorID = USB_VENDOR_ID,
+	.vendorDescr = USB_MANUFACTURER_NAME,
+};
+
+static struct platform_device rndis_device = {
+	.name   = "rndis",
+	.id     = -1,
+	.dev    = {
+		.platform_data  = &rndis_pdata,
+	},
+};
+#endif
 
 static struct tegra_ulpi_config ventana_ehci2_ulpi_phy_config = {
 	.reset_gpio = TEGRA_GPIO_PV1,
@@ -499,17 +545,6 @@ static struct tegra_otg_platform_data tegra_otg_pdata = {
 	.host_unregister = &tegra_usb_otg_host_unregister,
 };
 
-static void ventana_usb_init(void)
-{
-	tegra_usb_phy_init(tegra_usb_phy_pdata, ARRAY_SIZE(tegra_usb_phy_pdata));
-
-	tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
-	platform_device_register(&tegra_otg_device);
-
-	tegra_ehci3_device.dev.platform_data=&tegra_ehci_pdata[2];
-	platform_device_register(&tegra_ehci3_device);
-}
-
 static int __init ventana_gps_init(void)
 {
 	struct clk *clk32 = clk_get_sys(NULL, "blink");
@@ -538,6 +573,36 @@ static void __init ventana_power_off_init(void)
 	pm_power_off = ventana_power_off;
 }
 
+#define SERIAL_NUMBER_LENGTH 20
+static char usb_serial_num[SERIAL_NUMBER_LENGTH];
+static void ventana_usb_init(void)
+{
+	char *src = NULL;
+	int i;
+
+	tegra_usb_phy_init(tegra_usb_phy_pdata, ARRAY_SIZE(tegra_usb_phy_pdata));
+
+	tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
+	platform_device_register(&tegra_otg_device);
+
+	tegra_ehci3_device.dev.platform_data=&tegra_ehci_pdata[2];
+	platform_device_register(&tegra_ehci3_device);
+
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	src = usb_serial_num;
+
+	/* create a fake MAC address from our serial number.
+	 * first byte is 0x02 to signify locally administered.
+	 */
+	rndis_pdata.ethaddr[0] = 0x02;
+	for (i = 0; *src; i++) {
+		/* XOR the USB serial across the remaining bytes */
+		rndis_pdata.ethaddr[i % (ETH_ALEN - 1) + 1] ^= *src++;
+	}
+	platform_device_register(&rndis_device);
+#endif
+}
+
 static void __init tegra_ventana_init(void)
 {
 	struct board_info BoardInfo;
@@ -546,8 +611,8 @@ static void __init tegra_ventana_init(void)
 	tegra_clk_init_from_table(ventana_clk_init_table);
 	ventana_pinmux_init();
 	ventana_i2c_init();
-	snprintf(serial, sizeof(serial), "%llx", tegra_chip_uid());
-	andusb_plat.serial_number = kstrdup(serial, GFP_KERNEL);
+	snprintf(usb_serial_num, sizeof(usb_serial_num), "%llx", tegra_chip_uid());
+	andusb_plat.serial_number = kstrdup(usb_serial_num, GFP_KERNEL);
 	if (is_tegra_debug_uartport_hs() == true)
 		platform_device_register(&tegra_uartd_device);
 	else
