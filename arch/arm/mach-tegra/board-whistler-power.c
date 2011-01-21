@@ -209,11 +209,13 @@ static struct platform_device *whistler_max8907c_power_devices[] = {
 static struct max8907c_platform_data max8907c_pdata = {
 	.num_subdevs = ARRAY_SIZE(whistler_max8907c_power_devices),
 	.subdevs = whistler_max8907c_power_devices,
+	.irq_base = TEGRA_NR_IRQS,
 };
 
 static struct i2c_board_info __initdata whistler_regulators[] = {
 	{
 		I2C_BOARD_INFO("max8907c", 0x3C),
+		.irq = INT_EXTERNAL_PMU,
 		.platform_data	= &max8907c_pdata,
 	},
 };
