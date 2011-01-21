@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/board-cardhu.c
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -365,6 +365,7 @@ static void __init tegra_cardhu_init(void)
 	cardhu_sdhci_init();
 	cardhu_i2c_init();
 	cardhu_regulator_init();
+	cardhu_suspend_init();
 	cardhu_touch_init();
 #if ENABLE_USB_HOST
 	cardhu_usb_init();
