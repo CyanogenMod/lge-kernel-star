@@ -76,10 +76,10 @@ static struct regulator_consumer_supply tps658621_ldo4_supply[] = {
 	REGULATOR_SUPPLY("vddio_sys", "panjit_touch"),
 };
 static struct regulator_consumer_supply tps658621_ldo5_supply[] = {
-	REGULATOR_SUPPLY("vmmc", "sdhci-tegra.0"),
-	REGULATOR_SUPPLY("vmmc", "sdhci-tegra.1"),
-	REGULATOR_SUPPLY("vmmc", "sdhci-tegra.2"),
-	REGULATOR_SUPPLY("vmmc", "sdhci-tegra.3"),
+	REGULATOR_SUPPLY("disabled_vmmc", "sdhci-tegra.0"),
+	REGULATOR_SUPPLY("disabled_vmmc", "sdhci-tegra.1"),
+	REGULATOR_SUPPLY("disabled_vmmc", "sdhci-tegra.2"),
+	REGULATOR_SUPPLY("disabled_vmmc", "sdhci-tegra.3"),
 };
 static struct regulator_consumer_supply tps658621_ldo6_supply[] = {
 	REGULATOR_SUPPLY("vcsi", "tegra_camera"),
