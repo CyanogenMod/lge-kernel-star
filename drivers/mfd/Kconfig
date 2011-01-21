@@ -681,6 +681,17 @@ config MFD_OMAP_USB_HOST
 	  This MFD driver does the required setup functionalities for
 	  OMAP USB Host drivers.
 
+config MFD_TPS6591X
+	bool "TPS6591x Power Management chips"
+	depends on I2C && GPIOLIB && GENERIC_HARDIRQS
+	select MFD_CORE
+	help
+	  If you say yes here you get support for the TPS6591X series of
+	  Power Management chips.
+	  This driver provides common support for accessing the device,
+	  additional drivers must be enabled in order to use the
+	  functionality of the device.
+
 endif # MFD_SUPPORT
 
 menu "Multimedia Capabilities Port drivers"

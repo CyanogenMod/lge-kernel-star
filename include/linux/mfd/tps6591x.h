@@ -1,0 +1,102 @@
+/*
+ * include/linux/mfd/tps6591x.c
+ * Core driver interface for TI TPS6591x PMIC family
+ *
+ * Copyright (C) 2011 NVIDIA Corporation
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ *
+ */
+
+#ifndef __LINUX_MFD_TPS6591X_H
+#define __LINUX_MFD_TPS6591X_H
+
+#define tps6591x_rails(_name) "tps6591x_"#_name
+
+enum {
+	TPS6591X_ID_VIO,
+	TPS6591X_ID_VDD_1,
+	TPS6591X_ID_VDD_2,
+	TPS6591X_ID_VDDCTRL,
+	TPS6591X_ID_LDO_1,
+	TPS6591X_ID_LDO_2,
+	TPS6591X_ID_LDO_3,
+	TPS6591X_ID_LDO_4,
+	TPS6591X_ID_LDO_5,
+	TPS6591X_ID_LDO_6,
+	TPS6591X_ID_LDO_7,
+	TPS6591X_ID_LDO_8,
+};
+
+enum {
+	TPS6591X_INT_PWRHOLD_F,
+	TPS6591X_INT_VMBHI,
+	TPS6591X_INT_PWRON,
+	TPS6591X_INT_PWRON_LP,
+	TPS6591X_INT_PWRHOLD_R,
+	TPS6591X_INT_HOTDIE,
+	TPS6591X_INT_RTC_ALARM,
+	TPS6591X_INT_RTC_PERIOD,
+	TPS6591X_INT_GPIO0_R,
+	TPS6591X_INT_GPIO0_F,
+	TPS6591X_INT_GPIO1_R,
+	TPS6591X_INT_GPIO1_F,
+	TPS6591X_INT_GPIO2_R,
+	TPS6591X_INT_GPIO2_F,
+	TPS6591X_INT_GPIO3_R,
+	TPS6591X_INT_GPIO3_F,
+	TPS6591X_INT_GPIO4_R,
+	TPS6591X_INT_GPIO4_F,
+	TPS6591X_INT_GPIO5_R,
+	TPS6591X_INT_GPIO5_F,
+	TPS6591X_INT_WTCHDG,
+	TPS6591X_INT_VMBCH2_H,
+	TPS6591X_INT_VMBCH2_L,
+	TPS6591X_INT_PWRDN,
+};
+
+struct tps6591x_subdev_info {
+	int		id;
+	const char	*name;
+	void		*platform_data;
+};
+
+struct tps6591x_rtc_platform_data {
+	int irq;
+};
+
+struct tps6591x_platform_data {
+	int num_subdevs;
+	struct tps6591x_subdev_info *subdevs;
+
+	int gpio_base;
+	int irq_base;
+};
+
+/*
+ * NOTE: the functions below are not intended for use outside
+ * of the TPS6591X sub-device drivers
+ */
+extern int tps6591x_write(struct device *dev, int reg, uint8_t val);
+extern int tps6591x_writes(struct device *dev, int reg, int len, uint8_t *val);
+extern int tps6591x_read(struct device *dev, int reg, uint8_t *val);
+extern int tps6591x_reads(struct device *dev, int reg, int len, uint8_t *val);
+extern int tps6591x_set_bits(struct device *dev, int reg, uint8_t bit_mask);
+extern int tps6591x_clr_bits(struct device *dev, int reg, uint8_t bit_mask);
+extern int tps6591x_update(struct device *dev, int reg, uint8_t val,
+			   uint8_t mask);
+extern int tps6591x_power_off(void);
+
+#endif /*__LINUX_MFD_TPS6591X_H */

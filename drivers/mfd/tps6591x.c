@@ -1,0 +1,593 @@
+/*
+ * driver/mfd/tps6591x.c
+ *
+ * Core driver for TI TPS6591x PMIC family
+ *
+ * Copyright (C) 2011 NVIDIA Corporation
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ *
+ */
+
+#include <linux/interrupt.h>
+#include <linux/irq.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/mutex.h>
+#include <linux/slab.h>
+#include <linux/gpio.h>
+#include <linux/i2c.h>
+
+#include <linux/mfd/core.h>
+#include <linux/mfd/tps6591x.h>
+
+/* device control registers */
+#define TPS6591X_DEVCTRL	0x3F
+#define TPS6591X_DEVCTRL2	0x40
+
+/* interrupt status registers */
+#define TPS6591X_INT_STS	0x50
+#define TPS6591X_INT_STS2	0x52
+#define TPS6591X_INT_STS3	0x54
+
+/* interrupt mask registers */
+#define TPS6591X_INT_MSK	0x51
+#define TPS6591X_INT_MSK2	0x53
+#define TPS6591X_INT_MSK3	0x55
+
+/* GPIO register base address */
+#define TPS6591X_GPIO_BASE_ADDR	0x60
+
+/* silicon version number */
+#define TPS6591X_VERNUM		0x80
+
+struct tps6591x_irq_data {
+	u8	mask_reg;
+	u8	mask_mask;
+};
+
+#define TPS6591X_IRQ(_reg, _mask)				\
+	{							\
+		.mask_reg = (_reg) - TPS6591X_INT_MSK,		\
+		.mask_mask = (_mask),				\
+	}
+
+static const struct tps6591x_irq_data tps6591x_irqs[] = {
+	[TPS6591X_INT_PWRHOLD_F]  = TPS6591X_IRQ(TPS6591X_INT_MSK, 1 << 0),
+	[TPS6591X_INT_VMBHI]	  = TPS6591X_IRQ(TPS6591X_INT_MSK, 1 << 1),
+	[TPS6591X_INT_PWRON]	  = TPS6591X_IRQ(TPS6591X_INT_MSK, 1 << 2),
+	[TPS6591X_INT_PWRON_LP]	  = TPS6591X_IRQ(TPS6591X_INT_MSK, 1 << 3),
+	[TPS6591X_INT_PWRHOLD_R]  = TPS6591X_IRQ(TPS6591X_INT_MSK, 1 << 4),
+	[TPS6591X_INT_HOTDIE]	  = TPS6591X_IRQ(TPS6591X_INT_MSK, 1 << 5),
+	[TPS6591X_INT_RTC_ALARM]  = TPS6591X_IRQ(TPS6591X_INT_MSK, 1 << 6),
+	[TPS6591X_INT_RTC_PERIOD] = TPS6591X_IRQ(TPS6591X_INT_MSK, 1 << 7),
+	[TPS6591X_INT_GPIO0_R]	  = TPS6591X_IRQ(TPS6591X_INT_MSK2, 1 << 0),
+	[TPS6591X_INT_GPIO0_F]	  = TPS6591X_IRQ(TPS6591X_INT_MSK2, 1 << 1),
+	[TPS6591X_INT_GPIO1_R]	  = TPS6591X_IRQ(TPS6591X_INT_MSK2, 1 << 2),
+	[TPS6591X_INT_GPIO1_F]	  = TPS6591X_IRQ(TPS6591X_INT_MSK2, 1 << 3),
+	[TPS6591X_INT_GPIO2_R]	  = TPS6591X_IRQ(TPS6591X_INT_MSK2, 1 << 4),
+	[TPS6591X_INT_GPIO2_F]	  = TPS6591X_IRQ(TPS6591X_INT_MSK2, 1 << 5),
+	[TPS6591X_INT_GPIO3_R]	  = TPS6591X_IRQ(TPS6591X_INT_MSK2, 1 << 6),
+	[TPS6591X_INT_GPIO3_F]	  = TPS6591X_IRQ(TPS6591X_INT_MSK2, 1 << 7),
+	[TPS6591X_INT_GPIO4_R]	  = TPS6591X_IRQ(TPS6591X_INT_MSK3, 1 << 0),
+	[TPS6591X_INT_GPIO4_F]	  = TPS6591X_IRQ(TPS6591X_INT_MSK3, 1 << 1),
+	[TPS6591X_INT_GPIO5_R]	  = TPS6591X_IRQ(TPS6591X_INT_MSK3, 1 << 2),
+	[TPS6591X_INT_GPIO5_F]	  = TPS6591X_IRQ(TPS6591X_INT_MSK3, 1 << 3),
+	[TPS6591X_INT_WTCHDG]	  = TPS6591X_IRQ(TPS6591X_INT_MSK3, 1 << 4),
+	[TPS6591X_INT_VMBCH2_H]	  = TPS6591X_IRQ(TPS6591X_INT_MSK3, 1 << 5),
+	[TPS6591X_INT_VMBCH2_L]	  = TPS6591X_IRQ(TPS6591X_INT_MSK3, 1 << 6),
+	[TPS6591X_INT_PWRDN]	  = TPS6591X_IRQ(TPS6591X_INT_MSK3, 1 << 7),
+};
+
+struct tps6591x {
+	struct mutex		lock;
+	struct device		*dev;
+	struct i2c_client	*client;
+
+	struct gpio_chip	gpio;
+	struct irq_chip		irq_chip;
+	struct mutex		irq_lock;
+	int			irq_base;
+	u32			irq_en;
+	u8			mask_cache[3];
+	u8			mask_reg[3];
+};
+
+static inline int __tps6591x_read(struct i2c_client *client,
+				  int reg, uint8_t *val)
+{
+	int ret;
+
+	ret = i2c_smbus_read_byte_data(client, reg);
+	if (ret < 0) {
+		dev_err(&client->dev, "failed reading at 0x%02x\n", reg);
+		return ret;
+	}
+
+	*val = (uint8_t)ret;
+
+	return 0;
+}
+
+static inline int __tps6591x_reads(struct i2c_client *client, int reg,
+				   int len, uint8_t *val)
+{
+	int ret;
+
+	ret = i2c_smbus_read_i2c_block_data(client, reg, len, val);
+	if (ret < 0) {
+		dev_err(&client->dev, "failed reading from 0x%02x\n", reg);
+		return ret;
+	}
+
+	return 0;
+}
+
+static inline int __tps6591x_write(struct i2c_client *client,
+				 int reg, uint8_t val)
+{
+	int ret;
+
+	ret = i2c_smbus_write_byte_data(client, reg, val);
+	if (ret < 0) {
+		dev_err(&client->dev, "failed writing 0x%02x to 0x%02x\n",
+				val, reg);
+		return ret;
+	}
+
+	return 0;
+}
+
+static inline int __tps6591x_writes(struct i2c_client *client, int reg,
+				  int len, uint8_t *val)
+{
+	int ret;
+
+	ret = i2c_smbus_write_i2c_block_data(client, reg, len, val);
+	if (ret < 0) {
+		dev_err(&client->dev, "failed writings to 0x%02x\n", reg);
+		return ret;
+	}
+
+	return 0;
+}
+
+int tps6591x_write(struct device *dev, int reg, uint8_t val)
+{
+	return __tps6591x_write(to_i2c_client(dev), reg, val);
+}
+EXPORT_SYMBOL_GPL(tps6591x_write);
+
+int tps6591x_writes(struct device *dev, int reg, int len, uint8_t *val)
+{
+	return __tps6591x_writes(to_i2c_client(dev), reg, len, val);
+}
+EXPORT_SYMBOL_GPL(tps6591x_writes);
+
+int tps6591x_read(struct device *dev, int reg, uint8_t *val)
+{
+	return __tps6591x_read(to_i2c_client(dev), reg, val);
+}
+EXPORT_SYMBOL_GPL(tps6591x_read);
+
+int tps6591x_reads(struct device *dev, int reg, int len, uint8_t *val)
+{
+	return __tps6591x_reads(to_i2c_client(dev), reg, len, val);
+}
+EXPORT_SYMBOL_GPL(tps6591x_reads);
+
+int tps6591x_set_bits(struct device *dev, int reg, uint8_t bit_mask)
+{
+	struct tps6591x *tps6591x = dev_get_drvdata(dev);
+	uint8_t reg_val;
+	int ret = 0;
+
+	mutex_lock(&tps6591x->lock);
+
+	ret = __tps6591x_read(to_i2c_client(dev), reg, &reg_val);
+	if (ret)
+		goto out;
+
+	if ((reg_val & bit_mask) == 0) {
+		reg_val |= bit_mask;
+		ret = __tps6591x_write(to_i2c_client(dev), reg, reg_val);
+	}
+out:
+	mutex_unlock(&tps6591x->lock);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(tps6591x_set_bits);
+
+int tps6591x_clr_bits(struct device *dev, int reg, uint8_t bit_mask)
+{
+	struct tps6591x *tps6591x = dev_get_drvdata(dev);
+	uint8_t reg_val;
+	int ret = 0;
+
+	mutex_lock(&tps6591x->lock);
+
+	ret = __tps6591x_read(to_i2c_client(dev), reg, &reg_val);
+	if (ret)
+		goto out;
+
+	if (reg_val & bit_mask) {
+		reg_val &= ~bit_mask;
+		ret = __tps6591x_write(to_i2c_client(dev), reg, reg_val);
+	}
+out:
+	mutex_unlock(&tps6591x->lock);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(tps6591x_clr_bits);
+
+int tps6591x_update(struct device *dev, int reg, uint8_t val, uint8_t mask)
+{
+	struct tps6591x *tps6591x = dev_get_drvdata(dev);
+	uint8_t reg_val;
+	int ret = 0;
+
+	mutex_lock(&tps6591x->lock);
+
+	ret = __tps6591x_read(tps6591x->client, reg, &reg_val);
+	if (ret)
+		goto out;
+
+	if ((reg_val & mask) != val) {
+		reg_val = (reg_val & ~mask) | val;
+		ret = __tps6591x_write(tps6591x->client, reg, reg_val);
+	}
+out:
+	mutex_unlock(&tps6591x->lock);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(tps6591x_update);
+
+static struct i2c_client *tps6591x_i2c_client;
+int tps6591x_power_off(void)
+{
+	/* FIX ME */
+	return 0;
+}
+
+static int tps6591x_gpio_get(struct gpio_chip *gc, unsigned offset)
+{
+	struct tps6591x *tps6591x = container_of(gc, struct tps6591x, gpio);
+	uint8_t val;
+	int ret;
+
+	ret = __tps6591x_read(tps6591x->client, TPS6591X_GPIO_BASE_ADDR +
+			offset,	&val);
+	if (ret)
+		return ret;
+
+	return val & 0x1;
+}
+
+static void tps6591x_gpio_set(struct gpio_chip *chip, unsigned offset,
+			      int value)
+{
+
+	struct tps6591x *tps6591x = container_of(chip, struct tps6591x, gpio);
+
+	tps6591x_update(tps6591x->dev, TPS6591X_GPIO_BASE_ADDR + offset,
+			value, 0x1);
+}
+
+static int tps6591x_gpio_input(struct gpio_chip *gc, unsigned offset)
+{
+	/* FIXME: add handling of GPIOs as dedicated inputs */
+	return -ENOSYS;
+}
+
+static int tps6591x_gpio_output(struct gpio_chip *gc, unsigned offset,
+				int value)
+{
+	struct tps6591x *tps6591x = container_of(gc, struct tps6591x, gpio);
+	uint8_t reg_val, val;
+	int ret;
+
+	ret = __tps6591x_read(tps6591x->client, TPS6591X_GPIO_BASE_ADDR +
+			offset,	&reg_val);
+	if (ret)
+		return ret;
+
+	val = (value & 0x1) | 0x4;
+	reg_val = reg_val | val;
+	return __tps6591x_write(tps6591x->client, TPS6591X_GPIO_BASE_ADDR +
+			offset,	reg_val);
+}
+
+static void tps6591x_gpio_init(struct tps6591x *tps6591x, int gpio_base)
+{
+	int ret;
+
+	if (!gpio_base)
+		return;
+
+	tps6591x->gpio.owner		= THIS_MODULE;
+	tps6591x->gpio.label		= tps6591x->client->name;
+	tps6591x->gpio.dev		= tps6591x->dev;
+	tps6591x->gpio.base		= gpio_base;
+	tps6591x->gpio.ngpio		= 9;
+	tps6591x->gpio.can_sleep	= 1;
+
+	tps6591x->gpio.direction_input	= tps6591x_gpio_input;
+	tps6591x->gpio.direction_output	= tps6591x_gpio_output;
+	tps6591x->gpio.set		= tps6591x_gpio_set;
+	tps6591x->gpio.get		= tps6591x_gpio_get;
+
+	ret = gpiochip_add(&tps6591x->gpio);
+	if (ret)
+		dev_warn(tps6591x->dev, "GPIO registration failed: %d\n", ret);
+}
+
+static int __remove_subdev(struct device *dev, void *unused)
+{
+	platform_device_unregister(to_platform_device(dev));
+	return 0;
+}
+
+static int tps6591x_remove_subdevs(struct tps6591x *tps6591x)
+{
+	return device_for_each_child(tps6591x->dev, NULL, __remove_subdev);
+}
+
+static void tps6591x_irq_lock(unsigned int irq)
+{
+	struct tps6591x *tps6591x = get_irq_chip_data(irq);
+
+	mutex_lock(&tps6591x->irq_lock);
+}
+
+static void tps6591x_irq_enable(unsigned int irq)
+{
+	struct tps6591x *tps6591x = get_irq_chip_data(irq);
+	unsigned int __irq = irq - tps6591x->irq_base;
+	const struct tps6591x_irq_data *data = &tps6591x_irqs[__irq];
+
+	tps6591x->mask_reg[data->mask_reg] &= ~data->mask_mask;
+	tps6591x->irq_en |= (1 << __irq);
+}
+
+static void tps6591x_irq_disable(unsigned int irq)
+{
+	struct tps6591x *tps6591x = get_irq_chip_data(irq);
+
+	unsigned int __irq = irq - tps6591x->irq_base;
+	const struct tps6591x_irq_data *data = &tps6591x_irqs[__irq];
+
+	tps6591x->mask_reg[data->mask_reg] |= data->mask_mask;
+	tps6591x->irq_en &= ~(1 << __irq);
+}
+
+static void tps6591x_irq_sync_unlock(unsigned int irq)
+{
+	struct tps6591x *tps6591x = get_irq_chip_data(irq);
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(tps6591x->mask_reg); i++) {
+		if (tps6591x->mask_reg[i] != tps6591x->mask_cache[i]) {
+			if (!WARN_ON(tps6591x_write(tps6591x->dev,
+						    TPS6591X_INT_MSK + i,
+						    tps6591x->mask_reg[i])))
+				tps6591x->mask_cache[i] = tps6591x->mask_reg[i];
+		}
+	}
+
+	mutex_unlock(&tps6591x->irq_lock);
+}
+
+/* FIXME */
+static irqreturn_t tps6591x_irq(int irq, void *data)
+{
+	struct tps6591x *tps6591x = data;
+	int ret = 0;
+	u8 tmp[3];
+	int i;
+
+	for (i = 0; i < 3; i++) {
+		ret = tps6591x_read(tps6591x->dev, TPS6591X_INT_STS + 2*i,
+				&tmp[i]);
+		if (ret < 0) {
+			dev_err(tps6591x->dev, "failed to read interrupt status\n");
+			return IRQ_NONE;
+		}
+		ret = tps6591x_write(tps6591x->dev, TPS6591X_INT_STS + 2*i,
+			tmp[i]);
+		if (ret < 0) {
+			dev_err(tps6591x->dev, "failed to write interrupt status\n");
+			return IRQ_NONE;
+		}
+	}
+
+	return IRQ_HANDLED;
+}
+
+static int __devinit tps6591x_irq_init(struct tps6591x *tps6591x, int irq,
+				       int irq_base)
+{
+	int i, ret;
+
+	if (!irq_base) {
+		dev_warn(tps6591x->dev, "No interrupt support on IRQ base\n");
+		return -EINVAL;
+	}
+
+	mutex_init(&tps6591x->irq_lock);
+	for (i = 0; i < 3; i++) {
+		tps6591x->mask_cache[i] = 0xff;
+		tps6591x->mask_reg[i] = 0xff;
+		tps6591x_write(tps6591x->dev, TPS6591X_INT_MSK + 2*i, 0xff);
+	}
+
+	for (i = 0; i < 3; i++)
+		tps6591x_write(tps6591x->dev, TPS6591X_INT_STS + 2*i, 0xff);
+
+	tps6591x->irq_base = irq_base;
+
+	tps6591x->irq_chip.name = "tps6591x";
+	tps6591x->irq_chip.enable = tps6591x_irq_enable;
+	tps6591x->irq_chip.disable = tps6591x_irq_disable;
+	tps6591x->irq_chip.bus_lock = tps6591x_irq_lock;
+	tps6591x->irq_chip.bus_sync_unlock = tps6591x_irq_sync_unlock;
+
+	for (i = 0; i < ARRAY_SIZE(tps6591x_irqs); i++) {
+		int __irq = i + tps6591x->irq_base;
+		set_irq_chip_data(__irq, tps6591x);
+		set_irq_chip_and_handler(__irq, &tps6591x->irq_chip,
+					 handle_simple_irq);
+		set_irq_nested_thread(__irq, 1);
+#ifdef CONFIG_ARM
+		set_irq_flags(__irq, IRQF_VALID);
+#endif
+	}
+
+	ret = request_threaded_irq(irq, NULL, tps6591x_irq, IRQF_ONESHOT,
+				   "tps6591x", tps6591x);
+
+	if (!ret) {
+		device_init_wakeup(tps6591x->dev, 1);
+		enable_irq_wake(irq);
+	}
+
+	return ret;
+}
+
+static int __devinit tps6591x_add_subdevs(struct tps6591x *tps6591x,
+					  struct tps6591x_platform_data *pdata)
+{
+	struct tps6591x_subdev_info *subdev;
+	struct platform_device *pdev;
+	int i, ret = 0;
+
+	for (i = 0; i < pdata->num_subdevs; i++) {
+		subdev = &pdata->subdevs[i];
+
+		pdev = platform_device_alloc(subdev->name, subdev->id);
+
+		pdev->dev.parent = tps6591x->dev;
+		pdev->dev.platform_data = subdev->platform_data;
+
+		ret = platform_device_add(pdev);
+		if (ret)
+			goto failed;
+	}
+	return 0;
+
+failed:
+	tps6591x_remove_subdevs(tps6591x);
+	return ret;
+}
+
+static int __devinit tps6591x_i2c_probe(struct i2c_client *client,
+					const struct i2c_device_id *id)
+{
+	struct tps6591x_platform_data *pdata = client->dev.platform_data;
+	struct tps6591x *tps6591x;
+	int ret;
+
+	if (!pdata) {
+		dev_err(&client->dev, "tps6591x requires platform data\n");
+		return -ENOTSUPP;
+	}
+
+	ret = i2c_smbus_read_byte_data(client, TPS6591X_VERNUM);
+	if (ret < 0) {
+		dev_err(&client->dev, "Silicon version number read"
+				" failed: %d\n", ret);
+		return -EIO;
+	}
+
+	dev_info(&client->dev, "VERNUM is %02x\n", ret);
+
+	tps6591x = kzalloc(sizeof(struct tps6591x), GFP_KERNEL);
+	if (tps6591x == NULL)
+		return -ENOMEM;
+
+	tps6591x->client = client;
+	tps6591x->dev = &client->dev;
+	i2c_set_clientdata(client, tps6591x);
+
+	mutex_init(&tps6591x->lock);
+
+	if (client->irq) {
+		ret = tps6591x_irq_init(tps6591x, client->irq,
+					pdata->irq_base);
+		if (ret) {
+			dev_err(&client->dev, "IRQ init failed: %d\n", ret);
+			goto err_irq_init;
+		}
+	}
+
+	ret = tps6591x_add_subdevs(tps6591x, pdata);
+	if (ret) {
+		dev_err(&client->dev, "add devices failed: %d\n", ret);
+		goto err_add_devs;
+	}
+
+	tps6591x_gpio_init(tps6591x, pdata->gpio_base);
+
+	tps6591x_i2c_client = client;
+
+	return 0;
+
+err_add_devs:
+	if (client->irq)
+		free_irq(client->irq, tps6591x);
+err_irq_init:
+	kfree(tps6591x);
+	return ret;
+}
+
+static int __devexit tps6591x_i2c_remove(struct i2c_client *client)
+{
+	struct tps6591x *tps6591x = i2c_get_clientdata(client);
+
+	if (client->irq)
+		free_irq(client->irq, tps6591x);
+
+	return 0;
+}
+
+static const struct i2c_device_id tps6591x_id_table[] = {
+	{ "tps6591x", 0 },
+	{ },
+};
+MODULE_DEVICE_TABLE(i2c, tps6591x_id_table);
+
+static struct i2c_driver tps6591x_driver = {
+	.driver	= {
+		.name	= "tps6591x",
+		.owner	= THIS_MODULE,
+	},
+	.probe		= tps6591x_i2c_probe,
+	.remove		= __devexit_p(tps6591x_i2c_remove),
+	.id_table	= tps6591x_id_table,
+};
+
+static int __init tps6591x_init(void)
+{
+	return i2c_add_driver(&tps6591x_driver);
+}
+subsys_initcall(tps6591x_init);
+
+static void __exit tps6591x_exit(void)
+{
+	i2c_del_driver(&tps6591x_driver);
+}
+module_exit(tps6591x_exit);
+
+MODULE_DESCRIPTION("TPS6591X core driver");
+MODULE_LICENSE("GPL");
