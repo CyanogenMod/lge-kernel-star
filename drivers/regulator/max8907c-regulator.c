@@ -30,6 +30,7 @@ struct max8907c_regulator_info {
 	u32 step_uV;
 	u8 reg_base;
 	struct regulator_desc desc;
+	struct i2c_client *i2c;
 };
 
 #define REG_LDO(ids, base, min, max, step) \
@@ -209,7 +210,6 @@ static int max8907c_regulator_ldo_set_voltage(struct regulator_dev *rdev,
 					      int min_uV, int max_uV)
 {
 	const struct max8907c_regulator_info *info = rdev_get_drvdata(rdev);
-	struct device *parent = rdev_get_dev(rdev)->parent->parent;
 	int val;
 
 	if (min_uV < info->min_uV || max_uV > info->max_uV)
@@ -217,14 +217,13 @@ static int max8907c_regulator_ldo_set_voltage(struct regulator_dev *rdev,
 
 	val = (min_uV - info->min_uV) / info->step_uV;
 
-	return max8907c_reg_write(parent, info->reg_base + MAX8907C_VOUT, val);
+	return max8907c_reg_write(info->i2c, info->reg_base + MAX8907C_VOUT, val);
 }
 
 static int max8907c_regulator_bbat_set_voltage(struct regulator_dev *rdev,
 					       int min_uV, int max_uV)
 {
 	const struct max8907c_regulator_info *info = rdev_get_drvdata(rdev);
-	struct device *parent = rdev_get_dev(rdev)->parent->parent;
 	int val;
 
 	if (min_uV < info->min_uV || max_uV > info->max_uV)
@@ -232,17 +231,16 @@ static int max8907c_regulator_bbat_set_voltage(struct regulator_dev *rdev,
 
 	val = (min_uV - info->min_uV) / info->step_uV;
 
-	return max8907c_set_bits(parent, info->reg_base, MAX8907C_MASK_VBBATTCV,
+	return max8907c_set_bits(info->i2c, info->reg_base, MAX8907C_MASK_VBBATTCV,
 				 val);
 }
 
 static int max8907c_regulator_ldo_get_voltage(struct regulator_dev *rdev)
 {
 	const struct max8907c_regulator_info *info = rdev_get_drvdata(rdev);
-	struct device *parent = rdev_get_dev(rdev)->parent->parent;
 	int val;
 
-	val = max8907c_reg_read(parent, info->reg_base + MAX8907C_VOUT);
+	val = max8907c_reg_read(info->i2c, info->reg_base + MAX8907C_VOUT);
 	return val * info->step_uV + info->min_uV;
 }
 
@@ -256,11 +254,10 @@ static int max8907c_regulator_fixed_get_voltage(struct regulator_dev *rdev)
 static int max8907c_regulator_bbat_get_voltage(struct regulator_dev *rdev)
 {
 	const struct max8907c_regulator_info *info = rdev_get_drvdata(rdev);
-	struct device *parent = rdev_get_dev(rdev)->parent->parent;
 	int val;
 
 	val =
-	    max8907c_reg_read(parent, info->reg_base) & MAX8907C_MASK_VBBATTCV;
+	    max8907c_reg_read(info->i2c, info->reg_base) & MAX8907C_MASK_VBBATTCV;
 	return val * info->step_uV + info->min_uV;
 }
 
@@ -268,30 +265,27 @@ static int max8907c_regulator_wled_set_current_limit(struct regulator_dev *rdev,
 						     int min_uA, int max_uA)
 {
 	const struct max8907c_regulator_info *info = rdev_get_drvdata(rdev);
-	struct device *parent = rdev_get_dev(rdev)->parent->parent;
 
 	if (min_uA > 25500)
 		return -EDOM;
 
-	return max8907c_reg_write(parent, info->reg_base, min_uA / 100);
+	return max8907c_reg_write(info->i2c, info->reg_base, min_uA / 100);
 }
 
 static int max8907c_regulator_wled_get_current_limit(struct regulator_dev *rdev)
 {
 	const struct max8907c_regulator_info *info = rdev_get_drvdata(rdev);
-	struct device *parent = rdev_get_dev(rdev)->parent->parent;
 	int val;
 
-	val = max8907c_reg_read(parent, info->reg_base);
+	val = max8907c_reg_read(info->i2c, info->reg_base);
 	return val * 100;
 }
 
 static int max8907c_regulator_ldo_enable(struct regulator_dev *rdev)
 {
 	const struct max8907c_regulator_info *info = rdev_get_drvdata(rdev);
-	struct device *parent = rdev_get_dev(rdev)->parent->parent;
 
-	return max8907c_set_bits(parent, info->reg_base + MAX8907C_CTL,
+	return max8907c_set_bits(info->i2c, info->reg_base + MAX8907C_CTL,
 				 MAX8907C_MASK_LDO_EN | MAX8907C_MASK_LDO_SEQ,
 				 MAX8907C_MASK_LDO_EN | MAX8907C_MASK_LDO_SEQ);
 }
@@ -299,9 +293,8 @@ static int max8907c_regulator_ldo_enable(struct regulator_dev *rdev)
 static int max8907c_regulator_out5v_enable(struct regulator_dev *rdev)
 {
 	const struct max8907c_regulator_info *info = rdev_get_drvdata(rdev);
-	struct device *parent = rdev_get_dev(rdev)->parent->parent;
 
-	return max8907c_set_bits(parent, info->reg_base,
+	return max8907c_set_bits(info->i2c, info->reg_base,
 				 MAX8907C_MASK_OUT5V_VINEN |
 				 MAX8907C_MASK_OUT5V_ENSRC |
 				 MAX8907C_MASK_OUT5V_EN,
@@ -312,9 +305,8 @@ static int max8907c_regulator_out5v_enable(struct regulator_dev *rdev)
 static int max8907c_regulator_ldo_disable(struct regulator_dev *rdev)
 {
 	const struct max8907c_regulator_info *info = rdev_get_drvdata(rdev);
-	struct device *parent = rdev_get_dev(rdev)->parent->parent;
 
-	return max8907c_set_bits(parent, info->reg_base + MAX8907C_CTL,
+	return max8907c_set_bits(info->i2c, info->reg_base + MAX8907C_CTL,
 				 MAX8907C_MASK_LDO_EN | MAX8907C_MASK_LDO_SEQ,
 				 MAX8907C_MASK_LDO_SEQ);
 }
@@ -322,9 +314,8 @@ static int max8907c_regulator_ldo_disable(struct regulator_dev *rdev)
 static int max8907c_regulator_out5v_disable(struct regulator_dev *rdev)
 {
 	const struct max8907c_regulator_info *info = rdev_get_drvdata(rdev);
-	struct device *parent = rdev_get_dev(rdev)->parent->parent;
 
-	return max8907c_set_bits(parent, info->reg_base,
+	return max8907c_set_bits(info->i2c, info->reg_base,
 				 MAX8907C_MASK_OUT5V_VINEN |
 				 MAX8907C_MASK_OUT5V_ENSRC |
 				 MAX8907C_MASK_OUT5V_EN,
@@ -334,10 +325,9 @@ static int max8907c_regulator_out5v_disable(struct regulator_dev *rdev)
 static int max8907c_regulator_ldo_is_enabled(struct regulator_dev *rdev)
 {
 	const struct max8907c_regulator_info *info = rdev_get_drvdata(rdev);
-	struct device *parent = rdev_get_dev(rdev)->parent->parent;
 	int val;
 
-	val = max8907c_reg_read(parent, info->reg_base + MAX8907C_CTL);
+	val = max8907c_reg_read(info->i2c, info->reg_base + MAX8907C_CTL);
 	if (val < 0)
 		return -EDOM;
 
@@ -347,10 +337,9 @@ static int max8907c_regulator_ldo_is_enabled(struct regulator_dev *rdev)
 static int max8907c_regulator_out5v_is_enabled(struct regulator_dev *rdev)
 {
 	const struct max8907c_regulator_info *info = rdev_get_drvdata(rdev);
-	struct device *parent = rdev_get_dev(rdev)->parent->parent;
 	int val;
 
-	val = max8907c_reg_read(parent, info->reg_base);
+	val = max8907c_reg_read(info->i2c, info->reg_base);
 	if (val < 0)
 		return -EDOM;
 
@@ -365,12 +354,13 @@ static int max8907c_regulator_out5v_is_enabled(struct regulator_dev *rdev)
 
 static int max8907c_regulator_probe(struct platform_device *pdev)
 {
+	struct max8907c *max8907c = dev_get_drvdata(pdev->dev.parent);
 	struct max8907c_regulator_info *info;
 	struct regulator_dev *rdev;
 	u8 version;
 
 	/* Backwards compatibility with max8907b, SD1 uses different voltages */
-	version = max8907c_reg_read(pdev->dev.parent, MAX8907C_REG_II2RR);
+	version = max8907c_reg_read(max8907c->i2c_power, MAX8907C_REG_II2RR);
 	if ((version & MAX8907C_II2RR_VERSION_MASK) == MAX8907C_II2RR_VERSION_REV_B) {
 		max8907c_regulators[MAX8907C_SD1].min_uV = 637500;
 		max8907c_regulators[MAX8907C_SD1].max_uV = 1425000;
@@ -378,6 +368,7 @@ static int max8907c_regulator_probe(struct platform_device *pdev)
 	}
 
 	info = &max8907c_regulators[pdev->id];
+	info->i2c = max8907c->i2c_power;
 
 	rdev = regulator_register(&info->desc,
 				  &pdev->dev, pdev->dev.platform_data, info);
