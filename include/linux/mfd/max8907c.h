@@ -145,7 +145,7 @@
 #define MAX8907C_REG_RTC_STATUS             0x1A
 #define MAX8907C_REG_RTC_CNTL               0x1B
 #define MAX8907C_REG_RTC_IRQ                0x1C
-#define MAX8907C_REG_IRQ_IRQ_MASK           0x1D
+#define MAX8907C_REG_RTC_IRQ_MASK           0x1D
 #define MAX8907C_REG_MPL_CNTL               0x1E
 
 /* ADC and Touch Screen Controller register map */
@@ -162,22 +162,60 @@
 #define MAX8907C_MASK_OUT5V_ENSRC       0x0E
 #define MAX8907C_MASK_OUT5V_EN          0x01
 
+#define RTC_I2C_ADDR			0x68
+
+/* IRQ definitions */
+enum {
+	MAX8907C_IRQ_VCHG_DC_OVP,
+	MAX8907C_IRQ_VCHG_DC_F,
+	MAX8907C_IRQ_VCHG_DC_R,
+	MAX8907C_IRQ_VCHG_THM_OK_R,
+	MAX8907C_IRQ_VCHG_THM_OK_F,
+	MAX8907C_IRQ_VCHG_MBATTLOW_F,
+	MAX8907C_IRQ_VCHG_MBATTLOW_R,
+	MAX8907C_IRQ_VCHG_RST,
+	MAX8907C_IRQ_VCHG_DONE,
+	MAX8907C_IRQ_VCHG_TOPOFF,
+	MAX8907C_IRQ_VCHG_TMR_FAULT,
+	MAX8907C_IRQ_GPM_RSTIN,
+	MAX8907C_IRQ_GPM_MPL,
+	MAX8907C_IRQ_GPM_SW_3SEC,
+	MAX8907C_IRQ_GPM_EXTON_F,
+	MAX8907C_IRQ_GPM_EXTON_R,
+	MAX8907C_IRQ_GPM_SW_1SEC,
+	MAX8907C_IRQ_GPM_SW_F,
+	MAX8907C_IRQ_GPM_SW_R,
+	MAX8907C_IRQ_GPM_SYSCKEN_F,
+	MAX8907C_IRQ_GPM_SYSCKEN_R,
+	MAX8907C_IRQ_RTC_ALARM1,
+	MAX8907C_IRQ_RTC_ALARM0,
+	MAX8907C_NR_IRQS,
+};
+
 struct max8907c {
-	struct device *dev;
-
-	int (*read_dev) (void *io_data, u8 reg, u8 count, u8 * dst);
-	int (*write_dev) (void *io_data, u8 reg, u8 count, const u8 * src);
-
-	struct mutex io_lock;
+	struct device 		*dev;
+	struct mutex 		io_lock;
+	struct mutex		irq_lock;
+	struct i2c_client 	*i2c_power;
+	struct i2c_client 	*i2c_rtc;
+	int			irq_base;
+	int			core_irq;
 };
 
 struct max8907c_platform_data {
 	int num_subdevs;
 	struct platform_device **subdevs;
+	int irq_base;
 };
 
-int max8907c_reg_read(struct device *dev, u8 reg);
-int max8907c_reg_write(struct device *dev, u8 reg, u8 val);
-int max8907c_set_bits(struct device *dev, u8 reg, u8 mask, u8 val);
+int max8907c_reg_read(struct i2c_client *i2c, u8 reg);
+int max8907c_reg_bulk_read(struct i2c_client *i2c, u8 reg, u8 count, u8 *val);
+int max8907c_reg_write(struct i2c_client *i2c, u8 reg, u8 val);
+int max8907c_reg_bulk_write(struct i2c_client *i2c, u8 reg, u8 count, u8 *val);
+int max8907c_set_bits(struct i2c_client *i2c, u8 reg, u8 mask, u8 val);
 
+int max8907c_irq_init(struct max8907c *chip, int irq, int irq_base);
+void max8907c_irq_free(struct max8907c *chip);
+int max8907c_suspend(struct i2c_client *i2c, pm_message_t state);
+int max8907c_resume(struct i2c_client *i2c);
 #endif

@@ -17,77 +17,11 @@
 
 static struct mfd_cell cells[] = {
 	{.name = "max8907-regulator",},
+	{.name = "max8907c-rtc",},
 };
 
-int max8907c_reg_read(struct device *dev, u8 reg)
+static int max8907c_i2c_read(struct i2c_client *i2c, u8 reg, u8 count, u8 *dest)
 {
-	struct i2c_client *i2c = to_i2c_client(dev);
-	struct max8907c *max8907c = dev_get_drvdata(dev);
-	u8 val;
-	int ret;
-
-	mutex_lock(&max8907c->io_lock);
-
-	ret = max8907c->read_dev(i2c, reg, 1, &val);
-
-	mutex_unlock(&max8907c->io_lock);
-	pr_debug("max8907c: reg read  reg=%x, val=%x\n",
-		 (unsigned int)reg, (unsigned int)val);
-
-	if (ret != 0)
-		pr_err("Failed to read max8907c I2C driver: %d\n", ret);
-	return val;
-}
-EXPORT_SYMBOL_GPL(max8907c_reg_read);
-
-int max8907c_reg_write(struct device *dev, u8 reg, u8 val)
-{
-	struct i2c_client *i2c = to_i2c_client(dev);
-	struct max8907c *max8907c = dev_get_drvdata(dev);
-	int ret;
-
-	pr_debug("max8907c: reg write  reg=%x, val=%x\n",
-		 (unsigned int)reg, (unsigned int)val);
-	mutex_lock(&max8907c->io_lock);
-
-	ret = max8907c->write_dev(i2c, reg, 1, &val);
-
-	mutex_unlock(&max8907c->io_lock);
-
-	if (ret != 0)
-		pr_err("Failed to write max8907c I2C driver: %d\n", ret);
-	return ret;
-}
-EXPORT_SYMBOL_GPL(max8907c_reg_write);
-
-int max8907c_set_bits(struct device *dev, u8 reg, u8 mask, u8 val)
-{
-	struct i2c_client *i2c = to_i2c_client(dev);
-	struct max8907c *max8907c = dev_get_drvdata(dev);
-	u8 tmp;
-	int ret;
-
-	pr_debug("max8907c: reg write  reg=%02X, val=%02X, mask=%02X\n",
-		 (unsigned int)reg, (unsigned int)val, (unsigned int)mask);
-	mutex_lock(&max8907c->io_lock);
-
-	ret = max8907c->read_dev(i2c, reg, 1, &tmp);
-	if (ret == 0) {
-		val = (tmp & ~mask) | (val & mask);
-		ret = max8907c->write_dev(i2c, reg, 1, &val);
-	}
-
-	mutex_unlock(&max8907c->io_lock);
-
-	if (ret != 0)
-		pr_err("Failed to write max8907c I2C driver: %d\n", ret);
-	return ret;
-}
-EXPORT_SYMBOL_GPL(max8907c_set_bits);
-
-static int max8907c_i2c_read(void *io_data, u8 reg, u8 count, u8 * dest)
-{
-	struct i2c_client *i2c = (struct i2c_client *)io_data;
 	struct i2c_msg xfer[2];
 	int ret = 0;
 
@@ -110,9 +44,8 @@ static int max8907c_i2c_read(void *io_data, u8 reg, u8 count, u8 * dest)
 	return 0;
 }
 
-static int max8907c_i2c_write(void *io_data, u8 reg, u8 count, const u8 * src)
+static int max8907c_i2c_write(struct i2c_client *i2c, u8 reg, u8 count, const u8 *src)
 {
-	struct i2c_client *i2c = (struct i2c_client *)io_data;
 	u8 msg[0x100 + 1];
 	int ret = 0;
 
@@ -127,6 +60,96 @@ static int max8907c_i2c_write(void *io_data, u8 reg, u8 count, const u8 * src)
 
 	return 0;
 }
+
+int max8907c_reg_read(struct i2c_client *i2c, u8 reg)
+{
+	int ret;
+	u8 val;
+
+	ret = max8907c_i2c_read(i2c, reg, 1, &val);
+
+	pr_debug("max8907c: reg read  reg=%x, val=%x\n",
+		 (unsigned int)reg, (unsigned int)val);
+
+	if (ret != 0)
+		pr_err("Failed to read max8907c I2C driver: %d\n", ret);
+	return val;
+}
+EXPORT_SYMBOL_GPL(max8907c_reg_read);
+
+int max8907c_reg_bulk_read(struct i2c_client *i2c, u8 reg, u8 count, u8 *val)
+{
+	int ret;
+
+	ret = max8907c_i2c_read(i2c, reg, count, val);
+
+	pr_debug("max8907c: reg read  reg=%x, val=%x\n",
+		 (unsigned int)reg, (unsigned int)*val);
+
+	if (ret != 0)
+		pr_err("Failed to read max8907c I2C driver: %d\n", ret);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(max8907c_reg_bulk_read);
+
+int max8907c_reg_write(struct i2c_client *i2c, u8 reg, u8 val)
+{
+	struct max8907c *max8907c = i2c_get_clientdata(i2c);
+	int ret;
+
+	pr_debug("max8907c: reg write  reg=%x, val=%x\n",
+		 (unsigned int)reg, (unsigned int)val);
+
+	mutex_lock(&max8907c->io_lock);
+	ret = max8907c_i2c_write(i2c, reg, 1, &val);
+	mutex_unlock(&max8907c->io_lock);
+
+	if (ret != 0)
+		pr_err("Failed to write max8907c I2C driver: %d\n", ret);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(max8907c_reg_write);
+
+int max8907c_reg_bulk_write(struct i2c_client *i2c, u8 reg, u8 count, u8 *val)
+{
+	struct max8907c *max8907c = i2c_get_clientdata(i2c);
+	int ret;
+
+	pr_debug("max8907c: reg write  reg=%x, val=%x\n",
+		 (unsigned int)reg, (unsigned int)*val);
+
+	mutex_lock(&max8907c->io_lock);
+	ret = max8907c_i2c_write(i2c, reg, count, val);
+	mutex_unlock(&max8907c->io_lock);
+
+	if (ret != 0)
+		pr_err("Failed to write max8907c I2C driver: %d\n", ret);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(max8907c_reg_bulk_write);
+
+int max8907c_set_bits(struct i2c_client *i2c, u8 reg, u8 mask, u8 val)
+{
+	struct max8907c *max8907c = i2c_get_clientdata(i2c);
+	u8 tmp;
+	int ret;
+
+	pr_debug("max8907c: reg write  reg=%02X, val=%02X, mask=%02X\n",
+		 (unsigned int)reg, (unsigned int)val, (unsigned int)mask);
+
+	mutex_lock(&max8907c->io_lock);
+	ret = max8907c_i2c_read(i2c, reg, 1, &tmp);
+	if (ret == 0) {
+		val = (tmp & ~mask) | (val & mask);
+		ret = max8907c_i2c_write(i2c, reg, 1, &val);
+	}
+	mutex_unlock(&max8907c->io_lock);
+
+	if (ret != 0)
+		pr_err("Failed to write max8907c I2C driver: %d\n", ret);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(max8907c_set_bits);
 
 static int max8907c_remove_subdev(struct device *dev, void *unused)
 {
@@ -177,10 +200,14 @@ static int max8907c_i2c_probe(struct i2c_client *i2c,
 	if (max8907c == NULL)
 		return -ENOMEM;
 
-	max8907c->read_dev = max8907c_i2c_read;
-	max8907c->write_dev = max8907c_i2c_write;
 	max8907c->dev = &i2c->dev;
+	dev_set_drvdata(max8907c->dev, max8907c);
+
+	max8907c->i2c_power = i2c;
 	i2c_set_clientdata(i2c, max8907c);
+
+	max8907c->i2c_rtc = i2c_new_dummy(i2c->adapter, RTC_I2C_ADDR);
+	i2c_set_clientdata(max8907c->i2c_rtc, max8907c);
 
 	mutex_init(&max8907c->io_lock);
 
@@ -189,10 +216,13 @@ static int max8907c_i2c_probe(struct i2c_client *i2c,
 	ret = mfd_add_devices(max8907c->dev, -1, cells, ARRAY_SIZE(cells),
 			      NULL, 0);
 	if (ret != 0) {
+	  	i2c_unregister_device(max8907c->i2c_rtc);
 		kfree(max8907c);
 		pr_debug("max8907c: failed to add MFD devices   %X\n", ret);
 		return ret;
 	}
+
+	max8907c_irq_init(max8907c, i2c->irq, pdata->irq_base);
 
 	ret = max8097c_add_subdevs(max8907c, pdata);
 
@@ -203,7 +233,10 @@ static int max8907c_i2c_remove(struct i2c_client *i2c)
 {
 	struct max8907c *max8907c = i2c_get_clientdata(i2c);
 
+	max8907c_remove_subdevs(max8907c);
+	i2c_unregister_device(max8907c->i2c_rtc);
 	mfd_remove_devices(max8907c->dev);
+	max8907c_irq_free(max8907c);
 	kfree(max8907c);
 
 	return 0;
@@ -223,6 +256,8 @@ static struct i2c_driver max8907c_i2c_driver = {
 		   },
 	.probe = max8907c_i2c_probe,
 	.remove = max8907c_i2c_remove,
+	.suspend = max8907c_suspend,
+	.resume = max8907c_resume,
 	.id_table = max8907c_i2c_id,
 };
 
