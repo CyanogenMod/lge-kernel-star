@@ -220,12 +220,13 @@ static void ventana_i2c_init(void)
 	}
 
 static struct gpio_keys_button ventana_keys[] = {
-	[0] = GPIO_KEY(KEY_MENU, PQ3, 0),
+	[0] = GPIO_KEY(KEY_FIND, PQ3, 0),
 	[1] = GPIO_KEY(KEY_HOME, PQ1, 0),
 	[2] = GPIO_KEY(KEY_BACK, PQ2, 0),
 	[3] = GPIO_KEY(KEY_VOLUMEUP, PQ5, 0),
 	[4] = GPIO_KEY(KEY_VOLUMEDOWN, PQ4, 0),
 	[5] = GPIO_KEY(KEY_POWER, PV2, 1),
+	[6] = GPIO_KEY(KEY_MENU, PC7, 0),
 };
 
 static struct gpio_keys_platform_data ventana_keys_platform_data = {

@@ -186,10 +186,10 @@ static struct tegra_suspend_platform_data ventana_suspend_data = {
 	.separate_req	= true,
 	.corereq_high	= false,
 	.sysclkreq_high	= true,
-	.wake_enb	= TEGRA_WAKE_GPIO_PV2 | TEGRA_WAKE_GPIO_PC7,
+	.wake_enb	= TEGRA_WAKE_GPIO_PV2,
 	.wake_high	= 0,
 	.wake_low	= TEGRA_WAKE_GPIO_PV2,
-	.wake_any	= TEGRA_WAKE_GPIO_PC7,
+	.wake_any	= 0,
 };
 
 int __init ventana_regulator_init(void)
