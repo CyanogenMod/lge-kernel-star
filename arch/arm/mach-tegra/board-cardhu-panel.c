@@ -131,17 +131,18 @@ static struct resource cardhu_disp1_resources[] = {
 
 static struct tegra_dc_mode cardhu_panel_modes[] = {
 	{
-		.pclk = 18000000,
-		.h_ref_to_sync = 8,
+		/* 1366x768@62.3Hz */
+		.pclk = 72000000,
+		.h_ref_to_sync = 4,
 		.v_ref_to_sync = 2,
-		.h_sync_width = 4,
-		.v_sync_width = 1,
+		.h_sync_width = 32,
+		.v_sync_width = 5,
 		.h_back_porch = 20,
-		.v_back_porch = 7,
-		.h_active = 480,
-		.v_active = 640,
-		.h_front_porch = 8,
-		.v_front_porch = 8,
+		.v_back_porch = 12,
+		.h_active = 1366,
+		.v_active = 768,
+		.h_front_porch = 48,
+		.v_front_porch = 3,
 	},
 };
 
