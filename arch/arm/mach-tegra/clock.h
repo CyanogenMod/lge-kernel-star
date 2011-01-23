@@ -25,6 +25,7 @@
 #else
 /* !!!FIXME!!! PLL lock bits should work on Tegra3 */
 #define USE_PLL_LOCK_BITS 0	/* Use lock bits for PLL stabiliation */
+#define USE_PLLE_SS 1		/* Use spread spectrum coefficients for PLLE */
 #endif
 
 #define DIV_BUS			(1 << 0)
