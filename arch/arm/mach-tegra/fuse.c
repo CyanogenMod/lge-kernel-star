@@ -77,10 +77,7 @@ void tegra_init_fuse(void)
 	u32 reg = readl(IO_TO_VIRT(TEGRA_CLK_RESET_BASE + 0x48));
 	reg |= 1 << 28;
 	writel(reg, IO_TO_VIRT(TEGRA_CLK_RESET_BASE + 0x48));
-// !!! FIXME !!! add tegra3 stub
-#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 	tegra_init_speedo_data();
-#endif
 
 	pr_info("Tegra Revision: %s SKU: %d CPU Process: %d Core Process: %d\n",
 		tegra_revision_name[tegra_get_revision()],
