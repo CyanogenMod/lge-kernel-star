@@ -835,6 +835,13 @@ static int rate_get(void *data, u64 *val)
 	return 0;
 }
 
+static int state_get(void *data, u64 *val)
+{
+	struct clk *c = (struct clk *)data;
+	*val = (u64)((c->state == ON) ? 1 : 0);
+	return 0;
+}
+
 #ifdef CONFIG_TEGRA_CLOCK_DEBUG_WRITE
 
 static const mode_t parent_rate_mode =  S_IRUGO | S_IWUGO;
@@ -882,6 +889,19 @@ static int rate_set(void *data, u64 val)
 }
 DEFINE_SIMPLE_ATTRIBUTE(rate_fops, rate_get, rate_set, "%llu\n");
 
+static int state_set(void *data, u64 val)
+{
+	struct clk *c = (struct clk *)data;
+
+	if (val)
+		return clk_enable(c);
+	else {
+		clk_disable(c);
+		return 0;
+	}
+}
+DEFINE_SIMPLE_ATTRIBUTE(state_fops, state_get, state_set, "%llu\n");
+
 #else
 
 static const mode_t parent_rate_mode =  S_IRUGO;
@@ -894,6 +914,7 @@ static const struct file_operations parent_fops = {
 };
 
 DEFINE_SIMPLE_ATTRIBUTE(rate_fops, rate_get, NULL, "%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(state_fops, state_get, NULL, "%llu\n");
 #endif
 
 static int clk_debugfs_register_one(struct clk *c)
@@ -924,6 +945,11 @@ static int clk_debugfs_register_one(struct clk *c)
 
 	d = debugfs_create_file(
 		"rate", parent_rate_mode, c->dent, c, &rate_fops);
+	if (!d)
+		goto err_out;
+
+	d = debugfs_create_file(
+		"state", parent_rate_mode, c->dent, c, &state_fops);
 	if (!d)
 		goto err_out;
 
