@@ -869,7 +869,9 @@ static ssize_t parent_write(struct file *file,
 	if (!p)
 		return -EINVAL;
 
-	clk_set_parent(c, p);
+	if (clk_set_parent(c, p))
+		return -EINVAL;
+
 	return count;
 }
 
@@ -884,8 +886,7 @@ static const struct file_operations parent_fops = {
 static int rate_set(void *data, u64 val)
 {
 	struct clk *c = (struct clk *)data;
-	clk_set_rate(c, (unsigned long)val);
-	return 0;
+	return clk_set_rate(c, (unsigned long)val);
 }
 DEFINE_SIMPLE_ATTRIBUTE(rate_fops, rate_get, rate_set, "%llu\n");
 
