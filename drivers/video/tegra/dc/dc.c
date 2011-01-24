@@ -567,6 +567,17 @@ int tegra_dc_update_windows(struct tegra_dc_win *windows[], int n)
 					DC_WIN_LINE_STRIDE);
 		}
 
+		if (win->flags & TEGRA_WIN_FLAG_TILED)
+			tegra_dc_writel(dc,
+					DC_WIN_BUFFER_ADDR_MODE_TILE |
+					DC_WIN_BUFFER_ADDR_MODE_TILE_UV,
+					DC_WIN_BUFFER_ADDR_MODE);
+		else
+			tegra_dc_writel(dc,
+					DC_WIN_BUFFER_ADDR_MODE_LINEAR |
+					DC_WIN_BUFFER_ADDR_MODE_LINEAR_UV,
+					DC_WIN_BUFFER_ADDR_MODE);
+
 		tegra_dc_writel(dc, win->x * tegra_dc_fmt_bpp(win->fmt) / 8,
 				DC_WINBUF_ADDR_H_OFFSET);
 		tegra_dc_writel(dc, win->y, DC_WINBUF_ADDR_V_OFFSET);
