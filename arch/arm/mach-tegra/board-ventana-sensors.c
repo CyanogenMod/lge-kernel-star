@@ -158,6 +158,7 @@ static const struct i2c_board_info ventana_i2c3_board_info_pca9546[] = {
 static struct i2c_board_info ventana_i2c4_board_info[] = {
 	{
 		I2C_BOARD_INFO("nct1008", 0x4C),
+		.irq = TEGRA_GPIO_TO_IRQ(NCT1008_THERM2_GPIO),
 		.platform_data = &ventana_nct1008_pdata,
 	},
 	{
