@@ -24,6 +24,15 @@
 #include <mach/gpio.h>
 
 #define TPS6591X_GPIO_BASE	TEGRA_NR_GPIOS
+#define TPS6591X_GPIO_GP0	(TPS6591X_GPIO_BASE + 0)
+#define TPS6591X_GPIO_GP1	(TPS6591X_GPIO_BASE + 1)
+#define TPS6591X_GPIO_GP2	(TPS6591X_GPIO_BASE + 2)
+#define TPS6591X_GPIO_GP3	(TPS6591X_GPIO_BASE + 3)
+#define TPS6591X_GPIO_GP4	(TPS6591X_GPIO_BASE + 4)
+#define TPS6591X_GPIO_GP5	(TPS6591X_GPIO_BASE + 5)
+#define TPS6591X_GPIO_GP6	(TPS6591X_GPIO_BASE + 6)
+#define TPS6591X_GPIO_GP7	(TPS6591X_GPIO_BASE + 7)
+#define TPS6591X_GPIO_GP8	(TPS6591X_GPIO_BASE + 8)
 
 /* PCA954x I2C bus expander bus addresses */
 #define PCA954x_I2C_BUS_BASE	6
@@ -42,5 +51,6 @@ int cardhu_sensors_init(void);
 int cardhu_kbc_init(void);
 int cardhu_scroll_init(void);
 int cardhu_keys_init(void);
+int cardhu_gpio_switch_regulator_init(void);
 
 #endif

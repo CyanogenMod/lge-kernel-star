@@ -365,6 +365,7 @@ static void __init tegra_cardhu_init(void)
 	cardhu_sdhci_init();
 	cardhu_i2c_init();
 	cardhu_regulator_init();
+	cardhu_gpio_switch_regulator_init();
 	cardhu_suspend_init();
 	cardhu_touch_init();
 #if ENABLE_USB_HOST
