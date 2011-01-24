@@ -305,5 +305,13 @@ config REGULATOR_TPS6591X
 	help
 	  This driver supports TPS6591X voltage regulator chips.
 
+config REGULATOR_GPIO_SWITCH
+	bool "GPIO based enable/disable of power rails."
+	default n
+	help
+	  This driver supports gpio based switch control of the power rails.
+	  Say Yes if the given platform have the rail enable through the
+	  gpios.
+
 endif
 
