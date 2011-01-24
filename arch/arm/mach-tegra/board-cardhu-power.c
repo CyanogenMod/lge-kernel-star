@@ -308,7 +308,7 @@ static struct regulator_consumer_supply gpio_switch_en_3v3_modem_supply[] = {
 };
 static int gpio_switch_en_3v3_modem_voltages[] = { 3300};
 
-/* EN_USB1_VBUS_OC from AP GPIO GMI_RST J06*/
+/* EN_USB1_VBUS_OC from AP GPIO GMI_RST I04*/
 static struct regulator_consumer_supply gpio_switch_en_usb1_vbus_oc_supply[] = {
 	REGULATOR_SUPPLY("vdd_vbus_micro_usb", NULL),
 };
@@ -332,7 +332,7 @@ static struct regulator_consumer_supply gpio_switch_en_vdd_pnl1_supply[] = {
 };
 static int gpio_switch_en_vdd_pnl1_voltages[] = { 3300};
 
-/* CAM3_LDO_EN from AP GPIO KB_ROW8 R00*/
+/* CAM3_LDO_EN from AP GPIO KB_ROW8 S00*/
 static struct regulator_consumer_supply gpio_switch_cam3_ldo_en_supply[] = {
 	REGULATOR_SUPPLY("vdd_cam3", NULL),
 };
@@ -415,12 +415,12 @@ GPIO_REGULATOR_PINIT(3, en_3v3_sys, NULL, TPS6591X_GPIO_GP7, false)
 
 GPIO_REGULATOR_PINIT(4, en_vdd_bl,       NULL,          TEGRA_GPIO_PK3, false)
 GPIO_REGULATOR_PINIT(5, en_3v3_modem,    NULL,          TEGRA_GPIO_PD6, false)
-GPIO_REGULATOR_PINIT(6, en_usb1_vbus_oc, "vdd_5v0_sys", TEGRA_GPIO_PJ6, false)
+GPIO_REGULATOR_PINIT(6, en_usb1_vbus_oc, "vdd_5v0_sys", TEGRA_GPIO_PI4, false)
 GPIO_REGULATOR_PINIT(7, en_usb3_vbus_oc, "vdd_5v0_sys", TEGRA_GPIO_PH7, false)
 GPIO_REGULATOR_PINIT(8, en_vddio_vid_oc, "vdd_5v0_sys", TEGRA_GPIO_PT0, false)
 
 GPIO_REGULATOR_PINIT(9, en_vdd_pnl1, "vdd_3v3_devices", TEGRA_GPIO_PL4, false)
-GPIO_REGULATOR_PINIT(10, cam3_ldo_en, "vdd_3v3_devices", TEGRA_GPIO_PR0, false)
+GPIO_REGULATOR_PINIT(10, cam3_ldo_en, "vdd_3v3_devices", TEGRA_GPIO_PS0, false)
 GPIO_REGULATOR_PINIT(11, en_vdd_com,  "vdd_3v3_devices", TEGRA_GPIO_PD0, false)
 GPIO_REGULATOR_PINIT(12, en_3v3_fuse, "vdd_3v3_devices", TEGRA_GPIO_PL6, false)
 GPIO_REGULATOR_PINIT(13, en_3v3_emmc, "vdd_3v3_devices", TEGRA_GPIO_PD1, false)
