@@ -17,6 +17,13 @@ config TEGRA_DC
 	help
 	  Tegra display controller support.
 
+config TEGRA_OVERLAY
+	tristate "Tegra Overlay Device Node"
+	depends on TEGRA_DC
+	default y
+	help
+	  Device node for multi-client overlay support.
+
 config FB_TEGRA
 	tristate "Tegra Framebuffer driver"
 	depends on TEGRA_DC && FB = y
