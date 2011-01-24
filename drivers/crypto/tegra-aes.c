@@ -229,14 +229,6 @@ static int aes_hw_init(struct tegra_aes_dev *dd)
 		return ret;
 	}
 
-	ret = clk_set_rate(dd->iclk, 240000000);
-	if (ret) {
-		dev_err(dd->dev, "%s: iclk set_rate fail(%d)\n", __func__, ret);
-		clk_disable(dd->iclk);
-		clk_disable(dd->pclk);
-		return ret;
-	}
-
 	aes_writel(dd, 0x33, INT_ENB);
 	return ret;
 }
@@ -998,6 +990,12 @@ static int tegra_aes_probe(struct platform_device *pdev)
 	if (!dd->iclk) {
 		dev_err(dev, "iclock intialization failed.\n");
 		err = -ENODEV;
+		goto out;
+	}
+
+	err = clk_set_rate(dd->iclk, ULONG_MAX);
+	if (err) {
+		dev_err(dd->dev, "iclk set_rate fail(%d)\n", err);
 		goto out;
 	}
 
