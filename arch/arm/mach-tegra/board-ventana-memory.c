@@ -25,6 +25,57 @@
 
 static const struct tegra_emc_table ventana_emc_tables_elpida_300Mhz[] = {
 	{
+		.rate = 25000,   /* SDRAM frquency */
+		.regs = {
+			0x00000002,   /* RC */
+			0x00000006,   /* RFC */
+			0x00000003,   /* RAS */
+			0x00000003,   /* RP */
+			0x00000006,   /* R2W */
+			0x00000004,   /* W2R */
+			0x00000002,   /* R2P */
+			0x00000009,   /* W2P */
+			0x00000003,   /* RD_RCD */
+			0x00000003,   /* WR_RCD */
+			0x00000002,   /* RRD */
+			0x00000002,   /* REXT */
+			0x00000002,   /* WDV */
+			0x00000004,   /* QUSE */
+			0x00000003,   /* QRST */
+			0x00000008,   /* QSAFE */
+			0x0000000b,   /* RDV */
+			0x0000004d,   /* REFRESH */
+			0x00000000,   /* BURST_REFRESH_NUM */
+			0x00000003,   /* PDEX2WR */
+			0x00000003,   /* PDEX2RD */
+			0x00000003,   /* PCHG2PDEN */
+			0x00000008,   /* ACT2PDEN */
+			0x00000001,   /* AR2PDEN */
+			0x0000000a,   /* RW2PDEN */
+			0x00000004,   /* TXSR */
+			0x00000003,   /* TCKE */
+			0x00000008,   /* TFAW */
+			0x00000004,   /* TRPAB */
+			0x00000006,   /* TCLKSTABLE */
+			0x00000002,   /* TCLKSTOP */
+			0x00000068,   /* TREFBW */
+			0x00000003,   /* QUSE_EXTRA */
+			0x00000003,   /* FBIO_CFG6 */
+			0x00000000,   /* ODT_WRITE */
+			0x00000000,   /* ODT_READ */
+			0x00000082,   /* FBIO_CFG5 */
+			0xa06a04ae,   /* CFG_DIG_DLL */
+			0x0001f000,   /* DLL_XFORM_DQS */
+			0x00000000,   /* DLL_XFORM_QUSE */
+			0x00000000,   /* ZCAL_REF_CNT */
+			0x00000003,   /* ZCAL_WAIT_CNT */
+			0x00000000,   /* AUTO_CAL_INTERVAL */
+			0x00000000,   /* CFG_CLKTRIM_0 */
+			0x00000000,   /* CFG_CLKTRIM_1 */
+			0x00000000,   /* CFG_CLKTRIM_2 */
+		}
+	},
+	{
 		.rate = 50000,   /* SDRAM frequency */
 		.regs = {
 			0x00000003,   /* RC */
