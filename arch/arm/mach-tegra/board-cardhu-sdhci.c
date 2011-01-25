@@ -124,10 +124,53 @@ static struct platform_device tegra_sdhci_device3 = {
 	},
 };
 
+static int cardhu_sd_cd_gpio_init(void)
+{
+	unsigned int rc = 0;
+
+	rc = gpio_request(TEGRA_GPIO_PI5, "card_detect");
+	if (rc)
+		return rc;
+
+	tegra_gpio_enable(TEGRA_GPIO_PI5);
+
+	rc = gpio_direction_input(TEGRA_GPIO_PI5);
+	if (rc)
+		return rc;
+
+	return 0;
+}
+
+static int cardhu_sd_wp_gpio_init(void)
+{
+	unsigned int rc = 0;
+
+	rc = gpio_request(TEGRA_GPIO_PT3, "write_protect");
+	if (rc)
+		return rc;
+
+	tegra_gpio_enable(TEGRA_GPIO_PT3);
+
+	rc = gpio_direction_input(TEGRA_GPIO_PT3);
+	if (rc)
+		return rc;
+
+	return 0;
+}
+
 int __init cardhu_sdhci_init(void)
 {
+	unsigned int rc = 0;
 	platform_device_register(&tegra_sdhci_device3);
 	platform_device_register(&tegra_sdhci_device2);
+	rc = cardhu_sd_cd_gpio_init();
+	if (!rc)
+		tegra_sdhci_platform_data0.cd_gpio = TEGRA_GPIO_PI5;
+
+	rc = cardhu_sd_wp_gpio_init();
+	if (!rc)
+		tegra_sdhci_platform_data0.cd_gpio = TEGRA_GPIO_PT3;
+
 	platform_device_register(&tegra_sdhci_device0);
 	return 0;
 }

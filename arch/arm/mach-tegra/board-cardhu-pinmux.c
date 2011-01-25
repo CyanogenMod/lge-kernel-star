@@ -201,7 +201,6 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux[] = {
 	DEFAULT_PINMUX(VI_D8,           SDMMC2,          NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(VI_D9,           SDMMC2,          NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(VI_D10,          RSVD1,           NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(VI_D11,          RSVD1,           NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(VI_PCLK,         SDMMC2,          NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(VI_MCLK,         VI,              NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(VI_VSYNC,        RSVD1,           NORMAL,    NORMAL,     INPUT),
@@ -228,8 +227,6 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux[] = {
 	DEFAULT_PINMUX(CLK3_OUT,        EXTPERIPH3,      NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(CLK3_REQ,        DEV3,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GMI_WP_N,        RSVD1,           NORMAL,    NORMAL,     INPUT),
-#if defined(CONFIG_MTD_NAND_TEGRA)
-	DEFAULT_PINMUX(GMI_IORDY,       NAND,            NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(GMI_WAIT,        NAND,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GMI_ADV_N,       NAND,            NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(GMI_CLK,         NAND,            NORMAL,    NORMAL,     OUTPUT),
@@ -325,6 +322,12 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux[] = {
 	DEFAULT_PINMUX(PEX_L2_RST_N,    PCIE,            NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(PEX_L2_CLKREQ_N, PCIE,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(HDMI_CEC,        CEC,             NORMAL,    NORMAL,     INPUT),
+
+	/* Gpios */
+	/* SDMMC1 WP gpio */
+	DEFAULT_PINMUX(VI_D11,          RSVD1,           NORMAL,    NORMAL,     INPUT),
+	/* SDMMC1 CD gpio */
+	DEFAULT_PINMUX(GMI_IORDY,       RSVD1,           NORMAL,    NORMAL,     INPUT),
 };
 
 void __init cardhu_pinmux_init(void)
