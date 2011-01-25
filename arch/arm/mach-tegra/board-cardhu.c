@@ -151,16 +151,16 @@ static __initdata struct tegra_clk_init_table cardhu_clk_init_table[] = {
 	{ "uartd",	"clk_m",	13000000,	true},
 	{ "uarte",	"clk_m",	13000000,	true},
 	{ "pll_m",	NULL,		0,		true},
-	{ "blink",      "clk_32k",      32768,          false},
 	{ "pll_p_out4",	"pll_p",	24000000,	true },
 	{ "pwm",	"clk_32k",	32768,		false},
-	{ "blink",	"clk_32k",	32768,		false},
+	{ "blink",	"clk_32k",	32768,		true},
 	{ "pll_a",	NULL,		56448000,	true},
 	{ "pll_a_out0",	NULL,		11289600,	true},
 	{ "i2s1",	"pll_a_out0",	11289600,	true},
 	{ "i2s2",	"pll_a_out0",	11289600,	true},
 	{ "audio",	"pll_a_out0",	11289600,	true},
 	{ "audio_2x",	"audio",	22579200,	true},
+	{ "sdmmc3",	"clk_m",	12000000,	true},
 	{ NULL,		NULL,		0,		0},
 };
 

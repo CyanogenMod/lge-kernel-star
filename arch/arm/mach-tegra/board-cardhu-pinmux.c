@@ -92,8 +92,8 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux[] = {
 	DEFAULT_PINMUX(SDMMC3_DAT3,     SDMMC3,          PULL_UP,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SDMMC3_DAT4,     SDMMC3,          PULL_UP,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SDMMC3_DAT5,     SDMMC3,          PULL_UP,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(SDMMC3_DAT6,     SDMMC3,          PULL_UP,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(SDMMC3_DAT7,     SDMMC3,          PULL_UP,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(SDMMC3_DAT6,     RSVD1,           NORMAL,     NORMAL,     INPUT),
+	DEFAULT_PINMUX(SDMMC3_DAT7,     RSVD1,           NORMAL,     NORMAL,     INPUT),
 
 	/* SDMMC4 pinmux */
 	DEFAULT_PINMUX(SDMMC4_CLK,      SDMMC4,          NORMAL,    NORMAL,     INPUT),
