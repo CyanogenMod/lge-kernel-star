@@ -126,6 +126,7 @@ struct tegra_dc_win {
 
 	void			*virt_addr;
 	dma_addr_t		phys_addr;
+	unsigned		offset;
 	unsigned		offset_u;
 	unsigned		offset_v;
 	unsigned		stride;
