@@ -78,6 +78,10 @@
  * The clock operations must lock internally to protect against
  * read-modify-write on registers that are shared by multiple clocks
  */
+
+/* FIXME: remove and never ignore overclock */
+#define IGNORE_PARENT_OVERCLOCK 0
+
 static DEFINE_MUTEX(clock_list_lock);
 static LIST_HEAD(clocks);
 
@@ -291,6 +295,16 @@ int clk_set_parent(struct clk *c, struct clk *parent)
 
 	new_rate = clk_predict_rate_from_parent(c, parent);
 	old_rate = clk_get_rate_locked(c);
+
+	if (new_rate > clk_get_max_rate(c)) {
+
+		pr_err("Failed to set parent %s for %s (violates clock limit"
+		       " %lu)\n", parent->name, c->name, clk_get_max_rate(c));
+#if !IGNORE_PARENT_OVERCLOCK
+		ret = -EINVAL;
+		goto out;
+#endif
+	}
 
 	if (clk_is_auto_dvfs(c) && c->refcnt > 0 &&
 			(!c->parent || new_rate > old_rate)) {
