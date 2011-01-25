@@ -440,6 +440,28 @@ out:
 }
 EXPORT_SYMBOL(clk_round_rate);
 
+static int tegra_clk_clip_rate_for_parent(struct clk *c, struct clk *p)
+{
+	unsigned long flags, max_rate, old_rate, new_rate;
+
+	clk_lock_save(c, flags);
+
+	max_rate = clk_get_max_rate(c);
+	new_rate = clk_predict_rate_from_parent(c, p);
+	old_rate = clk_get_rate_locked(c);
+
+	clk_unlock_restore(c, flags);
+
+	if (new_rate > max_rate) {
+		u64 rate = max_rate;
+		rate *= old_rate;
+		do_div(rate, new_rate);
+
+		return clk_set_rate(c, (unsigned long)rate);
+	}
+	return 0;
+}
+
 static int tegra_clk_init_one_from_table(struct tegra_clk_init_table *table)
 {
 	struct clk *c;
@@ -464,6 +486,14 @@ static int tegra_clk_init_one_from_table(struct tegra_clk_init_table *table)
 		}
 
 		if (c->parent != p) {
+			ret = tegra_clk_clip_rate_for_parent(c, p);
+			if (ret) {
+				pr_warning("Unable to clip rate for parent %s"
+					   " of clock %s: %d\n",
+					   table->parent, table->name, ret);
+				return -EINVAL;
+			}
+
 			ret = clk_set_parent(c, p);
 			if (ret) {
 				pr_warning("Unable to set parent %s of clock %s: %d\n",
