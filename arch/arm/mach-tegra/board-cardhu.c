@@ -63,7 +63,7 @@ static struct plat_serial8250_port debug_uart_platform_data[] = {
 		.type		= PORT_TEGRA,
 		.iotype		= UPIO_MEM,
 		.regshift	= 2,
-		.uartclk	= 13000000,
+		.uartclk	= 216000000,
 	}, {
 		.flags		= 0,
 	}
@@ -145,7 +145,7 @@ static inline void cardhu_bt_rfkill(void) { }
 
 static __initdata struct tegra_clk_init_table cardhu_clk_init_table[] = {
 	/* name		parent		rate		enabled */
-	{ "uarta",	"clk_m",	13000000,	true},
+	{ "uarta",	"pll_p",	216000000,	true},
 	{ "uartb",	"clk_m",	13000000,	true},
 	{ "uartc",	"clk_m",	13000000,	true},
 	{ "uartd",	"clk_m",	13000000,	true},
