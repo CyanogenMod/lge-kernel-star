@@ -108,7 +108,6 @@ static int ventana_panel_disable(void)
 
 static int ventana_hdmi_enable(void)
 {
-	gpio_set_value(ventana_hdmi_enb, 1);
 	if (!ventana_hdmi_reg) {
 		ventana_hdmi_reg = regulator_get(NULL, "avdd_hdmi"); /* LD07 */
 		if (IS_ERR_OR_NULL(ventana_hdmi_reg)) {
@@ -135,7 +134,6 @@ static int ventana_hdmi_enable(void)
 
 static int ventana_hdmi_disable(void)
 {
-	gpio_set_value(ventana_hdmi_enb, 0);
 	regulator_disable(ventana_hdmi_reg);
 	regulator_disable(ventana_hdmi_pll);
 	return 0;
