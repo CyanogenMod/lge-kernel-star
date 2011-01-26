@@ -34,6 +34,12 @@
 #include "clock.h"
 #include "dvfs.h"
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+#define DISABLE_BOOT_CLOCKS 1
+#else
+#define DISABLE_BOOT_CLOCKS 0	/* !!!FIXME!!! DISABLED FOR EMMC ON CARDHU */
+#endif
+
 /*
  * Locking:
  *
@@ -579,6 +585,7 @@ __setup("tegra_keep_boot_clocks", tegra_keep_boot_clocks_setup);
  */
 static int __init tegra_init_disable_boot_clocks(void)
 {
+#if DISABLE_BOOT_CLOCKS
 	unsigned long flags;
 	struct clk *c;
 
@@ -604,6 +611,7 @@ static int __init tegra_init_disable_boot_clocks(void)
 	}
 
 	mutex_unlock(&clock_list_lock);
+#endif
 	return 0;
 }
 late_initcall(tegra_init_disable_boot_clocks);

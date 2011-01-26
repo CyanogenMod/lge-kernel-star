@@ -97,7 +97,7 @@ static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 	{ "sdmmc1",	"pll_p",	48000000,	false},
 	{ "sdmmc2",	"pll_p",	48000000,	false},
 	{ "sdmmc3",	"pll_p",	48000000,	false},
-	{ "sdmmc4",	"pll_p",	48000000,	false},
+	{ "sdmmc4",	"clk_m",	12000000,	true},
 	{ NULL,		NULL,		0,		0},
 };
 
