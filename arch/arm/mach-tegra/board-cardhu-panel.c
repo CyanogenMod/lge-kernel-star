@@ -36,8 +36,8 @@
 #include "devices.h"
 #include "gpio-names.h"
 
-#define cardhu_lvds_shutdown	TEGRA_GPIO_PB2
-#define cardhu_bl_enb		TEGRA_GPIO_PW1
+#define cardhu_lvds_shutdown	TEGRA_GPIO_PL2
+#define cardhu_bl_enb		TEGRA_GPIO_PK3
 
 static int cardhu_backlight_init(struct device *dev) {
 	int ret;
@@ -68,7 +68,7 @@ static int cardhu_backlight_notify(struct device *unused, int brightness)
 }
 
 static struct platform_pwm_backlight_data cardhu_backlight_data = {
-	.pwm_id		= 2,
+	.pwm_id		= 0,
 	.max_brightness	= 255,
 	.dft_brightness	= 224,
 	.pwm_period_ns	= 5000000,
