@@ -30,6 +30,7 @@
 #define CAMERA_PWNDN2_STROBE_GPIO	TEGRA_GPIO_PBB5
 #define CAMERA_RESET1_GPIO			TEGRA_GPIO_PD2
 #define CAMERA_FLASH_GPIO			TEGRA_GPIO_PA0
+#define ISL29018_IRQ_GPIO			TEGRA_GPIO_PK2
 
 static int whistler_camera_init(void)
 {
@@ -90,10 +91,21 @@ static void whistler_adxl34x_init(void)
 	gpio_direction_input(ADXL34X_IRQ_GPIO);
 }
 
+static void whistler_isl29018_init(void)
+{
+	tegra_gpio_enable(ISL29018_IRQ_GPIO);
+	gpio_request(ISL29018_IRQ_GPIO, "isl29018");
+	gpio_direction_input(ISL29018_IRQ_GPIO);
+}
+
 static struct i2c_board_info whistler_i2c1_board_info[] = {
 	{
 		I2C_BOARD_INFO("adxl34x", 0x1D),
 		.irq = TEGRA_GPIO_TO_IRQ(ADXL34X_IRQ_GPIO),
+	},
+	{
+		I2C_BOARD_INFO("isl29018", 0x44),
+		.irq = TEGRA_GPIO_TO_IRQ(ISL29018_IRQ_GPIO),
 	},
 };
 
@@ -102,6 +114,8 @@ int __init whistler_sensors_init(void)
 	whistler_camera_init();
 
 	whistler_adxl34x_init();
+
+	whistler_isl29018_init();
 
 	i2c_register_board_info(0, whistler_i2c1_board_info,
 		ARRAY_SIZE(whistler_i2c1_board_info));
