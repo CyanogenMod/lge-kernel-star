@@ -25,6 +25,126 @@
 #define TEGRA_MAX_DC		2
 #define DC_N_WINDOWS		3
 
+
+/* DSI pixel data format */
+enum {
+	TEGRA_DSI_PIXEL_FORMAT_16BIT_P,
+	TEGRA_DSI_PIXEL_FORMAT_18BIT_P,
+	TEGRA_DSI_PIXEL_FORMAT_18BIT_NP,
+	TEGRA_DSI_PIXEL_FORMAT_24BIT_P,
+};
+
+/* DSI virtual channel number */
+enum {
+	TEGRA_DSI_VIRTUAL_CHANNEL_0,
+	TEGRA_DSI_VIRTUAL_CHANNEL_1,
+	TEGRA_DSI_VIRTUAL_CHANNEL_2,
+	TEGRA_DSI_VIRTUAL_CHANNEL_3,
+};
+
+/* DSI transmit method for video data */
+enum {
+	TEGRA_DSI_VIDEO_TYPE_VIDEO_MODE,
+	TEGRA_DSI_VIDEO_TYPE_COMMAND_MODE,
+};
+
+/* DSI HS clock mode */
+enum {
+	TEGRA_DSI_VIDEO_CLOCK_CONTINUOUS,
+	TEGRA_DSI_VIDEO_CLOCK_TX_ONLY,
+};
+
+/* DSI burst mode setting in video mode */
+enum {
+	TEGRA_DSI_VIDEO_NONE_BURST_MODE,
+	TEGRA_DSI_VIDEO_NONE_BURST_MODE_WITH_SYNC_END,
+	TEGRA_DSI_VIDEO_BURST_MODE_LOWEST_SPEED,
+	TEGRA_DSI_VIDEO_BURST_MODE_LOW_SPEED,
+	TEGRA_DSI_VIDEO_BURST_MODE_MEDIUM_SPEED,
+	TEGRA_DSI_VIDEO_BURST_MODE_FAST_SPEED,
+	TEGRA_DSI_VIDEO_BURST_MODE_FASTEST_SPEED,
+	TEGRA_DSI_VIDEO_BURST_MODE_MANUAL,
+};
+
+enum {
+	TEGRA_DSI_PACKET_CMD,
+	TEGRA_DSI_DELAY_MS,
+};
+
+struct tegra_dsi_cmd {
+	u8	cmd_type;
+	u8	data_id;
+	union {
+		u16 data_len;
+		u16 delay_ms;
+		struct{
+			u8 data0;
+			u8 data1;
+		}sp;
+	}sp_len_dly;
+	u8	*pdata;
+};
+
+#define DSI_CMD_SHORT(di, p0, p1)	{ \
+					.cmd_type = TEGRA_DSI_PACKET_CMD, \
+					.data_id = di, \
+					.sp_len_dly.sp.data0 = p0, \
+					.sp_len_dly.sp.data1 = p1, \
+					}
+#define DSI_DLY_MS(ms)	{ \
+			.cmd_type = TEGRA_DSI_DELAY_MS, \
+			.sp_len_dly.delay_ms = ms, \
+			}
+
+#define DSI_CMD_LONG(di, ptr)	{ \
+				.cmd_type = TEGRA_DSI_PACKET_CMD, \
+				.data_id = di, \
+				.sp_len_dly.data_len = ARRAY_SIZE(ptr), \
+				.pdata = ptr, \
+				}
+
+struct dsi_phy_timing_ns {
+	u16		t_hsdexit_ns;
+	u16		t_hstrail_ns;
+	u16		t_hsprepr_ns;
+	u16		t_datzero_ns;
+
+	u16		t_clktrail_ns;
+	u16		t_clkpost_ns;
+	u16		t_clkzero_ns;
+	u16		t_tlpx_ns;
+};
+
+struct tegra_dsi_out {
+	u8		n_data_lanes;			/* required*/
+	u8		pixel_format;			/* required*/
+	u8		refresh_rate;			/* required*/
+	u8		virtual_channel;		/* required*/
+
+	bool		panel_has_frame_buffer;	/* required*/
+
+	struct tegra_dsi_cmd*	dsi_init_cmd;		/* required*/
+	u16		n_init_cmd;			/* required*/
+
+	u8		video_data_type;		/* required*/
+	u8		video_clock_mode;
+	u8		video_burst_mode;
+
+	u16		panel_buffer_size_byte;
+	u16		panel_reset_timeout_msec;
+
+	bool		hs_cmd_mode_supported;
+	bool		hs_cmd_mode_on_blank_supported;
+	bool		enable_hs_clock_on_lp_cmd_mode;
+
+	u32 		max_panel_freq_khz;
+	u32 		lp_cmd_mode_freq_khz;
+	u32		hs_clk_in_lp_cmd_mode_freq_khz;
+	u32		burst_mode_freq_khz;
+
+	struct dsi_phy_timing_ns phy_timing;
+};
+
 struct tegra_dc_mode {
 	int	pclk;
 	int	h_ref_to_sync;
@@ -47,6 +167,7 @@ struct tegra_dc_mode {
 enum {
 	TEGRA_DC_OUT_RGB,
 	TEGRA_DC_OUT_HDMI,
+	TEGRA_DC_OUT_DSI,
 };
 
 struct tegra_dc_out_pin {
@@ -110,6 +231,8 @@ struct tegra_dc_out {
 
 	struct tegra_dc_mode	*modes;
 	int			n_modes;
+
+	struct tegra_dsi_out	*dsi;
 
 	struct tegra_dc_out_pin	*out_pins;
 	unsigned		n_out_pins;
