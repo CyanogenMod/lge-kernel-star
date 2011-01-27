@@ -119,7 +119,7 @@ struct platform_device ventana_kbc_device = {
 int __init ventana_kbc_init(void)
 {
 	struct tegra_kbc_platform_data *data = &ventana_kbc_platform_data;
-	int i, j;
+	int i;
 
 	pr_info("KBC: ventana_kbc_init\n");
 
