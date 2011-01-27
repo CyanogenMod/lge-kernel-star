@@ -660,6 +660,12 @@ static int tegra2_pll_clk_enable(struct clk *c)
 	val |= PLL_BASE_ENABLE;
 	clk_writel(val, c->reg + PLL_BASE);
 
+	if (c->flags & PLLD) {
+		val = clk_readl(c->reg + PLL_MISC(c) + PLL_BASE);
+		val |= PLLD_MISC_CLKENABLE;
+		clk_writel(val, c->reg + PLL_MISC(c) + PLL_BASE);
+	}
+
 	tegra2_pll_clk_wait_for_lock(c);
 
 	return 0;
@@ -673,6 +679,12 @@ static void tegra2_pll_clk_disable(struct clk *c)
 	val = clk_readl(c->reg);
 	val &= ~(PLL_BASE_BYPASS | PLL_BASE_ENABLE);
 	clk_writel(val, c->reg);
+
+	if (c->flags & PLLD) {
+		val = clk_readl(c->reg + PLL_MISC(c) + PLL_BASE);
+		val &= ~PLLD_MISC_CLKENABLE;
+		clk_writel(val, c->reg + PLL_MISC(c) + PLL_BASE);
+	}
 }
 
 static int tegra2_pll_clk_set_rate(struct clk *c, unsigned long rate)
@@ -1645,6 +1657,11 @@ static struct clk_pll_freq_table tegra_pll_d_freq_table[] = {
 	{ 19200000, 216000000, 135, 12, 1, 3},
 	{ 26000000, 216000000, 216, 26, 1, 4},
 
+	{ 12000000,   5000000, 10, 24, 1, 4},
+	{ 12000000,  10000000, 10, 12, 1, 4},
+	{ 12000000, 161500000, 323, 24, 1, 4},
+	{ 12000000, 162000000, 162, 12, 1, 4},
+
 	{ 12000000, 594000000, 594, 12, 1, 8},
 	{ 13000000, 594000000, 594, 13, 1, 8},
 	{ 19200000, 594000000, 495, 16, 1, 8},
@@ -2243,6 +2260,8 @@ struct clk_duplicate tegra_clk_duplicates[] = {
 	CLK_DUPLICATE("usbd", "tegra-otg", NULL),
 	CLK_DUPLICATE("hdmi", "tegradc.0", "hdmi"),
 	CLK_DUPLICATE("hdmi", "tegradc.1", "hdmi"),
+	CLK_DUPLICATE("dsi", "tegradc.0", "dsi"),
+	CLK_DUPLICATE("dsi", "tegradc.1", "dsi"),
 	CLK_DUPLICATE("pwm", "tegra_pwm.0", NULL),
 	CLK_DUPLICATE("pwm", "tegra_pwm.1", NULL),
 	CLK_DUPLICATE("pwm", "tegra_pwm.2", NULL),
