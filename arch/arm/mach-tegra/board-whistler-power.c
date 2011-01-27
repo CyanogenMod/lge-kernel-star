@@ -68,10 +68,6 @@ static struct regulator_consumer_supply max8907c_LDO4_supply[] = {
 };
 
 static struct regulator_consumer_supply max8907c_LDO5_supply[] = {
-	REGULATOR_SUPPLY("vmmc", "sdhci-tegra.0"),
-	REGULATOR_SUPPLY("vmmc", "sdhci-tegra.1"),
-	REGULATOR_SUPPLY("vmmc", "sdhci-tegra.2"),
-	REGULATOR_SUPPLY("vmmc", "sdhci-tegra.3"),
 };
 
 static struct regulator_consumer_supply max8907c_LDO6_supply[] = {
