@@ -300,6 +300,8 @@
 #define TEGRA_USB_USBMODE_REG_OFFSET	0x1f8
 #define   TEGRA_USB_USBMODE_HOST		(3 << 0)
 
+#define TEGRA_PMC_USB_AO		0xf0
+#define   TEGRA_PMC_USB_AO_VBUS_WAKEUP_PD_P0	(1 << 2)
 #endif
 
 static DEFINE_SPINLOCK(utmip_pad_lock);
@@ -1373,6 +1375,16 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 		if (err < 0)
 			goto err1;
 	}
+
+/* Power-up the VBUS detector for UTMIP PHY */
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+{
+	u32 val = 0;
+	val = readl((IO_ADDRESS(TEGRA_PMC_BASE) + TEGRA_PMC_USB_AO));
+	val &= ~(TEGRA_PMC_USB_AO_VBUS_WAKEUP_PD_P0);
+	writel(val, (IO_ADDRESS(TEGRA_PMC_BASE) + TEGRA_PMC_USB_AO));
+}
+#endif
 	phy->reg_vdd = regulator_get(NULL, "avdd_usb");
 	if (WARN_ON(IS_ERR_OR_NULL(phy->reg_vdd))) {
 		pr_err("couldn't get regulator avdd_usb: %ld \n",
