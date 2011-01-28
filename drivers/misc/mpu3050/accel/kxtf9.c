@@ -16,11 +16,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
   $
  */
-/*******************************************************************************
- *
- * $Id: kxtf9.c 3867 2010-10-09 01:06:18Z prao $
- *
- *******************************************************************************/
 
 /**
  *  @defgroup   ACCELDL (Motion Library - Accelerometer Driver Layer)
@@ -30,7 +25,7 @@
  *  @{
  *      @file   kxtf9.c
  *      @brief  Accelerometer setup and handling methods.
-**/
+*/
 
 /* ------------------ */
 /* - Include Files. - */
@@ -40,7 +35,7 @@
 #include <linux/module.h>
 #endif
 
-#include "mpu3050.h"
+#include "mpu.h"
 #include "mlsl.h"
 #include "mlos.h"
 
@@ -56,13 +51,14 @@
     Accelerometer Initialization Functions
 *****************************************/
 
-static int kxtf9_suspend(mlsl_handle_t mlsl_handle,
+static int kxtf9_suspend(void *mlsl_handle,
 			 struct ext_slave_descr *slave,
 			 struct ext_slave_platform_data *pdata)
 {
 	int result;
-	/* RAM reset */
-	result = MLSLSerialWriteSingle(mlsl_handle, pdata->address, 0x1d, 0xcd);
+	result =
+	    MLSLSerialWriteSingle(mlsl_handle, pdata->address, 0x1b, 0);
+	ERROR_CHECK(result);
 	return result;
 }
 
@@ -70,7 +66,7 @@ static int kxtf9_suspend(mlsl_handle_t mlsl_handle,
 #define ACCEL_KIONIX_CTRL_REG      (0x1b)
 #define ACCEL_KIONIX_CTRL_MASK     (0x18)
 
-static int kxtf9_resume(mlsl_handle_t mlsl_handle,
+static int kxtf9_resume(void *mlsl_handle,
 			struct ext_slave_descr *slave,
 			struct ext_slave_platform_data *pdata)
 {
@@ -78,38 +74,55 @@ static int kxtf9_resume(mlsl_handle_t mlsl_handle,
 	unsigned char reg;
 
 	/* RAM reset */
-	result = MLSLSerialWriteSingle(mlsl_handle, pdata->address, 0x1d, 0xcd);
+	result =
+	    MLSLSerialWriteSingle(mlsl_handle, pdata->address, 0x1d, 0xcd);
+	ERROR_CHECK(result);
 	MLOSSleep(10);
 	/* Wake up */
-	result = MLSLSerialWriteSingle(mlsl_handle, pdata->address, 0x1b, 0x42);
+	result =
+	    MLSLSerialWriteSingle(mlsl_handle, pdata->address, 0x1b, 0x42);
+	ERROR_CHECK(result);
 	/* INT_CTRL_REG1: */
-	result = MLSLSerialWriteSingle(mlsl_handle, pdata->address, 0x1e, 0x14);
+	result =
+	    MLSLSerialWriteSingle(mlsl_handle, pdata->address, 0x1e, 0x14);
+	ERROR_CHECK(result);
 	/* WUF_THRESH: */
-	result = MLSLSerialWriteSingle(mlsl_handle, pdata->address, 0x5a, 0x00);
+	result =
+	    MLSLSerialWriteSingle(mlsl_handle, pdata->address, 0x5a, 0x00);
+	ERROR_CHECK(result);
 	/* DATA_CTRL_REG */
-	result = MLSLSerialWriteSingle(mlsl_handle, pdata->address, 0x21, 0x04);
+	result =
+	    MLSLSerialWriteSingle(mlsl_handle, pdata->address, 0x21, 0x04);
+	ERROR_CHECK(result);
 	/* WUF_TIMER */
-	result = MLSLSerialWriteSingle(mlsl_handle, pdata->address, 0x29, 0x02);
+	result =
+	    MLSLSerialWriteSingle(mlsl_handle, pdata->address, 0x29, 0x02);
+	ERROR_CHECK(result);
 
 	/* Full Scale */
 	reg = 0xc2;
 	reg &= ~ACCEL_KIONIX_CTRL_MASK;
-	reg |= 0x00;		/* TODO FIXME michelle */
-	if (slave->range.mantissa == 2) {
-		reg |= 0x00;
-	} else if (slave->range.mantissa == 4) {
+	reg |= 0x00;
+	if (slave->range.mantissa == 4)
 		reg |= 0x08;
-	} else if (slave->range.mantissa == 8) {
+	else if (slave->range.mantissa == 8)
 		reg |= 0x10;
+	else {
+		slave->range.mantissa = 2;
+		reg |= 0x00;
 	}
-	/* Normal operation */
-	result = MLSLSerialWriteSingle(mlsl_handle, pdata->address, 0x1b, reg);
+	slave->range.fraction = 0;
+
+	/* Normal operation  */
+	result =
+	    MLSLSerialWriteSingle(mlsl_handle, pdata->address, 0x1b, reg);
+	ERROR_CHECK(result);
 	MLOSSleep(50);
 
 	return ML_SUCCESS;
 }
 
-static int kxtf9_read(mlsl_handle_t mlsl_handle,
+static int kxtf9_read(void *mlsl_handle,
 		      struct ext_slave_descr *slave,
 		      struct ext_slave_platform_data *pdata,
 		      unsigned char *data)
@@ -118,9 +131,12 @@ static int kxtf9_read(mlsl_handle_t mlsl_handle,
 }
 
 static struct ext_slave_descr kxtf9_descr = {
+	/*.init             = */ NULL,
+	/*.exit             = */ NULL,
 	/*.suspend          = */ kxtf9_suspend,
 	/*.resume           = */ kxtf9_resume,
 	/*.read             = */ kxtf9_read,
+	/*.config           = */ NULL,
 	/*.name             = */ "kxtf9",
 	/*.type             = */ EXT_SLAVE_TYPE_ACCELEROMETER,
 	/*.id               = */ ACCEL_ID_KXTF9,
@@ -134,10 +150,7 @@ struct ext_slave_descr *kxtf9_get_slave_descr(void)
 {
 	return &kxtf9_descr;
 }
-
-#ifdef __KERNEL__
 EXPORT_SYMBOL(kxtf9_get_slave_descr);
-#endif
 
 /**
  *  @}

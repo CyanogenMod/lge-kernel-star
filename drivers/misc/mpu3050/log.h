@@ -15,16 +15,16 @@
  */
 
 /*
-// C/C++ logging functions.  See the logging documentation for API details.
-//
-// We'd like these to be available from C code (in case we import some from
-// somewhere), so this has a C interface.
-//
-// The output will be correct when the log file is shared between multiple
-// threads and/or multiple processes so long as the operating system
-// supports O_APPEND.  These calls have mutex-protected data structures
-// and so are NOT reentrant.  Do not use MPL_LOG in a signal handler.
-*/
+ * C/C++ logging functions.  See the logging documentation for API details.
+ *
+ * We'd like these to be available from C code (in case we import some from
+ * somewhere), so this has a C interface.
+ *
+ * The output will be correct when the log file is shared between multiple
+ * threads and/or multiple processes so long as the operating system
+ * supports O_APPEND.  These calls have mutex-protected data structures
+ * and so are NOT reentrant.  Do not use MPL_LOG in a signal handler.
+ */
 #ifndef _LIBS_CUTILS_MPL_LOG_H
 #define _LIBS_CUTILS_MPL_LOG_H
 
@@ -49,7 +49,6 @@ extern "C" {
  * You can modify this (for example with "#define MPL_LOG_NDEBUG 0"
  * at the top of your source file) to change that behavior.
  */
-#define MPL_LOGV		/* comment this out to enable VERBOSE level logging */
 #ifndef MPL_LOG_NDEBUG
 #ifdef NDEBUG
 #define MPL_LOG_NDEBUG 1
@@ -81,6 +80,7 @@ extern "C" {
 #define MPL_LOG_SILENT (8)
 #endif
 
+
 /*
  * This is the local tag used for the following simplified
  * logging macros.  You can change this preprocessor definition
@@ -99,7 +99,6 @@ extern "C" {
 /*
  * Simplified macro to send a verbose log message using the current MPL_LOG_TAG.
  */
-#define MPL_LOGV
 #ifndef MPL_LOGV
 #if MPL_LOG_NDEBUG
 #define MPL_LOGV(...) ((void)0)
@@ -117,9 +116,9 @@ extern "C" {
 #define MPL_LOGV_IF(cond, ...)   ((void)0)
 #else
 #define MPL_LOGV_IF(cond, ...) \
-    ((CONDITION(cond)) \
-    ? ((void)MPL_LOG(LOG_VERBOSE, MPL_LOG_TAG, __VA_ARGS__)) \
-    : (void)0)
+	((CONDITION(cond))						\
+		? ((void)MPL_LOG(LOG_VERBOSE, MPL_LOG_TAG, __VA_ARGS__)) \
+		: (void)0)
 #endif
 #endif
 
@@ -132,9 +131,9 @@ extern "C" {
 
 #ifndef MPL_LOGD_IF
 #define MPL_LOGD_IF(cond, ...) \
-    ((CONDITION(cond)) \
-    ? ((void)MPL_LOG(LOG_DEBUG, MPL_LOG_TAG, __VA_ARGS__)) \
-    : (void)0)
+	((CONDITION(cond))					       \
+		? ((void)MPL_LOG(LOG_DEBUG, MPL_LOG_TAG, __VA_ARGS__)) \
+		: (void)0)
 #endif
 
 /*
@@ -146,9 +145,9 @@ extern "C" {
 
 #ifndef MPL_LOGI_IF
 #define MPL_LOGI_IF(cond, ...) \
-    ((CONDITION(cond)) \
-    ? ((void)MPL_LOG(LOG_INFO, MPL_LOG_TAG, __VA_ARGS__)) \
-    : (void)0)
+	((CONDITION(cond))                                              \
+		? ((void)MPL_LOG(LOG_INFO, MPL_LOG_TAG, __VA_ARGS__))   \
+		: (void)0)
 #endif
 
 /*
@@ -160,9 +159,9 @@ extern "C" {
 
 #ifndef MPL_LOGW_IF
 #define MPL_LOGW_IF(cond, ...) \
-    ((CONDITION(cond)) \
-    ? ((void)MPL_LOG(LOG_WARN, MPL_LOG_TAG, __VA_ARGS__)) \
-    : (void)0)
+	((CONDITION(cond))					       \
+		? ((void)MPL_LOG(LOG_WARN, MPL_LOG_TAG, __VA_ARGS__))  \
+		: (void)0)
 #endif
 
 /*
@@ -174,9 +173,9 @@ extern "C" {
 
 #ifndef MPL_LOGE_IF
 #define MPL_LOGE_IF(cond, ...) \
-    ((CONDITION(cond)) \
-    ? ((void)MPL_LOG(LOG_ERROR, MPL_LOG_TAG, __VA_ARGS__)) \
-    : (void)0)
+	((CONDITION(cond))					       \
+		? ((void)MPL_LOG(LOG_ERROR, MPL_LOG_TAG, __VA_ARGS__)) \
+		: (void)0)
 #endif
 
 /* --------------------------------------------------------------------- */
@@ -188,12 +187,12 @@ extern "C" {
  * is -inverted- from the normal assert() semantics.
  */
 #define MPL_LOG_ALWAYS_FATAL_IF(cond, ...) \
-    ((CONDITION(cond)) \
-    ? ((void)android_printAssert(#cond, MPL_LOG_TAG, __VA_ARGS__)) \
-    : (void)0)
+	((CONDITION(cond))					   \
+		? ((void)android_printAssert(#cond, MPL_LOG_TAG, __VA_ARGS__)) \
+		: (void)0)
 
 #define MPL_LOG_ALWAYS_FATAL(...) \
-    (((void)android_printAssert(NULL, MPL_LOG_TAG, __VA_ARGS__)))
+	(((void)android_printAssert(NULL, MPL_LOG_TAG, __VA_ARGS__)))
 
 /*
  * Versions of MPL_LOG_ALWAYS_FATAL_IF and MPL_LOG_ALWAYS_FATAL that
@@ -216,7 +215,6 @@ extern "C" {
  * Stripped out of release builds.  Uses the current MPL_LOG_TAG.
  */
 #define MPL_LOG_ASSERT(cond, ...) MPL_LOG_FATAL_IF(!(cond), __VA_ARGS__)
-/*#define MPL_LOG_ASSERT(cond) MPL_LOG_FATAL_IF(!(cond), "Assertion failed: " #cond) */
 
 /* --------------------------------------------------------------------- */
 
@@ -239,13 +237,13 @@ extern "C" {
 #ifndef MPL_LOG_PRI
 #ifdef ANDROID
 #define MPL_LOG_PRI(priority, tag, ...) \
-    LOG(priority, tag, __VA_ARGS__)
+	LOG(priority, tag, __VA_ARGS__)
 #elif defined __KERNEL__
 #define MPL_LOG_PRI(priority, tag, ...) \
-    printk(MPL_##priority tag __VA_ARGS__)
+	printk(MPL_##priority tag __VA_ARGS__)
 #else
 #define MPL_LOG_PRI(priority, tag, ...) \
-    _MLPrintLog(MPL_##priority, tag, __VA_ARGS__)
+	_MLPrintLog(MPL_##priority, tag, __VA_ARGS__)
 #endif
 #endif
 
@@ -274,7 +272,8 @@ extern "C" {
  */
 
 #ifndef ANDROID
-	int _MLPrintLog(int priority, const char *tag, const char *fmt, ...);
+	int _MLPrintLog(int priority, const char *tag, const char *fmt,
+			...);
 	int _MLPrintVaLog(int priority, const char *tag, const char *fmt,
 			  va_list args);
 /* Final implementation of actual writing to a character device */

@@ -16,15 +16,16 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
   $
  */
-/*******************************************************************************
+/******************************************************************************
  *
- * $Id: mltypes.h 3866 2010-10-09 00:51:32Z nroyer $
- *
- *******************************************************************************/
+ * $Id: mltypes.h 4436 2011-01-13 05:07:53Z mcaramello $
+ * 
+ *****************************************************************************/
 
 /**
  *  @defgroup MLERROR
- *  @brief  Definition of the error codes used within the MPL and returned
+ *  @brief  Motion Library - Error definitions.
+ *          Definition of the error codes used within the MPL and returned
  *          to the user.
  *          Every function tries to return a meaningful error code basing
  *          on the occuring error condition. The error code is numeric.
@@ -67,8 +68,15 @@
  *          - (70)      ML_ERROR_COMPASS_DATA_OVERFLOW
  *          - (71)      ML_ERROR_COMPASS_DATA_UNDERFLOW
  *          - (72)      ML_ERROR_COMPASS_DATA_NOT_READY
+ *          - (75)      ML_ERROR_CALIBRATION_LOAD
+ *          - (76)      ML_ERROR_CALIBRATION_STORE
+ *          - (77)      ML_ERROR_CALIBRATION_LEN
+ *          - (78)      ML_ERROR_CALIBRATION_CHECKSUM
  *
-**/
+ *  @{
+ *      @file mltypes.h
+ *  @}
+ */
 
 #ifndef MLTYPES_H
 #define MLTYPES_H
@@ -84,19 +92,6 @@
     ML Types
 ---------------------------*/
 
-typedef long long MLS64;
-typedef int MLS32;
-typedef unsigned int MLU32;
-typedef short MLS16;
-typedef unsigned short MLU16;
-typedef char MLS8;
-typedef unsigned char MLU8;
-typedef unsigned char MLBOOL;
-typedef double MLDBL;
-typedef float MLFLT;
-
-typedef unsigned char tReg;
-
 /**
  * @struct tMLError The MPL Error Code return type.
  *
@@ -106,7 +101,7 @@ typedef unsigned char tReg;
  */
 typedef unsigned char tMLError;
 
-#if defined(LINUX) || defined (__KERNEL__)
+#if defined(LINUX) || defined(__KERNEL__)
 typedef unsigned int HANDLE;
 #endif
 
@@ -144,18 +139,19 @@ typedef int_fast8_t bool;
 /* - ML Errors. - */
 #define ERROR_NAME(x)   (#x)
 #define ERROR_CHECK(x)                                                  \
-{                                                                       \
-	if (ML_SUCCESS != x) {                                                 \
-	   MPL_LOGE("%s|%s|%d returning %d\n",                             \
-	   __FILE__, __func__, __LINE__, x);                           \
-	return x;                                                       \
-    }                                                                   \
-}
+	{								\
+		if (ML_SUCCESS != x) {					\
+			MPL_LOGE("%s|%s|%d returning %d\n",		\
+				__FILE__, __func__, __LINE__, x);	\
+			return x;					\
+		}							\
+	}
 
-#define ERROR_CHECK_FIRST(first, x)       {if (ML_SUCCESS == first) first = x; }
+#define ERROR_CHECK_FIRST(first, x)                                     \
+	{ if (ML_SUCCESS == first) first = x; }
 
 #define ML_SUCCESS                       (0)
-/* Generic Error code.  Propritary Error Codes only */
+/* Generic Error code.  Proprietary Error Codes only */
 #define ML_ERROR                         (1)
 
 /* Compatibility and other generic error codes */
@@ -173,6 +169,7 @@ typedef int_fast8_t bool;
 #define ML_ERROR_FILE_OPEN              (14)
 #define ML_ERROR_FILE_READ              (15)
 #define ML_ERROR_FILE_WRITE             (16)
+#define ML_ERROR_INVALID_CONFIGURATION  (17)
 
 /* Serial Communication */
 #define ML_ERROR_SERIAL_CLOSED          (20)
@@ -197,7 +194,7 @@ typedef int_fast8_t bool;
 #define ML_ERROR_LOG_MEMORY_ERROR       (50)
 #define ML_ERROR_LOG_OUTPUT_ERROR       (51)
 
-/*OS interface errors */
+/* OS interface errors */
 #define ML_ERROR_OS_BAD_PTR             (60)
 #define ML_ERROR_OS_BAD_HANDLE          (61)
 #define ML_ERROR_OS_CREATE_FAILED       (62)
@@ -207,6 +204,17 @@ typedef int_fast8_t bool;
 #define ML_ERROR_COMPASS_DATA_OVERFLOW  (70)
 #define ML_ERROR_COMPASS_DATA_UNDERFLOW (71)
 #define ML_ERROR_COMPASS_DATA_NOT_READY (72)
+
+/* Load/Store calibration */
+#define ML_ERROR_CALIBRATION_LOAD       (75)
+#define ML_ERROR_CALIBRATION_STORE      (76)
+#define ML_ERROR_CALIBRATION_LEN        (77)
+#define ML_ERROR_CALIBRATION_CHECKSUM   (78)
+
+/* For Linux coding compliance */
+#ifndef __KERNEL__
+#define EXPORT_SYMBOL(x) 
+#endif
 
 /*---------------------------
     p-Types

@@ -16,9 +16,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
   $
  */
-/***************************************************************************** *
- * $Id: mpu-i2c.h 3863 2010-10-08 22:05:31Z nroyer $
- ******************************************************************************/
 /**
  * @defgroup
  * @brief
@@ -45,7 +42,8 @@ int sensor_i2c_write_register(struct i2c_adapter *i2c_adap,
 
 int sensor_i2c_read(struct i2c_adapter *i2c_adap,
 		    unsigned char address,
-		    unsigned char reg, unsigned int len, unsigned char *data);
+		    unsigned char reg,
+		    unsigned int len, unsigned char *data);
 
 int mpu_memory_read(struct i2c_adapter *i2c_adap,
 		    unsigned char mpu_addr,
@@ -57,4 +55,4 @@ int mpu_memory_write(struct i2c_adapter *i2c_adap,
 		     unsigned short mem_addr,
 		     unsigned int len, unsigned char const *data);
 
-#endif				/* __MPU_I2C_H__ */
+#endif	/* __MPU_I2C_H__ */
