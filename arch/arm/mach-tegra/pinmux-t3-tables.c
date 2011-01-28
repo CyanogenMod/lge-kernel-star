@@ -99,6 +99,9 @@ const struct tegra_drive_pingroup_desc tegra_soc_drive_pingroups[TEGRA_MAX_DRIVE
 		.pupd_reg = reg,				\
 		.pupd_bit = 2,					\
 		.io_default = TEGRA_PIN_ ## iod,		\
+		.od_bit = 6,					\
+		.lock_bit = 7,					\
+		.ioreset_bit = 8,				\
 	}
 
 /* !!!FIXME!!! FILL IN fSafe COLUMN IN TABLE ....... */

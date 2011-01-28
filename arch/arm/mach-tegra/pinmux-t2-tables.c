@@ -97,6 +97,9 @@ const struct tegra_drive_pingroup_desc tegra_soc_drive_pingroups[TEGRA_MAX_DRIVE
 		.pupd_reg = pupd_r,				\
 		.pupd_bit = pupd_b,				\
 		.io_default = 0,				\
+		.od_bit = -1,					\
+		.lock_bit = -1,					\
+		.ioreset_bit = -1,				\
 	}
 
 const struct tegra_pingroup_desc tegra_soc_pingroups[TEGRA_MAX_PINGROUP] = {
