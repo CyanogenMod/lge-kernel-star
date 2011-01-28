@@ -1778,6 +1778,16 @@ static struct clk_ops tegra_clk_double_ops = {
 };
 
 /* Audio sync clock ops */
+static int tegra3_sync_source_set_rate(struct clk *c, unsigned long rate)
+{
+	c->rate = rate;
+	return 0;
+}
+
+static struct clk_ops tegra_sync_source_ops = {
+	.set_rate		= &tegra3_sync_source_set_rate,
+};
+
 static void tegra3_audio_sync_clk_init(struct clk *c)
 {
 	int source;
@@ -2437,33 +2447,34 @@ static struct clk tegra_dev2_clk = {
 	},
 };
 
-/* initialized before peripheral clocks */
-static struct clk_mux_sel mux_audio_sync_clk[AUDIO_SYNC_SOURCE_MASK+1+1];
-static const struct audio_sources {
-	const char *name;
-	int value;
-} mux_audio_sync_clk_sources[] = {
-	{ .name = "spdif_in", .value = 0 },
-	{ .name = "i2s0", .value = 1 },
-	{ .name = "i2s1", .value = 2 },
-	{ .name = "i2s2", .value = 3 },
-	{ .name = "i2s3", .value = 4 },
-	{ .name = "i2s4", .value = 5 },
-	{ .name = "pll_a_out0", .value = 6 },
-#if 0 /* FIXME: not implemented */
-	{ .name = "ext_vimclk", .value = 7 },
-#endif
-#if 1 /* FIXME: for debugging on tegra2 - to be removed */
-	{ .name = "pll_a_out0", .value = 7 },
-	{ .name = "pll_a_out0", .value = 8 },
-	{ .name = "pll_a_out0", .value = 9 },
-	{ .name = "pll_a_out0", .value =10 },
-	{ .name = "pll_a_out0", .value =11 },
-	{ .name = "pll_a_out0", .value =12 },
-	{ .name = "pll_a_out0", .value =13 },
-	{ .name = "pll_a_out0", .value =14 },
-	{ .name = "pll_a_out0", .value =15 },
-#endif
+/* Audio sync clocks */
+#define SYNC_SOURCE(_id)				\
+	{						\
+		.name      = #_id "_sync",		\
+		.rate      = 24000000,			\
+		.max_rate  = 24000000,			\
+		.ops       = &tegra_sync_source_ops	\
+	}
+static struct clk tegra_sync_source_list[] = {
+	SYNC_SOURCE(spdif_in),
+	SYNC_SOURCE(i2s0),
+	SYNC_SOURCE(i2s1),
+	SYNC_SOURCE(i2s2),
+	SYNC_SOURCE(i2s3),
+	SYNC_SOURCE(i2s4),
+	SYNC_SOURCE(vimclk),
+};
+
+static struct clk_mux_sel mux_audio_sync_clk[] =
+{
+	{ .input = &tegra_sync_source_list[0],	.value = 0},
+	{ .input = &tegra_sync_source_list[1],	.value = 1},
+	{ .input = &tegra_sync_source_list[2],	.value = 2},
+	{ .input = &tegra_sync_source_list[3],	.value = 3},
+	{ .input = &tegra_sync_source_list[4],	.value = 4},
+	{ .input = &tegra_sync_source_list[5],	.value = 5},
+	{ .input = &tegra_pll_a_out0,		.value = 6},
+	{ .input = &tegra_sync_source_list[6],	.value = 7},
 	{ 0, 0 }
 };
 
@@ -2520,25 +2531,6 @@ MUX_I2S_SPDIF(audio2, 2);
 MUX_I2S_SPDIF(audio3, 3);
 MUX_I2S_SPDIF(audio4, 4);
 MUX_I2S_SPDIF(audio, 5);		/* SPDIF */
-
-/* This is called after peripheral clocks are initialized, as the
- * audio_sync clock depends on some of the peripheral clocks.
- */
-
-static void init_audio_sync_clock_mux(void)
-{
-	int i;
-	struct clk_mux_sel *sel = mux_audio_sync_clk;
-	const struct audio_sources *src = mux_audio_sync_clk_sources;
-
-	for (i = 0; src->name; i++, sel++, src++) {
-		sel->input = tegra_get_clock_by_name(src->name);
-		if (!sel->input)
-			pr_err("%s: could not find clk %s\n", __func__,
-				src->name);
-		sel->value = src->value;
-	}
-}
 
 static struct clk_mux_sel mux_cclk[] = {
 	{ .input = &tegra_clk_m,	.value = 0},
@@ -2994,7 +2986,8 @@ void __init tegra_soc_init_clocks(void)
 		clkdev_add(&tegra_clk_duplicates[i].lookup);
 	}
 
-	init_audio_sync_clock_mux();
+	for (i = 0; i < ARRAY_SIZE(tegra_sync_source_list); i++)
+		tegra3_init_one_clock(&tegra_sync_source_list[i]);
 	for (i = 0; i < ARRAY_SIZE(tegra_clk_audio_list); i++)
 		tegra3_init_one_clock(&tegra_clk_audio_list[i]);
 	for (i = 0; i < ARRAY_SIZE(tegra_clk_audio_2x_list); i++)
