@@ -94,9 +94,14 @@ static int board_panel_type;
 
 void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
 
+#define NEVER_RESET 1
+
 void tegra_assert_system_reset(char mode, const char *cmd)
 {
-#ifndef CONFIG_TEGRA_FPGA_PLATFORM
+#ifdef defined(CONFIG_TEGRA_FPGA_PLATFORM) || NEVER_RESET
+	printk("tegra_assert_system_reset() call attempted on FPGA target platform.....");
+	do { } while (1);
+#else
 	void __iomem *reset = IO_ADDRESS(TEGRA_PMC_BASE + 0x00);
 	u32 reg;
 
@@ -104,9 +109,6 @@ void tegra_assert_system_reset(char mode, const char *cmd)
 	reg = readl_relaxed(reset);
 	reg |= 0x10;
 	writel_relaxed(reg, reset);
-#else
-	printk("tegra_assert_system_reset() call attempted on FPGA target platform.....");
-	do { } while (1);
 #endif
 }
 
