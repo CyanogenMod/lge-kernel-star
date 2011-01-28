@@ -34,6 +34,8 @@
 
 #include "devices.h"
 #include "gpio-names.h"
+#include "board.h"
+
 #define ventana_pnl_pwr_enb	TEGRA_GPIO_PC6
 #define ventana_bl_enb		TEGRA_GPIO_PD4
 #define ventana_lvds_shutdown	TEGRA_GPIO_PB2
@@ -154,8 +156,6 @@ static struct resource ventana_disp1_resources[] = {
 	},
 	{
 		.name	= "fbmem",
-		.start	= 0x18012000,
-		.end	= 0x18414000 - 1, /* enough for 1080P 16bpp */
 		.flags	= IORESOURCE_MEM,
 	},
 };
@@ -176,8 +176,6 @@ static struct resource ventana_disp2_resources[] = {
 	{
 		.name	= "fbmem",
 		.flags	= IORESOURCE_MEM,
-		.start	= 0x18414000,
-		.end	= 0x18BFD000 - 1,
 	},
 	{
 		.name	= "hdmi_regs",
@@ -287,8 +285,6 @@ static struct nvmap_platform_carveout ventana_carveouts[] = {
 	[1] = {
 		.name		= "generic-0",
 		.usage_mask	= NVMAP_HEAP_CARVEOUT_GENERIC,
-		.base		= 0x18C00000,
-		.size		= SZ_128M - 0xC00000,
 		.buddy_size	= SZ_32K,
 	},
 };
@@ -316,6 +312,8 @@ static struct platform_device *ventana_gfx_devices[] __initdata = {
 int __init ventana_panel_init(void)
 {
 	int err;
+	struct resource *res;
+
 	gpio_request(ventana_pnl_pwr_enb, "pnl_pwr_enb");
 	gpio_direction_output(ventana_pnl_pwr_enb, 1);
 	tegra_gpio_enable(ventana_pnl_pwr_enb);
@@ -332,8 +330,22 @@ int __init ventana_panel_init(void)
 	gpio_request(ventana_hdmi_hpd, "hdmi_hpd");
 	gpio_direction_input(ventana_hdmi_hpd);
 
+	ventana_carveouts[1].base = tegra_carveout_start;
+	ventana_carveouts[1].size = tegra_carveout_size;
+
 	err = platform_add_devices(ventana_gfx_devices,
 				   ARRAY_SIZE(ventana_gfx_devices));
+
+
+	res = nvhost_get_resource_byname(&ventana_disp1_device,
+		IORESOURCE_MEM, "fbmem");
+	res->start = tegra_fb_start;
+	res->end = tegra_fb_start + tegra_fb_size - 1;
+
+	res = nvhost_get_resource_byname(&ventana_disp2_device,
+		IORESOURCE_MEM, "fbmem");
+	res->start = tegra_fb2_start;
+	res->end = tegra_fb2_start + tegra_fb2_size - 1;
 
 	if (!err)
 		err = nvhost_device_register(&ventana_disp1_device);
