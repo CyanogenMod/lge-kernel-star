@@ -392,7 +392,7 @@ static void __init tegra_cardhu_init(void)
 
 static void __init tegra_cardhu_reserve(void)
 {
-	tegra_reserve(SZ_128M, SZ_4M, 0);
+	tegra_reserve(SZ_128M, SZ_4M, SZ_8M);
 }
 
 MACHINE_START(CARDHU, "cardhu")
