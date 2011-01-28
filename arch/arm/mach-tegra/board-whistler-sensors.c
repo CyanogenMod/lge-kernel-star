@@ -21,54 +21,96 @@
 #include <linux/i2c.h>
 #include <mach/gpio.h>
 #include <media/ov5650.h>
-
+#include <linux/regulator/consumer.h>
+#include <linux/err.h>
 #include "gpio-names.h"
 
-#define ADXL34X_IRQ_GPIO			TEGRA_GPIO_PAA1
-#define CAMERA_RESET2_SHUTTER_GPIO	TEGRA_GPIO_PBB1
-#define CAMERA_PWNDN1_GPIO			TEGRA_GPIO_PBB4
-#define CAMERA_PWNDN2_STROBE_GPIO	TEGRA_GPIO_PBB5
-#define CAMERA_RESET1_GPIO			TEGRA_GPIO_PD2
-#define CAMERA_FLASH_GPIO			TEGRA_GPIO_PA0
-#define ISL29018_IRQ_GPIO			TEGRA_GPIO_PK2
+#define CAMERA1_PWDN_GPIO		TEGRA_GPIO_PT2
+#define CAMERA1_RESET_GPIO		TEGRA_GPIO_PD2
+#define CAMERA_AF_PD_GPIO		TEGRA_GPIO_PT3
+#define CAMERA_FLASH_EN1_GPIO	TEGRA_GPIO_PBB4
+#define CAMERA_FLASH_EN2_GPIO	TEGRA_GPIO_PA0
+
+#define ADXL34X_IRQ_GPIO		TEGRA_GPIO_PAA1
+#define ISL29018_IRQ_GPIO		TEGRA_GPIO_PK2
+
+static struct regulator *reg_avdd_cam1; /* LDO9 */
+static struct regulator *reg_vdd_af;    /* LDO13 */
 
 static int whistler_camera_init(void)
 {
-	tegra_gpio_enable(CAMERA_PWNDN1_GPIO);
-	gpio_request(CAMERA_PWNDN1_GPIO, "camera_powerdown");
-	gpio_direction_output(CAMERA_PWNDN1_GPIO, 0);
-	gpio_export(CAMERA_PWNDN1_GPIO, false);
+	tegra_gpio_enable(CAMERA1_PWDN_GPIO);
+	gpio_request(CAMERA1_PWDN_GPIO, "camera1_powerdown");
+	gpio_direction_output(CAMERA1_PWDN_GPIO, 0);
 
-	tegra_gpio_enable(CAMERA_RESET1_GPIO);
-	gpio_request(CAMERA_RESET1_GPIO, "camera_reset1");
-	gpio_direction_output(CAMERA_RESET1_GPIO, 1);
-	gpio_export(CAMERA_RESET1_GPIO, false);
+	tegra_gpio_enable(CAMERA1_RESET_GPIO);
+	gpio_request(CAMERA1_RESET_GPIO, "camera1_reset");
+	gpio_direction_output(CAMERA1_RESET_GPIO, 0);
 
-	tegra_gpio_enable(CAMERA_RESET2_SHUTTER_GPIO);
-	gpio_request(CAMERA_RESET2_SHUTTER_GPIO, "camera_reset2_shutter");
-	gpio_direction_output(CAMERA_RESET2_SHUTTER_GPIO, 1);
-	gpio_export(CAMERA_RESET2_SHUTTER_GPIO, false);
+	tegra_gpio_enable(CAMERA_AF_PD_GPIO);
+	gpio_request(CAMERA_AF_PD_GPIO, "camera_autofocus");
+	gpio_direction_output(CAMERA_AF_PD_GPIO, 0);
+	gpio_export(CAMERA_AF_PD_GPIO, false);
 
-	tegra_gpio_enable(CAMERA_PWNDN2_STROBE_GPIO);
-	gpio_request(CAMERA_PWNDN2_STROBE_GPIO, "camera_pwrdwn2_strobe");
-	gpio_direction_output(CAMERA_PWNDN2_STROBE_GPIO, 0);
-	gpio_export(CAMERA_PWNDN2_STROBE_GPIO, false);
+	tegra_gpio_enable(CAMERA_FLASH_EN1_GPIO);
+	gpio_request(CAMERA_FLASH_EN1_GPIO, "camera_flash_en1");
+	gpio_direction_output(CAMERA_FLASH_EN1_GPIO, 0);
+	gpio_export(CAMERA_FLASH_EN1_GPIO, false);
 
-	tegra_gpio_enable(CAMERA_FLASH_GPIO);
-	gpio_request(CAMERA_FLASH_GPIO, "camera_flash");
-	gpio_direction_output(CAMERA_FLASH_GPIO, 0);
-	gpio_export(CAMERA_FLASH_GPIO, false);
+	tegra_gpio_enable(CAMERA_FLASH_EN2_GPIO);
+	gpio_request(CAMERA_FLASH_EN2_GPIO, "camera_flash_en2");
+	gpio_direction_output(CAMERA_FLASH_EN2_GPIO, 0);
+	gpio_export(CAMERA_FLASH_EN2_GPIO, false);
 
 	return 0;
 }
 
 static int whistler_ov5650_power_on(void)
 {
+	gpio_set_value(CAMERA1_PWDN_GPIO, 1);
+	gpio_set_value(CAMERA1_RESET_GPIO, 1);
+	gpio_set_value(CAMERA_AF_PD_GPIO, 1);
+
+	if (!reg_avdd_cam1) {
+		reg_avdd_cam1 = regulator_get(NULL, "vdd_cam1");
+		if (IS_ERR_OR_NULL(reg_avdd_cam1)) {
+			pr_err("whistler_ov5650_power_on: vdd_cam1 failed\n");
+			reg_avdd_cam1 = NULL;
+			return PTR_ERR(reg_avdd_cam1);
+		}
+		regulator_enable(reg_avdd_cam1);
+	}
+
+	if (!reg_vdd_af) {
+		reg_vdd_af = regulator_get(NULL, "vdd_vcore_af");
+		if (IS_ERR_OR_NULL(reg_vdd_af)) {
+			pr_err("whistler_ov5650_power_on: vdd_vcore_af failed\n");
+			reg_vdd_af = NULL;
+			return PTR_ERR(reg_vdd_af);
+		}
+		regulator_enable(reg_vdd_af);
+	}
+
 	return 0;
 }
 
 static int whistler_ov5650_power_off(void)
 {
+	gpio_set_value(CAMERA1_PWDN_GPIO, 0);
+	gpio_set_value(CAMERA1_RESET_GPIO, 0);
+	gpio_set_value(CAMERA_AF_PD_GPIO, 0);
+
+	if (reg_avdd_cam1) {
+		regulator_disable(reg_avdd_cam1);
+		regulator_put(reg_avdd_cam1);
+		reg_avdd_cam1 = NULL;
+	}
+
+	if (reg_vdd_af) {
+		regulator_disable(reg_vdd_af);
+		regulator_put(reg_vdd_af);
+		reg_vdd_af = NULL;
+	}
 	return 0;
 }
 
