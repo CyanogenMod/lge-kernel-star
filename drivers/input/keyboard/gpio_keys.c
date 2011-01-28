@@ -594,7 +594,11 @@ static int gpio_keys_resume(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct gpio_keys_drvdata *ddata = platform_get_drvdata(pdev);
 	struct gpio_keys_platform_data *pdata = pdev->dev.platform_data;
+	int wakeup_key = KEY_RESERVED;
 	int i;
+
+	if (pdata->wakeup_key)
+		wakeup_key = pdata->wakeup_key();
 
 	for (i = 0; i < pdata->nbuttons; i++) {
 
@@ -602,6 +606,14 @@ static int gpio_keys_resume(struct device *dev)
 		if (button->wakeup && device_may_wakeup(&pdev->dev)) {
 			int irq = gpio_to_irq(button->gpio);
 			disable_irq_wake(irq);
+
+			if (wakeup_key == button->code) {
+				unsigned int type = button->type ?: EV_KEY;
+
+				input_event(ddata->input, type, button->code, 1);
+				input_event(ddata->input, type, button->code, 0);
+				input_sync(ddata->input);
+			}
 		}
 
 		gpio_keys_report_event(&ddata->data[i]);
