@@ -139,7 +139,6 @@ static inline int __tps6591x_write(struct i2c_client *client,
 				 int reg, uint8_t val)
 {
 	int ret;
-
 	ret = i2c_smbus_write_byte_data(client, reg, val);
 	if (ret < 0) {
 		dev_err(&client->dev, "failed writing 0x%02x to 0x%02x\n",
@@ -427,9 +426,9 @@ static int __devinit tps6591x_irq_init(struct tps6591x *tps6591x, int irq,
 
 	mutex_init(&tps6591x->irq_lock);
 	for (i = 0; i < 3; i++) {
-		tps6591x->mask_cache[i] = 0xff;
-		tps6591x->mask_reg[i] = 0xff;
-		tps6591x_write(tps6591x->dev, TPS6591X_INT_MSK + 2*i, 0xff);
+		tps6591x->mask_cache[i] = 0x00;
+		tps6591x->mask_reg[i] = 0x00;
+		tps6591x_write(tps6591x->dev, TPS6591X_INT_MSK + 2*i, 0x00);
 	}
 
 	for (i = 0; i < 3; i++)
