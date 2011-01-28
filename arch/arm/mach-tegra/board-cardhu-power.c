@@ -377,7 +377,7 @@ static struct regulator_consumer_supply gpio_switch_en_1v8_cam_supply[] = {
 static int gpio_switch_en_1v8_cam_voltages[] = { 1800};
 
 /* Macro for defining gpio switch regulator platform data and device */
-#define GPIO_REGULATOR_PINIT(_id, _name, _input_supply, _gpio_nr, _active_low) \
+#define GPIO_REGULATOR_PINIT(_id, _name, _input_supply, _gpio_nr, _active_low, _init_state) \
 	static struct gpio_switch_regulator_platform_data		\
 				gpio_switch_regulator_##_name##_pdata = { \
 		.regulator_name	= "gpio-switch-"#_name,			\
@@ -385,6 +385,7 @@ static int gpio_switch_en_1v8_cam_voltages[] = { 1800};
 		.id		= _id,					\
 		.gpio_nr	= _gpio_nr,				\
 		.active_low	= _active_low,				\
+		.init_state	= _init_state,				\
 		.voltages	= gpio_switch_##_name##_voltages,	\
 		.n_voltages	= ARRAY_SIZE(gpio_switch_##_name##_voltages), \
 		.num_consumer_supplies =				\
@@ -408,27 +409,27 @@ static int gpio_switch_en_1v8_cam_voltages[] = { 1800};
 	};
 
 /* Gpio switch regulator platform data */
-GPIO_REGULATOR_PINIT(0, en_5v_cp,   NULL, TPS6591X_GPIO_GP0, false)
-GPIO_REGULATOR_PINIT(1, en_5v0,     NULL, TPS6591X_GPIO_GP2, false)
-GPIO_REGULATOR_PINIT(2, en_ddr,     NULL, TPS6591X_GPIO_GP6, false)
-GPIO_REGULATOR_PINIT(3, en_3v3_sys, NULL, TPS6591X_GPIO_GP7, false)
+GPIO_REGULATOR_PINIT(0, en_5v_cp,   NULL, TPS6591X_GPIO_GP0, false, 0)
+GPIO_REGULATOR_PINIT(1, en_5v0,     NULL, TPS6591X_GPIO_GP2, false, 0)
+GPIO_REGULATOR_PINIT(2, en_ddr,     NULL, TPS6591X_GPIO_GP6, false, 0)
+GPIO_REGULATOR_PINIT(3, en_3v3_sys, NULL, TPS6591X_GPIO_GP7, false, 0)
 
-GPIO_REGULATOR_PINIT(4, en_vdd_bl,       NULL,          TEGRA_GPIO_PK3, false)
-GPIO_REGULATOR_PINIT(5, en_3v3_modem,    NULL,          TEGRA_GPIO_PD6, false)
-GPIO_REGULATOR_PINIT(6, en_usb1_vbus_oc, "vdd_5v0_sys", TEGRA_GPIO_PI4, false)
-GPIO_REGULATOR_PINIT(7, en_usb3_vbus_oc, "vdd_5v0_sys", TEGRA_GPIO_PH7, false)
-GPIO_REGULATOR_PINIT(8, en_vddio_vid_oc, "vdd_5v0_sys", TEGRA_GPIO_PT0, false)
+GPIO_REGULATOR_PINIT(4, en_vdd_bl,       NULL,          TEGRA_GPIO_PK3, false, 1)
+GPIO_REGULATOR_PINIT(5, en_3v3_modem,    NULL,          TEGRA_GPIO_PD6, false, 0)
+GPIO_REGULATOR_PINIT(6, en_usb1_vbus_oc, "vdd_5v0_sys", TEGRA_GPIO_PI4, false, 0)
+GPIO_REGULATOR_PINIT(7, en_usb3_vbus_oc, "vdd_5v0_sys", TEGRA_GPIO_PH7, false, 0)
+GPIO_REGULATOR_PINIT(8, en_vddio_vid_oc, "vdd_5v0_sys", TEGRA_GPIO_PT0, false, 0)
 
-GPIO_REGULATOR_PINIT(9, en_vdd_pnl1, "vdd_3v3_devices", TEGRA_GPIO_PL4, false)
-GPIO_REGULATOR_PINIT(10, cam3_ldo_en, "vdd_3v3_devices", TEGRA_GPIO_PS0, false)
-GPIO_REGULATOR_PINIT(11, en_vdd_com,  "vdd_3v3_devices", TEGRA_GPIO_PD0, false)
-GPIO_REGULATOR_PINIT(12, en_3v3_fuse, "vdd_3v3_devices", TEGRA_GPIO_PL6, false)
-GPIO_REGULATOR_PINIT(13, en_3v3_emmc, "vdd_3v3_devices", TEGRA_GPIO_PD1, false)
-GPIO_REGULATOR_PINIT(14, en_vdd_sdmmc1, "vdd_3v3_devices", TEGRA_GPIO_PD7, false)
+GPIO_REGULATOR_PINIT(9, en_vdd_pnl1, "vdd_3v3_devices", TEGRA_GPIO_PL4, false, 1)
+GPIO_REGULATOR_PINIT(10, cam3_ldo_en, "vdd_3v3_devices", TEGRA_GPIO_PS0, false, 0)
+GPIO_REGULATOR_PINIT(11, en_vdd_com,  "vdd_3v3_devices", TEGRA_GPIO_PD0, false, 0)
+GPIO_REGULATOR_PINIT(12, en_3v3_fuse, "vdd_3v3_devices", TEGRA_GPIO_PL6, false, 0)
+GPIO_REGULATOR_PINIT(13, en_3v3_emmc, "vdd_3v3_devices", TEGRA_GPIO_PD1, false, 1)
+GPIO_REGULATOR_PINIT(14, en_vdd_sdmmc1, "vdd_3v3_devices", TEGRA_GPIO_PD7, false, 1)
 GPIO_REGULATOR_PINIT(15, en_3v3_pex_hvdd, "vdd_3v3_devices",
-							TEGRA_GPIO_PL7, false)
+							TEGRA_GPIO_PL7, false, 0)
 
-GPIO_REGULATOR_PINIT(16, en_1v8_cam,  "vdd_gen1v8", TEGRA_GPIO_PBB4, false)
+GPIO_REGULATOR_PINIT(16, en_1v8_cam,  "vdd_gen1v8", TEGRA_GPIO_PBB4, false, 0)
 
 static struct platform_device *gpio_switch_regulator_devices[] __initdata = {
 	&gpio_switch_regulator_en_5v_cp,
