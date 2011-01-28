@@ -350,7 +350,7 @@ static struct regulator_consumer_supply gpio_switch_en_vdd_sdmmc1_supply[] = {
 };
 static int gpio_switch_en_vdd_sdmmc1_voltages[] = { 3300};
 
-/* EN_3V3_EMMC from AP GPIO SDMMC4_DAT4 D01*/
+/* EN_3V3_EMMC from AP GPIO SDMMC3_DAT4 D01*/
 static struct regulator_consumer_supply gpio_switch_en_3v3_emmc_supply[] = {
 	REGULATOR_SUPPLY("vdd_emmc_core", NULL),
 };
