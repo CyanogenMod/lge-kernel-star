@@ -242,9 +242,7 @@ static struct platform_device tegra_rtc_device = {
 };
 
 static struct platform_device *cardhu_devices[] __initdata = {
-#if ENABLE_USB_HOST
 	&tegra_otg_device,
-#endif
 	&debug_uart,
 	&tegra_uartb_device,
 	&tegra_uartc_device,
