@@ -37,7 +37,7 @@
 #include "gpio-names.h"
 
 #define cardhu_lvds_shutdown	TEGRA_GPIO_PL2
-#define cardhu_bl_enb		TEGRA_GPIO_PK3
+#define cardhu_bl_enb		TEGRA_GPIO_PH2
 
 static int cardhu_backlight_init(struct device *dev) {
 	int ret;
@@ -215,7 +215,7 @@ static struct platform_device cardhu_nvmap_device = {
 static struct platform_device *cardhu_gfx_devices[] __initdata = {
 	&cardhu_nvmap_device,
 	&tegra_grhost_device,
-	&tegra_pwfm2_device,
+	&tegra_pwfm0_device,
 	&cardhu_backlight_device,
 };
 
