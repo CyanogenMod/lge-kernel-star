@@ -34,14 +34,12 @@
 #include <linux/delay.h>
 #include <linux/i2c.h>
 #include <linux/akm8975.h>
+#include <linux/mpu.h>
 #include <linux/i2c/pca954x.h>
 #include <linux/i2c/pca953x.h>
 #include <linux/nct1008.h>
 #include <linux/err.h>
 #include <linux/regulator/consumer.h>
-#ifdef CONFIG_SENSORS_MPU3050
-#include <linux/mpu3050.h>
-#endif
 
 #include <mach/gpio.h>
 
@@ -355,13 +353,14 @@ static struct i2c_board_info ventana_i2c8_board_info[] = {
 };
 
 #ifdef CONFIG_SENSORS_MPU3050
+#define SENSOR_MPU_NAME "mpu3050"
 static struct mpu3050_platform_data mpu3050_data = {
 	.int_config  = 0x10,
 	.orientation = { 0, -1, 0, -1, 0, 0, 0, 0, -1 },  /* Orientation matrix for MPU on ventana */
 	.level_shifter = 0,
 	.accel = {
 #ifdef CONFIG_SENSORS_KXTF9_MPU
-	.get_slave_descr = kxtf9_get_slave_descr,
+	.get_slave_descr = get_accel_slave_descr,
 #else
 	.get_slave_descr = NULL,
 #endif
@@ -373,11 +372,11 @@ static struct mpu3050_platform_data mpu3050_data = {
 
 	.compass = {
 #ifdef CONFIG_SENSORS_AK8975_MPU
-	.get_slave_descr = ak8975_get_slave_descr,
+	.get_slave_descr = get_compass_slave_descr,
 #else
 	.get_slave_descr = NULL,
 #endif
-	.adapt_num   = 3,            /* bus number 3 on ventana */
+	.adapt_num   = 4,            /* bus number 4 on ventana */
 	.bus         = EXT_SLAVE_BUS_PRIMARY,
 	.address     = 0x0C,
 	.orientation = { 1, 0, 0, 0, -1, 0, 0, 0, -1 },  /* Orientation matrix for AKM on ventana */
@@ -386,10 +385,20 @@ static struct mpu3050_platform_data mpu3050_data = {
 
 static struct i2c_board_info __initdata mpu3050_i2c0_boardinfo[] = {
 	{
-		I2C_BOARD_INFO("mpu3050", 0x68), /*.irq = 299,*/
+		I2C_BOARD_INFO(SENSOR_MPU_NAME, 0x68),
+		.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PZ4),
 		.platform_data = &mpu3050_data,
 	},
 };
+
+static void ventana_mpuirq_init(void)
+{
+	pr_info("*** MPU START *** ventana_mpuirq_init...\n");
+	tegra_gpio_enable(TEGRA_GPIO_PZ4);
+	gpio_request(TEGRA_GPIO_PZ4, SENSOR_MPU_NAME);
+	gpio_direction_input(TEGRA_GPIO_PZ4);
+	pr_info("*** MPU END *** ventana_mpuirq_init...\n");
+}
 #endif
 
 int __init ventana_sensors_init(void)
@@ -399,6 +408,9 @@ int __init ventana_sensors_init(void)
 	ventana_isl29018_init();
 #ifdef CONFIG_SENSORS_AK8975
 	ventana_akm8975_init();
+#endif
+#ifdef CONFIG_SENSORS_MPU3050
+	ventana_mpuirq_init();
 #endif
 	ventana_camera_init();
 	ventana_nct1008_init();
