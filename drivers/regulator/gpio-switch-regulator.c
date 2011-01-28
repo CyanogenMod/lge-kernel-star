@@ -162,6 +162,7 @@ static int __devinit gpio_switch_regulator_probe(struct platform_device *pdev)
 	struct gpio_switch_regulator_platform_data *pdata;
 	int id = pdev->id;
 	int ret = 0;
+	int init_val;
 
 	dev_dbg(&pdev->dev, "Probing regulator %d\n", id);
 
@@ -203,7 +204,7 @@ static int __devinit gpio_switch_regulator_probe(struct platform_device *pdev)
 
 	ri->input_regulator = NULL;
 	ri->is_gpio_init = false;
-	ri->is_enable = false;
+	ri->is_enable = (pdata->init_state) ? true : false;
 	ri->voltages = pdata->voltages;
 	ri->pdata = pdev->dev.platform_data;
 	ri->gpio_nr = pdata->gpio_nr;
@@ -228,7 +229,11 @@ static int __devinit gpio_switch_regulator_probe(struct platform_device *pdev)
 		goto gpio_init_fail;
 	}
 
-	ret = gpio_direction_output(ri->gpio_nr, (ri->active_low) ? 1 : 0);
+	if (ri->is_enable)
+		init_val = (ri->active_low) ? 0 : 1;
+	else
+		init_val = (ri->active_low) ? 1 : 0;
+	ret = gpio_direction_output(ri->gpio_nr, init_val);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "Unable to set direction %d\n",
 							 ri->gpio_nr);
