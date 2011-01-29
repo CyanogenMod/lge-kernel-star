@@ -302,8 +302,6 @@
 
 #define TEGRA_PMC_USB_AO		0xf0
 #define   TEGRA_PMC_USB_AO_VBUS_WAKEUP_PD_P0	(1 << 2)
-
-#define ICUSB_CTRL		0x15c
 #endif
 
 static DEFINE_SPINLOCK(utmip_pad_lock);
@@ -459,6 +457,11 @@ static void utmip_pad_power_on(struct tegra_usb_phy *phy)
 
 	clk_enable(phy->pad_clk);
 
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+	tegra_periph_reset_assert(phy->pad_clk);
+	udelay(100);
+	tegra_periph_reset_deassert(phy->pad_clk);
+#endif
 	spin_lock_irqsave(&utmip_pad_lock, flags);
 
 	if (utmip_pad_count++ == 0) {
@@ -611,7 +614,6 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 	void __iomem *base = phy->regs;
 	struct tegra_utmip_config *config = phy->config;
 
-	utmip_pad_power_on(phy);
 	val = readl(base + USB_SUSP_CTRL);
 	val |= UTMIP_RESET;
 	writel(val, base + USB_SUSP_CTRL);
@@ -668,6 +670,8 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 		writel(val, base + USB_SUSP_CTRL);
 	}
 
+	utmip_pad_power_on(phy);
+
 	val = readl(base + UTMIP_XCVR_CFG0);
 	val &= ~(UTMIP_FORCE_PD_POWERDOWN | UTMIP_FORCE_PD2_POWERDOWN |
 		 UTMIP_FORCE_PDZI_POWERDOWN | UTMIP_XCVR_SETUP(~0) |
@@ -709,7 +713,7 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 		writel(val, base + USB_SUSP_CTRL);
 	}
 #else
-	if ((phy->instance == 1) || (phy->instance == 2)) {
+	if (phy->instance == 1) {
 		val = readl(base + USB_SUSP_CTRL);
 		val |= UTMIP_PHY_ENABLE;
 		writel(val, base + USB_SUSP_CTRL);
@@ -740,13 +744,6 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 		writel(val, base + USB_PORTSC1);
 	}
 #else
-	if(phy->instance == 2) {
-		writel(0, base + ICUSB_CTRL);
-
-		val = readl(base + TEGRA_USB_USBMODE_REG_OFFSET);
-		writel((val | TEGRA_USB_USBMODE_HOST),
-			(base + TEGRA_USB_USBMODE_REG_OFFSET));
-	}
 	val = readl(base + HOSTPC1_DEVLC);
 	val &= ~HOSTPC1_DEVLC_PTS(~0);
 	val |= HOSTPC1_DEVLC_STS;
