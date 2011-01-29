@@ -286,13 +286,11 @@ static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
 	},
 };
 
-#if ENABLE_USB_HOST
 static void cardhu_usb_init(void)
 {
 	tegra_ehci3_device.dev.platform_data = &tegra_ehci_pdata[2];
 	platform_device_register(&tegra_ehci3_device);
 }
-#endif
 
 struct platform_device *tegra_usb_otg_host_register(void)
 {
@@ -367,9 +365,7 @@ static void __init tegra_cardhu_init(void)
 	cardhu_gpio_switch_regulator_init();
 	cardhu_suspend_init();
 	cardhu_touch_init();
-#if ENABLE_USB_HOST
 	cardhu_usb_init();
-#endif
 
 #ifdef CONFIG_KEYBOARD_TEGRA
 	cardhu_kbc_init();
