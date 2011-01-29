@@ -166,6 +166,9 @@ int __init cardhu_sdhci_init(void)
 	unsigned int rc = 0;
 	platform_device_register(&tegra_sdhci_device3);
 	platform_device_register(&tegra_sdhci_device2);
+
+#if 0
+	/* Fix ME: The gpios have to enabled for hot plug support */
 	rc = cardhu_sd_cd_gpio_init();
 	if (!rc)
 		tegra_sdhci_platform_data0.cd_gpio = TEGRA_GPIO_PI5;
@@ -173,7 +176,7 @@ int __init cardhu_sdhci_init(void)
 	rc = cardhu_sd_wp_gpio_init();
 	if (!rc)
 		tegra_sdhci_platform_data0.cd_gpio = TEGRA_GPIO_PT3;
-
+#endif
 	platform_device_register(&tegra_sdhci_device0);
 	return 0;
 }
