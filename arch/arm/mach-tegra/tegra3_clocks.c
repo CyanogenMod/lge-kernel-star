@@ -112,11 +112,6 @@
 #define PERIPH_CLK_SOURCE_NUM		(PERIPH_CLK_SOURCE_NUM1 + \
 					 PERIPH_CLK_SOURCE_NUM2)
 
-#define PERIPH_CLK_SOURCE_MASK(c)	\
-	(((c)->flags & MUX8) ? (7<<29) :\
-		(((c)->flags & MUX_PWM) ? (3 << 28) : (3<<30)))
-#define PERIPH_CLK_SOURCE_SHIFT(c)	\
-	(((c)->flags & MUX8) ? 29 : (((c)->flags & MUX_PWM) ? 28 : 30))
 #define PERIPH_CLK_SOURCE_DIVU71_MASK	0xFF
 #define PERIPH_CLK_SOURCE_DIVU16_MASK	0xFFFF
 #define PERIPH_CLK_SOURCE_DIV_SHIFT	0
@@ -1418,15 +1413,35 @@ static struct clk_ops tegra_pllx_div_ops = {
 };
 
 /* Periph clk ops */
+static inline u32 periph_clk_source_mask(struct clk *c)
+{
+	if (c->flags & MUX8)
+		 return 7 << 29;
+	else if (c->flags & MUX_PWM)
+		return 3 << 28;
+	else
+		return 3 << 30;
+}
+
+static inline u32 periph_clk_source_shift(struct clk *c)
+{
+	if (c->flags & MUX8)
+		 return 29;
+	else if (c->flags & MUX_PWM)
+		return 28;
+	else
+		return 30;
+}
 
 static void tegra3_periph_clk_init(struct clk *c)
 {
 	u32 val = clk_readl(c->reg);
 	const struct clk_mux_sel *mux = 0;
 	const struct clk_mux_sel *sel;
-	if (c->flags & (MUX | MUX_PWM | MUX8)) {
+	if (c->flags & MUX) {
 		for (sel = c->inputs; sel->input != NULL; sel++) {
-			if (val >> PERIPH_CLK_SOURCE_SHIFT(c) == sel->value)
+			if (((val & periph_clk_source_mask(c)) >>
+			    periph_clk_source_shift(c)) == sel->value)
 				mux = sel;
 		}
 		BUG_ON(!mux);
@@ -1512,14 +1527,14 @@ static int tegra3_periph_clk_set_parent(struct clk *c, struct clk *p)
 	const struct clk_mux_sel *sel;
 	pr_debug("%s: %s %s\n", __func__, c->name, p->name);
 
-	if (!(c->flags & (MUX | MUX_PWM | MUX8)))
+	if (!(c->flags & MUX))
 		return (p == c->parent) ? 0 : (-EINVAL);
 
 	for (sel = c->inputs; sel->input != NULL; sel++) {
 		if (sel->input == p) {
 			val = clk_readl(c->reg);
-			val &= ~PERIPH_CLK_SOURCE_MASK(c);
-			val |= (sel->value) << PERIPH_CLK_SOURCE_SHIFT(c);
+			val &= ~periph_clk_source_mask(c);
+			val |= (sel->value << periph_clk_source_shift(c));
 
 			if (c->refcnt)
 				clk_enable(p);
@@ -2791,7 +2806,7 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("i2s4",      "i2s.3",		NULL,   102,	0x3c0,	26000000,  mux_pllaout0_audio4_2x_pllp_clkm,	MUX | DIV_U71),
 	PERIPH_CLK("spdif_out",	"spdif_out",		NULL,	10,	0x108,	100000000, mux_pllaout0_audio_2x_pllp_clkm,	MUX | DIV_U71),
 	PERIPH_CLK("spdif_in",	"spdif_in",		NULL,	10,	0x10c,	100000000, mux_pllp_pllc_pllm,		MUX | DIV_U71),
-	PERIPH_CLK("pwm",	"pwm",			NULL,	17,	0x110,	432000000, mux_pllp_pllc_clk32_clkm,	MUX_PWM | DIV_U71),
+	PERIPH_CLK("pwm",	"pwm",			NULL,	17,	0x110,	432000000, mux_pllp_pllc_clk32_clkm,	MUX | MUX_PWM | DIV_U71),
 	PERIPH_CLK("d_audio",	"d_audio",		NULL,   106,	0x3d0,	48000000,  mux_plla_pllc_pllp_clkm,	MUX | DIV_U71),
 	PERIPH_CLK("dam0",	"dam.0",		NULL,   108,	0x3d8,	48000000,  mux_plla_pllc_pllp_clkm,	MUX | DIV_U71),
 	PERIPH_CLK("dam1",	"dam.1",		NULL,   109,	0x3dc,	48000000,  mux_plla_pllc_pllp_clkm,	MUX | DIV_U71),
@@ -2851,10 +2866,10 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("cve",	"cve",			NULL,	49,	0x140,	250000000, mux_pllp_plld_pllc_clkm,	MUX | DIV_U71), /* requires min voltage */
 	PERIPH_CLK("tvo",	"tvo",			NULL,	49,	0x188,	250000000, mux_pllp_plld_pllc_clkm,	MUX | DIV_U71), /* requires min voltage */
 	PERIPH_CLK_EX("dtv",	"dtv",			NULL,	79,	0x1dc,	250000000, mux_clk_m,			0,		&tegra_dtv_clk_ops),
-	PERIPH_CLK("hdmi",	"hdmi",			NULL,	51,	0x18c,	600000000, mux_pllp_pllm_plld_plla_pllc_plld2_clkm,	MUX8 | DIV_U71), /* requires min voltage */
+	PERIPH_CLK("hdmi",	"hdmi",			NULL,	51,	0x18c,	600000000, mux_pllp_pllm_plld_plla_pllc_plld2_clkm,	MUX | MUX8 | DIV_U71),
 	PERIPH_CLK("tvdac",	"tvdac",		NULL,	53,	0x194,	250000000, mux_pllp_plld_pllc_clkm,	MUX | DIV_U71), /* requires min voltage */
-	PERIPH_CLK("disp1",	"tegradc.0",		NULL,	27,	0x138,	600000000, mux_pllp_pllm_plld_plla_pllc_plld2_clkm,	MUX8), /* scales with voltage and process_id */
-	PERIPH_CLK("disp2",	"tegradc.1",		NULL,	26,	0x13c,	600000000, mux_pllp_pllm_plld_plla_pllc_plld2_clkm,	MUX8), /* scales with voltage and process_id */
+	PERIPH_CLK("disp1",	"tegradc.0",		NULL,	27,	0x138,	600000000, mux_pllp_pllm_plld_plla_pllc_plld2_clkm,	MUX | MUX8),
+	PERIPH_CLK("disp2",	"tegradc.1",		NULL,	26,	0x13c,	600000000, mux_pllp_pllm_plld_plla_pllc_plld2_clkm,	MUX | MUX8),
 	PERIPH_CLK("usbd",	"fsl-tegra-udc",	NULL,	22,	0,	480000000, mux_clk_m,			0), /* requires min voltage */
 	PERIPH_CLK("usb2",	"tegra-ehci.1",		NULL,	58,	0,	480000000, mux_clk_m,			0), /* requires min voltage */
 	PERIPH_CLK("usb3",	"tegra-ehci.2",		NULL,	59,	0,	480000000, mux_clk_m,			0), /* requires min voltage */
@@ -2866,9 +2881,9 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("csus",	"tegra_camera",		"csus",	92,	0,	150000000, mux_clk_m,			PERIPH_NO_RESET),
 
 	PERIPH_CLK("actmon",	"actmon",		NULL,	119,	0x3e8,	216000000, mux_pllp_pllc_clk32_clkm,	MUX | DIV_U71),
-	PERIPH_CLK("extern1",	"extern1",		NULL,	120,	0x3ec,	216000000, mux_plla_clk32_pllp_clkm_plle,	MUX8 | DIV_U71),
-	PERIPH_CLK("extern2",	"extern2",		NULL,	121,	0x3f0,	216000000, mux_plla_clk32_pllp_clkm_plle,	MUX8 | DIV_U71),
-	PERIPH_CLK("extern3",	"extern3",		NULL,	122,	0x3f4,	216000000, mux_plla_clk32_pllp_clkm_plle,	MUX8 | DIV_U71),
+	PERIPH_CLK("extern1",	"extern1",		NULL,	120,	0x3ec,	216000000, mux_plla_clk32_pllp_clkm_plle,	MUX | MUX8 | DIV_U71),
+	PERIPH_CLK("extern2",	"extern2",		NULL,	121,	0x3f0,	216000000, mux_plla_clk32_pllp_clkm_plle,	MUX | MUX8 | DIV_U71),
+	PERIPH_CLK("extern3",	"extern3",		NULL,	122,	0x3f4,	216000000, mux_plla_clk32_pllp_clkm_plle,	MUX | MUX8 | DIV_U71),
 	PERIPH_CLK("i2cslow",	"i2cslow",		NULL,	81,	0x3fc,	26000000,  mux_pllp_pllc_clk32_clkm,	MUX | DIV_U71),
 
 	SHARED_CLK("avp.sclk",	"tegra-avp",		"sclk",	&tegra_clk_sclk),
