@@ -142,7 +142,7 @@ static int gpio_switch_regulator_is_enabled(struct regulator_dev *rdev)
 	if (ri->input_regulator) {
 		ret = regulator_is_enabled(ri->input_regulator);
 		if (!ret)
-			return !ret;
+			return ret;
 	}
 	return (ri->is_enable) ? 1 : 0;
 }
