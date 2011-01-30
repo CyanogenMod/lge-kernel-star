@@ -1895,33 +1895,6 @@ static struct clk_ops tegra_cml_clk_ops = {
 	.disable		= &tegra3_cml_clk_disable,
 };
 
-/* cdev1 and cdev2 (dap_mclk1 and dap_mclk2) ops */
-
-static void tegra3_cdev_clk_init(struct clk *c)
-{
-	/* We could un-tristate the cdev1 or cdev2 pingroup here; this is
-	 * currently done in the pinmux code. */
-	c->state = ON;
-	if (!(clk_readl(PERIPH_CLK_TO_ENB_REG(c)) & PERIPH_CLK_TO_BIT(c)))
-		c->state = OFF;
-}
-
-static int tegra3_cdev_clk_enable(struct clk *c)
-{
-	clk_writel(PERIPH_CLK_TO_BIT(c), PERIPH_CLK_TO_ENB_SET_REG(c));
-	return 0;
-}
-
-static void tegra3_cdev_clk_disable(struct clk *c)
-{
-	clk_writel(PERIPH_CLK_TO_BIT(c), PERIPH_CLK_TO_ENB_CLR_REG(c));
-}
-
-static struct clk_ops tegra_cdev_clk_ops = {
-	.init			= &tegra3_cdev_clk_init,
-	.enable			= &tegra3_cdev_clk_enable,
-	.disable		= &tegra3_cdev_clk_disable,
-};
 
 /* shared bus ops */
 /*
@@ -2464,28 +2437,6 @@ static struct clk tegra_cml1_clk = {
 	},
 };
 
-/* dap_mclk1, belongs to the cdev1 pingroup. */
-static struct clk tegra_dev1_clk = {
-	.name      = "clk_dev1",
-	.ops       = &tegra_cdev_clk_ops,
-	.rate      = 26000000,
-	.max_rate  = 26000000,
-	.u.periph  = {
-		.clk_num = 94,
-	},
-};
-
-/* dap_mclk2, belongs to the cdev2 pingroup. */
-static struct clk tegra_dev2_clk = {
-	.name      = "clk_dev2",
-	.ops       = &tegra_cdev_clk_ops,
-	.rate      = 26000000,
-	.max_rate  = 26000000,
-	.u.periph  = {
-		.clk_num   = 93,
-	},
-};
-
 /* Audio sync clocks */
 #define SYNC_SOURCE(_id)				\
 	{						\
@@ -2988,8 +2939,6 @@ struct clk *tegra_ptr_clks[] = {
 	&tegra_clk_sclk,
 	&tegra_clk_hclk,
 	&tegra_clk_pclk,
-	&tegra_dev1_clk,
-	&tegra_dev2_clk,
 	&tegra_clk_virtual_cpu,
 	&tegra_clk_blink,
 	&tegra_clk_cop,
