@@ -243,7 +243,6 @@ static struct platform_device tegra_rtc_device = {
 };
 
 static struct platform_device *cardhu_devices[] __initdata = {
-	&tegra_otg_device,
 	&debug_uart,
 	&tegra_uartb_device,
 	&tegra_uartc_device,
@@ -285,12 +284,6 @@ static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
 			.power_down_on_bus_suspend = 0,
 	},
 };
-
-static void cardhu_usb_init(void)
-{
-	tegra_ehci3_device.dev.platform_data = &tegra_ehci_pdata[2];
-	platform_device_register(&tegra_ehci3_device);
-}
 
 struct platform_device *tegra_usb_otg_host_register(void)
 {
@@ -337,6 +330,20 @@ error:
 void tegra_usb_otg_host_unregister(struct platform_device *pdev)
 {
 	platform_device_unregister(pdev);
+}
+
+static struct tegra_otg_platform_data tegra_otg_pdata = {
+	.host_register = &tegra_usb_otg_host_register,
+	.host_unregister = &tegra_usb_otg_host_unregister,
+};
+
+static void cardhu_usb_init(void)
+{
+	tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
+	platform_device_register(&tegra_otg_device);
+
+	tegra_ehci3_device.dev.platform_data = &tegra_ehci_pdata[2];
+	platform_device_register(&tegra_ehci3_device);
 }
 
 
