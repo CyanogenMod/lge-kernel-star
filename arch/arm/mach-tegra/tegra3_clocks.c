@@ -467,6 +467,10 @@ static struct clk_ops tegra_clk_m_ops = {
 	.disable	= tegra3_clk_m_disable,
 };
 
+static struct clk_ops tegra_clk_m_div_ops = {
+	.enable		= tegra3_clk_m_enable,
+};
+
 /* PLL reference divider functions */
 static void tegra3_pll_ref_init(struct clk *c)
 {
@@ -2004,6 +2008,26 @@ static struct clk tegra_clk_m = {
 	.max_rate  = 48000000,
 };
 
+static struct clk tegra_clk_m_div2 = {
+	.name      = "clk_m_div2",
+	.ops       = &tegra_clk_m_div_ops,
+	.parent    = &tegra_clk_m,
+	.mul       = 1,
+	.div       = 2,
+	.state     = OFF,
+	.max_rate  = 24000000,
+};
+
+static struct clk tegra_clk_m_div4 = {
+	.name      = "clk_m_div4",
+	.ops       = &tegra_clk_m_div_ops,
+	.parent    = &tegra_clk_m,
+	.mul       = 1,
+	.div       = 4,
+	.state     = OFF,
+	.max_rate  = 12000000,
+};
+
 static struct clk tegra_pll_ref = {
 	.name      = "pll_ref",
 	.flags     = ENABLE_ON_INIT,
@@ -2936,6 +2960,8 @@ struct clk_duplicate tegra_clk_duplicates[] = {
 struct clk *tegra_ptr_clks[] = {
 	&tegra_clk_32k,
 	&tegra_clk_m,
+	&tegra_clk_m_div2,
+	&tegra_clk_m_div4,
 	&tegra_pll_ref,
 	&tegra_pll_m,
 	&tegra_pll_m_out1,
