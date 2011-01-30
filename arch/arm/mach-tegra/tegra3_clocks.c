@@ -1423,6 +1423,8 @@ static inline u32 periph_clk_source_mask(struct clk *c)
 		 return 7 << 29;
 	else if (c->flags & MUX_PWM)
 		return 3 << 28;
+	else if (c->flags & MUX_CLK_OUT)
+		return 3 << (c->u.periph.clk_num + 4);
 	else
 		return 3 << 30;
 }
@@ -1433,6 +1435,8 @@ static inline u32 periph_clk_source_shift(struct clk *c)
 		 return 29;
 	else if (c->flags & MUX_PWM)
 		return 28;
+	else if (c->flags & MUX_CLK_OUT)
+		return c->u.periph.clk_num + 4;
 	else
 		return 30;
 }
@@ -1708,6 +1712,97 @@ static struct clk_ops tegra_dtv_clk_ops = {
 	.round_rate		= &tegra3_periph_clk_round_rate,
 	.clk_cfg_ex		= &tegra3_dtv_clk_cfg_ex,
 	.reset			= &tegra3_periph_clk_reset,
+};
+
+
+/* Output clock ops */
+
+static DEFINE_SPINLOCK(clk_out_lock);
+
+static void tegra3_clk_out_init(struct clk *c)
+{
+	const struct clk_mux_sel *mux = 0;
+	const struct clk_mux_sel *sel;
+	u32 val = pmc_readl(c->reg);
+
+	c->state = (val & (0x1 << c->u.periph.clk_num)) ? ON : OFF;
+	c->mul = 1;
+	c->div = 1;
+
+	for (sel = c->inputs; sel->input != NULL; sel++) {
+		if (((val & periph_clk_source_mask(c)) >>
+		     periph_clk_source_shift(c)) == sel->value)
+			mux = sel;
+	}
+	BUG_ON(!mux);
+	c->parent = mux->input;
+}
+
+static int tegra3_clk_out_enable(struct clk *c)
+{
+	u32 val;
+	unsigned long flags;
+
+	pr_debug("%s on clock %s\n", __func__, c->name);
+
+	spin_lock_irqsave(&clk_out_lock, flags);
+	val = pmc_readl(c->reg);
+	val |= (0x1 << c->u.periph.clk_num);
+	pmc_writel(val, c->reg);
+	spin_unlock_irqrestore(&clk_out_lock, flags);
+
+	return 0;
+}
+
+static void tegra3_clk_out_disable(struct clk *c)
+{
+	u32 val;
+	unsigned long flags;
+
+	pr_debug("%s on clock %s\n", __func__, c->name);
+
+	spin_lock_irqsave(&clk_out_lock, flags);
+	val = pmc_readl(c->reg);
+	val &= ~(0x1 << c->u.periph.clk_num);
+	pmc_writel(val, c->reg);
+	spin_unlock_irqrestore(&clk_out_lock, flags);
+}
+
+static int tegra3_clk_out_set_parent(struct clk *c, struct clk *p)
+{
+	u32 val;
+	unsigned long flags;
+	const struct clk_mux_sel *sel;
+
+	pr_debug("%s: %s %s\n", __func__, c->name, p->name);
+
+	for (sel = c->inputs; sel->input != NULL; sel++) {
+		if (sel->input == p) {
+			if (c->refcnt)
+				clk_enable(p);
+
+			spin_lock_irqsave(&clk_out_lock, flags);
+			val = pmc_readl(c->reg);
+			val &= ~periph_clk_source_mask(c);
+			val |= (sel->value << periph_clk_source_shift(c));
+			pmc_writel(val, c->reg);
+			spin_unlock_irqrestore(&clk_out_lock, flags);
+
+			if (c->refcnt && c->parent)
+				clk_disable(c->parent);
+
+			clk_reparent(c, p);
+			return 0;
+		}
+	}
+	return -EINVAL;
+}
+
+static struct clk_ops tegra_clk_out_ops = {
+	.init			= &tegra3_clk_out_init,
+	.enable			= &tegra3_clk_out_enable,
+	.disable		= &tegra3_clk_out_disable,
+	.set_parent		= &tegra3_clk_out_set_parent,
 };
 
 
@@ -2522,6 +2617,66 @@ MUX_I2S_SPDIF(audio3, 3);
 MUX_I2S_SPDIF(audio4, 4);
 MUX_I2S_SPDIF(audio, 5);		/* SPDIF */
 
+/* External clock outputs (through PMC) */
+#define MUX_EXTERN_OUT(_id)						\
+static struct clk_mux_sel mux_clkm_clkm2_clkm4_extern##_id[] = {	\
+	{.input = &tegra_clk_m,		.value = 0},			\
+	{.input = &tegra_clk_m_div2,	.value = 1},			\
+	{.input = &tegra_clk_m_div4,	.value = 2},			\
+	{.input = NULL,			.value = 3}, /* placeholder */	\
+	{ 0, 0},							\
+}
+MUX_EXTERN_OUT(1);
+MUX_EXTERN_OUT(2);
+MUX_EXTERN_OUT(3);
+
+static struct clk_mux_sel *mux_extern_out_list[] = {
+	mux_clkm_clkm2_clkm4_extern1,
+	mux_clkm_clkm2_clkm4_extern2,
+	mux_clkm_clkm2_clkm4_extern3,
+};
+
+#define CLK_OUT_CLK(_id)					\
+	{							\
+		.name      = "clk_out_" #_id,			\
+		.lookup    = {					\
+			.dev_id    = "clk_out_" #_id,		\
+			.con_id	   = "extern" #_id,		\
+		},						\
+		.ops       = &tegra_clk_out_ops,		\
+		.reg       = 0x1a8,				\
+		.inputs    = mux_clkm_clkm2_clkm4_extern##_id,	\
+		.flags     = MUX_CLK_OUT,			\
+		.max_rate  = 216000000,				\
+		.u.periph = {					\
+			.clk_num   = (_id - 1) * 8 + 2,		\
+		},						\
+	}
+static struct clk tegra_clk_out_list[] = {
+	CLK_OUT_CLK(1),
+	CLK_OUT_CLK(2),
+	CLK_OUT_CLK(3),
+};
+
+/* called after peripheral external clocks are initialized */
+static void init_clk_out_mux(void)
+{
+	int i;
+	struct clk *c;
+
+	/* output clock con_id is the same as the name of peripheral
+	   external clock connected to input 3 of the output mux */
+	for (i = 0; i < ARRAY_SIZE(tegra_clk_out_list); i++) {
+		c = tegra_get_clock_by_name(
+			tegra_clk_out_list[i].lookup.con_id);
+		if (!c)
+			pr_err("%s: could not find clk %s\n", __func__,
+			       tegra_clk_out_list[i].lookup.con_id);
+		mux_extern_out_list[i][3].input = c;
+	}
+}
+
+/* Peripheral muxes */
 static struct clk_mux_sel mux_cclk[] = {
 	{ .input = &tegra_clk_m,	.value = 0},
 	{ .input = &tegra_pll_c,	.value = 1},
@@ -2704,9 +2859,7 @@ static struct clk_mux_sel mux_plla_clk32_pllp_clkm_plle[] = {
 	{ .input = &tegra_clk_32k,    .value = 1},
 	{ .input = &tegra_pll_p,      .value = 2},
 	{ .input = &tegra_clk_m,      .value = 3},
-#if 0 /* FIXME: not implemented */
 	{ .input = &tegra_pll_e,      .value = 4},
-#endif
 	{ 0, 0},
 };
 
@@ -2983,6 +3136,10 @@ void __init tegra_soc_init_clocks(void)
 		tegra3_init_one_clock(&tegra_clk_audio_list[i]);
 	for (i = 0; i < ARRAY_SIZE(tegra_clk_audio_2x_list); i++)
 		tegra3_init_one_clock(&tegra_clk_audio_2x_list[i]);
+
+	init_clk_out_mux();
+	for (i = 0; i < ARRAY_SIZE(tegra_clk_out_list); i++)
+		tegra3_init_one_clock(&tegra_clk_out_list[i]);
 }
 
 #ifdef CONFIG_PM

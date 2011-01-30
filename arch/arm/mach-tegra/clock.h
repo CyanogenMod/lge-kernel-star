@@ -47,6 +47,7 @@
 #define MUX_PWM			(1 << 16)
 #define MUX8			(1 << 17)
 #define DIV_U71_UART		(1 << 18)
+#define MUX_CLK_OUT		(1 << 19)
 #define ENABLE_ON_INIT		(1 << 28)
 
 #ifndef __ASSEMBLY__
