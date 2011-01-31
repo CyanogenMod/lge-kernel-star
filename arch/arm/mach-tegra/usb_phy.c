@@ -34,7 +34,6 @@
 #include <mach/iomap.h>
 #include <mach/pinmux.h>
 #include <mach/clk.h>
-#include <linux/regulator/consumer.h>
 #include "fuse.h"
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
@@ -574,35 +573,7 @@ static void utmi_phy_clk_enable(struct tegra_usb_phy *phy)
 		pr_err("%s: timeout waiting for phy to stabilize\n", __func__);
 }
 
-static void regulator_control(bool enable)
-{
-	struct regulator *reg_vbus = NULL;
-	struct regulator *reg_5v0_supply = NULL;
-
-	reg_5v0_supply =  regulator_get(NULL, "vdd_5v0_sys");
-	if (WARN_ON(IS_ERR_OR_NULL(reg_5v0_supply)))
-		printk("couldn't get regulator vdd_5v0_sys: %ld\n",
-			 PTR_ERR(reg_5v0_supply));
-	else {
-		if (enable)
-			regulator_enable(reg_5v0_supply);
-		else
-			regulator_disable(reg_5v0_supply);
-	}
-
-	reg_vbus = regulator_get(NULL, "vdd_vbus_typea_usb");
-	if (WARN_ON(IS_ERR_OR_NULL(reg_vbus)))
-		printk("couldn't get regulator vdd_vbus_typea_usb: %ld\n",
-			 PTR_ERR(reg_vbus));
-	else {
-		if (enable)
-			regulator_enable(reg_vbus);
-		else
-			regulator_disable(reg_vbus);
-	}
-}
-
-static void vbus_enable(int gpio)
+static void vbus_enable(struct tegra_usb_phy *phy)
 {
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	int gpio_status;
@@ -625,11 +596,11 @@ static void vbus_enable(int gpio)
 	}
 	gpio_set_value(gpio, 1);
 #else
-	regulator_control(true);
+	regulator_enable(phy->reg_vbus);
 #endif
 }
 
-static void vbus_disable(int gpio)
+static void vbus_disable(struct tegra_usb_phy *phy)
 {
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	if (gpio == -1)
@@ -638,7 +609,7 @@ static void vbus_disable(int gpio)
 	gpio_set_value(gpio, 0);
 	gpio_free(gpio);
 #else
-	regulator_control(false);
+	regulator_disable(phy->reg_vbus);
 #endif
 }
 
@@ -768,7 +739,7 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 		val &= ~USB_SUSP_SET;
 		writel(val, base + USB_SUSP_CTRL);
 		if (phy->mode == TEGRA_USB_PHY_MODE_HOST)
-			vbus_enable();
+			vbus_enable(phy);
 #endif
 	}
 
@@ -792,7 +763,7 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 	val |= HOSTPC1_DEVLC_STS;
 	writel(val, base + HOSTPC1_DEVLC);
 	if (phy->instance == 2 && phy->mode == TEGRA_USB_PHY_MODE_HOST) {
-		vbus_enable();
+		vbus_enable(phy);
 	}
 #endif
 	if (phy->mode == TEGRA_USB_PHY_MODE_HOST) {
@@ -812,11 +783,11 @@ static void utmi_phy_power_off(struct tegra_usb_phy *phy)
 	if (phy->mode == TEGRA_USB_PHY_MODE_HOST) {
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 		if (phy->instance == 0) {
-			vbus_disable(usb_phy_data[phy->instance].vbus_gpio);
+			vbus_disable(phy);
 		}
 #else
 		if (phy->instance == 2) {
-			vbus_disable(usb_phy_data[phy->instance].vbus_gpio);
+			vbus_disable(phy);
 		}
 #endif
 	}
@@ -1439,11 +1410,11 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 	writel(val, (IO_ADDRESS(TEGRA_PMC_BASE) + TEGRA_PMC_USB_AO));
 }
 #endif
-	phy->reg_vdd = regulator_get(NULL, "avdd_usb");
-	if (WARN_ON(IS_ERR_OR_NULL(phy->reg_vdd))) {
+	phy->reg_vbus = regulator_get(NULL, "avdd_usb");
+	if (WARN_ON(IS_ERR_OR_NULL(phy->reg_vbus))) {
 		pr_err("couldn't get regulator avdd_usb: %ld \n",
-			 PTR_ERR(phy->reg_vdd));
-		err = PTR_ERR(phy->reg_vdd);
+			 PTR_ERR(phy->reg_vbus));
+		err = PTR_ERR(phy->reg_vbus);
 		goto err1;
 	}
 
@@ -1562,7 +1533,7 @@ void tegra_usb_phy_close(struct tegra_usb_phy *phy)
 		utmip_pad_close(phy);
 	clk_disable(phy->pll_u);
 	clk_put(phy->pll_u);
-	regulator_put(phy->reg_vdd);
+	regulator_put(phy->reg_vbus);
 	if (phy->instance == 0 && usb_phy_data[0].vbus_irq)
 		free_irq(usb_phy_data[0].vbus_irq, phy);
 	kfree(phy);
