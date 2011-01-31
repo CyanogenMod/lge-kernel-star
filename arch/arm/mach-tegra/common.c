@@ -79,16 +79,22 @@ static struct board_info tegra_board_info = {
 static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 	/* name		parent		rate		enabled */
 	{ "clk_m",	NULL,		0,		true },
-	{ "pll_m",	"clk_m",	600000000,	true },
 	{ "pll_p",	NULL,		216000000,	true },
 	{ "pll_p_out1",	"pll_p",	28800000,	true },
 	{ "pll_p_out2",	"pll_p",	48000000,	true },
 	{ "pll_p_out3",	"pll_p",	72000000,	true },
 	{ "pll_p_out4",	"pll_p",	108000000,	true },
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+	{ "pll_m_out1",	"pll_m",	275000000,	true },
+	{ "sclk",	"pll_m_out1",	275000000,	true },
+	{ "hclk",	"sclk",		275000000,	true },
+	{ "pclk",	"hclk",		70000000,	true },
+#else
 	{ "pll_m_out1",	"pll_m",	120000000,	true },
 	{ "sclk",	"pll_m_out1",	120000000,	true },
 	{ "hclk",	"sclk",		120000000,	true },
 	{ "pclk",	"hclk",		60000000,	true },
+#endif
 	{ "csite",	NULL,		0,		true },
 	{ "emc",	NULL,		0,		true },
 	{ "cpu",	NULL,		0,		true },
