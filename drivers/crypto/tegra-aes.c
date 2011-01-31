@@ -1046,6 +1046,8 @@ static int tegra_aes_probe(struct platform_device *pdev)
 	spin_lock_init(&list_lock);
 	spin_lock(&list_lock);
 	for (i = 0; i < AES_NR_KEYSLOTS; i++) {
+		if (i == SSK_SLOT_NUM)
+			continue;
 		dd->slots[i].available = true;
 		dd->slots[i].slot_num = i;
 		INIT_LIST_HEAD(&dd->slots[i].node);
