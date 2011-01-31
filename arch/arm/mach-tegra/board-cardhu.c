@@ -146,10 +146,10 @@ static inline void cardhu_bt_rfkill(void) { }
 static __initdata struct tegra_clk_init_table cardhu_clk_init_table[] = {
 	/* name		parent		rate		enabled */
 	{ "uarta",	"pll_p",	216000000,	true},
-	{ "uartb",	"clk_m",	13000000,	true},
-	{ "uartc",	"clk_m",	13000000,	true},
-	{ "uartd",	"clk_m",	13000000,	true},
-	{ "uarte",	"clk_m",	13000000,	true},
+	{ "uartb",	"pll_p",	216000000,	false},
+	{ "uartc",	"pll_p",	216000000,	false},
+	{ "uartd",	"pll_p",	216000000,	false},
+	{ "uarte",	"pll_p",	216000000,	false},
 	{ "pll_m",	NULL,		0,		true},
 	{ "pll_p_out4",	"pll_p",	24000000,	true },
 	{ "pwm",	"clk_32k",	32768,		false},
