@@ -22,10 +22,10 @@
 #include <linux/regulator/machine.h>
 
 /*
- * struct gpio_regulator_switch_platform_data - Gpio based regulato switch
- * platform data.
+ * struct gpio_switch_regulator_subdev_data - Gpio switch regulator subdevice
+ * data.
  *
- * Platform data to register a gpio regulator switch device driver.
+ * Subdevice data to register a gpio regulator switch device driver.
  *
  * @regulator_name: The name of regulator.
  * @input_supply: Input supply name.
@@ -38,7 +38,7 @@
  * @num_consumer_supplies: Number of cosumer supplies.
  * @consumer_supplies: List of consumer spllies.
  */
-struct gpio_switch_regulator_platform_data {
+struct gpio_switch_regulator_subdev_data {
 	const char	*regulator_name;
 	const char	*input_supply;
 	int id;
@@ -51,8 +51,19 @@ struct gpio_switch_regulator_platform_data {
 	struct regulator_consumer_supply *consumer_supplies;
 	int num_consumer_supplies;
 	struct regulation_constraints constraints;
-	int (*enable_rail)(struct gpio_switch_regulator_platform_data *pdata);
-	int (*disable_rail)(struct gpio_switch_regulator_platform_data *pdata);
+	int (*enable_rail)(struct gpio_switch_regulator_subdev_data *pdata);
+	int (*disable_rail)(struct gpio_switch_regulator_subdev_data *pdata);
 
 };
+
+/**
+ * gpio_switch_regulator_platform_data - platform data for gpio_switch_regulator
+ * @num_subdevs: number of regulators used
+ * @subdevs: pointer to regulators used
+ */
+struct gpio_switch_regulator_platform_data {
+	int num_subdevs;
+	struct gpio_switch_regulator_subdev_data *subdevs;
+};
+
 #endif
