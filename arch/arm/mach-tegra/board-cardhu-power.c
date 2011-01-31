@@ -393,39 +393,41 @@ static struct regulator_consumer_supply gpio_switch_en_1v8_cam_supply[] = {
 static int gpio_switch_en_1v8_cam_voltages[] = { 1800};
 
 static int enable_load_switch_rail(
-		struct gpio_switch_regulator_platform_data *pdata)
+		struct gpio_switch_regulator_subdev_data *psubdev_data)
 {
 	int ret;
 
-	if (pdata->pin_group <= 0)
+	if (psubdev_data->pin_group <= 0)
 		return -EINVAL;
 
 	/* Tristate and make pin as input*/
-	ret = tegra_pinmux_set_tristate(pdata->pin_group, TEGRA_TRI_TRISTATE);
+	ret = tegra_pinmux_set_tristate(psubdev_data->pin_group,
+						TEGRA_TRI_TRISTATE);
 	if (ret < 0)
 		return ret;
-	return gpio_direction_input(pdata->gpio_nr);
+	return gpio_direction_input(psubdev_data->gpio_nr);
 }
 
 static int disable_load_switch_rail(
-		struct gpio_switch_regulator_platform_data *pdata)
+		struct gpio_switch_regulator_subdev_data *psubdev_data)
 {
 	int ret;
 
-	if (pdata->pin_group <= 0)
+	if (psubdev_data->pin_group <= 0)
 		return -EINVAL;
 
 	/* Un-tristate and driver low */
-	ret = tegra_pinmux_set_tristate(pdata->pin_group, TEGRA_TRI_NORMAL);
+	ret = tegra_pinmux_set_tristate(psubdev_data->pin_group,
+						TEGRA_TRI_NORMAL);
 	if (ret < 0)
 		return ret;
-	return gpio_direction_output(pdata->gpio_nr, 0);
+	return gpio_direction_output(psubdev_data->gpio_nr, 0);
 }
 
-/* Macro for defining gpio switch regulator platform data and device */
-#define GPIO_REGULATOR_PINIT(_id, _name, _input_supply, _gpio_nr, _active_low, _init_state, _pg, _enable, _disable) \
-	static struct gpio_switch_regulator_platform_data		\
-				gpio_switch_regulator_##_name##_pdata = { \
+/* Macro for defining gpio switch regulator sub device data */
+#define GREG_INIT(_id, _name, _input_supply, _gpio_nr, _active_low, 	\
+			_init_state, _pg, _enable, _disable)		\
+	[_id] = {							\
 		.regulator_name	= "gpio-switch-"#_name,			\
 		.input_supply	= _input_supply,			\
 		.id		= _id,					\
@@ -447,90 +449,72 @@ static int disable_load_switch_rail(
 		},							\
 		.enable_rail = _enable,					\
 		.disable_rail = _disable,				\
-	};								\
-									\
-	static struct platform_device gpio_switch_regulator_##_name = { \
-		.name = "gpio-switch-regulator",			\
-		.id   = _id,						\
-		.dev  = {						\
-		     .platform_data = &gpio_switch_regulator_##_name##_pdata,\
-		},							\
-	};
+	},
 
+static __initdata struct gpio_switch_regulator_subdev_data gswitch_subdevs[] =
+{
 /* Gpio switch regulator platform data */
-GPIO_REGULATOR_PINIT(0, en_5v_cp,   NULL, TPS6591X_GPIO_GP0, false, 0, 0, 0, 0)
-GPIO_REGULATOR_PINIT(1, en_5v0,     NULL, TPS6591X_GPIO_GP2, false, 0, 0, 0, 0)
-GPIO_REGULATOR_PINIT(2, en_ddr,     NULL, TPS6591X_GPIO_GP6, false, 0, 0, 0, 0)
-GPIO_REGULATOR_PINIT(3, en_3v3_sys, NULL, TPS6591X_GPIO_GP7, false, 0, 0, 0, 0)
+GREG_INIT(0, en_5v_cp,   NULL, TPS6591X_GPIO_GP0, false, 0, 0, 0, 0)
+GREG_INIT(1, en_5v0,     NULL, TPS6591X_GPIO_GP2, false, 0, 0, 0, 0)
+GREG_INIT(2, en_ddr,     NULL, TPS6591X_GPIO_GP6, false, 0, 0, 0, 0)
+GREG_INIT(3, en_3v3_sys, NULL, TPS6591X_GPIO_GP7, false, 0, 0, 0, 0)
 
-GPIO_REGULATOR_PINIT(4, dis_5v_switch,   "vdd_5v0_sys", TEGRA_GPIO_PX2,
+GREG_INIT(4, dis_5v_switch,   "vdd_5v0_sys", TEGRA_GPIO_PX2,
 			true, 0, 0, 0, 0)
-GPIO_REGULATOR_PINIT(5, en_vdd_bl,       NULL,          TEGRA_GPIO_PK3,
+GREG_INIT(5, en_vdd_bl,       NULL,          TEGRA_GPIO_PK3,
 			false, 1, 0, 0, 0)
-GPIO_REGULATOR_PINIT(6, en_3v3_modem,    NULL,          TEGRA_GPIO_PD6,
+GREG_INIT(6, en_3v3_modem,    NULL,          TEGRA_GPIO_PD6,
 			false, 0, 0, 0, 0)
-GPIO_REGULATOR_PINIT(7, en_usb1_vbus_oc, "master_5v_switch", TEGRA_GPIO_PI4,
+GREG_INIT(7, en_usb1_vbus_oc, "master_5v_switch", TEGRA_GPIO_PI4,
 			false, 0, TEGRA_PINGROUP_GMI_RST_N,
 			enable_load_switch_rail, disable_load_switch_rail)
-GPIO_REGULATOR_PINIT(8, en_usb3_vbus_oc, "master_5v_switch", TEGRA_GPIO_PH7,
+GREG_INIT(8, en_usb3_vbus_oc, "master_5v_switch", TEGRA_GPIO_PH7,
 			false, 0, TEGRA_PINGROUP_GMI_AD15,
 			enable_load_switch_rail, disable_load_switch_rail)
-GPIO_REGULATOR_PINIT(9, en_vddio_vid_oc, "master_5v_switch", TEGRA_GPIO_PT0,
+GREG_INIT(9, en_vddio_vid_oc, "master_5v_switch", TEGRA_GPIO_PT0,
 			false, 0, TEGRA_PINGROUP_VI_PCLK,
 			enable_load_switch_rail, disable_load_switch_rail)
 
-GPIO_REGULATOR_PINIT(10, en_vdd_pnl1, "vdd_3v3_devices", TEGRA_GPIO_PL4,
+GREG_INIT(10, en_vdd_pnl1, "vdd_3v3_devices", TEGRA_GPIO_PL4,
 			false, 1, 0, 0, 0)
-GPIO_REGULATOR_PINIT(11, cam3_ldo_en, "vdd_3v3_devices", TEGRA_GPIO_PS0,
+GREG_INIT(11, cam3_ldo_en, "vdd_3v3_devices", TEGRA_GPIO_PS0,
 			false, 0, 0, 0, 0)
-GPIO_REGULATOR_PINIT(12, en_vdd_com,  "vdd_3v3_devices", TEGRA_GPIO_PD0,
+GREG_INIT(12, en_vdd_com,  "vdd_3v3_devices", TEGRA_GPIO_PD0,
 			false, 1, 0, 0, 0)
-GPIO_REGULATOR_PINIT(13, en_3v3_fuse, "vdd_3v3_devices", TEGRA_GPIO_PL6,
+GREG_INIT(13, en_3v3_fuse, "vdd_3v3_devices", TEGRA_GPIO_PL6,
 			false, 0, 0, 0, 0)
-GPIO_REGULATOR_PINIT(14, en_3v3_emmc, "vdd_3v3_devices", TEGRA_GPIO_PD1,
+GREG_INIT(14, en_3v3_emmc, "vdd_3v3_devices", TEGRA_GPIO_PD1,
 			false, 1, 0, 0, 0)
-GPIO_REGULATOR_PINIT(15, en_vdd_sdmmc1, "vdd_3v3_devices", TEGRA_GPIO_PD7,
+GREG_INIT(15, en_vdd_sdmmc1, "vdd_3v3_devices", TEGRA_GPIO_PD7,
 			false, 1, 0, 0, 0)
-GPIO_REGULATOR_PINIT(16, en_3v3_pex_hvdd, "vdd_3v3_devices", TEGRA_GPIO_PL7,
-			false, 0, 0, 0, 0)
-
-GPIO_REGULATOR_PINIT(17, en_1v8_cam,  "vdd_gen1v8", TEGRA_GPIO_PBB4,
+GREG_INIT(16, en_3v3_pex_hvdd, "vdd_3v3_devices", TEGRA_GPIO_PL7,
 			false, 0, 0, 0, 0)
 
-static struct platform_device *gpio_switch_regulator_devices[] __initdata = {
-	&gpio_switch_regulator_en_5v_cp,
-	&gpio_switch_regulator_en_5v0,
-	&gpio_switch_regulator_en_ddr,
-	&gpio_switch_regulator_en_3v3_sys,
-	&gpio_switch_regulator_dis_5v_switch,
-	&gpio_switch_regulator_en_vdd_bl,
-	&gpio_switch_regulator_en_3v3_modem,
-	&gpio_switch_regulator_en_usb1_vbus_oc,
-	&gpio_switch_regulator_en_usb3_vbus_oc,
-	&gpio_switch_regulator_en_vddio_vid_oc,
-	&gpio_switch_regulator_en_vdd_pnl1,
-	&gpio_switch_regulator_cam3_ldo_en,
-	&gpio_switch_regulator_en_vdd_com,
-	&gpio_switch_regulator_en_3v3_fuse,
-	&gpio_switch_regulator_en_3v3_emmc,
-	&gpio_switch_regulator_en_vdd_sdmmc1,
-	&gpio_switch_regulator_en_3v3_pex_hvdd,
-	&gpio_switch_regulator_en_1v8_cam,
+GREG_INIT(17, en_1v8_cam,  "vdd_gen1v8", TEGRA_GPIO_PBB4,
+			false, 0, 0, 0, 0)
 };
 
+static __initdata struct gpio_switch_regulator_platform_data  gswitch_pdata = {
+	.num_subdevs = ARRAY_SIZE(gswitch_subdevs),
+	.subdevs = gswitch_subdevs,
+};
+
+static struct platform_device gswitch_regulator_pdata = {	\
+	.name = "gpio-switch-regulator",			\
+	.id   = -1,						\
+	.dev  = {						\
+	     .platform_data = &gswitch_pdata,			\
+	},							\
+};
 int __init cardhu_gpio_switch_regulator_init(void)
 {
 	int i;
-	struct gpio_switch_regulator_platform_data *pdata;
-	for (i = 0; i < ARRAY_SIZE(gpio_switch_regulator_devices); ++i) {
-		pdata = gpio_switch_regulator_devices[i]->dev.platform_data;
-		if (pdata->gpio_nr <= TEGRA_NR_GPIOS)
-			tegra_gpio_enable(pdata->gpio_nr);
+	for (i = 0; i < ARRAY_SIZE(gswitch_subdevs); ++i) {
+		if (gswitch_subdevs[i].gpio_nr <= TEGRA_NR_GPIOS)
+			tegra_gpio_enable(gswitch_subdevs[i].gpio_nr);
 	}
 
-	platform_add_devices(gpio_switch_regulator_devices,
-				ARRAY_SIZE(gpio_switch_regulator_devices));
-	return 0;
+	return platform_device_register(&gswitch_regulator_pdata);
 }
 #else
 int __init cardhu_gpio_switch_regulator_init(void)
