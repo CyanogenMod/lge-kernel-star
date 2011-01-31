@@ -46,22 +46,23 @@
  *                slewing of the signal.
  *                Value - FASTEST, FAST, SLOW, SLOWEST
  */
-#define SET_DRIVE(_name, hsm, schitt, drive, pulldn_drive, pullup_drive, pulldn_slew, pullup_slew) \
-	{							\
-		.pingroup = TEGRA_DRIVE_PINGROUP_##_name,	\
-		.hsm = TEGRA_HSM_##hsm,			        \
-		.schmitt = TEGRA_SCHMITT_##scimitt,		\
-		.drive = TEGRA_DRIVE_##drive,			\
-		.pull_down = TEGRA_PULL_#pulldn_drive,		\
-		.pull_up = TEGRA_PULL_pullup_drive,		\
-		.slew_rising = TEGRA_SLEW_#pulldn_slew,		\
-		.slew_falling = TEGRA_SLEW_#pullup_slew,	\
+#define SET_DRIVE(_name, _hsm, _schmitt, _drive, _pulldn_drive, _pullup_drive, _pulldn_slew, _pullup_slew) \
+	{                                               \
+		.pingroup = TEGRA_DRIVE_PINGROUP_##_name,   \
+		.hsm = TEGRA_HSM_##_hsm,                    \
+		.schmitt = TEGRA_SCHMITT_##_schmitt,        \
+		.drive = TEGRA_DRIVE_##_drive,              \
+		.pull_down = TEGRA_PULL_##_pulldn_drive,    \
+		.pull_up = TEGRA_PULL_##_pullup_drive,		\
+		.slew_rising = TEGRA_SLEW_##_pulldn_slew,   \
+		.slew_falling = TEGRA_SLEW_##_pullup_slew,	\
 	}
 
 /* !!!FIXME!!!! POPULATE THIS TABLE */
 static __initdata struct tegra_drive_pingroup_config cardhu_drive_pinmux[] = {
 	/* DEFAULT_DRIVE(<pin_group>), */
 	/* SET_DRIVE(ATA, DISABLE, DISABLE, DIV_1, 31, 31, FAST, FAST) */
+    SET_DRIVE(DAP2, DISABLE, ENABLE, DIV_1, 31, 31, FASTEST, FASTEST),
 };
 
 #define DEFAULT_PINMUX(_pingroup, _mux, _pupd, _tri, _io)	\
