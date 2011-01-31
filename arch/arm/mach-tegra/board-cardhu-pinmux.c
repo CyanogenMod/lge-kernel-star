@@ -142,12 +142,12 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux[] = {
 	DEFAULT_PINMUX(GEN2_I2C_SDA,    I2C2,            NORMAL,    NORMAL,     INPUT),
 
 	/* I2C3 pinmux */
-	I2C_PINMUX(CAM_I2C_SCL,     I2C3,            PULL_UP,    NORMAL,     INPUT, 	DISABLE, 	DISABLE),
-	I2C_PINMUX(CAM_I2C_SDA,     I2C3,            PULL_UP,    NORMAL,     INPUT,	DISABLE,	DISABLE),
+	I2C_PINMUX(CAM_I2C_SCL,		I2C3,		PULL_UP,	NORMAL,	INPUT,	DISABLE,	DISABLE),
+	I2C_PINMUX(CAM_I2C_SDA,		I2C3,		PULL_UP,	NORMAL,	INPUT,	DISABLE,	DISABLE),
 
 	/* I2C4 pinmux */
-	DEFAULT_PINMUX(DDC_SCL,         I2C4,            NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(DDC_SDA,         I2C4,            NORMAL,    NORMAL,     INPUT),
+	I2C_PINMUX(DDC_SCL,		I2C4,		PULL_UP,	NORMAL,	INPUT,	DISABLE,	DISABLE),
+	I2C_PINMUX(DDC_SDA,		I2C4,		PULL_UP,	NORMAL,	INPUT,	DISABLE,	DISABLE),
 
 	/* Power I2C pinmux */
 	DEFAULT_PINMUX(PWR_I2C_SCL,     I2CPWR,          NORMAL,    NORMAL,     INPUT),
@@ -327,7 +327,6 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux[] = {
 	DEFAULT_PINMUX(SPI2_MOSI,       SPI6,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SPI2_MISO,       SPI6,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SPI2_CS0_N,      SPI6,            NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(SPI2_SCK,        GMI,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SPI1_MOSI,       SPI1,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SPI1_SCK,        SPI1,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SPI1_CS0_N,      SPI1,            NORMAL,    NORMAL,     INPUT),
@@ -354,19 +353,20 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux[] = {
 
 
 	/* Power rails GPIO */
+	DEFAULT_PINMUX(SPI2_SCK,        GMI,             NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GMI_CS2_N,       NAND,            NORMAL,    NORMAL,     OUTPUT),
-	DEFAULT_PINMUX(GMI_RST_N,       RSVD3,           NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(GMI_AD15,        NAND,            NORMAL,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(GMI_RST_N,       RSVD3,           PULL_UP,   TRISTATE,   INPUT),
+	DEFAULT_PINMUX(GMI_AD15,        NAND,            PULL_UP,   TRISTATE,   INPUT),
 	DEFAULT_PINMUX(GPIO_PBB4,       VGP4,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(KB_ROW8,         KBC,             PULL_UP,   NORMAL,     INPUT),
 	DEFAULT_PINMUX(SDMMC3_DAT5,     SDMMC3,          PULL_UP,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SDMMC3_DAT4,     SDMMC3,          PULL_UP,    NORMAL,     INPUT),
 	VI_PINMUX(VI_D6,           VI,              NORMAL,    NORMAL,     OUTPUT, DISABLE, DISABLE),
-	VI_PINMUX(VI_D8,           SDMMC2,          NORMAL,    NORMAL,     INPUT, DISABLE, DISABLE),
-	VI_PINMUX(VI_D9,           SDMMC2,          NORMAL,    NORMAL,     INPUT, DISABLE, DISABLE),
-	VI_PINMUX(VI_PCLK,         SDMMC2,          NORMAL,    NORMAL,     INPUT, DISABLE, DISABLE),
-	VI_PINMUX(VI_HSYNC,        RSVD1,           NORMAL,    NORMAL,     INPUT, DISABLE, DISABLE),
-	VI_PINMUX(VI_VSYNC,        RSVD1,           NORMAL,    NORMAL,     INPUT, DISABLE, DISABLE),
+	VI_PINMUX(VI_D8,           SDMMC2,          NORMAL,    NORMAL,     INPUT,  DISABLE, DISABLE),
+	VI_PINMUX(VI_D9,           SDMMC2,          NORMAL,    NORMAL,     INPUT,  DISABLE, DISABLE),
+	VI_PINMUX(VI_PCLK,         RSVD1,           PULL_UP,   TRISTATE,   INPUT,  DISABLE, ENABLE),
+	VI_PINMUX(VI_HSYNC,        RSVD1,           NORMAL,    NORMAL,     INPUT,  DISABLE, DISABLE),
+	VI_PINMUX(VI_VSYNC,        RSVD1,           NORMAL,    NORMAL,     INPUT,  DISABLE, DISABLE),
 };
 
 void __init cardhu_pinmux_init(void)
