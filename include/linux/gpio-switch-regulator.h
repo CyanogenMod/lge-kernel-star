@@ -44,11 +44,15 @@ struct gpio_switch_regulator_platform_data {
 	int id;
 	int gpio_nr;
 	int active_low;
+	int pin_group;
 	int init_state;
 	int *voltages;
 	unsigned n_voltages;
 	struct regulator_consumer_supply *consumer_supplies;
 	int num_consumer_supplies;
 	struct regulation_constraints constraints;
+	int (*enable_rail)(struct gpio_switch_regulator_platform_data *pdata);
+	int (*disable_rail)(struct gpio_switch_regulator_platform_data *pdata);
+
 };
 #endif

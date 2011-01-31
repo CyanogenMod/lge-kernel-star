@@ -39,16 +39,61 @@ struct gpio_switch_regulator {
 	struct regulator_dev		*rdev;
 	struct device			*dev;
 	int				gpio_nr;
+	int				pin_group;
 	bool				is_gpio_init;
 	bool				is_enable;
 	bool				active_low;
 	int				*voltages;
 	void				*pdata;
 	unsigned			curr_vol_sel;
+	int (*enable_rail)(struct gpio_switch_regulator_platform_data *pdata);
+	int (*disable_rail)(struct gpio_switch_regulator_platform_data *pdata);
 };
 
+static int _gpio_regulator_enable(struct device *dev,
+		struct gpio_switch_regulator *ri)
+{
+	int init_val;
+	int ret;
+
+	if (ri->enable_rail) {
+		ret = ri->enable_rail(ri->pdata);
+	if (ret < 0)
+		dev_err(dev, "Unable to enable rail through board api "
+			" error %d\n", ret);
+	} else {
+		init_val = (ri->active_low) ? 0 : 1;
+		ret = gpio_direction_output(ri->gpio_nr, init_val);
+		if (ret < 0)
+			dev_err(dev, "Unable to set direction %d\n",
+				ri->gpio_nr);
+	}
+	return ret;
+}
+
+static int _gpio_regulator_disable(struct device *dev,
+		struct gpio_switch_regulator *ri)
+{
+	int init_val;
+	int ret;
+
+	if (ri->disable_rail) {
+		ret = ri->disable_rail(ri->pdata);
+	if (ret < 0)
+		dev_err(dev, "Unable to disable rail through "
+			"board api %d\n", ret);
+	} else {
+		init_val = (ri->active_low) ? 1 : 0;
+		ret = gpio_direction_output(ri->gpio_nr, init_val);
+		if (ret < 0)
+			dev_err(dev, "Unable to set direction %d\n",
+				ri->gpio_nr);
+	}
+	return ret;
+}
+
 static int gpio_switch_list_voltage(struct regulator_dev *rdev,
-				     unsigned selector)
+				unsigned selector)
 {
 	struct gpio_switch_regulator *ri = rdev_get_drvdata(rdev);
 
@@ -108,7 +153,9 @@ static int gpio_switch_regulator_enable(struct regulator_dev *rdev)
 		}
 	}
 
-	gpio_set_value(ri->gpio_nr, (ri->active_low) ? 0 : 1);
+	ret = _gpio_regulator_enable(&rdev->dev, ri);
+	if (ret < 0)
+		return ret;
 	ri->is_enable = true;
 	return 0;
 }
@@ -121,7 +168,10 @@ static int gpio_switch_regulator_disable(struct regulator_dev *rdev)
 	if (!ri->is_enable)
 		return 0;
 
-	gpio_set_value(ri->gpio_nr, (ri->active_low) ? 1 : 0);
+	ret = _gpio_regulator_disable(&rdev->dev, ri);
+	if (ret < 0)
+		return ret;
+
 	if (ri->input_regulator) {
 		ret = regulator_disable(ri->input_regulator);
 		if (ret < 0) {
@@ -162,7 +212,6 @@ static int __devinit gpio_switch_regulator_probe(struct platform_device *pdev)
 	struct gpio_switch_regulator_platform_data *pdata;
 	int id = pdev->id;
 	int ret = 0;
-	int init_val;
 
 	dev_dbg(&pdev->dev, "Probing regulator %d\n", id);
 
@@ -192,11 +241,12 @@ static int __devinit gpio_switch_regulator_probe(struct platform_device *pdev)
 	/* Initialize min and maximum contraint voltage if it is not
 	 * define in platform device */
 	if (!pdata->constraints.min_uV)
-		ri->reg_init_data.constraints.min_uV = pdata->voltages[0] *1000;
+		ri->reg_init_data.constraints.min_uV = 1000 *
+						pdata->voltages[0];
 
 	if (!pdata->constraints.max_uV)
-		ri->reg_init_data.constraints.max_uV =
-			pdata->voltages[pdata->n_voltages - 1] *1000;
+		ri->reg_init_data.constraints.max_uV = 1000 *
+				pdata->voltages[pdata->n_voltages - 1];
 
 	ri->reg_init_data.num_consumer_supplies =
 					pdata->num_consumer_supplies;
@@ -210,6 +260,13 @@ static int __devinit gpio_switch_regulator_probe(struct platform_device *pdev)
 	ri->gpio_nr = pdata->gpio_nr;
 	ri->active_low = pdata->active_low;
 	ri->dev = &pdev->dev;
+	ri->enable_rail = pdata->enable_rail;
+	ri->disable_rail = pdata->disable_rail;
+	ri->pin_group = pdata->pin_group;
+
+	/* Checking for board APIs enable/disable rail */
+	if (ri->enable_rail || ri->disable_rail)
+		BUG_ON(!(ri->enable_rail && ri->disable_rail));
 
 	/* Get the regulator structure if input supply is available */
 	if (pdata->input_supply) {
@@ -219,6 +276,14 @@ static int __devinit gpio_switch_regulator_probe(struct platform_device *pdev)
 					pdata->input_supply);
 			ret = -ENODEV;
 			goto reg_get_fail;
+		}
+		if (ri->is_enable) {
+			ret = regulator_enable(ri->input_regulator);
+			if (ret < 0) {
+				dev_err(&pdev->dev, "Unable to enable "
+					"regulator %s\n", pdata->input_supply);
+				goto gpio_init_fail;
+			}
 		}
 	}
 
@@ -230,15 +295,12 @@ static int __devinit gpio_switch_regulator_probe(struct platform_device *pdev)
 	}
 
 	if (ri->is_enable)
-		init_val = (ri->active_low) ? 0 : 1;
+		ret = _gpio_regulator_enable(&pdev->dev, ri);
 	else
-		init_val = (ri->active_low) ? 1 : 0;
-	ret = gpio_direction_output(ri->gpio_nr, init_val);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "Unable to set direction %d\n",
-							 ri->gpio_nr);
+		ret = _gpio_regulator_disable(&pdev->dev, ri);
+	if (ret < 0)
 		goto gpio_dir_fail;
-	}
+
 	ri->is_gpio_init = true;
 
 	ri->rdev = regulator_register(&ri->reg_desc, &pdev->dev,
