@@ -99,9 +99,15 @@ static struct regulator_consumer_supply tps6591x_ldo2_supply[] = {
 	REGULATOR_SUPPLY("avdd_plle", NULL),
 };
 
+#if defined(CONFIG_TEGRA_VERBIER_E1187)
 static struct regulator_consumer_supply tps6591x_ldo3_supply[] = {
 	REGULATOR_SUPPLY("vddio_sdmmc1", NULL),
 };
+#else
+static struct regulator_consumer_supply tps6591x_ldo3_supply[] = {
+	REGULATOR_SUPPLY("unused_rail_ldo3", NULL),
+};
+#endif
 
 static struct regulator_consumer_supply tps6591x_ldo4_supply[] = {
 	REGULATOR_SUPPLY("vdd_rtc", NULL),
@@ -109,6 +115,9 @@ static struct regulator_consumer_supply tps6591x_ldo4_supply[] = {
 
 static struct regulator_consumer_supply tps6591x_ldo5_supply[] = {
 	REGULATOR_SUPPLY("avdd_vdac", NULL),
+#if !defined(CONFIG_TEGRA_VERBIER_E1187)
+	REGULATOR_SUPPLY("vddio_sdmmc1", NULL),
+#endif
 };
 static struct regulator_consumer_supply tps6591x_ldo6_supply[] = {
 	REGULATOR_SUPPLY("avdd_dsi_csi", NULL),
