@@ -2204,6 +2204,7 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("pex",       NULL,			"pex",  70,     0,	0x31E,	26000000,  mux_clk_m,			PERIPH_MANUAL_RESET),
 	PERIPH_CLK("afi",       NULL,			"afi",  72,     0,	0x31E,	26000000,  mux_clk_m,			PERIPH_MANUAL_RESET),
 	PERIPH_CLK("pcie_xclk", NULL,		  "pcie_xclk",  74,     0,	0x31E,	26000000,  mux_clk_m,			PERIPH_MANUAL_RESET),
+	PERIPH_CLK("stat_mon",	"tegra-stat-mon",	NULL,	37,	0,	0x31E,	26000000,  mux_clk_m,			0),
 
 	SHARED_CLK("avp.sclk",	"tegra-avp",		"sclk",	&tegra_clk_sclk),
 	SHARED_CLK("avp.emc",	"tegra-avp",		"emc",	&tegra_clk_emc),
