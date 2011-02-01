@@ -39,10 +39,10 @@
 #define cardhu_lvds_shutdown	TEGRA_GPIO_PL2
 #define cardhu_bl_enb		TEGRA_GPIO_PH2
 #define cardhu_hdmi_hpd		TEGRA_GPIO_PN7
-#define cardhu_hdmi_enb		TEGRA_GPIO_PT0
 
 static struct regulator *cardhu_hdmi_reg = NULL;
 static struct regulator *cardhu_hdmi_pll = NULL;
+static struct regulator *cardhu_hdmi_vddio = NULL;
 
 static int cardhu_backlight_init(struct device *dev) {
 	int ret;
@@ -116,7 +116,6 @@ static int cardhu_panel_disable(void)
 static int cardhu_hdmi_enable(void)
 {
 	int ret;
-	gpio_set_value(cardhu_hdmi_enb, 1);
 	if (!cardhu_hdmi_reg) {
 		cardhu_hdmi_reg = regulator_get(NULL, "avdd_hdmi");
 		if (IS_ERR_OR_NULL(cardhu_hdmi_reg)) {
@@ -145,12 +144,29 @@ static int cardhu_hdmi_enable(void)
 		pr_err("hdmi: couldn't enable regulator avdd_hdmi_pll\n");
 		return ret;
 	}
+	if (!cardhu_hdmi_vddio) {
+		cardhu_hdmi_vddio = regulator_get(NULL, "vdd_hdmi_con");
+		if (IS_ERR_OR_NULL(cardhu_hdmi_vddio)) {
+			pr_err("hdmi: couldn't get regulator vdd_hdmi_con\n");
+			cardhu_hdmi_vddio = NULL;
+			regulator_put(cardhu_hdmi_pll);
+			cardhu_hdmi_pll = NULL;
+			regulator_put(cardhu_hdmi_reg);
+			cardhu_hdmi_reg = NULL;
+
+			return PTR_ERR(cardhu_hdmi_vddio);
+		}
+	}
+	ret = regulator_enable(cardhu_hdmi_vddio);
+	if (ret < 0) {
+		pr_err("hdmi: couldn't enable regulator vdd_hdmi_con\n");
+		return ret;
+	}
 	return 0;
 }
 
 static int cardhu_hdmi_disable(void)
 {
-	gpio_set_value(cardhu_hdmi_enb, 0);
 
 	regulator_disable(cardhu_hdmi_reg);
 	regulator_put(cardhu_hdmi_reg);
@@ -159,6 +175,10 @@ static int cardhu_hdmi_disable(void)
 	regulator_disable(cardhu_hdmi_pll);
 	regulator_put(cardhu_hdmi_pll);
 	cardhu_hdmi_pll = NULL;
+
+	regulator_disable(cardhu_hdmi_vddio);
+	regulator_put(cardhu_hdmi_vddio);
+	cardhu_hdmi_vddio = NULL;
 	return 0;
 }
 static struct resource cardhu_disp1_resources[] = {
@@ -342,10 +362,6 @@ int __init cardhu_panel_init(void)
 
 	cardhu_carveouts[1].base = tegra_carveout_start;
 	cardhu_carveouts[1].size = tegra_carveout_size;
-
-	tegra_gpio_enable(cardhu_hdmi_enb);
-	gpio_request(cardhu_hdmi_enb, "hdmi_5v_en");
-	gpio_direction_output(cardhu_hdmi_enb, 1);
 
 	tegra_gpio_enable(cardhu_hdmi_hpd);
 	gpio_request(cardhu_hdmi_hpd, "hdmi_hpd");
