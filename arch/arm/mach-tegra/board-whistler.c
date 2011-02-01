@@ -145,10 +145,22 @@ static struct tegra_i2c_platform_data whistler_i2c1_platform_data = {
 	.bus_clk_rate	= { 400000, 0 },
 };
 
+static const struct tegra_pingroup_config i2c2_ddc = {
+	.pingroup	= TEGRA_PINGROUP_DDC,
+	.func		= TEGRA_MUX_I2C2,
+};
+
+static const struct tegra_pingroup_config i2c2_gen2 = {
+	.pingroup	= TEGRA_PINGROUP_PTA,
+	.func		= TEGRA_MUX_I2C2,
+};
+
 static struct tegra_i2c_platform_data whistler_i2c2_platform_data = {
 	.adapter_nr	= 1,
-	.bus_count	= 1,
-	.bus_clk_rate	= { 400000, 0 },
+	.bus_count	= 2,
+	.bus_clk_rate	= { 400000, 100000 },
+	.bus_mux	= { &i2c2_ddc, &i2c2_gen2 },
+	.bus_mux_len	= { 1, 1 },
 };
 
 static struct tegra_i2c_platform_data whistler_i2c3_platform_data = {
