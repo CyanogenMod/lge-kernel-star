@@ -2804,6 +2804,7 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
 		udc_controller->vbus_active = 0;
 		udc_controller->usb_state = USB_STATE_DEFAULT;
 		otg_set_peripheral(udc_controller->transceiver, &udc_controller->gadget);
+		return 0;
 	}
 #endif
 
