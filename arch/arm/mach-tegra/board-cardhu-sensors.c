@@ -30,6 +30,11 @@
 #include <generated/mach-types.h>
 #include "gpio-names.h"
 #include "board.h"
+#include <linux/mpu.h>
+
+#include <mach/gpio.h>
+
+#include "gpio-names.h"
 #include "board-cardhu.h"
 
 static struct regulator *cardhu_1v8_cam1 = NULL;
@@ -319,6 +324,49 @@ static int __init cam_tca6416_init(void)
 }
 #endif
 
+#ifdef CONFIG_SENSORS_MPU3050
+#define SENSOR_MPU_NAME "mpu3050"
+static struct mpu3050_platform_data mpu3050_data = {
+	.int_config  = 0x10,
+	.orientation = { 0, -1, 0, -1, 0, 0, 0, 0, -1 },  /* Orientation matrix for MPU on cardhu */
+	.level_shifter = 0,
+
+	.accel = {
+	.get_slave_descr = get_accel_slave_descr,
+	.adapt_num   = 2,
+	.bus         = EXT_SLAVE_BUS_SECONDARY,
+	.address     = 0x0F,
+	.orientation = { 0, -1, 0, -1, 0, 0, 0, 0, -1 },  /* Orientation matrix for Kionix on cardhu */
+	},
+
+	.compass = {
+	.get_slave_descr = get_compass_slave_descr,
+	.adapt_num   = 2,
+	.bus         = EXT_SLAVE_BUS_PRIMARY,
+	.address     = 0x0C,
+	.orientation = { 1, 0, 0, 0, -1, 0, 0, 0, -1 },  /* Orientation matrix for AKM on cardhu */
+	},
+};
+
+static struct i2c_board_info __initdata mpu3050_i2c0_boardinfo[] = {
+	{
+		I2C_BOARD_INFO(SENSOR_MPU_NAME, 0x68),
+		.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PX1),
+		.platform_data = &mpu3050_data,
+	},
+};
+
+static void cardhu_mpuirq_init(void)
+{
+	pr_info("*** MPU START *** cardhu_mpuirq_init...\n");
+	tegra_gpio_enable(TEGRA_GPIO_PX1);
+	gpio_request(TEGRA_GPIO_PX1, SENSOR_MPU_NAME);
+	gpio_direction_input(TEGRA_GPIO_PX1);
+	pr_info("*** MPU END *** cardhu_mpuirq_init...\n");
+}
+#endif
+
+
 int __init cardhu_sensors_init(void)
 {
 	int err;
@@ -342,6 +390,19 @@ int __init cardhu_sensors_init(void)
 	err = cardhu_nct1008_init();
 	if (err)
 		return err;
+
+#ifdef CONFIG_SENSORS_MPU3050
+	cardhu_mpuirq_init();
+#endif
+
+	if (ARRAY_SIZE(cardhu_i2c3_board_info))
+		i2c_register_board_info(3, cardhu_i2c3_board_info,
+			ARRAY_SIZE(cardhu_i2c3_board_info));
+
+#ifdef CONFIG_SENSORS_MPU3050
+	i2c_register_board_info(2, mpu3050_i2c0_boardinfo,
+		ARRAY_SIZE(mpu3050_i2c0_boardinfo));
+#endif
 
 	return 0;
 }
