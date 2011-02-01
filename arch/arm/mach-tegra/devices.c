@@ -609,21 +609,6 @@ struct platform_device tegra_i2s_device2 = {
 	.num_resources	= ARRAY_SIZE(i2s_resource2),
 };
 
-static struct resource tegra_das_resources[] = {
-	[0] = {
-		.start = TEGRA_APB_MISC_DAS_BASE,
-		.end = TEGRA_APB_MISC_DAS_BASE + TEGRA_APB_MISC_DAS_SIZE - 1,
-		.flags = IORESOURCE_MEM,
-	},
-};
-
-struct platform_device tegra_das_device = {
-	.name		= "tegra-das",
-	.id		= -1,
-	.num_resources	= ARRAY_SIZE(tegra_das_resources),
-	.resource	= tegra_das_resources,
-};
-
 struct platform_device tegra_pcm_device = {
 	.name = "tegra-pcm-audio",
 	.id = -1,
@@ -663,7 +648,29 @@ struct platform_device tegra_audio_device = {
 	.resource	= audio_resource,
 	.num_resources	= ARRAY_SIZE(audio_resource),
 };
+
+/* FIXME : Temporarly adding - find the right solution */
+
+static struct resource spdif_resource[] = {
+	[0] = {
+		.start	= TEGRA_DMA_REQ_SEL_APBIF_CH3,
+		.end	= TEGRA_DMA_REQ_SEL_APBIF_CH3,
+		.flags	= IORESOURCE_DMA
+	},
+	[1] = {
+		.start	= TEGRA_SPDIF_BASE,
+		.end	= TEGRA_SPDIF_BASE + TEGRA_SPDIF_SIZE - 1,
+		.flags	= IORESOURCE_MEM
+	}
+};
 #endif
+
+struct platform_device tegra_spdif_device = {
+	.name		= "spdif_out",
+	.id		= -1,
+	.resource	= spdif_resource,
+	.num_resources	= ARRAY_SIZE(spdif_resource),
+};
 
 #if defined(CONFIG_SND_HDA_TEGRA)
 static u64 tegra_hda_dma_mask = DMA_BIT_MASK(32);
@@ -765,13 +772,6 @@ struct platform_device tegra_otg_device = {
 	.num_resources	= ARRAY_SIZE(tegra_otg_resources),
 };
 
-struct platform_device tegra_spdif_device = {
-	.name		= "spdif_out",
-	.id		= -1,
-	.resource	= spdif_resource,
-	.num_resources	= ARRAY_SIZE(spdif_resource),
-};
-
 #ifdef CONFIG_SATA_AHCI_TEGRA
 static u64 tegra_sata_dma_mask = DMA_BIT_MASK(32);
 
@@ -805,6 +805,23 @@ struct platform_device tegra_sata_device = {
 	},
 	.resource = tegra_sata_resources,
 	.num_resources = ARRAY_SIZE(tegra_sata_resources),
+};
+#endif
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+static struct resource das_resource[] = {
+	[0] = {
+		.start	= TEGRA_APB_MISC_BASE,
+		.end	= TEGRA_APB_MISC_BASE + TEGRA_APB_MISC_SIZE - 1,
+		.flags	= IORESOURCE_MEM
+	}
+};
+
+struct platform_device tegra_das_device = {
+	.name		= "tegra_das",
+	.id		= -1,
+	.resource	= das_resource,
+	.num_resources	= ARRAY_SIZE(das_resource),
 };
 #endif
 
