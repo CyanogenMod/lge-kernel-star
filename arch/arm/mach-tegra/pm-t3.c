@@ -28,14 +28,6 @@
 #include "gpio-names.h"
 #include "pm.h"
 
-#define SUSPEND_DEBUG_PRINT	1	/* Nonzero for debug prints */
-
-#if SUSPEND_DEBUG_PRINT
-#define DEBUG_SUSPEND(x) printk x
-#else
-#define DEBUG_SUSPEND(x)
-#endif
-
 #define CAR_CCLK_BURST_POLICY \
 	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x20)
 
@@ -185,11 +177,11 @@ static int cluster_switch_prolog_clock(unsigned int flags)
 				   be multipled by 2 because of the LP CPU's
 				   implied divied-by-2. */
 
-				DEBUG_SUSPEND(("%s: G freq %lu\r\n", __func__,
+				DEBUG_CLUSTER(("%s: G freq %lu\r\n", __func__,
 					       cur_rate));
 				err = clk_set_rate(c, max_rate * 2);
 				BUG_ON(err);
-				DEBUG_SUSPEND(("%s: G freq %lu\r\n", __func__,
+				DEBUG_CLUSTER(("%s: G freq %lu\r\n", __func__,
 					       clk_get_rate(c)));
 			}
 		}
@@ -296,10 +288,10 @@ void tegra_cluster_switch_epilog(unsigned int flags)
 	/* Perform post-switch clean-up of the interrupt distributor */
 	cluster_switch_epilog_gic();
 
-	#if SUSPEND_DEBUG_PRINT
+	#if DEBUG_CLUSTER_SWITCH
 	{
 		struct clk *c = tegra_get_clock_by_name("cpu");
-		DEBUG_SUSPEND(("%s: %s freq %lu\r\n", __func__,
+		DEBUG_CLUSTER(("%s: %s freq %lu\r\n", __func__,
 			is_lp_cluster() ? "LP" : "G", clk_get_rate(c)));
 	}
 	#endif
@@ -325,7 +317,7 @@ int tegra_cluster_control(unsigned int us, unsigned int flags)
 	if (flags & TEGRA_POWER_CLUSTER_IMMEDIATE)
 		us = 0;
 
-	DEBUG_SUSPEND(("%s(LP%d): %s->%s %s %s %d\r\n", __func__,
+	DEBUG_CLUSTER(("%s(LP%d): %s->%s %s %s %d\r\n", __func__,
 		(flags & TEGRA_POWER_SDRAM_SELFREFRESH) ? 1 : 2,
 		is_lp_cluster() ? "LP" : "G",
 		(target_cluster == TEGRA_POWER_CLUSTER_G) ? "G" : "LP",
@@ -346,7 +338,7 @@ int tegra_cluster_control(unsigned int us, unsigned int flags)
 		tegra_idle_lp2_last(flags);
 	local_irq_enable();
 
-	DEBUG_SUSPEND(("%s: %s\r\n", __func__, is_lp_cluster() ? "LP" : "G"));
+	DEBUG_CLUSTER(("%s: %s\r\n", __func__, is_lp_cluster() ? "LP" : "G"));
 
 	return 0;
 }
