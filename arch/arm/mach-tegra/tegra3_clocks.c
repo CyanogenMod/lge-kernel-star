@@ -1065,7 +1065,7 @@ static int tegra3_pll_clk_set_rate(struct clk *c, unsigned long rate)
 			val &= ~PLL_MISC_LFCON_MASK;
 			if (sel->n >= PLLDU_LFCON_SET_DIVN)
 				val |= 0x1 << PLL_MISC_LFCON_SHIFT;
-		} else if (c->flags & PLLX) {
+		} else if (c->flags & (PLLX | PLLM)) {
 			val &= ~(0x1 << PLL_MISC_DCCON_SHIFT);
 			if (rate >= (c->u.pll.vco_max >> 1))
 				val |= 0x1 << PLL_MISC_DCCON_SHIFT;
@@ -2124,7 +2124,7 @@ static struct clk tegra_clk_m_div2 = {
 	.parent    = &tegra_clk_m,
 	.mul       = 1,
 	.div       = 2,
-	.state     = OFF,
+	.state     = ON,
 	.max_rate  = 24000000,
 };
 
@@ -2134,7 +2134,7 @@ static struct clk tegra_clk_m_div4 = {
 	.parent    = &tegra_clk_m,
 	.mul       = 1,
 	.div       = 4,
-	.state     = OFF,
+	.state     = ON,
 	.max_rate  = 12000000,
 };
 
@@ -2200,7 +2200,7 @@ static struct clk_pll_freq_table tegra_pll_m_freq_table[] = {
 
 static struct clk tegra_pll_m = {
 	.name      = "pll_m",
-	.flags     = PLL_HAS_CPCON,
+	.flags     = PLL_HAS_CPCON | PLLM,
 	.ops       = &tegra_pll_ops,
 	.reg       = 0x90,
 	.parent    = &tegra_pll_ref,
