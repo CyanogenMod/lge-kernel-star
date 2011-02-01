@@ -159,8 +159,9 @@
 
 #define PLLU_BASE_POST_DIV		(1<<20)
 
+#define PLLD_BASE_DSIB_MUX_SHIFT	25
+#define PLLD_BASE_DSIB_MUX_MASK		(1<<PLLD_BASE_DSIB_MUX_SHIFT)
 #define PLLD_BASE_CSI_CLKENABLE		(1<<26)
-#define PLLD_BASE_DSIB_MUX_SEL		(1<<25)
 #define PLLD_MISC_DSI_CLKENABLE		(1<<30)
 #define PLLD_MISC_DIV_RST		(1<<23)
 #define PLLD_MISC_DCCON_SHIFT		12
@@ -1101,7 +1102,7 @@ tegra3_plld_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting)
 		break;
 	case TEGRA_CLK_PLLD_MIPI_MUX_SEL:
 		if (!(c->flags & PLL_ALT_MISC_REG)) {
-			mask = PLLD_BASE_DSIB_MUX_SEL;
+			mask = PLLD_BASE_DSIB_MUX_MASK;
 			reg = c->reg + PLL_BASE;
 			break;
 		}
@@ -1423,6 +1424,8 @@ static inline u32 periph_clk_source_mask(struct clk *c)
 		return 3 << 28;
 	else if (c->flags & MUX_CLK_OUT)
 		return 3 << (c->u.periph.clk_num + 4);
+	else if (c->flags & PLLD)
+		return PLLD_BASE_DSIB_MUX_MASK;
 	else
 		return 3 << 30;
 }
@@ -1435,6 +1438,8 @@ static inline u32 periph_clk_source_shift(struct clk *c)
 		return 28;
 	else if (c->flags & MUX_CLK_OUT)
 		return c->u.periph.clk_num + 4;
+	else if (c->flags & PLLD)
+		return PLLD_BASE_DSIB_MUX_SHIFT;
 	else
 		return 30;
 }
@@ -1709,6 +1714,45 @@ static struct clk_ops tegra_dtv_clk_ops = {
 	.set_rate		= &tegra3_periph_clk_set_rate,
 	.round_rate		= &tegra3_periph_clk_round_rate,
 	.clk_cfg_ex		= &tegra3_dtv_clk_cfg_ex,
+	.reset			= &tegra3_periph_clk_reset,
+};
+
+static int tegra3_dsib_clk_set_parent(struct clk *c, struct clk *p)
+{
+	const struct clk_mux_sel *sel;
+	struct clk *d = tegra_get_clock_by_name("pll_d");
+
+	pr_debug("%s: %s %s\n", __func__, c->name, p->name);
+
+	for (sel = c->inputs; sel->input != NULL; sel++) {
+		if (sel->input == p) {
+			if (c->refcnt)
+				clk_enable(p);
+
+			/* The DSIB parent selection bit is in PLLD base
+			   register - can not do direct r-m-w, must be
+			   protected by PLLD lock */
+			tegra_clk_cfg_ex(
+				d, TEGRA_CLK_PLLD_MIPI_MUX_SEL, sel->value);
+
+			if (c->refcnt && c->parent)
+				clk_disable(c->parent);
+
+			clk_reparent(c, p);
+			return 0;
+		}
+	}
+
+	return -EINVAL;
+}
+
+static struct clk_ops tegra_dsib_clk_ops = {
+	.init			= &tegra3_periph_clk_init,
+	.enable			= &tegra3_periph_clk_enable,
+	.disable		= &tegra3_periph_clk_disable,
+	.set_parent		= &tegra3_dsib_clk_set_parent,
+	.set_rate		= &tegra3_periph_clk_set_rate,
+	.round_rate		= &tegra3_periph_clk_round_rate,
 	.reset			= &tegra3_periph_clk_reset,
 };
 
@@ -2662,7 +2706,7 @@ static void init_clk_out_mux(void)
 	int i;
 	struct clk *c;
 
-	/* output clock con_id is the same as the name of peripheral
+	/* output clock con_id is the name of peripheral
 	   external clock connected to input 3 of the output mux */
 	for (i = 0; i < ARRAY_SIZE(tegra_clk_out_list); i++) {
 		c = tegra_get_clock_by_name(
@@ -2845,6 +2889,12 @@ static struct clk_mux_sel mux_plld_out0[] = {
 	{ 0, 0},
 };
 
+static struct clk_mux_sel mux_plld_out0_plld2_out0[] = {
+	{ .input = &tegra_pll_d_out0,  .value = 0},
+	{ .input = &tegra_pll_d2_out0, .value = 1},
+	{ 0, 0},
+};
+
 static struct clk_mux_sel mux_clk_32k[] = {
 	{ .input = &tegra_clk_32k, .value = 0},
 	{ 0, 0},
@@ -2997,9 +3047,8 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("usbd",	"fsl-tegra-udc",	NULL,	22,	0,	480000000, mux_clk_m,			0), /* requires min voltage */
 	PERIPH_CLK("usb2",	"tegra-ehci.1",		NULL,	58,	0,	480000000, mux_clk_m,			0), /* requires min voltage */
 	PERIPH_CLK("usb3",	"tegra-ehci.2",		NULL,	59,	0,	480000000, mux_clk_m,			0), /* requires min voltage */
-	PERIPH_CLK("dsi",	"dsi",			NULL,	48,	0,	500000000, mux_plld_out0,		0), /* scales with voltage */
-	/* FIXME: double-check that DSIB controller is on PLLD clock (not on PLLD2) */
-	PERIPH_CLK("dsib",	"dsib",			NULL,	82,	0,	500000000, mux_plld_out0,		0), /* scales with voltage */
+	PERIPH_CLK("dsi",	"dsi",			NULL,	48,	0,	500000000, mux_plld_out0,		0),
+	PERIPH_CLK_EX("dsib",	"dsib",			NULL,	82,	0xd0,	500000000, mux_plld_out0_plld2_out0,	MUX | PLLD,	&tegra_dsib_clk_ops),
 	PERIPH_CLK("csi",	"tegra_camera",		"csi",	52,	0,	72000000,  mux_pllp_out3,		0),
 	PERIPH_CLK("isp",	"tegra_camera",		"isp",	23,	0,	150000000, mux_clk_m,			0), /* same frequency as VI */
 	PERIPH_CLK("csus",	"tegra_camera",		"csus",	92,	0,	150000000, mux_clk_m,			PERIPH_NO_RESET),
