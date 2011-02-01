@@ -166,6 +166,32 @@ static enum tegra_suspend_mode current_suspend_mode = TEGRA_SUSPEND_NONE;
 static DEFINE_SPINLOCK(tegra_lp2_lock);
 static cpumask_t tegra_in_lp2;
 
+#if INSTRUMENT_CLUSTER_SWITCH
+enum tegra_cluster_switch_time_id
+{
+	tegra_cluster_switch_time_id_start = 0,
+	tegra_cluster_switch_time_id_prolog,
+	tegra_cluster_switch_time_id_switch,
+	tegra_cluster_switch_time_id_epilog,
+	tegra_cluster_switch_time_id_max
+};
+
+static unsigned long tegra_cluster_switch_times[tegra_cluster_switch_time_id_max];
+#define tegra_cluster_switch_time(flags, id) \
+	do { \
+		barrier(); \
+		if (flags & TEGRA_POWER_CLUSTER_MASK) { \
+			void __iomem *timer_us = IO_ADDRESS(TEGRA_TMRUS_BASE); \
+			if (id < tegra_cluster_switch_time_id_max) \
+				tegra_cluster_switch_times[id] = readl(timer_us); \
+				wmb(); \
+		} \
+		barrier(); \
+	} while(0)
+#else
+#define tegra_cluster_switch_time(flags, id) do {} while(0)
+#endif
+
 unsigned long tegra_cpu_power_good_time(void)
 {
 	if (WARN_ON_ONCE(!pdata))
@@ -432,6 +458,8 @@ void tegra_idle_lp2_last(unsigned int flags)
 	reg &= ~TEGRA_POWER_EFFECT_LP0;
 	pmc_32kwritel(reg, PMC_CTRL);
 
+	tegra_cluster_switch_time(flags, tegra_cluster_switch_time_id_start);
+
 	writel(virt_to_phys(tegra_resume), evp_reset);
 
 	/*
@@ -447,6 +475,7 @@ void tegra_idle_lp2_last(unsigned int flags)
 	cpu_complex_pm_enter();
 
 	suspend_cpu_complex();
+	tegra_cluster_switch_time(flags, tegra_cluster_switch_time_id_prolog);
 	flush_cache_all();
 	outer_flush_all();
 	outer_disable();
@@ -454,6 +483,7 @@ void tegra_idle_lp2_last(unsigned int flags)
 	tegra_sleep_cpu(PLAT_PHYS_OFFSET - PAGE_OFFSET);
 
 	l2x0_enable();
+	tegra_cluster_switch_time(flags, tegra_cluster_switch_time_id_switch);
 	restore_cpu_complex();
 	cpu_complex_pm_exit();
 
@@ -472,6 +502,26 @@ void tegra_idle_lp2_last(unsigned int flags)
 	}
 
 	spin_unlock(&tegra_lp2_lock);
+	tegra_cluster_switch_time(flags, tegra_cluster_switch_time_id_epilog);
+
+#if INSTRUMENT_CLUSTER_SWITCH
+	if (flags & TEGRA_POWER_CLUSTER_MASK) {
+		printk("cluster switch prolog took %lu us\n",
+			tegra_cluster_switch_times[tegra_cluster_switch_time_id_prolog] -
+			tegra_cluster_switch_times[tegra_cluster_switch_time_id_start]);
+
+		printk("cluster switch context save/restore took %lu us, cumulative time %lu us\n",
+			tegra_cluster_switch_times[tegra_cluster_switch_time_id_switch] -
+			tegra_cluster_switch_times[tegra_cluster_switch_time_id_prolog],
+			tegra_cluster_switch_times[tegra_cluster_switch_time_id_switch] -
+			tegra_cluster_switch_times[tegra_cluster_switch_time_id_start]),
+		printk("cluster switch epilog took %lu us, cumulative time %lu us\n",
+			tegra_cluster_switch_times[tegra_cluster_switch_time_id_epilog] -
+			tegra_cluster_switch_times[tegra_cluster_switch_time_id_switch],
+			tegra_cluster_switch_times[tegra_cluster_switch_time_id_epilog] -
+			tegra_cluster_switch_times[tegra_cluster_switch_time_id_start]);
+	}
+#endif
 }
 
 void tegra_idle_lp2(void)

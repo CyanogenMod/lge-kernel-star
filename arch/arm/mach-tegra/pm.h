@@ -70,6 +70,7 @@ extern void (*tegra_deep_sleep)(int);
 
 void tegra_idle_lp2_last(unsigned int flags);
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
+#define INSTRUMENT_CLUSTER_SWITCH 0 /* Must be zero for ARCH_TEGRA_2x_SOC */
 static inline int tegra_cluster_control(unsigned int us, unsigned int flags)
 { return -EPERM; }
 #define tegra_cluster_switch_prolog(flags) do {} while(0)
@@ -79,6 +80,7 @@ static inline unsigned int is_lp_cluster(void)
 static inline unsigned long tegra_get_lpcpu_max_rate(void)
 { return 0; }
 #else
+#define INSTRUMENT_CLUSTER_SWITCH 1 /* Should be zero for shipping code */
 int tegra_cluster_control(unsigned int us, unsigned int flags);
 void tegra_cluster_switch_prolog(unsigned int flags);
 void tegra_cluster_switch_epilog(unsigned int flags);
