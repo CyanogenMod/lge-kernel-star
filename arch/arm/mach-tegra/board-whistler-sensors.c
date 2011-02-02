@@ -33,6 +33,7 @@
 
 #define ADXL34X_IRQ_GPIO		TEGRA_GPIO_PAA1
 #define ISL29018_IRQ_GPIO		TEGRA_GPIO_PK2
+#define ADT7461_IRQ_GPIO			TEGRA_GPIO_PI2
 
 static struct regulator *reg_avdd_cam1; /* LDO9 */
 static struct regulator *reg_vdd_af;    /* LDO13 */
@@ -151,6 +152,20 @@ static struct i2c_board_info whistler_i2c1_board_info[] = {
 	},
 };
 
+static void whistler_adt7461_init(void)
+{
+	tegra_gpio_enable(ADT7461_IRQ_GPIO);
+	gpio_request(ADT7461_IRQ_GPIO, "adt7461");
+	gpio_direction_input(ADT7461_IRQ_GPIO);
+}
+
+static struct i2c_board_info whistler_i2c4_board_info[] = {
+	{
+		I2C_BOARD_INFO("adt7461", 0x4C),
+		.irq = TEGRA_GPIO_TO_IRQ(ADT7461_IRQ_GPIO),
+	},
+};
+
 int __init whistler_sensors_init(void)
 {
 	whistler_camera_init();
@@ -159,11 +174,16 @@ int __init whistler_sensors_init(void)
 
 	whistler_isl29018_init();
 
+	whistler_adt7461_init();
+
 	i2c_register_board_info(0, whistler_i2c1_board_info,
 		ARRAY_SIZE(whistler_i2c1_board_info));
 
 	i2c_register_board_info(3, whistler_i2c3_board_info,
 		ARRAY_SIZE(whistler_i2c3_board_info));
+
+	i2c_register_board_info(4, whistler_i2c4_board_info,
+		ARRAY_SIZE(whistler_i2c4_board_info));
 
 	return 0;
 }
