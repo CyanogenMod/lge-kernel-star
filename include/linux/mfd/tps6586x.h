@@ -54,8 +54,18 @@ struct tps6586x_subdev_info {
 	void		*platform_data;
 };
 
+struct tps6586x_epoch_start {
+	int year;
+	int month;
+	int day;
+	int hour;
+	int min;
+	int sec;
+};
+
 struct tps6586x_rtc_platform_data {
 	int irq;
+	struct tps6586x_epoch_start start;
 };
 
 struct tps6586x_platform_data {
