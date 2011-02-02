@@ -1411,7 +1411,6 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 	val &= ~(TEGRA_PMC_USB_AO_VBUS_WAKEUP_PD_P0 | TEGRA_PMC_USB_AO_ID_PD_P0);
 	writel(val, (IO_ADDRESS(TEGRA_PMC_BASE) + TEGRA_PMC_USB_AO));
 }
-#endif
 	if (phy->instance == 0)
 		phy->reg_vbus = regulator_get(NULL, "vdd_vbus_micro_usb");
 	else if (phy->instance == 2)
@@ -1421,8 +1420,10 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 	if (WARN_ON(IS_ERR_OR_NULL(phy->reg_vbus))) {
 		pr_err("couldn't get regulator vdd_vbus_usb: %ld, instance : %d\n",
 			 PTR_ERR(phy->reg_vbus), phy->instance);
+		err = PTR_ERR(phy->reg_vbus);
 		goto err1;
 	}
+#endif
 
 	if (instance == 0 && usb_phy_data[0].vbus_irq) {
 		err = request_threaded_irq(usb_phy_data[0].vbus_irq, NULL, usb_phy_vbus_irq_thr, IRQF_SHARED,
