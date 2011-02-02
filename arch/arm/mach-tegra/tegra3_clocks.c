@@ -26,6 +26,7 @@
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/clk.h>
+#include <linux/cpufreq.h>
 
 #include <asm/clkdev.h>
 
@@ -3188,14 +3189,56 @@ void __init tegra_soc_init_clocks(void)
 		tegra3_init_one_clock(&tegra_clk_out_list[i]);
 }
 
-#ifdef CONFIG_PM
-static u32 clk_rst_suspend[RST_DEVICES_NUM + CLK_OUT_ENB_NUM +
-			   PERIPH_CLK_SOURCE_NUM + 15];
-
 unsigned long tegra_get_lpcpu_max_rate(void)
 {
 	return tegra_clk_virtual_cpu.u.cpu.lp_max_rate;
 }
+
+#ifdef CONFIG_CPU_FREQ
+
+/*
+ * Frequency table index must be sequential starting at 0 and frequencies
+ * must be ascending.
+ */
+
+static struct cpufreq_frequency_table freq_table_1p0GHz[] = {
+	{ 0, 216000 },
+	{ 1, 312000 },
+	{ 2, 456000 },
+	{ 3, 608000 },
+	{ 4, 760000 },
+	{ 5, 816000 },
+	{ 6, 912000 },
+	{ 7, 1000000 },
+	{ 8, CPUFREQ_TABLE_END },
+};
+
+static struct tegra_cpufreq_table_data cpufreq_tables[] = {
+	{ freq_table_1p0GHz, 2, 6 },
+};
+
+struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void)
+{
+	int i, ret;
+	struct clk *cpu_clk = tegra_get_clock_by_name("cpu");
+
+	for (i = 0; i < ARRAY_SIZE(cpufreq_tables); i++) {
+		struct cpufreq_policy policy;
+		ret = cpufreq_frequency_table_cpuinfo(
+			&policy, cpufreq_tables[i].freq_table);
+		BUG_ON(ret);
+		if ((policy.max * 1000) == cpu_clk->max_rate)
+			return &cpufreq_tables[i];
+	}
+	pr_err("%s: No cpufreq table matching cpu range", __func__);
+	BUG();
+	return &cpufreq_tables[0];
+}
+#endif
+
+#ifdef CONFIG_PM
+static u32 clk_rst_suspend[RST_DEVICES_NUM + CLK_OUT_ENB_NUM +
+			   PERIPH_CLK_SOURCE_NUM + 15];
 
 void tegra_clk_suspend(void)
 {
