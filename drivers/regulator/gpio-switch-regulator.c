@@ -59,8 +59,8 @@ static int _gpio_regulator_enable(struct device *dev,
 
 	if (ri->enable_rail) {
 		ret = ri->enable_rail(ri->psubdev_data);
-	if (ret < 0)
-		dev_err(dev, "Unable to enable rail through board api "
+		if (ret < 0)
+			dev_err(dev, "Unable to enable rail through board api"
 			" error %d\n", ret);
 	} else {
 		init_val = (ri->active_low) ? 0 : 1;
@@ -80,9 +80,9 @@ static int _gpio_regulator_disable(struct device *dev,
 
 	if (ri->disable_rail) {
 		ret = ri->disable_rail(ri->psubdev_data);
-	if (ret < 0)
-		dev_err(dev, "Unable to disable rail through "
-			"board api %d\n", ret);
+		if (ret < 0)
+			dev_err(dev, "Unable to disable rail through "
+				"board api %d\n", ret);
 	} else {
 		init_val = (ri->active_low) ? 1 : 0;
 		ret = gpio_direction_output(ri->gpio_nr, init_val);
@@ -227,8 +227,8 @@ static int __devinit gpio_switch_regulator_probe(struct platform_device *pdev)
 
 	BUG_ON(!pdata->num_subdevs);
 
-	gswitch_reg = kzalloc(sizeof(struct gpio_switch_regulator) * pdata->num_subdevs,
-					GFP_KERNEL);
+	gswitch_reg = kzalloc(sizeof(struct gpio_switch_regulator) *
+				pdata->num_subdevs, GFP_KERNEL);
 	if (!gswitch_reg) {
 		dev_err(&pdev->dev, "%s:Failed to allocate memory\n", __func__);
 		return -ENOMEM;
@@ -331,7 +331,8 @@ static int __devinit gpio_switch_regulator_probe(struct platform_device *pdev)
 		ri->is_init_success = true;
 		continue;
 
-		/* Cleanup the current registration and continue for next registration*/
+		/* Cleanup the current registration and continue for next
+		 * registration*/
 reg_reg_fail:
 		if (ri->is_enable)
 			_gpio_regulator_disable(&pdev->dev, ri);
@@ -363,8 +364,9 @@ static int __devexit gpio_switch_regulator_remove(struct platform_device *pdev)
 
 	pdata = pdev->dev.platform_data;
 
-	for (i = 0; i < pdata->num_subdevs; ++i) {
-		ri = &gswitch_reg[i];
+	/* Unregister devices in reverse order */
+	for (i = pdata->num_subdevs; i; --i) {
+		ri = &gswitch_reg[i - 1];
 		/* If registration was not success, then do not release */
 		if (!ri->is_init_success)
 			continue;
