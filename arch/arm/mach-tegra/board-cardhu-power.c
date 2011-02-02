@@ -451,7 +451,7 @@ static int disable_load_switch_rail(
 		.disable_rail = _disable,				\
 	},
 
-static __initdata struct gpio_switch_regulator_subdev_data gswitch_subdevs[] =
+static struct gpio_switch_regulator_subdev_data gswitch_subdevs[] =
 {
 /* Gpio switch regulator platform data */
 GREG_INIT(0, en_5v_cp,   NULL, TPS6591X_GPIO_GP0, false, 0, 0, 0, 0)
@@ -494,7 +494,7 @@ GREG_INIT(17, en_1v8_cam,  "vdd_gen1v8", TEGRA_GPIO_PBB4,
 			false, 0, 0, 0, 0)
 };
 
-static __initdata struct gpio_switch_regulator_platform_data  gswitch_pdata = {
+static struct gpio_switch_regulator_platform_data  gswitch_pdata = {
 	.num_subdevs = ARRAY_SIZE(gswitch_subdevs),
 	.subdevs = gswitch_subdevs,
 };
