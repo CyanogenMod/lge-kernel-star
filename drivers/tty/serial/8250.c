@@ -303,6 +303,14 @@ static const struct serial8250_config uart_config[] = {
 		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_10,
 		.flags		= UART_CAP_FIFO | UART_CAP_AFE,
 	},
+	[PORT_TEGRA] = {
+		.name		= "Tegra",
+		.fifo_size	= 32,
+		.tx_loadsz	= 8,
+		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_T_TRIG_01 |
+				  UART_FCR_R_TRIG_01,
+		.flags		= UART_CAP_FIFO,
+	},
 };
 
 #if defined(CONFIG_MIPS_ALCHEMY)
@@ -2203,6 +2211,9 @@ dont_test_tx_en:
 	 * anyway, so we don't enable them here.
 	 */
 	up->ier = UART_IER_RLSI | UART_IER_RDI;
+	/* Use the receive timeout interrupt for tegra port*/
+	if (up->port.type == PORT_TEGRA)
+		up->ier |= UART_IER_RTOIE;
 	serial_outp(up, UART_IER, up->ier);
 
 	if (up->port.flags & UPF_FOURPORT) {
