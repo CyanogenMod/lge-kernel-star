@@ -128,6 +128,11 @@ static struct regulator_init_data ldo9_data = REGULATOR_INIT(ldo9, 1250, 3300);
 
 static struct tps6586x_rtc_platform_data rtc_data = {
 	.irq = TEGRA_NR_IRQS + TPS6586X_INT_RTC_ALM1,
+	.start = {
+		.year = 2009,
+		.month = 1,
+		.day = 1,
+	}
 };
 
 #define TPS_REG(_id, _data)			\
@@ -214,7 +219,7 @@ int __init ventana_regulator_init(void)
 	return 0;
 }
 
-static int __init ventana_pcie_init()
+static int __init ventana_pcie_init(void)
 {
 	int ret;
 
