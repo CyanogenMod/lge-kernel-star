@@ -299,8 +299,7 @@ config RTC_DRV_DM355EVM
 
 config RTC_DRV_TPS6586X
 	tristate "TI TPS6586X RTC"
-	depends on I2C
-	select MFD_TPS6586X
+	depends on MFD_TPS6586X
 	help
 	  This driver supports TPS6586X RTC
 
