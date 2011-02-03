@@ -47,3 +47,4 @@ obj-y				+= lis3lv02d/
 obj-$(CONFIG_SENSORS_NCT1008)	+= nct1008.o
 obj-$(CONFIG_BCM4329_RFKILL)	+= bcm4329_rfkill.o
 obj-$(CONFIG_TEGRA_CRYPTO_DEV)	+= tegra-cryptodev.o
+obj-$(CONFIG_MAX1749_VIBRATOR)	+= max1749.o
