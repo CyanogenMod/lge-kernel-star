@@ -244,8 +244,8 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux[] = {
 
 	DEFAULT_PINMUX(UART2_RXD,       IRDA,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(UART2_TXD,       IRDA,            NORMAL,    NORMAL,     OUTPUT),
-	DEFAULT_PINMUX(UART2_RTS_N,     GMI,             NORMAL,    NORMAL,     OUTPUT),
-	DEFAULT_PINMUX(UART2_CTS_N,     GMI,             NORMAL,    NORMAL,     OUTPUT),
+	DEFAULT_PINMUX(UART2_RTS_N,     UARTB,           NORMAL,    NORMAL,     OUTPUT),
+	DEFAULT_PINMUX(UART2_CTS_N,     UARTB,           NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(UART3_TXD,       UARTC,           NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(UART3_RXD,       UARTC,           NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(UART3_CTS_N,     UARTC,           NORMAL,    NORMAL,     INPUT),
