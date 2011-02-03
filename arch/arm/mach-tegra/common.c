@@ -265,9 +265,10 @@ static int __init tegra_board_info_parse(char *info)
 		pos++;
 	}
 
-	pr_info("board info: Id:%d%2d SKU:%d Fab:%d Rev:%c MinRev:%d\n",
+	pr_info("board info: Id:%d%2d SKU:%d%02d Fab:%d Rev:%c MinRev:%d\n",
 			bi->board_id >> 8 & 0xFF, bi->board_id & 0xFF,
-			bi->sku, bi->fab, bi->major_revision, bi->minor_revision);
+			bi->sku >> 8 & 0xFF, bi->sku & 0xFF, bi->fab,
+			bi->major_revision, bi->minor_revision);
 
 	return 1;
 }
