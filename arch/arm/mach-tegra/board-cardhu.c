@@ -141,7 +141,8 @@ static __initdata struct tegra_clk_init_table cardhu_clk_init_table[] = {
 	{ "uartd",	"pll_p",	216000000,	false},
 	{ "uarte",	"pll_p",	216000000,	false},
 	{ "pll_m",	NULL,		0,		true},
-	{ "hda2codec_2x", "pll_p",	48000000,	false },
+	{ "hda",	"pll_p",	108000000,	false},
+	{ "hda2codec_2x","pll_p",	48000000,	false},
 	{ "pll_p_out4",	"pll_p",	24000000,	true },
 	{ "pwm",	"clk_32k",	32768,		false},
 	{ "blink",	"clk_32k",	32768,		true},
@@ -242,6 +243,9 @@ static struct platform_device *cardhu_devices[] __initdata = {
 	&tegra_udc_device,
 #if ENABLE_USB_HOST
 	&tegra_ehci2_device,
+#endif
+#if defined(CONFIG_SND_HDA_TEGRA)
+	&tegra_hda_device,
 #endif
 #if defined(CONFIG_TEGRA_IOVMM_SMMU)
 	&tegra_smmu_device,
