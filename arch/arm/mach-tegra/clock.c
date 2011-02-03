@@ -34,11 +34,7 @@
 #include "clock.h"
 #include "dvfs.h"
 
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 #define DISABLE_BOOT_CLOCKS 1
-#else
-#define DISABLE_BOOT_CLOCKS 0	/* !!!FIXME!!! DISABLED FOR EMMC ON CARDHU */
-#endif
 
 /*
  * Locking:
