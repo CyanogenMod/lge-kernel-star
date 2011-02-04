@@ -31,8 +31,15 @@
 #include <mach/io.h>
 #include <mach/iomap.h>
 #include <mach/kbc.h>
+#include "board.h"
 
 #include "gpio-names.h"
+
+#define BOARD_E1187   0x0B57
+#define BOARD_E1186   0x0B56
+#define BOARD_E1198   0x0B62
+#define BOARD_E1291   0x0C5B
+
 
 #ifdef CONFIG_KEYBOARD_TEGRA
 #ifdef CONFIG_INPUT_ALPS_GPIO_SCROLLWHEEL
@@ -110,9 +117,14 @@ int __init cardhu_kbc_init(void)
 {
 	struct tegra_kbc_platform_data *data = &cardhu_kbc_platform_data;
 	int i;
+	struct board_info board_info;
 
-	pr_info("KBC: cardhu_kbc_init\n");
+	tegra_get_board_info(&board_info);
+	if ((board_info.board_id == BOARD_E1198) ||
+			(board_info.board_id == BOARD_E1291))
+		return 0;
 
+	pr_info("Registering tegra-kbc\n");
 	 /* Setup the pin configuration information. */
 	for (i = 0; i < KBC_MAX_GPIO; i++) {
 		data->pin_cfg[i].num = 0;
@@ -169,6 +181,15 @@ static struct platform_device cardhu_scroll_device = {
 int __init cardhu_scroll_init(void)
 {
 	int i;
+	struct board_info board_info;
+
+	tegra_get_board_info(&board_info);
+	if ((board_info.board_id == BOARD_E1198) ||
+		(board_info.board_id == BOARD_E1291))
+		return 0;
+
+	pr_info("Registering alps scroll wheel\n");
+
 	/* Setting pins to gpio mode */
 	for (i = 0; i < ARRAY_SIZE(scroll_keys); i++)
 		tegra_gpio_enable(scroll_keys[i].gpio);
@@ -197,9 +218,9 @@ int __init cardhu_scroll_init(void)
 
 static struct gpio_keys_button cardhu_keys[] = {
 	[0] = GPIO_KEY(KEY_HOME, PQ0, 0),
-	[1] = GPIO_KEY(KEY_MENU, PQ1, 0),
-	[2] = GPIO_KEY(KEY_SEARCH, PQ2, 0),
-	[3] = GPIO_KEY(KEY_BACK, PQ3, 0),
+	[1] = GPIO_KEY(KEY_BACK, PQ1, 0),
+	[2] = GPIO_KEY(KEY_MENU, PQ2, 0),
+	[3] = GPIO_KEY(KEY_SEARCH, PQ3, 0),
 	[4] = GPIO_KEY(KEY_VOLUMEUP, PR0, 0),
 	[5] = GPIO_KEY(KEY_VOLUMEDOWN, PR1, 0),
 	[6] = GPIO_KEY(KEY_POWER, PV0, 1),
@@ -222,23 +243,33 @@ int __init cardhu_keys_init(void)
 {
 	int i;
 	int ret;
+	struct board_info board_info;
+
+	tegra_get_board_info(&board_info);
+	if (!((board_info.board_id == BOARD_E1198) ||
+		(board_info.board_id == BOARD_E1291)))
+		return 0;
+
+	pr_info("Registering gpio keys\n");
 
 	/* Set KB_ROW2 to 0 for capcitive switch to be in scan mode */
-	ret = gpio_request(TEGRA_GPIO_PR2, "cap_sw_sl_scan");
-	if (ret < 0) {
-		pr_err("%s: gpio_request failed #%d\n",
+	if (board_info.board_id == BOARD_E1291) {
+		ret = gpio_request(TEGRA_GPIO_PR2, "cap_sw_sl_scan");
+		if (ret < 0) {
+			pr_err("%s: gpio_request failed #%d\n",
 					__func__, TEGRA_GPIO_PR2);
-		return ret;
-	}
-	ret = gpio_direction_output(TEGRA_GPIO_PR2, 0);
-	if (ret < 0) {
-		pr_err("%s: gpio_direction_output failed #%d\n",
+			return ret;
+		}
+		ret = gpio_direction_output(TEGRA_GPIO_PR2, 0);
+		if (ret < 0) {
+			pr_err("%s: gpio_direction_output failed #%d\n",
 					__func__, TEGRA_GPIO_PR2);
-		gpio_free(TEGRA_GPIO_PR2);
-		return ret;
-	}
+			gpio_free(TEGRA_GPIO_PR2);
+			return ret;
+		}
 
-	tegra_gpio_enable(TEGRA_GPIO_PR2);
+		tegra_gpio_enable(TEGRA_GPIO_PR2);
+	}
 
 	/* Enable gpio mode for other pins */
 	for (i = 0; i < ARRAY_SIZE(cardhu_keys); i++)
