@@ -61,6 +61,19 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat);
 
 void tegra_idle_lp2(void);
 
+#if defined(CONFIG_TEGRA_AUTO_HOTPLUG) && defined(CONFIG_ARCH_TEGRA_3x_SOC)
+int tegra_auto_hotplug_init(void);
+void tegra_auto_hotplug_exit(void);
+void tegra_auto_hotplug_governor(unsigned int cpu_freq);
+#else
+static inline int tegra_auto_hotplug_init(void)
+{ return 0; }
+static inline void tegra_auto_hotplug_exit(void)
+{ }
+static inline void tegra_auto_hotplug_governor(unsigned int cpu_freq)
+{ }
+#endif
+
 u64 tegra_rtc_read_ms(void);
 
 /*

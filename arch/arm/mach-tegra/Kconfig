@@ -221,6 +221,15 @@ config TEGRA_CLOCK_DEBUG_WRITE
 	depends on DEBUG_FS
 	default n
 
+config TEGRA_AUTO_HOTPLUG
+	bool "Enable automatic CPU hot-plugging"
+	depends on HOTPLUG_CPU && CPU_FREQ
+	default y
+	help
+	  This option enables turning CPUs off/on and switching tegra
+	  high/low power CPU clusters automatically, corresponding to
+	  CPU frequency scaling.
+
 config TEGRA_MC_PROFILE
 	tristate "Enable profiling memory controller utilization"
 	default n

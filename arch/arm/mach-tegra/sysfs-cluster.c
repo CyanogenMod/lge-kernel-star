@@ -142,7 +142,7 @@ static struct kobj_attribute cluster_powermode_attr =
 #endif
 
 #if DEBUG_CLUSTER_SWITCH
-unsigned int tegra_cluster_debug = 1;
+unsigned int tegra_cluster_debug = 0;
 static struct kobj_attribute cluster_debug_attr =
 		__ATTR(debug, 0640, sysfscluster_show, sysfscluster_store);
 #endif

@@ -37,6 +37,7 @@
 #include <mach/clk.h>
 
 #include "clock.h"
+#include "pm.h"
 
 static struct cpufreq_frequency_table *freq_table;
 
@@ -284,6 +285,10 @@ static int tegra_target(struct cpufreq_policy *policy,
 	ret = tegra_update_cpu_speed(new_speed);
 out:
 	mutex_unlock(&tegra_cpu_lock);
+
+	if (ret == 0)
+		tegra_auto_hotplug_governor(new_speed);
+
 	return ret;
 }
 
@@ -374,6 +379,8 @@ static struct cpufreq_driver tegra_cpufreq_driver = {
 
 static int __init tegra_cpufreq_init(void)
 {
+	int ret = 0;
+
 	struct tegra_cpufreq_table_data *table_data =
 		tegra_cpufreq_table_get();
 	BUG_ON(!table_data);
@@ -393,6 +400,10 @@ static int __init tegra_cpufreq_init(void)
 	throttle_lowest_index = table_data->throttle_lowest_index;
 	throttle_highest_index = table_data->throttle_highest_index;
 #endif
+	ret = tegra_auto_hotplug_init();
+	if (ret)
+		return ret;
+
 	freq_table = table_data->freq_table;
 	return cpufreq_register_driver(&tegra_cpufreq_driver);
 }
@@ -402,6 +413,7 @@ static void __exit tegra_cpufreq_exit(void)
 #ifdef CONFIG_TEGRA_THERMAL_THROTTLE
 	destroy_workqueue(workqueue);
 #endif
+	tegra_auto_hotplug_exit();
         cpufreq_unregister_driver(&tegra_cpufreq_driver);
 }
 
