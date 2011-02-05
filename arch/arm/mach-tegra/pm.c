@@ -506,16 +506,12 @@ void tegra_idle_lp2_last(unsigned int flags)
 
 #if INSTRUMENT_CLUSTER_SWITCH
 	if (flags & TEGRA_POWER_CLUSTER_MASK) {
-		printk("cluster switch prolog took %lu us\n",
+		printk("%s: prolog %lu us, switch %lu us, epilog %lu us, total %lu us\n",
+			is_lp_cluster() ? "G=>LP" : "LP=>G",
 			tegra_cluster_switch_times[tegra_cluster_switch_time_id_prolog] -
-			tegra_cluster_switch_times[tegra_cluster_switch_time_id_start]);
-
-		printk("cluster switch context save/restore took %lu us, cumulative time %lu us\n",
+			tegra_cluster_switch_times[tegra_cluster_switch_time_id_start],
 			tegra_cluster_switch_times[tegra_cluster_switch_time_id_switch] -
 			tegra_cluster_switch_times[tegra_cluster_switch_time_id_prolog],
-			tegra_cluster_switch_times[tegra_cluster_switch_time_id_switch] -
-			tegra_cluster_switch_times[tegra_cluster_switch_time_id_start]),
-		printk("cluster switch epilog took %lu us, cumulative time %lu us\n",
 			tegra_cluster_switch_times[tegra_cluster_switch_time_id_epilog] -
 			tegra_cluster_switch_times[tegra_cluster_switch_time_id_switch],
 			tegra_cluster_switch_times[tegra_cluster_switch_time_id_epilog] -
