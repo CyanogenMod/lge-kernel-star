@@ -32,14 +32,9 @@
 #include <mach/iomap.h>
 #include <mach/kbc.h>
 #include "board.h"
+#include "board-cardhu.h"
 
 #include "gpio-names.h"
-
-#define BOARD_E1187   0x0B57
-#define BOARD_E1186   0x0B56
-#define BOARD_E1198   0x0B62
-#define BOARD_E1291   0x0C5B
-
 
 #ifdef CONFIG_KEYBOARD_TEGRA
 #ifdef CONFIG_INPUT_ALPS_GPIO_SCROLLWHEEL
