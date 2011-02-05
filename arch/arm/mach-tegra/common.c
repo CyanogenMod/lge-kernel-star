@@ -232,52 +232,6 @@ static int __init tegra_bootloader_fb_arg(char *options)
 }
 early_param("tegra_fbmem", tegra_bootloader_fb_arg);
 
-static int __init tegra_board_info_parse(char *info)
-{
-	char *p;
-	int pos = 0;
-	struct board_info *bi = &tegra_board_info;
-
-	while (info && *info) {
-		if ((p = strchr(info, ':')))
-			*p++ = '\0';
-
-		if (strlen(info) > 0) {
-			switch(pos) {
-			case 0:
-				bi->board_id = simple_strtol(info, NULL, 16);
-				break;
-			case 1:
-				bi->sku = simple_strtol(info, NULL, 16);
-				break;
-			case 2:
-				bi->fab = simple_strtol(info, NULL, 16);
-				break;
-			case 3:
-				bi->major_revision = simple_strtol(info, NULL, 16);
-				break;
-			case 4:
-				bi->minor_revision = simple_strtol(info, NULL, 16);
-				break;
-			default:
-				break;
-			}
-		}
-
-		info = p;
-		pos++;
-	}
-
-	pr_info("board info: Id:%d%2d SKU:%d%02d Fab:%d Rev:%c MinRev:%d\n",
-			bi->board_id >> 8 & 0xFF, bi->board_id & 0xFF,
-			bi->sku >> 8 & 0xFF, bi->sku & 0xFF, bi->fab,
-			bi->major_revision, bi->minor_revision);
-
-	return 1;
-}
-
-__setup("board_info=", tegra_board_info_parse);
-
 static int __init tegra_debug_uartport(char *info)
 {
 	if (!strcmp(info, "hsport"))
@@ -297,7 +251,11 @@ __setup("debug_uartport=", tegra_debug_uartport);
 
 void tegra_get_board_info(struct board_info *bi)
 {
-	memcpy(bi, &tegra_board_info, sizeof(*bi));
+	bi->board_id = (system_serial_high >> 16) & 0xFFFF;
+	bi->sku = (system_serial_high) & 0xFFFF;
+	bi->fab = (system_serial_low >> 24) & 0xFF;
+	bi->major_revision = (system_serial_low >> 16) & 0xFF;
+	bi->minor_revision = (system_serial_low >> 8) & 0xFF;
 }
 
 /*
