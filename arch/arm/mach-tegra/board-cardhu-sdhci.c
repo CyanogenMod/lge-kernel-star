@@ -288,15 +288,24 @@ static int cardhu_wifi_reset(int on)
 
 static int __init cardhu_wifi_init(void)
 {
+	int rc;
 
-	gpio_request(CARDHU_WLAN_PWR, "wlan_power");
-	gpio_request(CARDHU_WLAN_RST, "wlan_rst");
+	rc = gpio_request(CARDHU_WLAN_PWR, "wlan_power");
+	if (rc)
+		pr_err("WLAN_PWR gpio request failed:%d\n", rc);
+	rc = gpio_request(CARDHU_WLAN_RST, "wlan_rst");
+	if (rc)
+		pr_err("WLAN_RST gpio request failed:%d\n", rc);
 
 	tegra_gpio_enable(CARDHU_WLAN_PWR);
 	tegra_gpio_enable(CARDHU_WLAN_RST);
 
-	gpio_direction_output(CARDHU_WLAN_PWR, 0);
+	rc = gpio_direction_output(CARDHU_WLAN_PWR, 0);
+	if (rc)
+		pr_err("WLAN_PWR gpio direction configuration failed:%d\n", rc);
 	gpio_direction_output(CARDHU_WLAN_RST, 0);
+	if (rc)
+		pr_err("WLAN_RST gpio direction configuration failed:%d\n", rc);
 
 	platform_device_register(&cardhu_wifi_device);
 	return 0;
