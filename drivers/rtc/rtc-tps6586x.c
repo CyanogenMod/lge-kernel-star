@@ -39,6 +39,7 @@ struct tps6586x_rtc {
 	unsigned long		epoch_start;
 	int			irq;
 	struct rtc_device	*rtc;
+	bool			irq_en;
 };
 
 static inline struct device *to_tps6586x_dev(struct device *dev)
@@ -139,6 +140,14 @@ static int tps6586x_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 		return -EINVAL;
 	}
 
+	if (alrm->enabled && !rtc->irq_en) {
+		enable_irq(rtc->irq);
+		rtc->irq_en = true;
+	} else if (!alrm->enabled && rtc->irq_en) {
+		disable_irq(rtc->irq);
+		rtc->irq_en = false;
+	}
+
 	seconds -= rtc->epoch_start;
 	ticks = (unsigned long long)seconds << 10;
 
@@ -202,14 +211,18 @@ static int tps6586x_rtc_alarm_irq_enable(struct device *dev,
 			dev_err(dev, "failed to set RTC_ENABLE\n");
 			return err;
 		}
-		enable_irq(rtc->irq);
+
+		if (!rtc->irq_en)
+			enable_irq(rtc->irq);
 	} else {
 		err = tps6586x_clr_bits(tps_dev, RTC_CTRL, RTC_ENABLE);
 		if (err < 0) {
 			dev_err(dev, "failed to clear RTC_ENABLE\n");
 			return err;
 		}
-		disable_irq(rtc->irq);
+
+		if (rtc->irq_en)
+			disable_irq(rtc->irq);
 	}
 
 	return 0;
@@ -286,8 +299,8 @@ static int __devinit tps6586x_rtc_probe(struct platform_device *pdev)
 			rtc->irq = -1;
 		} else {
 			device_init_wakeup(&pdev->dev, 1);
-			disable_irq(rtc->irq);
 			enable_irq_wake(rtc->irq);
+			disable_irq(rtc->irq);
 		}
 	}
 
