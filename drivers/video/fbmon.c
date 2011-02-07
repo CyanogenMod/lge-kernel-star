@@ -1011,13 +1011,20 @@ void fb_edid_add_monspecs(unsigned char *edid, struct fb_monspecs *specs)
 	while (pos < edid[2]) {
 		u8 len = edid[pos] & 0x1f, type = (edid[pos] >> 5) & 7;
 		pr_debug("Data block %u of %u bytes\n", type, len);
-		if (type == 2)
+		if (type == 2) {
 			for (i = pos; i < pos + len; i++) {
 				u8 idx = edid[pos + i] & 0x7f;
 				svd[svd_n++] = idx;
 				pr_debug("N%sative mode #%d\n",
 					 edid[pos + i] & 0x80 ? "" : "on-n", idx);
 			}
+		} else if (type == 3 && len >= 3) {
+			u32 ieee_reg = edid[pos + 1] | (edid[pos + 2] << 8) |
+				(edid[pos + 3] << 16);
+			if (ieee_reg == 0x000c03)
+				specs->misc |= FB_MISC_HDMI;
+		}
+
 		pos += len + 1;
 	}
 
