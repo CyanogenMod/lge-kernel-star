@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/board-ventana-sensors.c
  *
- * Copyright (c) 2010, NVIDIA, All Rights Reserved.
+ * Copyright (c) 2011, NVIDIA, All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,6 +27,7 @@
 #include <mach/gpio.h>
 
 #include <media/ov5650.h>
+#include <media/ov2710.h>
 #include <generated/mach-types.h>
 
 #include "gpio-names.h"
@@ -59,6 +60,7 @@ static int ventana_camera_init(void)
 
 static int ventana_ov5650_power_on(void)
 {
+	gpio_direction_output(CAMERA_CSI_MUX_SEL_GPIO, 0);
 	return 0;
 }
 
@@ -70,6 +72,22 @@ static int ventana_ov5650_power_off(void)
 struct ov5650_platform_data ventana_ov5650_data = {
 	.power_on = ventana_ov5650_power_on,
 	.power_off = ventana_ov5650_power_off,
+};
+
+static int ventana_ov2710_power_on(void)
+{
+	gpio_direction_output(CAMERA_CSI_MUX_SEL_GPIO, 1);
+	return 0;
+}
+
+static int ventana_ov2710_power_off(void)
+{
+	return 0;
+}
+
+struct ov2710_platform_data ventana_ov2710_data = {
+	.power_on = ventana_ov2710_power_on,
+	.power_off = ventana_ov2710_power_off,
 };
 
 static void ventana_isl29018_init(void)
@@ -174,6 +192,13 @@ static struct i2c_board_info ventana_i2c7_board_info[] = {
 	},
 };
 
+static struct i2c_board_info ventana_i2c8_board_info[] = {
+	{
+		I2C_BOARD_INFO("ov2710", 0x36),
+		.platform_data = &ventana_ov2710_data,
+	},
+};
+
 int __init ventana_sensors_init(void)
 {
 	struct board_info BoardInfo;
@@ -204,6 +229,9 @@ int __init ventana_sensors_init(void)
 	i2c_register_board_info(7, ventana_i2c7_board_info,
 		ARRAY_SIZE(ventana_i2c7_board_info));
 
+	i2c_register_board_info(8, ventana_i2c8_board_info,
+		ARRAY_SIZE(ventana_i2c8_board_info));
+
 	return 0;
 }
 
@@ -224,11 +252,23 @@ struct ov5650_gpios {
 
 static struct ov5650_gpios ov5650_gpio_keys[] = {
 	[0] = OV5650_GPIO("en_avdd_csi", AVDD_DSI_CSI_ENB_GPIO, 1),
-	[1] = OV5650_GPIO("cam2_pwdn", CAM2_PWR_DN_GPIO, 0),
-	[2] = OV5650_GPIO("cam2_rst_lo", CAM2_RST_L_GPIO, 1),
-	[3] = OV5650_GPIO("cam2_af_pwdn_lo", CAM2_AF_PWR_DN_L_GPIO, 0),
-	[4] = OV5650_GPIO("cam2_ldo_shdn_lo", CAM2_LDO_SHUTDN_L_GPIO, 1),
-	[5] = OV5650_GPIO("cam2_i2c_mux_rst_lo", CAM2_I2C_MUX_RST_GPIO, 1),
+	[1] = OV5650_GPIO("cam_i2c_mux_rst_lo", CAM_I2C_MUX_RST_GPIO, 1),
+
+	[2] = OV5650_GPIO("cam2_pwdn", CAM2_PWR_DN_GPIO, 0),
+	[3] = OV5650_GPIO("cam2_rst_lo", CAM2_RST_L_GPIO, 1),
+	[4] = OV5650_GPIO("cam2_af_pwdn_lo", CAM2_AF_PWR_DN_L_GPIO, 1),
+	[5] = OV5650_GPIO("cam2_ldo_shdn_lo", CAM2_LDO_SHUTDN_L_GPIO, 1),
+
+	[6] = OV5650_GPIO("cam1_pwdn", CAM1_PWR_DN_GPIO, 0),
+	[7] = OV5650_GPIO("cam1_rst_lo", CAM1_RST_L_GPIO, 1),
+	[8] = OV5650_GPIO("cam1_af_pwdn_lo", CAM1_AF_PWR_DN_L_GPIO, 0),
+	[9] = OV5650_GPIO("cam1_ldo_shdn_lo", CAM1_LDO_SHUTDN_L_GPIO, 1),
+
+	[10] = OV5650_GPIO("cam3_pwdn", CAM3_PWR_DN_GPIO, 0),
+	[11] = OV5650_GPIO("cam3_rst_lo", CAM3_RST_L_GPIO, 1),
+	[12] = OV5650_GPIO("cam3_af_pwdn_lo", CAM3_AF_PWR_DN_L_GPIO, 0),
+	[13] = OV5650_GPIO("cam3_ldo_shdn_lo", CAM3_LDO_SHUTDN_L_GPIO, 1),
+
 };
 
 int __init ventana_ov5650_late_init(void)
