@@ -30,6 +30,9 @@
 #include "gpio-names.h"
 #include "board.h"
 
+#define CARDHU_SD_CD TEGRA_GPIO_PI5
+#define CARDHU_SD_WP TEGRA_GPIO_PT3
+
 static struct resource sdhci_resource0[] = {
 	[0] = {
 		.start  = INT_SDMMC1,
@@ -143,15 +146,19 @@ static int cardhu_sd_cd_gpio_init(void)
 {
 	unsigned int rc = 0;
 
-	rc = gpio_request(TEGRA_GPIO_PI5, "card_detect");
-	if (rc)
+	rc = gpio_request(CARDHU_SD_CD, "card_detect");
+	if (rc) {
+		pr_err("Card detect gpio request failed:%d\n", rc);
 		return rc;
+	}
 
-	tegra_gpio_enable(TEGRA_GPIO_PI5);
+	tegra_gpio_enable(CARDHU_SD_CD);
 
-	rc = gpio_direction_input(TEGRA_GPIO_PI5);
-	if (rc)
+	rc = gpio_direction_input(CARDHU_SD_CD);
+	if (rc) {
+		pr_err("Unable to configure direction for card detect gpio:%d\n", rc);
 		return rc;
+	}
 
 	return 0;
 }
@@ -160,15 +167,19 @@ static int cardhu_sd_wp_gpio_init(void)
 {
 	unsigned int rc = 0;
 
-	rc = gpio_request(TEGRA_GPIO_PT3, "write_protect");
-	if (rc)
+	rc = gpio_request(CARDHU_SD_WP, "write_protect");
+	if (rc) {
+		pr_err("Write protect gpio request failed:%d\n", rc);
 		return rc;
+	}
 
-	tegra_gpio_enable(TEGRA_GPIO_PT3);
+	tegra_gpio_enable(CARDHU_SD_WP);
 
-	rc = gpio_direction_input(TEGRA_GPIO_PT3);
-	if (rc)
+	rc = gpio_direction_input(CARDHU_SD_WP);
+	if (rc) {
+		pr_err("Unable to configure direction for write protect gpio:%d\n", rc);
 		return rc;
+	}
 
 	return 0;
 }
@@ -179,16 +190,18 @@ int __init cardhu_sdhci_init(void)
 	platform_device_register(&tegra_sdhci_device3);
 	platform_device_register(&tegra_sdhci_device2);
 
-#if 0
 	/* Fix ME: The gpios have to enabled for hot plug support */
 	rc = cardhu_sd_cd_gpio_init();
-	if (!rc)
-		tegra_sdhci_platform_data0.cd_gpio = TEGRA_GPIO_PI5;
-
+	if (!rc) {
+		tegra_sdhci_platform_data0.cd_gpio = CARDHU_SD_CD;
+		tegra_sdhci_platform_data0.cd_gpio_polarity = 0;
+	}
 	rc = cardhu_sd_wp_gpio_init();
-	if (!rc)
-		tegra_sdhci_platform_data0.cd_gpio = TEGRA_GPIO_PT3;
-#endif
+	if (!rc) {
+		tegra_sdhci_platform_data0.wp_gpio = CARDHU_SD_WP;
+		tegra_sdhci_platform_data0.wp_gpio_polarity = 1;
+	}
+
 	platform_device_register(&tegra_sdhci_device0);
 	return 0;
 }

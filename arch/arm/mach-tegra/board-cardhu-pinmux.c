@@ -375,10 +375,10 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux[] = {
 	DEFAULT_PINMUX(HDMI_INT,        RSVD0,           NORMAL,    TRISTATE,   INPUT),
 
 	/* Gpios */
-	/* SDMMC1 WP gpio */
-	DEFAULT_PINMUX(VI_D11,          RSVD1,           NORMAL,    NORMAL,     INPUT),
 	/* SDMMC1 CD gpio */
-	DEFAULT_PINMUX(GMI_IORDY,       RSVD1,           NORMAL,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(GMI_IORDY,       RSVD1,           PULL_UP,    NORMAL,     INPUT),
+	/* SDMMC1 WP gpio */
+	DEFAULT_PINMUX(VI_D11,          RSVD1,           PULL_UP,    NORMAL,     INPUT),
 
 
 	/* Power rails GPIO */
