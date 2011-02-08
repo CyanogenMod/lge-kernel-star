@@ -72,6 +72,23 @@ enum {
 	TEGRA_DC_ERRDIFF_DITHER,
 };
 
+enum {
+	TEGRA_PIN_OUT_CONFIG_SEL_LHP0_LD21,
+	TEGRA_PIN_OUT_CONFIG_SEL_LHP1_LD18,
+	TEGRA_PIN_OUT_CONFIG_SEL_LHP2_LD19,
+	TEGRA_PIN_OUT_CONFIG_SEL_LVP0_LVP0_Out,
+	TEGRA_PIN_OUT_CONFIG_SEL_LVP1_LD20,
+
+	TEGRA_PIN_OUT_CONFIG_SEL_LM1_M1,
+	TEGRA_PIN_OUT_CONFIG_SEL_LM1_LD21,
+	TEGRA_PIN_OUT_CONFIG_SEL_LM1_PM1,
+
+	TEGRA_PIN_OUT_CONFIG_SEL_LDI_LD22,
+	TEGRA_PIN_OUT_CONFIG_SEL_LPP_LD23,
+	TEGRA_PIN_OUT_CONFIG_SEL_LDC_SDC,
+	TEGRA_PIN_OUT_CONFIG_SEL_LSPI_DE,
+};
+
 struct tegra_dc_out {
 	int			type;
 	unsigned		flags;
@@ -96,6 +113,9 @@ struct tegra_dc_out {
 
 	struct tegra_dc_out_pin	*out_pins;
 	unsigned		n_out_pins;
+
+	u8			*out_sel_configs;
+	unsigned		n_out_sel_configs;
 
 	int	(*enable)(void);
 	int	(*postpoweron)(void);
