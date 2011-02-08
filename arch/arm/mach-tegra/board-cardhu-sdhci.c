@@ -77,6 +77,10 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data0 = {
 	.wp_gpio = -1,
 	.power_gpio = -1,
 	.tap_delay = 6,
+	.is_voltage_switch_supported = false,
+	.vsd_name = NULL,
+	.vsd_slot_name = NULL,
+	.max_clk = 48000000,
 };
 
 static struct tegra_sdhci_platform_data tegra_sdhci_platform_data2 = {
@@ -86,6 +90,10 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data2 = {
 	.wp_gpio = -1,
 	.power_gpio = -1,
 	.tap_delay = 6,
+	.is_voltage_switch_supported = true,
+	.vsd_name = "vddio_sdmmc1",
+	.vsd_slot_name = "vddio_sd_slot",
+	.max_clk = 104000000,
 };
 
 static struct tegra_sdhci_platform_data tegra_sdhci_platform_data3 = {
@@ -95,6 +103,10 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data3 = {
 	.wp_gpio = -1,
 	.power_gpio = -1,
 	.tap_delay = 6,
+	.is_voltage_switch_supported = false,
+	.vsd_name = NULL,
+	.vsd_slot_name = NULL,
+	.max_clk = 48000000,
 };
 
 static struct platform_device tegra_sdhci_device0 = {
