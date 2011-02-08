@@ -212,8 +212,10 @@ static int tps6586x_rtc_alarm_irq_enable(struct device *dev,
 			return err;
 		}
 
-		if (!rtc->irq_en)
+		if (!rtc->irq_en) {
 			enable_irq(rtc->irq);
+			rtc->irq_en = true;
+		}
 	} else {
 		err = tps6586x_clr_bits(tps_dev, RTC_CTRL, RTC_ENABLE);
 		if (err < 0) {
@@ -221,8 +223,10 @@ static int tps6586x_rtc_alarm_irq_enable(struct device *dev,
 			return err;
 		}
 
-		if (rtc->irq_en)
+		if (rtc->irq_en) {
 			disable_irq(rtc->irq);
+			rtc->irq_en = false;
+		}
 	}
 
 	return 0;
