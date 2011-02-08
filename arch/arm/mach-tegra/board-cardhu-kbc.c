@@ -211,7 +211,7 @@ int __init cardhu_scroll_init(void)
 		.debounce_interval = 10,	\
 	}
 
-static struct gpio_keys_button cardhu_keys[] = {
+static struct gpio_keys_button cardhu_keys_e1198[] = {
 	[0] = GPIO_KEY(KEY_HOME, PQ0, 0),
 	[1] = GPIO_KEY(KEY_BACK, PQ1, 0),
 	[2] = GPIO_KEY(KEY_MENU, PQ2, 0),
@@ -221,16 +221,38 @@ static struct gpio_keys_button cardhu_keys[] = {
 	[6] = GPIO_KEY(KEY_POWER, PV0, 1),
 };
 
-static struct gpio_keys_platform_data cardhu_keys_platform_data = {
-	.buttons	= cardhu_keys,
-	.nbuttons       = ARRAY_SIZE(cardhu_keys),
+static struct gpio_keys_platform_data cardhu_keys_e1198_platform_data = {
+	.buttons	= cardhu_keys_e1198,
+	.nbuttons       = ARRAY_SIZE(cardhu_keys_e1198),
 };
 
-static struct platform_device cardhu_keys_device = {
+static struct platform_device cardhu_keys_e1198_device = {
 	.name   = "gpio-keys",
 	.id     = 0,
 	.dev    = {
-		.platform_data  = &cardhu_keys_platform_data,
+		.platform_data  = &cardhu_keys_e1198_platform_data,
+	},
+};
+
+static struct gpio_keys_button cardhu_keys_e1291[] = {
+	[0] = GPIO_KEY(KEY_MENU, PR0, 0),
+	[1] = GPIO_KEY(KEY_BACK, PR1, 0),
+	[2] = GPIO_KEY(KEY_HOME, PR2, 0),
+	[3] = GPIO_KEY(KEY_SEARCH, PQ3, 0),
+	[4] = GPIO_KEY(KEY_VOLUMEUP, PQ0, 0),
+	[5] = GPIO_KEY(KEY_VOLUMEDOWN, PQ1, 0),
+};
+
+static struct gpio_keys_platform_data cardhu_keys_e1291_platform_data = {
+	.buttons	= cardhu_keys_e1291,
+	.nbuttons       = ARRAY_SIZE(cardhu_keys_e1291),
+};
+
+static struct platform_device cardhu_keys_e1291_device = {
+	.name   = "gpio-keys",
+	.id     = 0,
+	.dev    = {
+		.platform_data  = &cardhu_keys_e1291_platform_data,
 	},
 };
 
@@ -247,30 +269,20 @@ int __init cardhu_keys_init(void)
 
 	pr_info("Registering gpio keys\n");
 
-	/* Set KB_ROW2 to 0 for capcitive switch to be in scan mode */
 	if (board_info.board_id == BOARD_E1291) {
-		ret = gpio_request(TEGRA_GPIO_PR2, "cap_sw_sl_scan");
-		if (ret < 0) {
-			pr_err("%s: gpio_request failed #%d\n",
-					__func__, TEGRA_GPIO_PR2);
-			return ret;
-		}
-		ret = gpio_direction_output(TEGRA_GPIO_PR2, 0);
-		if (ret < 0) {
-			pr_err("%s: gpio_direction_output failed #%d\n",
-					__func__, TEGRA_GPIO_PR2);
-			gpio_free(TEGRA_GPIO_PR2);
-			return ret;
-		}
+		/* Enable gpio mode for other pins */
+		for (i = 0; i < ARRAY_SIZE(cardhu_keys_e1291); i++)
+			tegra_gpio_enable(cardhu_keys_e1291[i].gpio);
 
-		tegra_gpio_enable(TEGRA_GPIO_PR2);
+		platform_device_register(&cardhu_keys_e1291_device);
+		return 0;
 	}
 
-	/* Enable gpio mode for other pins */
-	for (i = 0; i < ARRAY_SIZE(cardhu_keys); i++)
-		tegra_gpio_enable(cardhu_keys[i].gpio);
+	/* For E1198 */
+	for (i = 0; i < ARRAY_SIZE(cardhu_keys_e1198); i++)
+		tegra_gpio_enable(cardhu_keys_e1198[i].gpio);
 
-	platform_device_register(&cardhu_keys_device);
+	platform_device_register(&cardhu_keys_e1198_device);
 	return 0;
 }
 #else
