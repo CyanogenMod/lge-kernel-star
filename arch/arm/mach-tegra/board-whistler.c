@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/board-whistler.c
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010 - 2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -127,6 +127,7 @@ static struct tegra_utmip_config utmi_phy_config[] = {
 static struct tegra_ulpi_config ulpi_phy_config = {
 	.reset_gpio = TEGRA_GPIO_PG2,
 	.clk = "clk_dev2",
+	.inf_type = TEGRA_USB_LINK_ULPI,
 };
 
 static __initdata struct tegra_clk_init_table whistler_clk_init_table[] = {
