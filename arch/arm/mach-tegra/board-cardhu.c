@@ -55,6 +55,20 @@
 #include "fuse.h"
 
 
+static struct usb_mass_storage_platform_data tegra_usb_fsg_platform = {
+	.vendor = "NVIDIA",
+	.product = "Tegra 3",
+	.nluns = 1,
+};
+
+static struct platform_device tegra_usb_fsg_device = {
+	.name = "usb_mass_storage",
+	.id = -1,
+	.dev = {
+		.platform_data = &tegra_usb_fsg_platform,
+	},
+};
+
 /* !!!TODO: Change for cardhu (Taken from Ventana) */
 static struct tegra_utmip_config utmi_phy_config[] = {
 	[0] = {
@@ -186,8 +200,8 @@ static __initdata struct tegra_clk_init_table cardhu_clk_init_table[] = {
 	{ NULL,		NULL,		0,		0},
 };
 
-static char *usb_functions[] = { "mtp" };
-static char *usb_functions_adb[] = { "mtp", "adb" };
+static char *usb_functions[] = { "mtp", "usb_mass_storage" };
+static char *usb_functions_adb[] = { "mtp", "adb", "usb_mass_storage" };
 
 static struct android_usb_product usb_products[] = {
 	{
@@ -361,6 +375,7 @@ static struct platform_device tegra_camera = {
 };
 
 static struct platform_device *cardhu_devices[] __initdata = {
+	&tegra_usb_fsg_device,
 	&androidusb_device,
 	&tegra_pmu_device,
 #if defined(CONFIG_RTC_DRV_TEGRA)
