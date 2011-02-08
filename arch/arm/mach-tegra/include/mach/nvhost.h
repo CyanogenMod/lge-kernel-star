@@ -115,10 +115,8 @@ struct nvhost_set_nvmap_fd_args {
 	_IOR(NVHOST_IOCTL_MAGIC, 4, struct nvhost_get_param_args)
 #define NVHOST_IOCTL_CHANNEL_SET_NVMAP_FD	\
 	_IOW(NVHOST_IOCTL_MAGIC, 5, struct nvhost_set_nvmap_fd_args)
-#define NVHOST_IOCTL_CHANNEL_NULL_KICKOFF	\
-	_IOR(NVHOST_IOCTL_MAGIC, 6, struct nvhost_get_param_args)
 #define NVHOST_IOCTL_CHANNEL_LAST		\
-	_IOC_NR(NVHOST_IOCTL_CHANNEL_NULL_KICKOFF)
+	_IOC_NR(NVHOST_IOCTL_CHANNEL_SET_NVMAP_FD)
 #define NVHOST_IOCTL_CHANNEL_MAX_ARG_SIZE sizeof(struct nvhost_get_param_args)
 
 struct nvhost_ctrl_syncpt_read_args {
