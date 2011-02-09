@@ -77,5 +77,14 @@ config NVMAP_CARVEOUT_KILLER
 	  processes. This will kill the largest consumers of lowest priority
 	  first.
 
+config NVMAP_CARVEOUT_COMPACTOR
+	bool "Compact carveout when it gets fragmented"
+	depends on TEGRA_NVMAP
+	default y
+	help
+	  When carveout allocation attempt fails, compactor defragements
+	  heap and retries the failed allocation.
+	  Say Y here to let nvmap to keep carveout fragmentation under control.
+
 endif
 
