@@ -223,7 +223,7 @@ config TEGRA_CLOCK_DEBUG_WRITE
 
 config TEGRA_AUTO_HOTPLUG
 	bool "Enable automatic CPU hot-plugging"
-	depends on HOTPLUG_CPU && CPU_FREQ
+	depends on HOTPLUG_CPU && CPU_FREQ && !ARCH_CPU_PROBE_RELEASE
 	default y
 	help
 	  This option enables turning CPUs off/on and switching tegra
