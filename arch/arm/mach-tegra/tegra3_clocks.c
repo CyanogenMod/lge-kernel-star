@@ -113,6 +113,8 @@
 #define PERIPH_CLK_SOURCE_NUM		(PERIPH_CLK_SOURCE_NUM1 + \
 					 PERIPH_CLK_SOURCE_NUM2)
 
+#define CPU_SOFTRST_CTRL		0x380
+
 #define PERIPH_CLK_SOURCE_DIVU71_MASK	0xFF
 #define PERIPH_CLK_SOURCE_DIVU16_MASK	0xFFFF
 #define PERIPH_CLK_SOURCE_DIV_SHIFT	0
@@ -3238,7 +3240,7 @@ struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void)
 
 #ifdef CONFIG_PM
 static u32 clk_rst_suspend[RST_DEVICES_NUM + CLK_OUT_ENB_NUM +
-			   PERIPH_CLK_SOURCE_NUM + 15];
+			   PERIPH_CLK_SOURCE_NUM + 16];
 
 void tegra_clk_suspend(void)
 {
@@ -3246,6 +3248,7 @@ void tegra_clk_suspend(void)
 	u32 *ctx = clk_rst_suspend;
 
 	*ctx++ = clk_readl(OSC_CTRL) & OSC_CTRL_MASK;
+	*ctx++ = clk_readl(CPU_SOFTRST_CTRL);
 	*ctx++ = clk_readl(tegra_pll_c.reg + PLL_BASE);
 	*ctx++ = clk_readl(tegra_pll_c.reg + PLL_MISC(&tegra_pll_c));
 	*ctx++ = clk_readl(tegra_pll_a.reg + PLL_BASE);
@@ -3298,6 +3301,7 @@ void tegra_clk_resume(void)
 	val = clk_readl(OSC_CTRL) & ~OSC_CTRL_MASK;
 	val |= *ctx++;
 	clk_writel(val, OSC_CTRL);
+	clk_writel(*ctx++, CPU_SOFTRST_CTRL);
 
 	/* FIXME: add plld, and wait for lock */
 	clk_writel(*ctx++, tegra_pll_c.reg + PLL_BASE);
