@@ -22,8 +22,10 @@
 #include <linux/i2c/pca954x.h>
 #include <linux/i2c/pca953x.h>
 
+#include <linux/nct1008.h>
 #include "board.h"
 #include "board-cardhu.h"
+#include "gpio-names.h"
 
 #ifdef CONFIG_I2C_MUX_PCA954x
 static struct pca954x_platform_mode cardhu_pca954x_modes[] = {
@@ -48,6 +50,61 @@ static const struct i2c_board_info cardhu_i2c3_board_info[] = {
 	},
 #endif
 };
+
+static struct nct1008_platform_data cardhu_nct1008_pdata = {
+	.supported_hwrev = true,
+	.ext_range = false,
+	.conv_rate = 0x08,
+	.offset = 0,
+	.hysteresis = 5,
+	.shutdown_ext_limit = 75,
+	.shutdown_local_limit = 75,
+	.throttling_ext_limit = 60,
+	.alarm_fn = NULL,
+};
+
+static struct i2c_board_info cardhu_i2c4_board_info[] = {
+	{
+		I2C_BOARD_INFO("nct1008", 0x4C),
+		.platform_data = &cardhu_nct1008_pdata,
+		.irq = -1,
+	}
+};
+
+static int cardhu_nct1008_init(void)
+{
+	int nct1008_port = -1;
+	struct board_info BoardInfo;
+	int ret;
+
+	tegra_get_board_info(&BoardInfo);
+	if ((BoardInfo.board_id == BOARD_E1198) ||
+		(BoardInfo.board_id == BOARD_E1291)) {
+		nct1008_port = TEGRA_GPIO_PCC2;
+	} else if ((BoardInfo.board_id == BOARD_E1186) ||
+		(BoardInfo.board_id == BOARD_E1187)) {
+		/* FIXME: seems to be conflicting with usb3 vbus on E1186 */
+		/* nct1008_port = TEGRA_GPIO_PH7; */
+	}
+
+	if (nct1008_port >= 0) {
+		/* FIXME: enable irq when throttling is supported */
+		/* cardhu_i2c4_board_info[0].irq = */
+		/* TEGRA_GPIO_TO_IRQ(nct1008_port); */
+
+		ret = gpio_request(nct1008_port, "temp_alert");
+		if (ret < 0)
+			return ret;
+
+		ret = gpio_direction_input(nct1008_port);
+		if (ret < 0)
+			gpio_free(nct1008_port);
+		else
+			tegra_gpio_enable(nct1008_port);
+
+	}
+	return ret;
+}
 
 #if defined(CONFIG_GPIO_PCA953X)
 static struct pca953x_platform_data cardhu_pmu_tca6416_data = {
@@ -83,11 +140,20 @@ static int __init pmu_tca6416_init(void)
 
 int __init cardhu_sensors_init(void)
 {
+	int err;
 
 	if (ARRAY_SIZE(cardhu_i2c3_board_info))
 		i2c_register_board_info(3, cardhu_i2c3_board_info,
 			ARRAY_SIZE(cardhu_i2c3_board_info));
 
 	pmu_tca6416_init();
+
+	i2c_register_board_info(4, cardhu_i2c4_board_info,
+		ARRAY_SIZE(cardhu_i2c4_board_info));
+
+	err = cardhu_nct1008_init();
+	if (err)
+		return err;
+
 	return 0;
 }
