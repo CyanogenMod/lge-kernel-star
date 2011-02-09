@@ -134,7 +134,7 @@ static struct regulator_consumer_supply tps6591x_ldo8_supply[] = {
 	REGULATOR_SUPPLY("vdd_ddr_hs", NULL),
 };
 
-#define REGULATOR_INIT(_id, _minmv, _maxmv)				\
+#define REGULATOR_INIT(_id, _minmv, _maxmv, _always_on, _boot_on, _apply_uv) \
 	{								\
 		.constraints = {					\
 			.min_uV = (_minmv)*1000,			\
@@ -144,6 +144,9 @@ static struct regulator_consumer_supply tps6591x_ldo8_supply[] = {
 			.valid_ops_mask = (REGULATOR_CHANGE_MODE |	\
 					   REGULATOR_CHANGE_STATUS |	\
 					   REGULATOR_CHANGE_VOLTAGE),	\
+			.always_on = _always_on,			\
+			.boot_on = _boot_on,				\
+			.apply_uV = _apply_uv,				\
 		},							\
 		.num_consumer_supplies = ARRAY_SIZE(tps6591x_##_id##_supply),\
 		.consumer_supplies = tps6591x_##_id##_supply,		\
@@ -165,24 +168,34 @@ static struct regulator_consumer_supply tps6591x_ldo8_supply[] = {
 		.supply_regulator = tps6591x_rails(_supply_reg),	\
 	}
 
-static struct regulator_init_data vdd1_data = REGULATOR_INIT(vdd1, 600, 1500);
-static struct regulator_init_data vdd2_data = REGULATOR_INIT(vdd2, 600, 1500);
+static struct regulator_init_data vdd1_data = REGULATOR_INIT(vdd1, 600, 1500,
+							1, 1, 0);
+static struct regulator_init_data vdd2_data = REGULATOR_INIT(vdd2, 600, 1500,
+							1, 1, 0);
 static struct regulator_init_data vddctrl_data = REGULATOR_INIT(vddctrl, 600,
-						1400);
-static struct regulator_init_data vio_data = REGULATOR_INIT(vio, 1500, 3300);
+						1400, 1, 1, 0);
+static struct regulator_init_data vio_data = REGULATOR_INIT(vio, 1500, 3300,
+							1, 1, 0);
+
 static struct regulator_init_data ldo1_data = REGULATOR_INIT_SUPPLY(ldo1,
 						1000, 3300, VDD_2);
 static struct regulator_init_data ldo2_data = REGULATOR_INIT_SUPPLY(ldo2,
 						1000, 3300, VDD_2);
-static struct regulator_init_data ldo3_data = REGULATOR_INIT(ldo3, 1000, 3300);
-static struct regulator_init_data ldo4_data = REGULATOR_INIT(ldo4, 1000, 3300);
-static struct regulator_init_data ldo5_data = REGULATOR_INIT(ldo5, 1000, 3300);
+
+static struct regulator_init_data ldo3_data = REGULATOR_INIT(ldo3, 1000, 3300,
+							0, 0, 0);
+static struct regulator_init_data ldo4_data = REGULATOR_INIT(ldo4, 1000, 3300,
+							0, 0, 0);
+static struct regulator_init_data ldo5_data = REGULATOR_INIT(ldo5, 1000, 3300,
+							0, 0, 0);
+
 static struct regulator_init_data ldo6_data = REGULATOR_INIT_SUPPLY(ldo6,
 						1000, 3300, VIO);
 static struct regulator_init_data ldo7_data = REGULATOR_INIT_SUPPLY(ldo7,
 						1000, 3300, VIO);
 static struct regulator_init_data ldo8_data = REGULATOR_INIT_SUPPLY(ldo8,
 						1000, 3300, VIO);
+
 
 static struct tps6591x_rtc_platform_data rtc_data = {
 	.irq = TEGRA_NR_IRQS + TPS6591X_INT_RTC_ALARM,
