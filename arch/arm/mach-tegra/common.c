@@ -94,12 +94,12 @@ static int board_panel_type;
 
 void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
 
-#define NEVER_RESET 1
+#define NEVER_RESET 0
 
 void tegra_assert_system_reset(char mode, const char *cmd)
 {
 #ifdef defined(CONFIG_TEGRA_FPGA_PLATFORM) || NEVER_RESET
-	printk("tegra_assert_system_reset() call attempted on FPGA target platform.....");
+	printk("tegra_assert_system_reset() ignored.....");
 	do { } while (1);
 #else
 	void __iomem *reset = IO_ADDRESS(TEGRA_PMC_BASE + 0x00);
