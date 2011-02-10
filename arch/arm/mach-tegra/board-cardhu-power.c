@@ -27,6 +27,7 @@
 #include <mach/suspend.h>
 #include <linux/io.h>
 #include <linux/gpio-switch-regulator.h>
+#include <linux/regulator/tps6591x-regulator.h>
 
 #include <mach/iomap.h>
 #include <mach/irqs.h>
@@ -134,93 +135,93 @@ static struct regulator_consumer_supply tps6591x_ldo8_supply[] = {
 	REGULATOR_SUPPLY("vdd_ddr_hs", NULL),
 };
 
-#define REGULATOR_INIT(_id, _minmv, _maxmv, _always_on, _boot_on, _apply_uv) \
+#define TPS_PDATA_INIT_SUPPLY(_id, _minmv, _maxmv, _supply_reg, _always_on, \
+	_boot_on, _apply_uv, _init_uV, _init_enable, _init_apply)	\
+	static struct tps6591x_regulator_platform_data pdata_##_id =	\
 	{								\
-		.constraints = {					\
-			.min_uV = (_minmv)*1000,			\
-			.max_uV = (_maxmv)*1000,			\
-			.valid_modes_mask = (REGULATOR_MODE_NORMAL |	\
-					     REGULATOR_MODE_STANDBY),	\
-			.valid_ops_mask = (REGULATOR_CHANGE_MODE |	\
-					   REGULATOR_CHANGE_STATUS |	\
-					   REGULATOR_CHANGE_VOLTAGE),	\
-			.always_on = _always_on,			\
-			.boot_on = _boot_on,				\
-			.apply_uV = _apply_uv,				\
+		.regulator = {						\
+			.constraints = {				\
+				.min_uV = (_minmv)*1000,		\
+				.max_uV = (_maxmv)*1000,		\
+				.valid_modes_mask = (REGULATOR_MODE_NORMAL |  \
+						     REGULATOR_MODE_STANDBY), \
+				.valid_ops_mask = (REGULATOR_CHANGE_MODE |    \
+						   REGULATOR_CHANGE_STATUS |  \
+						   REGULATOR_CHANGE_VOLTAGE), \
+			},						\
+			.num_consumer_supplies =			\
+				ARRAY_SIZE(tps6591x_##_id##_supply),	\
+			.consumer_supplies = tps6591x_##_id##_supply,	\
+			.supply_regulator = tps6591x_rails(_supply_reg), \
 		},							\
-		.num_consumer_supplies = ARRAY_SIZE(tps6591x_##_id##_supply),\
-		.consumer_supplies = tps6591x_##_id##_supply,		\
+		.init_uV =  _init_uV * 1000,				\
+		.init_enable = _init_enable,				\
+		.init_apply = _init_apply				\
 	}
 
-#define REGULATOR_INIT_SUPPLY(_id, _minmv, _maxmv, _supply_reg)		\
+#define TPS_PDATA_INIT(_id, _minmv, _maxmv, _supply_reg, _always_on,	\
+	_boot_on, _apply_uv, _init_uV, _init_enable, _init_apply)	\
+	static struct tps6591x_regulator_platform_data pdata_##_id =	\
 	{								\
-		.constraints = {					\
-			.min_uV = (_minmv)*1000,			\
-			.max_uV = (_maxmv)*1000,			\
-			.valid_modes_mask = (REGULATOR_MODE_NORMAL |	\
-					     REGULATOR_MODE_STANDBY),	\
-			.valid_ops_mask = (REGULATOR_CHANGE_MODE |	\
-					   REGULATOR_CHANGE_STATUS |	\
-					   REGULATOR_CHANGE_VOLTAGE),	\
+		.regulator = {						\
+			.constraints = {				\
+				.min_uV = (_minmv)*1000,		\
+				.max_uV = (_maxmv)*1000,		\
+				.valid_modes_mask = (REGULATOR_MODE_NORMAL |  \
+						     REGULATOR_MODE_STANDBY), \
+				.valid_ops_mask = (REGULATOR_CHANGE_MODE |    \
+						   REGULATOR_CHANGE_STATUS |  \
+						   REGULATOR_CHANGE_VOLTAGE), \
+			},						\
+			.num_consumer_supplies =			\
+				ARRAY_SIZE(tps6591x_##_id##_supply),	\
+			.consumer_supplies = tps6591x_##_id##_supply,	\
 		},							\
-		.num_consumer_supplies = ARRAY_SIZE(tps6591x_##_id##_supply),\
-		.consumer_supplies = tps6591x_##_id##_supply,		\
-		.supply_regulator = tps6591x_rails(_supply_reg),	\
+		.init_uV =  _init_uV * 1000,				\
+		.init_enable = _init_enable,				\
+		.init_apply = _init_apply				\
 	}
 
-static struct regulator_init_data vdd1_data = REGULATOR_INIT(vdd1, 600, 1500,
-							1, 1, 0);
-static struct regulator_init_data vdd2_data = REGULATOR_INIT(vdd2, 600, 1500,
-							1, 1, 0);
-static struct regulator_init_data vddctrl_data = REGULATOR_INIT(vddctrl, 600,
-						1400, 1, 1, 0);
-static struct regulator_init_data vio_data = REGULATOR_INIT(vio, 1500, 3300,
-							1, 1, 0);
+TPS_PDATA_INIT(vdd1,    600, 1500, 0, 1, 1, 0, -1, 0, 0);
+TPS_PDATA_INIT(vdd2,    600, 1500, 0, 1, 1, 0, -1, 0, 0);
+TPS_PDATA_INIT(vddctrl, 600, 1400, 0, 1, 1, 0, -1, 0, 0);
+TPS_PDATA_INIT(vio,    1500, 3300, 0, 1, 1, 0, -1, 0, 0);
 
-static struct regulator_init_data ldo1_data = REGULATOR_INIT_SUPPLY(ldo1,
-						1000, 3300, VDD_2);
-static struct regulator_init_data ldo2_data = REGULATOR_INIT_SUPPLY(ldo2,
-						1000, 3300, VDD_2);
+TPS_PDATA_INIT_SUPPLY(ldo1, 1000, 3300, VDD_2, 0, 0, 0, -1, 0, 0);
+TPS_PDATA_INIT_SUPPLY(ldo2, 1000, 3300, VDD_2, 0, 0, 0, -1, 0, 0);
 
-static struct regulator_init_data ldo3_data = REGULATOR_INIT(ldo3, 1000, 3300,
-							0, 0, 0);
-static struct regulator_init_data ldo4_data = REGULATOR_INIT(ldo4, 1000, 3300,
-							0, 0, 0);
-static struct regulator_init_data ldo5_data = REGULATOR_INIT(ldo5, 1000, 3300,
-							0, 0, 0);
+TPS_PDATA_INIT(ldo3, 1000, 3300, 0, 0, 0, 0, -1, 0, 0);
+TPS_PDATA_INIT(ldo4, 1000, 3300, 0, 0, 0, 0, -1, 0, 0);
+TPS_PDATA_INIT(ldo5, 1000, 3300, 0, 0, 0, 0, -1, 0, 0);
 
-static struct regulator_init_data ldo6_data = REGULATOR_INIT_SUPPLY(ldo6,
-						1000, 3300, VIO);
-static struct regulator_init_data ldo7_data = REGULATOR_INIT_SUPPLY(ldo7,
-						1000, 3300, VIO);
-static struct regulator_init_data ldo8_data = REGULATOR_INIT_SUPPLY(ldo8,
-						1000, 3300, VIO);
-
+TPS_PDATA_INIT_SUPPLY(ldo6, 1000, 3300, VIO, 0, 0, 0, -1, 0, 0);
+TPS_PDATA_INIT_SUPPLY(ldo7, 1000, 3300, VIO, 0, 0, 0, -1, 0, 0);
+TPS_PDATA_INIT_SUPPLY(ldo8, 1000, 3300, VIO, 0, 0, 0, -1, 0, 0);
 
 static struct tps6591x_rtc_platform_data rtc_data = {
 	.irq = TEGRA_NR_IRQS + TPS6591X_INT_RTC_ALARM,
 };
 
-#define TPS_REG(_id, _data)			\
-	{					\
-		.id	= TPS6591X_ID_##_id,	\
-		.name	= "tps6591x-regulator",	\
-		.platform_data	= _data,	\
+#define TPS_REG(_id, _data)				\
+	{						\
+		.id	= TPS6591X_ID_##_id,		\
+		.name	= "tps6591x-regulator",		\
+		.platform_data	= &pdata_##_data,	\
 	}
 
 static struct tps6591x_subdev_info tps_devs[] = {
-	TPS_REG(VIO, &vio_data),
-	TPS_REG(VDD_1, &vdd1_data),
-	TPS_REG(VDD_2, &vdd2_data),
-	TPS_REG(VDDCTRL, &vddctrl_data),
-	TPS_REG(LDO_1, &ldo1_data),
-	TPS_REG(LDO_2, &ldo2_data),
-	TPS_REG(LDO_3, &ldo3_data),
-	TPS_REG(LDO_4, &ldo4_data),
-	TPS_REG(LDO_5, &ldo5_data),
-	TPS_REG(LDO_6, &ldo6_data),
-	TPS_REG(LDO_7, &ldo7_data),
-	TPS_REG(LDO_8, &ldo8_data),
+	TPS_REG(VIO, vio),
+	TPS_REG(VDD_1, vdd1),
+	TPS_REG(VDD_2, vdd2),
+	TPS_REG(VDDCTRL, vddctrl),
+	TPS_REG(LDO_1, ldo1),
+	TPS_REG(LDO_2, ldo2),
+	TPS_REG(LDO_3, ldo3),
+	TPS_REG(LDO_4, ldo4),
+	TPS_REG(LDO_5, ldo5),
+	TPS_REG(LDO_6, ldo6),
+	TPS_REG(LDO_7, ldo7),
+	TPS_REG(LDO_8, ldo8),
 	{
 		.id	= 0,
 		.name	= "tps6591x-rtc",
@@ -286,7 +287,7 @@ static struct regulator_consumer_supply gpio_switch_en_3v3_sys_supply[] = {
 	REGULATOR_SUPPLY("vcom_3v3", NULL),
 	REGULATOR_SUPPLY("vdd_3v3", NULL),
 	REGULATOR_SUPPLY("vcore_mmc", NULL),
-	REGULATOR_SUPPLY("vddo_pex_ctl", NULL),
+	REGULATOR_SUPPLY("vddio_pex_ctl", NULL),
 	REGULATOR_SUPPLY("hvdd_pex", NULL),
 	REGULATOR_SUPPLY("avdd_hdmi", NULL),
 	REGULATOR_SUPPLY("vpp_fuse", NULL),
@@ -438,7 +439,7 @@ static int disable_load_switch_rail(
 }
 
 /* Macro for defining gpio switch regulator sub device data */
-#define GREG_INIT(_id, _name, _input_supply, _gpio_nr, _active_low, 	\
+#define GREG_INIT(_id, _name, _input_supply, _gpio_nr, _active_low,	\
 			_init_state, _pg, _enable, _disable)		\
 	[_id] = {							\
 		.regulator_name	= "gpio-switch-"#_name,			\
@@ -464,8 +465,7 @@ static int disable_load_switch_rail(
 		.disable_rail = _disable,				\
 	},
 
-static struct gpio_switch_regulator_subdev_data gswitch_subdevs[] =
-{
+static struct gpio_switch_regulator_subdev_data gswitch_subdevs[] = {
 /* Gpio switch regulator platform data */
 GREG_INIT(0, en_5v_cp,   NULL, TPS6591X_GPIO_GP0, false, 0, 0, 0, 0)
 GREG_INIT(1, en_5v0,     NULL, TPS6591X_GPIO_GP2, false, 0, 0, 0, 0)
