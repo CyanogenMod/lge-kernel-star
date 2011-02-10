@@ -68,14 +68,6 @@ void tegra_assert_system_reset(char mode, const char *cmd)
 	writel_relaxed(reg, reset);
 }
 
-static struct board_info tegra_board_info = {
-	.board_id = -1,
-	.sku = -1,
-	.fab = -1,
-	.major_revision = -1,
-	.minor_revision = -1,
-};
-
 static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 	/* name		parent		rate		enabled */
 	{ "clk_m",	NULL,		0,		true },
@@ -382,6 +374,13 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 	if (tegra_carveout_size && tegra_carveout_start < tegra_grhost_aperture)
 		tegra_grhost_aperture = tegra_carveout_start;
 
+#ifdef CONFIG_TEGRA_IOVMM_SMMU
+	if (memblock_reserve(TEGRA_SMMU_BASE, TEGRA_SMMU_SIZE)) {
+		pr_err("Failed to reserve SMMU I/O window %08u@%08u\n",
+			TEGRA_SMMU_BASE, TEGRA_SMMU_SIZE);
+	}
+#endif
+
 	/*
 	 * TODO: We should copy the bootloader's framebuffer to the framebuffer
 	 * allocated above, and then free this one.
@@ -416,4 +415,9 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 		tegra_carveout_start,
 		tegra_carveout_size ?
 			tegra_carveout_start + tegra_carveout_size - 1 : 0);
+
+#ifdef CONFIG_TEGRA_IOVMM_SMMU
+	pr_info("SMMU:                   %08u - %08u\n",
+		TEGRA_SMMU_BASE, TEGRA_SMMU_BASE + TEGRA_SMMU_SIZE - 1);
+#endif
 }
