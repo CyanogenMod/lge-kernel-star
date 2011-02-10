@@ -28,6 +28,7 @@
 #include <linux/platform_device.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
+#include <linux/regulator/tps6591x-regulator.h>
 #include <linux/mfd/tps6591x.h>
 
 /* supply control and voltage setting  */
@@ -513,9 +514,70 @@ static struct tps6591x_regulator tps6591x_regulator[] = {
 };
 
 static inline int tps6591x_regulator_preinit(struct device *parent,
-					     struct tps6591x_regulator *ri)
+		struct tps6591x_regulator *ri,
+		struct tps6591x_regulator_platform_data *tps6591x_pdata)
 {
-	return tps6591x_set_bits(parent, ri->supply_reg.addr, 0x1);
+	int ret;
+
+	if (!tps6591x_pdata->init_apply)
+		return 0;
+
+	if (tps6591x_pdata->init_uV >= 0) {
+		switch (ri->desc.id) {
+		case TPS6591X_ID_VIO:
+			ret = __tps6591x_vio_set_voltage(parent, ri,
+					tps6591x_pdata->init_uV,
+					tps6591x_pdata->init_uV);
+			break;
+
+		case TPS6591X_ID_LDO_1:
+		case TPS6591X_ID_LDO_2:
+		case TPS6591X_ID_LDO_4:
+			ret = __tps6591x_ldo1_set_voltage(parent, ri,
+					tps6591x_pdata->init_uV,
+					tps6591x_pdata->init_uV);
+			break;
+
+		case TPS6591X_ID_LDO_3:
+		case TPS6591X_ID_LDO_5:
+		case TPS6591X_ID_LDO_6:
+		case TPS6591X_ID_LDO_7:
+		case TPS6591X_ID_LDO_8:
+			ret = __tps6591x_ldo3_set_voltage(parent, ri,
+					tps6591x_pdata->init_uV,
+					tps6591x_pdata->init_uV);
+			break;
+
+		case TPS6591X_ID_VDD_1:
+		case TPS6591X_ID_VDD_2:
+		case TPS6591X_ID_VDDCTRL:
+			ret = __tps6591x_vdd_set_voltage(parent, ri,
+					tps6591x_pdata->init_uV,
+					tps6591x_pdata->init_uV);
+			break;
+
+		default:
+			ret = -EINVAL;
+			break;
+		}
+		if (ret < 0) {
+			pr_err("Not able to initialize voltage %d for rail "
+				"%d err %d\n", tps6591x_pdata->init_uV,
+				ri->desc.id, ret);
+			return ret;
+		}
+	}
+
+	if (tps6591x_pdata->init_enable)
+		ret = tps6591x_set_bits(parent, ri->supply_reg.addr, 0x1);
+	else
+		ret = tps6591x_clr_bits(parent, ri->supply_reg.addr, 0x1);
+
+	if (ret < 0)
+		pr_err("Not able to %s rail %d err %d\n",
+			(tps6591x_pdata->init_enable) ? "enable" : "disable",
+			ri->desc.id, ret);
+	return ret;
 }
 
 static inline struct tps6591x_regulator *find_regulator_info(int id)
@@ -535,6 +597,7 @@ static int __devinit tps6591x_regulator_probe(struct platform_device *pdev)
 {
 	struct tps6591x_regulator *ri = NULL;
 	struct regulator_dev *rdev;
+	struct tps6591x_regulator_platform_data *tps_pdata;
 	int id = pdev->id;
 	int err;
 
@@ -545,13 +608,14 @@ static int __devinit tps6591x_regulator_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "invalid regulator ID specified\n");
 		return -EINVAL;
 	}
+	tps_pdata = pdev->dev.platform_data;
 
-	err = tps6591x_regulator_preinit(pdev->dev.parent, ri);
+	err = tps6591x_regulator_preinit(pdev->dev.parent, ri, tps_pdata);
 	if (err)
 		return err;
 
 	rdev = regulator_register(&ri->desc, &pdev->dev,
-				  pdev->dev.platform_data, ri);
+				&tps_pdata->regulator, ri);
 	if (IS_ERR_OR_NULL(rdev)) {
 		dev_err(&pdev->dev, "failed to register regulator %s\n",
 				ri->desc.name);
