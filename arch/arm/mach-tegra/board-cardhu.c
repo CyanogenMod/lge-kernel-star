@@ -232,6 +232,11 @@ static struct platform_device tegra_rtc_device = {
 	.num_resources = ARRAY_SIZE(tegra_rtc_resources),
 };
 
+static struct platform_device tegra_camera = {
+	.name = "tegra_camera",
+	.id = -1,
+};
+
 static struct platform_device *cardhu_devices[] __initdata = {
 	&debug_uart,
 	&tegra_uartb_device,
@@ -252,6 +257,7 @@ static struct platform_device *cardhu_devices[] __initdata = {
 #endif
 	&tegra_wdt_device,
 	&tegra_avp_device,
+	&tegra_camera,
 };
 
 static int __init cardhu_touch_init(void)
