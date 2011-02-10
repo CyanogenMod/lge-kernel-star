@@ -1759,6 +1759,10 @@ static struct clk_ops tegra_dsib_clk_ops = {
 	.reset			= &tegra3_periph_clk_reset,
 };
 
+/* pciex clock support only reset function */
+static struct clk_ops tegra_pciex_clk_ops = {
+	.reset    = tegra3_periph_clk_reset,
+};
 
 /* Output clock ops */
 
@@ -2034,7 +2038,6 @@ static struct clk_ops tegra_cml_clk_ops = {
 	.enable			= &tegra3_cml_clk_enable,
 	.disable		= &tegra3_cml_clk_disable,
 };
-
 
 /* shared bus ops */
 /*
@@ -2577,6 +2580,16 @@ static struct clk tegra_cml1_clk = {
 	},
 };
 
+static struct clk tegra_pciex_clk = {
+	.name      = "pciex",
+	.parent    = &tegra_pll_e,
+	.ops       = &tegra_pciex_clk_ops,
+	.max_rate  = 100000000,
+	.u.periph  = {
+		.clk_num   = 74,
+	},
+};
+
 /* Audio sync clocks */
 #define SYNC_SOURCE(_id)				\
 	{						\
@@ -3061,6 +3074,8 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("extern2",	"extern2",		NULL,	121,	0x3f0,	216000000, mux_plla_clk32_pllp_clkm_plle,	MUX | MUX8 | DIV_U71),
 	PERIPH_CLK("extern3",	"extern3",		NULL,	122,	0x3f4,	216000000, mux_plla_clk32_pllp_clkm_plle,	MUX | MUX8 | DIV_U71),
 	PERIPH_CLK("i2cslow",	"i2cslow",		NULL,	81,	0x3fc,	26000000,  mux_pllp_pllc_clk32_clkm,	MUX | DIV_U71),
+	PERIPH_CLK("pcie",	"tegra-pcie",		"pcie",	70,	0,	250000000, mux_clk_m, 			0),
+	PERIPH_CLK("afi",	"tegra-pcie",		"afi",	72,	0,	250000000, mux_clk_m, 			0),
 
 	SHARED_CLK("avp.sclk",	"tegra-avp",		"sclk",	&tegra_clk_sclk),
 	SHARED_CLK("avp.emc",	"tegra-avp",		"emc",	&tegra_clk_emc),
@@ -3107,6 +3122,8 @@ struct clk_duplicate tegra_clk_duplicates[] = {
 	CLK_DUPLICATE("cop", "tegra-avp", "cop"),
 	CLK_DUPLICATE("vde", "tegra-aes", "vde"),
 	CLK_DUPLICATE("cml1", "tegra_sata_cml", NULL),
+	CLK_DUPLICATE("cml0", "tegra_pcie", "cml"),
+	CLK_DUPLICATE("pciex", "tegra_pcie", "pciex"),
 };
 
 struct clk *tegra_ptr_clks[] = {
@@ -3136,6 +3153,7 @@ struct clk *tegra_ptr_clks[] = {
 	&tegra_pll_e,
 	&tegra_cml0_clk,
 	&tegra_cml1_clk,
+	&tegra_pciex_clk,
 	&tegra_clk_cclk,
 	&tegra_clk_sclk,
 	&tegra_clk_hclk,
