@@ -57,6 +57,7 @@ void tegra_init_fuse(void)
 	u32 reg = readl(IO_TO_VIRT(TEGRA_CLK_RESET_BASE + 0x48));
 	reg |= 1 << 28;
 	writel(reg, IO_TO_VIRT(TEGRA_CLK_RESET_BASE + 0x48));
+	tegra_init_speedo_data();
 
 	pr_info("Tegra Revision: %s SKU: %d CPU Process: %d Core Process: %d\n",
 		tegra_revision_name[tegra_get_revision()],
@@ -85,22 +86,6 @@ int tegra_sku_id(void)
 	u32 reg = tegra_fuse_readl(FUSE_SKU_INFO);
 	sku_id = reg & 0xFF;
 	return sku_id;
-}
-
-int tegra_cpu_process_id(void)
-{
-	int cpu_process_id;
-	u32 reg = tegra_fuse_readl(FUSE_SPARE_BIT);
-	cpu_process_id = (reg >> 6) & 3;
-	return cpu_process_id;
-}
-
-int tegra_core_process_id(void)
-{
-	int core_process_id;
-	u32 reg = tegra_fuse_readl(FUSE_SPARE_BIT);
-	core_process_id = (reg >> 12) & 3;
-	return core_process_id;
 }
 
 enum tegra_revision tegra_get_revision(void)
