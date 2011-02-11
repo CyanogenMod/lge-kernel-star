@@ -219,6 +219,7 @@ static void __init tegra_ventana_init(void)
 	ventana_touch_init();
 	ventana_keys_init();
 	ventana_panel_init();
+	ventana_sensors_init();
 }
 
 MACHINE_START(VENTANA, "ventana")
