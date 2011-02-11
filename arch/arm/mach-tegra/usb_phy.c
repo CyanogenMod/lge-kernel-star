@@ -31,6 +31,7 @@
 #include <mach/usb_phy.h>
 #include <mach/iomap.h>
 #include <mach/pinmux.h>
+#include "gpio-names.h"
 
 #define ULPI_VIEWPORT		0x170
 #define   ULPI_WAKEUP		(1 << 31)
@@ -361,6 +362,7 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
+	int gpio_status;
 	struct tegra_utmip_config *config = phy->config;
 
 	val = readl(base + USB_SUSP_CTRL);
@@ -470,6 +472,21 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 		val = readl(base + USB_SUSP_CTRL);
 		val &= ~USB_SUSP_SET;
 		writel(val, base + USB_SUSP_CTRL);
+		if (phy->mode == TEGRA_USB_PHY_MODE_HOST) {
+			gpio_status = gpio_request(TEGRA_GPIO_PD0,"VBUS_BUS");
+			if (gpio_status < 0) {
+				printk("VBUS_USB1 request GPIO FAILED\n");
+				WARN_ON(1);
+			}
+			tegra_gpio_enable(TEGRA_GPIO_PD0);
+			gpio_status = gpio_direction_output(TEGRA_GPIO_PD0, 1);
+			if (gpio_status < 0) {
+				printk("VBUS_USB1 request GPIO DIRECTION FAILED \n");
+				WARN_ON(1);
+			}
+			gpio_set_value(TEGRA_GPIO_PD0, 1);
+			tegra_pinmux_set_tristate(TEGRA_PINGROUP_SLXK, TEGRA_TRI_NORMAL);
+		}
 	}
 
 	utmi_phy_clk_enable(phy);
@@ -489,6 +506,11 @@ static void utmi_phy_power_off(struct tegra_usb_phy *phy)
 	void __iomem *base = phy->regs;
 
 	utmi_phy_clk_disable(phy);
+
+	if (phy->instance == 0 && phy->mode == TEGRA_USB_PHY_MODE_HOST) {
+		gpio_free(TEGRA_GPIO_PD0);
+		tegra_pinmux_set_tristate(TEGRA_PINGROUP_SLXK, TEGRA_TRI_TRISTATE);
+	}
 
 	if (phy->mode == TEGRA_USB_PHY_MODE_DEVICE) {
 		val = readl(base + USB_SUSP_CTRL);

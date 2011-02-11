@@ -1575,7 +1575,7 @@ static void setup_received_irq(struct fsl_udc *udc,
 		udc->ep0_dir = (setup->bRequestType & USB_DIR_IN)
 				?  USB_DIR_IN : USB_DIR_OUT;
 		spin_unlock(&udc->lock);
-		if (udc->driver->setup(&udc->gadget,
+		if (udc->driver && udc->driver->setup(&udc->gadget,
 				&udc->local_setup_buff) < 0)
 			ep0stall(udc);
 		spin_lock(&udc->lock);
@@ -1585,7 +1585,7 @@ static void setup_received_irq(struct fsl_udc *udc,
 		/* No data phase, IN status from gadget */
 		udc->ep0_dir = USB_DIR_IN;
 		spin_unlock(&udc->lock);
-		if (udc->driver->setup(&udc->gadget,
+		if (udc->driver && udc->driver->setup(&udc->gadget,
 				&udc->local_setup_buff) < 0)
 			ep0stall(udc);
 		spin_lock(&udc->lock);
@@ -1831,7 +1831,7 @@ static void suspend_irq(struct fsl_udc *udc)
 	udc->usb_state = USB_STATE_SUSPENDED;
 
 	/* report suspend to the driver, serial.c does not support this */
-	if (udc->driver->suspend)
+	if (udc->driver && udc->driver->suspend)
 		udc->driver->suspend(&udc->gadget);
 }
 
@@ -1841,7 +1841,7 @@ static void bus_resume(struct fsl_udc *udc)
 	udc->resume_state = 0;
 
 	/* report resume to the driver, serial.c does not support this */
-	if (udc->driver->resume)
+	if (udc->driver && udc->driver->resume)
 		udc->driver->resume(&udc->gadget);
 }
 
@@ -1855,7 +1855,8 @@ static int reset_queues(struct fsl_udc *udc)
 
 	/* report disconnect; the driver is already quiesced */
 	spin_unlock(&udc->lock);
-	udc->driver->disconnect(&udc->gadget);
+	if (udc->driver && udc->driver->disconnect)
+		udc->driver->disconnect(&udc->gadget);
 	spin_lock(&udc->lock);
 
 	return 0;
