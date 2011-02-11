@@ -29,6 +29,7 @@
 #include <mach/irqs.h>
 
 #include "gpio-names.h"
+#include "fuse.h"
 #include "power.h"
 #include "wakeups-t2.h"
 #include "board.h"
@@ -161,11 +162,15 @@ static struct i2c_board_info __initdata ventana_regulators[] = {
 };
 
 static struct tegra_suspend_platform_data ventana_suspend_data = {
+	/*
+	 * Check power on time and crystal oscillator start time
+	 * for appropriate settings.
+	 */
 	.cpu_timer	= 2000,
-	.cpu_off_timer	= 0,
-	.suspend_mode	= TEGRA_SUSPEND_LP1,
+	.cpu_off_timer	= 100,
+	.suspend_mode	= TEGRA_SUSPEND_LP0,
 	.core_timer	= 0x7e7e,
-	.core_off_timer = 0,
+	.core_off_timer = 0xf,
 	.separate_req	= true,
 	.corereq_high	= false,
 	.sysclkreq_high	= true,
@@ -178,7 +183,14 @@ static struct tegra_suspend_platform_data ventana_suspend_data = {
 int __init ventana_regulator_init(void)
 {
 	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
+	void __iomem *chip_id = IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x804;
 	u32 pmc_ctrl;
+	u32 minor;
+
+	minor = (readl(chip_id) >> 16) & 0xf;
+	/* A03 (but not A03p) chips do not support LP0 */
+	if (minor == 3 && !(tegra_spare_fuse(18) || tegra_spare_fuse(19)))
+		ventana_suspend_data.suspend_mode = TEGRA_SUSPEND_LP1;
 
 	/* configure the power management controller to trigger PMU
 	 * interrupts when low */
