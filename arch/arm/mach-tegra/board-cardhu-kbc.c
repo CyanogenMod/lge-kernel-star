@@ -241,6 +241,7 @@ static struct gpio_keys_button cardhu_keys_e1291[] = {
 	[3] = GPIO_KEY(KEY_SEARCH, PQ3, 0),
 	[4] = GPIO_KEY(KEY_VOLUMEUP, PQ0, 0),
 	[5] = GPIO_KEY(KEY_VOLUMEDOWN, PQ1, 0),
+	[6] = GPIO_KEY(KEY_POWER, PV0, 1),
 };
 
 static struct gpio_keys_platform_data cardhu_keys_e1291_platform_data = {
@@ -259,7 +260,6 @@ static struct platform_device cardhu_keys_e1291_device = {
 int __init cardhu_keys_init(void)
 {
 	int i;
-	int ret;
 	struct board_info board_info;
 
 	tegra_get_board_info(&board_info);
