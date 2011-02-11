@@ -25,3 +25,43 @@ config BCM4329_NVRAM_PATH
 	default "/proc/calibration"
 	---help---
 	  Path to the calibration file.
+
+config BCM4329_WIFI_CONTROL_FUNC
+	bool "Use bcm4329_wlan device"
+	depends on BCM4329
+	default n
+	---help---
+	   Use this option to get various parameters from architecture specific
+	   bcm4329_wlan platform device. Say n if unsure.
+
+if BCM4329_WIFI_CONTROL_FUNC
+
+config BCM4329_DHD_USE_STATIC_BUF
+	bool "Use static buffer"
+	depends on BCM4329
+	default n
+	---help---
+	   Use static buffer from kernel heap allocated during bcm4329_wlan
+	   platform device creation.
+
+config BCM4329_HW_OOB
+	bool "Use out of band interrupt"
+	depends on BCM4329
+	default n
+	---help---
+	   Use out of band interrupt for wake on wireless.
+
+config BCM4329_OOB_INTR_ONLY
+	bool "Use out of band interrupt only"
+	depends on BCM4329
+	default n
+	---help---
+	   Use out of band interrupt for all interrupts(including SDIO interrupts).
+
+config BCM4329_GET_CUSTOM_MAC_ENABLE
+	bool "Use custom mac address"
+	depends on BCM4329
+	default n
+	---help---
+	   Use mac address provided by bcm4329_wlan platform device.
+endif
