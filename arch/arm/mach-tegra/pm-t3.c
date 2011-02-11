@@ -84,19 +84,8 @@
 #define CPU_CLOCK(cpu)	(0x1<<(8+cpu))
 #define CPU_RESET(cpu)	(0x1111ul<<(cpu))
 
-#define FLOW_CTRL_CLUSTER_CONTROL \
-	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + 0x2c)
-#define FLOW_CTRL_CPU_CSR_IMMEDIATE_WAKE	(1<<3)
-#define FLOW_CTRL_CPU_CSR_SWITCH_CLUSTER	(1<<2)
 
 void tegra_suspend_dram(bool lp0_ok, unsigned int flags);
-
-unsigned int is_lp_cluster(void)
-{
-	unsigned int reg;
-	reg = readl(FLOW_CTRL_CLUSTER_CONTROL);
-	return (reg & 1); /* 0 == G, 1 == LP*/
-}
 
 static int cluster_switch_prolog_clock(unsigned int flags)
 {
@@ -313,6 +302,10 @@ int tegra_cluster_control(unsigned int us, unsigned int flags)
 	if ((current_cluster == target_cluster)
 	&& !(flags & TEGRA_POWER_CLUSTER_FORCE))
 		return -EEXIST;
+
+	if (target_cluster == TEGRA_POWER_CLUSTER_G)
+		if (!is_g_cluster_present())
+			return -EPERM;
 
 	if (flags & TEGRA_POWER_CLUSTER_IMMEDIATE)
 		us = 0;

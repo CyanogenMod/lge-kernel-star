@@ -50,6 +50,21 @@ unsigned long tegra_cpu_power_off_time(void);
 #define TEGRA_POWER_CLUSTER_IMMEDIATE	0x4000	/* Immediate wake */
 #define TEGRA_POWER_CLUSTER_FORCE	0x8000	/* Force switch */
 
+#define FLOW_CTRL_HALT_CPU(cpu)	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + \
+	((cpu) == 0 ? 0x8 : (0x18 + 8 * ((cpu) - 1))))
+#define FLOW_CTRL_CPU_CSR(cpu)	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + \
+	((cpu) == 0 ? 0x0 : (0x4 + cpu * 0x10)))
+
+#define FLOW_CTRL_CLUSTER_CONTROL \
+	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + 0x2c)
+#define FLOW_CTRL_CPU_CSR_IMMEDIATE_WAKE	(1<<3)
+#define FLOW_CTRL_CPU_CSR_SWITCH_CLUSTER	(1<<2)
+
+#define FUSE_SKU_DIRECT_CONFIG \
+	(IO_ADDRESS(TEGRA_FUSE_BASE) + 0x1F4)
+#define FUSE_SKU_DISABLE_ALL_CPUS	(1<<5)
+#define FUSE_SKU_NUM_DISABLED_CPUS(x)	(((x) >> 3) & 3)
+
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 void tegra2_lp0_suspend_init(void);
 #else
@@ -89,6 +104,8 @@ static inline int tegra_cluster_control(unsigned int us, unsigned int flags)
 { return -EPERM; }
 #define tegra_cluster_switch_prolog(flags) do {} while(0)
 #define tegra_cluster_switch_epilog(flags) do {} while(0)
+static inline bool is_g_cluster_present(void)
+{ return true; }
 static inline unsigned int is_lp_cluster(void)
 { return 0; }
 static inline unsigned long tegra_get_lpcpu_max_rate(void)
@@ -99,7 +116,19 @@ static inline unsigned long tegra_get_lpcpu_max_rate(void)
 int tegra_cluster_control(unsigned int us, unsigned int flags);
 void tegra_cluster_switch_prolog(unsigned int flags);
 void tegra_cluster_switch_epilog(unsigned int flags);
-unsigned int is_lp_cluster(void);
+static inline bool is_g_cluster_present(void)
+{
+	u32 fuse_sku = readl(FUSE_SKU_DIRECT_CONFIG);
+	if (fuse_sku & FUSE_SKU_DISABLE_ALL_CPUS)
+		return false;
+	return true;
+}
+static inline unsigned int is_lp_cluster(void)
+{
+	unsigned int reg;
+	reg = readl(FLOW_CTRL_CLUSTER_CONTROL);
+	return (reg & 1); /* 0 == G, 1 == LP*/
+}
 unsigned long tegra_get_lpcpu_max_rate(void);
 #endif
 
@@ -109,11 +138,6 @@ extern unsigned int tegra_cluster_debug;
 #else
 #define DEBUG_CLUSTER(x) do { } while (0)
 #endif
-
-#define FLOW_CTRL_HALT_CPU(cpu)	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + \
-	((cpu) == 0 ? 0x8 : (0x18 + 8 * ((cpu) - 1))))
-#define FLOW_CTRL_CPU_CSR(cpu)	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + \
-	((cpu) == 0 ? 0x0 : (0x4 + cpu * 0x10)))
 
 static inline void flowctrl_writel(unsigned long val, void __iomem *addr)
 {

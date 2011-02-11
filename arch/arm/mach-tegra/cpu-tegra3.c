@@ -195,11 +195,15 @@ static void tegra_auto_hotplug_work_func(struct work_struct *work)
 
 void tegra_auto_hotplug_governor(unsigned int cpu_freq)
 {
+	if (!is_g_cluster_present())
+		return;
+
 	mutex_lock(&tegra_hp_lock);
 
 	if (is_lp_cluster() && (cpu_freq > lpcpu_max_freq)) {
-		tegra_cluster_control(0, TEGRA_POWER_CLUSTER_G |
-					 TEGRA_POWER_CLUSTER_IMMEDIATE);
+		if (tegra_cluster_control(0, TEGRA_POWER_CLUSTER_G |
+					     TEGRA_POWER_CLUSTER_IMMEDIATE))
+			goto fail;
 		hp_stats_update(CONFIG_NR_CPUS, false);
 		hp_stats_update(0, true);
 	}
@@ -241,6 +245,7 @@ void tegra_auto_hotplug_governor(unsigned int cpu_freq)
 		       __func__, hp_state);
 		BUG();
 	}
+fail:
 	mutex_unlock(&tegra_hp_lock);
 }
 

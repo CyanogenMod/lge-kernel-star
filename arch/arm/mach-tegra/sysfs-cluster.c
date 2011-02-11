@@ -104,9 +104,6 @@
 #define PRINT_CLUSTER(x)
 #endif
 
-#define FLOW_CTRL_CLUSTER_CONTROL \
-	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + 0x2c)
-
 static struct kobject *cluster_kobj;
 static spinlock_t cluster_lock;
 static unsigned int flags = 0;

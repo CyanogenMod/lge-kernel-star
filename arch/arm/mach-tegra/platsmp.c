@@ -63,10 +63,6 @@ static int power_up_cpu(unsigned int cpu);
 #define CLK_RST_CONTROLLER_CPU_CMPLX_STATUS \
 	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x470)
 
-#define FUSE_SKU_DIRECT_CONFIG \
-	(IO_ADDRESS(TEGRA_FUSE_BASE) + 0x1F4)
-#define FUSE_SKU_DISABLE_ALL_CPUS	(1<<5)
-#define FUSE_SKU_NUM_DISABLED_CPUS(x)	(((x) >> 3) & 3)
 #endif
 
 extern void tegra_secondary_startup(void);
@@ -165,7 +161,7 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
 	scu_enable(scu_base);
 }
 
-#if defined(CONFIG_ARCH_TEGRA_3x_SOC)
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
 
 static bool is_cpu_powered(unsigned int cpu)
 {
