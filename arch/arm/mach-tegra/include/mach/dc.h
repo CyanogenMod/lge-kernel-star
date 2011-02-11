@@ -37,6 +37,7 @@ struct tegra_dc_mode {
 	int	v_active;
 	int	h_front_porch;
 	int	v_front_porch;
+	int	stereo_mode;
 	u32	flags;
 };
 
