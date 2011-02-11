@@ -1,7 +1,7 @@
 /*
  * ov5650.c - ov5650 sensor driver
  *
- * Copyright (C) 2010 Google Inc.
+ * Copyright (C) 2011 Google Inc.
  *
  * Contributors:
  *      Rebecca Schultz Zavin <rebecca@android.com>
