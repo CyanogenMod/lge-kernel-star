@@ -15,6 +15,9 @@
  *
  */
 
+/*#define DEBUG           1*/
+/*#define VERBOSE_DEBUG   1*/
+
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/platform_device.h>
@@ -324,7 +327,7 @@ static void configure_i2c_slave_address(struct tegra_i2c_slave_dev *i2c_dev)
 					I2C_SLV_ADDR2_ADDR0_TEN_BIT_ADDR_MODE;
 		writel(slave_add_reg, i2c_dev->base + I2C_SLV_ADDR2);
 	} else {
-		slave_add = (i2c_dev->slave_add & 0x3FF) >> 1;
+		slave_add = (i2c_dev->slave_add & 0x3FF);
 		slave_add_reg = readl(i2c_dev->base + I2C_SLV_ADDR1);
 		slave_add_reg |= slave_add << I2C_SLV_ADDR1_ADDR_SHIFT;
 		writel(slave_add_reg, i2c_dev->base + I2C_SLV_ADDR1);
@@ -1011,19 +1014,20 @@ static int tegra_i2c_slave_probe(struct platform_device *pdev)
 	i2c_bus->bus_clk_rate = pdata->bus_clk_rate ?: 100000;
 
 	i2c_bus->slv_adap.slv_algo = &tegra_i2c_slave_algo;
-
-	i2c_set_slave_adapdata(&i2c_bus->slv_adap, i2c_bus);
 	i2c_bus->slv_adap.owner = THIS_MODULE;
 	i2c_bus->slv_adap.class = I2C_CLASS_HWMON;
 	strlcpy(i2c_bus->slv_adap.name, "Tegra I2C SLAVE adapter",
 				sizeof(i2c_bus->slv_adap.name));
-	i2c_bus->slv_adap.dev.parent = &pdev->dev;
+	i2c_bus->slv_adap.parent_dev = &pdev->dev;
+	i2c_bus->slv_adap.dev = NULL;
 	i2c_bus->slv_adap.nr = pdata->adapter_nr;
 	ret = i2c_add_slave_adapter(&i2c_bus->slv_adap, true);
-	if (ret) {
+	if (ret < 0) {
 		dev_err(&pdev->dev, "Failed to add I2C adapter\n");
 		goto err_free_irq;
 	}
+	i2c_set_slave_adapdata(&i2c_bus->slv_adap, i2c_bus);
+	dev_dbg(&pdev->dev, "%s() suucess\n", __func__);
 	return 0;
 
 err_free_irq:
@@ -1038,6 +1042,7 @@ err_release_region:
 	release_mem_region(iomem->start, resource_size(iomem));
 err_iounmap:
 	iounmap(base);
+	dev_dbg(&pdev->dev, "%s() failed %d\n", __func__, ret);
 	return ret;
 }
 
@@ -1091,5 +1096,5 @@ static void __exit tegra_i2c_slave_exit_driver(void)
 {
 	platform_driver_unregister(&tegra_i2c_slave_driver);
 }
-module_init(tegra_i2c_slave_init_driver);
+subsys_initcall(tegra_i2c_slave_init_driver);
 module_exit(tegra_i2c_slave_exit_driver);

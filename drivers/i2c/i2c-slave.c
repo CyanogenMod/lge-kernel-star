@@ -246,7 +246,7 @@ int i2c_add_slave_adapter(struct i2c_slave_adapter *slv_adap, bool force_nr)
 	priv->master_adap.id = slv_adap->id;
 	priv->master_adap.algo = &priv->master_algo;
 	priv->master_adap.algo_data = priv;
-	priv->master_adap.dev.parent = &slv_adap->dev;
+	priv->master_adap.dev.parent = slv_adap->parent_dev;
 
 	if (force_nr) {
 		priv->master_adap.nr = slv_adap->nr;
@@ -255,13 +255,13 @@ int i2c_add_slave_adapter(struct i2c_slave_adapter *slv_adap, bool force_nr)
 		ret = i2c_add_adapter(&priv->master_adap);
 	}
 	if (ret < 0) {
-		dev_err(&slv_adap->dev,
+		dev_err(slv_adap->parent_dev,
 			"failed to add slave-adapter (error=%d)\n", ret);
 		kfree(priv);
 		return ret;
 	}
-
-	dev_info(&slv_adap->dev, "Added slave i2c bus %d\n",
+	slv_adap->dev = &priv->master_adap.dev;
+	dev_info(slv_adap->parent_dev, "Added slave i2c bus %d\n",
 		 i2c_adapter_id(&priv->master_adap));
 
 	return 0;

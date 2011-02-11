@@ -167,7 +167,8 @@ struct i2c_slave_adapter {
 
 	int timeout;			/* in jiffies */
 	int retries;
-	struct device dev;		/* the adapter device */
+	struct device *dev;		/* the adapter device */
+	struct device *parent_dev;	/* the adapter device */
 
 	int nr;
 	char name[48];
@@ -176,13 +177,13 @@ struct i2c_slave_adapter {
 
 static inline void *i2c_get_slave_adapdata(const struct i2c_slave_adapter *dev)
 {
-	return dev_get_drvdata(&dev->dev);
+	return dev_get_drvdata(dev->dev);
 }
 
 static inline void i2c_set_slave_adapdata(struct i2c_slave_adapter *dev,
 		void *data)
 {
-	dev_set_drvdata(&dev->dev, data);
+	dev_set_drvdata(dev->dev, data);
 }
 
 /*
