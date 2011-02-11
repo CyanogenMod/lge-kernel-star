@@ -58,6 +58,13 @@ enum fsl_usb2_phy_modes {
 	FSL_USB2_PHY_SERIAL,
 };
 
+enum fsl_usb2_phy_types {
+	FSL_USB2_PHY_TYPE_UTMIP = 1,
+	FSL_USB2_PHY_TYPE_ULPI = 2,
+	FSL_USB2_PHY_TYPE_HSIC = 3,
+	FSL_USB2_PHY_TYPE_ICUSB = 4,
+};
+
 struct clk;
 struct platform_device;
 
@@ -80,6 +87,7 @@ struct fsl_usb2_platform_data {
 	unsigned	invert_drvvbus:1;
 	unsigned	invert_pwr_fault:1;
         void		*phy_config;
+	enum fsl_usb2_phy_types usb_phy_type;
 };
 
 /* Flags in fsl_usb2_mph_platform_data */

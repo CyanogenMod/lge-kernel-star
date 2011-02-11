@@ -1313,7 +1313,8 @@ static irqreturn_t usb_phy_vbus_irq_thr(int irq, void *pdata)
 }
 
 struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
-			void *config, enum tegra_usb_phy_mode phy_mode)
+			void *config, enum tegra_usb_phy_mode phy_mode,
+			enum tegra_usb_phy_type usb_phy_type)
 {
 	struct tegra_usb_phy *phy;
 	struct tegra_ulpi_config *ulpi_config;
@@ -1330,6 +1331,7 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 	phy->regs = regs;
 	phy->config = config;
 	phy->mode = phy_mode;
+	phy->usb_phy_type = usb_phy_type;
 	phy->initialized = 0;
 	phy->regulator_on = 0;
 
@@ -1378,7 +1380,7 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 		goto err1;
 	}
 
-	if (phy_is_ulpi(phy)) {
+	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_ULPI) {
 		ulpi_config = config;
 
 		if (ulpi_config->inf_type == TEGRA_USB_LINK_ULPI) {
@@ -1483,7 +1485,7 @@ void tegra_usb_phy_power_off(struct tegra_usb_phy *phy)
 
 void tegra_usb_phy_preresume(struct tegra_usb_phy *phy)
 {
-	if (!phy_is_ulpi(phy))
+	if (phy->usb_phy_type != TEGRA_USB_PHY_TYPE_ULPI)
 		utmi_phy_preresume(phy);
 }
 
@@ -1519,7 +1521,7 @@ void tegra_ehci_phy_restore_end(struct tegra_usb_phy *phy)
 
 void tegra_usb_phy_clk_disable(struct tegra_usb_phy *phy)
 {
-	if (!phy_is_ulpi(phy))
+	if (phy->usb_phy_type != TEGRA_USB_PHY_TYPE_ULPI)
 		utmi_phy_clk_disable(phy);
 }
 
