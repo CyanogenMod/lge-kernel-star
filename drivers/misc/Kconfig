@@ -483,6 +483,12 @@ config PCH_PHUB
 	  To compile this driver as a module, choose M here: the module will
 	  be called pch_phub.
 
+config BCM4329_RFKILL
+	bool "Enable BCM4329 RFKILL driver"
+	default n
+	---help---
+	Adds BCM4329 RFKILL driver for Broadcom BCM4329 chipset
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
