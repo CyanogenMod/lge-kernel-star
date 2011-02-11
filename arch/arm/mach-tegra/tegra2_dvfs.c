@@ -38,13 +38,17 @@ static bool tegra_dvfs_cpu_disabled = true;
 #endif
 
 static const int core_millivolts[MAX_DVFS_FREQS] =
-	{950, 1000, 1100, 1200, 1275};
+	{950, 1000, 1100, 1200, 1275, 1300};
 static const int cpu_millivolts[MAX_DVFS_FREQS] =
 	{750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000, 1025, 1050, 1100, 1125};
 
 static const int cpu_speedo_nominal_millivolts[] =
 /* spedo_id  0,    1,    2 */
 	{ 1100, 1025, 1125 };
+
+static const int core_speedo_nominal_millivolts[] =
+/* spedo_id  0,    1,    2 */
+	{ 1200, 1200, 1300 };
 
 #define KHZ 1000
 #define MHZ 1000000
@@ -58,7 +62,7 @@ static struct dvfs_rail tegra2_dvfs_rail_vdd_cpu = {
 
 static struct dvfs_rail tegra2_dvfs_rail_vdd_core = {
 	.reg_id = "vdd_core",
-	.max_millivolts = 1275,
+	.max_millivolts = 1300,
 	.min_millivolts = 950,
 	.nominal_millivolts = 1200,
 	.step = 150, /* step vdd_core by 150 mV to allow vdd_aon to follow */
@@ -66,7 +70,7 @@ static struct dvfs_rail tegra2_dvfs_rail_vdd_core = {
 
 static struct dvfs_rail tegra2_dvfs_rail_vdd_aon = {
 	.reg_id = "vdd_aon",
-	.max_millivolts = 1275,
+	.max_millivolts = 1300,
 	.min_millivolts = 950,
 	.nominal_millivolts = 1200,
 #ifndef CONFIG_TEGRA_CORE_DVFS
@@ -136,11 +140,11 @@ static struct dvfs_rail *tegra2_dvfs_rails[] = {
 		.dvfs_rail	= &tegra2_dvfs_rail_vdd_cpu,	\
 	}
 
-#define CORE_DVFS(_clk_name, _auto, _mult, _freqs...)		\
+#define CORE_DVFS(_clk_name, _process_id, _auto, _mult, _freqs...)	\
 	{							\
 		.clk_name	= _clk_name,			\
 		.speedo_id	= -1,				\
-		.process_id	= -1,				\
+		.process_id	= _process_id,				\
 		.freqs		= {_freqs},			\
 		.freqs_mult	= _mult,			\
 		.millivolts	= core_millivolts,		\
@@ -165,8 +169,8 @@ static struct dvfs dvfs_init[] = {
 	CPU_DVFS("cpu", 2, 2, MHZ,   0,   0,   0,   0, 769, 769,  902,  902,  1026, 1026, 1140, 1140, 1200),
 	CPU_DVFS("cpu", 2, 3, MHZ,   0,   0,   0,   0, 940, 1000, 1000, 1000, 1130, 1130, 1200),
 
-	/* Core voltages (mV):       950,    1000,   1100,   1200,   1275 */
-	CORE_DVFS("emc",     1, KHZ, 57000,  333000, 333000, 666000, 666000),
+	/* Core voltages (mV):       950,    1000,   1100,   1200,   1275,   1300 */
+	CORE_DVFS("emc", -1,  1, KHZ, 57000,  333000, 333000, 666000, 666000, 760000),
 
 #if 0
 	/*
@@ -181,16 +185,16 @@ static struct dvfs dvfs_init[] = {
 	CORE_DVFS("sdmmc4",  1, KHZ, 44000,  52000,  52000,  52000,  52000),
 #endif
 
-	CORE_DVFS("ndflash", 1, KHZ, 130000, 150000, 158000, 164000, 164000),
-	CORE_DVFS("nor",     1, KHZ, 0,      92000,  92000,  92000,  92000),
-	CORE_DVFS("ide",     1, KHZ, 0,      0,      100000, 100000, 100000),
-	CORE_DVFS("mipi",    1, KHZ, 0,      40000,  40000,  40000, 60000),
-	CORE_DVFS("usbd",    1, KHZ, 0,      0,      0,      480000, 480000),
-	CORE_DVFS("usb2",    1, KHZ, 0,      0,      0,      480000, 480000),
-	CORE_DVFS("usb3",    1, KHZ, 0,      0,      0,      480000, 480000),
-	CORE_DVFS("pcie",    1, KHZ, 0,      0,      0,      250000, 250000),
-	CORE_DVFS("dsi",     1, KHZ, 100000, 100000, 100000, 500000, 500000),
-	CORE_DVFS("tvo",     1, KHZ, 0,      0,      0,      250000, 250000),
+	CORE_DVFS("ndflash", -1, 1, KHZ, 130000, 150000, 158000, 164000, 164000, 164000),
+	CORE_DVFS("nor",     -1, 1, KHZ, 0,      92000,  92000,  92000,  92000,  92000),
+	CORE_DVFS("ide",     -1, 1, KHZ, 0,      0,      100000, 100000, 100000, 100000),
+	CORE_DVFS("mipi",    -1, 1, KHZ, 0,      40000,  40000,  40000,  60000,  60000),
+	CORE_DVFS("usbd",    -1, 1, KHZ, 0,      0,      0,      480000, 480000, 480000),
+	CORE_DVFS("usb2",    -1, 1, KHZ, 0,      0,      0,      480000, 480000, 480000),
+	CORE_DVFS("usb3",    -1, 1, KHZ, 0,      0,      0,      480000, 480000, 480000),
+	CORE_DVFS("pcie",    -1, 1, KHZ, 0,      0,      0,      250000, 250000, 250000),
+	CORE_DVFS("dsi",     -1, 1, KHZ, 100000, 100000, 100000, 500000, 500000, 500000),
+	CORE_DVFS("tvo",     -1, 1, KHZ, 0,      0,      0,      250000, 250000, 250000),
 
 	/*
 	 * The clock rate for the display controllers that determines the
@@ -198,24 +202,24 @@ static struct dvfs dvfs_init[] = {
 	 * to the display block.  Disable auto-dvfs on the display clocks,
 	 * and let the display driver call tegra_dvfs_set_rate manually
 	 */
-	CORE_DVFS("disp1",   0, KHZ, 158000, 158000, 190000, 190000, 190000),
-	CORE_DVFS("disp2",   0, KHZ, 158000, 158000, 190000, 190000, 190000),
-	CORE_DVFS("hdmi",    0, KHZ, 0,      0,      0,      148500, 148500),
+	CORE_DVFS("disp1",   -1, 0, KHZ, 158000, 158000, 190000, 190000, 190000, 190000),
+	CORE_DVFS("disp2",   -1, 0, KHZ, 158000, 158000, 190000, 190000, 190000, 190000),
+	CORE_DVFS("hdmi",    -1, 0, KHZ, 0,      0,      0,      148500, 148500, 148500),
 
 	/*
 	 * These clocks technically depend on the core process id,
 	 * but just use the worst case value for now
 	 */
-	CORE_DVFS("host1x",  1, KHZ, 104500, 133000, 166000, 166000, 166000),
-	CORE_DVFS("epp",     1, KHZ, 133000, 171000, 247000, 300000, 300000),
-	CORE_DVFS("2d",      1, KHZ, 133000, 171000, 247000, 300000, 300000),
-	CORE_DVFS("3d",      1, KHZ, 114000, 161500, 247000, 300000, 300000),
-	CORE_DVFS("mpe",     1, KHZ, 104500, 152000, 228000, 250000, 250000),
-	CORE_DVFS("vi",      1, KHZ, 85000,  100000, 150000, 150000, 150000),
-	CORE_DVFS("sclk",    1, KHZ, 95000,  133000, 190000, 250000, 250000),
-	CORE_DVFS("vde",     1, KHZ, 95000,  123500, 209000, 250000, 250000),
+	CORE_DVFS("host1x", -1, 1, KHZ, 104500, 133000, 166000, 166000, 166000, 166000),
+	CORE_DVFS("epp",    -1, 1, KHZ, 133000, 171000, 247000, 300000, 300000, 300000),
+	CORE_DVFS("2d",     -1, 1, KHZ, 133000, 171000, 247000, 300000, 300000, 300000),
+	CORE_DVFS("3d",     -1, 1, KHZ, 114000, 161500, 247000, 300000, 300000, 300000),
+	CORE_DVFS("mpe",    -1, 1, KHZ, 104500, 152000, 228000, 250000, 250000, 250000),
+	CORE_DVFS("vi",     -1, 1, KHZ, 85000,  100000, 150000, 150000, 150000, 150000),
+	CORE_DVFS("sclk",   -1, 1, KHZ, 95000,  133000, 190000, 250000, 250000, 250000),
+	CORE_DVFS("vde",    -1, 1, KHZ, 95000,  123500, 209000, 250000, 250000, 250000),
 	/* What is this? */
-	CORE_DVFS("NVRM_DEVID_CLK_SRC", 1, MHZ, 480, 600, 800, 1067, 1067),
+	CORE_DVFS("NVRM_DEVID_CLK_SRC", -1, 1, MHZ, 480, 600, 800, 1067, 1067, 1067),
 };
 
 int tegra_dvfs_disable_core_set(const char *arg, const struct kernel_param *kp)
@@ -284,6 +288,11 @@ void __init tegra2_init_dvfs(void)
 	BUG_ON(speedo_id >= ARRAY_SIZE(cpu_speedo_nominal_millivolts));
 	tegra2_dvfs_rail_vdd_cpu.nominal_millivolts =
 		cpu_speedo_nominal_millivolts[speedo_id];
+	BUG_ON(speedo_id >= ARRAY_SIZE(core_speedo_nominal_millivolts));
+	tegra2_dvfs_rail_vdd_core.nominal_millivolts =
+		core_speedo_nominal_millivolts[speedo_id];
+	tegra2_dvfs_rail_vdd_aon.nominal_millivolts =
+		core_speedo_nominal_millivolts[speedo_id];
 
 	tegra_dvfs_init_rails(tegra2_dvfs_rails, ARRAY_SIZE(tegra2_dvfs_rails));
 	tegra_dvfs_add_relationships(tegra2_dvfs_relationships,
