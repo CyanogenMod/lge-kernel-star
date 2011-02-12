@@ -376,7 +376,7 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 
 #ifdef CONFIG_TEGRA_IOVMM_SMMU
 	if (memblock_reserve(TEGRA_SMMU_BASE, TEGRA_SMMU_SIZE)) {
-		pr_err("Failed to reserve SMMU I/O VA window %08lx@%08lx\n",
+		pr_err("Failed to reserve SMMU I/O VA window %08x@%08x\n",
 			TEGRA_SMMU_BASE, TEGRA_SMMU_SIZE);
 	}
 #endif
@@ -417,7 +417,7 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 			tegra_carveout_start + tegra_carveout_size - 1 : 0);
 
 #ifdef CONFIG_TEGRA_IOVMM_SMMU
-	pr_info("SMMU:                   %08lx - %08lx\n",
+	pr_info("SMMU:                   %08x - %08x\n",
 		TEGRA_SMMU_BASE, TEGRA_SMMU_BASE + TEGRA_SMMU_SIZE - 1);
 #endif
 }
