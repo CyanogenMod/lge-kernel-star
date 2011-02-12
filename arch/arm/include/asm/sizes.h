@@ -21,6 +21,10 @@
 #define __sizes_h                       1
 
 /* handy sizes */
+#define SZ_1				0x00000001
+#define SZ_2				0x00000002
+#define SZ_4				0x00000004
+#define SZ_8				0x00000008
 #define SZ_16				0x00000010
 #define SZ_32				0x00000020
 #define SZ_64				0x00000040
