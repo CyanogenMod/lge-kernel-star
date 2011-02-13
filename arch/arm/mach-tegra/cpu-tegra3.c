@@ -36,7 +36,8 @@
 
 #define INITIAL_STATE		TEGRA_HP_DISABLED
 #define IDLE_HYSTERESIS		100000
-#define UP_DELAY_MS		1000
+#define UP2G0_DELAY_MS		100
+#define UP2Gn_DELAY_MS		1000
 #define DOWN_DELAY_MS		2000
 
 static DEFINE_MUTEX(tegra_hp_lock);
@@ -44,9 +45,11 @@ static DEFINE_MUTEX(tegra_hp_lock);
 static struct workqueue_struct *hotplug_wq;
 static struct delayed_work hotplug_work;
 
-static unsigned long up_delay;
+static unsigned long up2gn_delay;
+static unsigned long up2g0_delay;
 static unsigned long down_delay;
-module_param(up_delay, ulong, 0644);
+module_param(up2gn_delay, ulong, 0644);
+module_param(up2g0_delay, ulong, 0644);
 module_param(down_delay, ulong, 0644);
 
 static unsigned int idle_top_freq;
@@ -91,7 +94,7 @@ static int hp_state_set(const char *arg, const struct kernel_param *kp)
 		case TEGRA_HP_UP:
 			if (old_state == TEGRA_HP_DISABLED) {
 				queue_delayed_work(
-					hotplug_wq, &hotplug_work, up_delay);
+					hotplug_wq, &hotplug_work, down_delay);
 				pr_info("Tegra auto-hotplug enabled\n");
 			}
 			break;
@@ -147,11 +150,6 @@ static void tegra_auto_hotplug_work_func(struct work_struct *work)
 
 	mutex_lock(&tegra_hp_lock);
 
-	if (is_lp_cluster()) {
-		mutex_unlock(&tegra_hp_lock);
-		return;
-	}
-
 	switch (hp_state) {
 	case TEGRA_HP_DISABLED:
 	case TEGRA_HP_IDLE:
@@ -163,7 +161,7 @@ static void tegra_auto_hotplug_work_func(struct work_struct *work)
 			queue_delayed_work(
 				hotplug_wq, &hotplug_work, down_delay);
 			hp_stats_update(cpu, false);
-		} else {
+		} else if (!is_lp_cluster()) {
 			tegra_cluster_control(0, TEGRA_POWER_CLUSTER_LP |
 						 TEGRA_POWER_CLUSTER_IMMEDIATE);
 			hp_stats_update(CONFIG_NR_CPUS, true);
@@ -171,12 +169,21 @@ static void tegra_auto_hotplug_work_func(struct work_struct *work)
 		}
 		break;
 	case TEGRA_HP_UP:
-		cpu = cpumask_next_zero(0, cpu_online_mask);
-		if (cpu < nr_cpu_ids) {
-			up = true;
+		if (is_lp_cluster()) {
+			tegra_cluster_control(0, TEGRA_POWER_CLUSTER_G |
+						 TEGRA_POWER_CLUSTER_IMMEDIATE);
+			hp_stats_update(CONFIG_NR_CPUS, false);
+			hp_stats_update(0, true);
 			queue_delayed_work(
-				hotplug_wq, &hotplug_work, up_delay);
-			hp_stats_update(cpu, true);
+				hotplug_wq, &hotplug_work, up2gn_delay);
+		} else {
+			cpu = cpumask_next_zero(0, cpu_online_mask);
+			if (cpu < nr_cpu_ids) {
+				up = true;
+				queue_delayed_work(
+					hotplug_wq, &hotplug_work, up2gn_delay);
+				hp_stats_update(cpu, true);
+			}
 		}
 		break;
 	default:
@@ -195,18 +202,13 @@ static void tegra_auto_hotplug_work_func(struct work_struct *work)
 
 void tegra_auto_hotplug_governor(unsigned int cpu_freq)
 {
+	unsigned long up_delay;
+
 	if (!is_g_cluster_present())
 		return;
 
 	mutex_lock(&tegra_hp_lock);
-
-	if (is_lp_cluster() && (cpu_freq > lpcpu_max_freq)) {
-		if (tegra_cluster_control(0, TEGRA_POWER_CLUSTER_G |
-					     TEGRA_POWER_CLUSTER_IMMEDIATE))
-			goto fail;
-		hp_stats_update(CONFIG_NR_CPUS, false);
-		hp_stats_update(0, true);
-	}
+	up_delay = is_lp_cluster() ? up2g0_delay : up2gn_delay;
 
 	switch (hp_state) {
 	case TEGRA_HP_DISABLED:
@@ -245,7 +247,6 @@ void tegra_auto_hotplug_governor(unsigned int cpu_freq)
 		       __func__, hp_state);
 		BUG();
 	}
-fail:
 	mutex_unlock(&tegra_hp_lock);
 }
 
@@ -268,14 +269,15 @@ int tegra_auto_hotplug_init(void)
 	idle_top_freq = lpcpu_max_freq;
 	idle_bottom_freq = idle_top_freq - IDLE_HYSTERESIS;
 
-	up_delay = msecs_to_jiffies(UP_DELAY_MS);
+	up2g0_delay = msecs_to_jiffies(UP2G0_DELAY_MS);
+	up2gn_delay = msecs_to_jiffies(UP2Gn_DELAY_MS);
 	down_delay = msecs_to_jiffies(DOWN_DELAY_MS);
 
 	hp_state = INITIAL_STATE;
 	pr_info("Tegra auto-hotplug initialized: %s\n",
 		(hp_state == TEGRA_HP_DISABLED) ? "disabled" : "enabled");
 
-	for (i = 0; i < CONFIG_NR_CPUS; i++) {
+	for (i = 0; i <= CONFIG_NR_CPUS; i++) {
 		hp_stats[i].time_up_total = 0;
 		hp_stats[i].last_update = cur_jiffies;
 
@@ -302,7 +304,7 @@ static int hp_stats_show(struct seq_file *s, void *data)
 	u64 cur_jiffies = get_jiffies_64();
 
 	mutex_lock(&tegra_hp_lock);
-	for (i = 0; i < CONFIG_NR_CPUS; i++) {
+	for (i = 0; i <= CONFIG_NR_CPUS; i++) {
 		bool was_up = (hp_stats[i].up_down_count & 0x1);
 		hp_stats_update(i, was_up);
 	}
