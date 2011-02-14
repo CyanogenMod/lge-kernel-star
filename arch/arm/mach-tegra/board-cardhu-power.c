@@ -148,6 +148,9 @@ static struct regulator_consumer_supply tps6591x_ldo8_supply[] = {
 				.valid_ops_mask = (REGULATOR_CHANGE_MODE |    \
 						   REGULATOR_CHANGE_STATUS |  \
 						   REGULATOR_CHANGE_VOLTAGE), \
+				.always_on = _always_on,		\
+				.boot_on = _boot_on,			\
+				.apply_uV = _apply_uv,			\
 			},						\
 			.num_consumer_supplies =			\
 				ARRAY_SIZE(tps6591x_##_id##_supply),	\
@@ -172,6 +175,9 @@ static struct regulator_consumer_supply tps6591x_ldo8_supply[] = {
 				.valid_ops_mask = (REGULATOR_CHANGE_MODE |    \
 						   REGULATOR_CHANGE_STATUS |  \
 						   REGULATOR_CHANGE_VOLTAGE), \
+				.always_on = _always_on,		\
+				.boot_on = _boot_on,			\
+				.apply_uV = _apply_uv,			\
 			},						\
 			.num_consumer_supplies =			\
 				ARRAY_SIZE(tps6591x_##_id##_supply),	\
