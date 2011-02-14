@@ -225,4 +225,18 @@ int tegra_dc_set_mode(struct tegra_dc *dc, const struct tegra_dc_mode *mode);
 unsigned tegra_dc_get_out_height(struct tegra_dc *dc);
 unsigned tegra_dc_get_out_width(struct tegra_dc *dc);
 
+/* PM0 and PM1 signal control */
+#define TEGRA_PWM_PM0 0
+#define TEGRA_PWM_PM1 1
+
+struct tegra_dc_pwm_params {
+	int which_pwm;
+	unsigned int period;
+	unsigned int clk_div;
+	unsigned int clk_select;
+	unsigned int duty_cycle;
+};
+
+void tegra_dc_config_pwm(struct tegra_dc *dc, struct tegra_dc_pwm_params *cfg);
+
 #endif
