@@ -702,10 +702,10 @@ static struct nvmap_heap_block *do_heap_relocate_listblock(
 		return NULL;
 	}
 
-	mutex_lock(&handle->lock);
+	spin_lock(&handle->lock);
 
 	if (!handle->owner) {
-		mutex_unlock(&handle->lock);
+		spin_unlock(&handle->lock);
 		return NULL;
 	}
 
@@ -756,7 +756,7 @@ static struct nvmap_heap_block *do_heap_relocate_listblock(
 
 fail:
 	mutex_unlock(&handle->owner->share->pin_lock);
-	mutex_unlock(&handle->lock);
+	spin_unlock(&handle->lock);
 	return heap_block_new;
 }
 
@@ -829,9 +829,9 @@ static void nvmap_heap_compact(struct nvmap_heap *heap,
 void nvmap_usecount_inc(struct nvmap_handle *h)
 {
 	if (h->alloc && !h->heap_pgalloc) {
-		mutex_lock(&h->lock);
+		spin_lock(&h->lock);
 		h->usecount++;
-		mutex_unlock(&h->lock);
+		spin_unlock(&h->lock);
 	} else {
 		h->usecount++;
 	}
