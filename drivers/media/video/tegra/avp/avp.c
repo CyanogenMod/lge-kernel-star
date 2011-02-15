@@ -553,7 +553,7 @@ static int avp_node_try_connect(struct trpc_node *node,
 
 	len = strlen(port_name);
 	if (len > XPC_PORT_NAME_LEN) {
-		pr_err("%s: port name (%s) to long\n", __func__, port_name);
+		pr_err("%s: port name (%s) too long\n", __func__, port_name);
 		return -EINVAL;
 	}
 
@@ -888,8 +888,8 @@ static int avp_reset(struct tegra_avp_info *avp, unsigned long reset_addr)
 
 	writel(stub_code_phys, TEGRA_AVP_RESET_VECTOR_ADDR);
 
-	pr_err("%s: TEGRA_AVP_RESET_VECTOR=%x\n", __func__, readl(TEGRA_AVP_RESET_VECTOR_ADDR));
-	pr_err("%s: Resetting AVP: reset_addr=%lx\n", __func__, reset_addr);
+	pr_debug("%s: TEGRA_AVP_RESET_VECTOR=%x\n", __func__, readl(TEGRA_AVP_RESET_VECTOR_ADDR));
+	pr_info("%s: Resetting AVP: reset_addr=%lx\n", __func__, reset_addr);
 
 	tegra_periph_reset_assert(avp->cop_clk);
 	udelay(10);
@@ -901,7 +901,7 @@ static int avp_reset(struct tegra_avp_info *avp, unsigned long reset_addr)
 	 * starts, so a dead kernel can be detected by polling this value */
 	timeout = jiffies + msecs_to_jiffies(2000);
 	while (time_before(jiffies, timeout)) {
-		pr_err("%s: TEGRA_AVP_RESET_VECTOR=%x\n", __func__, readl(TEGRA_AVP_RESET_VECTOR_ADDR));
+		pr_debug("%s: TEGRA_AVP_RESET_VECTOR=%x\n", __func__, readl(TEGRA_AVP_RESET_VECTOR_ADDR));
 		if (readl(TEGRA_AVP_RESET_VECTOR_ADDR) != stub_code_phys)
 			break;
 		cpu_relax();
@@ -910,7 +910,7 @@ static int avp_reset(struct tegra_avp_info *avp, unsigned long reset_addr)
 		pr_err("%s: Timed out waiting for AVP kernel to start\n", __func__);
 		ret = -EINVAL;
 	}
-	pr_err("%s: TEGRA_AVP_RESET_VECTOR=%x\n", __func__, readl(TEGRA_AVP_RESET_VECTOR_ADDR));
+	pr_debug("%s: TEGRA_AVP_RESET_VECTOR=%x\n", __func__, readl(TEGRA_AVP_RESET_VECTOR_ADDR));
 	WARN_ON(ret);
 	dma_unmap_single(NULL, stub_data_phys,
 			 sizeof(_tegra_avp_boot_stub_data),
@@ -956,7 +956,7 @@ static int avp_init(struct tegra_avp_info *avp)
 	mbox_writel(avp->msg, MBOX_TO_AVP);
 
 #ifdef CONFIG_TEGRA_AVP_KERNEL_ON_MMU
-	pr_err("%s: Using AVP MMU to relocate AVP kernel\n", __func__);
+	pr_info("%s: Using AVP MMU to relocate AVP kernel\n", __func__);
 #else
 	// Find nvmem carveout.
 	if (!pfn_valid(__phys_to_pfn(0x8e000000))) {
@@ -975,8 +975,8 @@ static int avp_init(struct tegra_avp_info *avp)
 		BUG();
 	}
 
-	pr_err("%s: Using carveout at %lx to load AVP kernel\n",
-	       __func__, avp->kernel_phys);
+	pr_info("%s: Using carveout at %lx to load AVP kernel\n",
+		__func__, avp->kernel_phys);
 	avp->kernel_data = ioremap(avp->kernel_phys, SZ_1M);
 #endif
 
@@ -988,8 +988,8 @@ static int avp_init(struct tegra_avp_info *avp)
 	pr_info("%s: Read firmware from '%s' (%d bytes)\n", __func__,
 		fw_file, avp_fw->size);
 
-	pr_err("%s: Loading AVP kernel at vaddr=%p paddr=%lx\n",
-	       __func__, avp->kernel_data, avp->kernel_phys);
+	pr_info("%s: Loading AVP kernel at vaddr=%p paddr=%lx\n",
+		__func__, avp->kernel_data, avp->kernel_phys);
 	memcpy(avp->kernel_data, avp_fw->data, avp_fw->size);
 	memset(avp->kernel_data + avp_fw->size, 0, SZ_1M - avp_fw->size);
 
