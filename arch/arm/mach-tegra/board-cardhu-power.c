@@ -321,6 +321,13 @@ static struct regulator_consumer_supply gpio_switch_en_3v3_sys_supply[] = {
 	REGULATOR_SUPPLY("vcom_pa", NULL),
 	REGULATOR_SUPPLY("vdd_3v3_devices", NULL),
 	REGULATOR_SUPPLY("vdd_3v3_dock", NULL),
+	REGULATOR_SUPPLY("vdd_3v3_edid", NULL),
+	REGULATOR_SUPPLY("vdd_3v3_hdmi_cec", NULL),
+	REGULATOR_SUPPLY("vdd_3v3_gmi", NULL),
+	REGULATOR_SUPPLY("vdd_3v3_spk_amp", NULL),
+	REGULATOR_SUPPLY("vdd_3v3_sensor", NULL),
+	REGULATOR_SUPPLY("vdd_3v3_cam", NULL),
+	REGULATOR_SUPPLY("vdd_3v3_als", NULL),
 	REGULATOR_SUPPLY("debug_cons", NULL),
 };
 static int gpio_switch_en_3v3_sys_voltages[] = { 3300};
@@ -367,6 +374,18 @@ static struct regulator_consumer_supply gpio_switch_en_vdd_pnl1_supply[] = {
 	REGULATOR_SUPPLY("vdd_lcd_panel", NULL),
 };
 static int gpio_switch_en_vdd_pnl1_voltages[] = { 3300};
+
+/* CAM1_LDO_EN from AP GPIO KB_ROW6 R06*/
+static struct regulator_consumer_supply gpio_switch_cam1_ldo_en_supply[] = {
+	REGULATOR_SUPPLY("vdd_2v8_cam1", NULL),
+};
+static int gpio_switch_cam1_ldo_en_voltages[] = { 2800};
+
+/* CAM2_LDO_EN from AP GPIO KB_ROW7 R07*/
+static struct regulator_consumer_supply gpio_switch_cam2_ldo_en_supply[] = {
+	REGULATOR_SUPPLY("vdd_2v8_cam2", NULL),
+};
+static int gpio_switch_cam2_ldo_en_voltages[] = { 2800};
 
 /* CAM3_LDO_EN from AP GPIO KB_ROW8 S00*/
 static struct regulator_consumer_supply gpio_switch_cam3_ldo_en_supply[] = {
@@ -510,6 +529,11 @@ GREG_INIT(16, en_3v3_pex_hvdd, "vdd_3v3_devices", TEGRA_GPIO_PL7,
 			false, 0, 0, 0, 0)
 
 GREG_INIT(17, en_1v8_cam,  "vdd_gen1v8", TEGRA_GPIO_PBB4,
+			false, 0, 0, 0, 0)
+
+GREG_INIT(18, cam1_ldo_en, "vdd_3v3_cam", TEGRA_GPIO_PR6,
+			false, 0, 0, 0, 0)
+GREG_INIT(19, cam2_ldo_en, "vdd_3v3_cam", TEGRA_GPIO_PR7,
 			false, 0, 0, 0, 0)
 };
 
