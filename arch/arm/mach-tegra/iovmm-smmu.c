@@ -589,7 +589,8 @@ static int smmu_map(struct tegra_iovmm_domain *domain,
 	int i;
 
 	if (as->smmu->verbose)
-		printk("%s:%d addr=%lx asid=%d\n", __func__, __LINE__, addr, as - as->smmu->as);
+		printk("%s:%d iova=%lx asid=%d\n", __func__, __LINE__,
+			addr, as - as->smmu->as);
 
 	for (i = 0; i < pcount; i++) {
 		unsigned long pfn;
@@ -606,6 +607,10 @@ static int smmu_map(struct tegra_iovmm_domain *domain,
 		if (!(pte = locate_pte(as, addr, true, &ptpage, &pte_counter)))
 			goto fail2;
 
+		if (as->smmu->verbose)
+			printk("%s:%d iova=%lx pfn=%lx asid=%d\n",
+				__func__, __LINE__,
+				addr, pfn, as - as->smmu->as);
 		if (*pte == _PTE_VACANT(addr))
 			(*pte_counter)++;
 		*pte = SMMU_PFN_TO_PTE(pfn, as->pte_attr);
@@ -657,7 +662,8 @@ static void smmu_unmap(struct tegra_iovmm_domain *domain,
 	unsigned int i, *pte_counter;
 
 	if (as->smmu->verbose)
-		printk("%s:%d addr=%lx asid=%d\n", __func__, __LINE__, addr, as - as->smmu->as);
+		printk("%s:%d iova=%lx asid=%d\n", __func__, __LINE__,
+			addr, as - as->smmu->as);
 	down(&as->sem);
 	for (i = 0; i < pcount; i++) {
 		unsigned long *pte;
@@ -695,8 +701,8 @@ static void smmu_map_pfn(struct tegra_iovmm_domain *domain,
 	struct page *ptpage;
 
 	if (smmu->verbose)
-		printk("%s:%d addr=%lx asid=%d\n", __func__, __LINE__,
-			(unsigned long)addr, as - as->smmu->as);
+		printk("%s:%d iova=%lx pfn=%lx asid=%d\n", __func__, __LINE__,
+			(unsigned long)addr, pfn, as - as->smmu->as);
 
 	BUG_ON(!pfn_valid(pfn));
 	down(&as->sem);
