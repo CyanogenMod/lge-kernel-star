@@ -131,6 +131,8 @@ static struct ov2710_reg mode_1920x1080[] = {
 	{0x4301, 0xff},
 	{0x4303, 0x00},
 	{0x3a00, 0x78},
+	{0x3a18, 0x00}, /* AEC gain ceiling bit 8 pg 51 */
+	{0x3a19, 0xf8}, /* AEC gain ceiling pg 51 */
 	{0x300f, 0x88},
 	{0x3011, 0x28},
 	{0x3a1a, 0x06},
@@ -158,6 +160,15 @@ static struct ov2710_reg mode_1920x1080[] = {
 	{0x3a1e, 0x30},
 	{0x3a11, 0x90},
 	{0x3a1f, 0x10},
+
+	{0x350c, 0xff}, /* peak VTS reg, set to highest limit */
+	{0x350d, 0xff}, /* peak VTS reg, set to highest limit */
+	{0x3503, 0x07}, /* enable manual gain and manual exposure */
+	{0x3500, 0x00}, /* write default to AEC PK EXPO */
+	{0x3501, 0x00}, /* write default to AEC PK EXPO */
+	{0x3502, 0x02}, /* write default to AEC PK EXPO */
+	{0x350a, 0x00}, /* write default to manual gain reg */
+	{0x350b, 0x10}, /* write default to manual gain reg */
 
 	{OV2710_TABLE_END, 0x0000}
 };
@@ -201,6 +212,8 @@ static struct ov2710_reg mode_1280x720[] = {
 	{0x4301, 0xff},
 	{0x4303, 0x00},
 	{0x3a00, 0x78},
+	{0x3a18, 0x00}, /* AEC gain ceiling bit 8 pg 51 */
+	{0x3a19, 0xf8}, /* AEC gain ceiling pg 51 */
 	{0x300f, 0x88},
 	{0x3011, 0x28},
 	{0x3a1a, 0x06},
@@ -264,6 +277,15 @@ static struct ov2710_reg mode_1280x720[] = {
 	{0x3a09, 0xf3},
 	{0x3a0a, 0x0b},
 	{0x3a0b, 0xa0},
+
+	{0x350c, 0xff}, /* peak VTS reg, set to highest limit */
+	{0x350d, 0xff}, /* peak VTS reg, set to highest limit */
+	{0x3503, 0x07}, /* enable manual gain and manual exposure */
+	{0x3500, 0x00}, /* write default to AEC PK EXPO */
+	{0x3501, 0x00}, /* write default to AEC PK EXPO */
+	{0x3502, 0x02}, /* write default to AEC PK EXPO */
+	{0x350a, 0x00}, /* write default to manual gain reg */
+	{0x350b, 0x10}, /* write default to manual gain reg */
 
 	{OV2710_TABLE_END, 0x0000}
 };
