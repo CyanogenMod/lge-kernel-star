@@ -25,6 +25,7 @@
 #include <asm/mach-types.h>
 #include <linux/platform_device.h>
 #include <linux/pwm_backlight.h>
+#include <linux/tegra_pwm_bl.h>
 #include <mach/nvhost.h>
 #include <mach/nvmap.h>
 #include <mach/irqs.h>
@@ -36,55 +37,26 @@
 #include "gpio-names.h"
 #include "board.h"
 
-#define whistler_bl_enb		TEGRA_GPIO_PW1
 #define whistler_hdmi_hpd	TEGRA_GPIO_PN7
 
 static struct regulator *whistler_hdmi_reg = NULL;
 static struct regulator *whistler_hdmi_pll = NULL;
 
-static int whistler_backlight_init(struct device *dev) {
-	int ret;
-
-	ret = gpio_request(whistler_bl_enb, "backlight_enb");
-	if (ret < 0)
-		return ret;
-
-	ret = gpio_direction_output(whistler_bl_enb, 1);
-	if (ret < 0)
-		gpio_free(whistler_bl_enb);
-	else
-		tegra_gpio_enable(whistler_bl_enb);
-
-	return ret;
+static struct platform_tegra_pwm_backlight_data whistler_disp1_backlight_data = {
+	.which_dc = 0,
+	.which_pwm = TEGRA_PWM_PM1,
+	.max_brightness	= 256,
+	.dft_brightness	= 77,
+	.period	= 0x1F,
+	.clk_div = 3,
+	.clk_select = 2,
 };
 
-static void whistler_backlight_exit(struct device *dev) {
-	gpio_set_value(whistler_bl_enb, 0);
-	gpio_free(whistler_bl_enb);
-	tegra_gpio_disable(whistler_bl_enb);
-}
-
-static int whistler_backlight_notify(struct device *unused, int brightness)
-{
-	gpio_set_value(whistler_bl_enb, !!brightness);
-	return brightness;
-}
-
-static struct platform_pwm_backlight_data whistler_backlight_data = {
-	.pwm_id		= 2,
-	.max_brightness	= 255,
-	.dft_brightness	= 224,
-	.pwm_period_ns	= 5000000,
-	.init		= whistler_backlight_init,
-	.exit		= whistler_backlight_exit,
-	.notify		= whistler_backlight_notify,
-};
-
-static struct platform_device whistler_backlight_device = {
-	.name	= "pwm-backlight",
+static struct platform_device whistler_disp1_backlight_device = {
+	.name	= "tegra-pwm-bl",
 	.id	= -1,
 	.dev	= {
-		.platform_data = &whistler_backlight_data,
+		.platform_data = &whistler_disp1_backlight_data,
 	},
 };
 
@@ -196,6 +168,10 @@ static struct tegra_dc_out_pin whistler_dc_out_pins[] = {
 	},
 };
 
+static u8 whistler_dc_out_pin_sel_config[] = {
+	TEGRA_PIN_OUT_CONFIG_SEL_LM1_PM1,
+};
+
 static struct tegra_dc_out whistler_disp1_out = {
 	.type		= TEGRA_DC_OUT_RGB,
 
@@ -208,6 +184,8 @@ static struct tegra_dc_out whistler_disp1_out = {
 	.out_pins	= whistler_dc_out_pins,
 	.n_out_pins	= ARRAY_SIZE(whistler_dc_out_pins),
 
+	.out_sel_configs   = whistler_dc_out_pin_sel_config,
+	.n_out_sel_configs = ARRAY_SIZE(whistler_dc_out_pin_sel_config),
 };
 
 static struct tegra_dc_out whistler_disp2_out = {
@@ -304,8 +282,7 @@ static struct platform_device whistler_nvmap_device = {
 static struct platform_device *whistler_gfx_devices[] __initdata = {
 	&whistler_nvmap_device,
 	&tegra_grhost_device,
-	&tegra_pwfm2_device,
-	&whistler_backlight_device,
+	&whistler_disp1_backlight_device,
 };
 
 int __init whistler_panel_init(void)
