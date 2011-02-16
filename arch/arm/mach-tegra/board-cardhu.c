@@ -358,11 +358,9 @@ static void __init tegra_cardhu_init(void)
 	tegra_common_init();
 	tegra_clk_init_from_table(cardhu_clk_init_table);
 	cardhu_pinmux_init();
-
-	platform_add_devices(cardhu_devices, ARRAY_SIZE(cardhu_devices));
-
-	cardhu_sdhci_init();
 	cardhu_i2c_init();
+	platform_add_devices(cardhu_devices, ARRAY_SIZE(cardhu_devices));
+	cardhu_sdhci_init();
 	cardhu_regulator_init();
 	cardhu_gpio_switch_regulator_init();
 	cardhu_suspend_init();
