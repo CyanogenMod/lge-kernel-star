@@ -3,7 +3,7 @@
  *
  * watchdog driver for NVIDIA tegra internal watchdog
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2011, NVIDIA Corporation.
  *
  * based on drivers/watchdog/softdog.c and drivers/watchdog/omap_wdt.c
  *
@@ -39,19 +39,6 @@
 #define MIN_WDT_PERIOD	5
 #define MAX_WDT_PERIOD	1000
 
-#define TIMER_PTV	0x0
-#define TIMER_EN	(1 << 31)
-#define TIMER_PERIODIC	(1 << 30)
-
-#define TIMER_PCR	0x4
-#define TIMER_PCR_INTR	(1 << 30)
-
-#define WDT_EN		(1 << 5)
-#define WDT_SEL_TMR1	(0 << 4)
-#define WDT_SYS_RST	(1 << 2)
-
-static int heartbeat = 30; /* must be greater than MIN_WDT_PERIOD and lower than MAX_WDT_PERIOD */
-
 struct tegra_wdt {
 	struct miscdevice	miscdev;
 	struct notifier_block	notifier;
@@ -66,6 +53,18 @@ struct tegra_wdt {
 };
 
 static struct platform_device *tegra_wdt_dev;
+static int heartbeat = 30;
+
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
+
+#define TIMER_PTV		0x0
+ #define TIMER_EN		(1 << 31)
+ #define TIMER_PERIODIC		(1 << 30)
+#define TIMER_PCR		0x4
+ #define TIMER_PCR_INTR		(1 << 30)
+#define WDT_EN			(1 << 5)
+#define WDT_SEL_TMR1		(0 << 4)
+#define WDT_SYS_RST		(1 << 2)
 
 static void tegra_wdt_enable(struct tegra_wdt *wdt)
 {
@@ -95,6 +94,72 @@ static irqreturn_t tegra_wdt_interrupt(int irq, void *dev_id)
 	writel(TIMER_PCR_INTR, wdt->wdt_timer + TIMER_PCR);
 	return IRQ_HANDLED;
 }
+#elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
+
+#define TIMER_PTV			0
+ #define TIMER_EN			(1 << 31)
+ #define TIMER_PERIODIC			(1 << 30)
+#define TIMER_PCR			0x4
+ #define TIMER_PCR_INTR			(1 << 30)
+#define WDT_CFG				(0)
+ #define WDT_CFG_TMR_SRC		(6 << 0) /* for TMR6. */
+ #define WDT_CFG_PERIOD			(1 << 4)
+ #define WDT_CFG_INT_EN			(1 << 12)
+ #define WDT_CFG_SYS_RST_EN		(1 << 14)
+ #define WDT_CFG_PMC2CAR_RST_EN		(1 << 15)
+#define WDT_CMD				(8)
+ #define WDT_CMD_START_COUNTER		(1 << 0)
+ #define WDT_CMD_DISABLE_COUNTER	(1 << 1)
+#define WDT_UNLOCK			(0xC)
+ #define WDT_UNLOCK_PATTERN		(0xC45A << 0)
+
+static void tegra_wdt_set_timeout(struct tegra_wdt *wdt, int sec)
+{
+	u32 ptv;
+
+	ptv = readl(wdt->wdt_timer + TIMER_PTV);
+
+	wdt->timeout = clamp(sec, MIN_WDT_PERIOD, MAX_WDT_PERIOD);
+	if (ptv & TIMER_EN) {
+		/* since the watchdog reset occurs when a fourth interrupt
+		 * is asserted before the first is processed, program the
+		 * timer period to one-fourth of the watchdog period */
+		ptv = (wdt->timeout * 1000000ul) / 4;
+		ptv |= (TIMER_EN | TIMER_PERIODIC);
+		writel(ptv, wdt->wdt_timer + TIMER_PTV);
+	}
+}
+
+static void tegra_wdt_enable(struct tegra_wdt *wdt)
+{
+	u32 val;
+
+	val = (wdt->timeout * 1000000ul) / 4;
+	val |= (TIMER_EN | TIMER_PERIODIC);
+	writel(val, wdt->wdt_timer + TIMER_PTV);
+
+	val = WDT_CFG_TMR_SRC | WDT_CFG_PERIOD | WDT_CFG_INT_EN |
+		/*WDT_CFG_SYS_RST_EN |*/ WDT_CFG_PMC2CAR_RST_EN;
+	writel(val, wdt->wdt_source + WDT_CFG);
+	writel(WDT_CMD_START_COUNTER, wdt->wdt_source + WDT_CMD);
+}
+
+static void tegra_wdt_disable(struct tegra_wdt *wdt)
+{
+	writel(WDT_UNLOCK_PATTERN, wdt->wdt_source + WDT_UNLOCK);
+	writel(WDT_CMD_DISABLE_COUNTER, wdt->wdt_source + WDT_CMD);
+
+	writel(0, wdt->wdt_timer + TIMER_PTV);
+}
+
+static irqreturn_t tegra_wdt_interrupt(int irq, void *dev_id)
+{
+	struct tegra_wdt *wdt = dev_id;
+
+	writel(WDT_CMD_START_COUNTER, wdt->wdt_source + WDT_CMD);
+	return IRQ_HANDLED;
+}
+#endif
 
 static int tegra_wdt_notify(struct notifier_block *this,
 			    unsigned long code, void *dev)
