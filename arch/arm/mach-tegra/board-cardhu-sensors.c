@@ -34,6 +34,7 @@
 
 static struct regulator *cardhu_1v8_cam1 = NULL;
 static struct regulator *cardhu_avdd_dsi_csi = NULL;
+static struct regulator *cardhu_vdd_2v8_cam1 = NULL;
 
 #ifdef CONFIG_I2C_MUX_PCA954x
 static struct pca954x_platform_mode cardhu_pca954x_modes[] = {
@@ -59,13 +60,26 @@ static int cardhu_camera_init(void)
 	 * and donot have TCA6416 exp for camera */
 	if ((board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1291)) {
-		tegra_gpio_enable(CAMERA_CSI_CAM_SEL_GPIO);
-		ret = gpio_request(CAMERA_CSI_CAM_SEL_GPIO, "camera_cam_mclk");
+		tegra_gpio_enable(CAM1_POWER_DWN_GPIO);
+		ret = gpio_request(CAM1_POWER_DWN_GPIO, "camera_power_en");
 		if (ret < 0)
 			pr_err("%s: gpio_request failed for gpio %s\n",
-				__func__, "CAMERA_CSI_CAM_SEL_GPIO");
-		gpio_direction_output(CAMERA_CSI_CAM_SEL_GPIO, 1);
-		gpio_export(CAMERA_CSI_CAM_SEL_GPIO, false);
+				__func__, "CAM1_POWER_DWN_GPIO");
+		tegra_gpio_enable(OV5650_RESETN_GPIO);
+		ret = gpio_request(OV5650_RESETN_GPIO, "camera_reset");
+		if (ret < 0)
+			pr_err("%s: gpio_request failed for gpio %s\n",
+				__func__, "OV5650_RESETN_GPIO");
+		gpio_direction_output(CAM1_POWER_DWN_GPIO, 1);
+		mdelay(10);
+
+		gpio_direction_output(OV5650_RESETN_GPIO, 1);
+		mdelay(5);
+		gpio_direction_output(OV5650_RESETN_GPIO, 0);
+		mdelay(5);
+		gpio_direction_output(OV5650_RESETN_GPIO, 1);
+		mdelay(5);
+
 	}
 
 	/* To select the CSIB MUX either for cam2 or cam3 */
@@ -89,73 +103,61 @@ static int cardhu_ov5650_power_on(void)
 	 * and donot have TCA6416 exp for camera */
 	if ((board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1291)) {
-		tegra_gpio_enable(CAM1_POWER_DWN_GPIO);
-		ret = gpio_request(CAM1_POWER_DWN_GPIO, "camera_power_en");
-		if (ret < 0)
-			pr_err("%s: gpio_request failed for gpio %s\n",
-				__func__, "CAM1_POWER_DWN_GPIO");
+
 		gpio_direction_output(CAM1_POWER_DWN_GPIO, 0);
-		gpio_export(CAM1_POWER_DWN_GPIO, false);
-
 		mdelay(10);
-		tegra_gpio_enable(CAM1_LDO_EN_GPIO);
-		ret = gpio_request(CAM1_LDO_EN_GPIO, "camera_ldo");
-		if (ret < 0)
-			pr_err("%s: gpio_request failed for gpio %s\n",
-				__func__, "CAM1_LDO_EN_GPIO");
-		gpio_direction_output(CAM1_LDO_EN_GPIO, 1);
-		gpio_export(CAM1_LDO_EN_GPIO, false);
 
-		tegra_gpio_enable(OV5650_RESETN_GPIO);
-		ret = gpio_request(OV5650_RESETN_GPIO, "camera_reset");
-		if (ret < 0)
-			pr_err("%s: gpio_request failed for gpio %s\n",
-				__func__, "OV5650_RESETN_GPIO");
-		gpio_direction_output(OV5650_RESETN_GPIO, 1);
-		mdelay(5);
-		gpio_direction_output(OV5650_RESETN_GPIO, 0);
-		mdelay(5);
-		gpio_direction_output(OV5650_RESETN_GPIO, 1);
+		if (cardhu_vdd_2v8_cam1 == NULL) {
+			cardhu_vdd_2v8_cam1 = regulator_get(NULL, "vdd_2v8_cam1");
+			if (WARN_ON(IS_ERR(cardhu_vdd_2v8_cam1))) {
+				pr_err("%s: couldn't get regulator vdd_2v8_cam1: %ld\n",
+					__func__, PTR_ERR(cardhu_vdd_2v8_cam1));
+				goto reg_alloc_fail;
+			}
+		}
+
+		regulator_enable(cardhu_vdd_2v8_cam1);
 		mdelay(5);
 	}
-	else {
-		if (cardhu_1v8_cam1 == NULL) {
-			cardhu_1v8_cam1 = regulator_get(NULL, "vdd_1v8_cam1");
-			if (WARN_ON(IS_ERR(cardhu_1v8_cam1))) {
-				pr_err("%s: couldn't get regulator vdd_1v8_cam1: %ld\n",
-					__func__, PTR_ERR(cardhu_1v8_cam1));
-				goto reg_alloc_fail;
-			}
+	/* Enable VDD_1V8_Cam1 */
+	if (cardhu_1v8_cam1 == NULL) {
+		cardhu_1v8_cam1 = regulator_get(NULL, "vdd_1v8_cam1");
+		if (WARN_ON(IS_ERR(cardhu_1v8_cam1))) {
+			pr_err("%s: couldn't get regulator vdd_1v8_cam1: %ld\n",
+				__func__, PTR_ERR(cardhu_1v8_cam1));
+			goto reg_alloc_fail;
 		}
+	}
+	regulator_enable(cardhu_1v8_cam1);
 
-		/* Enable AVDD_CSI_DSI */
-		if (cardhu_avdd_dsi_csi == NULL) {
-			cardhu_avdd_dsi_csi = regulator_get(NULL, "avdd_dsi_csi");
-			if (WARN_ON(IS_ERR(cardhu_avdd_dsi_csi))) {
-				pr_err("%s: couldn't get regulator avdd_dsi_csi: %ld\n",
-					__func__, PTR_ERR(cardhu_avdd_dsi_csi));
-				goto reg_alloc_fail;
-			}
+	/* Enable AVDD_CSI_DSI */
+	if (cardhu_avdd_dsi_csi == NULL) {
+		cardhu_avdd_dsi_csi = regulator_get(NULL, "avdd_dsi_csi");
+		if (WARN_ON(IS_ERR(cardhu_avdd_dsi_csi))) {
+			pr_err("%s: couldn't get regulator avdd_dsi_csi: %ld\n",
+				__func__, PTR_ERR(cardhu_avdd_dsi_csi));
+			goto reg_alloc_fail;
 		}
-
-		regulator_enable(cardhu_1v8_cam1);
-		regulator_enable(cardhu_avdd_dsi_csi);
-		mdelay(5);
-		return 0;
+	}
+	regulator_enable(cardhu_avdd_dsi_csi);
+	mdelay(5);
+	return 0;
 
 reg_alloc_fail:
-		if (cardhu_1v8_cam1) {
-			regulator_put(cardhu_1v8_cam1);
-			cardhu_1v8_cam1 = NULL;
-		}
-		if (cardhu_avdd_dsi_csi) {
-			regulator_put(cardhu_avdd_dsi_csi);
-			cardhu_avdd_dsi_csi = NULL;
-		}
-		return -ENODEV;
+	if (cardhu_1v8_cam1) {
+		regulator_put(cardhu_1v8_cam1);
+		cardhu_1v8_cam1 = NULL;
 	}
+	if (cardhu_avdd_dsi_csi) {
+		regulator_put(cardhu_avdd_dsi_csi);
+		cardhu_avdd_dsi_csi = NULL;
+	}
+	if (cardhu_vdd_2v8_cam1) {
+		regulator_put(cardhu_vdd_2v8_cam1);
+		cardhu_vdd_2v8_cam1 = NULL;
+	}
+	return -ENODEV;
 
-	return 0;
 }
 
 static int cardhu_ov5650_power_off(void)
@@ -167,20 +169,16 @@ static int cardhu_ov5650_power_off(void)
 	if ((board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1291)) {
 		gpio_direction_output(CAM1_POWER_DWN_GPIO, 1);
-		gpio_direction_output(OV5650_RESETN_GPIO, 0);
-		gpio_direction_output(CAM1_LDO_EN_GPIO, 0);
 	}
-	else {
-		if (cardhu_1v8_cam1)
-			regulator_disable(cardhu_1v8_cam1);
-
-		if (cardhu_avdd_dsi_csi)
-			regulator_disable(cardhu_avdd_dsi_csi);
-	}
+	if (cardhu_1v8_cam1)
+		regulator_disable(cardhu_1v8_cam1);
+	if (cardhu_avdd_dsi_csi)
+		regulator_disable(cardhu_avdd_dsi_csi);
+	if (cardhu_vdd_2v8_cam1)
+		regulator_disable(cardhu_vdd_2v8_cam1);
 
 	return 0;
 }
-
 
 struct ov5650_platform_data cardhu_ov5650_data = {
 	.power_on = cardhu_ov5650_power_on,
