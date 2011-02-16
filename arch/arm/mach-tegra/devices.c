@@ -923,18 +923,18 @@ struct platform_device tegra_smmu_device = {
 
 static struct resource tegra_wdt_resources[] = {
 	[0] = {
-		.start	= TEGRA_CLK_RESET_BASE,
-		.end	= TEGRA_CLK_RESET_BASE + 4 - 1,
+		.start	= TEGRA_WDT0_BASE,
+		.end	= TEGRA_WDT0_BASE + TEGRA_WDT0_SIZE - 1,
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] = {
-		.start	= TEGRA_TMR1_BASE,
-		.end	= TEGRA_TMR1_BASE + TEGRA_TMR1_SIZE - 1,
+		.start	= TEGRA_TMR6_BASE,
+		.end	= TEGRA_TMR6_BASE + TEGRA_TMR6_SIZE - 1,
 		.flags	= IORESOURCE_MEM,
 	},
 	[2] = {
-		.start	= INT_TMR1,
-		.end	= INT_TMR1,
+		.start	= INT_WDT_CPU,
+		.end	= INT_WDT_CPU,
 		.flags	= IORESOURCE_IRQ,
 	},
 };

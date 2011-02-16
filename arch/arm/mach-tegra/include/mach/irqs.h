@@ -312,7 +312,7 @@
 #define INT_I2C4			(INT_QUAD_BASE + 24)
 #define INT_TMR5			(INT_QUAD_BASE + 25)
 #define INT_TMR_SHARED			(INT_QUAD_BASE + 26)
-#define INT_WTD_CPU			(INT_QUAD_BASE + 27)
+#define INT_WDT_CPU			(INT_QUAD_BASE + 27)
 #define INT_WDT_AVP			(INT_QUAD_BASE + 28)
 #define INT_GPIO8			(INT_QUAD_BASE + 29)
 #define INT_CAR				(INT_QUAD_BASE + 30)
