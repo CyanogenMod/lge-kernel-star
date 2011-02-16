@@ -36,6 +36,31 @@ struct ov5650_info {
 #define OV5650_TABLE_END 1
 #define OV5650_MAX_RETRIES 3
 
+static struct ov5650_reg tp_none_seq[] = {
+	{0x5046, 0x00}, /* isp_off */
+	{OV5650_TABLE_END, 0x0000}
+};
+
+static struct ov5650_reg tp_cbars_seq[] = {
+	{0x503D, 0xC0},
+	{0x503E, 0x00},
+	{0x5046, 0x01}, /* isp_on */
+	{OV5650_TABLE_END, 0x0000}
+};
+
+static struct ov5650_reg tp_checker_seq[] = {
+	{0x503D, 0xC0},
+	{0x503E, 0x0A},
+	{0x5046, 0x01}, /* isp_on */
+	{OV5650_TABLE_END, 0x0000}
+};
+
+static struct ov5650_reg *test_pattern_modes[] = {
+	tp_none_seq,
+	tp_cbars_seq,
+	tp_checker_seq,
+};
+
 static struct ov5650_reg mode_start[] = {
 	{0x3008, 0x82}, /* reset registers pg 72 */
 	{OV5650_TABLE_WAIT_MS, 5},
@@ -617,6 +642,17 @@ static int ov5650_get_status(struct ov5650_info *info, u8 *status)
 	return err;
 }
 
+static int ov5650_test_pattern(struct ov5650_info *info,
+			       enum ov5650_test_pattern pattern)
+{
+	if (pattern >= ARRAY_SIZE(test_pattern_modes))
+		return -EINVAL;
+
+	return ov5650_write_table(info->i2c_client,
+				  test_pattern_modes[pattern],
+				  NULL, 0);
+}
+
 
 static long ov5650_ioctl(struct file *file,
 			 unsigned int cmd, unsigned long arg)
@@ -654,6 +690,13 @@ static long ov5650_ioctl(struct file *file,
 			return -EFAULT;
 		}
 		return 0;
+	}
+	case OV5650_IOCTL_TEST_PATTERN:
+	{
+		err = ov5650_test_pattern(info, (enum ov5650_test_pattern) arg);
+		if (err)
+			pr_err("%s %d %d\n", __func__, __LINE__, err);
+		return err;
 	}
 	default:
 		return -EINVAL;

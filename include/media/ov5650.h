@@ -18,6 +18,13 @@
 #define OV5650_IOCTL_SET_COARSE_TIME	_IOW('o', 3, __u32)
 #define OV5650_IOCTL_SET_GAIN		_IOW('o', 4, __u16)
 #define OV5650_IOCTL_GET_STATUS		_IOR('o', 5, __u8)
+#define OV5650_IOCTL_TEST_PATTERN	_IOW('o', 7, enum ov5650_test_pattern)
+
+enum ov5650_test_pattern {
+	TEST_PATTERN_NONE,
+	TEST_PATTERN_COLORBARS,
+	TEST_PATTERN_CHECKERBOARD
+};
 
 struct ov5650_mode {
 	int xres;
