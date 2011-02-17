@@ -166,6 +166,7 @@ static struct tegra_i2c_platform_data cardhu_i2c2_platform_data = {
 	.adapter_nr	= 1,
 	.bus_count	= 1,
 	.bus_clk_rate	= { 100000, 0 },
+	.is_clkon_always = true,
 };
 
 static struct tegra_i2c_platform_data cardhu_i2c3_platform_data = {
