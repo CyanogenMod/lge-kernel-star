@@ -200,6 +200,11 @@ struct max8907c {
 	struct i2c_client 	*i2c_rtc;
 	int			irq_base;
 	int			core_irq;
+
+	unsigned char 		cache_chg[2];
+	unsigned char 		cache_on[2];
+	unsigned char 		cache_rtc;
+
 };
 
 struct max8907c_platform_data {

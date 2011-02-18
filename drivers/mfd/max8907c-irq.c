@@ -24,6 +24,7 @@ struct max8907c_irq_data {
 	int	enable;		/* enable or not */
 	int	offs;		/* bit offset in mask register */
 	bool	is_rtc;
+	int	wake;
 };
 
 static struct max8907c_irq_data max8907c_irqs[] = {
@@ -190,19 +191,12 @@ static void max8907c_irq_sync_unlock(unsigned int irq)
 {
 	struct max8907c *chip = get_irq_chip_data(irq);
 	struct max8907c_irq_data *irq_data;
-	static unsigned char cache_chg[2] = {0xff, 0xff};
-	static unsigned char cache_on[2] = {0xff, 0xff};
-	static unsigned char cache_rtc = 0xff;
 	unsigned char irq_chg[2], irq_on[2];
 	unsigned char irq_rtc;
 	int i;
 
-	/* Load cached value. In initial, all IRQs are masked */
-	irq_chg[0] = cache_chg[0];
-	irq_chg[1] = cache_chg[1];
-	irq_on[0] = cache_on[0];
-	irq_on[1] = cache_on[1];
-	irq_rtc = cache_rtc;
+	irq_chg[0] = irq_chg[1] = irq_on[0] = irq_on[1] = irq_rtc = 0xFF;
+
 	for (i = 0; i < ARRAY_SIZE(max8907c_irqs); i++) {
 		irq_data = &max8907c_irqs[i];
 		/* 1 -- disable, 0 -- enable */
@@ -228,28 +222,28 @@ static void max8907c_irq_sync_unlock(unsigned int irq)
 		}
 	}
 	/* update mask into registers */
-	if (cache_chg[0] != irq_chg[0]) {
-		cache_chg[0] = irq_chg[0];
+	if (chip->cache_chg[0] != irq_chg[0]) {
+		chip->cache_chg[0] = irq_chg[0];
 		max8907c_reg_write(chip->i2c_power, MAX8907C_REG_CHG_IRQ1_MASK,
 			irq_chg[0]);
 	}
-	if (cache_chg[1] != irq_chg[1]) {
-		cache_chg[1] = irq_chg[1];
+	if (chip->cache_chg[1] != irq_chg[1]) {
+		chip->cache_chg[1] = irq_chg[1];
 		max8907c_reg_write(chip->i2c_power, MAX8907C_REG_CHG_IRQ2_MASK,
 			irq_chg[1]);
 	}
-	if (cache_on[0] != irq_on[0]) {
-		cache_on[0] = irq_on[0];
+	if (chip->cache_on[0] != irq_on[0]) {
+		chip->cache_on[0] = irq_on[0];
 		max8907c_reg_write(chip->i2c_power, MAX8907C_REG_ON_OFF_IRQ1_MASK,
 				irq_on[0]);
 	}
-	if (cache_on[1] != irq_on[1]) {
-		cache_on[1] = irq_on[1];
+	if (chip->cache_on[1] != irq_on[1]) {
+		chip->cache_on[1] = irq_on[1];
 		max8907c_reg_write(chip->i2c_power, MAX8907C_REG_ON_OFF_IRQ2_MASK,
 				irq_on[1]);
 	}
-	if (cache_rtc != irq_rtc) {
-		cache_rtc = irq_rtc;
+	if (chip->cache_rtc != irq_rtc) {
+		chip->cache_rtc = irq_rtc;
 		max8907c_reg_write(chip->i2c_rtc, MAX8907C_REG_RTC_IRQ_MASK,
 				   irq_rtc);
 	}
@@ -270,12 +264,25 @@ static void max8907c_irq_disable(unsigned int irq)
 	max8907c_irqs[irq - chip->irq_base].enable = 0;
 }
 
+static int max8907c_irq_set_wake(unsigned int irq, unsigned int on)
+{
+	struct max8907c *chip = get_irq_chip_data(irq);
+	if (on) {
+		max8907c_irqs[irq - chip->irq_base].wake
+			= max8907c_irqs[irq - chip->irq_base].enable;
+	} else {
+		max8907c_irqs[irq - chip->irq_base].wake = 0;
+	}
+	return 0;
+}
+
 static struct irq_chip max8907c_irq_chip = {
 	.name		= "max8907c",
 	.bus_lock	= max8907c_irq_lock,
 	.bus_sync_unlock = max8907c_irq_sync_unlock,
 	.enable		= max8907c_irq_enable,
 	.disable	= max8907c_irq_disable,
+	.set_wake	= max8907c_irq_set_wake,
 };
 
 int max8907c_irq_init(struct max8907c *chip, int irq, int irq_base)
@@ -304,6 +311,10 @@ int max8907c_irq_init(struct max8907c *chip, int irq, int irq_base)
 	max8907c_reg_write(chip->i2c_power, MAX8907C_REG_ON_OFF_IRQ2_MASK, 0xff);
 	max8907c_reg_write(chip->i2c_rtc, MAX8907C_REG_RTC_IRQ_MASK, 0xff);
 
+	chip->cache_chg[0] = chip->cache_chg[1] =
+		chip->cache_on[0] = chip->cache_on[1] =
+		chip->cache_rtc = 0xFF;
+
 	mutex_init(&chip->irq_lock);
 	chip->core_irq = irq;
 	chip->irq_base = irq_base;
@@ -330,23 +341,75 @@ int max8907c_irq_init(struct max8907c *chip, int irq, int irq_base)
 		chip->core_irq = 0;
 	}
 
+	device_init_wakeup(chip->dev, 1);
+
 	return ret;
 }
 
 int max8907c_suspend(struct i2c_client *i2c, pm_message_t state)
 {
-	struct max8907c *max8907c = i2c_get_clientdata(i2c);
+	struct max8907c *chip = i2c_get_clientdata(i2c);
 
-	disable_irq(max8907c->core_irq);
+	struct max8907c_irq_data *irq_data;
+	unsigned char irq_chg[2], irq_on[2];
+	unsigned char irq_rtc;
+	int i;
+
+	irq_chg[0] = irq_chg[1] = irq_on[0] = irq_on[1] = irq_rtc = 0xFF;
+
+	for (i = 0; i < ARRAY_SIZE(max8907c_irqs); i++) {
+		irq_data = &max8907c_irqs[i];
+		/* 1 -- disable, 0 -- enable */
+		switch (irq_data->mask_reg) {
+		case MAX8907C_REG_CHG_IRQ1_MASK:
+			irq_chg[0] &= ~irq_data->wake;
+			break;
+		case MAX8907C_REG_CHG_IRQ2_MASK:
+			irq_chg[1] &= ~irq_data->wake;
+			break;
+		case MAX8907C_REG_ON_OFF_IRQ1_MASK:
+			irq_on[0] &= ~irq_data->wake;
+			break;
+		case MAX8907C_REG_ON_OFF_IRQ2_MASK:
+			irq_on[1] &= ~irq_data->wake;
+			break;
+		case MAX8907C_REG_RTC_IRQ_MASK:
+			irq_rtc &= ~irq_data->wake;
+			break;
+		default:
+			dev_err(chip->dev, "wrong IRQ\n");
+			break;
+		}
+	}
+
+	max8907c_reg_write(chip->i2c_power, MAX8907C_REG_CHG_IRQ1_MASK, irq_chg[0]);
+	max8907c_reg_write(chip->i2c_power, MAX8907C_REG_CHG_IRQ2_MASK, irq_chg[1]);
+	max8907c_reg_write(chip->i2c_power, MAX8907C_REG_ON_OFF_IRQ1_MASK, irq_on[0]);
+	max8907c_reg_write(chip->i2c_power, MAX8907C_REG_ON_OFF_IRQ2_MASK, irq_on[1]);
+	max8907c_reg_write(chip->i2c_rtc, MAX8907C_REG_RTC_IRQ_MASK, irq_rtc);
+
+	if (device_may_wakeup(chip->dev))
+		enable_irq_wake(chip->core_irq);
+	else
+		disable_irq(chip->core_irq);
 
 	return 0;
 }
 
 int max8907c_resume(struct i2c_client *i2c)
 {
-	struct max8907c *max8907c = i2c_get_clientdata(i2c);
+	struct max8907c *chip = i2c_get_clientdata(i2c);
 
-	enable_irq(max8907c->core_irq);
+	if (device_may_wakeup(chip->dev))
+		disable_irq_wake(chip->core_irq);
+	else
+		enable_irq(chip->core_irq);
+
+	max8907c_reg_write(chip->i2c_power, MAX8907C_REG_CHG_IRQ1_MASK, chip->cache_chg[0]);
+	max8907c_reg_write(chip->i2c_power, MAX8907C_REG_CHG_IRQ2_MASK, chip->cache_chg[1]);
+	max8907c_reg_write(chip->i2c_power, MAX8907C_REG_ON_OFF_IRQ1_MASK, chip->cache_on[0]);
+	max8907c_reg_write(chip->i2c_power, MAX8907C_REG_ON_OFF_IRQ2_MASK, chip->cache_on[1]);
+	max8907c_reg_write(chip->i2c_rtc, MAX8907C_REG_RTC_IRQ_MASK, chip->cache_rtc);
 
 	return 0;
 }
