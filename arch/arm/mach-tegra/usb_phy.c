@@ -1055,8 +1055,23 @@ static int uhsic_phy_power_on(struct tegra_usb_phy *phy)
 
 static void uhsic_phy_power_off(struct tegra_usb_phy *phy)
 {
+	unsigned long val;
+	void __iomem *base = phy->regs;
 
-	/* Do not do any thing here */
+	val = readl(base + UHSIC_PADS_CFG1);
+	val &= ~UHSIC_RPU_STROBE;
+	val |= UHSIC_RPD_STROBE;
+	writel(val, base + UHSIC_PADS_CFG1);
+
+	val = readl(base + USB_SUSP_CTRL);
+	val |= UHSIC_RESET;
+	writel(val, base + USB_SUSP_CTRL);
+	udelay(30);
+
+	val = readl(base + USB_SUSP_CTRL);
+	val &= ~UHSIC_PHY_ENABLE;
+	writel(val, base + USB_SUSP_CTRL);
+
 }
 
 struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
