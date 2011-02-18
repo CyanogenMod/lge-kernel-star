@@ -279,6 +279,9 @@ static void tegra_ehci_restart(struct usb_hcd *hcd)
 	/* flush posted writes */
 	ehci_readl(ehci, &ehci->regs->command);
 	up_write(&ehci_cf_port_reset_rwsem);
+
+	/* Turn On Interrupts */
+	ehci_writel(ehci, INTR_MASK, &ehci->regs->intr_enable);
 }
 
 static int tegra_usb_suspend(struct usb_hcd *hcd)
