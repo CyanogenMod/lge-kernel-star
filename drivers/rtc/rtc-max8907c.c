@@ -237,9 +237,13 @@ static int __devinit max8907c_rtc_probe(struct platform_device *pdev)
 		goto out_rtc;
 	}
 
+	max8907c_set_bits(chip->i2c_power, MAX8907C_REG_SYSENSEL, 0x2, 0x2);
+
 	dev_set_drvdata(&pdev->dev, info);
 
 	platform_set_drvdata(pdev, info);
+
+	device_init_wakeup(&pdev->dev, 1);
 
 	return 0;
 out_rtc:
@@ -263,6 +267,28 @@ static int __devexit max8907c_rtc_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int max8907c_rtc_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	struct device *dev=&pdev->dev;
+	struct max8907c_rtc_info *info = platform_get_drvdata(pdev);
+
+	if (device_may_wakeup(dev))
+		enable_irq_wake(info->chip->irq_base + MAX8907C_IRQ_RTC_ALARM0);
+	return 0;
+}
+
+static int max8907c_rtc_resume(struct platform_device *pdev)
+{
+	struct device *dev=&pdev->dev;
+	struct max8907c_rtc_info *info = platform_get_drvdata(pdev);
+
+	if (device_may_wakeup(dev))
+		disable_irq_wake(info->chip->irq_base + MAX8907C_IRQ_RTC_ALARM0);
+	return 0;
+}
+#endif
+
 static struct platform_driver max8907c_rtc_driver = {
 	.driver		= {
 		.name	= "max8907c-rtc",
@@ -270,6 +296,10 @@ static struct platform_driver max8907c_rtc_driver = {
 	},
 	.probe		= max8907c_rtc_probe,
 	.remove		= __devexit_p(max8907c_rtc_remove),
+#ifdef CONFIG_PM
+	.suspend	= max8907c_rtc_suspend,
+	.resume		= max8907c_rtc_resume,
+#endif
 };
 
 static int __init max8907c_rtc_init(void)
