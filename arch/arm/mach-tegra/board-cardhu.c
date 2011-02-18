@@ -350,6 +350,7 @@ static void cardhu_usb_init(void)
 static void cardhu_gps_init(void)
 {
 	tegra_gpio_enable(TEGRA_GPIO_PU2);
+	tegra_gpio_enable(TEGRA_GPIO_PU3);
 }
 
 #ifdef CONFIG_SATA_AHCI_TEGRA
