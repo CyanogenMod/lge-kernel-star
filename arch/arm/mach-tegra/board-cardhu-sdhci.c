@@ -96,7 +96,7 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data2 = {
 	.is_voltage_switch_supported = true,
 	.vsd_name = "vddio_sdmmc1",
 	.vsd_slot_name = "vddio_sd_slot",
-	.max_clk = 104000000,
+	.max_clk = 208000000,
 };
 
 static struct tegra_sdhci_platform_data tegra_sdhci_platform_data3 = {
