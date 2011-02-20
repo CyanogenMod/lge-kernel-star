@@ -50,7 +50,13 @@
 #define TPS6591X_LDO6_ADD		0x35
 #define TPS6591X_LDO7_ADD		0x34
 #define TPS6591X_LDO8_ADD		0x33
+#define TPS6591X_EN1_LDO_ADD		0x45
+#define TPS6591X_EN1_SMPS_ADD		0x46
+#define TPS6591X_EN2_LDO_ADD		0x47
+#define TPS6591X_EN2_SMPS_ADD		0x48
 #define TPS6591X_INVALID_ADD		0xFF
+
+#define EN1_EN2_OFFSET			2
 
 struct tps6591x_register_info {
 	unsigned char addr;
@@ -71,6 +77,7 @@ struct tps6591x_regulator {
 	struct tps6591x_register_info supply_reg;
 	struct tps6591x_register_info op_reg;
 	struct tps6591x_register_info sr_reg;
+	struct tps6591x_register_info en1_reg;
 
 	int *voltages;
 };
@@ -78,6 +85,52 @@ struct tps6591x_regulator {
 static inline struct device *to_tps6591x_dev(struct regulator_dev *rdev)
 {
 	return rdev_get_dev(rdev)->parent->parent;
+}
+
+static int __tps6591x_ext_control_set(struct device *parent,
+				      struct tps6591x_regulator *ri,
+				      enum tps6591x_ext_control ectrl)
+{
+	int ret;
+	uint8_t mask, reg_val, addr;
+
+	/* For regulator that has separate operational and sleep register make
+	   sure that operational is used and clear sleep register to turn
+	   regulator off when external control is inactive */
+	if (ri->supply_type == supply_type_sr_op_reg) {
+		ret = tps6591x_read(parent, ri->op_reg.addr, &reg_val);
+		if (ret)
+			return ret;
+
+		if (reg_val & 0x80) {	/* boot has used sr - switch to op */
+			ret = tps6591x_read(parent, ri->sr_reg.addr, &reg_val);
+			if (ret)
+				return ret;
+
+			mask = ((1 << ri->sr_reg.nbits) - 1)
+				<< ri->sr_reg.shift_bits;
+			reg_val &= mask;
+			ret = tps6591x_write(parent, ri->op_reg.addr, reg_val);
+			if (ret)
+				return ret;
+		}
+		ret = tps6591x_write(parent, ri->sr_reg.addr, 0);
+		if (ret)
+			return ret;
+	}
+
+	switch (ectrl) {
+	case EXT_CTRL_EN1:
+		addr = ri->en1_reg.addr;
+		break;
+	case EXT_CTRL_EN2:
+		addr = ri->en1_reg.addr + EN1_EN2_OFFSET;
+		break;
+	default:
+		return -EINVAL;
+	}
+	mask = ((1 << ri->en1_reg.nbits) - 1) << ri->en1_reg.shift_bits;
+	return tps6591x_update(parent, addr, mask, mask);
 }
 
 static int __tps6591x_vio_set_voltage(struct device *parent,
@@ -441,7 +494,7 @@ static int tps6591x_vdd_voltages[] = {
 
 #define TPS6591X_REGULATOR(_id, vdata, _ops, s_addr, s_nbits, s_shift,	\
 			s_type, op_addr, op_nbits, op_shift, sr_addr,	\
-			sr_nbits, sr_shift)				\
+			sr_nbits, sr_shift, en1_addr, en1_shift)	\
 	.desc	= {							\
 		.name	= tps6591x_rails(_id),				\
 		.ops	= &tps6591x_regulator_##_ops,			\
@@ -466,51 +519,63 @@ static int tps6591x_vdd_voltages[] = {
 		.nbits	= sr_nbits,					\
 		.shift_bits = sr_shift,					\
 	},								\
+	.en1_reg	= {						\
+		.addr	= TPS6591X_##en1_addr##_ADD,			\
+		.nbits	= 1,						\
+		.shift_bits = en1_shift,				\
+	},								\
 	.voltages	= tps6591x_##vdata##_voltages,
 
-#define TPS6591X_VIO(_id, vdata, s_addr, s_nbits, s_shift, s_type)	\
+#define TPS6591X_VIO(_id, vdata, s_addr, s_nbits, s_shift, s_type,	\
+			en1_shift)					\
 {									\
 	TPS6591X_REGULATOR(_id, vdata, vio_ops, s_addr, s_nbits,	\
-			s_shift, s_type, INVALID, 0, 0,	INVALID, 0, 0)	\
+			s_shift, s_type, INVALID, 0, 0,	INVALID, 0, 0,	\
+			EN1_SMPS, en1_shift)				\
 }
 
-#define TPS6591X_LDO1(_id, vdata, s_addr, s_nbits, s_shift, s_type)	\
+#define TPS6591X_LDO1(_id, vdata, s_addr, s_nbits, s_shift, s_type,	\
+			en1_shift)					\
 {									\
 	TPS6591X_REGULATOR(_id, vdata, ldo1_ops, s_addr, s_nbits,	\
-			s_shift, s_type, INVALID, 0, 0,	INVALID, 0, 0)	\
+			s_shift, s_type, INVALID, 0, 0,	INVALID, 0, 0,	\
+			EN1_LDO, en1_shift)				\
 }
 
-#define TPS6591X_LDO3(_id, vdata, s_addr, s_nbits, s_shift, s_type)	\
+#define TPS6591X_LDO3(_id, vdata, s_addr, s_nbits, s_shift, s_type,	\
+			en1_shift)					\
 {									\
 	TPS6591X_REGULATOR(_id, vdata, ldo3_ops, s_addr, s_nbits,	\
-			s_shift, s_type, INVALID, 0, 0,	INVALID, 0, 0)	\
+			s_shift, s_type, INVALID, 0, 0,	INVALID, 0, 0,	\
+			EN1_LDO, en1_shift)				\
 }
 
 #define TPS6591X_VDD(_id, vdata, s_addr, s_nbits, s_shift, s_type,	\
 			op_addr, op_nbits, op_shift, sr_addr, sr_nbits,	\
-			sr_shift)					\
+			sr_shift, en1_shift)				\
 {									\
 	TPS6591X_REGULATOR(_id, vdata, vdd_ops, s_addr, s_nbits,	\
 			s_shift, s_type, op_addr, op_nbits, op_shift,	\
-			sr_addr, sr_nbits, sr_shift)			\
+			sr_addr, sr_nbits, sr_shift, EN1_SMPS,		\
+			en1_shift)					\
 }
 
 static struct tps6591x_regulator tps6591x_regulator[] = {
-	TPS6591X_VIO(VIO, vio, VIO, 2, 2, single_reg),
-	TPS6591X_LDO1(LDO_1, ldo124, LDO1, 6, 2, single_reg),
-	TPS6591X_LDO1(LDO_2, ldo124, LDO2, 6, 2, single_reg),
-	TPS6591X_LDO3(LDO_3, ldo35678, LDO3, 5, 2, single_reg),
-	TPS6591X_LDO1(LDO_4, ldo124, LDO4, 6, 2, single_reg),
-	TPS6591X_LDO3(LDO_5, ldo35678, LDO5, 5, 2, single_reg),
-	TPS6591X_LDO3(LDO_6, ldo35678, LDO6, 5, 2, single_reg),
-	TPS6591X_LDO3(LDO_7, ldo35678, LDO7, 5, 2, single_reg),
-	TPS6591X_LDO3(LDO_8, ldo35678, LDO8, 5, 2, single_reg),
+	TPS6591X_VIO(VIO, vio, VIO, 2, 2, single_reg, 0),
+	TPS6591X_LDO1(LDO_1, ldo124, LDO1, 6, 2, single_reg, 1),
+	TPS6591X_LDO1(LDO_2, ldo124, LDO2, 6, 2, single_reg, 2),
+	TPS6591X_LDO3(LDO_3, ldo35678, LDO3, 5, 2, single_reg, 7),
+	TPS6591X_LDO1(LDO_4, ldo124, LDO4, 6, 2, single_reg, 6),
+	TPS6591X_LDO3(LDO_5, ldo35678, LDO5, 5, 2, single_reg, 3),
+	TPS6591X_LDO3(LDO_6, ldo35678, LDO6, 5, 2, single_reg, 0),
+	TPS6591X_LDO3(LDO_7, ldo35678, LDO7, 5, 2, single_reg, 5),
+	TPS6591X_LDO3(LDO_8, ldo35678, LDO8, 5, 2, single_reg, 4),
 	TPS6591X_VDD(VDD_1, vdd, VDD1, 2, 0, sr_op_reg, VDD1_OP,
-		7, 0, VDD1_SR, 7, 0),
+		7, 0, VDD1_SR, 7, 0, 1),
 	TPS6591X_VDD(VDD_2, vdd, VDD2, 2, 0, sr_op_reg, VDD2_OP,
-		7, 0, VDD2_SR, 7, 0),
+		7, 0, VDD2_SR, 7, 0, 2),
 	TPS6591X_VDD(VDDCTRL, vdd, VDDCTRL, 2, 0, sr_op_reg,
-		VDDCTRL_OP, 7, 0, VDDCTRL_SR, 7, 0),
+		VDDCTRL_OP, 7, 0, VDDCTRL_SR, 7, 0, 3),
 };
 
 static inline int tps6591x_regulator_preinit(struct device *parent,
@@ -518,6 +583,17 @@ static inline int tps6591x_regulator_preinit(struct device *parent,
 		struct tps6591x_regulator_platform_data *tps6591x_pdata)
 {
 	int ret;
+
+	if (tps6591x_pdata->ectrl != EXT_CTRL_NONE) {
+		ret = __tps6591x_ext_control_set(
+			parent, ri, tps6591x_pdata->ectrl);
+		if (ret < 0) {
+			pr_err("Not able to configure external control %d"
+			       " for rail %d err %d\n", tps6591x_pdata->ectrl,
+			       ri->desc.id, ret);
+			return ret;
+		}
+	}
 
 	if (!tps6591x_pdata->init_apply)
 		return 0;

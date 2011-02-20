@@ -26,6 +26,12 @@
 
 #include <linux/regulator/machine.h>
 
+enum tps6591x_ext_control {
+	EXT_CTRL_NONE = 0x0,
+	EXT_CTRL_EN1,
+	EXT_CTRL_EN2
+};
+
 /*
  * struct tps6591x_regulator_platform_data - tps6591x regulator platform data.
  *
@@ -40,6 +46,7 @@ struct tps6591x_regulator_platform_data {
 	int init_uV;
 	unsigned init_enable:1;
 	unsigned init_apply:1;
+	enum tps6591x_ext_control ectrl;
 };
 
 #endif	/* __REGULATOR_TPS6591X_H */
