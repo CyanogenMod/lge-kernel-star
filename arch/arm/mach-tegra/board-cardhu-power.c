@@ -136,7 +136,7 @@ static struct regulator_consumer_supply tps6591x_ldo8_supply[] = {
 };
 
 #define TPS_PDATA_INIT_SUPPLY(_id, _minmv, _maxmv, _supply_reg, _always_on, \
-	_boot_on, _apply_uv, _init_uV, _init_enable, _init_apply)	\
+	_boot_on, _apply_uv, _init_uV, _init_enable, _init_apply, _ectrl) \
 	static struct tps6591x_regulator_platform_data pdata_##_id =	\
 	{								\
 		.regulator = {						\
@@ -159,11 +159,12 @@ static struct regulator_consumer_supply tps6591x_ldo8_supply[] = {
 		},							\
 		.init_uV =  _init_uV * 1000,				\
 		.init_enable = _init_enable,				\
-		.init_apply = _init_apply				\
+		.init_apply = _init_apply,				\
+		.ectrl = _ectrl						\
 	}
 
 #define TPS_PDATA_INIT(_id, _minmv, _maxmv, _supply_reg, _always_on,	\
-	_boot_on, _apply_uv, _init_uV, _init_enable, _init_apply)	\
+	_boot_on, _apply_uv, _init_uV, _init_enable, _init_apply, _ectrl) \
 	static struct tps6591x_regulator_platform_data pdata_##_id =	\
 	{								\
 		.regulator = {						\
@@ -185,24 +186,25 @@ static struct regulator_consumer_supply tps6591x_ldo8_supply[] = {
 		},							\
 		.init_uV =  _init_uV * 1000,				\
 		.init_enable = _init_enable,				\
-		.init_apply = _init_apply				\
+		.init_apply = _init_apply,				\
+		.ectrl = _ectrl						\
 	}
 
-TPS_PDATA_INIT(vdd1,    600, 1500, 0, 1, 1, 0, -1, 0, 0);
-TPS_PDATA_INIT(vdd2,    600, 1500, 0, 1, 1, 0, -1, 0, 0);
-TPS_PDATA_INIT(vddctrl, 600, 1400, 0, 1, 1, 0, -1, 0, 0);
-TPS_PDATA_INIT(vio,    1500, 3300, 0, 1, 1, 0, -1, 0, 0);
+TPS_PDATA_INIT(vdd1,    600, 1500, 0, 1, 1, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(vdd2,    600, 1500, 0, 1, 1, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(vddctrl, 600, 1400, 0, 1, 1, 0, -1, 0, 0, EXT_CTRL_EN1);
+TPS_PDATA_INIT(vio,    1500, 3300, 0, 1, 1, 0, -1, 0, 0, 0);
 
-TPS_PDATA_INIT_SUPPLY(ldo1, 1000, 3300, VDD_2, 0, 0, 0, -1, 0, 0);
-TPS_PDATA_INIT_SUPPLY(ldo2, 1000, 3300, VDD_2, 0, 0, 0, -1, 0, 0);
+TPS_PDATA_INIT_SUPPLY(ldo1, 1000, 3300, VDD_2, 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT_SUPPLY(ldo2, 1000, 3300, VDD_2, 0, 0, 0, -1, 0, 0, 0);
 
-TPS_PDATA_INIT(ldo3, 1000, 3300, 0, 0, 0, 0, -1, 0, 0);
-TPS_PDATA_INIT(ldo4, 1000, 3300, 0, 0, 0, 0, -1, 0, 0);
-TPS_PDATA_INIT(ldo5, 1000, 3300, 0, 0, 0, 0, -1, 0, 0);
+TPS_PDATA_INIT(ldo3, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(ldo4, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(ldo5, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
 
-TPS_PDATA_INIT_SUPPLY(ldo6, 1000, 3300, VIO, 0, 0, 0, -1, 0, 0);
-TPS_PDATA_INIT_SUPPLY(ldo7, 1000, 3300, VIO, 0, 0, 0, -1, 0, 0);
-TPS_PDATA_INIT_SUPPLY(ldo8, 1000, 3300, VIO, 0, 0, 0, -1, 0, 0);
+TPS_PDATA_INIT_SUPPLY(ldo6, 1000, 3300, VIO, 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT_SUPPLY(ldo7, 1000, 3300, VIO, 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT_SUPPLY(ldo8, 1000, 3300, VIO, 0, 0, 0, -1, 0, 0, 0);
 /* Currently tps6591x-rtc driver is not available need to enable once driver is ready */
 /*
 static struct tps6591x_rtc_platform_data rtc_data = {
