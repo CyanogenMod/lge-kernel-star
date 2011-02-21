@@ -416,6 +416,51 @@ void tegra_sdmmc_tap_delay(struct clk *c, int delay)
 	spin_unlock_irqrestore(&c->spinlock, flags);
 }
 
+static bool tegra_keep_boot_clocks = false;
+static int __init tegra_keep_boot_clocks_setup(char *__unused)
+{
+	tegra_keep_boot_clocks = true;
+	return 1;
+}
+__setup("tegra_keep_boot_clocks", tegra_keep_boot_clocks_setup);
+
+/*
+ * Iterate through all clocks, disabling any for which the refcount is 0
+ * but the clock init detected the bootloader left the clock on.
+ */
+static int __init tegra_init_disable_boot_clocks(void)
+{
+	struct clk *c;
+
+	mutex_lock(&clock_list_lock);
+
+	list_for_each_entry(c, &clocks, node) {
+		spin_lock_irq(&c->spinlock);
+
+		if (c->refcnt == 0 && c->state == ON &&
+				c->ops && c->ops->disable) {
+			pr_warn_once("%s clocks left on by bootloader:\n",
+				tegra_keep_boot_clocks ?
+					"Prevented disabling" :
+					"Disabling");
+
+			pr_warn("   %s\n", c->name);
+
+			if (!tegra_keep_boot_clocks) {
+				c->ops->disable(c);
+				c->state = OFF;
+			}
+		}
+
+		spin_unlock_irq(&c->spinlock);
+	}
+
+	mutex_unlock(&clock_list_lock);
+
+	return 0;
+}
+late_initcall(tegra_init_disable_boot_clocks);
+
 #ifdef CONFIG_DEBUG_FS
 
 static int __clk_lock_all_spinlocks(void)
