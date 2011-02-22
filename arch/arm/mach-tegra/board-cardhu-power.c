@@ -504,7 +504,7 @@ GREG_INIT(4, dis_5v_switch,   "vdd_5v0_sys", TEGRA_GPIO_PX2,
 GREG_INIT(5, en_vdd_bl,       NULL,          TEGRA_GPIO_PK3,
 			false, 1, 0, 0, 0)
 GREG_INIT(6, en_3v3_modem,    NULL,          TEGRA_GPIO_PD6,
-			false, 0, 0, 0, 0)
+			false, 1, 0, 0, 0)
 GREG_INIT(7, en_usb1_vbus_oc, "master_5v_switch", TEGRA_GPIO_PI4,
 			false, 0, TEGRA_PINGROUP_GMI_RST_N,
 			enable_load_switch_rail, disable_load_switch_rail)
