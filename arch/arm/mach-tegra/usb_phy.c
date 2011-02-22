@@ -21,6 +21,7 @@
 
 #include <linux/resource.h>
 #include <linux/delay.h>
+#include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/err.h>
 #include <linux/platform_device.h>
@@ -32,7 +33,7 @@
 #include <mach/usb_phy.h>
 #include <mach/iomap.h>
 #include <mach/pinmux.h>
-#include "gpio-names.h"
+#include "fuse.h"
 
 #define USB_USBCMD		0x140
 #define   USB_USBCMD_RS		(1 << 0)
@@ -328,6 +329,12 @@ static struct tegra_uhsic_config uhsic_default = {
 	.elastic_overrun_limit = 16,
 };
 
+struct usb_phy_plat_data usb_phy_data[] = {
+	{ 0, 0, -1},
+	{ 0, 0, -1},
+	{ 0, 0, -1},
+};
+
 static inline bool phy_is_ulpi(struct tegra_usb_phy *phy)
 {
 	return (phy->instance == 1);
@@ -475,11 +482,42 @@ static void utmi_phy_clk_enable(struct tegra_usb_phy *phy)
 		pr_err("%s: timeout waiting for phy to stabilize\n", __func__);
 }
 
+static void vbus_enable(int gpio)
+{
+	int gpio_status;
+
+	if (gpio == -1)
+		return;
+
+	gpio_status = gpio_request(gpio,"VBUS_USB");
+	if (gpio_status < 0) {
+		printk("VBUS_USB request GPIO FAILED\n");
+		WARN_ON(1);
+		return;
+	}
+	tegra_gpio_enable(gpio);
+	gpio_status = gpio_direction_output(gpio, 1);
+	if (gpio_status < 0) {
+		printk("VBUS_USB request GPIO DIRECTION FAILED \n");
+		WARN_ON(1);
+		return;
+	}
+	gpio_set_value(gpio, 1);
+}
+
+static void vbus_disable(int gpio)
+{
+	if (gpio == -1)
+		return;
+
+	gpio_set_value(gpio, 0);
+	gpio_free(gpio);
+}
+
 static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
-	int gpio_status;
 	struct tegra_utmip_config *config = phy->config;
 
 	val = readl(base + USB_SUSP_CTRL);
@@ -589,21 +627,6 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 		val = readl(base + USB_SUSP_CTRL);
 		val &= ~USB_SUSP_SET;
 		writel(val, base + USB_SUSP_CTRL);
-		if (phy->mode == TEGRA_USB_PHY_MODE_HOST) {
-			gpio_status = gpio_request(TEGRA_GPIO_PD0, "VBUS_BUS");
-			if (gpio_status < 0) {
-				printk(KERN_ERR "VBUS_USB1 request GPIO FAILED\n");
-				WARN_ON(1);
-			}
-			tegra_gpio_enable(TEGRA_GPIO_PD0);
-			gpio_status = gpio_direction_output(TEGRA_GPIO_PD0, 1);
-			if (gpio_status < 0) {
-				printk(KERN_ERR "VBUS_USB1 request GPIO DIRECTION FAILED\n");
-				WARN_ON(1);
-			}
-			gpio_set_value(TEGRA_GPIO_PD0, 1);
-			tegra_pinmux_set_tristate(TEGRA_PINGROUP_SLXK, TEGRA_TRI_NORMAL);
-		}
 	}
 
 	utmi_phy_clk_enable(phy);
@@ -612,6 +635,9 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 		val = readl(base + USB_PORTSC1);
 		val &= ~USB_PORTSC1_PTS(~0);
 		writel(val, base + USB_PORTSC1);
+	}
+	if (phy->mode == TEGRA_USB_PHY_MODE_HOST) {
+		vbus_enable(usb_phy_data[phy->instance].vbus_gpio);
 	}
 
 	return 0;
@@ -624,9 +650,8 @@ static void utmi_phy_power_off(struct tegra_usb_phy *phy)
 
 	utmi_phy_clk_disable(phy);
 
-	if (phy->instance == 0 && phy->mode == TEGRA_USB_PHY_MODE_HOST) {
-		gpio_free(TEGRA_GPIO_PD0);
-		tegra_pinmux_set_tristate(TEGRA_PINGROUP_SLXK, TEGRA_TRI_TRISTATE);
+	if (phy->mode == TEGRA_USB_PHY_MODE_HOST) {
+		vbus_disable(usb_phy_data[phy->instance].vbus_gpio);
 	}
 
 	if (phy->mode == TEGRA_USB_PHY_MODE_DEVICE) {
@@ -1074,6 +1099,18 @@ static void uhsic_phy_power_off(struct tegra_usb_phy *phy)
 
 }
 
+static irqreturn_t usb_phy_vbus_irq_thr(int irq, void *pdata)
+{
+	struct tegra_usb_phy *phy = pdata;
+
+	if (!phy->regulator_on) {
+		regulator_enable(phy->reg_vdd);
+		phy->regulator_on = 1;
+	}
+
+	return IRQ_HANDLED;
+}
+
 struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 			void *config, enum tegra_usb_phy_mode phy_mode)
 {
@@ -1093,6 +1130,7 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 	phy->config = config;
 	phy->mode = phy_mode;
 	phy->initialized = 0;
+	phy->regulator_on = 0;
 
 	if (!phy->config) {
 		if (phy_is_ulpi(phy)) {
@@ -1161,6 +1199,22 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 		if (err < 0)
 			goto err1;
 	}
+	phy->reg_vdd = regulator_get(NULL, "avdd_usb");
+	if (WARN_ON(IS_ERR_OR_NULL(phy->reg_vdd))) {
+		pr_err("couldn't get regulator avdd_usb: %ld \n",
+			 PTR_ERR(phy->reg_vdd));
+		err = PTR_ERR(phy->reg_vdd);
+		goto err1;
+	}
+
+	if (instance == 0 && usb_phy_data[0].vbus_irq) {
+		err = request_threaded_irq(usb_phy_data[0].vbus_irq, NULL, usb_phy_vbus_irq_thr, IRQF_SHARED,
+			"usb_phy_vbus", phy);
+		if (err) {
+			pr_err("Failed to register IRQ\n");
+			goto err1;
+		}
+	}
 
 	return phy;
 
@@ -1174,6 +1228,10 @@ err0:
 
 int tegra_usb_phy_power_on(struct tegra_usb_phy *phy)
 {
+	if (!phy->regulator_on) {
+		regulator_enable(phy->reg_vdd);
+		phy->regulator_on = 1;
+	}
 	if (phy_is_ulpi(phy)) {
 		struct tegra_ulpi_config *ulpi_config = phy->config;
 		if (ulpi_config->inf_type == TEGRA_USB_LINK_ULPI)
@@ -1198,6 +1256,11 @@ void tegra_usb_phy_power_off(struct tegra_usb_phy *phy)
 			null_phy_power_off(phy);
 	} else
 		utmi_phy_power_off(phy);
+
+	if (phy->regulator_on && (tegra_get_revision() >= TEGRA_REVISION_A03)) {
+		regulator_disable(phy->reg_vdd);
+		phy->regulator_on = 0;
+	}
 }
 
 void tegra_usb_phy_preresume(struct tegra_usb_phy *phy)
@@ -1252,6 +1315,9 @@ void tegra_usb_phy_close(struct tegra_usb_phy *phy)
 		utmip_pad_close(phy);
 	clk_disable(phy->pll_u);
 	clk_put(phy->pll_u);
+	regulator_put(phy->reg_vdd);
+	if (phy->instance == 0 && usb_phy_data[0].vbus_irq)
+		free_irq(usb_phy_data[0].vbus_irq, phy);
 	kfree(phy);
 }
 
@@ -1405,3 +1471,17 @@ bool tegra_usb_phy_is_device_connected(struct tegra_usb_phy *phy)
 	return true;
 }
 
+int __init tegra_usb_phy_init(struct usb_phy_plat_data *pdata, int size)
+{
+	if (pdata) {
+		int i;
+
+		for (i = 0; i < size; i++, pdata++) {
+			usb_phy_data[pdata->instance].instance = pdata->instance;
+			usb_phy_data[pdata->instance].vbus_irq = pdata->vbus_irq;
+			usb_phy_data[pdata->instance].vbus_gpio = pdata->vbus_gpio;
+		}
+	}
+
+	return 0;
+}
