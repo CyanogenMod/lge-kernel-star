@@ -53,6 +53,7 @@ struct tegra_otg_data {
 	struct platform_device *host;
 	struct platform_device *pdev;
 	struct work_struct work;
+	unsigned int intr_reg_data;
 };
 
 static inline unsigned long otg_readl(struct tegra_otg_data *tegra,
@@ -337,12 +338,38 @@ static int __exit tegra_otg_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int tegra_otg_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	struct tegra_otg_data *tegra_otg = platform_get_drvdata(pdev);
+
+	/* store the interupt enable for cable ID and VBUS */
+	tegra_otg->intr_reg_data = readl(tegra_otg->regs + USB_PHY_WAKEUP);
+
+	return 0;
+}
+
+static int tegra_otg_resume(struct platform_device * pdev)
+{
+	struct tegra_otg_data *tegra_otg = platform_get_drvdata(pdev);
+
+	/* restore the interupt enable for cable ID and VBUS */
+	writel(tegra_otg->intr_reg_data, (tegra_otg->regs + USB_PHY_WAKEUP));
+
+	return 0;
+}
+#endif
+
 static struct platform_driver tegra_otg_driver = {
 	.driver = {
 		.name  = "tegra-otg",
 	},
 	.remove  = __exit_p(tegra_otg_remove),
 	.probe   = tegra_otg_probe,
+#ifdef CONFIG_PM
+	.suspend = tegra_otg_suspend,
+	.resume = tegra_otg_resume,
+#endif
 };
 
 static int __init tegra_otg_init(void)
