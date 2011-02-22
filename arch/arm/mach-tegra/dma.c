@@ -191,6 +191,39 @@ int tegra_dma_cancel(struct tegra_dma_channel *ch)
 	return 0;
 }
 
+static unsigned int get_channel_status(struct tegra_dma_channel *ch,
+			struct tegra_dma_req *req, bool is_stop_dma)
+{
+	void __iomem *addr = IO_ADDRESS(TEGRA_APB_DMA_BASE);
+	unsigned int status;
+
+	if (is_stop_dma) {
+		/* STOP the DMA and get the transfer count.
+		 * Getting the transfer count is tricky.
+		 *  - Globally disable DMA on all channels
+		 *  - Read the channel's status register to know the number
+		 *    of pending bytes to be transfered.
+		 *  - Stop the dma channel
+		 *  - Globally re-enable DMA to resume other transfers
+		 */
+		spin_lock(&enable_lock);
+		writel(0, addr + APB_DMA_GEN);
+		udelay(20);
+		status = readl(ch->addr + APB_DMA_CHAN_STA);
+		tegra_dma_stop(ch);
+		writel(GEN_ENABLE, addr + APB_DMA_GEN);
+		spin_unlock(&enable_lock);
+		if (status & STA_ISE_EOC) {
+			pr_err("Got Dma Int here clearing");
+			writel(status, ch->addr + APB_DMA_CHAN_STA);
+		}
+		req->status = TEGRA_DMA_REQ_ERROR_ABORTED;
+	} else {
+		status = readl(ch->addr + APB_DMA_CHAN_STA);
+	}
+	return status;
+}
+
 /* should be called with the channel lock held */
 static unsigned int dma_active_count(struct tegra_dma_channel *ch,
 	struct tegra_dma_req *req, unsigned int status)
@@ -234,7 +267,6 @@ int tegra_dma_dequeue_req(struct tegra_dma_channel *ch,
 	unsigned int status;
 	unsigned long irq_flags;
 	int stop = 0;
-	void __iomem *addr = IO_ADDRESS(TEGRA_APB_DMA_BASE);
 
 	spin_lock_irqsave(&ch->lock, irq_flags);
 
@@ -256,22 +288,7 @@ int tegra_dma_dequeue_req(struct tegra_dma_channel *ch,
 	if (!stop)
 		goto skip_status;
 
-	/* STOP the DMA and get the transfer count.
-	 * Getting the transfer count is tricky.
-	 *  - Globally disable DMA on all channels
-	 *  - Read the channel's status register to know the number of pending
-	 *    bytes to be transferred.
-	 *  - Stop the dma channel
-	 *  - Globally re-enable DMA to resume other transfers
-	 */
-	spin_lock(&enable_lock);
-	writel(0, addr + APB_DMA_GEN);
-	udelay(20);
-	status = readl(ch->addr + APB_DMA_CHAN_STA);
-	tegra_dma_stop(ch);
-	writel(GEN_ENABLE, addr + APB_DMA_GEN);
-	spin_unlock(&enable_lock);
-
+	status = get_channel_status(ch, req, true);
 	req->bytes_transferred = dma_active_count(ch, req, status);
 
 	if (!list_empty(&ch->list)) {
@@ -324,6 +341,36 @@ bool tegra_dma_is_req_inflight(struct tegra_dma_channel *ch,
 	return false;
 }
 EXPORT_SYMBOL(tegra_dma_is_req_inflight);
+int tegra_dma_get_transfer_count(struct tegra_dma_channel *ch,
+			struct tegra_dma_req *req, bool is_stop_dma)
+{
+	unsigned int status;
+	unsigned long irq_flags;
+	int bytes_transferred = 0;
+
+	if (IS_ERR_OR_NULL(ch))
+		BUG();
+
+	spin_lock_irqsave(&ch->lock, irq_flags);
+
+	if (list_entry(ch->list.next, struct tegra_dma_req, node) != req) {
+		spin_unlock_irqrestore(&ch->lock, irq_flags);
+		pr_debug("The dma request is not the head req\n");
+		return req->bytes_transferred;
+	}
+
+	if (req->status != TEGRA_DMA_REQ_INFLIGHT) {
+		spin_unlock_irqrestore(&ch->lock, irq_flags);
+		pr_debug("The dma request is not running\n");
+		return req->bytes_transferred;
+	}
+
+	status = get_channel_status(ch, req, is_stop_dma);
+	bytes_transferred = dma_active_count(ch, req, status);
+	spin_unlock_irqrestore(&ch->lock, irq_flags);
+	return bytes_transferred;
+}
+EXPORT_SYMBOL(tegra_dma_get_transfer_count);
 
 int tegra_dma_enqueue_req(struct tegra_dma_channel *ch,
 	struct tegra_dma_req *req)
@@ -681,7 +728,7 @@ static void handle_continuous_dbl_dma(struct tegra_dma_channel *ch)
 				tegra_dma_update_hw_partial(ch, next_req);
 			}
 			req->buffer_status = TEGRA_DMA_REQ_BUF_STATUS_HALF_FULL;
-			req->status = TEGRA_DMA_REQ_SUCCESS;
+			req->bytes_transferred = req->size >> 1;
 			/* DMA lock is NOT held when callback is called */
 			spin_unlock_irqrestore(&ch->lock, irq_flags);
 			if (likely(req->threshold))

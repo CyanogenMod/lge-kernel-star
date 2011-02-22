@@ -147,6 +147,8 @@ void tegra_dma_flush(struct tegra_dma_channel *ch);
 
 bool tegra_dma_is_req_inflight(struct tegra_dma_channel *ch,
 	struct tegra_dma_req *req);
+int tegra_dma_get_transfer_count(struct tegra_dma_channel *ch,
+			struct tegra_dma_req *req, bool is_stop_dma);
 bool tegra_dma_is_empty(struct tegra_dma_channel *ch);
 bool tegra_dma_is_stopped(struct tegra_dma_channel *ch);
 
