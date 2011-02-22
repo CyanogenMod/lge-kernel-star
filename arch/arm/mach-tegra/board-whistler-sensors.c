@@ -23,6 +23,8 @@
 #include <media/ov5650.h>
 #include <linux/regulator/consumer.h>
 #include <linux/err.h>
+#include <linux/adt7461.h>
+
 #include "gpio-names.h"
 
 #define CAMERA1_PWDN_GPIO		TEGRA_GPIO_PT2
@@ -34,6 +36,8 @@
 #define ADXL34X_IRQ_GPIO		TEGRA_GPIO_PAA1
 #define ISL29018_IRQ_GPIO		TEGRA_GPIO_PK2
 #define ADT7461_IRQ_GPIO			TEGRA_GPIO_PI2
+
+extern void tegra_throttling_enable(bool enable);
 
 static struct regulator *reg_avdd_cam1; /* LDO9 */
 static struct regulator *reg_vdd_af;    /* LDO13 */
@@ -159,10 +163,24 @@ static void whistler_adt7461_init(void)
 	gpio_direction_input(ADT7461_IRQ_GPIO);
 }
 
+static struct adt7461_platform_data whistler_adt7461_pdata = {
+	.supported_hwrev = true,
+	.ext_range = false,
+	.therm2 = true,
+	.conv_rate = 0x05,
+	.offset = 0,
+	.hysteresis = 0,
+	.shutdown_ext_limit = 115,
+	.shutdown_local_limit = 120,
+	.throttling_ext_limit = 90,
+	.alarm_fn = tegra_throttling_enable,
+};
+
 static struct i2c_board_info whistler_i2c4_board_info[] = {
 	{
 		I2C_BOARD_INFO("adt7461", 0x4C),
 		.irq = TEGRA_GPIO_TO_IRQ(ADT7461_IRQ_GPIO),
+		.platform_data = &whistler_adt7461_pdata,
 	},
 };
 
