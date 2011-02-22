@@ -30,6 +30,11 @@
 #include <linux/mutex.h>
 #include <linux/sysfs.h>
 #include <linux/delay.h>
+#include <linux/gpio.h>
+#include <linux/interrupt.h>
+#include <linux/adt7461.h>
+
+#define DRIVER_NAME "adt7461"
 
 /*
  * The ADT7461 registers
@@ -68,16 +73,30 @@
 #define ADT7461_REG_R_TCRIT_HYST		0x21
 #define ADT7461_REG_W_TCRIT_HYST		0x21
 
+/* Configuration Register Bits */
+#define EXTENDED_RANGE_BIT		BIT(2)
+#define THERM2_BIT			BIT(5)
+#define STANDBY_BIT			BIT(6)
+#define ALERT_BIT			BIT(7)
+
+/* Max Temperature Measurements */
+#define EXTENDED_RANGE_OFFSET	64U
+#define STANDARD_RANGE_MAX		127U
+#define EXTENDED_RANGE_MAX		(150U + EXTENDED_RANGE_OFFSET)
+
 /*
  * Device flags
  */
 #define ADT7461_FLAG_ADT7461_EXT		0x01	/* ADT7461 extended mode */
+#define ADT7461_FLAG_THERM2			0x02	/* Pin 6 as Therm2 */
 
 /*
  * Client data
  */
 
 struct adt7461_data {
+	struct work_struct work;
+	struct i2c_client *client;
 	struct device *hwmon_dev;
 	struct mutex update_lock;
 	struct regulator *regulator;
@@ -85,7 +104,7 @@ struct adt7461_data {
 	unsigned long last_updated; /* in jiffies */
 	int flags;
 
-	u8 config_orig;		/* Original configuration register value */
+	u8 config;		/* configuration register value */
 	u8 alert_alarms;	/* Which alarm bits trigger ALERT# */
 
 	/* registers values */
@@ -100,6 +119,7 @@ struct adt7461_data {
 			   4: local input */
 	u8 temp_hyst;
 	u8 alarms; /* bitvector */
+	void (*alarm_fn)(bool raised);
 };
 
 /*
@@ -236,7 +256,6 @@ static struct adt7461_data *adt7461_update_device(struct device *dev)
 	 || !data->valid) {
 		u8 h, l;
 
-		pr_err("adt7461_update_device:Updating adt7461 data.\n");
 		adt7461_read_reg(client, ADT7461_REG_R_LOCAL_LOW, &data->temp8[0]);
 		adt7461_read_reg(client, ADT7461_REG_R_LOCAL_HIGH, &data->temp8[1]);
 		adt7461_read_reg(client, ADT7461_REG_R_LOCAL_CRIT, &data->temp8[2]);
@@ -267,9 +286,8 @@ static struct adt7461_data *adt7461_update_device(struct device *dev)
 			data->temp11[3] = (h << 8) | l;
 		adt7461_read_reg(client, ADT7461_REG_R_STATUS, &data->alarms);
 
-		/* Re-enable ALERT# output if it was originally enabled and
-		 * relevant alarms are all clear */
-		if ((data->config_orig & 0x80) == 0
+		/* Re-enable ALERT# output if relevant alarms are all clear */
+		if (!(data->flags & ADT7461_FLAG_THERM2)
 		 && (data->alarms & data->alert_alarms) == 0) {
 			u8 config;
 
@@ -278,7 +296,7 @@ static struct adt7461_data *adt7461_update_device(struct device *dev)
 				pr_err("adt7461_update_device:Re-enabling ALERT#\n");
 				i2c_smbus_write_byte_data(client,
 							ADT7461_REG_W_CONFIG1,
-							config & ~0x80);
+							config & ~ALERT_BIT);
 			}
 		}
 
@@ -476,6 +494,26 @@ static const struct attribute_group adt7461_group = {
 	.attrs = adt7461_attributes,
 };
 
+static void adt7461_work_func(struct work_struct *work)
+{
+	struct adt7461_data *data =
+			container_of(work, struct adt7461_data, work);
+	int irq = data->client->irq;
+
+	if (data->alarm_fn) {
+		/* Therm2 line is active low */
+		data->alarm_fn(!gpio_get_value(irq_to_gpio(irq)));
+	}
+}
+
+static irqreturn_t adt7461_irq(int irq, void *dev_id)
+{
+	struct adt7461_data *data = dev_id;
+	schedule_work(&data->work);
+
+	return IRQ_HANDLED;
+}
+
 static void adt7461_regulator_enable(struct i2c_client *client)
 {
 	struct adt7461_data *data = i2c_get_clientdata(client);
@@ -484,8 +522,7 @@ static void adt7461_regulator_enable(struct i2c_client *client)
 	if (IS_ERR_OR_NULL(data->regulator)) {
 		pr_err("adt7461_regulator_enable:Couldn't get regulator vdd_vcore_temp\n");
 		data->regulator = NULL;
-	}
-	else {
+	} else {
 		regulator_enable(data->regulator);
 		/* Optimal time to get the regulator turned on
 		 * before initializing adt7461 chip*/
@@ -508,28 +545,113 @@ static void adt7461_regulator_disable(struct i2c_client *client)
 	data->regulator = NULL;
 }
 
-static void adt7461_init_client(struct i2c_client *client)
+static void adt7461_enable(struct i2c_client *client)
 {
-	u8 config;
 	struct adt7461_data *data = i2c_get_clientdata(client);
 
-	adt7461_regulator_enable(client);
-	/* Start the conversions. */
-	i2c_smbus_write_byte_data(client, ADT7461_REG_W_CONVRATE,
-				5); /* 2 Hz */
-	if (adt7461_read_reg(client, ADT7461_REG_R_CONFIG1, &config) < 0) {
-		pr_err("adt7461_init_client:Initialization failed!\n");
-		return;
-	}
-	data->config_orig = config;
+	i2c_smbus_write_byte_data(client, ADT7461_REG_W_CONFIG1,
+				  data->config & ~STANDBY_BIT);
+}
 
-	/* Check Temperature Range Select */
-	if (config & 0x04)
+static void adt7461_disable(struct i2c_client *client)
+{
+	struct adt7461_data *data = i2c_get_clientdata(client);
+
+	i2c_smbus_write_byte_data(client, ADT7461_REG_W_CONFIG1,
+				  data->config | STANDBY_BIT);
+}
+
+static int adt7461_init_client(struct i2c_client *client)
+{
+	struct adt7461_data *data = i2c_get_clientdata(client);
+	struct adt7461_platform_data *pdata = client->dev.platform_data;
+	u8 config = 0;
+	u8 value;
+	int err;
+
+	if (!pdata || !pdata->supported_hwrev)
+		return -ENODEV;
+
+	if (pdata->therm2)
+		data->flags |= ADT7461_FLAG_THERM2;
+
+	if (pdata->ext_range)
 		data->flags |= ADT7461_FLAG_ADT7461_EXT;
 
-	config &= 0xBF;	/* run */
-	if (config != data->config_orig) /* Only write if changed */
-		i2c_smbus_write_byte_data(client, ADT7461_REG_W_CONFIG1, config);
+	adt7461_regulator_enable(client);
+
+	/* Start the conversions. */
+	err = i2c_smbus_write_byte_data(client, ADT7461_REG_W_CONVRATE,
+							pdata->conv_rate);
+	if (err < 0)
+		goto error;
+
+	/* External temperature h/w shutdown limit */
+	value = temp_to_u8(data, pdata->shutdown_ext_limit * 1000);
+	err = i2c_smbus_write_byte_data(client,
+				ADT7461_REG_W_REMOTE_CRIT, value);
+	if (err < 0)
+		goto error;
+
+	/* Local temperature h/w shutdown limit */
+	value = temp_to_u8(data, pdata->shutdown_local_limit * 1000);
+	err = i2c_smbus_write_byte_data(client, ADT7461_REG_W_LOCAL_CRIT,
+								value);
+	if (err < 0)
+		goto error;
+
+	/* External Temperature Throttling limit */
+	value = temp_to_u8(data, pdata->throttling_ext_limit * 1000);
+	err = i2c_smbus_write_byte_data(client, ADT7461_REG_W_REMOTE_HIGHH,
+								value);
+	if (err < 0)
+		goto error;
+
+	/* Local Temperature Throttling limit */
+	value = (data->flags & ADT7461_FLAG_ADT7461_EXT) ?
+				EXTENDED_RANGE_MAX : STANDARD_RANGE_MAX;
+	err = i2c_smbus_write_byte_data(client, ADT7461_REG_W_LOCAL_HIGH,
+								value);
+	if (err < 0)
+		goto error;
+
+	/* Remote channel offset */
+	err = i2c_smbus_write_byte_data(client, ADT7461_REG_W_REMOTE_OFFSH,
+							pdata->offset);
+	if (err < 0)
+		goto error;
+
+	/* THERM hysteresis */
+	err = i2c_smbus_write_byte_data(client, ADT7461_REG_W_TCRIT_HYST,
+					pdata->hysteresis);
+	if (err < 0)
+		goto error;
+
+	if (data->flags & ADT7461_FLAG_THERM2) {
+		data->alarm_fn = pdata->alarm_fn;
+		config = (THERM2_BIT | STANDBY_BIT);
+	} else {
+		config = (~ALERT_BIT & ~THERM2_BIT & STANDBY_BIT);
+	}
+
+	err = i2c_smbus_write_byte_data(client, ADT7461_REG_W_CONFIG1, config);
+	if (err < 0)
+		goto error;
+
+	data->config = config;
+	return 0;
+
+error:
+	pr_err("adt7461_init_client:Initialization failed!\n");
+	return err;
+}
+
+static int adt7461_init_irq(struct adt7461_data *data)
+{
+	INIT_WORK(&data->work, adt7461_work_func);
+
+	return request_irq(data->client->irq, adt7461_irq, IRQF_TRIGGER_RISING |
+				IRQF_TRIGGER_FALLING, DRIVER_NAME, data);
 }
 
 static int adt7461_probe(struct i2c_client *new_client,
@@ -542,13 +664,22 @@ static int adt7461_probe(struct i2c_client *new_client,
 	if (!data)
 		return -ENOMEM;
 
+	data->client = new_client;
 	i2c_set_clientdata(new_client, data);
 	mutex_init(&data->update_lock);
 
 	data->alert_alarms = 0x7c;
 
 	/* Initialize the ADT7461 chip */
-	adt7461_init_client(new_client);
+	err = adt7461_init_client(new_client);
+	if (err < 0)
+		goto exit_free;
+
+	if (data->flags & ADT7461_FLAG_THERM2) {
+		err = adt7461_init_irq(data);
+		if (err < 0)
+			goto exit_free;
+	}
 
 	/* Register sysfs hooks */
 	if ((err = sysfs_create_group(&new_client->dev.kobj, &adt7461_group)))
@@ -563,6 +694,7 @@ static int adt7461_probe(struct i2c_client *new_client,
 		goto exit_remove_files;
 	}
 
+	adt7461_enable(new_client);
 	return 0;
 
 exit_remove_files:
@@ -576,15 +708,13 @@ static int adt7461_remove(struct i2c_client *client)
 {
 	struct adt7461_data *data = i2c_get_clientdata(client);
 
-	adt7461_regulator_disable(client);
+	free_irq(client->irq, data);
+	cancel_work_sync(&data->work);
 	hwmon_device_unregister(data->hwmon_dev);
 	sysfs_remove_group(&client->dev.kobj, &adt7461_group);
 	device_remove_file(&client->dev,
 			&sensor_dev_attr_temp2_offset.dev_attr);
-
-	/* Restore initial configuration */
-	i2c_smbus_write_byte_data(client, ADT7461_REG_W_CONFIG1,
-				data->config_orig);
+	adt7461_regulator_disable(client);
 
 	kfree(data);
 	return 0;
@@ -609,20 +739,39 @@ static void adt7461_alert(struct i2c_client *client, unsigned int flag)
 		/* Disable ALERT# output, because these chips don't implement
 		  SMBus alert correctly; they should only hold the alert line
 		  low briefly. */
-		if (alarms & data->alert_alarms) {
+		if (!(data->flags & ADT7461_FLAG_THERM2)
+		 && (alarms & data->alert_alarms)) {
 			pr_err("adt7461_alert:Disabling ALERT#\n");
 			adt7461_read_reg(client, ADT7461_REG_R_CONFIG1, &config);
 			i2c_smbus_write_byte_data(client, ADT7461_REG_W_CONFIG1,
-					config | 0x80);
+					config | ALERT_BIT);
 		}
 	}
 }
+
+#ifdef CONFIG_PM
+static int adt7461_suspend(struct i2c_client *client, pm_message_t state)
+{
+	disable_irq(client->irq);
+	adt7461_disable(client);
+
+	return 0;
+}
+
+static int adt7461_resume(struct i2c_client *client)
+{
+	adt7461_enable(client);
+	enable_irq(client->irq);
+
+	return 0;
+}
+#endif
 
 /*
  * Driver data
  */
 static const struct i2c_device_id adt7461_id[] = {
-	{ "adt7461", 0 },
+	{ DRIVER_NAME, 0 },
 };
 
 MODULE_DEVICE_TABLE(i2c, adt7461_id);
@@ -630,12 +779,16 @@ MODULE_DEVICE_TABLE(i2c, adt7461_id);
 static struct i2c_driver adt7461_driver = {
 	.class		= I2C_CLASS_HWMON,
 	.driver = {
-		.name	= "adt7461",
+		.name	= DRIVER_NAME,
 	},
 	.probe		= adt7461_probe,
 	.remove		= adt7461_remove,
 	.alert		= adt7461_alert,
 	.id_table	= adt7461_id,
+#ifdef CONFIG_PM
+	.suspend	= adt7461_suspend,
+	.resume		= adt7461_resume,
+#endif
 };
 
 static int __init sensors_adt7461_init(void)
