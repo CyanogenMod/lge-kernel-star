@@ -164,10 +164,10 @@ static struct tps6586x_subdev_info tps_devs[] = {
 };
 
 static struct tps6586x_platform_data tps_platform = {
-	.irq_base = TEGRA_NR_IRQS,
+	.irq_base = TPS6586X_INT_BASE,
 	.num_subdevs = ARRAY_SIZE(tps_devs),
 	.subdevs = tps_devs,
-	.gpio_base = TEGRA_NR_GPIOS,
+	.gpio_base = TPS6586X_GPIO_BASE,
 };
 
 static struct i2c_board_info __initdata ventana_regulators[] = {
