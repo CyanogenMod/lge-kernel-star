@@ -184,7 +184,7 @@ static noinline void __init tegra_setup_bluesleep(void)
 	res[2].name   = "host_wake";
 	res[2].start  = gpio_to_irq(TEGRA_GPIO_PU6);
 	res[2].end    = gpio_to_irq(TEGRA_GPIO_PU6);
-	res[2].flags  = IORESOURCE_IRQ;
+	res[2].flags  = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE;
 
 	if (platform_device_add_resources(pdev, res, 3)) {
 		pr_err("unable to add resources to bluesleep device\n");
@@ -195,6 +195,10 @@ static noinline void __init tegra_setup_bluesleep(void)
 		pr_err("unable to add bluesleep device\n");
 		goto err_free_res;
 	}
+
+	tegra_gpio_enable(TEGRA_GPIO_PU6);
+	tegra_gpio_enable(TEGRA_GPIO_PU1);
+
 	return;
 
 err_free_res:
