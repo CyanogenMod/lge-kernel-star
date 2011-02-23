@@ -321,13 +321,13 @@ static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
 	},
 };
 
-static void ventana_usb_init()
+static void ventana_usb_init(void)
 {
 	tegra_ehci3_device.dev.platform_data=&tegra_ehci_pdata[2];
 	platform_device_register(&tegra_ehci3_device);
 }
 
-struct platform_device *tegra_usb_otg_host_register()
+struct platform_device *tegra_usb_otg_host_register(void)
 {
 	struct platform_device *pdev;
 	void *platform_data;
