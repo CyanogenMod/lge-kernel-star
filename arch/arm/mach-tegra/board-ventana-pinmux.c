@@ -32,6 +32,8 @@
 
 
 static __initdata struct tegra_drive_pingroup_config ventana_drive_pinmux[] = {
+	DEFAULT_DRIVE(AO1),
+	DEFAULT_DRIVE(AT1),
 	DEFAULT_DRIVE(DBG),
 	DEFAULT_DRIVE(DDC),
 	DEFAULT_DRIVE(VI1),
