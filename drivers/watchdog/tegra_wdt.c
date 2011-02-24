@@ -102,7 +102,7 @@ static irqreturn_t tegra_wdt_interrupt(int irq, void *dev_id)
 #define TIMER_PCR			0x4
  #define TIMER_PCR_INTR			(1 << 30)
 #define WDT_CFG				(0)
- #define WDT_CFG_TMR_SRC		(6 << 0) /* for TMR6. */
+ #define WDT_CFG_TMR_SRC		(0 << 0) /* for TMR10. */
  #define WDT_CFG_PERIOD			(1 << 4)
  #define WDT_CFG_INT_EN			(1 << 12)
  #define WDT_CFG_SYS_RST_EN		(1 << 14)
