@@ -27,6 +27,7 @@
 #include <mach/fb.h>
 #include <mach/gpio.h>
 #include <media/ov5650.h>
+#include <media/ov2710.h>
 #include <generated/mach-types.h>
 #include "gpio-names.h"
 #include "board.h"
@@ -190,6 +191,24 @@ struct ov5650_platform_data cardhu_ov5650_data = {
 	.power_off = cardhu_ov5650_power_off,
 };
 
+static int cardhu_ov2710_power_on(void)
+{
+	cardhu_ov5650_power_on();
+	gpio_direction_output(CAMERA_CSI_MUX_SEL_GPIO, 1);
+	return 0;
+}
+
+static int cardhu_ov2710_power_off(void)
+{
+	cardhu_ov5650_power_off();
+	return 0;
+}
+
+struct ov2710_platform_data cardhu_ov2710_data = {
+	.power_on = cardhu_ov2710_power_on,
+	.power_off = cardhu_ov2710_power_off,
+};
+
 static const struct i2c_board_info cardhu_i2c3_board_info[] = {
 #ifdef CONFIG_I2C_MUX_PCA954x
 	{
@@ -202,6 +221,13 @@ static struct i2c_board_info cardhu_i2c6_board_info[] = {
 	{
 		I2C_BOARD_INFO("ov5650", 0x36),
 		.platform_data = &cardhu_ov5650_data,
+	},
+};
+
+static struct i2c_board_info cardhu_i2c8_board_info[] = {
+	{
+		I2C_BOARD_INFO("ov2710", 0x36),
+		.platform_data = &cardhu_ov2710_data,
 	},
 };
 
@@ -381,6 +407,9 @@ int __init cardhu_sensors_init(void)
 	 * PCA954x_I2C_BUS0 to PCA954x_I2C_BUS1 */
 	i2c_register_board_info(PCA954x_I2C_BUS0, cardhu_i2c6_board_info,
 		ARRAY_SIZE(cardhu_i2c6_board_info));
+
+	i2c_register_board_info(PCA954x_I2C_BUS2, cardhu_i2c8_board_info,
+		ARRAY_SIZE(cardhu_i2c8_board_info));
 
 	pmu_tca6416_init();
 
