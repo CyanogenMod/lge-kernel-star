@@ -240,7 +240,7 @@ static struct tps6591x_subdev_info tps_devs[] = {
 };
 
 static struct tps6591x_platform_data tps_platform = {
-	.irq_base	= TEGRA_NR_IRQS,
+	.irq_base	= TPS6591X_IRQ_BASE,
 	.num_subdevs	= ARRAY_SIZE(tps_devs),
 	.subdevs	= tps_devs,
 	.gpio_base	= TPS6591X_GPIO_BASE,
