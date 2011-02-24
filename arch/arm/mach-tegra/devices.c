@@ -921,6 +921,26 @@ struct platform_device tegra_smmu_device = {
 };
 #endif
 
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
+#define CLK_RESET_RST_SOURCE	0x0
+static struct resource tegra_wdt_resources[] = {
+	[0] = {
+		.start	= TEGRA_CLK_RESET_BASE + CLK_RESET_RST_SOURCE,
+		.end	= TEGRA_CLK_RESET_BASE + CLK_RESET_RST_SOURCE + 4 - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start	= TEGRA_TMR1_BASE,
+		.end	= TEGRA_TMR1_BASE + TEGRA_TMR1_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	[2] = {
+		.start	= INT_TMR1,
+		.end	= INT_TMR1,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+#elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
 static struct resource tegra_wdt_resources[] = {
 	[0] = {
 		.start	= TEGRA_WDT0_BASE,
@@ -928,8 +948,8 @@ static struct resource tegra_wdt_resources[] = {
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] = {
-		.start	= TEGRA_TMR6_BASE,
-		.end	= TEGRA_TMR6_BASE + TEGRA_TMR6_SIZE - 1,
+		.start	= TEGRA_TMR10_BASE,
+		.end	= TEGRA_TMR10_BASE + TEGRA_TMR10_SIZE - 1,
 		.flags	= IORESOURCE_MEM,
 	},
 	[2] = {
@@ -938,6 +958,7 @@ static struct resource tegra_wdt_resources[] = {
 		.flags	= IORESOURCE_IRQ,
 	},
 };
+#endif
 
 struct platform_device tegra_wdt_device = {
 	.name		= "tegra_wdt",
