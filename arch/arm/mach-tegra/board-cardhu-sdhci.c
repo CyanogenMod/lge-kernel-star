@@ -84,6 +84,7 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data0 = {
 	.vsd_name = NULL,
 	.vsd_slot_name = NULL,
 	.max_clk = 48000000,
+	.is_8bit_supported = false,
 };
 
 static struct tegra_sdhci_platform_data tegra_sdhci_platform_data2 = {
@@ -97,6 +98,7 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data2 = {
 	.vsd_name = "vddio_sdmmc1",
 	.vsd_slot_name = "vddio_sd_slot",
 	.max_clk = 208000000,
+	.is_8bit_supported = false,
 };
 
 static struct tegra_sdhci_platform_data tegra_sdhci_platform_data3 = {
@@ -110,6 +112,7 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data3 = {
 	.vsd_name = NULL,
 	.vsd_slot_name = NULL,
 	.max_clk = 48000000,
+	.is_8bit_supported = true,
 };
 
 static struct platform_device tegra_sdhci_device0 = {
