@@ -379,7 +379,7 @@ static void tps6591x_irq_sync_unlock(unsigned int irq)
 	for (i = 0; i < ARRAY_SIZE(tps6591x->mask_reg); i++) {
 		if (tps6591x->mask_reg[i] != tps6591x->mask_cache[i]) {
 			if (!WARN_ON(tps6591x_write(tps6591x->dev,
-						    TPS6591X_INT_MSK + i,
+						    TPS6591X_INT_MSK + 2*i,
 						    tps6591x->mask_reg[i])))
 				tps6591x->mask_cache[i] = tps6591x->mask_reg[i];
 		}
@@ -388,12 +388,12 @@ static void tps6591x_irq_sync_unlock(unsigned int irq)
 	mutex_unlock(&tps6591x->irq_lock);
 }
 
-/* FIXME */
 static irqreturn_t tps6591x_irq(int irq, void *data)
 {
 	struct tps6591x *tps6591x = data;
 	int ret = 0;
 	u8 tmp[3];
+	u32 acks;
 	int i;
 
 	for (i = 0; i < 3; i++) {
@@ -403,12 +403,21 @@ static irqreturn_t tps6591x_irq(int irq, void *data)
 			dev_err(tps6591x->dev, "failed to read interrupt status\n");
 			return IRQ_NONE;
 		}
-		ret = tps6591x_write(tps6591x->dev, TPS6591X_INT_STS + 2*i,
-			tmp[i]);
-		if (ret < 0) {
-			dev_err(tps6591x->dev, "failed to write interrupt status\n");
-			return IRQ_NONE;
+		if (tmp[i]) {
+			ret = tps6591x_write(tps6591x->dev,
+					TPS6591X_INT_STS + 2*i,	tmp[i]);
+			if (ret < 0) {
+				dev_err(tps6591x->dev, "failed to write interrupt status\n");
+				return IRQ_NONE;
+			}
 		}
+	}
+	acks = (tmp[2] << 16) | (tmp[1] << 8) | tmp[0];
+	while (acks) {
+		i = __ffs(acks);
+		if (tps6591x->irq_en & (1 << i))
+			handle_nested_irq(tps6591x->irq_base + i);
+		acks &= ~(1 << i);
 	}
 
 	return IRQ_HANDLED;
