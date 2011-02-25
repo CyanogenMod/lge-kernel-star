@@ -353,6 +353,11 @@ static void cardhu_gps_init(void)
 	tegra_gpio_enable(TEGRA_GPIO_PU3);
 }
 
+static void cardhu_modem_init(void)
+{
+	tegra_gpio_enable(TEGRA_GPIO_PH5);
+}
+
 #ifdef CONFIG_SATA_AHCI_TEGRA
 static void cardhu_sata_init(void)
 {
@@ -376,6 +381,7 @@ static void __init tegra_cardhu_init(void)
 	cardhu_touch_init();
 	cardhu_usb_init();
 	cardhu_gps_init();
+	cardhu_modem_init();
 
 #ifdef CONFIG_KEYBOARD_TEGRA
 	cardhu_kbc_init();
