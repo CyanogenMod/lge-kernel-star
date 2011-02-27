@@ -1006,16 +1006,19 @@ static int tegra3_pll_clk_set_rate(struct clk *c, unsigned long rate)
 
 		switch (input_rate) {
 		case 12000000:
-		case 13000000:
 		case 26000000:
-			cfreq = 1000000;
+			cfreq = (rate <= 1000000 * 1000) ? 1000000 : 2000000;
+			break;
+		case 13000000:
+			cfreq = (rate <= 1000000 * 1000) ? 1000000 : 2600000;
 			break;
 		case 16800000:
 		case 19200000:
-			cfreq = 1200000;
+			cfreq = (rate <= 1200000 * 1000) ? 1200000 : 2400000;
 			break;
 		default:
-			pr_err("%s: Unexpected reference rate %lu\n", __func__, input_rate);
+			pr_err("%s: Unexpected reference rate %lu\n",
+			       __func__, input_rate);
 			BUG();
 		}
 
