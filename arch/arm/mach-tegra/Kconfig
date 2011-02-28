@@ -160,6 +160,13 @@ config TEGRA_PWM
 	help
 	  Enable support for the Tegra PWM controller(s).
 
+config TEGRA_CARDHU_DSI
+	bool "Support DSI panel on Cardhu"
+	depends on MACH_CARDHU
+	select TEGRA_DSI
+	help
+		Support for DSI Panel on Nvidia Cardhu
+
 config TEGRA_EMC_SCALING_ENABLE
 	bool "Enable scaling the memory frequency"
 	depends on !TEGRA_FPGA_PLATFORM
