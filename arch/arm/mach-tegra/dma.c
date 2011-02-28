@@ -537,9 +537,13 @@ static void tegra_dma_update_hw(struct tegra_dma_channel *ch,
 	case TEGRA_DMA_REQ_SEL_SL2B2:
 	case TEGRA_DMA_REQ_SEL_SL2B3:
 	case TEGRA_DMA_REQ_SEL_SL2B4:
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
 	case TEGRA_DMA_REQ_SEL_SL2B5:
 	case TEGRA_DMA_REQ_SEL_SL2B6:
+	case TEGRA_DMA_REQ_SEL_APBIF_CH0:
+	case TEGRA_DMA_REQ_SEL_APBIF_CH1:
+	case TEGRA_DMA_REQ_SEL_APBIF_CH2:
+	case TEGRA_DMA_REQ_SEL_APBIF_CH3:
 #endif
 	case TEGRA_DMA_REQ_SEL_SPI:
 		/* For spi/slink the burst size based on transfer size
@@ -553,6 +557,19 @@ static void tegra_dma_update_hw(struct tegra_dma_channel *ch,
 		else
 			ahb_seq |= AHB_SEQ_BURST_8;
 		break;
+
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
+	case TEGRA_DMA_REQ_SEL_I2S_2:
+	case TEGRA_DMA_REQ_SEL_I2S_1:
+	case TEGRA_DMA_REQ_SEL_SPD_I:
+	case TEGRA_DMA_REQ_SEL_UI_I:
+	case TEGRA_DMA_REQ_SEL_I2S2_2:
+	case TEGRA_DMA_REQ_SEL_I2S2_1:
+		/* For ARCH_2x i2s/spdif burst size is 4 word */
+		ahb_seq |= AHB_SEQ_BURST_4;
+		break;
+#endif
+
 	default:
 		ahb_seq |= AHB_SEQ_BURST_1;
 		break;
