@@ -58,46 +58,56 @@ static struct regulator_consumer_supply tps658621_sm2_supply[] = {
 	REGULATOR_SUPPLY("vdd_sm2", NULL),
 };
 static struct regulator_consumer_supply tps658621_ldo0_supply[] = {
+	REGULATOR_SUPPLY("vdd_ldo0", NULL),
 	REGULATOR_SUPPLY("p_cam_avdd", NULL),
 };
 static struct regulator_consumer_supply tps658621_ldo1_supply[] = {
+	REGULATOR_SUPPLY("vdd_ldo1", NULL),
 	REGULATOR_SUPPLY("avdd_pll", NULL),
 };
 static struct regulator_consumer_supply tps658621_ldo2_supply[] = {
+	REGULATOR_SUPPLY("vdd_ldo2", NULL),
 	REGULATOR_SUPPLY("vdd_rtc", NULL),
 	REGULATOR_SUPPLY("vdd_aon", NULL),
 };
 static struct regulator_consumer_supply tps658621_ldo3_supply[] = {
+	REGULATOR_SUPPLY("vdd_ldo3", NULL),
 	REGULATOR_SUPPLY("avdd_usb", NULL),
 	REGULATOR_SUPPLY("avdd_usb_pll", NULL),
 };
 static struct regulator_consumer_supply tps658621_ldo4_supply[] = {
+	REGULATOR_SUPPLY("vdd_ldo4", NULL),
 	REGULATOR_SUPPLY("avdd_osc", NULL),
 	REGULATOR_SUPPLY("vddio_sys", "panjit_touch"),
 };
 static struct regulator_consumer_supply tps658621_ldo5_supply[] = {
+	REGULATOR_SUPPLY("vdd_ldo5", NULL),
 	REGULATOR_SUPPLY("disabled_vmmc", "sdhci-tegra.0"),
 	REGULATOR_SUPPLY("disabled_vmmc", "sdhci-tegra.1"),
 	REGULATOR_SUPPLY("disabled_vmmc", "sdhci-tegra.2"),
 	REGULATOR_SUPPLY("disabled_vmmc", "sdhci-tegra.3"),
 };
 static struct regulator_consumer_supply tps658621_ldo6_supply[] = {
+	REGULATOR_SUPPLY("vdd_ldo6", NULL),
 	REGULATOR_SUPPLY("vcsi", "tegra_camera"),
 };
 static struct regulator_consumer_supply tps658621_ldo7_supply[] = {
+	REGULATOR_SUPPLY("vdd_ldo7", NULL),
 	REGULATOR_SUPPLY("avdd_hdmi", NULL),
 	REGULATOR_SUPPLY("vdd_fuse", NULL),
 };
 static struct regulator_consumer_supply tps658621_ldo8_supply[] = {
+	REGULATOR_SUPPLY("vdd_ldo8", NULL),
 	REGULATOR_SUPPLY("avdd_hdmi_pll", NULL),
 };
 static struct regulator_consumer_supply tps658621_ldo9_supply[] = {
+	REGULATOR_SUPPLY("vdd_ldo9", NULL),
 	REGULATOR_SUPPLY("avdd_2v85", NULL),
 	REGULATOR_SUPPLY("vdd_ddr_rx", NULL),
 	REGULATOR_SUPPLY("avdd_amp", NULL),
 };
 
-#define REGULATOR_INIT(_id, _minmv, _maxmv)				\
+#define REGULATOR_INIT(_id, _minmv, _maxmv, on)				\
 	{								\
 		.constraints = {					\
 			.min_uV = (_minmv)*1000,			\
@@ -107,24 +117,28 @@ static struct regulator_consumer_supply tps658621_ldo9_supply[] = {
 			.valid_ops_mask = (REGULATOR_CHANGE_MODE |	\
 					   REGULATOR_CHANGE_STATUS |	\
 					   REGULATOR_CHANGE_VOLTAGE),	\
+			.always_on = on,				\
 		},							\
 		.num_consumer_supplies = ARRAY_SIZE(tps658621_##_id##_supply),\
 		.consumer_supplies = tps658621_##_id##_supply,		\
 	}
 
-static struct regulator_init_data sm0_data = REGULATOR_INIT(sm0, 725, 1500);
-static struct regulator_init_data sm1_data = REGULATOR_INIT(sm1, 725, 1500);
-static struct regulator_init_data sm2_data = REGULATOR_INIT(sm2, 3000, 4550);
-static struct regulator_init_data ldo0_data = REGULATOR_INIT(ldo0, 1250, 3300);
-static struct regulator_init_data ldo1_data = REGULATOR_INIT(ldo1, 725, 1500);
-static struct regulator_init_data ldo2_data = REGULATOR_INIT(ldo2, 725, 1500);
-static struct regulator_init_data ldo3_data = REGULATOR_INIT(ldo3, 1250, 3300);
-static struct regulator_init_data ldo4_data = REGULATOR_INIT(ldo4, 1700, 2475);
-static struct regulator_init_data ldo5_data = REGULATOR_INIT(ldo5, 1250, 3300);
-static struct regulator_init_data ldo6_data = REGULATOR_INIT(ldo6, 1250, 1800);
-static struct regulator_init_data ldo7_data = REGULATOR_INIT(ldo7, 1250, 3300);
-static struct regulator_init_data ldo8_data = REGULATOR_INIT(ldo8, 1250, 3300);
-static struct regulator_init_data ldo9_data = REGULATOR_INIT(ldo9, 1250, 3300);
+#define ON	1
+#define OFF	0
+
+static struct regulator_init_data sm0_data = REGULATOR_INIT(sm0, 725, 1500, ON);
+static struct regulator_init_data sm1_data = REGULATOR_INIT(sm1, 725, 1500, ON);
+static struct regulator_init_data sm2_data = REGULATOR_INIT(sm2, 3000, 4550, ON);
+static struct regulator_init_data ldo0_data = REGULATOR_INIT(ldo0, 1250, 3300, OFF);
+static struct regulator_init_data ldo1_data = REGULATOR_INIT(ldo1, 725, 1500, ON);
+static struct regulator_init_data ldo2_data = REGULATOR_INIT(ldo2, 725, 1500, OFF);
+static struct regulator_init_data ldo3_data = REGULATOR_INIT(ldo3, 1250, 3300, OFF);
+static struct regulator_init_data ldo4_data = REGULATOR_INIT(ldo4, 1700, 2475, OFF);
+static struct regulator_init_data ldo5_data = REGULATOR_INIT(ldo5, 1250, 3300, ON);
+static struct regulator_init_data ldo6_data = REGULATOR_INIT(ldo6, 1250, 1800, OFF);
+static struct regulator_init_data ldo7_data = REGULATOR_INIT(ldo7, 1250, 3300, OFF);
+static struct regulator_init_data ldo8_data = REGULATOR_INIT(ldo8, 1250, 3300, OFF);
+static struct regulator_init_data ldo9_data = REGULATOR_INIT(ldo9, 1250, 3300, OFF);
 
 static struct tps6586x_rtc_platform_data rtc_data = {
 	.irq = TEGRA_NR_IRQS + TPS6586X_INT_RTC_ALM1,
@@ -213,7 +227,11 @@ int __init ventana_regulator_init(void)
 	 * interrupts when low */
 	pmc_ctrl = readl(pmc + PMC_CTRL);
 	writel(pmc_ctrl | PMC_CTRL_INTR_LOW, pmc + PMC_CTRL);
+
 	i2c_register_board_info(4, ventana_regulators, 1);
+
+	regulator_has_full_constraints();
+
 	tegra_init_suspend(&ventana_suspend_data);
 
 	return 0;

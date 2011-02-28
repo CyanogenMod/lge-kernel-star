@@ -94,6 +94,11 @@ static struct platform_device ventana_backlight_device = {
 
 static int ventana_panel_enable(void)
 {
+	struct regulator *reg = regulator_get(NULL, "vdd_ldo4");
+
+	regulator_enable(reg);
+	regulator_put(reg);
+
 	gpio_set_value(ventana_pnl_pwr_enb, 1);
 	gpio_set_value(ventana_lvds_shutdown, 1);
 	return 0;
