@@ -17,6 +17,9 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <mach/pinmux.h>
+#include "board.h"
+#include "board-cardhu.h"
+#include "gpio-names.h"
 
 #define DEFAULT_DRIVE(_name)					\
 	{							\
@@ -398,9 +401,39 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux[] = {
 	VI_PINMUX(VI_VSYNC,        RSVD1,           NORMAL,    NORMAL,     INPUT,  DISABLE, DISABLE),
 };
 
-void __init cardhu_pinmux_init(void)
+int __init cardhu_pinmux_init(void)
 {
 	tegra_pinmux_config_table(cardhu_pinmux, ARRAY_SIZE(cardhu_pinmux));
 	tegra_drive_pinmux_config_table(cardhu_drive_pinmux,
 					ARRAY_SIZE(cardhu_drive_pinmux));
+	return 0;
+}
+
+/* Initialize the pins to desired state as per power/asic/system-eng
+ * recomendation */
+int __init cardhu_pins_state_init(void)
+{
+	int ret;
+	struct board_info board_info;
+
+	tegra_get_board_info(&board_info);
+	if (board_info.board_id == BOARD_E1291) {
+
+		/* Set GMI_CS1_N Signal in GPIO Input Mode*/
+		ret = gpio_request(TEGRA_GPIO_PJ2, "GMI_CS1_N");
+		if (ret < 0) {
+			pr_err("%s() Error in gpio_request() for gpio %d\n",
+					__func__, TEGRA_GPIO_PJ2);
+			return ret;
+		}
+		ret = gpio_direction_input(TEGRA_GPIO_PJ2);
+		if (ret < 0) {
+			pr_err("%s() Error in setting gpio %d to input\n",
+				__func__, TEGRA_GPIO_PJ2);
+			gpio_free(TEGRA_GPIO_PJ2);
+			return ret;
+		}
+		tegra_gpio_enable(TEGRA_GPIO_PJ2);
+	}
+	return 0;
 }

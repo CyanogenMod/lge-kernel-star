@@ -393,6 +393,7 @@ static void __init tegra_cardhu_init(void)
 	cardhu_bt_rfkill();
 	cardhu_sata_init();
 	audio_wired_jack_init();
+	cardhu_pins_state_init();
 }
 
 static void __init tegra_cardhu_reserve(void)
