@@ -367,14 +367,12 @@ static void smmu_setup_regs(struct smmu_device *smmu)
 		for (asid = 0; asid < smmu->num_ases; asid++) {
 			struct smmu_as *as = &smmu->as[asid];
 
-			spin_lock(&smmu->lock);
 			writel(MC_SMMU_PTB_ASID_0_CURRENT_ASID(as->asid),
 				as->smmu->regs + MC_SMMU_PTB_ASID_0);
 			writel(as->pdir_page
 				? SMMU_MK_PDIR(as->pdir_page, as->pdir_attr)
 				: MC_SMMU_PTB_DATA_0_RESET_VAL,
 				as->smmu->regs + MC_SMMU_PTB_DATA_0);
-			spin_unlock(&smmu->lock);
 		}
 	}
 
