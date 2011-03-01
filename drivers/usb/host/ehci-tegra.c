@@ -668,7 +668,7 @@ static inline void remove_ehci_sys_file(struct ehci_hcd *ehci)
 
 static int ehci_tegra_wait_register(void __iomem *reg, u32 mask, u32 result)
 {
-	unsigned long timeout = 2000;
+	unsigned long timeout = 50000;
 
 	do {
 		if ((readl(reg) & mask) == result)
@@ -698,7 +698,7 @@ void tegra_ehci_recover_rx_error(void)
 		ehci_writel(ehci, val | PORT_SUSPEND, &ehci->regs->port_status[0]);
 		/* (2) wait until PORTSC SUSP = 1 */
 		if (handshake(ehci, &ehci->regs->port_status[0], PORT_SUSPEND,
-							PORT_SUSPEND, 2000)) {
+							PORT_SUSPEND, 5000)) {
 			pr_err("%s: timeout waiting for PORT_SUSPEND = 1\n", __func__);
 			return;
 		}
@@ -733,7 +733,7 @@ void tegra_ehci_recover_rx_error(void)
 		ehci_writel(ehci, val | PORT_RESUME, &ehci->regs->port_status[0]);
 		/* (10) wait until PORTSC FPR = 0 */
 		if (handshake(ehci, &ehci->regs->port_status[0], PORT_RESUME,
-								0, 2000)) {
+								0, 5000)) {
 			pr_err("%s: timeout waiting for PORT_RESUME = 1\n", __func__);
 			return;
 		}
