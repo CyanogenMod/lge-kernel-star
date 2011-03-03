@@ -691,7 +691,7 @@ static struct resource audio_resource[] = {
 
 struct platform_device tegra_audio_device = {
 	.name		= "audio",
-	.id		= -1,
+	.id		= 1,
 	.resource	= audio_resource,
 	.num_resources	= ARRAY_SIZE(audio_resource),
 };
