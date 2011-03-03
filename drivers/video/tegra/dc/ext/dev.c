@@ -38,8 +38,9 @@
 #include "../../nvmap/nvmap.h"
 #include "tegra_dc_ext_priv.h"
 
-static int tegra_dc_ext_devno;
-static struct class *tegra_dc_ext_class;
+int tegra_dc_ext_devno;
+struct class *tegra_dc_ext_class;
+static int head_count;
 
 struct tegra_dc_ext_flip_win {
 	struct tegra_dc_ext_flip_windowattr	attr;
@@ -54,6 +55,12 @@ struct tegra_dc_ext_flip_data {
 	struct work_struct		work;
 	struct tegra_dc_ext_flip_win	win[DC_N_WINDOWS];
 };
+
+int tegra_dc_ext_get_num_outputs(void)
+{
+	/* TODO: decouple output count from head count */
+	return head_count;
+}
 
 static int tegra_dc_ext_set_nvmap_fd(struct tegra_dc_ext_user *user,
 				     int fd)
@@ -574,15 +581,18 @@ struct tegra_dc_ext *tegra_dc_ext_register(struct nvhost_device *ndev,
 {
 	int ret;
 	struct tegra_dc_ext *ext;
+	int devno;
 
 	ext = kzalloc(sizeof(*ext), GFP_KERNEL);
 	if (!ext)
 		return ERR_PTR(-ENOMEM);
 
 	BUG_ON(!tegra_dc_ext_devno);
+	devno = tegra_dc_ext_devno + head_count + 1;
+
 	cdev_init(&ext->cdev, &tegra_dc_devops);
 	ext->cdev.owner = THIS_MODULE;
-	ret = cdev_add(&ext->cdev, tegra_dc_ext_devno, 1);
+	ret = cdev_add(&ext->cdev, devno, 1);
 	if (ret) {
 		dev_err(&ndev->dev, "Failed to create character device\n");
 		goto cleanup_alloc;
@@ -590,7 +600,7 @@ struct tegra_dc_ext *tegra_dc_ext_register(struct nvhost_device *ndev,
 
 	ext->dev = device_create(tegra_dc_ext_class,
 				 &ndev->dev,
-				 tegra_dc_ext_devno,
+				 devno,
 				 NULL,
 				 "tegra_dc_%d",
 				 ndev->id);
@@ -614,7 +624,7 @@ struct tegra_dc_ext *tegra_dc_ext_register(struct nvhost_device *ndev,
 
 	mutex_init(&ext->cursor.lock);
 
-	tegra_dc_ext_devno++;
+	head_count++;
 
 	return ext;
 
@@ -649,6 +659,8 @@ void tegra_dc_ext_unregister(struct tegra_dc_ext *ext)
 	cdev_del(&ext->cdev);
 
 	kfree(ext);
+
+	head_count--;
 }
 
 int __init tegra_dc_ext_module_init(void)
@@ -661,11 +673,24 @@ int __init tegra_dc_ext_module_init(void)
 		return -ENOMEM;
 	}
 
+	/* Reserve one character device per head, plus the control device */
 	ret = alloc_chrdev_region(&tegra_dc_ext_devno,
-				  0, TEGRA_MAX_DC,
+				  0, TEGRA_MAX_DC + 1,
 				  "tegra_dc_ext");
 	if (ret)
-		class_destroy(tegra_dc_ext_class);
+		goto cleanup_class;
+
+	ret = tegra_dc_ext_control_init();
+	if (ret)
+		goto cleanup_region;
+
+	return 0;
+
+cleanup_region:
+	unregister_chrdev_region(tegra_dc_ext_devno, TEGRA_MAX_DC);
+
+cleanup_class:
+	class_destroy(tegra_dc_ext_class);
 
 	return ret;
 }

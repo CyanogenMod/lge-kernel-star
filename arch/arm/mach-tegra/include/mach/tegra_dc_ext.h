@@ -35,6 +35,8 @@ void tegra_dc_ext_unregister(struct tegra_dc_ext *dc_ext);
 void tegra_dc_ext_enable(struct tegra_dc_ext *dc_ext);
 void tegra_dc_ext_disable(struct tegra_dc_ext *dc_ext);
 
+int tegra_dc_ext_process_hotplug(int output);
+
 #else /* CONFIG_TEGRA_DC_EXTENSIONS */
 
 static inline
@@ -64,6 +66,11 @@ void tegra_dc_ext_enable(struct tegra_dc_ext *dc_ext)
 static inline
 void tegra_dc_ext_disable(struct tegra_dc_ext *dc_ext)
 {
+}
+static inline
+int tegra_dc_ext_process_hotplug(int output)
+{
+	return 0;
 }
 #endif /* CONFIG_TEGRA_DC_EXTENSIONS */
 
