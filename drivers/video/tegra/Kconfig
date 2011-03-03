@@ -19,7 +19,7 @@ config TEGRA_DC
 
 config TEGRA_OVERLAY
 	tristate "Tegra Overlay Device Node"
-	depends on TEGRA_DC
+	depends on TEGRA_DC && !TEGRA_DC_EXTENSIONS
 	default y
 	help
 	  Device node for multi-client overlay support.
@@ -33,6 +33,13 @@ config FB_TEGRA
 	default FB
 	help
 	  Framebuffer device support for the Tegra display controller.
+
+config TEGRA_DC_EXTENSIONS
+	bool "Tegra Display Controller Extensions"
+	depends on TEGRA_DC
+	help
+	  This exposes support for extended capabilities of the Tegra display
+	  controller to userspace drivers.
 
 config TEGRA_NVMAP
 	bool "Tegra GPU memory management driver (nvmap)"
