@@ -205,12 +205,11 @@ TPS_PDATA_INIT(ldo5, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
 TPS_PDATA_INIT_SUPPLY(ldo6, 1000, 3300, VIO, 0, 0, 0, -1, 0, 0, 0);
 TPS_PDATA_INIT_SUPPLY(ldo7, 1000, 3300, VIO, 0, 0, 0, -1, 0, 0, 0);
 TPS_PDATA_INIT_SUPPLY(ldo8, 1000, 3300, VIO, 0, 0, 0, -1, 0, 0, 0);
-/* Currently tps6591x-rtc driver is not available need to enable once driver is ready */
-/*
+
 static struct tps6591x_rtc_platform_data rtc_data = {
 	.irq = TEGRA_NR_IRQS + TPS6591X_INT_RTC_ALARM,
 };
-*/
+
 #define TPS_REG(_id, _data)				\
 	{						\
 		.id	= TPS6591X_ID_##_id,		\
@@ -231,12 +230,11 @@ static struct tps6591x_subdev_info tps_devs[] = {
 	TPS_REG(LDO_6, ldo6),
 	TPS_REG(LDO_7, ldo7),
 	TPS_REG(LDO_8, ldo8),
-	/* Currently tps6591x-rtc driver is not available need to enable once driver is ready */
-	/*{
+	{
 		.id	= 0,
-		.name	= "tps6591x-rtc",
+		.name	= "rtc-tps6591x",
 		.platform_data = &rtc_data,
-	},*/
+	},
 };
 
 static struct tps6591x_platform_data tps_platform = {
