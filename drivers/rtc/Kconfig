@@ -1012,7 +1012,8 @@ config RTC_DRV_TEGRA
 
 config RTC_DRV_TPS6591x
 	tristate "TPS6591x RTC driver"
-	default RTC_CLASS
+	depends on MFD_TPS6591X
+	default n
 	help
 	  If you say yes here you get support for the TPS6591x RTC module.
 
