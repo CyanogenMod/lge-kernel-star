@@ -31,8 +31,9 @@ struct tegra_dc_ext *tegra_dc_ext_register(struct nvhost_device *ndev,
 					   struct tegra_dc *dc);
 void tegra_dc_ext_unregister(struct tegra_dc_ext *dc_ext);
 
-/* called by display controller on suspend */
-void tegra_dc_ext_suspend(struct tegra_dc_ext *dc_ext);
+/* called by display controller on enable/disable */
+void tegra_dc_ext_enable(struct tegra_dc_ext *dc_ext);
+void tegra_dc_ext_disable(struct tegra_dc_ext *dc_ext);
 
 #else /* CONFIG_TEGRA_DC_EXTENSIONS */
 
@@ -57,7 +58,11 @@ void tegra_dc_ext_unregister(struct tegra_dc_ext *dc_ext)
 {
 }
 static inline
-void tegra_dc_ext_suspend(struct tegra_dc_ext *dc_ext)
+void tegra_dc_ext_enable(struct tegra_dc_ext *dc_ext)
+{
+}
+static inline
+void tegra_dc_ext_disable(struct tegra_dc_ext *dc_ext)
 {
 }
 #endif /* CONFIG_TEGRA_DC_EXTENSIONS */
