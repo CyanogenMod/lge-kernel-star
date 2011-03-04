@@ -24,6 +24,7 @@
 #include <mach/irqs.h>
 
 #define TEGRA_NR_GPIOS		INT_GPIO_NR
+#define ARCH_NR_GPIOS		(TEGRA_NR_GPIOS + 128)
 
 #include <asm-generic/gpio.h>
 
