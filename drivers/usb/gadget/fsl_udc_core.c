@@ -2907,12 +2907,13 @@ static int fsl_udc_suspend(struct platform_device *pdev, pm_message_t state)
 static int fsl_udc_resume(struct platform_device *pdev)
 {
     if (udc_controller->transceiver) {
+        /* enable clock */
+        fsl_udc_clk_resume();
         if (!(fsl_readl(&usb_sys_regs->vbus_wakeup) & USB_SYS_ID_PIN_STATUS)) {
             /* If ID status is low means host is connected, return */
             return 0;
         }
-        /* enable clock and check for VBUS */
-        fsl_udc_clk_resume();
+        /* check for VBUS */
         if (!(fsl_readl(&usb_sys_regs->vbus_wakeup) & USB_SYS_VBUS_STATUS)) {
             /* if there is no VBUS then power down the clocks and return */
             fsl_udc_clk_suspend();
