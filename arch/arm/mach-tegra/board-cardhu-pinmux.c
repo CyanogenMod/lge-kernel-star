@@ -256,7 +256,7 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux[] = {
 	DEFAULT_PINMUX(GPIO_PU0,        RSVD1,           NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GPIO_PU1,        RSVD1,           NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GPIO_PU2,        RSVD1,           NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(GPIO_PU3,        PWM0,            NORMAL,    NORMAL,     OUTPUT),
+	DEFAULT_PINMUX(GPIO_PU3,        RSVD1,           NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GPIO_PU4,        PWM1,            NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(GPIO_PU5,        PWM2,            NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(GPIO_PU6,        PWM3,            NORMAL,    NORMAL,     OUTPUT),
@@ -268,7 +268,7 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux[] = {
 	DEFAULT_PINMUX(CLK3_REQ,        DEV3,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GMI_WP_N,        RSVD1,           NORMAL,    NORMAL,     INPUT),
 
-#if defined(CONFIG_MTD_NAND_TEGRA)
+#if 0 /* for testing on Verbier */
 	DEFAULT_PINMUX(GMI_WAIT,        NAND,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GMI_ADV_N,       NAND,            NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(GMI_CLK,         NAND,            NORMAL,    NORMAL,     OUTPUT),
@@ -298,7 +298,7 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux[] = {
 	DEFAULT_PINMUX(GMI_OE_N,        NAND,            NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(GMI_DQS,         NAND,            NORMAL,    NORMAL,     INPUT),
 #else
-	DEFAULT_PINMUX(GMI_CS2_N,       GMI,             NORMAL,    NORMAL,     OUTPUT), /* EN_VDD_BL1 */
+	DEFAULT_PINMUX(GMI_CS2_N,       RSVD1,           PULL_UP,   NORMAL,     INPUT), /* EN_VDD_BL1 */
 	DEFAULT_PINMUX(GMI_AD8,         PWM0,            NORMAL,    NORMAL,     OUTPUT), /* LCD1_BL_PWM */
 	DEFAULT_PINMUX(GMI_AD10,        NAND,            NORMAL,    NORMAL,     OUTPUT), /* LCD1_BL_EN */
 #endif
