@@ -40,7 +40,7 @@
 * should NOT be configured as KBC
 */
 #ifdef CONFIG_INPUT_ALPS_GPIO_SCROLLWHEEL
-#define WHISTLER_ROW_COUNT	2
+#define WHISTLER_ROW_COUNT	3
 #define WHISTLER_COL_COUNT	2
 #else
 #define WHISTLER_ROW_COUNT	4
@@ -49,8 +49,9 @@
 
 #ifdef CONFIG_INPUT_ALPS_GPIO_SCROLLWHEEL
 static int plain_kbd_keycode[] = {
-	KEY_POWER, KEY_RESERVED,
-	KEY_HOME,  KEY_BACK,
+	KEY_POWER,	KEY_RESERVED,
+	KEY_HOME,	KEY_BACK,
+	KEY_RESERVED,	KEY_MENU,
 };
 #else
 static int plain_kbd_keycode[] = {
