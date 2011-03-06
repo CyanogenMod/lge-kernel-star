@@ -196,6 +196,7 @@ int clk_set_rate_locked(struct clk *c, unsigned long rate);
 void tegra2_sdmmc_tap_delay(struct clk *c, int delay);
 int tegra_emc_set_rate(unsigned long rate);
 long tegra_emc_round_rate(unsigned long rate);
+struct clk *tegra_emc_predict_parent(unsigned long rate, u32 *div_value);
 
 static inline bool clk_is_auto_dvfs(struct clk *c)
 {

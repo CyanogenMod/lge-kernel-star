@@ -24,6 +24,7 @@
 #include <linux/err.h>
 #include <linux/io.h>
 #include <linux/module.h>
+#include <linux/delay.h>
 
 #include <mach/iomap.h>
 
@@ -37,28 +38,447 @@ static bool emc_enable;
 #endif
 module_param(emc_enable, bool, 0644);
 
-static void __iomem *emc_base = IO_ADDRESS(TEGRA_EMC_BASE);
+#define EMC_STATUS_UPDATE_TIMEOUT	100
+#define TEGRA_EMC_TABLE_MAX_SIZE 	16
+
+enum {
+	DLL_CHANGE_NONE = 0,
+	DLL_CHANGE_ON,
+	DLL_CHANGE_OFF,
+};
+
+#define EMC_CLK_DIV_SHIFT		0
+#define EMC_CLK_DIV_MASK		(0xFF << EMC_CLK_DIV_SHIFT)
+#define EMC_CLK_SOURCE_SHIFT		30
+#define EMC_CLK_SOURCE_MASK		(0x3 << EMC_CLK_SOURCE_SHIFT)
+#define EMC_CLK_LOW_JITTER_ENABLE	(0x1 << 29)
+#define	EMC_CLK_MC_SAME_FREQ		(0x1 << 16)
+
+#define BURST_REG_LIST \
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_RC)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_RFC)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_RAS)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_RP)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_R2W)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_W2R)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_R2P)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_W2P)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_RD_RCD)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_WR_RCD)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_RRD)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_REXT)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_WEXT)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_WDV)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_QUSE)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_QRST)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_QSAFE)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_RDV)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_REFRESH)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_BURST_REFRESH_NUM)	\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_PRE_REFRESH_REQ_CNT)	\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_PDEX2WR)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_PDEX2RD)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_PCHG2PDEN)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_ACT2PDEN)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_AR2PDEN)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_RW2PDEN)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_TXSR)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_TXSRDLL)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_TCKE)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_TFAW)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_TRPAB)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_TCLKSTABLE)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_TCLKSTOP)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_TREFBW)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_QUSE_EXTRA)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_FBIO_CFG6)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_ODT_WRITE)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_ODT_READ)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_FBIO_CFG5)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_CFG_DIG_DLL)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_CFG_DIG_DLL_PERIOD)	\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLL_XFORM_DQS0)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLL_XFORM_DQS1)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLL_XFORM_DQS2)          \
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLL_XFORM_DQS3)          \
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLL_XFORM_DQS4)          \
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLL_XFORM_DQS5)          \
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLL_XFORM_DQS6)          \
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLL_XFORM_DQS7)          \
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLL_XFORM_QUSE0)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLL_XFORM_QUSE1)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLL_XFORM_QUSE2)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLL_XFORM_QUSE3)         \
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLL_XFORM_QUSE4)         \
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLL_XFORM_QUSE5)         \
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLL_XFORM_QUSE6)         \
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLL_XFORM_QUSE7)         \
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLI_TRIM_TXDQS0)         \
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLI_TRIM_TXDQS1)         \
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLI_TRIM_TXDQS2)         \
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLI_TRIM_TXDQS3)         \
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLI_TRIM_TXDQS4)         \
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLI_TRIM_TXDQS5)         \
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLI_TRIM_TXDQS6)         \
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLI_TRIM_TXDQS7)         \
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLL_XFORM_DQ0)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLL_XFORM_DQ1)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLL_XFORM_DQ2)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DLL_XFORM_DQ3)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_XM2CMDPADCTRL)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_XM2DQSPADCTRL2)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_XM2DQPADCTRL2)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_XM2CLKPADCTRL)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_XM2COMPPADCTRL)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_XM2VTTGENPADCTRL)	\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_XM2VTTGENPADCTRL2)	\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_XM2QUSEPADCTRL)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_XM2DQSPADCTRL3)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_CTT_TERM_CTRL)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_ZCAL_INTERVAL)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_ZCAL_WAIT_CNT)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_MRS_WAIT_CNT)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_AUTO_CAL_CONFIG)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_CTT)			\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_CTT_DURATION)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_DYN_SELF_REF_CONTROL)	\
+								\
+	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_CFG)		\
+	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_OUTSTANDING_REQ)	\
+	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_TIMING_RCD)	\
+	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_TIMING_RP)	\
+	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_TIMING_RC)	\
+	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_TIMING_RAS)	\
+	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_TIMING_FAW)	\
+	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_TIMING_RRD)	\
+	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_TIMING_RAP2PRE)	\
+	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_TIMING_WAP2PRE)	\
+	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_TIMING_R2R)	\
+	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_TIMING_W2W)	\
+	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_TIMING_R2W)	\
+	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_TIMING_W2R)	\
+	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_DA_TURNS)		\
+	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_DA_COVERS)	\
+	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_MISC0)		\
+	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_RING1_THROTTLE)
+
+#define DEFINE_REG(base, reg)	((u32)IO_ADDRESS((base)) + (reg)),
+static const u32 burst_reg_addr[TEGRA_EMC_NUM_REGS] = {
+	BURST_REG_LIST
+};
+#undef DEFINE_REG
+
+#define DEFINE_REG(base, reg)	reg##_INDEX,
+enum {
+	BURST_REG_LIST
+};
+#undef DEFINE_REG
+
+static struct clk_mux_sel tegra_emc_clk_sel[TEGRA_EMC_TABLE_MAX_SIZE];
+static int emc_last_sel = TEGRA_EMC_TABLE_MAX_SIZE;
+static struct tegra_emc_table start_timing;
+
 static const struct tegra_emc_table *tegra_emc_table;
 static int tegra_emc_table_size;
 
+static u32 dram_type;
+static u32 dram_dev_num;
+
+static struct clk *emc;
+
+static void __iomem *emc_base = IO_ADDRESS(TEGRA_EMC_BASE);
+static void __iomem *mc_base = IO_ADDRESS(TEGRA_MC_BASE);
+static void __iomem *clk_base = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
+
 static inline void emc_writel(u32 val, unsigned long addr)
 {
-	__raw_writel(val, (u32)emc_base + addr);
-
+	writel(val, (u32)emc_base + addr);
+	barrier();
 }
-
 static inline u32 emc_readl(unsigned long addr)
 {
-	return __raw_readl((u32)emc_base + addr);
+	return readl((u32)emc_base + addr);
 }
-
-/* Select the closest EMC rate that is higher than the requested rate */
-long tegra_emc_round_rate(unsigned long rate)
+static inline void mc_writel(u32 val, unsigned long addr)
 {
-	return -ENOSYS;
+	writel(val, (u32)mc_base + addr);
+	barrier();
+}
+static inline u32 mc_readl(unsigned long addr)
+{
+	return readl((u32)mc_base + addr);
 }
 
-/* The EMC registers have shadow registers.  When the EMC clock is updated
+static int wait_for_update(u32 status_reg, u32 bit_mask, bool updated_state)
+{
+	int i;
+	for (i = 0; i < EMC_STATUS_UPDATE_TIMEOUT; i++) {
+		if (!!(emc_readl(status_reg) & bit_mask) == updated_state)
+			return 0;
+		udelay(1);
+	}
+	return -ETIMEDOUT;
+}
+
+static inline void emc_timing_update(void)
+{
+	int err;
+
+	emc_writel(0x1, EMC_TIMING_CONTROL);
+	err = wait_for_update(EMC_STATUS,
+			      EMC_STATUS_TIMING_UPDATE_STALLED, false);
+	if (err) {
+		pr_err("%s: timing update error: %d", __func__, err);
+		BUG();
+	}
+}
+
+static inline void auto_cal_disable(void)
+{
+	int err;
+
+	emc_writel(0, EMC_AUTO_CAL_INTERVAL);
+	err = wait_for_update(EMC_AUTO_CAL_STATUS,
+			      EMC_AUTO_CAL_STATUS_ACTIVE, false);
+	if (err) {
+		pr_err("%s: disable auto-cal error: %d", __func__, err);
+		BUG();
+	}
+}
+
+static inline bool need_qrst(const struct tegra_emc_table *next_timing,
+			     const struct tegra_emc_table *last_timing,
+			     u32 emc_dpd_reg)
+{
+	u32 last_mode = (last_timing->burst_regs[EMC_FBIO_CFG5_INDEX] &
+		EMC_CFG5_QUSE_MODE_MASK) >> EMC_CFG5_QUSE_MODE_SHIFT;
+	u32 next_mode = (next_timing->burst_regs[EMC_FBIO_CFG5_INDEX] &
+		EMC_CFG5_QUSE_MODE_MASK) >> EMC_CFG5_QUSE_MODE_SHIFT;
+
+	/* QUSE DPD is disabled */
+	bool ret = !(emc_dpd_reg & EMC_SEL_DPD_CTRL_QUSE_DPD_ENABLE) &&
+
+	/* QUSE uses external mode before or after clock change */
+		(((last_mode != EMC_CFG5_QUSE_MODE_PULSE_INTERN) &&
+		  (last_mode != EMC_CFG5_QUSE_MODE_INTERNAL_LPBK)) ||
+		 ((next_mode != EMC_CFG5_QUSE_MODE_PULSE_INTERN) &&
+		  (next_mode != EMC_CFG5_QUSE_MODE_INTERNAL_LPBK)))  &&
+
+	/* QUSE pad switches from schmitt to vref mode */
+		(((last_timing->burst_regs[EMC_XM2QUSEPADCTRL_INDEX] &
+		   EMC_XM2QUSEPADCTRL_IVREF_ENABLE) == 0) &&
+		 ((next_timing->burst_regs[EMC_XM2QUSEPADCTRL_INDEX] &
+		   EMC_XM2QUSEPADCTRL_IVREF_ENABLE) != 0));
+
+	return ret;
+}
+
+static inline void periodic_qrst_enable(u32 emc_cfg_reg, u32 emc_dbg_reg)
+{
+	/* enable write mux => enable periodic QRST => restore mux */
+	emc_writel(emc_dbg_reg | EMC_DBG_WRITE_MUX_ACTIVE, EMC_DBG);
+	emc_writel(emc_cfg_reg | EMC_CFG_PERIODIC_QRST, EMC_CFG);
+	emc_writel(emc_dbg_reg, EMC_DBG);
+}
+
+static inline void periodic_qrst_restore(u32 emc_cfg_reg, u32 emc_dbg_reg)
+{
+	/* enable write mux => restore periodic QRST => restore mux */
+	emc_writel(emc_dbg_reg | EMC_DBG_WRITE_MUX_ACTIVE, EMC_DBG);
+	emc_writel(emc_cfg_reg, EMC_CFG);
+	emc_writel(emc_dbg_reg, EMC_DBG);
+}
+
+static inline int get_dll_change(const struct tegra_emc_table *next_timing,
+				 const struct tegra_emc_table *last_timing)
+{
+	bool next_dll_enabled = !(next_timing->emc_mode_1 & 0x1);
+	bool last_dll_enabled = !(last_timing->emc_mode_1 & 0x1);
+
+	if (next_dll_enabled == last_dll_enabled)
+		return DLL_CHANGE_NONE;
+	else if (next_dll_enabled)
+		return DLL_CHANGE_ON;
+	else
+		return DLL_CHANGE_OFF;
+}
+
+static inline void set_dram_mode(const struct tegra_emc_table *next_timing,
+				 const struct tegra_emc_table *last_timing,
+				 int dll_change)
+{
+	if (dram_type == DRAM_TYPE_DDR3) {
+		/* first mode_1, then mode_2, then mode_reset*/
+		if (next_timing->emc_mode_1 != last_timing->emc_mode_1)
+			emc_writel(next_timing->emc_mode_1, EMC_EMRS);
+		if (next_timing->emc_mode_2 != last_timing->emc_mode_2)
+			emc_writel(next_timing->emc_mode_2, EMC_EMRS);
+
+		if ((next_timing->emc_mode_reset !=
+		     last_timing->emc_mode_reset) ||
+		    (dll_change == DLL_CHANGE_ON))
+		{
+			u32 reg = next_timing->emc_mode_reset &
+				(~EMC_MODE_SET_DLL_RESET);
+			if (dll_change == DLL_CHANGE_ON) {
+				reg |= EMC_MODE_SET_DLL_RESET;
+				reg |= EMC_MODE_SET_LONG_CNT;
+			}
+			emc_writel(reg, EMC_MRS);
+		}
+	} else {
+		/* first mode_2, then mode_1; mode_reset is not applicable */
+		if (next_timing->emc_mode_2 != last_timing->emc_mode_2)
+			emc_writel(next_timing->emc_mode_2, EMC_MRW);
+		if (next_timing->emc_mode_1 != last_timing->emc_mode_1)
+			emc_writel(next_timing->emc_mode_1, EMC_MRW);
+	}
+}
+
+static inline void do_clock_change(u32 clk_setting)
+{
+	int err;
+
+	mc_readl(MC_EMEM_ADR_CFG);	/* completes prev writes */
+	writel(clk_setting, (u32)clk_base + emc->reg);
+
+	err = wait_for_update(EMC_INTSTATUS,
+			      EMC_INTSTATUS_CLKCHANGE_COMPLETE, true);
+	if (err) {
+		pr_err("%s: clock change completion error: %d", __func__, err);
+		BUG();
+	}
+}
+
+static noinline void emc_set_clock(const struct tegra_emc_table *next_timing,
+				   const struct tegra_emc_table *last_timing,
+				   u32 clk_setting)
+{
+	int i, dll_change;
+	bool dyn_sref_enabled, vref_cal_toggle, qrst_used, zcal_long;
+
+	u32 emc_cfg_reg = emc_readl(EMC_CFG);
+	u32 emc_dbg_reg = emc_readl(EMC_DBG);
+
+	/* FIXME: remove steps enumeration below? */
+
+	/* 1. clear clkchange_complete interrupts */
+	emc_writel(EMC_INTSTATUS_CLKCHANGE_COMPLETE, EMC_INTSTATUS);
+
+	/* 2. disable dynamic self-refresh and wait for possible self-refresh
+	   entry/exit - waiting here before the clock change decreases worst
+	   case clock change stall time */
+	dyn_sref_enabled = emc_cfg_reg & EMC_CFG_DYN_SREF_ENABLE;
+	if (dyn_sref_enabled) {
+		emc_cfg_reg &= ~EMC_CFG_DYN_SREF_ENABLE;
+		emc_writel(emc_cfg_reg, EMC_CFG);
+		emc_timing_update();
+		udelay(5); /* wait for possible self-refresh entry/exit */
+	}
+
+	/* 3. disable auto-cal if vref mode is switching */
+	vref_cal_toggle = (next_timing->emc_acal_interval != 0) &&
+		((next_timing->burst_regs[EMC_XM2COMPPADCTRL_INDEX] ^
+		  last_timing->burst_regs[EMC_XM2COMPPADCTRL_INDEX]) &
+		 EMC_XM2COMPPADCTRL_VREF_CAL_ENABLE);
+	if (vref_cal_toggle)
+		auto_cal_disable();
+
+	/* 4. program burst shadow registers
+	   the last read below makes sure writes are completed*/
+	for (i = 0; i < TEGRA_EMC_NUM_REGS; i++)
+		__raw_writel(next_timing->burst_regs[i], burst_reg_addr[i]);
+	wmb();
+	barrier();
+
+	qrst_used = need_qrst(next_timing, last_timing,
+			      emc_readl(EMC_SEL_DPD_CTRL));
+
+	/* 5. flow control marker 1 (no EMC read access after this) */
+	emc_writel(1, EMC_STALL_BEFORE_CLKCHANGE);
+
+	/* 6. enable periodic QRST */
+	if (qrst_used)
+		periodic_qrst_enable(emc_cfg_reg, emc_dbg_reg);
+
+	/* 7. turn Off dll and enter self-refresh on DDR3 */
+	dll_change = get_dll_change(next_timing, last_timing);
+	if (dram_type == DRAM_TYPE_DDR3) {
+		if (dll_change == DLL_CHANGE_OFF)
+			emc_writel(next_timing->emc_mode_1, EMC_EMRS);
+		emc_writel(DRAM_BROADCAST(dram_dev_num) |
+			   EMC_SELF_REF_CMD_ENABLED, EMC_SELF_REF);
+	}
+
+	/* 8. flow control marker 2 */
+	emc_writel(1, EMC_STALL_AFTER_CLKCHANGE);
+
+	/* 9. exit self-refresh on DDR3 */
+	if (dram_type == DRAM_TYPE_DDR3)
+		emc_writel(DRAM_BROADCAST(dram_dev_num), EMC_SELF_REF);
+
+	/* 10. restore periodic QRST */
+	if (qrst_used)
+		periodic_qrst_restore(emc_cfg_reg, emc_dbg_reg);
+
+	/* 11. set dram mode registers */
+	set_dram_mode(next_timing, last_timing, dll_change);
+
+	/* 12. issue zcal command if turning zcal On */
+	zcal_long = (next_timing->burst_regs[EMC_ZCAL_INTERVAL_INDEX] != 0) &&
+		(last_timing->burst_regs[EMC_ZCAL_INTERVAL_INDEX] == 0);
+	if (zcal_long) {
+		emc_writel(EMC_ZQ_CAL_LONG_CMD_DEV0, EMC_ZQ_CAL);
+		if (dram_dev_num > 1)
+			emc_writel(EMC_ZQ_CAL_LONG_CMD_DEV1, EMC_ZQ_CAL);
+	}
+
+	/* 13. flow control marker 3 */
+	emc_writel(1, EMC_UNSTALL_RW_AFTER_CLKCHANGE);
+
+	/* 14. read any MC register to ensure the programming is done
+	       change EMC clock source register (EMC read access restored)
+	       wait for clk change completion */
+	do_clock_change(clk_setting);
+
+	/* 15. restore auto-cal */
+	if (vref_cal_toggle)
+		emc_writel(next_timing->emc_acal_interval,
+			   EMC_AUTO_CAL_INTERVAL);
+
+	/* 16. restore dynamic self-refresh */
+	if (dyn_sref_enabled) {
+		emc_cfg_reg |= EMC_CFG_DYN_SREF_ENABLE;
+		emc_writel(emc_cfg_reg, EMC_CFG);
+	}
+
+	/* 17. set zcal wait count */
+	if (zcal_long)
+		emc_writel(next_timing->emc_zcal_cnt_long, EMC_ZCAL_WAIT_CNT);
+
+	/* 18. update restored timing */
+	if (vref_cal_toggle || dyn_sref_enabled || zcal_long) {
+		/* let ZQ calibration, other ops complete before updating
+		   restored timing settings */
+		udelay(2);
+		emc_timing_update();
+	}
+}
+
+static inline void emc_get_timing(struct tegra_emc_table *timing)
+{
+	int i;
+
+	for (i = 0; i < TEGRA_EMC_NUM_REGS; i++)
+		timing->burst_regs[i] = __raw_readl(burst_reg_addr[i]);
+	timing->emc_acal_interval = 0;
+	timing->emc_zcal_cnt_long = 0;
+	timing->emc_mode_reset = 0;
+	timing->emc_mode_1 = 0;
+	timing->emc_mode_2 = 0;
+}
+
+/* The EMC registers have shadow registers. When the EMC clock is updated
  * in the clock controller, the shadow registers are copied to the active
  * registers, allowing glitchless memory bus frequency changes.
  * This function updates the shadow registers for a new clock frequency,
@@ -66,11 +486,185 @@ long tegra_emc_round_rate(unsigned long rate)
  * multiple frequency changes */
 int tegra_emc_set_rate(unsigned long rate)
 {
-	return -ENOSYS;
+	int i;
+	u32 clk_setting;
+	const struct tegra_emc_table *last_timing;
+
+	if (!tegra_emc_table)
+		return -EINVAL;
+
+	/* Table entries specify rate in kHz */
+	rate = rate / 1000;
+
+	for (i = 0; i < tegra_emc_table_size; i++) {
+		if (tegra_emc_clk_sel[i].input == NULL)
+			continue;	/* invalid entry */
+
+		if (tegra_emc_table[i].rate == rate)
+			break;
+	}
+
+	if (i >= tegra_emc_table_size)
+		return -EINVAL;
+
+	if (emc_last_sel >= tegra_emc_table_size) {
+		emc_get_timing(&start_timing);
+		last_timing = &start_timing;
+	}
+	else
+		last_timing = &tegra_emc_table[emc_last_sel];
+
+	clk_setting = tegra_emc_clk_sel[i].value;
+	emc_set_clock(&tegra_emc_table[i], last_timing, clk_setting);
+	emc_last_sel = i;
+
+	pr_debug("%s: rate %lu setting 0x%x\n", __func__, rate, clk_setting);
+
+	return 0;
+}
+
+/* Select the closest EMC rate that is higher than the requested rate */
+long tegra_emc_round_rate(unsigned long rate)
+{
+	int i;
+	int best = -1;
+	unsigned long distance = ULONG_MAX;
+
+	if (!tegra_emc_table)
+		return -EINVAL;
+
+	if (!emc_enable)
+		return -EINVAL;
+
+	pr_debug("%s: %lu\n", __func__, rate);
+
+	/* Table entries specify rate in kHz */
+	rate = rate / 1000;
+
+	for (i = 0; i < tegra_emc_table_size; i++) {
+		if (tegra_emc_clk_sel[i].input == NULL)
+			continue;	/* invalid entry */
+
+		if (tegra_emc_table[i].rate >= rate &&
+		    (tegra_emc_table[i].rate - rate) < distance) {
+			distance = tegra_emc_table[i].rate - rate;
+			best = i;
+		}
+	}
+
+	if (best < 0)
+		return -EINVAL;
+
+	pr_debug("%s: using %lu\n", __func__, tegra_emc_table[best].rate);
+
+	return tegra_emc_table[best].rate * 1000;
+}
+
+struct clk *tegra_emc_predict_parent(unsigned long rate, u32 *div_value)
+{
+	int i;
+
+	if (!tegra_emc_table)
+		return NULL;
+
+	pr_debug("%s: %lu\n", __func__, rate);
+
+	/* Table entries specify rate in kHz */
+	rate = rate / 1000;
+
+	for (i = 0; i < tegra_emc_table_size; i++) {
+		if (tegra_emc_table[i].rate == rate) {
+			*div_value = (tegra_emc_clk_sel[i].value &
+				EMC_CLK_DIV_MASK) >> EMC_CLK_DIV_SHIFT;
+			return tegra_emc_clk_sel[i].input;
+		}
+	}
+
+	return NULL;
+}
+
+static const struct clk_mux_sel *find_matching_input(
+	unsigned long table_rate,
+	u32 *div_value)
+{
+	unsigned long inp_rate;
+	const struct clk_mux_sel *sel;
+
+	for (sel = emc->inputs; sel->input != NULL; sel++) {
+		/* Table entries specify rate in kHz */
+		inp_rate = clk_get_rate(sel->input) / 1000;
+
+		/* ddr duty cycle requires only 1:1 or 1:2k ratio */
+		if ((inp_rate == table_rate) ||
+		    ((inp_rate >= 2*table_rate) &&
+		     (inp_rate % (2*table_rate) == 0))) {
+			*div_value = 2 * inp_rate / table_rate - 2;
+			return sel;
+		}
+	}
+	return NULL;
 }
 
 void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
 {
+	int i;
+	u32 reg, div_value;
+	bool pllm_entry = false;
+	const struct clk_mux_sel *sel;
+
+	emc = tegra_get_clock_by_name("emc");
+	BUG_ON(!emc);
+
+	if (emc->parent != tegra_get_clock_by_name("pll_m")) {
+		pr_warn("tegra: boot parent %s is not supported by EMC DFS\n",
+			emc->parent->name);
+		return;
+	}
+
+	tegra_emc_table_size = min(table_size, TEGRA_EMC_TABLE_MAX_SIZE);
+	for (i = 0; i < tegra_emc_table_size; i++) {
+		unsigned long table_rate = table[i].rate;
+		if (!table_rate)
+			continue;
+
+		sel = find_matching_input(table_rate, &div_value);
+		if (!sel)
+			continue;
+
+		tegra_emc_clk_sel[i] = *sel;
+		BUG_ON(div_value >
+		       (EMC_CLK_DIV_MASK >> EMC_CLK_DIV_SHIFT));
+		tegra_emc_clk_sel[i].value <<= EMC_CLK_SOURCE_SHIFT;
+		tegra_emc_clk_sel[i].value |= (div_value << EMC_CLK_DIV_SHIFT);
+
+		if ((div_value == 0) &&
+		    (tegra_emc_clk_sel[i].input == emc->parent)) {
+			tegra_emc_clk_sel[i].value |= EMC_CLK_LOW_JITTER_ENABLE;
+			pllm_entry = true;
+		}
+
+		if (table[i].burst_regs[MC_EMEM_ARB_MISC0_INDEX] &
+		    MC_EMEM_ARB_MISC0_EMC_SAME_FREQ)
+			tegra_emc_clk_sel[i].value |= EMC_CLK_MC_SAME_FREQ;
+	}
+
+	dram_type = (emc_readl(EMC_FBIO_CFG5) &
+		     EMC_CFG5_TYPE_MASK) >> EMC_CFG5_TYPE_SHIFT;
+	if ((dram_type != DRAM_TYPE_DDR3) && (dram_type != DRAM_TYPE_LPDDR2)) {
+		pr_err("Not supported DRAM type %u\n", dram_type);
+		return;
+	}
+	reg = emc_readl(EMC_CFG_2) & (~EMC_CFG_2_MODE_MASK);
+	reg |= ((dram_type == DRAM_TYPE_LPDDR2) ? EMC_CFG_2_PD_MODE :
+		EMC_CFG_2_SREF_MODE) << EMC_CFG_2_MODE_SHIFT;
+	emc_writel(reg, EMC_CFG_2);
+
+	dram_dev_num = (mc_readl(MC_EMEM_ADR_CFG) & 0x1) + 1; /* 2 dev max */
+
+	if (!pllm_entry) {
+		pr_err("tegra: invalid EMC DFS table: PLLM entry not found\n");
+		return;
+	}
+	pr_info("tegra: validated EMC DFS table\n");
 	tegra_emc_table = table;
-	tegra_emc_table_size = table_size;
 }

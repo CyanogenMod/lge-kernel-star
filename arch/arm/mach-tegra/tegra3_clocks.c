@@ -1876,33 +1876,50 @@ static long tegra3_emc_clk_round_rate(struct clk *c, unsigned long rate)
 	if (new_rate < 0)
 		new_rate = c->max_rate;
 
-	BUG_ON(new_rate != tegra3_periph_clk_round_rate(c, new_rate));
-
 	return new_rate;
 }
 
 static int tegra3_emc_clk_set_rate(struct clk *c, unsigned long rate)
 {
 	int ret;
+	u32 div_value;
+	struct clk *p;
+
 	/* The tegra3 memory controller has an interlock with the clock
 	 * block that allows memory shadowed registers to be updated,
 	 * and then transfer them to the main registers at the same
-	 * time as the clock update without glitches. */
+	 * time as the clock update without glitches. During clock change
+	 * operation both clock parent and divider may change simultaneously
+	 * to achieve requested rate. */
+	p = tegra_emc_predict_parent(rate, &div_value);
+	div_value += 2;		/* emc has fractional DIV_U71 divider */
+	if (!p)
+		return -EINVAL;
+
+	if (p == c->parent) {
+		if (div_value == c->div)
+			return 0;
+	} else if (c->refcnt)
+		clk_enable(p);
+
 	ret = tegra_emc_set_rate(rate);
 	if (ret < 0)
 		return ret;
 
-	/* FIXME: update MC clock control here */
-	ret = tegra3_periph_clk_set_rate(c, rate);
-
-	return ret;
+	if (p != c->parent) {
+		if(c->refcnt && c->parent)
+			clk_disable(c->parent);
+		clk_reparent(c, p);
+	}
+	c->div = div_value;
+	c->mul = 2;
+	return 0;
 }
 
 static struct clk_ops tegra_emc_clk_ops = {
 	.init			= &tegra3_emc_clk_init,
 	.enable			= &tegra3_periph_clk_enable,
 	.disable		= &tegra3_periph_clk_disable,
-	.set_parent		= &tegra3_periph_clk_set_parent,
 	.set_rate		= &tegra3_emc_clk_set_rate,
 	.round_rate		= &tegra3_emc_clk_round_rate,
 	.reset			= &tegra3_periph_clk_reset,
