@@ -275,6 +275,9 @@
 /* FIXME: recommended safety delay after lock is detected */
 #define PLL_POST_LOCK_DELAY		100
 
+static bool detach_shared_bus;
+module_param(detach_shared_bus, bool, 0644);
+
 /**
 * Structure defining the fields for USB UTMI clocks Parameters.
 */
@@ -2054,6 +2057,9 @@ static void tegra_clk_shared_bus_update(struct clk *bus)
 {
 	struct clk *c;
 	unsigned long rate = bus->min_rate;
+
+	if (detach_shared_bus)
+		return;
 
 	list_for_each_entry(c, &bus->shared_bus_list,
 			u.shared_bus_user.node) {
