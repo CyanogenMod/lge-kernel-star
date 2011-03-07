@@ -1118,8 +1118,8 @@ static void tegra_set_termios(struct uart_port *u, struct ktermios *termios,
 }
 
 /*
- * Flush any TX data submitted for DMA. Called when the TX circular
- * buffer is reset.
+ * Flush any TX data submitted for DMA and PIO. Called when the
+ * TX circular buffer is reset.
  */
 static void tegra_flush_buffer(struct uart_port *u)
 {
@@ -1128,6 +1128,8 @@ static void tegra_flush_buffer(struct uart_port *u)
 	dev_vdbg(u->dev, "%s called", __func__);
 
 	t = container_of(u, struct tegra_uart_port, uport);
+
+	t->tx_bytes = 0;
 
 	if (t->use_tx_dma) {
 		tegra_dma_dequeue_req(t->tx_dma, &t->tx_dma_req);
