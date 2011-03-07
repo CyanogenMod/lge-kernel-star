@@ -46,6 +46,7 @@
 
 #define cardhu_lvds_shutdown	TEGRA_GPIO_PL2
 #define cardhu_bl_enb		TEGRA_GPIO_PH2
+#define cardhu_bl_pwm		TEGRA_GPIO_PH0
 #define cardhu_hdmi_hpd		TEGRA_GPIO_PN7
 
 #ifdef DSI_PANEL_219
@@ -62,6 +63,8 @@ static int cardhu_backlight_init(struct device *dev) {
 	int ret;
 
 #ifndef CONFIG_TEGRA_CARDHU_DSI
+	tegra_gpio_disable(cardhu_bl_pwm);
+
 	ret = gpio_request(cardhu_bl_enb, "backlight_enb");
 	if (ret < 0)
 		return ret;
