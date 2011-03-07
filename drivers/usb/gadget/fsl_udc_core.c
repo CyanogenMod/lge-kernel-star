@@ -1207,10 +1207,10 @@ static int fsl_vbus_session(struct usb_gadget *gadget, int is_active)
 			/* stop the controller and turn off the clocks */
 			dr_controller_stop(udc);
 			dr_controller_reset(udc);
-			spin_unlock_irqrestore(&udc->lock, flags);
-			fsl_udc_clk_suspend();
 			udc->vbus_active = 0;
 			udc->usb_state = USB_STATE_DEFAULT;
+			spin_unlock_irqrestore(&udc->lock, flags);
+			fsl_udc_clk_suspend();
 		} else if (!udc->vbus_active && is_active) {
 			fsl_udc_clk_resume();
 			/* setup the controller in the device mode */
