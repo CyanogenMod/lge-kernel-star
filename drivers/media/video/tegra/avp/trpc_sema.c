@@ -29,7 +29,8 @@
 
 #include "trpc_sema.h"
 
-struct trpc_sema {
+struct tegra_sema_info {
+	struct file		*file;
 	wait_queue_head_t	wq;
 	spinlock_t		lock;
 	int			count;
@@ -46,7 +47,7 @@ static inline bool is_trpc_sema_file(struct file *file)
 	return false;
 }
 
-struct file *trpc_sema_get_from_fd(int fd)
+struct tegra_sema_info *trpc_sema_get_from_fd(int fd)
 {
 	struct file *file;
 
@@ -62,12 +63,17 @@ struct file *trpc_sema_get_from_fd(int fd)
 		return ERR_PTR(-EINVAL);
 	}
 
-	return file;
+	return file->private_data;
 }
 
-int trpc_sema_signal(struct file *file)
+void trpc_sema_put(struct tegra_sema_info *info)
 {
-	struct trpc_sema *info = file->private_data;
+	if (info->file)
+		fput(info->file);
+}
+
+int tegra_sema_signal(struct tegra_sema_info *info)
+{
 	unsigned long flags;
 
 	if (!info)
@@ -80,26 +86,25 @@ int trpc_sema_signal(struct file *file)
 	return 0;
 }
 
-static int trpc_sema_wait(struct trpc_sema *info, long *timeleft)
+int tegra_sema_wait(struct tegra_sema_info *info, long *timeout)
 {
 	unsigned long flags;
 	int ret = 0;
 	unsigned long endtime;
-	long timeout = *timeleft;
+	long timeleft = *timeout;
 
-	*timeleft = 0;
-	if (timeout < 0) {
-		timeout = MAX_SCHEDULE_TIMEOUT;
-	} else if (timeout > 0) {
-		timeout = msecs_to_jiffies(timeout);
-		endtime = jiffies + timeout;
-	}
+	*timeout = 0;
+	if (timeleft < 0)
+		timeleft = MAX_SCHEDULE_TIMEOUT;
+
+	timeleft = msecs_to_jiffies(timeleft);
+	endtime = jiffies + timeleft;
 
 again:
-	if (timeout)
+	if (timeleft)
 		ret = wait_event_interruptible_timeout(info->wq,
 						       info->count > 0,
-						       timeout);
+						       timeleft);
 	spin_lock_irqsave(&info->lock, flags);
 	if (info->count > 0) {
 		info->count--;
@@ -108,15 +113,15 @@ again:
 		ret = -ETIMEDOUT;
 	} else if (ret < 0) {
 		ret = -EINTR;
-		if (timeout != MAX_SCHEDULE_TIMEOUT &&
+		if (timeleft != MAX_SCHEDULE_TIMEOUT &&
 		    time_before(jiffies, endtime))
-			*timeleft = jiffies_to_msecs(endtime - jiffies);
+			*timeout = jiffies_to_msecs(endtime - jiffies);
 		else
-			*timeleft = 0;
+			*timeout = 0;
 	} else {
 		/* we woke up but someone else got the semaphore and we have
 		 * time left, try again */
-		timeout = ret;
+		timeleft = ret;
 		spin_unlock_irqrestore(&info->lock, flags);
 		goto again;
 	}
@@ -124,34 +129,53 @@ again:
 	return ret;
 }
 
-static int trpc_sema_open(struct inode *inode, struct file *file)
+int tegra_sema_open(struct tegra_sema_info **sema)
 {
-	struct trpc_sema *info;
-
-	info = kzalloc(sizeof(struct trpc_sema), GFP_KERNEL);
+	struct tegra_sema_info *info;
+	info = kzalloc(sizeof(struct tegra_sema_info), GFP_KERNEL);
 	if (!info)
 		return -ENOMEM;
 
-	nonseekable_open(inode, file);
 	init_waitqueue_head(&info->wq);
 	spin_lock_init(&info->lock);
+	*sema = info;
+	return 0;
+}
+
+static int trpc_sema_open(struct inode *inode, struct file *file)
+{
+	struct tegra_sema_info *info;
+	int ret;
+
+	ret = tegra_sema_open(&info);
+	if (ret < 0)
+		return ret;
+
+	info->file = file;
+	nonseekable_open(inode, file);
 	file->private_data = info;
+	return 0;
+}
+
+int tegra_sema_release(struct tegra_sema_info *sema)
+{
+	kfree(sema);
 	return 0;
 }
 
 static int trpc_sema_release(struct inode *inode, struct file *file)
 {
-	struct trpc_sema *info = file->private_data;
+	struct tegra_sema_info *info = file->private_data;
 
 	file->private_data = NULL;
-	kfree(info);
+	tegra_sema_release(info);
 	return 0;
 }
 
 static long trpc_sema_ioctl(struct file *file, unsigned int cmd,
 			    unsigned long arg)
 {
-	struct trpc_sema *info = file->private_data;
+	struct tegra_sema_info *info = file->private_data;
 	int ret;
 	long timeout;
 
@@ -166,14 +190,14 @@ static long trpc_sema_ioctl(struct file *file, unsigned int cmd,
 	case TEGRA_SEMA_IOCTL_WAIT:
 		if (copy_from_user(&timeout, (void __user *)arg, sizeof(long)))
 			return -EFAULT;
-		ret = trpc_sema_wait(info, &timeout);
+		ret = tegra_sema_wait(info, &timeout);
 		if (ret != -EINTR)
 			break;
 		if (copy_to_user((void __user *)arg, &timeout, sizeof(long)))
 			ret = -EFAULT;
 		break;
 	case TEGRA_SEMA_IOCTL_SIGNAL:
-		ret = trpc_sema_signal(file);
+		ret = tegra_sema_signal(info);
 		break;
 	default:
 		pr_err("%s: Unknown tegra_sema ioctl 0x%x\n", __func__,

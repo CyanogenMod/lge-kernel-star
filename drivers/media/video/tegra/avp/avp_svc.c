@@ -38,7 +38,7 @@ enum {
 	AVP_DBG_TRACE_SVC		= 1U << 0,
 };
 
-static u32 debug_mask = 0;
+static u32 debug_mask;
 module_param_named(debug_mask, debug_mask, uint, S_IWUSR | S_IRUGO);
 
 #define DBG(flag, args...) \

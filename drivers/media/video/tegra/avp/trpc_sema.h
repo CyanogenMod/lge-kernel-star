@@ -21,8 +21,10 @@
 #include <linux/types.h>
 #include <linux/fs.h>
 
-struct file *trpc_sema_get_from_fd(int fd);
-int trpc_sema_signal(struct file *file);
+struct tegra_sema_info;
+
+struct tegra_sema_info *trpc_sema_get_from_fd(int fd);
+void trpc_sema_put(struct tegra_sema_info *sema);
 int __init trpc_sema_init(void);
 
 #endif
