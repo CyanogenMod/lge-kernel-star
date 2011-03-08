@@ -580,15 +580,15 @@ int __init cardhu_gpio_switch_regulator_init(void)
 static struct tegra_suspend_platform_data cardhu_suspend_data = {
 	.cpu_timer	= 2000,
 	.cpu_off_timer	= 0,
-	.suspend_mode	= TEGRA_SUSPEND_NONE,
+	.suspend_mode	= TEGRA_SUSPEND_LP1,
 	.core_timer	= 0x7e7e,
 	.core_off_timer = 0,
 	.separate_req	= true,
 	.corereq_high	= false,
 	.sysclkreq_high	= true,
-	.wake_enb	= 0,
+	.wake_enb	= TEGRA_WAKE_GPIO_PV0 | TEGRA_WAKE_PWR_INT,
 	.wake_high	= 0,
-	.wake_low	= 0,
+	.wake_low	= TEGRA_WAKE_GPIO_PV0 | TEGRA_WAKE_PWR_INT,
 	.wake_any	= 0,
 };
 
