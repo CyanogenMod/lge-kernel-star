@@ -38,6 +38,9 @@
 #include "power.h"
 #include "wakeups-t3.h"
 
+#define PMC_CTRL		0x0
+#define PMC_CTRL_INTR_LOW	(1 << 17)
+
 #ifdef CONFIG_MFD_TPS6591X
 static struct regulator_consumer_supply tps6591x_vdd1_supply[] = {
 	REGULATOR_SUPPLY("vdd_core", NULL),
@@ -254,6 +257,12 @@ static struct i2c_board_info __initdata cardhu_regulators[] = {
 
 int __init cardhu_regulator_init(void)
 {
+	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
+	u32 pmc_ctrl;
+	/* configure the power management controller to trigger PMU
+	 * interrupts when low */
+	pmc_ctrl = readl(pmc + PMC_CTRL);
+	writel(pmc_ctrl | PMC_CTRL_INTR_LOW, pmc + PMC_CTRL);
 	i2c_register_board_info(4, cardhu_regulators, 1);
 	return 0;
 }
