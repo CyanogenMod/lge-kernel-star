@@ -33,7 +33,7 @@
 #include <linux/gpio.h>
 #include <linux/gpio_keys.h>
 #include <linux/input.h>
-#include <linux/tegra_usb.h>
+#include <linux/platform_data/tegra_usb.h>
 #include <linux/mfd/tps6586x.h>
 #include <linux/memblock.h>
 
