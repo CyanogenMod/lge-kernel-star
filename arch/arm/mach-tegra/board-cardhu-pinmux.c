@@ -362,7 +362,7 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux[] = {
 	DEFAULT_PINMUX(SPI1_SCK,        SPI1,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SPI1_CS0_N,      SPI1,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SPI1_MISO,       SPI1,            NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(SPI2_CS1_N,      SPI3,            NORMAL,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(SPI2_CS1_N,      SPI3,            PULL_UP,   NORMAL,     INPUT),
 	DEFAULT_PINMUX(SPI2_CS2_N,      SPI3,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(PEX_L0_PRSNT_N,  PCIE,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(PEX_L0_RST_N,    PCIE,            NORMAL,    NORMAL,     OUTPUT),
