@@ -25,6 +25,8 @@
 #include <linux/device.h>
 #include <linux/gpio.h>
 #include <linux/gpio_keys.h>
+#include <linux/mfd/tps6591x.h>
+#include <linux/interrupt_keys.h>
 #include <linux/gpio_scrollwheel.h>
 
 #include <mach/irqs.h>
@@ -186,6 +188,34 @@ static struct platform_device cardhu_keys_e1291_device = {
 	},
 };
 
+#define INT_KEY(_id, _irq, _iswake)		\
+	{					\
+		.code = _id,			\
+		.irq = _irq,			\
+		.active_low = 1,		\
+		.desc = #_id,			\
+		.type = EV_KEY,			\
+		.wakeup = _iswake,		\
+		.debounce_interval = 10,	\
+	}
+static struct interrupt_keys_button cardhu_int_keys_e1291[] = {
+	[0] = INT_KEY(KEY_MENU, TPS6591X_IRQ_BASE + TPS6591X_INT_PWRON, 0),
+	[1] = INT_KEY(KEY_MENU, TPS6591X_IRQ_BASE + TPS6591X_INT_PWRON_LP, 0),
+};
+
+static struct interrupt_keys_platform_data cardhu_int_keys_e1291_pdata = {
+	.int_buttons	= cardhu_int_keys_e1291,
+	.nbuttons       = ARRAY_SIZE(cardhu_int_keys_e1291),
+};
+
+static struct platform_device cardhu_int_keys_e1291_device = {
+	.name   = "interrupt-keys",
+	.id     = 0,
+	.dev    = {
+		.platform_data  = &cardhu_int_keys_e1291_pdata,
+	},
+};
+
 int __init cardhu_keys_init(void)
 {
 	int i;
@@ -204,6 +234,7 @@ int __init cardhu_keys_init(void)
 			tegra_gpio_enable(cardhu_keys_e1291[i].gpio);
 
 		platform_device_register(&cardhu_keys_e1291_device);
+		platform_device_register(&cardhu_int_keys_e1291_device);
 		return 0;
 	}
 
