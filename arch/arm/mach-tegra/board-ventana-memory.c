@@ -539,6 +539,30 @@ static const struct tegra_emc_table ventana_emc_tables_elpida_400Mhz[] = {
 	}
 };
 
+static const struct tegra_emc_chip ventana_emc_chips[] = {
+	{
+		.description = "Elpida 300MHz",
+		.mem_manufacturer_id = 0x0303,
+		.mem_revision_id1 = -1,
+		.mem_revision_id2 = -1,
+		.mem_pid = -1,
+		.table = ventana_emc_tables_elpida_300Mhz,
+		.table_size = ARRAY_SIZE(ventana_emc_tables_elpida_300Mhz)
+	},
+};
+
+static const struct tegra_emc_chip ventana_t25_emc_chips[] = {
+	{
+		.description = "Elpida 400MHz",
+		.mem_manufacturer_id = 0x0303,
+		.mem_revision_id1 = -1,
+		.mem_revision_id2 = -1,
+		.mem_pid = -1,
+		.table = ventana_emc_tables_elpida_400Mhz,
+		.table_size = ARRAY_SIZE(ventana_emc_tables_elpida_400Mhz)
+	},
+};
+
 #define TEGRA25_SKU		0x0B00
 
 int ventana_emc_init(void)
@@ -547,13 +571,11 @@ int ventana_emc_init(void)
 
 	tegra_get_board_info(&BoardInfo);
 	if (BoardInfo.sku == TEGRA25_SKU) {
-		pr_info("%s: Elpida 400 Mhz memory found\n", __func__);
-		tegra_init_emc(ventana_emc_tables_elpida_400Mhz,
-			ARRAY_SIZE(ventana_emc_tables_elpida_400Mhz));
+		tegra_init_emc(ventana_t25_emc_chips,
+			ARRAY_SIZE(ventana_t25_emc_chips));
 	} else {
-		pr_info("%s: Elpida 333 Mhz memory found\n", __func__);
-		tegra_init_emc(ventana_emc_tables_elpida_300Mhz,
-			ARRAY_SIZE(ventana_emc_tables_elpida_300Mhz));
+		tegra_init_emc(ventana_emc_chips,
+			ARRAY_SIZE(ventana_emc_chips));
 	}
 	return 0;
 }
