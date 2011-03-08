@@ -33,7 +33,7 @@
 #include <linux/gpio.h>
 #include <linux/gpio_scrollwheel.h>
 #include <linux/input.h>
-#include <linux/tegra_usb.h>
+#include <linux/platform_data/tegra_usb.h>
 #include <linux/memblock.h>
 
 #include <mach/clk.h>

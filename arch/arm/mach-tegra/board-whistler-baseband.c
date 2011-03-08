@@ -23,7 +23,7 @@
 #include <linux/delay.h>
 #include <linux/gpio.h>
 #include <linux/err.h>
-#include <linux/tegra_usb.h>
+#include <linux/platform_data/tegra_usb.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <mach/pinmux.h>
