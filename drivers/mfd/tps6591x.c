@@ -419,7 +419,6 @@ static irqreturn_t tps6591x_irq(int irq, void *data)
 			handle_nested_irq(tps6591x->irq_base + i);
 		acks &= ~(1 << i);
 	}
-
 	return IRQ_HANDLED;
 }
 
@@ -434,10 +433,13 @@ static int __devinit tps6591x_irq_init(struct tps6591x *tps6591x, int irq,
 	}
 
 	mutex_init(&tps6591x->irq_lock);
+
+	tps6591x->mask_reg[0] = 0xFF;
+	tps6591x->mask_reg[1] = 0xFF;
+	tps6591x->mask_reg[2] = 0xFF;
 	for (i = 0; i < 3; i++) {
-		tps6591x->mask_cache[i] = 0x00;
-		tps6591x->mask_reg[i] = 0x00;
-		tps6591x_write(tps6591x->dev, TPS6591X_INT_MSK + 2*i, 0x00);
+		tps6591x->mask_cache[i] = tps6591x->mask_reg[i];
+		tps6591x_write(tps6591x->dev, TPS6591X_INT_MSK + 2*i, tps6591x->mask_cache[i]);
 	}
 
 	for (i = 0; i < 3; i++)
@@ -464,7 +466,6 @@ static int __devinit tps6591x_irq_init(struct tps6591x *tps6591x, int irq,
 
 	ret = request_threaded_irq(irq, NULL, tps6591x_irq, IRQF_ONESHOT,
 				   "tps6591x", tps6591x);
-
 	if (!ret) {
 		device_init_wakeup(tps6591x->dev, 1);
 		enable_irq_wake(irq);
