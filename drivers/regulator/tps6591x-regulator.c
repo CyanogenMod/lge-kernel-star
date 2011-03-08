@@ -492,6 +492,15 @@ static int tps6591x_vdd_voltages[] = {
 	1412, 1425, 1437, 1450, 1462, 1475, 1487, 1500,
 };
 
+static int tps6591x_vddctrl_voltages[] = {
+	600, 612, 625, 637, 650, 662, 675, 687, 700, 712, 725, 737,
+	750, 762, 775, 787, 800, 812, 825, 837, 850, 862, 875, 887,
+	900, 912, 925, 937, 950, 962, 975, 987, 1000, 1012, 1025,
+	1037, 1050, 1062, 1075, 1087, 1100, 1112, 1125, 1137, 1150,
+	1162, 1175, 1187, 1200, 1212, 1225, 1237, 1250, 1262, 1275,
+	1287, 1300, 1312, 1325, 1337, 1350, 1362, 1375, 1387, 1400,
+};
+
 #define TPS6591X_REGULATOR(_id, vdata, _ops, s_addr, s_nbits, s_shift,	\
 			s_type, op_addr, op_nbits, op_shift, sr_addr,	\
 			sr_nbits, sr_shift, en1_addr, en1_shift)	\
@@ -574,7 +583,7 @@ static struct tps6591x_regulator tps6591x_regulator[] = {
 		7, 0, VDD1_SR, 7, 0, 1),
 	TPS6591X_VDD(VDD_2, vdd, VDD2, 2, 0, sr_op_reg, VDD2_OP,
 		7, 0, VDD2_SR, 7, 0, 2),
-	TPS6591X_VDD(VDDCTRL, vdd, VDDCTRL, 2, 0, sr_op_reg,
+	TPS6591X_VDD(VDDCTRL, vddctrl, VDDCTRL, 2, 0, sr_op_reg,
 		VDDCTRL_OP, 7, 0, VDDCTRL_SR, 7, 0, 3),
 };
 
