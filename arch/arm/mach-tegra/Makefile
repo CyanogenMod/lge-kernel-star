@@ -46,6 +46,7 @@ obj-$(CONFIG_USB_SUPPORT)		+= usb_phy.o
 obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
 obj-$(CONFIG_TEGRA_IOVMM)               += iovmm.o
 obj-$(CONFIG_TEGRA_IOVMM_GART)          += iovmm-gart.o
+obj-$(CONFIG_TEGRA_MC_PROFILE)          += tegra2_mc.o
 
 obj-${CONFIG_MACH_HARMONY}              += board-harmony.o
 obj-${CONFIG_MACH_HARMONY}              += board-harmony-panel.o

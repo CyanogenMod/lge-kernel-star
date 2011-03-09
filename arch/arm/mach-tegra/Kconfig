@@ -164,3 +164,11 @@ config TEGRA_CLOCK_DEBUG_WRITE
 	bool "Enable debugfs write access to clock tree"
 	depends on DEBUG_FS
 	default n
+
+config TEGRA_MC_PROFILE
+	tristate "Enable profiling memory controller utilization"
+	default n
+	help
+	  When enabled, provides a mechanism to perform statistical
+	  sampling of the memory controller usage on a client-by-client
+	  basis, and report the log through sysfs.
