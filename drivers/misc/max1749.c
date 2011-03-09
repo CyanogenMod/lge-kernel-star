@@ -27,7 +27,7 @@
 #include <linux/hrtimer.h>
 #include <linux/delay.h>
 
-#include <../staging/android/timed_output.h>
+#include "../staging/android/timed_output.h"
 
 static struct regulator *regulator;
 static int timeout;
