@@ -135,6 +135,13 @@ struct nvhost_ctrl_syncpt_wait_args {
 	__s32 timeout;
 };
 
+struct nvhost_ctrl_syncpt_waitex_args {
+	__u32 id;
+	__u32 thresh;
+	__s32 timeout;
+	__u32 value;
+};
+
 struct nvhost_ctrl_module_mutex_args {
 	__u32 id;
 	__u32 lock;
@@ -161,8 +168,11 @@ struct nvhost_ctrl_module_regrdwr_args {
 #define NVHOST_IOCTL_CTRL_MODULE_REGRDWR	\
 	_IOWR(NVHOST_IOCTL_MAGIC, 5, struct nvhost_ctrl_module_regrdwr_args)
 
+#define NVHOST_IOCTL_CTRL_SYNCPT_WAITEX		\
+	_IOWR(NVHOST_IOCTL_MAGIC, 6, struct nvhost_ctrl_syncpt_waitex_args)
+
 #define NVHOST_IOCTL_CTRL_LAST			\
-	_IOC_NR(NVHOST_IOCTL_CTRL_MODULE_REGRDWR)
+	_IOC_NR(NVHOST_IOCTL_CTRL_SYNCPT_WAITEX)
 #define NVHOST_IOCTL_CTRL_MAX_ARG_SIZE sizeof(struct nvhost_ctrl_module_regrdwr_args)
 
 #endif
