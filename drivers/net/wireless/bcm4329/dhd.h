@@ -184,7 +184,7 @@ typedef struct dhd_pub {
 			int retry = 0; \
 			smp_mb(); \
 			while (dhd_mmc_suspend && retry++ != b) { \
-				wait_event_interruptible_timeout(a, FALSE, HZ/100); \
+				wait_event_interruptible_timeout(a, FALSE, 3 * HZ); \
 			} \
 		} 	while (0)
 	#define DHD_PM_RESUME_WAIT(a) 		_DHD_PM_RESUME_WAIT(a, 200)
