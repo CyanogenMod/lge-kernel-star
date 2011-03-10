@@ -340,7 +340,7 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 		if (memblock_remove(tegra_carveout_start, carveout_size)) {
 			pr_err("Failed to remove carveout %08lx@%08lx "
 				"from memory map\n",
-				tegra_carveout_start, carveout_size);
+				carveout_size, tegra_carveout_start);
 			tegra_carveout_start = 0;
 			tegra_carveout_size = 0;
 		}
@@ -353,7 +353,7 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 		if (memblock_remove(tegra_fb2_start, fb2_size)) {
 			pr_err("Failed to remove second framebuffer %08lx@%08lx "
 				"from memory map\n",
-				tegra_fb2_start, fb2_size);
+				fb2_size, tegra_fb2_size);
 			tegra_fb2_start = 0;
 			tegra_fb2_size = 0;
 		} else
@@ -365,7 +365,7 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 		if (memblock_remove(tegra_fb_start, fb_size)) {
 			pr_err("Failed to remove framebuffer %08lx@%08lx "
 				"from memory map\n",
-				tegra_fb_start, fb_size);
+				fb_size, tegra_fb_start);
 			tegra_fb_start = 0;
 			tegra_fb_size = 0;
 		} else
@@ -382,9 +382,10 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 		tegra_grhost_aperture = tegra_carveout_start;
 
 #ifdef CONFIG_TEGRA_IOVMM_SMMU
-	if (memblock_reserve(TEGRA_SMMU_BASE, TEGRA_SMMU_SIZE)) {
-		pr_err("Failed to reserve SMMU I/O VA window %08x@%08x\n",
-			TEGRA_SMMU_BASE, TEGRA_SMMU_SIZE);
+	if (TEGRA_SMMU_BASE >= 0x80000000 &&
+		memblock_reserve(TEGRA_SMMU_BASE, TEGRA_SMMU_SIZE)) {
+		pr_err("Failed to reserve SMMU I/O VA window %08lx@%08lx\n",
+			TEGRA_SMMU_SIZE, TEGRA_SMMU_BASE);
 	}
 #endif
 
