@@ -120,8 +120,7 @@ static __initdata struct tegra_drive_pingroup_config cardhu_drive_pinmux[] = {
 		.ioreset	= TEGRA_PIN_IO_RESET_##_ioreset	\
 	}
 
-/* !!!FIXME!!!! POPULATE THIS TABLE */
-static __initdata struct tegra_pingroup_config cardhu_pinmux[] = {
+static __initdata struct tegra_pingroup_config cardhu_pinmux_common[] = {
 	/* SDMMC1 pinmux */
 	DEFAULT_PINMUX(SDMMC1_CLK,      SDMMC1,          NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SDMMC1_CMD,      SDMMC1,          PULL_UP,    NORMAL,     INPUT),
@@ -355,15 +354,11 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux[] = {
 	DEFAULT_PINMUX(DAP2_DOUT,       I2S1,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(DAP2_SCLK,       I2S1,            NORMAL,    NORMAL,     INPUT),
 #endif
-	DEFAULT_PINMUX(SPI2_MOSI,       SPI6,            NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(SPI2_MISO,       SPI6,            NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(SPI2_CS0_N,      SPI6,            NORMAL,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(SPI2_CS1_N,      SPI2,            PULL_UP,   NORMAL,     INPUT),
 	DEFAULT_PINMUX(SPI1_MOSI,       SPI1,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SPI1_SCK,        SPI1,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SPI1_CS0_N,      SPI1,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SPI1_MISO,       SPI1,            NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(SPI2_CS1_N,      SPI3,            PULL_UP,   NORMAL,     INPUT),
-	DEFAULT_PINMUX(SPI2_CS2_N,      SPI3,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(PEX_L0_PRSNT_N,  PCIE,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(PEX_L0_RST_N,    PCIE,            NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(PEX_L0_CLKREQ_N, PCIE,            NORMAL,    NORMAL,     INPUT),
@@ -401,11 +396,36 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux[] = {
 	VI_PINMUX(VI_VSYNC,        RSVD1,           NORMAL,    NORMAL,     INPUT,  DISABLE, DISABLE),
 };
 
+static __initdata struct tegra_pingroup_config cardhu_pinmux_e118x[] = {
+	/* Power rails GPIO */
+	DEFAULT_PINMUX(SPI2_SCK,        SPI2,            NORMAL,    NORMAL,     INPUT),
+};
+
+static __initdata struct tegra_pingroup_config cardhu_pinmux_e1198[] = {
+	/* SPI2 */
+	DEFAULT_PINMUX(SPI2_SCK,        SPI2,            PULL_UP,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(SPI2_MOSI,       SPI2,            PULL_UP,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(SPI2_MISO,       SPI2,            PULL_UP,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(SPI2_CS0_N,      SPI2,            PULL_UP,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(SPI2_CS2_N,      SPI2,            PULL_UP,    NORMAL,     INPUT),
+};
+
 int __init cardhu_pinmux_init(void)
 {
-	tegra_pinmux_config_table(cardhu_pinmux, ARRAY_SIZE(cardhu_pinmux));
+	struct board_info board_info;
+	tegra_pinmux_config_table(cardhu_pinmux_common, ARRAY_SIZE(cardhu_pinmux_common));
 	tegra_drive_pinmux_config_table(cardhu_drive_pinmux,
 					ARRAY_SIZE(cardhu_drive_pinmux));
+
+	tegra_get_board_info(&board_info);
+	if ((board_info.board_id == BOARD_E1291) ||
+		(board_info.board_id == BOARD_E1198)) {
+		tegra_pinmux_config_table(cardhu_pinmux_e1198,
+					ARRAY_SIZE(cardhu_pinmux_e1198));
+	} else {
+		tegra_pinmux_config_table(cardhu_pinmux_e118x,
+					ARRAY_SIZE(cardhu_pinmux_e118x));
+	}
 	return 0;
 }
 

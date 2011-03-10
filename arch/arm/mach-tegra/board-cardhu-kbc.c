@@ -36,22 +36,8 @@
 
 #include "gpio-names.h"
 
-#ifdef CONFIG_KEYBOARD_TEGRA
-#ifdef CONFIG_INPUT_ALPS_GPIO_SCROLLWHEEL
-#define CARDHU_ROW_COUNT	3
-#define CARDHU_COL_COUNT	2
-#else
 #define CARDHU_ROW_COUNT	4
 #define CARDHU_COL_COUNT	6
-#endif
-
-#ifdef CONFIG_INPUT_ALPS_GPIO_SCROLLWHEEL
-static int plain_kbd_keycode[] = {
-	KEY_POWER,	KEY_RESERVED,
-	KEY_HOME,	KEY_BACK,
-	KEY_RESERVED,	KEY_RESERVED,
-};
-#else
 static int plain_kbd_keycode[] = {
 	KEY_POWER,	KEY_RESERVED,	KEY_RESERVED,	KEY_RESERVED,
 			KEY_RESERVED,	KEY_RESERVED,	KEY_RESERVED,
@@ -64,7 +50,7 @@ static int plain_kbd_keycode[] = {
 	KEY_END,	KEY_BACK,	KEY_RESERVED,	KEY_RESERVED,
 			KEY_RESERVED,	KEY_PLAY,	KEY_PHONE,
 };
-#endif
+
 static struct tegra_kbc_wake_key cardhu_wake_cfg[] = {
 	[0] = {
 		.row = 0,
@@ -137,69 +123,12 @@ int __init cardhu_kbc_init(void)
 	platform_device_register(&cardhu_kbc_device);
 	return 0;
 }
-#else
-int __init cardhu_kbc_init(void)
-{
-}
-#endif
 
-#ifdef CONFIG_INPUT_ALPS_GPIO_SCROLLWHEEL
-#define GPIO_SCROLL(_pinaction, _gpio, _desc)		\
-{							\
-	.pinaction = GPIO_SCROLLWHEEL_PIN_##_pinaction,	\
-	.gpio = TEGRA_GPIO_##_gpio,			\
-	.desc = _desc,					\
-	.active_low = 1,				\
-	.debounce_interval = 2,				\
-}
-
-static struct gpio_scrollwheel_button scroll_keys[] = {
-	[0] = GPIO_SCROLL(ONOFF, PR3, "sw_onoff"),
-	[1] = GPIO_SCROLL(PRESS, PQ5, "sw_press"),
-	[2] = GPIO_SCROLL(ROT1, PQ3, "sw_rot1"),
-	[3] = GPIO_SCROLL(ROT2, PQ4, "sw_rot2"),
-};
-
-static struct gpio_scrollwheel_platform_data cardhu_scroll_platform_data = {
-	.buttons = scroll_keys,
-	.nbuttons = ARRAY_SIZE(scroll_keys),
-};
-
-static struct platform_device cardhu_scroll_device = {
-	.name	= "alps-gpio-scrollwheel",
-	.id	= 0,
-	.dev	= {
-		.platform_data = &cardhu_scroll_platform_data,
-	},
-};
-
-int __init cardhu_scroll_init(void)
-{
-	int i;
-	struct board_info board_info;
-
-	tegra_get_board_info(&board_info);
-	if ((board_info.board_id == BOARD_E1198) ||
-		(board_info.board_id == BOARD_E1291))
-		return 0;
-
-	pr_info("Registering alps scroll wheel\n");
-
-	/* Setting pins to gpio mode */
-	for (i = 0; i < ARRAY_SIZE(scroll_keys); i++)
-		tegra_gpio_enable(scroll_keys[i].gpio);
-
-	platform_device_register(&cardhu_scroll_device);
-	return 0;
-}
-#else
 int __init cardhu_scroll_init(void)
 {
 	return 0;
 }
-#endif
 
-#ifdef CONFIG_KEYBOARD_GPIO
 #define GPIO_KEY(_id, _gpio, _iswake)		\
 	{					\
 		.code = _id,			\
@@ -285,9 +214,3 @@ int __init cardhu_keys_init(void)
 	platform_device_register(&cardhu_keys_e1198_device);
 	return 0;
 }
-#else
-int __init cardhu_keys_init(void)
-{
-	return 0;
-}
-#endif

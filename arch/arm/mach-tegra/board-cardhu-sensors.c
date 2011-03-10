@@ -102,7 +102,6 @@ static int cardhu_camera_init(void)
 
 static int cardhu_ov5650_power_on(void)
 {
-	int ret;
 	struct board_info board_info;
 	tegra_get_board_info(&board_info);
 	/* Boards E1198 and E1291 are of Cardhu personality
