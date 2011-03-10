@@ -275,7 +275,7 @@ static int tps6591x_gpio_get(struct gpio_chip *gc, unsigned offset)
 }
 
 static void tps6591x_gpio_set(struct gpio_chip *chip, unsigned offset,
-			      int value)
+			int value)
 {
 
 	struct tps6591x *tps6591x = container_of(chip, struct tps6591x, gpio);
@@ -423,7 +423,7 @@ static irqreturn_t tps6591x_irq(int irq, void *data)
 }
 
 static int __devinit tps6591x_irq_init(struct tps6591x *tps6591x, int irq,
-				       int irq_base)
+				int irq_base)
 {
 	int i, ret;
 
@@ -569,6 +569,22 @@ static int __devexit tps6591x_i2c_remove(struct i2c_client *client)
 
 	return 0;
 }
+#ifdef CONFIG_PM
+static int tps6591x_i2c_suspend(struct i2c_client *client, pm_message_t state)
+{
+	if (client->irq)
+		disable_irq(client->irq);
+	return 0;
+}
+
+static int tps6591x_i2c_resume(struct i2c_client *client)
+{
+	if (client->irq)
+		enable_irq(client->irq);
+	return 0;
+}
+#endif
+
 
 static const struct i2c_device_id tps6591x_id_table[] = {
 	{ "tps6591x", 0 },
@@ -583,6 +599,10 @@ static struct i2c_driver tps6591x_driver = {
 	},
 	.probe		= tps6591x_i2c_probe,
 	.remove		= __devexit_p(tps6591x_i2c_remove),
+#ifdef CONFIG_PM
+	.suspend	= tps6591x_i2c_suspend,
+	.resume		= tps6591x_i2c_resume,
+#endif
 	.id_table	= tps6591x_id_table,
 };
 
