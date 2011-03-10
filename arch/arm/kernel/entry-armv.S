@@ -46,7 +46,7 @@
 	 * preserved from get_irqnr_and_base above
 	 */
 	test_for_ipi r0, r6, r5, lr
-	movne	r0, sp
+	movne	r1, sp
 	adrne	lr, BSYM(1b)
 	bne	do_IPI
 
