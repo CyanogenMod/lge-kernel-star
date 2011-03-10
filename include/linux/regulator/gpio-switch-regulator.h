@@ -63,7 +63,7 @@ struct gpio_switch_regulator_subdev_data {
  */
 struct gpio_switch_regulator_platform_data {
 	int num_subdevs;
-	struct gpio_switch_regulator_subdev_data *subdevs;
+	struct gpio_switch_regulator_subdev_data **subdevs;
 };
 
 #endif

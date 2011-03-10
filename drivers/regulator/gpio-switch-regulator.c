@@ -30,7 +30,7 @@
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
 #include <linux/gpio.h>
-#include <linux/gpio-switch-regulator.h>
+#include <linux/regulator/gpio-switch-regulator.h>
 
 struct gpio_switch_regulator {
 	struct regulator_desc		reg_desc;
@@ -236,7 +236,7 @@ static int __devinit gpio_switch_regulator_probe(struct platform_device *pdev)
 
 	for (rcount = 0; rcount < pdata->num_subdevs; ++rcount) {
 		ri = &gswitch_reg[rcount];
-		sdata = &pdata->subdevs[rcount];
+		sdata = pdata->subdevs[rcount];
 
 		/* Initialize the regulator parameter */
 		ri->reg_desc.name = sdata->regulator_name;
