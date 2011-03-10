@@ -307,6 +307,7 @@ static const struct i2c_board_info whistler_i2c_touch_info[] = {
 
 static int __init whistler_touch_init(void)
 {
+	tegra_gpio_enable(TEGRA_GPIO_PC6);
 	i2c_register_board_info(0, whistler_i2c_touch_info, 1);
 
 	return 0;
