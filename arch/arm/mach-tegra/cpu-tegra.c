@@ -217,16 +217,7 @@ static int tegra_update_cpu_speed(unsigned long rate)
 	 * Vote on memory bus frequency based on cpu frequency
 	 * This sets the minimum frequency, display or avp may request higher
 	 */
-	if (rate >= 816000)
-		clk_set_rate(emc_clk, 600000000); /* cpu 816 MHz, emc max */
-	else if (rate >= 608000)
-		clk_set_rate(emc_clk, 300000000); /* cpu 608 MHz, emc 150Mhz */
-	else if (rate >= 456000)
-		clk_set_rate(emc_clk, 150000000); /* cpu 456 MHz, emc 75Mhz */
-	else if (rate >= 312000)
-		clk_set_rate(emc_clk, 100000000); /* cpu 312 MHz, emc 50Mhz */
-	else
-		clk_set_rate(emc_clk, 50000000);  /* emc 25Mhz */
+	clk_set_rate(emc_clk, tegra_emc_to_cpu_ratio(rate));
 
 	for_each_online_cpu(freqs.cpu)
 		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);

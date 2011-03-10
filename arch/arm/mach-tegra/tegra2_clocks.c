@@ -2491,6 +2491,21 @@ struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void)
 	BUG();
 	return &cpufreq_tables[0];
 }
+
+unsigned long tegra_emc_to_cpu_ratio(unsigned long cpu_rate)
+{
+	/* Vote on memory bus frequency based on cpu frequency */
+	if (cpu_rate >= 816000)
+		return 600000000;	/* cpu 816 MHz, emc max */
+	else if (cpu_rate >= 608000)
+		return 300000000;	/* cpu 608 MHz, emc 150Mhz */
+	else if (cpu_rate >= 456000)
+		return 150000000;	/* cpu 456 MHz, emc 75Mhz */
+	else if (cpu_rate >= 312000)
+		return 100000000;	/* cpu 312 MHz, emc 50Mhz */
+	else
+		return 50000000;	/* emc 25Mhz */
+}
 #endif
 
 #ifdef CONFIG_PM

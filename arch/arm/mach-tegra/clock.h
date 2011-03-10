@@ -246,6 +246,7 @@ struct tegra_cpufreq_table_data {
 	int throttle_highest_index;
 };
 struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void);
+unsigned long tegra_emc_to_cpu_ratio(unsigned long cpu_rate);
 #endif
 
 #endif

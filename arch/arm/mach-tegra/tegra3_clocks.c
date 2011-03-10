@@ -2961,6 +2961,7 @@ static struct clk tegra_clk_emc = {
 	.ops = &tegra_emc_clk_ops,
 	.reg = 0x19c,
 	.max_rate = 800000000,
+	.min_rate = 50000000,
 	.inputs = mux_pllm_pllc_pllp_clkm,
 	.flags = MUX | DIV_U71 | PERIPH_EMC_ENB,
 	.u.periph = {
@@ -3298,6 +3299,26 @@ struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void)
 	pr_err("%s: No cpufreq table matching cpu range", __func__);
 	BUG();
 	return &cpufreq_tables[0];
+}
+
+unsigned long tegra_emc_to_cpu_ratio(unsigned long cpu_rate)
+{
+	static unsigned long emc_max_rate = 0;
+
+	if (emc_max_rate == 0)
+		emc_max_rate = clk_round_rate(
+			tegra_get_clock_by_name("emc"), ULONG_MAX);
+
+	/* Vote on memory bus frequency based on cpu frequency;
+	   cpu rate is in kHz, emc rate is in Hz */
+	if (cpu_rate >= 750000)
+		return emc_max_rate;	/* cpu >= 750 MHz, emc max */
+	else if (cpu_rate >= 450000)
+		return emc_max_rate/2;	/* cpu >= 500 MHz, emc max/2 */
+	else if (cpu_rate >= 250000)
+		return 100000000;	/* cpu >= 250 MHz, emc 100 MHz */
+	else
+		return 0;		/* emc min */
 }
 #endif
 
