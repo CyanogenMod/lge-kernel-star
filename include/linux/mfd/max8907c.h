@@ -162,6 +162,9 @@
 #define MAX8907C_MASK_OUT5V_ENSRC       0x0E
 #define MAX8907C_MASK_OUT5V_EN          0x01
 
+/* Power off bit in RESET_CNFG reg */
+#define MAX8907C_MASK_POWER_OFF			0x40
+
 #define RTC_I2C_ADDR			0x68
 
 /* IRQ definitions */
@@ -223,4 +226,5 @@ int max8907c_irq_init(struct max8907c *chip, int irq, int irq_base);
 void max8907c_irq_free(struct max8907c *chip);
 int max8907c_suspend(struct i2c_client *i2c, pm_message_t state);
 int max8907c_resume(struct i2c_client *i2c);
+int max8907c_power_off(void);
 #endif
