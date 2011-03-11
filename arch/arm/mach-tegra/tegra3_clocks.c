@@ -568,7 +568,7 @@ static int tegra3_super_clk_set_parent(struct clk *c, struct clk *p)
 			if (c->refcnt)
 				clk_enable(p);
 
-			clk_writel(val, c->reg);
+			clk_writel_delay(val, c->reg);
 
 			if (c->refcnt && c->parent)
 				clk_disable(c->parent);
@@ -2179,11 +2179,18 @@ static struct clk tegra_pll_ref = {
 };
 
 static struct clk_pll_freq_table tegra_pll_c_freq_table[] = {
+	{ 12000000, 624000000, 624, 12, 1, 8},
+	{ 13000000, 624000000, 624, 13, 1, 8},
+	{ 16800000, 600000000, 520, 14, 1, 8},
+	{ 19200000, 624000000, 520, 16, 1, 8},
+	{ 26000000, 624000000, 624, 26, 1, 8},
+
 	{ 12000000, 600000000, 600, 12, 1, 8},
 	{ 13000000, 600000000, 600, 13, 1, 8},
 	{ 16800000, 600000000, 500, 14, 1, 8},
 	{ 19200000, 600000000, 375, 12, 1, 6},
 	{ 26000000, 600000000, 600, 26, 1, 8},
+
 	{ 12000000, 416000000, 416, 12, 1, 8},
 	{ 13000000, 416000000, 416, 13, 1, 8},
 	{ 16800000, 416000000, 396, 16, 1, 8},
@@ -2198,7 +2205,7 @@ static struct clk tegra_pll_c = {
 	.ops       = &tegra_pll_ops,
 	.reg       = 0x80,
 	.parent    = &tegra_pll_ref,
-	.max_rate  = 600000000,
+	.max_rate  = 700000000,
 	.u.pll = {
 		.input_min = 2000000,
 		.input_max = 31000000,
@@ -2218,7 +2225,7 @@ static struct clk tegra_pll_c_out1 = {
 	.parent    = &tegra_pll_c,
 	.reg       = 0x84,
 	.reg_shift = 0,
-	.max_rate  = 600000000,
+	.max_rate  = 700000000,
 };
 
 static struct clk_pll_freq_table tegra_pll_m_freq_table[] = {
@@ -2804,7 +2811,7 @@ static struct clk tegra_clk_sclk = {
 	.inputs	= mux_sclk,
 	.reg	= 0x28,
 	.ops	= &tegra_super_ops,
-	.max_rate = 278000000,
+	.max_rate = 333500000,
 	.min_rate = 120000000,
 };
 
@@ -2824,7 +2831,7 @@ static struct clk tegra_clk_cop = {
 	.name      = "cop",
 	.parent    = &tegra_clk_sclk,
 	.ops       = &tegra_cop_ops,
-	.max_rate  = 278000000,
+	.max_rate  = 335000000,
 };
 
 static struct clk tegra_clk_hclk = {
@@ -2834,7 +2841,7 @@ static struct clk tegra_clk_hclk = {
 	.reg		= 0x30,
 	.reg_shift	= 4,
 	.ops		= &tegra_bus_ops,
-	.max_rate       = 278000000,
+	.max_rate       = 333500000,
 };
 
 static struct clk tegra_clk_pclk = {
@@ -2844,7 +2851,7 @@ static struct clk tegra_clk_pclk = {
 	.reg		= 0x30,
 	.reg_shift	= 0,
 	.ops		= &tegra_bus_ops,
-	.max_rate       = 140000000,
+	.max_rate       = 170000000,
 };
 
 static struct clk tegra_clk_blink = {
