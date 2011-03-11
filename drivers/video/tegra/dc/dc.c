@@ -985,6 +985,7 @@ EXPORT_SYMBOL(tegra_dc_get_out_width);
 
 static irqreturn_t tegra_dc_irq(int irq, void *ptr)
 {
+#ifndef CONFIG_TEGRA_FPGA_PLATFORM
 	struct tegra_dc *dc = ptr;
 	unsigned long status;
 	unsigned long val;
@@ -1058,6 +1059,9 @@ static irqreturn_t tegra_dc_irq(int irq, void *ptr)
 
 
 	return IRQ_HANDLED;
+#else
+	return IRQ_NONE;
+#endif
 }
 
 static void tegra_dc_set_color_control(struct tegra_dc *dc)
