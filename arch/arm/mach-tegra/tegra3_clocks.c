@@ -1742,7 +1742,7 @@ static int tegra3_dsib_clk_set_parent(struct clk *c, struct clk *p)
 			   register - can not do direct r-m-w, must be
 			   protected by PLLD lock */
 			tegra_clk_cfg_ex(
-				d, TEGRA_CLK_PLLD_MIPI_MUX_SEL, sel->value);
+				d, TEGRA_CLK_PLLD_CSI_OUT_ENB, sel->value);
 
 			if (c->refcnt && c->parent)
 				clk_disable(c->parent);
