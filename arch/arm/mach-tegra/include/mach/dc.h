@@ -364,6 +364,9 @@ int tegra_dc_update_windows(struct tegra_dc_win *windows[], int n);
 int tegra_dc_sync_windows(struct tegra_dc_win *windows[], int n);
 
 int tegra_dc_set_mode(struct tegra_dc *dc, const struct tegra_dc_mode *mode);
+struct fb_videomode;
+int tegra_dc_set_fb_mode(struct tegra_dc *dc, const struct fb_videomode *fbmode,
+	bool stereo_mode);
 
 unsigned tegra_dc_get_out_height(struct tegra_dc *dc);
 unsigned tegra_dc_get_out_width(struct tegra_dc *dc);
