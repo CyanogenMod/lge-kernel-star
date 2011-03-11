@@ -3163,6 +3163,12 @@ struct clk_duplicate tegra_clk_duplicates[] = {
 	CLK_DUPLICATE("i2c3", "tegra-i2c-slave.2", NULL),
 	CLK_DUPLICATE("i2c4", "tegra-i2c-slave.3", NULL),
 	CLK_DUPLICATE("i2c5", "tegra-i2c-slave.4", NULL),
+	CLK_DUPLICATE("sbc1", "spi_slave_tegra.0", NULL),
+	CLK_DUPLICATE("sbc2", "spi_slave_tegra.1", NULL),
+	CLK_DUPLICATE("sbc3", "spi_slave_tegra.2", NULL),
+	CLK_DUPLICATE("sbc4", "spi_slave_tegra.3", NULL),
+	CLK_DUPLICATE("sbc5", "spi_slave_tegra.4", NULL),
+	CLK_DUPLICATE("sbc6", "spi_slave_tegra.5", NULL),
 };
 
 struct clk *tegra_ptr_clks[] = {

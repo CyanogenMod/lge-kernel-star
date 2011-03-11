@@ -36,9 +36,15 @@ extern struct platform_device tegra_spi_device1;
 extern struct platform_device tegra_spi_device2;
 extern struct platform_device tegra_spi_device3;
 extern struct platform_device tegra_spi_device4;
+extern struct platform_device tegra_spi_slave_device1;
+extern struct platform_device tegra_spi_slave_device2;
+extern struct platform_device tegra_spi_slave_device3;
+extern struct platform_device tegra_spi_slave_device4;
 #if defined(CONFIG_ARCH_TEGRA_3x_SOC)
 extern struct platform_device tegra_spi_device5;
 extern struct platform_device tegra_spi_device6;
+extern struct platform_device tegra_spi_slave_device5;
+extern struct platform_device tegra_spi_slave_device6;
 #endif
 extern struct platform_device tegra_ehci1_device;
 extern struct platform_device tegra_ehci2_device;

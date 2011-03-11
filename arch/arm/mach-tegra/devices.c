@@ -300,6 +300,68 @@ struct platform_device tegra_spi_device6 = {
 };
 #endif
 
+struct platform_device tegra_spi_slave_device1 = {
+	.name           = "spi_slave_tegra",
+	.id             = 0,
+	.resource       = spi_resource1,
+	.num_resources  = ARRAY_SIZE(spi_resource1),
+	.dev  = {
+		.coherent_dma_mask      = 0xffffffff,
+	},
+};
+
+struct platform_device tegra_spi_slave_device2 = {
+	.name           = "spi_slave_tegra",
+	.id             = 1,
+	.resource       = spi_resource2,
+	.num_resources  = ARRAY_SIZE(spi_resource2),
+	.dev  = {
+		.coherent_dma_mask      = 0xffffffff,
+	},
+};
+
+struct platform_device tegra_spi_slave_device3 = {
+	.name           = "spi_slave_tegra",
+	.id             = 2,
+	.resource       = spi_resource3,
+	.num_resources  = ARRAY_SIZE(spi_resource3),
+	.dev  = {
+		.coherent_dma_mask      = 0xffffffff,
+	},
+};
+
+struct platform_device tegra_spi_slave_device4 = {
+	.name           = "spi_slave_tegra",
+	.id             = 3,
+	.resource       = spi_resource4,
+	.num_resources  = ARRAY_SIZE(spi_resource4),
+	.dev  = {
+		.coherent_dma_mask      = 0xffffffff,
+	},
+};
+#if defined(CONFIG_ARCH_TEGRA_3x_SOC)
+struct platform_device tegra_spi_slave_device5 = {
+	.name           = "spi_slave_tegra",
+	.id             = 4,
+	.resource       = spi_resource5,
+	.num_resources  = ARRAY_SIZE(spi_resource5),
+	.dev  = {
+		.coherent_dma_mask      = 0xffffffff,
+	},
+};
+
+struct platform_device tegra_spi_slave_device6 = {
+	.name           = "spi_slave_tegra",
+	.id             = 5,
+	.resource       = spi_resource6,
+	.num_resources  = ARRAY_SIZE(spi_resource6),
+	.dev  = {
+		.coherent_dma_mask      = 0xffffffff,
+	},
+};
+#endif
+
+
 
 static struct resource sdhci_resource1[] = {
 	[0] = {

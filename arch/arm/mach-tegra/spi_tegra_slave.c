@@ -934,11 +934,11 @@ static int spi_tegra_resume(struct platform_device *pdev)
 }
 #endif
 
-MODULE_ALIAS("platform:tegra_spi_slave");
+MODULE_ALIAS("platform:spi_slave_tegra");
 
 static struct platform_driver spi_tegra_driver = {
 	.driver = {
-		.name =		"tegra_spi_slave",
+		.name =		"spi_slave_tegra",
 		.owner =	THIS_MODULE,
 	},
 	.remove =	__devexit_p(spi_tegra_remove),
