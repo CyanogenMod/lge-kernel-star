@@ -363,6 +363,7 @@ static struct tegra_dc_platform_data cardhu_disp2_pdata = {
 	.fb		= &cardhu_hdmi_fb_data,
 };
 
+#ifdef CONFIG_TEGRA_CARDHU_DSI
 static int cardhu_dsi_panel_enable(void)
 {
 	static struct regulator *reg = NULL;
@@ -548,6 +549,7 @@ static struct tegra_fb_data cardhu_dsi_fb_data = {
 	.bits_per_pixel	= 32,
 #endif
 };
+#endif
 
 static struct tegra_dc_out cardhu_disp1_out = {
 	.align		= TEGRA_DC_ALIGN_MSB,
