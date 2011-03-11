@@ -106,6 +106,7 @@ obj-${CONFIG_MACH_WHISTLER}             += board-whistler-panel.o
 obj-${CONFIG_MACH_WHISTLER}             += board-whistler-sensors.o
 obj-${CONFIG_MACH_WHISTLER}             += board-whistler-kbc.o
 obj-${CONFIG_MACH_WHISTLER}             += board-whistler-baseband.o
+obj-${CONFIG_MACH_WHISTLER}             += board-whistler-memory.o
 
 # Cardhu
 
