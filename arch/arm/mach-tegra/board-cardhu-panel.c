@@ -361,6 +361,7 @@ static struct tegra_dc_platform_data cardhu_disp2_pdata = {
 	.flags		= 0,
 	.default_out	= &cardhu_disp2_out,
 	.fb		= &cardhu_hdmi_fb_data,
+	.emc_clk_rate	= 300000000,
 };
 
 #ifdef CONFIG_TEGRA_CARDHU_DSI
@@ -577,6 +578,7 @@ static struct tegra_dc_out cardhu_disp1_out = {
 static struct tegra_dc_platform_data cardhu_disp1_pdata = {
 	.flags		= TEGRA_DC_FLAG_ENABLED,
 	.default_out	= &cardhu_disp1_out,
+	.emc_clk_rate	= 300000000,
 #ifndef CONFIG_TEGRA_CARDHU_DSI
 	.fb		= &cardhu_fb_data,
 #else
