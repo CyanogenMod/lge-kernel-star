@@ -341,6 +341,40 @@ static inline int tps6586x_regulator_preinit(struct device *parent,
 				 1 << ri->enable_bit[1]);
 }
 
+static inline int tps6586x_regulator_set_pwm_mode(struct platform_device *pdev)
+{
+	struct device *parent = pdev->dev.parent;
+	struct regulator_init_data *p = pdev->dev.platform_data;
+	struct tps6586x_settings *setting = p->driver_data;
+	int ret = 0;
+	uint8_t mask;
+
+	if (setting == NULL)
+		return 0;
+
+	switch (pdev->id) {
+	case TPS6586X_ID_SM_0:
+		mask = 1 << SM0_PWM_BIT;
+		break;
+	case TPS6586X_ID_SM_1:
+		mask = 1 << SM1_PWM_BIT;
+		break;
+	case TPS6586X_ID_SM_2:
+		mask = 1 << SM2_PWM_BIT;
+		break;
+	default:
+		/* not all regulators have PWM/PFM option */
+		return 0;
+	}
+
+	if (setting->sm_pwm_mode == PWM_ONLY)
+		ret = tps6586x_set_bits(parent, TPS6586X_SMODE1, mask);
+	else if (setting->sm_pwm_mode == AUTO_PWM_PFM)
+		ret = tps6586x_clr_bits(parent, TPS6586X_SMODE1, mask);
+
+	return ret;
+}
+
 static inline struct tps6586x_regulator *find_regulator_info(int id)
 {
 	struct tps6586x_regulator *ri;
@@ -383,7 +417,7 @@ static int __devinit tps6586x_regulator_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, rdev);
 
-	return 0;
+	return tps6586x_regulator_set_pwm_mode(pdev);
 }
 
 static int __devexit tps6586x_regulator_remove(struct platform_device *pdev)
