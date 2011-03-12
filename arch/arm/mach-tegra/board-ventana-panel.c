@@ -227,6 +227,8 @@ static struct tegra_dc_out ventana_disp1_out = {
 
 	.align		= TEGRA_DC_ALIGN_MSB,
 	.order		= TEGRA_DC_ORDER_RED_BLUE,
+	.depth		= 18,
+	.dither		= TEGRA_DC_ORDERED_DITHER,
 
 	.modes	 	= ventana_panel_modes,
 	.n_modes 	= ARRAY_SIZE(ventana_panel_modes),
