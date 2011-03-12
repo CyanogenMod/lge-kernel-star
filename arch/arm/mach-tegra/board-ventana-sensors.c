@@ -247,6 +247,9 @@ static struct i2c_board_info ventana_i2c7_board_info[] = {
 		I2C_BOARD_INFO("ov5650", 0x36),
 		.platform_data = &ventana_ov5650_data,
 	},
+	{
+		I2C_BOARD_INFO("sh532u", 0x72),
+	},
 };
 
 static struct i2c_board_info ventana_i2c8_board_info[] = {
