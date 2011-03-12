@@ -1,6 +1,10 @@
 #ifndef __LINUX_MFD_TPS6586X_H
 #define __LINUX_MFD_TPS6586X_H
 
+#define SM0_PWM_BIT 0
+#define SM1_PWM_BIT 1
+#define SM2_PWM_BIT 2
+
 enum {
 	TPS6586X_ID_SM_0,
 	TPS6586X_ID_SM_1,
@@ -46,6 +50,17 @@ enum {
 	TPS6586X_INT_RESUME,
 	TPS6586X_INT_LOW_SYS,
 	TPS6586X_INT_RTC_ALM2,
+};
+
+enum pwm_pfm_mode {
+	PWM_ONLY,
+	AUTO_PWM_PFM,
+	NOT_CONFIGURABLE
+};
+
+struct tps6586x_settings {
+	/* SM0, SM1 and SM2 have PWM-only and auto PWM/PFM mode */
+	enum pwm_pfm_mode sm_pwm_mode;
 };
 
 struct tps6586x_subdev_info {
