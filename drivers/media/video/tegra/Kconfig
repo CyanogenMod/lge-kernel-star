@@ -28,5 +28,11 @@ config TORCH_SSL3250A
         depends on I2C && ARCH_TEGRA
         ---help---
           This is a driver for the SSL3250A flash/torch camera device
+
+config VIDEO_SH532U
+        tristate "SH532U focuser support"
+        depends on I2C && ARCH_TEGRA
+        ---help---
+          This is a driver for the SEMCO SH532U focuser
           for use with the tegra isp.
 
