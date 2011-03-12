@@ -45,6 +45,9 @@ static DEFINE_MUTEX(tegra_hp_lock);
 static struct workqueue_struct *hotplug_wq;
 static struct delayed_work hotplug_work;
 
+static bool no_lp;
+module_param(no_lp, bool, 0644);
+
 static unsigned long up2gn_delay;
 static unsigned long up2g0_delay;
 static unsigned long down_delay;
@@ -185,7 +188,7 @@ static void tegra_auto_hotplug_work_func(struct work_struct *work)
 			queue_delayed_work(
 				hotplug_wq, &hotplug_work, down_delay);
 			hp_stats_update(cpu, false);
-		} else if (!is_lp_cluster()) {
+		} else if (!is_lp_cluster() && !no_lp) {
 			tegra_cluster_control(0, TEGRA_POWER_CLUSTER_LP |
 						 TEGRA_POWER_CLUSTER_IMMEDIATE);
 			hp_stats_update(CONFIG_NR_CPUS, true);
@@ -193,7 +196,7 @@ static void tegra_auto_hotplug_work_func(struct work_struct *work)
 		}
 		break;
 	case TEGRA_HP_UP:
-		if (is_lp_cluster()) {
+		if (is_lp_cluster() && !no_lp) {
 			tegra_cluster_control(0, TEGRA_POWER_CLUSTER_G |
 						 TEGRA_POWER_CLUSTER_IMMEDIATE);
 			hp_stats_update(CONFIG_NR_CPUS, false);
