@@ -39,6 +39,10 @@
 #include <linux/err.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
+#include <linux/sysfs.h>
+#include <linux/kobject.h>
+#include <linux/regulator/consumer.h>
+#include <linux/ctype.h>
 
 #include <mach/tegra2_fuse.h>
 
@@ -60,6 +64,39 @@
 #define FUSE_DIS_PGM		0x02C
 #define FUSE_PWR_GOOD_SW	0x034
 
+static struct kobject *fuse_kobj;
+
+static ssize_t fuse_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf);
+static ssize_t fuse_store(struct kobject *kobj, struct kobj_attribute *attr,
+	const char *buf, size_t count);
+
+static struct kobj_attribute devkey_attr =
+	__ATTR(device_key, 0440, fuse_show, fuse_store);
+
+static struct kobj_attribute jtagdis_attr =
+	__ATTR(jtag_disable, 0440, fuse_show, fuse_store);
+
+static struct kobj_attribute odm_prod_mode_attr =
+	__ATTR(odm_production_mode, 0440, fuse_show, fuse_store);
+
+static struct kobj_attribute sec_boot_dev_cfg_attr =
+	__ATTR(sec_boot_dev_cfg, 0440, fuse_show, fuse_store);
+
+static struct kobj_attribute sec_boot_dev_sel_attr =
+	__ATTR(sec_boot_dev_sel, 0440, fuse_show, fuse_store);
+
+static struct kobj_attribute sbk_attr =
+	__ATTR(secure_boot_key, 0440, fuse_show, fuse_store);
+
+static struct kobj_attribute sw_rsvd_attr =
+	__ATTR(sw_reserved, 0440, fuse_show, fuse_store);
+
+static struct kobj_attribute ignore_dev_sel_straps_attr =
+	__ATTR(ignore_dev_sel_straps, 0440, fuse_show, fuse_store);
+
+static struct kobj_attribute odm_rsvd_attr =
+	__ATTR(odm_reserved, 0440, fuse_show, fuse_store);
+
 static u32 fuse_pgm_data[NFUSES / 2];
 static u32 fuse_pgm_mask[NFUSES / 2];
 static u32 tmp_fuse_pgm_data[NFUSES / 2];
@@ -68,6 +105,9 @@ static u32 master_enable;
 DEFINE_MUTEX(fuse_lock);
 
 static struct fuse_data fuse_info;
+struct regulator *vdd_fuse = NULL;
+
+#define FUSE_NAME_LEN	30
 
 struct param_info {
 	u32 *addr;
@@ -76,6 +116,7 @@ struct param_info {
 	int start_bit;
 	int nbits;
 	int data_offset;
+	char sysfs_name[FUSE_NAME_LEN];
 };
 
 static struct param_info fuse_info_tbl[] = {
@@ -86,6 +127,7 @@ static struct param_info fuse_info_tbl[] = {
 		.start_bit = 8,
 		.nbits = 32,
 		.data_offset = 0,
+		.sysfs_name = "device_key",
 	},
 	[JTAG_DIS] = {
 		.addr = &fuse_info.jtag_dis,
@@ -94,6 +136,7 @@ static struct param_info fuse_info_tbl[] = {
 		.start_bit = 24,
 		.nbits = 1,
 		.data_offset = 1,
+		.sysfs_name = "jtag_disable",
 	},
 	[ODM_PROD_MODE] = {
 		.addr = &fuse_info.odm_prod_mode,
@@ -102,6 +145,7 @@ static struct param_info fuse_info_tbl[] = {
 		.start_bit = 23,
 		.nbits = 1,
 		.data_offset = 2,
+		.sysfs_name = "odm_production_mode",
 	},
 	[SEC_BOOT_DEV_CFG] = {
 		.addr = &fuse_info.bootdev_cfg,
@@ -110,6 +154,7 @@ static struct param_info fuse_info_tbl[] = {
 		.start_bit = 8,
 		.nbits = 16,
 		.data_offset = 3,
+		.sysfs_name = "sec_boot_dev_cfg",
 	},
 	[SEC_BOOT_DEV_SEL] = {
 		.addr = &fuse_info.bootdev_sel,
@@ -118,6 +163,7 @@ static struct param_info fuse_info_tbl[] = {
 		.start_bit = 24,
 		.nbits = 3,
 		.data_offset = 4,
+		.sysfs_name = "sec_boot_dev_sel",
 	},
 	[SBK] = {
 		.addr = fuse_info.sbk,
@@ -126,6 +172,7 @@ static struct param_info fuse_info_tbl[] = {
 		.start_bit = 8,
 		.nbits = 128,
 		.data_offset = 5,
+		.sysfs_name = "secure_boot_key",
 	},
 	[SW_RSVD] = {
 		.addr = &fuse_info.sw_rsvd,
@@ -134,6 +181,7 @@ static struct param_info fuse_info_tbl[] = {
 		.start_bit = 28,
 		.nbits = 4,
 		.data_offset = 9,
+		.sysfs_name = "sw_reserved",
 	},
 	[IGNORE_DEV_SEL_STRAPS] = {
 		.addr = &fuse_info.ignore_devsel_straps,
@@ -142,6 +190,7 @@ static struct param_info fuse_info_tbl[] = {
 		.start_bit = 27,
 		.nbits = 1,
 		.data_offset = 10,
+		.sysfs_name = "ignore_dev_sel_straps",
 	},
 	[ODM_RSVD] = {
 		.addr = fuse_info.odm_rsvd,
@@ -150,6 +199,7 @@ static struct param_info fuse_info_tbl[] = {
 		.start_bit = 4,
 		.nbits = 256,
 		.data_offset = 11,
+		.sysfs_name = "odm_reserved",
 	},
 	[SBK_DEVKEY_STATUS] = {
 		.sz = SBK_DEVKEY_STATUS_SZ,
@@ -520,6 +570,11 @@ int tegra_fuse_program(struct fuse_data *pgm_data, u32 flags)
 		return -EPERM;
 	}
 
+	if (IS_ERR_OR_NULL(vdd_fuse)) {
+		pr_err("no regulator. fuse programming disabled\n");
+		return -EPERM;
+	}
+
 	mutex_lock(&fuse_lock);
 	memcpy(&fuse_info, pgm_data, sizeof(fuse_info));
 	for_each_set_bit(i, (unsigned long *)&flags, MAX_PARAMS) {
@@ -527,6 +582,7 @@ int tegra_fuse_program(struct fuse_data *pgm_data, u32 flags)
 			fuse_info_tbl[i].sz);
 	}
 
+	regulator_enable(vdd_fuse);
 	populate_fuse_arrs(&fuse_info, flags);
 	fuse_program_array(0);
 
@@ -535,6 +591,7 @@ int tegra_fuse_program(struct fuse_data *pgm_data, u32 flags)
 	set_fuse(MASTER_ENB, &reg);
 
 	memset(&fuse_info, 0, sizeof(fuse_info));
+	regulator_disable(vdd_fuse);
 	mutex_unlock(&fuse_lock);
 
 	return 0;
@@ -547,10 +604,194 @@ void tegra_fuse_program_disable(void)
 	mutex_unlock(&fuse_lock);
 }
 
+static int fuse_name_to_param(const char *str)
+{
+	int i;
+
+	for (i = DEVKEY; i < ARRAY_SIZE(fuse_info_tbl); i++) {
+		if (!strcmp(str, fuse_info_tbl[i].sysfs_name))
+			return i;
+	}
+
+	return -ENODATA;
+}
+
+static int char_to_xdigit(int c)
+{
+	return (c>='0' && c<='9') ? c - '0' :
+		(c>='a' && c<='f') ? c - 'a' + 10 :
+		(c>='A' && c<='F') ? c - 'A' + 10 : -1;
+}
+
+#define CHK_ERR(x) \
+{ \
+	if (x) \
+	{ \
+		pr_err("%s: sysfs_create_file fail(%d)!", __func__, x); \
+		return x; \
+	} \
+}
+
+#define CHARS_PER_WORD	8
+
+static ssize_t fuse_store(struct kobject *kobj, struct kobj_attribute *attr,
+	const char *buf, size_t count)
+{
+	enum fuse_io_param param = fuse_name_to_param(attr->attr.name);
+	int ret, i = 0;
+	struct fuse_data data = {0};
+	u32 *raw_data = ((u32 *)&data) + fuse_info_tbl[param].data_offset;
+
+	if ((param == -1) || (param == -ENODATA)) {
+		pr_err("%s: invalid fuse\n", __func__);
+		return -EINVAL;
+	}
+
+	if (!isxdigit(*buf)) {
+		pr_err("%s: isxdigit fail\n", __func__);
+		return count;
+	}
+
+	if (fuse_odm_prod_mode()) {
+		pr_err("%s: device locked. odm fuse already blown\n", __func__);
+		return 0;
+	}
+
+	count--;
+	if (DIV_ROUND_UP(count, 2) > fuse_info_tbl[param].sz) {
+		pr_err("%s: fuse parameter too long, should be %d bytes\n",
+			__func__, fuse_info_tbl[param].sz * 2);
+		return -EINVAL;
+	}
+
+	raw_data += (count / CHARS_PER_WORD);
+	*raw_data = 0;
+	while (isxdigit(*buf)) {
+		*raw_data <<= 4;
+		*raw_data += char_to_xdigit(*buf);
+		buf++;
+		if (++i == 8) {
+			raw_data--;
+			*raw_data = 0;
+			i = 0;
+		}
+	}
+
+	ret = tegra_fuse_program(&data, BIT(param));
+	if (ret) {
+		pr_err("%s: fuse program fail(%d)\n", __func__, ret);
+		return ret;
+	}
+
+	/* if odm prodn mode fuse is burnt, change file permissions to 0440 */
+	if (param == ODM_PROD_MODE) {
+		CHK_ERR(sysfs_chmod_file(kobj, &attr->attr, 0440));
+		CHK_ERR(sysfs_chmod_file(kobj, &devkey_attr.attr, 0440));
+		CHK_ERR(sysfs_chmod_file(kobj, &jtagdis_attr.attr, 0440));
+		CHK_ERR(sysfs_chmod_file(kobj, &sec_boot_dev_cfg_attr.attr, 0440));
+		CHK_ERR(sysfs_chmod_file(kobj, &sec_boot_dev_sel_attr.attr, 0440));
+		CHK_ERR(sysfs_chmod_file(kobj, &sbk_attr.attr, 0440));
+		CHK_ERR(sysfs_chmod_file(kobj, &sw_rsvd_attr.attr, 0440));
+		CHK_ERR(sysfs_chmod_file(kobj, &ignore_dev_sel_straps_attr.attr, 0440));
+		CHK_ERR(sysfs_chmod_file(kobj, &odm_rsvd_attr.attr, 0440));
+	}
+
+	return count;
+}
+
+static ssize_t fuse_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	enum fuse_io_param param = fuse_name_to_param(attr->attr.name);
+	u32 data[8];
+	char str[8];
+	int ret, i;
+
+	if ((param == -1) || (param == -ENODATA)) {
+		pr_err("%s: invalid fuse\n", __func__);
+		return -EINVAL;
+	}
+
+	if ((param == SBK) && fuse_odm_prod_mode()) {
+		pr_err("device locked. sbk read not allowed\n");
+		return 0;
+	}
+
+	memset(data, 0, sizeof(data));
+	ret = tegra_fuse_read(param, data, fuse_info_tbl[param].sz);
+	if (ret) {
+		pr_err("%s: read fail(%d)\n", __func__, ret);
+		return ret;
+	}
+
+	strcpy(buf, "");
+	for (i = 0; i < (fuse_info_tbl[param].sz/sizeof(u32)) ; i++) {
+		sprintf(str, "%08x", data[i]);
+		strcat(buf, str);
+	}
+
+	strcat(buf, "\n");
+	return strlen(buf);
+}
+
 static int __init tegra_fuse_program_init(void)
 {
+	/* get vfuse regulator */
+	vdd_fuse = regulator_get(NULL, "vdd_fuse");
+	if (IS_ERR_OR_NULL(vdd_fuse))
+		pr_err("%s: could not get vdd_fuse. fuse programming disabled\n", __func__);
+
+	fuse_kobj = kobject_create_and_add("fuse", firmware_kobj);
+	if (!fuse_kobj) {
+		pr_err("%s: fuse_kobj create fail\n", __func__);
+		return -ENODEV;
+	}
+
 	mutex_init(&fuse_lock);
+
+	/* change fuse file permissions, if ODM production fuse is not blown */
+	if (!fuse_odm_prod_mode())
+	{
+		devkey_attr.attr.mode = 0640;
+		jtagdis_attr.attr.mode = 0640;
+		odm_prod_mode_attr.attr.mode = 0640;
+		sec_boot_dev_cfg_attr.attr.mode = 0640;
+		sec_boot_dev_sel_attr.attr.mode = 0640;
+		sbk_attr.attr.mode = 0640;
+		sw_rsvd_attr.attr.mode = 0640;
+		ignore_dev_sel_straps_attr.attr.mode = 0640;
+		odm_rsvd_attr.attr.mode = 0640;
+		odm_prod_mode_attr.attr.mode = 0640;
+	}
+
+	CHK_ERR(sysfs_create_file(fuse_kobj, &odm_prod_mode_attr.attr));
+	CHK_ERR(sysfs_create_file(fuse_kobj, &devkey_attr.attr));
+	CHK_ERR(sysfs_create_file(fuse_kobj, &jtagdis_attr.attr));
+	CHK_ERR(sysfs_create_file(fuse_kobj, &sec_boot_dev_cfg_attr.attr));
+	CHK_ERR(sysfs_create_file(fuse_kobj, &sec_boot_dev_sel_attr.attr));
+	CHK_ERR(sysfs_create_file(fuse_kobj, &sbk_attr.attr));
+	CHK_ERR(sysfs_create_file(fuse_kobj, &sw_rsvd_attr.attr));
+	CHK_ERR(sysfs_create_file(fuse_kobj, &ignore_dev_sel_straps_attr.attr));
+	CHK_ERR(sysfs_create_file(fuse_kobj, &odm_rsvd_attr.attr));
+
 	return 0;
 }
 
+static void __exit tegra_fuse_program_exit(void)
+{
+	if (!IS_ERR_OR_NULL(vdd_fuse))
+		regulator_put(vdd_fuse);
+
+	sysfs_remove_file(fuse_kobj, &odm_prod_mode_attr.attr);
+	sysfs_remove_file(fuse_kobj, &devkey_attr.attr);
+	sysfs_remove_file(fuse_kobj, &jtagdis_attr.attr);
+	sysfs_remove_file(fuse_kobj, &sec_boot_dev_cfg_attr.attr);
+	sysfs_remove_file(fuse_kobj, &sec_boot_dev_sel_attr.attr);
+	sysfs_remove_file(fuse_kobj, &sbk_attr.attr);
+	sysfs_remove_file(fuse_kobj, &sw_rsvd_attr.attr);
+	sysfs_remove_file(fuse_kobj, &ignore_dev_sel_straps_attr.attr);
+	sysfs_remove_file(fuse_kobj, &odm_rsvd_attr.attr);
+	kobject_del(fuse_kobj);
+}
+
 module_init(tegra_fuse_program_init);
+module_exit(tegra_fuse_program_exit);
