@@ -42,6 +42,10 @@
 #define   USB_USBSTS_PCI	(1 << 2)
 #define   USB_USBSTS_HCH	(1 << 12)
 
+#define USB_TXFILLTUNING        0x164
+#define USB_FIFO_TXFILL_THRES(x)   (((x) & 0x1f) << 16)
+#define USB_FIFO_TXFILL_MASK    0x1f0000
+
 #define ULPI_VIEWPORT		0x170
 #define   ULPI_WAKEUP		(1 << 31)
 #define   ULPI_RUN		(1 << 30)
@@ -702,6 +706,19 @@ static void utmi_phy_postresume(struct tegra_usb_phy *phy)
 	writel(val, base + UTMIP_TX_CFG0);
 }
 
+static void uhsic_phy_postresume(struct tegra_usb_phy *phy)
+{
+	unsigned long val;
+	void __iomem *base = phy->regs;
+
+	val = readl(base + USB_TXFILLTUNING);
+	if ((val & USB_FIFO_TXFILL_MASK) != USB_FIFO_TXFILL_THRES(0x10)) {
+		val = USB_FIFO_TXFILL_THRES(0x10);
+		writel(val, base + USB_TXFILLTUNING);
+	}
+
+}
+
 static void utmi_phy_restore_start(struct tegra_usb_phy *phy,
 				   enum tegra_usb_phy_port_speed port_speed)
 {
@@ -1060,6 +1077,12 @@ static int uhsic_phy_power_on(struct tegra_usb_phy *phy)
 	val &= ~USB_PORTSC1_PTS(~0);
 	writel(val, base + USB_PORTSC1);
 
+	val = readl(base + USB_TXFILLTUNING);
+	if ((val & USB_FIFO_TXFILL_MASK) != USB_FIFO_TXFILL_THRES(0x10)) {
+		val = USB_FIFO_TXFILL_THRES(0x10);
+		writel(val, base + USB_TXFILLTUNING);
+	}
+
 	val = readl(base + USB_PORTSC1);
 	val &= ~(USB_PORTSC1_WKOC | USB_PORTSC1_WKDS | USB_PORTSC1_WKCN);
 	writel(val, base + USB_PORTSC1);
@@ -1271,8 +1294,15 @@ void tegra_usb_phy_preresume(struct tegra_usb_phy *phy)
 
 void tegra_usb_phy_postresume(struct tegra_usb_phy *phy)
 {
-	if (!phy_is_ulpi(phy))
+	struct tegra_ulpi_config *config = phy->config;
+
+	if ((phy->instance == 1) &&
+			(config->inf_type == TEGRA_USB_UHSIC))
+		uhsic_phy_postresume(phy);
+	else if (!phy_is_ulpi(phy))
 		utmi_phy_postresume(phy);
+
+	return 0;
 }
 
 void tegra_ehci_phy_restore_start(struct tegra_usb_phy *phy,
