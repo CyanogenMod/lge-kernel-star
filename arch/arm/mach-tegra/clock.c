@@ -111,9 +111,6 @@ static unsigned long clk_predict_rate_from_parent(struct clk *c, struct clk *p)
 
 	rate = clk_get_rate(p);
 
-	if (c->ops && c->ops->recalculate_rate)
-		c->ops->recalculate_rate(c);
-
 	if (c->mul != 0 && c->div != 0) {
 		rate *= c->mul;
 		rate += c->div - 1; /* round up */
@@ -123,11 +120,8 @@ static unsigned long clk_predict_rate_from_parent(struct clk *c, struct clk *p)
 	return rate;
 }
 
-static unsigned long clk_get_max_rate(struct clk *c)
+unsigned long clk_get_max_rate(struct clk *c)
 {
-	if (c->ops && c->ops->get_max_rate)
-		return c->ops->get_max_rate(c);
-	else
 		return c->max_rate;
 }
 
@@ -404,8 +398,6 @@ unsigned long clk_get_rate_all_locked(struct clk *c)
 
 	while (p) {
 		c = p;
-		if (c->ops && c->ops->recalculate_rate)
-			c->ops->recalculate_rate(c);
 		if (c->mul != 0 && c->div != 0) {
 			mul *= c->mul;
 			div *= c->div;
@@ -576,6 +568,27 @@ static int __init tegra_keep_boot_clocks_setup(char *__unused)
 	return 1;
 }
 __setup("tegra_keep_boot_clocks", tegra_keep_boot_clocks_setup);
+
+/*
+ * Bootloader may not match kernel restrictions on CPU clock sources.
+ * Make sure CPU clock is sourced from either main or backup parent.
+ */
+static int tegra_sync_cpu_clock(void)
+{
+	int ret;
+	unsigned long rate;
+	struct clk *c = tegra_get_clock_by_name("cpu");
+
+	BUG_ON(!c);
+	rate = clk_get_rate(c);
+	ret = clk_set_rate(c, rate);
+	if (ret)
+		pr_err("%s: Failed to sync CPU at rate %lu\n", __func__, rate);
+	else
+		pr_info("CPU rate: %lu MHz\n", clk_get_rate(c) / 1000000);
+	return ret;
+}
+late_initcall(tegra_sync_cpu_clock);
 
 /*
  * Iterate through all clocks, disabling any for which the refcount is 0

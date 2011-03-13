@@ -100,6 +100,7 @@ void tegra_idle_lp2_last(unsigned int flags);
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 #define INSTRUMENT_CLUSTER_SWITCH 0	/* Must be zero for ARCH_TEGRA_2x_SOC */
 #define DEBUG_CLUSTER_SWITCH 0		/* Must be zero for ARCH_TEGRA_2x_SOC */
+#define PARAMETERIZE_CLUSTER_SWITCH 0	/* Must be zero for ARCH_TEGRA_2x_SOC */
 static inline int tegra_cluster_control(unsigned int us, unsigned int flags)
 { return -EPERM; }
 #define tegra_cluster_switch_prolog(flags) do {} while(0)
@@ -108,13 +109,12 @@ static inline bool is_g_cluster_present(void)
 { return true; }
 static inline unsigned int is_lp_cluster(void)
 { return 0; }
-static inline unsigned long tegra_get_lpcpu_max_rate(void)
-{ return 0; }
 #define tegra_lp0_suspend_mc() do {} while(0)
 #define tegra_lp0_resume_mc() do {} while(0)
 #else
 #define INSTRUMENT_CLUSTER_SWITCH 1	/* Should be zero for shipping code */
 #define DEBUG_CLUSTER_SWITCH 1		/* Should be zero for shipping code */
+#define PARAMETERIZE_CLUSTER_SWITCH 1	/* Should be zero for shipping code */
 int tegra_cluster_control(unsigned int us, unsigned int flags);
 void tegra_cluster_switch_prolog(unsigned int flags);
 void tegra_cluster_switch_epilog(unsigned int flags);
@@ -131,7 +131,6 @@ static inline unsigned int is_lp_cluster(void)
 	reg = readl(FLOW_CTRL_CLUSTER_CONTROL);
 	return (reg & 1); /* 0 == G, 1 == LP*/
 }
-unsigned long tegra_get_lpcpu_max_rate(void);
 void tegra_lp0_suspend_mc(void);
 void tegra_lp0_resume_mc(void);
 #endif
@@ -141,6 +140,13 @@ extern unsigned int tegra_cluster_debug;
 #define DEBUG_CLUSTER(x) do { if (tegra_cluster_debug) printk x; } while (0)
 #else
 #define DEBUG_CLUSTER(x) do { } while (0)
+#endif
+#if PARAMETERIZE_CLUSTER_SWITCH
+void tegra_cluster_switch_set_parameters(unsigned int us, unsigned int flags);
+#else
+static inline void tegra_cluster_switch_set_parameters(
+	unsigned int us, unsigned int flags)
+{ }
 #endif
 
 static inline void flowctrl_writel(unsigned long val, void __iomem *addr)

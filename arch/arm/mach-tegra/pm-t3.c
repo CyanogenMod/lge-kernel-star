@@ -94,12 +94,14 @@ static int cluster_switch_prolog_clock(unsigned int flags)
 	u32 CclkBurstPolicy;
 	u32 SuperCclkDivier;
 
-	/* Read the CPU clock settings for the currently active CPU. */
-	CclkBurstPolicy = readl(CAR_CCLK_BURST_POLICY);
-	SuperCclkDivier = readl(CAR_SUPER_CCLK_DIVIDER);
-
 	/* Read the bond out register containing the G and LP CPUs. */
 	reg = readl(CAR_BOND_OUT_V);
+
+	/* Sync G-PLLX divider bypass with LP (no effect on G, just to prevent
+	   LP settings overwrite by save/restore code */
+	CclkBurstPolicy = ~PLLX_DIV2_BYPASS_LP & readl(CAR_CCLKG_BURST_POLICY);
+	CclkBurstPolicy |= PLLX_DIV2_BYPASS_LP & readl(CAR_CCLKLP_BURST_POLICY);
+	writel(CclkBurstPolicy, CAR_CCLKG_BURST_POLICY);
 
 	/* Switching to G? */
 	if (flags & TEGRA_POWER_CLUSTER_G) {
@@ -107,16 +109,17 @@ static int cluster_switch_prolog_clock(unsigned int flags)
 		if (reg & CAR_BOND_OUT_V_CPU_G)
 			return -ENXIO;
 
+		/* Keep G CPU clock policy set by upper laayer, with the
+		   exception of the transition via LP1 */
 		if (flags & TEGRA_POWER_SDRAM_SELFREFRESH) {
 			/* In LP1 power mode come up on CLKM (oscillator) */
+			CclkBurstPolicy = readl(CAR_CCLKG_BURST_POLICY);
 			CclkBurstPolicy |= ~0xF;
 			SuperCclkDivier = 0;
-		}
 
-		/* We will be running on the G CPU after the switch.
-		   Set up the G clock policy. */
-		writel(CclkBurstPolicy, CAR_CCLKG_BURST_POLICY);
-		writel(SuperCclkDivier, CAR_SUPER_CCLKG_DIVIDER);
+			writel(CclkBurstPolicy, CAR_CCLKG_BURST_POLICY);
+			writel(SuperCclkDivier, CAR_SUPER_CCLKG_DIVIDER);
+		}
 
 		/* Hold G CPUs 1-3 in reset after the switch */
 		reg = CPU_RESET(1) | CPU_RESET(2) | CPU_RESET(3);
@@ -144,43 +147,17 @@ static int cluster_switch_prolog_clock(unsigned int flags)
 		if (reg & CAR_BOND_OUT_V_CPU_LP)
 			return -ENXIO;
 
+		/* Keep LP CPU clock policy set by upper layer, with the
+		   exception of the transition via LP1 */
 		if (flags & TEGRA_POWER_SDRAM_SELFREFRESH) {
 			/* In LP1 power mode come up on CLKM (oscillator) */
+			CclkBurstPolicy = readl(CAR_CCLKLP_BURST_POLICY);
 			CclkBurstPolicy |= ~0xF;
 			SuperCclkDivier = 0;
-		} else {
-			/* It is possible that PLLX frequency is too high
-			   for the LP CPU. Reduce the frequency if necessary
-			   to prevent over-clocking when we switch. PLLX
-			   has an implied divide-by-2 when the LP CPU is
-			   active unless PLLX_DIV2_BYPASS_LP is selected. */
 
-			struct clk *c = tegra_get_clock_by_name("cpu");
-			unsigned long cur_rate = clk_get_rate(c);
-			unsigned long max_rate = tegra_get_lpcpu_max_rate();
-			int err;
-
-			BUG_ON(max_rate == 0);
-			if (cur_rate/2 > max_rate) {
-				/* PLLX is running too fast for the LP CPU.
-				   Reduce it to LP maximum rate which must
-				   be multipled by 2 because of the LP CPU's
-				   implied divied-by-2. */
-
-				DEBUG_CLUSTER(("%s: G freq %lu\r\n", __func__,
-					       cur_rate));
-				err = clk_set_rate(c, max_rate * 2);
-				BUG_ON(err);
-				DEBUG_CLUSTER(("%s: G freq %lu\r\n", __func__,
-					       clk_get_rate(c)));
-			}
+			writel(CclkBurstPolicy, CAR_CCLKLP_BURST_POLICY);
+			writel(SuperCclkDivier, CAR_SUPER_CCLKLP_DIVIDER);
 		}
-
-		/* We will be running on the LP CPU after the switch.
-		   Set up the LP clock policy. */
-		CclkBurstPolicy &= ~PLLX_DIV2_BYPASS_LP;
-		writel(CclkBurstPolicy, CAR_CCLKLP_BURST_POLICY);
-		writel(SuperCclkDivier, CAR_SUPER_CCLKLP_DIVIDER);
 
 		/* Take the LP CPU ut of reset after the switch */
 		reg = CPU_RESET(0);
@@ -280,7 +257,9 @@ void tegra_cluster_switch_epilog(unsigned int flags)
 
 	#if DEBUG_CLUSTER_SWITCH
 	{
-		struct clk *c = tegra_get_clock_by_name("cpu");
+		/* FIXME: clock functions below are taking mutex */
+		struct clk *c = tegra_get_clock_by_name(
+			is_lp_cluster() ? "cpu_lp" : "cpu_g");
 		DEBUG_CLUSTER(("%s: %s freq %lu\r\n", __func__,
 			is_lp_cluster() ? "LP" : "G", clk_get_rate(c)));
 	}

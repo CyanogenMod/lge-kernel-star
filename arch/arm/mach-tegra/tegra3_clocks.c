@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/tegra3_clocks.c
  *
- * Copyright (C) 2010 NVIDIA Corporation
+ * Copyright (C) 2010-2011 NVIDIA Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -185,6 +185,7 @@
 #define SUPER_STATE_RUN			(0x2 << SUPER_STATE_SHIFT)
 #define SUPER_STATE_IRQ			(0x3 << SUPER_STATE_SHIFT)
 #define SUPER_STATE_FIQ			(0x4 << SUPER_STATE_SHIFT)
+#define SUPER_LP_DIV2_BYPASS		(0x1 << 16)
 #define SUPER_SOURCE_MASK		0xF
 #define	SUPER_FIQ_SOURCE_SHIFT		12
 #define	SUPER_IRQ_SOURCE_SHIFT		8
@@ -192,7 +193,6 @@
 #define	SUPER_IDLE_SOURCE_SHIFT		0
 
 #define SUPER_CLK_DIVIDER		0x04
-#define IS_PLLX_DIV2			(!(clk_readl(0x370) & (1<<16)) && is_lp_cluster())
 
 #define BUS_CLK_DISABLE			(1<<3)
 #define BUS_CLK_DIV_MASK		0x3
@@ -530,6 +530,8 @@ static void tegra3_super_clk_init(struct clk *c)
 	shift = ((val & SUPER_STATE_MASK) == SUPER_STATE_IDLE) ?
 		SUPER_IDLE_SOURCE_SHIFT : SUPER_RUN_SOURCE_SHIFT;
 	source = (val >> shift) & SUPER_SOURCE_MASK;
+	if (c->flags & DIV_2)
+		source |= val & SUPER_LP_DIV2_BYPASS;
 	for (sel = c->inputs; sel->input != NULL; sel++) {
 		if (sel->value == source)
 			break;
@@ -546,10 +548,9 @@ static int tegra3_super_clk_enable(struct clk *c)
 
 static void tegra3_super_clk_disable(struct clk *c)
 {
-	pr_debug("%s on clock %s\n", __func__, c->name);
-
-	/* oops - don't disable the CPU clock! */
-	BUG();
+	/* since tegra 3 has 2 CPU super clocks - low power lp-mode clock and
+	   geared up g-mode super clock - mode switch may request to disable
+	   either of them; accept request with no affect on h/w */
 }
 
 static int tegra3_super_clk_set_parent(struct clk *c, struct clk *p)
@@ -565,8 +566,18 @@ static int tegra3_super_clk_set_parent(struct clk *c, struct clk *p)
 		SUPER_IDLE_SOURCE_SHIFT : SUPER_RUN_SOURCE_SHIFT;
 	for (sel = c->inputs; sel->input != NULL; sel++) {
 		if (sel->input == p) {
+			/* For LP mode super-clock switch between PLLX direct
+			   and divided-by-2 outputs is allowed only when other
+			   than PLLX clock source is current parent */
+			if ((c->flags & DIV_2) && (p->flags & PLLX) &&
+			    ((sel->value ^ val) & SUPER_LP_DIV2_BYPASS)) {
+				if (c->parent->flags & PLLX)
+					return -EINVAL;
+				val ^= SUPER_LP_DIV2_BYPASS;
+				clk_writel_delay(val, c->reg);
+			}
 			val &= ~(SUPER_SOURCE_MASK << shift);
-			val |= sel->value << shift;
+			val |= (sel->value & SUPER_SOURCE_MASK) << shift;
 
 			if (c->refcnt)
 				clk_enable(p);
@@ -612,7 +623,7 @@ static struct clk_ops tegra_super_ops = {
  */
 static void tegra3_cpu_clk_init(struct clk *c)
 {
-	/* FIXME: max limits for different SKUs */
+	c->state = (!is_lp_cluster() == (c->u.cpu.mode == MODE_G))? ON : OFF;
 }
 
 static int tegra3_cpu_clk_enable(struct clk *c)
@@ -622,10 +633,9 @@ static int tegra3_cpu_clk_enable(struct clk *c)
 
 static void tegra3_cpu_clk_disable(struct clk *c)
 {
-	pr_debug("%s on clock %s\n", __func__, c->name);
-
-	/* oops - don't disable the CPU clock! */
-	BUG();
+	/* since tegra 3 has 2 virtual CPU clocks - low power lp-mode clock
+	   and geared up g-mode clock - mode switch may request to disable
+	   either of them; accept request with no affect on h/w */
 }
 
 static int tegra3_cpu_clk_set_rate(struct clk *c, unsigned long rate)
@@ -646,10 +656,12 @@ static int tegra3_cpu_clk_set_rate(struct clk *c, unsigned long rate)
 	if (rate == clk_get_rate(c->u.cpu.backup))
 		goto out;
 
-	ret = clk_set_rate(c->u.cpu.main, rate);
-	if (ret) {
-		pr_err("Failed to change cpu pll to %lu\n", rate);
-		goto out;
+	if (rate != clk_get_rate(c->u.cpu.main)) {
+		ret = clk_set_rate(c->u.cpu.main, rate);
+		if (ret) {
+			pr_err("Failed to change cpu pll to %lu\n", rate);
+			goto out;
+		}
 	}
 
 	ret = clk_set_parent(c->parent, c->u.cpu.main);
@@ -663,20 +675,149 @@ out:
 	return ret;
 }
 
-static unsigned long tegra3_cpu_get_max_rate(struct clk *c)
-{
-	if (is_lp_cluster())
-		return c->u.cpu.lp_max_rate;
-	else
-		return c->max_rate;
-}
-
 static struct clk_ops tegra_cpu_ops = {
 	.init     = tegra3_cpu_clk_init,
 	.enable   = tegra3_cpu_clk_enable,
 	.disable  = tegra3_cpu_clk_disable,
 	.set_rate = tegra3_cpu_clk_set_rate,
-	.get_max_rate = tegra3_cpu_get_max_rate,
+};
+
+
+static void tegra3_cpu_cmplx_clk_init(struct clk *c)
+{
+	int i = !!is_lp_cluster();
+
+	BUG_ON(c->inputs[0].input->u.cpu.mode != MODE_G);
+	BUG_ON(c->inputs[1].input->u.cpu.mode != MODE_LP);
+	c->parent = c->inputs[i].input;
+}
+
+/* cpu complex clock provides second level vitualization (on top of
+   cpu virtual cpu rate control) in order to hide the CPU mode switch
+   sequence */
+#if PARAMETERIZE_CLUSTER_SWITCH
+static unsigned int switch_delay;
+static unsigned int switch_flags;
+static DEFINE_SPINLOCK(parameters_lock);
+
+void tegra_cluster_switch_set_parameters(unsigned int us, unsigned int flags)
+{
+	spin_lock(&parameters_lock);
+	switch_delay = us;
+	switch_flags = flags;
+	spin_unlock(&parameters_lock);
+}
+#endif
+
+static int tegra3_cpu_cmplx_clk_enable(struct clk *c)
+{
+	return 0;
+}
+
+static void tegra3_cpu_cmplx_clk_disable(struct clk *c)
+{
+	pr_debug("%s on clock %s\n", __func__, c->name);
+
+	/* oops - don't disable the CPU complex clock! */
+	BUG();
+}
+
+static int tegra3_cpu_cmplx_clk_set_rate(struct clk *c, unsigned long rate)
+{
+	return clk_set_rate(c->parent, rate);
+}
+
+static int tegra3_cpu_cmplx_clk_set_parent(struct clk *c, struct clk *p)
+{
+	int ret;
+	unsigned int flags, delay;
+	const struct clk_mux_sel *sel;
+	unsigned long rate = clk_get_rate(c->parent);
+
+	pr_debug("%s: %s %s\n", __func__, c->name, p->name);
+	BUG_ON(c->parent->u.cpu.mode != (is_lp_cluster() ? MODE_LP : MODE_G));
+
+	for (sel = c->inputs; sel->input != NULL; sel++) {
+		if (sel->input == p)
+			break;
+	}
+	if (!sel->input)
+		return -EINVAL;
+
+#if PARAMETERIZE_CLUSTER_SWITCH
+	spin_lock(&parameters_lock);
+	flags = switch_flags;
+	delay = switch_delay;
+	switch_flags = 0;
+	spin_unlock(&parameters_lock);
+
+	if (flags) {
+		/* over-clocking after the switch - allow, but lower rate */
+		if (rate > p->max_rate) {
+			rate = p->max_rate;
+			ret = clk_set_rate(c->parent, rate);
+			if (ret) {
+				pr_err("%s: Failed to set rate %lu for %s\n",
+				        __func__, rate, p->name);
+				return ret;
+			}
+		}
+	} else
+#endif
+	{
+		if (p == c->parent)		/* already switched - exit*/
+			return 0;
+
+		if (rate > p->max_rate) {	/* over-clocking - no switch */
+			pr_warn("%s: No %s mode switch to %s at rate %lu\n",
+				 __func__, c->name, p->name, rate);
+			return -ECANCELED;
+		}
+		flags = TEGRA_POWER_CLUSTER_IMMEDIATE;
+		delay = 0;
+	}
+	flags |= (p->u.cpu.mode == MODE_LP) ? TEGRA_POWER_CLUSTER_LP :
+		TEGRA_POWER_CLUSTER_G;
+
+	/* Since in both LP and G mode CPU main and backup sources are the
+	   same, set rate on the new parent just synchronizes super-clock
+	   muxes before mode switch with no PLL re-locking */
+	ret = clk_set_rate(p, rate);
+	if (ret) {
+		pr_err("%s: Failed to set rate %lu for %s\n",
+		       __func__, rate, p->name);
+		return ret;
+	}
+
+	/* Enabling new parent scales new mode voltage rail in advanvce
+	   before the switch happens*/
+	if (c->refcnt)
+		clk_enable(p);
+
+	/* switch CPU mode */
+	ret = tegra_cluster_control(delay, flags);
+	if (ret) {
+		if (c->refcnt)
+			clk_disable(p);
+		pr_err("%s: Failed to switch %s mode to %s\n",
+		       __func__, c->name, p->name);
+		return ret;
+	}
+
+	/* Disabling old parent scales old mode voltage rail */
+	if (c->refcnt && c->parent)
+		clk_disable(c->parent);
+
+	clk_reparent(c, p);
+	return 0;
+}
+
+static struct clk_ops tegra_cpu_cmplx_ops = {
+	.init     = tegra3_cpu_cmplx_clk_init,
+	.enable   = tegra3_cpu_cmplx_clk_enable,
+	.disable  = tegra3_cpu_cmplx_clk_disable,
+	.set_rate = tegra3_cpu_cmplx_clk_set_rate,
+	.set_parent = tegra3_cpu_cmplx_clk_set_parent,
 };
 
 /* virtual cop clock functions. Used to acquire the fake 'cop' clock to
@@ -910,7 +1051,7 @@ static void tegra3_pll_clk_init(struct clk *c)
 
 	if (c->flags & PLL_FIXED && !(val & PLL_BASE_OVERRIDE)) {
 		const struct clk_pll_freq_table *sel;
-		unsigned long input_rate = clk_get_rate(c->parent);
+		unsigned long input_rate = clk_get_rate_locked(c->parent);
 		for (sel = c->u.pll.freq_table; sel->input_rate != 0; sel++) {
 			if (sel->input_rate == input_rate &&
 				sel->output_rate == c->u.pll.fixed_rate) {
@@ -1286,12 +1427,8 @@ static void tegra3_pll_div_clk_init(struct clk *c)
 		c->mul = 2;
 	} else if (c->flags & DIV_2) {
 		c->state = ON;
-		if (c->flags & PLLD) {
+		if (c->flags & (PLLD | PLLX)) {
 			c->div = 2;
-			c->mul = 1;
-		}
-		else if (c->flags & PLLX) {
-			c->div = (IS_PLLX_DIV2) ? 2 : 1;
 			c->mul = 1;
 		}
 		else
@@ -1371,16 +1508,9 @@ static int tegra3_pll_div_clk_set_rate(struct clk *c, unsigned long rate)
 			c->mul = 2;
 			return 0;
 		}
-	} else if (c->flags & DIV_2) {
-		if (c->flags & PLLD) {
-			return clk_set_rate(c->parent, rate * 2);
-		}
-		else if (c->flags & PLLX) {
-			if (IS_PLLX_DIV2)
-				rate *= 2;
-			return clk_set_rate(c->parent, rate);
-		}
-	}
+	} else if (c->flags & DIV_2)
+		return clk_set_rate(c->parent, rate * 2);
+
 	return -EINVAL;
 }
 
@@ -1395,13 +1525,11 @@ static long tegra3_pll_div_clk_round_rate(struct clk *c, unsigned long rate)
 		if (divider < 0)
 			return divider;
 		return DIV_ROUND_UP(parent_rate * 2, divider + 2);
-	}
-	return -EINVAL;
-}
+	} else if (c->flags & DIV_2)
+		/* no rounding - fixed DIV_2 dividers pass rate to parent PLL */
+		return rate;
 
-static void tegra3_pllx_div_clk_recalculate_rate(struct clk *c)
-{
-	c->div = (IS_PLLX_DIV2) ? 2 : 1;
+	return -EINVAL;
 }
 
 static struct clk_ops tegra_pll_div_ops = {
@@ -1410,21 +1538,6 @@ static struct clk_ops tegra_pll_div_ops = {
 	.disable		= tegra3_pll_div_clk_disable,
 	.set_rate		= tegra3_pll_div_clk_set_rate,
 	.round_rate		= tegra3_pll_div_clk_round_rate,
-};
-
-static struct clk_ops tegra_plld_div_ops = {
-	.init			= tegra3_pll_div_clk_init,
-	.enable			= tegra3_pll_div_clk_enable,
-	.disable		= tegra3_pll_div_clk_disable,
-	.set_rate		= tegra3_pll_div_clk_set_rate,
-};
-
-static struct clk_ops tegra_pllx_div_ops = {
-	.init			= tegra3_pll_div_clk_init,
-	.enable			= tegra3_pll_div_clk_enable,
-	.disable		= tegra3_pll_div_clk_disable,
-	.set_rate		= tegra3_pll_div_clk_set_rate,
-	.recalculate_rate = tegra3_pllx_div_clk_recalculate_rate,
 };
 
 /* Periph clk ops */
@@ -2421,7 +2534,7 @@ static struct clk tegra_pll_d = {
 
 static struct clk tegra_pll_d_out0 = {
 	.name      = "pll_d_out0",
-	.ops       = &tegra_plld_div_ops,
+	.ops       = &tegra_pll_div_ops,
 	.flags     = DIV_2 | PLLD,
 	.parent    = &tegra_pll_d,
 	.max_rate  = 500000000,
@@ -2448,7 +2561,7 @@ static struct clk tegra_pll_d2 = {
 
 static struct clk tegra_pll_d2_out0 = {
 	.name      = "pll_d2_out0",
-	.ops       = &tegra_plld_div_ops,
+	.ops       = &tegra_pll_div_ops,
 	.flags     = DIV_2 | PLLD,
 	.parent    = &tegra_pll_d2,
 	.max_rate  = 500000000,
@@ -2563,7 +2676,7 @@ static struct clk tegra_pll_x = {
 
 static struct clk tegra_pll_x_out0 = {
 	.name      = "pll_x_out0",
-	.ops       = &tegra_pllx_div_ops,
+	.ops       = &tegra_pll_div_ops,
 	.flags     = DIV_2 | PLLX,
 	.parent    = &tegra_pll_x,
 	.max_rate  = 1000000000,
@@ -2776,7 +2889,20 @@ static void init_clk_out_mux(void)
 }
 
 /* Peripheral muxes */
-static struct clk_mux_sel mux_cclk[] = {
+static struct clk_mux_sel mux_cclk_g[] = {
+	{ .input = &tegra_clk_m,	.value = 0},
+	{ .input = &tegra_pll_c,	.value = 1},
+	{ .input = &tegra_clk_32k,	.value = 2},
+	{ .input = &tegra_pll_m,	.value = 3},
+	{ .input = &tegra_pll_p,	.value = 4},
+	{ .input = &tegra_pll_p_out4,	.value = 5},
+	{ .input = &tegra_pll_p_out3,	.value = 6},
+	/* { .input = &tegra_clk_d,	.value = 7}, - no use on tegra3 */
+	{ .input = &tegra_pll_x,	.value = 8},
+	{ 0, 0},
+};
+
+static struct clk_mux_sel mux_cclk_lp[] = {
 	{ .input = &tegra_clk_m,	.value = 0},
 	{ .input = &tegra_pll_c,	.value = 1},
 	{ .input = &tegra_clk_32k,	.value = 2},
@@ -2786,6 +2912,7 @@ static struct clk_mux_sel mux_cclk[] = {
 	{ .input = &tegra_pll_p_out3,	.value = 6},
 	/* { .input = &tegra_clk_d,	.value = 7}, - no use on tegra3 */
 	{ .input = &tegra_pll_x_out0,	.value = 8},
+	{ .input = &tegra_pll_x,	.value = 8 | SUPER_LP_DIV2_BYPASS},
 	{ 0, 0},
 };
 
@@ -2801,10 +2928,19 @@ static struct clk_mux_sel mux_sclk[] = {
 	{ 0, 0},
 };
 
-static struct clk tegra_clk_cclk = {
-	.name	= "cclk",
-	.inputs	= mux_cclk,
-	.reg	= 0x20,
+static struct clk tegra_clk_cclk_g = {
+	.name	= "cclk_g",
+	.inputs	= mux_cclk_g,
+	.reg	= 0x368,
+	.ops	= &tegra_super_ops,
+	.max_rate = 1000000000,
+};
+
+static struct clk tegra_clk_cclk_lp = {
+	.name	= "cclk_lp",
+	.flags  = DIV_2,
+	.inputs	= mux_cclk_lp,
+	.reg	= 0x370,
 	.ops	= &tegra_super_ops,
 	.max_rate = 1000000000,
 };
@@ -2818,16 +2954,41 @@ static struct clk tegra_clk_sclk = {
 	.min_rate = 120000000,
 };
 
-static struct clk tegra_clk_virtual_cpu = {
-	.name      = "cpu",
-	.parent    = &tegra_clk_cclk,
+static struct clk tegra_clk_virtual_cpu_g = {
+	.name      = "cpu_g",
+	.parent    = &tegra_clk_cclk_g,
 	.ops       = &tegra_cpu_ops,
 	.max_rate  = 1000000000,
 	.u.cpu = {
-		.main      = &tegra_pll_x_out0,
+		.main      = &tegra_pll_x,
 		.backup    = &tegra_pll_p,
-		.lp_max_rate = 456000000,
+		.mode      = MODE_G,
 	},
+};
+
+static struct clk tegra_clk_virtual_cpu_lp = {
+	.name      = "cpu_lp",
+	.parent    = &tegra_clk_cclk_lp,
+	.ops       = &tegra_cpu_ops,
+	.max_rate  = 456000000,
+	.u.cpu = {
+		.main      = &tegra_pll_x,
+		.backup    = &tegra_pll_p,
+		.mode      = MODE_LP,
+	},
+};
+
+static struct clk_mux_sel mux_cpu_cmplx[] = {
+	{ .input = &tegra_clk_virtual_cpu_g,	.value = 0},
+	{ .input = &tegra_clk_virtual_cpu_lp,	.value = 1},
+	{ 0, 0},
+};
+
+static struct clk tegra_clk_cpu_cmplx = {
+	.name      = "cpu",
+	.inputs    = mux_cpu_cmplx,
+	.ops       = &tegra_cpu_cmplx_ops,
+	.max_rate  = 1000000000,
 };
 
 static struct clk tegra_clk_twd = {
@@ -2843,7 +3004,7 @@ static struct clk tegra_clk_cop = {
 	.name      = "cop",
 	.parent    = &tegra_clk_sclk,
 	.ops       = &tegra_cop_ops,
-	.max_rate  = 335000000,
+	.max_rate  = 333500000,
 };
 
 static struct clk tegra_clk_hclk = {
@@ -3220,11 +3381,14 @@ struct clk *tegra_ptr_clks[] = {
 	&tegra_cml0_clk,
 	&tegra_cml1_clk,
 	&tegra_pciex_clk,
-	&tegra_clk_cclk,
+	&tegra_clk_cclk_g,
+	&tegra_clk_cclk_lp,
 	&tegra_clk_sclk,
 	&tegra_clk_hclk,
 	&tegra_clk_pclk,
-	&tegra_clk_virtual_cpu,
+	&tegra_clk_virtual_cpu_g,
+	&tegra_clk_virtual_cpu_lp,
+	&tegra_clk_cpu_cmplx,
 	&tegra_clk_blink,
 	&tegra_clk_cop,
 	&tegra_clk_emc,
@@ -3274,11 +3438,6 @@ void __init tegra_soc_init_clocks(void)
 	init_clk_out_mux();
 	for (i = 0; i < ARRAY_SIZE(tegra_clk_out_list); i++)
 		tegra3_init_one_clock(&tegra_clk_out_list[i]);
-}
-
-unsigned long tegra_get_lpcpu_max_rate(void)
-{
-	return tegra_clk_virtual_cpu.u.cpu.lp_max_rate;
 }
 
 #ifdef CONFIG_CPU_FREQ
@@ -3345,7 +3504,7 @@ unsigned long tegra_emc_to_cpu_ratio(unsigned long cpu_rate)
 
 #ifdef CONFIG_PM
 static u32 clk_rst_suspend[RST_DEVICES_NUM + CLK_OUT_ENB_NUM +
-			   PERIPH_CLK_SOURCE_NUM + 16];
+			   PERIPH_CLK_SOURCE_NUM + 18];
 
 void tegra_clk_suspend(void)
 {
@@ -3363,8 +3522,10 @@ void tegra_clk_suspend(void)
 	*ctx++ = clk_readl(tegra_pll_a_out0.reg);
 	*ctx++ = clk_readl(tegra_pll_c_out1.reg);
 
-	*ctx++ = clk_readl(tegra_clk_cclk.reg);
-	*ctx++ = clk_readl(tegra_clk_cclk.reg + SUPER_CLK_DIVIDER);
+	*ctx++ = clk_readl(tegra_clk_cclk_g.reg);
+	*ctx++ = clk_readl(tegra_clk_cclk_g.reg + SUPER_CLK_DIVIDER);
+	*ctx++ = clk_readl(tegra_clk_cclk_lp.reg);
+	*ctx++ = clk_readl(tegra_clk_cclk_lp.reg + SUPER_CLK_DIVIDER);
 
 	*ctx++ = clk_readl(tegra_clk_sclk.reg);
 	*ctx++ = clk_readl(tegra_clk_sclk.reg + SUPER_CLK_DIVIDER);
@@ -3419,8 +3580,10 @@ void tegra_clk_resume(void)
 	clk_writel(*ctx++, tegra_pll_a_out0.reg);
 	clk_writel(*ctx++, tegra_pll_c_out1.reg);
 
-	clk_writel(*ctx++, tegra_clk_cclk.reg);
-	clk_writel(*ctx++, tegra_clk_cclk.reg + SUPER_CLK_DIVIDER);
+	clk_writel(*ctx++, tegra_clk_cclk_g.reg);
+	clk_writel(*ctx++, tegra_clk_cclk_g.reg + SUPER_CLK_DIVIDER);
+	clk_writel(*ctx++, tegra_clk_cclk_lp.reg);
+	clk_writel(*ctx++, tegra_clk_cclk_lp.reg + SUPER_CLK_DIVIDER);
 
 	clk_writel(*ctx++, tegra_clk_sclk.reg);
 	clk_writel(*ctx++, tegra_clk_sclk.reg + SUPER_CLK_DIVIDER);

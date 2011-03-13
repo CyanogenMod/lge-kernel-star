@@ -19,6 +19,7 @@
 #include <linux/io.h>
 #include <linux/smp.h>
 #include <linux/delay.h>
+#include <linux/clk.h>
 
 #include <asm/hardware/gic.h>
 #include <asm/smp_scu.h>
@@ -27,6 +28,7 @@
 #include <mach/powergate.h>
 
 #include "pm.h"
+#include "clock.h"
 
 #define EVP_CPU_RESET_VECTOR \
 	(IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100)
@@ -79,16 +81,25 @@ int boot_secondary(unsigned int cpu, struct task_struct *idle)
 	int status;
 
 	if (is_lp_cluster()) {
+		struct clk *cpu_clk, *cpu_g_clk;
+
 		/* The G CPU may not be available for a
 		   variety of reasons. */
 		status = is_g_cluster_available(cpu);
 		if (status)
 			return status;
 
-		/* Switch to the G CPU before continuing. */
-		status = tegra_cluster_control(0,
-					       TEGRA_POWER_CLUSTER_G |
-					       TEGRA_POWER_CLUSTER_IMMEDIATE);
+		cpu_clk = tegra_get_clock_by_name("cpu");
+		cpu_g_clk = tegra_get_clock_by_name("cpu_g");
+
+		/* Switch to G CPU before continuing. */
+		if (!cpu_clk || !cpu_g_clk) {
+			/* Early boot, clock infrastructure is not initialized
+			   - CPU mode switch is not allowed */
+			status = -EINVAL;
+		} else
+			status = clk_set_parent(cpu_clk, cpu_g_clk);
+
 		if (status)
 			return status;
 	}

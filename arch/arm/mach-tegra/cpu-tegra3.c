@@ -29,10 +29,12 @@
 #include <linux/err.h>
 #include <linux/io.h>
 #include <linux/cpu.h>
+#include <linux/clk.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 
 #include "pm.h"
+#include "clock.h"
 
 #define INITIAL_STATE		TEGRA_HP_DISABLED
 #define IDLE_HYSTERESIS		100000
@@ -62,6 +64,9 @@ module_param(idle_bottom_freq, uint, 0644);
 
 static unsigned int lpcpu_max_freq;
 
+static struct clk *cpu_clk;
+static struct clk *cpu_g_clk;
+static struct clk *cpu_lp_clk;
 
 static struct {
 	cputime64_t time_up_total;
@@ -189,18 +194,20 @@ static void tegra_auto_hotplug_work_func(struct work_struct *work)
 				hotplug_wq, &hotplug_work, down_delay);
 			hp_stats_update(cpu, false);
 		} else if (!is_lp_cluster() && !no_lp) {
-			tegra_cluster_control(0, TEGRA_POWER_CLUSTER_LP |
-						 TEGRA_POWER_CLUSTER_IMMEDIATE);
-			hp_stats_update(CONFIG_NR_CPUS, true);
-			hp_stats_update(0, false);
+			if(!clk_set_parent(cpu_clk, cpu_lp_clk)) {
+				hp_stats_update(CONFIG_NR_CPUS, true);
+				hp_stats_update(0, false);
+			} else
+				queue_delayed_work(
+					hotplug_wq, &hotplug_work, down_delay);
 		}
 		break;
 	case TEGRA_HP_UP:
 		if (is_lp_cluster() && !no_lp) {
-			tegra_cluster_control(0, TEGRA_POWER_CLUSTER_G |
-						 TEGRA_POWER_CLUSTER_IMMEDIATE);
-			hp_stats_update(CONFIG_NR_CPUS, false);
-			hp_stats_update(0, true);
+			if(!clk_set_parent(cpu_clk, cpu_g_clk)) {
+				hp_stats_update(CONFIG_NR_CPUS, false);
+				hp_stats_update(0, true);
+			}
 			queue_delayed_work(
 				hotplug_wq, &hotplug_work, up2gn_delay);
 		} else {
@@ -281,7 +288,7 @@ int tegra_auto_hotplug_init(void)
 {
 	/*
 	 * Not bound to the issuer CPU (=> high-priority), has rescue worker
-	 * task, single-threaded, frrezeable.
+	 * task, single-threaded, freezable.
 	 */
 	hotplug_wq = alloc_workqueue(
 		"cpu-tegra3", WQ_UNBOUND | WQ_RESCUER | WQ_FREEZEABLE, 1);
@@ -289,7 +296,13 @@ int tegra_auto_hotplug_init(void)
 		return -ENOMEM;
 	INIT_DELAYED_WORK(&hotplug_work, tegra_auto_hotplug_work_func);
 
-	lpcpu_max_freq = tegra_get_lpcpu_max_rate() / 1000;
+	cpu_clk = clk_get_sys(NULL, "cpu");
+	cpu_g_clk = clk_get_sys(NULL, "cpu_g");
+	cpu_lp_clk = clk_get_sys(NULL, "cpu_lp");
+	if (IS_ERR(cpu_clk) || IS_ERR(cpu_g_clk) || IS_ERR(cpu_lp_clk))
+		return -ENOENT;
+
+	lpcpu_max_freq = clk_get_max_rate(cpu_lp_clk) / 1000;
 	idle_top_freq = lpcpu_max_freq;
 	idle_bottom_freq = idle_top_freq - IDLE_HYSTERESIS;
 

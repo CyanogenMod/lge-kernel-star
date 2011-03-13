@@ -84,9 +84,11 @@
 #include <linux/kobject.h>
 #include <linux/smp.h>
 #include <linux/io.h>
+#include <linux/clk.h>
 
 #include <mach/iomap.h>
 #include "power.h"
+#include "clock.h"
 
 #define SYSFS_CLUSTER_PRINTS	   1	/* Nonzero: enable status prints */
 #define SYSFS_CLUSTER_TRACE_PRINTS 0	/* Nonzero: enable trace prints */
@@ -239,6 +241,15 @@ static ssize_t sysfscluster_store(struct kobject *kobj,
 	int e;
 	int tmp;
 	int cnt;
+	struct clk *cpu_clk = tegra_get_clock_by_name("cpu");
+	struct clk *cpu_g_clk = tegra_get_clock_by_name("cpu_g");
+	struct clk *cpu_lp_clk = tegra_get_clock_by_name("cpu_lp");
+	struct clk *new_parent = NULL;
+
+	if (!cpu_clk || !cpu_g_clk || !cpu_lp_clk) {
+		ret = -ENOSYS;
+		goto fail;
+	}
 
 	TRACE_CLUSTER(("+sysfscluster_store: %p, %d\n", buf, count));
 
@@ -282,12 +293,9 @@ static ssize_t sysfscluster_store(struct kobject *kobj,
 			request |= TEGRA_POWER_SDRAM_SELFREFRESH;
 		}
 #endif
-		e = tegra_cluster_control(wake_ms * 1000, request);
-		if (e) {
-			PRINT_CLUSTER(("cluster/active: request failed (%d)\n",
-				       e));
-			ret = e;
-		}
+		tegra_cluster_switch_set_parameters(wake_ms * 1000, request);
+		new_parent = (flags & TEGRA_POWER_CLUSTER_LP) ?
+			cpu_lp_clk : cpu_g_clk;
 		break;
 
 	case ClusterAttr_Immediate:
@@ -372,6 +380,14 @@ static ssize_t sysfscluster_store(struct kobject *kobj,
 
 	spin_unlock(&cluster_lock);
 
+	if (new_parent) {
+		e = clk_set_parent(cpu_clk, new_parent);
+		if (e) {
+			PRINT_CLUSTER(("cluster/active: request failed (%d)\n",
+				       e));
+			ret = e;
+		}
+	}
 fail:
 	TRACE_CLUSTER(("-sysfscluster_store: %d\n", count));
 	return ret;

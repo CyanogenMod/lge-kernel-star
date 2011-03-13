@@ -86,10 +86,13 @@ struct clk_ops {
 	int		(*set_parent)(struct clk *, struct clk *);
 	int		(*set_rate)(struct clk *, unsigned long);
 	long		(*round_rate)(struct clk *, unsigned long);
-	unsigned long	(*get_max_rate)(struct clk *);
-	void		(*recalculate_rate)(struct clk *);
 	int		(*clk_cfg_ex)(struct clk *, enum tegra_clk_ex_param, u32);
 	void		(*reset)(struct clk *, bool);
+};
+
+enum cpu_mode {
+	MODE_G = 0,
+	MODE_LP,
 };
 
 enum clk_state {
@@ -152,7 +155,7 @@ struct clk {
 		struct {
 			struct clk			*main;
 			struct clk			*backup;
-			unsigned long			lp_max_rate;
+			enum cpu_mode			mode;
 		} cpu;
 		struct {
 			struct list_head		node;
@@ -193,6 +196,7 @@ unsigned long clk_measure_input_freq(void);
 int clk_reparent(struct clk *c, struct clk *parent);
 void tegra_clk_init_from_table(struct tegra_clk_init_table *table);
 void clk_set_cansleep(struct clk *c);
+unsigned long clk_get_max_rate(struct clk *c);
 unsigned long clk_get_rate_locked(struct clk *c);
 int clk_set_rate_locked(struct clk *c, unsigned long rate);
 void tegra2_sdmmc_tap_delay(struct clk *c, int delay);
