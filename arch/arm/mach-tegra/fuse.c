@@ -196,17 +196,18 @@ enum tegra_revision tegra_get_revision(void)
 	u32 id = readl(chip_id);
 
 	switch ((id >> 16) & 0xf) {
-#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+	case 1:
+		return TEGRA_REVISION_A01;
+#endif
 	case 2:
 		return TEGRA_REVISION_A02;
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	case 3:
 		if (get_spare_fuse(18) || get_spare_fuse(19))
 			return TEGRA_REVISION_A03p;
 		else
 			return TEGRA_REVISION_A03;
-#elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
-	case 1:
-		return TEGRA_REVISION_A01;
 #endif
 	default:
 		return TEGRA_REVISION_UNKNOWN;
