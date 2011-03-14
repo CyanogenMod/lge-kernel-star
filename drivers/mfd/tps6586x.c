@@ -602,25 +602,6 @@ static int __devexit tps6586x_i2c_remove(struct i2c_client *client)
 	return 0;
 }
 
-#ifdef CONFIG_PM
-static int tps6586x_i2c_suspend(struct i2c_client *client,
-	pm_message_t state)
-{
-	if (client->irq)
-		disable_irq(client->irq);
-
-	return 0;
-}
-
-static int tps6586x_i2c_resume(struct i2c_client *client)
-{
-	if (client->irq)
-		enable_irq(client->irq);
-
-	return 0;
-}
-#endif
-
 static const struct i2c_device_id tps6586x_id_table[] = {
 	{ "tps6586x", 0 },
 	{ },
@@ -635,10 +616,6 @@ static struct i2c_driver tps6586x_driver = {
 	.probe		= tps6586x_i2c_probe,
 	.remove		= __devexit_p(tps6586x_i2c_remove),
 	.id_table	= tps6586x_id_table,
-#ifdef CONFIG_PM
-	.suspend	= tps6586x_i2c_suspend,
-	.resume		= tps6586x_i2c_resume,
-#endif
 };
 
 static int __init tps6586x_init(void)
