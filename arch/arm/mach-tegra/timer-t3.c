@@ -62,12 +62,12 @@
 #define TIMERUS_USEC_CFG 0x14
 #define TIMERUS_CNTR_FREEZE 0x4c
 
-#define TIMER1_BASE 0x0
-#define TIMER2_BASE 0x8
-#define TIMER3_BASE 0x50
-#define TIMER4_BASE 0x58
-#define TIMER5_BASE 0x60
-#define TIMER6_BASE 0x68
+#define TIMER1_OFFSET (TEGRA_TMR1_BASE-TEGRA_TMR1_BASE)
+#define TIMER2_OFFSET (TEGRA_TMR2_BASE-TEGRA_TMR1_BASE)
+#define TIMER3_OFFSET (TEGRA_TMR3_BASE-TEGRA_TMR1_BASE)
+#define TIMER4_OFFSET (TEGRA_TMR4_BASE-TEGRA_TMR1_BASE)
+#define TIMER5_OFFSET (TEGRA_TMR5_BASE-TEGRA_TMR1_BASE)
+#define TIMER6_OFFSET (TEGRA_TMR6_BASE-TEGRA_TMR1_BASE)
 
 #define TIMER_PTV 0x0
 #define TIMER_PCR 0x4
@@ -90,7 +90,7 @@ static int tegra_timer_set_next_event(unsigned long cycles,
 	u32 reg;
 
 	reg = 0x80000000 | ((cycles > 1) ? (cycles-1) : 0);
-	timer_writel(reg, TIMER1_BASE + TIMER_PTV);
+	timer_writel(reg, TIMER1_OFFSET + TIMER_PTV);
 
 	return 0;
 }
@@ -100,12 +100,12 @@ static void tegra_timer_set_mode(enum clock_event_mode mode,
 {
 	u32 reg;
 
-	timer_writel(0, TIMER1_BASE + TIMER_PTV);
+	timer_writel(0, TIMER1_OFFSET + TIMER_PTV);
 
 	switch (mode) {
 	case CLOCK_EVT_MODE_PERIODIC:
 		reg = 0xC0000000 | ((1000000/HZ)-1);
-		timer_writel(reg, TIMER1_BASE + TIMER_PTV);
+		timer_writel(reg, TIMER1_OFFSET + TIMER_PTV);
 		break;
 	case CLOCK_EVT_MODE_ONESHOT:
 		break;
@@ -198,7 +198,7 @@ void read_persistent_clock(struct timespec *ts)
 static irqreturn_t tegra_timer_interrupt(int irq, void *dev_id)
 {
 	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
-	timer_writel(1<<30, TIMER1_BASE + TIMER_PCR);
+	timer_writel(1<<30, TIMER1_OFFSET + TIMER_PCR);
 	evt->event_handler(evt);
 	return IRQ_HANDLED;
 }
@@ -212,10 +212,10 @@ static struct irqaction tegra_timer_irq = {
 };
 
 static int lp2_wake_timers[] = {
-	TIMER3_BASE,
-	TIMER4_BASE,
-	TIMER5_BASE,
-	TIMER6_BASE,
+	TIMER3_OFFSET,
+	TIMER4_OFFSET,
+	TIMER5_OFFSET,
+	TIMER6_OFFSET,
 };
 
 static irqreturn_t tegra_lp2wake_interrupt(int irq, void *dev_id)
@@ -241,7 +241,7 @@ static struct irqaction tegra_lp2wake_irq_cpu##n = { \
 	LP2_TIMER_IRQ_ACTION(0, INT_TMR3); \
 	LP2_TIMER_IRQ_ACTION(1, INT_TMR4); \
 	LP2_TIMER_IRQ_ACTION(2, INT_TMR5); \
-	LP2_TIMER_IRQ_ACTION(3, INT_TMR_SHARED);
+	LP2_TIMER_IRQ_ACTION(3, INT_TMR6);
 
 LP2_TIMER_IRQ_ACTIONS();
 
@@ -296,6 +296,8 @@ static void test_lp2_wake_timers(void){}
 static void __init tegra_init_timer(void)
 {
 	unsigned long rate = clk_measure_input_freq();
+	void __iomem *chip_id = IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x804;
+	unsigned long id;
 	int ret;
 
 #ifdef CONFIG_HAVE_ARM_TWD
@@ -337,6 +339,24 @@ static void __init tegra_init_timer(void)
 	if (ret) {
 		printk(KERN_ERR "Failed to register timer IRQ: %d\n", ret);
 		BUG();
+	}
+
+	/* For T30.A01 use INT_TMR_SHARED instead of INT_TMR6. */
+	id = readl(chip_id);
+	if (((id & 0xFF00) >> 8) == 0x30) {
+#ifndef CONFIG_TEGRA_FPGA_PLATFORM
+		if (((id >> 16) & 0xf) == 1) {
+			tegra_lp2wake_irq_cpu3.irq = INT_TMR_SHARED;
+		}
+#else
+		void __iomem *emu_rev = IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x860;
+		unsigned long reg = readl(emu_rev);
+		unsigned long netlist = reg & 0xFFFF;
+		unsigned long patch = (reg >> 16) & 0xFF;
+		if ((netlist == 12) && (patch < 14)) {
+			tegra_lp2wake_irq_cpu3.irq = INT_TMR_SHARED;
+		}
+#endif
 	}
 
 	REGISTER_LP2_WAKE_IRQS();
