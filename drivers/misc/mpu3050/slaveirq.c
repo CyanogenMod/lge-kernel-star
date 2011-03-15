@@ -34,22 +34,22 @@
 #include <linux/mm.h>
 #include <linux/sched.h>
 #include <linux/wait.h>
-#include <asm/uaccess.h>
-#include <asm/io.h>
+#include <linux/uaccess.h>
+#include <linux/io.h>
+#include <linux/wait.h>
+#include <linux/slab.h>
 
 #include "mpu.h"
 #include "slaveirq.h"
 #include "mldl_cfg.h"
 #include "mpu-i2c.h"
-#include <linux/wait.h>
-#include <linux/slab.h>
 
 /* function which gets slave data and sends it to SLAVE */
 
 struct slaveirq_dev_data {
 	struct miscdevice dev;
 	struct i2c_client *slave_client;
-	struct irq_data data;
+	struct mpuirq_data data;
 	wait_queue_head_t slaveirq_wait;
 	int irq;
 	int pid;
@@ -83,7 +83,7 @@ static int slaveirq_release(struct inode *inode, struct file *file)
 
 /* read function called when from /dev/slaveirq is read */
 static ssize_t slaveirq_read(struct file *file,
-			   char *buf, size_t count, loff_t * ppos)
+			   char *buf, size_t count, loff_t *ppos)
 {
 	int len, err;
 	struct slaveirq_dev_data *data =
@@ -169,16 +169,14 @@ static irqreturn_t slaveirq_handler(int irq, void *dev_id)
 
 	/* wake up (unblock) for reading data from userspace */
 	/* and ignore first interrupt generated in module init */
-	if (data->data.interruptcount > 1) {
-		data->data_ready = 1;
+	data->data_ready = 1;
 
-		do_gettimeofday(&irqtime);
-		data->data.irqtime = (((long long) irqtime.tv_sec) << 32);
-		data->data.irqtime += irqtime.tv_usec;
-		data->data.data_type |= 1;
+	do_gettimeofday(&irqtime);
+	data->data.irqtime = (((long long) irqtime.tv_sec) << 32);
+	data->data.irqtime += irqtime.tv_usec;
+	data->data.data_type |= 1;
 
-		wake_up_interruptible(&data->slaveirq_wait);
-	}
+	wake_up_interruptible(&data->slaveirq_wait);
 
 	return IRQ_HANDLED;
 

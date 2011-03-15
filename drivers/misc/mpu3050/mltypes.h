@@ -16,11 +16,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
   $
  */
-/******************************************************************************
- *
- * $Id: mltypes.h 4436 2011-01-13 05:07:53Z mcaramello $
- * 
- *****************************************************************************/
 
 /**
  *  @defgroup MLERROR
@@ -68,6 +63,7 @@
  *          - (70)      ML_ERROR_COMPASS_DATA_OVERFLOW
  *          - (71)      ML_ERROR_COMPASS_DATA_UNDERFLOW
  *          - (72)      ML_ERROR_COMPASS_DATA_NOT_READY
+ *          - (73)      ML_ERROR_COMPASS_DATA_ERROR
  *          - (75)      ML_ERROR_CALIBRATION_LOAD
  *          - (76)      ML_ERROR_CALIBRATION_STORE
  *          - (77)      ML_ERROR_CALIBRATION_LEN
@@ -93,11 +89,12 @@
 ---------------------------*/
 
 /**
- * @struct tMLError The MPL Error Code return type.
+ *  @struct tMLError mltypes.h "mltypes"
+ *  @brief  The MPL Error Code return type.
  *
- * @code
+ *  @code
  *      typedef unsigned char tMLError;
- * @endcode
+ *  @endcode
  */
 typedef unsigned char tMLError;
 
@@ -204,6 +201,7 @@ typedef int_fast8_t bool;
 #define ML_ERROR_COMPASS_DATA_OVERFLOW  (70)
 #define ML_ERROR_COMPASS_DATA_UNDERFLOW (71)
 #define ML_ERROR_COMPASS_DATA_NOT_READY (72)
+#define ML_ERROR_COMPASS_DATA_ERROR     (73)
 
 /* Load/Store calibration */
 #define ML_ERROR_CALIBRATION_LOAD       (75)
@@ -211,9 +209,15 @@ typedef int_fast8_t bool;
 #define ML_ERROR_CALIBRATION_LEN        (77)
 #define ML_ERROR_CALIBRATION_CHECKSUM   (78)
 
+/* Accel errors */
+#define ML_ERROR_ACCEL_DATA_OVERFLOW    (79)
+#define ML_ERROR_ACCEL_DATA_UNDERFLOW   (80)
+#define ML_ERROR_ACCEL_DATA_NOT_READY   (81)
+#define ML_ERROR_ACCEL_DATA_ERROR       (82)
+
 /* For Linux coding compliance */
 #ifndef __KERNEL__
-#define EXPORT_SYMBOL(x) 
+#define EXPORT_SYMBOL(x)
 #endif
 
 /*---------------------------

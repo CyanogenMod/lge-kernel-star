@@ -61,7 +61,7 @@ struct mpuirq_dev_data {
 };
 
 static struct mpuirq_dev_data mpuirq_dev_data;
-static struct irq_data mpuirq_data;
+static struct mpuirq_data mpuirq_data;
 static char *interface = MPUIRQ_NAME;
 
 static void mpu_accel_data_work_fcn(struct work_struct *work);
@@ -206,22 +206,19 @@ static irqreturn_t mpuirq_handler(int irq, void *dev_id)
 
 	/* wake up (unblock) for reading data from userspace */
 	/* and ignore first interrupt generated in module init */
-	if (mpuirq_data.interruptcount > 1) {
-		mpuirq_dev_data.data_ready = 1;
+	mpuirq_dev_data.data_ready = 1;
 
-		do_gettimeofday(&irqtime);
-		mpuirq_data.irqtime = (((long long) irqtime.tv_sec) << 32);
-		mpuirq_data.irqtime += irqtime.tv_usec;
+	do_gettimeofday(&irqtime);
+	mpuirq_data.irqtime = (((long long) irqtime.tv_sec) << 32);
+	mpuirq_data.irqtime += irqtime.tv_usec;
 
-		if ((mpuirq_dev_data.accel_divider >= 0) &&
-		    (0 ==
-		     (mycount % (mpuirq_dev_data.accel_divider + 1)))) {
-			schedule_work((struct work_struct
-				       *) (&mpuirq_dev_data));
-		}
-
-		wake_up_interruptible(&mpuirq_wait);
+	if ((mpuirq_dev_data.accel_divider >= 0) &&
+		(0 == (mycount % (mpuirq_dev_data.accel_divider + 1)))) {
+		schedule_work((struct work_struct
+				*) (&mpuirq_dev_data));
 	}
+
+	wake_up_interruptible(&mpuirq_wait);
 
 	return IRQ_HANDLED;
 
