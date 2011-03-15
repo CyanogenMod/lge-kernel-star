@@ -247,6 +247,7 @@ static int aes_start_crypt(struct tegra_aes_dev *dd, u32 in_addr, u32 out_addr,
 
 	/* error, dma xfer complete */
 	aes_writel(dd, 0x33, INT_ENB);
+	enable_irq(INT_VDE_BSE_V);
 
 	cmdq[qlen++] = UCQOPCODE_DMASETUP << ICQBITSHIFT_OPCODE;
 	cmdq[qlen++] = in_addr;
@@ -316,9 +317,11 @@ static int aes_start_crypt(struct tegra_aes_dev *dd, u32 in_addr, u32 out_addr,
 	if (ret == 0) {
 		dev_err(dd->dev, "timed out (0x%x)\n",
 			aes_readl(dd, INTR_STATUS));
+		disable_irq(INT_VDE_BSE_V);
 		return -ETIMEDOUT;
 	}
 
+	disable_irq(INT_VDE_BSE_V);
 	aes_writel(dd, cmdq[qlen - 1], ICMDQUE_WR);
 	return 0;
 }
@@ -626,12 +629,8 @@ static irqreturn_t aes_irq(int irq, void *dev_id)
 	u32 value = aes_readl(dd, INTR_STATUS);
 
 	dev_dbg(dd->dev, "irq_stat: 0x%x", value);
-	if (!((value & ENGINE_BUSY_FIELD) & !(value & ICQ_EMPTY_FIELD))) {
-		/* avoid misfires */
-		value &= ~0x33;
-		aes_writel(dd, value, INT_ENB);
+	if (!((value & ENGINE_BUSY_FIELD) & !(value & ICQ_EMPTY_FIELD)))
 		complete(&dd->op_complete);
-	}
 
 	return IRQ_HANDLED;
 }
@@ -1015,6 +1014,7 @@ static int tegra_aes_probe(struct platform_device *pdev)
 		dev_err(dev, "request_irq failed\n");
 		goto out;
 	}
+	disable_irq(INT_VDE_BSE_V);
 
 	spin_lock_init(&list_lock);
 	spin_lock(&list_lock);
