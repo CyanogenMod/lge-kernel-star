@@ -74,6 +74,8 @@ static int ventana_backlight_notify(struct device *unused, int brightness)
 	return brightness;
 }
 
+static int ventana_disp1_check_fb(struct device *dev, struct fb_info *info);
+
 static struct platform_pwm_backlight_data ventana_backlight_data = {
 	.pwm_id		= 2,
 	.max_brightness	= 255,
@@ -82,6 +84,8 @@ static struct platform_pwm_backlight_data ventana_backlight_data = {
 	.init		= ventana_backlight_init,
 	.exit		= ventana_backlight_exit,
 	.notify		= ventana_backlight_notify,
+	/* Only toggle backlight on fb blank notifications for disp1 */
+	.check_fb   = ventana_disp1_check_fb,
 };
 
 static struct platform_device ventana_backlight_device = {
@@ -266,6 +270,11 @@ static struct nvhost_device ventana_disp1_device = {
 		.platform_data = &ventana_disp1_pdata,
 	},
 };
+
+static int ventana_disp1_check_fb(struct device *dev, struct fb_info *info)
+{
+	return info->device == &ventana_disp1_device.dev;
+}
 
 static struct nvhost_device ventana_disp2_device = {
 	.name		= "tegradc",
