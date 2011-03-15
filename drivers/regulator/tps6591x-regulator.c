@@ -22,6 +22,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/err.h>
 #include <linux/slab.h>
@@ -342,8 +343,10 @@ static int __tps6591x_vdd_set_voltage(struct device *parent,
 				val <<= ri->op_reg.shift_bits;
 				mask = ((1 << ri->op_reg.nbits) - 1)
 					<< ri->op_reg.shift_bits;
-				return tps6591x_update(parent,
+				ret = tps6591x_update(parent,
 					ri->op_reg.addr, val, mask);
+				udelay(100);
+				return ret;
 			}
 		}
 	}
