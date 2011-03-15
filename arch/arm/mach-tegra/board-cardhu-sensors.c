@@ -39,8 +39,10 @@
 #include "board-cardhu.h"
 
 static struct regulator *cardhu_1v8_cam1 = NULL;
+static struct regulator *cardhu_1v8_cam3 = NULL;
 static struct regulator *cardhu_avdd_dsi_csi = NULL;
 static struct regulator *cardhu_vdd_2v8_cam1 = NULL;
+static struct regulator *cardhu_vdd_cam3 = NULL;
 
 #ifdef CONFIG_I2C_MUX_PCA954x
 static struct pca954x_platform_mode cardhu_pca954x_modes[] = {
@@ -71,11 +73,20 @@ static int cardhu_camera_init(void)
 		if (ret < 0)
 			pr_err("%s: gpio_request failed for gpio %s\n",
 				__func__, "CAM1_POWER_DWN_GPIO");
+
+		tegra_gpio_enable(CAM3_POWER_DWN_GPIO);
+		ret = gpio_request(CAM3_POWER_DWN_GPIO, "cam3_power_en");
+		if (ret < 0)
+			pr_err("%s: gpio_request failed for gpio %s\n",
+				__func__, "CAM3_POWER_DWN_GPIO");
+
 		tegra_gpio_enable(OV5650_RESETN_GPIO);
 		ret = gpio_request(OV5650_RESETN_GPIO, "camera_reset");
 		if (ret < 0)
 			pr_err("%s: gpio_request failed for gpio %s\n",
 				__func__, "OV5650_RESETN_GPIO");
+
+		gpio_direction_output(CAM3_POWER_DWN_GPIO, 1);
 		gpio_direction_output(CAM1_POWER_DWN_GPIO, 1);
 		mdelay(10);
 
@@ -109,6 +120,7 @@ static int cardhu_ov5650_power_on(void)
 	if ((board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1291)) {
 
+		gpio_direction_output(CAM3_POWER_DWN_GPIO, 0);
 		gpio_direction_output(CAM1_POWER_DWN_GPIO, 0);
 		mdelay(10);
 
@@ -120,10 +132,32 @@ static int cardhu_ov5650_power_on(void)
 				goto reg_alloc_fail;
 			}
 		}
-
 		regulator_enable(cardhu_vdd_2v8_cam1);
+
+		if (cardhu_vdd_cam3 == NULL) {
+			cardhu_vdd_cam3 = regulator_get(NULL, "vdd_cam3");
+			if (WARN_ON(IS_ERR(cardhu_vdd_cam3))) {
+				pr_err("%s: couldn't get regulator vdd_cam3: %ld\n",
+					__func__, PTR_ERR(cardhu_vdd_cam3));
+				goto reg_alloc_fail;
+			}
+		}
+		regulator_enable(cardhu_vdd_cam3);
+
+		/* Enable VDD_1V8_Cam3 */
+		if (cardhu_1v8_cam3 == NULL) {
+			cardhu_1v8_cam3 = regulator_get(NULL, "vdd_1v8_cam3");
+			if (WARN_ON(IS_ERR(cardhu_1v8_cam3))) {
+				pr_err("%s: couldn't get regulator vdd_1v8_cam3: %ld\n",
+					__func__, PTR_ERR(cardhu_1v8_cam3));
+				goto reg_alloc_fail;
+			}
+		}
+		regulator_enable(cardhu_1v8_cam3);
+
 		mdelay(5);
 	}
+
 	/* Enable VDD_1V8_Cam1 */
 	if (cardhu_1v8_cam1 == NULL) {
 		cardhu_1v8_cam1 = regulator_get(NULL, "vdd_1v8_cam1");
@@ -153,6 +187,10 @@ reg_alloc_fail:
 		regulator_put(cardhu_1v8_cam1);
 		cardhu_1v8_cam1 = NULL;
 	}
+	if (cardhu_1v8_cam3) {
+		regulator_put(cardhu_1v8_cam3);
+		cardhu_1v8_cam3 = NULL;
+	}
 	if (cardhu_avdd_dsi_csi) {
 		regulator_put(cardhu_avdd_dsi_csi);
 		cardhu_avdd_dsi_csi = NULL;
@@ -160,6 +198,10 @@ reg_alloc_fail:
 	if (cardhu_vdd_2v8_cam1) {
 		regulator_put(cardhu_vdd_2v8_cam1);
 		cardhu_vdd_2v8_cam1 = NULL;
+	}
+	if (cardhu_vdd_cam3) {
+		regulator_put(cardhu_vdd_cam3);
+		cardhu_vdd_cam3 = NULL;
 	}
 	return -ENODEV;
 
