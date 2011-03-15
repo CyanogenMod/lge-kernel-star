@@ -36,6 +36,7 @@
 
 #include <mach/dma.h>
 #include <mach/spi.h>
+#include <mach/clk.h>
 
 #define SLINK_COMMAND		0x000
 #define   SLINK_BIT_LENGTH(x)		(((x) & 0x1f) << 0)
@@ -463,6 +464,21 @@ static void complete_operation(struct tegra_dma_req *req)
 		/*In order to make sure Rx fifo fluch is completed.*/
 		while (spi_tegra_readl(tspi, SLINK_STATUS)&SLINK_RX_FLUSH)
 			;
+		/*
+		 * rx disable and tx disable
+		 */
+		val_write = spi_tegra_readl(tspi, SLINK_COMMAND2);
+		val_write &= ~SLINK_RXEN;
+		val_write &= ~SLINK_TXEN;
+		spi_tegra_writel(tspi, val_write, SLINK_COMMAND2);
+
+		/*
+		 * reset the slink controller
+		 * */
+		tegra_periph_reset_assert(tspi->clk);
+		udelay(50);
+		tegra_periph_reset_deassert(tspi->clk);
+		udelay(50);
 	}
 
 	/* the SPI controller may come back with both the BSY and RDY bits
