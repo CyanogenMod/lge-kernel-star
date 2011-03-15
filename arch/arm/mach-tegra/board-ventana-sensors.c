@@ -352,14 +352,14 @@ static struct i2c_board_info ventana_i2c8_board_info[] = {
 	},
 };
 
-#ifdef CONFIG_SENSORS_MPU3050
+#ifdef CONFIG_MPU_SENSORS_MPU3050
 #define SENSOR_MPU_NAME "mpu3050"
 static struct mpu3050_platform_data mpu3050_data = {
 	.int_config  = 0x10,
 	.orientation = { 0, -1, 0, -1, 0, 0, 0, 0, -1 },  /* Orientation matrix for MPU on ventana */
 	.level_shifter = 0,
 	.accel = {
-#ifdef CONFIG_SENSORS_KXTF9_MPU
+#ifdef CONFIG_MPU_SENSORS_KXTF9
 	.get_slave_descr = get_accel_slave_descr,
 #else
 	.get_slave_descr = NULL,
@@ -371,7 +371,7 @@ static struct mpu3050_platform_data mpu3050_data = {
 	},
 
 	.compass = {
-#ifdef CONFIG_SENSORS_AK8975_MPU
+#ifdef CONFIG_MPU_SENSORS_AK8975
 	.get_slave_descr = get_compass_slave_descr,
 #else
 	.get_slave_descr = NULL,
@@ -409,7 +409,7 @@ int __init ventana_sensors_init(void)
 #ifdef CONFIG_SENSORS_AK8975
 	ventana_akm8975_init();
 #endif
-#ifdef CONFIG_SENSORS_MPU3050
+#ifdef CONFIG_MPU_SENSORS_MPU3050
 	ventana_mpuirq_init();
 #endif
 	ventana_camera_init();
@@ -446,7 +446,7 @@ int __init ventana_sensors_init(void)
 		ARRAY_SIZE(ventana_i2c8_board_info));
 
 
-#ifdef CONFIG_SENSORS_MPU3050
+#ifdef CONFIG_MPU_SENSORS_MPU3050
 	i2c_register_board_info(0, mpu3050_i2c0_boardinfo,
 		ARRAY_SIZE(mpu3050_i2c0_boardinfo));
 #endif
