@@ -31,6 +31,7 @@
 #include <linux/platform_device.h>
 #include <linux/clk.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 
 struct bcm4329_rfkill_data {
 	int gpio_reset;
@@ -54,9 +55,19 @@ static int bcm4329_bt_rfkill_set_power(void *data, bool blocked)
 		if (bcm4329_rfkill->bt_32k_clk)
 			clk_enable(bcm4329_rfkill->bt_32k_clk);
 		if (bcm4329_rfkill->gpio_shutdown)
+		{
+			gpio_direction_output(bcm4329_rfkill->gpio_shutdown, 0);
+			msleep(100);
 			gpio_direction_output(bcm4329_rfkill->gpio_shutdown, 1);
+			msleep(100);
+		}
 		if (bcm4329_rfkill->gpio_reset)
+		{
+			gpio_direction_output(bcm4329_rfkill->gpio_reset, 0);
+			msleep(100);
 			gpio_direction_output(bcm4329_rfkill->gpio_reset, 1);
+			msleep(100);
+		}
 	}
 
 	return 0;
