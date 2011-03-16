@@ -21,6 +21,7 @@
 #define __MACH_TEGRA_DC_H
 
 #include <linux/pm.h>
+#include <linux/types.h>
 
 #define TEGRA_MAX_DC		2
 #define DC_N_WINDOWS		3
@@ -193,6 +194,41 @@ enum {
 	TEGRA_DC_ERRDIFF_DITHER,
 };
 
+struct tegra_dc_sd_blp {
+	u16 time_constant;
+	u8 step;
+};
+
+struct tegra_dc_sd_fc {
+	u8 time_limit;
+	u8 threshold;
+};
+
+struct tegra_dc_sd_rgb {
+	u8 r;
+	u8 g;
+	u8 b;
+};
+
+struct tegra_dc_sd_settings {
+	unsigned enable;
+	bool use_auto_pwm;
+	u8 hw_update_delay;
+	unsigned bin_width;
+	u8 aggressiveness;
+
+	bool use_vid_luma;
+	struct tegra_dc_sd_rgb coeff;
+
+	struct tegra_dc_sd_fc fc;
+	struct tegra_dc_sd_blp blp;
+	u8 bltf[4][4];
+	struct tegra_dc_sd_rgb lut[9];
+
+	atomic_t *sd_brightness;
+	struct platform_device *bl_device;
+};
+
 enum {
 	TEGRA_PIN_OUT_CONFIG_SEL_LHP0_LD21,
 	TEGRA_PIN_OUT_CONFIG_SEL_LHP1_LD18,
@@ -211,31 +247,33 @@ enum {
 };
 
 struct tegra_dc_out {
-	int			type;
-	unsigned		flags;
+	int				type;
+	unsigned			flags;
 
 	/* size in mm */
-	unsigned		h_size;
-	unsigned		v_size;
+	unsigned			h_size;
+	unsigned			v_size;
 
-	int			dcc_bus;
-	int			hotplug_gpio;
+	int				dcc_bus;
+	int				hotplug_gpio;
 
-	unsigned		order;
-	unsigned		align;
-	unsigned		depth;
-	unsigned		dither;
+	unsigned			order;
+	unsigned			align;
+	unsigned			depth;
+	unsigned			dither;
 
-	unsigned		height; /* mm */
-	unsigned		width; /* mm */
+	struct tegra_dc_mode		*modes;
+	int				n_modes;
 
-	struct tegra_dc_mode	*modes;
-	int			n_modes;
+	struct tegra_dsi_out		*dsi;
 
-	struct tegra_dsi_out	*dsi;
+	unsigned			height; /* mm */
+	unsigned			width; /* mm */
 
-	struct tegra_dc_out_pin	*out_pins;
-	unsigned		n_out_pins;
+	struct tegra_dc_out_pin		*out_pins;
+	unsigned			n_out_pins;
+
+	struct tegra_dc_sd_settings	*sd_settings;
 
 	u8			*out_sel_configs;
 	unsigned		n_out_sel_configs;
