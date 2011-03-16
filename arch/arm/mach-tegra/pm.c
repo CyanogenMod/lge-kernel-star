@@ -49,6 +49,7 @@
 #include <mach/clk.h>
 #include <mach/iomap.h>
 #include <mach/irqs.h>
+#include <mach/powergate.h>
 
 #include "board.h"
 #include "clock.h"
@@ -191,6 +192,32 @@ static unsigned long tegra_cluster_switch_times[tegra_cluster_switch_time_id_max
 #else
 #define tegra_cluster_switch_time(flags, id) do {} while(0)
 #endif
+
+static void tegra_suspend_check_pwr_stats(void)
+{
+	/* cpus and l2 are powered off later */
+	unsigned long pwrgate_partid_mask =
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+		(1 << TEGRA_POWERGATE_HEG)	|
+		(1 << TEGRA_POWERGATE_SATA)	|
+		(1 << TEGRA_POWERGATE_3D1)	|
+#endif
+		(1 << TEGRA_POWERGATE_3D)	|
+		(1 << TEGRA_POWERGATE_VENC)	|
+		(1 << TEGRA_POWERGATE_PCIE)	|
+		(1 << TEGRA_POWERGATE_VDEC)	|
+		(1 << TEGRA_POWERGATE_MPE);
+	
+	int partid;
+
+	for (partid = 0; partid < TEGRA_NUM_POWERGATE; partid++)
+		if ((1 << partid) & pwrgate_partid_mask)
+			if (tegra_powergate_is_powered(partid))
+				pr_warning("partition %s is lef on before suspend\n",
+							tegra_powergate_get_name(partid));
+
+	return;
+}
 
 unsigned long tegra_cpu_power_good_time(void)
 {
@@ -677,6 +704,9 @@ static int tegra_suspend_enter(suspend_state_t state)
 		pr_info("LP0 not used due to unsupported wakeup events\n");
 		mode = TEGRA_SUSPEND_LP1;
 	}
+
+	if ((mode == TEGRA_SUSPEND_LP0) || (mode == TEGRA_SUSPEND_LP1))
+		tegra_suspend_check_pwr_stats();
 
 	tegra_common_suspend();
 
