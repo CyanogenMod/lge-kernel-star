@@ -25,6 +25,7 @@
 #include <asm/mach-types.h>
 #include <linux/platform_device.h>
 #include <linux/pwm_backlight.h>
+#include <asm/atomic.h>
 #include <mach/nvhost.h>
 #include <mach/nvmap.h>
 #include <mach/irqs.h>
@@ -58,6 +59,8 @@
 static struct regulator *cardhu_hdmi_reg = NULL;
 static struct regulator *cardhu_hdmi_pll = NULL;
 static struct regulator *cardhu_hdmi_vddio = NULL;
+
+static atomic_t sd_brightness = ATOMIC_INIT(255);
 
 static int cardhu_backlight_init(struct device *dev) {
 	int ret;
@@ -131,9 +134,12 @@ static void cardhu_backlight_exit(struct device *dev) {
 
 static int cardhu_backlight_notify(struct device *unused, int brightness)
 {
+	int cur_sd_brightness = atomic_read(&sd_brightness);
+	int orig_brightness = brightness;
+
 #ifndef CONFIG_TEGRA_CARDHU_DSI
-	int ret;
-	ret = gpio_request(cardhu_bl_enb, "backlight_enb");
+	/* Set the backlight GPIO pin mode to 'backlight_enable' */
+	gpio_request(cardhu_bl_enb, "backlight_enb");
 	gpio_set_value(cardhu_bl_enb, !!brightness);
 #else
 	#if DSI_PANEL_219
@@ -144,6 +150,13 @@ static int cardhu_backlight_notify(struct device *unused, int brightness)
 	gpio_set_value(cardhu_dsib_bl_enb, !!brightness);
 	#endif
 #endif
+	/* SD brightness is a percentage, 8-bit value. */
+	brightness = (brightness * cur_sd_brightness) / 255;
+	if (cur_sd_brightness != 255) {
+		printk("NVSD BL - in: %d, sd: %d, out: %d\n",
+			orig_brightness, cur_sd_brightness, brightness);
+	}
+
 	return brightness;
 }
 
@@ -327,6 +340,41 @@ static struct tegra_dc_mode cardhu_panel_modes[] = {
 		.h_front_porch = 48,
 		.v_front_porch = 3,
 	},
+};
+
+static struct tegra_dc_sd_settings cardhu_sd_settings = {
+	.enable = 1, /* Normal mode operation */
+	.use_auto_pwm = false,
+	.hw_update_delay = 0,
+	.bin_width = 0,
+	.aggressiveness = 5,
+	.use_vid_luma = true,
+	/* Default video coefficients */
+	.coeff = {5, 9, 2},
+	.fc = {0, 0},
+	/* Immediate backlight changes */
+	.blp = {1024, 255},
+	/* Default BL TF */
+	.bltf = {
+			{128, 136, 144, 152},
+			{160, 168, 176, 184},
+			{192, 200, 208, 216},
+			{224, 232, 240, 248}
+		},
+	/* Default LUT */
+	.lut = {
+			{255, 255, 255},
+			{199, 199, 199},
+			{153, 153, 153},
+			{116, 116, 116},
+			{85, 85, 85},
+			{59, 59, 59},
+			{36, 36, 36},
+			{17, 17, 17},
+			{0, 0, 0}
+		},
+	.sd_brightness = &sd_brightness,
+	.bl_device = &cardhu_backlight_device,
 };
 
 static struct tegra_fb_data cardhu_fb_data = {
@@ -555,6 +603,8 @@ static struct tegra_fb_data cardhu_dsi_fb_data = {
 static struct tegra_dc_out cardhu_disp1_out = {
 	.align		= TEGRA_DC_ALIGN_MSB,
 	.order		= TEGRA_DC_ORDER_RED_BLUE,
+	.sd_settings	= &cardhu_sd_settings,
+
 #ifndef CONFIG_TEGRA_CARDHU_DSI
 	.type		= TEGRA_DC_OUT_RGB,
 
