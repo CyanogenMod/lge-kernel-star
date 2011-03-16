@@ -24,6 +24,8 @@
 #include <linux/i2c/pca954x.h>
 #include <linux/i2c/pca953x.h>
 #include <linux/nct1008.h>
+#include <linux/err.h>
+#include <linux/regulator/consumer.h>
 
 #include <mach/gpio.h>
 
@@ -337,9 +339,28 @@ int __init ventana_ov5650_late_init(void)
 {
 	int ret;
 	int i;
+	struct regulator *cam_ldo6 = NULL;
 
 	if (!machine_is_ventana())
 		return 0;
+
+	cam_ldo6 = regulator_get(NULL, "vdd_ldo6");
+	if (IS_ERR_OR_NULL(cam_ldo6)) {
+		pr_err("%s: Couldn't get regulator ldo6\n", __func__);
+		return PTR_ERR(cam_ldo6);
+	}
+
+	ret = regulator_set_voltage(cam_ldo6, 1800*1000, 1800*1000);
+	if (ret){
+		pr_err("%s: Failed to set ldo6 to 1.8v\n", __func__);
+		goto fail_put_regulator;
+	}
+
+	ret = regulator_enable(cam_ldo6);
+	if (ret){
+		pr_err("%s: Failed to enable ldo6\n", __func__);
+		goto fail_put_regulator;
+	}
 
 	i2c_new_device(i2c_get_adapter(3), ventana_i2c3_board_info_tca6416);
 
@@ -349,7 +370,7 @@ int __init ventana_ov5650_late_init(void)
 		if (ret < 0) {
 			pr_err("%s: gpio_request failed for gpio #%d\n",
 				__func__, i);
-			goto fail;
+			goto fail_free_gpio;
 		}
 		gpio_direction_output(ov5650_gpio_keys[i].gpio,
 			ov5650_gpio_keys[i].enabled);
@@ -357,13 +378,25 @@ int __init ventana_ov5650_late_init(void)
 	}
 
 	i2c_new_device(i2c_get_adapter(3), ventana_i2c3_board_info_pca9546);
+
 	ventana_ov2710_power_off();
 	ventana_ov5650s_power_off();
+
+	ret = regulator_disable(cam_ldo6);
+	if (ret){
+		pr_err("%s: Failed to disable ldo6\n", __func__);
+		goto fail_free_gpio;
+	}
+
+	regulator_put(cam_ldo6);
 	return 0;
 
-fail:
+fail_free_gpio:
 	while (i--)
 		gpio_free(ov5650_gpio_keys[i].gpio);
+
+fail_put_regulator:
+	regulator_put(cam_ldo6);
 	return ret;
 }
 
