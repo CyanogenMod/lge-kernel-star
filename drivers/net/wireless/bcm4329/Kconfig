@@ -12,6 +12,14 @@ config BCM4329
 	  If you choose to build a module, it'll be called dhd. Say M if
 	  unsure.
 
+config BCM4329_FIRST_SCAN
+	depends on BCM4329
+	bool "first scan support"
+	default n
+	---help---
+	Initiate broadcast scan (active scan) just after
+	initializing with network interface.
+
 config BCM4329_FW_PATH
 	depends on BCM4329
 	string "Firmware path"
