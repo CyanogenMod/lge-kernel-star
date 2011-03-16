@@ -51,9 +51,9 @@ static int ph450_reset(void);
 static int ph450_handshake(void);
 
 static __initdata struct tegra_pingroup_config whistler_null_ulpi_pinmux[] = {
-	{TEGRA_PINGROUP_UAA, TEGRA_MUX_ULPI, TEGRA_PUPD_PULL_UP,
+	{TEGRA_PINGROUP_UAA, TEGRA_MUX_ULPI, TEGRA_PUPD_NORMAL,
 	 TEGRA_TRI_NORMAL},
-	{TEGRA_PINGROUP_UAB, TEGRA_MUX_ULPI, TEGRA_PUPD_PULL_UP,
+	{TEGRA_PINGROUP_UAB, TEGRA_MUX_ULPI, TEGRA_PUPD_NORMAL,
 	 TEGRA_TRI_NORMAL},
 	{TEGRA_PINGROUP_UDA, TEGRA_MUX_ULPI, TEGRA_PUPD_NORMAL,
 	 TEGRA_TRI_NORMAL},
@@ -196,31 +196,37 @@ static int __init ph450_init(void)
 
 static int ph450_reset(void)
 {
+	int retry = 100; /* retry for 10 sec */
+
 	gpio_set_value(AP2MDM_ACK2, 1);
 	gpio_set_value(MODEM_PWR_ON, 0);
 	gpio_set_value(MODEM_RESET, 0);
 	mdelay(200);
 	gpio_set_value(MODEM_RESET, 1);
+	mdelay(30);
+	gpio_set_value(MODEM_PWR_ON, 1);
 
-	return 0;
-}
-
-static int ph450_handshake(void)
-{
-	while (1) {
+	while (retry) {
 		/* wait for MDM2AP_ACK2 low */
 		int val = gpio_get_value(MDM2AP_ACK2);
 		if (!val) {
 			printk("MDM2AP_ACK2 detected\n");
-			break;
+			return 0;
 		} else {
 			printk(".");
+			retry--;
 			mdelay(100);
 		}
 	}
 
+	return 1;
+}
+
+static int ph450_handshake(void)
+{
 	/* set AP2MDM_ACK2 low */
 	gpio_set_value(AP2MDM_ACK2, 0);
+
 	return 0;
 }
 
