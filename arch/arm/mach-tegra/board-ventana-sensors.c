@@ -300,42 +300,42 @@ int __init ventana_sensors_init(void)
 	return 0;
 }
 
-#ifdef CONFIG_VIDEO_OV5650
+#ifdef CONFIG_TEGRA_CAMERA
 
-struct ov5650_gpios {
+struct tegra_camera_gpios {
 	const char *name;
 	int gpio;
 	int enabled;
 };
 
-#define OV5650_GPIO(_name, _gpio, _enabled)		\
+#define TEGRA_CAMERA_GPIO(_name, _gpio, _enabled)		\
 	{						\
 		.name = _name,				\
 		.gpio = _gpio,				\
 		.enabled = _enabled,			\
 	}
 
-static struct ov5650_gpios ov5650_gpio_keys[] = {
-	[0] = OV5650_GPIO("en_avdd_csi", AVDD_DSI_CSI_ENB_GPIO, 1),
-	[1] = OV5650_GPIO("cam_i2c_mux_rst_lo", CAM_I2C_MUX_RST_GPIO, 1),
+static struct tegra_camera_gpios ventana_camera_gpio_keys[] = {
+	[0] = TEGRA_CAMERA_GPIO("en_avdd_csi", AVDD_DSI_CSI_ENB_GPIO, 1),
+	[1] = TEGRA_CAMERA_GPIO("cam_i2c_mux_rst_lo", CAM_I2C_MUX_RST_GPIO, 1),
 
-	[2] = OV5650_GPIO("cam2_ldo_shdn_lo", CAM2_LDO_SHUTDN_L_GPIO, 1),
-	[3] = OV5650_GPIO("cam2_af_pwdn_lo", CAM2_AF_PWR_DN_L_GPIO, 0),
-	[4] = OV5650_GPIO("cam2_pwdn", CAM2_PWR_DN_GPIO, 0),
-	[5] = OV5650_GPIO("cam2_rst_lo", CAM2_RST_L_GPIO, 1),
+	[2] = TEGRA_CAMERA_GPIO("cam2_ldo_shdn_lo", CAM2_LDO_SHUTDN_L_GPIO, 1),
+	[3] = TEGRA_CAMERA_GPIO("cam2_af_pwdn_lo", CAM2_AF_PWR_DN_L_GPIO, 0),
+	[4] = TEGRA_CAMERA_GPIO("cam2_pwdn", CAM2_PWR_DN_GPIO, 0),
+	[5] = TEGRA_CAMERA_GPIO("cam2_rst_lo", CAM2_RST_L_GPIO, 1),
 
-	[6] = OV5650_GPIO("cam3_ldo_shdn_lo", CAM3_LDO_SHUTDN_L_GPIO, 1),
-	[7] = OV5650_GPIO("cam3_af_pwdn_lo", CAM3_AF_PWR_DN_L_GPIO, 0),
-	[8] = OV5650_GPIO("cam3_pwdn", CAM3_PWR_DN_GPIO, 0),
-	[9] = OV5650_GPIO("cam3_rst_lo", CAM3_RST_L_GPIO, 1),
+	[6] = TEGRA_CAMERA_GPIO("cam3_ldo_shdn_lo", CAM3_LDO_SHUTDN_L_GPIO, 1),
+	[7] = TEGRA_CAMERA_GPIO("cam3_af_pwdn_lo", CAM3_AF_PWR_DN_L_GPIO, 0),
+	[8] = TEGRA_CAMERA_GPIO("cam3_pwdn", CAM3_PWR_DN_GPIO, 0),
+	[9] = TEGRA_CAMERA_GPIO("cam3_rst_lo", CAM3_RST_L_GPIO, 1),
 
-	[10] = OV5650_GPIO("cam1_ldo_shdn_lo", CAM1_LDO_SHUTDN_L_GPIO, 1),
-	[11] = OV5650_GPIO("cam1_af_pwdn_lo", CAM1_AF_PWR_DN_L_GPIO, 0),
-	[12] = OV5650_GPIO("cam1_pwdn", CAM1_PWR_DN_GPIO, 0),
-	[13] = OV5650_GPIO("cam1_rst_lo", CAM1_RST_L_GPIO, 1),
+	[10] = TEGRA_CAMERA_GPIO("cam1_ldo_shdn_lo", CAM1_LDO_SHUTDN_L_GPIO, 1),
+	[11] = TEGRA_CAMERA_GPIO("cam1_af_pwdn_lo", CAM1_AF_PWR_DN_L_GPIO, 0),
+	[12] = TEGRA_CAMERA_GPIO("cam1_pwdn", CAM1_PWR_DN_GPIO, 0),
+	[13] = TEGRA_CAMERA_GPIO("cam1_rst_lo", CAM1_RST_L_GPIO, 1),
 };
 
-int __init ventana_ov5650_late_init(void)
+int __init ventana_camera_late_init(void)
 {
 	int ret;
 	int i;
@@ -364,17 +364,17 @@ int __init ventana_ov5650_late_init(void)
 
 	i2c_new_device(i2c_get_adapter(3), ventana_i2c3_board_info_tca6416);
 
-	for (i = 0; i < ARRAY_SIZE(ov5650_gpio_keys); i++) {
-		ret = gpio_request(ov5650_gpio_keys[i].gpio,
-			ov5650_gpio_keys[i].name);
+	for (i = 0; i < ARRAY_SIZE(ventana_camera_gpio_keys); i++) {
+		ret = gpio_request(ventana_camera_gpio_keys[i].gpio,
+			ventana_camera_gpio_keys[i].name);
 		if (ret < 0) {
 			pr_err("%s: gpio_request failed for gpio #%d\n",
 				__func__, i);
 			goto fail_free_gpio;
 		}
-		gpio_direction_output(ov5650_gpio_keys[i].gpio,
-			ov5650_gpio_keys[i].enabled);
-		gpio_export(ov5650_gpio_keys[i].gpio, false);
+		gpio_direction_output(ventana_camera_gpio_keys[i].gpio,
+			ventana_camera_gpio_keys[i].enabled);
+		gpio_export(ventana_camera_gpio_keys[i].gpio, false);
 	}
 
 	i2c_new_device(i2c_get_adapter(3), ventana_i2c3_board_info_pca9546);
@@ -393,13 +393,13 @@ int __init ventana_ov5650_late_init(void)
 
 fail_free_gpio:
 	while (i--)
-		gpio_free(ov5650_gpio_keys[i].gpio);
+		gpio_free(ventana_camera_gpio_keys[i].gpio);
 
 fail_put_regulator:
 	regulator_put(cam_ldo6);
 	return ret;
 }
 
-late_initcall(ventana_ov5650_late_init);
+late_initcall(ventana_camera_late_init);
 
-#endif /* CONFIG_VIDEO_OV5650 */
+#endif /* CONFIG_TEGRA_CAMERA */
