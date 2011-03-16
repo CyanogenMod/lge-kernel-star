@@ -227,6 +227,28 @@ static int tegra_pinmux_set_func(const struct tegra_pingroup_config *config)
 	return 0;
 }
 
+int tegra_pinmux_get_func(enum tegra_pingroup pg)
+{
+	int mux = -1;
+	unsigned long reg;
+	unsigned long flags;
+
+	if (pg < 0 || pg >=  TEGRA_MAX_PINGROUP)
+		return -ERANGE;
+
+	if (pingroups[pg].mux_reg < 0)
+		return -EINVAL;
+
+	spin_lock_irqsave(&mux_lock, flags);
+
+	reg = pg_readl(pingroups[pg].mux_reg);
+	mux = (reg >> pingroups[pg].mux_bit) & 0x3;
+
+	spin_unlock_irqrestore(&mux_lock, flags);
+
+	return mux;
+}
+
 int tegra_pinmux_set_tristate(enum tegra_pingroup pg,
 	enum tegra_tristate tristate)
 {
