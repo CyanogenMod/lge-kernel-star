@@ -549,6 +549,15 @@ static const struct tegra_emc_chip whistler_emc_chips[] = {
 		.table = whistler_emc_tables_elpida_300Mhz,
 		.table_size = ARRAY_SIZE(whistler_emc_tables_elpida_300Mhz)
 	},
+	{
+		.description = "Elpida 300MHz",
+		.mem_manufacturer_id = 0x0303,
+		.mem_revision_id1 = 0,
+		.mem_revision_id2 = 0,
+		.mem_pid = 0x5454,
+		.table = whistler_emc_tables_elpida_300Mhz,
+		.table_size = ARRAY_SIZE(whistler_emc_tables_elpida_300Mhz)
+	},
 };
 
 int __init whistler_emc_init(void)
