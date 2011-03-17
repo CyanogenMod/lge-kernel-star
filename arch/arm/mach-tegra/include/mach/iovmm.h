@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/include/mach/iovmm.h
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010-2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -85,7 +85,7 @@ struct tegra_iovmm_client {
 struct tegra_iovmm_area {
 	struct tegra_iovmm_domain	*domain;
 	tegra_iovmm_addr_t		iovm_start;
-	tegra_iovmm_addr_t		iovm_length;
+	size_t				iovm_length;
 	pgprot_t			pgprot;
 	struct tegra_iovmm_area_ops	*ops;
 };
@@ -155,7 +155,7 @@ void tegra_iovmm_client_unlock(struct tegra_iovmm_client *client);
  * respectively. VM operations may be called before this call returns */
 struct tegra_iovmm_area *tegra_iovmm_create_vm(
 	struct tegra_iovmm_client *client, struct tegra_iovmm_area_ops *ops,
-	unsigned long size, pgprot_t pgprot);
+	size_t size, size_t align, pgprot_t pgprot);
 
 /* called by clients to "zap" an iovmm_area, and replace all mappings
  * in it with invalid ones, without freeing the virtual address range */
