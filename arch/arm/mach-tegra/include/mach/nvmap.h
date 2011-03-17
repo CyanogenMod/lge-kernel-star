@@ -1,5 +1,5 @@
 /*
- * include/linux/nvmap.h
+ * arch/arm/mach-tegra/include/mach/nvmap.h
  *
  * structure declarations for nvmem and nvmap user-space ioctls
  *

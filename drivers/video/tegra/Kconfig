@@ -99,5 +99,14 @@ config TEGRA_DSI
 	default n
 	help
 	  Say Y here to enable the DSI panel.
+
+config NVMAP_CONVERT_CARVEOUT_TO_IOVMM
+	bool "Convert carveout to IOVMM"
+	depends on TEGRA_NVMAP && TEGRA_IOVMM
+	default y
+	help
+	  Say Y here to force to convert carveout memory requests to
+	  I/O virtual memory requests.
+
 endif
 
