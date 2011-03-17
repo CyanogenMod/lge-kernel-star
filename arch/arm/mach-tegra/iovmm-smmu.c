@@ -4,7 +4,7 @@
  * Tegra I/O VMM implementation for SMMU devices for Tegra 3 series
  * systems-on-a-chip.
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010-2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -38,10 +38,10 @@
 #include <mach/iovmm.h>
 #include <mach/iomap.h>
 
-// For debugging
-//#define HIT_MISS_STAT
-//#define SMMU_SYSFS
-//#define SMMU_DEBUG
+/* For debugging */
+/*#define HIT_MISS_STAT */
+/*#define SMMU_SYSFS */
+/*#define SMMU_DEBUG*/
 
 #ifdef SMMU_DEBUG
 #define SMMU_VERBOSE 1
@@ -50,9 +50,9 @@
 #endif
 
 #if defined(CONFIG_ARCH_TEGRA_3x_SOC)
-//
-// ALL-CAP macros have been copied from t30/armc.h
-//
+/*
+ * ALL-CAP macros copied from armc.h
+ */
 #define MC_SMMU_CONFIG_0				0x10
 #define MC_SMMU_CONFIG_0_SMMU_ENABLE_DISABLE		0
 #define MC_SMMU_CONFIG_0_SMMU_ENABLE_ENABLE		1
@@ -103,31 +103,37 @@
 #define MC_SMMU_TRANSLATION_ENABLE_1_0			0x22c
 #define MC_SMMU_TRANSLATION_ENABLE_2_0			0x230
 
-#define MC_SMMU_AFI_ASID_0              0x238   // PCIE
-#define MC_SMMU_AVPC_ASID_0             0x23c   // AVP
-#define MC_SMMU_DC_ASID_0               0x240   // Display controller
-#define MC_SMMU_DCB_ASID_0              0x244   // Display controller B
-#define MC_SMMU_EPP_ASID_0              0x248   // Encoder pre-processor
-#define MC_SMMU_G2_ASID_0               0x24c   // 2D engine
-#define MC_SMMU_HC_ASID_0               0x250   // Host1x
-#define MC_SMMU_HDA_ASID_0              0x254   // High-def audio
-#define MC_SMMU_ISP_ASID_0              0x258   // Image signal processor
-#define MC_SMMU_MPE_ASID_0              0x264   // MPEG encoder
-#define MC_SMMU_NV_ASID_0               0x268   // (3D)
-#define MC_SMMU_NV2_ASID_0              0x26c   // (3D)
-#define MC_SMMU_PPCS_ASID_0             0x270   // AHB
-#define MC_SMMU_SATA_ASID_0             0x278   // SATA
-#define MC_SMMU_VDE_ASID_0              0x27c   // Video decoder
-#define MC_SMMU_VI_ASID_0               0x280   // Video input
+#define MC_SMMU_AFI_ASID_0              0x238   /* PCIE */
+#define MC_SMMU_AVPC_ASID_0             0x23c   /* AVP */
+#define MC_SMMU_DC_ASID_0               0x240   /* Display controller */
+#define MC_SMMU_DCB_ASID_0              0x244   /* Display controller B */
+#define MC_SMMU_EPP_ASID_0              0x248   /* Encoder pre-processor */
+#define MC_SMMU_G2_ASID_0               0x24c   /* 2D engine */
+#define MC_SMMU_HC_ASID_0               0x250   /* Host1x */
+#define MC_SMMU_HDA_ASID_0              0x254   /* High-def audio */
+#define MC_SMMU_ISP_ASID_0              0x258   /* Image signal processor */
+#define MC_SMMU_MPE_ASID_0              0x264   /* MPEG encoder */
+#define MC_SMMU_NV_ASID_0               0x268   /* (3D) */
+#define MC_SMMU_NV2_ASID_0              0x26c   /* (3D) */
+#define MC_SMMU_PPCS_ASID_0             0x270   /* AHB */
+#define MC_SMMU_SATA_ASID_0             0x278   /* SATA */
+#define MC_SMMU_VDE_ASID_0              0x27c   /* Video decoder */
+#define MC_SMMU_VI_ASID_0               0x280   /* Video input */
 
 #define SMMU_PDE_NEXT_SHIFT		28
+
+/* Copied from arahb_arbc.h */
+#define AHB_ARBITRATION_XBAR_CTRL_0     0xe0
+#define AHB_ARBITRATION_XBAR_CTRL_0_SMMU_INIT_DONE_DONE		1
+#define AHB_ARBITRATION_XBAR_CTRL_0_SMMU_INIT_DONE_SHIFT	17
+
 #endif
 
 #define MC_SMMU_NUM_ASIDS	4
 #define MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_SECTION__MASK		0xffc00000
-#define MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_SECTION__SHIFT	12	// right shift
+#define MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_SECTION__SHIFT	12 /* right shift */
 #define MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_GROUP__MASK		0xffffc000
-#define MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_GROUP__SHIFT	12	// right shift
+#define MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_GROUP__SHIFT	12 /* right shift */
 #define MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA(iova, which)	\
 	((((iova) & MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_##which##__MASK) >> \
 		MC_SMMU_TLB_FLUSH_0_TLB_FLUSH_VA_##which##__SHIFT) |	\
@@ -190,7 +196,7 @@ typedef unsigned long smmu_pte_t;
 #define SMMU_ASID_DISABLE	0
 #define SMMU_ASID_ASID(n)	((n)&~SMMU_ASID_ENABLE(0))
 
-// Keep this as a "natural" enumeration (no assignments)
+/* Keep this as a "natural" enumeration (no assignments) */
 enum smmu_hwclient {
 	HWC_AFI,
 	HWC_AVPC,
@@ -217,7 +223,7 @@ struct smmu_hwc_state {
 	unsigned long enable_disable;
 };
 
-// Hardware client mapping initializer
+/* Hardware client mapping initializer */
 #define HWC_INIT(client)	\
 	[HWC_##client] = {MC_SMMU_##client##_ASID_0, SMMU_ASID_DISABLE},
 
@@ -247,7 +253,7 @@ struct domain_hwc_map {
 	const unsigned int nr_hwcs;
 };
 
-// Enable all hardware clients for SMMU translation
+/* Enable all hardware clients for SMMU translation */
 static const enum smmu_hwclient nvmap_hwcs[] = {
 	HWC_AFI,
 	HWC_AVPC,
@@ -275,9 +281,9 @@ static const struct domain_hwc_map smmu_hwc_map[] = {
 	},
 };
 
-//
-// Per address space
-//
+/*
+ * Per address space
+ */
 struct smmu_as {
 	struct smmu_device	*smmu;	/* back pointer to container */
 	unsigned int		asid;
@@ -294,11 +300,11 @@ struct smmu_as {
 	int		sysfs_use_count;
 };
 
-//
-// Per SMMU device
-//
+/*
+ * Per SMMU device
+ */
 struct smmu_device {
-	void __iomem	*regs;
+	void __iomem	*regs, *regs_ahbarb;
 	tegra_iovmm_addr_t	iovmm_base;	/* remappable base address */
 	unsigned long	page_count;		/* total remappable size */
 	spinlock_t	lock;
@@ -310,15 +316,17 @@ struct smmu_device {
 	struct device	sysfs_dev;
 	int		sysfs_use_count;
 	bool		enable;
-	//
-	// Register image savers for suspend/resume
-	//
+	struct page *avp_vector_page;	/* dummy page shared by all AS's */
+
+	/*
+	 * Register image savers for suspend/resume
+	 */
 	unsigned long translation_enable_0_0;
 	unsigned long translation_enable_1_0;
 	unsigned long translation_enable_2_0;
 	unsigned long asid_security_0;
 
-	unsigned long lowest_asid;	// Variable for hardware testing
+	unsigned long lowest_asid;	/* Variables for hardware testing */
 	unsigned long debug_asid;
 	unsigned long verbose;
 };
@@ -337,10 +345,10 @@ struct smmu_device {
 #define FLUSH_SMMU_REGS(smmu)	\
 	do { wmb(); (void)readl((smmu)->regs + MC_SMMU_CONFIG_0); } while(0)
 
-//
-// Flush all TLB entries and all PTC entries
-// Caller must lock smmu
-//
+/*
+ * Flush all TLB entries and all PTC entries
+ * Caller must lock smmu
+ */
 static void smmu_flush_regs(struct smmu_device *smmu, int enable)
 {
 	writel(MC_SMMU_PTC_FLUSH_0_PTC_FLUSH_TYPE_ALL,
@@ -363,7 +371,7 @@ static void smmu_setup_regs(struct smmu_device *smmu)
 	if (smmu->as) {
 		int asid;
 
-		// Set/restore page directory for each AS
+		/* Set/restore page directory for each AS */
 		for (asid = 0; asid < smmu->num_ases; asid++) {
 			struct smmu_as *as = &smmu->as[asid];
 
@@ -376,7 +384,7 @@ static void smmu_setup_regs(struct smmu_device *smmu)
 		}
 	}
 
-	// Set/restore ASID for each hardware client
+	/* Set/restore ASID for each hardware client */
 	for (i = 0; i < HWC_COUNT; i++) {
 		struct smmu_hwc_state *hwcst = &smmu->hwc_state[i];
 		writel(hwcst->enable_disable, smmu->regs + hwcst->reg);
@@ -410,6 +418,11 @@ static void smmu_setup_regs(struct smmu_device *smmu)
 #endif
 
 	smmu_flush_regs(smmu, 1);
+	writel(
+		readl(smmu->regs_ahbarb + AHB_ARBITRATION_XBAR_CTRL_0) |
+		(AHB_ARBITRATION_XBAR_CTRL_0_SMMU_INIT_DONE_DONE <<
+			AHB_ARBITRATION_XBAR_CTRL_0_SMMU_INIT_DONE_SHIFT),
+		smmu->regs_ahbarb + AHB_ARBITRATION_XBAR_CTRL_0);
 }
 
 static int smmu_suspend(struct tegra_iovmm_device *dev)
@@ -518,17 +531,21 @@ static int smmu_remove(struct platform_device *pdev)
 		kfree(smmu->as);
 	}
 
+	if (smmu->avp_vector_page)
+		__free_page(smmu->avp_vector_page);
 	if (smmu->regs)
 		iounmap(smmu->regs);
+	if (smmu->regs_ahbarb)
+		iounmap(smmu->regs_ahbarb);
 	tegra_iovmm_unregister(&smmu->iovmm_dev);
 	kfree(smmu);
 	return 0;
 }
 
-//
-// Maps PTBL for given iova and returns the PTE address
-// Caller must unmap the mapped PTBL returned in *ptbl_page_p
-//
+/*
+ * Maps PTBL for given iova and returns the PTE address
+ * Caller must unmap the mapped PTBL returned in *ptbl_page_p
+ */
 static smmu_pte_t *locate_pte(struct smmu_as *as,
 		unsigned long iova, bool allocate,
 		struct page **ptbl_page_p,
@@ -540,14 +557,14 @@ static smmu_pte_t *locate_pte(struct smmu_as *as,
 	smmu_pte_t *ptbl;
 
 	if (pdir[pdn] != _PDE_VACANT(pdn)) {
-		// Mapped entry table already exists
+		/* Mapped entry table already exists */
 		*ptbl_page_p = SMMU_EX_PTBL_PAGE(pdir[pdn]);
 		ptbl = kmap(*ptbl_page_p);
 	} else if (!allocate) {
 		kunmap(as->pdir_page);
 		return NULL;
 	} else {
-		// Vacant - allocate a new page table
+		/* Vacant - allocate a new page table */
 		if (as->smmu->verbose)
 			printk("%s:%d new PTBL pdn=%lx\n", __func__, __LINE__, pdn);
 		*ptbl_page_p = alloc_page(GFP_KERNEL|__GFP_DMA);
@@ -611,6 +628,7 @@ static int smmu_map(struct tegra_iovmm_domain *domain,
 			printk("%s:%d iova=%lx pfn=%lx asid=%d\n",
 				__func__, __LINE__,
 				addr, pfn, as - as->smmu->as);
+
 		if (*pte == _PTE_VACANT(addr))
 			(*pte_counter)++;
 		*pte = SMMU_PFN_TO_PTE(pfn, as->pte_attr);
@@ -719,9 +737,9 @@ static void smmu_map_pfn(struct tegra_iovmm_domain *domain,
 	up(&as->sem);
 }
 
-//
-// Caller must lock/unlock as
-//
+/*
+ * Caller must lock/unlock as
+ */
 static int alloc_pdir(struct smmu_as *as)
 {
 	unsigned long *pdir;
@@ -767,10 +785,10 @@ static int alloc_pdir(struct smmu_as *as)
 
 static void _sysfs_create(struct smmu_as *as, struct device *sysfs_parent);
 
-//
-// Allocate resources for an AS
-//	TODO: split into "alloc" and "lock"
-//
+/*
+ * Allocate resources for an AS
+ *	TODO: split into "alloc" and "lock"
+ */
 static struct tegra_iovmm_domain *smmu_alloc_domain(
 	struct tegra_iovmm_device *dev, struct tegra_iovmm_client *client)
 {
@@ -780,7 +798,7 @@ static struct tegra_iovmm_domain *smmu_alloc_domain(
 	const struct domain_hwc_map *map = NULL;
 	int asid, i;
 
-	// Look for a free AS
+	/* Look for a free AS */
 	for  (asid = smmu->lowest_asid; asid < smmu->num_ases; asid++) {
 		down(&smmu->as[asid].sem);
 		if (!smmu->as[asid].hwclients) {
@@ -798,7 +816,7 @@ static struct tegra_iovmm_domain *smmu_alloc_domain(
 	if (alloc_pdir(as) < 0)
 		goto bad3;
 
-	// Look for a matching hardware client group
+	/* Look for a matching hardware client group */
 	for (i = 0; ARRAY_SIZE(smmu_hwc_map); i++) {
 		if (!strcmp(smmu_hwc_map[i].dev_name, client->misc_dev->name)) {
 			map = &smmu_hwc_map[i];
@@ -813,18 +831,18 @@ static struct tegra_iovmm_domain *smmu_alloc_domain(
 	}
 
 	spin_lock(&smmu->lock);
-	// Update PDIR register
+	/* Update PDIR register */
 	writel(MC_SMMU_PTB_ASID_0_CURRENT_ASID(as->asid),
 		as->smmu->regs + MC_SMMU_PTB_ASID_0);
 	writel(SMMU_MK_PDIR(as->pdir_page, as->pdir_attr),
 		as->smmu->regs + MC_SMMU_PTB_DATA_0);
 	FLUSH_SMMU_REGS(smmu);
 
-	// Put each hardware client in the group into the address space
+	/* Put each hardware client in the group into the address space */
 	for (i = 0; i < map->nr_hwcs; i++) {
 		struct smmu_hwc_state *hwcst = &smmu->hwc_state[map->hwcs[i]];
 
-		// Is the hardware client busy?
+		/* Is the hardware client busy? */
 		if (hwcst->enable_disable != SMMU_ASID_DISABLE &&
 			hwcst->enable_disable != SMMU_ASID_ENABLE(as->asid)) {
 			pr_err(DRIVER_NAME
@@ -839,14 +857,17 @@ static struct tegra_iovmm_domain *smmu_alloc_domain(
 	}
 	FLUSH_SMMU_REGS(smmu);
 	spin_unlock(&smmu->lock);
-
 	as->hwclients = map;
 	_sysfs_create(as, client->misc_dev->this_device);
 	up(&as->sem);
+
+	/* Reserve "page zero" for AVP vectors using a common dummy page */
+	smmu_map_pfn(&as->domain, NULL, 0,
+		page_to_phys(as->smmu->avp_vector_page)>>SMMU_PAGE_SHIFT);
 	return &as->domain;
 
 bad:
-	// Reset hardware clients that have been enabled
+	/* Reset hardware clients that have been enabled */
 	while (--i >= 0) {
 		struct smmu_hwc_state *hwcst = &smmu->hwc_state[map->hwcs[i]];
 
@@ -863,10 +884,10 @@ bad3:
 
 }
 
-//
-// Release resources for an AS
-//	TODO: split into "unlock" and "free"
-//
+/*
+ * Release resources for an AS
+ *	TODO: split into "unlock" and "free"
+ */
 static void smmu_free_domain(
 	struct tegra_iovmm_domain *domain, struct tegra_iovmm_client *client)
 {
@@ -916,7 +937,7 @@ static struct tegra_iovmm_device_ops tegra_iovmm_smmu_ops = {
 static int smmu_probe(struct platform_device *pdev)
 {
 	struct smmu_device *smmu = NULL;
-	struct resource *regs = NULL, *window = NULL;
+	struct resource *regs = NULL, *window = NULL, *regs2 = NULL;
 	int e, asid;
 
 	if (!pdev) {
@@ -935,10 +956,11 @@ static int smmu_probe(struct platform_device *pdev)
 		return -ENXIO;
 	}
 
-	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	window = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	regs = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mc");
+	regs2 = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ahbarb");
+	window = platform_get_resource_byname(pdev, IORESOURCE_MEM, "smmu");
 
-	if (!regs || !window) {
+	if (!regs || !regs2 || !window) {
 		pr_err(DRIVER_NAME ": No SMMU resources\n");
 		return -ENODEV;
 	}
@@ -952,7 +974,8 @@ static int smmu_probe(struct platform_device *pdev)
 	smmu->iovmm_base = (tegra_iovmm_addr_t)window->start;
 	smmu->page_count = (window->end + 1 - window->start) >> SMMU_PAGE_SHIFT;
 	smmu->regs = ioremap(regs->start, regs->end + 1 - regs->start);
-	if (!smmu->regs) {
+	smmu->regs_ahbarb = ioremap(regs2->start, regs2->end + 1 - regs->start);
+	if (!smmu->regs || !smmu->regs_ahbarb) {
 		pr_err(DRIVER_NAME ": failed to remap SMMU registers\n");
 		e = -ENXIO;
 		goto fail;
@@ -981,7 +1004,7 @@ static int smmu_probe(struct platform_device *pdev)
 		goto fail;
 	}
 
-	// Initialize address space structure array
+	/* Initialize address space structure array */
 	for (asid = 0; asid < smmu->num_ases; asid++) {
 		struct smmu_as *as = &smmu->as[asid];
 
@@ -1004,11 +1027,19 @@ static int smmu_probe(struct platform_device *pdev)
 	smmu_setup_regs(smmu);
 	smmu->enable = 1;
 	platform_set_drvdata(pdev, smmu);
+
+	smmu->avp_vector_page = alloc_page(GFP_KERNEL);
+	if (!smmu->avp_vector_page)
+		goto fail;
 	return 0;
 
 fail:
+	if (smmu->avp_vector_page)
+		__free_page(smmu->avp_vector_page);
 	if (smmu->regs)
 		iounmap(smmu->regs);
+	if (smmu->regs_ahbarb)
+		iounmap(smmu->regs_ahbarb);
 	if (smmu && smmu->as) {
 		for (asid = 0; asid < smmu->num_ases; asid++) {
 			if (smmu->as[asid].pdir_page) {
@@ -1044,9 +1075,9 @@ subsys_initcall(smmu_init);
 module_exit(smmu_exit);
 
 #ifdef SMMU_SYSFS
-//
-// SMMU-global sysfs interface for debugging
-//
+/*
+ * SMMU-global sysfs interface for debugging
+ */
 static ssize_t _sysfs_show_reg(struct device *d,
 				struct device_attribute *da, char *buf);
 static ssize_t _sysfs_store_reg(struct device *d,

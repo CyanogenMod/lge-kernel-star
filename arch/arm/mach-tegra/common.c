@@ -17,6 +17,7 @@
  *
  */
 
+#include <linux/platform_device.h>
 #include <linux/console.h>
 #include <linux/init.h>
 #include <linux/io.h>
@@ -324,9 +325,25 @@ out:
 	iounmap(to_io);
 }
 
+#ifdef CONFIG_TEGRA_IOVMM_SMMU
+/* Support for Tegra3 A01 chip mask that needs to have SMMU IOVA reside in
+ * the upper half of 4GB IOVA space. A02 and after use the bottom 1GB and
+ * do not need to reserve memory.
+ */
+#define SUPPORT_TEGRA_3_IOVMM_SMMU_A01
+#endif
+
 void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 	unsigned long fb2_size)
 {
+#ifdef SUPPORT_TEGRA_3_IOVMM_SMMU_A01
+	extern struct platform_device tegra_smmu_device;
+	int smmu_reserved = 0;
+	size_t smmu_window_size;
+	struct resource *smmu_window =
+		    platform_get_resource_byname(&tegra_smmu_device,
+						IORESOURCE_MEM, "smmu");
+#endif
 	if (tegra_lp0_vec_size)
 		if (memblock_reserve(tegra_lp0_vec_start, tegra_lp0_vec_size)) {
 			pr_err("Failed to reserve lp0_vec %08lx@%08lx\n",
@@ -381,11 +398,26 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 	if (tegra_carveout_size && tegra_carveout_start < tegra_grhost_aperture)
 		tegra_grhost_aperture = tegra_carveout_start;
 
-#ifdef CONFIG_TEGRA_IOVMM_SMMU
-	if (TEGRA_SMMU_BASE >= 0x80000000 &&
-		memblock_reserve(TEGRA_SMMU_BASE, TEGRA_SMMU_SIZE)) {
-		pr_err("Failed to reserve SMMU I/O VA window %08lx@%08lx\n",
-			TEGRA_SMMU_SIZE, TEGRA_SMMU_BASE);
+#ifdef SUPPORT_TEGRA_3_IOVMM_SMMU_A01
+	if (!smmu_window) {
+		pr_err("No SMMU resources\n");
+	} else {
+		if (tegra_get_revision() == TEGRA_REVISION_A01) {
+			smmu_window->start = TEGRA_SMMU_BASE_A01;
+			smmu_window->end   = TEGRA_SMMU_BASE_A01 +
+						TEGRA_SMMU_SIZE_A01 - 1;
+		}
+		smmu_window_size = smmu_window->end + 1 - smmu_window->start;
+		if (smmu_window->start >= 0x80000000) {
+			if (memblock_reserve(smmu_window->start,
+						smmu_window_size))
+				pr_err(
+			"Failed to reserve SMMU I/O VA window %08lx@%08lx\n",
+				(unsigned long)smmu_window->start,
+				(unsigned long)smmu_window_size);
+			else
+				smmu_reserved = 1;
+		}
 	}
 #endif
 
@@ -424,8 +456,9 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 		tegra_carveout_size ?
 			tegra_carveout_start + tegra_carveout_size - 1 : 0);
 
-#ifdef CONFIG_TEGRA_IOVMM_SMMU
-	pr_info("SMMU:                   %08x - %08x\n",
-		TEGRA_SMMU_BASE, TEGRA_SMMU_BASE + TEGRA_SMMU_SIZE - 1);
+#ifdef SUPPORT_TEGRA_3_IOVMM_SMMU_A01
+	if (smmu_reserved)
+		pr_info("SMMU:                   %08x - %08x\n",
+			smmu_window->start, smmu_window->end);
 #endif
 }

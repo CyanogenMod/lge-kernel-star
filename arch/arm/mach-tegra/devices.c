@@ -971,7 +971,13 @@ static struct resource tegra_smmu_resources[] = {
 		.flags	= IORESOURCE_MEM,
 		.start	= TEGRA_SMMU_BASE,
 		.end	= TEGRA_SMMU_BASE + TEGRA_SMMU_SIZE - 1,
-	}
+	},
+	[2] = {
+		.name   = "ahbarb",
+		.flags  = IORESOURCE_MEM,
+		.start  = TEGRA_AHB_ARB_BASE,
+		.end    = TEGRA_AHB_ARB_BASE + TEGRA_AHB_ARB_SIZE - 1,
+        }
 };
 
 struct platform_device tegra_smmu_device = {
