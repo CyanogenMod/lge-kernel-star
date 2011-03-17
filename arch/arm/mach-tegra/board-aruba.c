@@ -563,7 +563,11 @@ static void __init tegra_aruba_init(void)
 
 static void __init tegra_aruba_reserve(void)
 {
+#if defined(CONFIG_NVMAP_CONVERT_CARVEOUT_TO_IOVMM)
+	tegra_reserve(0, SZ_4M, 0);
+#else
 	tegra_reserve(SZ_32M, SZ_4M, 0);
+#endif
 }
 
 MACHINE_START(ARUBA, "aruba")
