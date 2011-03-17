@@ -35,6 +35,9 @@
 #include <linux/spi/spi.h>
 
 #include <mach/dma.h>
+#ifdef CONFIG_DEBUG_FS
+#include <linux/debugfs.h>
+#endif
 #include <mach/spi.h>
 #include <mach/clk.h>
 
@@ -135,6 +138,7 @@
 
 #define SLINK_TX_FIFO		0x100
 #define SLINK_RX_FIFO		0x180
+#define SLINK_FIFO_DEPTH	0x20
 
 static const unsigned long spi_tegra_req_sels[] = {
 	TEGRA_DMA_REQ_SEL_SL2B1,
@@ -143,7 +147,7 @@ static const unsigned long spi_tegra_req_sels[] = {
 	TEGRA_DMA_REQ_SEL_SL2B4,
 };
 
-#define BB_LEN			2048
+#define BB_LEN			(16384)
 #define TX_FIFO_EMPTY_COUNT_MAX		SLINK_TX_FIFO_EMPTY_COUNT(0x20)
 #define RX_FIFO_FULL_COUNT_ZERO		SLINK_RX_FIFO_FULL_COUNT(0)
 
@@ -193,6 +197,7 @@ struct spi_tegra_data {
 	bool abort_happen;
 
 	u8 g_bits_per_word;
+	struct dentry *debugfs;
 };
 
 static inline unsigned long spi_tegra_readl(struct spi_tegra_data *tspi,
@@ -219,7 +224,7 @@ static void spi_tegra_clear_status(struct spi_tegra_data *tspi)
 
 	if (val & SLINK_ERR) {
 		val_write |= SLINK_ERR;
-		printk("%s ERROR bit set 0x%lx \n", __func__, val);
+		pr_err("%s ERROR bit set 0x%lx\n", __func__, val);
 		if (val & SLINK_TX_OVF)
 			val_write |= SLINK_TX_OVF;
 		if (val & SLINK_RX_OVF)
@@ -240,6 +245,7 @@ static void spi_tegra_go(struct spi_tegra_data *tspi)
 {
 	unsigned long val;
 	unsigned long test_val;
+	unsigned unused_fifo_size;
 
 	wmb();
 
@@ -263,9 +269,12 @@ static void spi_tegra_go(struct spi_tegra_data *tspi)
 	/*
 	 * TRM 24.1.1.7 wait for the FIFO to be full
 	 */
-	test_val = spi_tegra_readl(tspi, SLINK_STATUS);
-	while (!(test_val & SLINK_TX_FULL))
-		test_val = spi_tegra_readl(tspi, SLINK_STATUS);
+	test_val = spi_tegra_readl(tspi, SLINK_STATUS2);
+	unused_fifo_size = (tspi->tx_dma_req.size/4) >= SLINK_FIFO_DEPTH ?
+				0 :
+				SLINK_FIFO_DEPTH - (tspi->tx_dma_req.size/4);
+	while (SLINK_TX_FIFO_EMPTY_COUNT(test_val) != (unused_fifo_size))
+		test_val = spi_tegra_readl(tspi, SLINK_STATUS2);
 
 	spi_tegra_writel(tspi, val, SLINK_DMA_CTL);
 }
@@ -290,7 +299,8 @@ static unsigned spi_tegra_fill_tx_fifo(struct spi_tegra_data *tspi,
 		for (i = 0; i < len; i += tspi->cur_bytes_per_word) {
 			val = 0;
 			for (j = 0; j < tspi->cur_bytes_per_word; j++)
-				val |= tx_buf[i + j] << j * 8;
+				val |=
+					tx_buf[i + j] << (tspi->cur_bytes_per_word - j - 1) * 8;
 
 			tspi->tx_bb[i / tspi->cur_bytes_per_word] = val;
 		}
@@ -315,7 +325,8 @@ static unsigned spi_tegra_drain_rx_fifo(struct spi_tegra_data *tspi,
 		for (i = 0; i < len; i += tspi->cur_bytes_per_word) {
 			val = tspi->rx_bb[i / tspi->cur_bytes_per_word];
 			for (j = 0; j < tspi->cur_bytes_per_word; j++)
-				rx_buf[i + j] = (val >> (j * 8)) & 0xff;
+				rx_buf[i + j] =
+					(val >> (tspi->cur_bytes_per_word - j - 1) * 8) & 0xff;
 		}
 	}
 
@@ -361,7 +372,7 @@ static void spi_tegra_start_transfer(struct spi_device *spi,
 
 	spi_tegra_clear_status(tspi);
 	val = spi_tegra_readl(tspi, SLINK_COMMAND2);
-	val &= ~SLINK_SS_EN_CS(~0) | SLINK_RXEN | SLINK_TXEN;
+	val &= ~(SLINK_SS_EN_CS(~0) | SLINK_RXEN | SLINK_TXEN);
 	if (t->rx_buf)
 		val |= SLINK_RXEN;
 	if (t->tx_buf)
@@ -617,6 +628,73 @@ static int spi_tegra_transfer(struct spi_device *spi, struct spi_message *m)
 	return 0;
 }
 
+#ifdef CONFIG_DEBUG_FS
+static int spi_show_regs_open(struct inode *inode, struct file *file)
+{
+	file->private_data = inode->i_private;
+	return 0;
+}
+
+#define SPI_TEGRA_BUFSIZE	512
+static ssize_t  spi_show_regs(struct file *file, char __user *user_buf,
+				size_t count, loff_t *ppos)
+{
+	struct spi_tegra_data *tspi;
+	char *buf;
+	u32 len = 0;
+	ssize_t ret;
+	unsigned long flags;
+
+	tspi = file->private_data;
+	buf = kzalloc(SPI_TEGRA_BUFSIZE, GFP_KERNEL);
+	if (!buf)
+		return 0;
+
+	spin_lock_irqsave(&tspi->lock, flags);
+	len += snprintf(buf + len, SPI_TEGRA_BUFSIZE - len,
+		"SPI registers:\n");
+	len += snprintf(buf + len, SPI_TEGRA_BUFSIZE - len,
+		"SLINK_STATUS 0x%lx\n", spi_tegra_readl(tspi, SLINK_STATUS));
+	len += snprintf(buf + len, SPI_TEGRA_BUFSIZE - len,
+		"SLINK_STATUS2 0x%lx\n", spi_tegra_readl(tspi, SLINK_STATUS2));
+	len += snprintf(buf + len, SPI_TEGRA_BUFSIZE - len,
+		"SLINK_COMMAND 0x%lx\n", spi_tegra_readl(tspi, SLINK_COMMAND));
+	len += snprintf(buf + len, SPI_TEGRA_BUFSIZE - len,
+		"SLINK_COMMAND2 0x%lx\n", spi_tegra_readl(tspi, SLINK_COMMAND2));
+	len += snprintf(buf + len, SPI_TEGRA_BUFSIZE - len,
+		"SLINK_DMA_CTL 0x%lx\n", spi_tegra_readl(tspi, SLINK_DMA_CTL));
+	spin_unlock_irqrestore(&tspi->lock, flags);
+	ret =  simple_read_from_buffer(user_buf, count, ppos, buf, len);
+	kfree(buf);
+	return ret;
+}
+
+static const struct file_operations tegra_spi_regs_ops = {
+	.owner		= THIS_MODULE,
+	.open		= spi_show_regs_open,
+	.read		= spi_show_regs,
+};
+
+static int tegra_spi_debugfs_init(struct spi_tegra_data *tspi)
+{
+	char name[20] = {0};
+
+	sprintf(name, "%s.%d", tspi->pdev->name, tspi->pdev->id);
+	tspi->debugfs = debugfs_create_dir(name, NULL);
+	if (!tspi->debugfs)
+		return -ENOMEM;
+	debugfs_create_file("registers", S_IFREG | S_IRUGO,
+		tspi->debugfs, (void *)tspi, &tegra_spi_regs_ops);
+	return 0;
+}
+
+static void tegra_spi_debugfs_remove(struct spi_tegra_data *tspi)
+{
+	if (tspi->debugfs)
+		debugfs_remove_recursive(tspi->debugfs);
+}
+#endif
+
 static int __init spi_tegra_probe(struct platform_device *pdev)
 {
 	struct spi_master	*master;
@@ -732,6 +810,9 @@ static int __init spi_tegra_probe(struct platform_device *pdev)
 	tspi->tx_dma_req.dev = tspi;
 
 	ret = spi_register_master(master);
+#ifdef CONFIG_DEBUG_FS
+	tegra_spi_debugfs_init(tspi);
+#endif
 	if (ret < 0)
 		goto err7;
 
@@ -766,7 +847,9 @@ static int __devexit spi_tegra_remove(struct platform_device *pdev)
 
 	master = dev_get_drvdata(&pdev->dev);
 	tspi = spi_master_get_devdata(master);
-
+#ifdef CONFIG_DEBUG_FS
+	tegra_spi_debugfs_remove(tspi);
+#endif
 	tegra_dma_free_channel(tspi->rx_dma);
 
 	dma_free_coherent(&pdev->dev, sizeof(u32) * BB_LEN,
