@@ -494,7 +494,11 @@ static void __init tegra_cardhu_init(void)
 
 static void __init tegra_cardhu_reserve(void)
 {
+#if defined(CONFIG_NVMAP_CONVERT_CARVEOUT_TO_IOVMM)
+	tegra_reserve(0, SZ_4M, SZ_8M);
+#else
 	tegra_reserve(SZ_128M, SZ_4M, SZ_8M);
+#endif
 }
 
 MACHINE_START(CARDHU, "cardhu")
