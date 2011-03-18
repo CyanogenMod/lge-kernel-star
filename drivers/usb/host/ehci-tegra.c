@@ -652,7 +652,8 @@ static ssize_t store_ehci_power(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(ehci_power, 0666, show_ehci_power, store_ehci_power);
+static DEVICE_ATTR(ehci_power, S_IRUSR | S_IRGRP | S_IWUSR | S_IWGRP,
+		show_ehci_power, store_ehci_power);
 
 static inline int create_ehci_sys_file(struct ehci_hcd *ehci)
 {
