@@ -58,6 +58,9 @@
 #define CLK_OUT_ENB_CLR_V		0x444
 #define CLK_OUT_ENB_NUM			5
 
+#define RST_DEVICES_V_SWR_CPULP_RST_DIS	(0x1 << 1)
+#define CLK_OUT_ENB_V_CLK_ENB_CPULP_EN	(0x1 << 1)
+
 #define PERIPH_CLK_TO_BIT(c)		(1 << (c->u.periph.clk_num % 32))
 #define PERIPH_CLK_TO_RST_REG(c)	\
 	periph_clk_to_reg((c), RST_DEVICES_L, RST_DEVICES_V, 4)
@@ -3435,14 +3438,24 @@ void tegra_clk_resume(void)
 	clk_writel(*ctx++, RST_DEVICES_L);
 	clk_writel(*ctx++, RST_DEVICES_H);
 	clk_writel(*ctx++, RST_DEVICES_U);
-	clk_writel(*ctx++, RST_DEVICES_V);
+
+	/* For LP0 resume, don't reset lpcpu, since we are running from it */
+	val = *ctx++;
+	val &= ~RST_DEVICES_V_SWR_CPULP_RST_DIS;
+	clk_writel(val, RST_DEVICES_V);
+
 	clk_writel(*ctx++, RST_DEVICES_W);
 	wmb();
 
 	clk_writel(*ctx++, CLK_OUT_ENB_L);
 	clk_writel(*ctx++, CLK_OUT_ENB_H);
 	clk_writel(*ctx++, CLK_OUT_ENB_U);
-	clk_writel(*ctx++, CLK_OUT_ENB_V);
+
+	/* For LP0 resume, clk to lpcpu is required to be on */
+	val = *ctx++;
+	val |= CLK_OUT_ENB_V_CLK_ENB_CPULP_EN;
+	clk_writel(val, CLK_OUT_ENB_V);
+
 	clk_writel(*ctx++, CLK_OUT_ENB_W);
 	wmb();
 
