@@ -689,6 +689,9 @@ static int tegra_suspend_enter(suspend_state_t state)
 	cpu_pm_enter();
 	cpu_complex_pm_enter();
 
+	if (mode == TEGRA_SUSPEND_LP0)
+		tegra_lp0_suspend_mc();
+
 	suspend_cpu_complex();
 	flush_cache_all();
 	outer_flush_all();
@@ -700,6 +703,10 @@ static int tegra_suspend_enter(suspend_state_t state)
 		tegra_sleep_core(PLAT_PHYS_OFFSET - PAGE_OFFSET);
 
 	tegra_init_cache();
+
+	if (mode == TEGRA_SUSPEND_LP0)
+		tegra_lp0_resume_mc();
+
 	restore_cpu_complex();
 
 	cpu_complex_pm_exit();

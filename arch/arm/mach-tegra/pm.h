@@ -76,7 +76,7 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat);
 
 void tegra_idle_lp2(void);
 
-#if defined(CONFIG_TEGRA_AUTO_HOTPLUG) && defined(CONFIG_ARCH_TEGRA_3x_SOC)
+#if defined(CONFIG_TEGRA_AUTO_HOTPLUG) && !defined(CONFIG_ARCH_TEGRA_2x_SOC)
 int tegra_auto_hotplug_init(void);
 void tegra_auto_hotplug_exit(void);
 void tegra_auto_hotplug_governor(unsigned int cpu_freq);
@@ -110,6 +110,8 @@ static inline unsigned int is_lp_cluster(void)
 { return 0; }
 static inline unsigned long tegra_get_lpcpu_max_rate(void)
 { return 0; }
+#define tegra_lp0_suspend_mc() do {} while(0)
+#define tegra_lp0_resume_mc() do {} while(0)
 #else
 #define INSTRUMENT_CLUSTER_SWITCH 1	/* Should be zero for shipping code */
 #define DEBUG_CLUSTER_SWITCH 1		/* Should be zero for shipping code */
@@ -130,6 +132,8 @@ static inline unsigned int is_lp_cluster(void)
 	return (reg & 1); /* 0 == G, 1 == LP*/
 }
 unsigned long tegra_get_lpcpu_max_rate(void);
+void tegra_lp0_suspend_mc(void);
+void tegra_lp0_resume_mc(void);
 #endif
 
 #if DEBUG_CLUSTER_SWITCH

@@ -28,6 +28,8 @@
 #include <mach/iomap.h>
 #include <mach/irqs.h>
 
+#include "tegra3_emc.h"
+
 #define MC_INT_STATUS			0x0
 #define MC_INT_MASK			0x4
 #define MC_INT_DECERR_EMEM		(1<<6)
@@ -185,12 +187,21 @@ out:
 
 void __init tegra_mc_init(void)
 {
+	void __iomem *mc = IO_ADDRESS(TEGRA_MC_BASE);
+	u32 reg;
+
+	reg = 0x0A7F1010;
+	writel(reg, mc + MC_RESERVED_RSV);
+
+	reg = readl(mc + MC_EMEM_ARB_OVERRIDE);
+	reg |= 3;
+	writel(reg, mc + MC_EMEM_ARB_OVERRIDE);
+
 	if (request_irq(INT_MC_GENERAL, tegra_mc_error_isr, 0,
 			"mc_status", NULL)) {
 		pr_err("%s: unable to register MC error interrupt\n", __func__);
 	} else {
-		void __iomem *mc = IO_ADDRESS(TEGRA_MC_BASE);
-		u32 reg = MC_INT_DECERR_EMEM | MC_INT_SECURITY_VIOLATION |
+		reg = MC_INT_DECERR_EMEM | MC_INT_SECURITY_VIOLATION |
 				MC_INT_INVALID_SMMU_PAGE;
 		writel(reg, mc + MC_INT_MASK);
 	}
