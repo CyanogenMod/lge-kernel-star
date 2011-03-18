@@ -589,13 +589,17 @@ static void tegra_common_resume(void)
 
 static int tegra_suspend_prepare_late(void)
 {
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	disable_irq(INT_SYS_STATS_MON);
+#endif
 	return 0;
 }
 
 static void tegra_suspend_wake(void)
 {
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	enable_irq(INT_SYS_STATS_MON);
+#endif
 }
 
 static void tegra_pm_set(enum tegra_suspend_mode mode)
