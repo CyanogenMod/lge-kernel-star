@@ -171,6 +171,16 @@ static struct resource spi_resource4[] = {
 	},
 };
 
+struct platform_device tegra_spi_slave_device1 = {
+	.name           = "tegra_spi_slave",
+	.id             = 0,
+	.resource       = spi_resource1,
+	.num_resources  = ARRAY_SIZE(spi_resource1),
+	.dev  = {
+		.coherent_dma_mask      = 0xffffffff,
+	},
+};
+
 struct platform_device tegra_spi_device1 = {
 	.name		= "spi_tegra",
 	.id		= 0,
