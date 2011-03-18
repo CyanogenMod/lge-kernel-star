@@ -3,9 +3,6 @@
  *
  * Copyright (C) 2011 NVIDIA Corporation.
  *
- * Contributors:
- *      Qinggang Zhou <qzhou@nvidia.com>
- *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -61,7 +58,10 @@ static int sh532u_read_u8(u8 dev, u8 addr, u8 *val)
 
 	data[0] = (u8)addr;
 
-	msg[1].addr = client->addr;
+	if (dev)
+		msg[1].addr = dev;
+	else
+		msg[1].addr = client->addr;
 	msg[1].flags = I2C_M_RD;
 	msg[1].len = 1;
 	msg[1].buf = data + 2;
@@ -330,7 +330,7 @@ static unsigned int a2buf[] = {
 /* Write 1 byte data to the HVCA Drive IC by data type */
 static void sh532u_hvca_wr1(u8 ep_type, u8 ep_data1, u8 ep_addr)
 {
-	int err;
+	int err = 0;
 	u8 us_data;
 
 	switch (ep_type & 0xF0) {
@@ -360,13 +360,15 @@ static void sh532u_hvca_wr1(u8 ep_type, u8 ep_data1, u8 ep_addr)
 		err = 1;
 	}
 	if (!err)
-		sh532u_write_u8((u16)ep_addr, us_data);
+		err = sh532u_write_u8((u16)ep_addr, us_data);
+	if (err)
+		pr_err("Focuser: Failed to init!\n");
 }
 
 /* Write 2 byte data to the HVCA Drive IC by data type */
 static void sh532u_hvca_wr2(u8 ep_type, u8 ep_data1, u8 ep_data2, u8 ep_addr)
 {
-	int err;
+	int err = 0;
 	u8 uc_data1;
 	u8 uc_data2;
 	u16 us_data;
@@ -407,7 +409,9 @@ static void sh532u_hvca_wr2(u8 ep_type, u8 ep_data1, u8 ep_data2, u8 ep_addr)
 		err = 1;
 	}
 	if (!err)
-		sh532u_write_u16((u16)ep_addr, us_data);
+		err = sh532u_write_u16((u16)ep_addr, us_data);
+	if (err)
+		pr_err("Focuser: Failed to init!\n");
 }
 
 static void init_driver(void)
@@ -421,7 +425,7 @@ static void init_driver(void)
 			/* use hardcoded data instead */
 			eeprom_data = a2buf[(eeprom_addr & 0xFF) / 4];
 		} else {
-			if (!eeprom_read_u32(eeprom_addr & 0xFF, &eeprom_data))
+			if (eeprom_read_u32(eeprom_addr & 0xFF, &eeprom_data))
 				pr_info("sh532u: cannot read eeprom\n");
 		}
 
