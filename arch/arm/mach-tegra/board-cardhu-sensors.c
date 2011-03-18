@@ -584,7 +584,7 @@ static int __init cam_tca6416_init(void)
 }
 #endif
 
-#ifdef CONFIG_SENSORS_MPU3050
+#ifdef CONFIG_MPU_SENSORS_MPU3050
 #define SENSOR_MPU_NAME "mpu3050"
 static struct mpu3050_platform_data mpu3050_data = {
 	.int_config  = 0x10,
@@ -672,11 +672,11 @@ int __init cardhu_sensors_init(void)
 	i2c_register_board_info(4, cardhu_i2c4_nct1008_board_info,
 		ARRAY_SIZE(cardhu_i2c4_nct1008_board_info));
 
-#ifdef CONFIG_SENSORS_MPU3050
+#ifdef CONFIG_MPU_SENSORS_MPU3050
 	cardhu_mpuirq_init();
 #endif
 
-#ifdef CONFIG_SENSORS_MPU3050
+#ifdef CONFIG_MPU_SENSORS_MPU3050
 	i2c_register_board_info(2, mpu3050_i2c0_boardinfo,
 		ARRAY_SIZE(mpu3050_i2c0_boardinfo));
 #endif
