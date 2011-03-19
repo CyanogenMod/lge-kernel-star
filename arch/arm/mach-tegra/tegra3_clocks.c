@@ -2572,7 +2572,7 @@ static struct clk tegra_pll_x_out0 = {
 
 static struct clk_pll_freq_table tegra_pll_e_freq_table[] = {
 	/* PLLE special case: use cpcon field to store cml divider value */
-	{ 12000000,  100000000, 200, 1,  24, 13},
+	{ 12000000,  100000000, 150, 1,  18, 11},
 	{ 216000000, 100000000, 200, 18, 24, 13},
 #ifdef CONFIG_TEGRA_FPGA_PLATFORM
 	{ 13000000,  100000000, 200, 1,  26, 13},
