@@ -62,6 +62,10 @@ static struct regulator *cardhu_hdmi_vddio = NULL;
 
 static atomic_t sd_brightness = ATOMIC_INIT(255);
 
+static struct regulator *cardhu_lvds_reg = NULL;
+static struct regulator *cardhu_lvds_vdd_bl = NULL;
+static struct regulator *cardhu_lvds_vdd_panel = NULL;
+
 static int cardhu_backlight_init(struct device *dev) {
 	int ret;
 
@@ -110,7 +114,7 @@ static int cardhu_backlight_init(struct device *dev) {
 static void cardhu_backlight_exit(struct device *dev) {
 #ifndef CONFIG_TEGRA_CARDHU_DSI
 	int ret;
-	ret = gpio_request(cardhu_bl_enb, "backlight_enb");
+	/*ret = gpio_request(cardhu_bl_enb, "backlight_enb");*/
 	gpio_set_value(cardhu_bl_enb, 0);
 	gpio_free(cardhu_bl_enb);
 	tegra_gpio_disable(cardhu_bl_enb);
@@ -180,23 +184,50 @@ static struct platform_device cardhu_backlight_device = {
 
 static int cardhu_panel_enable(void)
 {
-	static struct regulator *reg = NULL;
-
-	if (reg == NULL) {
-		reg = regulator_get(NULL, "avdd_lvds");
-		if (WARN_ON(IS_ERR(reg)))
-			pr_err("%s: couldn't get regulator avdd_lvds: %ld\n",
-			       __func__, PTR_ERR(reg));
+	if (cardhu_lvds_reg == NULL) {
+		cardhu_lvds_reg = regulator_get(NULL, "vdd_lvds");
+		if (WARN_ON(IS_ERR(cardhu_lvds_reg)))
+			pr_err("%s: couldn't get regulator vdd_lvds: %ld\n",
+			       __func__, PTR_ERR(cardhu_lvds_reg));
 		else
-			regulator_enable(reg);
+			regulator_enable(cardhu_lvds_reg);
 	}
 
+	if (cardhu_lvds_vdd_bl == NULL) {
+		cardhu_lvds_vdd_bl = regulator_get(NULL, "vdd_backlight");
+		if (WARN_ON(IS_ERR(cardhu_lvds_vdd_bl)))
+			pr_err("%s: couldn't get regulator vdd_backlight: %ld\n",
+			       __func__, PTR_ERR(cardhu_lvds_vdd_bl));
+		else
+			regulator_enable(cardhu_lvds_vdd_bl);
+	}
+
+	if (cardhu_lvds_vdd_panel == NULL) {
+		cardhu_lvds_vdd_panel = regulator_get(NULL, "vdd_lcd_panel");
+		if (WARN_ON(IS_ERR(cardhu_lvds_vdd_panel)))
+			pr_err("%s: couldn't get regulator vdd_lcd_panel: %ld\n",
+			       __func__, PTR_ERR(cardhu_lvds_vdd_panel));
+		else
+			regulator_enable(cardhu_lvds_vdd_panel);
+	}
 	gpio_set_value(cardhu_lvds_shutdown, 1);
 	return 0;
 }
 
 static int cardhu_panel_disable(void)
 {
+	regulator_disable(cardhu_lvds_reg);
+	regulator_put(cardhu_lvds_reg);
+	cardhu_lvds_reg = NULL;
+
+	regulator_disable(cardhu_lvds_vdd_bl);
+	regulator_put(cardhu_lvds_vdd_bl);
+	cardhu_lvds_vdd_bl = NULL;
+
+	regulator_disable(cardhu_lvds_vdd_panel);
+	regulator_put(cardhu_lvds_vdd_panel);
+	cardhu_lvds_vdd_panel= NULL;
+
 	gpio_set_value(cardhu_lvds_shutdown, 0);
 	return 0;
 }
