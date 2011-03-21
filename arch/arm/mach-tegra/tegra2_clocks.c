@@ -2094,8 +2094,8 @@ static struct clk_mux_sel mux_pllp_out3[] = {
 	{ 0, 0},
 };
 
-static struct clk_mux_sel mux_plld[] = {
-	{ .input = &tegra_pll_d, .value = 0},
+static struct clk_mux_sel mux_plld_out0[] = {
+	{ .input = &tegra_pll_d_out0, .value = 0},
 	{ 0, 0},
 };
 
@@ -2214,7 +2214,7 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("usbd",	"fsl-tegra-udc",	NULL,	22,	0,	0x31E,	480000000, mux_clk_m,			0), /* requires min voltage */
 	PERIPH_CLK("usb2",	"tegra-ehci.1",		NULL,	58,	0,	0x31E,	480000000, mux_clk_m,			0), /* requires min voltage */
 	PERIPH_CLK("usb3",	"tegra-ehci.2",		NULL,	59,	0,	0x31E,	480000000, mux_clk_m,			0), /* requires min voltage */
-	PERIPH_CLK("dsi",	"dsi",			NULL,	48,	0,	0x31E,	500000000, mux_plld,			0), /* scales with voltage */
+	PERIPH_CLK("dsi",	"dsi",			NULL,	48,	0,	0x31E,	500000000, mux_plld_out0,		0), /* scales with voltage */
 	PERIPH_CLK("csi",	"tegra_camera",		"csi",	52,	0,	0x31E,	72000000,  mux_pllp_out3,		0),
 	PERIPH_CLK("isp",	"tegra_camera",		"isp",	23,	0,	0x31E,	150000000, mux_clk_m,			0), /* same frequency as VI */
 	PERIPH_CLK("csus",	"tegra_camera",		"csus",	92,	0,	0x31E,	150000000, mux_clk_m,			PERIPH_NO_RESET),
