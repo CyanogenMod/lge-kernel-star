@@ -2830,6 +2830,15 @@ static struct clk tegra_clk_virtual_cpu = {
 	},
 };
 
+static struct clk tegra_clk_twd = {
+	.name     = "twd",
+	.parent   = &tegra_clk_cclk,
+	.ops      = NULL,
+	.max_rate = 400000000,
+	.mul      = 1,
+	.div      = 2,
+};
+
 static struct clk tegra_clk_cop = {
 	.name      = "cop",
 	.parent    = &tegra_clk_sclk,
@@ -3180,6 +3189,7 @@ struct clk_duplicate tegra_clk_duplicates[] = {
 	CLK_DUPLICATE("sbc4", "spi_slave_tegra.3", NULL),
 	CLK_DUPLICATE("sbc5", "spi_slave_tegra.4", NULL),
 	CLK_DUPLICATE("sbc6", "spi_slave_tegra.5", NULL),
+	CLK_DUPLICATE("twd", "smp_twd", NULL),
 };
 
 struct clk *tegra_ptr_clks[] = {
@@ -3218,6 +3228,7 @@ struct clk *tegra_ptr_clks[] = {
 	&tegra_clk_blink,
 	&tegra_clk_cop,
 	&tegra_clk_emc,
+	&tegra_clk_twd,
 };
 
 static void tegra3_init_one_clock(struct clk *c)
