@@ -28,6 +28,8 @@
 #include <mach/iomap.h>
 #include <mach/irqs.h>
 
+#include <generated/mach-types.h>
+
 #include "gpio-names.h"
 #include "fuse.h"
 #include "power.h"
@@ -246,6 +248,9 @@ int __init ventana_regulator_init(void)
 static int __init ventana_pcie_init(void)
 {
 	int ret;
+
+	if (!machine_is_ventana())
+		return 0;
 
 	ret = gpio_request(TPS6586X_GPIO_BASE, "pcie_vdd");
 	if (ret < 0)
