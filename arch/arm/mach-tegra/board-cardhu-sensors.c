@@ -440,6 +440,12 @@ static void cardhu_mpuirq_init(void)
 #endif
 
 
+static struct i2c_board_info cardhu_i2c2_isl_board_info[] = {
+	{
+		I2C_BOARD_INFO("isl29028", 0x44),
+	}
+};
+
 int __init cardhu_sensors_init(void)
 {
 	int err;
@@ -462,6 +468,9 @@ int __init cardhu_sensors_init(void)
 
 	i2c_register_board_info(4, cardhu_i2c4_board_info,
 		ARRAY_SIZE(cardhu_i2c4_board_info));
+
+	i2c_register_board_info(2, cardhu_i2c2_isl_board_info,
+		ARRAY_SIZE(cardhu_i2c2_isl_board_info));
 
 	err = cardhu_nct1008_init();
 	if (err)
