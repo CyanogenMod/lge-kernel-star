@@ -121,6 +121,7 @@ struct tegra_dsi_out {
 	u8		pixel_format;			/* required*/
 	u8		refresh_rate;			/* required*/
 	u8		virtual_channel;		/* required*/
+	u8		dsi_instance;
 
 	bool		panel_has_frame_buffer;	/* required*/
 
