@@ -132,6 +132,7 @@
 #define SLINK_STATUS2		0x01c
 #define   SLINK_TX_FIFO_EMPTY_COUNT(val)	(((val) & 0x3f) >> 0)
 #define   SLINK_RX_FIFO_FULL_COUNT(val)		(((val) & 0x3f0000) >> 16)
+#define   SLINK_SS_HOLD_TIME(val)		(((val) & 0xF) << 6)
 
 #define SLINK_TX_FIFO		0x100
 #define SLINK_RX_FIFO		0x180
@@ -211,6 +212,8 @@ struct spi_tegra_data {
 	bool			is_clkon_always;
 	bool			clk_state;
 	bool			is_suspended;
+
+	bool			is_hw_based_cs;
 
 	struct completion	rx_dma_complete;
 	struct completion	tx_dma_complete;
@@ -565,14 +568,23 @@ static int spi_tegra_start_cpu_based_transfer(
 }
 
 static void spi_tegra_start_transfer(struct spi_device *spi,
-		    struct spi_transfer *t, bool is_first_of_msg)
+		    struct spi_transfer *t, bool is_first_of_msg,
+		    bool is_single_xfer)
 {
 	struct spi_tegra_data *tspi = spi_master_get_devdata(spi->master);
 	u32 speed;
 	u8 bits_per_word;
-	unsigned long val;
 	unsigned total_fifo_words;
 	int ret;
+	struct tegra_spi_device_controller_data *cdata = spi->controller_data;
+	unsigned long command;
+	unsigned long command2;
+#if defined CONFIG_ARCH_TEGRA_3x_SOC
+	unsigned long status2;
+#endif
+	int cs_setup_count;
+	int cs_hold_count;
+
 	unsigned int cs_pol_bit[] = {
 			SLINK_CS_POLARITY,
 			SLINK_CS_POLARITY1,
@@ -589,8 +601,17 @@ static void spi_tegra_start_transfer(struct spi_device *spi,
 		tspi->cur_speed = speed;
 	}
 
-	if (is_first_of_msg) {
+	tspi->cur = t;
+	tspi->cur_spi = spi;
+	tspi->cur_pos = 0;
+	tspi->cur_rx_pos = 0;
+	tspi->cur_tx_pos = 0;
+	tspi->rx_complete = 0;
+	tspi->tx_complete = 0;
+	total_fifo_words = spi_tegra_calculate_curr_xfer_param(spi, tspi, t);
 
+	command2 = tspi->def_command2_reg;
+	if (is_first_of_msg) {
 		if (!tspi->is_clkon_always) {
 			if (!tspi->clk_state) {
 				clk_enable(tspi->clk);
@@ -600,52 +621,71 @@ static void spi_tegra_start_transfer(struct spi_device *spi,
 
 		spi_tegra_clear_status(tspi);
 
-		val = tspi->def_command_reg;
-		val |= SLINK_BIT_LENGTH(bits_per_word - 1);
+		command = tspi->def_command_reg;
+		command |= SLINK_BIT_LENGTH(bits_per_word - 1);
 
-		val ^= cs_pol_bit[spi->chip_select];
+		/* possibly use the hw based chip select */
+		tspi->is_hw_based_cs = false;
+		if (cdata && cdata->is_hw_based_cs && is_single_xfer) {
+			if ((tspi->curr_dma_words * tspi->bytes_per_word) ==
+						(t->len - tspi->cur_pos)) {
+				cs_setup_count = cdata->cs_setup_clk_count >> 1;
+				if (cs_setup_count > 3)
+					cs_setup_count = 3;
+				cs_hold_count = cdata->cs_hold_clk_count;
+				if (cs_hold_count > 0xF)
+					cs_hold_count = 0xF;
+				tspi->is_hw_based_cs = true;
 
-		val &= ~SLINK_IDLE_SCLK_MASK & ~SLINK_CK_SDA;
+				command &= ~SLINK_CS_SW;
+				command2 &= ~SLINK_SS_SETUP(3);
+				command2 |= SLINK_SS_SETUP(cs_setup_count);
+#if defined CONFIG_ARCH_TEGRA_3x_SOC
+				status2 = spi_tegra_readl(tspi, SLINK_STATUS2);
+				status2 &= ~SLINK_SS_HOLD_TIME(0xF);
+				status2 |= SLINK_SS_HOLD_TIME(cs_hold_count);
+				spi_tegra_writel(tspi, status2, SLINK_STATUS2);
+#endif
+			}
+		}
+		if (!tspi->is_hw_based_cs) {
+			command |= SLINK_CS_SW;
+			command ^= cs_pol_bit[spi->chip_select];
+		}
+
+		command &= ~SLINK_IDLE_SCLK_MASK & ~SLINK_CK_SDA;
 		if (spi->mode & SPI_CPHA)
-			val |= SLINK_CK_SDA;
+			command |= SLINK_CK_SDA;
 
 		if (spi->mode & SPI_CPOL)
-			val |= SLINK_IDLE_SCLK_DRIVE_HIGH;
+			command |= SLINK_IDLE_SCLK_DRIVE_HIGH;
 		else
-			val |= SLINK_IDLE_SCLK_DRIVE_LOW;
+			command |= SLINK_IDLE_SCLK_DRIVE_LOW;
 	} else {
-		val = tspi->command_reg;
-		val &= ~SLINK_BIT_LENGTH(~0);
-		val |= SLINK_BIT_LENGTH(bits_per_word - 1);
+		command = tspi->command_reg;
+		command &= ~SLINK_BIT_LENGTH(~0);
+		command |= SLINK_BIT_LENGTH(bits_per_word - 1);
 	}
-	spi_tegra_writel(tspi, val, SLINK_COMMAND);
-	tspi->command_reg = val;
+
+	spi_tegra_writel(tspi, command, SLINK_COMMAND);
+	tspi->command_reg = command;
 
 	dev_dbg(&tspi->pdev->dev, "The def 0x%x and written 0x%lx\n",
-				tspi->def_command_reg, val);
+				tspi->def_command_reg, command);
 
-	val = tspi->def_command2_reg;
-	val &= ~(SLINK_SS_EN_CS(~0) | SLINK_RXEN | SLINK_TXEN);
+	command2 &= ~(SLINK_SS_EN_CS(~0) | SLINK_RXEN | SLINK_TXEN);
 	tspi->cur_direction = 0;
 	if (t->rx_buf) {
-		val |= SLINK_RXEN;
+		command2 |= SLINK_RXEN;
 		tspi->cur_direction |= DATA_DIR_RX;
 	}
 	if (t->tx_buf) {
-		val |= SLINK_TXEN;
+		command2 |= SLINK_TXEN;
 		tspi->cur_direction |= DATA_DIR_TX;
 	}
-	val |= SLINK_SS_EN_CS(spi->chip_select);
-	spi_tegra_writel(tspi, val, SLINK_COMMAND2);
-
-	tspi->cur = t;
-	tspi->cur_spi = spi;
-	tspi->cur_pos = 0;
-	tspi->cur_rx_pos = 0;
-	tspi->cur_tx_pos = 0;
-	tspi->rx_complete = 0;
-	tspi->tx_complete = 0;
-	total_fifo_words = spi_tegra_calculate_curr_xfer_param(spi, tspi, t);
+	command2 |= SLINK_SS_EN_CS(spi->chip_select);
+	spi_tegra_writel(tspi, command2, SLINK_COMMAND2);
+	tspi->command2_reg = command2;
 
 	if (total_fifo_words > SPI_FIFO_DEPTH)
 		ret = spi_tegra_start_dma_based_transfer(tspi, t);
@@ -658,12 +698,14 @@ static void spi_tegra_start_message(struct spi_device *spi,
 				    struct spi_message *m)
 {
 	struct spi_transfer *t;
+	int single_xfer = 0;
 
+	single_xfer = list_is_singular(&m->transfers);
 	m->actual_length = 0;
 	m->status = 0;
 
 	t = list_first_entry(&m->transfers, struct spi_transfer, transfer_list);
-	spi_tegra_start_transfer(spi, t, true);
+	spi_tegra_start_transfer(spi, t, true, single_xfer);
 }
 
 static int spi_tegra_setup(struct spi_device *spi)
@@ -720,6 +762,7 @@ static int spi_tegra_transfer(struct spi_device *spi, struct spi_message *m)
 	struct spi_transfer *t;
 	unsigned long flags;
 	int was_empty;
+	int bytes_per_word;
 
 	if (list_empty(&m->transfers) || !m->complete)
 		return -EINVAL;
@@ -729,6 +772,15 @@ static int spi_tegra_transfer(struct spi_device *spi, struct spi_message *m)
 			return -EINVAL;
 
 		if (t->len == 0)
+			return -EINVAL;
+
+		/* Check that the all words are available */
+		if (t->bits_per_word)
+			bytes_per_word = (t->bits_per_word + 7)/8;
+		else
+			bytes_per_word = (spi->bits_per_word + 7)/8;
+
+		if (t->len % bytes_per_word != 0)
 			return -EINVAL;
 
 		if (!t->rx_buf && !t->tx_buf)
@@ -761,6 +813,12 @@ static void spi_tegra_curr_transfer_complete(struct spi_tegra_data *tspi,
 	struct spi_message *m;
 	struct spi_device *spi;
 
+	/* Check if CS need to be toggele here */
+	if (tspi->cur && tspi->cur->cs_change &&
+				tspi->cur->delay_usecs) {
+		udelay(tspi->cur->delay_usecs);
+	}
+
 	m = list_first_entry(&tspi->queue, struct spi_message, queue);
 	if (err)
 		m->status = -EIO;
@@ -770,7 +828,7 @@ static void spi_tegra_curr_transfer_complete(struct spi_tegra_data *tspi,
 	if (!list_is_last(&tspi->cur->transfer_list, &m->transfers)) {
 		tspi->cur = list_first_entry(&tspi->cur->transfer_list,
 			struct spi_transfer, transfer_list);
-		spi_tegra_start_transfer(spi, tspi->cur, false);
+		spi_tegra_start_transfer(spi, tspi->cur, false, 0);
 	} else {
 		list_del(&m->queue);
 		m->complete(m->context);
