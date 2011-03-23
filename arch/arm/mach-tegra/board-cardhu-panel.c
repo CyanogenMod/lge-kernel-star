@@ -43,6 +43,7 @@
 #define DSI_PANEL_219 0
 #define DSI_PANEL_218 1
 #define AVDD_LCD PMU_TCA6416_GPIO_PORT17
+#define DSI_PANEL_RESET 1
 #endif
 
 #define cardhu_lvds_shutdown	TEGRA_GPIO_PL2
@@ -82,7 +83,7 @@ static int cardhu_backlight_init(struct device *dev) {
 	else
 		tegra_gpio_enable(cardhu_bl_enb);
 #else
-	#if DSI_PANEL_219
+	#if DSI_PANEL_219 || DSI_PANEL_218
 	/* Enable back light for DSIa panel */
 	printk("cardhu_dsi_backlight_init\n");
 	ret = gpio_request(cardhu_dsia_bl_enb, "dsia_bl_enable");
@@ -119,7 +120,7 @@ static void cardhu_backlight_exit(struct device *dev) {
 	gpio_free(cardhu_bl_enb);
 	tegra_gpio_disable(cardhu_bl_enb);
 #else
-	#if DSI_PANEL_219
+	#if DSI_PANEL_219 || DSI_PANEL_218
 	/* Disable back light for DSIa panel */
 	gpio_set_value(cardhu_dsia_bl_enb, 0);
 	gpio_free(cardhu_dsia_bl_enb);
@@ -146,7 +147,7 @@ static int cardhu_backlight_notify(struct device *unused, int brightness)
 	gpio_request(cardhu_bl_enb, "backlight_enb");
 	gpio_set_value(cardhu_bl_enb, !!brightness);
 #else
-	#if DSI_PANEL_219
+	#if DSI_PANEL_219 || DSI_PANEL_218
 	/* DSIa */
 	gpio_set_value(cardhu_dsia_bl_enb, !!brightness);
 
@@ -320,12 +321,21 @@ static struct resource cardhu_disp1_resources[] = {
 		.flags	= IORESOURCE_MEM,
 	},
 #ifdef CONFIG_TEGRA_CARDHU_DSI
+#ifdef CONFIG_TEGRA_DSI_INSTANCE_1
+	{
+		.name	= "dsi_regs",
+		.start	= TEGRA_DSIB_BASE,
+		.end	= TEGRA_DSIB_BASE + TEGRA_DSIB_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+#else
 	{
 		.name	= "dsi_regs",
 		.start	= TEGRA_DSI_BASE,
 		.end	= TEGRA_DSI_BASE + TEGRA_DSI_SIZE - 1,
 		.flags	= IORESOURCE_MEM,
 	},
+#endif
 #endif
 };
 
@@ -530,6 +540,7 @@ static int cardhu_dsi_panel_enable(void)
 	else
 		tegra_gpio_enable(AVDD_LCD);
 
+#if DSI_PANEL_RESET
 	ret = gpio_request(TEGRA_GPIO_PD2, "pd2");
 	if (ret < 0){
 		return ret;
@@ -547,6 +558,7 @@ static int cardhu_dsi_panel_enable(void)
 	mdelay(2);
 	gpio_set_value(TEGRA_GPIO_PD2, 1);
 	mdelay(2);
+#endif
 #endif
 
 	return 0;
@@ -571,7 +583,11 @@ struct tegra_dsi_out cardhu_dsi = {
 	.virtual_channel = TEGRA_DSI_VIRTUAL_CHANNEL_0,
 
 	.panel_has_frame_buffer = true,
-
+#ifdef CONFIG_TEGRA_DSI_INSTANCE_1
+	.dsi_instance = 1,
+#else
+	.dsi_instance = 0,
+#endif
 	.n_init_cmd = ARRAY_SIZE(dsi_init_cmd),
 	.dsi_init_cmd = dsi_init_cmd,
 
@@ -597,7 +613,7 @@ static struct tegra_dc_mode cardhu_dsi_modes[] = {
 
 #if DSI_PANEL_218
 	{
-		.pclk = 48000000,
+		.pclk = 323000000,
 		.h_ref_to_sync = 11,
 		.v_ref_to_sync = 1,
 		.h_sync_width = 16,
