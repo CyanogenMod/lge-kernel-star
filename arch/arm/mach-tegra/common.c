@@ -53,6 +53,7 @@ unsigned long tegra_carveout_size;
 unsigned long tegra_lp0_vec_start;
 unsigned long tegra_lp0_vec_size;
 unsigned long tegra_grhost_aperture;
+static   bool is_tegra_debug_uart_hsport;
 
 void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
 
@@ -234,6 +235,23 @@ static int __init tegra_board_info_parse(char *info)
 }
 
 __setup("board_info=", tegra_board_info_parse);
+
+static int __init tegra_debug_uartport(char *info)
+{
+	if (!strcmp(info, "hsport"))
+		is_tegra_debug_uart_hsport = true;
+	else if (!strcmp(info, "lsport"))
+		is_tegra_debug_uart_hsport = false;
+
+	return 1;
+}
+
+bool is_tegra_debug_uartport_hs(void)
+{
+	return is_tegra_debug_uart_hsport;
+}
+
+__setup("debug_uartport=", tegra_debug_uartport);
 
 void tegra_get_board_info(struct board_info *bi)
 {
