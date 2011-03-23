@@ -226,7 +226,6 @@ static struct platform_device tegra_camera = {
 };
 
 static struct platform_device *whistler_devices[] __initdata = {
-	&debug_uart,
 	&tegra_uartb_device,
 	&tegra_uartc_device,
 	&pmu_device,
@@ -358,6 +357,10 @@ static void __init tegra_whistler_init(void)
 	tegra_clk_init_from_table(whistler_clk_init_table);
 	whistler_pinmux_init();
 	whistler_i2c_init();
+	if (is_tegra_debug_uartport_hs() == true)
+		platform_device_register(&tegra_uarta_device);
+	else
+		platform_device_register(&debug_uart);
 	platform_add_devices(whistler_devices, ARRAY_SIZE(whistler_devices));
 
 	whistler_sdhci_init();
