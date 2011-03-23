@@ -48,10 +48,13 @@ struct tegra_overlay_windowattr {
 	__u32	flags;
 };
 
+#define TEGRA_OVERLAY_FLIP_FLAG_BLEND_REORDER (1 << 0)
+
 struct tegra_overlay_flip_args {
 	struct tegra_overlay_windowattr win[TEGRA_FB_FLIP_N_WINDOWS];
 	__u32 post_syncpt_id;
 	__u32 post_syncpt_val;
+	__u32 flags;
 };
 
 #define TEGRA_OVERLAY_IOCTL_MAGIC		'O'
