@@ -3911,5 +3911,7 @@ void tegra_clk_resume(void)
 	   EMC DFS as out of sync */
 	tegra3_periph_clk_init(&tegra_clk_emc);
 	tegra_emc_timing_invalidate();
+
+	tegra3_pll_clk_init(&tegra_pll_u);
 }
 #endif
