@@ -38,13 +38,11 @@
 #include "devices.h"
 #include "gpio-names.h"
 
-#ifdef CONFIG_TEGRA_CARDHU_DSI
 /* Select panel to be used. */
 #define DSI_PANEL_219 0
 #define DSI_PANEL_218 1
 #define AVDD_LCD PMU_TCA6416_GPIO_PORT17
 #define DSI_PANEL_RESET 1
-#endif
 
 #define cardhu_lvds_shutdown	TEGRA_GPIO_PL2
 #define cardhu_bl_enb		TEGRA_GPIO_PH2
@@ -67,23 +65,30 @@ static struct regulator *cardhu_lvds_reg = NULL;
 static struct regulator *cardhu_lvds_vdd_bl = NULL;
 static struct regulator *cardhu_lvds_vdd_panel = NULL;
 
+static struct board_info board_info;
+
 static int cardhu_backlight_init(struct device *dev) {
 	int ret;
 
 #ifndef CONFIG_TEGRA_CARDHU_DSI
-	tegra_gpio_disable(cardhu_bl_pwm);
+	if (board_info.board_id != BOARD_PM269) {
+		tegra_gpio_disable(cardhu_bl_pwm);
 
-	ret = gpio_request(cardhu_bl_enb, "backlight_enb");
-	if (ret < 0)
+		ret = gpio_request(cardhu_bl_enb, "backlight_enb");
+		if (ret < 0)
+			return ret;
+
+		ret = gpio_direction_output(cardhu_bl_enb, 1);
+		if (ret < 0)
+			gpio_free(cardhu_bl_enb);
+		else
+			tegra_gpio_enable(cardhu_bl_enb);
+
 		return ret;
+	}
+#endif
 
-	ret = gpio_direction_output(cardhu_bl_enb, 1);
-	if (ret < 0)
-		gpio_free(cardhu_bl_enb);
-	else
-		tegra_gpio_enable(cardhu_bl_enb);
-#else
-	#if DSI_PANEL_219 || DSI_PANEL_218
+#if DSI_PANEL_219 || DSI_PANEL_218
 	/* Enable back light for DSIa panel */
 	printk("cardhu_dsi_backlight_init\n");
 	ret = gpio_request(cardhu_dsia_bl_enb, "dsia_bl_enable");
@@ -106,21 +111,23 @@ static int cardhu_backlight_init(struct device *dev) {
 		gpio_free(cardhu_dsib_bl_enb);
 	else
 		tegra_gpio_enable(cardhu_dsib_bl_enb);
-	#endif
-
 #endif
+
 	return ret;
 };
 
 static void cardhu_backlight_exit(struct device *dev) {
 #ifndef CONFIG_TEGRA_CARDHU_DSI
-	int ret;
-	/*ret = gpio_request(cardhu_bl_enb, "backlight_enb");*/
-	gpio_set_value(cardhu_bl_enb, 0);
-	gpio_free(cardhu_bl_enb);
-	tegra_gpio_disable(cardhu_bl_enb);
-#else
-	#if DSI_PANEL_219 || DSI_PANEL_218
+	if (board_info.board_id != BOARD_PM269) {
+		/* int ret; */
+		/*ret = gpio_request(cardhu_bl_enb, "backlight_enb");*/
+		gpio_set_value(cardhu_bl_enb, 0);
+		gpio_free(cardhu_bl_enb);
+		tegra_gpio_disable(cardhu_bl_enb);
+		return;
+	}
+#endif
+#if DSI_PANEL_219 || DSI_PANEL_218
 	/* Disable back light for DSIa panel */
 	gpio_set_value(cardhu_dsia_bl_enb, 0);
 	gpio_free(cardhu_dsia_bl_enb);
@@ -133,7 +140,6 @@ static void cardhu_backlight_exit(struct device *dev) {
 
 	gpio_set_value(TEGRA_GPIO_PL2, 1);
 	mdelay(20);
-	#endif
 #endif
 }
 
@@ -143,18 +149,22 @@ static int cardhu_backlight_notify(struct device *unused, int brightness)
 	int orig_brightness = brightness;
 
 #ifndef CONFIG_TEGRA_CARDHU_DSI
-	/* Set the backlight GPIO pin mode to 'backlight_enable' */
-	gpio_request(cardhu_bl_enb, "backlight_enb");
-	gpio_set_value(cardhu_bl_enb, !!brightness);
-#else
-	#if DSI_PANEL_219 || DSI_PANEL_218
+	if (board_info.board_id != BOARD_PM269) {
+		/* Set the backlight GPIO pin mode to 'backlight_enable' */
+		gpio_request(cardhu_bl_enb, "backlight_enb");
+		gpio_set_value(cardhu_bl_enb, !!brightness);
+		goto final;
+	}
+#endif
+#if DSI_PANEL_219 || DSI_PANEL_218
 	/* DSIa */
 	gpio_set_value(cardhu_dsia_bl_enb, !!brightness);
 
 	/* DSIb */
 	gpio_set_value(cardhu_dsib_bl_enb, !!brightness);
-	#endif
 #endif
+
+final:
 	/* SD brightness is a percentage, 8-bit value. */
 	brightness = (brightness * cur_sd_brightness) / 255;
 	if (cur_sd_brightness != 255) {
@@ -320,7 +330,6 @@ static struct resource cardhu_disp1_resources[] = {
 		.end	= 0,	/* Filled in by cardhu_panel_init() */
 		.flags	= IORESOURCE_MEM,
 	},
-#ifdef CONFIG_TEGRA_CARDHU_DSI
 #ifdef CONFIG_TEGRA_DSI_INSTANCE_1
 	{
 		.name	= "dsi_regs",
@@ -335,7 +344,6 @@ static struct resource cardhu_disp1_resources[] = {
 		.end	= TEGRA_DSI_BASE + TEGRA_DSI_SIZE - 1,
 		.flags	= IORESOURCE_MEM,
 	},
-#endif
 #endif
 };
 
@@ -453,7 +461,6 @@ static struct tegra_dc_platform_data cardhu_disp2_pdata = {
 	.emc_clk_rate	= 300000000,
 };
 
-#ifdef CONFIG_TEGRA_CARDHU_DSI
 static int cardhu_dsi_panel_enable(void)
 {
 	static struct regulator *reg = NULL;
@@ -645,7 +652,7 @@ static struct tegra_fb_data cardhu_dsi_fb_data = {
 	.bits_per_pixel	= 32,
 #endif
 };
-#endif
+
 
 static struct tegra_dc_out cardhu_disp1_out = {
 	.align		= TEGRA_DC_ALIGN_MSB,
@@ -744,6 +751,18 @@ int __init cardhu_panel_init(void)
 {
 	int err;
 	struct resource *res;
+
+	tegra_get_board_info(&board_info);
+
+	if (board_info.board_id == BOARD_PM269) {
+		cardhu_disp1_out.type = TEGRA_DC_OUT_DSI;
+		cardhu_disp1_out.modes = cardhu_dsi_modes;
+		cardhu_disp1_out.n_modes = ARRAY_SIZE(cardhu_dsi_modes);
+		cardhu_disp1_out.dsi = &cardhu_dsi;
+		cardhu_disp1_out.enable = cardhu_dsi_panel_enable;
+		cardhu_disp1_out.disable = cardhu_dsi_panel_disable;
+		cardhu_disp1_pdata.fb = &cardhu_dsi_fb_data;
+	}
 
 	cardhu_carveouts[1].base = tegra_carveout_start;
 	cardhu_carveouts[1].size = tegra_carveout_size;

@@ -28,6 +28,7 @@
 #define BOARD_E1186   0x0B56
 #define BOARD_E1198   0x0B62
 #define BOARD_E1291   0x0C5B
+#define BOARD_PM269   0x0245
 
 /* External peripheral act as gpio */
 /* TPS6591x GPIOs */
