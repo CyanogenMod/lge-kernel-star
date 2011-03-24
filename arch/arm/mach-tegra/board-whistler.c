@@ -246,12 +246,27 @@ static int __init whistler_scroll_init(void)
 	return 0;
 }
 
+static struct usb_phy_plat_data tegra_usb_phy_pdata[] = {
+	[0] = {
+			.instance = 0,
+			.vbus_irq = MAX8907C_INT_BASE + MAX8907C_IRQ_VCHG_DC_R,
+			.vbus_gpio = TEGRA_GPIO_PN6,
+	},
+	[1] = {
+			.instance = 1,
+			.vbus_gpio = -1,
+	},
+	[2] = {
+			.instance = 2,
+			.vbus_gpio = -1,
+	},
+};
 
 static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
 	[0] = {
 			.phy_config = &utmi_phy_config[0],
 			.operating_mode = TEGRA_USB_HOST,
-			.power_down_on_bus_suspend = 0,
+			.power_down_on_bus_suspend = 1,
 		},
 	[1] = {
 			.phy_config = &ulpi_phy_config,
@@ -261,7 +276,7 @@ static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
 	[2] = {
 			.phy_config = &utmi_phy_config[1],
 			.operating_mode = TEGRA_USB_HOST,
-			.power_down_on_bus_suspend = 0,
+			.power_down_on_bus_suspend = 1,
 	},
 };
 
@@ -320,6 +335,8 @@ static struct tegra_otg_platform_data tegra_otg_pdata = {
 
 static void whistler_usb_init(void)
 {
+	tegra_usb_phy_init(tegra_usb_phy_pdata, ARRAY_SIZE(tegra_usb_phy_pdata));
+
 	tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
 	platform_device_register(&tegra_otg_device);
 
