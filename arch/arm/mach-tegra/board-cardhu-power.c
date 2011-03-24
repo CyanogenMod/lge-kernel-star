@@ -556,7 +556,7 @@ static int disable_load_switch_rail(
 	}
 
 /* common to all boards */
-GREG_INIT(0, en_5v_cp,		en_5v_cp,	NULL,			TPS6591X_GPIO_GP0,	false,	0,	0,	0,	0); 
+GREG_INIT(0, en_5v_cp,		en_5v_cp,	NULL,			TPS6591X_GPIO_GP0,	false,	0,	0,	0,	0);
 GREG_INIT(1, en_5v0,		en_5v0,		NULL,			TPS6591X_GPIO_GP2,	false,	0,	0,	0,	0);
 GREG_INIT(2, en_ddr,		en_ddr,		NULL,			TPS6591X_GPIO_GP6,	false,	0,	0,	0,	0);
 GREG_INIT(3, en_3v3_sys,	en_3v3_sys,	NULL,			TPS6591X_GPIO_GP7,	false,	0,	0,	0,	0);
@@ -696,3 +696,21 @@ int __init cardhu_suspend_init(void)
 	tegra_init_suspend(&cardhu_suspend_data);
 	return 0;
 }
+
+static void cardhu_power_off(void)
+{
+	int ret;
+	pr_err("cardhu: Powering off the device\n");
+	ret = tps6591x_power_off();
+	if (ret)
+		pr_err("cardhu: failed to power off\n");
+
+	while(1);
+}
+
+int __init cardhu_power_off_init(void)
+{
+	pm_power_off = cardhu_power_off;
+	return 0;
+}
+

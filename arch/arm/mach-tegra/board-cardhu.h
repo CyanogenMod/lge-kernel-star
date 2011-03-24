@@ -121,5 +121,6 @@ int cardhu_keys_init(void);
 int cardhu_gpio_switch_regulator_init(void);
 int cardhu_pins_state_init(void);
 int cardhu_emc_init(void);
+int cardhu_power_off_init(void);
 
 #endif

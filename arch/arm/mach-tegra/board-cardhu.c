@@ -378,6 +378,7 @@ static void __init tegra_cardhu_init(void)
 	cardhu_regulator_init();
 	cardhu_gpio_switch_regulator_init();
 	cardhu_suspend_init();
+	cardhu_power_off_init();
 	cardhu_touch_init();
 	cardhu_usb_init();
 	cardhu_gps_init();
