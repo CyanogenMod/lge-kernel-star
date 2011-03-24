@@ -35,7 +35,10 @@
 
 /* device control registers */
 #define TPS6591X_DEVCTRL	0x3F
+#define DEVCTRL_PWR_OFF_SEQ	(1 << 7)
+#define DEVCTRL_DEV_ON		(1 << 2)
 #define TPS6591X_DEVCTRL2	0x40
+
 
 /* interrupt status registers */
 #define TPS6591X_INT_STS	0x50
@@ -256,7 +259,22 @@ EXPORT_SYMBOL_GPL(tps6591x_update);
 static struct i2c_client *tps6591x_i2c_client;
 int tps6591x_power_off(void)
 {
-	/* FIX ME */
+	struct device *dev = NULL;
+	int ret;
+
+	if (!tps6591x_i2c_client)
+		return -EINVAL;
+
+	dev = &tps6591x_i2c_client->dev;
+
+	ret = tps6591x_set_bits(dev, TPS6591X_DEVCTRL, DEVCTRL_PWR_OFF_SEQ);
+	if (ret < 0)
+		return ret;
+
+	ret = tps6591x_clr_bits(dev, TPS6591X_DEVCTRL, DEVCTRL_DEV_ON);
+	if (ret < 0)
+		return ret;
+
 	return 0;
 }
 
