@@ -3,7 +3,7 @@
  *
  * Tegra graphics host driver
  *
- * Copyright (c) 2009-2010, NVIDIA Corporation.
+ * Copyright (c) 2009-2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -81,7 +81,6 @@ struct nvhost_submit_hdr {
 	__u32 syncpt_incrs;
 	__u32 num_cmdbufs;
 	__u32 num_relocs;
-	__u32 null_kickoff;
 };
 
 struct nvhost_cmdbuf {
@@ -115,8 +114,10 @@ struct nvhost_set_nvmap_fd_args {
 	_IOR(NVHOST_IOCTL_MAGIC, 4, struct nvhost_get_param_args)
 #define NVHOST_IOCTL_CHANNEL_SET_NVMAP_FD	\
 	_IOW(NVHOST_IOCTL_MAGIC, 5, struct nvhost_set_nvmap_fd_args)
+#define NVHOST_IOCTL_CHANNEL_NULL_KICKOFF	\
+	_IOR(NVHOST_IOCTL_MAGIC, 6, struct nvhost_get_param_args)
 #define NVHOST_IOCTL_CHANNEL_LAST		\
-	_IOC_NR(NVHOST_IOCTL_CHANNEL_SET_NVMAP_FD)
+	_IOC_NR(NVHOST_IOCTL_CHANNEL_NULL_KICKOFF)
 #define NVHOST_IOCTL_CHANNEL_MAX_ARG_SIZE sizeof(struct nvhost_get_param_args)
 
 struct nvhost_ctrl_syncpt_read_args {
