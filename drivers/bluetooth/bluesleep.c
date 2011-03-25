@@ -706,6 +706,9 @@ static int __init bluesleep_init(void)
 	if (retval)
 		return retval;
 
+	if (bsi == NULL)
+		return 0;
+
 	bluesleep_hdev = NULL;
 
 	bluetooth_dir = proc_mkdir("bluetooth", NULL);
@@ -792,6 +795,9 @@ fail:
  */
 static void __exit bluesleep_exit(void)
 {
+	if (bsi == NULL)
+		return;
+
 	/* assert bt wake */
 	if (bsi->has_ext_wake == 1)
 		gpio_set_value(bsi->ext_wake, 1);
