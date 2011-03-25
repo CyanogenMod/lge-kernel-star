@@ -28,6 +28,8 @@ DHDCFLAGS += -DGET_CUSTOM_MAC_ENABLE
 endif
 ifeq ($(CONFIG_BCM4329_HW_OOB),y)
 DHDCFLAGS += -DHW_OOB
+else
+DHDCFLAGS += -DSDIO_ISR_THREAD
 endif
 
 DHDOFILES = dhd_linux.o linux_osl.o bcmutils.o dhd_common.o dhd_custom_gpio.o \
