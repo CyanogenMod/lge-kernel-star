@@ -287,10 +287,13 @@ static struct nct1008_platform_data cardhu_nct1008_pdata = {
 	.alarm_fn = NULL,
 };
 
-static struct i2c_board_info cardhu_i2c4_board_info[] = {
+static struct i2c_board_info cardhu_i2c4_bq27510_board_info[] = {
 	{
 		I2C_BOARD_INFO("bq27510", 0x55),
 	},
+};
+
+static struct i2c_board_info cardhu_i2c4_board_info[] = {
 	{
 		I2C_BOARD_INFO("nct1008", 0x4C),
 		.platform_data = &cardhu_nct1008_pdata,
@@ -449,6 +452,8 @@ static struct i2c_board_info cardhu_i2c2_isl_board_info[] = {
 int __init cardhu_sensors_init(void)
 {
 	int err;
+	struct board_info board_info;
+	tegra_get_board_info(&board_info);
 
 	cardhu_camera_init();
 	cam_tca6416_init();
@@ -468,6 +473,10 @@ int __init cardhu_sensors_init(void)
 
 	i2c_register_board_info(4, cardhu_i2c4_board_info,
 		ARRAY_SIZE(cardhu_i2c4_board_info));
+
+	if (board_info.board_id == BOARD_E1291)
+		i2c_register_board_info(4, cardhu_i2c4_bq27510_board_info,
+			ARRAY_SIZE(cardhu_i2c4_bq27510_board_info));
 
 	i2c_register_board_info(2, cardhu_i2c2_isl_board_info,
 		ARRAY_SIZE(cardhu_i2c2_isl_board_info));
