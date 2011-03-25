@@ -538,7 +538,7 @@ static int cardhu_dsi_panel_enable(void)
 
 #if DSI_PANEL_218
 	printk("DSI_PANEL_218 is enabled\n");
-	ret = gpio_request(AVDD_LCD, 1);
+	ret = gpio_request(AVDD_LCD, "avdd_lcd");
 	if(ret < 0)
 		gpio_free(AVDD_LCD);
 	ret = gpio_direction_output(AVDD_LCD, 1);
