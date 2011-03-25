@@ -401,11 +401,18 @@ static struct regulator_consumer_supply gpio_switch_dis_5v_switch_supply[] = {
 };
 static int gpio_switch_dis_5v_switch_voltages[] = { 5000};
 
-/* EN_VDD_BL from AP GPIO GMI_CS2  K03 */
+/* EN_VDD_BL */
 static struct regulator_consumer_supply gpio_switch_en_vdd_bl_supply[] = {
 	REGULATOR_SUPPLY("vdd_backlight", NULL),
+	REGULATOR_SUPPLY("vdd_backlight1", NULL),
 };
 static int gpio_switch_en_vdd_bl_voltages[] = { 5000};
+
+/* EN_VDD_BL2 (E1291-A03) from AP PEX_L0_PRSNT_N DD.00 */
+static struct regulator_consumer_supply gpio_switch_en_vdd_bl2_supply[] = {
+	REGULATOR_SUPPLY("vdd_backlight2", NULL),
+};
+static int gpio_switch_en_vdd_bl2_voltages[] = { 5000};
 
 /* EN_3V3_MODEM from AP GPIO VI_VSYNCH D06*/
 static struct regulator_consumer_supply gpio_switch_en_3v3_modem_supply[] = {
@@ -414,13 +421,13 @@ static struct regulator_consumer_supply gpio_switch_en_3v3_modem_supply[] = {
 };
 static int gpio_switch_en_3v3_modem_voltages[] = { 3300};
 
-/* EN_USB1_VBUS_OC from AP GPIO GMI_RST I04*/
+/* EN_USB1_VBUS_OC*/
 static struct regulator_consumer_supply gpio_switch_en_usb1_vbus_oc_supply[] = {
 	REGULATOR_SUPPLY("vdd_vbus_micro_usb", NULL),
 };
 static int gpio_switch_en_usb1_vbus_oc_voltages[] = { 5000};
 
-/*EN_USB3_VBUS_OC from AP GPIO GMI_AD15 H07*/
+/*EN_USB3_VBUS_OC*/
 static struct regulator_consumer_supply gpio_switch_en_usb3_vbus_oc_supply[] = {
 	REGULATOR_SUPPLY("vdd_vbus_typea_usb", NULL),
 };
@@ -584,13 +591,23 @@ GREG_INIT(17, en_vddio_vid_oc_e118x,	en_vddio_vid_oc,	"master_5v_switch",
 		TEGRA_GPIO_PT0,		false,	0,	TEGRA_PINGROUP_VI_PCLK,
 		enable_load_switch_rail, disable_load_switch_rail);
 
-/* E1198/E1291 specific */
+/* E1198/E1291 specific  fab < A03 */
 GREG_INIT(15, en_usb1_vbus_oc, 		en_usb1_vbus_oc, 	"vdd_5v0_sys",
 		TEGRA_GPIO_PI4,		false,	0,	TEGRA_PINGROUP_GMI_RST_N,
 		enable_load_switch_rail, disable_load_switch_rail);
 GREG_INIT(16, en_usb3_vbus_oc,		en_usb3_vbus_oc,	"vdd_5v0_sys",
 		TEGRA_GPIO_PH7,		false,	0,	TEGRA_PINGROUP_GMI_AD15,
 		enable_load_switch_rail, disable_load_switch_rail);
+
+/* E1198/E1291 specific  fab >= A03 */
+GREG_INIT(15, en_usb1_vbus_oc_a03, 		en_usb1_vbus_oc, 	"vdd_5v0_sys",
+		TEGRA_GPIO_PDD6,		false,	0,	TEGRA_PINGROUP_PEX_L1_CLKREQ_N,
+		enable_load_switch_rail, disable_load_switch_rail);
+GREG_INIT(16, en_usb3_vbus_oc_a03,		en_usb3_vbus_oc,	"vdd_5v0_sys",
+		TEGRA_GPIO_PDD4,		false,	0,	TEGRA_PINGROUP_PEX_L1_PRSNT_N,
+		enable_load_switch_rail, disable_load_switch_rail);
+
+/* E1198/E1291 specific */
 GREG_INIT(17, en_vddio_vid_oc,		en_vddio_vid_oc,	"vdd_5v0_sys",
 		TEGRA_GPIO_PT0,		false,	0,	TEGRA_PINGROUP_VI_PCLK,
 		enable_load_switch_rail, disable_load_switch_rail);
@@ -599,13 +616,16 @@ GREG_INIT(17, en_vddio_vid_oc,		en_vddio_vid_oc,	"vdd_5v0_sys",
 GREG_INIT(18, cam1_ldo_en,	cam1_ldo_en,		"vdd_3v3_cam",	TEGRA_GPIO_PR6,		false,	0,	0,	0,	0);
 GREG_INIT(19, cam2_ldo_en,	cam2_ldo_en,		"vdd_3v3_cam",	TEGRA_GPIO_PR7,		false,	0,	0,	0,	0);
 
+/* E1291 A03 specific */
+GREG_INIT(20, en_vdd_bl1_a03,	en_vdd_bl,  	NULL,		TEGRA_GPIO_PDD2,	false,	1,	0,	0,	0);
+GREG_INIT(21, en_vdd_bl2_a03,	en_vdd_bl2,  	NULL,		TEGRA_GPIO_PDD0,	false,	1,	0,	0,	0);
+
 #define ADD_GPIO_REG(_name) &gpio_pdata_##_name
 #define COMMON_GPIO_REG \
 	ADD_GPIO_REG(en_5v_cp),			\
 	ADD_GPIO_REG(en_5v0),			\
 	ADD_GPIO_REG(en_ddr),			\
 	ADD_GPIO_REG(en_3v3_sys),		\
-	ADD_GPIO_REG(en_vdd_bl),		\
 	ADD_GPIO_REG(en_3v3_modem),		\
 	ADD_GPIO_REG(en_vdd_pnl1),		\
 	ADD_GPIO_REG(cam3_ldo_en),		\
@@ -617,17 +637,29 @@ GREG_INIT(19, cam2_ldo_en,	cam2_ldo_en,		"vdd_3v3_cam",	TEGRA_GPIO_PR7,		false,	
 	ADD_GPIO_REG(en_1v8_cam),
 
 #define E118x_GPIO_REG	\
+	ADD_GPIO_REG(en_vdd_bl),		\
 	ADD_GPIO_REG(dis_5v_switch_e118x),	\
 	ADD_GPIO_REG(en_usb1_vbus_oc_e118x),	\
 	ADD_GPIO_REG(en_usb3_vbus_oc_e118x),	\
 	ADD_GPIO_REG(en_vddio_vid_oc_e118x),
 
 #define E1198_GPIO_REG	\
-	ADD_GPIO_REG(en_usb1_vbus_oc),		\
-	ADD_GPIO_REG(en_usb3_vbus_oc),		\
 	ADD_GPIO_REG(en_vddio_vid_oc),		\
 	ADD_GPIO_REG(cam1_ldo_en),		\
 	ADD_GPIO_REG(cam2_ldo_en),
+
+#define E1291_1198_A00_GPIO_REG	\
+	ADD_GPIO_REG(en_usb1_vbus_oc),		\
+	ADD_GPIO_REG(en_usb3_vbus_oc),		\
+	ADD_GPIO_REG(en_vdd_bl),
+
+#define E1291_A03_GPIO_REG	\
+	ADD_GPIO_REG(en_usb1_vbus_oc_a03),		\
+	ADD_GPIO_REG(en_usb3_vbus_oc_a03),		\
+	ADD_GPIO_REG(en_vdd_bl1_a03), \
+	ADD_GPIO_REG(en_vdd_bl2_a03),
+
+/* Gpio switch regulator platform data  for E1186/E1187*/
 
 /* Gpio switch regulator platform data  for E1186/E1187*/
 static struct gpio_switch_regulator_subdev_data *gswitch_subdevs_e118x[] = {
@@ -638,6 +670,14 @@ static struct gpio_switch_regulator_subdev_data *gswitch_subdevs_e118x[] = {
 /* Gpio switch regulator platform data for E1198 and E1291*/
 static struct gpio_switch_regulator_subdev_data *gswitch_subdevs_e1198[] = {
 	COMMON_GPIO_REG
+	E1291_1198_A00_GPIO_REG
+	E1198_GPIO_REG
+};
+
+/* Gpio switch regulator platform data for E1291 A03*/
+static struct gpio_switch_regulator_subdev_data *gswitch_subdevs_e1291_a03[] = {
+	COMMON_GPIO_REG
+	E1291_A03_GPIO_REG
 	E1198_GPIO_REG
 };
 
@@ -657,12 +697,21 @@ int __init cardhu_gpio_switch_regulator_init(void)
 	tegra_get_board_info(&board_info);
 	switch (board_info.board_id) {
 	case BOARD_E1198:
+		gswitch_pdata.num_subdevs = ARRAY_SIZE(gswitch_subdevs_e1198);
+		gswitch_pdata.subdevs = gswitch_subdevs_e1198;
+		break;
 	case BOARD_E1291:
-		gswitch_pdata.num_subdevs = ARRAY_SIZE(gswitch_subdevs_e1198),
+		if (board_info.fab >= 0x3) {
+			gswitch_pdata.num_subdevs =
+					ARRAY_SIZE(gswitch_subdevs_e1291_a03);
+			gswitch_pdata.subdevs = gswitch_subdevs_e1291_a03;
+			break;
+		}
+		gswitch_pdata.num_subdevs = ARRAY_SIZE(gswitch_subdevs_e1198);
 		gswitch_pdata.subdevs = gswitch_subdevs_e1198;
 		break;
 	default:
-		gswitch_pdata.num_subdevs = ARRAY_SIZE(gswitch_subdevs_e118x),
+		gswitch_pdata.num_subdevs = ARRAY_SIZE(gswitch_subdevs_e118x);
 		gswitch_pdata.subdevs = gswitch_subdevs_e118x;
 		break;
 	}
