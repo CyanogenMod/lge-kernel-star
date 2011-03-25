@@ -726,7 +726,7 @@ static int tegra_i2c_probe(struct platform_device *pdev)
 	i2c_dev->is_dvc = plat->is_dvc;
 	init_completion(&i2c_dev->msg_complete);
 
-	if (irq == INT_I2C || irq == INT_I2C3)
+	if (irq == INT_I2C || irq == INT_I2C2 || irq == INT_I2C3)
 		i2c_dev->is_slave = true;
 
 	platform_set_drvdata(pdev, i2c_dev);
