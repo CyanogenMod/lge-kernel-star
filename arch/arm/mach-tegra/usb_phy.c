@@ -949,6 +949,7 @@ static int uhsic_phy_postresume(struct tegra_usb_phy *phy)
 static void utmi_phy_restore_start(struct tegra_usb_phy *phy,
 				   enum tegra_usb_phy_port_speed port_speed)
 {
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	unsigned long val;
 	void __iomem *base = phy->regs;
 
@@ -965,10 +966,12 @@ static void utmi_phy_restore_start(struct tegra_usb_phy *phy,
 	val |= UTMIP_DPDM_OBSERVE;
 	writel(val, base + UTMIP_MISC_CFG0);
 	udelay(10);
+#endif
 }
 
 static void utmi_phy_restore_end(struct tegra_usb_phy *phy)
 {
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	unsigned long val;
 	void __iomem *base = phy->regs;
 
@@ -976,6 +979,7 @@ static void utmi_phy_restore_end(struct tegra_usb_phy *phy)
 	val &= ~UTMIP_DPDM_OBSERVE;
 	writel(val, base + UTMIP_MISC_CFG0);
 	udelay(10);
+#endif
 }
 
 static void ulpi_set_tristate(bool enable)
