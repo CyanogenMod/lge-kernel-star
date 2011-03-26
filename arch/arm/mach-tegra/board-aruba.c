@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/board-aruba.c
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010-2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@
 #include <linux/gpio.h>
 #include <linux/gpio_keys.h>
 #include <linux/input.h>
-#include <linux/tegra_usb.h>
+#include <linux/platform_data/tegra_usb.h>
 #include <linux/usb/android_composite.h>
 #include <mach/clk.h>
 #include <mach/iomap.h>
