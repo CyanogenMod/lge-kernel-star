@@ -20,7 +20,6 @@
 
 #include <linux/i2c.h>
 #include <mach/gpio.h>
-#include <linux/i2c/nct1008.h>
 #include <linux/akm8975.h>
 
 #include "gpio-names.h"
