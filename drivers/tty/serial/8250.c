@@ -309,7 +309,7 @@ static const struct serial8250_config uart_config[] = {
 		.tx_loadsz	= 8,
 		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_T_TRIG_01 |
 				  UART_FCR_R_TRIG_01,
-		.flags		= UART_CAP_FIFO,
+		.flags		= UART_CAP_FIFO | UART_CAP_HW_CTSRTS,
 	},
 };
 
@@ -1874,8 +1874,13 @@ static void serial8250_set_mctrl(struct uart_port *port, unsigned int mctrl)
 		container_of(port, struct uart_8250_port, port);
 	unsigned char mcr = 0;
 
-	if (mctrl & TIOCM_RTS)
-		mcr |= UART_MCR_RTS;
+	if (up->port.type == PORT_TEGRA) {
+		if (mctrl & TIOCM_RTS)
+			mcr |= UART_MCR_HW_RTS;
+	} else {
+		if (mctrl & TIOCM_RTS)
+			mcr |= UART_MCR_RTS;
+	}
 	if (mctrl & TIOCM_DTR)
 		mcr |= UART_MCR_DTR;
 	if (mctrl & TIOCM_OUT1)
@@ -2432,6 +2437,19 @@ serial8250_do_set_termios(struct uart_port *port, struct ktermios *termios,
 
 		serial_outp(up, UART_LCR, UART_LCR_CONF_MODE_B);
 		serial_outp(up, UART_EFR, efr);
+	}
+
+	if (up->capabilities & UART_CAP_HW_CTSRTS) {
+		unsigned char mcr = serial_inp(up, UART_MCR);
+		/*
+		 * TEGRA UART core support the auto control of the RTS and CTS
+		 * flow control.
+		 */
+		if (termios->c_cflag & CRTSCTS)
+			mcr |= UART_MCR_HW_CTS;
+		else
+			mcr &= ~UART_MCR_HW_CTS;
+		serial_outp(up, UART_MCR, mcr);
 	}
 
 #ifdef CONFIG_ARCH_OMAP
