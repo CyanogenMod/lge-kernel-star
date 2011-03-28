@@ -4,6 +4,8 @@
  * Author: Li Yang <leoli@freescale.com>
  *         Jiang Bo <tanya.jiang@freescale.com>
  *
+ * Copyright (C) 2010-2011 NVIDIA Corporation
+ *
  * Description:
  * Freescale high-speed USB SOC DR module device controller driver.
  * This can be found on MPC8349E/MPC8313E cpus.
