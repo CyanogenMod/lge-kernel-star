@@ -270,7 +270,6 @@ static struct platform_device tegra_camera = {
 };
 
 static struct platform_device *ventana_devices[] __initdata = {
-	&debug_uart,
 	&tegra_uartb_device,
 	&tegra_uartc_device,
 	&pmu_device,
@@ -441,6 +440,10 @@ static void __init tegra_ventana_init(void)
 	tegra_clk_init_from_table(ventana_clk_init_table);
 	ventana_pinmux_init();
 	ventana_i2c_init();
+	if (is_tegra_debug_uartport_hs() == true)
+		platform_device_register(&tegra_uartd_device);
+	else
+		platform_device_register(&debug_uart);
 	tegra_ehci2_device.dev.platform_data
 		= &ventana_ehci2_ulpi_platform_data;
 	platform_add_devices(ventana_devices, ARRAY_SIZE(ventana_devices));
