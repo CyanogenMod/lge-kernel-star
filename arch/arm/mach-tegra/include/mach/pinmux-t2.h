@@ -17,6 +17,8 @@
 #ifndef __MACH_TEGRA_PINMUX_T2_H
 #define __MACH_TEGRA_PINMUX_T2_H
 
+void tegra2_init_pinmux(void);
+
 enum tegra_pingroup {
 	TEGRA_PINGROUP_ATA = 0,
 	TEGRA_PINGROUP_ATB,
