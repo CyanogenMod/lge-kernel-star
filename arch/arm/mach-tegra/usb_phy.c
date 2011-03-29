@@ -1122,6 +1122,10 @@ static void uhsic_phy_power_off(struct tegra_usb_phy *phy)
 
 }
 
+#ifdef CONFIG_USB_TEGRA_OTG
+extern void tegra_otg_check_vbus_detection(void);
+#endif
+
 static irqreturn_t usb_phy_vbus_irq_thr(int irq, void *pdata)
 {
 	struct tegra_usb_phy *phy = pdata;
@@ -1129,7 +1133,16 @@ static irqreturn_t usb_phy_vbus_irq_thr(int irq, void *pdata)
 	if (!phy->regulator_on) {
 		regulator_enable(phy->reg_vdd);
 		phy->regulator_on = 1;
+		/*
+		 * Optimal time to get the regulator turned on
+		 * before detecting vbus interrupt.
+		 */
+		mdelay(15);
 	}
+
+#ifdef CONFIG_USB_TEGRA_OTG
+	tegra_otg_check_vbus_detection();
+#endif
 
 	return IRQ_HANDLED;
 }
