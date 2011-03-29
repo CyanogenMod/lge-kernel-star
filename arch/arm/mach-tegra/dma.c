@@ -28,6 +28,7 @@
 #include <linux/irq.h>
 #include <linux/delay.h>
 #include <linux/clk.h>
+#include <linux/syscore_ops.h>
 #include <mach/dma.h>
 #include <mach/irqs.h>
 #include <mach/iomap.h>
@@ -745,7 +746,7 @@ postcore_initcall(tegra_dma_init);
 #ifdef CONFIG_PM
 static u32 apb_dma[5*TEGRA_SYSTEM_DMA_CH_NR + 3];
 
-void tegra_dma_suspend(void)
+static int tegra_dma_suspend(void)
 {
 	void __iomem *addr = IO_ADDRESS(TEGRA_APB_DMA_BASE);
 	u32 *ctx = apb_dma;
@@ -765,9 +766,11 @@ void tegra_dma_suspend(void)
 		*ctx++ = readl(addr + APB_DMA_CHAN_APB_PTR);
 		*ctx++ = readl(addr + APB_DMA_CHAN_APB_SEQ);
 	}
+
+	return 0;
 }
 
-void tegra_dma_resume(void)
+static void tegra_dma_resume(void)
 {
 	void __iomem *addr = IO_ADDRESS(TEGRA_APB_DMA_BASE);
 	u32 *ctx = apb_dma;
@@ -789,4 +792,16 @@ void tegra_dma_resume(void)
 	}
 }
 
+static struct syscore_ops tegra_dma_syscore_ops = {
+	.suspend = tegra_dma_suspend,
+	.resume = tegra_dma_resume,
+};
+
+static int tegra_dma_syscore_init(void)
+{
+	register_syscore_ops(&tegra_dma_syscore_ops);
+
+	return 0;
+}
+subsys_initcall(tegra_dma_syscore_init);
 #endif
