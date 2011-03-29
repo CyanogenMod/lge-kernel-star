@@ -42,14 +42,14 @@
 #define DSI_PANEL_219 0
 #define DSI_PANEL_218 1
 #define AVDD_LCD PMU_TCA6416_GPIO_PORT17
-#define DSI_PANEL_RESET 1
+#define DSI_PANEL_RESET 0
 
 #define cardhu_lvds_shutdown	TEGRA_GPIO_PL2
 #define cardhu_bl_enb		TEGRA_GPIO_PH2
 #define cardhu_bl_pwm		TEGRA_GPIO_PH0
 #define cardhu_hdmi_hpd		TEGRA_GPIO_PN7
 
-#ifdef DSI_PANEL_219
+#if defined(DSI_PANEL_219) || defined(DSI_PANEL_218)
 #define cardhu_dsia_bl_enb	TEGRA_GPIO_PW1
 #define cardhu_dsib_bl_enb	TEGRA_GPIO_PW0
 #define cardhu_dsi_panel_reset	TEGRA_GPIO_PD2
