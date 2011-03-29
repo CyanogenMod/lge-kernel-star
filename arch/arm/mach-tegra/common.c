@@ -24,6 +24,7 @@
 
 #include <asm/hardware/cache-l2x0.h>
 
+#include <mach/gpio.h>
 #include <mach/iomap.h>
 #include <mach/system.h>
 
@@ -77,6 +78,7 @@ void __init tegra_init_cache(void)
 void __init tegra_init_early(void)
 {
 	tegra_init_fuse();
+	tegra_gpio_resume_init();
 	tegra_init_clock();
 	tegra_clk_init_from_table(common_clk_init_table);
 	tegra_init_cache();
