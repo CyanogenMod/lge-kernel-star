@@ -183,6 +183,7 @@ struct tegra_aes_ctx {
 	struct tegra_aes_dev *dd;
 	unsigned long flags;
 	struct tegra_aes_slot *slot;
+	u8 key[AES_MAX_KEY_SIZE];
 	int keylen;
 };
 
@@ -326,11 +327,11 @@ static int aes_start_crypt(struct tegra_aes_dev *dd, u32 in_addr, u32 out_addr,
 	return 0;
 }
 
-static void aes_release_key_slot(struct tegra_aes_dev *dd)
+static void aes_release_key_slot(struct tegra_aes_ctx *ctx)
 {
 	spin_lock(&list_lock);
-	dd->ctx->slot->available = true;
-	dd->ctx->slot = NULL;
+	ctx->slot->available = true;
+	ctx->slot = NULL;
 	spin_unlock(&list_lock);
 }
 
@@ -486,12 +487,14 @@ static int tegra_aes_handle_req(struct tegra_aes_dev *dd)
 
 	/* assign new context to device */
 	ctx->dd = dd;
-	if (dd->ctx != ctx)
-		dd->ctx = ctx;
+	dd->ctx = ctx;
 
-	if (dd->flags & FLAGS_NEW_KEY) {
+	if (ctx->flags & FLAGS_NEW_KEY) {
+		/* copy the key */
+		memset(dd->ivkey_base, 0, AES_HW_KEY_TABLE_LENGTH_BYTES);
+		memcpy(dd->ivkey_base, ctx->key, ctx->keylen);
 		aes_set_key(dd);
-		dd->flags &= ~FLAGS_NEW_KEY;
+		ctx->flags &= ~FLAGS_NEW_KEY;
 	}
 
 	if ((dd->flags & FLAGS_CBC) && dd->iv) {
@@ -583,27 +586,23 @@ static int tegra_aes_setkey(struct crypto_ablkcipher *tfm, const u8 *key,
 	dev_dbg(dd->dev, "keylen: %d\n", keylen);
 
 	ctx->dd = dd;
-	dd->ctx = ctx;
-
-	if (ctx->slot)
-		aes_release_key_slot(dd);
 
 	if (key) {
-		key_slot = aes_find_key_slot(dd);
-		if (!key_slot) {
-			dev_err(dd->dev, "no empty slot\n");
-			return -ENOMEM;
+		if (!ctx->slot) {
+			key_slot = aes_find_key_slot(dd);
+			if (!key_slot) {
+				dev_err(dd->dev, "no empty slot\n");
+				return -ENOMEM;
+			}
+
+			ctx->slot = key_slot;
 		}
 
-		ctx->slot = key_slot;
+		memcpy(ctx->key, key, keylen);
 		ctx->keylen = keylen;
-
-		/* copy the key */
-		memset(dd->ivkey_base, 0, AES_HW_KEY_TABLE_LENGTH_BYTES);
-		memcpy(dd->ivkey_base, key, keylen);
 	}
 
-	dd->flags |= FLAGS_NEW_KEY;
+	ctx->flags |= FLAGS_NEW_KEY;
 	dev_dbg(dd->dev, "done\n");
 	return 0;
 }
@@ -848,6 +847,14 @@ static int tegra_aes_cra_init(struct crypto_tfm *tfm)
 	return 0;
 }
 
+void tegra_aes_cra_exit(struct crypto_tfm *tfm)
+{
+	struct tegra_aes_ctx *ctx = crypto_ablkcipher_ctx((struct crypto_ablkcipher *)tfm);
+
+	if (ctx && ctx->slot)
+		aes_release_key_slot(ctx);
+}
+
 static struct crypto_alg algs[] = {
 	{
 		.cra_name = "disabled_ecb(aes)",
@@ -860,6 +867,7 @@ static struct crypto_alg algs[] = {
 		.cra_type = &crypto_ablkcipher_type,
 		.cra_module = THIS_MODULE,
 		.cra_init = tegra_aes_cra_init,
+		.cra_exit = tegra_aes_cra_exit,
 		.cra_u.ablkcipher = {
 			.min_keysize = AES_MIN_KEY_SIZE,
 			.max_keysize = AES_MAX_KEY_SIZE,
@@ -878,6 +886,7 @@ static struct crypto_alg algs[] = {
 		.cra_type = &crypto_ablkcipher_type,
 		.cra_module = THIS_MODULE,
 		.cra_init = tegra_aes_cra_init,
+		.cra_exit = tegra_aes_cra_exit,
 		.cra_u.ablkcipher = {
 			.min_keysize = AES_MIN_KEY_SIZE,
 			.max_keysize = AES_MAX_KEY_SIZE,
@@ -895,6 +904,7 @@ static struct crypto_alg algs[] = {
 		.cra_type = &crypto_rng_type,
 		.cra_module = THIS_MODULE,
 		.cra_init = tegra_aes_cra_init,
+		.cra_exit = tegra_aes_cra_exit,
 		.cra_u.rng = {
 			.rng_make_random = tegra_aes_get_random,
 			.rng_reset = tegra_aes_rng_reset,
