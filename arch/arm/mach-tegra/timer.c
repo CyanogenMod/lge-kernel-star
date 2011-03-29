@@ -27,6 +27,7 @@
 #include <linux/clocksource.h>
 #include <linux/clk.h>
 #include <linux/io.h>
+#include <linux/syscore_ops.h>
 
 #include <asm/mach/time.h>
 #include <asm/localtimer.h>
@@ -261,13 +262,28 @@ struct sys_timer tegra_timer = {
 #ifdef CONFIG_PM
 static u32 usec_config;
 
-void tegra_timer_suspend(void)
+static int tegra_timer_suspend(void)
 {
 	usec_config = timer_readl(TIMERUS_USEC_CFG);
+
+	return 0;
 }
 
-void tegra_timer_resume(void)
+static void tegra_timer_resume(void)
 {
 	timer_writel(usec_config, TIMERUS_USEC_CFG);
 }
+
+static struct syscore_ops tegra_timer_syscore_ops = {
+	.suspend = tegra_timer_suspend,
+	.resume = tegra_timer_resume,
+};
+
+static int tegra_timer_syscore_init(void)
+{
+	register_syscore_ops(&tegra_timer_syscore_ops);
+
+	return 0;
+}
+subsys_initcall(tegra_timer_syscore_init);
 #endif
