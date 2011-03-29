@@ -25,6 +25,14 @@
 
 #include <asm/sizes.h>
 
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
+#define TEGRA_DRAM_BASE			0x00000000
+#define TEGRA_DRAM_SIZE			SZ_1G		/* Maximum size */
+#else
+#define TEGRA_DRAM_BASE			0x80000000
+#define TEGRA_DRAM_SIZE			(SZ_2G - SZ_1M)	/* Maximum size */
+#endif
+
 #define TEGRA_IRAM_BASE			0x40000000
 #define TEGRA_IRAM_SIZE			SZ_256K
 
