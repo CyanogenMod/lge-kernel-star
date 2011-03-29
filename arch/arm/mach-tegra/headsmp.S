@@ -34,11 +34,13 @@
  *	 Initial secondary processor boot vector; jumps to kernel's
  *	 secondary_startup routine
  */
+#ifdef CONFIG_SMP
 ENTRY(tegra_secondary_startup)
 	bl	tegra_invalidate_l1
 	bl	tegra_enable_coresite
 	b	secondary_startup
 ENDPROC(tegra_secondary_startup)
+#endif
 
 #ifdef CONFIG_PM
 /*
