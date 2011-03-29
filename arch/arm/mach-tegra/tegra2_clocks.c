@@ -25,6 +25,7 @@
 #include <linux/io.h>
 #include <linux/clkdev.h>
 #include <linux/clk.h>
+#include <linux/syscore_ops.h>
 
 #include <mach/iomap.h>
 
@@ -2305,37 +2306,11 @@ static void tegra2_init_one_clock(struct clk *c)
 	clkdev_add(&c->lookup);
 }
 
-void __init tegra2_init_clocks(void)
-{
-	int i;
-	struct clk *c;
-
-	for (i = 0; i < ARRAY_SIZE(tegra_ptr_clks); i++)
-		tegra2_init_one_clock(tegra_ptr_clks[i]);
-
-	for (i = 0; i < ARRAY_SIZE(tegra_list_clks); i++)
-		tegra2_init_one_clock(&tegra_list_clks[i]);
-
-	for (i = 0; i < ARRAY_SIZE(tegra_clk_duplicates); i++) {
-		c = tegra_get_clock_by_name(tegra_clk_duplicates[i].name);
-		if (!c) {
-			pr_err("%s: Unknown duplicate clock %s\n", __func__,
-				tegra_clk_duplicates[i].name);
-			continue;
-		}
-
-		tegra_clk_duplicates[i].lookup.clk = c;
-		clkdev_add(&tegra_clk_duplicates[i].lookup);
-	}
-
-	init_audio_sync_clock_mux();
-}
-
 #ifdef CONFIG_PM
 static u32 clk_rst_suspend[RST_DEVICES_NUM + CLK_OUT_ENB_NUM +
 			   PERIPH_CLK_SOURCE_NUM + 22];
 
-void tegra_clk_suspend(void)
+static int tegra_clk_suspend(void)
 {
 	unsigned long off, i;
 	u32 *ctx = clk_rst_suspend;
@@ -2384,9 +2359,11 @@ void tegra_clk_suspend(void)
 	*ctx++ = clk_readl(CLK_MASK_ARM);
 
 	BUG_ON(ctx - clk_rst_suspend != ARRAY_SIZE(clk_rst_suspend));
+
+	return 0;
 }
 
-void tegra_clk_resume(void)
+static void tegra_clk_resume(void)
 {
 	unsigned long off, i;
 	const u32 *ctx = clk_rst_suspend;
@@ -2448,4 +2425,41 @@ void tegra_clk_resume(void)
 	clk_writel(*ctx++, MISC_CLK_ENB);
 	clk_writel(*ctx++, CLK_MASK_ARM);
 }
+
+#else
+#define tegra_clk_suspend NULL
+#define tegra_clk_resume NULL
 #endif
+
+static struct syscore_ops tegra_clk_syscore_ops = {
+	.suspend = tegra_clk_suspend,
+	.resume = tegra_clk_resume,
+};
+
+void __init tegra2_init_clocks(void)
+{
+	int i;
+	struct clk *c;
+
+	for (i = 0; i < ARRAY_SIZE(tegra_ptr_clks); i++)
+		tegra2_init_one_clock(tegra_ptr_clks[i]);
+
+	for (i = 0; i < ARRAY_SIZE(tegra_list_clks); i++)
+		tegra2_init_one_clock(&tegra_list_clks[i]);
+
+	for (i = 0; i < ARRAY_SIZE(tegra_clk_duplicates); i++) {
+		c = tegra_get_clock_by_name(tegra_clk_duplicates[i].name);
+		if (!c) {
+			pr_err("%s: Unknown duplicate clock %s\n", __func__,
+				tegra_clk_duplicates[i].name);
+			continue;
+		}
+
+		tegra_clk_duplicates[i].lookup.clk = c;
+		clkdev_add(&tegra_clk_duplicates[i].lookup);
+	}
+
+	init_audio_sync_clock_mux();
+
+	register_syscore_ops(&tegra_clk_syscore_ops);
+}
