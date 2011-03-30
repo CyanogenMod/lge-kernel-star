@@ -658,13 +658,13 @@ static int fsl_ep_disable(struct usb_ep *_ep)
 		return -EINVAL;
 	}
 
+	/* disable ep on controller */
+	ep_num = ep_index(ep);
 #if defined(CONFIG_ARCH_TEGRA)
 	/* Touch the registers if cable is connected and phy is on */
 	if (vbus_enabled())
 #endif
 	{
-		/* disable ep on controller */
-		ep_num = ep_index(ep);
 		epctrl = fsl_readl(&dr_regs->endptctrl[ep_num]);
 		if (ep_is_in(ep))
 			epctrl &= ~EPCTRL_TX_ENABLE;
@@ -1051,7 +1051,7 @@ static int fsl_ep_dequeue(struct usb_ep *_ep, struct usb_request *_req)
 	done(ep, req, -ECONNRESET);
 
 	/* Enable EP */
-out:;
+out:
 #if defined(CONFIG_ARCH_TEGRA)
 	/* Touch the registers if cable is connected and phy is on */
 	if(vbus_enabled())
@@ -1131,7 +1131,7 @@ static void fsl_ep_fifo_flush(struct usb_ep *_ep)
 	unsigned long timeout;
 #define FSL_UDC_FLUSH_TIMEOUT 1000
 
-#ifdef CONFIG_ARCH_TEGRA
+#if defined(CONFIG_ARCH_TEGRA)
 	/* Touch the registers if cable is connected and phy is on */
 	if (!vbus_enabled())
 		return;
@@ -2806,15 +2806,15 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
 		udc_controller->vbus_active = 0;
 		udc_controller->usb_state = USB_STATE_DEFAULT;
 		otg_set_peripheral(udc_controller->transceiver, &udc_controller->gadget);
-		return 0;
 	}
-#endif
-
+#else
 #ifdef CONFIG_ARCH_TEGRA
 	/* Power down the phy if cable is not connected */
 	if(!vbus_enabled())
 		fsl_udc_clk_suspend();
 #endif
+#endif
+
 	return 0;
 
 err_unregister:

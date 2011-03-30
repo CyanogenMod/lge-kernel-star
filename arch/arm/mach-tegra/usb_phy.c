@@ -33,7 +33,7 @@
 #include <mach/usb_phy.h>
 #include <mach/iomap.h>
 #include <mach/pinmux.h>
-#include <mach/clk.h>
+
 #include "fuse.h"
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
@@ -137,9 +137,6 @@
 #define UTMIP_BAT_CHRG_CFG0	0x830
 #define   UTMIP_PD_CHRG			(1 << 0)
 
-#define UTMIP_SPARE_CFG0	0x834
-#define   FUSE_SETUP_SEL		(1 << 3)
-
 #define UTMIP_XCVR_CFG1		0x838
 #define   UTMIP_FORCE_PDDISC_POWERDOWN	(1 << 0)
 #define   UTMIP_FORCE_PDCHRP_POWERDOWN	(1 << 2)
@@ -149,65 +146,8 @@
 #define UTMIP_BIAS_CFG1		0x83c
 #define   UTMIP_BIAS_PDTRK_COUNT(x)	(((x) & 0x1f) << 3)
 
-#define UHSIC_PLL_CFG0				0x800
-
-#define UHSIC_PLL_CFG1				0x804
-#define   UHSIC_XTAL_FREQ_COUNT(x)		(((x) & 0xfff) << 0)
-#define   UHSIC_PLLU_ENABLE_DLY_COUNT(x)	(((x) & 0x1f) << 14)
-
-#define UHSIC_HSRX_CFG0				0x808
-#define   UHSIC_ELASTIC_UNDERRUN_LIMIT(x)	(((x) & 0x1f) << 2)
-#define   UHSIC_ELASTIC_OVERRUN_LIMIT(x)	(((x) & 0x1f) << 8)
-#define   UHSIC_IDLE_WAIT(x)			(((x) & 0x1f) << 13)
-
-#define UHSIC_HSRX_CFG1				0x80c
-#define   UHSIC_HS_SYNC_START_DLY(x)		(((x) & 0x1f) << 1)
-
-#define UHSIC_TX_CFG0				0x810
-#define   UHSIC_HS_POSTAMBLE_OUTPUT_ENABLE	(1 << 6)
-
-#define UHSIC_MISC_CFG0				0x814
-#define   UHSIC_SUSPEND_EXIT_ON_EDGE		(1 << 7)
-#define   UHSIC_DETECT_SHORT_CONNECT		(1 << 8)
-#define   UHSIC_FORCE_XCVR_MODE			(1 << 15)
-
-#define UHSIC_MISC_CFG1				0X818
-#define   UHSIC_PLLU_STABLE_COUNT(x)		(((x) & 0xfff) << 2)
-
-#define UHSIC_PADS_CFG0				0x81c
-#define   UHSIC_TX_RTUNEN			0xf000
-#define   UHSIC_TX_RTUNE(x)			(((x) & 0xf) << 12)
-
-#define UHSIC_PADS_CFG1				0x820
-#define   UHSIC_PD_BG				(1 << 2)
-#define   UHSIC_PD_TX				(1 << 3)
-#define   UHSIC_PD_TRK				(1 << 4)
-#define   UHSIC_PD_RX				(1 << 5)
-#define   UHSIC_PD_ZI				(1 << 6)
-#define   UHSIC_RX_SEL				(1 << 7)
-#define   UHSIC_RPD_DATA			(1 << 9)
-#define   UHSIC_RPD_STROBE			(1 << 10)
-#define   UHSIC_RPU_DATA			(1 << 11)
-#define   UHSIC_RPU_STROBE			(1 << 12)
-
-#define UHSIC_CMD_CFG0				0x824
-#define   UHSIC_PRETEND_CONNECT_DETECT		(1 << 5)
-
-#define UHSIC_STAT_CFG0				0x828
-#define   UHSIC_CONNECT_DETECT			(1 << 0)
-
-#define UHSIC_SPARE_CFG0			0x82c
-
 #else
 #define ULPI_VIEWPORT		0x160
-#define   ULPI_WAKEUP		(1 << 31)
-#define   ULPI_RUN		(1 << 30)
-#define   ULPI_RD_RW_WRITE	(1 << 29)
-#define   ULPI_RD_RW_READ	(0 << 29)
-#define   ULPI_PORT(x)		(((x) & 0x7) << 24)
-#define   ULPI_ADDR(x)		(((x) & 0xff) << 16)
-#define   ULPI_DATA_RD(x)	(((x) & 0xff) << 8)
-#define   ULPI_DATA_WR(x)	(((x) & 0xff) << 0)
 
 #define USB_PORTSC1		0x174
 #define   USB_PORTSC1_WKOC	(1 << 22)
@@ -230,6 +170,7 @@
 
 #define   UTMIP_PHY_ENABLE		(1 << 12)
 #define   ULPI_PHY_ENABLE		(1 << 13)
+#define   UHSIC_PHY_ENABLE	(1 << 19)
 
 #define   USB_WAKEUP_DEBOUNCE_COUNT(x)	(((x) & 0x7) << 16)
 
@@ -306,6 +247,94 @@
 
 #define ICUSB_CTRL		0x15c
 #endif
+
+#define ULPIS2S_CTRL		0x418
+#define   ULPIS2S_ENA			(1 << 0)
+#define   ULPIS2S_SUPPORT_DISCONNECT	(1 << 2)
+#define   ULPIS2S_PLLU_MASTER_BLASTER60	(1 << 3)
+#define   ULPIS2S_SPARE(x)		(((x) & 0xF) << 8)
+#define   ULPIS2S_FORCE_ULPI_CLK_OUT	(1 << 12)
+#define   ULPIS2S_DISCON_DONT_CHECK_SE0	(1 << 13)
+#define   ULPIS2S_SUPPORT_HS_KEEP_ALIVE (1 << 14)
+#define   ULPIS2S_DISABLE_STP_PU	(1 << 15)
+
+
+#define ULPI_TIMING_CTRL_0	0x424
+#define   ULPI_CLOCK_OUT_DELAY(x)	((x) & 0x1F)
+#define   ULPI_OUTPUT_PINMUX_BYP	(1 << 10)
+#define   ULPI_CLKOUT_PINMUX_BYP	(1 << 11)
+#define   ULPI_SHADOW_CLK_LOOPBACK_EN	(1 << 12)
+#define   ULPI_SHADOW_CLK_SEL		(1 << 13)
+#define   ULPI_CORE_CLK_SEL		(1 << 14)
+#define   ULPI_SHADOW_CLK_DELAY(x)	(((x) & 0x1F) << 16)
+#define   ULPI_LBK_PAD_EN		(1 << 26)
+#define   ULPI_LBK_PAD_E_INPUT_OR	(1 << 27)
+#define   ULPI_CLK_OUT_ENA		(1 << 28)
+#define   ULPI_CLK_PADOUT_ENA		(1 << 29)
+
+#define ULPI_TIMING_CTRL_1	0x428
+#define   ULPI_DATA_TRIMMER_LOAD	(1 << 0)
+#define   ULPI_DATA_TRIMMER_SEL(x)	(((x) & 0x7) << 1)
+#define   ULPI_STPDIRNXT_TRIMMER_LOAD	(1 << 16)
+#define   ULPI_STPDIRNXT_TRIMMER_SEL(x)	(((x) & 0x7) << 17)
+#define   ULPI_DIR_TRIMMER_LOAD		(1 << 24)
+#define   ULPI_DIR_TRIMMER_SEL(x)	(((x) & 0x7) << 25)
+
+
+
+#define UTMIP_SPARE_CFG0	0x834
+#define   FUSE_SETUP_SEL		(1 << 3)
+
+#define UHSIC_PLL_CFG0				0x800
+
+#define UHSIC_PLL_CFG1				0x804
+#define   UHSIC_XTAL_FREQ_COUNT(x)		(((x) & 0xfff) << 0)
+#define   UHSIC_PLLU_ENABLE_DLY_COUNT(x)	(((x) & 0x1f) << 14)
+
+#define UHSIC_HSRX_CFG0				0x808
+#define   UHSIC_ELASTIC_UNDERRUN_LIMIT(x)	(((x) & 0x1f) << 2)
+#define   UHSIC_ELASTIC_OVERRUN_LIMIT(x)	(((x) & 0x1f) << 8)
+#define   UHSIC_IDLE_WAIT(x)			(((x) & 0x1f) << 13)
+
+#define UHSIC_HSRX_CFG1				0x80c
+#define   UHSIC_HS_SYNC_START_DLY(x)		(((x) & 0x1f) << 1)
+
+#define UHSIC_TX_CFG0				0x810
+#define   UHSIC_HS_POSTAMBLE_OUTPUT_ENABLE	(1 << 6)
+
+#define UHSIC_MISC_CFG0				0x814
+#define   UHSIC_SUSPEND_EXIT_ON_EDGE		(1 << 7)
+#define   UHSIC_DETECT_SHORT_CONNECT		(1 << 8)
+#define   UHSIC_FORCE_XCVR_MODE			(1 << 15)
+
+#define UHSIC_MISC_CFG1				0X818
+#define   UHSIC_PLLU_STABLE_COUNT(x)		(((x) & 0xfff) << 2)
+
+#define UHSIC_PADS_CFG0				0x81c
+#define   UHSIC_TX_RTUNEN			0xf000
+#define   UHSIC_TX_RTUNE(x)			(((x) & 0xf) << 12)
+
+#define UHSIC_PADS_CFG1				0x820
+#define   UHSIC_PD_BG				(1 << 2)
+#define   UHSIC_PD_TX				(1 << 3)
+#define   UHSIC_PD_TRK				(1 << 4)
+#define   UHSIC_PD_RX				(1 << 5)
+#define   UHSIC_PD_ZI				(1 << 6)
+#define   UHSIC_RX_SEL				(1 << 7)
+#define   UHSIC_RPD_DATA			(1 << 9)
+#define   UHSIC_RPD_STROBE			(1 << 10)
+#define   UHSIC_RPU_DATA			(1 << 11)
+#define   UHSIC_RPU_STROBE			(1 << 12)
+
+#define UHSIC_CMD_CFG0				0x824
+#define   UHSIC_PRETEND_CONNECT_DETECT		(1 << 5)
+
+#define UHSIC_STAT_CFG0				0x828
+#define   UHSIC_CONNECT_DETECT			(1 << 0)
+
+#define UHSIC_SPARE_CFG0			0x82c
+
+
 
 static DEFINE_SPINLOCK(utmip_pad_lock);
 static int utmip_pad_count;
@@ -422,7 +451,7 @@ struct usb_phy_plat_data usb_phy_data[] = {
 
 static inline bool phy_is_ulpi(struct tegra_usb_phy *phy)
 {
-	return (phy->instance == 1);
+	return (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_ULPI);
 }
 
 static int utmip_pad_open(struct tegra_usb_phy *phy)
@@ -578,6 +607,7 @@ static void vbus_enable(struct tegra_usb_phy *phy)
 {
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	int gpio_status;
+	int gpio = usb_phy_data[phy->instance].vbus_gpio;
 
 	if (gpio == -1)
 		return;
@@ -597,20 +627,24 @@ static void vbus_enable(struct tegra_usb_phy *phy)
 	}
 	gpio_set_value(gpio, 1);
 #else
-	regulator_enable(phy->reg_vbus);
+	if (phy->reg_vbus)
+		regulator_enable(phy->reg_vbus);
 #endif
 }
 
 static void vbus_disable(struct tegra_usb_phy *phy)
 {
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	int gpio = usb_phy_data[phy->instance].vbus_gpio;
+
 	if (gpio == -1)
 		return;
 
 	gpio_set_value(gpio, 0);
 	gpio_free(gpio);
 #else
-	regulator_disable(phy->reg_vbus);
+	if (phy->reg_vbus)
+		regulator_disable(phy->reg_vbus);
 #endif
 }
 
@@ -620,7 +654,6 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 	void __iomem *base = phy->regs;
 	struct tegra_utmip_config *config = phy->config;
 
-	utmip_pad_power_on(phy);
 	val = readl(base + USB_SUSP_CTRL);
 	val |= UTMIP_RESET;
 	writel(val, base + USB_SUSP_CTRL);
@@ -677,6 +710,8 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 		writel(val, base + USB_SUSP_CTRL);
 	}
 
+	utmip_pad_power_on(phy);
+
 	val = readl(base + UTMIP_XCVR_CFG0);
 	val &= ~(UTMIP_FORCE_PD_POWERDOWN | UTMIP_FORCE_PD2_POWERDOWN |
 		 UTMIP_FORCE_PDZI_POWERDOWN | UTMIP_XCVR_SETUP(~0) |
@@ -702,7 +737,6 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 	val |= UTMIP_BIAS_PDTRK_COUNT(0x5);
 	writel(val, base + UTMIP_BIAS_CFG1);
 
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	if (phy->instance == 0) {
 		val = readl(base + UTMIP_SPARE_CFG0);
 		if (phy->mode == TEGRA_USB_PHY_MODE_DEVICE)
@@ -711,7 +745,7 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 			val |= FUSE_SETUP_SEL;
 		writel(val, base + UTMIP_SPARE_CFG0);
 	}
-
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	if (phy->instance == 2) {
 		val = readl(base + USB_SUSP_CTRL);
 		val |= UTMIP_PHY_ENABLE;
@@ -739,8 +773,6 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 		val = readl(base + USB_SUSP_CTRL);
 		val &= ~USB_SUSP_SET;
 		writel(val, base + USB_SUSP_CTRL);
-		if (phy->mode == TEGRA_USB_PHY_MODE_HOST)
-			vbus_enable(phy);
 #endif
 	}
 
@@ -763,13 +795,9 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 	val &= ~HOSTPC1_DEVLC_PTS(~0);
 	val |= HOSTPC1_DEVLC_STS;
 	writel(val, base + HOSTPC1_DEVLC);
-	if (((phy->instance == 0 ) || (phy->instance == 2))
-			&& phy->mode == TEGRA_USB_PHY_MODE_HOST) {
-		vbus_enable(phy);
-	}
 #endif
 	if (phy->mode == TEGRA_USB_PHY_MODE_HOST) {
-		vbus_enable(usb_phy_data[phy->instance].vbus_gpio);
+		vbus_enable(phy);
 	}
 
 	return 0;
@@ -783,15 +811,7 @@ static void utmi_phy_power_off(struct tegra_usb_phy *phy)
 	utmi_phy_clk_disable(phy);
 
 	if (phy->mode == TEGRA_USB_PHY_MODE_HOST) {
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-		if (phy->instance == 0) {
-			vbus_disable(phy);
-		}
-#else
-		if (phy->instance == 0 || phy->instance == 2) {
-			vbus_disable(phy);
-		}
-#endif
+		vbus_disable(phy);
 	}
 
 	if (phy->mode == TEGRA_USB_PHY_MODE_DEVICE) {
@@ -1237,10 +1257,11 @@ static int uhsic_phy_power_on(struct tegra_usb_phy *phy)
 	val &= ~(UHSIC_RESET);
 	writel(val, base + USB_SUSP_CTRL);
 	udelay(2);
-
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	val = readl(base + USB_PORTSC1);
 	val &= ~USB_PORTSC1_PTS(~0);
 	writel(val, base + USB_PORTSC1);
+#endif
 
 	val = readl(base + USB_TXFILLTUNING);
 	if ((val & USB_FIFO_TXFILL_MASK) != USB_FIFO_TXFILL_THRES(0x10)) {
@@ -1380,7 +1401,7 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 		goto err1;
 	}
 
-	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_ULPI) {
+	if (phy_is_ulpi(phy)) {
 		ulpi_config = config;
 
 		if (ulpi_config->inf_type == TEGRA_USB_LINK_ULPI) {
@@ -1390,11 +1411,9 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 				err = -ENXIO;
 				goto err1;
 			}
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 			tegra_gpio_enable(ulpi_config->reset_gpio);
 			gpio_request(ulpi_config->reset_gpio, "ulpi_phy_reset_b");
 			gpio_direction_output(ulpi_config->reset_gpio, 0);
-#endif
 
 			phy->ulpi = otg_ulpi_create(&ulpi_viewport_access_ops, 0);
 			phy->ulpi->io_priv = regs + ULPI_VIEWPORT;
@@ -1404,7 +1423,22 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 		if (err < 0)
 			goto err1;
 	}
+	phy->reg_vdd = regulator_get(NULL, "avdd_usb");
+	if (WARN_ON(IS_ERR_OR_NULL(phy->reg_vdd))) {
+		pr_err("couldn't get regulator avdd_usb: %ld \n",
+			 PTR_ERR(phy->reg_vdd));
+		err = PTR_ERR(phy->reg_vdd);
+		goto err1;
+	}
 
+	if (instance == 0 && usb_phy_data[0].vbus_irq) {
+		err = request_threaded_irq(usb_phy_data[0].vbus_irq, NULL, usb_phy_vbus_irq_thr, IRQF_SHARED,
+			"usb_phy_vbus", phy);
+		if (err) {
+			pr_err("Failed to register IRQ\n");
+			goto err1;
+		}
+	}
 /* Power-up the VBUS detector for UTMIP PHY */
 #ifdef CONFIG_ARCH_TEGRA_3x_SOC
 {
@@ -1427,15 +1461,6 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 	}
 #endif
 
-	if (instance == 0 && usb_phy_data[0].vbus_irq) {
-		err = request_threaded_irq(usb_phy_data[0].vbus_irq, NULL, usb_phy_vbus_irq_thr, IRQF_SHARED,
-			"usb_phy_vbus", phy);
-		if (err) {
-			pr_err("Failed to register IRQ\n");
-			goto err1;
-		}
-	}
-
 	return phy;
 
 err1:
@@ -1448,7 +1473,7 @@ err0:
 
 int tegra_usb_phy_power_on(struct tegra_usb_phy *phy)
 {
-	if (!phy->regulator_on) {
+	if (phy->reg_vdd && !phy->regulator_on) {
 		regulator_enable(phy->reg_vdd);
 		phy->regulator_on = 1;
 	}
@@ -1477,15 +1502,18 @@ void tegra_usb_phy_power_off(struct tegra_usb_phy *phy)
 	} else
 		utmi_phy_power_off(phy);
 
-	if (phy->regulator_on && (tegra_get_revision() >= TEGRA_REVISION_A03)) {
-		regulator_disable(phy->reg_vdd);
+	if (phy->reg_vdd && phy->regulator_on) {
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+		if (tegra_get_revision() >= TEGRA_REVISION_A03)
+#endif
+			regulator_disable(phy->reg_vdd);
 		phy->regulator_on = 0;
 	}
 }
 
 void tegra_usb_phy_preresume(struct tegra_usb_phy *phy)
 {
-	if (phy->usb_phy_type != TEGRA_USB_PHY_TYPE_ULPI)
+	if (!phy_is_ulpi(phy))
 		utmi_phy_preresume(phy);
 }
 
@@ -1521,7 +1549,7 @@ void tegra_ehci_phy_restore_end(struct tegra_usb_phy *phy)
 
 void tegra_usb_phy_clk_disable(struct tegra_usb_phy *phy)
 {
-	if (phy->usb_phy_type != TEGRA_USB_PHY_TYPE_ULPI)
+	if (!phy_is_ulpi(phy))
 		utmi_phy_clk_disable(phy);
 }
 
@@ -1542,7 +1570,10 @@ void tegra_usb_phy_close(struct tegra_usb_phy *phy)
 		utmip_pad_close(phy);
 	clk_disable(phy->pll_u);
 	clk_put(phy->pll_u);
-	regulator_put(phy->reg_vbus);
+	if (phy->reg_vbus)
+		regulator_put(phy->reg_vbus);
+	if (phy->reg_vdd)
+		regulator_put(phy->reg_vdd);
 	if (phy->instance == 0 && usb_phy_data[0].vbus_irq)
 		free_irq(usb_phy_data[0].vbus_irq, phy);
 	kfree(phy);
@@ -1575,10 +1606,12 @@ int tegra_usb_phy_bus_connect(struct tegra_usb_phy *phy)
 			return -ETIMEDOUT;
 		}
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 		if (utmi_wait_register(base + USB_PORTSC1, USB_PORTSC1_LS(2), USB_PORTSC1_LS(2)) < 0) {
 			pr_err("%s: timeout waiting for dplus state\n", __func__);
 			return -ETIMEDOUT;
 		}
+#endif
 	}
 
 	return 0;
@@ -1602,21 +1635,23 @@ int tegra_usb_phy_bus_reset(struct tegra_usb_phy *phy)
 		writel(val, base + USB_PORTSC1);
 		udelay(2);
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 		if (utmi_wait_register(base + USB_PORTSC1, USB_PORTSC1_LS(0), 0) < 0) {
 			pr_err("%s: timeout waiting for SE0\n", __func__);
 			return -ETIMEDOUT;
 		}
-
+#endif
 		if (utmi_wait_register(base + USB_PORTSC1, USB_PORTSC1_CCS, USB_PORTSC1_CCS) < 0) {
 			pr_err("%s: timeout waiting for connection status\n", __func__);
 			return -ETIMEDOUT;
 		}
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 		if (utmi_wait_register(base + USB_PORTSC1, USB_PORTSC1_PSPD(2), USB_PORTSC1_PSPD(2)) < 0) {
 			pr_err("%s: timeout waiting hsic high speed configuration\n", __func__);
 			return -ETIMEDOUT;
 		}
-
+#endif
 		val = readl(base + USB_USBCMD);
 		val &= ~USB_USBCMD_RS;
 		writel(val, base + USB_USBCMD);
@@ -1690,10 +1725,12 @@ bool tegra_usb_phy_is_device_connected(struct tegra_usb_phy *phy)
 			pr_err("%s: hsic no device connection\n", __func__);
 			return false;
 		}
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 		if (utmi_wait_register(base + USB_PORTSC1, USB_PORTSC1_LS(2), USB_PORTSC1_LS(2)) < 0) {
 			pr_err("%s: timeout waiting for dplus state\n", __func__);
 			return false;
 		}
+#endif
 	}
 	return true;
 }
