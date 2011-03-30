@@ -232,7 +232,6 @@ config TEGRA_AUTO_HOTPLUG
 
 config TEGRA_MC_PROFILE
 	tristate "Enable profiling memory controller utilization"
-	depends on ARCH_TEGRA_2x_SOC
 	default n
 	help
 	  When enabled, provides a mechanism to perform statistical
