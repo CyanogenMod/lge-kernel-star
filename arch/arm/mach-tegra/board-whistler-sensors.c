@@ -22,6 +22,7 @@
 #include <linux/i2c.h>
 #include <mach/gpio.h>
 #include <media/ov5650.h>
+#include <media/soc380.h>
 #include <linux/regulator/consumer.h>
 #include <linux/err.h>
 #include <linux/adt7461.h>
@@ -31,6 +32,8 @@
 
 #define CAMERA1_PWDN_GPIO		TEGRA_GPIO_PT2
 #define CAMERA1_RESET_GPIO		TEGRA_GPIO_PD2
+#define CAMERA2_PWDN_GPIO		TEGRA_GPIO_PBB5
+#define CAMERA2_RESET_GPIO		TEGRA_GPIO_PBB1
 #define CAMERA_AF_PD_GPIO		TEGRA_GPIO_PT3
 #define CAMERA_FLASH_EN1_GPIO	TEGRA_GPIO_PBB4
 #define CAMERA_FLASH_EN2_GPIO	TEGRA_GPIO_PA0
@@ -51,10 +54,22 @@ static int whistler_camera_init(void)
 	tegra_gpio_enable(CAMERA1_PWDN_GPIO);
 	gpio_request(CAMERA1_PWDN_GPIO, "camera1_powerdown");
 	gpio_direction_output(CAMERA1_PWDN_GPIO, 0);
+	gpio_export(CAMERA1_PWDN_GPIO, false);
 
 	tegra_gpio_enable(CAMERA1_RESET_GPIO);
 	gpio_request(CAMERA1_RESET_GPIO, "camera1_reset");
 	gpio_direction_output(CAMERA1_RESET_GPIO, 0);
+	gpio_export(CAMERA1_RESET_GPIO, false);
+
+	tegra_gpio_enable(CAMERA2_PWDN_GPIO);
+	gpio_request(CAMERA2_PWDN_GPIO, "camera2_powerdown");
+	gpio_direction_output(CAMERA2_PWDN_GPIO, 0);
+	gpio_export(CAMERA2_PWDN_GPIO, false);
+
+	tegra_gpio_enable(CAMERA2_RESET_GPIO);
+	gpio_request(CAMERA2_RESET_GPIO, "camera2_reset");
+	gpio_direction_output(CAMERA2_RESET_GPIO, 0);
+	gpio_export(CAMERA2_RESET_GPIO, false);
 
 	tegra_gpio_enable(CAMERA_AF_PD_GPIO);
 	gpio_request(CAMERA_AF_PD_GPIO, "camera_autofocus");
@@ -152,9 +167,71 @@ static int whistler_ov5650_power_off(void)
 	return 0;
 }
 
+static int whistler_soc380_power_on(void)
+{
+	gpio_set_value(CAMERA2_PWDN_GPIO, 0);
+
+	if (!reg_vddio_vi) {
+		reg_vddio_vi = regulator_get(NULL, "vddio_vi");
+		if (IS_ERR_OR_NULL(reg_vddio_vi)) {
+			pr_err("whistler_soc380_power_on: vddio_vi failed\n");
+			reg_vddio_vi = NULL;
+			return PTR_ERR(reg_vddio_vi);
+		}
+		regulator_set_voltage(reg_vddio_vi, 1800*1000, 1800*1000);
+		mdelay(5);
+		regulator_enable(reg_vddio_vi);
+	}
+
+	if (!reg_avdd_cam1) {
+		reg_avdd_cam1 = regulator_get(NULL, "vdd_cam1");
+		if (IS_ERR_OR_NULL(reg_avdd_cam1)) {
+			pr_err("whistler_soc380_power_on: vdd_cam1 failed\n");
+			reg_avdd_cam1 = NULL;
+			return PTR_ERR(reg_avdd_cam1);
+		}
+		regulator_enable(reg_avdd_cam1);
+	}
+	mdelay(5);
+
+	gpio_set_value(CAMERA2_RESET_GPIO, 1);
+	mdelay(10);
+	gpio_set_value(CAMERA2_RESET_GPIO, 0);
+	mdelay(5);
+	gpio_set_value(CAMERA2_RESET_GPIO, 1);
+	mdelay(20);
+
+	return 0;
+
+}
+
+static int whistler_soc380_power_off(void)
+{
+	gpio_set_value(CAMERA2_PWDN_GPIO, 1);
+	gpio_set_value(CAMERA2_RESET_GPIO, 0);
+
+	if (reg_avdd_cam1) {
+		regulator_disable(reg_avdd_cam1);
+		regulator_put(reg_avdd_cam1);
+		reg_avdd_cam1 = NULL;
+	}
+	if (reg_vddio_vi) {
+		regulator_disable(reg_vddio_vi);
+		regulator_put(reg_vddio_vi);
+		reg_vddio_vi = NULL;
+	}
+
+	return 0;
+}
+
 struct ov5650_platform_data whistler_ov5650_data = {
 	.power_on = whistler_ov5650_power_on,
 	.power_off = whistler_ov5650_power_off,
+};
+
+struct soc380_platform_data whistler_soc380_data = {
+	.power_on = whistler_soc380_power_on,
+	.power_off = whistler_soc380_power_off,
 };
 
 static struct i2c_board_info whistler_i2c3_board_info[] = {
@@ -164,6 +241,10 @@ static struct i2c_board_info whistler_i2c3_board_info[] = {
 	},
 	{
 		I2C_BOARD_INFO("ad5820", 0x0c),
+	},
+	{
+		I2C_BOARD_INFO("soc380", 0x3C),
+		.platform_data = &whistler_soc380_data,
 	},
 };
 
@@ -263,6 +344,7 @@ int __init whistler_sensor_late_init(void)
 	}
 
 	regulator_put(reg_vddio_vi);
+	reg_vddio_vi = NULL;
 	return 0;
 
 fail_put_regulator:
