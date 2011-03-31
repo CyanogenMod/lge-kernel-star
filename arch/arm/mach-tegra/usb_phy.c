@@ -1344,7 +1344,7 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 	int err;
 	bool hsic = false;
 
-	phy = kmalloc(sizeof(struct tegra_usb_phy), GFP_KERNEL);
+	phy = kzalloc(sizeof(struct tegra_usb_phy), GFP_KERNEL);
 	if (!phy)
 		return ERR_PTR(-ENOMEM);
 
