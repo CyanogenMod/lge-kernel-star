@@ -1433,9 +1433,6 @@ static void _tegra_dc_controller_disable(struct tegra_dc *dc)
 {
 	disable_irq(dc->irq);
 
-	if (dc->overlay)
-		tegra_overlay_disable(dc->overlay);
-
 	if (dc->out_ops && dc->out_ops->disable)
 		dc->out_ops->disable(dc);
 
@@ -1461,6 +1458,9 @@ static void _tegra_dc_disable(struct tegra_dc *dc)
 
 void tegra_dc_disable(struct tegra_dc *dc)
 {
+	if (dc->overlay)
+		tegra_overlay_disable(dc->overlay);
+
 	mutex_lock(&dc->lock);
 
 	if (dc->enabled) {
@@ -1746,6 +1746,9 @@ static int tegra_dc_suspend(struct nvhost_device *ndev, pm_message_t state)
 	struct tegra_dc *dc = nvhost_get_drvdata(ndev);
 
 	dev_info(&ndev->dev, "suspend\n");
+
+	if (dc->overlay)
+		tegra_overlay_disable(dc->overlay);
 
 	mutex_lock(&dc->lock);
 
