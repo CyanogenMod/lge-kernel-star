@@ -45,6 +45,7 @@
 #include <linux/ctype.h>
 
 #include <mach/tegra2_fuse.h>
+#include <mach/iomap.h>
 
 #include "fuse.h"
 
@@ -546,10 +547,21 @@ static int fuse_set(enum fuse_io_param io_param, u32 *param, int size)
 	return 0;
 }
 
+#define CAR_OSC_CTRL		0x50
+#define PMC_PLLP_OVERRIDE	0xF8
+#define PMC_OSC_OVERRIDE	BIT(0)
+#define PMC_OSC_FREQ_MASK	(BIT(2) | BIT(3))
+#define PMC_OSC_FREQ_SHIFT	2
+#define CAR_OSC_FREQ_SHIFT	30
+
+/* cycles corresponding to 13MHz, 19.2MHz, 12MHz, 26MHz */
+static int fuse_pgm_cycles[] = {130, 192, 120, 260};
+
 int tegra_fuse_program(struct fuse_data *pgm_data, u32 flags)
 {
 	u32 reg;
 	int i = 0;
+	int index;
 
 	mutex_lock(&fuse_lock);
 	reg = tegra_fuse_readl(FUSE_DIS_PGM);
@@ -584,7 +596,18 @@ int tegra_fuse_program(struct fuse_data *pgm_data, u32 flags)
 
 	regulator_enable(vdd_fuse);
 	populate_fuse_arrs(&fuse_info, flags);
-	fuse_program_array(0);
+
+	/* calculate the number of program cycles from the oscillator freq */
+	reg = readl(IO_ADDRESS(TEGRA_PMC_BASE) + PMC_PLLP_OVERRIDE);
+	if (reg & PMC_OSC_OVERRIDE) {
+		index = (reg & PMC_OSC_FREQ_MASK) >> PMC_OSC_FREQ_SHIFT;
+	} else {
+		reg = readl(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + CAR_OSC_CTRL);
+		index = reg >> CAR_OSC_FREQ_SHIFT;
+	}
+
+	pr_debug("%s: use %d programming cycles\n", __func__, fuse_pgm_cycles[index]);
+	fuse_program_array(fuse_pgm_cycles[index]);
 
 	/* disable program bit */
 	reg = 0;
