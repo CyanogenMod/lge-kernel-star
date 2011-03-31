@@ -47,6 +47,7 @@ typedef enum {
 #define MC_STAT_EMC_ADDR_LOW_0					0x98
 #define MC_STAT_EMC_ADDR_HIGH_0					0x9c
 #define MC_STAT_EMC_CLOCK_LIMIT_0				0xa0
+#define MC_STAT_EMC_CLOCKS_0					0xa4
 #define MC_STAT_EMC_CONTROL_0_0					0xa8
 #define MC_STAT_EMC_COUNT_0_0					0xb8
 #define MC_STAT_EMC_COUNT_1_0					0xbc
@@ -142,59 +143,37 @@ typedef enum {
 #define EMC_STAT_DRAM_DEV1_NO_BANKS_ACTIVE_CKE_EQ0_LO_0		0x25c
 #define EMC_STAT_DRAM_DEV1_NO_BANKS_ACTIVE_CKE_EQ0_HI_0		0x260
 
+#pragma pack(push)
+#pragma pack(1)
+
+typedef struct {
+	u32	signature;
+	u32	client_number;
+	u32	client_counts;
+	u32	total_counts;
+	u32	emc_clock_rate;
+} sample_data_t;
+
+#pragma pack(pop)
+
 typedef struct tegra_mc_counter {
-	/* constants during sampling */
 	bool		enabled;
-	bool		reschedule;
 	u32		period;
 	FILTER_MODE	mode;
 	u32		address_low;
-	u32		address_length_1; /* This represents (length - 1) */
-	u32		address_window_size_1; /* This represents (size - 1) */
-	u8		client_number;
+	u32		address_length;
+	u32		current_client_index;
+	u32		total_clients;
 	u8		clients[MC_COUNTER_CLIENT_SIZE];
-
-	/* variables during sampling */
-	bool		address_range_change;
-	u32		current_address_low;
-	u32		current_address_high;
-	u32		value;
-	u8		current_client;
-	u32		sample_count;
+	sample_data_t	sample_data;
 } tegra_mc_counter_t;
 
 typedef struct tegra_emc_dram_counter {
-	/* constants during sampling */
 	bool	enabled;
 	u8	device_mask;
 
-	/* variables during sampling */
-	u32	value;
+	sample_data_t	sample_data;
 } tegra_emc_dram_counter_t;
-
-#pragma pack(push)
-#pragma pack(1)
-#define LOG_EVENT_NUMBER_MAX		16
-#define MILLISECONDS_TO_TIME_QUANTUM	10
-typedef struct {
-	u16	time_quantum;
-	u16	event_state_change;
-} log_header_t;
-
-typedef struct {
-	struct _word0 {
-		u32 enabled			: 1; /* 0:0 */
-		u32 address_range_change	: 1; /* 1:1 */
-		u32 reserved1			: 2; /* 3:2 */
-		u32 event_id			: 8; /* 11:4 */
-		u32 address_range_low_pfn	: 20; /* 31:12 */
-	} word0;
-	struct _word1 {
-		u32 address_range_length_pfn	: 20; /* 19:0 */
-		u32 reserved1			: 12; /* 31:20 */
-	} word1;
-} log_event_t;
-#pragma pack(pop)
 
 /* client ids of mc/emc */
 typedef enum {

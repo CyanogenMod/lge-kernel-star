@@ -31,9 +31,13 @@
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/clk.h>
+
 #include <mach/iomap.h>
+
 #include <asm/uaccess.h>
 
+#include "clock.h"
 #include "tegra2_mc.h"
 
 static void stat_start(void);
@@ -45,13 +49,13 @@ static struct hrtimer sample_timer;
 #define MC_COUNTER_INITIALIZER()			\
 	{						\
 		.enabled = false,			\
-		.reschedule = false,			\
 		.period = 10,				\
 		.mode = FILTER_CLIENT,			\
 		.address_low = 0,			\
-		.address_length_1 = 0xfffffffful,	\
-		.address_window_size_1 = PAGE_SIZE,	\
-		.client_number = 0,			\
+		.address_length = 0xfffffffful,		\
+		.sample_data = {			\
+			.signature = 0xdeadbeef,	\
+		}					\
 	}
 
 static struct tegra_mc_counter mc_counter0 = MC_COUNTER_INITIALIZER();
@@ -68,6 +72,7 @@ static DEFINE_SPINLOCK(sample_log_lock);
 
 static u8 *sample_log_wptr = sample_log, *sample_log_rptr = sample_log;
 static int sample_log_size = SAMPLE_LOG_SIZE - 1;
+static struct clk *emc_clock = NULL;
 
 static bool sampling(void)
 {
@@ -126,16 +131,7 @@ static ssize_t tegra_mc_enable_store(struct sysdev_class *class,
 		if (!c->enabled)
 			continue;
 
-		c->current_address_low = c->address_low;
-		c->current_address_high = c->address_low;
-		c->address_range_change = (c->mode == FILTER_ADDR);
-		if (c->address_range_change)
-			c->current_address_high += c->address_window_size_1;
-		else
-			c->current_address_high += c->address_length_1;
-
-		c->current_client = 0;
-		c->sample_count = 0;
+		c->current_client_index = 0;
 	}
 
 	stat_start();
@@ -273,7 +269,6 @@ static int tegra_mc_client_parse(const char *buf, size_t count,
 		opt_client,
 		opt_address_low,
 		opt_address_length,
-		opt_address_window_size,
 		opt_err,
 	};
 	const match_table_t tokens = {
@@ -282,21 +277,20 @@ static int tegra_mc_client_parse(const char *buf, size_t count,
 		{opt_client, "client=%s"},
 		{opt_address_low, "address_low=%s"},
 		{opt_address_length, "address_length=%s"},
-		{opt_address_window_size, "address_window_size=%s"},
 		{opt_err, NULL},
 	};
-	int ret = 0, i, token, client_number;
+	int ret = 0, i, token, index = 0;
 	bool aggregate = false;
-	int  period, *client_ids, mode;
-	bool fperiod = false, fmode = false, fclient = false;
+	int period, *client_ids, mode;
 	u64 address_low = 0;
-	u64 address_length = 1ull<<32;
-	u64 address_window_size = PAGE_SIZE;
+	u64 address_length = 1ull << 32;
 
 	client_ids = kmalloc(sizeof(int) * (MC_COUNTER_CLIENT_SIZE + 1),
 		GFP_KERNEL);
 	if (!client_ids)
 		return -ENOMEM;
+
+	memset(client_ids, -1, (sizeof(int) * (MC_COUNTER_CLIENT_SIZE + 1)));
 
 	options = kstrdup(buf, GFP_KERNEL);
 	if (!options) {
@@ -313,47 +307,28 @@ static int tegra_mc_client_parse(const char *buf, size_t count,
 		token = match_token(p, tokens, args);
 		switch (token) {
 		case opt_period:
-			if (match_int(&args[0], &period) || period<=0) {
+			if (match_int(&args[0], &period) || period <= 0) {
 				ret = -EINVAL;
 				goto end;
 			}
-			fperiod = true;
 			break;
 
 		case opt_mode:
 			mode = tegra_mc_parse_mode(args[0].from);
-			if (mode<0) {
+			if (mode < 0) {
 				ret = mode;
 				goto end;
 			}
-			fmode = true;
 			break;
 
 		case opt_client:
-			client_ids[0] = 0;
-
 			ptr = get_options(args[0].from,
-				MC_COUNTER_CLIENT_SIZE+1 , client_ids);
+				MC_COUNTER_CLIENT_SIZE + 1, client_ids);
 
-			if (client_ids[0] <= 0) {
-				ret = -EINVAL;
-				goto end;
+			if (client_ids[1] == MC_STAT_AGGREGATE) {
+				aggregate = true;
+				break;
 			}
-
-			for (i = 1; i <= client_ids[0]; i++) {
-				if (client_ids[i] < MC_STAT_END)
-					continue;
-
-				if ((client_ids[i] != MC_STAT_AGGREGATE) ||
-				    client_ids[0] != 1) {
-					ret = -EINVAL;
-					goto end;
-				} else
-					aggregate = true;
-			}
-
-			client_number = client_ids[0];
-			fclient = true;
 			break;
 
 		case opt_address_low:
@@ -364,50 +339,30 @@ static int tegra_mc_client_parse(const char *buf, size_t count,
 			address_length = simple_strtoull(args[0].from, NULL, 0);
 			break;
 
-		case opt_address_window_size:
-			address_window_size = simple_strtoull(args[0].from,
-				NULL, 0);
-			break;
-
 		default:
 			ret = -EINVAL;
 			goto end;
 		}
 	}
 
-	if (!fmode || !fclient || (mode == FILTER_CLIENT && aggregate)) {
-		ret = -EINVAL;
-		goto end;
-	}
-
 	address_low &= PAGE_MASK;
-	address_length += PAGE_SIZE-1;
-	address_length &= ~((1ull << PAGE_SHIFT)-1ull);
-
-	address_window_size += PAGE_SIZE-1;
-	address_window_size &= ~((1ull << PAGE_SHIFT)-1ull);
+	address_length += PAGE_SIZE - 1;
+	address_length &= ~((1ull << PAGE_SHIFT) - 1ull);
 
 	if (mode == FILTER_CLIENT) {
 		counter = counter0;
-		counter->reschedule = (client_number>1);
-		counter->client_number = client_number;
 		llp->enabled = false;
 		counter1->enabled = false;
-		for (i = 1; i <= client_number && i < MC_COUNTER_CLIENT_SIZE; i++)
-			counter->clients[i - 1] = client_ids[i];
 	} else if (mode == FILTER_ADDR || mode == FILTER_NONE) {
 		if (aggregate) {
 			counter = counter1;
-			llp->enabled = true;
+			llp->enabled = false;
 			counter0->enabled = false;
 		} else {
 			counter = counter0;
 			counter1->enabled = false;
 			llp->enabled = false;
 		}
-		counter->client_number = 1;
-		counter->clients[0] = client_ids[1];
-		counter->reschedule = (mode != FILTER_NONE);
 	} else {
 		ret = -EINVAL;
 		goto end;
@@ -416,16 +371,20 @@ static int tegra_mc_client_parse(const char *buf, size_t count,
 	counter->mode = mode;
 	counter->enabled = true;
 	counter->address_low = (u32)address_low;
-	counter->address_length_1 = (u32)(address_length-1);
-	counter->address_window_size_1 = (u32)(address_window_size-1);
+	counter->address_length = (u32)(address_length - 1);
+
+	for (i = 1; i < MC_COUNTER_CLIENT_SIZE; i++) {
+		if (client_ids[i] != -1)
+			counter->clients[index++] = client_ids[i];
+	}
+
+	counter->total_clients = index;
 
 	if (llp->enabled) {
 		llp->mode = counter->mode;
-		llp->reschedule = counter->reschedule;
 		llp->period = counter->period;
 		llp->address_low = counter->address_low;
-		llp->address_length_1 = counter->address_length_1;
-		llp->address_window_size_1 = counter->address_window_size_1;
+		llp->address_length = counter->address_length;
 	}
 
 end:
@@ -467,7 +426,7 @@ static ssize_t tegra_mc_client_0_store(struct kobject *kobj,
 	} else if (strcmp(attr->attr.name, "on_schedule") == 0) {
 		if (tegra_mc_client_parse(buf, count,
 			&mc_counter0, &mc_counter1,
-			&emc_llp_counter)== 0) {
+			&emc_llp_counter) == 0) {
 
 			strncpy(tegra_mc_client_0_on_schedule_buffer,
 				buf, count);
@@ -645,13 +604,13 @@ void mc_stat_start(tegra_mc_counter_t *counter0, tegra_mc_counter_t *counter1)
 			ARMC_STAT_CONTROL_FILTER_COALESCED_SHIFT);
 		reg |= filter_client;
 		reg |= filter_addr;
-		reg |= (c->clients[c->current_client] <<
+		reg |= (c->clients[c->current_client_index] <<
 			ARMC_STAT_CONTROL_CLIENT_ID_SHIFT);
 
 		/* note these registers are shared */
-		writel(c->current_address_low,
+		writel(c->address_low,
 		       mc.mmio + MC_STAT_EMC_ADDR_LOW_0);
-		writel(c->current_address_high,
+		writel((c->address_low + c->address_length),
 		       mc.mmio + MC_STAT_EMC_ADDR_HIGH_0);
 		writel(0xFFFFFFFF, mc.mmio + MC_STAT_EMC_CLOCK_LIMIT_0);
 
@@ -669,14 +628,22 @@ void mc_stat_start(tegra_mc_counter_t *counter0, tegra_mc_counter_t *counter1)
 void mc_stat_stop(tegra_mc_counter_t *counter0,
 	tegra_mc_counter_t *counter1)
 {
+	u32 total_counts = readl(mc.mmio + MC_STAT_EMC_CLOCKS_0);
+
 	/* Disable statistics */
 	writel((MC_STAT_CONTROL_0_EMC_GATHER_DISABLE << MC_STAT_CONTROL_0_EMC_GATHER_SHIFT),
 		mc.mmio + MC_STAT_CONTROL_0);
 
-	if (counter0->enabled)
-		counter0->value = readl(mc.mmio + MC_STAT_EMC_COUNT_0_0);
-	else
-		counter1->value = readl(mc.mmio + MC_STAT_EMC_COUNT_1_0);
+	if (counter0->enabled) {
+		counter0->sample_data.client_counts = readl(mc.mmio + MC_STAT_EMC_COUNT_0_0);
+		counter0->sample_data.total_counts = total_counts;
+		counter0->sample_data.emc_clock_rate = clk_get_rate(emc_clock);
+	}
+	else {
+		counter1->sample_data.client_counts = readl(mc.mmio + MC_STAT_EMC_COUNT_1_0);
+		counter1->sample_data.total_counts = total_counts;
+		counter1->sample_data.emc_clock_rate = clk_get_rate(emc_clock);
+	}
 }
 
 void emc_stat_start(tegra_mc_counter_t *llp_counter,
@@ -723,9 +690,9 @@ void emc_stat_start(tegra_mc_counter_t *llp_counter,
 				 AREMC_STAT_CONTROL_FILTER_CLIENT_SHIFT);
 		}
 
-		writel(llp_counter->current_address_low,
+		writel(llp_counter->address_low,
 		       emc.mmio + EMC_STAT_LLMC_ADDR_LOW_0);
-		writel(llp_counter->current_address_high,
+		writel( (llp_counter->address_low + llp_counter->address_length),
 		       emc.mmio + EMC_STAT_LLMC_ADDR_HIGH_0);
 		writel(0xFFFFFFFF, emc.mmio + EMC_STAT_LLMC_CLOCK_LIMIT_0);
 		writel(llmc_ctrl, emc.mmio + EMC_STAT_LLMC_CONTROL_0_0);
@@ -813,75 +780,37 @@ void emc_stat_stop(tegra_mc_counter_t *llp_counter,
 			EMC_STAT_CONTROL_0_DRAM_GATHER_SHIFT);
 	writel(llmc_stat, emc.mmio + EMC_STAT_CONTROL_0);
 
-	if (tegra_mc_client_0_enabled == true)
-		llp_counter->value = readl(emc.mmio + EMC_STAT_LLMC_COUNT_0_0);
+	if (tegra_mc_client_0_enabled == true && llp_counter->enabled) {
+		u32 total_counts = readl(mc.mmio + MC_STAT_EMC_CLOCKS_0);
+		llp_counter->sample_data.client_counts = readl(emc.mmio + EMC_STAT_LLMC_COUNT_0_0);
+		llp_counter->sample_data.total_counts = total_counts;
+		llp_counter->sample_data.emc_clock_rate = clk_get_rate(emc_clock);
+	}
 
 	for (i = 0; i < EMC_DRAM_STAT_END - EMC_DRAM_STAT_BEGIN; i++) {
 		if (dram_counter[i].enabled) {
-			dram_counter[i].value = 0;
+
+			dram_counter[i].sample_data.client_counts = 0;
+			dram_counter[i].sample_data.emc_clock_rate = clk_get_rate(emc_clock);
+
 			if (!(dram_counter[i].device_mask & 0x1)) {
 				if (readl(emc.mmio + dev0_offsets_hi[i]) != 0) {
-					dram_counter[i].value = 0xFFFFFFFF;
+					dram_counter[i].sample_data.client_counts = 0xFFFFFFFF;
 					continue;
 				}
-				dram_counter[i].value +=
+				dram_counter[i].sample_data.client_counts +=
 					readl(emc.mmio + dev0_offsets_lo[i]);
 			}
+
 			if (!(dram_counter[i].device_mask & 0x2)) {
 				if (readl(emc.mmio + dev1_offsets_hi[i]) != 0) {
-					dram_counter[i].value = 0xFFFFFFFF;
+					dram_counter[i].sample_data.client_counts = 0xFFFFFFFF;
 					continue;
 				}
-				dram_counter[i].value +=
+				dram_counter[i].sample_data.client_counts +=
 					readl(emc.mmio + dev1_offsets_lo[i]);
 			}
 		}
-	}
-}
-
-static void stat_reschedule(tegra_mc_counter_t *counter0,
-	tegra_mc_counter_t *counter1,
-	tegra_mc_counter_t *llp)
-{
-	int i;
-	struct tegra_mc_counter *counters[] = {
-		counter0,
-		counter1,
-		llp
-	};
-
-	if (!tegra_mc_client_0_enabled)
-		return;
-
-	for (i = 0; i < ARRAY_SIZE(counters); i++) {
-		struct tegra_mc_counter *c = counters[i];
-
-		c->address_range_change = false;
-		if (!c->enabled || !c->reschedule)
-			continue;
-
-		c->sample_count++;
-
-		if (c->sample_count < c->period)
-			continue;
-
-		c->sample_count = 0;
-
-		if (c->mode == FILTER_CLIENT) {
-			c->current_client++;
-			if (c->current_client == c->client_number)
-				c->current_client = 0;
-			continue;
-		}
-
-		c->address_range_change = true;
-		c->current_address_low = c->current_address_high+1;
-
-		if (c->current_address_low >= c->address_low+c->address_length_1)
-			c->current_address_low = c->address_low;
-
-		c->current_address_high = c->current_address_low +
-			c->address_window_size_1;
 	}
 }
 
@@ -897,35 +826,6 @@ static void stat_stop(void)
 	emc_stat_stop(&emc_llp_counter, dram_counters);
 }
 
-static size_t stat_log_counter(struct tegra_mc_counter *c,
-	struct tegra_mc_counter *l, log_event_t *e, u32* value)
-{
-	size_t size = 0;
-
-	*value = c->value;
-	if (l)
-		*value += l->value;
-
-	if (!c->enabled || (l && !l->enabled) || !*value)
-		return 0;
-
-	e->word0.enabled = 1;
-	e->word0.address_range_change = c->address_range_change;
-	e->word0.event_id = (l) ? MC_STAT_AGGREGATE :
-		c->clients[c->current_client];
-	e->word0.address_range_low_pfn = __phys_to_pfn(c->current_address_low);
-	size += sizeof(e->word0);
-
-	if (c->address_range_change) {
-		e->word1.address_range_length_pfn =
-			__phys_to_pfn(c->address_window_size_1+1);
-		size += sizeof(e->word1);
-	}
-
-	size += sizeof(*value);
-	return size;
-}
-
 #define statcpy(_buf, _bufstart, _buflen, _elem)	\
 	do {						\
 		size_t s = sizeof(_elem);		\
@@ -937,88 +837,43 @@ static size_t stat_log_counter(struct tegra_mc_counter *c,
 
 static void stat_log(void)
 {
-	log_header_t	header = {0, 0};
-	log_event_t	event[LOG_EVENT_NUMBER_MAX];
-	u32		value[LOG_EVENT_NUMBER_MAX];
-	int		i, count = 0;
+	int		i;
 	unsigned long	flags;
-	size_t elem;
-	int	required_log_size = 0;
 
-	required_log_size += sizeof(header);
+	struct tegra_mc_counter *counters[] = {
+		&mc_counter0,
+		&mc_counter1,
+		&emc_llp_counter
+	};
+
+	spin_lock_irqsave(&sample_log_lock, flags);
 
 	if (tegra_mc_client_0_enabled) {
-		elem = stat_log_counter(&mc_counter0, NULL, &event[count],
-					&value[count]);
-		if (elem) {
-			required_log_size += elem;
-			count++;
-		}
+		for (i = 0; i < ARRAY_SIZE(counters); i++) {
+			struct tegra_mc_counter *c = counters[i];
 
-		elem = stat_log_counter(&mc_counter1, &emc_llp_counter,
-					&event[count], &value[count]);
-
-		if (elem) {
-			required_log_size += elem;
-			count++;
-		}
-	}
-
-	for (i = 0; i < EMC_DRAM_STAT_END - EMC_DRAM_STAT_BEGIN &&
-		count < LOG_EVENT_NUMBER_MAX; i++) {
-		if (dram_counters[i].enabled && dram_counters[i].value != 0) {
-			event[count].word0.enabled = 1;
-			event[count].word0.address_range_change = false;
-			event[count].word0.event_id = i + EMC_DRAM_STAT_BEGIN;
-			event[count].word0.address_range_low_pfn = 0;
-			required_log_size += sizeof(event[count].word0);
-
-			event[count].word1.address_range_length_pfn =
-				0xFFFFFFFFUL >> SHIFT_4K;
-
-			value[count] = dram_counters[i].value;
-			required_log_size += sizeof(value[count]);
-
-			count++;
-		}
-	}
-
-	header.time_quantum = sample_quantum * MILLISECONDS_TO_TIME_QUANTUM;
-	for (i = 0; i < count; i++) {
-		header.event_state_change |= 1 << i;
-	}
-
-	if (header.event_state_change != 0) {
-		spin_lock_irqsave(&sample_log_lock, flags);
-		if (unlikely(required_log_size > sample_log_size)) {
-			pr_err("%s: sample log too small!\n", __func__);
-			WARN_ON(1);
-			spin_unlock_irqrestore(&sample_log_lock, flags);
-			goto reschedule;
-		}
-
-		statcpy(sample_log_wptr, sample_log, SAMPLE_LOG_SIZE, header);
-
-		for (i=0; i<count; i++) {
-			statcpy(sample_log_wptr, sample_log,
-				SAMPLE_LOG_SIZE, event[i].word0);
-			if (!event[i].word0.address_range_change)
+			if (!c->enabled)
 				continue;
-			statcpy(sample_log_wptr, sample_log,
-				SAMPLE_LOG_SIZE, event[i].word1);
-		}
 
-		for (i=0; i<count; i++) {
-			statcpy(sample_log_wptr, sample_log,
-				SAMPLE_LOG_SIZE, value[i]);
-		}
+			c->sample_data.client_number = c->clients[c->current_client_index];
 
-		sample_log_size -= required_log_size;
-		spin_unlock_irqrestore(&sample_log_lock, flags);
+			c->current_client_index++;
+			if (c->current_client_index == c->total_clients)
+				c->current_client_index = 0;
+
+			statcpy(sample_log_wptr, sample_log,
+				SAMPLE_LOG_SIZE, c->sample_data);
+		}
 	}
 
-reschedule:
-	stat_reschedule(&mc_counter0, &mc_counter1, &emc_llp_counter);
+	for (i = 0; i < EMC_DRAM_STAT_END - EMC_DRAM_STAT_BEGIN; i++) {
+		if (dram_counters[i].enabled) {
+			statcpy(sample_log_wptr, sample_log,
+				SAMPLE_LOG_SIZE, dram_counters[i].sample_data);
+		}
+	}
+
+	spin_unlock_irqrestore(&sample_log_lock, flags);
 }
 
 static enum hrtimer_restart sample_timer_function(struct hrtimer *handle)
@@ -1088,6 +943,17 @@ static int tegra_mc_init(void)
 	/* hrtimer */
 	hrtimer_init(&sample_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
 	sample_timer.function = sample_timer_function;
+
+	for (i = 0; i < EMC_DRAM_STAT_END - EMC_DRAM_STAT_BEGIN; i++) {
+		dram_counters[i].sample_data.client_number = EMC_DRAM_STAT_BEGIN + i;
+		dram_counters[i].sample_data.signature = 0xdeadbeef;
+	}
+
+	emc_clock = clk_get_sys(NULL, "emc");
+	if (!emc_clock) {
+		pr_err("Could not get EMC clock\n");
+		goto out_remove_group_client_0;
+	}
 
 	return 0;
 
