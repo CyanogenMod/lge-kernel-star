@@ -812,12 +812,23 @@ static int tegra3_cpu_cmplx_clk_set_parent(struct clk *c, struct clk *p)
 	return 0;
 }
 
+static long tegra3_cpu_cmplx_round_rate(struct clk *c,
+	unsigned long rate)
+{
+	if (rate > c->parent->max_rate)
+		rate = c->parent->max_rate;
+	else if (rate < c->parent->min_rate)
+		rate = c->parent->min_rate;
+	return rate;
+}
+
 static struct clk_ops tegra_cpu_cmplx_ops = {
 	.init     = tegra3_cpu_cmplx_clk_init,
 	.enable   = tegra3_cpu_cmplx_clk_enable,
 	.disable  = tegra3_cpu_cmplx_clk_disable,
 	.set_rate = tegra3_cpu_cmplx_clk_set_rate,
 	.set_parent = tegra3_cpu_cmplx_clk_set_parent,
+	.round_rate = tegra3_cpu_cmplx_round_rate,
 };
 
 /* virtual cop clock functions. Used to acquire the fake 'cop' clock to
