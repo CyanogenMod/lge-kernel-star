@@ -280,11 +280,10 @@ static int tegra_target(struct cpufreq_policy *policy,
 	target_cpu_speed[policy->cpu] = freq;
 	new_speed = throttle_governor_speed(tegra_cpu_highest_speed());
 	ret = tegra_update_cpu_speed(new_speed);
-out:
-	mutex_unlock(&tegra_cpu_lock);
-
 	if (ret == 0)
 		tegra_auto_hotplug_governor(new_speed);
+out:
+	mutex_unlock(&tegra_cpu_lock);
 
 	return ret;
 }
@@ -397,7 +396,7 @@ static int __init tegra_cpufreq_init(void)
 	throttle_lowest_index = table_data->throttle_lowest_index;
 	throttle_highest_index = table_data->throttle_highest_index;
 #endif
-	ret = tegra_auto_hotplug_init();
+	ret = tegra_auto_hotplug_init(&tegra_cpu_lock);
 	if (ret)
 		return ret;
 

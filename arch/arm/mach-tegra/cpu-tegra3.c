@@ -42,7 +42,7 @@
 #define UP2Gn_DELAY_MS		1000
 #define DOWN_DELAY_MS		2000
 
-static DEFINE_MUTEX(tegra_hp_lock);
+static struct mutex *tegra3_cpu_lock;
 
 static struct workqueue_struct *hotplug_wq;
 static struct delayed_work hotplug_work;
@@ -132,7 +132,10 @@ static int hp_state_set(const char *arg, const struct kernel_param *kp)
 	int ret = 0;
 	int old_state;
 
-	mutex_lock(&tegra_hp_lock);
+	if (!tegra3_cpu_lock)
+		return ret;
+
+	mutex_lock(tegra3_cpu_lock);
 
 	old_state = hp_state;
 	ret = param_set_int(arg, kp);
@@ -159,7 +162,7 @@ static int hp_state_set(const char *arg, const struct kernel_param *kp)
 			hp_state = old_state;
 		}
 	}
-	mutex_unlock(&tegra_hp_lock);
+	mutex_unlock(tegra3_cpu_lock);
 	return ret;
 }
 
@@ -180,7 +183,7 @@ static void tegra_auto_hotplug_work_func(struct work_struct *work)
 	bool up = false;
 	unsigned int cpu = nr_cpu_ids;
 
-	mutex_lock(&tegra_hp_lock);
+	mutex_lock(tegra3_cpu_lock);
 
 	switch (hp_state) {
 	case TEGRA_HP_DISABLED:
@@ -224,7 +227,7 @@ static void tegra_auto_hotplug_work_func(struct work_struct *work)
 		pr_err("%s: invalid tegra hotplug state %d\n",
 		       __func__, hp_state);
 	}
-	mutex_unlock(&tegra_hp_lock);
+	mutex_unlock(tegra3_cpu_lock);
 
 	if (cpu < nr_cpu_ids) {
 		if (up)
@@ -241,7 +244,6 @@ void tegra_auto_hotplug_governor(unsigned int cpu_freq)
 	if (!is_g_cluster_present())
 		return;
 
-	mutex_lock(&tegra_hp_lock);
 	up_delay = is_lp_cluster() ? up2g0_delay : up2gn_delay;
 
 	switch (hp_state) {
@@ -281,10 +283,9 @@ void tegra_auto_hotplug_governor(unsigned int cpu_freq)
 		       __func__, hp_state);
 		BUG();
 	}
-	mutex_unlock(&tegra_hp_lock);
 }
 
-int tegra_auto_hotplug_init(void)
+int tegra_auto_hotplug_init(struct mutex *cpu_lock)
 {
 	/*
 	 * Not bound to the issuer CPU (=> high-priority), has rescue worker
@@ -310,6 +311,7 @@ int tegra_auto_hotplug_init(void)
 	up2gn_delay = msecs_to_jiffies(UP2Gn_DELAY_MS);
 	down_delay = msecs_to_jiffies(DOWN_DELAY_MS);
 
+	tegra3_cpu_lock = cpu_lock;
 	hp_state = INITIAL_STATE;
 	hp_init_stats();
 	pr_info("Tegra auto-hotplug initialized: %s\n",
@@ -327,14 +329,14 @@ static int hp_stats_show(struct seq_file *s, void *data)
 	int i;
 	u64 cur_jiffies = get_jiffies_64();
 
-	mutex_lock(&tegra_hp_lock);
+	mutex_lock(tegra3_cpu_lock);
 	if (hp_state != TEGRA_HP_DISABLED) {
 		for (i = 0; i <= CONFIG_NR_CPUS; i++) {
 			bool was_up = (hp_stats[i].up_down_count & 0x1);
 			hp_stats_update(i, was_up);
 		}
 	}
-	mutex_unlock(&tegra_hp_lock);
+	mutex_unlock(tegra3_cpu_lock);
 
 	seq_printf(s, "%-15s ", "cpu:");
 	for (i = 0; i < CONFIG_NR_CPUS; i++) {
@@ -375,6 +377,9 @@ static const struct file_operations hp_stats_fops = {
 
 static int __init tegra_auto_hotplug_debug_init(void)
 {
+	if (!tegra3_cpu_lock)
+		return -ENOENT;
+
 	hp_debugfs_root = debugfs_create_dir("tegra_hotplug", NULL);
 	if (!hp_debugfs_root)
 		return -ENOMEM;

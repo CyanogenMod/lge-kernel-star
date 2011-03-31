@@ -21,6 +21,8 @@
 #ifndef _MACH_TEGRA_SUSPEND_H_
 #define _MACH_TEGRA_SUSPEND_H_
 
+#include <linux/mutex.h>
+
 enum tegra_suspend_mode {
 	TEGRA_SUSPEND_NONE = 0,
 	TEGRA_SUSPEND_LP2,	/* CPU voltage off */
@@ -77,11 +79,11 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat);
 void tegra_idle_lp2(void);
 
 #if defined(CONFIG_TEGRA_AUTO_HOTPLUG) && !defined(CONFIG_ARCH_TEGRA_2x_SOC)
-int tegra_auto_hotplug_init(void);
+int tegra_auto_hotplug_init(struct mutex *cpu_lock);
 void tegra_auto_hotplug_exit(void);
 void tegra_auto_hotplug_governor(unsigned int cpu_freq);
 #else
-static inline int tegra_auto_hotplug_init(void)
+static inline int tegra_auto_hotplug_init(struct mutex *cpu_lock)
 { return 0; }
 static inline void tegra_auto_hotplug_exit(void)
 { }
