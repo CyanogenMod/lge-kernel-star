@@ -1454,8 +1454,8 @@ static int tegra_avp_release_fops(struct inode *inode, struct file *file)
 
 static int avp_enter_lp0(struct tegra_avp_info *avp)
 {
-	volatile u32 *avp_suspend_done =
-		avp->iram_backup_data + TEGRA_IRAM_SIZE;
+	volatile u32 *avp_suspend_done = avp->iram_backup_data
+		+ TEGRA_IRAM_SIZE - TEGRA_RESET_HANDLER_SIZE;
 	struct svc_enter_lp0 svc;
 	unsigned long endtime;
 	int ret;
