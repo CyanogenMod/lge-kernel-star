@@ -261,6 +261,23 @@ static int __init cardhu_touch_init(void)
 	return 0;
 }
 
+static struct usb_phy_plat_data tegra_usb_phy_pdata[] = {
+	[0] = {
+			.instance = 0,
+			.vbus_gpio = -1,
+			.vbus_reg_supply = "vdd_vbus_micro_usb",
+	},
+	[1] = {
+			.instance = 1,
+			.vbus_gpio = -1,
+	},
+	[2] = {
+			.instance = 2,
+			.vbus_gpio = -1,
+			.vbus_reg_supply = "vdd_vbus_typea_usb",
+	},
+};
+
 
 static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
 	[0] = {
@@ -337,6 +354,8 @@ static struct tegra_otg_platform_data tegra_otg_pdata = {
 
 static void cardhu_usb_init(void)
 {
+	tegra_usb_phy_init(tegra_usb_phy_pdata, ARRAY_SIZE(tegra_usb_phy_pdata));
+
 	tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
 	platform_device_register(&tegra_otg_device);
 
