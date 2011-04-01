@@ -84,6 +84,7 @@ struct usb_phy_plat_data {
 	int instance;
 	int vbus_irq;
 	int vbus_gpio;
+	char * vbus_reg_supply;
 };
 
 struct tegra_xtal_freq;

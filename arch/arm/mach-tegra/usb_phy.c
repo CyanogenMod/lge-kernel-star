@@ -444,9 +444,9 @@ static struct tegra_uhsic_config uhsic_default = {
 };
 
 struct usb_phy_plat_data usb_phy_data[] = {
-	{ 0, 0, -1},
-	{ 0, 0, -1},
-	{ 0, 0, -1},
+	{ 0, 0, -1, NULL},
+	{ 0, 0, -1, NULL},
+	{ 0, 0, -1, NULL},
 };
 
 static inline bool phy_is_ulpi(struct tegra_usb_phy *phy)
@@ -1439,26 +1439,23 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 			goto err1;
 		}
 	}
-/* Power-up the VBUS detector for UTMIP PHY */
+
 #ifdef CONFIG_ARCH_TEGRA_3x_SOC
-{
-	u32 val = 0;
-	val = readl((IO_ADDRESS(TEGRA_PMC_BASE) + TEGRA_PMC_USB_AO));
-	val &= ~(TEGRA_PMC_USB_AO_VBUS_WAKEUP_PD_P0 | TEGRA_PMC_USB_AO_ID_PD_P0);
-	writel(val, (IO_ADDRESS(TEGRA_PMC_BASE) + TEGRA_PMC_USB_AO));
-}
-	if (phy->instance == 0)
-		phy->reg_vbus = regulator_get(NULL, "vdd_vbus_micro_usb");
-	else if (phy->instance == 2)
-		phy->reg_vbus = regulator_get(NULL, "vdd_vbus_typea_usb");
-	else
-		return phy;
-	if (WARN_ON(IS_ERR_OR_NULL(phy->reg_vbus))) {
-		pr_err("couldn't get regulator vdd_vbus_usb: %ld, instance : %d\n",
-			 PTR_ERR(phy->reg_vbus), phy->instance);
-		err = PTR_ERR(phy->reg_vbus);
-		goto err1;
+	/* Power-up the VBUS detector for UTMIP PHY */
+	writel(readl((IO_ADDRESS(TEGRA_PMC_BASE) + TEGRA_PMC_USB_AO)) &
+			~(TEGRA_PMC_USB_AO_VBUS_WAKEUP_PD_P0 | TEGRA_PMC_USB_AO_ID_PD_P0),
+			(IO_ADDRESS(TEGRA_PMC_BASE) + TEGRA_PMC_USB_AO));
+
+	if (usb_phy_data[phy->instance].vbus_reg_supply) {
+		phy->reg_vbus = regulator_get(NULL, usb_phy_data[phy->instance].vbus_reg_supply);
+		if (WARN_ON(IS_ERR_OR_NULL(phy->reg_vbus))) {
+			pr_err("couldn't get regulator vdd_vbus_usb: %ld, instance : %d\n",
+				 PTR_ERR(phy->reg_vbus), phy->instance);
+			err = PTR_ERR(phy->reg_vbus);
+			goto err1;
+		}
 	}
+
 #endif
 
 	return phy;
@@ -1744,6 +1741,7 @@ int __init tegra_usb_phy_init(struct usb_phy_plat_data *pdata, int size)
 			usb_phy_data[pdata->instance].instance = pdata->instance;
 			usb_phy_data[pdata->instance].vbus_irq = pdata->vbus_irq;
 			usb_phy_data[pdata->instance].vbus_gpio = pdata->vbus_gpio;
+			usb_phy_data[pdata->instance].vbus_reg_supply = pdata->vbus_reg_supply;
 		}
 	}
 
