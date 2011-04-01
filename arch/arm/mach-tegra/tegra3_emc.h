@@ -51,6 +51,16 @@ void tegra_init_emc(const struct tegra_emc_table *table, int table_size);
 #define EMC_CFG_PERIODIC_QRST			(0x1 << 21)
 #define EMC_CFG_DYN_SREF_ENABLE			(0x1 << 28)
 
+#define EMC_REFCTRL				0x20
+#define EMC_REFCTRL_DEV_SEL_SHIFT		0
+#define EMC_REFCTRL_DEV_SEL_MASK		(0x3 << EMC_REFCTRL_DEV_SEL_SHIFT)
+#define EMC_REFCTRL_ENABLE			(0x1 << 31)
+#define EMC_REFCTRL_ENABLE_ALL(num)		\
+	((((num > 1) ? 0 : 2) << EMC_REFCTRL_DEV_SEL_SHIFT) \
+	 | EMC_REFCTRL_ENABLE)
+#define EMC_REFCTRL_DISABLE_ALL(num)		\
+	(((num > 1) ? 0 : 2) << EMC_REFCTRL_DEV_SEL_SHIFT)
+
 #define EMC_TIMING_CONTROL			0x28
 #define EMC_RC					0x2c
 #define EMC_RFC					0x30
@@ -89,7 +99,14 @@ void tegra_init_emc(const struct tegra_emc_table *table, int table_size);
 #define EMC_ODT_READ				0xb4
 #define EMC_WEXT				0xb8
 #define EMC_CTT					0xbc
+
 #define EMC_MRS_WAIT_CNT			0xc8
+#define EMC_MRS_WAIT_CNT_SHORT_WAIT_SHIFT	0
+#define EMC_MRS_WAIT_CNT_SHORT_WAIT_MASK	\
+	(0x3FF << EMC_MRS_WAIT_CNT_SHORT_WAIT_SHIFT)
+#define EMC_MRS_WAIT_CNT_LONG_WAIT_SHIFT	16
+#define EMC_MRS_WAIT_CNT_LONG_WAIT_MASK		\
+	(0x3FF << EMC_MRS_WAIT_CNT_LONG_WAIT_SHIFT)
 
 #define EMC_MRS					0xcc
 #define EMC_MODE_SET_DLL_RESET			(0x1 << 8)
@@ -111,6 +128,7 @@ enum {
 #define EMC_MRW					0xe8
 #define EMC_MRR					0xec
 #define EMC_XM2DQSPADCTRL3			0xf8
+#define EMC_XM2DQSPADCTRL3_VREF_ENABLE		(0x1 << 5)
 
 #define EMC_FBIO_CFG5				0x104
 #define EMC_CFG5_TYPE_SHIFT			0x0
@@ -160,6 +178,7 @@ enum {
 
 #define EMC_XM2CMDPADCTRL			0x2f0
 #define EMC_XM2DQSPADCTRL2			0x2fc
+#define EMC_XM2DQSPADCTRL2_VREF_ENABLE		(0x1 << 5)
 #define EMC_XM2DQPADCTRL2			0x304
 #define EMC_XM2CLKPADCTRL			0x308
 #define EMC_XM2COMPPADCTRL			0x30c

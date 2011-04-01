@@ -277,6 +277,58 @@ static inline void auto_cal_disable(void)
 	}
 }
 
+static inline bool dqs_preset(const struct tegra_emc_table *next_timing,
+			      const struct tegra_emc_table *last_timing)
+{
+	bool ret = false;
+
+#define DQS_SET(reg, bit)						      \
+	do {								      \
+		if ((next_timing->burst_regs[EMC_##reg##_INDEX] &	      \
+		     EMC_##reg##_##bit##_ENABLE) &&			      \
+		    (!(last_timing->burst_regs[EMC_##reg##_INDEX] &	      \
+		       EMC_##reg##_##bit##_ENABLE)))   {		      \
+			emc_writel(last_timing->burst_regs[EMC_##reg##_INDEX] \
+				   | EMC_##reg##_##bit##_ENABLE, EMC_##reg);  \
+			ret = true;					      \
+		}							      \
+	} while (0)
+
+	DQS_SET(XM2DQSPADCTRL2, VREF);
+	DQS_SET(XM2DQSPADCTRL3, VREF);
+	DQS_SET(XM2QUSEPADCTRL, IVREF);
+
+	return ret;
+}
+
+static inline void overwrite_mrs_wait_cnt(
+	const struct tegra_emc_table *next_timing,
+	bool zcal_long)
+{
+	u32 reg;
+	u32 cnt = 512;
+
+	/* For ddr3 when DLL is re-started: overwrite EMC DFS table settings
+	   for MRS_WAIT_LONG with maximum of MRS_WAIT_SHORT settings and
+	   expected operation length. Reduce the latter by the overlapping
+	   zq-calibration, if any */
+	if (zcal_long)
+		cnt -= dram_dev_num * 256;
+
+	reg = (next_timing->burst_regs[EMC_MRS_WAIT_CNT_INDEX] &
+		EMC_MRS_WAIT_CNT_SHORT_WAIT_MASK) >>
+		EMC_MRS_WAIT_CNT_SHORT_WAIT_SHIFT;
+	if (cnt < reg)
+		cnt = reg;
+
+	reg = (next_timing->burst_regs[EMC_MRS_WAIT_CNT_INDEX] &
+		(~EMC_MRS_WAIT_CNT_LONG_WAIT_MASK));
+	reg |= (cnt << EMC_MRS_WAIT_CNT_LONG_WAIT_SHIFT) &
+		EMC_MRS_WAIT_CNT_LONG_WAIT_MASK;
+
+	emc_writel(reg, EMC_MRS_WAIT_CNT);
+}
+
 static inline bool need_qrst(const struct tegra_emc_table *next_timing,
 			     const struct tegra_emc_table *last_timing,
 			     u32 emc_dpd_reg)
@@ -385,26 +437,38 @@ static noinline void emc_set_clock(const struct tegra_emc_table *next_timing,
 				   const struct tegra_emc_table *last_timing,
 				   u32 clk_setting)
 {
-	int i, dll_change;
+	int i, dll_change, pre_wait;
 	bool dyn_sref_enabled, vref_cal_toggle, qrst_used, zcal_long;
 
 	u32 emc_cfg_reg = emc_readl(EMC_CFG);
 	u32 emc_dbg_reg = emc_readl(EMC_DBG);
+
+	dyn_sref_enabled = emc_cfg_reg & EMC_CFG_DYN_SREF_ENABLE;
+	dll_change = get_dll_change(next_timing, last_timing);
+	zcal_long = (next_timing->burst_regs[EMC_ZCAL_INTERVAL_INDEX] != 0) &&
+		(last_timing->burst_regs[EMC_ZCAL_INTERVAL_INDEX] == 0);
 
 	/* FIXME: remove steps enumeration below? */
 
 	/* 1. clear clkchange_complete interrupts */
 	emc_writel(EMC_INTSTATUS_CLKCHANGE_COMPLETE, EMC_INTSTATUS);
 
-	/* 2. disable dynamic self-refresh and wait for possible self-refresh
-	   entry/exit - waiting here before the clock change decreases worst
-	   case clock change stall time */
-	dyn_sref_enabled = emc_cfg_reg & EMC_CFG_DYN_SREF_ENABLE;
+	/* 2. disable dynamic self-refresh and preset dqs vref, then wait for
+	   possible self-refresh entry/exit and/or dqs vref settled - waiting
+	   before the clock change decreases worst case change stall time */
+	pre_wait = 0;
 	if (dyn_sref_enabled) {
 		emc_cfg_reg &= ~EMC_CFG_DYN_SREF_ENABLE;
 		emc_writel(emc_cfg_reg, EMC_CFG);
+		pre_wait = 5;		/* 5us+ for self-refresh entry/exit */
+	}
+	if (dqs_preset(next_timing, last_timing)) {
+		if (pre_wait < 3)
+			pre_wait = 3;	/* 3us+ for dqs vref settled */
+	}
+	if (pre_wait) {
 		emc_timing_update();
-		udelay(5); /* wait for possible self-refresh entry/exit */
+		udelay(pre_wait);
 	}
 
 	/* 3. disable auto-cal if vref mode is switching */
@@ -415,13 +479,18 @@ static noinline void emc_set_clock(const struct tegra_emc_table *next_timing,
 	if (vref_cal_toggle)
 		auto_cal_disable();
 
-	/* 4. program burst shadow registers
-	   the last read below makes sure writes are completed*/
+	/* 4. program burst shadow registers */
 	for (i = 0; i < TEGRA_EMC_NUM_REGS; i++)
 		__raw_writel(next_timing->burst_regs[i], burst_reg_addr[i]);
 	wmb();
 	barrier();
 
+	/* On ddr3 when DLL is re-started predict MRS long wait count and
+	   overwrite DFS table setting */
+	if ((dram_type == DRAM_TYPE_DDR3) && (dll_change == DLL_CHANGE_ON))
+		overwrite_mrs_wait_cnt(next_timing, zcal_long);
+
+	/* the last read below makes sure prev writes are completed */
 	qrst_used = need_qrst(next_timing, last_timing,
 			      emc_readl(EMC_SEL_DPD_CTRL));
 
@@ -432,8 +501,10 @@ static noinline void emc_set_clock(const struct tegra_emc_table *next_timing,
 	if (qrst_used)
 		periodic_qrst_enable(emc_cfg_reg, emc_dbg_reg);
 
+	/* 6.1 disable auto-refresh to save time after clock change */
+	emc_writel(EMC_REFCTRL_DISABLE_ALL(dram_dev_num), EMC_REFCTRL);
+
 	/* 7. turn Off dll and enter self-refresh on DDR3 */
-	dll_change = get_dll_change(next_timing, last_timing);
 	if (dram_type == DRAM_TYPE_DDR3) {
 		if (dll_change == DLL_CHANGE_OFF)
 			emc_writel(next_timing->emc_mode_1, EMC_EMRS);
@@ -456,8 +527,6 @@ static noinline void emc_set_clock(const struct tegra_emc_table *next_timing,
 	set_dram_mode(next_timing, last_timing, dll_change);
 
 	/* 12. issue zcal command if turning zcal On */
-	zcal_long = (next_timing->burst_regs[EMC_ZCAL_INTERVAL_INDEX] != 0) &&
-		(last_timing->burst_regs[EMC_ZCAL_INTERVAL_INDEX] == 0);
 	if (zcal_long) {
 		emc_writel(EMC_ZQ_CAL_LONG_CMD_DEV0, EMC_ZQ_CAL);
 		if (dram_dev_num > 1)
@@ -471,6 +540,9 @@ static noinline void emc_set_clock(const struct tegra_emc_table *next_timing,
 	       change EMC clock source register (EMC read access restored)
 	       wait for clk change completion */
 	do_clock_change(clk_setting);
+
+	/* 14.1 re-enable auto-refresh */
+	emc_writel(EMC_REFCTRL_ENABLE_ALL(dram_dev_num), EMC_REFCTRL);
 
 	/* 15. restore auto-cal */
 	if (vref_cal_toggle)
@@ -488,12 +560,8 @@ static noinline void emc_set_clock(const struct tegra_emc_table *next_timing,
 		emc_writel(next_timing->emc_zcal_cnt_long, EMC_ZCAL_WAIT_CNT);
 
 	/* 18. update restored timing */
-	if (vref_cal_toggle || dyn_sref_enabled || zcal_long) {
-		/* let ZQ calibration, other ops complete before updating
-		   restored timing settings */
-		udelay(2);
-		emc_timing_update();
-	}
+	udelay(2);
+	emc_timing_update();
 }
 
 static inline void emc_get_timing(struct tegra_emc_table *timing)
