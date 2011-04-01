@@ -31,6 +31,7 @@ struct tegra_i2c_platform_data {
 	bool is_dvc;
 	int retries;
 	int timeout;	/* in jiffies */
+	u16 slave_addr;
 };
 
 #endif /* _LINUX_I2C_TEGRA_H */
