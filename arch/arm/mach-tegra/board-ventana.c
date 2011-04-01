@@ -162,6 +162,7 @@ static struct tegra_i2c_platform_data ventana_i2c1_platform_data = {
 	.adapter_nr	= 0,
 	.bus_count	= 1,
 	.bus_clk_rate	= { 400000, 0 },
+	.slave_addr = 0x00FC,
 };
 
 static const struct tegra_pingroup_config i2c2_ddc = {
@@ -180,12 +181,14 @@ static struct tegra_i2c_platform_data ventana_i2c2_platform_data = {
 	.bus_clk_rate	= { 400000, 10000 },
 	.bus_mux	= { &i2c2_ddc, &i2c2_gen2 },
 	.bus_mux_len	= { 1, 1 },
+	.slave_addr = 0x00FC,
 };
 
 static struct tegra_i2c_platform_data ventana_i2c3_platform_data = {
 	.adapter_nr	= 3,
 	.bus_count	= 1,
 	.bus_clk_rate	= { 400000, 0 },
+	.slave_addr = 0x00FC,
 };
 
 static struct tegra_i2c_platform_data ventana_dvc_platform_data = {
