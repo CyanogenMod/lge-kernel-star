@@ -104,6 +104,18 @@ struct clk *tegra_get_clock_by_name(const char *name)
 	return ret;
 }
 
+static void clk_stats_update(struct clk *c)
+{
+	u64 cur_jiffies = get_jiffies_64();
+
+	if (c->refcnt) {
+		c->stats.time_on = cputime64_add(c->stats.time_on,
+			cputime64_sub(cur_jiffies, c->stats.last_update));
+	}
+
+	c->stats.last_update = cur_jiffies;
+}
+
 /* Must be called with clk_lock(c) held */
 static unsigned long clk_predict_rate_from_parent(struct clk *c, struct clk *p)
 {
@@ -204,6 +216,7 @@ void clk_init(struct clk *c)
 		else
 			c->state = ON;
 	}
+	c->stats.last_update = get_jiffies_64();
 
 	mutex_lock(&clock_list_lock);
 	list_add(&c->node, &clocks);
@@ -240,6 +253,7 @@ int clk_enable(struct clk *c)
 			c->state = ON;
 			c->set = true;
 		}
+		clk_stats_update(c);
 	}
 	c->refcnt++;
 out:
@@ -267,6 +281,7 @@ void clk_disable(struct clk *c)
 			clk_disable(c->parent);
 
 		c->state = OFF;
+		clk_stats_update(c);
 	}
 	c->refcnt--;
 
@@ -981,6 +996,20 @@ DEFINE_SIMPLE_ATTRIBUTE(rate_fops, rate_get, NULL, "%llu\n");
 DEFINE_SIMPLE_ATTRIBUTE(state_fops, state_get, NULL, "%llu\n");
 #endif
 
+static int time_on_get(void *data, u64 *val)
+{
+	unsigned long flags;
+	struct clk *c = (struct clk *)data;
+
+	clk_lock_save(c, flags);
+	clk_stats_update(c);
+	*val = cputime64_to_clock_t(c->stats.time_on);
+	clk_unlock_restore(c, flags);
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(time_on_fops, time_on_get, NULL, "%llu\n");
+
 static int clk_debugfs_register_one(struct clk *c)
 {
 	struct dentry *d, *child, *child_tmp;
@@ -1014,6 +1043,11 @@ static int clk_debugfs_register_one(struct clk *c)
 
 	d = debugfs_create_file(
 		"state", parent_rate_mode, c->dent, c, &state_fops);
+	if (!d)
+		goto err_out;
+
+	d = debugfs_create_file(
+		"time_on", S_IRUGO, c->dent, c, &time_on_fops);
 	if (!d)
 		goto err_out;
 

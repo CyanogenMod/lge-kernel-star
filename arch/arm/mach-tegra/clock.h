@@ -59,6 +59,7 @@
 #include <linux/list.h>
 #include <linux/mutex.h>
 #include <linux/spinlock.h>
+#include <asm/cputime.h>
 
 #include <mach/clk.h>
 #define MAX_SAME_LIMIT_SKU_IDS	16
@@ -88,6 +89,11 @@ struct clk_ops {
 	long		(*round_rate)(struct clk *, unsigned long);
 	int		(*clk_cfg_ex)(struct clk *, enum tegra_clk_ex_param, u32);
 	void		(*reset)(struct clk *, bool);
+};
+
+struct clk_stats {
+	cputime64_t 	time_on;
+	u64 		last_update;
 };
 
 enum cpu_mode {
@@ -126,6 +132,7 @@ struct clk {
 	struct clk		*parent;
 	u32			div;
 	u32			mul;
+	struct clk_stats 	stats;
 
 	const struct clk_mux_sel	*inputs;
 	u32				reg;
