@@ -226,7 +226,6 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
 	struct tegra_gpio_bank *bank;
 	int port;
 	int pin;
-	int unmasked = 0;
 	struct irq_chip *chip = irq_desc_get_chip(desc);
 
 	chained_irq_enter(chip, desc);
@@ -237,26 +236,12 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
 		int gpio = tegra_gpio_compose(bank->bank, port, 0);
 		unsigned long sta = __raw_readl(GPIO_INT_STA(gpio)) &
 			__raw_readl(GPIO_INT_ENB(gpio));
-		u32 lvl = __raw_readl(GPIO_INT_LVL(gpio));
 
-		for_each_set_bit(pin, &sta, 8) {
-			__raw_writel(1 << pin, GPIO_INT_CLR(gpio));
-
-			/* if gpio is edge triggered, clear condition
-			 * before executing the hander so that we don't
-			 * miss edges
-			 */
-			if (lvl & (0x100 << pin)) {
-				unmasked = 1;
-				chained_irq_exit(chip, desc);
-			}
-
+		for_each_set_bit(pin, &sta, 8)
 			generic_handle_irq(gpio_to_irq(gpio + pin));
-		}
 	}
 
-	if (!unmasked)
-		chained_irq_exit(chip, desc);
+	chained_irq_exit(chip, desc);
 
 }
 
