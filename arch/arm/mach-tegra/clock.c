@@ -175,10 +175,16 @@ static void __clk_set_cansleep(struct clk *c)
 		if (child->parent != c)
 			continue;
 
-		WARN(child->ops && child->ops->set_parent,
-			"can't make child clock %s of %s "
-			"sleepable if it's parent could change",
-			child->name, c->name);
+		/* If set_parent operation is implemented for virtual cpu,
+		   all possible parents are sleeping clocks - hence, no
+		   warning. FIXME: another way to make this exception ? */
+		if(strcmp(child->name, "cpu")) {
+			WARN(child->ops && child->ops->set_parent,
+				"sleepable clock %s is not a sole parent"
+				" of its child %s - if child is reparented"
+				" only sleepable parents should be used",
+				c->name, child->name);
+		}
 
 		__clk_set_cansleep(child);
 	}
