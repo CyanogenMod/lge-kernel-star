@@ -27,7 +27,6 @@
 #include <linux/clk.h>
 
 #include <mach/iomap.h>
-#include <mach/suspend.h>
 
 #include "clock.h"
 #include "fuse.h"
