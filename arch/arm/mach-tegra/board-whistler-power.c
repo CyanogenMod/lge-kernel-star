@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 NVIDIA, Inc.
+ * Copyright (C) 2010-2011 NVIDIA, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -36,7 +36,7 @@
 #include "board.h"
 
 #define PMC_CTRL		0x0
- #define PMC_CTRL_INTR_LOW	(1 << 17)
+#define PMC_CTRL_INTR_LOW	(1 << 17)
 
 static struct regulator_consumer_supply max8907c_SD1_supply[] = {
 	REGULATOR_SUPPLY("vdd_cpu", NULL),
@@ -122,6 +122,7 @@ static struct regulator_consumer_supply max8907c_LDO17_supply[] = {
 };
 
 static struct regulator_consumer_supply max8907c_LDO18_supply[] = {
+	REGULATOR_SUPPLY("vddio_vi", NULL),
 	REGULATOR_SUPPLY("vcsi", "tegra_camera"),
 };
 
