@@ -2,7 +2,7 @@
  * arch/arm/mach-tegra/fuse.c
  *
  * Copyright (C) 2010 Google, Inc.
- * Copyright (C) 2010-2011 NVIDIA, Corp.
+ * Copyright (C) 2010-2011 NVIDIA Corp.
  *
  * Author:
  *	Colin Cross <ccross@android.com>
@@ -30,6 +30,13 @@ enum tegra_revision {
 #endif
 	TEGRA_REVISION_MAX,
 };
+
+struct tegra_id {
+	unsigned int chipid, major, minor, netlist, patch;
+	enum tegra_revision revision;
+};
+
+extern struct tegra_id tegra_id;
 
 unsigned long long tegra_chip_uid(void);
 unsigned int tegra_spare_fuse(int bit);

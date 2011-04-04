@@ -2,7 +2,7 @@
  * arch/arm/mach-tegra/fuse.c
  *
  * Copyright (C) 2010 Google, Inc.
- * Copyright (C) 2010-2011 NVIDIA, Corp.
+ * Copyright (C) 2010-2011 NVIDIA Corp.
  *
  * Author:
  *	Colin Cross <ccross@android.com>
@@ -20,6 +20,7 @@
 
 #include <linux/kernel.h>
 #include <linux/io.h>
+#include <linux/init.h>
 
 #include <mach/iomap.h>
 
@@ -191,12 +192,38 @@ int tegra_sku_id(void)
 	return sku_id;
 }
 
-enum tegra_revision tegra_get_revision(void)
-{
-	void __iomem *chip_id = IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x804;
-	u32 id = readl(chip_id);
+struct tegra_id tegra_id;
 
-	switch ((id >> 16) & 0xf) {
+static enum tegra_revision tegra_decode_revision(const struct tegra_id *id)
+{
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	if ((id->chipid & 0xf0) != 0x20)
+		return TEGRA_REVISION_UNKNOWN;
+#endif
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+	if ((id->chipid & 0xf0) != 0x30)
+		return TEGRA_REVISION_UNKNOWN;
+
+	switch (id->major) {
+	case 0:
+		if (id->minor != 1)
+			return TEGRA_REVISION_UNKNOWN;
+		else if (id->netlist == 12 && (id->patch & 0xf) == 12)
+			return TEGRA_REVISION_A01;
+		else if (id->netlist == 12 && (id->patch & 0xf) > 12)
+			return TEGRA_REVISION_A02;
+		else if (id->netlist > 12)
+			return TEGRA_REVISION_A02;
+		else
+			return TEGRA_REVISION_UNKNOWN;
+	case 1:
+		break;
+	default:
+		return TEGRA_REVISION_UNKNOWN;
+	}
+#endif
+
+	switch (id->minor) {
 #ifdef CONFIG_ARCH_TEGRA_3x_SOC
 	case 1:
 		return TEGRA_REVISION_A01;
@@ -214,3 +241,53 @@ enum tegra_revision tegra_get_revision(void)
 		return TEGRA_REVISION_UNKNOWN;
 	}
 }
+
+static enum tegra_revision tegra_set_revision(u32 chipid,
+					u32 major, u32 minor,
+					u32 nlist, u32 patch)
+{
+	tegra_id.chipid  = chipid;
+	tegra_id.major   = major;
+	tegra_id.minor   = minor;
+	tegra_id.netlist = nlist;
+	tegra_id.patch   = patch;
+	tegra_id.revision = tegra_decode_revision(&tegra_id);
+	return tegra_id.revision;
+}
+
+enum tegra_revision tegra_get_revision(void)
+{
+	if (tegra_id.chipid)
+		return tegra_id.revision;
+	else {/* Boot loader did not pass a valid chip ID */
+		void __iomem *chip_id = IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x804;
+		void __iomem *netlist = IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x860;
+		u32 cid = readl(chip_id);
+		u32 nlist = readl(netlist);
+
+		return tegra_set_revision((cid >> 8) & 0xff,
+					(cid >> 4) & 0xf,
+					(cid >> 16) & 0xf,
+					(nlist >> 0) & 0xffff,
+					(nlist >> 16) & 0xffff);
+	}
+}
+
+static int __init tegra_bootloader_tegraid(char *str)
+{
+	u32 id[5];
+	int i = 0;
+
+	do {
+		id[i++] = simple_strtoul(str, &str, 16);
+	} while (*str++ && i < ARRAY_SIZE(id));
+
+	while (i < ARRAY_SIZE(id))
+		id[i++] = 0;
+
+	(void)tegra_set_revision(id[0], id[1], id[2], id[3], id[4]);
+	return 0;
+}
+
+/* tegraid=chipid.major.minor.netlist.patch */
+early_param("tegraid", tegra_bootloader_tegraid);
