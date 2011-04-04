@@ -83,11 +83,19 @@ static int __init hlt_setup(char *__unused)
 __setup("nohlt", nohlt_setup);
 __setup("hlt", hlt_setup);
 
+extern void write_cmd_reserved_buffer(unsigned char *buf, size_t len); //20101110, jh.ahn@lge.com, Function for Warm-boot [START]
+
 void arm_machine_restart(char mode, const char *cmd)
 {
 	/*
 	 * Clean and disable cache, and turn off interrupts
 	 */
+//20101110, jh.ahn@lge.com, Function for Warm-boot [START]
+	unsigned char tmpbuf[2];
+	tmpbuf[0] = 'w';  //warm boot
+	write_cmd_reserved_buffer(tmpbuf,1);
+//20101110, jh.ahn@lge.com, Function for Warm-boot [END]
+
 	cpu_proc_fin();
 
 	/*

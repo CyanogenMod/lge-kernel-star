@@ -194,8 +194,18 @@ config TEGRA_LP2POLICY_IGNORE_LC
 
 endchoice
 
-if TEGRA_ODM_KIT
+comment "LGE Star options"
+config MACH_STAR
+	depends on ARCH_TEGRA_2x_SOC
+        default y
+        bool "LGE STAR project (Nvidia Tegra AP20)"
+        help
+         support LGE STAR platform
+
 source "arch/arm/mach-tegra/odm_kit/Kconfig"
+
+if MACH_STAR
+source "arch/arm/mach-tegra/Kconfig.lge"
 endif
 
 endif

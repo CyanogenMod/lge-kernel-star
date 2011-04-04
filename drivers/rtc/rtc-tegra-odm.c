@@ -31,6 +31,7 @@
 #include <linux/bcd.h>
 #include <linux/platform_device.h>
 #include "nvodm_pmu.h"
+#include <linux/semaphore.h> //ljs
 
 /* Create a custom rtc structrue and move this to that structure */
 static NvOdmPmuDeviceHandle hPmu = NULL;
@@ -40,6 +41,12 @@ static int tegra_rtc_ioctl(struct device *dev, unsigned int cmd, unsigned long a
 {
 	return -ENOIOCTLCMD;
 }
+
+extern wait_queue_head_t drm_wait_queue;
+extern unsigned long drm_diffTime;
+extern int drm_sign;
+extern struct semaphore drm_mutex;
+
 
 static int tegra_rtc_read_time(struct device *dev, struct rtc_time *tm)
 {
@@ -59,15 +66,36 @@ static int tegra_rtc_read_time(struct device *dev, struct rtc_time *tm)
 
 static int tegra_rtc_set_time(struct device *dev, struct rtc_time *tm)
 {
+	unsigned long prevTime;	
 	unsigned long now;
 	int ret;
 
 	if (hPmu == NULL)
 		return -1;
 
+	// read current time
+	if (hPmu==NULL || !NvOdmPmuReadRtc(hPmu, &prevTime)) {
+		printk("NvOdmPmuReadRtc failed\n");
+		return -1;
+	}
+
 	ret = rtc_tm_to_time(tm, &now);
 	if (ret != 0)
 		return -1;
+
+	down_interruptible(&drm_mutex);
+	if( now < prevTime )
+	{
+		drm_diffTime = prevTime - now;
+		drm_sign = 1;
+	}	
+	else
+	{
+		drm_diffTime = now - prevTime;
+		drm_sign = -1;
+	}
+	
+	wake_up_interruptible(&drm_wait_queue);
 
 	if (!NvOdmPmuWriteRtc(hPmu, (NvU32)now)) {
 		printk("NvOdmPmuWriteRtc failed\n");
@@ -128,8 +156,15 @@ static int tegra_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *wkalrm)
 
 	pr_debug("alarm_sec = %u\n", alarm_sec);
 
+//20100928, byoungwoo.yoon@lge.com, RTC alarm enable [START]
+#ifdef CONFIG_MACH_STAR
 	if(!NvOdmPmuWriteAlarm(hPmu, alarm_sec))
 		return -EINVAL;
+#else
+	if(!NvOdmPmuWriteAlarm(hPmu, alarm_sec-now))
+		return -EINVAL;
+#endif
+//20100928, byoungwoo.yoon@lge.com, RTC alarm enable [END]
 
 	return 0;
 }

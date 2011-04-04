@@ -1,0 +1,148 @@
+#drivers/heaven/Kconfig
+
+menu "LGE STAR device driver"
+
+config STAR_BATTERY_CHARGER
+	bool "Star Battery & Charger Driver"
+	default y
+	depends on MACH_STAR
+	help
+	 Support for Battery & Charger Driver.
+	
+config STAR_MUIC
+	bool "Star Muic MAXIM Driver"
+	default y
+	depends on MACH_STAR
+	help
+	 Support for muic MAX14526 driver.
+
+config STAR_MUIC_TI
+	bool "Star Muic TI Driver"
+	default y
+	depends on MACH_STAR
+	help
+	 Support for muic TS5USBA33402 driver.
+
+config STAR_PROXIMITY
+	bool "Star Proximity Sensor Driver"
+	default y
+	depends on MACH_STAR
+	help
+	 Suport for proximity sensor.
+
+config STAR_HEADSET_DET
+	bool "Star Headset Detection Driver"
+	default y
+	depends on MACH_STAR
+	help
+	 Suport for headset detection driver.
+
+config STAR_RIL
+	bool "Star RIL Driver"
+	default y
+	depends on MACH_STAR
+	help
+	 Suport for IFX MUX & SPI.
+
+config RINETWORK_DRIVER
+	bool "Raw ip network driver"
+	default y
+	depends on MACH_STAR
+	help
+	  Support for raw ip network driver.
+
+config LOGGER
+	bool "High-speed in-kernel logging driver"
+	default y
+	depends on !ANDROID_LOGGER	
+
+source "drivers/star/sensor/Kconfig"
+
+config STAR_POWERKEY
+    bool "Star Powerkey Driver"
+    default y
+    depends on MACH_STAR
+    help
+      Powerkey driver
+
+config STAR_VIBRATOR
+    bool "Star Vibrator Driver"
+    default y
+    depends on MACH_STAR
+    help
+      Vibrator driver
+
+config STAR_HOMEKEY
+    bool "Star Homekey Driver"
+    default n
+    depends on MACH_STAR
+    help
+      Homekey driver
+
+config STAR_TOUCH_LED
+    bool "Star TouchLED Driver"
+    default y
+    depends on MACH_STAR
+    help
+      Touch LED driver
+
+config STAR_HDMI_REG
+    bool "Star HDMI Regulator Driver"
+    default y
+    depends on MACH_STAR
+    help
+      HDMI regulator driver
+
+config STAR_WM8994_TEST
+	bool "Star wm8994 Driver"
+	default y
+	help
+	 Support for wm8994 driver.
+
+config STAR_ERS_TEST
+	bool "Star ERS Test Driver"
+	default y
+	help
+	 ERS Test Driver
+
+config STAR_FOTA
+	bool "Star FOTA Test Driver"
+	default y
+	help
+	 FOTA Test Driver	
+
+config STAR_CPWATCHER
+	bool "Star CP Status Watcher Driver"
+	default y
+	depends on MACH_STAR
+	help
+	 Suport for CP Status Watcher driver.
+
+config STAR_HALL
+	bool "Star Hall Driver"
+	default y
+	depends on MACH_STAR
+	help
+	 driver for hall ic
+
+config STAR_BL
+    bool "Star Backlight Driver"
+    default y
+    depends on MACH_STAR
+    help
+     driver for star Backlight
+
+config LGE_ATS_INPUT_DEVICE
+    bool "Support LGE ATS Input Device"
+    default y
+    depends on MACH_STAR
+    help
+     Choose if use ATS input device used for generating input event from user space
+
+config STAR_BD_ADDRESS
+	bool "BD Read / Write Driver"
+	default y
+	help
+	  LGE added: It supports Bluetooth address Read / Write functionality on user mode.	  
+            
+endmenu

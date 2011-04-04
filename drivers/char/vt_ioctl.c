@@ -133,7 +133,11 @@ static void vt_event_wait(struct vt_event_wait *vw)
 	list_add(&vw->list, &vt_events);
 	spin_unlock_irqrestore(&vt_event_lock, flags);
 	/* Wait for it to pass */
+    #if 1	// event hang possibility
+	wait_event_interruptible_timeout(vt_event_waitqueue, vw->done, 500);
+    #else
 	wait_event_interruptible(vt_event_waitqueue, vw->done);
+    #endif
 	/* Dequeue it */
 	spin_lock_irqsave(&vt_event_lock, flags);
 	list_del(&vw->list);

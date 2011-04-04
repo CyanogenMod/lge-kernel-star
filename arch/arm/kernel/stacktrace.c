@@ -97,7 +97,9 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
 		 * What guarantees do we have here that 'tsk'
 		 * is not running on another CPU?
 		 */
-		BUG();
+		/* 20101006 taewan.kim@lge.com temporary block because of reset */
+		/* BUG(); */
+		return;
 #else
 		data.no_sched_functions = 1;
 		frame.fp = thread_saved_fp(tsk);

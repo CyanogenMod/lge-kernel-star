@@ -94,6 +94,15 @@ NvBool NvOdmSdioSuspend(NvOdmSdioHandle hOdmSdio);
  */
 NvBool NvOdmSdioResume(NvOdmSdioHandle hOdmSdio);
 
+// 20100513 mingi.sung@lge.com Implementing WLAN card detection procedure temporarily [START]
+#if 1
+void do_wifi_cardetect(void *p);
+#endif
+// 20100513 mingi.sung@lge.com Implementing WLAN card detection procedure temporarily [END]
+
+// 20100717 mingi.sung@lge.com WLAN power control code for nVidia [START]
+NvBool NvOdmWlanEnable( NvBool IsEnable );
+// 20100717 mingi.sung@lge.com WLAN power control code for nVidia [END]
 
 #if defined(__cplusplus)
 }

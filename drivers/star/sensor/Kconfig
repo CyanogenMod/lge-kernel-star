@@ -1,0 +1,22 @@
+# drivers/star/sensor/Kconfig
+
+config STAR_COMPASS
+    bool "Star Compass Driver"
+    default y
+    help
+      AMI304 driver
+
+config STAR_GYRO_ACCEL
+    bool "Star Gyroscope/Accelerometer Driver for Rev.C"
+    default y
+    help
+      Support for gyroscope/accelerometer driver simultanously.
+
+config LGE_STAR_SENSOR_VERIFY
+    bool "Verify Star Sensor modules"
+    default y
+    help
+      Verify Star sensor modules, 
+	  Not avalable, kernel panic will happen and be reset. 
+
+

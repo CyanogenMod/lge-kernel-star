@@ -20,7 +20,7 @@
 #include <linux/reboot.h>
 #include <linux/sched.h>
 #include <linux/syscalls.h>
-
+#include <linux/timer.h> /* 20100802 jugwan.eom@lge.com */
 
 struct keyreset_state {
 	struct input_handler input_handler;
@@ -44,6 +44,27 @@ static void deferred_restart(struct work_struct *dummy)
 }
 static DECLARE_WORK(restart_work, deferred_restart);
 
+/* 20100802 jugwan.eom@lge.com [START_LGE] */
+static int keyreset_started;
+
+static void keyreset_timeout(unsigned long data)
+{
+    struct keyreset_state *state = (struct keyreset_state *)data;
+
+    printk("keyreset_timeout!\n");
+    state->restart_disabled = 1;
+
+    if (restart_requested)
+        panic("keyboard reset failed, %d", restart_requested);
+
+    pr_info("keyboard reset\n");
+    schedule_work(&restart_work);
+    restart_requested = 1;
+}
+
+static struct timer_list keyreset_timer = TIMER_INITIALIZER(keyreset_timeout, 0, 0);
+/* 20100802 jugwan.eom@lge.com [END_LGE] */
+
 static void keyreset_event(struct input_handle *handle, unsigned int type,
 			   unsigned int code, int value)
 {
@@ -56,8 +77,16 @@ static void keyreset_event(struct input_handle *handle, unsigned int type,
 	if (code >= KEY_MAX)
 		return;
 
-	if (!test_bit(code, state->keybit))
+	if (!test_bit(code, state->keybit)) { 
+        /* 20100802 jugwan.eom@lge.com [START_LGE] */
+        if (keyreset_started) {
+            pr_info("keyreset end!\n");
+            keyreset_started = 0;
+            del_timer(&keyreset_timer);
+        }
+        /* 20100802 jugwan.eom@lge.com [END_LGE] */
 		return;
+    }
 
 	spin_lock_irqsave(&state->lock, flags);
 	if (!test_bit(code, state->key) == !value)
@@ -73,22 +102,51 @@ static void keyreset_event(struct input_handle *handle, unsigned int type,
 		if (value)
 			state->key_down++;
 		else
+        {
+            /* 20100802 jugwan.eom@lge.com [START_LGE] */
+            if (keyreset_started) {
+                pr_info("keyreset end!\n");
+                keyreset_started = 0;
+                del_timer(&keyreset_timer);
+            }
+            /* 20100802 jugwan.eom@lge.com [END_LGE] */
 			state->key_down--;
 	}
-	if (state->key_down == 0 && state->key_up == 0)
+	}
+	if (state->key_down == 0 && state->key_up == 0) {
+        /* 20100802 jugwan.eom@lge.com [START_LGE] */
+        if (keyreset_started) {
+            pr_info("keyreset end!\n");
+            keyreset_started = 0;
+            del_timer(&keyreset_timer);
+        }
+        /* 20100802 jugwan.eom@lge.com [END_LGE] */
 		state->restart_disabled = 0;
+    }
 
 	pr_debug("reset key changed %d %d new state %d-%d-%d\n", code, value,
 		 state->key_down, state->key_up, state->restart_disabled);
 
 	if (value && !state->restart_disabled &&
-	    state->key_down == state->key_down_target) {
+        /* 20100802 jugwan.eom@lge.com, Change keyreset behaivor
+         * to follow LGE scenario: It needs at least 5 secs before reset
+         * [START_LGE]
+         */
+        state->key_down == state->key_down_target && !keyreset_started) {
+                pr_debug("keyreset start!\n");
+                keyreset_started = 1;
+                keyreset_timer.data = (unsigned long)state;
+                keyreset_timer.expires = jiffies + 5 * HZ;
+                add_timer(&keyreset_timer);
+#if 0
 		state->restart_disabled = 1;
 		if (restart_requested)
 			panic("keyboard reset failed, %d", restart_requested);
 		pr_info("keyboard reset\n");
 		schedule_work(&restart_work);
 		restart_requested = 1;
+#endif
+    /* 20100802 jugwan.eom@lge.com [END_LGE] */
 	}
 done:
 	spin_unlock_irqrestore(&state->lock, flags);

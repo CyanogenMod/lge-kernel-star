@@ -22,8 +22,20 @@
 #ifndef __LBEE9QMB_RFKILL_H
 #define __LBEE9QMB_RFKILL_H
 
+#define BRCM_LPM
+#ifdef BRCM_LPM
+#define BRCM_HOST_WAKE
+#define BRCM_BT_WAKE
+#endif
+
 struct lbee9qmb_platform_data {
 	int gpio_reset;
+#ifdef BRCM_BT_WAKE
+	int gpio_btwake;
+#endif
+#ifdef BRCM_HOST_WAKE
+	int gpio_hostwake;
+#endif	
 	int gpio_pwr;
 	int delay;
 };

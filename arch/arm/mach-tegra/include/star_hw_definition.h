@@ -1,0 +1,365 @@
+#ifndef _STAR_HW_DEFINITION_H_
+#define _STAR_HW_DEFINITION_H_
+
+#define AP20PERINFO(instance, config)  ((instance << 8) | config) 
+#define AP20INST(a)  ( a >> 8 )
+#define AP20CONF(a)  ( a & 0x00ff)
+
+#define AP20GPIOINFO(_port,_pin)	(((_port-'a') << 8) | (_pin))
+#define AP20GPIOPORT(X)	   			( X >> 8 )
+#define AP20GPIOPIN(X)	 			( X & 0x00ff )
+
+/* PIN MUX ARRAY POSITION */
+#define AP20_SDIO1				0
+#define AP20_SDIO2				1
+#define AP20_SDIO3				2
+#define AP20_SDIO4				3
+#define AP20_SDIO_MAX			4
+        
+#define AP20_UART1				0
+#define AP20_UART2				1
+#define AP20_UART3				2
+#define AP20_UART4				3
+#define AP20_UART5				4
+#define AP20_UART_MAX			5
+        
+#define AP20_SPI1				0
+#define AP20_SPI2				1
+#define AP20_SPI3				2
+#define AP20_SPI4				3
+#define AP20_SPI5				4
+#define AP20_SPI_MAX			5
+
+#define AP20_TWC				0
+#define AP20_TWC_MAX			1
+
+#define AP20_I2C_PMU			0
+#define AP20_I2C_PMU_MAX 		1
+
+#define AP20_ULPI				0
+#define AP20_ULPI_MAX			1
+
+#define AP20_SPDIF				0
+#define AP20_SPDIF_MAX			1
+
+#define AP20_HSI				0
+#define AP20_HSI_MAX			1
+
+#define AP20_HDMI				0
+#define AP20_HDMI_MAX			1
+
+#define AP20_PWM				0
+#define AP20_PWM_MAX			1
+
+#define AP20_ATA				0
+#define AP20_ATA_MAX			1
+
+#define AP20_NAND				0
+#define AP20_NAND_MAX			1
+
+#define AP20_DAP1				0
+#define AP20_DAP2				1
+#define AP20_DAP3				2
+#define AP20_DAP4				3
+#define AP20_DAP5				4
+#define AP20_DAP_MAX			5
+
+#define AP20_KBD				0
+#define AP20_KBD_MAX			1
+
+#define AP20_HDCP				0
+#define AP20_HDCP_MAX			1
+
+#define AP20_SYNC_NOR			0
+#define AP20_SYNC_NOR_MAX		1
+
+#define AP20_MIO				0
+#define AP20_MIO_MAX			1
+
+#define AP20_EXT_CLOCK1			0
+#define AP20_EXT_CLOCK2			1
+#define AP20_EXT_CLOCK3			2
+#define AP20_EXT_CLOCK_MAX		3
+       
+#define AP20_VIDEO_INPUT		0
+#define AP20_VIDEO_INPUT_MAX	1
+        
+#define AP20_DISPLAY1			0
+#define AP20_DISPLAY2			1
+#define AP20_DISPLAY_MAX		2
+
+#define AP20_BKL_PWM1			0
+#define AP20_BKL_PWM2			1
+#define AP20_BKL_PWM3			2
+#define AP20_BKL_PWM4			3
+#define AP20_BKL_PWM_MAX		4
+       
+#define AP20_CRT1				0
+#define AP20_CRT2				1
+#define AP20_CRT_MAX			2
+       
+#define AP20_TVO				0
+#define AP20_TVO_MAX			1
+
+#define AP20_ONEWIRE			0
+#define AP20_ONEWIRE_MAX		1
+
+#define AP20_PCI_EXP			0
+#define AP20_PCI_EXP_MAX		1
+        
+#define AP20_PTM				0
+#define AP20_PTM_MAX			1
+
+//GPIO PORT Group A
+#define AP20_GPIO_PA0		AP20GPIOINFO('a', 0)
+#define AP20_GPIO_PA1		AP20GPIOINFO('a', 1)
+#define AP20_GPIO_PA2		AP20GPIOINFO('a', 2)
+#define AP20_GPIO_PA3		AP20GPIOINFO('a', 3)
+#define AP20_GPIO_PA4		AP20GPIOINFO('a', 4)
+#define AP20_GPIO_PA5		AP20GPIOINFO('a', 5)
+#define AP20_GPIO_PA6		AP20GPIOINFO('a', 6)
+#define AP20_GPIO_PA7		AP20GPIOINFO('a', 7)
+//GPIO PORT Group B
+#define AP20_GPIO_PB0		AP20GPIOINFO('b', 0)
+#define AP20_GPIO_PB1		AP20GPIOINFO('b', 1)
+#define AP20_GPIO_PB2		AP20GPIOINFO('b', 2)
+#define AP20_GPIO_PB3		AP20GPIOINFO('b', 3)
+#define AP20_GPIO_PB4		AP20GPIOINFO('b', 4)
+#define AP20_GPIO_PB5		AP20GPIOINFO('b', 5)
+#define AP20_GPIO_PB6		AP20GPIOINFO('b', 6)
+#define AP20_GPIO_PB7		AP20GPIOINFO('b', 7)
+//GPIO PORT Group C
+#define AP20_GPIO_PC0		AP20GPIOINFO('c', 0)
+#define AP20_GPIO_PC1		AP20GPIOINFO('c', 1)
+#define AP20_GPIO_PC2		AP20GPIOINFO('c', 2)
+#define AP20_GPIO_PC3		AP20GPIOINFO('c', 3)
+#define AP20_GPIO_PC4		AP20GPIOINFO('c', 4)
+#define AP20_GPIO_PC5		AP20GPIOINFO('c', 5)
+#define AP20_GPIO_PC6		AP20GPIOINFO('c', 6)
+#define AP20_GPIO_PC7		AP20GPIOINFO('c', 7)
+//GPIO PORT Group D
+#define AP20_GPIO_PD0		AP20GPIOINFO('d', 0) 
+#define AP20_GPIO_PD1		AP20GPIOINFO('d', 1) 
+#define AP20_GPIO_PD2		AP20GPIOINFO('d', 2) 
+#define AP20_GPIO_PD3		AP20GPIOINFO('d', 3) 
+#define AP20_GPIO_PD4		AP20GPIOINFO('d', 4) 
+#define AP20_GPIO_PD5		AP20GPIOINFO('d', 5) 
+#define AP20_GPIO_PD6		AP20GPIOINFO('d', 6) 
+#define AP20_GPIO_PD7		AP20GPIOINFO('d', 7) 
+//GPIO PORT Group E
+#define AP20_GPIO_PE0		AP20GPIOINFO('e', 0) 
+#define AP20_GPIO_PE1		AP20GPIOINFO('e', 1)
+#define AP20_GPIO_PE2		AP20GPIOINFO('e', 2)
+#define AP20_GPIO_PE3		AP20GPIOINFO('e', 3)
+#define AP20_GPIO_PE4		AP20GPIOINFO('e', 4)
+#define AP20_GPIO_PE5		AP20GPIOINFO('e', 5)
+#define AP20_GPIO_PE6		AP20GPIOINFO('e', 6)
+#define AP20_GPIO_PE7		AP20GPIOINFO('e', 7)
+//GPIO PORT Group F
+#define AP20_GPIO_PF0		AP20GPIOINFO('f', 0) 
+#define AP20_GPIO_PF1		AP20GPIOINFO('f', 1)
+#define AP20_GPIO_PF2		AP20GPIOINFO('f', 2)
+#define AP20_GPIO_PF3		AP20GPIOINFO('f', 3)
+#define AP20_GPIO_PF4		AP20GPIOINFO('f', 4)
+#define AP20_GPIO_PF5		AP20GPIOINFO('f', 5)
+#define AP20_GPIO_PF6		AP20GPIOINFO('f', 6)
+#define AP20_GPIO_PF7		AP20GPIOINFO('f', 7)
+//GPIO PORT Group G
+#define AP20_GPIO_PG0		AP20GPIOINFO('g', 0) 
+#define AP20_GPIO_PG1		AP20GPIOINFO('g', 1)
+#define AP20_GPIO_PG2		AP20GPIOINFO('g', 2)
+#define AP20_GPIO_PG3		AP20GPIOINFO('g', 3)
+#define AP20_GPIO_PG4		AP20GPIOINFO('g', 4)
+#define AP20_GPIO_PG5		AP20GPIOINFO('g', 5)
+#define AP20_GPIO_PG6		AP20GPIOINFO('g', 6)
+#define AP20_GPIO_PG7		AP20GPIOINFO('g', 7)
+//GPIO PORT Group H
+#define AP20_GPIO_PH0		AP20GPIOINFO('h', 0) 
+#define AP20_GPIO_PH1		AP20GPIOINFO('h', 1)
+#define AP20_GPIO_PH2		AP20GPIOINFO('h', 2) 
+#define AP20_GPIO_PH3		AP20GPIOINFO('h', 3)
+#define AP20_GPIO_PH4		AP20GPIOINFO('h', 4)
+#define AP20_GPIO_PH5		AP20GPIOINFO('h', 5)
+#define AP20_GPIO_PH6		AP20GPIOINFO('h', 6)
+#define AP20_GPIO_PH7		AP20GPIOINFO('h', 7)
+//GPIO PORT Group I
+#define AP20_GPIO_PI0		AP20GPIOINFO('i', 0)
+#define AP20_GPIO_PI1    	AP20GPIOINFO('i', 1)   
+#define AP20_GPIO_PI2    	AP20GPIOINFO('i', 2)
+#define AP20_GPIO_PI3		AP20GPIOINFO('i', 3)
+#define AP20_GPIO_PI4		AP20GPIOINFO('i', 4)
+#define AP20_GPIO_PI5		AP20GPIOINFO('i', 5)
+#define AP20_GPIO_PI6		AP20GPIOINFO('i', 6)
+#define AP20_GPIO_PI7    	AP20GPIOINFO('i', 7)
+//GPIO PORT Group J
+#define AP20_GPIO_PJ0		AP20GPIOINFO('j', 0) 
+#define AP20_GPIO_PJ1		AP20GPIOINFO('j', 1)
+#define AP20_GPIO_PJ2		AP20GPIOINFO('j', 2)
+#define AP20_GPIO_PJ3		AP20GPIOINFO('j', 3)
+#define AP20_GPIO_PJ4		AP20GPIOINFO('j', 4)
+#define AP20_GPIO_PJ5		AP20GPIOINFO('j', 5)
+#define AP20_GPIO_PJ6		AP20GPIOINFO('j', 6)
+#define AP20_GPIO_PJ7		AP20GPIOINFO('j', 7)
+//GPIO PORT Group K
+#define AP20_GPIO_PK0		AP20GPIOINFO('k', 0) 
+#define AP20_GPIO_PK1		AP20GPIOINFO('k', 1)
+#define AP20_GPIO_PK2		AP20GPIOINFO('k', 2)
+#define AP20_GPIO_PK3		AP20GPIOINFO('k', 3)
+#define AP20_GPIO_PK4		AP20GPIOINFO('k', 4)
+#define AP20_GPIO_PK5		AP20GPIOINFO('k', 5)
+#define AP20_GPIO_PK6		AP20GPIOINFO('k', 6)
+#define AP20_GPIO_PK7		AP20GPIOINFO('k', 7)
+//GPIO PORT Group L
+#define AP20_GPIO_PL0		AP20GPIOINFO('l', 0) 
+#define AP20_GPIO_PL1		AP20GPIOINFO('l', 1)
+#define AP20_GPIO_PL2		AP20GPIOINFO('l', 2)
+#define AP20_GPIO_PL3		AP20GPIOINFO('l', 3)
+#define AP20_GPIO_PL4		AP20GPIOINFO('l', 4)
+#define AP20_GPIO_PL5		AP20GPIOINFO('l', 5)
+#define AP20_GPIO_PL6		AP20GPIOINFO('l', 6)
+#define AP20_GPIO_PL7		AP20GPIOINFO('l', 7)
+//GPIO PORT Group M
+#define AP20_GPIO_PM0		AP20GPIOINFO('m', 0) 
+#define AP20_GPIO_PM1		AP20GPIOINFO('m', 1)
+#define AP20_GPIO_PM2		AP20GPIOINFO('m', 2)
+#define AP20_GPIO_PM3		AP20GPIOINFO('m', 3)
+#define AP20_GPIO_PM4		AP20GPIOINFO('m', 4)
+#define AP20_GPIO_PM5		AP20GPIOINFO('m', 5)
+#define AP20_GPIO_PM6		AP20GPIOINFO('m', 6)
+#define AP20_GPIO_PM7		AP20GPIOINFO('m', 7)
+//GPIO PORT Group N
+#define AP20_GPIO_PN0		AP20GPIOINFO('n', 0) 
+#define AP20_GPIO_PN1		AP20GPIOINFO('n', 1)
+#define AP20_GPIO_PN2		AP20GPIOINFO('n', 2)
+#define AP20_GPIO_PN3		AP20GPIOINFO('n', 3)
+#define AP20_GPIO_PN4		AP20GPIOINFO('n', 4)
+#define AP20_GPIO_PN5		AP20GPIOINFO('n', 5)
+#define AP20_GPIO_PN6		AP20GPIOINFO('n', 6)
+#define AP20_GPIO_PN7		AP20GPIOINFO('n', 7)
+//GPIO PORT Group O
+#define AP20_GPIO_PO0		AP20GPIOINFO('o', 0) 
+#define AP20_GPIO_PO1		AP20GPIOINFO('o', 1)
+#define AP20_GPIO_PO2		AP20GPIOINFO('o', 2)
+#define AP20_GPIO_PO3		AP20GPIOINFO('o', 3)
+#define AP20_GPIO_PO4		AP20GPIOINFO('o', 4)
+#define AP20_GPIO_PO5		AP20GPIOINFO('o', 5)
+#define AP20_GPIO_PO6		AP20GPIOINFO('o', 6)
+#define AP20_GPIO_PO7		AP20GPIOINFO('o', 7)
+//GPIO PORT Group P
+#define AP20_GPIO_PP0		AP20GPIOINFO('p', 0) 
+#define AP20_GPIO_PP1		AP20GPIOINFO('p', 1)
+#define AP20_GPIO_PP2		AP20GPIOINFO('p', 2)
+#define AP20_GPIO_PP3		AP20GPIOINFO('p', 3)
+#define AP20_GPIO_PP4		AP20GPIOINFO('p', 4)
+#define AP20_GPIO_PP5		AP20GPIOINFO('p', 5)
+#define AP20_GPIO_PP6		AP20GPIOINFO('p', 6)
+#define AP20_GPIO_PP7		AP20GPIOINFO('p', 7)
+//GPIO PORT Group Q
+#define AP20_GPIO_PQ0		AP20GPIOINFO('q', 0) 
+#define AP20_GPIO_PQ1		AP20GPIOINFO('q', 1)
+#define AP20_GPIO_PQ2		AP20GPIOINFO('q', 2)
+#define AP20_GPIO_PQ3		AP20GPIOINFO('q', 3)
+#define AP20_GPIO_PQ4		AP20GPIOINFO('q', 4)
+#define AP20_GPIO_PQ5		AP20GPIOINFO('q', 5)
+#define AP20_GPIO_PQ6		AP20GPIOINFO('q', 6)
+#define AP20_GPIO_PQ7		AP20GPIOINFO('q', 7)
+//GPIO PORT Group R
+#define AP20_GPIO_PR0		AP20GPIOINFO('r', 0) 
+#define AP20_GPIO_PR1		AP20GPIOINFO('r', 1)
+#define AP20_GPIO_PR2		AP20GPIOINFO('r', 2)
+#define AP20_GPIO_PR3		AP20GPIOINFO('r', 3)
+#define AP20_GPIO_PR4		AP20GPIOINFO('r', 4)
+#define AP20_GPIO_PR5		AP20GPIOINFO('r', 5)
+#define AP20_GPIO_PR6		AP20GPIOINFO('r', 6)
+#define AP20_GPIO_PR7		AP20GPIOINFO('r', 7)
+//GPIO PORT Group S                     
+#define AP20_GPIO_PS0		AP20GPIOINFO('s', 0)
+#define AP20_GPIO_PS1		AP20GPIOINFO('s', 1)
+#define AP20_GPIO_PS2		AP20GPIOINFO('s', 2)
+#define AP20_GPIO_PS3		AP20GPIOINFO('s', 3)
+#define AP20_GPIO_PS4		AP20GPIOINFO('s', 4)
+#define AP20_GPIO_PS5		AP20GPIOINFO('s', 5)
+#define AP20_GPIO_PS6		AP20GPIOINFO('s', 6)
+#define AP20_GPIO_PS7		AP20GPIOINFO('s', 7)
+//GPIO PORT Group T
+#define AP20_GPIO_PT0		AP20GPIOINFO('t', 0) 
+#define AP20_GPIO_PT1		AP20GPIOINFO('t', 1)
+#define AP20_GPIO_PT2		AP20GPIOINFO('t', 2)
+#define AP20_GPIO_PT3		AP20GPIOINFO('t', 3)
+#define AP20_GPIO_PT4		AP20GPIOINFO('t', 4)
+#define AP20_GPIO_PT5		AP20GPIOINFO('t', 5)
+#define AP20_GPIO_PT6		AP20GPIOINFO('t', 6)
+#define AP20_GPIO_PT7		AP20GPIOINFO('t', 7)
+//GPIO PORT Group U                     
+#define AP20_GPIO_PU0		AP20GPIOINFO('u', 0)
+#define AP20_GPIO_PU1		AP20GPIOINFO('u', 1)
+#define AP20_GPIO_PU2		AP20GPIOINFO('u', 2)
+#define AP20_GPIO_PU3		AP20GPIOINFO('u', 3)
+#define AP20_GPIO_PU4		AP20GPIOINFO('u', 4)
+#define AP20_GPIO_PU5		AP20GPIOINFO('u', 5)
+#define AP20_GPIO_PU6		AP20GPIOINFO('u', 6)
+#define AP20_GPIO_PU7		AP20GPIOINFO('u', 7)
+//GPIO PORT Group V
+#define AP20_GPIO_PV0		AP20GPIOINFO('v', 0) 
+#define AP20_GPIO_PV1		AP20GPIOINFO('v', 1)
+#define AP20_GPIO_PV2		AP20GPIOINFO('v', 2)
+#define AP20_GPIO_PV3		AP20GPIOINFO('v', 3)
+#define AP20_GPIO_PV4		AP20GPIOINFO('v', 4)
+#define AP20_GPIO_PV5		AP20GPIOINFO('v', 5)
+#define AP20_GPIO_PV6		AP20GPIOINFO('v', 6)
+#define AP20_GPIO_PV7		AP20GPIOINFO('v', 7)
+//GPIO PORT Group W                     
+#define AP20_GPIO_PW0		AP20GPIOINFO('w', 0)
+#define AP20_GPIO_PW1		AP20GPIOINFO('w', 1)
+#define AP20_GPIO_PW2		AP20GPIOINFO('w', 2)
+#define AP20_GPIO_PW3		AP20GPIOINFO('w', 3)
+#define AP20_GPIO_PW4		AP20GPIOINFO('w', 4)
+#define AP20_GPIO_PW5		AP20GPIOINFO('w', 5)
+#define AP20_GPIO_PW6		AP20GPIOINFO('w', 6)
+#define AP20_GPIO_PW7		AP20GPIOINFO('w', 7)
+//GPIO PORT Group X
+#define AP20_GPIO_PX0		AP20GPIOINFO('x', 0) 
+#define AP20_GPIO_PX1		AP20GPIOINFO('x', 1)
+#define AP20_GPIO_PX2		AP20GPIOINFO('x', 2)
+#define AP20_GPIO_PX3		AP20GPIOINFO('x', 3)
+#define AP20_GPIO_PX4		AP20GPIOINFO('x', 4)
+#define AP20_GPIO_PX5		AP20GPIOINFO('x', 5)
+#define AP20_GPIO_PX6		AP20GPIOINFO('x', 6)
+#define AP20_GPIO_PX7		AP20GPIOINFO('x', 7)
+//GPIO PORT Group Y                     
+#define AP20_GPIO_PY0		AP20GPIOINFO('y', 0)
+#define AP20_GPIO_PY1		AP20GPIOINFO('y', 1)
+#define AP20_GPIO_PY2		AP20GPIOINFO('y', 2)
+#define AP20_GPIO_PY3		AP20GPIOINFO('y', 3)
+#define AP20_GPIO_PY4		AP20GPIOINFO('y', 4)
+#define AP20_GPIO_PY5		AP20GPIOINFO('y', 5)
+#define AP20_GPIO_PY6		AP20GPIOINFO('y', 6)
+#define AP20_GPIO_PY7		AP20GPIOINFO('y', 7)
+//GPIO PORT Group Z
+#define AP20_GPIO_PZ0		AP20GPIOINFO('z', 0) 
+#define AP20_GPIO_PZ1		AP20GPIOINFO('z', 1)
+#define AP20_GPIO_PZ2		AP20GPIOINFO('z', 2)
+#define AP20_GPIO_PZ3		AP20GPIOINFO('z', 3)
+#define AP20_GPIO_PZ4		AP20GPIOINFO('z', 4)
+#define AP20_GPIO_PZ5		AP20GPIOINFO('z', 5)
+#define AP20_GPIO_PZ6		AP20GPIOINFO('z', 6)
+#define AP20_GPIO_PZ7		AP20GPIOINFO('z', 7)
+//GPIO PORT Group AA 
+#define AP20_GPIO_PAA0		AP20GPIOINFO('z'+ 1, 0) 
+#define AP20_GPIO_PAA1		AP20GPIOINFO('z'+ 1, 1)
+#define AP20_GPIO_PAA2		AP20GPIOINFO('z'+ 1, 2)
+#define AP20_GPIO_PAA3		AP20GPIOINFO('z'+ 1, 3)
+#define AP20_GPIO_PAA4		AP20GPIOINFO('z'+ 1, 4)
+#define AP20_GPIO_PAA5		AP20GPIOINFO('z'+ 1, 5)
+#define AP20_GPIO_PAA6		AP20GPIOINFO('z'+ 1, 6)
+#define AP20_GPIO_PAA7		AP20GPIOINFO('z'+ 1, 7)
+//GPIO PORT Group BB 
+#define AP20_GPIO_PBB0		AP20GPIOINFO('z'+ 2, 0) 
+#define AP20_GPIO_PBB1		AP20GPIOINFO('z'+ 2, 1)
+#define AP20_GPIO_PBB2		AP20GPIOINFO('z'+ 2, 2)
+#define AP20_GPIO_PBB3		AP20GPIOINFO('z'+ 2, 3)
+#define AP20_GPIO_PBB4		AP20GPIOINFO('z'+ 2, 4)
+#define AP20_GPIO_PBB5		AP20GPIOINFO('z'+ 2, 5)
+#define AP20_GPIO_PBB6		AP20GPIOINFO('z'+ 2, 6)
+#define AP20_GPIO_PBB7		AP20GPIOINFO('z'+ 2, 7)
+#endif

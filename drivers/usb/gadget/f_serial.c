@@ -16,6 +16,14 @@
 #include "u_serial.h"
 #include "gadget_chips.h"
 
+//20100822, jm1.lee@lge.com, for USB mode switching [START]
+#if defined(CONFIG_MACH_STAR)
+#undef __init
+#define __init
+#undef __initdata
+#define __initdata
+#endif
+//20100822, jm1.lee@lge.com, for USB mode switching [END]
 
 /*
  * This function packages a simple "generic serial" port with no real

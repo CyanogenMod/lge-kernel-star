@@ -136,6 +136,41 @@ struct tegra_pingroup_desc {
 	s8 pupd_bit;		/* offset into the PULL_UPDOWN_REG_* register bit */
 };
 
+//20100724 byoungwoo.yoon@lge.com for gpio setting while sleep [LGE_START]
+#define APPLY_SLEEP_GPIO_TABLE	1
+#define SLEEP_GPIO_LOG	0
+#define APPLY_GPIO_INIT	0
+
+typedef enum {
+	TRISTATE = 0,
+	PIN_MUX_CTL,
+	PULLUPDOWN,
+	REG_DATA,
+} tegra_reg_t;
+
+extern int gpio_dbgfs_mode;   // 0=normal, 1=sleep
+
+#define NORMAL_MODE 		0
+#define SLEEP_MODE 			1
+
+#define TRISTATE_REG_A         0x14
+#define TRISTATE_REG_NUM       4
+#define PIN_MUX_CTL_REG_A      0x80
+#define PIN_MUX_CTL_REG_NUM    8
+#define PULLUPDOWN_REG_A       0xa0
+#define PULLUPDOWN_REG_NUM     5
+
+
+#define OFFSET_TRISTATE_REG	   0
+#define OFFSET_PIN_MUX_CTL	   TRISTATE_REG_NUM
+#define OFFSET_PULLUPDOWN_CTL  (TRISTATE_REG_NUM + PIN_MUX_CTL_REG_NUM)
+
+unsigned long get_reg_data( int pg, int reg );
+void set_reg_data( int pg, long data, int reg );
+static inline unsigned long pg_readl(unsigned long offset);
+static inline void pg_writel(unsigned long value, unsigned long offset);
+//20100724 byoungwoo.yoon@lge.com for gpio setting while sleep [LGE_END]
+
 int tegra_pinmux_set_tristate(tegra_pingroup_t pg, tegra_tristate_t tristate);
 int tegra_pinmux_set_pullupdown(tegra_pingroup_t pg, tegra_pullupdown_t pupd);
 

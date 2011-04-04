@@ -252,7 +252,12 @@ void NvRmPrivPmuLPxStateConfig(
     // - enable the On/Off control on entry, and disable on exit
     if (state == NvOdmSocPowerState_DeepSleep)
     {
+    // cs77.ha@lge.com : AP20 need USB power work around
+#if defined(CONFIG_MACH_STAR)
+        if (HasPmuProperty)
+#else
         if (HasPmuProperty && PmuProperty.CombinedPowerReq)
+#endif
         {
             NvU32 level = enter ?
                 ODM_VOLTAGE_ENABLE_EXT_ONOFF : ODM_VOLTAGE_DISABLE_EXT_ONOFF;
@@ -265,6 +270,7 @@ void NvRmPrivPmuLPxStateConfig(
         (state == NvOdmSocPowerState_DeepSleep))
         NvRmPrivPmuInterruptMask(hRmDevice, enter);
 }
+//20100725 taewan.kim@lge.com add MAX8907C FEATURE [END]
 
 /*****************************************************************************/
 
@@ -305,6 +311,38 @@ void NvRmPmuGetVoltage(
     NV_ASSERT(i < VOLTAGE_CONTROL_RETRY_CNT);
     NvOsMutexUnlock(s_Pmu.hMutex);
 }
+
+#if defined(CONFIG_MACH_STAR) 
+//20100704 bergkamp.cho@lge.com jongik's headset porting [LGE]
+NvU32 NvRmPmuGetHookAdc(
+    NvRmDeviceHandle hDevice)
+{
+    NvU32 i, value;
+    
+    NV_ASSERT(s_Pmu.hMutex);
+    NvOsMutexLock(s_Pmu.hMutex);
+    value = NvOdmPmuGetHookAdc(s_Pmu.hOdmPmu);
+    
+    NvOsMutexUnlock(s_Pmu.hMutex);
+	return value;
+}
+
+//20101121 cs77.ha@lge.com, HW power off in thermal limit [START]
+NvU32 NvRmPmuSetHwPowerOffConfig(
+    NvRmDeviceHandle hDevice,
+    NvBool Enable)
+{
+    NvU32 i, value;
+    
+    NV_ASSERT(s_Pmu.hMutex);
+    NvOsMutexLock(s_Pmu.hMutex);
+    value = NvOdmPmuSetHwPowerOffConfig(s_Pmu.hOdmPmu, Enable);
+    
+    NvOsMutexUnlock(s_Pmu.hMutex);
+	return value;
+}
+//20101121 cs77.ha@lge.com, HW power off in thermal limit [END]
+#endif
 
 void NvRmPmuSetVoltage( 
     NvRmDeviceHandle hDevice,
@@ -467,6 +505,39 @@ NvBool NvRmPmuGetBatteryData(
     return NV_FALSE;
 }
 
+//20100924, jh.ahn@lge.com, For updating battery information totally [START]
+#if defined(CONFIG_MACH_STAR)
+NvBool
+NvRmPmuUpdateBatteryInfo(
+	NvRmDeviceHandle hRmDevice,
+	NvRmPmuAcLineStatus *pAcStatus,
+	NvU8 * pBatStatus,
+	NvRmPmuBatteryData * pBatData)
+{
+	NvOdmPmuBatteryData BatteryData;
+
+	if (!s_PmuSupportedEnv)
+	    return NV_FALSE;
+
+	NV_ASSERT(s_Pmu.hMutex);
+	NvOsMutexLock(s_Pmu.hMutex);
+	if (NvOdmPmuUpdateBatteryInfo(
+			s_Pmu.hOdmPmu,
+			(NvOdmPmuAcLineStatus *)pAcStatus,
+			pBatStatus,
+			&BatteryData))
+	{
+        pBatData->batteryTemperature = BatteryData.batteryTemperature;
+        pBatData->batteryVoltage = BatteryData.batteryVoltage;
+        NvOsMutexUnlock(s_Pmu.hMutex);
+        return NV_TRUE;
+	}
+	NvOsMutexUnlock(s_Pmu.hMutex);
+	return NV_FALSE;
+}
+#endif
+//20100924, jh.ahn@lge.com, For updating battery information totally  [END]
+
 void NvRmPmuGetBatteryFullLifeTime( 
     NvRmDeviceHandle hRmDevice,
     NvRmPmuBatteryInstance batteryInst,
@@ -533,6 +604,42 @@ NvRmPmuWriteRtc(
     NvOsMutexUnlock(s_Pmu.hMutex);
     return ReturnStatus;
 }
+
+//20101005, jh.ahn@lge.com, Alarm funtion for Full Battery Recharging [START]
+NvBool
+NvRmPmuReadAlarm(
+    NvRmDeviceHandle  hRmDevice,
+    NvU32 *pCount)
+{
+    NvBool ReturnStatus = NV_FALSE;
+
+    if (!s_PmuSupportedEnv)
+        return NV_FALSE;
+
+    NV_ASSERT(s_Pmu.hMutex);
+    NvOsMutexLock(s_Pmu.hMutex);
+    ReturnStatus = NvOdmPmuReadAlarm(s_Pmu.hOdmPmu, pCount);
+    NvOsMutexUnlock(s_Pmu.hMutex);
+    return ReturnStatus;
+}
+
+NvBool
+NvRmPmuWriteAlarm(
+    NvRmDeviceHandle  hRmDevice,
+    NvU32 Count)
+{
+    NvBool ReturnStatus = NV_FALSE;
+
+    if (!s_PmuSupportedEnv)
+        return NV_FALSE;
+
+    NV_ASSERT(s_Pmu.hMutex);
+    NvOsMutexLock(s_Pmu.hMutex);
+    ReturnStatus = NvOdmPmuWriteAlarm(s_Pmu.hOdmPmu, Count);
+    NvOsMutexUnlock(s_Pmu.hMutex);
+    return ReturnStatus;
+}
+//20101005, jh.ahn@lge.com, Alarm funtion for Full Battery Recharging [END]
 
 NvBool
 NvRmPmuIsRtcInitialized(

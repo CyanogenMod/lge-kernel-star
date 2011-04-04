@@ -1,0 +1,81 @@
+config BCM4329
+	tristate "BCM4329 wireless support"
+#	depends on WLAN_80211
+	select WIRELESS_EXT
+	---help---
+	  This is a driver for the Broadcom 4329 wireless chip.
+
+config BCM4329_DEBUG
+	bool "Debug"
+	default n
+	depends on BCM4329
+
+config LGE_BCM432X_PATCH
+	bool "BCM432X Patch by LGE"
+	default y
+	depends on BCM4329
+
+config BCM4329_GPIO_BT_RESET
+	int "GPIO BT_RESET"
+	default 93
+	depends on BCM4329
+
+config BCM4329_GPIO_WL_RESET
+	int "GPIO WL_RESET"
+	default 110
+	depends on BCM4329
+
+config BRCM_LGE_WL_HOSTWAKEUP
+	bool "Support BCM4325/BCM4329 Host Wakeup function"
+	default n
+	depends on BCM4329
+
+config BRCM_LGE_WL_PKTFILTER
+	bool "Setting Multicat/Broadcast packet fillter."
+	default n
+	depends on BCM4329
+
+config BRCM_LGE_WL_ARPOFFLOAD
+	bool "Use Arp offload function."
+	default n
+	depends on BCM4329
+
+config BRCM_GPIO_INTR
+	bool "Use Broadcom Host Wakeup GPIO"
+	default n
+	depends on BCM4329
+	---help---
+	   This function is activated only if set CONFIG_HAS_EARLYSUSPEND.	
+
+config BCM4329_GPIO_WL_HOSTWAKEUP
+	int "GPIO WL_HOSTWAKEUP"
+	default 107
+	depends on BCM4329
+
+config BRCM_USE_DEEPSLEEP
+	bool "Use deepsleep instead of dhd_dev_reset"
+	default n
+	depends on BCM4329
+	---help---
+	   Use deepsleep instead of dhd_dev_reset and controlling GPIO when driver start or stop.
+
+config BRCM_USE_SOFTAP
+	bool "Use SoftAP"
+	default n
+	depends on BCM4329
+	---help---
+	   Using Softap feature.
+
+# config BCM4329_GPIO_WL_REGON
+#	int "GPIO WL_REGON"
+#	default 21
+#	depends on LG_FW_BCM4329
+
+config BRCM_USE_STATIC_BUF
+	bool "Use static buff of osl_malloc"
+	default n
+	depends on BCM4329
+config LGE_WMM_SKT
+	bool "Use WMM rule for SKT"
+	default n
+	depends on BCM4329

@@ -27,7 +27,10 @@ obj-$(CONFIG_TOUCHSCREEN_HTCPEN)	+= htcpen.o
 obj-$(CONFIG_TOUCHSCREEN_USB_COMPOSITE)	+= usbtouchscreen.o
 obj-$(CONFIG_TOUCHSCREEN_PENMOUNT)	+= penmount.o
 obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI)	+= synaptics_i2c_rmi.o
-obj-$(CONFIG_TOUCHSCREEN_TEGRA_ODM)	+= tegra_odm.o
+obj-$(CONFIG_TOUCHSCREEN_TEGRA_ODM)	+= tegra_odm_touch.o
+# 20100927 hyeongwon.oh@lge.com [KR SKT] Synaptics OneTouch driver [START]
+obj-$(CONFIG_ONETOUCH_TEGRA_ODM)	+= tegra_odm_onetouch.o
+# 20100927 hyeongwon.oh@lge.com [KR SKT] Synaptics OneTouch driver [END]
 obj-$(CONFIG_TOUCHSCREEN_TOUCHIT213)	+= touchit213.o
 obj-$(CONFIG_TOUCHSCREEN_TOUCHRIGHT)	+= touchright.o
 obj-$(CONFIG_TOUCHSCREEN_TOUCHWIN)	+= touchwin.o

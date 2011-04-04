@@ -307,6 +307,8 @@ typedef NvS32 NvAudioFxIoDevice;
 #define NvAudioFxIoDevice_BuiltInMic (0x1)
 #define NvAudioFxIoDevice_Mic (0x2)
 #define NvAudioFxIoDevice_LineIn (0x4)
+#define NvAudioFxIoDevice_BACK_MIC (0x8) //20101103  seki.par@lge.com VT speak ModeLGE_LAB1]
+#define NvAudioFxIoDevice_VR_Mode_Mask (0x10) //20101214 jin333.kim@lge.com VR mode on
 
 // Outputs
 #define NvAudioFxIoDevice_BuiltInSpeaker (0x100)

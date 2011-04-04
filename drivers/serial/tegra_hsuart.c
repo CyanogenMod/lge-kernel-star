@@ -51,7 +51,7 @@
 #define BYTES_TO_ALIGN(x) ((unsigned long)(ALIGN((x), sizeof(u32))) - \
 	(unsigned long)(x))
 
-#define UART_RX_DMA_BUFFER_SIZE    (2048*16)
+#define UART_RX_DMA_BUFFER_SIZE    (2048*8)
 
 #define UART_LSR_FIFOE		0x80
 #define UART_IER_EORD		0x20
@@ -91,6 +91,7 @@ const int dma_req_sel[] = {
 
 /* Wait time in microsec to complete current burst and update status */
 #define WAITTIME_DMA_BURST_COMPLETE 20
+#define STOP_DMA_AFTER_EACH_PACKET 1
 
 struct tegra_uart_port {
 	struct uart_port	uport;
@@ -372,6 +373,58 @@ static void tegra_rx_dma_complete_callback(struct tegra_dma_req *req)
 }
 
 /* Lock already taken */
+#if STOP_DMA_AFTER_EACH_PACKET
+static void do_handle_rx_dma(struct tegra_uart_port *t)
+{
+	unsigned char lsr;
+	int dma_trans_count;
+	int dma_read_count = 0;
+	int pio_read_count = 0;
+	int start_status;
+	struct uart_port *u = &t->uport;
+
+	/* Data available in fifo */
+	if (t->rts_active) {
+		set_rts(t, false);
+		/* Wait for dma to update status on current burst */
+		udelay(WAITTIME_DMA_BURST_COMPLETE);
+	}
+
+	dma_trans_count = tegra_dma_get_transfer_count(t->rx_dma,
+				&t->rx_dma_req, true);
+	if (dma_trans_count < 0) {
+		dev_err(t->uport.dev,"%s: dma count is less than 0\n",__func__);
+		BUG();
+		return;
+	}
+
+	dma_read_count = copy_dma_buffer_to_tty_buffer(t, dma_trans_count);
+
+	lsr = uart_readb(t, UART_LSR);
+	if (lsr & UART_LSR_DR)
+		pio_read_count = do_handle_rx_pio(t);
+
+	t->last_read_index = 0;
+	t->already_read_bytecount = 0;
+	t->last_transfer_count = 0;
+	start_status = tegra_dma_start_dma(t->rx_dma, &t->rx_dma_req);
+	if (start_status < 0) {
+		dev_err(t->uport.dev, "%s: dma can not be started\n", __func__);
+		BUG();
+		return;
+	}
+
+	/* enable the rts now */
+	if (t->rts_active)
+		set_rts(t, true);
+
+	if (dma_read_count || pio_read_count)
+		tty_flip_buffer_push(u->state->port.tty);
+	return;
+}
+#else
+
+/* Lock already taken */
 static void do_handle_rx_dma(struct tegra_uart_port *t)
 {
 	unsigned char lsr;
@@ -434,6 +487,7 @@ static void do_handle_rx_dma(struct tegra_uart_port *t)
 	}
 	return;
 }
+#endif
 
 static char do_decode_rx_error(struct tegra_uart_port *t, u8 lsr)
 {

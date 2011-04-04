@@ -1,0 +1,13 @@
+#
+# Broadcast Device Driver Support
+#
+
+menu "BROADCAST_DEVICE"
+
+config LGE_BROADCAST
+	bool "LGE broacast device"
+	default n
+	help
+	  Select this if you want to use broadcast service
+	  
+endmenu

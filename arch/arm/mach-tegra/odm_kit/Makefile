@@ -1,3 +1,1 @@
-obj-y += adaptations/
-obj-y += platform/
-obj-y += query/
+obj-$(CONFIG_TEGRA_ODM_STAR) += star/

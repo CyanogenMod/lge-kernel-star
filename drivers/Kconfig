@@ -115,4 +115,8 @@ source "drivers/xen/Kconfig"
 source "drivers/staging/Kconfig"
 
 source "drivers/platform/Kconfig"
+
+#/ LGE_DOM_UPDATE_S suyong.han 2010/09/12 {
+source "drivers/broadcast/Kconfig"
+#/ LGE_DOM_UPDATE_E suyong.han 2010/09/12 }
 endmenu

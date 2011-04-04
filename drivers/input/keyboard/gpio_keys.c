@@ -94,7 +94,7 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, ddata);
 
 	input->name = pdev->name;
-	input->phys = "gpio-keys/input0";
+	input->phys = "tegra-kbc/input0";
 	input->dev.parent = &pdev->dev;
 
 	input->id.bustype = BUS_HOST;
@@ -122,14 +122,14 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 
 		error = gpio_request(button->gpio, button->desc ?: "gpio_keys");
 		if (error < 0) {
-			pr_err("gpio-keys: failed to request GPIO %d,"
+			pr_err("tegra-kbc: failed to request GPIO %d,"
 				" error %d\n", button->gpio, error);
 			goto fail2;
 		}
 
 		error = gpio_direction_input(button->gpio);
 		if (error < 0) {
-			pr_err("gpio-keys: failed to configure input"
+			pr_err("tegra-kbc: failed to configure input"
 				" direction for GPIO %d, error %d\n",
 				button->gpio, error);
 			gpio_free(button->gpio);
@@ -139,7 +139,7 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 		irq = gpio_to_irq(button->gpio);
 		if (irq < 0) {
 			error = irq;
-			pr_err("gpio-keys: Unable to get irq number"
+			pr_err("tegra-kbc: Unable to get irq number"
 				" for GPIO %d, error %d\n",
 				button->gpio, error);
 			gpio_free(button->gpio);
@@ -152,7 +152,7 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 				    button->desc ? button->desc : "gpio_keys",
 				    bdata);
 		if (error) {
-			pr_err("gpio-keys: Unable to claim irq %d; error %d\n",
+			pr_err("tegra-kbc: Unable to claim irq %d; error %d\n",
 				irq, error);
 			gpio_free(button->gpio);
 			goto fail2;
@@ -163,10 +163,11 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 
 		input_set_capability(input, type, button->code);
 	}
+	input_set_capability(input, EV_KEY, KEY_TESTMODE_UNLOCK);
 
 	error = input_register_device(input);
 	if (error) {
-		pr_err("gpio-keys: Unable to register input device, "
+		pr_err("tegra-kbc: Unable to register input device, "
 			"error: %d\n", error);
 		goto fail2;
 	}
@@ -265,7 +266,7 @@ static struct platform_driver gpio_keys_device_driver = {
 	.probe		= gpio_keys_probe,
 	.remove		= __devexit_p(gpio_keys_remove),
 	.driver		= {
-		.name	= "gpio-keys",
+		.name	= "tegra-kbc",
 		.owner	= THIS_MODULE,
 #ifdef CONFIG_PM
 		.pm	= &gpio_keys_pm_ops,
@@ -289,4 +290,4 @@ module_exit(gpio_keys_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Phil Blundell <pb@handhelds.org>");
 MODULE_DESCRIPTION("Keyboard driver for CPU GPIOs");
-MODULE_ALIAS("platform:gpio-keys");
+MODULE_ALIAS("platform:tegra-kbc");

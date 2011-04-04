@@ -259,6 +259,14 @@ config SPI_XILINX
 # being probably the most widely used ones.
 #
 comment "SPI Protocol Masters"
+#// LGE_DOM_UPDATE_S suyong.han 2010/09/12 {
+config SPI_TDMB
+	tristate "SPI LG2102 from LG SIC"
+	default n
+	depends on ARCH_TEGRA
+	help
+	Enable this driver to support LG SIC2102 RFBB chipset
+#// LGE_DOM_UPDATE_E suyong.han 2010/09/12 }
 
 config SPI_SPIDEV
 	tristate "User mode SPI device driver support"

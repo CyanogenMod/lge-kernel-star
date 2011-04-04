@@ -961,17 +961,236 @@ const struct tegra_pingroup_desc* tegra_pinmux_get_pingroups(void) {
 }
 
 #ifdef CONFIG_PM
+//20100724 byoungwoo.yoon@lge.com move to "pinmux.h"
+/*
 #define TRISTATE_REG_A         0x14
 #define TRISTATE_REG_NUM       4
 #define PIN_MUX_CTL_REG_A      0x80
 #define PIN_MUX_CTL_REG_NUM    8
 #define PULLUPDOWN_REG_A       0xa0
 #define PULLUPDOWN_REG_NUM     5
+*/
+
 #define PADCTRL_REG            0x868
 #define PADCTRL_REG_NUM        42
 
 static u32 pinmux_reg[TRISTATE_REG_NUM + PIN_MUX_CTL_REG_NUM +
                      PULLUPDOWN_REG_NUM + PADCTRL_REG_NUM];
+
+#if 1
+u32 sleep_pinmux_reg[TRISTATE_REG_NUM + PIN_MUX_CTL_REG_NUM + PULLUPDOWN_REG_NUM] = 
+{
+	// TRISTATE		:   ( 0->normal,   1->tristate)
+	0xffffffff,		//  TRISTATE[0]
+	0xffffffff,		//  TRISTATE[1]
+ 	0xffffffff,		//  TRISTATE[2]
+ 	0xffffffff,		//  TRISTATE[3]
+ 	//PIN_MUX_CONTROL
+ 	0x02a32036,		//  PIN_MUX_CONTROL[0]
+ 	0xa8a01403,		//  PIN_MUX_CONTROL[1]
+ 	0xa00a00d5,		//  PIN_MUX_CONTROL[2]
+ 	0xfffaa943,		//  PIN_MUX_CONTROL[3]
+ 	0x00000000,		//  PIN_MUX_CONTROL[4]
+ 	0x00000000,		//  PIN_MUX_CONTROL[5]
+ 	0x00c00000,		//  PIN_MUX_CONTROL[6]
+ 	0x00000000,		//  PIN_MUX_CONTROL[7]
+ 	// PULL UP/DOWN   : ( 0->normal,  1-> pull Up,  2-> pull Down,  3-> RSVD )
+ 	0x215556aa,		//  PULLUPDOWN[0]
+ 	0x0000aa00,		//  PULLUPDOWN[1]
+ 	0x00aa6655,		//  PULLUPDOWN[2]
+ 	0xa1a55a8a,		//  PULLUPDOWN[3]
+ 	0xa000200a,		//  PULLUPDOWN[4]
+};
+#else
+//20100724 byoungwoo.yoon@lge.com for gpio setting while sleep [LGE_START]
+static u32 sleep_pinmux_reg[TRISTATE_REG_NUM + PIN_MUX_CTL_REG_NUM + PULLUPDOWN_REG_NUM] = 
+{
+	
+#if defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT)	// for SU660
+	// TRISTATE		:   ( 0->normal,   1->tristate)
+	0xf716fff9,		//  TRISTATE[0]
+	0xdfe4bfdf,		//  TRISTATE[1]
+ 	0xffffffff,		//  TRISTATE[2]
+ 	0xff7fdbff,		//  TRISTATE[3]
+ 	//PIN_MUX_CONTROL
+ 	0x02a32036,		//  PIN_MUX_CONTROL[0]
+ 	0xa8a01403,		//  PIN_MUX_CONTROL[1]
+ 	0xa00a00d5,		//  PIN_MUX_CONTROL[2]
+ 	0xfffaa943,		//  PIN_MUX_CONTROL[3]
+ 	0x00000000,		//  PIN_MUX_CONTROL[4]
+ 	0x00000000,		//  PIN_MUX_CONTROL[5]
+ 	0x00c00000,		//  PIN_MUX_CONTROL[6]
+ 	0x00000000,		//  PIN_MUX_CONTROL[7]
+ 	// PULL UP/DOWN   : ( 0->normal,  1-> pull Up,  2-> pull Down,  3-> RSVD )
+ 	0x215556aa,		//  PULLUPDOWN[0]
+ 	0x0000aa00,		//  PULLUPDOWN[1]
+ 	0x00aa6655,		//  PULLUPDOWN[2]
+ 	0xa1a55a8a,		//  PULLUPDOWN[3]
+ 	0xa000200a,		//  PULLUPDOWN[4]
+ 	
+#else	// for LGP990
+
+	// TRISTATE		:   ( 0->normal,   1->tristate)
+	0xf716fff9,		//  TRISTATE[0]
+	0xdfe4bfdf,		//  TRISTATE[1]
+ 	0xffffffff,		//  TRISTATE[2]
+ 	0xff7fdbff,		//  TRISTATE[3]
+ 	//PIN_MUX_CONTROL
+ 	0x02a32036,		//  PIN_MUX_CONTROL[0]
+ 	0xa8a01403,		//  PIN_MUX_CONTROL[1]
+ 	0xa00a00d5,		//  PIN_MUX_CONTROL[2]
+ 	0xfffaa943,		//  PIN_MUX_CONTROL[3]
+ 	0x00000000,		//  PIN_MUX_CONTROL[4]
+ 	0x00000000,		//  PIN_MUX_CONTROL[5]
+ 	0x00c00000,		//  PIN_MUX_CONTROL[6]
+ 	0x00000000,		//  PIN_MUX_CONTROL[7]
+ 	// PULL UP/DOWN   : ( 0->normal,  1-> pull Up,  2-> pull Down,  3-> RSVD )
+ 	0x215556aa,		//  PULLUPDOWN[0]
+ 	0x0000aa00,		//  PULLUPDOWN[1]
+ 	0x00aa6655,		//  PULLUPDOWN[2]
+ 	0xa1a55a8a,		//  PULLUPDOWN[3]
+ 	0xa000200a,		//  PULLUPDOWN[4]
+#endif 	
+ 
+};
+#endif
+
+#if 0 // original
+{
+	// TRISTATE
+	0xb11affe0,		//  TRISTATE[0]
+	0x00e7ade8,		//  TRISTATE[1]
+ 	0xffdfffff,		//  TRISTATE[2]
+ 	0x000041ff,		//  TRISTATE[3]
+ 	//PIN_MUX_CONTROL
+ 	0x02a32036,		//  PIN_MUX_CONTROL[0]
+ 	0xa8a01403,		//  PIN_MUX_CONTROL[1]
+ 	0xa00a00d5,		//  PIN_MUX_CONTROL[2]
+ 	0xfffaa943,		//  PIN_MUX_CONTROL[3]
+ 	0x00000000,		//  PIN_MUX_CONTROL[4]
+ 	0x00000000,		//  PIN_MUX_CONTROL[5]
+ 	0x00c00000,		//  PIN_MUX_CONTROL[6]
+ 	0x00000000,		//  PIN_MUX_CONTROL[7]
+ 	// PULL UP/DOWN
+ 	0x215556aa,		//  PULLUPDOWN[0]
+ 	0x0000aa00,		//  PULLUPDOWN[1]
+ 	0x00aa6655,		//  PULLUPDOWN[2]
+ 	0xa1a55a8a,		//  PULLUPDOWN[3]
+ 	0xa000200a,		//  PULLUPDOWN[4]
+};
+#endif
+
+unsigned long get_reg_data( int pg, int reg )
+{
+	unsigned long ret = 0;
+
+	//printk("[PINMUX] get_reg_data start :: pg=%d, reg=%d \n", pg, reg);
+	
+	if ( gpio_dbgfs_mode == NORMAL_MODE )  
+	{
+		switch( reg ) {
+		case TRISTATE:
+			ret = (pg_readl(pingroups[pg].tri_reg) >> pingroups[pg].tri_bit) & 0x1;
+			printk("[PINMUX] TRISTATE ::  tri_reg=%d, tri_bit=%d \n", pingroups[pg].tri_reg, pingroups[pg].tri_bit);
+			break;
+		case PIN_MUX_CTL:
+			ret = (pg_readl(pingroups[pg].mux_reg) >> pingroups[pg].mux_bit) & 0x1;
+			printk("[PINMUX] PIN_MUX_CTL ::  mux_reg=%d, mux_bit=%d \n", pingroups[pg].mux_reg, pingroups[pg].mux_bit);
+			break;
+		case PULLUPDOWN:
+			ret = (pg_readl(pingroups[pg].pupd_reg) >> pingroups[pg].pupd_bit) & 0x1;
+			printk("[PINMUX] PULLUPDOWN ::  pupd_reg=%d, pupd_bit=%d \n", pingroups[pg].pupd_reg, pingroups[pg].pupd_bit);
+			break;
+		case REG_DATA:
+			ret = pinmux_reg[pg]; 
+			printk("[PINMUX] REG_DATA ::  data=%d \n", ret);
+			break;
+		}
+	}
+	else
+	{
+		switch( reg ) {
+		case TRISTATE:
+			ret = (sleep_pinmux_reg[(pingroups[pg].tri_reg-TRISTATE_REG_A)/4] 
+				>> pingroups[pg].tri_bit) & 0x1;
+			printk("[PINMUX] TRISTATE ::  tri_reg=%d, tri_bit=%d \n", pingroups[pg].tri_reg, pingroups[pg].tri_bit);
+			break;
+		case PIN_MUX_CTL:
+			ret = (sleep_pinmux_reg[(pingroups[pg].mux_reg-PIN_MUX_CTL_REG_A)/4 + OFFSET_PIN_MUX_CTL] 
+				>> pingroups[pg].mux_bit) & 0x1;
+			printk("[PINMUX] PIN_MUX_CTL ::  mux_reg=%d, mux_bit=%d \n", pingroups[pg].mux_reg, pingroups[pg].mux_bit);
+			break;
+		case PULLUPDOWN:
+			ret = (sleep_pinmux_reg[(pingroups[pg].pupd_reg-PULLUPDOWN_REG_A)/4 + TRISTATE_REG_NUM + PIN_MUX_CTL_REG_NUM] 
+				>> pingroups[pg].pupd_bit) & 0x1;
+			printk("[PINMUX] PULLUPDOWN ::  pupd_reg=%d, pupd_bit=%d \n", pingroups[pg].pupd_reg, pingroups[pg].pupd_bit);
+			break;
+		case REG_DATA:
+			ret = sleep_pinmux_reg[pg];
+		}
+	}
+
+	return ret;
+}
+
+void set_reg_data( int pg, long data, int reg )
+{
+	long temp;
+	
+	if ( gpio_dbgfs_mode == NORMAL_MODE )  
+	{
+		switch( reg ) {
+		case TRISTATE:
+			tegra_pinmux_set_tristate(pg, data);
+			break;
+		case PIN_MUX_CTL:
+			temp = pg_readl(pingroups[pg].mux_reg);
+			temp &= ~(0x3 << pingroups[pg].mux_bit);
+			temp |= data << pingroups[pg].mux_bit;
+			pg_writel(temp, pingroups[pg].mux_reg);
+			break;
+		case PULLUPDOWN:
+			tegra_pinmux_set_pullupdown(pg, data);
+			break;
+		}
+	}
+	else
+	{
+		switch( reg ) {
+		case TRISTATE:
+			temp = sleep_pinmux_reg[(pingroups[pg].tri_reg-TRISTATE_REG_A)/4 + OFFSET_TRISTATE_REG];
+			printk("[PINMUX] TRISTATE ::  before value=0x%x, data=0x%x, shift=%d \n", temp, data, pingroups[pg].tri_bit);
+			temp &= ~(0x1 << pingroups[pg].tri_bit);
+			temp |= data << pingroups[pg].tri_bit;
+			printk("[PINMUX] TRISTATE ::  after value=0x%x \n", temp);
+			sleep_pinmux_reg[(pingroups[pg].tri_reg-TRISTATE_REG_A)/4 + OFFSET_TRISTATE_REG] = temp;
+			break;
+		case PIN_MUX_CTL:
+			temp = sleep_pinmux_reg[(pingroups[pg].mux_reg-PIN_MUX_CTL_REG_A)/4 + OFFSET_PIN_MUX_CTL];
+			printk("[PINMUX] PIN_MUX_CTL ::  before value=0x%x, data=0x%x, shift=%d \n", temp, data, pingroups[pg].mux_bit);
+			temp &= ~(0x3 << pingroups[pg].mux_bit);
+			temp |= data << pingroups[pg].mux_bit;
+			printk("[PINMUX] PIN_MUX_CTL ::  after value=0x%x \n", temp);
+			sleep_pinmux_reg[(pingroups[pg].mux_reg-PIN_MUX_CTL_REG_A)/4 + OFFSET_PIN_MUX_CTL]  = temp;
+			break;
+		case PULLUPDOWN:
+			temp = sleep_pinmux_reg[(pingroups[pg].pupd_reg-PULLUPDOWN_REG_A)/4 + OFFSET_PULLUPDOWN_CTL];
+			printk("[PINMUX] PULLUPDOWN ::  before value=0x%x, data=0x%x, shift=%d \n", temp, data, pingroups[pg].pupd_bit);
+			temp &= ~(0x3 << pingroups[pg].pupd_bit);
+			temp |= data << pingroups[pg].pupd_bit;
+			printk("[PINMUX] PULLUPDOWN ::  after value=0x%x \n", temp);
+			sleep_pinmux_reg[(pingroups[pg].pupd_reg-PULLUPDOWN_REG_A)/4 + OFFSET_PULLUPDOWN_CTL] = temp;
+			break;
+		case REG_DATA:
+			printk("[PINMUX] REG_DATA :: (before) sleep_pinmux_reg[%d]=0x%x \n", pg, sleep_pinmux_reg[pg]);
+			sleep_pinmux_reg[pg]=data;		
+			printk("[PINMUX] REG_DATA :: (after) sleep_pinmux_reg[%d]=0x%x \n", pg, sleep_pinmux_reg[pg]);
+		}
+	}
+
+}
+
+//20100724 byoungwoo.yoon@lge.com for gpio setting while sleep [LGE_END]
 
 static inline unsigned long pg_readl(unsigned long offset)
 {
@@ -999,6 +1218,48 @@ void tegra_pinmux_suspend(void)
 
        for (i=0; i<PADCTRL_REG_NUM; i++)
                *ctx++ = pg_readl(PADCTRL_REG + i*4);
+
+#if SLEEP_GPIO_LOG
+		ctx = pinmux_reg;
+		pr_info("[POWER-Pinmux] <<<< Suspend PinMux Setting value (Before setting) [START] >>>>>  \n");
+		for (i=0; i<TRISTATE_REG_NUM; i++)
+			pr_info("[POWER-Pinmux] TRISTATE_REG [%d] = 0x%x !! \n", i, pg_readl(TRISTATE_REG_A + i*4) );
+		for (i=0; i<PIN_MUX_CTL_REG_NUM; i++)
+			pr_info("[POWER-Pinmux] PIN_MUX_CTL [%d] = 0x%x !! \n", i, pg_readl(PIN_MUX_CTL_REG_A + i*4) );
+		for (i=0; i<PULLUPDOWN_REG_NUM; i++)
+			pr_info("[POWER-Pinmux] PULLUPDOWN [%d] = 0x%x !! \n", i, pg_readl(PULLUPDOWN_REG_A + i*4) );
+		pr_info("[POWER-Pinmux] <<<< Suspend PinMux Setting value [END] >>>>>  \n");
+#endif
+
+//20100724 byoungwoo.yoon@lge.com for gpio setting while sleep [LGE_START]
+#if APPLY_SLEEP_GPIO_TABLE
+		ctx = sleep_pinmux_reg;
+		for (i=0; i<TRISTATE_REG_NUM; i++)	{
+				//pr_info("[POWER-Pinmux] writing TRISTATE[%d] data = 0x%x \n", i, *ctx);
+				pg_writel(*ctx++, TRISTATE_REG_A + i*4);
+			}
+		/*for (i=0; i<PIN_MUX_CTL_REG_NUM; i++)	{
+				//pr_info("[POWER-Pinmux] writing PINMUX[%d] data = 0x%x \n", i, *ctx);
+				pg_writel(*ctx++, PIN_MUX_CTL_REG_A + i*4);
+			}
+		for (i=0; i<PULLUPDOWN_REG_NUM; i++)	{
+				//pr_info("[POWER-Pinmux] writing PUPD[%d] data = 0x%x \n", i, *ctx);
+				pg_writel(*ctx++, PULLUPDOWN_REG_A + i*4);
+			}*/
+#endif
+//20100724 byoungwoo.yoon@lge.com for gpio setting while sleep [LGE_END]
+
+#if SLEEP_GPIO_LOG
+		ctx = pinmux_reg;
+		pr_info("[POWER-Pinmux] <<<< Suspend PinMux Setting value (after setting) [START] >>>>>  \n");
+		for (i=0; i<TRISTATE_REG_NUM; i++)
+			pr_info("[POWER-Pinmux] TRISTATE_REG [%d] = 0x%x !! \n", i, pg_readl(TRISTATE_REG_A + i*4) );
+		for (i=0; i<PIN_MUX_CTL_REG_NUM; i++)
+			pr_info("[POWER-Pinmux] PIN_MUX_CTL [%d] = 0x%x !! \n", i, pg_readl(PIN_MUX_CTL_REG_A + i*4) );
+		for (i=0; i<PULLUPDOWN_REG_NUM; i++)
+			pr_info("[POWER-Pinmux] PULLUPDOWN [%d] = 0x%x !! \n", i, pg_readl(PULLUPDOWN_REG_A + i*4) );
+		pr_info("[POWER-Pinmux] <<<< Suspend PinMux Setting value [END] >>>>>  \n");
+#endif
 }
 
 void tegra_pinmux_resume(void)

@@ -822,6 +822,8 @@ WaitForCompletion:
             else
                 hRmI2cCont->I2cTransferStatus = NvError_I2cInternalError;
 
+		NvOsDebugPrintf("[KERNEL] ##  I2C receive error status = 0x%x, slaveaddr = 0x%x##\n", hRmI2cCont->ControllerStatus,pTransaction->Address);
+
             goto ReadExitWithReset;
         }
         else
@@ -1042,6 +1044,8 @@ WaitForCompletion:
                 hRmI2cCont->I2cTransferStatus = NvError_I2cArbitrationFailed;
             else
                 hRmI2cCont->I2cTransferStatus = NvError_I2cInternalError;
+
+            NvOsDebugPrintf("[KERNEL] ##  I2C send error status = 0x%x, slaveaddr = 0x%x##\n", hRmI2cCont->ControllerStatus,pTransaction->Address);
             goto WriteExitWithReset;
         }   
         else

@@ -30,6 +30,14 @@
 
 #include "u_ether.h"
 
+//20100822, jm1.lee@lge.com, for USB mode switching [START]
+#if defined(CONFIG_MACH_STAR)
+#undef __init
+#define __init
+#undef __initdata
+#define __initdata
+#endif
+//20100822, jm1.lee@lge.com, for USB mode switching [END]
 
 /*
  * This component encapsulates the Ethernet link glue needed to provide

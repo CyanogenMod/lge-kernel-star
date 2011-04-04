@@ -148,6 +148,19 @@ static char *log_buf = __log_buf;
 static int log_buf_len = __LOG_BUF_LEN;
 static unsigned logged_chars; /* Number of chars produced since last read+clear operation */
 
+/* 20100916 taewan.kim@lge.com set default loglevel [START] */
+#if defined(CONFIG_MACH_STAR)
+void set_default_loglevel()
+{
+    console_printk[0] = DEFAULT_CONSOLE_LOGLEVEL;
+    console_printk[1] = DEFAULT_MESSAGE_LOGLEVEL;
+    console_printk[2] = MINIMUM_CONSOLE_LOGLEVEL;
+    console_printk[3] = DEFAULT_CONSOLE_LOGLEVEL;
+}
+EXPORT_SYMBOL(set_default_loglevel);
+#endif
+/* 20100916 taewan.kim@lge.com set default loglevel [END] */
+
 #ifdef CONFIG_KEXEC
 /*
  * This appends the listed symbols to /proc/vmcoreinfo

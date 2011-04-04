@@ -327,6 +327,51 @@ NvRmPrivAp20DttPolicyUpdate(
     pDtt->TcorePolicy.PolicyRange = (NvU32)Range;
 }
 
+//20101121 cs77.ha@lge.com, HW power off in thermal limit [START]
+#if defined(CONFIG_MACH_STAR)
+static NvU32    ThermalLimitPwrOffEnalble = NV_FALSE;
+extern NvRmDeviceHandle s_hRmGlobal;
+
+void
+NvRmPrivStarDttPolicyUpdate(
+    NvRmDeviceHandle hRmDevice,
+    NvS32 TemperatureC,
+    NvRmDtt* pDtt)
+{
+    NvRmDttAp20PolicyRange Range;
+
+    Range = (NvRmDttAp20PolicyRange)pDtt->TcorePolicy.PolicyRange;
+    switch (Range)
+    {
+        case NvRmDttAp20PolicyRange_ThrottleDown:
+            if(!ThermalLimitPwrOffEnalble){
+                NvOsDebugPrintf(">>>>>> DTT: NvRmDttAp20PolicyRange_ThrottleDown!!!!!! <<<<<< \n");
+                ThermalLimitPwrOffEnalble = NV_TRUE;
+                NvOsDebugPrintf(">>>>>> DTT: HWPowerOffConfig ON!!!!!! <<<<<< \n");
+                NvRmPmuSetHwPowerOffConfig(s_hRmGlobal, NV_TRUE);
+            }
+            break;
+            
+        case NvRmDttAp20PolicyRange_FreeRunning:
+        case NvRmDttAp20PolicyRange_LimitVoltage:
+        default:
+            if(ThermalLimitPwrOffEnalble){
+                if(Range==NvRmDttAp20PolicyRange_FreeRunning)
+                    NvOsDebugPrintf(">>>>>> DTT: NvRmDttAp20PolicyRange_FreeRunning \n" );
+                else if(Range==NvRmDttAp20PolicyRange_LimitVoltage)
+                    NvOsDebugPrintf(">>>>>> DTT: NvRmDttAp20PolicyRange_LimitVoltage \n" );
+                else
+                    NvOsDebugPrintf(">>>>>> DTT: NvRmDttAp20PolicyRange_unknow \n" );
+                ThermalLimitPwrOffEnalble = NV_FALSE;
+                NvRmPmuSetHwPowerOffConfig(s_hRmGlobal, NV_FALSE);
+                NvOsDebugPrintf(">>>>>> DTT: HWPowerOffConfig OFF!!!!!! <<<<<< \n");
+            }
+            break;
+    }
+}
+#endif
+//20101121 cs77.ha@lge.com, HW power off in thermal limit [END]
+
 
 NvBool
 NvRmPrivAp20DttClockUpdate(

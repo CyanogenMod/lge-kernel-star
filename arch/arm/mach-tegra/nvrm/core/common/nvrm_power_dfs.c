@@ -1825,6 +1825,12 @@ static void DttIntrCallback(void* args)
         (void)NvOdmTmonParameterConfig(pDtt->hOdmTcore,
             NvOdmTmonConfigParam_IntrLimitHigh, &HighLimit);
         DttRangeReport(TemperatureC, pDtt);
+        
+//20101121 cs77.ha@lge.com, HW power off in thermal limit [START]
+#if defined(CONFIG_MACH_STAR)
+        NvRmPrivStarDttPolicyUpdate(pDfs->hRm, TemperatureC, pDtt);
+#endif
+//20101121 cs77.ha@lge.com, HW power off in thermal limit [END]
     }
 }
 

@@ -26,6 +26,11 @@
 #include <linux/rslib.h>
 #endif
 
+
+//20101110, jh.ahn@lge.com, Function for Warm-boot [START]
+void *reserved_buffer;
+//20101110, jh.ahn@lge.com, Function for Warm-boot [END]
+
 struct ram_console_buffer {
 	uint32_t    sig;
 	uint32_t    start;
@@ -323,6 +328,11 @@ static int ram_console_driver_probe(struct platform_device *pdev)
 	size_t buffer_size;
 	void *buffer;
 
+//20101110, jh.ahn@lge.com, Function for Warm-boot [START]
+        size_t reserved_start;
+        size_t reserved_size;
+//20101110, jh.ahn@lge.com, Function for Warm-boot [END]
+
 	if (res == NULL || pdev->num_resources != 1 ||
 	    !(res->flags & IORESOURCE_MEM)) {
 		printk(KERN_ERR "ram_console: invalid resource, %p %d flags "
@@ -339,8 +349,34 @@ static int ram_console_driver_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+//20101110, jh.ahn@lge.com, Function for Warm-boot [START]
+       //fix it
+       #define RAM_RESERVED_SIZE 100*1024
+       reserved_start = start+ buffer_size;
+       reserved_buffer = ioremap(reserved_start, RAM_RESERVED_SIZE);
+       //memset(reserved_buffer, 0x00, 100*1024);
+       printk ("ram console : ram_console virtual addr = 0x%x \n", buffer);
+       printk ("ram console : reserved_buffer virtual = 0x%x \n", reserved_buffer);
+       printk ("ram console : reserved_buffer physical= 0x%x \n", reserved_start);
+//20101110, jh.ahn@lge.com, Function for Warm-boot [END]
+
 	return ram_console_init(buffer, buffer_size, NULL/* allocate */);
 }
+
+//20101110, jh.ahn@lge.com, Function for Warm-boot [START]
+void write_cmd_reserved_buffer(unsigned char *buf, size_t len)
+{
+	memcpy(reserved_buffer, buf, len);
+}
+
+void read_cmd_reserved_buffer(unsigned char *buf, size_t len)
+{
+	memcpy(buf, reserved_buffer, len);
+}
+
+EXPORT_SYMBOL_GPL(write_cmd_reserved_buffer);
+EXPORT_SYMBOL_GPL(read_cmd_reserved_buffer);
+//20101110, jh.ahn@lge.com, Function for Warm-boot [END]
 
 static struct platform_driver ram_console_driver = {
 	.probe = ram_console_driver_probe,

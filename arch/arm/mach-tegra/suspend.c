@@ -763,6 +763,7 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 
 	/* Always enable CPU power request; just normal polarity is supported */
 	reg = readl(pmc + PMC_CTRL);
+    //20101005 taewan.kim@lge.com infinit reset
 	BUG_ON(reg & (TEGRA_POWER_CPU_PWRREQ_POLARITY << TEGRA_POWER_PMC_SHIFT));
 	reg |= (TEGRA_POWER_CPU_PWRREQ_OE << TEGRA_POWER_PMC_SHIFT);
 	pmc_32kwritel(reg, PMC_CTRL);

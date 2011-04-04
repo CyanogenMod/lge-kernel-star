@@ -23,8 +23,10 @@
  */
 #define NR_UNIX98_PTY_DEFAULT	4096      /* Default maximum for Unix98 ptys */
 #define NR_UNIX98_PTY_MAX	(1 << MINORBITS) /* Absolute limit */
-#define NR_LDISCS		20
-
+/* LGE_KERNEL_MUX START */
+/* #define NR_LDISCS		20 */
+#define NR_LDISCS		22
+/* LGE_KERNEL_MUX END */ 
 /* line disciplines */
 #define N_TTY		0
 #define N_SLIP		1
@@ -48,6 +50,10 @@
 #define N_PPS		18	/* Pulse per Second */
 
 #define N_V253		19	/* Codec control over voice modem */
+/* LGE_KERNEL_MUX START */
+#define N_TS0710        20      /* Gsm0710 multiplexer */
+/* LGE_KERNEL_MUX END */ 
+#define N_RIN           21      /* Raw IP Network, vsnet */ 
 
 /*
  * This character is the same as _POSIX_VDISABLE: it cannot be used as

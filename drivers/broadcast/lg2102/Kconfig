@@ -1,0 +1,14 @@
+#
+# LG2102_DEVICE subsystem configuration
+#
+
+#menu "LG2102 support"
+
+config LG2102_TDMB
+	default n
+	---help---
+	  This driver implements the front-end of the Xen virtual
+	  keyboard and mouse device driver.  It communicates with a back-end
+	  in another domain.
+  
+#endmenu

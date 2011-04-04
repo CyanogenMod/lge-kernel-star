@@ -126,6 +126,11 @@ config RTC_INTF_ALARM_DEV
 	help
 	  Exports the alarm interface to user-space.
 
+config RTC_INTF_DRM_DEV
+	bool "Android drm device"
+	default y
+	help
+	  Exports the drm interface to user-space.
 
 config RTC_DRV_TEST
 	tristate "Test driver/device"

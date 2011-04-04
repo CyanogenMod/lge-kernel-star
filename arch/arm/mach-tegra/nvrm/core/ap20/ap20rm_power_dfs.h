@@ -281,7 +281,10 @@ extern "C"
 
 /// Default low corners for core and dedicated CPU voltages
 #define NVRM_AP20_LOW_CORE_MV (950)
-#define NVRM_AP20_LOW_CPU_MV (750)
+//#define NVRM_AP20_LOW_CPU_MV (750)
+//20100903 taewan.kim@lge.com min voltage fix
+#define NVRM_AP20_LOW_CPU_MV (770)
+
 
 /// Core voltage in suspend
 #define NVRM_AP20_SUSPEND_CORE_MV (1000)
@@ -371,6 +374,17 @@ NvRmPrivAp20DttPolicyUpdate(
     NvRmDeviceHandle hRmDevice,
     NvS32 TemperatureC,
     NvRmDtt* pDt);
+
+//20101121 cs77.ha@lge.com, HW power off in thermal limit [START]
+#if defined(CONFIG_MACH_STAR)
+void
+NvRmPrivStarDttPolicyUpdate(
+    NvRmDeviceHandle hRmDevice,
+    NvS32 TemperatureC,
+    NvRmDtt* pDt);
+
+#endif
+//20101121 cs77.ha@lge.com, HW power off in thermal limit [END]
 
 /**
  * Throttles DFS target clocks.

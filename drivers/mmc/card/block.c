@@ -46,7 +46,9 @@ MODULE_ALIAS("mmc:block");
 /*
  * max 8 partitions per card
  */
-#define MMC_SHIFT	3
+//20100929, taein.kim@lge.com, [MMC] : max limitation :  8 -> 16 [START]
+#define MMC_SHIFT	4
+//20100929, taein.kim@lge.com, [MMC] : max limitation :  8 -> 16 [END]
 #define MMC_NUM_MINORS	(256 >> MMC_SHIFT)
 
 static DECLARE_BITMAP(dev_use, MMC_NUM_MINORS);
@@ -521,7 +523,17 @@ static struct mmc_blk_data *mmc_blk_alloc(struct mmc_card *card)
 	const char *mmc_blk_name;
 #endif
 
+        //20100813 taewan.kim@lge.com mmcblk mount fix [START]
+#if defined(CONFIG_MACH_STAR)
+        if (card->type == MMC_TYPE_MMC)
 	devidx = find_first_zero_bit(dev_use, MMC_NUM_MINORS);
+        else
+            devidx = find_next_zero_bit(dev_use, MMC_NUM_MINORS, 1);
+#else
+        devidx = find_first_zero_bit(dev_use, MMC_NUM_MINORS);
+#endif
+        //20100813 taewan.kim@lge.com mmcblk mount fix [END]
+
 	if (devidx >= MMC_NUM_MINORS)
 		return ERR_PTR(-ENOSPC);
 	__set_bit(devidx, dev_use);

@@ -40,11 +40,26 @@ struct gserial {
 
 	/* REVISIT avoid this CDC-ACM support harder ... */
 	struct usb_cdc_line_coding port_line_coding;	/* 9600-8-N-1 etc */
+//20101112, jm1.lee@lge.com, resolve packet loss problem when ospd transfer big size file or image [START]
+#if defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
+	u16				serial_state;
+
+	/* control signal callbacks*/
+	unsigned int (*get_dtr)(struct gserial *p);
+	unsigned int (*get_rts)(struct gserial *p);
+#endif
+//20101112, jm1.lee@lge.com, resolve packet loss problem when ospd transfer big size file or image [END]
 
 	/* notification callbacks */
 	void (*connect)(struct gserial *p);
 	void (*disconnect)(struct gserial *p);
 	int (*send_break)(struct gserial *p, int duration);
+//20101112, jm1.lee@lge.com, resolve packet loss problem when ospd transfer big size file or image [START]
+#if defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
+	unsigned int (*send_carrier_detect)(struct gserial *p, unsigned int);
+	unsigned int (*send_ring_indicator)(struct gserial *p, unsigned int);
+#endif
+//20101112, jm1.lee@lge.com, resolve packet loss problem when ospd transfer big size file or image [END]
 };
 
 /* utilities to allocate/free request and buffer */
@@ -63,5 +78,9 @@ void gserial_disconnect(struct gserial *);
 int acm_bind_config(struct usb_configuration *c, u8 port_num);
 int gser_bind_config(struct usb_configuration *c, u8 port_num);
 int obex_bind_config(struct usb_configuration *c, u8 port_num);
-
+//20100710, jm1.lee@lge.com, for LGE Android USB Driver interface [START]
+#if defined(CONFIG_MACH_STAR)
+int gps_bind_config(struct usb_configuration *c, u8 port_num);
+#endif
+//20100710, jm1.lee@lge.com, for LGE Android USB Driver interface [END]
 #endif /* __U_SERIAL_H */

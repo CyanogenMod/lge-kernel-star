@@ -286,9 +286,11 @@ static int inet_create(struct net *net, struct socket *sock, int protocol)
 	char answer_no_check;
 	int try_loading_module = 0;
 	int err;
-
+//SU660 hobbes.song socket permission denied workaround
+#if !(defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT))
 	if (!current_has_network())
 		return -EACCES;
+#endif
 
 	if (unlikely(!inet_ehash_secret))
 		if (sock->type != SOCK_RAW && sock->type != SOCK_DGRAM)

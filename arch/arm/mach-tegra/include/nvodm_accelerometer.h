@@ -406,6 +406,13 @@ NvOdmAccelSetSampleRate(NvOdmAccelHandle hDevice, NvU32 SampleRate);
 NvBool
 NvOdmAccelGetSampleRate(NvOdmAccelHandle hDevice, NvU32* pSampleRate);
 
+NvBool 
+NvOdmAccelerometerGetParameter(NvOdmAccelHandle hDevice, NvU8 attrib, NvU32* info);
+
+NvBool
+NvOdmAccelerometerSetParameter(NvOdmAccelHandle hDevice, NvU8 attrib, NvU32 info);
+NvBool NvAccelerometerI2CSetRegs(NvOdmAccelHandle hDevice, NvU8 offset, NvU8* value, NvU32 len);
+NvBool NvAccelerometerI2CGetRegs(NvOdmAccelHandle hDevice, NvU8 offset, NvU8* value, NvU32 len);
 
 #if defined(__cplusplus)
 }

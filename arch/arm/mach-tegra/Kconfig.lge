@@ -1,0 +1,138 @@
+
+choice
+	prompt "HW Revision"
+	config MACH_STAR_REV_A
+	bool "STAR Rev.A"
+	depends on MACH_STAR
+	config MACH_STAR_REV_B
+	bool "STAR Rev.B"
+	depends on MACH_STAR
+	config MACH_STAR_REV_C
+	bool "STAR Rev.C"
+	depends on MACH_STAR
+	config MACH_STAR_REV_D
+	bool "STAR Rev.D"
+	depends on MACH_STAR
+	config MACH_STAR_REV_E
+	bool "STAR Rev.E"
+	depends on MACH_STAR
+	config MACH_STAR_REV_F
+	bool "STAR Rev.F"
+	depends on MACH_STAR
+endchoice
+
+config MACH_STAR_SKT
+    bool "Star SKT"
+    depends on MACH_STAR
+
+if MACH_STAR_SKT
+
+choice 
+	prompt "SKT HW Revision"
+	config MACH_STAR_SKT_REV_A
+	bool "STAR SKT Rev.A"
+	depends on MACH_STAR_SKT
+	config MACH_STAR_SKT_REV_B
+	bool "STAR SKT Rev.B"
+	depends on MACH_STAR_SKT
+	config MACH_STAR_SKT_REV_C
+	bool "STAR SKT Rev.C"
+	depends on MACH_STAR_SKT
+	config MACH_STAR_SKT_REV_D
+	bool "STAR SKT Rev.D"
+	depends on MACH_STAR_SKT
+	config MACH_STAR_SKT_REV_E
+	bool "STAR SKT Rev.E"
+	depends on MACH_STAR_SKT
+endchoice
+
+endif
+
+config STAR_PMIC
+	bool "star pmic test"
+	depends on MACH_STAR
+	default y
+
+menuconfig LPRINTK
+        bool "LGE Debugging Message"
+        depends on MACH_STAR && DEBUG_FS
+
+if LPRINTK
+config  LPRINTK_ALL
+        bool "Select All Devices"
+        select LPRINTK_KERNEL
+        select LPRINTK_SD
+        select LPRINTK_KEY
+        select LPRINTK_FS
+        select LPRINTK_LCD
+        select LPRINTK_CAMERA
+        select LPRINTK_AUDIO
+        select LPRINTK_TOUCH
+        select LPRINTK_USB
+        select LPRINTK_BATT
+        select LPRINTK_CHARGER
+        select LPRINTK_POWER
+        select LPRINTK_WIFI
+        select LPRINTK_SENSOR
+        select LPRINTK_BT
+        select LPRINTK_FM
+        select LPRINTK_GPIO
+        select LPRINTK_MUIC
+        select LPRINTK_MES
+        select LPRINTK_SPI
+        select LPRINTK_MUX
+        select LPRINTK_RIL
+        select LPRINTK_PROXI
+
+        comment "Select individual device for debugging"
+        depends on !LPRINTK_ALL
+
+        config LPRINTK_KERNEL
+        bool "Kernel"
+        config LPRINTK_SD
+        bool "SD"
+        config LPRINTK_KEY
+        bool "Keypad"
+        config LPRINTK_FS
+        bool "File System"
+        config LPRINTK_LCD
+        bool "Display"
+        config LPRINTK_CAMERA
+        bool "Camera"
+        config LPRINTK_AUDIO
+        bool "Audio"
+        config LPRINTK_TOUCH
+        bool "Touch Screen"
+        config LPRINTK_USB
+        bool "USB"
+        config LPRINTK_BATT
+        bool "Battery"
+        config LPRINTK_CHARGER
+        bool "Charger"
+        config LPRINTK_POWER
+        bool "Power"
+        config LPRINTK_WIFI
+        bool "WIFI"
+        config LPRINTK_SENSOR
+        bool "Sensor"
+        config LPRINTK_BT
+        bool "Bluetooth"
+        config LPRINTK_FM
+        bool "FM Radio"
+        config LPRINTK_GPIO
+        bool "GPIO"
+        config LPRINTK_MUIC
+        bool "MUIC"
+        config LPRINTK_MES
+        bool "MES"
+        config LPRINTK_SPI
+        bool "SPI"
+        config LPRINTK_MUX
+        bool "MUX"
+        config LPRINTK_RIL
+        bool "RIL"
+        config LPRINTK_PROXI
+        bool "PROXI"
+
+endif # LPRINTK
+source "drivers/star/Kconfig"

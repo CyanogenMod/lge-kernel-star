@@ -40,7 +40,13 @@ static void stop_drawing_early_suspend(struct early_suspend *h)
 	wake_up_all(&fb_state_wq);
 	ret = wait_event_timeout(fb_state_wq,
 				 fb_state == FB_STATE_STOPPED_DRAWING,
+//20101225, csha, skipped releaseScreen [START]
+#if defined(CONFIG_MACH_STAR)
+				 HZ<<1);
+#else
 				 HZ);
+#endif
+//20101225, csha, skipped releaseScreen [END]
 	if (unlikely(fb_state != FB_STATE_STOPPED_DRAWING))
 		pr_warning("stop_drawing_early_suspend: timeout waiting for "
 			   "userspace to stop drawing\n");

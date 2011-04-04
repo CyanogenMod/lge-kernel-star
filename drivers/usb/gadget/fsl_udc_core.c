@@ -2091,6 +2091,7 @@ static void fsl_udc_irq_work(struct work_struct* irq_work)
 		 * charger if setup packet is not received */
 		schedule_delayed_work(&udc->work, USB_CHARGER_DETECTION_WAIT_TIME_MS);
 		udc->current_limit_ma = USB_DEFAULT_CURRENT_LIMIT_MA;
+		printk("USB cable connected\n");
 	}
 
 	if (cable_disconnected) {
@@ -2108,6 +2109,7 @@ static void fsl_udc_irq_work(struct work_struct* irq_work)
 		udc->current_limit_ma = 0;
 		if (udc->transceiver)
 			udc->transceiver->state = OTG_STATE_UNDEFINED;
+		printk("USB cable dis-connected\n");
 	}
 
 	if (udc->vbus_regulator) {
@@ -2262,6 +2264,15 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 	udc_controller->gadget.dev.driver = &driver->driver;
 	spin_unlock_irqrestore(&udc_controller->lock, flags);
 
+//20100822, jm1.lee@lge.com, for USB mode switching [START]
+#if defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
+        retval = device_add(&udc_controller->gadget.dev);
+	if (retval < 0){
+            printk(KERN_ERR "%s : device_add fail!!\n", __func__);
+		goto out;
+       }
+#endif
+//20100822, jm1.lee@lge.com, for USB mode switching [END]
 	/* bind udc driver to gadget driver */
 	retval = driver->bind(&udc_controller->gadget);
 	if (retval) {
@@ -2346,6 +2357,10 @@ int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
 	udc_controller->gadget.dev.driver = NULL;
 	udc_controller->driver = NULL;
 
+//20100822, jm1.lee@lge.com, for USB mode switching
+#if defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
+	device_del(&udc_controller->gadget.dev);
+#endif
 	printk(KERN_WARNING "unregistered gadget driver '%s'\n",
 	       driver->driver.name);
 	return 0;
@@ -2841,10 +2856,16 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
 	dev_set_name(&udc_controller->gadget.dev, "gadget");
 	udc_controller->gadget.dev.release = fsl_udc_release;
 	udc_controller->gadget.dev.parent = &pdev->dev;
+//20100822, jm1.lee@lge.com, for USB mode switching [START]
+#if defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
+	device_initialize(&udc_controller->gadget.dev);
+#else
 	ret = device_register(&udc_controller->gadget.dev);
 	if (ret < 0)
 		goto err_free_irq;
 
+#endif
+//20100822, jm1.lee@lge.com, for USB mode switching [END]
 	/* setup QH and epctrl for ep0 */
 	ep0_setup(udc_controller);
 

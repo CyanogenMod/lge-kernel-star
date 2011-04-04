@@ -378,7 +378,9 @@ struct input_absinfo {
 #define KEY_WIMAX		246
 
 /* Range 248 - 255 is reserved for special needs of AT keyboard driver */
-
+#if defined(CONFIG_MACH_STAR)
+#define KEY_HOOK 247
+#endif
 #define BTN_MISC		0x100
 #define BTN_0			0x100
 #define BTN_1			0x101
@@ -594,6 +596,15 @@ struct input_absinfo {
 #define KEY_NUMERIC_9		0x209
 #define KEY_NUMERIC_STAR	0x20a
 #define KEY_NUMERIC_POUND	0x20b
+
+
+//20100714 joseph.jung@lge.com for Touch Button event cancel [START]
+#define KEY_REJECT			0x210
+//20100714 joseph.jung@lge.com for Touch Button event cancel [END]
+
+//2010.10.09 for pattern unlock. taesub.kim@lge.com [START_LGE]
+#define KEY_TESTMODE_UNLOCK	0x211
+//2010.10.09 for pattern unlock. taesub.kim@lge.com [END_LGE]
 
 /* We avoid low common keys in module aliases so they don't get huge. */
 #define KEY_MIN_INTERESTING	KEY_MUTE

@@ -112,3 +112,9 @@ obj-$(CONFIG_VLYNQ)		+= vlynq/
 obj-$(CONFIG_STAGING)		+= staging/
 obj-y				+= platform/
 obj-y				+= ieee802154/
+obj-$(CONFIG_MACH_STAR)		+= star/
+#// LGE_DOM_UPDATE_S suyong.han 2010/09/12 {
+# LGE_CHANGE_BROADCAST [inb612@lge.com] 2009.12.01
+obj-$(CONFIG_LGE_BROADCAST)	+= broadcast/
+#obj-y	+= broadcast/
+#// LGE_DOM_UPDATE_E suyong.han 2010/09/12 }

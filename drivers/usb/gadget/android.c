@@ -54,8 +54,16 @@ MODULE_VERSION("1.0");
 static const char longname[] = "Gadget Android";
 
 /* Default vendor and product IDs, overridden by platform data */
+//20100412, jm1.lee@lge.com, for LGE USB Driver interface [START]
+#if defined (CONFIG_MACH_STAR)
+#define VENDOR_ID		0x1004
+#define PRODUCT_ID		0x618E
+#define ADB_PRODUCT_ID 0x618E
+#else
 #define VENDOR_ID		0x18D1
 #define PRODUCT_ID		0x0001
+#endif
+//20100412, jm1.lee@lge.com, for LGE USB Driver interface [END]
 
 struct android_dev {
 	struct usb_composite_dev *cdev;
@@ -100,7 +108,15 @@ static struct usb_device_descriptor device_desc = {
 	.bLength              = sizeof(device_desc),
 	.bDescriptorType      = USB_DT_DEVICE,
 	.bcdUSB               = __constant_cpu_to_le16(0x0200),
+//20100807, jm1.lee@lge.com, for LGE USB Driver interface [START]
+#if defined(CONFIG_MACH_STAR)
+	.bDeviceClass         = USB_CLASS_COMM,
+	.bDeviceSubClass	= 0x2,
+	.bDeviceProtocol	= 0x0,
+#else
 	.bDeviceClass         = USB_CLASS_PER_INTERFACE,
+#endif
+//20100807, jm1.lee@lge.com, for LGE USB Driver interface [END]
 	.idVendor             = __constant_cpu_to_le16(VENDOR_ID),
 	.idProduct            = __constant_cpu_to_le16(PRODUCT_ID),
 	.bcdDevice            = __constant_cpu_to_le16(0xffff),
@@ -256,8 +272,15 @@ static int __init android_bind(struct usb_composite_dev *cdev)
 	id = usb_string_id(cdev);
 	if (id < 0)
 		return id;
+//20100814, jm1.lee@lge.com, remove USB serila number [START]
+#if defined(CONFIG_MACH_STAR)
+	strings_dev[STRING_SERIAL_IDX].id = NULL;
+	device_desc.iSerialNumber = NULL;
+#else
 	strings_dev[STRING_SERIAL_IDX].id = id;
 	device_desc.iSerialNumber = id;
+#endif
+//20100814, jm1.lee@lge.com, remove USB serila number [END]
 
 	if (gadget->ops->wakeup)
 		android_config_driver.bmAttributes |= USB_CONFIG_ATT_WAKEUP;

@@ -473,6 +473,21 @@ NvOdmGpioReleasePinHandle(NvOdmServicesGpioHandle hOdmGpio,
  * @param PinValue The pin state to set. 0 means drive low, 1 means drive high.
  */
 void
+NvOdmGpioSetBusState(NvOdmServicesGpioHandle hOdmGpio,
+    NvOdmGpioPinHandle *hGpioPin,
+    NvU32 *PinValue,
+	NvU32 numberOfPins);
+
+/**
+ * Sets the output state of a set of GPIO pins.
+ *
+ * @see NvOdmGpioOpen, NvOdmGpioGetState
+ *
+ * @param hOdmGpio The GPIO handle.
+ * @param hGpioPin The pin handle.
+ * @param PinValue The pin state to set. 0 means drive low, 1 means drive high.
+ */
+void
 NvOdmGpioSetState(NvOdmServicesGpioHandle hOdmGpio,
     NvOdmGpioPinHandle hGpioPin,
     NvU32 PinValue);
@@ -1135,6 +1150,11 @@ void NvOdmServicesPmuGetVoltage(
         NvU32 vddId,
         NvU32 * pMilliVolts );
 
+#if defined(CONFIG_MACH_STAR) //20100704 bergkamp.cho@lge.com jongik's headset porting [LGE]
+NvU32 NvOdmServicesPmuGetHookValue( 
+        NvOdmServicesPmuHandle handle);
+#endif
+
 /**
  * Sets new voltage level for the specified PMU rail.
  *
@@ -1183,6 +1203,28 @@ typedef enum
     /// Ignore -- Forces compilers to make 32-bit enums.
     NvOdmServicesPmuBatteryInstance_Force32 = 0x7FFFFFFF
 } NvOdmServicesPmuBatteryInstance;
+
+//20100909, jh.ahn@lge.com, for detecting power source in battery checker [START]
+typedef enum
+{
+
+    /// Specifies AC is offline.
+       NvOdmServicesPmuAcLine_Offline,
+
+    /// Specifies AC is online.
+       NvOdmServicesPmuAcLine_Online,
+
+    /// Specifies backup power.
+       NvOdmServicesPmuAcLine_BackupPower,
+	NvOdmServicesPmuAcLineStatus_Num,
+	NvOdmServicesPmuAcLineStatus_Force32 = 0x7FFFFFFF
+} NvOdmServicesPmuAcLineStatus;
+
+NvBool
+NvOdmServicesPmuGetAcLineStatus(
+    NvOdmServicesPmuHandle handle,
+    NvOdmServicesPmuAcLineStatus * pStatus);
+//20100909, jh.ahn@lge.com, for detecting power source in battery checker [END]
 
 /**
  * Gets the battery status.
@@ -1245,6 +1287,17 @@ NvOdmServicesPmuGetBatteryData(
     NvOdmServicesPmuHandle handle,
     NvOdmServicesPmuBatteryInstance batteryInst,
     NvOdmServicesPmuBatteryData * pData);
+
+//20100924, jh.ahn@lge.com, For updating battery information totally [START]
+#if defined(CONFIG_MACH_STAR)
+NvBool
+NvOdmServicesPmuUpdateBatteryInfo(
+	NvOdmServicesPmuHandle handle,
+	NvOdmServicesPmuAcLineStatus * pAcStatus,
+	NvU8 * pBatStatus,
+	NvOdmServicesPmuBatteryData * pBatData);
+#endif
+//20100924, jh.ahn@lge.com, For updating battery information totally  [END]
 
 /**
  * Gets the battery full lifetime.

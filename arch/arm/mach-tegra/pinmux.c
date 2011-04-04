@@ -497,15 +497,21 @@ static int dbg_pinmux_show(struct seq_file *s, void *unused)
 		if (pingroups[i].mux_reg < 0) {
 			seq_printf(s, "TEGRA_MUX_NONE");
 			len = strlen("NONE");
-		} else {
-			mux = (pg_readl(pingroups[i].mux_reg) >>
-			       pingroups[i].mux_bit) & 0x3;
+		} 
+		else 
+		{
+			//20100725 younghoon.lee@lge.com for pinmux setting while sleep [LGE_START]
+			//mux = (pg_readl(pingroups[i].mux_reg) >>
+			//       pingroups[i].mux_bit) & 0x3;
+			mux = get_reg_data(i, PIN_MUX_CTL);
+			//20100725 younghoon.lee@lge.com for pinmux setting while sleep [LGE_END]
 			if (pingroups[i].funcs[mux] == TEGRA_MUX_RSVD) {
 				seq_printf(s, "TEGRA_MUX_RSVD%1lu", mux+1);
 				len = 5;
-			} else {
-				seq_printf(s, "TEGRA_MUX_%s",
-					   tegra_mux_names[pingroups[i].funcs[mux]]);
+			} 
+			else 
+			{
+				seq_printf(s, "TEGRA_MUX_%s", tegra_mux_names[pingroups[i].funcs[mux]]);
 				len = strlen(tegra_mux_names[pingroups[i].funcs[mux]]);
 			}
 		}
@@ -515,8 +521,11 @@ static int dbg_pinmux_show(struct seq_file *s, void *unused)
 			seq_printf(s, "TEGRA_PUPD_NORMAL");
 			len = strlen("NORMAL");
 		} else {
-			pupd = (pg_readl(pingroups[i].pupd_reg) >>
-				pingroups[i].pupd_bit) & 0x3;
+			//20100725 younghoon.lee@lge.com for pinmux setting while sleep [LGE_START]
+			//pupd = (pg_readl(pingroups[i].pupd_reg) >>
+			//	pingroups[i].pupd_bit) & 0x3;
+			pupd = get_reg_data(i, PULLUPDOWN);
+			//20100725 younghoon.lee@lge.com for pinmux setting while sleep [LGE_END]
 			seq_printf(s, "TEGRA_PUPD_%s", pupd_name(pupd));
 			len = strlen(pupd_name(pupd));
 		}
@@ -525,9 +534,11 @@ static int dbg_pinmux_show(struct seq_file *s, void *unused)
 		if (pingroups[i].tri_reg < 0) {
 			seq_printf(s, "TEGRA_TRI_NORMAL");
 		} else {
-			tri = (pg_readl(pingroups[i].tri_reg) >>
-			       pingroups[i].tri_bit) & 0x1;
-
+			//20100725 younghoon.lee@lge.com for pinmux setting while sleep [LGE_START]
+			//tri = (pg_readl(pingroups[i].tri_reg) >>
+			//       pingroups[i].tri_bit) & 0x1;
+			tri = get_reg_data(i, TRISTATE);
+			//20100725 younghoon.lee@lge.com for pinmux setting while sleep [LGE_END]
 			seq_printf(s, "TEGRA_TRI_%s", tri_name(tri));
 		}
 		seq_printf(s, "},\n");
@@ -547,10 +558,416 @@ static const struct file_operations debug_fops = {
 	.release	= single_release,
 };
 
+//20100725 younghoon.lee@lge.com for pinmux setting while sleep [LGE_START]
+#include <asm/uaccess.h>
+#include <linux/io.h>
+
+extern int gpio_dbgfs_mod;   // 0=normal, 1=sleep
+static int gpio_pinmux_reg_num = 0;	
+
+typedef struct  {
+    tegra_pingroup_t pg_tristate;
+}pg_info;
+
+static int dbg_open_pinmux_reg_num(struct inode *inode, struct file *file)
+{
+        file->private_data = inode->i_private;
+            return 0;
+}
+static ssize_t dbg_get_pinmux_reg_num(struct file *file, char __user *userbuf,
+                                size_t count, loff_t *ppos)
+{
+        char buf[64];
+        int ret;
+        
+        ret= snprintf(buf, sizeof(buf) - 1, "Selected pinmux_reg is %d \n", gpio_pinmux_reg_num); 
+
+        return simple_read_from_buffer(userbuf, count, ppos, buf, ret);
+}
+static ssize_t dbg_set_pinmux_reg_num(struct file *file, const char __user *ubuf,
+                                size_t count, loff_t *ppos)
+{
+        char buf[16];
+        long result=0;
+        int len, ret;
+        memset(buf, 0, sizeof(buf));
+
+        if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+            return -EFAULT;
+
+		ret = strict_strtol(buf, 16, &result);
+		pr_info("[Power Debugfs] %s: input = %d \n", __func__, result);
+		if ( 0 <= result && result < 17 )
+			gpio_pinmux_reg_num = result;
+		
+        return count;
+}
+static const struct file_operations fops_pinmux_reg_num = {
+    .read = dbg_get_pinmux_reg_num,
+    .write = dbg_set_pinmux_reg_num,
+    .open = dbg_open_pinmux_reg_num,
+};
+
+static int dbg_open_pinmux_reg_value(struct inode *inode, struct file *file)
+{
+        file->private_data = inode->i_private;
+            return 0;
+}
+static ssize_t dbg_get_pinmux_reg_value(struct file *file, char __user *userbuf,
+                                size_t count, loff_t *ppos)
+{
+        char buf[64];
+        int ret;
+		unsigned long data;
+
+		if ( gpio_dbgfs_mode == NORMAL_MODE )  
+		{
+			data = get_reg_data(gpio_pinmux_reg_num, REG_DATA);
+			ret= snprintf(buf, sizeof(buf) - 1, " pinmux_reg[%d] 0x%x \n", gpio_pinmux_reg_num, data);
+		}
+		else
+		{
+			data = get_reg_data(gpio_pinmux_reg_num, REG_DATA);
+			ret= snprintf(buf, sizeof(buf) - 1, " sleep_pinmux_reg[%d] 0x%x \n", gpio_pinmux_reg_num, data);
+		}        
+         
+
+        return simple_read_from_buffer(userbuf, count, ppos, buf, ret);
+}
+static ssize_t dbg_set_pinmux_reg_value(struct file *file, const char __user *ubuf,
+                                size_t count, loff_t *ppos)
+{
+        char buf[16];
+        long result=0;
+        int len, ret;
+        memset(buf, 0, sizeof(buf));
+
+        if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+            return -EFAULT;
+
+		ret = strict_strtol(buf, 16, &result);
+		pr_info("[Power Debugfs] %s: input = %d \n", __func__, result);
+
+		set_reg_data( gpio_pinmux_reg_num, result, REG_DATA );
+		
+        return count;
+}
+static const struct file_operations fops_pinmux_reg_value = {
+    .read = dbg_get_pinmux_reg_value,
+    .write = dbg_set_pinmux_reg_value,
+    .open = dbg_open_pinmux_reg_value,
+};
+
+
+static int dbg_open_pingroup_select(struct inode *inode, struct file *file)
+{
+        file->private_data = inode->i_private;
+            return 0;
+}
+
+static ssize_t dbg_get_pingroup_select(struct file *file, char __user *userbuf,
+                                size_t count, loff_t *ppos)
+{
+        pg_info *pg_info = file->private_data;
+        char buf[128];
+		char buf_name[32];
+		char buf_tri[32];
+		char buf_func[32];
+		char buf_pupd[32];
+        int ret;
+		int i = pg_info->pg_tristate;
+		
+		unsigned long tri;
+		unsigned long mux;
+		unsigned long pupd;
+		
+		ret = snprintf(buf_name , sizeof(buf_name)-1,  " TEGRA_PINGROUP_%s", pingroups[i].name);
+		
+		if (pingroups[i].mux_reg < 0) 
+		{
+			ret = snprintf(buf_func,sizeof(buf_func)-1,  "TEGRA_MUX_NONE");
+		} 
+		else 
+		{
+			mux = get_reg_data(i, PIN_MUX_CTL);
+			pr_info("[Power Debugfs] %s: mux=%d \n", __func__, mux);
+			if (pingroups[i].funcs[mux] == TEGRA_MUX_RSVD) 
+			{
+				ret = snprintf(buf_func,sizeof(buf_func)-1,  "TEGRA_MUX_RSVD%1lu", mux+1);
+			} else {
+				ret = snprintf(buf_func,sizeof(buf_func)-1,"TEGRA_MUX_%s",
+					   tegra_mux_names[pingroups[i].funcs[mux]]);
+			}
+		}
+		
+		if (pingroups[i].pupd_reg < 0) 
+		{
+			ret = snprintf(buf_pupd,sizeof(buf_pupd)-1, "TEGRA_PUPD_NORMAL");
+		} 
+		else 
+		{
+			pupd = get_reg_data(i, PULLUPDOWN);		
+			pr_info("[Power Debugfs] %s: pupd=%d \n", __func__, pupd);
+			ret = snprintf(buf_pupd,sizeof(buf_pupd)-1, "TEGRA_PUPD_%s", pupd_name(pupd));
+		}
+		
+		if (pingroups[i].tri_reg < 0) 
+		{
+			ret = snprintf(buf_tri,sizeof(buf_tri), "TEGRA_TRI_NORMAL");
+		} 
+		else 
+		{
+			tri = get_reg_data(i, TRISTATE);
+			pr_info("[Power Debugfs] %s: tri=%d \n", __func__, tri);
+			ret = snprintf(buf_tri,sizeof(buf_tri), "TEGRA_TRI_%s", tri_name(tri));
+		}
+		
+		ret = snprintf(buf,sizeof(buf), "%s : %s, %s, %s\n", buf_name, buf_tri, buf_func, buf_pupd);
+
+        return simple_read_from_buffer(userbuf, count, ppos, buf, ret);
+}
+
+static ssize_t dbg_set_pingroup_select(struct file *file, const char __user *ubuf,
+                                size_t count, loff_t *ppos)
+{
+        pg_info *pg_info = file->private_data;
+        char buf[16];
+        int i;
+		int len;
+
+        memset(buf, 0, sizeof(buf));
+        
+        if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+            return -EFAULT;
+
+		len = strlen(buf);
+		buf[len-1]=NULL;
+		
+		for(i=0; i < TEGRA_MAX_PINGROUP; i++)
+		{
+			if( strcmp(pingroups[i].name, buf)==0)
+				pg_info->pg_tristate = i;
+		}
+
+        return count;
+}
+
+static const struct file_operations fops_pingroup_select = {
+    .read = dbg_get_pingroup_select,
+    .write = dbg_set_pingroup_select,
+    .open = dbg_open_pingroup_select,
+};
+
+static int dbg_open_tristate_enable(struct inode *inode, struct file *file)
+{
+        file->private_data = inode->i_private;
+        return 0;
+}
+
+static ssize_t dbg_get_tristate_enable(struct file *file, char __user *userbuf,
+                                size_t count, loff_t *ppos)
+{
+        pg_info *pg_info = file->private_data;
+        char buf[64];
+        int ret;
+		int i=pg_info->pg_tristate;
+		unsigned long tri;
+		
+		if (pingroups[i].tri_reg < 0) {
+			pr_info("[Power Debugfs] %s: tri_reg < 0 \n", __func__);
+			ret = snprintf( buf,sizeof(buf) - 1, "%S : TEGRA_TRI_NORMAL\n",
+				pingroups[pg_info->pg_tristate].name);
+		} 
+		else 
+		{
+			tri = get_reg_data(i, TRISTATE);
+			pr_info("[Power Debugfs] %s: tri=%d \n", __func__, tri);
+			ret = snprintf(buf, sizeof(buf)-1, "%s : TEGRA_TRI_%s (0->nor, 1->tri) \n",
+				pingroups[pg_info->pg_tristate].name, tri_name(tri));
+		}
+
+        return simple_read_from_buffer(userbuf, count, ppos, buf, ret);
+}
+
+static ssize_t dbg_set_tristate_enable(struct file *file, const char __user *ubuf,
+                                size_t count, loff_t *ppos)
+{
+        pg_info *pg_info = file->private_data;
+        char buf[16];
+		
+		long result, ret;
+        tegra_pingroup_t pg = pg_info->pg_tristate;		
+		
+        memset(buf, 0, sizeof(buf));
+
+        if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+            return -EFAULT;
+	
+		ret = strict_strtol(buf, 16, &result);	
+		pr_info("[Power Debugfs] %s: input = %d \n", __func__, result);
+
+		set_reg_data( pg, result, TRISTATE );
+
+        return count;
+}
+
+static const struct file_operations fops_tristate_enable = {
+    .read = dbg_get_tristate_enable,
+    .write = dbg_set_tristate_enable,
+    .open = dbg_open_tristate_enable,
+};
+
+
+static int dbg_open_pinmux_enable(struct inode *inode, struct file *file)
+{
+        file->private_data = inode->i_private;
+            return 0;
+}
+
+static ssize_t dbg_get_pinmux_enable(struct file *file, char __user *userbuf,
+                                size_t count, loff_t *ppos)
+{
+        pg_info *pg_info = file->private_data;
+        char buf[64];
+        int ret;
+		unsigned long mux;
+		tegra_pingroup_t pg = pg_info->pg_tristate;
+		
+		if (pingroups[pg].mux_reg < 0) {
+			pr_info("[Power Debugfs] %s: mux_reg < 0 \n", __func__);
+			ret = snprintf( buf,sizeof(buf) - 1, "%S : TEGRA_MUX_NONE\n",
+				pingroups[pg_info->pg_tristate].name);
+		} 
+		else 
+		{
+			mux = get_reg_data(pg, PIN_MUX_CTL);
+			pr_info("[Power Debugfs] %s: mux=%d \n", __func__, mux);
+			if (pingroups[pg].funcs[mux] == TEGRA_MUX_RSVD) 
+			{
+				pr_info("[Power Debugfs] %s: funcs[mux] == TEGRA_MUX_RSVD \n", __func__);
+				ret = snprintf(buf,sizeof(buf)-1, "%s : TEGRA_MUX_RSVD%1lu\n",
+				   pingroups[pg_info->pg_tristate].name, mux+1);
+			} 
+			else 
+			{
+				ret = snprintf(buf,sizeof(buf)-1, "%s : TEGRA_MUX_%s\n",
+				   pingroups[pg_info->pg_tristate].name, tegra_mux_names[pingroups[pg].funcs[mux]]);
+			}
+		}
+
+        return simple_read_from_buffer(userbuf, count, ppos, buf, ret);
+}
+
+static ssize_t dbg_set_pinmux_enable(struct file *file, const char __user *ubuf,
+                                size_t count, loff_t *ppos)
+{
+        pg_info *pg_info = file->private_data;
+        char buf[16];
+		long result, ret;
+		unsigned long flags;
+		tegra_pingroup_t pg = pg_info->pg_tristate;	 
+		
+        memset(buf, 0, sizeof(buf));
+
+        if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+            return -EFAULT;
+	
+		ret = strict_strtol(buf, 16, &result);	
+		pr_info("[Power Debugfs] %s: input = %d \n", __func__, result);
+
+	   	spin_lock_irqsave(&mux_lock, flags);
+		set_reg_data( pg, result, PIN_MUX_CTL );
+		spin_unlock_irqrestore(&mux_lock, flags);
+
+        return count;
+}
+
+static const struct file_operations fops_pinmux_enable = {
+    .read = dbg_get_pinmux_enable,
+    .write = dbg_set_pinmux_enable,
+    .open = dbg_open_pinmux_enable,
+};
+
+
+static int dbg_open_PUPD_enable(struct inode *inode, struct file *file)
+{
+        file->private_data = inode->i_private;
+            return 0;
+}
+
+static ssize_t dbg_get_PUPD_enable(struct file *file, char __user *userbuf,
+                                size_t count, loff_t *ppos)
+{
+        pg_info *pg_info = file->private_data;
+        char buf[64];
+        int ret;
+        unsigned long pupd;
+		tegra_pingroup_t pg = pg_info->pg_tristate;
+		
+		if (pingroups[pg].pupd_reg < 0) {
+			pr_info("[Power Debugfs] %s: pupd_reg < 0 \n", __func__);
+			ret = snprintf( buf,sizeof(buf) - 1, "%S : TEGRA_PUPD_NORMAL\n",
+				pingroups[pg].name);
+		} 
+		else
+		{
+			pupd = get_reg_data(pg, PULLUPDOWN);
+			pr_info("[Power Debugfs] %s: pupd=%d \n", __func__, pupd);
+			ret = snprintf(buf,sizeof(buf)-1 , "%s : TEGRA_PUPD_%s (0->Nor, 1->P/U, 2->P/D, 3->RSVD) \n" ,
+				pingroups[pg].name, pupd_name(pupd));
+		}
+	
+        return simple_read_from_buffer(userbuf, count, ppos, buf, ret);
+}
+
+static ssize_t dbg_set_PUPD_enable(struct file *file, const char __user *ubuf,
+                                size_t count, loff_t *ppos)
+{
+        pg_info *pg_info = file->private_data;
+        char buf[16];
+		long result, ret;
+        tegra_pingroup_t pg = pg_info->pg_tristate;
+		
+        memset(buf, 0, sizeof(buf));
+
+        if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+            return -EFAULT;
+		
+		ret = strict_strtol(buf, 16, &result);	
+		pr_info("[Power Debugfs] %s: input = %d \n", __func__, result);
+
+		set_reg_data( pg, result, PULLUPDOWN);
+		
+        return count;
+}
+
+static const struct file_operations fops_PUPD_enable = {
+    .read = dbg_get_PUPD_enable,
+    .write = dbg_set_PUPD_enable,
+    .open = dbg_open_PUPD_enable,
+};
+
+
+//20100725 younghoon.lee@lge.com for pinmux setting while sleep [LGE_END]
+
 static int __init tegra_pinmux_debuginit(void)
 {
 	(void) debugfs_create_file("tegra_pinmux", S_IRUGO,
 					NULL, NULL, &debug_fops);
+	
+	//20100725 younghoon.lee@lge.com for pinmux setting while sleep [LGE_START]
+	pg_info *buff;
+	buff =(pg_info *) kmalloc(sizeof(pg_info),GFP_KERNEL);
+	buff->pg_tristate = 2;
+
+	debugfs_create_file("pinmux_reg_num", 0666, NULL, buff, &fops_pinmux_reg_num);
+	debugfs_create_file("pinmux_reg_val", 0666, NULL, buff, &fops_pinmux_reg_value);
+	debugfs_create_file("pingroup", 0666, NULL, buff, &fops_pingroup_select);
+	debugfs_create_file("tristate", 0666, NULL, buff, &fops_tristate_enable);
+	debugfs_create_file("pinmux", 0666, NULL, buff, &fops_pinmux_enable);
+	debugfs_create_file("pupd", 0666, NULL, buff, &fops_PUPD_enable);
+	//20100725 younghoon.lee@lge.com for pinmux setting while sleep [LGE_END]
+
 	return 0;
 }
 late_initcall(tegra_pinmux_debuginit);

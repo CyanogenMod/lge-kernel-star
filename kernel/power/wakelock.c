@@ -536,6 +536,54 @@ static const struct file_operations wakelock_stats_fops = {
 	.release = single_release,
 };
 
+//20101008, byoungwoo.yoon@lge.com, add sysfs to check the status of the active wakelocks  [START]
+
+static int active_wakelock_stats_show(struct seq_file *m, void *unused)
+{
+	unsigned long irqflags;
+	struct wake_lock *lock;
+	bool print_expired = true;
+	int ret;
+	int type = WAKE_LOCK_SUSPEND;
+	
+	spin_lock_irqsave(&list_lock, irqflags);
+
+	list_for_each_entry(lock, &active_wake_locks[type], link) {
+		if (lock->flags & WAKE_LOCK_AUTO_EXPIRE) {
+			long timeout = lock->expires - jiffies;
+			if (timeout > 0)
+				seq_printf(m, "active wake lock %s, time left %ld\n",
+					lock->name, timeout);
+			else if (print_expired)
+				seq_printf(m, "wake lock %s, expired\n", lock->name);
+		} else {
+			seq_printf(m, "active wake lock %s\n", lock->name);
+			if (!debug_mask & DEBUG_EXPIRE)
+				print_expired = false;
+		}
+	}
+
+	spin_unlock_irqrestore(&list_lock, irqflags);
+	return 0;
+}
+
+
+
+static int active_wakelock_stats_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, active_wakelock_stats_show, NULL);
+}
+
+static const struct file_operations active_wakelock_stats_fops = {
+	.owner = THIS_MODULE,
+	.open = active_wakelock_stats_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+//20101008, byoungwoo.yoon@lge.com, add sysfs to check the status of the active wakelocks  [START]
+
+
 static int __init wakelocks_init(void)
 {
 	int ret;
@@ -572,6 +620,10 @@ static int __init wakelocks_init(void)
 #ifdef CONFIG_WAKELOCK_STAT
 	proc_create("wakelocks", S_IRUGO, NULL, &wakelock_stats_fops);
 #endif
+
+	//20101008, byoungwoo.yoon@lge.com, add sysfs to check the status of the active wakelocks  [START]
+	proc_create("active_wakelocks", S_IRUGO, NULL, &active_wakelock_stats_fops);
+	//20101008, byoungwoo.yoon@lge.com, add sysfs to check the status of the active wakelocks  [START]
 
 	return 0;
 

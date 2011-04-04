@@ -1874,8 +1874,13 @@ int sdhci_add_host(struct sdhci_host *host)
 	}
 
 	if (host->quirks & SDHCI_QUIRK_RUNTIME_DISABLE) {
+#if defined (CONFIG_LGE_BCM432X_PATCH)
+		if(mmc->index != 0)
+#endif /* CONFIG_LGE_BCM432X_PATCH */
 		mmc->caps |= MMC_CAP_DISABLE;
-		mmc_set_disable_delay(mmc, msecs_to_jiffies(50));
+		//indal.choi - temporarily
+	  //indal.choi delay time.. very.. slow..
+		mmc_set_disable_delay(mmc, msecs_to_jiffies(100));
 	}
 
 	if (host->data_width >= 8)

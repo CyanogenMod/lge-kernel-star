@@ -397,11 +397,15 @@ static int tegra_battery_probe(struct platform_device *pdev)
 	batt_dev->charging_source = NvCharger_Type_AC;
 	batt_dev->charging_enabled = NvCharge_Control_Charging_Enable;
 
+//cs77.ha@lge.com this is froyo 10.7.2 source but build ERROR [START]
+#if 0
 	result = NvOdmBatteryDeviceOpen(&(batt_dev->hOdmBattDev), NULL);
 	if (!result) {
 		pr_err("NvOdmBatteryDeviceOpen FAILED\n");
 		goto err;
 	}
+#endif
+//cs77.ha@lge.com this is froyo 10.7.2 source but build ERROR [END]
 
 	for (i = 0; i < ARRAY_SIZE(tegra_supplies); i++) {
 		rc = power_supply_register(&pdev->dev, &tegra_supplies[i]);
@@ -453,10 +457,14 @@ static int tegra_battery_remove(struct platform_device *pdev)
 		device_remove_file(&pdev->dev, &tegra_battery_attr);
 
 		del_timer_sync(&(batt_dev->battery_poll_timer));
+//cs77.ha@lge.com this is froyo 10.7.2 source but build ERROR [START]
+#if 0
                 if (batt_dev->hOdmBattDev) {
                         NvOdmBatteryDeviceClose(batt_dev->hOdmBattDev);
                         batt_dev->hOdmBattDev = NULL;
                 }
+#endif
+//cs77.ha@lge.com this is froyo 10.7.2 source but build ERROR [END]
 		kfree(batt_dev);
 		batt_dev = NULL;
 	}

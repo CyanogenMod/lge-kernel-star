@@ -47,6 +47,11 @@
 /* #define VERBOSE_DEBUG */
 /* #define DUMP_MSGS */
 
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+/* #define AD_DBG */
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 
 #include <linux/blkdev.h>
 #include <linux/completion.h>
@@ -69,6 +74,11 @@
 #include <linux/wakelock.h>
 #include <linux/platform_device.h>
 
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+#include <asm/unaligned.h>
+#endif
+//20100901, jm1.lee@lge.com, for autorun [END]
 #include <linux/usb.h>
 #include <linux/usb_usual.h>
 #include <linux/usb/ch9.h>
@@ -77,15 +87,55 @@
 #include "gadget_chips.h"
 
 
+//20100824, jm1.lee@lge.com, for USB mode switching
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
 #define BULK_BUFFER_SIZE           4096
+#else
+#define BULK_BUFFER_SIZE           16384
+#endif
 
 
 /*-------------------------------------------------------------------------*/
 
 #define DRIVER_NAME		"usb_mass_storage"
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+#define DRIVER_NAME_AUTORUN	"usb_autorun"
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 #define MAX_LUNS		8
 
+//20100407, jm1.lee@lge.com, add mass storage device information [START]
+#if defined (CONFIG_MACH_STAR)
+#define VENDOR_NAME_LGE	"LGE"
+#if defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT)
+#define PRODUCT_NAME_ANDROID	"SU660"
+#define PRODUCT_NAME_EXTERNAL "SU660 SD Card"
+#else
+#define PRODUCT_NAME_ANDROID	"P990"
+#define PRODUCT_NAME_EXTERNAL "P990 SD Card"
+#endif
+static const char vendor_name[] = VENDOR_NAME_LGE;
+static const char product_name[] = PRODUCT_NAME_ANDROID;
+static const char product_name_external[] = PRODUCT_NAME_EXTERNAL;
+
+enum
+{
+	INTERNAL_MASS_STORAGE = 0,
+	EXTERNAL_MASS_STORAGE = 1
+};
+#endif
+//20100407, jm1.lee@lge.com, add mass storage device information [END]
 static const char shortname[] = DRIVER_NAME;
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+#ifdef AD_DBG
+#define ad_info(fmt,args...)	pr_info("AD: " fmt, ## args)
+#else
+#define ad_info(fmt,args...)	do { } while (0)
+#endif
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 
 #ifdef DEBUG
 #define LDBG(lun, fmt, args...) \
@@ -137,6 +187,12 @@ static const char shortname[] = DRIVER_NAME;
 
 /*-------------------------------------------------------------------------*/
 
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+#define TYPE_UMS	0x00
+#define TYPE_CDROM	0x05
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 /* Bulk-only data structures */
 
 /* Command Block Wrapper */
@@ -188,6 +244,12 @@ struct bulk_cs_wrap {
 #define SC_READ_12			0xa8
 #define SC_READ_CAPACITY		0x25
 #define SC_READ_FORMAT_CAPACITIES	0x23
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+#define SC_READ_HEADER			0x44
+#define SC_READ_TOC			0x43
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 #define SC_RELEASE			0x17
 #define SC_REQUEST_SENSE		0x03
 #define SC_RESERVE			0x16
@@ -199,6 +261,32 @@ struct bulk_cs_wrap {
 #define SC_WRITE_6			0x0a
 #define SC_WRITE_10			0x2a
 #define SC_WRITE_12			0xaa
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+#define SC_LGE_SPE      		0xF1
+#define SUB_CODE_MODE_CHANGE		0x01
+#define SUB_CODE_GET_VALUE		0x02
+#define SUB_CODE_PROBE_DEV		0xff
+#define TYPE_MOD_CHG_TO_ACM		0x01
+#define TYPE_MOD_CHG_TO_UMS		0x02
+#define TYPE_MOD_CHG_TO_MTP		0x03
+#define TYPE_MOD_CHG_TO_ASK		0x05
+#define TYPE_MOD_CHG2_TO_ACM		0x81
+#define TYPE_MOD_CHG2_TO_UMS		0x82
+#define TYPE_MOD_CHG2_TO_MTP		0x83
+#define TYPE_MOD_CHG2_TO_ASK		0x85
+/*ACK TO SEND HOST PC */
+#define ACK_STATUS_TO_HOST		0x10
+#define ACK_SW_REV_TO_HOST		0x12
+#define ACK_MEID_TO_HOST		0x13
+#define ACK_MODEL_TO_HOST		0x14
+#define ACK_SUB_VER_TO_HOST		0x15
+#define SUB_ACK_STATUS_ACM		0x00
+#define SUB_ACK_STATUS_MTP		0x01
+#define SUB_ACK_STATUS_UMS		0x02
+#define SUB_ACK_STATUS_ASK		0x03
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 
 /* SCSI Sense Key/Additional Sense Code/ASC Qualifier values */
 #define SS_NO_SENSE				0
@@ -220,6 +308,45 @@ struct bulk_cs_wrap {
 #define ASC(x)		((u8) ((x) >> 8))
 #define ASCQ(x)		((u8) (x))
 
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+static const char *chg_mode[] = {
+	"change_unknown",
+	"change_acm",
+	"change_mtp",
+	"change_ums",
+	"change_ask",
+	"query_value",
+	"device_info",
+};
+
+enum chg_mode_state{
+	MODE_STATE_UNKNOWN = 0,
+	MODE_STATE_ACM,
+	MODE_STATE_MTP,
+	MODE_STATE_UMS,
+	MODE_STATE_ASK,
+	MODE_STATE_GET_VALUE,
+	MODE_STATE_PROBE_DEV,
+};
+
+static const char *check_str[] = {
+	"ACK_STATUS_ACM",
+	"ACK_STATUS_MTP",
+	"ACK_STATUS_UMS",
+	"ACK_STATUS_ASK",
+};
+
+enum check_mode_state {
+	ACK_STATUS_ACM = SUB_ACK_STATUS_ACM,
+	ACK_STATUS_MTP = SUB_ACK_STATUS_MTP,
+	ACK_STATUS_UMS = SUB_ACK_STATUS_UMS,
+	ACK_STATUS_ASK = SUB_ACK_STATUS_ASK,
+	ACK_STATUS_ERR,
+};
+
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 
 /*-------------------------------------------------------------------------*/
 
@@ -316,7 +443,11 @@ struct fsg_dev {
 
 	unsigned int		bulk_out_maxpacket;
 	enum fsg_state		state;		/* For exception handling */
-
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	enum chg_mode_state	mode_state;
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 	u8			config, new_config;
 
 	unsigned int		running : 1;
@@ -363,8 +494,19 @@ struct fsg_dev {
 
 	struct switch_dev sdev;
 
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	int autorun_enable;
+	struct switch_dev autorun_sdev;
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 	struct wake_lock wake_lock;
 };
+
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com)
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+unsigned int user_mode = 0;
+#endif
 
 static inline struct fsg_dev *func_to_dev(struct usb_function *f)
 {
@@ -386,7 +528,13 @@ static void set_bulk_out_req_length(struct fsg_dev *fsg,
 	rem = length % fsg->bulk_out_maxpacket;
 	if (rem > 0)
 		length += fsg->bulk_out_maxpacket - rem;
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	if (bh->outreq) { bh->outreq->length = length; }
+#else
 	bh->outreq->length = length;
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 }
 
 static struct fsg_dev			*the_fsg;
@@ -464,6 +612,15 @@ static void put_be32(u8 *buf, u32 val)
 	buf[3] = val & 0xff;
 }
 
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+/* Routines for unaligned data access */
+static u32 get_unaligned_be24(u8 *buf)
+{
+		return 0xffffff & (u32) get_unaligned_be32(buf - 1);
+}
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 /*-------------------------------------------------------------------------*/
 
 /*
@@ -645,6 +802,16 @@ static int fsg_function_setup(struct usb_function *f,
 	u16			w_length = le16_to_cpu(ctrl->wLength);
 
 	DBG(fsg, "fsg_function_setup\n");
+
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	if (!fsg->autorun_enable) {
+		if (w_index != intf_desc.bInterfaceNumber)
+			return value;
+	}
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
+
 	/* Handle Bulk-only class-specific requests */
 	if ((ctrl->bRequestType & USB_TYPE_MASK) == USB_TYPE_CLASS) {
 	DBG(fsg, "USB_TYPE_CLASS\n");
@@ -653,7 +820,11 @@ static int fsg_function_setup(struct usb_function *f,
 			if (ctrl->bRequestType != (USB_DIR_OUT |
 					USB_TYPE_CLASS | USB_RECIP_INTERFACE))
 				break;
+#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
+			if (w_value != 0) {
+#else
 			if (w_index != 0 || w_value != 0) {
+#endif
 				value = -EDOM;
 				break;
 			}
@@ -669,7 +840,11 @@ static int fsg_function_setup(struct usb_function *f,
 			if (ctrl->bRequestType != (USB_DIR_IN |
 					USB_TYPE_CLASS | USB_RECIP_INTERFACE))
 				break;
+#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
+			if (w_value != 0) {
+#else
 			if (w_index != 0 || w_value != 0) {
+#endif
 				value = -EDOM;
 				break;
 			}
@@ -776,6 +951,28 @@ static int do_read(struct fsg_dev *fsg)
 
 	/* Get the starting Logical Block Address and check that it's
 	 * not too big */
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	if (fsg->cmnd[0] == SC_READ_6) {
+		if (fsg->autorun_enable)
+			lba = get_unaligned_be24(&fsg->cmnd[1]);
+		else
+			lba = (fsg->cmnd[1] << 16) | get_be16(&fsg->cmnd[2]);
+	} else {
+		if (fsg->autorun_enable)
+			lba = get_unaligned_be32(&fsg->cmnd[2]);
+		else
+			lba = get_be32(&fsg->cmnd[2]);
+
+		/* We allow DPO (Disable Page Out = don't save data in the
+		 * cache) and FUA (Force Unit Access = don't read from the
+		 * cache), but we don't implement them. */
+		if ((fsg->cmnd[1] & ~0x18) != 0) {
+			curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
+			return -EINVAL;
+		}
+	}
+#else
 	if (fsg->cmnd[0] == SC_READ_6)
 		lba = (fsg->cmnd[1] << 16) | get_be16(&fsg->cmnd[2]);
 	else {
@@ -789,6 +986,9 @@ static int do_read(struct fsg_dev *fsg)
 			return -EINVAL;
 		}
 	}
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
+
 	if (lba >= curlun->num_sectors) {
 		curlun->sense_data = SS_LOGICAL_BLOCK_ADDRESS_OUT_OF_RANGE;
 		return -EINVAL;
@@ -909,6 +1109,31 @@ static int do_write(struct fsg_dev *fsg)
 
 	/* Get the starting Logical Block Address and check that it's
 	 * not too big */
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	if (fsg->cmnd[0] == SC_WRITE_6) {
+		if (fsg->autorun_enable)
+			lba = get_unaligned_be24(&fsg->cmnd[1]);
+		else
+			lba = (fsg->cmnd[1] << 16) | get_be16(&fsg->cmnd[2]);
+	} else {
+		if (fsg->autorun_enable)
+			lba = get_unaligned_be32(&fsg->cmnd[2]);
+		else
+			lba = get_be32(&fsg->cmnd[2]);
+
+		/* We allow DPO (Disable Page Out = don't save data in the
+		 * cache) and FUA (Force Unit Access = write directly to the
+		 * medium).  We don't implement DPO; we implement FUA by
+		 * performing synchronous output. */
+		if ((fsg->cmnd[1] & ~0x18) != 0) {
+			curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
+			return -EINVAL;
+		}
+		if (fsg->cmnd[1] & 0x08)	/* FUA */
+			curlun->filp->f_flags |= O_SYNC;
+	}
+#else
 	if (fsg->cmnd[0] == SC_WRITE_6)
 		lba = (fsg->cmnd[1] << 16) | get_be16(&fsg->cmnd[2]);
 	else {
@@ -925,6 +1150,9 @@ static int do_write(struct fsg_dev *fsg)
 		if (fsg->cmnd[1] & 0x08)	/* FUA */
 			curlun->filp->f_flags |= O_SYNC;
 	}
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
+
 	if (lba >= curlun->num_sectors) {
 		curlun->sense_data = SS_LOGICAL_BLOCK_ADDRESS_OUT_OF_RANGE;
 		return -EINVAL;
@@ -1232,17 +1460,67 @@ static int do_verify(struct fsg_dev *fsg)
 
 /*-------------------------------------------------------------------------*/
 
+/* LGE_CHANGE_S [hyunhui.park@lge.com] 2010-07-10, Setting of UMS */
+/* If board is not GED, mass storage's vendor/product name is
+ * "LGE Android Platform USB Device"
+ * FIXME : This info must be in platform data of mass storage
+ */
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET
+#define LGE_UMS_VENDOR    "LGE"
+#define LGE_UMS_PRODUCT   "Android Platform"
+#define LGE_CDROM_PRODUCT "Android CDROM"
+#endif
+/* LGE_CHANGE_E [hyunhui.park@lge.com] 2010-07-10 */
+
 static int do_inquiry(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 {
 	u8	*buf = (u8 *) bh->buf;
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	static char product_disk_id[] = LGE_UMS_PRODUCT;
+	static char product_cdrom_id[] = LGE_CDROM_PRODUCT;
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 
 	if (!fsg->curlun) {		/* Unsupported LUNs are okay */
 		fsg->bad_lun_okay = 1;
 		memset(buf, 0, 36);
 		buf[0] = 0x7f;		/* Unsupported, no device-type */
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+		if (fsg->autorun_enable)
+			buf[4] = 35; // Additional length
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 		return 36;
 	}
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	if(fsg->autorun_enable) {
+		/* CD-Rom For Autorun */
+		memset(buf, 0, 8);	/* Non-removable, direct-access device */
+		buf[0] = TYPE_CDROM;
+		buf[1] = 0x80;	/* set removable bit */
+		buf[2] = 2;		/* ANSI SCSI level 2 */
+		buf[3] = 2;		/* SCSI-2 INQUIRY data format */
+		buf[4] = 31;	/* Additional length */
 
+		sprintf(buf + 8, "%-8s%-16s%04x", fsg->vendor,
+				product_cdrom_id,fsg->release);
+	} else {
+		/* Mass storage */
+		memset(buf, 0, 8);	/* Non-removable, direct-access device */
+		buf[0] = TYPE_UMS;
+		buf[1] = 0x80;	/* set removable bit */
+		buf[2] = 2;		/* ANSI SCSI level 2 */
+		buf[3] = 2;		/* SCSI-2 INQUIRY data format */
+		buf[4] = 31;	/* Additional length */
+
+		sprintf(buf + 8, "%-8s%-16s%04x", fsg->vendor,
+				product_disk_id,fsg->release);
+	}
+
+#else
 	memset(buf, 0, 8);	/* Non-removable, direct-access device */
 
 	buf[1] = 0x80;	/* set removable bit */
@@ -1252,9 +1530,94 @@ static int do_inquiry(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 				/* No special options */
 	sprintf(buf + 8, "%-8s%-16s%04x", fsg->vendor,
 			fsg->product, fsg->release);
+
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
+
+#if defined(CONFIG_MACH_STAR)
+	if(fsg->lun == INTERNAL_MASS_STORAGE)
+		sprintf(buf + 8, "%-8s%-16s%04x", fsg->vendor, product_name, fsg->release);
+	else if(fsg->lun == EXTERNAL_MASS_STORAGE)
+		sprintf(buf + 8, "%-8s%-16s%04x", fsg->vendor, product_name_external, fsg->release);
+#endif
+
 	return 36;
 }
 
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+static int do_ack_status(struct fsg_dev *fsg, struct fsg_buffhd *bh, u8 ack)
+{
+	u8	*buf = (u8 *) bh->buf;
+
+	if (!fsg->curlun) {		/* Unsupported LUNs are okay */
+		fsg->bad_lun_okay = 1;
+		memset(buf, 0, 1);
+		buf[0] = 0xf;
+		return 1;
+	}
+
+	if(ack == SUB_ACK_STATUS_ACM)
+		buf[0] = SUB_ACK_STATUS_ACM;
+	else if(ack == SUB_ACK_STATUS_MTP)
+		buf[0] = SUB_ACK_STATUS_MTP;
+	else if(ack == SUB_ACK_STATUS_UMS)
+		buf[0] = SUB_ACK_STATUS_UMS;
+	else if(ack == SUB_ACK_STATUS_ASK)
+		buf[0] = SUB_ACK_STATUS_ASK;
+
+	return 1;
+}
+static int do_get_sw_rev(struct fsg_dev *fsg, struct fsg_buffhd *bh)
+{
+	u8	*buf = (u8 *) bh->buf;
+
+	memset(buf, 0, 7);
+
+	buf[0] = 2;
+	buf[1] = 1;
+	buf[5] = 1;
+	buf[6] = 2;
+	return 7;
+}
+static int do_get_meid(struct fsg_dev *fsg, struct fsg_buffhd *bh)
+{
+	u8	*buf = (u8 *) bh->buf;
+
+	memset(buf, 0, 7);
+
+	buf[0] = 3;
+	buf[1] = 1;
+	buf[5] = 1;
+	buf[6] = 3;
+	return 7;
+}
+static int do_get_model(struct fsg_dev *fsg, struct fsg_buffhd *bh)
+{
+	u8	*buf = (u8 *) bh->buf;
+
+	memset(buf, 0, 7);
+
+	buf[0] = 4;
+	buf[1] = 1;
+	buf[5] = 1;
+	buf[6] = 4;
+	return 7;
+}
+static int do_get_sub_ver(struct fsg_dev *fsg, struct fsg_buffhd *bh)
+{
+	u8	*buf = (u8 *) bh->buf;
+
+	memset(buf, 0, 7);
+
+	buf[0] = 5;
+	buf[1] = 1;
+	buf[5] = 1;
+	buf[6] = 5;
+	return 7;
+}
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 
 static int do_request_sense(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 {
@@ -1302,7 +1665,16 @@ static int do_request_sense(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 	memset(buf, 0, 18);
 	buf[0] = valid | 0x70;			/* Valid, current error */
 	buf[2] = SK(sd);
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	if (fsg->autorun_enable)
+		put_unaligned_be32(sdinfo, &buf[3]); /* Sense information */
+	else
+		put_be32(&buf[3], sdinfo); /* Sense information */
+#else
 	put_be32(&buf[3], sdinfo);		/* Sense information */
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 	buf[7] = 18 - 8;			/* Additional sense length */
 	buf[12] = ASC(sd);
 	buf[13] = ASCQ(sd);
@@ -1313,9 +1685,22 @@ static int do_request_sense(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 static int do_read_capacity(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 {
 	struct lun	*curlun = fsg->curlun;
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	u32		lba;
+#else
 	u32		lba = get_be32(&fsg->cmnd[2]);
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 	int		pmi = fsg->cmnd[8];
 	u8		*buf = (u8 *) bh->buf;
+
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	if (fsg->autorun_enable)
+		lba = get_unaligned_be32(&fsg->cmnd[2]);
+	else
+		lba = get_be32(&fsg->cmnd[2]);
+#endif
 
 	/* Check the PMI and LBA fields */
 	if (pmi > 1 || (pmi == 0 && lba != 0)) {
@@ -1323,11 +1708,97 @@ static int do_read_capacity(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 		return -EINVAL;
 	}
 
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	if (fsg->autorun_enable) {
+		/* Max logical block */
+		put_unaligned_be32(curlun->num_sectors - 1, &buf[0]);
+		put_unaligned_be32(512, &buf[4]); /* Block length */
+	} else {
+		put_be32(&buf[0], curlun->num_sectors - 1);	/* Max logical block */
+		put_be32(&buf[4], 512);	/* Block length */
+	}
+#else
 	put_be32(&buf[0], curlun->num_sectors - 1);	/* Max logical block */
 	put_be32(&buf[4], 512);				/* Block length */
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 	return 8;
 }
 
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+static void store_cdrom_address(u8 *dest, int msf, u32 addr)
+{
+	if (msf) {
+		/* Convert to Minutes-Seconds-Frames */
+		addr >>= 2;		/* Convert to 2048-byte frames */
+		addr += 2*75;		/* Lead-in occupies 2 seconds */
+		dest[3] = addr % 75;	/* Frames */
+		addr /= 75;
+		dest[2] = addr % 60;	/* Seconds */
+		addr /= 60;
+		dest[1] = addr;		/* Minutes */
+		dest[0] = 0;		/* Reserved */
+	} else {
+		/* Absolute sector */
+		put_unaligned_be32(addr, dest);
+	}
+}
+
+static int do_read_header(struct fsg_dev *fsg, struct fsg_buffhd *bh)
+{
+	struct lun	*curlun = fsg->curlun;
+	int		msf = fsg->cmnd[1] & 0x02;
+	u32		lba = get_unaligned_be32(&fsg->cmnd[2]);
+	u8		*buf = (u8 *) bh->buf;
+
+	if ((fsg->cmnd[1] & ~0x02) != 0) {		/* Mask away MSF */
+		DBG(fsg, "fail 'do_read_header' invalid field in cdb\n");
+		curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
+		return -EINVAL;
+	}
+	if (lba >= curlun->num_sectors) {
+		DBG(fsg, "fail 'do_read_header' address out of range\n");
+		curlun->sense_data = SS_LOGICAL_BLOCK_ADDRESS_OUT_OF_RANGE;
+		return -EINVAL;
+	}
+
+	memset(buf, 0, 8);
+	buf[0] = 0x01;		/* 2048 bytes of user data, rest is EC */
+	store_cdrom_address(&buf[4], msf, lba);
+	return 8;
+}
+
+static int do_read_toc(struct fsg_dev *fsg, struct fsg_buffhd *bh)
+{
+	struct lun	*curlun = fsg->curlun;
+	int		msf = fsg->cmnd[1] & 0x02;
+	int		start_track = fsg->cmnd[6];
+	u8		*buf = (u8 *) bh->buf;
+
+	if ((fsg->cmnd[1] & ~0x02) != 0 ||		/* Mask away MSF */
+			start_track > 1) {
+		curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
+		DBG(fsg, "fail do_read_toc start track\n");
+		return -EINVAL;
+	}
+
+	memset(buf, 0, 20);
+	buf[1] = (20-2);		/* TOC data length */
+	buf[2] = 1;			/* First track number */
+	buf[3] = 1;			/* Last track number */
+	buf[5] = 0x16;			/* Data track, copying allowed */
+	buf[6] = 0x01;			/* Only track is number 1 */
+	store_cdrom_address(&buf[8], msf, 0);
+
+	buf[13] = 0x16;			/* Lead-out track is data */
+	buf[14] = 0xAA;			/* Lead-out track number */
+	store_cdrom_address(&buf[16], msf, curlun->num_sectors);
+	return 20;
+}
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 
 static int do_mode_sense(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 {
@@ -1385,11 +1856,23 @@ static int do_mode_sense(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 			buf[2] = 0x04;	/* Write cache enable, */
 					/* Read cache not disabled */
 					/* No cache retention priorities */
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+			put_unaligned_be16(0xffff, &buf[4]);
+					 /* Don't disable prefetch */
+					/* Minimum prefetch = 0 */
+			put_unaligned_be16(0xffff, &buf[8]);
+					/* Maximum prefetch */
+			put_unaligned_be16(0xffff, &buf[10]);
+					/* Maximum prefetch ceiling */
+#else
 			put_be16(&buf[4], 0xffff);  /* Don't disable prefetch */
 					/* Minimum prefetch = 0 */
 			put_be16(&buf[8], 0xffff);  /* Maximum prefetch */
 			/* Maximum prefetch ceiling */
 			put_be16(&buf[10], 0xffff);
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 		}
 		buf += 12;
 	}
@@ -1405,11 +1888,26 @@ static int do_mode_sense(struct fsg_dev *fsg, struct fsg_buffhd *bh)
 		return -EINVAL;
 	}
 
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	/*  Store the mode data length */
+	if (mscmnd == SC_MODE_SENSE_6)
+		buf0[0] = len - 1;
+	else {
+		if (fsg->autorun_enable)
+			put_unaligned_be16(len - 2, buf0);
+		else
+			put_be16(buf0, len - 2);
+	}
+#else
 	/*  Store the mode data length */
 	if (mscmnd == SC_MODE_SENSE_6)
 		buf0[0] = len - 1;
 	else
 		put_be16(buf0, len - 2);
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
+
 	return len;
 }
 
@@ -1425,8 +1923,20 @@ static int do_start_stop(struct fsg_dev *fsg)
 	if (loej) {
 		/* eject request from the host */
 		if (backing_file_is_open(curlun)) {
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+			/* If eject command is received to Autorun CD,
+			 * we reject the eject request.
+			 */
+			if (!fsg->autorun_enable) {
+				close_backing_file(fsg, curlun);
+				curlun->unit_attention_data = SS_MEDIUM_NOT_PRESENT;
+			}
+#else
 			close_backing_file(fsg, curlun);
 			curlun->unit_attention_data = SS_MEDIUM_NOT_PRESENT;
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 		}
 	}
 
@@ -1460,9 +1970,20 @@ static int do_read_format_capacities(struct fsg_dev *fsg,
 	buf[0] = buf[1] = buf[2] = 0;
 	buf[3] = 8;	/* Only the Current/Maximum Capacity Descriptor */
 	buf += 4;
-
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	if (fsg->autorun_enable) {
+		put_unaligned_be32(curlun->num_sectors, &buf[0]); /* Num of blocks */
+		put_unaligned_be32(512, &buf[4]);		/* Block length */
+	} else {
+		put_be32(&buf[0], curlun->num_sectors);	/* Number of blocks */
+		put_be32(&buf[4], 512);				/* Block length */
+	}
+#else
 	put_be32(&buf[0], curlun->num_sectors);	/* Number of blocks */
 	put_be32(&buf[4], 512);				/* Block length */
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 	buf[4] = 0x02;					/* Current capacity */
 	return 12;
 }
@@ -1537,6 +2058,11 @@ static int throw_away_data(struct fsg_dev *fsg)
 			 * the bulk-out maxpacket size */
 			bh->outreq->length = bh->bulk_out_intended_length =
 					amount;
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+			ad_info("In throw_away_data() - ");
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 			start_transfer(fsg, fsg->bulk_out, bh->outreq,
 					&bh->outreq_busy, &bh->state);
 			fsg->next_buffhd_to_fill = bh->next;
@@ -1560,14 +2086,29 @@ static int finish_reply(struct fsg_dev *fsg)
 
 	switch (fsg->data_dir) {
 	case DATA_DIR_NONE:
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+		ad_info("In finish_reply() - DATA_DIR_NONE");
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 		break;			/* Nothing to send */
 
 	case DATA_DIR_UNKNOWN:
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+		ad_info("In finish_reply() - DATA_DIR_UNKNOWN");
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 		rc = -EINVAL;
 		break;
 
 	/* All but the last buffer of data must have already been sent */
 	case DATA_DIR_TO_HOST:
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+		ad_info("finish_reply()- DIR_TO_HOST");
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 		if (fsg->data_size == 0)
 			;		/* Nothing to send */
 
@@ -1591,6 +2132,11 @@ static int finish_reply(struct fsg_dev *fsg)
 	/* We have processed all we want from the data the host has sent.
 	 * There may still be outstanding bulk-out requests. */
 	case DATA_DIR_FROM_HOST:
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+		ad_info("In finish_reply() - DATA_DIR_FROM_HOST");
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 		if (fsg->residue == 0)
 			;		/* Nothing to receive */
 
@@ -1669,6 +2215,11 @@ static int send_status(struct fsg_dev *fsg)
 	csw->Status = status;
 
 	bh->inreq->length = USB_BULK_CS_WRAP_LEN;
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	ad_info("In send_status() - ");
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 	start_transfer(fsg, fsg->bulk_in, bh->inreq,
 			&bh->inreq_busy, &bh->state);
 
@@ -1702,21 +2253,50 @@ static int check_command(struct fsg_dev *fsg, int cmnd_size,
 	/* We can't reply at all until we know the correct data direction
 	 * and size. */
 	if (fsg->data_size_from_cmnd == 0)
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	{
 		data_dir = DATA_DIR_NONE;
+		ad_info("(check_cmd(1))\n");
+	}
+#else
+		data_dir = DATA_DIR_NONE;
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 	if (fsg->data_dir == DATA_DIR_UNKNOWN) {	/* CB or CBI */
 		fsg->data_dir = data_dir;
 		fsg->data_size = fsg->data_size_from_cmnd;
-
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+		ad_info("(check_cmd(2))\n");
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 	} else {					/* Bulk-only */
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+		ad_info("(check_cmdd(3))");
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 		if (fsg->data_size < fsg->data_size_from_cmnd) {
 
 			/* Host data size < Device data size is a phase error.
 			 * Carry out the command, but only transfer as much
 			 * as we are allowed. */
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+			ad_info("phase error1");
+#else
 			DBG(fsg, "phase error 1\n");
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 			fsg->data_size_from_cmnd = fsg->data_size;
 			fsg->phase_error = 1;
 		}
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+		ad_info("OK \n");
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 	}
 	fsg->residue = fsg->usb_amount_left = fsg->data_size;
 
@@ -1734,9 +2314,23 @@ static int check_command(struct fsg_dev *fsg, int cmnd_size,
 		 * and INQUIRY commands with cbw->Length == 12 (it should be 6). */
 		if ((fsg->cmnd[0] == SC_REQUEST_SENSE && fsg->cmnd_size == 12)
 		 || (fsg->cmnd[0] == SC_INQUIRY && fsg->cmnd_size == 12))
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+		{
 			cmnd_size = fsg->cmnd_size;
+			ad_info("(check_cmd(5))\n");	// success Verify the length of the CMD
+		}
+#else
+			cmnd_size = fsg->cmnd_size;
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 		else {
 			fsg->phase_error = 1;
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+			ad_info("(check_cmd(6)) \n");  //fail Verify the length of the CMD
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 			return -EINVAL;
 		}
 	}
@@ -1750,12 +2344,32 @@ static int check_command(struct fsg_dev *fsg, int cmnd_size,
 	/* Check the LUN */
 	if (fsg->lun >= 0 && fsg->lun < fsg->nluns) {
 		fsg->curlun = curlun = &fsg->luns[fsg->lun];
+		//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+		ad_info("(check_cmd(7)) ");	// check the run OK
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 		if (fsg->cmnd[0] != SC_REQUEST_SENSE) {
 			curlun->sense_data = SS_NO_SENSE;
 			curlun->sense_data_info = 0;
 			curlun->info_valid = 0;
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+			ad_info("(check_cmd(8)) \n");   //- but not same SC_REQUSET_SENSE
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 		}
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+		ad_info("(check_cmd(9))\n");   // - same SC_REQUSET_SENSE
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 	} else {
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+		ad_info("(check_cmd(10)) ");  //check the run NOT OK
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 		fsg->curlun = curlun = NULL;
 		fsg->bad_lun_okay = 0;
 
@@ -1766,6 +2380,11 @@ static int check_command(struct fsg_dev *fsg, int cmnd_size,
 			DBG(fsg, "unsupported LUN %d\n", fsg->lun);
 			return -EINVAL;
 		}
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+		ad_info("(check_cmd(12))  \n");//supported LUN
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 	}
 
 	/* If a unit attention condition exists, only INQUIRY and
@@ -1775,6 +2394,11 @@ static int check_command(struct fsg_dev *fsg, int cmnd_size,
 			fsg->cmnd[0] != SC_REQUEST_SENSE) {
 		curlun->sense_data = curlun->unit_attention_data;
 		curlun->unit_attention_data = SS_NO_SENSE;
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+		ad_info("(check_cmd(13)) \n");	//ERROR unit attention condition
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 		return -EINVAL;
 	}
 
@@ -1801,6 +2425,10 @@ static int check_command(struct fsg_dev *fsg, int cmnd_size,
 }
 
 
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com)
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+extern int get_autorun_user_mode(void);
+#endif
 static int do_scsi_command(struct fsg_dev *fsg)
 {
 	struct fsg_buffhd	*bh;
@@ -1831,6 +2459,106 @@ static int do_scsi_command(struct fsg_dev *fsg)
 				"INQUIRY")) == 0)
 			reply = do_inquiry(fsg, bh);
 		break;
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	case SC_LGE_SPE:
+		pr_info("%s : SC_LGE_SPE - %x %x %x\n", __func__,
+			  fsg->cmnd[0], fsg->cmnd[1], fsg->cmnd[2]);
+
+		fsg->mode_state = MODE_STATE_UNKNOWN;
+		switch(fsg->cmnd[1])
+		{
+			case SUB_CODE_MODE_CHANGE:
+				switch(fsg->cmnd[2])
+				{
+					case TYPE_MOD_CHG_TO_ACM :
+					case TYPE_MOD_CHG2_TO_ACM :
+						fsg->mode_state = MODE_STATE_ACM;
+						break;
+					case TYPE_MOD_CHG_TO_UMS :
+					case TYPE_MOD_CHG2_TO_UMS :
+						fsg->mode_state = MODE_STATE_UMS;
+						break;
+					case TYPE_MOD_CHG_TO_MTP :
+					case TYPE_MOD_CHG2_TO_MTP :
+						fsg->mode_state = MODE_STATE_MTP;
+						break;
+					case TYPE_MOD_CHG_TO_ASK :
+					case TYPE_MOD_CHG2_TO_ASK :
+						fsg->mode_state = MODE_STATE_ASK;
+						break;
+					default:
+						fsg->mode_state = MODE_STATE_UNKNOWN;
+				}
+				pr_info("%s : SC_LGE_MODE - %d\n", __func__, fsg->mode_state);
+				if (fsg->autorun_enable && &fsg->autorun_sdev) {
+					switch_set_state(&fsg->autorun_sdev, fsg->mode_state);
+					/* For Refreshing Uevent, This Uevent will be ignore by
+					   AutoRun APK */
+					switch_set_state(&fsg->autorun_sdev, MODE_STATE_UNKNOWN);
+				}
+				reply = 0;
+				break;
+			case SUB_CODE_GET_VALUE:
+				switch(fsg->cmnd[2])
+				{
+					case ACK_STATUS_TO_HOST :	// 0xf1 0x02 0x10
+						/* If some error exists, we set default mode
+						   to ACM mode */
+						user_mode = get_autorun_user_mode();
+						if (user_mode >= ACK_STATUS_ERR) {
+							pr_err("%s [AUTORUN] : Error on user mode setting, set default mode (ACM)\n", __func__);
+							user_mode = ACK_STATUS_ACM;
+						} else
+							pr_info("%s [AUTORUN] : send user mode to PC %s\n", __func__, check_str[user_mode]);
+
+						fsg->data_size_from_cmnd = 1;
+						if ((reply = check_command(fsg, 6, DATA_DIR_TO_HOST,
+										(7<<1), 1, check_str[user_mode])) == 0)
+							reply=do_ack_status(fsg, bh, user_mode);
+						break;
+					case ACK_SW_REV_TO_HOST :	// 0xf1 0x02 0x12
+						fsg->data_size_from_cmnd = 7;
+						if ((reply = check_command(fsg, 6, DATA_DIR_TO_HOST,
+										(7<<1), 1, "ACK_SW_REV")) == 0)
+							reply=do_get_sw_rev(fsg, bh);
+						break;
+					case ACK_MEID_TO_HOST :		// 0xf1 0x02 0x13
+						fsg->data_size_from_cmnd = 7;
+						if ((reply = check_command(fsg, 6, DATA_DIR_TO_HOST,
+										(7<<1), 1, "ACK_MEID")) == 0)
+							reply=do_get_meid(fsg, bh);
+						break;
+					case ACK_MODEL_TO_HOST :	// 0xf1 0x02 0x14
+						fsg->data_size_from_cmnd = 7;
+						if ((reply = check_command(fsg, 6, DATA_DIR_TO_HOST,
+										(7<<1), 1, "ACK_MODEL_NAME")) == 0)
+							reply=do_get_model(fsg, bh);
+						break;
+					case ACK_SUB_VER_TO_HOST:	// 0xf1 0x02 0x15
+						fsg->data_size_from_cmnd = 7;
+						if ((reply = check_command(fsg, 6, DATA_DIR_TO_HOST,
+										(7<<1), 1, "ACK_SUB_VERSION")) == 0)
+							reply=do_get_sub_ver(fsg, bh);
+						break;
+					default:
+						break;
+				}
+
+				break;
+			case SUB_CODE_PROBE_DEV:
+				fsg->mode_state = MODE_STATE_PROBE_DEV;
+				reply=0;
+				break;
+			default:
+				fsg->mode_state = MODE_STATE_UNKNOWN;
+				reply=0;
+				break;
+		}
+
+		break;
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 
 	case SC_MODE_SELECT_6:
 		fsg->data_size_from_cmnd = fsg->cmnd[4];
@@ -1904,7 +2632,29 @@ static int do_scsi_command(struct fsg_dev *fsg)
 				"READ CAPACITY")) == 0)
 			reply = do_read_capacity(fsg, bh);
 		break;
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	case SC_READ_HEADER:
+		if (!fsg->curlun->ro)
+			goto unknown_cmnd;
+		fsg->data_size_from_cmnd = get_unaligned_be16(&fsg->cmnd[7]);
+		if ((reply = check_command(fsg, 10, DATA_DIR_TO_HOST,
+				(3<<7) | (0x1f<<1), 1,
+				"READ HEADER")) == 0)
+			reply = do_read_header(fsg, bh);
+		break;
 
+	case SC_READ_TOC:
+		if (!fsg->curlun->ro)
+			goto unknown_cmnd;
+		fsg->data_size_from_cmnd = get_unaligned_be16(&fsg->cmnd[7]);
+		if ((reply = check_command(fsg, 10, DATA_DIR_TO_HOST,
+				(7<<6) | (1<<1), 1,
+				"READ TOC")) == 0)
+			reply = do_read_toc(fsg, bh);
+		break;
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 	case SC_READ_FORMAT_CAPACITIES:
 		fsg->data_size_from_cmnd = get_be16(&fsg->cmnd[7]);
 		if ((reply = check_command(fsg, 10, DATA_DIR_TO_HOST,
@@ -1990,8 +2740,18 @@ static int do_scsi_command(struct fsg_dev *fsg)
 		/* Fall through */
 
 	default:
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+unknown_cmnd:
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 		fsg->data_size_from_cmnd = 0;
 		sprintf(unknown, "Unknown x%02x", fsg->cmnd[0]);
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+		ad_info("unknown_cmnd x%02x", fsg->cmnd[0]);
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 		if ((reply = check_command(fsg, fsg->cmnd_size,
 				DATA_DIR_UNKNOWN, 0xff, 0, unknown)) == 0) {
 			fsg->curlun->sense_data = SS_INVALID_COMMAND;
@@ -2004,7 +2764,16 @@ static int do_scsi_command(struct fsg_dev *fsg)
 	VDBG(fsg, "reply: %d, fsg->data_size_from_cmnd: %d\n",
 			reply, fsg->data_size_from_cmnd);
 	if (reply == -EINTR || signal_pending(current))
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	{
+		ad_info("go error = return -EINTR\n");
 		return -EINTR;
+	}
+#else
+		return -EINTR;
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 
 	/* Set up the single reply buffer for finish_reply() */
 	if (reply == -EINVAL)
@@ -2270,7 +3039,14 @@ static int do_set_config(struct fsg_dev *fsg, u8 new_config)
 			fsg->config = 0;	// Reset on errors
 	}
 
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	if (!fsg->autorun_enable)
+		switch_set_state(&fsg->sdev, new_config);
+#else
 	switch_set_state(&fsg->sdev, new_config);
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 	adjust_wake_lock(fsg);
 	return rc;
 }
@@ -2493,6 +3269,11 @@ static int open_backing_file(struct fsg_dev *fsg, struct lun *curlun,
 	struct inode			*inode = NULL;
 	loff_t				size;
 	loff_t				num_sectors;
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	loff_t				min_sectors;
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 
 	/* R/W if we can, R/O if we must */
 	ro = curlun->ro;
@@ -2537,11 +3318,41 @@ static int open_backing_file(struct fsg_dev *fsg, struct lun *curlun,
 		goto out;
 	}
 	num_sectors = size >> 9;	/* File size in 512-byte sectors */
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	if(fsg->autorun_enable) {
+		min_sectors = 1;
+
+		num_sectors &= ~3;	// Reduce to a multiple of 2048
+		//min_sectors = 300*4;	// Smallest track is 300 frames
+		min_sectors = 300*2;
+		if (num_sectors >= 256*60*75*4) {
+			num_sectors = (256*60*75 - 1) * 4;
+			LINFO(curlun, "file too big: %s\n", filename);
+			ad_info("file too big: %s\n", filename);
+			LINFO(curlun, "using only first %d blocks\n",
+					(int) num_sectors);
+		}
+
+		if (num_sectors < min_sectors) {
+			LINFO(curlun, "file too small: %s\n", filename);
+			ad_info("file too small: %s\n", filename);
+		}
+	} else {
+		if (num_sectors == 0) {
+			LINFO(curlun, "file too small: %s\n", filename);
+			rc = -ETOOSMALL;
+			goto out;
+		}
+	}
+#else
 	if (num_sectors == 0) {
 		LINFO(curlun, "file too small: %s\n", filename);
 		rc = -ETOOSMALL;
 		goto out;
 	}
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 
 	get_file(filp);
 	curlun->ro = ro;
@@ -2659,6 +3470,41 @@ static ssize_t store_file(struct device *dev, struct device_attribute *attr,
 
 static DEVICE_ATTR(file, 0444, show_file, store_file);
 
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+#if 0
+static ssize_t store_community(struct device *dev,
+			struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct fsg_dev	*fsg = dev_get_drvdata(dev);
+	unsigned long tmp;
+	int ret = 0;
+
+	down_write(&fsg->filesem);
+
+	if (count > 0 && buf[0]) {
+		/* NOTE : base of converting from string to long is 16(hex) */
+		ret = strict_strtoul(buf, 16, &tmp);
+		if (ret) {
+			up_write(&fsg->filesem);
+			return ret;
+		}
+
+
+		autorun_user_mode = (unsigned int)tmp;
+		pr_info("%s: set user_mode is %d\n",__func__ ,autorun_user_mode);
+	}
+	up_write(&fsg->filesem);
+
+	return count;
+}
+
+//static DEVICE_ATTR(community, 0666, show_community, store_community);
+static DEVICE_ATTR(community, 0666, NULL, store_community);
+#endif
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
+
 /*-------------------------------------------------------------------------*/
 
 static void fsg_release(struct kref *ref)
@@ -2679,7 +3525,12 @@ static void lun_release(struct device *dev)
 
 /*-------------------------------------------------------------------------*/
 
+//20100822, jm1.lee@lge.com, for USB mode switching(__initdata and __init can not use after kernel booting)
+#if defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
+static int fsg_alloc(void)
+#else
 static int __init fsg_alloc(void)
+#endif
 {
 	struct fsg_dev		*fsg;
 
@@ -2705,6 +3556,23 @@ static ssize_t print_switch_state(struct switch_dev *sdev, char *buf)
 	struct fsg_dev	*fsg = container_of(sdev, struct fsg_dev, sdev);
 	return sprintf(buf, "%s\n", (fsg->config ? "online" : "offline"));
 }
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+
+static ssize_t print_switch_name_autorun(struct switch_dev *sdev, char *buf)
+{
+	return sprintf(buf, "%s\n", DRIVER_NAME_AUTORUN);
+}
+
+static ssize_t print_switch_state_autorun(struct switch_dev *sdev, char *buf)
+{
+	pr_info("%s : send Uevent - %s\n", __func__,  chg_mode[sdev->state]);
+
+	return sprintf(buf, "%s\n", chg_mode[sdev->state]);
+
+}
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 
 static void
 fsg_function_unbind(struct usb_configuration *c, struct usb_function *f)
@@ -2721,6 +3589,11 @@ fsg_function_unbind(struct usb_configuration *c, struct usb_function *f)
 		curlun = &fsg->luns[i];
 		if (curlun->registered) {
 			device_remove_file(&curlun->dev, &dev_attr_file);
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	/*		device_remove_file(&curlun->dev, &dev_attr_community); */
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 			device_unregister(&curlun->dev);
 			curlun->registered = 0;
 		}
@@ -2738,7 +3611,17 @@ fsg_function_unbind(struct usb_configuration *c, struct usb_function *f)
 	/* Free the data buffers */
 	for (i = 0; i < NUM_BUFFERS; ++i)
 		kfree(fsg->buffhds[i].buf);
+	wake_lock_destroy(&the_fsg->wake_lock);
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	if (fsg->autorun_enable)
+		switch_dev_unregister(&the_fsg->autorun_sdev);
+	else
+		switch_dev_unregister(&the_fsg->sdev);
+#else
 	switch_dev_unregister(&fsg->sdev);
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 }
 
 static int
@@ -2779,7 +3662,17 @@ fsg_function_bind(struct usb_configuration *c, struct usb_function *f)
 
 	for (i = 0; i < fsg->nluns; ++i) {
 		curlun = &fsg->luns[i];
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+		if (fsg->autorun_enable)
+			curlun->ro = 1; /* cdrom : read only */
+		else
+			curlun->ro = 0; /* mass storage : read/write */
+#else
 		curlun->ro = 0;
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
+
 		curlun->dev.release = lun_release;
 		/* use "usb_mass_storage" platform device as parent if available */
 		if (fsg->pdev)
@@ -2800,6 +3693,20 @@ fsg_function_bind(struct usb_configuration *c, struct usb_function *f)
 			device_unregister(&curlun->dev);
 			goto out;
 		}
+//20100901, jm1.lee@lge.com, for autorun [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+#if 0
+		rc = device_create_file(&curlun->dev, &dev_attr_community);
+		if (rc != 0) {
+			ERROR(fsg, "device_create_community failed: %d\n", rc);
+			device_remove_file(&curlun->dev, &dev_attr_file);
+			device_unregister(&curlun->dev);
+			goto out;
+		}
+#endif
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
+
 		curlun->registered = 1;
 		kref_get(&fsg->ref);
 	}
@@ -2911,6 +3818,8 @@ static void fsg_function_disable(struct usb_function *f)
 	raise_exception(fsg, FSG_STATE_CONFIG_CHANGE);
 }
 
+//20100824, jm1.lee@lge.com, for USB mode switching [START]
+#if !defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
 static int __init fsg_probe(struct platform_device *pdev)
 {
 	struct usb_mass_storage_platform_data *pdata = pdev->dev.platform_data;
@@ -2944,37 +3853,109 @@ static struct platform_driver fsg_platform_driver = {
 	.probe = fsg_probe,
 };
 
+#endif
+//20100824, jm1.lee@lge.com, for USB mode switching [END]
+
+//20100817, jm1.lee@lge.com, for USB mode switching [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+int mass_storage_function_add(struct usb_composite_dev *cdev,
+	struct usb_configuration *c, int nluns, int autorun_enable)
+#elif defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
+int mass_storage_function_add(struct usb_composite_dev *cdev,
+	struct usb_configuration *c, int nluns)
+#else
 int mass_storage_bind_config(struct usb_configuration *c)
+#endif
+//20100817, jm1.lee@lge.com, for USB mode switching [END]
 {
 	int		rc;
 	struct fsg_dev	*fsg;
 
+//20100817, jm1.lee@lge.com, for USB mode switching [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	if (autorun_enable)
+		printk(KERN_INFO "mass_storage_function_add : AUTORUN\n");
+	else
+		printk(KERN_INFO "mass_storage_function_add\n");
+#else
 	printk(KERN_INFO "mass_storage_bind_config\n");
+#endif
+//20100817, jm1.lee@lge.com, for USB mode switching [END]
 	rc = fsg_alloc();
 	if (rc)
 		return rc;
 	fsg = the_fsg;
+//20100817, jm1.lee@lge.com, for USB mode switching [START]
+#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
+	fsg->nluns = nluns;
+	fsg->vendor = vendor_name;
+	fsg->product = product_name;
+#endif
+//20100817, jm1.lee@lge.com, for USB mode switching [END]
 
 	spin_lock_init(&fsg->lock);
 	init_rwsem(&fsg->filesem);
 	kref_init(&fsg->ref);
 	init_completion(&fsg->thread_notifier);
 
+//20100817, jm1.lee@lge.com, for USB mode switching
+#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	if (the_fsg->autorun_enable)
+		the_fsg->buf_size = BULK_BUFFER_SIZE;
+	else
+		the_fsg->buf_size = 32768;
+#else
+	the_fsg->buf_size = BULK_BUFFER_SIZE;
+#endif
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [START]
+#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN
+	the_fsg->autorun_enable = autorun_enable;
+
+	if (the_fsg->autorun_enable) {
+		the_fsg->autorun_sdev.name = DRIVER_NAME_AUTORUN;
+		the_fsg->autorun_sdev.print_name = print_switch_name_autorun;
+		the_fsg->autorun_sdev.print_state = print_switch_state_autorun;
+
+		rc = switch_dev_register(&the_fsg->autorun_sdev);
+		if (rc < 0)
+			goto err_switch_dev_register;
+	} else {
 	the_fsg->sdev.name = DRIVER_NAME;
 	the_fsg->sdev.print_name = print_switch_name;
 	the_fsg->sdev.print_state = print_switch_state;
 	rc = switch_dev_register(&the_fsg->sdev);
 	if (rc < 0)
 		goto err_switch_dev_register;
+	}
+#else
+	the_fsg->sdev.name = DRIVER_NAME;
+	the_fsg->sdev.print_name = print_switch_name;
+	the_fsg->sdev.print_state = print_switch_state;
+	rc = switch_dev_register(&the_fsg->sdev);
+	if (rc < 0)
+		goto err_switch_dev_register;
+#endif
+//20100901, jm1.lee@lge.com, for autorun (from vs660, editor:adwardk.kim@lge.com) [END]
 
+//20100817, jm1.lee@lge.com, for USB mode switching
+#if !defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
 	rc = platform_driver_register(&fsg_platform_driver);
 	if (rc != 0)
 		goto err_platform_driver_register;
+#endif
 
 	wake_lock_init(&the_fsg->wake_lock, WAKE_LOCK_SUSPEND,
 			   "usb_mass_storage");
 
+//20100817, jm1.lee@lge.com, USB mode switching [START]
+#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
+	fsg->cdev = cdev;
+#else
 	fsg->cdev = c->cdev;
+#endif
+//20100817, jm1.lee@lge.com, USB mode switching [END]
 	fsg->function.name = shortname;
 	fsg->function.descriptors = fs_function;
 	fsg->function.bind = fsg_function_bind;
@@ -2992,8 +3973,12 @@ int mass_storage_bind_config(struct usb_configuration *c)
 
 err_usb_add_function:
 	wake_lock_destroy(&the_fsg->wake_lock);
+//20100824, jm1.lee@lge.com, for USB mode switching [START]
+#if !defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
 	platform_driver_unregister(&fsg_platform_driver);
 err_platform_driver_register:
+#endif
+//20100824, jm1.lee@lge.com, for USB mode switching [END]
 	switch_dev_unregister(&the_fsg->sdev);
 err_switch_dev_register:
 	kref_put(&the_fsg->ref, fsg_release);
@@ -3001,6 +3986,8 @@ err_switch_dev_register:
 	return rc;
 }
 
+//20100824, jm1.lee@lge.com, for USB mode switching [START]
+#if !defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
 static struct android_usb_function mass_storage_function = {
 	.name = "usb_mass_storage",
 	.bind_config = mass_storage_bind_config,
@@ -3013,4 +4000,6 @@ static int __init init(void)
 	return 0;
 }
 module_init(init);
+#endif
+//20100824, jm1.lee@lge.com, for USB mode switching [END]
 

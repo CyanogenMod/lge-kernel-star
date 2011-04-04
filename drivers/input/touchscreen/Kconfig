@@ -285,6 +285,14 @@ config TOUCHSCREEN_TEGRA_ODM
 	  Adds a touchscreen input device for drivers written using NVIDIA's
 	  Tegra ODM kit interface
 
+config ONETOUCH_TEGRA_ODM
+	boolean "NVIDIA Tegra ODM-kit based synaptics onetouch driver"
+	depends on ARCH_TEGRA && TEGRA_NVRM
+	default n
+	help
+	  Adds a touchscreen input device for drivers written using NVIDIA's
+	  Tegra ODM kit interface
+
 config TOUCHSCREEN_TOUCHRIGHT
 	tristate "Touchright serial touchscreen"
 	select SERIO

@@ -136,6 +136,18 @@ typedef struct NvRmPmuVddRailCapabilitiesRec
     NvU32 MilliVolts,
     NvU32 * pSettleMicroSeconds );
 
+#if defined(CONFIG_MACH_STAR) 
+//20100704 bergkamp.cho@lge.com jongik's headset porting [LGE]
+NvU32 NvRmPmuGetHookAdc(
+    NvRmDeviceHandle hDevice);
+
+//20101121 cs77.ha@lge.com, HW power off in thermal limit [START]
+NvU32 NvRmPmuSetHwPowerOffConfig(
+    NvRmDeviceHandle hDevice,
+    NvBool Enable);
+//20101121 cs77.ha@lge.com, HW power off in thermal limit [END]
+#endif
+
 /**
  * Configures SoC power rail controls for the upcoming PMU voltage transition.
  *
@@ -198,6 +210,11 @@ typedef enum
 #define NVODM_BATTERY_STATUS_LOW                0x02
 #define NVODM_BATTERY_STATUS_CRITICAL           0x04
 #define NVODM_BATTERY_STATUS_CHARGING           0x08
+//20100608, jh.ahn@lge.com, Write the description here in detail [START]
+#define NVODM_BATTERY_STATUS_DISCHARGING        0x10
+#define NVODM_BATTERY_STATUS_IDLE               0x20
+#define NVODM_BATTERY_STATUS_VERY_CRITICAL      0x40
+//20100608, jh.ahn@lge.com, Write the description here in detail [END]
 #define NVODM_BATTERY_STATUS_NO_BATTERY         0x80
 #define NVODM_BATTERY_STATUS_UNKNOWN            0xFF
 
@@ -344,6 +361,17 @@ typedef enum
     NvRmPmuBatteryInstance batteryInst,
     NvRmPmuBatteryData * pData );
 
+//20100924, jh.ahn@lge.com, For updating battery information totally [START]
+#if defined(CONFIG_MACH_STAR)
+NvBool
+NvRmPmuUpdateBatteryInfo(
+	NvRmDeviceHandle hRmDevice,
+	NvRmPmuAcLineStatus *pAcStatus,
+	NvU8 * pBatStatus,
+	NvRmPmuBatteryData * pBatData);
+#endif
+//20100924, jh.ahn@lge.com, For updating battery information totally  [END]
+
 /**
  * Gets the battery full life time.
  *
@@ -399,6 +427,30 @@ typedef enum
  NvBool NvRmPmuWriteRtc( 
     NvRmDeviceHandle hRmDevice,
     NvU32 Count );
+
+//20101005, jh.ahn@lge.com, Alarm funtion for Full Battery Recharging [START]
+/**
+ * Gets the alarm count in seconds of the current external RTC (in PMU).
+ *
+ * @param hDevice A handle to the PMU.
+ * @param Count A pointer to where to return the current counter in sec.
+ * @return NV_TRUE if successful, or NV_FALSE otherwise.
+ */
+NvBool NvRmPmuReadAlarm(
+    NvRmDeviceHandle hRmDevice,
+    NvU32* Count);
+
+/**
+ * Updates alarm count value.
+ *
+ * @param hDevice A handle to the PMU.
+ * @param Count data with which to update the current counter in sec.
+ * @return NV_TRUE if successful, or NV_FALSE otherwise.
+ */
+NvBool NvRmPmuWriteAlarm(
+    NvRmDeviceHandle hRmDevice,
+    NvU32 Count);
+//20101005, jh.ahn@lge.com, Alarm funtion for Full Battery Recharging [END]
 
 /**
  * Verifies whether the RTC is initialized.

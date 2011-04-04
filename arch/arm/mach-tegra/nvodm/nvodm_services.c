@@ -134,6 +134,35 @@ NvOdmGpioReleasePinHandle(NvOdmServicesGpioHandle hOdmGpio,
         NvRmGpioReleasePinHandles(hOdmGpio->hGpio, &hRmPin, 1);
 }
 
+//cs77.ha@lge.com LCD IF fast init
+//NvBug 716430
+// hGpioPin == pointer to array of GPIO pin handles, arraySize ==  numberOfPins
+// PinValue == pointer to array of corresponding GPIN pin values
+// numberOfPins = number of pins in the bus
+void
+NvOdmGpioSetBusState(
+    NvOdmServicesGpioHandle hOdmGpio,
+    NvOdmGpioPinHandle *hGpioPin,
+    NvU32 *PinValue,
+	NvU32 numberOfPins)
+{
+	NvU32 i;
+    NvRmGpioPinState *val = (NvRmGpioPinState *)PinValue;
+    NvRmGpioPinHandle *hRmPin = (NvRmGpioPinHandle *)hGpioPin;
+    if (hOdmGpio == NULL || hGpioPin == NULL)
+        return;
+/*
+	NvOsDebugPrintf( "NvOdmGpioSetBusState: ================\n");
+    NvOsDebugPrintf( "  BusSize = %d\n", numberOfPins );
+	for( i = 0; i< numberOfPins; i++)
+	{
+		NvOsDebugPrintf( "  Bus[%d], hndl = 0x%x, value = %d\n", i, hRmPin[i], val[i]);
+	}
+	NvOsDebugPrintf( "NvOdmGpioSetBusState: ================\n");
+*/
+    NvRmGpioWritePins( hOdmGpio->hGpio, hRmPin, val, numberOfPins);
+}
+
 void
 NvOdmGpioSetState(
     NvOdmServicesGpioHandle hOdmGpio,
@@ -520,18 +549,23 @@ NvOdmI2cTransaction(
                 status =  NvOdmI2cStatus_SlaveNotFound;
                 break;
             case NvError_I2cReadFailed:
+                NvOsDebugPrintf("[Kernel : I2C ERROR] NvError_I2cDeviceNotFound \n");
                 status = NvOdmI2cStatus_ReadFailed;
                 break;
             case NvError_I2cWriteFailed:
+                NvOsDebugPrintf("[Kernel : I2C ERROR] NvError_I2cWriteFailed \n");
                 status = NvOdmI2cStatus_WriteFailed;
                 break;
             case NvError_I2cArbitrationFailed:
+                NvOsDebugPrintf("[Kernel : I2C ERROR] NvError_I2cArbitrationFailed \n");
                 status = NvOdmI2cStatus_ArbitrationFailed;
                 break;
             case NvError_I2cInternalError:
+                NvOsDebugPrintf("[Kernel : I2C ERROR] NvError_I2cInternalError \n");
                 status = NvOdmI2cStatus_InternalError;
                 break;
             case NvError_Timeout:
+                NvOsDebugPrintf("[Kernel : I2C ERROR] NvError_Timeout \n");
             default:
                 status = NvOdmI2cStatus_Timeout;
                 break;
@@ -788,6 +822,16 @@ void NvOdmServicesPmuGetCapabilities(
     return;
 }
 
+#if defined(CONFIG_MACH_STAR) //20100704 bergkamp.cho@lge.com jongik's headset porting [LGE]
+NvU32 NvOdmServicesPmuGetHookValue( 
+        NvOdmServicesPmuHandle handle)
+{
+    NvU32 value =0;
+    NvRmDeviceHandle hRmDev = (NvRmDeviceHandle)handle;
+    value = NvRmPmuGetHookAdc(hRmDev);
+}
+#endif
+
 void NvOdmServicesPmuGetVoltage( 
         NvOdmServicesPmuHandle handle,
         NvU32 vddId, 
@@ -816,6 +860,18 @@ void NvOdmServicesPmuSetSocRailPowerState(
     NvRmPmuSetSocRailPowerState(hRmDev, vddId, Enable);
 }
 
+//20100909, jh.ahn@lge.com, for detecting power source in battery checker [START]
+NvBool
+NvOdmServicesPmuGetAcLineStatus(
+    NvOdmServicesPmuHandle handle,
+    NvOdmServicesPmuAcLineStatus* pStatus)
+{
+    return NvRmPmuGetAcLineStatus(
+        (NvRmDeviceHandle)handle,
+        (NvRmPmuAcLineStatus *)pStatus);
+}
+//20100909, jh.ahn@lge.com, for detecting power source in battery checker [END]
+
 NvBool 
 NvOdmServicesPmuGetBatteryStatus(
     NvOdmServicesPmuHandle handle,
@@ -839,6 +895,24 @@ NvOdmServicesPmuGetBatteryData(
         (NvRmPmuBatteryInstance)batteryInst,
         (NvRmPmuBatteryData *)pData);
 }
+
+//20100924, jh.ahn@lge.com, For updating battery information totally [START]
+#if defined(CONFIG_MACH_STAR)
+NvBool
+NvOdmServicesPmuUpdateBatteryInfo(
+	NvOdmServicesPmuHandle handle,
+	NvOdmServicesPmuAcLineStatus * pAcStatus,
+	NvU8 * pBatStatus,
+	NvOdmServicesPmuBatteryData * pBatData)
+{
+	return NvRmPmuUpdateBatteryInfo(
+			(NvRmDeviceHandle)handle,
+			(NvRmPmuAcLineStatus *)pAcStatus,
+			pBatStatus,
+			(NvRmPmuBatteryData *)pBatData);
+}
+#endif
+//20100924, jh.ahn@lge.com, For updating battery information totally  [END]
 
 void
 NvOdmServicesPmuGetBatteryFullLifeTime(

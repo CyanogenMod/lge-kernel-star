@@ -27,6 +27,14 @@
 
 #include <linux/usb/composite.h>
 
+//20100822, jm1.lee@lge.com, for USB mode switching [START]
+#if defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
+#undef __exit
+#define __exit
+#undef __init
+#define __init
+#endif
+//20100822, jm1.lee@lge.com, for USB mode switching [END]
 
 /*
  * The code in this file is utility code, used to build a gadget driver
@@ -71,6 +79,8 @@ MODULE_PARM_DESC(iSerialNumber, "SerialNumber string");
 
 /*-------------------------------------------------------------------------*/
 
+//20100822, jm1.lee@lge.com, for USB mode switching [START]
+#if !defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
 static ssize_t enable_show(struct device *dev, struct device_attribute *attr,
 		char *buf)
 {
@@ -96,6 +106,8 @@ static ssize_t enable_store(
 }
 
 static DEVICE_ATTR(enable, S_IRUGO | S_IWUSR, enable_show, enable_store);
+#endif
+//20100822, jm1.lee@lge.com, for USB mode switching [END]
 
 
 /**
@@ -115,6 +127,18 @@ static DEVICE_ATTR(enable, S_IRUGO | S_IWUSR, enable_show, enable_store);
 int __init usb_add_function(struct usb_configuration *config,
 		struct usb_function *function)
 {
+//20100822, jm1.lee@lge.com, for USB mode switching [START]
+#if defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
+	struct usb_composite_dev	*cdev = config->cdev;
+	int	value = -EINVAL;
+
+	DBG(cdev, "adding '%s'/%p to config '%s'/%p\n",
+			function->name, function,
+			config->label, config);
+
+	if (!function->set_alt || !function->disable)
+		goto done;
+#else
 	struct usb_composite_dev	*cdev = config->cdev;
 	int	value = -EINVAL;
 	int index;
@@ -138,6 +162,8 @@ int __init usb_add_function(struct usb_configuration *config,
 		return value;
 	}
 	dev_set_drvdata(function->dev, function);
+#endif
+//20100822, jm1.lee@lge.com, for USB mode switching [END]
 
 	function->config = config;
 	list_add_tail(&function->list, &config->functions);
@@ -274,19 +300,29 @@ static int config_buf(struct usb_configuration *config,
 		enum usb_device_speed speed, void *buf, u8 type)
 {
 	struct usb_config_descriptor	*c = buf;
+//20100822, jm1.lee@lge.com, for USB mode switching
+#if !defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
 	struct usb_interface_descriptor *intf;
+#endif
 	void				*next = buf + USB_DT_CONFIG_SIZE;
 	int				len = USB_BUFSIZ - USB_DT_CONFIG_SIZE;
 	struct usb_function		*f;
 	int				status;
 	int				interfaceCount = 0;
+//20100822, jm1.lee@lge.com, for USB mode switching
+#if !defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
 	u8 *dest;
+#endif
 
 	/* write the config descriptor */
 	c = buf;
 	c->bLength = USB_DT_CONFIG_SIZE;
 	c->bDescriptorType = type;
 	/* wTotalLength and bNumInterfaces are written later */
+//20100822, jm1.lee@lge.com, for USB mode switching
+#if defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
+	c->bNumInterfaces = config->next_interface_id;
+#endif
 	c->bConfigurationValue = config->bConfigurationValue;
 	c->iConfiguration = config->iConfiguration;
 	c->bmAttributes = USB_CONFIG_ATT_ONE | config->bmAttributes;
@@ -305,19 +341,38 @@ static int config_buf(struct usb_configuration *config,
 	/* add each function's descriptors */
 	list_for_each_entry(f, &config->functions, list) {
 		struct usb_descriptor_header **descriptors;
+//20100822, jm1.lee@lge.com, for USB mode switching
+#if !defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
 		struct usb_descriptor_header *descriptor;
+#endif
 
 		if (speed == USB_SPEED_HIGH)
 			descriptors = f->hs_descriptors;
 		else
 			descriptors = f->descriptors;
+//20100822, jm1.lee@lge.com, for USB mode switching [START]
+#if defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
+		if (!descriptors || descriptors[0] == NULL) {
+			for (; f != config->interface[interfaceCount];) {
+				interfaceCount++;
+				c->bNumInterfaces--;
+			}
+			continue;
+		}
+		for (; f != config->interface[interfaceCount];)
+			interfaceCount++;
+#else
 		if (f->hidden || !descriptors || descriptors[0] == NULL)
 			continue;
+#endif
+//20100822, jm1.lee@lge.com, for USB mode switching [END]
 		status = usb_descriptor_fillbuf(next, len,
 			(const struct usb_descriptor_header **) descriptors);
 		if (status < 0)
 			return status;
 
+//20100822, jm1.lee@lge.com, for USB mode switching [START]
+#if !defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
 		/* set interface numbers dynamically */
 		dest = next;
 		while ((descriptor = *descriptors++) != NULL) {
@@ -331,6 +386,8 @@ static int config_buf(struct usb_configuration *config,
 			}
 			dest += intf->bLength;
 		}
+#endif
+//20100822, jm1.lee@lge.com, for USB mode switching [END]
 
 		len -= status;
 		next += status;
@@ -338,7 +395,10 @@ static int config_buf(struct usb_configuration *config,
 
 	len = next - buf;
 	c->wTotalLength = cpu_to_le16(len);
+//20100822, jm1.lee@lge.com, for USB mode switching
+#if !defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
 	c->bNumInterfaces = interfaceCount;
+#endif
 	return len;
 }
 
@@ -482,8 +542,12 @@ static int set_config(struct usb_composite_dev *cdev,
 
 		if (!f)
 			break;
+//20100822, jm1.lee@lge.com, for USB mode switching [START]
+#if !defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
 		if (f->hidden)
 			continue;
+#endif
+//20100822, jm1.lee@lge.com, for USB mode switching [END]
 
 		result = f->set_alt(f, tmp, 0);
 		if (result < 0) {
@@ -951,6 +1015,10 @@ static void /* __init_or_exit */
 composite_unbind(struct usb_gadget *gadget)
 {
 	struct usb_composite_dev	*cdev = get_gadget_data(gadget);
+//20100822, jm1.lee@lge.com, for USB mode switching
+#if defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
+	unsigned i;
+#endif
 
 	/* composite_disconnect() must already have been called
 	 * by the underlying peripheral controller driver!
@@ -977,6 +1045,12 @@ composite_unbind(struct usb_gadget *gadget)
 				/* may free memory for "f" */
 			}
 		}
+//20100822, jm1.lee@lge.com, for USB mode switching [START]
+#if defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
+		for (i = 0; i < MAX_CONFIG_INTERFACES; i++)
+			c->interface[i] = NULL;
+#endif
+//20100822, jm1.lee@lge.com, for USB mode switching [END]  
 		list_del(&c->list);
 		if (c->unbind) {
 			DBG(cdev, "unbind config '%s'/%p\n", c->label, c);
@@ -1141,7 +1215,12 @@ static struct usb_gadget_driver composite_driver = {
 	.speed		= USB_SPEED_HIGH,
 
 	.bind		= composite_bind,
+//20100822, jm1.lee@lge.com, for USB mode switching
+#if defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
+	.unbind		= composite_unbind,
+#else
 	.unbind		= __exit_p(composite_unbind),
+#endif
 
 	.setup		= composite_setup,
 	.disconnect	= composite_disconnect,
@@ -1180,9 +1259,13 @@ int __init usb_composite_register(struct usb_composite_driver *driver)
 	composite_driver.driver.name = driver->name;
 	composite = driver;
 
+//20100822, jm1.lee@lge.com, for USB mode switching [START]
+#if !defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
 	driver->class = class_create(THIS_MODULE, "usb_composite");
 	if (IS_ERR(driver->class))
 		return PTR_ERR(driver->class);
+#endif
+//20100822, jm1.lee@lge.com, for USB mode switching [END]
 
 	return usb_gadget_register_driver(&composite_driver);
 }
