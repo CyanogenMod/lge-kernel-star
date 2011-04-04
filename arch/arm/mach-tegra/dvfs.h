@@ -5,6 +5,8 @@
  * Author:
  *	Colin Cross <ccross@google.com>
  *
+ * Copyright (C) 2010-2011 NVIDIA Corporation.
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -47,6 +49,7 @@ struct dvfs_rail {
 	int nominal_millivolts;
 	int step;
 	bool disabled;
+	bool updating;
 
 	struct list_head node;  /* node in dvfs_rail_list */
 	struct list_head dvfs;  /* list head of attached dvfs clocks */
@@ -90,5 +93,6 @@ int tegra_dvfs_init_rails(struct dvfs_rail *dvfs_rails[], int n);
 void tegra_dvfs_add_relationships(struct dvfs_relationship *rels, int n);
 void tegra_dvfs_rail_enable(struct dvfs_rail *rail);
 void tegra_dvfs_rail_disable(struct dvfs_rail *rail);
+bool tegra_dvfs_rail_updating(struct clk *clk);
 
 #endif

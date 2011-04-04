@@ -5,6 +5,8 @@
  * Author:
  *	Colin Cross <ccross@google.com>
  *
+ * Copyright (C) 2010-2011 NVIDIA Corporation.
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -126,9 +128,11 @@ static int dvfs_rail_set_voltage(struct dvfs_rail *rail, int millivolts)
 		}
 
 		if (!rail->disabled) {
+			rail->updating = true;
 			ret = regulator_set_voltage(rail->reg,
 				rail->new_millivolts * 1000,
 				rail->max_millivolts * 1000);
+			rail->updating = false;
 		}
 		if (ret) {
 			pr_err("Failed to set dvfs regulator %s\n", rail->reg_id);
@@ -450,6 +454,14 @@ int tegra_dvfs_rail_disable_by_name(const char *reg_id)
 out:
 	mutex_unlock(&dvfs_lock);
 	return ret;
+}
+
+bool tegra_dvfs_rail_updating(struct clk *clk)
+{
+	return (!clk ? false :
+		(!clk->dvfs ? false :
+		 (!clk->dvfs->dvfs_rail ? false :
+		  (clk->dvfs->dvfs_rail->updating))));
 }
 
 /*
