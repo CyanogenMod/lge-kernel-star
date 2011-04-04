@@ -16,14 +16,6 @@
 #define _LINUX_RNDIS_H
 
 #include "ndis.h"
-#include "u_ether.h"
-
-//20100822, jm1.lee@lge.com, for USB mode switching [START]
-#if defined(CONFIG_MACH_STAR)
-#undef __devinit
-#define __devinit
-#endif
-//20100822, jm1.lee@lge.com, for USB mode switching [END]
 
 #define RNDIS_MAXIMUM_FRAME_SIZE	1518
 #define RNDIS_MAX_TOTAL_SIZE		1558

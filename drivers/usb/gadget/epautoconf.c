@@ -32,14 +32,6 @@
 
 #include "gadget_chips.h"
 
-//20100822, jm1.lee@lge.com, for USB mode switching [START]
-#if defined(CONFIG_MACH_STAR)
-#undef __init
-#define __init
-#undef __initdata
-#define __initdata
-#endif
-//20100822, jm1.lee@lge.com, for USB mode switching [END]
 
 /* we must assign addresses for configurable endpoints (like net2280) */
 static __initdata unsigned epnum;

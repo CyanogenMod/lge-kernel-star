@@ -32,21 +32,6 @@
 #include "u_ether.h"
 #include "rndis.h"
 
-//20101102, jm1.lee@lge.com, for supporting AndroidNet Driver ver. 2.1
-#if defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-#define USB_DT_INTERFACE_ASSOCIATION_SIZE  8
-#endif
-
-//20100822, jm1.lee@lge.com, for USB mode switching [START]
-#if defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-#include "rndis.c"
-
-#undef __init
-#define __init
-#undef __initdata
-#define __initdata
-#endif
-//20100822, jm1.lee@lge.com, for USB mode switching [END]
 
 /*
  * This function is an RNDIS Ethernet port -- a Microsoft protocol that's
@@ -134,25 +119,6 @@ static unsigned int bitrate(struct usb_gadget *g)
 
 
 /* interface descriptor: */
-
-//20101102, jm1.lee@lge.com, add interface descriptor for supporting AndroidNet Driver ver. 2.1 [START]
-#if defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-struct usb_interface_assoc_descriptor rndis_interface_assoc_desc = {
-	.bLength           = USB_DT_INTERFACE_ASSOCIATION_SIZE,
-	.bDescriptorType   = USB_DT_INTERFACE_ASSOCIATION,
-	.bInterfaceCount   = 2,
-#ifdef CONFIG_USB_ANDROID_RNDIS_WCEIS
-	.bFunctionClass    = USB_CLASS_WIRELESS_CONTROLLER,
-	.bFunctionSubClass = 1,
-	.bFunctionProtocol = 3,
-#else
-	.bFunctionClass    = USB_CLASS_COMM,
-	.bFunctionSubClass = USB_CDC_SUBCLASS_ACM,
-	.bFunctionProtocol = USB_CDC_ACM_PROTO_VENDOR,
-#endif
-};
-#endif	/* CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET */
-//20101102, jm1.lee@lge.com, add interface descriptor for supporting AndroidNet Driver ver. 2.1 [END]
 
 static struct usb_interface_descriptor rndis_control_intf __initdata = {
 	.bLength =		sizeof rndis_control_intf,
@@ -251,10 +217,6 @@ static struct usb_endpoint_descriptor fs_out_desc __initdata = {
 
 static struct usb_descriptor_header *eth_fs_function[] __initdata = {
 	/* control interface matches ACM, not Ethernet */
-//20101102, jm1.lee@lge.com, for supporting AndroidNet Driver ver. 2.1
-#if defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-	(struct usb_descriptor_header *) &rndis_interface_assoc_desc,
-#endif
 	(struct usb_descriptor_header *) &rndis_control_intf,
 	(struct usb_descriptor_header *) &header_desc,
 	(struct usb_descriptor_header *) &call_mgmt_descriptor,
@@ -299,10 +261,6 @@ static struct usb_endpoint_descriptor hs_out_desc __initdata = {
 
 static struct usb_descriptor_header *eth_hs_function[] __initdata = {
 	/* control interface matches ACM, not Ethernet */
-//20101102, jm1.lee@lge.com, for supporting AndroidNet Driver ver. 2.1
-#if defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-	(struct usb_descriptor_header *) &rndis_interface_assoc_desc,
-#endif
 	(struct usb_descriptor_header *) &rndis_control_intf,
 	(struct usb_descriptor_header *) &header_desc,
 	(struct usb_descriptor_header *) &call_mgmt_descriptor,
@@ -636,11 +594,6 @@ rndis_bind(struct usb_configuration *c, struct usb_function *f)
 	int			status;
 	struct usb_ep		*ep;
 
-//20100828, jm1.lee@lge.com, Fix fail to release RNDIS [START]
-	int vendorID= 0x1004;
-	char *manufacturer="LG Electronics Inc.";
-//20100828, jm1.lee@lge.com, Fix fail to release RNDIS [END]
-
 	/* allocate instance-specific interface IDs */
 	status = usb_interface_id(c, f);
 	if (status < 0)
@@ -745,22 +698,13 @@ rndis_bind(struct usb_configuration *c, struct usb_function *f)
 	rndis_set_param_medium(rndis->config, NDIS_MEDIUM_802_3, 0);
 	rndis_set_host_mac(rndis->config, rndis->ethaddr);
 
-//20100828, jm1.lee@lge.com, Fix fail to release RNDIS [START]
 #ifdef CONFIG_USB_ANDROID_RNDIS
-#if defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-// FIXME
-	if (rndis_set_param_vendor(rndis->config, vendorID,
-				manufacturer))
-		goto fail;
-#else
 	if (rndis_pdata) {
 		if (rndis_set_param_vendor(rndis->config, rndis_pdata->vendorID,
 					rndis_pdata->vendorDescr))
 			goto fail;
 	}
 #endif
-#endif
-//20100828, jm1.lee@lge.com, Fix fail to release RNDIS [END]
 
 	/* NOTE:  all that is done without knowing or caring about
 	 * the network link ... which is unavailable to this code
@@ -908,8 +852,6 @@ fail:
 	return status;
 }
 
-//20100822, jm1.lee@lge.com, for USB mode switching [START]
-#if !defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
 #ifdef CONFIG_USB_ANDROID_RNDIS
 #include "rndis.c"
 
@@ -960,4 +902,3 @@ static int __init init(void)
 module_init(init);
 
 #endif /* CONFIG_USB_ANDROID_RNDIS */
-#endif /* CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET */

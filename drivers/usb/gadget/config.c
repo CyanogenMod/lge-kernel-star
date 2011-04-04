@@ -27,12 +27,6 @@
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
 
-//20100822, jm1.lee@lge.com, for USB mode switching [START]
-#if defined(CONFIG_MACH_STAR)
-#undef __init
-#define __init
-#endif
-//20100822, jm1.lee@lge.com, for USB mode switching [END]
 
 /**
  * usb_descriptor_fillbuf - fill buffer with descriptors

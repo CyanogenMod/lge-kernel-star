@@ -32,11 +32,6 @@
 
 #include <linux/usb/android_composite.h>
 
-//20100824, jm1.lee@lge.com, for USB mode switching
-#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-#include "f_adb.h"
-#endif
-
 #define BULK_BUFFER_SIZE           4096
 
 /* number of tx requests to allocate */
@@ -52,15 +47,8 @@ struct adb_dev {
 	struct usb_ep *ep_in;
 	struct usb_ep *ep_out;
 
-//20100824, jm1.lee@lge.com, for USB mode switching [START]
-#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-	atomic_t online;
-	atomic_t error;
-#else
 	int online;
 	int error;
-#endif
-//20100824, jm1.lee@lge.com, for USB mode switching [END]
 
 	atomic_t read_excl;
 	atomic_t write_excl;
@@ -132,10 +120,7 @@ static struct usb_descriptor_header *hs_adb_descs[] = {
 /* temporary variable used between adb_open() and adb_gadget_bind() */
 static struct adb_dev *_adb_dev;
 
-//20100824, jm1.lee@lge.com, for USB mode switching
-#if !defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
 static atomic_t adb_enable_excl;
-#endif
 
 static inline struct adb_dev *func_to_dev(struct usb_function *f)
 {
@@ -217,12 +202,7 @@ static void adb_complete_in(struct usb_ep *ep, struct usb_request *req)
 	struct adb_dev *dev = _adb_dev;
 
 	if (req->status != 0)
-//20100824, jm1.lee@lge.com, for USB mode switching
-#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-		atomic_set(&dev->error, 1);
-#else
 		dev->error = 1;
-#endif
 
 	req_put(dev, &dev->tx_idle, req);
 
@@ -235,22 +215,12 @@ static void adb_complete_out(struct usb_ep *ep, struct usb_request *req)
 
 	dev->rx_done = 1;
 	if (req->status != 0)
-//20100824, jm1.lee@lge.com, for USB mode switching
-#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-		atomic_set(&dev->error, 1);
-#else
 		dev->error = 1;
-#endif
 
 	wake_up(&dev->read_wq);
 }
 
-//20100824, jm1.lee@lge.com, for USB mode switching
-#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-static int create_bulk_endpoints(struct adb_dev *dev,
-#else
 static int __init create_bulk_endpoints(struct adb_dev *dev,
-#endif
 				struct usb_endpoint_descriptor *in_desc,
 				struct usb_endpoint_descriptor *out_desc)
 {
@@ -319,33 +289,16 @@ static ssize_t adb_read(struct file *fp, char __user *buf,
 		return -EBUSY;
 
 	/* we will block until we're online */
-//20100824, jm1.lee@lge.com, for USB mode switching
-#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-	while (!(atomic_read(&dev->online) || atomic_read(&dev->error))) {
-#else
 	while (!(dev->online || dev->error)) {
-#endif
 		DBG(cdev, "adb_read: waiting for online state\n");
 		ret = wait_event_interruptible(dev->read_wq,
-//20100824, jm1.lee@lge.com, for USB mode switching [START]
-#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-			(atomic_read(&dev->online) ||
-			atomic_read(&dev->error)));
-#else
 				(dev->online || dev->error));
-#endif
-//20100824, jm1.lee@lge.com, for USB mode switching [END]
 		if (ret < 0) {
 			_unlock(&dev->read_excl);
 			return ret;
 		}
 	}
-//20100824, jm1.lee@lge.com, for USB mode switching
-#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-	if (atomic_read(&dev->error)) {
-#else
 	if (dev->error) {
-#endif
 		r = -EIO;
 		goto done;
 	}
@@ -359,12 +312,7 @@ requeue_req:
 	if (ret < 0) {
 		DBG(cdev, "adb_read: failed to queue req %p (%d)\n", req, ret);
 		r = -EIO;
-//20100824, jm1.lee@lge.com, for USB mode switching
-#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-		atomic_set(&dev->error, 1);
-#else
 		dev->error = 1;
-#endif
 		goto done;
 	} else {
 		DBG(cdev, "rx %p queue\n", req);
@@ -373,21 +321,11 @@ requeue_req:
 	/* wait for a request to complete */
 	ret = wait_event_interruptible(dev->read_wq, dev->rx_done);
 	if (ret < 0) {
-//20100824, jm1.lee@lge.com, for USB mode switching
-#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-		atomic_set(&dev->error, 1);
-#else
 		dev->error = 1;
-#endif
 		r = ret;
 		goto done;
 	}
-//20100824, jm1.lee@lge.com, for USB mode switching
-#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-	if (!atomic_read(&dev->error)) {
-#else
 	if (!dev->error) {
-#endif
 		/* If we got a 0-len packet, throw it back and try again. */
 		if (req->actual == 0)
 			goto requeue_req;
@@ -420,12 +358,7 @@ static ssize_t adb_write(struct file *fp, const char __user *buf,
 		return -EBUSY;
 
 	while (count > 0) {
-//20100824, jm1.lee@lge.com, for USB mode switching
-#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-		if (atomic_read(&dev->error)) {
-#else
 		if (dev->error) {
-#endif
 			DBG(cdev, "adb_write dev->error\n");
 			r = -EIO;
 			break;
@@ -434,12 +367,7 @@ static ssize_t adb_write(struct file *fp, const char __user *buf,
 		/* get an idle tx request to use */
 		req = 0;
 		ret = wait_event_interruptible(dev->write_wq,
-//20100824, jm1.lee@lge.com, for USB mode switching
-#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-			((req = req_get(dev, &dev->tx_idle)) || atomic_read(&dev->error)));
-#else
 			((req = req_get(dev, &dev->tx_idle)) || dev->error));
-#endif
 
 		if (ret < 0) {
 			r = ret;
@@ -460,12 +388,7 @@ static ssize_t adb_write(struct file *fp, const char __user *buf,
 			ret = usb_ep_queue(dev->ep_in, req, GFP_ATOMIC);
 			if (ret < 0) {
 				DBG(cdev, "adb_write: xfer error %d\n", ret);
-//20100824, jm1.lee@lge.com, for USB mode switching
-#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-				atomic_set(&dev->error, 1);
-#else
 				dev->error = 1;
-#endif
 				r = -EIO;
 				break;
 			}
@@ -507,13 +430,7 @@ static int adb_open(struct inode *ip, struct file *fp)
 	fp->private_data = _adb_dev;
 
 	/* clear the error latch */
-//20100824, jm1.lee@lge.com, for USB mode switching
-#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-	atomic_set(&_adb_dev->error, 0);
-#else
 	_adb_dev->error = 0;
-#endif
-
 	return 0;
 }
 
@@ -531,15 +448,7 @@ static int adb_release(struct inode *ip, struct file *fp)
 
 	if (count < 5)
 		printk(KERN_INFO "adb_release\n");
-
-//20100531, jm1.lee@lge.com, check _adb_dev before removing adb device[START]
-#if defined(CONFIG_MACH_STAR)
-	if (_adb_dev)
 	_unlock(&_adb_dev->open_excl);
-#else
-	_unlock(&_adb_dev->open_excl);
-#endif
-//20100531, jm1.lee@lge.com, check _adb_dev before removing adb device [END]
 	return 0;
 }
 
@@ -558,8 +467,6 @@ static struct miscdevice adb_device = {
 	.fops = &adb_fops,
 };
 
-//20100824, jm1.lee@lge.com, for USB mode switching [START]
-#if !defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
 static int adb_enable_open(struct inode *ip, struct file *fp)
 {
 	if (atomic_inc_return(&adb_enable_excl) != 1) {
@@ -592,8 +499,6 @@ static struct miscdevice adb_enable_device = {
 	.name = "android_adb_enable",
 	.fops = &adb_enable_fops,
 };
-#endif
-//20100824, jm1.lee@lge.com, for USB mode switching [END]
 
 static int
 adb_function_bind(struct usb_configuration *c, struct usb_function *f)
@@ -632,37 +537,18 @@ adb_function_bind(struct usb_configuration *c, struct usb_function *f)
 	return 0;
 }
 
-//20100824, jm1.lee@lge.com, for USB mode switching [START]
-#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-void adb_function_exit(void)
-{
-	misc_deregister(&adb_device);
-	kfree(_adb_dev);
-	_adb_dev = NULL;
-}
-#endif
-//20100824, jm1.lee@lge.com, for USB mode switching [END]
-
 static void
 adb_function_unbind(struct usb_configuration *c, struct usb_function *f)
 {
 	struct adb_dev	*dev = func_to_dev(f);
 	struct usb_request *req;
 
-//20100824, jm1.lee@lge.com, for USB mode switching
-#if !defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
 	spin_lock_irq(&dev->lock);
-#endif
 
 	adb_request_free(dev->rx_req, dev->ep_out);
 	while ((req = req_get(dev, &dev->tx_idle)))
 		adb_request_free(req, dev->ep_in);
 
-//20100824, jm1.lee@lge.com, for USB mode switching [START]
-#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-	atomic_set(&dev->online, 0);
-	atomic_set(&dev->error, 1);
-#else
 	dev->online = 0;
 	dev->error = 1;
 	spin_unlock_irq(&dev->lock);
@@ -671,8 +557,6 @@ adb_function_unbind(struct usb_configuration *c, struct usb_function *f)
 	misc_deregister(&adb_enable_device);
 	kfree(_adb_dev);
 	_adb_dev = NULL;
-#endif
-//20100824, jm1.lee@lge.com, for USB mode switching [END]
 }
 
 static int adb_function_set_alt(struct usb_function *f,
@@ -697,12 +581,7 @@ static int adb_function_set_alt(struct usb_function *f,
 		usb_ep_disable(dev->ep_in);
 		return ret;
 	}
-//20100824, jm1.lee@lge.com, for USB mode switching
-#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-	atomic_set(&dev->online, 1);
-#else
 	dev->online = 1;
-#endif
 
 	/* readers may be blocked waiting for us to go online */
 	wake_up(&dev->read_wq);
@@ -715,15 +594,8 @@ static void adb_function_disable(struct usb_function *f)
 	struct usb_composite_dev	*cdev = dev->cdev;
 
 	DBG(cdev, "adb_function_disable\n");
-//20100824, jm1.lee@lge.com, for USB mode switching [START]
-#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-	atomic_set(&dev->online, 0);
-	atomic_set(&dev->error, 1);
-#else
 	dev->online = 0;
 	dev->error = 1;
-#endif
-//20100824, jm1.lee@lge.com, for USB mode switching [END]
 	usb_ep_disable(dev->ep_in);
 	usb_ep_disable(dev->ep_out);
 
@@ -733,20 +605,7 @@ static void adb_function_disable(struct usb_function *f)
 	VDBG(cdev, "%s disabled\n", dev->function.name);
 }
 
-//20100824, jm1.lee@lge.com, for USB mode switching
-#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-int adb_function_add(struct usb_composite_dev *cdev,
-	struct usb_configuration *c)
-{
-	INFO(cdev, "adb_function_add\n");
-
-	return usb_add_function(c, &_adb_dev->function);
-}
-
-int adb_function_init(void)
-#else
 static int adb_bind_config(struct usb_configuration *c)
-#endif
 {
 	struct adb_dev *dev;
 	int ret;
@@ -768,10 +627,7 @@ static int adb_bind_config(struct usb_configuration *c)
 
 	INIT_LIST_HEAD(&dev->tx_idle);
 
-//20100824, jm1.lee@lge.com, for USB mode switching
-#if !defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
 	dev->cdev = c->cdev;
-#endif
 	dev->function.name = "adb";
 	dev->function.descriptors = fs_adb_descs;
 	dev->function.hs_descriptors = hs_adb_descs;
@@ -780,26 +636,13 @@ static int adb_bind_config(struct usb_configuration *c)
 	dev->function.set_alt = adb_function_set_alt;
 	dev->function.disable = adb_function_disable;
 
-//20100824, jm1.lee@lge.com, for USB mode switching
-#if !defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
 	/* start disabled */
 	dev->function.hidden = 1;
-#endif
 
 	/* _adb_dev must be set before calling usb_gadget_register_driver */
 	_adb_dev = dev;
 
 	ret = misc_register(&adb_device);
-//20100824, jm1.lee@lge.com, for USB mode switching [START]
-#if defined (CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-	if (ret) {
-		kfree(dev);
-		printk(KERN_ERR "adb gadget driver failed to initialize\n");
-	}
-
-	return ret;
-}
-#else
 	if (ret)
 		goto err1;
 	ret = misc_register(&adb_enable_device);
@@ -834,5 +677,3 @@ static int __init init(void)
 	return 0;
 }
 module_init(init);
-#endif
-//20100824, jm1.lee@lge.com, for USB mode switching [END]

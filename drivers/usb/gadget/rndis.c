@@ -41,12 +41,6 @@
 
 #include "rndis.h"
 
-//20100822, jm1.lee@lge.com, for USB mode switching [START]
-#if defined(CONFIG_MACH_STAR)
-#undef __init
-#define __init
-#endif
-//20100822, jm1.lee@lge.com, for USB mode switching [END]
 
 /* The driver for your USB chip needs to support ep0 OUT to work with
  * RNDIS, plus all three CDC Ethernet endpoints (interrupt not optional).
