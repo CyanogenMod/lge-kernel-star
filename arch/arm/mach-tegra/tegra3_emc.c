@@ -695,10 +695,8 @@ static const struct clk_mux_sel *find_matching_input(
 		/* Table entries specify rate in kHz */
 		inp_rate = clk_get_rate(sel->input) / 1000;
 
-		/* ddr duty cycle requires only 1:1 or 1:2k ratio */
-		if ((inp_rate == table_rate) ||
-		    ((inp_rate >= 2*table_rate) &&
-		     (inp_rate % (2*table_rate) == 0))) {
+		if ((inp_rate >= table_rate) &&
+		     (inp_rate % table_rate == 0)) {
 			*div_value = 2 * inp_rate / table_rate - 2;
 			return sel;
 		}
@@ -710,8 +708,8 @@ void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
 {
 	int i;
 	u32 reg, div_value;
-	bool pllm_entry = false;
-	unsigned long boot_rate;
+	bool max_entry = false;
+	unsigned long boot_rate, max_rate;
 	const struct clk_mux_sel *sel;
 
 	emc_stats.clkchange_count = 0;
@@ -721,6 +719,7 @@ void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
 	emc = tegra_get_clock_by_name("emc");
 	BUG_ON(!emc);
 	boot_rate = clk_get_rate(emc) / 1000;
+	max_rate = clk_get_max_rate(emc) / 1000;
 
 	if (emc->parent != tegra_get_clock_by_name("pll_m")) {
 		pr_warn("tegra: boot parent %s is not supported by EMC DFS\n",
@@ -741,6 +740,9 @@ void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
 		if (table_rate == boot_rate)
 			emc_last_sel = i;
 
+		if (table_rate == max_rate)
+			max_entry = true;
+
 		tegra_emc_clk_sel[i] = *sel;
 		BUG_ON(div_value >
 		       (EMC_CLK_DIV_MASK >> EMC_CLK_DIV_SHIFT));
@@ -750,7 +752,6 @@ void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
 		if ((div_value == 0) &&
 		    (tegra_emc_clk_sel[i].input == emc->parent)) {
 			tegra_emc_clk_sel[i].value |= EMC_CLK_LOW_JITTER_ENABLE;
-			pllm_entry = true;
 		}
 
 		if (table[i].burst_regs[MC_EMEM_ARB_MISC0_INDEX] &
@@ -771,8 +772,9 @@ void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
 
 	dram_dev_num = (mc_readl(MC_EMEM_ADR_CFG) & 0x1) + 1; /* 2 dev max */
 
-	if (!pllm_entry) {
-		pr_err("tegra: invalid EMC DFS table: PLLM entry not found\n");
+	if (!max_entry) {
+		pr_err("tegra: invalid EMC DFS table: entry for max rate"
+		       " %lu kHz is not found\n", max_rate);
 		return;
 	}
 	pr_info("tegra: validated EMC DFS table\n");

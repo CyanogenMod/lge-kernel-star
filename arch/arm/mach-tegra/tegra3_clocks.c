@@ -1063,7 +1063,7 @@ static void tegra3_pll_clk_init(struct clk *c)
 
 	if (c->flags & PLL_FIXED && !(val & PLL_BASE_OVERRIDE)) {
 		const struct clk_pll_freq_table *sel;
-		unsigned long input_rate = clk_get_rate_locked(c->parent);
+		unsigned long input_rate = clk_get_rate(c->parent);
 		for (sel = c->u.pll.freq_table; sel->input_rate != 0; sel++) {
 			if (sel->input_rate == input_rate &&
 				sel->output_rate == c->u.pll.fixed_rate) {
@@ -2005,7 +2005,13 @@ static struct clk_ops tegra_clk_out_ops = {
 static void tegra3_emc_clk_init(struct clk *c)
 {
 	tegra3_periph_clk_init(c);
-	c->max_rate = clk_get_rate_locked(c->parent);
+
+	/* On A01 limit EMC maximum rate to boot frequency;
+	   starting with A02 full PLLM range should be supported */
+	if (tegra_get_revision() == TEGRA_REVISION_A01)
+		c->max_rate = clk_get_rate_locked(c);
+	else
+		c->max_rate = clk_get_rate(c->parent);
 }
 
 static long tegra3_emc_clk_round_rate(struct clk *c, unsigned long rate)
