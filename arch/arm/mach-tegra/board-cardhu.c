@@ -375,13 +375,13 @@ static struct platform_device tegra_camera = {
 };
 
 static struct platform_device *cardhu_devices[] __initdata = {
-	&tegra_usb_fsg_device,
-	&androidusb_device,
 	&tegra_pmu_device,
 #if defined(CONFIG_RTC_DRV_TEGRA)
 	&tegra_rtc_device,
 #endif
 	&tegra_udc_device,
+	&tegra_usb_fsg_device,
+	&androidusb_device,
 #if defined(CONFIG_SND_HDA_TEGRA)
 	&tegra_hda_device,
 #endif
