@@ -59,7 +59,7 @@ static int hdmi_reg_resume(struct platform_device *pdev)
     return 0;
 }
 
-static int __init hdmi_reg_probe(struct platform_device *pdev)
+static int __devinit hdmi_reg_probe(struct platform_device *pdev)
 {
     int ret;
     NvU32 pin, port;

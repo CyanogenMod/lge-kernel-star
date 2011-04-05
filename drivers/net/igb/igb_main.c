@@ -63,6 +63,7 @@ static const struct e1000_info *igb_info_tbl[] = {
 static struct pci_device_id igb_pci_tbl[] = {
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82576), board_82575 },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82576_NS), board_82575 },
+	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82576_NS_SERDES), board_82575 },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82576_FIBER), board_82575 },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82576_SERDES), board_82575 },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82576_SERDES_QUAD), board_82575 },
@@ -4559,7 +4560,7 @@ static void igb_receive_skb(struct igb_ring *ring, u8 status,
 	bool vlan_extracted = (adapter->vlgrp && (status & E1000_RXD_STAT_VP));
 
 	skb_record_rx_queue(skb, ring->queue_index);
-	if (vlan_extracted)
+	if (vlan_extracted && adapter->vlgrp)
 		vlan_gro_receive(&ring->napi, adapter->vlgrp,
 		                 le16_to_cpu(rx_desc->wb.upper.vlan),
 		                 skb);

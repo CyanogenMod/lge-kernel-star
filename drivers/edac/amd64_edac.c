@@ -156,7 +156,7 @@ static int amd64_set_scrub_rate(struct mem_ctl_info *mci, u32 *bandwidth)
 
 	default:
 		amd64_printk(KERN_ERR, "Unsupported family!\n");
-		break;
+		return -EINVAL;
 	}
 	return amd64_search_set_scrub_rate(pvt->misc_f3_ctl, *bandwidth,
 			min_scrubrate);
@@ -1491,7 +1491,7 @@ static inline u64 f10_get_base_addr_offset(u64 sys_addr, int hi_range_sel,
 	u64 chan_off;
 
 	if (hi_range_sel) {
-		if (!(dct_sel_base_addr & 0xFFFFF800) &&
+		if (!(dct_sel_base_addr & 0xFFFF0000) &&
 		   hole_valid && (sys_addr >= 0x100000000ULL))
 			chan_off = hole_off << 16;
 		else
@@ -1628,7 +1628,7 @@ static int f10_match_to_this_node(struct amd64_pvt *pvt, int dram_range,
 	debugf1("   HoleOffset=0x%x  HoleValid=0x%x IntlvSel=0x%x\n",
 			hole_off, hole_valid, intlv_sel);
 
-	if (intlv_en ||
+	if (intlv_en &&
 	    (intlv_sel != ((sys_addr >> 12) & intlv_en)))
 		return -EINVAL;
 

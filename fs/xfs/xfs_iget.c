@@ -228,13 +228,12 @@ xfs_iget_cache_hit(
 		xfs_itrace_exit_tag(ip, "xfs_iget.alloc");
 
 		/*
-		 * We need to set XFS_INEW atomically with clearing the
-		 * reclaimable tag so that we do have an indicator of the
-		 * inode still being initialized.
+		 * We need to set XFS_IRECLAIM to prevent xfs_reclaim_inode
+		 * from stomping over us while we recycle the inode.  We can't
+		 * clear the radix tree reclaimable tag yet as it requires
+		 * pag_ici_lock to be held exclusive.
 		 */
-		ip->i_flags |= XFS_INEW;
-		ip->i_flags &= ~XFS_IRECLAIMABLE;
-		__xfs_inode_clear_reclaim_tag(mp, pag, ip);
+		ip->i_flags |= XFS_IRECLAIM;
 
 		spin_unlock(&ip->i_flags_lock);
 		read_unlock(&pag->pag_ici_lock);
@@ -253,7 +252,15 @@ xfs_iget_cache_hit(
 			__xfs_inode_set_reclaim_tag(pag, ip);
 			goto out_error;
 		}
+
+		write_lock(&pag->pag_ici_lock);
+		spin_lock(&ip->i_flags_lock);
+		ip->i_flags &= ~(XFS_IRECLAIMABLE | XFS_IRECLAIM);
+		ip->i_flags |= XFS_INEW;
+		__xfs_inode_clear_reclaim_tag(mp, pag, ip);
 		inode->i_state = I_LOCK|I_NEW;
+		spin_unlock(&ip->i_flags_lock);
+		write_unlock(&pag->pag_ici_lock);
 	} else {
 		/* If the VFS inode is being torn down, pause and try again. */
 		if (!igrab(inode)) {
@@ -288,7 +295,6 @@ xfs_iget_cache_miss(
 	xfs_trans_t		*tp,
 	xfs_ino_t		ino,
 	struct xfs_inode	**ipp,
-	xfs_daddr_t		bno,
 	int			flags,
 	int			lock_flags) __releases(pag->pag_ici_lock)
 {
@@ -301,7 +307,7 @@ xfs_iget_cache_miss(
 	if (!ip)
 		return ENOMEM;
 
-	error = xfs_iread(mp, tp, ip, bno, flags);
+	error = xfs_iread(mp, tp, ip, flags);
 	if (error)
 		goto out_destroy;
 
@@ -385,8 +391,6 @@ out_destroy:
  *        within the file system for the inode being requested.
  * lock_flags -- flags indicating how to lock the inode.  See the comment
  *		 for xfs_ilock() for a list of valid values.
- * bno -- the block number starting the buffer containing the inode,
- *	  if known (as by bulkstat), else 0.
  */
 int
 xfs_iget(
@@ -395,8 +399,7 @@ xfs_iget(
 	xfs_ino_t	ino,
 	uint		flags,
 	uint		lock_flags,
-	xfs_inode_t	**ipp,
-	xfs_daddr_t	bno)
+	xfs_inode_t	**ipp)
 {
 	xfs_inode_t	*ip;
 	int		error;
@@ -427,7 +430,7 @@ again:
 		read_unlock(&pag->pag_ici_lock);
 		XFS_STATS_INC(xs_ig_missed);
 
-		error = xfs_iget_cache_miss(mp, pag, tp, ino, &ip, bno,
+		error = xfs_iget_cache_miss(mp, pag, tp, ino, &ip,
 							flags, lock_flags);
 		if (error)
 			goto out_error_or_again;
@@ -511,17 +514,21 @@ xfs_ireclaim(
 {
 	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_perag	*pag;
+	xfs_agino_t		agino = XFS_INO_TO_AGINO(mp, ip->i_ino);
 
 	XFS_STATS_INC(xs_ig_reclaims);
 
 	/*
-	 * Remove the inode from the per-AG radix tree.  It doesn't matter
-	 * if it was never added to it because radix_tree_delete can deal
-	 * with that case just fine.
+	 * Remove the inode from the per-AG radix tree.
+	 *
+	 * Because radix_tree_delete won't complain even if the item was never
+	 * added to the tree assert that it's been there before to catch
+	 * problems with the inode life time early on.
 	 */
 	pag = xfs_get_perag(mp, ip->i_ino);
 	write_lock(&pag->pag_ici_lock);
-	radix_tree_delete(&pag->pag_ici_root, XFS_INO_TO_AGINO(mp, ip->i_ino));
+	if (!radix_tree_delete(&pag->pag_ici_root, agino))
+		ASSERT(0);
 	write_unlock(&pag->pag_ici_lock);
 	xfs_put_perag(mp, pag);
 

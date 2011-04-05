@@ -540,6 +540,10 @@ void radeon_compute_pll(struct radeon_pll *pll,
 	*frac_fb_div_p = best_frac_feedback_div;
 	*ref_div_p = best_ref_div;
 	*post_div_p = best_post_div;
+	DRM_DEBUG_KMS("%d %d, pll dividers - fb: %d.%d ref: %d, post %d\n",
+		      freq, best_freq / 1000, best_feedback_div, best_frac_feedback_div,
+		      best_ref_div, best_post_div);
+
 }
 
 static void radeon_user_framebuffer_destroy(struct drm_framebuffer *fb)
@@ -599,7 +603,11 @@ radeon_user_framebuffer_create(struct drm_device *dev,
 	struct drm_gem_object *obj;
 
 	obj = drm_gem_object_lookup(dev, file_priv, mode_cmd->handle);
-
+	if (obj ==  NULL) {
+		dev_err(&dev->pdev->dev, "No GEM object associated to handle 0x%08X, "
+			"can't create framebuffer\n", mode_cmd->handle);
+		return NULL;
+	}
 	return radeon_framebuffer_create(dev, mode_cmd, obj);
 }
 
