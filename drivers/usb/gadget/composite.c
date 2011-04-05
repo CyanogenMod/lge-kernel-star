@@ -992,7 +992,6 @@ static void composite_disconnect(struct usb_gadget *gadget)
 		cdev->mute_switch = 0;
 	else
 		schedule_work(&cdev->switch_work);
-	spin_unlock_irqrestore(&cdev->lock, flags);
 }
 
 /*-------------------------------------------------------------------------*/
