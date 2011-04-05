@@ -206,6 +206,7 @@ static enum hrtimer_restart star_vib_timeout(struct hrtimer *timer )
 	star_vib_vibrating(NV_FALSE);
 #else
 //20101112 sh80.choi@lge.com Call Vibrate Volume [END_LGE_LAB1]
+	atomic_set(&is_enable, 0);
 	star_vib_enable(NV_FALSE);
 #endif
 
@@ -226,6 +227,7 @@ static ssize_t star_vib_stay_store(struct device *dev, struct device_attribute *
 	printk("%s: Timeout value = %ld ms\n", __func__, value );
 	#endif
 	vib_stay_time = value;
+	atomic_set(&is_enable, 1);
 	if( atomic_read(&is_enable) == 1 )
 	{
 		#if 0 

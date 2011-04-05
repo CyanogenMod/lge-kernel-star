@@ -65,3 +65,4 @@ obj-$(CONFIG_LGE_ATS_INPUT_DEVICE) += lge_ats_eta.o
 obj-$(CONFIG_LGE_ATS_INPUT_DEVICE) += lge_ats_event_log.o
 #20101121 BT: dohyung10.lee@lge.com - For the BD Address Read / Write
 obj-$(CONFIG_STAR_BD_ADDRESS)	+= star_bd_address.o
+obj-$(CONFIG_STAR_VIBRATOR)	+= star_vib.o
