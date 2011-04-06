@@ -32,6 +32,7 @@
 #include <linux/gpio.h>
 #include <linux/input.h>
 #include <linux/platform_data/tegra_usb.h>
+#include <linux/usb/android_composite.h>
 #include <linux/spi/spi.h>
 #include <mach/clk.h>
 #include <mach/iomap.h>
@@ -149,6 +150,43 @@ static __initdata struct tegra_clk_init_table enterprise_clk_init_table[] = {
 	{ NULL,		NULL,		0,		0},
 };
 
+static char *usb_functions[] = { "mtp", "usb_mass_storage" };
+static char *usb_functions_adb[] = { "mtp", "adb", "usb_mass_storage" };
+
+static struct android_usb_product usb_products[] = {
+	{
+		.product_id     = 0x7102,
+		.num_functions  = ARRAY_SIZE(usb_functions),
+		.functions      = usb_functions,
+	},
+	{
+		.product_id     = 0x7100,
+		.num_functions  = ARRAY_SIZE(usb_functions_adb),
+		.functions      = usb_functions_adb,
+	},
+};
+
+/* standard android USB platform data */
+static struct android_usb_platform_data andusb_plat = {
+	.vendor_id              = 0x0955,
+	.product_id             = 0x7100,
+	.manufacturer_name      = "NVIDIA",
+	.product_name           = "Enterprise",
+	.serial_number          = NULL,
+	.num_products = ARRAY_SIZE(usb_products),
+	.products = usb_products,
+	.num_functions = ARRAY_SIZE(usb_functions_adb),
+	.functions = usb_functions_adb,
+};
+
+static struct platform_device androidusb_device = {
+	.name   = "android_usb",
+	.id     = -1,
+	.dev    = {
+		.platform_data  = &andusb_plat,
+	},
+};
+
 static struct i2c_board_info __initdata enterprise_i2c_bus1_board_info[] = {
 	{
 		I2C_BOARD_INFO("wm8903", 0x1a),
@@ -227,6 +265,7 @@ static struct platform_device tegra_camera = {
 };
 
 static struct platform_device *enterprise_devices[] __initdata = {
+	&androidusb_device,
 	&debug_uart,
 	&tegra_uarta_device,
 	&tegra_uartb_device,
