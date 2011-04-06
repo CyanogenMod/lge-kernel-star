@@ -69,7 +69,7 @@ static struct dvfs_rail *tegra3_dvfs_rails[] = {
 
 static struct dvfs cpu_dvfs_table[] = {
 	/* Cpu voltages (mV):	     750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000, 1025, 1050, 1075, 1100, 1125 */
-	CPU_DVFS("cpu_g", 0, 0, MHZ,   0,   0, 470, 470, 575, 575, 680, 680, 785, 785, 1000),
+	CPU_DVFS("cpu_g", 0, 0, MHZ,   0,   0, 614, 614, 714, 714, 815, 815, 915, 915, 1000),
 };
 
 #define CORE_DVFS(_clk_name, _process_id, _auto, _mult, _freqs...)	\
