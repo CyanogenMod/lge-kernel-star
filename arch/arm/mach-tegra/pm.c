@@ -594,7 +594,9 @@ static int tegra_common_suspend(void)
 static void tegra_common_resume(void)
 {
 	void __iomem *mc = IO_ADDRESS(TEGRA_MC_BASE);
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	void __iomem *emc = IO_ADDRESS(TEGRA_EMC_BASE);
+#endif
 
 	/* Clear DPD sample */
 	writel(0x0, pmc + PMC_DPD_SAMPLE);
@@ -602,10 +604,10 @@ static void tegra_common_resume(void)
 	writel(tegra_sctx.mc[0], mc + MC_SECURITY_START);
 	writel(tegra_sctx.mc[1], mc + MC_SECURITY_SIZE);
 	writel(tegra_sctx.mc[2], mc + MC_SECURITY_CFG2);
-
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	/* trigger emc mode write */
 	writel(EMC_MRW_DEV_NONE, emc + EMC_MRW_0);
-
+#endif
 	/* clear scratch registers shared by suspend and the reset pen */
 	writel(0x0, pmc + PMC_SCRATCH39);
 	writel(0x0, pmc + PMC_SCRATCH41);

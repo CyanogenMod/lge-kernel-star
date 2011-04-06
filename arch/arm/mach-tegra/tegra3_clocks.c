@@ -3671,5 +3671,10 @@ void tegra_clk_resume(void)
 
 	clk_writel(*ctx++, MISC_CLK_ENB);
 	clk_writel(*ctx++, CLK_MASK_ARM);
+
+	/* Since EMC clock is not restored update current state, and mark
+	   EMC DFS as out of sync */
+	tegra3_periph_clk_init(&tegra_clk_emc);
+	tegra_emc_timing_invalidate();
 }
 #endif

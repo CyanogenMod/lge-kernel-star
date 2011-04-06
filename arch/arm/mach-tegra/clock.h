@@ -195,8 +195,6 @@ struct tegra_sku_rate_limit {
 
 void tegra_soc_init_clocks(void);
 void tegra2_init_clocks(void);
-void tegra2_periph_reset_deassert(struct clk *c);
-void tegra2_periph_reset_assert(struct clk *c);
 void clk_init(struct clk *clk);
 struct clk *tegra_get_clock_by_name(const char *name);
 unsigned long clk_measure_input_freq(void);
@@ -210,6 +208,7 @@ void tegra2_sdmmc_tap_delay(struct clk *c, int delay);
 int tegra_emc_set_rate(unsigned long rate);
 long tegra_emc_round_rate(unsigned long rate);
 struct clk *tegra_emc_predict_parent(unsigned long rate, u32 *div_value);
+void tegra_emc_timing_invalidate(void);
 
 static inline bool clk_is_auto_dvfs(struct clk *c)
 {
