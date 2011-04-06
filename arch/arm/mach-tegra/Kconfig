@@ -93,6 +93,11 @@ config MACH_WARIO
 # Cardhu
 
 # Enterprise
+config MACH_TEGRA_ENTERPRISE
+       bool "Tegra_enterprise board"
+       depends on ARCH_TEGRA_3x_SOC
+       help
+         Support for NVIDIA Tegra_enterprise development platform
 
 config TEGRA_FPGA_PLATFORM
        bool "Support for NVIDIA Tegra FPGA platform"

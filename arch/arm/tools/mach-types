@@ -1102,3 +1102,4 @@ sam9repeater		MACH_SAM9REPEATER	SAM9REPEATER		3424
 # Aruba
 # Cardhu
 # Enterprise
+tegra_enterprise	MACH_TEGRA_ENTERPRISE	TEGRA_ENTERPRISE	3435
