@@ -407,9 +407,13 @@ static void enterprise_gps_init(void)
 
 static void __init tegra_enterprise_init(void)
 {
+	char serial[20];
+
 	tegra_clk_init_from_table(enterprise_clk_init_table);
 	enterprise_pinmux_init();
 	enterprise_i2c_init();
+	snprintf(serial, sizeof(serial), "%llx", tegra_chip_uid());
+	andusb_plat.serial_number = kstrdup(serial, GFP_KERNEL);
 	platform_add_devices(enterprise_devices, ARRAY_SIZE(enterprise_devices));
 	enterprise_regulator_init();
 	enterprise_sdhci_init();
