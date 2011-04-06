@@ -52,6 +52,20 @@
 #include "fuse.h"
 
 
+static struct usb_mass_storage_platform_data tegra_usb_fsg_platform = {
+	.vendor = "NVIDIA",
+	.product = "Tegra 3",
+	.nluns = 1,
+};
+
+static struct platform_device tegra_usb_fsg_device = {
+	.name = "usb_mass_storage",
+	.id = -1,
+	.dev = {
+		.platform_data = &tegra_usb_fsg_platform,
+	},
+};
+
 static struct plat_serial8250_port debug_uart_platform_data[] = {
 	{
 		.membase	= IO_ADDRESS(TEGRA_UARTD_BASE),
@@ -265,6 +279,7 @@ static struct platform_device tegra_camera = {
 };
 
 static struct platform_device *enterprise_devices[] __initdata = {
+	&tegra_usb_fsg_device,
 	&androidusb_device,
 	&debug_uart,
 	&tegra_uarta_device,
