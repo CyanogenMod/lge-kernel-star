@@ -27,6 +27,7 @@
 #include <linux/io.h>
 
 #include <mach/hardware.h>
+#include <mach/iomap.h>
 #include <asm/page.h>
 #include <asm/mach/map.h>
 
@@ -93,8 +94,9 @@ void __iomem *tegra_ioremap(unsigned long p, size_t size, unsigned int type)
 	 * __arm_ioremap fails to set the domain of ioremapped memory
 	 * correctly, only use it on physical memory.
 	 */
-	if (v == NULL && p < SZ_1G)
-		v = __arm_ioremap(p, size, type);
+	if (v == NULL && p >= TEGRA_DRAM_BASE &&
+		p <= (TEGRA_DRAM_BASE + TEGRA_DRAM_SIZE))
+			v = __arm_ioremap(p, size, type);
 
 	/*
 	 * If the physical address was not physical memory or statically
