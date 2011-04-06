@@ -90,8 +90,7 @@
 #define INT_CPU0_PMU_INTR		(INT_SEC_BASE + 24)
 #define INT_CPU1_PMU_INTR		(INT_SEC_BASE + 25)
 #define INT_SEC_RES_26			(INT_SEC_BASE + 26)
-#define INT_S_LINK1			(INT_SEC_BASE + 27)
-#define INT_SPI_1			INT_S_LINK1
+#define INT_SPI_1			(INT_SEC_BASE + 27)
 #define INT_APB_DMA_COP			(INT_SEC_BASE + 28)
 #define INT_AHB_DMA_COP			(INT_SEC_BASE + 29)
 #define INT_DMA_TX			(INT_SEC_BASE + 30)
