@@ -251,12 +251,12 @@ typedef enum
     DP3T_S3_CP_USB
 } DP3T_MODE_TYPE;
 
-//20100813, jh.ahn@lge.com, For Charger setting at booting time [START]
+//20100813, , For Charger setting at booting time [START]
 typedef enum {
     DEFAULT,	// 0 - Normal case , deactivate charger
     RESET,		// 1 - No need to set charger at Booing time
 } TYPE_RESET;
-//20100813, jh.ahn@lge.com, For Charger setting at booting time [END]
+//20100813, , For Charger setting at booting time [END]
 
 max14526_device_type read_device_type (void);
 void Set_MAX14526_Usb_Mode_Detect(void);

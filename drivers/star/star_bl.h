@@ -20,7 +20,7 @@ typedef struct {
 
 
 
-// 101017 sk.jang@lge.com added some variables to adjust backlight brightness
+// 101017  added some variables to adjust backlight brightness
 //int remainder;
 //int backlight_minimum;
 //int numerator1 , numerator2;

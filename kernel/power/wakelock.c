@@ -253,7 +253,7 @@ long has_wake_lock(int type)
 	unsigned long irqflags;
 	spin_lock_irqsave(&list_lock, irqflags);
 	ret = has_wake_lock_locked(type);
-	if (ret && (debug_mask & DEBUG_SUSPEND) && type == WAKE_LOCK_SUSPEND)
+	if (ret &&  /* (debug_mask & DEBUG_SUSPEND) && */ type == WAKE_LOCK_SUSPEND)	//20110106  for log about active wakelocks
 		print_active_locks(type);
 	spin_unlock_irqrestore(&list_lock, irqflags);
 	return ret;
@@ -265,7 +265,7 @@ static void suspend(struct work_struct *work)
 	int entry_event_num;
 
 	if (has_wake_lock(WAKE_LOCK_SUSPEND)) {
-		if (debug_mask & DEBUG_SUSPEND)
+		//if (debug_mask & DEBUG_SUSPEND)	//20110106  for log about active wakelocks
 			pr_info("suspend: abort suspend\n");
 		return;
 	}
@@ -536,7 +536,7 @@ static const struct file_operations wakelock_stats_fops = {
 	.release = single_release,
 };
 
-//20101008, byoungwoo.yoon@lge.com, add sysfs to check the status of the active wakelocks  [START]
+//20101008, , add sysfs to check the status of the active wakelocks  [START]
 
 static int active_wakelock_stats_show(struct seq_file *m, void *unused)
 {
@@ -581,7 +581,7 @@ static const struct file_operations active_wakelock_stats_fops = {
 	.llseek = seq_lseek,
 	.release = single_release,
 };
-//20101008, byoungwoo.yoon@lge.com, add sysfs to check the status of the active wakelocks  [START]
+//20101008, , add sysfs to check the status of the active wakelocks  [START]
 
 
 static int __init wakelocks_init(void)
@@ -621,9 +621,9 @@ static int __init wakelocks_init(void)
 	proc_create("wakelocks", S_IRUGO, NULL, &wakelock_stats_fops);
 #endif
 
-	//20101008, byoungwoo.yoon@lge.com, add sysfs to check the status of the active wakelocks  [START]
+	//20101008, , add sysfs to check the status of the active wakelocks  [START]
 	proc_create("active_wakelocks", S_IRUGO, NULL, &active_wakelock_stats_fops);
-	//20101008, byoungwoo.yoon@lge.com, add sysfs to check the status of the active wakelocks  [START]
+	//20101008, , add sysfs to check the status of the active wakelocks  [START]
 
 	return 0;
 

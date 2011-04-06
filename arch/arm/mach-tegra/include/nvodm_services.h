@@ -1150,7 +1150,7 @@ void NvOdmServicesPmuGetVoltage(
         NvU32 vddId,
         NvU32 * pMilliVolts );
 
-#if defined(CONFIG_MACH_STAR) //20100704 bergkamp.cho@lge.com jongik's headset porting [LGE]
+#if defined(CONFIG_MACH_STAR) //20100704  headset porting [LGE]
 NvU32 NvOdmServicesPmuGetHookValue( 
         NvOdmServicesPmuHandle handle);
 #endif
@@ -1204,7 +1204,7 @@ typedef enum
     NvOdmServicesPmuBatteryInstance_Force32 = 0x7FFFFFFF
 } NvOdmServicesPmuBatteryInstance;
 
-//20100909, jh.ahn@lge.com, for detecting power source in battery checker [START]
+//20100909, , for detecting power source in battery checker [START]
 typedef enum
 {
 
@@ -1224,7 +1224,7 @@ NvBool
 NvOdmServicesPmuGetAcLineStatus(
     NvOdmServicesPmuHandle handle,
     NvOdmServicesPmuAcLineStatus * pStatus);
-//20100909, jh.ahn@lge.com, for detecting power source in battery checker [END]
+//20100909, , for detecting power source in battery checker [END]
 
 /**
  * Gets the battery status.
@@ -1288,7 +1288,7 @@ NvOdmServicesPmuGetBatteryData(
     NvOdmServicesPmuBatteryInstance batteryInst,
     NvOdmServicesPmuBatteryData * pData);
 
-//20100924, jh.ahn@lge.com, For updating battery information totally [START]
+//20100924, , For updating battery information totally [START]
 #if defined(CONFIG_MACH_STAR)
 NvBool
 NvOdmServicesPmuUpdateBatteryInfo(
@@ -1297,7 +1297,7 @@ NvOdmServicesPmuUpdateBatteryInfo(
 	NvU8 * pBatStatus,
 	NvOdmServicesPmuBatteryData * pBatData);
 #endif
-//20100924, jh.ahn@lge.com, For updating battery information totally  [END]
+//20100924, , For updating battery information totally  [END]
 
 /**
  * Gets the battery full lifetime.

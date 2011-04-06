@@ -107,7 +107,9 @@ typedef struct star_accel_device_data
 static star_accel_device *g_accel;
 int flip_pre_pre_state = 0;
 int call_once = 1;
-
+unsigned char* transfer_data_read;
+unsigned char* transfer_data_write;
+extern int reboot;
 
 void star_accel_enable_irq(void)
 {
@@ -182,17 +184,26 @@ static bool star_accel_i2c_write_data( star_accel_device *accel, unsigned char r
     int i;
     NvOdmI2cStatus i2c_status = NvOdmI2cStatus_Timeout;
     NvOdmI2cTransactionInfo info;
-    unsigned char* transfer_data;
+    //unsigned char* transfer_data;
 
-    transfer_data = (unsigned char*)NvOdmOsAlloc(len+1);
+    // this code is assumed that length should be under 10
+    if (len > 10) {
+        printk("[star accel driver] %s : length should be 1 ( len = %d)\n", __func__, len);
+        return false;
+    }
+
+    //transfer_data = (unsigned char*)NvOdmOsAlloc(len+1);
 
     for (i = 0; i < GYRO_ACCEL_I2C_MAX_RETRY && i2c_status != NvOdmI2cStatus_Success; i++)
     {
-        transfer_data[0] = reg; 
-        NvOdmOsMemcpy( &transfer_data[1], data, (size_t)len);
+        //transfer_data[0] = reg; 
+        //NvOdmOsMemcpy( &transfer_data[1], data, (size_t)len);
+        transfer_data_write[0] = reg; 
+        NvOdmOsMemcpy( &transfer_data_write[1], data, (size_t)len);
 
         info.Address = accel->i2c_address;
-        info.Buf = transfer_data;
+        //info.Buf = transfer_data;
+        info.Buf = transfer_data_write;
         info.Flags = NVODM_I2C_IS_WRITE;
         info.NumBytes = len+1;
 	
@@ -202,10 +213,14 @@ static bool star_accel_i2c_write_data( star_accel_device *accel, unsigned char r
     if( i2c_status != NvOdmI2cStatus_Success )
     {    
         printk("[star accel driver] %s : i2c transaction error(Number = %d)!\n",__func__,i2c_status);
-        NvOdmOsFree(transfer_data);
+        //NvOdmOsFree(transfer_data);
+
+        //reboot sensors
+        reboot = 1;
+
         return false;
     }    
-    NvOdmOsFree(transfer_data); 
+    //NvOdmOsFree(transfer_data); 
     return true;
 }
 
@@ -214,9 +229,14 @@ static bool star_accel_i2c_read_data( star_accel_device *accel, unsigned char re
     int i;
     NvOdmI2cStatus i2c_status = NvOdmI2cStatus_Timeout;
     NvOdmI2cTransactionInfo info[2];
-    unsigned char* transfer_data;
+    //unsigned char* transfer_data;
 
-    transfer_data = (unsigned char*)NvOdmOsAlloc(len);
+    // this code is assumed that length should be under 10
+    if (len > 10) {
+        printk("[star accel driver] %s : length should be 1 ( len = %d)\n", __func__, len);
+        return false;
+    }
+    //transfer_data = (unsigned char*)NvOdmOsAlloc(len);
 
     for (i = 0; i < GYRO_ACCEL_I2C_MAX_RETRY && i2c_status != NvOdmI2cStatus_Success; i++)
     {
@@ -226,7 +246,8 @@ static bool star_accel_i2c_read_data( star_accel_device *accel, unsigned char re
        info[0].NumBytes = 1;
 
        info[1].Address = ( g_accel->i2c_address | 0x01 );
-       info[1].Buf = transfer_data;
+       //info[1].Buf = transfer_data;
+       info[1].Buf = transfer_data_read;
        info[1].Flags = 0;
        info[1].NumBytes = len;
 
@@ -236,11 +257,16 @@ static bool star_accel_i2c_read_data( star_accel_device *accel, unsigned char re
     if( i2c_status != NvOdmI2cStatus_Success )
     {
         printk("[star driver] %s : i2c transaction error(Number= %d)!\n",__func__, i2c_status);
-        NvOdmOsFree(transfer_data);
+        //NvOdmOsFree(transfer_data);
+
+        //reboot sensors
+        reboot = 1;
+
         return false;
     }
-    NvOdmOsMemcpy( data, transfer_data, len );
-    NvOdmOsFree(transfer_data);
+    NvOdmOsMemcpy( data, transfer_data_read, len );
+    //NvOdmOsMemcpy( data, transfer_data, len );
+    //NvOdmOsFree(transfer_data);
     return true;
 }
 
@@ -272,18 +298,6 @@ static void star_accel_set_sample_rate( star_accel_device *accel, unsigned int s
 	star_accel_i2c_write_data( accel, KXTF9_I2C_DATA_CTRL_REG, &rate, 1 );
 }
 
-int lge_sensor_verify_kxtf9(void) 
-{
-	unsigned char value = 0;
-
-	star_accel_i2c_read_data( g_accel, 0x0F, &value, 1 );
-	printk("[%s] ### Accelerometer ## KXTF9 ## WHO_AM_I = 0x%x \n",MOD_TAG,value);
-
-	if(KXTF9_WHID != value)
-		return SENSOR_ERROR;
-
-	return SENSOR_OK;
-}
 
 NvBool NvAccelerometerI2CSetRegsPassThrough(NvU8 offset, NvU8* value, NvU32 len)
 {
@@ -445,7 +459,7 @@ static void star_accel_whoami( void )
 	#endif
 }
 
-// 20100702 taewan.kim@lge.com Power control bug fix [START]
+// 20100702  Power control bug fix [START]
 static void star_accel_set_power_rail(NvU32 vdd_id, NvBool is_enable )
 {
 	NvOdmServicesPmuVddRailCapabilities vddrailcap;
@@ -479,7 +493,108 @@ static void star_accel_set_power_rail(NvU32 vdd_id, NvBool is_enable )
 	#endif
 	NvOdmServicesPmuClose(h_pmu);
 }
-// 20100702 taewan.kim@lge.com Power control bug fix [END]
+// 20100702  Power control bug fix [END]
+
+
+int lge_sensor_verify_kxtf9(void) 
+{
+	unsigned char value = 0;
+
+	star_accel_i2c_read_data( g_accel, 0x0F, &value, 1 );
+	printk("[%s] ### Accelerometer ## KXTF9 ## WHO_AM_I = 0x%x \n",MOD_TAG,value);
+
+	if(KXTF9_WHID != value)
+		return SENSOR_ERROR;
+
+	return SENSOR_OK;
+}
+
+int lge_sensor_shutdown_kxtf9(void)
+{
+	NvU32 I2cInstance = 0;
+	const NvOdmPeripheralConnectivity *pcon;
+	int err;
+	NvBool found_gpio=NV_FALSE, found_i2c=NV_FALSE;
+
+	int loop;
+
+	printk("[%s:%d] \n", __FUNCTION__, __LINE__);
+	#if STAR_ACCEL_DEBUG
+		printk("[skhwang]%s\n", __func__);
+	#endif
+
+	pcon = (NvOdmPeripheralConnectivity*)NvOdmPeripheralGetGuid(NV_ODM_GUID('a','c','c','e','l','e','r','o'));
+
+	for(loop = 0; loop< pcon->NumAddress; loop++)
+	{
+		switch(pcon->AddressList[loop].Interface)
+		{
+			case NvOdmIoModule_I2c:
+				g_accel->i2c_address = (pcon->AddressList[loop].Address<<1);
+				I2cInstance = pcon->AddressList[loop].Instance;
+				found_i2c = NV_TRUE;
+				break;
+			case NvOdmIoModule_Gpio:
+				g_accel->intr_port = pcon->AddressList[loop].Instance;
+				g_accel->intr_pin = pcon->AddressList[loop].Address;
+				found_gpio = NV_TRUE;
+				break;
+			case NvOdmIoModule_Vdd:
+				g_accel->vdd_id = pcon->AddressList[loop].Address;
+				star_accel_set_power_rail(g_accel->vdd_id, NV_FALSE);
+				NvOdmOsWaitUS(30);
+				break;
+			default:
+				break;
+		}
+	}
+    return SENSOR_OK;
+}
+
+int lge_sensor_restart_kxtf9(void)
+{
+	NvU32 I2cInstance = 0;
+	const NvOdmPeripheralConnectivity *pcon;
+	int err;
+	NvBool found_gpio=NV_FALSE, found_i2c=NV_FALSE;
+
+	int loop;
+
+	printk("[%s:%d] \n", __FUNCTION__, __LINE__);
+	#if STAR_ACCEL_DEBUG
+		printk("[skhwang]%s\n", __func__);
+	#endif
+
+	pcon = (NvOdmPeripheralConnectivity*)NvOdmPeripheralGetGuid(NV_ODM_GUID('a','c','c','e','l','e','r','o'));
+
+	for(loop = 0; loop< pcon->NumAddress; loop++)
+	{
+		switch(pcon->AddressList[loop].Interface)
+		{
+			case NvOdmIoModule_I2c:
+				g_accel->i2c_address = (pcon->AddressList[loop].Address<<1);
+				I2cInstance = pcon->AddressList[loop].Instance;
+				found_i2c = NV_TRUE;
+				break;
+			case NvOdmIoModule_Gpio:
+				g_accel->intr_port = pcon->AddressList[loop].Instance;
+				g_accel->intr_pin = pcon->AddressList[loop].Address;
+				found_gpio = NV_TRUE;
+				break;
+			case NvOdmIoModule_Vdd:
+				g_accel->vdd_id = pcon->AddressList[loop].Address;
+				star_accel_set_power_rail(g_accel->vdd_id, NV_TRUE);
+				NvOdmOsWaitUS(30);
+				break;
+			default:
+				break;
+		}
+	}
+	
+    return SENSOR_OK;
+
+}
+
 
 static int star_accel_misc_open( struct inode *inode, struct file *file )
 {
@@ -921,7 +1036,7 @@ static void star_accel_irq_handler(void *arg)
 {
 	
 	//printk("%s() -- start\n\n", __func__);
-	schedule_work(&g_accel->work); //magoo@lge.com
+	schedule_work(&g_accel->work); //
 
 }
 
@@ -1014,11 +1129,19 @@ static int __init star_accel_probe( struct platform_device *pdev )
 		goto failtomemorydev;
 	}
 
-    // 20100702 taewan.kim@lge.com Power control bug fix [START]
+    transfer_data_read  = kzalloc(12, GFP_KERNEL);
+    transfer_data_write = kzalloc(12, GFP_KERNEL);
+    if (transfer_data_read == NULL || transfer_data_write == NULL) {
+		err = -ENOMEM;
+		printk("[skhwang][%s], Failed to alloc the memory\n", __func__);
+		goto failtomemorydev;
+    }
+
+    // 20100702  Power control bug fix [START]
 	/*g_accel->h_accel_pmu = NvOdmServicesPmuOpen();
 	if( !g_accel->h_accel_pmu )
 	{err=-ENOSYS; goto failtomemorydev;}*/
-    // 20100702 taewan.kim@lge.com Power control bug fix [START]
+    // 20100702  Power control bug fix [START]
 
 	pcon = (NvOdmPeripheralConnectivity*)NvOdmPeripheralGetGuid(NV_ODM_GUID('a','c','c','e','l','e','r','o'));
 	//pcon = (NvOdmPeripheralConnectivity*)NvOdmPeripheralGetGuid(NV_ODM_GUID('p','r','o','x','i','m','i','t'));
@@ -1042,7 +1165,7 @@ static int __init star_accel_probe( struct platform_device *pdev )
 				#if STAR_ACCEL_DEBUG
 					printk("[skhwang] KXTF9 POWER %d\n", g_accel->vdd_id );
 				#endif
-                // 20100702 taewan.kim@lge.com Power control bug fix
+                // 20100702  Power control bug fix
 				star_accel_set_power_rail(g_accel->vdd_id, NV_TRUE);
 				NvOdmOsWaitUS(30);
 				break;
@@ -1149,6 +1272,13 @@ static int star_accel_remove( struct platform_device *pdev )
 {
 	input_unregister_device(g_accel->input_dev);
 
+    if (transfer_data_read != NULL) {
+        kfree(transfer_data_read);
+    }
+    if (transfer_data_write != NULL) {
+        kfree(transfer_data_write);
+    }
+
 	return 0;
 }
 
@@ -1189,6 +1319,6 @@ static void __exit star_accel_exit(void)
 module_init(star_accel_init);
 module_exit(star_accel_exit);
 
-MODULE_AUTHOR("sk.hwang@lge.com");
+MODULE_AUTHOR("");
 MODULE_DESCRIPTION("driver of star accelerometer sensor");
 MODULE_LICENSE("GPL");

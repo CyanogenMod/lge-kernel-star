@@ -103,17 +103,17 @@ Max8907SetVoltage(
     NvU32* pSettleMicroSeconds);
 
 #if defined(CONFIG_MACH_STAR) 
-//20100704 bergkamp.cho@lge.com jongik's headset porting [LGE]
+//20100704  headset porting [LGE]
 NvU32
 Max8907GetHookAdc(
     NvOdmPmuDeviceHandle hDevice);
 
-//20101121 cs77.ha@lge.com, HW power off in thermal limit [START]
+//20101121 HW power off in thermal limit [START]
 NvU32
 Max8907SetHwPowerOffConfig(
     NvOdmPmuDeviceHandle hDevice,
     NvBool Enable);
-//20101121 cs77.ha@lge.com, HW power off in thermal limit [END]
+//20101121 HW power off in thermal limit [END]
 #endif
 
 void
@@ -138,7 +138,7 @@ Max8907GetBatteryData(
     NvOdmPmuBatteryInstance batteryInst,
     NvOdmPmuBatteryData *pData);
 
-//20100924, jh.ahn@lge.com, For updating battery information totally [START]
+//20100924, , For updating battery information totally [START]
 #if defined(CONFIG_MACH_STAR)
 NvBool
 Max8907UpdateBatteryInfo(
@@ -147,7 +147,7 @@ Max8907UpdateBatteryInfo(
 	NvU8 *pBatStatus,
 	NvOdmPmuBatteryData *pBatData);
 #endif // CONFIG_MACH_STAR
-//20100924, jh.ahn@lge.com, For updating battery information totally [END]
+//20100924, , For updating battery information totally [END]
 
 void
 Max8907GetBatteryFullLifeTime(

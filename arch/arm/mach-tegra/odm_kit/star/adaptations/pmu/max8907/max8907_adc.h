@@ -24,7 +24,7 @@ extern "C"
 {
 #endif
 
-//20100622, jh.ahn@lge.com, Definition for ADC control[START]
+//20100622, , Definition for ADC control[START]
 
 //#define REG_ADC_SCHED 				0x10
 // use MAX8907_ADC_SCHED
@@ -117,12 +117,12 @@ extern "C"
 // // ON/OFF controller
 #define MAX8907_RESET_CNFG_INT_REF_EN_SHIFT    0x0
 #define MAX8907_RESET_CNFG_INT_REF_EN_MASK     0x1
-//20100622, jh.ahn@lge.com, Definition for ADC control [END]
+//20100622, , Definition for ADC control [END]
 
-//20100622, jh.ahn@lge.com, setup ADC function in PMU for VCHG, VBBATT, VMBATT, THM [START]
+//20100622, , setup ADC function in PMU for VCHG, VBBATT, VMBATT, THM [START]
 NvBool
 Max8907AdcSetup(NvOdmPmuDeviceHandle hDevice);
-//20100622, jh.ahn@lge.com, setup ADC function in PMU for VCHG, VBBATT, VMBATT, THM [END]
+//20100622, , setup ADC function in PMU for VCHG, VBBATT, VMBATT, THM [END]
 
 /* read voltage from ... */
 NvBool 
@@ -130,7 +130,7 @@ Max8907AdcVBatSenseRead(
     NvOdmPmuDeviceHandle hDevice, 
     NvU32 *volt);
 
-#if defined(CONFIG_MACH_STAR) //20100704 bergkamp.cho@lge.com jongik's headset porting [LGE]
+#if defined(CONFIG_MACH_STAR) //20100704  headset porting [LGE]
 NvU32 
 Max8907AdcHookAdcRead(
     NvOdmPmuDeviceHandle hDevice);

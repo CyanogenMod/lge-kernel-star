@@ -59,13 +59,13 @@
 #include <dhd_dbg.h>
 
 
-/* LGE_CHANGE_S [yoohoo@lge.com] 2009-03-30, change ifname to wlan%d */
+/* LGE_CHANGE_S [] 2009-03-30, change ifname to wlan%d */
 #if defined(CONFIG_LGE_BCM432X_PATCH)
 #undef alloc_etherdev
 #define alloc_etherdev(sizeof_priv) \
 	alloc_netdev(sizeof_priv, "wlan%d", ether_setup)
 #endif /* CONFIG_LGE_BCM432X_PATCH */
-/* LGE_CHANGE_E [yoohoo@lge.com] 2009-03-30, change ifname to wlan%d */
+/* LGE_CHANGE_E [] 2009-03-30, change ifname to wlan%d */
 
 #if defined(CUSTOMER_HW2) && defined(CONFIG_WIFI_CONTROL_FUNC)
 #include <linux/wifi_tiwlan.h>
@@ -264,7 +264,9 @@ typedef struct dhd_info {
 	long dpc_pid;
 	struct semaphore dpc_sem;
 	struct completion dpc_exited;
-
+#if defined(CONFIG_LGE_BCM432X_PATCH)		//by sjpark 11-01-11 : send hang event
+	int hang_was_sent; /* flag that message was send at least once */
+#endif
 	/* Thread to issue ioctl for multicast */
 	long sysioc_pid;
 	struct semaphore sysioc_sem;
@@ -294,11 +296,11 @@ struct semaphore dhd_registration_sem;
 /* load firmware and/or nvram values from the filesystem */
 module_param_string(firmware_path, firmware_path, MOD_PARAM_PATHLEN, 0);
 module_param_string(nvram_path, nvram_path, MOD_PARAM_PATHLEN, 0);
-/* LGE_CHANGE_S [yoohoo@lge.com] 2009-04-03, configs */
+/* LGE_CHANGE_S [] 2009-04-03, configs */
 #if defined(CONFIG_LGE_BCM432X_PATCH)
 module_param_string(config_path, config_path, MOD_PARAM_PATHLEN, 0);
 #endif /* CONFIG_LGE_BCM432X_PATCH */
-/* LGE_CHANGE_E [yoohoo@lge.com] 2009-04-03, configs */
+/* LGE_CHANGE_E [] 2009-04-03, configs */
 
 /* Error bits */
 module_param(dhd_msg_level, int, 0);
@@ -334,14 +336,14 @@ uint dhd_pkt_filter_init = 0;
 module_param(dhd_pkt_filter_init, uint, 0);
 
 /* Pkt filter mode control */
-// 20101008 byoungwook.baek@lge.com, bug-fix: When LCD turned off, multicast packet is filtered [START]
+// 20101008 , bug-fix: When LCD turned off, multicast packet is filtered [START]
 #if defined(CONFIG_LGE_BCM432X_PATCH)
 /* Pkt filter deny mode */
 uint dhd_master_mode = FALSE;
 #else
 uint dhd_master_mode = TRUE;
 #endif
-// 20101008 byoungwook.baek@lge.com, bug-fix: When LCD turned off, multicast packet is filtered [END]
+// 20101008 , bug-fix: When LCD turned off, multicast packet is filtered [END]
 module_param(dhd_master_mode, uint, 1);
 
 /* Watchdog thread priority, -1 to use kernel timer */
@@ -421,6 +423,11 @@ module_param(dhd_rxbound, uint, 0);
 extern uint dhd_deferred_tx;
 module_param(dhd_deferred_tx, uint, 0);
 
+#if defined(CONFIG_LGE_BCM432X_PATCH)	//20110121
+extern bool ap_priv_running;
+int ap_suspend_status;
+struct wake_lock ap_suspend_wake_lock;
+#endif
 
 
 #ifdef SDTEST
@@ -470,18 +477,22 @@ static int dhd_wl_host_event(dhd_info_t *dhd, int *ifidx, void *pktdata,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_PM_SLEEP) && 1
 static int dhd_sleep_pm_callback(struct notifier_block *nfb, unsigned long action, void *ignored)
 {
+	int ret = NOTIFY_DONE;
 	switch (action)
 	{
 		case PM_HIBERNATION_PREPARE:
 		case PM_SUSPEND_PREPARE:
 			dhd_mmc_suspend = TRUE;
-			return NOTIFY_OK;
+			ret = NOTIFY_OK;
+			break;
 		case PM_POST_HIBERNATION:
 		case PM_POST_SUSPEND:
 			dhd_mmc_suspend = FALSE;
-		return NOTIFY_OK;
+			ret = NOTIFY_OK;
+			break;
 	}
-	return 0;
+	smp_mb();
+	return ret;
 }
 
 static struct notifier_block dhd_sleep_pm_notifier = {
@@ -512,14 +523,21 @@ static void dhd_set_packet_filter(int value, dhd_pub_t *dhd)
 
 
 #if defined(CONFIG_HAS_EARLYSUSPEND)
+#if defined(CONFIG_BRCM_LGE_WL_ARPOFFLOAD)	//Setting dtim.	20110120
+extern uint wl_dtim_val;
+#endif
 extern bool dhd_early_suspend_state(void);
 static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 {
-#if 0 // 20101005 byoungwook.baek@lge.com - bug fix: multicast packet lost/wifi throughput down [START]
+#if 0 // 20101005  - bug fix: multicast packet lost/wifi throughput down [START]
 	int power_mode = PM_MAX;
 	/* wl_pkt_filter_enable_t	enable_parm; */
 	char iovbuf[32];
 	int bcn_li_dtim = 3;
+#endif
+#if defined(CONFIG_BRCM_LGE_WL_ARPOFFLOAD)	//Setting dtim.	20110120
+	char iovbuf[32];
+	int bcn_li_dtim = 0;
 #endif
 #ifdef CUSTOMER_HW2
 	uint roamvar = 1;
@@ -528,13 +546,14 @@ static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 	DHD_TRACE(("%s: enter, value = %d in_suspend=%d\n", \
 			__FUNCTION__, value, dhd->in_suspend));
 
-	if (dhd && dhd->up) {
+//	if (dhd && dhd->up) {
+	if (dhd) {
 		if (value && dhd->in_suspend) {
 
 				/* Kernel suspended */
 				DHD_TRACE(("%s: force extra Suspend setting \n", __FUNCTION__));
 
-#if 0 // 20101005 byoungwook.baek@lge.com - bug fix: multicast packet lost/wifi throughput down [START]
+#if 0 // 20101005  - bug fix: multicast packet lost/wifi throughput down [START]
 				dhdcdc_set_ioctl(dhd, 0, WLC_SET_PM,
 					(char *)&power_mode, sizeof(power_mode));
 #endif
@@ -542,16 +561,27 @@ static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 				/* Enable packet filter, only allow unicast packet to send up */
 				dhd_set_packet_filter(1, dhd);
 
+#if defined(CONFIG_LGE_BCM432X_PATCH)	//20110121
+				if(ap_priv_running == TRUE)
+					ap_suspend_status = 1;
+#endif
 				/* if dtim skip setup as default force it to wake each thrid dtim
 				 *  for better power saving.
 				 *  Note that side effect is chance to miss BC/MC packet
 				*/
 
-#if 0 // 20101005 byoungwook.baek@lge.com - bug fix: multicast packet lost/wifi throughput down [START]
+#if 0 // 20101005  - bug fix: multicast packet lost/wifi throughput down [START]
 				if ((dhd->dtim_skip == 0) || (dhd->dtim_skip == 1))
 					bcn_li_dtim = 3;
 				else
 					bcn_li_dtim = dhd->dtim_skip;
+				bcm_mkiovar("bcn_li_dtim", (char *)&bcn_li_dtim,
+					4, iovbuf, sizeof(iovbuf));
+				dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
+#endif
+#if defined(CONFIG_BRCM_LGE_WL_ARPOFFLOAD)	//Setting dtim.	20110120	
+				bcn_li_dtim = wl_dtim_val;
+				printk("%s:%d wl_dtim_val = %d\n",__func__,__LINE__,wl_dtim_val);
 				bcm_mkiovar("bcn_li_dtim", (char *)&bcn_li_dtim,
 					4, iovbuf, sizeof(iovbuf));
 				dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
@@ -569,7 +599,7 @@ static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 				/* Kernel resumed  */
 				DHD_TRACE(("%s: Remove extra suspend setting \n", __FUNCTION__));
 
-#if 0 // 20101005 byoungwook.baek@lge.com - bug fix: multicast packet lost/wifi throughput down [START]
+#if 0 // 20101005  - bug fix: multicast packet lost/wifi throughput down [START]
 				power_mode = PM_FAST;
 				dhdcdc_set_ioctl(dhd, 0, WLC_SET_PM, (char *)&power_mode,
 					sizeof(power_mode));
@@ -578,9 +608,20 @@ static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 				/* disable pkt filter */
 				dhd_set_packet_filter(0, dhd);
 
-#if 0 // 20101005 byoungwook.baek@lge.com - bug fix: multicast packet lost/wifi throughput down [START]
+#if defined(CONFIG_LGE_BCM432X_PATCH)	//20110121
+				if(ap_priv_running == TRUE)
+					ap_suspend_status = 0;
+#endif
+#if 0 // 20101005  - bug fix: multicast packet lost/wifi throughput down [START]
 				/* restore pre-suspend setting for dtim_skip */
 				bcm_mkiovar("bcn_li_dtim", (char *)&dhd->dtim_skip,
+					4, iovbuf, sizeof(iovbuf));
+
+				dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
+#endif
+#if defined(CONFIG_BRCM_LGE_WL_ARPOFFLOAD)	//Setting dtim.	20110120
+				bcn_li_dtim = 0;
+				bcm_mkiovar("bcn_li_dtim", (char *)&bcn_li_dtim,
 					4, iovbuf, sizeof(iovbuf));
 
 				dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
@@ -933,6 +974,9 @@ dhd_op_if(dhd_if_t *ifp)
 				/* save ptr to wl0.1 netdev for use in wl_iw.c  */
 				ap_net_dev = ifp->net;
 				 /* signal to the SOFTAP 'sleeper' thread, wl0.1 is ready */
+#if defined(CONFIG_LGE_BCM432X_PATCH)	//20110121
+				if(ap_priv_running == TRUE)
+#endif
 				up(&ap_eth_sema);
 #endif
 				DHD_TRACE(("\n ==== pid:%x, net_device for if:%s created ===\n\n",
@@ -1116,7 +1160,12 @@ dhd_start_xmit(struct sk_buff *skb, struct net_device *net)
 		/* Send Event when bus down detected during data session */
 		if (dhd->pub.busstate == DHD_BUS_DOWN)  {
 			DHD_ERROR(("%s: Event RELOAD send up\n", __FUNCTION__));
+			
+#if defined(CONFIG_LGE_BCM432X_PATCH)		//by sjpark 11-01-11 : send hang event
+			net_os_send_hang_message(net);
+#else
 			wl_iw_send_priv_event(net, "RELOAD");
+#endif
 		}
 		return -ENODEV;
 	}
@@ -1416,11 +1465,21 @@ dhd_watchdog(ulong data)
 		mod_timer(&dhd->timer, jiffies + dhd_watchdog_ms * HZ / 1000);
 }
 
+#if defined(CONFIG_LGE_BCM432X_PATCH)	//htclk fail patch
+extern int ht_err_cnt;
+void htclk_fail_reset(void *bus);
+#endif
 static int
 dhd_dpc_thread(void *data)
 {
 	dhd_info_t *dhd = (dhd_info_t *)data;
 
+	int reset_flag = FALSE;
+
+#if defined(CONFIG_LGE_BCM432X_PATCH)	//htclk fail patch
+reset:
+#endif
+	
 	WAKE_LOCK_INIT(&dhd->pub, WAKE_LOCK_DPC, "dhd_dpc_thread");
 	/* This thread doesn't need any user-level access,
 	 * so get rid of all our resources
@@ -1450,6 +1509,14 @@ dhd_dpc_thread(void *data)
 			} else {
 				dhd_bus_stop(dhd->pub.bus, TRUE);
 			}
+#if defined(CONFIG_LGE_BCM432X_PATCH)	//htclk fail patch
+			if(ht_err_cnt > 10)
+			{
+				printk("%s:%d\n",__func__,__LINE__);
+				reset_flag = TRUE;
+				break;
+			}
+#endif
 		}
 		else
 			break;
@@ -1457,6 +1524,21 @@ dhd_dpc_thread(void *data)
 
 	WAKE_LOCK_DESTROY(&dhd->pub, WAKE_LOCK_DPC);
 
+#if defined(CONFIG_LGE_BCM432X_PATCH)	//htclk fail patch
+	if(reset_flag == TRUE)
+	{
+		printk("%s:%d : htclk_fail_reset call\n",__func__,__LINE__);
+		
+		htclk_fail_reset((void*)dhd);
+		reset_flag = FALSE;
+
+		ht_err_cnt = 0;
+//		init_completion(&dhd->dpc_exited);
+//		dhd->dpc_pid = kernel_thread(dhd_dpc_thread, dhd, 0);
+		mdelay(500);
+		goto reset;
+	}
+#endif
 	complete_and_exit(&dhd->dpc_exited, 0);
 }
 
@@ -1806,8 +1888,12 @@ dhd_ioctl_entry(struct net_device *net, struct ifreq *ifr, int cmd)
 	WAKE_UNLOCK(&dhd->pub, WAKE_LOCK_IOCTL);
 	WAKE_LOCK_DESTROY(&dhd->pub, WAKE_LOCK_IOCTL);
 	if (bcmerror == -ETIMEDOUT) {
-		DHD_ERROR(("%s: Event RELOAD send up\n", __FUNCTION__));
+		DHD_ERROR(("%s: Event HANGED send up\n", __FUNCTION__));
+#if defined(CONFIG_LGE_BCM432X_PATCH)		//by sjpark 11-01-11 : send hang event
+		net_os_send_hang_message(net);
+#else
 		wl_iw_send_priv_event(net, "RELOAD");
+#endif
 	}
 done:
 	if (!bcmerror && buf && ioc.buf) {
@@ -1851,11 +1937,11 @@ dhd_open(struct net_device *net)
 	uint32 toe_ol;
 #endif
 	int ifidx = dhd_net2idx(dhd, net);
-/* LGE_CHANGE_S [yoohoo@lge.com] 2009-08-26, Not need to call dhd_bus_start(). Later call dhd_bus_start in dhdsdio_probe in dhd_sdio.c */
+/* LGE_CHANGE_S [] 2009-08-26, Not need to call dhd_bus_start(). Later call dhd_bus_start in dhdsdio_probe in dhd_sdio.c */
 #if !defined(CONFIG_LGE_BCM432X_PATCH)
 	int32 ret = 0;
 #endif /* CONFIG_LGE_BCM432X_PATCH */
-/* LGE_CHANGE_E [yoohoo@lge.com] 2009-08-26, Not need to call dhd_bus_start(). Later call dhd_bus_start in dhdsdio_probe in dhd_sdio.c */
+/* LGE_CHANGE_E [] 2009-08-26, Not need to call dhd_bus_start(). Later call dhd_bus_start in dhdsdio_probe in dhd_sdio.c */
 
 	DHD_TRACE(("%s: ifidx %d\n", __FUNCTION__, ifidx));
 
@@ -1884,13 +1970,13 @@ dhd_open(struct net_device *net)
 
 
 	OLD_MOD_INC_USE_COUNT;
-/* LGE_CHANGE_S [yoohoo@lge.com] 2009-08-26, Not need to call dhd_bus_start(). Later call dhd_bus_start in dhdsdio_probe in dhd_sdio.c */
+/* LGE_CHANGE_S [] 2009-08-26, Not need to call dhd_bus_start(). Later call dhd_bus_start in dhdsdio_probe in dhd_sdio.c */
 #if !defined(CONFIG_LGE_BCM432X_PATCH)
 	return ret;
 #else
 	return 0;
 #endif /* CONFIG_LGE_BCM432X_PATCH */
-/* LGE_CHANGE_E [yoohoo@lge.com] 2009-08-26, Not need to call dhd_bus_start(). Later call dhd_bus_start in dhdsdio_probe in dhd_sdio.c */
+/* LGE_CHANGE_E [] 2009-08-26, Not need to call dhd_bus_start(). Later call dhd_bus_start in dhdsdio_probe in dhd_sdio.c */
 }
 
 osl_t *
@@ -2107,6 +2193,9 @@ dhd_attach(osl_t *osh, struct dhd_bus *bus, uint bus_hdrlen)
 	WAKE_LOCK_INIT(&dhd->pub, WAKE_LOCK_TMOUT, "dhd_wake_lock");
 	WAKE_LOCK_INIT(&dhd->pub, WAKE_LOCK_LINK_DOWN_TMOUT, "dhd_wake_lock_link_dw_event");
 	WAKE_LOCK_INIT(&dhd->pub, WAKE_LOCK_PNO_FIND_TMOUT, "dhd_wake_lock_link_pno_find_event");
+#if defined(CONFIG_LGE_BCM432X_PATCH)	//20110121
+	wake_lock_init(&ap_suspend_wake_lock,WAKE_LOCK_SUSPEND,"ap_suspend_wake_lock");
+#endif
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	dhd->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 20;
 	dhd->early_suspend.suspend = dhd_early_suspend;
@@ -2218,7 +2307,7 @@ dhd_bus_start(dhd_pub_t *dhdp)
 
 	dhdp->pktfilter_count = 1;
 
-// 20101008 byoungwook.baek@lge.com, bug-fix: When LCD turned off, multicast packet is filtered [START]
+// 20101008 , bug-fix: When LCD turned off, multicast packet is filtered [START]
 #if defined(CONFIG_LGE_BCM432X_PATCH)
 	/* Setup filter to deny only broadcast */
 	dhdp->pktfilter[0] = "100 0 0 0 0xff 0xff";
@@ -2226,7 +2315,7 @@ dhd_bus_start(dhd_pub_t *dhdp)
 	/* Setup filter to allow only unicast */
 	dhdp->pktfilter[0] = "100 0 0 0 0x01 0x00";
 #endif
-// 20101008 byoungwook.baek@lge.com, bug-fix: When LCD turned off, multicast packet is filtered [END]
+// 20101008 , bug-fix: When LCD turned off, multicast packet is filtered [END]
 
 #endif /* EMBEDDED_PLATFORM */
 
@@ -2479,6 +2568,9 @@ dhd_detach(dhd_pub_t *dhdp)
 		WAKE_LOCK_DESTROY(dhdp, WAKE_LOCK_TMOUT);
 		WAKE_LOCK_DESTROY(dhdp, WAKE_LOCK_LINK_DOWN_TMOUT);
 		WAKE_LOCK_DESTROY(dhdp, WAKE_LOCK_PNO_FIND_TMOUT);
+#if defined(CONFIG_LGE_BCM432X_PATCH)	//20110121
+		wake_lock_destroy(&ap_suspend_wake_lock);
+#endif
 		free_netdev(ifp->net);
 		MFREE(dhd->pub.osh, ifp, sizeof(*ifp));
 		MFREE(dhd->pub.osh, dhd, sizeof(*dhd));
@@ -2654,9 +2746,12 @@ dhd_os_ioctl_resp_wait(dhd_pub_t *pub, uint *condition, bool *pending)
 	/* Wait until control frame is available */
 	add_wait_queue(&dhd->ioctl_resp_wait, &wait);
 	set_current_state(TASK_INTERRUPTIBLE);
+	smp_mb();
 
-	while (!(*condition) && (!signal_pending(current) && timeout))
+	while (!(*condition) && (!signal_pending(current) && timeout)) {
 		timeout = schedule_timeout(timeout);
+		smp_mb();
+	}
 
 	if (signal_pending(current))
 		*pending = TRUE;
@@ -3063,6 +3158,22 @@ dhd_dev_get_pno_status(struct net_device *dev)
 
 #endif /* PNO_SUPPORT */
 
+#if defined(CONFIG_LGE_BCM432X_PATCH)		//by sjpark 11-01-11 : send hang event
+int net_os_send_hang_message(struct net_device *dev)
+{
+	dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev);
+	int ret = 0;
+
+	if (dhd) {
+		if (!dhd->hang_was_sent) {
+			dhd->hang_was_sent = 1;
+			ret = wl_iw_send_priv_event(dev, "HANGED");
+		}
+	}
+	return ret;
+}
+#endif
+
 static int
 dhd_get_pend_8021x_cnt(dhd_info_t *dhd)
 {
@@ -3091,7 +3202,7 @@ dhd_wait_pend8021x(struct net_device *dev)
 	return pend;
 }
 
-/* LGE_CHANGE_S, [yoohoo@lge.com], 2009-11-19, Use deepsleep instead of dhd_dev_reset when driver start or stop */
+/* LGE_CHANGE_S, [], 2009-11-19, Use deepsleep instead of dhd_dev_reset when driver start or stop */
 #if defined(CONFIG_LGE_BCM432X_PATCH) && defined(CONFIG_BRCM_USE_DEEPSLEEP)
 dhd_pub_t * get_dhd_pub_from_dev(struct net_device *dev)
 {
@@ -3099,9 +3210,9 @@ dhd_pub_t * get_dhd_pub_from_dev(struct net_device *dev)
 
 	return &dhd->pub;
 }
-/* LGE_CHANGE_S, [yoohoo@lge.com], 2009-11-19, Use deepsleep instead of dhd_dev_reset when driver start or stop */
+/* LGE_CHANGE_S, [], 2009-11-19, Use deepsleep instead of dhd_dev_reset when driver start or stop */
 #endif /* CONFIG_LGE_BCM432X_PATCH && CONFIG_BRCM_USE_DEEPSLEEP */
-/* LGE_CHANGE_E, [yoohoo@lge.com], 2009-11-19, Use deepsleep instead of dhd_dev_reset when driver start or stop */
+/* LGE_CHANGE_E, [], 2009-11-19, Use deepsleep instead of dhd_dev_reset when driver start or stop */
 
 #ifdef DHD_DEBUG
 int
@@ -3139,3 +3250,35 @@ exit:
 	return ret;
 }
 #endif /* DHD_DEBUG */
+
+#if defined(CONFIG_LGE_BCM432X_PATCH)	//htclk fail patch
+#include <bcmsdbus.h>
+
+void htclk_fail_reset(void *bus)
+{
+	dhd_info_t *dhd = (dhd_info_t *)bus;
+
+	printk("Enter %s:%d\n",__func__,__LINE__);
+	/* Turning off watchdog */
+	dhd_os_wd_timer(&dhd->pub, 0);
+
+	dhd_bus_devreset(&dhd->pub, 1);
+
+	sdioh_stop(NULL);
+	
+	dhd_customer_gpio_wlan_ctrl(WLAN_RESET_OFF);
+	mdelay(200);		// 200ms
+	dhd_customer_gpio_wlan_ctrl(WLAN_RESET_ON);
+
+	sdioh_start(NULL, 0);
+	
+	dhd_bus_devreset(&dhd->pub, 0);
+	
+	/* Turning on watchdog back */
+	dhd_os_wd_timer(&dhd->pub, dhd_watchdog_ms);
+
+	sdioh_start(NULL, 1);
+	
+	dhd_preinit_ioctls(&dhd->pub);
+}
+#endif

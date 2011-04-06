@@ -34,9 +34,9 @@
 #include <linux/workqueue.h>
 #include <linux/smp_lock.h>
 #include <linux/suspend.h>
-// 20100728 cs77.ha@lge.com related deepsleep wakeup delay, (NVIDIA john moser) [START]
+// 20100728 related deepsleep wakeup delay, (NVIDIA john moser) [START]
 #include <linux/delay.h>
-// 20100728 cs77.ha@lge.com related deepsleep wakeup delay, (NVIDIA john moser) [END]
+// 20100728  related deepsleep wakeup delay, (NVIDIA john moser) [END]
 #include <linux/reboot.h>
 #include <linux/delay.h>
 
@@ -72,10 +72,10 @@ static void tegra_cpufreq_hotplug(NvRmPmRequest req)
 	if (disable_hotplug)
 		return;
         #if 0
-		// 20101002 sunghoon.kim@lge.com disable dual core and dvfs enable for single core [START]
+		// 20101002  disable dual core and dvfs enable for single core [START]
 	        req = NvRmPmRequest_CpuOffFlag;
         	disable_hotplug = 1;
-		// 20101002 sunghoon.kim@lge.com disable dual core and dvfs enable for single core [STOP]
+		// 20101002  disable dual core and dvfs enable for single core [STOP]
         #endif
 	if (req & NvRmPmRequest_CpuOnFlag) {
 		struct cpumask m;

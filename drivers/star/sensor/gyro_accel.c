@@ -25,7 +25,7 @@
 #include <linux/miscdevice.h>
 #include <linux/regulator/consumer.h>
 
-#include "nvodm_gyroscope_accel.h"
+#include <nvodm_gyroscope_accel.h>
 #include "nvodm_gyro_accel_kxtf9.h"
 #include "mach/lprintk.h"
 
@@ -35,6 +35,7 @@
 
 #include "lge_sensor_verify.h"
 #include "star_accel.h"
+#include "ami304.h"
 
 #define  DEBUG 0
 #define  MISC_DYNAMIC_MINOR		 	255
@@ -44,6 +45,7 @@
 //#define MAX_LGE_ACCEL_SAMPLERATE    7  /* for JSR256 API */
 
 int sensor_sleep_st = 0;
+int reboot = 0;
 
 #ifdef CONFIG_HAS_EARLYSUSPEND // wkkim : temporary early suspend apply
 #include <linux/earlysuspend.h>
@@ -137,6 +139,9 @@ extern int AMI304_Reset_Init();
 extern int AMI304_Init(int mode);
 extern int kxtf9_get_acceleration_data_passthrough(int *xyz_data);
 extern int tegra_accel_hw_init(void);
+extern int lge_sensor_shutdown_proxi(void);
+extern int lge_sensor_restart_proximity();
+extern int tegra_compass_hw_init(void);
 
 void NvOdmResetI2C(NvOdmGyroAccelHandle );
 /** Function to close the ODM device. This function will help in switching
@@ -314,6 +319,56 @@ int is_flip_enabled(void)
     return atomic_read(&flip_flag);
 }
 
+int lge_sensor_shoutdown_all(void)
+{
+
+	printk("[%s] reboot gen2 i2c sensors\n",__func__);
+
+	atomic_set(&bypass_flag, 0);
+	
+	//call reboot function
+	lge_sensor_shutdown_compass();
+	lge_sensor_shutdown_kxtf9();
+	lge_sensor_shutdown_proxi();
+	lge_sensor_shutdown_gyro();
+
+
+	msleep(1);
+
+	// do power down 
+	lge_sensor_restart_gyro();
+	lge_sensor_restart_kxtf9();
+	lge_sensor_restart_compass();
+	lge_sensor_restart_proximity();
+
+}
+
+int lge_sensor_shutdown_gyro(void)
+{
+    close_odm_gyro_accel();
+    #if 0
+    unsigned char value = 0;
+    NvOdmResetI2C(star_motion_dev->hOdmGyroAccel);
+    printk("[%s] ### Gyro ## Reset  \n",MOD_TAG);
+
+    if(GYRO_WHID != value)
+        return SENSOR_ERROR;
+#endif
+    return SENSOR_OK;
+}
+int lge_sensor_restart_gyro(void)
+{
+    int err; 
+    
+    err = open_def_odm_gyro_accel();
+    if (!err) {
+        return SENSOR_ERROR;
+#if DEBUG
+        lprintk("open_def_odm_gyro_accel\n");
+#endif
+    }    
+    return SENSOR_OK;
+}
 
 /*---------------------------------------------------------------------------
   motion_sensor_power_on/off
@@ -1039,6 +1094,21 @@ static ssize_t motion_cal_onoff_store(struct device *dev, struct device_attribut
 	return count;
 }
 
+static ssize_t motion_sensors_reboot_store(struct device *dev,  struct device_attribute *attr,const char *buf, size_t count)
+{
+	u32    val;
+	val = simple_strtoul(buf, NULL, 10);
+	//lprintk("[motion_set_shake_onoff_store]  flag [%d]\n",val);
+
+	if (val) {
+		reboot = 1; 
+	} else {
+		reboot = 0; 
+	}
+
+	return count;
+}
+
 static DEVICE_ATTR(accel_onoff, 0666, motion_accel_onoff_show, motion_accel_onoff_store);
 static DEVICE_ATTR(tilt_onoff, 0666, motion_tilt_onoff_show, motion_tilt_onoff_store);
 static DEVICE_ATTR(gyro_onoff, 0666, motion_gyro_onoff_show, motion_gyro_onoff_store);
@@ -1058,6 +1128,9 @@ static DEVICE_ATTR(composite_delay, 0666,NULL, motion_composite_delay_store);
 //Sensor Calibration
 static DEVICE_ATTR(cal_onoff, 0666, motion_cal_onoff_show, motion_cal_onoff_store);
 
+//Sensor reboot test
+static DEVICE_ATTR(reboot, 0666, NULL, motion_sensors_reboot_store);
+
 static struct attribute *star_motion_attributes[] = {
 	&dev_attr_accel_onoff.attr,
 	&dev_attr_gyro_onoff.attr,
@@ -1074,6 +1147,7 @@ static struct attribute *star_motion_attributes[] = {
 	&dev_attr_compass_delay.attr,
 	&dev_attr_cal_onoff.attr,
 	&dev_attr_composite_delay.attr,	
+	&dev_attr_reboot.attr,
 	NULL
 };
 
@@ -1491,6 +1565,24 @@ static int star_motion_ioctl(struct inode *inode, struct file *file, unsigned in
 			atomic_set(&cal_result, buf[1]);
 			if(sensor_sleep_st == 1)
 				atomic_set(&suspend_flag, 1);
+			break;
+		case MOTION_IOCTL_COMPASS_INIT:
+			{
+				tegra_compass_hw_init();
+			}
+			break;					
+		case MOTION_IOCTL_CHECK_SENSOR_I2C_ERROR:
+			//printk("MOTION_IOCTL_CHECK_SENSOR_I2C_ERROR[%d] \n",reboot);
+			if (copy_to_user(argp, &reboot, sizeof(reboot))) {
+				return -EFAULT;
+			}
+			break;
+		case MOTION_IOCTL_REBOOT_SENSORS:
+			printk(".............MOTION_IOCTL_REBOOT_SENSORS................\n");
+			reboot = 0;
+
+			lge_sensor_shoutdown_all();
+			
 			break;
 
 		default:
@@ -2186,7 +2278,7 @@ static int __init star_motion_probe(struct platform_device *pdev)
 	lprintk("[MPU3050] MPU3050_GYRO_I2C_PRODUCT_ID : %x\n",value);
 #endif
 #ifdef CONFIG_HAS_EARLYSUSPEND // wkkim : temporary early suspend apply
-	early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
+	early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 2;
 	early_suspend.suspend = gyro_early_suspend;
 	early_suspend.resume = gyro_late_resume;
 	register_early_suspend(&early_suspend);

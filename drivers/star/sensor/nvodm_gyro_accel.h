@@ -85,7 +85,7 @@ typedef enum
 } NvOdmGyroAccelThresholdSource;
 
 // Timeout for I2C transaction.
-enum { I2C_GYROACCEL_TRANSACTION_TIMEOUT = 10 }; // 1000 -> 10 (ms) // 2010.10.16 byoungwoo.yoon@lge.com
+enum { I2C_GYROACCEL_TRANSACTION_TIMEOUT = 10 }; // 1000 -> 10 (ms) // 2010.10.16 
 // Maximum number of packetsize supported by the I2C controller.
 //enum { I2C_GYROACCEL_PACKET_SIZE = 8}; //original
 enum { I2C_GYROACCEL_PACKET_SIZE = 200};

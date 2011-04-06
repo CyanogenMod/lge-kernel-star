@@ -104,10 +104,10 @@ static int debug_enable_flag = 0x01;
 #define BL_POWER_STATE_ON 0x01
 #define BL_POWER_STATE_OFF 0x00
 
-// 101103 kyungsik.lee@lge.com, Minimum Brightness level for HW Dimming
+// 101103 , Minimum Brightness level for HW Dimming
 #define LCD_LED_DIM 1
-// 101017 sk.jang@lge.com added some variables to adjust backlight brightness
-// 101103 kyungsik.lee@lge.com, Define parameters from global variables
+// 101017  added some variables to adjust backlight brightness
+// 101103 , Define parameters from global variables
 #define BRIGHTNESS_MIN 30
 #define NUMERATOR1 6
 #define NUMERATOR2 14
@@ -170,7 +170,7 @@ static struct aat2870_drvdata_t *drvdata;
 //static spinlock_t intensity_lock; //km.lee
 
 
-static NvU8 BACKLIGHT_DEFAULT = 0x0B; //101017, sk.jang@lge.com set the value to the current consumption '9.9mA'
+static NvU8 BACKLIGHT_DEFAULT = 0x0B; //101017,  set the value to the current consumption '9.9mA'
 
 
 NvBool IsReadThreadStart = NV_TRUE;
@@ -248,7 +248,7 @@ static struct aat2870_ctl_tbl_t aat2870bl_normal_tbl[] = {
 /* Set to ALC mode HW-high gain mode*/
 #if defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT)
 static struct aat2870_ctl_tbl_t aat2870bl_alc_tbl[] = {
-/*2010-12-18. sk.jang@lge.com. Change the ALC Settting value [START] */
+/*2010-12-18. . Change the ALC Settting value [START] */
     /* ALC table 0~15 */
     {0x12,0x19},  /* ALS current setting 5.63mA */
     {0x13,0x1D},  /* ALS current setting 6.53mA */
@@ -274,7 +274,7 @@ static struct aat2870_ctl_tbl_t aat2870bl_alc_tbl[] = {
     { 0x00, 0xFF },  /* Channel Enable : ALL */
     { 0xFF, 0xFE }   /* end or command */
 };
-/*2010-12-18. sk.jang@lge.com. Change the ALC Settting value [END] */
+/*2010-12-18. . Change the ALC Settting value [END] */
 #else
 static struct aat2870_ctl_tbl_t aat2870bl_alc_tbl[] = {
     /* ALC table 0~15 20101218 tunning ver. */
@@ -615,7 +615,7 @@ star_bl_brightness_linearized(int intensity, int *level)
     int last_intensity; 
 
 
-	//101017, sk.jang@lge.com Set the Backlight Brightness to be linearized.[START] 
+	//101017,  Set the Backlight Brightness to be linearized.[START] 
 	if (intensity < BRIGHTNESS_MIN) {
 		
 		//Too low for intensity value
@@ -636,7 +636,7 @@ star_bl_brightness_linearized(int intensity, int *level)
 		//Too High for intensity value
 		ret = -EINVAL; 
 	}
-	//101017, sk.jang@lge.com Set the Backlight Brightness to be linearized.[END]
+	//101017,  Set the Backlight Brightness to be linearized.[END]
 
 	return ret;
 }  
@@ -655,7 +655,7 @@ star_bl_store_intensity(struct device *dev, struct device_attribute *attr, const
 
 	sscanf(buf, "%d", &intensity);//level range: 0 to 22 from aat2870 ds
 
-	//101103, kyungsik.lee@lge.com, Replaced with function.
+	//101103, , Replaced with function.
 	if (star_bl_brightness_linearized(intensity, &level)) {
 
 		printk("[BL] Invalid Intensity value: %d\n", intensity);

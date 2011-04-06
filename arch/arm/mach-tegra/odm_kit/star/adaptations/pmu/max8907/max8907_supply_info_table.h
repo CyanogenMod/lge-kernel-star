@@ -32,7 +32,7 @@ extern "C"
 #define MAX8907_REQUESTVOLTAGE_LX_V2       1200
 #define MAX8907_REQUESTVOLTAGE_LX_V3       1800
 
-//20100413, cs77.ha@lge.com, add [START]
+//20100413, add [START]
 #if defined(CONFIG_MACH_STAR_REV_C) || defined(CONFIG_MACH_STAR_REV_D) || defined(CONFIG_MACH_STAR_REV_E) || defined(CONFIG_MACH_STAR_REV_F)
 #define MAX8907_REQUESTVOLTAGE_LDO1        3300     //DDRx 3.3V
 #define MAX8907_REQUESTVOLTAGE_LDO2        1100     //PLL 1.1V
@@ -54,10 +54,10 @@ extern "C"
 #define MAX8907_REQUESTVOLTAGE_LDO18       1800     //VI 1.8V
 #define MAX8907_REQUESTVOLTAGE_LDO19       1800     //TOUCH 1.8V
 #define MAX8907_REQUESTVOLTAGE_LDO20       0
-//20101104 julius.moon@lge.com [KR SKT] Button LED Current for SU660 // Tunned 20101225 for WHITE Color [START]
+//20101104  [KR SKT] Button LED Current for SU660 // Tunned 20101225 for WHITE Color [START]
 #if defined (STAR_COUNTRY_KR)&& defined (STAR_OPERATOR_SKT)
 #define MAX8907_REQUESTVOLTAGE_WLED        0x14     //0x14(2mA)//0x50(8mA) //0x32(5mA)    //0x46(7mA), <- 0x64(10mA)   :   0x00(0.1mA)~0xff(25.5mA)
-//20101104 julius.moon@lge.com [KR SKT] Button LED Current for SU660 // Tunned 20101225 for WHITE Color [END]
+//20101104  [KR SKT] Button LED Current for SU660 // Tunned 20101225 for WHITE Color [END]
 #else
 #define MAX8907_REQUESTVOLTAGE_WLED        0x14     //0x14(2mA)  <- 0x46(7mA) <- 0x64(10mA) : 0x00(0.1mA)~0xff(25.5mA)
 #endif
@@ -108,7 +108,7 @@ extern "C"
 #else
 #error "NOT SURPORTED!!!"
 #endif
-//20100413, cs77.ha@lge.com, add [END]
+//20100413, add [END]
 
 #define MAX8907_REQUESTVOLTAGE_EXT_DCDC_1  5000    // Fixed
 #define MAX8907_REQUESTVOLTAGE_EXT_DCDC_2     0    // Reserved
@@ -149,14 +149,14 @@ extern "C"
 // is fixed at max. Turn Off time is "just in case" placeholder -  no need
 // for s/w to track when output capacitors are discharged.
 
-//20100811 cs77.ha@lge.com CPU power patch [START]
+//20100811 CPU power patch [START]
 #define MAX8952_SCALE_UP_UV_PER_US         (16000)   // 16mv per 1us
-//20100811 cs77.ha@lge.com CPU power patch [END]
+//20100811 CPU power patch [END]
 #define MAX8907_SCALE_UP_UV_PER_US         (2500)
 #define MAX8907_TURN_ON_TIME_US            (3000)
 #define MAX8907_TURN_OFF_TIME_US           (20)
 
-//20100413, cs77.ha@lge.com, add
+//20100413, add
 #define MAX8907_INVALID_PORT               0xff
 
 // Output voltages supplied by PMU
@@ -197,13 +197,13 @@ typedef enum
     #if defined(CONFIG_MACH_STAR)
     /*-- White LED --*/
     Max8907PmuSupply_WHITE_LED,    // (Boost WLED)
-    //20100413, cs77.ha@lge.com, add [START]
+    //20100413, add [START]
     Max8907PmuSupply_SOC,
     Max8907PmuSupply_reset,
-    //20100413, cs77.ha@lge.com, add [END]
+    //20100413, add [END]
     #endif
 
-    //20100413, cs77.ha@lge.com, add [START]
+    //20100413, add [START]
     #ifndef CONFIG_MACH_STAR
     /*-- External DC/DC switcher --*/
     Max8907PmuSupply_EXT_DCDC_1,   // EXT_DC/DC1
@@ -227,7 +227,7 @@ typedef enum
     // potentiometer (DPM) AD5258
     Max8907LxV1_Ad5258_DPM_EXT_DCDC_7,
     #endif
-    //20100413, cs77.ha@lge.com, add [END],
+    //20100413, add [END],
 
     #if 0
     //Temp for enabling fuse using p2 of i0 expander

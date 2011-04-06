@@ -1043,19 +1043,19 @@ static NvOdmQuerySdioInterfaceProperty s_NvOdmQuerySdioInterfaceProperty[4] =
 
     {NV_FALSE, 10, NV_TRUE,  6, NvOdmQuerySdioSlotUsage_wlan},
     {NV_FALSE,  0, NV_FALSE, 6, NvOdmQuerySdioSlotUsage_unused}, //SDIO2 is not used.
-//20100928, jm1.lee@lge.com, change removable option and setting time [START]
+//20100928, change removable option and setting time [START]
 #if defined (CONFIG_MACH_STAR)
     {NV_TRUE, 10, NV_TRUE, 6, NvOdmQuerySdioSlotUsage_Media}, // micro SD, Removable, Settling time is 10ms. Dedicated to LDO10 power
 #else
     {NV_FALSE, 500, NV_FALSE, 6, NvOdmQuerySdioSlotUsage_Media}, // micro SD, Removable, Settling time is 500ms. 500ms should be adjusted/optimized later again. Dedicated to LDO10 power
 #endif
-//20100928, jm1.lee@lge.com, change removable option and setting time [END]
+//20100928, change removable option and setting time [END]
     {NV_FALSE, 10, NV_TRUE,  6, NvOdmQuerySdioSlotUsage_Boot},
 };
 
 
 // Wake Events
-//20100413, cs77.ha@lge.com, wakeup control [START]
+//20100413, wakeup control [START]
 #if defined(CONFIG_MACH_STAR)
 static NvOdmWakeupPadInfo s_NvOdmWakeupPadInfo[] =
 {
@@ -1073,17 +1073,17 @@ static NvOdmWakeupPadInfo s_NvOdmWakeupPadInfo[] =
     {NV_FALSE/*NV_TRUE*/,  11, NvOdmWakeupPadPolarity_Low},     // Wake Event 11 - spi2_cs2 (BATT_LOW_INT_N)
     {NV_FALSE, 12, NvOdmWakeupPadPolarity_Low},     // Wake Event 12 - spi2_cs1 (AUDIO_INT_N)
     {NV_TRUE/*NV_FALSE*/, 13, NvOdmWakeupPadPolarity_Low},     // Wake Event 13 - sdio1_dat1
-// 101111 hyeongwon.oh@lge.com [SU660] HOME key gpio pk6 -> pv6 to wakeup while sleep [START]
+// 101111  [SU660] HOME key gpio pk6 -> pv6 to wakeup while sleep [START]
 #if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
     {NV_TRUE, 14, NvOdmWakeupPadPolarity_Low}, // Wake Event 14 - gp3_pv[6]
 #else
     {NV_FALSE, 14, NvOdmWakeupPadPolarity_AnyEdge}, // Wake Event 14 - gp3_pv[6]
 #endif
-// 101111 hyeongwon.oh@lge.com [SU660] HOME key gpio pk6 -> pv6 to wakeup while sleep [END]
+// 101111  [SU660] HOME key gpio pk6 -> pv6 to wakeup while sleep [END]
     {NV_FALSE, 15, NvOdmWakeupPadPolarity_AnyEdge}, // Wake Event 15 - gmi_ad16
     {NV_FALSE, 16, NvOdmWakeupPadPolarity_High},    // Wake Event 16 - rtc_irq
     {NV_FALSE, 17, NvOdmWakeupPadPolarity_High},    // Wake Event 17 - kbc_interrupt
-    {NV_TRUE,  18, NvOdmWakeupPadPolarity_Low},     // Wake Event 18 - pwr_int (PMIC_INT)  //20100928, byoungwoo.yoon@lge.com, PMU interrupt enable for RTC alarm
+    {NV_TRUE,  18, NvOdmWakeupPadPolarity_Low},     // Wake Event 18 - pwr_int (PMIC_INT)  //20100928, , PMU interrupt enable for RTC alarm
     {NV_TRUE,  19, NvOdmWakeupPadPolarity_AnyEdge}, // Wake Event 19 - usb_vbus_wakeup[0] (USB_OUT_5V)
     {NV_FALSE, 20, NvOdmWakeupPadPolarity_High},    // Wake Event 20 - usb_vbus_wakeup[1]
     {NV_FALSE, 21, NvOdmWakeupPadPolarity_Low},     // Wake Event 21 - usb_iddig[0]
@@ -1133,7 +1133,7 @@ static NvOdmWakeupPadInfo s_NvOdmWakeupPadInfo[] =
     {NV_FALSE, 30, NvOdmWakeupPadPolarity_High}     // Wake Event 30 - dap1_dout (DAP1_DOUT)
 };
 #endif
-//20100413, cs77.ha@lge.com, wakeup control [END]
+//20100413, wakeup control [END]
 
 /* --- Function Implementations ---*/
 
@@ -1233,15 +1233,15 @@ NvOdmQuerySpiGetDeviceInfo(
         {NvOdmQuerySpiSignalMode_1, NV_FALSE, NV_FALSE};
 
 #ifdef CONFIG_SPI_TDMB	
-	//20100918 suyong.han@lge.com TDMB Base [START_LGE_LAB1]
-	//20100912, suyong.han@lge.com [START]	
+	//20100918  TDMB Base [START_LGE_LAB1]
+	//20100912,  [START]	
 	static const NvOdmQuerySpiDeviceInfo s_Spi2Cs0Info =
 		{NvOdmQuerySpiSignalMode_0, NV_TRUE, NV_FALSE};
 #else
 	static const NvOdmQuerySpiDeviceInfo s_Spi2Cs0Info =
 		{NvOdmQuerySpiSignalMode_3, NV_TRUE, NV_FALSE};
-	//20100912, syblue.lee@lge.com [END]
-	//20100918 suyong.han@lge.com TDMB Base [END_LGE_LAB1]
+	//20100912,  [END]
+	//20100918  TDMB Base [END_LGE_LAB1]
 #endif
 
     if ((OdmIoModule == NvOdmIoModule_Spi) &&
@@ -1485,17 +1485,17 @@ const NvU8* NvOdmQueryProjectName(void)
 
     { NvOdmPinRegister_Ap20_PullUpDown_C,
 #ifdef CONFIG_SPI_TDMB	
-    //20100918 suyong.han@lge.com TDMB Base [START_LGE_LAB1]
-    //20100912, suyong.han@lge.com [START]  
+    //20100918  TDMB Base [START_LGE_LAB1]
+    //20100912,  [START]  
      //SPIC : pull up -> pull down
      NVODM_QUERY_PIN_AP20_PULLUPDOWN_C(0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x2, 0x1, 0x2, 0x2, 0x2, 0x2, 0x2, 0x0, 0x0) },
-    //20100912, syblue.lee@lge.com [END]
-    //20100918 suyong.han@lge.com TDMB Base [END_LGE_LAB1]
+    //20100912,  [END]
+    //20100918  TDMB Base [END_LGE_LAB1]
 #else
      NVODM_QUERY_PIN_AP20_PULLUPDOWN_C(0x1, 0x1, 0x1, 0x1, 0x2, 0x1, 0x2, 0x1, 0x2, 0x2, 0x2, 0x2, 0x0, 0x0, 0x0) },
 #endif
 
-	//20100810 km.lee@lge.com LCD one shot mode
+	//20100810  LCD one shot mode
     { NvOdmPinRegister_Ap20_PullUpDown_D,
 #if defined (CONFIG_MACH_STAR)
      //UAB : pull up -> pull down
@@ -1507,7 +1507,7 @@ const NvU8* NvOdmQueryProjectName(void)
     // Pull ups for the kbc pins
     { NvOdmPinRegister_Ap20_PullUpDown_E,
 #if defined (CONFIG_MACH_STAR)
-     //20101001-2, syblue.lee@lge.com, Pull down MISO pin(Fix spi rx bad data while resuming)
+     //20101001-2, , Pull down MISO pin(Fix spi rx bad data while resuming)
 	 NVODM_QUERY_PIN_AP20_PULLUPDOWN_E(0x2, 0x2, 0x0, 0x0, 0x0, 0x0, 0x2, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x2, 0x2) },	
 #else
      NVODM_QUERY_PIN_AP20_PULLUPDOWN_E(0x2, 0x2, 0x0, 0x0, 0x0, 0x0, 0x2, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x2, 0x2) },
@@ -1582,7 +1582,7 @@ NvBool NvOdmQueryGetPmuProperty(NvOdmPmuProperty* pPmuProperty)
     pPmuProperty->IrqConnected = NV_FALSE;
 #endif
 
-    pPmuProperty->IrqConnected = NV_TRUE; // 20100928, byoungwoo.yoon@lge.com, RTC alarm enable 
+    pPmuProperty->IrqConnected = NV_TRUE; // 20100928, , RTC alarm enable 
 
     pPmuProperty->PowerGoodCount = 0x7E;
     pPmuProperty->IrqPolarity = NvOdmInterruptPolarity_Low;
@@ -1593,33 +1593,33 @@ NvBool NvOdmQueryGetPmuProperty(NvOdmPmuProperty* pPmuProperty)
     pPmuProperty->CorePowerReqPolarity = NvOdmCorePowerReqPolarity_High;
     pPmuProperty->SysClockReqPolarity = NvOdmSysClockReqPolarity_High;
 #if defined(CONFIG_MACH_STAR_REV_B)
-	//20100917 cs77.ha@lge.com one PMIC (max8907B)
+	//20100917 one PMIC (max8907B)
     pPmuProperty->CombinedPowerReq = NV_TRUE;
 #else
-	//20100917 cs77.ha@lge.com CPU power separated (max8907C + max8952)
+	//20100917 CPU power separated (max8907C + max8952)
     pPmuProperty->CombinedPowerReq = NV_FALSE;
 #endif
     pPmuProperty->CpuPowerGoodUs = 2000;
     pPmuProperty->AccuracyPercent = 3;
 
-    //20100917 cs77.ha@lge.com system hang issue.
+    //20100917 system hang issue.
 #if defined(CONFIG_MACH_STAR_REV_B)
-	//20100917 cs77.ha@lge.com voltage output is restored to default level (max8907)
+	//20100917 voltage output is restored to default level (max8907)
     pPmuProperty->VCpuOTPOnWakeup = NV_TRUE;
 #else
-	//20100917 cs77.ha@lge.com voltage output is restored to before status (max8952)
+	//20100917 voltage output is restored to before status (max8952)
     pPmuProperty->VCpuOTPOnWakeup = NV_FALSE;
 #endif
 
     /* Setting Power off count for 100 ms  -32KHz clock rate*/
     pPmuProperty->PowerOffCount = 0xc00;
-    //20100918 taewan.kim@lge.com system hang issue [START]
+    //20100918  system hang issue [START]
 #if defined(CONFIG_MACH_STAR_REV_B)
     pPmuProperty->CpuPowerOffUs = 1000;
 #else
     pPmuProperty->CpuPowerOffUs = 1500;
 #endif
-    //20100918 taewan.kim@lge.com system hang issue [END]
+    //20100918  system hang issue [END]
     return NV_TRUE;
 }
 
@@ -1792,7 +1792,7 @@ NvU32 NvOdmQueryMemSize(NvOdmMemoryType MemType)
 
 NvU32 NvOdmQueryCarveoutSize(void)
 {
-    //20100802 taewan.kim@lge.com increase carveout memory
+    //20100802  increase carveout memory
     return 0x08000000; // 128 MB <- 64MB
 }
 

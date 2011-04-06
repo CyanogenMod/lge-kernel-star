@@ -80,4 +80,7 @@
 #define AMI304_FORCE_MODE			1
 #define AMI304_IRQ				IRQ_EINT9
 
+int lge_sensor_shutdown_compass(void);
+int lge_sensor_restart_compass(void);
+
 #endif

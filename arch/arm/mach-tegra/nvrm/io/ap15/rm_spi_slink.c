@@ -743,10 +743,10 @@ WaitForTransferCompletion(
     // If timeout happen then stop all transfer and exit.
     if (Error == NvError_Timeout)
     {
-//20101221-1, syblue.lee@lge.com, Workaround code to recover repeated spi transaction timeout error [START]
+//20101221-1, , Workaround code to recover repeated spi transaction timeout error [START]
 		pr_err("Spi: Timeout error occurs %u\n",hRmSpiSlink->InstanceId);
 		hRmSpiSlink->IsIntDoneDue = NV_TRUE;
-//20101221-1, syblue.lee@lge.com, Workaround code to recover repeated spi transaction timeout error [END]
+//20101221-1, , Workaround code to recover repeated spi transaction timeout error [END]
 
         // Disable the data flow first.
         hHwInt->HwSetDataFlowFxn(&hRmSpiSlink->HwRegs,
@@ -964,16 +964,16 @@ static void BoostFrequency(NvRmSpiHandle hRmSpiSlink, NvBool IsBoost, NvU32 Tran
             {
                 hRmSpiSlink->BusyHints[0].BoostKHz = 150000; // Emc
                 hRmSpiSlink->BusyHints[0].BoostDurationMs
-                    = 1000;	//20101218-1, syblue.lee@lge.com, NVIDIA patch for RxTransfer error	: 10 + ((4 * (TransactionSize * 8))) / ClockSpeedInKHz;
+                    = 1000;	//20101218-1, , NVIDIA patch for RxTransfer error	: 10 + ((4 * (TransactionSize * 8))) / ClockSpeedInKHz;
                 hRmSpiSlink->BusyHints[1].BoostKHz = 150000; // Ahb
                 hRmSpiSlink->BusyHints[1].BoostDurationMs
-                    = 1000;	//20101218-1, syblue.lee@lge.com, NVIDIA patch for RxTransfer error	: 10 + ((4 * (TransactionSize * 8))) / ClockSpeedInKHz;
+                    = 1000;	//20101218-1, , NVIDIA patch for RxTransfer error	: 10 + ((4 * (TransactionSize * 8))) / ClockSpeedInKHz;
                 hRmSpiSlink->BusyHints[2].BoostKHz = 150000; // Apb
                 hRmSpiSlink->BusyHints[2].BoostDurationMs
-                    = 1000;	//20101218-1, syblue.lee@lge.com, NVIDIA patch for RxTransfer error	: 10 + ((4 * (TransactionSize * 8))) / ClockSpeedInKHz;
+                    = 1000;	//20101218-1, , NVIDIA patch for RxTransfer error	: 10 + ((4 * (TransactionSize * 8))) / ClockSpeedInKHz;
                 hRmSpiSlink->BusyHints[3].BoostKHz = 600000; // Cpu
                 hRmSpiSlink->BusyHints[3].BoostDurationMs
-                    = 1000;	//20101218-1, syblue.lee@lge.com, NVIDIA patch for RxTransfer error	: 10 + ((4 * (TransactionSize * 8))) / ClockSpeedInKHz;
+                    = 1000;	//20101218-1, , NVIDIA patch for RxTransfer error	: 10 + ((4 * (TransactionSize * 8))) / ClockSpeedInKHz;
                 NvRmPowerBusyHintMulti(hRmSpiSlink->hDevice, hRmSpiSlink->RmPowerClientId,
                                        hRmSpiSlink->BusyHints, 4,
                                        NvRmDfsBusyHintSyncMode_Async);
@@ -2104,12 +2104,12 @@ static NvError MasterModeReadWriteDma(
             if (CurrentTransWord >= hRmSpiSlink->HwRegs.MaxWordTransfer)
             {
                 wmb();
-		  rmb();		 //20101208-1, syblue.lee@lge.com, NVIDIA's patch for syncing dma buffer copy.
+		  rmb();		 //20101208-1, , NVIDIA's patch for syncing dma buffer copy.
                 dsb();
                 outer_sync();
-//20101208-1, syblue.lee@lge.com, NVIDIA's patch : 10us wait for completing dma buffer copy before StartDma() [START]
+//20101208-1, , NVIDIA's patch : 10us wait for completing dma buffer copy before StartDma() [START]
 		  NvOsWaitUS(50); //To fix randomly at command pending because of broken 1st spi data.
-//20101204-1, syblue.lee@lge.com, NVIDIA's patch : 10us wait for completing dma buffer copy before StartDma() [END]
+//20101204-1, , NVIDIA's patch : 10us wait for completing dma buffer copy before StartDma() [END]
                 Error = StartDma(hRmSpiSlink->hTxDma, &hRmSpiSlink->TxDmaReq);
 		SPI_DEBUG_PRINT("%s-%d\n", __FUNCTION__, __LINE__);
                 // Wait till fifo full if the transfer size is more than fifo size
@@ -2153,7 +2153,7 @@ static NvError MasterModeReadWriteDma(
             hRmSpiSlink->hHwInterface->HwStartTransferFxn(&hRmSpiSlink->HwRegs, NV_TRUE);
 
         if (!Error)
-            WaitForTransferCompletion(hRmSpiSlink, 500, NV_FALSE);	////20101218-3, syblue.lee@lge.com, NVIDIA patch to protect infinite loop : WaitForTransferCompletion(hRmSpiSlink, NV_WAIT_INFINITE, NV_FALSE);
+            WaitForTransferCompletion(hRmSpiSlink, 500, NV_FALSE);	////20101218-3, , NVIDIA patch to protect infinite loop : WaitForTransferCompletion(hRmSpiSlink, NV_WAIT_INFINITE, NV_FALSE);
 
         Error = (hRmSpiSlink->RxTransferStatus)? hRmSpiSlink->RxTransferStatus:
                                     hRmSpiSlink->TxTransferStatus;
@@ -2355,12 +2355,12 @@ static NvError SlaveModeSpiStartReadWriteDma(
         hRmSpiSlink->CurrTransInfo.pTxBuff = hRmSpiSlink->pTxDmaBuffer;
         hRmSpiSlink->TxDmaReq.size = CurrentTransWord *4;
         wmb();
-	 rmb();		  //20101208-1, syblue.lee@lge.com, NVIDIA's patch for syncing dma buffer copy.
+	 rmb();		  //20101208-1, , NVIDIA's patch for syncing dma buffer copy.
         dsb();
         outer_sync();
-//20101208-1, syblue.lee@lge.com, NVIDIA's patch : 10us wait for completing dma buffer copy before StartDma() [START]
+//20101208-1, , NVIDIA's patch : 10us wait for completing dma buffer copy before StartDma() [START]
 	 NvOsWaitUS(50); //To fix randomly at command pending because of broken 1st spi data.
-//20101204-1, syblue.lee@lge.com, NVIDIA's patch : 10us wait for completing dma buffer copy before StartDma() [END]
+//20101204-1, , NVIDIA's patch : 10us wait for completing dma buffer copy before StartDma() [END]
         Error = StartDma(hRmSpiSlink->hTxDma, &hRmSpiSlink->TxDmaReq);
         do
         {

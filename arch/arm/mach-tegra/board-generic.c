@@ -164,7 +164,7 @@ static struct platform_device tegra_android_device = {
 };
 #ifdef CONFIG_USB_ANDROID_MASS_STORAGE
 static struct usb_mass_storage_platform_data tegra_usb_fsg_platform = {
-//20100710, jm1.lee@lge.com, change mass storage device information [START]
+//20100710, change mass storage device information [START]
 #if defined (CONFIG_MACH_STAR)
 	.vendor = "LGE",
 	.product = "Android Phone",
@@ -172,7 +172,7 @@ static struct usb_mass_storage_platform_data tegra_usb_fsg_platform = {
 	.vendor = "NVIDIA",
 	.product = "Tegra 2",
 #endif
-//20100710, jm1.lee@lge.com, change mass storage device information [END]
+//20100710, change mass storage device information [END]
 	.nluns = 1,
 	.bulk_size = 16384,
 };
@@ -302,7 +302,7 @@ static struct platform_device tegra_android_device =
 
 #ifdef CONFIG_USB_ANDROID_MASS_STORAGE
 static struct usb_mass_storage_platform_data tegra_usb_fsg_platform = {
-//20100710, jm1.lee@lge.com, change mass storage device information [START]
+//20100710, change mass storage device information [START]
 #if defined (CONFIG_MACH_STAR)
 	.vendor = "LGE",
 	.product = "Android Phone",
@@ -310,7 +310,7 @@ static struct usb_mass_storage_platform_data tegra_usb_fsg_platform = {
 	.vendor = "NVIDIA",
 	.product = "Tegra 2",
 #endif
-//20100710, jm1.lee@lge.com, change mass storage device information [END]
+//20100710, change mass storage device information [END]
 	.nluns = 1,
 	.bulk_size = 16384,
 };

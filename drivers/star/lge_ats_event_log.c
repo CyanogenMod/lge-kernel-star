@@ -53,7 +53,7 @@ int is_started = 0;
 
 /* LGE_CHANGE
  * support MTC using diag port
- * 2010-07-11 taehung.kim@lge.com
+ * 2010-07-11 
  */
 #if defined (CONFIG_MACH_MSM7X27_THUNDERC) || defined(LG_FW_MTC)
 extern unsigned char g_diag_mtc_check;

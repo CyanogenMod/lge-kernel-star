@@ -66,9 +66,9 @@ NvBool Synaptics_PowerControl(NvOdmTouchDeviceHandle hDevice, NvOdmTouchPowerMod
 
 NvBool Synaptics_GetCalibrationData(NvOdmTouchDeviceHandle hDevice, NvU32 NumOfCalibrationData, NvS32* pRawCoordBuffer);
 
-// 20101020 joseph.jung@lge.com Interrupt Enable/Disable [START]
+// 20101020  Interrupt Enable/Disable [START]
 void Synaptics_InterruptMask(NvOdmTouchDeviceHandle hDevice, NvBool mask);
-// 20101020 joseph.jung@lge.com Interrupt Enable/Disable [END]
+// 20101020  Interrupt Enable/Disable [END]
 
 
 #if defined(__cplusplus)

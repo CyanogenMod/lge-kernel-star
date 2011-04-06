@@ -331,10 +331,10 @@ CFLAGS_KERNEL	=
 AFLAGS_KERNEL	=
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
 
-# 20100705, sunghoon.kim@lge.com,[LGE_START]
+# 20100705, ,[LGE_START]
 CFLAGS_MODULE	+= -DSTAR_COUNTRY_$(TARGET_STAR_COUNTRY) -DSTAR_OPERATOR_$(TARGET_STAR_OPERATOR)
 CFLAGS_KERNEL	+= -DSTAR_COUNTRY_$(TARGET_STAR_COUNTRY) -DSTAR_OPERATOR_$(TARGET_STAR_OPERATOR)
-# 20100705, sunghoon.kim@lge.com,[LGE_END]
+# 20100705, ,[LGE_END]
 
 # Use LINUXINCLUDE when you must reference the include/ directory.
 # Needed to be compatible with the O= option

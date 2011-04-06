@@ -49,6 +49,8 @@
 #define DEBUG_LOG			0
 #define COMPASS_I2C_MAX_RETRY   5
 
+extern int reboot;
+
 // For interrupt handle, set GPIO when an interrupt happens.
 static void GpioInterruptHandler(void *arg);
 NvBool NvCompassI2COpen(NvOdmServicesI2cHandle* hI2CDevice, NvU32 id);
@@ -379,6 +381,10 @@ NvBool NvCompassI2CSetRegs(NvOdmCompassHandle hDevice, NvU8 offset, NvU8* value,
         if (i2c_status != NvOdmI2cStatus_Success )
         {
             printk("[star compass driver] %s : i2c transaction error(Number = %d)!\n", __func__, i2c_status);
+
+            //reboot sensors
+            reboot = 1;
+			
             return NV_FALSE;
         }
 
@@ -426,6 +432,10 @@ NvBool NvCompassI2CGetRegs(NvOdmCompassHandle hDevice, NvU8 offset, NvU8* value,
 	if (i2c_status != NvOdmI2cStatus_Success)
 	{
 		printk("Error : NvCompassI2CGetRegs -2n" );
+
+              //reboot sensors
+              reboot = 1;
+		
 		return NV_FALSE;
 	}
 

@@ -157,11 +157,11 @@ osl_attach(void *pdev, uint bustype, bool pkttag)
 	osh = kmalloc(sizeof(osl_t), GFP_ATOMIC);
 	ASSERT(osh);
 
-/* LGE_CHANGE_S, [dongp.kim@lge.com], 2010-04-22, WBT Fix */
+/* LGE_CHANGE_S, [], 2010-04-22, WBT Fix */
 // WBT Fix TD# 37025, 37026
 	if ( ! osh )
 	    return NULL;
-/* LGE_CHANGE_S, [dongp.kim@lge.com], 2010-04-22, WBT Fix */
+/* LGE_CHANGE_S, [], 2010-04-22, WBT Fix */
 
 	bzero(osh, sizeof(osl_t));
 
@@ -461,9 +461,9 @@ void*
 osl_malloc(osl_t *osh, uint size)
 {
 	void *addr;
-/* LGE_CHANGE_S, [dongp.kim@lge.com], 2010-03-04, in order to prevent kernel panic because of memory leak, when Wi-Fi insmode */
+/* LGE_CHANGE_S, [], 2010-03-04, in order to prevent kernel panic because of memory leak, when Wi-Fi insmode */
 	int flags = 0;
-/* LGE_CHANGE_E, [dongp.kim@lge.com], 2010-03-04, in order to prevent kernel panic because of memory leak, when Wi-Fi insmode */
+/* LGE_CHANGE_E, [], 2010-03-04, in order to prevent kernel panic because of memory leak, when Wi-Fi insmode */
 	
 	if (osh)
 		ASSERT(osh->magic == OS_HANDLE_MAGIC);
@@ -501,14 +501,14 @@ osl_malloc(osl_t *osh, uint size)
 	}
 original:
 #endif 
-/* LGE_CHANGE_S, [dongp.kim@lge.com], 2010-03-04, in order to prevent kernel panic because of memory leak, when Wi-Fi insmode */
+/* LGE_CHANGE_S, [], 2010-03-04, in order to prevent kernel panic because of memory leak, when Wi-Fi insmode */
 	if ( size > (8 *1024) ){
 		flags |= GFP_KERNEL;
 	}
 	else{
 		flags |= GFP_ATOMIC; // org value
 	}
-/* LGE_CHANGE_E, [dongp.kim@lge.com], 2010-03-04, in order to prevent kernel panic because of memory leak, when Wi-Fi insmode */
+/* LGE_CHANGE_E, [], 2010-03-04, in order to prevent kernel panic because of memory leak, when Wi-Fi insmode */
 	if ((addr = kmalloc(size, flags)) == NULL) {
 		if (osh)
 			osh->failed++;

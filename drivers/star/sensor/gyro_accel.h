@@ -68,10 +68,18 @@ typedef enum {
 #define MOTION_IOCTL_CALIBRATION_FINISHED 		_IOWR(MOTION_MAGIC, 0x14, int[5])
 #define MOTION_IOCTL_ACCEL_INIT 		_IOWR(MOTION_MAGIC, 0x15, short)
 
+#define MOTION_IOCTL_CHECK_SENSOR_I2C_ERROR	    		_IOWR(MOTION_MAGIC, 0x16, short)
+#define MOTION_IOCTL_REBOOT_SENSORS 		_IOWR(MOTION_MAGIC, 0x17, short)
+#define MOTION_IOCTL_COMPASS_INIT 		_IOWR(MOTION_MAGIC, 0x18, short)
+
 void motion_send_tap_detection(int type,int direction);
 void motion_send_flip_detection(int value);
 
  int is_tap_enabled(void);
  int is_flip_enabled(void);
+ int lge_sensor_shoutdown_all(void);
+ int lge_sensor_shutdown_gyro(void);
+ int lge_sensor_restart_gyro(void);
+
 #endif //__MPU3050_H__
 

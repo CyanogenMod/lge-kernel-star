@@ -463,13 +463,22 @@ static int dhdsdio_download_code_array(struct dhd_bus *bus);
 #endif
 
 #if defined(CONFIG_HAS_EARLYSUSPEND)
-/* LGE_CHANGE_S [yoohoo@lge.com] 2009-11-19, Support Host Wakeup */
+/* LGE_CHANGE_S [] 2009-11-19, Support Host Wakeup */
+#if 0		//by sjpark 10-12-22 : idle time current (not used)
 #if defined(CONFIG_BRCM_LGE_WL_HOSTWAKEUP)
 #include <linux/wakelock.h>
 extern int dhd_suspend_context;
 extern struct wake_lock wlan_host_wakelock;
 #endif /* CONFIG_BRCM_LGE_WL_HOSTWAKEUP */
-/* LGE_CHANGE_S [yoohoo@lge.com] 2009-11-19, Support Host Wakeup */
+#endif
+/* LGE_CHANGE_S [] 2009-11-19, Support Host Wakeup */
+
+#if defined(CONFIG_LGE_BCM432X_PATCH)	//20110121
+#include <linux/wakelock.h>
+extern int ap_suspend_status;
+extern struct wake_lock ap_suspend_wake_lock;
+#endif
+
 extern void *dhd_es_get_dhd_bus(void);
 extern void dhd_es_set_dhd_bus(void *);
 extern bool dhd_early_suspend_state(void);
@@ -521,8 +530,16 @@ dhdsdio_set_siaddr_window(dhd_bus_t *bus, uint32 address)
 		                 (address >> 24) & SBSDIO_SBADDRHIGH_MASK, &err);
 	return err;
 }
+#if defined(CONFIG_LGE_BCM432X_PATCH)	//htclk fail patch
+unsigned long old_jiff;
+unsigned long cur_jiff;
+
+int ht_err_cnt;
+extern void htclk_fail_reset(void *bus);
+#endif
 
 extern volatile bool dhd_mmc_suspend;
+
 /* Turn backplane clock on or off */
 static int
 dhdsdio_htclk(dhd_bus_t *bus, bool on, bool pendok)
@@ -552,7 +569,18 @@ dhdsdio_htclk(dhd_bus_t *bus, bool on, bool pendok)
 
 		bcmsdh_cfg_write(sdh, SDIO_FUNC_1, SBSDIO_FUNC1_CHIPCLKCSR, clkreq, &err);
 		if (err) {
-			printk("[DEBUG] %s:%d dhd_mmc_suspend %d\n",__func__,__LINE__,dhd_mmc_suspend);
+#if defined(CONFIG_LGE_BCM432X_PATCH)	//htclk fail patch
+			if( ht_err_cnt == 0 )
+				old_jiff = jiffies;
+
+			cur_jiff = jiffies;
+			
+			if( (cur_jiff < old_jiff) || (cur_jiff - old_jiff) > 500 )
+				ht_err_cnt = 0;
+			else
+				ht_err_cnt++;
+#endif
+//			printk("[DEBUG] %s:%d dhd_mmc_suspend %d\n",__func__,__LINE__,dhd_mmc_suspend);
 			DHD_ERROR(("%s: HT Avail request error: %d\n", __FUNCTION__, err));
 			return BCME_ERROR;
 		}
@@ -844,9 +872,6 @@ dhdsdio_bussleep(dhd_bus_t *bus, bool sleep)
 
 		/* Change state */
 		bus->sleeping = TRUE;
-
-		/* wait for mmc_host_deeper_disable */
-		OSL_DELAY(10000);
 
 	} else {
 		/* Waking up: bus power up is ok, set local state */
@@ -4262,7 +4287,7 @@ dhdsdio_dpc(dhd_bus_t *bus)
 
 	/* On frame indication, read available frames */
 	if (PKT_AVAILABLE()) {
-/* LGE_CHANGE_S [yoohoo@lge.com] 2009-11-19, Support Host Wakeup */
+/* LGE_CHANGE_S [] 2009-11-19, Support Host Wakeup */
 #if 0 // by mingi.sung
 #if defined(CONFIG_BRCM_LGE_WL_HOSTWAKEUP)
 		//Is this location appropriate??.. Need to test more.
@@ -4274,7 +4299,13 @@ dhdsdio_dpc(dhd_bus_t *bus)
 		}
 #endif /* CONFIG_BRCM_LGE_WL_HOSTWAKEUP */
 #endif
-/* LGE_CHANGE_S [yoohoo@lge.com] 2009-11-19, Support Host Wakeup */
+/* LGE_CHANGE_S [] 2009-11-19, Support Host Wakeup */
+#if defined(CONFIG_LGE_BCM432X_PATCH)	//20110121
+		if(ap_suspend_status == 1 )
+		{
+			wake_lock_timeout(&ap_suspend_wake_lock, 60*HZ);
+		}
+#endif
 		framecnt = dhdsdio_readframes(bus, rxlimit, &rxdone);
 		if (rxdone || bus->rxskip)
 			intstatus &= ~I_HMB_FRAME_IND;
@@ -4426,12 +4457,12 @@ dhdsdio_isr(void *arg)
 	bus->intdis = TRUE;
 
 #if defined(SDIO_ISR_THREAD)
-/* LGE_CHANGE_S [yoohoo@lge.com] 2009-11-19, Support Host Wakeup */
+/* LGE_CHANGE_S [] 2009-11-19, Support Host Wakeup */
 #if defined(CONFIG_BRCM_LGE_WL_HOSTWAKEUP)
 	bus->dpc_sched = TRUE;
 	DHD_TRACE(("Calling dhdsdio_dpc() from %s\n", __FUNCTION__));
 #endif /* CONFIG_BRCM_LGE_WL_HOSTWAKEUP */
-/* LGE_CHANGE_E [yoohoo@lge.com] 2009-11-19, Support Host Wakeup */
+/* LGE_CHANGE_E [] 2009-11-19, Support Host Wakeup */
 	while (dhdsdio_dpc(bus));
 #else
 	bus->dpc_sched = TRUE;
@@ -5939,7 +5970,7 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 	return bcmerror;
 }
 
-//by sjpark 10-12-15	[
+//by sjpark 10-12-15
 #if defined(CONFIG_BRCM_LGE_WL_HOSTWAKEUP)
 
 int dhdsdio_setiovar(struct dhd_bus *bus, char *cmd, void *data, int size)
@@ -6012,5 +6043,5 @@ int dhdsdio_set_dtim(struct dhd_bus *bus, int enable)
 
 #endif	/*CONFIG_BRCM_LGE_WL_HOSTWAKEUP*/
 
-//by sjpark 10-12-15	]
+//by sjpark 10-12-15
 

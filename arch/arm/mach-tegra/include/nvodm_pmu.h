@@ -170,17 +170,17 @@ NvOdmPmuSetVoltage(
     NvU32* pSettleMicroSeconds);
 
 #if defined(CONFIG_MACH_STAR) 
-//20100704 bergkamp.cho@lge.com jongik's headset porting [LGE]
+//20100704  headset porting [LGE]
 NvU32
 NvOdmPmuGetHookAdc(
     NvOdmPmuDeviceHandle hDevice);
 
-//20101121 cs77.ha@lge.com, HW power off in thermal limit [START]
+//20101121 cs77, HW power off in thermal limit [START]
 NvU32
 NvOdmPmuSetHwPowerOffConfig(
     NvOdmPmuDeviceHandle hDevice,
     NvBool Enable);
-//20101121 cs77.ha@lge.com, HW power off in thermal limit [END]
+//20101121 cs77, HW power off in thermal limit [END]
 #endif
 
 
@@ -229,11 +229,11 @@ typedef enum
 #define NVODM_BATTERY_STATUS_LOW                0x02
 #define NVODM_BATTERY_STATUS_CRITICAL           0x04
 #define NVODM_BATTERY_STATUS_CHARGING           0x08
-//20100608, jh.ahn@lge.com, Write the description here in detail [START]
+//20100608, , Write the description here in detail [START]
 #define NVODM_BATTERY_STATUS_DISCHARGING        0x10
 #define NVODM_BATTERY_STATUS_IDLE               0x20
 #define NVODM_BATTERY_STATUS_VERY_CRITICAL      0x40
-//20100608, jh.ahn@lge.com, Write the description here in detail [END]
+//20100608, , Write the description here in detail [END]
 #define NVODM_BATTERY_STATUS_NO_BATTERY         0x80
 #define NVODM_BATTERY_STATUS_UNKNOWN            0xFF
 
@@ -364,7 +364,7 @@ NvOdmPmuGetBatteryData(
     NvOdmPmuBatteryInstance batteryInst,
     NvOdmPmuBatteryData *pData);
 
-//20100924, jh.ahn@lge.com, For updating battery information totally [START]
+//20100924, , For updating battery information totally [START]
 #if defined(CONFIG_MACH_STAR)
 NvBool
 NvOdmPmuUpdateBatteryInfo(
@@ -373,7 +373,7 @@ NvOdmPmuUpdateBatteryInfo(
 	NvU8 * pBatStatus,
 	NvOdmPmuBatteryData * pBatData);
 #endif
-//20100924, jh.ahn@lge.com, For updating battery information totally  [END]
+//20100924, , For updating battery information totally  [END]
 
 /**
  * Gets the battery full life time.
@@ -512,13 +512,13 @@ NvBool
 NvOdmPmuIsRtcInitialized(
     NvOdmPmuDeviceHandle hDevice);
 
-//20100413, cs77.ha@lge.com, temporary powerkey [START]
+//20100413,  temporary powerkey [START]
 #ifdef CONFIG_MACH_STAR_FIRENZE
 NvBool
 NvOdmPmuInputDevInit(
     NvOdmPmuDeviceHandle hDevice);
 #endif
-//20100413, cs77.ha@lge.com, temporary powerkey [END]
+//20100413, temporary powerkey [END]
 
 /**
  * Registers a callback function for PMU RTC Alarm.

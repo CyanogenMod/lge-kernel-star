@@ -33,19 +33,19 @@
 #include "nvodm_touch.h"
 #include "nvodm_touch_int.h"
 
-// 20100414 joseph.jung@lge.com LGE Touch Customization [START]
+// 20100414  LGE Touch Customization [START]
 #include "nvodm_touch_synaptics.h"
 #include "nvodm_touch_cypress.h"
-// 20100414 joseph.jung@lge.com  LGE Touch Customization [END]
+// 20100414   LGE Touch Customization [END]
 
 
-// 20100414 joseph.jung@lge.com LGE Touch Dual Support - Synaptics & Cypress [START]
+// 20100414  LGE Touch Dual Support - Synaptics & Cypress [START]
 #ifdef FEATURE_LGE_TOUCH_DUAL_SUPPORT
 #include "../../adaptations/pmu/max8907/max8907_supply_info_table.h"
 
 NvU32 pinValue = 0xFFFFFFFF;
 #endif /* FEATURE_LGE_TOUCH_DUAL_SUPPORT */
-// 20100402 joseph.jung@lge.com LGE Touch Dual Support - Synaptics & Cypress [END]
+// 20100402  LGE Touch Dual Support - Synaptics & Cypress [END]
 
 
 /** Implementation for the NvOdm TouchPad */
@@ -55,7 +55,7 @@ NvOdmTouchDeviceOpen( NvOdmTouchDeviceHandle *hDevice, NvOdmOsSemaphoreHandle* h
 {
     NvBool ret = NV_TRUE;
 
-// 20100414 joseph.jung@lge.com LGE Touch Dual Support - Synaptics & Cypress [START]
+// 20100414  LGE Touch Dual Support - Synaptics & Cypress [START]
 #ifdef FEATURE_LGE_TOUCH_DUAL_SUPPORT
 	printk("[TOUCH] Touch maker gpio pin value = %d\n", pinValue);
 
@@ -95,7 +95,7 @@ NvOdmTouchDeviceOpen( NvOdmTouchDeviceHandle *hDevice, NvOdmOsSemaphoreHandle* h
 #else
 	ret = Synaptics_Open(hDevice, hIntSema);
 #endif /* FEATURE_LGE_TOUCH_DUAL_SUPPORT */
-// 20100402 joseph.jung@lge.com LGE Touch Dual Support - Synaptics & Cypress [END]
+// 20100402  LGE Touch Dual Support - Synaptics & Cypress [END]
 
     return ret;
 }
@@ -167,16 +167,16 @@ NvOdmTouchGetCalibrationData(NvOdmTouchDeviceHandle hDevice, NvU32 NumOfCalibrat
     return hDevice->GetCalibrationData(hDevice, NumOfCalibrationData, pRawCoordBuffer);
 }
 
-// 20101020 joseph.jung@lge.com Interrupt Enable/Disable [START]
+// 20101020  Interrupt Enable/Disable [START]
 void
 NvOdmTouchInterruptMask(NvOdmTouchDeviceHandle hDevice, NvBool mask)
 {
 	hDevice->InterruptMask(hDevice, mask);
 }
-// 20101020 joseph.jung@lge.com Interrupt Enable/Disable [END]
+// 20101020  Interrupt Enable/Disable [END]
 
 
-// 20100718 joseph.jung@lge.com grip suppression [START]
+// 20100718  grip suppression [START]
 NvU8 touch_grip_suppression_value = 0;
 
 void setTouchGripSuppressionValue(int value)
@@ -188,9 +188,9 @@ int getTouchGripSuppressionValue(void)
 {
 	return (int)touch_grip_suppression_value;
 }
-// 20100718 joseph.jung@lge.com grip suppression [END]
+// 20100718  grip suppression [END]
 
-// 20100906 joseph.jung@lge.com Touch F/W version [START]
+// 20100906  Touch F/W version [START]
 int touch_fw_version = 0;
 
 void storeTouchFWversion(int value)
@@ -202,5 +202,5 @@ int showTouchFWversion(void)
 {
 	return touch_fw_version;
 }
-// 20100906 joseph.jung@lge.com Touch F/W version [END]
+// 20100906  Touch F/W version [END]
 

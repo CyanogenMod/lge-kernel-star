@@ -20,7 +20,7 @@
 
 #define MAX8952_REG_INVALID 0xFF
 
-//20100819, taewan.kim@lge.com, Voltage bug fix
+//20100819, , Voltage bug fix
 #define MAX8952_FPWM_EN0	0x80
 
 #endif

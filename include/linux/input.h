@@ -598,13 +598,13 @@ struct input_absinfo {
 #define KEY_NUMERIC_POUND	0x20b
 
 
-//20100714 joseph.jung@lge.com for Touch Button event cancel [START]
+//20100714  for Touch Button event cancel [START]
 #define KEY_REJECT			0x210
-//20100714 joseph.jung@lge.com for Touch Button event cancel [END]
+//20100714  for Touch Button event cancel [END]
 
-//2010.10.09 for pattern unlock. taesub.kim@lge.com [START_LGE]
+//2010.10.09 for pattern unlock.  [START_LGE]
 #define KEY_TESTMODE_UNLOCK	0x211
-//2010.10.09 for pattern unlock. taesub.kim@lge.com [END_LGE]
+//2010.10.09 for pattern unlock.  [END_LGE]
 
 /* We avoid low common keys in module aliases so they don't get huge. */
 #define KEY_MIN_INTERESTING	KEY_MUTE

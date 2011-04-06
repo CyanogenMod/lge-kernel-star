@@ -635,9 +635,9 @@ static void Cypress_InitOdmTouch (NvOdmTouchDevice* Dev)
 #endif /* CYPRESS_SUPPORT_CAL */
 	Dev->CurrentSampleRate = CYPRESS_HIGH_SAMPLE_RATE;
     Dev->OutputDebugMessage = NV_FALSE;
-// 20101020 joseph.jung@lge.com Interrupt Enable/Disable [START]
+// 20101020  Interrupt Enable/Disable [START]
 	Dev->InterruptMask = Cypress_InterruptMask;
-// 20101020 joseph.jung@lge.com Interrupt Enable/Disable [END]
+// 20101020  Interrupt Enable/Disable [END]
 }
 
 
@@ -819,9 +819,9 @@ NvBool Cypress_Open (NvOdmTouchDeviceHandle* hDevice, NvOdmOsSemaphoreHandle* hI
 	// TODO : read firmware version
 	hTouch->ChipFirmVersion = CypressFirmVersion;
 	NVODMTOUCH_PRINTF(("[TOUCH] Touch controller Firmware Revision ID = %x\n", hTouch->ChipFirmVersion));
-// 20100906 joseph.jung@lge.com Touch F/W version [START]
+// 20100906  Touch F/W version [START]
 	storeTouchFWversion(hTouch->ChipFirmVersion);
-// 20100906 joseph.jung@lge.com Touch F/W version [END]
+// 20100906  Touch F/W version [END]
 
 
     /* get chip revision id */
@@ -874,7 +874,7 @@ void Cypress_Close (NvOdmTouchDeviceHandle hDevice)
 }
 
 
-// 20101020 joseph.jung@lge.com Interrupt Enable/Disable [START]
+// 20101020  Interrupt Enable/Disable [START]
 void Cypress_InterruptMask(NvOdmTouchDeviceHandle hDevice, NvBool mask)
 {
 	/*
@@ -889,7 +889,7 @@ void Cypress_InterruptMask(NvOdmTouchDeviceHandle hDevice, NvBool mask)
 		printk("[TOUCH] Cypress_InterruptMask by %d\n", mask);
 	}
 }
-// 20101020 joseph.jung@lge.com Interrupt Enable/Disable [END]
+// 20101020  Interrupt Enable/Disable [END]
 
 
 
@@ -1074,7 +1074,7 @@ NvBool Cypress_PowerControl (NvOdmTouchDeviceHandle hDevice, NvOdmTouchPowerMode
 						hTouch->hPin,
 						NvOdmGpioPinMode_InputData);
 
-		// 20100824 joseph.jung@lge.com Some Panels are entered bootload mode when go to sleep
+		// 20100824  Some Panels are entered bootload mode when go to sleep
 		Cypress_ModeChange(hTouch, CYPRESS_MODE_OPERATION);
 	}
 	else	// sleep

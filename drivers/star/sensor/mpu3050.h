@@ -3,7 +3,7 @@
  *
  * MPU3050 gyroscope sensor driver header file.
  *
- * 2009/09/05 : created by <chpark96@lge.com>
+ * 2009/09/05 : created by <>
  *
  */
 

@@ -43,9 +43,6 @@ struct tegra_touch_driver_data
 	struct input_dev	*input_dev;
 	struct task_struct	*task;
 	NvOdmOsSemaphoreHandle	semaphore;
-#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
-	NvOdmOsMutexHandle hMutex;
-#endif
 	NvOdmTouchDeviceHandle	hTouchDevice;
 	NvBool			bPollingMode;
 	NvU32			pollingIntervalMS;
@@ -59,7 +56,7 @@ struct tegra_touch_driver_data
 };
 
 
-// 20100825 joseph.jung@lge.com Debug Message Control (Temporary) [START]
+// 20100825  Debug Message Control (Temporary) [START]
 #define touch_fingerprint(enable, fmt, args...) do { \
 			if (enable) \
 				printk(fmt, ##args); \
@@ -90,10 +87,10 @@ ssize_t touch_fingerprint_store(struct device *dev, struct device_attribute *att
 }
 
 DEVICE_ATTR(fingerprint, 0666, NULL, touch_fingerprint_store);
-// 20100825 joseph.jung@lge.com Debug Message Control (Temporary) [END]
+// 20100825  Debug Message Control (Temporary) [END]
 
 
-// 20100906 joseph.jung@lge.com Touch F/W version [START]
+// 20100906  Touch F/W version [START]
 ssize_t touch_fw_version_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	sprintf(buf, "%d\n", showTouchFWversion());
@@ -101,10 +98,10 @@ ssize_t touch_fw_version_show(struct device *dev, struct device_attribute *attr,
 }
 
 DEVICE_ATTR(fw_version, 0666, touch_fw_version_show, NULL);
-// 20100906 joseph.jung@lge.com Touch F/W version [END]
+// 20100906  Touch F/W version [END]
 
 
-// 20100718 joseph.jung@lge.com grip suppression [START]
+// 20100718  grip suppression [START]
 #ifdef FEATURE_LGE_TOUCH_GRIP_SUPPRESSION
 ssize_t touch_gripsuppression_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -136,14 +133,14 @@ ssize_t touch_gripsuppression_store(struct device *dev, struct device_attribute 
 
 DEVICE_ATTR(gripsuppression, 0666, touch_gripsuppression_show, touch_gripsuppression_store);
 #endif /* FEATURE_LGE_TOUCH_GRIP_SUPPRESSION */
-// 20100718 joseph.jung@lge.com grip suppression [END]
+// 20100718  grip suppression [END]
 
 
-// 20100820 joseph.jung@lge.com touch LED control [START]
+// 20100820  touch LED control [START]
 #ifdef CONFIG_STAR_TOUCH_LED
 extern void touchLED_enable(NvBool status);
 #endif
-// 20100820 joseph.jung@lge.com touch LED control [END]
+// 20100820  touch LED control [END]
 
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -155,18 +152,10 @@ static void tegra_touch_early_suspend(struct early_suspend *es)
 	printk("[TOUCH] tegra_touch_early_suspend\n");
 	
 	if (touch && touch->hTouchDevice) {
-#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
-        NvOdmOsMutexLock(touch->hMutex);
-		NvOdmTouchInterruptMask(touch->hTouchDevice, NV_TRUE);
-			
-		NvOdmTouchPowerControl(touch->hTouchDevice, NvOdmTouch_PowerMode_3);
-        NvOdmOsMutexUnlock(touch->hMutex);
-#else
 		NvOdmTouchInterruptMask(touch->hTouchDevice, NV_TRUE);
 		NvOdmOsSleepMS(50);
 			
 		NvOdmTouchPowerControl(touch->hTouchDevice, NvOdmTouch_PowerMode_3);
-#endif
 	}
 	else {
 		pr_err("tegra_touch_early_suspend: NULL handles passed\n");
@@ -186,10 +175,10 @@ static void tegra_touch_late_resume(struct early_suspend *es)
 			NvOdmTouchDeviceClose(touch->hTouchDevice);
 			NvOdmTouchDeviceOpen(&touch->hTouchDevice, &touch->semaphore);
 
-// 20101130 joseph.jung@lge.com for ESD [START]
+// 20101130  for ESD [START]
 			NvOdmTouchPowerControl(touch->hTouchDevice, NvOdmTouch_PowerMode_3);
 			NvOdmTouchPowerControl(touch->hTouchDevice, NvOdmTouch_PowerMode_1);
-// 20101130 joseph.jung@lge.com for ESD [END]
+// 20101130  for ESD [END]
 		}
 		else
 			NvOdmTouchInterruptMask(touch->hTouchDevice, NV_FALSE);
@@ -307,7 +296,7 @@ static void tegra_touch_adjust_position(NvU32 finger_num, NvU32 x_value, NvU32 y
 #endif /* FEATURE_LGE_TOUCH_MOVING_IMPROVE */
 
 
-// 20100402 joseph.jung@lge.com LGE Touch thread Customization [START]
+// 20100402  LGE Touch thread Customization [START]
 #ifdef FEATURE_LGE_TOUCH_CUSTOMIZE
 static int tegra_touch_thread(void *pdata)
 {
@@ -347,26 +336,14 @@ static int tegra_touch_thread(void *pdata)
         bKeepReadingSamples = NV_TRUE;
         while (bKeepReadingSamples)
         {
-#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
-        	NvOdmOsMutexLock(touch->hMutex);
-#endif
 			if (!NvOdmTouchReadCoordinate(touch->hTouchDevice, &c))
 			{
 				pr_err("What the... Nvidia!! Why does it happen i2c error and why can't I recover it??\n");
-#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
-				NvOdmTouchDeviceClose(touch->hTouchDevice);
-				NvOdmTouchDeviceOpen(&touch->hTouchDevice, &touch->semaphore);
-        		NvOdmOsMutexUnlock(touch->hMutex);
-				break;
-#else
+				
 				bKeepReadingSamples = NV_FALSE;
 
 				goto DoneWithSample;
-#endif
 			}
-#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
-	   		NvOdmOsMutexUnlock(touch->hMutex);
-#endif
 
 			if (c.fingerstate & NvOdmTouchSampleIgnore)
 			{
@@ -379,18 +356,18 @@ static int tegra_touch_thread(void *pdata)
 			{
 				Prev_ToolDown[i] = ToolDown[i];
 
-// 20100718 joseph.jung@lge.com grip suppression [START]
+// 20100718  grip suppression [START]
 #ifdef FEATURE_LGE_TOUCH_GRIP_SUPPRESSION
 				grip_suppression_value = getTouchGripSuppressionValue();
 
 				if(c.additionalInfo.multi_XYCoords[i][0] >= grip_suppression_value && c.additionalInfo.multi_XYCoords[i][0] <= LGE_TOUCH_RESOLUTION_X - grip_suppression_value)
 				{
 #endif /* FEATURE_LGE_TOUCH_GRIP_SUPPRESSION */
-// 20100718 joseph.jung@lge.com grip suppression [END]	
+// 20100718  grip suppression [END]	
 				
 				if(c.additionalInfo.multi_fingerstate[i])
 				{
-// 20101022 joseph.jung@lge.com touch smooth moving improve [START]
+// 20101022  touch smooth moving improve [START]
 #ifdef FEATURE_LGE_TOUCH_MOVING_IMPROVE
 
 					tegra_touch_adjust_position(i, c.additionalInfo.multi_XYCoords[i][0], c.additionalInfo.multi_XYCoords[i][1], Prev_ToolDown[i]);
@@ -405,17 +382,17 @@ static int tegra_touch_thread(void *pdata)
 #else /* FEATURE_LGE_TOUCH_MOVING_IMPROVE */
 
 					x[i] = c.additionalInfo.multi_XYCoords[i][0];
-// 20100720 joseph.jung@lge.com LCD Active area expansion [START]
+// 20100720  LCD Active area expansion [START]
 #ifdef FEATURE_LGE_TOUCH_EXPAND_HIDDEN_ACTIVE_AREA
 					if(c.additionalInfo.multi_XYCoords[i][1] < TOUCH_LCD_ACTIVE_AREA_Y && c.additionalInfo.multi_XYCoords[i][1] >= LGE_TOUCH_RESOLUTION_Y)
 						y[i] = LGE_TOUCH_RESOLUTION_Y - 1;
 					else
 #endif /* FEATURE_LGE_TOUCH_EXPAND_HIDDEN_ACTIVE_AREA */
-// 20100720 joseph.jung@lge.com LCD Active area expansion [END]
+// 20100720  LCD Active area expansion [END]
 					y[i] = c.additionalInfo.multi_XYCoords[i][1];
 
 #endif /* FEATURE_LGE_TOUCH_MOVING_IMPROVE */
-// 20101022 joseph.jung@lge.com touch smooth moving improve [END]
+// 20101022  touch smooth moving improve [END]
 
 					pressure[i] = c.additionalInfo.Pressure[i];
 					width[i] = c.additionalInfo.width[i];
@@ -425,13 +402,13 @@ static int tegra_touch_thread(void *pdata)
 				else
 					ToolDown[i] = NV_FALSE;
 
-// 20100718 joseph.jung@lge.com grip suppression [START]
+// 20100718  grip suppression [START]
 #ifdef FEATURE_LGE_TOUCH_GRIP_SUPPRESSION
 				}
 				else
 					ToolDown[i] = NV_FALSE;
 #endif /* FEATURE_LGE_TOUCH_GRIP_SUPPRESSION */
-// 20100718 joseph.jung@lge.com grip suppression [END]
+// 20100718  grip suppression [END]
 			}
 
 			if (c.fingerstate & NvOdmTouchSampleValidFlag)
@@ -570,7 +547,7 @@ static int tegra_touch_thread(void *pdata)
 									}
 									else
 									{
-// 20101209 joseph.jung@lge.com change Touch Key recognition algorithm [START]
+// 20101209  change Touch Key recognition algorithm [START]
 										// Recognize as do nothing 
 										if(Prev_ToolDown[i] == NV_FALSE)
 											ToolDown[i] = NV_FALSE;
@@ -594,13 +571,13 @@ static int tegra_touch_thread(void *pdata)
 											}
 										}
 										*/
-// 20101209 joseph.jung@lge.com change Touch Key recognition algorithm [END]
+// 20101209  change Touch Key recognition algorithm [END]
 									}
 
 								}
 								else
 								{
-// 20101209 joseph.jung@lge.com change Touch Key recognition algorithm [START]
+// 20101209  change Touch Key recognition algorithm [START]
 									if(y[i] < LGE_TOUCH_RESOLUTION_Y)
 									{
 										input_report_abs(touch->input_dev, ABS_MT_POSITION_X, x[i]);
@@ -633,7 +610,7 @@ static int tegra_touch_thread(void *pdata)
 											ToolDown[i] = NV_FALSE;
 									}
 /*									
-// 20101021 joseph.jung@lge.com lcd-button area touch scenario change [START]
+// 20101021  lcd-button area touch scenario change [START]
 									if(y[i] < LGE_TOUCH_RESOLUTION_Y)
 									{
 										input_report_abs(touch->input_dev, ABS_MT_POSITION_X, x[i]);
@@ -648,7 +625,7 @@ static int tegra_touch_thread(void *pdata)
 
 										lcd_finger_num++;
 									}
-// 20101021 joseph.jung@lge.com lcd-button area touch scenario change [END]
+// 20101021  lcd-button area touch scenario change [END]
 									
 									if(Prev_ToolDown[i] == NV_FALSE)
 									{
@@ -666,14 +643,14 @@ static int tegra_touch_thread(void *pdata)
 											touch_fingerprint(DebugMsgPrint, "[TOUCH] Key Event KEY = %d, PRESS = %d\n", pressed_button_type, 0);
 											pressed_button_type = KEY_REJECT;
 
-// 20101021 joseph.jung@lge.com lcd-button area touch scenario change [START]
+// 20101021  lcd-button area touch scenario change [START]
 											if(curr_event_type != TOUCH_EVENT_ABS)
-// 20101021 joseph.jung@lge.com lcd-button area touch scenario change [END]
+// 20101021  lcd-button area touch scenario change [END]
 											input_sync(touch->input_dev);
 										}
 									}
 */
-// 20101209 joseph.jung@lge.com change Touch Key recognition algorithm [END]
+// 20101209  change Touch Key recognition algorithm [END]
 								}
 							}
 							else
@@ -749,12 +726,12 @@ static int tegra_touch_thread(void *pdata)
 					prev_event_type = curr_event_type;
 				}
 
-// 20100820 joseph.jung@lge.com touch LED control [START]
+// 20100820  touch LED control [START]
 #ifdef CONFIG_STAR_TOUCH_LED
 				if(curr_event_type == TOUCH_EVENT_ABS || (curr_event_type == TOUCH_EVENT_BUTTON && pressed_button_type != KEY_REJECT))
 	        		touchLED_enable(NV_TRUE);
 #endif
-// 20100820 joseph.jung@lge.com touch LED control [END]
+// 20100820  touch LED control [END]
 			}
 			
 			valid_fingers = 0;
@@ -950,7 +927,7 @@ DoneWithSample:
 	return 0;
 }
 #endif /* FEATURE_LGE_TOUCH_CUSTOMIZE */
-// 20100402 joseph.jung@lge.com LGE Touch thread Customization [END]
+// 20100402  LGE Touch thread Customization [END]
 
 static int __init tegra_touch_probe(struct platform_device *pdev)
 {
@@ -969,9 +946,6 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 		return err;
 	}
 	
-#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
-    touch->hMutex = NvOdmOsMutexCreate();
-#endif
 	touch->semaphore = NvOdmOsSemaphoreCreate(0);
 	if (!touch->semaphore) {
 		err = -1;
@@ -979,7 +953,7 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 		goto err_semaphore_create_failed;
 	}
 
-// 20100423 joseph.jung@lge.com for Touch Interrupt Issue at booting [START]
+// 20100423  for Touch Interrupt Issue at booting [START]
 #ifdef FEATURE_LGE_TOUCH_CUSTOMIZE
 	touch->bPollingMode = NV_FALSE;
 	if (!NvOdmTouchDeviceOpen(&touch->hTouchDevice, &touch->semaphore)) {
@@ -1001,7 +975,7 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 		touch->pollingIntervalMS = 10;
 	}
 #endif /* FEATURE_LGE_TOUCH_CUSTOMIZE */
-// 20100423 joseph.jung@lge.com for Touch Interrupt Issue at booting [END]
+// 20100423  for Touch Interrupt Issue at booting [END]
 
 	touch->task =
 		kthread_create(tegra_touch_thread, touch, "tegra_touch_thread");
@@ -1042,7 +1016,7 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 		touch->MinY = caps->YMinPosition;
 	}
 
-// 20100407 joseph.jung@lge.com LGE Touch Customization [START]
+// 20100407  LGE Touch Customization [START]
 #ifdef FEATURE_LGE_TOUCH_CUSTOMIZE
 	// button
 	set_bit(KEY_MENU, touch->input_dev->keybit);
@@ -1083,7 +1057,7 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 		input_set_abs_params(touch->input_dev, ABS_TOOL_WIDTH, 0, 
 			caps->MaxNumberOfWidthReported, 0, 0);
 #endif /* FEATURE_LGE_TOUCH_CUSTOMIZE */
-// 20100407 joseph.jung@lge.com LGE Touch Customization [END]
+// 20100407  LGE Touch Customization [END]
 
 	platform_set_drvdata(pdev, touch);
 
@@ -1094,7 +1068,7 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 		goto err_input_register_device_failed;
 	}
 
-// 20100718 joseph.jung@lge.com grip suppression [START]
+// 20100718  grip suppression [START]
 #ifdef FEATURE_LGE_TOUCH_GRIP_SUPPRESSION
 	err = device_create_file(&pdev->dev, &dev_attr_gripsuppression);
 	if (err) {
@@ -1102,26 +1076,26 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 		goto devfs_failed;
 	}
 #endif /* FEATURE_LGE_TOUCH_GRIP_SUPPRESSION */
-// 20100718 joseph.jung@lge.com grip suppression [END]
+// 20100718  grip suppression [END]
 
-// 20100825 joseph.jung@lge.com Debug Message Control (Temporary) [START]
+// 20100825  Debug Message Control (Temporary) [START]
 	err = device_create_file(&pdev->dev, &dev_attr_fingerprint);
 	if (err) {
 		pr_err("tegra_touch_probe: fingerprint device_create_file failed\n");
 		goto devfs_failed;
 	}
-// 20100825 joseph.jung@lge.com Debug Message Control (Temporary) [END]
+// 20100825  Debug Message Control (Temporary) [END]
 
-// 20100906 joseph.jung@lge.com Touch F/W version [START]
+// 20100906  Touch F/W version [START]
 	err = device_create_file(&pdev->dev, &dev_attr_fw_version);
 	if (err) {
 		pr_err("tegra_touch_probe: fw_version device_create_file failed\n");
 		goto devfs_failed;
 	}
-// 20100906 joseph.jung@lge.com Touch F/W version [END]
+// 20100906  Touch F/W version [END]
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
-        touch->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
+        touch->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 21;
         touch->early_suspend.suspend = tegra_touch_early_suspend;
         touch->early_suspend.resume = tegra_touch_late_resume;
         register_early_suspend(&touch->early_suspend);
@@ -1130,19 +1104,19 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 	printk(KERN_INFO NVODM_TOUCH_NAME ": Successfully registered the ODM touch driver %x\n", (NvU32)touch->hTouchDevice);
 	return 0;
 
-// 20100718 joseph.jung@lge.com device file management [START]
+// 20100718  device file management [START]
 devfs_failed:
-// 20100825 joseph.jung@lge.com [START]
+// 20100825  [START]
 #ifdef FEATURE_LGE_TOUCH_GRIP_SUPPRESSION
 	device_remove_file(&pdev->dev, &dev_attr_gripsuppression);
 #endif
 	device_remove_file(&pdev->dev, &dev_attr_fingerprint);
-// 20100825 joseph.jung@lge.com [END]
-// 20100906 joseph.jung@lge.com Touch F/W version [START]
+// 20100825  [END]
+// 20100906  Touch F/W version [START]
 	device_remove_file(&pdev->dev, &dev_attr_fw_version);
-// 20100906 joseph.jung@lge.com Touch F/W version [END]
+// 20100906  Touch F/W version [END]
 	input_unregister_device(input_dev);
-// 20100718 joseph.jung@lge.com device file management [END]
+// 20100718  device file management [END]
 	
 err_input_register_device_failed:
 	NvOdmTouchDeviceClose(touch->hTouchDevice);
@@ -1150,9 +1124,6 @@ err_kthread_create_failed:
 	/* FIXME How to destroy the thread? Maybe we should use workqueues? */
 err_open_failed:
 	NvOdmOsSemaphoreDestroy(touch->semaphore);
-#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
-	NvOdmOsMutexDestroy(touch->hMutex);
-#endif
 err_semaphore_create_failed:
 	kfree(touch);
 	input_free_device(input_dev);
@@ -1171,24 +1142,21 @@ static int tegra_touch_remove(struct platform_device *pdev)
 	NvOdmTouchInterruptMask(touch->hTouchDevice, NV_TRUE);
 	NvOdmOsSleepMS(50);
 
-// 20100718 joseph.jung@lge.com grip suppression [START]
+// 20100718  grip suppression [START]
 #ifdef FEATURE_LGE_TOUCH_GRIP_SUPPRESSION
 	device_remove_file(&pdev->dev, &dev_attr_gripsuppression);
 #endif
-// 20100718 joseph.jung@lge.com grip suppression [END]
+// 20100718  grip suppression [END]
 
-// 20100825 joseph.jung@lge.com Debug Message Control (Temporary) [START]
+// 20100825  Debug Message Control (Temporary) [START]
 	device_remove_file(&pdev->dev, &dev_attr_fingerprint);
-// 20100825 joseph.jung@lge.com Debug Message Control (Temporary) [END]
+// 20100825  Debug Message Control (Temporary) [END]
 
-// 20100906 joseph.jung@lge.com Touch F/W version [START]
+// 20100906  Touch F/W version [START]
 	device_remove_file(&pdev->dev, &dev_attr_fw_version);
-// 20100906 joseph.jung@lge.com Touch F/W version [END]
+// 20100906  Touch F/W version [END]
 
 	NvOdmOsSemaphoreDestroy(touch->semaphore);
-#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
-	NvOdmOsMutexDestroy(touch->hMutex);
-#endif
 	NvOdmTouchDeviceClose(touch->hTouchDevice);
 
 	/* FIXME How to destroy the thread? Maybe we should use workqueues? */
@@ -1213,24 +1181,21 @@ static void tegra_touch_shutdown(struct  platform_device *pdev)
 	NvOdmTouchInterruptMask(touch->hTouchDevice, NV_TRUE);
 	NvOdmOsSleepMS(50);
 
-// 20100718 joseph.jung@lge.com grip suppression [START]
+// 20100718  grip suppression [START]
 #ifdef FEATURE_LGE_TOUCH_GRIP_SUPPRESSION
 	device_remove_file(&pdev->dev, &dev_attr_gripsuppression);
 #endif
-// 20100718 joseph.jung@lge.com grip suppression [END]
+// 20100718  grip suppression [END]
 
-// 20100825 joseph.jung@lge.com Debug Message Control (Temporary) [START]
+// 20100825  Debug Message Control (Temporary) [START]
 	device_remove_file(&pdev->dev, &dev_attr_fingerprint);
-// 20100825 joseph.jung@lge.com Debug Message Control (Temporary) [END]
+// 20100825  Debug Message Control (Temporary) [END]
 
-// 20100906 joseph.jung@lge.com Touch F/W version [START]
+// 20100906  Touch F/W version [START]
 	device_remove_file(&pdev->dev, &dev_attr_fw_version);
-// 20100906 joseph.jung@lge.com Touch F/W version [END]
+// 20100906  Touch F/W version [END]
 
 	NvOdmOsSemaphoreDestroy(touch->semaphore);
-#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
-	NvOdmOsMutexDestroy(touch->hMutex);
-#endif
 	NvOdmTouchDeviceClose(touch->hTouchDevice);
 
 	input_unregister_device(touch->input_dev);

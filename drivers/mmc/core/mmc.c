@@ -243,11 +243,11 @@ static int mmc_read_ext_csd(struct mmc_card *card)
 	}
 
 	switch (ext_csd[EXT_CSD_CARD_TYPE]) {
-        /* 20100901 taewan.kim@lge.com eMMC 4.4 Support [START] */
+        /* 20100901  eMMC 4.4 Support [START] */
 	case EXT_CSD_CARD_TYPE_DDR52 | EXT_CSD_CARD_TYPE_52 | EXT_CSD_CARD_TYPE_26:
 		card->ext_csd.hs_max_dtr = 52000000;
 		break;
-        /* 20100901 taewan.kim@lge.com eMMC 4.4 Support [END] */
+        /* 20100901  eMMC 4.4 Support [END] */
 	case EXT_CSD_CARD_TYPE_52 | EXT_CSD_CARD_TYPE_26:
 		card->ext_csd.hs_max_dtr = 52000000;
 		break;

@@ -21,7 +21,8 @@
 
 /* Fixed constants first: */
 #undef NR_OPEN
-#define INR_OPEN 1024		/* Initial setting for nfile rlimits */
+//#define INR_OPEN 1024		/* Initial setting for nfile rlimits */
+#define INR_OPEN 2048		/*  for aging & hopper test */
 
 #define BLOCK_SIZE_BITS 10
 #define BLOCK_SIZE (1<<BLOCK_SIZE_BITS)

@@ -13,10 +13,10 @@
 #include <linux/miscdevice.h>
 #include <linux/mutex.h>
 #include "nvodm_services.h"
-//20101208 km.lee@lge.com GPIO ioctl [START]
+//20101208  GPIO ioctl [START]
 #include <linux/uaccess.h>
 #include <linux/ioctl.h>
-//20101208 km.lee@lge.com GPIO ioctl [END]
+//20101208  GPIO ioctl [END]
 
 #define DRIVER_NAME    "tegra_panel_gpio_set"
 #define DRIVER_DESC    "Nvidia Tegra panel_gpio_set driver"
@@ -38,7 +38,7 @@ typedef struct KPanelGpioSetValuesRec
     NvU32 PinValue;
 } KPanelGpioSetValues;
 
-//20101208 km.lee@lge.com GPIO ioctl
+//20101208  GPIO ioctl
 #define HITACHI_CPU_WRITE       _IOW('H', 0x01, struct KPanelGpioSetValuesRec)
 
 static ssize_t tegra_panel_gpio_set_write(struct file *file, const char __user *data,
@@ -80,7 +80,7 @@ tegra_panel_gpio_set_release(struct inode *inode, struct file *file)
     return 0;
 }
 
-//20101208 km.lee@lge.com GPIO ioctl [START]
+//20101208  GPIO ioctl [START]
 static int tegra_panel_gpio_set_ioctl(struct inode *inode, struct file *file,
 		unsigned int cmd, unsigned long arg)
 {
@@ -99,7 +99,7 @@ static int tegra_panel_gpio_set_ioctl(struct inode *inode, struct file *file,
 	
     return 0;
 }
-//20101208 km.lee@lge.com GPIO ioctl [END]
+//20101208  GPIO ioctl [END]
 
 static struct file_operations tegra_panel_gpio_set_fops = {
     .owner      = THIS_MODULE,
@@ -108,7 +108,7 @@ static struct file_operations tegra_panel_gpio_set_fops = {
     .open       = tegra_panel_gpio_set_open,
     .release    = tegra_panel_gpio_set_release,
     .llseek     = tegra_panel_gpio_set_lseek, 
-//20101208 km.lee@lge.com GPIO ioctl
+//20101208  GPIO ioctl
     .ioctl = tegra_panel_gpio_set_ioctl,
 };
 

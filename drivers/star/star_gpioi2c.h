@@ -3,7 +3,7 @@
  * i2c simulation heaer.
  * you must assgin scl/sda pin, full/half delay
  *	
- * doncopy@lge.com	
+ * 	
  *	
  */
 

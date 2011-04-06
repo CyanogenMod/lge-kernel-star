@@ -33,6 +33,7 @@ extern int lge_sensor_verify_compass(void);
 extern int lge_sensor_reset_gyro(void);
 static int __init lge_sensor_verify_init(void)
 {
+#if 0
 	int timeout = 0; 
 	unsigned short flag = 0;  
 	unsigned int rtVal = 0;
@@ -64,6 +65,8 @@ static int __init lge_sensor_verify_init(void)
 	}
 	// do reboot system 
 	emergency_restart();
+#endif
+	return 0;
 }
 
 static void __exit lge_sensor_verify_exit(void)

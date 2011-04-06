@@ -156,7 +156,7 @@ static int tegra_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *wkalrm)
 
 	pr_debug("alarm_sec = %u\n", alarm_sec);
 
-//20100928, byoungwoo.yoon@lge.com, RTC alarm enable [START]
+//20100928, , RTC alarm enable [START]
 #ifdef CONFIG_MACH_STAR
 	if(!NvOdmPmuWriteAlarm(hPmu, alarm_sec))
 		return -EINVAL;
@@ -164,7 +164,7 @@ static int tegra_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *wkalrm)
 	if(!NvOdmPmuWriteAlarm(hPmu, alarm_sec-now))
 		return -EINVAL;
 #endif
-//20100928, byoungwoo.yoon@lge.com, RTC alarm enable [END]
+//20100928, , RTC alarm enable [END]
 
 	return 0;
 }

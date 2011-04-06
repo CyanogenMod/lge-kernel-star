@@ -483,7 +483,7 @@ CONFIG_PACKET=y
 # CONFIG_PACKET_MMAP is not set
 CONFIG_UNIX=y
 CONFIG_XFRM=y
-# LGE_CHANGE_S, [Lab1_DCM_Data_Froyo_005][jewon.lee@lge.com], 2010-11-02,  < L2TP IPSec PSK config enable for VPN >
+# LGE_CHANGE_S, [Lab1_DCM_Data_Froyo_005][], 2010-11-02,  < L2TP IPSec PSK config enable for VPN >
 CONFIG_XFRM_USER=y
 CONFIG_NET_KEY=y
 CONFIG_INET_AH=y
@@ -493,7 +493,7 @@ CONFIG_INET_XFRM_TUNNEL=y
 CONFIG_INET_XFRM_MODE_TRANSPORT=y
 CONFIG_INET_XFRM_MODE_TUNNEL=y
 CONFIG_INET_XFRM_MODE_BEET=y
-# LGE_CHANGE_E, [Lab1_DCM_Data_Froyo_005][jewon.lee@lge.com], 2010-11-02,  < L2TP IPSec PSK config enable for VPN >
+# LGE_CHANGE_E, [Lab1_DCM_Data_Froyo_005][], 2010-11-02,  < L2TP IPSec PSK config enable for VPN >
 
 # CONFIG_XFRM_SUB_POLICY is not set
 # CONFIG_XFRM_MIGRATE is not set
@@ -1085,7 +1085,7 @@ CONFIG_LGE_WMM_SKT=y
 CONFIG_ATM_DRIVERS=y
 # CONFIG_ATM_DUMMY is not set
 # CONFIG_ATM_TCP is not set
-# LGE_CHANGE_S, [Lab1_DCM_Data_Froyo_005][jewon.lee@lge.com], 2010-11-02,  < PPP config enable for VPN >
+# LGE_CHANGE_S, [Lab1_DCM_Data_Froyo_005][], 2010-11-02,  < PPP config enable for VPN >
 CONFIG_PPP=y
 CONFIG_PPP_MULTILINK=y
 CONFIG_PPP_FILTER=y
@@ -1098,7 +1098,7 @@ CONFIG_PPPOE=y
 CONFIG_PPPOL2TP=y
 CONFIG_PPPOLAC=y
 CONFIG_PPPOPNS=y
-# LGE_CHANGE_E, [Lab1_DCM_Data_Froyo_005][jewon.lee@lge.com], 2010-11-02,  < PPP config enable for VPN >
+# LGE_CHANGE_E, [Lab1_DCM_Data_Froyo_005][], 2010-11-02,  < PPP config enable for VPN >
 CONFIG_PPPOATM=y
 # CONFIG_SLIP is not set
 CONFIG_SLHC=y

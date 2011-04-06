@@ -27,7 +27,7 @@
 // Module debug: 0=disable, 1=enable
 #define NVODMTOUCH_ENABLE_PRINTF (0)
 
-// 20100420 joseph.jung@lge.com Debugging Message Print Setting [START]
+// 20100420  Debugging Message Print Setting [START]
 #ifdef FEATURE_LGE_TOUCH_CUSTOMIZE
 #if (NVODMTOUCH_ENABLE_PRINTF)
 #define NVODMTOUCH_PRINTF(x)   NvOdmOsPrintf x
@@ -41,7 +41,7 @@
 #define NVODMTOUCH_PRINTF(x)
 #endif
 #endif /* FEATURE_LGE_TOUCH_CUSTOMIZE */
-// 20100420 joseph.jung@lge.com Debugging Message Print Setting [END]
+// 20100420  Debugging Message Print Setting [END]
 
 #if defined(__cplusplus)
 extern "C"
@@ -61,9 +61,9 @@ typedef struct NvOdmTouchDeviceRec{
     void   (*Close)             (NvOdmTouchDeviceHandle hDevice);
     NvU16                       CurrentSampleRate;
     NvBool                      OutputDebugMessage;
-// 20101020 joseph.jung@lge.com Interrupt Enable/Disable [START]
+// 20101020  Interrupt Enable/Disable [START]
 	void	(*InterruptMask)	(NvOdmTouchDeviceHandle hDevice, NvBool mask);
-// 20101020 joseph.jung@lge.com Interrupt Enable/Disable [END]
+// 20101020  Interrupt Enable/Disable [END]
 } NvOdmTouchDevice;
 
 

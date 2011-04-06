@@ -134,7 +134,7 @@ NvOdmGpioReleasePinHandle(NvOdmServicesGpioHandle hOdmGpio,
         NvRmGpioReleasePinHandles(hOdmGpio->hGpio, &hRmPin, 1);
 }
 
-//cs77.ha@lge.com LCD IF fast init
+//LCD IF fast init
 //NvBug 716430
 // hGpioPin == pointer to array of GPIO pin handles, arraySize ==  numberOfPins
 // PinValue == pointer to array of corresponding GPIN pin values
@@ -822,7 +822,7 @@ void NvOdmServicesPmuGetCapabilities(
     return;
 }
 
-#if defined(CONFIG_MACH_STAR) //20100704 bergkamp.cho@lge.com jongik's headset porting [LGE]
+#if defined(CONFIG_MACH_STAR) //20100704  headset porting [LGE]
 NvU32 NvOdmServicesPmuGetHookValue( 
         NvOdmServicesPmuHandle handle)
 {
@@ -860,7 +860,7 @@ void NvOdmServicesPmuSetSocRailPowerState(
     NvRmPmuSetSocRailPowerState(hRmDev, vddId, Enable);
 }
 
-//20100909, jh.ahn@lge.com, for detecting power source in battery checker [START]
+//20100909, , for detecting power source in battery checker [START]
 NvBool
 NvOdmServicesPmuGetAcLineStatus(
     NvOdmServicesPmuHandle handle,
@@ -870,7 +870,7 @@ NvOdmServicesPmuGetAcLineStatus(
         (NvRmDeviceHandle)handle,
         (NvRmPmuAcLineStatus *)pStatus);
 }
-//20100909, jh.ahn@lge.com, for detecting power source in battery checker [END]
+//20100909, , for detecting power source in battery checker [END]
 
 NvBool 
 NvOdmServicesPmuGetBatteryStatus(
@@ -896,7 +896,7 @@ NvOdmServicesPmuGetBatteryData(
         (NvRmPmuBatteryData *)pData);
 }
 
-//20100924, jh.ahn@lge.com, For updating battery information totally [START]
+//20100924, , For updating battery information totally [START]
 #if defined(CONFIG_MACH_STAR)
 NvBool
 NvOdmServicesPmuUpdateBatteryInfo(
@@ -912,7 +912,7 @@ NvOdmServicesPmuUpdateBatteryInfo(
 			(NvRmPmuBatteryData *)pBatData);
 }
 #endif
-//20100924, jh.ahn@lge.com, For updating battery information totally  [END]
+//20100924, , For updating battery information totally  [END]
 
 void
 NvOdmServicesPmuGetBatteryFullLifeTime(

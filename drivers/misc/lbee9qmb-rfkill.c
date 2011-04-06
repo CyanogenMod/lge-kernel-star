@@ -60,10 +60,10 @@ struct bcm_bt_lpm {
 } bt_lpm;
 #endif
 
-/* 20100818 jaewoo56.lee@lge.com for debugging of resetting when getting a dump [START] */
+/* 20100818 for debugging of resetting when getting a dump [START] */
 #include "nvodm_services.h"
 
-/* 20101005 taewan.kim@lge.com for debugging of resetting when getting a dump */
+/* 20101005  for debugging of resetting when getting a dump */
 extern NvBool NvOdmBtEnable(NvBool IsEnable);
 
 static int lbee9qmb_rfkill_set_power(void *data, bool blocked)
@@ -71,12 +71,12 @@ static int lbee9qmb_rfkill_set_power(void *data, bool blocked)
 	struct platform_device *pdev = data;
 	struct lbee9qmb_platform_data *plat = pdev->dev.platform_data;
 
-/* 20100818 jaewoo56.lee@lge.com for debugging of resetting when getting a dump [START] */
+/* 20100818 for debugging of resetting when getting a dump [START] */
     NvU32 RequestedPeriod, ReturnedPeriod;
     RequestedPeriod = 0;
-/* 20100818 jaewoo56.lee@lge.com for debugging of resetting when getting a dump [END] */
+/* 20100818 for debugging of resetting when getting a dump [END] */
     
-/* 20100721 jaewoo56.lee@lge.com for BTLA Porting to Froyo [START] */
+/* 20100721 for BTLA Porting to Froyo [START] */
 #if 0
 	struct regulator *regulator;
 
@@ -87,12 +87,12 @@ static int lbee9qmb_rfkill_set_power(void *data, bool blocked)
 		return PTR_ERR(regulator);
 	}
 #endif
-/* 20100721 jaewoo56.lee@lge.com for BTLA Porting to Froyo [END] */
+/* 20100721 for BTLA Porting to Froyo [END] */
 
-    /* 20101005 taewan.kim@lge.com for debugging of resetting when getting a dump [START] */
+    /* 20101005  for debugging of resetting when getting a dump [START] */
 	if (!blocked) {
                 NvOdmBtEnable(NV_TRUE);
-//		regulator_enable(regulator); /* 20100721 jaewoo56.lee@lge.com for BTLA Porting to Froyo */
+//		regulator_enable(regulator); /* 20100721 for BTLA Porting to Froyo */
 		gpio_set_value(plat->gpio_reset, 0);
 //		if (plat->gpio_pwr!=-1)
 //			gpio_set_value(plat->gpio_pwr, 0);
@@ -103,13 +103,13 @@ static int lbee9qmb_rfkill_set_power(void *data, bool blocked)
 		bt_lpm.bt_enable=1;
 	} else {
 		gpio_set_value(plat->gpio_reset, 0);
-//		regulator_disable(regulator); /* 20100721 jaewoo56.lee@lge.com for BTLA Porting to Froyo */
+//		regulator_disable(regulator); /* 20100721 for BTLA Porting to Froyo */
                 NvOdmBtEnable(NV_FALSE);
             bt_lpm.bt_enable=0;
 	}
-    /* 20101005 taewan.kim@lge.com for debugging of resetting when getting a dump [END] */
+    /* 20101005  for debugging of resetting when getting a dump [END] */
 
-//	regulator_put(regulator); /* 20100721 jaewoo56.lee@lge.com for BTLA Porting to Froyo */
+//	regulator_put(regulator); /* 20100721 for BTLA Porting to Froyo */
 	return 0;
 }
 

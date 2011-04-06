@@ -44,9 +44,9 @@ Date			Author				Descriptions
 #include "nvos.h"
 
 
-// 20100413 joseph.jung@lge.com for Touch Firmware Upgrade [START]
+// 20100413  for Touch Firmware Upgrade [START]
 #include "synaptics_ts_firmware.h"
-// 20100413 joseph.jung@lge.com for Touch Firmware Upgrade [END]
+// 20100413  for Touch Firmware Upgrade [END]
 
 
 ////////////////////////////////////////////////////////////////////
@@ -69,29 +69,29 @@ Date			Author				Descriptions
 
 #define SYNAPTICS_FINGER_MAX					10
 
-// 20101128 hyeongwon.oh@lge.com Ghost finger solution is applied to a ver. 3 or later for SKT [START]
+// 20101128  Ghost finger solution is applied to a ver. 3 or later for SKT [START]
 #if defined(STAR_OPERATOR_SKT)
 #define SYNAPTICS_MELT_SUPPORT_VER				3
 #else
-// 20100929 joseph.jung@lge.com Ghost finger solution is applied to a ver. 4 or later for P990 [START]
+// 20100929  Ghost finger solution is applied to a ver. 4 or later for P990 [START]
 #define SYNAPTICS_MELT_SUPPORT_VER				4
-// 20100929 joseph.jung@lge.com Ghost finger solution is applied to a ver. 4 or later for P990 [END]
+// 20100929  Ghost finger solution is applied to a ver. 4 or later for P990 [END]
 #endif
-// 20101128 hyeongwon.oh@lge.com Ghost finger solution is applied to a ver. 3 or later for SKT [END]
+// 20101128  Ghost finger solution is applied to a ver. 3 or later for SKT [END]
 
 
-// 20101130 joseph.jung@lge.com Touch Panel is changed and base f/w version is 11 from Rev.F for P990 [START]
+// 20101130  Touch Panel is changed and base f/w version is 11 from Rev.F for P990 [START]
 #define SYNAPTICS_NEW_PANEL_BASE_FW_VER			11
-// 20101130 joseph.jung@lge.com Touch Panel is changed and base f/w version is 11 from Rev.F for P990 [END]
+// 20101130  Touch Panel is changed and base f/w version is 11 from Rev.F for P990 [END]
 
 
-// 20100930 hyeongwon.oh@lge.com [SKT KR] block touch firmware upgrade [START]
+// 20100930  [SKT KR] block touch firmware upgrade [START]
 #if defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT)
 #undef SYNAPTICS_SUPPORT_FW_UPGRADE
 #else 
 #define SYNAPTICS_SUPPORT_FW_UPGRADE
 #endif 
-// 20100930 hyeongwon.oh@lge.com [SKT KR] block touch firmware upgrade [END]
+// 20100930  [SKT KR] block touch firmware upgrade [END]
 
 #undef SYNAPTICS_SUPPORT_CAL					// Use for only resistive touch
 
@@ -113,9 +113,9 @@ Date			Author				Descriptions
 #define SYNAPTICS_DATA_BASE_REG					0x13
 
 #define SYNAPTICS_INT_STATUS_REG				0x14
-// 20101223 hyeongwon.oh@lge.com [STAR] requested by synaptics for analyze ghost finger [START] 
+// 20101223  [STAR] requested by synaptics for analyze ghost finger [START] 
 #define SYNAPTICS_FINGER_STATUS_REG				0x15
-// 20101223 hyeongwon.oh@lge.com [STAR] requested by synaptics for analyze ghost finger [END] 
+// 20101223  [STAR] requested by synaptics for analyze ghost finger [END] 
 #define SYNAPTICS_DEVICE_CONTROL_REG			0x4F
 #define SYNAPTICS_INTERRUPT_ENABLE_REG			0x50
 #define SYNAPTICS_REPORT_MODE_REG				0x51
@@ -141,13 +141,13 @@ Date			Author				Descriptions
 #define SYNAPTICS_FLASH_QUERY_BASE_REG			0xE9
 #define SYNAPTICS_FLASH_DATA_BASE_REG			0xEC
 
-// 20100929 joseph.jung@lge.com Ghost finger solution = touch f/w [START]
+// 20100929  Ghost finger solution = touch f/w [START]
 #define SYNAPTICS_MELT_CONTROL_REG				0xF0
 
 #define SYNAPTICS_NO_MELT_MODE					0
 #define SYNAPTICS_MELT_MODE						1<<0
 #define SYNAPTICS_AUTO_MELT_MODE				1<<1
-// 20100929 joseph.jung@lge.com Ghost finger solution = touch f/w [END]
+// 20100929  Ghost finger solution = touch f/w [END]
 
 #define SYNAPTICS_INT_FLASH						1<<0
 #define SYNAPTICS_INT_STATUS 					1<<1
@@ -173,7 +173,7 @@ Date			Author				Descriptions
 ////////////////// Synaptics Data from Register ////////////////////
 ////////////////////////////////////////////////////////////////////
 
-// 20100319 joseph.jung@lge.com Positon Conversion : Panel resolution -> LCD resolution [START]
+// 20100319  Positon Conversion : Panel resolution -> LCD resolution [START]
 #ifdef FEATURE_LGE_TOUCH_CUSTOMIZE
 // convert reported coordinates, X : 1036 -> 479, Y : 1681 -> 799 (1728 -> 903)
 #define TS_SNTS_GET_X_POSITION(high_reg, low_reg) \
@@ -186,7 +186,7 @@ Date			Author				Descriptions
 #define TS_SNTS_GET_Y_POSITION(high_reg, low_reg) \
 		((int)((high_reg << 4) & 0x000007F0) | (int)((low_reg >> 4) & 0x0F))
 #endif /* FEATURE_LGE_TOUCH_CUSTOMIZE */
-// 20100319 joseph.jung@lge.com Positon Conversion : Panel resolution -> LCD resolution [END]
+// 20100319  Positon Conversion : Panel resolution -> LCD resolution [END]
 
 #define TS_SNTS_HAS_PINCH(gesture_reg) \
 		((gesture_reg&0x40)>>6)
@@ -260,9 +260,9 @@ typedef struct Synaptics_TouchDeviceRec
 	NvU32 I2cVddId;
 	NvU8 FirmwareRevId;
     NvU32 I2cClockSpeedKHz;
-// 20100929 joseph.jung@lge.com Ghost finger solution = touch f/w [START]
+// 20100929  Ghost finger solution = touch f/w [START]
 	NvU8 MeltType;
-// 20100929 joseph.jung@lge.com Ghost finger solution = touch f/w [START]
+// 20100929  Ghost finger solution = touch f/w [START]
 } Synaptics_TouchDevice;
 
 
@@ -294,36 +294,21 @@ static synaptics_ts_sensor_data ts_reg_data={0};
 static synaptics_ts_finger_data curr_ts_data;
 static synaptics_ts_finger_data prev_ts_data;
 
-// 20101223 joseph.jung@lge.com improve ghost finger avoid algorithm [START]
+// 20101223  improve ghost finger avoid algorithm [START]
 static int synaptics_ts_melting_count = 0;
 static NvBool synaptics_ts_melting_enable = NV_TRUE;
 
 static NvU32 synaptics_ts_melting_check_time;
 
 static NvBool synaptics_ts_first_finger_pressed = NV_FALSE;
-// 20101223 joseph.jung@lge.com improve ghost finger avoid algorithm [END]
+// 20101223  improve ghost finger avoid algorithm [END]
 
-// 20101223 hyeongwon.oh@lge.com [SU660] block touch interrupt when onetouch is on reset [START]
+// 20101223  [SU660] block touch interrupt when onetouch is on reset [START]
 #if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
-extern NvOdmServicesGpioIntrHandle hGpioIntr_onetouch;
 NvOdmServicesGpioIntrHandle hGpioIntr_touch;
-static NvBool isMasked = NV_FALSE;
 #endif
-// 20101223 hyeongwon.oh@lge.com [SU660] block touch interrupt when onetouch is on reset [END]
-////////////////////////////////////////////////////////////////////
-/////////////     Basic Local Functions Definition    //////////////
-////////////////////////////////////////////////////////////////////
+// 20101223  [SU660] block touch interrupt when onetouch is on reset [END]
 
-static NvBool Synaptics_WriteRegister (Synaptics_TouchDevice* hTouch, NvU8 reg, NvU8 val);
-static NvBool Synaptics_WriteRegisterMulti(Synaptics_TouchDevice* hTouch, NvU8 reg, NvU8* buffer, NvU32 len);
-static NvBool Synaptics_SetRegAddr (Synaptics_TouchDevice* hTouch, NvU8 reg);
-static NvBool Synaptics_ReadRegisterSafe (Synaptics_TouchDevice* hTouch, NvU8 reg, NvU8* buffer, NvU32 len);
-static NvBool Synaptics_Configure (Synaptics_TouchDevice* hTouch);
-static void Synaptics_GpioIsr(void *arg);
-static NvBool Synaptics_GetSamples (Synaptics_TouchDevice* hTouch, NvOdmTouchCoordinateInfo* coord);
-
-static void Synaptics_InitOdmTouch (NvOdmTouchDevice* Dev);
-static NvBool Synaptics_Init(Synaptics_TouchDevice* hTouch);
 
 
 ////////////////////////////////////////////////////////////////////
@@ -495,10 +480,6 @@ static void Synaptics_GpioIsr(void *arg)
 static NvBool Synaptics_GetSamples (Synaptics_TouchDevice* hTouch, NvOdmTouchCoordinateInfo* coord)
 {
 	NvU8 i;
-// 20101223 hyeongwon.oh@lge.com [STAR] requested by synaptics for analisys ghost finger [START] 
-//	NvU8 reg[3] = {0,};
-//	NvU8 melt_tmp = 0;
-// 20101223 hyeongwon.oh@lge.com [STAR] requested by synaptics for analisys ghost finger [END] 
 
 	NVODMTOUCH_PRINTF(("[TOUCH] Synaptics_GetSamples [START]\n"));
 
@@ -508,22 +489,6 @@ static NvBool Synaptics_GetSamples (Synaptics_TouchDevice* hTouch, NvOdmTouchCoo
 		return NV_FALSE;
 	}
     
-// 20101223 hyeongwon.oh@lge.com [STAR] requested by synaptics for analisys ghost finger [START] 
-#if 0
-    NvOdmOsMemset(reg, 0, sizeof(reg));
-	if (Synaptics_ReadRegisterSafe (hTouch, SYNAPTICS_FINGER_STATUS_REG, (NvU8*)(&reg), sizeof(reg)))
-	{
-		printk("[TOUCH] FINGER_SATUS is %#x,%#x,%#x\n",reg[0],reg[1],reg[2]);
-	}
-
-    NvOdmOsMemset(reg, 0, sizeof(reg));
-	if (Synaptics_ReadRegisterSafe (hTouch, SYNAPTICS_MELT_CONTROL_REG, (NvU8*)(&melt_tmp), sizeof(melt_tmp)))
-	{
-		printk("[TOUCH] MELT_CONTROL_REG is %#x,\n",melt_tmp);
-	}
-#endif
-// 20101223 hyeongwon.oh@lge.com [STAR] requested by synaptics for analisys ghost finger [END] 
-
 	NVODMTOUCH_PRINTF(("[TOUCH] ===Synaptics Touch === INT mode[0x%02x]\n", ts_reg_data.interrupt_status_reg));
 
 	coord->additionalInfo.Fingers = 0;
@@ -577,7 +542,7 @@ static NvBool Synaptics_GetSamples (Synaptics_TouchDevice* hTouch, NvOdmTouchCoo
 				}
 			}
 		}
-// 20101223 joseph.jung@lge.com improve ghost finger avoidance algorithm [START]
+// 20101223  improve ghost finger avoidance algorithm [START]
 		if(hTouch->FirmwareRevId >= SYNAPTICS_MELT_SUPPORT_VER && hTouch->MeltType == SYNAPTICS_MELT_MODE)
 		{
 			if((coord->additionalInfo.Fingers > 1) || (coord->additionalInfo.Fingers == 1 && coord->additionalInfo.multi_fingerstate[0] == 0))
@@ -616,7 +581,7 @@ static NvBool Synaptics_GetSamples (Synaptics_TouchDevice* hTouch, NvOdmTouchCoo
 			else
 				synaptics_ts_first_finger_pressed = NV_FALSE;
 		}
-// 20101223 joseph.jung@lge.com improve ghost finger avoidance algorithm [END]
+// 20101223  improve ghost finger avoidance algorithm [END]
 	}
 
 	//NVODMTOUCH_PRINTF(("[Touch Driver] Synaptics_GetSamples [END]\n"));
@@ -625,29 +590,35 @@ static NvBool Synaptics_GetSamples (Synaptics_TouchDevice* hTouch, NvOdmTouchCoo
 }
 
 
-// 20100906 joseph.jung@lge.com for Touch Firmware Version Check [START]
-static NvU8 Synaptics_GetFWVersion(Synaptics_TouchDevice* hTouch)
+// 20100906  for Touch Firmware Version Check [START]
+static NvBool Synaptics_GetFWVersion(Synaptics_TouchDevice* hTouch)
 {
 	NvU8 RMI_Query_BaseAddr;
 	NvU8 FWVersion_Addr;
 
-	NvU8 SynapticsFirmVersion;
+	hTouch->FirmwareRevId = 0x00;
 	
 	if(!Synaptics_ReadRegisterSafe (hTouch, SYNAPTICS_RMI_QUERY_BASE_REG, (NvU8*)(&RMI_Query_BaseAddr), sizeof(RMI_Query_BaseAddr)))
-		return 0xFF;
+		return NV_FALSE;
 
 	FWVersion_Addr = RMI_Query_BaseAddr+3;
 	
-	Synaptics_ReadRegisterSafe (hTouch, FWVersion_Addr, (NvU8*)(&SynapticsFirmVersion), sizeof(SynapticsFirmVersion));
-    printk("[TOUCH] Touch controller Firmware Version = %x\n", SynapticsFirmVersion);
-
-	return SynapticsFirmVersion;
+	if(Synaptics_ReadRegisterSafe (hTouch, FWVersion_Addr, (NvU8*)(&hTouch->FirmwareRevId), sizeof(hTouch->FirmwareRevId)))
+	{
+		printk("[TOUCH] Touch controller Firmware Version = %x\n", hTouch->FirmwareRevId);
+// 20100906  Touch F/W version [START]
+		storeTouchFWversion(hTouch->FirmwareRevId);
+// 20100906  Touch F/W version [END]
+		return NV_TRUE;
+	}
+	else
+		return NV_FALSE;
 }
-// 20100906 joseph.jung@lge.com for Touch Firmware Version Check [END]
+// 20100906  for Touch Firmware Version Check [END]
 
 
 
-// 20100413 joseph.jung@lge.com for Touch Firmware Upgrade [START]
+// 20100413  for Touch Firmware Upgrade [START]
 #ifdef SYNAPTICS_SUPPORT_FW_UPGRADE
 static unsigned long ExtractLongFromHeader(const NvU8 *SynaImage)  // Endian agnostic 
 {
@@ -692,8 +663,6 @@ static NvBool Synaptics_UpgradeFirmware(Synaptics_TouchDevice* hTouch)
 
 	int try_count = 0;
 	int try_limit = 2000;
-
-	NvU8 TouchFWVersion;
 
 	NvU8 FlashQueryBaseAddr, FlashDataBaseAddr;
 	NvU8 RMICommandBaseAddr;
@@ -745,26 +714,12 @@ static NvBool Synaptics_UpgradeFirmware(Synaptics_TouchDevice* hTouch)
 
 
 	////////////////////////	F/W Version Check	///////////////////////////
-// 20101129 joseph.jung@lge.com Touch F/W upgrade is supported for Rev.F or later for P990 [START]
 #if defined(CONFIG_MACH_STAR_REV_F)
-	TouchFWVersion = Synaptics_GetFWVersion(hTouch);
-// 20101130 joseph.jung@lge.com Touch Panel is changed and base f/w version is 11 from Rev.F for P990 [START]
-	if(TouchFWVersion < SYNAPTICS_NEW_PANEL_BASE_FW_VER)
+	Synaptics_GetFWVersion(hTouch);
+
+	if((hTouch->FirmwareRevId >= 0x64 && SynapticsFirmware[0x1F] >= 0x64) || (hTouch->FirmwareRevId < 0x64 && SynapticsFirmware[0x1F] < 0x64))
 	{
-		printk("[Touch Driver] Check H/W version and Touch F/W version!!!!\n");
-// 20101229 joseph.jung@lge.com Touch Panel f/w upgrade fail pattern #1 [START]
-		if(TouchFWVersion == 10)
-		{
-			printk("[Touch Driver] previously, touch panel f/w upgrade is failed!!!!\n");
-		}
-		else
-// 20101229 joseph.jung@lge.com Touch Panel f/w upgrade fail pattern #1 [START]
-		return NV_TRUE;
-	}
-// 20101130 joseph.jung@lge.com Touch Panel is changed and base f/w version is 11 from Rev.F for P990 [END]
-	if((TouchFWVersion >= 0x64 && SynapticsFirmware[0x1F] >= 0x64) || (TouchFWVersion < 0x64 && SynapticsFirmware[0x1F] < 0x64))
-	{
-		if(!(TouchFWVersion < SynapticsFirmware[0x1F]))
+		if(!(hTouch->FirmwareRevId < SynapticsFirmware[0x1F]))
 		{
 			printk("[Touch Driver] Synaptics_UpgradeFirmware does not necessary!!!!\n");
 			return NV_TRUE;
@@ -774,7 +729,6 @@ static NvBool Synaptics_UpgradeFirmware(Synaptics_TouchDevice* hTouch)
 	printk("[Touch Driver] Synaptics_UpgradeFirmware : Do not support anymore under Rev.F!!!!\n");
 	return NV_TRUE;
 #endif
-// 20101129 joseph.jung@lge.com Touch F/W upgrade is supported for Rev.F or later for P990 [END]
 
 
 	////////////////////////	Configuration	///////////////////////////
@@ -1081,7 +1035,7 @@ static NvBool Synaptics_UpgradeFirmware(Synaptics_TouchDevice* hTouch)
 	return NV_TRUE;
 }
 #endif
-// 20100413 joseph.jung@lge.com for Touch Firmware Upgrade [END]
+// 20100413  for Touch Firmware Upgrade [END]
 
 
 
@@ -1104,9 +1058,9 @@ static void Synaptics_InitOdmTouch (NvOdmTouchDevice* Dev)
 #endif /* SYNAPTICS_SUPPORT_CAL */
 	Dev->CurrentSampleRate = SYNAPTICS_HIGH_SAMPLE_RATE;
     Dev->OutputDebugMessage = NV_FALSE;
-// 20101020 joseph.jung@lge.com Interrupt Enable/Disable [START]
+// 20101020  Interrupt Enable/Disable [START]
 	Dev->InterruptMask = Synaptics_InterruptMask;
-// 20101020 joseph.jung@lge.com Interrupt Enable/Disable [END]
+// 20101020  Interrupt Enable/Disable [END]
 }
 
 
@@ -1128,7 +1082,7 @@ static NvBool Synaptics_Init(Synaptics_TouchDevice* hTouch)
 		prev_ts_data.pressure[i] = curr_ts_data.pressure[i] = 0;
 	}
 
-// 20100929 joseph.jung@lge.com Ghost finger solution = touch f/w [START]
+// 20100929  Ghost finger solution = touch f/w [START]
 	if(hTouch->FirmwareRevId >= SYNAPTICS_MELT_SUPPORT_VER)
 	{
 		NvU8 melt_mode = SYNAPTICS_MELT_MODE;
@@ -1137,19 +1091,23 @@ static NvBool Synaptics_Init(Synaptics_TouchDevice* hTouch)
 	}
 	else
 		hTouch->MeltType = SYNAPTICS_MELT_MODE;
-// 20100929 joseph.jung@lge.com Ghost finger solution = touch f/w [END]
+// 20100929  Ghost finger solution = touch f/w [END]
 
 	Synaptics_ReadRegisterSafe (hTouch, SYNAPTICS_DATA_BASE_REG, (NvU8*)(&ts_reg_data), sizeof(ts_reg_data));
 
-// 20100402 joseph.jung@lge.com Touch Register Setting [START]
+// 20100402  Touch Register Setting [START]
 	Synaptics_WriteRegister(hTouch, SYNAPTICS_DELTA_X_THRES_REG, SYNAPTICS_DELTA_THRESHOLD);	// Delta X
 	Synaptics_WriteRegister(hTouch, SYNAPTICS_DELTA_Y_THRES_REG, SYNAPTICS_DELTA_THRESHOLD);	// Delta Y
-// 20100402 joseph.jung@lge.com Touch Register Setting [END]
+// 20100402  Touch Register Setting [END]
 
-// 20101228 joseph.jung@lge.com improve ghost finger avoidance algorithm [START]
+// 20101228  improve ghost finger avoidance algorithm [START]
 	Synaptics_WriteRegister(hTouch, 0x5B, 0x00);		// 2d gesture enable1 = not use
 	Synaptics_WriteRegister(hTouch, 0x5C, 0x00);		// 2d gesture enable2 = not use
-// 20101228 joseph.jung@lge.com improve ghost finger avoidance algorithm [END]
+// 20101228  improve ghost finger avoidance algorithm [END]
+
+// 20110120  change to continuous mode by appl. request [START]
+	Synaptics_WriteRegister(hTouch, 0x51, 0x08);
+// 20110120  change to continuous mode by appl. request [END]
 
 	return NV_TRUE;
 }
@@ -1271,12 +1229,6 @@ NvBool Synaptics_Open (NvOdmTouchDeviceHandle* hDevice, NvOdmOsSemaphoreHandle* 
     if (NV_FALSE == Synaptics_PowerOnOff(&hTouch->OdmTouch, 1))
             goto fail;
 
-/* move from here
-    *hDevice = &hTouch->OdmTouch;
-    if (Synaptics_EnableInterrupt(*hDevice, *hIntSema) == NV_FALSE)
-          goto fail;
-*/
-
     NvOdmGpioConfig(hTouch->hGpio,
                     hTouch->hPin,
                     NvOdmGpioPinMode_InputData);
@@ -1288,20 +1240,15 @@ NvBool Synaptics_Open (NvOdmTouchDeviceHandle* hDevice, NvOdmOsSemaphoreHandle* 
     hTouch->I2cClockSpeedKHz = SYNAPTICS_I2C_SPEED_KHZ;
     NVODMTOUCH_PRINTF(("[TOUCH] i2c speed = %d\n", hTouch->I2cClockSpeedKHz));
 	
-// 20100413 joseph.jung@lge.com for Touch Firmware Upgrade [START]
+// 20100413  for Touch Firmware Upgrade [START]
 #ifdef SYNAPTICS_SUPPORT_FW_UPGRADE
 	if(Synaptics_UpgradeFirmware(hTouch) == NV_FALSE)
 		goto fail;
 #endif
-// 20100413 joseph.jung@lge.com for Touch Firmware Upgrade [END]
+// 20100413  for Touch Firmware Upgrade [END]
 
 	/* get chip revision id */
-    hTouch->FirmwareRevId = Synaptics_GetFWVersion(hTouch);
-// 20100906 joseph.jung@lge.com Touch F/W version [START]
-	storeTouchFWversion(hTouch->FirmwareRevId);
-// 20100906 joseph.jung@lge.com Touch F/W version [END]
-	
-	//printk("[TOUCH] Touch controller Firmware Version = %x\n", hTouch->FirmwareRevId);
+    Synaptics_GetFWVersion(hTouch);
 
     /* initialize */
     if(!Synaptics_Init(hTouch))	 goto fail;
@@ -1314,16 +1261,16 @@ NvBool Synaptics_Open (NvOdmTouchDeviceHandle* hDevice, NvOdmOsSemaphoreHandle* 
     /* configure panel */
     if (!Synaptics_Configure(hTouch)) goto fail;
 
-	/* move to here */
+	/* Register Interrupt */
     *hDevice = &hTouch->OdmTouch;
     if (Synaptics_EnableInterrupt(*hDevice, *hIntSema) == NV_FALSE)
           goto fail;
 	
-// 20101223 hyeongwon.oh@lge.com [SU660] block touch interrupt when onetouch is on reset [START]
+// 20101223  [SU660] block touch interrupt when onetouch is on reset [START]
 #if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
 	hGpioIntr_touch = hTouch->hGpioIntr;
 #endif
-// 20101223 hyeongwon.oh@lge.com [SU660] block touch interrupt when onetouch is on reset [END]
+// 20101223  [SU660] block touch interrupt when onetouch is on reset [END]
 
     return NV_TRUE;
 
@@ -1347,12 +1294,7 @@ void Synaptics_Close (NvOdmTouchDeviceHandle hDevice)
         if (hTouch->hPin)
         {
             if (hTouch->hGpioIntr)
-			{
                 NvOdmGpioInterruptUnregister(hTouch->hGpio, hTouch->hPin, hTouch->hGpioIntr);
-#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
-				hGpioIntr_touch = NULL;
-#endif
-			}
 
             NvOdmGpioReleasePinHandle(hTouch->hGpio, hTouch->hPin);
         }
@@ -1366,7 +1308,7 @@ void Synaptics_Close (NvOdmTouchDeviceHandle hDevice)
     NvOdmOsFree(hTouch);
 }
 
-// 20101020 joseph.jung@lge.com Interrupt Enable/Disable [START]
+// 20101020  Interrupt Enable/Disable [START]
 void Synaptics_InterruptMask(NvOdmTouchDeviceHandle hDevice, NvBool mask)
 {
 	/*
@@ -1381,7 +1323,7 @@ void Synaptics_InterruptMask(NvOdmTouchDeviceHandle hDevice, NvBool mask)
 		printk("[TOUCH] Synaptics_InterruptMask by %d\n", mask);
 	}
 }
-// 20101020 joseph.jung@lge.com Interrupt Enable/Disable [END]
+// 20101020  Interrupt Enable/Disable [END]
 
 
 
@@ -1507,27 +1449,9 @@ NvBool Synaptics_PowerOnOff (NvOdmTouchDeviceHandle hDevice, NvBool OnOff)
             NvOdmServicesPmuSetVoltage( hTouch->hPmu, hTouch->CoreVddId, vddrailcapCore.requestMilliVolts, &settletime);
         	NvOdmOsWaitUS(SYNAPTICS_POR_DELAY_MS*1000); // wait to settle power
 			NvOdmServicesPmuSetVoltage( hTouch->hPmu, hTouch->I2cVddId, vddrailcapI2c.requestMilliVolts, &settletime);
-// 20101223 hyeongwon.oh@lge.com [SU660] block touch interrupt when touch is on reset [START]
-#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
-			if(hGpioIntr_onetouch && isMasked)
-			{
-				NvOdmGpioInterruptMask(hGpioIntr_onetouch, NV_FALSE);
-				isMasked = NV_FALSE;
-			}
-#endif
-// 20101223 hyeongwon.oh@lge.com [SU660] block touch interrupt when  touch is on reset [END]
 		}
         else
 		{
-// 20101223 hyeongwon.oh@lge.com [SU660] block touch interrupt when  touch is on reset [START]
-#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
-			if(hGpioIntr_onetouch && !isMasked)
-			{
-				NvOdmGpioInterruptMask(hGpioIntr_onetouch, NV_TRUE);
-				isMasked = NV_TRUE;
-			}
-#endif
-// 20101223 hyeongwon.oh@lge.com [SU660] block touch interrupt when  touch is on reset [END]
 			NvOdmServicesPmuSetVoltage( hTouch->hPmu, hTouch->I2cVddId, NVODM_VOLTAGE_OFF, &settletime);
             NvOdmServicesPmuSetVoltage( hTouch->hPmu, hTouch->CoreVddId, NVODM_VOLTAGE_OFF, &settletime);
 		}
@@ -1550,10 +1474,10 @@ NvBool Synaptics_PowerControl (NvOdmTouchDeviceHandle hDevice, NvOdmTouchPowerMo
     NvU8 SleepMode;
 	NvU8 DeviceControl;
 
-// 20100920 joseph.jung@lge.com ESD Issue [START]
+// 20100920  ESD Issue [START]
 	NvU8 configValueX;
 	NvU8 configValueY;
-// 20100920 joseph.jung@lge.com ESD Issue [END]
+// 20100920  ESD Issue [END]
 
 	if (!hTouch)
 		return NV_FALSE;
@@ -1582,7 +1506,7 @@ NvBool Synaptics_PowerControl (NvOdmTouchDeviceHandle hDevice, NvOdmTouchPowerMo
 	else
 		hTouch->SleepMode = (NvU32)SleepMode;
 
-// 20100920 joseph.jung@lge.com ESD Issue [START]
+// 20100920  ESD Issue [START]
 	if(mode == NvOdmTouch_PowerMode_0)
 	{
 		Synaptics_ReadRegisterSafe (hTouch, SYNAPTICS_DELTA_X_THRES_REG, (NvU8*)(&configValueX), sizeof(configValueX));
@@ -1595,14 +1519,14 @@ NvBool Synaptics_PowerControl (NvOdmTouchDeviceHandle hDevice, NvOdmTouchPowerMo
 		if(configValueY != SYNAPTICS_DELTA_THRESHOLD)
 			return NV_FALSE;
 	}
-// 20100920 joseph.jung@lge.com ESD Issue [END]
+// 20100920  ESD Issue [END]
 
 	if(Synaptics_ReadRegisterSafe (hTouch, SYNAPTICS_DEVICE_CONTROL_REG, (NvU8*)(&DeviceControl), sizeof(DeviceControl)))
 		printk("Synaptics Device Control Read Success\n");
 	if(Synaptics_WriteRegister(hTouch, SYNAPTICS_DEVICE_CONTROL_REG, ((DeviceControl & 0xFC) | SleepMode)))
 		printk("Synaptics Device Control Write Success\n");
 
-// 20101223 joseph.jung@lge.com improve ghost finger avoidance algorithm [START]
+// 20101223  improve ghost finger avoidance algorithm [START]
 	if(!SleepMode && hTouch->FirmwareRevId >= SYNAPTICS_MELT_SUPPORT_VER)
 	{
 		if(Synaptics_WriteRegister(hTouch, SYNAPTICS_MELT_CONTROL_REG, SYNAPTICS_MELT_MODE))
@@ -1615,7 +1539,7 @@ NvBool Synaptics_PowerControl (NvOdmTouchDeviceHandle hDevice, NvOdmTouchPowerMo
 			synaptics_ts_melting_enable = NV_TRUE;
 		}
 	}
-// 20101223 joseph.jung@lge.com improve ghost finger avoidance algorithm [END]
+// 20101223  improve ghost finger avoidance algorithm [END]
     
     return NV_TRUE;
 }

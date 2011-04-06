@@ -94,12 +94,11 @@ typedef struct Synaptics_OneTouch_DeviceRec
     NvU32 I2cClockSpeedKHz;
 } Synaptics_OneTouch_Device;
 
-// 20101223 hyeongwon.oh@lge.com [SU660] block touch interrupt when onetouch is on reset [START]
+// 20101223  [SU660] block touch interrupt when onetouch is on reset [START]
 #if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
 extern NvOdmServicesGpioIntrHandle hGpioIntr_touch;
-NvOdmServicesGpioIntrHandle hGpioIntr_onetouch;
 #endif
-// 20101223 hyeongwon.oh@lge.com [SU660] block touch interrupt when onetouch is on reset [END]
+// 20101223  [SU660] block touch interrupt when onetouch is on reset [END]
 
 ////////////////////////////////////////////////////////////////////
 /////////////     Basic Local Functions Definition    //////////////
@@ -438,7 +437,7 @@ NvBool Synaptics_OneTouch_Open (NvOdmOneTouchDeviceHandle* hDevice, NvOdmOsSemap
 
     if ((found & 4) != 0)
     {
-// 20101120 hyeongwon.oh@lge.com power off when Onetouch close    
+// 20101120  power off when Onetouch close    
 #if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
         if (NV_FALSE == Synaptics_OneTouch_PowerOnOff(&hTouch->OdmOneTouch, 1))
 	    	goto fail;   
@@ -488,12 +487,6 @@ NvBool Synaptics_OneTouch_Open (NvOdmOneTouchDeviceHandle* hDevice, NvOdmOsSemap
     if (Synaptics_OneTouch_EnableInterrupt(*hDevice, *hIntSema) == NV_FALSE)
           goto fail;
 	
-// 20101223 hyeongwon.oh@lge.com [SU660] block touch interrupt when onetouch is on reset [START]
-#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
-	hGpioIntr_onetouch = hTouch->hGpioIntr;
-#endif
-// 20101223 hyeongwon.oh@lge.com [SU660] block touch interrupt when onetouch is on reset [END]
-
     return NV_TRUE;
 
  fail:
@@ -509,7 +502,7 @@ void Synaptics_OneTouch_Close (NvOdmOneTouchDeviceHandle hDevice)
 
     if (!hTouch) return;
 
-// 20101120 hyeongwon.oh@lge.com power off when Onetouch close    
+// 20101120  power off when Onetouch close    
 #if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
     Synaptics_OneTouch_PowerOnOff(&hTouch->OdmOneTouch, NV_FALSE);
 #endif 
@@ -519,12 +512,7 @@ void Synaptics_OneTouch_Close (NvOdmOneTouchDeviceHandle hDevice)
         if (hTouch->hPin)
         {
             if (hTouch->hGpioIntr)
-			{
                 NvOdmGpioInterruptUnregister(hTouch->hGpio, hTouch->hPin, hTouch->hGpioIntr);
-#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
-				hGpioIntr_onetouch = NULL;
-#endif
-			}
 
             NvOdmGpioReleasePinHandle(hTouch->hGpio, hTouch->hPin);
         }
@@ -608,7 +596,7 @@ NvBool Synaptics_OneTouch_ReadButton (NvOdmOneTouchDeviceHandle hDevice, NvOdmOn
 
 NvBool Synaptics_OneTouch_PowerOnOff (NvOdmOneTouchDeviceHandle hDevice, NvBool OnOff)
 {
-// 20101120 hyeongwon.oh@lge.com power off when Onetouch close    
+// 20101120  power off when Onetouch close    
 #if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
 	NvOdmServicesPmuVddRailCapabilities vddrailcap;
 	NvU32 settletime;
@@ -631,32 +619,31 @@ NvBool Synaptics_OneTouch_PowerOnOff (NvOdmOneTouchDeviceHandle hDevice, NvBool 
 		
 	if(OnOff)
 	{
-// 20101223 hyeongwon.oh@lge.com [SU660] block touch interrupt when onetouch is on reset [START]
+// 20101223  [SU660] block touch interrupt when onetouch is on reset [START]
 #if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
 		if(hGpioIntr_touch)
 			NvOdmGpioInterruptMask(hGpioIntr_touch, NV_TRUE);
 #endif
-// 20101223 hyeongwon.oh@lge.com [SU660] block touch interrupt when onetouch is on reset [END]
+// 20101223  [SU660] block touch interrupt when onetouch is on reset [END]
 			
 	    NvOdmServicesPmuSetVoltage( hTouch->hPmu, hTouch->I2cVddId, NVODM_VOLTAGE_OFF, &settletime);
         NvOdmOsWaitUS(SYNAPTICS_POR_DELAY_MS*1000); // wait to settle power
 		NvOdmServicesPmuSetVoltage( hTouch->hPmu, Max8907PmuSupply_LDO16, NVODM_VOLTAGE_OFF, &settletime);
-		NvOdmOsWaitUS(SYNAPTICS_POR_DELAY_MS*3*1000); // wait to settle power
+		NvOdmOsWaitUS(SYNAPTICS_POR_DELAY_MS*2*1000); // wait to settle power
 
 		NvOdmServicesPmuSetVoltage( hTouch->hPmu, Max8907PmuSupply_LDO16, MAX8907_REQUESTVOLTAGE_LDO16, &settletime);
 		NvOdmServicesPmuSetVoltage( hTouch->hPmu, hTouch->I2cVddId, MAX8907_REQUESTVOLTAGE_LDO19, &settletime);
 
-// 20101223 hyeongwon.oh@lge.com [SU660] block touch interrupt when onetouch is on reset [START]
+// 20101223  [SU660] block touch interrupt when onetouch is on reset [START]
 #if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
 		if(hGpioIntr_touch)
 			NvOdmGpioInterruptMask(hGpioIntr_touch, NV_FALSE);
 #endif
-// 20101223 hyeongwon.oh@lge.com [SU660] block touch interrupt when onetouch is on reset [END]
+// 20101223  [SU660] block touch interrupt when onetouch is on reset [END]
 	}else
 		NvOdmServicesPmuSetVoltage( hTouch->hPmu, Max8907PmuSupply_LDO16, NVODM_VOLTAGE_OFF, &settletime);
 
-	if (settletime)
-		NvOdmOsWaitUS(settletime); // wait to settle power
+		NvOdmOsWaitUS(SYNAPTICS_POR_DELAY_MS*5*1000); // wait to settle power
 
     NvOdmServicesPmuClose(hTouch->hPmu);
 #endif

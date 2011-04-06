@@ -20,7 +20,7 @@
 #include <linux/reboot.h>
 #include <linux/sched.h>
 #include <linux/syscalls.h>
-#include <linux/timer.h> /* 20100802 jugwan.eom@lge.com */
+#include <linux/timer.h> /* 20100802  */
 
 struct keyreset_state {
 	struct input_handler input_handler;
@@ -44,7 +44,7 @@ static void deferred_restart(struct work_struct *dummy)
 }
 static DECLARE_WORK(restart_work, deferred_restart);
 
-/* 20100802 jugwan.eom@lge.com [START_LGE] */
+/* 20100802  [START_LGE] */
 static int keyreset_started;
 
 static void keyreset_timeout(unsigned long data)
@@ -63,7 +63,7 @@ static void keyreset_timeout(unsigned long data)
 }
 
 static struct timer_list keyreset_timer = TIMER_INITIALIZER(keyreset_timeout, 0, 0);
-/* 20100802 jugwan.eom@lge.com [END_LGE] */
+/* 20100802  [END_LGE] */
 
 static void keyreset_event(struct input_handle *handle, unsigned int type,
 			   unsigned int code, int value)
@@ -78,13 +78,13 @@ static void keyreset_event(struct input_handle *handle, unsigned int type,
 		return;
 
 	if (!test_bit(code, state->keybit)) { 
-        /* 20100802 jugwan.eom@lge.com [START_LGE] */
+        /* 20100802  [START_LGE] */
         if (keyreset_started) {
             pr_info("keyreset end!\n");
             keyreset_started = 0;
             del_timer(&keyreset_timer);
         }
-        /* 20100802 jugwan.eom@lge.com [END_LGE] */
+        /* 20100802  [END_LGE] */
 		return;
     }
 
@@ -128,7 +128,7 @@ static void keyreset_event(struct input_handle *handle, unsigned int type,
 		 state->key_down, state->key_up, state->restart_disabled);
 
 	if (value && !state->restart_disabled &&
-        /* 20100802 jugwan.eom@lge.com, Change keyreset behaivor
+        /* 20100802 , Change keyreset behaivor
          * to follow LGE scenario: It needs at least 5 secs before reset
          * [START_LGE]
          */
@@ -146,7 +146,7 @@ static void keyreset_event(struct input_handle *handle, unsigned int type,
 		schedule_work(&restart_work);
 		restart_requested = 1;
 #endif
-    /* 20100802 jugwan.eom@lge.com [END_LGE] */
+    /* 20100802  [END_LGE] */
 	}
 done:
 	spin_unlock_irqrestore(&state->lock, flags);

@@ -252,7 +252,7 @@ void NvRmPrivPmuLPxStateConfig(
     // - enable the On/Off control on entry, and disable on exit
     if (state == NvOdmSocPowerState_DeepSleep)
     {
-    // cs77.ha@lge.com : AP20 need USB power work around
+    // AP20 need USB power work around
 #if defined(CONFIG_MACH_STAR)
         if (HasPmuProperty)
 #else
@@ -270,7 +270,7 @@ void NvRmPrivPmuLPxStateConfig(
         (state == NvOdmSocPowerState_DeepSleep))
         NvRmPrivPmuInterruptMask(hRmDevice, enter);
 }
-//20100725 taewan.kim@lge.com add MAX8907C FEATURE [END]
+//20100725  add MAX8907C FEATURE [END]
 
 /*****************************************************************************/
 
@@ -313,7 +313,7 @@ void NvRmPmuGetVoltage(
 }
 
 #if defined(CONFIG_MACH_STAR) 
-//20100704 bergkamp.cho@lge.com jongik's headset porting [LGE]
+//20100704  headset porting [LGE]
 NvU32 NvRmPmuGetHookAdc(
     NvRmDeviceHandle hDevice)
 {
@@ -327,7 +327,7 @@ NvU32 NvRmPmuGetHookAdc(
 	return value;
 }
 
-//20101121 cs77.ha@lge.com, HW power off in thermal limit [START]
+//20101121 HW power off in thermal limit [START]
 NvU32 NvRmPmuSetHwPowerOffConfig(
     NvRmDeviceHandle hDevice,
     NvBool Enable)
@@ -341,7 +341,7 @@ NvU32 NvRmPmuSetHwPowerOffConfig(
     NvOsMutexUnlock(s_Pmu.hMutex);
 	return value;
 }
-//20101121 cs77.ha@lge.com, HW power off in thermal limit [END]
+//20101121 HW power off in thermal limit [END]
 #endif
 
 void NvRmPmuSetVoltage( 
@@ -505,7 +505,7 @@ NvBool NvRmPmuGetBatteryData(
     return NV_FALSE;
 }
 
-//20100924, jh.ahn@lge.com, For updating battery information totally [START]
+//20100924, , For updating battery information totally [START]
 #if defined(CONFIG_MACH_STAR)
 NvBool
 NvRmPmuUpdateBatteryInfo(
@@ -536,7 +536,7 @@ NvRmPmuUpdateBatteryInfo(
 	return NV_FALSE;
 }
 #endif
-//20100924, jh.ahn@lge.com, For updating battery information totally  [END]
+//20100924, , For updating battery information totally  [END]
 
 void NvRmPmuGetBatteryFullLifeTime( 
     NvRmDeviceHandle hRmDevice,
@@ -605,7 +605,7 @@ NvRmPmuWriteRtc(
     return ReturnStatus;
 }
 
-//20101005, jh.ahn@lge.com, Alarm funtion for Full Battery Recharging [START]
+//20101005, , Alarm funtion for Full Battery Recharging [START]
 NvBool
 NvRmPmuReadAlarm(
     NvRmDeviceHandle  hRmDevice,
@@ -639,7 +639,7 @@ NvRmPmuWriteAlarm(
     NvOsMutexUnlock(s_Pmu.hMutex);
     return ReturnStatus;
 }
-//20101005, jh.ahn@lge.com, Alarm funtion for Full Battery Recharging [END]
+//20101005, , Alarm funtion for Full Battery Recharging [END]
 
 NvBool
 NvRmPmuIsRtcInitialized(

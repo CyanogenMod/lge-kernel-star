@@ -769,13 +769,22 @@ static inline void add_post_recv_queue(mux_recv_struct ** head,
 	*head = new_item;
 }
 
+#define MUX_CONTROL_BUG_FIX //by eunae.kim 2011-01-07
 static void ts0710_flow_on(u8 dlci, ts0710_con * ts0710)
 {
+#if defined(MUX_CONTROL_BUG_FIX) /*  2011-01-07 */
+           if (!((ts0710->dlci[0].state) & (CONNECTED | FLOW_STOPPED)))
+                     return;
+
+           if (!((ts0710->dlci[dlci].state) & (CONNECTED | FLOW_STOPPED)))
+                     return;
+#else
 	if (!(ts0710->dlci[0].state) & (CONNECTED | FLOW_STOPPED))
 		return;
 
 	if (!(ts0710->dlci[dlci].state) & (CONNECTED | FLOW_STOPPED))
 		return;
+#endif
 
 	if (!(ts0710->dlci[dlci].flow_control))
 		return;
@@ -1013,7 +1022,7 @@ void process_uih(ts0710_con * ts0710, char *data, int len, u8 dlci) {
 	tty->ldisc.ops->receive_buf(tty, uih_data_start, NULL, uih_len);
 #endif
 	if (flow_control)
-		tty_throttle(tty);	//20101127-3, syblue.lee@lge.com, Teleca's patch for mux flow control
+		tty_throttle(tty);	//20101127-3, , Teleca's patch for mux flow control
 //		ts0710_flow_off(tty, dlci, ts0710);
 }
 
@@ -1339,14 +1348,14 @@ static void mux_close(struct tty_struct *tty, struct file *filp)
 	if (mux_tty[line] == 0)
 #ifdef LGE_KERNEL_MUX
 /*Workaround Infineon modem - DLS opened once will never be closed*/
-//20100915-1, syblue.lee@lge.com, Fix VT can't recevie data from CP [START]
+//20100915-1, , Fix VT can't recevie data from CP [START]
 		if(dlci==12)
 		{	//When VT close DLC 12 with flow off status, must send flow on status to CP
 			//TS0710_PRINTK("%s - close channel[%d]\n", __FUNCTION__, dlci);
 			ts0710_flow_on(dlci, &ts0710_connection);
 		}
 	TS0710_PRINTK("%s - close channel[%d]\n", __FUNCTION__, dlci);	
-//20100915, syblue.lee@lge.com, Fix VT can't recevie data from CP [END]
+//20100915, , Fix VT can't recevie data from CP [END]
         return;
 #else        
 		ts0710_close_channel(dlci);
@@ -1373,7 +1382,7 @@ static void mux_close(struct tty_struct *tty, struct file *filp)
 		mux_recv_info[line] = 0;
 		TS0710_DEBUG("Free mux_recv_info for /dev/mux%d\n", line);
 	}
-        tty_unthrottle(tty);	//20101127-3, syblue.lee@lge.com, Teleca's patch for mux flow control
+        tty_unthrottle(tty);	//20101127-3, , Teleca's patch for mux flow control
 //	ts0710_flow_on(dlci, ts0710);
 
 	wake_up_interruptible(&tty->read_wait);
@@ -1994,15 +2003,15 @@ static int ts_ldisc_open(struct tty_struct *tty)
     spi_data_recieved.flags = NULL;
     spi_data_recieved.size = 0;
     spi_data_recieved.updated = 0;
-    // LGE_UPDATE_S // 20100826 syblue.lee@lge.com, initialize task handle [START]
+    // LGE_UPDATE_S // 20100826 , initialize task handle [START]
     task = NULL;
-    // LGE_UPDATE_E // 20100826 syblue.lee@lge.com, initialize task handle [START]
+    // LGE_UPDATE_E // 20100826 , initialize task handle [START]
     write_task = NULL;
     write_task = kthread_run(ts_ldisc_tx_looper,NULL,"%s","ts_ldisc_tx_looper");
     if(write_task == NULL)
         TS0710_DEBUG("ts_ldisc_open WRITE_THREAD is not started!!!\n");
 
-// LGE_UPDATE_S // 20100722 jungyeon.kim@lge.com 
+// LGE_UPDATE_S // 20100722  
 //	set_user_nice(write_task, 19); // 19:O 5:O 2:O 0:O
 //	set_user_nice(write_task, 0);
 // LGE_UPDATE_E
@@ -2039,9 +2048,9 @@ static void ts_ldisc_close(struct tty_struct *tty)
         TS0710_DEBUG("ts_ldisc_close READ_THREAD is stopped\n");    
     }
     if(write_task != NULL){
-        // LGE_UPDATE_S // 20100826 syblue.lee@lge.com, if write semaphore holds on the thread, release it [START]
+        // LGE_UPDATE_S // 20100826 , if write semaphore holds on the thread, release it [START]
         up(&spi_write_sema);
-        // LGE_UPDATE_E // 20100826 syblue.lee@lge.com, if write semaphore holds on the thread, release it [START]
+        // LGE_UPDATE_E // 20100826 , if write semaphore holds on the thread, release it [START]
         kthread_stop(write_task);
         TS0710_DEBUG("ts_ldisc_close WRITE_THREAD is stopped\n");    
     }
@@ -2056,12 +2065,12 @@ static void ts_ldisc_close(struct tty_struct *tty)
 			hGpio =  (NvOdmServicesGpioHandle)NvOdmGpioOpen();
 		if(hPin==NULL)
 			hPin = NvOdmGpioAcquirePinHandle(hGpio, 'v'-'a', 0);
-		NvOdmGpioSetState(hGpio,hPin, 1);	//20100607, syblue.lee@lge.com, remain only this code
+		NvOdmGpioSetState(hGpio,hPin, 1);	//20100607, , remain only this code
 		NvOdmGpioConfig(hGpio, hPin, NvOdmGpioPinMode_Output);
 		NvOsSleepMS(200);
-		NvOdmGpioSetState(hGpio,hPin, 0);	//20100607, syblue.lee@lge.com, remain only this code
+		NvOdmGpioSetState(hGpio,hPin, 0);	//20100607, , remain only this code
 		NvOsSleepMS(200);
-		NvOdmGpioSetState(hGpio,hPin, 1);	//20100607, syblue.lee@lge.com, remain only this code
+		NvOdmGpioSetState(hGpio,hPin, 1);	//20100607, , remain only this code
 		//NvOdmGpioReleasePinHandle(hGpio, hPin);
 		
 		ts0710_upon_disconnect();

@@ -49,12 +49,12 @@ GetPmuInstance(NvOdmPmuDeviceHandle hDevice)
         Pmu.pfnInterruptHandler       = Max8907InterruptHandler;
         Pmu.pfnReadRtc                = Max8907RtcCountRead;
         Pmu.pfnWriteRtc               = Max8907RtcCountWrite;
-        Pmu.pfnReadAlarm              = Max8907RtcAlarmCountRead;	//20100928, byoungwoo.yoon@lge.com, RTC alarm enable
-        Pmu.pfnWriteAlarm             = Max8907RtcAlarmCountWrite;	//20100928, byoungwoo.yoon@lge.com, RTC alarm enable
+        Pmu.pfnReadAlarm              = Max8907RtcAlarmCountRead;	//20100928, , RTC alarm enable
+        Pmu.pfnWriteAlarm             = Max8907RtcAlarmCountWrite;	//20100928, , RTC alarm enable
         Pmu.pfnIsRtcInitialized       = Max8907IsRtcInitialized;
-        Pmu.pfnGetHookAdc             = Max8907GetHookAdc;		//20100704 bergkamp.cho@lge.com jongik's headset porting [LGE]
-        Pmu.pfnSetHwPowerOffConfig    = Max8907SetHwPowerOffConfig; //20101121 cs77.ha@lge.com, HW power off in thermal limit [START]
-        Pmu.pfnUpdateBatteryInfo	  = Max8907UpdateBatteryInfo;  //20100924, jh.ahn@lge.com, For updating battery information totally  [END]
+        Pmu.pfnGetHookAdc             = Max8907GetHookAdc;		//20100704  headset porting [LGE]
+        Pmu.pfnSetHwPowerOffConfig    = Max8907SetHwPowerOffConfig; //20101121 HW power off in thermal limit [START]
+        Pmu.pfnUpdateBatteryInfo	  = Max8907UpdateBatteryInfo;  //20100924, , For updating battery information totally  [END]
         Pmu.pPrivate                  = NULL;
         Pmu.Hal                       = NV_TRUE;  
         Pmu.Init                      = NV_FALSE;
@@ -154,7 +154,7 @@ NvOdmPmuSetVoltage(NvOdmPmuDeviceHandle hDevice,
 }
 
 #if defined(CONFIG_MACH_STAR) 
-//20100704 bergkamp.cho@lge.com jongik's headset porting [LGE]
+//20100704  headset porting [LGE]
 NvU32
 NvOdmPmuGetHookAdc(NvOdmPmuDeviceHandle hDevice)
 {   
@@ -166,7 +166,7 @@ NvOdmPmuGetHookAdc(NvOdmPmuDeviceHandle hDevice)
     return value;
 }
 
-//20101121 cs77.ha@lge.com, HW power off in thermal limit [START]
+//20101121 , HW power off in thermal limit [START]
 NvU32
 NvOdmPmuSetHwPowerOffConfig(NvOdmPmuDeviceHandle hDevice,
                    NvBool Enable)
@@ -178,7 +178,7 @@ NvOdmPmuSetHwPowerOffConfig(NvOdmPmuDeviceHandle hDevice,
 		value = pmu->pfnSetHwPowerOffConfig(pmu, Enable);
     return value;
 }
-//20101121 cs77.ha@lge.com, HW power off in thermal limit [END]
+//20101121 HW power off in thermal limit [END]
 #endif
 
 NvBool 
@@ -228,7 +228,7 @@ NvOdmPmuGetBatteryData(NvOdmPmuDeviceHandle hDevice,
     return NV_TRUE;
 }
 
-//20100924, jh.ahn@lge.com, For updating battery information totally [START]
+//20100924, , For updating battery information totally [START]
 NvBool
 NvOdmPmuUpdateBatteryInfo(NvOdmPmuDeviceHandle hDevice,
 				NvOdmPmuAcLineStatus *pAcStatus,
@@ -251,7 +251,7 @@ NvOdmPmuUpdateBatteryInfo(NvOdmPmuDeviceHandle hDevice,
 
 	return NV_TRUE;
 }
-//20100924, jh.ahn@lge.com, For updating battery information totally  [END]
+//20100924, , For updating battery information totally  [END]
 
 void
 NvOdmPmuGetBatteryFullLifeTime(NvOdmPmuDeviceHandle hDevice, 

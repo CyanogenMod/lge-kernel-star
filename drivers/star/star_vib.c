@@ -9,9 +9,9 @@
 #include <linux/miscdevice.h>
 #include <linux/timer.h>
 
-//20100717 sk.hwang@lge.com For HRTIMER @linux 2.6.32[start]
+//20100717  For HRTIMER @linux 2.6.32[start]
 #include <linux/hrtimer.h>
-//20100717 sk.hwang@lge.com For HRTIMER @linux 2.6.32[end]
+//20100717  For HRTIMER @linux 2.6.32[end]
 
 #include "nvcommon.h"
 #include "nvodm_services.h"
@@ -69,7 +69,7 @@ static void star_vib_work_func(struct work_struct *work)
 }
 
 
-// 20100903 taewan.kim@lge.com Power control bug fix [START]
+// 20100903  Power control bug fix [START]
 static int star_vib_set_power_rail( NvU32 vdd_id, NvBool is_enable )
 {
     NvOdmServicesPmuHandle h_pmu = NvOdmServicesPmuOpen();
@@ -107,11 +107,11 @@ static int star_vib_set_power_rail( NvU32 vdd_id, NvBool is_enable )
 
     return -1;
 }
-// 20100903 taewan.kim@lge.com Power control bug fix [END]
+// 20100903  Power control bug fix [END]
 
 static void star_vib_vibrating( NvBool on )
 {
-//20101112 sh80.choi@lge.com Call Vibrate Volume [START_LGE_LAB1]
+//20101112 Call Vibrate Volume [START_LGE_LAB1]
 #ifdef STAR_COUNTRY_KR
 	NvBool vib_onoff;
 	
@@ -122,7 +122,7 @@ static void star_vib_vibrating( NvBool on )
 
 	NvOdmGpioConfig( g_vib->h_vib_gpio, g_vib->h_vib_gpio_pin, NvOdmGpioPinMode_Output);
 	NvOdmGpioSetState( g_vib->h_vib_gpio, g_vib->h_vib_gpio_pin, vib_onoff );
-//20101112 sh80.choi@lge.com Call Vibrate Volume [END_LGE_LAB1]
+//20101112 Call Vibrate Volume [END_LGE_LAB1]
 #else
 
 	NvOdmGpioConfig( g_vib->h_vib_gpio, g_vib->h_vib_gpio_pin, NvOdmGpioPinMode_Output);
@@ -130,7 +130,7 @@ static void star_vib_vibrating( NvBool on )
 #endif
 }
 
-//20101112 sh80.choi@lge.com Call Vibrate Volume [START_LGE_LAB1]
+//20101112 all Vibrate Volume [START_LGE_LAB1]
 #ifdef STAR_COUNTRY_KR
 NvOdmServicesPwmHandle hOdmPwm = NULL;
 
@@ -162,7 +162,7 @@ NvBool star_vibrator_pwn_set(NvBool IsEnable)
 	   
 }
 #endif
-//20101112 sh80.choi@lge.com Call Vibrate Volume [END_LGE_LAB1]
+//20101112 Call Vibrate Volume [END_LGE_LAB1]
 
 static void star_vib_enable( NvBool is_enable )
 {
@@ -170,21 +170,21 @@ static void star_vib_enable( NvBool is_enable )
 	{
         //star_vib_set_power_rail( g_vib->h_vib_pmu, g_vib->vdd_id, is_enable);
 		star_vib_vibrating( is_enable );
-//20101112 sh80.choi@lge.com Call Vibrate Volume [START_LGE_LAB1]
+//20101112 Call Vibrate Volume [START_LGE_LAB1]
 #ifdef STAR_COUNTRY_KR
 		star_vibrator_pwn_set(is_enable);
 #endif
-//20101112 sh80.choi@lge.com Call Vibrate Volume [END_LGE_LAB1]
+//20101112 Call Vibrate Volume [END_LGE_LAB1]
 	}
 	else
 	{
         //star_vib_set_power_rail( g_vib->h_vib_pmu, g_vib->vdd_id, is_enable);
 		star_vib_vibrating( is_enable );
-//20101112 sh80.choi@lge.com Call Vibrate Volume [START_LGE_LAB1]
+//20101112 Call Vibrate Volume [START_LGE_LAB1]
 #ifdef STAR_COUNTRY_KR
 		star_vibrator_pwn_set(is_enable);
 #endif
-//20101112 sh80.choi@lge.com Call Vibrate Volume [END_LGE_LAB1]
+//20101112 Call Vibrate Volume [END_LGE_LAB1]
 	}
 }
 /*
@@ -237,9 +237,9 @@ static ssize_t star_vib_stay_store(struct device *dev, struct device_attribute *
 		if( value < 1000 )
 		{
 			timeout = (unsigned long)(value * 1000 * 1000 );
-//20101112 sh80.choi@lge.com Call Vibrate Volume [START_LGE_LAB1]
+//20101112 Call Vibrate Volume [START_LGE_LAB1]
 #ifndef STAR_COUNTRY_KR
-//20101112 sh80.choi@lge.com Call Vibrate Volume [END_LGE_LAB1]
+//20101112 Call Vibrate Volume [END_LGE_LAB1]
 			star_vib_enable(NV_TRUE);
 #endif
 			hrtimer_start(&g_vib->timer, ktime_set(0, timeout), HRTIMER_MODE_REL);
@@ -247,10 +247,10 @@ static ssize_t star_vib_stay_store(struct device *dev, struct device_attribute *
 		else
 		{
 			timeout = (long)value / 1000;
-//20101112 sh80.choi@lge.com Call Vibrate Volume [START_LGE_LAB1]
+//20101112 Call Vibrate Volume [START_LGE_LAB1]
 #ifndef STAR_COUNTRY_KR
 			star_vib_enable(NV_TRUE);
-//20101112 sh80.choi@lge.com Call Vibrate Volume [END_LGE_LAB1]
+//20101112 Call Vibrate Volume [END_LGE_LAB1]
 #endif
 			hrtimer_start(&g_vib->timer, ktime_set((long)timeout, 0), HRTIMER_MODE_REL);
 		}
@@ -280,11 +280,11 @@ static ssize_t star_vib_onoff_store(struct device *dev, struct device_attribute 
 		#if VIB_DEBUG
 		printk("vibrator on...\n");	
 		#endif
-//20101112 sh80.choi@lge.com Call Vibrate Volume [START_LGE_LAB1]
+//20101112 Call Vibrate Volume [START_LGE_LAB1]
 #ifdef STAR_COUNTRY_KR
 		star_vib_enable(val);
 #endif
-//20101112 sh80.choi@lge.com Call Vibrate Volume [END_LGE_LAB1]
+//20101112 Call Vibrate Volume [END_LGE_LAB1]
 		
 //		star_vib_enable(NV_TRUE);
 		#if VIB_DEBUG
@@ -368,11 +368,11 @@ static int __init star_vib_probe(struct platform_device *pdev )
 		return err;
 	}
 
-        // 20100903 taewan.kim@lge.com Power control bug fix [START]
+        // 20100903  Power control bug fix [START]
 	/*g_vib->h_vib_pmu = NvOdmServicesPmuOpen();
 	if( !g_vib->h_vib_pmu )
 	{err=-ENOSYS; return err;}*/
-        // 20100903 taewan.kim@lge.com Power control bug fix [END]
+        // 20100903  Power control bug fix [END]
 
 	pcon = (NvOdmPeripheralConnectivity*)NvOdmPeripheralGetGuid(NV_ODM_GUID('v','i','b','r','a','t','o','r'));
 	for(loop = 0; loop< pcon->NumAddress; loop++)
@@ -421,11 +421,11 @@ static int __init star_vib_probe(struct platform_device *pdev )
         return err;
     }
 
-//20101112 sh80.choi@lge.com Call Vibrate Volume [START_LGE_LAB1]
+//20101112 Call Vibrate Volume [START_LGE_LAB1]
 #ifdef STAR_COUNTRY_KR
 	hOdmPwm = NvOdmPwmOpen();
 #endif
-//20101112 sh80.choi@lge.com Call Vibrate Volume [END_LGE_LAB1]
+//20101112 Call Vibrate Volume [END_LGE_LAB1]
 	
 //	NvOdmGpioConfig( g_vib->vib_gpio, g_vib->en_port, NvOdmGpioPinMode_Output);
 //	INIT_DELAYED_WORK(&g_vib->delayed_work_vib, star_vib_work_func );
@@ -493,6 +493,6 @@ static void __exit star_vib_exit(void)
 module_init(star_vib_init);
 module_exit(star_vib_exit);
 
-MODULE_AUTHOR("sk.hwang@lge.com");
+MODULE_AUTHOR("");
 MODULE_DESCRIPTION("driver of star viberator");
 MODULE_LICENSE("GPL");

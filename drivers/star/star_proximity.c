@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2010 LGE, Inc.
  *
- * Author: Taewan.kim <taewan.kim@lge.com>
+ * Author: Taewan.kim <>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -80,6 +80,7 @@ typedef struct ProximityDeviceRec
 static atomic_t proxi_status;
 static bool proxi_enabled = false;
 static ProximityDevice s_proximity;
+static int reset_flag = 0;
 
 static NvBool star_proxi_write_reg(ProximityDevice* proximity, NvU8 reg, NvU8 val)
 {
@@ -313,7 +314,7 @@ static void star_proxi_enable(ProximityDevice *data)
         return;
 
 	
-    star_proxi_power_onoff(data, true);
+    //star_proxi_power_onoff(data, true);
 	#ifndef CONFIG_MACH_STAR_REV_D
 	//star_proxi_vddio_vi_power_onoff( 22, true );
 	#endif
@@ -346,7 +347,7 @@ static void star_proxi_disable(ProximityDevice *data)
     star_proxi_write_reg(&s_proximity, 0x04, 0x02 );
     s_shutdown_mode = true;
 
-    star_proxi_power_onoff(data, false);
+    //star_proxi_power_onoff(data, false);
 	#ifndef CONFIG_MACH_STAR_REV_D
 	//star_proxi_vddio_vi_power_onoff( 22, false );
 	#endif
@@ -390,6 +391,27 @@ static ssize_t star_proxi_onoff_store(struct device *dev, struct device_attribut
         star_proxi_disable(&s_proximity);
     }
     return count;
+}
+
+int lge_sensor_shutdown_proxi(void)
+{
+
+    if (proxi_enabled != false)
+    {
+        star_proxi_disable(&s_proximity);
+        reset_flag = 1;
+    }
+    return 0;
+}
+
+int lge_sensor_restart_proximity(void)
+{
+    if (reset_flag == 1)
+    {
+        star_proxi_enable(&s_proximity);
+        reset_flag = 0;
+    }
+    return 0;
 }
 
 static ssize_t star_proxi_delay_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -705,6 +727,6 @@ static void __exit proximity_exit(void)
 module_init(proximity_init);
 module_exit(proximity_exit);
 
-MODULE_AUTHOR("sk.hwang@lge.com");
+MODULE_AUTHOR("");
 MODULE_DESCRIPTION("star proximity driver");
 MODULE_LICENSE("GPL");

@@ -3,7 +3,7 @@
  * 
  *    Description:  
  * 
- *         Author:  Jugwan Eom, zugwan@lge.com
+ *         Author:  Jugwan Eom, 
  *        Company:  MES Group, LG Electronics, Inc.
  */
 

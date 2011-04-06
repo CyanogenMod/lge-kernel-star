@@ -40,11 +40,11 @@
 #if defined(CONFIG_MTD_NAND_TEGRA) || defined(CONFIG_EMBEDDED_MMC_START_OFFSET)
 #define MAX_MTD_PARTNR 8
 static struct mtd_partition tegra_mtd_partitions[MAX_MTD_PARTNR];
-//20100419 bergkamp.cho@lge.com for headset detetion [LGE_START]
+//20100419  for headset detetion [LGE_START]
 #if defined(CONFIG_MACH_STAR)
-#include <linux/switch.h>	//20100419 bergkamp.cho@lge.com for Headset Detection [LGE]
+#include <linux/switch.h>	//20100419  for Headset Detection [LGE]
 #endif /* CONFIG_MACH_STAR */
-//20100419 bergkamp.cho@lge.com for headset detection [LGE_END]
+//20100419  for headset detection [LGE_END]
 
 struct tegra_nand_platform tegra_nand_plat = {
 	.parts = tegra_mtd_partitions,

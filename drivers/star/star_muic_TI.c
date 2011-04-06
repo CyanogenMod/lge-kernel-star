@@ -113,7 +113,7 @@ void muic_CP_UART_set(Muic_Device *s_hMuicHandle);
 void muic_AP_USB_set(Muic_Device *s_hMuicHandle);
 void muic_CP_USB_set(Muic_Device *s_hMuicHandle);
 
-//20100526, jh.ahn@lge.com, charging_ic Function [START]
+//20100526, , charging_ic Function [START]
 #if defined(CONFIG_STAR_BATTERY_CHARGER)
 typedef enum {
   CHG_IC_DEFAULT_MODE=0,    		/* 0  */
@@ -128,7 +128,7 @@ typedef enum {
 extern void charging_ic_active(NvU32);
 extern void charging_ic_deactive(void);
 #endif /* CONFIG_STAR_BATTERY_CHARGER */
-//20100526, jh.ahn@lge.com, charging_ic Function [END]
+//20100526, , charging_ic Function [END]
 
 NvBool muic_factory_audio_mode = NV_FALSE;
 
@@ -702,12 +702,12 @@ void muic_AP_UART_set(Muic_Device *s_hMuicHandle){
     NvS32 ret;
 
     /* Turn on charger IC with FACTORY mode */
-//20100526, jh.ahn@lge.com, Turn on charger IC with FACTORY mode [START]
+//20100526, , Turn on charger IC with FACTORY mode [START]
 #if defined(CONFIG_STAR_BATTERY_CHARGER)
     lprintk(D_MUIC, "%s: CHG_IC_FACTORY_MODE(%d) \n", __func__, CHG_IC_FACTORY_MODE);	
     charging_ic_active(CHG_IC_FACTORY_MODE);
 #endif /* CONFIG_STAR_BATTERY_CHARGER */
-//20100526, jh.ahn@lge.com, Turn on charger IC with FACTORY mode [END]
+//20100526, , Turn on charger IC with FACTORY mode [END]
 
     /* Connect CP UART signals to AP */
     usif_switch_ctrl(s_hMuicHandle, USIF_AP);
@@ -731,12 +731,12 @@ void muic_AP_USB_set(Muic_Device *s_hMuicHandle){
 
     /* Turn on charger IC with TA mode */
     //	charging_ic_set_ta_mode();
-//20100526, jh.ahn@lge.com, Turn on charger IC with Standard USB mode [START]
+//20100526, , Turn on charger IC with Standard USB mode [START]
 #if defined(CONFIG_STAR_BATTERY_CHARGER)
     lprintk(D_MUIC, "%s: CHG_IC_DEFAULT_MODE(%d) \n", __func__, CHG_IC_DEFAULT_MODE);	
     charging_ic_active(CHG_IC_DEFAULT_MODE); 
 #endif /* CONFIG_STAR_BATTERY_CHARGER */
-//20100526, jh.ahn@lge.com, Turn on charger IC with Standard USB mode [END]
+//20100526, , Turn on charger IC with Standard USB mode [END]
 	
     /* Connect CP UART signals to AP */
     usif_switch_ctrl(s_hMuicHandle, USIF_AP);
@@ -760,12 +760,12 @@ void muic_CP_UART_set(Muic_Device *s_hMuicHandle){
     NvS32 ret;
 
     /* Turn on charger IC with FACTORY mode */
-//20100526, jh.ahn@lge.com, Turn on charger IC with FACTORY mode [START]
+//20100526, , Turn on charger IC with FACTORY mode [START]
 #if defined(CONFIG_STAR_BATTERY_CHARGER)
     lprintk(D_MUIC, "%s: CHG_IC_FACTORY_MODE(%d) \n", __func__, CHG_IC_FACTORY_MODE);	
     charging_ic_active(CHG_IC_FACTORY_MODE);
 #endif /* CONFIG_STAR_BATTERY_CHARGER */
-//20100526, jh.ahn@lge.com, Turn on charger IC with FACTORY mode [END]
+//20100526, , Turn on charger IC with FACTORY mode [END]
 
     /* Connect CP UART signals to DP3T */
     usif_switch_ctrl(s_hMuicHandle, USIF_DP3T);
@@ -789,12 +789,12 @@ void muic_CP_USB_set(Muic_Device *s_hMuicHandle){
     /* Turn on charger IC with TA mode */
     //	charging_ic_set_ta_mode();
     
-//20100526, jh.ahn@lge.com, Turn on charger IC with Standard USB mode [START]
+//20100526, , Turn on charger IC with Standard USB mode [START]
 #if defined(CONFIG_STAR_BATTERY_CHARGER)
     lprintk(D_MUIC, "%s: CHG_IC_DEFAULT_MODE(%d) \n", __func__, CHG_IC_DEFAULT_MODE);	
     charging_ic_active(CHG_IC_DEFAULT_MODE); 
 #endif /* CONFIG_STAR_BATTERY_CHARGER */
-//20100526, jh.ahn@lge.com, Turn on charger IC with Standard USB mode [END]
+//20100526, , Turn on charger IC with Standard USB mode [END]
 
     /* Connect CP UART signals to AP */
     usif_switch_ctrl(s_hMuicHandle, USIF_AP);
@@ -829,14 +829,14 @@ void muic_initialize(TYPE_RESET reset){
         ret = muic_i2c_write_byte(CONTROL_2, MUSB_DET_DIS);	// USB_DET_DIS is neg enabled
     }
 
-//20100526, jh.ahn@lge.com, Charging IC Reset [START]
+//20100526, , Charging IC Reset [START]
     #if defined(CONFIG_STAR_BATTERY_CHARGER)
     else {
     lprintk(D_MUIC, "%s: charging_ic_deactive call \n", __func__ );
     charging_ic_deactive();
     }
     #endif /* CONFIG_STAR_BATTERY_CHARGER */
-//20100526, jh.ahn@lge.com, Charging IC Reset [END]
+//20100526, , Charging IC Reset [END]
 
     /* Initialize MUIC - Default setting.
      *
@@ -908,12 +908,12 @@ NvBool muic_distinguish_charger(Muic_Device *s_hMuicHandle){
     NvBool ret = NV_TRUE;
 
     /* Enable charger IC in TA mode */
-//20100526, jh.ahn@lge.com, Enable charger IC in TA mode [START]
+//20100526, , Enable charger IC in TA mode [START]
     #if defined(CONFIG_STAR_BATTERY_CHARGER)
     lprintk(D_MUIC, "%s: CHG_IC_TA_MODE(%d) \n", __func__, CHG_IC_TA_MODE);	
     charging_ic_active(CHG_IC_TA_MODE);
     #endif /* CONFIG_STAR_BATTERY_CHARGER */
-//20100526, jh.ahn@lge.com, Enable charger IC in TA mode [END]
+//20100526, , Enable charger IC in TA mode [END]
 
     /* Connect CP UART signals to AP */
     usif_switch_ctrl(s_hMuicHandle, USIF_AP);
@@ -992,7 +992,7 @@ NvBool muic_distinguish_vbus_accessory(Muic_Device *s_hMuicHandle){
             break;
 
             /* AP_USB */
-        case 0x05:  //20100501 ks.kwon@lge.com Add 180K mode for VBUS Accessory
+        case 0x05:  //20100501  Add 180K mode for VBUS Accessory
         case 0x0b:
             muic_AP_USB_set(s_hMuicHandle);
             break;
@@ -1315,11 +1315,11 @@ NvBool TS5USBA33402_device_detection(Muic_Device *s_hMuicHandle, NvS32 upon_irq)
     }	
 
     // INT_EN, CP_AUD, CHG_TYP, USB_DET_DIS on.
-    ret = muic_i2c_write_byte(CONTROL_2, MINT_EN | MCP_AUD | MCHG_TYP); //interrupt enabled by ks.kwon@lge.com
+    ret = muic_i2c_write_byte(CONTROL_2, MINT_EN | MCP_AUD | MCHG_TYP); //interrupt enabled by 
 
     if(muic_mode == MUIC_UNKNOWN || muic_mode == MUIC_NONE){
         muic_initialize(DEFAULT);
-//        charging_ic_deactive();		//20100506 ks.kwon@lge.com for charging animation, by demand from taehwan.kim
+//        charging_ic_deactive();		//20100506  for charging animation, by demand from taehwan.kim
 //        printk(KERN_INFO "[MUIC]charging_ic_deactive()\n");
     }
     return ret;
@@ -1566,6 +1566,6 @@ static void __exit muic_exit(void)
 module_init(muic_init);
 module_exit(muic_exit);
 
-MODULE_AUTHOR("jm1.lee@lge.com");
+MODULE_AUTHOR("");
 MODULE_DESCRIPTION("star MUIC Driver");
 MODULE_LICENSE("GPL");

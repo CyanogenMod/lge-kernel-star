@@ -73,7 +73,7 @@ extern "C"
 #define AMI304_CTRL1_FS1_FORCE			0x02 //Force
 #define AMI304_CTRL1_ODR1			0x10 //20SPS(20HZ)
 #define AMI304_CTRL2_DREN			0x08
-#define AMI304_CTRL2_DREN_DISABLE	0x00 //diyu@lge.com
+#define AMI304_CTRL2_DREN_DISABLE	0x00 //
 #define AMI304_CTRL2_DRP			0x04
 #define AMI304_CTRL3_NOFORCE_BIT		0x00
 #define AMI304_CTRL3_FORCE_BIT			0x40
@@ -163,9 +163,9 @@ typedef enum
 } NvOdmCompassThresholdSource;
 
 // Timeout for I2C transaction.
-//jinsoo.oh@lge.com 0608 audio test
+// 0608 audio test
 //enum { I2C_COMPASS_TRANSACTION_TIMEOUT = 1000 };
-enum { I2C_COMPASS_TRANSACTION_TIMEOUT = 10 };	// 500 -> 10 (ms) // 2010.10.16 byoungwoo.yoon@lge.com
+enum { I2C_COMPASS_TRANSACTION_TIMEOUT = 10 };	// 500 -> 10 (ms) // 2010.10.16 
 // Maximum number of packetsize supported by the I2C controller.
 enum { I2C_COMPASS_PACKET_SIZE = 8};
 static NvU8 s_ReadBuffer[I2C_COMPASS_PACKET_SIZE];

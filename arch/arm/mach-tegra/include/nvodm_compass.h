@@ -33,7 +33,7 @@
 /**
  * @file
  * <b>NVIDIA Tegra ODM Kit:
- *         Compass Interface</b> //di.yu@lge.com
+ *         Compass Interface</b> //
  *
  * @b Description: Defines the ODM interface for compass devices.
  *

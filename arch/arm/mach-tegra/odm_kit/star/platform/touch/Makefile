@@ -8,9 +8,9 @@ ccflags-y += -DNV_DEBUG=0
 endif
 
 obj-y += nvodm_touch.o
-# 20100414 joseph.jung@lge.com for Star Touch Compile
+# 20100414  for Star Touch Compile
 obj-y += nvodm_touch_synaptics.o
 obj-y += nvodm_touch_cypress.o
-# 20100919 hyeongwon.oh@lge.com for Star OneTouch
+# 20100919  for Star OneTouch
 obj-y += nvodm_onetouch.o
 obj-y += nvodm_onetouch_synaptics.o

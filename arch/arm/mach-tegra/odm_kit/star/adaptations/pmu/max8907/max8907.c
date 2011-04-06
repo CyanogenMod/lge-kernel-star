@@ -28,7 +28,7 @@
 #include "max8907_interrupt.h"
 #include "max8907_batterycharger.h"
 #include "max8907_supply_info_table.h"
-//20100413, cs77.ha@lge.com, unused [START]
+//20100413, unused [START]
 #ifndef CONFIG_MACH_STAR
 #include "fan5355_buck_reg.h"
 #include "fan5355_buck_i2c.h"
@@ -38,18 +38,18 @@
 #include "mic2826_i2c.h"
 #include "ad5258_dpm.h"
 #endif
-//20100413, cs77.ha@lge.com, unused [END]
+//20100413, unused [END]
 
 #include "max8952_buck_reg.h"
 #include "max8952_buck_i2c.h"
 
-//20100528, jh.ahn@lge.com, Write the description here in detail [START]
+//20100528, , Write the description here in detail [START]
 #if defined (CONFIG_MACH_STAR)
 #include <linux/err.h>
 #endif // CONFIG_MACH_STAR
-//20100528, jh.ahn@lge.com, Write the description here in detail [END]
+//20100528, , Write the description here in detail [END]
 
-//20100428, jh.ahn@lge.com, This define for Debug Message function [START]
+//20100428, , This define for Debug Message function [START]
 #include <mach/lprintk.h>
 
 //#define LG_DEBUG_PMU
@@ -60,9 +60,9 @@
 #else
 #define LDP(fmt, arg...) do {} while (0)
 #endif // LG_DEBUG_BATT
-//20100428, jh.ahn@lge.com, This define for Debug Message function [END]
+//20100428, , This define for Debug Message function [END]
 
-//20100528, jh.ahn@lge.com, Write the description here in detail [START]
+//20100528, , Write the description here in detail [START]
 #if (defined(CONFIG_MACH_STAR) && defined(CONFIG_STAR_BATTERY_CHARGER))
 typedef enum {
   CHG_IC_DEFAULT_MODE=0,    		/* 0  */
@@ -77,7 +77,7 @@ typedef enum {
 extern max8922_status get_charging_ic_status(void);
 extern NvBool ARRAY_TP_BOOT(void);
 #endif // CONFIG_STAR_BATTERY_CHARGER
-//20100528, jh.ahn@lge.com, Write the description here in detail [END]
+//20100528, , Write the description here in detail [END]
 
 // Private PMU context info
 Max8907PrivData *hMax8907Pmu;
@@ -86,13 +86,13 @@ Max8907PrivData *hMax8907Pmu;
 
 #define MAX_CHARGER_LIMIT_MA    1000
 
-//20100528, jh.ahn@lge.com, This definition is for Whistler which has no Battery! [START]
+//20100528, , This definition is for Whistler which has no Battery! [START]
 #if defined (CONFIG_MACH_STAR)  && defined (CONFIG_STAR_BATTERY_CHARGER)
 #define ALWAYS_ONLINE (0)
 #else
 #define ALWAYS_ONLINE (1)
 #endif
-//20100528, jh.ahn@lge.com, This definition is for Whistler which has no Battery! [END]
+//20100528, , This definition is for Whistler which has no Battery! [END]
 
 /**
  * MAX8907 regulators can be enabled/disabled via s/w I2C commands only
@@ -198,11 +198,11 @@ static NvU32 Max8907PmuVoltageSet_SD_B_LDO_B(const NvU32 OutMilliVolts);
 static NvU32 Max8907PmuVoltageSet_LDO_A(const NvU32 OutMilliVolts);
 
 #define MAX8907_MAX_OUTPUT_VOLTAGE_INDEX   0x3F
-//20100413, cs77.ha@lge.com, unused [START]
+//20100413, unused [START]
 #ifndef CONFIG_MACH_STAR
 #define FAN5355_MAX_OUTPUT_VOLTAGE_INDEX    0x37
 #endif
-//20100413, cs77.ha@lge.com, unused [END]
+//20100413, unused [END]
 #define MAX8952_MAX_OUTPUT_VOLTAGE_INDEX	0x3F
 
 static NvU32 Max8907PmuVoltageGet_SD_A(const NvU32 OutVoltageIndex)
@@ -223,7 +223,7 @@ static NvU32 Max8907PmuVoltageGet_LDO_A(const NvU32 OutVoltageIndex)
     return VoltageTable_LDO_A[OutVoltageIndex];
 }
 
-//20100413, cs77.ha@lge.com, unused [START]
+//20100413, unused [START]
 #ifndef CONFIG_MACH_STAR
 // Secondary PMU MIC2826 API
 static NvBool MIC2826ReadVoltageReg(NvOdmPmuDeviceHandle hDevice,
@@ -323,7 +323,7 @@ const NvU8 MIC2826_LDO_Votage_Table[] =
 #define MIC2826_BUCK_Votage_Table_Size NV_ARRAY_SIZE(MIC2826_BUCK_Votage_Table)
 #define MIC2826_LDO_Votage_Table_Size  NV_ARRAY_SIZE(MIC2826_LDO_Votage_Table)
 #endif
-//20100413, cs77.ha@lge.com, unused [END]
+//20100413, unused [END]
 
 #ifndef MIN
 #define MIN(a, b)   (a) <= (b) ? (a) : (b)
@@ -332,17 +332,17 @@ const NvU8 MIC2826_LDO_Votage_Table[] =
 #define MAX8907_MIN_OUTPUT_VOLTAGE_SD_A_x10          6375  // 637.5 mV
 #define MAX8907_MIN_OUTPUT_VOLTAGE_SD_B_LDO_B        750   // 750 mV
 #define MAX8907_MIN_OUTPUT_VOLTAGE_LDO_A             650   // 650 mV
-//20100413, cs77.ha@lge.com, unused
+//20100413, unused
 #ifndef CONFIG_MACH_STAR
 #define FAN5355_MIN_OUTPUT_VOLTAGE_x10                7500  // 750.0 mV
 #endif
-//20100819, taewan.kim@lge.com, Voltage bug fix
+//20100819, , Voltage bug fix
 #define MAX8952_MIN_OUTPUT_VOLTAGE_x10				7700 // 770.0mV <-- 750.0mV
 
 #define MAX8907_OUTPUT_VOLTAGE_INCREMENT_SD_A_x10     125  // 12.5 mV
 #define MAX8907_OUTPUT_VOLTAGE_INCREMENT_SD_B_LDO_B   50   // 50 mV
 #define MAX8907_OUTPUT_VOLTAGE_INCREMENT_LDO_A        25   // 25 mV
-//20100413, cs77.ha@lge.com, unused
+//20100413, unused
 #ifndef CONFIG_MACH_STAR
 #define FAN5355_OUTPUT_VOLTAGE_INCREMENT_x10           125  // 12.5 mV
 #endif
@@ -351,7 +351,7 @@ const NvU8 MIC2826_LDO_Votage_Table[] =
 #define MAX8907_MAX_OUTPUT_VOLTAGE_SD_A_x10         14250  // 1,425.0 mV
 #define MAX8907_MAX_OUTPUT_VOLTAGE_SD_B_LDO_B       3900   // 3,900 mV
 #define MAX8907_MAX_OUTPUT_VOLTAGE_LDO_A            2225   // 2,225 mV
-//20100413, cs77.ha@lge.com, unused
+//20100413, unused
 #ifndef CONFIG_MACH_STAR
 #define FAN5355_MAX_OUTPUT_VOLTAGE_x10               14375  // 1,437.5 mV
 #endif
@@ -396,7 +396,7 @@ static NvU32 Max8907PmuVoltageSet_LDO_A(const NvU32 OutMilliVolts)
             MAX8907_MAX_OUTPUT_VOLTAGE_INDEX);
 }
 
-//20100413, cs77.ha@lge.com, unused [START]
+//20100413, unused [START]
 #ifndef CONFIG_MACH_STAR
 static NvU32 Fan5355PmuVoltageGet_VOUT_02(const NvU32 OutVoltageIndex)
 {
@@ -415,7 +415,7 @@ static NvU32 Fan5355PmuVoltageSet_VOUT_02(const NvU32 OutMilliVolts)
             FAN5355_MAX_OUTPUT_VOLTAGE_x10);
 }
 #endif
-//20100413, cs77.ha@lge.com, unused [END]
+//20100413, unused [END]
 
 static NvU32 Max8952PmuVoltageGet_VOUT(const NvU32 OutVoltageIndex)
 {
@@ -949,7 +949,7 @@ const Max8907PmuSupplyInfo Max8907SupplyInfoTable[] =
     },
     #endif
 
-    //20100413, cs77.ha@lge.com, unused [START]
+    //20100413, unused [START]
     #ifndef CONFIG_MACH_STAR
     // EXT_DC/DC1 (for HDMI, VGA, USB)
     // By default, this is hard-wired as "always on" (see schematics)
@@ -1176,7 +1176,7 @@ const Max8907PmuSupplyInfo Max8907SupplyInfoTable[] =
         },
     },
     #endif
-    //20100413, cs77.ha@lge.com, unused [END]
+    //20100413, unused [END]
 
     #if 0
     // FUSE Vcc is wired from VBAT.
@@ -1263,7 +1263,7 @@ Max8907ReadVoltageReg(
     return NV_TRUE;
 }
 
-//20100413, cs77.ha@lge.com, trace info [START]
+//20100413,  trace info [START]
 static NvU32 currentPowerState = 0;
 static void PMUStateDump(NvOdmPmuDeviceHandle hDevice)
 {
@@ -1303,7 +1303,9 @@ static void PMUStateDump(NvOdmPmuDeviceHandle hDevice)
                 MilliVolts[Max8907PmuSupply_LDO19],
                 MilliVolts[Max8907PmuSupply_LDO20]);
 }
-//20100413, cs77.ha@lge.com, trace info [END]
+//20100413,  trace info [END]
+
+extern NvU32 Accel_PRail; 
 
 static NvBool
 Max8907WriteVoltageReg(
@@ -1321,9 +1323,12 @@ Max8907WriteVoltageReg(
     if (MilliVolts == ODM_VOLTAGE_OFF)
     {
         // check if the supply can be turned off
-        if (((Max8907PrivData*)hDevice->pPrivate)->supplyRefCntTable[pSupplyInfo->supply] == 1)
+        //if (((Max8907PrivData*)hDevice->pPrivate)->supplyRefCntTable[pSupplyInfo->supply] == 1)
+        if (((((Max8907PrivData*)hDevice->pPrivate)->supplyRefCntTable[pSupplyInfo->supply] == 1))
+			|| (vddRail == Max8907PmuSupply_LDO8) || (vddRail == Max8907PmuSupply_LDO7) 
+			|| (Accel_PRail == vddRail))  
         {
-// 20101128 hyeongwon.oh@lge.com [SU660] SDIO power always on [START]
+// 20101128  [SU660] SDIO power always on [START]
 #if defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT)
 #if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F) 
             if ( vddRail ==  Max8907PmuSupply_LDO12)
@@ -1333,7 +1338,7 @@ Max8907WriteVoltageReg(
             }
 #endif
 #endif		
-// 20101128 hyeongwon.oh@lge.com [SU660] SDIO power always on [END]
+// 20101128  [SU660] SDIO power always on [END]
             // turn off the supply
             NvOdmServicesPmuSetSocRailPowerState(
                 ((Max8907PrivData*)hDevice->pPrivate)->hOdmPmuSevice, pSupplyInfo->supply, NV_FALSE);
@@ -1348,7 +1353,7 @@ Max8907WriteVoltageReg(
             ((Max8907PrivData*)hDevice->pPrivate)->pVoltages[vddRail] =
                 ODM_VOLTAGE_OFF;
             SettleUS = MAX8907_TURN_OFF_TIME_US;
-            //20100603, cs77.ha@lge.com, power log [START]
+            //20100603, power log [START]
             #if 0 //def CONFIG_LPRINTK
             currentPowerState &= ~(0x1 << vddRail);
             PMUStateDump(hDevice);
@@ -1360,7 +1365,7 @@ Max8907WriteVoltageReg(
                 lprintk(D_POWER, "OFF ===== SDV%d(%dmA)====\n",
                         (int)vddRail, (int)ODM_VOLTAGE_OFF);
             #endif
-            //20100603, cs77.ha@lge.com, power log [END]
+            //20100603, power log [END]
         }
 
         if (((Max8907PrivData*)hDevice->pPrivate)->supplyRefCntTable[pSupplyInfo->supply] != 0)
@@ -1374,10 +1379,10 @@ Max8907WriteVoltageReg(
         return NV_TRUE;
     }
 
-    //20100819 cs77.ha@lge.com  skip same voltage setting [START]
+    //20100819 skip same voltage setting [START]
     if (MilliVolts == ((Max8907PrivData*)hDevice->pPrivate)->pVoltages[vddRail])
         goto setDone;
-    //20100819 cs77.ha@lge.com  skip same voltage setting [END]
+    //20100819 skip same voltage setting [END]
 
     // Set voltage level
     data = pSupplyInfo->SetVoltage(MilliVolts);
@@ -1393,7 +1398,10 @@ Max8907WriteVoltageReg(
     ((Max8907PrivData*)hDevice->pPrivate)->pVoltages[vddRail] = MilliVolts;
 
     // turn on supply
-    if (((Max8907PrivData*)hDevice->pPrivate)->supplyRefCntTable[pSupplyInfo->supply] == 0)
+    //if (((Max8907PrivData*)hDevice->pPrivate)->supplyRefCntTable[pSupplyInfo->supply] == 0)
+    if (((((Max8907PrivData*)hDevice->pPrivate)->supplyRefCntTable[pSupplyInfo->supply] == 0)) 
+		|| (vddRail == Max8907PmuSupply_LDO8) || (vddRail == Max8907PmuSupply_LDO7) 
+		|| (Accel_PRail == vddRail))
     {
         // Enable the output (read-modify-write the control register)
         Max8907I2cRead8(hDevice, pSupplyInfo->ControlRegAddr, &data);
@@ -1411,7 +1419,7 @@ Max8907WriteVoltageReg(
 
             SettleUS = MAX8907_TURN_ON_TIME_US;
         }
-        //20100603, cs77.ha@lge.com, power log [START]
+        //20100603,  power log [START]
         #if 0 //def CONFIG_LPRINTK 
         currentPowerState |= (0x1 << vddRail);
         PMUStateDump(hDevice);
@@ -1423,12 +1431,12 @@ Max8907WriteVoltageReg(
             lprintk(D_POWER, "ON ===== SDV%d(%dmA)====\n",
                     vddRail, (int)data);
         #endif
-        //20100603, cs77.ha@lge.com, power log [END]
+        //20100603,  power log [END]
     }
 
-//20100819 cs77.ha@lge.com  skip same voltage setting [START]
+//20100819 skip same voltage setting [START]
 setDone:
-//20100819 cs77.ha@lge.com  skip same voltage setting [END]
+//20100819 skip same voltage setting [END]
 
     ((Max8907PrivData*)hDevice->pPrivate)->supplyRefCntTable[pSupplyInfo->supply] ++;
 
@@ -1462,10 +1470,10 @@ Max8907OnOffConfigure(NvOdmPmuDeviceHandle hDevice)
 
     return Max8907I2cWrite8(hDevice, MAX8907_SYSENSEL, data);
 }
-//20100413, cs77.ha@lge.com, configuration for I2C mode of LDOs [START]
+//20100413, configuration for I2C mode of LDOs [START]
 #if defined(CONFIG_MACH_STAR)
 
-//20100427, cs77.ha@lge.com, SMPL [START]
+//20100427,  SMPL [START]
 #define SMPL_TIME           MAX8907_MPL_TIME_0_5_SEC
 
 static NvBool
@@ -1509,9 +1517,9 @@ Max8907SetSMPL(
         
     return NV_TRUE;
 }
-//20100427, cs77.ha@lge.com, SMPL [END]
+//20100427, SMPL [END]
 
-//20100518, cs77.ha@lge.com, OUT5V VBUS enable / OUT3.3V disable [START]
+//20100518, OUT5V VBUS enable / OUT3.3V disable [START]
 static NvBool
 Max8907SetVchgLDO(
     NvOdmPmuDeviceHandle hDevice)
@@ -1525,7 +1533,7 @@ Max8907SetVchgLDO(
     
     return NV_TRUE;
 }
-//20100518, cs77.ha@lge.com, ... [END]
+//20100518,  ... [END]
 
 
 static NvBool
@@ -1593,7 +1601,7 @@ Max8907WhiteLEDSwitch(
 }
 
 #endif
-//20100413, cs77.ha@lge.com, configuration for I2C mode of LDOs [END]
+//20100413, configuration for I2C mode of LDOs [END]
 
 static NvBool
 Max8907PwrEnConfigure(NvOdmPmuDeviceHandle hDevice, NvBool Enable)
@@ -1727,7 +1735,7 @@ Max8907PwrEnAttach(
     return NV_TRUE;
 }
 
-//20100413, cs77.ha@lge.com, unused [START]
+//20100413, unused [START]
 #ifndef CONFIG_MACH_STAR
 static NvBool
 Tca6416ConfigPort(
@@ -1932,13 +1940,13 @@ Max8952WriteVoltageReg(
         NvOdmServicesPmuSetSocRailPowerState(
                 ((Max8907PrivData*)(hDevice->pPrivate))->hOdmPmuSevice, pSupplyInfo->supply, NV_TRUE);
 
-        //20100819 cs77.ha@lge.com  skip same voltage setting [START]
+        //20100819 skip same voltage setting [START]
         if (MilliVolts == LastMV)
             goto setDone;
-        //20100819 cs77.ha@lge.com  skip same voltage setting [END]
+        //20100819 skip same voltage setting [END]
 
         // Set voltage level
-        //20100819, taewan.kim@lge.com, Voltage bug fix [START]
+        //20100819, , Voltage bug fix [START]
 #if defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT)
 #if defined(CONFIG_MACH_STAR_SKT_REV_A) || defined(CONFIG_MACH_STAR_SKT_REV_B)
         data = pSupplyInfo->SetVoltage(MilliVolts) | MAX8952_FPWM_EN0;
@@ -1952,18 +1960,18 @@ Max8952WriteVoltageReg(
         data = pSupplyInfo->SetVoltage(MilliVolts);
 #endif
 #endif
-        //20100819, taewan.kim@lge.com, Voltage bug fix [END]
+        //20100819, , Voltage bug fix [END]
         if (!Max8952I2cWrite8(hDevice, pSupplyInfo->OutputVoltageRegAddr, data))
             return NV_FALSE;
 
-        //20100811 cs77.ha@lge.com CPU power patch [START]
+        //20100811 CPU power patch [START]
         if (MilliVolts > LastMV)
         {
             SettleUS = 1 + (MilliVolts - LastMV) * 1000 / MAX8952_SCALE_UP_UV_PER_US;
         }
 		
         ((Max8907PrivData*)hDevice->pPrivate)->pVoltages[vddRail] = MilliVolts;
-        //20100811 cs77.ha@lge.com CPU power patch [END]
+        //20100811 CPU power patch [END]
 		
         #ifdef FEATURE_MAX8907C_MAX8952_COMBINATION
         // MAX8952 is directly connected to BUCK1
@@ -1974,16 +1982,16 @@ Max8952WriteVoltageReg(
         #endif
     }
 
-//20100819 cs77.ha@lge.com  skip same voltage setting [START]
+//20100819 skip same voltage setting [START]
 setDone:
-//20100819 cs77.ha@lge.com  skip same voltage setting [END]
+//20100819 skip same voltage setting [END]
 
-    //20100811 cs77.ha@lge.com CPU power patch [START]
+    //20100811 CPU power patch [START]
     if (pSettleMicroSeconds)
         *pSettleMicroSeconds = SettleUS;
     else
         NvOdmOsWaitUS(SettleUS);
-    //20100811 cs77.ha@lge.com CPU power patch [END]
+    //20100811 CPU power patch [END]
 	
     return NV_TRUE;
 }
@@ -2072,7 +2080,7 @@ Max8907LxV1Ad5258WriteVoltageReg(
     return NV_TRUE;
 }
 #endif
-//20100413, cs77.ha@lge.com, unused [END]
+//20100413, unused [END]
 
 NvBool
 Max8907Setup(NvOdmPmuDeviceHandle hDevice)
@@ -2164,15 +2172,15 @@ Max8907Setup(NvOdmPmuDeviceHandle hDevice)
         return NV_FALSE;
     }
 
-    //20100413, cs77.ha@lge.com, configuration [START]
+    //20100413, configuration [START]
     #if defined(CONFIG_MACH_STAR)    
-    //20100427, cs77.ha@lge.com, SMPL
+    //20100427,  SMPL
     Max8907SetSMPL(hDevice);
 
-    //20100518, cs77.ha@lge.com, OUT5V VCHG detect / OUT3.3V diable
+    //20100518, OUT5V VCHG detect / OUT3.3V diable
     Max8907SetVchgLDO(hDevice);    
     #endif
-    //20100413, cs77.ha@lge.com, configuration [END]
+    //20100413, configuration [END]
 
     // Configure PWREN, and attach CPU V1 rail to it.
     // TODO: h/w events (power cycle, reset, battery low) auto-disables PWREN.
@@ -2192,7 +2200,7 @@ Max8907Setup(NvOdmPmuDeviceHandle hDevice)
     }
     #endif
 
-    //20100622, jh.ahn@lge.com, ADC Setting for BAT voltage, temperature read [START]
+    //20100622, , ADC Setting for BAT voltage, temperature read [START]
     #if defined(CONFIG_MACH_STAR)
     if (!Max8907AdcSetup(hDevice))
     {
@@ -2201,7 +2209,7 @@ Max8907Setup(NvOdmPmuDeviceHandle hDevice)
     }
     LDP("[eidola] ADC Setup Done!");
     #endif
-    //20100622, jh.ahn@lge.com, ADC Setting for BAT voltage, temperature read [END]
+    //20100622, , ADC Setting for BAT voltage, temperature read [END]
 
     //Check battery presence
     if (!Max8907BatteryChargerMainBatt(hDevice,&((Max8907PrivData*)hDevice->pPrivate)->battPresence))
@@ -2220,16 +2228,16 @@ Max8907Setup(NvOdmPmuDeviceHandle hDevice)
     {
         NVODMPMU_PRINTF(("[NVODM PMU]Max8907Setup: set voltage error\n"));
     }
-    //20100624, cs77.ha@lge.com, revB [START]
+    //20100624, revB [START]
     #if defined(CONFIG_MACH_STAR_REV_B)
     if (!Max8907I2cWrite8(hDevice, 0x9C, 0x1C))
         return NV_FALSE;
     #endif 
-    //20100624, cs77.ha@lge.com, revB [END]
+    //20100624, revB [END]
 
-    //20100928, byoungwoo.yoon@lge.com, enable PMU interrupt for RTC wakeup [START]
+    //20100928, , enable PMU interrupt for RTC wakeup [START]
     Max8907SetupInterrupt(hDevice);
-    //20100928, byoungwoo.yoon@lge.com, enable PMU interrupt for RTC wakeup [END]
+    //20100928, , enable PMU interrupt for RTC wakeup [END]
     
     // Power up Whistler thermal monitor (it is reported "not connected"
     // if board info ROMs cannot be read when the thermal rail is enabled).
@@ -2326,7 +2334,7 @@ Max8907GetVoltage(
         // Fixed voltage
         *pMilliVolts = MAX8907_MAX_OUTPUT_VOLTAGE_RTC;
     }
-    //20100413, cs77.ha@lge.com, unused [START]
+    //20100413, unused [START]
     #ifndef CONFIG_MACH_STAR
     else if (vddRail == Max8907PmuSupply_EXT_DCDC_1)
     {
@@ -2364,7 +2372,7 @@ Max8907GetVoltage(
 		*pMilliVolts = 0;
     }
     #endif
-    //20100413, cs77.ha@lge.com, unused [END]
+    //20100413, unused [END]
     else
     {
         if (!Max8907ReadVoltageReg(hDevice, vddRail, pMilliVolts))
@@ -2375,7 +2383,7 @@ Max8907GetVoltage(
     return NV_TRUE;
 }
 
-//20100413, cs77.ha@lge.com, unused [START]
+//20100413, unused [START]
 #ifndef CONFIG_MACH_STAR
 static  NvBool
 Tca6416UsbVbusControl(
@@ -2443,9 +2451,9 @@ Tca6416FuseControl(
     return NV_TRUE;
 }
 #endif
-//20100413, cs77.ha@lge.com, unused [END]
+//20100413, unused [END]
 
-//20100727, byoungwoo.yoon@lge.com, change SEQ of LDO5 before power-off [LGE_START]
+//20100727, , change SEQ of LDO5 before power-off [LGE_START]
 void
 Max8907ChangeSEQ( NvOdmPmuDeviceHandle hDevice, NvU32 reg )
 {
@@ -2468,7 +2476,7 @@ Max8907ChangeSEQ( NvOdmPmuDeviceHandle hDevice, NvU32 reg )
 	}
 	printk("[PowerOff] LDOCTL%d=0x%x (after) \n", reg/4-4, data);
 }
-//20100727, byoungwoo.yoon@lge.com, change SEQ of LDO5 before power-off [LGE_END]
+//20100727, , change SEQ of LDO5 before power-off [LGE_END]
 
 NvBool
 Max8907SetVoltage(
@@ -2488,12 +2496,12 @@ Max8907SetVoltage(
     }
 
     #if defined(CONFIG_MACH_STAR)
-    //20100413, cs77.ha@lge.com, power off [START]
+    //20100413, power off [START]
     if ( vddRail == Max8907PmuSupply_SOC && MilliVolts == ODM_VOLTAGE_OFF)
     {
         NvU8 data;
 
-        //20100626, cs77.ha@lge.com, Touch LED off
+        //20100626, Touch LED off
         Max8907WhiteLEDSwitch(hDevice, 0);
 
         Max8907I2cWrite8(hDevice, MAX8907_LDOCTL20, 0x1C);
@@ -2512,13 +2520,13 @@ Max8907SetVoltage(
         Max8907I2cWrite8(hDevice, MAX8907_LDOCTL7, 0x1C);
         Max8907I2cWrite8(hDevice, MAX8907_LDOCTL6, 0x1C);
 
-        //20100727, byoungwoo.yoon@lge.com, change SEQ of LDO5 before power-off
+        //20100727, , change SEQ of LDO5 before power-off
         Max8907ChangeSEQ( hDevice, MAX8907_LDOCTL5);
         Max8907ChangeSEQ( hDevice, MAX8907_LDOCTL4);
         Max8907ChangeSEQ( hDevice, MAX8907_LDOCTL3);
         Max8907ChangeSEQ( hDevice, MAX8907_LDOCTL2);
         Max8907ChangeSEQ( hDevice, MAX8907_LDOCTL1);
-        //20100426, cs77.ha@lge.com, PMIC off
+        //20100426, PMIC off
         if (!Max8907I2cRead8(hDevice, MAX8907_RESET_CNFG, &data))
             return NV_FALSE;
 
@@ -2528,28 +2536,28 @@ Max8907SetVoltage(
 
         return Max8907I2cWrite8(hDevice, MAX8907_RESET_CNFG, data);
     }
-    //20100413, cs77.ha@lge.com, power off [END]
+    //20100413, power off [END]
 
-    //20100611, cs77.ha@lge.com, Touch LED [START]
+    //20100611, Touch LED [START]
     if ( vddRail == Max8907PmuSupply_WHITE_LED )
     {
         NvU8 data = (NvU8)MilliVolts;
         
         return Max8907WhiteLEDSwitch(hDevice, data);
     }
-    //20100611, cs77.ha@lge.com, Touch LED [END]    
+    //20100611, Touch LED [END]    
 
-    //20100703, cs77.ha@lge.com, PMIC reset [START]
+    //20100703, PMIC reset [START]
     if ( vddRail == Max8907PmuSupply_reset && MilliVolts == ODM_VOLTAGE_OFF)
     {
         NvU8 data;
 
         printk("PMIC reset\n");
 
-        //20100626, cs77.ha@lge.com, Touch LED off
+        //20100626, Touch LED off
         Max8907WhiteLEDSwitch(hDevice, 0);
         
-        //20100426, cs77.ha@lge.com, PMIC reset
+        //20100426, PMIC reset
         if (!Max8907I2cRead8(hDevice, MAX8907_RESET_CNFG, &data))
             return NV_FALSE;
 
@@ -2559,7 +2567,7 @@ Max8907SetVoltage(
 
         return Max8907I2cWrite8(hDevice, MAX8907_RESET_CNFG, data);
     }
-    //20100703, cs77.ha@lge.com, PMIC reset [END]
+    //20100703, PMIC reset [END]
     #endif
 
 #if 0
@@ -2587,14 +2595,14 @@ Max8907SetVoltage(
         #ifdef FEATURE_MAX8907C_MAX8952_COMBINATION
 		if( vddRail == Max8907PmuSupply_EXT_DCDC_8_CPU )
 		{
-//20100811 cs77.ha@lge.com CPU power patch [START]
+//20100811 CPU power patch [START]
             //if (!Max8952WriteVoltageReg(hDevice, vddRail, MilliVolts))
             if (!Max8952WriteVoltageReg(hDevice, vddRail, MilliVolts, pSettleMicroSeconds))
-//20100811 cs77.ha@lge.com CPU power patch [END]
+//20100811 CPU power patch [END]
                 return NV_FALSE;
 		}
         #endif
-        //20100413, cs77.ha@lge.com, unused [START]
+        //20100413, unused [START]
         #ifndef CONFIG_MACH_STAR
 		else if ((vddRail == Max8907PmuSupply_EXT_DCDC_1) ||
             (vddRail == Max8907PmuSupply_EXT_DCDC_3) ||
@@ -2627,7 +2635,7 @@ Max8907SetVoltage(
 #endif
         }
         #endif
-        //20100413, cs77.ha@lge.com, unused [END]
+        //20100413, unused [END]
         #ifdef FEATURE_MAX8907C_MAX8952_COMBINATION
         else
         #endif
@@ -2643,7 +2651,7 @@ Max8907SetVoltage(
         return NV_FALSE;
     }
 
-    //20100413, cs77.ha@lge.com, unused [START]
+    //20100413, unused [START]
     #ifndef CONFIG_MACH_STAR   
     // Check whether need to enable VBUS for any of the USB Instance
     if ((vddRail == Max8907PmuSupply_EXT_DCDC_3_USB1) ||
@@ -2654,12 +2662,12 @@ Max8907SetVoltage(
             return NV_FALSE;
     }
     #endif  
-    //20100413, cs77.ha@lge.com, unused [END]
+    //20100413, unused [END]
     return NV_TRUE;
 }
 
 #if defined(CONFIG_MACH_STAR) 
-//20100704 bergkamp.cho@lge.com jongik's headset porting [LGE]
+//20100704  headset porting [LGE]
 NvU32
 Max8907GetHookAdc(
     NvOdmPmuDeviceHandle hDevice)
@@ -2669,7 +2677,7 @@ Max8907GetHookAdc(
     return value;
 }
 
-//20101121 cs77.ha@lge.com, HW power off in thermal limit [START]
+//20101121 HW power off in thermal limit [START]
 NvU32
 Max8907SetHwPowerOffConfig(
     NvOdmPmuDeviceHandle hDevice,
@@ -2694,7 +2702,7 @@ Max8907SetHwPowerOffConfig(
         return Max8907I2cWrite8(hDevice, MAX8907_SYSENSEL, data);
     }
 }
-//20101121 cs77.ha@lge.com, HW power off in thermal limit [END]
+//20101121 HW power off in thermal limit [END]
 
 #endif
 void
@@ -2721,7 +2729,7 @@ Max8907GetAcLineStatus(
 	NV_ASSERT(pStatus);
 
 #if (defined(CONFIG_MACH_STAR) && defined(CONFIG_STAR_BATTERY_CHARGER))
-//20100907, jh.ahn@lge.com, AcLine status function for bootloader Battery checker [START]
+//20100907, , AcLine status function for bootloader Battery checker [START]
 	if (!Max8907BatteryChargerOK(hDevice, &acLineStatus))
 	{
 		NVODMPMU_PRINTF(("[NVODM PMU] Max8907GetAcLineStatus: Error in checking main charger presence.\n"));
@@ -2733,7 +2741,7 @@ Max8907GetAcLineStatus(
 	else
 		*pStatus = NvOdmPmuAcLine_Offline;
 	return NV_TRUE;
-//20100907, jh.ahn@lge.com, AcLine status function for bootloader Battery checker [END]
+//20100907, , AcLine status function for bootloader Battery checker [END]
 #else // Original Code
     // check if battery is present
     if (((Max8907PrivData*)hDevice->pPrivate)->battPresence == NV_FALSE)
@@ -2786,16 +2794,16 @@ Max8907GetBatteryStatus(
     NvOdmPmuBatteryInstance batteryInst,
     NvU8 *pStatus)
 {
-	//20100529, jh.ahn@lge.com, Code Change for STAR [START]
+	//20100529, , Code Change for STAR [START]
 	NvOdmPmuAcLineStatus stat = NvOdmPmuAcLine_Offline;
 	//NvBool batFull = NV_FALSE;
-	//20100529, jh.ahn@lge.com, Code Change for STAR [END]
+	//20100529, , Code Change for STAR [END]
 
 	NV_ASSERT(hDevice);
 	NV_ASSERT(pStatus);
 	NV_ASSERT(batteryInst <= NvOdmPmuBatteryInst_Num);
 
-//20100529, jh.ahn@lge.com, Code Change for STAR [START]
+//20100529, , Code Change for STAR [START]
 	//Check battery presence
 	if (!Max8907BatteryChargerMainBatt(hDevice,&((Max8907PrivData*)hDevice->pPrivate)->battPresence))
 	{
@@ -2847,7 +2855,7 @@ Max8907GetBatteryStatus(
 				}
 #endif // CONFIG_STAR_BATTERY_CHARGER
 			}
-//20100529, jh.ahn@lge.com, Battery presence && AC offline [START]
+//20100529, , Battery presence && AC offline [START]
 			else  // Battery presence && AC offline
 			{
 				// Not implemented yet by Nvidia
@@ -2859,7 +2867,7 @@ Max8907GetBatteryStatus(
 				//LDP("[jh.ahn] VMBATT  = %d", VBatSense);
 				*pStatus = NVODM_BATTERY_STATUS_DISCHARGING;
 			}
-//20100529, jh.ahn@lge.com, Battery presence && AC offline [END]
+//20100529, , Battery presence && AC offline [END]
 		}
 		else // Battery is not present
 		{
@@ -2871,7 +2879,7 @@ Max8907GetBatteryStatus(
 	{
 		*pStatus = NVODM_BATTERY_STATUS_UNKNOWN;
 	}
-//20100529, jh.ahn@lge.com, Code Change for STAR [END]
+//20100529, , Code Change for STAR [END]
     return NV_TRUE;
 }
 
@@ -2900,7 +2908,7 @@ Max8907GetBatteryData(
 	NV_ASSERT(pData);
 	NV_ASSERT(batteryInst <= NvOdmPmuBatteryInst_Num);
 
-//20100529, jh.ahn@lge.com, Write the description here in detail [START]
+//20100529, , Write the description here in detail [START]
 #if defined (CONFIG_MACH_STAR)
 	batteryData.batteryCurrent = 10;
 	batteryData.batteryMahConsumed = 500;
@@ -2964,13 +2972,13 @@ Max8907GetBatteryData(
 		*pData = batteryData;
 	}
 #endif // CONFIG_MACH_STAR
-//20100529, jh.ahn@lge.com, Write the description here in detail [END]
+//20100529, , Write the description here in detail [END]
 /*	else
 	{
 		*pData = batteryData;
 	}
 */
-//20100529, jh.ahn@lge.com, For Factory Power Test [START]
+//20100529, , For Factory Power Test [START]
 // No_battery & AC online state.... also need battery temperature for Battery detect
 	//if ( 1 == ARRAY_TP_BOOT() ) // For Factory Power Test
 	//{
@@ -2997,12 +3005,12 @@ Max8907GetBatteryData(
 
 		*pData = batteryData;
 	//}
-//20100915, jh.ahn@lge.com, For Factory Power Test [END]
+//20100915, , For Factory Power Test [END]
 */
     return NV_TRUE;
 }
 
-//20100924, jh.ahn@lge.com, For updating battery information totally [START]
+//20100924, , For updating battery information totally [START]
 #if defined(CONFIG_MACH_STAR)
 NvBool
 Max8907UpdateBatteryInfo(
@@ -3106,7 +3114,7 @@ Max8907UpdateBatteryInfo(
 	return NV_TRUE;
 }
 #endif // CONFIG_MACH_STAR
-//20100924, jh.ahn@lge.com, For updating battery information totally  [END]
+//20100924, , For updating battery information totally  [END]
 
 void
 Max8907GetBatteryFullLifeTime(
@@ -3139,7 +3147,7 @@ Max8907SetChargingCurrent(
 #endif // CONFIG_MACH_STAR
     NV_ASSERT(hDevice);
 
-    //20100518, cs77.ha@lge.com, remove PMIC battery routine [START]
+    //20100518, remove PMIC battery routine [START]
     #if defined(CONFIG_MACH_STAR)
     return NV_TRUE;
     #else    
@@ -3217,7 +3225,7 @@ Max8907SetChargingCurrent(
 
     return NV_TRUE;
     #endif
-    //20100518, cs77.ha@lge.com, remove PMIC battery routine [END]
+    //20100518, remove PMIC battery routine [END]
 }
 
 void Max8907InterruptHandler( NvOdmPmuDeviceHandle  hDevice)
@@ -3225,16 +3233,16 @@ void Max8907InterruptHandler( NvOdmPmuDeviceHandle  hDevice)
     // If the interrupt handle is called, the interrupt is supported.
     ((Max8907PrivData*)hDevice->pPrivate)->pmuInterruptSupported = NV_TRUE;
 
-//20100413, cs77.ha@lge.com, change [START]
+//20100413, change [START]
 #if defined(CONFIG_MACH_STAR)
     Max8907InterruptHandler_int(hDevice);
 #else
     Max8907InterruptHandler_int(hDevice, &((Max8907PrivData*)hDevice->pPrivate)->pmuStatus);
 #endif
-//20100413, cs77.ha@lge.com, change [END]
+//20100413, change [END]
 }
 
-//20100413, cs77.ha@lge.com, unused [START]
+//20100413, unused [START]
 #ifndef CONFIG_MACH_STAR
 /****************   Secondary PMU MIC2826 Programming  */
 static NvBool
@@ -3402,5 +3410,5 @@ MIC2826WriteVoltageReg(
     return NV_TRUE;
 }
 #endif  
-//20100413, cs77.ha@lge.com, unused [END]
+//20100413, unused [END]
 

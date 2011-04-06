@@ -31,7 +31,7 @@
 
 /* Constants */
 #define	MODULE_NAME                         	"tspdrv"
-//20101218 km.lee@lge.com vib disable on reboot
+//20101218  vib disable on reboot
 #define BRR_NAME								"tspdrv_cntl"
 #define	TSPDRV						"/dev/"MODULE_NAME
 #define 	TSPDRV_MAGIC_NUMBER			0x494D4D52

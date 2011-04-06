@@ -34,11 +34,11 @@
 
 #define WLAN_GUID            NV_ODM_GUID('s','d','i','o','w','l','a','n')
 
-/* 20101005 taewan.kim@lge.com for debugging of resetting when getting a dump [START] */
+/* 20101005  for debugging of resetting when getting a dump [START] */
 static int nBlink32KClockOnWlan = 0;
 static int nBlink32KClockOnBt = 0;
 NvOdmServicesPwmHandle hBcmPwm;
-/* 20101005 taewan.kim@lge.com for debugging of resetting when getting a dump [END] */
+/* 20101005  for debugging of resetting when getting a dump [END] */
 
 typedef enum
 {
@@ -76,7 +76,7 @@ static NvBool SdioOdmWlanSetPowerOn(NvOdmSdioHandle hOdmSdio, NvBool IsEnable)
     NvU32 RequestedPeriod, ReturnedPeriod;
     RequestedPeriod = 0;
 
-    /* 20101005 taewan.kim@lge.com for debugging of resetting when getting a dump [START] */
+    /* 20101005  for debugging of resetting when getting a dump [START] */
     if (IsEnable) 
     {
         if (nBlink32KClockOnWlan == 0 && nBlink32KClockOnBt == 0)
@@ -108,11 +108,11 @@ static NvBool SdioOdmWlanSetPowerOn(NvOdmSdioHandle hOdmSdio, NvBool IsEnable)
         nBlink32KClockOnWlan = 0;
 
      }
-     /* 20101005 taewan.kim@lge.com for debugging of resetting when getting a dump [END] */
+     /* 20101005  for debugging of resetting when getting a dump [END] */
      return NV_TRUE;
 }
 
-// 20100717 mingi.sung@lge.com WLAN power control code for nVidia [START]
+// 20100717  WLAN power control code for nVidia [START]
 #include <linux/module.h>
 NvOdmSdio *g_pDeviceWlan = NULL;
 NvBool NvOdmWlanEnable( NvBool IsEnable )
@@ -137,9 +137,9 @@ NvBool NvOdmWlanEnable( NvBool IsEnable )
 	return NV_TRUE;
 }
 EXPORT_SYMBOL(NvOdmWlanEnable);
-// 20100717 mingi.sung@lge.com WLAN power control code for nVidia [END]
+// 20100717  WLAN power control code for nVidia [END]
 
-/* 20101005 taewan.kim@lge.com for debugging of resetting when getting a dump [START] */
+/* 20101005  for debugging of resetting when getting a dump [START] */
 NvBool NvOdmBtEnable(NvBool IsEnable)
 {
     NvU32 RequestedPeriod, ReturnedPeriod;
@@ -175,7 +175,7 @@ NvBool NvOdmBtEnable(NvBool IsEnable)
     return NV_TRUE;
 }
 EXPORT_SYMBOL(NvOdmBtEnable);
-/* 20101005 taewan.kim@lge.com for debugging of resetting when getting a dump [END] */
+/* 20101005  for debugging of resetting when getting a dump [END] */
 
 NvOdmSdioHandle NvOdmSdioOpen(NvU32 Instance)
 {
@@ -259,9 +259,9 @@ NvOdmSdioHandle NvOdmSdioOpen(NvU32 Instance)
         }
 
         pDevice->hPwm = hPwmTemp;
-/* 20100818 jaewoo56.lee@lge.com for debugging of resetting when getting a dump [START] */
+/* 20100818 for debugging of resetting when getting a dump [START] */
         hBcmPwm = hPwmTemp;
-/* 20100818 jaewoo56.lee@lge.com for debugging of resetting when getting a dump [END] */
+/* 20100818 for debugging of resetting when getting a dump [END] */
     
         // Search for the Vdd rail and set the proper volage to the rail.
         if (pConnectivity->AddressList[1].Interface == NvOdmIoModule_Gpio)
@@ -290,7 +290,7 @@ NvOdmSdioHandle NvOdmSdioOpen(NvU32 Instance)
 
         pDevice->hGpio = hGpioTemp;
 
-// 20100717 mingi.sung@lge.com WLAN power control code for nVidia [START]
+// 20100717  WLAN power control code for nVidia [START]
 
 		g_pDeviceWlan = pDevice;
 
@@ -308,7 +308,7 @@ NvOdmSdioHandle NvOdmSdioOpen(NvU32 Instance)
             return (pDevice);
         }
 */
-// 20100717 mingi.sung@lge.com WLAN power control code for nVidia [END]
+// 20100717  WLAN power control code for nVidia [END]
 
     }
     pDevice->PoweredOn = NV_TRUE;
@@ -335,9 +335,9 @@ void NvOdmSdioClose(NvOdmSdioHandle hOdmSdio)
         NvOdmOsDebugPrintf("ODM SDIO : close pwm handle\n");
         NvOdmPwmClose(hOdmSdio->hPwm);
 
-// 20100717 mingi.sung@lge.com WLAN power control code for nVidia [START]
+// 20100717  WLAN power control code for nVidia [START]
 		g_pDeviceWlan = NULL;
-// 20100717 mingi.sung@lge.com WLAN power control code for nVidia [END]
+// 20100717  WLAN power control code for nVidia [END]
     }
     NvOdmSetPowerOnSdio(hOdmSdio, NV_FALSE);
     if (hOdmSdio->hPmu != NULL)
@@ -411,9 +411,9 @@ NvBool NvOdmSdioSuspend(NvOdmSdioHandle hOdmSdio)
     if (pConnectivity->Guid == WLAN_GUID)
     {
         // Turn off power
-// 20100827 mingi.sung@lge.com [WLAN] To prevent turning on/off WLAN when SDIO host controller suspends/resumes [START]
+// 20100827  [WLAN] To prevent turning on/off WLAN when SDIO host controller suspends/resumes [START]
         //Status = SdioOdmWlanSetPowerOn(hOdmSdio, NV_FALSE);
-// 20100827 mingi.sung@lge.com [WLAN] To prevent turning on/off WLAN when SDIO host controller suspends/resumes [END]
+// 20100827  [WLAN] To prevent turning on/off WLAN when SDIO host controller suspends/resumes [END]
 
     }
     hOdmSdio->PoweredOn = NV_FALSE;
@@ -438,9 +438,9 @@ NvBool NvOdmSdioResume(NvOdmSdioHandle hOdmSdio)
     if (pConnectivity->Guid == WLAN_GUID)
     {
         // Turn on power
-// 20100827 mingi.sung@lge.com [WLAN] To prevent turning on/off WLAN when SDIO host controller suspends/resumes [START]
+// 20100827  [WLAN] To prevent turning on/off WLAN when SDIO host controller suspends/resumes [START]
         //Status = SdioOdmWlanSetPowerOn(hOdmSdio, NV_TRUE);
-// 20100827 mingi.sung@lge.com [WLAN] To prevent turning on/off WLAN when SDIO host controller suspends/resumes [END]
+// 20100827  [WLAN] To prevent turning on/off WLAN when SDIO host controller suspends/resumes [END]
     }
     NV_DRIVER_TRACE(("Resume SDIO%d", hOdmSdio->Instance));
     hOdmSdio->PoweredOn = NV_TRUE;

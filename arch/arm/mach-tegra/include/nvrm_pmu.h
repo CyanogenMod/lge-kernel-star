@@ -137,15 +137,15 @@ typedef struct NvRmPmuVddRailCapabilitiesRec
     NvU32 * pSettleMicroSeconds );
 
 #if defined(CONFIG_MACH_STAR) 
-//20100704 bergkamp.cho@lge.com jongik's headset porting [LGE]
+//20100704  headset porting [LGE]
 NvU32 NvRmPmuGetHookAdc(
     NvRmDeviceHandle hDevice);
 
-//20101121 cs77.ha@lge.com, HW power off in thermal limit [START]
+//20101121 HW power off in thermal limit [START]
 NvU32 NvRmPmuSetHwPowerOffConfig(
     NvRmDeviceHandle hDevice,
     NvBool Enable);
-//20101121 cs77.ha@lge.com, HW power off in thermal limit [END]
+//20101121 HW power off in thermal limit [END]
 #endif
 
 /**
@@ -210,11 +210,11 @@ typedef enum
 #define NVODM_BATTERY_STATUS_LOW                0x02
 #define NVODM_BATTERY_STATUS_CRITICAL           0x04
 #define NVODM_BATTERY_STATUS_CHARGING           0x08
-//20100608, jh.ahn@lge.com, Write the description here in detail [START]
+//20100608, , Write the description here in detail [START]
 #define NVODM_BATTERY_STATUS_DISCHARGING        0x10
 #define NVODM_BATTERY_STATUS_IDLE               0x20
 #define NVODM_BATTERY_STATUS_VERY_CRITICAL      0x40
-//20100608, jh.ahn@lge.com, Write the description here in detail [END]
+//20100608, , Write the description here in detail [END]
 #define NVODM_BATTERY_STATUS_NO_BATTERY         0x80
 #define NVODM_BATTERY_STATUS_UNKNOWN            0xFF
 
@@ -361,7 +361,7 @@ typedef enum
     NvRmPmuBatteryInstance batteryInst,
     NvRmPmuBatteryData * pData );
 
-//20100924, jh.ahn@lge.com, For updating battery information totally [START]
+//20100924, , For updating battery information totally [START]
 #if defined(CONFIG_MACH_STAR)
 NvBool
 NvRmPmuUpdateBatteryInfo(
@@ -370,7 +370,7 @@ NvRmPmuUpdateBatteryInfo(
 	NvU8 * pBatStatus,
 	NvRmPmuBatteryData * pBatData);
 #endif
-//20100924, jh.ahn@lge.com, For updating battery information totally  [END]
+//20100924, , For updating battery information totally  [END]
 
 /**
  * Gets the battery full life time.
@@ -428,7 +428,7 @@ NvRmPmuUpdateBatteryInfo(
     NvRmDeviceHandle hRmDevice,
     NvU32 Count );
 
-//20101005, jh.ahn@lge.com, Alarm funtion for Full Battery Recharging [START]
+//20101005, , Alarm funtion for Full Battery Recharging [START]
 /**
  * Gets the alarm count in seconds of the current external RTC (in PMU).
  *
@@ -450,7 +450,7 @@ NvBool NvRmPmuReadAlarm(
 NvBool NvRmPmuWriteAlarm(
     NvRmDeviceHandle hRmDevice,
     NvU32 Count);
-//20101005, jh.ahn@lge.com, Alarm funtion for Full Battery Recharging [END]
+//20101005, , Alarm funtion for Full Battery Recharging [END]
 
 /**
  * Verifies whether the RTC is initialized.

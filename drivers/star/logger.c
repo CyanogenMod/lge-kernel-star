@@ -86,7 +86,7 @@ struct logger_tag {
 
 static struct kset *logger_kset;
 
-/* ricky_kwak@lge.com
+/* ricky_
  * July 1, 2009
  * enabled logd
  */

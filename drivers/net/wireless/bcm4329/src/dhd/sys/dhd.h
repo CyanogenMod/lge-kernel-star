@@ -181,6 +181,7 @@ typedef struct dhd_pub {
 	#define DHD_PM_RESUME_WAIT_INIT(a) DECLARE_WAIT_QUEUE_HEAD(a);
 	#define _DHD_PM_RESUME_WAIT(a, b) do {\
 			int retry = 0; \
+			smp_mb(); \
 			while (dhd_mmc_suspend && retry++ != b) { \
 				wait_event_timeout(a, FALSE, HZ/100); \
 			} \
@@ -451,6 +452,9 @@ typedef enum cust_gpio_modes {
 } cust_gpio_modes_t;
 extern int wl_iw_iscan_set_scan_broadcast_prep(struct net_device *dev, uint flag);
 extern int wl_iw_send_priv_event(struct net_device *dev, char *flag);
+#if defined(CONFIG_LGE_BCM432X_PATCH)		//by sjpark 11-01-11 : send hang event
+extern int net_os_send_hang_message(struct net_device *dev);
+#endif
 /*
  * Insmod parameters for debug/test
  */
@@ -514,11 +518,11 @@ extern uint dhd_pktgen_len;
 #define MOD_PARAM_PATHLEN	2048
 extern char fw_path[MOD_PARAM_PATHLEN];
 extern char nv_path[MOD_PARAM_PATHLEN];
-/* LGE_CHANGE_S [yoohoo@lge.com] 2009-04-03, configs */
+/* LGE_CHANGE_S [] 2009-04-03, configs */
 #if defined(CONFIG_LGE_BCM432X_PATCH)
 extern char config_path[MOD_PARAM_PATHLEN];
 #endif /* CONFIG_LGE_BCM432X_PATCH */
-/* LGE_CHANGE_E [yoohoo@lge.com] 2009-04-03, configs */
+/* LGE_CHANGE_E [] 2009-04-03, configs */
 
 /* For supporting multiple interfaces */
 #define DHD_MAX_IFS	16

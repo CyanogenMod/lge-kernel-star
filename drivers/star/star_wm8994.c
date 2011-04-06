@@ -4,7 +4,7 @@
 #include <linux/kthread.h>
 #include <linux/device.h>
 #include <linux/kernel.h>
-//#include <linux/tegra_devices.h>	//20100716 bergkamp.cho@lge.com blocking for compile error [LGE]
+//#include <linux/tegra_devices.h>	//20100716  blocking for compile error [LGE]
 
 #include <nvodm_services.h>
 

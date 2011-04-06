@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2009 LGE, Inc.
  *
- * Author: Changsu Ha <cs77.ha@lge.com>
+ * Author: <>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@
 /**
 	@brief		 star(lgp990) power key
  
-	@author		 cs77.ha@lge.com
+	@author		
 	@date		 2010-04-13
  
 	@version	 V1.00		 2010.04.13		 Changsu Ha	 Create
@@ -33,16 +33,16 @@
 //select option
 #define POWERKEY_WORKQUEUE
 
-//20100610, cs77.ha@lge.com, sleep status gpio for modem [START]
+//20100610, sleep status gpio for modem [START]
 #define AP_SUSPEND_STATUS
-//20100610, cs77.ha@lge.com, sleep status gpio for modem [START]
+//20100610, sleep status gpio for modem [START]
 
 
 #define POWERKEY_DELAYED_CHECK
 
-//20100714, cs77.ha@lge.com, AP20 Edge Wakeup Fail [START]
+//20100714, AP20 Edge Wakeup Fail [START]
 //#define AP20_EDGE_WAKEUP_FAIL
-//20100714, cs77.ha@lge.com, AP20 Edge Wakeup Fail [END]
+//20100714, AP20 Edge Wakeup Fail [END]
 
 
 #define AP20_A03_POWERKEY_WAR
@@ -78,11 +78,11 @@
 #define WAKEUP_POWERKEY_MASK    (1 << 24)     // Wake Event 24 - AP_ONKEY
 #endif
 
-//20101110, jh.ahn@lge.com, Function for Warm-boot [START]
+//20101110, , Function for Warm-boot [START]
 extern void write_cmd_reserved_buffer(unsigned char *buf, size_t len);
 extern void read_cmd_reserved_buffer(unsigned char *buf, size_t len);
 extern void emergency_restart(void); 
-//20101110, jh.ahn@lge.com, Function for Warm-boot [END]
+//20101110, , Function for Warm-boot [END]
 
 typedef struct PowerKeyDeviceRec
 {
@@ -94,11 +94,11 @@ typedef struct PowerKeyDeviceRec
     NvU32   sleepStatus;
 #endif
 
-//20100714, cs77.ha@lge.com, AP20 Edge Wakeup Fail [START]
+//20100714, AP20 Edge Wakeup Fail [START]
 #ifdef AP20_EDGE_WAKEUP_FAIL
     int             interruptKeyLevel;
 #endif
-//20100714, cs77.ha@lge.com, AP20 Edge Wakeup Fail [END]
+//20100714, AP20 Edge Wakeup Fail [END]
 
     
     struct input_dev    *inputDev;
@@ -124,7 +124,7 @@ static int key_wakeup_ISR = 0;
 static void __iomem *pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
 #endif
 
-//20101129, cs77.ha@lge.com, idle current issue [START]
+//20101129, idle current issue [START]
 typedef struct TouchMakerRec
 {
     NvOdmServicesGpioHandle gpioHandle;
@@ -132,10 +132,10 @@ typedef struct TouchMakerRec
 } TouchMaker;
 
 static TouchMaker s_touchMaker;
-//20101129, cs77.ha@lge.com, idle current issue [END]
+//20101129, idle current issue [END]
 
 
-//20100610, cs77.ha@lge.com, sleep status gpio for modem [START]
+//20100610, sleep status gpio for modem [START]
 #ifdef AP_SUSPEND_STATUS
 typedef struct ModemCheckRec
 {
@@ -145,7 +145,7 @@ typedef struct ModemCheckRec
 
 static ModemCheck s_modemCheck;
 #endif
-//20100610, cs77.ha@lge.com, sleep status gpio for modem [END]
+//20100610, sleep status gpio for modem [END]
 
 #define POWERKEY_DELAY_NSEC     20000000     //20ms
 #define KEYCHECK_RETRY_COUNT    5   // it must be odd value.
@@ -222,7 +222,7 @@ static void powerkey_handle(struct work_struct *wq)
     }
 #endif
 
-//20100714, cs77.ha@lge.com, AP20 Edge Wakeup Fail [START]
+//20100714, AP20 Edge Wakeup Fail [START]
 #ifdef AP20_EDGE_WAKEUP_FAIL
     if(s_powerkey.interruptKeyLevel){
         // high level is interrupted, next it will detect low level.
@@ -274,7 +274,7 @@ static void powerkey_handle(struct work_struct *wq)
 int_done:
     NvOdmGpioInterruptDone(s_powerkey.intr);
 #else
-//20100714, cs77.ha@lge.com, AP20 Edge Wakeup Fail [END]
+//20100714, AP20 Edge Wakeup Fail [END]
 
 #ifndef POWERKEY_DELAYED_CHECK
     if(!s_powerkey.gpioHandle || !s_powerkey.pinHandle || !s_powerkey.inputDev)
@@ -419,7 +419,7 @@ static const struct attribute_group star_pmic_group = {
     .attrs = star_pmic_attributes,
 };
 
-//20101110, jh.ahn@lge.com, Function for Warm-boot [START]
+//20101110, , Function for Warm-boot [START]
 static ssize_t star_reset_show(struct device *dev, 
             struct device_attribute *attr, char *buf)
 {
@@ -451,10 +451,10 @@ static struct attribute *star_reset_attributes[] = {
 static const struct attribute_group star_reset_group = {
     .attrs = star_reset_attributes,
 };
-//20101110, jh.ahn@lge.com, Function for Warm-boot [END]
+//20101110, , Function for Warm-boot [END]
 
 #ifndef AP20_A03_POWERKEY_WAR
-//20100610, cs77.ha@lge.com, sleep status gpio for modem [START]
+//20100610, sleep status gpio for modem [START]
 #ifdef AP_SUSPEND_STATUS
 static int modem_suspend(struct platform_device *pdev, pm_message_t state)
 {
@@ -474,7 +474,7 @@ static int modem_resume(struct platform_device *pdev)
     return 0;
 }
 #endif
-//20100610, cs77.ha@lge.com, sleep status gpio for modem [END]
+//20100610, sleep status gpio for modem [END]
 #endif
 
 static int __init powerkey_probe(struct platform_device *pdev)
@@ -483,7 +483,7 @@ static int __init powerkey_probe(struct platform_device *pdev)
     NvU32 pin, port;
     const NvOdmPeripheralConnectivity *con = NULL;
 
-//20101129, cs77.ha@lge.com, idle current issue [START]
+//20101129, idle current issue [START]
     //GPIO configuration
     s_touchMaker.gpioHandle = NvOdmGpioOpen();
     port = 'x'-'a';
@@ -492,10 +492,10 @@ static int __init powerkey_probe(struct platform_device *pdev)
                                                     port, pin);
     NvOdmGpioConfig(s_touchMaker.gpioHandle, s_touchMaker.pinHandle, 
                     NvOdmGpioPinMode_InputData);
-//20101129, cs77.ha@lge.com, idle current issue [END]
+//20101129, idle current issue [END]
 
 
-//20100610, cs77.ha@lge.com, sleep status gpio for modem [START]
+//20100610, sleep status gpio for modem [START]
 #ifdef AP_SUSPEND_STATUS
     //GPIO configuration
     s_modemCheck.gpioHandle = NvOdmGpioOpen();
@@ -517,7 +517,7 @@ static int __init powerkey_probe(struct platform_device *pdev)
     NvOdmGpioConfig(s_modemCheck.gpioHandle, s_modemCheck.pinHandle, 
                     NvOdmGpioPinMode_Output);
 #endif
-//20100610, cs77.ha@lge.com, sleep status gpio for modem [END]
+//20100610, sleep status gpio for modem [END]
 
     memset(&s_powerkey, 0x00, sizeof(s_powerkey));
 
@@ -573,7 +573,7 @@ static int __init powerkey_probe(struct platform_device *pdev)
     NvOdmGpioConfig(s_powerkey.gpioHandle, s_powerkey.pinHandle, 
                     NvOdmGpioPinMode_InputData);
 
-    //20100714, cs77.ha@lge.com, AP20 Edge Wakeup Fail [START]
+    //20100714, AP20 Edge Wakeup Fail [START]
     #ifdef AP20_EDGE_WAKEUP_FAIL
     s_powerkey.interruptKeyLevel = 0;
 
@@ -595,7 +595,7 @@ static int __init powerkey_probe(struct platform_device *pdev)
         goto err_interrupt_register_fail;
     }
     #endif
-    //20100714, cs77.ha@lge.com, AP20 Edge Wakeup Fail [END]
+    //20100714, AP20 Edge Wakeup Fail [END]
 
     // input device
     s_powerkey.inputDev = input_allocate_device();
@@ -620,13 +620,13 @@ static int __init powerkey_probe(struct platform_device *pdev)
     s_powerkey.timer.function = powerkey_timer_func;
 #endif
 
-//20100703, cs77.ha@lge.com, PMIC reset [START]
+//20100703, PMIC reset [START]
     ret = sysfs_create_group(&pdev->dev.kobj, &star_pmic_group);
     if (ret) {
         printk(KERN_ERR "[star powerkey] sysfs_create_group ERROR\n");
         goto err_input_device_register_fail;
     }
-//20100703, cs77.ha@lge.com, PMIC reset [END]
+//20100703, PMIC reset [END]
     
     ret = sysfs_create_group(&pdev->dev.kobj, &star_hwsku_group);
     if (ret) {
@@ -634,13 +634,13 @@ static int __init powerkey_probe(struct platform_device *pdev)
         goto err_input_device_register_fail;
     }
 
-//20101110, jh.ahn@lge.com, Function for Warm-boot [START]
+//20101110, , Function for Warm-boot [START]
     ret = sysfs_create_group(&pdev->dev.kobj, &star_reset_group);
     if (ret) {
         printk(KERN_ERR "[star powerkey] sysfs_create_group ERROR\n");
         goto err_input_device_register_fail;
     }
-//20101110, jh.ahn@lge.com, Function for Warm-boot [END]
+//20101110, , Function for Warm-boot [END]
 
     return 0;
 err_input_device_register_fail: 
@@ -664,31 +664,31 @@ err_semaphore_create_failed:
 
 err_probe_fail:
 
-//20100610, cs77.ha@lge.com, sleep status gpio for modem [START]
+//20100610, sleep status gpio for modem [START]
 #ifdef AP_SUSPEND_STATUS
     NvOdmGpioReleasePinHandle(s_modemCheck.gpioHandle, s_modemCheck.pinHandle);
 err_modem_chk_gpio_pin_acquire_fail:
     NvOdmGpioClose(s_modemCheck.gpioHandle); 
 err_open_modem_chk_gpio_fail:
 #endif
-//20100610, cs77.ha@lge.com, sleep status gpio for modem [END]
+//20100610, sleep status gpio for modem [END]
     return -ENOSYS;
 }
 
 static int powerkey_remove(struct platform_device *pdev)
 {
-//20100703, cs77.ha@lge.com, PMIC reset [START]
+//20100703, PMIC reset [START]
     sysfs_remove_group(&pdev->dev.kobj, &star_pmic_group);
     sysfs_remove_group(&pdev->dev.kobj, &star_hwsku_group);
-    sysfs_remove_group(&pdev->dev.kobj, &star_reset_group); //20101110, jh.ahn@lge.com, Function for Warm-boot
-//20100703, cs77.ha@lge.com, PMIC reset [END]
+    sysfs_remove_group(&pdev->dev.kobj, &star_reset_group); //20101110, , Function for Warm-boot
+//20100703, PMIC reset [END]
     
-//20100610, cs77.ha@lge.com, sleep status gpio for modem [START]
+//20100610, sleep status gpio for modem [START]
 #ifdef AP_SUSPEND_STATUS
     NvOdmGpioReleasePinHandle(s_modemCheck.gpioHandle, s_modemCheck.pinHandle);
     NvOdmGpioClose(s_modemCheck.gpioHandle); 
 #endif
-//20100610, cs77.ha@lge.com, sleep status gpio for modem [END]
+//20100610, sleep status gpio for modem [END]
 
     input_unregister_device(s_powerkey.inputDev);
     NvOdmGpioInterruptUnregister(s_powerkey.gpioHandle, s_powerkey.pinHandle,
@@ -765,7 +765,7 @@ int powerkey_resume(struct platform_device *dev)
 static struct platform_driver powerkey_driver = {
     .probe      = powerkey_probe,
     .remove     = powerkey_remove,
-//20100610, cs77.ha@lge.com, sleep status gpio for modem [START]
+//20100610, sleep status gpio for modem [START]
 #ifdef AP20_A03_POWERKEY_WAR
     .suspend    = powerkey_suspend,
     .resume     = powerkey_resume,
@@ -775,7 +775,7 @@ static struct platform_driver powerkey_driver = {
     .resume     = modem_resume,
 #endif
 #endif
-//20100610, cs77.ha@lge.com, sleep status gpio for modem [END]
+//20100610, sleep status gpio for modem [END]
     .driver = {
         .name   = "star_powerkey",
         .owner  = THIS_MODULE,
@@ -795,7 +795,7 @@ static void __exit powerkey_exit(void)
 module_init(powerkey_init);
 module_exit(powerkey_exit);
 
-MODULE_AUTHOR("cs77.ha@lge.com");
+MODULE_AUTHOR("");
 MODULE_DESCRIPTION("star power key");
 MODULE_LICENSE("GPL");
 

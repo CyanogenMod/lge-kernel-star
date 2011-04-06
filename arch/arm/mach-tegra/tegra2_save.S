@@ -358,13 +358,13 @@ __tear_down_master_pll_cpu:
 	ldr	r0, [r5, #CLK_RESET_PLLM_BASE]
 	bic	r0, r0, #(1<<30)
 	str	r0, [r5, #CLK_RESET_PLLM_BASE]
-//20101117, cs77.ha@lge.com, gpio wakeup from LP1 [START]
+//20101117, gpio wakeup from LP1 [START]
 #if !defined(CONFIG_MACH_STAR)
 	ldr	r0, [r5, #CLK_RESET_PLLP_BASE]
 	bic	r0, r0, #(1<<30)
 	str	r0, [r5, #CLK_RESET_PLLP_BASE]
 #endif
-//20101117, cs77.ha@lge.com, gpio wakeup from LP1 [END]
+//20101117, gpio wakeup from LP1 [END]
 	ldr	r0, [r5, #CLK_RESET_PLLC_BASE]
 	bic	r0, r0, #(1<<30)
 	str	r0, [r5, #CLK_RESET_PLLC_BASE]

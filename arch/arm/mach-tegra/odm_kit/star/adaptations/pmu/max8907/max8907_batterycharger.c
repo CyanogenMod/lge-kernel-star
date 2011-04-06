@@ -22,7 +22,7 @@
 #include "max8907_i2c.h"
 #include "max8907_adc.h"
 
-//20100529, jh.ahn@lge.com, For getting of Charger Information [START]
+//20100529, , For getting of Charger Information [START]
 #include <linux/kernel.h>
 #include <mach/lprintk.h>
 
@@ -48,14 +48,14 @@ typedef enum {
 
 extern max8922_status get_charging_ic_status(void);
 #endif // CONFIG_STAR_BATTERY_CHARGER
-//20100529, jh.ahn@lge.com, For getting of Charger Information [END]
+//20100529, , For getting of Charger Information [END]
 
 NvBool
 Max8907BatteryChargerMainBatt(
     NvOdmPmuDeviceHandle hDevice,
     NvBool *status)
 {
-    //20100529, jh.ahn@lge.com, Battery detection by battery Temp( -40`C ~ 90`C) [START]
+    //20100529, , Battery detection by battery Temp( -40`C ~ 90`C) [START]
 #if defined (CONFIG_MACH_STAR)
     //read battery temp 
     NvU32 VBatTemp = 0;
@@ -87,7 +87,7 @@ Max8907BatteryChargerMainBatt(
     data = (data >> MAX8907_CHG_STAT_MBDET_SHIFT) & MAX8907_CHG_STAT_MBDET_MASK;
     *status = (data == 0 ? NV_TRUE : NV_FALSE );    // MBDET low (0) = present
 #endif // CONFIG_MACH_STAR
-    //20100529, jh.ahn@lge.com, Battery detection by battery Temp( -40`C ~ 90`C) [END]
+    //20100529, , Battery detection by battery Temp( -40`C ~ 90`C) [END]
     return NV_TRUE;
 }
 
@@ -111,7 +111,7 @@ Max8907BatteryChargerEnabled(
     NvOdmPmuDeviceHandle hDevice,
     NvBool *status)
 {
-//20100529, jh.ahn@lge.com, Use charger status : not PMU but dedicated Charger IC [START]
+//20100529, , Use charger status : not PMU but dedicated Charger IC [START]
 #if defined (CONFIG_MACH_STAR) && defined (CONFIG_STAR_BATTERY_CHARGER)
     switch (get_charging_ic_status())
     	{
@@ -138,7 +138,7 @@ Max8907BatteryChargerEnabled(
     data = (data >> MAX8907_CHG_STAT_CHG_EN_STAT_SHIFT) & MAX8907_CHG_STAT_CHG_EN_STAT_MASK;
     *status = (data == 0 ? NV_FALSE : NV_TRUE ); 
 #endif // CONFIG_STAR_BATTERY_CHARGER
-//20100529, jh.ahn@lge.com, Use charger status : not PMU but dedicated Charger IC [END]
+//20100529, , Use charger status : not PMU but dedicated Charger IC [END]
     return NV_TRUE;
 }
 

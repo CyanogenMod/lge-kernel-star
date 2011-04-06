@@ -763,9 +763,9 @@ sdioh_cis_read(sdioh_info_t *sd, uint func, uint8 *cisd, uint32 length)
 extern SDIOH_API_RC
 sdioh_request_byte(sdioh_info_t *sd, uint rw, uint func, uint regaddr, uint8 *byte)
 {
-/* LGE_CHANGE_S, [dongp.kim@lge.com], 2010-04-22, WBT Fix */
+/* LGE_CHANGE_S, [], 2010-04-22, WBT Fix */
 	int err_ret = 0; 
-/* LGE_CHANGE_S, [dongp.kim@lge.com], 2010-04-22, WBT Fix */
+/* LGE_CHANGE_S, [], 2010-04-22, WBT Fix */
 
 	sd_info(("%s: rw=%d, func=%d, addr=0x%05x\n", __FUNCTION__, rw, func, regaddr));
 

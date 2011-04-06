@@ -2,7 +2,7 @@
  *       Filename:  lprintk.c
  *    Description:  
  *
- *         Author:  Jugwan Eom, zugwan@lge.com
+ *         Author:  Jugwan Eom, 
  *        Company:  MAS Group, LG Electronics, Inc.
  */
 

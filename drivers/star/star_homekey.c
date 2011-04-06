@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2009 LGE, Inc.
  *
- * Author: Hyeongwon Oh <hyeongwon.oh@lge.com>
+ * Author: <>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@
 /**
 	@brief		 star(LGE_SU660) home key
  
-	@author		 hyeongwon.oh@lge.com
+	@author		 
 	@date		 2010-11-29
  
 	@version	 V1.00		 2010.11.29		 Hyeongwon Oh	 Create
@@ -215,7 +215,7 @@ static void __exit homekey_exit(void)
 module_init(homekey_init);
 module_exit(homekey_exit);
 
-MODULE_AUTHOR("hyeongwon.oh@lge.com");
+MODULE_AUTHOR("");
 MODULE_DESCRIPTION("star home key");
 MODULE_LICENSE("GPL");
 

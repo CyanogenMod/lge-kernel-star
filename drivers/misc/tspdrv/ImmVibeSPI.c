@@ -185,7 +185,7 @@ static void vib_close( )
 }
 #endif
 
-//20101218 km.lee@lge.com vib disable on reboot
+//20101218  vib disable on reboot
 void vib_enable( NvBool on )
 {
   	/*
@@ -197,6 +197,19 @@ void vib_enable( NvBool on )
 	NvOdmGpioConfig( g_vib->h_vib_gpio, g_vib->h_vib_gpio_pin, NvOdmGpioPinMode_Output );
 	NvOdmGpioSetState( g_vib->h_vib_gpio, g_vib->h_vib_gpio_pin, on );
 }
+//20100111  vib disable on reboot 2nd [START]
+void vib_enable_reboot( NvBool on )
+{
+  	
+	if ( vib_set_power_rail( g_vib->vdd_id, on ) != 0 ) {
+		printk( "[ImmVibeSPI][%s] : Failed to vib_set_power_rail\n", __func__ );
+	}
+	
+
+	NvOdmGpioConfig( g_vib->h_vib_gpio, g_vib->h_vib_gpio_pin, NvOdmGpioPinMode_Output );
+	NvOdmGpioSetState( g_vib->h_vib_gpio, g_vib->h_vib_gpio_pin, on );
+}
+//20100111  vib disable on reboot 2nd [END]
 
 // mode [1] : disable
 // mode [2] : enable
@@ -299,13 +312,13 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_Set( VibeUInt8 nActuatorIndex, Vibe
 	NvU32	DutyCycle;
 	NvU32	ReturnedPeriod;
 	
-	DbgOut(( "[ImmVibeSPI] ImmVibeSPI_ForceOut_Set nForce =  %d \n", nForce ));
+//	DbgOut(( "[ImmVibeSPI] ImmVibeSPI_ForceOut_Set nForce =  %d \n", nForce ));
 
    	if ( nForce == 0 ) {
 		DutyCycle = 0x00320000; // 50% duty
    	} else {
 		DutyCycle = ((100*nForce/256)+50) << 16;
-		printk( "[ImmVibeSPI] ImmVibeSPI_ForceOut_Set DutyCycle =  %x \n", DutyCycle );
+//		printk( "[ImmVibeSPI] ImmVibeSPI_ForceOut_Set DutyCycle =  %x \n", DutyCycle );
    	}
 
 	NvOdmPwmConfig( g_vib->hOdmPwm, NvOdmPwmOutputId_PWM3, NvOdmPwmMode_Enable, DutyCycle, &g_requestedPeriod, &ReturnedPeriod );

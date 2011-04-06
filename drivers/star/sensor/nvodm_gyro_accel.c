@@ -46,6 +46,9 @@
 #define DEBUG_LOG             	0
 #define DEBUG_NV_ACCEL         	0
 #define TIMEOUT 5
+
+extern int reboot;
+
 // For interrupt handle, set GPIO when an interrupt happens.
 static void GpioInterruptHandler(void *arg);
 NvBool NvGyroAccelI2COpen(NvOdmServicesI2cHandle* hI2CDevice, NvU32 id);
@@ -58,6 +61,8 @@ void NvGyroAccelGetInterruptSouce(NvOdmGyroAccelHandle hDevice,
 		NvOdmGyroAccelIntType  *IntType,
 		NvOdmGyroAccelAxisType *IntMotionAxis);
 void NvOdmResetI2C(NvOdmGyroAccelHandle hDevice); 
+
+NvU32 Accel_PRail;
 
 /*
  * Set accelerometer registers.
@@ -138,6 +143,8 @@ void NvGyroAccelSetPowerRail(NvOdmServicesPmuHandle hPMUDevice, NvU32 Id, NvBool
 	NvOdmServicesPmuVddRailCapabilities vddrailcap;
 	NvU32 settletime;
 	printk(" ## MPU3050 : 3 \n") ;
+
+	Accel_PRail = Id;
 
 	if (hPMUDevice) {
 		NvOdmServicesPmuGetCapabilities(hPMUDevice, Id, &vddrailcap);
@@ -327,6 +334,10 @@ NvBool NvGyroAccelI2CSetRegs(NvOdmGyroAccelHandle hDevice, NvU8 offset, NvU8* va
 	
 	if (i2c_status != NvOdmI2cStatus_Success) {
 	    printk(" ## MPU3050 _ Give up!! NvGyroAccelI2CSetRegs failed: register %d \n", offset);
+
+           //reboot sensors
+           reboot = 1;
+		
             return NV_FALSE;
 	}
 
@@ -375,6 +386,10 @@ NvBool NvGyroAccelI2CGetRegs(NvOdmGyroAccelHandle hDevice, NvU8 offset, NvU8* va
 
 	if (i2c_status != NvOdmI2cStatus_Success) {
 	    printk(" ## MPU3050 _ Give up!! NvGyroAccelI2CSetRegs failed: register %d \n", offset);
+
+           //reboot sensors
+           reboot = 1;
+		
             return NV_FALSE;
 	}
 

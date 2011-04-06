@@ -1878,9 +1878,13 @@ int sdhci_add_host(struct sdhci_host *host)
 		if(mmc->index != 0)
 #endif /* CONFIG_LGE_BCM432X_PATCH */
 		mmc->caps |= MMC_CAP_DISABLE;
-		//indal.choi - temporarily
-	  //indal.choi delay time.. very.. slow..
+                /* 20110104  sync from LU3000 [START] */
+#if defined(CONFIG_MACH_STAR)
 		mmc_set_disable_delay(mmc, msecs_to_jiffies(100));
+#else
+		mmc_set_disable_delay(mmc, msecs_to_jiffies(50));
+#endif
+                /* 20110104  sync from LU3000 [END] */
 	}
 
 	if (host->data_width >= 8)
@@ -2099,7 +2103,16 @@ void sdhci_card_detect_callback(struct sdhci_host *host)
 
 	spin_unlock_irqrestore(&host->lock, flags);
 
+//20110114, add 1.2 secs delay in detecting card on insert [START]
+	if (!strncmp(mmc_hostname(host->mmc), "mmc1", 4)){
+		if (present)
+			mmc_detect_change(host->mmc, msecs_to_jiffies(1200));
+		else
+			mmc_detect_change(host->mmc, msecs_to_jiffies(200));
+	}
+	else	    //original
 	mmc_detect_change(host->mmc, msecs_to_jiffies(200));
+//20110114, add 1.2 secs delay in detecting card on insert [END]
 }
 EXPORT_SYMBOL_GPL(sdhci_card_detect_callback);
 

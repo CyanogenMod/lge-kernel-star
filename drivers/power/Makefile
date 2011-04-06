@@ -28,7 +28,7 @@ obj-$(CONFIG_BATTERY_WM97XX)	+= wm97xx_battery.o
 obj-$(CONFIG_BATTERY_BQ27x00)	+= bq27x00_battery.o
 obj-$(CONFIG_BATTERY_DA9030)	+= da9030_battery.o
 obj-$(CONFIG_BATTERY_MAX17040)	+= max17040_battery.o
-# 100831, jh.ahn@lge.com, star use star_battery_charger
+# 100831, , star use star_battery_charger
 ifeq ($(CONFIG_MACH_STAR),n)
 obj-$(CONFIG_TEGRA_BATTERY_ODM)	+= tegra_odm_battery.o
 endif

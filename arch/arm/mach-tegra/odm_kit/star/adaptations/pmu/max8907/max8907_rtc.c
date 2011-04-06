@@ -136,7 +136,7 @@ Max8907RtcAlarmCountRead(
     NvOdmPmuDeviceHandle hDevice,
     NvU32* Count)
 {
-    //20100928, byoungwoo.yoon@lge.com, RTC alarm enable [START]
+    //20100928, , RTC alarm enable [START]
     NvU32 data = 0;
     NvU32 BcdHours, BcdMinutes, BcdSeconds;
     NvU32 Hours, Minutes, Seconds;
@@ -207,7 +207,7 @@ Max8907RtcAlarmCountRead(
     }
     NVODMPMU_PRINTF(("\n *Count=0x%x ", *Count));
     return NV_TRUE;
-    //20100928, byoungwoo.yoon@lge.com, RTC alarm enable [END]
+    //20100928, , RTC alarm enable [END]
 	
 }
 
@@ -293,7 +293,7 @@ Max8907RtcAlarmCountWrite(
     NvOdmPmuDeviceHandle hDevice,
     NvU32 Count)
 {
-    //20100928, byoungwoo.yoon@lge.com, RTC alarm enable [START]
+    //20100928, , RTC alarm enable [START]
     NvU32 BcdHours, BcdMinutes, BcdSeconds;
     NvU32 data = 0;
     NvU8 BcdDD, BcdMM, BcdYY1, BcdYY2;
@@ -364,7 +364,7 @@ Max8907RtcAlarmCountWrite(
         NVODMPMU_PRINTF(("\n [Alarm] Max8907RtcCountWrite() error. "));
         return NV_FALSE;
     }
-    //20100928, byoungwoo.yoon@lge.com, RTC alarm enable [END]
+    //20100928, , RTC alarm enable [END]
 
     return NV_FALSE;
 }
@@ -372,7 +372,7 @@ Max8907RtcAlarmCountWrite(
 NvBool
 Max8907RtcIsAlarmIntEnabled(NvOdmPmuDeviceHandle hDevice)
 {
-    //20100928, byoungwoo.yoon@lge.com, RTC alarm enable [START]
+    //20100928, , RTC alarm enable [START]
     NvU8 data = 0;
     NVODMPMU_PRINTF(("\n [Alarm] Max8907RtcIsAlarmIntEnabled()  "));
     if (Max8907RtcI2cRead8(hDevice, MAX8907_ALARM0_CNTL, &data))
@@ -391,7 +391,7 @@ Max8907RtcIsAlarmIntEnabled(NvOdmPmuDeviceHandle hDevice)
     }
 
     NVODMPMU_PRINTF(("\n [Alarm] Max8907I2cRead32() error. "));
-    //20100928, byoungwoo.yoon@lge.com, RTC alarm enable [END]
+    //20100928, , RTC alarm enable [END]
 
     return NV_FALSE;
 }
@@ -401,7 +401,7 @@ Max8907RtcAlarmIntEnable(
     NvOdmPmuDeviceHandle hDevice,
     NvBool Enable)
 {
-    //20100928, byoungwoo.yoon@lge.com, RTC alarm enable [START]
+    //20100928, , RTC alarm enable [START]
     NvU8 data = 0;
 
     NVODMPMU_PRINTF(("\n [Alarm] Max8907RtcAlarmIntEnable()  "));
@@ -415,7 +415,7 @@ Max8907RtcAlarmIntEnable(
     }
 
     NVODMPMU_PRINTF(("\n [Alarm] Error !! : Max8907I2cWrite32()  "));
-    //20100928, byoungwoo.yoon@lge.com, RTC alarm enable [END]
+    //20100928, , RTC alarm enable [END]
 
     return NV_FALSE;
 }

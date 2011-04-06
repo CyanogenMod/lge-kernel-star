@@ -42,7 +42,7 @@
 #include <linux/spi/spi.h>
 #include <linux/workqueue.h>
 #define NV_DEBUG 0
-//kh.sung@lge.com
+//
 #include "nvos.h"
 #include "nvcommon.h"
 #include "nvodm_services.h"
@@ -52,19 +52,22 @@
 
 #include <linux/spi/ifx_n721_spi.h>
 
-//20100927-1, syblue.lee@lge.com, Hold wake-lock for cp interrupt [START]
+#include <linux/io.h>
+#include <mach/iomap.h>
+
+//20100927-1, , Hold wake-lock for cp interrupt [START]
 #define WAKE_LOCK_RESUME
 #ifdef WAKE_LOCK_RESUME
 #include <linux/wakelock.h>
 #endif
-//20100927, syblue.lee@lge.com, Hold wake-lock for cp interrupt [END]
+//20100927, , Hold wake-lock for cp interrupt [END]
 
-//20100701-1, syblue.lee@lge.com, delay time until CP can be ready again [START]
+//20100701-1, , delay time until CP can be ready again [START]
 #include <linux/delay.h>
-#define MRDY_DELAY_TIME	400	//20101127-1, syblue.lee@lge.com, Change delay time for transcation : 1000us -> 400us
-//20100701-1, syblue.lee@lge.com, delay time until CP can be ready again [END]
+#define MRDY_DELAY_TIME	400	//20101127-1, , Change delay time for transcation : 1000us -> 400us
+//20100701-1, , delay time until CP can be ready again [END]
 
-#define SPI_GUID                NV_ODM_GUID('s','t','a','r','-','s','p','i')	//20100607, syblue.lee@lge.com, add spi guid
+#define SPI_GUID                NV_ODM_GUID('s','t','a','r','-','s','p','i')	//20100607, , add spi guid
 
 
 //#define CONFIG_SPI_DEBUG
@@ -88,7 +91,7 @@ void dump_atcmd(char *data, int len)
 }
 
 #else
-#include <mach/lprintk.h> //20100426, es.lee@lge.com, Change printk to lprintk
+#include <mach/lprintk.h> //20100426, , Change printk to lprintk
 #define SPI_DEBUG_PRINT(format, args...)  lprintk(D_SPI,format , ## args)
 void dump_atcmd(char *data, int len) 
 {
@@ -150,12 +153,12 @@ struct ifx_spi_data {
         unsigned int		throttle;
         struct work_struct      ifx_work;
         struct work_queue_struct *ifx_wq;
-//20100927-1, syblue.lee@lge.com, Hold wake-lock for cp interrupt [START]
+//20100927-1, , Hold wake-lock for cp interrupt [START]
 #ifdef WAKE_LOCK_RESUME
 	struct wake_lock wake_lock;
 	unsigned int		wake_lock_flag;
 #endif
-//20100927, syblue.lee@lge.com, Hold wake-lock for cp interrupt [END]
+//20100927, , Hold wake-lock for cp interrupt [END]
 };
 
 union ifx_spi_frame_header{
@@ -234,7 +237,7 @@ static int
 ifx_spi_open(struct tty_struct *tty, struct file *filp)
 {
 	int status = 0;
-//20100607, syblue.lee@lge.com, add else code [START]
+//20100607, , add else code [START]
 	struct ifx_spi_data *spi_data;
 	if(gspi_data)
 	{
@@ -250,7 +253,7 @@ ifx_spi_open(struct tty_struct *tty, struct file *filp)
 		ifx_spi_buffer_initialization();
 		SPI_DEBUG_PRINT("ifx_spi_open failed!!\n");
 	}
-//20100607, syblue.lee@lge.com, add else code [END]
+//20100607, , add else code [END]
 
 	return status;
 }
@@ -275,6 +278,8 @@ ifx_spi_close(struct tty_struct *tty, struct file *filp)
 static int 
 ifx_spi_write(struct tty_struct *tty, const unsigned char *buf, int count)
 {	
+	unsigned int u32register = 0 ;
+	unsigned int value  = 0;
 	struct ifx_spi_data *spi_data = (struct ifx_spi_data *)tty->driver_data;
 
 	if(spi_data==NULL)
@@ -299,16 +304,22 @@ ifx_spi_write(struct tty_struct *tty, const unsigned char *buf, int count)
 	ifx_spi_count = count;
 	//printk("%s - %d\n", __FUNCTION__, __LINE__); 
 	ifx_spi_set_mrdy_signal(1);  
-//20101127-2, syblue.lee@lge.com, Add spi 10sec wait_timeout of SRDY [START]	
+//20101127-2, , Add spi 10sec wait_timeout of SRDY [START]	
 	//wait_for_completion(&spi_data->ifx_read_write_completion);	
-	wait_for_completion_timeout(&spi_data->ifx_read_write_completion, 10*HZ);	
+	//printk("%s - %d\n", __FUNCTION__, __LINE__); 	
+	wait_for_completion_timeout(&spi_data->ifx_read_write_completion, 2*HZ);	
+	//printk("%s - %d\n", __FUNCTION__, __LINE__); 	
 	if(ifx_ret_count==0)
 	{	
-		lge_debug[D_SPI].enable = 1;
+		u32register = readl(IO_ADDRESS(0x6000d1b8));
+		//printk("%s - %d\n", __FUNCTION__, __LINE__);	
+		//lge_debug[D_SPI].enable = 1;
+		printk("%s -u32register = %08X, SRDY = %d\n", __FUNCTION__, u32register, ((u32register>>5)&0x00000001)); 
+		//printk("%s - %d\n", __FUNCTION__, __LINE__);	
 		ifx_spi_set_mrdy_signal(0);  
-		printk("%s - timeout!! Can't get SRDY from CP for 10sec. Set MRDY high to low\n", __FUNCTION__, __LINE__); 		
+		//printk("%s - timeout!! Can't get SRDY from CP for 1sec. Set MRDY high to low\n", __FUNCTION__); 		
 	}
-//20101127-2, syblue.lee@lge.com, Add spi 10sec wait_timeout of SRDY [END]	
+//20101127-2, , Add spi 10sec wait_timeout of SRDY [END]	
 	init_completion(&spi_data->ifx_read_write_completion);
 
 	SPI_DEBUG_PRINT("%s - %d\n", __FUNCTION__, __LINE__); 
@@ -376,9 +387,9 @@ ifx_spi_probe(struct spi_device *spi)
 		return -ENOMEM;
         }
 
-//20100711-3, syblue.lee@lge.com, init ifx_tty [START]
+//20100711-3, , init ifx_tty [START]
 	spi_data->ifx_tty = NULL;
-//20100711, syblue.lee@lge.com, init ifx_tty [END]
+//20100711, , init ifx_tty [END]
 
         status = ifx_spi_allocate_frame_memory(IFX_SPI_MAX_BUF_SIZE + IFX_SPI_HEADER_SIZE);
         if(status != 0){
@@ -401,23 +412,23 @@ ifx_spi_probe(struct spi_device *spi)
         spi_data->spi = spi;
         spi->mode = SPI_MODE_1;
         spi->bits_per_word = 8;
-//20100607, syblue.lee@lge.com, add more setup code [START]	
+//20100607, , add more setup code [START]	
         spi->chip_select = 0;
         spi->max_speed_hz = 24*1000*1000; //24Mhz
-//20100607, syblue.lee@lge.com, add more setup code [END] 
+//20100607, , add more setup code [END] 
         status = spi_setup(spi);
         if(status < 0){
 		printk("Failed to setup SPI \n");
         }             
 
-//20100927-1, syblue.lee@lge.com, Hold wake-lock for cp interrupt [START]
+//20100927-1, , Hold wake-lock for cp interrupt [START]
 #ifdef WAKE_LOCK_RESUME
 	wake_lock_init(&spi_data->wake_lock, WAKE_LOCK_SUSPEND, "mspi_wake");
 	spi_data->wake_lock_flag = 0;
 #endif
-//20100927-1, syblue.lee@lge.com, Hold wake-lock for cp interrupt [END]
+//20100927-1, , Hold wake-lock for cp interrupt [END]
 
-//20100607, syblue.lee@lge.com, add MRDY pin setup[START] 
+//20100607, , add MRDY pin setup[START] 
 	pConnectivity = NvOdmPeripheralGetGuid(SPI_GUID);      
 	MrdyPort = pConnectivity->AddressList[1].Instance;
 	MrdyPin = pConnectivity->AddressList[1].Address;
@@ -434,7 +445,7 @@ ifx_spi_probe(struct spi_device *spi)
 	}
 	SPI_DEBUG_PRINT("MRDY handle = %x\n", (int)hPin);
 	NvOdmGpioConfig(hGpio, hPin, NvOdmGpioPinMode_Output);
-//20100607, syblue.lee@lge.com, add MRDY pin setup[END] 
+//20100607, , add MRDY pin setup[END] 
 
 	/* Enable SRDY Interrupt request - If the SRDY signal is high then ifx_spi_handle_srdy_irq() is called */
 	status = request_irq(spi->irq, ifx_spi_handle_srdy_irq,  IRQF_TRIGGER_RISING, spi->dev.driver->name, spi_data);
@@ -481,7 +492,7 @@ ifx_spi_remove(struct spi_device *spi)
 }
 
 
-//20100908 cs77.ha@lge.com deepsleep wakeup issue [START]
+//20100908 deepsleep wakeup issue [START]
 #include <mach/iomap.h>
 #include <linux/io.h>
 
@@ -514,13 +525,13 @@ static int ifx_spi_resume(struct platform_device *dev)
     reg = readl(pmc_base + PMC_WAKE_STATUS);
 
     if (reg & WAKEUP_IFX_SRDY_MASK) {
-//20100927-1, syblue.lee@lge.com, Hold wake-lock for cp interrupt [START]
+//20100927-1, , Hold wake-lock for cp interrupt [START]
 #ifdef	WAKE_LOCK_RESUME
 	//printk("[IFX_SRDY] %s() wake lock : 0x%lx\n", __func__, &gspi_data->wake_lock);
 	if(&gspi_data->wake_lock)
-		wake_lock_timeout(&gspi_data->wake_lock, 50);	//20101203-1, syblue.lee@lge.com, change 3 to 1 for power consumption
+		wake_lock_timeout(&gspi_data->wake_lock, 50);	//20101203-1, , change 3 to 1 for power consumption
 #endif
-//20100927-1, syblue.lee@lge.com, Hold wake-lock for cp interrupt [END]
+//20100927-1, , Hold wake-lock for cp interrupt [END]
         printk("[IFX_SRDY] %s() wakeup pad : 0x%lx\n", __func__, reg);
 #ifndef CONFIG_SPI_DEBUG
 	 lge_debug[D_SPI].enable = 1;
@@ -531,7 +542,7 @@ static int ifx_spi_resume(struct platform_device *dev)
 
     return 0;
 }
-//20100908 cs77.ha@lge.com deepsleep wakeup issue [END]
+//20100908 deepsleep wakeup issue [END]
 
 /* End of TTY - SPI driver Operations */
 
@@ -545,10 +556,10 @@ static struct spi_driver ifx_spi_driver = {
 	},
 	.probe = ifx_spi_probe,
 	.remove = __devexit_p(ifx_spi_remove),
-    //20100908 cs77.ha@lge.com deepsleep wakeup issue [START]
+    //20100908 deepsleep wakeup issue [START]
 	.suspend = ifx_spi_suspend,
 	.resume = ifx_spi_resume,
-    //20100908 cs77.ha@lge.com deepsleep wakeup issue [END]
+    //20100908 deepsleep wakeup issue [END]
 };
 
 /*
@@ -648,15 +659,15 @@ ifx_spi_get_header_info(unsigned int *valid_buf_size)
 		header.framesbytes[i] = ifx_rx_buffer[/*3-*/i];
 	}
 
-//20101127-2, syblue.lee@lge.com, Discard if mux size is bigger than MAX SIZE [START]
-	if(header.ifx_spi_header.curr_data_size>IFX_SPI_MAX_BUF_SIZE)	//20101201-1, syblue.lee@lge.com, bug fix : >= -> >
+//20101127-2, , Discard if mux size is bigger than MAX SIZE [START]
+	if(header.ifx_spi_header.curr_data_size>IFX_SPI_MAX_BUF_SIZE)	//20101201-1, , bug fix : >= -> >
 	{
 		printk("%s - invalid header : 0x%x 0x%x 0x%x 0x%x!!!\n", __FUNCTION__, header.framesbytes[0], header.framesbytes[1], header.framesbytes[2], header.framesbytes[3]);
 		*valid_buf_size = 0;
 	}
 	else
 		*valid_buf_size = header.ifx_spi_header.curr_data_size;
-//20101127-2, syblue.lee@lge.com, Discard if mux size is bigger than MAX SIZE [END]
+//20101127-2, , Discard if mux size is bigger than MAX SIZE [END]
 
 	if(header.ifx_spi_header.more){
 		return header.ifx_spi_header.next_data_size;
@@ -673,7 +684,7 @@ ifx_spi_set_mrdy_signal(int value)
 	//struct GpioHandle ifxGpioHandle;
 	//gpio_set_value(IFX_MRDY_GPIO, value);
 
-	NvOdmGpioSetState(hGpio,hPin,(NvU32)value);	//20100607, syblue.lee@lge.com, remain only this code
+	NvOdmGpioSetState(hGpio,hPin,(NvU32)value);	//20100607, , remain only this code
 	//NvOdmGpioConfig(hGpio, hPin, NvOdmGpioPinMode_Output);
 }
 
@@ -766,7 +777,7 @@ ifx_spi_send_and_receive_data(struct ifx_spi_data *spi_data)
 	SPI_DEBUG_PRINT("SPI RX : ");
 	dump_atcmd(ifx_rx_buffer, 20) ; 	
 
-	if((spi_data->throttle == 0) && (rx_valid_buf_size != 0) && (spi_data->ifx_tty!=NULL)){	//20100711-3, syblue.lee@lge.com, check ifx_tty
+	if((spi_data->throttle == 0) && (rx_valid_buf_size != 0) && (spi_data->ifx_tty!=NULL)){	//20100711-3, , check ifx_tty
 		tty_insert_flip_string(spi_data->ifx_tty, ifx_rx_buffer+IFX_SPI_HEADER_SIZE, rx_valid_buf_size);
 		tty_flip_buffer_push(spi_data->ifx_tty);
 	}  
@@ -854,9 +865,9 @@ ifx_spi_handle_work(struct work_struct *work)
 		/* It is a condition where Slave has initiated data transfer and both SRDY and MRDY are high and at the end of data transfer		
 	 	* MUX has some data to transfer. MUX initiates Master initiated transfer rising MRDY high, which will not be detected at Slave-MODEM.
 	 	* So it was required to rise MRDY high again */
-//20100701-1, syblue.lee@lge.com, delay time until CP can be ready again [START]
+//20100701-1, , delay time until CP can be ready again [START]
 		udelay(MRDY_DELAY_TIME);
-//20100701-1, syblue.lee@lge.com, delay time until CP can be ready again [END]
+//20100701-1, , delay time until CP can be ready again [END]
                 ifx_spi_set_mrdy_signal(1);    		
 		}
 	}
@@ -867,9 +878,9 @@ ifx_spi_handle_work(struct work_struct *work)
 		if(ifx_sender_buf_size == 0){
 			if(ifx_receiver_buf_size == 0){		
 				ifx_spi_set_mrdy_signal(0);
-//20100701-1, syblue.lee@lge.com, delay time until CP can be ready again [START]
+//20100701-1, , delay time until CP can be ready again [START]
 				udelay(MRDY_DELAY_TIME);
-//20100701-1, syblue.lee@lge.com, delay time until CP can be ready again [END]
+//20100701-1, , delay time until CP can be ready again [END]
 				ifx_spi_buffer_initialization();
 			}
 			ifx_master_initiated_transfer = 0;
@@ -909,7 +920,7 @@ __init ifx_spi_init(void)
 
 	/* initialize the tty driver */
 	ifx_spi_tty_driver->owner = THIS_MODULE;
-	ifx_spi_tty_driver->driver_name = "tty_ifxn721";	//20100607, syblue.lee@lge.com, modify ifxn721 -> tty_ifxn721
+	ifx_spi_tty_driver->driver_name = "tty_ifxn721";	//20100607, , modify ifxn721 -> tty_ifxn721
 	ifx_spi_tty_driver->name = "ttyspi";
 	ifx_spi_tty_driver->major = IFX_SPI_MAJOR;
 	ifx_spi_tty_driver->minor_start = 0;

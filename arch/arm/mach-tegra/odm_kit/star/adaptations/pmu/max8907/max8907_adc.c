@@ -21,7 +21,7 @@
 #include "max8907_i2c.h"
 #include "max8907_reg.h"
 
-//20100428, jh.ahn@lge.com, This define for Debug Message function [START]
+//20100428, , This define for Debug Message function [START]
 #include <linux/kernel.h>
 #include <mach/lprintk.h>
 
@@ -33,9 +33,9 @@
 #else
 #define LDPA(fmt, arg...) do {} while (0)
 #endif // LG_DEBUG_PMU
-//20100428, jh.ahn@lge.com, This define for Debug Message function [END]
+//20100428, , This define for Debug Message function [END]
 
-//20100622, jh.ahn@lge.com, setup ADC function in PMU for VCHG, VBBATT, VMBATT, THM [START]
+//20100622, , setup ADC function in PMU for VCHG, VBBATT, VMBATT, THM [START]
 NvBool
 Max8907AdcSetup(NvOdmPmuDeviceHandle hDevice)
 {
@@ -99,7 +99,7 @@ Max8907AdcSetup(NvOdmPmuDeviceHandle hDevice)
     LDPA("[jh.ahn] ADC_Settinge_Done!");
     return NV_TRUE;
 }
-//20100622, jh.ahn@lge.com, setup ADC function in PMU for VCHG, VBBATT, VMBATT, THM [END]
+//20100622, , setup ADC function in PMU for VCHG, VBBATT, VMBATT, THM [END]
 
 #if defined(CONFIG_MACH_STAR) //jongik2.kim 20100803 HOOK_DETECTION
 NvU32 
@@ -146,7 +146,7 @@ Max8907AdcVBatSenseRead(
     NvOdmPmuDeviceHandle hDevice, 
     NvU32 *volt)
 {
-//20100622, jh.ahn@lge.com, Write the description here in detail [START]
+//20100622, , Write the description here in detail [START]
     NvU8 data, msb_data, lsb_data;
     NvU32 batvdata;
 
@@ -183,7 +183,7 @@ Max8907AdcVBatSenseRead(
     batvdata = (msb_data << 4) | (lsb_data >> 4) ;
     *volt = batvdata*2; //This conversion is for 12bit ADC result : 8.192*CODE/2^N = 8.192*CODE/4096 = CODE*2 [mV]
     LDPA("[jh.ahn] VMBATT[mV] = %d\n", *volt);
-//20100622, jh.ahn@lge.com, Write the description here in detail [END]
+//20100622, , Write the description here in detail [END]
 
     return NV_TRUE;
 }
@@ -193,7 +193,7 @@ Max8907AdcVBatTempRead(
     NvOdmPmuDeviceHandle hDevice, 
     NvU32 *btemp)
 {
-//20100622, jh.ahn@lge.com, Write the description here in detail [START]
+//20100622, , Write the description here in detail [START]
     NvU8 data, msb_data, lsb_data;
     NvU32 btempdata;
 
@@ -231,7 +231,7 @@ Max8907AdcVBatTempRead(
     *btemp = (NvU32)(68000*btempdata/(4096-btempdata)); //This conversion is for 12bit ADC result : R = (CODE/2^12*Rpu)/(1-CODE/2^12)
     LDPA("[jh.ahn] bTHM [Rthm] = %d\n", *btemp);
     *btemp = btempdata;
-//20100622, jh.ahn@lge.com, Write the description here in detail [END]
+//20100622, , Write the description here in detail [END]
 
     return NV_TRUE;
 }
@@ -241,11 +241,11 @@ Max8907BatteryTemperature(
     NvU32 VBatSense,
     NvU32 VBatTemp)
 {
-//20100624, jh.ahn@lge.com, Write the description here in detail [START]
+//20100624, , Write the description here in detail [START]
     static NvU16 BAT_TEMP_TABLE[] = BAT_T_TABLE;
 
     LDPA("[jh.ahn] BatTemp[K] = %d(%d[C]) \n", BAT_TEMP_TABLE[VBatTemp], (BAT_TEMP_TABLE[VBatTemp]-2730));
     return BAT_TEMP_TABLE[VBatTemp];
-//20100624, jh.ahn@lge.com, Write the description here in detail [END]
+//20100624, , Write the description here in detail [END]
 }
 

@@ -97,7 +97,7 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
 		 * What guarantees do we have here that 'tsk'
 		 * is not running on another CPU?
 		 */
-		/* 20101006 taewan.kim@lge.com temporary block because of reset */
+		/* 20101006  temporary block because of reset */
 		/* BUG(); */
 		return;
 #else

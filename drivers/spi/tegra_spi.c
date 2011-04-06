@@ -268,10 +268,10 @@ static int __init tegra_spi_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-//20100711-1, syblue.lee@lge.com, add mode_bits [START]
+//20100711-1, , add mode_bits [START]
 	/* the spi->mode bits understood by this driver: */
 	master->mode_bits = NV_SUPPORTED_MODE_BITS;
-//20100711, syblue.lee@lge.com, add mode_bits [END]
+//20100711, , add mode_bits [END]
 
 	master->setup = tegra_spi_setup;
 	master->transfer = tegra_spi_transfer;

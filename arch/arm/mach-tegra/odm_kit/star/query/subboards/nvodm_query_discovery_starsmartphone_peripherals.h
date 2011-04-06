@@ -18,7 +18,7 @@
 #endif
 
 #if defined(CONFIG_MACH_STAR)
-//20100413, cs77.ha@lge.com, power off [START]
+//20100413, power off [START]
 //POWER OFF
 {
     NV_VDD_SoC_ODM_ID,
@@ -26,19 +26,19 @@
     NV_ARRAY_SIZE(s_lge_SocOdmAddresses),
     NvOdmPeripheralClass_Other
 },
-//20100413, cs77.ha@lge.com, power off [END]
+//20100413, power off [END]
 
-//20100703, cs77.ha@lge.com, PMIC reset [START]
+//20100703, PMIC reset [START]
 {
     NV_ODM_GUID('p','m','_','r','e','s','e','t'),
     s_lge_PowerResetAddresses,
     NV_ARRAY_SIZE(s_lge_PowerResetAddresses),
     NvOdmPeripheralClass_Other
 },
-//20100703, cs77.ha@lge.com, PMIC reset [END]
+//20100703, PMIC reset [END]
 #endif
 
-//20100413, cs77.ha@lge.com, powerkey [START]
+//20100413, powerkey [START]
 #if defined(CONFIG_MACH_STAR)
 {
     NV_ODM_GUID('p','o','w','e','r','k','e','y'),
@@ -47,9 +47,9 @@
     NvOdmPeripheralClass_Other
 },
 #endif
-//20100413, cs77.ha@lge.com, powerkey [END]
+//20100413, powerkey [END]
 
-//20101129, hyeongwon.oh@lge.com, SU660 homekey [START]
+//20101129, , SU660 homekey [START]
 #if defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT)
 #if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F) 
 {
@@ -60,7 +60,7 @@
 },
 #endif
 #endif
-//20101129, hyeongwon.oh@lge.com, SU660 homekey [END]
+//20101129, , SU660 homekey [END]
 
 // LCD module
 {
@@ -399,7 +399,7 @@
     NvOdmPeripheralClass_Other,
 },
 
-// Accelerometer sk.hwang@lge.com
+// Accelerometer 
 {
     NV_ODM_GUID('a','c','c','e','l','e','r','o'),
     s_lge_AccelerometerAddresses,
@@ -407,7 +407,7 @@
     NvOdmPeripheralClass_Other
 },
 
-// Compass sk.hwang@lge.com 
+// Compass  
 {
 	NV_ODM_GUID('c','o','m','p','a','s','s','-'),
     s_lge_CompassAddresses,
@@ -423,7 +423,7 @@
     NvOdmPeripheralClass_Other
 },
 
-// Proximity sk.hwang@lge.com 
+// Proximity  
 {
     NV_ODM_GUID('p','r','o','x','i','m','i','t'),
     s_lge_ProximityAddresses,
@@ -439,7 +439,7 @@
     NvOdmPeripheralClass_Other
 },
 
-// 20100927 hyeongwon.oh@lge.com Synaptics OneTouch support [START]
+// 20100927  Synaptics OneTouch support [START]
 //	Touch Panel
 {
 // Synaptics touch is used, GUID needs to be changed accordingly
@@ -448,9 +448,9 @@
 	NV_ARRAY_SIZE(s_lge_SynapticsOneTouchAddresses),
 	NvOdmPeripheralClass_HCI
 },
-// 20100927 hyeongwon.oh@lge.com Synaptics OneTouch support [END]
+// 20100927  Synaptics OneTouch support [END]
 
-// 20100527 joseph.jung@lge.com Synaptics/Cypress Touch support [START]
+// 20100527  Synaptics/Cypress Touch support [START]
 //	Touch Panel
 {
 // Synaptics touch is used, GUID needs to be changed accordingly
@@ -467,9 +467,9 @@
 	NV_ARRAY_SIZE(s_lge_CypressTouchAddresses),
 	NvOdmPeripheralClass_HCI
 },
-// 20100527 joseph.jung@lge.com Synaptics/Cypress Touch support [END]
+// 20100527  Synaptics/Cypress Touch support [END]
 
-//20100609, jh.ahn@lge.com, Write the description here in detail [START]
+//20100609, , Write the description here in detail [START]
 #if defined(CONFIG_MACH_STAR)
 {
     NV_ODM_GUID('c','h','a','r','g','i','n','g'),
@@ -478,9 +478,9 @@
     NvOdmPeripheralClass_Other
 },
 #endif
-//20100609, jh.ahn@lge.com, Write the description here in detail [END]
+//20100609, , Write the description here in detail [END]
 
-// 20100401 taewan.kim@lge.com MUIC driver [START]
+// 20100401  MUIC driver [START]
 #if defined(CONFIG_MACH_STAR)
 {
     NV_ODM_GUID('s','t','a','r','m','u','i','c'),
@@ -489,9 +489,9 @@
     NvOdmPeripheralClass_Other
 },
 #endif
-// 20100401 taewan.kim@lge.com MUIC driver [END]
+// 20100401  MUIC driver [END]
 
-//20100424, bojung.ko@lge.com, RIL code from firenze [START]
+//20100424, , RIL code from firenze [START]
 #if defined(CONFIG_MACH_STAR)
 {
     NV_ODM_GUID('s','t','a','r','-','s','p','i'),
@@ -534,7 +534,7 @@
 },
 
 // Headset Driver Module
-//20100421 bergkamp.cho@lge.com for headset driver [LGE_START]
+//20100421  for headset driver [LGE_START]
 #if defined(CONFIG_MACH_STAR)
 {
     NV_ODM_GUID('h','e','a','d', 's', 'e', 't', '_'),
@@ -543,9 +543,9 @@
     NvOdmPeripheralClass_Other
 },
 #endif /* CONFIG_MACH_STAR */
-//20100421 bergkamp.cho@lge.com for headset driver [LGE_END]
+//20100421  for headset driver [LGE_END]
 
-//LGE_UPDATE_S neo.shin@lge.com 2010-05-024 GPS UART & GPIO Setting
+//LGE_UPDATE_S  2010-05-024 GPS UART & GPIO Setting
 //BCM4751-GPS
 {
 	NV_ODM_GUID('N','V','O','D','M','G','P','S'),
@@ -553,18 +553,18 @@
 	NV_ARRAY_SIZE(s_lge_GPSAddresses),
 	NvOdmPeripheralClass_Other
 },
-//LGE_UPDATE_E neo.shin@lge.com 2010-05-024 GPS UART & GPIO Setting
+//LGE_UPDATE_E  2010-05-024 GPS UART & GPIO Setting
 
-//20100611, cs77.ha@lge.com, Touch LED [START]
+//20100611, Touch LED [START]
 {
     NV_ODM_GUID('t','o','u','c','h','L','E','D'), 
     s_lge_TouchLEDAddresses,
     NV_ARRAY_SIZE(s_lge_TouchLEDAddresses),
     NvOdmPeripheralClass_Other
 },
-//20100611, cs77.ha@lge.com, Touch LED [END]
+//20100611, Touch LED [END]
 
-//20100603, cs77.ha@lge.com, star pmic [START]
+//20100603, star pmic [START]
 #ifdef CONFIG_STAR_PMIC
 {
     NV_ODM_GUID('a','l','l','p','o','w','e','r'), 
@@ -573,9 +573,9 @@
     NvOdmPeripheralClass_Other
 },
 #endif
-//20100603, cs77.ha@lge.com, star pmic [END]
+//20100603, star pmic [END]
 
-//20100730, kyungsik.lee@lge.com, star cpwatcher [START]
+//20100730, , star cpwatcher [START]
 #if defined(CONFIG_MACH_STAR)
 {
 	NV_ODM_GUID('c','p','d','e','v','i','c','e'),
@@ -584,19 +584,19 @@
 	NvOdmPeripheralClass_Other
 },
 #endif /* CONFIG_MACH_STAR */
-//20100730, kyungsik.lee@lge.com, star cpwatcher [END]
+//20100730, , star cpwatcher [END]
 
 #ifdef CONFIG_SPI_TDMB	
-//20100918 suyong.han@lge.com TDMB Base [START_LGE_LAB1]
-//20100912, suyong.han@lge.com [START]	
+//20100918  TDMB Base [START_LGE_LAB1]
+//20100912,  [START]	
 {
 	NV_ODM_GUID('s','p','i','_','t','d','m','b'),
 	s_tdmbSIC2102Addresses,
 	NV_ARRAY_SIZE(s_tdmbSIC2102Addresses),
 	NvOdmPeripheralClass_Other
 },
-//20100912, syblue.lee@lge.com [END]
-//20100918 suyong.han@lge.com TDMB Base [END_LGE_LAB1]
+//20100912,  [END]
+//20100918  TDMB Base [END_LGE_LAB1]
 #endif
 
 

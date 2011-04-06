@@ -37,7 +37,7 @@
 #include <linux/mmc/sdio_func.h>
 #include <linux/mmc/sdio_ids.h>
 
-/* LGE_CHANGE_S [yoohoo@lge.com] 2009-11-19, Support Host Wakeup */
+/* LGE_CHANGE_S [] 2009-11-19, Support Host Wakeup */
 #if defined(CONFIG_BRCM_LGE_WL_HOSTWAKEUP)
 
 #include <linux/earlysuspend.h>
@@ -56,7 +56,7 @@ extern int del_wl_timers(void);
 extern void register_mmc_card_pm(struct early_suspend *);
 extern void unregister_mmc_card_pm(void);
 #endif /* CONFIG_BRCM_LGE_WL_HOSTWAKEUP */
-/* LGE_CHANGE_E [yoohoo@lge.com] 2009-11-19, Support Host Wakeup */
+/* LGE_CHANGE_E [] 2009-11-19, Support Host Wakeup */
 
 #if !defined(SDIO_VENDOR_ID_BROADCOM)
 #define SDIO_VENDOR_ID_BROADCOM		0x02d0
@@ -267,26 +267,26 @@ dhd_early_suspend_state(void)
 static int
 dhd_es_lock_dhd_bus(void)
 {
-/* LGE_CHANGE_S, [dongp.kim@lge.com], 2010-04-22, WBT Fix */
+/* LGE_CHANGE_S, [], 2010-04-22, WBT Fix */
 // WBT Fix TD# 36996
     	void *bus;
 	bus = dhd_es_get_dhd_pub();
 	if ( bus )
 		dhd_os_proto_block(bus);
-/* LGE_CHANGE_S, [dongp.kim@lge.com], 2010-04-22, WBT Fix */
+/* LGE_CHANGE_S, [], 2010-04-22, WBT Fix */
 	return 0;
 }
 
 static int
 dhd_es_unlock_dhd_bus(void)
 {
-/* LGE_CHANGE_S, [dongp.kim@lge.com], 2010-04-22, WBT Fix */
+/* LGE_CHANGE_S, [], 2010-04-22, WBT Fix */
 // WBT Fix TD# 36997
 	void *bus;
 	bus = dhd_es_get_dhd_pub();
 	if ( bus )
 		dhd_os_proto_unblock(bus);
-/* LGE_CHANGE_S, [dongp.kim@lge.com], 2010-04-22, WBT Fix */
+/* LGE_CHANGE_S, [], 2010-04-22, WBT Fix */
 	return 0;
 }
 
@@ -571,14 +571,14 @@ dhd_register_early_suspend(void)
 {
 	printk("[sdmmc]%s:%d - enter\n",__func__,__LINE__);
 
-	/* LGE_CHANGE_S [yoohoo@lge.com] 2009-01-14, Support Host Wakeup */
+	/* LGE_CHANGE_S [] 2009-01-14, Support Host Wakeup */
 	dhd_early_suspend_ctrl.drv_loaded = TRUE;
 
 	register_mmc_card_pm(&early_suspend_data);
 	dhd_register_hwakeup();
 	printk("[sdmmc]%s:%d - GPIO_WLAN_HOST_WAKE [%d:%d]\n",
 			__func__,__LINE__, GPIO_WLAN_HOST_WAKE, gpio_get_value(GPIO_WLAN_HOST_WAKE));
-	/* LGE_CHANGE_E [yoohoo@lge.com] 2010-01-14, Support Host Wakeup */
+	/* LGE_CHANGE_E [] 2010-01-14, Support Host Wakeup */
 
 	printk("[sdmmc]%s:%d - end\n",__func__,__LINE__);
 	return 0;
@@ -589,7 +589,7 @@ dhd_unregister_early_suspend(void)
 {
 	printk("[sdmmc]%s:%d - enter\n",__func__,__LINE__);
 
-	/* LGE_CHANGE_S [yoohoo@lge.com] 2009-01-14, Support Host Wakeup */
+	/* LGE_CHANGE_S [] 2009-01-14, Support Host Wakeup */
 	if (dhd_early_suspend_ctrl.drv_loaded == FALSE) 
 		return 0;
 	dhd_unregister_hwakeup();
@@ -599,7 +599,7 @@ dhd_unregister_early_suspend(void)
 	/* Destroy the wake lock */
 	//wake_lock_destroy(&wlan_host_wakelock);			//by sjpark 10-12-22 : idle time current (not used)
 	wake_lock_destroy(&wlan_host_wakelock_resume);
-	/* LGE_CHANGE_E [yoohoo@lge.com] 2010-01-14, Support Host Wakeup */
+	/* LGE_CHANGE_E [] 2010-01-14, Support Host Wakeup */
 
 	printk("[sdmmc]%s:%d - end\n",__func__,__LINE__);
 	return 0;

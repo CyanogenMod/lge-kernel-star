@@ -108,3 +108,6 @@ enum{
 /* function */
 void star_accel_enable_irq(void);
 void star_accel_disable_irq(void);
+
+int lge_sensor_shutdown_kxtf9(void);
+int lge_sensor_restart_kxtf9(void);

@@ -41,6 +41,7 @@
 #endif
 #include <linux/workqueue.h>
 
+static int rindrv_count = 0;
 static struct net_device **rin_devs;
 
 static int rin_maxdev = RIN_NRUNIT;
@@ -686,13 +687,7 @@ static struct rin_st *rin_alloc(dev_t line)
 	if (dev) {
 		sl = netdev_priv(dev);
 		if (test_bit(SLF_INUSE, &sl->flags)) {
-			printk("%s - line : %d\n", __FUNCTION__, __LINE__);
 			unregister_netdevice(dev);
-			smp_wmb();
-			smp_rmb();
-			dsb();
-			outer_sync();
-			printk("%s - line : %d\n", __FUNCTION__, __LINE__);
 			dev = NULL;
 			rin_devs[i] = NULL;
 		}
@@ -715,6 +710,7 @@ static struct rin_st *rin_alloc(dev_t line)
 	sl->dev	      	= dev;
 	spin_lock_init(&sl->lock);
 	rin_devs[i] = dev;
+	
 	return sl;
 }
 
@@ -732,6 +728,7 @@ static int rin_open(struct tty_struct *tty)
 {
 	struct rin_st *sl;
 	int err;
+	static int realloc_count = 0;
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
@@ -757,7 +754,25 @@ static int rin_open(struct tty_struct *tty)
 
 	/* OK.  Find a free RIN channel to use. */
 	err = -ENFILE;
+	if(rindrv_count==0)
+	{
 	sl = rin_alloc(tty_devnum(tty));
+		printk("%s - line : %d, sl->dev = %x\n", __FUNCTION__, __LINE__, sl->dev);
+	}
+	else if(rindrv_count>0)
+	{
+		if(realloc_count<rindrv_count)
+		{
+			sl = netdev_priv(rin_devs[realloc_count]);
+			printk("%s - line : %d, realloc sl->dev = %x\n", __FUNCTION__, __LINE__, sl->dev);
+			realloc_count ++;
+		}
+	}
+	else
+	{
+		printk("%s - line : %d, error rindrv_count = %d\n", __FUNCTION__, __LINE__, rindrv_count);
+		sl = NULL;
+	}
 	if (sl == NULL)
 		goto err_exit;
 
@@ -766,6 +781,8 @@ static int rin_open(struct tty_struct *tty)
 	sl->line = tty_devnum(tty);
 	sl->pid = current->pid;
 
+	if(rindrv_count==0 && realloc_count == 0)
+	{
 	if (!test_bit(SLF_INUSE, &sl->flags)) {
 		/* Perform the low-level RIN initialization. */
 		err = rin_alloc_bufs(sl, RIN_MTU);
@@ -774,13 +791,18 @@ static int rin_open(struct tty_struct *tty)
 
 		set_bit(SLF_INUSE, &sl->flags);
 
-		printk("%s - line : %d\n", __FUNCTION__, __LINE__);
 		err = register_netdevice(sl->dev);
-		printk("%s - line : %d\n", __FUNCTION__, __LINE__);
 		if (err)
 			goto err_free_bufs;
 	}
+	}
+	else if( rindrv_count == realloc_count)
+	{
+		rindrv_count = 0;
+		realloc_count = 0;
+		printk("%s - line : %d, realloc done!!\n", __FUNCTION__, __LINE__);
 
+	}
 	/* Done.  We have linked the TTY line to a channel. */
 	rtnl_unlock();
 	tty->receive_room = 65536;	/* We don't flow control */
@@ -841,7 +863,8 @@ static void rin_close(struct tty_struct *tty)
 	if (!sl->leased)
 		sl->line = 0;
 	
-	printk("%s - line : %d\n", __FUNCTION__, __LINE__);
+	rindrv_count++;
+	printk("%s - line : %d - rindrv_count = %d\n", __FUNCTION__, __LINE__, rindrv_count);
 }
 
 /* Perform I/O control on an active RIN channel. */

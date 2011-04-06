@@ -42,11 +42,11 @@
 #include <linux/i2c/atmel_maxtouch.h>
 #endif
 
-//20100419 bergkamp.cho@lge.com for headset detetion [LGE_START]
+//20100419  for headset detetion [LGE_START]
 #if defined(CONFIG_MACH_STAR)
-#include <linux/switch.h>	//20100419 bergkamp.cho@lge.com for Headset Detection [LGE]
+#include <linux/switch.h>	//20100419  for Headset Detection [LGE]
 #endif /* CONFIG_MACH_STAR */
-//20100419 bergkamp.cho@lge.com for headset detection [LGE_END]
+//20100419  for headset detection [LGE_END]
 
 #include <mach/iomap.h>
 #include <mach/io.h>
@@ -94,18 +94,18 @@
 #endif
 //20100830, gunwoo1.kim, soft reset [END]
 
-//20100724 byoungwoo.yoon@lge.com for poweroff leakage [LGE_START]
+//20100724  for poweroff leakage [LGE_START]
 #include "odm_kit/star/adaptations/pmu/max8907/max8907_supply_info_table.h"
 #include <linux/delay.h>
-//20100724 byoungwoo.yoon@lge.com for poweroff leakage [LGE_END]
+//20100724  for poweroff leakage [LGE_END]
 
-//20101023 suyong.han@lge.com TDMB Base [START_LGE_LAB1]
-//20100912, suyong.han@lge.com [START]	
+//20101023  TDMB Base [START_LGE_LAB1]
+//20100912,  [START]	
 #ifdef CONFIG_SPI_TDMB
 #include <linux/broadcast/board_broadcast.h>
 #endif
-//20100912, suyong.han@lge.com [END]		
-//20101023 suyong.han@lge.com TDMB Base [END_LGE_LAB1]
+//20100912,  [END]		
+//20101023  TDMB Base [END_LGE_LAB1]
 
 NvRmGpioHandle s_hGpioGlobal;
 
@@ -256,12 +256,12 @@ struct platform_device star_reset_keys_device = {
 #endif
 //20100830, gunwoo1.kim, soft reset [END]
 
-// 20101121 BT: dohyung10.lee@lge.com - For the BD Address Read /write [Start]
+// 20101121 BT:  - For the BD Address Read /write [Start]
 struct platform_device star_bd_address_device = {
 	.name = "star_bd_address",
 	.id = -1,
 };
-// 20101121 BT: dohyung10.lee@lge.com - For the BD Address Read /write [End]
+// 20101121 BT:  - For the BD Address Read /write [End]
 
 
 #ifdef CONFIG_MMC_SDHCI_TEGRA
@@ -270,9 +270,9 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform[] = {
 	[0] = {
 		.bus_width = 4,
 		.debounce = 5,
-// 20100827 mingi.sung@lge.com [WLAN] NVIDIA bug fix - lock up after suspend [START]
+// 20100827  [WLAN] NVIDIA bug fix - lock up after suspend [START]
 		.is_always_on = 1,
-// 20100827 mingi.sung@lge.com [WLAN] NVIDIA bug fix - lock up after suspend [END]
+// 20100827  [WLAN] NVIDIA bug fix - lock up after suspend [END]
 	},
 	[1] = {
 		.bus_width = 4,
@@ -973,7 +973,7 @@ static struct platform_device tegra_nvec_device = {
 };
 #endif
 
-//20100527, jh.ahn@lge.com, For Star Battery Driver [START]
+//20100527, , For Star Battery Driver [START]
 #if (defined(CONFIG_MACH_STAR) && defined(CONFIG_STAR_BATTERY_CHARGER))
 #ifndef CONFIG_TEGRA_BATTERY_ODM
 #error "You have to set defconfig(Device Drivers -> Power supply class support -> NVIDIA Tegra ODM kit battery driver)"
@@ -990,7 +990,7 @@ static struct platform_device tegra_battery_device = {
 	.id = -1,
 };
 #endif // CONFIG_MACH_STAR
-//20100527, jh.ahn@lge.com, For Star Battery Driver [END]
+//20100527, , For Star Battery Driver [END]
 
 #ifdef CONFIG_REGULATOR_TEGRA
 static struct regulator_consumer_supply pex_clk_consumers[] = {
@@ -1244,14 +1244,14 @@ static struct platform_device tegra_touch_device = {
 };
 #endif
 
-// 20100927  hyeongwon.oh@lge.com Synaptics OneTouch support [START]
+// 20100927   Synaptics OneTouch support [START]
 #ifdef CONFIG_ONETOUCH_TEGRA_ODM
 static struct platform_device tegra_onetouch_device = {
 	.name = "tegra_onetouch",
 	.id = -1,
 };
 #endif
-// 20100927  hyeongwon.oh@lge.com Synaptics OneTouch support [END]
+// 20100927   Synaptics OneTouch support [END]
 
 
 #ifdef CONFIG_STAR_GYRO_ACCEL
@@ -1268,7 +1268,7 @@ static struct platform_device tegra_gyro_accel_device =
 };
 #endif
 
-//20100526 sk.hwang@lge.com, For Compass Driver [start]
+//20100526 , For Compass Driver [start]
 #ifdef CONFIG_STAR_COMPASS
 static struct platform_device star_compass_device =
 {
@@ -1373,10 +1373,10 @@ static struct platform_device star_compass_device =
 	.id	  = -1,
 };
 #endif
-// 20100917 jay.sim@lge.com, Temp for Sensor Modulazation --
+// 20100917 , Temp for Sensor Modulazation --
 
 
-//20100526 sk.hwang@lge.com, For Vibrator Driver [start]
+//20100526 , For Vibrator Driver [start]
 #ifdef CONFIG_STAR_VIBRATOR
 static struct platform_device star_vib_device =
 {
@@ -1384,9 +1384,9 @@ static struct platform_device star_vib_device =
     .id   = -1,
 };
 #endif
-//20100526 sk.hwang@lge.com, For Vibrator Driver [end]
+//20100526 , For Vibrator Driver [end]
 
-#ifdef CONFIG_STAR_HALL //20100903 sk.hwang@lge.com
+#ifdef CONFIG_STAR_HALL //20100903 
 static struct platform_device star_hall_device =
 {
     .name = "star_hall",
@@ -1408,7 +1408,7 @@ static struct platform_device tegra_vibrator_device = {
 };
 #endif
 
-//20101101, gunwoo1.kim@lge.com, ATS [START]
+//20101101,  ATS [START]
 #if defined(CONFIG_LGE_ATS_INPUT_DEVICE)
 static struct platform_device ats_event_log_device =
 {
@@ -1416,9 +1416,9 @@ static struct platform_device ats_event_log_device =
     .id   = -1,
 };
 #endif
-//20101101, gunwoo1.kim@lge.com, ATS [START]
+//20101101,  ATS [START]
 
-// 20100526 sk.hwang@lge.com Proximity driver [START]
+// 20100526  Proximity driver [START]
 #ifdef CONFIG_STAR_PROXIMITY
 static struct platform_device star_proximity_device =
 {
@@ -1426,9 +1426,9 @@ static struct platform_device star_proximity_device =
     .id   = -1,
 };
 #endif
-// 20100526 sk.hwang@lge.com Proximity driver [END]
+// 20100526  Proximity driver [END]
 
-//20100413, cs77.ha@lge.com, star powerkey [START]
+//20100413,  star powerkey [START]
 #ifdef CONFIG_MACH_STAR
 #ifdef CONFIG_STAR_POWERKEY
 static struct platform_device star_powerkey =
@@ -1438,7 +1438,7 @@ static struct platform_device star_powerkey =
 };
 #endif
 
-//20100611, cs77.ha@lge.com, touch LED [START]
+//20100611, touch LED [START]
 #ifdef CONFIG_STAR_TOUCH_LED
 static struct platform_device star_touch_led =
 {
@@ -1447,9 +1447,9 @@ static struct platform_device star_touch_led =
 };
 
 #endif
-//20100611, cs77.ha@lge.com, touch LED [END]
+//20100611,  touch LED [END]
 
-//20100702, cs77.ha@lge.com, HDMI regulator [START]
+//20100702, cs77, HDMI regulator [START]
 #ifdef CONFIG_STAR_HDMI_REG
 static struct platform_device star_hdmi_reg =
 {
@@ -1457,9 +1457,9 @@ static struct platform_device star_hdmi_reg =
     .id   = -1,
 };
 #endif
-//20100702, cs77.ha@lge.com, HDMI regulator [END]
+//20100702, cs77, HDMI regulator [END]
 
-//20101129, hyeongwon.oh@lge.com, SU660 star homekey [START]
+//20101129, , SU660 star homekey [START]
 #ifdef CONFIG_STAR_HOMEKEY
 static struct platform_device star_homekey =
 {
@@ -1467,17 +1467,17 @@ static struct platform_device star_homekey =
     .id   = -1,
 };
 #endif
-//20101129, hyeongwon.oh@lge.com, SU660 star homekey [END]
+//20101129, , SU660 star homekey [END]
 
 #endif
-//20100413, cs77.ha@lge.com, star powerkey [END]
+//20100413,  star powerkey [END]
 
 
-//20100419 bergkamp.cho@lge.com headset detection [LGE_START]
+//20100419  headset detection [LGE_START]
 #if defined(CONFIG_MACH_STAR)
 static struct gpio_switch_platform_data star_headset_data = {
 	.name = "h2w",
-    .gpio = 170,	//20100419 bergkamp.cho@lge.com GPIO Index, not used for nVidia gpio
+    .gpio = 170,	//20100419  GPIO Index, not used for nVidia gpio
 };
 static struct platform_device star_headset_device = {
 	.name		= "star_headset",
@@ -1485,17 +1485,17 @@ static struct platform_device star_headset_device = {
 	.dev.platform_data = &star_headset_data,
 };
 #endif
-//20100419 bergkamp.cho@lge.com headset detection [LGE_END]
+//20100419  headset detection [LGE_END]
 
-//LGE_UPDATE_S neo.shin@lge.com 2010-05-024 GPS UART & GPIO Setting
+//LGE_UPDATE_S  2010-05-024 GPS UART & GPIO Setting
 static struct platform_device tegra_gps_gpio =
 {
     .name = "tegra_gps_gpio",
     .id   = -1,
 };
-//LGE_UPDATE_E neo.shin@lge.com 2010-05-024 GPS UART & GPIO Setting
+//LGE_UPDATE_E  2010-05-024 GPS UART & GPIO Setting
 
-//20100704 bergkamp.cho@lge.com jongik's headset porting [LGE_START]
+//20100704  jongik's headset porting [LGE_START]
 #if defined(CONFIG_MACH_STAR)
 static struct platform_device star_wm8994_pdevice =
 {
@@ -1503,8 +1503,8 @@ static struct platform_device star_wm8994_pdevice =
 	.id	  = -1,
 };
 #endif
-//20100704 bergkamp.cho@lge.com jongik's headset porting [LGE_END]
-//20100401 taewan.kim@lge.com MUIC driver [START]
+//20100704  jongik's headset porting [LGE_END]
+//20100401  MUIC driver [START]
 #if defined(CONFIG_MACH_STAR)
 static struct platform_device star_muic_device =
 {
@@ -1512,9 +1512,9 @@ static struct platform_device star_muic_device =
     .id   = -1,
 };
 #endif
-// 20100401 taewan.kim@lge.com MUIC driver [END]
+// 20100401  MUIC driver [END]
 
-//20100803 taewan.kim@lge.com  crash dump [START]
+//20100803   crash dump [START]
 #if defined(CONFIG_ANDROID_RAM_CONSOLE)
 #define STAR_RAM_CONSOLE_BASE 	(383*SZ_1M)
 #define STAR_RAM_CONSOLE_SIZE	(512*SZ_1K) 	
@@ -1534,7 +1534,7 @@ static struct platform_device ram_console_device = {
         .resource       = ram_console_resource,
 };
 #endif
-//20100803 taewan.kim@lge.com  crash dump [END]
+//20100803   crash dump [END]
 
 static struct platform_device *nvodm_devices[] __initdata = {
 #ifdef CONFIG_RTC_DRV_TEGRA
@@ -1546,24 +1546,24 @@ static struct platform_device *nvodm_devices[] __initdata = {
 #ifdef CONFIG_TEGRA_NVEC
 	&tegra_nvec_device,
 #endif
-//20100527, jh.ahn@lge.com, For Star Battery Driver [START]
+//20100527, , For Star Battery Driver [START]
 #if (defined(CONFIG_MACH_STAR) && defined(CONFIG_STAR_BATTERY_CHARGER))
 	&star_battery_charger_device,
 #elif defined(CONFIG_TEGRA_BATTERY_NVEC) || defined(CONFIG_TEGRA_BATTERY_ODM)
 	&tegra_battery_device,
 #endif // CONFIG_MACH_STAR
-//20100527, jh.ahn@lge.com, For Star Battery Driver [END]
+//20100527, , For Star Battery Driver [END]
 #ifdef CONFIG_REGULATOR_TEGRA
 	&tegra_regulator_device,
 #endif
 #ifdef CONFIG_TOUCHSCREEN_TEGRA_ODM
 	&tegra_touch_device,
 #endif
-// 20100927  hyeongwon.oh@lge.com Synaptics OneTouch support [START]
+// 20100927   Synaptics OneTouch support [START]
 #ifdef CONFIG_ONETOUCH_TEGRA_ODM
 	&tegra_onetouch_device,
 #endif
-// 20100927  hyeongwon.oh@lge.com Synaptics OneTouch support [END]
+// 20100927   Synaptics OneTouch support [END]
 #ifdef CONFIG_INPUT_TEGRA_ODM_SCROLL
 	//&tegra_scrollwheel_device,
 #endif
@@ -1609,50 +1609,50 @@ static struct platform_device *nvodm_devices[] __initdata = {
     &star_hdmi_reg,
 #endif
 
-//20101129, hyeongwon.oh@lge.com, SU660 star homekey [START]
+//20101129, , SU660 star homekey [START]
 #ifdef CONFIG_STAR_HOMEKEY
     &star_homekey,
 #endif 
-//20101129, hyeongwon.oh@lge.com, SU660 star homekey [END]
+//20101129, , SU660 star homekey [END]
 
-//20100419 bergkamp.cho@lge.com for headset detection [LGE_START]
+//20100419  for headset detection [LGE_START]
 #if defined(CONFIG_MACH_STAR)
     &star_headset_device,			//for not boot
 #endif /* CONFIG_MACH_STAR */
-//20100419 bergkamp.cho@lge.com for headset detection [LGE_END]
+//20100419  for headset detection [LGE_END]
 
-//LGE_UPDATE_S neo.shin@lge.com 2010-05-024 GPS UART & GPIO Setting
+//LGE_UPDATE_S  2010-05-024 GPS UART & GPIO Setting
     &tegra_gps_gpio,
-//LGE_UPDATE_E neo.shin@lge.com 2010-05-024 GPS UART & GPIO Setting
+//LGE_UPDATE_E  2010-05-024 GPS UART & GPIO Setting
 
-//20100704 bergkamp.cho@lge.com jongik's wm8994 driver porting [LGE_START]
+//20100704  jongik's wm8994 driver porting [LGE_START]
 #if defined(CONFIG_MACH_STAR)
     &star_wm8994_pdevice,		//for not boot
 #endif /* CONFIG_MACH_STAR */
-//20100704 bergkamp.cho@lge.com jongik's wm8994 driver porting [LGE_END]
+//20100704  jongik's wm8994 driver porting [LGE_END]
 #if defined(CONFIG_ANDROID_RAM_CONSOLE)
-    &ram_console_device, //20100803 taewan.kim@lge.com  crash dump
+    &ram_console_device, //20100803   crash dump
 #endif
 
-//20100830, gunwoo1.kim@lge.com, soft reset [START]
+//20100830, gunwoo1, soft reset [START]
 #if defined(CONFIG_INPUT_KEYRESET)
     &star_reset_keys_device,
 #endif
-//20100830, gunwoo1.kim@lge.com, soft reset [END]
+//20100830, gunwoo1, soft reset [END]
 
-//20101101, gunwoo1.kim@lge.com, ATS [START]
+//20101101, gunwoo1, ATS [START]
 #if defined(CONFIG_LGE_ATS_INPUT_DEVICE)
     &ats_event_log_device,
 #endif
-//20101101, gunwoo1.kim@lge.com, ATS [START]
+//20101101, gunwoo1, ATS [START]
 
-// 20101121 BT: dohyung10.lee@lge.com - For the BD Address Read /write [Start]
+// 20101121 BT: dohyung10 - For the BD Address Read /write [Start]
 	&star_bd_address_device,
-// 20101121 BT: dohyung10.lee@lge.com - For the BD Address Read /write [End]
+// 20101121 BT: dohyung10 - For the BD Address Read /write [End]
 
 };
 
-//20100711-1, syblue.lee@lge.com, add spi_ifxn721 [START]
+//20100711-1, , add spi_ifxn721 [START]
 #ifdef CONFIG_SPI_TEGRA
 #include <linux/spi/spi.h>
 
@@ -1675,13 +1675,13 @@ static void __init tegra_register_ifxn721(void)
     NvU32 instance = 0xFFFF;
     NvU32 cs = 0xFFF;
 	NvU32 pin = 0xFFFF, port = 0xFFFF;	//SPI_SRDY
-	NvU32 pin2 = 0xFFFF, port2 = 0xFFFF; //SPI_MRDY	//20100607, syblue.lee@lge.com, Add spi_mrdy
+	NvU32 pin2 = 0xFFFF, port2 = 0xFFFF; //SPI_MRDY	//20100607, , Add spi_mrdy
     const NvOdmPeripheralConnectivity *pConnectivity = NULL;
     int i;
     const NvOdmQuerySpiDeviceInfo *pSpiDeviceInfo;
 
     pConnectivity =
-        NvOdmPeripheralGetGuid(NV_ODM_GUID('s','t','a','r','-','s','p','i'));	//20100607, syblue.lee@lge.com, modify ifxn-721 -> star-spi
+        NvOdmPeripheralGetGuid(NV_ODM_GUID('s','t','a','r','-','s','p','i'));	//20100607, , modify ifxn-721 -> star-spi
 	
     if (!pConnectivity){
 	 printk("[tegra_spi]pConnectivity = %d \n", (int)pConnectivity);
@@ -1702,7 +1702,7 @@ static void __init tegra_register_ifxn721(void)
 			   port = pConnectivity->AddressList[i].Instance;
 			   pin = pConnectivity->AddressList[i].Address;
 		}
-		else //20100607, syblue.lee@lge.com, add spi_mrdy
+		else //20100607, , add spi_mrdy
 		{
 			   port2 = pConnectivity->AddressList[i].Instance;
 			   pin2 = pConnectivity->AddressList[i].Address;
@@ -1715,7 +1715,7 @@ static void __init tegra_register_ifxn721(void)
 
     /* SPI ethernet driver needs one SPI info and a gpio for interrupt */
     if (instance == 0xffff || cs == 0xffff || port == 0xFFFF || pin == 0xFFFF
-		|| port2 == 0xFFFF || pin2 == 0xFFFF){	//20100607, syblue.lee@lge.com, add spi_mrdy
+		|| port2 == 0xFFFF || pin2 == 0xFFFF){	//20100607, , add spi_mrdy
 	 printk("[tegra_spi]instance = %d, cs = %d, srdy[%d-%d], mrdy[%d-%d]\n", instance, cs, port, pin, port2, pin2);
         return;
     }
@@ -1747,8 +1747,8 @@ static void __init tegra_register_ifxn721(void)
 }
 
 #ifdef CONFIG_SPI_TDMB
-//20100918 suyong.han@lge.com TDMB Base [START_LGE_LAB1]
-//20100912, suyong.han@lge.com [START]		
+//20100918  TDMB Base [START_LGE_LAB1]
+//20100912,  [START]		
 static struct broadcast_tdmb_data tdmb_platform_data = {
 	.hNVODM_DmbIntPin		= 0,
 };
@@ -1796,30 +1796,30 @@ static void __init star_tdmb_spi_init(void)
 		pr_err("%s: spi_register_board_info returned error\n", __func__);
 	}
 }
-//20100912, suyong.han@lge.com [END]		
-//20100918 suyong.han@lge.com TDMB Base [END_LGE_LAB1]
+//20100912,  [END]		
+//20100918  TDMB Base [END_LGE_LAB1]
 #endif
 
 #endif /*CONFIG_SPI_TEGRA*/
-//20100711, syblue.lee@lge.com, add spi_ifxn721 [END]
+//20100711, , add spi_ifxn721 [END]
 
 #ifdef CONFIG_SPI_TEGRA
 static struct tegra_spi_platform_data tegra_spi_platform[] = {
 	[0] = {
-//20100711-1, syblue.lee@lge.com, add pinmux [START]		
+//20100711-1, , add pinmux [START]		
 		.pinmux = NvOdmSpiPinMap_Config1,
-//20100711, syblue.lee@lge.com, add pinmux [END]
+//20100711, , add pinmux [END]
 		.is_slink = true,
 	},
 #ifdef CONFIG_SPI_TDMB	
-//20100918 suyong.han@lge.com TDMB Base [START_LGE_LAB1]
-//20100912, suyong.han@lge.com [START]	
+//20100918  TDMB Base [START_LGE_LAB1]
+//20100912,  [START]	
 	[1] = {
 		.pinmux = NvOdmSpiPinMap_Config4,
 		.is_slink = true,
 	},
-//20100912, syblue.lee@lge.com [END]
-//20100918 suyong.han@lge.com TDMB Base [END_LGE_LAB1]
+//20100912,  [END]
+//20100918  TDMB Base [END_LGE_LAB1]
 #endif
 
 #if 0	
@@ -1847,8 +1847,8 @@ static struct platform_device tegra_spi_devices[] = {
 	},
 	
 #ifdef CONFIG_SPI_TDMB	
-//20100918 suyong.han@lge.com TDMB Base [START_LGE_LAB1]
-//20100912, suyong.han@lge.com [START]	
+//20100918  TDMB Base [START_LGE_LAB1]
+//20100912,  [START]	
 	[1] = {
 		.name = "tegra_spi",
 		.id = 1,
@@ -1856,8 +1856,8 @@ static struct platform_device tegra_spi_devices[] = {
 			.platform_data = &tegra_spi_platform[1],
 		},
 	},	
-//20100912, syblue.lee@lge.com [END]
-//20100918 suyong.han@lge.com TDMB Base [END_LGE_LAB1]
+//20100912,  [END]
+//20100918  TDMB Base [END_LGE_LAB1]
 #endif
 
 #if 0
@@ -1946,16 +1946,16 @@ static noinline void __init tegra_setup_spi(void)
 		}
 	}
 
-//20100711-1, syblue.lee@lge.com, add spi_ifxn721 [START]
+//20100711-1, , add spi_ifxn721 [START]
 	tegra_register_ifxn721();
-//20100711, syblue.lee@lge.com, add spi_ifxn721 [END]
+//20100711, , add spi_ifxn721 [END]
 
 #ifdef CONFIG_SPI_TDMB	
-//20100918 suyong.han@lge.com TDMB Base [START_LGE_LAB1]
-//20100912, suyong.han@lge.com [START]	
+//20100918  TDMB Base [START_LGE_LAB1]
+//20100912,  [START]	
 		star_tdmb_spi_init();
-//20100912, syblue.lee@lge.com [END]
-//20100918 suyong.han@lge.com TDMB Base [END_LGE_LAB1]
+//20100912,  [END]
+//20100918  TDMB Base [END_LGE_LAB1]
 #endif
 
 }
@@ -2057,6 +2057,153 @@ static struct platform_device tegra_i2c_devices[] = {
 		},
 	},
 };
+
+
+static NvBool sensor_poweron()
+{
+
+	NvU32 mvolt_ldo7, mvolt_ldo8;
+	NvU32 settletime;
+	int retry = 0;
+	printk("sensor poweron\n");
+	NvOdmServicesPmuHandle h_pmu = NvOdmServicesPmuOpen();
+	if (!h_pmu)
+	{ 
+		printk("sensor pmu handle fail!\n");
+		return NV_FALSE;
+	}
+
+	do {
+
+		NvOdmServicesPmuSetVoltage( h_pmu, Max8907PmuSupply_LDO7 , NVODM_VOLTAGE_OFF, &settletime);
+		NvOdmOsWaitUS(settletime);
+
+		NvOdmServicesPmuSetVoltage( h_pmu, Max8907PmuSupply_LDO8 , NVODM_VOLTAGE_OFF, &settletime);
+		NvOdmOsWaitUS(settletime);
+
+		NvOdmServicesPmuGetVoltage(h_pmu, Max8907PmuSupply_LDO7, &mvolt_ldo7);
+		NvOdmServicesPmuGetVoltage(h_pmu, Max8907PmuSupply_LDO7, &mvolt_ldo8);
+
+		printk("LDO7 = %dmV, LDO8 = %dmV\n", mvolt_ldo7, mvolt_ldo8);
+		retry++;
+		if (retry > 10) 
+		{ 
+			printk("sensor power control off fail!\n");
+	                NvOdmServicesPmuClose(h_pmu);
+			return NV_FALSE;
+		}
+
+
+	} while ( mvolt_ldo7 !=0 || mvolt_ldo8  != 0 );
+
+	msleep(1500);
+	
+        do {
+
+		NvOdmServicesPmuSetVoltage( h_pmu, Max8907PmuSupply_LDO7 , 3000, &settletime);
+		NvOdmOsWaitUS(settletime);
+
+		NvOdmServicesPmuSetVoltage( h_pmu, Max8907PmuSupply_LDO8 , 1800, &settletime);
+		NvOdmOsWaitUS(settletime);
+
+		NvOdmServicesPmuGetVoltage(h_pmu, Max8907PmuSupply_LDO7, &mvolt_ldo7);
+		NvOdmServicesPmuGetVoltage(h_pmu, Max8907PmuSupply_LDO8, &mvolt_ldo8);
+
+		printk("LDO7 = %dmV, LDO8 = %dmV\n", mvolt_ldo7, mvolt_ldo8);
+		retry++;
+		if (retry > 10) 
+		{ 
+			printk("sensor power control on fail!\n");
+	                NvOdmServicesPmuClose(h_pmu);
+			return NV_FALSE;
+		}
+
+
+	} while ( mvolt_ldo7 ==0 || mvolt_ldo8  == 0 );
+
+
+	NvOdmOsWaitUS(10);
+
+	NvOdmServicesPmuClose(h_pmu);
+	return NV_TRUE;
+}
+
+
+static void sensor_workaround()
+{
+
+#define GEN2_I2C_SCL 't' - 'a', 5
+#define GEN2_I2C_SDA 't' - 'a', 6
+#define HALL_INT 'u' - 'a', 5
+#define COM_INT 'r' -'a', 4
+#define GYRO_INT_N 'q' - 'a' , 5
+#define MOTION_INT 'i' -'a', 0
+#define PROXI_OUT 'w' - 'a', 2
+       
+	NvOdmServicesGpioHandle hGpio;
+	NvOdmGpioPinHandle hSclGpioPinHandle;
+	NvOdmGpioPinHandle hSdaGpioPinHandle;
+	NvOdmGpioPinHandle hHalGpioPinHandle;
+	NvOdmGpioPinHandle hComGpioPinHandle;
+	NvOdmGpioPinHandle hGyrGpioPinHandle;
+	NvOdmGpioPinHandle hMotGpioPinHandle;
+	NvOdmGpioPinHandle hProGpioPinHandle;
+
+	hGpio = NvOdmGpioOpen();
+
+	if (!hGpio)
+	{
+		printk("%s: NvOdmGpioOpen Error \n", __func__);
+		goto error_open_gpio_fail;
+	}
+
+	hSclGpioPinHandle = NvOdmGpioAcquirePinHandle(hGpio, GEN2_I2C_SCL);
+	hSdaGpioPinHandle = NvOdmGpioAcquirePinHandle(hGpio, GEN2_I2C_SDA);  
+	hHalGpioPinHandle = NvOdmGpioAcquirePinHandle(hGpio, HALL_INT);  
+	hComGpioPinHandle = NvOdmGpioAcquirePinHandle(hGpio, COM_INT);
+	hGyrGpioPinHandle = NvOdmGpioAcquirePinHandle(hGpio, GYRO_INT_N);
+	hMotGpioPinHandle = NvOdmGpioAcquirePinHandle(hGpio, MOTION_INT);
+	hProGpioPinHandle = NvOdmGpioAcquirePinHandle(hGpio, PROXI_OUT);
+
+         if (!hSclGpioPinHandle ||
+	     !hSdaGpioPinHandle ||
+	     !hHalGpioPinHandle ||
+	     !hComGpioPinHandle ||
+	     !hGyrGpioPinHandle ||
+	     !hMotGpioPinHandle ||
+	     !hProGpioPinHandle ) 
+         {
+                 printk("%s: Couldn't NvOdmGpioAcquirePinHandle  pin \n", __func__);
+                 goto error_open_gpio_pin_acquire_fail;
+         }  
+
+	NvOdmGpioSetState(hGpio,hSclGpioPinHandle , 0x0); NvOdmGpioConfig(hGpio, hSclGpioPinHandle, 5 );
+	NvOdmGpioSetState(hGpio,hSdaGpioPinHandle , 0x0); NvOdmGpioConfig(hGpio, hSdaGpioPinHandle, 5 );
+	NvOdmGpioSetState(hGpio,hHalGpioPinHandle , 0x0); NvOdmGpioConfig(hGpio, hHalGpioPinHandle, 5 );
+	NvOdmGpioSetState(hGpio,hComGpioPinHandle , 0x0); NvOdmGpioConfig(hGpio, hComGpioPinHandle, 5 );
+	NvOdmGpioSetState(hGpio,hGyrGpioPinHandle , 0x0); NvOdmGpioConfig(hGpio, hGyrGpioPinHandle, 5 );
+	NvOdmGpioSetState(hGpio,hMotGpioPinHandle , 0x0); NvOdmGpioConfig(hGpio, hMotGpioPinHandle, 5 );
+	NvOdmGpioSetState(hGpio,hProGpioPinHandle , 0x0); NvOdmGpioConfig(hGpio, hProGpioPinHandle, 5 );
+
+       if (!sensor_poweron())
+       {
+          printk("%s: sensor_poweron() fail \n", __func__);
+       }
+
+done:
+ 
+error_open_gpio_pin_acquire_fail:
+	NvOdmGpioReleasePinHandle(hGpio,hSclGpioPinHandle);
+	NvOdmGpioReleasePinHandle(hGpio,hSdaGpioPinHandle);
+	NvOdmGpioReleasePinHandle(hGpio,hHalGpioPinHandle); 
+	NvOdmGpioReleasePinHandle(hGpio,hComGpioPinHandle);
+	NvOdmGpioReleasePinHandle(hGpio,hGyrGpioPinHandle);
+	NvOdmGpioReleasePinHandle(hGpio,hMotGpioPinHandle);
+	NvOdmGpioReleasePinHandle(hGpio,hProGpioPinHandle);
+error_open_gpio_fail:
+        NvOdmGpioClose(hGpio);
+}
+
 static noinline void __init tegra_setup_i2c(void)
 {
 	const NvOdmPeripheralConnectivity *smbus;
@@ -2070,6 +2217,8 @@ static noinline void __init tegra_setup_i2c(void)
 	NvU32 odm_mux_i2cp_nr;
 	NvU32 odm_clk_i2cp_nr;
 	int i;
+
+        sensor_workaround();
 
 	smbus = NvOdmPeripheralGetGuid(NV_ODM_GUID('I','2','c','S','m','B','u','s'));
 
@@ -2191,7 +2340,7 @@ static int tegra_setup_pcie(void)
 late_initcall(tegra_setup_pcie);
 #endif
 
-//20100724 byoungwoo.yoon@lge.com for poweroff leakage [LGE_START]
+//20100724  for poweroff leakage [LGE_START]
 #define MAX_COUNT 10
 void tegra_voltage_off( NvU32 vddId )
 {
@@ -2220,13 +2369,13 @@ void tegra_voltage_off( NvU32 vddId )
 		pr_info("[POWER] %s: LOD=%d (count=%d) success !!	\n", __func__, vddId-4, count);
 	}
 }
-//20100724 byoungwoo.yoon@lge.com for poweroff leakage [LGE_END]
+//20100724  for poweroff leakage [LGE_END]
 
 static void tegra_system_power_off(void)
 {
 	struct regulator *regulator = regulator_get(NULL, "soc_main");
 
-//20100724 byoungwoo.yoon@lge.com for poweroff leakage [LGE_START]
+//20100724  for poweroff leakage [LGE_START]
     #if 0
 	u32 settling_time;
 
@@ -2244,7 +2393,7 @@ static void tegra_system_power_off(void)
 	tegra_voltage_off(Max8907PmuSupply_LDO4);
 	tegra_voltage_off(Max8907PmuSupply_LDO5);	
     #endif
-//20100724 byoungwoo.yoon@lge.com for poweroff leakage [LGE_END]
+//20100724  for poweroff leakage [LGE_END]
 
 
 	if (!IS_ERR(regulator)) {
@@ -2379,7 +2528,7 @@ static void __init tegra_setup_suspend(void)
 #endif
 #endif
 #endif
-//20101117, cs77.ha@lge.com, gpio wakeup from LP1 [END]
+//20101117, cs77, gpio wakeup from LP1 [END]
 
 
 do_register:

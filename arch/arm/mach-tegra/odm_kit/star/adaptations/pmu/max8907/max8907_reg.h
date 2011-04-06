@@ -400,14 +400,14 @@ extern "C"
 #define MAX8907_RESET_CNFG_PWREN_EN_SHIFT      0x7
 #define MAX8907_RESET_CNFG_PWREN_EN_MASK       0x1
 
-//20100413, cs77.ha@lge.com, add [START]
+//20100413, add [START]
 #define MAX8907_RESET_CNFG_SFT_RST_SHIFT       0x5
 #define MAX8907_RESET_CNFG_SFT_RST_MASK        0x1
 #define MAX8907_SYSENSEL_POWER_OFF_SHIFT       0x6
 #define MAX8907_SYSENSEL_POWER_OFF_MASK        0x1 
-//20100413, cs77.ha@lge.com, add [END]
+//20100413, add [END]
 
-//20100427, cs77.ha@lge.com, SMPL [START]
+//20100427, SMPL [START]
 #define MAX8907_MPL_EN_SHIFT                   0x4
 #define MAX8907_MPL_EN_MASK                    0x1
 
@@ -416,19 +416,19 @@ extern "C"
 #define MAX8907_MPL_TIME_1_SEC                 0x1
 #define MAX8907_MPL_TIME_1_5_SEC               0x2
 #define MAX8907_MPL_TIME_2_SEC                 0x3
-//20100427, cs77.ha@lge.com, SMPL [END]
+//20100427, SMPL [END]
 
-//20100727, byoungwoo.yoon@lge.com, change SEQ [START]
+//20100727, , change SEQ [START]
 #define MAX8907_LDOCTL_SEQ_MASK	0x7
 #define MAX8907_LDOCTL_SEQ_SHIFT	0x2
-//20100727, byoungwoo.yoon@lge.com, change SEQ [END]
+//20100727, , change SEQ [END]
 
-//20100928, byoungwoo.yoon@lge.com, RTC alarm enable [START]
+//20100928, , RTC alarm enable [START]
 #define MAX8907_ALARM0_CNTL_ENABLE	0x77
 #define MAX8907_RTC_IRQ_ALARM0_R		0x08
 #define MAX8907_RTC_IRQ_ALARM1_R		0x04
 #define MAX8907_RTC_IRQ_MASK_ALARM0_R	0x08
-//20100928, byoungwoo.yoon@lge.com, RTC alarm enable [END]
+//20100928, , RTC alarm enable [END]
 
 #if defined(__cplusplus)
 }

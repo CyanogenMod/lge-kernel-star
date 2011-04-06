@@ -268,6 +268,17 @@ int AMI304_Init(int mode)
 	return 0;
 }
 
+int tegra_compass_hw_init(void)
+{
+	msleep(1);
+	//	mdelay(50); //to waiting time(50ms) from PowerOFF to Stand-by
+	//On soft reset
+	AMI304_Reset_Init();
+
+	AMI304_Init(AMI304_FORCE_MODE); // default is Force State
+	
+}
+
 static int AMI304_SetMode(int newmode)
 {
 	int mode = 0;
@@ -434,6 +445,17 @@ static int AMI304_Report_Value(int en_dis)
 	input_sync(compass_dev->input_dev);
 
 	return 0;
+}
+
+int open_ami304()
+{
+	AMI304_Reset_Init();
+
+	AMI304_Init(AMI304_FORCE_MODE); // default is Force State
+#if DEBUG_AMI304
+	printk("[%s:%d] Compass Sensor: AMI304 registered driver! \n", __FUNCTION__, __LINE__);
+#endif
+	return 0;  
 }
 
 static ssize_t show_chipinfo_value(struct device *dev, struct device_attribute *attr, char *buf)
@@ -1003,12 +1025,7 @@ static NvS32 __init ami304_probe(struct platform_device *pdev)
 		pr_err("open_def_odm_comp: Failed \n");
 		goto exit_alloc_data_failed;
 	}
-	msleep(1);
-	//	mdelay(50); //to waiting time(50ms) from PowerOFF to Stand-by
-	//On soft reset
-	AMI304_Reset_Init();
 
-	AMI304_Init(AMI304_FORCE_MODE); // default is Force State
 #if DEBUG_AMI304
 	printk("[%s:%d] Compass Sensor: AMI304 registered driver! \n", __FUNCTION__, __LINE__);
 #endif
@@ -1127,6 +1144,40 @@ int lge_sensor_verify_compass(void)
     return SENSOR_OK;
 }
 
+int lge_sensor_shutdown_compass(void)
+{
+	// reset device 
+	printk("[%s:%d] \n", __FUNCTION__, __LINE__);
+	close_odm_compass();
+	return SENSOR_OK;
+}
+
+int lge_sensor_restart_compass(void)
+{
+	NvS32 err = -1;
+
+	printk("[%s:%d] \n", __FUNCTION__, __LINE__);
+	err = open_def_odm_compass();
+	if (!err) {
+		pr_err("open_def_odm_comp: Failed \n");
+		return (-1);
+	}
+	msleep(1);
+	//	mdelay(50); //to waiting time(50ms) from PowerOFF to Stand-by
+
+	err = open_ami304();
+	if (err) {
+		printk(KERN_ERR
+				"ami304 device Init failed\n");
+		return (-1);
+	}
+
+#if DEBUG_AMI304
+	printk("[%s:%d] Compass Sensor: AMI304 registered driver! \n", __FUNCTION__, __LINE__);
+#endif
+
+	return SENSOR_OK;
+}
 static NvS32 ami304_remove(struct platform_device *pdev)
 {
 	int err;

@@ -37,7 +37,7 @@ static star_hall_device *g_hall;
 static atomic_t sensing_hall;
 static bool power_enabled = false;
 
-// 20100903 taewan.kim@lge.com Power control bug fix [START]
+// 20100903  Power control bug fix [START]
 static int star_hall_set_power_rail( NvU32 vdd_id, NvBool is_enable )
 {
     NvOdmServicesPmuHandle h_pmu = NvOdmServicesPmuOpen();
@@ -74,7 +74,7 @@ static int star_hall_set_power_rail( NvU32 vdd_id, NvBool is_enable )
 
     return -1;
 }
-// 20100903 taewan.kim@lge.com Power control bug fix [END]
+// 20100903  Power control bug fix [END]
 
 static void star_hall_work_func( struct work_struct* work )
 {
@@ -284,6 +284,6 @@ static void __exit star_hall_exit( void )
 module_init(star_hall_init);
 module_exit(star_hall_exit);
 
-MODULE_AUTHOR("sk.hwang@lge.com");
+MODULE_AUTHOR("");
 MODULE_DESCRIPTION("driver of star hall ic");
 MODULE_LICENSE("GPL");

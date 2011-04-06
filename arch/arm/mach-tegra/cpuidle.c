@@ -67,7 +67,7 @@ void __init tegra_init_idle(struct tegra_suspend_platform_data *plat)
 static int tegra_idle_enter_lp3(struct cpuidle_device *dev,
 	struct cpuidle_state *state)
 {
-	//20100907 taewan.kim@lge.com race condition fix [START]
+	//20100907  race condition fix [START]
 	//void __iomem *flow_ctrl = IO_ADDRESS(TEGRA_FLOW_CTRL_BASE);
 	void __iomem *flow_ctrl;
 	ktime_t enter, exit;
@@ -79,7 +79,7 @@ static int tegra_idle_enter_lp3(struct cpuidle_device *dev,
 	local_irq_disable();
 	flow_ctrl = IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + FLOW_CTRL_HALT_CPUx_EVENTS(dev->cpu);
 	reg = FLOW_CTRL_WAITEVENT | FLOW_CTRL_JTAG_RESUME;
-	//20100907 taewan.kim@lge.com race condition fix [END]
+	//20100907  race condition fix [END]
 
 	smp_rmb();
 
