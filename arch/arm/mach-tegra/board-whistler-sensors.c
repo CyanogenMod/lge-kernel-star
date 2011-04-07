@@ -91,6 +91,7 @@ static int whistler_ov5650_power_on(void)
 		regulator_enable(reg_avdd_cam1);
 	}
 	mdelay(5);
+
 	if (!reg_vdd_mipi) {
 		reg_vdd_mipi = regulator_get(NULL, "vddio_mipi");
 		if (IS_ERR_OR_NULL(reg_vdd_mipi)) {
@@ -100,6 +101,18 @@ static int whistler_ov5650_power_on(void)
 		}
 		regulator_enable(reg_vdd_mipi);
 	}
+	mdelay(5);
+
+	if (!reg_vdd_af) {
+		reg_vdd_af = regulator_get(NULL, "vdd_vcore_af");
+		if (IS_ERR_OR_NULL(reg_vdd_af)) {
+			pr_err("whistler_ov5650_power_on: vdd_vcore_af failed\n");
+			reg_vdd_af = NULL;
+			return PTR_ERR(reg_vdd_af);
+		}
+		regulator_enable(reg_vdd_af);
+	}
+	mdelay(5);
 
 	gpio_set_value(CAMERA1_RESET_GPIO, 1);
 	mdelay(10);
@@ -107,12 +120,14 @@ static int whistler_ov5650_power_on(void)
 	mdelay(5);
 	gpio_set_value(CAMERA1_RESET_GPIO, 1);
 	mdelay(20);
+	gpio_set_value(CAMERA_AF_PD_GPIO, 1);
 
 	return 0;
 }
 
 static int whistler_ov5650_power_off(void)
 {
+	gpio_set_value(CAMERA_AF_PD_GPIO, 0);
 	gpio_set_value(CAMERA1_PWDN_GPIO, 1);
 	gpio_set_value(CAMERA1_RESET_GPIO, 0);
 
@@ -120,6 +135,12 @@ static int whistler_ov5650_power_off(void)
 		regulator_disable(reg_avdd_cam1);
 		regulator_put(reg_avdd_cam1);
 		reg_avdd_cam1 = NULL;
+	}
+
+	if (reg_vdd_mipi) {
+		regulator_disable(reg_vdd_mipi);
+		regulator_put(reg_vdd_mipi);
+		reg_vdd_mipi = NULL;
 	}
 
 	if (reg_vdd_af) {
@@ -140,6 +161,9 @@ static struct i2c_board_info whistler_i2c3_board_info[] = {
 	{
 		I2C_BOARD_INFO("ov5650", 0x36),
 		.platform_data = &whistler_ov5650_data,
+	},
+	{
+		I2C_BOARD_INFO("ad5820", 0x0c),
 	},
 };
 
