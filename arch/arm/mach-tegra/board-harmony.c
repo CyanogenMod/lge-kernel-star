@@ -176,19 +176,19 @@ static struct platform_device harmony_audio_device = {
 };
 
 static struct tegra_i2c_platform_data harmony_i2c1_platform_data = {
-	.bus_clk_rate   = 400000,
+	.bus_clk_rate   = { 400000 },
 };
 
 static struct tegra_i2c_platform_data harmony_i2c2_platform_data = {
-	.bus_clk_rate   = 400000,
+	.bus_clk_rate   = { 400000 },
 };
 
 static struct tegra_i2c_platform_data harmony_i2c3_platform_data = {
-	.bus_clk_rate   = 400000,
+	.bus_clk_rate   = { 400000 },
 };
 
 static struct tegra_i2c_platform_data harmony_dvc_platform_data = {
-	.bus_clk_rate   = 400000,
+	.bus_clk_rate   = { 400000 },
 };
 
 static struct wm8903_platform_data harmony_wm8903_pdata = {
@@ -227,7 +227,7 @@ static void __init harmony_i2c_init(void)
 }
 
 /* OTG gadget device */
-static u64 tegra_otg_dmamask = DMA_BIT_MASK(32);
+/*static u64 tegra_otg_dmamask = DMA_BIT_MASK(32);
 
 
 static struct resource tegra_otg_resources[] = {
@@ -243,7 +243,7 @@ static struct resource tegra_otg_resources[] = {
 	},
 };
 
-/*static struct fsl_usb2_platform_data tegra_otg_pdata = {
+static struct fsl_usb2_platform_data tegra_otg_pdata = {
 	.operating_mode	= FSL_USB2_DR_DEVICE,
 	.phy_mode	= FSL_USB2_PHY_UTMI,
 };
