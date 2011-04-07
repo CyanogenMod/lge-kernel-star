@@ -67,24 +67,18 @@ static struct resource sdhci_resource4[] = {
 };
 
 static struct tegra_sdhci_platform_data tegra_sdhci_platform_data1 = {
-	.clk_id = NULL,
-	.force_hs = 1,
 	.cd_gpio = -1,
 	.wp_gpio = -1,
 	.power_gpio = -1,
 };
 
 static struct tegra_sdhci_platform_data tegra_sdhci_platform_data2 = {
-	.clk_id = NULL,
-	.force_hs = 1,
 	.cd_gpio = TEGRA_GPIO_PI5,
 	.wp_gpio = TEGRA_GPIO_PH1,
 	.power_gpio = TEGRA_GPIO_PT3,
 };
 
 static struct tegra_sdhci_platform_data tegra_sdhci_platform_data4 = {
-	.clk_id = NULL,
-	.force_hs = 0,
 	.cd_gpio = TEGRA_GPIO_PH2,
 	.wp_gpio = TEGRA_GPIO_PH3,
 	.power_gpio = TEGRA_GPIO_PI6,
