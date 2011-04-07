@@ -243,7 +243,7 @@ static struct resource tegra_otg_resources[] = {
 	},
 };
 
-static struct fsl_usb2_platform_data tegra_otg_pdata = {
+/*static struct fsl_usb2_platform_data tegra_otg_pdata = {
 	.operating_mode	= FSL_USB2_DR_DEVICE,
 	.phy_mode	= FSL_USB2_PHY_UTMI,
 };
@@ -258,7 +258,7 @@ static struct platform_device tegra_otg = {
 	},
 	.resource = tegra_otg_resources,
 	.num_resources = ARRAY_SIZE(tegra_otg_resources),
-};
+};*/
 
 /* PDA power */
 static struct pda_power_pdata pda_power_pdata = {
