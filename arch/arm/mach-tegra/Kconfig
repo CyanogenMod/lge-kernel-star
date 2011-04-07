@@ -238,3 +238,12 @@ config TEGRA_MC_PROFILE
 	  When enabled, provides a mechanism to perform statistical
 	  sampling of the memory controller usage on a client-by-client
 	  basis, and report the log through sysfs.
+
+config TEGRA_EDP_LIMITS
+	bool "Enforce electrical design limits"
+	depends on CPU_FREQ
+	default n
+	help
+	  Limit maximum CPU frequency based on temperature and number
+	  of on-line CPUs to keep CPU rail current within power supply
+	  capabilities.

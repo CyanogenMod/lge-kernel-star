@@ -78,6 +78,18 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat);
 
 void tegra_idle_lp2(void);
 
+struct tegra_edp_limits {
+	int	temperature;
+	unsigned int freq_limits[CONFIG_NR_CPUS];
+};
+#ifdef CONFIG_TEGRA_EDP_LIMITS
+void tegra_init_cpu_edp_limits(const struct tegra_edp_limits *limits, int size);
+#else
+static inline void tegra_init_cpu_edp_limits(
+	const struct tegra_edp_limits *limits, int size)
+{ }
+#endif
+
 #if defined(CONFIG_TEGRA_AUTO_HOTPLUG) && !defined(CONFIG_ARCH_TEGRA_2x_SOC)
 int tegra_auto_hotplug_init(struct mutex *cpu_lock);
 void tegra_auto_hotplug_exit(void);

@@ -32,6 +32,7 @@
 #include <linux/io.h>
 #include <linux/suspend.h>
 #include <linux/debugfs.h>
+#include <linux/cpu.h>
 
 #include <asm/system.h>
 
@@ -41,6 +42,8 @@
 #include "clock.h"
 #include "pm.h"
 
+/* tegra throttling and edp governors require frequencies in the table
+   to be in ascending order */
 static struct cpufreq_frequency_table *freq_table;
 
 
@@ -188,6 +191,121 @@ void tegra_throttling_enable(bool enable)
 }
 #endif /* CONFIG_TEGRA_THERMAL_THROTTLE */
 
+#ifdef CONFIG_TEGRA_EDP_LIMITS
+
+static const struct tegra_edp_limits *cpu_edp_limits;
+static int cpu_edp_limits_size;
+static int edp_thermal_index;
+static cpumask_t edp_cpumask;
+static unsigned int edp_limit;
+
+static void edp_update_limit(void)
+{
+	int i;
+	unsigned int limit;
+
+	if (!cpu_edp_limits)
+		return;
+
+	limit = cpu_edp_limits[edp_thermal_index].freq_limits[
+			cpumask_weight(&edp_cpumask) - 1];
+
+	for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++) {
+		if (freq_table[i].frequency > limit) {
+			break;
+		}
+	}
+	BUG_ON(i == 0);	/* min freq above the limit or table empty */
+	edp_limit = freq_table[i-1].frequency;
+}
+
+static unsigned int edp_governor_speed(unsigned int requested_speed)
+{
+	if ((!cpu_edp_limits) || (requested_speed <= edp_limit))
+		return requested_speed;
+	else
+		return edp_limit;
+}
+
+static int tegra_cpu_edp_notify(
+	struct notifier_block *nb, unsigned long event, void *hcpu)
+{
+	int ret = 0;
+	unsigned int cpu_speed, new_speed;
+	int cpu = (long)hcpu;
+
+	switch (event) {
+	case CPU_UP_PREPARE:
+		mutex_lock(&tegra_cpu_lock);
+		cpu_set(cpu, edp_cpumask);
+		edp_update_limit();
+
+		cpu_speed = tegra_getspeed(0);
+		new_speed = edp_governor_speed(cpu_speed);
+		if (cpu_speed != new_speed) {
+			ret = tegra_update_cpu_speed(new_speed);
+			if (ret) {
+				cpu_clear(cpu, edp_cpumask);
+				edp_update_limit();
+			}
+			printk(KERN_DEBUG "tegra CPU:%sforce EDP limit %u kHz"
+				"\n", ret ? " failed to " : " ", new_speed);
+		}
+		mutex_unlock(&tegra_cpu_lock);
+		break;
+	case CPU_DEAD:
+		mutex_lock(&tegra_cpu_lock);
+		cpu_clear(cpu, edp_cpumask);
+		edp_update_limit();
+		mutex_unlock(&tegra_cpu_lock);
+		break;
+	}
+	return notifier_from_errno(ret);
+}
+
+static struct notifier_block tegra_cpu_edp_notifier = {
+	.notifier_call = tegra_cpu_edp_notify,
+};
+
+static void tegra_cpu_edp_init(bool resume)
+{
+	if (!cpu_edp_limits) {
+		if (!resume)
+			pr_info("tegra CPU: no EDP table is provided\n");
+		return;
+	}
+
+	edp_thermal_index = 0;
+	edp_cpumask = *cpu_online_mask;
+	edp_update_limit();
+
+	if (!resume)
+		register_hotcpu_notifier(&tegra_cpu_edp_notifier);
+
+	pr_info("tegra CPU: set EDP limit %u MHz\n", edp_limit / 1000);
+}
+
+static void tegra_cpu_edp_exit(void)
+{
+	if (!cpu_edp_limits)
+		return;
+
+	unregister_hotcpu_notifier(&tegra_cpu_edp_notifier);
+}
+
+void tegra_init_cpu_edp_limits(const struct tegra_edp_limits *limits, int size)
+{
+	cpu_edp_limits = limits;
+	cpu_edp_limits_size = cpu_edp_limits_size;
+}
+
+#else	/* CONFIG_TEGRA_EDP_LIMITS */
+
+#define edp_governor_speed(requested_speed) (requested_speed)
+#define tegra_cpu_edp_init(resume)
+#define tegra_cpu_edp_exit()
+#endif	/* CONFIG_TEGRA_EDP_LIMITS */
+
 int tegra_verify_speed(struct cpufreq_policy *policy)
 {
 	return cpufreq_frequency_table_verify(policy, freq_table);
@@ -279,6 +397,7 @@ static int tegra_target(struct cpufreq_policy *policy,
 
 	target_cpu_speed[policy->cpu] = freq;
 	new_speed = throttle_governor_speed(tegra_cpu_highest_speed());
+	new_speed = edp_governor_speed(new_speed);
 	ret = tegra_update_cpu_speed(new_speed);
 	if (ret == 0)
 		tegra_auto_hotplug_governor(new_speed);
@@ -300,6 +419,7 @@ static int tegra_pm_notify(struct notifier_block *nb, unsigned long event,
 		tegra_update_cpu_speed(freq_table[0].frequency);
 	} else if (event == PM_POST_SUSPEND) {
 		is_suspended = false;
+		tegra_cpu_edp_init(true);
 	}
 	mutex_unlock(&tegra_cpu_lock);
 
@@ -401,6 +521,7 @@ static int __init tegra_cpufreq_init(void)
 		return ret;
 
 	freq_table = table_data->freq_table;
+	tegra_cpu_edp_init(false);
 	return cpufreq_register_driver(&tegra_cpufreq_driver);
 }
 
@@ -409,6 +530,7 @@ static void __exit tegra_cpufreq_exit(void)
 #ifdef CONFIG_TEGRA_THERMAL_THROTTLE
 	destroy_workqueue(workqueue);
 #endif
+	tegra_cpu_edp_exit();
 	tegra_auto_hotplug_exit();
         cpufreq_unregister_driver(&tegra_cpufreq_driver);
 }
