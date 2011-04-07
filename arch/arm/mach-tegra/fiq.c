@@ -27,9 +27,58 @@
 
 #include <mach/iomap.h>
 #include <mach/fiq.h>
-#include <mach/legacy_irq.h>
 
 #include "board.h"
+
+#define ICTLR_CPU_IER		0x20
+#define ICTLR_CPU_IER_SET	0x24
+#define ICTLR_CPU_IER_CLR	0x28
+#define ICTLR_CPU_IEP_CLASS	0x2C
+
+#define FIRST_LEGACY_IRQ	32
+
+static void __iomem *ictlr_reg_base[] = {
+	IO_ADDRESS(TEGRA_PRIMARY_ICTLR_BASE),
+	IO_ADDRESS(TEGRA_SECONDARY_ICTLR_BASE),
+	IO_ADDRESS(TEGRA_TERTIARY_ICTLR_BASE),
+	IO_ADDRESS(TEGRA_QUATERNARY_ICTLR_BASE),
+};
+
+static void tegra_legacy_select_fiq(unsigned int irq, bool fiq)
+{
+	void __iomem *base;
+	pr_debug("%s: %d\n", __func__, irq);
+
+	irq -= 32;
+	base = ictlr_reg_base[irq>>5];
+	writel(fiq << (irq & 31), base + ICTLR_CPU_IEP_CLASS);
+}
+
+static void tegra_fiq_mask(struct irq_data *d)
+{
+	void __iomem *base;
+	int leg_irq;
+
+	if (d->irq < FIRST_LEGACY_IRQ)
+		return;
+
+	leg_irq = d->irq - FIRST_LEGACY_IRQ;
+	base = ictlr_reg_base[leg_irq >> 5];
+	writel(1 << (leg_irq & 31), base + ICTLR_CPU_IER_CLR);
+}
+
+static void tegra_fiq_unmask(struct irq_data *d)
+{
+	void __iomem *base;
+	int leg_irq;
+
+	if (d->irq < FIRST_LEGACY_IRQ)
+		return;
+
+	leg_irq = d->irq - FIRST_LEGACY_IRQ;
+	base = ictlr_reg_base[leg_irq >> 5];
+	writel(1 << (leg_irq & 31), base + ICTLR_CPU_IER_SET);
+}
 
 void tegra_fiq_enable(int irq)
 {
@@ -40,11 +89,11 @@ void tegra_fiq_enable(int irq)
 	val |= 2; /* enableNS */
 	writel(val, base + GIC_CPU_CTRL);
 	tegra_legacy_select_fiq(irq, true);
-	tegra_legacy_unmask_irq(irq);
+	tegra_fiq_unmask(irq);
 }
 
 void tegra_fiq_disable(int irq)
 {
-	tegra_legacy_mask_irq(irq);
+	tegra_fiq_mask(irq);
 	tegra_legacy_select_fiq(irq, false);
 }
