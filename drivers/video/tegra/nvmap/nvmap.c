@@ -24,7 +24,6 @@
 #include <linux/highmem.h>
 #include <linux/io.h>
 #include <linux/rbtree.h>
-#include <linux/smp_lock.h>
 #include <linux/vmalloc.h>
 #include <linux/wait.h>
 
