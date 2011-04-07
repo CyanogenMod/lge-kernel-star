@@ -97,6 +97,16 @@
 #define I2C_HEADER_MASTER_ADDR_SHIFT		12
 #define I2C_HEADER_SLAVE_ADDR_SHIFT		1
 
+struct tegra_i2c_dev;
+
+struct tegra_i2c_bus {
+	struct tegra_i2c_dev *dev;
+	const struct tegra_pingroup_config *mux;
+	int mux_len;
+	unsigned long bus_clk_rate;
+	struct i2c_adapter adapter;
+};
+
 /**
  * struct tegra_i2c_dev	- per device i2c context
  * @dev: device reference for power management
@@ -138,14 +148,6 @@ struct tegra_i2c_dev {
 	int last_mux_len;
 	unsigned long last_bus_clk_rate;
 	struct tegra_i2c_bus busses[1];
-};
-
-struct tegra_i2c_bus {
-	struct tegra_i2c_dev *dev;
-	const struct tegra_pingroup_config *mux;
-	int mux_len;
-	unsigned long bus_clk_rate;
-	struct i2c_adapter adapter;
 };
 
 static void dvc_writel(struct tegra_i2c_dev *i2c_dev, u32 val, unsigned long reg)
@@ -531,9 +533,9 @@ static int tegra_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
 		i2c_dev->last_mux_len = i2c_bus->mux_len;
 	}
 
-	if (i2c_dev->last_bus_clk != i2c_bus->bus_clk_rate) {
-		tegra_i2c_set_clk(i2c_dev, i2c_bus->bus_clk_rate);
-		i2c_dev->last_bus_clk = i2c_bus->bus_clk_rate;
+	if (i2c_dev->last_bus_clk_rate != i2c_bus->bus_clk_rate) {
+		clk_set_rate(i2c_dev, i2c_bus->bus_clk_rate * 8);
+		i2c_dev->last_bus_clk_rate = i2c_bus->bus_clk_rate;
 	}
 
 	clk_enable(i2c_dev->clk);
