@@ -1350,12 +1350,12 @@ static void tegra_clk_shared_bus_init(struct clk *c)
 	c->state = OFF;
 	c->set = true;
 
-	spin_lock_irqsave(&c->parent->spinlock, flags);
+	clk_lock_save(c->parent, &flags);
 
 	list_add_tail(&c->u.shared_bus_user.node,
 		&c->parent->shared_bus_list);
 
-	spin_unlock_irqrestore(&c->parent->spinlock, flags);
+	clk_unlock_restore(c->parent, &flags);
 }
 
 static int tegra_clk_shared_bus_set_rate(struct clk *c, unsigned long rate)
@@ -1368,12 +1368,12 @@ static int tegra_clk_shared_bus_set_rate(struct clk *c, unsigned long rate)
 	if (new_rate < 0)
 		return new_rate;
 
-	spin_lock_irqsave(&c->parent->spinlock, flags);
+	clk_lock_save(c->parent, &flags);
 
 	c->u.shared_bus_user.rate = new_rate;
 	ret = tegra_clk_shared_bus_update(c->parent);
 
-	spin_unlock_irqrestore(&c->parent->spinlock, flags);
+	clk_unlock_restore(c->parent, &flags);
 
 	return ret;
 }
@@ -1388,12 +1388,12 @@ static int tegra_clk_shared_bus_enable(struct clk *c)
 	unsigned long flags;
 	int ret;
 
-	spin_lock_irqsave(&c->parent->spinlock, flags);
+	clk_lock_save(c->parent, &flags);
 
 	c->u.shared_bus_user.enabled = true;
 	ret = tegra_clk_shared_bus_update(c->parent);
 
-	spin_unlock_irqrestore(&c->parent->spinlock, flags);
+	clk_unlock_restore(c->parent, &flags);
 
 	return ret;
 }
@@ -1403,13 +1403,13 @@ static void tegra_clk_shared_bus_disable(struct clk *c)
 	unsigned long flags;
 	int ret;
 
-	spin_lock_irqsave(&c->parent->spinlock, flags);
+	clk_lock_save(c->parent, &flags);
 
 	c->u.shared_bus_user.enabled = false;
 	ret = tegra_clk_shared_bus_update(c->parent);
 	WARN_ON_ONCE(ret);
 
-	spin_unlock_irqrestore(&c->parent->spinlock, flags);
+	clk_unlock_restore(c->parent, &flags);
 }
 
 static struct clk_ops tegra_clk_shared_bus_ops = {

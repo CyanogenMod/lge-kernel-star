@@ -24,7 +24,6 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/module.h>
-#include <linux/sched.h>
 #include <linux/seq_file.h>
 #include <linux/slab.h>
 
@@ -32,26 +31,45 @@
 
 #include "board.h"
 #include "clock.h"
+#include "dvfs.h"
 
 /*
  * Locking:
  *
- * Each struct clk has a spinlock.
+ * Each struct clk has a lock.  Depending on the cansleep flag, that lock
+ * may be a spinlock or a mutex.  For most clocks, the spinlock is sufficient,
+ * and using the spinlock allows the clock to be manipulated from an interrupt
+ * or while holding a spinlock.  Some clocks may need to adjust a regulator
+ * in order to maintain the required voltage for a new frequency.  Those
+ * clocks set the cansleep flag, and take a mutex so that the regulator api
+ * can be used while holding the lock.
  *
  * To avoid AB-BA locking problems, locks must always be traversed from child
  * clock to parent clock.  For example, when enabling a clock, the clock's lock
  * is taken, and then clk_enable is called on the parent, which take's the
- * parent clock's lock.  There is one exceptions to this ordering: When dumping
- * the clock tree through debugfs.  In this case, clk_lock_all is called,
- * which attemps to iterate through the entire list of clocks and take every
- * clock lock.  If any call to spin_trylock fails, all locked clocks are
- * unlocked, and the process is retried.  When all the locks are held,
- * the only clock operation that can be called is clk_get_rate_all_locked.
+ * parent clock's lock.  There are two exceptions to this ordering:
+ *  1. When setting a clock as cansleep, in which case the entire list of clocks
+ *     is traversed to set the children as cansleep as well.  This must occur
+ *     during init, before any calls to clk_get, so no other clock locks can
+ *     get taken.
+ *  2. When dumping the clock tree through debugfs.  In this case, clk_lock_all
+ *     is called, which attemps to iterate through the entire list of clocks
+ *     and take every clock lock.  If any call to clk_trylock fails, a locked
+ *     clocks are unlocked, and the process is retried.  When all the locks
+ *     are held, the only clock operation that can be called is
+ *     clk_get_rate_all_locked.
  *
  * Within a single clock, no clock operation can call another clock operation
  * on itself, except for clk_get_rate_locked and clk_set_rate_locked.  Any
  * clock operation can call any other clock operation on any of it's possible
  * parents.
+ *
+ * clk_set_cansleep is used to mark a clock as sleeping.  It is called during
+ * dvfs (Dynamic Voltage and Frequency Scaling) init on any clock that has a
+ * dvfs requirement.  It can only be called on clocks that are the sole parent
+ * of all of their child clocks, meaning the child clock can not be reparented
+ * onto a different, possibly non-sleeping, clock.  This is inherently true
+ * of all leaf clocks in the clock tree
  *
  * An additional mutex, clock_list_lock, is used to protect the list of all
  * clocks.
@@ -77,7 +95,7 @@ struct clk *tegra_get_clock_by_name(const char *name)
 	return ret;
 }
 
-/* Must be called with c->spinlock held */
+/* Must be called with clk_lock(c) held */
 static unsigned long clk_predict_rate_from_parent(struct clk *c, struct clk *p)
 {
 	u64 rate;
@@ -93,7 +111,7 @@ static unsigned long clk_predict_rate_from_parent(struct clk *c, struct clk *p)
 	return rate;
 }
 
-/* Must be called with c->spinlock held */
+/* Must be called with clk_lock(c) held */
 unsigned long clk_get_rate_locked(struct clk *c)
 {
 	unsigned long rate;
@@ -111,15 +129,45 @@ unsigned long clk_get_rate(struct clk *c)
 	unsigned long flags;
 	unsigned long rate;
 
-	spin_lock_irqsave(&c->spinlock, flags);
+	clk_lock_save(c, &flags);
 
 	rate = clk_get_rate_locked(c);
 
-	spin_unlock_irqrestore(&c->spinlock, flags);
+	clk_unlock_restore(c, &flags);
 
 	return rate;
 }
 EXPORT_SYMBOL(clk_get_rate);
+
+static void __clk_set_cansleep(struct clk *c)
+{
+	struct clk *child;
+	BUG_ON(mutex_is_locked(&c->mutex));
+	BUG_ON(spin_is_locked(&c->spinlock));
+
+	list_for_each_entry(child, &clocks, node) {
+		if (child->parent != c)
+			continue;
+
+		WARN(child->ops && child->ops->set_parent,
+			"can't make child clock %s of %s "
+			"sleepable if it's parent could change",
+			child->name, c->name);
+
+		__clk_set_cansleep(child);
+	}
+
+	c->cansleep = true;
+}
+
+/* Must be called before any clk_get calls */
+void clk_set_cansleep(struct clk *c)
+{
+
+	mutex_lock(&clock_list_lock);
+	__clk_set_cansleep(c);
+	mutex_unlock(&clock_list_lock);
+}
 
 int clk_reparent(struct clk *c, struct clk *parent)
 {
@@ -129,7 +177,7 @@ int clk_reparent(struct clk *c, struct clk *parent)
 
 void clk_init(struct clk *c)
 {
-	spin_lock_init(&c->spinlock);
+	clk_lock_init(c);
 
 	if (c->ops && c->ops->init)
 		c->ops->init(c);
@@ -153,7 +201,13 @@ int clk_enable(struct clk *c)
 	int ret = 0;
 	unsigned long flags;
 
-	spin_lock_irqsave(&c->spinlock, flags);
+	clk_lock_save(c, &flags);
+
+	if (clk_is_auto_dvfs(c)) {
+		ret = tegra_dvfs_set_rate(c, clk_get_rate_locked(c));
+		if (ret)
+			goto out;
+	}
 
 	if (c->refcnt == 0) {
 		if (c->parent) {
@@ -175,7 +229,7 @@ int clk_enable(struct clk *c)
 	}
 	c->refcnt++;
 out:
-	spin_unlock_irqrestore(&c->spinlock, flags);
+	clk_unlock_restore(c, &flags);
 	return ret;
 }
 EXPORT_SYMBOL(clk_enable);
@@ -184,11 +238,11 @@ void clk_disable(struct clk *c)
 {
 	unsigned long flags;
 
-	spin_lock_irqsave(&c->spinlock, flags);
+	clk_lock_save(c, &flags);
 
 	if (c->refcnt == 0) {
 		WARN(1, "Attempting to disable clock %s with refcnt 0", c->name);
-		spin_unlock_irqrestore(&c->spinlock, flags);
+		clk_unlock_restore(c, &flags);
 		return;
 	}
 	if (c->refcnt == 1) {
@@ -202,18 +256,21 @@ void clk_disable(struct clk *c)
 	}
 	c->refcnt--;
 
-	spin_unlock_irqrestore(&c->spinlock, flags);
+	if (clk_is_auto_dvfs(c) && c->refcnt == 0)
+		tegra_dvfs_set_rate(c, 0);
+
+	clk_unlock_restore(c, &flags);
 }
 EXPORT_SYMBOL(clk_disable);
 
 int clk_set_parent(struct clk *c, struct clk *parent)
 {
-	int ret;
+	int ret = 0;
 	unsigned long flags;
 	unsigned long new_rate;
 	unsigned long old_rate;
 
-	spin_lock_irqsave(&c->spinlock, flags);
+	clk_lock_save(c, &flags);
 
 	if (!c->ops || !c->ops->set_parent) {
 		ret = -ENOSYS;
@@ -223,12 +280,23 @@ int clk_set_parent(struct clk *c, struct clk *parent)
 	new_rate = clk_predict_rate_from_parent(c, parent);
 	old_rate = clk_get_rate_locked(c);
 
+	if (clk_is_auto_dvfs(c) && c->refcnt > 0 &&
+			(!c->parent || new_rate > old_rate)) {
+		ret = tegra_dvfs_set_rate(c, new_rate);
+		if (ret)
+			goto out;
+	}
+
 	ret = c->ops->set_parent(c, parent);
 	if (ret)
 		goto out;
 
+	if (clk_is_auto_dvfs(c) && c->refcnt > 0 &&
+			new_rate < old_rate)
+		ret = tegra_dvfs_set_rate(c, new_rate);
+
 out:
-	spin_unlock_irqrestore(&c->spinlock, flags);
+	clk_unlock_restore(c, &flags);
 	return ret;
 }
 EXPORT_SYMBOL(clk_set_parent);
@@ -241,10 +309,11 @@ EXPORT_SYMBOL(clk_get_parent);
 
 int clk_set_rate_locked(struct clk *c, unsigned long rate)
 {
+	int ret = 0;
+	unsigned long old_rate;
 	long new_rate;
 
-	if (!c->ops || !c->ops->set_rate)
-		return -ENOSYS;
+	old_rate = clk_get_rate_locked(c);
 
 	if (rate > c->max_rate)
 		rate = c->max_rate;
@@ -252,30 +321,47 @@ int clk_set_rate_locked(struct clk *c, unsigned long rate)
 	if (c->ops && c->ops->round_rate) {
 		new_rate = c->ops->round_rate(c, rate);
 
-		if (new_rate < 0)
-			return new_rate;
+		if (new_rate < 0) {
+			ret = new_rate;
+			return ret;
+		}
 
 		rate = new_rate;
 	}
 
-	return c->ops->set_rate(c, rate);
+	if (clk_is_auto_dvfs(c) && rate > old_rate && c->refcnt > 0) {
+		ret = tegra_dvfs_set_rate(c, rate);
+		if (ret)
+			return ret;
+	}
+
+	ret = c->ops->set_rate(c, rate);
+	if (ret)
+		return ret;
+
+	if (clk_is_auto_dvfs(c) && rate < old_rate && c->refcnt > 0)
+		ret = tegra_dvfs_set_rate(c, rate);
+
+	return ret;
 }
 
 int clk_set_rate(struct clk *c, unsigned long rate)
 {
-	int ret;
 	unsigned long flags;
+	int ret;
 
-	spin_lock_irqsave(&c->spinlock, flags);
+	if (!c->ops || !c->ops->set_rate)
+		return -ENOSYS;
+
+	clk_lock_save(c, &flags);
 
 	ret = clk_set_rate_locked(c, rate);
 
-	spin_unlock_irqrestore(&c->spinlock, flags);
+	clk_unlock_restore(c, &flags);
 
 	return ret;
 }
 EXPORT_SYMBOL(clk_set_rate);
-
 
 /* Must be called with clocks lock and all indvidual clock locks held */
 unsigned long clk_get_rate_all_locked(struct clk *c)
@@ -306,7 +392,7 @@ long clk_round_rate(struct clk *c, unsigned long rate)
 	unsigned long flags;
 	long ret;
 
-	spin_lock_irqsave(&c->spinlock, flags);
+	clk_lock_save(c, &flags);
 
 	if (!c->ops || !c->ops->round_rate) {
 		ret = -ENOSYS;
@@ -319,7 +405,7 @@ long clk_round_rate(struct clk *c, unsigned long rate)
 	ret = c->ops->round_rate(c, rate);
 
 out:
-	spin_unlock_irqrestore(&c->spinlock, flags);
+	clk_unlock_restore(c, &flags);
 	return ret;
 }
 EXPORT_SYMBOL(clk_round_rate);
@@ -400,6 +486,7 @@ EXPORT_SYMBOL(tegra_periph_reset_assert);
 void __init tegra_init_clock(void)
 {
 	tegra2_init_clocks();
+	tegra2_init_dvfs();
 }
 
 /*
@@ -411,9 +498,9 @@ void tegra_sdmmc_tap_delay(struct clk *c, int delay)
 {
 	unsigned long flags;
 
-	spin_lock_irqsave(&c->spinlock, flags);
+	clk_lock_save(c, &flags);
 	tegra2_sdmmc_tap_delay(c, delay);
-	spin_unlock_irqrestore(&c->spinlock, flags);
+	clk_unlock_restore(c, &flags);
 }
 
 static bool tegra_keep_boot_clocks = false;
@@ -430,13 +517,13 @@ __setup("tegra_keep_boot_clocks", tegra_keep_boot_clocks_setup);
  */
 static int __init tegra_init_disable_boot_clocks(void)
 {
+	unsigned long flags;
 	struct clk *c;
 
 	mutex_lock(&clock_list_lock);
 
 	list_for_each_entry(c, &clocks, node) {
-		spin_lock_irq(&c->spinlock);
-
+		clk_lock_save(c, &flags);
 		if (c->refcnt == 0 && c->state == ON &&
 				c->ops && c->ops->disable) {
 			pr_warn_once("%s clocks left on by bootloader:\n",
@@ -451,33 +538,71 @@ static int __init tegra_init_disable_boot_clocks(void)
 				c->state = OFF;
 			}
 		}
-
-		spin_unlock_irq(&c->spinlock);
+		clk_unlock_restore(c, &flags);
 	}
 
 	mutex_unlock(&clock_list_lock);
-
 	return 0;
 }
 late_initcall(tegra_init_disable_boot_clocks);
 
 #ifdef CONFIG_DEBUG_FS
 
+/*
+ * Attempt to lock all the clocks that are marked cansleep
+ * Must be called with irqs enabled
+ */
+static int __clk_lock_all_mutexes(void)
+{
+	struct clk *c;
+
+	might_sleep();
+
+	list_for_each_entry(c, &clocks, node)
+		if (clk_cansleep(c))
+			if (!mutex_trylock(&c->mutex))
+				goto unlock_mutexes;
+
+	return 0;
+
+unlock_mutexes:
+	list_for_each_entry_continue_reverse(c, &clocks, node)
+		if (clk_cansleep(c))
+			mutex_unlock(&c->mutex);
+
+	return -EAGAIN;
+}
+
+/*
+ * Attempt to lock all the clocks that are not marked cansleep
+ * Must be called with irqs disabled
+ */
 static int __clk_lock_all_spinlocks(void)
 {
 	struct clk *c;
 
 	list_for_each_entry(c, &clocks, node)
-		if (!spin_trylock(&c->spinlock))
-			goto unlock_spinlocks;
+		if (!clk_cansleep(c))
+			if (!spin_trylock(&c->spinlock))
+				goto unlock_spinlocks;
 
 	return 0;
 
 unlock_spinlocks:
 	list_for_each_entry_continue_reverse(c, &clocks, node)
-		spin_unlock(&c->spinlock);
+		if (!clk_cansleep(c))
+			spin_unlock(&c->spinlock);
 
 	return -EAGAIN;
+}
+
+static void __clk_unlock_all_mutexes(void)
+{
+	struct clk *c;
+
+	list_for_each_entry_reverse(c, &clocks, node)
+		if (clk_cansleep(c))
+			mutex_unlock(&c->mutex);
 }
 
 static void __clk_unlock_all_spinlocks(void)
@@ -485,7 +610,8 @@ static void __clk_unlock_all_spinlocks(void)
 	struct clk *c;
 
 	list_for_each_entry_reverse(c, &clocks, node)
-		spin_unlock(&c->spinlock);
+		if (!clk_cansleep(c))
+			spin_unlock(&c->spinlock);
 }
 
 /*
@@ -498,6 +624,10 @@ static void clk_lock_all(void)
 {
 	int ret;
 retry:
+	ret = __clk_lock_all_mutexes();
+	if (ret)
+		goto failed_mutexes;
+
 	local_irq_disable();
 
 	ret = __clk_lock_all_spinlocks();
@@ -509,7 +639,9 @@ retry:
 
 failed_spinlocks:
 	local_irq_enable();
-	yield();
+	__clk_unlock_all_mutexes();
+failed_mutexes:
+	msleep(1);
 	goto retry;
 }
 
@@ -523,10 +655,20 @@ static void clk_unlock_all(void)
 	__clk_unlock_all_spinlocks();
 
 	local_irq_enable();
+
+	__clk_unlock_all_mutexes();
 }
 
 static struct dentry *clk_debugfs_root;
 
+static void dvfs_show_one(struct seq_file *s, struct dvfs *d, int level)
+{
+	seq_printf(s, "%*s  %-*s%21s%d mV\n",
+			level * 3 + 1, "",
+			30 - level * 3, d->dvfs_rail->reg_id,
+			"",
+			d->cur_millivolts);
+}
 
 static void clock_tree_show_one(struct seq_file *s, struct clk *c, int level)
 {
@@ -562,6 +704,9 @@ static void clock_tree_show_one(struct seq_file *s, struct clk *c, int level)
 		!c->set ? '*' : ' ',
 		30 - level * 3, c->name,
 		state, c->refcnt, div, clk_get_rate_all_locked(c));
+
+	if (c->dvfs)
+		dvfs_show_one(s, c->dvfs, level + 1);
 
 	list_for_each_entry(child, &clocks, node) {
 		if (child->parent != c)
@@ -699,6 +844,9 @@ static int __init clk_debugfs_init(void)
 	d = debugfs_create_file("clock_tree", S_IRUGO, clk_debugfs_root, NULL,
 		&clock_tree_fops);
 	if (!d)
+		goto err_out;
+
+	if (dvfs_debugfs_init(clk_debugfs_root))
 		goto err_out;
 
 	list_for_each_entry(c, &clocks, node) {

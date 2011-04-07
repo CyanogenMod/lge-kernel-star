@@ -21,11 +21,14 @@
 #define __MACH_CLK_H
 
 struct clk;
+struct dvfs;
 
 void tegra_periph_reset_deassert(struct clk *c);
 void tegra_periph_reset_assert(struct clk *c);
 
+int tegra_dvfs_set_rate(struct clk *c, unsigned long rate);
 unsigned long clk_get_rate_all_locked(struct clk *c);
 void tegra_sdmmc_tap_delay(struct clk *c, int delay);
+int tegra_dvfs_rail_disable_by_name(const char *reg_id);
 
 #endif
