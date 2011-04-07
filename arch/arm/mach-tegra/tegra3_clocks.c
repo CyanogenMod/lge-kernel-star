@@ -2325,6 +2325,12 @@ static struct clk tegra_pll_ref = {
 };
 
 static struct clk_pll_freq_table tegra_pll_c_freq_table[] = {
+	{ 12000000, 832000000, 416,  6, 1, 8},
+	{ 13000000, 832000000, 832, 13, 1, 8},
+	{ 16800000, 832000000, 396,  8, 1, 8},		/* actual: 831.6 MHz */
+	{ 19200000, 832000000, 260,  6, 1, 8},
+	{ 26000000, 832000000, 416, 13, 1, 8},
+
 	{ 12000000, 624000000, 624, 12, 1, 8},
 	{ 13000000, 624000000, 624, 13, 1, 8},
 	{ 16800000, 600000000, 520, 14, 1, 8},
@@ -2339,7 +2345,7 @@ static struct clk_pll_freq_table tegra_pll_c_freq_table[] = {
 
 	{ 12000000, 416000000, 416, 12, 1, 8},
 	{ 13000000, 416000000, 416, 13, 1, 8},
-	{ 16800000, 416000000, 396, 16, 1, 8},
+	{ 16800000, 416000000, 396, 16, 1, 8},		/* actual: 415.8 MHz */
 	{ 19200000, 416000000, 260, 12, 1, 6},
 	{ 26000000, 416000000, 416, 26, 1, 8},
 	{ 0, 0, 0, 0, 0, 0 },
@@ -2351,7 +2357,7 @@ static struct clk tegra_pll_c = {
 	.ops       = &tegra_pll_ops,
 	.reg       = 0x80,
 	.parent    = &tegra_pll_ref,
-	.max_rate  = 700000000,
+	.max_rate  = 1400000000,
 	.u.pll = {
 		.input_min = 2000000,
 		.input_max = 31000000,
@@ -2959,7 +2965,7 @@ static struct clk tegra_clk_sclk = {
 	.inputs	= mux_sclk,
 	.reg	= 0x28,
 	.ops	= &tegra_super_ops,
-	.max_rate = 333500000,
+	.max_rate = 280000000,
 	.min_rate = 120000000,
 };
 
@@ -3014,7 +3020,7 @@ static struct clk tegra_clk_cop = {
 	.name      = "cop",
 	.parent    = &tegra_clk_sclk,
 	.ops       = &tegra_cop_ops,
-	.max_rate  = 333500000,
+	.max_rate  = 280000000,
 };
 
 static struct clk tegra_clk_hclk = {
@@ -3024,7 +3030,7 @@ static struct clk tegra_clk_hclk = {
 	.reg		= 0x30,
 	.reg_shift	= 4,
 	.ops		= &tegra_bus_ops,
-	.max_rate       = 333500000,
+	.max_rate       = 280000000,
 };
 
 static struct clk tegra_clk_pclk = {
@@ -3034,7 +3040,7 @@ static struct clk tegra_clk_pclk = {
 	.reg		= 0x30,
 	.reg_shift	= 0,
 	.ops		= &tegra_bus_ops,
-	.max_rate       = 170000000,
+	.max_rate       = 140000000,
 };
 
 static struct clk tegra_clk_blink = {
@@ -3272,7 +3278,7 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("2d",	"2d",			NULL,	21,	0x15c,	416000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
 	PERIPH_CLK_EX("vi",	"tegra_camera",		"vi",	20,	0x148,	150000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71,	&tegra_vi_clk_ops), /* scales with voltage and process_id */
 	PERIPH_CLK("vi_sensor",	"tegra_camera",		"vi_sensor",	20,	0x1a8,	150000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | PERIPH_NO_RESET), /* scales with voltage and process_id */
-	PERIPH_CLK("epp",	"epp",			NULL,	19,	0x16c,	300000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
+	PERIPH_CLK("epp",	"epp",			NULL,	19,	0x16c,	416000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
 	PERIPH_CLK("mpe",	"mpe",			NULL,	60,	0x170,	416000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
 	PERIPH_CLK("host1x",	"host1x",		NULL,	28,	0x180,	208000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
 	PERIPH_CLK("cve",	"cve",			NULL,	49,	0x140,	250000000, mux_pllp_plld_pllc_clkm,	MUX | DIV_U71), /* requires min voltage */
@@ -3298,7 +3304,7 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("i2cslow",	"i2cslow",		NULL,	81,	0x3fc,	26000000,  mux_pllp_pllc_clk32_clkm,	MUX | DIV_U71),
 	PERIPH_CLK("pcie",	"tegra-pcie",		"pcie",	70,	0,	250000000, mux_clk_m, 			0),
 	PERIPH_CLK("afi",	"tegra-pcie",		"afi",	72,	0,	250000000, mux_clk_m, 			0),
-	PERIPH_CLK("se",	"tegra-se",		NULL,	127,	0x42c,	300000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
+	PERIPH_CLK("se",	"tegra-se",		NULL,	127,	0x42c,	416000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
 
 	SHARED_CLK("avp.sclk",	"tegra-avp",		"sclk",	&tegra_clk_sclk),
 	SHARED_CLK("avp.emc",	"tegra-avp",		"emc",	&tegra_clk_emc),
