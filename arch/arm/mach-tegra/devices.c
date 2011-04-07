@@ -607,45 +607,6 @@ static struct resource tegra_udc_resources[] = {
 	},
 };
 
-static struct resource tegra_usb1_resources[] = {
-	[0] = {
-		.start	= TEGRA_USB_BASE,
-		.end	= TEGRA_USB_BASE + TEGRA_USB_SIZE - 1,
-		.flags	= IORESOURCE_MEM,
-	},
-	[1] = {
-		.start	= INT_USB,
-		.end	= INT_USB,
-		.flags	= IORESOURCE_IRQ,
-	},
-};
-
-static struct resource tegra_usb2_resources[] = {
-	[0] = {
-		.start	= TEGRA_USB2_BASE,
-		.end	= TEGRA_USB2_BASE + TEGRA_USB2_SIZE - 1,
-		.flags	= IORESOURCE_MEM,
-	},
-	[1] = {
-		.start	= INT_USB2,
-		.end	= INT_USB2,
-		.flags	= IORESOURCE_IRQ,
-	},
-};
-
-static struct resource tegra_usb3_resources[] = {
-	[0] = {
-		.start	= TEGRA_USB3_BASE,
-		.end	= TEGRA_USB3_BASE + TEGRA_USB3_SIZE - 1,
-		.flags	= IORESOURCE_MEM,
-	},
-	[1] = {
-		.start	= INT_USB3,
-		.end	= INT_USB3,
-		.flags	= IORESOURCE_IRQ,
-	},
-};
-
 static u64 tegra_udc_dmamask = DMA_BIT_MASK(32);
 
 static struct fsl_usb2_platform_data tegra_udc_pdata = {
@@ -663,41 +624,6 @@ struct platform_device tegra_udc_device = {
 	},
 	.resource = tegra_udc_resources,
 	.num_resources = ARRAY_SIZE(tegra_udc_resources),
-};
-
-static u64 tegra_ehci_dmamask = DMA_BIT_MASK(32);
-
-struct platform_device tegra_ehci1_device = {
-	.name	= "tegra-ehci",
-	.id	= 0,
-	.dev	= {
-		.dma_mask	= &tegra_ehci_dmamask,
-		.coherent_dma_mask = DMA_BIT_MASK(32),
-	},
-	.resource = tegra_usb1_resources,
-	.num_resources = ARRAY_SIZE(tegra_usb1_resources),
-};
-
-struct platform_device tegra_ehci2_device = {
-	.name	= "tegra-ehci",
-	.id	= 1,
-	.dev	= {
-		.dma_mask	= &tegra_ehci_dmamask,
-		.coherent_dma_mask = DMA_BIT_MASK(32),
-	},
-	.resource = tegra_usb2_resources,
-	.num_resources = ARRAY_SIZE(tegra_usb2_resources),
-};
-
-struct platform_device tegra_ehci3_device = {
-	.name	= "tegra-ehci",
-	.id	= 2,
-	.dev	= {
-		.dma_mask	= &tegra_ehci_dmamask,
-		.coherent_dma_mask = DMA_BIT_MASK(32),
-	},
-	.resource = tegra_usb3_resources,
-	.num_resources = ARRAY_SIZE(tegra_usb3_resources),
 };
 
 static struct resource tegra_otg_resources[] = {
@@ -720,42 +646,6 @@ struct platform_device tegra_otg_device = {
 	.num_resources	= ARRAY_SIZE(tegra_otg_resources),
 };
 
-static struct resource i2s_resource1[] = {
-	[0] = {
-		.start	= INT_I2S1,
-		.end	= INT_I2S1,
-		.flags	= IORESOURCE_IRQ
-	},
-	[1] = {
-		.start	= TEGRA_DMA_REQ_SEL_I2S_1,
-		.end	= TEGRA_DMA_REQ_SEL_I2S_1,
-		.flags	= IORESOURCE_DMA
-	},
-	[2] = {
-		.start	= TEGRA_I2S1_BASE,
-		.end	= TEGRA_I2S1_BASE + TEGRA_I2S1_SIZE - 1,
-		.flags	= IORESOURCE_MEM
-	}
-};
-
-static struct resource i2s_resource2[] = {
-	[0] = {
-		.start	= INT_I2S2,
-		.end	= INT_I2S2,
-		.flags	= IORESOURCE_IRQ
-	},
-	[1] = {
-		.start	= TEGRA_DMA_REQ_SEL_I2S2_1,
-		.end	= TEGRA_DMA_REQ_SEL_I2S2_1,
-		.flags	= IORESOURCE_DMA
-	},
-	[2] = {
-		.start	= TEGRA_I2S2_BASE,
-		.end	= TEGRA_I2S2_BASE + TEGRA_I2S2_SIZE - 1,
-		.flags	= IORESOURCE_MEM
-	}
-};
-
 static struct resource spdif_resource[] = {
 	[0] = {
 		.start	= INT_SPDIF,
@@ -772,20 +662,6 @@ static struct resource spdif_resource[] = {
 		.end	= TEGRA_SPDIF_BASE + TEGRA_SPDIF_SIZE - 1,
 		.flags	= IORESOURCE_MEM
 	}
-};
-
-struct platform_device tegra_i2s_device1 = {
-	.name		= "i2s",
-	.id		= 0,
-	.resource	= i2s_resource1,
-	.num_resources	= ARRAY_SIZE(i2s_resource1),
-};
-
-struct platform_device tegra_i2s_device2 = {
-	.name		= "i2s",
-	.id		= 1,
-	.resource	= i2s_resource2,
-	.num_resources	= ARRAY_SIZE(i2s_resource2),
 };
 
 struct platform_device tegra_spdif_device = {
@@ -892,121 +768,6 @@ struct platform_device tegra_pwfm3_device = {
 	.id		= 3,
 	.num_resources	= 1,
 	.resource	= &tegra_pwfm3_resource,
-};
-
-static struct resource tegra_uarta_resources[] = {
-	[0] = {
-		.start 	= TEGRA_UARTA_BASE,
-		.end	= TEGRA_UARTA_BASE + TEGRA_UARTA_SIZE - 1,
-		.flags	= IORESOURCE_MEM,
-	},
-	[1] = {
-		.start	= INT_UARTA,
-		.end	= INT_UARTA,
-		.flags	= IORESOURCE_IRQ,
-	},
-};
-
-static struct resource tegra_uartb_resources[]= {
-	[0] = {
-		.start 	= TEGRA_UARTB_BASE,
-		.end	= TEGRA_UARTB_BASE + TEGRA_UARTB_SIZE - 1,
-		.flags	= IORESOURCE_MEM,
-	},
-	[1] = {
-		.start	= INT_UARTB,
-		.end	= INT_UARTB,
-		.flags	= IORESOURCE_IRQ,
-	},
-};
-
-static struct resource tegra_uartc_resources[] = {
-	[0] = {
-		.start 	= TEGRA_UARTC_BASE,
-		.end	= TEGRA_UARTC_BASE + TEGRA_UARTC_SIZE - 1,
-		.flags	= IORESOURCE_MEM,
-	},
-	[1] = {
-		.start	= INT_UARTC,
-		.end	= INT_UARTC,
-		.flags	= IORESOURCE_IRQ,
-	},
-};
-
-static struct resource tegra_uartd_resources[] = {
-	[0] = {
-		.start 	= TEGRA_UARTD_BASE,
-		.end	= TEGRA_UARTD_BASE + TEGRA_UARTD_SIZE - 1,
-		.flags	= IORESOURCE_MEM,
-	},
-	[1] = {
-		.start	= INT_UARTD,
-		.end	= INT_UARTD,
-		.flags	= IORESOURCE_IRQ,
-	},
-};
-
-static struct resource tegra_uarte_resources[] = {
-	[0] = {
-		.start 	= TEGRA_UARTE_BASE,
-		.end	= TEGRA_UARTE_BASE + TEGRA_UARTE_SIZE - 1,
-		.flags	= IORESOURCE_MEM,
-	},
-	[1] = {
-		.start	= INT_UARTE,
-		.end	= INT_UARTE,
-		.flags	= IORESOURCE_IRQ,
-	},
-};
-
-struct platform_device tegra_uarta_device = {
-	.name	= "tegra_uart",
-	.id	= 0,
-	.num_resources	= ARRAY_SIZE(tegra_uarta_resources),
-	.resource	= tegra_uarta_resources,
-	.dev	= {
-		.coherent_dma_mask	= DMA_BIT_MASK(32),
-	},
-};
-
-struct platform_device tegra_uartb_device = {
-	.name	= "tegra_uart",
-	.id	= 1,
-	.num_resources	= ARRAY_SIZE(tegra_uartb_resources),
-	.resource	= tegra_uartb_resources,
-	.dev	= {
-		.coherent_dma_mask	= DMA_BIT_MASK(32),
-	},
-};
-
-struct platform_device tegra_uartc_device = {
-	.name	= "tegra_uart",
-	.id	= 2,
-	.num_resources	= ARRAY_SIZE(tegra_uartc_resources),
-	.resource	= tegra_uartc_resources,
-	.dev	= {
-		.coherent_dma_mask	= DMA_BIT_MASK(32),
-	},
-};
-
-struct platform_device tegra_uartd_device = {
-	.name	= "tegra_uart",
-	.id	= 3,
-	.num_resources	= ARRAY_SIZE(tegra_uartd_resources),
-	.resource	= tegra_uartd_resources,
-	.dev	= {
-		.coherent_dma_mask	= DMA_BIT_MASK(32),
-	},
-};
-
-struct platform_device tegra_uarte_device = {
-	.name	= "tegra_uart",
-	.id	= 4,
-	.num_resources	= ARRAY_SIZE(tegra_uarte_resources),
-	.resource	= tegra_uarte_resources,
-	.dev	= {
-		.coherent_dma_mask	= DMA_BIT_MASK(32),
-	},
 };
 
 static struct resource tegra_grhost_resources[] = {
