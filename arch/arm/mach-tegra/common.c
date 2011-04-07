@@ -166,19 +166,6 @@ static int __init tegra_lp0_vec_arg(char *options)
 }
 early_param("lp0_vec", tegra_lp0_vec_arg);
 
-void __init tegra_reserve(void)
-{
-	if (tegra_lp0_vec_size)
-		if (memblock_reserve(tegra_lp0_vec_start, tegra_lp0_vec_size))
-			pr_err("Failed to reserve lp0_vec %08lx@%08lx\n",
-				tegra_lp0_vec_size, tegra_lp0_vec_start);
-
-	pr_info("Tegra reserved memory:\n"
-		"LP0:                    %08lx - %08lx\n",
-		tegra_lp0_vec_start,
-		tegra_lp0_vec_start + tegra_lp0_vec_size - 1);
-}
-
 static int __init tegra_bootloader_fb_arg(char *options)
 {
 	char *p = options;
