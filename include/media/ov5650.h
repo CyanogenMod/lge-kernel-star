@@ -19,6 +19,7 @@
 #define OV5650_IOCTL_SET_GAIN		_IOW('o', 4, __u16)
 #define OV5650_IOCTL_GET_STATUS		_IOR('o', 5, __u8)
 #define OV5650_IOCTL_TEST_PATTERN	_IOW('o', 7, enum ov5650_test_pattern)
+#define OV5650_IOCTL_SET_CAMERA_MODE	_IOW('o', 10, __u32)
 
 enum ov5650_test_pattern {
 	TEST_PATTERN_NONE,

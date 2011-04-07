@@ -26,11 +26,32 @@ struct ov5650_reg {
 	u16 val;
 };
 
-struct ov5650_info {
-	int mode;
+enum StereoCameraMode{
+	/* Sets the default camera to Main */
+	Main,
+	/* Sets the stereo camera to stereo mode. */
+	Stereo,
+	/* Only the sensor on the left is on. */
+	LeftOnly,
+	/* Only the sensor on the right is on. */
+	RightOnly,
+	/* Ignore -- Forces compilers to make 32-bit enums. */
+	StereoCameraMode_Force32 = 0x7FFFFFFF
+};
+
+struct ov5650_sensor {
 	struct i2c_client *i2c_client;
 	struct ov5650_platform_data *pdata;
 };
+
+struct ov5650_info {
+	int mode;
+	enum StereoCameraMode camera_mode;
+	struct ov5650_sensor left;
+	struct ov5650_sensor right;
+};
+
+static struct ov5650_info *info;
 
 #define OV5650_TABLE_WAIT_MS 0
 #define OV5650_TABLE_END 1
@@ -342,60 +363,6 @@ static struct ov5650_reg mode_2080x1164[] = {
 	{OV5650_TABLE_END, 0x0000}
 };
 
-static struct ov5650_reg mode_1920x1088[] = {
-	{0x3621, 0x2f}, /* analog horizontal binning/sampling not enabled.
-			   pg 108 */
-	{0x3632, 0x55}, /* analog pg 108 */
-	{0x3703, 0xe6}, /* analog pg 108 */
-	{0x370c, 0xa0}, /* analog pg 108 */
-	{0x370d, 0x04}, /* analog pg 108 */
-	{0x3713, 0x2f}, /* analog pg 108 */
-	{0x3800, 0x02}, /* HREF start point higher 4 bits [3:0] pg 108 */
-	{0x3801, 0x58}, /* HREF start point lower  8 bits [7:0] pg 108 */
-	{0x3802, 0x00}, /* VREF start point higher 4 bits [3:0] pg 108 */
-	{0x3803, 0x0c}, /* VREF start point [7:0] pg 108 */
-	{0x3804, 0x0a}, /* HREF width  higher 4 bits [3:0] pg 108 */
-	{0x3805, 0x20}, /* HREF width  lower  8 bits [7:0] pg 108 */
-	{0x3806, 0x07}, /* VREF height higher 4 bits [3:0] pg 109 */
-	{0x3807, 0xa0}, /* VREF height lower  8 bits [7:0] pg 109 */
-	{0x3808, 0x0a}, /* DVP horizontal output size higher 4 bits [3:0]
-			   pg 109 */
-	{0x3809, 0x20}, /* DVP horizontal output size lower  8 bits [7:0]
-			   pg 109 */
-	{0x380a, 0x07}, /* DVP vertical   output size higher 4 bits [3:0]
-			   pg 109 */
-	{0x380b, 0xa0}, /* DVP vertical   output size lower  8 bits [7:0]
-			   pg 109 */
-	{0x380c, 0x0c}, /* total horizontal size higher 5 bits [4:0] pg 109,
-			   line length */
-	{0x380d, 0xb4}, /* total horizontal size lower  8 bits [7:0] pg 109,
-			   line length */
-	{0x380e, 0x07}, /* total vertical size higher 5 bits [4:0] pg 109,
-			   frame length */
-	{0x380f, 0xb0}, /* total vertical size lower  8 bits [7:0] pg 109,
-			   frame length */
-	{0x3818, 0xc0}, /* timing control reg18 mirror & dkhf pg 110 */
-	{0x381a, 0x3c}, /* HS mirror adjustment pg 110 */
-	{0x3a0d, 0x06}, /* b60 max pg 113 */
-	{0x3c01, 0x00}, /* 5060HZ_CTRL01 pg 116 */
-	{0x3007, 0x3f}, /* clock enable03 pg 98 */
-	{0x5059, 0x80}, /* => NOT found */
-	{0x3003, 0x03}, /* reset MIPI and DVP pg 97 */
-	{0x3500, 0x00}, /* long exp 1/3 in unit of 1/16 line, pg 38 */
-	{0x3501, 0x7a}, /* long exp 2/3 in unit of 1/16 line, pg 38,
-			   note frame length start with 0x7b0,
-			   and SENSOR_BAYER_DEFAULT_MAX_COARSE_DIFF=3 */
-	{0x3502, 0xd0}, /* long exp 3/3 in unit of 1/16 line, pg 38.
-			   Two lines of integration time. */
-	{0x350a, 0x00}, /* gain output to sensor, pg 38 */
-	{0x350b, 0x00}, /* gain output to sensor, pg 38 */
-	{0x4801, 0x0f}, /* MIPI control01 pg 125 */
-	{0x300e, 0x0c}, /* SC_MIPI_SC_CTRL0 pg 73 */
-	{0x4803, 0x50}, /* MIPI CTRL3 pg 91 */
-	{0x4800, 0x34}, /* MIPI CTRl0 idle and short line pg 89 */
-	{OV5650_TABLE_END, 0x0000}
-};
-
 static struct ov5650_reg mode_1264x704[] = {
 	{0x3600, 0x54}, /* analog pg 108 */
 	{0x3601, 0x05}, /* analog pg 108 */
@@ -539,39 +506,6 @@ static inline void ov5650_get_gain_reg(struct ov5650_reg *regs, u16 gain)
 	regs->val = gain;
 }
 
-static int ov5650_read_reg(struct i2c_client *client, u16 addr, u8 *val)
-{
-	int err;
-	struct i2c_msg msg[2];
-	unsigned char data[3];
-
-	if (!client->adapter)
-		return -ENODEV;
-
-	msg[0].addr = client->addr;
-	msg[0].flags = 0;
-	msg[0].len = 2;
-	msg[0].buf = data;
-
-	/* high byte goes out first */
-	data[0] = (u8) (addr >> 8);;
-	data[1] = (u8) (addr & 0xff);
-
-	msg[1].addr = client->addr;
-	msg[1].flags = I2C_M_RD;
-	msg[1].len = 1;
-	msg[1].buf = data + 2;
-
-	err = i2c_transfer(client->adapter, msg, 2);
-
-	if (err != 2)
-		return -EINVAL;
-
-	*val = data[2];
-
-	return 0;
-}
-
 static int ov5650_write_reg(struct i2c_client *client, u16 addr, u8 val)
 {
 	int err;
@@ -597,17 +531,41 @@ static int ov5650_write_reg(struct i2c_client *client, u16 addr, u8 val)
 			return 0;
 		retry++;
 		pr_err("ov5650: i2c transfer failed, retrying %x %x\n",
-		       addr, val);
+			addr, val);
 		msleep(3);
 	} while (retry <= OV5650_MAX_RETRIES);
 
 	return err;
 }
 
-static int ov5650_write_table(struct i2c_client *client,
-			      const struct ov5650_reg table[],
-			      const struct ov5650_reg override_list[],
-			      int num_override_regs)
+static int ov5650_write_reg_helper(struct ov5650_info *info,
+					u16 addr, u8 val)
+{
+	int ret;
+	switch (info->camera_mode) {
+	case Main:
+	case LeftOnly:
+		ret = ov5650_write_reg(info->left.i2c_client, addr, val);
+		break;
+	case Stereo:
+		ret = ov5650_write_reg(info->left.i2c_client, addr, val);
+		if (ret)
+			break;
+		ret = ov5650_write_reg(info->right.i2c_client, addr, val);
+		break;
+	case RightOnly:
+		ret = ov5650_write_reg(info->right.i2c_client, addr, val);
+		break;
+	default:
+		return -1;
+	}
+	return ret;
+}
+
+static int ov5650_write_table(struct ov5650_info *info,
+				const struct ov5650_reg table[],
+				const struct ov5650_reg override_list[],
+				int num_override_regs)
 {
 	int err;
 	const struct ov5650_reg *next;
@@ -633,7 +591,7 @@ static int ov5650_write_table(struct i2c_client *client,
 			}
 		}
 
-		err = ov5650_write_reg(client, next->addr, val);
+		err = ov5650_write_reg_helper(info, next->addr, val);
 		if (err)
 			return err;
 	}
@@ -669,20 +627,20 @@ static int ov5650_set_mode(struct ov5650_info *info, struct ov5650_mode *mode)
 	ov5650_get_coarse_time_regs(reg_list + 2, mode->coarse_time);
 	ov5650_get_gain_reg(reg_list + 5, mode->gain);
 
-	err = ov5650_write_table(info->i2c_client, reset_seq, NULL, 0);
+	err = ov5650_write_table(info, reset_seq, NULL, 0);
 	if (err)
 		return err;
 
-	err = ov5650_write_table(info->i2c_client, mode_start, NULL, 0);
+	err = ov5650_write_table(info, mode_start, NULL, 0);
 	if (err)
 		return err;
 
-	err = ov5650_write_table(info->i2c_client, mode_table[sensor_mode],
+	err = ov5650_write_table(info, mode_table[sensor_mode],
 		reg_list, 6);
 	if (err)
 		return err;
 
-	err = ov5650_write_table(info->i2c_client, mode_end, NULL, 0);
+	err = ov5650_write_table(info, mode_end, NULL, 0);
 	if (err)
 		return err;
 
@@ -699,7 +657,7 @@ static int ov5650_set_frame_length(struct ov5650_info *info, u32 frame_length)
 	ov5650_get_frame_length_regs(reg_list, frame_length);
 
 	for (i = 0; i < 2; i++)	{
-		ret = ov5650_write_reg(info->i2c_client, reg_list[i].addr,
+		ret = ov5650_write_reg_helper(info, reg_list[i].addr,
 			reg_list[i].val);
 		if (ret)
 			return ret;
@@ -717,22 +675,22 @@ static int ov5650_set_coarse_time(struct ov5650_info *info, u32 coarse_time)
 
 	ov5650_get_coarse_time_regs(reg_list, coarse_time);
 
-	ret = ov5650_write_reg(info->i2c_client, 0x3212, 0x01);
+	ret = ov5650_write_reg_helper(info, 0x3212, 0x01);
 	if (ret)
 		return ret;
 
 	for (i = 0; i < 3; i++)	{
-		ret = ov5650_write_reg(info->i2c_client, reg_list[i].addr,
+		ret = ov5650_write_reg_helper(info, reg_list[i].addr,
 			reg_list[i].val);
 		if (ret)
 			return ret;
 	}
 
-	ret = ov5650_write_reg(info->i2c_client, 0x3212, 0x11);
+	ret = ov5650_write_reg_helper(info, 0x3212, 0x11);
 	if (ret)
 		return ret;
 
-	ret = ov5650_write_reg(info->i2c_client, 0x3212, 0xa1);
+	ret = ov5650_write_reg_helper(info, 0x3212, 0xa1);
 	if (ret)
 		return ret;
 
@@ -746,19 +704,9 @@ static int ov5650_set_gain(struct ov5650_info *info, u16 gain)
 
 	ov5650_get_gain_reg(&reg_list, gain);
 
-	ret = ov5650_write_reg(info->i2c_client, reg_list.addr, reg_list.val);
+	ret = ov5650_write_reg_helper(info, reg_list.addr, reg_list.val);
 
 	return ret;
-}
-
-static int ov5650_get_status(struct ov5650_info *info, u8 *status)
-{
-	int err;
-
-	*status = 0;
-	err = ov5650_read_reg(info->i2c_client, 0x002, status);
-	pr_info("%s: %u %d\n", __func__, *status, err);
-	return err;
 }
 
 static int ov5650_test_pattern(struct ov5650_info *info,
@@ -767,9 +715,55 @@ static int ov5650_test_pattern(struct ov5650_info *info,
 	if (pattern >= ARRAY_SIZE(test_pattern_modes))
 		return -EINVAL;
 
-	return ov5650_write_table(info->i2c_client,
+	return ov5650_write_table(info,
 				  test_pattern_modes[pattern],
 				  NULL, 0);
+}
+
+static int ov5650_set_power(int val)
+{
+	pr_info("%s: val=%d camera mode=%d\n", __func__, val,
+			info->camera_mode);
+
+	switch (info->camera_mode) {
+	case Main:
+	case LeftOnly:
+		if (info->left.pdata) {
+			if (val && info->left.pdata->power_on)
+				info->left.pdata->power_on();
+			else if (info->left.pdata->power_off)
+				info->left.pdata->power_off();
+		}
+		break;
+
+	case Stereo:
+		if (info->left.pdata) {
+			if (val && info->left.pdata->power_on)
+				info->left.pdata->power_on();
+			else if (info->left.pdata->power_off)
+				info->left.pdata->power_off();
+		}
+		if (info->right.pdata) {
+			if (val && info->right.pdata->power_on)
+				info->right.pdata->power_on();
+			else if (info->right.pdata->power_off)
+				info->right.pdata->power_off();
+		}
+		break;
+
+	case RightOnly:
+		if (info->right.pdata) {
+			if (val && info->right.pdata->power_on)
+				info->right.pdata->power_on();
+			else if (info->right.pdata->power_off)
+				info->right.pdata->power_off();
+		}
+		break;
+
+	default:
+		return -1;
+	}
+	return 0;
 }
 
 static long ov5650_ioctl(struct file *file,
@@ -779,6 +773,21 @@ static long ov5650_ioctl(struct file *file,
 	struct ov5650_info *info = file->private_data;
 
 	switch (cmd) {
+	case OV5650_IOCTL_SET_CAMERA_MODE:
+	{
+		if (info->camera_mode != arg) {
+			err = ov5650_set_power(0);
+			if (err) {
+				pr_info("%s %d\n", __func__, __LINE__);
+				return err;
+			}
+			info->camera_mode = arg;
+			err = ov5650_set_power(1);
+			if (err)
+				return err;
+		}
+		return 0;
+	}
 	case OV5650_IOCTL_SET_MODE:
 	{
 		struct ov5650_mode mode;
@@ -799,11 +808,7 @@ static long ov5650_ioctl(struct file *file,
 		return ov5650_set_gain(info, (u16)arg);
 	case OV5650_IOCTL_GET_STATUS:
 	{
-		u8 status;
-
-		err = ov5650_get_status(info, &status);
-		if (err)
-			return err;
+		u16 status = 0;
 		if (copy_to_user((void __user *)arg, &status,
 				 2)) {
 			pr_info("%s %d\n", __func__, __LINE__);
@@ -824,24 +829,17 @@ static long ov5650_ioctl(struct file *file,
 	return 0;
 }
 
-static struct ov5650_info *info;
-
 static int ov5650_open(struct inode *inode, struct file *file)
 {
-	u8 status;
-
 	pr_info("%s\n", __func__);
 	file->private_data = info;
-	if (info->pdata && info->pdata->power_on)
-		info->pdata->power_on();
-	ov5650_get_status(info, &status);
+	ov5650_set_power(1);
 	return 0;
 }
 
 int ov5650_release(struct inode *inode, struct file *file)
 {
-	if (info->pdata && info->pdata->power_off)
-		info->pdata->power_off();
+	ov5650_set_power(0);
 	file->private_data = NULL;
 	return 0;
 }
@@ -860,17 +858,18 @@ static struct miscdevice ov5650_device = {
 	.fops = &ov5650_fileops,
 };
 
-static int ov5650_probe(struct i2c_client *client,
+static int left_ov5650_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
 	int err;
+	pr_info("%s: probing sensor.\n", __func__);
 
-	pr_info("ov5650: probing sensor.\n");
-
-	info = kzalloc(sizeof(struct ov5650_info), GFP_KERNEL);
 	if (!info) {
-		pr_err("ov5650: Unable to allocate memory!\n");
-		return -ENOMEM;
+		info = kzalloc(sizeof(struct ov5650_info), GFP_KERNEL);
+		if (!info) {
+			pr_err("ov5650: Unable to allocate memory!\n");
+			return -ENOMEM;
+		}
 	}
 
 	err = misc_register(&ov5650_device);
@@ -880,48 +879,91 @@ static int ov5650_probe(struct i2c_client *client,
 		return err;
 	}
 
-	info->pdata = client->dev.platform_data;
-	info->i2c_client = client;
+	info->left.pdata = client->dev.platform_data;
+	info->left.i2c_client = client;
 
-	i2c_set_clientdata(client, info);
 	return 0;
 }
 
-static int ov5650_remove(struct i2c_client *client)
+static int left_ov5650_remove(struct i2c_client *client)
 {
-	struct ov5650_info *info;
-	info = i2c_get_clientdata(client);
 	misc_deregister(&ov5650_device);
 	kfree(info);
 	return 0;
 }
 
-static const struct i2c_device_id ov5650_id[] = {
+static const struct i2c_device_id left_ov5650_id[] = {
 	{ "ov5650", 0 },
+	{ "ov5650L", 0 },
 	{ },
 };
 
-MODULE_DEVICE_TABLE(i2c, ov5650_id);
+MODULE_DEVICE_TABLE(i2c, left_ov5650_id);
 
-static struct i2c_driver ov5650_i2c_driver = {
+static struct i2c_driver left_ov5650_i2c_driver = {
 	.driver = {
 		.name = "ov5650",
 		.owner = THIS_MODULE,
 	},
-	.probe = ov5650_probe,
-	.remove = ov5650_remove,
-	.id_table = ov5650_id,
+	.probe = left_ov5650_probe,
+	.remove = left_ov5650_remove,
+	.id_table = left_ov5650_id,
+};
+
+static int right_ov5650_probe(struct i2c_client *client,
+			const struct i2c_device_id *id)
+{
+	pr_info("%s: probing sensor.\n", __func__);
+	if (!info) {
+		info = kzalloc(sizeof(struct ov5650_info), GFP_KERNEL);
+		if (!info) {
+			pr_err("ov5650_right: Unable to allocate memory!\n");
+			return -ENOMEM;
+		}
+	}
+
+	info->right.pdata = client->dev.platform_data;
+	info->right.i2c_client = client;
+
+	return 0;
+}
+
+static int right_ov5650_remove(struct i2c_client *client)
+{
+	return 0;
+}
+
+static const struct i2c_device_id right_ov5650_id[] = {
+	{ "ov5650R", 0 },
+	{ },
+};
+
+MODULE_DEVICE_TABLE(i2c, right_ov5650_id);
+
+static struct i2c_driver right_ov5650_i2c_driver = {
+	.driver = {
+		.name = "ov5650R",
+		.owner = THIS_MODULE,
+	},
+	.probe = right_ov5650_probe,
+	.remove = right_ov5650_remove,
+	.id_table = right_ov5650_id,
 };
 
 static int __init ov5650_init(void)
 {
+	int ret;
 	pr_info("ov5650 sensor driver loading\n");
-	return i2c_add_driver(&ov5650_i2c_driver);
+	ret = i2c_add_driver(&left_ov5650_i2c_driver);
+	if (ret)
+		return ret;
+	return i2c_add_driver(&right_ov5650_i2c_driver);
 }
 
 static void __exit ov5650_exit(void)
 {
-	i2c_del_driver(&ov5650_i2c_driver);
+	i2c_del_driver(&right_ov5650_i2c_driver);
+	i2c_del_driver(&left_ov5650_i2c_driver);
 }
 
 module_init(ov5650_init);
