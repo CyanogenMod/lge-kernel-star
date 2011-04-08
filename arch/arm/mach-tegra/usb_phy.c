@@ -173,13 +173,17 @@
 #define   USB_PHY_CLK_VALID		(1 << 7)
 
 #define   UTMIP_RESET			(1 << 11)
-#define   UHSIC_RESET			(1 << 14)
-
 #define   UTMIP_PHY_ENABLE		(1 << 12)
 #define   ULPI_PHY_ENABLE		(1 << 13)
-#define   UHSIC_PHY_ENABLE	(1 << 19)
+#define   UHSIC_RESET			(1 << 14)
 
 #define   USB_WAKEUP_DEBOUNCE_COUNT(x)	(((x) & 0x7) << 16)
+#define   UHSIC_PHY_ENABLE		(1 << 19)
+#define   ULPIS2S_SLV0_RESET		(1 << 20)
+#define   ULPIS2S_SLV1_RESET		(1 << 21)
+#define   ULPIS2S_LINE_RESET		(1 << 22)
+#define   ULPI_PADS_RESET		(1 << 23)
+#define   ULPI_PADS_CLKEN_RESET		(1 << 24)
 
 #define USB1_LEGACY_CTRL	0x410
 #define   USB1_NO_LEGACY_MODE			(1 << 0)
@@ -264,6 +268,7 @@
 #define   ULPIS2S_DISCON_DONT_CHECK_SE0	(1 << 13)
 #define   ULPIS2S_SUPPORT_HS_KEEP_ALIVE (1 << 14)
 #define   ULPIS2S_DISABLE_STP_PU	(1 << 15)
+#define   ULPIS2S_SLV0_CLAMP_XMIT	(1 << 16)
 
 
 #define ULPI_TIMING_CTRL_0	0x424
@@ -455,11 +460,6 @@ struct usb_phy_plat_data usb_phy_data[] = {
 	{ 0, 0, -1, NULL},
 	{ 0, 0, -1, NULL},
 };
-
-static inline bool phy_is_ulpi(struct tegra_usb_phy *phy)
-{
-	return (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_ULPI);
-}
 
 static int utmip_pad_open(struct tegra_usb_phy *phy)
 {
@@ -1211,6 +1211,33 @@ static void null_phy_power_off(struct tegra_usb_phy *phy)
 	writel(val, base + ULPI_TIMING_CTRL_0);
 }
 
+static void null_phy_post_usbcmd_reset(struct tegra_usb_phy *phy)
+{
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+	unsigned long val;
+	void __iomem *base = phy->regs;
+
+	val = readl(base + ULPIS2S_CTRL);
+	val |=  ULPIS2S_SLV0_CLAMP_XMIT;
+	writel(val, base + ULPIS2S_CTRL);
+
+	val = readl(base + USB_SUSP_CTRL);
+	val |= ULPIS2S_SLV0_RESET;
+	writel(val, base + USB_SUSP_CTRL);
+	udelay(10);
+
+	/* remove slave0 reset */
+	val = readl(base + USB_SUSP_CTRL);
+	val &= ~ULPIS2S_SLV0_RESET;
+	writel(val, base + USB_SUSP_CTRL);
+	udelay(10);
+
+	val = readl(base + ULPIS2S_CTRL);
+	val &=  ~ULPIS2S_SLV0_CLAMP_XMIT;
+	writel(val, base + ULPIS2S_CTRL);
+#endif
+}
+
 static int uhsic_phy_power_on(struct tegra_usb_phy *phy)
 {
 	unsigned long val;
@@ -1349,7 +1376,6 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 	unsigned long parent_rate;
 	int i;
 	int err;
-	bool hsic = false;
 
 	phy = kzalloc(sizeof(struct tegra_usb_phy), GFP_KERNEL);
 	if (!phy)
@@ -1364,18 +1390,14 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 	phy->regulator_on = 0;
 
 	if (!phy->config) {
-		if (phy_is_ulpi(phy)) {
+		if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_LINK_ULPI ||
+		    phy->usb_phy_type == TEGRA_USB_PHY_TYPE_NULL_ULPI) {
 			pr_err("%s: ulpi phy configuration missing", __func__);
 			err = -EINVAL;
 			goto err0;
 		} else {
 			phy->config = &utmip_default[instance];
 		}
-	}
-
-	if (phy_is_ulpi(phy)) {
-		ulpi_config = config;
-		hsic = (ulpi_config->inf_type == TEGRA_USB_UHSIC);
 	}
 
 	phy->pll_u = clk_get_sys(NULL, "pll_u");
@@ -1387,7 +1409,7 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 	clk_enable(phy->pll_u);
 
 	parent_rate = clk_get_rate(clk_get_parent(phy->pll_u));
-	if (hsic) {
+	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_HSIC) {
 		for (i = 0; i < ARRAY_SIZE(tegra_uhsic_freq_table); i++) {
 			if (tegra_uhsic_freq_table[i].freq == parent_rate) {
 				phy->freq = &tegra_uhsic_freq_table[i];
@@ -1408,28 +1430,27 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 		goto err1;
 	}
 
-	if (phy_is_ulpi(phy)) {
-		ulpi_config = config;
-
-		if (ulpi_config->inf_type == TEGRA_USB_LINK_ULPI) {
-			phy->clk = clk_get_sys(NULL, ulpi_config->clk);
-			if (IS_ERR(phy->clk)) {
-				pr_err("%s: can't get ulpi clock\n", __func__);
-				err = -ENXIO;
-				goto err1;
-			}
-			tegra_gpio_enable(ulpi_config->reset_gpio);
-			gpio_request(ulpi_config->reset_gpio, "ulpi_phy_reset_b");
-			gpio_direction_output(ulpi_config->reset_gpio, 0);
-
-			phy->ulpi = otg_ulpi_create(&ulpi_viewport_access_ops, 0);
-			phy->ulpi->io_priv = regs + ULPI_VIEWPORT;
-		}
-	} else {
+	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_UTMIP) {
 		err = utmip_pad_open(phy);
 		if (err < 0)
 			goto err1;
+	} else if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_LINK_ULPI) {
+		ulpi_config = config;
+
+		phy->clk = clk_get_sys(NULL, ulpi_config->clk);
+		if (IS_ERR(phy->clk)) {
+			pr_err("%s: can't get ulpi clock\n", __func__);
+			err = -ENXIO;
+			goto err1;
+		}
+		tegra_gpio_enable(ulpi_config->reset_gpio);
+		gpio_request(ulpi_config->reset_gpio, "ulpi_phy_reset_b");
+		gpio_direction_output(ulpi_config->reset_gpio, 0);
+
+		phy->ulpi = otg_ulpi_create(&ulpi_viewport_access_ops, 0);
+		phy->ulpi->io_priv = regs + ULPI_VIEWPORT;
 	}
+
 	phy->reg_vdd = regulator_get(NULL, "avdd_usb");
 	if (WARN_ON(IS_ERR_OR_NULL(phy->reg_vdd))) {
 		pr_err("couldn't get regulator avdd_usb: %ld \n",
@@ -1449,20 +1470,21 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 
 #ifdef CONFIG_ARCH_TEGRA_3x_SOC
 	/* Power-up the VBUS detector for UTMIP PHY */
-	writel(readl((IO_ADDRESS(TEGRA_PMC_BASE) + TEGRA_PMC_USB_AO)) &
+	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_UTMIP) {
+		writel(readl((IO_ADDRESS(TEGRA_PMC_BASE) + TEGRA_PMC_USB_AO)) &
 			~(TEGRA_PMC_USB_AO_VBUS_WAKEUP_PD_P0 | TEGRA_PMC_USB_AO_ID_PD_P0),
 			(IO_ADDRESS(TEGRA_PMC_BASE) + TEGRA_PMC_USB_AO));
 
-	if (usb_phy_data[phy->instance].vbus_reg_supply) {
-		phy->reg_vbus = regulator_get(NULL, usb_phy_data[phy->instance].vbus_reg_supply);
-		if (WARN_ON(IS_ERR_OR_NULL(phy->reg_vbus))) {
-			pr_err("couldn't get regulator vdd_vbus_usb: %ld, instance : %d\n",
-				 PTR_ERR(phy->reg_vbus), phy->instance);
-			err = PTR_ERR(phy->reg_vbus);
-			goto err1;
+		if (usb_phy_data[phy->instance].vbus_reg_supply) {
+			phy->reg_vbus = regulator_get(NULL, usb_phy_data[phy->instance].vbus_reg_supply);
+			if (WARN_ON(IS_ERR_OR_NULL(phy->reg_vbus))) {
+				pr_err("couldn't get regulator vdd_vbus_usb: %ld, instance : %d\n",
+					PTR_ERR(phy->reg_vbus), phy->instance);
+				err = PTR_ERR(phy->reg_vbus);
+				goto err1;
+			}
 		}
 	}
-
 #endif
 
 	return phy;
@@ -1477,34 +1499,35 @@ err0:
 
 int tegra_usb_phy_power_on(struct tegra_usb_phy *phy)
 {
+	const tegra_phy_fp power_on[] = {
+		utmi_phy_power_on,
+		ulpi_phy_power_on,
+		null_phy_power_on,
+		uhsic_phy_power_on,
+	};
+
 	if (phy->reg_vdd && !phy->regulator_on) {
 		regulator_enable(phy->reg_vdd);
 		phy->regulator_on = 1;
 	}
-	if (phy_is_ulpi(phy)) {
-		struct tegra_ulpi_config *ulpi_config = phy->config;
-		if (ulpi_config->inf_type == TEGRA_USB_LINK_ULPI)
-			return ulpi_phy_power_on(phy);
-		else if (ulpi_config->inf_type == TEGRA_USB_UHSIC)
-			return uhsic_phy_power_on(phy);
-		else
-			return null_phy_power_on(phy);
-	} else
-		return utmi_phy_power_on(phy);
+
+	if (power_on[phy->usb_phy_type])
+		return power_on[phy->usb_phy_type](phy);
+
+	return 0;
 }
 
 void tegra_usb_phy_power_off(struct tegra_usb_phy *phy)
 {
-	if (phy_is_ulpi(phy)) {
-		struct tegra_ulpi_config *ulpi_config = phy->config;
-		if (ulpi_config->inf_type == TEGRA_USB_LINK_ULPI)
-			ulpi_phy_power_off(phy);
-		else if (ulpi_config->inf_type == TEGRA_USB_UHSIC)
-			uhsic_phy_power_off(phy);
-		else
-			null_phy_power_off(phy);
-	} else
-		utmi_phy_power_off(phy);
+	const tegra_phy_fp power_off[] = {
+		utmi_phy_power_off,
+		ulpi_phy_power_off,
+		null_phy_power_off,
+		uhsic_phy_power_off,
+	};
+
+	if (power_off[phy->usb_phy_type])
+		power_off[phy->usb_phy_type](phy);
 
 	if (phy->reg_vdd && phy->regulator_on) {
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
@@ -1517,27 +1540,47 @@ void tegra_usb_phy_power_off(struct tegra_usb_phy *phy)
 
 void tegra_usb_phy_preresume(struct tegra_usb_phy *phy)
 {
-	if (!phy_is_ulpi(phy))
-		utmi_phy_preresume(phy);
+	const tegra_phy_fp preresume[] = {
+		utmi_phy_preresume,
+		NULL,
+		NULL,
+		NULL,
+	};
+
+	if (preresume[phy->usb_phy_type])
+		preresume[phy->usb_phy_type](phy);
 }
 
 void tegra_usb_phy_postresume(struct tegra_usb_phy *phy)
 {
-	struct tegra_ulpi_config *config = phy->config;
+	const tegra_phy_fp postresume[] = {
+		utmi_phy_postresume,
+		NULL,
+		NULL,
+		uhsic_phy_postresume,
+	};
 
-	if ((phy->instance == 1) &&
-			(config->inf_type == TEGRA_USB_UHSIC))
-		uhsic_phy_postresume(phy);
-	else if (!phy_is_ulpi(phy))
-		utmi_phy_postresume(phy);
+	if (postresume[phy->usb_phy_type])
+		postresume[phy->usb_phy_type](phy);
+}
 
-	return 0;
+void tegra_ehci_post_reset(struct tegra_usb_phy *phy)
+{
+	const tegra_phy_fp post_reset[] = {
+		NULL,
+		NULL,
+		null_phy_post_usbcmd_reset,
+		NULL,
+	};
+
+	if (post_reset[phy->usb_phy_type])
+		post_reset[phy->usb_phy_type](phy);
 }
 
 void tegra_ehci_phy_restore_start(struct tegra_usb_phy *phy,
 				 enum tegra_usb_phy_port_speed port_speed)
 {
-	if (!phy_is_ulpi(phy))
+	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_UTMIP)
 		utmi_phy_restore_start(phy, port_speed);
 	else
 		ulpi_phy_restore_start(phy, port_speed);
@@ -1545,7 +1588,7 @@ void tegra_ehci_phy_restore_start(struct tegra_usb_phy *phy,
 
 void tegra_ehci_phy_restore_end(struct tegra_usb_phy *phy)
 {
-	if (!phy_is_ulpi(phy))
+	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_UTMIP)
 		utmi_phy_restore_end(phy);
 	else
 		ulpi_phy_restore_end(phy);
@@ -1553,25 +1596,23 @@ void tegra_ehci_phy_restore_end(struct tegra_usb_phy *phy)
 
 void tegra_usb_phy_clk_disable(struct tegra_usb_phy *phy)
 {
-	if (!phy_is_ulpi(phy))
+	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_UTMIP)
 		utmi_phy_clk_disable(phy);
 }
 
 void tegra_usb_phy_clk_enable(struct tegra_usb_phy *phy)
 {
-	if (!phy_is_ulpi(phy))
+	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_UTMIP)
 		utmi_phy_clk_enable(phy);
 }
 
 void tegra_usb_phy_close(struct tegra_usb_phy *phy)
 {
-	if (phy_is_ulpi(phy)) {
-		struct tegra_ulpi_config *ulpi_config = phy->config;
-
-		if (ulpi_config->inf_type == TEGRA_USB_LINK_ULPI)
-			clk_put(phy->clk);
-	} else
+	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_UTMIP)
 		utmip_pad_close(phy);
+	else if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_LINK_ULPI)
+		clk_put(phy->clk);
+
 	clk_disable(phy->pll_u);
 	clk_put(phy->pll_u);
 	if (phy->reg_vbus)
@@ -1587,10 +1628,8 @@ int tegra_usb_phy_bus_connect(struct tegra_usb_phy *phy)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
-	struct tegra_ulpi_config *config = phy->config;
 
-	if (phy_is_ulpi(phy) && (config->inf_type == TEGRA_USB_UHSIC)) {
-
+	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_HSIC) {
 		val = readl(base + UHSIC_MISC_CFG0);
 		val |= UHSIC_DETECT_SHORT_CONNECT;
 		writel(val, base + UHSIC_MISC_CFG0);
@@ -1625,10 +1664,8 @@ int tegra_usb_phy_bus_reset(struct tegra_usb_phy *phy)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
-	struct tegra_ulpi_config *config = phy->config;
 
-	if (phy_is_ulpi(phy) && (config->inf_type == TEGRA_USB_UHSIC)) {
-
+	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_HSIC) {
 		val = readl(base + USB_PORTSC1);
 		val |= USB_PORTSC1_PTC(5);
 		writel(val, base + USB_PORTSC1);
@@ -1698,10 +1735,8 @@ int tegra_usb_phy_bus_idle(struct tegra_usb_phy *phy)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
-	struct tegra_ulpi_config *config = phy->config;
 
-	if (phy_is_ulpi(phy) && (config->inf_type == TEGRA_USB_UHSIC)) {
-
+	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_HSIC) {
 		val = readl(base + UHSIC_MISC_CFG0);
 		val |= UHSIC_DETECT_SHORT_CONNECT;
 		writel(val, base + UHSIC_MISC_CFG0);
@@ -1722,9 +1757,8 @@ int tegra_usb_phy_bus_idle(struct tegra_usb_phy *phy)
 bool tegra_usb_phy_is_device_connected(struct tegra_usb_phy *phy)
 {
 	void __iomem *base = phy->regs;
-	struct tegra_ulpi_config *config = phy->config;
 
-	if (phy_is_ulpi(phy) && (config->inf_type == TEGRA_USB_UHSIC)) {
+	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_HSIC) {
 		if (!((readl(base + UHSIC_STAT_CFG0) & UHSIC_CONNECT_DETECT) == UHSIC_CONNECT_DETECT)) {
 			pr_err("%s: hsic no device connection\n", __func__);
 			return false;
