@@ -291,8 +291,9 @@ static int __devinit tps6586x_rtc_probe(struct platform_device *pdev)
 
 	/* 1 kHz tick mode, enable tick counting */
 	err = tps6586x_update(tps_dev, RTC_CTRL,
-			RTC_ENABLE | ((pdata->cl_sel<<CL_SEL_POS)&CL_SEL_MASK),
-			RTC_ENABLE | OSC_SRC_SEL | PRE_BYPASS | CL_SEL_MASK);
+		RTC_ENABLE | OSC_SRC_SEL | ((pdata->cl_sel << CL_SEL_POS) &
+					    CL_SEL_MASK),
+		RTC_ENABLE | OSC_SRC_SEL | PRE_BYPASS | CL_SEL_MASK);
 	if (err < 0) {
 		dev_err(&pdev->dev, "unable to start counter\n");
 		goto fail;
