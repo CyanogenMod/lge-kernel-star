@@ -156,7 +156,7 @@ static struct tegra_ehci_platform_data ventana_ehci2_ulpi_platform_data = {
 	.operating_mode = TEGRA_USB_HOST,
 	.power_down_on_bus_suspend = 1,
 	.phy_config = &ventana_ehci2_ulpi_phy_config,
-	.usb_phy_type = TEGRA_USB_PHY_TYPE_ULPI,
+	.phy_type = TEGRA_USB_PHY_TYPE_LINK_ULPI,
 };
 
 static struct tegra_i2c_platform_data ventana_i2c1_platform_data = {
@@ -340,7 +340,7 @@ static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
 			.phy_config = &ulpi_phy_config,
 			.operating_mode = TEGRA_USB_HOST,
 			.power_down_on_bus_suspend = 1,
-			.usb_phy_type = TEGRA_USB_PHY_TYPE_ULPI,
+			.phy_type = TEGRA_USB_PHY_TYPE_LINK_ULPI,
 	},
 	[2] = {
 			.phy_config = &utmi_phy_config[1],
