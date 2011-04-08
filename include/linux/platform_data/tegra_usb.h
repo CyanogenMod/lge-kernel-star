@@ -22,11 +22,12 @@ enum tegra_usb_operating_modes {
 	TEGRA_USB_OTG,
 };
 
-enum tegra_usb_phy_host_type {
-	TEGRA_USB_PHY_HOST_TYPE_UTMIP = 1,
-	TEGRA_USB_PHY_HOST_TYPE_ULPI = 2,
-	TEGRA_USB_PHY_HOST_TYPE_HSIC = 3,
-	TEGRA_USB_PHY_HOST_TYPE_ICUSB = 4,
+enum tegra_usb_phy_type {
+	TEGRA_USB_PHY_TYPE_UTMIP = 0,
+	TEGRA_USB_PHY_TYPE_LINK_ULPI = 1,
+	TEGRA_USB_PHY_TYPE_NULL_ULPI = 2,
+	TEGRA_USB_PHY_TYPE_HSIC = 3,
+	TEGRA_USB_PHY_TYPE_ICUSB = 4,
 };
 
 struct tegra_ehci_platform_data {
@@ -34,7 +35,7 @@ struct tegra_ehci_platform_data {
 	/* power down the phy on bus suspend */
 	int power_down_on_bus_suspend;
 	void *phy_config;
-	enum tegra_usb_phy_host_type usb_phy_type;
+	enum tegra_usb_phy_type phy_type;
 };
 
 struct tegra_otg_platform_data {
