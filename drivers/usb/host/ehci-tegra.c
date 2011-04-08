@@ -92,10 +92,7 @@ static int tegra_ehci_hub_control(
 	struct		tegra_ehci_hcd *tegra = dev_get_drvdata(hcd->self.controller);
 	bool		hsic = false;
 
-	if (tegra->phy->instance == 1) {
-		struct tegra_ulpi_config *config = tegra->phy->config;
-		hsic = (config->inf_type == TEGRA_USB_UHSIC);
-	}
+	hsic = (tegra->phy->usb_phy_type == TEGRA_USB_PHY_TYPE_HSIC);
 
 	status_reg = &ehci->regs->port_status[(wIndex & 0xff) - 1];
 
@@ -266,9 +263,11 @@ done:
 static void tegra_ehci_restart(struct usb_hcd *hcd)
 {
 	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
+	struct tegra_ehci_hcd *tegra = dev_get_drvdata(hcd->self.controller);
 	unsigned int temp;
 
 	ehci_reset(ehci);
+	tegra_ehci_post_reset(tegra->phy);
 
 	/* setup the frame list and Async q heads */
 	ehci_writel(ehci, ehci->periodic_dma, &ehci->regs->frame_list);
@@ -301,12 +300,8 @@ static int tegra_usb_suspend(struct usb_hcd *hcd)
 	struct ehci_regs __iomem *hw = tegra->ehci->regs;
 	unsigned long flags;
 	int hsic = 0;
-	struct tegra_ulpi_config *config;
 
-	if (tegra->phy->instance == 1) {
-		config = tegra->phy->config;
-		hsic = (config->inf_type == TEGRA_USB_UHSIC);
-	}
+	hsic = (tegra->phy->usb_phy_type == TEGRA_USB_PHY_TYPE_HSIC);
 
 	spin_lock_irqsave(&tegra->ehci->lock, flags);
 
@@ -328,12 +323,8 @@ static int tegra_usb_resume(struct usb_hcd *hcd)
 	struct ehci_regs __iomem *hw = ehci->regs;
 	unsigned long val;
 	int hsic = 0;
-	struct tegra_ulpi_config *config;
 
-	if (tegra->phy->instance == 1) {
-		config = tegra->phy->config;
-		hsic = (config->inf_type == TEGRA_USB_UHSIC);
-	}
+	hsic = (tegra->phy->usb_phy_type == TEGRA_USB_PHY_TYPE_HSIC);
 
 	set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
 	tegra_ehci_power_up(hcd);
@@ -453,6 +444,7 @@ static void tegra_ehci_shutdown(struct usb_hcd *hcd)
 static int tegra_ehci_setup(struct usb_hcd *hcd)
 {
 	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
+	struct tegra_ehci_hcd *tegra = dev_get_drvdata(hcd->self.controller);
 	int retval;
 
 	/* EHCI registers start at offset 0x100 */
@@ -473,6 +465,7 @@ static int tegra_ehci_setup(struct usb_hcd *hcd)
 	/* switch to host mode */
 	hcd->has_tt = 1;
 	ehci_reset(ehci);
+	tegra_ehci_post_reset(tegra->phy);
 
 	retval = ehci_halt(ehci);
 	if (retval)
@@ -854,7 +847,7 @@ static int tegra_ehci_probe(struct platform_device *pdev)
 	INIT_DELAYED_WORK(&tegra->work, tegra_hsic_connection_work);
 
 	tegra->phy = tegra_usb_phy_open(instance, hcd->regs, pdata->phy_config,
-						TEGRA_USB_PHY_MODE_HOST, pdata->usb_phy_type);
+					TEGRA_USB_PHY_MODE_HOST, pdata->phy_type);
 	if (IS_ERR(tegra->phy)) {
 		dev_err(&pdev->dev, "Failed to open USB phy\n");
 		err = -ENXIO;
