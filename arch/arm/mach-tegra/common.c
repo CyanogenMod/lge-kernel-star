@@ -341,7 +341,6 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 #ifdef SUPPORT_TEGRA_3_IOVMM_SMMU_A01
 	extern struct platform_device tegra_smmu_device;
 	int smmu_reserved = 0;
-	size_t smmu_window_size;
 	struct resource *smmu_window =
 		    platform_get_resource_byname(&tegra_smmu_device,
 						IORESOURCE_MEM, "smmu");
@@ -404,6 +403,8 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 	if (!smmu_window) {
 		pr_err("No SMMU resources\n");
 	} else {
+		size_t smmu_window_size;
+
 		if (tegra_get_revision() == TEGRA_REVISION_A01) {
 			smmu_window->start = TEGRA_SMMU_BASE_A01;
 			smmu_window->end   = TEGRA_SMMU_BASE_A01 +
@@ -415,8 +416,8 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 						smmu_window_size))
 				pr_err(
 			"Failed to reserve SMMU I/O VA window %08lx@%08lx\n",
-				(unsigned long)smmu_window->start,
-				(unsigned long)smmu_window_size);
+				(unsigned long)smmu_window_size,
+				(unsigned long)smmu_window->start);
 			else
 				smmu_reserved = 1;
 		}
