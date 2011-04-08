@@ -176,8 +176,7 @@ static void irq_work(struct work_struct *work)
 		}
 	}
 	clk_disable(tegra->clk);
-	if (from != to)
-		tegra_otg_disable_clk();
+	tegra_otg_disable_clk();
 }
 
 static irqreturn_t tegra_otg_irq(int irq, void *data)
