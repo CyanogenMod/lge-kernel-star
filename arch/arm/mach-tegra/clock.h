@@ -51,6 +51,7 @@
 #define DIV_U71_UART		(1 << 18)
 #define MUX_CLK_OUT		(1 << 19)
 #define PLLM			(1 << 20)
+#define DIV_U71_INT		(1 << 21)
 #define ENABLE_ON_INIT		(1 << 28)
 
 #ifndef __ASSEMBLY__
