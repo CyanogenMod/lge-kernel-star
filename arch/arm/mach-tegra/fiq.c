@@ -49,7 +49,7 @@ static void tegra_legacy_select_fiq(unsigned int irq, bool fiq)
 	void __iomem *base;
 	pr_debug("%s: %d\n", __func__, irq);
 
-	irq -= 32;
+	irq -= FIRST_LEGACY_IRQ;
 	base = ictlr_reg_base[irq>>5];
 	writel(fiq << (irq & 31), base + ICTLR_CPU_IEP_CLASS);
 }
@@ -89,11 +89,11 @@ void tegra_fiq_enable(int irq)
 	val |= 2; /* enableNS */
 	writel(val, base + GIC_CPU_CTRL);
 	tegra_legacy_select_fiq(irq, true);
-	tegra_fiq_unmask(irq);
+	tegra_fiq_unmask(irq_get_irq_data(irq));
 }
 
 void tegra_fiq_disable(int irq)
 {
-	tegra_fiq_mask(irq);
+	tegra_fiq_mask(irq_get_irq_data(irq));
 	tegra_legacy_select_fiq(irq, false);
 }
