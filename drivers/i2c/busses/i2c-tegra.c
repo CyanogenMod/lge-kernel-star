@@ -534,7 +534,7 @@ static int tegra_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
 	}
 
 	if (i2c_dev->last_bus_clk_rate != i2c_bus->bus_clk_rate) {
-		clk_set_rate(i2c_dev, i2c_bus->bus_clk_rate * 8);
+		clk_set_rate(i2c_dev->clk, i2c_bus->bus_clk_rate * 8);
 		i2c_dev->last_bus_clk_rate = i2c_bus->bus_clk_rate;
 	}
 
