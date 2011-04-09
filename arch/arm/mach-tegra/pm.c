@@ -242,8 +242,6 @@ static int tegra_reset_sleeping_cpu(int cpu)
 
 	tegra_pen_unlock();
 
-	local_fiq_enable();
-
 	return ret;
 }
 
@@ -442,14 +440,10 @@ void tegra_idle_lp2(void)
 
 	cpu_pm_enter();
 
-	local_fiq_disable();
-
 	if (last_cpu)
 		tegra_idle_lp2_last();
 	else
 		tegra_sleep_wfi(PLAT_PHYS_OFFSET - PAGE_OFFSET);
-
-	local_fiq_enable();
 
 	cpu_pm_exit();
 
