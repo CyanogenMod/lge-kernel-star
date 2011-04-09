@@ -23,6 +23,8 @@ int fsl_udc_clk_init(struct platform_device *pdev)
 	struct resource *res;
 	int err;
 	int instance;
+	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
+
 
 	udc_clk = clk_get(&pdev->dev, NULL);
 	if (IS_ERR(udc_clk)) {
