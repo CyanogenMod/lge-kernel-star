@@ -1927,7 +1927,7 @@ static int tegra_audio_resume(struct platform_device *pdev)
 
 static struct platform_driver tegra_audio_driver = {
 	.driver = {
-		.name = "i2s",
+		.name = "tegra-i2s",
 		.owner = THIS_MODULE,
 	},
 	.probe = tegra_audio_probe,
