@@ -46,6 +46,7 @@
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 
+#include <mach/clk.h>
 #include <mach/iomap.h>
 #include <mach/irqs.h>
 
@@ -393,8 +394,12 @@ void tegra_idle_lp2_last(void)
 
 	writel(virt_to_phys(tegra_resume), evp_reset);
 
+	/*
+	 * we can use the locked call here, because all other cpus are in reset
+	 * and irqs are disabled
+	 */
 	set_power_timers(pdata->cpu_timer, pdata->cpu_off_timer,
-		clk_get_rate(tegra_pclk));
+		clk_get_rate_all_locked(tegra_pclk));
 
 	cpu_complex_pm_enter();
 
