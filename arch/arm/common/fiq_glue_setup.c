@@ -14,6 +14,8 @@
 #include <linux/kernel.h>
 #include <linux/percpu.h>
 #include <linux/slab.h>
+#include <linux/syscore_ops.h>
+#include <asm/cpu_pm.h>
 #include <asm/fiq.h>
 #include <asm/fiq_glue.h>
 
@@ -98,3 +100,56 @@ void fiq_glue_resume(void)
 		current_handler->resume(current_handler);
 }
 
+static int fiq_glue_cpu_pm_notify(struct notifier_block *self, unsigned long cmd,
+	void *v)
+{
+	switch (cmd) {
+	case CPU_PM_ENTER:
+		//pr_info("cpu pm enter %d\n", smp_processor_id());
+		local_fiq_disable();
+		break;
+	case CPU_PM_ENTER_FAILED:
+	case CPU_PM_EXIT:
+		fiq_glue_resume();
+		local_fiq_enable();
+		//pr_info("cpu pm exit %d\n", smp_processor_id());
+		break;
+	}
+	return NOTIFY_OK;
+}
+
+static struct notifier_block fiq_glue_cpu_pm_notifier = {
+	.notifier_call = fiq_glue_cpu_pm_notify,
+};
+
+static int __init fiq_glue_cpu_pm_init(void)
+{
+	return cpu_pm_register_notifier(&fiq_glue_cpu_pm_notifier);
+}
+core_initcall(fiq_glue_cpu_pm_init);
+
+#ifdef CONFIG_PM
+static int fiq_glue_syscore_suspend(void)
+{
+	local_fiq_disable();
+	return 0;
+}
+
+static void fiq_glue_syscore_resume(void)
+{
+	fiq_glue_resume();
+	local_fiq_enable();
+}
+
+static struct syscore_ops fiq_glue_syscore_ops = {
+	.suspend = fiq_glue_syscore_suspend,
+	.resume = fiq_glue_syscore_resume,
+};
+
+static int __init fiq_glue_syscore_init(void)
+{
+	register_syscore_ops(&fiq_glue_syscore_ops);
+	return 0;
+}
+late_initcall(fiq_glue_syscore_init);
+#endif
