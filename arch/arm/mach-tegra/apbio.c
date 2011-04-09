@@ -129,14 +129,14 @@ void tegra_apb_writel(u32 value, unsigned long offset)
 	apb_writel(value, offset);
 }
 
-void tegra_init_apb_dma(void)
+static int tegra_init_apb_dma(void)
 {
 #ifdef CONFIG_TEGRA_SYSTEM_DMA
 	tegra_apb_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT |
 		TEGRA_DMA_SHARED);
 	if (!tegra_apb_dma) {
 		pr_err("%s: can not allocate dma channel\n", __func__);
-		return;
+		return -ENODEV;
 	}
 
 	tegra_apb_bb = dma_alloc_coherent(NULL, sizeof(u32),
@@ -145,7 +145,9 @@ void tegra_init_apb_dma(void)
 		pr_err("%s: can not allocate bounce buffer\n", __func__);
 		tegra_dma_free_channel(tegra_apb_dma);
 		tegra_apb_dma = NULL;
-		return;
+		return -ENOMEM;
 	}
 #endif
+	return 0;
 }
+arch_initcall(tegra_init_apb_dma);

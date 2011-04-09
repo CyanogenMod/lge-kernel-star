@@ -151,7 +151,6 @@ void __init tegra_init_early(void)
 	tegra_clk_init_from_table(common_clk_init_table);
 	tegra_init_power();
 	tegra_init_cache();
-	tegra_init_apb_dma();
 }
 
 static int __init tegra_lp0_vec_arg(char *options)

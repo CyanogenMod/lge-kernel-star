@@ -17,4 +17,3 @@
 
 u32 tegra_apb_readl(unsigned long offset);
 void tegra_apb_writel(u32 value, unsigned long offset);
-void tegra_init_apb_dma(void);
