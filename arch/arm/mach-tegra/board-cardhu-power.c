@@ -250,6 +250,13 @@ static struct tps6591x_rtc_platform_data rtc_data = {
 		.platform_data	= &pdata_##_data,	\
 	}
 
+#define TPS_RTC_REG()				\
+	{						\
+		.id	= 0,		\
+		.name	= "rtc_tps6591x",	\
+		.platform_data = &rtc_data,	\
+	}
+
 static struct tps6591x_subdev_info tps_devs_e118x[] = {
 	TPS_REG(VIO, vio),
 	TPS_REG(VDD_1, vdd1),
@@ -263,11 +270,7 @@ static struct tps6591x_subdev_info tps_devs_e118x[] = {
 	TPS_REG(LDO_6, ldo6),
 	TPS_REG(LDO_7, ldo7),
 	TPS_REG(LDO_8, ldo8),
-	{
-		.id	= 0,
-		.name	= "rtc-tps6591x",
-		.platform_data = &rtc_data,
-	},
+	TPS_RTC_REG(),
 };
 
 static struct tps6591x_subdev_info tps_devs_e1198[] = {
@@ -283,11 +286,7 @@ static struct tps6591x_subdev_info tps_devs_e1198[] = {
 	TPS_REG(LDO_6, ldo6),
 	TPS_REG(LDO_7, ldo7),
 	TPS_REG(LDO_8, ldo8),
-	{
-		.id	= 0,
-		.name	= "rtc-tps6591x",
-		.platform_data = &rtc_data,
-	},
+	TPS_RTC_REG(),
 };
 
 static struct tps6591x_platform_data tps_platform = {
