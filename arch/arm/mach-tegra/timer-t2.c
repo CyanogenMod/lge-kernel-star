@@ -47,10 +47,10 @@
 #define TIMERUS_USEC_CFG 0x14
 #define TIMERUS_CNTR_FREEZE 0x4c
 
-#define TIMER1_BASE 0x0
-#define TIMER2_BASE 0x8
-#define TIMER3_BASE 0x50
-#define TIMER4_BASE 0x58
+#define TIMER1_OFFSET (TEGRA_TMR1_BASE-TEGRA_TMR1_BASE)
+#define TIMER2_OFFSET (TEGRA_TMR2_BASE-TEGRA_TMR1_BASE)
+#define TIMER3_OFFSET (TEGRA_TMR3_BASE-TEGRA_TMR1_BASE)
+#define TIMER4_OFFSET (TEGRA_TMR4_BASE-TEGRA_TMR1_BASE)
 
 #define TIMER_PTV 0x0
 #define TIMER_PCR 0x4
@@ -74,7 +74,7 @@ static int tegra_timer_set_next_event(unsigned long cycles,
 	u32 reg;
 
 	reg = 0x80000000 | ((cycles > 1) ? (cycles-1) : 0);
-	timer_writel(reg, TIMER3_BASE + TIMER_PTV);
+	timer_writel(reg, TIMER3_OFFSET + TIMER_PTV);
 
 	return 0;
 }
@@ -84,12 +84,12 @@ static void tegra_timer_set_mode(enum clock_event_mode mode,
 {
 	u32 reg;
 
-	timer_writel(0, TIMER3_BASE + TIMER_PTV);
+	timer_writel(0, TIMER3_OFFSET + TIMER_PTV);
 
 	switch (mode) {
 	case CLOCK_EVT_MODE_PERIODIC:
 		reg = 0xC0000000 | ((1000000/HZ)-1);
-		timer_writel(reg, TIMER3_BASE + TIMER_PTV);
+		timer_writel(reg, TIMER3_OFFSET + TIMER_PTV);
 		break;
 	case CLOCK_EVT_MODE_ONESHOT:
 		break;
@@ -189,7 +189,7 @@ void read_persistent_clock(struct timespec *ts)
 static irqreturn_t tegra_timer_interrupt(int irq, void *dev_id)
 {
 	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
-	timer_writel(1<<30, TIMER3_BASE + TIMER_PCR);
+	timer_writel(1<<30, TIMER3_OFFSET + TIMER_PCR);
 	evt->event_handler(evt);
 	return IRQ_HANDLED;
 }
@@ -262,17 +262,6 @@ static void __init tegra_init_timer(void)
 	case 26000000:
 		timer_writel(0x0019, TIMERUS_USEC_CFG);
 		break;
-#ifndef CONFIG_ARCH_TEGRA_2x_SOC
-	case 16800000:
-		timer_writel(0x0453, TIMERUS_USEC_CFG);
-		break;
-	case 38400000:
-		timer_writel(0x04BF, TIMERUS_USEC_CFG);
-		break;
-	case 48000000:
-		timer_writel(0x002F, TIMERUS_USEC_CFG);
-		break;
-#endif
 	default:
 		WARN(1, "Unknown clock rate");
 	}
