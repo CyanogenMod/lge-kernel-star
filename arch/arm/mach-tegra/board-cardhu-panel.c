@@ -243,6 +243,38 @@ static int cardhu_panel_disable(void)
 	return 0;
 }
 
+static int cardhu_hdmi_vddio_enable(void)
+{
+	int ret;
+	if (!cardhu_hdmi_vddio) {
+		cardhu_hdmi_vddio = regulator_get(NULL, "vdd_hdmi_con");
+		if (IS_ERR_OR_NULL(cardhu_hdmi_vddio)) {
+			ret = PTR_ERR(cardhu_hdmi_vddio);
+			pr_err("hdmi: couldn't get regulator vdd_hdmi_con\n");
+			cardhu_hdmi_vddio = NULL;
+			return ret;
+		}
+	}
+	ret = regulator_enable(cardhu_hdmi_vddio);
+	if (ret < 0) {
+		pr_err("hdmi: couldn't enable regulator vdd_hdmi_con\n");
+		regulator_put(cardhu_hdmi_vddio);
+		cardhu_hdmi_vddio = NULL;
+		return ret;
+	}
+	return ret;
+}
+
+static int cardhu_hdmi_vddio_disable(void)
+{
+	if (cardhu_hdmi_vddio) {
+		regulator_disable(cardhu_hdmi_vddio);
+		regulator_put(cardhu_hdmi_vddio);
+		cardhu_hdmi_vddio = NULL;
+	}
+	return 0;
+}
+
 static int cardhu_hdmi_enable(void)
 {
 	int ret;
@@ -274,24 +306,6 @@ static int cardhu_hdmi_enable(void)
 		pr_err("hdmi: couldn't enable regulator avdd_hdmi_pll\n");
 		return ret;
 	}
-	if (!cardhu_hdmi_vddio) {
-		cardhu_hdmi_vddio = regulator_get(NULL, "vdd_hdmi_con");
-		if (IS_ERR_OR_NULL(cardhu_hdmi_vddio)) {
-			pr_err("hdmi: couldn't get regulator vdd_hdmi_con\n");
-			cardhu_hdmi_vddio = NULL;
-			regulator_put(cardhu_hdmi_pll);
-			cardhu_hdmi_pll = NULL;
-			regulator_put(cardhu_hdmi_reg);
-			cardhu_hdmi_reg = NULL;
-
-			return PTR_ERR(cardhu_hdmi_vddio);
-		}
-	}
-	ret = regulator_enable(cardhu_hdmi_vddio);
-	if (ret < 0) {
-		pr_err("hdmi: couldn't enable regulator vdd_hdmi_con\n");
-		return ret;
-	}
 	return 0;
 }
 
@@ -306,9 +320,6 @@ static int cardhu_hdmi_disable(void)
 	regulator_put(cardhu_hdmi_pll);
 	cardhu_hdmi_pll = NULL;
 
-	regulator_disable(cardhu_hdmi_vddio);
-	regulator_put(cardhu_hdmi_vddio);
-	cardhu_hdmi_vddio = NULL;
 	return 0;
 }
 static struct resource cardhu_disp1_resources[] = {
@@ -452,6 +463,9 @@ static struct tegra_dc_out cardhu_disp2_out = {
 
 	.enable		= cardhu_hdmi_enable,
 	.disable	= cardhu_hdmi_disable,
+
+	.postsuspend	= cardhu_hdmi_vddio_disable,
+	.hotplug_init	= cardhu_hdmi_vddio_enable,
 };
 
 static struct tegra_dc_platform_data cardhu_disp2_pdata = {
