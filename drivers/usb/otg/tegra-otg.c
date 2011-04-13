@@ -401,6 +401,11 @@ static int tegra_otg_resume(struct platform_device * pdev)
 
 	tegra_otg_enable_clk();
 
+	/* Following delay is intentional.
+	 * It is placed here after observing system hang.
+	 * Root cause is not confirmed.
+	 */
+	msleep(1);
 	/* restore the interupt enable for cable ID and VBUS */
 	clk_enable(tegra_otg->clk);
 	writel(tegra_otg->intr_reg_data, (tegra_otg->regs + USB_PHY_WAKEUP));
