@@ -618,11 +618,19 @@ static struct i2c_board_info __initdata mpu3050_i2c0_boardinfo[] = {
 
 static void cardhu_mpuirq_init(void)
 {
+	struct board_info board_info;
+	tegra_get_board_info(&board_info);
+	if (board_info.board_id != BOARD_E1291)
+		return;
+
 	pr_info("*** MPU START *** cardhu_mpuirq_init...\n");
 	tegra_gpio_enable(TEGRA_GPIO_PX1);
 	gpio_request(TEGRA_GPIO_PX1, SENSOR_MPU_NAME);
 	gpio_direction_input(TEGRA_GPIO_PX1);
 	pr_info("*** MPU END *** cardhu_mpuirq_init...\n");
+
+	i2c_register_board_info(2, mpu3050_i2c0_boardinfo,
+		ARRAY_SIZE(mpu3050_i2c0_boardinfo));
 }
 #endif
 
@@ -675,12 +683,6 @@ int __init cardhu_sensors_init(void)
 #ifdef CONFIG_MPU_SENSORS_MPU3050
 	cardhu_mpuirq_init();
 #endif
-
-#ifdef CONFIG_MPU_SENSORS_MPU3050
-	i2c_register_board_info(2, mpu3050_i2c0_boardinfo,
-		ARRAY_SIZE(mpu3050_i2c0_boardinfo));
-#endif
-
 	return 0;
 }
 
