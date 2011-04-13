@@ -369,6 +369,16 @@ config SPI_TEGRA
 	help
 	  SPI driver for NVidia Tegra SoCs
 
+config SPI_SLAVE_TEGRA
+	tristate "Nvidia Tegra SPI slave controller"
+	depends on ARCH_TEGRA
+	select TEGRA_SYSTEM_DMA
+	default n
+	help
+	  SPI Slave driver for NVidia Tegra SoCs.
+	  Say yes if slave spi functionality is required from the tegra spi controller.
+	  The interface is same as the master spi.
+
 config SPI_TI_SSP
 	tristate "TI Sequencer Serial Port - SPI Support"
 	depends on MFD_TI_SSP
