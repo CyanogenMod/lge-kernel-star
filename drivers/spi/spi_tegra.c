@@ -233,8 +233,6 @@ struct spi_tegra_data {
 	u32			dma_control_reg;
 	u32			def_command_reg;
 	u32			def_command2_reg;
-	u32			max_speed[MAX_CHIP_SELECT];
-	u32			modes[MAX_CHIP_SELECT];
 };
 
 static inline unsigned long spi_tegra_readl(struct spi_tegra_data *tspi,
@@ -752,8 +750,17 @@ static int spi_tegra_setup(struct spi_device *spi)
 	else
 		val &= ~cs_bit;
 	tspi->def_command_reg |= val;
-	tspi->modes[spi->chip_select] = spi->mode;
-	tspi->max_speed[spi->chip_select] = spi->max_speed_hz;
+
+	if (!tspi->is_clkon_always && !tspi->clk_state) {
+		clk_enable(tspi->clk);
+		tspi->clk_state = 1;
+	}
+	spi_tegra_writel(tspi, tspi->def_command_reg, SLINK_COMMAND);
+	if (!tspi->is_clkon_always && tspi->clk_state) {
+		clk_disable(tspi->clk);
+		tspi->clk_state = 0;
+	}
+
 	spin_unlock_irqrestore(&tspi->lock, flags);
 	return 0;
 }
