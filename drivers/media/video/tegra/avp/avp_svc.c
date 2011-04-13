@@ -2,6 +2,8 @@
  * Copyright (C) 2010 Google, Inc.
  * Author: Dima Zavin <dima@android.com>
  *
+ * Copyright (C) 2010-2011 NVIDIA Corporation
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -200,7 +202,7 @@ static void do_svc_nvmap_pin(struct avp_svc_info *avp_svc,
 	struct svc_nvmap_pin *msg = (struct svc_nvmap_pin *)_msg;
 	struct svc_nvmap_pin_resp resp;
 	struct nvmap_handle_ref *handle;
-	unsigned long addr = ~0UL;
+	phys_addr_t addr = ~0UL;
 	unsigned long id = msg->handle_id;
 	int err;
 

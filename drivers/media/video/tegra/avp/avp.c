@@ -137,11 +137,11 @@ struct tegra_avp_info {
 	struct nvmap_client	*nvmap_drv;
 	struct nvmap_handle_ref	*kernel_handle;
 	void			*kernel_data;
-	unsigned long		kernel_phys;
+	phys_addr_t		kernel_phys;
 
 	struct nvmap_handle_ref *iram_backup_handle;
 	void			*iram_backup_data;
-	unsigned long		iram_backup_phys;
+	phys_addr_t		iram_backup_phys;
 	unsigned long		resume_addr;
 
 	struct trpc_endpoint	*avp_ep;
@@ -978,7 +978,7 @@ static int avp_init(struct tegra_avp_info *avp)
 	}
 
 	pr_info("%s: Using carveout at %lx to load AVP kernel\n",
-		__func__, avp->kernel_phys);
+		__func__, (unsigned long)(avp->kernel_phys));
 	avp->kernel_data = ioremap(avp->kernel_phys, SZ_1M);
 #endif
 
@@ -991,7 +991,7 @@ static int avp_init(struct tegra_avp_info *avp)
 		fw_file, avp_fw->size);
 
 	pr_info("%s: Loading AVP kernel at vaddr=%p paddr=%lx\n",
-		__func__, avp->kernel_data, avp->kernel_phys);
+		__func__, avp->kernel_data, (unsigned long)(avp->kernel_phys));
 	memcpy(avp->kernel_data, avp_fw->data, avp_fw->size);
 	memset(avp->kernel_data + avp_fw->size, 0, SZ_1M - avp_fw->size);
 
@@ -1098,7 +1098,7 @@ static int _load_lib(struct tegra_avp_info *avp, struct tegra_avp_lib *lib,
 	void *args;
 	struct nvmap_handle_ref *lib_handle;
 	void *lib_data;
-	unsigned long lib_phys;
+	phys_addr_t lib_phys;
 	int ret;
 
 	DBG(AVP_DBG_TRACE_LIB, "avp_lib: loading library '%s'\n", lib->name);
@@ -1694,7 +1694,7 @@ static int tegra_avp_probe(struct platform_device *pdev)
 	tegra_avp = avp;
 
 	pr_info("%s: driver registered, kernel %lx(%p), msg area %lx/%lx\n",
-		__func__, avp->kernel_phys, avp->kernel_data,
+		__func__, (unsigned long)(avp->kernel_phys), avp->kernel_data,
 		(unsigned long)avp->msg_area_addr,
 		(unsigned long)avp->msg_area_addr + AVP_MSG_AREA_SIZE);
 
