@@ -69,6 +69,8 @@ enum {
 	SVC_AVP_WDT_RESET		= 34,
 	SVC_DFS_GET_CLK_UTIL		= 35,
 	SVC_DFS_GET_CLK_UTIL_RESPONSE	= 36,
+	SVC_MODULE_CLOCK_SET		= 37,
+	SVC_MODULE_CLOCK_SET_RESPONSE	= 38,
 };
 
 struct svc_msg {
@@ -204,6 +206,18 @@ struct svc_module_ctrl {
 	u32	module_id;
 	u32	client_id;
 	u8	enable;
+};
+
+struct svc_clock_ctrl {
+	u32	svc_id;
+	u32	module_id;
+	u32	clk_freq;
+};
+
+struct svc_clock_ctrl_response {
+	u32	svc_id;
+	u32	err;
+	u32	act_freq;
 };
 
 /* power messages */

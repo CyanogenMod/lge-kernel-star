@@ -436,6 +436,48 @@ static void do_svc_printf(struct avp_svc_info *avp_svc, struct svc_msg *_msg,
 	pr_info("[AVP]: %s", tmp_str);
 }
 
+static void do_svc_module_clock_set(struct avp_svc_info *avp_svc,
+				    struct svc_msg *_msg,
+				    size_t len)
+{
+	struct svc_clock_ctrl *msg = (struct svc_clock_ctrl *)_msg;
+	struct svc_clock_ctrl_response resp;
+	struct avp_module *mod;
+	struct avp_clk *aclk;
+	int ret = 0;
+
+	mod = find_avp_module(avp_svc, msg->module_id);
+	if (!mod) {
+		pr_err("avp_svc: unknown module clock requested: %d\n",
+		       msg->module_id);
+		resp.err = AVP_ERR_EINVAL;
+		goto send_response;
+	}
+
+	mutex_lock(&avp_svc->clk_lock);
+
+	aclk = &avp_svc->clks[mod->clk_req];
+	ret = clk_set_rate(aclk->clk, msg->clk_freq);
+	if (ret) {
+		pr_err("avp_svc: Failed to set module (id = %d) frequency to %d kHz\n",
+			msg->module_id, msg->clk_freq);
+		resp.err = AVP_ERR_EINVAL;
+		resp.act_freq = 0;
+		mutex_unlock(&avp_svc->clk_lock);
+		goto send_response;
+	}
+
+	resp.act_freq = clk_get_rate(aclk->clk);
+
+	mutex_unlock(&avp_svc->clk_lock);
+	resp.err = 0;
+
+send_response:
+	resp.svc_id = SVC_MODULE_CLOCK_SET_RESPONSE;
+	trpc_send_msg(avp_svc->rpc_node, avp_svc->cpu_ep, &resp,
+		      sizeof(resp), GFP_KERNEL);
+}
+
 static int dispatch_svc_message(struct avp_svc_info *avp_svc,
 				struct svc_msg *msg,
 				size_t len)
@@ -517,6 +559,10 @@ static int dispatch_svc_message(struct avp_svc_info *avp_svc,
 		break;
 	case SVC_AVP_WDT_RESET:
 		pr_err("avp_svc: AVP has been reset by watchdog\n");
+		break;
+	case SVC_MODULE_CLOCK_SET:
+		DBG(AVP_DBG_TRACE_SVC, "%s: got module_clock_set\n", __func__);
+		do_svc_module_clock_set(avp_svc, msg, len);
 		break;
 	default:
 		pr_err("avp_svc: invalid SVC call 0x%x\n", msg->svc_id);
