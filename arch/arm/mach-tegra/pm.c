@@ -156,7 +156,7 @@ static void __iomem *evp_reset =
 #define MC_SECURITY_SIZE	0x70
 #define MC_SECURITY_CFG2	0x7c
 
-unsigned long tegra_pgd_phys;  /* pgd used by hotplug & LP2 bootup */
+phys_addr_t tegra_pgd_phys;  /* pgd used by hotplug & LP2 bootup */
 static pgd_t *tegra_pgd;
 
 static int tegra_last_pclk;

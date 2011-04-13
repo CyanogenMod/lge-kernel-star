@@ -166,7 +166,7 @@ struct spi_tegra_data {
 
 	struct clk		*clk;
 	void __iomem		*base;
-	unsigned long		phys;
+	phys_addr_t		phys;
 
 	u32			cur_speed;
 
