@@ -147,6 +147,13 @@
 #define   UTMIP_BIAS_PDTRK_COUNT(x)	(((x) & 0x1f) << 3)
 
 #else
+#define USB_USBCMD		0x130
+#define   USB_USBCMD_RS		(1 << 0)
+
+#define USB_USBSTS		0x134
+#define   USB_USBSTS_PCI	(1 << 2)
+#define   USB_USBSTS_HCH	(1 << 12)
+
 #define ULPI_VIEWPORT		0x160
 
 #define USB_PORTSC1		0x174
