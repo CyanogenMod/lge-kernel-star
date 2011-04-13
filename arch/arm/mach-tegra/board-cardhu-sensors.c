@@ -618,8 +618,6 @@ static struct i2c_board_info __initdata mpu3050_i2c0_boardinfo[] = {
 
 static void cardhu_mpuirq_init(void)
 {
-	struct board_info board_info;
-	tegra_get_board_info(&board_info);
 	if (board_info.board_id != BOARD_E1291)
 		return;
 
