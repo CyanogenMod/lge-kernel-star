@@ -149,7 +149,7 @@ struct tegra_aes_reqctx {
 
 struct tegra_aes_dev {
 	struct device *dev;
-	unsigned long phys_base;
+	phys_addr_t phys_base;
 	void __iomem *io_base;
 	dma_addr_t ivkey_phys_base;
 	void __iomem *ivkey_base;
