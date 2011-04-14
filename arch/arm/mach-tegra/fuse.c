@@ -21,6 +21,7 @@
 #include <linux/kernel.h>
 #include <linux/io.h>
 #include <linux/init.h>
+#include <linux/string.h>
 
 #include <mach/iomap.h>
 
@@ -232,10 +233,8 @@ static enum tegra_revision tegra_decode_revision(const struct tegra_id *id)
 		return TEGRA_REVISION_A02;
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	case 3:
-		if (get_spare_fuse(18) || get_spare_fuse(19))
-			return TEGRA_REVISION_A03p;
-		else
-			return TEGRA_REVISION_A03;
+		return (*(id->priv) == 'p') ? TEGRA_REVISION_A03p
+					    : TEGRA_REVISION_A03;
 #endif
 	default:
 		return TEGRA_REVISION_UNKNOWN;
@@ -244,13 +243,14 @@ static enum tegra_revision tegra_decode_revision(const struct tegra_id *id)
 
 static enum tegra_revision tegra_set_revision(u32 chipid,
 					u32 major, u32 minor,
-					u32 nlist, u32 patch)
+					u32 nlist, u32 patch, const char *priv)
 {
 	tegra_id.chipid  = chipid;
 	tegra_id.major   = major;
 	tegra_id.minor   = minor;
 	tegra_id.netlist = nlist;
 	tegra_id.patch   = patch;
+	tegra_id.priv    = (char *)priv;
 	tegra_id.revision = tegra_decode_revision(&tegra_id);
 	return tegra_id.revision;
 }
@@ -264,30 +264,45 @@ enum tegra_revision tegra_get_revision(void)
 		void __iomem *netlist = IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x860;
 		u32 cid = readl(chip_id);
 		u32 nlist = readl(netlist);
+		char *priv = NULL;
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+		if (get_spare_fuse(18) || get_spare_fuse(19))
+			priv = "p";
+#endif
 		return tegra_set_revision((cid >> 8) & 0xff,
 					(cid >> 4) & 0xf,
 					(cid >> 16) & 0xf,
 					(nlist >> 0) & 0xffff,
-					(nlist >> 16) & 0xffff);
+					(nlist >> 16) & 0xffff,
+					priv);
 	}
 }
 
+static char chippriv[16]; /* Permanent buffer for private string */
 static int __init tegra_bootloader_tegraid(char *str)
 {
 	u32 id[5];
 	int i = 0;
+	char *priv = NULL;
 
 	do {
 		id[i++] = simple_strtoul(str, &str, 16);
 	} while (*str++ && i < ARRAY_SIZE(id));
 
+	if (*(str - 1) == '.') {
+		strncpy(chippriv, str, sizeof(chippriv) - 1);
+		priv = chippriv;
+		if (strlen(str) > sizeof(chippriv) - 1)
+			pr_err("### tegraid.priv in kernel arg truncated\n");
+	}
+
 	while (i < ARRAY_SIZE(id))
 		id[i++] = 0;
 
-	(void)tegra_set_revision(id[0], id[1], id[2], id[3], id[4]);
+	(void)tegra_set_revision(id[0], id[1], id[2], id[3], id[4], priv);
 	return 0;
 }
 
-/* tegraid=chipid.major.minor.netlist.patch */
+/* tegraid=chipid.major.minor.netlist.patch[.priv] */
 early_param("tegraid", tegra_bootloader_tegraid);

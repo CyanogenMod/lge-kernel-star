@@ -34,6 +34,7 @@ enum tegra_revision {
 struct tegra_id {
 	unsigned int chipid, major, minor, netlist, patch;
 	enum tegra_revision revision;
+	char *priv;
 };
 
 extern struct tegra_id tegra_id;
