@@ -342,7 +342,6 @@ static int tegra_otg_probe(struct platform_device *pdev)
 	INIT_WORK (&tegra->work, irq_work);
 
 	dev_info(&pdev->dev, "otg transceiver registered\n");
-	clk_disable(tegra->clk);
 	return 0;
 
 err_irq:
