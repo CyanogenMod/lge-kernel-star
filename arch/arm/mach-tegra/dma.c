@@ -32,6 +32,7 @@
 #include <mach/dma.h>
 #include <mach/irqs.h>
 #include <mach/iomap.h>
+#include <mach/clk.h>
 
 #define APB_DMA_GEN				0x000
 #define GEN_ENABLE				(1<<31)
@@ -106,6 +107,7 @@
 #define TEGRA_SYSTEM_DMA_CH_MAX	\
 	(TEGRA_SYSTEM_DMA_CH_NR - TEGRA_SYSTEM_DMA_AVP_CH_NUM - 1)
 
+static struct clk *dma_clk;
 const unsigned int ahb_addr_wrap_table[8] = {
 	0, 32, 64, 128, 256, 512, 1024, 2048
 };
@@ -892,6 +894,15 @@ int __init tegra_dma_init(void)
 	if (ret != 0) {
 		pr_err("Unable to enable clock for APB DMA\n");
 		goto fail;
+	}
+
+	dma_clk = clk_get_sys("apbdma", "apbdma");
+	if (!IS_ERR_OR_NULL(dma_clk)) {
+		clk_enable(dma_clk);
+		tegra_periph_reset_assert(dma_clk);
+		udelay(10);
+		tegra_periph_reset_deassert(dma_clk);
+		udelay(10);
 	}
 
 	addr = IO_ADDRESS(TEGRA_APB_DMA_BASE);
