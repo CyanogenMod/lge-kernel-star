@@ -1282,7 +1282,7 @@ static int handle_load_lib_ioctl(struct tegra_avp_info *avp, unsigned long arg)
 	struct tegra_avp_lib lib;
 	int ret;
 
-	pr_info("%s: \n", __func__);
+	pr_debug("%s: ioctl\n", __func__);
 	if (copy_from_user(&lib, (void __user *)arg, sizeof(lib)))
 		return -EFAULT;
 	lib.name[TEGRA_AVP_LIB_MAX_NAME - 1] = '\0';
@@ -1367,6 +1367,7 @@ int tegra_avp_open(struct tegra_avp_info **avp)
 	struct tegra_avp_info *new_avp = tegra_avp;
 	int ret = 0;
 
+	pr_debug("%s: open\n", __func__);
 	mutex_lock(&new_avp->open_lock);
 
 	if (!new_avp->refcount)
@@ -1397,10 +1398,7 @@ int tegra_avp_release(struct tegra_avp_info *avp)
 {
 	int ret = 0;
 
-	// FIXME: Just for now, to test AVP loading.
-	pr_info("%s: FIXME: ignoring release\n", __func__);
-	return 0;
-
+	pr_debug("%s: close\n", __func__);
 	mutex_lock(&avp->open_lock);
 	if (!avp->refcount) {
 		pr_err("%s: releasing while in invalid state\n", __func__);
