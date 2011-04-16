@@ -21,8 +21,17 @@
 
 #include <linux/ioctl.h> /* For IOCTL macros */
 
-#define SH532U_IOCTL_GET_CONFIG	_IOR('o', 1, struct sh532u_config)
+#define SH532U_IOCTL_GET_CONFIG		_IOR('o', 1, struct sh532u_config)
 #define SH532U_IOCTL_SET_POSITION	_IOW('o', 2, u32)
+#define SH532U_IOCTL_GET_MOVE_STATUS	_IOW('o', 3, unsigned char)
+
+enum sh532u_move_status {
+	SH532U_STATE_UNKNOWN = 1,
+	SH532U_WAIT_FOR_MOVE_END,
+	SH532U_WAIT_FOR_SETTLE,
+	SH532U_LENS_SETTLED,
+	SH532U_Forced32 = 0x7FFFFFFF
+};
 
 struct sh532u_config {
 	__u32 settle_time;

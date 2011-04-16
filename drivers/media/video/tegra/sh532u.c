@@ -131,7 +131,6 @@ static int sh532u_write_u8(u16 addr, u8 val)
 	struct i2c_client *client = info->i2c_client;
 	struct i2c_msg msg;
 	unsigned char data[2];
-	u8 tmp;
 
 	data[0] = (u8) (addr & 0xff);
 	data[1] = (u8) (val & 0xff);
@@ -417,8 +416,8 @@ static void sh532u_hvca_wr2(u8 ep_type, u8 ep_data1, u8 ep_data2, u8 ep_addr)
 static void init_driver(void)
 {
 	int eeprom_addr;
-	unsigned int eeprom_data;
-	u8 ep_addr, ep_type, ep_data1, ep_data2, uc_data;
+	unsigned int eeprom_data = 0;
+	u8 ep_addr, ep_type, ep_data1, ep_data2;
 
 	for (eeprom_addr = 0x30; eeprom_addr <= 0x013C; eeprom_addr += 4) {
 		if (eeprom_addr > 0xff) {
@@ -461,7 +460,45 @@ static int sh532u_set_position(struct sh532u_info *info, s16 position)
 {
 	if (position > info->config.limit_high)
 		return -1;
-	lens_move_pulse(position);
+	/* Caller's responsibility to check motor status. */
+	move_driver(position);
+	return 0;
+}
+
+static int sh532u_get_move_status(unsigned long arg)
+{
+	enum sh532u_move_status status = SH532U_Forced32;
+	u8 ucTmp;
+	u16 usSmvFin;
+	int err = sh532u_read_u8(0, STMVEN_211, &ucTmp) |
+		sh532u_read_u16(RZ_211H, &usSmvFin);
+	if (err)
+		return err;
+
+	/* StepMove Error Handling, Unexpected Position */
+	if ((usSmvFin == 0x7FFF) || (usSmvFin == 0x8001)) {
+		/* Stop StepMove Operation */
+		err = sh532u_write_u8(STMVEN_211, ucTmp & 0xFE);
+		if (err)
+			return err;
+	}
+
+	if (ucTmp & STMVEN_ON) {
+		err = sh532u_read_u8(0, MSSET_211, &ucTmp);
+		if (err)
+			return err;
+		if  (ucTmp & CHTGST_ON)
+			status = SH532U_WAIT_FOR_SETTLE;
+		else
+			status = SH532U_LENS_SETTLED;
+	} else
+		status = SH532U_WAIT_FOR_MOVE_END;
+
+	if (copy_to_user((void __user *) arg, &status,
+			 sizeof(enum sh532u_move_status))) {
+		pr_info("Error in copying move status: %s: %d\n", __func__, __LINE__);
+		return -EFAULT;
+	}
 	return 0;
 }
 
@@ -474,16 +511,18 @@ static long sh532u_ioctl(
 
 	switch (cmd) {
 	case SH532U_IOCTL_GET_CONFIG:
-		if (copy_to_user((void __user *) arg,
-				 &info->config,
+		if (copy_to_user((void __user *) arg, &info->config,
 				 sizeof(info->config))) {
-			pr_err("%s: 0x%x\n", __func__, __LINE__);
+			pr_err("Error in copying config: %s: %d\n", __func__, __LINE__);
 			return -EFAULT;
 		}
 		return 0;
 
 	case SH532U_IOCTL_SET_POSITION:
 		return sh532u_set_position(info, (s16)(arg & 0xffff));
+
+	case SH532U_IOCTL_GET_MOVE_STATUS:
+		return sh532u_get_move_status(arg);
 
 	default:
 		return -EINVAL;
