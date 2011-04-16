@@ -293,6 +293,14 @@ config ONETOUCH_TEGRA_ODM
 	  Adds a touchscreen input device for drivers written using NVIDIA's
 	  Tegra ODM kit interface
 
+config TOUCHSCREEN_ANDROID_VIRTUALKEYS
+	boolean "Support userspace-managed virtual keys on android"
+	depends on TOUCHSCREEN_TEGRA_ODM
+	default y
+	help
+	  Replaces the direct key events with a sysfs file with the key coordinates
+	  to be used by Android userspace for the capacitive keys
+
 config TOUCHSCREEN_TOUCHRIGHT
 	tristate "Touchright serial touchscreen"
 	select SERIO

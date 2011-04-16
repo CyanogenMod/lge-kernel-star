@@ -421,14 +421,20 @@ static int tegra_touch_thread(void *pdata)
 						//if(c.additionalInfo.Fingers == 1 && i == 0)
 						if(valid_fingers == 1 && i == 0)
 						{
+#ifdef CONFIG_TOUCHSCREEN_ANDROID_VIRTUALKEYS
+							curr_event_type = TOUCH_EVENT_ABS;
+#else
 							if((y[i] < LGE_TOUCH_RESOLUTION_Y && prev_event_type == TOUCH_EVENT_NULL) || prev_event_type == TOUCH_EVENT_ABS)
 								curr_event_type = TOUCH_EVENT_ABS;
 							else if((y[i] >= LGE_TOUCH_RESOLUTION_Y && prev_event_type == TOUCH_EVENT_NULL) || prev_event_type == TOUCH_EVENT_BUTTON)
 								curr_event_type = TOUCH_EVENT_BUTTON;
+#endif
 
 							if(curr_event_type == TOUCH_EVENT_ABS)
 							{
+#ifndef CONFIG_TOUCHSCREEN_ANDROID_VIRTUALKEYS
 								if(y[i] < LGE_TOUCH_RESOLUTION_Y)
+#endif
 								{
 									input_report_abs(touch->input_dev, ABS_MT_POSITION_X, x[i]);
 									input_report_abs(touch->input_dev, ABS_MT_POSITION_Y, y[i]);
