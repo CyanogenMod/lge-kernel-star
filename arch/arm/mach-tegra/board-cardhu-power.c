@@ -741,6 +741,23 @@ static struct tegra_suspend_platform_data cardhu_suspend_data = {
 
 int __init cardhu_suspend_init(void)
 {
+	struct board_info board_info;
+
+	tegra_get_board_info(&board_info);
+	switch (board_info.board_id) {
+	case BOARD_E1291:
+	case BOARD_E1198:
+		break;
+	case BOARD_PM269:
+	case BOARD_E1187:
+	case BOARD_E1186:
+		cardhu_suspend_data.cpu_timer = 5000;
+		cardhu_suspend_data.cpu_off_timer = 5000;
+		break;
+	default:
+		break;
+	}
+
 	tegra_init_suspend(&cardhu_suspend_data);
 	return 0;
 }
