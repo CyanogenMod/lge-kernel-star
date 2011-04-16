@@ -62,7 +62,7 @@ struct tegra_touch_driver_data
 				printk(fmt, ##args); \
 } while (0)
 
-NvBool DebugMsgPrint = NV_TRUE;//NV_FALSE;
+NvBool DebugMsgPrint = NV_FALSE;
 
 ssize_t touch_fingerprint_store(struct device *dev, struct device_attribute *attr, const char *buffer, size_t count)
 {
