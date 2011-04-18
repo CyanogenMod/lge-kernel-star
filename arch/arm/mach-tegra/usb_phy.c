@@ -489,7 +489,7 @@ static void utmip_pad_close(struct tegra_usb_phy *phy)
 	clk_put(phy->pad_clk);
 }
 
-static void utmip_pad_power_on(struct tegra_usb_phy *phy)
+static int utmip_pad_power_on(struct tegra_usb_phy *phy)
 {
 	unsigned long val, flags;
 	void __iomem *base = phy->pad_regs;
@@ -507,6 +507,8 @@ static void utmip_pad_power_on(struct tegra_usb_phy *phy)
 	spin_unlock_irqrestore(&utmip_pad_lock, flags);
 
 	clk_disable(phy->pad_clk);
+
+	return 0;
 }
 
 static int utmip_pad_power_off(struct tegra_usb_phy *phy)
@@ -810,7 +812,7 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 	return 0;
 }
 
-static void utmi_phy_power_off(struct tegra_usb_phy *phy)
+static int utmi_phy_power_off(struct tegra_usb_phy *phy)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
@@ -852,9 +854,11 @@ static void utmi_phy_power_off(struct tegra_usb_phy *phy)
 	writel(val, base + UTMIP_BIAS_CFG1);
 #endif
 	utmip_pad_power_off(phy);
+
+	return 0;
 }
 
-static void utmi_phy_preresume(struct tegra_usb_phy *phy)
+static int utmi_phy_preresume(struct tegra_usb_phy *phy)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
@@ -862,9 +866,11 @@ static void utmi_phy_preresume(struct tegra_usb_phy *phy)
 	val = readl(base + UTMIP_TX_CFG0);
 	val |= UTMIP_HS_DISCON_DISABLE;
 	writel(val, base + UTMIP_TX_CFG0);
+
+	return 0;
 }
 
-static void utmi_phy_postresume(struct tegra_usb_phy *phy)
+static int utmi_phy_postresume(struct tegra_usb_phy *phy)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
@@ -872,6 +878,8 @@ static void utmi_phy_postresume(struct tegra_usb_phy *phy)
 	val = readl(base + UTMIP_TX_CFG0);
 	val &= ~UTMIP_HS_DISCON_DISABLE;
 	writel(val, base + UTMIP_TX_CFG0);
+
+	return 0;
 }
 
 static void uhsic_phy_postresume(struct tegra_usb_phy *phy)
@@ -1059,7 +1067,7 @@ static int ulpi_phy_power_on(struct tegra_usb_phy *phy)
 	return 0;
 }
 
-static void ulpi_phy_power_off(struct tegra_usb_phy *phy)
+static int ulpi_phy_power_off(struct tegra_usb_phy *phy)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
@@ -1105,6 +1113,8 @@ static void ulpi_phy_power_off(struct tegra_usb_phy *phy)
 #endif
 
 	clk_disable(phy->clk);
+
+	return 0;
 }
 
 static int null_phy_power_on(struct tegra_usb_phy *phy)
@@ -1201,7 +1211,7 @@ static int null_phy_power_on(struct tegra_usb_phy *phy)
 	return 0;
 }
 
-static void null_phy_power_off(struct tegra_usb_phy *phy)
+static int null_phy_power_off(struct tegra_usb_phy *phy)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
@@ -1209,9 +1219,11 @@ static void null_phy_power_off(struct tegra_usb_phy *phy)
 	val = readl(base + ULPI_TIMING_CTRL_0);
 	val &= ~ULPI_CLK_PADOUT_ENA;
 	writel(val, base + ULPI_TIMING_CTRL_0);
+
+	return 0;
 }
 
-static void null_phy_post_usbcmd_reset(struct tegra_usb_phy *phy)
+static int null_phy_post_usbcmd_reset(struct tegra_usb_phy *phy)
 {
 #ifdef CONFIG_ARCH_TEGRA_3x_SOC
 	unsigned long val;
@@ -1236,6 +1248,7 @@ static void null_phy_post_usbcmd_reset(struct tegra_usb_phy *phy)
 	val &=  ~ULPIS2S_SLV0_CLAMP_XMIT;
 	writel(val, base + ULPIS2S_CTRL);
 #endif
+	return 0;
 }
 
 static int uhsic_phy_power_on(struct tegra_usb_phy *phy)
@@ -1316,12 +1329,13 @@ static int uhsic_phy_power_on(struct tegra_usb_phy *phy)
 	if (utmi_wait_register(base + USB_SUSP_CTRL, USB_PHY_CLK_VALID,
 							USB_PHY_CLK_VALID)) {
 		pr_err("%s: timeout waiting for phy to stabilize\n", __func__);
+		return -ETIMEDOUT;
 	}
 
 	return 0;
 }
 
-static void uhsic_phy_power_off(struct tegra_usb_phy *phy)
+static int uhsic_phy_power_off(struct tegra_usb_phy *phy)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
@@ -1340,6 +1354,7 @@ static void uhsic_phy_power_off(struct tegra_usb_phy *phy)
 	val &= ~UHSIC_PHY_ENABLE;
 	writel(val, base + USB_SUSP_CTRL);
 
+	return 0;
 }
 
 #ifdef CONFIG_USB_TEGRA_OTG
@@ -1499,6 +1514,8 @@ err0:
 
 int tegra_usb_phy_power_on(struct tegra_usb_phy *phy)
 {
+	int ret = 0;
+
 	const tegra_phy_fp power_on[] = {
 		utmi_phy_power_on,
 		ulpi_phy_power_on,
@@ -1512,9 +1529,9 @@ int tegra_usb_phy_power_on(struct tegra_usb_phy *phy)
 	}
 
 	if (power_on[phy->usb_phy_type])
-		return power_on[phy->usb_phy_type](phy);
+		ret = power_on[phy->usb_phy_type](phy);
 
-	return 0;
+	return ret;
 }
 
 void tegra_usb_phy_power_off(struct tegra_usb_phy *phy)

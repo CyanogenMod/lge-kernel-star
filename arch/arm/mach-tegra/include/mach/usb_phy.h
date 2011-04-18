@@ -94,7 +94,7 @@ struct tegra_usb_phy {
 	int initialized;
 };
 
-typedef void (*tegra_phy_fp)(struct tegra_usb_phy *phy);
+typedef int (*tegra_phy_fp)(struct tegra_usb_phy *phy);
 
 struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 			void *config, enum tegra_usb_phy_mode phy_mode,
