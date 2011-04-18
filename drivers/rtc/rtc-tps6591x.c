@@ -43,6 +43,18 @@
 #define RTC_RESET_VALUE 0x80
 #define ALARM_INT_STATUS 0x40
 
+/*
+Linux RTC driver refers 1900 as base year in many calculations.
+(e.g. refer drivers/rtc/rtc-lib.c)
+*/
+#define OS_REF_YEAR 1900
+
+/*
+	PMU RTC have only 2 nibbles to store year information, so using an offset
+	of 100 to set the base year as 2000 for our driver.
+*/
+#define RTC_YEAR_OFFSET 100
+
 struct tps6591x_rtc {
 	unsigned long		epoch_start;
 	int			irq;
@@ -90,13 +102,13 @@ static int tps6591x_write_regs(struct device *dev, int reg, int len,
 
 static int tps6591x_rtc_valid_tm(struct rtc_time *tm)
 {
-	if (tm->tm_year > 99
-		|| ((unsigned)tm->tm_mon) >= 12
+	if (tm->tm_year >= (RTC_YEAR_OFFSET + 99)
+		|| tm->tm_mon >= 12
 		|| tm->tm_mday < 1
-		|| tm->tm_mday > rtc_month_days(tm->tm_mon, tm->tm_year + 1900)
-		|| ((unsigned)tm->tm_hour) >= 24
-		|| ((unsigned)tm->tm_min) >= 60
-		|| ((unsigned)tm->tm_sec) >= 60)
+		|| tm->tm_mday > rtc_month_days(tm->tm_mon, tm->tm_year + OS_REF_YEAR)
+		|| tm->tm_hour >= 24
+		|| tm->tm_min >= 60
+		|| tm->tm_sec >= 60)
 		return -EINVAL;
 	return 0;
 }
@@ -127,8 +139,8 @@ static void convert_decimal_to_bcd(u8 *buf, u8 len)
 
 static void print_time(struct device *dev, struct rtc_time *tm)
 {
-	dev_info(dev, "RTC Time : %d-%d-%d %d:%d:%d\n",
-		tm->tm_mday, tm->tm_mon, tm->tm_year,
+	dev_info(dev, "RTC Time : %d/%d/%d %d:%d:%d\n",
+		(tm->tm_mon + 1), tm->tm_mday, (tm->tm_year + OS_REF_YEAR),
 		tm->tm_hour, tm->tm_min , tm->tm_sec);
 }
 
@@ -284,10 +296,8 @@ static int tps6591x_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	}
 
 	if (alrm->enabled && !rtc->irq_en) {
-		enable_irq(rtc->irq);
 		rtc->irq_en = true;
 	} else if (!alrm->enabled && rtc->irq_en) {
-		disable_irq(rtc->irq);
 		rtc->irq_en = false;
 	}
 
@@ -439,15 +449,20 @@ static int __devinit tps6591x_rtc_probe(struct platform_device *pdev)
 		return -EBUSY;
 	}
 
-	if (reg & RTC_RESET_VALUE)
-		dev_info(&pdev->dev, "\n %s RTC reset occured\n", __func__);
-
 	reg = ENABLE_ALARM_INT;
 	tps6591x_write_regs(&pdev->dev, RTC_INT, 1, &reg);
 	if (err) {
 		dev_err(&pdev->dev, "unable to program Interrupt Mask reg\n");
 		return -EBUSY;
 	}
+
+	if (pdata->time.tm_year < 2000 || pdata->time.tm_year > 2100)	{
+		memset(&pdata->time, 0, sizeof(pdata->time));
+		pdata->time.tm_year = RTC_YEAR_OFFSET;
+		pdata->time.tm_mday = 1;
+	} else
+	pdata->time.tm_year -= OS_REF_YEAR;
+	tps6591x_rtc_set_time(&pdev->dev, &pdata->time);
 
 	if (pdata && (pdata->irq >= 0)) {
 		rtc->irq = pdata->irq;
