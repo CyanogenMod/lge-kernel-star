@@ -54,6 +54,7 @@
 #include "devices.h"
 #include "gpio-names.h"
 #include "fuse.h"
+#include "board-whistler-baseband.h"
 
 static struct plat_serial8250_port debug_uart_platform_data[] = {
 	{
@@ -341,7 +342,7 @@ static void whistler_usb_init(void)
 	tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
 	platform_device_register(&tegra_otg_device);
 
-	tegra_ehci3_device.dev.platform_data=&tegra_ehci_pdata[2];
+	tegra_ehci3_device.dev.platform_data = &tegra_ehci_pdata[2];
 	platform_device_register(&tegra_ehci3_device);
 }
 
@@ -392,6 +393,7 @@ static void __init tegra_whistler_init(void)
 	whistler_scroll_init();
 	whistler_power_off_init();
 	whistler_emc_init();
+	whistler_baseband_init();
 }
 
 int __init tegra_whistler_protected_aperture_init(void)

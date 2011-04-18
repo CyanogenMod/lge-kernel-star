@@ -1,49 +1,189 @@
 /*
  * arch/arm/mach-tegra/board-whistler-baseband.c
  *
- * Copyright (c) 2011, NVIDIA Corporation.
+ * Copyright (C) 2011 NVIDIA Corporation
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * This software is licensed under the terms of the GNU General Public
+ * License version 2, as published by the Free Software Foundation, and
+ * may be copied, distributed, and modified under those terms.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-#include <linux/resource.h>
-#include <linux/platform_device.h>
-#include <linux/delay.h>
-#include <linux/gpio.h>
-#include <linux/err.h>
-#include <linux/platform_data/tegra_usb.h>
-#include <asm/mach-types.h>
-#include <asm/mach/arch.h>
-#include <mach/pinmux.h>
-#include <mach/usb_phy.h>
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/module.h>
+#include <linux/moduleparam.h>
+#include <linux/tegra_caif.h>
+#include "board-whistler-baseband.h"
 
-#include "devices.h"
-#include "gpio-names.h"
+unsigned long baseband_type = BOARD_WHISTLER_BASEBAND_U3XX;
 
-#define MODEM_PWR_ON	TEGRA_GPIO_PV1
-#define MODEM_RESET	TEGRA_GPIO_PV0
+module_param(baseband_type, ulong, 0644);
+MODULE_PARM_DESC(baseband_type, "baseband type");
 
-/* Rainbow1 and 570 */
-#define AWR		TEGRA_GPIO_PZ0
-#define CWR		TEGRA_GPIO_PY6
-#define SPI_INT		TEGRA_GPIO_PO6
-#define SPI_SLAVE_SEL	TEGRA_GPIO_PV2
+static struct tegra_clk_init_table u3xx_clk[] = {
+	/* spi slave controller clock @ 4 x 13 Mhz interface clock */
+	{ "sbc1",	"pll_m",	52000000,	true},
+	{ NULL,		NULL,		0,		0},
+};
 
-/* PH450 */
-#define AP2MDM_ACK2	TEGRA_GPIO_PU2
-#define MDM2AP_ACK2	TEGRA_GPIO_PV2
+static struct tegra_clk_init_table n731_clk[] = {
+	/* spi master controller clock @ 4 x 12 Mhz interface clock */
+	{ "sbc1",	"pll_m",	48000000,	true},
+	{ NULL,		NULL,		0,		0},
+};
+
+static struct tegra_clk_init_table spi_loopback_clk[] = {
+	/* spi slave / master controller clocks @ 4 x max interface clock */
+	{ "sbc1",	"pll_m",	60000000,	true},
+	{ "sbc2",	"pll_m",	60000000,	true},
+	{ NULL,		NULL,		0,		0},
+};
+
+static struct tegra_clk_init_table hsic_clk[] = {
+	{ NULL,		NULL,		0,		0},
+};
+
+static struct platform_device *u3xx_device[] = {
+	/* spi slave */
+	&tegra_spi_slave_device1,
+};
+
+static struct platform_device *n731_device[] = {
+	/* spi master */
+	&tegra_spi_device1,
+};
+
+static struct platform_device *spi_loopback_device[] = {
+	/* spi slave / master */
+	&tegra_spi_slave_device1,
+	&tegra_spi_device2,
+};
+
+static struct platform_device *hsic_device[] = {
+};
+
+struct tegra_caif_platform_data  tegra_whistler_u3xx_plat_data = {
+	.reset = TEGRA_CAIF_SSPI_GPIO_RESET,
+	.power = TEGRA_CAIF_SSPI_GPIO_POWER,
+	.awr = TEGRA_CAIF_SSPI_GPIO_AWR,
+	.cwr = TEGRA_CAIF_SSPI_GPIO_CWR,
+	.spi_int = TEGRA_CAIF_SSPI_GPIO_SPI_INT,
+	.spi_ss = TEGRA_CAIF_SSPI_GPIO_SS,
+};
+
+static struct spi_board_info u3xx_spi_board_info[] = {
+	/* spi slave */
+	{
+		.modalias = "baseband_spi_slave0.0",
+		.bus_num = 0,
+		.chip_select = 0,
+		.mode = SPI_MODE_0,
+		.max_speed_hz = 52000000,
+		.platform_data = &tegra_whistler_u3xx_plat_data,
+		.irq = 0,
+	},
+};
+
+static struct spi_board_info n731_spi_board_info[] = {
+	/* spi master */
+	{
+		.modalias = "spi_ipc",
+		.bus_num = 0,
+		.chip_select = 0,
+		.mode = SPI_MODE_1,
+		.max_speed_hz = 12000000,
+		.platform_data = NULL,
+		.irq = 0,
+	},
+};
+
+static struct spi_board_info spi_loopback_spi_board_info[] = {
+	/* spi slave <---> spi master */
+	{
+		.modalias = "baseband_loopback",
+		.bus_num = 0,
+		.chip_select = 0,
+		.mode = SPI_MODE_0,
+		.max_speed_hz = 13000000,
+		.platform_data = &tegra_whistler_u3xx_plat_data,
+		.irq = 0,
+	},
+	{
+		.modalias = "baseband_spi_master1.1",
+		.bus_num = 1,
+		.chip_select = 1,
+		.mode = SPI_MODE_0,
+		.max_speed_hz = 13000000,
+		.platform_data = NULL,
+		.irq = 0,
+	},
+};
+
+static struct whistler_baseband whistler_baseband[] = {
+	[BOARD_WHISTLER_BASEBAND_U3XX] = {
+		.clk_init = u3xx_clk,
+		.platform_device = u3xx_device,
+		.platform_device_size = ARRAY_SIZE(u3xx_device),
+		.spi_board_info = u3xx_spi_board_info,
+		.spi_board_info_size = ARRAY_SIZE(u3xx_spi_board_info),
+	},
+	[BOARD_WHISTLER_BASEBAND_N731] = {
+		.clk_init = n731_clk,
+		.platform_device = n731_device,
+		.platform_device_size = ARRAY_SIZE(n731_device),
+		.spi_board_info = n731_spi_board_info,
+		.spi_board_info_size = ARRAY_SIZE(n731_spi_board_info),
+	},
+	[BOARD_WHISTLER_BASEBAND_SPI_LOOPBACK] = {
+		.clk_init = spi_loopback_clk,
+		.platform_device = spi_loopback_device,
+		.platform_device_size = ARRAY_SIZE(spi_loopback_device),
+		.spi_board_info = spi_loopback_spi_board_info,
+		.spi_board_info_size = ARRAY_SIZE(spi_loopback_spi_board_info),
+	},
+	[BOARD_WHISTLER_BASEBAND_HSIC] = {
+		.clk_init = hsic_clk,
+		.platform_device = hsic_device,
+		.platform_device_size = ARRAY_SIZE(hsic_device),
+	},
+};
+
+int whistler_baseband_init(void)
+{
+	int idx;
+	int err;
+	idx = baseband_type;
+
+	if (whistler_baseband[idx].clk_init)
+		tegra_clk_init_from_table(whistler_baseband[idx].clk_init);
+
+	if (whistler_baseband[idx].platform_device_size)
+		platform_add_devices(whistler_baseband[idx].platform_device,
+			whistler_baseband[idx].platform_device_size);
+
+	if (whistler_baseband[idx].spi_board_info_size) {
+		err = spi_register_board_info(
+			whistler_baseband[idx].spi_board_info,
+			whistler_baseband[idx].spi_board_info_size);
+		if (err < 0)
+			pr_err("%s: spi_register_board returned error %d\n",
+				__func__, err);
+	}
+
+	tegra_gpio_enable(TEGRA_CAIF_SSPI_GPIO_RESET);
+	tegra_gpio_enable(TEGRA_CAIF_SSPI_GPIO_POWER);
+	tegra_gpio_enable(TEGRA_CAIF_SSPI_GPIO_AWR);
+	tegra_gpio_enable(TEGRA_CAIF_SSPI_GPIO_CWR);
+	tegra_gpio_enable(TEGRA_CAIF_SSPI_GPIO_SPI_INT);
+	tegra_gpio_enable(TEGRA_CAIF_SSPI_GPIO_SS);
+	return 0;
+}
 
 static int rainbow_570_reset(void);
 static int rainbow_570_handshake(void);
@@ -209,14 +349,11 @@ static int ph450_reset(void)
 	while (retry) {
 		/* wait for MDM2AP_ACK2 low */
 		int val = gpio_get_value(MDM2AP_ACK2);
-		if (!val) {
-			printk("MDM2AP_ACK2 detected\n");
-			return 0;
-		} else {
-			printk(".");
+		if (!val)
+			break;
+		else
 			retry--;
 			mdelay(100);
-		}
 	}
 
 	return 1;
@@ -230,7 +367,7 @@ static int ph450_handshake(void)
 	return 0;
 }
 
-int __init whistler_baseband_init(void)
+int __init whistler_baseband_ph450_init(void)
 {
 	int ret;
 
@@ -244,6 +381,5 @@ int __init whistler_baseband_init(void)
 	}
 
 	tegra_null_ulpi_init();
-
 	return 0;
 }
