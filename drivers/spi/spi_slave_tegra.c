@@ -1097,7 +1097,8 @@ static int __init spi_tegra_probe(struct platform_device *pdev)
 	init_completion(&tspi->rx_dma_complete);
 
 
-	tspi->rx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT);
+	tspi->rx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT,
+				"spi_rx_%d", pdev->id);
 	if (!tspi->rx_dma) {
 		dev_err(&pdev->dev, "can not allocate rx dma channel\n");
 		ret = -ENODEV;
@@ -1125,7 +1126,8 @@ static int __init spi_tegra_probe(struct platform_device *pdev)
 	tspi->rx_dma_req.req_sel = spi_tegra_req_sels[pdev->id];
 	tspi->rx_dma_req.dev = tspi;
 
-	tspi->tx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT);
+	tspi->tx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT,
+				"spi_tx_%d", pdev->id);
 	if (!tspi->tx_dma) {
 		dev_err(&pdev->dev, "can not allocate tx dma channel\n");
 		ret = -ENODEV;
