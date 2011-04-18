@@ -489,7 +489,8 @@ static int setup_dma(struct audio_driver_state *ads)
 		ads->out.dma_req[i].source_addr = ads->out.buf_phy[i];
 	}
 	ads->out.dma_chan =
-		 tegra_dma_allocate_channel(TEGRA_DMA_MODE_CONTINUOUS_SINGLE);
+		 tegra_dma_allocate_channel(TEGRA_DMA_MODE_CONTINUOUS_SINGLE,
+			"spdif_tx_req_%d", ads->dma_req_sel);
 	if (!ads->out.dma_chan) {
 		pr_err("%s: error alloc output DMA channel: %ld\n",
 			__func__, PTR_ERR(ads->out.dma_chan));
