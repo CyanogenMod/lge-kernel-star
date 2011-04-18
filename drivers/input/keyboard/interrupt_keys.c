@@ -33,15 +33,21 @@
 #include <linux/platform_device.h>
 #include <linux/input.h>
 #include <linux/interrupt_keys.h>
-#include <linux/workqueue.h>
+#include <linux/spinlock.h>
+
+enum {
+	KEY_RELEASED = 0,
+	KEY_PRESSED,
+};
 
 struct interrupt_button_data {
 	struct interrupt_keys_button *button;
 	struct input_dev *input;
 	struct timer_list timer;
-	struct work_struct work;
 	int timer_debounce;	/* in msecs */
 	bool disabled;
+	int key_state;
+	spinlock_t lock;
 };
 
 struct interrupt_keys_drvdata {
@@ -53,105 +59,60 @@ struct interrupt_keys_drvdata {
 	struct interrupt_button_data data[0];
 };
 
-/**
- * get_n_events_by_type() - returns maximum number of events per @type
- * @type: type of button (%EV_KEY, %EV_SW)
- *
- * Return value of this function can be used to allocate bitmap
- * large enough to hold all bits for given type.
- */
-static inline int get_n_events_by_type(int type)
+static void interrupt_keys_timer(unsigned long _data)
 {
-	BUG_ON(type != EV_SW && type != EV_KEY);
-	return (type == EV_KEY) ? KEY_CNT : SW_CNT;
-}
-
-/**
- * interrupt_keys_disable_button() - disables given interrupt button
- * @bdata: button data for button to be disabled
- *
- * Disables button pointed by @bdata. This is done by masking
- * IRQ line. After this function is called, button won't generate
- * input events anymore. Note that one can only disable buttons
- * that don't share IRQs.
- *
- * Make sure that @bdata->disable_lock is locked when entering
- * this function to avoid races when concurrent threads are
- * disabling buttons at the same time.
- */
-static void interrupt_keys_disable_button(struct interrupt_button_data *bdata)
-{
-	if (!bdata->disabled) {
-		/*
-		 * Disable IRQ and possible debouncing timer.
-		 */
-		disable_irq(bdata->button->irq);
-		if (bdata->timer_debounce)
-			del_timer_sync(&bdata->timer);
-
-		bdata->disabled = true;
-	}
-}
-
-/**
- * interrupt_keys_enable_button() - enables given interrupt button
- * @bdata: button data for button to be disabled
- *
- * Enables given button pointed by @bdata.
- *
- * Make sure that @bdata->disable_lock is locked when entering
- * this function to avoid races with concurrent threads trying
- * to enable the same button at the same time.
- */
-static void interrupt_keys_enable_button(struct interrupt_button_data *bdata)
-{
-	if (bdata->disabled) {
-		enable_irq(bdata->button->irq);
-		bdata->disabled = false;
-	}
-}
-
-static void interrupt_keys_report_event(struct interrupt_button_data *bdata)
-{
+	struct interrupt_button_data *bdata =
+			(struct interrupt_button_data *)_data;
 	struct interrupt_keys_button *button = bdata->button;
 	struct input_dev *input = bdata->input;
 	unsigned int type = button->type ?: EV_KEY;
+	unsigned long iflags;
 
-	input_event(input, type, button->code, 1);
-	input_sync(input);
-	input_event(input, type, button->code, 0);
-	input_sync(input);
-}
-
-static void interrupt_keys_work_func(struct work_struct *work)
-{
-	struct interrupt_button_data *bdata =
-		container_of(work, struct interrupt_button_data, work);
-
-	interrupt_keys_report_event(bdata);
-}
-
-static void interrupt_keys_timer(unsigned long _data)
-{
-	struct interrupt_button_data *data =
-				(struct interrupt_button_data *)_data;
-
-	schedule_work(&data->work);
+	spin_lock_irqsave(&bdata->lock, iflags);
+	if (bdata->key_state == KEY_PRESSED) {
+		input_event(input, type, button->code, 0);
+		input_sync(input);
+		bdata->key_state = KEY_RELEASED;
+	} else
+		dev_info(&input->dev, "Key state is in release, not sending "
+					"any event\n");
+	spin_unlock_irqrestore(&bdata->lock, iflags);
+	return;
 }
 
 static irqreturn_t interrupt_keys_isr(int irq, void *dev_id)
 {
 	struct interrupt_button_data *bdata = dev_id;
 	struct interrupt_keys_button *button = bdata->button;
+	struct input_dev *input = bdata->input;
+	unsigned int type = button->type ?: EV_KEY;
+	unsigned long iflags;
 
 	BUG_ON(irq != button->irq);
 
-	if (bdata->timer_debounce)
+	spin_lock_irqsave(&bdata->lock, iflags);
+	if (bdata->key_state == KEY_RELEASED) {
+		input_event(input, type, button->code, 1);
+		input_sync(input);
+		if (!bdata->timer_debounce) {
+			input_event(input, type, button->code, 0);
+			input_sync(input);
+			spin_unlock_irqrestore(&bdata->lock, iflags);
+			return IRQ_HANDLED;
+		}
+		bdata->key_state = KEY_PRESSED;
+	}
+
+	if ((bdata->key_state == KEY_PRESSED) && (bdata->timer_debounce)) {
+		spin_unlock_irqrestore(&bdata->lock, iflags);
 		mod_timer(&bdata->timer,
 			jiffies + msecs_to_jiffies(bdata->timer_debounce));
-	else
-		schedule_work(&bdata->work);
+		return IRQ_HANDLED;
+	}
+	spin_unlock_irqrestore(&bdata->lock, iflags);
 
+	/* Should not reach to this point */
+	WARN_ON(1);
 	return IRQ_HANDLED;
 }
 
@@ -165,7 +126,7 @@ static int __devinit interrupt_keys_setup_key(struct platform_device *pdev,
 	int irq, error;
 
 	setup_timer(&bdata->timer, interrupt_keys_timer, (unsigned long)bdata);
-	INIT_WORK(&bdata->work, interrupt_keys_work_func);
+	spin_lock_init(&bdata->lock);
 
 	irq = button->irq;
 	if (irq < 0) {
@@ -260,6 +221,7 @@ static int __devinit interrupt_keys_probe(struct platform_device *pdev)
 
 		bdata->input = input;
 		bdata->button = button;
+		bdata->timer_debounce = button->debounce_interval;
 
 		error = interrupt_keys_setup_key(pdev, bdata, button);
 		if (error)
@@ -277,11 +239,6 @@ static int __devinit interrupt_keys_probe(struct platform_device *pdev)
 		goto fail2;
 	}
 
-	/* get current state of buttons */
-	for (i = 0; i < pdata->nbuttons; i++)
-		interrupt_keys_report_event(&ddata->data[i]);
-	input_sync(input);
-
 	device_init_wakeup(&pdev->dev, wakeup);
 
 	return 0;
@@ -291,7 +248,6 @@ fail2:
 		free_irq(pdata->int_buttons[i].irq, &ddata->data[i]);
 		if (ddata->data[i].timer_debounce)
 			del_timer_sync(&ddata->data[i].timer);
-		cancel_work_sync(&ddata->data[i].work);
 	}
 
 	platform_set_drvdata(pdev, NULL);
@@ -315,7 +271,6 @@ static int __devexit interrupt_keys_remove(struct platform_device *pdev)
 		free_irq(pdata->int_buttons[i].irq, &ddata->data[i]);
 		if (ddata->data[i].timer_debounce)
 			del_timer_sync(&ddata->data[i].timer);
-		cancel_work_sync(&ddata->data[i].work);
 	}
 
 	input_unregister_device(input);
