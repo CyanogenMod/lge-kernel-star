@@ -740,7 +740,8 @@ static int tegra_uart_init_rx_dma(struct tegra_uart_port *t)
 	dma_addr_t rx_dma_phys;
 	void *rx_dma_virt;
 
-	t->rx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_CONTINUOUS);
+	t->rx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_CONTINUOUS,
+					"uart_rx_%d", t->uport.line);
 	if (!t->rx_dma) {
 		dev_err(t->uport.dev, "%s: failed to allocate RX DMA.\n", __func__);
 		return -ENODEV;
@@ -784,7 +785,8 @@ static int tegra_startup(struct uart_port *u)
 
 	t->use_tx_dma = false;
 	if (!TX_FORCE_PIO) {
-		t->tx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT);
+		t->tx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT,
+					"uart_tx_%d", u->line);
 		if (t->tx_dma)
 			t->use_tx_dma = true;
 		else
