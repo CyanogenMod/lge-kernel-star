@@ -23,6 +23,8 @@
 #ifndef __LINUX_MFD_TPS6591X_H
 #define __LINUX_MFD_TPS6591X_H
 
+#include <linux/rtc.h>
+
 #define tps6591x_rails(_name) "tps6591x_"#_name
 
 enum {
@@ -75,6 +77,7 @@ struct tps6591x_subdev_info {
 
 struct tps6591x_rtc_platform_data {
 	int irq;
+	struct rtc_time time;
 };
 
 struct tps6591x_platform_data {
