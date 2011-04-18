@@ -647,3 +647,74 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 			smmu_window->start, smmu_window->end);
 #endif
 }
+
+#if defined CONFIG_HAS_EARLYSUSPEND && defined CONFIG_CPU_FREQ
+static char cpufreq_gov_default[32];
+static char *cpufreq_gov_conservative = "conservative";
+static char *cpufreq_sysfs_place_holder="/sys/devices/system/cpu/cpu%i/cpufreq/scaling_governor";
+
+static void cpufreq_set_governor(char *governor)
+{
+	struct file *scaling_gov = NULL;
+	char    buf[128];
+	int i;
+	loff_t offset = 0;
+
+	if (governor == NULL)
+		return;
+
+	for_each_cpu(i, cpu_present_mask) {
+		sprintf(buf, cpufreq_sysfs_place_holder, i);
+		scaling_gov = filp_open(buf, O_RDWR, 0);
+		if (scaling_gov != NULL) {
+			if (scaling_gov->f_op != NULL &&
+				scaling_gov->f_op->write != NULL)
+				scaling_gov->f_op->write(scaling_gov,
+						governor,
+						strlen(governor),
+						&offset);
+			else
+				pr_err("f_op might be null\n");
+
+			filp_close(scaling_gov, NULL);
+		} else {
+			pr_err("%s. Can't open %s\n", __func__, buf);
+		}
+	}
+}
+
+void cpufreq_save_default_governor(void)
+{
+	struct file *scaling_gov = NULL;
+	char    buf[128];
+	loff_t offset = 0;
+
+	buf[127] = 0;
+	sprintf(buf, cpufreq_sysfs_place_holder,0);
+	scaling_gov = filp_open(buf, O_RDONLY, 0);
+	if (scaling_gov != NULL) {
+		if (scaling_gov->f_op != NULL &&
+			scaling_gov->f_op->read != NULL)
+			scaling_gov->f_op->read(scaling_gov,
+					cpufreq_gov_default,
+					127,
+					&offset);
+		else
+			pr_err("f_op might be null\n");
+
+		filp_close(scaling_gov, NULL);
+	} else {
+		pr_err("%s. Can't open %s\n", __func__, buf);
+	}
+}
+
+void cpufreq_restore_default_governor(void)
+{
+	cpufreq_set_governor(cpufreq_gov_default);
+}
+
+void cpufreq_set_conservative_governor(void)
+{
+	cpufreq_set_governor(cpufreq_gov_conservative);
+}
+#endif
