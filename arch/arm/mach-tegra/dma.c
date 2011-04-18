@@ -122,6 +122,7 @@ struct tegra_dma_channel {
 	int			id;
 	spinlock_t		lock;
 	char			name[TEGRA_DMA_NAME_SIZE];
+	char			client_name[TEGRA_DMA_NAME_SIZE];
 	void  __iomem		*addr;
 	int			mode;
 	int			irq;
@@ -446,10 +447,23 @@ int tegra_dma_enqueue_req(struct tegra_dma_channel *ch,
 }
 EXPORT_SYMBOL(tegra_dma_enqueue_req);
 
-struct tegra_dma_channel *tegra_dma_allocate_channel(int mode)
+static void tegra_dma_dump_channel_usage(void)
+{
+	int i;
+	pr_info("DMA channel allocation dump:\n");
+	for (i = TEGRA_SYSTEM_DMA_CH_MIN; i <= TEGRA_SYSTEM_DMA_CH_MAX; i++) {
+		struct tegra_dma_channel *ch = &dma_channels[i];
+		pr_warn("dma %d used by %s\n", i, ch->client_name);
+	}
+	return;
+}
+
+struct tegra_dma_channel *tegra_dma_allocate_channel(int mode,
+		const char namefmt [ ],...)
 {
 	int channel;
 	struct tegra_dma_channel *ch = NULL;
+	va_list args;
 
 	if (WARN_ON(!tegra_dma_initialized))
 		return NULL;
@@ -462,12 +476,18 @@ struct tegra_dma_channel *tegra_dma_allocate_channel(int mode)
 	} else {
 		channel = find_first_zero_bit(channel_usage,
 			ARRAY_SIZE(dma_channels));
-		if (channel >= ARRAY_SIZE(dma_channels))
+		if (channel >= ARRAY_SIZE(dma_channels)) {
+			tegra_dma_dump_channel_usage();
 			goto out;
+		}
 	}
 	__set_bit(channel, channel_usage);
 	ch = &dma_channels[channel];
 	ch->mode = mode;
+	va_start(args, namefmt);
+	vsnprintf(ch->client_name, sizeof(ch->client_name),
+		namefmt, args);
+	va_end(args);
 
 out:
 	mutex_unlock(&tegra_dma_lock);
@@ -482,6 +502,7 @@ void tegra_dma_free_channel(struct tegra_dma_channel *ch)
 	tegra_dma_cancel(ch);
 	mutex_lock(&tegra_dma_lock);
 	__clear_bit(ch->id, channel_usage);
+	memset(ch->client_name, 0, sizeof(ch->client_name));
 	mutex_unlock(&tegra_dma_lock);
 }
 EXPORT_SYMBOL(tegra_dma_free_channel);
@@ -916,6 +937,8 @@ int __init tegra_dma_init(void)
 
 		ch->id = i;
 		snprintf(ch->name, TEGRA_DMA_NAME_SIZE, "dma_channel_%d", i);
+
+		memset(ch->client_name, 0, sizeof(ch->client_name));
 
 		ch->addr = IO_ADDRESS(TEGRA_APB_DMA_CH0_BASE +
 			TEGRA_APB_DMA_CH0_SIZE * i);
