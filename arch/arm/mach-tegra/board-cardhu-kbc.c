@@ -181,7 +181,7 @@ static struct platform_device cardhu_keys_e1291_device = {
 	},
 };
 
-#define INT_KEY(_id, _irq, _iswake)		\
+#define INT_KEY(_id, _irq, _iswake, _deb_int)	\
 	{					\
 		.code = _id,			\
 		.irq = _irq,			\
@@ -189,11 +189,11 @@ static struct platform_device cardhu_keys_e1291_device = {
 		.desc = #_id,			\
 		.type = EV_KEY,			\
 		.wakeup = _iswake,		\
-		.debounce_interval = 10,	\
+		.debounce_interval = _deb_int,	\
 	}
 static struct interrupt_keys_button cardhu_int_keys_e1291[] = {
-	[0] = INT_KEY(KEY_MENU, TPS6591X_IRQ_BASE + TPS6591X_INT_PWRON, 0),
-	[1] = INT_KEY(KEY_MENU, TPS6591X_IRQ_BASE + TPS6591X_INT_PWRON_LP, 0),
+	[0] = INT_KEY(KEY_MENU, TPS6591X_IRQ_BASE + TPS6591X_INT_PWRON, 0, 100),
+	[1] = INT_KEY(KEY_POWER, TPS6591X_IRQ_BASE + TPS6591X_INT_PWRON_LP, 0, 8000),
 };
 
 static struct interrupt_keys_platform_data cardhu_int_keys_e1291_pdata = {
