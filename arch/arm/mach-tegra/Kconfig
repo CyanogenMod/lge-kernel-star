@@ -31,17 +31,20 @@ comment "Tegra board type"
 
 config MACH_HARMONY
        bool "Harmony board"
+       select MACH_HAS_SND_SOC_TEGRA_WM8903
        help
          Support for NVIDIA Harmony development platform
 
 config MACH_VENTANA
        bool "Ventana board"
+       select MACH_HAS_SND_SOC_TEGRA_WM8903
        help
          Support for NVIDIA Ventana development platform
 
 config MACH_KAEN
        bool "Kaen board"
        select MACH_SEABOARD
+       select MACH_HAS_SND_SOC_TEGRA_WM8903
        help
          Support for the Kaen version of Seaboard
 
@@ -52,6 +55,7 @@ config MACH_PAZ00
 
 config MACH_SEABOARD
        bool "Seaboard board"
+       select MACH_HAS_SND_SOC_TEGRA_WM8903
        help
          Support for nVidia Seaboard development platform. It will
 	 also be included for some of the derivative boards that
