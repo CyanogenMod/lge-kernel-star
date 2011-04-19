@@ -13,6 +13,7 @@
 #include <linux/i2c.h>
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 #include <media/ssl3250a.h>
 
 #define SSL3250A_I2C_REG_AMP		0x00
@@ -37,25 +38,37 @@ static struct ssl3250a_info *info;
 
 static int ssl3250a_gpio(u8 gpio, u8 val)
 {
+	int prev_val;
+
 	switch (gpio) {
 	case SSL3250A_GPIO_ACT:
-		if (info->pdata && info->pdata->gpio_act)
-			return info->pdata->gpio_act(val);
+		if (info->pdata && info->pdata->gpio_act) {
+			prev_val = info->pdata->gpio_act(val);
+			if (val && (prev_val ^ val))
+				mdelay(1); /*delay for device ready*/
+			return 0;
+		}
 		return -1;
 
 	case SSL3250A_GPIO_EN1:
-		if (info->pdata && info->pdata->gpio_en1)
-			return info->pdata->gpio_en1(val);
+		if (info->pdata && info->pdata->gpio_en1) {
+			info->pdata->gpio_en1(val);
+			return 0;
+		}
 		return -1;
 
 	case SSL3250A_GPIO_EN2:
-		if (info->pdata && info->pdata->gpio_en2)
-			return info->pdata->gpio_en2(val);
+		if (info->pdata && info->pdata->gpio_en2) {
+			info->pdata->gpio_en2(val);
+			return 0;
+		}
 		return -1;
 
 	case SSL3250A_GPIO_STRB:
-		if (info->pdata && info->pdata->gpio_strb)
-			return info->pdata->gpio_strb(val);
+		if (info->pdata && info->pdata->gpio_strb) {
+			info->pdata->gpio_strb(val);
+			return 0;
+		}
 
 	default:
 		return -1;
@@ -218,9 +231,21 @@ static long ssl3250a_ioctl(
 
 static int ssl3250a_open(struct inode *inode, struct file *file)
 {
+	int err;
+	u8 reg;
 	file->private_data = info;
-	if (info->pdata && info->pdata->init)
-		info->pdata->init();
+
+	pr_info("%s\n", __func__);
+	if (info->pdata && info->pdata->init) {
+		err = info->pdata->init();
+		if (err)
+			pr_err("ssl3250a_open: Board init failed\n");
+	}
+	ssl3250a_gpio(SSL3250A_GPIO_ACT, 1);
+	err = ssl3250a_get_reg(SSL3250A_I2C_REG_STS, &reg);
+	ssl3250a_gpio(SSL3250A_GPIO_ACT, 0);
+	if (err)
+		pr_err("ssl3250a_open: Device init failed\n");
 	return 0;
 }
 
