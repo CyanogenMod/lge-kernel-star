@@ -745,6 +745,7 @@ static struct tegra_suspend_platform_data cardhu_suspend_data = {
 	.wake_high	= 0,
 	.wake_low	= TEGRA_WAKE_GPIO_PV0 | TEGRA_WAKE_PWR_INT,
 	.wake_any	= 0,
+	.cpu_lp2_min_residency = 2000,
 };
 
 int __init cardhu_suspend_init(void)
