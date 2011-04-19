@@ -2,6 +2,7 @@
  * arch/arm/mach-tegra/include/mach/suspend.h
  *
  * Copyright (C) 2010 Google, Inc.
+ * Copyright (C) 2011 NVIDIA Corporation
  *
  * Author:
  *	Colin Cross <ccross@google.com>
@@ -39,10 +40,12 @@ struct tegra_suspend_platform_data {
 	bool corereq_high;         /* Core power request active-high */
 	bool sysclkreq_high;       /* System clock request is active-high */
 	enum tegra_suspend_mode suspend_mode;
+	unsigned long cpu_lp2_min_residency; /* Min LP2 state residency in us */
 };
 
 unsigned long tegra_cpu_power_good_time(void);
 unsigned long tegra_cpu_power_off_time(void);
+unsigned long tegra_cpu_lp2_min_residency(void);
 
 #define TEGRA_POWER_SDRAM_SELFREFRESH	0x400	/* SDRAM is in self-refresh */
 

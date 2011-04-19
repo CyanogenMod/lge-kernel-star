@@ -3,7 +3,7 @@
  *
  * CPU idle driver for Tegra CPUs
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010-2011, NVIDIA Corporation.
  * Copyright (c) 2011 Google, Inc.
  * Author: Colin Cross <ccross@android.com>
  *         Gary King <gking@nvidia.com>
@@ -57,6 +57,8 @@ static struct {
 	unsigned int lp2_int_count[NR_IRQS];
 	unsigned int last_lp2_int_count[NR_IRQS];
 } idle_stats;
+
+static unsigned int tegra_lp2_min_residency;
 
 struct cpuidle_driver tegra_idle = {
 	.name = "tegra_idle",
@@ -115,6 +117,8 @@ static int tegra_idle_enter_lp2(struct cpuidle_device *dev,
 	hrtimer_peek_ahead_timers();
 
 	smp_rmb();
+	if (state->target_residency < tegra_lp2_min_residency)
+		state->target_residency = tegra_lp2_min_residency;
 
 	idle_stats.cpu_wants_lp2_time[dev->cpu] += us;
 
@@ -143,6 +147,8 @@ static int tegra_idle_enter(unsigned int cpu)
 	dev->state_count = 0;
 	dev->cpu = cpu;
 
+	tegra_lp2_min_residency = tegra_cpu_lp2_min_residency();
+
 	state = &dev->states[0];
 	snprintf(state->name, CPUIDLE_NAME_LEN, "LP3");
 	snprintf(state->desc, CPUIDLE_DESC_LEN, "CPU flow-controlled");
@@ -161,6 +167,8 @@ static int tegra_idle_enter(unsigned int cpu)
 
 	state->target_residency = tegra_cpu_power_off_time() +
 		tegra_cpu_power_good_time();
+	if (state->target_residency < tegra_lp2_min_residency)
+		state->target_residency = tegra_lp2_min_residency;
 	state->power_usage = 0;
 	state->flags = CPUIDLE_FLAG_TIME_VALID;
 	state->enter = tegra_idle_enter_lp2;

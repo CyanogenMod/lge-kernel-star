@@ -235,6 +235,14 @@ unsigned long tegra_cpu_power_off_time(void)
 	return pdata->cpu_off_timer;
 }
 
+unsigned long tegra_cpu_lp2_min_residency(void)
+{
+	if (WARN_ON_ONCE(!pdata))
+		return 2000;
+
+	return pdata->cpu_lp2_min_residency;
+}
+
 /* ensures that sufficient time is passed for a register write to
  * serialize into the 32KHz domain */
 static void pmc_32kwritel(u32 val, unsigned long offs)
