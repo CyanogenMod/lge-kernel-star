@@ -241,6 +241,14 @@ TPS_PDATA_INIT_SUPPLY(ldo8, 1000, 3300, VIO, 0, 0, 0, -1, 0, 0, 0);
 
 static struct tps6591x_rtc_platform_data rtc_data = {
 	.irq = TEGRA_NR_IRQS + TPS6591X_INT_RTC_ALARM,
+	.time = {
+		.tm_year = 2000,
+		.tm_mon = 0,
+		.tm_mday = 1,
+		.tm_hour = 0,
+		.tm_min = 0,
+		.tm_sec = 0,
+	},
 };
 
 #define TPS_REG(_id, _data)				\
