@@ -43,16 +43,17 @@
 
 #include "tegra-aes.h"
 
-#define FLAGS_MODE_MASK		0x000f
+#define FLAGS_MODE_MASK		0x00ff
 #define FLAGS_ENCRYPT		BIT(0)
-#define FLAGS_CBC		BIT(1)
-#define FLAGS_GIV		BIT(2)
-#define FLAGS_RNG		BIT(3)
-#define FLAGS_NEW_KEY		BIT(4)
-#define FLAGS_NEW_IV		BIT(5)
-#define FLAGS_INIT		BIT(6)
-#define FLAGS_FAST		BIT(7)
-#define FLAGS_BUSY		8
+#define FLAGS_CBC			BIT(1)
+#define FLAGS_GIV			BIT(2)
+#define FLAGS_RNG			BIT(3)
+#define FLAGS_OFB			BIT(4)
+#define FLAGS_NEW_KEY			BIT(5)
+#define FLAGS_NEW_IV			BIT(6)
+#define FLAGS_INIT			BIT(7)
+#define FLAGS_FAST			BIT(8)
+#define FLAGS_BUSY			9
 
 /*
  * Defines AES engine Max process bytes size in one go, which takes 1 msec.
@@ -265,6 +266,7 @@ static int aes_start_crypt(struct tegra_aes_dev *dd, u32 in_addr, u32 out_addr,
 	aes_writel(dd, value, CMDQUE_CONTROL);
 	dev_dbg(dd->dev, "cmd_q_ctrl=0x%x", value);
 
+	value = 0;
 	if (mode & FLAGS_CBC) {
 		value = ((0x1 << SECURE_INPUT_ALG_SEL_SHIFT) |
 			((dd->ctx->keylen * 8) << SECURE_INPUT_KEY_LEN_SHIFT) |
@@ -276,6 +278,17 @@ static int aes_start_crypt(struct tegra_aes_dev *dd, u32 in_addr, u32 out_addr,
 				<< SECURE_VCTRAM_SEL_SHIFT) |
 			((mode & FLAGS_ENCRYPT) ? 1 : 0)
 				<< SECURE_CORE_SEL_SHIFT |
+			(0 << SECURE_RNG_ENB_SHIFT) |
+			(0 << SECURE_HASH_ENB_SHIFT));
+	} else if (mode & FLAGS_OFB) {
+		value = ((0x1 << SECURE_INPUT_ALG_SEL_SHIFT) |
+			((dd->ctx->keylen * 8) << SECURE_INPUT_KEY_LEN_SHIFT) |
+			((u32)upd_iv << SECURE_IV_SELECT_SHIFT) |
+			((u32)0 << SECURE_IV_SELECT_SHIFT) |
+			(SECURE_XOR_POS_FIELD) |
+			(2 << SECURE_INPUT_SEL_SHIFT) |
+			(0 << SECURE_VCTRAM_SEL_SHIFT) |
+			(SECURE_CORE_SEL_FIELD) |
 			(0 << SECURE_RNG_ENB_SHIFT) |
 			(0 << SECURE_HASH_ENB_SHIFT));
 	} else if (mode & FLAGS_RNG){
@@ -497,8 +510,11 @@ static int tegra_aes_handle_req(struct tegra_aes_dev *dd)
 		ctx->flags &= ~FLAGS_NEW_KEY;
 	}
 
-	if ((dd->flags & FLAGS_CBC) && dd->iv) {
-		/* set iv to the aes hw slot */
+	if (((dd->flags & FLAGS_CBC) || (dd->flags & FLAGS_OFB)) && dd->iv) {
+		/* set iv to the aes hw slot
+		 * Hw generates updated iv only after iv is set in slot.
+		 * So key and iv is passed asynchronously.
+		 */
 		memcpy(dd->buf_in, dd->iv, dd->ivlen);
 
 		ret = aes_start_crypt(dd, (u32)dd->dma_buf_in,
@@ -678,7 +694,15 @@ static int tegra_aes_cbc_decrypt(struct ablkcipher_request *req)
 {
 	return tegra_aes_crypt(req, FLAGS_CBC);
 }
+static int tegra_aes_ofb_encrypt(struct ablkcipher_request *req)
+{
+	return tegra_aes_crypt(req, FLAGS_ENCRYPT | FLAGS_OFB);
+}
 
+static int tegra_aes_ofb_decrypt(struct ablkcipher_request *req)
+{
+	return tegra_aes_crypt(req, FLAGS_OFB);
+}
 static int tegra_aes_get_random(struct crypto_rng *tfm, u8 *rdata,
 	unsigned int dlen)
 {
@@ -894,6 +918,26 @@ static struct crypto_alg algs[] = {
 			.setkey = tegra_aes_setkey,
 			.encrypt = tegra_aes_cbc_encrypt,
 			.decrypt = tegra_aes_cbc_decrypt,
+		}
+	}, {
+		.cra_name = "disabled_ofb(aes)",
+		.cra_driver_name = "ofb-aes-tegra",
+		.cra_priority = 100,
+		.cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER | CRYPTO_ALG_ASYNC,
+		.cra_blocksize = AES_BLOCK_SIZE,
+		.cra_ctxsize  = sizeof(struct tegra_aes_ctx),
+		.cra_alignmask = 3,
+		.cra_type = &crypto_ablkcipher_type,
+		.cra_module = THIS_MODULE,
+		.cra_init = tegra_aes_cra_init,
+		.cra_exit = tegra_aes_cra_exit,
+		.cra_u.ablkcipher = {
+			.min_keysize = AES_MIN_KEY_SIZE,
+			.max_keysize = AES_MAX_KEY_SIZE,
+			.ivsize = AES_MIN_KEY_SIZE,
+			.setkey = tegra_aes_setkey,
+			.encrypt = tegra_aes_ofb_encrypt,
+			.decrypt = tegra_aes_ofb_decrypt,
 		}
 	}, {
 		.cra_name = "disabled_ansi_cprng",
