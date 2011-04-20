@@ -19,6 +19,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 
+#include "board.h"
 #include "board-cardhu.h"
 #include "tegra3_emc.h"
 
@@ -608,7 +609,18 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g[] = {
 
 int cardhu_emc_init(void)
 {
-	tegra_init_emc(cardhu_emc_tables_h5tc2g,
-		ARRAY_SIZE(cardhu_emc_tables_h5tc2g));
+	struct board_info board;
+
+	tegra_get_board_info(&board);
+
+	switch (board.board_id) {
+	case BOARD_PM269:	/* LPDDR2 table is not ready, yet */
+		break;
+	default:
+		tegra_init_emc(cardhu_emc_tables_h5tc2g,
+			ARRAY_SIZE(cardhu_emc_tables_h5tc2g));
+		break;
+	}
+
 	return 0;
 }
