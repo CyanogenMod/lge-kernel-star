@@ -406,6 +406,11 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_cardhu[] = {
 	DEFAULT_PINMUX(GMI_CS2_N,       NAND,            NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(GMI_RST_N,       RSVD3,           PULL_UP,   TRISTATE,   INPUT),
 	DEFAULT_PINMUX(GMI_AD15,        NAND,            PULL_UP,   TRISTATE,   INPUT),
+
+	DEFAULT_PINMUX(GMI_CS0_N,       GMI,             NORMAL,    NORMAL,     OUTPUT),
+	DEFAULT_PINMUX(GMI_CS1_N,       GMI,             NORMAL,    TRISTATE,   OUTPUT),
+	/*TP_IRQ*/
+	DEFAULT_PINMUX(GMI_CS4_N,       GMI,             NORMAL,    NORMAL,     INPUT),
 };
 
 static __initdata struct tegra_pingroup_config cardhu_pinmux_cardhu_a03[] = {
@@ -425,6 +430,27 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_e1198[] = {
 	DEFAULT_PINMUX(SPI2_CS2_N,      SPI2,            PULL_UP,    NORMAL,     INPUT),
 };
 
+static __initdata struct tegra_pingroup_config unused_pins_lowpower[] = {
+	DEFAULT_PINMUX(GMI_WAIT,        GMI,            PULL_UP,    TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_ADV_N,       GMI,            PULL_UP,    TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_CLK,         GMI,            PULL_DOWN,  TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_CS3_N,       GMI,            PULL_UP,    TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_CS6_N,       GMI,            PULL_UP,    TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_AD0,         GMI,            NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_AD1,         GMI,            NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_AD2,         GMI,            NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_AD3,         GMI,            NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_AD4,         GMI,            NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_AD5,         GMI,            NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_AD6,         GMI,            NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_AD7,         GMI,            NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_AD9,         GMI,            PULL_DOWN,  TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_AD11,        GMI,            PULL_DOWN,  TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_WR_N,        GMI,            PULL_UP,    TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_OE_N,        GMI,            PULL_UP,    TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_DQS,         GMI,            PULL_UP,    TRISTATE,     OUTPUT),
+};
+
 int __init cardhu_pinmux_init(void)
 {
 	struct board_info board_info;
@@ -439,14 +465,19 @@ int __init cardhu_pinmux_init(void)
 					ARRAY_SIZE(cardhu_pinmux_cardhu));
 		tegra_pinmux_config_table(cardhu_pinmux_e1198,
 					ARRAY_SIZE(cardhu_pinmux_e1198));
+		tegra_pinmux_config_table(unused_pins_lowpower,
+					ARRAY_SIZE(unused_pins_lowpower));
 		break;
 	case BOARD_E1291:
-		if (board_info.fab < 0x3)
+		if (board_info.fab < 0x3) {
 			tegra_pinmux_config_table(cardhu_pinmux_cardhu,
 					ARRAY_SIZE(cardhu_pinmux_cardhu));
-		else
+			tegra_pinmux_config_table(unused_pins_lowpower,
+					ARRAY_SIZE(unused_pins_lowpower));
+		} else {
 			tegra_pinmux_config_table(cardhu_pinmux_cardhu_a03,
 					ARRAY_SIZE(cardhu_pinmux_cardhu_a03));
+		}
 		break;
 	default:
 		tegra_pinmux_config_table(cardhu_pinmux_e118x,
