@@ -14,7 +14,6 @@
 
 #include <linux/kernel.h>
 #include <linux/device.h>
-#include <linux/usb/android_composite.h>
 
 #include "u_serial.h"
 #include "gadget_chips.h"
@@ -815,39 +814,3 @@ int __init acm_bind_config(struct usb_configuration *c, u8 port_num)
 		kfree(acm);
 	return status;
 }
-
-#ifdef CONFIG_USB_ANDROID_ACM
-
-extern int gps_bind_config(struct usb_configuration *c, struct usb_function *f);
-int acm_function_bind_config(struct usb_configuration *c)
-{
-	int ret = acm_bind_config(c, 0);
-	if (ret == 0)
-//20100710, , for LGE Android USB Driver Interface [START]
-#if defined(CONFIG_MACH_STAR)
-		ret = gser_bind_config(c, 1);/* bound to /dev/ttyGS1 */
-	if (ret == 0)
-		ret = gps_bind_config(c, 2);/* bound to /dev/ttyGS2 */
-	if (ret == 0)
-		ret = gserial_setup(c->cdev->gadget, 3);
-#else
-		gserial_setup(c->cdev->gadget, 1);
-#endif
-//20100710, , for LGE Android USB Driver Interface [END]
-	return ret;
-}
-
-static struct android_usb_function acm_function = {
-	.name = "acm",
-	.bind_config = acm_function_bind_config,
-};
-
-static int __init init(void)
-{
-	printk(KERN_INFO "f_acm init\n");
-	android_register_function(&acm_function);
-	return 0;
-}
-module_init(init);
-
-#endif /* CONFIG_USB_ANDROID_ACM */
