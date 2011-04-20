@@ -297,7 +297,7 @@ static int MLDLGetSiliconRev(struct mldl_cfg *pdata,
 
 	result = MLSLSerialReadMem(mlsl_handle, pdata->addr,
 				   memAddr, 1, &index);
-	ERROR_CHECK(result)
+	ERROR_CHECK(result);
 	if (result)
 		return result;
 	index >>= 2;
@@ -306,7 +306,7 @@ static int MLDLGetSiliconRev(struct mldl_cfg *pdata,
 	result =
 	    MLSLSerialWriteSingle(mlsl_handle, pdata->addr,
 				  MPUREG_BANK_SEL, 0);
-	ERROR_CHECK(result)
+	ERROR_CHECK(result);
 	if (result)
 		return result;
 
@@ -330,20 +330,28 @@ static int MLDLGetSiliconRev(struct mldl_cfg *pdata,
 }
 
 /**
- *  @brief      Enable/Disable the use MPU's VDDIO level shifters.
- *              When enabled the voltage interface with AUX or other external
- *              accelerometer is using Vlogic instead of VDD (supply).
+ *  @brief  Enable / Disable the use MPU's secondary I2C interface level
+ *          shifters.
+ *          When enabled the secondary I2C interface to which the external
+ *          device is connected runs at VDD voltage (main supply).
+ *          When disabled the 2nd interface runs at VDDIO voltage.
+ *          See the device specification for more details.
  *
- *  @note       Must be called after MLSerialOpen().
- *  @note       Typically be called before MLDmpOpen().
- *              If called after MLDmpOpen(), must be followed by a call to
- *              MLDLApplyLevelShifterBit() to write the setting on the hw.
+ *  @note   using this API may produce unpredictable results, depending on how
+ *          the MPU and slave device are setup on the target platform.
+ *          Use of this API should entirely be restricted to system
+ *          integrators. Once the correct value is found, there should be no
+ *          need to change the level shifter at runtime.
  *
- *  @param[in]  enable
- *                  1 to enable, 0 to disable
+ *  @pre    Must be called after MLSerialOpen().
+ *  @note   Typically called before MLDmpOpen().
  *
- *  @return     ML_SUCCESS if successfull, a non-zero error code otherwise.
-**/
+ *  @param[in]  enable:
+ *                  0 to run at VDDIO (default),
+ *                  1 to run at VDD.
+ *
+ *  @return ML_SUCCESS if successfull, a non-zero error code otherwise.
+ */
 static int MLDLSetLevelShifterBit(struct mldl_cfg *pdata,
 				  void *mlsl_handle,
 				  unsigned char enable)
@@ -358,9 +366,9 @@ static int MLDLSetLevelShifterBit(struct mldl_cfg *pdata,
 		return ML_ERROR_INVALID_PARAMETER;
 
 	/*-- on parts before B6 the VDDIO bit is bit 7 of ACCEL_BURST_ADDR --
-	  NOTE: this is incompatible with ST accelerometers where the VDDIO
-		bit MUST be set to enable ST's internal logic to autoincrement
-		the register address on burst reads --*/
+	NOTE: this is incompatible with ST accelerometers where the VDDIO
+	bit MUST be set to enable ST's internal logic to autoincrement
+	the register address on burst reads --*/
 	if ((pdata->silicon_revision & 0xf) < MPU_SILICON_REV_B6) {
 		reg = MPUREG_ACCEL_BURST_ADDR;
 		mask = 0x80;
@@ -1123,6 +1131,7 @@ int mpu3050_open(struct mldl_cfg *mldl_cfg,
 {
 	int result;
 	/* Default is Logic HIGH, pushpull, latch disabled, anyread to clear */
+	mldl_cfg->ignore_system_suspend = FALSE;
 	mldl_cfg->int_config = BIT_INT_ANYRD_2CLEAR | BIT_DMP_INT_EN;
 	mldl_cfg->clk_src = MPU_CLK_SEL_PLLGYROZ;
 	mldl_cfg->lpf = MPU_FILTER_42HZ;

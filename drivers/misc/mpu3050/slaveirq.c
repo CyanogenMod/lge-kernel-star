@@ -89,7 +89,9 @@ static ssize_t slaveirq_read(struct file *file,
 	struct slaveirq_dev_data *data =
 		container_of(file->private_data, struct slaveirq_dev_data, dev);
 
-	if (!data->data_ready) {
+	if (!data->data_ready &&
+		data->timeout &&
+		!(file->f_flags & O_NONBLOCK)) {
 		wait_event_interruptible_timeout(data->slaveirq_wait,
 						 data->data_ready,
 						 data->timeout);
@@ -112,7 +114,8 @@ static ssize_t slaveirq_read(struct file *file,
 	return len;
 }
 
-unsigned int slaveirq_poll(struct file *file, struct poll_table_struct *poll)
+static unsigned int slaveirq_poll(struct file *file,
+				struct poll_table_struct *poll)
 {
 	int mask = 0;
 	struct slaveirq_dev_data *data =
@@ -168,7 +171,6 @@ static irqreturn_t slaveirq_handler(int irq, void *dev_id)
 	data->data.interruptcount++;
 
 	/* wake up (unblock) for reading data from userspace */
-	/* and ignore first interrupt generated in module init */
 	data->data_ready = 1;
 
 	do_gettimeofday(&irqtime);
@@ -223,6 +225,8 @@ int slaveirq_init(struct i2c_adapter *slave_adapter,
 	data->data_ready = 0;
 	data->timeout = 0;
 
+	init_waitqueue_head(&data->slaveirq_wait);
+
 	res = request_irq(data->irq, slaveirq_handler, IRQF_TRIGGER_RISING,
 			  data->dev.name, data);
 
@@ -241,7 +245,6 @@ int slaveirq_init(struct i2c_adapter *slave_adapter,
 		goto out_misc_register;
 	}
 
-	init_waitqueue_head(&data->slaveirq_wait);
 	return res;
 
 out_misc_register:

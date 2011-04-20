@@ -160,14 +160,84 @@ int ak8975_read(void *mlsl_handle,
 	return status;
 }
 
+static int ak8975_config(void *mlsl_handle,
+			struct ext_slave_descr *slave,
+			struct ext_slave_platform_data *pdata,
+			struct ext_slave_config *data)
+{
+	int result;
+	if (!data->data)
+		return ML_ERROR_INVALID_PARAMETER;
+
+	switch (data->key) {
+	case MPU_SLAVE_WRITE_REGISTERS:
+		result = MLSLSerialWrite(mlsl_handle, pdata->address,
+					data->len,
+					(unsigned char *)data->data);
+		ERROR_CHECK(result);
+		break;
+	case MPU_SLAVE_CONFIG_ODR_SUSPEND:
+	case MPU_SLAVE_CONFIG_ODR_RESUME:
+	case MPU_SLAVE_CONFIG_FSR_SUSPEND:
+	case MPU_SLAVE_CONFIG_FSR_RESUME:
+	case MPU_SLAVE_CONFIG_MOT_THS:
+	case MPU_SLAVE_CONFIG_NMOT_THS:
+	case MPU_SLAVE_CONFIG_MOT_DUR:
+	case MPU_SLAVE_CONFIG_NMOT_DUR:
+	case MPU_SLAVE_CONFIG_IRQ_SUSPEND:
+	case MPU_SLAVE_CONFIG_IRQ_RESUME:
+	default:
+		return ML_ERROR_FEATURE_NOT_IMPLEMENTED;
+	};
+
+	return ML_SUCCESS;
+}
+
+static int ak8975_get_config(void *mlsl_handle,
+				struct ext_slave_descr *slave,
+				struct ext_slave_platform_data *pdata,
+				struct ext_slave_config *data)
+{
+	int result;
+	if (!data->data)
+		return ML_ERROR_INVALID_PARAMETER;
+
+	switch (data->key) {
+	case MPU_SLAVE_READ_REGISTERS:
+	{
+		unsigned char *serial_data = (unsigned char *)data->data;
+		result = MLSLSerialRead(mlsl_handle, pdata->address,
+					serial_data[0],
+					data->len - 1,
+					&serial_data[1]);
+		ERROR_CHECK(result);
+		break;
+	}
+	case MPU_SLAVE_CONFIG_ODR_SUSPEND:
+	case MPU_SLAVE_CONFIG_ODR_RESUME:
+	case MPU_SLAVE_CONFIG_FSR_SUSPEND:
+	case MPU_SLAVE_CONFIG_FSR_RESUME:
+	case MPU_SLAVE_CONFIG_MOT_THS:
+	case MPU_SLAVE_CONFIG_NMOT_THS:
+	case MPU_SLAVE_CONFIG_MOT_DUR:
+	case MPU_SLAVE_CONFIG_NMOT_DUR:
+	case MPU_SLAVE_CONFIG_IRQ_SUSPEND:
+	case MPU_SLAVE_CONFIG_IRQ_RESUME:
+	default:
+		return ML_ERROR_FEATURE_NOT_IMPLEMENTED;
+	};
+
+	return ML_SUCCESS;
+}
+
 struct ext_slave_descr ak8975_descr = {
 	/*.init             = */ NULL,
 	/*.exit             = */ NULL,
 	/*.suspend          = */ ak8975_suspend,
 	/*.resume           = */ ak8975_resume,
 	/*.read             = */ ak8975_read,
-	/*.config           = */ NULL,
-	/*.get_config       = */ NULL,
+	/*.config           = */ ak8975_config,
+	/*.get_config       = */ ak8975_get_config,
 	/*.name             = */ "ak8975",
 	/*.type             = */ EXT_SLAVE_TYPE_COMPASS,
 	/*.id               = */ COMPASS_ID_AKM,

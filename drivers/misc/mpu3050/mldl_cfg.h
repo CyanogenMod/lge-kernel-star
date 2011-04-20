@@ -93,6 +93,7 @@
 struct mldl_cfg {
 	/* MPU related configuration */
 	unsigned long requested_sensors;
+	unsigned char ignore_system_suspend;
 	unsigned char addr;
 	unsigned char int_config;
 	unsigned char ext_sync;
