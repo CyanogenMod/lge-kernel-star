@@ -56,7 +56,6 @@ static bool is_suspended;
 
 unsigned int tegra_getspeed(unsigned int cpu);
 static int tegra_update_cpu_speed(unsigned long rate);
-static unsigned long tegra_cpu_highest_speed(void);
 
 #ifdef CONFIG_TEGRA_THERMAL_THROTTLE
 /* CPU frequency is gradually lowered when throttling is enabled */
@@ -118,7 +117,7 @@ void tegra_throttling_enable(bool enable)
 		cancel_delayed_work_sync(&throttle_work);
 		is_throttling = false;
 		/* restore speed requested by governor */
-		tegra_update_cpu_speed(tegra_cpu_highest_speed());
+		tegra_cpu_cap_highest_speed(NULL);
 	}
 
 	mutex_unlock(&tegra_cpu_lock);
@@ -242,7 +241,7 @@ static int tegra_cpu_edp_notify(
 
 		cpu_speed = tegra_getspeed(0);
 		new_speed = edp_governor_speed(cpu_speed);
-		if (cpu_speed != new_speed) {
+		if (new_speed < cpu_speed) {
 			ret = tegra_update_cpu_speed(new_speed);
 			if (ret) {
 				cpu_clear(cpu, edp_cpumask);
@@ -364,14 +363,46 @@ static int tegra_update_cpu_speed(unsigned long rate)
 	return 0;
 }
 
-static unsigned long tegra_cpu_highest_speed(void)
-{
+unsigned int tegra_get_slowest_cpu_n(void) {
+	unsigned int cpu = nr_cpu_ids;
+	unsigned long rate = ULONG_MAX;
+	int i;
+
+	for_each_online_cpu(i)
+		if ((i > 0) && (rate > target_cpu_speed[i])) {
+			cpu = i;
+			rate = target_cpu_speed[i];
+		}
+	return cpu;
+}
+
+unsigned long tegra_cpu_lowest_speed(void) {
+	unsigned long rate = ULONG_MAX;
+	int i;
+
+	for_each_online_cpu(i)
+		rate = min(rate, target_cpu_speed[i]);
+	return rate;
+}
+
+unsigned long tegra_cpu_highest_speed(void) {
 	unsigned long rate = 0;
 	int i;
 
 	for_each_online_cpu(i)
 		rate = max(rate, target_cpu_speed[i]);
 	return rate;
+}
+
+int tegra_cpu_cap_highest_speed(unsigned int *speed_cap)
+{
+	unsigned int new_speed = tegra_cpu_highest_speed();
+
+	new_speed = throttle_governor_speed(new_speed);
+	new_speed = edp_governor_speed(new_speed);
+	if (speed_cap)
+		*speed_cap = new_speed;
+	return tegra_update_cpu_speed(new_speed);
 }
 
 static int tegra_target(struct cpufreq_policy *policy,
@@ -396,9 +427,7 @@ static int tegra_target(struct cpufreq_policy *policy,
 	freq = freq_table[idx].frequency;
 
 	target_cpu_speed[policy->cpu] = freq;
-	new_speed = throttle_governor_speed(tegra_cpu_highest_speed());
-	new_speed = edp_governor_speed(new_speed);
-	ret = tegra_update_cpu_speed(new_speed);
+	ret = tegra_cpu_cap_highest_speed(&new_speed);
 	if (ret == 0)
 		tegra_auto_hotplug_governor(new_speed);
 out:

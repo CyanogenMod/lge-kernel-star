@@ -190,7 +190,7 @@ static void tegra_auto_hotplug_work_func(struct work_struct *work)
 	case TEGRA_HP_IDLE:
 		break;
 	case TEGRA_HP_DOWN:
-		cpu = cpumask_next(0, cpu_online_mask);
+		cpu = tegra_get_slowest_cpu_n();
 		if (cpu < nr_cpu_ids) {
 			up = false;
 			queue_delayed_work(
@@ -210,6 +210,8 @@ static void tegra_auto_hotplug_work_func(struct work_struct *work)
 			if(!clk_set_parent(cpu_clk, cpu_g_clk)) {
 				hp_stats_update(CONFIG_NR_CPUS, false);
 				hp_stats_update(0, true);
+				/* catch-up with governor target speed */
+				tegra_cpu_cap_highest_speed(NULL);
 			}
 			queue_delayed_work(
 				hotplug_wq, &hotplug_work, up2gn_delay);

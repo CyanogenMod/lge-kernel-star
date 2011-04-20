@@ -81,6 +81,11 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat);
 
 void tegra_idle_lp2(void);
 
+unsigned int tegra_get_slowest_cpu_n(void);
+unsigned long tegra_cpu_lowest_speed(void);
+unsigned long tegra_cpu_highest_speed(void);
+int tegra_cpu_cap_highest_speed(unsigned int *speed_cap);
+
 struct tegra_edp_limits {
 	int	temperature;
 	unsigned int freq_limits[CONFIG_NR_CPUS];
