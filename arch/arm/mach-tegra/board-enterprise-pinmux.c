@@ -60,7 +60,7 @@
 	}
 
 /* !!!FIXME!!!! POPULATE THIS TABLE */
-static __initdata struct tegra_drive_pingroup_config tegra_enterprise_drive_pinmux[] = {
+static __initdata struct tegra_drive_pingroup_config enterprise_drive_pinmux[] = {
 	/* DEFAULT_DRIVE(<pin_group>), */
 	/* SET_DRIVE(ATA, DISABLE, DISABLE, DIV_1, 31, 31, FAST, FAST) */
 	SET_DRIVE(DAP2, 	DISABLE, ENABLE, DIV_1, 31, 31, FASTEST, FASTEST),
@@ -118,7 +118,7 @@ static __initdata struct tegra_drive_pingroup_config tegra_enterprise_drive_pinm
 		.ioreset	= TEGRA_PIN_IO_RESET_##_ioreset	\
 	}
 
-static __initdata struct tegra_pingroup_config tegra_enterprise_pinmux[] = {
+static __initdata struct tegra_pingroup_config enterprise_pinmux[] = {
 	/* SDMMC1 pinmux */
 	DEFAULT_PINMUX(SDMMC1_CLK,      SDMMC1,          NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SDMMC1_CMD,      SDMMC1,          PULL_UP,    NORMAL,     INPUT),
@@ -365,10 +365,10 @@ static __initdata struct tegra_pingroup_config tegra_enterprise_pinmux[] = {
 	VI_PINMUX(VI_VSYNC,        RSVD1,           NORMAL,    NORMAL,     INPUT,  DISABLE, DISABLE),
 };
 
-int __init tegra_enterprise_pinmux_init(void)
+int __init enterprise_pinmux_init(void)
 {
-	tegra_pinmux_config_table(tegra_enterprise_pinmux, ARRAY_SIZE(tegra_enterprise_pinmux));
-	tegra_drive_pinmux_config_table(tegra_enterprise_drive_pinmux,
-					ARRAY_SIZE(tegra_enterprise_drive_pinmux));
+	tegra_pinmux_config_table(enterprise_pinmux, ARRAY_SIZE(enterprise_pinmux));
+	tegra_drive_pinmux_config_table(enterprise_drive_pinmux,
+					ARRAY_SIZE(enterprise_drive_pinmux));
 	return 0;
 }

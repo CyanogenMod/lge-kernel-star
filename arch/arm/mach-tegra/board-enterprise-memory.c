@@ -23,7 +23,7 @@
 #include "tegra3_emc.h"
 
 
-static const struct tegra_emc_table tegra_enterprise_emc_tables_h5tc2g[] = {
+static const struct tegra_emc_table enterprise_emc_tables_h5tc2g[] = {
 	{
 		0x30,   	/* Rev 3.0 */
 		27000,   	/* SDRAM frquency */
@@ -722,9 +722,9 @@ static const struct tegra_emc_table tegra_enterprise_emc_tables_h5tc2g[] = {
 	}
 };
 
-int tegra_enterprise_emc_init(void)
+int enterprise_emc_init(void)
 {
-	tegra_init_emc(tegra_enterprise_emc_tables_h5tc2g,
-		ARRAY_SIZE(tegra_enterprise_emc_tables_h5tc2g));
+	tegra_init_emc(enterprise_emc_tables_h5tc2g,
+		ARRAY_SIZE(enterprise_emc_tables_h5tc2g));
 	return 0;
 }

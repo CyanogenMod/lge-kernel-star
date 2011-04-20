@@ -74,7 +74,7 @@ static struct platform_device debug_uart = {
 	},
 };
 
-/* !!!TODO: Change for tegra_enterprise (Taken from Cardhu) */
+/* !!!TODO: Change for enterprise (Taken from Cardhu) */
 static struct tegra_utmip_config utmi_phy_config[] = {
 	[0] = {
 			.hssync_start_delay = 0,
@@ -106,7 +106,7 @@ static struct tegra_utmip_config utmi_phy_config[] = {
 };
 
 #ifdef CONFIG_BCM4329_RFKILL
-static struct resource tegra_enterprise_bcm4329_rfkill_resources[] = {
+static struct resource enterprise_bcm4329_rfkill_resources[] = {
 	{
 		.name   = "bcm4329_nshutdown_gpio",
 		.start  = TEGRA_GPIO_PU0,
@@ -115,24 +115,24 @@ static struct resource tegra_enterprise_bcm4329_rfkill_resources[] = {
 	},
 };
 
-static struct platform_device tegra_enterprise_bcm4329_rfkill_device = {
+static struct platform_device enterprise_bcm4329_rfkill_device = {
 	.name = "bcm4329_rfkill",
 	.id             = -1,
-	.num_resources  = ARRAY_SIZE(tegra_enterprise_bcm4329_rfkill_resources),
-	.resource       = tegra_enterprise_bcm4329_rfkill_resources,
+	.num_resources  = ARRAY_SIZE(enterprise_bcm4329_rfkill_resources),
+	.resource       = enterprise_bcm4329_rfkill_resources,
 };
 
-static noinline void __init tegra_enterprise_bt_rfkill(void)
+static noinline void __init enterprise_bt_rfkill(void)
 {
-	platform_device_register(&tegra_enterprise_bcm4329_rfkill_device);
+	platform_device_register(&enterprise_bcm4329_rfkill_device);
 
 	return;
 }
 #else
-static inline void tegra_enterprise_bt_rfkill(void) { }
+static inline void enterprise_bt_rfkill(void) { }
 #endif
 
-static __initdata struct tegra_clk_init_table tegra_enterprise_clk_init_table[] = {
+static __initdata struct tegra_clk_init_table enterprise_clk_init_table[] = {
 	/* name		parent		rate		enabled */
 	{ "uarta",	"pll_p",	216000000,	true},
 	{ "uartb",	"pll_p",	216000000,	false},
@@ -142,58 +142,58 @@ static __initdata struct tegra_clk_init_table tegra_enterprise_clk_init_table[] 
 	{ "pll_m",	NULL,		0,		true},
 	{ "hda",	"pll_p",	108000000,	false},
 	{ "hda2codec_2x","pll_p",	48000000,	false},
-	{ "pll_p_out4",	"pll_p",	24000000,	true },
+	{ "pll_p_out4",	"pll_p",	216000000,	true },
 	{ "pwm",	"clk_32k",	32768,		false},
 	{ "blink",	"clk_32k",	32768,		true},
-	{ "pll_a",	NULL,		56448000,	true},
-	{ "pll_a_out0",	NULL,		11289600,	true},
+	{ "pll_a",	NULL,		56448000,	false},
+	{ "pll_a_out0",	NULL,		11289600,	false},
 	{ NULL,		NULL,		0,		0},
 };
 
-static struct i2c_board_info __initdata tegra_enterprise_i2c_bus1_board_info[] = {
+static struct i2c_board_info __initdata enterprise_i2c_bus1_board_info[] = {
 	{
 		I2C_BOARD_INFO("wm8903", 0x1a),
 	},
 };
 
-static struct tegra_i2c_platform_data tegra_enterprise_i2c1_platform_data = {
+static struct tegra_i2c_platform_data enterprise_i2c1_platform_data = {
 	.adapter_nr	= 0,
 	.bus_count	= 1,
 	.bus_clk_rate	= { 100000, 0 },
 };
 
-static struct tegra_i2c_platform_data tegra_enterprise_i2c2_platform_data = {
+static struct tegra_i2c_platform_data enterprise_i2c2_platform_data = {
 	.adapter_nr	= 1,
 	.bus_count	= 1,
 	.bus_clk_rate	= { 100000, 0 },
 	.is_clkon_always = true,
 };
 
-static struct tegra_i2c_platform_data tegra_enterprise_i2c3_platform_data = {
+static struct tegra_i2c_platform_data enterprise_i2c3_platform_data = {
 	.adapter_nr	= 2,
 	.bus_count	= 1,
 	.bus_clk_rate	= { 100000, 0 },
 };
 
-static struct tegra_i2c_platform_data tegra_enterprise_i2c4_platform_data = {
+static struct tegra_i2c_platform_data enterprise_i2c4_platform_data = {
 	.adapter_nr	= 3,
 	.bus_count	= 1,
 	.bus_clk_rate	= { 100000, 0 },
 };
 
-static struct tegra_i2c_platform_data tegra_enterprise_i2c5_platform_data = {
+static struct tegra_i2c_platform_data enterprise_i2c5_platform_data = {
 	.adapter_nr	= 4,
 	.bus_count	= 1,
 	.bus_clk_rate	= { 100000, 0 },
 };
 
-static void tegra_enterprise_i2c_init(void)
+static void enterprise_i2c_init(void)
 {
-	tegra_i2c_device1.dev.platform_data = &tegra_enterprise_i2c1_platform_data;
-	tegra_i2c_device2.dev.platform_data = &tegra_enterprise_i2c2_platform_data;
-	tegra_i2c_device3.dev.platform_data = &tegra_enterprise_i2c3_platform_data;
-	tegra_i2c_device4.dev.platform_data = &tegra_enterprise_i2c4_platform_data;
-	tegra_i2c_device5.dev.platform_data = &tegra_enterprise_i2c5_platform_data;
+	tegra_i2c_device1.dev.platform_data = &enterprise_i2c1_platform_data;
+	tegra_i2c_device2.dev.platform_data = &enterprise_i2c2_platform_data;
+	tegra_i2c_device3.dev.platform_data = &enterprise_i2c3_platform_data;
+	tegra_i2c_device4.dev.platform_data = &enterprise_i2c4_platform_data;
+	tegra_i2c_device5.dev.platform_data = &enterprise_i2c5_platform_data;
 
 	platform_device_register(&tegra_i2c_device5);
 	platform_device_register(&tegra_i2c_device4);
@@ -227,7 +227,7 @@ static struct platform_device tegra_camera = {
 	.id = -1,
 };
 
-static struct platform_device *tegra_enterprise_devices[] __initdata = {
+static struct platform_device *enterprise_devices[] __initdata = {
 	&debug_uart,
 	&tegra_uartb_device,
 	&tegra_uartc_device,
@@ -271,19 +271,16 @@ static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
 			.phy_config = &utmi_phy_config[0],
 			.operating_mode = TEGRA_USB_HOST,
 			.power_down_on_bus_suspend = 1,
-			.usb_phy_type = TEGRA_USB_PHY_TYPE_UTMIP,
 	},
 	[1] = {
 			.phy_config = &utmi_phy_config[1],
 			.operating_mode = TEGRA_USB_HOST,
 			.power_down_on_bus_suspend = 1,
-			.usb_phy_type = TEGRA_USB_PHY_TYPE_UTMIP,
 	},
 	[2] = {
 			.phy_config = &utmi_phy_config[2],
 			.operating_mode = TEGRA_USB_HOST,
 			.power_down_on_bus_suspend = 1,
-			.usb_phy_type = TEGRA_USB_PHY_TYPE_UTMIP,
 	},
 };
 
@@ -339,7 +336,7 @@ static struct tegra_otg_platform_data tegra_otg_pdata = {
 	.host_unregister = &tegra_usb_otg_host_unregister,
 };
 
-static void tegra_enterprise_usb_init(void)
+static void enterprise_usb_init(void)
 {
 	tegra_usb_phy_init(tegra_usb_phy_pdata, ARRAY_SIZE(tegra_usb_phy_pdata));
 
@@ -355,34 +352,34 @@ static void tegra_enterprise_usb_init(void)
 
 }
 
-static void tegra_enterprise_gps_init(void)
+static void enterprise_gps_init(void)
 {
 	tegra_gpio_enable(TEGRA_GPIO_PU2);
 	tegra_gpio_enable(TEGRA_GPIO_PU3);
 }
 
-static void tegra_enterprise_modem_init(void)
+static void enterprise_modem_init(void)
 {
 	tegra_gpio_enable(TEGRA_GPIO_PH5);
 }
 
-static void __init tegra_tegra_enterprise_init(void)
+static void __init tegra_enterprise_init(void)
 {
 	tegra_common_init();
-	tegra_clk_init_from_table(tegra_enterprise_clk_init_table);
-	tegra_enterprise_pinmux_init();
-	tegra_enterprise_i2c_init();
-	platform_add_devices(tegra_enterprise_devices, ARRAY_SIZE(tegra_enterprise_devices));
-	tegra_enterprise_sdhci_init();
-	tegra_enterprise_usb_init();
-	tegra_enterprise_gps_init();
-	tegra_enterprise_modem_init();
-	tegra_enterprise_panel_init();
-	tegra_enterprise_bt_rfkill();
-	tegra_enterprise_emc_init();
+	tegra_clk_init_from_table(enterprise_clk_init_table);
+	enterprise_pinmux_init();
+	enterprise_i2c_init();
+	platform_add_devices(enterprise_devices, ARRAY_SIZE(enterprise_devices));
+	enterprise_sdhci_init();
+	enterprise_usb_init();
+	enterprise_gps_init();
+	enterprise_modem_init();
+	enterprise_panel_init();
+	enterprise_bt_rfkill();
+	enterprise_emc_init();
 }
 
-static void __init tegra_tegra_enterprise_reserve(void)
+static void __init tegra_enterprise_reserve(void)
 {
 	tegra_reserve(SZ_128M, SZ_4M, SZ_8M);
 }
@@ -392,8 +389,8 @@ MACHINE_START(TEGRA_ENTERPRISE, "tegra_enterprise")
 	.phys_io        = IO_APB_PHYS,
 	.io_pg_offst    = ((IO_APB_VIRT) >> 18) & 0xfffc,
 	.init_irq       = tegra_init_irq,
-	.init_machine   = tegra_tegra_enterprise_init,
+	.init_machine   = tegra_enterprise_init,
 	.map_io         = tegra_map_common_io,
-	.reserve        = tegra_tegra_enterprise_reserve,
+	.reserve        = tegra_enterprise_reserve,
 	.timer          = &tegra_timer,
 MACHINE_END

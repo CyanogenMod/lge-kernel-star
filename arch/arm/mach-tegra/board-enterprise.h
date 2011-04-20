@@ -24,12 +24,12 @@
 #include <mach/gpio.h>
 #include <mach/irqs.h>
 
-int tegra_enterprise_charge_init(void);
-int tegra_enterprise_sdhci_init(void);
-int tegra_enterprise_pinmux_init(void);
-int tegra_enterprise_panel_init(void);
+int enterprise_charge_init(void);
+int enterprise_sdhci_init(void);
+int enterprise_pinmux_init(void);
+int enterprise_panel_init(void);
 int touch_init(void);
-int tegra_enterprise_emc_init(void);
+int enterprise_emc_init(void);
 
 /* Touchscreen GPIO addresses   */
 #ifdef CONFIG_TOUCHSCREEN_ATMEL_MT_T9

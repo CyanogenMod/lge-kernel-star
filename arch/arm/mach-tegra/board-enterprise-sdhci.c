@@ -31,8 +31,8 @@
 #include "board.h"
 
 
-#define TEGRA_ENTERPRISE_SD_CD TEGRA_GPIO_PI5
-#define TEGRA_ENTERPRISE_SD_WP TEGRA_GPIO_PT3
+#define ENTERPRISE_SD_CD TEGRA_GPIO_PI5
+#define ENTERPRISE_SD_WP TEGRA_GPIO_PT3
 
 static struct resource sdhci_resource0[] = {
 	[0] = {
@@ -109,19 +109,19 @@ static struct platform_device tegra_sdhci_device3 = {
 	},
 };
 
-static int tegra_enterprise_sd_cd_gpio_init(void)
+static int enterprise_sd_cd_gpio_init(void)
 {
 	unsigned int rc = 0;
 
-	rc = gpio_request(TEGRA_ENTERPRISE_SD_CD, "card_detect");
+	rc = gpio_request(ENTERPRISE_SD_CD, "card_detect");
 	if (rc) {
 		pr_err("Card detect gpio request failed:%d\n", rc);
 		return rc;
 	}
 
-	tegra_gpio_enable(TEGRA_ENTERPRISE_SD_CD);
+	tegra_gpio_enable(ENTERPRISE_SD_CD);
 
-	rc = gpio_direction_input(TEGRA_ENTERPRISE_SD_CD);
+	rc = gpio_direction_input(ENTERPRISE_SD_CD);
 	if (rc) {
 		pr_err("Unable to configure direction for card detect gpio:%d\n", rc);
 		return rc;
@@ -130,19 +130,19 @@ static int tegra_enterprise_sd_cd_gpio_init(void)
 	return 0;
 }
 
-static int tegra_enterprise_sd_wp_gpio_init(void)
+static int enterprise_sd_wp_gpio_init(void)
 {
 	unsigned int rc = 0;
 
-	rc = gpio_request(TEGRA_ENTERPRISE_SD_WP, "write_protect");
+	rc = gpio_request(ENTERPRISE_SD_WP, "write_protect");
 	if (rc) {
 		pr_err("Write protect gpio request failed:%d\n", rc);
 		return rc;
 	}
 
-	tegra_gpio_enable(TEGRA_ENTERPRISE_SD_WP);
+	tegra_gpio_enable(ENTERPRISE_SD_WP);
 
-	rc = gpio_direction_input(TEGRA_ENTERPRISE_SD_WP);
+	rc = gpio_direction_input(ENTERPRISE_SD_WP);
 	if (rc) {
 		pr_err("Unable to configure direction for write protect gpio:%d\n", rc);
 		return rc;
@@ -151,20 +151,20 @@ static int tegra_enterprise_sd_wp_gpio_init(void)
 	return 0;
 }
 
-int __init tegra_enterprise_sdhci_init(void)
+int __init enterprise_sdhci_init(void)
 {
 	unsigned int rc = 0;
 	platform_device_register(&tegra_sdhci_device3);
 
 	/* Fix ME: The gpios have to enabled for hot plug support */
-	rc = tegra_enterprise_sd_cd_gpio_init();
+	rc = enterprise_sd_cd_gpio_init();
 	if (!rc) {
-		tegra_sdhci_platform_data0.cd_gpio = TEGRA_ENTERPRISE_SD_CD;
+		tegra_sdhci_platform_data0.cd_gpio = ENTERPRISE_SD_CD;
 		tegra_sdhci_platform_data0.cd_gpio_polarity = 0;
 	}
-	rc = tegra_enterprise_sd_wp_gpio_init();
+	rc = enterprise_sd_wp_gpio_init();
 	if (!rc) {
-		tegra_sdhci_platform_data0.wp_gpio = TEGRA_ENTERPRISE_SD_WP;
+		tegra_sdhci_platform_data0.wp_gpio = ENTERPRISE_SD_WP;
 		tegra_sdhci_platform_data0.wp_gpio_polarity = 1;
 	}
 
