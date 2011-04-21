@@ -161,6 +161,28 @@ int max8907c_power_off(void)
 						MAX8907C_MASK_POWER_OFF, 0x40);
 }
 
+void max8907c_deep_sleep(int enter)
+{
+	if (!max8907c_client)
+		return;
+
+	if (enter) {
+		max8907c_reg_write(max8907c_client, MAX8907C_REG_SDSEQCNT1,
+						MAX8907C_POWER_UP_DELAY_CNT12);
+		max8907c_reg_write(max8907c_client, MAX8907C_REG_SDSEQCNT2,
+							MAX8907C_DELAY_CNT0);
+		max8907c_reg_write(max8907c_client, MAX8907C_REG_SDCTL2,
+							MAX8907C_SD_SEQ2);
+	} else {
+		max8907c_reg_write(max8907c_client, MAX8907C_REG_SDSEQCNT1,
+							MAX8907C_DELAY_CNT0);
+		max8907c_reg_write(max8907c_client, MAX8907C_REG_SDCTL2,
+							MAX8907C_SD_SEQ1);
+		max8907c_reg_write(max8907c_client, MAX8907C_REG_SDSEQCNT2,
+				MAX8907C_POWER_UP_DELAY_CNT1 | MAX8907C_POWER_DOWN_DELAY_CNT12);
+	}
+}
+
 static int max8907c_remove_subdev(struct device *dev, void *unused)
 {
 	platform_device_unregister(to_platform_device(dev));
@@ -196,6 +218,54 @@ static int max8097c_add_subdevs(struct max8907c *max8907c,
 error:
 	max8907c_remove_subdevs(max8907c);
 	return ret;
+}
+
+int max8907c_pwr_en_config(void)
+{
+	int ret;
+	u8 data;
+
+	if (!max8907c_client)
+		return -EINVAL;
+
+	/*
+	 * Enable/disable PWREN h/w control mechanism (PWREN signal must be
+	 * inactive = high at this time)
+	 */
+	ret = max8907c_set_bits(max8907c_client, MAX8907C_REG_RESET_CNFG,
+					MAX8907C_MASK_PWR_EN, MAX8907C_PWR_EN);
+	if (ret != 0)
+		return ret;
+
+	/*
+	 * When enabled, connect PWREN to SEQ2 by clearing SEQ2 configuration
+	 * settings for silicon revision that requires s/w WAR. On other
+	 * MAX8907B revisions PWREN is always connected to SEQ2.
+	 */
+	data = max8907c_reg_read(max8907c_client, MAX8907C_REG_II2RR);
+
+	if (data == MAX8907B_II2RR_PWREN_WAR) {
+		data = 0x00;
+		ret = max8907c_reg_write(max8907c_client, MAX8907C_REG_SEQ2CNFG, data);
+	}
+	return ret;
+}
+
+int max8907c_pwr_en_attach(void)
+{
+	int ret;
+
+	if (!max8907c_client)
+		return -EINVAL;
+
+	/* No sequencer delay for CPU rail when it is attached */
+	ret = max8907c_reg_write(max8907c_client, MAX8907C_REG_SDSEQCNT1,
+							MAX8907C_DELAY_CNT0);
+	if (ret != 0)
+		return ret;
+
+	return max8907c_set_bits(max8907c_client, MAX8907C_REG_SDCTL1,
+					MAX8907C_MASK_CTL_SEQ, MAX8907C_CTL_SEQ);
 }
 
 static int max8907c_i2c_probe(struct i2c_client *i2c,
@@ -237,6 +307,9 @@ static int max8907c_i2c_probe(struct i2c_client *i2c,
 	max8907c_irq_init(max8907c, i2c->irq, pdata->irq_base);
 
 	ret = max8097c_add_subdevs(max8907c, pdata);
+
+	if (pdata->max8907c_setup)
+		return pdata->max8907c_setup();
 
 	return ret;
 }

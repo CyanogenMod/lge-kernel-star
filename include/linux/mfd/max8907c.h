@@ -163,9 +163,34 @@
 #define MAX8907C_MASK_OUT5V_EN          0x01
 
 /* Power off bit in RESET_CNFG reg */
-#define MAX8907C_MASK_POWER_OFF			0x40
+#define MAX8907C_MASK_POWER_OFF		0x40
+
+#define MAX8907C_MASK_PWR_EN		0x80
+#define MAX8907C_MASK_CTL_SEQ		0x1C
+
+#define MAX8907C_PWR_EN			0x80
+#define MAX8907C_CTL_SEQ		0x04
+
+#define MAX8907C_SD_SEQ1		0x02
+#define MAX8907C_SD_SEQ2		0x06
+
+#define MAX8907C_DELAY_CNT0		0x00
+
+#define MAX8907C_POWER_UP_DELAY_CNT1	0x10
+#define MAX8907C_POWER_UP_DELAY_CNT12	0xC0
+
+#define MAX8907C_POWER_DOWN_DELAY_CNT12	0x0C
 
 #define RTC_I2C_ADDR			0x68
+
+/*
+ * MAX8907B revision requires s/w WAR to connect PWREN input to
+ * sequencer 2 because of the bug in the silicon.
+ */
+#define MAX8907B_II2RR_PWREN_WAR		(0x12)
+
+/* Defines common for all supplies PWREN  sequencer selection */
+#define MAX8907B_SEQSEL_PWREN_LXX		1 /* SEQ2 (PWREN) */
 
 /* IRQ definitions */
 enum {
@@ -214,6 +239,7 @@ struct max8907c_platform_data {
 	int num_subdevs;
 	struct platform_device **subdevs;
 	int irq_base;
+	int (*max8907c_setup)(void);
 };
 
 int max8907c_reg_read(struct i2c_client *i2c, u8 reg);
@@ -227,4 +253,7 @@ void max8907c_irq_free(struct max8907c *chip);
 int max8907c_suspend(struct i2c_client *i2c, pm_message_t state);
 int max8907c_resume(struct i2c_client *i2c);
 int max8907c_power_off(void);
+void max8907c_deep_sleep(int enter);
+int max8907c_pwr_en_config(void);
+int max8907c_pwr_en_attach(void);
 #endif
