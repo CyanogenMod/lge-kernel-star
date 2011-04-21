@@ -143,6 +143,7 @@ struct tegra_avp_info {
 	void			*iram_backup_data;
 	phys_addr_t		iram_backup_phys;
 	unsigned long		resume_addr;
+	unsigned long		reset_addr;
 
 	struct trpc_endpoint	*avp_ep;
 	struct rb_root		endpoints;
@@ -944,7 +945,7 @@ static int avp_init(struct tegra_avp_info *avp)
 	const struct firmware *avp_fw;
 	int ret;
 	struct trpc_endpoint *ep;
-	const char *fw_file = AVP_KERNEL_FW;
+	char fw_file[30];
 
 	avp->nvmap_libs = nvmap_create_client(nvmap_dev, "avp_libs");
 	if (IS_ERR(avp->nvmap_libs)) {
@@ -957,28 +958,44 @@ static int avp_init(struct tegra_avp_info *avp)
 	 * to read out when its kernel boots. */
 	mbox_writel(avp->msg, MBOX_TO_AVP);
 
-#ifdef CONFIG_TEGRA_AVP_KERNEL_ON_MMU
+#if defined(CONFIG_TEGRA_AVP_KERNEL_ON_MMU) /* Tegra2 with AVP MMU */
+	/* paddr is any address returned from nvmap_pin */
+	/* vaddr is AVP_KERNEL_VIRT_BASE */
 	pr_info("%s: Using AVP MMU to relocate AVP kernel\n", __func__);
-#else
-	// Find nvmem carveout.
+	sprintf(fw_file, "nvrm_avp.bin");
+	avp->reset_addr = AVP_KERNEL_VIRT_BASE;
+#elif defined(CONFIG_TEGRA_AVP_KERNEL_ON_SMMU) /* Tegra3 with SMMU */
+	/* paddr is any address behind SMMU */
+	/* vaddr is TEGRA_SMMU_BASE */
+	pr_info("%s: Using SMMU at %lx to load AVP kernel\n",
+		__func__, avp->kernel_phys);
+	BUG_ON(avp->kernel_phys != 0xe0000000
+		&& avp->kernel_phys != 0x00001000);
+	sprintf(fw_file, "nvrm_avp_%08lx.bin", avp->kernel_phys);
+	avp->reset_addr = avp->kernel_phys;
+#else /* nvmem= carveout */
+	/* paddr is found in nvmem= carveout */
+	/* vaddr is same as paddr */
+	/* Find nvmem carveout */
 	if (!pfn_valid(__phys_to_pfn(0x8e000000))) {
-		fw_file = "nvrm_avp_8e000000.bin";
 		avp->kernel_phys = 0x8e000000;
 	}
 	else if (!pfn_valid(__phys_to_pfn(0x9e000000))) {
-		fw_file = "nvrm_avp_9e000000.bin";
 		avp->kernel_phys = 0x9e000000;
 	}
 	else if (!pfn_valid(__phys_to_pfn(0xbe000000))) {
-		fw_file = "nvrm_avp_be000000.bin";
 		avp->kernel_phys = 0xbe000000;
 	}
 	else {
+		pr_err("Cannot find nvmem= carveout to load AVP kernel\n");
+		pr_err("Check kernel command line "
+			"to see if nvmem= is defined\n");
 		BUG();
 	}
-
-	pr_info("%s: Using carveout at %lx to load AVP kernel\n",
-		__func__, (unsigned long)(avp->kernel_phys));
+	pr_info("%s: Using nvmem= carveout at %lx to load AVP kernel\n",
+		__func__, avp->kernel_phys);
+	sprintf(fw_file, "nvrm_avp_%08lx.bin", avp->kernel_phys);
+	avp->reset_addr = avp->kernel_phys;
 	avp->kernel_data = ioremap(avp->kernel_phys, SZ_1M);
 #endif
 
@@ -987,7 +1004,7 @@ static int avp_init(struct tegra_avp_info *avp)
 		pr_err("%s: Cannot read firmware '%s'\n", __func__, fw_file);
 		goto err_req_fw;
 	}
-	pr_info("%s: Read firmware from '%s' (%d bytes)\n", __func__,
+	pr_info("%s: Reading firmware from '%s' (%d bytes)\n", __func__,
 		fw_file, avp_fw->size);
 
 	pr_info("%s: Loading AVP kernel at vaddr=%p paddr=%lx\n",
@@ -998,11 +1015,7 @@ static int avp_init(struct tegra_avp_info *avp)
 	wmb();
 	release_firmware(avp_fw);
 
-#ifdef CONFIG_TEGRA_AVP_KERNEL_ON_MMU
-	ret = avp_reset(avp, AVP_KERNEL_VIRT_BASE);
-#else
-	ret = avp_reset(avp, avp->kernel_phys);
-#endif
+	ret = avp_reset(avp, avp->reset_addr);
 	if (ret) {
 		pr_err("%s: cannot reset the AVP.. aborting..\n", __func__);
 		goto err_reset;
@@ -1549,6 +1562,7 @@ static int tegra_avp_probe(struct platform_device *pdev)
 	struct tegra_avp_info *avp;
 	int ret = 0;
 	int irq;
+	unsigned int heap_mask;
 
 	irq = platform_get_irq_byname(pdev, "mbox_from_avp_pending");
 	if (irq < 0) {
@@ -1569,26 +1583,48 @@ static int tegra_avp_probe(struct platform_device *pdev)
 		goto err_nvmap_create_drv_client;
 	}
 
-	avp->kernel_handle = nvmap_alloc(avp->nvmap_drv, SZ_1M, SZ_1M,
-					 NVMAP_HANDLE_WRITE_COMBINE);
-	if (IS_ERR(avp->kernel_handle)) {
-		pr_err("%s: cannot create handle\n", __func__);
-		ret = PTR_ERR(avp->kernel_handle);
-		goto err_nvmap_alloc;
-	}
+#if defined(CONFIG_TEGRA_AVP_KERNEL_ON_MMU) /* Tegra2 with AVP MMU */
+	heap_mask = NVMAP_HEAP_CARVEOUT_MASK;
+#elif defined(CONFIG_TEGRA_AVP_KERNEL_ON_SMMU) /* Tegra3 with SMMU */
+	heap_mask = NVMAP_HEAP_IOVMM;
+#else /* nvmem= carveout */
+	heap_mask = 0;
+#endif
 
-	avp->kernel_data = nvmap_mmap(avp->kernel_handle);
-	if (!avp->kernel_data) {
-		pr_err("%s: cannot map kernel handle\n", __func__);
-		ret = -ENOMEM;
-		goto err_nvmap_mmap;
-	}
+	if (heap_mask) {
+		avp->kernel_handle = nvmap_create_handle(avp->nvmap_drv, SZ_1M);
+		if (IS_ERR(avp->kernel_handle)) {
+			pr_err("%s: cannot create kernel handle\n", __func__);
+			ret = PTR_ERR(avp->kernel_handle);
+			goto err_nvmap_create_handle;
+		}
 
-	avp->kernel_phys = nvmap_pin(avp->nvmap_drv, avp->kernel_handle);
-	if (IS_ERR((void *)avp->kernel_phys)) {
-		pr_err("%s: cannot pin kernel handle\n", __func__);
-		ret = PTR_ERR((void *)avp->kernel_phys);
-		goto err_nvmap_pin;
+		ret = nvmap_alloc_handle_id(avp->nvmap_drv,
+					nvmap_ref_to_id(avp->kernel_handle),
+					heap_mask, PAGE_SIZE,
+					NVMAP_HANDLE_WRITE_COMBINE);
+		if (ret) {
+			pr_err("%s: cannot allocate kernel memory\n", __func__);
+			goto err_nvmap_alloc;
+		}
+
+		avp->kernel_data = nvmap_mmap(avp->kernel_handle);
+		if (!avp->kernel_data) {
+			pr_err("%s: cannot map kernel handle\n", __func__);
+			ret = -ENOMEM;
+			goto err_nvmap_mmap;
+		}
+
+		avp->kernel_phys =
+			nvmap_pin(avp->nvmap_drv, avp->kernel_handle);
+		if (IS_ERR((void *)avp->kernel_phys)) {
+			pr_err("%s: cannot pin kernel handle\n", __func__);
+			ret = PTR_ERR((void *)avp->kernel_phys);
+			goto err_nvmap_pin;
+		}
+
+		pr_info("%s: allocated memory at %lx for AVP kernel\n",
+			__func__, avp->kernel_phys);
 	}
 
 	/* allocate an extra 4 bytes at the end which AVP uses to signal to
@@ -1691,8 +1727,7 @@ static int tegra_avp_probe(struct platform_device *pdev)
 
 	tegra_avp = avp;
 
-	pr_info("%s: driver registered, kernel %lx(%p), msg area %lx/%lx\n",
-		__func__, (unsigned long)(avp->kernel_phys), avp->kernel_data,
+	pr_info("%s: message area %lx/%lx\n", __func__,
 		(unsigned long)avp->msg_area_addr,
 		(unsigned long)avp->msg_area_addr + AVP_MSG_AREA_SIZE);
 
@@ -1724,6 +1759,9 @@ err_nvmap_pin:
 err_nvmap_mmap:
 	nvmap_free(avp->nvmap_drv, avp->kernel_handle);
 err_nvmap_alloc:
+	nvmap_free_handle_id(avp->nvmap_drv,
+			nvmap_ref_to_id(avp->kernel_handle));
+err_nvmap_create_handle:
 	nvmap_client_put(avp->nvmap_drv);
 err_nvmap_create_drv_client:
 	kfree(avp);
