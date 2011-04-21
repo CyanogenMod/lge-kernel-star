@@ -207,10 +207,27 @@ static struct platform_device *whistler_max8907c_power_devices[] = {
 	&max8907c_LDO20_device,
 };
 
+static int whistler_max8907c_setup(void)
+{
+	int ret;
+
+	/*
+	 * Configure PWREN, and attach CPU V1 rail to it.
+	 * TODO: h/w events (power cycle, reset, battery low) auto-disables PWREN.
+	 * Only soft reset (not supported) requires s/w to disable PWREN explicitly
+	 */
+	ret = max8907c_pwr_en_config();
+	if (ret != 0)
+		return ret;
+
+	return max8907c_pwr_en_attach();
+}
+
 static struct max8907c_platform_data max8907c_pdata = {
 	.num_subdevs = ARRAY_SIZE(whistler_max8907c_power_devices),
 	.subdevs = whistler_max8907c_power_devices,
 	.irq_base = TEGRA_NR_IRQS,
+	.max8907c_setup = whistler_max8907c_setup,
 };
 
 static struct i2c_board_info __initdata whistler_regulators[] = {
@@ -225,9 +242,9 @@ static struct tegra_suspend_platform_data whistler_suspend_data = {
 	.cpu_timer	= 2000,
 	.cpu_off_timer	= 1000,
 	.suspend_mode	= TEGRA_SUSPEND_LP0,
-	.core_timer	= 0x7e7e,
-	.core_off_timer = 0xf,
-	.separate_req	= true,
+	.core_timer	= 0x7e,
+	.core_off_timer = 0xc00,
+	.separate_req	= false,
 	.corereq_high	= true,
 	.sysclkreq_high	= true,
 	.wake_enb	= TEGRA_WAKE_KBC_EVENT,
@@ -254,6 +271,8 @@ int __init whistler_regulator_init(void)
 	writel(pmc_ctrl | PMC_CTRL_INTR_LOW, pmc + PMC_CTRL);
 
 	i2c_register_board_info(4, whistler_regulators, 1);
+
+	tegra_deep_sleep = max8907c_deep_sleep;
 
 	tegra_init_suspend(&whistler_suspend_data);
 
