@@ -930,6 +930,75 @@ static void utmi_phy_restore_end(struct tegra_usb_phy *phy)
 	udelay(10);
 }
 
+static void ulpi_set_tristate(bool enable)
+{
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+	int tristate = (enable)? TEGRA_TRI_TRISTATE : TEGRA_TRI_NORMAL;
+
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA0, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA1, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA2, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA3, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA4, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA5, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA6, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA7, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_CLK, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DIR, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_STP, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_NXT, tristate);
+#endif
+}
+
+static void ulpi_phy_reset(void __iomem *base)
+{
+	unsigned long val;
+
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_CLK, TEGRA_TRI_TRISTATE);
+#endif
+	val = readl(base + USB_SUSP_CTRL);
+	val |= UHSIC_RESET;
+	writel(val, base + USB_SUSP_CTRL);
+
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	val = readl(base + USB_SUSP_CTRL);
+	val |= UTMIP_RESET;
+	writel(val, base + USB_SUSP_CTRL);
+#endif
+}
+
+static void ulpi_set_host(void __iomem *base)
+{
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	unsigned long val;
+
+	val = readl(base + TEGRA_USB_USBMODE_REG_OFFSET);
+	val |= TEGRA_USB_USBMODE_HOST;
+	writel(val, base + TEGRA_USB_USBMODE_REG_OFFSET);
+
+	val = readl(base + HOSTPC1_DEVLC);
+	val |= HOSTPC1_DEVLC_PTS(2);
+	writel(val, base + HOSTPC1_DEVLC);
+#endif
+}
+
+static void ulpi_set_trimmer(void __iomem *base, u8 data, u8 sdn, u8 dir)
+{
+	unsigned long val;
+
+	val = ULPI_DATA_TRIMMER_SEL(data);
+	val |= ULPI_STPDIRNXT_TRIMMER_SEL(sdn);
+	val |= ULPI_DIR_TRIMMER_SEL(dir);
+	writel(val, base + ULPI_TIMING_CTRL_1);
+	udelay(10);
+
+	val |= ULPI_DATA_TRIMMER_LOAD;
+	val |= ULPI_STPDIRNXT_TRIMMER_LOAD;
+	val |= ULPI_DIR_TRIMMER_LOAD;
+	writel(val, base + ULPI_TIMING_CTRL_1);
+}
+
 static void ulpi_phy_restore_start(struct tegra_usb_phy *phy,
 				   enum tegra_usb_phy_port_speed port_speed)
 {
@@ -982,23 +1051,8 @@ static int ulpi_phy_power_on(struct tegra_usb_phy *phy)
 #endif
 	}
 
-	val = readl(base + USB_SUSP_CTRL);
-	val |= UHSIC_RESET;
-	writel(val, base + USB_SUSP_CTRL);
-
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-	val = readl(base + USB_SUSP_CTRL);
-	val |= UTMIP_RESET;
-	writel(val, base + USB_SUSP_CTRL);
-
-	val = readl(base + TEGRA_USB_USBMODE_REG_OFFSET);
-	writel((val | TEGRA_USB_USBMODE_HOST),
-			(base + TEGRA_USB_USBMODE_REG_OFFSET));
-
-	val = readl(base + HOSTPC1_DEVLC);
-	val |= HOSTPC1_DEVLC_PTS(2);
-	writel(val, base + HOSTPC1_DEVLC);
-#endif
+	ulpi_phy_reset(base);
+	ulpi_set_host(base);
 
 	val = readl(base + ULPI_TIMING_CTRL_0);
 	val |= ULPI_OUTPUT_PINMUX_BYP | ULPI_CLKOUT_PINMUX_BYP;
@@ -1023,16 +1077,7 @@ static int ulpi_phy_power_on(struct tegra_usb_phy *phy)
 	val = 0;
 	writel(val, base + ULPI_TIMING_CTRL_1);
 
-	val |= ULPI_DATA_TRIMMER_SEL(4);
-	val |= ULPI_STPDIRNXT_TRIMMER_SEL(4);
-	val |= ULPI_DIR_TRIMMER_SEL(4);
-	writel(val, base + ULPI_TIMING_CTRL_1);
-	udelay(10);
-
-	val |= ULPI_DATA_TRIMMER_LOAD;
-	val |= ULPI_STPDIRNXT_TRIMMER_LOAD;
-	val |= ULPI_DIR_TRIMMER_LOAD;
-	writel(val, base + ULPI_TIMING_CTRL_1);
+	ulpi_set_trimmer(base, 4, 4, 4);
 
 	val = 0;
 	val |= ULPI_WAKEUP;
@@ -1127,15 +1172,14 @@ static int null_phy_power_on(struct tegra_usb_phy *phy)
 	void __iomem *base = phy->regs;
 	struct tegra_ulpi_config *config = phy->config;
 
-	if (config->preinit)
-		config->preinit();
-
 	if (!config->trimmer)
 		config->trimmer = &default_trimmer;
 
-	val = readl(base + USB_SUSP_CTRL);
-	val |= UHSIC_RESET;
-	writel(val, base + USB_SUSP_CTRL);
+	ulpi_phy_reset(base);
+	ulpi_set_host(base);
+
+	if (config->preinit)
+		config->preinit();
 
 	val = readl(base + ULPI_TIMING_CTRL_0);
 	val |= ULPI_OUTPUT_PINMUX_BYP | ULPI_CLKOUT_PINMUX_BYP;
@@ -1144,27 +1188,23 @@ static int null_phy_power_on(struct tegra_usb_phy *phy)
 	val = readl(base + USB_SUSP_CTRL);
 	val |= ULPI_PHY_ENABLE;
 	writel(val, base + USB_SUSP_CTRL);
+	udelay(10);
 
 	/* set timming parameters */
 	val = readl(base + ULPI_TIMING_CTRL_0);
 	val |= ULPI_SHADOW_CLK_LOOPBACK_EN;
 	val |= ULPI_SHADOW_CLK_SEL;
-	val |= ULPI_OUTPUT_PINMUX_BYP;
-	val |= ULPI_CLKOUT_PINMUX_BYP;
-	val |= ULPI_LBK_PAD_EN;
+	val &= ~ULPI_LBK_PAD_EN;
 	val |= ULPI_SHADOW_CLK_DELAY(config->trimmer->shadow_clk_delay);
 	val |= ULPI_CLOCK_OUT_DELAY(config->trimmer->clock_out_delay);
 	val |= ULPI_LBK_PAD_E_INPUT_OR;
 	writel(val, base + ULPI_TIMING_CTRL_0);
 
-	val = 0;
-	writel(val, base + ULPI_TIMING_CTRL_1);
+	writel(0, base + ULPI_TIMING_CTRL_1);
 	udelay(10);
 
-	/* enable null phy mode */
-	val = ULPIS2S_ENA;
-	val |= ULPIS2S_PLLU_MASTER_BLASTER60;
-	val |= ULPIS2S_SPARE((phy->mode == TEGRA_USB_PHY_MODE_HOST) ? 3 : 1);
+	/* start internal 60MHz clock */
+	val = ULPIS2S_PLLU_MASTER_BLASTER60;
 	writel(val, base + ULPIS2S_CTRL);
 
 	/* select ULPI_CORE_CLK_SEL to SHADOW_CLK */
@@ -1173,40 +1213,57 @@ static int null_phy_power_on(struct tegra_usb_phy *phy)
 	writel(val, base + ULPI_TIMING_CTRL_0);
 	udelay(10);
 
-	/* enable ULPI null clocks - can't set the trimmers before this */
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	/* remove slave0 reset */
+	val = readl(base + USB_SUSP_CTRL);
+	val &= ~ULPIS2S_SLV0_RESET;
+	writel(val, base + USB_SUSP_CTRL);
+	udelay(10);
+#endif
+	/* enable ULPI null phy clock - can't set the trimmers before this */
 	val = readl(base + ULPI_TIMING_CTRL_0);
 	val |= ULPI_CLK_OUT_ENA;
 	writel(val, base + ULPI_TIMING_CTRL_0);
 	udelay(10);
 
-	val = ULPI_DATA_TRIMMER_SEL(config->trimmer->data_trimmer);
-	val |= ULPI_STPDIRNXT_TRIMMER_SEL(config->trimmer->stpdirnxt_trimmer);
-	val |= ULPI_DIR_TRIMMER_SEL(4);
-	writel(val, base + ULPI_TIMING_CTRL_1);
-	udelay(10);
+	/* set trimmers */
+	ulpi_set_trimmer(base, config->trimmer->data_trimmer,
+			 config->trimmer->stpdirnxt_trimmer, 1);
 
-	val |= ULPI_DATA_TRIMMER_LOAD;
-	val |= ULPI_STPDIRNXT_TRIMMER_LOAD;
-	val |= ULPI_DIR_TRIMMER_LOAD;
-	writel(val, base + ULPI_TIMING_CTRL_1);
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	/* remove various ULPIS2S resets */
+	val = readl(base + USB_SUSP_CTRL);
+	val &= ~ULPIS2S_LINE_RESET;
+	val &= ~ULPIS2S_SLV1_RESET;
+	val &= ~ULPI_PADS_RESET;
+	val &= ~ULPI_PADS_CLKEN_RESET;
+	writel(val, base + USB_SUSP_CTRL);
+#endif
+
+	val = readl(base + ULPIS2S_CTRL);
+	val |= ULPIS2S_ENA;
+	val |= ULPIS2S_SPARE((phy->mode == TEGRA_USB_PHY_MODE_HOST)? 3 : 1);
+	writel(val, base + ULPIS2S_CTRL);
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	val = readl(base + USB_SUSP_CTRL);
+	val |= USB_SUSP_CLR;
+	writel(val, base + USB_SUSP_CTRL);
+	udelay(100);
+	val = readl(base + USB_SUSP_CTRL);
+	val &= ~USB_SUSP_CLR;
+	writel(val, base + USB_SUSP_CTRL);
+#endif
+	if (utmi_wait_register(base + USB_SUSP_CTRL, USB_PHY_CLK_VALID,
+						     USB_PHY_CLK_VALID)) {
+		pr_err("%s: timeout waiting for phy to stabilize\n", __func__);
+		return -ETIMEDOUT;
+	}
 
 	val = readl(base + ULPI_TIMING_CTRL_0);
 	val |= ULPI_CLK_PADOUT_ENA;
 	writel(val, base + ULPI_TIMING_CTRL_0);
 	udelay(10);
-
-	val = readl(base + USB_SUSP_CTRL);
-	val |= USB_SUSP_CLR;
-	writel(val, base + USB_SUSP_CTRL);
-	udelay(100);
-
-	val = readl(base + USB_SUSP_CTRL);
-	val &= ~USB_SUSP_CLR;
-	writel(val, base + USB_SUSP_CTRL);
-
-	if (utmi_wait_register(base + USB_SUSP_CTRL, USB_PHY_CLK_VALID,
-						     USB_PHY_CLK_VALID))
-		pr_err("%s: timeout waiting for phy to stabilize\n", __func__);
 
 	if (config->postinit)
 		config->postinit();
@@ -1223,12 +1280,13 @@ static int null_phy_power_off(struct tegra_usb_phy *phy)
 	val &= ~ULPI_CLK_PADOUT_ENA;
 	writel(val, base + ULPI_TIMING_CTRL_0);
 
+	ulpi_set_tristate(true);
 	return 0;
 }
 
 static int null_phy_post_usbcmd_reset(struct tegra_usb_phy *phy)
 {
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	unsigned long val;
 	void __iomem *base = phy->regs;
 
@@ -1250,6 +1308,8 @@ static int null_phy_post_usbcmd_reset(struct tegra_usb_phy *phy)
 	val = readl(base + ULPIS2S_CTRL);
 	val &=  ~ULPIS2S_SLV0_CLAMP_XMIT;
 	writel(val, base + ULPIS2S_CTRL);
+
+	ulpi_set_host(base);
 #endif
 	return 0;
 }
