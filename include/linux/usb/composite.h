@@ -37,6 +37,16 @@
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
 
+/*
+ * USB function drivers should return USB_GADGET_DELAYED_STATUS if they
+ * wish to delay the status phase of the setup transfer till they are
+ * ready. The composite framework will then delay the data/status phase
+ * of the setup transfer till all the function drivers that requested for
+ * USB_GADGET_DELAYED_STAUS, invoke usb_composite_setup_continue().
+ *
+ */
+#define USB_GADGET_DELAYED_STATUS       0x7fff /* Impossibly large value */
+
 
 struct usb_configuration;
 
@@ -286,6 +296,7 @@ struct usb_composite_driver {
 
 extern int usb_composite_register(struct usb_composite_driver *);
 extern void usb_composite_unregister(struct usb_composite_driver *);
+extern void usb_composite_setup_continue(struct usb_composite_dev *cdev);
 
 
 /**
@@ -339,7 +350,12 @@ struct usb_composite_dev {
 	 */
 	unsigned			deactivations;
 
-	/* protects at least deactivation count */
+	/* the composite driver won't complete the setup transfer's
+	 * data/status phase till delayed_status is zero.
+	 */
+	int                             delayed_status;
+
+	/* protects deactivations and delayed_status counts*/
 	spinlock_t			lock;
 };
 
