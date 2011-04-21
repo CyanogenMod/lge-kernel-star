@@ -49,4 +49,9 @@ void tegra_idle_lp2(void);
 
 u64 tegra_rtc_read_ms(void);
 
+/*
+ * Callbacks for platform drivers to implement.
+ */
+extern void (*tegra_deep_sleep)(int);
+
 #endif /* _MACH_TEGRA_SUSPEND_H_ */
