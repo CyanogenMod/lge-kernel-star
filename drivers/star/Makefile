@@ -30,7 +30,7 @@ obj-$(CONFIG_STAR_HEADSET_DET) += headset_det.o
 #LGE_KERNEL_MUX START
 obj-$(CONFIG_STAR_RIL) += ts0710mux/
 EXTRA_CFLAGS += -DLGE_KERNEL_MUX
-obj-$(CONFIG_RINETWORK_DRIVER) += rindrv/
+obj-$(CONFIG_RINETWORK_DRIVER) += rindrv.o
 #LGE_KERNEL_MUX END
 
 obj-$(CONFIG_LOGGER)		+= logger.o
@@ -40,6 +40,11 @@ obj-$(CONFIG_STAR_WM8994_TEST)	+= star_wm8994.o
 #20100827, 
 obj-$(CONFIG_STAR_GYRO_ACCEL)	+= sensor/
 obj-$(CONFIG_STAR_COMPASS)		+= sensor/
+
+obj-$(CONFIG_STAR_SENSORS)	+= sensor.module/
+obj-$(CONFIG_STAR_GYROSCOPE2)	+= sensor.module/
+obj-$(CONFIG_STAR_ACCELEROMETER2)	+= sensor.module/
+obj-$(CONFIG_STAR_COMPASS2)		+= sensor.module/
 
 #obj-$(CONFIG_STAR_GYRO_ACCEL) += gyro_accel.o
 #obj-$(CONFIG_STAR_GYRO_ACCEL) += mpu3050.o
@@ -53,9 +58,6 @@ obj-$(CONFIG_STAR_ERS_TEST)	+= star_ers.o
 #20100730, , CP Watcher
 obj-$(CONFIG_STAR_CPWATCHER) += cpwatcher.o
 
-#20101105, 
-obj-$(CONFIG_STAR_FOTA)	+= star_fota.o
-
 obj-$(CONFIG_STAR_HALL)	+= star_hall.o
 obj-$(CONFIG_STAR_BL) += star_bl.o
 
@@ -63,6 +65,10 @@ obj-$(CONFIG_STAR_BL) += star_bl.o
 obj-$(CONFIG_LGE_ATS_INPUT_DEVICE) += star_ats.o
 obj-$(CONFIG_LGE_ATS_INPUT_DEVICE) += lge_ats_eta.o
 obj-$(CONFIG_LGE_ATS_INPUT_DEVICE) += lge_ats_event_log.o
-#20101121 BT: For the BD Address Read / Write
+
+#20101105, 
+obj-$(CONFIG_STAR_FOTA)	+= star_fota.o
+
+#
 obj-$(CONFIG_STAR_BD_ADDRESS)	+= star_bd_address.o
 obj-$(CONFIG_STAR_VIBRATOR)	+= star_vib.o

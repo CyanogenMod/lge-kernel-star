@@ -35,6 +35,7 @@
 #include <linux/spinlock.h>
 
 #define BRCM_WAKELOCKTIMEOUT
+#define WAKELOCKTIMEOUT 1147
 #ifdef BRCM_WAKELOCKTIMEOUT
 #include <linux/hrtimer.h>
 #endif
@@ -259,7 +260,7 @@ static void brcm_host_wake_work_func(struct work_struct *ignored)
   	hrtimer_start(&bt_lpm.check_hostwakeup_timer, bt_lpm.check_hostwakeup_delay,
 			HRTIMER_MODE_REL);
 
-	wake_lock_timeout(&bt_lpm.host_wake_lock, 5*HZ);
+	wake_lock_timeout(&bt_lpm.host_wake_lock, WAKELOCKTIMEOUT);//6*HZ);
     }
     return;
 #endif

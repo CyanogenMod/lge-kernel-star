@@ -1652,6 +1652,17 @@ out:
 
 #ifdef CONFIG_PM
 
+//20110214, , cancel delayed work queue when the device enter sleep [START]
+int sdhci_cancel_delayed_work(struct sdhci_host *host, pm_message_t state)
+{
+	int ret;
+
+	ret = mmc_cancel_delayed_work(host->mmc, state);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(sdhci_cancel_delayed_work);
+//20110214, , cancel delayed work queue when the device enter sleep [END]
+
 int sdhci_suspend_host(struct sdhci_host *host, pm_message_t state)
 {
 	int ret;
@@ -2103,16 +2114,7 @@ void sdhci_card_detect_callback(struct sdhci_host *host)
 
 	spin_unlock_irqrestore(&host->lock, flags);
 
-//20110114, add 1.2 secs delay in detecting card on insert [START]
-	if (!strncmp(mmc_hostname(host->mmc), "mmc1", 4)){
-		if (present)
-			mmc_detect_change(host->mmc, msecs_to_jiffies(1200));
-		else
-			mmc_detect_change(host->mmc, msecs_to_jiffies(200));
-	}
-	else	    //original
 	mmc_detect_change(host->mmc, msecs_to_jiffies(200));
-//20110114, add 1.2 secs delay in detecting card on insert [END]
 }
 EXPORT_SYMBOL_GPL(sdhci_card_detect_callback);
 

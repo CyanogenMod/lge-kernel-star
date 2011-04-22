@@ -8,3 +8,4 @@ ccflags-y += -DNV_DEBUG=0
 endif
 
 obj-$(CONFIG_TEGRA_ODM_HARMONY)		+= nvodm_mouse.o
+obj-$(CONFIG_TEGRA_ODM_VENTANA)		+= nvodm_mouse.o

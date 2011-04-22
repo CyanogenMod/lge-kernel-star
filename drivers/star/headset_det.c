@@ -61,6 +61,7 @@
 //20101005  STAR_COUNTRY_KR Add [END_LGE_LAB1]
 
 struct headset_switch_data	*headset_sw_data;
+static int headset_off = 0;
 
 unsigned int headset_status = 0;
 unsigned int headset_gpio_status = 0;
@@ -109,7 +110,7 @@ int hook_press_time = 100;
 int hook_release_time = 20; 
 #endif
 
-//20101117, gpio wakeup from LP1 [START]
+//20101117, , gpio wakeup from LP1 [START]
 #include <linux/wakelock.h>
 extern bool core_lock_on;
 NvU32 headset_vdd_address = 0;
@@ -117,7 +118,7 @@ NvU32 headset_vdd_voltage = 0;
 NvOdmServicesPmuHandle headset_h_pmu;
 int suspend_status = 0;
 //static struct wake_lock hook_det_lock;
-//20101117, gpio wakeup from LP1 [END]
+//20101117, , gpio wakeup from LP1 [END]
 
 
 extern void star_headsetdet_bias(int bias);	//20100421  for framwork function used in kernel ==> error [LGE]
@@ -182,6 +183,7 @@ NvU32 headset_get_hook_adc_average(int cnt)
 
 static void headset_det_work(struct work_struct *work)
 {
+    if (headset_off) return;
 	NvOdmGpioGetState(s_hHeadsetHandle.hGpio, s_hHeadsetHandle.h_Headset_Detection, &headset_gpio_status);	//20100419  for nVidia headset driver [LGE]
 	headset_status = headset_gpio_status;
 
@@ -207,6 +209,7 @@ static void headset_det_work(struct work_struct *work)
 static void type_det_work(struct work_struct *work)
 {
     NvU32 hook_value =0;
+    if (headset_off) return;
 
     if(star_get_i2c_busy())
     {
@@ -269,6 +272,7 @@ static void type_det_work(struct work_struct *work)
 static void type_det_work(struct work_struct *work)
 {
     NvU32 hook_value =0;
+	if (headset_off) return;
 
     NvOdmGpioGetState(s_hHeadsetHandle.hGpio, s_hHeadsetHandle.h_Headset_Detection, &headset_gpio_status);	
 	headset_status = headset_gpio_status;
@@ -342,7 +346,7 @@ static void type_det_work(struct work_struct *work)
 static void hook_det_work(struct work_struct *work)
 {
     int hok_adc_value =0;
-    
+    if (headset_off) return;
     if(headset_type != STAR_HEADSET)
         return;
 	
@@ -446,11 +450,11 @@ static void headset_hook_int_handler(void *dev_id)
 	}
 	else{
 		//lprintk(D_AUDIO, KERN_ERR "##(Headset_det.c)## headset_hook_int_handler()!!\n");
-		//20101125, hookkey press is skipped When wakeup from LP1 [START]
+		//20101125, , hookkey press is skipped When wakeup from LP1 [START]
         if(suspend_status){
             schedule_work(&switch_data->hook_delayed_work);
         }else{
-        //20101125, hookkey press is skipped When wakeup from LP1 [END]
+        //20101125, , hookkey press is skipped When wakeup from LP1 [END]
         
             if(hook_gpio){
                 schedule_delayed_work(&switch_data->hook_delayed_work,	msecs_to_jiffies(hook_release_time));
@@ -501,6 +505,8 @@ static ssize_t headset_detect_show(struct device *dev, struct device_attribute *
 
 ssize_t headset_detect_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
+    if (headset_off) return count;
+		
     headset_det_work(&headset_sw_data->work);
 	return count;
 }
@@ -575,7 +581,7 @@ static int headsetdet_probe(struct platform_device *pdev)
                 pin[j] = pConnectivity->AddressList[i].Address;
                 j++;
                 break;
-            //20101117, gpio wakeup from LP1 [START]
+            //20101117, , gpio wakeup from LP1 [START]
             case NvOdmIoModule_Vdd:
                 {
                     NvOdmServicesPmuVddRailCapabilities vddrailcap;
@@ -586,7 +592,7 @@ static int headsetdet_probe(struct platform_device *pdev)
                     headset_vdd_voltage = vddrailcap.requestMilliVolts;
                 }
                 break;
-            //20101117, gpio wakeup from LP1 [END]
+            //20101117, , gpio wakeup from LP1 [END]
             default:
                 break;
         }
@@ -704,9 +710,9 @@ static int headsetdet_probe(struct platform_device *pdev)
     }
 	lprintk(D_AUDIO, KERN_ERR "##(Headset_det.c)## headset detection - NvOdmGpioInterruptRegister() success..!!\n");	//20100421  [LGE]
 
-    //20101125, hookkey press is skipped When wakeup from LP1 [START]
+    //20101125, , hookkey press is skipped When wakeup from LP1 [START]
     //wake_lock_init(&hook_det_lock, WAKE_LOCK_SUSPEND, "hook_det_wake");
-    //20101125, hookkey press is skipped When wakeup from LP1 [END]
+    //20101125, , hookkey press is skipped When wakeup from LP1 [END]
 
 /*====================== nVidia GPIO Control(E) =======================*/
 
@@ -736,6 +742,68 @@ err_get_interrupt_handler:
 	return ret;
 }
 
+static void headset_shutdown(struct platform_device *pdev)
+{
+
+	lprintk(D_AUDIO, KERN_ERR "##(Headset_det.c)## headsetdet_shutdown() : headset detection ended..!!\n");	//20100421  [LGE]
+
+	struct headset_switch_data *switch_data = platform_get_drvdata(pdev);
+
+	//20101125, , hookkey press is skipped When wakeup from LP1 [START]
+	//wake_lock_destroy(&hook_det_lock);
+	//20101125, , hookkey press is skipped When wakeup from LP1 [END]
+
+	headset_off = 1;
+
+	if (headset_h_pmu)
+		NvOdmServicesPmuClose(headset_h_pmu);
+	lprintk(D_AUDIO, KERN_ERR "##(Headset_det.c)## headsetdet_shutdown() : NvOdmServicesPmuClose\n");
+#if 0
+	if (&headset_sw_data->work)
+	{
+		cancel_work_sync(&headset_sw_data->work);
+		printk("switch_data->work canceled\n");
+	}  
+
+	if (&headset_sw_data->delayed_work)
+	{
+		cancel_delayed_work_sync(&headset_sw_data->delayed_work);
+		printk("witch_data->delayed_work canceled\n");
+	}
+
+	if(&headset_sw_data->hook_delayed_work)
+	{
+		cancel_delayed_work_sync(&headset_sw_data->hook_delayed_work);
+		printk("headset_sw_data->hook_delayed_work canceled\n");
+	}
+#endif
+	/*====================== nVidia GPIO Control(S) =======================*/
+	NvOdmGpioInterruptUnregister(s_hHeadsetHandle.hGpio, s_hHeadsetHandle.h_Headset_Detection, s_hHeadsetHandle.hheadsetInterrupt);
+	NvOdmGpioSetState(s_hHeadsetHandle.hGpio, s_hHeadsetHandle.h_Headset_Detection, 0);
+	NvOdmGpioConfig(s_hHeadsetHandle.hGpio, s_hHeadsetHandle.h_Headset_Detection, NvOdmGpioPinMode_Output);
+
+	NvOdmGpioInterruptUnregister(s_hHeadsetHandle.hGpio, s_hHeadsetHandle.h_Hookkey_Detection, s_hHeadsetHandle.hhookInterrupt);	//20100421  for Hookkey [LGE]
+	NvOdmGpioSetState(s_hHeadsetHandle.hGpio, s_hHeadsetHandle.h_Hookkey_Detection, 0);
+	NvOdmGpioConfig(s_hHeadsetHandle.hGpio, s_hHeadsetHandle.h_Headset_Detection, NvOdmGpioPinMode_Output);
+
+
+	NvOdmGpioReleasePinHandle(s_hHeadsetHandle.hGpio, s_hHeadsetHandle.h_Headset_Detection);
+
+	NvOdmGpioReleasePinHandle(s_hHeadsetHandle.hGpio, s_hHeadsetHandle.h_Hookkey_Detection);	//20100421  for Hookkey [LGE]
+
+	NvOdmGpioClose(s_hHeadsetHandle.hGpio);
+	/*====================== nVidia GPIO Control(E) =======================*/
+
+#if 0
+	switch_dev_unregister(&headset_sw_data->sdev);
+
+	input_unregister_device(headset_sw_data->ip_dev);	//20100421  for Hookkey [LGE]
+
+	if(headset_sw_data) kfree(headset_sw_data);
+#endif
+	lprintk(D_AUDIO, KERN_ERR "##(Headset_det.c)## headsetdet_shutdown() : completed\n");
+}
+
 static int headsetdet_remove(struct platform_device *pdev)
 {
 
@@ -743,9 +811,9 @@ static int headsetdet_remove(struct platform_device *pdev)
 
     struct headset_switch_data *switch_data = platform_get_drvdata(pdev);
 
-    //20101125, hookkey press is skipped When wakeup from LP1 [START]
+    //20101125, , hookkey press is skipped When wakeup from LP1 [START]
     //wake_lock_destroy(&hook_det_lock);
-    //20101125, hookkey press is skipped When wakeup from LP1 [END]
+    //20101125, , hookkey press is skipped When wakeup from LP1 [END]
 
     if (headset_h_pmu)
         NvOdmServicesPmuClose(headset_h_pmu);
@@ -776,12 +844,12 @@ static int headsetdet_remove(struct platform_device *pdev)
 
 static int headset_suspend(struct platform_device *pdev, pm_message_t state)
 {
-//20101117, gpio wakeup from LP1 [START]
+//20101117, , gpio wakeup from LP1 [START]
     if(core_lock_on && headset_vdd_address){
         NvOdmServicesPmuSetVoltage(headset_h_pmu, headset_vdd_address, headset_vdd_voltage, NULL);
     }
     suspend_status = 1;
-//20101117, gpio wakeup from LP1 [END]
+//20101117, , gpio wakeup from LP1 [END]
     if(core_lock_on == 0){
         block_hook_int =1;
 	headset_type = STAR_NONE;
@@ -795,12 +863,12 @@ static int headset_suspend(struct platform_device *pdev, pm_message_t state)
 
 static int headset_resume(struct platform_device *pdev)
 {
-//20101117, gpio wakeup from LP1 [START]
+//20101117, , gpio wakeup from LP1 [START]
     if(core_lock_on && headset_vdd_address){
         NvOdmServicesPmuSetVoltage(headset_h_pmu, headset_vdd_address, NVODM_VOLTAGE_OFF, NULL);
     } 
     suspend_status = 0;
-//20101117, gpio wakeup from LP1 [END]
+//20101117, , gpio wakeup from LP1 [END]
 
     
     
@@ -823,6 +891,7 @@ static struct platform_driver headsetdet_driver = {
 	.remove		= __devexit_p(headsetdet_remove),
 	.suspend    = headset_suspend,
 	.resume     = headset_resume,
+        .shutdown   = headset_shutdown,
 	.driver		= {
 		.name	= "star_headset",
 		.owner	= THIS_MODULE,

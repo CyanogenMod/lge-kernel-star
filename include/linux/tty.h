@@ -283,7 +283,11 @@ struct tty_struct {
 	void *driver_data;
 	struct list_head tty_files;
 
-#define N_TTY_BUF_SIZE 4096
+//LGE_TELECA_CR:707_DATA_THROUGHPUT START
+//LGE_TELECA_CR:1056_SPI/MUX_IMPROVEMENT START
+#define N_TTY_BUF_SIZE 32768
+//LGE_TELECA_CR:1056_SPI/MUX_IMPROVEMENT END
+//LGE_TELECA_CR:707_DATA_THROUGHPUT END
 
 	/*
 	 * The following is data for the N_TTY line discipline.  For

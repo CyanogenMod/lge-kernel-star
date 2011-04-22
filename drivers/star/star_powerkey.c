@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2009 LGE, Inc.
  *
- * Author: <>
+ * Author: Changsu Ha <>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -30,34 +30,20 @@
 	@version	 V1.00		 2010.04.13		 Changsu Ha	 Create
 */
 
-//select option
-#define POWERKEY_WORKQUEUE
-
-//20100610, sleep status gpio for modem [START]
+//20100610, , sleep status gpio for modem [START]
 #define AP_SUSPEND_STATUS
-//20100610, sleep status gpio for modem [START]
-
-
-#define POWERKEY_DELAYED_CHECK
-
-//20100714, AP20 Edge Wakeup Fail [START]
-//#define AP20_EDGE_WAKEUP_FAIL
-//20100714, AP20 Edge Wakeup Fail [END]
-
+//20100610, , sleep status gpio for modem [START]
 
 #define AP20_A03_POWERKEY_WAR
 
+#define POWERKEY_DELAYED_WORKQUEUE
 
 #include <linux/platform_device.h>
 #include <linux/device.h>
 #include <linux/uaccess.h>
 
 #include <linux/input.h>
-
-#ifndef POWERKEY_WORKQUEUE
-#include <linux/kthread.h>
-#include <linux/freezer.h>
-#endif
+#include <linux/wakelock.h>  
 
 #include "mach/nvrm_linux.h"
 #include "nvcommon.h"
@@ -65,10 +51,6 @@
 #include "nvodm_services.h"
 #include "nvodm_query.h"
 #include "nvodm_query_discovery.h"
-
-#ifdef POWERKEY_DELAYED_CHECK
-#include <linux/hrtimer.h>
-#endif
 
 #ifdef AP20_A03_POWERKEY_WAR
 #include <mach/iomap.h>
@@ -78,39 +60,30 @@
 #define WAKEUP_POWERKEY_MASK    (1 << 24)     // Wake Event 24 - AP_ONKEY
 #endif
 
-//20101110, , Function for Warm-boot [START]
+// 20110209  disable gpio interrupt during power-off  [START] 
+#include <linux/gpio.h>
+
+extern void tegra_gpio_disable_all_irq(void);
+// 20110209  disable gpio interrupt during power-off  [END] 
+#if 1
 extern void write_cmd_reserved_buffer(unsigned char *buf, size_t len);
 extern void read_cmd_reserved_buffer(unsigned char *buf, size_t len);
 extern void emergency_restart(void); 
-//20101110, , Function for Warm-boot [END]
+#endif
 
+int  pwky_shutdown = 0;
 typedef struct PowerKeyDeviceRec
 {
     NvOdmServicesGpioHandle gpioHandle;
     NvOdmGpioPinHandle  pinHandle;
-    NvOdmServicesGpioIntrHandle intr;
-#ifdef POWERKEY_DELAYED_CHECK
-    struct hrtimer  timer;
-    NvU32   sleepStatus;
-#endif
-
-//20100714, AP20 Edge Wakeup Fail [START]
-#ifdef AP20_EDGE_WAKEUP_FAIL
-    int             interruptKeyLevel;
-#endif
-//20100714, AP20 Edge Wakeup Fail [END]
-
-    
+    NvOdmServicesGpioIntrHandle intHandle;    
     struct input_dev    *inputDev;
     
-#ifndef DIRECT_ISR_HANDLE
-#ifdef POWERKEY_WORKQUEUE
-    struct work_struct  work;
+#ifdef POWERKEY_DELAYED_WORKQUEUE
+    struct wake_lock wlock;
+    struct delayed_work  work;
 #else
-    struct task_struct  *task;
-    NvOdmOsSemaphoreHandle  semaphore;
-    NvOsMutexHandle hMutex;
-#endif
+    struct work_struct  work;
 #endif
 
     NvU32    kill;
@@ -124,7 +97,7 @@ static int key_wakeup_ISR = 0;
 static void __iomem *pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
 #endif
 
-//20101129, idle current issue [START]
+//20101129, , idle current issue [START]
 typedef struct TouchMakerRec
 {
     NvOdmServicesGpioHandle gpioHandle;
@@ -132,10 +105,10 @@ typedef struct TouchMakerRec
 } TouchMaker;
 
 static TouchMaker s_touchMaker;
-//20101129, idle current issue [END]
+//20101129, , idle current issue [END]
 
 
-//20100610, sleep status gpio for modem [START]
+//20100610, , sleep status gpio for modem [START]
 #ifdef AP_SUSPEND_STATUS
 typedef struct ModemCheckRec
 {
@@ -145,13 +118,13 @@ typedef struct ModemCheckRec
 
 static ModemCheck s_modemCheck;
 #endif
-//20100610, sleep status gpio for modem [END]
+//20100610, , sleep status gpio for modem [END]
 
 #define POWERKEY_DELAY_NSEC     20000000     //20ms
 #define KEYCHECK_RETRY_COUNT    5   // it must be odd value.
 
 static void powerkey_interrupt_handler(void* arg);
-char brdrev[5];
+static char brdrev[5];
 
 static int __init tegra_setup_board_type(char *str)
 {
@@ -161,31 +134,6 @@ static int __init tegra_setup_board_type(char *str)
 }
 
 early_param("brdrev", tegra_setup_board_type);
-
-#ifdef POWERKEY_DELAYED_CHECK
-static enum hrtimer_restart powerkey_timer_func(struct hrtimer *timer)
-{
-    NvU32   pinValue;
-
-    if(!s_powerkey.gpioHandle || !s_powerkey.pinHandle || !s_powerkey.inputDev)
-        printk("POWERKEY handler error\n");
-
-    NvOdmGpioGetState(s_powerkey.gpioHandle, s_powerkey.pinHandle, &pinValue);
-
-    if(pinValue){
-        printk("POWERKEY release\n");
-        input_report_key(s_powerkey.inputDev, KEY_POWER, 0);
-    }else{
-        printk("POWERKEY press\n");
-        input_report_key(s_powerkey.inputDev, KEY_POWER, 1);
-    }
-    input_sync(s_powerkey.inputDev);
-    NvOdmGpioInterruptDone(s_powerkey.intr);
-
-    return HRTIMER_NORESTART;
-}
-#endif
-
 
 static void powerkey_handle(struct work_struct *wq)
 {
@@ -217,121 +165,43 @@ static void powerkey_handle(struct work_struct *wq)
             input_sync(s_powerkey.inputDev);
         }
         key_wakeup_ISR = 1;
-        NvOdmGpioInterruptDone(s_powerkey.intr);
         return;
     }
 #endif
 
-//20100714, AP20 Edge Wakeup Fail [START]
-#ifdef AP20_EDGE_WAKEUP_FAIL
-    if(s_powerkey.interruptKeyLevel){
-        // high level is interrupted, next it will detect low level.
-        NvOdmGpioConfig(s_powerkey.gpioHandle, s_powerkey.pinHandle, 
-                    NvOdmGpioPinMode_InputInterruptLow);
-        s_powerkey.interruptKeyLevel = 0;
-        #ifdef POWERKEY_DELAYED_CHECK
-        if(s_powerkey.sleepStatus == 0){
-            hrtimer_cancel(&s_powerkey.timer);
-            hrtimer_start(&s_powerkey.timer, ktime_set(0, POWERKEY_DELAY_NSEC), HRTIMER_MODE_REL);
-        }else{
-            NvOdmGpioGetState(s_powerkey.gpioHandle, s_powerkey.pinHandle, &pinValue);
-            if(!pinValue){
-                goto int_done;
-            }
-            printk("POWERKEY release \n");
-            input_report_key(s_powerkey.inputDev, KEY_POWER, 0);
-        }
-        #else
-        printk("POWERKEY release \n");
-        input_report_key(s_powerkey.inputDev, KEY_POWER, 0);
-        #endif
-    }else{
-        //low level is interrupted, next it will detect high level.
-        NvOdmGpioConfig(s_powerkey.gpioHandle, s_powerkey.pinHandle, 
-                    NvOdmGpioPinMode_InputInterruptHigh);
-        s_powerkey.interruptKeyLevel = 1;
-        #ifdef POWERKEY_DELAYED_CHECK
-        if(s_powerkey.sleepStatus == 0){
-            hrtimer_cancel(&s_powerkey.timer);
-            hrtimer_start(&s_powerkey.timer, ktime_set(0, POWERKEY_DELAY_NSEC), HRTIMER_MODE_REL);
-        }else{
-            NvOdmGpioGetState(s_powerkey.gpioHandle, s_powerkey.pinHandle, &pinValue);
-            if(pinValue){
-                goto int_done;
-            }
-            printk("POWERKEY press \n");
-            input_report_key(s_powerkey.inputDev, KEY_POWER, 1);
-        }
-        #else
-        printk("POWERKEY press \n");
-        input_report_key(s_powerkey.inputDev, KEY_POWER, 1);
-        #endif
-    }
-    #ifndef POWERKEY_DELAYED_CHECK
-    input_sync(s_powerkey.inputDev);
-    #endif
-
-int_done:
-    NvOdmGpioInterruptDone(s_powerkey.intr);
-#else
-//20100714, AP20 Edge Wakeup Fail [END]
-
-#ifndef POWERKEY_DELAYED_CHECK
     if(!s_powerkey.gpioHandle || !s_powerkey.pinHandle || !s_powerkey.inputDev)
         printk("POWERKEY handler error\n");
     
     NvOdmGpioGetState(s_powerkey.gpioHandle, s_powerkey.pinHandle, &pinValue);
     
     if(pinValue){
-        //printk("POWERKEY release\n");
+        printk("POWERKEY release\n");
         input_report_key(s_powerkey.inputDev, KEY_POWER, 0);
-        input_sync(s_powerkey.inputDev);
     }else{
-        //printk("POWERKEY press\n");
+        printk("POWERKEY press\n");
         input_report_key(s_powerkey.inputDev, KEY_POWER, 1);
-        input_sync(s_powerkey.inputDev);
     }
-    NvOdmGpioInterruptDone(s_powerkey.intr);
-#else
-    hrtimer_cancel(&s_powerkey.timer);
-    hrtimer_start(&s_powerkey.timer, ktime_set(0, POWERKEY_DELAY_NSEC), HRTIMER_MODE_REL);
-#endif
-#endif
+    input_sync(s_powerkey.inputDev);
 }
 
-#ifdef POWERKEY_WORKQUEUE
 static void powerkey_interrupt_handler(void* arg)
 {
     PowerKeyDevice *powerKeyDevice = (PowerKeyDevice *)arg;
     
-    printk("powerkey_interrupt_handler\n");
-
-    schedule_work(&powerKeyDevice->work);    
-}
-#else
-static void powerkey_interrupt_handler(void* arg)
-{
-    PowerKeyDevice *powerkeyDevice =(PowerKeyDevice*)arg;
-    
-    NvOdmOsSemaphoreSignal(powerkeyDevice->semaphore);
-}
-
-static int powerkey_thread(void *pdata){
-    PowerKeyDevice *powerkeyDevice =(PowerKeyDevice*)pdata;
-    
-    /* touch event thread should be frozen before suspend */
-    set_freezable_with_signal();
-
-    while(powerkeyDevice->kill == 0){
-        NvOdmOsSemaphoreWait(powerkeyDevice->semaphore);
-        NvOsMutexLock(powerkeyDevice->hMutex);
-        powerkey_handle(NULL);
-        NvOsMutexUnlock(powerkeyDevice->hMutex);
+    if (pwky_shutdown)
+    {
+        NvOdmGpioInterruptDone(s_powerkey.intHandle);
+        return;
     }
-
-    return 0;
-}
+    printk("powerkey_interrupt_handler\n");
+#ifdef POWERKEY_DELAYED_WORKQUEUE
+    schedule_delayed_work(&powerKeyDevice->work, msecs_to_jiffies(20));
+    wake_lock_timeout(&s_powerkey.wlock, msecs_to_jiffies(50));
+#else
+    schedule_work(&powerKeyDevice->work);
 #endif
+    NvOdmGpioInterruptDone(s_powerkey.intHandle);
+}
 
 static ssize_t star_pmic_show(struct device *dev, 
             struct device_attribute *attr, char *buf)
@@ -419,15 +289,25 @@ static const struct attribute_group star_pmic_group = {
     .attrs = star_pmic_attributes,
 };
 
-//20101110, , Function for Warm-boot [START]
+#if 1
 static ssize_t star_reset_show(struct device *dev, 
             struct device_attribute *attr, char *buf)
 {
 
     unsigned char tmpbuf[2];
+    int ret;
+    int tag;
+
     read_cmd_reserved_buffer(tmpbuf,1);
-    printk("[doncopy] power key reserved_buffer = %x\n",tmpbuf[0]);
-    return 0;
+    printk(" power key reserved_buffer = %x\n",tmpbuf[0]);
+
+    if ('w' == tmpbuf[0]||'p'== tmpbuf[0])
+        tag = 1;
+    else
+        tag = 0;
+
+    ret = sprintf(buf,"%d\n",tag);
+    return ret;
 }
 
 static ssize_t star_reset_store(struct device *dev, 
@@ -438,7 +318,7 @@ static ssize_t star_reset_store(struct device *dev,
     tmpbuf[0] = 'w'; // index for warm-boot
     write_cmd_reserved_buffer(tmpbuf,1);
     emergency_restart();
-    return 0;
+    return count;
 }
 
 static DEVICE_ATTR(reset, 0666, star_reset_show, star_reset_store);
@@ -451,30 +331,58 @@ static struct attribute *star_reset_attributes[] = {
 static const struct attribute_group star_reset_group = {
     .attrs = star_reset_attributes,
 };
-//20101110, , Function for Warm-boot [END]
+#endif
+// 20110209  disable gpio interrupt during power-off  [START] 
+//extern void muic_gpio_interrupt_mask();
+extern void keep_touch_led_on();
+
+static ssize_t star_poweroff_store(struct device *dev, struct device_attribute *attr, char *buf, size_t count)
+{
+    u32 val = 0;
+    val = simple_strtoul(buf, NULL, 10);
+
+    pwky_shutdown = 1;
+
+    printk("[PowerKey] input value = %d  @star_powerkey_store \n", val );
+
+    if( val == 1 )
+    {
+        wake_lock(&s_powerkey.wlock);
+        tegra_gpio_disable_all_irq();
+        keep_touch_led_on();
+    }
+    return count;
+}
+
+static DEVICE_ATTR(poweroff, 0222, NULL, star_poweroff_store);
+
+static struct attribute *star_poweroff_attributes[] = {
+    &dev_attr_poweroff.attr,
+    NULL
+};
+
+static const struct attribute_group star_poweroff_group = {
+    .attrs = star_poweroff_attributes,
+};
+// 20110209  disable gpio interrupt during power-off  [END] 
+
 
 #ifndef AP20_A03_POWERKEY_WAR
-//20100610, sleep status gpio for modem [START]
+//20100610, , sleep status gpio for modem [START]
 #ifdef AP_SUSPEND_STATUS
 static int modem_suspend(struct platform_device *pdev, pm_message_t state)
 {
     NvOdmGpioSetState(s_modemCheck.gpioHandle, s_modemCheck.pinHandle, 0);
-    #ifdef POWERKEY_DELAYED_CHECK 
-    s_powerkey.sleepStatus= 1;
-    #endif
     return 0;
 }
 
 static int modem_resume(struct platform_device *pdev)
 {
     NvOdmGpioSetState(s_modemCheck.gpioHandle, s_modemCheck.pinHandle, 1);
-    #ifdef POWERKEY_DELAYED_CHECK 
-    s_powerkey.sleepStatus= 0;
-    #endif
     return 0;
 }
 #endif
-//20100610, sleep status gpio for modem [END]
+//20100610, , sleep status gpio for modem [END]
 #endif
 
 static int __init powerkey_probe(struct platform_device *pdev)
@@ -483,7 +391,7 @@ static int __init powerkey_probe(struct platform_device *pdev)
     NvU32 pin, port;
     const NvOdmPeripheralConnectivity *con = NULL;
 
-//20101129, idle current issue [START]
+//20101129, , idle current issue [START]
     //GPIO configuration
     s_touchMaker.gpioHandle = NvOdmGpioOpen();
     port = 'x'-'a';
@@ -492,10 +400,10 @@ static int __init powerkey_probe(struct platform_device *pdev)
                                                     port, pin);
     NvOdmGpioConfig(s_touchMaker.gpioHandle, s_touchMaker.pinHandle, 
                     NvOdmGpioPinMode_InputData);
-//20101129, idle current issue [END]
+//20101129, , idle current issue [END]
 
 
-//20100610, sleep status gpio for modem [START]
+//20100610, , sleep status gpio for modem [START]
 #ifdef AP_SUSPEND_STATUS
     //GPIO configuration
     s_modemCheck.gpioHandle = NvOdmGpioOpen();
@@ -504,8 +412,8 @@ static int __init powerkey_probe(struct platform_device *pdev)
         printk(KERN_ERR "[star modem_chk] NvOdmGpioOpen Error \n");
         goto err_open_modem_chk_gpio_fail;
     }
-    port = 'r'-'a';
-    pin = 0;
+    port = 'h'-'a';
+    pin = 2;
     s_modemCheck.pinHandle = NvOdmGpioAcquirePinHandle(s_modemCheck.gpioHandle, 
                                                     port, pin);
     if (!s_modemCheck.pinHandle)
@@ -517,7 +425,7 @@ static int __init powerkey_probe(struct platform_device *pdev)
     NvOdmGpioConfig(s_modemCheck.gpioHandle, s_modemCheck.pinHandle, 
                     NvOdmGpioPinMode_Output);
 #endif
-//20100610, sleep status gpio for modem [END]
+//20100610, , sleep status gpio for modem [END]
 
     memset(&s_powerkey, 0x00, sizeof(s_powerkey));
 
@@ -536,23 +444,11 @@ static int __init powerkey_probe(struct platform_device *pdev)
         goto err_probe_fail;
     }
     
-#ifdef POWERKEY_WORKQUEUE
-    INIT_WORK(&s_powerkey.work, powerkey_handle);
+#ifdef POWERKEY_DELAYED_WORKQUEUE
+    INIT_DELAYED_WORK(&s_powerkey.work, powerkey_handle);
+    wake_lock_init(&s_powerkey.wlock, WAKE_LOCK_SUSPEND, "powerkey_delay");
 #else
-    NvOsMutexCreate(&s_powerkey.hMutex);
-    s_powerkey.semaphore = NvOdmOsSemaphoreCreate(0);
-    if (!s_powerkey.semaphore) {
-        printk(KERN_ERR "tegra_touch_probe: Semaphore creation failed\n");
-        goto err_semaphore_create_failed;
-    }
-    
-    s_powerkey.task =
-        kthread_create(powerkey_thread, &s_powerkey, "powerkey_thread");
-
-    if(s_powerkey.task == NULL) {
-        goto err_kthread_create_failed;
-    }
-    wake_up_process( s_powerkey.task );
+    INIT_WORK(&s_powerkey.work, powerkey_handle);
 #endif
 
     //GPIO configuration
@@ -573,29 +469,14 @@ static int __init powerkey_probe(struct platform_device *pdev)
     NvOdmGpioConfig(s_powerkey.gpioHandle, s_powerkey.pinHandle, 
                     NvOdmGpioPinMode_InputData);
 
-    //20100714, AP20 Edge Wakeup Fail [START]
-    #ifdef AP20_EDGE_WAKEUP_FAIL
-    s_powerkey.interruptKeyLevel = 0;
-
     //GPIO interrupt registration
-    if (NvOdmGpioInterruptRegister(s_powerkey.gpioHandle, &s_powerkey.intr,
-            s_powerkey.pinHandle, NvOdmGpioPinMode_InputInterruptLow, 
-            powerkey_interrupt_handler, (void*)&s_powerkey, 0) == NV_FALSE)
-    {
-        printk(KERN_ERR "[star Powerkey] interrupt registeration fail!\n");
-        goto err_interrupt_register_fail;
-    }
-    #else
-    //GPIO interrupt registration
-    if (NvOdmGpioInterruptRegister(s_powerkey.gpioHandle, &s_powerkey.intr,
+    if (NvOdmGpioInterruptRegister(s_powerkey.gpioHandle, &s_powerkey.intHandle,
             s_powerkey.pinHandle, NvOdmGpioPinMode_InputInterruptAny, 
             powerkey_interrupt_handler, (void*)&s_powerkey, 0) == NV_FALSE)
     {
         printk(KERN_ERR "[star Powerkey] interrupt registeration fail!\n");
         goto err_interrupt_register_fail;
     }
-    #endif
-    //20100714, AP20 Edge Wakeup Fail [END]
 
     // input device
     s_powerkey.inputDev = input_allocate_device();
@@ -614,95 +495,96 @@ static int __init powerkey_probe(struct platform_device *pdev)
         goto err_input_device_register_fail;
     }
 
-#ifdef POWERKEY_DELAYED_CHECK 
-    s_powerkey.sleepStatus = 0;
-    hrtimer_init(&s_powerkey.timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-    s_powerkey.timer.function = powerkey_timer_func;
-#endif
-
-//20100703, PMIC reset [START]
+//20100703, , PMIC reset [START]
     ret = sysfs_create_group(&pdev->dev.kobj, &star_pmic_group);
     if (ret) {
         printk(KERN_ERR "[star powerkey] sysfs_create_group ERROR\n");
-        goto err_input_device_register_fail;
+        goto err_pmic_sysfs_fail;
     }
-//20100703, PMIC reset [END]
+//20100703, , PMIC reset [END]
     
     ret = sysfs_create_group(&pdev->dev.kobj, &star_hwsku_group);
     if (ret) {
         printk(KERN_ERR "[star powerkey] sysfs_create_group ERROR\n");
-        goto err_input_device_register_fail;
+        goto err_hwsku_sysfs_fail;
     }
 
-//20101110, , Function for Warm-boot [START]
     ret = sysfs_create_group(&pdev->dev.kobj, &star_reset_group);
     if (ret) {
         printk(KERN_ERR "[star powerkey] sysfs_create_group ERROR\n");
+        goto err_reset_sysfs_fail;
+    }
+
+// 20110209  disable gpio interrupt during power-off  [START] 
+    ret = sysfs_create_group(&pdev->dev.kobj, &star_poweroff_group);
+    if (ret) {
+        printk(KERN_ERR "[star powerkey] sysfs_create_group <star_poweroff_group> ERROR\n");
         goto err_input_device_register_fail;
     }
-//20101110, , Function for Warm-boot [END]
+// 20110209  disable gpio interrupt during power-off  [END] 
 
     return 0;
+err_reset_sysfs_fail:    
+    sysfs_remove_group(&pdev->dev.kobj, &star_hwsku_group);
+err_hwsku_sysfs_fail:
+    sysfs_remove_group(&pdev->dev.kobj, &star_pmic_group);
+err_pmic_sysfs_fail:
+    input_unregister_device(s_powerkey.inputDev);
+
 err_input_device_register_fail: 
     input_free_device(s_powerkey.inputDev);    
 err_input_device_allocation_fail: 
     NvOdmGpioInterruptUnregister(s_powerkey.gpioHandle, s_powerkey.pinHandle,
-        s_powerkey.intr);    
+        s_powerkey.intHandle);    
 err_interrupt_register_fail:  
     NvOdmGpioReleasePinHandle(s_powerkey.gpioHandle, s_powerkey.pinHandle);
 err_gpio_pin_acquire_fail:
     NvOdmGpioClose(s_powerkey.gpioHandle);  
 
 err_open_gpio_fail:
-  
-#ifndef POWERKEY_WORKQUEUE
-err_kthread_create_failed:
-    NvOdmOsSemaphoreDestroy(s_powerkey.semaphore);
-err_semaphore_create_failed:
-    NvOsMutexDestroy(s_powerkey.hMutex);
+#ifdef POWERKEY_DELAYED_WORKQUEUE
+    wake_lock_destroy(&s_powerkey.wlock);
 #endif
 
 err_probe_fail:
 
-//20100610, sleep status gpio for modem [START]
+//20100610, , sleep status gpio for modem [START]
 #ifdef AP_SUSPEND_STATUS
     NvOdmGpioReleasePinHandle(s_modemCheck.gpioHandle, s_modemCheck.pinHandle);
 err_modem_chk_gpio_pin_acquire_fail:
     NvOdmGpioClose(s_modemCheck.gpioHandle); 
 err_open_modem_chk_gpio_fail:
 #endif
-//20100610, sleep status gpio for modem [END]
+//20100610, , sleep status gpio for modem [END]
     return -ENOSYS;
 }
 
 static int powerkey_remove(struct platform_device *pdev)
 {
-//20100703, PMIC reset [START]
+//20100703, , PMIC reset [START]
     sysfs_remove_group(&pdev->dev.kobj, &star_pmic_group);
     sysfs_remove_group(&pdev->dev.kobj, &star_hwsku_group);
-    sysfs_remove_group(&pdev->dev.kobj, &star_reset_group); //20101110, , Function for Warm-boot
-//20100703, PMIC reset [END]
+    sysfs_remove_group(&pdev->dev.kobj, &star_reset_group);
+//20100703, , PMIC reset [END]
     
-//20100610, sleep status gpio for modem [START]
+//20100610, , sleep status gpio for modem [START]
 #ifdef AP_SUSPEND_STATUS
     NvOdmGpioReleasePinHandle(s_modemCheck.gpioHandle, s_modemCheck.pinHandle);
     NvOdmGpioClose(s_modemCheck.gpioHandle); 
 #endif
-//20100610, sleep status gpio for modem [END]
+//20100610, , sleep status gpio for modem [END]
 
     input_unregister_device(s_powerkey.inputDev);
+    input_free_device(s_powerkey.inputDev);  
+
     NvOdmGpioInterruptUnregister(s_powerkey.gpioHandle, s_powerkey.pinHandle,
-        s_powerkey.intr);
+        s_powerkey.intHandle);
     
     NvOdmGpioReleasePinHandle(s_powerkey.gpioHandle, s_powerkey.pinHandle);
     NvOdmGpioClose(s_powerkey.gpioHandle);
 
-#ifndef POWERKEY_WORKQUEUE
-    s_powerkey.kill = NV_TRUE;
-    NvOdmOsSemaphoreSignal(s_powerkey.semaphore);
-
-    NvOdmOsSemaphoreDestroy(s_powerkey.semaphore);
-    NvOsMutexDestroy(s_powerkey.hMutex);
+#ifdef POWERKEY_DELAYED_WORKQUEUE
+    wake_lock_destroy(&s_powerkey.wlock);
 #endif
     return 0;
 }
@@ -765,7 +647,7 @@ int powerkey_resume(struct platform_device *dev)
 static struct platform_driver powerkey_driver = {
     .probe      = powerkey_probe,
     .remove     = powerkey_remove,
-//20100610, sleep status gpio for modem [START]
+//20100610, , sleep status gpio for modem [START]
 #ifdef AP20_A03_POWERKEY_WAR
     .suspend    = powerkey_suspend,
     .resume     = powerkey_resume,
@@ -775,7 +657,7 @@ static struct platform_driver powerkey_driver = {
     .resume     = modem_resume,
 #endif
 #endif
-//20100610, sleep status gpio for modem [END]
+//20100610, , sleep status gpio for modem [END]
     .driver = {
         .name   = "star_powerkey",
         .owner  = THIS_MODULE,

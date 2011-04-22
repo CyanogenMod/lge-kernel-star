@@ -19,6 +19,12 @@
 #ifndef __LINUX_SPI_H
 #define __LINUX_SPI_H
 
+//20100920-1, , enabled when CONFIG_DUAL_SPI is defined [START]
+#ifdef	CONFIG_DUAL_SPI
+#define LGE_DUAL_SPI_1
+#endif
+//20100920, , enabled when CONFIG_DUAL_SPI is defined [END]
+
 #include <linux/device.h>
 #include <linux/mod_devicetable.h>
 

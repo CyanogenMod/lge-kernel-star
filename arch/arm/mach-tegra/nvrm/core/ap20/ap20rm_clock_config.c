@@ -540,7 +540,21 @@ Ap20EmcTimingSet(
 
     for (i = 0; i < s_Ap20EmcConfig.EmcTimingRegNum; i++)
     {
+	    //20110218, , DVFS patch [START]
+	    #if 1
+        if (s_Ap20EmcConfig.pEmcTimingReg[i] == EMC_DLL_XFORM_DQS_0)
+        {
+            NvU32 mask =
+                NV_DRF_NUM(EMC, DLL_XFORM_DQS, XFORM_DQS_OFFS, 0xFFFFFFFFUL);
+            NvU32 offs = NV_DRF_NUM(EMC, DLL_XFORM_DQS, XFORM_DQS_OFFS, 0xC0);
+            d = pEmcConfig->pOdmEmcConfig->EmcTimingParameters[i];
+            d = ((((d & mask) << 2) - offs) & mask) | (d & (~mask));
+        }
+        else if (s_Ap20EmcConfig.pEmcTimingReg[i] == EMC_CFG_DIG_DLL_0)
+	    #else
         if (i == EMC_CFG_DIG_DLL_INDEX)
+	    #endif
+	    //20110218, , DVFS patch [END]
             d = pEmcConfig->EmcDigDll;
         else
             d = pEmcConfig->pOdmEmcConfig->EmcTimingParameters[i];

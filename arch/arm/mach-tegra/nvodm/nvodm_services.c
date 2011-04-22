@@ -134,7 +134,7 @@ NvOdmGpioReleasePinHandle(NvOdmServicesGpioHandle hOdmGpio,
         NvRmGpioReleasePinHandles(hOdmGpio->hGpio, &hRmPin, 1);
 }
 
-//LCD IF fast init
+// LCD IF fast init
 //NvBug 716430
 // hGpioPin == pointer to array of GPIO pin handles, arraySize ==  numberOfPins
 // PinValue == pointer to array of corresponding GPIN pin values
@@ -822,7 +822,7 @@ void NvOdmServicesPmuGetCapabilities(
     return;
 }
 
-#if defined(CONFIG_MACH_STAR) //20100704  headset porting [LGE]
+#if defined(CONFIG_MACH_STAR) //20100704  jongik's headset porting [LGE]
 NvU32 NvOdmServicesPmuGetHookValue( 
         NvOdmServicesPmuHandle handle)
 {

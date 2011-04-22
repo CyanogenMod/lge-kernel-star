@@ -63,5 +63,5 @@ obj-$(CONFIG_MACH_VENTANA)		+= board-ventana-wifi.o
 #LGE_CHANGE[] 2010-03-30, debug message beautifier
 obj-$(CONFIG_LPRINTK)			+=lprintk.o
 
-#20100602, pmic on/off test
+#20100602, , pmic on/off test
 obj-$(CONFIG_STAR_PMIC)			+=pmic.o

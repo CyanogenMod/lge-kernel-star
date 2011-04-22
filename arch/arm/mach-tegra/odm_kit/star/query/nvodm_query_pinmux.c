@@ -34,25 +34,44 @@
 
 #define NVODM_PINMUX_ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
+static const NvU32 s_NvOdmPinMuxConfig_Uart_Hsi_Ulpi[] = {
+    NvOdmUartPinMap_Config7,    // Instance 0: UART-A is mapped to SDIO1 pins when ULPI is used
+    NvOdmUartPinMap_Config1,    // Instance 1: UART-B
+    NvOdmUartPinMap_Config1,    // Instance 2: UART-C
+    0, // UART-D function disabled: pins used by BB (SPI1)
+    0, // UART-E function disabled: pins used by WiFi (SDIO1)
+};
+
+static const NvU32 s_NvOdmPinMuxConfig_Uart_Ril_Emp[] = {
+    NvOdmUartPinMap_Config6,    // Instance 0: UART-A is mapped to UAA pin group.
+    NvOdmUartPinMap_Config1,    // Instance 1: UART-B
+    NvOdmUartPinMap_Config1,    // Instance 2: UART-C
+    0, // UART-D function disabled: pins used by BB (SPI1)
+    0, // UART-E function disabled: pins used by WiFi (SDIO1)
+};
+
 static const NvU32 s_NvOdmPinMuxConfig_Uart[] = {
     NvOdmUartPinMap_Config6,
     NvOdmUartPinMap_Config2, // Debug message
     NvOdmUartPinMap_Config1, // BT
+#if defined (CONFIG_MACH_STAR) && !defined(CONFIG_MACH_STAR_REV_F)
+// mdm does not use ap side - gps
+    0,
+#else
     NvOdmUartPinMap_Config2, // GPS
+#endif
     0,
 };
 
 static const NvU32 s_NvOdmPinMuxConfig_Spi[] = {
     NvOdmSpiPinMap_Config1, // Modem
-#ifdef CONFIG_SPI_TDMB	
-	//20100918  TDMB Base [START_LGE_LAB1]
-	//20100912,  [START]	
-	NvOdmSpiPinMap_Config4, // TDMB
+//20100809-1, , Add SPI2 for AP-CP IPC [START]
+#ifdef CONFIG_DUAL_SPI
+	NvOdmSpiPinMap_Config4, // Modem
 #else    
 		0,
-	//20100912,  [END]
-	//20100918  TDMB Base [END_LGE_LAB1]
 #endif
+//20100809, , Add SPI2 for AP-CP IPC [END]
     0,
     0,
     0,
@@ -205,6 +224,30 @@ NvOdmQueryPinMux(
     const NvU32 **pPinMuxConfigTable,
     NvU32 *pCount)
 {
+	//20101023  add tegra-10.9.3[start] 
+	NvU32 CustomerOption = 0;
+	NvU32 Personality = 0;
+	NvU32 Ril = 0;
+	NvOdmServicesKeyListHandle hKeyList;
+	if (hKeyList)
+    {   
+        CustomerOption =
+            NvOdmServicesGetKeyValue(hKeyList,
+                                     NvOdmKeyListId_ReservedBctCustomerOption);
+        NvOdmServicesKeyListClose(hKeyList);
+        Personality =
+            NV_DRF_VAL(TEGRA_DEVKIT, BCT_CUSTOPT, PERSONALITY, CustomerOption);
+    Ril =
+            NV_DRF_VAL(TEGRA_DEVKIT, BCT_CUSTOPT, RIL, CustomerOption);
+    }   
+
+    if (!Personality)
+        Personality = TEGRA_DEVKIT_DEFAULT_PERSONALITY;
+
+    if (!Ril)
+        Ril = TEGRA_DEVKIT_BCT_CUSTOPT_0_RIL_DEFAULT;	
+	//20101023  add tegra-10.9.3[end] 
+
     switch (IoModule)
     {
     case NvOdmIoModule_Display:
@@ -268,8 +311,21 @@ NvOdmQueryPinMux(
         break;
 
     case NvOdmIoModule_Uart:
+        if (Ril == TEGRA_DEVKIT_BCT_CUSTOPT_0_RIL_EMP_RAINBOW_ULPI)
+        {
+            *pPinMuxConfigTable = s_NvOdmPinMuxConfig_Uart_Hsi_Ulpi;
+            *pCount = NV_ARRAY_SIZE(s_NvOdmPinMuxConfig_Uart_Hsi_Ulpi);
+        }
+        else if (Ril == TEGRA_DEVKIT_BCT_CUSTOPT_0_RIL_EMP_RAINBOW)
+        {
+            *pPinMuxConfigTable = s_NvOdmPinMuxConfig_Uart_Ril_Emp;
+            *pCount = NV_ARRAY_SIZE(s_NvOdmPinMuxConfig_Uart_Ril_Emp);
+        }
+        else
+        {
             *pPinMuxConfigTable = s_NvOdmPinMuxConfig_Uart;
             *pCount = NV_ARRAY_SIZE(s_NvOdmPinMuxConfig_Uart);
+		}
         break;
 
     case NvOdmIoModule_ExternalClock:
@@ -343,7 +399,7 @@ NvOdmQueryPinMux(
         break;
 
 //20100725  add CPU Panel [START]
-#if defined(CONFIG_MACH_STAR_REV_B)
+#if !defined(CONFIG_MACH_STAR)
     case NvOdmIoModule_Dsi:
         *pPinMuxConfigTable = s_NvOdmPinMuxConfig_Dsi;
         *pCount = NV_ARRAY_SIZE(s_NvOdmPinMuxConfig_Dsi);

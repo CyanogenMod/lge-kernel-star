@@ -163,7 +163,6 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 
 		input_set_capability(input, type, button->code);
 	}
-	input_set_capability(input, EV_KEY, KEY_TESTMODE_UNLOCK);
 
 	error = input_register_device(input);
 	if (error) {

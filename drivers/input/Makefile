@@ -26,6 +26,3 @@ obj-$(CONFIG_INPUT_APMPOWER)	+= apm-power.o
 obj-$(CONFIG_INPUT_KEYRESET)	+= keyreset.o
 
 obj-$(CONFIG_XEN_KBDDEV_FRONTEND)	+= xen-kbdfront.o
-#LGE_CHANGE_S, [], 2010-07-06 - LGOSP
-obj-y	+= lgosp-hid/
-#LGE_CHANGE_E, [], 2010-07-06 - LGOSP

@@ -252,7 +252,7 @@ void NvRmPrivPmuLPxStateConfig(
     // - enable the On/Off control on entry, and disable on exit
     if (state == NvOdmSocPowerState_DeepSleep)
     {
-    // AP20 need USB power work around
+    //  : AP20 need USB power work around
 #if defined(CONFIG_MACH_STAR)
         if (HasPmuProperty)
 #else
@@ -313,7 +313,7 @@ void NvRmPmuGetVoltage(
 }
 
 #if defined(CONFIG_MACH_STAR) 
-//20100704  headset porting [LGE]
+//20100704  jongik's headset porting [LGE]
 NvU32 NvRmPmuGetHookAdc(
     NvRmDeviceHandle hDevice)
 {
@@ -327,7 +327,7 @@ NvU32 NvRmPmuGetHookAdc(
 	return value;
 }
 
-//20101121 HW power off in thermal limit [START]
+//20101121 , HW power off in thermal limit [START]
 NvU32 NvRmPmuSetHwPowerOffConfig(
     NvRmDeviceHandle hDevice,
     NvBool Enable)
@@ -341,7 +341,7 @@ NvU32 NvRmPmuSetHwPowerOffConfig(
     NvOsMutexUnlock(s_Pmu.hMutex);
 	return value;
 }
-//20101121 HW power off in thermal limit [END]
+//20101121 , HW power off in thermal limit [END]
 #endif
 
 void NvRmPmuSetVoltage( 

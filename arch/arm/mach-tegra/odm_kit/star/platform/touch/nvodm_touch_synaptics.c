@@ -69,29 +69,17 @@ Date			Author				Descriptions
 
 #define SYNAPTICS_FINGER_MAX					10
 
-// 20101128  Ghost finger solution is applied to a ver. 3 or later for SKT [START]
-#if defined(STAR_OPERATOR_SKT)
-#define SYNAPTICS_MELT_SUPPORT_VER				3
-#else
-// 20100929  Ghost finger solution is applied to a ver. 4 or later for P990 [START]
+// 20100929  Ghost finger solution is applied to a ver. 4 or later for P999DW [START]
 #define SYNAPTICS_MELT_SUPPORT_VER				4
-// 20100929  Ghost finger solution is applied to a ver. 4 or later for P990 [END]
-#endif
-// 20101128  Ghost finger solution is applied to a ver. 3 or later for SKT [END]
+// 20100929  Ghost finger solution is applied to a ver. 4 or later for P999DW [END]
 
 
-// 20101130  Touch Panel is changed and base f/w version is 11 from Rev.F for P990 [START]
+// 20101130  Touch Panel is changed and base f/w version is 11 from Rev 1.0 for P999 [START]
 #define SYNAPTICS_NEW_PANEL_BASE_FW_VER			11
-// 20101130  Touch Panel is changed and base f/w version is 11 from Rev.F for P990 [END]
+// 20101130  Touch Panel is changed and base f/w version is 11 from Rev 1.0 for P999 [END]
 
 
-// 20100930  [SKT KR] block touch firmware upgrade [START]
-#if defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT)
-#undef SYNAPTICS_SUPPORT_FW_UPGRADE
-#else 
 #define SYNAPTICS_SUPPORT_FW_UPGRADE
-#endif 
-// 20100930  [SKT KR] block touch firmware upgrade [END]
 
 #undef SYNAPTICS_SUPPORT_CAL					// Use for only resistive touch
 
@@ -99,11 +87,14 @@ Date			Author				Descriptions
 ////////////////////////////////////////////////////////////////////
 ///////////////       Synaptics EVENT Define      //////////////////
 ////////////////////////////////////////////////////////////////////
+
+// 20101022  touch smooth moving improve
 #ifdef FEATURE_LGE_TOUCH_MOVING_IMPROVE
 #define SYNAPTICS_DELTA_THRESHOLD				0x01
 #else 
 #define SYNAPTICS_DELTA_THRESHOLD				0x05
 #endif /* FEATURE_LGE_TOUCH_MOVING_IMPROVE */
+// 20101022  touch smooth moving improve
 
 ////////////////////////////////////////////////////////////////////
 /////////////// Synaptics Control & Data Register //////////////////
@@ -113,9 +104,7 @@ Date			Author				Descriptions
 #define SYNAPTICS_DATA_BASE_REG					0x13
 
 #define SYNAPTICS_INT_STATUS_REG				0x14
-// 20101223  [STAR] requested by synaptics for analyze ghost finger [START] 
-#define SYNAPTICS_FINGER_STATUS_REG				0x15
-// 20101223  [STAR] requested by synaptics for analyze ghost finger [END] 
+
 #define SYNAPTICS_DEVICE_CONTROL_REG			0x4F
 #define SYNAPTICS_INTERRUPT_ENABLE_REG			0x50
 #define SYNAPTICS_REPORT_MODE_REG				0x51
@@ -302,12 +291,6 @@ static NvU32 synaptics_ts_melting_check_time;
 
 static NvBool synaptics_ts_first_finger_pressed = NV_FALSE;
 // 20101223  improve ghost finger avoid algorithm [END]
-
-// 20101223  [SU660] block touch interrupt when onetouch is on reset [START]
-#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
-NvOdmServicesGpioIntrHandle hGpioIntr_touch;
-#endif
-// 20101223  [SU660] block touch interrupt when onetouch is on reset [END]
 
 
 
@@ -714,7 +697,8 @@ static NvBool Synaptics_UpgradeFirmware(Synaptics_TouchDevice* hTouch)
 
 
 	////////////////////////	F/W Version Check	///////////////////////////
-#if defined(CONFIG_MACH_STAR_REV_F)
+// 20101129  Touch F/W upgrade is supported for Rev 1.0 or later for P999 [START]
+#if defined(TMUS_10) || defined(CONFIG_MACH_STAR_REV_F)
 	Synaptics_GetFWVersion(hTouch);
 
 	if((hTouch->FirmwareRevId >= 0x64 && SynapticsFirmware[0x1F] >= 0x64) || (hTouch->FirmwareRevId < 0x64 && SynapticsFirmware[0x1F] < 0x64))
@@ -726,9 +710,10 @@ static NvBool Synaptics_UpgradeFirmware(Synaptics_TouchDevice* hTouch)
 		}
 	}
 #else
-	printk("[Touch Driver] Synaptics_UpgradeFirmware : Do not support anymore under Rev.F!!!!\n");
+	printk("[Touch Driver] Synaptics_UpgradeFirmware : Do not support anymore under Rev 1.0!!!!\n");
 	return NV_TRUE;
 #endif
+// 20101129  Touch F/W upgrade is supported for Rev 1.0 or later for P999 [END]
 
 
 	////////////////////////	Configuration	///////////////////////////
@@ -1266,12 +1251,6 @@ NvBool Synaptics_Open (NvOdmTouchDeviceHandle* hDevice, NvOdmOsSemaphoreHandle* 
     if (Synaptics_EnableInterrupt(*hDevice, *hIntSema) == NV_FALSE)
           goto fail;
 	
-// 20101223  [SU660] block touch interrupt when onetouch is on reset [START]
-#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
-	hGpioIntr_touch = hTouch->hGpioIntr;
-#endif
-// 20101223  [SU660] block touch interrupt when onetouch is on reset [END]
-
     return NV_TRUE;
 
  fail:

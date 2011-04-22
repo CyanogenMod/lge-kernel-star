@@ -39,7 +39,7 @@ NvBool Max8907I2cRead8(
    NvU8 Addr,
    NvU8 *Data);
 
-//20100526, PMIC I2C [START]
+//20100526, , PMIC I2C [START]
 #if defined(CONFIG_MACH_STAR)
 NvBool Max8907RtcI2cWrite8(
    NvOdmPmuDeviceHandle hDevice,
@@ -51,7 +51,7 @@ NvBool Max8907RtcI2cRead8(
    NvU8 Addr,
    NvU8 *Data);
 #endif
-//20100526, PMIC I2C [END]
+//20100526, , PMIC I2C [END]
 
 NvBool Max8907I2cWrite32(
    NvOdmPmuDeviceHandle hDevice,

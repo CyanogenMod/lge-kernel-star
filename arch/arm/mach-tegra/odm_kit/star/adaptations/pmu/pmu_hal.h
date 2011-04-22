@@ -45,8 +45,8 @@ typedef NvBool (*pfnPmuWriteRtc)(NvOdmPmuDeviceHandle, NvU32);
 typedef NvBool (*pfnPmuIsRtcInitialized)(NvOdmPmuDeviceHandle);
 typedef NvBool (*pfnPmuReadAlarm)(NvOdmPmuDeviceHandle, NvU32*);
 typedef NvBool (*pfnPmuWriteAlarm)(NvOdmPmuDeviceHandle, NvU32);
-typedef NvU32  (*pfnPmuGetHookAdc)(NvOdmPmuDeviceHandle);	//20100704 headset porting [LGE]
-typedef NvU32  (*pfnPmuSetHwPowerOffConfig)(NvOdmPmuDeviceHandle, NvBool);  //20101121 HW power off in thermal limit
+typedef NvU32  (*pfnPmuGetHookAdc)(NvOdmPmuDeviceHandle);	//20100704  jongik's headset porting [LGE]
+typedef NvU32  (*pfnPmuSetHwPowerOffConfig)(NvOdmPmuDeviceHandle, NvBool);  //20101121 , HW power off in thermal limit
 typedef NvBool (*pfnPmuUpdateBatteryInfo)(NvOdmPmuDeviceHandle, NvOdmPmuAcLineStatus*, NvU8*, NvOdmPmuBatteryData*); // 20100924 , For updating battery information totally
 typedef NvBool (*pfnPmuAlarmInterrupt)(NvOdmPmuDeviceHandle);
 typedef NvBool (*pfnPmuEnableRtcInt)(NvOdmPmuDeviceHandle, NvBool);
@@ -76,8 +76,8 @@ typedef struct NvOdmPmuDeviceRec
     pfnPmuSuspendRtc             pfnSuspendRtc;
     pfnPmuResumeRtc              pfnResumeRtc;
     pfnPmuIsRtcInitialized       pfnIsRtcInitialized;
-    pfnPmuGetHookAdc             pfnGetHookAdc;		//20100704  headset porting [LGE]
-    pfnPmuSetHwPowerOffConfig    pfnSetHwPowerOffConfig;    //20101121 HW power off in thermal limit
+    pfnPmuGetHookAdc             pfnGetHookAdc;		//20100704  jongik's headset porting [LGE]
+    pfnPmuSetHwPowerOffConfig    pfnSetHwPowerOffConfig;    //20101121 , HW power off in thermal limit
     pfnPmuUpdateBatteryInfo		 pfnUpdateBatteryInfo;	// 20100924 , For updating battery information totally
     void                        *pPrivate;
     NvBool                       Hal;

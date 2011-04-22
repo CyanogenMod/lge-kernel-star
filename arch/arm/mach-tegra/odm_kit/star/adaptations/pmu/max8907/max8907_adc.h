@@ -130,7 +130,7 @@ Max8907AdcVBatSenseRead(
     NvOdmPmuDeviceHandle hDevice, 
     NvU32 *volt);
 
-#if defined(CONFIG_MACH_STAR) //20100704  headset porting [LGE]
+#if defined(CONFIG_MACH_STAR) //20100704  jongik's headset porting [LGE]
 NvU32 
 Max8907AdcHookAdcRead(
     NvOdmPmuDeviceHandle hDevice);

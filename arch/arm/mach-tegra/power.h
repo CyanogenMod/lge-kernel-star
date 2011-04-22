@@ -47,6 +47,13 @@
 #define TEGRA_IRAM_CODE_SIZE		SZ_4K
 
 #ifndef __ASSEMBLY__
+
+//20110213, , sched_clock mismatch issue after deepsleep [START]
+#if defined(CONFIG_MACH_STAR)
+void tegra_lp0_sched_clock_clear(void);    
+#endif
+//20110213, , sched_clock mismatch issue after deepsleep [END]
+
 void tegra_lp2_set_trigger(unsigned long cycles);
 void __cortex_a9_save(unsigned int mode);
 void tegra_lp2_startup(void);

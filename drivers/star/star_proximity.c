@@ -44,8 +44,6 @@
 #define PROXI_DEFAULT_DELAY_NS        200000000
 
 #define STAR_PROX_DEBUG 0 
-#define PROXIMITY_I2C_RETRY_COUNT 5
-#define PROXIMITY_I2C_TIMEOUT 20
 
 struct star_proxi_i2c_init_data {
     NvU8 reg;
@@ -84,13 +82,10 @@ static int reset_flag = 0;
 
 static NvBool star_proxi_write_reg(ProximityDevice* proximity, NvU8 reg, NvU8 val)
 {
-    int i;
-    NvOdmI2cStatus Error = NvOdmI2cStatus_Timeout;
+    NvOdmI2cStatus Error;
     NvOdmI2cTransactionInfo TransactionInfo;
     NvU8 arr[2];
 
-    for (i = 0; i < PROXIMITY_I2C_RETRY_COUNT && Error != NvOdmI2cStatus_Success; i++)
-    {
         arr[0] = reg;        // register address
         arr[1] = val;        // u16 value (lsb-msb)
 
@@ -99,12 +94,14 @@ static NvBool star_proxi_write_reg(ProximityDevice* proximity, NvU8 reg, NvU8 va
         TransactionInfo.Flags = NVODM_I2C_IS_WRITE;
         TransactionInfo.NumBytes = 2;
 
+    do
+    {
         Error = NvOdmI2cTransaction(proximity->gen2_i2c,
                                     &TransactionInfo,
                                     1,
                                     400,
-                                    PROXIMITY_I2C_TIMEOUT);
-    }
+                                    10);
+    } while (Error == NvOdmI2cStatus_Timeout);
 
     if (Error != NvOdmI2cStatus_Success)
     {
@@ -118,13 +115,10 @@ static NvBool star_proxi_write_reg(ProximityDevice* proximity, NvU8 reg, NvU8 va
 
 static NvBool star_proxi_read_reg(ProximityDevice* proximity, NvU8 reg, NvU8 *val)
 {
-    int i;
     NvU8 reg_buff = 0, ReadBuffer[2];
-    NvOdmI2cStatus  status = NvOdmI2cStatus_Timeout;
+    NvOdmI2cStatus  status = NvOdmI2cStatus_Success;
     NvOdmI2cTransactionInfo TransactionInfo[2];
 
-    for (i = 0; i < PROXIMITY_I2C_RETRY_COUNT && status != NvOdmI2cStatus_Success; i++)
-    {
         reg_buff = reg & 0xFF;
 
         TransactionInfo[0].Address = (proximity->i2c_address);
@@ -137,8 +131,13 @@ static NvBool star_proxi_read_reg(ProximityDevice* proximity, NvU8 reg, NvU8 *va
         TransactionInfo[1].Flags = 0;
         TransactionInfo[1].NumBytes = 2;
 
-        status = NvOdmI2cTransaction(proximity->gen2_i2c, TransactionInfo, 2, 400, PROXIMITY_I2C_TIMEOUT);
-    }
+
+    do
+    {
+         status = NvOdmI2cTransaction(proximity->gen2_i2c, TransactionInfo, 2, 400, 10);
+
+    } while(status == NvOdmI2cStatus_Timeout);
+
 
     if (status != NvOdmI2cStatus_Success)
     {
@@ -173,11 +172,11 @@ static void star_proxi_i2c_init_write(void)
 
 static void star_proxi_power_onoff(ProximityDevice *data, bool enable)
 {
+#if 1
     NvOdmServicesPmuHandle ldo_pmu = NvOdmServicesPmuOpen();
     NvOdmServicesPmuVddRailCapabilities vddrailcap;
     NvU32 settletime = 0;
     
-    if (ldo_pmu) {
         if (enable)
         {
             NvOdmServicesPmuGetCapabilities(ldo_pmu, data->vddId, &vddrailcap);
@@ -188,9 +187,11 @@ static void star_proxi_power_onoff(ProximityDevice *data, bool enable)
             NvOdmServicesPmuSetVoltage(ldo_pmu, data->vddId, NVODM_VOLTAGE_OFF, &settletime);
         }
 
+    //if (settletime)
         NvOdmOsWaitUS(10000);   
+
         NvOdmServicesPmuClose(ldo_pmu);
-    }
+#endif
 }
 
 static void star_proxi_vddio_vi_power_onoff( NvU32 vdd_id, NvBool is_enable )
@@ -217,8 +218,9 @@ static void star_proxi_vddio_vi_power_onoff( NvU32 vdd_id, NvBool is_enable )
 		}
 		if(settletime)
 			NvOdmOsWaitUS(settletime);
-	        NvOdmServicesPmuClose(h_pmu);
 	}
+
+	NvOdmServicesPmuClose(h_pmu);
 }
 
 static NvU8 star_read_vo_bit(ProximityDevice *data)
@@ -250,6 +252,7 @@ static void star_proxi_workqueue_func(struct work_struct *work)
     	input_report_abs(s_proximity.input_dev, ABS_DISTANCE, atomic_read(&proxi_status));
     	input_sync(s_proximity.input_dev);
 	//20101126 Fixed the bug that proximity dose not work when target is booted firstly.[end]	
+	
 	if( atomic_read(&proxi_status) == s_proximity.MVO )
 	{
 		//this code must delete.
@@ -315,9 +318,7 @@ static void star_proxi_enable(ProximityDevice *data)
 
 	
     //star_proxi_power_onoff(data, true);
-	#ifndef CONFIG_MACH_STAR_REV_D
-	//star_proxi_vddio_vi_power_onoff( 22, true );
-	#endif
+
     star_proxi_i2c_init_write();                 //Initail Operation, Procedure 1, see the 25page GP2AP datasheet
 
 	s_proximity.MVO = 0;
@@ -346,11 +347,7 @@ static void star_proxi_disable(ProximityDevice *data)
 	//go to shutdown
     star_proxi_write_reg(&s_proximity, 0x04, 0x02 );
     s_shutdown_mode = true;
-
     //star_proxi_power_onoff(data, false);
-	#ifndef CONFIG_MACH_STAR_REV_D
-	//star_proxi_vddio_vi_power_onoff( 22, false );
-	#endif
 
 //	NvOdmGpioInterruptUnregister( s_proximity.proxi_out_gpio, s_proximity.proxi_out_gpio_pin, star_proxi_interrupt_handler);
 
@@ -501,12 +498,16 @@ static int __init proximity_probe(struct platform_device *pdev)
     }
 
 	s_proximity.MVO = 0;
+	#if defined(CONFIG_MACH_STAR_MDM_C)
+	port = 'r' - 'a';//'a' - 'a';
+	pin = 2;//0;
+	#elif defined (CONFIG_MACH_STAR_REV_F)
+	port = 'w'-'a';
+	pin = 2;
+	#else
+	#endif
 
     lprintk(D_PROXI, "[star Proximity] start!!!--------------------------------------------------------------------------\n");
-
-	#ifndef CONFIG_MACH_STAR_REV_D
-	//star_proxi_vddio_vi_power_onoff( 22, true );	
-	#endif
 
     s_proximity.proxi_out_gpio = NvOdmGpioOpen();
     if (!s_proximity.proxi_out_gpio)
@@ -645,7 +646,7 @@ err_open_gpio_fail:
 
     return ret;
 
-	#endif
+#endif
 }
 
 static int proximity_remove(struct platform_device *pdev)

@@ -1005,10 +1005,8 @@ u32 sleep_pinmux_reg[TRISTATE_REG_NUM + PIN_MUX_CTL_REG_NUM + PULLUPDOWN_REG_NUM
 //20100724  for gpio setting while sleep [LGE_START]
 static u32 sleep_pinmux_reg[TRISTATE_REG_NUM + PIN_MUX_CTL_REG_NUM + PULLUPDOWN_REG_NUM] = 
 {
-	
-#if defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT)	// for SU660
 	// TRISTATE		:   ( 0->normal,   1->tristate)
-	0xf716fff9,		//  TRISTATE[0]
+	0xf736fff9,		//  TRISTATE[0]
 	0xdfe4bfdf,		//  TRISTATE[1]
  	0xffffffff,		//  TRISTATE[2]
  	0xff7fdbff,		//  TRISTATE[3]
@@ -1027,31 +1025,6 @@ static u32 sleep_pinmux_reg[TRISTATE_REG_NUM + PIN_MUX_CTL_REG_NUM + PULLUPDOWN_
  	0x00aa6655,		//  PULLUPDOWN[2]
  	0xa1a55a8a,		//  PULLUPDOWN[3]
  	0xa000200a,		//  PULLUPDOWN[4]
- 	
-#else	// for LGP990
-
-	// TRISTATE		:   ( 0->normal,   1->tristate)
-	0xf716fff9,		//  TRISTATE[0]
-	0xdfe4bfdf,		//  TRISTATE[1]
- 	0xffffffff,		//  TRISTATE[2]
- 	0xff7fdbff,		//  TRISTATE[3]
- 	//PIN_MUX_CONTROL
- 	0x02a32036,		//  PIN_MUX_CONTROL[0]
- 	0xa8a01403,		//  PIN_MUX_CONTROL[1]
- 	0xa00a00d5,		//  PIN_MUX_CONTROL[2]
- 	0xfffaa943,		//  PIN_MUX_CONTROL[3]
- 	0x00000000,		//  PIN_MUX_CONTROL[4]
- 	0x00000000,		//  PIN_MUX_CONTROL[5]
- 	0x00c00000,		//  PIN_MUX_CONTROL[6]
- 	0x00000000,		//  PIN_MUX_CONTROL[7]
- 	// PULL UP/DOWN   : ( 0->normal,  1-> pull Up,  2-> pull Down,  3-> RSVD )
- 	0x215556aa,		//  PULLUPDOWN[0]
- 	0x0000aa00,		//  PULLUPDOWN[1]
- 	0x00aa6655,		//  PULLUPDOWN[2]
- 	0xa1a55a8a,		//  PULLUPDOWN[3]
- 	0xa000200a,		//  PULLUPDOWN[4]
-#endif 	
- 
 };
 #endif
 

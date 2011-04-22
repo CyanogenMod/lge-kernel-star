@@ -1150,7 +1150,7 @@ void NvOdmServicesPmuGetVoltage(
         NvU32 vddId,
         NvU32 * pMilliVolts );
 
-#if defined(CONFIG_MACH_STAR) //20100704  headset porting [LGE]
+#if defined(CONFIG_MACH_STAR) //20100704  jongik's headset porting [LGE]
 NvU32 NvOdmServicesPmuGetHookValue( 
         NvOdmServicesPmuHandle handle);
 #endif

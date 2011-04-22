@@ -257,6 +257,8 @@ static inline void mmc_set_bus_resume_policy(struct mmc_host *host, int manual)
 
 extern int mmc_resume_bus(struct mmc_host *host);
 
+//20110214, , add cancel_delayed_work when device is entered suspend
+extern int mmc_cancel_delayed_work(struct mmc_host *, pm_message_t);
 extern int mmc_suspend_host(struct mmc_host *, pm_message_t);
 extern int mmc_resume_host(struct mmc_host *);
 

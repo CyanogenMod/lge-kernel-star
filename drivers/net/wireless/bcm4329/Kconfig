@@ -20,10 +20,11 @@ config BCM4329_GPIO_BT_RESET
 	default 93
 	depends on BCM4329
 
-config BCM4329_GPIO_WL_RESET
-	int "GPIO WL_RESET"
-	default 110
-	depends on BCM4329
+#, 20101105, Kconfig deleted  
+#config BCM4329_GPIO_WL_RESET
+#	int "GPIO WL_RESET"
+#	default 110
+#	depends on BCM4329
 
 config BRCM_LGE_WL_HOSTWAKEUP
 	bool "Support BCM4325/BCM4329 Host Wakeup function"
@@ -73,9 +74,5 @@ config BRCM_USE_SOFTAP
 
 config BRCM_USE_STATIC_BUF
 	bool "Use static buff of osl_malloc"
-	default n
-	depends on BCM4329
-config LGE_WMM_SKT
-	bool "Use WMM rule for SKT"
 	default n
 	depends on BCM4329

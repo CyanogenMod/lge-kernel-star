@@ -1,13 +1,5 @@
 
-#if defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT)
-// Temperature Monitor (TMON)
-{
-    NV_ODM_GUID('a','d','t','7','4','6','1',' '),
-    s_lge_Tmon0Addresses,
-    NV_ARRAY_SIZE(s_lge_Tmon0Addresses),
-    NvOdmPeripheralClass_Other
-},
-#elif defined(CONFIG_MACH_STAR_REV_F)	// modified in LGP990 revF
+#if 1
 // Temperature Monitor (TMON)
 {
     NV_ODM_GUID('a','d','t','7','4','6','1',' '),
@@ -18,7 +10,7 @@
 #endif
 
 #if defined(CONFIG_MACH_STAR)
-//20100413, power off [START]
+//20100413, , power off [START]
 //POWER OFF
 {
     NV_VDD_SoC_ODM_ID,
@@ -26,19 +18,19 @@
     NV_ARRAY_SIZE(s_lge_SocOdmAddresses),
     NvOdmPeripheralClass_Other
 },
-//20100413, power off [END]
+//20100413, , power off [END]
 
-//20100703, PMIC reset [START]
+//20100703, , PMIC reset [START]
 {
     NV_ODM_GUID('p','m','_','r','e','s','e','t'),
     s_lge_PowerResetAddresses,
     NV_ARRAY_SIZE(s_lge_PowerResetAddresses),
     NvOdmPeripheralClass_Other
 },
-//20100703, PMIC reset [END]
+//20100703, , PMIC reset [END]
 #endif
 
-//20100413, powerkey [START]
+//20100413, , powerkey [START]
 #if defined(CONFIG_MACH_STAR)
 {
     NV_ODM_GUID('p','o','w','e','r','k','e','y'),
@@ -47,20 +39,7 @@
     NvOdmPeripheralClass_Other
 },
 #endif
-//20100413, powerkey [END]
-
-//20101129, , SU660 homekey [START]
-#if defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT)
-#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F) 
-{
-    NV_ODM_GUID('h','o','m','e','-','k','e','y'),
-    s_lge_HomeKeyAddresses,
-    NV_ARRAY_SIZE(s_lge_HomeKeyAddresses),
-    NvOdmPeripheralClass_Other
-},
-#endif
-#endif
-//20101129, , SU660 homekey [END]
+//20100413, , powerkey [END]
 
 // LCD module
 {
@@ -439,17 +418,6 @@
     NvOdmPeripheralClass_Other
 },
 
-// 20100927  Synaptics OneTouch support [START]
-//	Touch Panel
-{
-// Synaptics touch is used, GUID needs to be changed accordingly
-	NV_ODM_GUID('o','n','e','t','o','u','c','h'),
-	s_lge_SynapticsOneTouchAddresses,
-	NV_ARRAY_SIZE(s_lge_SynapticsOneTouchAddresses),
-	NvOdmPeripheralClass_HCI
-},
-// 20100927  Synaptics OneTouch support [END]
-
 // 20100527  Synaptics/Cypress Touch support [START]
 //	Touch Panel
 {
@@ -519,7 +487,13 @@
 
 // Bluetooth on COMMs Module
 {
+/* 20100815  for bluetooth on [LGE_START] */
+#if defined (CONFIG_MACH_STAR)
      NV_ODM_GUID('b','l','u','t','o','o','t','h'),
+#else
+     NV_ODM_GUID('b','c','m','_','4','3','2','9'), // ORIGINAL
+#endif
+/* 20100815  for bluetooth on [LGE_END] */
      s_lge_BluetoothAddresses,
      NV_ARRAY_SIZE(s_lge_BluetoothAddresses),
      NvOdmPeripheralClass_Other
@@ -555,16 +529,16 @@
 },
 //LGE_UPDATE_E  2010-05-024 GPS UART & GPIO Setting
 
-//20100611, Touch LED [START]
+//20100611, , Touch LED [START]
 {
     NV_ODM_GUID('t','o','u','c','h','L','E','D'), 
     s_lge_TouchLEDAddresses,
     NV_ARRAY_SIZE(s_lge_TouchLEDAddresses),
     NvOdmPeripheralClass_Other
 },
-//20100611, Touch LED [END]
+//20100611, , Touch LED [END]
 
-//20100603, star pmic [START]
+//20100603, , star pmic [START]
 #ifdef CONFIG_STAR_PMIC
 {
     NV_ODM_GUID('a','l','l','p','o','w','e','r'), 
@@ -573,7 +547,7 @@
     NvOdmPeripheralClass_Other
 },
 #endif
-//20100603, star pmic [END]
+//20100603, , star pmic [END]
 
 //20100730, , star cpwatcher [START]
 #if defined(CONFIG_MACH_STAR)
@@ -585,18 +559,4 @@
 },
 #endif /* CONFIG_MACH_STAR */
 //20100730, , star cpwatcher [END]
-
-#ifdef CONFIG_SPI_TDMB	
-//20100918  TDMB Base [START_LGE_LAB1]
-//20100912,  [START]	
-{
-	NV_ODM_GUID('s','p','i','_','t','d','m','b'),
-	s_tdmbSIC2102Addresses,
-	NV_ARRAY_SIZE(s_tdmbSIC2102Addresses),
-	NvOdmPeripheralClass_Other
-},
-//20100912,  [END]
-//20100918  TDMB Base [END_LGE_LAB1]
-#endif
-
 

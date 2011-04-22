@@ -3,7 +3,7 @@
 
 static inline void machine_emergency_restart(void)
 {
-	machine_restart(NULL);
+	machine_restart("panic");
 }
 
 #endif /* _ASM_GENERIC_EMERGENCY_RESTART_H */

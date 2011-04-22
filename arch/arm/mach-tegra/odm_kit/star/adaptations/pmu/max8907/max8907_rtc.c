@@ -101,10 +101,10 @@ Max8907RtcCountRead(
             // get seconds since reference time value given
             // year, month, day, hour, minutes and seconds
             // NOTE: Using linux specific API mktime for conversion
-            *Count = mktime(YYYY, (MM + 1), DD, Hours, Minutes, Seconds);
+            *Count = mktime(YYYY, (MM), DD, Hours, Minutes, Seconds);
             NVODMPMU_PRINTF(("\n Rtc read count=0x%x ", *Count));
             NVODMPMU_PRINTF(("\n mktime: YYYY=%d MM=%d DD=%d Hr=%d Min=%d "
-                "Sec=%d, *Count=0x%x ", YYYY, (MM + 1), DD, Hours, Minutes,
+                "Sec=%d, *Count=0x%x ", YYYY, (MM), DD, Hours, Minutes,
                 Seconds, *Count));
 #if NV_DEBUG
             // Call to verify that reverse conversion of seconds matches date
@@ -179,10 +179,10 @@ Max8907RtcAlarmCountRead(
             // get seconds since reference time value given
             // year, month, day, hour, minutes and seconds
             // NOTE: Using linux specific API mktime for conversion
-            *Count = mktime(YYYY, (MM + 1), DD, Hours, Minutes, Seconds);
+            *Count = mktime(YYYY, (MM), DD, Hours, Minutes, Seconds);
             NVODMPMU_PRINTF(("\n [Alarm] Rtc read count=0x%x ", *Count));
             NVODMPMU_PRINTF(("\n [Alarm] mktime: YYYY=%d MM=%d DD=%d Hr=%d Min=%d "
-                "Sec=%d, *Count=0x%x ", YYYY, (MM + 1), DD, Hours, Minutes,
+                "Sec=%d, *Count=0x%x ", YYYY, (MM), DD, Hours, Minutes,
                 Seconds, *Count));
 #if NV_DEBUG
             // Call to verify that reverse conversion of seconds matches date
@@ -248,7 +248,7 @@ Max8907RtcCountWrite(
 
         // convert date to bcd format
         BcdDD = DECIMAL_TO_BCD((NvU8)tm.tm_mday);
-        BcdMM = DECIMAL_TO_BCD((NvU8)tm.tm_mon);
+        BcdMM = DECIMAL_TO_BCD((NvU8)tm.tm_mon+1);
         YYYY = (NvU16)tm.tm_year + LINUX_RTC_BASE_YEAR;
         BcdYY1 = DECIMAL_TO_BCD((NvU8)(YYYY % 100));
         BcdYY2 = DECIMAL_TO_BCD((NvU8)(YYYY / 100));
@@ -326,7 +326,7 @@ Max8907RtcAlarmCountWrite(
 
         // convert date to bcd format
         BcdDD = DECIMAL_TO_BCD((NvU8)tm.tm_mday);
-        BcdMM = DECIMAL_TO_BCD((NvU8)tm.tm_mon);
+        BcdMM = DECIMAL_TO_BCD((NvU8)tm.tm_mon+1);
         YYYY = (NvU16)tm.tm_year + LINUX_RTC_BASE_YEAR;
         BcdYY1 = DECIMAL_TO_BCD((NvU8)(YYYY % 100));
         BcdYY2 = DECIMAL_TO_BCD((NvU8)(YYYY / 100));

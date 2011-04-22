@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdh_sdmmc.c,v 1.1.2.5.6.30 2010/08/13 00:36:19 Exp $
+ * $Id: bcmsdh_sdmmc.c,v 1.1.2.5.6.30.4.1 2010/09/02 23:12:21 Exp $
  */
 #include <typedefs.h>
 
@@ -35,10 +35,6 @@
 #include <sdiovar.h>	/* ioctl/iovars */
 
 #include <linux/mmc/core.h>
-#if defined(CONFIG_LGE_BCM432X_PATCH)
-#include <linux/mmc/host.h>
-#include <linux/mmc/card.h>
-#endif	/* CONFIG_LGE_BCM432X_PATCH */
 #include <linux/mmc/sdio_func.h>
 #include <linux/mmc/sdio_ids.h>
 
@@ -66,11 +62,7 @@ extern int sdio_reset_comm(struct mmc_card *card);
 extern PBCMSDH_SDMMC_INSTANCE gInstance;
 
 uint sd_sdmode = SDIOH_MODE_SD4;	/* Use SD4 mode by default */
-#if !defined(CONFIG_LGE_BCM432X_PATCH)
 uint sd_f2_blocksize = 512;		/* Default blocksize */
-#else
-uint sd_f2_blocksize = 64;		/* Default blocksize */
-#endif	/* CONFIG_LGE_BCM432X_PATCH */
 
 uint sd_divisor = 2;			/* Default 48MHz/2 = 24MHz */
 
@@ -683,6 +675,7 @@ sdioh_enable_hw_oob_intr(sdioh_info_t *sd, bool enable)
 		data = 3;	/* enable hw oob interrupt */
 	else
 		data = 4;	/* disable hw oob interrupt */
+	data |= 4;		/* Active HIGH */
 
 	status = sdioh_request_byte(sd, SDIOH_WRITE, 0, 0xf2, &data);
 	return status;
@@ -974,22 +967,6 @@ sdioh_request_packet(sdioh_info_t *sd, uint fix_inc, uint write, uint func,
 	return ((err_ret == 0) ? SDIOH_API_RC_SUCCESS : SDIOH_API_RC_FAIL);
 }
 
-#if defined(CONFIG_LGE_BCM432X_PATCH)
-#define PKTALIGN(osh, p, len, align)					\
-	do {								\
-		uint datalign;						\
-		datalign = (uintptr)PKTDATA((osh), (p));		\
-		datalign = ROUNDUP(datalign, (align)) - datalign;	\
-		ASSERT(datalign < (align));				\
-		ASSERT(PKTLEN((osh), (p)) >= ((len) + datalign));	\
-		if (datalign)						\
-			PKTPULL((osh), (p), datalign);			\
-		PKTSETLEN((osh), (p), (len));				\
-	} while (0)
-#ifndef DHD_SDALIGN
-#define DHD_SDALIGN 32
-#endif
-#endif	/* CONFIG_LGE_BCM432X_PATCH */
 
 /*
  * This function takes a buffer or packet, and fixes everything up so that in the
@@ -1018,25 +995,14 @@ sdioh_request_buffer(sdioh_info_t *sd, uint pio_dma, uint fix_inc, uint write, u
 		sd_data(("%s: Creating new %s Packet, len=%d\n",
 		         __FUNCTION__, write ? "TX" : "RX", buflen_u));
 #ifdef DHD_USE_STATIC_BUF
-#if !defined(CONFIG_LGE_BCM432X_PATCH)
 		if (!(mypkt = PKTGET_STATIC(sd->osh, buflen_u, write ? TRUE : FALSE))) {
 #else
-		if (!(mypkt = PKTGET_STATIC(sd->osh, buflen_u + DHD_SDALIGN, write ? TRUE : FALSE))) {
-#endif	/* CONFIG_LGE_BCM432X_PATCH */
-#else
-#if !defined(CONFIG_LGE_BCM432X_PATCH)
 		if (!(mypkt = PKTGET(sd->osh, buflen_u, write ? TRUE : FALSE))) {
-#else
-		if (!(mypkt = PKTGET(sd->osh, buflen_u + DHD_SDALIGN, write ? TRUE : FALSE))) {
-#endif	/* CONFIG_LGE_BCM432X_PATCH */
 #endif /* DHD_USE_STATIC_BUF */
 			sd_err(("%s: PKTGET failed: len %d\n",
 			           __FUNCTION__, buflen_u));
 			return SDIOH_API_RC_FAIL;
 		}
-#if defined(CONFIG_LGE_BCM432X_PATCH)	
-		PKTALIGN(osh, mypkt, buflen_u, DHD_SDALIGN);
-#endif	/* CONFIG_LGE_BCM432X_PATCH */
 
 		/* For a write, copy the buffer data into the packet. */
 		if (write) {
@@ -1063,25 +1029,14 @@ sdioh_request_buffer(sdioh_info_t *sd, uint pio_dma, uint fix_inc, uint write, u
 		sd_data(("%s: Creating aligned %s Packet, len=%d\n",
 		         __FUNCTION__, write ? "TX" : "RX", PKTLEN(sd->osh, pkt)));
 #ifdef DHD_USE_STATIC_BUF
-#if !defined(CONFIG_LGE_BCM432X_PATCH)
 		if (!(mypkt = PKTGET_STATIC(sd->osh, PKTLEN(sd->osh, pkt), write ? TRUE : FALSE))) {
 #else
-		if (!(mypkt = PKTGET_STATIC(sd->osh, PKTLEN(sd->osh, pkt) + DHD_SDALIGN, write ? TRUE : FALSE))) {
-#endif /* CONFIG_LGE_BCM432X_PATCH */
-#else
-#if !defined(CONFIG_LGE_BCM432X_PATCH)
 		if (!(mypkt = PKTGET(sd->osh, PKTLEN(sd->osh, pkt), write ? TRUE : FALSE))) {
-#else
-		if (!(mypkt = PKTGET(sd->osh, PKTLEN(sd->osh, pkt) + DHD_SDALIGN, write ? TRUE : FALSE))) {
-#endif
 #endif /* DHD_USE_STATIC_BUF */
 			sd_err(("%s: PKTGET failed: len %d\n",
 			           __FUNCTION__, PKTLEN(sd->osh, pkt)));
 			return SDIOH_API_RC_FAIL;
 		}
-#if defined(CONFIG_LGE_BCM432X_PATCH)	
-		PKTALIGN(osh, mypkt, PKTLEN(sd->osh, pkt), DHD_SDALIGN);
-#endif	/* CONFIG_LGE_BCM432X_PATCH */
 
 		/* For a write, copy the buffer data into the packet. */
 		if (write) {
@@ -1116,11 +1071,14 @@ sdioh_request_buffer(sdioh_info_t *sd, uint pio_dma, uint fix_inc, uint write, u
 extern int
 sdioh_abort(sdioh_info_t *sd, uint func)
 {
+#if defined(MMC_SDIO_ABORT)
+	char t_func = (char) func;
+#endif /* defined(MMC_SDIO_ABORT) */
 	sd_trace(("%s: Enter\n", __FUNCTION__));
 
 #if defined(MMC_SDIO_ABORT)
 	/* issue abort cmd52 command through F1 */
-	sdioh_request_byte(sd, SD_IO_OP_WRITE, SDIO_FUNC_0, SDIOD_CCCR_IOABORT, (uint8 *)&func);
+	sdioh_request_byte(sd, SD_IO_OP_WRITE, SDIO_FUNC_0, SDIOD_CCCR_IOABORT, &t_func);
 #endif /* defined(MMC_SDIO_ABORT) */
 
 	sd_trace(("%s: Exit\n", __FUNCTION__));
@@ -1139,12 +1097,6 @@ int sdioh_sdio_reset(sdioh_info_t *si)
 void
 sdioh_sdmmc_devintr_off(sdioh_info_t *sd)
 {
-#if defined(CONFIG_LGE_BCM432X_PATCH)
-	struct mmc_card *card = gInstance->func[0]->card;
-	struct mmc_host *host = card->host;
-
-	host->ops->enable_sdio_irq(host, 0);
-#endif	/* CONFIG_LGE_BCM432X_PATCH */
 	sd_trace(("%s: %d\n", __FUNCTION__, sd->use_client_ints));
 	sd->intmask &= ~CLIENT_INTR;
 }
@@ -1153,15 +1105,8 @@ sdioh_sdmmc_devintr_off(sdioh_info_t *sd)
 void
 sdioh_sdmmc_devintr_on(sdioh_info_t *sd)
 {
-#if defined(CONFIG_LGE_BCM432X_PATCH)
-	struct mmc_card *card = gInstance->func[0]->card;
-	struct mmc_host *host = card->host;
-#endif	/* CONFIG_LGE_BCM432X_PATCH */
 	sd_trace(("%s: %d\n", __FUNCTION__, sd->use_client_ints));
 	sd->intmask |= CLIENT_INTR;
-#if defined(CONFIG_LGE_BCM432X_PATCH)
-	host->ops->enable_sdio_irq(host, 1);
-#endif	/* CONFIG_LGE_BCM432X_PATCH */
 }
 
 /* Read client card reg */

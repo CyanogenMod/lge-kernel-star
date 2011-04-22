@@ -328,9 +328,6 @@ dhd_prot_hdrpush(dhd_pub_t *dhd, int ifidx, void *pktbuf)
 {
 #ifdef BDC
 	struct bdc_header *h;
-#if defined(CONFIG_LGE_WMM_SKT)
-	uint8 priority;
-#endif
 #endif /* BDC */
 
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
@@ -348,16 +345,7 @@ dhd_prot_hdrpush(dhd_pub_t *dhd, int ifidx, void *pktbuf)
 		h->flags |= BDC_FLAG_SUM_NEEDED;
 
 
-#if defined(CONFIG_LGE_WMM_SKT)
-	priority = (PKTPRIO(pktbuf) & BDC_PRIORITY_MASK);
-	if(priority == 5){
-		h->priority = 6;
-	} else {
-		h->priority = priority;
-	}
-#else
 	h->priority = (PKTPRIO(pktbuf) & BDC_PRIORITY_MASK);
-#endif	/* CONFIG_LGE_WMM_SKT */
 	h->flags2 = 0;
 	h->rssi = 0;
 #endif /* BDC */

@@ -11,6 +11,4 @@ obj-y += nvodm_touch.o
 # 20100414  for Star Touch Compile
 obj-y += nvodm_touch_synaptics.o
 obj-y += nvodm_touch_cypress.o
-# 20100919  for Star OneTouch
-obj-y += nvodm_onetouch.o
-obj-y += nvodm_onetouch_synaptics.o
+

@@ -37,27 +37,6 @@
 #include <linux/mmc/sdio_func.h>
 #include <linux/mmc/sdio_ids.h>
 
-/* LGE_CHANGE_S [] 2009-11-19, Support Host Wakeup */
-#if defined(CONFIG_BRCM_LGE_WL_HOSTWAKEUP)
-
-#include <linux/earlysuspend.h>
-#include <mach/gpio.h>
-#include <linux/irq.h>
-#include <linux/mmc/host.h>
-#include <linux/wakelock.h>
-
-#define GPIO_WLAN_HOST_WAKE CONFIG_BCM4329_GPIO_WL_HOSTWAKEUP
-
-//struct wake_lock wlan_host_wakelock; 		//by sjpark 10-12-22 : idle time current (not used)
-struct wake_lock wlan_host_wakelock_resume;
-int dhd_suspend_context = FALSE;
-
-extern int del_wl_timers(void);
-extern void register_mmc_card_pm(struct early_suspend *);
-extern void unregister_mmc_card_pm(void);
-#endif /* CONFIG_BRCM_LGE_WL_HOSTWAKEUP */
-/* LGE_CHANGE_E [] 2009-11-19, Support Host Wakeup */
-
 #if !defined(SDIO_VENDOR_ID_BROADCOM)
 #define SDIO_VENDOR_ID_BROADCOM		0x02d0
 #endif /* !defined(SDIO_VENDOR_ID_BROADCOM) */
@@ -75,15 +54,11 @@ extern void unregister_mmc_card_pm(void);
 #endif /* !defined(SDIO_DEVICE_ID_BROADCOM_4329) */
 #if !defined(SDIO_DEVICE_ID_BROADCOM_4319)
 #define SDIO_DEVICE_ID_BROADCOM_4319	0x4319
-#endif /* !defined(SDIO_DEVICE_ID_BROADCOM_4319) */
+#endif /* !defined(SDIO_DEVICE_ID_BROADCOM_4329) */
 
 #include <bcmsdh_sdmmc.h>
 
 #include <dhd_dbg.h>
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_PM_SLEEP)
-extern volatile bool dhd_mmc_suspend;
-#endif
 
 extern void sdioh_sdmmc_devintr_off(sdioh_info_t *sd);
 extern void sdioh_sdmmc_devintr_on(sdioh_info_t *sd);
@@ -108,31 +83,6 @@ PBCMSDH_SDMMC_INSTANCE gInstance;
 extern int bcmsdh_probe(struct device *dev);
 extern int bcmsdh_remove(struct device *dev);
 struct device sdmmc_dev;
-
-#if defined(CONFIG_BRCM_LGE_WL_HOSTWAKEUP)
-extern int dhdsdio_bussleep(void *bus, bool sleep);
-extern bool dhdsdio_dpc(void *bus);
-extern int dhd_os_proto_block(void *pub);
-extern int dhd_os_proto_unblock(void * pub);
-extern void *dhd_es_get_dhd_pub(void);
-extern void *dhd_es_get_dhd_bus_sdh(void);
-static int dhd_register_early_suspend(void);
-static int dhd_unregister_early_suspend(void);
-void dhd_early_suspend(struct early_suspend *h);
-void dhd_late_resume(struct early_suspend *h);
-static struct early_suspend early_suspend_data = {
-	.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 20,
-	.suspend = dhd_early_suspend,
-	.resume = dhd_late_resume
-};
-DECLARE_WAIT_QUEUE_HEAD(bussleep_wake);
-typedef struct dhd_early_suspend {
-	bool state;
-	bool drv_loaded;
-	struct dhd_bus_t *bus;
-} dhd_early_suspend_t;
-dhd_early_suspend_t dhd_early_suspend_ctrl = { 0, 0, 0};
-#endif /* CONFIG_BRCM_LGE_WL_HOSTWAKEUP */
 
 static int bcmsdh_sdmmc_probe(struct sdio_func *func,
                               const struct sdio_device_id *id)
@@ -230,157 +180,6 @@ sdioh_sdmmc_osfree(sdioh_info_t *sd)
 	MFREE(sd->osh, sdos, sizeof(struct sdos_info));
 }
 
-#if defined(CONFIG_HAS_EARLYSUSPEND)
-
-void
-dhd_es_set_dhd_bus(void *bus)
-{
-#if defined(CONFIG_BRCM_LGE_WL_HOSTWAKEUP)
-	dhd_early_suspend_ctrl.bus = bus;
-#endif
-}
-
-void *
-dhd_es_get_dhd_bus(void)
-{
-#if defined(CONFIG_BRCM_LGE_WL_HOSTWAKEUP)
-	return dhd_early_suspend_ctrl.bus;
-#else
-	return NULL;
-#endif
-}
-
-bool
-dhd_early_suspend_state(void)
-{
-#if defined(CONFIG_BRCM_LGE_WL_HOSTWAKEUP)
-	return dhd_early_suspend_ctrl.state;
-#else
-	return 0;
-#endif
-}
-
-#endif
-
-#if defined(CONFIG_BRCM_LGE_WL_HOSTWAKEUP)
-
-static int
-dhd_es_lock_dhd_bus(void)
-{
-/* LGE_CHANGE_S, [], 2010-04-22, WBT Fix */
-// WBT Fix TD# 36996
-    	void *bus;
-	bus = dhd_es_get_dhd_pub();
-	if ( bus )
-		dhd_os_proto_block(bus);
-/* LGE_CHANGE_S, [], 2010-04-22, WBT Fix */
-	return 0;
-}
-
-static int
-dhd_es_unlock_dhd_bus(void)
-{
-/* LGE_CHANGE_S, [], 2010-04-22, WBT Fix */
-// WBT Fix TD# 36997
-	void *bus;
-	bus = dhd_es_get_dhd_pub();
-	if ( bus )
-		dhd_os_proto_unblock(bus);
-/* LGE_CHANGE_S, [], 2010-04-22, WBT Fix */
-	return 0;
-}
-
-static void dhd_enable_sdio_irq(int enable)
-{
-	struct mmc_card *card;
-	struct mmc_host *host;
-
-	if(gInstance->func[0] == NULL){
-		printk("[sdmmc]%s:%d - PBCMSDH_SDMMC_INSTANCE func[0] is NULL\n",__func__,__LINE__);
-		return;
-	}
-
-	card = gInstance->func[0]->card;
-	host = card->host;
-
-	host->ops->enable_sdio_irq(host, enable);
-}
-
-static int dhd_suspend(void)
-{
-	int bus_state;
-	int max_tries = 3;
-	int gpio = 0;
-
-	printk("[sdmmc]%s:%d - enter\n",__func__,__LINE__);
-	DHD_TRACE(("%s: SUSPEND Enter\n", __FUNCTION__));
-
-	if (NULL != dhd_early_suspend_ctrl.bus) {
-		dhd_es_lock_dhd_bus();
-
-		do {
-			bus_state = dhdsdio_bussleep(dhd_early_suspend_ctrl.bus, TRUE);
-			if (bus_state == BCME_BUSY)
-			{
-
-				/* 250ms timeout */
-				wait_event_timeout(bussleep_wake, FALSE, HZ/4);
-				DHD_TRACE(("%s in loop\n", __FUNCTION__));
-			}
-		} while ((bus_state == BCME_BUSY) && (max_tries-- > 0));
-
-		if(max_tries <= 0)
-		{
-			DHD_ERROR(("[sdmmc]%s:%d - bus_state is BUSY, dhdsdio_bussleep Fail\n",__func__,__LINE__));
-			dhd_es_unlock_dhd_bus();
-			/* This value should be returned to mmc_suspend*/
-			return -1;
-		}
-
-		dhd_early_suspend_ctrl.state = TRUE;
-		gpio = gpio_get_value(GPIO_WLAN_HOST_WAKE);
-		printk("[sdmmc]%s:%d - GPIO_WLAN_HOST_WAKE [%d:%d]\n",__func__,__LINE__,GPIO_WLAN_HOST_WAKE,gpio);
-		DHD_TRACE(("%s: SUSPEND Done gpio->%d\n", __FUNCTION__, gpio));
-	}
-	else
-		DHD_ERROR(("[sdmmc]%s:%d - dhd_early_suspend_t bus is NULL\n",__func__,__LINE__));
-
-	printk("[sdmmc]%s:%d - end\n",__func__,__LINE__);
-	return 0;
-}
-
-static int dhd_resume(void)
-{
-	int gpio = 0;
-
-	dhd_enable_sdio_irq(FALSE);
-	dhd_suspend_context = FALSE;
-
-	printk("[sdmmc]%s:%d - enter\n",__func__,__LINE__);
-	DHD_TRACE(("%s: RESUME Enter\n", __FUNCTION__));
-
-	if (NULL != dhd_early_suspend_ctrl.bus) {
-		dhd_early_suspend_ctrl.state = FALSE;
-
-		//wake_lock_timeout(&wlan_host_wakelock_resume, 2*HZ);
-		wake_lock(&wlan_host_wakelock_resume);			//by sjpark 10-12-22 : idle time current 
-
-		dhdsdio_dpc(dhd_early_suspend_ctrl.bus);
-		dhd_es_unlock_dhd_bus();
-
-		gpio = gpio_get_value(GPIO_WLAN_HOST_WAKE);
-		printk("[sdmmc]%s:%d - GPIO_WLAN_HOST_WAKE [%d:%d]\n",__func__,__LINE__,GPIO_WLAN_HOST_WAKE,gpio);
-		DHD_TRACE(("%s: RESUME Done gpio->%d\n", __FUNCTION__, gpio));
-		wake_unlock(&wlan_host_wakelock_resume);			//by sjpark 10-12-22 : idle time current 
-	}
-	else
-		DHD_ERROR(("[sdmmc]%s:%d - dhd_early_suspend_t bus is NULL\n",__func__,__LINE__));
-
-	return 0;
-}
-
-#endif /* CONFIG_BRCM_LGE_WL_HOSTWAKEUP */
-
 /* Interrupt enable/disable */
 SDIOH_API_RC
 sdioh_interrupt_set(sdioh_info_t *sd, bool enable)
@@ -454,12 +253,6 @@ int sdio_function_init(void)
 	bzero(&sdmmc_dev, sizeof(sdmmc_dev));
 	error = sdio_register_driver(&bcmsdh_sdmmc_driver);
 
-#if defined(CONFIG_BRCM_LGE_WL_HOSTWAKEUP)
-	if (!error) {
-		dhd_register_early_suspend();
-		DHD_TRACE(("%s: registered with Android PM\n", __FUNCTION__));
-	}
-#endif /* CONFIG_BRCM_LGE_WL_HOSTWAKEUP */
 
 	return error;
 }
@@ -472,137 +265,9 @@ void sdio_function_cleanup(void)
 {
 	sd_trace(("%s Enter\n", __FUNCTION__));
 
-#if defined(CONFIG_BRCM_LGE_WL_HOSTWAKEUP)
-	sdio_claim_host(gInstance->func[0]);
-	dhd_enable_sdio_irq(FALSE);
-	sdio_release_host(gInstance->func[0]);
-	dhd_unregister_early_suspend();
-	dhd_suspend_context = TRUE;
-#endif /* CONFIG_BRCM_LGE_WL_HOSTWAKEUP */
 
 	sdio_unregister_driver(&bcmsdh_sdmmc_driver);
 
 	if (gInstance)
 		kfree(gInstance);
 }
-
-
-#if defined(CONFIG_BRCM_LGE_WL_HOSTWAKEUP)
-
-extern int dhdsdio_set_dtim(void *bus, int enalbe);		//by sjpark 10-12-15
-
-void dhd_early_suspend(struct early_suspend *h)
-{
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_PM_SLEEP)
-            dhd_mmc_suspend = FALSE;
-#endif
-	DHD_TRACE(("%s: enter\n", __FUNCTION__));
-
-	dhd_suspend_context = TRUE;
-	
-	/* If chip active is done, do put the device to suspend */
-	del_wl_timers();
-
-	dhdsdio_set_dtim(dhd_early_suspend_ctrl.bus, TRUE);		//by sjpark 10-12-15
-
-	if(dhd_suspend() < 0) {
-		dhd_enable_sdio_irq(TRUE); /* make sure one more for testing, later */
-		DHD_ERROR(("%s: dhd_suspend() failed\n", __FUNCTION__));
-		return;
-	} 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_PM_SLEEP)
-        dhd_mmc_suspend = TRUE;
-#endif
-}
-EXPORT_SYMBOL(dhd_early_suspend);
-
-void dhd_late_resume(struct early_suspend *h)
-{
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_PM_SLEEP)
-            dhd_mmc_suspend = FALSE;
-#endif
-
-	printk(KERN_ERR "%s: enter\n", __FUNCTION__);
-	DHD_TRACE(("%s: enter\n", __FUNCTION__));
-
-	if(dhd_suspend_context == TRUE ){
-
-	/*Do the resume operations*/
-	dhd_resume();
-	}
-	else 
-		printk("%s: Do not dhd_suspend mode setting.\n",__FUNCTION__);
-
-	dhdsdio_set_dtim(dhd_early_suspend_ctrl.bus, FALSE);		//by sjpark 10-12-15
-
-	return;
-}
-EXPORT_SYMBOL(dhd_late_resume);
-
-/**
- * Initializes the module.
- * @return On success, 0. On error, -1, and <code>errno</code> is set
- * appropriately.
- */
-static int
-dhd_register_hwakeup(void)
-{
-	int ret=0;
-
-	printk("[sdmmc]%s:%d - enter\n",__func__,__LINE__);
-
-	/* wake lock initialize */
-	printk("[sdmmc]%s:%d - wake lock initialize\n",__func__,__LINE__);
-   	//wake_lock_init(&wlan_host_wakelock, WAKE_LOCK_SUSPEND, "WLAN_HOST_WAKE");		//by sjpark 10-12-22 : idle time current (not used)
-   	wake_lock_init(&wlan_host_wakelock_resume, WAKE_LOCK_SUSPEND, "WLAN_HOST_WAKE_RESUME");	
-
-	printk("[sdmmc]%s:%d - end\n",__func__,__LINE__);
-	return ret;
-}
-
-static void
-dhd_unregister_hwakeup(void)
-{
-	printk("[sdmmc]%s:%d - Do not anything\n",__func__,__LINE__);
-}
-
-static int
-dhd_register_early_suspend(void)
-{
-	printk("[sdmmc]%s:%d - enter\n",__func__,__LINE__);
-
-	/* LGE_CHANGE_S [] 2009-01-14, Support Host Wakeup */
-	dhd_early_suspend_ctrl.drv_loaded = TRUE;
-
-	register_mmc_card_pm(&early_suspend_data);
-	dhd_register_hwakeup();
-	printk("[sdmmc]%s:%d - GPIO_WLAN_HOST_WAKE [%d:%d]\n",
-			__func__,__LINE__, GPIO_WLAN_HOST_WAKE, gpio_get_value(GPIO_WLAN_HOST_WAKE));
-	/* LGE_CHANGE_E [] 2010-01-14, Support Host Wakeup */
-
-	printk("[sdmmc]%s:%d - end\n",__func__,__LINE__);
-	return 0;
-}
-
-static int
-dhd_unregister_early_suspend(void)
-{
-	printk("[sdmmc]%s:%d - enter\n",__func__,__LINE__);
-
-	/* LGE_CHANGE_S [] 2009-01-14, Support Host Wakeup */
-	if (dhd_early_suspend_ctrl.drv_loaded == FALSE) 
-		return 0;
-	dhd_unregister_hwakeup();
-	printk("[sdmmc]%s:%d - GPIO_WLAN_HOST_WAKE [%d:%d]\n",
-			__func__,__LINE__, GPIO_WLAN_HOST_WAKE, gpio_get_value(GPIO_WLAN_HOST_WAKE));
-	unregister_mmc_card_pm();
-	/* Destroy the wake lock */
-	//wake_lock_destroy(&wlan_host_wakelock);			//by sjpark 10-12-22 : idle time current (not used)
-	wake_lock_destroy(&wlan_host_wakelock_resume);
-	/* LGE_CHANGE_E [] 2010-01-14, Support Host Wakeup */
-
-	printk("[sdmmc]%s:%d - end\n",__func__,__LINE__);
-	return 0;
-}
-
-#endif /* CONFIG_BRCM_LGE_WL_HOSTWAKEUP */

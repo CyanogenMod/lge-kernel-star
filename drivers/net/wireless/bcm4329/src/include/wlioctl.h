@@ -24,7 +24,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wlioctl.h,v 1.601.4.15.2.14.2.62 2010/08/19 01:20:12 Exp $
+ * $Id: wlioctl.h,v 1.601.4.15.2.14.2.62.4.2 2011/01/19 01:20:44 Exp $
  */
 
 
@@ -253,6 +253,12 @@ typedef struct wl_join_params {
 #define WL_JOIN_PARAMS_FIXED_SIZE 	(sizeof(wl_join_params_t) - sizeof(chanspec_t))
 
 #define WLC_CNTRY_BUF_SZ	4		
+
+typedef struct wl_country {
+	char country_abbrev[WLC_CNTRY_BUF_SZ];	
+	int32 rev;				
+	char ccode[WLC_CNTRY_BUF_SZ];		
+} wl_country_t;
 
 
 typedef enum sup_auth_status {
@@ -857,6 +863,7 @@ typedef struct wl_ioctl {
 #define PM_MAX	1
 #define PM_FAST 2
 
+#define LISTEN_INTERVAL			20
 
 #define	INTERFERE_NONE	0	
 #define	NON_WLAN	1	

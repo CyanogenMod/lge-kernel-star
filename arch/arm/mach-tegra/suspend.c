@@ -456,6 +456,12 @@ static void tegra_suspend_dram(bool lp0_ok)
 	} else {
 		NvRmPrivPowerSetState(s_hRmGlobal, NvRmPowerState_LP0);
 
+        //20110213, , sched_clock mismatch issue after deepsleep [START]
+        #if defined(CONFIG_MACH_STAR)
+        tegra_lp0_sched_clock_clear();
+        #endif
+        //20110213, , sched_clock mismatch issue after deepsleep [END]
+
 		mode |= TEGRA_POWER_CPU_PWRREQ_OE;
 		mode |= TEGRA_POWER_PWRREQ_OE;
 		mode |= TEGRA_POWER_EFFECT_LP0;
@@ -763,7 +769,6 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 
 	/* Always enable CPU power request; just normal polarity is supported */
 	reg = readl(pmc + PMC_CTRL);
-    //20101005  infinit reset
 	BUG_ON(reg & (TEGRA_POWER_CPU_PWRREQ_POLARITY << TEGRA_POWER_PMC_SHIFT));
 	reg |= (TEGRA_POWER_CPU_PWRREQ_OE << TEGRA_POWER_PMC_SHIFT);
 	pmc_32kwritel(reg, PMC_CTRL);

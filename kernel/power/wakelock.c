@@ -31,7 +31,7 @@ enum {
 	DEBUG_EXPIRE = 1U << 3,
 	DEBUG_WAKE_LOCK = 1U << 4,
 };
-static int debug_mask = DEBUG_EXIT_SUSPEND | DEBUG_WAKEUP;
+static int debug_mask = DEBUG_EXIT_SUSPEND | DEBUG_WAKEUP | DEBUG_SUSPEND;
 module_param_named(debug_mask, debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 
 #define WAKE_LOCK_TYPE_MASK              (0x0f)
@@ -253,7 +253,7 @@ long has_wake_lock(int type)
 	unsigned long irqflags;
 	spin_lock_irqsave(&list_lock, irqflags);
 	ret = has_wake_lock_locked(type);
-	if (ret &&  /* (debug_mask & DEBUG_SUSPEND) && */ type == WAKE_LOCK_SUSPEND)	//20110106  for log about active wakelocks
+	if (ret && (debug_mask & DEBUG_SUSPEND) && type == WAKE_LOCK_SUSPEND)	//20110106  for log about active wakelocks
 		print_active_locks(type);
 	spin_unlock_irqrestore(&list_lock, irqflags);
 	return ret;
@@ -265,7 +265,7 @@ static void suspend(struct work_struct *work)
 	int entry_event_num;
 
 	if (has_wake_lock(WAKE_LOCK_SUSPEND)) {
-		//if (debug_mask & DEBUG_SUSPEND)	//20110106  for log about active wakelocks
+		if (debug_mask & DEBUG_SUSPEND)
 			pr_info("suspend: abort suspend\n");
 		return;
 	}

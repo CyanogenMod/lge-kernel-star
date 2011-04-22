@@ -431,6 +431,8 @@ extern void sdhci_remove_host(struct sdhci_host *host, int dead);
 extern void sdhci_card_detect_callback(struct sdhci_host *host);
 
 #ifdef CONFIG_PM
+//20110214, , cancel delayed work queue when the device enter sleep 
+extern int sdhci_cancel_delayed_work(struct sdhci_host *host, pm_message_t state);
 extern int sdhci_suspend_host(struct sdhci_host *host, pm_message_t state);
 extern int sdhci_resume_host(struct sdhci_host *host);
 #endif

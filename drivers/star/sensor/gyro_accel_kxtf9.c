@@ -75,6 +75,11 @@ static atomic_t		flip_flag;
 #define GYRO_ACCEL_I2C_MAX_RETRY 5
 #define GYRO_ACCEL_I2C_TIMEOUT 10
 
+char brdrev[5]; 
+#define BD_REVB	"B" 
+#define BD_REVC "C"
+
+
 struct accelerometer_data {
     NvU32 x;
     NvU32 y;
@@ -416,14 +421,48 @@ static int kxtf9_get_acceleration_data_test(int *xyz_mg)
 	xyz_mg[1] = -hw_mg[0];
 	xyz_mg[2] = -hw_mg[2];
 #elif defined(STAR_COUNTRY_US) && defined(STAR_OPERATOR_TMO)
+
+	if(!strncmp(brdrev,BD_REVB,1)){
+		xyz_mg[0] = hw_mg[0];
+		xyz_mg[1] = -hw_mg[1];
+		xyz_mg[2] = -hw_mg[2];
+	} else { 
+		xyz_mg[0] = hw_mg[1];
+		xyz_mg[1] = -hw_mg[0];
+		xyz_mg[2] = hw_mg[2];  
+	}
+#elif defined(STAR_COUNTRY_CA) && defined(STAR_OPERATOR_AWC)
+	if(!strncmp(brdrev,BD_REVB,1)){
+		xyz_mg[0] = hw_mg[0];
+		xyz_mg[1] = -hw_mg[1];
+		xyz_mg[2] = -hw_mg[2];
+	} else { 
+		xyz_mg[0] = hw_mg[1];
+		xyz_mg[1] = -hw_mg[0];
+		xyz_mg[2] = hw_mg[2];  
+	}
+#elif defined(STAR_COUNTRY_CA) && defined(STAR_OPERATOR_AVC)
+	if(!strncmp(brdrev,BD_REVB,1)){
 	xyz_mg[0] = hw_mg[0];
 	xyz_mg[1] = -hw_mg[1];
 	xyz_mg[2] = -hw_mg[2];
+	} else { 
+		xyz_mg[0] = hw_mg[1];
+		xyz_mg[1] = -hw_mg[0];
+		xyz_mg[2] = hw_mg[2];  
+	}
 #else
+	if(!strncmp(brdrev,BD_REVB,1)){
+		xyz_mg[0] = hw_mg[0];
+		xyz_mg[1] = -hw_mg[1];
+		xyz_mg[2] = -hw_mg[2];
+	} else { 
 	xyz_mg[0] = hw_mg[1];
 	xyz_mg[1] = -hw_mg[0];
 	xyz_mg[2] = hw_mg[2];
+	}
 #endif
+
 
 	//printk("YJ- CNT=[  %4d,  %4d,  %4d] , ACC=[  %4d,  %4d,  %4d] \n", hw_cnt[0], hw_cnt[1], hw_cnt[2], hw_mg[0], hw_mg[1] , hw_mg[2] );
 	return 0;
@@ -987,7 +1026,7 @@ void star_accel_process_screen_rotation(unsigned char tilt_pos_pre, unsigned cha
 		break;
 	}
 
-	if((tilt_pos_cur == 0x01) || (tilt_pos_cur == 0x02))
+	//if((tilt_pos_cur == 0x01) || (tilt_pos_cur == 0x02))
 	{
 		if(call_once == 1)
 		{

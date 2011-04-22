@@ -48,18 +48,7 @@
 #include <star_hw_definition.h>
 #include <star_pinmux_definition.h>
 
-#if defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT)
-static const NvOdmIoAddress s_lge_Tmon0Addresses[] = 
-{
-    { NvOdmIoModule_I2c_Pmu, 0x00, 0x98, 0 },               /* I2C bus */
-    { NvOdmIoModule_Vdd, 0x00, Max8907PmuSupply_LDO15, 0 }, /* TMON pwer rail -> D4REG */
-    { NvOdmIoModule_Gpio, 'k' - 'a', 2, 0 },                /* GPIO Port K and Pin 2 */
-
-    /* Temperature zone mapping */
-    { NvOdmIoModule_Tsense, NvOdmTmonZoneID_Core, ADT7461ChannelID_Remote, 0 }, /* TSENSOR */
-    { NvOdmIoModule_Tsense, NvOdmTmonZoneID_Ambient, ADT7461ChannelID_Local, 0 }, /* TSENSOR */
-};
-#elif defined(CONFIG_MACH_STAR_REV_F)	// modified in LGP990 revF
+#if 1
 static const NvOdmIoAddress s_lge_Tmon0Addresses[] = 
 {
     { NvOdmIoModule_I2c_Pmu, 0x00, 0x98, 0 },               /* I2C bus */
@@ -73,40 +62,29 @@ static const NvOdmIoAddress s_lge_Tmon0Addresses[] =
 #endif
 
 #if defined(CONFIG_MACH_STAR)
-//20100413, power off [START]
+//20100413, , power off [START]
 static const NvOdmIoAddress s_lge_SocOdmAddresses[] =
 {
     { NvOdmIoModule_Vdd, 0x00, Max8907PmuSupply_SOC, 0 },
 };
-//20100413, power off [END]
+//20100413, , power off [END]
 
-//20100703, power reset [START]
+//20100703, , power reset [START]
 static const NvOdmIoAddress s_lge_PowerResetAddresses[] =
 {
     { NvOdmIoModule_Vdd, 0x00, Max8907PmuSupply_reset, 0 },
 };
-//20100703, power reset [END]
+//20100703, , power reset [END]
 #endif
 
-//20100413, powerkey [START]
+//20100413, , powerkey [START]
 #if defined(CONFIG_MACH_STAR)
 static const NvOdmIoAddress s_lge_PowerKeyAddresses[] =
 {
     { NvOdmIoModule_Gpio, 'v' - 'a' , 2, 0 },
 };
 #endif
-//20100413, powerkey [END]
-
-//20101129, , SU660 homekey [START]
-#if defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT)
-#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F) 
-static const NvOdmIoAddress s_lge_HomeKeyAddresses[] =
-{
-    { NvOdmIoModule_Gpio, 'v' - 'a' , 6, 0 },
-};
-#endif
-#endif
-//20101129, , SU660 homekey [END]
+//20100413, , powerkey [END]
 
 static const NvOdmIoAddress s_lge_HdmiAddresses[] =
 {
@@ -361,7 +339,9 @@ static const NvOdmIoAddress s_lge_SdioAddresses[] =
     { NvOdmIoModule_Vdd, 0x00, Max8907PmuSupply_LDO12, 0 }, // 2.8V microSD(VDDIO_SDIO) 
     { NvOdmIoModule_Vdd, 0x00, Max8907PmuSupply_LX_V3, 0 }, // 1.8V eMMC VCCQ & microSD detect(VDDIO_NAND)
     //20100727 it should be always on for (a03 deepsleep isseu) work around [START]
-    #if defined(CONFIG_MACH_STAR_REV_B)   
+    #if defined(CONFIG_MACH_STAR)
+    //do nothing
+    #else
     { NvOdmIoModule_Vdd, 0x00, Max8907PmuSupply_LDO5, 0 }, // eMMC 2.8V VCC
     #endif
     //20100727 it should be always on for (a03 deepsleep isseu) work around [END]
@@ -371,9 +351,7 @@ static const NvOdmIoAddress s_lge_SdioAddresses[] =
 static const NvOdmIoAddress s_lge_VibAddresses[] =
 {
     { NvOdmIoModule_Vdd, 0x0, Max8907PmuSupply_LDO13, 0 }, // VCC_MOTOR_3V0
-#if defined (CONFIG_MACH_STAR_REV_A)
-    { NvOdmIoModule_Gpio, 'u' - 'a', 5, 0 }, //VIBE_EN
-#else
+#if defined (CONFIG_MACH_STAR)
     { NvOdmIoModule_Gpio, 'u' - 'a', 4, 0 }, //VIBE_EN
 #endif
 };
@@ -408,10 +386,10 @@ static const NvOdmIoAddress s_lge_GyroAddresses[] =
 static const NvOdmIoAddress s_lge_ProximityAddresses[] =
 {
 	{ NvOdmIoModule_I2c,  0x01, 0x44, 0 }, /* I2C device address is 0x44 */
-#if defined (CONFIG_MACH_STAR_REV_E) || defined (CONFIG_MACH_STAR_REV_F)
-	{ NvOdmIoModule_Gpio, 'w' - 'a', 2, 0 }, 
-#elif defined (CONFIG_MACH_STAR_REV_D)
+#if defined (CONFIG_MACH_STAR_MDM_C)
 	{ NvOdmIoModule_Gpio, 'r' - 'a', 2, 0 }, 
+#elif defined (CONFIG_MACH_STAR_REV_F)
+	{ NvOdmIoModule_Gpio, 'w' - 'a', 2, 0 }, 
 #else
 	{ NvOdmIoModule_Gpio, 'a' - 'a', 0, 0 }, 
 #endif
@@ -465,18 +443,6 @@ static const NvOdmIoAddress s_lge_TouchPanelAddresses[] =
 #endif
 
 #if defined(CONFIG_MACH_STAR)
-// 20100927   Synaptics OneTouch support [START]
-static const NvOdmIoAddress s_lge_SynapticsOneTouchAddresses[] = 
-{
-	{ NvOdmIoModule_I2c, 0x00, 0x2C, 0 },						/* GEN1_I2C instance = 0x00, OneTouch IC I2C Address = 0x2C */
-	{ NvOdmIoModule_Gpio, 'j' - 'a', 6, 0 },					/* GPIO Port J and Pin 6, Int */
-	{ NvOdmIoModule_Vdd, 0x00, Max8907PmuSupply_LDO16, 0 },	// VCC_TOUCH_1V8
-#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F) // 20101120  power off when Onetouch close
-	{ NvOdmIoModule_I2c_Pmu, 0x00, Max8907PmuSupply_LDO19, 0 },	// TOUCH_I2C_1V8
-#endif 
-};
-// 20100927   Synaptics OneTouch support [END]
-
 // 20100527  Synaptics/Cypress Touch support [START]
 static const NvOdmIoAddress s_lge_SynapticsTouchAddresses[] = 
 {
@@ -500,24 +466,15 @@ static const NvOdmIoAddress s_lge_CypressTouchAddresses[] =
 #if defined (CONFIG_MACH_STAR)
 static const NvOdmIoAddress s_lge_MuicAddresses[] = 
 {
-#if defined (CONFIG_MACH_STAR_REV_A)
-    { NvOdmIoModule_I2c, 0x00, 0x44, 0 },            /* GEN1_I2C instance = 0x00, Muic IC I2C Address = 0x44 */
-#endif
     { NvOdmIoModule_Gpio, 'u' - 'a', 0, 0 }, /* INT_N_MUIC */
     { NvOdmIoModule_Gpio, 'u' - 'a', 1, 0 }, /* AP20_UART_SW */
     { NvOdmIoModule_Gpio, 'u' - 'a', 2, 0 }, /* IFX_UART_SW   */
-    { NvOdmIoModule_Gpio, 'u' - 'a', 3, 0 }, /* USIF1_SW  */
-#if defined(CONFIG_MACH_STAR_REV_D) || defined(CONFIG_MACH_STAR_REV_E) || defined(CONFIG_MACH_STAR_REV_F)
-//20100917  for IFX_USB_VBUS_EN GPIO Port # for SKT  [START]
-#if defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT)
-    { NvOdmIoModule_Gpio, 'r' - 'a', 5, 0 }, /* IFX_USB_VBUS_EN  */
+#if defined(CONFIG_MACH_STAR)
+    { NvOdmIoModule_Gpio, 'r' - 'a', 7, 0 }, /* MDM_USB_VBUS_EN  */
 #else
-//for P990 Below...
-    { NvOdmIoModule_Gpio, 'r' - 'a', 7, 0 }, /* IFX_USB_VBUS_EN  */
+#error MUIC PIN not assigned
+    { NvOdmIoModule_Gpio, 'u' - 'a', 3, 0 }, /* USIF1_SW  */
 #endif
-//20100917  for IFX_USB_VBUS_EN GPIO Port # for SKT  [END]
-#endif
-
 };
 #endif
 // 20100401  MUIC driver [END]
@@ -543,11 +500,25 @@ static const NvOdmIoAddress s_lge_BackLightAddresses[] =
 #if defined (CONFIG_MACH_STAR)
 static const NvOdmIoAddress s_lge_SpiAddresses[] = 
 {
+#if defined (CONFIG_MACH_STAR_REV_F)
     { NvOdmIoModule_Gpio, 'o' - 'a', 5, 0 }, 
     { NvOdmIoModule_Gpio, 'o' - 'a', 0, 0 }, 
+#else
+//20100729-1, , Crazy!!, it changed [START]
+    { NvOdmIoModule_Gpio, 'u' - 'a', 6, 0},	//SRDY1 //{ NvOdmIoModule_Gpio, 'o' - 'a', 5},	//SRDY2 
+    { NvOdmIoModule_Gpio, 'j' - 'a', 6, 0}, //MRDY1//{ NvOdmIoModule_Gpio, 'o' - 'a', 0}, //MRDY2
+//20100729, , Crazy!!, it changed [END]
+#endif
 //20100711-1, , Add spi controller 0 and chip select 0 [START]
     { NvOdmIoModule_Spi, AP20_SPI1,  0x0, 0 }, /* Spi Controller 0 and Chip Select 0 */
 //20100711, , Add spi controller 0 and chip select 0 [END]
+//20100809-1, , Add SPI2 for AP-CP IPC [START]
+#ifdef CONFIG_DUAL_SPI
+    { NvOdmIoModule_Gpio, 'o' - 'a', 5, 0},	//SRDY2 
+    { NvOdmIoModule_Gpio, 'o' - 'a', 0, 0}, //MRDY2
+    { NvOdmIoModule_Spi, AP20_SPI2,  0x0, 0}, /* Spi Controller 1 and Chip Select 0 */
+#endif
+//20100809, , Add SPI2 for AP-CP IPC [END]
 };
 #endif
 //20100424, , RIL code from firenze [END]
@@ -556,7 +527,9 @@ static const NvOdmIoAddress s_lge_SpiAddresses[] =
 static const NvOdmIoAddress s_lge_BluetoothAddresses[] =
 {
     { NvOdmIoModule_Uart, 0x2,  0x0, 0 }, //Instance 2 means UART3.
-#if defined(CONFIG_MACH_STAR_SKT_REV_D) || defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_REV_F)
+#if defined (CONFIG_MACH_STAR_MDM_C)
+    { NvOdmIoModule_Gpio, 'q' - 'a', 4, 0 }, // bt_en
+#elif defined (CONFIG_MACH_STAR_REV_F)
     { NvOdmIoModule_Gpio, 'z' - 'a', 2, 0 }, // bt_en
 #else
     { NvOdmIoModule_Gpio, 'q' - 'a', 4, 0 }, // bt_en
@@ -569,8 +542,10 @@ static const NvOdmIoAddress s_lge_BluetoothAddresses[] =
 static const NvOdmIoAddress s_lge_WlanAddresses[] =
 {
     { NvOdmIoModule_Sdio, 0x0, 0x0, 0 },    // WLAN is on SD Bus
-#if defined(CONFIG_MACH_STAR_SKT_REV_D) || defined(CONFIG_MACH_STAR_REV_F)
-    { NvOdmIoModule_Gpio, 'w' - 'a', 1, 0 }, // wlan_en
+#if defined (CONFIG_MACH_STAR_MDM_C)
+    { NvOdmIoModule_Gpio, 'q' - 'a', 3, 0 }, // wlan_en
+#elif defined (CONFIG_MACH_STAR_REV_F)
+    { NvOdmIoModule_Gpio, 'w' - 'a', 1 }, // wlan_en
 #else
     { NvOdmIoModule_Gpio, 'q' - 'a', 3, 0 }, // wlan_en
 #endif    
@@ -581,28 +556,12 @@ static const NvOdmIoAddress s_lge_WlanAddresses[] =
 
 //20100421  [LGE_START]
 #if defined (CONFIG_MACH_STAR)
-#if !defined(STAR_COUNTRY_KR)//Global 						//20101005  Gpio MicBias[START_LGE_LAB1]
 static const NvOdmIoAddress s_lge_HeadsetAddresses[] = 
 {
     { NvOdmIoModule_Gpio, 'g' - 'a', 3, 0 }, //Headset Detection
     { NvOdmIoModule_Gpio, 'd' - 'a', 3, 0 }, //hook Detection //jongik2.kim 20100803 HOOK_DETECTION    
-    { NvOdmIoModule_Vdd, 0x00, Max8907PmuSupply_LDO12, 0 }, //hook detection power rail
+    { NvOdmIoModule_Vdd, 0x00, Max8907PmuSupply_LDO12, 0 },	// hook detection power rail
 };
-#else //KR
-static const NvOdmIoAddress s_lge_HeadsetAddresses[] = 
-{
-    { NvOdmIoModule_Gpio, 'g' - 'a', 3, 0 }, //Headset Detection
-#if defined(CONFIG_MACH_STAR_SKT_REV_A)
-    { NvOdmIoModule_Gpio, 'd' - 'a', 3, 0 }, //hook Detection //jongik2.kim 20100803 HOOK_DETECTION     
-#elif defined(CONFIG_MACH_STAR_SKT_REV_B)||defined(CONFIG_MACH_STAR_SKT_REV_C)
-    { NvOdmIoModule_Gpio, 'h' - 'a', 3, 0 }, //TEST
-#else
-    { NvOdmIoModule_Gpio, 'n' - 'a', 5, 0 }, //CONFIG_MACH_STAR_SKT_REV_D //20101101  Gpio MicBias[START_LGE_LAB1]
-#endif
-	{ NvOdmIoModule_Gpio, 'h' - 'a', 1, 0 },  //Headset MicBias
-    { NvOdmIoModule_Vdd, 0x00, Max8907PmuSupply_LDO12, 0 }, //hook detection power rail
-};
-#endif /*STAR_COUNTRY_KR*/ //20101005  Gpio MicBias[END_LGE_LAB1]
 #endif /* CONFIG_MACH_STAR */
 //20100421  [LGE_END]
 
@@ -679,15 +638,15 @@ static const NvOdmIoAddress s_lge_GPSAddresses[] =
 //LGE_UPDATE_E  2010-05-024 GPS UART & GPIO Setting
 
 
-//20100611, Touch LED [START]
+//20100611, , Touch LED [START]
 static const NvOdmIoAddress s_lge_TouchLEDAddresses[] = 
 {
 	{ NvOdmIoModule_Vdd, 0x00, Max8907PmuSupply_WHITE_LED, 0 },   //Touch LED
 };
-//20100611, Touch LED [END]
+//20100611, , Touch LED [END]
 
 
-//20100603, star pmic [START]
+//20100603, , star pmic [START]
 #ifdef CONFIG_STAR_PMIC
 static const NvOdmIoAddress s_lge_AllRailAddresses[] =
 {
@@ -713,21 +672,5 @@ static const NvOdmIoAddress s_lge_AllRailAddresses[] =
     { NvOdmIoModule_Vdd, 0x00, Max8907PmuSupply_LDO20, 0 },
 };
 #endif
-//20100603, star pmic [END]
-
-#ifdef CONFIG_SPI_TDMB	
-//20100918  TDMB Base [START_LGE_LAB1]
-//20100912,  [START]	
-static const NvOdmIoAddress s_tdmbSIC2102Addresses[] =
-{
-    { NvOdmIoModule_Spi, AP20_SPI2,  0x0, 0 },                      /* Spi Controller 0 and Chip Select 0 */
-    { NvOdmIoModule_Gpio, 'r' - 'a', 0x7, 0 },                      /* GPIO Port R and Pin 7 DMB_EN */
-    { NvOdmIoModule_Gpio, 'o' - 'a', 0x7, 0 },                      /* GPIO Port O and Pin 7 DMB_RESET */
-    { NvOdmIoModule_Gpio, 'o' - 'a', 0x6, 0 },                      /* GPIO Port O and Pin 6 DMB_INT */
-    { NvOdmIoModule_Gpio, 'x' - 'a', 0x7, 0 }                      /* GPIO Port X and Pin 7 DMB_EAR_ANT */
-};
-//20100912,  [END]
-//20100918  TDMB Base [END_LGE_LAB1]
-#endif
-
+//20100603, , star pmic [END]
 

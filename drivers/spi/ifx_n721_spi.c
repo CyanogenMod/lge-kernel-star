@@ -52,19 +52,9 @@
 
 #include <linux/spi/ifx_n721_spi.h>
 
-#include <linux/io.h>
-#include <mach/iomap.h>
-
-//20100927-1, , Hold wake-lock for cp interrupt [START]
-#define WAKE_LOCK_RESUME
-#ifdef WAKE_LOCK_RESUME
-#include <linux/wakelock.h>
-#endif
-//20100927, , Hold wake-lock for cp interrupt [END]
-
 //20100701-1, , delay time until CP can be ready again [START]
 #include <linux/delay.h>
-#define MRDY_DELAY_TIME	400	//20101127-1, , Change delay time for transcation : 1000us -> 400us
+#define MRDY_DELAY_TIME	1000
 //20100701-1, , delay time until CP can be ready again [END]
 
 #define SPI_GUID                NV_ODM_GUID('s','t','a','r','-','s','p','i')	//20100607, , add spi guid
@@ -158,12 +148,6 @@ struct ifx_spi_data {
         unsigned int		throttle;
         struct work_struct      ifx_work;
         struct work_queue_struct *ifx_wq;
-//20100927-1, , Hold wake-lock for cp interrupt [START]
-#ifdef WAKE_LOCK_RESUME
-	struct wake_lock wake_lock;
-	unsigned int		wake_lock_flag;
-#endif
-//20100927, , Hold wake-lock for cp interrupt [END]
 };
 
 union ifx_spi_frame_header{
@@ -280,11 +264,70 @@ ifx_spi_close(struct tty_struct *tty, struct file *filp)
  * Once data read from MODEM is transferred to TTY core flip buffers, then "ifx_read_write_completion" is set
  * and this function returns number of bytes sent to MODEM
  */
+
+//LGE_TELECA_CR1317_DATA_THROUGHPUT START
+//#define LGE_DUMP_SPI_BUFFER
+#ifdef LGE_DUMP_SPI_BUFFER
+#define DUMP_SPI_BUFFER_SIZE 64
+static void DUMP_SPI_BUFFER(const unsigned char *txt, const unsigned char *buf, int count)
+{
+    char dump_buf_str[DUMP_SPI_BUFFER_SIZE];
+
+    if (buf != NULL)
+    {
+        int i = 0;
+        int str_len = 0;
+        int written_len = 0;
+        unsigned char cur_byte = 0;
+        char *cur_str = dump_buf_str;
+        while (i  < count)
+        {
+            if ((cur_byte < 32) || (cur_byte > 126))
+            {
+                // not a character
+                written_len = snprintf(cur_str, DUMP_SPI_BUFFER_SIZE - str_len, "%02X ", cur_byte);
+                if (written_len > 0 && written_len < (DUMP_SPI_BUFFER_SIZE - str_len))
+                {
+                    // written_len characters are successfully written
+                    str_len += written_len;
+                    cur_str += written_len;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            else
+            {
+                // a character
+                *cur_str = cur_byte;
+                ++str_len;
+                ++cur_str;
+            }
+            
+            if ((str_len+1) >= DUMP_SPI_BUFFER_SIZE)
+            {
+                break;
+            }
+            
+            ++i;
+        }
+        *cur_str = 0;
+        printk("%s:count:%d [ %s]\n", txt, count, dump_buf_str);
+    }
+    else
+    {
+        printk("%s: buffer is NULL\n", txt);
+    }
+}
+#else
+#define DUMP_SPI_BUFFER(...)
+#endif //LGE_DUMP_SPI_BUFFER
+//LGE_TELECA_CR1317_DATA_THROUGHPUT END
+
 static int 
 ifx_spi_write(struct tty_struct *tty, const unsigned char *buf, int count)
 {	
-	unsigned int u32register = 0 ;
-	unsigned int value  = 0;
 	struct ifx_spi_data *spi_data = (struct ifx_spi_data *)tty->driver_data;
 
 	if(spi_data==NULL)
@@ -294,6 +337,9 @@ ifx_spi_write(struct tty_struct *tty, const unsigned char *buf, int count)
 	}
 
         ifx_ret_count = 0;
+
+	DUMP_SPI_BUFFER(__FUNCTION__, buf, count);
+
 	spi_data->ifx_tty = tty;
 	spi_data->ifx_tty->low_latency = 1;
 	if( !buf ){
@@ -307,27 +353,10 @@ ifx_spi_write(struct tty_struct *tty, const unsigned char *buf, int count)
 	ifx_master_initiated_transfer = 1;
 	ifx_spi_buf = buf;
 	ifx_spi_count = count;
-	//printk("%s - %d\n", __FUNCTION__, __LINE__); 
+	SPI_DEBUG_PRINT("ifx_spi_write\n");	
 	ifx_spi_set_mrdy_signal(1);  
-//20101127-2, , Add spi 10sec wait_timeout of SRDY [START]	
-	//wait_for_completion(&spi_data->ifx_read_write_completion);	
-	//printk("%s - %d\n", __FUNCTION__, __LINE__); 	
-	wait_for_completion_timeout(&spi_data->ifx_read_write_completion, 2*HZ);	
-	//printk("%s - %d\n", __FUNCTION__, __LINE__); 	
-	if(ifx_ret_count==0)
-	{	
-		u32register = readl(IO_ADDRESS(0x6000d1b8));
-		//printk("%s - %d\n", __FUNCTION__, __LINE__);	
-		//lge_debug[D_SPI].enable = 1;
-		printk("%s -u32register = %08X, SRDY = %d\n", __FUNCTION__, u32register, ((u32register>>5)&0x00000001)); 
-		//printk("%s - %d\n", __FUNCTION__, __LINE__);	
-		ifx_spi_set_mrdy_signal(0);  
-		//printk("%s - timeout!! Can't get SRDY from CP for 1sec. Set MRDY high to low\n", __FUNCTION__); 		
-	}
-//20101127-2, , Add spi 10sec wait_timeout of SRDY [END]	
+	wait_for_completion(&spi_data->ifx_read_write_completion);
 	init_completion(&spi_data->ifx_read_write_completion);
-
-	SPI_DEBUG_PRINT("%s - %d\n", __FUNCTION__, __LINE__); 
 
 	return ifx_ret_count; /* Number of bytes sent to the device */
 }
@@ -405,6 +434,7 @@ ifx_spi_probe(struct spi_device *spi)
         dev_set_drvdata(&spi->dev,spi_data);
         spin_lock_init(&spi_data->spi_lock);
         INIT_WORK(&spi_data->ifx_work,ifx_spi_handle_work);
+        SPI_DEBUG_PRINT("[e] INIT_WORK\n");
 
         spi_data->ifx_wq = create_singlethread_workqueue("ifxn721");
         if(!spi_data->ifx_wq){
@@ -425,13 +455,6 @@ ifx_spi_probe(struct spi_device *spi)
         if(status < 0){
 		printk("Failed to setup SPI \n");
         }             
-
-//20100927-1, , Hold wake-lock for cp interrupt [START]
-#ifdef WAKE_LOCK_RESUME
-	wake_lock_init(&spi_data->wake_lock, WAKE_LOCK_SUSPEND, "mspi_wake");
-	spi_data->wake_lock_flag = 0;
-#endif
-//20100927-1, , Hold wake-lock for cp interrupt [END]
 
 //20100607, , add MRDY pin setup[START] 
 	pConnectivity = NvOdmPeripheralGetGuid(SPI_GUID);      
@@ -454,6 +477,7 @@ ifx_spi_probe(struct spi_device *spi)
 
 	/* Enable SRDY Interrupt request - If the SRDY signal is high then ifx_spi_handle_srdy_irq() is called */
 	status = request_irq(spi->irq, ifx_spi_handle_srdy_irq,  IRQF_TRIGGER_RISING, spi->dev.driver->name, spi_data);
+	SPI_DEBUG_PRINT("[e] spi->irq:%d  status:%d\n", spi->irq, status);
 	if (status != 0){
 		printk(KERN_ERR "Failed to request IRQ for SRDY\n");
 		printk(KERN_ERR "IFX SPI Probe Failed\n");
@@ -515,7 +539,7 @@ static int ifx_spi_suspend(struct platform_device *dev, pm_message_t state)
     // Clear power key wakeup pad bit.
     if (reg & WAKEUP_IFX_SRDY_MASK)
     {
-        //printk("[IFX_SRDY] %s() wakeup pad : 0x%lx\n", __func__, reg);
+        printk("[IFX_SRDY] %s() wakeup pad : 0x%lx\n", __func__, reg);
         writel(WAKEUP_IFX_SRDY_MASK, pmc_base + PMC_WAKE_STATUS);
     }
 
@@ -530,18 +554,7 @@ static int ifx_spi_resume(struct platform_device *dev)
     reg = readl(pmc_base + PMC_WAKE_STATUS);
 
     if (reg & WAKEUP_IFX_SRDY_MASK) {
-//20100927-1, , Hold wake-lock for cp interrupt [START]
-#ifdef	WAKE_LOCK_RESUME
-	//printk("[IFX_SRDY] %s() wake lock : 0x%lx\n", __func__, &gspi_data->wake_lock);
-	if(&gspi_data->wake_lock)
-		wake_lock_timeout(&gspi_data->wake_lock, 50);	//20101203-1, , change 3 to 1 for power consumption
-#endif
-//20100927-1, , Hold wake-lock for cp interrupt [END]
         printk("[IFX_SRDY] %s() wakeup pad : 0x%lx\n", __func__, reg);
-#ifdef CONFIG_LPRINTK
-	 lge_debug[D_SPI].enable = 1;
-#endif
-	 gspi_data->wake_lock_flag = 1;
         queue_work(gspi_data->ifx_wq, &gspi_data->ifx_work);
     }
 
@@ -664,16 +677,7 @@ ifx_spi_get_header_info(unsigned int *valid_buf_size)
 		header.framesbytes[i] = ifx_rx_buffer[/*3-*/i];
 	}
 
-//20101127-2, , Discard if mux size is bigger than MAX SIZE [START]
-	if(header.ifx_spi_header.curr_data_size>IFX_SPI_MAX_BUF_SIZE)	//20101201-1, , bug fix : >= -> >
-	{
-		printk("%s - invalid header : 0x%x 0x%x 0x%x 0x%x!!!\n", __FUNCTION__, header.framesbytes[0], header.framesbytes[1], header.framesbytes[2], header.framesbytes[3]);
-		*valid_buf_size = 0;
-	}
-	else
 		*valid_buf_size = header.ifx_spi_header.curr_data_size;
-//20101127-2, , Discard if mux size is bigger than MAX SIZE [END]
-
 	if(header.ifx_spi_header.more){
 		return header.ifx_spi_header.next_data_size;
 	}
@@ -715,6 +719,8 @@ ifx_spi_get_next_frame_size(int count)
 static void 
 ifx_spi_setup_transmission(void)
 {
+	SPI_DEBUG_PRINT("[e] ifx_spi_setup_transmission\n");
+
 	if( (ifx_sender_buf_size != 0) || (ifx_receiver_buf_size != 0) ){
 		if(ifx_sender_buf_size > ifx_receiver_buf_size){
 			ifx_current_frame_size = ifx_sender_buf_size;
@@ -762,10 +768,11 @@ ifx_spi_send_and_receive_data(struct ifx_spi_data *spi_data)
 	unsigned int rx_valid_buf_size;
 	int status = 0; 
 
-	SPI_DEBUG_PRINT("SPI TX : ");
-	dump_atcmd(ifx_tx_buffer, ifx_tx_buffer[0]) ; 	
+	SPI_DEBUG_PRINT("SPI tx(%d) : %x %x %x %x\n", ifx_ret_count, ifx_tx_buffer[0], ifx_tx_buffer[1], ifx_tx_buffer[2], ifx_tx_buffer[3]);
 	status = ifx_spi_sync_read_write(spi_data, ifx_current_frame_size+IFX_SPI_HEADER_SIZE); /* 4 bytes for header */                         
 	if(status > 0){
+		DUMP_SPI_BUFFER(__FUNCTION__"[tx]", &(ifx_tx_buffer[4]), ifx_current_frame_size);
+
 		memset(ifx_tx_buffer,0,IFX_SPI_MAX_BUF_SIZE+IFX_SPI_HEADER_SIZE);
 		ifx_ret_count = ifx_ret_count + ifx_valid_frame_size;
 	}
@@ -779,10 +786,11 @@ ifx_spi_send_and_receive_data(struct ifx_spi_data *spi_data)
 	/* Handling Received data */
 	ifx_receiver_buf_size = ifx_spi_get_header_info(&rx_valid_buf_size);
 
-	SPI_DEBUG_PRINT("SPI RX : ");
-	dump_atcmd(ifx_rx_buffer, 20) ; 	
-
 	if((spi_data->throttle == 0) && (rx_valid_buf_size != 0) && (spi_data->ifx_tty!=NULL)){	//20100711-3, , check ifx_tty
+
+		SPI_DEBUG_PRINT("SPI rx(%d) : %x %x %x %x\n", rx_valid_buf_size, ifx_rx_buffer[0], ifx_rx_buffer[1], ifx_rx_buffer[2], ifx_rx_buffer[3]); 
+		DUMP_SPI_BUFFER(__FUNCTION__"[rx]", &(ifx_rx_buffer[4]), rx_valid_buf_size);
+
 		tty_insert_flip_string(spi_data->ifx_tty, ifx_rx_buffer+IFX_SPI_HEADER_SIZE, rx_valid_buf_size);
 		tty_flip_buffer_push(spi_data->ifx_tty);
 	}  
@@ -791,13 +799,6 @@ ifx_spi_send_and_receive_data(struct ifx_spi_data *spi_data)
 	handle RTS and CTS in SPI flow control
 	Reject the packet as of now 
 	}*/
-		if(spi_data->wake_lock_flag)
-		{
-			spi_data->wake_lock_flag = 0;
-#ifdef CONFIG_LPRINTK
-			lge_debug[D_SPI].enable = 0;
-#endif
-		}
 }
 
 /*
@@ -814,6 +815,9 @@ ifx_spi_sync_read_write(struct ifx_spi_data *spi_data, unsigned int len)
                         		.rx_buf		= ifx_rx_buffer,
 					.len		= len,
 				    };
+
+	SPI_DEBUG_PRINT("[e] ifx_spi_sync_read_write\n");
+
         spi_message_init(&m);
 	spi_message_add_tail(&t, &m);
 
@@ -945,8 +949,9 @@ __init ifx_spi_init(void)
 
 	/* Register SPI Driver */
 	status = spi_register_driver(&ifx_spi_driver);
+	SPI_DEBUG_PRINT(KERN_ERR "spi_register_driver return %d\n", status);
 	if (status < 0){ 
-		printk("Failed to register SPI device");
+		printk(KERN_ERR "Failed to register SPI device");
 		tty_unregister_driver(ifx_spi_tty_driver);
 		put_tty_driver(ifx_spi_tty_driver);
 		return status;

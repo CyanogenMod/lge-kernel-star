@@ -222,7 +222,7 @@ static void vib_generatePWM( NvOdmPwmMode mode )
 
 	if ( g_vib->hOdmPwm!= NULL ) {
 		DutyCycle = 0x00320000; // 50% duty
-		NvOdmPwmConfig( g_vib->hOdmPwm, NvOdmPwmOutputId_PWM3, mode, DutyCycle, &g_requestedPeriod, &ReturnedPeriod );
+		NvOdmPwmConfig( g_vib->hOdmPwm, NvOdmPwmOutputId_PWM0, mode, DutyCycle, &g_requestedPeriod, &ReturnedPeriod );
 	}
 	else	{
 		printk( "[ImmVibeSPI] : Failed to vib_generatePWM.\n");
@@ -321,7 +321,7 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_Set( VibeUInt8 nActuatorIndex, Vibe
 //		printk( "[ImmVibeSPI] ImmVibeSPI_ForceOut_Set DutyCycle =  %x \n", DutyCycle );
    	}
 
-	NvOdmPwmConfig( g_vib->hOdmPwm, NvOdmPwmOutputId_PWM3, NvOdmPwmMode_Enable, DutyCycle, &g_requestedPeriod, &ReturnedPeriod );
+	NvOdmPwmConfig( g_vib->hOdmPwm, NvOdmPwmOutputId_PWM0, NvOdmPwmMode_Enable, DutyCycle, &g_requestedPeriod, &ReturnedPeriod );
 
    	return VIBE_S_SUCCESS;
 }

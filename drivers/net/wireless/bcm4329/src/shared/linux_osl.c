@@ -461,9 +461,7 @@ void*
 osl_malloc(osl_t *osh, uint size)
 {
 	void *addr;
-/* LGE_CHANGE_S, [], 2010-03-04, in order to prevent kernel panic because of memory leak, when Wi-Fi insmode */
-	int flags = 0;
-/* LGE_CHANGE_E, [], 2010-03-04, in order to prevent kernel panic because of memory leak, when Wi-Fi insmode */
+
 	
 	if (osh)
 		ASSERT(osh->magic == OS_HANDLE_MAGIC);
@@ -501,15 +499,8 @@ osl_malloc(osl_t *osh, uint size)
 	}
 original:
 #endif 
-/* LGE_CHANGE_S, [], 2010-03-04, in order to prevent kernel panic because of memory leak, when Wi-Fi insmode */
-	if ( size > (8 *1024) ){
-		flags |= GFP_KERNEL;
-	}
-	else{
-		flags |= GFP_ATOMIC; // org value
-	}
-/* LGE_CHANGE_E, [], 2010-03-04, in order to prevent kernel panic because of memory leak, when Wi-Fi insmode */
-	if ((addr = kmalloc(size, flags)) == NULL) {
+
+	if ((addr = kmalloc(size, GFP_ATOMIC)) == NULL) {
 		if (osh)
 			osh->failed++;
 		return (NULL);

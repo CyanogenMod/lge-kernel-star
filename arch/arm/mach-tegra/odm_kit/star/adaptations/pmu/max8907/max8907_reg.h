@@ -400,14 +400,14 @@ extern "C"
 #define MAX8907_RESET_CNFG_PWREN_EN_SHIFT      0x7
 #define MAX8907_RESET_CNFG_PWREN_EN_MASK       0x1
 
-//20100413, add [START]
+//20100413, , add [START]
 #define MAX8907_RESET_CNFG_SFT_RST_SHIFT       0x5
 #define MAX8907_RESET_CNFG_SFT_RST_MASK        0x1
 #define MAX8907_SYSENSEL_POWER_OFF_SHIFT       0x6
 #define MAX8907_SYSENSEL_POWER_OFF_MASK        0x1 
-//20100413, add [END]
+//20100413, , add [END]
 
-//20100427, SMPL [START]
+//20100427, , SMPL [START]
 #define MAX8907_MPL_EN_SHIFT                   0x4
 #define MAX8907_MPL_EN_MASK                    0x1
 
@@ -416,7 +416,7 @@ extern "C"
 #define MAX8907_MPL_TIME_1_SEC                 0x1
 #define MAX8907_MPL_TIME_1_5_SEC               0x2
 #define MAX8907_MPL_TIME_2_SEC                 0x3
-//20100427, SMPL [END]
+//20100427, , SMPL [END]
 
 //20100727, , change SEQ [START]
 #define MAX8907_LDOCTL_SEQ_MASK	0x7

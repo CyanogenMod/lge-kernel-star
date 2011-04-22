@@ -39,13 +39,11 @@
 
 #include <rm_spi_slink.h>
 
-#define ENABLE_TX_RX_DUMP		0
 //#define CONFIG_SPI_DEBUG
 #ifdef CONFIG_SPI_DEBUG
 #define SPI_DEBUG_PRINT(format, args...) printk(format , ## args)
 #else
-#include <mach/lprintk.h>
-#define SPI_DEBUG_PRINT(format, args...) lprintk(D_SPI, format , ## args)
+#define SPI_DEBUG_PRINT(format, args...)
 #endif
 
 /* Cannot use spinlocks as the NvRm SPI apis uses mutextes and one cannot use
@@ -153,7 +151,7 @@ static int tegra_spi_do_message(struct tegra_spi *spi, struct spi_message *m)
 	NvRmSpiTransactionInfo trans[64];
 	struct spi_transfer *t;
 	unsigned int len = 0;
-	int j, i = 0;
+	int i = 0;
 
 	list_for_each_entry(t, &m->transfers, transfer_list) {
 		if (i==ARRAY_SIZE(trans))
@@ -172,19 +170,6 @@ static int tegra_spi_do_message(struct tegra_spi *spi, struct spi_message *m)
 			trans[i].txBuffer = (NvU8*)t->tx_buf;
 			trans[i].len = t->len;
 			len += t->len;
-#if ENABLE_TX_RX_DUMP
-			if(t->tx_buf) {
-				printk("spi tx =");
-				for(j=4;j<20;j++)
-				{
-					if( ((NvU8 *)t->tx_buf)[j]>=32 && ((NvU8 *)t->tx_buf)[j]<=126)
-						printk("%c",((NvU8 *)t->tx_buf)[j]);
-					else
-						printk(",%x",((NvU8 *)t->tx_buf)[j]);
-						
-				}
-			}
-#endif	//DEBUG_PRINT				
 #if 1			
 			NvRmSpiTransaction(spi->rm_spi, 
 				spi->pinmux, 
@@ -195,17 +180,6 @@ static int tegra_spi_do_message(struct tegra_spi *spi, struct spi_message *m)
 				t->len,
 				m->spi->bits_per_word);
 #endif
-#if ENABLE_TX_RX_DUMP
-			printk("spi rx =");
-			for(j=4;j<20;j++)
-			{
-				if(((NvU8 *)t->rx_buf)[j]>=32 && ((NvU8 *)t->rx_buf)[j]<=126)
-					printk("%c",((NvU8 *)t->rx_buf)[j]);	
-				else
-					printk(",%x",((NvU8 *)t->tx_buf)[j]);
-			}
-			printk("\n");
-#endif	//DEBUG_PRINT				
 		}
 
 		i++;

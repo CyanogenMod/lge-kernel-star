@@ -16,13 +16,6 @@ config STAR_MUIC
 	help
 	 Support for muic MAX14526 driver.
 
-config STAR_MUIC_TI
-	bool "Star Muic TI Driver"
-	default y
-	depends on MACH_STAR
-	help
-	 Support for muic TS5USBA33402 driver.
-
 config STAR_PROXIMITY
 	bool "Star Proximity Sensor Driver"
 	default y
@@ -57,6 +50,7 @@ config LOGGER
 	depends on !ANDROID_LOGGER	
 
 source "drivers/star/sensor/Kconfig"
+source "drivers/star/sensor.module/Kconfig"
 
 config STAR_POWERKEY
     bool "Star Powerkey Driver"

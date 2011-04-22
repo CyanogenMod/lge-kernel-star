@@ -1826,11 +1826,11 @@ static void DttIntrCallback(void* args)
             NvOdmTmonConfigParam_IntrLimitHigh, &HighLimit);
         DttRangeReport(TemperatureC, pDtt);
         
-//20101121 HW power off in thermal limit [START]
+//20101121 , HW power off in thermal limit [START]
 #if defined(CONFIG_MACH_STAR)
         NvRmPrivStarDttPolicyUpdate(pDfs->hRm, TemperatureC, pDtt);
 #endif
-//20101121 HW power off in thermal limit [END]
+//20101121 , HW power off in thermal limit [END]
     }
 }
 

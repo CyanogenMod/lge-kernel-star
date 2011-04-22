@@ -20,7 +20,7 @@
 #define STAR_ERS_TEST_PROC_FILE "driver/fota_test"
 extern int create_star_fota_test_proc_file(void);
 extern void remove_star_fota_test_proc_file(void);
-extern int fota_ebl_download(void);
+//extern int fota_ebl_download(void);
 
 typedef enum
 {
@@ -35,8 +35,8 @@ extern void DP3T_Switch_ctrl(DP3T_MODE_TYPE mode);
 void ifx_uart_sw_ctrl( void )
 {
     printk("%s\n", __func__);
-    USIF_ctrl(USIF_IPC);
-    DP3T_Switch_ctrl(DP3T_NC);
+    //USIF_ctrl(USIF_IPC);
+    //DP3T_Switch_ctrl(DP3T_NC);
 }
 
 void ifx_power_low(void)
@@ -114,9 +114,99 @@ void ifx_reset_high(void)
 
 void ifx_fota_reset(void)
 {
-    fota_ebl_download();
+    //fota_ebl_download();
 }
 
+int mdm_reset(void)
+{
+    unsigned int pin_val = 0;    
+    NvOdmServicesGpioHandle h_gpio;	
+    NvOdmGpioPinHandle h_gpiopin;
+    NvOdmGpioPinHandle h_uart1_rtspin;
+
+    printk("%s \n", __func__);    
+    h_gpio = NvOdmGpioOpen();
+    if (!h_gpio)
+	{
+		printk("%s: NvOdmGpioOpen Error\n", __func__);
+		goto error_open_gpio_fail;
+	}
+
+    h_gpiopin = NvOdmGpioAcquirePinHandle(h_gpio, 'v' - 'a', 0);
+    if (!h_gpiopin)
+	{
+		printk("%s: Couldn't NvOdmGpioAcquirePinHandle pin\n", __func__);
+		goto error_open_gpio_pin_acquire_fail;
+	}
+
+    h_uart1_rtspin = NvOdmGpioAcquirePinHandle(h_gpio, 'o' - 'a', 3);
+    if (!h_uart1_rtspin)
+	{
+		printk("%s: Couldn't NvOdmGpioAcquirePinHandle pin\n", __func__);
+		goto error_open_gpio_pin_acquire_fail;
+	}
+
+    NvOdmGpioSetState( h_gpio, h_uart1_rtspin, 0x1);
+    NvOdmGpioConfig( h_gpio, h_uart1_rtspin, NvOdmGpioPinMode_Output);
+    NvOdmGpioGetState( h_gpio, h_uart1_rtspin, &pin_val);
+    printk("ifx_reset_high - [CP RTS]: pin %d\n", pin_val);         
+
+	//reset Communication Processor (GPIO_PV0: high -> 1000ms -> low -> 3000ms -> high)
+    NvOdmGpioSetState( h_gpio, h_gpiopin, 0x1);
+    NvOdmGpioConfig( h_gpio, h_gpiopin, NvOdmGpioPinMode_Output);
+    msleep(1000);
+    NvOdmGpioSetState( h_gpio, h_gpiopin, 0x0);
+    msleep(3000);
+    NvOdmGpioSetState( h_gpio, h_gpiopin, 0x1);
+    NvOdmGpioGetState( h_gpio, h_gpiopin, &pin_val);
+    printk("ifx_reset_high - [CP RESET]: pin %d\n", pin_val);         
+
+    NvOdmGpioReleasePinHandle(h_gpio, h_uart1_rtspin);
+    NvOdmGpioReleasePinHandle(h_gpio, h_gpiopin);
+    NvOdmGpioClose(h_gpio);
+    return 0;
+
+error_open_gpio_pin_acquire_fail:
+	NvOdmGpioClose(h_gpio);
+error_open_gpio_fail:
+	return -ENOSYS;
+}
+
+int mdm_rts_low(void)
+{
+    unsigned int pin_val = 0;    
+    NvOdmServicesGpioHandle h_gpio;	
+    NvOdmGpioPinHandle h_uart1_rtspin;
+
+    printk("%s \n", __func__);    
+    h_gpio = NvOdmGpioOpen();
+    if (!h_gpio)
+	{
+		printk("%s: NvOdmGpioOpen Error\n", __func__);
+		goto error_open_gpio_fail;
+	}
+
+    h_uart1_rtspin = NvOdmGpioAcquirePinHandle(h_gpio, 'o' - 'a', 3);
+    if (!h_uart1_rtspin)
+	{
+		printk("%s: Couldn't NvOdmGpioAcquirePinHandle pin\n", __func__);
+		goto error_open_gpio_pin_acquire_fail;
+	}
+
+    NvOdmGpioSetState( h_gpio, h_uart1_rtspin, 0x1);
+    NvOdmGpioConfig( h_gpio, h_uart1_rtspin, NvOdmGpioPinMode_Output);
+    NvOdmGpioGetState( h_gpio, h_uart1_rtspin, &pin_val);
+    printk("ifx_reset_high - [CP RTS]: pin %d\n", pin_val);         
+
+    NvOdmGpioReleasePinHandle(h_gpio, h_uart1_rtspin);
+    NvOdmGpioClose(h_gpio);
+    return 0;
+
+error_open_gpio_pin_acquire_fail:
+	NvOdmGpioClose(h_gpio);
+error_open_gpio_fail:
+	return -ENOSYS;
+}
 
 
 static ssize_t fota_test_proc_read(struct file *filp, char *buf, size_t len, loff_t *offset)
@@ -161,6 +251,12 @@ static ssize_t fota_test_proc_write(struct file *filp, const char *buf, size_t l
         case '5':
 	    ifx_fota_reset();
             break;	    
+        case '6':
+        	mdm_reset();
+        	break;
+        case '7':
+        	mdm_rts_low();
+        	break;
 
 	default :
             printk("FOTA Driver invalid arg\n");

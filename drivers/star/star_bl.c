@@ -38,6 +38,9 @@
 #include <linux/delay.h>
 #include <mach/lprintk.h>
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
 
 #define NV_DEBUG 0
 
@@ -162,6 +165,10 @@ struct aat2870_drvdata_t {
 	struct delayed_work delayed_work_bl;
 	struct input_dev *input_dev;
 	unsigned char power_onoff_ref;
+#ifdef CONFIG_HAS_EARLYSUSPEND
+    struct early_suspend    early_suspend;
+#endif
+
 };
 
 
@@ -246,54 +253,24 @@ static struct aat2870_ctl_tbl_t aat2870bl_normal_tbl[] = {
 };
 
 /* Set to ALC mode HW-high gain mode*/
-#if defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT)
-static struct aat2870_ctl_tbl_t aat2870bl_alc_tbl[] = {
-/*2010-12-18. . Change the ALC Settting value [START] */
-    /* ALC table 0~15 */
-    {0x12,0x19},  /* ALS current setting 5.63mA */
-    {0x13,0x1D},  /* ALS current setting 6.53mA */
-    {0x14,0x20},  /* ALS current setting 7.20mA */
-    {0x15,0x22},  /* ALS current setting 7.65mA */
-    {0x16,0x23},  /* ALS current setting 7.88mA */
-    {0x17,0x25},  /* ALS current setting 8.33mA */
-    {0x18,0x28},  /* ALS current setting 9.0mA */
-    {0x19,0x2A},  /* ALS current setting 9.45mA */
-    {0x1A,0x2B},  /* ALS current setting 9.68mA */
-    {0x1B,0x2D},  /* ALS current setting 10.13mA */
-    {0x1C,0x2F},  /* ALS current setting 10.58mA */
-    {0x1D,0x33},  /* ALS current setting 11.48mA */
-    {0x1E,0x36},  /* ALS current setting 12.15mA */
-    {0x1F,0x39},  /* ALS current setting 12.83mA */
-    {0x20,0x3C},  /* ALS current setting 13.50mA */
-    {0x21,0x3F},  /* ALS current setting 14.18mA */
-
-    { 0x0E, 0x73 },  /* SNSR_LIN_LOG=linear, ALSOUT_LIN_LOG=log, RSET=16k~64k,
-                                   * GAIN=low, GM=man gain, ALS_EN=on */
-    { 0x0F, 0x01 },  /* SBIAS=3.0V, SBIAS=on */
-    { 0x10, 0x90 },  /* pwm inactive, auto polling, 1sec, +0% */
-    { 0x00, 0xFF },  /* Channel Enable : ALL */
-    { 0xFF, 0xFE }   /* end or command */
-};
-/*2010-12-18. . Change the ALC Settting value [END] */
-#else
 static struct aat2870_ctl_tbl_t aat2870bl_alc_tbl[] = {
     /* ALC table 0~15 20101218 tunning ver. */
-    {0x12,0x19},  /* ALS current setting 5.63mA */
-    {0x13,0x20},  /* ALS current setting 7.20mA */
-    {0x14,0x21},  /* ALS current setting 7.43mA */
-    {0x15,0x23},  /* ALS current setting 7.88mA */
-    {0x16,0x24},  /* ALS current setting 8.10mA */
-    {0x17,0x25},  /* ALS current setting 8.33mA */
-    {0x18,0x27},  /* ALS current setting 8.78mA */
-    {0x19,0x28},  /* ALS current setting 9.0mA */
-    {0x1A,0x29},  /* ALS current setting 9.23mA */
-    {0x1B,0x2A},  /* ALS current setting 9.45mA */
-    {0x1C,0x2F},  /* ALS current setting 10.58mA */
-    {0x1D,0x30},  /* ALS current setting 10.80mA */
-    {0x1E,0x32},  /* ALS current setting 11.25mA */
-    {0x1F,0x35},  /* ALS current setting 11.93mA */
-    {0x20,0x36},  /* ALS current setting 12.15mA */
-    {0x21,0x37},  /* ALS current setting 12.38mA */
+    {0x12,0x19},  /* ALS current setting 5.6mA */
+    {0x13,0x20},  /* ALS current setting 7.2mA */
+    {0x14,0x21},  /* ALS current setting 7.4mA */
+    {0x15,0x23},  /* ALS current setting 7.9mA */
+    {0x16,0x24},  /* ALS current setting 8.1mA */
+    {0x17,0x25},  /* ALS current setting 8.3mA */
+    {0x18,0x27},  /* ALS current setting 9.0mA */
+    {0x19,0x28},  /* ALS current setting 9.5mA */
+    {0x1A,0x29},  /* ALS current setting 10.1mA */
+    {0x1B,0x2A},  /* ALS current setting 10.8mA */
+    {0x1C,0x2F},  /* ALS current setting 11.5mA */
+    {0x1D,0x30},  /* ALS current setting 12.2mA */
+    {0x1E,0x32},  /* ALS current setting 12.8mA */
+    {0x1F,0x35},  /* ALS current setting 13.5mA */
+    {0x20,0x36},  /* ALS current setting 14.2mA */
+    {0x21,0x37},  /* ALS current setting 14.6mA */
 
     { 0x0E, 0x73 },  /* SNSR_LIN_LOG=linear, ALSOUT_LIN_LOG=log, RSET=16k~64k,
                                    * GAIN=low, GM=man gain, ALS_EN=on */
@@ -302,7 +279,7 @@ static struct aat2870_ctl_tbl_t aat2870bl_alc_tbl[] = {
     { 0x00, 0xFF },  /* Channel Enable : ALL */
     { 0xFF, 0xFE }   /* end or command */
 };
-#endif
+
 
 static struct aat2870_lux_tbl_t  aat2870_lux_tbl[] = {
 
@@ -535,10 +512,14 @@ static int star_bl_io_deinit(void)
 {
 	int retval = 0;
 
+      	I2C_SDA_LO;
+	I2C_SCL_LO;
+	I2C_SDA_DIR(DIR_OUT);
+	I2C_SCL_DIR(DIR_OUT);
 
-	NvOdmGpioReleasePinHandle(hStarI2csim->hI2cServiceGpioHandle, hStarI2csim->hSdaGpioPinHandle);
-	NvOdmGpioReleasePinHandle(hStarI2csim->hI2cServiceGpioHandle, hStarI2csim->hSclGpioPinHandle);
-	NvOdmGpioClose(hStarI2csim->hI2cServiceGpioHandle);
+	if (hStarI2csim->hSdaGpioPinHandle) NvOdmGpioReleasePinHandle(hStarI2csim->hI2cServiceGpioHandle, hStarI2csim->hSdaGpioPinHandle);
+	if (hStarI2csim->hSclGpioPinHandle) NvOdmGpioReleasePinHandle(hStarI2csim->hI2cServiceGpioHandle, hStarI2csim->hSclGpioPinHandle);
+	if (hStarI2csim->hI2cServiceGpioHandle) NvOdmGpioClose(hStarI2csim->hI2cServiceGpioHandle);
 
 	hStarI2csim->hI2cServiceGpioHandle = 0;
 	hStarI2csim->hSclGpioPinHandle = 0;
@@ -948,6 +929,38 @@ star_bl_store_onoff(struct device *dev, struct device_attribute *attr, const cha
 	return count;
 }
 
+//20110202, , force off [START]
+static void star_aat2870_reset(void);
+
+static ssize_t
+star_bl_show_foff(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return 0;
+}
+
+static ssize_t
+star_bl_store_foff(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+    int onoff;
+	static struct aat2870_drvdata_t *drv;	
+	
+	drv = drvdata;
+	if (!count)
+		return -EINVAL;
+
+	sscanf(buf, "%d", &onoff);
+    
+    star_bl_send_cmd(drv, drv->cmds.sleep);
+	drv->status = BL_POWER_STATE_OFF;
+	drv->power_onoff_ref = FALSE;
+	printk("[BL] Power Off\n");
+    
+	star_aat2870_reset();
+	printk("[BL] star_aat2870_reset\n");
+
+	return count;
+}
+//20110202, , force off [END]
 
 static DEVICE_ATTR(intensity, 0666, star_bl_show_intensity, star_bl_store_intensity);
 static DEVICE_ATTR(alc_level, 0444, star_bl_show_alc_level, NULL);
@@ -956,6 +969,9 @@ static DEVICE_ATTR(onoff, 0666, star_bl_show_onoff, star_bl_store_onoff);
 static DEVICE_ATTR(hwdim, 0666, star_bl_show_hwdim, star_bl_store_hwdim);
 static DEVICE_ATTR(lsensor_onoff, 0666, star_bl_show_lsensor_onoff, star_bl_store_lsensor_onoff);
 //static DEVICE_ATTR(alc_reg, 0666, alc_reg_show, alc_reg_store);
+//20110202, , force off [START]
+static DEVICE_ATTR(foff, 0666, star_bl_show_onoff, star_bl_store_foff);
+//20110202, , force off [END]
 
 
 static struct attribute *star_bl_attributes[] = {
@@ -965,6 +981,9 @@ static struct attribute *star_bl_attributes[] = {
 	&dev_attr_onoff.attr,
 	&dev_attr_hwdim.attr,
 	&dev_attr_lsensor_onoff.attr,
+    //20110202, , force off [START]
+	&dev_attr_foff.attr,
+    //20110202, , force off [END]
 	NULL,
 };
 
@@ -1010,6 +1029,55 @@ static void star_aat2870_reset(void)
 	return;
 }
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void star_aat2870_early_suspend(struct early_suspend *es)
+{
+	static struct aat2870_drvdata_t *drv;
+	
+	drv = drvdata;
+
+	if (drv->status == BL_POWER_STATE_ON) {
+		if(drv->dim_status != DIMMING_NONE)	{
+			star_bl_send_cmd(drv, aat2870bl_stop_fade_tbl);
+			drv->dim_status = DIMMING_NONE;
+			DBG("star_aat2870_early_suspend : [BL] DIMMING_OFF \n");
+		}
+		star_bl_send_cmd(drv, drv->cmds.sleep);
+		drv->status = BL_POWER_STATE_OFF;
+		drv->power_onoff_ref = FALSE;
+		printk("star_aat2870_early_suspend : [BL] Power Off\n");
+	}
+
+	return;
+}
+
+static void star_aat2870_late_resume(struct early_suspend *es)
+{
+	static struct aat2870_drvdata_t *drv;
+	
+	drv = drvdata;
+
+	if (drv->status == BL_POWER_STATE_OFF) {
+		if(drv->dim_status != DIMMING_NONE)	{
+			star_bl_send_cmd(drv, aat2870bl_stop_fade_tbl);
+			drv->dim_status = DIMMING_NONE;
+			DBG("star_aat2870_early_suspend : [BL] DIMMING_OFF \n");
+		}
+
+		if (drv->op_mode == AAT2870_OP_MODE_NORMAL) {
+			star_bl_send_cmd(drv, drv->cmds.normal);
+		} else if (drv->op_mode == AAT2870_OP_MODE_ALC) {
+			star_bl_send_cmd(drv, drv->cmds.alc);
+		} else {
+		}
+		drv->status = BL_POWER_STATE_ON;
+		drv->power_onoff_ref = TRUE;
+		printk("star_aat2870_late_resume : [BL] Power On\n");
+	}
+
+	return;
+}
+#endif
 
 static int star_aat2870_probe(struct platform_device *pdev)
 {
@@ -1041,6 +1109,12 @@ static int star_aat2870_probe(struct platform_device *pdev)
 	drv->lsensor_poll_time = BL_DEFAULT_LSENSOR_POLL_TIME;
 	drv->power_onoff_ref = FALSE;
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+    drv->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN;
+    drv->early_suspend.suspend = star_aat2870_early_suspend;
+    drv->early_suspend.resume = star_aat2870_late_resume;
+    register_early_suspend(&drv->early_suspend);
+#endif
 
 	drv->input_dev = input_allocate_device();
 	if (!drv->input_dev) {
@@ -1102,6 +1176,32 @@ err:
 }
 
 
+static void star_aat2870_shutdown(struct platform_device *pdev)
+{
+
+	struct aat2870_drvdata_t *drv;
+        printk("star_att2870_shutdown\n"); 
+
+	drv = drvdata;
+#if 0
+    if (&drv->delayed_work_bl)
+	cancel_delayed_work_sync(&drv->delayed_work_bl);
+#endif
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+    unregister_early_suspend(&drv->early_suspend);
+#endif
+
+	NvOdmGpioSetState( hBLResetGpio, hBLResetGpioPin, 0x0);
+	NvOdmGpioConfig( hBLResetGpio, hBLResetGpioPin,5);
+
+	if (hBLResetGpioPin) NvOdmGpioReleasePinHandle(hBLResetGpio, hBLResetGpioPin);
+	if (hBLResetGpio) NvOdmGpioClose(hBLResetGpio);
+
+	star_bl_io_deinit();
+}
+
+
 static struct platform_device star_aat2870_device = {
 	.name = "star_aat2870",
 	.id = 0, 
@@ -1110,6 +1210,7 @@ static struct platform_device star_aat2870_device = {
 
 static struct platform_driver star_aat2870_driver = {
     .probe		= star_aat2870_probe,
+    .shutdown		= star_aat2870_shutdown,
     .driver		= {
         .name = "star_aat2870",
         .owner = THIS_MODULE,

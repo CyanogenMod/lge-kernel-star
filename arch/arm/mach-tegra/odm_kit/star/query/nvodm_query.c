@@ -1,22 +1,45 @@
 /*
- *
  * Copyright (c) 2009 NVIDIA Corporation.
+ * All rights reserved.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
+ * Redistributions of source code must retain the above copyright notice,
+ * this list of conditions and the following disclaimer.
  *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ *
+ * Neither the name of the NVIDIA Corporation nor the names of its contributors
+ * may be used to endorse or promote products derived from this software
+ * without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
  */
 
+/**
+ * @file
+ * <b>NVIDIA APX ODM Kit:
+ *         Implementation of the ODM Query API</b>
+ *
+ * @b Description: Implements the query functions for ODMs that may be
+ *                 accessed at boot-time, runtime, or anywhere in between.
+ */
+
+#include <star_hw_definition.h>
 #include "nvodm_query.h"
 #include "nvodm_query_gpio.h"
 #include "nvodm_query_memc.h"
@@ -707,334 +730,6 @@ static const NvOdmSdramControllerConfigAdv s_NvOdmStarSmartphoneHynixEmcConfigTa
 };
 #endif
 
-static const NvOdmSdramControllerConfigAdv s_NvOdmStarSmartphoneSamsungEmcConfigTable[] =
-{
-    {
-                  0x20,   /* Rev 2.0 */
-                 18000,   /* SDRAM frquency */
-                   900,   /* EMC core voltage */
-                    46,   /* Number of EMC parameters below */
-        {
-					  0x00000002,	/* RC */
-					  0x00000006,	/* RFC */
-					  0x00000003,	/* RAS */
-					  0x00000003,	/* RP */
-					  0x00000006,	/* R2W */
-					  0x00000004,	/* W2R */
-					  0x00000002,	/* R2P */
-					  0x00000009,	/* W2P */
-					  0x00000003,	/* RD_RCD */
-					  0x00000003,	/* WR_RCD */
-					  0x00000002,	/* RRD */
-					  0x00000002,	/* REXT */
-					  0x00000002,	/* WDV */
-					  0x00000005,	/* QUSE */
-					  0x00000003,	/* QRST */
-					  0x00000008,	/* QSAFE */
-					  0x0000000b,	/* RDV */
-					  0x00000038,	/* REFRESH */
-					  0x00000000,	/* BURST_REFRESH_NUM */
-					  0x00000003,	/* PDEX2WR */
-					  0x00000003,	/* PDEX2RD */
-					  0x00000003,	/* PCHG2PDEN */
-					  0x00000008,	/* ACT2PDEN */
-					  0x00000001,	/* AR2PDEN */
-					  0x0000000a,	/* RW2PDEN */
-					  0x00000003,	/* TXSR */
-					  0x00000003,	/* TCKE */
-					  0x00000008,	/* TFAW */
-					  0x00000004,	/* TRPAB */
-					  0x00000006,	/* TCLKSTABLE */
-					  0x00000002,	/* TCLKSTOP */
-					  0x0000004B,	/* TREFBW */
-					  0x00000000,	/* QUSE_EXTRA */
-					  0x00000001,	/* FBIO_CFG6 */
-					  0x00000000,	/* ODT_WRITE */
-					  0x00000000,	/* ODT_READ */
-					  0x00000082,	/* FBIO_CFG5 */
-					  0xA06A04AE,	/* CFG_DIG_DLL */
-					  0x00005810,	/* DLL_XFORM_DQS */
-					  0x00000000,	/* DLL_XFORM_QUSE */
-					  0x00000000,	/* ZCAL_REF_CNT */
-					  0x00000002,	/* ZCAL_WAIT_CNT */
-					  0x00000000,	/* AUTO_CAL_INTERVAL */
-					  0x00000000,	/* CFG_CLKTRIM_0 */
-					  0x00000000,	/* CFG_CLKTRIM_1 */
-					  0x00000000,	/* CFG_CLKTRIM_2 */
-        }
-    },
-    {
-                  0x20,   /* Rev 2.0 */
-                 27000,   /* SDRAM frquency */
-                   950,   /* EMC core voltage */
-                    46,   /* Number of EMC parameters below */
-        {
-					  0x00000002,	/* RC */
-					  0x00000006,	/* RFC */
-					  0x00000003,	/* RAS */
-					  0x00000003,	/* RP */
-					  0x00000006,	/* R2W */
-					  0x00000004,	/* W2R */
-					  0x00000002,	/* R2P */
-					  0x00000009,	/* W2P */
-					  0x00000003,	/* RD_RCD */
-					  0x00000003,	/* WR_RCD */
-					  0x00000002,	/* RRD */
-					  0x00000002,	/* REXT */
-					  0x00000002,	/* WDV */
-					  0x00000005,	/* QUSE */
-					  0x00000003,	/* QRST */
-					  0x00000008,	/* QSAFE */
-					  0x0000000b,	/* RDV */
-					  0x00000054,	/* REFRESH */
-					  0x00000000,	/* BURST_REFRESH_NUM */
-					  0x00000003,	/* PDEX2WR */
-					  0x00000003,	/* PDEX2RD */
-					  0x00000003,	/* PCHG2PDEN */
-					  0x00000008,	/* ACT2PDEN */
-					  0x00000001,	/* AR2PDEN */
-					  0x0000000a,	/* RW2PDEN */
-					  0x00000004,	/* TXSR */
-					  0x00000003,	/* TCKE */
-					  0x00000008,	/* TFAW */
-					  0x00000004,	/* TRPAB */
-					  0x00000006,	/* TCLKSTABLE */
-					  0x00000002,	/* TCLKSTOP */
-					  0x00000071,	/* TREFBW */
-					  0x00000000,	/* QUSE_EXTRA */
-					  0x00000001,	/* FBIO_CFG6 */
-					  0x00000000,	/* ODT_WRITE */
-					  0x00000000,	/* ODT_READ */
-					  0x00000082,	/* FBIO_CFG5 */
-					  0xA06A04AE,	/* CFG_DIG_DLL */
-					  0x00005810,	/* DLL_XFORM_DQS */
-					  0x00000000,	/* DLL_XFORM_QUSE */
-					  0x00000000,	/* ZCAL_REF_CNT */
-					  0x00000003,	/* ZCAL_WAIT_CNT */
-					  0x00000000,	/* AUTO_CAL_INTERVAL */
-					  0x00000000,	/* CFG_CLKTRIM_0 */
-					  0x00000000,	/* CFG_CLKTRIM_1 */
-					  0x00000000,	/* CFG_CLKTRIM_2 */
-        }
-    },
-    {
-                  0x20,   /* Rev 2.0 */
-                 54000,   /* SDRAM frquency */
-                  1000,   /* EMC core voltage */
-                    46,   /* Number of EMC parameters below */
-        {
-					  0x00000004,	/* RC */
-					  0x00000008,	/* RFC */
-					  0x00000003,	/* RAS */
-					  0x00000003,	/* RP */
-					  0x00000006,	/* R2W */
-					  0x00000004,	/* W2R */
-					  0x00000002,	/* R2P */
-					  0x00000009,	/* W2P */
-					  0x00000003,	/* RD_RCD */
-					  0x00000003,	/* WR_RCD */
-					  0x00000002,	/* RRD */
-					  0x00000002,	/* REXT */
-					  0x00000002,	/* WDV */
-					  0x00000005,	/* QUSE */
-					  0x00000003,	/* QRST */
-					  0x00000008,	/* QSAFE */
-					  0x0000000b,	/* RDV */
-					  0x000000a8,	/* REFRESH */
-					  0x00000000,	/* BURST_REFRESH_NUM */
-					  0x00000003,	/* PDEX2WR */
-					  0x00000003,	/* PDEX2RD */
-					  0x00000003,	/* PCHG2PDEN */
-					  0x00000008,	/* ACT2PDEN */
-					  0x00000001,	/* AR2PDEN */
-					  0x0000000a,	/* RW2PDEN */
-					  0x00000008,	/* TXSR */
-					  0x00000003,	/* TCKE */
-					  0x00000008,	/* TFAW */
-					  0x00000004,	/* TRPAB */
-					  0x00000006,	/* TCLKSTABLE */
-					  0x00000002,	/* TCLKSTOP */
-					  0x000000e1,	/* TREFBW */
-					  0x00000000,	/* QUSE_EXTRA */
-					  0x00000002,	/* FBIO_CFG6 */
-					  0x00000000,	/* ODT_WRITE */
-					  0x00000000,	/* ODT_READ */
-					  0x00000082,	/* FBIO_CFG5 */
-					  0xA06A04AE,	/* CFG_DIG_DLL */
-					  0x00005810,	/* DLL_XFORM_DQS */
-					  0x00000000,	/* DLL_XFORM_QUSE */
-					  0x00000000,	/* ZCAL_REF_CNT */
-					  0x00000005,	/* ZCAL_WAIT_CNT */
-					  0x00000000,	/* AUTO_CAL_INTERVAL */
-					  0x00000000,	/* CFG_CLKTRIM_0 */
-					  0x00000000,	/* CFG_CLKTRIM_1 */
-					  0x00000000,	/* CFG_CLKTRIM_2 */
-        }
-    },
-    {
-                  0x20,   /* Rev 2.0 */
-                108000,   /* SDRAM frquency */
-                  1000,   /* EMC core voltage */
-                    46,   /* Number of EMC parameters below */
-        {
-					  0x00000007,	/* RC */
-					  0x0000000f,	/* RFC */
-					  0x00000005,	/* RAS */
-					  0x00000003,	/* RP */
-					  0x00000006,	/* R2W */
-					  0x00000004,	/* W2R */
-					  0x00000002,	/* R2P */
-					  0x00000009,	/* W2P */
-					  0x00000003,	/* RD_RCD */
-					  0x00000003,	/* WR_RCD */
-					  0x00000002,	/* RRD */
-					  0x00000002,	/* REXT */
-					  0x00000002,	/* WDV */
-					  0x00000005,	/* QUSE */
-					  0x00000003,	/* QRST */
-					  0x00000008,	/* QSAFE */
-					  0x0000000b,	/* RDV */
-					  0x0000017f,	/* REFRESH */
-					  0x00000000,	/* BURST_REFRESH_NUM */
-					  0x00000003,	/* PDEX2WR */
-					  0x00000003,	/* PDEX2RD */
-					  0x00000003,	/* PCHG2PDEN */
-					  0x00000008,	/* ACT2PDEN */
-					  0x00000001,	/* AR2PDEN */
-					  0x0000000a,	/* RW2PDEN */
-					  0x00000010,	/* TXSR */
-					  0x00000003,	/* TCKE */
-					  0x00000008,	/* TFAW */
-					  0x00000004,	/* TRPAB */
-					  0x00000006,	/* TCLKSTABLE */
-					  0x00000002,	/* TCLKSTOP */
-					  0x000001c2,	/* TREFBW */
-					  0x00000000,	/* QUSE_EXTRA */
-					  0x00000003,	/* FBIO_CFG6 */
-					  0x00000000,	/* ODT_WRITE */
-					  0x00000000,	/* ODT_READ */
-					  0x00000082,	/* FBIO_CFG5 */
-					  0xA06A04AE,	/* CFG_DIG_DLL */
-					  0x007FC010,	/* DLL_XFORM_DQS */
-					  0x00000000,	/* DLL_XFORM_QUSE */
-					  0x00000000,	/* ZCAL_REF_CNT */
-					  0x0000000a,	/* ZCAL_WAIT_CNT */
-					  0x00000000,	/* AUTO_CAL_INTERVAL */
-					  0x00000000,	/* CFG_CLKTRIM_0 */
-					  0x00000000,	/* CFG_CLKTRIM_1 */
-					  0x00000000,	/* CFG_CLKTRIM_2 */
-        }
-    },
-    {
-                  0x20,   /* Rev 2.0 */
-                150000,   /* SDRAM frquency */
-                  1000,   /* EMC core voltage */
-                    46,   /* Number of EMC parameters below */
-        {
-					  0x00000009,	/* RC */
-					  0x00000014,	/* RFC */
-					  0x00000007,	/* RAS */
-					  0x00000003,	/* RP */
-					  0x00000006,	/* R2W */
-					  0x00000004,	/* W2R */
-					  0x00000002,	/* R2P */
-					  0x00000009,	/* W2P */
-					  0x00000003,	/* RD_RCD */
-					  0x00000003,	/* WR_RCD */
-					  0x00000002,	/* RRD */
-					  0x00000002,	/* REXT */
-					  0x00000002,	/* WDV */
-					  0x00000005,	/* QUSE */
-					  0x00000003,	/* QRST */
-					  0x00000008,	/* QSAFE */
-					  0x0000000b,	/* RDV */
-					  0x0000021f,	/* REFRESH */
-					  0x00000000,	/* BURST_REFRESH_NUM */
-					  0x00000003,	/* PDEX2WR */
-					  0x00000003,	/* PDEX2RD */
-					  0x00000003,	/* PCHG2PDEN */
-					  0x00000008,	/* ACT2PDEN */
-					  0x00000001,	/* AR2PDEN */
-					  0x0000000a,	/* RW2PDEN */
-					  0x000000015,	 /* TXSR */
-					  0x00000003,	/* TCKE */
-					  0x00000008,	/* TFAW */
-					  0x00000004,	/* TRPAB */
-					  0x00000006,	/* TCLKSTABLE */
-					  0x00000002,	/* TCLKSTOP */
-					  0x00000270,	/* TREFBW */
-					  0x00000000,	/* QUSE_EXTRA */
-					  0x00000003,	/* FBIO_CFG6 */
-					  0x00000000,	/* ODT_WRITE */
-					  0x00000000,	/* ODT_READ */
-					  0x00000082,	/* FBIO_CFG5 */
-					  0xA04C04AE,	/* CFG_DIG_DLL */
-					  0x007FC010,	/* DLL_XFORM_DQS */
-					  0x00000000,	/* DLL_XFORM_QUSE */
-					  0x00000000,	/* ZCAL_REF_CNT */
-					  0x0000000e,	/* ZCAL_WAIT_CNT */
-					  0x00000000,	/* AUTO_CAL_INTERVAL */
-					  0x00000000,	/* CFG_CLKTRIM_0 */
-					  0x00000000,	/* CFG_CLKTRIM_1 */
-					  0x00000000,	/* CFG_CLKTRIM_2 */
-        }
-    },
-    {
-                  0x20,   /* Rev 2.0 */
-                300000,   /* SDRAM frquency */
-                  1200,   /* EMC core voltage */
-                    46,   /* Number of EMC parameters below */
-        {
-					  0x00000012,	/* RC */
-					  0x00000027,	/* RFC */
-					  0x0000000d,	/* RAS */
-					  0x00000006,	/* RP */
-					  0x00000007,	/* R2W */
-					  0x00000005,	/* W2R */
-					  0x00000003,	/* R2P */
-					  0x00000009,	/* W2P */
-					  0x00000006,	/* RD_RCD */
-					  0x00000006,	/* WR_RCD */
-					  0x00000003,	/* RRD */
-					  0x00000003,	/* REXT */
-					  0x00000002,	/* WDV */
-					  0x00000006,	/* QUSE */
-					  0x00000003,	/* QRST */
-					  0x00000009,	/* QSAFE */
-					  0x0000000C,	/* RDV */
-					  0x0000045f,	/* REFRESH */
-					  0x00000000,	/* BURST_REFRESH_NUM */
-					  0x00000004,	/* PDEX2WR */
-					  0x00000004,	/* PDEX2RD */
-					  0x00000006,	/* PCHG2PDEN */
-					  0x00000008,	/* ACT2PDEN */
-					  0x00000001,	/* AR2PDEN */
-					  0x0000000e,	/* RW2PDEN */
-					  0x0000002a,	/* TXSR */
-					  0x00000003,	/* TCKE */
-					  0x0000000f,	/* TFAW */
-					  0x00000007,	/* TRPAB */
-					  0x00000005,	/* TCLKSTABLE */
-					  0x00000002,	/* TCLKSTOP */
-					  0x000004e0,	/* TREFBW */
-					  0x00000005,	/* QUSE_EXTRA */
-					  0x00000002,	/* FBIO_CFG6 */
-					  0x00000000,	/* ODT_WRITE */
-					  0x00000000,	/* ODT_READ */
-					  0x00000282,	/* FBIO_CFG5 */
-					  0xE03C048B,	/* CFG_DIG_DLL */
-					  0x007FE010,	/* DLL_XFORM_DQS */
-					  0x00000000,	/* DLL_XFORM_QUSE */
-					  0x00000000,	/* ZCAL_REF_CNT */
-					  0x0000001b,	/* ZCAL_WAIT_CNT */
-					  0x00000000,	/* AUTO_CAL_INTERVAL */
-					  0x00000000,	/* CFG_CLKTRIM_0 */
-					  0x00000000,	/* CFG_CLKTRIM_1 */
-					  0x00000000,	/* CFG_CLKTRIM_2 */
-        }
-    }
-};
-
 
 static NvOdmQuerySdioInterfaceProperty s_NvOdmQuerySdioInterfaceProperty[4] =
 {
@@ -1043,43 +738,37 @@ static NvOdmQuerySdioInterfaceProperty s_NvOdmQuerySdioInterfaceProperty[4] =
 
     {NV_FALSE, 10, NV_TRUE,  6, NvOdmQuerySdioSlotUsage_wlan},
     {NV_FALSE,  0, NV_FALSE, 6, NvOdmQuerySdioSlotUsage_unused}, //SDIO2 is not used.
-//20100928, change removable option and setting time [START]
+//20100928, , change removable option and setting time [START]
 #if defined (CONFIG_MACH_STAR)
     {NV_TRUE, 10, NV_TRUE, 6, NvOdmQuerySdioSlotUsage_Media}, // micro SD, Removable, Settling time is 10ms. Dedicated to LDO10 power
 #else
     {NV_FALSE, 500, NV_FALSE, 6, NvOdmQuerySdioSlotUsage_Media}, // micro SD, Removable, Settling time is 500ms. 500ms should be adjusted/optimized later again. Dedicated to LDO10 power
 #endif
-//20100928, change removable option and setting time [END]
+//20100928, , change removable option and setting time [END]
     {NV_FALSE, 10, NV_TRUE,  6, NvOdmQuerySdioSlotUsage_Boot},
 };
 
 
 // Wake Events
-//20100413, wakeup control [START]
-#if defined(CONFIG_MACH_STAR)
+//20100413, , wakeup control [START]
+#if defined (CONFIG_MACH_STAR)
 static NvOdmWakeupPadInfo s_NvOdmWakeupPadInfo[] =
 {
-    {NV_TRUE,   0, NvOdmWakeupPadPolarity_High},    // Wake Event  0 - ulpi_data4 (IPC_SRDY)    high??
+    {NV_FALSE,  0, NvOdmWakeupPadPolarity_High},    // Wake Event  0 - ulpi_data4 (IPC_SRDY2)    high??
     {NV_FALSE,  1, NvOdmWakeupPadPolarity_High},    // Wake Event  1 - gp3_pv[3] (IPC_RESET_FLAG)
     {NV_FALSE,  2, NvOdmWakeupPadPolarity_High},    // Wake Event  2 - dvi_d3
     {NV_FALSE,  3, NvOdmWakeupPadPolarity_Low},     // Wake Event  3 - sdio3_dat1
     {NV_FALSE,  4, NvOdmWakeupPadPolarity_High},    // Wake Event  4 - hdmi_int (HDMI_INT_N)
     {NV_FALSE/*NV_TRUE*/,   5, NvOdmWakeupPadPolarity_High},    // Wake Event  5 - vgp[6] (proxi_out)
     {NV_FALSE,  6, NvOdmWakeupPadPolarity_High},    // Wake Event  6 - gp3_pu[5] (VIB_EN)
-    {NV_FALSE,  7, NvOdmWakeupPadPolarity_AnyEdge}, // Wake Event  7 - gp3_pu[6] (VIB_PWM)
+    {NV_TRUE,   7, NvOdmWakeupPadPolarity_High}, // Wake Event  7 - gp3_pu[6] (IPC_SRDY1)
     {NV_TRUE,   8, NvOdmWakeupPadPolarity_AnyEdge},    // Wake Event  8 - gmi_wp_n (BT_HOST_WAKEUP)
     {NV_FALSE/*NV_TRUE*/,   9, NvOdmWakeupPadPolarity_AnyEdge},     // Wake Event  9 - gp3_ps[2] (CHG_STATUS_N_AP20)
     {NV_FALSE, 10, NvOdmWakeupPadPolarity_High},    // Wake Event 10 - gmi_ad21
     {NV_FALSE/*NV_TRUE*/,  11, NvOdmWakeupPadPolarity_Low},     // Wake Event 11 - spi2_cs2 (BATT_LOW_INT_N)
     {NV_FALSE, 12, NvOdmWakeupPadPolarity_Low},     // Wake Event 12 - spi2_cs1 (AUDIO_INT_N)
     {NV_TRUE/*NV_FALSE*/, 13, NvOdmWakeupPadPolarity_Low},     // Wake Event 13 - sdio1_dat1
-// 101111  [SU660] HOME key gpio pk6 -> pv6 to wakeup while sleep [START]
-#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F)
-    {NV_TRUE, 14, NvOdmWakeupPadPolarity_Low}, // Wake Event 14 - gp3_pv[6]
-#else
     {NV_FALSE, 14, NvOdmWakeupPadPolarity_AnyEdge}, // Wake Event 14 - gp3_pv[6]
-#endif
-// 101111  [SU660] HOME key gpio pk6 -> pv6 to wakeup while sleep [END]
     {NV_FALSE, 15, NvOdmWakeupPadPolarity_AnyEdge}, // Wake Event 15 - gmi_ad16
     {NV_FALSE, 16, NvOdmWakeupPadPolarity_High},    // Wake Event 16 - rtc_irq
     {NV_FALSE, 17, NvOdmWakeupPadPolarity_High},    // Wake Event 17 - kbc_interrupt
@@ -1098,42 +787,9 @@ static NvOdmWakeupPadInfo s_NvOdmWakeupPadInfo[] =
     {NV_FALSE, 30, NvOdmWakeupPadPolarity_High}     // Wake Event 30 - dap1_dout (DAP1_DOUT)
 };
 #else
-static NvOdmWakeupPadInfo s_NvOdmWakeupPadInfo[] =
-{
-    {NV_FALSE,  0, NvOdmWakeupPadPolarity_Low},     // Wake Event  0 - ulpi_data4 (UART_RI)
-    {NV_FALSE,  1, NvOdmWakeupPadPolarity_High},    // Wake Event  1 - gp3_pv[3] (BB_MOD, MODEM_RESET_OUT)
-    {NV_FALSE,  2, NvOdmWakeupPadPolarity_High},    // Wake Event  2 - dvi_d3
-    {NV_FALSE,  3, NvOdmWakeupPadPolarity_Low},     // Wake Event  3 - sdio3_dat1
-    {NV_FALSE,  4, NvOdmWakeupPadPolarity_High},    // Wake Event  4 - hdmi_int (HDMI_HPD)
-    {NV_FALSE,  5, NvOdmWakeupPadPolarity_High},    // Wake Event  5 - vgp[6] (VI_GP6, Flash_EN2)
-    {NV_FALSE,  6, NvOdmWakeupPadPolarity_High},    // Wake Event  6 - gp3_pu[5] (GPS_ON_OFF, GPS_IRQ)
-    {NV_FALSE,  7, NvOdmWakeupPadPolarity_AnyEdge}, // Wake Event  7 - gp3_pu[6] (GPS_INT, BT_IRQ)
-    {NV_FALSE,  8, NvOdmWakeupPadPolarity_AnyEdge}, // Wake Event  8 - gmi_wp_n (MICRO SD_CD)
-    {NV_FALSE,  9, NvOdmWakeupPadPolarity_High},    // Wake Event  9 - gp3_ps[2] (KB_COL10)
-    {NV_FALSE, 10, NvOdmWakeupPadPolarity_High},    // Wake Event 10 - gmi_ad21 (Accelerometer_TH/TAP)
-    {NV_FALSE, 11, NvOdmWakeupPadPolarity_Low},     // Wake Event 11 - spi2_cs2 (PEN_INT, AUDIO-IRQ)
-    {NV_FALSE, 12, NvOdmWakeupPadPolarity_Low},     // Wake Event 12 - spi2_cs1 (HEADSET_DET, not used)
-    {NV_FALSE, 13, NvOdmWakeupPadPolarity_Low},     // Wake Event 13 - sdio1_dat1
-    {NV_FALSE, 14, NvOdmWakeupPadPolarity_AnyEdge}, // Wake Event 14 - gp3_pv[6] (WLAN_INT)
-    {NV_FALSE, 15, NvOdmWakeupPadPolarity_AnyEdge}, // Wake Event 15 - gmi_ad16  (SPI3_DOUT, DTV_SPI4_CS1)
-    {NV_FALSE, 16, NvOdmWakeupPadPolarity_High},    // Wake Event 16 - rtc_irq
-    {NV_FALSE, 17, NvOdmWakeupPadPolarity_High},    // Wake Event 17 - kbc_interrupt
-    {NV_TRUE,  18, NvOdmWakeupPadPolarity_Low},     // Wake Event 18 - pwr_int (PMIC_INT)
-    {NV_FALSE, 19, NvOdmWakeupPadPolarity_High},    // Wake Event 19 - usb_vbus_wakeup[0]
-    {NV_FALSE, 20, NvOdmWakeupPadPolarity_High},    // Wake Event 20 - usb_vbus_wakeup[1]
-    {NV_FALSE, 21, NvOdmWakeupPadPolarity_Low},     // Wake Event 21 - usb_iddig[0]
-    {NV_FALSE, 22, NvOdmWakeupPadPolarity_Low},     // Wake Event 22 - usb_iddig[1]
-    {NV_FALSE, 23, NvOdmWakeupPadPolarity_Low},     // Wake Event 23 - gmi_iordy (HSMMC_CLK)
-    {NV_FALSE, 24, NvOdmWakeupPadPolarity_High},    // Wake Event 24 - gp3_pv[2] (BB_MOD, MODEM WAKEUP_AP15, SPI-SS)
-    {NV_FALSE, 25, NvOdmWakeupPadPolarity_High},    // Wake Event 25 - gp3_ps[4] (KB_COL12)
-    {NV_FALSE, 26, NvOdmWakeupPadPolarity_High},    // Wake Event 26 - gp3_ps[5] (KB_COL10)
-    {NV_FALSE, 27, NvOdmWakeupPadPolarity_High},    // Wake Event 27 - gp3_ps[0] (KB_COL8)
-    {NV_FALSE, 28, NvOdmWakeupPadPolarity_Low},     // Wake Event 28 - gp3_pq[6] (KB_ROW6)
-    {NV_FALSE, 29, NvOdmWakeupPadPolarity_Low},     // Wake Event 29 - gp3_pq[7] (KB_ROW6)
-    {NV_FALSE, 30, NvOdmWakeupPadPolarity_High}     // Wake Event 30 - dap1_dout (DAP1_DOUT)
-};
+#error STAR_HW not assigned
 #endif
-//20100413, wakeup control [END]
+//20100413, , wakeup control [END]
 
 /* --- Function Implementations ---*/
 
@@ -1229,20 +885,22 @@ NvOdmQuerySpiGetDeviceInfo(
     NvU32 ControllerId,
     NvU32 ChipSelect)
 {
+#ifdef CONFIG_SPI_TEGRA
     static const NvOdmQuerySpiDeviceInfo s_Spi1Cs0Info_IfxRil =
-        {NvOdmQuerySpiSignalMode_1, NV_FALSE, NV_FALSE};
-
-#ifdef CONFIG_SPI_TDMB	
-	//20100918  TDMB Base [START_LGE_LAB1]
-	//20100912,  [START]	
+	 {NvOdmQuerySpiSignalMode_1, NV_TRUE, NV_FALSE, NV_FALSE, 0, 0};
+#else
+    static const NvOdmQuerySpiDeviceInfo s_Spi1Cs0Info_IfxRil =
+        {NvOdmQuerySpiSignalMode_1, NV_TRUE, NV_TRUE, NV_FALSE, 0, 0};	//	{NvOdmQuerySpiSignalMode_1, NV_FALSE, NV_FALSE};
+#endif
+//20100809-1, , Add SPI2 for AP-CP IPC [START]
+#ifdef CONFIG_DUAL_SPI
 	static const NvOdmQuerySpiDeviceInfo s_Spi2Cs0Info =
-		{NvOdmQuerySpiSignalMode_0, NV_TRUE, NV_FALSE};
+		{NvOdmQuerySpiSignalMode_1, NV_TRUE, NV_TRUE, NV_FALSE, 0, 0};
 #else
 	static const NvOdmQuerySpiDeviceInfo s_Spi2Cs0Info =
-		{NvOdmQuerySpiSignalMode_3, NV_TRUE, NV_FALSE};
-	//20100912,  [END]
-	//20100918  TDMB Base [END_LGE_LAB1]
+        {NvOdmQuerySpiSignalMode_3, NV_TRUE, NV_FALSE, NV_FALSE, 0, 0};
 #endif
+//20100809, , Add SPI2 for AP-CP IPC [END]
 
     if ((OdmIoModule == NvOdmIoModule_Spi) &&
         (ControllerId == 0 ) && (ChipSelect == 0))
@@ -1255,7 +913,7 @@ NvOdmQuerySpiGetDeviceInfo(
     return NULL;
 }
 
-
+//20101204-1, , NVIDIA's patch for setting signal level during idle state [START]
 static const NvOdmQuerySpiIdleSignalState s_NvOdmQuerySpiIdleSignalStateLevel[] = 
 { 
 	{NV_FALSE, NvOdmQuerySpiSignalMode_1, NV_FALSE} // Spi 1 
@@ -1270,11 +928,12 @@ NvOdmQuerySpiGetIdleSignalState(
 	{ 
 		if (ControllerId == 0) 
 			return &s_NvOdmQuerySpiIdleSignalStateLevel[0]; 
+		else if (ControllerId == 1) 
+			return &s_NvOdmQuerySpiIdleSignalStateLevel[0]; 
 	} 
 	return NULL; 
 } 
-
-
+//20101204-1, , NVIDIA's patch for setting signal level during idle state [END]
 
 const NvOdmQueryI2sInterfaceProperty *
 NvOdmQueryI2sGetInterfaceProperty(
@@ -1401,19 +1060,11 @@ const void*
 NvOdmQuerySdramControllerConfigGet(NvU32 *pEntries, NvU32 *pRevision)
 {
 #if NVODM_ENABLE_EMC_DVFS
-#if defined(CONFIG_MACH_STAR_REV_C)
-    if (pRevision)
-        *pRevision = s_NvOdmStarSmartphoneSamsungEmcConfigTable[0].Revision;
-    if (pEntries)
-        *pEntries = NV_ARRAY_SIZE(s_NvOdmStarSmartphoneSamsungEmcConfigTable);
-    return (const void*)s_NvOdmStarSmartphoneSamsungEmcConfigTable;
-#elif defined(CONFIG_MACH_STAR_REV_D) || defined(CONFIG_MACH_STAR_REV_E) || defined(CONFIG_MACH_STAR_REV_F)
     if (pRevision)
         *pRevision = s_NvOdmStarSmartphoneHynixEmcConfigTable[0].Revision;
     if (pEntries)
         *pEntries = NV_ARRAY_SIZE(s_NvOdmStarSmartphoneHynixEmcConfigTable);
     return (const void*)s_NvOdmStarSmartphoneHynixEmcConfigTable;
-#endif
 #endif
     if (pEntries)
         *pEntries = 0;
@@ -1481,37 +1132,23 @@ const NvU8* NvOdmQueryProjectName(void)
      
     // Pull ups for the kbc pins
     { NvOdmPinRegister_Ap20_PullUpDown_B,
+#if defined (CONFIG_MACH_STAR)
+     //KBCD : pull up -> pull down
      NVODM_QUERY_PIN_AP20_PULLUPDOWN_B(0x0, 0x0, 0x0, 0x0, 0x2, 0x0, 0x2, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0) },
+#else
+     NVODM_QUERY_PIN_AP20_PULLUPDOWN_B(0x0, 0x0, 0x0, 0x0, 0x2, 0x0, 0x2, 0x2, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0) },
+#endif
 
     { NvOdmPinRegister_Ap20_PullUpDown_C,
-#ifdef CONFIG_SPI_TDMB	
-    //20100918  TDMB Base [START_LGE_LAB1]
-    //20100912,  [START]  
-     //SPIC : pull up -> pull down
-     NVODM_QUERY_PIN_AP20_PULLUPDOWN_C(0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x2, 0x1, 0x2, 0x2, 0x2, 0x2, 0x2, 0x0, 0x0) },
-    //20100912,  [END]
-    //20100918  TDMB Base [END_LGE_LAB1]
-#else
-     NVODM_QUERY_PIN_AP20_PULLUPDOWN_C(0x1, 0x1, 0x1, 0x1, 0x2, 0x1, 0x2, 0x1, 0x2, 0x2, 0x2, 0x2, 0x0, 0x0, 0x0) },
-#endif
+     NVODM_QUERY_PIN_AP20_PULLUPDOWN_C(0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x2, 0x1, 0x2, 0x2, 0x2, 0x2, 0x0, 0x0, 0x0) },	//20110120-2, , SPI2 pulldown setting : 5th 0x2->0x1
 
 	//20100810  LCD one shot mode
     { NvOdmPinRegister_Ap20_PullUpDown_D,
-#if defined (CONFIG_MACH_STAR)
-     //UAB : pull up -> pull down
-     NVODM_QUERY_PIN_AP20_PULLUPDOWN_D(0x2, 0x1, 0x0, 0x2, 0x2, 0x2, 0x1, 0x1, 0x1, 0x1, 0x0, 0x0, 0x1, 0x0, 0x2, 0x2) },
-#else
      NVODM_QUERY_PIN_AP20_PULLUPDOWN_D(0x2, 0x2, 0x0, 0x2, 0x2, 0x2, 0x1, 0x1, 0x1, 0x1, 0x2, 0x0, 0x1, 0x0, 0x2, 0x2) },
-#endif
 
     // Pull ups for the kbc pins
     { NvOdmPinRegister_Ap20_PullUpDown_E,
-#if defined (CONFIG_MACH_STAR)
-     //20101001-2, , Pull down MISO pin(Fix spi rx bad data while resuming)
-	 NVODM_QUERY_PIN_AP20_PULLUPDOWN_E(0x2, 0x2, 0x0, 0x0, 0x0, 0x0, 0x2, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x2, 0x2) },	
-#else
      NVODM_QUERY_PIN_AP20_PULLUPDOWN_E(0x2, 0x2, 0x0, 0x0, 0x0, 0x0, 0x2, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x2, 0x2) },
-#endif
 
     // Set pad control for the sdio2 - - AOCFG1 and AOCFG2 pad control register
     { NvOdmPinRegister_Ap20_PadCtrl_AOCFG1PADCTRL,
@@ -1564,6 +1201,13 @@ const NvU8* NvOdmQueryProjectName(void)
 
     { NvOdmPinRegister_Ap20_PadCtrl_DAP3CFGPADCTRL,
       NVODM_QUERY_PIN_AP20_PADCTRL_AOCFG1PADCTRL(!HIGHSPEED, SCHMITT, OHM_400, 0, 0, 0, 0) },
+//20101210-1, , Nvidia's patch for spi signal strength [START]
+	{ NvOdmPinRegister_Ap20_PadCtrl_SPICFGPADCTRL, // for spi2
+	NVODM_QUERY_PIN_AP20_PADCTRL_AOCFG1PADCTRL(!HIGHSPEED, SCHMITT, OHM_50, 31, 31, 3, 3) },
+
+	{ NvOdmPinRegister_Ap20_PadCtrl_UADCFGPADCTRL, // for spi1
+	NVODM_QUERY_PIN_AP20_PADCTRL_AOCFG1PADCTRL(!HIGHSPEED, SCHMITT, OHM_50, 31, 31, 3, 3) },
+//20101210-1, , Nvidia's patch for spi signal strength [END]
 };
 
 
@@ -1592,7 +1236,7 @@ NvBool NvOdmQueryGetPmuProperty(NvOdmPmuProperty* pPmuProperty)
 
     pPmuProperty->CorePowerReqPolarity = NvOdmCorePowerReqPolarity_High;
     pPmuProperty->SysClockReqPolarity = NvOdmSysClockReqPolarity_High;
-#if defined(CONFIG_MACH_STAR_REV_B)
+#ifndef CONFIG_MACH_STAR
 	//20100917 one PMIC (max8907B)
     pPmuProperty->CombinedPowerReq = NV_TRUE;
 #else
@@ -1603,7 +1247,7 @@ NvBool NvOdmQueryGetPmuProperty(NvOdmPmuProperty* pPmuProperty)
     pPmuProperty->AccuracyPercent = 3;
 
     //20100917 system hang issue.
-#if defined(CONFIG_MACH_STAR_REV_B)
+#ifndef CONFIG_MACH_STAR
 	//20100917 voltage output is restored to default level (max8907)
     pPmuProperty->VCpuOTPOnWakeup = NV_TRUE;
 #else
@@ -1614,7 +1258,7 @@ NvBool NvOdmQueryGetPmuProperty(NvOdmPmuProperty* pPmuProperty)
     /* Setting Power off count for 100 ms  -32KHz clock rate*/
     pPmuProperty->PowerOffCount = 0xc00;
     //20100918  system hang issue [START]
-#if defined(CONFIG_MACH_STAR_REV_B)
+#ifndef CONFIG_MACH_STAR
     pPmuProperty->CpuPowerOffUs = 1000;
 #else
     pPmuProperty->CpuPowerOffUs = 1500;

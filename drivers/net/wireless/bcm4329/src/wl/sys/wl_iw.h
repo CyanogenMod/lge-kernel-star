@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_iw.h,v 1.5.34.1.6.35 2010/08/20 02:42:33 Exp $
+ * $Id: wl_iw.h,v 1.5.34.1.6.36.4.16 2011/01/14 22:25:05 Exp $
  */
 
 
@@ -47,9 +47,9 @@
 #define BAND_SET_CMD				"BANDSET"
 #define DTIM_SKIP_GET_CMD			"DTIMSKIPGET"
 #define DTIM_SKIP_SET_CMD			"DTIMSKIPSET"
-#define SETSUSPEND_CMD				"SETSUSPEND"
+#define SETSUSPEND_CMD				"SETSUSPENDOPT"
 #define PNOSSIDCLR_SET_CMD			"PNOSSIDCLR"
-#define PNOSETUP_SET_CMD			"PNOSETUP" 
+#define PNOSETUP_SET_CMD			"PNOSETUP " 
 #define PNOENABLE_SET_CMD			"PNOFORCE"
 #define PNODEBUG_SET_CMD			"PNODEBUG"
 
@@ -60,6 +60,12 @@
 typedef struct wl_iw_extra_params {
 	int 	target_channel; 
 } wl_iw_extra_params_t;
+
+struct cntry_locales_custom {
+	char iso_abbrev[WLC_CNTRY_BUF_SZ];	
+	char custom_locale[WLC_CNTRY_BUF_SZ];	
+	int32 custom_locale_rev;		
+};
 
 #define SOFTAP 1
 
@@ -93,12 +99,14 @@ typedef struct wl_iw_extra_params {
 #if defined(CONFIG_LGE_BCM432X_PATCH) && defined(SOFTAP)
 #define WL_IW_SET_STOP_SOFTAP	(SIOCIWFIRSTPRIV+29)
 #define WL_IW_SET_START_SOFTAP	(SIOCIWFIRSTPRIV+31)
-#define WL_COMBO_SCAN            (SIOCIWFIRSTPRIV+33)
-#define WL_AP_SPARE3            (SIOCIWFIRSTPRIV+35)
+#define WL_AP_STA_DISASSOC            (SIOCIWFIRSTPRIV+33)
+#define WL_COMBO_SCAN            (SIOCIWFIRSTPRIV+35)
 #else
-#define WL_COMBO_SCAN            (SIOCIWFIRSTPRIV+29)
-#define WL_AP_SPARE3            (SIOCIWFIRSTPRIV+31)
+#define WL_AP_STA_DISASSOC		(SIOCIWFIRSTPRIV+29)
+#define WL_COMBO_SCAN           (SIOCIWFIRSTPRIV+31)
 #endif	/* defined(CONFIG_LGE_BCM432X_PATCH) && defined(SOFTAP) */
+
+
 #define 		G_SCAN_RESULTS 8*1024
 #define 		WE_ADD_EVENT_FIX	0x80
 #define          G_WLAN_SET_ON	0
@@ -127,19 +135,18 @@ typedef struct wl_iw {
 } wl_iw_t;
 
 int	 wl_control_wl_start(struct net_device *dev);
-#define WLC_IW_SS_CACHE_MAXLEN				512
+#define WLC_IW_SS_CACHE_MAXLEN				2048
 #define WLC_IW_SS_CACHE_CTRL_FIELD_MAXLEN	32
 #define WLC_IW_BSS_INFO_MAXLEN 				\
 	(WLC_IW_SS_CACHE_MAXLEN - WLC_IW_SS_CACHE_CTRL_FIELD_MAXLEN)
 
-typedef struct wl_iw_ss_cache{
+typedef struct wl_iw_ss_cache {
+	struct wl_iw_ss_cache *next;
+	int dirty;
 	uint32 buflen;
 	uint32 version;
 	uint32 count;
 	wl_bss_info_t bss_info[1];
-	char dummy[WLC_IW_BSS_INFO_MAXLEN - sizeof(wl_bss_info_t)];
-	int dirty;
-	struct wl_iw_ss_cache *next;
 } wl_iw_ss_cache_t;
 
 typedef struct wl_iw_ss_cache_ctrl {
@@ -170,11 +177,13 @@ struct ap_profile {
 	uint32	channel; 
 	uint32	preamble;
 	uint32	max_scb;	
+	uint32  closednet;  
+	char country_code[WLC_CNTRY_BUF_SZ];
 };
 
 
 #define MACLIST_MODE_DISABLED	0
-#define MACLIST_MODE_ENABLED	1
+#define MACLIST_MODE_DENY		1
 #define MACLIST_MODE_ALLOW		2
 struct mflist {
 	uint count;
@@ -182,8 +191,7 @@ struct mflist {
 };
 struct mac_list_set {
 	uint32	mode;
-	struct mflist white_list;
-	struct mflist black_list;
+	struct mflist mac_list;
 };
 #endif   
 
@@ -201,6 +209,7 @@ extern int net_os_set_suspend_disable(struct net_device *dev, int val);
 extern int net_os_set_suspend(struct net_device *dev, int val);
 extern int net_os_set_dtim_skip(struct net_device *dev, int val);
 extern int net_os_set_packet_filter(struct net_device *dev, int val);
+extern void get_customized_country_code(char *country_iso_code, wl_country_t *cspec);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)
 #define IWE_STREAM_ADD_EVENT(info, stream, ends, iwe, extra) \
@@ -220,21 +229,24 @@ extern int net_os_set_packet_filter(struct net_device *dev, int val);
 
 extern int dhd_pno_enable(dhd_pub_t *dhd, int pfn_enabled);
 extern int dhd_pno_clean(dhd_pub_t *dhd);
-extern int dhd_pno_set(dhd_pub_t *dhd, wlc_ssid_t* ssids_local, int nssid, uchar  scan_fr);
+extern int dhd_pno_set(dhd_pub_t *dhd, wlc_ssid_t* ssids_local, int nssid, ushort  scan_fr);
 extern int dhd_pno_get_status(dhd_pub_t *dhd);
 extern int dhd_dev_pno_reset(struct net_device *dev);
 extern int dhd_dev_pno_set(struct net_device *dev, wlc_ssid_t* ssids_local, \
-				 int nssid, uchar  scan_fr);
+				 int nssid, ushort  scan_fr);
 extern int dhd_dev_pno_enable(struct net_device *dev,  int pfn_enabled);
 extern int dhd_dev_get_pno_status(struct net_device *dev);
+void	dhd_bus_country_set(struct net_device *dev, wl_country_t *cspec);
+extern int dhd_get_dtim_skip(dhd_pub_t *dhd);
 
 #define PNO_TLV_PREFIX			'S'
-#define PNO_TLV_VERSION			1
-#define PNO_TLV_SUBVERSION 		0
-#define PNO_TLV_RESERVED		0
+#define PNO_TLV_VERSION			'1'
+#define PNO_TLV_SUBVERSION 		'2'
+#define PNO_TLV_RESERVED		'0'
 #define PNO_TLV_TYPE_SSID_IE		'S'
 #define PNO_TLV_TYPE_TIME		'T'
 #define  PNO_EVENT_UP			"PNO_EVENT"
+#define PNO_SCAN_MAX_FW		508	
 
 typedef struct cmd_tlv {
 	char prefix;
@@ -264,6 +276,20 @@ typedef struct cscan_tlv {
 #define CSCAN_TLV_TYPE_PASSIVE_IE    'P'
 #define CSCAN_TLV_TYPE_HOME_IE         'H'
 #define CSCAN_TLV_TYPE_STYPE_IE        'T'
+
+#ifdef SOFTAP_TLV_CFG
+
+#define SOFTAP_SET_CMD				"SOFTAPSET "
+#define SOFTAP_TLV_PREFIX			'A'
+#define SOFTAP_TLV_VERSION			'1'
+#define SOFTAP_TLV_SUBVERSION		'0'
+#define SOFTAP_TLV_RESERVED		'0'
+
+#define TLV_TYPE_SSID				'S'
+#define TLV_TYPE_SECUR				'E'
+#define TLV_TYPE_KEY				'K'
+#define TLV_TYPE_CHANNEL			'C'
+#endif 
 
 extern int wl_iw_parse_channel_list_tlv(char** list_str, uint16* channel_list, \
 					int channel_num, int *bytes_left);

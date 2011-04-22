@@ -19,6 +19,7 @@
 #ifndef INCLUDED_MAX8907_SUPPLY_INFO_HEADER
 #define INCLUDED_MAX8907_SUPPLY_INFO_HEADER
 
+#include <star_hw_definition.h>
 #include "nvodm_pmu.h"
 
 #if defined(__cplusplus)
@@ -32,8 +33,8 @@ extern "C"
 #define MAX8907_REQUESTVOLTAGE_LX_V2       1200
 #define MAX8907_REQUESTVOLTAGE_LX_V3       1800
 
-//20100413, add [START]
-#if defined(CONFIG_MACH_STAR_REV_C) || defined(CONFIG_MACH_STAR_REV_D) || defined(CONFIG_MACH_STAR_REV_E) || defined(CONFIG_MACH_STAR_REV_F)
+//20100413, , add [START]
+#if defined(CONFIG_MACH_STAR)
 #define MAX8907_REQUESTVOLTAGE_LDO1        3300     //DDRx 3.3V
 #define MAX8907_REQUESTVOLTAGE_LDO2        1100     //PLL 1.1V
 #define MAX8907_REQUESTVOLTAGE_LDO3        1800     //LCD 1.8V
@@ -54,61 +55,11 @@ extern "C"
 #define MAX8907_REQUESTVOLTAGE_LDO18       1800     //VI 1.8V
 #define MAX8907_REQUESTVOLTAGE_LDO19       1800     //TOUCH 1.8V
 #define MAX8907_REQUESTVOLTAGE_LDO20       0
-//20101104  [KR SKT] Button LED Current for SU660 // Tunned 20101225 for WHITE Color [START]
-#if defined (STAR_COUNTRY_KR)&& defined (STAR_OPERATOR_SKT)
-#define MAX8907_REQUESTVOLTAGE_WLED        0x14     //0x14(2mA)//0x50(8mA) //0x32(5mA)    //0x46(7mA), <- 0x64(10mA)   :   0x00(0.1mA)~0xff(25.5mA)
-//20101104  [KR SKT] Button LED Current for SU660 // Tunned 20101225 for WHITE Color [END]
-#else
 #define MAX8907_REQUESTVOLTAGE_WLED        0x14     //0x14(2mA)  <- 0x46(7mA) <- 0x64(10mA) : 0x00(0.1mA)~0xff(25.5mA)
-#endif
-#elif defined(CONFIG_MACH_STAR_REV_B)
-#define MAX8907_REQUESTVOLTAGE_LDO1        3300    //DDRx
-#define MAX8907_REQUESTVOLTAGE_LDO2        1100    //PLLs
-#define MAX8907_REQUESTVOLTAGE_LDO3        0       //unused
-#define MAX8907_REQUESTVOLTAGE_LDO4        3300    //USB
-#define MAX8907_REQUESTVOLTAGE_LDO5        2800    //eMMC 2.8V
-#define MAX8907_REQUESTVOLTAGE_LDO6        1800    //HDMI_PLL
-#define MAX8907_REQUESTVOLTAGE_LDO7        3000    //sensor 3.0V
-#define MAX8907_REQUESTVOLTAGE_LDO8        1800    //sensor 1.8V
-#define MAX8907_REQUESTVOLTAGE_LDO9        3300    //fuse(DNI)
-#define MAX8907_REQUESTVOLTAGE_LDO10       3100    //Touch
-#define MAX8907_REQUESTVOLTAGE_LDO11       3300    //HDMI
-#define MAX8907_REQUESTVOLTAGE_LDO12       2800    //SDIO
-#define MAX8907_REQUESTVOLTAGE_LDO13       3000    //MOTOR
-#define MAX8907_REQUESTVOLTAGE_LDO14       0       //unused
-#define MAX8907_REQUESTVOLTAGE_LDO15       3300    //AP Temp
-#define MAX8907_REQUESTVOLTAGE_LDO16       2800    //eMMC 2.8V(DNI)
-#define MAX8907_REQUESTVOLTAGE_LDO17       1200    //MIPI
-#define MAX8907_REQUESTVOLTAGE_LDO18       1800    //VI
-#define MAX8907_REQUESTVOLTAGE_LDO19       1800    //Touch_1.8V(added)
-#define MAX8907_REQUESTVOLTAGE_LDO20       0       //unused
-#define MAX8907_REQUESTVOLTAGE_WLED        0x64    //0x64(10.0mA)      0x00(0.0mA)~0xff(25.5mA)
-#elif defined(CONFIG_MACH_STAR_REV_A)
-#define MAX8907_REQUESTVOLTAGE_LDO1        3300    //DDRx
-#define MAX8907_REQUESTVOLTAGE_LDO2        1100    //PLLs
-#define MAX8907_REQUESTVOLTAGE_LDO3        0       //unused
-#define MAX8907_REQUESTVOLTAGE_LDO4        3300    //USB
-#define MAX8907_REQUESTVOLTAGE_LDO5        2800    //eMMC 2.8V
-#define MAX8907_REQUESTVOLTAGE_LDO6        1800    //HDMI_PLL
-#define MAX8907_REQUESTVOLTAGE_LDO7        3000    //sensor 3.0V
-#define MAX8907_REQUESTVOLTAGE_LDO8        1800    //sensor 1.8V
-#define MAX8907_REQUESTVOLTAGE_LDO9        3300    //fuse(DNI)
-#define MAX8907_REQUESTVOLTAGE_LDO10       3100    //Touch
-#define MAX8907_REQUESTVOLTAGE_LDO11       3300    //HDMI
-#define MAX8907_REQUESTVOLTAGE_LDO12       2800    //SDIO
-#define MAX8907_REQUESTVOLTAGE_LDO13       3000    //MOTOR
-#define MAX8907_REQUESTVOLTAGE_LDO14       2800    //GPS(DNI)
-#define MAX8907_REQUESTVOLTAGE_LDO15       3300    //AP Temp
-#define MAX8907_REQUESTVOLTAGE_LDO16       2800    //eMMC 2.8V(DNI)
-#define MAX8907_REQUESTVOLTAGE_LDO17       1200    //MIPI
-#define MAX8907_REQUESTVOLTAGE_LDO18       1800    //VI
-#define MAX8907_REQUESTVOLTAGE_LDO19       0       //unused
-#define MAX8907_REQUESTVOLTAGE_LDO20       0       //unused
-#define MAX8907_REQUESTVOLTAGE_WLED        0x64    //0x64(10mA)      0x00(0.1mA)~0xff(25.5mA)
 #else
 #error "NOT SURPORTED!!!"
 #endif
-//20100413, add [END]
+//20100413, , add [END]
 
 #define MAX8907_REQUESTVOLTAGE_EXT_DCDC_1  5000    // Fixed
 #define MAX8907_REQUESTVOLTAGE_EXT_DCDC_2     0    // Reserved
@@ -156,7 +107,7 @@ extern "C"
 #define MAX8907_TURN_ON_TIME_US            (3000)
 #define MAX8907_TURN_OFF_TIME_US           (20)
 
-//20100413, add
+//20100413, , add
 #define MAX8907_INVALID_PORT               0xff
 
 // Output voltages supplied by PMU
@@ -197,13 +148,13 @@ typedef enum
     #if defined(CONFIG_MACH_STAR)
     /*-- White LED --*/
     Max8907PmuSupply_WHITE_LED,    // (Boost WLED)
-    //20100413, add [START]
+    //20100413, , add [START]
     Max8907PmuSupply_SOC,
     Max8907PmuSupply_reset,
-    //20100413, add [END]
+    //20100413, , add [END]
     #endif
 
-    //20100413, add [START]
+    //20100413, , add [START]
     #ifndef CONFIG_MACH_STAR
     /*-- External DC/DC switcher --*/
     Max8907PmuSupply_EXT_DCDC_1,   // EXT_DC/DC1
@@ -227,7 +178,7 @@ typedef enum
     // potentiometer (DPM) AD5258
     Max8907LxV1_Ad5258_DPM_EXT_DCDC_7,
     #endif
-    //20100413, add [END],
+    //20100413, , add [END],
 
     #if 0
     //Temp for enabling fuse using p2 of i0 expander
@@ -236,6 +187,12 @@ typedef enum
 
 	// MAX8952 for VDD CPU
 	Max8907PmuSupply_EXT_DCDC_8_CPU,
+
+    //20110131, , Stop i2c comm during reset [START]
+    #if defined(CONFIG_MACH_STAR)
+    Max8907PmuSupply_Stop_i2c_Flag,    
+    #endif
+    //20110131, , Stop i2c comm during reset [END]
 
     Max8907PmuSupply_Num,
     Max8907PmuSupply_Force32 = 0x7FFFFFFF

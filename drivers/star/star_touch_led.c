@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2009 LGE, Inc.
  *
- * Author: <>
+ * Author: Changsu Ha <>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -65,6 +65,9 @@ typedef struct TouchLEDRec{
 #endif
     NvU8            setVal;
     NvU8            maxVal;
+
+	NvU8			is_working;
+    NvU8            keep_led_on;
 } TouchLED;
 
 static TouchLED s_touchLED;
@@ -91,6 +94,7 @@ static NvBool touchLED_Control(NvU8 value)
 		hrtimer_cancel(&s_touchLED.timer);
 #endif
 // 20100820  LGE Touch LED Control [END]
+		if ( s_touchLED.keep_led_on != 1 )
 		NvOdmServicesPmuSetVoltage(s_touchLED.hPmu, s_touchLED.conn->AddressList[0].Address, NVODM_VOLTAGE_OFF, &settle_us);
 	}
 	
@@ -112,30 +116,36 @@ static enum hrtimer_restart touchLED_timer_func(struct hrtimer *timer)
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void touchLED_early_suspend(struct early_suspend *es)
 {
+	printk("[LED] touchLED_early_suspend\n");
+	s_touchLED.is_working = 0;
 	touchLED_Control(NV_FALSE);
 	return;
 }
 
 static void touchLED_late_resume(struct early_suspend *es)
 {
+	printk("[LED] touchLED_late_resume\n");
+	s_touchLED.is_working = 1;
 	touchLED_Control(NV_TRUE);
 	return;
 }
 #else
 static int touchLED_suspend(struct platform_device *pdev, pm_message_t state)
 {
+	s_touchLED.is_working = 0;
 	touchLED_Control(NV_FALSE);
 	return 0;
 }
 
 static int touchLED_resume(struct platform_device *pdev)
 {
+	s_touchLED.is_working = 1;
 	touchLED_Control(NV_TRUE);
 	return 0;
 }
 #endif
 
-//20101104, WLED set [START]
+//20101104, , WLED set [START]
 static ssize_t star_wled_show(struct device *dev, 
             struct device_attribute *attr, char *buf)
 {
@@ -173,7 +183,15 @@ static struct attribute *star_wled_attributes[] = {
 static const struct attribute_group star_wled_group = {
     .attrs = star_wled_attributes,
 };
-//20101104, WLED set [END]
+//20101104, , WLED set [END]
+
+void keep_touch_led_on()
+{
+	s_touchLED.keep_led_on = 1;
+	touchLED_Control(NV_TRUE);
+}
+
+EXPORT_SYMBOL(keep_touch_led_on);
 
 static int __init touchLED_probe(struct platform_device *pdev)
 {
@@ -211,26 +229,29 @@ static int __init touchLED_probe(struct platform_device *pdev)
 #endif
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
-    s_touchLED.early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
+    s_touchLED.early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 2;
     s_touchLED.early_suspend.suspend = touchLED_early_suspend;
     s_touchLED.early_suspend.resume = touchLED_late_resume;
     register_early_suspend(&s_touchLED.early_suspend);
 #endif
 
-    //20101104, WLED set [START]
+    s_touchLED.keep_led_on = 0;
+    //20101104, , WLED set [START]
     if (sysfs_create_group(&pdev->dev.kobj, &star_wled_group)) {
         printk(KERN_ERR "[star touch led] sysfs_create_group ERROR\n");
     }
-    //20101104, WLED set [END]
+    //20101104, , WLED set [END]
+
+	s_touchLED.is_working = 1;
 
     return 0;
 }
 
 static int touchLED_remove(struct platform_device *pdev)
 {
-    //20101104, WLED set [START]
+    //20101104, , WLED set [START]
     sysfs_remove_group(&pdev->dev.kobj, &star_wled_group);
-    //20101104, WLED set [END]
+    //20101104, , WLED set [END]
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
     unregister_early_suspend(&s_touchLED.early_suspend);
@@ -238,13 +259,32 @@ static int touchLED_remove(struct platform_device *pdev)
 
     touchLED_Control(NV_FALSE);
     NvOdmServicesPmuClose( s_touchLED.hPmu );
+	
+	s_touchLED.is_working = 0;
     return 0;
+}
+
+static void touchLED_shutdown(struct  platform_device *pdev)
+{
+    //20101104, , WLED set [START]
+    sysfs_remove_group(&pdev->dev.kobj, &star_wled_group);
+    //20101104, , WLED set [END]
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+    unregister_early_suspend(&s_touchLED.early_suspend);
+#endif
+
+    touchLED_Control(NV_TRUE);	// remove off-command to keep LED on before PMIC power-off
+    NvOdmServicesPmuClose( s_touchLED.hPmu );
+
+	s_touchLED.is_working = 0;
 }
 
 
 static struct platform_driver touchLED_driver = {
     .probe      = touchLED_probe,
     .remove     = touchLED_remove,
+    .shutdown	= touchLED_shutdown,
 #ifndef CONFIG_HAS_EARLYSUSPEND
     .suspend    = touchLED_suspend,
     .resume     = touchLED_resume,
@@ -258,6 +298,7 @@ static struct platform_driver touchLED_driver = {
 // 20100820  LGE Touch LED Control [START]
 void touchLED_enable(NvBool status)
 {
+	if(s_touchLED.is_working)
     touchLED_Control(status);
 }
 // 20100820  LGE Touch LED Control [END]

@@ -83,20 +83,52 @@ static int __init hlt_setup(char *__unused)
 __setup("nohlt", nohlt_setup);
 __setup("hlt", hlt_setup);
 
-extern void write_cmd_reserved_buffer(unsigned char *buf, size_t len); //20101110, , Function for Warm-boot [START]
+extern void write_cmd_reserved_buffer(unsigned char *buf, size_t len);
 
 void arm_machine_restart(char mode, const char *cmd)
 {
 	/*
 	 * Clean and disable cache, and turn off interrupts
 	 */
-//20101110, , Function for Warm-boot [START]
-	unsigned char tmpbuf[2];
-	tmpbuf[0] = 'w';  //warm boot
-	write_cmd_reserved_buffer(tmpbuf,1);
-//20101110, , Function for Warm-boot [END]
 
+#if defined (CONFIG_MACH_STAR)
+	unsigned char tmpbuf[2];
+        if (cmd)
+        {
+         strncpy(tmpbuf, cmd, 1);
+        }
+        else
+        {
+          tmpbuf[0] = 'w';
+        }
+
+	switch (tmpbuf[0])
+	{
+		case 'w':
+		break;
+#if defined (CONFIG_STAR_HIDDEN_RESET)
+		case 'h':
+		break;
+#endif
+		case 'p':
+		break;
+		default:
+		tmpbuf[0] ='w';
+		break;
+	}
+	write_cmd_reserved_buffer(tmpbuf,1);
+#endif
+
+//20110124, , fix lockup during reset [START]
+#if defined(CONFIG_MACH_STAR)
+    if ( cmd == NULL )
+	    cpu_proc_fin();
+    else if ( *cmd != 'p' )
 	cpu_proc_fin();
+#else
+	cpu_proc_fin();
+#endif
+//20110124, , fix lockup during reset [END]
 
 	/*
 	 * Tell the mm system that we are going to reboot -

@@ -40,24 +40,26 @@ extern struct tegra_audio_state_t tegra_audio_state;
 
 static AlsaTransport* atrans = 0;
 
-
-static NvAudioFxMixerHandle tegra_transport_mixer_open(void)
+// 20110223, , media server restart 2 [start]
+static NvError tegra_transport_mixer_open(NvAudioFxMixerHandle* phMixer)
 {
 	NvError status = NvSuccess;
-	NvAudioFxMixerHandle hMixer = 0;
+	NvError retStatus = NvSuccess;
 	NvFxTransportMessageMixerOpen message;
 	struct completion comp;
 
 	init_completion(&comp);
 	message.Message = NVFXTRANSPORT_MESSAGE_MIXER_OPEN;
 	message.pPrivateData = (void*)&comp;
-	message.phMixer = &hMixer;
+	message.phMixer = phMixer;
+	message.pReturnError = &retStatus;
 
 	transport_send_message(NvFxTransportMessageMixerOpen);
 
 EXIT_WITH_ERROR:
-	return hMixer;
+	return retStatus;
 }
+// 20110223, , media server restart 2 [end]
 
 static void tegra_transport_mixer_close(NvAudioFxMixerHandle hMixer)
 {
@@ -297,6 +299,9 @@ static void AlsaTransportServiceThread(void *arg)
 			switch (in.Message.Message) {
 			case NVFXTRANSPORT_MESSAGE_MIXER_OPEN: {
 				*in.MixerOpen.phMixer = in.MixerOpen.hMixer;
+// 20110223, , media server restart 2 [start]
+				*in.MixerOpen.pReturnError = in.MixerOpen.ReturnError;
+// 20110223, , media server restart 2 [end]				
 				transport_complete(in.MixerOpen.pPrivateData);
 			}
 			break;
@@ -493,15 +498,15 @@ int tegra_audiofx_init(struct tegra_audio_data* tegra_snd_cx)
 			snd_printk(KERN_ERR "tegra_transport_init failed \n");
 			return -EFAULT;
 		}
+// 20110223, , media server restart 2 [start]
+		e = tegra_snd_cx->xrt_fxn.MixerOpen(
+			&tegra_snd_cx->mixer_handle);
 
-		tegra_snd_cx->mixer_handle =
-					tegra_snd_cx->xrt_fxn.MixerOpen();
-
-		if (!tegra_snd_cx->mixer_handle) {
+		if (e != NvSuccess) {
 			ret = -EFAULT;
 			goto fail;
 		}
-
+// 20110223, , media server restart 2 [end]
 		e = tegra_audiofx_createfx(tegra_snd_cx);
 		if (e != NvSuccess) {
 			snd_printk(KERN_ERR "tegra_audiofx_createfx failed \n");

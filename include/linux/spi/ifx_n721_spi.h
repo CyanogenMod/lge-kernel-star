@@ -53,9 +53,17 @@
 // hgahn
 //#define IFX_SPI_MAX_BUF_SIZE		1528	/* Max buffer size */
 //#define IFX_SPI_DEFAULT_BUF_SIZE	128 	/* Default buffer size*/
+//LGE_TELECA_CR:707_DATA_THROUGHPUT START
+//LGE_TELECA_CR1317_DATA_THROUGHPUT START
+#ifdef CONFIG_DUAL_SPI
+#define IFX_SPI_MAX_BUF_SIZE		3068	/* Max buffer size */
+#define IFX_SPI_DEFAULT_BUF_SIZE	3068 	/* Default buffer size*/
+#else
 #define IFX_SPI_MAX_BUF_SIZE		2044	/* Max buffer size */
 #define IFX_SPI_DEFAULT_BUF_SIZE	2044 	/* Default buffer size*/
-
+#endif
+//LGE_TELECA_CR1317_DATA_THROUGHPUT END
+//LGE_TELECA_CR:707_DATA_THROUGHPUT END
 
 
 #define IFX_SPI_HEADER_SIZE		4

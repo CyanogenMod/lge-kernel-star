@@ -1,57 +1,22 @@
-
 choice
-	prompt "HW Revision"
-	config MACH_STAR_REV_A
-	bool "STAR Rev.A"
-	depends on MACH_STAR
-	config MACH_STAR_REV_B
-	bool "STAR Rev.B"
-	depends on MACH_STAR
-	config MACH_STAR_REV_C
-	bool "STAR Rev.C"
-	depends on MACH_STAR
-	config MACH_STAR_REV_D
-	bool "STAR Rev.D"
-	depends on MACH_STAR
-	config MACH_STAR_REV_E
-	bool "STAR Rev.E"
-	depends on MACH_STAR
-	config MACH_STAR_REV_F
-	bool "STAR Rev.F"
-	depends on MACH_STAR
+       prompt "HW Revision"
+       config MACH_STAR_TMUS
+       bool "STAR TMUS (p999)"
+       depends on MACH_STAR
+       config MACH_STAR_REV_F
+       bool "STAR Rev.F (p990)"
+       depends on MACH_STAR
 endchoice
-
-config MACH_STAR_SKT
-    bool "Star SKT"
-    depends on MACH_STAR
-
-if MACH_STAR_SKT
-
-choice 
-	prompt "SKT HW Revision"
-	config MACH_STAR_SKT_REV_A
-	bool "STAR SKT Rev.A"
-	depends on MACH_STAR_SKT
-	config MACH_STAR_SKT_REV_B
-	bool "STAR SKT Rev.B"
-	depends on MACH_STAR_SKT
-	config MACH_STAR_SKT_REV_C
-	bool "STAR SKT Rev.C"
-	depends on MACH_STAR_SKT
-	config MACH_STAR_SKT_REV_D
-	bool "STAR SKT Rev.D"
-	depends on MACH_STAR_SKT
-	config MACH_STAR_SKT_REV_E
-	bool "STAR SKT Rev.E"
-	depends on MACH_STAR_SKT
-endchoice
-
-endif
 
 config STAR_PMIC
 	bool "star pmic test"
 	depends on MACH_STAR
 	default y
+
+config STAR_HIDDEN_RESET
+	bool "star hidden reset"
+	depends on MACH_STAR
+	default n
 
 menuconfig LPRINTK
         bool "LGE Debugging Message"

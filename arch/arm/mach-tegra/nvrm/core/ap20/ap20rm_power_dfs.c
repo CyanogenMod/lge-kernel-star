@@ -327,7 +327,7 @@ NvRmPrivAp20DttPolicyUpdate(
     pDtt->TcorePolicy.PolicyRange = (NvU32)Range;
 }
 
-//20101121 HW power off in thermal limit [START]
+//20101121 , HW power off in thermal limit [START]
 #if defined(CONFIG_MACH_STAR)
 static NvU32    ThermalLimitPwrOffEnalble = NV_FALSE;
 extern NvRmDeviceHandle s_hRmGlobal;
@@ -370,7 +370,7 @@ NvRmPrivStarDttPolicyUpdate(
     }
 }
 #endif
-//20101121 HW power off in thermal limit [END]
+//20101121 , HW power off in thermal limit [END]
 
 
 NvBool

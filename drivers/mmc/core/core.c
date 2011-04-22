@@ -1270,6 +1270,18 @@ EXPORT_SYMBOL(mmc_card_can_sleep);
 
 #ifdef CONFIG_PM
 
+//20110214, , cancel delayed work queue when the device enter sleep [START]
+int mmc_cancel_delayed_work(struct mmc_host *host, pm_message_t state)
+{
+	if (host->caps & MMC_CAP_DISABLE)
+		cancel_delayed_work(&host->disable);
+	cancel_delayed_work(&host->detect);
+	mmc_flush_scheduled_work();
+	return 0;
+}
+EXPORT_SYMBOL(mmc_cancel_delayed_work);
+//20110214, , cancel delayed work queue when the device enter sleep [END]
+
 /**
  *	mmc_suspend_host - suspend a host
  *	@host: mmc host

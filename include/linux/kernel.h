@@ -245,7 +245,6 @@ extern struct ratelimit_state printk_ratelimit_state;
 extern int printk_ratelimit(void);
 extern bool printk_timed_ratelimit(unsigned long *caller_jiffies,
 				   unsigned int interval_msec);
-/* 20100916  set default loglevel */
 #if defined(CONFIG_MACH_STAR)
 extern void set_default_loglevel(void);
 #endif

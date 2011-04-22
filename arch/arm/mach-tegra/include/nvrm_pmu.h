@@ -137,15 +137,15 @@ typedef struct NvRmPmuVddRailCapabilitiesRec
     NvU32 * pSettleMicroSeconds );
 
 #if defined(CONFIG_MACH_STAR) 
-//20100704  headset porting [LGE]
+//20100704  jongik's headset porting [LGE]
 NvU32 NvRmPmuGetHookAdc(
     NvRmDeviceHandle hDevice);
 
-//20101121 HW power off in thermal limit [START]
+//20101121 , HW power off in thermal limit [START]
 NvU32 NvRmPmuSetHwPowerOffConfig(
     NvRmDeviceHandle hDevice,
     NvBool Enable);
-//20101121 HW power off in thermal limit [END]
+//20101121 , HW power off in thermal limit [END]
 #endif
 
 /**

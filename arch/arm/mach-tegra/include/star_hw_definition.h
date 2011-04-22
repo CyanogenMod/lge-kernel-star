@@ -362,4 +362,21 @@
 #define AP20_GPIO_PBB5		AP20GPIOINFO('z'+ 2, 5)
 #define AP20_GPIO_PBB6		AP20GPIOINFO('z'+ 2, 6)
 #define AP20_GPIO_PBB7		AP20GPIOINFO('z'+ 2, 7)
+
+
+#define STAR_WHISTLER			0
+#define STAR_FIRENZE			1
+#define STAR_REV_A			2
+#define STAR_REV_B			3
+#define STAR_REV_C			4
+#define STAR_MDM_A			5
+#define STAR_MDM_B			6
+#define STAR_REV_D			7
+#define STAR_MDM_C			8
+#define STAR_TMUS_B			9
+#define STAR_TMUS_C	   	        10
+#define STAR_TMUS_D                     11
+#define STAR_TMUS_E                     12
+#define STAR_TMUS_F                     13     
+
 #endif

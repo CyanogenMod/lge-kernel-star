@@ -75,6 +75,27 @@ union cnt32_to_63 {
  * clear-bit instruction. Otherwise caller must remember to clear the top
  * bit explicitly.
  */
+
+//20110213, , sched_clock mismatch issue after deepsleep [START]
+#if defined(CONFIG_MACH_STAR)
+static u32 __m_cnt_hi=0;
+
+#define cnt32_to_63(cnt_lo) \
+({ \
+	union cnt32_to_63 __x; \
+	__x.hi = __m_cnt_hi; \
+ 	smp_rmb(); \
+	__x.lo = (cnt_lo); \
+	if (unlikely((s32)(__x.hi ^ __x.lo) < 0)) \
+		__m_cnt_hi = __x.hi = (__x.hi ^ 0x80000000) + (__x.hi >> 31); \
+	__x.val; \
+})
+#define cnt32_to_63_clear(clear) \
+    ({ \
+        __m_cnt_hi=0;\
+    })
+
+#else
 #define cnt32_to_63(cnt_lo) \
 ({ \
 	static u32 __m_cnt_hi; \
@@ -86,5 +107,7 @@ union cnt32_to_63 {
 		__m_cnt_hi = __x.hi = (__x.hi ^ 0x80000000) + (__x.hi >> 31); \
 	__x.val; \
 })
+#endif
+//20110213, , sched_clock mismatch issue after deepsleep [END]
 
 #endif

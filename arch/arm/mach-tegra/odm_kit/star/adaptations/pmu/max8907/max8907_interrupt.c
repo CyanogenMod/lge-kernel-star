@@ -42,7 +42,7 @@ Max8907SetupInterrupt(
         return NV_FALSE;
     pmuStatus->mChgPresent = status;
 
-    //20100413, temporary power key - Clear Interrupt
+    //20100413, , temporary power key - Clear Interrupt
     if (!Max8907I2cRead8(hDevice, MAX8907_CHG_IRQ1, &data)){        
         return NV_FALSE;
     }
@@ -61,26 +61,26 @@ Max8907SetupInterrupt(
 
     /* Set up Interrupt Mask */
     // CHG_IRQ1
-    //20100517, VCHG detect [START]
+    //20100517, , VCHG detect [START]
     #ifndef CONFIG_MACH_STAR
     data = ~(((NvU8)MAX8907_CHG_IRQ1_VCHG_R_MASK<<MAX8907_CHG_IRQ1_VCHG_R_SHIFT) |
             ((NvU8)MAX8907_CHG_IRQ1_VCHG_F_MASK<<MAX8907_CHG_IRQ1_VCHG_F_SHIFT));
     #else
     data = 0xff;
     #endif
-    //20100517, VCHG detect [START]
+    //20100517, , VCHG detect [START]
     if (!Max8907I2cWrite8(hDevice, MAX8907_CHG_IRQ1_MASK, data))
         return NV_FALSE;
 
     // CHG_IRQ2
-    //20100517, Batt Low detect [START]
+    //20100517, , Batt Low detect [START]
     #ifndef CONFIG_MACH_STAR
     data = ~(((NvU8)MAX8907_CHG_IRQ2_MBATTLOW_R_MASK<<MAX8907_CHG_IRQ2_MBATTLOW_R_SHIFT) |
             ((NvU8)MAX8907_CHG_IRQ2_MBATTLOW_F_MASK<<MAX8907_CHG_IRQ2_MBATTLOW_F_SHIFT));
     #else
     data = 0xff;
     #endif
-    //20100517, Batt Low detect [START]
+    //20100517, , Batt Low detect [START]
     if (!Max8907I2cWrite8(hDevice, MAX8907_CHG_IRQ2_MASK, data))
         return NV_FALSE;
 
@@ -120,7 +120,7 @@ Max8907InterruptHandler_int(
         return;
     }
 
-    //20100518, unused [START]
+    //20100518, , unused [START]
     #ifndef CONFIG_MACH_STAR
     if (data)
     {
@@ -136,14 +136,14 @@ Max8907InterruptHandler_int(
         }
     }
     #endif
-    //20100518, unused [END]
+    //20100518, , unused [END]
 
     // CHG_IRQ2
     if (!Max8907I2cRead8(hDevice, MAX8907_CHG_IRQ2, &data))
     {
         return;
     }
-    //20100518, unused [START]
+    //20100518, , unused [START]
     #ifndef CONFIG_MACH_STAR
     if (data){
         if (data & MAX8907_CHG_IRQ2_CHG_DONE_MASK)
@@ -165,7 +165,7 @@ Max8907InterruptHandler_int(
         }
     }
     #endif
-    //20100518, unused [END]
+    //20100518, , unused [END]
 
     // ON_OFF_IRQ1
     if (!Max8907I2cRead8(hDevice, MAX8907_ON_OFF_IRQ1, &data))

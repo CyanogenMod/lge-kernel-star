@@ -71,12 +71,7 @@ static void tegra_cpufreq_hotplug(NvRmPmRequest req)
 	smp_rmb();
 	if (disable_hotplug)
 		return;
-        #if 0
-		// 20101002  disable dual core and dvfs enable for single core [START]
-	        req = NvRmPmRequest_CpuOffFlag;
-        	disable_hotplug = 1;
-		// 20101002  disable dual core and dvfs enable for single core [STOP]
-        #endif
+	
 	if (req & NvRmPmRequest_CpuOnFlag) {
 		struct cpumask m;
 

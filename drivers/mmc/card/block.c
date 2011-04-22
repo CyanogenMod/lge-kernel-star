@@ -378,6 +378,11 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 		 * until later as we need to wait for the card to leave
 		 * programming mode even when things go wrong.
 		 */
+//20110123, , do not redo I/O when nomedium error [START]
+		if (brq.cmd.error == -ENOMEDIUM) {
+			goto cmd_err;
+		}
+//20110123, , do not redo I/O when nomedium error [END]
 		if (brq.cmd.error || brq.data.error || brq.stop.error) {
 			if (brq.data.blocks > 1 && rq_data_dir(req) == READ) {
 				/* Redo read one sector at a time */
@@ -501,7 +506,11 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 
 	spin_lock_irq(&md->lock);
 	while (ret)
+	{
+//20110123, , supressed the error message
+		req->cmd_flags |= REQ_QUIET;
 		ret = __blk_end_request(req, -EIO, blk_rq_cur_bytes(req));
+	}
 	spin_unlock_irq(&md->lock);
 
 	return 0;

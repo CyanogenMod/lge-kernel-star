@@ -457,7 +457,7 @@ NvBool Adt7461Init(NvOdmTmonDeviceHandle hTmon)
         {
             NvU32 usec = 0;
             NvU32 RailAddress = pIoAddress->Address;
-            NvOdmServicesPmuVddRailCapabilities RailCapabilities;
+            NvOdmServicesPmuVddRailCapabilities RailCapabilities = {0};
             NvOdmServicesPmuGetCapabilities(
                 pPrivData->hOdmPmuSevice, RailAddress, &RailCapabilities);
             NvOdmServicesPmuSetVoltage(pPrivData->hOdmPmuSevice, RailAddress,

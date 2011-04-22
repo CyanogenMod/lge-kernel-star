@@ -46,6 +46,7 @@
 
 int sensor_sleep_st = 0;
 int reboot = 0;
+extern int call_once;
 
 #ifdef CONFIG_HAS_EARLYSUSPEND // wkkim : temporary early suspend apply
 #include <linux/earlysuspend.h>
@@ -887,6 +888,7 @@ static ssize_t motion_flip_onoff_store(struct device *dev, struct device_attribu
 
 	if (val) {
 		atomic_set(&flip_flag, 1);
+		call_once = 1;
 	} else {
 		atomic_set(&flip_flag, 0);
 	}

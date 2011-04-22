@@ -1,0 +1,31 @@
+# drivers/star/sensor/Kconfig
+config STAR_SENSORS
+    bool "Star Sensor Drivers for module load" 
+    default y
+	depends on !STAR_COMPASS && !STAR_GYRO_ACCEL
+    help
+      Support for all sensors initialization. If you want to load sensor drivers
+	  for module type, you have to check this option. And should uncheck STAR_COMPASS,
+	  STAR_GYRO_ACCEL option.
+
+config STAR_COMPASS2
+    tristate "Star Compass Driver for Module"
+    default m
+	depends on STAR_SENSORS
+    help
+      AMI304 driver
+
+config STAR_ACCELEROMETER2
+    tristate "Star Accelerometer Driver for Module"
+    default m
+	depends on STAR_SENSORS
+    help
+      Support for accelerometer driver simultanously.
+
+config STAR_GYROSCOPE2
+    tristate "Star Gyroscope Driver for Module"
+    default m
+	depends on STAR_SENSORS
+    help
+      Support for gyroscope/accelerometer driver simultanously.
+

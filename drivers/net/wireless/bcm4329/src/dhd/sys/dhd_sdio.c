@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_sdio.c,v 1.157.2.27.2.33.2.129 2010/08/19 20:36:22 Exp $
+ * $Id: dhd_sdio.c,v 1.157.2.27.2.33.2.129.4.9 2011/01/06 00:54:32 Exp $
  */
 
 #include <typedefs.h>
@@ -429,8 +429,9 @@ static void dhdsdio_sdtest_set(dhd_bus_t *bus, bool start);
 
 #ifdef DHD_DEBUG
 static int dhdsdio_checkdied(dhd_bus_t *bus, uint8 *data, uint size);
-static int dhdsdio_mem_dump(dhd_bus_t *bus);
 #endif /* DHD_DEBUG  */
+
+
 static int dhdsdio_download_state(dhd_bus_t *bus, bool enter);
 
 static void dhdsdio_release(dhd_bus_t *bus, osl_t *osh);
@@ -462,47 +463,11 @@ static int dhdsdio_download_nvram(struct dhd_bus *bus);
 static int dhdsdio_download_code_array(struct dhd_bus *bus);
 #endif
 
-#if defined(CONFIG_HAS_EARLYSUSPEND)
-/* LGE_CHANGE_S [] 2009-11-19, Support Host Wakeup */
-#if 0		//by sjpark 10-12-22 : idle time current (not used)
-#if defined(CONFIG_BRCM_LGE_WL_HOSTWAKEUP)
-#include <linux/wakelock.h>
-extern int dhd_suspend_context;
-extern struct wake_lock wlan_host_wakelock;
-#endif /* CONFIG_BRCM_LGE_WL_HOSTWAKEUP */
-#endif
-/* LGE_CHANGE_S [] 2009-11-19, Support Host Wakeup */
-
 #if defined(CONFIG_LGE_BCM432X_PATCH)	//20110121
 #include <linux/wakelock.h>
 extern int ap_suspend_status;
 extern struct wake_lock ap_suspend_wake_lock;
 #endif
-
-extern void *dhd_es_get_dhd_bus(void);
-extern void dhd_es_set_dhd_bus(void *);
-extern bool dhd_early_suspend_state(void);
-
-void *
-dhd_es_get_dhd_pub(void)
-{
-	dhd_bus_t *bus = dhd_es_get_dhd_bus();
-	if (bus)
-		return bus->dhd;
-	else
-		return NULL;
-}
-
-void *
-dhd_es_get_dhd_bus_sdh(void)
-{
-	dhd_bus_t *bus = dhd_es_get_dhd_bus();
-	if (bus)
-		return bus->sdh;
-	else
-		return NULL;
-}
-#endif /* CONFIG_HAS_EARLYSUSPEND */
 
 static void
 dhd_dongle_setmemsize(struct dhd_bus *bus, int mem_size)
@@ -536,9 +501,9 @@ unsigned long cur_jiff;
 
 int ht_err_cnt;
 extern void htclk_fail_reset(void *bus);
+extern volatile bool dhd_mmc_suspend;
 #endif
 
-extern volatile bool dhd_mmc_suspend;
 
 /* Turn backplane clock on or off */
 static int
@@ -771,6 +736,7 @@ dhdsdio_sdclk(dhd_bus_t *bus, bool on)
 static int
 dhdsdio_clkctl(dhd_bus_t *bus, uint target, bool pendok)
 {
+	int ret = BCME_OK;
 #ifdef DHD_DEBUG
 	uint oldstate = bus->clkstate;
 #endif /* DHD_DEBUG */
@@ -783,7 +749,7 @@ dhdsdio_clkctl(dhd_bus_t *bus, uint target, bool pendok)
 			dhd_os_wd_timer(bus->dhd, dhd_watchdog_ms);
 			bus->activity = TRUE;
 		}
-		return BCME_OK;
+		return ret;
 	}
 
 	switch (target) {
@@ -792,29 +758,32 @@ dhdsdio_clkctl(dhd_bus_t *bus, uint target, bool pendok)
 		if (bus->clkstate == CLK_NONE)
 			dhdsdio_sdclk(bus, TRUE);
 		/* Now request HT Avail on the backplane */
-		dhdsdio_htclk(bus, TRUE, pendok);
+		ret = dhdsdio_htclk(bus, TRUE, pendok);
+		if (ret == BCME_OK) {
 		dhd_os_wd_timer(bus->dhd, dhd_watchdog_ms);
 		bus->activity = TRUE;
+		}
 		break;
 
 	case CLK_SDONLY:
 		/* Remove HT request, or bring up SD clock */
 		if (bus->clkstate == CLK_NONE)
-			dhdsdio_sdclk(bus, TRUE);
+			ret = dhdsdio_sdclk(bus, TRUE);
 		else if (bus->clkstate == CLK_AVAIL)
-			dhdsdio_htclk(bus, FALSE, FALSE);
+			ret = dhdsdio_htclk(bus, FALSE, FALSE);
 		else
 			DHD_ERROR(("dhdsdio_clkctl: request for %d -> %d\n",
 			           bus->clkstate, target));
+		if (ret == BCME_OK)
 		dhd_os_wd_timer(bus->dhd, dhd_watchdog_ms);
 		break;
 
 	case CLK_NONE:
 		/* Make sure to remove HT request */
 		if (bus->clkstate == CLK_AVAIL)
-			dhdsdio_htclk(bus, FALSE, FALSE);
+			ret = dhdsdio_htclk(bus, FALSE, FALSE);
 		/* Now remove the SD clock */
-		dhdsdio_sdclk(bus, FALSE);
+		ret = dhdsdio_sdclk(bus, FALSE);
 		dhd_os_wd_timer(bus->dhd, 0);
 		break;
 	}
@@ -822,7 +791,7 @@ dhdsdio_clkctl(dhd_bus_t *bus, uint target, bool pendok)
 	DHD_INFO(("dhdsdio_clkctl: %d -> %d\n", oldstate, bus->clkstate));
 #endif /* DHD_DEBUG */
 
-	return BCME_OK;
+	return ret;
 }
 
 int
@@ -1906,12 +1875,6 @@ dhdsdio_checkdied(dhd_bus_t *bus, uint8 *data, uint size)
 		DHD_ERROR(("%s: %s\n", __FUNCTION__, strbuf.origbuf));
 	}
 
-#ifdef DHD_DEBUG
-	if (sdpcm_shared.flags & SDPCM_SHARED_TRAP) {
-		/* Mem dump to a file on device */
-		dhdsdio_mem_dump(bus);
-	}
-#endif /* DHD_DEBUG */
 
 done:
 	if (mbuffer)
@@ -1922,56 +1885,6 @@ done:
 	return bcmerror;
 }
 
-static int
-dhdsdio_mem_dump(dhd_bus_t *bus)
-{
-	int ret = 0;
-	int size; /* Full mem size */
-	int start = 0; /* Start address */
-	int read_size = 0; /* Read size of each iteration */
-	uint8 *buf = NULL, *databuf = NULL;
-
-	/* Get full mem size */
-	size = bus->ramsize;
-	buf = MALLOC(bus->dhd->osh, size);
-	if (!buf) {
-		printf("%s: Out of memory (%d bytes)\n", __FUNCTION__, size);
-		return -1;
-	}
-
-	/* Read mem content */
-	printf("Dump dongle memory");
-	databuf = buf;
-	while (size)
-	{
-		read_size = MIN(MEMBLOCK, size);
-		if ((ret = dhdsdio_membytes(bus, FALSE, start, databuf, read_size)))
-		{
-			printf("%s: Error membytes %d\n", __FUNCTION__, ret);
-			if (buf) {
-				MFREE(bus->dhd->osh, buf, size);
-			}
-			return -1;
-		}
-		printf(".");
-
-		/* Decrement size and increment start address */
-		size -= read_size;
-		start += read_size;
-		databuf += read_size;
-	}
-	printf("Done\n");
-
-	/* free buf before return !!! */
-	if (write_to_file(bus->dhd, buf, bus->ramsize))
-	{
-		printf("%s: Error writing to files\n", __FUNCTION__);
-		return -1;
-	}
-
-	/* buf free handled in write_to_file, not here */
-	return 0;
-}
 
 #define CONSOLE_LINE_MAX	192
 
@@ -2783,6 +2696,9 @@ dhd_bus_stop(struct dhd_bus *bus, bool enforce_mutex)
 
 	BUS_WAKE(bus);
 
+	/* Change our idea of bus state */
+	bus->dhd->busstate = DHD_BUS_DOWN;
+
 	/* Enable clock for device interrupts */
 	dhdsdio_clkctl(bus, CLK_AVAIL, FALSE);
 
@@ -2790,9 +2706,6 @@ dhd_bus_stop(struct dhd_bus *bus, bool enforce_mutex)
 	W_SDREG(0, &bus->regs->hostintmask, retries);
 	local_hostintmask = bus->hostintmask;
 	bus->hostintmask = 0;
-
-	/* Change our idea of bus state */
-	bus->dhd->busstate = DHD_BUS_DOWN;
 
 	/* Force clocks on backplane to be sure F2 interrupt propagates */
 	saveclk = bcmsdh_cfg_read(bus->sdh, SDIO_FUNC_1, SBSDIO_FUNC1_CHIPCLKCSR, &err);
@@ -4134,6 +4047,12 @@ dhdsdio_hostmail(dhd_bus_t *bus)
 	return intstatus;
 }
 
+#if defined(CONFIG_LGE_BCM432X_PATCH)		//by sjpark 11-02-01
+extern struct net_device *g_net_dev;
+extern bool 	ap_fw_loaded;
+extern int net_os_send_hang_message(struct net_device *dev);
+#endif
+
 bool
 dhdsdio_dpc(dhd_bus_t *bus)
 {
@@ -4146,23 +4065,10 @@ dhdsdio_dpc(dhd_bus_t *bus)
 	uint framecnt = 0;		  /* Temporary counter of tx/rx frames */
 	bool rxdone = TRUE;		  /* Flag for no more read data */
 	bool resched = FALSE;	  /* Flag indicating resched wanted */
-
-	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
-
-#if defined(CONFIG_HAS_EARLYSUSPEND)
-	if (dhd_early_suspend_state() == TRUE) {
-		DHD_TRACE(("%s : enters\n", __FUNCTION__));
-		/* 
-		* we are already in early_suspend mode. so this isr would
-		* probably be pending one in intc of ARM while dhd_suspend
-		* is processing.
-		* we simply ignore this pending isr at this moment.
-		* otherwise system will be screwed up because sdio bus
-		* already started sleeping
-		*/
-		return FALSE;
-	}
+#if defined(CONFIG_LGE_BCM432X_PATCH)		//by sjpark 11-02-01
+	int reset_flag = FALSE;
 #endif	
+	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
 
 	/* Start with leftover status bits */
 	intstatus = bus->intstatus;
@@ -4287,19 +4193,6 @@ dhdsdio_dpc(dhd_bus_t *bus)
 
 	/* On frame indication, read available frames */
 	if (PKT_AVAILABLE()) {
-/* LGE_CHANGE_S [] 2009-11-19, Support Host Wakeup */
-#if 0 // by mingi.sung
-#if defined(CONFIG_BRCM_LGE_WL_HOSTWAKEUP)
-		//Is this location appropriate??.. Need to test more.
-		/*Hold a wake lock to avoid suspend-resume to often if there is continuous data
-	         * transfer. */
-		if(dhd_suspend_context == FALSE)
-		{
-			wake_lock_timeout(&wlan_host_wakelock, 2*HZ);
-		}
-#endif /* CONFIG_BRCM_LGE_WL_HOSTWAKEUP */
-#endif
-/* LGE_CHANGE_S [] 2009-11-19, Support Host Wakeup */
 #if defined(CONFIG_LGE_BCM432X_PATCH)	//20110121
 		if(ap_suspend_status == 1 )
 		{
@@ -4324,6 +4217,9 @@ clkwait:
 		DHD_INTR(("%s: enable SDIO interrupts, rxdone %d framecnt %d\n",
 		          __FUNCTION__, rxdone, framecnt));
 		bus->intdis = FALSE;
+#if defined(OOB_INTR_ONLY)
+		bcmsdh_oob_intr_set(1);
+#endif /* (OOB_INTR_ONLY) */
 		bcmsdh_intr_enable(sdh);
 	}
 
@@ -4380,8 +4276,16 @@ clkwait:
 	if ((bus->dhd->busstate == DHD_BUS_DOWN) || bcmsdh_regfail(sdh)) {
 		DHD_ERROR(("%s: failed backplane access over SDIO, halting operation %d \n",
 		           __FUNCTION__, bcmsdh_regfail(sdh)));
+// 20110201  Disable SDIO interrupt when BUS is down [START]
+#if defined(CONFIG_LGE_BCM432X_PATCH)
+		bcmsdh_intr_disable(bus->sdh);
+#endif
+// 20110201  Disable SDIO interrupt when BUS is down [END]
 		bus->dhd->busstate = DHD_BUS_DOWN;
 		bus->intstatus = 0;
+#if defined(CONFIG_LGE_BCM432X_PATCH)		//by sjpark 11-02-01
+		reset_flag = TRUE;
+#endif
 	} else if (bus->clkstate == CLK_PENDING) {
 		DHD_INFO(("%s: rescheduled due to CLK_PENDING awaiting \
 			I_CHIPACTIVE interrupt", __FUNCTION__));
@@ -4402,6 +4306,20 @@ clkwait:
 	}
 
 	dhd_os_sdunlock(bus->dhd);
+
+#if defined(CONFIG_LGE_BCM432X_PATCH)		//by sjpark 11-02-01
+	if(reset_flag == TRUE)
+	{
+		if(ap_fw_loaded == FALSE){
+			if(g_net_dev != NULL)
+			{
+				printk("[%s] : net_os_send_hang_message send. Should not occur.\n",__FUNCTION__);
+				net_os_send_hang_message(g_net_dev);
+			}
+		}
+		return 0;
+	}
+#endif
 
 	return resched;
 }
@@ -4425,6 +4343,12 @@ dhdsdio_isr(void *arg)
 	bcmsdh_info_t *sdh;
 
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
+
+// 20110212  Prevent BUS IS DOWN error [START]
+#if defined(CONFIG_LGE_BCM432X_PATCH)
+	dhd_mmc_suspend = FALSE;
+#endif
+// 20110212  Prevent BUS IS DOWN error [END]
 
 	if (!bus) {
 		DHD_ERROR(("%s : bus is null pointer , exit \n", __FUNCTION__));
@@ -4457,12 +4381,7 @@ dhdsdio_isr(void *arg)
 	bus->intdis = TRUE;
 
 #if defined(SDIO_ISR_THREAD)
-/* LGE_CHANGE_S [] 2009-11-19, Support Host Wakeup */
-#if defined(CONFIG_BRCM_LGE_WL_HOSTWAKEUP)
-	bus->dpc_sched = TRUE;
 	DHD_TRACE(("Calling dhdsdio_dpc() from %s\n", __FUNCTION__));
-#endif /* CONFIG_BRCM_LGE_WL_HOSTWAKEUP */
-/* LGE_CHANGE_E [] 2009-11-19, Support Host Wakeup */
 	while (dhdsdio_dpc(bus));
 #else
 	bus->dpc_sched = TRUE;
@@ -4730,7 +4649,6 @@ dhd_bus_watchdog(dhd_pub_t *dhdp)
 	if (bus->sleeping)
 		return FALSE;
 
-	dhd_os_sdlock(bus->dhd);
 
 	/* Poll period: check device if appropriate. */
 	if (bus->poll && (++bus->polltick >= bus->pollrate)) {
@@ -4796,14 +4714,11 @@ dhd_bus_watchdog(dhd_pub_t *dhdp)
 			bus->idlecount = 0;
 			if (bus->activity) {
 				bus->activity = FALSE;
-				dhd_os_wd_timer(bus->dhd, dhd_watchdog_ms);
-			} else {
 				dhdsdio_clkctl(bus, CLK_NONE, FALSE);
 			}
 		}
 	}
 
-	dhd_os_sdunlock(bus->dhd);
 
 	return bus->ipend;
 }
@@ -5068,10 +4983,6 @@ dhdsdio_probe(uint16 venid, uint16 devid, uint16 bus_no, uint16 slot,
 		DHD_ERROR(("%s: Net attach failed!!\n", __FUNCTION__));
 		goto fail;
 	}
-
-#if defined(CONFIG_HAS_EARLYSUSPEND)
-	dhd_es_set_dhd_bus(bus);
-#endif	
 
 	return bus;
 
@@ -5899,15 +5810,13 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 
 	if (flag == TRUE) {
 		if (!bus->dhd->dongle_reset) {
+			dhd_os_sdlock(dhdp);
+			/* Turning off watchdog */
+			dhd_os_wd_timer(dhdp, 0);
 #if !defined(IGNORE_ETH0_DOWN)
 			/* Force flow control as protection when stop come before ifconfig_down */
 			dhd_txflowcontrol(bus->dhd, 0, ON);
 #endif /* !defined(IGNORE_ETH0_DOWN) */
-			/* save country settinng if was pre-setup with priv ioctl */
-			dhd_os_proto_block(dhdp);
-			dhdcdc_query_ioctl(bus->dhd, 0, WLC_GET_COUNTRY,
-				bus->dhd->country_code, sizeof(bus->dhd->country_code));
-			dhd_os_proto_unblock(dhdp);
 			/* Expect app to have torn down any connection before calling */
 			/* Stop the bus, disable F2 */
 			dhd_bus_stop(bus, FALSE);
@@ -5917,6 +5826,7 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 
 			bus->dhd->dongle_reset = TRUE;
 			bus->dhd->up = FALSE;
+			dhd_os_sdunlock(dhdp);
 
 			DHD_TRACE(("%s:  WLAN OFF DONE\n", __FUNCTION__));
 			/* App can now remove power from device */
@@ -5929,6 +5839,8 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 
 		if (bus->dhd->dongle_reset) {
 			/* Turn on WLAN */
+			dhd_os_sdlock(dhdp);
+
 			/* Reset SD client */
 			bcmsdh_reset(bus->sdh);
 
@@ -5941,8 +5853,8 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 					dhdsdio_download_firmware(bus, bus->dhd->osh, bus->sdh)) {
 
 					/* Re-init bus, enable F2 transfer */
-					dhd_bus_init((dhd_pub_t *) bus->dhd, FALSE);
-
+					bcmerror = dhd_bus_init((dhd_pub_t *) bus->dhd, FALSE);
+					if (bcmerror == BCME_OK) {
 #if defined(OOB_INTR_ONLY)
 					dhd_enable_oob_intr(bus, TRUE);
 #endif /* defined(OOB_INTR_ONLY) */
@@ -5954,12 +5866,20 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 					/* Restore flow control  */
 					dhd_txflowcontrol(bus->dhd, 0, OFF);
 #endif 
+						/* Turning on watchdog back */
+						dhd_os_wd_timer(dhdp, dhd_watchdog_ms);
 
 					DHD_TRACE(("%s: WLAN ON DONE\n", __FUNCTION__));
+					} else {
+						dhd_bus_stop(bus, FALSE);
+						dhdsdio_release_dongle(bus, bus->dhd->osh);
+					}
 				} else
 					bcmerror = BCME_SDIO_ERROR;
 			} else
 				bcmerror = BCME_SDIO_ERROR;
+
+			dhd_os_sdunlock(dhdp);
 		} else {
 			bcmerror = BCME_NOTDOWN;
 			DHD_ERROR(("%s: Set DEVRESET=FALSE invoked when device is on\n",
@@ -5969,79 +5889,3 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 	}
 	return bcmerror;
 }
-
-//by sjpark 10-12-15
-#if defined(CONFIG_BRCM_LGE_WL_HOSTWAKEUP)
-
-int dhdsdio_setiovar(struct dhd_bus *bus, char *cmd, void *data, int size)
-{
-		int ret = 0;
-		char iovbuf[512] = {0};
-		dhd_pub_t *dhd = NULL;
-		wl_ioctl_t ioc = {0};
-		int ioctl_len = 0;
-
-		DHD_INFO(("%s: Enter\n", __FUNCTION__));
-
-		if(!bus)
-				return -1;
-
-		dhd = (dhd_pub_t *)bus->dhd;
-
-		if((ioctl_len = strlen(cmd) + 1 + size) > sizeof(iovbuf))
-				return -1;
-
-		ret = bcm_mkiovar(cmd, (char *)data, size, iovbuf, sizeof(iovbuf));
-		if(ret == 0) {
-				return -1;
-		}
-
-		memset(&ioc, 0 , sizeof(ioc));
-		ioc.cmd = WLC_SET_VAR;
-		ioc.buf = iovbuf;
-		ioc.len = ioctl_len;
-		ioc.set = TRUE;
-
-		if( (ret = dhd_prot_ioctl(dhd, 0, &ioc, ioc.buf, ioc.len) ) < 0)
-		{
-				DHD_ERROR(("%s: dhdsdio_setiovar failure. ret[%d]\n", __FUNCTION__, ret));
-				return -1;
-		}
-		else {
-				DHD_TRACE(("%s: dhdsdio_setiovar Success. ret[%d]\n", __FUNCTION__, ret));
-		}
-
-		return 0;
-
-}
-
-extern uint wl_dtim_val;
-int dhdsdio_set_dtim(struct dhd_bus *bus, int enable)
-{
-	//dhd_pub_t *dhd = NULL;
-	int value, ret;
-	//char iovbuf[WLC_IOCTL_SMLEN];
-
-	DHD_INFO(("%s: Enter\n", __FUNCTION__));
-	printk("%s: Enter, set : %d\n", __FUNCTION__,enable);
-	if(!bus)
-		return -1;
-
-	if ( enable ){	
-		value = wl_dtim_val;
-	}
-	else{
-		value = 0;
-	}
-
-	ret = dhdsdio_setiovar(bus, "bcn_li_dtim", &value, sizeof(value));
-	if( ret < 0 )
-		DHD_ERROR(("%s: bcn_li_dtim ioctl error %d\n",__FUNCTION__,ret));
-		
-	return 0;
-}
-
-#endif	/*CONFIG_BRCM_LGE_WL_HOSTWAKEUP*/
-
-//by sjpark 10-12-15
-

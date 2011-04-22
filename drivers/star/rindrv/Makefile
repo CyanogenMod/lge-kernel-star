@@ -1,2 +1,0 @@
-obj-y += rindrv.o 
-

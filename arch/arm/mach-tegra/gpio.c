@@ -33,6 +33,7 @@
 #include "nvcommon.h"
 #include "nvrm_pmu.h"
 #include "nvodm_query_discovery.h"
+#include "gpio-names.h"
 
 #define GPIO_BANK(x)		((x) >> 5)
 #define GPIO_PORT(x)		(((x) >> 3) & 0x3)
@@ -280,7 +281,7 @@ struct tegra_init_gpio_info {
 #if APPLY_GPIO_INIT
 const struct tegra_init_gpio_info tegra_init_gpio_info_array[] = {
     /* Dynamic change */
-  #if defined(CONFIG_MACH_STAR_SKT_REV_D) || defined(CONFIG_MACH_STAR_REV_F)	
+    #if defined(CONFIG_MACH_STAR_REV_F)
     { 'w'-'a',      1, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_INIT_ONLY_LOW,   LM1},  // WLAN_EN
     { 'z'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_INIT_ONLY_LOW,   LSDI},  // BT_EN
   #else
@@ -290,7 +291,7 @@ const struct tegra_init_gpio_info tegra_init_gpio_info_array[] = {
 
     /* All GPIO output pins should be defined here */
     // CP sleep status (high : +3mA)
-    //{ 'h'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW/*GPIO_SLEEP_HIGH*/,  ATD},   // TEST_GPIO2(Sleep status)(P999BN)
+    //{ 'h'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW/*GPIO_HIGH*/,  /*TRISTATE_SKIP*/ATD},   // TEST_GPIO2(Sleep status)
     { 't'-'a',      4, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   DTA},   // 8MN_CAM_VCM_EN
     { 'd'-'a',      5, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_HIGH,  DTA},   // VT_CAM_PWDN 
     { 't'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   DTB},   // FLASH_LED_TOURCH
@@ -301,8 +302,8 @@ const struct tegra_init_gpio_info tegra_init_gpio_info_array[] = {
     //{ 'u'-'a',      1, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   GPU},   // AP20_UART_SW 
     //{ 'u'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   GPU},   // MDM_UART_SW 
     { 'u'-'a',      4, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   GPU},   // VIBE_EN
-    //{ 'j'-'a',      6, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   IRRX},  // IPC_MRDY1 (P999bn)
-    //{ 'r'-'a',      7, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   KBCB},  // IFX_VBUS_EN 
+    //{ 'j'-'a',      6, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   IRRX},  // IPC_MRDY1
+    //{ 'r'-'a',      7, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   KBCB},  // MDM_VBUS_EN 
     //{ 's'-'a',      1, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_HIGH,  KBCB},  // CHG_EN_SET_N_AP20
     //already { 'r'-'a',      3, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   KBCD},  // BL_DCDC_RST_N
     { 'r'-'a',      6, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   KBCD},  // CAM_SUBPM_EN
@@ -316,13 +317,9 @@ const struct tegra_init_gpio_info tegra_init_gpio_info_array[] = {
     //{ 'k'-'a',      4, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_HIGH,  ATC},   // MUIC_SDA ?
     //already { 'k'-'a',      3, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_HIGH,  ATC},   // WM_LDO_EN
     { 'g'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   ATC},   // WLAN_WAKEUP 
-    //{ 'u'-'a',      3, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   GPU},   // USIF1_SW (LGP90)
-    //{ 'r'-'a',      0, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_HIGH,  KBCA},  // IFX1_AP20 (sleep_status) (LGP90)
-    //{ 'j'-'a',      0, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   GMD},   // GPS_RESET_N (LGP90) dynamic??
-    //{ 'j'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   GMD},   // GPS_PWR_ON (LGP90) dynamic??
         
     /* All wakeup pins should be defined here : gpio input enable */
-    { 'o'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   UAB},   //  IPC_SRDY
+    { 'o'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   UAB},   //  IPC_SRDY2
     { 'z'-'a' + 2,  5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   DTE},   //  NC  +
     { 'a'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   DTE},   // PROXI_OUT(NC) +
     { 'c'-'a',      7, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GMB},   // BT_HOST_WAKEUP
@@ -332,26 +329,22 @@ const struct tegra_init_gpio_info tegra_init_gpio_info_array[] = {
     { 'v'-'a',      2, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   UAC},   // AP_PWR_ON(powerkey)    
     //{ 'w'-'a',      2, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   SPIG},  // AUDIO_INT_N
     { 'w'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   SPIH},  // BATT_LOW_INT
-  #if defined(CONFIG_MACH_STAR_SKT_REV_D)     
-    { 'n'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   LSDA},  //  HOOK_DET
-  #else
     { 'd'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   SLXC},  //  HOOK_DET
-  #endif
     //{ 'i'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATB},   // MICROSD_DET_N
 
-    /* input pins */
-    //{ 'h'-'a',      1, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATD},   // TEST_GPIO1(P999BN)
-    //{ 'h'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATD},   // NC
-    //{ 'h'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATD},   // NC
+    /* tristate group's input pins */
+    { 'h'-'a',      1, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATD},   // TEST_GPIO1
+    { 'h'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATD},   // NC 
+    { 'h'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATD},   // NC 
     { 'u'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GPU},   // HALL_INT
-    //{ 'u'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GPU},   // VIBE_PWM(P999BN)
+    { 'u'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GPU},   // VIBE_PWM
     { 'u'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GPU},   // INT_N_MUIC
-    { 'u'-'a',      6, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GPU},   // VIBE_PMW(LGP990), IPC_SRDY1(P999BN)
+    { 'u'-'a',      6, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GPU},   // IPC_SRDY1
     { 'r'-'a',      4, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCD},  // COM_INT
-    //{ 'r'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCD},  // BATT_ID(P999BN)
+    { 'r'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCD},  // BATT_ID
     { 'q'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCF},  // GYRO_INT_N
     { 'q'-'a',      2, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCF},  // NC
-    { 'o'-'a',      6, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   UAB},   // SPI2_MISO
+    { 'o'-'a',      6, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   UAB},   // output검토필요. APTEMP_POWER_OFF_N
     { 'o'-'a',      7, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   UAB},   // SPI2_CLK
     { 'k'-'a',      2, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATC},   // THERMAL_IRQ
     { 'g'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATC},   // VOL_KEY_UP
@@ -360,17 +353,8 @@ const struct tegra_init_gpio_info tegra_init_gpio_info_array[] = {
     { 'i'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATC},   // MOTION_INT
     { 'x'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   SPIE},  //  TOUCH_MAKER_ID
     { 'x'-'a',      6, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   SPIE},  //  TOUCH_INT
-    { 'r'-'a',      1, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCA},  // IFX2_AP20 (LGP990)
-    { 'r'-'a',      2, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCA},  // PROXI_OUT
-#if defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT)	
-    { 'j'-'a',      6, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   IRRX},  // LOWER_TOUCH_INT/ (SU660)
-#endif
-#if defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT)
-#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F) 
-    { 'v'-'a',      6, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GPV},  // HomeKey (SU660)
-#endif
-#endif
-    #if 1
+
+    /* group tristate or input */
     { 'j'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   IRTX},  // LCD_MAKER_ID
     //{ 'q'-'a',      0, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_HIGH,  KBCC},  // BL_DCDC_SDA
     //{ 'q'-'a',      1, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_HIGH,  KBCC},  // BL_DCDC_SOL
@@ -379,16 +363,6 @@ const struct tegra_init_gpio_info tegra_init_gpio_info_array[] = {
     { 'w'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   SPIH},  // BATT_LOW_INT
     { 't'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   DTD},   //  VT_PCLK
     { 't'-'a',      1, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   CSUS},  //  VT_MCLK
-    #endif
-
-    /* voice call ?? */
-    //{ 0xFF        0, SFIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   CDEV1},   // AUDIO MCLK
-    //{ 0xFF        0, SFIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   CDEV2},   // AUDIO MCLK2
-    //{ 0xFF        0, SFIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATC},     // GMI_ADV_N, GMI_OE **    
-    //{ 0xFF        0, SFIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   DAP1},    // DAP1
-    //{ 0xFF        0, SFIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   DAP2},    // DAP2
-    //{ 0xFF        0, SFIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   DAP4},    // BT DAP
-    //{ 0xFF        0, SFIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   DAP3},    // DAP 
 };
 #endif
 
@@ -397,22 +371,21 @@ const struct tegra_init_gpio_info tegra_sleep_gpio_info_array[] = {
     { 0xFF,         0, SFIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   PMC},     // PMC
     //{ 0xFF,         0, SFIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   I2CP},    // power i2c 
 
-    /* Keep gpio output level */
-  #if defined(CONFIG_MACH_STAR_SKT_REV_D) || defined(CONFIG_MACH_STAR_REV_F)	
+    /* Dynamic change */
+    #if defined(CONFIG_MACH_STAR_REV_F)
     { 'w'-'a',      1, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_INIT_ONLY_LOW,   LM1},  // WLAN_EN
     { 'z'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_INIT_ONLY_LOW,   LSDI},  // BT_EN
   #else
     { 'q'-'a',      3, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_INIT_ONLY_LOW,     KBCF},  // WLAN_EN
     { 'q'-'a',      4, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_INIT_ONLY_LOW,     KBCF},  // BT_EN
   #endif
-    { 's'-'a',      1, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_INIT_ONLY_HIGH,    KBCB},  // CHG_EN_SET_N_AP20
-    { 'v'-'a',      0, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_INIT_ONLY_LOW,     UAC},   // IFX_RESET_1.8V
-    { 'v'-'a',      1, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_INIT_ONLY_LOW,     UAC},   // IFX_PWRON_1.8V high시 300uA발생.
+    { 's'-'a',      1, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_INIT_ONLY_LOW/*GPIO_SLEEP_HIGH*/,  KBCB},  // CHG_EN_SET_N_AP20
     
     /* All GPIO output pins should be defined here */
-    //{ 'h'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW/*GPIO_SLEEP_HIGH*/,  ATD},   // TEST_GPIO2(Sleep status)(P999BN)
+    // CP sleep status (high : +3mA)
+    { 'h'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW/*GPIO_HIGH*/,  /*TRISTATE_SKIP*/ATD},   // TEST_GPIO2(Sleep status)
     { 't'-'a',      4, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   DTA},   // 8MN_CAM_VCM_EN
-    { 'd'-'a',      5, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   DTA},   // VT_CAM_PWDN 
+    { 'd'-'a',      5, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_HIGH,  DTA},   // VT_CAM_PWDN 
     { 't'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   DTB},   // FLASH_LED_TOURCH
     { 't'-'a',      3, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   DTB},   // FLASH_LED_INH
     { 'z'-'a' + 2,  1, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   DTE},   // VT_RESET_N 
@@ -421,25 +394,23 @@ const struct tegra_init_gpio_info tegra_sleep_gpio_info_array[] = {
     { 'u'-'a',      1, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   GPU},   // AP20_UART_SW
     { 'u'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   GPU},   // MDM_UART_SW
     { 'u'-'a',      4, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   GPU},   // VIBE_EN
-    //{ 'j'-'a',      6, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   IRRX},  // IPC_MRDY1 (P999bn)
-    { 'r'-'a',      7, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   KBCB},  // IFX_VBUS_EN 
+    { 'j'-'a',      6, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   IRRX},  // IPC_MRDY1
+    { 'r'-'a',      7, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   KBCB},  // MDM_VBUS_EN 
     { 'r'-'a',      3, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   KBCD},  // BL_DCDC_RST_N
     { 'r'-'a',      6, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   KBCD},  // CAM_SUBPM_EN
     { 'v'-'a',      7, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   LVP0},  // LCD_RESET_N
     { 'k'-'a',      5, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   SPDO},  // HDMI_REG_EN
     { 'x'-'a',      4, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   SPID},  // BT_WAKEUP
     { 'o'-'a',      0, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   UAB},   // IPC_MRDY
+    { 'v'-'a',      0, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   UAC},   // IFX_RESET_1.8V
+    { 'v'-'a',      1, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   UAC},   // IFX_PWRON_1.8V
     { 'i'-'a',      7, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_HIGH,  ATC},   // MUIC_SCL ?
     { 'k'-'a',      4, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_HIGH,  ATC},   // MUIC_SDA ?
     { 'k'-'a',      3, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_HIGH,  ATC},   // WM_LDO_EN
     { 'g'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   ATC},   // WLAN_WAKEUP 
-    { 'u'-'a',      3, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   GPU},   // USIF1_SW (LGP90)
-    { 'r'-'a',      0, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   KBCA},  // IFX1_AP20 (sleep_status) (LGP990)
-    { 'j'-'a',      0, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_HIGH,  GMD},   // GPS_RESET_N (LGP90) dynamic??
-    { 'j'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   GMD},   // GPS_PWR_ON (LGP90) dynamic??
 
     /* All wakeup pins should be defined here : gpio input enable */
-    { 'o'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   UAB},   //  IPC_SRDY
+    { 'o'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   UAB},   //  IPC_SRDY2
     { 'z'-'a' + 2,  5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   DTE},   //  NC  +
     { 'a'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   DTE},   // PROXI_OUT(NC) +
     { 'c'-'a',      7, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GMB},   // BT_HOST_WAKEUP
@@ -449,40 +420,32 @@ const struct tegra_init_gpio_info tegra_sleep_gpio_info_array[] = {
     { 'v'-'a',      2, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   UAC},   // AP_PWR_ON(powerkey)    
     //{ 'w'-'a',      2, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   SPIG},  // AUDIO_INT_N
     { 'w'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   SPIH},  // BATT_LOW_INT
-  #if defined(CONFIG_MACH_STAR_SKT_REV_D)     
-    { 'n'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   LSDA},  //  HOOK_DET
-  #else
     { 'd'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   SLXC},  //  HOOK_DET
-  #endif
     //{ 'i'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATB},   // MICROSD_DET_N
 
-    /* input pins */
-    //{ 'h'-'a',      1, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATD},   // TEST_GPIO1(P999BN)
-    //{ 'h'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATD},   // NC
-    //{ 'h'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATD},   // NC
+    /* tristate group's input pins */
+    { 'h'-'a',      1, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATD},   // TEST_GPIO1
+    { 'h'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATD},   // NC 
+    { 'h'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATD},   // NC 
     { 'u'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GPU},   // HALL_INT
-    //{ 'u'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GPU},   // VIBE_PWM(P999BN)
+    { 'u'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GPU},   // VIBE_PWM
     { 'u'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GPU},   // INT_N_MUIC
-    { 'u'-'a',      6, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GPU},   // VIBE_PMW(LGP990), IPC_SRDY1(P999BN)
+    { 'u'-'a',      6, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GPU},   // IPC_SRDY1
     { 'r'-'a',      4, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCD},  // COM_INT
-    //{ 'r'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCD},  // BATT_ID(P999BN)
+    { 'r'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCD},  // BATT_ID
     { 'q'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCF},  // GYRO_INT_N
     { 'q'-'a',      2, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCF},  // CHG_PGB_N
-    { 'o'-'a',      6, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   UAB},   // SPI2_MISO
+    { 'o'-'a',      6, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   UAB},   // output검토필요. APTEMP_POWER_OFF_N
     { 'o'-'a',      7, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   UAB},   // SPI2_CLK
     { 'k'-'a',      2, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATC},   // THERMAL_IRQ
-    { 'g'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_HIGH,  ATC},   // VOL_KEY_UP
-    { 'g'-'a',      1, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_HIGH,  ATC},   // VOL_KEY_DOWN
+    { 'g'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATC},   // VOL_KEY_UP
+    { 'g'-'a',      1, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATC},   // VOL_KEY_DOWN
     { 'g'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATC},   // EARJACK_SENSE
     { 'i'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATC},   // MOTION_INT
     { 'x'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   SPIE},  // TOUCH_MAKER_ID
     { 'x'-'a',      6, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   SPIE},  // TOUCH_INT
-    { 'r'-'a',      1, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCA},  // IFX2_AP20 (LGP990)
-    { 'r'-'a',      2, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCA},  // PROXI_OUT
-#if defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT)	
-    { 'j'-'a',      6, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   IRRX},  // LOWER_TOUCH_INT/ (SU660)
-#endif
 
+    /* group tristate or input */
     #if 1
     { 'j'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   IRTX},  // LCD_MAKER_ID
     //{ 'q'-'a',      0, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_HIGH,  KBCC},  // BL_DCDC_SDA
@@ -516,8 +479,7 @@ static struct tegra_gpio_bank tegra_sleep_gpio_banks[] = {
 #else
 //20100724  for gpio setting while sleep [LGE_START]
 static struct tegra_gpio_bank tegra_sleep_gpio_banks[] = {
-#if defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT)	// for SU660
-                    //  PORT 0   ,  PORT 1   ,   PORT2   ,   PORT3        
+#if 1	// real
     //  A, B, C, D        
     {.bank = 0, .irq = INT_GPIO1, 
         .cnf        = {0x00000000, 0x00000008, 0x00000000, 0x00000001},
@@ -527,15 +489,15 @@ static struct tegra_gpio_bank tegra_sleep_gpio_banks[] = {
         .int_lvl    = {0x00000000, 0x00000000, 0x00000000, 0x00000000}}, 
     //  E, F, G, H
     {.bank = 1, .irq = INT_GPIO2, 
-        .cnf        = {0x000000ff, 0x00000000, 0x0000000b, 0x00000000},
-        .out        = {0x0000001f, 0x00000000, 0x00000000, 0x00000000}, 
-        .oe         = {0x000000ff, 0x00000000, 0x00000000, 0x00000000},  
+        .cnf        = {0x000000ff, 0x00000000, 0x0000000b, 0x0000000F},
+        .out        = {0x0000001f, 0x00000000, 0x00000000, 0x00000004}, 
+        .oe         = {0x000000ff, 0x00000000, 0x00000000, 0x00000004},  
         .int_enb    = {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
         .int_lvl    = {0x00000000, 0x00000000, 0x00080800, 0x00000000}},   
     //  I, J, K, L
     {.bank = 2, .irq = INT_GPIO3, 
-        .cnf        = {0x000000a1, 0x00000005, 0x00000038, 0x00000000},
-        .out        = {0x00000080, 0x00000001, 0x00000018, 0x00000000}, 
+        .cnf        = {0x000000a1, 0x00000045, 0x00000038, 0x00000000},
+        .out        = {0x00000080, 0x00000041, 0x00000018, 0x00000000}, 
         .oe         = {0x00000080, 0x00000005, 0x00000038, 0x00000000},  
         .int_enb    = {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
         .int_lvl    = {0x00202000, 0x00000000, 0x00000000, 0x00000000}},   
@@ -549,15 +511,15 @@ static struct tegra_gpio_bank tegra_sleep_gpio_banks[] = {
     //  Q, R, S, T  
     {.bank = 4, .irq = INT_GPIO5, 
         .cnf        = {0x0000001b, 0x000000FB, 0x00000007, 0x00000011},
-        .out        = {0x00000003, 0x00000000, 0x00000002, 0x00000000}, 
-        .oe         = {0x0000001b, 0x000000C9, 0x00000002, 0x00000011},  
+        .out        = {0x00000003, 0x00000080, 0x00000002, 0x00000000}, 
+        .oe         = {0x0000001b, 0x00000049, 0x00000003, 0x00000011},  
         .int_enb    = {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
         .int_lvl    = {0x00000000, 0x00008000, 0x00000000, 0x00000000}},   
     //  U, V, W, X     
     {.bank = 5, .irq = INT_GPIO6, 
-        .cnf        = {0x0000003f, 0x00000081, 0x00000000, 0x00000060},
-        .out        = {0x00000000, 0x00000001, 0x00000000, 0x00000040}, 
-        .oe         = {0x0000001e, 0x00000081, 0x00000000, 0x00000000},  
+        .cnf        = {0x0000007f, 0x00000087, 0x00000000, 0x00000060},
+        .out        = {0x00000000, 0x00000002, 0x00000000, 0x00000040}, 
+        .oe         = {0x0000001e, 0x00000082, 0x00000000, 0x00000000},  
         .int_enb    = {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
         .int_lvl    = {0x00000100, 0x00000000, 0x00000000, 0x00004000}},   
     // Y, Z, AA, AB    
@@ -568,57 +530,55 @@ static struct tegra_gpio_bank tegra_sleep_gpio_banks[] = {
         .int_enb    = {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
         .int_lvl    = {0x00000000, 0x00000000, 0x00000000, 0x00000000}},   
 };
-
-#else	// for LGP990
-
+#endif 
+#if 0 // revB
                     //  PORT 0   ,  PORT 1   ,   PORT2   ,   PORT3        
-    //  A, B, C, D        
     {.bank = 0, .irq = INT_GPIO1, 
-        .cnf        = {0x00000000, 0x00000008, 0x00000000, 0x00000001},
-        .out        = {0x00000000, 0x00000008, 0x00000000, 0x00000000}, 
-        .oe         = {0x00000000, 0x00000008, 0x00000000, 0x00000001},  
+        .cnf        = {0x00000000, 0x00000000, 0x00000000, 0x00000000},
+        .out        = {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
+        .oe         = {0x00000000, 0x00000000, 0x00000000, 0x00000000},  
         .int_enb    = {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
         .int_lvl    = {0x00000000, 0x00000000, 0x00000000, 0x00000000}}, 
-    //  E, F, G, H
+
     {.bank = 1, .irq = INT_GPIO2, 
-        .cnf        = {0x000000ff, 0x00000000, 0x0000000b, 0x00000000},
-        .out        = {0x0000001f, 0x00000000, 0x00000000, 0x00000000}, 
-        .oe         = {0x000000ff, 0x00000000, 0x00000000, 0x00000000},  
+        .cnf        = {0x00000000, 0x00000000, 0x0000000b, 0x00000000},
+        .out        = {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
+        .oe         = {0x00000000, 0x00000000, 0x00000000, 0x00000000},  
         .int_enb    = {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
         .int_lvl    = {0x00000000, 0x00000000, 0x00080800, 0x00000000}},   
-    //  I, J, K, L
+    
     {.bank = 2, .irq = INT_GPIO3, 
-        .cnf        = {0x000000a1, 0x00000005, 0x00000038, 0x00000000},
-        .out        = {0x00000080, 0x00000001, 0x00000018, 0x00000000}, 
-        .oe         = {0x00000080, 0x00000005, 0x00000038, 0x00000000},  
+        .cnf        = {0x000000a1, 0x00000000, 0x00000038, 0x00000000},
+        .out        = {0x00000080, 0x00000000, 0x00000018, 0x00000000}, 
+        .oe         = {0x00000080, 0x00000000, 0x00000038, 0x00000000},  
         .int_enb    = {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
-        .int_lvl    = {0x00202000, 0x00000000, 0x00000000, 0x00000000}},   
-    //  M, N, O, P
+        .int_lvl    = {0x00202001, 0x00000000, 0x00000000, 0x00000000}},   
+        
     {.bank = 3, .irq = INT_GPIO4, 
-        .cnf        = {0x00000000, 0x00000050, 0x00000021, 0x00000000},
-        .out        = {0x00000000, 0x00000050, 0x00000000, 0x00000000}, 
-        .oe         = {0x00000000, 0x00000050, 0x00000001, 0x00000000},  
+        .cnf        = {0x00000000, 0x00000000, 0x00000021, 0x00000000},
+        .out        = {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
+        .oe         = {0x00000000, 0x00000000, 0x00000001, 0x00000000},  
         .int_enb    = {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
-        .int_lvl    = {0x00000000, 0x00080800, 0x00002020, 0x00000000}},   
-    //  Q, R, S, T  
+        .int_lvl    = {0x00000000, 0x00008010, 0x00002020, 0x00000000}},   
+        
     {.bank = 4, .irq = INT_GPIO5, 
-        .cnf        = {0x0000001b, 0x000000FB, 0x00000007, 0x00000011},
-        .out        = {0x00000003, 0x00000000, 0x00000002, 0x00000000}, 
-        .oe         = {0x0000001b, 0x00000049, 0x00000002, 0x00000011},  
+        .cnf        = {0x0000001b, 0x00000099, 0x00000007, 0x00000000},
+        .out        = {0x00000003, 0x00000088, 0x00000002, 0x00000000}, 
+        .oe         = {0x0000001b, 0x00000009, 0x00000003, 0x00000000},  
         .int_enb    = {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
         .int_lvl    = {0x00000000, 0x00008000, 0x00000000, 0x00000000}},   
-    //  U, V, W, X     
+        
     {.bank = 5, .irq = INT_GPIO6, 
-        .cnf        = {0x0000003f, 0x00000081, 0x00000000, 0x00000060},
-        .out        = {0x00000000, 0x00000001, 0x00000000, 0x00000040}, 
-        .oe         = {0x0000001e, 0x00000081, 0x00000000, 0x00000000},  
+        .cnf        = {0x0000001f, 0x00000084, 0x00000000, 0x00000060},
+        .out        = {0x00000000, 0x00000080, 0x00000000, 0x00000040}, 
+        .oe         = {0x0000001e, 0x00000080, 0x00000000, 0x00000000},  
         .int_enb    = {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
-        .int_lvl    = {0x00000100, 0x00000000, 0x00000000, 0x00004000}},   
-    // Y, Z, AA, AB    
+        .int_lvl    = {0x00000100, 0x00000000, 0x00000000, 0x00000000}},   
+        
     {.bank = 6, .irq = INT_GPIO7, 
-        .cnf        = {0x00000000, 0x00000000, 0x00000000, 0x00000001},
+        .cnf        = {0x00000000, 0x00000000, 0x00000000, 0x00000000},
         .out        = {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
-        .oe         = {0x00000000, 0x00000000, 0x00000000, 0x00000001},  
+        .oe         = {0x00000000, 0x00000000, 0x00000000, 0x00000000},  
         .int_enb    = {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
         .int_lvl    = {0x00000000, 0x00000000, 0x00000000, 0x00000000}},   
 };
@@ -739,6 +699,58 @@ static void tegra_gpio_irq_unmask(unsigned int irq)
 
 	tegra_gpio_mask_write(GPIO_MSK_INT_ENB(gpio), gpio, 1);
 }
+
+// 20110209  disable gpio interrupt during power-off  [START] 
+
+static const unsigned int disable_interrupt_list[] = 
+{
+    TEGRA_GPIO_PV2,  // power_key
+    TEGRA_GPIO_PW3,  // BATT_LOW_INT
+  #if defined(CONFIG_MACH_STAR_SKT_REV_D)     
+    TEGRA_GPIO_PN5, //  HOOK_DET
+  #else
+    TEGRA_GPIO_PD3,  //  HOOK_DET
+  #endif
+    TEGRA_GPIO_PU5,    // HALL_INT
+    TEGRA_GPIO_PU0,   // INT_N_MUIC
+    TEGRA_GPIO_PR4,  // COM_INT
+    TEGRA_GPIO_PQ5,  // GYRO_INT_N
+    TEGRA_GPIO_PK2,   // THERMAL_IRQ
+    TEGRA_GPIO_PG0,   // VOL_KEY_UP
+    TEGRA_GPIO_PG1,   // VOL_KEY_DOWN
+    TEGRA_GPIO_PG3,   // EARJACK_SENSE
+    TEGRA_GPIO_PI0,   // MOTION_INT
+    TEGRA_GPIO_PX6,  //  TOUCH_INT
+    TEGRA_GPIO_PR2,  // PROXI_OUT
+#if defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT)	
+    TEGRA_GPIO_PJ6,  // LOWER_TOUCH_INT/ (SU660)
+#endif
+#if defined(STAR_COUNTRY_KR) && defined(STAR_OPERATOR_SKT)
+#if defined(CONFIG_MACH_STAR_SKT_REV_E) || defined(CONFIG_MACH_STAR_SKT_REV_F) 
+    TEGRA_GPIO_PV6,  // HomeKey (SU660)
+#endif
+#endif
+    TEGRA_GPIO_PW3,  // BATT_LOW_INT
+    TEGRA_GPIO_PV3,	// MDM_RESET_FLAG +
+    TEGRA_GPIO_PU6,	// SDRY1
+    0xFFFF,		      // LAST MARK
+};
+
+
+void tegra_gpio_disable_all_irq(void)
+{
+	int val=0;	
+	int i=0;
+	
+	while(  TEGRA_GPIO_PBB7 >= disable_interrupt_list[i]  && disable_interrupt_list[i] >= 0 )
+	{
+		printk("[PowerOff] tegra_gpio_disable_all_irq() :: gpio = %d \n", disable_interrupt_list[i] );
+		tegra_gpio_mask_write(GPIO_MSK_INT_ENB(disable_interrupt_list[i]), disable_interrupt_list[i], 0);
+		i++;
+	}
+
+}
+// 20110209  disable gpio interrupt during power-off  [END]
 
 static int tegra_gpio_irq_set_type(unsigned int irq, unsigned int type)
 {

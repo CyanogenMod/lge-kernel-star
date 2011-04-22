@@ -73,7 +73,7 @@ typedef struct NvOdmTouchDeviceRec *NvOdmTouchDeviceHandle;
 //#define FEATURE_LGE_TOUCH_DUAL_SUPPORT	// 20101113  prevent chip damage, only use synaptics touch
 #define FEATURE_LGE_TOUCH_GRIP_SUPPRESSION
 #define FEATURE_LGE_TOUCH_EXPAND_HIDDEN_ACTIVE_AREA
-#define FEATURE_LGE_TOUCH_MOVING_IMPROVE	// 20101018  [STAR] apply touch moving improve
+#define FEATURE_LGE_TOUCH_MOVING_IMPROVE
 #endif
 
 #ifdef FEATURE_LGE_TOUCH_CUSTOMIZE

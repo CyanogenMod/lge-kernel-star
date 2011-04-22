@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdh_linux.c,v 1.42.10.10.2.14 2010/08/17 16:34:23 Exp $
+ * $Id: bcmsdh_linux.c,v 1.42.10.10.2.14.4.2 2010/09/15 00:30:11 Exp $
  */
 
 /**
@@ -77,6 +77,9 @@ struct bcmsdh_hc {
 	unsigned int oob_irq;
 	unsigned long oob_flags; /* OOB Host specifiction as edge and etc */
 	bool oob_irq_registered;
+#if defined(OOB_INTR_ONLY)
+	spinlock_t irq_lock;
+#endif
 };
 static bcmsdh_hc_t *sdhcinfo = NULL;
 
@@ -188,7 +191,12 @@ int bcmsdh_probe(struct device *dev)
 #endif /* BCMLXSDMMC */
 
 #if defined(OOB_INTR_ONLY)
+#ifdef HW_OOB
+	irq_flags = \
+		IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL | IORESOURCE_IRQ_SHAREABLE;
+#else
 	irq_flags = IRQF_TRIGGER_FALLING;
+#endif /* HW_OOB */
 	irq = dhd_customer_oob_irq_map(&irq_flags);
 	if  (irq < 0) {
 		SDLX_MSG(("%s: Host irq is not defined\n", __FUNCTION__));
@@ -228,6 +236,9 @@ int bcmsdh_probe(struct device *dev)
 	sdhc->oob_irq = irq;
 	sdhc->oob_flags = irq_flags;
 	sdhc->oob_irq_registered = FALSE;	/* to make sure.. */
+#if defined(OOB_INTR_ONLY)
+	spin_lock_init(&sdhc->irq_lock);
+#endif
 
 	/* chain SDIO Host Controller info together */
 	sdhc->next = sdhcinfo;
@@ -571,14 +582,30 @@ bcmsdh_unregister(void)
 }
 
 #if defined(OOB_INTR_ONLY)
+void bcmsdh_oob_intr_set(bool enable)
+{
+	static bool curstate = 1;
+	unsigned long flags;
+
+	spin_lock_irqsave(&sdhcinfo->irq_lock, flags);
+	if (curstate != enable) {
+		if (enable)
+			enable_irq(sdhcinfo->oob_irq);
+		else
+			disable_irq_nosync(sdhcinfo->oob_irq);
+		curstate = enable;
+	}
+	spin_unlock_irqrestore(&sdhcinfo->irq_lock, flags);
+}
 static irqreturn_t wlan_oob_irq(int irq, void *dev_id)
 {
 	dhd_pub_t *dhdp;
 
 	dhdp = (dhd_pub_t *)dev_get_drvdata(sdhcinfo->dev);
 
+	bcmsdh_oob_intr_set(0);
+
 	if (dhdp == NULL) {
-		disable_irq(sdhcinfo->oob_irq);
 		SDLX_MSG(("Out of band GPIO interrupt fired way too early\n"));
 		return IRQ_HANDLED;
 	}
@@ -596,9 +623,14 @@ int bcmsdh_register_oob_intr(void * dhdp)
 
 	SDLX_MSG(("%s Enter\n", __FUNCTION__));
 
+/* Example of  HW_OOB for HW2: please refer to your host  specifiction */
+/* sdhcinfo->oob_flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL | IORESOURCE_IRQ_SHAREABLE; */
+
 	dev_set_drvdata(sdhcinfo->dev, dhdp);
 
 	if (!sdhcinfo->oob_irq_registered) {
+		SDLX_MSG(("%s IRQ=%d Type=%X \n", __FUNCTION__, \
+				(int)sdhcinfo->oob_irq, (int)sdhcinfo->oob_flags));
 		/* Refer to customer Host IRQ docs about proper irqflags definition */
 		error = request_irq(sdhcinfo->oob_irq, wlan_oob_irq, sdhcinfo->oob_flags,
 			"bcmsdh_sdmmc", NULL);
@@ -620,14 +652,6 @@ void bcmsdh_unregister_oob_intr(void)
 	disable_irq(sdhcinfo->oob_irq);	/* just in case.. */
 	free_irq(sdhcinfo->oob_irq, NULL);
 	sdhcinfo->oob_irq_registered = FALSE;
-}
-
-void bcmsdh_oob_intr_set(bool enable)
-{
-	if (enable)
-		enable_irq(sdhcinfo->oob_irq);
-	else
-		disable_irq(sdhcinfo->oob_irq);
 }
 #endif /* defined(OOB_INTR_ONLY) */
 /* Module parameters specific to each host-controller driver */

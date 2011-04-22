@@ -47,7 +47,7 @@ NvBool NvOdmBatteryDeviceOpen(NvOdmBatteryDeviceHandle *hDevice,
                               NvOdmOsSemaphoreHandle *hOdmSemaphore)
 {
     *hDevice = NULL;
-    return NV_FALSE;
+    return NV_TRUE;
 }
 
 void NvOdmBatteryDeviceClose(NvOdmBatteryDeviceHandle hDevice)
@@ -68,7 +68,7 @@ NvBool NvOdmBatteryGetAcLineStatus(
        NvOdmBatteryAcLineStatus *pStatus)
 {
     *pStatus = NvOdmBatteryAcLine_Offline;
-    return NV_FALSE;
+    return NV_TRUE;
 }
 
 
@@ -88,7 +88,7 @@ NvBool NvOdmBatteryGetBatteryStatus(
        NvU8 *pStatus)
 {
     *pStatus = NVODM_BATTERY_STATUS_UNKNOWN;
-    return NV_FALSE;
+    return NV_TRUE;
 }
 
 /**
@@ -118,7 +118,7 @@ NvBool NvOdmBatteryGetBatteryData(
     BatteryData.BatteryVoltage         = NVODM_BATTERY_DATA_UNKNOWN;
 
     *pData = BatteryData;
-    return NV_FALSE;
+    return NV_TRUE;
 }
 
 /**

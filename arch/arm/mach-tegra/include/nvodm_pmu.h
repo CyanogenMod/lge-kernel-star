@@ -170,17 +170,17 @@ NvOdmPmuSetVoltage(
     NvU32* pSettleMicroSeconds);
 
 #if defined(CONFIG_MACH_STAR) 
-//20100704  headset porting [LGE]
+//20100704  jongik's headset porting [LGE]
 NvU32
 NvOdmPmuGetHookAdc(
     NvOdmPmuDeviceHandle hDevice);
 
-//20101121 cs77, HW power off in thermal limit [START]
+//20101121 , HW power off in thermal limit [START]
 NvU32
 NvOdmPmuSetHwPowerOffConfig(
     NvOdmPmuDeviceHandle hDevice,
     NvBool Enable);
-//20101121 cs77, HW power off in thermal limit [END]
+//20101121 , HW power off in thermal limit [END]
 #endif
 
 
@@ -512,13 +512,13 @@ NvBool
 NvOdmPmuIsRtcInitialized(
     NvOdmPmuDeviceHandle hDevice);
 
-//20100413,  temporary powerkey [START]
+//20100413, , temporary powerkey [START]
 #ifdef CONFIG_MACH_STAR_FIRENZE
 NvBool
 NvOdmPmuInputDevInit(
     NvOdmPmuDeviceHandle hDevice);
 #endif
-//20100413, temporary powerkey [END]
+//20100413, , temporary powerkey [END]
 
 /**
  * Registers a callback function for PMU RTC Alarm.
