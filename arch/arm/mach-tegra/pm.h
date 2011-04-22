@@ -81,6 +81,7 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat);
 
 void tegra_idle_lp2(void);
 
+unsigned int tegra_count_slow_cpus(unsigned long speed_limit);
 unsigned int tegra_get_slowest_cpu_n(void);
 unsigned long tegra_cpu_lowest_speed(void);
 unsigned long tegra_cpu_highest_speed(void);

@@ -178,6 +178,26 @@ static struct kernel_param_ops tegra_hp_state_ops = {
 module_param_cb(auto_hotplug, &tegra_hp_state_ops, &hp_state, 0644);
 
 
+enum {
+	TEGRA_CPU_SPEED_BALANCED,
+	TEGRA_CPU_SPEED_BIASED,
+	TEGRA_CPU_SPEED_SKEWED,
+};
+
+static int tegra_cpu_speed_balance(void)
+{
+	unsigned long highest_speed = tegra_cpu_highest_speed();
+
+	/* balanced: freq targets for all CPUs are above 50% of highest speed
+	   biased: freq target for at least one CPU is below 50% threshold
+	   skewed: freq targets for at least 2 CPUs are below 25% threshold */
+	if (tegra_count_slow_cpus(highest_speed / 4) >= 2)
+		return TEGRA_CPU_SPEED_SKEWED;
+	else if (tegra_count_slow_cpus(highest_speed / 2) >= 1)
+		return TEGRA_CPU_SPEED_BIASED;
+	return TEGRA_CPU_SPEED_BALANCED;
+}
+
 static void tegra_auto_hotplug_work_func(struct work_struct *work)
 {
 	bool up = false;
@@ -213,17 +233,32 @@ static void tegra_auto_hotplug_work_func(struct work_struct *work)
 				/* catch-up with governor target speed */
 				tegra_cpu_cap_highest_speed(NULL);
 			}
-			queue_delayed_work(
-				hotplug_wq, &hotplug_work, up2gn_delay);
 		} else {
-			cpu = cpumask_next_zero(0, cpu_online_mask);
-			if (cpu < nr_cpu_ids) {
-				up = true;
-				queue_delayed_work(
-					hotplug_wq, &hotplug_work, up2gn_delay);
-				hp_stats_update(cpu, true);
+			switch (tegra_cpu_speed_balance()) {
+			/* cpu speed is up and balanced - one more on-line */
+			case TEGRA_CPU_SPEED_BALANCED:
+				cpu = cpumask_next_zero(0, cpu_online_mask);
+				if (cpu < nr_cpu_ids) {
+					up = true;
+					hp_stats_update(cpu, true);
+				}
+				break;
+			/* cpu speed is up, but skewed - remove one core */
+			case TEGRA_CPU_SPEED_SKEWED:
+				cpu = tegra_get_slowest_cpu_n();
+				if (cpu < nr_cpu_ids) {
+					up = false;
+					hp_stats_update(cpu, false);
+				}
+				break;
+			/* cpu speed is up, but under-utilized - do nothing */
+			case TEGRA_CPU_SPEED_BIASED:
+			default:
+				break;
 			}
 		}
+		queue_delayed_work(
+			hotplug_wq, &hotplug_work, up2gn_delay);
 		break;
 	default:
 		pr_err("%s: invalid tegra hotplug state %d\n",

@@ -363,6 +363,17 @@ static int tegra_update_cpu_speed(unsigned long rate)
 	return 0;
 }
 
+unsigned int tegra_count_slow_cpus(unsigned long speed_limit)
+{
+	unsigned int cnt = 0;
+	int i;
+
+	for_each_online_cpu(i)
+		if (target_cpu_speed[i] <= speed_limit)
+			cnt++;
+	return cnt;
+}
+
 unsigned int tegra_get_slowest_cpu_n(void) {
 	unsigned int cpu = nr_cpu_ids;
 	unsigned long rate = ULONG_MAX;
