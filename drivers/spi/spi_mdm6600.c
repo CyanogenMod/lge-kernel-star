@@ -74,7 +74,7 @@
 #endif
 #endif
 
-#define LGE_SPI_DEBUG_LOG
+//#define LGE_SPI_DEBUG_LOG
 #ifdef LGE_SPI_DEBUG_LOG
 #define SPI_DEBUG_LOG SPI_LOG
 #else
