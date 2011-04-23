@@ -1053,6 +1053,9 @@ static ssize_t tegra_battery_store_property(
 {
 	static NvU32 value = 0;
 
+	/* Ignore this completely for now */
+	return count;
+
 	value = (NvU32)(simple_strtoul(buf, NULL, 0));
 	LDB("[gauge]: gauge_value(%d)", value);
 
@@ -1590,12 +1593,12 @@ static int tegra_battery_get_property(struct power_supply *psy,
 	switch (psp)
 	{
 		case POWER_SUPPLY_PROP_STATUS:
-			if (batt_dev->BatteryGauge_on == NV_FALSE) // Not yet receive CBC from CP
+			/*if (batt_dev->BatteryGauge_on == NV_FALSE) // Not yet receive CBC from CP
 			{
 				val->intval = POWER_SUPPLY_STATUS_UNKNOWN;
 				LDB("[Warning] Cannot receive CBC from CP until now, Display Battery loading Icon!!");
 			}
-			else if (batt_dev->present == NV_FALSE) // NVODM_BATTERY_STATUS_NO_BATTERY
+			else */if (batt_dev->present == NV_FALSE) // NVODM_BATTERY_STATUS_NO_BATTERY
 			{
 				val->intval = POWER_SUPPLY_STATUS_UNKNOWN;
 				//LDB("[bat_poll] intval: NVODM_BATTERY_STATUS_NO_BATTERY(%d)", val->intval);
@@ -1651,10 +1654,10 @@ static int tegra_battery_get_property(struct power_supply *psy,
 			break;
 
 		case POWER_SUPPLY_PROP_CAPACITY:
-			if (batt_dev->BatteryGauge_on == NV_TRUE)
+			//if (batt_dev->BatteryGauge_on == NV_TRUE)
 			val->intval = batt_dev->BatteryLifePercent;
-			else
-				val->intval = 999;
+			/*else
+				val->intval = 999;*/
 			//LDB("[bat_poll] intval: POWER_SUPPLY_PROP_CAPACITY(%d)", val->intval);
 			break;
 
