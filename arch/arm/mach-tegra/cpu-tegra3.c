@@ -37,7 +37,6 @@
 #include "clock.h"
 
 #define INITIAL_STATE		TEGRA_HP_DISABLED
-#define IDLE_HYSTERESIS		100000
 #define UP2G0_DELAY_MS		200
 #define UP2Gn_DELAY_MS		1000
 #define DOWN_DELAY_MS		2000
@@ -61,8 +60,6 @@ static unsigned int idle_top_freq;
 static unsigned int idle_bottom_freq;
 module_param(idle_top_freq, uint, 0644);
 module_param(idle_bottom_freq, uint, 0644);
-
-static unsigned int lpcpu_max_freq;
 
 static struct clk *cpu_clk;
 static struct clk *cpu_g_clk;
@@ -340,9 +337,8 @@ int tegra_auto_hotplug_init(struct mutex *cpu_lock)
 	if (IS_ERR(cpu_clk) || IS_ERR(cpu_g_clk) || IS_ERR(cpu_lp_clk))
 		return -ENOENT;
 
-	lpcpu_max_freq = clk_get_max_rate(cpu_lp_clk) / 1000;
-	idle_top_freq = lpcpu_max_freq;
-	idle_bottom_freq = idle_top_freq - IDLE_HYSTERESIS;
+	idle_top_freq = clk_get_max_rate(cpu_lp_clk) / 1000;
+	idle_bottom_freq = clk_get_min_rate(cpu_g_clk) / 1000;
 
 	up2g0_delay = msecs_to_jiffies(UP2G0_DELAY_MS);
 	up2gn_delay = msecs_to_jiffies(UP2Gn_DELAY_MS);

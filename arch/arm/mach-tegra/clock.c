@@ -137,6 +137,11 @@ unsigned long clk_get_max_rate(struct clk *c)
 		return c->max_rate;
 }
 
+unsigned long clk_get_min_rate(struct clk *c)
+{
+		return c->min_rate;
+}
+
 /* Must be called with clk_lock(c) held */
 unsigned long clk_get_rate_locked(struct clk *c)
 {

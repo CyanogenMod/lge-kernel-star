@@ -2974,7 +2974,6 @@ static struct clk tegra_clk_virtual_cpu_g = {
 	.parent    = &tegra_clk_cclk_g,
 	.ops       = &tegra_cpu_ops,
 	.max_rate  = 1000000000,
-	.min_rate  = 312000000,
 	.u.cpu = {
 		.main      = &tegra_pll_x,
 		.backup    = &tegra_pll_p,
@@ -2986,7 +2985,7 @@ static struct clk tegra_clk_virtual_cpu_lp = {
 	.name      = "cpu_lp",
 	.parent    = &tegra_clk_cclk_lp,
 	.ops       = &tegra_cpu_ops,
-	.max_rate  = 456000000,
+	.max_rate  = 500000000,
 	.u.cpu = {
 		.main      = &tegra_pll_x,
 		.backup    = &tegra_pll_p,
@@ -3479,6 +3478,27 @@ static struct tegra_cpufreq_table_data cpufreq_tables[] = {
 	{ freq_table_1p0GHz, 2, 6 },
 };
 
+static void clip_cpu_rate_limits(
+	struct cpufreq_frequency_table *freq_table,
+	struct cpufreq_policy *policy)
+{
+	int idx, ret;
+	struct clk *cpu_clk_g = tegra_get_clock_by_name("cpu_g");
+	struct clk *cpu_clk_lp = tegra_get_clock_by_name("cpu_lp");
+
+	/* clip CPU LP mode maximum frequency to table entry, and
+	   set CPU G mode minimum frequency one table step below */
+	ret = cpufreq_frequency_table_target(policy, freq_table,
+		cpu_clk_lp->max_rate / 1000, CPUFREQ_RELATION_H, &idx);
+	if (ret || !idx) {
+		pr_err("%s: LP CPU max rate %lu %s of cpufreq table", __func__,
+		       cpu_clk_lp->max_rate, ret ? "outside" : "at the bottom");
+		BUG();
+	}
+	cpu_clk_lp->max_rate = freq_table[idx].frequency * 1000;
+	cpu_clk_g->min_rate = freq_table[idx-1].frequency * 1000;
+}
+
 struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void)
 {
 	int i, ret;
@@ -3486,11 +3506,15 @@ struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void)
 
 	for (i = 0; i < ARRAY_SIZE(cpufreq_tables); i++) {
 		struct cpufreq_policy policy;
+		policy.cpu = 0;	/* any on-line cpu */
 		ret = cpufreq_frequency_table_cpuinfo(
 			&policy, cpufreq_tables[i].freq_table);
 		BUG_ON(ret);
-		if ((policy.max * 1000) == cpu_clk->max_rate)
+		if ((policy.max * 1000) == cpu_clk->max_rate) {
+			clip_cpu_rate_limits(
+				cpufreq_tables[i].freq_table, &policy);
 			return &cpufreq_tables[i];
+		}
 	}
 	pr_err("%s: No cpufreq table matching cpu range", __func__);
 	BUG();
