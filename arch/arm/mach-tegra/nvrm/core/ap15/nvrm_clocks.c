@@ -2791,7 +2791,9 @@ static const NvRmModuleID s_Ap15PllM0UsagePolicy[] =
     NvRmModuleID_Mpe,
     NvRmModuleID_Vde,
     NvRmModuleID_Uart,
-    NvRmModuleID_Slink //===> adding this line };
+#ifdef CONFIG_MACH_STAR_TMUS
+    NvRmModuleID_Slink
+#endif
 };
 
 // PLLD may be selected as a source only for Display, HDMI, and DSI modules.

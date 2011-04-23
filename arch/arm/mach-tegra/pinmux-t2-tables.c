@@ -1006,7 +1006,11 @@ u32 sleep_pinmux_reg[TRISTATE_REG_NUM + PIN_MUX_CTL_REG_NUM + PULLUPDOWN_REG_NUM
 static u32 sleep_pinmux_reg[TRISTATE_REG_NUM + PIN_MUX_CTL_REG_NUM + PULLUPDOWN_REG_NUM] = 
 {
 	// TRISTATE		:   ( 0->normal,   1->tristate)
+#ifdef CONFIG_MACH_STAR_TMUS
 	0xf736fff9,		//  TRISTATE[0]
+#else
+	0xf716fff9,             //  TRISTATE[0]
+#endif
 	0xdfe4bfdf,		//  TRISTATE[1]
  	0xffffffff,		//  TRISTATE[2]
  	0xff7fdbff,		//  TRISTATE[3]

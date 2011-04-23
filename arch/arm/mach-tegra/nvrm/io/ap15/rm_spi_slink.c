@@ -743,9 +743,12 @@ WaitForTransferCompletion(
     // If timeout happen then stop all transfer and exit.
     if (Error == NvError_Timeout)
     {
-
 	pr_err("Spi%d: %dms Timeout Error\n", hRmSpiSlink->InstanceId, WaitTimeOutMS);
-    	//hRmSpiSlink->IsIntDoneDue = NV_TRUE;
+#ifdef CONFIG_MACH_STAR_REV_F
+//20101221-1, , Workaround code to recover repeated spi transaction timeout error [START]
+         hRmSpiSlink->IsIntDoneDue = NV_TRUE;
+//20101221-1, , Workaround code to recover repeated spi transaction timeout error [END]
+#endif
         // Disable the data flow first.
         hHwInt->HwSetDataFlowFxn(&hRmSpiSlink->HwRegs,
                                     hRmSpiSlink->CurrentDirection, NV_FALSE);
@@ -786,7 +789,9 @@ WaitForTransferCompletion(
             // All requested transfer has been done.
             CurrentSlinkPacketTransfer = hRmSpiSlink->CurrTransInfo.CurrPacketCount;
 		pr_err("Spi%d: CurrentSlinkPacketTransfer = %d, IsReady = %d\n", hRmSpiSlink->InstanceId, CurrentSlinkPacketTransfer, IsReady);
-            //Error = NvSuccess;
+#ifdef CONFIG_MACH_STAR_REV_F
+                Error = NvSuccess;
+#endif
         }
         else
         {
@@ -2153,7 +2158,11 @@ static NvError MasterModeReadWriteDma(
             hRmSpiSlink->hHwInterface->HwStartTransferFxn(&hRmSpiSlink->HwRegs, NV_TRUE);
 
         if (!Error)
+#ifdef CONFIG_MACH_STAR_TMUS
             WaitForTransferCompletion(hRmSpiSlink, 1000, NV_FALSE);	////20101218-3, , NVIDIA patch to protect infinite loop : WaitForTransferCompletion(hRmSpiSlink, NV_WAIT_INFINITE, NV_FALSE);
+#else
+            WaitForTransferCompletion(hRmSpiSlink, 500, NV_FALSE);	////20101218-3, , NVIDIA patch to protect infinite loop : WaitForTransferCompletion(hRmSpiSlink, NV_WAIT_INFINITE, NV_FALSE);
+#endif
 
         Error = (hRmSpiSlink->RxTransferStatus)? hRmSpiSlink->RxTransferStatus:
                                     hRmSpiSlink->TxTransferStatus;

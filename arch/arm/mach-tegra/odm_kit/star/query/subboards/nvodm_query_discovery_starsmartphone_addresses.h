@@ -388,10 +388,8 @@ static const NvOdmIoAddress s_lge_ProximityAddresses[] =
 	{ NvOdmIoModule_I2c,  0x01, 0x44, 0 }, /* I2C device address is 0x44 */
 #if defined (CONFIG_MACH_STAR_MDM_C)
 	{ NvOdmIoModule_Gpio, 'r' - 'a', 2, 0 }, 
-#elif defined (CONFIG_MACH_STAR_REV_F)
-	{ NvOdmIoModule_Gpio, 'w' - 'a', 2, 0 }, 
 #else
-	{ NvOdmIoModule_Gpio, 'a' - 'a', 0, 0 }, 
+	{ NvOdmIoModule_Gpio, 'w' - 'a', 2, 0 }, 
 #endif
 	{ NvOdmIoModule_Vdd,  0x00, Max8907PmuSupply_LDO7 , 0 },  /* LDO8 1.8V VCC_SENSOR_1V8*/
 	{ NvOdmIoModule_Vdd,  0x00, Max8907PmuSupply_LDO8, 0 },   /* LDO7 3.0v VCC_SENSOR_3V0 */
@@ -529,10 +527,8 @@ static const NvOdmIoAddress s_lge_BluetoothAddresses[] =
     { NvOdmIoModule_Uart, 0x2,  0x0, 0 }, //Instance 2 means UART3.
 #if defined (CONFIG_MACH_STAR_MDM_C)
     { NvOdmIoModule_Gpio, 'q' - 'a', 4, 0 }, // bt_en
-#elif defined (CONFIG_MACH_STAR_REV_F)
-    { NvOdmIoModule_Gpio, 'z' - 'a', 2, 0 }, // bt_en
 #else
-    { NvOdmIoModule_Gpio, 'q' - 'a', 4, 0 }, // bt_en
+    { NvOdmIoModule_Gpio, 'z' - 'a', 2, 0 }, // bt_en
 #endif    
     { NvOdmIoModule_Gpio, 'c' - 'a', 7, 0 }, // bt_host_wakeup
     { NvOdmIoModule_Gpio, 'x' - 'a', 4, 0 }, // bt_wakeup
@@ -544,10 +540,8 @@ static const NvOdmIoAddress s_lge_WlanAddresses[] =
     { NvOdmIoModule_Sdio, 0x0, 0x0, 0 },    // WLAN is on SD Bus
 #if defined (CONFIG_MACH_STAR_MDM_C)
     { NvOdmIoModule_Gpio, 'q' - 'a', 3, 0 }, // wlan_en
-#elif defined (CONFIG_MACH_STAR_REV_F)
-    { NvOdmIoModule_Gpio, 'w' - 'a', 1 }, // wlan_en
 #else
-    { NvOdmIoModule_Gpio, 'q' - 'a', 3, 0 }, // wlan_en
+    { NvOdmIoModule_Gpio, 'w' - 'a', 1 }, // wlan_en
 #endif    
     { NvOdmIoModule_Gpio, 's' - 'a', 0, 0 }, // wlan_host_wakeup
     { NvOdmIoModule_Gpio, 'g' - 'a', 2, 0 }, // wlan_wakeup
