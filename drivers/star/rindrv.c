@@ -570,9 +570,7 @@ static void rin_receive_buf(struct tty_struct *tty, const unsigned char *cp,
 	skb = dev_alloc_skb(count);
 	if (skb == NULL) {
 		printk(KERN_WARNING "%s: memory squeeze, dropping packet.\n", sl->dev->name);
-#ifdef CONFIG_MACH_STAR_TMUS
         sl->rx_bytes += count;
-#endif
 		sl->rx_dropped++;
 		return;
 	}
@@ -581,13 +579,11 @@ static void rin_receive_buf(struct tty_struct *tty, const unsigned char *cp,
 	skb_reset_mac_header(skb);
 	skb->protocol = htons(ETH_P_IP);
 
-#ifdef CONFIG_MACH_STAR_TMUS
     spin_lock_bh(&sl->lock);
 	sl->rx_bytes += count;
 	netif_rx(skb);
 	sl->rx_packets++;
     spin_unlock_bh(&sl->lock);
-#endif
 
 // 2011.2.2 [ril] improve the performance of TCP Throughput [end]
 #ifdef RIN_DEINSALA_DEBUG
