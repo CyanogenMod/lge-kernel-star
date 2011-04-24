@@ -1045,19 +1045,9 @@ static ssize_t tegra_battery_show_property(
 	return sprintf(buf, "%d\n", batt_dev->BatteryLifePercent);
 }
 
-static ssize_t tegra_battery_store_property(
-		struct device *dev,
-		struct device_attribute *attr,
-		const char *buf,
-		size_t count)
+static ssize_t tegra_at_command_parse(
+		NvU32 value)
 {
-	static NvU32 value = 0;
-
-	/* Ignore this completely for now */
-	return count;
-
-	value = (NvU32)(simple_strtoul(buf, NULL, 0));
-	LDB("[gauge]: gauge_value(%d)", value);
 
 //20100702, , for Fuel gauge reset [START]
 	if ( value == Gauge_CTL_Reset_Done )
@@ -1098,11 +1088,26 @@ static ssize_t tegra_battery_store_property(
 	{
 		lprintk(D_BATT, "%s: [Critical] Unexpected Battery gauge value from CP & RIL!!!(%d) \n", __func__, value);
 		batt_dev->BatteryLifePercent = 101; // default setting
-		return count;
+		return 0;
 	}
 //20100702, , for Fuel gauge reset [END]
-	return count;
+	return 0;
 }
+
+static ssize_t tegra_battery_store_property(
+		struct device *dev,
+		struct device_attribute *attr,
+		const char *buf,
+		size_t count)
+{
+	static NvU32 value = 0;
+
+	value = (NvU32)(simple_strtoul(buf, NULL, 0));
+	LDB("[gauge]: gauge_value(%d)", value);
+	if (!tegra_at_command_parse(value))
+		return count;
+}
+
 
 static struct device_attribute tegra_battery_attr = {
 	.attr = { .name = "bat_gauge", .mode = S_IRUGO | S_IWUGO,
@@ -1593,6 +1598,10 @@ static int tegra_battery_get_property(struct power_supply *psy,
 	switch (psp)
 	{
 		case POWER_SUPPLY_PROP_STATUS:
+			if (batt_dev->BatteryGauge_on == NV_FALSE) // Not yet receive CBC from CP
+			{
+				tegra_at_command_parse(52407);
+			}
 			/*if (batt_dev->BatteryGauge_on == NV_FALSE) // Not yet receive CBC from CP
 			{
 				val->intval = POWER_SUPPLY_STATUS_UNKNOWN;
