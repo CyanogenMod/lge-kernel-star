@@ -185,6 +185,9 @@ static const char *func_name(enum tegra_mux_func func)
 	if (func == TEGRA_MUX_NONE)
 		return "NONE";
 
+	if (func == TEGRA_MUX_INVALID)
+		return "INVALID";
+
 	if (func < 0 || func >=  TEGRA_MAX_MUX)
 		return "<UNKNOWN>";
 
@@ -302,6 +305,13 @@ static int tegra_pinmux_set_func(const struct tegra_pingroup_config *config)
 
 	if (pingroups[pg].mux_reg < 0)
 		return -EINVAL;
+
+	if (func == TEGRA_MUX_INVALID) {
+		pr_err("The pingroup %s is not recommended for option %s\n",
+				pingroup_name(pg), func_name(func));
+		WARN_ON(1);
+		return -EINVAL;
+	}
 
 	if (func < 0)
 		return -ERANGE;
