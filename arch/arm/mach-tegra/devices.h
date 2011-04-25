@@ -29,7 +29,6 @@ extern struct platform_device tegra_i2c_device1;
 extern struct platform_device tegra_i2c_device2;
 extern struct platform_device tegra_i2c_device3;
 extern struct platform_device tegra_i2c_device4;
-extern struct platform_device tegra_spi_slave_device1;
 extern struct platform_device tegra_spi_device1;
 extern struct platform_device tegra_spi_device2;
 extern struct platform_device tegra_spi_device3;
