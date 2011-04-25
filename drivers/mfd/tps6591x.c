@@ -289,7 +289,10 @@ static int tps6591x_gpio_get(struct gpio_chip *gc, unsigned offset)
 	if (ret)
 		return ret;
 
-	return val & 0x1;
+	if (val & 0x4)
+		return val & 0x1;
+	else
+		return ((val & 0x2)? 1: 0);
 }
 
 static void tps6591x_gpio_set(struct gpio_chip *chip, unsigned offset,
@@ -304,8 +307,18 @@ static void tps6591x_gpio_set(struct gpio_chip *chip, unsigned offset,
 
 static int tps6591x_gpio_input(struct gpio_chip *gc, unsigned offset)
 {
-	/* FIXME: add handling of GPIOs as dedicated inputs */
-	return -ENOSYS;
+	struct tps6591x *tps6591x = container_of(gc, struct tps6591x, gpio);
+	uint8_t reg_val;
+	int ret;
+
+	ret = __tps6591x_read(tps6591x->client, TPS6591X_GPIO_BASE_ADDR +
+			offset,	&reg_val);
+	if (ret)
+		return ret;
+
+	reg_val &= ~0x4;
+	return __tps6591x_write(tps6591x->client, TPS6591X_GPIO_BASE_ADDR +
+			offset,	reg_val);
 }
 
 static int tps6591x_gpio_output(struct gpio_chip *gc, unsigned offset,
