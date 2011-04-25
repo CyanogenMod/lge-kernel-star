@@ -1158,7 +1158,7 @@ struct platform_device tegra_avp_device = {
 static struct resource tegra_aes_resources[] = {
 	{
 		.start	= TEGRA_VDE_BASE,
-		.end	= TEGRA_VDE_BASE + TEGRA_VDE_BASE - 1,
+		.end	= TEGRA_VDE_BASE + TEGRA_VDE_SIZE - 1,
 		.flags	= IORESOURCE_MEM,
 	},
 	{
