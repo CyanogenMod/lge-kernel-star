@@ -761,7 +761,11 @@ static NvOdmWakeupPadInfo s_NvOdmWakeupPadInfo[] =
     {NV_FALSE,  4, NvOdmWakeupPadPolarity_High},    // Wake Event  4 - hdmi_int (HDMI_INT_N)
     {NV_FALSE/*NV_TRUE*/,   5, NvOdmWakeupPadPolarity_High},    // Wake Event  5 - vgp[6] (proxi_out)
     {NV_FALSE,  6, NvOdmWakeupPadPolarity_High},    // Wake Event  6 - gp3_pu[5] (VIB_EN)
+#ifdef CONFIG_MACH_STAR_TMUS
     {NV_TRUE,   7, NvOdmWakeupPadPolarity_High}, // Wake Event  7 - gp3_pu[6] (IPC_SRDY1)
+#else
+    {NV_FALSE,  7, NvOdmWakeupPadPolarity_AnyEdge}, // Wake Event  7 - gp3_pu[6] (VIB_PWM)
+#endif
     {NV_TRUE,   8, NvOdmWakeupPadPolarity_AnyEdge},    // Wake Event  8 - gmi_wp_n (BT_HOST_WAKEUP)
     {NV_FALSE/*NV_TRUE*/,   9, NvOdmWakeupPadPolarity_AnyEdge},     // Wake Event  9 - gp3_ps[2] (CHG_STATUS_N_AP20)
     {NV_FALSE, 10, NvOdmWakeupPadPolarity_High},    // Wake Event 10 - gmi_ad21
@@ -887,7 +891,7 @@ NvOdmQuerySpiGetDeviceInfo(
 {
 #ifdef CONFIG_SPI_TEGRA
     static const NvOdmQuerySpiDeviceInfo s_Spi1Cs0Info_IfxRil =
-	 {NvOdmQuerySpiSignalMode_1, NV_TRUE, NV_FALSE, NV_FALSE, 0, 0};
+	 {NvOdmQuerySpiSignalMode_1, NV_FALSE, NV_FALSE};//{NvOdmQuerySpiSignalMode_1, NV_TRUE, NV_FALSE, NV_FALSE, 0, 0};
 #else
     static const NvOdmQuerySpiDeviceInfo s_Spi1Cs0Info_IfxRil =
         {NvOdmQuerySpiSignalMode_1, NV_TRUE, NV_TRUE, NV_FALSE, 0, 0};	//	{NvOdmQuerySpiSignalMode_1, NV_FALSE, NV_FALSE};
@@ -898,7 +902,7 @@ NvOdmQuerySpiGetDeviceInfo(
 		{NvOdmQuerySpiSignalMode_1, NV_TRUE, NV_TRUE, NV_FALSE, 0, 0};
 #else
 	static const NvOdmQuerySpiDeviceInfo s_Spi2Cs0Info =
-        {NvOdmQuerySpiSignalMode_3, NV_TRUE, NV_FALSE, NV_FALSE, 0, 0};
+        {NvOdmQuerySpiSignalMode_3, NV_TRUE, NV_FALSE};//{NvOdmQuerySpiSignalMode_3, NV_TRUE, NV_FALSE, NV_FALSE, 0, 0};
 #endif
 //20100809, , Add SPI2 for AP-CP IPC [END]
 
@@ -1140,7 +1144,11 @@ const NvU8* NvOdmQueryProjectName(void)
 #endif
 
     { NvOdmPinRegister_Ap20_PullUpDown_C,
+#ifdef CONFIG_MACH_STAR_TMUS
+     NVODM_QUERY_PIN_AP20_PULLUPDOWN_C(0x1, 0x1, 0x1, 0x1, 0x2, 0x1, 0x2, 0x1, 0x2, 0x2, 0x2, 0x2, 0x0, 0x0, 0x0) },
+#else
      NVODM_QUERY_PIN_AP20_PULLUPDOWN_C(0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x2, 0x1, 0x2, 0x2, 0x2, 0x2, 0x0, 0x0, 0x0) },	//20110120-2, , SPI2 pulldown setting : 5th 0x2->0x1
+#endif
 
 	//20100810  LCD one shot mode
     { NvOdmPinRegister_Ap20_PullUpDown_D,
