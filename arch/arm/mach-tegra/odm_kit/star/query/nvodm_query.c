@@ -754,7 +754,11 @@ static NvOdmQuerySdioInterfaceProperty s_NvOdmQuerySdioInterfaceProperty[4] =
 #if defined (CONFIG_MACH_STAR)
 static NvOdmWakeupPadInfo s_NvOdmWakeupPadInfo[] =
 {
+#ifdef CONFIG_MACH_STAR_TMUS
     {NV_FALSE,  0, NvOdmWakeupPadPolarity_High},    // Wake Event  0 - ulpi_data4 (IPC_SRDY2)    high??
+#else
+    {NV_TRUE,  0, NvOdmWakeupPadPolarity_High},    // Wake Event  0 - ulpi_data4 (IPC_SRDY2)    high??
+#endif
     {NV_FALSE,  1, NvOdmWakeupPadPolarity_High},    // Wake Event  1 - gp3_pv[3] (IPC_RESET_FLAG)
     {NV_FALSE,  2, NvOdmWakeupPadPolarity_High},    // Wake Event  2 - dvi_d3
     {NV_FALSE,  3, NvOdmWakeupPadPolarity_Low},     // Wake Event  3 - sdio3_dat1
@@ -932,8 +936,10 @@ NvOdmQuerySpiGetIdleSignalState(
 	{ 
 		if (ControllerId == 0) 
 			return &s_NvOdmQuerySpiIdleSignalStateLevel[0]; 
+#ifdef CONFIG_MACH_STAR_TMUS
 		else if (ControllerId == 1) 
 			return &s_NvOdmQuerySpiIdleSignalStateLevel[0]; 
+#endif
 	} 
 	return NULL; 
 } 
@@ -1214,11 +1220,13 @@ const NvU8* NvOdmQueryProjectName(void)
     { NvOdmPinRegister_Ap20_PadCtrl_DAP3CFGPADCTRL,
       NVODM_QUERY_PIN_AP20_PADCTRL_AOCFG1PADCTRL(!HIGHSPEED, SCHMITT, OHM_400, 0, 0, 0, 0) },
 //20101210-1, , Nvidia's patch for spi signal strength [START]
+#ifdef CONFIG_MACH_STAR_TMUS
 	{ NvOdmPinRegister_Ap20_PadCtrl_SPICFGPADCTRL, // for spi2
 	NVODM_QUERY_PIN_AP20_PADCTRL_AOCFG1PADCTRL(!HIGHSPEED, SCHMITT, OHM_50, 31, 31, 3, 3) },
 
 	{ NvOdmPinRegister_Ap20_PadCtrl_UADCFGPADCTRL, // for spi1
 	NVODM_QUERY_PIN_AP20_PADCTRL_AOCFG1PADCTRL(!HIGHSPEED, SCHMITT, OHM_50, 31, 31, 3, 3) },
+#endif
 //20101210-1, , Nvidia's patch for spi signal strength [END]
 };
 
