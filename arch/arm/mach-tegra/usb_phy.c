@@ -882,7 +882,7 @@ static int utmi_phy_postresume(struct tegra_usb_phy *phy)
 	return 0;
 }
 
-static void uhsic_phy_postresume(struct tegra_usb_phy *phy)
+static int uhsic_phy_postresume(struct tegra_usb_phy *phy)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
@@ -893,6 +893,7 @@ static void uhsic_phy_postresume(struct tegra_usb_phy *phy)
 		writel(val, base + USB_TXFILLTUNING);
 	}
 
+	return 0;
 }
 
 static void utmi_phy_restore_start(struct tegra_usb_phy *phy,
