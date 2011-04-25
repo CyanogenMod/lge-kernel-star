@@ -371,6 +371,7 @@ static void __init tegra_enterprise_init(void)
 	enterprise_i2c_init();
 	platform_add_devices(enterprise_devices, ARRAY_SIZE(enterprise_devices));
 	enterprise_sdhci_init();
+	enterprise_regulator_init();
 	enterprise_usb_init();
 	enterprise_gps_init();
 	enterprise_modem_init();
