@@ -828,11 +828,12 @@ static void clock_tree_show_one(struct seq_file *s, struct clk *c, int level)
 		}
 	}
 
-	seq_printf(s, "%*s%c%c%-*s %-6s %-3d %-8s %-10lu\n",
+	seq_printf(s, "%*s%c%c%-*s%c %-6s %-3d %-8s %-10lu\n",
 		level * 3 + 1, "",
 		rate > max_rate ? '!' : ' ',
 		!c->set ? '*' : ' ',
 		30 - level * 3, c->name,
+		c->cansleep ? '$' : ' ',
 		state, c->refcnt, div, rate);
 
 	if (c->dvfs)
