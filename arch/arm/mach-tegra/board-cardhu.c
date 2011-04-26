@@ -339,6 +339,17 @@ static struct usb_phy_plat_data tegra_usb_phy_pdata[] = {
 	},
 };
 
+static struct tegra_ulpi_config uhsic_phy_config = {
+	.enable_gpio = EN_HSIC_GPIO,
+	.reset_gpio = PM267_SMSC4640_HSIC_HUB_RESET_GPIO,
+};
+
+static struct tegra_ehci_platform_data tegra_ehci_uhsic_pdata = {
+	.phy_type = TEGRA_USB_PHY_TYPE_HSIC,
+	.phy_config = &uhsic_phy_config,
+	.operating_mode = TEGRA_USB_HOST,
+	.power_down_on_bus_suspend = 1,
+};
 
 static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
 	[0] = {
@@ -412,14 +423,21 @@ static struct tegra_otg_platform_data tegra_otg_pdata = {
 
 static void cardhu_usb_init(void)
 {
+	struct board_info bi;
+
+	tegra_get_board_info(&bi);
+
 	tegra_usb_phy_init(tegra_usb_phy_pdata, ARRAY_SIZE(tegra_usb_phy_pdata));
 
 	tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
 	platform_device_register(&tegra_otg_device);
 
-	tegra_ehci2_device.dev.platform_data = &tegra_ehci_pdata[1];
+	if ((bi.board_id == BOARD_PM267) || (bi.board_id == BOARD_E1186)) {
+		tegra_ehci2_device.dev.platform_data = &tegra_ehci_uhsic_pdata;
+	} else {
+		tegra_ehci2_device.dev.platform_data = &tegra_ehci_pdata[1];
+	}
 	platform_device_register(&tegra_ehci2_device);
-
 
 	tegra_ehci3_device.dev.platform_data = &tegra_ehci_pdata[2];
 	platform_device_register(&tegra_ehci3_device);
