@@ -105,12 +105,18 @@ static struct regulator_consumer_supply tps658621_ldo9_supply[] = {
 	REGULATOR_SUPPLY("avdd_amp", NULL),
 };
 
-/*
- * Current TPS6586x is known for having a voltage glitch if current load changes
- * from low to high in auto PWM/PFM mode for CPU's Vdd line.
- */
+static struct tps6586x_settings sm0_config = {
+	.sm_pwm_mode = PWM_DEFAULT_VALUE,
+	.slew_rate = SLEW_RATE_3520UV_PER_SEC,
+};
+
 static struct tps6586x_settings sm1_config = {
+	/*
+	 * Current TPS6586x is known for having a voltage glitch if current load
+	 * changes from low to high in auto PWM/PFM mode for CPU's Vdd line.
+	 */
 	.sm_pwm_mode = PWM_ONLY,
+	.slew_rate = SLEW_RATE_3520UV_PER_SEC,
 };
 
 #define REGULATOR_INIT(_id, _minmv, _maxmv, on, config)			\
@@ -134,7 +140,7 @@ static struct tps6586x_settings sm1_config = {
 #define ON	1
 #define OFF	0
 
-static struct regulator_init_data sm0_data = REGULATOR_INIT(sm0, 725, 1500, ON, NULL);
+static struct regulator_init_data sm0_data = REGULATOR_INIT(sm0, 725, 1500, ON, &sm0_config);
 static struct regulator_init_data sm1_data = REGULATOR_INIT(sm1, 725, 1500, ON, &sm1_config);
 static struct regulator_init_data sm2_data = REGULATOR_INIT(sm2, 3000, 4550, ON, NULL);
 static struct regulator_init_data ldo0_data = REGULATOR_INIT(ldo0, 1250, 3300, OFF, NULL);
