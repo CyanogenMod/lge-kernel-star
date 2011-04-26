@@ -41,6 +41,7 @@ struct tegra_ulpi_trimmer {
 };
 
 struct tegra_ulpi_config {
+	int enable_gpio;
 	int reset_gpio;
 	const char *clk;
 	const struct tegra_ulpi_trimmer *trimmer;

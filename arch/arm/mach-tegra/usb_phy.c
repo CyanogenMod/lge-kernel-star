@@ -146,7 +146,48 @@
 #define UTMIP_BIAS_CFG1		0x83c
 #define   UTMIP_BIAS_PDTRK_COUNT(x)	(((x) & 0x1f) << 3)
 
-#else
+#define UHSIC_PLL_CFG1				0x804
+#define   UHSIC_XTAL_FREQ_COUNT(x)		(((x) & 0xfff) << 0)
+#define   UHSIC_PLLU_ENABLE_DLY_COUNT(x)	(((x) & 0x1f) << 14)
+
+#define UHSIC_HSRX_CFG0				0x808
+#define   UHSIC_ELASTIC_UNDERRUN_LIMIT(x)	(((x) & 0x1f) << 2)
+#define   UHSIC_ELASTIC_OVERRUN_LIMIT(x)	(((x) & 0x1f) << 8)
+#define   UHSIC_IDLE_WAIT(x)			(((x) & 0x1f) << 13)
+
+#define UHSIC_HSRX_CFG1				0x80c
+#define   UHSIC_HS_SYNC_START_DLY(x)		(((x) & 0x1f) << 1)
+
+#define UHSIC_MISC_CFG0				0x814
+#define   UHSIC_SUSPEND_EXIT_ON_EDGE		(1 << 7)
+#define   UHSIC_DETECT_SHORT_CONNECT		(1 << 8)
+#define   UHSIC_FORCE_XCVR_MODE			(1 << 15)
+
+#define UHSIC_MISC_CFG1				0X818
+#define   UHSIC_PLLU_STABLE_COUNT(x)		(((x) & 0xfff) << 2)
+
+#define UHSIC_PADS_CFG0				0x81c
+#define   UHSIC_TX_RTUNEN			0xf000
+#define   UHSIC_TX_RTUNE(x)			(((x) & 0xf) << 12)
+
+#define UHSIC_PADS_CFG1				0x820
+#define   UHSIC_PD_BG				(1 << 2)
+#define   UHSIC_PD_TX				(1 << 3)
+#define   UHSIC_PD_TRK				(1 << 4)
+#define   UHSIC_PD_RX				(1 << 5)
+#define   UHSIC_PD_ZI				(1 << 6)
+#define   UHSIC_RX_SEL				(1 << 7)
+#define   UHSIC_RPD_DATA			(1 << 9)
+#define   UHSIC_RPD_STROBE			(1 << 10)
+#define   UHSIC_RPU_DATA			(1 << 11)
+#define   UHSIC_RPU_STROBE			(1 << 12)
+
+#define UHSIC_STAT_CFG0				0x828
+#define   UHSIC_CONNECT_DETECT			(1 << 0)
+
+
+#else	/* T30 definitions */
+
 #define USB_USBCMD		0x130
 #define   USB_USBCMD_RS		(1 << 0)
 
@@ -247,7 +288,12 @@
 #define HOSTPC1_DEVLC		0x1b4
 #define   HOSTPC1_DEVLC_PHCD		(1 << 22)
 #define   HOSTPC1_DEVLC_PTS(x)		(((x) & 0x7) << 29)
+#define   HOSTPC1_DEVLC_PTS_MASK	7
+#define   HOSTPC1_DEVLC_PTS_HSIC	4
 #define   HOSTPC1_DEVLC_STS 		(1 << 28)
+#define   HOSTPC1_DEVLC_PSPD(x)		(((x) & 0x3) << 25)
+#define   HOSTPC1_DEVLC_PSPD_MASK	3
+#define   HOSTPC1_DEVLC_PSPD_HIGH_SPEED	2
 
 #define TEGRA_USB_USBMODE_REG_OFFSET	0x1f8
 #define   TEGRA_USB_USBMODE_HOST		(3 << 0)
@@ -257,7 +303,48 @@
 #define   TEGRA_PMC_USB_AO_ID_PD_P0		(1 << 3)
 
 #define ICUSB_CTRL		0x15c
+
+#define UHSIC_PLL_CFG1				0xc04
+#define   UHSIC_XTAL_FREQ_COUNT(x)		(((x) & 0xfff) << 0)
+#define   UHSIC_PLLU_ENABLE_DLY_COUNT(x)	(((x) & 0x1f) << 14)
+
+#define UHSIC_HSRX_CFG0				0xc08
+#define   UHSIC_ELASTIC_UNDERRUN_LIMIT(x)	(((x) & 0x1f) << 2)
+#define   UHSIC_ELASTIC_OVERRUN_LIMIT(x)	(((x) & 0x1f) << 8)
+#define   UHSIC_IDLE_WAIT(x)			(((x) & 0x1f) << 13)
+
+#define UHSIC_HSRX_CFG1				0xc0c
+#define   UHSIC_HS_SYNC_START_DLY(x)		(((x) & 0x1f) << 1)
+
+#define UHSIC_MISC_CFG0				0xc14
+#define   UHSIC_SUSPEND_EXIT_ON_EDGE		(1 << 7)
+#define   UHSIC_DETECT_SHORT_CONNECT		(1 << 8)
+#define   UHSIC_FORCE_XCVR_MODE			(1 << 15)
+
+#define UHSIC_MISC_CFG1				0xc18
+#define   UHSIC_PLLU_STABLE_COUNT(x)		(((x) & 0xfff) << 2)
+
+#define UHSIC_PADS_CFG0				0xc1c
+#define   UHSIC_TX_RTUNEN			0xf000
+#define   UHSIC_TX_RTUNE(x)			(((x) & 0xf) << 12)
+
+#define UHSIC_PADS_CFG1				0xc20
+#define   UHSIC_PD_BG				(1 << 2)
+#define   UHSIC_PD_TX				(1 << 3)
+#define   UHSIC_PD_TRK				(1 << 4)
+#define   UHSIC_PD_RX				(1 << 5)
+#define   UHSIC_PD_ZI				(1 << 6)
+#define   UHSIC_RX_SEL				(1 << 7)
+#define   UHSIC_RPD_DATA			(1 << 9)
+#define   UHSIC_RPD_STROBE			(1 << 10)
+#define   UHSIC_RPU_DATA			(1 << 11)
+#define   UHSIC_RPU_STROBE			(1 << 12)
+
+#define UHSIC_STAT_CFG0				0xc28
+#define   UHSIC_CONNECT_DETECT			(1 << 0)
 #endif
+
+/* Common registers */
 
 #define ULPIS2S_CTRL		0x418
 #define   ULPIS2S_ENA			(1 << 0)
@@ -299,50 +386,11 @@
 
 #define UHSIC_PLL_CFG0				0x800
 
-#define UHSIC_PLL_CFG1				0x804
-#define   UHSIC_XTAL_FREQ_COUNT(x)		(((x) & 0xfff) << 0)
-#define   UHSIC_PLLU_ENABLE_DLY_COUNT(x)	(((x) & 0x1f) << 14)
-
-#define UHSIC_HSRX_CFG0				0x808
-#define   UHSIC_ELASTIC_UNDERRUN_LIMIT(x)	(((x) & 0x1f) << 2)
-#define   UHSIC_ELASTIC_OVERRUN_LIMIT(x)	(((x) & 0x1f) << 8)
-#define   UHSIC_IDLE_WAIT(x)			(((x) & 0x1f) << 13)
-
-#define UHSIC_HSRX_CFG1				0x80c
-#define   UHSIC_HS_SYNC_START_DLY(x)		(((x) & 0x1f) << 1)
-
 #define UHSIC_TX_CFG0				0x810
 #define   UHSIC_HS_POSTAMBLE_OUTPUT_ENABLE	(1 << 6)
 
-#define UHSIC_MISC_CFG0				0x814
-#define   UHSIC_SUSPEND_EXIT_ON_EDGE		(1 << 7)
-#define   UHSIC_DETECT_SHORT_CONNECT		(1 << 8)
-#define   UHSIC_FORCE_XCVR_MODE			(1 << 15)
-
-#define UHSIC_MISC_CFG1				0X818
-#define   UHSIC_PLLU_STABLE_COUNT(x)		(((x) & 0xfff) << 2)
-
-#define UHSIC_PADS_CFG0				0x81c
-#define   UHSIC_TX_RTUNEN			0xf000
-#define   UHSIC_TX_RTUNE(x)			(((x) & 0xf) << 12)
-
-#define UHSIC_PADS_CFG1				0x820
-#define   UHSIC_PD_BG				(1 << 2)
-#define   UHSIC_PD_TX				(1 << 3)
-#define   UHSIC_PD_TRK				(1 << 4)
-#define   UHSIC_PD_RX				(1 << 5)
-#define   UHSIC_PD_ZI				(1 << 6)
-#define   UHSIC_RX_SEL				(1 << 7)
-#define   UHSIC_RPD_DATA			(1 << 9)
-#define   UHSIC_RPD_STROBE			(1 << 10)
-#define   UHSIC_RPU_DATA			(1 << 11)
-#define   UHSIC_RPU_STROBE			(1 << 12)
-
 #define UHSIC_CMD_CFG0				0x824
 #define   UHSIC_PRETEND_CONNECT_DETECT		(1 << 5)
-
-#define UHSIC_STAT_CFG0				0x828
-#define   UHSIC_CONNECT_DETECT			(1 << 0)
 
 #define UHSIC_SPARE_CFG0			0x82c
 
@@ -1367,6 +1415,7 @@ static int uhsic_phy_power_on(struct tegra_usb_phy *phy)
 	val &= ~(UHSIC_RESET);
 	writel(val, base + USB_SUSP_CTRL);
 	udelay(2);
+
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	val = readl(base + USB_PORTSC1);
 	val &= ~USB_PORTSC1_PTS(~0);
@@ -1524,10 +1573,32 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 		tegra_gpio_enable(ulpi_config->reset_gpio);
 		gpio_request(ulpi_config->reset_gpio, "ulpi_phy_reset_b");
 		gpio_direction_output(ulpi_config->reset_gpio, 0);
-
 		phy->ulpi = otg_ulpi_create(&ulpi_viewport_access_ops, 0);
 		phy->ulpi->io_priv = regs + ULPI_VIEWPORT;
 	}
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+	else if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_HSIC) {
+		ulpi_config = config;
+		gpio_request(ulpi_config->enable_gpio,
+			"uhsic_enable");
+		gpio_request(ulpi_config->reset_gpio,
+			"uhsic_reset");
+		/* hsic enable signal deasserted, hsic reset asserted */
+		gpio_direction_output(ulpi_config->enable_gpio,
+			0 /* deasserted */);
+		gpio_direction_output(ulpi_config->reset_gpio,
+			0 /* asserted */);
+		tegra_gpio_enable(ulpi_config->enable_gpio);
+		tegra_gpio_enable(ulpi_config->reset_gpio);
+		/* keep hsic reset asserted for 1 ms */
+		udelay(1000);
+		/* enable (power on) hsic */
+		gpio_set_value_cansleep(ulpi_config->enable_gpio, 1);
+		udelay(1000);
+		/* deassert reset */
+		gpio_set_value_cansleep(ulpi_config->reset_gpio, 1);
+	}
+#endif
 
 	phy->reg_vdd = regulator_get(NULL, "avdd_usb");
 	if (WARN_ON(IS_ERR_OR_NULL(phy->reg_vdd))) {
@@ -1708,8 +1779,18 @@ int tegra_usb_phy_bus_connect(struct tegra_usb_phy *phy)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
+	struct tegra_ulpi_config *config = phy->config;
 
 	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_HSIC) {
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+		/* Change the USB controller PHY type to HSIC */
+		val = readl(base + HOSTPC1_DEVLC);
+		val &= ~HOSTPC1_DEVLC_PTS(HOSTPC1_DEVLC_PTS_MASK);
+		val |= HOSTPC1_DEVLC_PTS(HOSTPC1_DEVLC_PTS_HSIC);
+		val &= ~HOSTPC1_DEVLC_PSPD(HOSTPC1_DEVLC_PSPD_MASK);
+		val |= HOSTPC1_DEVLC_PSPD(HOSTPC1_DEVLC_PSPD_HIGH_SPEED);
+		writel(val, base + HOSTPC1_DEVLC);
+#endif
 		val = readl(base + UHSIC_MISC_CFG0);
 		val |= UHSIC_DETECT_SHORT_CONNECT;
 		writel(val, base + UHSIC_MISC_CFG0);
@@ -1721,7 +1802,9 @@ int tegra_usb_phy_bus_connect(struct tegra_usb_phy *phy)
 
 		val = readl(base + UHSIC_PADS_CFG1);
 		val &= ~UHSIC_RPD_STROBE;
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 		val |= UHSIC_RPU_STROBE;
+#endif
 		writel(val, base + UHSIC_PADS_CFG1);
 
 		if (utmi_wait_register(base + UHSIC_STAT_CFG0, UHSIC_CONNECT_DETECT, UHSIC_CONNECT_DETECT) < 0) {
@@ -1746,6 +1829,7 @@ int tegra_usb_phy_bus_reset(struct tegra_usb_phy *phy)
 	void __iomem *base = phy->regs;
 
 	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_HSIC) {
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 		val = readl(base + USB_PORTSC1);
 		val |= USB_PORTSC1_PTC(5);
 		writel(val, base + USB_PORTSC1);
@@ -1755,6 +1839,7 @@ int tegra_usb_phy_bus_reset(struct tegra_usb_phy *phy)
 		val &= ~USB_PORTSC1_PTC(~0);
 		writel(val, base + USB_PORTSC1);
 		udelay(2);
+#endif
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 		if (utmi_wait_register(base + USB_PORTSC1, USB_PORTSC1_LS(0), 0) < 0) {

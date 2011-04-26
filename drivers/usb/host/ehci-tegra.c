@@ -193,8 +193,13 @@ static int tegra_ehci_hub_control(
 	}
 
 	/* Handle port reset here */
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	if ((hsic) && (typeReq == SetPortFeature) &&
 		((wValue == USB_PORT_FEAT_RESET) || (wValue == USB_PORT_FEAT_POWER))) {
+#else
+	if ((hsic) && (typeReq == SetPortFeature) &&
+		(wValue == USB_PORT_FEAT_POWER)) {
+#endif
 		selector = wIndex >> 8;
 		wIndex &= 0xff;
 		if (!wIndex || wIndex > ports) {
@@ -209,6 +214,7 @@ static int tegra_ehci_hub_control(
 		temp &= ~PORT_RWC_BITS;
 
 		switch (wValue) {
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 		case USB_PORT_FEAT_RESET:
 		{
 			if (temp & PORT_RESUME) {
@@ -239,6 +245,7 @@ static int tegra_ehci_hub_control(
 
 			break;
 		}
+#endif
 		case USB_PORT_FEAT_POWER:
 		{
 			if (HCS_PPC(ehci->hcs_params))
