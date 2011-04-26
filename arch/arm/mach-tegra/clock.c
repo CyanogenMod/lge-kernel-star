@@ -71,10 +71,7 @@
  *
  * clk_set_cansleep is used to mark a clock as sleeping.  It is called during
  * dvfs (Dynamic Voltage and Frequency Scaling) init on any clock that has a
- * dvfs requirement.  It can only be called on clocks that are the sole parent
- * of all of their child clocks, meaning the child clock can not be reparented
- * onto a different, possibly non-sleeping, clock.  This is inherently true
- * of all leaf clocks in the clock tree
+ * dvfs requirement, and propagated to all possible children of sleeping clock.
  *
  * An additional mutex, clock_list_lock, is used to protect the list of all
  * clocks.
@@ -173,25 +170,27 @@ EXPORT_SYMBOL(clk_get_rate);
 static void __clk_set_cansleep(struct clk *c)
 {
 	struct clk *child;
+	int i;
 	BUG_ON(mutex_is_locked(&c->mutex));
 	BUG_ON(spin_is_locked(&c->spinlock));
 
+	/* Make sure that all possible descendants of sleeping clock are
+	   marked as sleeping (to eliminate "sleeping parent - non-sleeping
+	   child" relationship */
 	list_for_each_entry(child, &clocks, node) {
-		if (child->parent != c)
-			continue;
+		bool possible_parent = (child->parent == c);
 
-		/* If set_parent operation is implemented for virtual cpu,
-		   all possible parents are sleeping clocks - hence, no
-		   warning. FIXME: another way to make this exception ? */
-		if(strcmp(child->name, "cpu")) {
-			WARN(child->ops && child->ops->set_parent,
-				"sleepable clock %s is not a sole parent"
-				" of its child %s - if child is reparented"
-				" only sleepable parents should be used",
-				c->name, child->name);
+		if (!possible_parent && child->inputs) {
+			for (i = 0; child->inputs[i].input; i++) {
+				if (child->inputs[i].input == c) {
+					possible_parent = true;
+					break;
+				}
+			}
 		}
 
-		__clk_set_cansleep(child);
+		if (possible_parent)
+			__clk_set_cansleep(child);
 	}
 
 	c->cansleep = true;
