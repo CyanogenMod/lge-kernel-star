@@ -1391,9 +1391,7 @@ static int tegra3_plle_configure(struct clk *c, bool force_training)
 
 	val = clk_readl(c->reg + PLL_MISC(c));
 	val |= PLLE_MISC_SETUP_VALUE;
-#if USE_PLL_LOCK_BITS
 	val |= PLLE_MISC_LOCK_ENABLE;
-#endif
 	clk_writel(val, c->reg + PLL_MISC(c));
 
 	val = clk_readl(PLLE_SS_CTRL);
