@@ -204,7 +204,6 @@ static __initdata struct tegra_pingroup_config whistler_null_ulpi_pinmux[] = {
 static struct tegra_ulpi_trimmer e951_trimmer = { 10, 1, 1, 1 };
 
 static struct tegra_ulpi_config ehci2_null_ulpi_phy_config = {
-	.inf_type = TEGRA_USB_NULL_ULPI,
 	.trimmer = &e951_trimmer,
 	.preinit = rainbow_570_reset,
 	.postinit = rainbow_570_handshake,
