@@ -88,6 +88,7 @@ static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 	{ "hclk",	"sclk",		216000000,	true },
 	{ "pclk",	"hclk",		108000000,	true },
 #else
+	{ "pll_m",	"clk_m",	600000000,	true },
 	{ "pll_m_out1",	"pll_m",	120000000,	true },
 	{ "sclk",	"pll_m_out1",	120000000,	true },
 	{ "hclk",	"sclk",		120000000,	true },
