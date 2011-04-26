@@ -443,17 +443,12 @@ static int tegra_touch_thread(void *pdata)
 #ifdef CONFIG_TOUCHSCREEN_ANDROID_VIRTUALKEYS
 									if(y[i] >= LGE_TOUCH_RESOLUTION_Y) {
 										if (Prev_ToolDown[i] == NV_FALSE) {
-											timeout_jiffies = jiffies + msecs_to_jiffies(250);
-											input_report_abs(touch->input_dev, ABS_MT_TOUCH_MAJOR, pressure[i]);
-										} else if (timeout_jiffies && time_is_after_eq_jiffies(timeout_jiffies)) {
+											timeout_jiffies = jiffies + msecs_to_jiffies(300);
+										} else if (time_is_after_eq_jiffies(timeout_jiffies)) {
 											input_report_abs(touch->input_dev, ABS_MT_TOUCH_MAJOR, 0);
 											input_mt_sync(touch->input_dev);
-											timeout_jiffies = 0;
 										}
-										input_report_abs(touch->input_dev, ABS_MT_WIDTH_MAJOR, width[i]);
-										input_report_abs(touch->input_dev, ABS_MT_POSITION_X, x[i]);
-										input_report_abs(touch->input_dev, ABS_MT_POSITION_Y, y[i]);
-									} else {
+									}
 #endif
 									input_report_abs(touch->input_dev, ABS_MT_TOUCH_MAJOR, pressure[i]);
 									input_report_abs(touch->input_dev, ABS_MT_WIDTH_MAJOR, width[i]);
@@ -463,9 +458,6 @@ static int tegra_touch_thread(void *pdata)
 									input_mt_sync(touch->input_dev);
 									touch_fingerprint(DebugMsgPrint, "[TOUCH] Finger1 Press x = %d, y = %d, width = %d\n", x[i], y[i], width[i]);
 
-#ifdef CONFIG_TOUCHSCREEN_ANDROID_VIRTUALKEYS
-									}
-#endif
 									lcd_finger_num++;
 								}
 							}
