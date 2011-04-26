@@ -396,8 +396,8 @@ int tegra_dma_enqueue_req(struct tegra_dma_channel *ch,
 
 	list_for_each_entry(_req, &ch->list, node) {
 		if (req == _req) {
-		    spin_unlock_irqrestore(&ch->lock, irq_flags);
-		    return -EEXIST;
+			spin_unlock_irqrestore(&ch->lock, irq_flags);
+			return -EEXIST;
 		}
 	}
 
@@ -459,7 +459,7 @@ static void tegra_dma_dump_channel_usage(void)
 }
 
 struct tegra_dma_channel *tegra_dma_allocate_channel(int mode,
-		const char namefmt [ ],...)
+		const char namefmt[], ...)
 {
 	int channel;
 	struct tegra_dma_channel *ch = NULL;
@@ -555,7 +555,7 @@ static void tegra_dma_update_hw(struct tegra_dma_channel *ch,
 	csr = CSR_IE_EOC | CSR_FLOW;
 	ahb_seq = AHB_SEQ_INTR_ENB;
 
-	switch(req->req_sel) {
+	switch (req->req_sel) {
 	case TEGRA_DMA_REQ_SEL_SL2B1:
 	case TEGRA_DMA_REQ_SEL_SL2B2:
 	case TEGRA_DMA_REQ_SEL_SL2B3:
@@ -930,7 +930,7 @@ int __init tegra_dma_init(void)
 	writel(GEN_ENABLE, addr + APB_DMA_GEN);
 	writel(0, addr + APB_DMA_CNTRL);
 	writel(0xFFFFFFFFul >> (31 - TEGRA_SYSTEM_DMA_CH_MAX),
-	       addr + APB_DMA_IRQ_MASK_SET);
+			addr + APB_DMA_IRQ_MASK_SET);
 
 	for (i = TEGRA_SYSTEM_DMA_CH_MIN; i <= TEGRA_SYSTEM_DMA_CH_MAX; i++) {
 		struct tegra_dma_channel *ch = &dma_channels[i];
@@ -1040,4 +1040,67 @@ static int tegra_dma_syscore_init(void)
 	return 0;
 }
 subsys_initcall(tegra_dma_syscore_init);
+#endif
+
+#ifdef CONFIG_DEBUG_FS
+
+#include <linux/debugfs.h>
+#include <linux/seq_file.h>
+
+static int dbg_dma_show(struct seq_file *s, void *unused)
+{
+	int i;
+	void __iomem *addr = IO_ADDRESS(TEGRA_APB_DMA_BASE);
+
+	seq_printf(s, "    APBDMA global register\n");
+	seq_printf(s, "DMA_GEN:   0x%08x\n", __raw_readl(addr + APB_DMA_GEN));
+	seq_printf(s, "DMA_CNTRL: 0x%08x\n", __raw_readl(addr + APB_DMA_CNTRL));
+	seq_printf(s, "IRQ_MASK:  0x%08x\n",
+					__raw_readl(addr + APB_DMA_IRQ_MASK));
+
+	for (i = 0; i < TEGRA_SYSTEM_DMA_CH_NR; i++) {
+		addr = IO_ADDRESS(TEGRA_APB_DMA_CH0_BASE +
+				  TEGRA_APB_DMA_CH0_SIZE * i);
+
+		seq_printf(s, "    APBDMA channel %02d register\n", i);
+		seq_printf(s, "0x00: 0x%08x 0x%08x 0x%08x 0x%08x\n",
+					__raw_readl(addr + 0x0),
+					__raw_readl(addr + 0x4),
+					__raw_readl(addr + 0x8),
+					__raw_readl(addr + 0xC));
+		seq_printf(s, "0x10: 0x%08x 0x%08x 0x%08x 0x%08x\n",
+					__raw_readl(addr + 0x10),
+					__raw_readl(addr + 0x14),
+					__raw_readl(addr + 0x18),
+					__raw_readl(addr + 0x1C));
+	}
+	seq_printf(s, "\nAPB DMA users\n");
+	seq_printf(s, "-------------\n");
+	for (i = TEGRA_SYSTEM_DMA_CH_MIN; i <= TEGRA_SYSTEM_DMA_CH_MAX; i++) {
+		struct tegra_dma_channel *ch = &dma_channels[i];
+		if (strlen(ch->client_name) > 0)
+			seq_printf(s, "dma %d -> %s\n", i, ch->client_name);
+	}
+	return 0;
+}
+
+static int dbg_dma_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, dbg_dma_show, &inode->i_private);
+}
+
+static const struct file_operations debug_fops = {
+	.open	   = dbg_dma_open,
+	.read	   = seq_read,
+	.llseek	 = seq_lseek,
+	.release	= single_release,
+};
+
+static int __init tegra_dma_debuginit(void)
+{
+	(void) debugfs_create_file("tegra_dma", S_IRUGO,
+					NULL, NULL, &debug_fops);
+	return 0;
+}
+late_initcall(tegra_dma_debuginit);
 #endif
