@@ -239,6 +239,7 @@ TPS_PDATA_INIT_SUPPLY(ldo6, 1000, 3300, VIO, 0, 0, 0, -1, 0, 0, 0);
 TPS_PDATA_INIT_SUPPLY(ldo7, 1000, 3300, VIO, 0, 0, 0, -1, 0, 0, 0);
 TPS_PDATA_INIT_SUPPLY(ldo8, 1000, 3300, VIO, 0, 0, 0, -1, 0, 0, 0);
 
+#if defined(CONFIG_RTC_DRV_TPS6591x)
 static struct tps6591x_rtc_platform_data rtc_data = {
 	.irq = TEGRA_NR_IRQS + TPS6591X_INT_RTC_ALARM,
 	.time = {
@@ -251,18 +252,19 @@ static struct tps6591x_rtc_platform_data rtc_data = {
 	},
 };
 
-#define TPS_REG(_id, _data)				\
-	{						\
-		.id	= TPS6591X_ID_##_id,		\
-		.name	= "tps6591x-regulator",		\
-		.platform_data	= &pdata_##_data,	\
-	}
-
 #define TPS_RTC_REG()				\
 	{						\
 		.id	= 0,		\
 		.name	= "rtc_tps6591x",	\
 		.platform_data = &rtc_data,	\
+	}
+#endif
+
+#define TPS_REG(_id, _data)				\
+	{						\
+		.id	= TPS6591X_ID_##_id,		\
+		.name	= "tps6591x-regulator",		\
+		.platform_data	= &pdata_##_data,	\
 	}
 
 static struct tps6591x_subdev_info tps_devs_e118x[] = {
@@ -278,7 +280,9 @@ static struct tps6591x_subdev_info tps_devs_e118x[] = {
 	TPS_REG(LDO_6, ldo6),
 	TPS_REG(LDO_7, ldo7),
 	TPS_REG(LDO_8, ldo8),
+#if defined(CONFIG_RTC_DRV_TPS6591x)
 	TPS_RTC_REG(),
+#endif
 };
 
 static struct tps6591x_subdev_info tps_devs_e1198[] = {
@@ -294,7 +298,9 @@ static struct tps6591x_subdev_info tps_devs_e1198[] = {
 	TPS_REG(LDO_6, ldo6),
 	TPS_REG(LDO_7, ldo7),
 	TPS_REG(LDO_8, ldo8),
+#if defined(CONFIG_RTC_DRV_TPS6591x)
 	TPS_RTC_REG(),
+#endif
 };
 
 static struct tps6591x_platform_data tps_platform = {
@@ -749,8 +755,8 @@ static struct tegra_suspend_platform_data cardhu_suspend_data = {
 	.separate_req	= true,
 	.corereq_high	= false,
 	.sysclkreq_high	= true,
-	.wake_enb	= TEGRA_WAKE_GPIO_PV0 | TEGRA_WAKE_PWR_INT,
-	.wake_high	= 0,
+	.wake_enb	= TEGRA_WAKE_GPIO_PV0 | TEGRA_WAKE_PWR_INT | TEGRA_WAKE_RTC_ALARM,
+	.wake_high	= TEGRA_WAKE_RTC_ALARM,
 	.wake_low	= TEGRA_WAKE_GPIO_PV0 | TEGRA_WAKE_PWR_INT,
 	.wake_any	= 0,
 	.cpu_lp2_min_residency = 2000,
