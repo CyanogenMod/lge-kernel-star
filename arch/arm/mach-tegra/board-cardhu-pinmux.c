@@ -265,7 +265,7 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_common[] = {
 	DEFAULT_PINMUX(DAP4_SCLK,       I2S3,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(CLK3_OUT,        EXTPERIPH3,      NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(CLK3_REQ,        DEV3,            NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(GMI_WP_N,        RSVD1,           NORMAL,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(GMI_WP_N,        GMI,             NORMAL,    NORMAL,     INPUT),
 
 #if 0 /* for testing on Verbier */
 	DEFAULT_PINMUX(GMI_WAIT,        NAND,            NORMAL,    NORMAL,     INPUT),
@@ -301,10 +301,10 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_common[] = {
 	DEFAULT_PINMUX(GMI_AD8,         PWM0,            NORMAL,    NORMAL,     OUTPUT), /* LCD1_BL_PWM */
 	DEFAULT_PINMUX(GMI_AD10,        NAND,            NORMAL,    NORMAL,     OUTPUT), /* LCD1_BL_EN */
 #endif
-	DEFAULT_PINMUX(GMI_A16,         SPI4,            PULL_UP,   NORMAL,     INPUT),
-	DEFAULT_PINMUX(GMI_A17,         SPI4,            PULL_UP,   NORMAL,     INPUT),
-	DEFAULT_PINMUX(GMI_A18,         SPI4,            PULL_UP,   NORMAL,     INPUT),
-	DEFAULT_PINMUX(GMI_A19,         SPI4,            PULL_UP,   NORMAL,     INPUT),
+	DEFAULT_PINMUX(GMI_A16,         SPI4,            NORMAL,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(GMI_A17,         SPI4,            NORMAL,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(GMI_A18,         SPI4,            NORMAL,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(GMI_A19,         SPI4,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(CAM_MCLK,        VI_ALT2,         PULL_UP,   NORMAL,     INPUT),
 	DEFAULT_PINMUX(GPIO_PCC1,       RSVD1,           NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GPIO_PBB0,       RSVD1,           NORMAL,    NORMAL,     INPUT),
@@ -407,10 +407,10 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_cardhu[] = {
 	DEFAULT_PINMUX(GMI_RST_N,       RSVD3,           PULL_UP,   TRISTATE,   INPUT),
 	DEFAULT_PINMUX(GMI_AD15,        NAND,            PULL_UP,   TRISTATE,   INPUT),
 
-	DEFAULT_PINMUX(GMI_CS0_N,       GMI,             NORMAL,    NORMAL,     OUTPUT),
-	DEFAULT_PINMUX(GMI_CS1_N,       GMI,             NORMAL,    TRISTATE,   OUTPUT),
+	DEFAULT_PINMUX(GMI_CS0_N,       GMI,             PULL_UP,   NORMAL,     INPUT),
+	DEFAULT_PINMUX(GMI_CS1_N,       GMI,             PULL_UP,   TRISTATE,   INPUT),
 	/*TP_IRQ*/
-	DEFAULT_PINMUX(GMI_CS4_N,       GMI,             NORMAL,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(GMI_CS4_N,       GMI,             PULL_UP,   NORMAL,     INPUT),
 };
 
 static __initdata struct tegra_pingroup_config cardhu_pinmux_cardhu_a03[] = {
@@ -431,24 +431,26 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_e1198[] = {
 };
 
 static __initdata struct tegra_pingroup_config unused_pins_lowpower[] = {
-	DEFAULT_PINMUX(GMI_WAIT,        GMI,            PULL_UP,    TRISTATE,     OUTPUT),
-	DEFAULT_PINMUX(GMI_ADV_N,       GMI,            PULL_UP,    TRISTATE,     OUTPUT),
-	DEFAULT_PINMUX(GMI_CLK,         GMI,            PULL_DOWN,  TRISTATE,     OUTPUT),
-	DEFAULT_PINMUX(GMI_CS3_N,       GMI,            PULL_UP,    TRISTATE,     OUTPUT),
-	DEFAULT_PINMUX(GMI_CS6_N,       GMI,            PULL_UP,    TRISTATE,     OUTPUT),
-	DEFAULT_PINMUX(GMI_AD0,         GMI,            NORMAL,     TRISTATE,     OUTPUT),
-	DEFAULT_PINMUX(GMI_AD1,         GMI,            NORMAL,     TRISTATE,     OUTPUT),
-	DEFAULT_PINMUX(GMI_AD2,         GMI,            NORMAL,     TRISTATE,     OUTPUT),
-	DEFAULT_PINMUX(GMI_AD3,         GMI,            NORMAL,     TRISTATE,     OUTPUT),
-	DEFAULT_PINMUX(GMI_AD4,         GMI,            NORMAL,     TRISTATE,     OUTPUT),
-	DEFAULT_PINMUX(GMI_AD5,         GMI,            NORMAL,     TRISTATE,     OUTPUT),
-	DEFAULT_PINMUX(GMI_AD6,         GMI,            NORMAL,     TRISTATE,     OUTPUT),
-	DEFAULT_PINMUX(GMI_AD7,         GMI,            NORMAL,     TRISTATE,     OUTPUT),
-	DEFAULT_PINMUX(GMI_AD9,         GMI,            PULL_DOWN,  TRISTATE,     OUTPUT),
-	DEFAULT_PINMUX(GMI_AD11,        GMI,            PULL_DOWN,  TRISTATE,     OUTPUT),
-	DEFAULT_PINMUX(GMI_WR_N,        GMI,            PULL_UP,    TRISTATE,     OUTPUT),
-	DEFAULT_PINMUX(GMI_OE_N,        GMI,            PULL_UP,    TRISTATE,     OUTPUT),
-	DEFAULT_PINMUX(GMI_DQS,         GMI,            PULL_UP,    TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_WAIT,        NAND,           PULL_UP,    TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_ADV_N,       NAND,           NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_CLK,         NAND,           NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_CS3_N,       NAND,           NORMAL,     NORMAL,       OUTPUT),
+	DEFAULT_PINMUX(GMI_CS6_N,       SATA,           NORMAL,     NORMAL,       OUTPUT),
+	DEFAULT_PINMUX(GMI_CS7_N,       NAND,           PULL_UP,    NORMAL,       INPUT),
+	DEFAULT_PINMUX(GMI_AD0,         NAND,           NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_AD1,         NAND,           NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_AD2,         NAND,           NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_AD3,         NAND,           NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_AD4,         NAND,           NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_AD5,         NAND,           NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_AD6,         NAND,           NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_AD7,         NAND,           NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_AD9,         PWM1,           NORMAL,     NORMAL,       OUTPUT),
+	DEFAULT_PINMUX(GMI_AD11,        NAND,           NORMAL,     NORMAL,       OUTPUT),
+	DEFAULT_PINMUX(GMI_AD13,        NAND,           PULL_UP,    NORMAL,       INPUT),
+	DEFAULT_PINMUX(GMI_WR_N,        NAND,           NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_OE_N,        NAND,           NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_DQS,         NAND,           NORMAL,     TRISTATE,     OUTPUT),
 };
 
 int __init cardhu_pinmux_init(void)
@@ -487,31 +489,76 @@ int __init cardhu_pinmux_init(void)
 	return 0;
 }
 
+struct pin_info_low_power_mode {
+	char name[16];
+	int gpio_nr;
+	bool is_gpio;
+	bool is_input;
+	int value; /* Value if it is output*/
+};
+#define PIN_GPIO_LPM(_name, _gpio, _is_input, _value)	\
+	{					\
+		.name		= _name,	\
+		.gpio_nr	= _gpio,	\
+		.is_gpio	= true,		\
+		.is_input	= _is_input,	\
+		.value		= _value,	\
+	}
+
+struct pin_info_low_power_mode pin_lpm_cardhu_common[] = {
+	PIN_GPIO_LPM("GMI_CS3_N", TEGRA_GPIO_PK4, 0, 0),
+	PIN_GPIO_LPM("GMI_CS4_N", TEGRA_GPIO_PK2, 1, 0),
+	PIN_GPIO_LPM("GMI_AD9",   TEGRA_GPIO_PH1, 0, 0),
+	PIN_GPIO_LPM("GMI_AD11",  TEGRA_GPIO_PH3, 0, 0),
+	PIN_GPIO_LPM("GMI_CS7",   TEGRA_GPIO_PI6, 1, 0),
+	PIN_GPIO_LPM("GMI_CS0",   TEGRA_GPIO_PJ0, 1, 0),
+	PIN_GPIO_LPM("GMI_CS1",   TEGRA_GPIO_PJ2, 1, 0),
+	PIN_GPIO_LPM("GMI_WP_N",  TEGRA_GPIO_PC7, 1, 0),
+};
+
+static void set_unused_pin_gpio(struct pin_info_low_power_mode *lpm_pin_info,
+		int list_count)
+{
+	int i;
+	struct pin_info_low_power_mode *pin_info;
+	int ret;
+
+	for (i = 0; i < list_count; ++i) {
+		pin_info = (struct pin_info_low_power_mode *)(lpm_pin_info + i);
+		if (!pin_info->is_gpio)
+			continue;
+
+		ret = gpio_request(pin_info->gpio_nr, pin_info->name);
+		if (ret < 0) {
+			pr_err("%s() Error in gpio_request() for gpio %d\n",
+					__func__, pin_info->gpio_nr);
+			continue;
+		}
+		if (pin_info->is_input)
+			ret = gpio_direction_input(pin_info->gpio_nr);
+		else
+			ret = gpio_direction_output(pin_info->gpio_nr,
+							pin_info->value);
+		if (ret < 0) {
+			pr_err("%s() Error in setting gpio %d to in/out\n",
+				__func__, pin_info->gpio_nr);
+			gpio_free(pin_info->gpio_nr);
+			continue;
+		}
+		tegra_gpio_enable(pin_info->gpio_nr);
+	}
+}
+
 /* Initialize the pins to desired state as per power/asic/system-eng
  * recomendation */
 int __init cardhu_pins_state_init(void)
 {
-	int ret;
 	struct board_info board_info;
 
 	tegra_get_board_info(&board_info);
-	if (board_info.board_id == BOARD_E1291) {
-
-		/* Set GMI_CS1_N Signal in GPIO Input Mode*/
-		ret = gpio_request(TEGRA_GPIO_PJ2, "GMI_CS1_N");
-		if (ret < 0) {
-			pr_err("%s() Error in gpio_request() for gpio %d\n",
-					__func__, TEGRA_GPIO_PJ2);
-			return ret;
-		}
-		ret = gpio_direction_input(TEGRA_GPIO_PJ2);
-		if (ret < 0) {
-			pr_err("%s() Error in setting gpio %d to input\n",
-				__func__, TEGRA_GPIO_PJ2);
-			gpio_free(TEGRA_GPIO_PJ2);
-			return ret;
-		}
-		tegra_gpio_enable(TEGRA_GPIO_PJ2);
-	}
+	if ((board_info.board_id == BOARD_E1291) ||
+		(board_info.board_id == BOARD_E1198))
+			set_unused_pin_gpio(&pin_lpm_cardhu_common[0],
+					ARRAY_SIZE(pin_lpm_cardhu_common));
 	return 0;
 }
