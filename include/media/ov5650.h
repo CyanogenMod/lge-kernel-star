@@ -1,11 +1,20 @@
-/**
- * Copyright (c) 2008 NVIDIA Corporation.  All rights reserved.
+/*
+ * Copyright (C) 2010 Motorola, Inc.
+ * Copyright (C) 2011 NVIDIA Corporation.
  *
- * NVIDIA Corporation and its licensors retain all intellectual property
- * and proprietary rights in and to this software and related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA Corporation is strictly prohibited.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+ * 02111-1307, USA
  */
 
 #ifndef __OV5650_H__
