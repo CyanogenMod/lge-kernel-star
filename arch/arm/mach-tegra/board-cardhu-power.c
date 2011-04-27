@@ -769,6 +769,10 @@ int __init cardhu_suspend_init(void)
 	tegra_get_board_info(&board_info);
 	switch (board_info.board_id) {
 	case BOARD_E1291:
+		/* CORE_PWR_REQ to be high for E1291-A03 */
+		if (board_info.fab == 0x3)
+			cardhu_suspend_data.corereq_high = true;
+		break;
 	case BOARD_E1198:
 		break;
 	case BOARD_PM269:
