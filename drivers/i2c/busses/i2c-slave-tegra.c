@@ -180,7 +180,6 @@ struct tegra_i2c_slave_bus {
 struct tegra_i2c_slave_dev {
 	struct device *dev;
 	struct clk *clk;
-	struct clk *i2c_clk;
 	struct resource *iomem;
 	void __iomem *base;
 	int cont_id;
@@ -652,7 +651,7 @@ static int tegra_i2c_slave_start(struct i2c_slave_adapter *slv_adap, int addr,
 	get_packet_headers(i2c_dev, 4096, 0, &i2c_dev->rx_pack_hdr1,
 		&i2c_dev->rx_pack_hdr2, &i2c_dev->rx_pack_hdr3);
 
-	clk_enable(i2c_dev->i2c_clk);
+	clk_enable(i2c_dev->clk);
 	configure_i2c_slave_packet_mode(i2c_dev);
 	configure_i2c_slave_address(i2c_dev);
 	do_tx_fifo_empty(i2c_dev, NULL);
@@ -692,7 +691,7 @@ static void tegra_i2c_slave_stop(struct i2c_slave_adapter *slv_adap,
 	writel(0, i2c_dev->base + I2C_INT_MASK);
 	i2c_dev->curr_transfer = 0;
 	i2c_dev->is_slave_started = false;
-	clk_disable(i2c_dev->i2c_clk);
+	clk_disable(i2c_dev->clk);
 	if (is_buffer_clear) {
 		i2c_dev->rx_msg_head = 0;
 		i2c_dev->rx_msg_tail = 0;
@@ -910,7 +909,6 @@ static int tegra_i2c_slave_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct resource *iomem;
 	struct clk *clk;
-	struct clk *i2c_clk;
 	void *base;
 	int irq;
 	int ret = 0;
@@ -958,24 +956,17 @@ static int tegra_i2c_slave_probe(struct platform_device *pdev)
 		goto err_release_region;
 	}
 
-	i2c_clk = clk_get(&pdev->dev, "i2c");
-	if (!i2c_clk) {
-		ret = -ENODEV;
-		goto err_clk_put;
-	}
-
 	rx_buffer_size = (pdata->max_rx_buffer_size)?:4096;
 	tx_buffer_size = (pdata->max_tx_buffer_size)?:4096;
 	i2c_dev = kzalloc(sizeof(struct tegra_i2c_slave_dev) +
 			rx_buffer_size + tx_buffer_size, GFP_KERNEL);
 	if (!i2c_dev) {
 		ret = -ENOMEM;
-		goto err_i2c_clk_put;
+		goto err_clk_put;
 	}
 
 	i2c_dev->base = base;
 	i2c_dev->clk = clk;
-	i2c_dev->i2c_clk = i2c_clk;
 	i2c_dev->iomem = iomem;
 	i2c_dev->irq = irq;
 	i2c_dev->cont_id = pdev->id;
@@ -1034,8 +1025,6 @@ err_free_irq:
 	free_irq(i2c_dev->irq, i2c_dev);
 err_free:
 	kfree(i2c_dev);
-err_i2c_clk_put:
-	clk_put(i2c_clk);
 err_clk_put:
 	clk_put(clk);
 err_release_region:
@@ -1052,7 +1041,6 @@ static int tegra_i2c_slave_remove(struct platform_device *pdev)
 
 	i2c_del_slave_adapter(&i2c_dev->bus.slv_adap);
 	free_irq(i2c_dev->irq, i2c_dev);
-	clk_put(i2c_dev->i2c_clk);
 	clk_put(i2c_dev->clk);
 	release_mem_region(i2c_dev->iomem->start,
 			resource_size(i2c_dev->iomem));
