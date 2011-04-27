@@ -533,6 +533,12 @@ __v7_setup:
 	orrlt	r10, r10, #1 << 11		@ set bit #11
 	mcrlt	p15, 0, r10, c15, c0, 1		@ write diagnostic register
 #endif
+#ifdef CONFIG_ARM_ERRATA_752520
+	cmp	r6, #0x29			@ present prior to r2p9
+	mrclt	p15, 0, r10, c15, c0, 1		@ read diagnostic register
+	orrlt	r10, r10, #1 << 20		@ set bit #20
+	mcrlt	p15, 0, r10, c15, c0, 1		@ write diagnostic register
+#endif
 
 3:	mov	r10, #0
 #ifdef HARVARD_CACHE

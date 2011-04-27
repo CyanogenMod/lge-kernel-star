@@ -1262,6 +1262,15 @@ config ARM_ERRATA_720791
 	  This workaround disables gating the Core clock when the Instruction
 	  side is waiting for a Page Table Walk answer or linefill completion.
 
+config ARM_ERRATA_752520
+	bool "ARM errata: Faulty arbitration between PLD and Cacheable TLB requests may create a system deadlock"
+	depends on CPU_V7
+	help
+	  Under rare circumstances, PLDs may interfere with a Cacheable page table walk,
+	  creating a processor deadlock. The erratum can only happen when the Data Cache
+	  and MMU are enabled, with the TLB descriptors marked as L1 cacheable,
+	  so that Page Table Walks are performed as cache linefills.
+
 endmenu
 
 source "arch/arm/common/Kconfig"
