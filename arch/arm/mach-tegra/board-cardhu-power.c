@@ -508,6 +508,11 @@ static struct regulator_consumer_supply gpio_switch_en_1v8_cam_supply[] = {
 };
 static int gpio_switch_en_1v8_cam_voltages[] = { 1800};
 
+static struct regulator_consumer_supply gpio_switch_en_vbrtr_supply[] = {
+	REGULATOR_SUPPLY("vdd_vbrtr", NULL),
+};
+static int gpio_switch_en_vbrtr_voltages[] = { 3300};
+
 static int enable_load_switch_rail(
 		struct gpio_switch_regulator_subdev_data *psubdev_data)
 {
@@ -627,6 +632,8 @@ GREG_INIT(19, cam2_ldo_en,	cam2_ldo_en,		"vdd_3v3_cam",	TEGRA_GPIO_PR7,		false,	
 GREG_INIT(20, en_vdd_bl1_a03,	en_vdd_bl,  	NULL,		TEGRA_GPIO_PDD2,	false,	1,	0,	0,	0);
 GREG_INIT(21, en_vdd_bl2_a03,	en_vdd_bl2,  	NULL,		TEGRA_GPIO_PDD0,	false,	1,	0,	0,	0);
 
+GREG_INIT(22, en_vbrtr,	en_vbrtr, "vdd_3v3_devices",	PMU_TCA6416_GPIO_PORT12,		false,	0,	0,	0,	0);
+
 #define ADD_GPIO_REG(_name) &gpio_pdata_##_name
 #define COMMON_GPIO_REG \
 	ADD_GPIO_REG(en_5v_cp),			\
@@ -648,7 +655,8 @@ GREG_INIT(21, en_vdd_bl2_a03,	en_vdd_bl2,  	NULL,		TEGRA_GPIO_PDD0,	false,	1,	0,
 	ADD_GPIO_REG(dis_5v_switch_e118x),	\
 	ADD_GPIO_REG(en_usb1_vbus_oc_e118x),	\
 	ADD_GPIO_REG(en_usb3_vbus_oc_e118x),	\
-	ADD_GPIO_REG(en_vddio_vid_oc_e118x),
+	ADD_GPIO_REG(en_vddio_vid_oc_e118x), \
+	ADD_GPIO_REG(en_vbrtr),
 
 #define E1198_GPIO_REG	\
 	ADD_GPIO_REG(en_vddio_vid_oc),		\
