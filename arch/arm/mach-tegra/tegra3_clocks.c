@@ -333,6 +333,11 @@ static int tegra_periph_clk_enable_refcount[CLK_OUT_ENB_NUM * 32];
 		udelay(2);						\
 	} while (0)
 
+static inline int clk_set_div(struct clk *c, int n)
+{
+	return clk_set_rate(c, (clk_get_rate(c->parent) + n-1) / n);
+}
+
 static inline u32 periph_clk_to_reg(
 	struct clk *c, u32 reg_L, u32 reg_V, int offs)
 {
@@ -893,6 +898,87 @@ static struct clk_ops tegra_bus_ops = {
 	.enable			= tegra3_bus_clk_enable,
 	.disable		= tegra3_bus_clk_disable,
 	.set_rate		= tegra3_bus_clk_set_rate,
+};
+
+/* Virtual system bus complex clock is used to hide the sequence of
+   changing sclk/hclk/pclk parents and dividers to configure requested
+   sclk target rate. */
+static void tegra3_sbus_cmplx_init(struct clk *c)
+{
+	c->max_rate = c->parent->max_rate;
+	c->min_rate = c->parent->min_rate;
+}
+
+static long tegra3_sbus_cmplx_round_rate(struct clk *c, unsigned long rate)
+{
+	struct clk *new_parent;
+
+	if (rate > c->u.system.threshold) {
+		new_parent = c->u.system.sclk_high;
+		rate = clk_round_rate(new_parent, rate);
+		if (rate > c->u.system.threshold)
+			return (long)rate;
+
+		/* rounded target above threshold dips under -
+		   use threshold as a target */
+		rate = c->u.system.threshold;
+	}
+	new_parent = c->u.system.sclk_low;
+	return clk_round_rate(new_parent, rate);
+}
+
+static int tegra3_sbus_cmplx_set_rate(struct clk *c, unsigned long rate)
+{
+	int ret;
+	struct clk *new_parent;
+
+	/* - select the appropriate sclk parent
+	   - keep hclk at the same rate as sclk
+	   - set pclk at 1:2 rate of hclk unless pclk minimum is violated,
+	     in the latter case switch to 1:1 ratio */
+
+	if (rate >= c->u.system.pclk->min_rate * 2) {
+		ret = clk_set_div(c->u.system.pclk, 2);
+		if (ret) {
+			pr_err("Failed to set 1 : 2 pclk divider\n");
+			return ret;
+		}
+	}
+
+	new_parent = (rate <= c->u.system.threshold) ?
+		c->u.system.sclk_low : c->u.system.sclk_high;
+
+	ret = clk_set_rate(new_parent, rate);
+	if (ret) {
+		pr_err("Failed to set sclk source %s to %lu\n",
+		       new_parent->name, rate);
+		return ret;
+	}
+
+	if (new_parent != clk_get_parent(c->parent)) {
+		ret = clk_set_parent(c->parent, new_parent);
+		if (ret) {
+			pr_err("Failed to switch sclk source to %s\n",
+			       new_parent->name);
+			return ret;
+		}
+	}
+
+	if (rate < c->u.system.pclk->min_rate * 2) {
+		ret = clk_set_div(c->u.system.pclk, 1);
+		if (ret) {
+			pr_err("Failed to set 1 : 1 pclk divider\n");
+			return ret;
+		}
+	}
+
+	return 0;
+}
+
+static struct clk_ops tegra_sbus_cmplx_ops = {
+	.init = tegra3_sbus_cmplx_init,
+	.set_rate = tegra3_sbus_cmplx_set_rate,
+	.round_rate = tegra3_sbus_cmplx_round_rate,
 };
 
 /* Blink output functions */
@@ -3028,6 +3114,7 @@ static struct clk tegra_clk_hclk = {
 	.reg_shift	= 4,
 	.ops		= &tegra_bus_ops,
 	.max_rate       = 216000000,
+	.min_rate       = 36000000,
 };
 
 static struct clk tegra_clk_pclk = {
@@ -3038,6 +3125,20 @@ static struct clk tegra_clk_pclk = {
 	.reg_shift	= 0,
 	.ops		= &tegra_bus_ops,
 	.max_rate       = 108000000,
+	.min_rate       = 36000000,
+};
+
+static struct clk tegra_clk_sbus_cmplx = {
+	.name	   = "sbus",
+	.parent    = &tegra_clk_sclk,
+	.ops       = &tegra_sbus_cmplx_ops,
+	.u.system  = {
+		.pclk = &tegra_clk_pclk,
+		.hclk = &tegra_clk_hclk,
+		.sclk_low = &tegra_pll_p_out4,
+		.sclk_high = &tegra_pll_m_out1,
+		.threshold = 216000000,
+	},
 };
 
 static struct clk tegra_clk_blink = {
@@ -3298,7 +3399,7 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("afi",	"tegra-pcie",		"afi",	72,	0,	250000000, mux_clk_m, 			0),
 	PERIPH_CLK("se",	"tegra-se",		NULL,	127,	0x42c,	416000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
 
-	SHARED_CLK("avp.sclk",	"tegra-avp",		"sclk",	&tegra_clk_sclk),
+	SHARED_CLK("avp.sclk",	"tegra-avp",		"sclk",	&tegra_clk_sbus_cmplx),
 	SHARED_CLK("avp.emc",	"tegra-avp",		"emc",	&tegra_clk_emc),
 	SHARED_CLK("cpu.emc",	"cpu",			"emc",	&tegra_clk_emc),
 	SHARED_CLK("disp1.emc",	"tegradc.0",		"emc",	&tegra_clk_emc),
@@ -3404,6 +3505,7 @@ struct clk *tegra_ptr_clks[] = {
 	&tegra_clk_cpu_cmplx,
 	&tegra_clk_blink,
 	&tegra_clk_cop,
+	&tegra_clk_sbus_cmplx,
 	&tegra_clk_emc,
 	&tegra_clk_twd,
 };
