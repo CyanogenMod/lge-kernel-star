@@ -165,6 +165,13 @@ struct clk {
 			enum cpu_mode			mode;
 		} cpu;
 		struct {
+			struct clk			*pclk;
+			struct clk			*hclk;
+			struct clk			*sclk_low;
+			struct clk			*sclk_high;
+			unsigned long			threshold;
+		} system;
+		struct {
 			struct list_head		node;
 			bool				enabled;
 			unsigned long			rate;

@@ -231,6 +231,11 @@ static int clk_div16_get_divider(unsigned long parent_rate, unsigned long rate)
 	return divider_u16 - 1;
 }
 
+static inline int clk_set_div(struct clk *c, int n)
+{
+	return clk_set_rate(c, (clk_get_rate(c->parent) + n-1) / n);
+}
+
 /* clk_m functions */
 static unsigned long tegra2_clk_m_autodetect_rate(struct clk *c)
 {
@@ -454,7 +459,32 @@ static long tegra2_vsclk_round_rate(struct clk *c, unsigned long rate)
 
 static int tegra2_vsclk_set_rate(struct clk *c, unsigned long rate)
 {
-	return clk_set_rate(c->parent, rate);
+	int ret;
+
+	if (rate >= c->u.system.pclk->min_rate * 2) {
+		ret = clk_set_div(c->u.system.pclk, 2);
+		if (ret) {
+			pr_err("Failed to set 1 : 2 pclk divider\n");
+			return ret;
+		}
+	}
+
+	ret = clk_set_rate(c->parent, rate);
+	if (ret) {
+		pr_err("Failed to set sclk source %s to %lu\n",
+			c->parent->name, rate);
+		return ret;
+	}
+
+	if (rate < c->u.system.pclk->min_rate * 2) {
+		ret = clk_set_div(c->u.system.pclk, 1);
+		if (ret) {
+			pr_err("Failed to set 1 : 1 pclk divider\n");
+			return ret;
+		}
+	}
+
+	return 0;
 }
 
 static struct clk_ops tegra_vsclk_ops = {
@@ -2052,6 +2082,9 @@ static struct clk tegra_clk_virtual_sclk = {
 	.name	= "vsclk",
 	.parent	= &tegra_clk_sclk,
 	.ops	= &tegra_vsclk_ops,
+	.u.system = {
+		.pclk = &tegra_clk_pclk,
+	},
 };
 
 static struct clk tegra_clk_blink = {
