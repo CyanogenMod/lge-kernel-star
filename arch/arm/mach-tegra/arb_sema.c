@@ -36,6 +36,7 @@
 #define ARB_GRANT_STATUS	0x0
 #define ARB_GRANT_REQUEST	0x4
 #define ARB_GRANT_RELEASE	0x8
+#define ARB_GRANT_PENDING	0xC
 
 struct tegra_arb_dev {
 	void __iomem	*sema_base;
@@ -117,7 +118,7 @@ int tegra_arb_mutex_lock_timeout(enum tegra_arb_module lock, int msecs)
 	request_arb_sem(lock);
 	ret = wait_for_completion_timeout(&arb->arb_gnt_complete[lock], msecs_to_jiffies(msecs));
 	if (ret == 0) {
-		pr_err("timed out.\n");
+		pr_err("timed out. pending:0x%x\n", arb_sema_read(ARB_GRANT_PENDING));
 		cancel_arb_sem(lock);
 		mutex_unlock(&arb->mutexes[lock]);
 		return -ETIMEDOUT;
