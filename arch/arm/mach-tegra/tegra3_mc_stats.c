@@ -36,7 +36,7 @@
 #include "tegra3_mc_stats.h"
 
 #define MC_STAT_SETS 2
-static unsigned int trace_mask = 0xf;
+static unsigned int trace_mask = 0x0;
 
 #define TRACE_FLOW	1
 #define TRACE_REG	2
