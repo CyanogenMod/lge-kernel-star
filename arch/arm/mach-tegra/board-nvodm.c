@@ -1347,10 +1347,10 @@ static ssize_t star_virtual_keys_show(struct kobject *kobj,
        /* Dimensions, 80x80, y starts at 830
        center: x: menu: 75, home: 185, back: 295, search 405, y: 880 */
        return sprintf(buf,
-                       __stringify(EV_KEY) ":" __stringify(KEY_MENU)  ":75:880:80:80"
-                       ":" __stringify(EV_KEY) ":" __stringify(KEY_HOME)   ":185:880:80:80"
-                       ":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)   ":295:880:80:80"
-                       ":" __stringify(EV_KEY) ":" __stringify(KEY_SEARCH) ":405:880:80:80"
+                       __stringify(EV_KEY) ":" __stringify(KEY_MENU)  ":75:880:110:110"
+                       ":" __stringify(EV_KEY) ":" __stringify(KEY_HOME)   ":185:880:110:110"
+                       ":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)   ":295:880:110:110"
+                       ":" __stringify(EV_KEY) ":" __stringify(KEY_SEARCH) ":405:880:110:110"
                        "\n");
 }
 
