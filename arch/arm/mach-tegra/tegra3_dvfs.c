@@ -29,7 +29,7 @@ static const int cpu_millivolts[MAX_DVFS_FREQS] =
 	{750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000, 1025, 1050, 1075, 1100, 1125};
 
 static const int core_millivolts[MAX_DVFS_FREQS] =
-	{950, 1000, 1100, 1200};
+	{1000, 1050, 1100, 1150, 1200, 1250, 1300};
 
 #define KHZ 1000
 #define MHZ 1000000
@@ -72,11 +72,11 @@ static struct dvfs cpu_dvfs_table[] = {
 	CPU_DVFS("cpu_g", 0, 0, MHZ,   0,   0, 614, 614, 714, 714, 815, 815, 915, 915, 1000),
 };
 
-#define CORE_DVFS(_clk_name, _process_id, _auto, _mult, _freqs...)	\
+#define CORE_DVFS(_clk_name, _speedo_id, _auto, _mult, _freqs...)	\
 	{							\
 		.clk_name	= _clk_name,			\
-		.speedo_id	= -1,				\
-		.process_id	= _process_id,				\
+		.speedo_id	= _speedo_id,			\
+		.process_id	= -1,				\
 		.freqs		= {_freqs},			\
 		.freqs_mult	= _mult,			\
 		.millivolts	= core_millivolts,		\
@@ -85,8 +85,38 @@ static struct dvfs cpu_dvfs_table[] = {
 	}
 
 static struct dvfs core_dvfs_table[] = {
-	/* Cpu voltages (mV):	            950,   1000,   1100,   1200 */
-	CORE_DVFS("cpu_lp", 0, 1, KHZ,   313500, 361000, 456000, 456000)
+	/* Core voltages (mV):	           1000,   1050,   1100,   1150,    1200,    1250,    1300 */
+	CORE_DVFS("cpu_lp", 0, 1, KHZ,   294500, 342000, 427000, 484000,  500000,  500000,  500000),
+
+	CORE_DVFS("emc",    0, 1, KHZ,   108000, 108000, 108000, 108000,  533000,  533000,  533000),
+
+	CORE_DVFS("sbus",   0, 1, KHZ,   136000, 163000, 191000, 216500,  245000,  245000,  245000),
+
+	CORE_DVFS("vde",    0, 1, KHZ,   216000, 270000, 332000, 380000,  416000,  416000,  416000),
+	CORE_DVFS("mpe",    0, 1, KHZ,   234000, 285000, 332000, 380000,  416000,  416000,  416000),
+	CORE_DVFS("2d",     0, 1, KHZ,   267000, 285000, 332000, 380000,  416000,  416000,  416000),
+	CORE_DVFS("epp",    0, 1, KHZ,   267000, 285000, 332000, 380000,  416000,  416000,  416000),
+	CORE_DVFS("3d",     0, 1, KHZ,   234000, 285000, 332000, 380000,  416000,  416000,  416000),
+	CORE_DVFS("se",     0, 1, KHZ,   267000, 285000, 332000, 380000,  416000,  416000,  416000),
+	CORE_DVFS("host1x", 0, 1, KHZ,   152000, 188000, 222000, 254000,  267000,  267000,  267000),
+
+	CORE_DVFS("pll_c",  0, 1, KHZ,   600000, 600000, 800000, 800000, 1066000, 1066000, 1066000),
+
+	CORE_DVFS("sdmmc1",-1, 1, KHZ,   104000, 104000, 104000, 104000, 208000,  208000,  208000),
+	CORE_DVFS("sdmmc2",-1, 1, KHZ,   104000, 104000, 104000, 104000, 208000,  208000,  208000),
+	CORE_DVFS("sdmmc3",-1, 1, KHZ,   104000, 104000, 104000, 104000, 208000,  208000,  208000),
+	CORE_DVFS("sdmmc4",-1, 1, KHZ,   104000, 104000, 104000, 104000, 208000,  208000,  208000),
+	CORE_DVFS("tvo",   -1, 1, KHZ,   0,      297000, 297000, 297000, 297000,  297000,  297000),
+	CORE_DVFS("dsi",   -1, 1, KHZ,   430000, 430000, 430000, 430000, 500000,  500000,  500000),
+
+	/*
+	 * The clock rate for the display controllers that determines the
+	 * necessary core voltage depends on a divider that is internal
+	 * to the display block.  Disable auto-dvfs on the display clocks,
+	 * and let the display driver call tegra_dvfs_set_rate manually
+	 */
+	CORE_DVFS("disp1", -1, 0, KHZ,   120000, 120000, 120000, 120000, 190000,  190000,  190000),
+	CORE_DVFS("disp2", -1, 0, KHZ,   158000, 158000, 190000, 190000, 190000,  190000,  190000),
 };
 
 int tegra_dvfs_disable_cpu_set(const char *arg, const struct kernel_param *kp)
