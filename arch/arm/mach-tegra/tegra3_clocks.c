@@ -3050,7 +3050,7 @@ static struct clk tegra_clk_sclk = {
 	.reg	= 0x28,
 	.ops	= &tegra_super_ops,
 	.max_rate = 216000000,
-	.min_rate = 120000000,
+	.min_rate = 108000000,
 };
 
 static struct clk tegra_clk_virtual_cpu_g = {
@@ -3137,7 +3137,7 @@ static struct clk tegra_clk_sbus_cmplx = {
 		.hclk = &tegra_clk_hclk,
 		.sclk_low = &tegra_pll_p_out4,
 		.sclk_high = &tegra_pll_m_out1,
-		.threshold = 216000000,
+		.threshold = 108000000,
 	},
 };
 
