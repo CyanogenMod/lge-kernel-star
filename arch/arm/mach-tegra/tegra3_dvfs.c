@@ -24,6 +24,7 @@
 #include "fuse.h"
 
 static bool tegra_dvfs_cpu_disabled = false;
+static bool tegra_dvfs_core_disabled = true;
 
 static const int cpu_millivolts[MAX_DVFS_FREQS] =
 	{750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000, 1025, 1050, 1075, 1100, 1125};
@@ -119,6 +120,23 @@ static struct dvfs core_dvfs_table[] = {
 	CORE_DVFS("disp2", -1, 0, KHZ,   158000, 158000, 190000, 190000, 190000,  190000,  190000),
 };
 
+
+int tegra_dvfs_disable_core_set(const char *arg, const struct kernel_param *kp)
+{
+	int ret;
+
+	ret = param_set_bool(arg, kp);
+	if (ret)
+		return ret;
+
+	if (tegra_dvfs_core_disabled)
+		tegra_dvfs_rail_disable(&tegra3_dvfs_rail_vdd_core);
+	else
+		tegra_dvfs_rail_enable(&tegra3_dvfs_rail_vdd_core);
+
+	return 0;
+}
+
 int tegra_dvfs_disable_cpu_set(const char *arg, const struct kernel_param *kp)
 {
 	int ret;
@@ -140,12 +158,20 @@ int tegra_dvfs_disable_get(char *buffer, const struct kernel_param *kp)
 	return param_get_bool(buffer, kp);
 }
 
+static struct kernel_param_ops tegra_dvfs_disable_core_ops = {
+	.set = tegra_dvfs_disable_core_set,
+	.get = tegra_dvfs_disable_get,
+};
+
 static struct kernel_param_ops tegra_dvfs_disable_cpu_ops = {
 	.set = tegra_dvfs_disable_cpu_set,
 	.get = tegra_dvfs_disable_get,
 };
 
-module_param_cb(disable_cpu, &tegra_dvfs_disable_cpu_ops, &tegra_dvfs_cpu_disabled, 0644);
+module_param_cb(disable_core, &tegra_dvfs_disable_core_ops,
+	&tegra_dvfs_core_disabled, 0644);
+module_param_cb(disable_cpu, &tegra_dvfs_disable_cpu_ops,
+	&tegra_dvfs_cpu_disabled, 0644);
 
 static void init_dvfs_from_table(struct dvfs *dvfs_table, int table_size,
 				 int speedo_id, int process_id)
@@ -186,6 +212,9 @@ void __init tegra_soc_init_dvfs(void)
 	int cpu_process_id = 0;		/* FIXME: get real CPU process ID */
 	int core_process_id = 0;	/* FIXME: get real core process ID */
 
+#ifndef CONFIG_TEGRA_CORE_DVFS
+	tegra_dvfs_cpu_disabled = true;
+#endif
 #ifndef CONFIG_TEGRA_CPU_DVFS
 	tegra_dvfs_cpu_disabled = true;
 #endif
@@ -199,6 +228,8 @@ void __init tegra_soc_init_dvfs(void)
 	init_dvfs_from_table(core_dvfs_table, ARRAY_SIZE(core_dvfs_table),
 			     speedo_id, core_process_id);
 
+	if (tegra_dvfs_core_disabled)
+		tegra_dvfs_rail_disable(&tegra3_dvfs_rail_vdd_core);
 	if (tegra_dvfs_cpu_disabled)
 		tegra_dvfs_rail_disable(&tegra3_dvfs_rail_vdd_cpu);
 }
