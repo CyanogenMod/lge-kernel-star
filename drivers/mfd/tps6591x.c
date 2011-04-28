@@ -39,7 +39,6 @@
 #define DEVCTRL_DEV_ON		(1 << 2)
 #define TPS6591X_DEVCTRL2	0x40
 
-
 /* interrupt status registers */
 #define TPS6591X_INT_STS	0x50
 #define TPS6591X_INT_STS2	0x52
@@ -125,7 +124,7 @@ static inline int __tps6591x_read(struct i2c_client *client,
 }
 
 static inline int __tps6591x_reads(struct i2c_client *client, int reg,
-				   int len, uint8_t *val)
+				int len, uint8_t *val)
 {
 	int ret;
 
@@ -410,8 +409,8 @@ static void tps6591x_irq_sync_unlock(unsigned int irq)
 	for (i = 0; i < ARRAY_SIZE(tps6591x->mask_reg); i++) {
 		if (tps6591x->mask_reg[i] != tps6591x->mask_cache[i]) {
 			if (!WARN_ON(tps6591x_write(tps6591x->dev,
-						    TPS6591X_INT_MSK + 2*i,
-						    tps6591x->mask_reg[i])))
+						TPS6591X_INT_MSK + 2*i,
+						tps6591x->mask_reg[i])))
 				tps6591x->mask_cache[i] = tps6591x->mask_reg[i];
 		}
 	}
@@ -470,7 +469,8 @@ static int __devinit tps6591x_irq_init(struct tps6591x *tps6591x, int irq,
 	tps6591x->mask_reg[2] = 0xFF;
 	for (i = 0; i < 3; i++) {
 		tps6591x->mask_cache[i] = tps6591x->mask_reg[i];
-		tps6591x_write(tps6591x->dev, TPS6591X_INT_MSK + 2*i, tps6591x->mask_cache[i]);
+		tps6591x_write(tps6591x->dev, TPS6591X_INT_MSK + 2*i,
+				 tps6591x->mask_cache[i]);
 	}
 
 	for (i = 0; i < 3; i++)
@@ -496,7 +496,7 @@ static int __devinit tps6591x_irq_init(struct tps6591x *tps6591x, int irq,
 	}
 
 	ret = request_threaded_irq(irq, NULL, tps6591x_irq, IRQF_ONESHOT,
-				   "tps6591x", tps6591x);
+				"tps6591x", tps6591x);
 	if (!ret) {
 		device_init_wakeup(tps6591x->dev, 1);
 		enable_irq_wake(irq);
@@ -530,6 +530,82 @@ failed:
 	tps6591x_remove_subdevs(tps6591x);
 	return ret;
 }
+#ifdef CONFIG_DEBUG_FS
+#include <linux/debugfs.h>
+#include <linux/seq_file.h>
+static void print_regs(const char *header, struct seq_file *s,
+		struct i2c_client *client, int start_offset,
+		int end_offset)
+{
+	uint8_t reg_val;
+	int i;
+	int ret;
+
+	seq_printf(s, "%s\n", header);
+	for (i = start_offset; i <= end_offset; ++i) {
+		ret = __tps6591x_read(client, i, &reg_val);
+		if (ret >= 0)
+			seq_printf(s, "Reg 0x%02x Value 0x%02x\n", i, reg_val);
+	}
+	seq_printf(s, "------------------\n");
+}
+
+static int dbg_tps_show(struct seq_file *s, void *unused)
+{
+	struct tps6591x *tps = s->private;
+	struct i2c_client *client = tps->client;
+
+	seq_printf(s, "TPS6591x Registers\n");
+	seq_printf(s, "------------------\n");
+
+	print_regs("Timing Regs",    s, client, 0x0, 0x6);
+	print_regs("Alarm Regs",     s, client, 0x8, 0xD);
+	print_regs("RTC Regs",       s, client, 0x10, 0x16);
+	print_regs("BCK Regs",       s, client, 0x17, 0x1B);
+	print_regs("PUADEN Regs",    s, client, 0x18, 0x18);
+	print_regs("REF Regs",       s, client, 0x1D, 0x1D);
+	print_regs("VDD Regs",       s, client, 0x1E, 0x29);
+	print_regs("LDO Regs",       s, client, 0x30, 0x37);
+	print_regs("THERM Regs",     s, client, 0x38, 0x38);
+	print_regs("BBCH Regs",      s, client, 0x39, 0x39);
+	print_regs("DCDCCNTRL Regs", s, client, 0x3E, 0x3E);
+	print_regs("DEV_CNTRL Regs", s, client, 0x3F, 0x40);
+	print_regs("SLEEP Regs",     s, client, 0x41, 0x44);
+	print_regs("EN1 Regs",       s, client, 0x45, 0x48);
+	print_regs("INT Regs",       s, client, 0x50, 0x55);
+	print_regs("GPIO Regs",      s, client, 0x60, 0x68);
+	print_regs("WATCHDOG Regs",  s, client, 0x69, 0x69);
+	print_regs("VMBCH Regs",     s, client, 0x6A, 0x6B);
+	print_regs("LED_CTRL Regs",  s, client, 0x6c, 0x6D);
+	print_regs("PWM_CTRL Regs",  s, client, 0x6E, 0x6F);
+	print_regs("SPARE Regs",     s, client, 0x70, 0x70);
+	print_regs("VERNUM Regs",    s, client, 0x80, 0x80);
+	return 0;
+}
+
+static int dbg_tps_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, dbg_tps_show, inode->i_private);
+}
+
+static const struct file_operations debug_fops = {
+	.open		= dbg_tps_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static void __init tps6591x_debuginit(struct tps6591x *tps)
+{
+	(void)debugfs_create_file("tps6591x", S_IRUGO, NULL,
+			tps, &debug_fops);
+}
+#else
+static void __init tps6591x_debuginit(struct tps6591x *tpsi)
+{
+	return;
+}
+#endif
 
 static int __devinit tps6591x_i2c_probe(struct i2c_client *client,
 					const struct i2c_device_id *id)
@@ -578,6 +654,8 @@ static int __devinit tps6591x_i2c_probe(struct i2c_client *client,
 	}
 
 	tps6591x_gpio_init(tps6591x, pdata->gpio_base);
+
+	tps6591x_debuginit(tps6591x);
 
 	tps6591x_i2c_client = client;
 
