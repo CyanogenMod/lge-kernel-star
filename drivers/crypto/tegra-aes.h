@@ -22,7 +22,7 @@
 #define ICMDQUE_WR		0x1000
 #define CMDQUE_CONTROL		0x1008
 #define INTR_STATUS		0x1018
-#define INT_ENB		0x1040
+#define INT_ENB			0x1040
 #define CONFIG			0x1044
 #define IRAM_ACCESS_CFG		0x10A0
 #define SECURE_DEST_ADDR	0x1100
