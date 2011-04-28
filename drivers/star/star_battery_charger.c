@@ -1982,7 +1982,7 @@ static NvBool determine_capacity_for_demo(void)
 		batt_dev->batt_vol = (NvU32)(Average_Vol /Valid_count); // Booting time, current consumption is high, so determine capacity with bias...
 		batt_dev->vol_for_capacity = batt_dev->batt_vol + 200;
 	}
-
+/*
 	switch (get_charging_ic_status())
 	{
 		case CHG_IC_DEFAULT_MODE:
@@ -2023,8 +2023,8 @@ static NvBool determine_capacity_for_demo(void)
 			}
 			break;
 	}
-/*      The values provided by this are WAAY wrong
-	star_capacity_from_voltage_via_calculate(); */
+*/
+	star_capacity_from_voltage_via_calculate();
 	valid_capacity_gauge();
 
 	return NV_TRUE;
