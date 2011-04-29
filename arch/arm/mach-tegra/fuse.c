@@ -48,6 +48,8 @@
 #define FUSE_X_COORDINATE_MASK	0x1ff
 #define FUSE_Y_COORDINATE	0x218
 #define FUSE_Y_COORDINATE_MASK	0x1ff
+#define FUSE_GPU_INFO		0x390
+#define FUSE_GPU_INFO_MASK	(1<<2)
 #define FUSE_SPARE_BIT		0x244
 #endif
 
@@ -207,6 +209,21 @@ int tegra_sku_id(void)
 	u32 reg = tegra_fuse_readl(FUSE_SKU_INFO);
 	sku_id = reg & 0xFF;
 	return sku_id;
+}
+
+int tegra_gpu_register_sets(void)
+{
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
+	return 1;
+#elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
+	u32 reg = readl(IO_TO_VIRT(TEGRA_CLK_RESET_BASE + FUSE_GPU_INFO));
+	if (reg & FUSE_GPU_INFO_MASK)
+		return 1;
+	else
+		return 2;
+#else
+#error ERROR! Neither 2x or 3x Tegra present
+#endif
 }
 
 static enum tegra_revision tegra_decode_revision(const struct tegra_id *id)
