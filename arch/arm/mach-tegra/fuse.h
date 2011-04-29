@@ -37,6 +37,8 @@ struct tegra_id {
 	char *priv;
 };
 
+#define INVALID_PROCESS_ID	99 // don't expect to have 100 process id's
+
 extern struct tegra_id tegra_id;
 
 unsigned long long tegra_chip_uid(void);
@@ -50,3 +52,5 @@ void tegra_init_speedo_data(void);
 u32 tegra_fuse_readl(unsigned long offset);
 void tegra_fuse_writel(u32 value, unsigned long offset);
 enum tegra_revision tegra_get_revision(void);
+const char *tegra_get_revision_name(void);
+

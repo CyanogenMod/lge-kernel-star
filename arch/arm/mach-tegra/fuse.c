@@ -75,6 +75,11 @@ static inline bool get_spare_fuse(int bit)
 	return tegra_fuse_readl(FUSE_SPARE_BIT + bit * 4);
 }
 
+const char *tegra_get_revision_name(void)
+{
+	return tegra_revision_name[tegra_get_revision()];
+}
+
 void tegra_init_fuse(void)
 {
 	u32 reg = readl(IO_TO_VIRT(TEGRA_CLK_RESET_BASE + 0x48));
@@ -83,7 +88,7 @@ void tegra_init_fuse(void)
 	tegra_init_speedo_data();
 
 	pr_info("Tegra Revision: %s SKU: %d CPU Process: %d Core Process: %d\n",
-		tegra_revision_name[tegra_get_revision()],
+		tegra_get_revision_name(),
 		tegra_sku_id(), tegra_cpu_process_id(),
 		tegra_core_process_id());
 }
