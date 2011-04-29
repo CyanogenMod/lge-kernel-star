@@ -748,7 +748,7 @@ int __init cardhu_gpio_switch_regulator_init(void)
 
 static struct tegra_suspend_platform_data cardhu_suspend_data = {
 	.cpu_timer	= 2000,
-	.cpu_off_timer	= 0,
+	.cpu_off_timer	= 200,
 	.suspend_mode	= TEGRA_SUSPEND_LP1,
 	.core_timer	= 0x7e7e,
 	.core_off_timer = 0,
