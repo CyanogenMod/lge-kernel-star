@@ -300,7 +300,7 @@ static int node_put_to_send(u8 dlci, u8 *data, int size)
 	            free_node = i;
 	//                if (free_node > max_frame_usage) {
 	//                    max_frame_usage = free_node;
-	//                    LTMUX("max_frame_usage=%d", max_frame_usage);
+	//                    TS0710_LOG("max_frame_usage=%d", max_frame_usage);
 	//                }
 	            break;
 	        }
@@ -793,11 +793,11 @@ void process_mcc(u8 * data, u32 len, ts0710_con * ts0710, int longpkt)
 		}
 
 	case NSC:		/*Non supported command resonse */
-		LTMUX("MUX Received Non supported command response");
+		TS0710_LOG("MUX Received Non supported command response");
 		break;
 
 	default:		/*Non supported command received */
-		LTMUX("MUX Received a non supported command");
+		TS0710_LOG("MUX Received a non supported command");
 		send_nsc_msg(ts0710, mcc_short_pkt->h.type, MCC_RSP);
 		break;
 	}
@@ -932,7 +932,7 @@ void ts0710_recv_data_server(ts0710_con * ts0710, short_frame *short_pkt, int le
 		TS0710_DEBUG("UIH packet received");
 
 		if (GET_PF(short_pkt->h.control)) {
-			LTMUX("MUX Error: UIH packet with P/F set, discard it!");
+			TS0710_LOG("MUX Error: UIH packet with P/F set, discard it!");
 			break;
 		}
 
@@ -982,7 +982,7 @@ void process_uih(ts0710_con * ts0710, char *data, int len, u8 dlci) {
 
 	if ((ts0710->dlci[dlci].state != CONNECTED)
 			&& (ts0710->dlci[dlci].state != FLOW_STOPPED)) {
-		LTMUX("MUX Error: DLCI [%d] not connected, discard it!", dlci);
+		TS0710_LOG("MUX Error: DLCI [%d] not connected, discard it!", dlci);
 		send_dm(ts0710, dlci);
 		return;
 	}
@@ -1016,7 +1016,7 @@ void process_uih(ts0710_con * ts0710, char *data, int len, u8 dlci) {
 	if (!uih_len)
 		return;
 
-	LTMUX("TS07.10:uih tag %x on dlci %d",tag,dlci);
+	TS0710_LOG("TS07.10:uih tag %x on dlci %d",tag,dlci);
 #endif
 
 	tty_idx = dlci;
@@ -1562,11 +1562,11 @@ static void DUMP_MUX_BUFFER(const unsigned char *txt, const unsigned char *buf, 
             ++i;
         }
         *cur_str = 0;
-        LTMUX("%s:count:%d [ %s]", txt, count, dump_buf_str);
+        TS0710_LOG("%s:count:%d [ %s]", txt, count, dump_buf_str);
     }
     else
     {
-        LTMUX("%s: buffer is NULL", txt);
+        TS0710_LOG("%s: buffer is NULL", txt);
     }
 }
 #else
@@ -2008,7 +2008,7 @@ static int ts_ldisc_tx_looper(void *param)
             TS0710_LOG("writing to SPI end [i=%d]", i);
             if (res != data_size)
             {
-                LTMUX("ERROR: writing to SPI failed [data_size=%d; res=%d]", data_size, res);
+                TS0710_LOG("ERROR: writing to SPI failed [data_size=%d; res=%d]", data_size, res);
             }
             kfree(data_ptr);
         }
@@ -2174,7 +2174,7 @@ static void ts_ldisc_close(struct tty_struct *tty)
 
 static void ts_ldisc_wake(struct tty_struct *tty)
 {
-	LTMUX("ts wake");
+	TS0710_LOG("ts wake");
 }
 
 static ssize_t ts_ldisc_read(struct tty_struct *tty, struct file *file,
