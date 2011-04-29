@@ -895,7 +895,7 @@ static void nvhdcp_downstream_worker(struct work_struct *work)
 	nvhdcp_vdbg("An is 0x%016llx\n", nvhdcp->a_n);
 	if (verify_ksv(nvhdcp->a_ksv)) {
 		nvhdcp_err("Aksv verify failure! (0x%016llx)\n", nvhdcp->a_ksv);
-		goto failure;
+		goto disable;
 	}
 
 	/* write Ainfo to receiver - set 1.1 only if b_caps supports it */
@@ -1018,6 +1018,11 @@ lost_hdmi:
 	hdcp_ctrl_run(hdmi, 0);
 
 err:
+	mutex_unlock(&nvhdcp->lock);
+	return;
+disable:
+	nvhdcp->state = STATE_OFF;
+	nvhdcp_set_plugged(nvhdcp, false);
 	mutex_unlock(&nvhdcp->lock);
 	return;
 }
