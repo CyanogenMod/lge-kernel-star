@@ -1486,7 +1486,7 @@ static void tegra_dc_reset_worker(struct work_struct *work)
 	mutex_lock(&dc->lock);
 
 	if (dc->enabled == false || dc->suspended)
-		return;
+		goto unlock;
 
 	dc->enabled = false;
 
@@ -1531,6 +1531,7 @@ static void tegra_dc_reset_worker(struct work_struct *work)
 	_tegra_dc_controller_enable(dc);
 
 	dc->enabled = true;
+unlock:
 	mutex_unlock(&dc->lock);
 	mutex_unlock(&shared_lock);
 }
