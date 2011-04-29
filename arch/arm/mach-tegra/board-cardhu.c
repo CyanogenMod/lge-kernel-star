@@ -380,8 +380,8 @@ static struct platform_device *cardhu_devices[] __initdata = {
 	&tegra_rtc_device,
 #endif
 	&tegra_udc_device,
-	&tegra_usb_fsg_device,
 	&androidusb_device,
+	&tegra_usb_fsg_device,
 #if defined(CONFIG_SND_HDA_TEGRA)
 	&tegra_hda_device,
 #endif
