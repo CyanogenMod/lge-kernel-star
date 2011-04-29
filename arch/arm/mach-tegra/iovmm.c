@@ -26,6 +26,7 @@
 #include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/slab.h>
+#include <linux/syscore_ops.h>
 
 #include <mach/iovmm.h>
 
@@ -69,7 +70,8 @@ struct iovmm_share_group {
 
 static LIST_HEAD(iovmm_devices);
 static LIST_HEAD(iovmm_groups);
-static DEFINE_MUTEX(iovmm_list_lock);
+static DEFINE_MUTEX(iovmm_group_list_lock);
+static DEFINE_SPINLOCK(iovmm_device_list_lock);
 static struct kmem_cache *iovmm_cache;
 
 static tegra_iovmm_addr_t iovmm_align_up(struct tegra_iovmm_device *dev,
@@ -130,7 +132,7 @@ static int tegra_iovmm_read_proc(char *page, char **start, off_t off,
 
 	int len = 0;
 
-	mutex_lock(&iovmm_list_lock);
+	mutex_lock(&iovmm_group_list_lock);
 	len += iovmprint("\ngroups\n");
 	if (list_empty(&iovmm_groups))
 		len += iovmprint("\t<empty>\n");
@@ -149,7 +151,7 @@ static int tegra_iovmm_read_proc(char *page, char **start, off_t off,
 				total, total_free, max_free, num_free, num);
 		}
 	}
-	mutex_unlock(&iovmm_list_lock);
+	mutex_unlock(&iovmm_group_list_lock);
 
 	*eof = 1;
 	return len;
@@ -631,7 +633,7 @@ void tegra_iovmm_free_client(struct tegra_iovmm_client *client)
 			wake_up(&client->domain->delay_lock);
 		}
 	}
-	mutex_lock(&iovmm_list_lock);
+	mutex_lock(&iovmm_group_list_lock);
 	if (!atomic_dec_return(&client->domain->clients))
 		if (dev->ops->free_domain)
 			dev->ops->free_domain(dev, client->domain);
@@ -643,7 +645,7 @@ void tegra_iovmm_free_client(struct tegra_iovmm_client *client)
 	}
 	kfree(client->name);
 	kfree(client);
-	mutex_unlock(&iovmm_list_lock);
+	mutex_unlock(&iovmm_group_list_lock);
 }
 
 struct tegra_iovmm_client *tegra_iovmm_alloc_client(const char *name,
@@ -652,12 +654,13 @@ struct tegra_iovmm_client *tegra_iovmm_alloc_client(const char *name,
 	struct tegra_iovmm_client *c = kzalloc(sizeof(*c), GFP_KERNEL);
 	struct iovmm_share_group *grp = NULL;
 	struct tegra_iovmm_device *dev;
+	unsigned long flags;
 
 	if (!c) return NULL;
 	c->name = kstrdup(name, GFP_KERNEL);
 	if (!c->name) goto fail;
 
-	mutex_lock(&iovmm_list_lock);
+	mutex_lock(&iovmm_group_list_lock);
 	if (share_group) {
 		list_for_each_entry(grp, &iovmm_groups, group_list) {
 			if (grp->name && !strcmp(grp->name, share_group))
@@ -672,10 +675,12 @@ struct tegra_iovmm_client *tegra_iovmm_alloc_client(const char *name,
 			kfree(grp);
 			goto fail_lock;
 		}
+		spin_lock_irqsave(&iovmm_device_list_lock, flags);
 		list_for_each_entry(dev, &iovmm_devices, list) {
 			grp->domain = dev->ops->alloc_domain(dev, c);
 			if (grp->domain) break;
 		}
+		spin_unlock_irqrestore(&iovmm_device_list_lock, flags);
 		if (!grp->domain) {
 			pr_err("%s: alloc_domain failed for %s\n",
 				__func__, c->name);
@@ -696,11 +701,11 @@ struct tegra_iovmm_client *tegra_iovmm_alloc_client(const char *name,
 	spin_lock(&grp->lock);
 	list_add_tail(&c->list, &grp->client_list);
 	spin_unlock(&grp->lock);
-	mutex_unlock(&iovmm_list_lock);
+	mutex_unlock(&iovmm_group_list_lock);
 	return c;
 
 fail_lock:
-	mutex_unlock(&iovmm_list_lock);
+	mutex_unlock(&iovmm_group_list_lock);
 fail:
 	if (c) {
 		if (c->name) kfree(c->name);
@@ -712,29 +717,38 @@ fail:
 int tegra_iovmm_register(struct tegra_iovmm_device *dev)
 {
 	BUG_ON(!dev);
-	mutex_lock(&iovmm_list_lock);
+	mutex_lock(&iovmm_group_list_lock);
 	if (list_empty(&iovmm_devices)) {
 		iovmm_cache = KMEM_CACHE(tegra_iovmm_block, 0);
 		if (!iovmm_cache) {
 			pr_err("%s: failed to make kmem cache\n", __func__);
-			mutex_unlock(&iovmm_list_lock);
+			mutex_unlock(&iovmm_group_list_lock);
 			return -ENOMEM;
 		}
 		create_proc_read_entry("iovmminfo", S_IRUGO, NULL,
 			tegra_iovmm_read_proc, NULL);
 	}
 	list_add_tail(&dev->list, &iovmm_devices);
-	mutex_unlock(&iovmm_list_lock);
+	mutex_unlock(&iovmm_group_list_lock);
 	printk("%s: added %s\n", __func__, dev->name);
 	return 0;
 }
 
-int tegra_iovmm_suspend(void)
+int tegra_iovmm_unregister(struct tegra_iovmm_device *dev)
+{
+	mutex_lock(&iovmm_group_list_lock);
+	list_del(&dev->list);
+	mutex_unlock(&iovmm_group_list_lock);
+	return 0;
+}
+
+static int tegra_iovmm_suspend(void)
 {
 	int rc = 0;
 	struct tegra_iovmm_device *dev;
+	unsigned long flags;
 
-	mutex_lock(&iovmm_list_lock);
+	spin_lock_irqsave(&iovmm_device_list_lock, flags);
 	list_for_each_entry(dev, &iovmm_devices, list) {
 
 		if (!dev->ops->suspend)
@@ -744,32 +758,37 @@ int tegra_iovmm_suspend(void)
 		if (rc) {
 			pr_err("%s: %s suspend returned %d\n",
 			       __func__, dev->name, rc);
-			mutex_unlock(&iovmm_list_lock);
+			spin_unlock_irqrestore(&iovmm_device_list_lock, flags);
 			return rc;
 		}
 	}
-	mutex_unlock(&iovmm_list_lock);
+	spin_unlock_irqrestore(&iovmm_device_list_lock, flags);
 	return 0;	
 }
 
-void tegra_iovmm_resume(void)
+static void tegra_iovmm_resume(void)
 {
 	struct tegra_iovmm_device *dev;
+	unsigned long flags;
 
-	mutex_lock(&iovmm_list_lock);
+	spin_lock_irqsave(&iovmm_device_list_lock, flags);
 
 	list_for_each_entry(dev, &iovmm_devices, list) {
 		if (dev->ops->resume)
 			dev->ops->resume(dev);
 	}
 
-	mutex_unlock(&iovmm_list_lock);
+	spin_unlock_irqrestore(&iovmm_device_list_lock, flags);
 }
 
-int tegra_iovmm_unregister(struct tegra_iovmm_device *dev)
+static struct syscore_ops tegra_iovmm_syscore_ops = {
+	.suspend = tegra_iovmm_suspend,
+	.resume = tegra_iovmm_resume,
+};
+
+static __init int tegra_iovmm_syscore_init(void)
 {
-	mutex_lock(&iovmm_list_lock);
-	list_del(&dev->list);
-	mutex_unlock(&iovmm_list_lock);
+	register_syscore_ops(&tegra_iovmm_syscore_ops);
 	return 0;
 }
+subsys_initcall(tegra_iovmm_syscore_init);

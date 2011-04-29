@@ -192,12 +192,6 @@ int tegra_iovmm_register(struct tegra_iovmm_device *dev);
 /* called by drivers to remove an I/O VMM device from the system */
 int tegra_iovmm_unregister(struct tegra_iovmm_device *dev);
 
-/* called by platform suspend code to save IOVMM context */
-int tegra_iovmm_suspend(void);
-
-/* restores IOVMM context */
-void tegra_iovmm_resume(void);
-
 #else /* CONFIG_TEGRA_IOVMM */
 
 static inline struct tegra_iovmm_client *tegra_iovmm_alloc_client(
