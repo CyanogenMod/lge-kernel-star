@@ -261,9 +261,9 @@ static struct pca953x_platform_data ventana_tca6416_data = {
 };
 
 static struct pca954x_platform_mode ventana_pca9546_modes[] = {
-	{ .adap_id = 6, }, /* REAR CAM1 */
-	{ .adap_id = 7, }, /* REAR CAM2 */
-	{ .adap_id = 8, }, /* FRONT CAM3 */
+	{ .adap_id = 6, .deselect_on_exit = 1 }, /* REAR CAM1 */
+	{ .adap_id = 7, .deselect_on_exit = 1 }, /* REAR CAM2 */
+	{ .adap_id = 8, .deselect_on_exit = 1 }, /* FRONT CAM3 */
 };
 
 static struct pca954x_platform_data ventana_pca9546_data = {
