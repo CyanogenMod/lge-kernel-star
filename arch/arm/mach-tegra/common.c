@@ -386,7 +386,7 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 		if (memblock_remove(tegra_fb2_start, fb2_size)) {
 			pr_err("Failed to remove second framebuffer %08lx@%08lx "
 				"from memory map\n",
-				fb2_size, tegra_fb2_size);
+				fb2_size, tegra_fb2_start);
 			tegra_fb2_start = 0;
 			tegra_fb2_size = 0;
 		} else
