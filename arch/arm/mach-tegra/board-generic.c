@@ -24,6 +24,7 @@
 #include <linux/pda_power.h>
 #include <linux/io.h>
 #include <linux/usb/android_composite.h>
+#include <linux/usb/f_accessory.h>
 
 #include <linux/i2c.h>
 
@@ -77,9 +78,26 @@ static char *tegra_android_functions_rndis_adb[] = {
 #endif
 };
 
+static char *tegra_android_functions_accessory[] = { 
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
+	"accessory",
+#endif
+};
+static char *tegra_android_functions_accessory_adb[] = { 
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
+	"accessory", 
+#endif
+#ifdef CONFIG_USB_ANDROID_ADB
+	"adb",
+#endif
+};
+
 static char *tegra_android_functions_all[] = {
 #ifdef CONFIG_USB_ANDROID_RNDIS
 	"rndis",
+#endif
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
+	"accessory",
 #endif
 #ifdef CONFIG_USB_ANDROID_MASS_STORAGE
 	"usb_mass_storage",
@@ -123,6 +141,17 @@ static struct android_usb_product tegra_android_products[] = {
 		.num_functions = ARRAY_SIZE(tegra_android_functions_rndis_adb),
 		.functions = tegra_android_functions_rndis_adb,
 	},
+	[4] = {
+		.product_id = 0x7104,
+		.num_functions = ARRAY_SIZE(tegra_android_functions_accessory),
+		.functions = tegra_android_functions_accessory,
+	},
+	[5] = {
+		.product_id = 0x7105,
+		.num_functions = ARRAY_SIZE(tegra_android_functions_accessory_adb),
+		.functions = tegra_android_functions_accessory_adb,
+	},
+
 };
 
 static char *harmony_dev = "NVIDIA Harmony";
