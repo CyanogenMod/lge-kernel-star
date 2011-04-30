@@ -76,6 +76,34 @@ TRACE_EVENT(nvhost_channel_write_submit,
 	  (unsigned long)__entry->cmdbufs, (unsigned long)__entry->relocs)
 );
 
+TRACE_EVENT(nvhost_ioctl_channel_submit,
+	TP_PROTO(const char *name, u32 version, u32 cmdbufs, u32 relocs,
+		 u32 waitchks),
+
+	TP_ARGS(name, version, cmdbufs, relocs, waitchks),
+
+	TP_STRUCT__entry(
+		__field(const char *, name)
+		__field(u32, version)
+		__field(u32, cmdbufs)
+		__field(u32, relocs)
+		__field(u32, waitchks)
+	),
+
+	TP_fast_assign(
+		__entry->name = name;
+		__entry->version = version;
+		__entry->cmdbufs = cmdbufs;
+		__entry->relocs = relocs;
+		__entry->waitchks = waitchks;
+	),
+
+	TP_printk("name=%s, version=%lu, cmdbufs=%lu, relocs=%ld, waitchks=%ld",
+	  __entry->name, (unsigned long)__entry->version,
+	  (unsigned long)__entry->cmdbufs, (unsigned long)__entry->relocs,
+	  (unsigned long)__entry->waitchks)
+);
+
 TRACE_EVENT(nvhost_channel_write_cmdbuf,
 	TP_PROTO(const char *name, u32 mem_id, u32 words, u32 offset),
 
@@ -117,6 +145,28 @@ TRACE_EVENT(nvhost_channel_write_relocs,
 
 	TP_printk("name=%s, relocs=%lu",
 	  __entry->name, (unsigned long)__entry->relocs)
+);
+
+TRACE_EVENT(nvhost_channel_write_waitchks,
+	TP_PROTO(const char *name, u32 waitchks, u32 waitmask),
+
+	TP_ARGS(name, waitchks, waitmask),
+
+	TP_STRUCT__entry(
+		__field(const char *, name)
+		__field(u32, waitchks)
+		__field(u32, waitmask)
+	),
+
+	TP_fast_assign(
+		__entry->name = name;
+		__entry->waitchks = waitchks;
+		__entry->waitmask = waitmask;
+	),
+
+	TP_printk("name=%s, waitchks=%lu, waitmask=0x08lx",
+	  __entry->name, (unsigned long)__entry->waitchks,
+	  (unsigned long)__entry->waitmask)
 );
 
 TRACE_EVENT(nvhost_channel_context_switch,

@@ -76,11 +76,28 @@ int nvhost_bus_register(struct nvhost_master *host);
 #define NVHOST_NO_TIMEOUT (-1)
 #define NVHOST_IOCTL_MAGIC 'H'
 
+/* version 0 header (used with write() submit interface) */
 struct nvhost_submit_hdr {
 	__u32 syncpt_id;
 	__u32 syncpt_incrs;
 	__u32 num_cmdbufs;
 	__u32 num_relocs;
+};
+
+#define NVHOST_SUBMIT_VERSION_V0		0x0
+#define NVHOST_SUBMIT_VERSION_V1		0x1
+#define NVHOST_SUBMIT_VERSION_MAX_SUPPORTED	NVHOST_SUBMIT_VERSION_V1
+
+/* version 1 header (used with ioctl() submit interface) */
+struct nvhost_submit_hdr_ext {
+	__u32 syncpt_id;	/* version 0 fields */
+	__u32 syncpt_incrs;
+	__u32 num_cmdbufs;
+	__u32 num_relocs;
+	__u32 submit_version;	/* version 1 fields */
+	__u32 num_waitchks;
+	__u32 waitchk_mask;
+	__u32 pad[5];		/* future expansion */
 };
 
 struct nvhost_cmdbuf {
@@ -94,6 +111,13 @@ struct nvhost_reloc {
 	__u32 cmdbuf_offset;
 	__u32 target;
 	__u32 target_offset;
+};
+
+struct nvhost_waitchk {
+	__u32 mem;
+	__u32 offset;
+	__u32 syncpt_id;
+	__u32 thresh;
 };
 
 struct nvhost_get_param_args {
@@ -116,9 +140,11 @@ struct nvhost_set_nvmap_fd_args {
 	_IOW(NVHOST_IOCTL_MAGIC, 5, struct nvhost_set_nvmap_fd_args)
 #define NVHOST_IOCTL_CHANNEL_NULL_KICKOFF	\
 	_IOR(NVHOST_IOCTL_MAGIC, 6, struct nvhost_get_param_args)
+#define NVHOST_IOCTL_CHANNEL_SUBMIT_EXT		\
+	_IOW(NVHOST_IOCTL_MAGIC, 7, struct nvhost_submit_hdr_ext)
 #define NVHOST_IOCTL_CHANNEL_LAST		\
-	_IOC_NR(NVHOST_IOCTL_CHANNEL_NULL_KICKOFF)
-#define NVHOST_IOCTL_CHANNEL_MAX_ARG_SIZE sizeof(struct nvhost_get_param_args)
+	_IOC_NR(NVHOST_IOCTL_CHANNEL_SUBMIT_EXT)
+#define NVHOST_IOCTL_CHANNEL_MAX_ARG_SIZE sizeof(struct nvhost_submit_hdr_ext)
 
 struct nvhost_ctrl_syncpt_read_args {
 	__u32 id;
