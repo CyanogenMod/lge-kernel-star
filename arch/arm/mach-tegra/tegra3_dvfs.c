@@ -35,11 +35,14 @@ static const int core_millivolts[MAX_DVFS_FREQS] =
 #define KHZ 1000
 #define MHZ 1000000
 
+#define VDD_CPU_BELOW_VDD_CORE_MAX	300
+
 static struct dvfs_rail tegra3_dvfs_rail_vdd_cpu = {
 	.reg_id = "vdd_cpu",
 	.max_millivolts = 1125,
 	.min_millivolts = 800,
 	.nominal_millivolts = 1000,
+	.step = VDD_CPU_BELOW_VDD_CORE_MAX,
 };
 
 static struct dvfs_rail tegra3_dvfs_rail_vdd_core = {
@@ -47,13 +50,45 @@ static struct dvfs_rail tegra3_dvfs_rail_vdd_core = {
 	.max_millivolts = 1300,
 	.min_millivolts = 950,
 	.nominal_millivolts = 1200,
-	.step = 100, /* FIXME: step vdd_core by 100 mV - maybe not needed */
+	.step = VDD_CPU_BELOW_VDD_CORE_MAX,
 	.disabled = true, /* FIXME: replace with sysfs control */
 };
 
 static struct dvfs_rail *tegra3_dvfs_rails[] = {
 	&tegra3_dvfs_rail_vdd_cpu,
 	&tegra3_dvfs_rail_vdd_core,
+};
+
+
+/* vdd_core must not be lower than vdd_cpu */
+static int tegra3_dvfs_rel_vdd_cpu_vdd_core(struct dvfs_rail *vdd_cpu,
+	struct dvfs_rail *vdd_core)
+{
+	int core_floor = max(vdd_cpu->new_millivolts, vdd_cpu->millivolts);
+	return max(vdd_core->new_millivolts, core_floor);
+}
+
+/* vdd_cpu must be within VDD_CPU_BELOW_VDD_CORE_MAX below vdd_core */
+static int tegra3_dvfs_rel_vdd_core_vdd_cpu(struct dvfs_rail *vdd_core,
+	struct dvfs_rail *vdd_cpu)
+{
+	int cpu_floor = max(vdd_core->new_millivolts, vdd_core->millivolts) -
+		VDD_CPU_BELOW_VDD_CORE_MAX;
+	return max(vdd_cpu->new_millivolts, cpu_floor);
+}
+
+static struct dvfs_relationship tegra3_dvfs_relationships[] = {
+	{
+		.from = &tegra3_dvfs_rail_vdd_cpu,
+		.to = &tegra3_dvfs_rail_vdd_core,
+		.solve = tegra3_dvfs_rel_vdd_cpu_vdd_core,
+		.solved_at_nominal = true,
+	},
+	{
+		.from = &tegra3_dvfs_rail_vdd_core,
+		.to = &tegra3_dvfs_rail_vdd_cpu,
+		.solve = tegra3_dvfs_rel_vdd_core_vdd_cpu,
+	},
 };
 
 #define CPU_DVFS(_clk_name, _speedo_id, _process_id, _mult, _freqs...)	\
@@ -220,8 +255,8 @@ void __init tegra_soc_init_dvfs(void)
 #endif
 
 	tegra_dvfs_init_rails(tegra3_dvfs_rails, ARRAY_SIZE(tegra3_dvfs_rails));
-
-	/* FIXME: add [CPU/CORE/AON] relationships here */
+	tegra_dvfs_add_relationships(tegra3_dvfs_relationships,
+		ARRAY_SIZE(tegra3_dvfs_relationships));
 
 	init_dvfs_from_table(cpu_dvfs_table, ARRAY_SIZE(cpu_dvfs_table),
 			     speedo_id, cpu_process_id);

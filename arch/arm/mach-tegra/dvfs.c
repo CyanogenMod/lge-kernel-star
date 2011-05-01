@@ -107,6 +107,7 @@ static int dvfs_rail_set_voltage(struct dvfs_rail *rail, int millivolts)
 	if (rail->disabled)
 		return 0;
 
+	rail->resolving_to = true;
 	steps = DIV_ROUND_UP(abs(millivolts - rail->millivolts), rail->step);
 
 	for (i = 0; i < steps; i++) {
@@ -124,7 +125,7 @@ static int dvfs_rail_set_voltage(struct dvfs_rail *rail, int millivolts)
 		list_for_each_entry(rel, &rail->relationships_to, to_node) {
 			ret = dvfs_rail_update(rel->to);
 			if (ret)
-				return ret;
+				goto out;
 		}
 
 		if (!rail->disabled) {
@@ -136,7 +137,7 @@ static int dvfs_rail_set_voltage(struct dvfs_rail *rail, int millivolts)
 		}
 		if (ret) {
 			pr_err("Failed to set dvfs regulator %s\n", rail->reg_id);
-			return ret;
+			goto out;
 		}
 
 		rail->millivolts = rail->new_millivolts;
@@ -148,16 +149,18 @@ static int dvfs_rail_set_voltage(struct dvfs_rail *rail, int millivolts)
 		list_for_each_entry(rel, &rail->relationships_to, to_node) {
 			ret = dvfs_rail_update(rel->to);
 			if (ret)
-				return ret;
+				goto out;
 		}
 	}
 
 	if (unlikely(rail->millivolts != millivolts)) {
 		pr_err("%s: rail didn't reach target %d in %d steps (%d)\n",
 			__func__, millivolts, steps, rail->millivolts);
-		return -EINVAL;
+		ret = -EINVAL;
 	}
 
+out:
+	rail->resolving_to = false;
 	return ret;
 }
 
@@ -178,6 +181,11 @@ static int dvfs_rail_update(struct dvfs_rail *rail)
 
 	/* if regulators are not connected yet, return and handle it later */
 	if (!rail->reg)
+		return 0;
+
+	/* if rail update is entered while resolving circular dependencies,
+	   abort recursion */
+	if (rail->resolving_to)
 		return 0;
 
 	/* Find the maximum voltage requested by any clock */
@@ -311,13 +319,14 @@ static bool tegra_dvfs_all_rails_suspended(void)
 	return all_suspended;
 }
 
-static bool tegra_dvfs_from_rails_suspended(struct dvfs_rail *to)
+static bool tegra_dvfs_from_rails_suspended_or_solved(struct dvfs_rail *to)
 {
 	struct dvfs_relationship *rel;
 	bool all_suspended = true;
 
 	list_for_each_entry(rel, &to->relationships_from, from_node)
-		if (!rel->from->suspended && !rel->from->disabled)
+		if (!rel->from->suspended && !rel->from->disabled &&
+			!rel->solved_at_nominal)
 			all_suspended = false;
 
 	return all_suspended;
@@ -330,7 +339,7 @@ static int tegra_dvfs_suspend_one(void)
 
 	list_for_each_entry(rail, &dvfs_rail_list, node) {
 		if (!rail->suspended && !rail->disabled &&
-		    tegra_dvfs_from_rails_suspended(rail)) {
+		    tegra_dvfs_from_rails_suspended_or_solved(rail)) {
 			ret = dvfs_rail_set_voltage(rail,
 				rail->nominal_millivolts);
 			if (ret)

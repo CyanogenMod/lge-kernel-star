@@ -40,6 +40,7 @@ struct dvfs_relationship {
 
 	struct list_head to_node; /* node in relationship_to list */
 	struct list_head from_node; /* node in relationship_from list */
+	bool solved_at_nominal;
 };
 
 struct dvfs_rail {
@@ -50,6 +51,7 @@ struct dvfs_rail {
 	int step;
 	bool disabled;
 	bool updating;
+	bool resolving_to;
 
 	struct list_head node;  /* node in dvfs_rail_list */
 	struct list_head dvfs;  /* list head of attached dvfs clocks */
