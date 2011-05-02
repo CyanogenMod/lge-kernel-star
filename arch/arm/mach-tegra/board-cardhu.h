@@ -103,6 +103,8 @@
 #define PCA954x_I2C_BUS2	(PCA954x_I2C_BUS_BASE + 2)
 #define PCA954x_I2C_BUS3	(PCA954x_I2C_BUS_BASE + 3)
 
+#define AC_PRESENT_GPIO		TPS6591X_GPIO_GP4
+
 /*****************Interrupt tables ******************/
 /* External peripheral act as interrupt controller */
 /* TPS6591x IRQs */

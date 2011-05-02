@@ -443,6 +443,7 @@ static struct nct1008_platform_data cardhu_nct1008_pdata = {
 static struct i2c_board_info cardhu_i2c4_bq27510_board_info[] = {
 	{
 		I2C_BOARD_INFO("bq27510", 0x55),
+		.irq = AC_PRESENT_GPIO,
 	},
 };
 
