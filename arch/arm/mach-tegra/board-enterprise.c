@@ -109,8 +109,8 @@ static struct tegra_utmip_config utmi_phy_config[] = {
 static struct resource enterprise_bcm4329_rfkill_resources[] = {
 	{
 		.name   = "bcm4329_nshutdown_gpio",
-		.start  = TEGRA_GPIO_PU0,
-		.end    = TEGRA_GPIO_PU0,
+		.start  = TEGRA_GPIO_PE6,
+		.end    = TEGRA_GPIO_PE6,
 		.flags  = IORESOURCE_IO,
 	},
 };
