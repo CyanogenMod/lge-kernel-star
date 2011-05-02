@@ -1011,6 +1011,61 @@ static const struct file_operations clock_tree_fops = {
 	.release	= single_release,
 };
 
+static void syncevent_one(struct clk *c)
+{
+	struct clk *child;
+
+	if (c->state == ON)
+		trace_clock_enable(c->name, 1, smp_processor_id());
+	else
+		trace_clock_disable(c->name, 0, smp_processor_id());
+
+	trace_clock_set_rate(c->name, clk_get_rate_all_locked(c),
+				smp_processor_id());
+
+	list_for_each_entry(child, &clocks, node) {
+		if (child->parent != c)
+			continue;
+
+		syncevent_one(child);
+	}
+}
+
+static int syncevent_write(struct file *file, const char __user *user_buf,
+				size_t count, loff_t *ppos)
+{
+	struct clk *c;
+	char buffer[40];
+	int buf_size;
+
+	memset(buffer, 0, sizeof(buffer));
+	buf_size = min(count, (sizeof(buffer)-1));
+
+	if (copy_from_user(buffer, user_buf, buf_size))
+		return -EFAULT;
+
+	if (!strnicmp("all", buffer, 3)) {
+		mutex_lock(&clock_list_lock);
+
+		clk_lock_all();
+
+		list_for_each_entry(c, &clocks, node) {
+			if (c->parent == NULL)
+				syncevent_one(c);
+		}
+
+		clk_unlock_all();
+
+		mutex_unlock(&clock_list_lock);
+	}
+
+	return count;
+}
+
+static const struct file_operations syncevent_fops = {
+	.write		= syncevent_write,
+};
+
 static int possible_parents_show(struct seq_file *s, void *data)
 {
 	struct clk *c = s->private;
@@ -1246,6 +1301,9 @@ static int __init clk_debugfs_init(void)
 		&clock_tree_fops);
 	if (!d)
 		goto err_out;
+
+	d = debugfs_create_file("syncevents", S_IWUGO, clk_debugfs_root, NULL,
+		&syncevent_fops);
 
 	if (dvfs_debugfs_init(clk_debugfs_root))
 		goto err_out;
