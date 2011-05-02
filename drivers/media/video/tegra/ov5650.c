@@ -720,16 +720,16 @@ static int ov5650_test_pattern(struct ov5650_info *info,
 				  NULL, 0);
 }
 
-static int ov5650_set_power(int val)
+static int ov5650_set_power(int powerLevel)
 {
-	pr_info("%s: val=%d camera mode=%d\n", __func__, val,
+	pr_info("%s: powerLevel=%d camera mode=%d\n", __func__, powerLevel,
 			info->camera_mode);
 
 	switch (info->camera_mode) {
 	case Main:
 	case LeftOnly:
 		if (info->left.pdata) {
-			if (val && info->left.pdata->power_on)
+			if (powerLevel && info->left.pdata->power_on)
 				info->left.pdata->power_on();
 			else if (info->left.pdata->power_off)
 				info->left.pdata->power_off();
@@ -738,13 +738,13 @@ static int ov5650_set_power(int val)
 
 	case Stereo:
 		if (info->left.pdata) {
-			if (val && info->left.pdata->power_on)
+			if (powerLevel && info->left.pdata->power_on)
 				info->left.pdata->power_on();
 			else if (info->left.pdata->power_off)
 				info->left.pdata->power_off();
 		}
 		if (info->right.pdata) {
-			if (val && info->right.pdata->power_on)
+			if (powerLevel && info->right.pdata->power_on)
 				info->right.pdata->power_on();
 			else if (info->right.pdata->power_off)
 				info->right.pdata->power_off();
@@ -753,7 +753,7 @@ static int ov5650_set_power(int val)
 
 	case RightOnly:
 		if (info->right.pdata) {
-			if (val && info->right.pdata->power_on)
+			if (powerLevel && info->right.pdata->power_on)
 				info->right.pdata->power_on();
 			else if (info->right.pdata->power_off)
 				info->right.pdata->power_off();
@@ -788,6 +788,10 @@ static long ov5650_ioctl(struct file *file,
 		}
 		return 0;
 	}
+	case OV5650_IOCTL_SYNC_SENSORS:
+		if (info->right.pdata->synchronize_sensors)
+			info->right.pdata->synchronize_sensors();
+		return 0;
 	case OV5650_IOCTL_SET_MODE:
 	{
 		struct ov5650_mode mode;

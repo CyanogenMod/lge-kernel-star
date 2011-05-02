@@ -22,13 +22,14 @@
 
 #include <linux/ioctl.h>  /* For IOCTL macros */
 
-#define OV5650_IOCTL_SET_MODE		_IOW('o', 1, struct ov5650_mode)
+#define OV5650_IOCTL_SET_MODE			_IOW('o', 1, struct ov5650_mode)
 #define OV5650_IOCTL_SET_FRAME_LENGTH	_IOW('o', 2, __u32)
 #define OV5650_IOCTL_SET_COARSE_TIME	_IOW('o', 3, __u32)
-#define OV5650_IOCTL_SET_GAIN		_IOW('o', 4, __u16)
-#define OV5650_IOCTL_GET_STATUS		_IOR('o', 5, __u8)
-#define OV5650_IOCTL_TEST_PATTERN	_IOW('o', 7, enum ov5650_test_pattern)
+#define OV5650_IOCTL_SET_GAIN			_IOW('o', 4, __u16)
+#define OV5650_IOCTL_GET_STATUS			_IOR('o', 5, __u8)
+#define OV5650_IOCTL_TEST_PATTERN		_IOW('o', 7, enum ov5650_test_pattern)
 #define OV5650_IOCTL_SET_CAMERA_MODE	_IOW('o', 10, __u32)
+#define OV5650_IOCTL_SYNC_SENSORS		_IOW('o', 11, __u32)
 
 enum ov5650_test_pattern {
 	TEST_PATTERN_NONE,
@@ -47,7 +48,7 @@ struct ov5650_mode {
 struct ov5650_platform_data {
 	int (*power_on)(void);
 	int (*power_off)(void);
-
+	void (*synchronize_sensors)(void);
 };
 #endif /* __KERNEL__ */
 
