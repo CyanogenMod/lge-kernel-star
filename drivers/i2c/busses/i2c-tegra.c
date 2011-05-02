@@ -17,6 +17,9 @@
  *
  */
 
+/*#define DEBUG           1*/
+/*#define VERBOSE_DEBUG   1*/
+
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/platform_device.h>
@@ -156,6 +159,7 @@ struct tegra_i2c_dev {
 	size_t msg_buf_remaining;
 	int msg_read;
 	struct i2c_msg *msgs;
+	int msg_add;
 	int msgs_num;
 	bool is_suspended;
 	int bus_count;
@@ -411,7 +415,8 @@ static irqreturn_t tegra_i2c_isr(int irq, void *dev_id)
 	status = i2c_readl(i2c_dev, I2C_INT_STATUS);
 
 	if (status == 0) {
-		dev_warn(i2c_dev->dev, "unknown interrupt\n");
+		dev_warn(i2c_dev->dev, "unknown interrupt Add 0x%02x\n",
+						i2c_dev->msg_add);
 		i2c_dev->msg_err |= I2C_ERR_UNKNOWN_INTERRUPT;
 
 		if (!i2c_dev->irq_disabled) {
@@ -424,14 +429,21 @@ static irqreturn_t tegra_i2c_isr(int irq, void *dev_id)
 	}
 
 	if (unlikely(status & status_err)) {
+		dev_warn(i2c_dev->dev, "I2c error status 0x%08x\n", status);
 		if (status & I2C_INT_NO_ACK) {
 			i2c_dev->msg_err |= I2C_ERR_NO_ACK;
-			dev_warn(i2c_dev->dev, "no acknowledge\n");
+			dev_warn(i2c_dev->dev, "no acknowledge from address"
+					" 0x%x\n", i2c_dev->msg_add);
+			dev_warn(i2c_dev->dev, "Packet status 0x%08x\n",
+				i2c_readl(i2c_dev, I2C_PACKET_TRANSFER_STATUS));
 		}
 
 		if (status & I2C_INT_ARBITRATION_LOST) {
 			i2c_dev->msg_err |= I2C_ERR_ARBITRATION_LOST;
-			dev_warn(i2c_dev->dev, "arbitration lost\n");
+			dev_warn(i2c_dev->dev, "arbitration lost during "
+				" communicate to add 0x%x\n", i2c_dev->msg_add);
+			dev_warn(i2c_dev->dev, "Packet status 0x%08x\n",
+				i2c_readl(i2c_dev, I2C_PACKET_TRANSFER_STATUS));
 		}
 
 		complete(&i2c_dev->msg_complete);
@@ -531,6 +543,7 @@ static int tegra_i2c_xfer_msg(struct tegra_i2c_bus *i2c_bus,
 	i2c_dev->msg_err = I2C_ERR_NONE;
 	i2c_dev->msg_read = (msg->flags & I2C_M_RD);
 	INIT_COMPLETION(i2c_dev->msg_complete);
+	i2c_dev->msg_add = msg->addr;
 
 	i2c_dev->packet_header = (0 << PACKET_HEADER0_HEADER_SIZE_SHIFT) |
 			PACKET_HEADER0_PROTOCOL_I2C |
