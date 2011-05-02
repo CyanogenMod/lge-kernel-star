@@ -461,12 +461,14 @@ static int gpio_switch_en_vdd_pnl1_voltages[] = { 3300};
 /* CAM1_LDO_EN from AP GPIO KB_ROW6 R06*/
 static struct regulator_consumer_supply gpio_switch_cam1_ldo_en_supply[] = {
 	REGULATOR_SUPPLY("vdd_2v8_cam1", NULL),
+	REGULATOR_SUPPLY("vdd_2v8_cam1_af", NULL),
 };
 static int gpio_switch_cam1_ldo_en_voltages[] = { 2800};
 
 /* CAM2_LDO_EN from AP GPIO KB_ROW7 R07*/
 static struct regulator_consumer_supply gpio_switch_cam2_ldo_en_supply[] = {
 	REGULATOR_SUPPLY("vdd_2v8_cam2", NULL),
+	REGULATOR_SUPPLY("vdd_2v8_cam2_af", NULL),
 };
 static int gpio_switch_cam2_ldo_en_voltages[] = { 2800};
 

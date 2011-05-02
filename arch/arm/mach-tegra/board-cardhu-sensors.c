@@ -48,19 +48,17 @@ static struct regulator *cardhu_vdd_cam3 = NULL;
 
 static struct board_info board_info;
 
-#ifdef CONFIG_I2C_MUX_PCA954x
 static struct pca954x_platform_mode cardhu_pca954x_modes[] = {
-	{ .adap_id = PCA954x_I2C_BUS0, },
-	{ .adap_id = PCA954x_I2C_BUS1, },
-	{ .adap_id = PCA954x_I2C_BUS2, },
-	{ .adap_id = PCA954x_I2C_BUS3, },
+	{ .adap_id = PCA954x_I2C_BUS0, .deselect_on_exit = true, },
+	{ .adap_id = PCA954x_I2C_BUS1, .deselect_on_exit = true, },
+	{ .adap_id = PCA954x_I2C_BUS2, .deselect_on_exit = true, },
+	{ .adap_id = PCA954x_I2C_BUS3, .deselect_on_exit = true, },
 };
 
 static struct pca954x_platform_data cardhu_pca954x_data = {
 	.modes    = cardhu_pca954x_modes,
 	.num_modes      = ARRAY_SIZE(cardhu_pca954x_modes),
 };
-#endif
 
 static int cardhu_camera_init(void)
 {
@@ -397,12 +395,10 @@ struct ov2710_platform_data cardhu_ov2710_data = {
 };
 
 static const struct i2c_board_info cardhu_i2c3_board_info[] = {
-#ifdef CONFIG_I2C_MUX_PCA954x
 	{
 		I2C_BOARD_INFO("pca9546", 0x70),
 		.platform_data = &cardhu_pca954x_data,
 	},
-#endif
 };
 static struct i2c_board_info cardhu_i2c6_board_info[] = {
 	{
@@ -639,10 +635,6 @@ int __init cardhu_sensors_init(void)
 #ifdef CONFIG_SENSORS_MPU3050
 	cardhu_mpuirq_init();
 #endif
-
-	if (ARRAY_SIZE(cardhu_i2c3_board_info))
-		i2c_register_board_info(3, cardhu_i2c3_board_info,
-			ARRAY_SIZE(cardhu_i2c3_board_info));
 
 #ifdef CONFIG_SENSORS_MPU3050
 	i2c_register_board_info(2, mpu3050_i2c0_boardinfo,
