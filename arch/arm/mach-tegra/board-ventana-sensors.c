@@ -72,6 +72,8 @@ static int ventana_left_ov5650_power_on(void)
 {
 	gpio_direction_output(CAMERA_CSI_MUX_SEL_GPIO, 0);
 	gpio_direction_output(AVDD_DSI_CSI_ENB_GPIO, 1);
+	gpio_direction_output(CAM2_LDO_SHUTDN_L_GPIO, 1);
+	mdelay(5);
 	gpio_direction_output(CAM2_PWR_DN_GPIO, 0);
 	mdelay(5);
 	gpio_direction_output(CAM2_RST_L_GPIO, 0);
@@ -86,6 +88,7 @@ static int ventana_left_ov5650_power_off(void)
 	gpio_direction_output(AVDD_DSI_CSI_ENB_GPIO, 0);
 	gpio_direction_output(CAM2_RST_L_GPIO, 0);
 	gpio_direction_output(CAM2_PWR_DN_GPIO, 1);
+	gpio_direction_output(CAM2_LDO_SHUTDN_L_GPIO, 0);
 	return 0;
 }
 
@@ -127,6 +130,8 @@ static int ventana_ov2710_power_on(void)
 {
 	gpio_direction_output(CAMERA_CSI_MUX_SEL_GPIO, 1);
 	gpio_direction_output(AVDD_DSI_CSI_ENB_GPIO, 1);
+	gpio_direction_output(CAM3_LDO_SHUTDN_L_GPIO, 1);
+	mdelay(5);
 	gpio_direction_output(CAM3_PWR_DN_GPIO, 0);
 	mdelay(5);
 	gpio_direction_output(CAM3_RST_L_GPIO, 0);
@@ -140,6 +145,7 @@ static int ventana_ov2710_power_off(void)
 {
 	gpio_direction_output(CAM3_RST_L_GPIO, 0);
 	gpio_direction_output(CAM3_PWR_DN_GPIO, 1);
+	gpio_direction_output(CAM3_LDO_SHUTDN_L_GPIO, 0);
 	gpio_direction_output(AVDD_DSI_CSI_ENB_GPIO, 0);
 	gpio_direction_output(CAMERA_CSI_MUX_SEL_GPIO, 0);
 	return 0;
@@ -388,17 +394,17 @@ static struct tegra_camera_gpios ventana_camera_gpio_keys[] = {
 	[0] = TEGRA_CAMERA_GPIO("en_avdd_csi", AVDD_DSI_CSI_ENB_GPIO, 1),
 	[1] = TEGRA_CAMERA_GPIO("cam_i2c_mux_rst_lo", CAM_I2C_MUX_RST_GPIO, 1),
 
-	[2] = TEGRA_CAMERA_GPIO("cam2_ldo_shdn_lo", CAM2_LDO_SHUTDN_L_GPIO, 1),
+	[2] = TEGRA_CAMERA_GPIO("cam2_ldo_shdn_lo", CAM2_LDO_SHUTDN_L_GPIO, 0),
 	[3] = TEGRA_CAMERA_GPIO("cam2_af_pwdn_lo", CAM2_AF_PWR_DN_L_GPIO, 0),
 	[4] = TEGRA_CAMERA_GPIO("cam2_pwdn", CAM2_PWR_DN_GPIO, 0),
 	[5] = TEGRA_CAMERA_GPIO("cam2_rst_lo", CAM2_RST_L_GPIO, 1),
 
-	[6] = TEGRA_CAMERA_GPIO("cam3_ldo_shdn_lo", CAM3_LDO_SHUTDN_L_GPIO, 1),
+	[6] = TEGRA_CAMERA_GPIO("cam3_ldo_shdn_lo", CAM3_LDO_SHUTDN_L_GPIO, 0),
 	[7] = TEGRA_CAMERA_GPIO("cam3_af_pwdn_lo", CAM3_AF_PWR_DN_L_GPIO, 0),
 	[8] = TEGRA_CAMERA_GPIO("cam3_pwdn", CAM3_PWR_DN_GPIO, 0),
 	[9] = TEGRA_CAMERA_GPIO("cam3_rst_lo", CAM3_RST_L_GPIO, 1),
 
-	[10] = TEGRA_CAMERA_GPIO("cam1_ldo_shdn_lo", CAM1_LDO_SHUTDN_L_GPIO, 1),
+	[10] = TEGRA_CAMERA_GPIO("cam1_ldo_shdn_lo", CAM1_LDO_SHUTDN_L_GPIO, 0),
 	[11] = TEGRA_CAMERA_GPIO("cam1_af_pwdn_lo", CAM1_AF_PWR_DN_L_GPIO, 0),
 	[12] = TEGRA_CAMERA_GPIO("cam1_pwdn", CAM1_PWR_DN_GPIO, 0),
 	[13] = TEGRA_CAMERA_GPIO("cam1_rst_lo", CAM1_RST_L_GPIO, 1),
