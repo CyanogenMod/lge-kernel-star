@@ -16,14 +16,6 @@
 #include "u_serial.h"
 #include "gadget_chips.h"
 
-//20100822, , for USB mode switching [START]
-#if defined(CONFIG_MACH_STAR) && 1==2
-#undef __init
-#define __init
-#undef __initdata
-#define __initdata
-#endif
-//20100822, , for USB mode switching [END]
 
 /*
  * This function packages a simple "generic serial" port with no real
@@ -34,30 +26,30 @@
  * if you can arrange appropriate host side drivers.
  */
 
-struct gser_descs {
+struct gps_descs {
 	struct usb_endpoint_descriptor	*in;
 	struct usb_endpoint_descriptor	*out;
 };
 
-struct f_gser {
+struct f_gps {
 	struct gserial			port;
 	u8				data_id;
 	u8				port_num;
 
-	struct gser_descs		fs;
-	struct gser_descs		hs;
+	struct gps_descs		fs;
+	struct gps_descs		hs;
 };
 
-static inline struct f_gser *func_to_gser(struct usb_function *f)
+static inline struct f_gps *func_to_gps(struct usb_function *f)
 {
-	return container_of(f, struct f_gser, port.func);
+	return container_of(f, struct f_gps, port.func);
 }
 
 /*-------------------------------------------------------------------------*/
 
 /* interface descriptor: */
 
-static struct usb_interface_descriptor gser_interface_desc __initdata = {
+static struct usb_interface_descriptor gps_interface_desc __initdata = {
 	.bLength =		USB_DT_INTERFACE_SIZE,
 	.bDescriptorType =	USB_DT_INTERFACE,
 	/* .bInterfaceNumber = DYNAMIC */
@@ -70,72 +62,72 @@ static struct usb_interface_descriptor gser_interface_desc __initdata = {
 
 /* full speed support: */
 
-static struct usb_endpoint_descriptor gser_fs_in_desc __initdata = {
+static struct usb_endpoint_descriptor gps_fs_in_desc __initdata = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
 	.bEndpointAddress =	USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 };
 
-static struct usb_endpoint_descriptor gser_fs_out_desc __initdata = {
+static struct usb_endpoint_descriptor gps_fs_out_desc __initdata = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
 	.bEndpointAddress =	USB_DIR_OUT,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 };
 
-static struct usb_descriptor_header *gser_fs_function[] __initdata = {
-	(struct usb_descriptor_header *) &gser_interface_desc,
-	(struct usb_descriptor_header *) &gser_fs_in_desc,
-	(struct usb_descriptor_header *) &gser_fs_out_desc,
+static struct usb_descriptor_header *gps_fs_function[] __initdata = {
+	(struct usb_descriptor_header *) &gps_interface_desc,
+	(struct usb_descriptor_header *) &gps_fs_in_desc,
+	(struct usb_descriptor_header *) &gps_fs_out_desc,
 	NULL,
 };
 
 /* high speed support: */
 
-static struct usb_endpoint_descriptor gser_hs_in_desc __initdata = {
+static struct usb_endpoint_descriptor gps_hs_in_desc __initdata = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 	.wMaxPacketSize =	cpu_to_le16(512),
 };
 
-static struct usb_endpoint_descriptor gser_hs_out_desc __initdata = {
+static struct usb_endpoint_descriptor gps_hs_out_desc __initdata = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 	.wMaxPacketSize =	cpu_to_le16(512),
 };
 
-static struct usb_descriptor_header *gser_hs_function[] __initdata = {
-	(struct usb_descriptor_header *) &gser_interface_desc,
-	(struct usb_descriptor_header *) &gser_hs_in_desc,
-	(struct usb_descriptor_header *) &gser_hs_out_desc,
+static struct usb_descriptor_header *gps_hs_function[] __initdata = {
+	(struct usb_descriptor_header *) &gps_interface_desc,
+	(struct usb_descriptor_header *) &gps_hs_in_desc,
+	(struct usb_descriptor_header *) &gps_hs_out_desc,
 	NULL,
 };
 
 /* string descriptors: */
 
-static struct usb_string gser_string_defs[] = {
+static struct usb_string gps_string_defs[] = {
 	[0].s = "Generic Serial",
 	{  } /* end of list */
 };
 
-static struct usb_gadget_strings gser_string_table = {
+static struct usb_gadget_strings gps_string_table = {
 	.language =		0x0409,	/* en-us */
-	.strings =		gser_string_defs,
+	.strings =		gps_string_defs,
 };
 
-static struct usb_gadget_strings *gser_strings[] = {
-	&gser_string_table,
+static struct usb_gadget_strings *gps_strings[] = {
+	&gps_string_table,
 	NULL,
 };
 
 /*-------------------------------------------------------------------------*/
 
-static int gser_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
+static int gps_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 {
-	struct f_gser		*gser = func_to_gser(f);
+	struct f_gps		*gser = func_to_gps(f);
 	struct usb_composite_dev *cdev = f->config->cdev;
 
 	/* we know alt == 0, so this is an activation or a reset */
@@ -154,9 +146,9 @@ static int gser_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	return 0;
 }
 
-static void gser_disable(struct usb_function *f)
+static void gps_disable(struct usb_function *f)
 {
-	struct f_gser	*gser = func_to_gser(f);
+	struct f_gps	*gser = func_to_gps(f);
 	struct usb_composite_dev *cdev = f->config->cdev;
 
 	DBG(cdev, "generic ttyGS%d deactivated\n", gser->port_num);
@@ -168,10 +160,10 @@ static void gser_disable(struct usb_function *f)
 /* serial function driver setup/binding */
 
 static int __init
-gser_bind(struct usb_configuration *c, struct usb_function *f)
+gps_bind(struct usb_configuration *c, struct usb_function *f)
 {
 	struct usb_composite_dev *cdev = c->cdev;
-	struct f_gser		*gser = func_to_gser(f);
+	struct f_gps		*gser = func_to_gps(f);
 	int			status;
 	struct usb_ep		*ep;
 
@@ -180,30 +172,30 @@ gser_bind(struct usb_configuration *c, struct usb_function *f)
 	if (status < 0)
 		goto fail;
 	gser->data_id = status;
-	gser_interface_desc.bInterfaceNumber = status;
+	gps_interface_desc.bInterfaceNumber = status;
 
 	status = -ENODEV;
 
 	/* allocate instance-specific endpoints */
-	ep = usb_ep_autoconfig(cdev->gadget, &gser_fs_in_desc);
+	ep = usb_ep_autoconfig(cdev->gadget, &gps_fs_in_desc);
 	if (!ep)
 		goto fail;
 	gser->port.in = ep;
 	ep->driver_data = cdev;	/* claim */
 
-	ep = usb_ep_autoconfig(cdev->gadget, &gser_fs_out_desc);
+	ep = usb_ep_autoconfig(cdev->gadget, &gps_fs_out_desc);
 	if (!ep)
 		goto fail;
 	gser->port.out = ep;
 	ep->driver_data = cdev;	/* claim */
 
 	/* copy descriptors, and track endpoint copies */
-	f->descriptors = usb_copy_descriptors(gser_fs_function);
+	f->descriptors = usb_copy_descriptors(gps_fs_function);
 
-	gser->fs.in = usb_find_endpoint(gser_fs_function,
-			f->descriptors, &gser_fs_in_desc);
-	gser->fs.out = usb_find_endpoint(gser_fs_function,
-			f->descriptors, &gser_fs_out_desc);
+	gser->fs.in = usb_find_endpoint(gps_fs_function,
+			f->descriptors, &gps_fs_in_desc);
+	gser->fs.out = usb_find_endpoint(gps_fs_function,
+			f->descriptors, &gps_fs_out_desc);
 
 
 	/* support all relevant hardware speeds... we expect that when
@@ -211,18 +203,18 @@ gser_bind(struct usb_configuration *c, struct usb_function *f)
 	 * both speeds
 	 */
 	if (gadget_is_dualspeed(c->cdev->gadget)) {
-		gser_hs_in_desc.bEndpointAddress =
-				gser_fs_in_desc.bEndpointAddress;
-		gser_hs_out_desc.bEndpointAddress =
-				gser_fs_out_desc.bEndpointAddress;
+		gps_hs_in_desc.bEndpointAddress =
+				gps_fs_in_desc.bEndpointAddress;
+		gps_hs_out_desc.bEndpointAddress =
+				gps_fs_out_desc.bEndpointAddress;
 
 		/* copy descriptors, and track endpoint copies */
-		f->hs_descriptors = usb_copy_descriptors(gser_hs_function);
+		f->hs_descriptors = usb_copy_descriptors(gps_hs_function);
 
-		gser->hs.in = usb_find_endpoint(gser_hs_function,
-				f->hs_descriptors, &gser_hs_in_desc);
-		gser->hs.out = usb_find_endpoint(gser_hs_function,
-				f->hs_descriptors, &gser_hs_out_desc);
+		gser->hs.in = usb_find_endpoint(gps_hs_function,
+				f->hs_descriptors, &gps_hs_in_desc);
+		gser->hs.out = usb_find_endpoint(gps_hs_function,
+				f->hs_descriptors, &gps_hs_out_desc);
 	}
 
 	DBG(cdev, "generic ttyGS%d: %s speed IN/%s OUT/%s\n",
@@ -244,16 +236,16 @@ fail:
 }
 
 static void
-gser_unbind(struct usb_configuration *c, struct usb_function *f)
+gps_unbind(struct usb_configuration *c, struct usb_function *f)
 {
 	if (gadget_is_dualspeed(c->cdev->gadget))
 		usb_free_descriptors(f->hs_descriptors);
 	usb_free_descriptors(f->descriptors);
-	kfree(func_to_gser(f));
+	kfree(func_to_gps(f));
 }
 
 /**
- * gser_bind_config - add a generic serial function to a configuration
+ * gps_bind_config - add a generic serial function to a configuration
  * @c: the configuration to support the serial instance
  * @port_num: /dev/ttyGS* port this interface will use
  * Context: single threaded during gadget setup
@@ -264,9 +256,9 @@ gser_unbind(struct usb_configuration *c, struct usb_function *f)
  * handle all the ones it binds.  Caller is also responsible
  * for calling @gserial_cleanup() before module unload.
  */
-int __init gser_bind_config(struct usb_configuration *c, u8 port_num)
+int __init gps_bind_config(struct usb_configuration *c, u8 port_num)
 {
-	struct f_gser	*gser;
+	struct f_gps	*gser;
 	int		status;
 
 	/* REVISIT might want instance-specific strings to help
@@ -274,11 +266,11 @@ int __init gser_bind_config(struct usb_configuration *c, u8 port_num)
 	 */
 
 	/* maybe allocate device-global string ID */
-	if (gser_string_defs[0].id == 0) {
+	if (gps_string_defs[0].id == 0) {
 		status = usb_string_id(c->cdev);
 		if (status < 0)
 			return status;
-		gser_string_defs[0].id = status;
+		gps_string_defs[0].id = status;
 	}
 
 	/* allocate and initialize one new instance */
@@ -288,12 +280,12 @@ int __init gser_bind_config(struct usb_configuration *c, u8 port_num)
 
 	gser->port_num = port_num;
 
-	gser->port.func.name = "gser";
-	gser->port.func.strings = gser_strings;
-	gser->port.func.bind = gser_bind;
-	gser->port.func.unbind = gser_unbind;
-	gser->port.func.set_alt = gser_set_alt;
-	gser->port.func.disable = gser_disable;
+	gser->port.func.name = "gps";
+	gser->port.func.strings = gps_strings;
+	gser->port.func.bind = gps_bind;
+	gser->port.func.unbind = gps_unbind;
+	gser->port.func.set_alt = gps_set_alt;
+	gser->port.func.disable = gps_disable;
 
 	status = usb_add_function(c, &gser->port.func);
 	if (status)

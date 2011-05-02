@@ -55,6 +55,9 @@ static char *tegra_android_functions_ums[] = {
 };
 
 static char *tegra_android_functions_ums_adb[] = {
+#ifdef CONFIG_USB_ANDROID_ACM
+	"acm",
+#endif
 #ifdef CONFIG_USB_ANDROID_MASS_STORAGE
 	"usb_mass_storage",
 #endif
@@ -78,26 +81,24 @@ static char *tegra_android_functions_rndis_adb[] = {
 #endif
 };
 
-static char *tegra_android_functions_accessory[] = { 
 #ifdef CONFIG_USB_ANDROID_ACCESSORY
+static char *tegra_android_functions_accessory[] = { 
 	"accessory",
-#endif
 };
 static char *tegra_android_functions_accessory_adb[] = { 
-#ifdef CONFIG_USB_ANDROID_ACCESSORY
 	"accessory", 
-#endif
 #ifdef CONFIG_USB_ANDROID_ADB
 	"adb",
 #endif
 };
+#endif
 
 static char *tegra_android_functions_all[] = {
 #ifdef CONFIG_USB_ANDROID_RNDIS
 	"rndis",
 #endif
-#ifdef CONFIG_USB_ANDROID_ACCESSORY
-	"accessory",
+#ifdef CONFIG_USB_ANDROID_ACM
+	"acm",
 #endif
 #ifdef CONFIG_USB_ANDROID_MASS_STORAGE
 	"usb_mass_storage",
@@ -141,6 +142,7 @@ static struct android_usb_product tegra_android_products[] = {
 		.num_functions = ARRAY_SIZE(tegra_android_functions_rndis_adb),
 		.functions = tegra_android_functions_rndis_adb,
 	},
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
 	[4] = {
 		.product_id = 0x7104,
 		.num_functions = ARRAY_SIZE(tegra_android_functions_accessory),
@@ -151,6 +153,7 @@ static struct android_usb_product tegra_android_products[] = {
 		.num_functions = ARRAY_SIZE(tegra_android_functions_accessory_adb),
 		.functions = tegra_android_functions_accessory_adb,
 	},
+#endif
 
 };
 
