@@ -32,6 +32,7 @@
 #include "gpio-names.h"
 #include "board.h"
 #include <linux/mpu.h>
+#include <media/sh532u.h>
 
 #include <mach/gpio.h>
 
@@ -123,9 +124,6 @@ static int cardhu_left_ov5650_power_on(void)
 	if ((board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1291)) {
 
-		gpio_direction_output(CAM1_POWER_DWN_GPIO, 0);
-		mdelay(10);
-
 		if (cardhu_vdd_2v8_cam1 == NULL) {
 			cardhu_vdd_2v8_cam1 = regulator_get(NULL, "vdd_2v8_cam1");
 			if (WARN_ON(IS_ERR(cardhu_vdd_2v8_cam1))) {
@@ -161,6 +159,14 @@ static int cardhu_left_ov5650_power_on(void)
 	regulator_enable(cardhu_avdd_dsi_csi);
 
 	mdelay(5);
+	if ((board_info.board_id == BOARD_E1198) ||
+		(board_info.board_id == BOARD_E1291)) {
+		gpio_direction_output(CAM1_POWER_DWN_GPIO, 0);
+		mdelay(20);
+		gpio_direction_output(OV5650_RESETN_GPIO, 0);
+		mdelay(100);
+		gpio_direction_output(OV5650_RESETN_GPIO, 1);
+	}
 	return 0;
 
 reg_alloc_fail:
@@ -400,6 +406,35 @@ static const struct i2c_board_info cardhu_i2c3_board_info[] = {
 		.platform_data = &cardhu_pca954x_data,
 	},
 };
+
+static int sh532u_power_control(void *cdata, int is_enable) {
+	static struct regulator *vdd_2v8_cam1_af = NULL;
+	if (vdd_2v8_cam1_af == NULL) {
+		vdd_2v8_cam1_af = regulator_get(NULL, "vdd_2v8_cam1_af");
+		if (WARN_ON(IS_ERR_OR_NULL(vdd_2v8_cam1_af))) {
+			pr_err("%s: couldn't get regulator vdd_2v8_cam1_af:"
+				" %ld\n", __func__, PTR_ERR(vdd_2v8_cam1_af));
+			return -ENODEV;
+		}
+	}
+	if (is_enable) {
+		regulator_enable(vdd_2v8_cam1_af);
+		mdelay(20);
+	} else
+		regulator_disable(vdd_2v8_cam1_af);
+	return 0;
+}
+static int sh532u_init(void *cdata) {
+	return sh532u_power_control(cdata, true);
+}
+static int sh532u_deinit(void *cdata) {
+	return sh532u_power_control(cdata, false);
+}
+
+struct sh532u_platform_data sh532u_pdata = {
+	.board_init = sh532u_init,
+	.board_deinit = sh532u_deinit,
+};
 static struct i2c_board_info cardhu_i2c6_board_info[] = {
 	{
 		I2C_BOARD_INFO("ov5650L", 0x36),
@@ -407,6 +442,7 @@ static struct i2c_board_info cardhu_i2c6_board_info[] = {
 	},
 	{
 		I2C_BOARD_INFO("sh532u", 0x72),
+		.platform_data = &sh532u_pdata,
 	},
 };
 
