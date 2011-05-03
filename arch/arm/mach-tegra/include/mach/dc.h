@@ -140,6 +140,9 @@ struct tegra_dsi_out {
 	bool		hs_cmd_mode_supported;
 	bool		hs_cmd_mode_on_blank_supported;
 	bool		enable_hs_clock_on_lp_cmd_mode;
+	bool		no_pkt_seq_eot; /* 1st generation panel may not
+					 * support eot. Don't set it for
+					 * most panels. */
 
 	u32 		max_panel_freq_khz;
 	u32 		lp_cmd_mode_freq_khz;
