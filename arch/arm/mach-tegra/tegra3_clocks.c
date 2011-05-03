@@ -195,6 +195,8 @@
 #define	SUPER_IDLE_SOURCE_SHIFT		0
 
 #define SUPER_CLK_DIVIDER		0x04
+#define SUPER_CLOCK_DIV_U71_SHIFT	16
+#define SUPER_CLOCK_DIV_U71_MASK	(0xff << SUPER_CLOCK_DIV_U71_SHIFT)
 
 #define BUS_CLK_DISABLE			(1<<3)
 #define BUS_CLK_DIV_MASK		0x3
@@ -529,10 +531,12 @@ static struct clk_ops tegra_pll_ref_ops = {
 };
 
 /* super clock functions */
-/* "super clocks" on tegra have two-stage muxes and a clock skipping
- * super divider.  We will ignore the clock skipping divider, since we
- * can't lower the voltage when using the clock skip, but we can if we
- * lower the PLL frequency.
+/* "super clocks" on tegra3 have two-stage muxes, fractional 7.1 divider and
+ * clock skipping super divider.  We will ignore the clock skipping divider,
+ * since we can't lower the voltage when using the clock skip, but we can if
+ * we lower the PLL frequency. We will use 7.1 divider for CPU super-clock
+ * only when its parent is a fixed rate PLL, since we can't change PLL rate
+ * in this case.
  */
 static void tegra3_super_clk_init(struct clk *c)
 {
@@ -555,11 +559,20 @@ static void tegra3_super_clk_init(struct clk *c)
 	}
 	BUG_ON(sel->input == NULL);
 	c->parent = sel->input;
+
+	if (c->flags & DIV_U71) {
+		val = clk_readl(c->reg + SUPER_CLK_DIVIDER);
+		val &= SUPER_CLOCK_DIV_U71_MASK;
+		clk_writel(val, c->reg + SUPER_CLK_DIVIDER);
+		c->div = (val >> SUPER_CLOCK_DIV_U71_SHIFT) + 2;
+		c->mul = 2;
+	}
+	else
+		clk_writel(0, c->reg + SUPER_CLK_DIVIDER);
 }
 
 static int tegra3_super_clk_enable(struct clk *c)
 {
-	clk_writel(0, c->reg + SUPER_CLK_DIVIDER);
 	return 0;
 }
 
@@ -612,14 +625,25 @@ static int tegra3_super_clk_set_parent(struct clk *c, struct clk *p)
 }
 
 /*
- * Super clocks have "clock skippers" instead of dividers.  Dividing using
- * a clock skipper does not allow the voltage to be scaled down, so instead
- * adjust the rate of the parent clock.  This requires that the parent of a
- * super clock have no other children, otherwise the rate will change
- * underneath the other children.
+ * Do not use super clocks "skippers", since dividing using a clock skipper
+ * does not allow the voltage to be scaled down. Instead adjust the rate of
+ * the parent clock. This requires that the parent of a super clock have no
+ * other children, otherwise the rate will change underneath the other
+ * children. Special case: if fixed rate PLL is CPU super clock parent the
+ * rate of this PLL can't be changed, and it has many other children. In
+ * this case use 7.1 fractional divider to adjust the super clock rate.
  */
 static int tegra3_super_clk_set_rate(struct clk *c, unsigned long rate)
 {
+	if ((c->flags & DIV_U71) && (c->parent->flags & PLL_FIXED)) {
+		int div = clk_div71_get_divider(c->parent->u.pll.fixed_rate,
+					rate, c->flags, ROUND_DIVIDER_DOWN);
+		clk_writel(div << SUPER_CLOCK_DIV_U71_SHIFT,
+			   c->reg + SUPER_CLK_DIVIDER);
+		c->div = div + 2;
+		c->mul = 2;
+		return 0;
+	}
 	return clk_set_rate(c->parent, rate);
 }
 
@@ -658,6 +682,7 @@ static void tegra3_cpu_clk_disable(struct clk *c)
 static int tegra3_cpu_clk_set_rate(struct clk *c, unsigned long rate)
 {
 	int ret;
+	unsigned int backup_rate;
 	/*
 	 * Take an extra reference to the main pll so it doesn't turn
 	 * off when we move the cpu off of it
@@ -670,7 +695,12 @@ static int tegra3_cpu_clk_set_rate(struct clk *c, unsigned long rate)
 		goto out;
 	}
 
-	if (rate == clk_get_rate(c->u.cpu.backup))
+	backup_rate = clk_get_rate(c->u.cpu.backup);
+	if (c->u.cpu.backup->flags & PLL_FIXED) {
+		clk_set_rate(c->parent, rate);
+		if (rate <= backup_rate)
+			goto out;
+	} else if (rate == backup_rate)
 		goto out;
 
 	if (rate != clk_get_rate(c->u.cpu.main)) {
@@ -3096,6 +3126,7 @@ static struct clk_mux_sel mux_sclk[] = {
 
 static struct clk tegra_clk_cclk_g = {
 	.name	= "cclk_g",
+	.flags  = DIV_U71 | DIV_U71_INT,
 	.inputs	= mux_cclk_g,
 	.reg	= 0x368,
 	.ops	= &tegra_super_ops,
@@ -3104,7 +3135,7 @@ static struct clk tegra_clk_cclk_g = {
 
 static struct clk tegra_clk_cclk_lp = {
 	.name	= "cclk_lp",
-	.flags  = DIV_2,
+	.flags  = DIV_2 | DIV_U71 | DIV_U71_INT,
 	.inputs	= mux_cclk_lp,
 	.reg	= 0x370,
 	.ops	= &tegra_super_ops,
@@ -3636,20 +3667,21 @@ static struct cpufreq_frequency_table freq_table_300MHz[] = {
 };
 
 static struct cpufreq_frequency_table freq_table_1p0GHz[] = {
-	{ 0, 216000 },
-	{ 1, 312000 },
-	{ 2, 456000 },
-	{ 3, 608000 },
-	{ 4, 760000 },
-	{ 5, 816000 },
-	{ 6, 912000 },
-	{ 7, 1000000 },
-	{ 8, CPUFREQ_TABLE_END },
+	{ 0, 108000 },
+	{ 1, 216000 },
+	{ 2, 312000 },
+	{ 3, 456000 },
+	{ 4, 608000 },
+	{ 5, 760000 },
+	{ 6, 816000 },
+	{ 7, 912000 },
+	{ 8, 1000000 },
+	{ 9, CPUFREQ_TABLE_END },
 };
 
 static struct tegra_cpufreq_table_data cpufreq_tables[] = {
 	{ freq_table_300MHz, 0, 1 },
-	{ freq_table_1p0GHz, 2, 6 },
+	{ freq_table_1p0GHz, 2, 7 },
 };
 
 static void clip_cpu_rate_limits(
