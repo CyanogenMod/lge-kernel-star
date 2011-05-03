@@ -138,7 +138,7 @@ struct tegra_aes_reqctx {
 	unsigned long mode;
 };
 
-#define TEGRA_AES_QUEUE_LENGTH	50
+#define TEGRA_AES_QUEUE_LENGTH	500
 
 struct tegra_aes_engine {
 	struct tegra_aes_dev *dd;
@@ -252,7 +252,7 @@ static int bsea_alloc_iram(struct tegra_aes_dev *dd)
 		goto out;
 	}
 	dd->bsea_iram_address = nvmap_handle_address(dd->client,
-				nvmap_ref_to_id(dd->h_ref));
+					nvmap_ref_to_id(dd->h_ref));
 
 	dd->bsea_iram_base = nvmap_mmap(dd->h_ref);	/* get virtual address */
 	if (!dd->bsea_iram_base) {
@@ -263,11 +263,16 @@ static int bsea_alloc_iram(struct tegra_aes_dev *dd)
 	memset(dd->bsea_iram_base, 0, dd->h_ref->handle->size);
 
 	return 0;
+
 out:
 	if (dd->bsea_iram_base)
 		nvmap_munmap(dd->h_ref, dd->bsea_iram_base);
-	if (dd->client)
+
+	if (dd->client) {
+		nvmap_free_handle_id(dd->client, nvmap_ref_to_id(dd->h_ref));
 		nvmap_client_put(dd->client);
+	}
+
 	return -ENOMEM;
 }
 
@@ -275,8 +280,11 @@ static void bsea_free_iram(struct tegra_aes_dev *dd)
 {
 	if (dd->bsea_iram_base)
 		nvmap_munmap(dd->h_ref, dd->bsea_iram_base);
-	if (dd->client)
+
+	if (dd->client) {
+		nvmap_free_handle_id(dd->client, nvmap_ref_to_id(dd->h_ref));
 		nvmap_client_put(dd->client);
+	}
 }
 
 static int aes_hw_init(struct tegra_aes_engine *engine)
@@ -292,6 +300,7 @@ static int aes_hw_init(struct tegra_aes_engine *engine)
 			return ret;
 		}
 	}
+
 	if (engine->iclk) {
 		ret = clk_enable(engine->iclk);
 		if (ret < 0) {
@@ -320,6 +329,8 @@ static int aes_start_crypt(struct tegra_aes_engine *eng, u32 in_addr,
 	u32 cmdq[AES_HW_MAX_ICQ_LENGTH];
 	int qlen = 0, i, eng_busy, icq_empty, ret;
 	u32 value;
+
+	aes_writel(eng, 0xFFFFFFFF, INTR_STATUS);
 
 	/* error, dma xfer complete */
 	aes_writel(eng, 0x33, INT_ENB);
@@ -406,6 +417,7 @@ static int aes_start_crypt(struct tegra_aes_engine *eng, u32 in_addr,
 		disable_irq(eng->irq);
 		return -ETIMEDOUT;
 	}
+
 	disable_irq(eng->irq);
 	aes_writel(eng, cmdq[qlen - 1], ICMDQUE_WR);
 	return 0;
@@ -461,11 +473,10 @@ static int aes_set_key(struct tegra_aes_engine *eng)
 	value |= (eng->slot_num << SECURE_KEY_INDEX_SHIFT);
 	aes_writel(eng, value, SECURE_CONFIG);
 
+	if (eng->use_ssk)
+		goto out;
+
 	if (eng->res_id == TEGRA_ARB_BSEV) {
-
-		if (eng->use_ssk)
-			goto out;
-
 		/* copy the key table from sdram to vram */
 		cmdq[0] = 0;
 		cmdq[0] = UCQOPCODE_MEMDMAVD << ICQBITSHIFT_OPCODE |
@@ -496,9 +507,6 @@ static int aes_set_key(struct tegra_aes_engine *eng)
 			icq_empty = value & BIT(3);
 		} while (eng_busy & (!icq_empty));
 	} else {
-		if (eng->use_ssk)
-			goto out;
-
 		/* settable command to get key into internal registers */
 		value = 0;
 		value = UCQOPCODE_SETTABLE << ICQBITSHIFT_OPCODE |
@@ -535,10 +543,11 @@ static int tegra_aes_handle_req(struct tegra_aes_engine *eng)
 	async_req = crypto_dequeue_request(&dd->queue);
 	if (!async_req)
 		clear_bit(FLAGS_BUSY, &eng->busy);
-
 	spin_unlock_irqrestore(&dd->lock, irq_flags);
+
 	if (!async_req)
 		return -ENODATA;
+
 	if (backlog)
 		backlog->complete(backlog, -EINPROGRESS);
 
@@ -554,6 +563,7 @@ static int tegra_aes_handle_req(struct tegra_aes_engine *eng)
 		eng->res_id);
 		return -EBUSY;
 	}
+
 	/* assign new request to device */
 	eng->req = req;
 	eng->total = req->nbytes;
@@ -612,6 +622,7 @@ static int tegra_aes_handle_req(struct tegra_aes_engine *eng)
 		count = min((int)sg_dma_len(in_sg), (int)dma_max);
 		WARN_ON(sg_dma_len(in_sg) != sg_dma_len(out_sg));
 		nblocks = DIV_ROUND_UP(count, AES_BLOCK_SIZE);
+
 		ret = aes_start_crypt(eng, addr_in, addr_out, nblocks,
 			dd->flags, true);
 
@@ -698,41 +709,51 @@ static int tegra_aes_setkey(struct crypto_ablkcipher *tfm, const u8 *key,
 static void bsev_workqueue_handler(struct work_struct *work)
 {
 	struct tegra_aes_dev *dd = aes_dev;
+	struct tegra_aes_engine *engine = &dd->bsev;
 	int ret;
 
-	aes_hw_init(&dd->bsev);
+	aes_hw_init(engine);
 
 	/* empty the crypto queue and then return */
 	do {
-		ret = tegra_aes_handle_req(&dd->bsev);
+		ret = tegra_aes_handle_req(engine);
 	} while (!ret);
 
-	aes_hw_deinit(&dd->bsev);
+	aes_hw_deinit(engine);
 }
 
 static void bsea_workqueue_handler(struct work_struct *work)
 {
 	struct tegra_aes_dev *dd = aes_dev;
+	struct tegra_aes_engine *engine = &dd->bsea;
 	int ret;
 
-	aes_hw_init(&dd->bsea);
+	aes_hw_init(engine);
 
 	/* empty the crypto queue and then return */
 	do {
-		ret = tegra_aes_handle_req(&dd->bsea);
+		ret = tegra_aes_handle_req(engine);
 	} while (!ret);
 
-	aes_hw_deinit(&dd->bsea);
+	aes_hw_deinit(engine);
 }
 
 static irqreturn_t aes_bsev_irq(int irq, void *dev_id)
 {
 	struct tegra_aes_dev *dd = (struct tegra_aes_dev *)dev_id;
 	u32 value = aes_readl(&dd->bsev, INTR_STATUS);
+	u32 intr_err_mask = (value & (BIT(19) | BIT(20) | BIT(22)));
+
+	dev_dbg(dd->dev, "irq_stat: 0x%x", value);
+	if (intr_err_mask) {
+		aes_writel(&dd->bsea, intr_err_mask, INTR_STATUS);
+		goto done;
+	}
 
 	if (!(value & ENGINE_BUSY_FIELD))
 		complete(&dd->bsev.op_complete);
 
+done:
 	return IRQ_HANDLED;
 }
 
@@ -740,22 +761,14 @@ static irqreturn_t aes_bsea_irq(int irq, void *dev_id)
 {
 	struct tegra_aes_dev *dd = (struct tegra_aes_dev *)dev_id;
 	u32 value = aes_readl(&dd->bsea, INTR_STATUS);
-	u32 intr_err_mask = (value & (BIT(19) | BIT(20)));
-	u32 cmdq_ctrl = 0;
+	u32 intr_err_mask = (value & (BIT(19) | BIT(20) | BIT(22)));
 
 	dev_dbg(dd->dev, "irq_stat: 0x%x", value);
 	if (intr_err_mask) {
-		dev_err(dd->dev, "BSEA Error Intrrupt: INTR_STATUS=0x%x\n",
-		value);
-		if (value & BIT(2)) {
-			cmdq_ctrl = aes_readl(&dd->bsea, CMDQUE_CONTROL);
-			cmdq_ctrl |= BIT(2);
-			aes_writel(&dd->bsea, cmdq_ctrl, CMDQUE_CONTROL);
-			aes_writel(&dd->bsea, intr_err_mask, INTR_STATUS);
-		} else
-			aes_writel(&dd->bsea, intr_err_mask, INTR_STATUS);
+		aes_writel(&dd->bsea, intr_err_mask, INTR_STATUS);
 		goto done;
 	}
+
 	if (!(value & ENGINE_BUSY_FIELD))
 		complete(&dd->bsea.op_complete);
 
@@ -1141,9 +1154,22 @@ static int tegra_aes_probe(struct platform_device *pdev)
 		goto out;
 	}
 
+	dd->bsea.iclk = clk_get(dev, "sclk");
+	if (!dd->bsea.iclk) {
+		dev_err(dev, "iclock intialization failed.\n");
+		err = -ENODEV;
+		goto out;
+	}
+
 	err = clk_set_rate(dd->bsev.iclk, ULONG_MAX);
 	if (err) {
 		dev_err(dd->dev, "bsev iclk set_rate fail(%d)\n", err);
+		goto out;
+	}
+
+	err = clk_set_rate(dd->bsea.iclk, ULONG_MAX);
+	if (err) {
+		dev_err(dd->dev, "bsea iclk set_rate fail(%d)\n", err);
 		goto out;
 	}
 
@@ -1154,7 +1180,6 @@ static int tegra_aes_probe(struct platform_device *pdev)
 	 */
 	dd->bsev.ivkey_base = dma_alloc_coherent(dev, SZ_512,
 		&dd->bsev.ivkey_phys_base, GFP_KERNEL);
-	/* Allocated IRAM for BSEA */
 	dd->bsea.ivkey_base = NULL;
 	if (!dd->bsev.ivkey_base) {
 		dev_err(dev, "can not allocate iv/key buffer for BSEV\n");
@@ -1185,8 +1210,8 @@ static int tegra_aes_probe(struct platform_device *pdev)
 	init_completion(&dd->bsev.op_complete);
 	init_completion(&dd->bsea.op_complete);
 
-	bsev_wq = alloc_workqueue("bsev_wq", WQ_HIGHPRI, 16);
-	bsea_wq = alloc_workqueue("bsea_wq", WQ_HIGHPRI, 16);
+	bsev_wq = alloc_workqueue("bsev_wq", WQ_HIGHPRI | WQ_UNBOUND, 1);
+	bsea_wq = alloc_workqueue("bsea_wq", WQ_HIGHPRI | WQ_UNBOUND, 1);
 	if (!bsev_wq || !bsea_wq) {
 		dev_err(dev, "alloc_workqueue failed\n");
 		goto out;
