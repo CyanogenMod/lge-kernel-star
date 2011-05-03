@@ -445,19 +445,19 @@ static struct clk_ops tegra_cpu_ops = {
 	.set_rate = tegra2_cpu_clk_set_rate,
 };
 
-static void tegra2_vsclk_init(struct clk *c)
+static void tegra2_virtual_sclk_init(struct clk *c)
 {
 	c->max_rate = c->parent->max_rate;
 	c->min_rate = c->parent->min_rate;
 }
 
-static long tegra2_vsclk_round_rate(struct clk *c, unsigned long rate)
+static long tegra2_virtual_sclk_round_rate(struct clk *c, unsigned long rate)
 {
 	long new_rate = rate;
 	return new_rate;
 }
 
-static int tegra2_vsclk_set_rate(struct clk *c, unsigned long rate)
+static int tegra2_virtual_sclk_set_rate(struct clk *c, unsigned long rate)
 {
 	int ret;
 
@@ -487,10 +487,10 @@ static int tegra2_vsclk_set_rate(struct clk *c, unsigned long rate)
 	return 0;
 }
 
-static struct clk_ops tegra_vsclk_ops = {
-	.init = tegra2_vsclk_init,
-	.set_rate = tegra2_vsclk_set_rate,
-	.round_rate = tegra2_vsclk_round_rate,
+static struct clk_ops tegra_virtual_sclk_ops = {
+	.init = tegra2_virtual_sclk_init,
+	.set_rate = tegra2_virtual_sclk_set_rate,
+	.round_rate = tegra2_virtual_sclk_round_rate,
 };
 
 /* virtual cop clock functions. Used to acquire the fake 'cop' clock to
@@ -2079,9 +2079,9 @@ static struct clk tegra_clk_pclk = {
 };
 
 static struct clk tegra_clk_virtual_sclk = {
-	.name	= "vsclk",
+	.name	= "virt_sclk",
 	.parent	= &tegra_clk_sclk,
-	.ops	= &tegra_vsclk_ops,
+	.ops	= &tegra_virtual_sclk_ops,
 	.u.system = {
 		.pclk = &tegra_clk_pclk,
 	},
@@ -2324,6 +2324,7 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("stat_mon",	"tegra-stat-mon",	NULL,	37,	0,	0x31E,	26000000,  mux_clk_m,			0),
 
 	SHARED_CLK("avp.sclk",	"tegra-avp",		"sclk",	&tegra_clk_virtual_sclk),
+	SHARED_CLK("bsea.sclk",	"tegra-aes",		"sclk",	&tegra_clk_virtual_sclk),
 	SHARED_CLK("usbd.sclk",	"fsl-tegra-udc",	"sclk",	&tegra_clk_virtual_sclk),
 	SHARED_CLK("usb1.sclk",	"tegra-ehci.0",		"sclk",	&tegra_clk_virtual_sclk),
 	SHARED_CLK("usb2.sclk",	"tegra-ehci.1",		"sclk",	&tegra_clk_virtual_sclk),
@@ -2448,14 +2449,17 @@ static struct tegra_sku_rate_limit sku_limits[] =
 	RATE_LIMIT("sclk",	240000000, 0x04, 0x7, 0x08, 0x0F, 0x10),
 	RATE_LIMIT("hclk",	240000000, 0x04, 0x7, 0x08, 0x0F, 0x10),
 	RATE_LIMIT("avp.sclk",	240000000, 0x04, 0x7, 0x08, 0x0F, 0x10),
+	RATE_LIMIT("bsea.sclk",	240000000, 0x04, 0x7, 0x08, 0x0F, 0x10),
 	RATE_LIMIT("vde",	240000000, 0x04, 0x7, 0x08, 0x0F, 0x10),
 	RATE_LIMIT("3d",	300000000, 0x04, 0x7, 0x08, 0x0F, 0x10),
 
 	RATE_LIMIT("host1x",	108000000, 0x0F),
 
 	RATE_LIMIT("sclk",	300000000, 0x14, 0x17, 0x18, 0x1B, 0x1C),
+	RATE_LIMIT("virt_sclk",	300000000, 0x14, 0x17, 0x18, 0x1B, 0x1C),
 	RATE_LIMIT("hclk",	300000000, 0x14, 0x17, 0x18, 0x1B, 0x1C),
 	RATE_LIMIT("avp.sclk",	300000000, 0x14, 0x17, 0x18, 0x1B, 0x1C),
+	RATE_LIMIT("bsea.sclk",	300000000, 0x14, 0x17, 0x18, 0x1B, 0x1C),
 	RATE_LIMIT("vde",	300000000, 0x14, 0x17, 0x18, 0x1B, 0x1C),
 	RATE_LIMIT("3d",	400000000, 0x14, 0x17, 0x18, 0x1B, 0x1C),
 };
