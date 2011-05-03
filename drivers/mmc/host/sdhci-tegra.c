@@ -85,6 +85,36 @@ static unsigned int tegra_sdhci_get_ro(struct sdhci_host *sdhci)
 	return gpio_get_value(plat->wp_gpio);
 }
 
+static void sdhci_status_notify_cb(int card_present, void *dev_id)
+{
+	struct sdhci_host *sdhci = (struct sdhci_host *)dev_id;
+	struct platform_device *pdev = to_platform_device(mmc_dev(sdhci->mmc));
+	struct tegra_sdhci_platform_data *plat;
+	unsigned int status, oldstat;
+
+	pr_debug("%s: card_present %d\n", mmc_hostname(sdhci->mmc),
+		card_present);
+
+	plat = pdev->dev.platform_data;
+	if (!plat->mmc_data.status) {
+		mmc_detect_change(sdhci->mmc, 0);
+		return;
+	}
+
+	status = plat->mmc_data.status(mmc_dev(sdhci->mmc));
+
+	oldstat = plat->mmc_data.card_present;
+	plat->mmc_data.card_present = status;
+	if (status ^ oldstat) {
+		pr_debug("%s: Slot status change detected (%d -> %d)\n",
+			mmc_hostname(sdhci->mmc), oldstat, status);
+		if (status && !plat->mmc_data.built_in)
+			mmc_detect_change(sdhci->mmc, (5 * HZ) / 2);
+		else
+			mmc_detect_change(sdhci->mmc, 0);
+	}
+}
+
 static irqreturn_t carddetect_irq(int irq, void *data)
 {
 	struct sdhci_host *sdhost = (struct sdhci_host *)data;
@@ -132,6 +162,15 @@ static int tegra_sdhci_pltfm_init(struct sdhci_host *host,
 		return -ENXIO;
 	}
 
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+	if (plat->mmc_data.embedded_sdio)
+		mmc_set_embedded_sdio_data(host->mmc,
+			&plat->mmc_data.embedded_sdio->cis,
+			&plat->mmc_data.embedded_sdio->cccr,
+			plat->mmc_data.embedded_sdio->funcs,
+			plat->mmc_data.embedded_sdio->num_funcs);
+#endif
+
 	if (gpio_is_valid(plat->power_gpio)) {
 		rc = gpio_request(plat->power_gpio, "sdhci_power");
 		if (rc) {
@@ -162,6 +201,12 @@ static int tegra_sdhci_pltfm_init(struct sdhci_host *host,
 			goto out_cd;
 		}
 
+	} else if (plat->mmc_data.register_status_notify) {
+		plat->mmc_data.register_status_notify(sdhci_status_notify_cb, host);
+	}
+
+	if (plat->mmc_data.status) {
+		plat->mmc_data.card_present = plat->mmc_data.status(mmc_dev(host->mmc));
 	}
 
 	if (gpio_is_valid(plat->wp_gpio)) {
