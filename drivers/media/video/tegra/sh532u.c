@@ -38,6 +38,7 @@
 struct sh532u_info {
 	struct i2c_client *i2c_client;
 	struct sh532u_config config;
+	struct sh532u_platform_data sh532u_pdata;
 };
 
 static struct sh532u_info *info;
@@ -534,6 +535,9 @@ static int sh532u_open(struct inode *inode, struct file *file)
 {
 	pr_info("sh532 open\n");
 	file->private_data = info;
+	if (info->sh532u_pdata.board_init)
+		info->sh532u_pdata.board_init(
+			info->sh532u_pdata.context_data);
 	init_driver();
 	return 0;
 }
@@ -541,6 +545,9 @@ static int sh532u_open(struct inode *inode, struct file *file)
 int sh532u_release(struct inode *inode, struct file *file)
 {
 	pr_info("sh532 release\n");
+	if (info->sh532u_pdata.board_deinit)
+		info->sh532u_pdata.board_deinit(
+			info->sh532u_pdata.context_data);
 	file->private_data = NULL;
 	return 0;
 }
@@ -564,6 +571,7 @@ static int sh532u_probe(
 	const struct i2c_device_id *id)
 {
 	int err;
+	struct sh532u_platform_data *sh532u_pdata = client->dev.platform_data;
 
 	pr_info("sh532u: probing sensor.\n");
 	info = kzalloc(sizeof(struct sh532u_info), GFP_KERNEL);
@@ -584,6 +592,12 @@ static int sh532u_probe(
 	info->config.pos_low = POS_LOW;
 	info->config.pos_high = POS_HIGH;
 	i2c_set_clientdata(client, info);
+
+	if (sh532u_pdata) {
+		info->sh532u_pdata.context_data = sh532u_pdata->context_data;
+		info->sh532u_pdata.board_init = sh532u_pdata->board_init;
+		info->sh532u_pdata.board_deinit = sh532u_pdata->board_deinit;
+	}
 	return 0;
 }
 

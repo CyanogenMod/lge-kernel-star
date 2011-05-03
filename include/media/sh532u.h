@@ -43,6 +43,11 @@ struct sh532u_config {
 	s16 limit_high;
 };
 
+struct sh532u_platform_data {
+	void *context_data;
+	int (*board_init)(void *context_data);
+	int (*board_deinit)(void *context_data);
+};
 /* Register Definition  : Sany Driver IC */
 /* EEPROM addresses */
 #define addrHallOffset		0x10
@@ -302,7 +307,9 @@ P0  P1
 #define END_ADDR		0x01BF
 
 /*Macro define*/
+#if !defined(abs)
 #define abs(a)		(((a) > 0) ? (a) : -(a))
+#endif
 
 #endif
 /* __SH532U_H__ */
