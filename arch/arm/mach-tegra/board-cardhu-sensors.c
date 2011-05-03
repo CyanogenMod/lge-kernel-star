@@ -190,8 +190,6 @@ static int cardhu_left_ov5650_power_off(void)
 	if ((board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1291)) {
 		gpio_direction_output(CAM1_POWER_DWN_GPIO, 1);
-		gpio_direction_output(CAM2_POWER_DWN_GPIO, 1);
-		gpio_direction_output(CAM3_POWER_DWN_GPIO, 1);
 	}
 	if (cardhu_1v8_cam1)
 		regulator_disable(cardhu_1v8_cam1);
@@ -212,12 +210,14 @@ static int cardhu_right_ov5650_power_on(void)
 {
 	/* Boards E1198 and E1291 are of Cardhu personality
 	 * and donot have TCA6416 exp for camera */
+	if (board_info.board_id == BOARD_E1198)
+		gpio_direction_output(CAM1_POWER_DWN_GPIO, 0);
+	if (board_info.board_id == BOARD_E1291)
+		gpio_direction_output(CAM2_POWER_DWN_GPIO, 0);
+	mdelay(10);
+
 	if ((board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1291)) {
-
-		gpio_direction_output(CAM1_POWER_DWN_GPIO, 0);
-		gpio_direction_output(CAM2_POWER_DWN_GPIO, 0);
-		mdelay(10);
 
 		if (cardhu_vdd_2v8_cam2 == NULL) {
 			cardhu_vdd_2v8_cam2 = regulator_get(NULL, "vdd_2v8_cam2");
@@ -278,11 +278,10 @@ static int cardhu_right_ov5650_power_off(void)
 {
 	/* Boards E1198 and E1291 are of Cardhu personality
 	 * and donot have TCA6416 exp for camera */
-	if ((board_info.board_id == BOARD_E1198) ||
-		(board_info.board_id == BOARD_E1291)) {
+	if (board_info.board_id == BOARD_E1198)
 		gpio_direction_output(CAM1_POWER_DWN_GPIO, 1);
+	if (board_info.board_id == BOARD_E1291)
 		gpio_direction_output(CAM2_POWER_DWN_GPIO, 1);
-	}
 
 	if (cardhu_1v8_cam2)
 		regulator_disable(cardhu_1v8_cam2);
@@ -309,9 +308,6 @@ static int cardhu_ov2710_power_on(void)
 	 * and donot have TCA6416 exp for camera */
 	if ((board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1291)) {
-
-		gpio_direction_output(CAM1_POWER_DWN_GPIO, 0);
-		gpio_direction_output(CAM2_POWER_DWN_GPIO, 0);
 		gpio_direction_output(CAM3_POWER_DWN_GPIO, 0);
 		mdelay(10);
 
@@ -370,16 +366,13 @@ reg_alloc_fail:
 
 static int cardhu_ov2710_power_off(void)
 {
-	gpio_direction_output(CAMERA_CSI_MUX_SEL_GPIO, 1);
+	gpio_direction_output(CAMERA_CSI_MUX_SEL_GPIO, 0);
 
 	/* Boards E1198 and E1291 are of Cardhu personality
 	 * and donot have TCA6416 exp for camera */
 	if ((board_info.board_id == BOARD_E1198) ||
-		(board_info.board_id == BOARD_E1291)) {
-		gpio_direction_output(CAM1_POWER_DWN_GPIO, 1);
-		gpio_direction_output(CAM2_POWER_DWN_GPIO, 1);
+		(board_info.board_id == BOARD_E1291))
 		gpio_direction_output(CAM3_POWER_DWN_GPIO, 1);
-	}
 
 	if (cardhu_1v8_cam3)
 		regulator_disable(cardhu_1v8_cam3);
