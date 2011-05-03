@@ -932,10 +932,10 @@ static int utmi_phy_postresume(struct tegra_usb_phy *phy)
 
 static int uhsic_phy_postresume(struct tegra_usb_phy *phy)
 {
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	unsigned long val;
 	void __iomem *base = phy->regs;
 
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	val = readl(base + USB_TXFILLTUNING);
 	if ((val & USB_FIFO_TXFILL_MASK) != USB_FIFO_TXFILL_THRES(0x10)) {
 		val = USB_FIFO_TXFILL_THRES(0x10);
