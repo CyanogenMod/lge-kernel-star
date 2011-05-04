@@ -598,6 +598,21 @@ GREG_INIT(11, en_vdd_sdmmc1,	en_vdd_sdmmc1,	"vdd_3v3_devices",	TEGRA_GPIO_PD7,		
 GREG_INIT(12, en_3v3_pex_hvdd,	en_3v3_pex_hvdd, "vdd_3v3_devices",	TEGRA_GPIO_PL7,		false,	0,	0,	0,	0);
 GREG_INIT(13, en_1v8_cam,	en_1v8_cam,  	"vdd_gen1v8",		TEGRA_GPIO_PBB4,	false,	0,	0,	0,	0);
 
+/*Specific to pm269*/
+GREG_INIT(4, en_vdd_bl_p269,		en_vdd_bl,		NULL,
+	TEGRA_GPIO_PH3,	false,	1,	0,	0,	0);
+GREG_INIT(6, en_vdd_pnl1_pm269,		en_vdd_pnl1,		"vdd_3v3_devices",
+	TEGRA_GPIO_PW1,	false,	1,	0,	0,	0);
+GREG_INIT(9, en_3v3_fuse_pm269,		en_3v3_fuse,		"vdd_3v3_devices",
+	TEGRA_GPIO_PC1,	false,	0,	0,	0,	0);
+GREG_INIT(11, en_vdd_sdmmc1_pm269,	en_vdd_sdmmc1,		"vdd_3v3_devices",
+	TEGRA_GPIO_PP1,	false,	1,	0,	0,	0);
+GREG_INIT(12, en_3v3_pex_hvdd_pm269,	en_3v3_pex_hvdd,	"vdd_3v3_devices",
+	TEGRA_GPIO_PC6,	false,	0,	0,	0,	0);
+GREG_INIT(17, en_vddio_vid_oc_pm269,	en_vddio_vid_oc,	"vdd_5v0_sys",
+	TEGRA_GPIO_PP2,	false,	0,	TEGRA_PINGROUP_VI_PCLK,
+	enable_load_switch_rail, disable_load_switch_rail);
+
 /* Specific to E1187/E1186 */
 GREG_INIT(14, dis_5v_switch_e118x,	dis_5v_switch,		"vdd_5v0_sys",
 		TEGRA_GPIO_PX2,		true, 	0, 	0,	0,	0);
@@ -658,6 +673,26 @@ GREG_INIT(22, en_vbrtr,	en_vbrtr, "vdd_3v3_devices",	PMU_TCA6416_GPIO_PORT12,		f
 	ADD_GPIO_REG(en_3v3_pex_hvdd),		\
 	ADD_GPIO_REG(en_1v8_cam),
 
+#define PM269_GPIO_REG \
+	ADD_GPIO_REG(en_5v_cp),			\
+	ADD_GPIO_REG(en_5v0),			\
+	ADD_GPIO_REG(en_ddr),			\
+	ADD_GPIO_REG(en_vdd_bl),		\
+	ADD_GPIO_REG(en_3v3_sys),		\
+	ADD_GPIO_REG(en_3v3_modem),		\
+	ADD_GPIO_REG(en_vdd_pnl1),		\
+	ADD_GPIO_REG(cam3_ldo_en),		\
+	ADD_GPIO_REG(en_vdd_com),		\
+	ADD_GPIO_REG(en_3v3_fuse_pm269),	\
+	ADD_GPIO_REG(en_3v3_emmc),		\
+	ADD_GPIO_REG(en_vdd_sdmmc1_pm269),	\
+	ADD_GPIO_REG(en_3v3_pex_hvdd_pm269),	\
+	ADD_GPIO_REG(en_1v8_cam),		\
+	ADD_GPIO_REG(dis_5v_switch_e118x),	\
+	ADD_GPIO_REG(en_usb1_vbus_oc_e118x),	\
+	ADD_GPIO_REG(en_usb3_vbus_oc_e118x),	\
+	ADD_GPIO_REG(en_vddio_vid_oc_pm269),
+
 #define E118x_GPIO_REG	\
 	ADD_GPIO_REG(en_vdd_bl),		\
 	ADD_GPIO_REG(dis_5v_switch_e118x),	\
@@ -697,6 +732,11 @@ static struct gpio_switch_regulator_subdev_data *gswitch_subdevs_e1198[] = {
 	E1198_GPIO_REG
 };
 
+/* Gpio switch regulator platform data for PM269*/
+static struct gpio_switch_regulator_subdev_data *gswitch_subdevs_pm269[] = {
+	PM269_GPIO_REG
+};
+
 /* Gpio switch regulator platform data for E1291 A03*/
 static struct gpio_switch_regulator_subdev_data *gswitch_subdevs_e1291_a03[] = {
 	COMMON_GPIO_REG
@@ -732,6 +772,10 @@ int __init cardhu_gpio_switch_regulator_init(void)
 		}
 		gswitch_pdata.num_subdevs = ARRAY_SIZE(gswitch_subdevs_e1198);
 		gswitch_pdata.subdevs = gswitch_subdevs_e1198;
+		break;
+	case BOARD_PM269:
+		gswitch_pdata.num_subdevs = ARRAY_SIZE(gswitch_subdevs_pm269);
+		gswitch_pdata.subdevs = gswitch_subdevs_pm269;
 		break;
 	default:
 		gswitch_pdata.num_subdevs = ARRAY_SIZE(gswitch_subdevs_e118x);
