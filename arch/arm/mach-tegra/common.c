@@ -93,9 +93,9 @@ static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 #else
 	{ "pll_m",	"clk_m",	600000000,	true },
 	{ "pll_m_out1",	"pll_m",	120000000,	true },
-	{ "sclk",	"pll_m_out1",	120000000,	true },
-	{ "hclk",	"sclk",		120000000,	true },
-	{ "pclk",	"hclk",		60000000,	true },
+	{ "sclk",	"pll_m_out1",	40000000,	true },
+	{ "hclk",	"sclk",		40000000,	true },
+	{ "pclk",	"hclk",		40000000,	true },
 #endif
 	{ "csite",	NULL,		0,		true },
 	{ "emc",	NULL,		0,		true },
