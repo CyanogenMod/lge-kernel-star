@@ -171,6 +171,23 @@ ENTRY(__tegra_cpu_reset_handler)
 	mcr	p14, 0, r0, c7, c12, 6		@ Enable CoreSight access
 	b	.
 #endif
+#ifndef CONFIG_TRUSTED_FOUNDATIONS
+	cpsid	aif, 0x13			@ SVC mode, interrupts disabled
+	mrc	p15, 0, r0, c0, c0, 0		@ read main ID register
+	and	r5, r0, #0x00f00000		@ variant
+	and	r6, r0, #0x0000000f		@ revision
+	orr	r6, r6, r5, lsr #20-4		@ combine variant and revision
+#ifdef CONFIG_ARM_ERRATA_743622
+	teq	r6, #0x20			@ present in r2p0
+	teqne	r6, #0x21			@ present in r2p1
+	teqne	r6, #0x22			@ present in r2p2
+	teqne	r6, #0x27			@ present in r2p7
+	teqne	r6, #0x29			@ present in r2p9
+	mrceq	p15, 0, r10, c15, c0, 1		@ read diagnostic register
+	orreq	r10, r10, #1 << 6		@ set bit #6
+	mcreq	p15, 0, r10, c15, c0, 1		@ write diagnostic register
+#endif
+#endif
 	mrc	p15, 0, r10, c0, c0, 5		@ MPIDR
 	and	r10, r10, #0x3			@ R10 = CPU number
 	mov	r11, #1
