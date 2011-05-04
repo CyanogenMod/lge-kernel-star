@@ -23,19 +23,23 @@
 #include <linux/err.h>
 #include <linux/string.h>
 #include <linux/delay.h>
+#include <linux/clk.h>
 
 #include <mach/iomap.h>
 #include <mach/kfuse.h>
 
+#include "clock.h"
 #include "apbio.h"
 
+static struct clk *kfuse_clk = NULL;
+
 /* register definition */
-#define KFUSE_STATE					0x80
+#define KFUSE_STATE			0x80
 #define  KFUSE_STATE_DONE		(1u << 16)
 #define  KFUSE_STATE_CRCPASS		(1u << 17)
-#define KFUSE_KEYADDR					0x88
+#define KFUSE_KEYADDR			0x88
 #define  KFUSE_KEYADDR_AUTOINC		(1u << 16)
-#define KFUSE_KEYS					0x8c
+#define KFUSE_KEYS			0x8c
 
 static inline u32 tegra_kfuse_readl(unsigned long offset)
 {
@@ -71,11 +75,22 @@ int tegra_kfuse_read(void *dest, size_t len)
 	if (len > KFUSE_DATA_SZ)
 		return -EINVAL;
 
+	if (kfuse_clk == NULL) {
+		kfuse_clk = tegra_get_clock_by_name("kfuse");
+		if (IS_ERR_OR_NULL(kfuse_clk)) {
+			pr_err("kfuse: can't get kfuse clock\n");
+			return -EINVAL;
+		}
+	}
+
+	clk_enable(kfuse_clk);
+
 	tegra_kfuse_writel(KFUSE_KEYADDR_AUTOINC, KFUSE_KEYADDR);
 	wait_for_done();
 
 	if ((tegra_kfuse_readl(KFUSE_STATE) & KFUSE_STATE_CRCPASS) == 0) {
 		pr_err("kfuse: crc failed\n");
+		clk_disable(kfuse_clk);
 		return -EIO;
 	}
 
@@ -83,6 +98,8 @@ int tegra_kfuse_read(void *dest, size_t len)
 		v = tegra_kfuse_readl(KFUSE_KEYS);
 		memcpy(dest + cnt, &v, sizeof v);
 	}
+
+	clk_disable(kfuse_clk);
 
 	return 0;
 }
