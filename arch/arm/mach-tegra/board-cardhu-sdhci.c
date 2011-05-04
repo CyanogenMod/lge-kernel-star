@@ -34,6 +34,7 @@
 
 #define CARDHU_WLAN_PWR	TEGRA_GPIO_PD4
 #define CARDHU_WLAN_RST	TEGRA_GPIO_PD3
+#define CARDHU_WLAN_WOW	TEGRA_GPIO_PO4
 #define CARDHU_SD_CD TEGRA_GPIO_PI5
 #define CARDHU_SD_WP TEGRA_GPIO_PT3
 #define PM269_SD_WP TEGRA_GPIO_PZ4
@@ -47,15 +48,26 @@ static int cardhu_wifi_power(int on);
 static int cardhu_wifi_set_carddetect(int val);
 
 static struct wifi_platform_data cardhu_wifi_control = {
-	.set_power      = cardhu_wifi_power,
-	.set_reset      = cardhu_wifi_reset,
-	.set_carddetect = cardhu_wifi_set_carddetect,
+	.set_power	= cardhu_wifi_power,
+	.set_reset	= cardhu_wifi_reset,
+	.set_carddetect	= cardhu_wifi_set_carddetect,
+};
+
+static struct resource wifi_resource[] = {
+	[0] = {
+		.name	= "bcm4329_wlan_irq",
+		.start	= TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PO4),
+		.end	= TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PO4),
+		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL | IORESOURCE_IRQ_SHAREABLE,
+	},
 };
 
 static struct platform_device cardhu_wifi_device = {
-	.name           = "bcm4329_wlan",
-	.id             = 1,
-	.dev            = {
+	.name		= "bcm4329_wlan",
+	.id		= 1,
+	.num_resources	= 1,
+	.resource	= wifi_resource,
+	.dev		= {
 		.platform_data = &cardhu_wifi_control,
 	},
 };
@@ -296,9 +308,13 @@ static int __init cardhu_wifi_init(void)
 	rc = gpio_request(CARDHU_WLAN_RST, "wlan_rst");
 	if (rc)
 		pr_err("WLAN_RST gpio request failed:%d\n", rc);
+	rc = gpio_request(CARDHU_WLAN_WOW, "bcmsdh_sdmmc");
+	if (rc)
+		pr_err("WLAN_WOW gpio request failed:%d\n", rc);
 
 	tegra_gpio_enable(CARDHU_WLAN_PWR);
 	tegra_gpio_enable(CARDHU_WLAN_RST);
+	tegra_gpio_enable(CARDHU_WLAN_WOW);
 
 	rc = gpio_direction_output(CARDHU_WLAN_PWR, 0);
 	if (rc)
@@ -306,6 +322,9 @@ static int __init cardhu_wifi_init(void)
 	gpio_direction_output(CARDHU_WLAN_RST, 0);
 	if (rc)
 		pr_err("WLAN_RST gpio direction configuration failed:%d\n", rc);
+	rc = gpio_direction_input(CARDHU_WLAN_WOW);
+	if (rc)
+		pr_err("WLAN_WOW gpio direction configuration failed:%d\n", rc);
 
 	platform_device_register(&cardhu_wifi_device);
 	return 0;
