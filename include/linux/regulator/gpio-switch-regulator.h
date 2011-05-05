@@ -33,7 +33,7 @@
  * @gpio_nr: Gpio nr which controls this switch.
  * @active_low: true if making gpio low makes voltage output enable.
  * @init_state: 1 if init_state should be active.
- * @voltages: Possible voltages to set at output.
+ * @voltages: Possible voltages to set at output. The values are in millivolt.
  * @n_voltages: Number of voltages.
  * @num_consumer_supplies: Number of cosumer supplies.
  * @consumer_supplies: List of consumer spllies.

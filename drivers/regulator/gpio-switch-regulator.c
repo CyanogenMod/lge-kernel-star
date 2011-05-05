@@ -134,7 +134,7 @@ static int gpio_switch_get_voltage(struct regulator_dev *rdev)
 		return regulator_get_voltage(ri->input_regulator);
 
 	if (ri->curr_vol_sel < ri->reg_desc.n_voltages)
-		return ri->voltages[ri->curr_vol_sel];
+		return ri->voltages[ri->curr_vol_sel] * 1000;
 	return 0;
 }
 
