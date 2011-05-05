@@ -102,6 +102,7 @@
 #define   UTMIP_FORCE_PD_POWERDOWN		(1 << 14)
 #define   UTMIP_FORCE_PD2_POWERDOWN		(1 << 16)
 #define   UTMIP_FORCE_PDZI_POWERDOWN		(1 << 18)
+#define   UTMIP_XCVR_LSBIAS_SEL			(1 << 21)
 #define   UTMIP_XCVR_HSSLEW_MSB(x)		(((x) & 0x7f) << 25)
 
 #define UTMIP_BIAS_CFG0		0x80c
@@ -249,6 +250,7 @@
 #define   UTMIP_FORCE_PD_POWERDOWN		(1 << 14)
 #define   UTMIP_FORCE_PD2_POWERDOWN		(1 << 16)
 #define   UTMIP_FORCE_PDZI_POWERDOWN		(1 << 18)
+#define   UTMIP_XCVR_LSBIAS_SEL			(1 << 21)
 #define   UTMIP_XCVR_HSSLEW_MSB(x)		(((x) & 0x7f) << 25)
 
 #define UTMIP_BIAS_CFG0		0x80c
@@ -409,6 +411,7 @@ struct tegra_xtal_freq {
 	u8 active_delay;
 	u16 xtal_freq_count;
 	u16 debounce;
+	u8 pdtrk_count;
 };
 
 static const struct tegra_xtal_freq tegra_freq_table[] = {
@@ -419,6 +422,7 @@ static const struct tegra_xtal_freq tegra_freq_table[] = {
 		.active_delay = 0x04,
 		.xtal_freq_count = 0x76,
 		.debounce = 0x7530,
+		.pdtrk_count = 5,
 	},
 	{
 		.freq = 13000000,
@@ -427,6 +431,7 @@ static const struct tegra_xtal_freq tegra_freq_table[] = {
 		.active_delay = 0x05,
 		.xtal_freq_count = 0x7F,
 		.debounce = 0x7EF4,
+		.pdtrk_count = 5,
 	},
 	{
 		.freq = 19200000,
@@ -435,6 +440,7 @@ static const struct tegra_xtal_freq tegra_freq_table[] = {
 		.active_delay = 0x06,
 		.xtal_freq_count = 0xBB,
 		.debounce = 0xBB80,
+		.pdtrk_count = 7,
 	},
 	{
 		.freq = 26000000,
@@ -443,6 +449,7 @@ static const struct tegra_xtal_freq tegra_freq_table[] = {
 		.active_delay = 0x09,
 		.xtal_freq_count = 0xFE,
 		.debounce = 0xFDE8,
+		.pdtrk_count = 9,
 	},
 };
 
@@ -484,8 +491,8 @@ static struct tegra_utmip_config utmip_default[] = {
 		.elastic_limit = 16,
 		.term_range_adj = 6,
 		.xcvr_setup = 9,
-		.xcvr_lsfslew = 1,
-		.xcvr_lsrslew = 1,
+		.xcvr_lsfslew = 2,
+		.xcvr_lsrslew = 2,
 	},
 	[2] = {
 		.hssync_start_delay = 9,
@@ -727,7 +734,7 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 #endif
 
 	val = readl(base + UTMIP_TX_CFG0);
-	val &= ~UTMIP_FS_PREABMLE_J;
+	val |= UTMIP_FS_PREABMLE_J;
 	writel(val, base + UTMIP_TX_CFG0);
 
 	val = readl(base + UTMIP_HSRX_CFG0);
@@ -773,10 +780,10 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	utmip_pad_power_on(phy);
 
 	val = readl(base + UTMIP_XCVR_CFG0);
-	val &= ~(UTMIP_FORCE_PD_POWERDOWN | UTMIP_FORCE_PD2_POWERDOWN |
-		 UTMIP_FORCE_PDZI_POWERDOWN | UTMIP_XCVR_SETUP(~0) |
-		 UTMIP_XCVR_LSFSLEW(~0) | UTMIP_XCVR_LSRSLEW(~0) |
-		 UTMIP_XCVR_HSSLEW_MSB(~0));
+	val &= ~(UTMIP_XCVR_LSBIAS_SEL | UTMIP_FORCE_PD_POWERDOWN |
+		 UTMIP_FORCE_PD2_POWERDOWN |UTMIP_FORCE_PDZI_POWERDOWN |
+		 UTMIP_XCVR_SETUP(~0) | UTMIP_XCVR_LSFSLEW(~0) |
+		 UTMIP_XCVR_LSRSLEW(~0) | UTMIP_XCVR_HSSLEW_MSB(~0));
 	val |= UTMIP_XCVR_SETUP(config->xcvr_setup);
 	val |= UTMIP_XCVR_LSFSLEW(config->xcvr_lsfslew);
 	val |= UTMIP_XCVR_LSRSLEW(config->xcvr_lsrslew);
@@ -789,12 +796,15 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	writel(val, base + UTMIP_XCVR_CFG1);
 
 	val = readl(base + UTMIP_BAT_CHRG_CFG0);
-	val &= ~UTMIP_PD_CHRG;
+	if (phy->mode == TEGRA_USB_PHY_MODE_HOST)
+		val |= UTMIP_PD_CHRG;
+	else
+		val &= ~UTMIP_PD_CHRG;
 	writel(val, base + UTMIP_BAT_CHRG_CFG0);
 
 	val = readl(base + UTMIP_BIAS_CFG1);
 	val &= ~UTMIP_BIAS_PDTRK_COUNT(~0);
-	val |= UTMIP_BIAS_PDTRK_COUNT(0x5);
+	val |= UTMIP_BIAS_PDTRK_COUNT(phy->freq->pdtrk_count);
 	writel(val, base + UTMIP_BIAS_CFG1);
 
 	if (phy->instance == 0) {
@@ -807,6 +817,10 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	}
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	if (phy->instance == 2) {
+		val = readl(base + UTMIP_SPARE_CFG0);
+		val |= FUSE_SETUP_SEL;
+		writel(val, base + UTMIP_SPARE_CFG0);
+
 		val = readl(base + USB_SUSP_CTRL);
 		val |= UTMIP_PHY_ENABLE;
 		writel(val, base + USB_SUSP_CTRL);
@@ -872,9 +886,11 @@ static void utmi_phy_power_off(struct tegra_usb_phy *phy, bool is_dpd)
 		writel(val, base + USB_SUSP_CTRL);
 	}
 
-	val = readl(base + UTMIP_BAT_CHRG_CFG0);
-	val |= UTMIP_PD_CHRG;
-	writel(val, base + UTMIP_BAT_CHRG_CFG0);
+	if (phy->mode == TEGRA_USB_PHY_MODE_DEVICE) {
+		val = readl(base + UTMIP_BAT_CHRG_CFG0);
+		val |= UTMIP_PD_CHRG;
+		writel(val, base + UTMIP_BAT_CHRG_CFG0);
+	}
 
 	val = readl(base + UTMIP_XCVR_CFG1);
 	val |= UTMIP_FORCE_PDDISC_POWERDOWN | UTMIP_FORCE_PDCHRP_POWERDOWN |
