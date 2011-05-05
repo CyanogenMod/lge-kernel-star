@@ -80,7 +80,7 @@ static struct platform_device debug_uart = {
 
 static struct tegra_utmip_config utmi_phy_config[] = {
 	[0] = {
-			.hssync_start_delay = 0,
+			.hssync_start_delay = 9,
 			.idle_wait_delay = 17,
 			.elastic_limit = 16,
 			.term_range_adj = 6,
@@ -89,7 +89,7 @@ static struct tegra_utmip_config utmi_phy_config[] = {
 			.xcvr_lsrslew = 2,
 	},
 	[1] = {
-			.hssync_start_delay = 0,
+			.hssync_start_delay = 9,
 			.idle_wait_delay = 17,
 			.elastic_limit = 16,
 			.term_range_adj = 6,
