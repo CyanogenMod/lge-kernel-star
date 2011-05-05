@@ -67,3 +67,11 @@ obj-${CONFIG_MACH_VENTANA}              += board-ventana-pinmux.o
 obj-${CONFIG_MACH_VENTANA}              += board-ventana-sdhci.o
 obj-${CONFIG_MACH_VENTANA}              += board-ventana-power.o
 obj-${CONFIG_MACH_VENTANA}              += board-ventana-panel.o
+
+# Aruba
+
+# Whistler
+
+# Cardhu
+
+# Enterprise
