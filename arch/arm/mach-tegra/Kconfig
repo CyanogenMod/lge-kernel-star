@@ -86,14 +86,12 @@ config MACH_WARIO
        help
          Support for the Wario version of Seaboard
 
-# Whistler
 config MACH_WHISTLER
        bool "Whistler board"
        depends on ARCH_TEGRA_2x_SOC
        help
          Support for NVIDIA Whistler development platform
 
-# Aruba
 config MACH_ARUBA
        bool "Aruba board"
        depends on ARCH_TEGRA_3x_SOC
@@ -101,15 +99,12 @@ config MACH_ARUBA
        help
          Support for NVIDIA Aruba2 FPGA development platform
 
-# Cardhu
-
 config MACH_CARDHU
        bool "Cardhu board"
        depends on ARCH_TEGRA_3x_SOC
        help
          Support for NVIDIA Cardhu development platform
 
-# Enterprise
 config MACH_TEGRA_ENTERPRISE
        bool "Enterprise board"
        depends on ARCH_TEGRA_3x_SOC

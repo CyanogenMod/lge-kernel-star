@@ -98,7 +98,6 @@ obj-${CONFIG_MACH_VENTANA}              += board-ventana-sensors.o
 obj-${CONFIG_MACH_VENTANA}              += board-ventana-kbc.o
 obj-${CONFIG_MACH_VENTANA}              += board-ventana-memory.o
 
-# Aruba
 obj-${CONFIG_MACH_ARUBA}                += board-aruba.o
 obj-${CONFIG_MACH_ARUBA}                += board-aruba-panel.o
 obj-${CONFIG_MACH_ARUBA}                += board-aruba-pinmux.o
@@ -106,7 +105,6 @@ obj-${CONFIG_MACH_ARUBA}                += board-aruba-power.o
 obj-${CONFIG_MACH_ARUBA}                += board-aruba-sdhci.o
 obj-${CONFIG_MACH_ARUBA}                += board-aruba-sensors.o
 
-# Whistler
 obj-${CONFIG_MACH_WHISTLER}             += board-whistler.o
 obj-${CONFIG_MACH_WHISTLER}             += board-whistler-pinmux.o
 obj-${CONFIG_MACH_WHISTLER}             += board-whistler-sdhci.o
@@ -117,7 +115,6 @@ obj-${CONFIG_MACH_WHISTLER}             += board-whistler-sensors.o
 obj-${CONFIG_MACH_WHISTLER}             += board-whistler-baseband.o
 obj-${CONFIG_MACH_WHISTLER}             += board-whistler-memory.o
 
-# Cardhu
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-kbc.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-panel.o
@@ -128,7 +125,6 @@ obj-${CONFIG_MACH_CARDHU}               += board-cardhu-sensors.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-memory.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-powermon.o
 
-# Enterprise
 obj-${CONFIG_MACH_TEGRA_ENTERPRISE}     += board-enterprise.o
 obj-${CONFIG_MACH_TEGRA_ENTERPRISE}     += board-enterprise-panel.o
 obj-${CONFIG_MACH_TEGRA_ENTERPRISE}     += board-enterprise-pinmux.o
