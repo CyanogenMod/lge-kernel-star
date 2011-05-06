@@ -194,17 +194,21 @@ static int power_up_cpu(unsigned int cpu)
 	BUG_ON(cpu == smp_processor_id());
 	BUG_ON(is_lp_cluster());
 
-	/* This function is entered after CPU has been already un-gated by
-	   flow controller. Wait for confirmation that cpu is powered and
-	   remove clamps. */
-	timeout = jiffies + HZ;
-	do {
-		if (is_cpu_powered(cpu))
-			goto remove_clamps;
-		udelay(10);
-	} while (time_before(jiffies, timeout));
-
-	/* Flow controller did not work as expected - try directly toggle
+	/* If this cpu has booted this function is entered after
+	 * CPU has been already un-gated by flow controller. Wait
+	 * for confirmation that cpu is powered and remove clamps.
+	 * On first boot entry do not wait - go to direct ungate.
+	 */
+	if (cpu_isset(cpu,*(cpumask_t*)&tegra_cpu_init_map))
+	{
+		timeout = jiffies + HZ;
+		do {
+			if (is_cpu_powered(cpu))
+				goto remove_clamps;
+			udelay(10);
+		} while (time_before(jiffies, timeout));
+	}
+	/* 1'st boot or Flow controller did not work as expected - try directly toggle
 	   power gates. Bail out if direct power on also failed */
 	if (!is_cpu_powered(cpu))
 	{
