@@ -18,6 +18,7 @@
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/gpio.h>
+#include <linux/slab.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
 
@@ -26,6 +27,12 @@
 
 #include "sdhci.h"
 #include "sdhci-pltfm.h"
+
+#define SDHCI_VENDOR_CLOCK_CNTRL       0x100
+
+struct tegra_sdhci_host {
+	bool	clk_enabled;
+};
 
 static u32 tegra_sdhci_readl(struct sdhci_host *host, int reg)
 {
@@ -146,6 +153,24 @@ static int tegra_sdhci_8bit(struct sdhci_host *host, int bus_width)
 	return 0;
 }
 
+static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct tegra_sdhci_host *tegra_host = pltfm_host->priv;
+
+	pr_debug("%s %s %u enabled=%u\n", __func__,
+		mmc_hostname(sdhci->mmc), clock, tegra_host->clk_enabled);
+
+	if (clock && !tegra_host->clk_enabled) {
+		clk_enable(pltfm_host->clk);
+		sdhci_writeb(sdhci, 1, SDHCI_VENDOR_CLOCK_CNTRL);
+		tegra_host->clk_enabled = true;
+	} else if (!clock && tegra_host->clk_enabled) {
+		sdhci_writeb(sdhci, 0, SDHCI_VENDOR_CLOCK_CNTRL);
+		clk_disable(pltfm_host->clk);
+		tegra_host->clk_enabled = false;
+	}
+}
 
 static int tegra_sdhci_pltfm_init(struct sdhci_host *host,
 				  struct sdhci_pltfm_data *pdata)
@@ -153,6 +178,7 @@ static int tegra_sdhci_pltfm_init(struct sdhci_host *host,
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
 	struct tegra_sdhci_platform_data *plat;
+	struct tegra_sdhci_host *tegra_host;
 	struct clk *clk;
 	int rc;
 
@@ -160,6 +186,12 @@ static int tegra_sdhci_pltfm_init(struct sdhci_host *host,
 	if (plat == NULL) {
 		dev_err(mmc_dev(host->mmc), "missing platform data\n");
 		return -ENXIO;
+	}
+
+	tegra_host = kzalloc(sizeof(struct tegra_sdhci_host), GFP_KERNEL);
+	if (tegra_host == NULL) {
+		dev_err(mmc_dev(host->mmc), "failed to allocate tegra host\n");
+		return -ENOMEM;
 	}
 
 #ifdef CONFIG_MMC_EMBEDDED_SDIO
@@ -226,8 +258,12 @@ static int tegra_sdhci_pltfm_init(struct sdhci_host *host,
 		rc = PTR_ERR(clk);
 		goto out_wp;
 	}
-	clk_enable(clk);
+	rc = clk_enable(clk);
+	if (rc != 0)
+		goto err_clkput;
 	pltfm_host->clk = clk;
+	pltfm_host->priv = tegra_host;
+	tegra_host->clk_enabled = true;
 
 	if (plat->is_8bit)
 		host->mmc->caps |= MMC_CAP_8_BIT_DATA;
@@ -237,6 +273,9 @@ static int tegra_sdhci_pltfm_init(struct sdhci_host *host,
 		host->mmc->pm_flags = MMC_PM_KEEP_POWER | MMC_PM_IGNORE_PM_NOTIFY;
 
 	return 0;
+
+err_clkput:
+	clk_put(clk);
 
 out_wp:
 	if (gpio_is_valid(plat->wp_gpio)) {
@@ -260,6 +299,7 @@ out_power:
 	}
 
 out:
+	kfree(tegra_host);
 	return rc;
 }
 
@@ -267,6 +307,7 @@ static void tegra_sdhci_pltfm_exit(struct sdhci_host *host)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
+	struct tegra_sdhci_host *tegra_host = pltfm_host->priv;
 	struct tegra_sdhci_platform_data *plat;
 
 	plat = pdev->dev.platform_data;
@@ -287,8 +328,25 @@ static void tegra_sdhci_pltfm_exit(struct sdhci_host *host)
 		gpio_free(plat->power_gpio);
 	}
 
-	clk_disable(pltfm_host->clk);
+	if (tegra_host->clk_enabled)
+		clk_disable(pltfm_host->clk);
 	clk_put(pltfm_host->clk);
+
+	kfree(tegra_host);
+}
+
+static int tegra_sdhci_suspend(struct sdhci_host *sdhci, pm_message_t state)
+{
+	tegra_sdhci_set_clock(sdhci, 0);
+
+	return 0;
+}
+
+static int tegra_sdhci_resume(struct sdhci_host *sdhci)
+{
+	tegra_sdhci_set_clock(sdhci, 1);
+
+	return 0;
 }
 
 static struct sdhci_ops tegra_sdhci_ops = {
@@ -297,6 +355,9 @@ static struct sdhci_ops tegra_sdhci_ops = {
 	.read_w     = tegra_sdhci_readw,
 	.write_l    = tegra_sdhci_writel,
 	.platform_8bit_width = tegra_sdhci_8bit,
+	.set_clock  = tegra_sdhci_set_clock,
+	.suspend    = tegra_sdhci_suspend,
+	.resume     = tegra_sdhci_resume,
 };
 
 struct sdhci_pltfm_data sdhci_tegra_pdata = {
