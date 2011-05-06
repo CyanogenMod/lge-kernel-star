@@ -390,6 +390,7 @@ error:
 static void tegra_usb_otg_host_unregister(struct platform_device *pdev)
 {
 	kfree(pdev->dev.platform_data);
+	pdev->dev.platform_data = NULL;
 	platform_device_unregister(pdev);
 }
 
