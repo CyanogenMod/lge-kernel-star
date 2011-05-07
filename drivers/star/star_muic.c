@@ -1568,9 +1568,7 @@ static struct platform_driver muic_driver = {
     .remove    = muic_remove,
     .suspend   = muic_suspend,
     .resume    = muic_resume,
-#ifndef CONFIG_MACH_STAR_REV_F
     .shutdown = muic_shutdown,
-#endif
     .driver    = {
         .name = "star_muic",
     },
