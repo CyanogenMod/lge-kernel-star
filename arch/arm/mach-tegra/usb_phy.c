@@ -1587,22 +1587,26 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 		ulpi_config = config;
 		gpio_request(ulpi_config->enable_gpio,
 			"uhsic_enable");
-		gpio_request(ulpi_config->reset_gpio,
-			"uhsic_reset");
+		if (ulpi_config->reset_gpio != -1)
+			gpio_request(ulpi_config->reset_gpio,
+				"uhsic_reset");
 		/* hsic enable signal deasserted, hsic reset asserted */
 		gpio_direction_output(ulpi_config->enable_gpio,
 			0 /* deasserted */);
-		gpio_direction_output(ulpi_config->reset_gpio,
-			0 /* asserted */);
+		if (ulpi_config->reset_gpio != -1)
+			gpio_direction_output(ulpi_config->reset_gpio,
+				0 /* asserted */);
 		tegra_gpio_enable(ulpi_config->enable_gpio);
-		tegra_gpio_enable(ulpi_config->reset_gpio);
+		if (ulpi_config->reset_gpio != -1)
+			tegra_gpio_enable(ulpi_config->reset_gpio);
 		/* keep hsic reset asserted for 1 ms */
 		udelay(1000);
 		/* enable (power on) hsic */
 		gpio_set_value_cansleep(ulpi_config->enable_gpio, 1);
 		udelay(1000);
 		/* deassert reset */
-		gpio_set_value_cansleep(ulpi_config->reset_gpio, 1);
+		if (ulpi_config->reset_gpio != -1)
+			gpio_set_value_cansleep(ulpi_config->reset_gpio, 1);
 	}
 #endif
 
