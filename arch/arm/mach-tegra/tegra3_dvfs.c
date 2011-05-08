@@ -33,11 +33,11 @@ static const int core_millivolts[MAX_DVFS_FREQS] =
 	{1000, 1050, 1100, 1150, 1200, 1250, 1300};
 
 static const int core_speedo_nominal_millivolts[] =
-/* spedo_id  0,    1,    2 */
+/* speedo_id 0,    1,    2 */
 	{ 1200, 1200, 1300 };
 
 static const int cpu_speedo_nominal_millivolts[] =
-/* spedo_id  0,    1,    2 */
+/* speedo_id 0,    1,    2 */
 	{ 1125, 1125, 1125 };
 
 /* FIXME: EDP limit API */
@@ -115,6 +115,12 @@ static struct dvfs_relationship tegra3_dvfs_relationships[] = {
 static struct dvfs cpu_dvfs_table[] = {
 	/* Cpu voltages (mV):	     750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000, 1025, 1050, 1075, 1100, 1125 */
 	CPU_DVFS("cpu_g", 0, 0, MHZ,   1,   1, 614, 614, 714, 714, 815, 815, 915, 915, 1000),
+
+	/*
+	 * "Safe entry" to be used when no match for chip speedo, process
+	 *  corner is found (just to boot at low rate); must be the last one
+	 */
+	CPU_DVFS("cpu_g",-1,-1, MHZ,   1,   1, 216, 216, 300),
 };
 
 #define CORE_DVFS(_clk_name, _speedo_id, _auto, _mult, _freqs...)	\
@@ -298,11 +304,14 @@ static int __init get_cpu_nominal_mv_index(
 		}
 	}
 
-	if (i == 0) {
-		pr_err("tegra3_dvfs: unable to adjust cpu dvfs table to"
-		       " nominal voltage %d\n", mv);
-		return -ENOSYS;
-	}
+	BUG_ON(i == 0);
+	if (j == (ARRAY_SIZE(cpu_dvfs_table) - 1))
+		pr_err("tegra3_dvfs: WARNING!!!\n"
+		       "tegra3_dvfs: no cpu dvfs table found for chip speedo_id"
+		       " %d and process_id %d: set CPU rate limit at %lu\n"
+		       "tegra3_dvfs: WARNING!!!\n",
+		       speedo_id, process_id, d->freqs[i-1] * d->freqs_mult);
+
 	*cpu_dvfs = d;
 	return (i - 1);
 }

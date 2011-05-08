@@ -3629,6 +3629,12 @@ void __init tegra_soc_init_clocks(void)
  * must be ascending.
  */
 
+static struct cpufreq_frequency_table freq_table_300MHz[] = {
+	{ 0, 216000 },
+	{ 1, 300000 },
+	{ 2, CPUFREQ_TABLE_END },
+};
+
 static struct cpufreq_frequency_table freq_table_1p0GHz[] = {
 	{ 0, 216000 },
 	{ 1, 312000 },
@@ -3642,16 +3648,17 @@ static struct cpufreq_frequency_table freq_table_1p0GHz[] = {
 };
 
 static struct tegra_cpufreq_table_data cpufreq_tables[] = {
+	{ freq_table_300MHz, 0, 1 },
 	{ freq_table_1p0GHz, 2, 6 },
 };
 
 static void clip_cpu_rate_limits(
 	struct cpufreq_frequency_table *freq_table,
-	struct cpufreq_policy *policy)
+	struct cpufreq_policy *policy,
+	struct clk *cpu_clk_g,
+	struct clk *cpu_clk_lp)
 {
 	int idx, ret;
-	struct clk *cpu_clk_g = tegra_get_clock_by_name("cpu_g");
-	struct clk *cpu_clk_lp = tegra_get_clock_by_name("cpu_lp");
 
 	/* clip CPU LP mode maximum frequency to table entry, and
 	   set CPU G mode minimum frequency one table step below */
@@ -3669,7 +3676,8 @@ static void clip_cpu_rate_limits(
 struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void)
 {
 	int i, ret;
-	struct clk *cpu_clk = tegra_get_clock_by_name("cpu");
+	struct clk *cpu_clk_g = tegra_get_clock_by_name("cpu_g");
+	struct clk *cpu_clk_lp = tegra_get_clock_by_name("cpu_lp");
 
 	for (i = 0; i < ARRAY_SIZE(cpufreq_tables); i++) {
 		struct cpufreq_policy policy;
@@ -3677,9 +3685,9 @@ struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void)
 		ret = cpufreq_frequency_table_cpuinfo(
 			&policy, cpufreq_tables[i].freq_table);
 		BUG_ON(ret);
-		if ((policy.max * 1000) == cpu_clk->max_rate) {
-			clip_cpu_rate_limits(
-				cpufreq_tables[i].freq_table, &policy);
+		if ((policy.max * 1000) == cpu_clk_g->max_rate) {
+			clip_cpu_rate_limits(cpufreq_tables[i].freq_table,
+				&policy, cpu_clk_g, cpu_clk_lp);
 			return &cpufreq_tables[i];
 		}
 	}
