@@ -1682,7 +1682,7 @@ static int tegra_battery_get_property(struct power_supply *psy,
 			break;
 
 		case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-			val->intval = batt_dev->batt_vol;
+			val->intval = batt_dev->batt_vol * 1000;
 			//LDB("[bat_poll] intval: POWER_SUPPLY_PROP_VOLTAGE_NOW(%d)", val->intval);
 			break;
 
