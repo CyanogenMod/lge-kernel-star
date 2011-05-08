@@ -208,15 +208,23 @@ static int dvfs_rail_update(struct dvfs_rail *rail)
 static int dvfs_rail_connect_to_regulator(struct dvfs_rail *rail)
 {
 	struct regulator *reg;
+	int v;
 
 	if (!rail->reg) {
 		reg = regulator_get(NULL, rail->reg_id);
 		if (IS_ERR(reg))
 			return -EINVAL;
 	}
-
 	rail->reg = reg;
 
+	v = regulator_get_voltage(reg);
+	if (v < 0) {
+		pr_err("tegra_dvfs: failed initial get %s voltage\n",
+		       rail->reg_id);
+		return v;
+	}
+	rail->millivolts = v / 1000;
+	rail->new_millivolts = rail->millivolts;
 	return 0;
 }
 
@@ -242,6 +250,12 @@ __tegra_dvfs_set_rate(struct dvfs *d, unsigned long rate)
 			i++;
 
 		d->cur_millivolts = d->millivolts[i];
+		if ((d->max_millivolts) &&
+		    (d->cur_millivolts > d->max_millivolts)) {
+			pr_warn("tegra_dvfs: voltage %d too high for dvfs on"
+				" %s\n", d->cur_millivolts, d->clk_name);
+			return -EINVAL;
+		}
 	}
 
 	d->cur_rate = rate;
