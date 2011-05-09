@@ -59,6 +59,9 @@ unsigned long tegra_lp0_vec_size;
 unsigned long tegra_grhost_aperture = ~0ul;
 static   bool is_tegra_debug_uart_hsport;
 
+static int pmu_core_edp;
+static int board_panel_type;
+
 void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
 
 void tegra_assert_system_reset(char mode, const char *cmd)
@@ -251,6 +254,34 @@ static int __init tegra_bootloader_fb_arg(char *options)
 	return 0;
 }
 early_param("tegra_fbmem", tegra_bootloader_fb_arg);
+
+enum panel_type get_panel_type(void)
+{
+	return board_panel_type;
+}
+static int __init tegra_board_panel_type(char *options)
+{
+	if (!strcmp(options, "lvds"))
+		board_panel_type = panel_type_lvds;
+	else if (!strcmp(options, "dsi"))
+		board_panel_type = panel_type_dsi;
+	else
+		return 0;
+	return 1;
+}
+__setup("panel=", tegra_board_panel_type);
+
+int get_core_edp(void)
+{
+	return pmu_core_edp;
+}
+static int __init tegra_pmu_core_edp(char *options)
+{
+	char *p = options;
+	pmu_core_edp = memparse(p, &p);
+	return 1;
+}
+__setup("core_edp_mv=", tegra_pmu_core_edp);
 
 static int __init tegra_debug_uartport(char *info)
 {

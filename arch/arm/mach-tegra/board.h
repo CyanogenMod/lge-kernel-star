@@ -68,6 +68,14 @@ struct board_info {
 	u8  minor_revision;
 };
 
+enum panel_type {
+	panel_type_lvds = 0,
+	panel_type_dsi,
+};
+
 void tegra_get_board_info(struct board_info *);
+
+int get_core_edp(void);
+enum panel_type get_panel_type(void);
 
 #endif
