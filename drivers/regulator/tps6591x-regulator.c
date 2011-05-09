@@ -81,11 +81,20 @@ struct tps6591x_regulator {
 	struct tps6591x_register_info en1_reg;
 
 	int *voltages;
+
+	int delay; /* delay in us for regulator to stabilize */
 };
 
 static inline struct device *to_tps6591x_dev(struct regulator_dev *rdev)
 {
 	return rdev_get_dev(rdev)->parent->parent;
+}
+
+static int tps6591x_regulator_enable_time(struct regulator_dev *rdev)
+{
+	struct tps6591x_regulator *ri = rdev_get_drvdata(rdev);
+
+	return ri->delay;
 }
 
 static int __tps6591x_ext_control_set(struct device *parent,
@@ -430,6 +439,7 @@ static struct regulator_ops tps6591x_regulator_vio_ops = {
 	.get_voltage = tps6591x_vio_get_voltage,
 	.set_voltage = tps6591x_vio_set_voltage,
 
+	.enable_time = tps6591x_regulator_enable_time,
 	.is_enabled = tps6591x_regulator_is_enabled,
 	.enable = tps6591x_regulator_enable,
 	.disable = tps6591x_regulator_disable,
@@ -440,6 +450,7 @@ static struct regulator_ops tps6591x_regulator_ldo1_ops = {
 	.get_voltage = tps6591x_ldo1_get_voltage,
 	.set_voltage = tps6591x_ldo1_set_voltage,
 
+	.enable_time = tps6591x_regulator_enable_time,
 	.is_enabled = tps6591x_regulator_is_enabled,
 	.enable = tps6591x_regulator_enable,
 	.disable = tps6591x_regulator_disable,
@@ -450,6 +461,7 @@ static struct regulator_ops tps6591x_regulator_ldo3_ops = {
 	.get_voltage = tps6591x_ldo3_get_voltage,
 	.set_voltage = tps6591x_ldo3_set_voltage,
 
+	.enable_time = tps6591x_regulator_enable_time,
 	.is_enabled = tps6591x_regulator_is_enabled,
 	.enable = tps6591x_regulator_enable,
 	.disable = tps6591x_regulator_disable,
@@ -460,6 +472,7 @@ static struct regulator_ops tps6591x_regulator_vdd_ops = {
 	.get_voltage = tps6591x_vdd_get_voltage,
 	.set_voltage = tps6591x_vdd_set_voltage,
 
+	.enable_time = tps6591x_regulator_enable_time,
 	.is_enabled = tps6591x_regulator_is_enabled,
 	.enable = tps6591x_regulator_enable,
 	.disable = tps6591x_regulator_disable,
@@ -504,90 +517,91 @@ static int tps6591x_vddctrl_voltages[] = {
 	1287, 1300, 1312, 1325, 1337, 1350, 1362, 1375, 1387, 1400,
 };
 
-#define TPS6591X_REGULATOR(_id, vdata, _ops, s_addr, s_nbits, s_shift,	\
-			s_type, op_addr, op_nbits, op_shift, sr_addr,	\
-			sr_nbits, sr_shift, en1_addr, en1_shift)	\
-	.desc	= {							\
-		.name	= tps6591x_rails(_id),				\
-		.ops	= &tps6591x_regulator_##_ops,			\
-		.type	= REGULATOR_VOLTAGE,				\
-		.id	= TPS6591X_ID_##_id,				\
-		.n_voltages = ARRAY_SIZE(tps6591x_##vdata##_voltages),	\
-		.owner	= THIS_MODULE,					\
-	},								\
-	.supply_type	= supply_type_##s_type,				\
-	.supply_reg	= {						\
-		.addr	= TPS6591X_##s_addr##_ADD,			\
-		.nbits	= s_nbits,					\
-		.shift_bits = s_shift,					\
-	},								\
-	.op_reg		= {						\
-		.addr	= TPS6591X_##op_addr##_ADD,			\
-		.nbits	= op_nbits,					\
-		.shift_bits = op_shift,					\
-	},								\
-	.sr_reg		= {						\
-		.addr	= TPS6591X_##sr_addr##_ADD,			\
-		.nbits	= sr_nbits,					\
-		.shift_bits = sr_shift,					\
-	},								\
-	.en1_reg	= {						\
-		.addr	= TPS6591X_##en1_addr##_ADD,			\
-		.nbits	= 1,						\
-		.shift_bits = en1_shift,				\
-	},								\
-	.voltages	= tps6591x_##vdata##_voltages,
+#define TPS6591X_REGULATOR(_id, vdata, _ops, s_addr, s_nbits, s_shift,		\
+			s_type, op_addr, op_nbits, op_shift, sr_addr,		\
+			sr_nbits, sr_shift, en1_addr, en1_shift, en_time)	\
+	.desc	= {								\
+		.name	= tps6591x_rails(_id),					\
+		.ops	= &tps6591x_regulator_##_ops,				\
+		.type	= REGULATOR_VOLTAGE,					\
+		.id	= TPS6591X_ID_##_id,					\
+		.n_voltages = ARRAY_SIZE(tps6591x_##vdata##_voltages),		\
+		.owner	= THIS_MODULE,						\
+	},									\
+	.supply_type	= supply_type_##s_type,					\
+	.supply_reg	= {							\
+		.addr	= TPS6591X_##s_addr##_ADD,				\
+		.nbits	= s_nbits,						\
+		.shift_bits = s_shift,						\
+	},									\
+	.op_reg		= {							\
+		.addr	= TPS6591X_##op_addr##_ADD,				\
+		.nbits	= op_nbits,						\
+		.shift_bits = op_shift,						\
+	},									\
+	.sr_reg		= {							\
+		.addr	= TPS6591X_##sr_addr##_ADD,				\
+		.nbits	= sr_nbits,						\
+		.shift_bits = sr_shift,						\
+	},									\
+	.en1_reg	= {							\
+		.addr	= TPS6591X_##en1_addr##_ADD,				\
+		.nbits	= 1,							\
+		.shift_bits = en1_shift,					\
+	},									\
+	.voltages	= tps6591x_##vdata##_voltages,				\
+	.delay		= en_time,
 
 #define TPS6591X_VIO(_id, vdata, s_addr, s_nbits, s_shift, s_type,	\
-			en1_shift)					\
+			en1_shift, en_time)				\
 {									\
 	TPS6591X_REGULATOR(_id, vdata, vio_ops, s_addr, s_nbits,	\
 			s_shift, s_type, INVALID, 0, 0,	INVALID, 0, 0,	\
-			EN1_SMPS, en1_shift)				\
+			EN1_SMPS, en1_shift, en_time)			\
 }
 
 #define TPS6591X_LDO1(_id, vdata, s_addr, s_nbits, s_shift, s_type,	\
-			en1_shift)					\
+			en1_shift, en_time)				\
 {									\
 	TPS6591X_REGULATOR(_id, vdata, ldo1_ops, s_addr, s_nbits,	\
 			s_shift, s_type, INVALID, 0, 0,	INVALID, 0, 0,	\
-			EN1_LDO, en1_shift)				\
+			EN1_LDO, en1_shift, en_time)			\
 }
 
 #define TPS6591X_LDO3(_id, vdata, s_addr, s_nbits, s_shift, s_type,	\
-			en1_shift)					\
+			en1_shift, en_time)				\
 {									\
 	TPS6591X_REGULATOR(_id, vdata, ldo3_ops, s_addr, s_nbits,	\
 			s_shift, s_type, INVALID, 0, 0,	INVALID, 0, 0,	\
-			EN1_LDO, en1_shift)				\
+			EN1_LDO, en1_shift, en_time)			\
 }
 
 #define TPS6591X_VDD(_id, vdata, s_addr, s_nbits, s_shift, s_type,	\
 			op_addr, op_nbits, op_shift, sr_addr, sr_nbits,	\
-			sr_shift, en1_shift)				\
+			sr_shift, en1_shift, en_time)			\
 {									\
 	TPS6591X_REGULATOR(_id, vdata, vdd_ops, s_addr, s_nbits,	\
 			s_shift, s_type, op_addr, op_nbits, op_shift,	\
 			sr_addr, sr_nbits, sr_shift, EN1_SMPS,		\
-			en1_shift)					\
+			en1_shift, en_time)				\
 }
 
 static struct tps6591x_regulator tps6591x_regulator[] = {
-	TPS6591X_VIO(VIO, vio, VIO, 2, 2, single_reg, 0),
-	TPS6591X_LDO1(LDO_1, ldo124, LDO1, 6, 2, single_reg, 1),
-	TPS6591X_LDO1(LDO_2, ldo124, LDO2, 6, 2, single_reg, 2),
-	TPS6591X_LDO3(LDO_3, ldo35678, LDO3, 5, 2, single_reg, 7),
-	TPS6591X_LDO1(LDO_4, ldo124, LDO4, 6, 2, single_reg, 6),
-	TPS6591X_LDO3(LDO_5, ldo35678, LDO5, 5, 2, single_reg, 3),
-	TPS6591X_LDO3(LDO_6, ldo35678, LDO6, 5, 2, single_reg, 0),
-	TPS6591X_LDO3(LDO_7, ldo35678, LDO7, 5, 2, single_reg, 5),
-	TPS6591X_LDO3(LDO_8, ldo35678, LDO8, 5, 2, single_reg, 4),
+	TPS6591X_VIO(VIO, vio, VIO, 2, 2, single_reg, 0, 350),
+	TPS6591X_LDO1(LDO_1, ldo124, LDO1, 6, 2, single_reg, 1, 420),
+	TPS6591X_LDO1(LDO_2, ldo124, LDO2, 6, 2, single_reg, 2, 420),
+	TPS6591X_LDO3(LDO_3, ldo35678, LDO3, 5, 2, single_reg, 7, 230),
+	TPS6591X_LDO1(LDO_4, ldo124, LDO4, 6, 2, single_reg, 6, 230),
+	TPS6591X_LDO3(LDO_5, ldo35678, LDO5, 5, 2, single_reg, 3, 230),
+	TPS6591X_LDO3(LDO_6, ldo35678, LDO6, 5, 2, single_reg, 0, 230),
+	TPS6591X_LDO3(LDO_7, ldo35678, LDO7, 5, 2, single_reg, 5, 230),
+	TPS6591X_LDO3(LDO_8, ldo35678, LDO8, 5, 2, single_reg, 4, 230),
 	TPS6591X_VDD(VDD_1, vdd, VDD1, 2, 0, sr_op_reg, VDD1_OP,
-		7, 0, VDD1_SR, 7, 0, 1),
+		7, 0, VDD1_SR, 7, 0, 1, 350),
 	TPS6591X_VDD(VDD_2, vdd, VDD2, 2, 0, sr_op_reg, VDD2_OP,
-		7, 0, VDD2_SR, 7, 0, 2),
+		7, 0, VDD2_SR, 7, 0, 2, 350),
 	TPS6591X_VDD(VDDCTRL, vddctrl, VDDCTRL, 2, 0, sr_op_reg,
-		VDDCTRL_OP, 7, 0, VDDCTRL_SR, 7, 0, 3),
+		VDDCTRL_OP, 7, 0, VDDCTRL_SR, 7, 0, 3, 900),
 };
 
 static inline int tps6591x_regulator_preinit(struct device *parent,
