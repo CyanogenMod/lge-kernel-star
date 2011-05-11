@@ -42,7 +42,6 @@
 static struct regulator *cardhu_1v8_cam1 = NULL;
 static struct regulator *cardhu_1v8_cam2 = NULL;
 static struct regulator *cardhu_1v8_cam3 = NULL;
-static struct regulator *cardhu_avdd_dsi_csi = NULL;
 static struct regulator *cardhu_vdd_2v8_cam1 = NULL;
 static struct regulator *cardhu_vdd_2v8_cam2 = NULL;
 static struct regulator *cardhu_vdd_cam3 = NULL;
@@ -147,17 +146,6 @@ static int cardhu_left_ov5650_power_on(void)
 	}
 	regulator_enable(cardhu_1v8_cam1);
 
-	/* Enable AVDD_CSI_DSI */
-	if (cardhu_avdd_dsi_csi == NULL) {
-		cardhu_avdd_dsi_csi = regulator_get(NULL, "avdd_dsi_csi");
-		if (WARN_ON(IS_ERR(cardhu_avdd_dsi_csi))) {
-			pr_err("%s: couldn't get regulator avdd_dsi_csi: %ld\n",
-				__func__, PTR_ERR(cardhu_avdd_dsi_csi));
-			goto reg_alloc_fail;
-		}
-	}
-	regulator_enable(cardhu_avdd_dsi_csi);
-
 	mdelay(5);
 	if ((board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1291)) {
@@ -173,10 +161,6 @@ reg_alloc_fail:
 	if (cardhu_1v8_cam1) {
 		regulator_put(cardhu_1v8_cam1);
 		cardhu_1v8_cam1 = NULL;
-	}
-	if (cardhu_avdd_dsi_csi) {
-		regulator_put(cardhu_avdd_dsi_csi);
-		cardhu_avdd_dsi_csi = NULL;
 	}
 	if (cardhu_vdd_2v8_cam1) {
 		regulator_put(cardhu_vdd_2v8_cam1);
@@ -199,8 +183,6 @@ static int cardhu_left_ov5650_power_off(void)
 	}
 	if (cardhu_1v8_cam1)
 		regulator_disable(cardhu_1v8_cam1);
-	if (cardhu_avdd_dsi_csi)
-		regulator_disable(cardhu_avdd_dsi_csi);
 	if (cardhu_vdd_2v8_cam1)
 		regulator_disable(cardhu_vdd_2v8_cam1);
 
@@ -246,17 +228,6 @@ static int cardhu_right_ov5650_power_on(void)
 	}
 	regulator_enable(cardhu_1v8_cam2);
 
-	/* Enable AVDD_CSI_DSI */
-	if (cardhu_avdd_dsi_csi == NULL) {
-		cardhu_avdd_dsi_csi = regulator_get(NULL, "avdd_dsi_csi");
-		if (WARN_ON(IS_ERR(cardhu_avdd_dsi_csi))) {
-			pr_err("%s: couldn't get regulator avdd_dsi_csi: %ld\n",
-				__func__, PTR_ERR(cardhu_avdd_dsi_csi));
-			goto reg_alloc_fail;
-		}
-	}
-	regulator_enable(cardhu_avdd_dsi_csi);
-
 	mdelay(5);
 	return 0;
 
@@ -264,10 +235,6 @@ reg_alloc_fail:
 	if (cardhu_1v8_cam2) {
 		regulator_put(cardhu_1v8_cam2);
 		cardhu_1v8_cam2 = NULL;
-	}
-	if (cardhu_avdd_dsi_csi) {
-		regulator_put(cardhu_avdd_dsi_csi);
-		cardhu_avdd_dsi_csi = NULL;
 	}
 	if (cardhu_vdd_2v8_cam2) {
 		regulator_put(cardhu_vdd_2v8_cam2);
@@ -290,8 +257,6 @@ static int cardhu_right_ov5650_power_off(void)
 
 	if (cardhu_1v8_cam2)
 		regulator_disable(cardhu_1v8_cam2);
-	if (cardhu_avdd_dsi_csi)
-		regulator_disable(cardhu_avdd_dsi_csi);
 	if (cardhu_vdd_2v8_cam2)
 		regulator_disable(cardhu_vdd_2v8_cam2);
 
@@ -340,17 +305,6 @@ static int cardhu_ov2710_power_on(void)
 		}
 	}
 	regulator_enable(cardhu_1v8_cam3);
-
-	/* Enable AVDD_CSI_DSI */
-	if (cardhu_avdd_dsi_csi == NULL) {
-		cardhu_avdd_dsi_csi = regulator_get(NULL, "avdd_dsi_csi");
-		if (WARN_ON(IS_ERR(cardhu_avdd_dsi_csi))) {
-			pr_err("%s: couldn't get regulator avdd_dsi_csi: %ld\n",
-				__func__, PTR_ERR(cardhu_avdd_dsi_csi));
-			goto reg_alloc_fail;
-		}
-	}
-	regulator_enable(cardhu_avdd_dsi_csi);
 	mdelay(5);
 
 	return 0;
@@ -359,10 +313,6 @@ reg_alloc_fail:
 	if (cardhu_1v8_cam3) {
 		regulator_put(cardhu_1v8_cam3);
 		cardhu_1v8_cam3 = NULL;
-	}
-	if (cardhu_avdd_dsi_csi) {
-		regulator_put(cardhu_avdd_dsi_csi);
-		cardhu_avdd_dsi_csi = NULL;
 	}
 	if (cardhu_vdd_cam3) {
 		regulator_put(cardhu_vdd_cam3);
@@ -387,8 +337,6 @@ static int cardhu_ov2710_power_off(void)
 
 	if (cardhu_1v8_cam3)
 		regulator_disable(cardhu_1v8_cam3);
-	if (cardhu_avdd_dsi_csi)
-		regulator_disable(cardhu_avdd_dsi_csi);
 	if (cardhu_vdd_cam3)
 		regulator_disable(cardhu_vdd_cam3);
 
