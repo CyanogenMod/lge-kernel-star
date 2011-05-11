@@ -1054,6 +1054,7 @@ static void ulpi_set_trimmer(void __iomem *base, u8 data, u8 sdn, u8 dir)
 static void ulpi_phy_restore_start(struct tegra_usb_phy *phy,
 				   enum tegra_usb_phy_port_speed port_speed)
 {
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	unsigned long val;
 	void __iomem *base = phy->regs;
 
@@ -1065,10 +1066,12 @@ static void ulpi_phy_restore_start(struct tegra_usb_phy *phy,
 	val = readl(base + ULPI_TIMING_CTRL_0);
 	val &= ~ULPI_OUTPUT_PINMUX_BYP;
 	writel(val, base + ULPI_TIMING_CTRL_0);
+#endif
 }
 
 static void ulpi_phy_restore_end(struct tegra_usb_phy *phy)
 {
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	unsigned long val;
 	void __iomem *base = phy->regs;
 
@@ -1079,6 +1082,7 @@ static void ulpi_phy_restore_end(struct tegra_usb_phy *phy)
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UAA, TEGRA_TRI_NORMAL);
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UAB, TEGRA_TRI_NORMAL);
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UDA, TEGRA_TRI_NORMAL);
+#endif
 }
 
 static int ulpi_phy_power_on(struct tegra_usb_phy *phy)
