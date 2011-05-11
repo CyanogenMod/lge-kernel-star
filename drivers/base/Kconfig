@@ -175,4 +175,6 @@ config ARCH_NO_SYSDEV_OPS
 	  sysdev driver power management (suspend/resume) and shutdown
 	  operations.
 
+source "drivers/base/regmap/Kconfig"
+
 endmenu
