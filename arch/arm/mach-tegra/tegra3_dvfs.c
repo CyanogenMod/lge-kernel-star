@@ -22,9 +22,10 @@
 #include "clock.h"
 #include "dvfs.h"
 #include "fuse.h"
+#include "board.h"
 
-static bool tegra_dvfs_cpu_disabled = false;
-static bool tegra_dvfs_core_disabled = true;
+static bool tegra_dvfs_cpu_disabled;
+static bool tegra_dvfs_core_disabled;
 
 static const int cpu_millivolts[MAX_DVFS_FREQS] =
 	{750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000, 1025, 1050, 1075, 1100, 1125};
@@ -39,9 +40,6 @@ static const int core_speedo_nominal_millivolts[] =
 static const int cpu_speedo_nominal_millivolts[] =
 /* speedo_id 0,    1,    2 */
 	{ 1125, 1125, 1125 };
-
-/* FIXME: EDP limit API */
-static int core_edp_limit;
 
 #define KHZ 1000
 #define MHZ 1000000
@@ -60,7 +58,6 @@ static struct dvfs_rail tegra3_dvfs_rail_vdd_core = {
 	.max_millivolts = 1300,
 	.min_millivolts = 950,
 	.step = VDD_CPU_BELOW_VDD_CORE_MAX,
-	.disabled = true, /* FIXME: replace with sysfs control */
 };
 
 static struct dvfs_rail *tegra3_dvfs_rails[] = {
@@ -333,6 +330,7 @@ static int __init get_cpu_nominal_mv_index(
 static int __init get_core_nominal_mv_index(int speedo_id)
 {
 	int i, mv;
+	int core_edp_limit = get_core_edp();
 
 	/*
 	 * Start with nominal level for the chips with this speedo_id. Then,

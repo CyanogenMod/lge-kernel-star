@@ -59,7 +59,7 @@ unsigned long tegra_lp0_vec_size;
 unsigned long tegra_grhost_aperture = ~0ul;
 static   bool is_tegra_debug_uart_hsport;
 
-static int pmu_core_edp;
+static int pmu_core_edp = 1200;	/* default 1.2V EDP limit */
 static int board_panel_type;
 
 void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
@@ -278,7 +278,9 @@ int get_core_edp(void)
 static int __init tegra_pmu_core_edp(char *options)
 {
 	char *p = options;
-	pmu_core_edp = memparse(p, &p);
+	int core_edp = memparse(p, &p);
+	if (core_edp != 0)
+		pmu_core_edp = core_edp;
 	return 1;
 }
 __setup("core_edp_mv=", tegra_pmu_core_edp);
