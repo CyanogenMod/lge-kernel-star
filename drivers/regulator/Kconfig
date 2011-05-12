@@ -305,6 +305,12 @@ config REGULATOR_TPS6591X
 	help
 	  This driver supports TPS6591X voltage regulator chips.
 
+config REGULATOR_TPS6236X
+	tristate "TI TPS6236X DC-DC core power suply regulators"
+	default n
+	help
+	  This driver supports TPS6236X DC-DC Processor core supply.
+
 config REGULATOR_GPIO_SWITCH
 	bool "GPIO based enable/disable of power rails."
 	default n
