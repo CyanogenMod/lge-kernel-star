@@ -53,9 +53,9 @@
 
 static struct plat_serial8250_port debug_uart_platform_data[] = {
 	{
-		.membase	= IO_ADDRESS(TEGRA_UARTA_BASE),
-		.mapbase	= TEGRA_UARTA_BASE,
-		.irq		= INT_UARTA,
+		.membase	= IO_ADDRESS(TEGRA_UARTD_BASE),
+		.mapbase	= TEGRA_UARTD_BASE,
+		.irq		= INT_UARTD,
 		.flags		= UPF_BOOT_AUTOCONF | UPF_FIXED_TYPE,
 		.type		= PORT_TEGRA,
 		.iotype		= UPIO_MEM,
@@ -137,7 +137,7 @@ static __initdata struct tegra_clk_init_table enterprise_clk_init_table[] = {
 	{ "uarta",	"pll_p",	216000000,	true},
 	{ "uartb",	"pll_p",	216000000,	false},
 	{ "uartc",	"pll_p",	216000000,	false},
-	{ "uartd",	"pll_p",	216000000,	false},
+	{ "uartd",	"pll_p",	216000000,	true},
 	{ "uarte",	"pll_p",	216000000,	false},
 	{ "pll_m",	NULL,		0,		true},
 	{ "hda",	"pll_p",	108000000,	false},
@@ -230,7 +230,6 @@ static struct platform_device *enterprise_devices[] __initdata = {
 	&debug_uart,
 	&tegra_uartb_device,
 	&tegra_uartc_device,
-	&tegra_uartd_device,
 	&tegra_uarte_device,
 	&pmu_device,
 	&tegra_rtc_device,
