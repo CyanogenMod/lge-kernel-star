@@ -32,7 +32,6 @@
 
 
 #define ENTERPRISE_SD_CD TEGRA_GPIO_PI5
-#define ENTERPRISE_SD_WP TEGRA_GPIO_PT3
 
 static struct resource sdhci_resource0[] = {
 	[0] = {
@@ -61,7 +60,7 @@ static struct resource sdhci_resource3[] = {
 };
 
 
-static struct tegra_sdhci_platform_data tegra_sdhci_platform_data0 = {
+static struct tegra_sdhci_platform_data tegra_sdhci_platform_data2 = {
 	.clk_id = NULL,
 	.force_hs = 1,
 	.cd_gpio = -1,
@@ -69,7 +68,7 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data0 = {
 	.power_gpio = -1,
 	.tap_delay = 6,
 	.is_voltage_switch_supported = true,
-	.vdd_rail_name = "vddio_sdmmc1",
+	.vdd_rail_name = "vddio_sdmmc3",
 	.slot_rail_name = "vddio_sd_slot",
 	.vdd_max_uv = 3320000,
 	.vdd_min_uv = 3280000,
@@ -134,45 +133,18 @@ static int enterprise_sd_cd_gpio_init(void)
 	return 0;
 }
 
-static int enterprise_sd_wp_gpio_init(void)
-{
-	unsigned int rc = 0;
-
-	rc = gpio_request(ENTERPRISE_SD_WP, "write_protect");
-	if (rc) {
-		pr_err("Write protect gpio request failed:%d\n", rc);
-		return rc;
-	}
-
-	tegra_gpio_enable(ENTERPRISE_SD_WP);
-
-	rc = gpio_direction_input(ENTERPRISE_SD_WP);
-	if (rc) {
-		pr_err("Unable to configure direction for write protect gpio:%d\n", rc);
-		return rc;
-	}
-
-	return 0;
-}
-
 int __init enterprise_sdhci_init(void)
 {
 	unsigned int rc = 0;
 	platform_device_register(&tegra_sdhci_device3);
 
-	/* Fix ME: The gpios have to enabled for hot plug support */
 	rc = enterprise_sd_cd_gpio_init();
 	if (!rc) {
-		tegra_sdhci_platform_data0.cd_gpio = ENTERPRISE_SD_CD;
-		tegra_sdhci_platform_data0.cd_gpio_polarity = 0;
-	}
-	rc = enterprise_sd_wp_gpio_init();
-	if (!rc) {
-		tegra_sdhci_platform_data0.wp_gpio = ENTERPRISE_SD_WP;
-		tegra_sdhci_platform_data0.wp_gpio_polarity = 1;
+		tegra_sdhci_platform_data2.cd_gpio = ENTERPRISE_SD_CD;
+		tegra_sdhci_platform_data2.cd_gpio_polarity = 0;
 	}
 
-	platform_device_register(&tegra_sdhci_device0);
+	platform_device_register(&tegra_sdhci_device2);
 
 	return 0;
 }
