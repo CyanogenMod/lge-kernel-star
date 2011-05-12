@@ -475,12 +475,6 @@ static int tegra_ehci_setup(struct usb_hcd *hcd)
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	ehci->has_hostpc = 1;
 #endif
-
-	/* switch to host mode */
-	hcd->has_tt = 1;
-	ehci_reset(ehci);
-	tegra_ehci_post_reset(tegra->phy);
-
 	retval = ehci_halt(ehci);
 	if (retval)
 		return retval;
@@ -490,7 +484,18 @@ static int tegra_ehci_setup(struct usb_hcd *hcd)
 	if (retval)
 		return retval;
 
+	hcd->has_tt = 1;
 	ehci->sbrn = 0x20;
+
+	ehci_reset(ehci);
+	tegra_ehci_post_reset(tegra->phy);
+
+	/*
+	 * Resetting the controller has the side effect of resetting the PHY.
+	 * So, never reset the controller after the calling
+	 * tegra_ehci_reinit API.
+	 */
+	ehci->controller_resets_phy = 1;
 
 	ehci_port_power(ehci, 1);
 	return retval;
