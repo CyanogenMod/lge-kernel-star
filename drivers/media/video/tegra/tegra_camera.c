@@ -290,9 +290,13 @@ static int tegra_camera_probe(struct platform_device *pdev)
 	int err;
 
 	pr_info("%s: probe\n", TEGRA_CAMERA_NAME);
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	tegra_camera_regulator_csi = regulator_get(&pdev->dev, "vcsi");
+#else
+	tegra_camera_regulator_csi = regulator_get(&pdev->dev, "avdd_dsi_csi");
+#endif
 	if (IS_ERR_OR_NULL(tegra_camera_regulator_csi)) {
-		pr_err("%s: Couldn't get regulator vcsi\n", TEGRA_CAMERA_NAME);
+		pr_err("%s: Couldn't get regulator\n", TEGRA_CAMERA_NAME);
 		return PTR_ERR(tegra_camera_regulator_csi);
 	}
 
