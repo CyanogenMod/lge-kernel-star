@@ -86,8 +86,7 @@ int fsl_udc_clk_init(struct platform_device *pdev)
 		err = PTR_ERR(phy);
 		goto err1;
 	}
-
-	tegra_usb_phy_power_on(phy);
+	tegra_usb_phy_power_on(phy, true);
 
 	return 0;
 err1:
@@ -124,18 +123,18 @@ void fsl_udc_clk_release(void)
 	clk_put(emc_clk);
 }
 
-void fsl_udc_clk_suspend(void)
+void fsl_udc_clk_suspend(bool is_dpd)
 {
-	tegra_usb_phy_power_off(phy);
+	tegra_usb_phy_power_off(phy, is_dpd);
 	clk_disable(udc_clk);
 	clk_disable(sclk_clk);
 	clk_disable(emc_clk);
 }
 
-void fsl_udc_clk_resume(void)
+void fsl_udc_clk_resume(bool is_dpd)
 {
 	clk_enable(emc_clk);
 	clk_enable(sclk_clk);
 	clk_enable(udc_clk);
-	tegra_usb_phy_power_on(phy);
+	tegra_usb_phy_power_on(phy,  is_dpd);
 }

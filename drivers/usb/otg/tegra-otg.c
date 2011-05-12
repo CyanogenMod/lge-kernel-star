@@ -175,7 +175,6 @@ static void irq_work(struct work_struct *work)
 			tegra_start_host(tegra);
 		}
 	}
-	clk_disable(tegra->clk);
 	tegra_otg_disable_clk();
 }
 
