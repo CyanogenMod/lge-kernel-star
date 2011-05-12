@@ -38,6 +38,7 @@
 
 #include <mach/hardware.h>
 #include <mach/clk.h>
+#include <mach/edp.h>
 
 #include "clock.h"
 #include "pm.h"
@@ -45,7 +46,6 @@
 /* tegra throttling and edp governors require frequencies in the table
    to be in ascending order */
 static struct cpufreq_frequency_table *freq_table;
-
 
 static struct clk *cpu_clk;
 static struct clk *emc_clk;
@@ -227,6 +227,44 @@ static unsigned int edp_governor_speed(unsigned int requested_speed)
 		return edp_limit;
 }
 
+int tegra_edp_update_thermal_zone(int temperature)
+{
+	int i;
+	int ret = 0;
+	int nlimits = cpu_edp_limits_size;
+	int index;
+
+	if (!cpu_edp_limits)
+		return -EINVAL;
+
+	index = nlimits - 1;
+
+	if (temperature < cpu_edp_limits[0].temperature) {
+		index = 0;
+	} else {
+		for (i = 0; i < (nlimits - 1); i++) {
+			if (temperature >= cpu_edp_limits[i].temperature &&
+			   temperature < cpu_edp_limits[i + 1].temperature) {
+				index = i + 1;
+				break;
+			}
+		}
+	}
+
+	mutex_lock(&tegra_cpu_lock);
+
+	edp_thermal_index = index;
+	edp_update_limit();
+	ret = tegra_cpu_cap_highest_speed(NULL);
+	if (ret)
+		pr_err("%s: update cpu speed fail(%d)", __func__, ret);
+
+	mutex_unlock(&tegra_cpu_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(tegra_edp_update_thermal_zone);
+
 static int tegra_cpu_edp_notify(
 	struct notifier_block *nb, unsigned long event, void *hcpu)
 {
@@ -248,6 +286,7 @@ static int tegra_cpu_edp_notify(
 				cpu_clear(cpu, edp_cpumask);
 				edp_update_limit();
 			}
+
 			printk(KERN_DEBUG "tegra CPU:%sforce EDP limit %u kHz"
 				"\n", ret ? " failed to " : " ", new_speed);
 		}
@@ -296,7 +335,7 @@ static void tegra_cpu_edp_exit(void)
 void tegra_init_cpu_edp_limits(const struct tegra_edp_limits *limits, int size)
 {
 	cpu_edp_limits = limits;
-	cpu_edp_limits_size = cpu_edp_limits_size;
+	cpu_edp_limits_size = size;
 }
 
 #else	/* CONFIG_TEGRA_EDP_LIMITS */
@@ -574,7 +613,7 @@ static void __exit tegra_cpufreq_exit(void)
 #endif
 	tegra_cpu_edp_exit();
 	tegra_auto_hotplug_exit();
-        cpufreq_unregister_driver(&tegra_cpufreq_driver);
+	cpufreq_unregister_driver(&tegra_cpufreq_driver);
 }
 
 
