@@ -470,6 +470,9 @@ static void __init tegra_cardhu_init(void)
 	cardhu_pinmux_init();
 	cardhu_i2c_init();
 	cardhu_usb_init();
+#ifdef CONFIG_TEGRA_EDP_LIMITS
+	cardhu_edp_init();
+#endif
 	platform_add_devices(cardhu_devices, ARRAY_SIZE(cardhu_devices));
 	cardhu_sdhci_init();
 	cardhu_regulator_init();

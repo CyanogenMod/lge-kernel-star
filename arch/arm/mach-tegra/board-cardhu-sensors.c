@@ -35,6 +35,7 @@
 #include <media/sh532u.h>
 
 #include <mach/gpio.h>
+#include <mach/edp.h>
 
 #include "gpio-names.h"
 #include "board-cardhu.h"
@@ -428,6 +429,8 @@ static struct i2c_board_info cardhu_i2c8_board_info[] = {
 	},
 };
 
+extern void tegra_throttling_enable(bool enable);
+
 static struct nct1008_platform_data cardhu_nct1008_pdata = {
 	.supported_hwrev = true,
 	.ext_range = false,
@@ -436,8 +439,8 @@ static struct nct1008_platform_data cardhu_nct1008_pdata = {
 	.hysteresis = 5,
 	.shutdown_ext_limit = 75,
 	.shutdown_local_limit = 75,
-	.throttling_ext_limit = 60,
-	.alarm_fn = NULL,
+	.throttling_ext_limit = 90,
+	.alarm_fn = tegra_throttling_enable,
 };
 
 static struct i2c_board_info cardhu_i2c4_bq27510_board_info[] = {
@@ -447,7 +450,7 @@ static struct i2c_board_info cardhu_i2c4_bq27510_board_info[] = {
 	},
 };
 
-static struct i2c_board_info cardhu_i2c4_board_info[] = {
+static struct i2c_board_info cardhu_i2c4_nct1008_board_info[] = {
 	{
 		I2C_BOARD_INFO("nct1008", 0x4C),
 		.platform_data = &cardhu_nct1008_pdata,
@@ -455,10 +458,19 @@ static struct i2c_board_info cardhu_i2c4_board_info[] = {
 	}
 };
 
+#ifdef CONFIG_TEGRA_EDP_LIMITS
+extern void cardhu_thermal_zones_info(struct tegra_edp_limits **, int *);
+#endif
+
 static int cardhu_nct1008_init(void)
 {
 	int nct1008_port = -1;
 	int ret;
+#ifdef CONFIG_TEGRA_EDP_LIMITS
+	struct tegra_edp_limits *z;
+	int zones_sz;
+	int i;
+#endif
 
 	if ((board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1291)) {
@@ -471,8 +483,7 @@ static int cardhu_nct1008_init(void)
 
 	if (nct1008_port >= 0) {
 		/* FIXME: enable irq when throttling is supported */
-		/* cardhu_i2c4_board_info[0].irq = */
-		/* TEGRA_GPIO_TO_IRQ(nct1008_port); */
+		cardhu_i2c4_nct1008_board_info[0].irq = TEGRA_GPIO_TO_IRQ(nct1008_port);
 
 		ret = gpio_request(nct1008_port, "temp_alert");
 		if (ret < 0)
@@ -483,8 +494,16 @@ static int cardhu_nct1008_init(void)
 			gpio_free(nct1008_port);
 		else
 			tegra_gpio_enable(nct1008_port);
-
 	}
+
+#ifdef CONFIG_TEGRA_EDP_LIMITS
+	cardhu_thermal_zones_info(&z, &zones_sz);
+	zones_sz = min(zones_sz, MAX_ZONES);
+	for (i = 0; i < zones_sz; i++)
+		cardhu_nct1008_pdata.thermal_zones[i] = z[i].temperature;
+
+	cardhu_nct1008_pdata.thermal_zones_sz = zones_sz;
+#endif
 	return ret;
 }
 
@@ -622,9 +641,6 @@ int __init cardhu_sensors_init(void)
 
 	pmu_tca6416_init();
 
-	i2c_register_board_info(4, cardhu_i2c4_board_info,
-		ARRAY_SIZE(cardhu_i2c4_board_info));
-
 	if (board_info.board_id == BOARD_E1291)
 		i2c_register_board_info(4, cardhu_i2c4_bq27510_board_info,
 			ARRAY_SIZE(cardhu_i2c4_bq27510_board_info));
@@ -635,6 +651,9 @@ int __init cardhu_sensors_init(void)
 	err = cardhu_nct1008_init();
 	if (err)
 		return err;
+
+	i2c_register_board_info(4, cardhu_i2c4_nct1008_board_info,
+		ARRAY_SIZE(cardhu_i2c4_nct1008_board_info));
 
 #ifdef CONFIG_SENSORS_MPU3050
 	cardhu_mpuirq_init();
