@@ -28,6 +28,7 @@
 #include <linux/io.h>
 #include <linux/regulator/gpio-switch-regulator.h>
 #include <linux/regulator/tps6591x-regulator.h>
+#include <linux/regulator/tps6236x-regulator.h>
 
 #include <mach/iomap.h>
 #include <mach/irqs.h>
@@ -42,8 +43,12 @@
 #define PMC_CTRL		0x0
 #define PMC_CTRL_INTR_LOW	(1 << 17)
 
-static struct regulator_consumer_supply tps6591x_vdd1_supply[] = {
+static struct regulator_consumer_supply tps6591x_vdd1_supply_skubit0_0[] = {
 	REGULATOR_SUPPLY("vdd_core", NULL),
+	REGULATOR_SUPPLY("en_vddio_ddr_1v2", NULL),
+};
+
+static struct regulator_consumer_supply tps6591x_vdd1_supply_skubit0_1[] = {
 	REGULATOR_SUPPLY("en_vddio_ddr_1v2", NULL),
 };
 
@@ -221,7 +226,8 @@ static struct regulator_consumer_supply tps6591x_ldo8_supply[] = {
 		.ectrl = _ectrl						\
 	}
 
-TPS_PDATA_INIT(vdd1,    600, 1500, 0, 1, 1, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT_BOARD(vdd1, skubit0_0, 600, 1500, 0, 1, 1, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT_BOARD(vdd1, skubit0_1, 600, 1500, 0, 1, 1, 0, -1, 0, 0, 0);
 TPS_PDATA_INIT(vdd2,    600, 1500, 0, 1, 1, 0, -1, 0, 0, 0);
 TPS_PDATA_INIT(vddctrl, 600, 1400, 0, 1, 1, 0, -1, 0, 0, EXT_CTRL_EN1);
 TPS_PDATA_INIT(vio,    1500, 3300, 0, 1, 1, 0, -1, 0, 0, 0);
@@ -267,37 +273,61 @@ static struct tps6591x_rtc_platform_data rtc_data = {
 		.platform_data	= &pdata_##_data,	\
 	}
 
-static struct tps6591x_subdev_info tps_devs_e118x[] = {
+#define TPS6591X_DEV_COMMON_E118X \
+	TPS_REG(VDD_2, vdd2),		\
+	TPS_REG(VDDCTRL, vddctrl),	\
+	TPS_REG(LDO_1, ldo1),		\
+	TPS_REG(LDO_2, ldo2),		\
+	TPS_REG(LDO_3, ldo3_e118x),	\
+	TPS_REG(LDO_4, ldo4),		\
+	TPS_REG(LDO_5, ldo5_e118x),	\
+	TPS_REG(LDO_6, ldo6),		\
+	TPS_REG(LDO_7, ldo7),		\
+	TPS_REG(LDO_8, ldo8)
+
+static struct tps6591x_subdev_info tps_devs_e118x_skubit0_0[] = {
 	TPS_REG(VIO, vio),
-	TPS_REG(VDD_1, vdd1),
-	TPS_REG(VDD_2, vdd2),
-	TPS_REG(VDDCTRL, vddctrl),
-	TPS_REG(LDO_1, ldo1),
-	TPS_REG(LDO_2, ldo2),
-	TPS_REG(LDO_3, ldo3_e118x),
-	TPS_REG(LDO_4, ldo4),
-	TPS_REG(LDO_5, ldo5_e118x),
-	TPS_REG(LDO_6, ldo6),
-	TPS_REG(LDO_7, ldo7),
-	TPS_REG(LDO_8, ldo8),
+	TPS_REG(VDD_1, vdd1_skubit0_0),
+	TPS6591X_DEV_COMMON_E118X,
 #if defined(CONFIG_RTC_DRV_TPS6591x)
 	TPS_RTC_REG(),
 #endif
 };
 
-static struct tps6591x_subdev_info tps_devs_e1198[] = {
+static struct tps6591x_subdev_info tps_devs_e118x_skubit0_1[] = {
 	TPS_REG(VIO, vio),
-	TPS_REG(VDD_1, vdd1),
-	TPS_REG(VDD_2, vdd2),
-	TPS_REG(VDDCTRL, vddctrl),
-	TPS_REG(LDO_1, ldo1),
-	TPS_REG(LDO_2, ldo2),
-	TPS_REG(LDO_3, ldo3_e1198),
-	TPS_REG(LDO_4, ldo4),
-	TPS_REG(LDO_5, ldo5_e1198),
-	TPS_REG(LDO_6, ldo6),
-	TPS_REG(LDO_7, ldo7),
-	TPS_REG(LDO_8, ldo8),
+	TPS_REG(VDD_1, vdd1_skubit0_1),
+	TPS6591X_DEV_COMMON_E118X,
+#if defined(CONFIG_RTC_DRV_TPS6591x)
+	TPS_RTC_REG(),
+#endif
+};
+
+#define TPS6591X_DEV_COMMON_CARDHU	\
+	TPS_REG(VDD_2, vdd2),		\
+	TPS_REG(VDDCTRL, vddctrl),	\
+	TPS_REG(LDO_1, ldo1),		\
+	TPS_REG(LDO_2, ldo2),		\
+	TPS_REG(LDO_3, ldo3_e1198),	\
+	TPS_REG(LDO_4, ldo4),		\
+	TPS_REG(LDO_5, ldo5_e1198),	\
+	TPS_REG(LDO_6, ldo6),		\
+	TPS_REG(LDO_7, ldo7),		\
+	TPS_REG(LDO_8, ldo8)
+
+static struct tps6591x_subdev_info tps_devs_e1198_skubit0_0[] = {
+	TPS_REG(VIO, vio),
+	TPS_REG(VDD_1, vdd1_skubit0_0),
+	TPS6591X_DEV_COMMON_CARDHU,
+#if defined(CONFIG_RTC_DRV_TPS6591x)
+	TPS_RTC_REG(),
+#endif
+};
+
+static struct tps6591x_subdev_info tps_devs_e1198_skubit0_1[] = {
+	TPS_REG(VIO, vio),
+	TPS_REG(VDD_1, vdd1_skubit0_1),
+	TPS6591X_DEV_COMMON_CARDHU,
 #if defined(CONFIG_RTC_DRV_TPS6591x)
 	TPS_RTC_REG(),
 #endif
@@ -316,27 +346,82 @@ static struct i2c_board_info __initdata cardhu_regulators[] = {
 	},
 };
 
+/* TPS62361B DC-DC converter */
+static struct regulator_consumer_supply tps6236x_dcdc_supply[] = {
+	REGULATOR_SUPPLY("vdd_core", NULL),
+};
+
+static struct tps6236x_regulator_platform_data tps6236x_pdata = {
+	.reg_init_data = {					\
+		.constraints = {				\
+			.min_uV = 500000,			\
+			.max_uV = 1770000,			\
+			.valid_modes_mask = (REGULATOR_MODE_NORMAL |  \
+					     REGULATOR_MODE_STANDBY), \
+			.valid_ops_mask = (REGULATOR_CHANGE_MODE |    \
+					   REGULATOR_CHANGE_STATUS |  \
+					   REGULATOR_CHANGE_VOLTAGE), \
+			.always_on = 1,				\
+			.boot_on =  1,				\
+			.apply_uV = 0,				\
+		},						\
+		.num_consumer_supplies = ARRAY_SIZE(tps6236x_dcdc_supply), \
+		.consumer_supplies = tps6236x_dcdc_supply,		\
+		},							\
+	.internal_pd_enable = 0,					\
+	.vsel = 3,							\
+	.init_uV = -1,							\
+	.init_apply = 0,						\
+};
+
+static struct i2c_board_info __initdata tps6236x_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("tps62361B", 0x60),
+		.platform_data	= &tps6236x_pdata,
+	},
+};
+
 int __init cardhu_regulator_init(void)
 {
 	struct board_info board_info;
 	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
 	u32 pmc_ctrl;
+
 	/* configure the power management controller to trigger PMU
 	 * interrupts when low */
+
 	pmc_ctrl = readl(pmc + PMC_CTRL);
 	writel(pmc_ctrl | PMC_CTRL_INTR_LOW, pmc + PMC_CTRL);
 
 	tegra_get_board_info(&board_info);
 	if ((board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1291)) {
-		tps_platform.num_subdevs = ARRAY_SIZE(tps_devs_e1198);
-		tps_platform.subdevs = tps_devs_e1198;
+		if ((board_info.sku & 1) == 1) {
+			tps_platform.num_subdevs =
+					ARRAY_SIZE(tps_devs_e1198_skubit0_1);
+			tps_platform.subdevs = tps_devs_e1198_skubit0_1;
+		} else {
+			tps_platform.num_subdevs =
+					ARRAY_SIZE(tps_devs_e1198_skubit0_0);
+			tps_platform.subdevs = tps_devs_e1198_skubit0_0;
+		}
 	} else {
-		tps_platform.num_subdevs = ARRAY_SIZE(tps_devs_e118x);
-		tps_platform.subdevs = tps_devs_e118x;
+		if ((board_info.sku & 1) == 1) {
+			tps_platform.num_subdevs = ARRAY_SIZE(tps_devs_e118x_skubit0_1);
+			tps_platform.subdevs = tps_devs_e118x_skubit0_1;
+		} else {
+			tps_platform.num_subdevs = ARRAY_SIZE(tps_devs_e118x_skubit0_0);
+			tps_platform.subdevs = tps_devs_e118x_skubit0_0;
+		}
 	}
 
 	i2c_register_board_info(4, cardhu_regulators, 1);
+
+	/* Resgister the TPS6236x for all boards whose sku bit 0 is set. */
+	if ((board_info.sku & 1) == 1) {
+		pr_info("Registering the device TPS62361B\n");
+		i2c_register_board_info(4, tps6236x_boardinfo, 1);
+	}
 	return 0;
 }
 
@@ -583,7 +668,7 @@ static int disable_load_switch_rail(
 	}
 
 /* common to all boards */
-GREG_INIT(0, en_5v_cp,		en_5v_cp,	NULL,			TPS6591X_GPIO_GP0,	false,	0,	0,	0,	0);
+GREG_INIT(0, en_5v_cp,		en_5v_cp,	NULL,			TPS6591X_GPIO_GP0,	false,	1,	0,	0,	0);
 GREG_INIT(1, en_5v0,		en_5v0,		NULL,			TPS6591X_GPIO_GP2,	false,	0,	0,	0,	0);
 GREG_INIT(2, en_ddr,		en_ddr,		NULL,			TPS6591X_GPIO_GP6,	false,	0,	0,	0,	0);
 GREG_INIT(3, en_3v3_sys,	en_3v3_sys,	NULL,			TPS6591X_GPIO_GP7,	false,	0,	0,	0,	0);
@@ -813,6 +898,12 @@ int __init cardhu_suspend_init(void)
 	struct board_info board_info;
 
 	tegra_get_board_info(&board_info);
+
+	/* CORE_PWR_REQ to be high for all board whose sku bit 0 is set.
+	 * This is require to enable the dc-dc converter tps62361x */
+	if ((board_info.sku & 1) == 1)
+		cardhu_suspend_data.corereq_high = true;
+
 	switch (board_info.board_id) {
 	case BOARD_E1291:
 		/* CORE_PWR_REQ to be high for E1291-A03 */
