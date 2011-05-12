@@ -275,6 +275,7 @@ static int __init get_cpu_nominal_mv_index(
 {
 	int i, j, mv;
 	struct dvfs *d;
+	struct clk *c;
 
 	/*
 	 * Start with nominal level for the chips with this speedo_id. Then,
@@ -287,18 +288,28 @@ static int __init get_cpu_nominal_mv_index(
 		mv = min(mv, tegra3_dvfs_rail_vdd_core.nominal_millivolts);
 
 	/*
-	 * Find matching cpu dvfs entry, and index to the minimum voltage for
-	 * maximum frequency specified in the entry, not exceeding nominal
-	 * limit. This index point to the final nominal voltage.
+	 * Find matching cpu dvfs entry, and use it to determine index to the
+	 * final nominal voltage, that satisfies the following requirements:
+	 * - allows CPU to run at minimum of the maximum rates specified in
+	 *   the dvfs entry and clock tree
+	 * - does not violate cpu_to_core dependency as determined above
 	 */
 	for (i = 0, j = 0; j <  ARRAY_SIZE(cpu_dvfs_table); j++) {
 		d = &cpu_dvfs_table[j];
 		if (match_dvfs_one(d, speedo_id, process_id)) {
+			c = tegra_get_clock_by_name(d->clk_name);
+			BUG_ON(!c);
+
 			for (; i < MAX_DVFS_FREQS; i++) {
 				if ((d->freqs[i] == 0) ||
 				    (cpu_millivolts[i] == 0) ||
 				    (mv < cpu_millivolts[i]))
 					break;
+
+				if (c->max_rate <= d->freqs[i]*d->freqs_mult) {
+					i++;
+					break;
+				}
 			}
 			break;
 		}
