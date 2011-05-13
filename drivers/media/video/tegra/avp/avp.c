@@ -1411,6 +1411,9 @@ int tegra_avp_release(struct tegra_avp_info *avp)
 {
 	int ret = 0;
 
+	pr_info("%s: WORKAROUND: ignoring AVP release\n", __func__);
+	return 0;
+
 	pr_debug("%s: close\n", __func__);
 	mutex_lock(&avp->open_lock);
 	if (!avp->refcount) {
