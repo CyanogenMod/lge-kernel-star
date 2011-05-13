@@ -3608,6 +3608,10 @@ struct clk *tegra_ptr_clks[] = {
 	&tegra_clk_twd,
 };
 
+static struct tegra_edp_limits default_cpu_edp_limits[] = {
+	{90, { 1000000, 1000000, 1000000, 1000000 } },
+};
+
 static void tegra3_init_one_clock(struct clk *c)
 {
 	clk_init(c);
@@ -3651,6 +3655,9 @@ void __init tegra_soc_init_clocks(void)
 	init_clk_out_mux();
 	for (i = 0; i < ARRAY_SIZE(tegra_clk_out_list); i++)
 		tegra3_init_one_clock(&tegra_clk_out_list[i]);
+
+	tegra_init_cpu_edp_limits(default_cpu_edp_limits,
+				  ARRAY_SIZE(default_cpu_edp_limits));
 }
 
 #ifdef CONFIG_CPU_FREQ
