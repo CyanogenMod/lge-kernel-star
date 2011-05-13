@@ -53,6 +53,7 @@ static struct clk *emc_clk;
 static unsigned long target_cpu_speed[CONFIG_NR_CPUS];
 static DEFINE_MUTEX(tegra_cpu_lock);
 static bool is_suspended;
+static int suspend_index;
 
 unsigned int tegra_getspeed(unsigned int cpu);
 static int tegra_update_cpu_speed(unsigned long rate);
@@ -455,8 +456,8 @@ static int tegra_pm_notify(struct notifier_block *nb, unsigned long event,
 	if (event == PM_SUSPEND_PREPARE) {
 		is_suspended = true;
 		pr_info("Tegra cpufreq suspend: setting frequency to %d kHz\n",
-			freq_table[0].frequency);
-		tegra_update_cpu_speed(freq_table[0].frequency);
+			freq_table[suspend_index].frequency);
+		tegra_update_cpu_speed(freq_table[suspend_index].frequency);
 	} else if (event == PM_POST_SUSPEND) {
 		is_suspended = false;
 		tegra_cpu_edp_init(true);
@@ -540,6 +541,7 @@ static int __init tegra_cpufreq_init(void)
 	struct tegra_cpufreq_table_data *table_data =
 		tegra_cpufreq_table_get();
 	BUG_ON(!table_data);
+	suspend_index = table_data->suspend_index;
 
 #ifdef CONFIG_TEGRA_THERMAL_THROTTLE
 	/*
