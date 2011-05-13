@@ -737,8 +737,10 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode)
 	cpu_pm_enter();
 	cpu_complex_pm_enter();
 
-	if (mode == TEGRA_SUSPEND_LP0)
+	if (mode == TEGRA_SUSPEND_LP0) {
+		tegra_lp0_cpu_mode(true);
 		tegra_lp0_suspend_mc();
+	}
 
 	suspend_cpu_complex(0);
 	flush_cache_all();
@@ -752,8 +754,10 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode)
 
 	tegra_init_cache();
 
-	if (mode == TEGRA_SUSPEND_LP0)
+	if (mode == TEGRA_SUSPEND_LP0) {
 		tegra_lp0_resume_mc();
+		tegra_lp0_cpu_mode(false);
+	}
 
 	restore_cpu_complex(0);
 

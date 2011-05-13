@@ -105,6 +105,7 @@ void tegra_cluster_switch_prolog(unsigned int flags);
 void tegra_cluster_switch_epilog(unsigned int flags);
 void tegra_lp0_suspend_mc(void);
 void tegra_lp0_resume_mc(void);
+void tegra_lp0_cpu_mode(bool enter);
 #else
 static inline int tegra_cluster_control(unsigned int us, unsigned int flags)
 #define INSTRUMENT_CLUSTER_SWITCH 0	/* Must be zero for ARCH_TEGRA_2x_SOC */
@@ -117,6 +118,7 @@ static inline void tegra_cluster_switch_prolog(unsigned int flags) {}
 static inline void tegra_cluster_switch_epilog(unsigned int flags) {}
 static inline void tegra_lp0_suspend_mc(void) {}
 static inline void tegra_lp0_resume_mc(void) {}
+static inline void tegra_lp0_cpu_mode(bool enter) {}
 #endif
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
