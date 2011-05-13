@@ -29,6 +29,7 @@ int enterprise_sdhci_init(void);
 int enterprise_pinmux_init(void);
 int enterprise_panel_init(void);
 int touch_init(void);
+int enterprise_kbc_init(void);
 int enterprise_emc_init(void);
 int enterprise_regulator_init(void);
 int enterprise_baseband_init(void);

@@ -363,6 +363,7 @@ static void __init tegra_enterprise_init(void)
 	enterprise_sdhci_init();
 	enterprise_regulator_init();
 	enterprise_usb_init();
+	enterprise_kbc_init();
 	enterprise_gps_init();
 	enterprise_baseband_init();
 	enterprise_panel_init();
