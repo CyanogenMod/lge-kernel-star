@@ -38,7 +38,10 @@
 #define RTC_ALARM		0x8
 #define RTC_INT			0x12
 #define RTC_RESET_STATUS	0x16
+#define RTC_BBCH_REG		0x39
 
+#define RTC_BBCH_SEL		0x02
+#define RTC_BBCH_EN     	0x01
 #define ENABLE_ALARM_INT 0x8
 #define RTC_RESET_VALUE 0x80
 #define ALARM_INT_STATUS 0x40
@@ -411,6 +414,7 @@ static int __devinit tps6591x_rtc_probe(struct platform_device *pdev)
 {
 	struct tps6591x_rtc_platform_data *pdata = pdev->dev.platform_data;
 	struct tps6591x_rtc *rtc;
+	struct rtc_time tm;
 	int err;
 	u8 reg;
 
@@ -449,6 +453,13 @@ static int __devinit tps6591x_rtc_probe(struct platform_device *pdev)
 		return -EBUSY;
 	}
 
+	reg = RTC_BBCH_SEL | RTC_BBCH_EN;
+	tps6591x_write_regs(&pdev->dev, RTC_BBCH_REG, 1, &reg);
+	if (err) {
+		dev_err(&pdev->dev, "unable to program Charger reg\n");
+		return -EBUSY;
+	}
+
 	reg = ENABLE_ALARM_INT;
 	tps6591x_write_regs(&pdev->dev, RTC_INT, 1, &reg);
 	if (err) {
@@ -456,13 +467,16 @@ static int __devinit tps6591x_rtc_probe(struct platform_device *pdev)
 		return -EBUSY;
 	}
 
-	if (pdata->time.tm_year < 2000 || pdata->time.tm_year > 2100)	{
-		memset(&pdata->time, 0, sizeof(pdata->time));
-		pdata->time.tm_year = RTC_YEAR_OFFSET;
-		pdata->time.tm_mday = 1;
-	} else
-	pdata->time.tm_year -= OS_REF_YEAR;
-	tps6591x_rtc_set_time(&pdev->dev, &pdata->time);
+	tps6591x_rtc_read_time(&pdev->dev, &tm);
+	if ((tm.tm_year < RTC_YEAR_OFFSET || tm.tm_year > (RTC_YEAR_OFFSET + 99))){
+		if (pdata->time.tm_year < 2000 || pdata->time.tm_year > 2100)	{
+			memset(&pdata->time, 0, sizeof(pdata->time));
+			pdata->time.tm_year = RTC_YEAR_OFFSET;
+			pdata->time.tm_mday = 1;
+		} else
+		pdata->time.tm_year -= OS_REF_YEAR;
+		tps6591x_rtc_set_time(&pdev->dev, &pdata->time);
+	}
 
 	if (pdata && (pdata->irq >= 0)) {
 		rtc->irq = pdata->irq;
