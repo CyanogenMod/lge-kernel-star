@@ -76,13 +76,14 @@ int tegra_cpu_cap_highest_speed(unsigned int *speed_cap);
 #if defined(CONFIG_TEGRA_AUTO_HOTPLUG) && !defined(CONFIG_ARCH_TEGRA_2x_SOC)
 int tegra_auto_hotplug_init(struct mutex *cpu_lock);
 void tegra_auto_hotplug_exit(void);
-void tegra_auto_hotplug_governor(unsigned int cpu_freq);
+void tegra_auto_hotplug_governor(unsigned int cpu_freq, bool suspend);
 #else
 static inline int tegra_auto_hotplug_init(struct mutex *cpu_lock)
 { return 0; }
 static inline void tegra_auto_hotplug_exit(void)
 { }
-static inline void tegra_auto_hotplug_governor(unsigned int cpu_freq)
+static inline void tegra_auto_hotplug_governor(unsigned int cpu_freq,
+						bool suspend)
 { }
 #endif
 
