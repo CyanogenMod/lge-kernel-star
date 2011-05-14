@@ -136,6 +136,23 @@ int __init cardhu_scroll_init(void)
 		.debounce_interval = 10,	\
 	}
 
+static struct gpio_keys_button cardhu_keys_pm269[] = {
+	[0] = GPIO_KEY(KEY_POWER, PV0, 1),
+};
+
+static struct gpio_keys_platform_data cardhu_keys_pm269_platform_data = {
+	.buttons	= cardhu_keys_pm269,
+	.nbuttons	= ARRAY_SIZE(cardhu_keys_pm269),
+};
+
+static struct platform_device cardhu_keys_pm269_device = {
+	.name   = "gpio-keys",
+	.id     = 0,
+	.dev    = {
+		.platform_data  = &cardhu_keys_pm269_platform_data,
+	},
+};
+
 static struct gpio_keys_button cardhu_keys_e1198[] = {
 	[0] = GPIO_KEY(KEY_HOME, PQ0, 0),
 	[1] = GPIO_KEY(KEY_BACK, PQ1, 0),
@@ -148,7 +165,7 @@ static struct gpio_keys_button cardhu_keys_e1198[] = {
 
 static struct gpio_keys_platform_data cardhu_keys_e1198_platform_data = {
 	.buttons	= cardhu_keys_e1198,
-	.nbuttons       = ARRAY_SIZE(cardhu_keys_e1198),
+	.nbuttons	= ARRAY_SIZE(cardhu_keys_e1198),
 };
 
 static struct platform_device cardhu_keys_e1198_device = {
@@ -170,7 +187,7 @@ static struct gpio_keys_button cardhu_keys_e1291[] = {
 
 static struct gpio_keys_platform_data cardhu_keys_e1291_platform_data = {
 	.buttons	= cardhu_keys_e1291,
-	.nbuttons       = ARRAY_SIZE(cardhu_keys_e1291),
+	.nbuttons	= ARRAY_SIZE(cardhu_keys_e1291),
 };
 
 static struct platform_device cardhu_keys_e1291_device = {
@@ -216,7 +233,8 @@ int __init cardhu_keys_init(void)
 
 	tegra_get_board_info(&board_info);
 	if (!((board_info.board_id == BOARD_E1198) ||
-		(board_info.board_id == BOARD_E1291)))
+		(board_info.board_id == BOARD_E1291) ||
+		(board_info.board_id == BOARD_PM269)))
 		return 0;
 
 	pr_info("Registering gpio keys\n");
@@ -228,13 +246,17 @@ int __init cardhu_keys_init(void)
 
 		platform_device_register(&cardhu_keys_e1291_device);
 		platform_device_register(&cardhu_int_keys_e1291_device);
-		return 0;
+	} else if (board_info.board_id == BOARD_PM269) {
+		for (i = 0; i < ARRAY_SIZE(cardhu_keys_pm269); i++)
+			tegra_gpio_enable(cardhu_keys_pm269[i].gpio);
+
+		platform_device_register(&cardhu_keys_pm269_device);
+	} else {
+		/* For E1198 */
+		for (i = 0; i < ARRAY_SIZE(cardhu_keys_e1198); i++)
+			tegra_gpio_enable(cardhu_keys_e1198[i].gpio);
+
+		platform_device_register(&cardhu_keys_e1198_device);
 	}
-
-	/* For E1198 */
-	for (i = 0; i < ARRAY_SIZE(cardhu_keys_e1198); i++)
-		tegra_gpio_enable(cardhu_keys_e1198[i].gpio);
-
-	platform_device_register(&cardhu_keys_e1198_device);
 	return 0;
 }
