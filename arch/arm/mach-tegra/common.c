@@ -136,8 +136,6 @@ static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 	{ "pll_p_out2",	"pll_p",	48000000,	true },
 	{ "pll_p_out3",	"pll_p",	102000000,	true },
 	{ "pll_m_out1",	"pll_m",	275000000,	true },
-	{ "pll_c",	NULL,		ULONG_MAX,	false },
-	{ "pll_c_out1",	"pll_c",	208000000,	false },
 	{ "pll_p_out4",	"pll_p",	102000000,	true },
 	{ "sclk",	"pll_p_out4",	102000000,	true },
 	{ "hclk",	"sclk",		102000000,	true },
@@ -165,14 +163,8 @@ static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 	{ "sdmmc3",	"pll_p",	48000000,	false},
 	{ "sdmmc4",	"clk_m",	12000000,	true},
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
-	{ "vde",	"pll_c",	ULONG_MAX,	false },
-	{ "host1x",	"pll_c",	0,		false },
-	{ "mpe",	"pll_c",	0,		false },
-	{ "3d",		"pll_c",	0,		false },
-	{ "3d2",	"pll_c",	0,		false },
-	{ "2d",		"pll_c",	0,		false },
-	{ "epp",	"pll_c",	0,		false },
-	{ "se",		"pll_c",	0,		false },
+	{ "cbus",	"pll_c",	ULONG_MAX,	false },
+	{ "pll_c_out1",	"pll_c",	208000000,	false },
 #endif
 	{ NULL,		NULL,		0,		0},
 };
