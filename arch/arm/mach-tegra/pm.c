@@ -303,6 +303,7 @@ static void pmc_32kwritel(u32 val, unsigned long offs)
 static void set_power_timers(unsigned long us_on, unsigned long us_off,
 			     long rate)
 {
+	static unsigned long last_us_off = 0;
 	unsigned long long ticks;
 	unsigned long long pclk;
 
@@ -311,7 +312,7 @@ static void set_power_timers(unsigned long us_on, unsigned long us_off,
 	else
 		pclk = rate;
 
-	if (rate != tegra_last_pclk) {
+	if ((rate != tegra_last_pclk) || (us_off != last_us_off)) {
 		ticks = (us_on * pclk) + 999999ull;
 		do_div(ticks, 1000000);
 		writel((unsigned long)ticks, pmc + PMC_CPUPWRGOOD_TIMER);
@@ -322,6 +323,7 @@ static void set_power_timers(unsigned long us_on, unsigned long us_off,
 		wmb();
 	}
 	tegra_last_pclk = pclk;
+	last_us_off = us_off;
 }
 
 /*
@@ -523,11 +525,14 @@ unsigned int tegra_idle_lp2_last(unsigned int sleep_time, unsigned int flags)
 	 * We can use clk_get_rate_all_locked() here, because all other cpus
 	 * are in LP2 state and irqs are disabled
 	 */
-	set_power_timers(pdata->cpu_timer, pdata->cpu_off_timer,
-		clk_get_rate_all_locked(tegra_pclk));
-
-	if (flags & TEGRA_POWER_CLUSTER_MASK)
+	if (flags & TEGRA_POWER_CLUSTER_MASK) {
+		set_power_timers(pdata->cpu_timer, 0,
+			clk_get_rate_all_locked(tegra_pclk));
 		tegra_cluster_switch_prolog(mode);
+	} else {
+		set_power_timers(pdata->cpu_timer, pdata->cpu_off_timer,
+			clk_get_rate_all_locked(tegra_pclk));
+	}
 
 	if (sleep_time)
 		tegra_lp2_set_trigger(sleep_time);
