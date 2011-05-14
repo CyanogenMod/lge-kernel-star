@@ -22,7 +22,6 @@
 #include <linux/regulator/machine.h>
 #include <linux/mfd/tps6586x.h>
 #include <linux/gpio.h>
-#include <mach/suspend.h>
 #include <linux/io.h>
 
 #include <mach/iomap.h>
@@ -32,7 +31,7 @@
 
 #include "gpio-names.h"
 #include "fuse.h"
-#include "power.h"
+#include "pm.h"
 #include "wakeups-t2.h"
 #include "board.h"
 #include "board-ventana.h"
@@ -212,13 +211,8 @@ static struct tegra_suspend_platform_data ventana_suspend_data = {
 	.suspend_mode	= TEGRA_SUSPEND_LP0,
 	.core_timer	= 0x7e7e,
 	.core_off_timer = 0xf,
-	.separate_req	= true,
 	.corereq_high	= false,
 	.sysclkreq_high	= true,
-	.wake_enb	= TEGRA_WAKE_GPIO_PV2,
-	.wake_high	= 0,
-	.wake_low	= TEGRA_WAKE_GPIO_PV2,
-	.wake_any	= 0,
 };
 
 int __init ventana_regulator_init(void)

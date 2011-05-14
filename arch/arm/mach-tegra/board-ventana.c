@@ -276,7 +276,7 @@ static struct platform_device tegra_camera = {
 static struct platform_device *ventana_devices[] __initdata = {
 	&tegra_uartb_device,
 	&tegra_uartc_device,
-	&pmu_device,
+	&tegra_pmu_device,
 	&tegra_udc_device,
 	&tegra_ehci2_device,
 	&tegra_gart_device,
@@ -440,8 +440,6 @@ static void __init ventana_power_off_init(void)
 
 static void __init tegra_ventana_init(void)
 {
-	tegra_common_init();
-
 	tegra_clk_init_from_table(ventana_clk_init_table);
 	ventana_pinmux_init();
 	ventana_i2c_init();
@@ -490,11 +488,10 @@ void __init tegra_ventana_reserve(void)
 
 MACHINE_START(VENTANA, "ventana")
 	.boot_params    = 0x00000100,
-	.phys_io        = IO_APB_PHYS,
-	.io_pg_offst    = ((IO_APB_VIRT) >> 18) & 0xfffc,
-	.init_irq       = tegra_init_irq,
-	.init_machine   = tegra_ventana_init,
 	.map_io         = tegra_map_common_io,
 	.reserve        = tegra_ventana_reserve,
+	.init_early	= tegra_init_early,
+	.init_irq	= tegra_init_irq,
 	.timer          = &tegra_timer,
+	.init_machine	= tegra_ventana_init,
 MACHINE_END

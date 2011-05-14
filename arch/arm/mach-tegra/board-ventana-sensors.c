@@ -33,7 +33,6 @@
 
 #include <linux/delay.h>
 #include <linux/i2c.h>
-#include <linux/akm8975.h>
 #include <linux/mpu.h>
 #include <linux/i2c/pca954x.h>
 #include <linux/i2c/pca953x.h>
