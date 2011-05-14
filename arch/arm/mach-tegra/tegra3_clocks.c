@@ -3130,7 +3130,7 @@ static struct clk tegra_clk_cclk_g = {
 	.inputs	= mux_cclk_g,
 	.reg	= 0x368,
 	.ops	= &tegra_super_ops,
-	.max_rate = 1000000000,
+	.max_rate = 1300000000,
 };
 
 static struct clk tegra_clk_cclk_lp = {
@@ -3139,7 +3139,7 @@ static struct clk tegra_clk_cclk_lp = {
 	.inputs	= mux_cclk_lp,
 	.reg	= 0x370,
 	.ops	= &tegra_super_ops,
-	.max_rate = 1000000000,
+	.max_rate = 500000000,
 };
 
 static struct clk tegra_clk_sclk = {
@@ -3155,7 +3155,7 @@ static struct clk tegra_clk_virtual_cpu_g = {
 	.name      = "cpu_g",
 	.parent    = &tegra_clk_cclk_g,
 	.ops       = &tegra_cpu_ops,
-	.max_rate  = 1000000000,
+	.max_rate  = 1300000000,
 	.u.cpu = {
 		.main      = &tegra_pll_x,
 		.backup    = &tegra_pll_p,
@@ -3185,7 +3185,7 @@ static struct clk tegra_clk_cpu_cmplx = {
 	.name      = "cpu",
 	.inputs    = mux_cpu_cmplx,
 	.ops       = &tegra_cpu_cmplx_ops,
-	.max_rate  = 1000000000,
+	.max_rate  = 1300000000,
 };
 
 static struct clk tegra_clk_twd = {
@@ -3686,9 +3686,25 @@ static struct cpufreq_frequency_table freq_table_1p0GHz[] = {
 	{ 9, CPUFREQ_TABLE_END },
 };
 
+static struct cpufreq_frequency_table freq_table_1p3GHz[] = {
+	{ 0,  108000 },
+	{ 1,  216000 },
+	{ 2,  340000 },
+	{ 3,  480000 },
+	{ 4,  640000 },
+	{ 5,  760000 },
+	{ 6,  880000 },
+	{ 7, 1000000 },
+	{ 8, 1100000 },
+	{ 9, 1200000 },
+	{10, 1300000 },
+	{11, CPUFREQ_TABLE_END },
+};
+
 static struct tegra_cpufreq_table_data cpufreq_tables[] = {
 	{ freq_table_300MHz, 0, 1 },
 	{ freq_table_1p0GHz, 2, 7 },
+	{ freq_table_1p3GHz, 2, 9, 1},
 };
 
 static void clip_cpu_rate_limits(
