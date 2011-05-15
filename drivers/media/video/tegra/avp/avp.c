@@ -1559,6 +1559,44 @@ static struct trpc_node avp_trpc_node = {
 	.try_connect	= avp_node_try_connect,
 };
 
+struct nvmap_client *avp_early_nvmap_drv;
+struct nvmap_handle_ref *avp_early_kernel_handle;
+void *avp_early_kernel_data;
+phys_addr_t avp_early_kernel_phys;
+
+void avp_early_init(void)
+{
+	int ret;
+
+	avp_early_nvmap_drv = nvmap_create_client(nvmap_dev, "avp_early");
+	if (IS_ERR(avp_early_nvmap_drv))
+		pr_crit("%s: nvmap_create_client error\n", __func__);
+
+	avp_early_kernel_handle =
+		nvmap_create_handle(avp_early_nvmap_drv, SZ_1M);
+	if (IS_ERR(avp_early_kernel_handle))
+		pr_crit("%s: nvmap_create_handle error\n", __func__);
+
+	ret = nvmap_alloc_handle_id(avp_early_nvmap_drv,
+				nvmap_ref_to_id(avp_early_kernel_handle),
+				NVMAP_HEAP_IOVMM, PAGE_SIZE,
+				NVMAP_HANDLE_WRITE_COMBINE);
+	if (ret)
+		pr_crit("%s: nvmap_alloc_handle_id error\n", __func__);
+
+	avp_early_kernel_data = nvmap_mmap(avp_early_kernel_handle);
+	if (!avp_early_kernel_data)
+		pr_crit("%s: nvmap_mmap error\n", __func__);
+
+	avp_early_kernel_phys =
+		nvmap_pin(avp_early_nvmap_drv, avp_early_kernel_handle);
+	if (IS_ERR((void *)avp_early_kernel_phys))
+		pr_crit("%s: nvmap_pin error\n", __func__);
+
+	pr_info("%s: allocated memory at %x for AVP kernel\n",
+		__func__, avp_early_kernel_phys);
+}
+
 static int tegra_avp_probe(struct platform_device *pdev)
 {
 	void *msg_area;
@@ -1594,7 +1632,14 @@ static int tegra_avp_probe(struct platform_device *pdev)
 	heap_mask = 0;
 #endif
 
-	if (heap_mask) {
+	if (heap_mask == NVMAP_HEAP_IOVMM) {
+		avp->nvmap_drv = avp_early_nvmap_drv;
+		avp->kernel_handle = avp_early_kernel_handle;
+		avp->kernel_data = avp_early_kernel_data;
+		avp->kernel_phys = avp_early_kernel_phys;
+	}
+
+	if (heap_mask == NVMAP_HEAP_CARVEOUT_MASK) {
 		avp->kernel_handle = nvmap_create_handle(avp->nvmap_drv, SZ_1M);
 		if (IS_ERR(avp->kernel_handle)) {
 			pr_err("%s: cannot create kernel handle\n", __func__);
