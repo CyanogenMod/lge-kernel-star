@@ -155,6 +155,7 @@ static struct dvfs_rail *tegra2_dvfs_rails[] = {
 	}
 
 static struct dvfs dvfs_init[] = {
+#if 0
 	/* Cpu voltages (mV):	   750, 775, 800, 825, 850, 875,  900,  925,  950,  975,  1000, 1025, 1050, 1100, 1125 */
 	CPU_DVFS("cpu", 0, 0, MHZ, 314, 314, 314, 456, 456, 456,  608,  608,  608,  760,  817,  817,  912,  1000),
 	CPU_DVFS("cpu", 0, 1, MHZ, 314, 314, 314, 456, 456, 456,  618,  618,  618,  770,  827,  827,  922,  1000),
@@ -241,6 +242,7 @@ static struct dvfs dvfs_init[] = {
 	CORE_DVFS("vde",      3, 1, KHZ, 171000, 218500, 300000, 300000, 300000, 300000, 300000),
 	/* What is this? */
 	CORE_DVFS("NVRM_DEVID_CLK_SRC", -1, 1, MHZ, 480, 600, 800, 1067, 1067, 1067, 1067),
+#endif
 };
 
 int tegra_dvfs_disable_core_set(const char *arg, const struct kernel_param *kp)
