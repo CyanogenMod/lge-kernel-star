@@ -66,9 +66,8 @@
  *     clk_get_rate_all_locked.
  *
  * Within a single clock, no clock operation can call another clock operation
- * on itself, except for clk_get_rate_locked and clk_set_rate_locked.  Any
- * clock operation can call any other clock operation on any of it's possible
- * parents.
+ * on itself, except for clk_xxx_locked.  Any clock operation can call any other
+ * clock operation on any of it's possible parents.
  *
  * clk_set_cansleep is used to mark a clock as sleeping.  It is called during
  * dvfs (Dynamic Voltage and Frequency Scaling) init on any clock that has a
@@ -234,24 +233,21 @@ void clk_init(struct clk *c)
 	mutex_unlock(&clock_list_lock);
 }
 
-int clk_enable(struct clk *c)
+static int clk_enable_locked(struct clk *c)
 {
 	int ret = 0;
-	unsigned long flags;
-
-	clk_lock_save(c, &flags);
 
 	if (clk_is_auto_dvfs(c)) {
 		ret = tegra_dvfs_set_rate(c, clk_get_rate_locked(c));
 		if (ret)
-			goto out;
+			return ret;
 	}
 
 	if (c->refcnt == 0) {
 		if (c->parent) {
 			ret = clk_enable(c->parent);
 			if (ret)
-				goto out;
+				return ret;
 		}
 
 		if (c->ops && c->ops->enable) {
@@ -260,7 +256,7 @@ int clk_enable(struct clk *c)
 			if (ret) {
 				if (c->parent)
 					clk_disable(c->parent);
-				goto out;
+				return ret;
 			}
 			c->state = ON;
 			c->set = true;
@@ -268,21 +264,27 @@ int clk_enable(struct clk *c)
 		clk_stats_update(c);
 	}
 	c->refcnt++;
-out:
+
+	return ret;
+}
+
+
+int clk_enable(struct clk *c)
+{
+	int ret = 0;
+	unsigned long flags;
+
+	clk_lock_save(c, &flags);
+	ret = clk_enable_locked(c);
 	clk_unlock_restore(c, &flags);
 	return ret;
 }
 EXPORT_SYMBOL(clk_enable);
 
-void clk_disable(struct clk *c)
+static void clk_disable_locked(struct clk *c)
 {
-	unsigned long flags;
-
-	clk_lock_save(c, &flags);
-
 	if (c->refcnt == 0) {
 		WARN(1, "Attempting to disable clock %s with refcnt 0", c->name);
-		clk_unlock_restore(c, &flags);
 		return;
 	}
 	if (c->refcnt == 1) {
@@ -300,7 +302,14 @@ void clk_disable(struct clk *c)
 
 	if (clk_is_auto_dvfs(c) && c->refcnt == 0)
 		tegra_dvfs_set_rate(c, 0);
+}
 
+void clk_disable(struct clk *c)
+{
+	unsigned long flags;
+
+	clk_lock_save(c, &flags);
+	clk_disable_locked(c);
 	clk_unlock_restore(c, &flags);
 }
 EXPORT_SYMBOL(clk_disable);
@@ -311,6 +320,7 @@ int clk_set_parent(struct clk *c, struct clk *parent)
 	unsigned long flags;
 	unsigned long new_rate;
 	unsigned long old_rate;
+	bool disable = false;
 
 	clk_lock_save(c, &flags);
 
@@ -332,6 +342,20 @@ int clk_set_parent(struct clk *c, struct clk *parent)
 #endif
 	}
 
+	/* The new clock control register setting does not take effect if
+	 * clock is disabled. Later, when the clock is enabled it would run
+	 * for several cycles on the old parent, which may hang h/w if the
+	 * parent is already disabled. To guarantee h/w switch to the new
+	 * setting enable clock while setting parent.
+	 */
+	if ((c->refcnt == 0) && (c->flags & MUX)) {
+		pr_warn("Setting parent of clock %s with refcnt 0", c->name);
+		disable = true;
+		ret = clk_enable_locked(c);
+		if (ret)
+			goto out;
+	}
+
 	if (clk_is_auto_dvfs(c) && c->refcnt > 0 &&
 			(!c->parent || new_rate > old_rate)) {
 		ret = tegra_dvfs_set_rate(c, new_rate);
@@ -348,6 +372,8 @@ int clk_set_parent(struct clk *c, struct clk *parent)
 		ret = tegra_dvfs_set_rate(c, new_rate);
 
 out:
+	if (disable)
+		clk_disable_locked(c);
 	clk_unlock_restore(c, &flags);
 	return ret;
 }
@@ -364,6 +390,7 @@ int clk_set_rate_locked(struct clk *c, unsigned long rate)
 	int ret = 0;
 	unsigned long old_rate, max_rate;
 	long new_rate;
+	bool disable = false;
 
 	old_rate = clk_get_rate_locked(c);
 
@@ -382,20 +409,38 @@ int clk_set_rate_locked(struct clk *c, unsigned long rate)
 		rate = new_rate;
 	}
 
+	/* The new clock control register setting does not take effect if
+	 * clock is disabled. Later, when the clock is enabled it would run
+	 * for several cycles on the old rate, which may over-clock module
+	 * at given voltage. To guarantee h/w switch to the new setting
+	 * enable clock while setting rate.
+	 */
+	if ((c->refcnt == 0) && (c->flags & (DIV_U71 | DIV_U16)) &&
+		clk_is_auto_dvfs(c)) {
+		pr_warn("Setting rate of clock %s with refcnt 0", c->name);
+		disable = true;
+		ret = clk_enable_locked(c);
+		if (ret)
+			goto out;
+	}
+
 	if (clk_is_auto_dvfs(c) && rate > old_rate && c->refcnt > 0) {
 		ret = tegra_dvfs_set_rate(c, rate);
 		if (ret)
-			return ret;
+			goto out;
 	}
 
 	trace_clock_set_rate(c->name, rate, smp_processor_id());
 	ret = c->ops->set_rate(c, rate);
 	if (ret)
-		return ret;
+		goto out;
 
 	if (clk_is_auto_dvfs(c) && rate < old_rate && c->refcnt > 0)
 		ret = tegra_dvfs_set_rate(c, rate);
 
+out:
+	if (disable)
+		clk_disable_locked(c);
 	return ret;
 }
 
