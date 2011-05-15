@@ -137,6 +137,24 @@ static void tegra_dma_update_hw_partial(struct tegra_dma_channel *ch,
 	struct tegra_dma_req *req);
 static void tegra_dma_stop(struct tegra_dma_channel *ch);
 
+void tegra_dma_flush(struct tegra_dma_channel *ch)
+{
+}
+EXPORT_SYMBOL(tegra_dma_flush);
+
+void tegra_dma_dequeue(struct tegra_dma_channel *ch)
+{
+	struct tegra_dma_req *req;
+
+	if (tegra_dma_is_empty(ch))
+		return;
+
+	req = list_entry(ch->list.next, typeof(*req), node);
+
+	tegra_dma_dequeue_req(ch, req);
+	return;
+}
+
 void tegra_dma_stop(struct tegra_dma_channel *ch)
 {
 	u32 csr;
@@ -232,7 +250,7 @@ int tegra_dma_dequeue_req(struct tegra_dma_channel *ch,
 	}
 	if (!found) {
 		spin_unlock_irqrestore(&ch->lock, irq_flags);
-		return -EINVAL;
+		return 0;
 	}
 
 	if (!stop)
@@ -268,6 +286,8 @@ skip_status:
 
 	spin_unlock_irqrestore(&ch->lock, irq_flags);
 
+	/* Callback should be called without any lock */
+	req->complete(req);
 	return 0;
 }
 EXPORT_SYMBOL(tegra_dma_dequeue_req);
