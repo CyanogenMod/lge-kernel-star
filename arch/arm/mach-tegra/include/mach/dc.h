@@ -119,18 +119,22 @@ struct dsi_phy_timing_ns {
 };
 
 struct tegra_dsi_out {
-	u8		n_data_lanes;			/* required*/
-	u8		pixel_format;			/* required*/
-	u8		refresh_rate;			/* required*/
-	u8		virtual_channel;		/* required*/
+	u8		n_data_lanes;			/* required */
+	u8		pixel_format;			/* required */
+	u8		refresh_rate;			/* required */
+	u8		panel_reset;			/* required */
+	u8		virtual_channel;		/* required */
 	u8		dsi_instance;
 
 	bool		panel_has_frame_buffer;	/* required*/
 
-	struct tegra_dsi_cmd*	dsi_init_cmd;		/* required*/
-	u16		n_init_cmd;			/* required*/
+	struct tegra_dsi_cmd*	dsi_init_cmd;		/* required */
+	u16		n_init_cmd;			/* required */
 
-	u8		video_data_type;		/* required*/
+	struct tegra_dsi_cmd*	dsi_suspend_cmd;	/* required */
+	u16		n_suspend_cmd;			/* required */
+
+	u8		video_data_type;		/* required */
 	u8		video_clock_mode;
 	u8		video_burst_mode;
 
