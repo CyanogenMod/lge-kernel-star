@@ -1180,3 +1180,26 @@ struct platform_device tegra_aes_device = {
 		.coherent_dma_mask = DMA_BIT_MASK(32),
 	},
 };
+
+static struct resource tegra_kbc_resources[] = {
+	[0] = {
+		.start = TEGRA_KBC_BASE,
+		.end   = TEGRA_KBC_BASE + TEGRA_KBC_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	[1] = {
+		.start = INT_KBC,
+		.end   = INT_KBC,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+
+struct platform_device tegra_kbc_device = {
+	.name = "tegra-kbc",
+	.id = -1,
+	.resource = tegra_kbc_resources,
+	.num_resources = ARRAY_SIZE(tegra_kbc_resources),
+	.dev = {
+		.platform_data = 0,
+	},
+};
