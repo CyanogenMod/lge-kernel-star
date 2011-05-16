@@ -228,6 +228,7 @@ static struct platform_device tegra_camera = {
 
 static struct platform_device *enterprise_devices[] __initdata = {
 	&debug_uart,
+	&tegra_uarta_device,
 	&tegra_uartb_device,
 	&tegra_uartc_device,
 	&tegra_uarte_device,
@@ -341,10 +342,6 @@ static void enterprise_usb_init(void)
 	tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
 	platform_device_register(&tegra_otg_device);
 
-	tegra_ehci2_device.dev.platform_data = &tegra_ehci_pdata[1];
-	platform_device_register(&tegra_ehci2_device);
-
-
 	tegra_ehci3_device.dev.platform_data = &tegra_ehci_pdata[2];
 	platform_device_register(&tegra_ehci3_device);
 
@@ -354,11 +351,6 @@ static void enterprise_gps_init(void)
 {
 	tegra_gpio_enable(TEGRA_GPIO_PU2);
 	tegra_gpio_enable(TEGRA_GPIO_PU3);
-}
-
-static void enterprise_modem_init(void)
-{
-	tegra_gpio_enable(TEGRA_GPIO_PH5);
 }
 
 static void __init tegra_enterprise_init(void)
@@ -372,7 +364,7 @@ static void __init tegra_enterprise_init(void)
 	enterprise_regulator_init();
 	enterprise_usb_init();
 	enterprise_gps_init();
-	enterprise_modem_init();
+	enterprise_baseband_init();
 	enterprise_panel_init();
 	enterprise_bt_rfkill();
 	enterprise_emc_init();

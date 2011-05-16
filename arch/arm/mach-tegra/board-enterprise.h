@@ -31,6 +31,7 @@ int enterprise_panel_init(void);
 int touch_init(void);
 int enterprise_emc_init(void);
 int enterprise_regulator_init(void);
+int enterprise_baseband_init(void);
 
 /* Touchscreen GPIO addresses   */
 #ifdef CONFIG_TOUCHSCREEN_ATMEL_MT_T9
