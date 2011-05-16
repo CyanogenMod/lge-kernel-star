@@ -55,6 +55,8 @@
 #define cardhu_dsi_panel_reset	TEGRA_GPIO_PD2
 #endif
 
+static struct regulator *cardhu_dsi_reg = NULL;
+
 static struct regulator *cardhu_hdmi_reg = NULL;
 static struct regulator *cardhu_hdmi_pll = NULL;
 static struct regulator *cardhu_hdmi_vddio = NULL;
@@ -311,7 +313,6 @@ static int cardhu_hdmi_enable(void)
 
 static int cardhu_hdmi_disable(void)
 {
-
 	regulator_disable(cardhu_hdmi_reg);
 	regulator_put(cardhu_hdmi_reg);
 	cardhu_hdmi_reg = NULL;
@@ -319,7 +320,6 @@ static int cardhu_hdmi_disable(void)
 	regulator_disable(cardhu_hdmi_pll);
 	regulator_put(cardhu_hdmi_pll);
 	cardhu_hdmi_pll = NULL;
-
 	return 0;
 }
 static struct resource cardhu_disp1_resources[] = {
@@ -477,18 +477,28 @@ static struct tegra_dc_platform_data cardhu_disp2_pdata = {
 
 static int cardhu_dsi_panel_enable(void)
 {
-	static struct regulator *reg = NULL;
 	int ret;
 
-	if (reg == NULL) {
-		reg = regulator_get(NULL, "avdd_dsi_csi");
-		if (IS_ERR_OR_NULL(reg)) {
+	if (cardhu_dsi_reg == NULL) {
+		cardhu_dsi_reg = regulator_get(NULL, "avdd_dsi_csi");
+		if (IS_ERR_OR_NULL(cardhu_dsi_reg)) {
 		pr_err("dsi: Could not get regulator avdd_dsi_csi\n");
-			reg = NULL;
-			return PTR_ERR(reg);
+			cardhu_dsi_reg = NULL;
+			return PTR_ERR(cardhu_dsi_reg);
 		}
 	}
-	regulator_enable(reg);
+	regulator_enable(cardhu_dsi_reg);
+
+	ret = gpio_request(TEGRA_GPIO_PJ1, "DSI TE");
+	if (ret < 0)
+		return ret;
+
+	ret = gpio_direction_input(TEGRA_GPIO_PJ1);
+	if (ret < 0) {
+		gpio_free(TEGRA_GPIO_PJ1);
+		return ret;
+	}
+	tegra_gpio_enable(TEGRA_GPIO_PJ1);
 
 #if DSI_PANEL_219
 	ret = gpio_request(TEGRA_GPIO_PL2, "pl2");
@@ -587,7 +597,52 @@ static int cardhu_dsi_panel_enable(void)
 
 static int cardhu_dsi_panel_disable(void)
 {
-	return 0;
+	int err;
+
+	err = 0;
+	printk(KERN_INFO "DSI panel disable\n");
+
+#if DSI_PANEL_219
+	tegra_gpio_disable(TEGRA_GPIO_PU2);
+	gpio_free(TEGRA_GPIO_PU2);
+	tegra_gpio_disable(TEGRA_GPIO_PH2);
+	gpio_free(TEGRA_GPIO_PH2);
+	tegra_gpio_disable(TEGRA_GPIO_PH0);
+	gpio_free(TEGRA_GPIO_PH0);
+	tegra_gpio_disable(TEGRA_GPIO_PL2);
+	gpio_free(TEGRA_GPIO_PL2);
+#endif
+
+#if DSI_PANEL_218
+	tegra_gpio_disable(TEGRA_GPIO_PD2);
+	gpio_free(TEGRA_GPIO_PD2);
+#endif
+
+	return err;
+}
+
+static int cardhu_dsi_panel_postsuspend(void)
+{
+	int err;
+
+	err = 0;
+	printk(KERN_INFO "DSI panel postsuspend\n");
+
+	if (cardhu_dsi_reg) {
+		err = regulator_disable(cardhu_dsi_reg);
+		if (err < 0)
+			printk(KERN_ERR
+			"DSI regulator avdd_dsi_csi disable failed\n");
+		regulator_put(cardhu_dsi_reg);
+		cardhu_dsi_reg = NULL;
+	}
+
+#if DSI_PANEL_218
+	tegra_gpio_disable(AVDD_LCD);
+	gpio_free(AVDD_LCD);
+#endif
+
+	return err;
 }
 
 static struct tegra_dsi_cmd dsi_init_cmd[]= {
@@ -595,6 +650,13 @@ static struct tegra_dsi_cmd dsi_init_cmd[]= {
 	DSI_DLY_MS(150),
 	DSI_CMD_SHORT(0x05, 0x29, 0x00),
 	DSI_DLY_MS(20),
+};
+
+static struct tegra_dsi_cmd dsi_suspend_cmd[] = {
+	DSI_CMD_SHORT(0x05, 0x28, 0x00),
+	DSI_DLY_MS(20),
+	DSI_CMD_SHORT(0x05, 0x10, 0x00),
+	DSI_DLY_MS(5),
 };
 
 struct tegra_dsi_out cardhu_dsi = {
@@ -609,10 +671,16 @@ struct tegra_dsi_out cardhu_dsi = {
 #else
 	.dsi_instance = 0,
 #endif
+	.panel_reset = DSI_PANEL_RESET,
+
 	.n_init_cmd = ARRAY_SIZE(dsi_init_cmd),
 	.dsi_init_cmd = dsi_init_cmd,
 
+	.n_suspend_cmd = ARRAY_SIZE(dsi_suspend_cmd),
+	.dsi_suspend_cmd = dsi_suspend_cmd,
+
 	.video_data_type = TEGRA_DSI_VIDEO_TYPE_COMMAND_MODE,
+	.lp_cmd_mode_freq_khz = 430000,
 };
 
 static struct tegra_dc_mode cardhu_dsi_modes[] = {
@@ -691,6 +759,7 @@ static struct tegra_dc_out cardhu_disp1_out = {
 
 	.enable		= cardhu_dsi_panel_enable,
 	.disable	= cardhu_dsi_panel_disable,
+	.postsuspend	= cardhu_dsi_panel_postsuspend,
 #endif
 };
 static struct tegra_dc_platform_data cardhu_disp1_pdata = {
