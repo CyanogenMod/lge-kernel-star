@@ -155,7 +155,7 @@ void tegra_iovmm_client_unlock(struct tegra_iovmm_client *client);
  * respectively. VM operations may be called before this call returns */
 struct tegra_iovmm_area *tegra_iovmm_create_vm(
 	struct tegra_iovmm_client *client, struct tegra_iovmm_area_ops *ops,
-	size_t size, size_t align, pgprot_t pgprot);
+	size_t size, size_t align, pgprot_t pgprot, unsigned long iovm_start);
 
 /* called by clients to "zap" an iovmm_area, and replace all mappings
  * in it with invalid ones, without freeing the virtual address range */
@@ -225,7 +225,7 @@ static inline void tegra_iovmm_client_unlock(struct tegra_iovmm_client *client)
 
 static inline struct tegra_iovmm_area *tegra_iovmm_create_vm(
 	struct tegra_iovmm_client *client, struct tegra_iovmm_area_ops *ops,
-	unsigned long size, pgprot_t pgprot)
+	unsigned long size, pgprot_t pgprot, unsigned long iovm_start)
 {
 	return NULL;
 }

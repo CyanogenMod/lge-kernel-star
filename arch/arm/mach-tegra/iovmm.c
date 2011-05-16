@@ -36,6 +36,8 @@
  */
 #define MIN_SPLIT_PAGE (4)
 #define MIN_SPLIT_BYTES(_d) (MIN_SPLIT_PAGE<<(_d)->dev->pgsize_bits)
+#define NO_SPLIT(m) ((m) < MIN_SPLIT_BYTES(domain))
+#define DO_SPLIT(m) ((m) >= MIN_SPLIT_BYTES(domain))
 
 #define iovmm_start(_b) ((_b)->vm_area.iovm_start)
 #define iovmm_length(_b) ((_b)->vm_area.iovm_length)
@@ -281,24 +283,22 @@ static struct tegra_iovmm_block *iovmm_split_free_block(
 	return rem;
 }
 
+static int iovmm_block_splitting;
 static struct tegra_iovmm_block *iovmm_alloc_block(
 	struct tegra_iovmm_domain *domain, size_t size, size_t align)
 {
 #define SIMALIGN(b, a)	(((b)->start%(a)) ? ((a)-((b)->start%(a))) : 0)
-#define NO_SPLIT(m)	((m) < MIN_SPLIT_BYTES(domain))
-#define DO_SPLIT(m)	((m) >= MIN_SPLIT_BYTES(domain))
 
 	struct rb_node *n;
 	struct tegra_iovmm_block *b, *best;
 	size_t simalign;
-	static int splitting = 0;
 
 	BUG_ON(!size);
 	size = iovmm_align_up(domain->dev, size);
 	align = iovmm_align_up(domain->dev, align);
 	for (;;) {
 		spin_lock(&domain->block_lock);
-		if (!splitting)
+		if (!iovmm_block_splitting)
 			break;
 		spin_unlock(&domain->block_lock);
 		schedule();
@@ -331,7 +331,7 @@ static struct tegra_iovmm_block *iovmm_alloc_block(
 
 	simalign = SIMALIGN(best, align);
 	if (DO_SPLIT(simalign)) {
-		splitting = 1;
+		iovmm_block_splitting = 1;
 		spin_unlock(&domain->block_lock);
 
 		/* Split off misalignment */
@@ -352,16 +352,83 @@ static struct tegra_iovmm_block *iovmm_alloc_block(
 	iovmm_length(best) = size;
 
 	if (DO_SPLIT((best->start + best->length) - iovmm_end(best))) {
-		splitting = 1;
+		iovmm_block_splitting = 1;
 		spin_unlock(&domain->block_lock);
 
 		/* Split off excess */
 		(void)iovmm_split_free_block(domain, best, size + simalign);
 	}
 
-	splitting = 0;
+	iovmm_block_splitting = 0;
 	spin_unlock(&domain->block_lock);
 
+	return best;
+}
+
+static struct tegra_iovmm_block *iovmm_allocate_vm(
+	struct tegra_iovmm_domain *domain, size_t size,
+	size_t align, unsigned long iovm_start)
+{
+	struct rb_node *n;
+	struct tegra_iovmm_block *b, *best;
+
+	BUG_ON(iovm_start % align);
+	BUG_ON(!size);
+
+	size = iovmm_align_up(domain->dev, size);
+	for (;;) {
+		spin_lock(&domain->block_lock);
+		if (!iovmm_block_splitting)
+			break;
+		spin_unlock(&domain->block_lock);
+		schedule();
+	}
+
+	n = rb_first(&domain->free_blocks);
+	best = NULL;
+	while (n) {
+		b = rb_entry(n, struct tegra_iovmm_block, free_node);
+		if ((b->start <= iovm_start) &&
+		     (b->start + b->length) >= (iovm_start + size)) {
+			best = b;
+			break;
+		}
+		n = rb_next(n);
+	}
+
+	if (!best)
+		goto fail;
+
+	/* split the mem before iovm_start. */
+	if (DO_SPLIT(iovm_start - best->start)) {
+		iovmm_block_splitting = 1;
+		spin_unlock(&domain->block_lock);
+		best = iovmm_split_free_block(domain, best,
+			(iovm_start - best->start));
+	}
+	if (!best)
+		goto fail;
+
+	/* remove the desired block from free list. */
+	rb_erase(&best->free_node, &domain->free_blocks);
+	clear_bit(BK_free, &best->flags);
+	atomic_inc(&best->ref);
+
+	iovmm_start(best) = iovm_start;
+	iovmm_length(best) = size;
+
+	BUG_ON(best->start > iovmm_start(best));
+	BUG_ON((best->start + best->length) < iovmm_end(best));
+	/* split the mem after iovm_start+size. */
+	if (DO_SPLIT(best->start + best->length - iovmm_end(best))) {
+		iovmm_block_splitting = 1;
+		spin_unlock(&domain->block_lock);
+		(void)iovmm_split_free_block(domain, best,
+			(iovmm_start(best) - best->start + size));
+	}
+fail:
+	iovmm_block_splitting = 0;
+	spin_unlock(&domain->block_lock);
 	return best;
 }
 
@@ -391,9 +458,12 @@ int tegra_iovmm_domain_init(struct tegra_iovmm_domain *domain,
 	return 0;
 }
 
+/* If iovm_start != 0, tries to allocate specified iova block if it is free.
+ * if it is not free, it fails.
+ */
 struct tegra_iovmm_area *tegra_iovmm_create_vm(
 	struct tegra_iovmm_client *client, struct tegra_iovmm_area_ops *ops,
-	size_t size, size_t align, pgprot_t pgprot)
+	size_t size, size_t align, pgprot_t pgprot, unsigned long iovm_start)
 {
 	struct tegra_iovmm_block *b;
 	struct tegra_iovmm_domain *domain;
@@ -402,7 +472,10 @@ struct tegra_iovmm_area *tegra_iovmm_create_vm(
 
 	domain = client->domain;
 
-	b = iovmm_alloc_block(domain, size, align);
+	if (iovm_start)
+		b = iovmm_allocate_vm(domain, size, align, iovm_start);
+	else
+		b = iovmm_alloc_block(domain, size, align);
 	if (!b) return NULL;
 
 	b->vm_area.domain = domain;
