@@ -40,9 +40,9 @@ static const u32 core_process_speedos[][PROCESS_CORNERS_NUM] = {
 /* Maximum speedo levels for each CPU process corner */
 static const u32 cpu_process_speedos[][PROCESS_CORNERS_NUM] = {
 // proc_id 0    1    2    3
-	{305, 337, 360, 376}, // soc_speedo_id 0
-	{337, 337, 360, 376}, // soc_speedo_id 1
-	{305, 337, 360, 376}, // soc_speedo_id 2
+	{306, 338, 360, 376}, // soc_speedo_id 0
+	{306, 338, 360, 376}, // soc_speedo_id 1
+	{338, 338, 360, 376}, // soc_speedo_id 2
 };
 
 static int cpu_process_id;
