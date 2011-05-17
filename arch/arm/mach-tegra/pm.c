@@ -913,9 +913,6 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 		tegra2_lp0_suspend_init();
 
 	suspend_set_ops(&tegra_suspend_ops);
-#endif
-
-	current_suspend_mode = plat->suspend_mode;
 
 	/* Create /sys/power/suspend/type */
 	suspend_kobj = kobject_create_and_add("suspend", power_kobj);
@@ -925,6 +922,9 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 			pr_err("%s: sysfs_create_file suspend type failed!", \
 								__func__);
 	}
+#endif
+
+	current_suspend_mode = plat->suspend_mode;
 }
 
 static int tegra_debug_uart_suspend(void)
