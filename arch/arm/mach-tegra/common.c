@@ -192,7 +192,11 @@ static void __init tegra_init_power(void)
 	tegra_powergate_power_off(TEGRA_POWERGATE_MPE);
 	tegra_powergate_power_off(TEGRA_POWERGATE_3D);
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	/* for TEGRA_3x_SOC it will be handled seperately */
 	tegra_powergate_power_off(TEGRA_POWERGATE_PCIE);
+#endif
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	tegra_powergate_power_off(TEGRA_POWERGATE_3D1);
 #endif
 }
 
