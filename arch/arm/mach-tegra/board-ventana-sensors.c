@@ -271,7 +271,7 @@ static const struct i2c_board_info ventana_i2c0_board_info[] = {
 
 static const struct i2c_board_info ventana_i2c2_board_info[] = {
 	{
-		I2C_BOARD_INFO("bq20z75-battery", 0x0B),
+		I2C_BOARD_INFO("bq20z75", 0x0B),
 		.irq = TEGRA_GPIO_TO_IRQ(AC_PRESENT_GPIO),
 	},
 };
