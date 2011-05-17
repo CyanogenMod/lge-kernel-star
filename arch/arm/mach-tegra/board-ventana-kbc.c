@@ -41,7 +41,7 @@
 #define VENTANA_ROW_COUNT	15
 #define VENTANA_COL_COUNT	7
 
-static int plain_kbd_keycode[] = {
+static const u32 ventana_keymap[] = {
 	KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
 			KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
 	KEY_RESERVED, KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
@@ -74,6 +74,13 @@ static int plain_kbd_keycode[] = {
 			KEY_VOLUMEDOWN, KEY_VOLUMEUP, KEY_RESERVED,
 };
 
+
+
+static const struct matrix_keymap_data ventana_keymap_data = {
+	.keymap         = ventana_keymap,
+	.keymap_size    = ARRAY_SIZE(ventana_keymap),
+};
+
 static struct tegra_kbc_wake_key ventana_wake_cfg[] = {
 	[0] = {
 		.row = 14,
@@ -84,13 +91,9 @@ static struct tegra_kbc_wake_key ventana_wake_cfg[] = {
 static struct tegra_kbc_platform_data ventana_kbc_platform_data = {
 	.debounce_cnt = 20,
 	.repeat_cnt = 50 * 32,
-	.scan_timeout_cnt = 3000 * 32,
-	.plain_keycode = plain_kbd_keycode,
-	.fn_keycode = NULL,
-	.is_filter_keys = false,
-	.is_wake_on_any_key = false,
-	.wake_key_cnt = 1,
+	.wake_cnt = 1,
 	.wake_cfg = &ventana_wake_cfg[0],
+	.keymap_data = &ventana_keymap_data,
 };
 
 static struct resource ventana_kbc_resources[] = {
@@ -126,16 +129,16 @@ int __init ventana_kbc_init(void)
 	/* Setup the pin configuration information. */
 	for (i = 0; i < KBC_MAX_GPIO; i++) {
 		data->pin_cfg[i].num = 0;
-		data->pin_cfg[i].pin_type = kbc_pin_unused;
+		data->pin_cfg[i].is_row = false;
 	}
 	for (i = 0; i < VENTANA_ROW_COUNT; i++) {
 		data->pin_cfg[i].num = i;
-		data->pin_cfg[i].pin_type = kbc_pin_row;
+		data->pin_cfg[i].is_row = true;
 	}
 
 	for (i = 0; i < VENTANA_COL_COUNT; i++) {
 		data->pin_cfg[i + VENTANA_ROW_COUNT].num = i;
-		data->pin_cfg[i + VENTANA_ROW_COUNT].pin_type = kbc_pin_col;
+		data->pin_cfg[i + VENTANA_ROW_COUNT].is_row = false;
 	}
 	platform_device_register(&ventana_kbc_device);
 	return 0;
