@@ -136,7 +136,7 @@ static int power_up_cpu(unsigned int cpu)
 	/* First boot or Flow controller did not work as expected. Try to
 	   directly toggle power gates. Error if direct power on also fails. */
 	if (!is_cpu_powered(cpu)) {
-		ret = tegra_powergate_power_on(TEGRA_CPU_POWERGATE_ID(cpu));
+		ret = tegra_unpowergate_partition(TEGRA_CPU_POWERGATE_ID(cpu));
 		if (ret)
 			goto fail;
 
