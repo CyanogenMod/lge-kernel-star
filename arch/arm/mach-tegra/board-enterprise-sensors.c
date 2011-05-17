@@ -73,7 +73,7 @@ static void enterprise_nct1008_init(void)
 static struct mpu3050_platform_data mpu3050_data = {
 	.int_config  = 0x10,
 	/* Orientation matrix for MPU on enterprise */
-	.orientation = { 0, -1, 0, -1, 0, 0, 0, 0, -1 },
+	.orientation = { -1, 0, 0, 0, -1, 0, 0, 0, 1 },
 	.level_shifter = 0,
 
 	.accel = {
@@ -82,7 +82,7 @@ static struct mpu3050_platform_data mpu3050_data = {
 		.bus         = EXT_SLAVE_BUS_SECONDARY,
 		.address     = 0x0F,
 		/* Orientation matrix for Kionix on enterprise */
-		.orientation = { 0, -1, 0, -1, 0, 0, 0, 0, -1 },
+		.orientation = { 0, 1, 0, -1, 0, 0, 0, 0, 1 },
 
 	},
 
@@ -92,7 +92,7 @@ static struct mpu3050_platform_data mpu3050_data = {
 		.bus         = EXT_SLAVE_BUS_PRIMARY,
 		.address     = 0x0C,
 		/* Orientation matrix for AKM on enterprise */
-		.orientation = { 1, 0, 0, 0, -1, 0, 0, 0, -1 },
+		.orientation = { 0, 1, 0, -1, 0, 0, 0, 0, 1 },
 	},
 };
 
