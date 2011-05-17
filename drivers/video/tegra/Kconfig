@@ -102,7 +102,7 @@ config TEGRA_DSI
 
 config NVMAP_CONVERT_CARVEOUT_TO_IOVMM
 	bool "Convert carveout to IOVMM"
-	depends on TEGRA_NVMAP && TEGRA_IOVMM
+	depends on TEGRA_NVMAP && TEGRA_IOVMM_SMMU
 	default y
 	help
 	  Say Y here to force to convert carveout memory requests to
