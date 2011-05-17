@@ -87,7 +87,7 @@ static struct regulator_consumer_supply tps80031_ldo4_supply[] = {
 };
 
 static struct regulator_consumer_supply tps80031_ldo5_supply[] = {
-	REGULATOR_SUPPLY("unused_ldo5", NULL),
+	REGULATOR_SUPPLY("vdd_sensor", NULL),
 };
 
 static struct regulator_consumer_supply tps80031_ldo6_supply[] = {

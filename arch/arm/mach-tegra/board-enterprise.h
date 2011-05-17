@@ -28,6 +28,7 @@ int enterprise_charge_init(void);
 int enterprise_sdhci_init(void);
 int enterprise_pinmux_init(void);
 int enterprise_panel_init(void);
+int enterprise_sensors_init(void);
 int touch_init(void);
 int enterprise_kbc_init(void);
 int enterprise_emc_init(void);
