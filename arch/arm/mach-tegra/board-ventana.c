@@ -36,6 +36,7 @@
 #include <linux/platform_data/tegra_usb.h>
 #include <linux/mfd/tps6586x.h>
 #include <linux/memblock.h>
+#include <linux/i2c/atmel_mxt_ts.h>
 
 #include <mach/clk.h>
 #include <mach/iomap.h>
@@ -290,28 +291,44 @@ static struct platform_device *ventana_devices[] __initdata = {
 };
 
 
-static struct panjit_i2c_ts_platform_data panjit_data = {
-	.gpio_reset = TEGRA_GPIO_PQ7,
+static struct mxt_platform_data atmel_mxt_info = {
+	.x_line		= 27,
+	.y_line		= 42,
+	.x_size		= 768,
+	.y_size		= 1366,
+	.blen		= 0x20,
+	.threshold	= 0x3C,
+	.voltage	= 3300000,
+	.orient		= MXT_ROTATED_90,
+	.irqflags	= IRQF_TRIGGER_FALLING,
 };
 
-static const struct i2c_board_info ventana_i2c_bus1_touch_info[] = {
+static struct i2c_board_info __initdata i2c_info[] = {
 	{
-		I2C_BOARD_INFO("panjit_touch", 0x3),
-		.irq		= TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PV6),
-		.platform_data	= &panjit_data,
-	},
+	 I2C_BOARD_INFO("atmel_mxt_ts", 0x5A),
+	 .irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PV6),
+	 .platform_data = &atmel_mxt_info,
+	 },
 };
 
-static int __init ventana_touch_init(void)
+static int __init ventana_touch_init_atmel(void)
 {
 	tegra_gpio_enable(TEGRA_GPIO_PV6);
-
 	tegra_gpio_enable(TEGRA_GPIO_PQ7);
-	i2c_register_board_info(0, ventana_i2c_bus1_touch_info, 1);
+
+	gpio_request(TEGRA_GPIO_PV6, "atmel-irq");
+	gpio_direction_input(TEGRA_GPIO_PV6);
+
+	gpio_request(TEGRA_GPIO_PQ7, "atmel-reset");
+	gpio_direction_output(TEGRA_GPIO_PQ7, 0);
+	msleep(1);
+	gpio_set_value(TEGRA_GPIO_PQ7, 1);
+	msleep(100);
+
+	i2c_register_board_info(0, i2c_info, 1);
 
 	return 0;
 }
-
 
 static struct usb_phy_plat_data tegra_usb_phy_pdata[] = {
 	[0] = {
@@ -440,6 +457,8 @@ static void __init ventana_power_off_init(void)
 
 static void __init tegra_ventana_init(void)
 {
+	struct board_info BoardInfo;
+
 	tegra_clk_init_from_table(ventana_clk_init_table);
 	ventana_pinmux_init();
 	ventana_i2c_init();
@@ -453,7 +472,16 @@ static void __init tegra_ventana_init(void)
 	ventana_sdhci_init();
 	ventana_charge_init();
 	ventana_regulator_init();
-	ventana_touch_init();
+
+	tegra_get_board_info(&BoardInfo);
+
+	/* boards with sku > 0 have atmel touch panels */
+	if (BoardInfo.sku) {
+		pr_info("Initializing Atmel touch driver\n");
+		ventana_touch_init_atmel();
+	} else {
+		pr_info("Initializing Panjit touch driver\n");
+	}
 
 #ifdef CONFIG_KEYBOARD_GPIO
 	ventana_keys_init();
