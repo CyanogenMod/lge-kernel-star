@@ -965,8 +965,7 @@ void cardhu_thermal_zones_info(struct tegra_edp_limits **z, int *sz)
 
 int __init cardhu_edp_init(void)
 {
-	// FIXME: uncomment to override default EDP with above table
-	//tegra_init_cpu_edp_limits(cardhu_edp_limits, ARRAY_SIZE(cardhu_edp_limits));
+	tegra_init_cpu_edp_limits(cardhu_edp_limits, ARRAY_SIZE(cardhu_edp_limits));
 	return 0;
 }
 #endif
