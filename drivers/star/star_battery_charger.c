@@ -2420,24 +2420,30 @@ static void star_gauge_follower_func(void)
 
 	//LDC("");
 
+        if (batt_dev->BatteryLifePercent - batt_dev->BatteryGauge > 5 ||
+            batt_dev->BatteryLifePercent - batt_dev->BatteryGauge < -5) {
+		// If the diff is over 5%, just reset it
+        	batt_dev->BatteryLifePercent = batt_dev->BatteryGauge;
+	}
+
 	if (batt_dev->ACLineStatus == NV_TRUE)
 	{
-			if (batt_dev->BatteryGauge > batt_dev->BatteryLifePercent)
-				batt_dev->BatteryLifePercent += 1;
-			else if (batt_dev->BatteryGauge < batt_dev->BatteryLifePercent)
-				batt_dev->BatteryLifePercent -= 1;
-		}
-		else if (batt_dev->ACLineStatus == NV_FALSE)
-		{
-			//if (batt_dev->BatteryGauge > batt_dev->BatteryLifePercent)
-			//	batt_dev->BatteryLifePercent += 1;
-			//else 
-			if (batt_dev->BatteryGauge < batt_dev->BatteryLifePercent)
-				batt_dev->BatteryLifePercent -= 1;
-		}
+		if (batt_dev->BatteryGauge > batt_dev->BatteryLifePercent)
+			batt_dev->BatteryLifePercent += 1;
+		else if (batt_dev->BatteryGauge < batt_dev->BatteryLifePercent)
+			batt_dev->BatteryLifePercent -= 1;
+	}
+	else if (batt_dev->ACLineStatus == NV_FALSE)
+	{
+		//if (batt_dev->BatteryGauge > batt_dev->BatteryLifePercent)
+		//	batt_dev->BatteryLifePercent += 1;
+		//else 
+		if (batt_dev->BatteryGauge < batt_dev->BatteryLifePercent)
+			batt_dev->BatteryLifePercent -= 1;
+	}
 
-		if (batt_dev->BatteryLifePercent < 0) batt_dev->BatteryLifePercent = 0;
-		if (batt_dev->BatteryLifePercent > 100) batt_dev->BatteryLifePercent = 100;
+	if (batt_dev->BatteryLifePercent < 0) batt_dev->BatteryLifePercent = 0;
+	if (batt_dev->BatteryLifePercent > 100) batt_dev->BatteryLifePercent = 100;
 }
 
 static void tegra_battery_status_poll_work(struct work_struct *work)
