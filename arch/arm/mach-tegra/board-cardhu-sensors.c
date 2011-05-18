@@ -263,10 +263,30 @@ static int cardhu_right_ov5650_power_off(void)
 	return 0;
 }
 
+static void cardhu_ov5650_synchronize_sensors(void)
+{
+	if (board_info.board_id == BOARD_E1198) {
+		gpio_direction_output(CAM1_POWER_DWN_GPIO, 1);
+		mdelay(50);
+		gpio_direction_output(CAM1_POWER_DWN_GPIO, 0);
+		mdelay(50);
+	}
+	else if (board_info.board_id == BOARD_E1291) {
+		gpio_direction_output(CAM1_POWER_DWN_GPIO, 1);
+		gpio_direction_output(CAM2_POWER_DWN_GPIO, 1);
+		mdelay(50);
+		gpio_direction_output(CAM1_POWER_DWN_GPIO, 0);
+		gpio_direction_output(CAM2_POWER_DWN_GPIO, 0);
+		mdelay(50);
+	}
+	else
+		pr_err("%s: UnSupported BoardId\n", __func__);
+}
 
 struct ov5650_platform_data cardhu_right_ov5650_data = {
 	.power_on = cardhu_right_ov5650_power_on,
 	.power_off = cardhu_right_ov5650_power_off,
+	.synchronize_sensors = cardhu_ov5650_synchronize_sensors,
 };
 
 static int cardhu_ov2710_power_on(void)
