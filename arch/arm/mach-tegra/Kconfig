@@ -151,15 +151,19 @@ config TEGRA_PWM
 
 config TEGRA_EMC_SCALING_ENABLE
 	bool "Enable scaling the memory frequency"
+	depends on !TEGRA_FPGA_PLATFORM
+	default n
 
 endif
 
 config TEGRA_CPU_DVFS
 	bool "Enable voltage scaling on Tegra CPU"
+	depends on !TEGRA_FPGA_PLATFORM
 	default y
 
 config TEGRA_CORE_DVFS
 	bool "Enable voltage scaling on Tegra core"
+	depends on !TEGRA_FPGA_PLATFORM
 	depends on TEGRA_CPU_DVFS
 	default y
 
@@ -204,11 +208,12 @@ config TEGRA_ARB_SEMAPHORE
 	bool
 
 config TEGRA_THERMAL_THROTTLE
-       bool "Enable throttling of CPU speed on overtemp"
-       depends on CPU_FREQ
-       default y
-       help
-         Also requires enabling a temperature sensor such as NCT1008.
+	bool "Enable throttling of CPU speed on overtemp"
+	depends on !TEGRA_FPGA_PLATFORM
+	depends on CPU_FREQ
+	default y
+	help
+	  Also requires enabling a temperature sensor such as NCT1008.
 
 config WIFI_CONTROL_FUNC
 	bool "Enable WiFi control function abstraction"
@@ -239,6 +244,7 @@ config TEGRA_MC_PROFILE
 
 config TEGRA_EDP_LIMITS
 	bool "Enforce electrical design limits"
+	depends on !TEGRA_FPGA_PLATFORM
 	depends on CPU_FREQ
 	default y if ARCH_TEGRA_3x_SOC
 	default n
