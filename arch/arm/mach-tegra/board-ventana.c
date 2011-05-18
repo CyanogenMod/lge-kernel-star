@@ -249,7 +249,6 @@ static int ventana_wakeup_key(void)
 static struct gpio_keys_platform_data ventana_keys_platform_data = {
 	.buttons	= ventana_keys,
 	.nbuttons	= ARRAY_SIZE(ventana_keys),
-	.wakeup_key	= ventana_wakeup_key,
 };
 
 static struct platform_device ventana_keys_device = {

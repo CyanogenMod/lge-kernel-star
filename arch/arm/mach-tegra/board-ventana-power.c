@@ -234,7 +234,7 @@ int __init ventana_regulator_init(void)
 
 	i2c_register_board_info(4, ventana_regulators, 1);
 
-	regulator_has_full_constraints();
+//	regulator_has_full_constraints();
 
 	tegra_init_suspend(&ventana_suspend_data);
 
