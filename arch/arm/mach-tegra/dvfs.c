@@ -214,8 +214,8 @@ static int dvfs_rail_connect_to_regulator(struct dvfs_rail *rail)
 		reg = regulator_get(NULL, rail->reg_id);
 		if (IS_ERR(reg))
 			return -EINVAL;
+		rail->reg = reg;
 	}
-	rail->reg = reg;
 
 	v = regulator_get_voltage(reg);
 	if (v < 0) {
