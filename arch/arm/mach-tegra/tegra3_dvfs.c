@@ -402,9 +402,9 @@ static int __init get_core_nominal_mv_index(int speedo_id)
 
 void __init tegra_soc_init_dvfs(void)
 {
-	int speedo_id = 0; 		/* FIXME: get real speedo ID */
-	int cpu_process_id = 0;		/* FIXME: get real CPU process ID */
-	int core_process_id = 0;	/* FIXME: get real core process ID */
+	int speedo_id = tegra_soc_speedo_id();
+	int cpu_process_id = tegra_cpu_process_id();
+	int core_process_id = tegra_core_process_id();
 
 	int i;
 	int core_nominal_mv_index;

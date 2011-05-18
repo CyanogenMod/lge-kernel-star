@@ -73,14 +73,17 @@ static int rev_sku_to_soc_speedo(int rev, int sku)
 		break;
 	case TEGRA_REVISION_A02:
 		switch (sku) {
-		case 0: // AP30
+		case 0x87: // AP30
 			soc_speedo = 1;
 			break;
-		case 1: // T30
+		case 0x81: // T30
+		case 0:    // ENG
 			soc_speedo = 2;
 			break;
 		default:
-			BUG();
+			// FIXME: replace with BUG() when all SKU's valid
+			pr_err("Tegra3 Rev-A02: Unknown SKU %d\n", sku);
+			soc_speedo = 0;
 			break;
 		}
 		break;
@@ -143,10 +146,7 @@ void tegra_init_speedo_data(void)
 		core_process_id = INVALID_PROCESS_ID;
 	}
 
-	pr_info("Tegra3 SKU: %d Rev: %s CPU Process: %d CORE Process: %d "
-		"Speedo ID: %d",
-		tegra_sku_id(), tegra_get_revision_name(),
-		cpu_process_id, core_process_id, soc_speedo_id);
+	pr_debug("%s Soc speedo value %d", __func__, soc_speedo_id);
 }
 
 int tegra_cpu_process_id(void)
