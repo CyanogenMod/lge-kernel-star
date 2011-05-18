@@ -113,6 +113,19 @@ static inline u64 read_pmc_wake_status(void)
 	return reg;
 }
 
+static inline u64 read_pmc_sw_wake_status(void)
+{
+	u64 reg;
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	reg = readl(pmc + PMC_SW_WAKE_STATUS);
+#else
+	reg = __raw_readl(pmc + PMC_SW_WAKE_STATUS);
+	reg |= ((u64)readl(pmc + PMC_SW_WAKE2_STATUS)) << 32;
+#endif
+	return reg;
+}
+
 static inline void clear_pmc_sw_wake_status(void)
 {
 	pmc_32kwritel(0, PMC_SW_WAKE_STATUS);
@@ -234,7 +247,7 @@ static int tegra_pm_irq_syscore_suspend(void)
 	temp &= ~PMC_CTRL_LATCH_WAKEUPS;
 	pmc_32kwritel(temp, PMC_CTRL);
 
-	status = read_pmc_wake_status();
+	status = read_pmc_sw_wake_status();
 
 	lvl = read_pmc_wake_level();
 
