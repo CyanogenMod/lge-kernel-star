@@ -1625,7 +1625,7 @@ static int tegra_avp_probe(struct platform_device *pdev)
 	}
 
 #if defined(CONFIG_TEGRA_AVP_KERNEL_ON_MMU) /* Tegra2 with AVP MMU */
-	heap_mask = NVMAP_HEAP_CARVEOUT_MASK;
+	heap_mask = NVMAP_HEAP_CARVEOUT_GENERIC;
 #elif defined(CONFIG_TEGRA_AVP_KERNEL_ON_SMMU) /* Tegra3 with SMMU */
 	heap_mask = NVMAP_HEAP_IOVMM;
 #else /* nvmem= carveout */
@@ -1639,20 +1639,12 @@ static int tegra_avp_probe(struct platform_device *pdev)
 		avp->kernel_phys = avp_early_kernel_phys;
 	}
 
-	if (heap_mask == NVMAP_HEAP_CARVEOUT_MASK) {
-		avp->kernel_handle = nvmap_create_handle(avp->nvmap_drv, SZ_1M);
+	if (heap_mask == NVMAP_HEAP_CARVEOUT_GENERIC) {
+		avp->kernel_handle = nvmap_alloc(avp->nvmap_drv, SZ_1M, SZ_1M,
+						NVMAP_HANDLE_WRITE_COMBINE);
 		if (IS_ERR_OR_NULL(avp->kernel_handle)) {
-			pr_err("%s: cannot create kernel handle\n", __func__);
+			pr_err("%s: cannot create handle\n", __func__);
 			ret = PTR_ERR(avp->kernel_handle);
-			goto err_nvmap_create_handle;
-		}
-
-		ret = nvmap_alloc_handle_id(avp->nvmap_drv,
-					nvmap_ref_to_id(avp->kernel_handle),
-					heap_mask, PAGE_SIZE,
-					NVMAP_HANDLE_WRITE_COMBINE);
-		if (ret) {
-			pr_err("%s: cannot allocate kernel memory\n", __func__);
 			goto err_nvmap_alloc;
 		}
 
@@ -1663,15 +1655,15 @@ static int tegra_avp_probe(struct platform_device *pdev)
 			goto err_nvmap_mmap;
 		}
 
-		avp->kernel_phys =
-			nvmap_pin(avp->nvmap_drv, avp->kernel_handle);
+		avp->kernel_phys = nvmap_pin(avp->nvmap_drv,
+					avp->kernel_handle);
 		if (IS_ERR_OR_NULL((void *)avp->kernel_phys)) {
 			pr_err("%s: cannot pin kernel handle\n", __func__);
 			ret = PTR_ERR((void *)avp->kernel_phys);
 			goto err_nvmap_pin;
 		}
 
-		pr_info("%s: allocated memory at %lx for AVP kernel\n",
+		pr_info("%s: allocated carveout memory at %lx for AVP kernel\n",
 			__func__, (unsigned long)avp->kernel_phys);
 	}
 
@@ -1807,9 +1799,6 @@ err_nvmap_pin:
 err_nvmap_mmap:
 	nvmap_free(avp->nvmap_drv, avp->kernel_handle);
 err_nvmap_alloc:
-	nvmap_free_handle_id(avp->nvmap_drv,
-			nvmap_ref_to_id(avp->kernel_handle));
-err_nvmap_create_handle:
 	nvmap_client_put(avp->nvmap_drv);
 err_nvmap_create_drv_client:
 	kfree(avp);
