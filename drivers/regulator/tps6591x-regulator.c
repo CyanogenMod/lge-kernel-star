@@ -51,6 +51,8 @@
 #define TPS6591X_LDO6_ADD		0x35
 #define TPS6591X_LDO7_ADD		0x34
 #define TPS6591X_LDO8_ADD		0x33
+#define TPS6591X_SLEEP_SET_LDO_OFF_ADD	0x43
+#define TPS6591X_SLEEP_SET_RES_OFF_ADD	0x44
 #define TPS6591X_EN1_LDO_ADD		0x45
 #define TPS6591X_EN1_SMPS_ADD		0x46
 #define TPS6591X_EN2_LDO_ADD		0x47
@@ -79,6 +81,7 @@ struct tps6591x_regulator {
 	struct tps6591x_register_info op_reg;
 	struct tps6591x_register_info sr_reg;
 	struct tps6591x_register_info en1_reg;
+	struct tps6591x_register_info slp_off_reg;
 
 	int *voltages;
 
@@ -102,7 +105,8 @@ static int __tps6591x_ext_control_set(struct device *parent,
 				      enum tps6591x_ext_control ectrl)
 {
 	int ret;
-	uint8_t mask, reg_val, addr;
+	uint8_t mask, reg_val, addr, offset;
+	struct tps6591x_register_info *ext_reg;
 
 	/* For regulator that has separate operational and sleep register make
 	   sure that operational is used and clear sleep register to turn
@@ -129,17 +133,24 @@ static int __tps6591x_ext_control_set(struct device *parent,
 			return ret;
 	}
 
+	offset = 0;
 	switch (ectrl) {
-	case EXT_CTRL_EN1:
-		addr = ri->en1_reg.addr;
-		break;
 	case EXT_CTRL_EN2:
-		addr = ri->en1_reg.addr + EN1_EN2_OFFSET;
+		offset = EN1_EN2_OFFSET;
+		/* fall through to EXT_CTRL_EN1 */
+	case EXT_CTRL_EN1:
+		ext_reg = &(ri->en1_reg);
+		break;
+	case EXT_CTRL_SLEEP_OFF:
+		ext_reg = &(ri->slp_off_reg);
 		break;
 	default:
 		return -EINVAL;
 	}
-	mask = ((1 << ri->en1_reg.nbits) - 1) << ri->en1_reg.shift_bits;
+
+	addr = ext_reg->addr + offset;
+	mask = ((1 << ext_reg->nbits) - 1) << ext_reg->shift_bits;
+
 	return tps6591x_update(parent, addr, mask, mask);
 }
 
@@ -519,7 +530,8 @@ static int tps6591x_vddctrl_voltages[] = {
 
 #define TPS6591X_REGULATOR(_id, vdata, _ops, s_addr, s_nbits, s_shift,		\
 			s_type, op_addr, op_nbits, op_shift, sr_addr,		\
-			sr_nbits, sr_shift, en1_addr, en1_shift, en_time)	\
+			sr_nbits, sr_shift, en1_addr, en1_shift, slp_off_addr,	\
+			slp_off_shift, en_time)					\
 	.desc	= {								\
 		.name	= tps6591x_rails(_id),					\
 		.ops	= &tps6591x_regulator_##_ops,				\
@@ -549,59 +561,67 @@ static int tps6591x_vddctrl_voltages[] = {
 		.nbits	= 1,							\
 		.shift_bits = en1_shift,					\
 	},									\
+	.slp_off_reg	= {							\
+		.addr	= TPS6591X_SLEEP_SET_##slp_off_addr##_ADD,		\
+		.nbits	= 1,							\
+		.shift_bits = slp_off_shift,					\
+	},									\
 	.voltages	= tps6591x_##vdata##_voltages,				\
 	.delay		= en_time,
 
 #define TPS6591X_VIO(_id, vdata, s_addr, s_nbits, s_shift, s_type,	\
-			en1_shift, en_time)				\
+			en1_shift, slp_off_shift, en_time)		\
 {									\
 	TPS6591X_REGULATOR(_id, vdata, vio_ops, s_addr, s_nbits,	\
 			s_shift, s_type, INVALID, 0, 0,	INVALID, 0, 0,	\
-			EN1_SMPS, en1_shift, en_time)			\
+			EN1_SMPS, en1_shift, RES_OFF, slp_off_shift,	\
+			en_time)					\
 }
 
 #define TPS6591X_LDO1(_id, vdata, s_addr, s_nbits, s_shift, s_type,	\
-			en1_shift, en_time)				\
+			en1_shift, slp_off_shift, en_time)		\
 {									\
 	TPS6591X_REGULATOR(_id, vdata, ldo1_ops, s_addr, s_nbits,	\
-			s_shift, s_type, INVALID, 0, 0,	INVALID, 0, 0,	\
-			EN1_LDO, en1_shift, en_time)			\
+			s_shift, s_type, INVALID, 0, 0, INVALID, 0, 0,	\
+			EN1_LDO, en1_shift, LDO_OFF, slp_off_shift,	\
+			en_time)					\
 }
 
 #define TPS6591X_LDO3(_id, vdata, s_addr, s_nbits, s_shift, s_type,	\
-			en1_shift, en_time)				\
+			en1_shift, slp_off_shift, en_time)		\
 {									\
 	TPS6591X_REGULATOR(_id, vdata, ldo3_ops, s_addr, s_nbits,	\
-			s_shift, s_type, INVALID, 0, 0,	INVALID, 0, 0,	\
-			EN1_LDO, en1_shift, en_time)			\
+			s_shift, s_type, INVALID, 0, 0, INVALID, 0, 0,	\
+			EN1_LDO, en1_shift, LDO_OFF, slp_off_shift,	\
+			en_time)					\
 }
 
 #define TPS6591X_VDD(_id, vdata, s_addr, s_nbits, s_shift, s_type,	\
 			op_addr, op_nbits, op_shift, sr_addr, sr_nbits,	\
-			sr_shift, en1_shift, en_time)			\
+			sr_shift, en1_shift, slp_off_shift, en_time)	\
 {									\
 	TPS6591X_REGULATOR(_id, vdata, vdd_ops, s_addr, s_nbits,	\
 			s_shift, s_type, op_addr, op_nbits, op_shift,	\
 			sr_addr, sr_nbits, sr_shift, EN1_SMPS,		\
-			en1_shift, en_time)				\
+			en1_shift, RES_OFF, slp_off_shift, en_time)	\
 }
 
 static struct tps6591x_regulator tps6591x_regulator[] = {
-	TPS6591X_VIO(VIO, vio, VIO, 2, 2, single_reg, 0, 350),
-	TPS6591X_LDO1(LDO_1, ldo124, LDO1, 6, 2, single_reg, 1, 420),
-	TPS6591X_LDO1(LDO_2, ldo124, LDO2, 6, 2, single_reg, 2, 420),
-	TPS6591X_LDO3(LDO_3, ldo35678, LDO3, 5, 2, single_reg, 7, 230),
-	TPS6591X_LDO1(LDO_4, ldo124, LDO4, 6, 2, single_reg, 6, 230),
-	TPS6591X_LDO3(LDO_5, ldo35678, LDO5, 5, 2, single_reg, 3, 230),
-	TPS6591X_LDO3(LDO_6, ldo35678, LDO6, 5, 2, single_reg, 0, 230),
-	TPS6591X_LDO3(LDO_7, ldo35678, LDO7, 5, 2, single_reg, 5, 230),
-	TPS6591X_LDO3(LDO_8, ldo35678, LDO8, 5, 2, single_reg, 4, 230),
+	TPS6591X_VIO(VIO, vio, VIO, 2, 2, single_reg, 0, 0, 350),
+	TPS6591X_LDO1(LDO_1, ldo124, LDO1, 6, 2, single_reg, 1, 1, 420),
+	TPS6591X_LDO1(LDO_2, ldo124, LDO2, 6, 2, single_reg, 2, 2, 420),
+	TPS6591X_LDO3(LDO_3, ldo35678, LDO3, 5, 2, single_reg, 7, 7, 230),
+	TPS6591X_LDO1(LDO_4, ldo124, LDO4, 6, 2, single_reg, 6, 6, 230),
+	TPS6591X_LDO3(LDO_5, ldo35678, LDO5, 5, 2, single_reg, 3, 3, 230),
+	TPS6591X_LDO3(LDO_6, ldo35678, LDO6, 5, 2, single_reg, 0, 0, 230),
+	TPS6591X_LDO3(LDO_7, ldo35678, LDO7, 5, 2, single_reg, 5, 5, 230),
+	TPS6591X_LDO3(LDO_8, ldo35678, LDO8, 5, 2, single_reg, 4, 4, 230),
 	TPS6591X_VDD(VDD_1, vdd, VDD1, 2, 0, sr_op_reg, VDD1_OP,
-		7, 0, VDD1_SR, 7, 0, 1, 350),
+		7, 0, VDD1_SR, 7, 0, 1, 1, 350),
 	TPS6591X_VDD(VDD_2, vdd, VDD2, 2, 0, sr_op_reg, VDD2_OP,
-		7, 0, VDD2_SR, 7, 0, 2, 350),
+		7, 0, VDD2_SR, 7, 0, 2, 2, 350),
 	TPS6591X_VDD(VDDCTRL, vddctrl, VDDCTRL, 2, 0, sr_op_reg,
-		VDDCTRL_OP, 7, 0, VDDCTRL_SR, 7, 0, 3, 900),
+		VDDCTRL_OP, 7, 0, VDDCTRL_SR, 7, 0, 3, 3, 900),
 };
 
 static inline int tps6591x_regulator_preinit(struct device *parent,

@@ -29,7 +29,8 @@
 enum tps6591x_ext_control {
 	EXT_CTRL_NONE = 0x0,
 	EXT_CTRL_EN1,
-	EXT_CTRL_EN2
+	EXT_CTRL_EN2,
+	EXT_CTRL_SLEEP_OFF,
 };
 
 /*
