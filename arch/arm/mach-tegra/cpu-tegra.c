@@ -185,10 +185,6 @@ module_exit(tegra_cpu_debug_exit);
 #else /* CONFIG_TEGRA_THERMAL_THROTTLE */
 #define tegra_cpu_is_throttling() (0)
 #define throttle_governor_speed(requested_speed) (requested_speed)
-
-void tegra_throttling_enable(bool enable)
-{
-}
 #endif /* CONFIG_TEGRA_THERMAL_THROTTLE */
 
 #ifdef CONFIG_TEGRA_EDP_LIMITS
