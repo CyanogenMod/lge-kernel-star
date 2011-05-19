@@ -37,6 +37,7 @@
 #include "gpio-names.h"
 #include "board.h"
 #include "board-ventana.h"
+#include "cpu-tegra.h"
 
 #define ISL29018_IRQ_GPIO	TEGRA_GPIO_PZ2
 #define AKM8975_IRQ_GPIO	TEGRA_GPIO_PN5
@@ -50,8 +51,6 @@
 #define CAMERA_FLASH_MAX_LED_AMP	7
 #define CAMERA_FLASH_MAX_TORCH_AMP	11
 #define CAMERA_FLASH_MAX_FLASH_AMP	31
-
-extern void tegra_throttling_enable(bool enable);
 
 static int ventana_camera_init(void)
 {
