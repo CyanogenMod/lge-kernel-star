@@ -36,7 +36,7 @@
 
 #include "clock.h"
 #include "fuse.h"
-#include "pm.h"
+#include "dvfs.h"
 
 #define RST_DEVICES_L			0x004
 #define RST_DEVICES_H			0x008
@@ -683,7 +683,14 @@ static void tegra3_cpu_clk_disable(struct clk *c)
 static int tegra3_cpu_clk_set_rate(struct clk *c, unsigned long rate)
 {
 	int ret;
-	unsigned int backup_rate;
+	unsigned long backup_rate;
+
+	if((!c->dvfs->dvfs_rail->reg) && (clk_get_rate_locked(c) < rate)) {
+			WARN(1, "Increasing CPU rate while regulator is not"
+				" ready may overclock CPU\n");
+			return -ENOSYS;
+	}
+
 	/*
 	 * Take an extra reference to the main pll so it doesn't turn
 	 * off when we move the cpu off of it
