@@ -648,7 +648,7 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 #endif
 }
 
-#if defined CONFIG_HAS_EARLYSUSPEND && defined CONFIG_CPU_FREQ
+#ifdef CONFIG_TEGRA_CONVSERVATIVE_GOV_ON_EARLYSUPSEND
 static char cpufreq_gov_default[32];
 static char *cpufreq_gov_conservative = "conservative";
 static char *cpufreq_sysfs_place_holder="/sys/devices/system/cpu/cpu%i/cpufreq/scaling_governor";
@@ -663,7 +663,7 @@ static void cpufreq_set_governor(char *governor)
 	if (governor == NULL)
 		return;
 
-	for_each_cpu(i, cpu_present_mask) {
+	for_each_online_cpu(i) {
 		sprintf(buf, cpufreq_sysfs_place_holder, i);
 		scaling_gov = filp_open(buf, O_RDWR, 0);
 		if (scaling_gov != NULL) {
@@ -717,4 +717,4 @@ void cpufreq_set_conservative_governor(void)
 {
 	cpufreq_set_governor(cpufreq_gov_conservative);
 }
-#endif
+#endif /* CONFIG_TEGRA_CONVSERVATIVE_GOV_ON_EARLYSUPSEND */

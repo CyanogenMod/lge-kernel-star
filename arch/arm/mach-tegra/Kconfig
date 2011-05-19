@@ -294,6 +294,13 @@ config TEGRA_EMC_TO_DDR_CLOCK
 	default "2" if ARCH_TEGRA_2x_SOC
 	default "1"
 
+config TEGRA_CONVSERVATIVE_GOV_ON_EARLYSUPSEND
+	bool "Use conservative cpu frequency governor when device enters early suspend"
+	depends on HAS_EARLYSUSPEND && CPU_FREQ
+	default n
+	help
+	 Also will restore to original cpu frequency governor when device is resumed
+
 config TEGRA_LEGACY_AUDIO
 	bool "Enable Tegra Legacy Audio APIs"
 	default n

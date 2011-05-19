@@ -75,10 +75,11 @@ enum panel_type {
 
 void tegra_get_board_info(struct board_info *);
 void tegra_get_pmu_board_info(struct board_info *bi);
+#ifdef CONFIG_TEGRA_CONVSERVATIVE_GOV_ON_EARLYSUPSEND
 void cpufreq_save_default_governor(void);
 void cpufreq_restore_default_governor(void);
 void cpufreq_set_conservative_governor(void);
-
+#endif
 int get_core_edp(void);
 enum panel_type get_panel_type(void);
 
