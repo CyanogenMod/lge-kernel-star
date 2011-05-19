@@ -37,7 +37,15 @@
 #define TPS6591X_DEVCTRL	0x3F
 #define DEVCTRL_PWR_OFF_SEQ	(1 << 7)
 #define DEVCTRL_DEV_ON		(1 << 2)
+#define DEVCTRL_DEV_SLP		(1 << 1)
 #define TPS6591X_DEVCTRL2	0x40
+
+/* device sleep on registers */
+#define TPS6591X_SLEEP_KEEP_ON	0x42
+#define SLEEP_KEEP_ON_THERM	(1 << 7)
+#define SLEEP_KEEP_ON_CLKOUT32K	(1 << 6)
+#define SLEEP_KEEP_ON_VRTC	(1 << 5)
+#define SLEEP_KEEP_ON_I2CHS	(1 << 4)
 
 /* interrupt status registers */
 #define TPS6591X_INT_STS	0x50
@@ -291,7 +299,7 @@ static int tps6591x_gpio_get(struct gpio_chip *gc, unsigned offset)
 	if (val & 0x4)
 		return val & 0x1;
 	else
-		return ((val & 0x2)? 1: 0);
+		return (val & 0x2) ? 1 : 0;
 }
 
 static void tps6591x_gpio_set(struct gpio_chip *chip, unsigned offset,
@@ -607,6 +615,78 @@ static void __init tps6591x_debuginit(struct tps6591x *tpsi)
 }
 #endif
 
+static int __init tps6591x_sleepinit(struct tps6591x *tpsi,
+					struct tps6591x_platform_data *pdata)
+{
+	struct device *dev = NULL;
+	int ret = 0;
+
+	dev = tpsi->dev;
+
+	if (!pdata->dev_slp_en)
+		goto no_err_return;
+
+	/* pmu dev_slp_en is set. Make sure slp_keepon is available before
+	 * allowing SLEEP device state */
+	if (!pdata->slp_keepon) {
+		dev_err(dev, "slp_keepon_data required for slp_en\n");
+		goto err_sleep_init;
+	}
+
+	/* enabling SLEEP device state */
+	ret = tps6591x_set_bits(dev, TPS6591X_DEVCTRL, DEVCTRL_DEV_SLP);
+	if (ret < 0) {
+		dev_err(dev, "set dev_slp failed: %d\n", ret);
+		goto err_sleep_init;
+	}
+
+	if (pdata->slp_keepon->therm_keepon) {
+		ret = tps6591x_set_bits(dev, TPS6591X_SLEEP_KEEP_ON,
+						SLEEP_KEEP_ON_THERM);
+		if (ret < 0) {
+			dev_err(dev, "set therm_keepon failed: %d\n", ret);
+			goto disable_dev_slp;
+		}
+	}
+
+	if (pdata->slp_keepon->clkout32k_keepon) {
+		ret = tps6591x_set_bits(dev, TPS6591X_SLEEP_KEEP_ON,
+						SLEEP_KEEP_ON_CLKOUT32K);
+		if (ret < 0) {
+			dev_err(dev, "set clkout32k_keepon failed: %d\n", ret);
+			goto disable_dev_slp;
+		}
+	}
+
+
+	if (pdata->slp_keepon->vrtc_keepon) {
+		ret = tps6591x_set_bits(dev, TPS6591X_SLEEP_KEEP_ON,
+						SLEEP_KEEP_ON_VRTC);
+		if (ret < 0) {
+			dev_err(dev, "set vrtc_keepon failed: %d\n", ret);
+			goto disable_dev_slp;
+		}
+	}
+
+	if (pdata->slp_keepon->i2chs_keepon) {
+		ret = tps6591x_set_bits(dev, TPS6591X_SLEEP_KEEP_ON,
+						SLEEP_KEEP_ON_I2CHS);
+		if (ret < 0) {
+			dev_err(dev, "set i2chs_keepon failed: %d\n", ret);
+			goto disable_dev_slp;
+		}
+	}
+
+no_err_return:
+	return 0;
+
+disable_dev_slp:
+	tps6591x_clr_bits(dev, TPS6591X_DEVCTRL, DEVCTRL_DEV_SLP);
+
+err_sleep_init:
+	return ret;
+}
+
 static int __devinit tps6591x_i2c_probe(struct i2c_client *client,
 					const struct i2c_device_id *id)
 {
@@ -656,6 +736,8 @@ static int __devinit tps6591x_i2c_probe(struct i2c_client *client,
 	tps6591x_gpio_init(tps6591x, pdata->gpio_base);
 
 	tps6591x_debuginit(tps6591x);
+
+	tps6591x_sleepinit(tps6591x, pdata);
 
 	tps6591x_i2c_client = client;
 

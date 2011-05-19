@@ -80,12 +80,23 @@ struct tps6591x_rtc_platform_data {
 	struct rtc_time time;
 };
 
+struct tps6591x_sleep_keepon_data {
+	/* set 1 to maintain the following on sleep mode */
+	unsigned therm_keepon:1;	/* themal monitoring */
+	unsigned clkout32k_keepon:1;	/* CLK32KOUT */
+	unsigned vrtc_keepon:1;		/* LD0 full load capability */
+	unsigned i2chs_keepon:1;	/* high speed internal clock */
+};
+
 struct tps6591x_platform_data {
 	int num_subdevs;
 	struct tps6591x_subdev_info *subdevs;
 
 	int gpio_base;
 	int irq_base;
+
+	bool dev_slp_en;
+	struct tps6591x_sleep_keepon_data *slp_keepon;
 };
 
 /*
