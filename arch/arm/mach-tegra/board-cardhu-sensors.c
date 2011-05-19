@@ -39,6 +39,7 @@
 
 #include "gpio-names.h"
 #include "board-cardhu.h"
+#include "cpu-tegra.h"
 
 static struct regulator *cardhu_1v8_cam1 = NULL;
 static struct regulator *cardhu_1v8_cam2 = NULL;
@@ -428,8 +429,6 @@ static struct i2c_board_info cardhu_i2c8_board_info[] = {
 		.platform_data = &cardhu_ov2710_data,
 	},
 };
-
-extern void tegra_throttling_enable(bool enable);
 
 static struct nct1008_platform_data cardhu_nct1008_pdata = {
 	.supported_hwrev = true,
