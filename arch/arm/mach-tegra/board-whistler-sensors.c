@@ -29,6 +29,7 @@
 #include <generated/mach-types.h>
 
 #include "gpio-names.h"
+#include "cpu-tegra.h"
 
 #define CAMERA1_PWDN_GPIO		TEGRA_GPIO_PT2
 #define CAMERA1_RESET_GPIO		TEGRA_GPIO_PD2
@@ -41,8 +42,6 @@
 #define ADXL34X_IRQ_GPIO		TEGRA_GPIO_PAA1
 #define ISL29018_IRQ_GPIO		TEGRA_GPIO_PK2
 #define ADT7461_IRQ_GPIO		TEGRA_GPIO_PI2
-
-extern void tegra_throttling_enable(bool enable);
 
 static struct regulator *reg_avdd_cam1; /* LDO9 */
 static struct regulator *reg_vdd_af;    /* LDO13 */
