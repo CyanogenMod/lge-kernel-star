@@ -2,6 +2,7 @@
  * arch/arm/mach-tegra/include/mach/hardware.h
  *
  * Copyright (C) 2010 Google, Inc.
+ * Copyright (C) 2011 NVIDIA Corp.
  *
  * Author:
  *	Colin Cross <ccross@google.com>
@@ -25,4 +26,23 @@
 #define PCIBIOS_MIN_MEM			0
 #define pcibios_assign_all_busses()	1
 
+enum tegra_chipid {
+	TEGRA_CHIPID_UNKNOWN = 0,
+	TEGRA_CHIPID_TEGRA2 = 0x20,
+	TEGRA_CHIPID_TEGRA3 = 0x30,
+};
+
+enum tegra_revision {
+	TEGRA_REVISION_UNKNOWN = 0,
+	TEGRA_REVISION_A01,
+	TEGRA_REVISION_A02,
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
+	TEGRA_REVISION_A03,
+	TEGRA_REVISION_A03p,
+#endif
+	TEGRA_REVISION_MAX,
+};
+
+enum tegra_chipid tegra_get_chipid(void);
+enum tegra_revision tegra_get_revision(void);
 #endif
