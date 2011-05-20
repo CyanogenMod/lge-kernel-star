@@ -49,11 +49,18 @@
 #define FUSE_SPARE_BIT		0x244
 #endif
 
+struct tegra_id {
+	enum tegra_revision chipid;
+	unsigned int major, minor, netlist, patch;
+	enum tegra_revision revision;
+	char *priv;
+};
+
+static struct tegra_id tegra_id;
+
 static const char *tegra_revision_name[TEGRA_REVISION_MAX] = {
 	[TEGRA_REVISION_UNKNOWN] = "unknown",
-#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
 	[TEGRA_REVISION_A01] = "A01",
-#endif
 	[TEGRA_REVISION_A02] = "A02",
 #if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 	[TEGRA_REVISION_A03] = "A03",
@@ -123,7 +130,7 @@ unsigned long long tegra_chip_uid(void)
 	   various fields is <fieldname:size_in_bits> with the UID composed
 	   thusly:
 
-            <CID:4><VENDOR:4><FAB:6><LOT:26><WAFER:6><X:9><Y:9>
+	   <CID:4><VENDOR:4><FAB:6><LOT:26><WAFER:6><X:9><Y:9>
 
 	   Where:
 
@@ -133,7 +140,7 @@ unsigned long long tegra_chip_uid(void)
 		VENDOR     4     56     Vendor code
 		FAB        6     50     FAB code
 		LOT       26     24     Lot code (5-digit base-36-coded-decimal,
-				            re-encoded to 26 bits binary)
+					re-encoded to 26 bits binary)
 		WAFER      6     18     Wafer id
 		X          9      9     Wafer X-coordinate
 		Y          9      0     Wafer Y-coordinate
@@ -146,7 +153,7 @@ unsigned long long tegra_chip_uid(void)
 	reg = (reg & 0xFF00) >> 8;
 
 	switch (reg) {
-	case 0x30:
+	case TEGRA_CHIPID_TEGRA3:
 		cid = 0;
 		break;
 
@@ -200,16 +207,14 @@ int tegra_sku_id(void)
 	return sku_id;
 }
 
-struct tegra_id tegra_id;
-
 static enum tegra_revision tegra_decode_revision(const struct tegra_id *id)
 {
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
-	if ((id->chipid & 0xf0) != 0x20)
+	if ((id->chipid & 0xf0) != TEGRA_CHIPID_TEGRA2)
 		return TEGRA_REVISION_UNKNOWN;
 #endif
 #ifdef CONFIG_ARCH_TEGRA_3x_SOC
-	if ((id->chipid & 0xf0) != 0x30)
+	if ((id->chipid & 0xf0) != TEGRA_CHIPID_TEGRA3)
 		return TEGRA_REVISION_UNKNOWN;
 
 	switch (id->major) {
@@ -232,10 +237,9 @@ static enum tegra_revision tegra_decode_revision(const struct tegra_id *id)
 #endif
 
 	switch (id->minor) {
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
 	case 1:
+		BUG_ON((id->chipid & 0xf0) == TEGRA_CHIPID_TEGRA2);
 		return TEGRA_REVISION_A01;
-#endif
 	case 2:
 		return TEGRA_REVISION_A02;
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
@@ -248,42 +252,59 @@ static enum tegra_revision tegra_decode_revision(const struct tegra_id *id)
 	}
 }
 
-static enum tegra_revision tegra_set_revision(u32 chipid,
+static void tegra_set_tegraid(u32 chipid,
 					u32 major, u32 minor,
 					u32 nlist, u32 patch, const char *priv)
 {
-	tegra_id.chipid  = chipid;
+	tegra_id.chipid  = (enum tegra_chipid) chipid;
 	tegra_id.major   = major;
 	tegra_id.minor   = minor;
 	tegra_id.netlist = nlist;
 	tegra_id.patch   = patch;
 	tegra_id.priv    = (char *)priv;
 	tegra_id.revision = tegra_decode_revision(&tegra_id);
-	return tegra_id.revision;
+}
+
+static void tegra_get_tegraid_from_hw()
+{
+	void __iomem *chip_id = IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x804;
+	void __iomem *netlist = IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x860;
+	u32 cid = readl(chip_id);
+	u32 nlist = readl(netlist);
+	char *priv = NULL;
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	if (get_spare_fuse(18) || get_spare_fuse(19))
+		priv = "p";
+#endif
+	tegra_set_tegraid((cid >> 8) & 0xff,
+			  (cid >> 4) & 0xf,
+			  (cid >> 16) & 0xf,
+			  (nlist >> 0) & 0xffff,
+			  (nlist >> 16) & 0xffff,
+			  priv);
+}
+
+enum tegra_chipid tegra_get_chipid(void)
+{
+	if (tegra_id.chipid == TEGRA_CHIPID_UNKNOWN) {
+		/* Boot loader did not pass a valid chip ID.
+		 * Get it from hardware */
+		tegra_get_tegraid_from_hw();
+	}
+
+	return tegra_id.chipid;
 }
 
 enum tegra_revision tegra_get_revision(void)
 {
-	if (tegra_id.chipid)
-		return tegra_id.revision;
-	else {/* Boot loader did not pass a valid chip ID */
-		void __iomem *chip_id = IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x804;
-		void __iomem *netlist = IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x860;
-		u32 cid = readl(chip_id);
-		u32 nlist = readl(netlist);
-		char *priv = NULL;
-
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-		if (get_spare_fuse(18) || get_spare_fuse(19))
-			priv = "p";
-#endif
-		return tegra_set_revision((cid >> 8) & 0xff,
-					(cid >> 4) & 0xf,
-					(cid >> 16) & 0xf,
-					(nlist >> 0) & 0xffff,
-					(nlist >> 16) & 0xffff,
-					priv);
+	if (tegra_id.chipid == TEGRA_CHIPID_UNKNOWN) {
+		/* Boot loader did not pass a valid chip ID.
+		 * Get it from hardware */
+		tegra_get_tegraid_from_hw();
 	}
+
+	return tegra_id.revision;
 }
 
 static char chippriv[16]; /* Permanent buffer for private string */
@@ -307,7 +328,7 @@ static int __init tegra_bootloader_tegraid(char *str)
 	while (i < ARRAY_SIZE(id))
 		id[i++] = 0;
 
-	(void)tegra_set_revision(id[0], id[1], id[2], id[3], id[4], priv);
+	tegra_set_tegraid(id[0], id[1], id[2], id[3], id[4], priv);
 	return 0;
 }
 
