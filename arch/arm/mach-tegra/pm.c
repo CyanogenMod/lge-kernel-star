@@ -203,49 +203,6 @@ static unsigned long tegra_cluster_switch_times[tegra_cluster_switch_time_id_max
 #define tegra_cluster_switch_time(flags, id) do {} while(0)
 #endif
 
-static ssize_t suspend_mode_show(struct kobject *kobj,
-					struct kobj_attribute *attr, char *buf)
-{
-	char *start = buf;
-	char *end = buf + PAGE_SIZE;
-
-	start += scnprintf(start, end - start, "%s ", \
-				tegra_suspend_name[current_suspend_mode]);
-	start += scnprintf(start, end - start, "\n");
-
-	return start - buf;
-}
-
-static ssize_t suspend_mode_store(struct kobject *kobj,
-					struct kobj_attribute *attr,
-					const char *buf, size_t n)
-{
-	int len;
-	const char *name_ptr;
-	enum tegra_suspend_mode new_mode;
-
-	name_ptr = buf;
-	while (*name_ptr && !isspace(*name_ptr))
-		name_ptr++;
-	len = name_ptr - buf;
-	if (!len)
-		goto bad_name;
-
-	for (new_mode = TEGRA_SUSPEND_NONE; \
-			new_mode < TEGRA_MAX_SUSPEND_MODE; ++new_mode) {
-		if (!strncmp(buf, tegra_suspend_name[new_mode], len)) {
-			current_suspend_mode = new_mode;
-			break;
-		}
-	}
-
-bad_name:
-	return n;
-}
-
-static struct kobj_attribute suspend_mode_attribute =
-	__ATTR(mode, 0666, suspend_mode_show, suspend_mode_store);
-
 static void tegra_suspend_check_pwr_stats(void)
 {
 	/* cpus and l2 are powered off later */
@@ -839,6 +796,49 @@ static const struct platform_suspend_ops tegra_suspend_ops = {
 	.wake		= tegra_suspend_wake,
 	.enter		= tegra_suspend_enter,
 };
+
+static ssize_t suspend_mode_show(struct kobject *kobj,
+					struct kobj_attribute *attr, char *buf)
+{
+	char *start = buf;
+	char *end = buf + PAGE_SIZE;
+
+	start += scnprintf(start, end - start, "%s ", \
+				tegra_suspend_name[current_suspend_mode]);
+	start += scnprintf(start, end - start, "\n");
+
+	return start - buf;
+}
+
+static ssize_t suspend_mode_store(struct kobject *kobj,
+					struct kobj_attribute *attr,
+					const char *buf, size_t n)
+{
+	int len;
+	const char *name_ptr;
+	enum tegra_suspend_mode new_mode;
+
+	name_ptr = buf;
+	while (*name_ptr && !isspace(*name_ptr))
+		name_ptr++;
+	len = name_ptr - buf;
+	if (!len)
+		goto bad_name;
+
+	for (new_mode = TEGRA_SUSPEND_NONE; \
+			new_mode < TEGRA_MAX_SUSPEND_MODE; ++new_mode) {
+		if (!strncmp(buf, tegra_suspend_name[new_mode], len)) {
+			current_suspend_mode = new_mode;
+			break;
+		}
+	}
+
+bad_name:
+	return n;
+}
+
+static struct kobj_attribute suspend_mode_attribute =
+	__ATTR(mode, 0666, suspend_mode_show, suspend_mode_store);
 #endif
 
 void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
