@@ -319,5 +319,12 @@ config REGULATOR_GPIO_SWITCH
 	  Say Yes if the given platform have the rail enable through the
 	  gpios.
 
+config REGULATOR_AAT2870
+	bool "AnalogicTech AAT2870 Regulators"
+	depends on MFD_AAT2870_CORE
+	help
+	  If you have a AnalogicTech AAT2870 say Y to enable the
+	  regulator driver.
+
 endif
 
