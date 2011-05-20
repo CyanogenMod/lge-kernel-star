@@ -21,9 +21,53 @@
 #include <linux/i2c.h>
 #include <linux/err.h>
 #include <linux/mpu.h>
+#include <linux/nct1008.h>
 #include <mach/gpio.h>
+#include "cpu-tegra.h"
 #include "gpio-names.h"
 #include "board-enterprise.h"
+
+static struct nct1008_platform_data enterprise_nct1008_pdata = {
+	.supported_hwrev = true,
+	.ext_range = false,
+	.conv_rate = 0x08,
+	.offset = 0,
+	.hysteresis = 5,
+	.shutdown_ext_limit = 75,
+	.shutdown_local_limit = 75,
+	.throttling_ext_limit = 90,
+	.alarm_fn = tegra_throttling_enable,
+};
+
+static struct i2c_board_info enterprise_i2c4_nct1008_board_info[] = {
+	{
+		I2C_BOARD_INFO("nct1008", 0x4C),
+		.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PH7),
+		.platform_data = &enterprise_nct1008_pdata,
+	}
+};
+
+static void enterprise_nct1008_init(void)
+{
+	int ret;
+
+	tegra_gpio_enable(TEGRA_GPIO_PH7);
+	ret = gpio_request(TEGRA_GPIO_PH7, "temp_alert");
+	if (ret < 0) {
+		pr_err("%s: gpio_request failed %d\n", __func__, ret);
+		return;
+	}
+
+	ret = gpio_direction_input(TEGRA_GPIO_PH7);
+	if (ret < 0) {
+		pr_err("%s: gpio_direction_input failed %d\n", __func__, ret);
+		gpio_free(TEGRA_GPIO_PH7);
+		return;
+	}
+
+	i2c_register_board_info(4, enterprise_i2c4_nct1008_board_info,
+				ARRAY_SIZE(enterprise_i2c4_nct1008_board_info));
+}
 
 #define SENSOR_MPU_NAME "mpu3050"
 static struct mpu3050_platform_data mpu3050_data = {
@@ -97,6 +141,7 @@ static void enterprise_isl_init(void)
 int __init enterprise_sensors_init(void)
 {
 	enterprise_isl_init();
+	enterprise_nct1008_init();
 	enterprise_mpuirq_init();
 
 	return 0;
