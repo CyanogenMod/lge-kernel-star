@@ -227,8 +227,8 @@ static struct regulator_consumer_supply tps6591x_ldo8_supply[] = {
 		.ectrl = _ectrl						\
 	}
 
-TPS_PDATA_INIT_BOARD(vdd1, skubit0_0, 600, 1500, 0, 1, 1, 0, -1, 0, 0, 0);
-TPS_PDATA_INIT_BOARD(vdd1, skubit0_1, 600, 1500, 0, 1, 1, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT_BOARD(vdd1, skubit0_0, 600, 1500, 0, 1, 1, 0, -1, 0, 0, EXT_CTRL_SLEEP_OFF);
+TPS_PDATA_INIT_BOARD(vdd1, skubit0_1, 600, 1500, 0, 1, 1, 0, -1, 0, 0, EXT_CTRL_SLEEP_OFF);
 TPS_PDATA_INIT(vdd2,    600, 1500, 0, 1, 1, 0, -1, 0, 0, 0);
 TPS_PDATA_INIT(vddctrl, 600, 1400, 0, 1, 1, 0, -1, 0, 0, EXT_CTRL_EN1);
 TPS_PDATA_INIT(vio,    1500, 3300, 0, 1, 1, 0, -1, 0, 0, 0);
@@ -885,7 +885,7 @@ static struct tegra_suspend_platform_data cardhu_suspend_data = {
 	.core_timer	= 0x7e7e,
 	.core_off_timer = 0,
 	.separate_req	= true,
-	.corereq_high	= false,
+	.corereq_high	= true,
 	.sysclkreq_high	= true,
 	.wake_enb	= TEGRA_WAKE_GPIO_PV0 | TEGRA_WAKE_PWR_INT | TEGRA_WAKE_RTC_ALARM,
 	.wake_high	= TEGRA_WAKE_RTC_ALARM,
