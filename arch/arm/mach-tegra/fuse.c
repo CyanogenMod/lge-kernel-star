@@ -51,12 +51,13 @@
 
 static const char *tegra_revision_name[TEGRA_REVISION_MAX] = {
 	[TEGRA_REVISION_UNKNOWN] = "unknown",
-#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+	[TEGRA_REVISION_A01] = "A01",
+#endif
 	[TEGRA_REVISION_A02] = "A02",
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 	[TEGRA_REVISION_A03] = "A03",
 	[TEGRA_REVISION_A03p] = "A03 prime",
-#elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
-	[TEGRA_REVISION_A01] = "A01",
 #endif
 };
 

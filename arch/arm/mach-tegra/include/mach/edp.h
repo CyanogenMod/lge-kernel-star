@@ -23,7 +23,7 @@
 
 struct tegra_edp_limits {
 	int	temperature;
-	unsigned int freq_limits[CONFIG_NR_CPUS];
+	unsigned int freq_limits[4];
 };
 
 #ifdef CONFIG_TEGRA_EDP_LIMITS

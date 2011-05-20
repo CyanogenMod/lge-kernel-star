@@ -110,13 +110,13 @@ void tegra_init_speedo_data(void)
 	pr_debug("%s CPU speedo value %u\n", __func__, cpu_speedo_val);
 	pr_debug("%s Core speedo value %u\n", __func__, core_speedo_val);
 
-	cpu_process_id = -1; // out of range for valid cpu-speedo
 	for (iv = 0; iv < PROCESS_CORNERS_NUM; iv++) {
 		if (cpu_speedo_val < cpu_process_speedos[soc_speedo_id][iv]) {
-			cpu_process_id = iv -1;
 			break;
 		}
 	}
+	cpu_process_id = iv -1;
+
 	if (cpu_process_id == -1) {
 		pr_err("****************************************************");
 		pr_err("****************************************************");
@@ -128,13 +128,13 @@ void tegra_init_speedo_data(void)
 		cpu_process_id = INVALID_PROCESS_ID;
 	}
 
-	core_process_id = -1; // out of range for valid core-speedo
 	for (iv = 0; iv < PROCESS_CORNERS_NUM; iv++) {
 		if (core_speedo_val < core_process_speedos[soc_speedo_id][iv]) {
-			core_process_id = iv -1;
 			break;
 		}
 	}
+	core_process_id = iv -1;
+
 	if (core_process_id == -1) {
 		pr_err("*****************************************************");
 		pr_err("*****************************************************");
