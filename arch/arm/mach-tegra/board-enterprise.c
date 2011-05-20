@@ -368,6 +368,7 @@ static void __init tegra_enterprise_init(void)
 	enterprise_bt_rfkill();
 	enterprise_emc_init();
 	enterprise_sensors_init();
+	enterprise_suspend_init();
 }
 
 static void __init tegra_enterprise_reserve(void)

@@ -347,12 +347,12 @@ int __init enterprise_regulator_init(void)
 
 static struct tegra_suspend_platform_data enterprise_suspend_data = {
 	.cpu_timer	= 2000,
-	.cpu_off_timer	= 0,
-	.suspend_mode	= TEGRA_SUSPEND_NONE,
+	.cpu_off_timer	= 200,
+	.suspend_mode	= TEGRA_SUSPEND_LP1,
 	.core_timer	= 0x7e7e,
 	.core_off_timer = 0,
 	.separate_req	= true,
-	.corereq_high	= false,
+	.corereq_high	= true,
 	.sysclkreq_high	= true,
 	.wake_enb	= 0,
 	.wake_high	= 0,
