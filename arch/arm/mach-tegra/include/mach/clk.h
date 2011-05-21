@@ -37,7 +37,12 @@ enum tegra_clk_ex_param {
 void tegra_periph_reset_deassert(struct clk *c);
 void tegra_periph_reset_assert(struct clk *c);
 
+#ifndef CONFIG_TEGRA_FPGA_PLATFORM
 int tegra_dvfs_set_rate(struct clk *c, unsigned long rate);
+#else
+static inline int tegra_dvfs_set_rate(struct clk *c, unsigned long rate)
+{ return 0; }
+#endif
 unsigned long clk_get_rate_all_locked(struct clk *c);
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 void tegra_sdmmc_tap_delay(struct clk *c, int delay);

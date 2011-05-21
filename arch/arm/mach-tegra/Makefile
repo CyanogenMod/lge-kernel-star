@@ -27,11 +27,13 @@ obj-$(CONFIG_TEGRA_PWM)                 += pwm.o
 obj-$(CONFIG_TEGRA_ARB_SEMAPHORE)       += arb_sema.o
 
 obj-y                                   += clock.o
-obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += dvfs.o
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
 obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += tegra3_clocks.o
+ifneq ($(CONFIG_TEGRA_FPGA_PLATFORM),y)
+obj-y                                   += dvfs.o
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_dvfs.o
 obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += tegra3_dvfs.o
+endif
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_fuse.o
 ifneq ($(CONFIG_TEGRA_FPGA_PLATFORM),y)
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_speedo.o
