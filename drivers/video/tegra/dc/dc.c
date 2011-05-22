@@ -1311,7 +1311,7 @@ static void tegra_dc_set_out(struct tegra_dc *dc, struct tegra_dc_out *out)
 
 }
 
-unsigned tegra_dc_get_out_height(struct tegra_dc *dc)
+unsigned tegra_dc_get_out_height(const struct tegra_dc *dc)
 {
 	if (dc->out)
 		return dc->out->height;
@@ -1320,7 +1320,7 @@ unsigned tegra_dc_get_out_height(struct tegra_dc *dc)
 }
 EXPORT_SYMBOL(tegra_dc_get_out_height);
 
-unsigned tegra_dc_get_out_width(struct tegra_dc *dc)
+unsigned tegra_dc_get_out_width(const struct tegra_dc *dc)
 {
 	if (dc->out)
 		return dc->out->width;
@@ -1328,6 +1328,15 @@ unsigned tegra_dc_get_out_width(struct tegra_dc *dc)
 		return 0;
 }
 EXPORT_SYMBOL(tegra_dc_get_out_width);
+
+unsigned tegra_dc_get_out_max_pixclock(const struct tegra_dc *dc)
+{
+	if (dc->out && dc->out->max_pixclock)
+		return dc->out->max_pixclock;
+	else
+		return 0;
+}
+EXPORT_SYMBOL(tegra_dc_get_out_max_pixclock);
 
 static void tegra_dc_vblank(struct work_struct *work)
 {

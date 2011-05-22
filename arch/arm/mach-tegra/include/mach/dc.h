@@ -287,6 +287,7 @@ struct tegra_dc_out {
 	int				hotplug_gpio;
 	const char			*parent_clk;
 
+	unsigned			max_pixclock;
 	unsigned			order;
 	unsigned			align;
 	unsigned			depth;
@@ -442,8 +443,9 @@ struct fb_videomode;
 int tegra_dc_set_fb_mode(struct tegra_dc *dc, const struct fb_videomode *fbmode,
 	bool stereo_mode);
 
-unsigned tegra_dc_get_out_height(struct tegra_dc *dc);
-unsigned tegra_dc_get_out_width(struct tegra_dc *dc);
+unsigned tegra_dc_get_out_height(const struct tegra_dc *dc);
+unsigned tegra_dc_get_out_width(const struct tegra_dc *dc);
+unsigned tegra_dc_get_out_max_pixclock(const struct tegra_dc *dc);
 
 /* PM0 and PM1 signal control */
 #define TEGRA_PWM_PM0 0
