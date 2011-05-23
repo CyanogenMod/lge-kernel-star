@@ -334,6 +334,26 @@ static struct tps6591x_subdev_info tps_devs_e1198_skubit0_1[] = {
 #endif
 };
 
+#define TPS_GPIO_INIT_PDATA(gpio_nr, _init_apply, _sleep_en, _pulldn_en, _output_en, _output_val)	\
+	[gpio_nr] = {					\
+			.sleep_en	= _sleep_en,	\
+			.pulldn_en	= _pulldn_en,	\
+			.output_mode_en	= _output_en,	\
+			.output_val	= _output_val,	\
+			.init_apply	= _init_apply,	\
+		     }
+static struct tps6591x_gpio_init_data tps_gpio_pdata_e1291_a04[] =  {
+	TPS_GPIO_INIT_PDATA(0, 0, 0, 0, 0, 0),
+	TPS_GPIO_INIT_PDATA(1, 0, 0, 0, 0, 0),
+	TPS_GPIO_INIT_PDATA(2, 1, 1, 0, 1, 1),
+	TPS_GPIO_INIT_PDATA(3, 0, 0, 0, 0, 0),
+	TPS_GPIO_INIT_PDATA(4, 0, 0, 0, 0, 0),
+	TPS_GPIO_INIT_PDATA(5, 0, 0, 0, 0, 0),
+	TPS_GPIO_INIT_PDATA(6, 0, 0, 0, 0, 0),
+	TPS_GPIO_INIT_PDATA(7, 0, 0, 0, 0, 0),
+	TPS_GPIO_INIT_PDATA(8, 0, 0, 0, 0, 0),
+};
+
 static struct tps6591x_platform_data tps_platform = {
 	.irq_base	= TPS6591X_IRQ_BASE,
 	.gpio_base	= TPS6591X_GPIO_BASE,
@@ -414,6 +434,14 @@ int __init cardhu_regulator_init(void)
 			tps_platform.num_subdevs = ARRAY_SIZE(tps_devs_e118x_skubit0_0);
 			tps_platform.subdevs = tps_devs_e118x_skubit0_0;
 		}
+	}
+
+	/* E1291-A04: Enable DEV_SLP and enable sleep on GPIO2 */
+	if ((board_info.board_id == BOARD_E1291) && (board_info.fab == 0x4)) {
+		tps_platform.dev_slp_en = true;
+		tps_platform.gpio_init_data = tps_gpio_pdata_e1291_a04;
+		tps_platform.num_gpioinit_data =
+					ARRAY_SIZE(tps_gpio_pdata_e1291_a04);
 	}
 
 	i2c_register_board_info(4, cardhu_regulators, 1);
