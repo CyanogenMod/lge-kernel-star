@@ -172,6 +172,7 @@ TWL_CLASS_IS(4030, TWL4030_CLASS_ID)
 TWL_CLASS_IS(6030, TWL6030_CLASS_ID)
 
 #define TWL6025_SUBCLASS	BIT(4)  /* TWL6025 has changed registers */
+#define MPU80031_SUBCLASS	BIT(5)  /* MPU80031 has changed registers */
 
 /* So we can recover the features in other parts of twl stack */
 unsigned int twl_features(void);
@@ -555,6 +556,7 @@ int twl6030_set_usb_in_current(int currentmA);
 
 struct twl4030_clock_init_data {
 	bool ck32k_lowpwr_enable;
+	bool clk32_active_state_on;
 };
 
 struct twl4030_bci_platform_data {

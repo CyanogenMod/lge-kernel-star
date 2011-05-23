@@ -221,6 +221,7 @@
 #define TWL6030_SMPS_OFFSET		0xB0
 #define TWL6030_SMPS_MULT		0xB3
 
+
 /* Few power values */
 #define R_CFG_BOOT			0x05
 
@@ -231,6 +232,9 @@
 #define HIGH_PERF_SQ			(1 << 3)
 #define CK32K_LOWPWR_EN			(1 << 7)
 
+/* MPU80031 specific clock32 generation register */
+#define REG_CLK32KG_CFG_TRANS 0x8D
+#define REG_CLK32KG_CFG_STATE 0x8E
 
 /* chip-specific feature flags, for i2c_device_id.driver_data */
 #define TWL4030_VAUX2		BIT(0)	/* pre-5030 voltage ranges */
@@ -1066,12 +1070,28 @@ static inline int __init unprotect_pm_master(void)
 }
 
 static void clocks_init(struct device *dev,
-			struct twl4030_clock_init_data *clock)
+			struct twl4030_clock_init_data *clock,
+			unsigned long features)
 {
 	int e = 0;
 	struct clk *osc;
 	u32 rate;
 	u8 ctrl = HFCLK_FREQ_26_MHZ;
+
+	if (features & MPU80031_SUBCLASS) {
+		if (clock && clock->clk32_active_state_on) {
+			e = twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, 0x1,
+					REG_CLK32KG_CFG_TRANS);
+			if (!e)
+				e = twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, 0x1,
+					REG_CLK32KG_CFG_STATE);
+			if (e) {
+				dev_err(dev, "Error in initialization"
+						" of 32K output\n");
+				return;
+			}
+		}
+	}
 
 #if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
 	if (cpu_is_omap2430())
@@ -1209,7 +1229,7 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	}
 
 	/* setup clock framework */
-	clocks_init(&client->dev, pdata->clock);
+	clocks_init(&client->dev, pdata->clock, id->driver_data);
 
 	/* load power event scripts */
 	if (twl_has_power() && pdata->power)
@@ -1269,6 +1289,7 @@ static const struct i2c_device_id twl_ids[] = {
 	{ "tps65920", TPS_SUBSET },	/* fewer LDOs; no codec or charger */
 	{ "twl6030", TWL6030_CLASS },	/* "Phoenix power chip" */
 	{ "twl6025", TWL6030_CLASS | TWL6025_SUBCLASS }, /* "Phoenix lite" */
+	{ "mpu80031", TWL6030_CLASS | TWL6025_SUBCLASS | MPU80031_SUBCLASS},
 	{ /* end of list */ },
 };
 MODULE_DEVICE_TABLE(i2c, twl_ids);
