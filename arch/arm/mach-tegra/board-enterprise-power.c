@@ -104,19 +104,25 @@ static struct regulator_init_data ldo6_data = TPS_PDATA_INIT(ldo6, 1000, 3300, 0
 static struct regulator_init_data ldousb_data = TPS_PDATA_INIT(ldousb, 1000, 3300, 0, 1, 1, 0);
 static struct regulator_init_data ldo7_data = TPS_PDATA_INIT(ldo7, 1000, 3300, 0, 1, 1, 0);
 
+static struct twl4030_clock_init_data clk_data = {
+	.ck32k_lowpwr_enable = 0,
+	.clk32_active_state_on = 1,
+};
+
 static struct twl4030_platform_data tps_platform = {
-    .smps4 = &smps4_data,
-    .vio = &vio_data,
-    .smps3 = &smps3_data,
-    .ldo2 = &ldo2_data,
-    .ldo6 = &ldo6_data,
-    .ldousb = &ldousb_data,
-    .ldo7 = &ldo7_data,
+	.clock	= &clk_data,
+	.smps4	= &smps4_data,
+	.vio	= &vio_data,
+	.smps3	= &smps3_data,
+	.ldo2	= &ldo2_data,
+	.ldo6	= &ldo6_data,
+	.ldousb	= &ldousb_data,
+	.ldo7	= &ldo7_data,
 };
 
 static struct i2c_board_info __initdata enterprise_regulators[] = {
 	{
-		I2C_BOARD_INFO("twl6025", 0x48),
+		I2C_BOARD_INFO("mpu80031", 0x48),
 		.irq		= INT_EXTERNAL_PMU,
 		.platform_data	= &tps_platform,
 	},
