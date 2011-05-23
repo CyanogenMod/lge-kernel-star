@@ -43,15 +43,21 @@
 #define DSI_PANEL_RESET 0
 
 #define enterprise_lvds_shutdown	TEGRA_GPIO_PL2
-#define enterprise_bl_enb		TEGRA_GPIO_PH2
-#define enterprise_bl_pwm		TEGRA_GPIO_PH0
 #define enterprise_hdmi_hpd		TEGRA_GPIO_PN7
 
 #define enterprise_dsi_panel_reset	TEGRA_GPIO_PW0
 
-static struct regulator *enterprise_hdmi_reg = NULL;
-static struct regulator *enterprise_hdmi_pll = NULL;
-static struct regulator *enterprise_hdmi_vddio = NULL;
+#define enterprise_lcd_2d_3d		TEGRA_GPIO_PH1
+#define ENTERPRISE_STEREO_3D		0
+#define ENTERPRISE_STEREO_2D		1
+
+#define enterprise_lcd_swp_pl		TEGRA_GPIO_PH2
+#define ENTERPRISE_STEREO_LANDSCAPE	0
+#define ENTERPRISE_STEREO_PORTRAIT	1
+
+static struct regulator *enterprise_hdmi_reg;
+static struct regulator *enterprise_hdmi_pll;
+static struct regulator *enterprise_hdmi_vddio;
 
 static atomic_t sd_brightness = ATOMIC_INIT(255);
 
@@ -292,6 +298,30 @@ static int enterprise_dsi_panel_disable(void)
 	return 0;
 }
 
+static void enterprise_stereo_set_mode(int mode)
+{
+	switch (mode) {
+	case TEGRA_DC_STEREO_MODE_2D:
+		gpio_set_value(TEGRA_GPIO_PH1, ENTERPRISE_STEREO_2D);
+		break;
+	case TEGRA_DC_STEREO_MODE_3D:
+		gpio_set_value(TEGRA_GPIO_PH1, ENTERPRISE_STEREO_3D);
+		break;
+	}
+}
+
+static void enterprise_stereo_set_orientation(int mode)
+{
+	switch (mode) {
+	case TEGRA_DC_STEREO_LANDSCAPE:
+		gpio_set_value(TEGRA_GPIO_PH2, ENTERPRISE_STEREO_LANDSCAPE);
+		break;
+	case TEGRA_DC_STEREO_PORTRAIT:
+		gpio_set_value(TEGRA_GPIO_PH2, ENTERPRISE_STEREO_PORTRAIT);
+		break;
+	}
+}
+
 static struct tegra_dsi_cmd dsi_init_cmd[]= {
 	DSI_CMD_SHORT(0x05, 0x11, 0x00),
 	DSI_DLY_MS(150),
@@ -311,6 +341,11 @@ struct tegra_dsi_out enterprise_dsi = {
 	.dsi_init_cmd = dsi_init_cmd,
 
 	.video_data_type = TEGRA_DSI_VIDEO_TYPE_COMMAND_MODE,
+};
+
+static struct tegra_stereo_out enterprise_stereo = {
+	.set_mode		= &enterprise_stereo_set_mode,
+	.set_orientation	= &enterprise_stereo_set_orientation,
 };
 
 static struct tegra_dc_mode enterprise_dsi_modes[] = {
@@ -345,10 +380,11 @@ static struct tegra_dc_out enterprise_disp1_out = {
 
 	.type		= TEGRA_DC_OUT_DSI,
 
-	.modes	 	= enterprise_dsi_modes,
-	.n_modes 	= ARRAY_SIZE(enterprise_dsi_modes),
+	.modes		= enterprise_dsi_modes,
+	.n_modes	= ARRAY_SIZE(enterprise_dsi_modes),
 
 	.dsi		= &enterprise_dsi,
+	.stereo		= &enterprise_stereo,
 
 	.enable		= enterprise_dsi_panel_enable,
 	.disable	= enterprise_dsi_panel_disable,
@@ -424,6 +460,16 @@ int __init enterprise_panel_init(void)
 	tegra_gpio_enable(enterprise_hdmi_hpd);
 	gpio_request(enterprise_hdmi_hpd, "hdmi_hpd");
 	gpio_direction_input(enterprise_hdmi_hpd);
+
+	tegra_gpio_enable(enterprise_lcd_2d_3d);
+	gpio_request(enterprise_lcd_2d_3d, "lcd_2d_3d");
+	gpio_direction_output(enterprise_lcd_2d_3d, 0);
+	enterprise_stereo_set_mode(enterprise_stereo.mode_2d_3d);
+
+	tegra_gpio_enable(enterprise_lcd_swp_pl);
+	gpio_request(enterprise_lcd_swp_pl, "lcd_swp_pl");
+	gpio_direction_output(enterprise_lcd_swp_pl, 0);
+	enterprise_stereo_set_orientation(enterprise_stereo.orientation);
 
 	tegra_gpio_disable(TEGRA_GPIO_PW1);
 
