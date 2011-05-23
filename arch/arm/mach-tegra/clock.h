@@ -53,6 +53,7 @@
 #define PLLM			(1 << 20)
 #define DIV_U71_INT		(1 << 21)
 #define ENABLE_ON_INIT		(1 << 28)
+#define PERIPH_ON_APB		(1 << 29)
 
 #ifndef __ASSEMBLY__
 
