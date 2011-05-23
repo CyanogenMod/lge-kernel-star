@@ -148,12 +148,30 @@ struct tegra_dsi_out {
 					 * support eot. Don't set it for
 					 * most panels. */
 
-	u32 		max_panel_freq_khz;
-	u32 		lp_cmd_mode_freq_khz;
+	u32		max_panel_freq_khz;
+	u32		lp_cmd_mode_freq_khz;
 	u32		hs_clk_in_lp_cmd_mode_freq_khz;
 	u32		burst_mode_freq_khz;
 
 	struct dsi_phy_timing_ns phy_timing;
+};
+
+enum {
+	TEGRA_DC_STEREO_MODE_2D,
+	TEGRA_DC_STEREO_MODE_3D
+};
+
+enum {
+	TEGRA_DC_STEREO_LANDSCAPE,
+	TEGRA_DC_STEREO_PORTRAIT
+};
+
+struct tegra_stereo_out {
+	int  mode_2d_3d;
+	int  orientation;
+
+	void (*set_mode)(int mode);
+	void (*set_orientation)(int orientation);
 };
 
 struct tegra_dc_mode {
@@ -182,8 +200,8 @@ enum {
 };
 
 struct tegra_dc_out_pin {
-	int     name;
-	int     pol;
+	int	name;
+	int	pol;
 };
 
 enum {
@@ -277,6 +295,7 @@ struct tegra_dc_out {
 	int				n_modes;
 
 	struct tegra_dsi_out		*dsi;
+	struct tegra_stereo_out		*stereo;
 
 	unsigned			height; /* mm */
 	unsigned			width; /* mm */
