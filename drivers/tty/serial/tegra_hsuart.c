@@ -363,7 +363,10 @@ static void wait_sym_time(struct tegra_uart_port *t, unsigned int syms)
 static void tegra_fifo_reset(struct tegra_uart_port *t, u8 fcr_bits)
 {
 	unsigned char fcr = t->fcr_shadow;
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	fcr |= fcr_bits & (UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT);
+	uart_writeb(t, fcr, UART_FCR);
+#else
 	/*Hw issue: Resetting tx fifo with non-fifo
 	mode to avoid any extra character to be sent*/
 	fcr &= ~UART_FCR_ENABLE_FIFO;
@@ -372,9 +375,6 @@ static void tegra_fifo_reset(struct tegra_uart_port *t, u8 fcr_bits)
 	fcr |= fcr_bits & (UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT);
 	uart_writeb(t, fcr, UART_FCR);
 	fcr |= UART_FCR_ENABLE_FIFO;
-	uart_writeb(t, fcr, UART_FCR);
-#else
-	fcr |= fcr_bits & (UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT);
 	uart_writeb(t, fcr, UART_FCR);
 #endif
 	uart_readb(t, UART_SCR); /* Dummy read to ensure the write is posted */
