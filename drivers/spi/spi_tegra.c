@@ -151,7 +151,7 @@ static const unsigned long spi_tegra_req_sels[] = {
 	TEGRA_DMA_REQ_SEL_SL2B2,
 	TEGRA_DMA_REQ_SEL_SL2B3,
 	TEGRA_DMA_REQ_SEL_SL2B4,
-#if defined(CONFIG_ARCH_TEGRA_3x_SOC)
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	TEGRA_DMA_REQ_SEL_SL2B5,
 	TEGRA_DMA_REQ_SEL_SL2B6,
 #endif
@@ -579,7 +579,7 @@ static void spi_tegra_start_transfer(struct spi_device *spi,
 	struct tegra_spi_device_controller_data *cdata = spi->controller_data;
 	unsigned long command;
 	unsigned long command2;
-#if defined CONFIG_ARCH_TEGRA_3x_SOC
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	unsigned long status2;
 #endif
 	int cs_setup_count;
@@ -640,7 +640,7 @@ static void spi_tegra_start_transfer(struct spi_device *spi,
 				command &= ~SLINK_CS_SW;
 				command2 &= ~SLINK_SS_SETUP(3);
 				command2 |= SLINK_SS_SETUP(cs_setup_count);
-#if defined CONFIG_ARCH_TEGRA_3x_SOC
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 				status2 = spi_tegra_readl(tspi, SLINK_STATUS2);
 				status2 &= ~SLINK_SS_HOLD_TIME(0xF);
 				status2 |= SLINK_SS_HOLD_TIME(cs_hold_count);
