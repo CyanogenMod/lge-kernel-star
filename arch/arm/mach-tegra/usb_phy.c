@@ -187,7 +187,7 @@
 #define   UHSIC_CONNECT_DETECT			(1 << 0)
 
 
-#else	/* T30 definitions */
+#else
 
 #define USB_USBCMD		0x130
 #define   USB_USBCMD_RS		(1 << 0)
@@ -881,7 +881,7 @@ static void utmi_phy_power_off(struct tegra_usb_phy *phy, bool is_dpd)
 	       UTMIP_FORCE_PDDR_POWERDOWN;
 	writel(val, base + UTMIP_XCVR_CFG1);
 
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	val = readl(base + UTMIP_BIAS_CFG1);
 	val |= UTMIP_BIAS_PDTRK_COUNT(0x5);
 	writel(val, base + UTMIP_BIAS_CFG1);
@@ -982,7 +982,7 @@ static void utmi_phy_restore_end(struct tegra_usb_phy *phy)
 
 static void ulpi_set_tristate(bool enable)
 {
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	int tristate = (enable)? TEGRA_TRI_TRISTATE : TEGRA_TRI_NORMAL;
 
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA0, tristate);
@@ -1004,7 +1004,7 @@ static void ulpi_phy_reset(void __iomem *base)
 {
 	unsigned long val;
 
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_CLK, TEGRA_TRI_TRISTATE);
 #endif
 	val = readl(base + USB_SUSP_CTRL);
@@ -1582,7 +1582,7 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 		phy->ulpi = otg_ulpi_create(&ulpi_viewport_access_ops, 0);
 		phy->ulpi->io_priv = regs + ULPI_VIEWPORT;
 	}
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	else if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_HSIC) {
 		ulpi_config = config;
 		gpio_request(ulpi_config->enable_gpio,
@@ -1623,7 +1623,7 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 		}
 	}
 
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	/* Power-up the VBUS detector for UTMIP PHY */
 	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_UTMIP) {
 		writel(readl((IO_ADDRESS(TEGRA_PMC_BASE) + TEGRA_PMC_USB_AO)) &
@@ -1792,7 +1792,7 @@ int tegra_usb_phy_bus_connect(struct tegra_usb_phy *phy)
 	void __iomem *base = phy->regs;
 
 	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_HSIC) {
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 		/* Change the USB controller PHY type to HSIC */
 		val = readl(base + HOSTPC1_DEVLC);
 		val &= ~HOSTPC1_DEVLC_PTS(HOSTPC1_DEVLC_PTS_MASK);

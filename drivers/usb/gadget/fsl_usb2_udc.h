@@ -9,7 +9,7 @@
 #define USB_MAX_CTRL_PAYLOAD		64
 #define USB_DR_SYS_OFFSET		0x400
 
-#if !defined(CONFIG_ARCH_TEGRA_3x_SOC)
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
  /* USB DR device mode registers (Little Endian) */
 struct usb_dr_device {
 	/* Capability register */
@@ -171,7 +171,7 @@ struct usb_dr_host {
 	u32 endptcomplete;	/* Endpoint Complete Register */
 	u32 endptctrl[6];	/* Endpoint Control Registers */
 };
-#endif // if !defined(CONFIG_ARCH_TEGRA_3x_SOC)
+#endif // ifdef CONFIG_ARCH_TEGRA_2x_SOC
 
  /* non-EHCI USB system interface registers (Big Endian) */
 #ifdef CONFIG_ARCH_TEGRA
@@ -299,7 +299,7 @@ struct usb_sys_interface {
 #define  PORTSCX_WAKE_ON_OVER_CURRENT         0x00400000
 #define  PORTSCX_PHY_LOW_POWER_SPD            0x00800000
 
-#if !defined(CONFIG_ARCH_TEGRA_3x_SOC)
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 #define  PORTSCX_PORT_FORCE_FULL_SPEED        0x01000000
 #define  PORTSCX_PORT_SPEED_MASK              0x0C000000
 #define  PORTSCX_PORT_WIDTH                   0x10000000

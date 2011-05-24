@@ -2062,7 +2062,7 @@ static irqreturn_t fsl_udc_irq(int irq, void *_udc)
 		spin_unlock_irqrestore(&udc->lock, flags);
 		return IRQ_NONE;
 	}
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	{
 		u32 temp = fsl_readl(&usb_sys_regs->vbus_sensors);
 		udc->vbus_active = (temp & USB_SYS_VBUS_ASESSION) ? true : false;
@@ -2337,12 +2337,12 @@ static int fsl_proc_read(char *page, char **start, off_t off, int count,
 	next += t;
 
 	tmp_reg = fsl_readl(&dr_regs->portsc1);
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	tmp_reg2 = tmp_reg;
+#else
 	/* In Tegra3 the Phy Type Select(PTS) and Port Speed fields are specified in
 	 * hostpc1devlc register instead of portsc1 register. */
 	tmp_reg2 = fsl_readl(&dr_regs->hostpc1devlc);
-#else
-	tmp_reg2 = tmp_reg;
 #endif
 	t = scnprintf(next, size,
 		"USB Port Status&Control Reg:\n"
@@ -2696,10 +2696,10 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
 	}
 #endif
 
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-	control_reg = &dr_regs->hostpc1devlc;
-#else
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	control_reg = &dr_regs->portsc1;
+#else
+	control_reg = &dr_regs->hostpc1devlc;
 #endif
 #if !defined(CONFIG_ARCH_MXC) && !defined(CONFIG_ARCH_TEGRA)
 	usb_sys_regs = (struct usb_sys_interface *)
