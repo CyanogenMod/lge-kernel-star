@@ -468,6 +468,9 @@
 #define TEGRA_USB3_BASE			0x7D008000
 #define TEGRA_USB3_SIZE			SZ_16K
 
+#define TEGRA_SE_BASE			0x70012000
+#define TEGRA_SE_SIZE			SZ_8K
+
 #endif
 
 #if defined(CONFIG_TEGRA_DEBUG_UART_NONE)
