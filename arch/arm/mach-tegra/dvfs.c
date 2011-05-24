@@ -217,7 +217,7 @@ static int dvfs_rail_connect_to_regulator(struct dvfs_rail *rail)
 		rail->reg = reg;
 	}
 
-	v = regulator_get_voltage(reg);
+	v = regulator_get_voltage(rail->reg);
 	if (v < 0) {
 		pr_err("tegra_dvfs: failed initial get %s voltage\n",
 		       rail->reg_id);
