@@ -268,7 +268,7 @@ static unsigned int available_cpus(void)
 
 	if (ncores == 0) {
 		ncores = scu_get_core_count(scu_base);
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 		if (ncores > 1) {
 			u32 fuse_sku = readl(FUSE_SKU_DIRECT_CONFIG);
 			ncores -= FUSE_SKU_NUM_DISABLED_CPUS(fuse_sku);

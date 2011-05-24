@@ -24,10 +24,8 @@
 /* physical offset of RAM */
 #if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 #define PLAT_PHYS_OFFSET		UL(0)
-#elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
-#define PLAT_PHYS_OFFSET		UL(0x80000000)
 #else
-#error "Invalid Tegra SoC family selection"
+#define PLAT_PHYS_OFFSET		UL(0x80000000)
 #endif
 
 /*

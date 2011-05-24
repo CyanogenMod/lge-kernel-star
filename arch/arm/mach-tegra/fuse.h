@@ -20,7 +20,7 @@
 
 enum tegra_revision {
 	TEGRA_REVISION_UNKNOWN = 0,
-#if defined(CONFIG_ARCH_TEGRA_3x_SOC)
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
 	TEGRA_REVISION_A01,
 #endif
 	TEGRA_REVISION_A02,

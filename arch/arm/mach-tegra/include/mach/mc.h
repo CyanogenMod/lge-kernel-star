@@ -98,7 +98,7 @@
 
 void tegra_mc_set_priority(unsigned long client, unsigned long prio);
 
-#elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
+#else
 	/* !!!FIXME!!! IMPLEMENT ME */
 #define tegra_mc_set_priority(client, prio) \
 	do { /* nothing for now */ } while (0)

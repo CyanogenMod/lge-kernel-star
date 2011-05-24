@@ -100,7 +100,7 @@ static struct tegra_gpio_bank tegra_gpio_banks[] = {
 	{.bank = 4, .irq = INT_GPIO5},
 	{.bank = 5, .irq = INT_GPIO6},
 	{.bank = 6, .irq = INT_GPIO7},
-#if defined(CONFIG_ARCH_TEGRA_3x_SOC)
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	{.bank = 7, .irq = INT_GPIO8},
 #endif
 };

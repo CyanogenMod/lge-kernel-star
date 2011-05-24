@@ -946,7 +946,7 @@ int __init tegra_dma_init(void)
 		spin_lock_init(&ch->lock);
 		INIT_LIST_HEAD(&ch->list);
 
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 		if (i >= 16)
 			irq = INT_APB_DMA_CH16 + i - 16;
 		else

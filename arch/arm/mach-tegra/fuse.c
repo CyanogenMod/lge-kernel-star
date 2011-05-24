@@ -33,7 +33,7 @@
 #define FUSE_UID_LOW		0x108
 #define FUSE_UID_HIGH		0x10c
 #define FUSE_SPARE_BIT		0x200
-#elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
+#else
 #define FUSE_VENDOR_CODE	0x200
 #define FUSE_VENDOR_CODE_MASK	0xf
 #define FUSE_FAB_CODE		0x204

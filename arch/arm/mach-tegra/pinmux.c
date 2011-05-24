@@ -96,7 +96,7 @@ static char *tegra_mux_names[TEGRA_MAX_MUX] = {
 	[TEGRA_MUX_VI] = "VI",
 	[TEGRA_MUX_VI_SENSOR_CLK] = "VI_SENSOR_CLK",
 	[TEGRA_MUX_XIO] = "XIO",
-#if defined(CONFIG_ARCH_TEGRA_3x_SOC)
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	[TEGRA_MUX_BLINK] = "BLINK",
 	[TEGRA_MUX_CEC] = "CEC",
 	[TEGRA_MUX_CLK12] = "CLK12",

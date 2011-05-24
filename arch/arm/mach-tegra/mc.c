@@ -42,6 +42,6 @@ void tegra_mc_set_priority(unsigned long client, unsigned long prio)
 	spin_unlock_irqrestore(&tegra_mc_lock, flags);
 
 }
-#elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
+#else
 	/* !!!FIXME!!! IMPLEMENT ME */
 #endif

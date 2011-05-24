@@ -49,7 +49,7 @@
 #define SMMU_VERBOSE 0
 #endif
 
-#if defined(CONFIG_ARCH_TEGRA_3x_SOC)
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 /*
  * ALL-CAP macros copied from armc.h
  */
