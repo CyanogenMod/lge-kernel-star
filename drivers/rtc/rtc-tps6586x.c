@@ -40,6 +40,7 @@
 #define RTC_ALARM1_HI	0xc1
 #define RTC_COUNT4	0xc6
 #define RTC_COUNT4_DUMMYREAD 0xc5  /* start a PMU RTC access by reading the register prior to the RTC_COUNT4 */
+#define ALM1_VALID_RANGE_IN_SEC 0x3FFF /*only 14-bits width in second*/
 
 struct tps6586x_rtc {
 	unsigned long		epoch_start;
@@ -133,8 +134,11 @@ static int tps6586x_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	struct device *tps_dev = to_tps6586x_dev(dev);
 	unsigned long seconds;
 	unsigned long ticks;
+	unsigned long long rticks = 0;
 	u8 buff[3];
+	u8 rbuff[6];
 	int err;
+	int i;
 
 	if (rtc->irq == -1)
 		return -EIO;
@@ -155,6 +159,22 @@ static int tps6586x_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	}
 
 	seconds -= rtc->epoch_start;
+
+	if (seconds > ALM1_VALID_RANGE_IN_SEC) {
+		err = tps6586x_reads(tps_dev, RTC_COUNT4_DUMMYREAD, sizeof(rbuff), rbuff);
+		if (err < 0) {
+			dev_err(dev, "failed to read counter\n");
+			return err;
+		}
+
+		for (i = 1; i < sizeof(rbuff); i++) {
+			rticks <<= 8;
+			rticks |= rbuff[i];
+		}
+
+		seconds = (rticks >> 10) - 1;
+	}
+
 	ticks = (unsigned long long)seconds << 10;
 
 	buff[0] = (ticks >> 16) & 0xff;
