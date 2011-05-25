@@ -1387,14 +1387,15 @@ int tegra_avp_open(struct tegra_avp_info **avp)
 		ret = avp_init(new_avp);
 
 	if (ret < 0) {
+		mutex_unlock(&new_avp->open_lock);
 		new_avp = 0;
 		goto out;
 	}
 
 	new_avp->refcount++;
 
-out:
 	mutex_unlock(&new_avp->open_lock);
+out:
 	*avp = new_avp;
 	return ret;
 }
