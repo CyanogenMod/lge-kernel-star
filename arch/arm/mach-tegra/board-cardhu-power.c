@@ -226,8 +226,8 @@ static struct regulator_consumer_supply tps6591x_ldo8_supply[] = {
 		.ectrl = _ectrl						\
 	}
 
-TPS_PDATA_INIT_BOARD(vdd1, skubit0_0, 600, 1500, 0, 1, 1, 0, -1, 0, 0, 0);
-TPS_PDATA_INIT_BOARD(vdd1, skubit0_1, 600, 1500, 0, 1, 1, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT_BOARD(vdd1, skubit0_0, 600, 1500, 0, 1, 1, 0, -1, 0, 0, EXT_CTRL_SLEEP_OFF);
+TPS_PDATA_INIT_BOARD(vdd1, skubit0_1, 600, 1500, 0, 1, 1, 0, -1, 0, 0, EXT_CTRL_SLEEP_OFF);
 TPS_PDATA_INIT(vdd2,    600, 1500, 0, 1, 1, 0, -1, 0, 0, 0);
 TPS_PDATA_INIT(vddctrl, 600, 1400, 0, 1, 1, 0, -1, 0, 0, EXT_CTRL_EN1);
 TPS_PDATA_INIT(vio,    1500, 3300, 0, 1, 1, 0, -1, 0, 0, 0);
@@ -353,9 +353,15 @@ static struct tps6591x_gpio_init_data tps_gpio_pdata_e1291_a04[] =  {
 	TPS_GPIO_INIT_PDATA(8, 0, 0, 0, 0, 0),
 };
 
+static struct tps6591x_sleep_keepon_data tps_slp_keepon = {
+	.clkout32k_keepon = 1,
+};
+
 static struct tps6591x_platform_data tps_platform = {
 	.irq_base	= TPS6591X_IRQ_BASE,
 	.gpio_base	= TPS6591X_GPIO_BASE,
+	.dev_slp_en	= true,
+	.slp_keepon	= &tps_slp_keepon,
 };
 
 static struct i2c_board_info __initdata cardhu_regulators[] = {
@@ -703,18 +709,16 @@ GREG_INIT(0, en_5v_cp,		en_5v_cp,	NULL,			TPS6591X_GPIO_GP0,	false,	1,	0,	0,	0);
 GREG_INIT(1, en_5v0,		en_5v0,		NULL,			TPS6591X_GPIO_GP2,	false,	0,	0,	0,	0);
 GREG_INIT(2, en_ddr,		en_ddr,		NULL,			TPS6591X_GPIO_GP6,	false,	0,	0,	0,	0);
 GREG_INIT(3, en_3v3_sys,	en_3v3_sys,	NULL,			TPS6591X_GPIO_GP7,	false,	0,	0,	0,	0);
-
-
-GREG_INIT(4, en_vdd_bl,		en_vdd_bl,  	NULL,			TEGRA_GPIO_PK3,		false,	1,	0,	0,	0);
-GREG_INIT(5, en_3v3_modem,	en_3v3_modem,	NULL,			TEGRA_GPIO_PD6, 	false, 	1,	0,	0,	0);
-GREG_INIT(6, en_vdd_pnl1,	en_vdd_pnl1, 	"vdd_3v3_devices",	TEGRA_GPIO_PL4,		false,	1,	0,	0,	0);
-GREG_INIT(7, cam3_ldo_en,	cam3_ldo_en, 	"vdd_3v3_devices",	TEGRA_GPIO_PS0,		false,	0,	0,	0,	0);
+GREG_INIT(4, en_vdd_bl,		en_vdd_bl,	NULL,			TEGRA_GPIO_PK3,		false,	1,	0,	0,	0);
+GREG_INIT(5, en_3v3_modem,	en_3v3_modem,	NULL,			TEGRA_GPIO_PD6,		false,	1,	0,	0,	0);
+GREG_INIT(6, en_vdd_pnl1,	en_vdd_pnl1,	"vdd_3v3_devices",	TEGRA_GPIO_PL4,		false,	1,	0,	0,	0);
+GREG_INIT(7, cam3_ldo_en,	cam3_ldo_en,	"vdd_3v3_devices",	TEGRA_GPIO_PS0,		false,	0,	0,	0,	0);
 GREG_INIT(8, en_vdd_com,	en_vdd_com,	"vdd_3v3_devices",	TEGRA_GPIO_PD0,		false,	1,	0,	0,	0);
 GREG_INIT(9, en_3v3_fuse,	en_3v3_fuse,	"vdd_3v3_devices",	TEGRA_GPIO_PL6,		false,	0,	0,	0,	0);
 GREG_INIT(10, en_3v3_emmc,	en_3v3_emmc,	"vdd_3v3_devices",	TEGRA_GPIO_PD1,		false,	1,	0,	0,	0);
 GREG_INIT(11, en_vdd_sdmmc1,	en_vdd_sdmmc1,	"vdd_3v3_devices",	TEGRA_GPIO_PD7,		false,	1,	0,	0,	0);
 GREG_INIT(12, en_3v3_pex_hvdd,	en_3v3_pex_hvdd, "vdd_3v3_devices",	TEGRA_GPIO_PL7,		false,	0,	0,	0,	0);
-GREG_INIT(13, en_1v8_cam,	en_1v8_cam,  	"vdd_gen1v8",		TEGRA_GPIO_PBB4,	false,	0,	0,	0,	0);
+GREG_INIT(13, en_1v8_cam,	en_1v8_cam,	"vdd_gen1v8",		TEGRA_GPIO_PBB4,	false,	0,	0,	0,	0);
 
 /* E1291-A04 specific */
 GREG_INIT(1, en_5v0_a04,	en_5v0,		NULL,			TPS6591X_GPIO_GP8,	false,	0,	0,	0,	0);
@@ -739,7 +743,7 @@ GREG_INIT(17, en_vddio_vid_oc_pm269,	en_vddio_vid_oc,	"master_5v_switch",
 
 /* Specific to E1187/E1186 */
 GREG_INIT(14, dis_5v_switch_e118x,	dis_5v_switch,		"vdd_5v0_sys",
-		TEGRA_GPIO_PX2,		true, 	0, 	0,	0,	0);
+		TEGRA_GPIO_PX2,		true,	0,	0,	0,	0);
 GREG_INIT(15, en_usb1_vbus_oc_e118x,	en_usb1_vbus_oc,	"master_5v_switch",
 		TEGRA_GPIO_PI4,		false,	0,	TEGRA_PINGROUP_GMI_RST_N,
 		enable_load_switch_rail, disable_load_switch_rail);
@@ -751,7 +755,7 @@ GREG_INIT(17, en_vddio_vid_oc_e118x,	en_vddio_vid_oc,	"master_5v_switch",
 		enable_load_switch_rail, disable_load_switch_rail);
 
 /* E1198/E1291 specific  fab < A03 */
-GREG_INIT(15, en_usb1_vbus_oc, 		en_usb1_vbus_oc, 	"vdd_5v0_sys",
+GREG_INIT(15, en_usb1_vbus_oc,		en_usb1_vbus_oc,	"vdd_5v0_sys",
 		TEGRA_GPIO_PI4,		false,	0,	TEGRA_PINGROUP_GMI_RST_N,
 		enable_load_switch_rail, disable_load_switch_rail);
 GREG_INIT(16, en_usb3_vbus_oc,		en_usb3_vbus_oc,	"vdd_5v0_sys",
@@ -759,7 +763,7 @@ GREG_INIT(16, en_usb3_vbus_oc,		en_usb3_vbus_oc,	"vdd_5v0_sys",
 		enable_load_switch_rail, disable_load_switch_rail);
 
 /* E1198/E1291 specific  fab >= A03 */
-GREG_INIT(15, en_usb1_vbus_oc_a03, 		en_usb1_vbus_oc, 	"vdd_5v0_sys",
+GREG_INIT(15, en_usb1_vbus_oc_a03,	en_usb1_vbus_oc,	"vdd_5v0_sys",
 		TEGRA_GPIO_PDD6,		false,	0,	TEGRA_PINGROUP_PEX_L1_CLKREQ_N,
 		enable_load_switch_rail, disable_load_switch_rail);
 GREG_INIT(16, en_usb3_vbus_oc_a03,		en_usb3_vbus_oc,	"vdd_5v0_sys",
@@ -772,14 +776,14 @@ GREG_INIT(17, en_vddio_vid_oc,		en_vddio_vid_oc,	"vdd_5v0_sys",
 		enable_load_switch_rail, disable_load_switch_rail);
 
 /* E1198/E1291 specific*/
-GREG_INIT(18, cam1_ldo_en,	cam1_ldo_en,		"vdd_3v3_cam",	TEGRA_GPIO_PR6,		false,	0,	0,	0,	0);
-GREG_INIT(19, cam2_ldo_en,	cam2_ldo_en,		"vdd_3v3_cam",	TEGRA_GPIO_PR7,		false,	0,	0,	0,	0);
+GREG_INIT(18, cam1_ldo_en,	cam1_ldo_en,	"vdd_3v3_cam",	TEGRA_GPIO_PR6,		false,	0,	0,	0,	0);
+GREG_INIT(19, cam2_ldo_en,	cam2_ldo_en,	"vdd_3v3_cam",	TEGRA_GPIO_PR7,		false,	0,	0,	0,	0);
 
 /* E1291 A03 specific */
-GREG_INIT(20, en_vdd_bl1_a03,	en_vdd_bl,  	NULL,		TEGRA_GPIO_PDD2,	false,	1,	0,	0,	0);
-GREG_INIT(21, en_vdd_bl2_a03,	en_vdd_bl2,  	NULL,		TEGRA_GPIO_PDD0,	false,	1,	0,	0,	0);
+GREG_INIT(20, en_vdd_bl1_a03,	en_vdd_bl,	NULL,		TEGRA_GPIO_PDD2,	false,	1,	0,	0,	0);
+GREG_INIT(21, en_vdd_bl2_a03,	en_vdd_bl2,	NULL,		TEGRA_GPIO_PDD0,	false,	1,	0,	0,	0);
 
-GREG_INIT(22, en_vbrtr,	en_vbrtr, "vdd_3v3_devices",	PMU_TCA6416_GPIO_PORT12,		false,	0,	0,	0,	0);
+GREG_INIT(22, en_vbrtr,		en_vbrtr,	"vdd_3v3_devices",	PMU_TCA6416_GPIO_PORT12,	false,	0,	0,	0,	0);
 
 #define ADD_GPIO_REG(_name) &gpio_pdata_##_name
 
@@ -951,7 +955,7 @@ static struct tegra_suspend_platform_data cardhu_suspend_data = {
 	.suspend_mode	= TEGRA_SUSPEND_LP2,
 	.core_timer	= 0x7e7e,
 	.core_off_timer = 0,
-	.corereq_high	= false,
+	.corereq_high	= true,
 	.sysclkreq_high	= true,
 	.cpu_lp2_min_residency = 2000,
 };
@@ -1003,7 +1007,7 @@ static void cardhu_power_off(void)
 	if (ret)
 		pr_err("cardhu: failed to power off\n");
 
-	while(1);
+	while (1);
 }
 
 int __init cardhu_power_off_init(void)
@@ -1019,10 +1023,10 @@ int __init cardhu_power_off_init(void)
  */
 static struct tegra_edp_limits cardhu_edp_limits[] = {
 /* Temperature	 1 CPU	  2 CPUs   3 CPUs   4 CPUs */
-	{60,	{1400000, 1300000, 1300000, 1300000}},
-	{70,	{1400000, 1300000, 1300000, 1260000}},
-	{80,	{1400000, 1300000, 1300000, 1200000}},
-	{90,	{1400000, 1300000, 1300000, 1100000}},
+	{60,	{1400000, 1300000, 1300000, 1300000} },
+	{70,	{1400000, 1300000, 1300000, 1260000} },
+	{80,	{1400000, 1300000, 1300000, 1200000} },
+	{90,	{1400000, 1300000, 1300000, 1100000} },
 };
 
 void cardhu_thermal_zones_info(struct tegra_edp_limits **z, int *sz)
