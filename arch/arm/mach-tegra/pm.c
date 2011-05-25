@@ -57,6 +57,7 @@
 #include "pm.h"
 #include "pm-irq.h"
 #include "sleep.h"
+#include "fuse.h"
 
 struct suspend_context {
 	/*
@@ -178,8 +179,7 @@ static const char *tegra_suspend_name[TEGRA_MAX_SUSPEND_MODE] = {
 };
 
 #if INSTRUMENT_CLUSTER_SWITCH
-enum tegra_cluster_switch_time_id
-{
+enum tegra_cluster_switch_time_id {
 	tegra_cluster_switch_time_id_start = 0,
 	tegra_cluster_switch_time_id_prolog,
 	tegra_cluster_switch_time_id_switch,
@@ -187,14 +187,17 @@ enum tegra_cluster_switch_time_id
 	tegra_cluster_switch_time_id_max
 };
 
-static unsigned long tegra_cluster_switch_times[tegra_cluster_switch_time_id_max];
+static unsigned long
+		tegra_cluster_switch_times[tegra_cluster_switch_time_id_max];
 #define tegra_cluster_switch_time(flags, id) \
 	do { \
 		barrier(); \
 		if (flags & TEGRA_POWER_CLUSTER_MASK) { \
-			void __iomem *timer_us = IO_ADDRESS(TEGRA_TMRUS_BASE); \
+			void __iomem *timer_us = \
+						IO_ADDRESS(TEGRA_TMRUS_BASE); \
 			if (id < tegra_cluster_switch_time_id_max) \
-				tegra_cluster_switch_times[id] = readl(timer_us); \
+				tegra_cluster_switch_times[id] = \
+							readl(timer_us); \
 				wmb(); \
 		} \
 		barrier(); \
@@ -223,8 +226,8 @@ static void tegra_suspend_check_pwr_stats(void)
 	for (partid = 0; partid < TEGRA_NUM_POWERGATE; partid++)
 		if ((1 << partid) & pwrgate_partid_mask)
 			if (tegra_powergate_is_powered(partid))
-				pr_warning("partition %s is lef on before suspend\n",
-							tegra_powergate_get_name(partid));
+				pr_warning("partition %s is left on before suspend\n",
+					tegra_powergate_get_name(partid));
 
 	return;
 }
@@ -551,7 +554,7 @@ void tegra_idle_lp2_last(unsigned int flags)
 
 #if INSTRUMENT_CLUSTER_SWITCH
 	if (flags & TEGRA_POWER_CLUSTER_MASK) {
-		printk("%s: prolog %lu us, switch %lu us, epilog %lu us, total %lu us\n",
+		pr_err("%s: prolog %lu us, switch %lu us, epilog %lu us, total %lu us\n",
 			is_lp_cluster() ? "G=>LP" : "LP=>G",
 			tegra_cluster_switch_times[tegra_cluster_switch_time_id_prolog] -
 			tegra_cluster_switch_times[tegra_cluster_switch_time_id_start],
@@ -857,6 +860,16 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 	create_suspend_pgtable();
 
 #ifdef CONFIG_PM
+
+	if ((tegra_get_chipid() == TEGRA_CHIPID_TEGRA3) &&
+	    (tegra_get_revision() == TEGRA_REVISION_A01) &&
+	    (plat->suspend_mode == TEGRA_SUSPEND_LP0)) {
+		/* Tegra 3 A01 supports only LP1 */
+		pr_warning("Suspend mode LP0 is not supported on A01\n");
+		pr_warning("Disabling LP0\n");
+		plat->suspend_mode = TEGRA_SUSPEND_LP1;
+	}
+
 	if (plat->suspend_mode == TEGRA_SUSPEND_LP0 && !tegra_lp0_vec_size) {
 		pr_warning("Suspend mode LP0 requested, no lp0_vec\n");
 		pr_warning("Disabling LP0\n");
