@@ -198,13 +198,13 @@ static unsigned int edp_limit;
 static void edp_update_limit(void)
 {
 	int i;
-	unsigned int limit;
+	unsigned int limit = cpumask_weight(&edp_cpumask);
 
 	if (!cpu_edp_limits)
 		return;
 
-	limit = cpu_edp_limits[edp_thermal_index].freq_limits[
-			cpumask_weight(&edp_cpumask) - 1];
+	BUG_ON((edp_thermal_index >= cpu_edp_limits_size) || (limit == 0));
+	limit = cpu_edp_limits[edp_thermal_index].freq_limits[limit - 1];
 
 	for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++) {
 		if (freq_table[i].frequency > limit) {
@@ -248,13 +248,13 @@ int tegra_edp_update_thermal_zone(int temperature)
 	}
 
 	mutex_lock(&tegra_cpu_lock);
-
 	edp_thermal_index = index;
-	edp_update_limit();
-	ret = tegra_cpu_cap_highest_speed(NULL);
-	if (ret)
-		pr_err("%s: update cpu speed fail(%d)", __func__, ret);
 
+	/* Update cpu rate if cpufreq (at least on cpu0) is already started */
+	if (target_cpu_speed[0]) {
+		edp_update_limit();
+		tegra_cpu_cap_highest_speed(NULL);
+	}
 	mutex_unlock(&tegra_cpu_lock);
 
 	return ret;
@@ -292,6 +292,7 @@ static int tegra_cpu_edp_notify(
 		mutex_lock(&tegra_cpu_lock);
 		cpu_clear(cpu, edp_cpumask);
 		edp_update_limit();
+		tegra_cpu_cap_highest_speed(NULL);
 		mutex_unlock(&tegra_cpu_lock);
 		break;
 	}
@@ -306,18 +307,22 @@ static void tegra_cpu_edp_init(bool resume)
 {
 	if (!cpu_edp_limits) {
 		if (!resume)
-			pr_info("tegra CPU: no EDP table is provided\n");
+			pr_info("cpu-tegra: no EDP table is provided\n");
 		return;
 	}
 
-	edp_thermal_index = 0;
+	/* FIXME: use the highest temperature limits if sensor is not on-line?
+	 * If thermal zone is not set yet by the sensor, edp_thermal_index = 0.
+	 * Boot frequency allowed SoC to get here, should work till sensor is
+	 * initialized.
+	 */
 	edp_cpumask = *cpu_online_mask;
 	edp_update_limit();
 
-	if (!resume)
+	if (!resume) {
 		register_hotcpu_notifier(&tegra_cpu_edp_notifier);
-
-	pr_info("tegra CPU: set EDP limit %u MHz\n", edp_limit / 1000);
+		pr_info("cpu-tegra: init EDP limit: %u MHz\n", edp_limit/1000);
+	}
 }
 
 static void tegra_cpu_edp_exit(void)
