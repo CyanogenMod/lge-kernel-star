@@ -40,4 +40,17 @@ int enterprise_baseband_init(void);
 #define TOUCH_GPIO_RST_ATMEL_T9	TEGRA_GPIO_PH6
 #endif
 
+/*****************External GPIO tables ******************/
+/* External peripheral gpio base. */
+#define TPS80031_GPIO_BASE	TEGRA_NR_GPIOS
+#define TPS80031_GPIO_REGEN1	(TPS80031_GPIO_BASE + 0)
+#define TPS80031_GPIO_REGEN2	(TPS80031_GPIO_BASE + 1)
+#define TPS80031_GPIO_SYSEN	(TPS80031_GPIO_BASE + 2)
+#define TPS80031_GPIO_END	(TPS80031_GPIO_BASE + 3)
+
+/*****************External Interrupt tables ******************/
+/* External peripheral irq base */
+#define TPS80031_IRQ_BASE	TEGRA_NR_IRQS
+#define TPS80031_IRQ_END	(TPS80031_IRQ_BASE + 24)
+
 #endif
