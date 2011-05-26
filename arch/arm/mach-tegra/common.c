@@ -150,7 +150,7 @@ void tegra_init_cache(void)
 #endif
 
 	/* Enable PL310 double line fill feature. */
-	writel(((1<<30) | 7), p + L2X0_PREFETCH_CTRL);
+	writel(((1<<30) | 0), p + L2X0_PREFETCH_CTRL);
 #endif
 	aux_ctrl = readl(p + L2X0_CACHE_TYPE);
 	aux_ctrl = (aux_ctrl & 0x700) << (17-8);
