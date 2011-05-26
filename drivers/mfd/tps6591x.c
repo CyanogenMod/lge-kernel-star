@@ -179,13 +179,27 @@ static inline int __tps6591x_writes(struct i2c_client *client, int reg,
 
 int tps6591x_write(struct device *dev, int reg, uint8_t val)
 {
-	return __tps6591x_write(to_i2c_client(dev), reg, val);
+	struct tps6591x *tps6591x = dev_get_drvdata(dev);
+	int ret = 0;
+
+	mutex_lock(&tps6591x->lock);
+	ret = __tps6591x_write(to_i2c_client(dev), reg, val);
+	mutex_unlock(&tps6591x->lock);
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(tps6591x_write);
 
 int tps6591x_writes(struct device *dev, int reg, int len, uint8_t *val)
 {
-	return __tps6591x_writes(to_i2c_client(dev), reg, len, val);
+	struct tps6591x *tps6591x = dev_get_drvdata(dev);
+	int ret = 0;
+
+	mutex_lock(&tps6591x->lock);
+	ret = __tps6591x_writes(to_i2c_client(dev), reg, len, val);
+	mutex_unlock(&tps6591x->lock);
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(tps6591x_writes);
 
@@ -213,7 +227,7 @@ int tps6591x_set_bits(struct device *dev, int reg, uint8_t bit_mask)
 	if (ret)
 		goto out;
 
-	if ((reg_val & bit_mask) == 0) {
+	if ((reg_val & bit_mask) != bit_mask) {
 		reg_val |= bit_mask;
 		ret = __tps6591x_write(to_i2c_client(dev), reg, reg_val);
 	}
@@ -258,7 +272,7 @@ int tps6591x_update(struct device *dev, int reg, uint8_t val, uint8_t mask)
 		goto out;
 
 	if ((reg_val & mask) != val) {
-		reg_val = (reg_val & ~mask) | val;
+		reg_val = (reg_val & ~mask) | (val & mask);
 		ret = __tps6591x_write(tps6591x->client, reg, reg_val);
 	}
 out:
