@@ -41,6 +41,7 @@
 #include <mach/gpio.h>
 #include <media/ov5650.h>
 #include <media/ov2710.h>
+#include <media/tps61050.h>
 #include <generated/mach-types.h>
 #include "gpio-names.h"
 #include "board.h"
@@ -420,6 +421,72 @@ struct sh532u_platform_data sh532u_pdata = {
 	.board_init = sh532u_init,
 	.board_deinit = sh532u_deinit,
 };
+
+
+static bool cardhu_tps61050_pm_flag = 0;
+
+static struct tps61050_pin_state cardhu_tps61050_pinstate = {
+	.mask		= 0x0008, /*VGP3*/
+	.values		= 0x0008,
+};
+
+static int cardhu_tps61050_pm(int pwr)
+{
+	switch (pwr) {
+	case TPS61050_PWR_OFF:
+		if (cardhu_tps61050_pm_flag && cardhu_1v8_cam1) {
+			regulator_disable(cardhu_1v8_cam1);
+			cardhu_tps61050_pm_flag = 0;
+		}
+		return 0;
+
+	case TPS61050_PWR_STDBY:
+	case TPS61050_PWR_COMM:
+	case TPS61050_PWR_ON:
+		if (!cardhu_tps61050_pm_flag) {
+			if (cardhu_1v8_cam1 == NULL) {
+				cardhu_1v8_cam1 =
+					regulator_get(NULL, "vdd_1v8_cam1");
+				if (WARN_ON(IS_ERR(cardhu_1v8_cam1))) {
+					pr_err("%s: err: %ld\n",
+						__func__,
+						PTR_ERR(cardhu_1v8_cam1));
+					regulator_put(cardhu_1v8_cam1);
+					cardhu_1v8_cam1 = NULL;
+				}
+			}
+			regulator_enable(cardhu_1v8_cam1);
+			cardhu_tps61050_pm_flag = 1;
+			mdelay(5);
+		}
+		return 0;
+
+	default:
+		return -1;
+	}
+}
+
+static struct tps61050_platform_data cardhu_tps61050_data = {
+	.cfg		= 0,
+	.num		= 1,
+	.max_amp_torch	= CAMERA_FLASH_MAX_TORCH_AMP,
+	.max_amp_flash	= CAMERA_FLASH_MAX_FLASH_AMP,
+	.pinstate	= &cardhu_tps61050_pinstate,
+	.init		= NULL,
+	.exit		= NULL,
+	.pm		= cardhu_tps61050_pm,
+	.gpio_envm	= NULL,
+	.gpio_sync	= NULL,
+};
+
+static const struct i2c_board_info cardhu_i2c_board_info_tps61050[] = {
+	{
+		I2C_BOARD_INFO("tps61050", 0x33),
+		.platform_data = &cardhu_tps61050_data,
+	},
+};
+
+
 static struct i2c_board_info cardhu_i2c6_board_info[] = {
 	{
 		I2C_BOARD_INFO("ov5650L", 0x36),
@@ -652,6 +719,9 @@ int __init cardhu_sensors_init(void)
 
 	i2c_register_board_info(2, cardhu_i2c3_board_info,
 		ARRAY_SIZE(cardhu_i2c3_board_info));
+
+	i2c_register_board_info(2, cardhu_i2c_board_info_tps61050,
+		ARRAY_SIZE(cardhu_i2c_board_info_tps61050));
 
 	/* Left  camera is on PCA954x's I2C BUS0, Right camera is on BUS1 &
 	 * Front camera is on BUS2 */
