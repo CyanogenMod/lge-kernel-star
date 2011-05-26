@@ -37,6 +37,12 @@ config TORCH_SSL3250A
         ---help---
           This is a driver for the SSL3250A flash/torch camera device
 
+config TORCH_TPS61050
+        tristate "TPS61050 flash/torch support"
+        depends on I2C && ARCH_TEGRA
+        ---help---
+          This is a driver for the TPS61050 flash/torch camera device
+
 config VIDEO_SH532U
         tristate "SH532U focuser support"
         depends on I2C && ARCH_TEGRA
