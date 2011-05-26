@@ -63,6 +63,10 @@
 /* silicon version number */
 #define TPS6591X_VERNUM		0x80
 
+#define TPS6591X_GPIO_SLEEP	7
+#define TPS6591X_GPIO_PDEN	3
+#define TPS6591X_GPIO_DIR	2
+
 struct tps6591x_irq_data {
 	u8	mask_reg;
 	u8	mask_mask;
@@ -346,12 +350,35 @@ static int tps6591x_gpio_output(struct gpio_chip *gc, unsigned offset,
 			offset,	reg_val);
 }
 
-static void tps6591x_gpio_init(struct tps6591x *tps6591x, int gpio_base)
+static void tps6591x_gpio_init(struct tps6591x *tps6591x,
+			struct tps6591x_platform_data *pdata)
 {
 	int ret;
+	int gpio_base = pdata->gpio_base;
+	int i;
+	u8 gpio_reg;
+	struct tps6591x_gpio_init_data *ginit;
 
-	if (!gpio_base)
+	if (gpio_base <= 0)
 		return;
+
+	for (i = 0; i < pdata->num_gpioinit_data; ++i) {
+		ginit = &pdata->gpio_init_data[i];
+		if (!ginit->init_apply)
+			continue;
+		gpio_reg = (ginit->sleep_en << TPS6591X_GPIO_SLEEP) |
+				(ginit->pulldn_en << TPS6591X_GPIO_PDEN) |
+				(ginit->output_mode_en << TPS6591X_GPIO_DIR);
+
+		if (ginit->output_mode_en)
+			gpio_reg |= ginit->output_val;
+
+		ret =  __tps6591x_write(tps6591x->client,
+				TPS6591X_GPIO_BASE_ADDR + i, gpio_reg);
+		if (ret < 0)
+			dev_err(&tps6591x->client->dev, "Gpio %d init "
+				"configuration failed: %d\n", i, ret);
+	}
 
 	tps6591x->gpio.owner		= THIS_MODULE;
 	tps6591x->gpio.label		= tps6591x->client->name;
@@ -733,7 +760,7 @@ static int __devinit tps6591x_i2c_probe(struct i2c_client *client,
 		goto err_add_devs;
 	}
 
-	tps6591x_gpio_init(tps6591x, pdata->gpio_base);
+	tps6591x_gpio_init(tps6591x, pdata);
 
 	tps6591x_debuginit(tps6591x);
 
@@ -758,6 +785,10 @@ static int __devexit tps6591x_i2c_remove(struct i2c_client *client)
 	if (client->irq)
 		free_irq(client->irq, tps6591x);
 
+	if (gpiochip_remove(&tps6591x->gpio) < 0)
+		dev_err(&client->dev, "Error in removing the gpio driver\n");
+
+	kfree(tps6591x);
 	return 0;
 }
 #ifdef CONFIG_PM

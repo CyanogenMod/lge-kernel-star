@@ -88,15 +88,26 @@ struct tps6591x_sleep_keepon_data {
 	unsigned i2chs_keepon:1;	/* high speed internal clock */
 };
 
-struct tps6591x_platform_data {
-	int num_subdevs;
-	struct tps6591x_subdev_info *subdevs;
+struct tps6591x_gpio_init_data {
+	unsigned sleep_en:1;	/* Enable sleep mode */
+	unsigned pulldn_en:1;	/* Enable pull down */
+	unsigned output_mode_en:1; /* Enable output mode during init */
+	unsigned output_val:1;	/* Output value if it is in output mode */
+	unsigned init_apply:1;	/* Apply init data on configuring gpios*/
+};
 
+struct tps6591x_platform_data {
 	int gpio_base;
 	int irq_base;
 
+	int num_subdevs;
+	struct tps6591x_subdev_info *subdevs;
+
 	bool dev_slp_en;
 	struct tps6591x_sleep_keepon_data *slp_keepon;
+
+	struct tps6591x_gpio_init_data *gpio_init_data;
+	int num_gpioinit_data;
 };
 
 /*
