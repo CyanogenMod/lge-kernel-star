@@ -311,6 +311,13 @@ config REGULATOR_TPS6236X
 	help
 	  This driver supports TPS6236X DC-DC Processor core supply.
 
+config REGULATOR_TPS80031
+	tristate "TI TPS80031 Power regulators"
+	depends on MFD_TPS80031
+	default n
+	help
+	  This driver supports TPS80031 voltage regulator chips.
+
 config REGULATOR_GPIO_SWITCH
 	bool "GPIO based enable/disable of power rails."
 	default n
