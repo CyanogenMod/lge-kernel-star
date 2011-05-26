@@ -43,6 +43,7 @@
 #include <mach/io.h>
 #include <mach/iomap.h>
 #include <mach/nvmap.h>
+#include <mach/legacy_irq.h>
 
 #include "../../../../video/tegra/nvmap/nvmap.h"
 
@@ -1031,6 +1032,8 @@ static int avp_init(struct tegra_avp_info *avp)
 	wmb();
 	release_firmware(avp_fw);
 
+	tegra_init_legacy_irq_cop();
+
 	ret = avp_reset(avp, avp->reset_addr);
 	if (ret) {
 		pr_err("%s: cannot reset the AVP.. aborting..\n", __func__);
@@ -1424,9 +1427,6 @@ static int tegra_avp_open_fops(struct inode *inode, struct file *file)
 int tegra_avp_release(struct tegra_avp_info *avp)
 {
 	int ret = 0;
-
-	pr_info("%s: WORKAROUND: ignoring AVP release\n", __func__);
-	return 0;
 
 	pr_debug("%s: close\n", __func__);
 	mutex_lock(&avp->open_lock);
