@@ -40,11 +40,21 @@
 
 #define CARDHU_ROW_COUNT	4
 #define CARDHU_COL_COUNT	2
+#define CARDHU_PM269_ROW_COUNT	2
+#define CARDHU_PM269_COL_COUNT	4
+
 static int plain_kbd_keycode[] = {
 	KEY_POWER,	KEY_RESERVED,
 	KEY_HOME,	KEY_BACK,
 	KEY_CAMERA,	KEY_CAMERA,
 	KEY_VOLUMEDOWN,	KEY_VOLUMEUP
+};
+
+static int plain_kbd_keycode_pm269[] = {
+	KEY_POWER,	KEY_RESERVED,
+	KEY_VOLUMEUP,	KEY_VOLUMEDOWN,
+	KEY_HOME,	KEY_MENU,
+	KEY_BACK,	KEY_SEARCH
 };
 
 static struct tegra_kbc_wake_key cardhu_wake_cfg[] = {
@@ -79,7 +89,6 @@ static struct resource cardhu_kbc_resources[] = {
 	},
 };
 
-
 struct platform_device cardhu_kbc_device = {
 	.name = "tegra-kbc",
 	.id = -1,
@@ -95,11 +104,19 @@ int __init cardhu_kbc_init(void)
 	struct tegra_kbc_platform_data *data = &cardhu_kbc_platform_data;
 	int i;
 	struct board_info board_info;
+	int row_count = CARDHU_ROW_COUNT, col_count = CARDHU_COL_COUNT;
 
 	tegra_get_board_info(&board_info);
+
 	if ((board_info.board_id == BOARD_E1198) ||
 			(board_info.board_id == BOARD_E1291))
 		return 0;
+
+	if (board_info.board_id == BOARD_PM269) {
+		cardhu_kbc_platform_data.plain_keycode = plain_kbd_keycode_pm269;
+		row_count = CARDHU_PM269_ROW_COUNT;
+		col_count = CARDHU_PM269_COL_COUNT;
+	}
 
 	pr_info("Registering tegra-kbc\n");
 	 /* Setup the pin configuration information. */
@@ -107,16 +124,17 @@ int __init cardhu_kbc_init(void)
 		data->pin_cfg[i].num = 0;
 		data->pin_cfg[i].pin_type = kbc_pin_unused;
 	}
-	for (i = 0; i < CARDHU_ROW_COUNT; i++) {
+	for (i = 0; i < row_count; i++) {
 		data->pin_cfg[i].num = i;
 		data->pin_cfg[i].pin_type = kbc_pin_row;
 	}
-
-	for (i = 0; i < CARDHU_COL_COUNT; i++) {
-		data->pin_cfg[i + CARDHU_ROW_COUNT].num = i;
-		data->pin_cfg[i + CARDHU_ROW_COUNT].pin_type = kbc_pin_col;
+	for (i = 0; i < col_count; i++) {
+		data->pin_cfg[i + row_count].num = i;
+		data->pin_cfg[i + row_count].pin_type = kbc_pin_col;
 	}
+
 	platform_device_register(&cardhu_kbc_device);
+
 	return 0;
 }
 
