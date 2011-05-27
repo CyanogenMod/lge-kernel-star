@@ -745,19 +745,14 @@ static struct resource spdif_resource[] = {
 };
 
 #else
-static struct resource audio_resource[] = {
-	[0] = {
-		.start	= TEGRA_AUDIO_CLUSTER_BASE,
-		.end	= TEGRA_AUDIO_CLUSTER_BASE + TEGRA_AUDIO_CLUSTER_SIZE - 1,
-		.flags	= IORESOURCE_MEM
-	}
+struct platform_device tegra_i2s_device0 = {
+	.name		= "i2s",
+	.id		= 0,
 };
 
 struct platform_device tegra_audio_device = {
 	.name		= "audio",
 	.id		= 1,
-	.resource	= audio_resource,
-	.num_resources	= ARRAY_SIZE(audio_resource),
 };
 
 /* FIXME : Temporarly adding - find the right solution */
