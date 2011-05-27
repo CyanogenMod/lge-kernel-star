@@ -134,6 +134,7 @@ static int tps6586x_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	struct device *tps_dev = to_tps6586x_dev(dev);
 	unsigned long seconds;
 	unsigned long ticks;
+	unsigned long rtc_current_time;
 	unsigned long long rticks = 0;
 	u8 buff[3];
 	u8 rbuff[6];
@@ -160,20 +161,20 @@ static int tps6586x_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 
 	seconds -= rtc->epoch_start;
 
-	if (seconds > ALM1_VALID_RANGE_IN_SEC) {
-		err = tps6586x_reads(tps_dev, RTC_COUNT4_DUMMYREAD, sizeof(rbuff), rbuff);
-		if (err < 0) {
-			dev_err(dev, "failed to read counter\n");
-			return err;
-		}
-
-		for (i = 1; i < sizeof(rbuff); i++) {
-			rticks <<= 8;
-			rticks |= rbuff[i];
-		}
-
-		seconds = (rticks >> 10) - 1;
+	err = tps6586x_reads(tps_dev, RTC_COUNT4_DUMMYREAD, sizeof(rbuff), rbuff);
+	if (err < 0) {
+		dev_err(dev, "failed to read counter\n");
+		return err;
 	}
+
+	for (i = 1; i < sizeof(rbuff); i++) {
+		rticks <<= 8;
+		rticks |= rbuff[i];
+	}
+
+	rtc_current_time = rticks >> 10;
+	if ((seconds - rtc_current_time) > ALM1_VALID_RANGE_IN_SEC)
+		seconds = rtc_current_time - 1;
 
 	ticks = (unsigned long long)seconds << 10;
 
