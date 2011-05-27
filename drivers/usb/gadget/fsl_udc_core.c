@@ -1592,6 +1592,11 @@ static void setup_received_irq(struct fsl_udc *udc,
 		if (setup->bRequestType != (USB_DIR_OUT | USB_TYPE_STANDARD
 						| USB_RECIP_DEVICE))
 			break;
+#ifdef CONFIG_ARCH_TEGRA
+		/* This delay is necessary for some windows drivers to
+		 * properly recognize the device */
+		mdelay(1);
+#endif
 		ch9setaddress(udc, wValue, wIndex, wLength);
 		return;
 
