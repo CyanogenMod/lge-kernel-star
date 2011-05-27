@@ -51,6 +51,7 @@ const char *tegra_get_revision_name(void);
 
 int tegra_cpu_process_id(void);
 int tegra_core_process_id(void);
+int tegra_cpu_speedo_id(void);
 int tegra_soc_speedo_id(void);
 void tegra_init_speedo_data(void);
 
@@ -58,6 +59,7 @@ void tegra_init_speedo_data(void);
 
 static inline int tegra_cpu_process_id(void) { return 0; }
 static inline int tegra_core_process_id(void) { return 0; }
+static inline int tegra_cpu_speedo_id(void) { return 0; }
 static inline int tegra_soc_speedo_id(void) { return 0; }
 static inline void tegra_init_speedo_data(void) { }
 

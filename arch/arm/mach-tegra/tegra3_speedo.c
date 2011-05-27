@@ -41,13 +41,15 @@ static const u32 core_process_speedos[][PROCESS_CORNERS_NUM] = {
 /* Maximum speedo levels for each CPU process corner */
 static const u32 cpu_process_speedos[][PROCESS_CORNERS_NUM] = {
 /* proc_id 0    1    2    3 */
-	{306, 338, 360, 376}, /* soc_speedo_id 0 */
-	{306, 338, 360, 376}, /* soc_speedo_id 1 */
-	{338, 338, 360, 376}, /* soc_speedo_id 2 */
+	{306, 338, 360, 376}, /* cpu_speedo_id 0 */
+	{306, 338, 360, 376}, /* cpu_speedo_id 1 */
+	{338, 338, 360, 376}, /* cpu_speedo_id 2 */
+	{338, 338, 360, 376}, /* cpu_speedo_id 3 */
 };
 
 static int cpu_process_id;
 static int core_process_id;
+static int cpu_speedo_id;
 static int soc_speedo_id;
 
 static inline u8 fuse_package_info(void)
@@ -70,48 +72,53 @@ static void fuse_speedo_calib(u32 *speedo_g, u32 *speedo_lp)
 	*speedo_g = ((reg >> 16) & 0xFFFF) * 4;
 }
 
-static int rev_sku_to_soc_speedo(int rev, int sku)
+static void rev_sku_to_speedo_ids(int rev, int sku)
 {
-	int soc_speedo;
 	u8 pkg;
 
 	switch (rev) {
 	case TEGRA_REVISION_A01:
-		pr_warning("Tegra3 Rev-A01: Using default Speedo: 0\n");
-		soc_speedo = 0;
+		cpu_speedo_id = 0;
+		soc_speedo_id = 0;
 		break;
 	case TEGRA_REVISION_A02:
 		switch (sku) {
 		case 0x87: /* AP30 */
-			soc_speedo = 1;
+			cpu_speedo_id = 1;
+			soc_speedo_id = 1;
 			break;
 		case 0x81: /* T30 */
-			soc_speedo = 2;
+			cpu_speedo_id = 2;
+			soc_speedo_id = 2;
 			break;
 		case 0x83: /* T30S */
-			soc_speedo = 0; /* FIXME => 3 when table avbl */
+			cpu_speedo_id = 3;
+			soc_speedo_id = 2;
 			break;
 		case 0:    /* ENG - check PKG_SKU */
 			pr_info("Tegra3 ENG SKU: Checking pkg info\n");
 			pkg = fuse_package_info();
 			switch (pkg) {
 			case 1: /* MID => assume T30 */
-				soc_speedo = 2;
+				cpu_speedo_id = 2;
+				soc_speedo_id = 2;
 				break;
 			case 2: /* DSC => assume T30S */
-				soc_speedo = 0; /* FIXME => 3 when table avbl */
+				cpu_speedo_id = 3;
+				soc_speedo_id = 2;
 				break;
 			default:
 				pr_err("Tegra3 Rev-A02: Reserved pkg info %d\n",
 				       pkg);
-				soc_speedo = 0;
+				BUG();
 				break;
 			}
 			break;
 		default:
 			/* FIXME: replace with BUG() when all SKU's valid */
 			pr_err("Tegra3 Rev-A02: Unknown SKU %d\n", sku);
-			soc_speedo = 0;
+			cpu_speedo_id = 0;
+			soc_speedo_id = 0;
 			break;
 		}
 		break;
@@ -119,10 +126,6 @@ static int rev_sku_to_soc_speedo(int rev, int sku)
 		BUG();
 		break;
 	}
-
-	pr_debug("Tegra3 Package: %d SKU: %d Rev: %s Speedo: %d",
-		 pkg, sku, tegra_get_revision_name(), soc_speedo);
-	return soc_speedo;
 }
 
 void tegra_init_speedo_data(void)
@@ -130,16 +133,16 @@ void tegra_init_speedo_data(void)
 	u32 cpu_speedo_val, core_speedo_val;
 	int iv;
 
-	soc_speedo_id = rev_sku_to_soc_speedo(tegra_get_revision(),
-					      tegra_sku_id());
-	BUG_ON(soc_speedo_id >= ARRAY_SIZE(cpu_process_speedos));
+	rev_sku_to_speedo_ids(tegra_get_revision(), tegra_sku_id());
+	BUG_ON(cpu_speedo_id >= ARRAY_SIZE(cpu_process_speedos));
+	BUG_ON(soc_speedo_id >= ARRAY_SIZE(core_process_speedos));
 
 	fuse_speedo_calib(&cpu_speedo_val, &core_speedo_val);
 	pr_debug("%s CPU speedo value %u\n", __func__, cpu_speedo_val);
 	pr_debug("%s Core speedo value %u\n", __func__, core_speedo_val);
 
 	for (iv = 0; iv < PROCESS_CORNERS_NUM; iv++) {
-		if (cpu_speedo_val < cpu_process_speedos[soc_speedo_id][iv]) {
+		if (cpu_speedo_val < cpu_process_speedos[cpu_speedo_id][iv]) {
 			break;
 		}
 	}
@@ -176,7 +179,8 @@ void tegra_init_speedo_data(void)
 		soc_speedo_id = 0;
 	}
 
-	pr_debug("%s Soc speedo value %d", __func__, soc_speedo_id);
+	pr_info("Tegra3: CPU Speedo ID %d, Soc Speedo ID %d",
+		 cpu_speedo_id, soc_speedo_id);
 }
 
 int tegra_cpu_process_id(void)
@@ -195,6 +199,11 @@ int tegra_core_process_id(void)
 		return 0;
 	else
 		return core_process_id;
+}
+
+int tegra_cpu_speedo_id(void)
+{
+	return cpu_speedo_id;
 }
 
 int tegra_soc_speedo_id(void)

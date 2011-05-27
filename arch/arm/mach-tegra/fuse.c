@@ -99,11 +99,9 @@ void tegra_init_fuse(void)
 	writel(reg, IO_TO_VIRT(TEGRA_CLK_RESET_BASE + 0x48));
 	tegra_init_speedo_data();
 
-	pr_info("Tegra Revision: %s SKU: %d CPU Process: %d Core Process: %d "
-		"Speedo ID: %d\n",
-		tegra_get_revision_name(),
-		tegra_sku_id(), tegra_cpu_process_id(),
-		tegra_core_process_id(), tegra_soc_speedo_id());
+	pr_info("Tegra Revision: %s SKU: %d CPU Process: %d Core Process: %d\n",
+		tegra_get_revision_name(), tegra_sku_id(),
+		tegra_cpu_process_id(), tegra_core_process_id());
 }
 
 unsigned long long tegra_chip_uid(void)
