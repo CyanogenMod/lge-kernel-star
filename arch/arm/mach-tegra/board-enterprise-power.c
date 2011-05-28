@@ -28,7 +28,6 @@
 #include <linux/gpio.h>
 #include <mach/suspend.h>
 #include <linux/io.h>
-#include <linux/i2c/twl.h>
 
 #include <mach/iomap.h>
 #include <mach/irqs.h>
@@ -41,13 +40,25 @@
 
 /************************ TPS80031 based regulator ****************/
 static struct regulator_consumer_supply tps80031_vio_supply[] = {
+	REGULATOR_SUPPLY("vio_1v8", NULL),
 	REGULATOR_SUPPLY("avdd_osc", NULL),
 	REGULATOR_SUPPLY("vddio_sys", NULL),
 	REGULATOR_SUPPLY("vddio_uart", NULL),
+	REGULATOR_SUPPLY("vddio_lcd", NULL),
 	REGULATOR_SUPPLY("vddio_audio", NULL),
 	REGULATOR_SUPPLY("vddio_bb", NULL),
+	REGULATOR_SUPPLY("vddio_gmi", NULL),
+	REGULATOR_SUPPLY("avdd_usb_pll", NULL),
 	REGULATOR_SUPPLY("vddio_cam", NULL),
 	REGULATOR_SUPPLY("vddio_sdmmc1", NULL),
+	REGULATOR_SUPPLY("vddio_sdmmc4", NULL),
+	REGULATOR_SUPPLY("avdd_hdmi_pll", NULL),
+	REGULATOR_SUPPLY("vddio_gps", NULL),
+	REGULATOR_SUPPLY("vdd_lcd_buffered", NULL),
+	REGULATOR_SUPPLY("vddio_nand", NULL),
+	REGULATOR_SUPPLY("vddio_sd", NULL),
+	REGULATOR_SUPPLY("vdd_bat", NULL),
+	REGULATOR_SUPPLY("vdd_io", NULL),
 };
 
 static struct regulator_consumer_supply tps80031_smps1_supply[] = {
@@ -60,10 +71,13 @@ static struct regulator_consumer_supply tps80031_smps2_supply[] = {
 
 static struct regulator_consumer_supply tps80031_smps3_supply[] = {
 	REGULATOR_SUPPLY("en_vddio_ddr_1v2", NULL),
+	REGULATOR_SUPPLY("vddio_ddr", NULL),
+	REGULATOR_SUPPLY("vdd_lpddr", NULL),
+	REGULATOR_SUPPLY("ddr_comp_pu", NULL),
 };
 
 static struct regulator_consumer_supply tps80031_smps4_supply[] = {
-	REGULATOR_SUPPLY("avdd_dsi_csi", NULL),
+	REGULATOR_SUPPLY("vddio_sdmmc_2v85", NULL),
 };
 
 static struct regulator_consumer_supply tps80031_vana_supply[] = {
@@ -71,7 +85,7 @@ static struct regulator_consumer_supply tps80031_vana_supply[] = {
 };
 
 static struct regulator_consumer_supply tps80031_ldo1_supply[] = {
-	REGULATOR_SUPPLY("unused_ldo1", NULL),
+	REGULATOR_SUPPLY("avdd_dsi_csi", NULL),
 };
 
 static struct regulator_consumer_supply tps80031_ldo2_supply[] = {
@@ -83,15 +97,21 @@ static struct regulator_consumer_supply tps80031_ldo3_supply[] = {
 };
 
 static struct regulator_consumer_supply tps80031_ldo4_supply[] = {
-	REGULATOR_SUPPLY("unused_ldo4", NULL),
+	REGULATOR_SUPPLY("avdd_lcd", NULL),
 };
 
 static struct regulator_consumer_supply tps80031_ldo5_supply[] = {
 	REGULATOR_SUPPLY("vdd_sensor", NULL),
+	REGULATOR_SUPPLY("vdd_compass", NULL),
+	REGULATOR_SUPPLY("vdd_als", NULL),
+	REGULATOR_SUPPLY("vdd_gyro", NULL),
+	REGULATOR_SUPPLY("vdd_touch", NULL),
+	REGULATOR_SUPPLY("vdd_proxim_diode", NULL),
 };
 
 static struct regulator_consumer_supply tps80031_ldo6_supply[] = {
-	REGULATOR_SUPPLY("vddio_sdmmc3", NULL),
+	REGULATOR_SUPPLY("vdd_ddr_rx", NULL),
+	REGULATOR_SUPPLY("vddf_core_emmc", NULL),
 };
 
 static struct regulator_consumer_supply tps80031_ldo7_supply[] = {
@@ -102,7 +122,7 @@ static struct regulator_consumer_supply tps80031_ldo7_supply[] = {
 };
 
 static struct regulator_consumer_supply tps80031_ldoln_supply[] = {
-	REGULATOR_SUPPLY("unused_ldoln", NULL),
+	REGULATOR_SUPPLY("vdd_ddr_hs", NULL),
 };
 
 static struct regulator_consumer_supply tps80031_ldousb_supply[] = {
@@ -198,18 +218,57 @@ static struct i2c_board_info __initdata enterprise_regulators[] = {
 
 /************************ GPIO based switch regulator ****************/
 
+/* REGEN1 from PMU*/
+static struct regulator_consumer_supply gpio_switch_pmu_5v15_en_supply[] = {
+	REGULATOR_SUPPLY("vdd_5v15", NULL),
+};
+static int gpio_switch_pmu_5v15_en_voltages[] = {5000};
+
 /* REGEN2 from PMU*/
-static struct regulator_consumer_supply gpio_switch_pmu_regen2_supply[] = {
+static struct regulator_consumer_supply gpio_switch_pmu_3v3_en_supply[] = {
+	REGULATOR_SUPPLY("avdd_usb_hdmi_3v3", NULL),
 	REGULATOR_SUPPLY("avdd_usb", NULL),
 	REGULATOR_SUPPLY("avdd_hdmi", NULL),
-	REGULATOR_SUPPLY("avdd_hdmi_pll", NULL),
+	REGULATOR_SUPPLY("vdd_nct1008", NULL),
 };
-static int gpio_switch_pmu_regen2_voltages[] = {3300};
+static int gpio_switch_pmu_3v3_en_voltages[] = {3300};
+
+/* SYSEN from PMU*/
+static struct regulator_consumer_supply gpio_switch_pmu_hdmi_5v0_en_supply[] = {
+	REGULATOR_SUPPLY("hdmi_5v0", NULL),
+};
+static int gpio_switch_pmu_hdmi_5v0_en_voltages[] = {5000};
+
+/* LCD-D16 (GPIO M0) from T30*/
+static struct regulator_consumer_supply gpio_switch_vdd_fuse_en_supply[] = {
+	REGULATOR_SUPPLY("vpp_fuse", NULL),
+};
+static int gpio_switch_vdd_fuse_en_voltages[] = {3300};
+
+/* LCD-D17 (GPIO M1) from T30*/
+static struct regulator_consumer_supply gpio_switch_sdmmc3_vdd_sel_supply[] = {
+	REGULATOR_SUPPLY("vddio_sdmmc3_2v85_1v8", NULL),
+	REGULATOR_SUPPLY("sdmmc3_compu_pu", NULL),
+	REGULATOR_SUPPLY("vddio_sdmmc3", NULL),
+};
+static int gpio_switch_sdmmc3_vdd_sel_voltages[] = {2850};
+
+/* LCD-D23 (GPIO M7) from T30*/
+static struct regulator_consumer_supply gpio_switch_cam_ldo_2v8_en_supply[] = {
+	REGULATOR_SUPPLY("vdd_2v8_cam", NULL),
+};
+static int gpio_switch_cam_ldo_2v8_en_voltages[] = {2800};
+
+/* LCD-D9 (GPIO F1) from T30*/
+static struct regulator_consumer_supply gpio_switch_cam_ldo_1v8_en_supply[] = {
+	REGULATOR_SUPPLY("vdd_1v8_cam", NULL),
+};
+static int gpio_switch_cam_ldo_1v8_en_voltages[] = {1800};
 
 /* Macro for defining gpio switch regulator sub device data */
-#define GREG_INIT(_id, _var, _name, _input_supply, _gpio_nr, _active_low, \
+#define GREG_INIT(_id, _name, _input_supply, _gpio_nr, _active_low, \
 			_init_state, _pg, _enable, _disable)		\
-	static struct gpio_switch_regulator_subdev_data gpio_pdata_##_var =  \
+	static struct gpio_switch_regulator_subdev_data gpio_pdata_##_name =  \
 	{								\
 		.regulator_name	= "gpio-switch-"#_name,			\
 		.input_supply	= _input_supply,			\
@@ -234,11 +293,24 @@ static int gpio_switch_pmu_regen2_voltages[] = {3300};
 		.disable_rail = _disable,				\
 	}
 
-GREG_INIT(0, pmu_regen2, pmu_regen2, NULL, TPS80031_GPIO_REGEN2, false, 0, 0, 0, 0);
+GREG_INIT(0, pmu_5v15_en,     NULL,      TPS80031_GPIO_REGEN1, false, 0, 0, 0, 0);
+GREG_INIT(1, pmu_3v3_en,      "vdd_5v15", TPS80031_GPIO_REGEN2, false, 0, 0, 0, 0);
+GREG_INIT(2, pmu_hdmi_5v0_en, "vdd_5v15", TPS80031_GPIO_SYSEN, false, 0, 0, 0, 0);
+
+GREG_INIT(3, vdd_fuse_en,    "avdd_usb_hdmi_3v3", TEGRA_GPIO_PM0, false, 0, 0, 0, 0);
+GREG_INIT(4, sdmmc3_vdd_sel, "vddio_sdmmc_2v85", TEGRA_GPIO_PM1, false, 0, 0, 0, 0);
+GREG_INIT(5, cam_ldo_2v8_en,    NULL, TEGRA_GPIO_PM7, false, 0, 0, 0, 0);
+GREG_INIT(6, cam_ldo_1v8_en,    NULL, TEGRA_GPIO_PF1, false, 0, 0, 0, 0);
 
 #define ADD_GPIO_REG(_name)	(&gpio_pdata_##_name)
 static struct gpio_switch_regulator_subdev_data *gswitch_subdevs[] = {
-	ADD_GPIO_REG(pmu_regen2),
+	ADD_GPIO_REG(pmu_5v15_en),
+	ADD_GPIO_REG(pmu_3v3_en),
+	ADD_GPIO_REG(pmu_hdmi_5v0_en),
+	ADD_GPIO_REG(vdd_fuse_en),
+	ADD_GPIO_REG(sdmmc3_vdd_sel),
+	ADD_GPIO_REG(cam_ldo_2v8_en),
+	ADD_GPIO_REG(cam_ldo_1v8_en),
 };
 
 static struct gpio_switch_regulator_platform_data  gswitch_pdata = {
