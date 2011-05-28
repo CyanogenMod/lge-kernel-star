@@ -964,7 +964,10 @@ static int dbg_pinmux_show(struct seq_file *s, void *unused)
 			mux = (pg_readl(pingroups[i].mux_reg) >>
 			       pingroups[i].mux_bit) & 0x3;
 			BUG_ON(pingroups[i].funcs[mux] == 0);
-			if (pingroups[i].funcs[mux] & TEGRA_MUX_RSVD) {
+			if (pingroups[i].funcs[mux] ==  TEGRA_MUX_INVALID) {
+				seq_printf(s, "TEGRA_MUX_INVALID");
+				len = 7;
+			} else if (pingroups[i].funcs[mux] & TEGRA_MUX_RSVD) {
 				seq_printf(s, "TEGRA_MUX_RSVD%1lu", mux+1);
 				len = 5;
 			} else {
