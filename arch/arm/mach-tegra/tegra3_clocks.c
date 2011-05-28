@@ -198,6 +198,8 @@
 #define SUPER_CLK_DIVIDER		0x04
 #define SUPER_CLOCK_DIV_U71_SHIFT	16
 #define SUPER_CLOCK_DIV_U71_MASK	(0xff << SUPER_CLOCK_DIV_U71_SHIFT)
+/* guarantees safe cpu backup */
+#define SUPER_CLOCK_DIV_U71_MIN		0x2
 
 #define BUS_CLK_DISABLE			(1<<3)
 #define BUS_CLK_DIV_MASK		0x3
@@ -568,11 +570,13 @@ static void tegra3_super_clk_init(struct clk *c)
 	c->parent = sel->input;
 
 	if (c->flags & DIV_U71) {
-		val = clk_readl(c->reg + SUPER_CLK_DIVIDER);
-		val &= SUPER_CLOCK_DIV_U71_MASK;
-		clk_writel(val, c->reg + SUPER_CLK_DIVIDER);
-		c->div = (val >> SUPER_CLOCK_DIV_U71_SHIFT) + 2;
+		/* Init safe 7.1 divider value (does not affect PLLX path) */
+		clk_writel(SUPER_CLOCK_DIV_U71_MIN << SUPER_CLOCK_DIV_U71_SHIFT,
+			   c->reg + SUPER_CLK_DIVIDER);
 		c->mul = 2;
+		c->div = 2;
+		if (!(c->parent->flags & PLLX))
+			c->div += SUPER_CLOCK_DIV_U71_MIN;
 	}
 	else
 		clk_writel(0, c->reg + SUPER_CLK_DIVIDER);
@@ -616,6 +620,20 @@ static int tegra3_super_clk_set_parent(struct clk *c, struct clk *p)
 			val &= ~(SUPER_SOURCE_MASK << shift);
 			val |= (sel->value & SUPER_SOURCE_MASK) << shift;
 
+			/* 7.1 divider for CPU super-clock does not affect
+			   PLLX path */
+			if (c->flags & DIV_U71) {
+				u32 div = 0;
+				if (!(p->flags & PLLX)) {
+					div = clk_readl(c->reg +
+							SUPER_CLK_DIVIDER);
+					div &= SUPER_CLOCK_DIV_U71_MASK;
+					div >>= SUPER_CLOCK_DIV_U71_SHIFT;
+				}
+				c->div = div + 2;
+				c->mul = 2;
+			}
+
 			if (c->refcnt)
 				clk_enable(p);
 
@@ -645,6 +663,8 @@ static int tegra3_super_clk_set_rate(struct clk *c, unsigned long rate)
 	if ((c->flags & DIV_U71) && (c->parent->flags & PLL_FIXED)) {
 		int div = clk_div71_get_divider(c->parent->u.pll.fixed_rate,
 					rate, c->flags, ROUND_DIVIDER_DOWN);
+		div = max(div, SUPER_CLOCK_DIV_U71_MIN);
+
 		clk_writel(div << SUPER_CLOCK_DIV_U71_SHIFT,
 			   c->reg + SUPER_CLK_DIVIDER);
 		c->div = div + 2;
@@ -689,7 +709,6 @@ static void tegra3_cpu_clk_disable(struct clk *c)
 static int tegra3_cpu_clk_set_rate(struct clk *c, unsigned long rate)
 {
 	int ret;
-	unsigned long backup_rate;
 
 	if (!c->dvfs || !c->dvfs->dvfs_rail) {
 #ifdef CONFIG_TEGRA_FPGA_PLATFORM
@@ -720,12 +739,8 @@ static int tegra3_cpu_clk_set_rate(struct clk *c, unsigned long rate)
 		goto out;
 	}
 
-	backup_rate = clk_get_rate(c->u.cpu.backup);
-	if (c->u.cpu.backup->flags & PLL_FIXED) {
-		clk_set_rate(c->parent, rate);
-		if (rate <= backup_rate)
-			goto out;
-	} else if (rate == backup_rate)
+	ret = clk_set_rate(c->parent, rate);
+	if (!ret && (rate <= clk_get_rate(c->parent)))
 		goto out;
 
 	if (rate != clk_get_rate(c->u.cpu.main)) {
@@ -1276,9 +1291,8 @@ static void tegra3_pll_clk_init(struct clk *c)
 				return;
 			}
 		}
-		pr_warning("Clock %s has unknown fixed frequency\n", c->name);
-		c->mul = 1;
-		c->div = 1;
+		pr_err("Clock %s has unknown fixed frequency\n", c->name);
+		BUG();
 	} else if (val & PLL_BASE_BYPASS) {
 		c->mul = 1;
 		c->div = 1;
@@ -1290,6 +1304,10 @@ static void tegra3_pll_clk_init(struct clk *c)
 		else
 			c->div *= (0x1 << ((val & PLL_BASE_DIVP_MASK) >>
 					PLL_BASE_DIVP_SHIFT));
+		if (c->flags & PLL_FIXED) {
+			unsigned long rate = clk_get_rate_locked(c);
+			BUG_ON(rate != c->u.pll.fixed_rate);
+		}
 	}
 
 	if (c->flags & PLLU) {
@@ -1349,9 +1367,13 @@ static int tegra3_pll_clk_set_rate(struct clk *c, unsigned long rate)
 	pr_debug("%s: %s %lu\n", __func__, c->name, rate);
 
 	if (c->flags & PLL_FIXED) {
-		val = clk_readl(c->reg + PLL_BASE);
-		if (!(val & PLL_BASE_OVERRIDE) && (rate == c->u.pll.fixed_rate))
-			return 0;
+		int ret = 0;
+		if (rate != c->u.pll.fixed_rate) {
+			pr_err("%s: Can not change %s fixed rate %lu to %lu\n",
+			       __func__, c->name, c->u.pll.fixed_rate, rate);
+			ret = -EINVAL;
+		}
+		return ret;
 	}
 
 	p_div = 0;
@@ -1421,10 +1443,6 @@ static int tegra3_pll_clk_set_rate(struct clk *c, unsigned long rate)
 	c->div = sel->m * sel->p;
 
 	old_base = val = clk_readl(c->reg + PLL_BASE);
-	if (c->flags & PLL_FIXED) {
-		BUG();
-		val |= PLL_BASE_OVERRIDE;
-	}
 	val &= ~(PLL_BASE_DIVM_MASK | PLL_BASE_DIVN_MASK |
 		 ((c->flags & PLLU) ? PLLU_BASE_POST_DIV : PLL_BASE_DIVP_MASK));
 	val |= (sel->m << PLL_BASE_DIVM_SHIFT) |
@@ -2682,7 +2700,7 @@ static struct clk tegra_pll_p = {
 		.vco_max   = 1400000000,
 		.freq_table = tegra_pll_p_freq_table,
 		.lock_delay = 300,
-		.fixed_rate = 216000000,
+		.fixed_rate = 408000000,
 	},
 };
 
@@ -2727,6 +2745,10 @@ static struct clk tegra_pll_p_out4 = {
 };
 
 static struct clk_pll_freq_table tegra_pll_a_freq_table[] = {
+	{ 9600000, 564480000, 294, 5, 1, 4},
+	{ 9600000, 552960000, 288, 5, 1, 4},
+	{ 9600000, 24000000,  5,   2, 1, 1},
+
 	{ 28800000, 56448000, 49, 25, 1, 1},
 	{ 28800000, 73728000, 64, 25, 1, 1},
 	{ 28800000, 24000000,  5,  6, 1, 1},
@@ -2739,7 +2761,7 @@ static struct clk tegra_pll_a = {
 	.ops       = &tegra_pll_ops,
 	.reg       = 0xb0,
 	.parent    = &tegra_pll_p_out1,
-	.max_rate  = 100000000,
+	.max_rate  = 700000000,
 	.u.pll = {
 		.input_min = 2000000,
 		.input_max = 31000000,
@@ -3201,7 +3223,7 @@ static struct clk tegra_clk_sclk = {
 	.reg	= 0x28,
 	.ops	= &tegra_super_ops,
 	.max_rate = 300000000,
-	.min_rate = 108000000,
+	.min_rate = 102000000,
 };
 
 static struct clk tegra_clk_virtual_cpu_g = {
@@ -3276,7 +3298,7 @@ static struct clk tegra_clk_pclk = {
 	.reg_shift	= 0,
 	.ops		= &tegra_bus_ops,
 	.max_rate       = 150000000,
-	.min_rate       = 36000000,
+	.min_rate       = 34000000,
 };
 
 static struct clk tegra_clk_sbus_cmplx = {
@@ -3288,7 +3310,7 @@ static struct clk tegra_clk_sbus_cmplx = {
 		.hclk = &tegra_clk_hclk,
 		.sclk_low = &tegra_pll_p_out4,
 		.sclk_high = &tegra_pll_m_out1,
-		.threshold = 108000000, /* exact factor of low range pll_p */
+		.threshold = 204000000, /* exact factor of low range pll_p */
 	},
 };
 
@@ -3538,7 +3560,7 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("usb3",	"tegra-ehci.2",		NULL,	59,	0,	480000000, mux_clk_m,			0), /* requires min voltage */
 	PERIPH_CLK("dsia",	"tegradc.0",		"dsia",	48,	0,	500000000, mux_plld_out0,		0),
 	PERIPH_CLK_EX("dsib",	"tegradc.1",		"dsib",	82,	0xd0,	500000000, mux_plld_out0_plld2_out0,	MUX | PLLD,	&tegra_dsib_clk_ops),
-	PERIPH_CLK("csi",	"tegra_camera",		"csi",	52,	0,	72000000,  mux_pllp_out3,		0),
+	PERIPH_CLK("csi",	"tegra_camera",		"csi",	52,	0,	102000000, mux_pllp_out3,		0),
 	PERIPH_CLK("isp",	"tegra_camera",		"isp",	23,	0,	150000000, mux_clk_m,			0), /* same frequency as VI */
 	PERIPH_CLK("csus",	"tegra_camera",		"csus",	92,	0,	150000000, mux_clk_m,			PERIPH_NO_RESET),
 
@@ -3722,14 +3744,14 @@ void __init tegra_soc_init_clocks(void)
  */
 
 static struct cpufreq_frequency_table freq_table_300MHz[] = {
-	{ 0, 216000 },
+	{ 0, 204000 },
 	{ 1, 300000 },
 	{ 2, CPUFREQ_TABLE_END },
 };
 
 static struct cpufreq_frequency_table freq_table_1p0GHz[] = {
-	{ 0, 108000 },
-	{ 1, 216000 },
+	{ 0, 102000 },
+	{ 1, 204000 },
 	{ 2, 312000 },
 	{ 3, 456000 },
 	{ 4, 608000 },
@@ -3741,8 +3763,8 @@ static struct cpufreq_frequency_table freq_table_1p0GHz[] = {
 };
 
 static struct cpufreq_frequency_table freq_table_1p3GHz[] = {
-	{ 0,  108000 },
-	{ 1,  216000 },
+	{ 0,  102000 },
+	{ 1,  204000 },
 	{ 2,  340000 },
 	{ 3,  480000 },
 	{ 4,  640000 },
@@ -3756,8 +3778,8 @@ static struct cpufreq_frequency_table freq_table_1p3GHz[] = {
 };
 
 static struct cpufreq_frequency_table freq_table_1p4GHz[] = {
-	{ 0,  108000 },
-	{ 1,  216000 },
+	{ 0,  102000 },
+	{ 1,  204000 },
 	{ 2,  370000 },
 	{ 3,  480000 },
 	{ 4,  620000 },
@@ -3982,6 +4004,7 @@ void tegra_clk_resume(void)
 	tegra3_periph_clk_init(&tegra_clk_emc);
 	tegra_emc_timing_invalidate();
 
-	tegra3_pll_clk_init(&tegra_pll_u);
+	tegra3_pll_clk_init(&tegra_pll_u); /* Re-init utmi parameters */
+	tegra3_pll_clk_init(&tegra_pll_p); /* Fire a bug if not restored */
 }
 #endif

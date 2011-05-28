@@ -29,6 +29,12 @@
 #include <mach/iomap.h>
 #include <mach/dma.h>
 
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+#define UART_SOURCE_RATE 408000000
+#else
+#define UART_SOURCE_RATE 216000000
+#endif
+
 static struct resource i2c_resource1[] = {
 	[0] = {
 		.start	= INT_I2C,
@@ -678,7 +684,7 @@ static struct plat_serial8250_port debug_uarta_platform_data[] = {
 		.type           = PORT_TEGRA,
 		.iotype         = UPIO_MEM,
 		.regshift       = 2,
-		.uartclk        = 216000000,
+		.uartclk        = UART_SOURCE_RATE,
 	},
 	{
 		.flags          = 0,
@@ -694,7 +700,7 @@ static struct plat_serial8250_port debug_uartb_platform_data[] = {
 		.type           = PORT_TEGRA,
 		.iotype         = UPIO_MEM,
 		.regshift       = 2,
-		.uartclk        = 216000000,
+		.uartclk        = UART_SOURCE_RATE,
 	},
 	{
 		.flags          = 0,
@@ -710,7 +716,7 @@ static struct plat_serial8250_port debug_uartc_platform_data[] = {
 		.type           = PORT_TEGRA,
 		.iotype         = UPIO_MEM,
 		.regshift       = 2,
-		.uartclk        = 216000000,
+		.uartclk        = UART_SOURCE_RATE,
 	},
 	{
 		.flags          = 0,
@@ -726,7 +732,7 @@ static struct plat_serial8250_port debug_uartd_platform_data[] = {
 		.type           = PORT_TEGRA,
 		.iotype         = UPIO_MEM,
 		.regshift       = 2,
-		.uartclk        = 216000000,
+		.uartclk        = UART_SOURCE_RATE,
 	},
 	{
 		.flags          = 0,
@@ -743,7 +749,7 @@ static struct plat_serial8250_port debug_uarte_platform_data[] = {
 		.type           = PORT_TEGRA,
 		.iotype         = UPIO_MEM,
 		.regshift       = 2,
-		.uartclk        = 216000000,
+		.uartclk        = UART_SOURCE_RATE,
 	},
 	{
 		.flags          = 0,

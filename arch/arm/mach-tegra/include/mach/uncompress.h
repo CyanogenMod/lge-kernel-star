@@ -66,6 +66,12 @@
 #define DEBUG_UART_RST_CLR_BIT		0
 #endif
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+#define DEBUG_UART_DLL			0x75
+#else
+#define DEBUG_UART_DLL			0xdd
+#endif
+
 static void putc(int c)
 {
 	volatile u8 *uart = (volatile u8 *)TEGRA_DEBUG_UART_BASE;
@@ -120,7 +126,7 @@ static inline void arch_decomp_setup(void)
 
 	/* Set up debug UART. */
 	uart[UART_LCR << shift] |= UART_LCR_DLAB;
-	uart[UART_DLL << shift] = 0x75;
+	uart[UART_DLL << shift] = DEBUG_UART_DLL;
 	uart[UART_DLM << shift] = 0x0;
 	uart[UART_LCR << shift] = 3;
 }
