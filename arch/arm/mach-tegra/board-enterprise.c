@@ -60,7 +60,7 @@ static struct plat_serial8250_port debug_uart_platform_data[] = {
 		.type		= PORT_TEGRA,
 		.iotype		= UPIO_MEM,
 		.regshift	= 2,
-		.uartclk	= 216000000,
+		.uartclk	= 408000000,
 	}, {
 		.flags		= 0,
 	}
@@ -134,17 +134,17 @@ static inline void enterprise_bt_rfkill(void) { }
 
 static __initdata struct tegra_clk_init_table enterprise_clk_init_table[] = {
 	/* name		parent		rate		enabled */
-	{ "uarta",	"pll_p",	216000000,	true},
-	{ "uartb",	"pll_p",	216000000,	false},
-	{ "uartc",	"pll_p",	216000000,	false},
-	{ "uartd",	"pll_p",	216000000,	true},
-	{ "uarte",	"pll_p",	216000000,	false},
+	{ "uarta",	"pll_p",	408000000,	true},
+	{ "uartb",	"pll_p",	408000000,	false},
+	{ "uartc",	"pll_p",	408000000,	false},
+	{ "uartd",	"pll_p",	408000000,	true},
+	{ "uarte",	"pll_p",	408000000,	false},
 	{ "pll_m",	NULL,		0,		true},
 	{ "hda",	"pll_p",	108000000,	false},
 	{ "hda2codec_2x","pll_p",	48000000,	false},
 	{ "pwm",	"clk_32k",	32768,		false},
 	{ "blink",	"clk_32k",	32768,		true},
-	{ "pll_a",	NULL,		56448000,	false},
+	{ "pll_a",	NULL,		564480000,	false},
 	{ "pll_a_out0",	NULL,		11289600,	false},
 	{ NULL,		NULL,		0,		0},
 };
