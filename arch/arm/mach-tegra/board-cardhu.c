@@ -176,7 +176,7 @@ static __initdata struct tegra_clk_init_table cardhu_clk_init_table[] = {
 	{ "hda2codec_2x","pll_p",	48000000,	false},
 	{ "pwm",	"clk_32k",	32768,		false},
 	{ "blink",	"clk_32k",	32768,		true},
-	{ "pll_a",	NULL,		56448000,	true},
+	{ "pll_a",	NULL,		552960000,	true},
 	{ "pll_a_out0",	NULL,		11289600,	true},
 	{ "i2s1",	"pll_a_out0",	11289600,	true},
 	{ "i2s2",	"pll_a_out0",	11289600,	true},
@@ -282,7 +282,7 @@ static void __init cardhu_uart_init(void)
 			pr_info("The debug console clock name is %s\n",
 						debug_uart_clk->name);
 			clk_enable(debug_uart_clk);
-			clk_set_rate(debug_uart_clk, 216000000);
+			clk_set_rate(debug_uart_clk, 408000000);
 		} else {
 			pr_err("Not getting the clock %s for debug console\n",
 					debug_uart_clk->name);
