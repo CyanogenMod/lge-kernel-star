@@ -1060,7 +1060,7 @@ void mem_cgroup_print_oom_info(struct mem_cgroup *memcg, struct task_struct *p)
 	static char memcg_name[PATH_MAX];
 	int ret;
 
-	if (!memcg)
+	if (!memcg || !p)
 		return;
 
 
@@ -2349,11 +2349,11 @@ int mem_cgroup_prepare_migration(struct page *page, struct mem_cgroup **ptr)
 	}
 	unlock_page_cgroup(pc);
 
-	*ptr = mem;
 	if (mem) {
 		ret = __mem_cgroup_try_charge(NULL, GFP_KERNEL, &mem, false);
 		css_put(&mem->css);
 	}
+	*ptr = mem;
 	return ret;
 }
 
@@ -3361,12 +3361,6 @@ static int mem_cgroup_register_event(struct cgroup *cgrp, struct cftype *cft,
 		}
 	}
 
-	/*
-	 * We need to increment refcnt to be sure that all thresholds
-	 * will be unregistered before calling __mem_cgroup_free()
-	 */
-	mem_cgroup_get(memcg);
-
 	if (type == _MEM)
 		rcu_assign_pointer(memcg->thresholds, thresholds_new);
 	else
@@ -3459,9 +3453,6 @@ assign:
 
 	/* To be sure that nobody uses thresholds before freeing it */
 	synchronize_rcu();
-
-	for (i = 0; i < thresholds->size - size; i++)
-		mem_cgroup_put(memcg);
 
 	kfree(thresholds);
 unlock:
