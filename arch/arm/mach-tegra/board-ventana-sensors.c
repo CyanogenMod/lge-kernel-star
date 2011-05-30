@@ -438,12 +438,6 @@ int __init ventana_camera_late_init(void)
 		return PTR_ERR(cam_ldo6);
 	}
 
-	ret = regulator_set_voltage(cam_ldo6, 1800*1000, 1800*1000);
-	if (ret){
-		pr_err("%s: Failed to set ldo6 to 1.8v\n", __func__);
-		goto fail_put_regulator;
-	}
-
 	ret = regulator_enable(cam_ldo6);
 	if (ret){
 		pr_err("%s: Failed to enable ldo6\n", __func__);
