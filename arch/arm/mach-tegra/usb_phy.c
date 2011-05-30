@@ -1689,11 +1689,11 @@ void tegra_usb_phy_power_off(struct tegra_usb_phy *phy, bool is_dpd)
 	if (power_off[phy->usb_phy_type])
 		power_off[phy->usb_phy_type](phy, is_dpd);
 
-	if (phy->reg_vdd && phy->regulator_on) {
+	if (phy->reg_vdd && phy->regulator_on && is_dpd) {
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 		if (tegra_get_revision() >= TEGRA_REVISION_A03)
 #endif
-			regulator_disable(phy->reg_vdd);
+		regulator_disable(phy->reg_vdd);
 		phy->regulator_on = 0;
 	}
 }
