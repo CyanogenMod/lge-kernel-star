@@ -122,6 +122,37 @@ static struct platform_device enterprise_backlight_device = {
 		.platform_data = &enterprise_backlight_data,
 	},
 };
+static int enterprise_hdmi_vddio_enable(void)
+{
+	int ret;
+	if (!enterprise_hdmi_vddio) {
+		enterprise_hdmi_vddio = regulator_get(NULL, "hdmi_5v0");
+		if (IS_ERR_OR_NULL(enterprise_hdmi_vddio)) {
+			ret = PTR_ERR(enterprise_hdmi_vddio);
+			pr_err("hdmi: couldn't get regulator hdmi_5v0\n");
+			enterprise_hdmi_vddio = NULL;
+			return ret;
+		}
+	}
+	ret = regulator_enable(enterprise_hdmi_vddio);
+	if (ret < 0) {
+		pr_err("hdmi: couldn't enable regulator hdmi_5v0\n");
+		regulator_put(enterprise_hdmi_vddio);
+		enterprise_hdmi_vddio = NULL;
+		return ret;
+	}
+	return ret;
+}
+
+static int enterprise_hdmi_vddio_disable(void)
+{
+	if (enterprise_hdmi_vddio) {
+		regulator_disable(enterprise_hdmi_vddio);
+		regulator_put(enterprise_hdmi_vddio);
+		enterprise_hdmi_vddio = NULL;
+	}
+	return 0;
+}
 
 static int enterprise_hdmi_enable(void)
 {
@@ -154,24 +185,6 @@ static int enterprise_hdmi_enable(void)
 		pr_err("hdmi: couldn't enable regulator avdd_hdmi_pll\n");
 		return ret;
 	}
-	if (!enterprise_hdmi_vddio) {
-		enterprise_hdmi_vddio = regulator_get(NULL, "vdd_hdmi_con");
-		if (IS_ERR_OR_NULL(enterprise_hdmi_vddio)) {
-			pr_err("hdmi: couldn't get regulator vdd_hdmi_con\n");
-			enterprise_hdmi_vddio = NULL;
-			regulator_put(enterprise_hdmi_pll);
-			enterprise_hdmi_pll = NULL;
-			regulator_put(enterprise_hdmi_reg);
-			enterprise_hdmi_reg = NULL;
-
-			return PTR_ERR(enterprise_hdmi_vddio);
-		}
-	}
-	ret = regulator_enable(enterprise_hdmi_vddio);
-	if (ret < 0) {
-		pr_err("hdmi: couldn't enable regulator vdd_hdmi_con\n");
-		return ret;
-	}
 	return 0;
 }
 
@@ -186,9 +199,6 @@ static int enterprise_hdmi_disable(void)
 	regulator_put(enterprise_hdmi_pll);
 	enterprise_hdmi_pll = NULL;
 
-	regulator_disable(enterprise_hdmi_vddio);
-	regulator_put(enterprise_hdmi_vddio);
-	enterprise_hdmi_vddio = NULL;
 	return 0;
 }
 static struct resource enterprise_disp1_resources[] = {
@@ -299,6 +309,8 @@ static struct tegra_dc_out enterprise_disp2_out = {
 
 	.enable		= enterprise_hdmi_enable,
 	.disable	= enterprise_hdmi_disable,
+	.postsuspend	= enterprise_hdmi_vddio_disable,
+	.hotplug_init	= enterprise_hdmi_vddio_enable,
 };
 
 static struct tegra_dc_platform_data enterprise_disp2_pdata = {
