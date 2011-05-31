@@ -1987,7 +1987,7 @@ static NvBool determine_capacity_for_demo(void)
 		batt_dev->batt_vol = (NvU32)(Average_Vol /Valid_count); // Booting time, current consumption is high, so determine capacity with bias...
 		batt_dev->vol_for_capacity = batt_dev->batt_vol + 200;
 	}
-/*
+
 	switch (get_charging_ic_status())
 	{
 		case CHG_IC_DEFAULT_MODE:
@@ -2028,8 +2028,8 @@ static NvBool determine_capacity_for_demo(void)
 			}
 			break;
 	}
-*/
-	star_capacity_from_voltage_via_calculate();
+/*      The values provided by this are WAAY wrong
+	star_capacity_from_voltage_via_calculate(); */
 	valid_capacity_gauge();
 
 	return NV_TRUE;
@@ -2069,12 +2069,12 @@ static ssize_t star_at_charge_store_property(
 	if ( value == 1 )
 	{
 		at_charge_index = NV_TRUE;
-		batt_dev->repeat_index = NV_FALSE;
+		//batt_dev->repeat_index = NV_FALSE;
 
 		star_battery_infomation_update();
 		star_battery_data_onetime_update(Update_Battery_Data);
 
-		charging_ic_active(CHG_IC_TA_MODE); // star_battery_date_onetime_update() for TA/USB is executed in active / deactive func.
+		//charging_ic_active(CHG_IC_TA_MODE); // star_battery_date_onetime_update() for TA/USB is executed in active / deactive func.
 
 	}
 
