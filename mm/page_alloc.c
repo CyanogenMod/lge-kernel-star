@@ -4735,6 +4735,7 @@ static int __init init_per_zone_wmark_min(void)
 	lowmem_kbytes = nr_free_buffer_pages() * (PAGE_SIZE >> 10);
 
 	min_free_kbytes = int_sqrt(lowmem_kbytes * 16);
+    min_free_kbytes = 10240;	//bt issue : source sync
 	if (min_free_kbytes < 128)
 		min_free_kbytes = 128;
 	if (min_free_kbytes > 65536)
