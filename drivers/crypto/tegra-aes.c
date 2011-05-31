@@ -151,6 +151,8 @@ struct tegra_aes_engine {
 	void __iomem *io_base;
 	void __iomem *ivkey_base;
 	unsigned long phys_base;
+	unsigned long iram_phys;
+	void *iram_virt;
 	dma_addr_t ivkey_phys_base;
 	dma_addr_t dma_buf_in;
 	dma_addr_t dma_buf_out;
@@ -176,8 +178,6 @@ struct tegra_aes_dev {
 	struct tegra_aes_engine bsea;
 	struct nvmap_client *client;
 	struct nvmap_handle_ref *h_ref;
-	unsigned long bsea_iram_address;
-	void *bsea_iram_base;
 	struct tegra_aes_ctx *ctx;
 	struct crypto_queue queue;
 	spinlock_t lock;
@@ -223,12 +223,13 @@ static inline void aes_writel(struct tegra_aes_engine *engine,
 	writel(val, engine->io_base + offset);
 }
 
-static int bsea_alloc_iram(struct tegra_aes_dev *dd)
+static int alloc_iram(struct tegra_aes_dev *dd)
 {
 	size_t size, align ;
 	int err;
 
 	dd->h_ref = NULL;
+
 	/* [key+iv+u-iv=64B] * 8 = 512Bytes */
 	size = align = (AES_HW_KEY_TABLE_LENGTH_BYTES * AES_NR_KEYSLOTS);
 	dd->client = nvmap_create_client(nvmap_dev, "aes_bsea");
@@ -251,22 +252,22 @@ static int bsea_alloc_iram(struct tegra_aes_dev *dd)
 		nvmap_free_handle_id(dd->client, nvmap_ref_to_id(dd->h_ref));
 		goto out;
 	}
-	dd->bsea_iram_address = nvmap_handle_address(dd->client,
+	dd->bsea.iram_phys = nvmap_handle_address(dd->client,
 					nvmap_ref_to_id(dd->h_ref));
 
-	dd->bsea_iram_base = nvmap_mmap(dd->h_ref);	/* get virtual address */
-	if (!dd->bsea_iram_base) {
+	dd->bsea.iram_virt = nvmap_mmap(dd->h_ref);	/* get virtual address */
+	if (!dd->bsea.iram_virt) {
 		dev_err(dd->dev, "%s: no mem, BSEA IRAM alloc failure\n",
 		__func__);
 		goto out;
 	}
-	memset(dd->bsea_iram_base, 0, dd->h_ref->handle->size);
+	memset(dd->bsea.iram_virt, 0, dd->h_ref->handle->size);
 
 	return 0;
 
 out:
-	if (dd->bsea_iram_base)
-		nvmap_munmap(dd->h_ref, dd->bsea_iram_base);
+	if (dd->bsea.iram_virt)
+		nvmap_munmap(dd->h_ref, dd->bsea.iram_virt);
 
 	if (dd->client) {
 		nvmap_free_handle_id(dd->client, nvmap_ref_to_id(dd->h_ref));
@@ -276,10 +277,10 @@ out:
 	return -ENOMEM;
 }
 
-static void bsea_free_iram(struct tegra_aes_dev *dd)
+static void free_iram(struct tegra_aes_dev *dd)
 {
-	if (dd->bsea_iram_base)
-		nvmap_munmap(dd->h_ref, dd->bsea_iram_base);
+	if (dd->bsea.iram_virt)
+		nvmap_munmap(dd->h_ref, dd->bsea.iram_virt);
 
 	if (dd->client) {
 		nvmap_free_handle_id(dd->client, nvmap_ref_to_id(dd->h_ref));
@@ -346,7 +347,7 @@ static int aes_start_crypt(struct tegra_aes_engine *eng, u32 in_addr,
 	/* access SDRAM through AHB */
 	value &= (~CMDQ_CTRL_SRC_STM_SEL_FIELD & ~CMDQ_CTRL_DST_STM_SEL_FIELD);
 	value |= (CMDQ_CTRL_SRC_STM_SEL_FIELD | CMDQ_CTRL_DST_STM_SEL_FIELD |
-		CMDQ_CTRL_ICMDQEN_FIELD);
+		CMDQ_CTRL_ICMDQEN_FIELD | CMDQ_CTRL_ERROR_FLUSH_ENB);
 	aes_writel(eng, value, CMDQUE_CONTROL);
 
 	value = 0;
@@ -513,7 +514,7 @@ static int aes_set_key(struct tegra_aes_engine *eng)
 			UCQCMD_CRYPTO_TABLESEL << ICQBITSHIFT_TABLESEL |
 			(UCQCMD_KEYTABLESEL | eng->slot_num)
 			<< ICQBITSHIFT_KEYTABLEID |
-			dd->bsea_iram_address >> 2;
+			dd->bsea.iram_phys >> 2;
 			aes_writel(eng, value, ICMDQUE_WR);
 		do {
 			value = aes_readl(eng, INTR_STATUS);
@@ -687,9 +688,9 @@ static int tegra_aes_setkey(struct crypto_ablkcipher *tfm, const u8 *key,
 
 		/* copy the key */
 		memset(dd->bsev.ivkey_base, 0, AES_HW_KEY_TABLE_LENGTH_BYTES);
-		memset(dd->bsea_iram_base, 0, AES_HW_KEY_TABLE_LENGTH_BYTES);
+		memset(dd->bsea.iram_virt, 0, AES_HW_KEY_TABLE_LENGTH_BYTES);
 		memcpy(dd->bsev.ivkey_base, key, keylen);
-		memcpy(dd->bsea_iram_base, key, keylen);
+		memcpy(dd->bsea.iram_virt, key, keylen);
 	} else {
 		dd->bsev.slot_num = SSK_SLOT_NUM;
 		dd->bsea.slot_num = SSK_SLOT_NUM;
@@ -738,22 +739,20 @@ static void bsea_workqueue_handler(struct work_struct *work)
 	aes_hw_deinit(engine);
 }
 
+#define INT_ERROR_MASK	0xFFF000
 static irqreturn_t aes_bsev_irq(int irq, void *dev_id)
 {
 	struct tegra_aes_dev *dd = (struct tegra_aes_dev *)dev_id;
 	u32 value = aes_readl(&dd->bsev, INTR_STATUS);
-	u32 intr_err_mask = (value & (BIT(19) | BIT(20) | BIT(22)));
 
-	dev_dbg(dd->dev, "irq_stat: 0x%x", value);
-	if (intr_err_mask) {
-		aes_writel(&dd->bsea, intr_err_mask, INTR_STATUS);
-		goto done;
-	}
+	dev_dbg(dd->dev, "bsev irq_stat: 0x%x", value);
+	if (value & INT_ERROR_MASK)
+		aes_writel(&dd->bsev, INT_ERROR_MASK, INTR_STATUS);
 
+	value = aes_readl(&dd->bsev, INTR_STATUS);
 	if (!(value & ENGINE_BUSY_FIELD))
 		complete(&dd->bsev.op_complete);
 
-done:
 	return IRQ_HANDLED;
 }
 
@@ -761,18 +760,15 @@ static irqreturn_t aes_bsea_irq(int irq, void *dev_id)
 {
 	struct tegra_aes_dev *dd = (struct tegra_aes_dev *)dev_id;
 	u32 value = aes_readl(&dd->bsea, INTR_STATUS);
-	u32 intr_err_mask = (value & (BIT(19) | BIT(20) | BIT(22)));
 
-	dev_dbg(dd->dev, "irq_stat: 0x%x", value);
-	if (intr_err_mask) {
-		aes_writel(&dd->bsea, intr_err_mask, INTR_STATUS);
-		goto done;
-	}
+	dev_dbg(dd->dev, "bsea irq_stat: 0x%x", value);
+	if (value & INT_ERROR_MASK)
+		aes_writel(&dd->bsea, INT_ERROR_MASK, INTR_STATUS);
 
+	value = aes_readl(&dd->bsea, INTR_STATUS);
 	if (!(value & ENGINE_BUSY_FIELD))
 		complete(&dd->bsea.op_complete);
 
-done:
 	return IRQ_HANDLED;
 }
 
@@ -837,7 +833,7 @@ static int tegra_aes_get_random(struct crypto_rng *tfm, u8 *rdata,
 	unsigned int dlen)
 {
 	struct tegra_aes_dev *dd = aes_dev;
-	struct tegra_aes_engine *eng = &dd->bsev;
+	struct tegra_aes_engine *eng = &dd->bsea;
 	int ret, i;
 	u8 *dest = rdata, *dt = dd->dt;
 
@@ -894,7 +890,7 @@ static int tegra_aes_rng_reset(struct crypto_rng *tfm, u8 *seed,
 {
 	struct tegra_aes_dev *dd = aes_dev;
 	struct tegra_aes_ctx *ctx = &rng_ctx;
-	struct tegra_aes_engine *eng = &dd->bsev;
+	struct tegra_aes_engine *eng = &dd->bsea;
 	struct tegra_aes_slot *key_slot;
 	struct timespec ts;
 	int ret = 0;
@@ -927,8 +923,8 @@ static int tegra_aes_rng_reset(struct crypto_rng *tfm, u8 *seed,
 	}
 
 	/* copy the key to the key slot */
-	memset(eng->ivkey_base, 0, AES_HW_KEY_TABLE_LENGTH_BYTES);
-	memcpy(eng->ivkey_base, seed + DEFAULT_RNG_BLK_SZ, AES_KEYSIZE_128);
+	memset(dd->bsea.iram_virt, 0, AES_HW_KEY_TABLE_LENGTH_BYTES);
+	memcpy(dd->bsea.iram_virt, seed + DEFAULT_RNG_BLK_SZ, AES_KEYSIZE_128);
 
 	/* take the hardware semaphore */
 	if (tegra_arb_mutex_lock_timeout(eng->res_id, ARB_SEMA_TIMEOUT) < 0) {
@@ -1124,7 +1120,7 @@ static int tegra_aes_probe(struct platform_device *pdev)
 		goto out;
 	}
 
-	err = bsea_alloc_iram(dd);
+	err = alloc_iram(dd);
 	if (err < 0) {
 		dev_err(dev, "Failed to allocate IRAM for BSEA\n");
 		goto out;
@@ -1264,7 +1260,8 @@ out:
 	for (j = 0; j < i; j++)
 		crypto_unregister_alg(&algs[j]);
 
-	bsea_free_iram(dd);
+	free_iram(dd);
+
 	if (dd->bsev.ivkey_base) {
 		dma_free_coherent(dev, SZ_512, dd->bsev.ivkey_base,
 			dd->bsev.ivkey_phys_base);
@@ -1344,7 +1341,7 @@ static int __devexit tegra_aes_remove(struct platform_device *pdev)
 	for (i = 0; i < ARRAY_SIZE(algs); i++)
 		crypto_unregister_alg(&algs[i]);
 
-	bsea_free_iram(dd);
+	free_iram(dd);
 	dma_free_coherent(dev, SZ_512, dd->bsev.ivkey_base,
 		dd->bsev.ivkey_phys_base);
 	dma_free_coherent(dev, AES_HW_DMA_BUFFER_SIZE_BYTES, dd->bsev.buf_in,
