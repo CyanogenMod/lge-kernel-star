@@ -1193,9 +1193,6 @@ static int _load_lib(struct tegra_avp_info *avp, struct tegra_avp_lib *lib,
 		"avp_lib: Successfully loaded library %s (lib_id=%x)\n",
 		lib->name, resp.lib_id);
 
-	pr_info("avp_lib: Successfully loaded library %s (lib_id=%x)\n",
-			lib->name, resp.lib_id);
-
 	/* We free the memory here because by this point the AVP has already
 	 * requested memory for the library for all the sections since it does
 	 * it's own relocation and memory management. So, our allocations were
