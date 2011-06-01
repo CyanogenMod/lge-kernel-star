@@ -1705,6 +1705,16 @@ static const struct alg_test_desc alg_test_descs[] = {
 				}
 			}
 		}
+	},{
+		.alg = "cmac(aes)",
+		.test = alg_test_hash,
+		.fips_allowed = 1,
+		.suite = {
+			.hash = {
+				.vecs = cmac_aes_tv_template,
+				.count = CMAC_AES_TEST_VECTORS
+			}
+		}
 	}, {
 		.alg = "crc32c",
 		.test = alg_test_crc32c,
@@ -2219,6 +2229,22 @@ static const struct alg_test_desc alg_test_descs[] = {
 			}
 		}
 	}, {
+		.alg = "ofb(aes)",
+		.test = alg_test_skcipher,
+		.fips_allowed = 1,
+		.suite = {
+			.cipher = {
+				.enc = {
+					.vecs = aes_ofb_enc_tv_template,
+					.count = AES_OFB_ENC_TEST_VECTORS
+				},
+				.dec = {
+					.vecs = aes_ofb_dec_tv_template,
+					.count = AES_OFB_DEC_TEST_VECTORS
+				}
+			}
+		}
+	},{
 		.alg = "pcbc(fcrypt)",
 		.test = alg_test_skcipher,
 		.suite = {
