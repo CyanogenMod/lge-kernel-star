@@ -24,7 +24,7 @@
 #include <linux/resource.h>
 #include <asm/mach-types.h>
 #include <linux/platform_device.h>
-#include <linux/pwm_backlight.h>
+#include <linux/tegra_pwm_bl.h>
 #include <asm/atomic.h>
 #include <mach/nvhost.h>
 #include <mach/nvmap.h>
@@ -47,7 +47,6 @@
 #define enterprise_bl_pwm		TEGRA_GPIO_PH0
 #define enterprise_hdmi_hpd		TEGRA_GPIO_PN7
 
-#define enterprise_dsia_bl_enb	TEGRA_GPIO_PW1
 #define enterprise_dsi_panel_reset	TEGRA_GPIO_PW0
 
 static struct regulator *enterprise_hdmi_reg = NULL;
@@ -56,70 +55,21 @@ static struct regulator *enterprise_hdmi_vddio = NULL;
 
 static atomic_t sd_brightness = ATOMIC_INIT(255);
 
-static int enterprise_backlight_init(struct device *dev)
-{
-	int ret;
-
-	/* Enable back light for DSIa panel */
-	printk("enterprise_dsi_backlight_init\n");
-
-	ret = gpio_request(enterprise_dsia_bl_enb, "dsia_bl_enable");
-	if (ret < 0)
-		return ret;
-
-	ret = gpio_direction_output(enterprise_dsia_bl_enb, 1);
-	if (ret < 0)
-		gpio_free(enterprise_dsia_bl_enb);
-	else
-		tegra_gpio_enable(enterprise_dsia_bl_enb);
-
-	return ret;
-}
-
-static void enterprise_backlight_exit(struct device *dev)
-{
-	/* Disable back light for DSIa panel */
-	gpio_set_value(enterprise_dsia_bl_enb, 0);
-	gpio_free(enterprise_dsia_bl_enb);
-	tegra_gpio_disable(enterprise_dsia_bl_enb);
-
-	gpio_set_value(TEGRA_GPIO_PL2, 1);
-	mdelay(20);
-}
-
-static int enterprise_backlight_notify(struct device *unused, int brightness)
-{
-	int cur_sd_brightness = atomic_read(&sd_brightness);
-	int orig_brightness = brightness;
-
-	/* DSIa */
-	gpio_set_value(enterprise_dsia_bl_enb, !!brightness);
-
-	/* SD brightness is a percentage, 8-bit value. */
-	brightness = (brightness * cur_sd_brightness) / 255;
-	if (cur_sd_brightness != 255) {
-		printk("NVSD BL - in: %d, sd: %d, out: %d\n",
-			orig_brightness, cur_sd_brightness, brightness);
-	}
-
-	return brightness;
-}
-
-static struct platform_pwm_backlight_data enterprise_backlight_data = {
-	.pwm_id		= 0,
+static struct platform_tegra_pwm_backlight_data enterprise_disp1_backlight_data = {
+	.which_dc	= 0,
+	.which_pwm	= TEGRA_PWM_PM1,
 	.max_brightness	= 255,
 	.dft_brightness	= 224,
-	.pwm_period_ns	= 5000000,
-	.init		= enterprise_backlight_init,
-	.exit		= enterprise_backlight_exit,
-	.notify		= enterprise_backlight_notify,
+	.period		= 0x3F,
+	.clk_div	= 1,
+	.clk_select	= 2,
 };
 
-static struct platform_device enterprise_backlight_device = {
-	.name	= "pwm-backlight",
+static struct platform_device enterprise_disp1_backlight_device = {
+	.name	= "tegra-pwm-bl",
 	.id	= -1,
 	.dev	= {
-		.platform_data = &enterprise_backlight_data,
+		.platform_data = &enterprise_disp1_backlight_data,
 	},
 };
 static int enterprise_hdmi_vddio_enable(void)
@@ -287,7 +237,7 @@ static struct tegra_dc_sd_settings enterprise_sd_settings = {
 			{0, 0, 0}
 		},
 	.sd_brightness = &sd_brightness,
-	.bl_device = &enterprise_backlight_device,
+	.bl_device = &enterprise_disp1_backlight_device,
 };
 
 static struct tegra_fb_data enterprise_hdmi_fb_data = {
@@ -463,7 +413,10 @@ static struct platform_device *enterprise_gfx_devices[] __initdata = {
 	&enterprise_nvmap_device,
 	&tegra_grhost_device,
 	&tegra_pwfm0_device,
-	&enterprise_backlight_device,
+};
+
+static struct platform_device *enterprise_bl_devices[]  = {
+	&enterprise_disp1_backlight_device,
 };
 
 int __init enterprise_panel_init(void)
@@ -477,6 +430,8 @@ int __init enterprise_panel_init(void)
 	tegra_gpio_enable(enterprise_hdmi_hpd);
 	gpio_request(enterprise_hdmi_hpd, "hdmi_hpd");
 	gpio_direction_input(enterprise_hdmi_hpd);
+
+	tegra_gpio_disable(TEGRA_GPIO_PW1);
 
 	err = platform_add_devices(enterprise_gfx_devices,
 				ARRAY_SIZE(enterprise_gfx_devices));
@@ -495,5 +450,8 @@ int __init enterprise_panel_init(void)
 	res->end = tegra_fb2_start + tegra_fb2_size - 1;
 	if (!err)
 		err = nvhost_device_register(&enterprise_disp2_device);
+
+	err = platform_add_devices(enterprise_bl_devices,
+				ARRAY_SIZE(enterprise_bl_devices));
 	return err;
 }
