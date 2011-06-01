@@ -45,8 +45,12 @@ static int tegra_pwm_backlight_update_status(struct backlight_device *bl)
 		dev_err(&bl->dev, "Invalid brightness value: %d max: %d\n",
 		brightness, max);
 
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 	/* map API brightness range from (0~255) to hw range (0~128) */
 	tbl->params.duty_cycle = (brightness * 128) / 255;
+#else
+	tbl->params.duty_cycle = brightness & 0xFF;
+#endif
 
 	/* Call tegra display controller function to update backlight */
 	dc = tegra_dc_get_dc(tbl->which_dc);
@@ -141,7 +145,7 @@ static int __init tegra_pwm_backlight_init(void)
 {
 	return platform_driver_register(&tegra_pwm_backlight_driver);
 }
-module_init(tegra_pwm_backlight_init);
+late_initcall(tegra_pwm_backlight_init);
 
 static void __exit tegra_pwm_backlight_exit(void)
 {
