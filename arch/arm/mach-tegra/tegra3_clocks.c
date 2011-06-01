@@ -685,6 +685,17 @@ static int tegra3_cpu_clk_set_rate(struct clk *c, unsigned long rate)
 	int ret;
 	unsigned long backup_rate;
 
+	if (!c->dvfs || !c->dvfs->dvfs_rail) {
+#ifdef CONFIG_TEGRA_FPGA_PLATFORM
+		/* Hardware clock control is not possible on FPGA platforms.
+		   Report success so that upper level layers don't complain
+		   needlessly. */
+		return 0;
+#else
+		return -ENOSYS;
+#endif
+	}
+
 	if((!c->dvfs->dvfs_rail->reg) && (clk_get_rate_locked(c) < rate)) {
 			WARN(1, "Increasing CPU rate while regulator is not"
 				" ready may overclock CPU\n");
