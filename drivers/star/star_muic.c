@@ -51,7 +51,8 @@ enum
     DISABLE = 0x0, 
     ENABLE  = 0x1
 };
-#else
+#endif
+#ifndef CONFIG_MACH_STAR_TMUS
 typedef enum
 {
     USIF_UART,
@@ -76,6 +77,9 @@ typedef struct MuicDeviceRec
     NvOdmGpioPinHandle h_AP20_UART_SW;
     NvOdmGpioPinHandle h_IFX_UART_SW;
 #if defined(CONFIG_MACH_STAR)
+#ifdef CONFIG_MACH_STAR_REV_F
+    NvOdmGpioPinHandle h_USIF1_SW;
+#endif
     NvOdmGpioPinHandle h_USB_VBUS_EN;
 #else
     NvOdmGpioPinHandle h_USIF1_SW;    
@@ -431,7 +435,7 @@ static max14526_device_type boot_muic_state = DEVICE_NONE;
 //static NvBool send_key_muic_hook_pressed = NV_FALSE;
 //DP3T_MODE_TYPE  DP3T_mode = DP3T_NC;
 
-#if !defined(CONFIG_MACH_STAR)
+#if !defined(CONFIG_MACH_STAR_TMUS)
 static void USIF_ctrl(USIF_MODE_TYPE mode);
 #endif
 static void DP3T_Switch_ctrl(DP3T_MODE_TYPE mode);
@@ -649,7 +653,7 @@ int max14526_muic_init(TYPE_RESET reset)
     ret=  MUIC_Reg_Write(&s_hMuicHandle, CTRL2_REG, INT_EN_M);
    
     DP3T_Switch_ctrl(DP3T_NC);
-#if !defined(CONFIG_MACH_STAR)
+#if !defined(CONFIG_MACH_STAR_TMUS)
     USIF_ctrl(USIF_IPC);
 #endif
     //20100526, , Charging IC Reset [START]
@@ -762,7 +766,7 @@ static NvBool MUIC_Reg_Read (Muic_Device* hMuicHandle, NvU8 reg, NvU8 *val)
 #endif
 }
 
-#if !defined(CONFIG_MACH_STAR)
+#if !defined(CONFIG_MACH_STAR_TMUS)
 void USIF_ctrl(USIF_MODE_TYPE mode)
 {
     if(mode == USIF_UART)
@@ -893,7 +897,7 @@ void Set_MAX14526_Factory_Mode_Detect(void)
 {
     printk("-->> MUIC : %s\n",__func__);
 
-#if !defined(CONFIG_MACH_STAR)
+#if !defined(CONFIG_MACH_STAR_TMUS)
     USIF_ctrl(USIF_UART);
 #endif
     DP3T_Switch_ctrl(DP3T_S2_CP_SW);
@@ -918,7 +922,7 @@ void Set_MAX14526_Develop_Mode_Detect(void)
 {
     printk("-->> MUIC : %s\n",__func__);
 
-#if !defined(CONFIG_MACH_STAR)
+#if !defined(CONFIG_MACH_STAR_TMUS)
     USIF_ctrl(USIF_IPC);
 #endif
     DP3T_Switch_ctrl(DP3T_S1_AP);
@@ -944,7 +948,7 @@ void Set_MAX14526_Usb_Mode_Detect(void)
 {
     printk("-->> MUIC : %s \n",__func__);
 
-#if !defined(CONFIG_MACH_STAR)
+#if !defined(CONFIG_MACH_STAR_TMUS)
     USIF_ctrl(USIF_IPC); 
 #endif
     DP3T_Switch_ctrl(DP3T_NC);
@@ -969,7 +973,7 @@ void Set_MAX14526_CP_USB_Mode(void){
 
     printk("-->> MUIC : %s \n",__func__);
 
-#if !defined(CONFIG_MACH_STAR)
+#if !defined(CONFIG_MACH_STAR_TMUS)
     USIF_ctrl(USIF_IPC);
 #endif
     DP3T_Switch_ctrl(DP3T_S3_CP_USB);
@@ -994,7 +998,7 @@ void Set_MAX14526_CP_USB_Mode_PortSetting(void){
 
     printk("-->> MUIC : %s \n",__func__);
 
-#if !defined(CONFIG_MACH_STAR)
+#if !defined(CONFIG_MACH_STAR_TMUS)
     USIF_ctrl(USIF_IPC);
 #endif
     DP3T_Switch_ctrl(DP3T_S3_CP_USB);
@@ -1314,7 +1318,11 @@ static int __init muic_probe(struct platform_device *pdev)
 #else	
     NvU32 I2cInstance = 0;
 #endif
+#if defined(CONFIG_MACH_STAR_REV_D) || defined(CONFIG_MACH_STAR_REV_E) || defined(CONFIG_MACH_STAR_REV_F)
+    NvU32 pin[5], port[5];
+#else
     NvU32 pin[4], port[4];
+#endif
     const NvOdmPeripheralConnectivity *pConnectivity = NULL;
 
     printk(KERN_INFO "muic_probe\n");
@@ -1369,7 +1377,7 @@ static int __init muic_probe(struct platform_device *pdev)
         goto err_open_gpio_pin_acquire_fail;
     }
 
-#if defined(CONFIG_MACH_STAR)
+#if defined(CONFIG_MACH_STAR_TMUS)
     s_hMuicHandle.h_USB_VBUS_EN = NvOdmGpioAcquirePinHandle(s_hMuicHandle.hGpio, port[3], pin[3]);
     if (!s_hMuicHandle.h_USB_VBUS_EN)
     {
@@ -1383,11 +1391,22 @@ static int __init muic_probe(struct platform_device *pdev)
         lprintk(D_MUIC, "%s: Couldn't NvOdmGpioAcquirePinHandle  pin \n", __func__);
         goto err_open_gpio_pin_acquire_fail;
     }
+
+    s_hMuicHandle.h_USB_VBUS_EN = NvOdmGpioAcquirePinHandle(s_hMuicHandle.hGpio, port[4], pin[4]);
+    if (!s_hMuicHandle.h_USB_VBUS_EN)
+    {
+        lprintk(D_MUIC, "%s: Couldn't NvOdmGpioAcquirePinHandle  pin \n", __func__);
+        goto err_open_gpio_pin_acquire_fail;
+    }
 #endif
+
     NvOdmGpioConfig(s_hMuicHandle.hGpio, s_hMuicHandle.h_INT_N_MUIC, NvOdmGpioPinMode_InputData);
     NvOdmGpioConfig(s_hMuicHandle.hGpio, s_hMuicHandle.h_AP20_UART_SW, NvOdmGpioPinMode_Output);
     NvOdmGpioConfig(s_hMuicHandle.hGpio, s_hMuicHandle.h_IFX_UART_SW, NvOdmGpioPinMode_Output);
 #if defined(CONFIG_MACH_STAR)
+#ifdef CONFIG_MACH_STAR_REV_F
+    NvOdmGpioConfig(s_hMuicHandle.hGpio, s_hMuicHandle.h_USIF1_SW, NvOdmGpioPinMode_Output);
+#endif
     NvOdmGpioConfig(s_hMuicHandle.hGpio, s_hMuicHandle.h_USB_VBUS_EN, NvOdmGpioPinMode_Output);
 #else
     NvOdmGpioConfig(s_hMuicHandle.hGpio, s_hMuicHandle.h_USIF1_SW, NvOdmGpioPinMode_Output);
@@ -1463,6 +1482,9 @@ err_open_i2c_handle:
     NvOdmGpioReleasePinHandle(s_hMuicHandle.hGpio, s_hMuicHandle.h_INT_N_MUIC);
     NvOdmGpioReleasePinHandle(s_hMuicHandle.hGpio, s_hMuicHandle.h_AP20_UART_SW);
     NvOdmGpioReleasePinHandle(s_hMuicHandle.hGpio, s_hMuicHandle.h_IFX_UART_SW);
+#ifdef CONFIG_MACH_STAR_REV_F
+    NvOdmGpioReleasePinHandle(s_hMuicHandle.hGpio, s_hMuicHandle.h_USIF1_SW);
+#endif
 #if defined(CONFIG_MACH_STAR)
     NvOdmGpioReleasePinHandle(s_hMuicHandle.hGpio, s_hMuicHandle.h_USB_VBUS_EN);
 #else
@@ -1485,6 +1507,9 @@ static int muic_remove(struct platform_device *pdev)
     NvOdmGpioReleasePinHandle(s_hMuicHandle.hGpio, s_hMuicHandle.h_AP20_UART_SW);
     NvOdmGpioReleasePinHandle(s_hMuicHandle.hGpio, s_hMuicHandle.h_IFX_UART_SW);
 #if defined(CONFIG_MACH_STAR)
+#ifdef CONFIG_MACH_STAR_REV_F
+    NvOdmGpioReleasePinHandle(s_hMuicHandle.hGpio, s_hMuicHandle.h_USIF1_SW);
+#endif
     NvOdmGpioReleasePinHandle(s_hMuicHandle.hGpio, s_hMuicHandle.h_USB_VBUS_EN);
 #else
     NvOdmGpioReleasePinHandle(s_hMuicHandle.hGpio, s_hMuicHandle.h_USIF1_SW);
@@ -1524,6 +1549,9 @@ static void muic_shutdown(struct platform_device *pdev)
     NvOdmGpioSetState(s_hMuicHandle.hGpio, s_hMuicHandle.h_IFX_UART_SW , 0x0);
     NvOdmGpioReleasePinHandle(s_hMuicHandle.hGpio, s_hMuicHandle.h_IFX_UART_SW);
 #if defined(CONFIG_MACH_STAR)
+#ifdef CONFIG_MACH_STAR_REV_F
+    NvOdmGpioReleasePinHandle(s_hMuicHandle.hGpio, s_hMuicHandle.h_USIF1_SW);
+#endif
     NvOdmGpioSetState(s_hMuicHandle.hGpio, s_hMuicHandle.h_USB_VBUS_EN , 0x0);
     NvOdmGpioReleasePinHandle(s_hMuicHandle.hGpio, s_hMuicHandle.h_USB_VBUS_EN);
 #else

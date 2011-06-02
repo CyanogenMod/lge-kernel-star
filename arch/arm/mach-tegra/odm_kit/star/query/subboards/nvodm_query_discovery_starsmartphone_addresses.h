@@ -467,11 +467,13 @@ static const NvOdmIoAddress s_lge_MuicAddresses[] =
     { NvOdmIoModule_Gpio, 'u' - 'a', 0, 0 }, /* INT_N_MUIC */
     { NvOdmIoModule_Gpio, 'u' - 'a', 1, 0 }, /* AP20_UART_SW */
     { NvOdmIoModule_Gpio, 'u' - 'a', 2, 0 }, /* IFX_UART_SW   */
+#ifdef CONFIG_MACH_STAR_REV_F
+    { NvOdmIoModule_Gpio, 'u' - 'a', 3, 0 }, /* USIF1_SW  */
+#endif
 #if defined(CONFIG_MACH_STAR)
     { NvOdmIoModule_Gpio, 'r' - 'a', 7, 0 }, /* MDM_USB_VBUS_EN  */
 #else
 #error MUIC PIN not assigned
-    { NvOdmIoModule_Gpio, 'u' - 'a', 3, 0 }, /* USIF1_SW  */
 #endif
 };
 #endif
