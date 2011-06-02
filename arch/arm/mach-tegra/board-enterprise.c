@@ -347,8 +347,8 @@ static void enterprise_usb_init(void)
 
 static void enterprise_gps_init(void)
 {
-	tegra_gpio_enable(TEGRA_GPIO_PU2);
-	tegra_gpio_enable(TEGRA_GPIO_PU3);
+	tegra_gpio_enable(TEGRA_GPIO_PE4);
+	tegra_gpio_enable(TEGRA_GPIO_PE5);
 }
 
 static void __init tegra_enterprise_init(void)
