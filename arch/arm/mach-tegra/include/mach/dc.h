@@ -266,6 +266,7 @@ struct tegra_dc_out {
 
 	int				dcc_bus;
 	int				hotplug_gpio;
+	const char			*parent_clk;
 
 	unsigned			order;
 	unsigned			align;
