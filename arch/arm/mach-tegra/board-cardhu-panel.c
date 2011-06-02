@@ -388,13 +388,13 @@ static struct resource cardhu_disp2_resources[] = {
 
 static struct tegra_dc_mode cardhu_panel_modes[] = {
 	{
-		/* 1366x768@62.3Hz */
-		.pclk = 72000000,
+		/* 1366x768@59Hz */
+		.pclk = 68000000,
 		.h_ref_to_sync = 4,
 		.v_ref_to_sync = 2,
-		.h_sync_width = 32,
+		.h_sync_width = 30,
 		.v_sync_width = 5,
-		.h_back_porch = 20,
+		.h_back_porch = 18,
 		.v_back_porch = 12,
 		.h_active = 1366,
 		.v_active = 768,
@@ -731,6 +731,7 @@ static struct tegra_dc_out cardhu_disp1_out = {
 	.align		= TEGRA_DC_ALIGN_MSB,
 	.order		= TEGRA_DC_ORDER_RED_BLUE,
 	.sd_settings	= &cardhu_sd_settings,
+	.parent_clk	= "pll_p",
 
 #ifndef CONFIG_TEGRA_CARDHU_DSI
 	.type		= TEGRA_DC_OUT_RGB,
