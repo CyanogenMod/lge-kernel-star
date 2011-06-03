@@ -195,7 +195,7 @@ static int aat2870_update_bits(struct aat2870_data *aat2870, u8 addr,
 	if (ret)
 		return ret;
 
-	new_val = (old_val & ~mask) | val;
+	new_val = (old_val & ~mask) | (val & mask);
 	change = old_val != new_val;
 	if (change)
 		ret = aat2870->write(aat2870, addr, new_val);
@@ -471,14 +471,25 @@ static int aat2870_i2c_suspend(struct i2c_client *client, pm_message_t state)
 	struct aat2870_data *aat2870 = i2c_get_clientdata(client);
 
 	aat2870_disable(aat2870);
+
 	return 0;
 }
 
 static int aat2870_i2c_resume(struct i2c_client *client)
 {
 	struct aat2870_data *aat2870 = i2c_get_clientdata(client);
+	struct aat2870_register *reg = NULL;
+	int i;
 
 	aat2870_enable(aat2870);
+
+	/* restore registers */
+	for (i = 0; i < AAT2870_REG_NUM; i++) {
+		reg = &aat2870->reg_cache[i];
+		if (reg->writeable)
+			aat2870->write(aat2870, i, reg->value);
+	}
+
 	return 0;
 }
 #else

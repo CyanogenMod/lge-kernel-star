@@ -693,7 +693,7 @@ config MFD_TPS6591X
 	  functionality of the device.
 
 config MFD_AAT2870_CORE
-	bool "Support for the AnlogicTech AAT2870"
+	bool "Support for the AnalogicTech AAT2870"
 	select MFD_CORE
 	depends on I2C=y && GPIOLIB
 	help

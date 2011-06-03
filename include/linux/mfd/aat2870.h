@@ -89,7 +89,7 @@ enum aat2870_id {
 
 /* Backlight current magnitude (mA) */
 enum aat2870_current {
-	AAT2870_CURRENT_0_45 = 0,
+	AAT2870_CURRENT_0_45,
 	AAT2870_CURRENT_0_90,
 	AAT2870_CURRENT_1_80,
 	AAT2870_CURRENT_2_70,
@@ -99,7 +99,7 @@ enum aat2870_current {
 	AAT2870_CURRENT_6_30,
 	AAT2870_CURRENT_7_20,
 	AAT2870_CURRENT_8_10,
-	AAT2870_CURRENT_9_00 = 10,
+	AAT2870_CURRENT_9_00,
 	AAT2870_CURRENT_9_90,
 	AAT2870_CURRENT_10_8,
 	AAT2870_CURRENT_11_7,
@@ -109,7 +109,7 @@ enum aat2870_current {
 	AAT2870_CURRENT_15_3,
 	AAT2870_CURRENT_16_2,
 	AAT2870_CURRENT_17_1,
-	AAT2870_CURRENT_18_0 = 20,
+	AAT2870_CURRENT_18_0,
 	AAT2870_CURRENT_18_9,
 	AAT2870_CURRENT_19_8,
 	AAT2870_CURRENT_20_7,
@@ -119,13 +119,13 @@ enum aat2870_current {
 	AAT2870_CURRENT_24_3,
 	AAT2870_CURRENT_25_2,
 	AAT2870_CURRENT_26_1,
-	AAT2870_CURRENT_27_0 = 30,
+	AAT2870_CURRENT_27_0,
 	AAT2870_CURRENT_27_9
 };
 
 struct aat2870_register {
-	int readable;
-	int writeable;
+	bool readable;
+	bool writeable;
 	u8 value;
 };
 
@@ -136,7 +136,7 @@ struct aat2870_data {
 	struct mutex io_lock;
 	struct aat2870_register *reg_cache; /* register cache */
 	int en_pin; /* enable GPIO pin (if < 0, ignore this value) */
-	int is_enable;
+	bool is_enable;
 
 	/* init and uninit for platform specified */
 	int (*init)(struct aat2870_data *aat2870);
