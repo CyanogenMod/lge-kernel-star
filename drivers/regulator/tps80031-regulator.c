@@ -32,31 +32,6 @@
 #include <linux/regulator/tps80031-regulator.h>
 #include <linux/mfd/tps80031.h>
 
-#define TPS80031ID_VIO_BASE_ADD		0x47
-#define TPS80031ID_SMPS1_BASE_ADD	0x53
-#define TPS80031ID_SMPS2_BASE_ADD	0x59
-#define TPS80031ID_SMPS3_BASE_ADD	0x65
-#define TPS80031ID_SMPS4_BASE_ADD	0x41
-#define TPS80031ID_VANA_BASE_ADD	0x81
-#define TPS80031ID_VRTC_BASE_ADD	0xC3
-#define TPS80031ID_LDO1_BASE_ADD	0x9D
-#define TPS80031ID_LDO2_BASE_ADD	0x85
-#define TPS80031ID_LDO3_BASE_ADD	0x8D
-#define TPS80031ID_LDO4_BASE_ADD	0x89
-#define TPS80031ID_LDO5_BASE_ADD	0x99
-#define TPS80031ID_LDO6_BASE_ADD	0x91
-#define TPS80031ID_LDO7_BASE_ADD	0xA5
-#define TPS80031ID_LDOLN_BASE_ADD	0x95
-#define TPS80031ID_LDOUSB_BASE_ADD	0xA1
-
-#define VREG_GRP		0
-
-/* Register offsets */
-#define VREG_TRANS		0
-#define VREG_STATE		1
-#define VREG_VOLTAGE		2
-#define VREG_VOLTAGE_DCDC	3
-
 /* Flags for DCDC Voltage reading */
 #define DCDC_OFFSET_EN		BIT(0)
 #define DCDC_EXTENDED_EN	BIT(1)
@@ -76,8 +51,12 @@
 
 struct tps80031_regulator {
 
-	/* start of regulator's PM_RECEIVER control register bank */
-	u8			base;
+	/* Regulator register address.*/
+	u8		trans_reg;
+	u8		state_reg;
+	u8		force_reg;
+	u8		volt_reg;
+	u8		volt_id;
 
 	/* twl resource ID, for resource control state machine */
 	u8			id;
@@ -115,7 +94,7 @@ static u8 tps80031_get_smps_offset(struct device *parent)
 	u8 value;
 	int ret;
 
-	ret = tps80031_read(parent, PMC_SMPS_OFFSET_ADD, &value);
+	ret = tps80031_read(parent, SLAVE_ID1, PMC_SMPS_OFFSET_ADD, &value);
 	if (ret < 0) {
 		dev_err(parent, "Error in reading smps offset register\n");
 		return 0;
@@ -128,7 +107,7 @@ static u8 tps80031_get_smps_mult(struct device *parent)
 	u8 value;
 	int ret;
 
-	ret = tps80031_read(parent, PMC_SMPS_MULT_ADD, &value);
+	ret = tps80031_read(parent, SLAVE_ID1, PMC_SMPS_MULT_ADD, &value);
 	if (ret < 0) {
 		dev_err(parent, "Error in reading smps mult register\n");
 		return 0;
@@ -143,7 +122,7 @@ static int tps80031_reg_is_enabled(struct regulator_dev *rdev)
 	uint8_t state;
 	int ret;
 
-	ret = tps80031_read(parent, ri->base + VREG_STATE, &state);
+	ret = tps80031_read(parent, SLAVE_ID1, ri->state_reg, &state);
 	if (ret < 0) {
 		dev_err(&rdev->dev, "Error in reading the STATE register\n");
 		return ret;
@@ -157,7 +136,7 @@ static int tps80031_reg_enable(struct regulator_dev *rdev)
 	struct device *parent = to_tps80031_dev(rdev);
 	int ret;
 
-	ret = tps80031_update(parent, ri->base + VREG_STATE, STATE_ON,
+	ret = tps80031_update(parent, SLAVE_ID1, ri->state_reg, STATE_ON,
 					STATE_MASK);
 	if (ret < 0) {
 		dev_err(&rdev->dev, "Error in updating the STATE register\n");
@@ -173,7 +152,7 @@ static int tps80031_reg_disable(struct regulator_dev *rdev)
 	struct device *parent = to_tps80031_dev(rdev);
 	int ret;
 
-	ret = tps80031_update(parent, ri->base + VREG_STATE, STATE_OFF,
+	ret = tps80031_update(parent, SLAVE_ID1, ri->state_reg, STATE_OFF,
 					STATE_MASK);
 	if (ret < 0)
 		dev_err(&rdev->dev, "Error in updating the STATE register\n");
@@ -267,6 +246,7 @@ static int __tps80031_dcdc_set_voltage(struct device *parent,
 {
 	int vsel = 0;
 	int ret;
+	uint8_t force = 0;
 
 	switch (ri->flags) {
 	case 0:
@@ -340,7 +320,22 @@ static int __tps80031_dcdc_set_voltage(struct device *parent,
 		break;
 	}
 
-	ret = tps80031_write(parent, ri->base + VREG_VOLTAGE_DCDC, vsel);
+	if (ri->force_reg) {
+		ret = tps80031_read(parent, ri->volt_id, ri->force_reg,
+						&force);
+		if (ret < 0) {
+			dev_err(ri->dev, "Error in reading the force register\n");
+			return ret;
+		}
+		if (((force >> 6) & 0x3) == 0) {
+			ret = tps80031_write(parent, ri->volt_id,
+						ri->force_reg, vsel);
+			goto out;
+		}
+	}
+	ret = tps80031_write(parent, ri->volt_id, ri->volt_reg, vsel);
+
+out:
 	if (ret < 0)
 		dev_err(ri->dev, "Error in updating the Voltage register\n");
 	return ret;
@@ -359,15 +354,29 @@ static int tps80031dcdc_get_voltage(struct regulator_dev *rdev)
 	struct tps80031_regulator *ri = rdev_get_drvdata(rdev);
 	struct device *parent = to_tps80031_dev(rdev);
 	uint8_t vsel = 0;
+	uint8_t force = 0;
 	int ret;
 	int voltage = 0;
 
-	ret = tps80031_read(parent, ri->base + VREG_VOLTAGE_DCDC, &vsel);
+	if (ri->force_reg) {
+		ret = tps80031_read(parent, ri->volt_id, ri->force_reg, &force);
+		if (ret < 0) {
+			dev_err(&rdev->dev, "Error in reading the force register\n");
+			return ret;
+		}
+		if (((force >> 6) & 0x3) == 0) {
+			vsel = force & 0x3F;
+			goto decode;
+		}
+	}
+
+	ret = tps80031_read(parent, ri->volt_id, ri->volt_reg, &vsel);
 	if (ret < 0) {
 		dev_err(&rdev->dev, "Error in reading the Voltage register\n");
 		return ret;
 	}
 
+decode:
 	switch (ri->flags) {
 	case 0:
 		if (vsel == 0)
@@ -465,7 +474,7 @@ static int __tps80031_ldo_set_voltage(struct device *parent,
 	 * mV = 1000mv + 100mv * (vsel - 1)
 	 */
 	vsel = (min_uV/1000 - 1000)/100 + 1;
-	ret = tps80031_write(parent, ri->base + VREG_VOLTAGE, vsel);
+	ret = tps80031_write(parent, ri->volt_id, ri->volt_reg, vsel);
 	if (ret < 0)
 		dev_err(ri->dev, "Error in writing the Voltage register\n");
 	return ret;
@@ -487,7 +496,7 @@ static int tps80031ldo_get_voltage(struct regulator_dev *rdev)
 	uint8_t vsel;
 	int ret;
 
-	ret = tps80031_read(parent, ri->base + VREG_VOLTAGE, &vsel);
+	ret = tps80031_read(parent, ri->volt_id, ri->volt_reg, &vsel);
 	if (ret < 0) {
 		dev_err(&rdev->dev, "Error in reading the Voltage register\n");
 		return ret;
@@ -519,9 +528,14 @@ static struct regulator_ops tps80031ldo_ops = {
 	.enable_time	= tps80031_regulator_enable_time,
 };
 
-#define TPS80031_REG(_id, min_mVolts, max_mVolts, _ops, _n_volt, _delay) \
+#define TPS80031_REG(_id, _trans_reg, _state_reg, _force_reg, _volt_reg, \
+		_volt_id, min_mVolts, max_mVolts, _ops, _n_volt, _delay) \
 {								\
-	.base = TPS80031ID_##_id##_BASE_ADD,			\
+	.trans_reg = _trans_reg,				\
+	.state_reg = _state_reg,				\
+	.force_reg = _force_reg,				\
+	.volt_reg = _volt_reg,					\
+	.volt_id = _volt_id,					\
 	.id = TPS80031_ID_##_id,				\
 	.min_mV = min_mVolts,					\
 	.max_mV = max_mVolts,					\
@@ -537,22 +551,22 @@ static struct regulator_ops tps80031ldo_ops = {
 }
 
 static struct tps80031_regulator tps80031_regulator[] = {
-	TPS80031_REG(VIO,   600, 2100, tps80031dcdc_ops, 63, 500),
-	TPS80031_REG(SMPS1, 600, 2100, tps80031dcdc_ops, 63, 500),
-	TPS80031_REG(SMPS2, 600, 2100, tps80031dcdc_ops, 63, 500),
-	TPS80031_REG(SMPS3, 600, 2100, tps80031dcdc_ops, 63, 500),
-	TPS80031_REG(SMPS4, 600, 2100, tps80031dcdc_ops, 63, 500),
+	TPS80031_REG(VIO,   0x47, 0x48, 0x49, 0x4A, SLAVE_ID0, 600, 2100, tps80031dcdc_ops, 63, 500),
+	TPS80031_REG(SMPS1, 0x53, 0x54, 0x55, 0x56, SLAVE_ID0, 600, 2100, tps80031dcdc_ops, 63, 500),
+	TPS80031_REG(SMPS2, 0x59, 0x5A, 0x5B, 0x5C, SLAVE_ID0, 600, 2100, tps80031dcdc_ops, 63, 500),
+	TPS80031_REG(SMPS3, 0x65, 0x66, 0x00, 0x68, SLAVE_ID1, 600, 2100, tps80031dcdc_ops, 63, 500),
+	TPS80031_REG(SMPS4, 0x41, 0x42, 0x00, 0x44, SLAVE_ID1, 600, 2100, tps80031dcdc_ops, 63, 500),
 
-	TPS80031_REG(LDO1,   1100, 3300, tps80031ldo_ops, 24, 500),
-	TPS80031_REG(LDO2,   1100, 3300, tps80031ldo_ops, 24, 500),
-	TPS80031_REG(LDO3,   1100, 3300, tps80031ldo_ops, 24, 500),
-	TPS80031_REG(LDO4,   1100, 3300, tps80031ldo_ops, 24, 500),
-	TPS80031_REG(LDO5,   1100, 3300, tps80031ldo_ops, 24, 500),
-	TPS80031_REG(LDO6,   1100, 3300, tps80031ldo_ops, 24, 500),
-	TPS80031_REG(LDO7,   1100, 3300, tps80031ldo_ops, 24, 500),
-	TPS80031_REG(LDOUSB, 1100, 3300, tps80031ldo_ops, 24, 500),
-	TPS80031_REG(LDOLN,  1100, 3300, tps80031ldo_ops, 24, 500),
-	TPS80031_REG(VANA,   1100, 3300, tps80031ldo_ops, 24, 500),
+	TPS80031_REG(LDO1,   0x9D, 0x9E, 0x00, 0x9F, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
+	TPS80031_REG(LDO2,   0x85, 0x86, 0x00, 0x87, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
+	TPS80031_REG(LDO3,   0x8D, 0x8E, 0x00, 0x8F, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
+	TPS80031_REG(LDO4,   0x89, 0x8A, 0x00, 0x8B, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
+	TPS80031_REG(LDO5,   0x99, 0x9A, 0x00, 0x9B, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
+	TPS80031_REG(LDO6,   0x91, 0x92, 0x00, 0x93, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
+	TPS80031_REG(LDO7,   0xA5, 0xA6, 0x00, 0xA7, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
+	TPS80031_REG(LDOUSB, 0xA1, 0xA2, 0x00, 0xA3, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
+	TPS80031_REG(LDOLN,  0x95, 0x96, 0x00, 0x97, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
+	TPS80031_REG(VANA,   0x81, 0x82, 0x00, 0x83, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
 };
 
 
@@ -605,11 +619,11 @@ static inline int tps80031_regulator_preinit(struct device *parent,
 	}
 
 	if (tps80031_pdata->init_enable)
-		ret = tps80031_update(parent, ri->base + VREG_STATE, STATE_ON,
-								STATE_MASK);
+		ret = tps80031_update(parent, SLAVE_ID1, ri->state_reg,
+				STATE_ON, STATE_MASK);
 	else
-		ret = tps80031_update(parent, ri->base + VREG_STATE, STATE_OFF,
-								STATE_MASK);
+		ret = tps80031_update(parent, SLAVE_ID1, ri->state_reg,
+				STATE_OFF, STATE_MASK);
 	if (ret < 0)
 		dev_err(ri->dev, "Not able to %s rail %d err %d\n",
 			(tps80031_pdata->init_enable) ? "enable" : "disable",
