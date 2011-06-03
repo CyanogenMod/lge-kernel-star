@@ -63,6 +63,8 @@
 #define STATE_ON	0x01
 #define STATE_MASK	0x03
 
+#define TPS_NUM_SLAVES	4
+
 static u8 pmc_ext_control_base[] = {
 	REGEN1_BASE_ADD,
 	REGEN2_BASE_ADD,
@@ -109,10 +111,15 @@ static const struct tps80031_irq_data tps80031_irqs[] = {
 	[TPS80031_INT_RES2]		= TPS80031_IRQ(C, 7),
 };
 
+/* Structure for TPS80031 Slaves */
+struct tps80031_client {
+	struct i2c_client *client;
+	struct mutex lock;
+	u8 addr;
+};
+
 struct tps80031 {
-	struct mutex		lock;
 	struct device		*dev;
-	struct i2c_client	*client;
 
 	struct gpio_chip	gpio;
 	struct irq_chip		irq_chip;
@@ -121,6 +128,7 @@ struct tps80031 {
 	u32			irq_en;
 	u8			mask_cache[3];
 	u8			mask_reg[3];
+	struct tps80031_client	tps_clients[TPS_NUM_SLAVES];
 };
 
 static inline int __tps80031_read(struct i2c_client *client,
@@ -130,7 +138,9 @@ static inline int __tps80031_read(struct i2c_client *client,
 
 	ret = i2c_smbus_read_byte_data(client, reg);
 	if (ret < 0) {
-		dev_err(&client->dev, "failed reading at 0x%02x\n", reg);
+		dev_err(&client->dev,
+			"failed reading from addr 0x%02x, reg 0x%02x\n",
+			client->addr, reg);
 		return ret;
 	}
 
@@ -146,7 +156,9 @@ static inline int __tps80031_reads(struct i2c_client *client, int reg,
 
 	ret = i2c_smbus_read_i2c_block_data(client, reg, len, val);
 	if (ret < 0) {
-		dev_err(&client->dev, "failed reading from 0x%02x\n", reg);
+		dev_err(&client->dev,
+			"failed reading from addr 0x%02x, reg	0x%02x\n",
+			 client->addr, reg);
 		return ret;
 	}
 
@@ -159,8 +171,8 @@ static inline int __tps80031_write(struct i2c_client *client,
 	int ret;
 	ret = i2c_smbus_write_byte_data(client, reg, val);
 	if (ret < 0) {
-		dev_err(&client->dev, "failed writing 0x%02x to 0x%02x\n",
-				val, reg);
+		dev_err(&client->dev,
+			"failed writing 0x%02x to 0x%02x\n", val, reg);
 		return ret;
 	}
 
@@ -181,120 +193,132 @@ static inline int __tps80031_writes(struct i2c_client *client, int reg,
 	return 0;
 }
 
-int tps80031_write(struct device *dev, int reg, uint8_t val)
+int tps80031_write(struct device *dev, int sid, int reg, uint8_t val)
 {
 	struct tps80031 *tps80031 = dev_get_drvdata(dev);
+	struct tps80031_client *tps = &tps80031->tps_clients[sid];
 	int ret;
 
-	mutex_lock(&tps80031->lock);
-	ret = __tps80031_write(to_i2c_client(dev), reg, val);
-	mutex_unlock(&tps80031->lock);
+	mutex_lock(&tps->lock);
+	ret = __tps80031_write(tps->client, reg, val);
+	mutex_unlock(&tps->lock);
 
 	return ret;
 }
 EXPORT_SYMBOL_GPL(tps80031_write);
 
-int tps80031_writes(struct device *dev, int reg, int len, uint8_t *val)
+int tps80031_writes(struct device *dev, int sid, int reg, int len, uint8_t *val)
 {
 	struct tps80031 *tps80031 = dev_get_drvdata(dev);
+	struct tps80031_client *tps = &tps80031->tps_clients[sid];
 	int ret;
 
-	mutex_lock(&tps80031->lock);
-	ret = __tps80031_writes(to_i2c_client(dev), reg, len, val);
-	mutex_unlock(&tps80031->lock);
+	mutex_lock(&tps->lock);
+	ret = __tps80031_writes(tps->client, reg, len, val);
+	mutex_unlock(&tps->lock);
 
 	return ret;
 }
 EXPORT_SYMBOL_GPL(tps80031_writes);
 
-int tps80031_read(struct device *dev, int reg, uint8_t *val)
+int tps80031_read(struct device *dev, int sid, int reg, uint8_t *val)
 {
-	return __tps80031_read(to_i2c_client(dev), reg, val);
+	struct tps80031 *tps80031 = dev_get_drvdata(dev);
+	struct tps80031_client *tps = &tps80031->tps_clients[sid];
+
+	return __tps80031_read(tps->client, reg, val);
 }
 EXPORT_SYMBOL_GPL(tps80031_read);
 
-int tps80031_reads(struct device *dev, int reg, int len, uint8_t *val)
+int tps80031_reads(struct device *dev, int sid, int reg, int len, uint8_t *val)
 {
-	return __tps80031_reads(to_i2c_client(dev), reg, len, val);
+	struct tps80031 *tps80031 = dev_get_drvdata(dev);
+	struct tps80031_client *tps = &tps80031->tps_clients[sid];
+
+	return __tps80031_reads(tps->client, reg, len, val);
 }
 EXPORT_SYMBOL_GPL(tps80031_reads);
 
-int tps80031_set_bits(struct device *dev, int reg, uint8_t bit_mask)
+int tps80031_set_bits(struct device *dev, int sid, int reg, uint8_t bit_mask)
 {
 	struct tps80031 *tps80031 = dev_get_drvdata(dev);
+	struct tps80031_client *tps = &tps80031->tps_clients[sid];
 	uint8_t reg_val;
 	int ret = 0;
 
-	mutex_lock(&tps80031->lock);
+	mutex_lock(&tps->lock);
 
-	ret = __tps80031_read(to_i2c_client(dev), reg, &reg_val);
+	ret = __tps80031_read(tps->client, reg, &reg_val);
 	if (ret)
 		goto out;
 
-	if ((reg_val & bit_mask) != reg_val) {
+	if ((reg_val & bit_mask) != bit_mask) {
 		reg_val |= bit_mask;
-		ret = __tps80031_write(to_i2c_client(dev), reg, reg_val);
+		ret = __tps80031_write(tps->client, reg, reg_val);
 	}
 out:
-	mutex_unlock(&tps80031->lock);
+	mutex_unlock(&tps->lock);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(tps80031_set_bits);
 
-int tps80031_clr_bits(struct device *dev, int reg, uint8_t bit_mask)
+int tps80031_clr_bits(struct device *dev, int sid, int reg, uint8_t bit_mask)
 {
 	struct tps80031 *tps80031 = dev_get_drvdata(dev);
+	struct tps80031_client *tps = &tps80031->tps_clients[sid];
 	uint8_t reg_val;
 	int ret = 0;
 
-	mutex_lock(&tps80031->lock);
+	mutex_lock(&tps->lock);
 
-	ret = __tps80031_read(to_i2c_client(dev), reg, &reg_val);
+	ret = __tps80031_read(tps->client, reg, &reg_val);
 	if (ret)
 		goto out;
 
 	if (reg_val & bit_mask) {
 		reg_val &= ~bit_mask;
-		ret = __tps80031_write(to_i2c_client(dev), reg, reg_val);
+		ret = __tps80031_write(tps->client, reg, reg_val);
 	}
 out:
-	mutex_unlock(&tps80031->lock);
+	mutex_unlock(&tps->lock);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(tps80031_clr_bits);
 
-int tps80031_update(struct device *dev, int reg, uint8_t val, uint8_t mask)
+int tps80031_update(struct device *dev, int sid, int reg, uint8_t val,
+		uint8_t mask)
 {
 	struct tps80031 *tps80031 = dev_get_drvdata(dev);
+	struct tps80031_client *tps = &tps80031->tps_clients[sid];
 	uint8_t reg_val;
 	int ret = 0;
 
-	mutex_lock(&tps80031->lock);
+	mutex_lock(&tps->lock);
 
-	ret = __tps80031_read(tps80031->client, reg, &reg_val);
+	ret = __tps80031_read(tps->client, reg, &reg_val);
 	if (ret)
 		goto out;
 
 	if ((reg_val & mask) != val) {
 		reg_val = (reg_val & ~mask) | (val & mask);
-		ret = __tps80031_write(tps80031->client, reg, reg_val);
+		ret = __tps80031_write(tps->client, reg, reg_val);
 	}
 out:
-	mutex_unlock(&tps80031->lock);
+	mutex_unlock(&tps->lock);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(tps80031_update);
 
-static struct i2c_client *tps80031_i2c_client;
-
+static struct tps80031 *tps80031_dev;
 int tps80031_power_off(void)
 {
-	struct device *dev = NULL;
+	struct tps80031_client *tps = &tps80031_dev->tps_clients[SLAVE_ID1];
+	struct device *dev;
 
-	if (!tps80031_i2c_client)
+	if (!tps->client)
 		return -EINVAL;
 
-	dev = &tps80031_i2c_client->dev;
+	dev = &tps->client->dev;
 
 	/* FIXME!! Put the logic here to switch off pmu*/
 	return 0;
@@ -303,18 +327,19 @@ int tps80031_power_off(void)
 static int tps80031_gpio_get(struct gpio_chip *gc, unsigned offset)
 {
 	struct tps80031 *tps80031 = container_of(gc, struct tps80031, gpio);
+	struct tps80031_client *tps = &tps80031->tps_clients[SLAVE_ID1];
 	uint8_t state;
 	uint8_t trans;
 	int ret;
 
-	ret = __tps80031_read(tps80031->client,
+	ret = __tps80031_read(tps->client,
 			pmc_ext_control_base[offset] +
 				EXT_CONTROL_CFG_STATE, &state);
 	if (ret)
 		return ret;
 
 	if (state != 0) {
-		ret = __tps80031_read(tps80031->client,
+		ret = __tps80031_read(tps->client,
 				pmc_ext_control_base[offset] +
 					EXT_CONTROL_CFG_TRANS, &trans);
 		if (ret)
@@ -324,46 +349,47 @@ static int tps80031_gpio_get(struct gpio_chip *gc, unsigned offset)
 	return 0;
 }
 
-static void tps80031_gpio_set(struct gpio_chip *chip, unsigned offset,
+static void tps80031_gpio_set(struct gpio_chip *gc, unsigned offset,
 			int value)
 {
-	struct tps80031 *tps80031 = container_of(chip, struct tps80031, gpio);
-	tps80031_update(tps80031->dev,
+	struct tps80031 *tps80031 = container_of(gc, struct tps80031, gpio);
+
+	tps80031_update(tps80031->dev, SLAVE_ID1,
 		pmc_ext_control_base[offset] + EXT_CONTROL_CFG_TRANS,
 			value, 0x1);
 }
 
-static int tps80031_gpio_input(struct gpio_chip *chip, unsigned offset)
+static int tps80031_gpio_input(struct gpio_chip *gc, unsigned offset)
 {
 	return -EIO;
 }
 
-static int tps80031_gpio_output(struct gpio_chip *chip, unsigned offset,
+static int tps80031_gpio_output(struct gpio_chip *gc, unsigned offset,
 				int value)
 {
-	tps80031_gpio_set(chip, offset, value);
+	tps80031_gpio_set(gc, offset, value);
 	return 0;
 }
 
-static int tps80031_gpio_enable(struct gpio_chip *chip, unsigned offset)
+static int tps80031_gpio_enable(struct gpio_chip *gc, unsigned offset)
 {
-	struct tps80031 *tps80031 = container_of(chip, struct tps80031, gpio);
+	struct tps80031 *tps80031 = container_of(gc, struct tps80031, gpio);
 	int ret;
 
-	ret = tps80031_update(tps80031->dev,
+	ret = tps80031_update(tps80031->dev, SLAVE_ID1,
 		pmc_ext_control_base[offset] + EXT_CONTROL_CFG_STATE,
 						STATE_ON, STATE_MASK);
 	if (ret)
 		return ret;
 
-	return tps80031_write(tps80031->dev,
+	return tps80031_write(tps80031->dev, SLAVE_ID1,
 		pmc_ext_control_base[offset] + EXT_CONTROL_CFG_TRANS, 0x0);
 }
 
-static void tps80031_gpio_disable(struct gpio_chip *chip, unsigned offset)
+static void tps80031_gpio_disable(struct gpio_chip *gc, unsigned offset)
 {
-	struct tps80031 *tps80031 = container_of(chip, struct tps80031, gpio);
-	tps80031_update(tps80031->dev,
+	struct tps80031 *tps80031 = container_of(gc, struct tps80031, gpio);
+	tps80031_update(tps80031->dev, SLAVE_ID1,
 		pmc_ext_control_base[offset] + EXT_CONTROL_CFG_STATE,
 						STATE_OFF, STATE_MASK);
 }
@@ -373,19 +399,20 @@ static void tps80031_gpio_init(struct tps80031 *tps80031,
 {
 	int ret;
 	int gpio_base = pdata->gpio_base;
+	struct tps80031_client *tps = &tps80031->tps_clients[SLAVE_ID1];
 
 	if (gpio_base <= 0)
 		return;
 
 	tps80031->gpio.owner		= THIS_MODULE;
-	tps80031->gpio.label		= tps80031->client->name;
+	tps80031->gpio.label		= tps->client->name;
 	tps80031->gpio.dev		= tps80031->dev;
 	tps80031->gpio.base		= gpio_base;
 	tps80031->gpio.ngpio		= 3;
 	tps80031->gpio.can_sleep	= 1;
 
-	tps80031->gpio.request = tps80031_gpio_enable;
-	tps80031->gpio.free = tps80031_gpio_disable;
+	tps80031->gpio.request		= tps80031_gpio_enable;
+	tps80031->gpio.free		= tps80031_gpio_disable;
 	tps80031->gpio.direction_input	= tps80031_gpio_input;
 	tps80031->gpio.direction_output	= tps80031_gpio_output;
 	tps80031->gpio.set		= tps80031_gpio_set;
@@ -442,10 +469,15 @@ static void tps80031_irq_sync_unlock(unsigned int irq)
 
 	for (i = 0; i < ARRAY_SIZE(tps80031->mask_reg); i++) {
 		if (tps80031->mask_reg[i] != tps80031->mask_cache[i]) {
-			if (!WARN_ON(tps80031_write(tps80031->dev,
+			if (!WARN_ON(tps80031_write(tps80031->dev, SLAVE_ID2,
 						TPS80031_INT_MSK_LINE_A + i,
 						tps80031->mask_reg[i])))
-				tps80031->mask_cache[i] = tps80031->mask_reg[i];
+				if (!WARN_ON(tps80031_write(tps80031->dev,
+						SLAVE_ID2,
+						TPS80031_INT_MSK_STS_A + i,
+						tps80031->mask_reg[i])))
+					tps80031->mask_cache[i] =
+							tps80031->mask_reg[i];
 		}
 	}
 
@@ -461,15 +493,15 @@ static irqreturn_t tps80031_irq(int irq, void *data)
 	int i;
 
 	for (i = 0; i < 3; i++) {
-		ret = tps80031_read(tps80031->dev, TPS80031_INT_STS_A + i,
-				&tmp[i]);
+		ret = tps80031_read(tps80031->dev, SLAVE_ID2,
+			TPS80031_INT_STS_A + i,	&tmp[i]);
 		if (ret < 0) {
 			dev_err(tps80031->dev, "failed to read interrupt "
 							"status\n");
 			return IRQ_NONE;
 		}
 		if (tmp[i]) {
-			ret = tps80031_write(tps80031->dev,
+			ret = tps80031_write(tps80031->dev, SLAVE_ID2,
 					TPS80031_INT_STS_A + i, tmp[i]);
 			if (ret < 0) {
 				dev_err(tps80031->dev, "failed to write "
@@ -503,10 +535,13 @@ static int __devinit tps80031_irq_init(struct tps80031 *tps80031, int irq,
 	for (i = 0; i < 3; i++) {
 		tps80031->mask_reg[i] = 0xFF;
 		tps80031->mask_cache[i] = tps80031->mask_reg[i];
-		tps80031_write(tps80031->dev, TPS80031_INT_MSK_LINE_A + i,
-				 tps80031->mask_cache[i]);
-		tps80031_write(tps80031->dev, TPS80031_INT_MSK_STS_A + i, 0x0);
-		tps80031_write(tps80031->dev, TPS80031_INT_STS_A + i, 0xFF);
+		tps80031_write(tps80031->dev, SLAVE_ID2,
+					TPS80031_INT_MSK_LINE_A + i,
+					tps80031->mask_cache[i]);
+		tps80031_write(tps80031->dev, SLAVE_ID2,
+					TPS80031_INT_MSK_STS_A + i, 0xFF);
+		tps80031_write(tps80031->dev, SLAVE_ID2,
+					TPS80031_INT_STS_A + i, 0xFF);
 	}
 
 	tps80031->irq_base = irq_base;
@@ -541,10 +576,10 @@ static int __devinit tps80031_irq_init(struct tps80031 *tps80031, int irq,
 static void tps80031_clk32k_enable(struct tps80031 *tps80031, int base_add)
 {
 	int ret;
-	ret = tps80031_update(tps80031->dev,
+	ret = tps80031_update(tps80031->dev, SLAVE_ID1,
 			base_add + EXT_CONTROL_CFG_STATE, STATE_ON, STATE_MASK);
 	if (!ret)
-		ret = tps80031_update(tps80031->dev,
+		ret = tps80031_update(tps80031->dev, SLAVE_ID1,
 				base_add + EXT_CONTROL_CFG_TRANS,
 				STATE_ON, STATE_MASK);
 	if (ret < 0)
@@ -600,53 +635,57 @@ failed:
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 static void print_regs(const char *header, struct seq_file *s,
-		struct i2c_client *client, int start_offset,
-		int end_offset)
+		int sid, int start_offset, int end_offset)
 {
+	struct tps80031 *tps80031 = s->private;
+	struct tps80031_client *tps = &tps80031->tps_clients[sid];
 	uint8_t reg_val;
 	int i;
 	int ret;
 
 	seq_printf(s, "%s\n", header);
 	for (i = start_offset; i <= end_offset; ++i) {
-		ret = __tps80031_read(client, i, &reg_val);
+		ret = __tps80031_read(tps->client, i, &reg_val);
 		if (ret >= 0)
-			seq_printf(s, "Reg 0x%02x Value 0x%02x\n", i, reg_val);
+			seq_printf(s, "Addr = 0x%02x Reg 0x%02x Value 0x%02x\n",
+						tps->client->addr, i, reg_val);
 	}
 	seq_printf(s, "------------------\n");
 }
 
 static int dbg_tps_show(struct seq_file *s, void *unused)
 {
-	struct tps80031 *tps = s->private;
-	struct i2c_client *client = tps->client;
-
 	seq_printf(s, "TPS80031 Registers\n");
 	seq_printf(s, "------------------\n");
-	print_regs("VIO Regs",       s, client, 0x47, 0x49);
-	print_regs("SMPS1 Regs",     s, client, 0x53, 0x57);
-	print_regs("SMPS2 Regs",     s, client, 0x59, 0x5D);
-	print_regs("SMPS3 Regs",     s, client, 0x65, 0x68);
-	print_regs("SMPS4 Regs",     s, client, 0x41, 0x44);
-	print_regs("VANA Regs",      s, client, 0x81, 0x83);
-	print_regs("VRTC Regs",      s, client, 0xC3, 0xC4);
-	print_regs("LDO1 Regs",      s, client, 0x9D, 0x9F);
-	print_regs("LDO2 Regs",      s, client, 0x85, 0x87);
-	print_regs("LDO3 Regs",      s, client, 0x8D, 0x8F);
-	print_regs("LDO4 Regs",      s, client, 0x89, 0x8B);
-	print_regs("LDO5 Regs",      s, client, 0x99, 0x9B);
-	print_regs("LDO6 Regs",      s, client, 0x91, 0x93);
-	print_regs("LDO7 Regs",      s, client, 0xA5, 0xA7);
-	print_regs("LDOUSB Regs",    s, client, 0xA1, 0xA3);
-	print_regs("LDOLN Regs",     s, client, 0x95, 0x97);
-	print_regs("REGEN1 Regs",    s, client, 0xAE, 0xAF);
-	print_regs("REGEN2 Regs",    s, client, 0xB1, 0xB2);
-	print_regs("SYSEN Regs",     s, client, 0xB4, 0xB5);
-	print_regs("CLK32KAO Regs",  s, client, 0xBA, 0xBB);
-	print_regs("CLK32KG Regs",   s, client, 0xBD, 0xBE);
-	print_regs("CLK32KAUD Regs", s, client, 0xC0, 0xC1);
-	print_regs("INT Regs",       s, client, 0xD0, 0xD8);
-	print_regs("VERNUM Regs",    s, client, 0x87, 0x87);
+	print_regs("VIO Regs",       s, SLAVE_ID1, 0x47, 0x49);
+	print_regs("VIO Regs",       s, SLAVE_ID0, 0x49, 0x4A);
+	print_regs("SMPS1 Regs",     s, SLAVE_ID1, 0x53, 0x54);
+	print_regs("SMPS1 Regs",     s, SLAVE_ID0, 0x55, 0x56);
+	print_regs("SMPS1 Regs",     s, SLAVE_ID1, 0x57, 0x57);
+	print_regs("SMPS2 Regs",     s, SLAVE_ID1, 0x59, 0x5B);
+	print_regs("SMPS2 Regs",     s, SLAVE_ID0, 0x5B, 0x5C);
+	print_regs("SMPS2 Regs",     s, SLAVE_ID1, 0x5C, 0x5D);
+	print_regs("SMPS3 Regs",     s, SLAVE_ID1, 0x65, 0x68);
+	print_regs("SMPS4 Regs",     s, SLAVE_ID1, 0x41, 0x44);
+	print_regs("VANA Regs",      s, SLAVE_ID1, 0x81, 0x83);
+	print_regs("VRTC Regs",      s, SLAVE_ID1, 0xC3, 0xC4);
+	print_regs("LDO1 Regs",      s, SLAVE_ID1, 0x9D, 0x9F);
+	print_regs("LDO2 Regs",      s, SLAVE_ID1, 0x85, 0x87);
+	print_regs("LDO3 Regs",      s, SLAVE_ID1, 0x8D, 0x8F);
+	print_regs("LDO4 Regs",      s, SLAVE_ID1, 0x89, 0x8B);
+	print_regs("LDO5 Regs",      s, SLAVE_ID1, 0x99, 0x9B);
+	print_regs("LDO6 Regs",      s, SLAVE_ID1, 0x91, 0x93);
+	print_regs("LDO7 Regs",      s, SLAVE_ID1, 0xA5, 0xA7);
+	print_regs("LDOUSB Regs",    s, SLAVE_ID1, 0xA1, 0xA3);
+	print_regs("LDOLN Regs",     s, SLAVE_ID1, 0x95, 0x97);
+	print_regs("REGEN1 Regs",    s, SLAVE_ID1, 0xAE, 0xAF);
+	print_regs("REGEN2 Regs",    s, SLAVE_ID1, 0xB1, 0xB2);
+	print_regs("SYSEN Regs",     s, SLAVE_ID1, 0xB4, 0xB5);
+	print_regs("CLK32KAO Regs",  s, SLAVE_ID1, 0xBA, 0xBB);
+	print_regs("CLK32KG Regs",   s, SLAVE_ID1, 0xBD, 0xBE);
+	print_regs("CLK32KAUD Regs", s, SLAVE_ID1, 0xC0, 0xC1);
+	print_regs("INT Regs",       s, SLAVE_ID2, 0xD0, 0xD8);
+	print_regs("VERNUM Regs",    s, SLAVE_ID1, 0x87, 0x87);
 	return 0;
 }
 
@@ -674,12 +713,38 @@ static void __init tps80031_debuginit(struct tps80031 *tpsi)
 }
 #endif
 
+static int __devexit tps80031_i2c_remove(struct i2c_client *client)
+{
+	struct tps80031 *tps80031 = i2c_get_clientdata(client);
+	int i;
+
+	if (client->irq)
+		free_irq(client->irq, tps80031);
+
+	if (tps80031->gpio.owner != NULL)
+		if (gpiochip_remove(&tps80031->gpio) < 0)
+			dev_err(&client->dev, "Error in removing the gpio driver\n");
+
+	for (i = 0; i < TPS_NUM_SLAVES; i++) {
+		struct tps80031_client *tps = &tps80031->tps_clients[i];
+		if (tps->client && tps->client != client)
+			i2c_unregister_device(tps->client);
+		tps80031->tps_clients[i].client = NULL;
+		mutex_destroy(&tps->lock);
+	}
+
+	kfree(tps80031);
+	return 0;
+}
+
 static int __devinit tps80031_i2c_probe(struct i2c_client *client,
 					const struct i2c_device_id *id)
 {
 	struct tps80031_platform_data *pdata = client->dev.platform_data;
 	struct tps80031 *tps80031;
+	struct tps80031_client *tps;
 	int ret;
+	int i;
 
 	if (!pdata) {
 		dev_err(&client->dev, "tps80031 requires platform data\n");
@@ -699,25 +764,43 @@ static int __devinit tps80031_i2c_probe(struct i2c_client *client,
 	if (tps80031 == NULL)
 		return -ENOMEM;
 
-	tps80031->client = client;
 	tps80031->dev = &client->dev;
 	i2c_set_clientdata(client, tps80031);
 
-	mutex_init(&tps80031->lock);
+	/* Set up slaves */
+	tps80031->tps_clients[SLAVE_ID0].addr = I2C_ID0_ADDR;
+	tps80031->tps_clients[SLAVE_ID1].addr = I2C_ID1_ADDR;
+	tps80031->tps_clients[SLAVE_ID2].addr = I2C_ID2_ADDR;
+	tps80031->tps_clients[SLAVE_ID3].addr = I2C_ID3_ADDR;
+	for (i = 0; i < TPS_NUM_SLAVES; i++) {
+		tps = &tps80031->tps_clients[i];
+		if (tps->addr == client->addr)
+			tps->client = client;
+		else
+			tps->client = i2c_new_dummy(client->adapter,
+						tps->addr);
+		if (!tps->client) {
+			dev_err(&client->dev, "can't attach client %d\n", i);
+			ret = -ENOMEM;
+			goto fail;
+		}
+		i2c_set_clientdata(tps->client, tps80031);
+		mutex_init(&tps->lock);
+	}
 
 	if (client->irq) {
 		ret = tps80031_irq_init(tps80031, client->irq,
 					pdata->irq_base);
 		if (ret) {
 			dev_err(&client->dev, "IRQ init failed: %d\n", ret);
-			goto err_irq_init;
+			goto fail;
 		}
 	}
 
 	ret = tps80031_add_subdevs(tps80031, pdata);
 	if (ret) {
 		dev_err(&client->dev, "add devices failed: %d\n", ret);
-		goto err_add_devs;
+		goto fail;
 	}
 
 	tps80031_gpio_init(tps80031, pdata);
@@ -726,32 +809,15 @@ static int __devinit tps80031_i2c_probe(struct i2c_client *client,
 
 	tps80031_debuginit(tps80031);
 
-	tps80031_i2c_client = client;
+	tps80031_dev = tps80031;
 
 	return 0;
 
-err_add_devs:
-	if (client->irq)
-		free_irq(client->irq, tps80031);
-
-err_irq_init:
-	kfree(tps80031);
+fail:
+	tps80031_i2c_remove(client);
 	return ret;
 }
 
-static int __devexit tps80031_i2c_remove(struct i2c_client *client)
-{
-	struct tps80031 *tps80031 = i2c_get_clientdata(client);
-
-	if (client->irq)
-		free_irq(client->irq, tps80031);
-
-	if (gpiochip_remove(&tps80031->gpio) < 0)
-		dev_err(&client->dev, "Error in removing the gpio driver\n");
-
-	kfree(tps80031);
-	return 0;
-}
 #ifdef CONFIG_PM
 static int tps80031_i2c_suspend(struct i2c_client *client, pm_message_t state)
 {

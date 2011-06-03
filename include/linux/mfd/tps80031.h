@@ -71,6 +71,20 @@ enum {
 	TPS80031_INT_RES2,
 };
 
+enum {
+	SLAVE_ID0 = 0,
+	SLAVE_ID1 = 1,
+	SLAVE_ID2 = 2,
+	SLAVE_ID3 = 3,
+};
+
+enum {
+	I2C_ID0_ADDR = 0x12,
+	I2C_ID1_ADDR = 0x48,
+	I2C_ID2_ADDR = 0x49,
+	I2C_ID3_ADDR = 0x4A,
+};
+
 struct tps80031_subdev_info {
 	int		id;
 	const char	*name;
@@ -95,13 +109,17 @@ struct tps80031_platform_data {
  * NOTE: the functions below are not intended for use outside
  * of the TPS80031 sub-device drivers
  */
-extern int tps80031_write(struct device *dev, int reg, uint8_t val);
-extern int tps80031_writes(struct device *dev, int reg, int len, uint8_t *val);
-extern int tps80031_read(struct device *dev, int reg, uint8_t *val);
-extern int tps80031_reads(struct device *dev, int reg, int len, uint8_t *val);
-extern int tps80031_set_bits(struct device *dev, int reg, uint8_t bit_mask);
-extern int tps80031_clr_bits(struct device *dev, int reg, uint8_t bit_mask);
-extern int tps80031_update(struct device *dev, int reg, uint8_t val,
+extern int tps80031_write(struct device *dev, int sid, int reg, uint8_t val);
+extern int tps80031_writes(struct device *dev, int sid, int reg, int len,
+				uint8_t *val);
+extern int tps80031_read(struct device *dev, int sid, int reg, uint8_t *val);
+extern int tps80031_reads(struct device *dev, int sid, int reg, int len,
+				uint8_t *val);
+extern int tps80031_set_bits(struct device *dev, int sid, int reg,
+				uint8_t bit_mask);
+extern int tps80031_clr_bits(struct device *dev, int sid, int reg,
+				uint8_t bit_mask);
+extern int tps80031_update(struct device *dev, int sid, int reg, uint8_t val,
 			   uint8_t mask);
 extern int tps80031_power_off(void);
 
