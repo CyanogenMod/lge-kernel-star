@@ -28,9 +28,6 @@
 #include <linux/fb.h>
 #include <linux/backlight.h>
 #include <linux/mfd/aat2870.h>
-#if defined(CONFIG_HAS_EARLYSUSPEND)
-#include <linux/earlysuspend.h>
-#endif /* defined(CONFIG_HAS_EARLYSUSPEND) */
 
 struct aat2870_bl_driver_data {
 	struct platform_device *pdev;
@@ -39,9 +36,6 @@ struct aat2870_bl_driver_data {
 	int channels;
 	int max_current;
 	int brightness; /* current brightness */
-#if defined(CONFIG_HAS_EARLYSUSPEND)
-	struct early_suspend early_suspend;
-#endif /* defined(CONFIG_HAS_EARLYSUSPEND) */
 };
 
 static inline int aat2870_brightness(struct aat2870_bl_driver_data *aat2870_bl,
@@ -125,53 +119,11 @@ static int aat2870_bl_check_fb(struct backlight_device *bd, struct fb_info *fi)
 }
 
 static const struct backlight_ops aat2870_bl_ops = {
+	.options = BL_CORE_SUSPENDRESUME,
 	.get_brightness = aat2870_bl_get_brightness,
-	.update_status  = aat2870_bl_update_status,
+	.update_status = aat2870_bl_update_status,
 	.check_fb = aat2870_bl_check_fb,
 };
-
-#if defined(CONFIG_PM)
-static int aat2870_bl_suspend(struct platform_device *pdev, pm_message_t state)
-{
-	struct aat2870_bl_driver_data *aat2870_bl = platform_get_drvdata(pdev);
-
-	aat2870_bl_disable(aat2870_bl);
-
-	return 0;
-}
-
-static int aat2870_bl_resume(struct platform_device *pdev)
-{
-	struct aat2870_bl_driver_data *aat2870_bl = platform_get_drvdata(pdev);
-	struct backlight_device *bd = aat2870_bl->bd;
-
-	aat2870_bl_enable(aat2870_bl);
-	backlight_update_status(bd);
-
-	return 0;
-}
-#else
-#define aat2870_bl_suspend	NULL
-#define aat2870_bl_resume	NULL
-#endif /* defined(CONFIG_PM) */
-
-#if defined(CONFIG_HAS_EARLYSUSPEND)
-static void aat2870_bl_early_suspend(struct early_suspend *h)
-{
-	struct aat2870_bl_driver_data *aat2870_bl =
-		container_of(h, struct aat2870_bl_driver_data, early_suspend);
-
-	aat2870_bl_suspend(aat2870_bl->pdev, PMSG_SUSPEND);
-}
-
-static void aat2870_bl_late_resume(struct early_suspend *h)
-{
-	struct aat2870_bl_driver_data *aat2870_bl =
-		container_of(h, struct aat2870_bl_driver_data, early_suspend);
-
-	aat2870_bl_resume(aat2870_bl->pdev);
-}
-#endif /* defined(CONFIG_HAS_EARLYSUSPEND) */
 
 static int aat2870_bl_probe(struct platform_device *pdev)
 {
@@ -242,13 +194,6 @@ static int aat2870_bl_probe(struct platform_device *pdev)
 		goto out_bl_dev_unregister;
 	}
 
-#if defined(CONFIG_HAS_EARLYSUSPEND)
-	aat2870_bl->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN;
-	aat2870_bl->early_suspend.suspend = aat2870_bl_early_suspend;
-	aat2870_bl->early_suspend.resume = aat2870_bl_late_resume;
-	register_early_suspend(&aat2870_bl->early_suspend);
-#endif /* defined(CONFIG_HAS_EARLYSUSPEND) */
-
 	return 0;
 
 out_bl_dev_unregister:
@@ -263,10 +208,6 @@ static int aat2870_bl_remove(struct platform_device *pdev)
 {
 	struct aat2870_bl_driver_data *aat2870_bl = platform_get_drvdata(pdev);
 	struct backlight_device *bd = aat2870_bl->bd;
-
-#if defined(CONFIG_HAS_EARLYSUSPEND)
-	unregister_early_suspend(&aat2870_bl->early_suspend);
-#endif /* defined(CONFIG_HAS_EARLYSUSPEND) */
 
 	bd->props.power = FB_BLANK_POWERDOWN;
 	bd->props.brightness = 0;
@@ -285,10 +226,6 @@ static struct platform_driver aat2870_bl_driver = {
 	},
 	.probe		= aat2870_bl_probe,
 	.remove		= aat2870_bl_remove,
-#if !defined(CONFIG_HAS_EARLYSUSPEND)
-	.suspend	= aat2870_bl_suspend,
-	.resume		= aat2870_bl_resume,
-#endif /* !defined(CONFIG_HAS_EARLYSUSPEND) */
 };
 
 static int __init aat2870_bl_init(void)
