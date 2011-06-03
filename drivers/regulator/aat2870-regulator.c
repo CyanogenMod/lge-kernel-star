@@ -33,7 +33,7 @@ struct aat2870_regulator {
 	struct platform_device *pdev;
 	struct regulator_desc desc;
 
-	int *voltages; /* uV */
+	const int *voltages; /* uV */
 
 	int min_uV;
 	int max_uV;
@@ -145,7 +145,7 @@ static struct regulator_ops aat2870_ldo_ops = {
 	.is_enabled = aat2870_ldo_is_enabled,
 };
 
-static int aat2870_ldo_voltages[] = {
+static const int aat2870_ldo_voltages[] = {
 	1200000, 1300000, 1500000, 1600000,
 	1800000, 2000000, 2200000, 2500000,
 	2600000, 2700000, 2800000, 2900000,
