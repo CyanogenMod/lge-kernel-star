@@ -67,42 +67,43 @@
 #define TPS6591X_GPIO_PDEN	3
 #define TPS6591X_GPIO_DIR	2
 
-struct tps6591x_irq_data {
-	u8	mask_reg;
-	u8	mask_mask;
+enum irq_type {
+	EVENT,
+	GPIO,
 };
 
-#define TPS6591X_IRQ(_reg, _mask)				\
-	{							\
-		.mask_reg = (_reg) - TPS6591X_INT_MSK,		\
-		.mask_mask = (_mask),				\
+struct tps6591x_irq_data {
+	u8		mask_reg;
+	u8		mask_pos;
+	enum irq_type	type;
+};
+
+#define TPS6591X_IRQ(_reg, _mask_pos, _type)	\
+	{					\
+		.mask_reg	= (_reg),	\
+		.mask_pos	= (_mask_pos),	\
+		.type		= (_type),	\
 	}
 
 static const struct tps6591x_irq_data tps6591x_irqs[] = {
-	[TPS6591X_INT_PWRHOLD_F]  = TPS6591X_IRQ(TPS6591X_INT_MSK, 1 << 0),
-	[TPS6591X_INT_VMBHI]	  = TPS6591X_IRQ(TPS6591X_INT_MSK, 1 << 1),
-	[TPS6591X_INT_PWRON]	  = TPS6591X_IRQ(TPS6591X_INT_MSK, 1 << 2),
-	[TPS6591X_INT_PWRON_LP]	  = TPS6591X_IRQ(TPS6591X_INT_MSK, 1 << 3),
-	[TPS6591X_INT_PWRHOLD_R]  = TPS6591X_IRQ(TPS6591X_INT_MSK, 1 << 4),
-	[TPS6591X_INT_HOTDIE]	  = TPS6591X_IRQ(TPS6591X_INT_MSK, 1 << 5),
-	[TPS6591X_INT_RTC_ALARM]  = TPS6591X_IRQ(TPS6591X_INT_MSK, 1 << 6),
-	[TPS6591X_INT_RTC_PERIOD] = TPS6591X_IRQ(TPS6591X_INT_MSK, 1 << 7),
-	[TPS6591X_INT_GPIO0_R]	  = TPS6591X_IRQ(TPS6591X_INT_MSK2, 1 << 0),
-	[TPS6591X_INT_GPIO0_F]	  = TPS6591X_IRQ(TPS6591X_INT_MSK2, 1 << 1),
-	[TPS6591X_INT_GPIO1_R]	  = TPS6591X_IRQ(TPS6591X_INT_MSK2, 1 << 2),
-	[TPS6591X_INT_GPIO1_F]	  = TPS6591X_IRQ(TPS6591X_INT_MSK2, 1 << 3),
-	[TPS6591X_INT_GPIO2_R]	  = TPS6591X_IRQ(TPS6591X_INT_MSK2, 1 << 4),
-	[TPS6591X_INT_GPIO2_F]	  = TPS6591X_IRQ(TPS6591X_INT_MSK2, 1 << 5),
-	[TPS6591X_INT_GPIO3_R]	  = TPS6591X_IRQ(TPS6591X_INT_MSK2, 1 << 6),
-	[TPS6591X_INT_GPIO3_F]	  = TPS6591X_IRQ(TPS6591X_INT_MSK2, 1 << 7),
-	[TPS6591X_INT_GPIO4_R]	  = TPS6591X_IRQ(TPS6591X_INT_MSK3, 1 << 0),
-	[TPS6591X_INT_GPIO4_F]	  = TPS6591X_IRQ(TPS6591X_INT_MSK3, 1 << 1),
-	[TPS6591X_INT_GPIO5_R]	  = TPS6591X_IRQ(TPS6591X_INT_MSK3, 1 << 2),
-	[TPS6591X_INT_GPIO5_F]	  = TPS6591X_IRQ(TPS6591X_INT_MSK3, 1 << 3),
-	[TPS6591X_INT_WTCHDG]	  = TPS6591X_IRQ(TPS6591X_INT_MSK3, 1 << 4),
-	[TPS6591X_INT_VMBCH2_H]	  = TPS6591X_IRQ(TPS6591X_INT_MSK3, 1 << 5),
-	[TPS6591X_INT_VMBCH2_L]	  = TPS6591X_IRQ(TPS6591X_INT_MSK3, 1 << 6),
-	[TPS6591X_INT_PWRDN]	  = TPS6591X_IRQ(TPS6591X_INT_MSK3, 1 << 7),
+	[TPS6591X_INT_PWRHOLD_F]	= TPS6591X_IRQ(0, 0, EVENT),
+	[TPS6591X_INT_VMBHI]		= TPS6591X_IRQ(0, 1, EVENT),
+	[TPS6591X_INT_PWRON]		= TPS6591X_IRQ(0, 2, EVENT),
+	[TPS6591X_INT_PWRON_LP]		= TPS6591X_IRQ(0, 3, EVENT),
+	[TPS6591X_INT_PWRHOLD_R]	= TPS6591X_IRQ(0, 4, EVENT),
+	[TPS6591X_INT_HOTDIE]		= TPS6591X_IRQ(0, 5, EVENT),
+	[TPS6591X_INT_RTC_ALARM]	= TPS6591X_IRQ(0, 6, EVENT),
+	[TPS6591X_INT_RTC_PERIOD]	= TPS6591X_IRQ(0, 7, EVENT),
+	[TPS6591X_INT_GPIO0]		= TPS6591X_IRQ(1, 0, GPIO),
+	[TPS6591X_INT_GPIO1]		= TPS6591X_IRQ(1, 2, GPIO),
+	[TPS6591X_INT_GPIO2]		= TPS6591X_IRQ(1, 4, GPIO),
+	[TPS6591X_INT_GPIO3]		= TPS6591X_IRQ(1, 6, GPIO),
+	[TPS6591X_INT_GPIO4]		= TPS6591X_IRQ(2, 0, GPIO),
+	[TPS6591X_INT_GPIO5]		= TPS6591X_IRQ(2, 2, GPIO),
+	[TPS6591X_INT_WTCHDG]		= TPS6591X_IRQ(2, 4, EVENT),
+	[TPS6591X_INT_VMBCH2_H]		= TPS6591X_IRQ(2, 5, EVENT),
+	[TPS6591X_INT_VMBCH2_L]		= TPS6591X_IRQ(2, 6, EVENT),
+	[TPS6591X_INT_PWRDN]		= TPS6591X_IRQ(2, 7, EVENT),
 };
 
 struct tps6591x {
@@ -364,6 +365,17 @@ static int tps6591x_gpio_output(struct gpio_chip *gc, unsigned offset,
 			offset,	reg_val);
 }
 
+static int tps6591x_gpio_to_irq(struct gpio_chip *gc, unsigned off)
+{
+	struct tps6591x *tps6591x;
+	tps6591x = container_of(gc, struct tps6591x, gpio);
+
+	if ((off >= 0) && (off <= TPS6591X_INT_GPIO5 - TPS6591X_INT_GPIO0))
+		return tps6591x->irq_base + TPS6591X_INT_GPIO0 + off;
+
+	return -EIO;
+}
+
 static void tps6591x_gpio_init(struct tps6591x *tps6591x,
 			struct tps6591x_platform_data *pdata)
 {
@@ -405,6 +417,7 @@ static void tps6591x_gpio_init(struct tps6591x *tps6591x,
 	tps6591x->gpio.direction_output	= tps6591x_gpio_output;
 	tps6591x->gpio.set		= tps6591x_gpio_set;
 	tps6591x->gpio.get		= tps6591x_gpio_get;
+	tps6591x->gpio.to_irq		= tps6591x_gpio_to_irq;
 
 	ret = gpiochip_add(&tps6591x->gpio);
 	if (ret)
@@ -429,25 +442,31 @@ static void tps6591x_irq_lock(unsigned int irq)
 	mutex_lock(&tps6591x->irq_lock);
 }
 
-static void tps6591x_irq_enable(unsigned int irq)
+static void tps6591x_irq_mask(unsigned int irq)
 {
 	struct tps6591x *tps6591x = get_irq_chip_data(irq);
 	unsigned int __irq = irq - tps6591x->irq_base;
 	const struct tps6591x_irq_data *data = &tps6591x_irqs[__irq];
 
-	tps6591x->mask_reg[data->mask_reg] &= ~data->mask_mask;
-	tps6591x->irq_en |= (1 << __irq);
+	if (data->type == EVENT)
+		tps6591x->mask_reg[data->mask_reg] |= (1 << data->mask_pos);
+	else
+		tps6591x->mask_reg[data->mask_reg] |= (3 << data->mask_pos);
+
+	tps6591x->irq_en &= ~(1 << __irq);
 }
 
-static void tps6591x_irq_disable(unsigned int irq)
+static void tps6591x_irq_unmask(unsigned int irq)
 {
 	struct tps6591x *tps6591x = get_irq_chip_data(irq);
 
 	unsigned int __irq = irq - tps6591x->irq_base;
 	const struct tps6591x_irq_data *data = &tps6591x_irqs[__irq];
 
-	tps6591x->mask_reg[data->mask_reg] |= data->mask_mask;
-	tps6591x->irq_en &= ~(1 << __irq);
+	if (data->type == EVENT) {
+		tps6591x->mask_reg[data->mask_reg] &= ~(1 << data->mask_pos);
+		tps6591x->irq_en |= (1 << __irq);
+	}
 }
 
 static void tps6591x_irq_sync_unlock(unsigned int irq)
@@ -467,36 +486,73 @@ static void tps6591x_irq_sync_unlock(unsigned int irq)
 	mutex_unlock(&tps6591x->irq_lock);
 }
 
+static int tps6591x_irq_set_type(unsigned int irq, unsigned int type)
+{
+	struct tps6591x *tps6591x = get_irq_chip_data(irq);
+
+	unsigned int __irq = irq - tps6591x->irq_base;
+	const struct tps6591x_irq_data *data = &tps6591x_irqs[__irq];
+
+	if (data->type == GPIO) {
+		if (type & IRQ_TYPE_EDGE_FALLING)
+			tps6591x->mask_reg[data->mask_reg]
+				&= ~(1 << data->mask_pos);
+		else
+			tps6591x->mask_reg[data->mask_reg]
+				|= (1 << data->mask_pos);
+
+		if (type & IRQ_TYPE_EDGE_RISING)
+			tps6591x->mask_reg[data->mask_reg]
+				&= ~(2 << data->mask_pos);
+		else
+			tps6591x->mask_reg[data->mask_reg]
+				|= (2 << data->mask_pos);
+
+		tps6591x->irq_en |= (1 << __irq);
+	}
+
+	return 0;
+}
+
 static irqreturn_t tps6591x_irq(int irq, void *data)
 {
 	struct tps6591x *tps6591x = data;
 	int ret = 0;
 	u8 tmp[3];
-	u32 acks;
+	u32 acks, mask = 0;
 	int i;
 
 	for (i = 0; i < 3; i++) {
 		ret = tps6591x_read(tps6591x->dev, TPS6591X_INT_STS + 2*i,
 				&tmp[i]);
 		if (ret < 0) {
-			dev_err(tps6591x->dev, "failed to read interrupt status\n");
+			dev_err(tps6591x->dev,
+				"failed to read interrupt status\n");
 			return IRQ_NONE;
 		}
 		if (tmp[i]) {
 			ret = tps6591x_write(tps6591x->dev,
 					TPS6591X_INT_STS + 2*i,	tmp[i]);
 			if (ret < 0) {
-				dev_err(tps6591x->dev, "failed to write interrupt status\n");
+				dev_err(tps6591x->dev,
+					"failed to write interrupt status\n");
 				return IRQ_NONE;
 			}
 		}
 	}
+
 	acks = (tmp[2] << 16) | (tmp[1] << 8) | tmp[0];
-	while (acks) {
-		i = __ffs(acks);
-		if (tps6591x->irq_en & (1 << i))
+
+	for (i = 0; i < ARRAY_SIZE(tps6591x_irqs); i++) {
+		if (tps6591x_irqs[i].type == GPIO)
+			mask = (3 << (tps6591x_irqs[i].mask_pos
+					+ tps6591x_irqs[i].mask_reg*8));
+		else if (tps6591x_irqs[i].type == EVENT)
+			mask = (1 << (tps6591x_irqs[i].mask_pos
+					+ tps6591x_irqs[i].mask_reg*8));
+
+		if ((acks & mask) && (tps6591x->irq_en & (1 << i)))
 			handle_nested_irq(tps6591x->irq_base + i);
-		acks &= ~(1 << i);
 	}
 	return IRQ_HANDLED;
 }
@@ -528,10 +584,11 @@ static int __devinit tps6591x_irq_init(struct tps6591x *tps6591x, int irq,
 	tps6591x->irq_base = irq_base;
 
 	tps6591x->irq_chip.name = "tps6591x";
-	tps6591x->irq_chip.enable = tps6591x_irq_enable;
-	tps6591x->irq_chip.disable = tps6591x_irq_disable;
+	tps6591x->irq_chip.mask = tps6591x_irq_mask;
+	tps6591x->irq_chip.unmask = tps6591x_irq_unmask;
 	tps6591x->irq_chip.bus_lock = tps6591x_irq_lock;
 	tps6591x->irq_chip.bus_sync_unlock = tps6591x_irq_sync_unlock;
+	tps6591x->irq_chip.set_type = tps6591x_irq_set_type;
 
 	for (i = 0; i < ARRAY_SIZE(tps6591x_irqs); i++) {
 		int __irq = i + tps6591x->irq_base;
