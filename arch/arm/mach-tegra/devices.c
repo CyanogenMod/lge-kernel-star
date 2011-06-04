@@ -669,6 +669,130 @@ struct platform_device tegra_uarte_device = {
 	},
 };
 
+static struct plat_serial8250_port debug_uarta_platform_data[] = {
+	{
+		.membase        = IO_ADDRESS(TEGRA_UARTA_BASE),
+		.mapbase        = TEGRA_UARTA_BASE,
+		.irq            = INT_UARTA,
+		.flags          = UPF_BOOT_AUTOCONF | UPF_FIXED_TYPE,
+		.type           = PORT_TEGRA,
+		.iotype         = UPIO_MEM,
+		.regshift       = 2,
+		.uartclk        = 216000000,
+	},
+	{
+		.flags          = 0,
+	},
+};
+
+static struct plat_serial8250_port debug_uartb_platform_data[] = {
+	{
+		.membase        = IO_ADDRESS(TEGRA_UARTB_BASE),
+		.mapbase        = TEGRA_UARTB_BASE,
+		.irq            = INT_UARTB,
+		.flags          = UPF_BOOT_AUTOCONF | UPF_FIXED_TYPE,
+		.type           = PORT_TEGRA,
+		.iotype         = UPIO_MEM,
+		.regshift       = 2,
+		.uartclk        = 216000000,
+	},
+	{
+		.flags          = 0,
+	},
+};
+
+static struct plat_serial8250_port debug_uartc_platform_data[] = {
+	{
+		.membase        = IO_ADDRESS(TEGRA_UARTC_BASE),
+		.mapbase        = TEGRA_UARTC_BASE,
+		.irq            = INT_UARTC,
+		.flags          = UPF_BOOT_AUTOCONF | UPF_FIXED_TYPE,
+		.type           = PORT_TEGRA,
+		.iotype         = UPIO_MEM,
+		.regshift       = 2,
+		.uartclk        = 216000000,
+	},
+	{
+		.flags          = 0,
+	},
+};
+
+static struct plat_serial8250_port debug_uartd_platform_data[] = {
+	{
+		.membase        = IO_ADDRESS(TEGRA_UARTD_BASE),
+		.mapbase        = TEGRA_UARTD_BASE,
+		.irq            = INT_UARTD,
+		.flags          = UPF_BOOT_AUTOCONF | UPF_FIXED_TYPE,
+		.type           = PORT_TEGRA,
+		.iotype         = UPIO_MEM,
+		.regshift       = 2,
+		.uartclk        = 216000000,
+	},
+	{
+		.flags          = 0,
+	},
+};
+
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+static struct plat_serial8250_port debug_uarte_platform_data[] = {
+	{
+		.membase        = IO_ADDRESS(TEGRA_UARTE_BASE),
+		.mapbase        = TEGRA_UARTE_BASE,
+		.irq            = INT_UARTE,
+		.flags          = UPF_BOOT_AUTOCONF | UPF_FIXED_TYPE,
+		.type           = PORT_TEGRA,
+		.iotype         = UPIO_MEM,
+		.regshift       = 2,
+		.uartclk        = 216000000,
+	},
+	{
+		.flags          = 0,
+	},
+};
+#endif
+
+struct platform_device debug_uarta_device = {
+	.name = "serial8250",
+	.id = PLAT8250_DEV_PLATFORM,
+	.dev = {
+		.platform_data = debug_uarta_platform_data,
+	},
+};
+
+struct platform_device debug_uartb_device = {
+	.name = "serial8250",
+	.id = PLAT8250_DEV_PLATFORM,
+	.dev = {
+		.platform_data = debug_uartb_platform_data,
+	},
+};
+
+struct platform_device debug_uartc_device = {
+	.name = "serial8250",
+	.id = PLAT8250_DEV_PLATFORM,
+	.dev = {
+		.platform_data = debug_uartc_platform_data,
+	},
+};
+
+struct platform_device debug_uartd_device = {
+	.name = "serial8250",
+	.id = PLAT8250_DEV_PLATFORM,
+	.dev = {
+		.platform_data = debug_uartd_platform_data,
+	},
+};
+
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+struct platform_device debug_uarte_device = {
+	.name = "serial8250",
+	.id = PLAT8250_DEV_PLATFORM,
+	.dev = {
+		.platform_data = debug_uarte_platform_data,
+	},
+};
+#endif
+
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 static struct resource i2s_resource1[] = {
 	[0] = {
