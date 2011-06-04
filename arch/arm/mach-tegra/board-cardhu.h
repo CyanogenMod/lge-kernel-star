@@ -23,6 +23,7 @@
 
 #include <mach/gpio.h>
 #include <mach/irqs.h>
+#include <linux/mfd/tps6591x.h>
 
 #define BOARD_E1187   0x0B57
 #define BOARD_E1186   0x0B56
@@ -114,7 +115,9 @@
 /* External peripheral act as interrupt controller */
 /* TPS6591x IRQs */
 #define TPS6591X_IRQ_BASE	TEGRA_NR_IRQS
-#define TPS6591X_IRQ_END	(TPS6591X_IRQ_BASE + 24)
+#define TPS6591X_IRQ_END	(TPS6591X_IRQ_BASE + 18)
+
+#define AC_PRESENT_INT		(TPS6591X_INT_GPIO4 + TPS6591X_IRQ_BASE)
 
 int cardhu_charge_init(void);
 int cardhu_regulator_init(void);
