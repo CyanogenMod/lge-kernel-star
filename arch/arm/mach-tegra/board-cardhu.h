@@ -25,12 +25,18 @@
 #include <mach/irqs.h>
 #include <linux/mfd/tps6591x.h>
 
+/* Processor Board  ID */
 #define BOARD_E1187   0x0B57
 #define BOARD_E1186   0x0B56
 #define BOARD_E1198   0x0B62
 #define BOARD_E1291   0x0C5B
 #define BOARD_PM267   0x0243
 #define BOARD_PM269   0x0245
+
+/* SKU Information */
+#define SKU_DCDC_TPS62361_SUPPORT	0x1
+#define SKU_SLT_ULPI_SUPPORT		0x2
+#define SKU_T30S_SUPPORT		0x4
 
 /* External peripheral act as gpio */
 /* TPS6591x GPIOs */

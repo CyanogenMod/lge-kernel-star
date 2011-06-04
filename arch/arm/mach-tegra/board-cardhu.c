@@ -54,29 +54,6 @@
 #include "fuse.h"
 
 
-static struct plat_serial8250_port debug_uart_platform_data[] = {
-	{
-		.membase	= IO_ADDRESS(TEGRA_UARTA_BASE),
-		.mapbase	= TEGRA_UARTA_BASE,
-		.irq		= INT_UARTA,
-		.flags		= UPF_BOOT_AUTOCONF | UPF_FIXED_TYPE,
-		.type		= PORT_TEGRA,
-		.iotype		= UPIO_MEM,
-		.regshift	= 2,
-		.uartclk	= 216000000,
-	}, {
-		.flags		= 0,
-	}
-};
-
-static struct platform_device debug_uart = {
-	.name = "serial8250",
-	.id = PLAT8250_DEV_PLATFORM,
-	.dev = {
-		.platform_data = debug_uart_platform_data,
-	},
-};
-
 /* !!!TODO: Change for cardhu (Taken from Ventana) */
 static struct tegra_utmip_config utmi_phy_config[] = {
 	[0] = {
@@ -194,11 +171,6 @@ static inline void tegra_setup_bluesleep(void) { }
 
 static __initdata struct tegra_clk_init_table cardhu_clk_init_table[] = {
 	/* name		parent		rate		enabled */
-	{ "uarta",	"pll_p",	216000000,	true},
-	{ "uartb",	"pll_p",	216000000,	false},
-	{ "uartc",	"pll_p",	216000000,	false},
-	{ "uartd",	"pll_p",	216000000,	false},
-	{ "uarte",	"pll_p",	216000000,	false},
 	{ "pll_m",	NULL,		0,		true},
 	{ "hda",	"pll_p",	108000000,	false},
 	{ "hda2codec_2x","pll_p",	48000000,	false},
@@ -267,6 +239,61 @@ static void cardhu_i2c_init(void)
 	platform_device_register(&tegra_i2c_device1);
 }
 
+static struct platform_device *cardhu_uart_devices[] __initdata = {
+	&tegra_uarta_device,
+	&tegra_uartb_device,
+	&tegra_uartc_device,
+	&tegra_uartd_device,
+	&tegra_uarte_device,
+};
+static struct clk *debug_uart_clk;
+
+static void __init uart_debug_init(void)
+{
+	struct board_info board_info;
+
+	tegra_get_board_info(&board_info);
+	if (board_info.sku & SKU_SLT_ULPI_SUPPORT) {
+		if ((board_info.board_id == BOARD_E1186) ||
+			(board_info.board_id == BOARD_E1187) ||
+			(board_info.board_id == BOARD_PM269)) {
+				/* UARTB is the debug port. */
+				pr_info("Selecting UARTB as the debug console\n");
+				cardhu_uart_devices[1] = &debug_uartb_device;
+				debug_uart_clk =
+					clk_get_sys("serial8250.0", "uartb");
+				return;
+		}
+		pr_err("%s(): Unhandled SKU information for Board 0x%04x\n",
+				__func__, board_info.board_id);
+	}
+	/* UARTA is the debug port. */
+	pr_info("Selecting UARTA as the debug console\n");
+	cardhu_uart_devices[0] = &debug_uarta_device;
+	debug_uart_clk = clk_get_sys("serial8250.0", "uarta");
+}
+
+static void __init cardhu_uart_init(void)
+{
+	/* Register low speed only if it is selected */
+	if (!is_tegra_debug_uartport_hs()) {
+		uart_debug_init();
+		/* Clock enable for the debug channel */
+		if (!IS_ERR_OR_NULL(debug_uart_clk)) {
+			pr_info("The debug console clock name is %s\n",
+						debug_uart_clk->name);
+			clk_enable(debug_uart_clk);
+			clk_set_rate(debug_uart_clk, 216000000);
+		} else {
+			pr_err("Not getting the clock %s for debug console\n",
+					debug_uart_clk->name);
+		}
+	}
+
+	platform_add_devices(cardhu_uart_devices,
+				ARRAY_SIZE(cardhu_uart_devices));
+}
+
 #if defined(CONFIG_RTC_DRV_TEGRA)
 static struct resource tegra_rtc_resources[] = {
 	[0] = {
@@ -325,11 +352,6 @@ static struct platform_device tegra_camera = {
 };
 
 static struct platform_device *cardhu_devices[] __initdata = {
-	&debug_uart,
-	&tegra_uartb_device,
-	&tegra_uartc_device,
-	&tegra_uartd_device,
-	&tegra_uarte_device,
 	&pmu_device,
 #if defined(CONFIG_RTC_DRV_TEGRA)
 	&tegra_rtc_device,
@@ -513,6 +535,7 @@ static void __init tegra_cardhu_init(void)
 #ifdef CONFIG_TEGRA_EDP_LIMITS
 	cardhu_edp_init();
 #endif
+	cardhu_uart_init();
 	platform_add_devices(cardhu_devices, ARRAY_SIZE(cardhu_devices));
 	cardhu_sdhci_init();
 	cardhu_regulator_init();
