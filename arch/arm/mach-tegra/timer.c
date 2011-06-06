@@ -301,3 +301,10 @@ void tegra_timer_resume(void)
 	timer_writel(usec_config, TIMERUS_USEC_CFG);
 	tegra_sched_clock_resume();
 }
+
+//20110213, , sched_clock mismatch issue after deepsleep [START]
+void tegra_lp0_sched_clock_clear()
+{
+    cnt32_to_63_clear(0);
+}
+//20110213, , sched_clock mismatch issue after deepsleep [END]
