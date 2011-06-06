@@ -442,14 +442,14 @@ static struct tegra_fb_data cardhu_fb_data = {
 	.win		= 0,
 	.xres		= 1366,
 	.yres		= 768,
-	.bits_per_pixel	= 16,
+	.bits_per_pixel	= 32,
 };
 
 static struct tegra_fb_data cardhu_hdmi_fb_data = {
 	.win		= 0,
 	.xres		= 1366,
 	.yres		= 768,
-	.bits_per_pixel	= 16,
+	.bits_per_pixel	= 32,
 };
 
 static struct tegra_dc_out cardhu_disp2_out = {
