@@ -22,6 +22,10 @@
 #include <linux/input.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
+#if defined(CONFIG_HAS_EARLYSUSPEND)
+#include <linux/earlysuspend.h>
+#endif
+
 
 /* Family ID */
 #define MXT224_ID		0x80
@@ -275,8 +279,15 @@ struct mxt_data {
 	u8 idle_cycle_time;
 	u8 is_stopped;
 	struct mutex access_mutex;
+#if defined(CONFIG_HAS_EARLYSUSPEND)
+	struct early_suspend early_suspend;
+#endif
 };
 
+#if defined(CONFIG_HAS_EARLYSUSPEND)
+static void mxt_early_suspend(struct early_suspend *es);
+static void mxt_early_resume(struct early_suspend *es);
+#endif
 
 static bool mxt_object_readable(unsigned int type)
 {
@@ -1272,6 +1283,13 @@ static int __devinit mxt_probe(struct i2c_client *client,
 		goto err_free_object;
 	}
 
+#if defined(CONFIG_HAS_EARLYSUSPEND)
+	data->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
+	data->early_suspend.suspend = mxt_early_suspend;
+	data->early_suspend.resume = mxt_early_resume;
+	register_early_suspend(&data->early_suspend);
+#endif
+
 	error = mxt_make_highchg(data);
 	if (error)
 		goto err_free_irq;
@@ -1381,6 +1399,34 @@ static int mxt_resume(struct device *dev)
 end:
 	return 0;
 }
+
+#if defined(CONFIG_HAS_EARLYSUSPEND)
+static void mxt_early_suspend(struct early_suspend *es)
+{
+	struct mxt_data *mxt;
+	struct device *dev;
+	mxt = container_of(es, struct mxt_data, early_suspend);
+	dev = &mxt->client->dev;
+	dev_info(dev, "MXT Early Suspend entered\n");
+
+	if (mxt_suspend(&mxt->client->dev) != 0)
+		dev_err(&mxt->client->dev, "%s: failed\n", __func__);
+	dev_info(dev, "MXT Early Suspended\n");
+}
+
+static void mxt_early_resume(struct early_suspend *es)
+{
+	struct mxt_data *mxt;
+	struct device *dev;
+	mxt = container_of(es, struct mxt_data, early_suspend);
+	dev = &mxt->client->dev;
+	dev_info(dev, "MXT Early Resume entered\n");
+
+	if (mxt_resume(&mxt->client->dev) != 0)
+		dev_err(&mxt->client->dev, "%s: failed\n", __func__);
+	dev_info(dev, "MXT Early Resumed\n");
+}
+#endif
 
 static const struct dev_pm_ops mxt_pm_ops = {
 	.suspend	= mxt_suspend,
