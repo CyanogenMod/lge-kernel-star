@@ -652,6 +652,7 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 static char cpufreq_gov_default[32];
 static char *cpufreq_gov_conservative = "conservative";
 static char *cpufreq_sysfs_place_holder="/sys/devices/system/cpu/cpu%i/cpufreq/scaling_governor";
+static char *cpufreq_gov_conservative_param="/sys/devices/system/cpu/cpufreq/conservative/%s";
 
 static void cpufreq_set_governor(char *governor)
 {
@@ -697,7 +698,7 @@ void cpufreq_save_default_governor(void)
 			scaling_gov->f_op->read != NULL)
 			scaling_gov->f_op->read(scaling_gov,
 					cpufreq_gov_default,
-					127,
+					32,
 					&offset);
 		else
 			pr_err("f_op might be null\n");
@@ -711,6 +712,55 @@ void cpufreq_save_default_governor(void)
 void cpufreq_restore_default_governor(void)
 {
 	cpufreq_set_governor(cpufreq_gov_default);
+}
+
+void cpufreq_set_conservative_governor_param(int up_th, int down_th)
+{
+	struct file *gov_param = NULL;
+	static char buf[128],parm[8];
+	loff_t offset = 0;
+
+	if (up_th <= down_th) {
+		printk(KERN_ERR "%s: up_th(%d) is lesser than down_th(%d)\n",
+			__func__, up_th, down_th);
+		return;
+	}
+
+	sprintf(parm, "%d", up_th);
+	sprintf(buf, cpufreq_gov_conservative_param ,"up_threshold");
+	gov_param = filp_open(buf, O_RDONLY, 0);
+	if (gov_param != NULL) {
+		if (gov_param->f_op != NULL &&
+			gov_param->f_op->write != NULL)
+			gov_param->f_op->write(gov_param,
+					parm,
+					strlen(parm),
+					&offset);
+		else
+			pr_err("f_op might be null\n");
+
+		filp_close(gov_param, NULL);
+	} else {
+		pr_err("%s. Can't open %s\n", __func__, buf);
+	}
+
+	sprintf(parm, "%d", down_th);
+	sprintf(buf, cpufreq_gov_conservative_param ,"down_threshold");
+	gov_param = filp_open(buf, O_RDONLY, 0);
+	if (gov_param != NULL) {
+		if (gov_param->f_op != NULL &&
+			gov_param->f_op->write != NULL)
+			gov_param->f_op->write(gov_param,
+					parm,
+					strlen(parm),
+					&offset);
+		else
+			pr_err("f_op might be null\n");
+
+		filp_close(gov_param, NULL);
+	} else {
+		pr_err("%s. Can't open %s\n", __func__, buf);
+	}
 }
 
 void cpufreq_set_conservative_governor(void)
