@@ -252,7 +252,7 @@ static int clk_enable_locked(struct clk *c)
 
 		if (c->ops && c->ops->enable) {
 			ret = c->ops->enable(c);
-			trace_clock_enable(c->name, 1, smp_processor_id());
+			trace_clock_enable(c->name, 1, 0);
 			if (ret) {
 				if (c->parent)
 					clk_disable(c->parent);
@@ -289,7 +289,7 @@ static void clk_disable_locked(struct clk *c)
 	}
 	if (c->refcnt == 1) {
 		if (c->ops && c->ops->disable) {
-			trace_clock_disable(c->name, 0, smp_processor_id());
+			trace_clock_disable(c->name, 0, 0);
 			c->ops->disable(c);
 		}
 		if (c->parent)
@@ -430,7 +430,7 @@ int clk_set_rate_locked(struct clk *c, unsigned long rate)
 			goto out;
 	}
 
-	trace_clock_set_rate(c->name, rate, smp_processor_id());
+	trace_clock_set_rate(c->name, rate, 0);
 	ret = c->ops->set_rate(c, rate);
 	if (ret)
 		goto out;
