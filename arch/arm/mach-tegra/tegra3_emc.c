@@ -521,8 +521,13 @@ static noinline void emc_set_clock(const struct tegra_emc_table *next_timing,
 		emc_writel(DRAM_BROADCAST(dram_dev_num), EMC_SELF_REF);
 
 	/* 10. restore periodic QRST */
-	if (qrst_used)
+	if ((qrst_used) || (next_timing->emc_periodic_qrst !=
+			    last_timing->emc_periodic_qrst)) {
+		emc_cfg_reg = next_timing->emc_periodic_qrst ?
+			emc_cfg_reg | EMC_CFG_PERIODIC_QRST :
+			emc_cfg_reg & (~EMC_CFG_PERIODIC_QRST);
 		periodic_qrst_restore(emc_cfg_reg, emc_dbg_reg);
+	}
 
 	/* 11. set dram mode registers */
 	set_dram_mode(next_timing, last_timing, dll_change);
@@ -576,6 +581,8 @@ static inline void emc_get_timing(struct tegra_emc_table *timing)
 	timing->emc_mode_reset = 0;
 	timing->emc_mode_1 = 0;
 	timing->emc_mode_2 = 0;
+	timing->emc_periodic_qrst = (emc_readl(EMC_CFG) &
+				     EMC_CFG_PERIODIC_QRST) ? 1 : 0;
 }
 
 /* The EMC registers have shadow registers. When the EMC clock is updated

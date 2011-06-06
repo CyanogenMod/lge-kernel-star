@@ -34,6 +34,7 @@ struct tegra_emc_table {
 	/* updated separately under some conditions */
 	u32 emc_zcal_cnt_long;
 	u32 emc_acal_interval;
+	u32 emc_periodic_qrst;
 	u32 emc_mode_reset;
 	u32 emc_mode_1;
 	u32 emc_mode_2;
