@@ -523,6 +523,8 @@ static struct tegra_dc_out cardhu_disp2_out = {
 	.dcc_bus	= 3,
 	.hotplug_gpio	= cardhu_hdmi_hpd,
 
+	.max_pixclock	= KHZ2PICOS(148500),
+
 	.align		= TEGRA_DC_ALIGN_MSB,
 	.order		= TEGRA_DC_ORDER_RED_BLUE,
 

@@ -195,6 +195,8 @@ static struct tegra_dc_out whistler_disp2_out = {
 	.dcc_bus	= 1,
 	.hotplug_gpio	= whistler_hdmi_hpd,
 
+	.max_pixclock	= KHZ2PICOS(148500),
+
 	.align		= TEGRA_DC_ALIGN_MSB,
 	.order		= TEGRA_DC_ORDER_RED_BLUE,
 
