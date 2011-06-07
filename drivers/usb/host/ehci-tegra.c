@@ -1047,6 +1047,9 @@ static int tegra_ehci_remove(struct platform_device *pdev)
 
 	if (tegra == NULL || hcd == NULL)
 		return -EINVAL;
+	/* make sure controller is on as we will touch its registers */
+	if (!tegra->host_resumed)
+		tegra_ehci_power_up(hcd, true);
 
 #ifdef CONFIG_USB_OTG_UTILS
 	if (tegra->transceiver) {
