@@ -267,7 +267,7 @@ static void tegra_set_tegraid(u32 chipid,
 	tegra_id.revision = tegra_decode_revision(&tegra_id);
 }
 
-static void tegra_get_tegraid_from_hw()
+static void tegra_get_tegraid_from_hw(void)
 {
 	void __iomem *chip_id = IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x804;
 	void __iomem *netlist = IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x860;
