@@ -1130,29 +1130,29 @@ static int tegra_aes_probe(struct platform_device *pdev)
 	dd->bsea.res_id = TEGRA_ARB_BSEA;
 
 	dd->bsev.pclk = clk_get(dev, "bsev");
-	if (!dd->bsev.pclk) {
-		dev_err(dev, "pclock intialization failed.\n");
+	if (IS_ERR(dd->bsev.pclk)) {
+		dev_err(dev, "v: pclock intialization failed.\n");
 		err = -ENODEV;
 		goto out;
 	}
 
 	dd->bsev.iclk = clk_get(dev, "vde");
-	if (!dd->bsev.iclk) {
-		dev_err(dev, "iclock intialization failed.\n");
+	if (IS_ERR(dd->bsev.iclk)) {
+		dev_err(dev, "v: iclock intialization failed.\n");
 		err = -ENODEV;
 		goto out;
 	}
 
 	dd->bsea.pclk = clk_get(dev, "bsea");
-	if (!dd->bsea.pclk) {
-		dev_err(dev, "pclock intialization failed.\n");
+	if (IS_ERR(dd->bsea.pclk)) {
+		dev_err(dev, "a: pclock intialization failed.\n");
 		err = -ENODEV;
 		goto out;
 	}
 
 	dd->bsea.iclk = clk_get(dev, "sclk");
-	if (!dd->bsea.iclk) {
-		dev_err(dev, "iclock intialization failed.\n");
+	if (IS_ERR(dd->bsea.iclk)) {
+		dev_err(dev, "a: iclock intialization failed.\n");
 		err = -ENODEV;
 		goto out;
 	}
