@@ -15,6 +15,8 @@
 #include "nvodm_query.h"
 #include "nvodm_query_discovery.h"
 
+#include <linux/switch.h>
+
 #define HALL_DEBUG 1
 
 typedef struct star_hall_device_data
@@ -31,6 +33,7 @@ typedef struct star_hall_device_data
 	NvU8 int_even_odd;
 	struct delayed_work delayed_work_hall;
 	struct input_dev* input_device;
+	struct switch_dev sdev;
 }star_hall_device;
 
 static star_hall_device *g_hall;
@@ -147,6 +150,10 @@ static void star_hall_intr_handler( void *arg )
 		{atomic_set( &sensing_hall, 1 );input_report_abs(g_hall->input_device, ABS_HAT2X, 1);input_sync(g_hall->input_device);}
 
 	//NvOdmGpioInterruptMask(g_hall->h_hall_intr, NV_FALSE);// NV_FALSE --> enable intr , NV_TRUE --> disable
+
+	/* 2 == CAR */
+	switch_set_state(&g_hall->sdev, gpio_status ? 0 : 2);
+
 	NvOdmGpioInterruptDone(g_hall->h_hall_intr);
 }
 
@@ -249,6 +256,9 @@ static int __init star_hall_probe( struct platform_device *pdev )
 		goto err_irq_request;
 	}
 
+	g_hall->sdev.name = "dock";
+	switch_dev_register(&g_hall->sdev);
+
 	return 0;
 
 error:
@@ -260,6 +270,7 @@ err_irq_request:
 
 static int star_hall_remove( struct platform_device *pdev )
 {
+	switch_dev_unregister(&g_hall->sdev);
 	return 0;
 }
 
