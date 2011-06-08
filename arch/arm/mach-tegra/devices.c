@@ -1322,3 +1322,31 @@ struct platform_device tegra_kbc_device = {
 		.platform_data = 0,
 	},
 };
+
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+static u64 tegra_se_dma_mask = DMA_BIT_MASK(32);
+
+struct resource tegra_se_resources[] = {
+	[0] = {
+		.start = TEGRA_SE_BASE,
+		.end = TEGRA_SE_BASE + TEGRA_SE_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	[1] = {
+		.start = INT_SE,
+		.end = INT_SE,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+
+struct platform_device tegra_se_device = {
+	.name = "tegra-se",
+	.id = -1,
+	.dev = {
+		.coherent_dma_mask = DMA_BIT_MASK(32),
+		.dma_mask = &tegra_se_dma_mask,
+	},
+	.resource = tegra_se_resources,
+	.num_resources = ARRAY_SIZE(tegra_se_resources),
+};
+#endif

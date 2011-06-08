@@ -108,6 +108,7 @@ extern struct platform_device debug_uartb_device;
 extern struct platform_device debug_uartc_device;
 extern struct platform_device debug_uartd_device;
 #if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+extern struct platform_device tegra_se_device;
 extern struct platform_device debug_uarte_device;
 #endif
 
