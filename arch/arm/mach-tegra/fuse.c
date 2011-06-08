@@ -22,6 +22,8 @@
 #include <linux/io.h>
 #include <linux/init.h>
 #include <linux/string.h>
+#include <linux/module.h>
+#include <linux/moduleparam.h>
 
 #include <mach/iomap.h>
 
@@ -50,13 +52,15 @@
 #endif
 
 struct tegra_id {
-	enum tegra_revision chipid;
+	enum tegra_chipid chipid;
 	unsigned int major, minor, netlist, patch;
 	enum tegra_revision revision;
 	char *priv;
 };
 
 static struct tegra_id tegra_id;
+static unsigned int tegra_chip_id;
+static unsigned int tegra_chip_rev;
 
 static const char *tegra_revision_name[TEGRA_REVISION_MAX] = {
 	[TEGRA_REVISION_UNKNOWN] = "unknown",
@@ -331,6 +335,22 @@ static int __init tegra_bootloader_tegraid(char *str)
 	tegra_set_tegraid(id[0], id[1], id[2], id[3], id[4], priv);
 	return 0;
 }
+
+static unsigned int get_chip_id(const char *val, struct kernel_param *kp)
+{
+	tegra_chip_id = (unsigned int)tegra_get_chipid();
+	return param_get_uint(val, kp);
+}
+static unsigned int get_chip_rev(const char *val, struct kernel_param *kp)
+{
+	tegra_chip_rev = (unsigned int)tegra_get_revision();
+	return param_get_uint(val, kp);
+}
+
+module_param_call(tegra_chip_id, NULL, get_chip_id, &tegra_chip_id, 0444);
+__MODULE_PARM_TYPE(tegra_chip_id, "uint");
+module_param_call(tegra_chip_rev, NULL, get_chip_rev, &tegra_chip_rev, 0444);
+__MODULE_PARM_TYPE(tegra_chip_rev, "uint");
 
 /* tegraid=chipid.major.minor.netlist.patch[.priv] */
 early_param("tegraid", tegra_bootloader_tegraid);
