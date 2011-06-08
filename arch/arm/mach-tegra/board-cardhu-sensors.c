@@ -721,6 +721,10 @@ int __init cardhu_ov5650_late_init(void)
 	int ret;
 	int i;
 
+	if ((board_info.board_id == BOARD_E1198) ||
+		(board_info.board_id == BOARD_E1291))
+		return 0;
+
 	printk("%s: \n", __func__);
 	for (i = 0; i < ARRAY_SIZE(ov5650_gpio_keys); i++) {
 		ret = gpio_request(ov5650_gpio_keys[i].gpio,
