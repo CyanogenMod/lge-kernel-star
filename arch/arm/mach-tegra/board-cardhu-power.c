@@ -696,11 +696,13 @@ static int disable_load_switch_rail(
 		.disable_rail = _disable,				\
 	}
 
-/* common to all boards */
+/* common to most of boards*/
 GREG_INIT(0, en_5v_cp,		en_5v_cp,	NULL,			TPS6591X_GPIO_GP0,	false,	1,	0,	0,	0);
 GREG_INIT(1, en_5v0,		en_5v0,		NULL,			TPS6591X_GPIO_GP2,	false,	0,	0,	0,	0);
 GREG_INIT(2, en_ddr,		en_ddr,		NULL,			TPS6591X_GPIO_GP6,	false,	0,	0,	0,	0);
 GREG_INIT(3, en_3v3_sys,	en_3v3_sys,	NULL,			TPS6591X_GPIO_GP7,	false,	0,	0,	0,	0);
+
+
 GREG_INIT(4, en_vdd_bl,		en_vdd_bl,  	NULL,			TEGRA_GPIO_PK3,		false,	1,	0,	0,	0);
 GREG_INIT(5, en_3v3_modem,	en_3v3_modem,	NULL,			TEGRA_GPIO_PD6, 	false, 	1,	0,	0,	0);
 GREG_INIT(6, en_vdd_pnl1,	en_vdd_pnl1, 	"vdd_3v3_devices",	TEGRA_GPIO_PL4,		false,	1,	0,	0,	0);
@@ -711,6 +713,12 @@ GREG_INIT(10, en_3v3_emmc,	en_3v3_emmc,	"vdd_3v3_devices",	TEGRA_GPIO_PD1,		fals
 GREG_INIT(11, en_vdd_sdmmc1,	en_vdd_sdmmc1,	"vdd_3v3_devices",	TEGRA_GPIO_PD7,		false,	1,	0,	0,	0);
 GREG_INIT(12, en_3v3_pex_hvdd,	en_3v3_pex_hvdd, "vdd_3v3_devices",	TEGRA_GPIO_PL7,		false,	0,	0,	0,	0);
 GREG_INIT(13, en_1v8_cam,	en_1v8_cam,  	"vdd_gen1v8",		TEGRA_GPIO_PBB4,	false,	0,	0,	0,	0);
+
+/* E1291-A04 specific */
+GREG_INIT(1, en_5v0_a04,	en_5v0,		NULL,			TPS6591X_GPIO_GP8,	false,	0,	0,	0,	0);
+GREG_INIT(2, en_ddr_a04,	en_ddr,		NULL,			TPS6591X_GPIO_GP7,	false,	0,	0,	0,	0);
+GREG_INIT(3, en_3v3_sys_a04,	en_3v3_sys,	NULL,			TPS6591X_GPIO_GP6,	false,	0,	0,	0,	0);
+
 
 /*Specific to pm269*/
 GREG_INIT(4, en_vdd_bl_p269,		en_vdd_bl,		NULL,
@@ -772,11 +780,27 @@ GREG_INIT(21, en_vdd_bl2_a03,	en_vdd_bl2,  	NULL,		TEGRA_GPIO_PDD0,	false,	1,	0,
 GREG_INIT(22, en_vbrtr,	en_vbrtr, "vdd_3v3_devices",	PMU_TCA6416_GPIO_PORT12,		false,	0,	0,	0,	0);
 
 #define ADD_GPIO_REG(_name) &gpio_pdata_##_name
+
 #define COMMON_GPIO_REG \
 	ADD_GPIO_REG(en_5v_cp),			\
 	ADD_GPIO_REG(en_5v0),			\
 	ADD_GPIO_REG(en_ddr),			\
 	ADD_GPIO_REG(en_3v3_sys),		\
+	ADD_GPIO_REG(en_3v3_modem),		\
+	ADD_GPIO_REG(en_vdd_pnl1),		\
+	ADD_GPIO_REG(cam3_ldo_en),		\
+	ADD_GPIO_REG(en_vdd_com),		\
+	ADD_GPIO_REG(en_3v3_fuse),		\
+	ADD_GPIO_REG(en_3v3_emmc),		\
+	ADD_GPIO_REG(en_vdd_sdmmc1),		\
+	ADD_GPIO_REG(en_3v3_pex_hvdd),		\
+	ADD_GPIO_REG(en_1v8_cam),
+
+#define COMMON_GPIO_REG_E1291_A04 \
+	ADD_GPIO_REG(en_5v_cp),			\
+	ADD_GPIO_REG(en_5v0_a04),		\
+	ADD_GPIO_REG(en_ddr_a04),		\
+	ADD_GPIO_REG(en_3v3_sys_a04),		\
 	ADD_GPIO_REG(en_3v3_modem),		\
 	ADD_GPIO_REG(en_vdd_pnl1),		\
 	ADD_GPIO_REG(cam3_ldo_en),		\
@@ -858,6 +882,14 @@ static struct gpio_switch_regulator_subdev_data *gswitch_subdevs_e1291_a03[] = {
 	E1198_GPIO_REG
 };
 
+/* Gpio switch regulator platform data for E1291 A04*/
+static struct gpio_switch_regulator_subdev_data *gswitch_subdevs_e1291_a04[] = {
+	COMMON_GPIO_REG_E1291_A04
+	E1291_A03_GPIO_REG
+	E1198_GPIO_REG
+};
+
+
 static struct gpio_switch_regulator_platform_data  gswitch_pdata;
 static struct platform_device gswitch_regulator_pdata = {
 	.name = "gpio-switch-regulator",
@@ -878,14 +910,19 @@ int __init cardhu_gpio_switch_regulator_init(void)
 		gswitch_pdata.subdevs = gswitch_subdevs_e1198;
 		break;
 	case BOARD_E1291:
-		if (board_info.fab >= 0x3) {
+		if (board_info.fab == 0x3) {
 			gswitch_pdata.num_subdevs =
 					ARRAY_SIZE(gswitch_subdevs_e1291_a03);
 			gswitch_pdata.subdevs = gswitch_subdevs_e1291_a03;
-			break;
+		} else if (board_info.fab == 0x4) {
+			gswitch_pdata.num_subdevs =
+					ARRAY_SIZE(gswitch_subdevs_e1291_a04);
+			gswitch_pdata.subdevs = gswitch_subdevs_e1291_a04;
+		} else {
+			gswitch_pdata.num_subdevs =
+					ARRAY_SIZE(gswitch_subdevs_e1198);
+			gswitch_pdata.subdevs = gswitch_subdevs_e1198;
 		}
-		gswitch_pdata.num_subdevs = ARRAY_SIZE(gswitch_subdevs_e1198);
-		gswitch_pdata.subdevs = gswitch_subdevs_e1198;
 		break;
 	case BOARD_PM269:
 		gswitch_pdata.num_subdevs = ARRAY_SIZE(gswitch_subdevs_pm269);
