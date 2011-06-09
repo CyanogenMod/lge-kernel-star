@@ -2,11 +2,10 @@ if ARCH_TEGRA
 
 comment "NVIDIA Tegra options"
 
-choice
-	prompt "Select Tegra processor family for target system"
-
 config ARCH_TEGRA_2x_SOC
-	bool "Tegra 2 family"
+	bool "Tegra 2 family SOC"
+	default y
+	depends on !ARCH_TEGRA_3x_SOC
 	select CPU_V7
 	select ARM_GIC
 	select ARCH_REQUIRE_GPIOLIB
@@ -22,7 +21,7 @@ config ARCH_TEGRA_2x_SOC
 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
 
 config ARCH_TEGRA_3x_SOC
-	bool "Tegra 3 family"
+	bool "Tegra 3 family SOC"
 	select CPU_V7
 	select ARM_GIC
 	select ARCH_REQUIRE_GPIOLIB
@@ -34,8 +33,6 @@ config ARCH_TEGRA_3x_SOC
 	help
 	  Support for NVIDIA Tegra 3 family of SoCs, based upon the
 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
-
-endchoice
 
 config TEGRA_PCI
 	bool "PCI Express support"
