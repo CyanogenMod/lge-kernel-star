@@ -101,7 +101,6 @@ static powergate_partition powergate_partition_info[TEGRA_NUM_POWERGATE] = {
 };
 
 static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
-static void __iomem *mc = IO_ADDRESS(TEGRA_MC_BASE);
 
 static u32 pmc_read(unsigned long reg)
 {
@@ -113,6 +112,9 @@ static void pmc_write(u32 val, unsigned long reg)
 	writel(val, pmc + reg);
 }
 
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+static void __iomem *mc = IO_ADDRESS(TEGRA_MC_BASE);
+
 static u32 mc_read(unsigned long reg)
 {
 	return readl(mc + reg);
@@ -123,7 +125,6 @@ static void mc_write(u32 val, unsigned long reg)
 	writel(val, mc + reg);
 }
 
-#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
 static void mc_flush(int id)
 {
 	u32 idx, rst_ctrl, rst_stat;
