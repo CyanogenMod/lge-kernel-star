@@ -540,13 +540,10 @@ int tegra_powergate_partition_with_clk_off(int id)
 
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	/* Restrict functions use to selected partitions */
-	BUG_ON(id != TEGRA_POWERGATE_PCIE && id != TEGRA_POWERGATE_SATA &&
-		id != TEGRA_POWERGATE_3D && id != TEGRA_POWERGATE_3D1 &&
-		id != TEGRA_POWERGATE_MPE);
+	BUG_ON(id != TEGRA_POWERGATE_PCIE && id != TEGRA_POWERGATE_SATA);
 #else
 	/* Restrict functions use to selected partitions */
-	BUG_ON(id != TEGRA_POWERGATE_PCIE && id != TEGRA_POWERGATE_MPE &&
-		id != TEGRA_POWERGATE_3D);
+	BUG_ON(id != TEGRA_POWERGATE_PCIE);
 #endif
 	/* Disable clks for the partition */
 	partition_clk_disable(id);
