@@ -514,13 +514,13 @@ static int tegra_clk_clip_rate_for_parent(struct clk *c, struct clk *p)
 {
 	unsigned long flags, max_rate, old_rate, new_rate;
 
-	clk_lock_save(c, flags);
+	clk_lock_save(c, &flags);
 
 	max_rate = clk_get_max_rate(c);
 	new_rate = clk_predict_rate_from_parent(c, p);
 	old_rate = clk_get_rate_locked(c);
 
-	clk_unlock_restore(c, flags);
+	clk_unlock_restore(c, &flags);
 
 	if (new_rate > max_rate) {
 		u64 rate = max_rate;
@@ -646,10 +646,10 @@ void __init tegra_init_clock(void)
 void tegra_sdmmc_tap_delay(struct clk *c, int delay) {
 	unsigned long flags;
 
-	clk_lock_save(c, flags);
+	clk_lock_save(c, &flags);
 	tegra2_sdmmc_tap_delay(c, delay);
 
-	clk_unlock_restore(c, flags);
+	clk_unlock_restore(c, &flags);
 }
 #endif
 
@@ -727,7 +727,7 @@ int tegra_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting)
 	int ret = 0;
 	unsigned long flags;
 
-	clk_lock_save(c, flags);
+	clk_lock_save(c, &flags);
 
 	if (!c->ops || !c->ops->clk_cfg_ex) {
 		ret = -ENOSYS;
@@ -736,7 +736,7 @@ int tegra_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting)
 	ret = c->ops->clk_cfg_ex(c, p, setting);
 
 out:
-	clk_unlock_restore(c, flags);
+	clk_unlock_restore(c, &flags);
 	return ret;
 }
 
@@ -1079,10 +1079,10 @@ static int time_on_get(void *data, u64 *val)
 	unsigned long flags;
 	struct clk *c = (struct clk *)data;
 
-	clk_lock_save(c, flags);
+	clk_lock_save(c, &flags);
 	clk_stats_update(c);
 	*val = cputime64_to_clock_t(c->stats.time_on);
-	clk_unlock_restore(c, flags);
+	clk_unlock_restore(c, &flags);
 
 	return 0;
 }
