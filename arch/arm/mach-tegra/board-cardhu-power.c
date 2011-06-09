@@ -733,7 +733,7 @@ GREG_INIT(11, en_vdd_sdmmc1_pm269,	en_vdd_sdmmc1,		"vdd_3v3_devices",
 	TEGRA_GPIO_PP1,	false,	1,	0,	0,	0);
 GREG_INIT(12, en_3v3_pex_hvdd_pm269,	en_3v3_pex_hvdd,	"vdd_3v3_devices",
 	TEGRA_GPIO_PC6,	false,	0,	0,	0,	0);
-GREG_INIT(17, en_vddio_vid_oc_pm269,	en_vddio_vid_oc,	"vdd_5v0_sys",
+GREG_INIT(17, en_vddio_vid_oc_pm269,	en_vddio_vid_oc,	"master_5v_switch",
 	TEGRA_GPIO_PP2,	false,	0,	TEGRA_PINGROUP_VI_PCLK,
 	enable_load_switch_rail, disable_load_switch_rail);
 
