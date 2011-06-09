@@ -616,10 +616,10 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g[] = {
 static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 	{
 		0x30,       /* Rev 3.0 */
-		27000,      /* SDRAM frequency */
+		25500,      /* SDRAM frequency */
 		{
 			0x00000001, /* EMC_RC */
-			0x00000004, /* EMC_RFC */
+			0x00000003, /* EMC_RFC */
 			0x00000000, /* EMC_RAS */
 			0x00000000, /* EMC_RP */
 			0x00000002, /* EMC_R2W */
@@ -636,9 +636,9 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 			0x00000004, /* EMC_QRST */
 			0x00000007, /* EMC_QSAFE */
 			0x0000000c, /* EMC_RDV */
-			0x000000cb, /* EMC_REFRESH */
+			0x000000bd, /* EMC_REFRESH */
 			0x00000000, /* EMC_BURST_REFRESH_NUM */
-			0x00000032, /* EMC_PRE_REFRESH_REQ_CNT */
+			0x0000002f, /* EMC_PRE_REFRESH_REQ_CNT */
 			0x00000002, /* EMC_PDEX2WR */
 			0x00000002, /* EMC_PDEX2RD */
 			0x00000001, /* EMC_PCHG2PDEN */
@@ -652,7 +652,7 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 			0x00000000, /* EMC_TRPAB */
 			0x00000004, /* EMC_TCLKSTABLE */
 			0x00000005, /* EMC_TCLKSTOP */
-			0x000000d3, /* EMC_TREFBW */
+			0x000000c3, /* EMC_TREFBW */
 			0x00000000, /* EMC_QUSE_EXTRA */
 			0x00000004, /* EMC_FBIO_CFG6 */
 			0x00000000, /* EMC_ODT_WRITE */
@@ -704,9 +704,9 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 			0xa0f10000, /* EMC_AUTO_CAL_CONFIG */
 			0x00000000, /* EMC_CTT */
 			0x00000000, /* EMC_CTT_DURATION */
-			0x8000076e, /* EMC_DYN_SELF_REF_CONTROL */
-			0x00000001, /* MC_EMEM_ARB_CFG */
-			0x80000014, /* MC_EMEM_ARB_OUTSTANDING_REQ */
+			0x80000280, /* EMC_DYN_SELF_REF_CONTROL */
+			0x00020001, /* MC_EMEM_ARB_CFG */
+			0x80000008, /* MC_EMEM_ARB_OUTSTANDING_REQ */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RCD */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RP */
 			0x00000002, /* MC_EMEM_ARB_TIMING_RC */
@@ -720,8 +720,8 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 			0x00000002, /* MC_EMEM_ARB_TIMING_R2W */
 			0x00000006, /* MC_EMEM_ARB_TIMING_W2R */
 			0x06020102, /* MC_EMEM_ARB_DA_TURNS */
-			0x000a0403, /* MC_EMEM_ARB_DA_COVERS */
-			0x72830504, /* MC_EMEM_ARB_MISC0 */
+			0x000a0402, /* MC_EMEM_ARB_DA_COVERS */
+			0x74430303, /* MC_EMEM_ARB_MISC0 */
 			0x001f0000, /* MC_EMEM_ARB_RING1_THROTTLE */
 		},
 		0x00000040, /* EMC_ZCAL_WAIT_CNT after clock change */
@@ -733,7 +733,7 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 	},
 	{
 		0x30,       /* Rev 3.0 */
-		54000,      /* SDRAM frequency */
+		51000,      /* SDRAM frequency */
 		{
 			0x00000002, /* EMC_RC */
 			0x00000008, /* EMC_RFC */
@@ -753,23 +753,23 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 			0x00000004, /* EMC_QRST */
 			0x00000007, /* EMC_QSAFE */
 			0x0000000c, /* EMC_RDV */
-			0x00000198, /* EMC_REFRESH */
+			0x00000181, /* EMC_REFRESH */
 			0x00000000, /* EMC_BURST_REFRESH_NUM */
-			0x00000066, /* EMC_PRE_REFRESH_REQ_CNT */
+			0x00000060, /* EMC_PRE_REFRESH_REQ_CNT */
 			0x00000002, /* EMC_PDEX2WR */
 			0x00000002, /* EMC_PDEX2RD */
 			0x00000001, /* EMC_PCHG2PDEN */
 			0x00000000, /* EMC_ACT2PDEN */
 			0x00000007, /* EMC_AR2PDEN */
 			0x0000000f, /* EMC_RW2PDEN */
-			0x0000000a, /* EMC_TXSR */
-			0x0000000a, /* EMC_TXSRDLL */
+			0x00000009, /* EMC_TXSR */
+			0x00000009, /* EMC_TXSRDLL */
 			0x00000004, /* EMC_TCKE */
 			0x00000002, /* EMC_TFAW */
 			0x00000000, /* EMC_TRPAB */
 			0x00000004, /* EMC_TCLKSTABLE */
 			0x00000005, /* EMC_TCLKSTOP */
-			0x000001a6, /* EMC_TREFBW */
+			0x0000018e, /* EMC_TREFBW */
 			0x00000000, /* EMC_QUSE_EXTRA */
 			0x00000004, /* EMC_FBIO_CFG6 */
 			0x00000000, /* EMC_ODT_WRITE */
@@ -821,9 +821,9 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 			0xa0f10000, /* EMC_AUTO_CAL_CONFIG */
 			0x00000000, /* EMC_CTT */
 			0x00000000, /* EMC_CTT_DURATION */
-			0x8000076e, /* EMC_DYN_SELF_REF_CONTROL */
+			0x8000040b, /* EMC_DYN_SELF_REF_CONTROL */
 			0x00000001, /* MC_EMEM_ARB_CFG */
-			0x80000014, /* MC_EMEM_ARB_OUTSTANDING_REQ */
+			0x8000000a, /* MC_EMEM_ARB_OUTSTANDING_REQ */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RCD */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RP */
 			0x00000002, /* MC_EMEM_ARB_TIMING_RC */
@@ -837,8 +837,8 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 			0x00000002, /* MC_EMEM_ARB_TIMING_R2W */
 			0x00000006, /* MC_EMEM_ARB_TIMING_W2R */
 			0x06020102, /* MC_EMEM_ARB_DA_TURNS */
-			0x000a0403, /* MC_EMEM_ARB_DA_COVERS */
-			0x72830504, /* MC_EMEM_ARB_MISC0 */
+			0x000a0402, /* MC_EMEM_ARB_DA_COVERS */
+			0x73430303, /* MC_EMEM_ARB_MISC0 */
 			0x001f0000, /* MC_EMEM_ARB_RING1_THROTTLE */
 		},
 		0x00000040, /* EMC_ZCAL_WAIT_CNT after clock change */
@@ -850,10 +850,10 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 	},
 	{
 		0x30,       /* Rev 3.0 */
-		108000,     /* SDRAM frequency */
+		102000,     /* SDRAM frequency */
 		{
-			0x00000005, /* EMC_RC */
-			0x00000011, /* EMC_RFC */
+			0x00000004, /* EMC_RC */
+			0x00000010, /* EMC_RFC */
 			0x00000003, /* EMC_RAS */
 			0x00000001, /* EMC_RP */
 			0x00000002, /* EMC_R2W */
@@ -870,23 +870,23 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 			0x00000004, /* EMC_QRST */
 			0x00000007, /* EMC_QSAFE */
 			0x0000000c, /* EMC_RDV */
-			0x00000330, /* EMC_REFRESH */
+			0x00000303, /* EMC_REFRESH */
 			0x00000000, /* EMC_BURST_REFRESH_NUM */
-			0x000000cc, /* EMC_PRE_REFRESH_REQ_CNT */
+			0x000000c0, /* EMC_PRE_REFRESH_REQ_CNT */
 			0x00000002, /* EMC_PDEX2WR */
 			0x00000002, /* EMC_PDEX2RD */
 			0x00000001, /* EMC_PCHG2PDEN */
 			0x00000000, /* EMC_ACT2PDEN */
 			0x00000007, /* EMC_AR2PDEN */
 			0x0000000f, /* EMC_RW2PDEN */
-			0x00000013, /* EMC_TXSR */
-			0x00000013, /* EMC_TXSRDLL */
+			0x00000012, /* EMC_TXSR */
+			0x00000012, /* EMC_TXSRDLL */
 			0x00000004, /* EMC_TCKE */
 			0x00000004, /* EMC_TFAW */
 			0x00000000, /* EMC_TRPAB */
 			0x00000004, /* EMC_TCLKSTABLE */
 			0x00000005, /* EMC_TCLKSTOP */
-			0x0000034b, /* EMC_TREFBW */
+			0x0000031c, /* EMC_TREFBW */
 			0x00000000, /* EMC_QUSE_EXTRA */
 			0x00000004, /* EMC_FBIO_CFG6 */
 			0x00000000, /* EMC_ODT_WRITE */
@@ -938,9 +938,9 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 			0xa0f10000, /* EMC_AUTO_CAL_CONFIG */
 			0x00000000, /* EMC_CTT */
 			0x00000000, /* EMC_CTT_DURATION */
-			0x8000076e, /* EMC_DYN_SELF_REF_CONTROL */
+			0x80000713, /* EMC_DYN_SELF_REF_CONTROL */
 			0x00000001, /* MC_EMEM_ARB_CFG */
-			0x80000014, /* MC_EMEM_ARB_OUTSTANDING_REQ */
+			0x80000013, /* MC_EMEM_ARB_OUTSTANDING_REQ */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RCD */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RP */
 			0x00000003, /* MC_EMEM_ARB_TIMING_RC */
@@ -990,15 +990,15 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 			0x00000ffd, /* EMC_REFRESH */
 			0x00000000, /* EMC_BURST_REFRESH_NUM */
 			0x000003ff, /* EMC_PRE_REFRESH_REQ_CNT */
-			0x00000002, /* EMC_PDEX2WR */
-			0x00000002, /* EMC_PDEX2RD */
+			0x0000000b, /* EMC_PDEX2WR */
+			0x0000000b, /* EMC_PDEX2RD */
 			0x00000001, /* EMC_PCHG2PDEN */
 			0x00000000, /* EMC_ACT2PDEN */
 			0x0000000a, /* EMC_AR2PDEN */
 			0x00000012, /* EMC_RW2PDEN */
 			0x0000005b, /* EMC_TXSR */
 			0x00000200, /* EMC_TXSRDLL */
-			0x00000004, /* EMC_TCKE */
+			0x0000000d, /* EMC_TCKE */
 			0x00000010, /* EMC_TFAW */
 			0x00000000, /* EMC_TRPAB */
 			0x00000005, /* EMC_TCLKSTABLE */
@@ -1009,7 +1009,7 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 			0x00000000, /* EMC_ODT_WRITE */
 			0x00000000, /* EMC_ODT_READ */
 			0x00007088, /* EMC_FBIO_CFG5 */
-			0xf0120441, /* EMC_CFG_DIG_DLL */
+			0x00120084, /* EMC_CFG_DIG_DLL */
 			0x00008000, /* EMC_CFG_DIG_DLL_PERIOD */
 			0x00010000, /* EMC_DLL_XFORM_DQS0 */
 			0x00010000, /* EMC_DLL_XFORM_DQS1 */
@@ -1043,10 +1043,10 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 			0x0800013d, /* EMC_XM2DQSPADCTRL2 */
 			0x00000000, /* EMC_XM2DQPADCTRL2 */
 			0x77ffc084, /* EMC_XM2CLKPADCTRL */
-			0x01f1f50f, /* EMC_XM2COMPPADCTRL */
-			0x07077404, /* EMC_XM2VTTGENPADCTRL */
-			0x00000007, /* EMC_XM2VTTGENPADCTRL2 */
-			0x0800011d, /* EMC_XM2QUSEPADCTRL */
+			0x01f1f508, /* EMC_XM2COMPPADCTRL */
+			0x03037404, /* EMC_XM2VTTGENPADCTRL */
+			0x54000007, /* EMC_XM2VTTGENPADCTRL2 */
+			0x08000168, /* EMC_XM2QUSEPADCTRL */
 			0x08000021, /* EMC_XM2DQSPADCTRL3 */
 			0x00000802, /* EMC_CTT_TERM_CTRL */
 			0x00000000, /* EMC_ZCAL_INTERVAL */
@@ -1055,7 +1055,7 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 			0xa0f10404, /* EMC_AUTO_CAL_CONFIG */
 			0x00000000, /* EMC_CTT */
 			0x00000000, /* EMC_CTT_DURATION */
-			0x000020ae, /* EMC_DYN_SELF_REF_CONTROL */
+			0x800020ae, /* EMC_DYN_SELF_REF_CONTROL */
 			0x00000008, /* MC_EMEM_ARB_CFG */
 			0x80000060, /* MC_EMEM_ARB_OUTSTANDING_REQ */
 			0x00000002, /* MC_EMEM_ARB_TIMING_RCD */
@@ -1076,9 +1076,9 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 			0x001f0000, /* MC_EMEM_ARB_RING1_THROTTLE */
 		},
 		0x00000040, /* EMC_ZCAL_WAIT_CNT after clock change */
-		0x00000010, /* EMC_AUTO_CAL_INTERVAL */
+		0x001fffff, /* EMC_AUTO_CAL_INTERVAL */
 		0x00000000, /* EMC_CFG.PERIODIC_QRST */
-		0x80001941, /* Mode Register 0 */
+		0x80000941, /* Mode Register 0 */
 		0x80100002, /* Mode Register 1 */
 		0x80200008, /* Mode Register 2 */
 	},
