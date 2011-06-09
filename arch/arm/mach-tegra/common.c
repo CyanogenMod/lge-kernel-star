@@ -55,6 +55,7 @@
 
 #define AHB_GIZMO_AHB_MEM		0xc
 #define   ENB_FAST_REARBITRATE	BIT(2)
+#define   DONT_SPLIT_AHB_WR     BIT(7)
 
 #define AHB_GIZMO_USB		0x1c
 #define AHB_GIZMO_USB2		0x78
@@ -233,7 +234,7 @@ static void __init tegra_init_ahb_gizmo_settings(void)
 	unsigned long val;
 
 	val = gizmo_readl(AHB_GIZMO_AHB_MEM);
-	val |= ENB_FAST_REARBITRATE;
+	val |= ENB_FAST_REARBITRATE | IMMEDIATE | DONT_SPLIT_AHB_WR;
 	gizmo_writel(val, AHB_GIZMO_AHB_MEM);
 
 	val = gizmo_readl(AHB_GIZMO_USB);
