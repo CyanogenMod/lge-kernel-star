@@ -109,6 +109,7 @@ void tegra_assert_system_reset(char mode, const char *cmd)
 static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 	/* name		parent		rate		enabled */
 	{ "clk_m",	NULL,		0,		true },
+#ifndef CONFIG_TEGRA_FPGA_PLATFORM
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	{ "pll_p",	NULL,		216000000,	true },
 	{ "pll_p_out1",	"pll_p",	28800000,	true },
@@ -132,6 +133,19 @@ static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 	{ "sclk",	"pll_p_out4",	102000000,	true },
 	{ "hclk",	"sclk",		102000000,	true },
 	{ "pclk",	"hclk",		51000000,	true },
+#endif
+#else
+	{ "pll_p",	NULL,		216000000,	true },
+	{ "pll_p_out1",	"pll_p",	28800000,	true },
+	{ "pll_p_out2",	"pll_p",	48000000,	true },
+	{ "pll_p_out3",	"pll_p",	72000000,	true },
+	{ "pll_m_out1",	"pll_m",	275000000,	true },
+	{ "pll_c",	NULL,		ULONG_MAX,	false },
+	{ "pll_c_out1",	"pll_c",	208000000,	false },
+	{ "pll_p_out4",	"pll_p",	108000000,	true },
+	{ "sclk",	"pll_p_out4",	108000000,	true },
+	{ "hclk",	"sclk",		108000000,	true },
+	{ "pclk",	"hclk",		54000000,	true },
 #endif
 	{ "csite",	NULL,		0,		true },
 	{ "emc",	NULL,		0,		true },

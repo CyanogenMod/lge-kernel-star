@@ -2700,7 +2700,11 @@ static struct clk tegra_pll_p = {
 		.vco_max   = 1400000000,
 		.freq_table = tegra_pll_p_freq_table,
 		.lock_delay = 300,
+#ifndef CONFIG_TEGRA_FPGA_PLATFORM
 		.fixed_rate = 408000000,
+#else
+		.fixed_rate = 216000000,
+#endif
 	},
 };
 
@@ -3310,7 +3314,11 @@ static struct clk tegra_clk_sbus_cmplx = {
 		.hclk = &tegra_clk_hclk,
 		.sclk_low = &tegra_pll_p_out4,
 		.sclk_high = &tegra_pll_m_out1,
+#ifndef CONFIG_TEGRA_FPGA_PLATFORM
 		.threshold = 204000000, /* exact factor of low range pll_p */
+#else
+		.threshold = 108000000, /* exact factor of low range pll_p */
+#endif
 	},
 };
 
