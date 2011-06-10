@@ -107,8 +107,8 @@ typedef const struct si_pub  si_t;
 
 #include <linux/rtnetlink.h>
 
-#define WL_IW_USE_ISCAN  1
-#define ENABLE_ACTIVE_PASSIVE_SCAN_SUPPRESS  1
+#define WL_IW_USE_ISCAN  0
+#define ENABLE_ACTIVE_PASSIVE_SCAN_SUPPRESS  0
 
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)) && 1
@@ -1936,9 +1936,11 @@ wl_iw_control_wl_off_softap(
 		dhd_dev_reset(dev, 1);
 
 #if defined(WL_IW_USE_ISCAN)
-		
+
+#ifndef CSCAN
 		wl_iw_free_ss_cache();
 		wl_iw_run_ss_cache_timer(0);
+#endif
 		memset(g_scan, 0, G_SCAN_RESULTS);
 		
 		g_ss_cache_ctrl.m_link_down = 1;
