@@ -575,7 +575,7 @@ static int gpio_switch_en_3v3_pex_hvdd_voltages[] = { 3300};
 
 /* EN_3v3_FUSE from AP GPIO VI_D08 L06*/
 static struct regulator_consumer_supply gpio_switch_en_3v3_fuse_supply[] = {
-	REGULATOR_SUPPLY("vpp_fuse_pg", NULL),
+	REGULATOR_SUPPLY("vdd_fuse", NULL),
 };
 static int gpio_switch_en_3v3_fuse_voltages[] = { 3300};
 
