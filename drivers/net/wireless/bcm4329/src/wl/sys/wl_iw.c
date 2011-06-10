@@ -111,7 +111,7 @@ typedef const struct si_pub  si_t;
 #include <linux/rtnetlink.h>
 
 #define WL_IW_USE_ISCAN  1
-#define ENABLE_ACTIVE_PASSIVE_SCAN_SUPPRESS  1
+#define ENABLE_ACTIVE_PASSIVE_SCAN_SUPPRESS  0
 
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)) && 1
@@ -2006,8 +2006,8 @@ wl_iw_control_wl_off_softap(
 		bcm_mdelay(200); //20120313 sangjun.bae@lge.com SoftAp delay for not turning on soft ap
 
 #if defined(WL_IW_USE_ISCAN)
-		
-#if  !defined(CSCAN)
+
+#ifndef CSCAN
 		wl_iw_free_ss_cache();
 		wl_iw_run_ss_cache_timer(0);
 		memset(g_scan, 0, G_SCAN_RESULTS);
