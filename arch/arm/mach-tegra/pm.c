@@ -518,7 +518,7 @@ void tegra_idle_lp2_last(unsigned int flags)
 		clk_get_rate_all_locked(tegra_pclk));
 
 	if (flags & TEGRA_POWER_CLUSTER_MASK)
-		tegra_cluster_switch_prolog(mode);
+		tegra_cluster_switch_prolog(reg);
 
 	cpu_complex_pm_enter();
 
@@ -536,7 +536,7 @@ void tegra_idle_lp2_last(unsigned int flags)
 	cpu_complex_pm_exit();
 
 	if (flags & TEGRA_POWER_CLUSTER_MASK)
-		tegra_cluster_switch_epilog(mode);
+		tegra_cluster_switch_epilog(reg);
 
 	spin_lock(&tegra_lp2_lock);
 
