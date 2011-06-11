@@ -3270,7 +3270,7 @@ static struct clk tegra_clk_cpu_cmplx = {
 
 static struct clk tegra_clk_twd = {
 	.name     = "twd",
-	.parent   = &tegra_clk_cclk,
+	.parent   = &tegra_clk_cclk_lp, /* FIXME??? */
 	.ops      = NULL,
 	.max_rate = 400000000,
 	.mul      = 1,
