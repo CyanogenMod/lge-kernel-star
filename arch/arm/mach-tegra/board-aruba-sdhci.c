@@ -103,8 +103,6 @@ static struct resource sdhci_resource3[] = {
 
 
 static struct tegra_sdhci_platform_data tegra_sdhci_platform_data0 = {
-	.clk_id = NULL,
-	.force_hs = 0,
 #if ARUBA_WIFI  /* !!!FIXME!!! NOT SUPPORTED YET */
 	.register_status_notify	= aruba_wifi_status_register,
 	.cccr   = {
@@ -123,25 +121,21 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data0 = {
 	.cd_gpio = -1,
 	.wp_gpio = -1,
 	.power_gpio = -1,
-	.max_clk = 12000000,
+/*	.max_clk = 12000000, */
 };
 
 static struct tegra_sdhci_platform_data tegra_sdhci_platform_data2 = {
-	.clk_id = NULL,
-	.force_hs = 1,
 	.cd_gpio = -1,
 	.wp_gpio = -1,
 	.power_gpio = -1,
-	.max_clk = 12000000,
+/*	.max_clk = 12000000, */
 };
 
 static struct tegra_sdhci_platform_data tegra_sdhci_platform_data3 = {
-	.clk_id = NULL,
-	.force_hs = 0,
 	.cd_gpio = -1,
 	.wp_gpio = -1,
 	.power_gpio = -1,
-	.max_clk = 12000000,
+/*	.max_clk = 12000000, */
 };
 
 static struct platform_device tegra_sdhci_device0 = {

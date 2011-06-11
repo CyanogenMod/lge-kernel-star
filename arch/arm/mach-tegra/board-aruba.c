@@ -268,11 +268,13 @@ static struct tegra_audio_platform_data tegra_audio_pdata[] = {
 	}
 };
 
+#if 0
 struct tegra_wired_jack_conf audio_wr_jack_conf = {
 	.hp_det_n = TEGRA_GPIO_PW2,
 	.en_mic_ext = TEGRA_GPIO_PX1,
 	.en_mic_int = TEGRA_GPIO_PX0,
 };
+#endif
 
 static void aruba_i2c_init(void)
 {
@@ -425,7 +427,7 @@ static struct platform_device *aruba_devices[] __initdata = {
 	&tegra_uartc_device,
 	&tegra_uartd_device,
 	&tegra_uarte_device,
-	&pmu_device,
+	&tegra_pmu_device,
 	&tegra_rtc_device,
 	&tegra_udc_device,
 #if defined(CONFIG_TEGRA_IOVMM_SMMU)
@@ -540,7 +542,6 @@ static void __init tegra_aruba_init(void)
 {
 	char serial[20];
 
-	tegra_common_init();
 	tegra_clk_init_from_table(aruba_clk_init_table);
 	aruba_pinmux_init();
 
@@ -572,11 +573,10 @@ static void __init tegra_aruba_reserve(void)
 
 MACHINE_START(ARUBA, "aruba")
 	.boot_params    = 0x80000100,
-	.phys_io        = IO_APB_PHYS,
-	.io_pg_offst    = ((IO_APB_VIRT) >> 18) & 0xfffc,
-	.init_irq       = tegra_init_irq,
-	.init_machine   = tegra_aruba_init,
 	.map_io         = tegra_map_common_io,
 	.reserve        = tegra_aruba_reserve,
+	.init_early	= tegra_init_early,
+	.init_irq       = tegra_init_irq,
 	.timer          = &tegra_timer,
+	.init_machine   = tegra_aruba_init,
 MACHINE_END

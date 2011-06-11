@@ -33,7 +33,6 @@
 
 #include <linux/i2c.h>
 #include <mach/gpio.h>
-#include <linux/akm8975.h>
 
 #include "gpio-names.h"
 
