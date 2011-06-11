@@ -42,6 +42,7 @@
 #include "nvodm_query.h"
 #include "nvodm_query_discovery.h"
 
+#include <linux/leds.h>
 
 #define TOUCH_LED_TIMER
 
@@ -68,6 +69,10 @@ typedef struct TouchLEDRec{
 
 	NvU8			is_working;
     NvU8            keep_led_on;
+#ifdef CONFIG_LEDS_CLASS
+    struct led_classdev leddev;
+#endif
+    NvU8			is_blinking;
 } TouchLED;
 
 static TouchLED s_touchLED;
@@ -81,8 +86,18 @@ static NvBool touchLED_Control(NvU8 value)
 	{
 // 20100820  LGE Touch LED Control [START]
 #ifdef TOUCH_LED_TIMER
+		ktime_t delay;
+		if (s_touchLED.delay > 1000) {
+			/* Insert a 2 second pause between pulses */
+			if (s_touchLED.setVal == 0)
+				delay = ktime_set(2, 0);
+			else
+				delay = ktime_set(0, s_touchLED.delay);
+		} else {
+			delay = ktime_set(s_touchLED.delay, 0);
+		}
 		hrtimer_cancel(&s_touchLED.timer);
-		hrtimer_start(&s_touchLED.timer, ktime_set(s_touchLED.delay, 0), HRTIMER_MODE_REL);
+		hrtimer_start(&s_touchLED.timer, delay, HRTIMER_MODE_REL);
 #endif
 // 20100820  LGE Touch LED Control [END]
         NvOdmServicesPmuSetVoltage(s_touchLED.hPmu, s_touchLED.conn->AddressList[0].Address, s_touchLED.setVal, &settle_us);
@@ -103,7 +118,16 @@ static NvBool touchLED_Control(NvU8 value)
 
 static void touchLED_timeout(struct work_struct *wq)
 {
-	touchLED_Control(NV_FALSE);
+	if (s_touchLED.is_blinking) {
+		if (s_touchLED.setVal > 0) {
+			s_touchLED.setVal--;
+		} else { 
+			s_touchLED.setVal = s_touchLED.is_blinking;
+		}
+	        touchLED_Control(NV_TRUE);
+        } else {
+		touchLED_Control(NV_FALSE);
+        }
 }
 
 static enum hrtimer_restart touchLED_timer_func(struct hrtimer *timer)
@@ -118,6 +142,8 @@ static void touchLED_early_suspend(struct early_suspend *es)
 {
 	printk("[LED] touchLED_early_suspend\n");
 	s_touchLED.is_working = 0;
+        if (s_touchLED.keep_led_on || s_touchLED.is_blinking)
+		return;
 	touchLED_Control(NV_FALSE);
 	return;
 }
@@ -126,6 +152,8 @@ static void touchLED_late_resume(struct early_suspend *es)
 {
 	printk("[LED] touchLED_late_resume\n");
 	s_touchLED.is_working = 1;
+        if (s_touchLED.keep_led_on || s_touchLED.is_blinking)
+		return;
 	touchLED_Control(NV_TRUE);
 	return;
 }
@@ -175,6 +203,72 @@ static ssize_t star_wled_store(struct device *dev,
 
 static DEVICE_ATTR(wled, 0666, star_wled_show, star_wled_store);
 
+#ifdef CONFIG_LEDS_CLASS
+static ssize_t star_blink_show(struct device *dev,
+                    struct device_attribute *attr, char *buf)
+{
+    return 0;
+}
+
+static ssize_t star_blink_store(struct device *dev,
+                     struct device_attribute *attr,
+                     const char *buf, size_t size)
+{
+    struct led_classdev *led_cdev = dev_get_drvdata(dev);
+    unsigned long state;
+    NvU32 val = 0;
+    unsigned long step_duration;
+
+    /* Input value is animation duration in msec */
+    val = (NvU32)simple_strtoul(buf, NULL, 10);
+
+    if (!val) {
+    	s_touchLED.delay = TOUCH_DELAY_SEC;
+	s_touchLED.setVal = s_touchLED.is_blinking;
+	s_touchLED.is_blinking = 0;
+        touchLED_Control(NV_FALSE);
+    } else {
+        if (s_touchLED.is_blinking) {
+	     /* config change, save original brighness! */
+             s_touchLED.setVal = s_touchLED.is_blinking;
+        }
+        step_duration = val / s_touchLED.setVal;
+        printk(KERN_DEBUG "My step duration is %ld msec from %ld and %d\n",step_duration, val, s_touchLED.setVal);
+    	s_touchLED.delay = step_duration * 1000 * 1000; // in nsec
+	s_touchLED.is_blinking = s_touchLED.setVal;
+        touchLED_Control(NV_TRUE);
+    }
+    return size;
+}
+
+static DEVICE_ATTR(blink, 0666, star_blink_show, star_blink_store);
+
+static ssize_t star_enable_show(struct device *dev,
+                    struct device_attribute *attr, char *buf)
+{
+    return 0;
+}
+
+static ssize_t star_enable_store(struct device *dev,
+                     struct device_attribute *attr,
+                     const char *buf, size_t size)
+{
+    struct led_classdev *led_cdev = dev_get_drvdata(dev);
+    unsigned long state;
+    NvU8 val = 0;
+
+    val = (NvU8)simple_strtoul(buf, NULL, 10);
+
+    s_touchLED.keep_led_on = val ? 1 : 0;
+    touchLED_Control(val ? NV_TRUE : NV_FALSE);
+
+    return size;
+}
+
+static DEVICE_ATTR(enable, 0666, star_enable_show, star_enable_store);
+
+#endif
+
 static struct attribute *star_wled_attributes[] = {
     &dev_attr_wled.attr,
     NULL
@@ -185,13 +279,29 @@ static const struct attribute_group star_wled_group = {
 };
 //20101104, , WLED set [END]
 
-void keep_touch_led_on()
+void keep_touch_led_on(void)
 {
 	s_touchLED.keep_led_on = 1;
 	touchLED_Control(NV_TRUE);
 }
 
 EXPORT_SYMBOL(keep_touch_led_on);
+
+#ifdef CONFIG_LEDS_CLASS
+
+static void led_brightness_set(struct led_classdev *led_cdev,
+                   enum led_brightness brightness)
+{
+    long val = brightness*20*100/100/255;
+
+    // 0~100 (0.0mA~10.0mA)
+    if((int)val > s_touchLED.maxVal)
+        s_touchLED.setVal = s_touchLED.maxVal;
+    else
+        s_touchLED.setVal = (int)val;
+}
+
+#endif
 
 static int __init touchLED_probe(struct platform_device *pdev)
 {
@@ -241,6 +351,17 @@ static int __init touchLED_probe(struct platform_device *pdev)
         printk(KERN_ERR "[star touch led] sysfs_create_group ERROR\n");
     }
     //20101104, , WLED set [END]
+
+#ifdef CONFIG_LEDS_CLASS
+    /* Add leds class support */
+    s_touchLED.leddev.name = "buttonpanel";
+    s_touchLED.leddev.brightness_set = led_brightness_set;
+    s_touchLED.leddev.max_brightness = 255;
+    s_touchLED.leddev.flags = 0;
+    led_classdev_register(&pdev->dev, &s_touchLED.leddev);
+    device_create_file(s_touchLED.leddev.dev, &dev_attr_blink);
+    device_create_file(s_touchLED.leddev.dev, &dev_attr_enable);
+#endif
 
 	s_touchLED.is_working = 1;
 
