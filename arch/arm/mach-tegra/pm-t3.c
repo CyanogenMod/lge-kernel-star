@@ -300,13 +300,17 @@ int tegra_cluster_control(unsigned int us, unsigned int flags)
 
 	local_irq_disable();
 	if (flags & TEGRA_POWER_SDRAM_SELFREFRESH) {
+#if 0 /* FIXME! */
 		if (us)
 			tegra_lp2_set_trigger(us);
+#endif
 
 		tegra_suspend_dram(false, flags);
 
+#if 0 /* FIXME! */
 		if (us)
 			tegra_lp2_set_trigger(0);
+#endif
 	} else
 		tegra_idle_lp2_last(flags);
 	local_irq_enable();

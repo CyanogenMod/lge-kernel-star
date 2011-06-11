@@ -199,6 +199,7 @@ static int power_up_cpu(unsigned int cpu)
 	 * for confirmation that cpu is powered and remove clamps.
 	 * On first boot entry do not wait - go to direct ungate.
 	 */
+#if 0 /* FIXME! */
 	if (cpu_isset(cpu,*(cpumask_t*)&tegra_cpu_init_map))
 	{
 		timeout = jiffies + HZ;
@@ -208,6 +209,7 @@ static int power_up_cpu(unsigned int cpu)
 			udelay(10);
 		} while (time_before(jiffies, timeout));
 	}
+#endif
 	/* 1'st boot or Flow controller did not work as expected - try directly toggle
 	   power gates. Bail out if direct power on also failed */
 	if (!is_cpu_powered(cpu))
