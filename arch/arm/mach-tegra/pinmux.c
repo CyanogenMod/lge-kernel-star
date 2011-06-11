@@ -925,11 +925,6 @@ void tegra_pinmux_config_pullupdown_table(const struct tegra_pingroup_config *co
 	}
 }
 
-void tegra_init_pinmux(void)
-{
-	tegra2_init_pinmux();
-}
-
 #ifdef	CONFIG_DEBUG_FS
 
 #include <linux/debugfs.h>

@@ -26,10 +26,10 @@
 #include <linux/io.h>
 #include <linux/init.h>
 #include <linux/string.h>
+#include <linux/syscore_ops.h>
 
 #include <mach/iomap.h>
 #include <mach/pinmux.h>
-#include <mach/suspend.h>
 
 #define DRIVE_PINGROUP(pg_name, r)		\
 	[TEGRA_DRIVE_PINGROUP_ ## pg_name] = {	\
@@ -373,7 +373,7 @@ static inline void pg_writel(unsigned long value, unsigned long offset)
 	writel(value, IO_TO_VIRT(TEGRA_APB_MISC_BASE + offset));
 }
 
-void tegra_pinmux_suspend(void)
+static int tegra_pinmux_suspend(void)
 {
 	unsigned int i;
 	u32 *ctx = pinmux_reg;
@@ -383,9 +383,11 @@ void tegra_pinmux_suspend(void)
 
 	for (i = 0; i < ARRAY_SIZE(tegra_soc_drive_pingroups); i ++)
 		*ctx++ = pg_readl(tegra_soc_drive_pingroups[i].reg);
+
+	return 0;
 }
 
-void tegra_pinmux_resume(void)
+static void tegra_pinmux_resume(void)
 {
 	unsigned int i;
 	u32 *ctx = pinmux_reg;
@@ -395,5 +397,15 @@ void tegra_pinmux_resume(void)
 
 	for (i = 0; i < ARRAY_SIZE(tegra_soc_drive_pingroups); i ++)
 		pg_writel(*ctx++, tegra_soc_drive_pingroups[i].reg);
+}
+
+static struct syscore_ops tegra_pinmux_syscore_ops = {
+	.suspend = tegra_pinmux_suspend,
+	.resume = tegra_pinmux_resume,
+};
+
+void tegra_init_pinmux(void)
+{
+	register_syscore_ops(&tegra_pinmux_syscore_ops);
 }
 #endif

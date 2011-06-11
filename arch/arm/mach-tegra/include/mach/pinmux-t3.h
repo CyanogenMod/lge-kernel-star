@@ -17,6 +17,8 @@
 #ifndef __MACH_TEGRA_PINMUX_T3_H
 #define __MACH_TEGRA_PINMUX_T3_H
 
+void tegra_init_pinmux(void);
+
 #define TEGRA_PINMUX_HAS_IO_DIRECTION	1
 
 enum tegra_pingroup {
@@ -272,7 +274,6 @@ enum tegra_pingroup {
 	TEGRA_MAX_PINGROUP,
 };
 
-#endif
 enum tegra_drive_pingroup {
 	TEGRA_DRIVE_PINGROUP_AO1 = 0,
 	TEGRA_DRIVE_PINGROUP_AO2,
@@ -318,3 +319,4 @@ enum tegra_drive_pingroup {
 	TEGRA_MAX_DRIVE_PINGROUP,
 };
 
+#endif
