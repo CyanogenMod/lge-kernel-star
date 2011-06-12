@@ -232,6 +232,9 @@ static ssize_t star_blink_store(struct device *dev,
 	     /* config change, save original brighness! */
              s_touchLED.setVal = s_touchLED.is_blinking;
         }
+        if (s_touchLED.setVal < 10) {
+	     s_touchLED.setVal = 10;
+        }
         step_duration = val / s_touchLED.setVal;
     	s_touchLED.delay = step_duration * 1000 * 1000; // in nsec
 	s_touchLED.is_blinking = s_touchLED.setVal;
