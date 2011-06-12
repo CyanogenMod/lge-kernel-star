@@ -3640,6 +3640,8 @@ static struct clk_mux_sel mux_plla_clk32_pllp_clkm_plle[] = {
 	{ 0, 0},
 };
 
+static struct raw_notifier_head emc_rate_change_nh;
+
 static struct clk tegra_clk_emc = {
 	.name = "emc",
 	.ops = &tegra_emc_clk_ops,
@@ -3651,6 +3653,7 @@ static struct clk tegra_clk_emc = {
 	.u.periph = {
 		.clk_num = 57,
 	},
+	.rate_change_nh = &emc_rate_change_nh,
 };
 
 static struct clk tegra_clk_cbus = {
@@ -3821,6 +3824,7 @@ struct clk tegra_list_clks[] = {
 	SHARED_CLK("usb1.emc",	"tegra-ehci.0",		"emc",	&tegra_clk_emc, NULL, 0),
 	SHARED_CLK("usb2.emc",	"tegra-ehci.1",		"emc",	&tegra_clk_emc, NULL, 0),
 	SHARED_CLK("usb3.emc",	"tegra-ehci.2",		"emc",	&tegra_clk_emc, NULL, 0),
+	SHARED_CLK("mon.emc",	"tegra_actmon",		"emc",	&tegra_clk_emc, NULL, 0),
 
 	SHARED_CLK("host1x.cbus","tegra_grhost",	"host1x", &tegra_clk_cbus, "host1x", 2),
 	SHARED_CLK("3d.cbus",	"tegra_grhost",		"gr3d",	&tegra_clk_cbus, "3d",  0),
