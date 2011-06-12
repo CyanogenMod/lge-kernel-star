@@ -324,6 +324,13 @@ void clk_disable(struct clk *c)
 }
 EXPORT_SYMBOL(clk_disable);
 
+static int clk_rate_change_notify(struct clk *c, unsigned long rate)
+{
+	if (!c->rate_change_nh)
+		return -ENOSYS;
+	return raw_notifier_call_chain(c->rate_change_nh, rate, NULL);
+}
+
 int clk_set_parent(struct clk *c, struct clk *parent)
 {
 	int ret = 0;
@@ -380,6 +387,9 @@ int clk_set_parent(struct clk *c, struct clk *parent)
 	if (clk_is_auto_dvfs(c) && c->refcnt > 0 &&
 			new_rate < old_rate)
 		ret = tegra_dvfs_set_rate(c, new_rate);
+
+	if (new_rate != old_rate)
+		clk_rate_change_notify(c, new_rate);
 
 out:
 	if (disable)
@@ -447,6 +457,9 @@ int clk_set_rate_locked(struct clk *c, unsigned long rate)
 
 	if (clk_is_auto_dvfs(c) && rate < old_rate && c->refcnt > 0)
 		ret = tegra_dvfs_set_rate(c, rate);
+
+	if (rate != old_rate)
+		clk_rate_change_notify(c, rate);
 
 out:
 	if (disable)
@@ -764,6 +777,33 @@ int tegra_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting)
 out:
 	clk_unlock_restore(c, &flags);
 	return ret;
+}
+
+int tegra_register_clk_rate_notifier(struct clk *c, struct notifier_block *nb)
+{
+	int ret;
+	unsigned long flags;
+
+	if (!c->rate_change_nh)
+		return -ENOSYS;
+
+	clk_lock_save(c, &flags);
+	ret = raw_notifier_chain_register(c->rate_change_nh, nb);
+	clk_unlock_restore(c, &flags);
+	return ret;
+}
+
+void tegra_unregister_clk_rate_notifier(
+	struct clk *c, struct notifier_block *nb)
+{
+	unsigned long flags;
+
+	if (!c->rate_change_nh)
+		return;
+
+	clk_lock_save(c, &flags);
+	raw_notifier_chain_unregister(c->rate_change_nh, nb);
+	clk_unlock_restore(c, &flags);
 }
 
 #ifdef CONFIG_DEBUG_FS
