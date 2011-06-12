@@ -16,7 +16,7 @@
 static struct tegra_usb_phy *phy;
 static struct clk *udc_clk;
 static struct clk *emc_clk;
-static struct clk *hclk_clk;
+static struct clk *sclk_clk;
 static void *udc_base;
 
 int fsl_udc_clk_init(struct platform_device *pdev)
@@ -35,21 +35,15 @@ int fsl_udc_clk_init(struct platform_device *pdev)
 
 	clk_enable(udc_clk);
 
-	hclk_clk = clk_get(&pdev->dev, "hclk");
-	if (IS_ERR(hclk_clk)) {
-		dev_err(&pdev->dev, "Can't get hclk clock\n");
-		err = PTR_ERR(hclk_clk);
-		goto err_hclk;
+	sclk_clk = clk_get(&pdev->dev, "sclk");
+	if (IS_ERR(sclk_clk)) {
+		dev_err(&pdev->dev, "Can't get sclk clock\n");
+		err = PTR_ERR(sclk_clk);
+		goto err_sclk;
 	}
 
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-	/* Set hclk to 240MHz. For Tegra 2x SOC */
-	clk_set_rate(hclk_clk, 240000000);
-#else
-	/* Set hclk to 216MHz. For Tegra 3x SOC */
-	clk_set_rate(hclk_clk, 216000000);
-#endif
-	clk_enable(hclk_clk);
+	clk_set_rate(sclk_clk, 80000000);
+	clk_enable(sclk_clk);
 
 	emc_clk = clk_get(&pdev->dev, "emc");
 	if (IS_ERR(emc_clk)) {
@@ -101,9 +95,9 @@ err0:
 	clk_disable(emc_clk);
 	clk_put(emc_clk);
 err_emc:
-	clk_disable(hclk_clk);
-	clk_put(hclk_clk);
-err_hclk:
+	clk_disable(sclk_clk);
+	clk_put(sclk_clk);
+err_sclk:
 	clk_disable(udc_clk);
 	clk_put(udc_clk);
 	return err;
@@ -122,8 +116,8 @@ void fsl_udc_clk_release(void)
 	clk_disable(udc_clk);
 	clk_put(udc_clk);
 
-	clk_disable(hclk_clk);
-	clk_put(hclk_clk);
+	clk_disable(sclk_clk);
+	clk_put(sclk_clk);
 
 	clk_disable(emc_clk);
 	clk_put(emc_clk);
@@ -133,14 +127,14 @@ void fsl_udc_clk_suspend(bool is_dpd)
 {
 	tegra_usb_phy_power_off(phy, is_dpd);
 	clk_disable(udc_clk);
-	clk_disable(hclk_clk);
+	clk_disable(sclk_clk);
 	clk_disable(emc_clk);
 }
 
 void fsl_udc_clk_resume(bool is_dpd)
 {
 	clk_enable(emc_clk);
-	clk_enable(hclk_clk);
+	clk_enable(sclk_clk);
 	clk_enable(udc_clk);
 	tegra_usb_phy_power_on(phy,  is_dpd);
 }
