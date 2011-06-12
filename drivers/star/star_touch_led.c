@@ -222,18 +222,17 @@ static ssize_t star_blink_store(struct device *dev,
     /* Input value is animation duration in msec */
     val = (NvU32)simple_strtoul(buf, NULL, 10);
 
-    if (!val) {
+    if (!val && s_touchLED.is_blinking) {
     	s_touchLED.delay = TOUCH_DELAY_SEC;
 	s_touchLED.setVal = s_touchLED.is_blinking;
 	s_touchLED.is_blinking = 0;
         touchLED_Control(NV_FALSE);
-    } else {
+    } else if (val) {
         if (s_touchLED.is_blinking) {
 	     /* config change, save original brighness! */
              s_touchLED.setVal = s_touchLED.is_blinking;
         }
         step_duration = val / s_touchLED.setVal;
-        printk(KERN_DEBUG "My step duration is %ld msec from %ld and %d\n",step_duration, val, s_touchLED.setVal);
     	s_touchLED.delay = step_duration * 1000 * 1000; // in nsec
 	s_touchLED.is_blinking = s_touchLED.setVal;
         touchLED_Control(NV_TRUE);
