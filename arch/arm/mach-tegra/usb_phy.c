@@ -874,7 +874,7 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	return 0;
 }
 
-static void utmi_phy_power_off(struct tegra_usb_phy *phy, bool is_dpd)
+static int utmi_phy_power_off(struct tegra_usb_phy *phy, bool is_dpd)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
