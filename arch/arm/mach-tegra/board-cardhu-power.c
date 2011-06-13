@@ -24,7 +24,6 @@
 #include <linux/regulator/machine.h>
 #include <linux/mfd/tps6591x.h>
 #include <linux/gpio.h>
-#include <mach/suspend.h>
 #include <linux/io.h>
 #include <linux/regulator/gpio-switch-regulator.h>
 #include <linux/regulator/tps6591x-regulator.h>
@@ -38,7 +37,7 @@
 #include "gpio-names.h"
 #include "board.h"
 #include "board-cardhu.h"
-#include "power.h"
+#include "pm.h"
 #include "wakeups-t3.h"
 
 #define PMC_CTRL		0x0
@@ -952,13 +951,8 @@ static struct tegra_suspend_platform_data cardhu_suspend_data = {
 	.suspend_mode	= TEGRA_SUSPEND_LP1,
 	.core_timer	= 0x7e7e,
 	.core_off_timer = 0,
-	.separate_req	= true,
 	.corereq_high	= false,
 	.sysclkreq_high	= true,
-	.wake_enb	= TEGRA_WAKE_GPIO_PV0 | TEGRA_WAKE_PWR_INT | TEGRA_WAKE_RTC_ALARM,
-	.wake_high	= TEGRA_WAKE_RTC_ALARM,
-	.wake_low	= TEGRA_WAKE_GPIO_PV0 | TEGRA_WAKE_PWR_INT,
-	.wake_any	= 0,
 	.cpu_lp2_min_residency = 2000,
 };
 

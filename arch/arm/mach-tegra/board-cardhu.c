@@ -495,7 +495,6 @@ static void cardhu_sata_init(void) { }
 
 static void __init tegra_cardhu_init(void)
 {
-	tegra_common_init();
 	tegra_clk_init_from_table(cardhu_clk_init_table);
 	cardhu_pinmux_init();
 	cardhu_i2c_init();
@@ -538,11 +537,10 @@ static void __init tegra_cardhu_reserve(void)
 
 MACHINE_START(CARDHU, "cardhu")
 	.boot_params    = 0x80000100,
-	.phys_io        = IO_APB_PHYS,
-	.io_pg_offst    = ((IO_APB_VIRT) >> 18) & 0xfffc,
-	.init_irq       = tegra_init_irq,
-	.init_machine   = tegra_cardhu_init,
 	.map_io         = tegra_map_common_io,
 	.reserve        = tegra_cardhu_reserve,
+	.init_early	= tegra_init_early,
+	.init_irq       = tegra_init_irq,
 	.timer          = &tegra_timer,
+	.init_machine   = tegra_cardhu_init,
 MACHINE_END
