@@ -87,7 +87,7 @@
 #include <linux/clk.h>
 
 #include <mach/iomap.h>
-#include "power.h"
+#include "pm.h"
 #include "clock.h"
 
 #define SYSFS_CLUSTER_PRINTS	   1	/* Nonzero: enable status prints */

@@ -719,8 +719,11 @@ static const char *lp_state[TEGRA_MAX_SUSPEND_MODE] = {
 
 static int tegra_suspend_enter(suspend_state_t state)
 {
-	enum tegra_suspend_mode mode = current_suspend_mode;
+	return tegra_suspend_dram(current_suspend_mode);
+}
 
+int tegra_suspend_dram(enum tegra_suspend_mode mode)
+{
 	BUG_ON(mode < 0 || mode >= TEGRA_MAX_SUSPEND_MODE);
 
 	if ((mode == TEGRA_SUSPEND_LP0) && !tegra_pm_irq_lp0_allowed()) {

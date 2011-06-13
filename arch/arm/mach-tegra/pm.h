@@ -47,6 +47,8 @@ unsigned long tegra_cpu_power_good_time(void);
 unsigned long tegra_cpu_power_off_time(void);
 unsigned long tegra_cpu_lp2_min_residency(void);
 
+int tegra_suspend_dram(enum tegra_suspend_mode mode);
+
 #define TEGRA_POWER_SDRAM_SELFREFRESH	0x400	/* SDRAM is in self-refresh */
 
 #define TEGRA_POWER_CLUSTER_G		0x1000	/* G CPU */

@@ -86,8 +86,6 @@
 #define CPU_RESET(cpu)	(0x1111ul<<(cpu))
 
 
-void tegra_suspend_dram(bool lp0_ok, unsigned int flags);
-
 static int cluster_switch_prolog_clock(unsigned int flags)
 {
 	u32 reg;
@@ -305,7 +303,7 @@ int tegra_cluster_control(unsigned int us, unsigned int flags)
 			tegra_lp2_set_trigger(us);
 #endif
 
-		tegra_suspend_dram(false, flags);
+		tegra_suspend_dram(TEGRA_SUSPEND_LP1);
 
 #if 0 /* FIXME! */
 		if (us)
