@@ -517,6 +517,7 @@ static void __init tegra_cardhu_init(void)
 	cardhu_scroll_init();
 	cardhu_keys_init();
 	cardhu_panel_init();
+	cardhu_pmon_init();
 	cardhu_sensors_init();
 	cardhu_bt_rfkill();
 	tegra_setup_bluesleep();

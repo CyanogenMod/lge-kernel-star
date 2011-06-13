@@ -108,5 +108,6 @@ obj-${CONFIG_MACH_CARDHU}               += board-cardhu-power.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-sdhci.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-sensors.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-memory.o
+obj-${CONFIG_MACH_CARDHU}               += board-cardhu-powermon.o
 
 # Enterprise
