@@ -124,13 +124,29 @@ config TEGRA_VERBIER_E1187
          Select this only if you are an NVIDIA developer working on
          an verbier E1187 platforms. All others must leave this unselected.
 
+choice
+       prompt "Tegra platform type"
+       default TEGRA_SILICON_PLATFORM
+
+config TEGRA_SILICON_PLATFORM
+        bool "Silicon"
+        help
+          This enables support for a Tegra silicon platform.
+
+config TEGRA_SIMULATION_PLATFORM
+        bool "Simulation"
+        help
+          This enables support for a Tegra simulation platform.
+          Select this only if you are an NVIDIA developer working
+          on a simulation platform.
+
 config TEGRA_FPGA_PLATFORM
-       bool "Support for NVIDIA Tegra FPGA platform"
-       default n
-       help
-         This enables the NVIDIA Tegra FPGA platform support.
-         Select this only if you are an NVIDIA developer working on
-         an FPGA platforms. All others must leave this unselected.
+        bool "FPGA"
+        help
+          This enables support for a Tegra FPGA platform.
+          Select this only if you are an NVIDIA developer working
+          on a FPGA platform.
+endchoice
 
 choice
         prompt "Low-level debug console UART"
@@ -185,17 +201,17 @@ config TEGRA_CARDHU_DSI
 
 config TEGRA_EMC_SCALING_ENABLE
 	bool "Enable scaling the memory frequency"
-	depends on !TEGRA_FPGA_PLATFORM
+	depends on TEGRA_SILICON_PLATFORM
 	default n
 
 config TEGRA_CPU_DVFS
 	bool "Enable voltage scaling on Tegra CPU"
-	depends on !TEGRA_FPGA_PLATFORM
+	depends on TEGRA_SILICON_PLATFORM
 	default y
 
 config TEGRA_CORE_DVFS
 	bool "Enable voltage scaling on Tegra core"
-	depends on !TEGRA_FPGA_PLATFORM
+	depends on TEGRA_SILICON_PLATFORM
 	depends on TEGRA_CPU_DVFS
 	default y
 
@@ -248,7 +264,7 @@ config TEGRA_ARB_SEMAPHORE
 
 config TEGRA_THERMAL_THROTTLE
 	bool "Enable throttling of CPU speed on overtemp"
-	depends on !TEGRA_FPGA_PLATFORM
+	depends on TEGRA_SILICON_PLATFORM
 	depends on CPU_FREQ
 	default y
 	help
@@ -283,7 +299,7 @@ config TEGRA_MC_PROFILE
 
 config TEGRA_EDP_LIMITS
 	bool "Enforce electrical design limits"
-	depends on !TEGRA_FPGA_PLATFORM
+	depends on TEGRA_SILICON_PLATFORM
 	depends on CPU_FREQ
 	default y if ARCH_TEGRA_3x_SOC
 	default n
