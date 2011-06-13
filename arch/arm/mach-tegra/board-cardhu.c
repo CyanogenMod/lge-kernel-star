@@ -564,7 +564,23 @@ static void cardhu_gps_init(void)
 
 static void cardhu_modem_init(void)
 {
-	tegra_gpio_enable(TEGRA_GPIO_PH5);
+	struct board_info board_info;
+	int w_disable_gpio;
+
+	tegra_get_board_info(&board_info);
+	switch (board_info.board_id) {
+	case BOARD_E1291:
+		if (board_info.fab < 0x3) {
+			w_disable_gpio = TEGRA_GPIO_PH5;
+		} else {
+			w_disable_gpio = TEGRA_GPIO_PDD5;
+		}
+		tegra_gpio_enable(w_disable_gpio);
+		gpio_direction_input(w_disable_gpio);
+		break;
+	default:
+		break;
+	}
 }
 
 #ifdef CONFIG_SATA_AHCI_TEGRA
