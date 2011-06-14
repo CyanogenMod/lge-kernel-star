@@ -217,11 +217,13 @@ static struct tegra_i2c_platform_data cardhu_i2c5_platform_data = {
 };
 
 
+#if 0
 struct tegra_wired_jack_conf audio_wr_jack_conf = {
 	.hp_det_n = TEGRA_GPIO_PW2,
 	.en_mic_ext = TEGRA_GPIO_PX1,
 	.en_mic_int = TEGRA_GPIO_PX0,
 };
+#endif
 
 static void cardhu_i2c_init(void)
 {
@@ -521,7 +523,7 @@ static void __init tegra_cardhu_init(void)
 	cardhu_bt_rfkill();
 	tegra_setup_bluesleep();
 	cardhu_sata_init();
-	audio_wired_jack_init();
+	//audio_wired_jack_init();
 	cardhu_pins_state_init();
 	cardhu_emc_init();
 }
