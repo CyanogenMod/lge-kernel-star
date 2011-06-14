@@ -56,17 +56,19 @@
 #define cardhu_dsi_panel_reset	TEGRA_GPIO_PD2
 #endif
 
-static struct regulator *cardhu_dsi_reg = NULL;
-
 static struct regulator *cardhu_hdmi_reg = NULL;
 static struct regulator *cardhu_hdmi_pll = NULL;
 static struct regulator *cardhu_hdmi_vddio = NULL;
 
 static atomic_t sd_brightness = ATOMIC_INIT(255);
 
+#ifdef CONFIG_TEGRA_CARDHU_DSI
+static struct regulator *cardhu_dsi_reg = NULL;
+#else
 static struct regulator *cardhu_lvds_reg = NULL;
 static struct regulator *cardhu_lvds_vdd_bl = NULL;
 static struct regulator *cardhu_lvds_vdd_panel = NULL;
+#endif
 
 static struct board_info board_info;
 
@@ -151,9 +153,7 @@ static int cardhu_backlight_notify(struct device *unused, int brightness)
 	/* Set the backlight GPIO pin mode to 'backlight_enable' */
 	gpio_request(cardhu_bl_enb, "backlight_enb");
 	gpio_set_value(cardhu_bl_enb, !!brightness);
-	goto final;
-#endif
-#if DSI_PANEL_219 || DSI_PANEL_218
+#elif DSI_PANEL_219 || DSI_PANEL_218
 	/* DSIa */
 	gpio_set_value(cardhu_dsia_bl_enb, !!brightness);
 
@@ -161,7 +161,6 @@ static int cardhu_backlight_notify(struct device *unused, int brightness)
 	gpio_set_value(cardhu_dsib_bl_enb, !!brightness);
 #endif
 
-final:
 	/* SD brightness is a percentage, 8-bit value. */
 	brightness = (brightness * cur_sd_brightness) / 255;
 	if (cur_sd_brightness != 255) {
@@ -190,6 +189,7 @@ static struct platform_device cardhu_backlight_device = {
 	},
 };
 
+#ifndef CONFIG_TEGRA_CARDHU_DSI
 static int cardhu_panel_enable(void)
 {
 	if (cardhu_lvds_reg == NULL) {
@@ -245,6 +245,7 @@ static int cardhu_panel_disable(void)
 		gpio_set_value(cardhu_lvds_shutdown, 0);
 	return 0;
 }
+#endif
 
 static int cardhu_hdmi_vddio_enable(void)
 {
@@ -386,6 +387,7 @@ static struct resource cardhu_disp2_resources[] = {
 	},
 };
 
+#ifndef CONFIG_TEGRA_CARDHU_DSI
 static struct tegra_dc_mode cardhu_panel_modes[] = {
 	{
 		/* 1366x768@59Hz */
@@ -402,6 +404,7 @@ static struct tegra_dc_mode cardhu_panel_modes[] = {
 		.v_front_porch = 3,
 	},
 };
+#endif
 
 static struct tegra_dc_sd_settings cardhu_sd_settings = {
 	.enable = 0, /* Disabled by default. */
@@ -494,6 +497,7 @@ static struct tegra_dc_sd_settings cardhu_sd_settings = {
 	.bl_device = &cardhu_backlight_device,
 };
 
+#ifndef CONFIG_TEGRA_CARDHU_DSI
 static struct tegra_fb_data cardhu_fb_data = {
 	.win		= 0,
 	.xres		= 1366,
@@ -501,6 +505,7 @@ static struct tegra_fb_data cardhu_fb_data = {
 	.bits_per_pixel	= 32,
 	.flags		= TEGRA_FB_FLIP_ON_PROBE,
 };
+#endif
 
 static struct tegra_fb_data cardhu_hdmi_fb_data = {
 	.win		= 0,
@@ -535,6 +540,7 @@ static struct tegra_dc_platform_data cardhu_disp2_pdata = {
 	.emc_clk_rate	= 300000000,
 };
 
+#ifdef CONFIG_TEGRA_CARDHU_DSI
 static int cardhu_dsi_panel_enable(void)
 {
 	int ret;
@@ -785,7 +791,7 @@ static struct tegra_fb_data cardhu_dsi_fb_data = {
 #endif
 	.flags		= TEGRA_FB_FLIP_ON_PROBE,
 };
-
+#endif
 
 static struct tegra_dc_out cardhu_disp1_out = {
 	.align		= TEGRA_DC_ALIGN_MSB,
