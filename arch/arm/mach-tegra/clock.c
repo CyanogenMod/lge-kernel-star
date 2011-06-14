@@ -236,9 +236,16 @@ void clk_init(struct clk *c)
 static int clk_enable_locked(struct clk *c)
 {
 	int ret = 0;
+	int rate = clk_get_rate_locked(c);
+	bool set_rate = false;
+
+	if (rate > c->max_rate) {
+		rate = c->max_rate;
+		set_rate = true;
+	}
 
 	if (clk_is_auto_dvfs(c)) {
-		ret = tegra_dvfs_set_rate(c, clk_get_rate_locked(c));
+		ret = tegra_dvfs_set_rate(c, rate);
 		if (ret)
 			return ret;
 	}
@@ -249,6 +256,9 @@ static int clk_enable_locked(struct clk *c)
 			if (ret)
 				return ret;
 		}
+
+		if (set_rate)
+			clk_set_rate_locked(c, rate);
 
 		if (c->ops && c->ops->enable) {
 			ret = c->ops->enable(c);
