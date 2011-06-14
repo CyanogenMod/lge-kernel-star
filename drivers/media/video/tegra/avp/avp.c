@@ -370,7 +370,7 @@ static int msg_wait_ack_locked(struct tegra_avp_info *avp, u32 cmd, u32 *arg)
 {
 	/* rem_ack is a pointer into shared memory that the AVP modifies */
 	volatile u32 *rem_ack = avp->msg_to_avp;
-	unsigned long endtime = jiffies + HZ / 5;
+	unsigned long endtime = jiffies + msecs_to_jiffies(400);
 	int ret;
 
 	do {
@@ -548,6 +548,8 @@ static int avp_node_try_connect(struct trpc_node *node,
 	int ret;
 	unsigned long flags;
 	int len;
+	const int max_retry_cnt = 6;
+	int cnt = 0;
 
 	DBG(AVP_DBG_TRACE_TRPC_CONN, "%s: trying connect from %s\n", __func__,
 		port_name);
@@ -602,16 +604,29 @@ static int avp_node_try_connect(struct trpc_node *node,
 	 * take the from_avp_lock and everything should stay consistent.
 	 */
 	recv_msg_lock(avp);
-	mutex_lock(&avp->to_avp_lock);
-	ret = msg_write(avp, &msg, sizeof(msg), NULL, 0);
-	if (ret) {
-		pr_err("%s: remote has not acked last message (%s)\n", __func__,
-			   port_name);
+	for (cnt = 0; cnt < max_retry_cnt; cnt++) {
+		/* Retry to connect to AVP at this function maximum 6 times.
+		 * Because this section is protected by mutex and
+		 * needed to re-send the CMD_CONNECT command by CPU
+		 * if AVP didn't receive the command.
+		 */
+		mutex_lock(&avp->to_avp_lock);
+		ret = msg_write(avp, &msg, sizeof(msg), NULL, 0);
+		if (ret) {
+			pr_err("%s: remote has not acked last message (%s)\n",
+				   __func__, port_name);
+			mutex_unlock(&avp->to_avp_lock);
+			goto err_msg_write;
+		}
+		ret = msg_wait_ack_locked(avp, CMD_RESPONSE, &rinfo->rem_id);
 		mutex_unlock(&avp->to_avp_lock);
-		goto err_msg_write;
+		if (!ret && rinfo->rem_id)
+			break;
+
+		/* Skip the sleep function at last retry count */
+		if ((cnt + 1) < max_retry_cnt)
+			usleep_range(100, 2000);
 	}
-	ret = msg_wait_ack_locked(avp, CMD_RESPONSE, &rinfo->rem_id);
-	mutex_unlock(&avp->to_avp_lock);
 
 	if (ret) {
 		pr_err("%s: remote end won't respond for '%s'\n", __func__,
