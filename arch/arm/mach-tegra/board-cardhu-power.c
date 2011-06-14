@@ -405,6 +405,7 @@ static struct i2c_board_info __initdata tps6236x_boardinfo[] = {
 int __init cardhu_regulator_init(void)
 {
 	struct board_info board_info;
+	struct board_info pmu_board_info;
 	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
 	u32 pmc_ctrl;
 
@@ -415,6 +416,8 @@ int __init cardhu_regulator_init(void)
 	writel(pmc_ctrl | PMC_CTRL_INTR_LOW, pmc + PMC_CTRL);
 
 	tegra_get_board_info(&board_info);
+	tegra_get_pmu_board_info(&pmu_board_info);
+
 	if ((board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1291)) {
 		if ((board_info.sku & 1) == 1) {
@@ -427,7 +430,7 @@ int __init cardhu_regulator_init(void)
 			tps_platform.subdevs = tps_devs_e1198_skubit0_0;
 		}
 	} else {
-		if ((board_info.sku & 1) == 1) {
+		if ((pmu_board_info.sku & 1) == 1) {
 			tps_platform.num_subdevs = ARRAY_SIZE(tps_devs_e118x_skubit0_1);
 			tps_platform.subdevs = tps_devs_e118x_skubit0_1;
 		} else {
@@ -447,7 +450,7 @@ int __init cardhu_regulator_init(void)
 	i2c_register_board_info(4, cardhu_regulators, 1);
 
 	/* Resgister the TPS6236x for all boards whose sku bit 0 is set. */
-	if ((board_info.sku & 1) == 1) {
+	if (((board_info.sku & 1) == 1) || ((pmu_board_info.sku & 1) == 1)) {
 		pr_info("Registering the device TPS62361B\n");
 		i2c_register_board_info(4, tps6236x_boardinfo, 1);
 	}
@@ -962,12 +965,18 @@ static struct tegra_suspend_platform_data cardhu_suspend_data = {
 int __init cardhu_suspend_init(void)
 {
 	struct board_info board_info;
+	struct board_info pmu_board_info;
 
 	tegra_get_board_info(&board_info);
+	tegra_get_pmu_board_info(&pmu_board_info);
 
-	/* CORE_PWR_REQ to be high for all board whose sku bit 0 is set.
-	 * This is require to enable the dc-dc converter tps62361x */
-	if ((board_info.sku & 1) == 1)
+	/* For PMU Fab A03 and A04 make core_pwr_req to high */
+	if ((pmu_board_info.fab == 0x3) || (pmu_board_info.fab == 0x4))
+		cardhu_suspend_data.corereq_high = true;
+
+	/* CORE_PWR_REQ to be high for all processor/pmu board whose sku bit 0
+	 * is set. This is require to enable the dc-dc converter tps62361x */
+	if (((board_info.sku & 1) == 1) || ((pmu_board_info.sku & 1) == 1))
 		cardhu_suspend_data.corereq_high = true;
 
 	switch (board_info.board_id) {
