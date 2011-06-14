@@ -87,6 +87,7 @@ unsigned long tegra_lp0_vec_start;
 unsigned long tegra_lp0_vec_size;
 unsigned long tegra_grhost_aperture = ~0ul;
 static   bool is_tegra_debug_uart_hsport;
+static struct board_info pmu_board_info;
 
 static int pmu_core_edp = 1200;	/* default 1.2V EDP limit */
 static int board_panel_type;
@@ -417,6 +418,25 @@ void tegra_get_board_info(struct board_info *bi)
 	bi->major_revision = (system_serial_low >> 16) & 0xFF;
 	bi->minor_revision = (system_serial_low >> 8) & 0xFF;
 }
+
+static int __init tegra_pmu_board_info(char *info)
+{
+	char *p = info;
+	pmu_board_info.board_id = memparse(p, &p);
+	pmu_board_info.sku = memparse(p+1, &p);
+	pmu_board_info.fab = memparse(p+1, &p);
+	pmu_board_info.major_revision = memparse(p+1, &p);
+	pmu_board_info.minor_revision = memparse(p+1, &p);
+	return 1;
+}
+
+void tegra_get_pmu_board_info(struct board_info *bi)
+{
+	memcpy(bi, &pmu_board_info, sizeof(struct board_info));
+}
+
+__setup("pmuboard=", tegra_pmu_board_info);
+
 
 /*
  * Tegra has a protected aperture that prevents access by most non-CPU

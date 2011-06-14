@@ -74,6 +74,7 @@ enum panel_type {
 };
 
 void tegra_get_board_info(struct board_info *);
+void tegra_get_pmu_board_info(struct board_info *bi);
 
 int get_core_edp(void);
 enum panel_type get_panel_type(void);
