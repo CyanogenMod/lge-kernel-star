@@ -449,6 +449,7 @@ static struct tegra_otg_platform_data tegra_otg_pdata = {
 
 static void cardhu_usb_init(void)
 {
+#if 0
 	struct board_info bi;
 
 	tegra_get_board_info(&bi);
@@ -473,6 +474,7 @@ static void cardhu_usb_init(void)
 	tegra_ehci3_device.dev.platform_data = &tegra_ehci_pdata[2];
 	platform_device_register(&tegra_ehci3_device);
 
+#endif
 }
 
 static void cardhu_gps_init(void)
