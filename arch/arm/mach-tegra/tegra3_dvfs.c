@@ -110,6 +110,7 @@ static struct dvfs_relationship tegra3_dvfs_relationships[] = {
 	}
 
 static struct dvfs cpu_dvfs_table[] = {
+#if 0
 	/* Cpu voltages (mV):	     750, 775, 800, 825, 850, 875,  900,  925,  950,  975, 1000, 1025, 1050, 1075, 1100, 1125, 1150*/
 	CPU_DVFS("cpu_g", 0, 0, MHZ, 399, 399, 541, 541, 684, 684,  817,  817,  817, 1026, 1102, 1149, 1187, 1225, 1282, 1300),
 	CPU_DVFS("cpu_g", 0, 1, MHZ, 481, 481, 652, 652, 807, 807,  948,  948,  948, 1117, 1171, 1206, 1300),
@@ -129,6 +130,7 @@ static struct dvfs cpu_dvfs_table[] = {
 	CPU_DVFS("cpu_g", 3, 2, MHZ,   1, 540, 540, 711, 711, 883,  883, 1039, 1039, 1039, 1178, 1206, 1263, 1301, 1400),
 	CPU_DVFS("cpu_g", 3, 3, MHZ,   1, 570, 570, 777, 777, 931,  931, 1102, 1102, 1102, 1216, 1255, 1304, 1400),
 
+#endif
 	/*
 	 * "Safe entry" to be used when no match for chip speedo, process
 	 *  corner is found (just to boot at low rate); must be the last one
