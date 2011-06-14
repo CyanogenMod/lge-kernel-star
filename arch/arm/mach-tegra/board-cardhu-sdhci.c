@@ -79,42 +79,42 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data0 = {
 	.cd_gpio = -1,
 	.wp_gpio = -1,
 	.power_gpio = -1,
-	.tap_delay = 6,
+/*	.tap_delay = 6,
 	.is_voltage_switch_supported = false,
 	.vdd_rail_name = NULL,
 	.slot_rail_name = NULL,
 	.vdd_max_uv = -1,
 	.vdd_min_uv = -1,
 	.max_clk = 0,
-	.is_8bit_supported = false,
+	.is_8bit_supported = false, */
 };
 
 static struct tegra_sdhci_platform_data tegra_sdhci_platform_data2 = {
 	.cd_gpio = -1,
 	.wp_gpio = -1,
 	.power_gpio = -1,
-	.tap_delay = 6,
+/*	.tap_delay = 6,
 	.is_voltage_switch_supported = true,
 	.vdd_rail_name = "vddio_sdmmc1",
 	.slot_rail_name = "vddio_sd_slot",
 	.vdd_max_uv = 3320000,
 	.vdd_min_uv = 3280000,
 	.max_clk = 208000000,
-	.is_8bit_supported = false,
+	.is_8bit_supported = false, */
 };
 
 static struct tegra_sdhci_platform_data tegra_sdhci_platform_data3 = {
 	.cd_gpio = -1,
 	.wp_gpio = -1,
 	.power_gpio = -1,
-	.tap_delay = 6,
+/*	.tap_delay = 6,
 	.is_voltage_switch_supported = false,
 	.vdd_rail_name = NULL,
 	.slot_rail_name = NULL,
 	.vdd_max_uv = -1,
 	.vdd_min_uv = -1,
 	.max_clk = 48000000,
-	.is_8bit_supported = true,
+	.is_8bit_supported = true, */
 };
 
 static struct platform_device tegra_sdhci_device0 = {
@@ -213,6 +213,7 @@ static int pm269_sd_wp_gpio_init(void)
 int __init cardhu_sdhci_init(void)
 {
 	unsigned int rc = 0;
+#if 0
 	struct board_info board_info;
 	tegra_get_board_info(&board_info);
 	if (board_info.board_id == BOARD_PM269) {
@@ -230,16 +231,19 @@ int __init cardhu_sdhci_init(void)
 			tegra_sdhci_platform_data0.wp_gpio_polarity = 1;
 		}
 	}
+#endif
 
 	platform_device_register(&tegra_sdhci_device3);
 	platform_device_register(&tegra_sdhci_device2);
 
+#if 0
 	/* Fix ME: The gpios have to enabled for hot plug support */
 	rc = cardhu_sd_cd_gpio_init();
 	if (!rc) {
 		tegra_sdhci_platform_data0.cd_gpio = CARDHU_SD_CD;
 		tegra_sdhci_platform_data0.cd_gpio_polarity = 0;
 	}
+#endif
 
 
 
