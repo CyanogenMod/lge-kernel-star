@@ -44,6 +44,7 @@ struct ov5650_mode {
 	__u32 coarse_time;
 	__u16 gain;
 };
+
 #ifdef __KERNEL__
 struct ov5650_platform_data {
 	int (*power_on)(void);

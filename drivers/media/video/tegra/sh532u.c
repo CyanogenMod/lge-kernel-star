@@ -24,7 +24,9 @@
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
+#include <media/ov5650.h>
 #include <media/sh532u.h>
+#include <media/tegra_camera.h>
 
 #include <asm/traps.h>
 
@@ -34,18 +36,22 @@
 #define FOCAL_LENGTH 0x408d70a4 /* (4.42f) */
 #define FNUMBER 0x40333333 /* (2.8f) */
 
-
-struct sh532u_info {
+struct sh532u_sensor {
 	struct i2c_client *i2c_client;
 	struct sh532u_config config;
-	struct sh532u_platform_data sh532u_pdata;
+	struct sh532u_platform_data pdata;
 };
 
-static struct sh532u_info *info;
+struct sh532u_info {
+	enum StereoCameraMode camera_mode;
+	struct sh532u_sensor *left;
+	struct sh532u_sensor *right;
+};
 
-static int sh532u_read_u8(u8 dev, u8 addr, u8 *val)
+static struct sh532u_info *stereo_sh532u_info; /* set to NULL by compiler */
+
+static int sh532u_read_u8(struct i2c_client *client, u8 dev, u8 addr, u8 *val)
 {
-	struct i2c_client *client = info->i2c_client;
 	struct i2c_msg msg[2];
 	unsigned char data[3];
 
@@ -73,9 +79,8 @@ static int sh532u_read_u8(u8 dev, u8 addr, u8 *val)
 	return 0;
 }
 
-static int sh532u_read_u16(u8 addr, u16 *val)
+static int sh532u_read_u16(struct i2c_client *client, u8 addr, u16 *val)
 {
-	struct i2c_client *client = info->i2c_client;
 	struct i2c_msg msg[2];
 	u8 buf[4];
 
@@ -98,9 +103,8 @@ static int sh532u_read_u16(u8 addr, u16 *val)
 	return 0;
 }
 
-static int eeprom_read_u32(u8 addr, u32 *val)
+static int eeprom_read_u32(struct i2c_client *client, u8 addr, u32 *val)
 {
-	struct i2c_client *client = info->i2c_client;
 	struct i2c_msg msg[2];
 	union {
 		u8   dataU8[8];
@@ -127,9 +131,8 @@ static int eeprom_read_u32(u8 addr, u32 *val)
 	return 0;
 }
 
-static int sh532u_write_u8(u16 addr, u8 val)
+static int sh532u_write_u8(struct i2c_client *client, u16 addr, u8 val)
 {
-	struct i2c_client *client = info->i2c_client;
 	struct i2c_msg msg;
 	unsigned char data[2];
 
@@ -143,13 +146,12 @@ static int sh532u_write_u8(u16 addr, u8 val)
 
 	if (i2c_transfer(client->adapter, &msg, 1) != 1)
 		return -1;
-
-	return 0;
+	else
+		return 0;
 }
 
-static int sh532u_write_u16(u16 addr, u16 val)
+static int sh532u_write_u16(struct i2c_client *client, u16 addr, u16 val)
 {
-	struct i2c_client *client = info->i2c_client;
 	struct i2c_msg msg;
 	unsigned char data[3];
 
@@ -167,14 +169,14 @@ static int sh532u_write_u16(u16 addr, u16 val)
 	return 0;
 }
 
-static void move_driver(s16 tarPos)
+static void move_driver(struct i2c_client *client, s16 tarPos)
 {
 	s16 curPos, moveStep;
 	u16 moveDistance;
 	int err;
 
 	/* Read Current Position */
-	err = sh532u_read_u16(RZ_211H, &curPos);
+	err = sh532u_read_u16(client, RZ_211H, &curPos);
 	if (err)
 		goto move_driver_error;
 	/* Check move distance to Target Position */
@@ -182,8 +184,9 @@ static void move_driver(s16 tarPos)
 
 	/* if move distance is shorter than MS1Z12(=Step width) */
 	if (moveDistance <= STMV_SIZE) {
-		err = sh532u_write_u8(MSSET_211, (INI_MSSET_211 | 0x01));
-		err = err | sh532u_write_u16(MS1Z22_211H, tarPos);
+		err = sh532u_write_u8(client, MSSET_211,
+							(INI_MSSET_211 | 0x01));
+		err = err | sh532u_write_u16(client, MS1Z22_211H, tarPos);
 		if (err)
 			goto move_driver_error;
 	} else {
@@ -193,12 +196,11 @@ static void move_driver(s16 tarPos)
 			moveStep = -STMV_SIZE;
 
 		/* Set StepMove Target Positon */
-		err = sh532u_write_u16(MS1Z12_211H, moveStep);
-		err = err | sh532u_write_u16(STMVENDH_211, tarPos);
+		err = sh532u_write_u16(client, MS1Z12_211H, moveStep);
+		err = err | sh532u_write_u16(client, STMVENDH_211, tarPos);
 		/* Start StepMove */
 		err = err |
-		      sh532u_write_u8(
-			STMVEN_211,
+		      sh532u_write_u8(client, STMVEN_211,
 			(STMCHTG_ON | STMSV_ON | STMLFF_OFF | STMVEN_ON));
 		if (err)
 			goto move_driver_error;
@@ -206,10 +208,10 @@ static void move_driver(s16 tarPos)
 
 	return;
 move_driver_error:
-	pr_err("Focuser: %s failed!\n", __func__);
+	pr_err("sh532u: %s failed!\n", __func__);
 }
 
-static void wait_for_move(void)
+static void wait_for_move(struct i2c_client *client)
 {
 	u16 usSmvFin;
 	u8 moveTime, ucParMod, tmp;
@@ -218,14 +220,15 @@ static void wait_for_move(void)
 	moveTime = 0;
 	do {
 		mdelay(1);
-		err = sh532u_read_u8(0, STMVEN_211, &ucParMod);
-		err = err | sh532u_read_u16(RZ_211H, &usSmvFin);
+		err = sh532u_read_u8(client, 0, STMVEN_211, &ucParMod);
+		err = err | sh532u_read_u16(client, RZ_211H, &usSmvFin);
 		if (err)
 			goto wait_for_move_error;
 		/* StepMove Error Handling, Unexpected Position */
 		if ((usSmvFin == 0x7FFF) || (usSmvFin == 0x8001)) {
 			/* Stop StepMove Operation */
-			err = sh532u_write_u8(STMVEN_211, ucParMod & 0xFE);
+			err = sh532u_write_u8(client, STMVEN_211,
+							ucParMod & 0xFE);
 			if (err)
 				goto wait_for_move_error;
 		}
@@ -239,7 +242,7 @@ static void wait_for_move(void)
 		do {
 			mdelay(1);
 			moveTime++;
-			err = sh532u_read_u8(0, MSSET_211, &tmp);
+			err = sh532u_read_u8(client, 0, MSSET_211, &tmp);
 			if (err)
 				goto wait_for_move_error;
 		} while ((tmp & CHTGST_ON) && (moveTime < 15));
@@ -247,17 +250,18 @@ static void wait_for_move(void)
 
 	return;
 wait_for_move_error:
-	pr_err("Focuser: %s failed!\n", __func__);
+	pr_err("sh532u: %s failed!\n", __func__);
 }
 
-static void lens_move_pulse(s16 position)
+static void lens_move_pulse(struct i2c_client *client, s16 position)
 {
-	move_driver(position);
-	wait_for_move();
+	move_driver(client, position);
+	wait_for_move(client);
 }
 
-static void get_rom_info(void)
+static void get_rom_info(struct sh532u_sensor *info)
 {
+	struct i2c_client *client = info->i2c_client;
 	u8 tmp;
 	int err;
 
@@ -265,11 +269,11 @@ static void get_rom_info(void)
 	Inf1 and Mac1 are the mechanical limit position.
 	Inf1     : Bottom limit.
 	Mac1 : Top limit. */
-	err = sh532u_read_u8(0x50, addrMac1, &tmp);
+	err = sh532u_read_u8(client, 0x50, addrMac1, &tmp);
 	if (err)
 		goto get_rom_info_error;
 	info->config.limit_low = (tmp<<8) & 0xff00;
-	err = sh532u_read_u8(0x50, addrInf1, &tmp);
+	err = sh532u_read_u8(client, 0x50, addrInf1, &tmp);
 	if (err)
 		goto get_rom_info_error;
 	info->config.limit_high = (tmp<<8) & 0xff00;
@@ -278,34 +282,35 @@ static void get_rom_info(void)
 	Inf2 and Mac2 are the calibration data for SEMCO AF lens.
 	Inf2: Best focus (lens position) when object distance is 1.2M.
 	Mac2: Best focus (lens position) when object distance is 10cm. */
-	err = sh532u_read_u8(0x50, addrMac2, &tmp);
+	err = sh532u_read_u8(client, 0x50, addrMac2, &tmp);
 	if (err)
 		goto get_rom_info_error;
 	info->config.pos_low = (tmp << 8) & 0xff00;
-	err = sh532u_read_u8(0x50, addrInf2, &tmp);
+	err = sh532u_read_u8(client, 0x50, addrInf2, &tmp);
 	if (err)
 		goto get_rom_info_error;
 	info->config.pos_high = (tmp << 8) & 0xff00;
 
 	return;
 get_rom_info_error:
-	pr_err("Focuser: %s failed!\n", __func__);
+	pr_err("sh532u: %s failed!\n", __func__);
 	info->config.limit_high = POS_HIGH;
 	info->config.limit_low = POS_LOW;
 	info->config.pos_high = POS_HIGH;
 	info->config.pos_low = POS_LOW;
 }
 
-static void init_hvca_pos(void)
+static void init_hvca_pos(struct sh532u_sensor *info)
 {
+	struct i2c_client *client = info->i2c_client;
 	short sBottomLimit, sTopLimit;
 
-	get_rom_info();
+	get_rom_info(info);
 	sBottomLimit = (((int)info->config.limit_low * 5) >> 3) & 0xFFC0;
-	lens_move_pulse(sBottomLimit);
+	lens_move_pulse(client, sBottomLimit);
 	sTopLimit = (((int)info->config.limit_high * 5) >> 3) & 0xFFC0;
-	lens_move_pulse(sTopLimit);
-	lens_move_pulse(info->config.pos_high);
+	lens_move_pulse(client, sTopLimit);
+	lens_move_pulse(client, info->config.pos_high);
 }
 
 static unsigned int a2buf[] = {
@@ -328,8 +333,10 @@ static unsigned int a2buf[] = {
 };
 
 /* Write 1 byte data to the HVCA Drive IC by data type */
-static void sh532u_hvca_wr1(u8 ep_type, u8 ep_data1, u8 ep_addr)
+static void sh532u_hvca_wr1(struct sh532u_sensor *info,
+					u8 ep_type, u8 ep_data1, u8 ep_addr)
 {
+	struct i2c_client *client = info->i2c_client;
 	int err = 0;
 	u8 us_data;
 
@@ -339,20 +346,20 @@ static void sh532u_hvca_wr1(u8 ep_type, u8 ep_data1, u8 ep_addr)
 		break;
 
 	case INDIRECT_EEPROM:
-		err = sh532u_read_u8(0x50, ep_data1, &us_data);
+		err = sh532u_read_u8(client, 0x50, ep_data1, &us_data);
 		break;
 
 	case INDIRECT_HVCA:
-		err = sh532u_read_u8(0, (u16)ep_data1, &us_data);
+		err = sh532u_read_u8(client, 0, (u16)ep_data1, &us_data);
 		break;
 
 	case MASK_AND:
-		err = sh532u_read_u8(0, (u16)ep_addr, &us_data);
+		err = sh532u_read_u8(client, 0, (u16)ep_addr, &us_data);
 		us_data = us_data & ep_data1;
 		break;
 
 	case MASK_OR:
-		err = sh532u_read_u8(0, (u16)ep_addr, &us_data);
+		err = sh532u_read_u8(client, 0, (u16)ep_addr, &us_data);
 		us_data = us_data | ep_data1;
 		break;
 
@@ -360,14 +367,20 @@ static void sh532u_hvca_wr1(u8 ep_type, u8 ep_data1, u8 ep_addr)
 		err = 1;
 	}
 	if (!err)
-		err = sh532u_write_u8((u16)ep_addr, us_data);
+		err = sh532u_write_u8(client, (u16)ep_addr, us_data);
+
+	/* we output error message when there is I2C error, but we can't do
+	 * anything about it nor recover from it. */
 	if (err)
-		pr_err("Focuser: Failed to init!\n");
+		pr_err("sh532u: %s: Failed to init!: client=0x%x, ep_addr=0x%2x, us_data=0x%x, ret=%d\n",
+			__func__, (u32)client, (u32)ep_addr, (u32)us_data, err);
 }
 
 /* Write 2 byte data to the HVCA Drive IC by data type */
-static void sh532u_hvca_wr2(u8 ep_type, u8 ep_data1, u8 ep_data2, u8 ep_addr)
+static void sh532u_hvca_wr2(struct sh532u_sensor *info, u8 ep_type,
+				u8 ep_data1, u8 ep_data2, u8 ep_addr)
 {
+	struct i2c_client *client = info->i2c_client;
 	int err = 0;
 	u8 uc_data1;
 	u8 uc_data2;
@@ -380,27 +393,29 @@ static void sh532u_hvca_wr2(u8 ep_type, u8 ep_data1, u8 ep_data2, u8 ep_addr)
 		break;
 
 	case INDIRECT_EEPROM:
-		err = sh532u_read_u8(0x50, (u16)ep_data1, &uc_data1);
-		err = err | sh532u_read_u8(0x50, (u16)ep_data2, &uc_data2);
+		err = sh532u_read_u8(client, 0x50, (u16)ep_data1,
+							&uc_data1);
+		err = err | sh532u_read_u8(client, 0x50, (u16)ep_data2,
+			&uc_data2);
 		us_data = (((u16)uc_data1 << 8) & 0xFF00) |
 			((u16)uc_data2 & 0x00FF);
 		break;
 
 	case INDIRECT_HVCA:
-		err = sh532u_read_u8(0, (u16)ep_data1, &uc_data1);
-		err = err | sh532u_read_u8(0, (u16)ep_data2, &uc_data2);
+		err = sh532u_read_u8(client, 0, (u16)ep_data1, &uc_data1);
+		err = err | sh532u_read_u8(client, 0, (u16)ep_data2, &uc_data2);
 		us_data = (((u16)uc_data1 << 8) & 0xFF00) |
 			((u16)uc_data2 & 0x00FF);
 		break;
 
 	case MASK_AND:
-		err = sh532u_read_u16((u16)ep_addr, &us_data);
+		err = sh532u_read_u16(client, (u16)ep_addr, &us_data);
 		us_data = us_data & ((((u16)ep_data1 << 8) & 0xFF00) |
 			((u16)ep_data2 & 0x00FF));
 		break;
 
 	case MASK_OR:
-		err = sh532u_read_u16((u16)ep_addr, &us_data);
+		err = sh532u_read_u16(client, (u16)ep_addr, &us_data);
 		us_data = us_data | ((((u16)ep_data1 << 8) & 0xFF00) |
 			((u16)ep_data2 & 0x00FF));
 		break;
@@ -409,23 +424,31 @@ static void sh532u_hvca_wr2(u8 ep_type, u8 ep_data1, u8 ep_data2, u8 ep_addr)
 		err = 1;
 	}
 	if (!err)
-		err = sh532u_write_u16((u16)ep_addr, us_data);
+		err = sh532u_write_u16(client, (u16)ep_addr, us_data);
+
+	/* we output error message when there is I2C error, but we can't do
+	 * anything about it nor recover from it. */
 	if (err)
-		pr_err("Focuser: Failed to init!\n");
+		pr_err("sh532u: %s: Failed to init!: client=0x%x, ep_addr=0x%2x, us_data=0x%x, ret=%d\n",
+			__func__, (u32)client, (u32)ep_addr, (u32)us_data, err);
 }
 
-static void init_driver(void)
+static void init_driver(struct sh532u_sensor *info)
 {
 	int eeprom_addr;
 	unsigned int eeprom_data = 0;
 	u8 ep_addr, ep_type, ep_data1, ep_data2;
+
+	pr_info("sh532u: init_driver: i2c_client = 0x%x\n",
+			(u32)info->i2c_client);
 
 	for (eeprom_addr = 0x30; eeprom_addr <= 0x013C; eeprom_addr += 4) {
 		if (eeprom_addr > 0xff) {
 			/* use hardcoded data instead */
 			eeprom_data = a2buf[(eeprom_addr & 0xFF) / 4];
 		} else {
-			if (eeprom_read_u32(eeprom_addr & 0xFF, &eeprom_data))
+			if (eeprom_read_u32(info->i2c_client,
+				eeprom_addr & 0xFF, &eeprom_data))
 				pr_info("sh532u: cannot read eeprom\n");
 		}
 
@@ -442,9 +465,11 @@ static void init_driver(void)
 			mdelay((unsigned int)((ep_data1 << 8) | ep_data2));
 		} else {
 			if ((ep_type & 0x0F) == DATA_1BYTE) {
-				sh532u_hvca_wr1(ep_type, ep_data1, ep_addr);
+				sh532u_hvca_wr1(info, ep_type, ep_data1,
+								ep_addr);
 			} else {
-				sh532u_hvca_wr2(ep_type,
+				sh532u_hvca_wr2(info,
+						ep_type,
 						ep_data1,
 						ep_data2,
 						ep_addr);
@@ -453,39 +478,40 @@ static void init_driver(void)
 	}
 	msleep(300);
 
-	init_hvca_pos();
+	init_hvca_pos(info);
 }
 
 
-static int sh532u_set_position(struct sh532u_info *info, s16 position)
+static int sh532u_set_position(struct sh532u_sensor *info, s16 position)
 {
 	if (position > info->config.limit_high)
 		return -1;
 	/* Caller's responsibility to check motor status. */
-	move_driver(position);
+	move_driver(info->i2c_client, position);
 	return 0;
 }
 
-static int sh532u_get_move_status(unsigned long arg)
+static int sh532u_get_move_status(struct sh532u_sensor *info, unsigned long arg)
 {
+	struct i2c_client *client = info->i2c_client;
 	enum sh532u_move_status status = SH532U_Forced32;
 	u8 ucTmp;
 	u16 usSmvFin;
-	int err = sh532u_read_u8(0, STMVEN_211, &ucTmp) |
-		sh532u_read_u16(RZ_211H, &usSmvFin);
+	int err = sh532u_read_u8(client, 0, STMVEN_211, &ucTmp) |
+		sh532u_read_u16(client, RZ_211H, &usSmvFin);
 	if (err)
 		return err;
 
 	/* StepMove Error Handling, Unexpected Position */
 	if ((usSmvFin == 0x7FFF) || (usSmvFin == 0x8001)) {
 		/* Stop StepMove Operation */
-		err = sh532u_write_u8(STMVEN_211, ucTmp & 0xFE);
+		err = sh532u_write_u8(client, STMVEN_211, ucTmp & 0xFE);
 		if (err)
 			return err;
 	}
 
 	if (ucTmp & STMVEN_ON) {
-		err = sh532u_read_u8(0, MSSET_211, &ucTmp);
+		err = sh532u_read_u8(client, 0, MSSET_211, &ucTmp);
 		if (err)
 			return err;
 		if  (ucTmp & CHTGST_ON)
@@ -497,24 +523,24 @@ static int sh532u_get_move_status(unsigned long arg)
 
 	if (copy_to_user((void __user *) arg, &status,
 			 sizeof(enum sh532u_move_status))) {
-		pr_info("Error in copying move status: %s: %d\n", __func__, __LINE__);
+		pr_info("Error in copying move status: %s: %d\n",
+				__func__, __LINE__);
 		return -EFAULT;
 	}
 	return 0;
 }
 
-static long sh532u_ioctl(
-	struct file *file,
+static long sh532u_ioctl_helper(
+	struct sh532u_sensor *info,
 	unsigned int cmd,
 	unsigned long arg)
 {
-	struct sh532u_info *info = file->private_data;
-
 	switch (cmd) {
 	case SH532U_IOCTL_GET_CONFIG:
 		if (copy_to_user((void __user *) arg, &info->config,
 				 sizeof(info->config))) {
-			pr_err("Error in copying config: %s: %d\n", __func__, __LINE__);
+			pr_err("Error in copying config: %s: %d\n",
+					__func__, __LINE__);
 			return -EFAULT;
 		}
 		return 0;
@@ -523,31 +549,89 @@ static long sh532u_ioctl(
 		return sh532u_set_position(info, (s16)(arg & 0xffff));
 
 	case SH532U_IOCTL_GET_MOVE_STATUS:
-		return sh532u_get_move_status(arg);
+		return sh532u_get_move_status(info, arg);
 
 	default:
 		return -EINVAL;
 	}
 }
 
+static long sh532u_ioctl(
+	struct file *file,
+	unsigned int cmd,
+	unsigned long arg)
+{
+	struct sh532u_info *stereo_info = file->private_data;
+	int ret;
+
+	/* select a camera */
+	if (cmd == SH532U_IOCTL_SET_CAMERA_MODE) {
+		stereo_info->camera_mode = arg;
+		return 0;
+	}
+
+	if (StereoCameraMode_Left & stereo_info->camera_mode) {
+		ret = sh532u_ioctl_helper(stereo_info->left, cmd, arg);
+		if (ret)
+			return ret;
+
+		if (StereoCameraMode_Stereo & stereo_info->camera_mode) {
+			/* To be finalized for stereo */
+			if (cmd != SH532U_IOCTL_GET_CONFIG)
+				ret = sh532u_ioctl_helper(stereo_info->right,
+								cmd, arg);
+		}
+		return ret;
+	}
+
+	if (StereoCameraMode_Right & stereo_info->camera_mode)
+		return sh532u_ioctl_helper(stereo_info->right, cmd, arg);
+
+	return 0;
+}
+
+static void sh532u_open_helper(struct sh532u_sensor *info)
+{
+	if (info->pdata.board_init)
+		info->pdata.board_init(info->pdata.context_data);
+	init_driver(info);
+}
+
+static void sh532u_release_helper(struct sh532u_sensor *info)
+{
+	if (info->pdata.board_deinit)
+		info->pdata.board_deinit(info->pdata.context_data);
+}
 
 static int sh532u_open(struct inode *inode, struct file *file)
 {
-	pr_info("sh532 open\n");
-	file->private_data = info;
-	if (info->sh532u_pdata.board_init)
-		info->sh532u_pdata.board_init(
-			info->sh532u_pdata.context_data);
-	init_driver();
+	pr_info("sh532u open: camera_mode: %2d\n",
+			stereo_sh532u_info->camera_mode);
+
+	file->private_data = stereo_sh532u_info;
+
+	if (StereoCameraMode_Left & stereo_sh532u_info->camera_mode)
+		sh532u_open_helper(stereo_sh532u_info->left);
+
+	if (StereoCameraMode_Right & stereo_sh532u_info->camera_mode)
+		sh532u_open_helper(stereo_sh532u_info->right);
+
 	return 0;
 }
 
 int sh532u_release(struct inode *inode, struct file *file)
 {
-	pr_info("sh532 release\n");
-	if (info->sh532u_pdata.board_deinit)
-		info->sh532u_pdata.board_deinit(
-			info->sh532u_pdata.context_data);
+	struct sh532u_info *info = file->private_data;
+
+	pr_info("sh532u release: camera_mode: %2d\n",
+			info->camera_mode);
+
+	if (StereoCameraMode_Left & info->camera_mode)
+		sh532u_release_helper(info->left);
+
+	if (StereoCameraMode_Right & info->camera_mode)
+		sh532u_release_helper(info->right);
+
 	file->private_data = NULL;
 	return 0;
 }
@@ -566,75 +650,194 @@ static struct miscdevice sh532u_device = {
 	.fops = &sh532u_fileops,
 };
 
-static int sh532u_probe(
+static int sh532u_probe_init(struct i2c_client *client,
+				struct sh532u_sensor **info)
+{
+	struct sh532u_platform_data *pdata = client->dev.platform_data;
+	struct sh532u_sensor *p_info =
+		kzalloc(sizeof(struct sh532u_sensor), GFP_KERNEL);
+	if (!p_info) {
+		pr_err("%s\n", "sh532u_sensor: Unable to allocate memory!\n");
+		return -ENOMEM;
+	}
+
+	p_info->i2c_client = client;
+	p_info->config.settle_time = SETTLETIME_MS;
+	p_info->config.focal_length = FOCAL_LENGTH;
+	p_info->config.fnumber = FNUMBER;
+	p_info->config.pos_low = POS_LOW;
+	p_info->config.pos_high = POS_HIGH;
+	i2c_set_clientdata(client, p_info);
+
+	if (pdata) {
+		p_info->pdata.context_data = pdata->context_data;
+		p_info->pdata.board_init = pdata->board_init;
+		p_info->pdata.board_deinit = pdata->board_deinit;
+	}
+
+	*info = p_info;
+	return 0;
+}
+
+static int sh532u_probe_helper(struct i2c_client *client)
+{
+	struct sh532u_platform_data *pdata = client->dev.platform_data;
+	int err;
+
+	if (!stereo_sh532u_info) {
+		stereo_sh532u_info = kzalloc(sizeof(struct sh532u_info),
+								GFP_KERNEL);
+		if (!stereo_sh532u_info) {
+			pr_err("%s\n",
+				"sh532u_info: Unable to allocate memory!\n");
+			return -ENOMEM;
+		}
+
+		err = misc_register(&sh532u_device);
+		if (err) {
+			pr_err("sh532u: Unable to register sh532u device!\n");
+			kfree(stereo_sh532u_info);
+			stereo_sh532u_info = NULL;
+			return err;
+		}
+
+		err = sh532u_probe_init(client, &stereo_sh532u_info->left);
+		if (err) {
+			kfree(stereo_sh532u_info);
+			stereo_sh532u_info = NULL;
+			return -ENOMEM;
+		}
+
+		err = sh532u_probe_init(client, &stereo_sh532u_info->right);
+		if (err) {
+			kfree(stereo_sh532u_info);
+			stereo_sh532u_info = NULL;
+			kfree(stereo_sh532u_info->left);
+			return -ENOMEM;
+		}
+		stereo_sh532u_info->camera_mode = StereoCameraMode_Left;
+	}
+
+	return 0;
+}
+
+static int left_sh532u_probe(
 	struct i2c_client *client,
 	const struct i2c_device_id *id)
 {
-	int err;
-	struct sh532u_platform_data *sh532u_pdata = client->dev.platform_data;
+	int err ;
 
-	pr_info("sh532u: probing sensor.\n");
-	info = kzalloc(sizeof(struct sh532u_info), GFP_KERNEL);
-	if (!info) {
-		pr_err("sh532u: Unable to allocate memory!\n");
-		return -ENOMEM;
-	}
-	err = misc_register(&sh532u_device);
-	if (err) {
-		pr_err("sh532u: Unable to register misc device!\n");
-		kfree(info);
-		return err;
-	}
-	info->i2c_client = client;
-	info->config.settle_time = SETTLETIME_MS;
-	info->config.focal_length = FOCAL_LENGTH;
-	info->config.fnumber = FNUMBER;
-	info->config.pos_low = POS_LOW;
-	info->config.pos_high = POS_HIGH;
-	i2c_set_clientdata(client, info);
+	pr_info("left_sh532u: probing sensor: i2c_client=0x%x\n", (u32)client);
 
-	if (sh532u_pdata) {
-		info->sh532u_pdata.context_data = sh532u_pdata->context_data;
-		info->sh532u_pdata.board_init = sh532u_pdata->board_init;
-		info->sh532u_pdata.board_deinit = sh532u_pdata->board_deinit;
-	}
-	return 0;
+	err = sh532u_probe_helper(client);
+
+	return err;
 }
 
-static int sh532u_remove(struct i2c_client *client)
+static int left_sh532u_remove(struct i2c_client *client)
 {
-	struct sh532u_info *info;
-	info = i2c_get_clientdata(client);
-	misc_deregister(&sh532u_device);
-	kfree(info);
+	pr_info("left_sh532u to be removed\n");
+	if (!stereo_sh532u_info || !client) {
+		pr_info("left_sh532u_remove(): NULL pointers\n");
+		return 0;
+	}
+
+	kfree(stereo_sh532u_info->left);
+	stereo_sh532u_info->left = NULL;
+
+	if (!stereo_sh532u_info->right) {
+		misc_deregister(&sh532u_device);
+		kfree(stereo_sh532u_info);
+		stereo_sh532u_info = NULL;
+	}
+
 	return 0;
 }
 
-static const struct i2c_device_id sh532u_id[] = {
+static const struct i2c_device_id left_sh532u_id[] = {
 	{ "sh532u", 0 },
+	{ "sh532uL", 0 },
 	{ },
 };
 
-MODULE_DEVICE_TABLE(i2c, sh532u_id);
+MODULE_DEVICE_TABLE(i2c, left_sh532u_id);
 
-static struct i2c_driver sh532u_i2c_driver = {
+static struct i2c_driver left_sh532u_i2c_driver = {
 	.driver = {
-		.name = "sh532u",
+		.name = "sh532uL",
 		.owner = THIS_MODULE,
 	},
-	.probe = sh532u_probe,
-	.remove = sh532u_remove,
-	.id_table = sh532u_id,
+	.probe = left_sh532u_probe,
+	.remove = left_sh532u_remove,
+	.id_table = left_sh532u_id,
+};
+
+static int right_sh532u_probe(
+	struct i2c_client *client,
+	const struct i2c_device_id *id)
+{
+	int err ;
+
+	pr_info("right_sh532u: probing sensor: i2c_client=0x%x\n", (u32)client);
+
+	err = sh532u_probe_helper(client);
+
+	return err;
+}
+
+static int right_sh532u_remove(struct i2c_client *client)
+{
+	if (!stereo_sh532u_info || !client) {
+		pr_info("right_sh532u_remove(): NULL pointers\n");
+		return 0;
+	}
+
+	kfree(stereo_sh532u_info->right);
+	stereo_sh532u_info->right = NULL;
+
+	if (!stereo_sh532u_info->left) {
+		misc_deregister(&sh532u_device);
+		kfree(stereo_sh532u_info);
+		stereo_sh532u_info = NULL;
+	}
+
+	return 0;
+}
+
+static const struct i2c_device_id right_sh532u_id[] = {
+	{ "sh532uR", 0 },
+	{ },
+};
+
+MODULE_DEVICE_TABLE(i2c, right_sh532u_id);
+
+static struct i2c_driver right_sh532u_i2c_driver = {
+	.driver = {
+		.name = "sh532uR",
+		.owner = THIS_MODULE,
+	},
+	.probe = right_sh532u_probe,
+	.remove = right_sh532u_remove,
+	.id_table = right_sh532u_id,
 };
 
 static int __init sh532u_init(void)
 {
-	return i2c_add_driver(&sh532u_i2c_driver);
+	int ret;
+	pr_info("sh532u focuser driver loading\n");
+	ret = i2c_add_driver(&left_sh532u_i2c_driver);
+	if (ret)
+		return ret;
+
+	ret = i2c_add_driver(&right_sh532u_i2c_driver);
+
+	return ret;
 }
 
 static void __exit sh532u_exit(void)
 {
-	i2c_del_driver(&sh532u_i2c_driver);
+	i2c_del_driver(&left_sh532u_i2c_driver);
+	i2c_del_driver(&right_sh532u_i2c_driver);
 }
 
 module_init(sh532u_init);

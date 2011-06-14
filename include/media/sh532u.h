@@ -24,6 +24,7 @@
 #define SH532U_IOCTL_GET_CONFIG		_IOR('o', 1, struct sh532u_config)
 #define SH532U_IOCTL_SET_POSITION	_IOW('o', 2, u32)
 #define SH532U_IOCTL_GET_MOVE_STATUS	_IOW('o', 3, unsigned char)
+#define SH532U_IOCTL_SET_CAMERA_MODE	_IOW('o', 4, unsigned char)
 
 enum sh532u_move_status {
 	SH532U_STATE_UNKNOWN = 1,
