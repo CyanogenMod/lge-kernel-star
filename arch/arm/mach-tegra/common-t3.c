@@ -206,3 +206,4 @@ void __init tegra_mc_init(void)
 		writel(reg, mc + MC_INT_MASK);
 	}
 }
+arch_initcall(tegra_mc_init);
