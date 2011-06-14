@@ -28,8 +28,6 @@ int tegra_sku_id(void);
 void tegra_init_fuse(void);
 u32 tegra_fuse_readl(unsigned long offset);
 void tegra_fuse_writel(u32 value, unsigned long offset);
-enum tegra_chipid tegra_get_chipid(void);
-enum tegra_revision tegra_get_revision(void);
 const char *tegra_get_revision_name(void);
 
 #ifdef CONFIG_TEGRA_SILICON_PLATFORM
