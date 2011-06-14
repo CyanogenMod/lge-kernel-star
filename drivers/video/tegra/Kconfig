@@ -87,13 +87,6 @@ config NVMAP_CARVEOUT_COMPACTOR
 	  Say Y here to let nvmap to keep carveout fragmentation under control.
 
 
-config TEGRA_ENABLE_SUPPORT_FOR_1080p_30HZ
-	bool "Enable support for 1080p @ 30Hz"
-	default n
-	help
-	  Say Y here to Enable 1080p@30Hz instead of 1080p@60Hz
-	  If unsure, say N.
-
 config TEGRA_DSI
 	bool "Enable DSI panel."
 	default n
