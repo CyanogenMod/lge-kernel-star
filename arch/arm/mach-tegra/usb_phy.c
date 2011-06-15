@@ -1149,6 +1149,8 @@ static int ulpi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 
 	ulpi_set_trimmer(base, 4, 4, 4);
 
+/* HACK! FIXME */
+#if CONFIG_ARCH_TEGRA_2x_SOC
 	val = 0;
 	val |= ULPI_WAKEUP;
 	val |= ULPI_RD_WR;
@@ -1164,6 +1166,7 @@ static int ulpi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	} while (timeout);
 	if (!timeout)
 		pr_err("%s: timeout on ULPI Wakeup\n", __func__);
+#endif
 
 	/* Fix VbusInvalid due to floating VBUS */
 	ret = otg_io_write(phy->ulpi, 0xC0, 0x08);
