@@ -96,6 +96,28 @@ static tegra_iovmm_addr_t iovmm_align_down(struct tegra_iovmm_device *dev,
 
 #define iovmprint(fmt, arg...) snprintf(page+len, count-len, fmt, ## arg)
 
+size_t tegra_iovmm_get_max_free(struct tegra_iovmm_client *client)
+{
+	struct rb_node *n;
+	struct tegra_iovmm_block *b;
+	struct tegra_iovmm_domain *domain = client->domain;
+
+	spin_lock(&domain->block_lock);
+	n = rb_first(&domain->all_blocks);
+	tegra_iovmm_addr_t max_free = 0;
+	while (n) {
+		b = rb_entry(n, struct tegra_iovmm_block, all_node);
+		n = rb_next(n);
+		if (test_bit(BK_free, &b->flags)) {
+			max_free = max_t(tegra_iovmm_addr_t,
+				max_free, iovmm_length(b));
+		}
+	}
+	spin_unlock(&domain->block_lock);
+	return max_free;
+}
+
+
 static void tegra_iovmm_block_stats(struct tegra_iovmm_domain *domain,
 	unsigned int *num_blocks, unsigned int *num_free,
 	tegra_iovmm_addr_t *total, size_t *total_free, size_t *max_free)
