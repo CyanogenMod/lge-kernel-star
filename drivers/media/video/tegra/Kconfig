@@ -24,6 +24,13 @@ config VIDEO_OV2710
           This is a driver for the Omnivision OV2710 camera sensor
           for use with the tegra isp.
 
+config VIDEO_AR0832
+        tristate "AR0832 camera sensor support"
+        depends on I2C && ARCH_TEGRA
+        ---help---
+          This is a driver for the AR0832 camera sensor
+          for use with the tegra isp.
+
 config VIDEO_SOC380
         tristate "SOC380 camera sensor support"
         depends on I2C && ARCH_TEGRA
