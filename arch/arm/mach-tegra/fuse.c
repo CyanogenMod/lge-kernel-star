@@ -263,8 +263,11 @@ static enum tegra_revision tegra_decode_revision(const struct tegra_id *id)
 		return TEGRA_REVISION_A02;
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	case 3:
-		return (*(id->priv) == 'p') ? TEGRA_REVISION_A03p
-					    : TEGRA_REVISION_A03;
+		WARN_ON(id->priv == NULL);
+
+		return ((id->priv != NULL) &&
+			(*(id->priv) == 'p')) ? TEGRA_REVISION_A03p
+					      : TEGRA_REVISION_A03;
 #endif
 	default:
 		return TEGRA_REVISION_UNKNOWN;
