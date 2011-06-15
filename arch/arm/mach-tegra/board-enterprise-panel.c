@@ -46,6 +46,7 @@
 #define enterprise_hdmi_hpd		TEGRA_GPIO_PN7
 
 #define enterprise_dsi_panel_reset	TEGRA_GPIO_PW0
+#define enterprise_dsi_panel_bl		TEGRA_GPIO_PW1
 
 #define enterprise_lcd_2d_3d		TEGRA_GPIO_PH1
 #define ENTERPRISE_STEREO_3D		0
@@ -54,6 +55,8 @@
 #define enterprise_lcd_swp_pl		TEGRA_GPIO_PH2
 #define ENTERPRISE_STEREO_LANDSCAPE	0
 #define ENTERPRISE_STEREO_PORTRAIT	1
+
+static struct regulator *enterprise_dsi_reg = NULL;
 
 static struct regulator *enterprise_hdmi_reg;
 static struct regulator *enterprise_hdmi_pll;
@@ -278,23 +281,64 @@ static struct tegra_dc_platform_data enterprise_disp2_pdata = {
 
 static int enterprise_dsi_panel_enable(void)
 {
-	static struct regulator *reg = NULL;
+	int ret;
 
-	if (reg == NULL) {
-		reg = regulator_get(NULL, "avdd_dsi_csi");
-		if (IS_ERR_OR_NULL(reg)) {
-		pr_err("dsi: Could not get regulator avdd_dsi_csi\n");
-			reg = NULL;
-			return PTR_ERR(reg);
+	if (enterprise_dsi_reg == NULL) {
+		enterprise_dsi_reg = regulator_get(NULL, "avdd_dsi_csi");
+		if (IS_ERR_OR_NULL(enterprise_dsi_reg)) {
+			pr_err("dsi: Could not get regulator avdd_dsi_csi\n");
+				enterprise_dsi_reg = NULL;
+				return PTR_ERR(enterprise_dsi_reg);
 		}
 	}
-	regulator_enable(reg);
+	ret = regulator_enable(enterprise_dsi_reg);
+	if (ret < 0) {
+		printk(KERN_ERR
+			"DSI regulator avdd_dsi_csi could not be enabled\n");
+		return ret;
+	}
 
-	return 0;
+#if DSI_PANEL_RESET
+	ret = gpio_request(enterprise_dsi_panel_reset, "panel reset");
+	if (ret < 0)
+		return ret;
+
+	ret = gpio_direction_output(enterprise_dsi_panel_reset, 0);
+	if (ret < 0) {
+		gpio_free(enterprise_dsi_panel_reset);
+		return ret;
+	}
+	tegra_gpio_enable(enterprise_dsi_panel_reset);
+
+	gpio_set_value(enterprise_dsi_panel_reset, 0);
+	udelay(2000);
+	gpio_set_value(enterprise_dsi_panel_reset, 1);
+	mdelay(20);
+#endif
+
+	ret = gpio_request(enterprise_dsi_panel_bl, "DSIa backlight");
+	if (ret < 0)
+		return ret;
+
+	ret = gpio_direction_output(enterprise_dsi_panel_bl, 1);
+	if (ret < 0) {
+		gpio_free(enterprise_dsi_panel_bl);
+		return ret;
+	}
+	tegra_gpio_enable(enterprise_dsi_panel_bl);
+
+	return ret;
 }
 
 static int enterprise_dsi_panel_disable(void)
 {
+	tegra_gpio_disable(enterprise_dsi_panel_bl);
+	gpio_free(enterprise_dsi_panel_bl);
+
+#if DSI_PANEL_RESET
+	tegra_gpio_disable(enterprise_dsi_panel_reset);
+	gpio_free(enterprise_dsi_panel_reset);
+#endif
 	return 0;
 }
 
@@ -322,11 +366,34 @@ static void enterprise_stereo_set_orientation(int mode)
 	}
 }
 
+static int enterprise_dsi_panel_postsuspend(void)
+{
+	int err = 0;
+
+	if (enterprise_dsi_reg) {
+		err = regulator_disable(enterprise_dsi_reg);
+		if (err < 0)
+			printk(KERN_ERR
+			"DSI regulator avdd_dsi_csi disable failed\n");
+		regulator_put(enterprise_dsi_reg);
+		enterprise_dsi_reg = NULL;
+	}
+
+	return err;
+}
+
 static struct tegra_dsi_cmd dsi_init_cmd[]= {
 	DSI_CMD_SHORT(0x05, 0x11, 0x00),
 	DSI_DLY_MS(150),
 	DSI_CMD_SHORT(0x05, 0x29, 0x00),
 	DSI_DLY_MS(20),
+};
+
+static struct tegra_dsi_cmd dsi_suspend_cmd[] = {
+	DSI_CMD_SHORT(0x05, 0x28, 0x00),
+	DSI_DLY_MS(20),
+	DSI_CMD_SHORT(0x05, 0x10, 0x00),
+	DSI_DLY_MS(5),
 };
 
 struct tegra_dsi_out enterprise_dsi = {
@@ -337,10 +404,16 @@ struct tegra_dsi_out enterprise_dsi = {
 
 	.panel_has_frame_buffer = true,
 	.dsi_instance = 0,
+
+	.panel_reset = DSI_PANEL_RESET,
+
 	.n_init_cmd = ARRAY_SIZE(dsi_init_cmd),
 	.dsi_init_cmd = dsi_init_cmd,
 
+	.n_suspend_cmd = ARRAY_SIZE(dsi_suspend_cmd),
+	.dsi_suspend_cmd = dsi_suspend_cmd,
 	.video_data_type = TEGRA_DSI_VIDEO_TYPE_COMMAND_MODE,
+	.lp_cmd_mode_freq_khz = 430000,
 };
 
 static struct tegra_stereo_out enterprise_stereo = {
@@ -388,6 +461,7 @@ static struct tegra_dc_out enterprise_disp1_out = {
 
 	.enable		= enterprise_dsi_panel_enable,
 	.disable	= enterprise_dsi_panel_disable,
+	.postsuspend	= enterprise_dsi_panel_postsuspend,
 };
 static struct tegra_dc_platform_data enterprise_disp1_pdata = {
 	.flags		= TEGRA_DC_FLAG_ENABLED,
