@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2010 Samsung Electronics Co.Ltd
  * Copyright (C) 2011 Atmel Corporation
+ * Copyright (C) 2011 NVIDIA Corporation
  * Author: Joonyoung Shim <jy0922.shim@samsung.com>
  *
  * This program is free software; you can redistribute  it and/or modify it
@@ -15,6 +16,16 @@
 #define __LINUX_ATMEL_MXT_TS_H
 
 #include <linux/types.h>
+
+/*
+ * Atmel I2C addresses
+ */
+#define	MXT224_I2C_ADDR1	0x4A
+#define	MXT224_I2C_ADDR2	0x4B
+#define	MXT1386_I2C_ADDR1	0x4C
+#define	MXT1386_I2C_ADDR2	0x4D
+#define	MXT1386_I2C_ADDR3	0x5A
+#define	MXT1386_I2C_ADDR4	0x5B
 
 /* Orient */
 #define MXT_NORMAL		0x0

@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2010 Samsung Electronics Co.Ltd
  * Copyright (C) 2011 Atmel Corporation
+ * Copyright (C) 2011 NVIDIA Corporation
  * Author: Joonyoung Shim <jy0922.shim@samsung.com>
  *
  * This program is free software; you can redistribute  it and/or modify it
@@ -258,6 +259,7 @@ struct mxt_data {
 	u16 last_address;
 	u8 actv_cycle_time;
 	u8 idle_cycle_time;
+	u8 is_stopped;
 	struct mutex access_mutex;
 };
 
@@ -391,6 +393,7 @@ static int __mxt_read_reg(struct i2c_client *client,
 {
 	struct i2c_msg xfer[2];
 	u8 buf[2];
+	int retval = 0;
 	struct mxt_data *data = i2c_get_clientdata(client);
 
 	if ((data->last_address == reg) && (reg == data->msg_address)) {
@@ -399,11 +402,9 @@ static int __mxt_read_reg(struct i2c_client *client,
 			dev_err(&client->dev,
 				"%s: Failure reading maxTouch device\n",
 				__func__);
-	   mutex_unlock(&data->access_mutex);
-			return -EIO;
+			retval = -EIO;
 		}
-	   mutex_unlock(&data->access_mutex);
-		return 0;
+		goto mxt_read_exit;
 	}
 
 	buf[0] = reg & 0xff;
@@ -424,13 +425,14 @@ static int __mxt_read_reg(struct i2c_client *client,
 	mutex_lock(&data->access_mutex);
 	if (i2c_transfer(client->adapter, xfer, 2) != 2) {
 		dev_err(&client->dev, "%s: i2c transfer failed\n", __func__);
-		mutex_unlock(&data->access_mutex);
-		return -EIO;
+		retval = -EIO;
 	}
-	mutex_unlock(&data->access_mutex);
 
 	data->last_address = reg;
-	return 0;
+
+mxt_read_exit:
+	mutex_unlock(&data->access_mutex);
+	return retval;
 }
 
 static int mxt_read_reg(struct i2c_client *client, u16 reg, u8 *val)
@@ -441,6 +443,7 @@ static int mxt_read_reg(struct i2c_client *client, u16 reg, u8 *val)
 static int mxt_write_reg(struct i2c_client *client, u16 reg, u8 val)
 {
 	u8 buf[3];
+	int retval = 0;
 	struct mxt_data *data = i2c_get_clientdata(client);
 
 	buf[0] = reg & 0xff;
@@ -450,12 +453,14 @@ static int mxt_write_reg(struct i2c_client *client, u16 reg, u8 val)
 	mutex_lock(&data->access_mutex);
 	if (i2c_master_send(client, buf, 3) != 3) {
 		dev_err(&client->dev, "%s: i2c send failed\n", __func__);
-		mutex_unlock(&data->access_mutex);
-		return -EIO;
+		retval = -EIO;
+		goto mxt_write_exit;
 	}
 	data->last_address = reg + 1;
+
+mxt_write_exit:
 	mutex_unlock(&data->access_mutex);
-	return 0;
+	return retval;
 }
 
 static int mxt_read_object_table(struct i2c_client *client,
@@ -1118,20 +1123,21 @@ static const struct attribute_group mxt_attr_group = {
 static void mxt_start(struct mxt_data *data)
 {
 	int error;
-
-	printk(KERN_WARNING "in MXT_START(), idle time: %d %d", data->idle_cycle_time, data->actv_cycle_time);
+	struct device *dev = &data->client->dev;
+	dev_info(dev, "in MXT_START(), idle time: %d %d", data->idle_cycle_time, data->actv_cycle_time);
 	/* Restore the cycle time settings to wake from sleep */
 	error = mxt_write_object(data, MXT_GEN_POWER, MXT_POWER_ACTVACQINT,
 				 data->actv_cycle_time);
 	if (error)
-		printk("\n\nresume failed!");
+		dev_info(dev, "\n\nResume failed!");
 	error = mxt_write_object(data, MXT_GEN_POWER, MXT_POWER_IDLEACQINT,
 				 data->idle_cycle_time);
 	if (error)
-		printk("\n\nresume failed!");
+		dev_info(dev, "\n\nResume failed!");
 
-	printk(KERN_WARNING "Restored ACTV %d, IDLE %d", data->actv_cycle_time,
+	dev_info(dev, "Restored ACTV %d, IDLE %d", data->actv_cycle_time,
 	       data->idle_cycle_time);
+	data->is_stopped = 0;
 }
 
 static void mxt_stop(struct mxt_data *data)
@@ -1139,6 +1145,10 @@ static void mxt_stop(struct mxt_data *data)
 	u8 actv_cycle_time;
 	u8 idle_cycle_time;
 	int error;
+	struct device *dev = &data->client->dev;
+
+	if (data->is_stopped)
+		return;
 
 
 	error = mxt_read_object(data, MXT_GEN_POWER, MXT_POWER_ACTVACQINT,
@@ -1164,12 +1174,13 @@ static void mxt_stop(struct mxt_data *data)
 	if (error)
 		goto i2c_error;
 
-	printk(KERN_WARNING "MXT Suspended, saved ACTV %d and IDLE %d",
+	dev_info(dev, "MXT Suspended, saved ACTV %d and IDLE %d",
 	       actv_cycle_time, idle_cycle_time);
+	data->is_stopped = 1;
 	return;
 
 i2c_error:
-	printk(KERN_WARNING "MXT Suspend failed!");
+	dev_info(dev, "MXT Suspend failed!");
 
 }
 
@@ -1207,7 +1218,7 @@ static int __devinit mxt_probe(struct i2c_client *client,
 		goto err_free_mem;
 	}
 
-	input_dev->name = "Atmel maXTouch Touchscreen";
+	input_dev->name = "atmel-maxtouch";
 	input_dev->id.bustype = BUS_I2C;
 	input_dev->dev.parent = &client->dev;
 	input_dev->open = mxt_input_open;
@@ -1217,6 +1228,7 @@ static int __devinit mxt_probe(struct i2c_client *client,
 	data->input_dev = input_dev;
 	data->pdata = pdata;
 	data->irq = client->irq;
+	data->is_stopped = 0;
 
 	mxt_calc_resolution(data);
 
