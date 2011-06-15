@@ -163,7 +163,7 @@ static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 	{ "pll_u",	NULL,		480000000,	false },
 	{ "sdmmc1",	"pll_p",	48000000,	false},
 	{ "sdmmc3",	"pll_p",	48000000,	false},
-	{ "sdmmc4",	"pll_p",	48000000,	false},
+	{ "sdmmc4",	"clk_m",	12000000,	true},
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	{ "vde",	"pll_c",	ULONG_MAX,	false },
 	{ "host1x",	"pll_c",	0,		false },
