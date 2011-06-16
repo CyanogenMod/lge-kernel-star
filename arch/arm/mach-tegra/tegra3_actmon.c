@@ -66,6 +66,7 @@
 #define ACTMON_DEV_INTR_AVG_UP_WMARK		(0x1 << 24)
 
 #define ACTMON_DEFAULT_AVG_WINDOW_LOG2		6
+#define ACTMON_DEFAULT_AVG_BAND			6	/* 1/10 of % */
 
 enum actmon_type {
 	ACTMON_LOAD_SAMPLER,
@@ -196,6 +197,18 @@ static inline void actmon_dev_avg_wmark_set(struct actmon_dev *dev)
 	actmon_writel(avg - band, offs(ACTMON_DEV_AVG_DOWN_WMARK));
 }
 
+static unsigned long actmon_dev_avg_freq_get(struct actmon_dev *dev)
+{
+	u64 val;
+
+	if (dev->type == ACTMON_FREQ_SAMPLER)
+		return dev->avg_count / actmon_sampling_period;
+
+	val = (u64)dev->avg_count * dev->cur_freq;
+	do_div(val, actmon_clk_freq * actmon_sampling_period);
+	return (u32)val;
+}
+
 /* Activity monitor sampling operations */
 irqreturn_t actmon_dev_isr(int irq, void *dev_id)
 {
@@ -248,36 +261,29 @@ irqreturn_t actmon_dev_isr(int irq, void *dev_id)
 
 irqreturn_t actmon_dev_fn(int irq, void *dev_id)
 {
-	unsigned long flags;
-	unsigned long freq = 0;
+	unsigned long flags, freq;
 	struct actmon_dev *dev = (struct actmon_dev *)dev_id;
 
 	spin_lock_irqsave(&dev->lock, flags);
 
-	if (dev->state == ACTMON_ON) {
-		if (dev->type == ACTMON_FREQ_SAMPLER) {
-			freq = dev->avg_count / actmon_sampling_period;
-		}
-		else {
-			u64 tmp = (u64)dev->avg_count * dev->cur_freq;
-			freq = actmon_clk_freq * actmon_sampling_period;
-			do_div(tmp, freq);
-			freq = (u32)tmp;
-		}
-
-		dev->avg_actv_freq = freq;
-		freq = do_percent(freq, dev->avg_sustain_coef);
-		freq += dev->boost_freq;
-		dev->target_freq = freq;
+	if (dev->state != ACTMON_ON) {
+		spin_unlock_irqrestore(&dev->lock, flags);
+		return IRQ_HANDLED;
 	}
+
+	freq = actmon_dev_avg_freq_get(dev);
+	dev->avg_actv_freq = freq;
+	freq = do_percent(freq, dev->avg_sustain_coef);
+	freq += dev->boost_freq;
+	dev->target_freq = freq;
+
 	spin_unlock_irqrestore(&dev->lock, flags);
 
-	if (freq) {
-		pr_debug("%s.%s(kHz): avg: %lu, target: %lu current: %lu\n",
+	pr_debug("%s.%s(kHz): avg: %lu, target: %lu current: %lu\n",
 			dev->dev_id, dev->con_id, dev->avg_actv_freq,
 			dev->target_freq, dev->cur_freq);
-		clk_set_rate(dev->clk, freq * 1000);
-	}
+	clk_set_rate(dev->clk, freq * 1000);
+
 	return IRQ_HANDLED;
 }
 
@@ -309,9 +315,15 @@ static void actmon_dev_configure(struct actmon_dev *dev, unsigned long freq)
 	dev->target_freq = freq;
 	dev->avg_actv_freq = freq;
 
-	dev->avg_count = (dev->type == ACTMON_FREQ_SAMPLER) ?
-		dev->cur_freq : actmon_clk_freq;
-	dev->avg_count *= actmon_sampling_period;
+	if (dev->type == ACTMON_FREQ_SAMPLER) {
+		dev->avg_count = dev->cur_freq * actmon_sampling_period;
+		dev->avg_band_freq = dev->max_freq *
+			ACTMON_DEFAULT_AVG_BAND / 1000;
+	} else {
+		dev->avg_count = actmon_clk_freq * actmon_sampling_period;
+		dev->avg_band_freq = actmon_clk_freq *
+			ACTMON_DEFAULT_AVG_BAND / 1000;
+	}
 	actmon_writel(dev->avg_count, offs(ACTMON_DEV_INIT_AVG));
 
 	BUG_ON(!dev->boost_up_threshold);
@@ -329,7 +341,7 @@ static void actmon_dev_configure(struct actmon_dev *dev, unsigned long freq)
 	val |= ((dev->down_wmark_window - 1) <<
 		ACTMON_DEV_CTRL_DOWN_WMARK_NUM_SHIFT) &
 		ACTMON_DEV_CTRL_DOWN_WMARK_NUM_MASK;
-	val |=	((dev->up_wmark_window - 1) <<
+	val |=  ((dev->up_wmark_window - 1) <<
 		ACTMON_DEV_CTRL_UP_WMARK_NUM_SHIFT) &
 		ACTMON_DEV_CTRL_UP_WMARK_NUM_MASK;
 	val |= ACTMON_DEV_CTRL_DOWN_WMARK_ENB | ACTMON_DEV_CTRL_UP_WMARK_ENB;
@@ -462,14 +474,15 @@ static int __init actmon_dev_init(struct actmon_dev *dev)
 	return 0;
 }
 
-/* EMC activity monitor: frequency sampling device */
+/* EMC activity monitor: frequency sampling device:
+ * activity counter is incremented every 256 memory transactions, and
+ * each transaction takes 2 EMC clocks; count_weight = 512.
+ */
 static struct actmon_dev actmon_dev_emc = {
 	.reg	= 0x1c0,
 	.glb_status_irq_mask = (0x1 << 26),
 	.dev_id = "tegra_actmon",
 	.con_id = "emc",
-
-	.avg_band_freq		= 3000,
 
 	.boost_freq_step	= 16000,
 	.boost_up_coef		= 200,
@@ -490,8 +503,38 @@ static struct actmon_dev actmon_dev_emc = {
 	},
 };
 
+/* AVP activity monitor: load sampling device:
+ * activity counter is incremented on every actmon clock pulse while
+ * AVP is not halted by flow controller; count_weight = 1.
+ */
+static struct actmon_dev actmon_dev_avp = {
+	.reg	= 0x0c0,
+	.glb_status_irq_mask = (0x1 << 30),
+	.dev_id = "tegra_actmon",
+	.con_id = "avp",
+
+	.boost_freq_step	= 8000,
+	.boost_up_coef		= 200,
+	.boost_down_coef	= 50,
+	.boost_up_threshold	= 75,
+	.boost_down_threshold	= 50,
+
+	.up_wmark_window	= 1,
+	.down_wmark_window	= 3,
+	.avg_window_log2	= ACTMON_DEFAULT_AVG_WINDOW_LOG2,
+	.count_weight		= 0x1,
+
+	.type			= ACTMON_LOAD_SAMPLER,
+	.state			= ACTMON_UNINITIALIZED,
+
+	.rate_change_nb = {
+		.notifier_call = actmon_rate_notify_cb,
+	},
+};
+
 static struct actmon_dev *actmon_devices[] = {
 	&actmon_dev_emc,
+	&actmon_dev_avp,
 };
 
 /* Activity monitor suspend/resume */
@@ -543,6 +586,18 @@ static const struct file_operations type_fops = {
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
+
+static int actv_get(void *data, u64 *val)
+{
+	unsigned long flags;
+	struct actmon_dev *dev = data;
+
+	spin_lock_irqsave(&dev->lock, flags);
+	*val = actmon_dev_avg_freq_get(dev);
+	spin_unlock_irqrestore(&dev->lock, flags);
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(actv_fops, actv_get, NULL, "%llu\n");
 
 static int step_get(void *data, u64 *val)
 {
@@ -652,12 +707,21 @@ static int period_get(void *data, u64 *val)
 }
 static int period_set(void *data, u64 val)
 {
+	int i;
+	unsigned long flags;
 	u8 period = (u8)val;
 
 	if (period) {
 		actmon_sampling_period = period;
 		actmon_writel(period - 1, ACTMON_GLB_PERIOD_CTRL);
-		/* FIXME: update up/down wm for load sampler */
+
+		for (i = 0; i < ARRAY_SIZE(actmon_devices); i++) {
+			struct actmon_dev *dev = actmon_devices[i];
+			spin_lock_irqsave(&dev->lock, flags);
+			actmon_dev_wmark_set(dev);
+			spin_unlock_irqrestore(&dev->lock, flags);
+		}
+		actmon_wmb();
 		return 0;
 	}
 	return -EINVAL;
@@ -681,8 +745,8 @@ static int actmon_debugfs_create_dev(struct actmon_dev *dev)
 	if (!d)
 		return -ENOMEM;
 
-	d = debugfs_create_u32(
-		"avg_activity", RO_MODE, dir, (u32 *)&dev->avg_actv_freq);
+	d = debugfs_create_file(
+		"avg_activity", RO_MODE, dir, dev, &actv_fops);
 	if (!d)
 		return -ENOMEM;
 

@@ -5,8 +5,7 @@
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * the Free Software Foundation; version 2 of the License.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -1086,6 +1085,8 @@ static long tegra3_sbus_cmplx_round_rate(struct clk *c, unsigned long rate)
 {
 	struct clk *new_parent;
 	struct clk *new_parent_after_round;
+
+	rate = max(rate, c->min_rate);
 
 	new_parent = (rate <= c->u.system.threshold) ?
 		c->u.system.sclk_low : c->u.system.sclk_high;
@@ -3514,6 +3515,8 @@ static struct clk tegra_clk_pclk = {
 	.min_rate       = 40000000,
 };
 
+static struct raw_notifier_head sbus_rate_change_nh;
+
 static struct clk tegra_clk_sbus_cmplx = {
 	.name	   = "sbus",
 	.parent    = &tegra_clk_sclk,
@@ -3529,6 +3532,7 @@ static struct clk tegra_clk_sbus_cmplx = {
 		.threshold = 108000000, /* exact factor of low range pll_p */
 #endif
 	},
+	.rate_change_nh = &sbus_rate_change_nh,
 };
 
 static struct clk tegra_clk_blink = {
@@ -3814,6 +3818,7 @@ struct clk tegra_list_clks[] = {
 	SHARED_CLK("usb1.sclk",	"tegra-ehci.0",		"sclk",	&tegra_clk_sbus_cmplx, NULL, 0),
 	SHARED_CLK("usb2.sclk",	"tegra-ehci.1",		"sclk",	&tegra_clk_sbus_cmplx, NULL, 0),
 	SHARED_CLK("usb3.sclk",	"tegra-ehci.2",		"sclk",	&tegra_clk_sbus_cmplx, NULL, 0),
+	SHARED_CLK("mon.avp",	"tegra_actmon",		"avp",	&tegra_clk_sbus_cmplx, NULL, 0),
 	SHARED_CLK("avp.emc",	"tegra-avp",		"emc",	&tegra_clk_emc, NULL, 0),
 	SHARED_CLK("cpu.emc",	"cpu",			"emc",	&tegra_clk_emc, NULL, 0),
 	SHARED_CLK("disp1.emc",	"tegradc.0",		"emc",	&tegra_clk_emc, NULL, 0),
