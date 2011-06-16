@@ -219,6 +219,13 @@ config TEGRA_IOVMM_SMMU
 	  shared with the operating system into contiguous I/O virtual
 	  space through the SMMU hardware included on Tegra SoCs
 
+config TEGRA_IOVMM_SMMU_SYSFS
+	bool "Enable SMMU register access for debugging"
+	depends on TEGRA_IOVMM_SMMU
+	default n
+	help
+	  Enables SMMU register access through /sys/devices/smmu/* files.
+
 config TEGRA_IOVMM
 	bool
 
