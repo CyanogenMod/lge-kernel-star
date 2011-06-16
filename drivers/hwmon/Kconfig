@@ -1295,6 +1295,13 @@ config SENSORS_MC13783_ADC
         help
           Support for the A/D converter on MC13783 PMIC.
 
+config SENSORS_INA219
+	tristate "Texas Instruments INA219 POWER MONITOR SENSOR DRIVER"
+	depends on I2C
+	default n
+	help
+		Support for the TI INA219 power monitor sensor.
+
 if ACPI
 
 comment "ACPI drivers"
