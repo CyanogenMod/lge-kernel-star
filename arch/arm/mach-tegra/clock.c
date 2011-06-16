@@ -1066,7 +1066,7 @@ static int state_get(void *data, u64 *val)
 
 #ifdef CONFIG_TEGRA_CLOCK_DEBUG_WRITE
 
-static const mode_t parent_rate_mode =  S_IRUGO | S_IWUGO;
+static const mode_t parent_rate_mode =  S_IRUGO | S_IWUSR;
 
 static ssize_t parent_write(struct file *file,
 	const char __user *userbuf, size_t count, loff_t *ppos)

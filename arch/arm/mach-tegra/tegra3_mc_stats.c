@@ -227,7 +227,7 @@ static ssize_t tegra_mc_quantum_store(struct sysdev_class *class,
 	TEGRA_MC_EXPAND(_attr2,_mode2) \
 	TEGRA_MC_EXPAND(_attr3,_mode3)
 
-TEGRA_MC_ATTRIBUTES(enable, 0666, log, 0444, quantum, 0666)
+TEGRA_MC_ATTRIBUTES(enable, 0644, log, 0444, quantum, 0644)
 
 #undef TEGRA_MC_EXPAND
 
@@ -238,7 +238,7 @@ TEGRA_MC_ATTRIBUTES(enable, 0666, log, 0444, quantum, 0666)
 /* /sys/devices/system/tegra_mc_stats/log */
 /* /sys/devices/system/tegra_mc_stats/quantum */
 static struct sysdev_class_attribute *tegra_mc_attrs[] = {
-	TEGRA_MC_ATTRIBUTES(enable, 0666, log, 0444, quantum, 0666)
+	TEGRA_MC_ATTRIBUTES(enable, 0644, log, 0444, quantum, 0644)
 	NULL
 };
 
