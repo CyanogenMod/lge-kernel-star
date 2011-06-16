@@ -1,7 +1,7 @@
 /*
- * arch/arm/mach-tegra/include/mach/tegra2_fuse.h
+ * arch/arm/mach-tegra/include/mach/tegra_odm_fuses.h
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,8 +18,8 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-#ifndef __MACH_TEGRA2_FUSE_H
-#define __MACH_TEGRA2_FUSE_H
+#ifndef __MACH_TEGRA_ODM_FUSES_H
+#define __MACH_TEGRA_ODM_FUSES_H
 
 #define SBK_DEVKEY_STATUS_SZ	sizeof(u32)
 
@@ -43,11 +43,10 @@ enum fuse_io_param {
 	IGNORE_DEV_SEL_STRAPS, /* 1 bit long */
 	ODM_RSVD,
 	SBK_DEVKEY_STATUS,
-	MASTER_ENB,
 	_PARAMS_U32 = 0x7FFFFFFF
 };
 
-#define MAX_PARAMS ODM_RSVD
+#define MAX_PARAMS SBK_DEVKEY_STATUS
 
 /* the order of the members is pre-decided. please do not change */
 struct fuse_data {

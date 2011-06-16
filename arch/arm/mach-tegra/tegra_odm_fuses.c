@@ -1,7 +1,7 @@
 /*
- * arch/arm/mach-tegra/tegra2_fuse.c
+ * arch/arm/mach-tegra/tegra_odm_fuses.c
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010-2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -43,8 +43,9 @@
 #include <linux/kobject.h>
 #include <linux/regulator/consumer.h>
 #include <linux/ctype.h>
+#include <linux/clk.h>
 
-#include <mach/tegra2_fuse.h>
+#include <mach/tegra_odm_fuses.h>
 #include <mach/iomap.h>
 
 #include "fuse.h"
@@ -63,6 +64,7 @@
 #define FUSE_TIME_PGM		0x01C
 #define FUSE_PRIV2INTFC		0x020
 #define FUSE_DIS_PGM		0x02C
+#define FUSE_WRITE_ACCESS	0x030
 #define FUSE_PWR_GOOD_SW	0x034
 
 static struct kobject *fuse_kobj;
@@ -101,12 +103,12 @@ static struct kobj_attribute odm_rsvd_attr =
 static u32 fuse_pgm_data[NFUSES / 2];
 static u32 fuse_pgm_mask[NFUSES / 2];
 static u32 tmp_fuse_pgm_data[NFUSES / 2];
-static u32 master_enable;
 
 DEFINE_MUTEX(fuse_lock);
 
 static struct fuse_data fuse_info;
-struct regulator *vdd_fuse = NULL;
+struct regulator *vdd_fuse;
+struct clk *clk_fuse;
 
 #define FUSE_NAME_LEN	30
 
@@ -124,8 +126,13 @@ static struct param_info fuse_info_tbl[] = {
 	[DEVKEY] = {
 		.addr = &fuse_info.devkey,
 		.sz = sizeof(fuse_info.devkey),
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 		.start_off = 0x12,
 		.start_bit = 8,
+#else
+		.start_off = 0x16,
+		.start_bit = 22,
+#endif
 		.nbits = 32,
 		.data_offset = 0,
 		.sysfs_name = "device_key",
@@ -151,8 +158,13 @@ static struct param_info fuse_info_tbl[] = {
 	[SEC_BOOT_DEV_CFG] = {
 		.addr = &fuse_info.bootdev_cfg,
 		.sz = sizeof(fuse_info.bootdev_cfg),
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 		.start_off = 0x14,
 		.start_bit = 8,
+#else
+		.start_off = 0x18,
+		.start_bit = 22,
+#endif
 		.nbits = 16,
 		.data_offset = 3,
 		.sysfs_name = "sec_boot_dev_cfg",
@@ -160,8 +172,13 @@ static struct param_info fuse_info_tbl[] = {
 	[SEC_BOOT_DEV_SEL] = {
 		.addr = &fuse_info.bootdev_sel,
 		.sz = sizeof(fuse_info.bootdev_sel),
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 		.start_off = 0x14,
 		.start_bit = 24,
+#else
+		.start_off = 0x1A,
+		.start_bit = 6,
+#endif
 		.nbits = 3,
 		.data_offset = 4,
 		.sysfs_name = "sec_boot_dev_sel",
@@ -169,8 +186,13 @@ static struct param_info fuse_info_tbl[] = {
 	[SBK] = {
 		.addr = fuse_info.sbk,
 		.sz = sizeof(fuse_info.sbk),
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 		.start_off = 0x0A,
 		.start_bit = 8,
+#else
+		.start_off = 0x0E,
+		.start_bit = 22,
+#endif
 		.nbits = 128,
 		.data_offset = 5,
 		.sysfs_name = "secure_boot_key",
@@ -178,8 +200,13 @@ static struct param_info fuse_info_tbl[] = {
 	[SW_RSVD] = {
 		.addr = &fuse_info.sw_rsvd,
 		.sz = sizeof(fuse_info.sw_rsvd),
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 		.start_off = 0x14,
 		.start_bit = 28,
+#else
+		.start_off = 0x1A,
+		.start_bit = 10,
+#endif
 		.nbits = 4,
 		.data_offset = 9,
 		.sysfs_name = "sw_reserved",
@@ -187,8 +214,13 @@ static struct param_info fuse_info_tbl[] = {
 	[IGNORE_DEV_SEL_STRAPS] = {
 		.addr = &fuse_info.ignore_devsel_straps,
 		.sz = sizeof(fuse_info.ignore_devsel_straps),
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 		.start_off = 0x14,
 		.start_bit = 27,
+#else
+		.start_off = 0x1A,
+		.start_bit = 9,
+#endif
 		.nbits = 1,
 		.data_offset = 10,
 		.sysfs_name = "ignore_dev_sel_straps",
@@ -196,21 +228,19 @@ static struct param_info fuse_info_tbl[] = {
 	[ODM_RSVD] = {
 		.addr = fuse_info.odm_rsvd,
 		.sz = sizeof(fuse_info.odm_rsvd),
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 		.start_off = 0x16,
 		.start_bit = 4,
+#else
+		.start_off = 0x1A,
+		.start_bit = 14,
+#endif
 		.nbits = 256,
 		.data_offset = 11,
 		.sysfs_name = "odm_reserved",
 	},
 	[SBK_DEVKEY_STATUS] = {
 		.sz = SBK_DEVKEY_STATUS_SZ,
-	},
-	[MASTER_ENB] = {
-		.addr = &master_enable,
-		.sz = sizeof(u8),
-		.start_off = 0x0,
-		.start_bit = 0,
-		.nbits = 1,
 	},
 };
 
@@ -219,6 +249,7 @@ static void wait_for_idle(void)
 	u32 reg;
 
 	do {
+		udelay(1);
 		reg = tegra_fuse_readl(FUSE_CTRL);
 	} while ((reg & (0xF << 16)) != STATE_IDLE);
 }
@@ -232,6 +263,7 @@ static u32 fuse_cmd_read(u32 addr)
 {
 	u32 reg;
 
+	wait_for_idle();
 	tegra_fuse_writel(addr, FUSE_REG_ADDR);
 	reg = tegra_fuse_readl(FUSE_CTRL);
 	reg &= ~FUSE_CMD_MASK;
@@ -247,6 +279,7 @@ static void fuse_cmd_write(u32 value, u32 addr)
 {
 	u32 reg;
 
+	wait_for_idle();
 	tegra_fuse_writel(addr, FUSE_REG_ADDR);
 	tegra_fuse_writel(value, FUSE_REG_WRITE);
 
@@ -261,6 +294,7 @@ static void fuse_cmd_sense(void)
 {
 	u32 reg;
 
+	wait_for_idle();
 	reg = tegra_fuse_readl(FUSE_CTRL);
 	reg &= ~FUSE_CMD_MASK;
 	reg |= FUSE_SENSE;
@@ -318,8 +352,13 @@ static void get_fuse(enum fuse_io_param io_param, u32 *out)
 
 int tegra_fuse_read(enum fuse_io_param io_param, u32 *data, int size)
 {
-	int ret = 0, nbits;
+	int nbits;
 	u32 sbk[4], devkey = 0;
+
+	if (IS_ERR_OR_NULL(clk_fuse)) {
+		pr_err("fuse read disabled");
+		return -ENODEV;
+	}
 
 	if (!data)
 		return -EINVAL;
@@ -331,6 +370,8 @@ int tegra_fuse_read(enum fuse_io_param io_param, u32 *data, int size)
 	}
 
 	mutex_lock(&fuse_lock);
+
+	clk_enable(clk_fuse);
 	fuse_reg_unhide();
 	fuse_cmd_sense();
 
@@ -349,15 +390,19 @@ int tegra_fuse_read(enum fuse_io_param io_param, u32 *data, int size)
 	}
 
 	fuse_reg_hide();
+	clk_disable(clk_fuse);
 	mutex_unlock(&fuse_lock);
-	return ret;
+
+	return 0;
 }
 
 static bool fuse_odm_prod_mode(void)
 {
 	u32 odm_prod_mode = 0;
 
+	clk_enable(clk_fuse);
 	get_fuse(ODM_PROD_MODE, &odm_prod_mode);
+	clk_disable(clk_fuse);
 	return (odm_prod_mode ? true : false);
 }
 
@@ -393,16 +438,11 @@ static void set_fuse(enum fuse_io_param io_param, u32 *data)
 
 static void populate_fuse_arrs(struct fuse_data *info, u32 flags)
 {
-	u32 data = 0;
 	u32 *src = (u32 *)info;
 	int i;
 
 	memset(fuse_pgm_data, 0, sizeof(fuse_pgm_data));
 	memset(fuse_pgm_mask, 0, sizeof(fuse_pgm_mask));
-
-	/* enable program bit */
-	data = 1;
-	set_fuse(MASTER_ENB, &data);
 
 	if ((flags & FLAGS_ODMRSVD)) {
 		set_fuse(ODM_RSVD, info->odm_rsvd);
@@ -442,7 +482,6 @@ static void fuse_program_array(int pgm_cycles)
 	u32 *data = tmp_fuse_pgm_data, addr = 0, *mask = fuse_pgm_mask;
 	int i = 0;
 
-	fuse_reg_unhide();
 	fuse_cmd_sense();
 
 	/* get the first 2 fuse bytes */
@@ -503,20 +542,13 @@ static void fuse_program_array(int pgm_cycles)
 		}
 
 		if (i < 2) {
+			wait_for_idle();
 			fuse_power_disable();
 			fuse_cmd_sense();
 			fuse_power_enable();
 		}
 	}
 
-	/* Read all data into the chip options */
-	tegra_fuse_writel(0x1, FUSE_PRIV2INTFC);
-	udelay(1);
-	tegra_fuse_writel(0, FUSE_PRIV2INTFC);
-
-	while (!(tegra_fuse_readl(FUSE_CTRL) & (1 << 30)));
-
-	fuse_reg_hide();
 	fuse_power_disable();
 }
 
@@ -530,22 +562,26 @@ static int fuse_set(enum fuse_io_param io_param, u32 *param, int size)
 
 	data = (u32*)kzalloc(size, GFP_KERNEL);
 	if (!data) {
-		pr_err("failed to alloc %d bytes\n", nwords);
+		pr_err("failed to alloc %d bytes\n", size);
 		return -ENOMEM;
 	}
 
 	get_fuse(io_param, data);
 
+	/* set only new fuse bits */
 	for (i = 0; i < nwords; i++) {
-		if ((data[i] | param[i]) != param[i]) {
-			pr_info("hw_val: 0x%x, sw_val: 0x%x, final: 0x%x\n",
-				data[i], param[i], (data[i] | param[i]));
-			param[i] = (data[i] | param[i]);
-		}
+		param[i] = (~data[i] & param[i]);
 	}
+
 	kfree(data);
 	return 0;
 }
+
+/*
+ * Function pointer to optional board specific function
+ */
+int (*tegra_fuse_regulator_en)(int);
+EXPORT_SYMBOL(tegra_fuse_regulator_en);
 
 #define CAR_OSC_CTRL		0x50
 #define PMC_PLLP_OVERRIDE	0xF8
@@ -554,25 +590,40 @@ static int fuse_set(enum fuse_io_param io_param, u32 *param, int size)
 #define PMC_OSC_FREQ_SHIFT	2
 #define CAR_OSC_FREQ_SHIFT	30
 
+#define FUSE_SENSE_DONE_BIT	BIT(30)
+#define START_DATA		BIT(0)
+#define SKIP_RAMREPAIR		BIT(1)
+#define FUSE_PGM_TIMEOUT_MS	50
+
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 /* cycles corresponding to 13MHz, 19.2MHz, 12MHz, 26MHz */
 static int fuse_pgm_cycles[] = {130, 192, 120, 260};
+#else
+/* cycles corresponding to 13MHz, 16.8MHz, 19.2MHz, 38.4MHz, 12MHz, 48MHz, 26MHz */
+static int fuse_pgm_cycles[] = {130, 168, 0, 0, 192, 384, 0, 0, 120, 480, 0, 0, 260};
+#endif
 
 int tegra_fuse_program(struct fuse_data *pgm_data, u32 flags)
 {
 	u32 reg;
 	int i = 0;
 	int index;
+	int ret;
+	int delay = FUSE_PGM_TIMEOUT_MS;
 
-	mutex_lock(&fuse_lock);
-	reg = tegra_fuse_readl(FUSE_DIS_PGM);
-	mutex_unlock(&fuse_lock);
-	if (reg) {
-		pr_err("fuse programming disabled");
-		return -EACCES;
+	if (!pgm_data || !flags) {
+		pr_err("invalid parameter");
+		return -EINVAL;
+	}
+
+	if (IS_ERR_OR_NULL(clk_fuse) ||
+	   (!tegra_fuse_regulator_en && IS_ERR_OR_NULL(vdd_fuse))) {
+		pr_err("fuse write disabled");
+		return -ENODEV;
 	}
 
 	if (fuse_odm_prod_mode() && (flags != FLAGS_ODMRSVD)) {
-		pr_err("reserved odm fuses are allowed in secure mode");
+		pr_err("reserved odm fuses aren't allowed in secure mode");
 		return -EPERM;
 	}
 
@@ -582,10 +633,24 @@ int tegra_fuse_program(struct fuse_data *pgm_data, u32 flags)
 		return -EPERM;
 	}
 
-	if (IS_ERR_OR_NULL(vdd_fuse)) {
-		pr_err("no regulator. fuse programming disabled\n");
-		return -EPERM;
+	clk_enable(clk_fuse);
+
+	/* make all the fuse registers visible */
+	fuse_reg_unhide();
+
+	/* check that fuse options write access hasn't been disabled */
+	mutex_lock(&fuse_lock);
+	reg = tegra_fuse_readl(FUSE_DIS_PGM);
+	mutex_unlock(&fuse_lock);
+	if (reg) {
+		pr_err("fuse programming disabled");
+		fuse_reg_hide();
+		clk_disable(clk_fuse);
+		return -EACCES;
 	}
+
+	/* enable software writes to the fuse registers */
+	tegra_fuse_writel(0, FUSE_WRITE_ACCESS);
 
 	mutex_lock(&fuse_lock);
 	memcpy(&fuse_info, pgm_data, sizeof(fuse_info));
@@ -594,7 +659,15 @@ int tegra_fuse_program(struct fuse_data *pgm_data, u32 flags)
 			fuse_info_tbl[i].sz);
 	}
 
-	regulator_enable(vdd_fuse);
+#if ENABLE_FUSE_BURNING
+	if (tegra_fuse_regulator_en)
+		ret = tegra_fuse_regulator_en(1);
+	else
+		ret = regulator_enable(vdd_fuse);
+
+	if (ret)
+		BUG_ON("regulator enable fail\n");
+
 	populate_fuse_arrs(&fuse_info, flags);
 
 	/* calculate the number of program cycles from the oscillator freq */
@@ -609,22 +682,37 @@ int tegra_fuse_program(struct fuse_data *pgm_data, u32 flags)
 	pr_debug("%s: use %d programming cycles\n", __func__, fuse_pgm_cycles[index]);
 	fuse_program_array(fuse_pgm_cycles[index]);
 
-	/* disable program bit */
-	reg = 0;
-	set_fuse(MASTER_ENB, &reg);
-
 	memset(&fuse_info, 0, sizeof(fuse_info));
-	regulator_disable(vdd_fuse);
+
+	if (tegra_fuse_regulator_en)
+		tegra_fuse_regulator_en(0);
+	else
+		regulator_disable(vdd_fuse);
+#endif
+
 	mutex_unlock(&fuse_lock);
 
-	return 0;
-}
+	/* disable software writes to the fuse registers */
+	tegra_fuse_writel(1, FUSE_WRITE_ACCESS);
 
-void tegra_fuse_program_disable(void)
-{
-	mutex_lock(&fuse_lock);
-	tegra_fuse_writel(0x1, FUSE_DIS_PGM);
-	mutex_unlock(&fuse_lock);
+	/* make all the fuse registers invisible */
+	fuse_reg_hide();
+
+	/* apply the fuse values immediately instead of resetting the chip */
+	fuse_cmd_sense();
+
+	tegra_fuse_writel(START_DATA | SKIP_RAMREPAIR, FUSE_PRIV2INTFC);
+
+	/* check sense and shift done in addition to IDLE */
+	do {
+		mdelay(1);
+		reg = tegra_fuse_readl(FUSE_CTRL);
+		reg &= (FUSE_SENSE_DONE_BIT | STATE_IDLE);
+	} while ((reg != (FUSE_SENSE_DONE_BIT | STATE_IDLE)) && (--delay > 0));
+
+	clk_disable(clk_fuse);
+
+	return ((delay > 0) ? 0 : -ETIMEDOUT);
 }
 
 static int fuse_name_to_param(const char *str)
@@ -639,7 +727,7 @@ static int fuse_name_to_param(const char *str)
 	return -ENODATA;
 }
 
-static int char_to_xdigit(int c)
+static int char_to_xdigit(char c)
 {
 	return (c>='0' && c<='9') ? c - '0' :
 		(c>='a' && c<='f') ? c - 'a' + 10 :
@@ -655,13 +743,12 @@ static int char_to_xdigit(int c)
 	} \
 }
 
-#define CHARS_PER_WORD	8
-
 static ssize_t fuse_store(struct kobject *kobj, struct kobj_attribute *attr,
 	const char *buf, size_t count)
 {
 	enum fuse_io_param param = fuse_name_to_param(attr->attr.name);
 	int ret, i = 0;
+	int orig_count = count;
 	struct fuse_data data = {0};
 	u32 *raw_data = ((u32 *)&data) + fuse_info_tbl[param].data_offset;
 	u8 *raw_byte_data = (u8 *)raw_data;
@@ -672,11 +759,11 @@ static ssize_t fuse_store(struct kobject *kobj, struct kobj_attribute *attr,
 	}
 
 	if (!isxdigit(*buf))
-		return count;
+		return -EINVAL;
 
 	if (fuse_odm_prod_mode()) {
 		pr_err("%s: device locked. odm fuse already blown\n", __func__);
-		return 0;
+		return -EPERM;
 	}
 
 	count--;
@@ -686,19 +773,32 @@ static ssize_t fuse_store(struct kobject *kobj, struct kobj_attribute *attr,
 		return -EINVAL;
 	}
 
+	/* we need to fit each character into a single nibble */
 	raw_byte_data += DIV_ROUND_UP(count, 2) - 1;
-	for (i = 0; i < DIV_ROUND_UP(count, 2); i++, buf++) {
+
+	/* in case of odd number of writes, write the first one here */
+	if (count & BIT(0)) {
 		*raw_byte_data = char_to_xdigit(*buf);
-		*raw_byte_data <<= 4;
 		buf++;
-		*raw_byte_data |= (char_to_xdigit(*buf) & 0xF);
 		raw_byte_data--;
+		count--;
+	}
+
+	for (i = 1; i <= count; i++, buf++) {
+		if (i & BIT(0)) {
+			*raw_byte_data = char_to_xdigit(*buf);
+		} else {
+			*raw_byte_data <<= 4;
+			*raw_byte_data |= char_to_xdigit(*buf);
+			raw_byte_data--;
+		}
 	}
 
 	ret = tegra_fuse_program(&data, BIT(param));
 	if (ret) {
 		pr_err("%s: fuse program fail(%d)\n", __func__, ret);
-		return ret;
+		orig_count = ret;
+		goto done;
 	}
 
 	/* if odm prodn mode fuse is burnt, change file permissions to 0440 */
@@ -714,7 +814,8 @@ static ssize_t fuse_store(struct kobject *kobj, struct kobj_attribute *attr,
 		CHK_ERR(sysfs_chmod_file(kobj, &odm_rsvd_attr.attr, 0440));
 	}
 
-	return count;
+done:
+	return orig_count;
 }
 
 static ssize_t fuse_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
@@ -753,14 +854,28 @@ static ssize_t fuse_show(struct kobject *kobj, struct kobj_attribute *attr, char
 
 static int __init tegra_fuse_program_init(void)
 {
-	/* get vfuse regulator */
-	vdd_fuse = regulator_get(NULL, "vdd_fuse");
-	if (IS_ERR_OR_NULL(vdd_fuse))
-		pr_err("%s: could not get vdd_fuse. fuse programming disabled\n", __func__);
+	if (!tegra_fuse_regulator_en) {
+		/* get vdd_fuse regulator */
+		vdd_fuse = regulator_get(NULL, "vdd_fuse");
+		if (IS_ERR_OR_NULL(vdd_fuse))
+			pr_err("%s: no vdd_fuse. fuse write disabled\n", __func__);
+	}
+
+	clk_fuse = clk_get_sys("fuse-tegra", "fuse_burn");
+	if (IS_ERR_OR_NULL(clk_fuse)) {
+		pr_err("%s: no clk_fuse. fuse read/write disabled\n", __func__);
+		if (!IS_ERR_OR_NULL(vdd_fuse)) {
+			regulator_put(vdd_fuse);
+			vdd_fuse = NULL;
+		}
+		return -ENODEV;
+	}
 
 	fuse_kobj = kobject_create_and_add("fuse", firmware_kobj);
 	if (!fuse_kobj) {
 		pr_err("%s: fuse_kobj create fail\n", __func__);
+		regulator_put(vdd_fuse);
+		clk_put(clk_fuse);
 		return -ENODEV;
 	}
 
@@ -796,8 +911,15 @@ static int __init tegra_fuse_program_init(void)
 
 static void __exit tegra_fuse_program_exit(void)
 {
+
+	fuse_power_disable();
+	fuse_reg_hide();
+
 	if (!IS_ERR_OR_NULL(vdd_fuse))
 		regulator_put(vdd_fuse);
+
+	if (!IS_ERR_OR_NULL(clk_fuse))
+		clk_put(clk_fuse);
 
 	sysfs_remove_file(fuse_kobj, &odm_prod_mode_attr.attr);
 	sysfs_remove_file(fuse_kobj, &devkey_attr.attr);
@@ -811,5 +933,5 @@ static void __exit tegra_fuse_program_exit(void)
 	kobject_del(fuse_kobj);
 }
 
-module_init(tegra_fuse_program_init);
+late_initcall(tegra_fuse_program_init);
 module_exit(tegra_fuse_program_exit);
