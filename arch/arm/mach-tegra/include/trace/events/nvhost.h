@@ -3,7 +3,7 @@
  *
  * Nvhost event logging to ftrace.
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010-2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -164,7 +164,7 @@ TRACE_EVENT(nvhost_channel_write_waitchks,
 		__entry->waitmask = waitmask;
 	),
 
-	TP_printk("name=%s, waitchks=%lu, waitmask=0x08lx",
+	TP_printk("name=%s, waitchks=%lu, waitmask=%08lx",
 	  __entry->name, (unsigned long)__entry->waitchks,
 	  (unsigned long)__entry->waitmask)
 );
@@ -285,6 +285,63 @@ TRACE_EVENT(nvhost_ioctl_ctrl_syncpt_wait,
 
 	TP_printk("id=%u, threshold=%u, timeout=%d",
 	  __entry->id, __entry->threshold, __entry->timeout)
+);
+
+TRACE_EVENT(nvhost_channel_submitted,
+	TP_PROTO(const char *name, u32 syncpt_base, u32 syncpt_max),
+
+	TP_ARGS(name, syncpt_base, syncpt_max),
+
+	TP_STRUCT__entry(
+		__field(const char *, name)
+		__field(u32, syncpt_base)
+		__field(u32, syncpt_max)
+	),
+
+	TP_fast_assign(
+		__entry->name = name;
+		__entry->syncpt_base = syncpt_base;
+		__entry->syncpt_max = syncpt_max;
+	),
+
+	TP_printk("name=%s, syncpt_base=%d, syncpt_max=%d",
+		__entry->name, __entry->syncpt_base, __entry->syncpt_max)
+);
+
+TRACE_EVENT(nvhost_channel_submit_complete,
+	TP_PROTO(const char *name, int count),
+
+	TP_ARGS(name, count),
+
+	TP_STRUCT__entry(
+		__field(const char *, name)
+		__field(int, count)
+	),
+
+	TP_fast_assign(
+		__entry->name = name;
+		__entry->count = count;
+	),
+
+	TP_printk("name=%s, count=%d", __entry->name, __entry->count)
+);
+
+TRACE_EVENT(nvhost_wait_cdma,
+	TP_PROTO(const char *name, u32 eventid),
+
+	TP_ARGS(name, eventid),
+
+	TP_STRUCT__entry(
+		__field(const char *, name)
+		__field(u32, eventid)
+	),
+
+	TP_fast_assign(
+		__entry->name = name;
+		__entry->eventid = eventid;
+	),
+
+	TP_printk("name=%s, event=%d", __entry->name, __entry->eventid)
 );
 
 #endif /*  _TRACE_NVHOST_H */
