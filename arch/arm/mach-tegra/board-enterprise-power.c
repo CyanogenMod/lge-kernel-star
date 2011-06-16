@@ -174,6 +174,25 @@ TPS_PDATA_INIT(ldoln, 1000, 3300, tps80031_rails(SMPS3), 0, 0, 0, -1, 0, 0);
 TPS_PDATA_INIT(ldousb, 1000, 3300, 0, 0, 0, 0, -1, 0, 0);
 TPS_PDATA_INIT(vana,  1000, 3300, 0, 0, 0, 0, -1, 0, 0);
 
+static struct tps80031_rtc_platform_data rtc_data = {
+	.irq = TPS80031_IRQ_BASE + TPS80031_INT_RTC_ALARM,
+	.time = {
+		.tm_year = 2011,
+		.tm_mon = 0,
+		.tm_mday = 1,
+		.tm_hour = 1,
+		.tm_min = 2,
+		.tm_sec = 3,
+	},
+};
+
+#define TPS_RTC()				\
+	{						\
+		.id	= 0,		\
+		.name	= "rtc_tps80031",	\
+		.platform_data = &rtc_data,	\
+	}
+
 #define TPS_REG(_id, _data)				\
 	{						\
 		.id	 = TPS80031_ID_##_id,		\
@@ -197,6 +216,7 @@ static struct tps80031_subdev_info tps80031_devs[] = {
 	TPS_REG(LDOLN, ldoln),
 	TPS_REG(LDOUSB, ldousb),
 	TPS_REG(VANA, vana),
+	TPS_RTC(),
 };
 
 struct tps80031_32kclock_plat_data clk32k_pdata = {
