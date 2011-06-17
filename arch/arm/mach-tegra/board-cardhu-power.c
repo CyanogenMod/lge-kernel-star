@@ -935,8 +935,8 @@ int __init cardhu_suspend_init(void)
 			cardhu_suspend_data.corereq_high = true;
 		break;
 	case BOARD_E1198:
-		break;
 	case BOARD_PM269:
+		break;
 	case BOARD_E1187:
 	case BOARD_E1186:
 		cardhu_suspend_data.cpu_timer = 5000;
