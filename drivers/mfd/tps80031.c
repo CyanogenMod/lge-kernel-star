@@ -52,6 +52,10 @@
 #define REGEN2_BASE_ADD		0xB1
 #define SYSEN_BASE_ADD		0xB4
 
+/* device control registers */
+#define TPS80031_PHOENIX_DEV_ON	0x25
+#define DEVOFF	1
+
 #define CLK32KAO_BASE_ADD	0xBA
 #define CLK32KG_BASE_ADD	0xBD
 #define CLK32KAUDIO_BASE_ADD	0xC0
@@ -313,15 +317,11 @@ static struct tps80031 *tps80031_dev;
 int tps80031_power_off(void)
 {
 	struct tps80031_client *tps = &tps80031_dev->tps_clients[SLAVE_ID1];
-	struct device *dev;
 
 	if (!tps->client)
 		return -EINVAL;
-
-	dev = &tps->client->dev;
-
-	/* FIXME!! Put the logic here to switch off pmu*/
-	return 0;
+	dev_info(&tps->client->dev, "switching off PMU\n");
+	return __tps80031_write(tps->client, TPS80031_PHOENIX_DEV_ON, DEVOFF);
 }
 
 static int tps80031_gpio_get(struct gpio_chip *gc, unsigned offset)
