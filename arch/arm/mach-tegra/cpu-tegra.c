@@ -582,7 +582,9 @@ static int __init tegra_cpufreq_init(void)
 
 	struct tegra_cpufreq_table_data *table_data =
 		tegra_cpufreq_table_get();
-	BUG_ON(!table_data);
+	if (IS_ERR_OR_NULL(table_data))
+		return -EINVAL;
+
 	suspend_index = table_data->suspend_index;
 
 #ifdef CONFIG_TEGRA_THERMAL_THROTTLE

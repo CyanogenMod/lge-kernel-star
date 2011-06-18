@@ -4054,18 +4054,33 @@ static struct cpufreq_frequency_table freq_table_1p4GHz[] = {
 
 static struct tegra_cpufreq_table_data cpufreq_tables[] = {
 	{ freq_table_300MHz, 0, 1 },
-	{ freq_table_1p0GHz, 2, 7 },
-	{ freq_table_1p3GHz, 2, 9, 1},
-	{ freq_table_1p4GHz, 2, 10, 1},
+	{ freq_table_1p0GHz, 2, 7, 2},
+	{ freq_table_1p3GHz, 2, 9, 2},
+	{ freq_table_1p4GHz, 2, 10, 2},
 };
 
-static void clip_cpu_rate_limits(
+static int clip_cpu_rate_limits(
 	struct cpufreq_frequency_table *freq_table,
 	struct cpufreq_policy *policy,
 	struct clk *cpu_clk_g,
 	struct clk *cpu_clk_lp)
 {
 	int idx, ret;
+
+	/* clip CPU G mode maximum frequency to table entry */
+	ret = cpufreq_frequency_table_target(policy, freq_table,
+		cpu_clk_g->max_rate / 1000, CPUFREQ_RELATION_H, &idx);
+	if (ret) {
+		pr_err("%s: G CPU max rate %lu outside of cpufreq table",
+		       __func__, cpu_clk_g->max_rate);
+		return ret;
+	}
+	cpu_clk_g->max_rate = freq_table[idx].frequency * 1000;
+	if (cpu_clk_g->max_rate < cpu_clk_lp->max_rate) {
+		pr_err("%s: G CPU max rate %lu is below LP CPU max rate %lu",
+		       __func__, cpu_clk_g->max_rate, cpu_clk_lp->max_rate);
+		return -EINVAL;
+	}
 
 	/* clip CPU LP mode maximum frequency to table entry, and
 	   set CPU G mode minimum frequency one table step below */
@@ -4074,33 +4089,46 @@ static void clip_cpu_rate_limits(
 	if (ret || !idx) {
 		pr_err("%s: LP CPU max rate %lu %s of cpufreq table", __func__,
 		       cpu_clk_lp->max_rate, ret ? "outside" : "at the bottom");
-		BUG();
+		return ret;
 	}
 	cpu_clk_lp->max_rate = freq_table[idx].frequency * 1000;
 	cpu_clk_g->min_rate = freq_table[idx-1].frequency * 1000;
+	return 0;
 }
 
 struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void)
 {
 	int i, ret;
+	unsigned long selection_rate;
 	struct clk *cpu_clk_g = tegra_get_clock_by_name("cpu_g");
 	struct clk *cpu_clk_lp = tegra_get_clock_by_name("cpu_lp");
+
+	/* For table selection use top cpu_g rate in dvfs ladder; selection
+	   rate may exceed cpu max_rate (e.g., because of edp limitations on
+	   cpu voltage) - in any case max_rate will be clipped to the table */
+	if (cpu_clk_g->dvfs && cpu_clk_g->dvfs->num_freqs)
+		selection_rate =
+			cpu_clk_g->dvfs->freqs[cpu_clk_g->dvfs->num_freqs - 1];
+	else
+		selection_rate = cpu_clk_g->max_rate;
 
 	for (i = 0; i < ARRAY_SIZE(cpufreq_tables); i++) {
 		struct cpufreq_policy policy;
 		policy.cpu = 0;	/* any on-line cpu */
 		ret = cpufreq_frequency_table_cpuinfo(
 			&policy, cpufreq_tables[i].freq_table);
-		BUG_ON(ret);
-		if ((policy.max * 1000) == cpu_clk_g->max_rate) {
-			clip_cpu_rate_limits(cpufreq_tables[i].freq_table,
-				&policy, cpu_clk_g, cpu_clk_lp);
-			return &cpufreq_tables[i];
+		if (!ret) {
+			if ((policy.max * 1000) == selection_rate) {
+				ret = clip_cpu_rate_limits(
+					cpufreq_tables[i].freq_table,
+					&policy, cpu_clk_g, cpu_clk_lp);
+				if (!ret)
+					return &cpufreq_tables[i];
+			}
 		}
 	}
-	pr_err("%s: No cpufreq table matching cpu range", __func__);
-	BUG();
-	return &cpufreq_tables[0];
+	WARN(1, "%s: No cpufreq table matching G & LP cpu ranges", __func__);
+	return NULL;
 }
 
 unsigned long tegra_emc_to_cpu_ratio(unsigned long cpu_rate)
