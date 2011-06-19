@@ -173,7 +173,6 @@ struct aat2870_drvdata_t {
 
 
 static struct aat2870_drvdata_t *drvdata; 
-static int restore_value = -1;
 
 //static spinlock_t intensity_lock; //km.lee
 
@@ -375,9 +374,6 @@ static void star_bl_work_func(struct work_struct *wq)
 		input_sync(drv->input_dev);
 		DBG("[BL] %s()\n", __FUNCTION__);
 		schedule_delayed_work(&drv->delayed_work_bl, drv->lsensor_poll_time);
-	} else if (drv->op_mode == AAT2870_OP_MODE_NORMAL && restore_value >= 0) {
-		/* Reset intensity after ALC is disabled */
-		star_bl_write(AAT2870_REG_BLM, restore_value);
 	}
 }
 
@@ -638,6 +634,9 @@ star_bl_store_intensity(struct device *dev, struct device_attribute *attr, const
 	if (!count)
 		return -EINVAL;
 
+	if (strnlen(current->comm,11) == 11 && !strncmp(current->comm,"nvrm_daemon",11))
+		return count;
+
 	sscanf(buf, "%d", &intensity);//level range: 0 to 22 from aat2870 ds
 
 	//101103, , Replaced with function.
@@ -688,8 +687,6 @@ star_bl_store_intensity(struct device *dev, struct device_attribute *attr, const
 	//if (drv->intensity != level) { //Deep sleep Issue: need to be updated everytime
 	star_bl_write(AAT2870_REG_BLM, level);
 	drv->intensity = level;
-	if (restore_value < 0)
-		restore_value = drv->intensity;
 	//}
 	//spin_unlock( &intensity_lock ); //km.lee
 	
@@ -784,7 +781,7 @@ star_bl_show_lsensor_onoff(struct device *dev, struct device_attribute *attr, ch
 	if (!drv) return 0;
 
 	ret = snprintf(buf, PAGE_SIZE, "%s\n", (drv->lsensor_enable == TRUE)  ? "1":"0");
-
+	
 	return ret;
 }
 
@@ -809,8 +806,8 @@ star_bl_store_lsensor_onoff(struct device *dev, struct device_attribute *attr, c
 			schedule_delayed_work(&drv->delayed_work_bl, drv->lsensor_poll_time);
 		}
 	} else {
-		drv->lsensor_enable = FALSE;
 
+		drv->lsensor_enable = FALSE;
 	}
 
 	return count;
@@ -850,6 +847,7 @@ star_bl_store_alc(struct device *dev, struct device_attribute *attr, const char 
 	sscanf(buf, "%d", &alc);
 
 	if (alc) {
+
 		next_mode = AAT2870_OP_MODE_ALC;
 		if (drv->lsensor_enable) {
 
@@ -858,9 +856,6 @@ star_bl_store_alc(struct device *dev, struct device_attribute *attr, const char 
 	} else {
 
 		next_mode = AAT2870_OP_MODE_NORMAL;
-		restore_value = -1;
-		/* Run one reset cycle in a bit... */
-		schedule_delayed_work(&drv->delayed_work_bl, msecs_to_jiffies(5000));
 	}
 	//printk("[KERNEL] alc = %d  %s() %d\n",alc , __FUNCTION__, __LINE__);
 	star_bl_switch_mode(next_mode);
