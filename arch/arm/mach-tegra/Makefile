@@ -89,7 +89,6 @@ obj-${CONFIG_MACH_HARMONY}              += board-harmony-panel.o
 obj-${CONFIG_MACH_HARMONY}              += board-harmony-pinmux.o
 obj-${CONFIG_MACH_HARMONY}              += board-harmony-pcie.o
 obj-${CONFIG_MACH_HARMONY}              += board-harmony-power.o
-obj-${CONFIG_MACH_HARMONY}              += board-harmony-sdhci.o
 
 obj-${CONFIG_MACH_PAZ00}                += board-paz00.o
 obj-${CONFIG_MACH_PAZ00}                += board-paz00-pinmux.o
