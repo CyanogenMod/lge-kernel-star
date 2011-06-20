@@ -1052,7 +1052,7 @@ static struct resource das_resource[] = {
 };
 
 struct platform_device tegra_das_device = {
-	.name		= "tegra_das",
+	.name		= "tegra-das",
 	.id		= -1,
 	.resource	= das_resource,
 	.num_resources	= ARRAY_SIZE(das_resource),
