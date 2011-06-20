@@ -380,7 +380,7 @@ static int __init touchLED_probe(struct platform_device *pdev)
     device_create_file(s_touchLED.leddev.dev, &dev_attr_blink);
     device_create_file(s_touchLED.leddev.dev, &dev_attr_enable);
 
-    s_touchLED.blink_workqueue = create_workqueue("star_ledpulse");
+    s_touchLED.blink_workqueue = create_singlethread_workqueue("star_ledpulse");
     INIT_DELAYED_WORK(&s_touchLED.blink_queue, star_blink_queue);
     wake_lock_init(&s_touchLED.wlock, WAKE_LOCK_SUSPEND, "ledpulse_active");
     alarm_init(&s_touchLED.alarm, ANDROID_ALARM_ELAPSED_REALTIME_WAKEUP,
