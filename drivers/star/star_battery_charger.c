@@ -3086,7 +3086,7 @@ static int tegra_battery_probe(struct platform_device *pdev)
 	printk(KERN_INFO "%s: battery driver registered\n", pdev->name);
 
 	batt_dev->battery_poll_interval = NVBATTERY_POLLING_INTERVAL*HZ;
-	batt_dev->battery_workqueue = create_workqueue("battery_workqueue");
+	batt_dev->battery_workqueue = create_singlethread_workqueue("battery_workqueue");
 	if (batt_dev->battery_workqueue == NULL)
 	{
 		rc = -ENOMEM;
