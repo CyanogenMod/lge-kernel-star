@@ -257,3 +257,11 @@ config TEGRA_EMC_TO_DDR_CLOCK
 	int "EMC to DDR clocks ratio"
 	default "2" if ARCH_TEGRA_2x_SOC
 	default "1"
+
+config TEGRA_LEGACY_AUDIO
+	bool "Enable Tegra Legacy Audio APIs"
+	default n
+	help
+	  Say Y if you want to add support legacy (non-ALSA) audio APIs on
+	  Tegra. This will disable ALSA (ASoC) support.
+
