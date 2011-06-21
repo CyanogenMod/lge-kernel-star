@@ -37,6 +37,9 @@
 #include "pm.h"
 #include "wakeups-t3.h"
 
+#define PMC_CTRL		0x0
+#define PMC_CTRL_INTR_LOW	(1 << 17)
+
 /************************ TPS80031 based regulator ****************/
 static struct regulator_consumer_supply tps80031_vio_supply[] = {
 	REGULATOR_SUPPLY("vio_1v8", NULL),
@@ -339,6 +342,15 @@ static int __init enterprise_gpio_switch_regulator_init(void)
 
 int __init enterprise_regulator_init(void)
 {
+	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
+	u32 pmc_ctrl;
+
+	/* configure the power management controller to trigger PMU
+	 * interrupts when low */
+
+	pmc_ctrl = readl(pmc + PMC_CTRL);
+	writel(pmc_ctrl | PMC_CTRL_INTR_LOW, pmc + PMC_CTRL);
+
 	i2c_register_board_info(4, enterprise_regulators, 1);
 	enterprise_gpio_switch_regulator_init();
 	return 0;
