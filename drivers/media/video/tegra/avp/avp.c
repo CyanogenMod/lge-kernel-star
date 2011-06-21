@@ -44,6 +44,7 @@
 #include <mach/iomap.h>
 #include <mach/nvmap.h>
 #include <mach/legacy_irq.h>
+#include <mach/hardware.h>
 
 #include "../../../../video/tegra/nvmap/nvmap.h"
 
@@ -986,8 +987,8 @@ static int avp_init(struct tegra_avp_info *avp)
 	/* vaddr is TEGRA_SMMU_BASE */
 	pr_info("%s: Using SMMU at %lx to load AVP kernel\n",
 		__func__, (unsigned long)avp->kernel_phys);
-	BUG_ON(avp->kernel_phys != 0xe0000000
-		&& avp->kernel_phys != 0x00001000);
+	BUG_ON(avp->kernel_phys != 0xeff00000
+		&& avp->kernel_phys != 0x0ff00000);
 	sprintf(fw_file, "nvrm_avp_%08lx.bin", (unsigned long)avp->kernel_phys);
 	avp->reset_addr = avp->kernel_phys;
 #else /* nvmem= carveout */
@@ -1010,7 +1011,7 @@ static int avp_init(struct tegra_avp_info *avp)
 		BUG();
 	}
 	pr_info("%s: Using nvmem= carveout at %lx to load AVP kernel\n",
-		__func__, avp->kernel_phys);
+		__func__, (unsigned long)avp->kernel_phys);
 	sprintf(fw_file, "nvrm_avp_%08lx.bin", avp->kernel_phys);
 	avp->reset_addr = avp->kernel_phys;
 	avp->kernel_data = ioremap(avp->kernel_phys, SZ_1M);
@@ -1025,7 +1026,7 @@ static int avp_init(struct tegra_avp_info *avp)
 		fw_file, avp_fw->size);
 
 	pr_info("%s: Loading AVP kernel at vaddr=%p paddr=%lx\n",
-		__func__, avp->kernel_data, (unsigned long)(avp->kernel_phys));
+		__func__, avp->kernel_data, (unsigned long)avp->kernel_phys);
 	memcpy(avp->kernel_data, avp_fw->data, avp_fw->size);
 	memset(avp->kernel_data + avp_fw->size, 0, SZ_1M - avp_fw->size);
 
@@ -1573,44 +1574,6 @@ static struct trpc_node avp_trpc_node = {
 	.try_connect	= avp_node_try_connect,
 };
 
-static struct nvmap_client *avp_early_nvmap_drv;
-static struct nvmap_handle_ref *avp_early_kernel_handle;
-static void *avp_early_kernel_data;
-static phys_addr_t avp_early_kernel_phys;
-
-void avp_early_init(void)
-{
-	int ret;
-
-	avp_early_nvmap_drv = nvmap_create_client(nvmap_dev, "avp_early");
-	if (IS_ERR_OR_NULL(avp_early_nvmap_drv))
-		pr_crit("%s: nvmap_create_client error\n", __func__);
-
-	avp_early_kernel_handle =
-		nvmap_create_handle(avp_early_nvmap_drv, SZ_1M);
-	if (IS_ERR_OR_NULL(avp_early_kernel_handle))
-		pr_crit("%s: nvmap_create_handle error\n", __func__);
-
-	ret = nvmap_alloc_handle_id(avp_early_nvmap_drv,
-				nvmap_ref_to_id(avp_early_kernel_handle),
-				NVMAP_HEAP_IOVMM, PAGE_SIZE,
-				NVMAP_HANDLE_UNCACHEABLE);
-	if (ret)
-		pr_crit("%s: nvmap_alloc_handle_id error\n", __func__);
-
-	avp_early_kernel_data = nvmap_mmap(avp_early_kernel_handle);
-	if (!avp_early_kernel_data)
-		pr_crit("%s: nvmap_mmap error\n", __func__);
-
-	avp_early_kernel_phys =
-		nvmap_pin(avp_early_nvmap_drv, avp_early_kernel_handle);
-	if (IS_ERR_OR_NULL((void *)avp_early_kernel_phys))
-		pr_crit("%s: nvmap_pin error\n", __func__);
-
-	pr_info("%s: allocated memory at %x for AVP kernel\n",
-		__func__, avp_early_kernel_phys);
-}
-
 static int tegra_avp_probe(struct platform_device *pdev)
 {
 	void *msg_area;
@@ -1647,10 +1610,41 @@ static int tegra_avp_probe(struct platform_device *pdev)
 #endif
 
 	if (heap_mask == NVMAP_HEAP_IOVMM) {
-		avp->nvmap_drv = avp_early_nvmap_drv;
-		avp->kernel_handle = avp_early_kernel_handle;
-		avp->kernel_data = avp_early_kernel_data;
-		avp->kernel_phys = avp_early_kernel_phys;
+		u32 iovmm_addr = 0x0ff00000;
+
+		/* Tegra3 A01 has different SMMU address */
+		if (tegra_get_chipid() == TEGRA_CHIPID_TEGRA3
+			&& tegra_get_revision() == TEGRA_REVISION_A01) {
+			iovmm_addr = 0xeff00000;
+		}
+
+		avp->kernel_handle = nvmap_alloc_iovm(avp->nvmap_drv, SZ_1M,
+						L1_CACHE_BYTES,
+						NVMAP_HANDLE_WRITE_COMBINE,
+						iovmm_addr);
+		if (IS_ERR_OR_NULL(avp->kernel_handle)) {
+			pr_err("%s: cannot create handle\n", __func__);
+			ret = PTR_ERR(avp->kernel_handle);
+			goto err_nvmap_alloc;
+		}
+
+		avp->kernel_data = nvmap_mmap(avp->kernel_handle);
+		if (!avp->kernel_data) {
+			pr_err("%s: cannot map kernel handle\n", __func__);
+			ret = -ENOMEM;
+			goto err_nvmap_mmap;
+		}
+
+		avp->kernel_phys =
+			nvmap_pin(avp->nvmap_drv, avp->kernel_handle);
+		if (IS_ERR_OR_NULL((void *)avp->kernel_phys)) {
+			pr_err("%s: cannot pin kernel handle\n", __func__);
+			ret = PTR_ERR((void *)avp->kernel_phys);
+			goto err_nvmap_pin;
+		}
+
+		pr_info("%s: allocated IOVM at %lx for AVP kernel\n",
+			__func__, (unsigned long)avp->kernel_phys);
 	}
 
 	if (heap_mask == NVMAP_HEAP_CARVEOUT_GENERIC) {
