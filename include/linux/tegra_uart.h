@@ -20,8 +20,18 @@
 #ifndef _TEGRA_UART_H_
 #define _TEGRA_UART_H_
 
+#include <linux/clk.h>
+
+struct uart_clk_parent {
+	const char	*name;
+	struct clk	*parent_clk;
+	unsigned long	fixed_clk_rate;
+};
+
 struct tegra_uart_platform_data {
 	void (*wake_peer)(struct uart_port *);
+	struct uart_clk_parent *parent_clk_list;
+	int parent_clk_count;
 };
 
 int tegra_uart_is_tx_empty(struct uart_port *);
