@@ -41,6 +41,9 @@ static void __iomem *emc = IO_ADDRESS(TEGRA_EMC_BASE);
 static const struct tegra_emc_table *tegra_emc_table;
 static int tegra_emc_table_size;
 
+static unsigned long tegra_emc_max_bus_rate;  /* 2 * 1000 * maximum emc_clock rate */
+static unsigned long tegra_emc_min_bus_rate;  /* 2 * 1000 * minimum emc_clock rate */
+
 static inline void emc_writel(u32 val, unsigned long addr)
 {
 	writel(val, emc + addr);
@@ -142,6 +145,14 @@ long tegra_emc_round_rate(unsigned long rate)
 	if (!emc_enable)
 		return -EINVAL;
 
+	if (rate >= tegra_emc_max_bus_rate) {
+		best = tegra_emc_table_size - 1;
+		goto round_out;
+	} else if (rate <= tegra_emc_min_bus_rate) {
+		best = 0;
+		goto round_out;
+	}
+
 	pr_debug("%s: %lu\n", __func__, rate);
 
 	/*
@@ -160,7 +171,7 @@ long tegra_emc_round_rate(unsigned long rate)
 
 	if (best < 0)
 		return -EINVAL;
-
+round_out:
 	pr_debug("%s: using %lu\n", __func__, tegra_emc_table[best].rate);
 
 	return tegra_emc_table[best].rate * 2 * 1000;
@@ -188,11 +199,11 @@ int tegra_emc_set_rate(unsigned long rate)
 	 */
 	rate = rate / 2 / 1000;
 
-	for (i = 0; i < tegra_emc_table_size; i++)
+	for (i = tegra_emc_table_size - 1; i >= 0; i--)
 		if (tegra_emc_table[i].rate == rate)
 			break;
 
-	if (i >= tegra_emc_table_size)
+	if (i < 0)
 		return -EINVAL;
 
 	pr_debug("%s: setting to %lu\n", __func__, rate);
@@ -246,6 +257,10 @@ void tegra_init_emc(const struct tegra_emc_chip *chips, int chips_size)
 			chips[chip_matched].description);
 		tegra_emc_table = chips[chip_matched].table;
 		tegra_emc_table_size = chips[chip_matched].table_size;
+
+		tegra_emc_min_bus_rate = tegra_emc_table[0].rate * 2 * 1000;
+		tegra_emc_max_bus_rate = tegra_emc_table[tegra_emc_table_size - 1].rate * 2 * 1000;
+
 	} else {
 		pr_err("%s: Memory not recognized, memory scaling disabled\n",
 			__func__);
