@@ -67,3 +67,15 @@ config PROC_PAGE_MONITOR
 	  /proc/pid/smaps, /proc/pid/clear_refs, /proc/pid/pagemap,
 	  /proc/kpagecount, and /proc/kpageflags. Disabling these
           interfaces will reduce the size of the kernel by approximately 4kb.
+
+config REPORT_PRESENT_CPUS
+	default n
+	depends on PROC_FS && SMP
+	bool "Report present cpus instead of online cpus"
+	help
+	  This is a work around to report Present CPUs instead of Online CPUs.
+	  Some power savings implements use CPU hotplug for power domains.
+	  It is a bug to enable this on a server or other architecture that
+	  uses cpu hotplug in the correct way.
+
+
