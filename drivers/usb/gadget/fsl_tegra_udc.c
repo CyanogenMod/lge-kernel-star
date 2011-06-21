@@ -42,7 +42,7 @@ int fsl_udc_clk_init(struct platform_device *pdev)
 	}
 
 	clk_enable(emc_clk);
-	clk_set_rate(emc_clk, 300000000);
+	clk_set_rate(emc_clk, ULONG_MAX);
 
 	/* we have to remap the registers ourselves as fsl_udc does not
 	 * export them for us.
