@@ -24,6 +24,8 @@
 #ifndef __LINUX_MFD_TPS80031_H
 #define __LINUX_MFD_TPS80031_H
 
+#include <linux/rtc.h>
+
 #define tps80031_rails(_name) "tps80031_"#_name
 
 enum {
@@ -89,6 +91,11 @@ struct tps80031_subdev_info {
 	int		id;
 	const char	*name;
 	void		*platform_data;
+};
+
+struct tps80031_rtc_platform_data {
+	int irq;
+	struct rtc_time time;
 };
 
 struct tps80031_32kclock_plat_data {
