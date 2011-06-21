@@ -369,8 +369,14 @@ static int tegra_mc_client_parse(const char *buf, size_t count,
 				    client_ids[0] != 1) {
 					ret = -EINVAL;
 					goto end;
-				} else
+				} else {
 					aggregate = true;
+					emc_trace(TRACE_OPT,
+						  "aggregate=true\n");
+					client_ids[0] = 1;
+					client_ids[1] = MC_STAT_AGGREGATE;
+					break;
+				}
 			}
 
 			num_clients = client_ids[0];
@@ -399,8 +405,7 @@ static int tegra_mc_client_parse(const char *buf, size_t count,
 			goto end;
 		}
 	}
-
-	if (!fmode || !fclient || (mode == FILTER_CLIENT && aggregate)) {
+	if (!fmode || !fclient) {
 		ret = -EINVAL;
 		goto end;
 	}
@@ -420,11 +425,14 @@ static int tegra_mc_client_parse(const char *buf, size_t count,
 		counter1->enabled = false;
 		for (i = 1; (i <= num_clients) && (i < MC_COUNTER_CLIENT_SIZE); i++)
 			counter->clients[i - 1] = client_ids[i];
+		emc_trace(TRACE_OPT,
+			  "\ncounter0 is enabled (counter1 and llc are disabled)\n");
 	} else if (mode == FILTER_ADDR || mode == FILTER_NONE) {
-		//emc_trace(TRACE_ERR, "\n****using unsupported addr mode****\n");
+		/* emc_trace(TRACE_ERR,
+		   "\n****using unsupported addr mode****\n"); */
 		if (aggregate) {
 			counter = counter1;
-			llp->enabled = true;
+			llp->enabled = true; /* NOTE: was false in tegra2. */
 			counter0->enabled = false;
 		} else {
 			counter = counter0;
@@ -647,13 +655,18 @@ void mc_stat_start(tegra_mc_counter_t *counter0, tegra_mc_counter_t *counter1)
 {
 	struct tegra_mc_counter *c;
 
+	emc_trace(TRACE_OPT, "tegra_mc_client_0_enabled=%d\n",
+		  tegra_mc_client_0_enabled);
+	emc_trace(TRACE_OPT, "counter0->enabled=%d, counter1->enabled=%d\n",
+		  counter0->enabled, counter1->enabled);
 	if (!tegra_mc_client_0_enabled)
 		return;
 
 	c = (counter0->enabled) ? counter0 : counter1;
 
 	/* disable statistics */
-	writel((MC_STAT_CONTROL_0_EMC_GATHER_DISABLE << MC_STAT_CONTROL_0_EMC_GATHER_SHIFT),
+	writel((MC_STAT_CONTROL_0_EMC_GATHER_DISABLE <<
+		MC_STAT_CONTROL_0_EMC_GATHER_SHIFT),
 		mc.mmio + MC_STAT_CONTROL_0);
 
 	if (c->enabled) {
@@ -661,8 +674,7 @@ void mc_stat_start(tegra_mc_counter_t *counter0, tegra_mc_counter_t *counter1)
 		u32 reg_num;
 		reg |= (MC_STAT_EMC_FILTER_SET0_MISCELLANEOUS_0_COALESCED_DIS <<
 			MC_STAT_EMC_FILTER_SET0_MISCELLANEOUS_0_COALESCED_SHIFT);
-
-		/* note these registers are shared */
+		/* Note these registers are shared */
 		writel(c->current_address_low,
 		       mc.mmio + MC_STAT_EMC_FILTER_SET0_ADDR__LIMIT_LO_0);
 		writel(c->current_address_high,
@@ -674,19 +686,40 @@ void mc_stat_start(tegra_mc_counter_t *counter0, tegra_mc_counter_t *counter1)
 		writel(0xFFFF, mc.mmio + MC_STAT_EMC_CLOCK_LIMIT_MSBS_0);
 		writel(reg, mc.mmio + MC_STAT_EMC_FILTER_SET0_MISCELLANEOUS_0);
 
-		writel(0, mc.mmio + MC_STAT_EMC_FILTER_SET0_CLIENT_0_0);
-		writel(0, mc.mmio + MC_STAT_EMC_FILTER_SET0_CLIENT_1_0);
-		writel(0, mc.mmio + MC_STAT_EMC_FILTER_SET0_CLIENT_2_0);
-		reg_num = c->clients[c->current_client] / 32;
-		reg = 1 << (c->clients[c->current_client] % 32);
-		writel(reg, mc.mmio + MC_STAT_EMC_FILTER_SET0_CLIENT_0_0 + (reg_num * 4));
-		emc_trace(TRACE_REG, "current_client=%d, client=%d writing to reg 0x%x, val=0x%x\n",
-			c->current_client, c->clients[c->current_client],
-			MC_STAT_EMC_FILTER_SET0_CLIENT_0_0 + (reg_num * 4), reg);
-		emc_trace(TRACE_REG, "client_0=0x%x, client_1=0x%x, client_2=0x%x\n",
-			readl(mc.mmio + MC_STAT_EMC_FILTER_SET0_CLIENT_0_0),
-			readl(mc.mmio + MC_STAT_EMC_FILTER_SET0_CLIENT_1_0),
-			readl(mc.mmio + MC_STAT_EMC_FILTER_SET0_CLIENT_2_0));
+		if (c->clients[0] == MC_STAT_AGGREGATE) {
+			/* enable all clients */
+			writel(0xFFFFFFFF,
+			       mc.mmio + MC_STAT_EMC_FILTER_SET0_CLIENT_0_0);
+			writel(0xFFFFFFFF,
+			       mc.mmio + MC_STAT_EMC_FILTER_SET0_CLIENT_1_0);
+			writel(0x00000003,
+			       mc.mmio + MC_STAT_EMC_FILTER_SET0_CLIENT_2_0);
+			emc_trace(TRACE_REG, "select all clients\n");
+		} else {
+			/* enable a selected client at a time */
+			writel(0, mc.mmio + MC_STAT_EMC_FILTER_SET0_CLIENT_0_0);
+			writel(0, mc.mmio + MC_STAT_EMC_FILTER_SET0_CLIENT_1_0);
+			writel(0, mc.mmio + MC_STAT_EMC_FILTER_SET0_CLIENT_2_0);
+			reg_num = c->clients[c->current_client] / 32;
+			reg = 1 << (c->clients[c->current_client] % 32);
+			writel(reg,
+			       mc.mmio + MC_STAT_EMC_FILTER_SET0_CLIENT_0_0 +
+			       (reg_num * 4));
+			emc_trace(TRACE_REG,
+				  "idx=%d, client=%d, reg=0x%x, val=0x%x\n",
+				  c->current_client,
+				  c->clients[c->current_client],
+				  MC_STAT_EMC_FILTER_SET0_CLIENT_0_0 +
+				  (reg_num * 4), reg);
+			emc_trace(TRACE_REG,
+				  "client_0=0x%x, client_1=0x%x, client_2=0x%x\n",
+				  readl(mc.mmio +
+					MC_STAT_EMC_FILTER_SET0_CLIENT_0_0),
+				  readl(mc.mmio +
+					MC_STAT_EMC_FILTER_SET0_CLIENT_1_0),
+				  readl(mc.mmio +
+					MC_STAT_EMC_FILTER_SET0_CLIENT_2_0));
+		}
 	}
 
 	/* reset then enable statistics */
