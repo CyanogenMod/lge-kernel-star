@@ -503,7 +503,7 @@ int __init cardhu_pinmux_init(void)
 					ARRAY_SIZE(unused_pins_lowpower));
 		break;
 	case BOARD_E1291:
-		if (board_info.fab < 0x3) {
+		if (board_info.fab < BOARD_FAB_A03) {
 			tegra_pinmux_config_table(cardhu_pinmux_cardhu,
 					ARRAY_SIZE(cardhu_pinmux_cardhu));
 			tegra_pinmux_config_table(unused_pins_lowpower,

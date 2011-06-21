@@ -39,6 +39,21 @@
 #define SKU_SLT_ULPI_SUPPORT		0x2
 #define SKU_T30S_SUPPORT		0x4
 
+#define SKU_MEMORY_TYPE_BIT		0x4
+#define SKU_MEMORY_TYPE_MASK		0x3
+#define SKU_MEMORY_SAMSUNG_EC		0x0
+#define SKU_MEMORY_ELPIDA		0x1
+#define SKU_MEMORY_SAMSUNG_EB		0x2
+#define MEMORY_TYPE(sku) (((sku) >> SKU_MEMORY_TYPE_BIT) & SKU_MEMORY_TYPE_MASK)
+
+/* Board Fab version */
+#define BOARD_FAB_A00			0x0
+#define BOARD_FAB_A01			0x1
+#define BOARD_FAB_A02			0x2
+#define BOARD_FAB_A03			0x3
+#define BOARD_FAB_A04			0x4
+
+
 /* External peripheral act as gpio */
 /* TPS6591x GPIOs */
 #define TPS6591X_GPIO_BASE	TEGRA_NR_GPIOS

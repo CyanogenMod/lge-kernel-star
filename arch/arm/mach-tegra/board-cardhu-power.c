@@ -374,7 +374,7 @@ int __init cardhu_regulator_init(void)
 
 	if ((board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1291)) {
-		if ((board_info.sku & 1) == 1) {
+		if (board_info.sku & SKU_DCDC_TPS62361_SUPPORT) {
 			tps_platform.num_subdevs =
 					ARRAY_SIZE(tps_devs_e1198_skubit0_1);
 			tps_platform.subdevs = tps_devs_e1198_skubit0_1;
@@ -384,7 +384,7 @@ int __init cardhu_regulator_init(void)
 			tps_platform.subdevs = tps_devs_e1198_skubit0_0;
 		}
 	} else {
-		if ((pmu_board_info.sku & 1) == 1) {
+		if (pmu_board_info.sku & SKU_DCDC_TPS62361_SUPPORT) {
 			tps_platform.num_subdevs = ARRAY_SIZE(tps_devs_e118x_skubit0_1);
 			tps_platform.subdevs = tps_devs_e118x_skubit0_1;
 		} else {
@@ -394,7 +394,7 @@ int __init cardhu_regulator_init(void)
 	}
 
 	/* E1291-A04: Enable DEV_SLP and enable sleep on GPIO2 */
-	if ((board_info.board_id == BOARD_E1291) && (board_info.fab == 0x4)) {
+	if ((board_info.board_id == BOARD_E1291) && (board_info.fab == BOARD_FAB_A04)) {
 		tps_platform.dev_slp_en = true;
 		tps_platform.gpio_init_data = tps_gpio_pdata_e1291_a04;
 		tps_platform.num_gpioinit_data =
@@ -404,7 +404,8 @@ int __init cardhu_regulator_init(void)
 	i2c_register_board_info(4, cardhu_regulators, 1);
 
 	/* Resgister the TPS6236x for all boards whose sku bit 0 is set. */
-	if (((board_info.sku & 1) == 1) || ((pmu_board_info.sku & 1) == 1)) {
+	if ((board_info.sku & SKU_DCDC_TPS62361_SUPPORT) ||
+			(pmu_board_info.sku & SKU_DCDC_TPS62361_SUPPORT)) {
 		pr_info("Registering the device TPS62361B\n");
 		i2c_register_board_info(4, tps6236x_boardinfo, 1);
 	}
@@ -865,11 +866,11 @@ int __init cardhu_gpio_switch_regulator_init(void)
 		gswitch_pdata.subdevs = gswitch_subdevs_e1198;
 		break;
 	case BOARD_E1291:
-		if (board_info.fab == 0x3) {
+		if (board_info.fab == BOARD_FAB_A03) {
 			gswitch_pdata.num_subdevs =
 					ARRAY_SIZE(gswitch_subdevs_e1291_a03);
 			gswitch_pdata.subdevs = gswitch_subdevs_e1291_a03;
-		} else if (board_info.fab == 0x4) {
+		} else if (board_info.fab == BOARD_FAB_A04) {
 			gswitch_pdata.num_subdevs =
 					ARRAY_SIZE(gswitch_subdevs_e1291_a04);
 			gswitch_pdata.subdevs = gswitch_subdevs_e1291_a04;
@@ -918,18 +919,18 @@ int __init cardhu_suspend_init(void)
 	tegra_get_pmu_board_info(&pmu_board_info);
 
 	/* For PMU Fab A03 and A04 make core_pwr_req to high */
-	if ((pmu_board_info.fab == 0x3) || (pmu_board_info.fab == 0x4))
+	if ((pmu_board_info.fab == BOARD_FAB_A03) || (pmu_board_info.fab == BOARD_FAB_A04))
 		cardhu_suspend_data.corereq_high = true;
 
 	/* CORE_PWR_REQ to be high for all processor/pmu board whose sku bit 0
 	 * is set. This is require to enable the dc-dc converter tps62361x */
-	if (((board_info.sku & 1) == 1) || ((pmu_board_info.sku & 1) == 1))
+	if ((board_info.sku & SKU_DCDC_TPS62361_SUPPORT) || (pmu_board_info.sku & SKU_DCDC_TPS62361_SUPPORT))
 		cardhu_suspend_data.corereq_high = true;
 
 	switch (board_info.board_id) {
 	case BOARD_E1291:
 		/* CORE_PWR_REQ to be high for E1291-A03 */
-		if (board_info.fab == 0x3)
+		if (board_info.fab == BOARD_FAB_A03)
 			cardhu_suspend_data.corereq_high = true;
 		break;
 	case BOARD_E1198:
