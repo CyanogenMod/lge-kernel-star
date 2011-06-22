@@ -307,7 +307,8 @@ static int aes_hw_init(struct tegra_aes_engine *engine)
 		if (ret < 0) {
 			dev_err(dd->dev, "%s: iclock enable fail(%d)\n",
 			__func__, ret);
-			clk_disable(engine->pclk);
+			if (engine->pclk)
+				clk_disable(engine->pclk);
 			return ret;
 		}
 	}
@@ -661,7 +662,7 @@ static int tegra_aes_setkey(struct crypto_ablkcipher *tfm, const u8 *key,
 	struct tegra_aes_slot *key_slot;
 
 	if (!ctx || !dd) {
-		dev_err(dd->dev, "ctx=0x%x, dd=0x%x\n",
+		pr_err("ctx=0x%x, dd=0x%x\n",
 			(unsigned int)ctx, (unsigned int)dd);
 		return -EINVAL;
 	}
