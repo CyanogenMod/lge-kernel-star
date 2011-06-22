@@ -771,6 +771,7 @@ err_get_clks:
 		clk_put(avp_svc->sclk);
 	if (!IS_ERR_OR_NULL(avp_svc->emcclk))
 		clk_put(avp_svc->emcclk);
+	kfree(avp_svc);
 err_alloc:
 	return ERR_PTR(ret);
 }
