@@ -340,6 +340,16 @@ static int __init enterprise_gpio_switch_regulator_init(void)
 	return platform_device_register(&gswitch_regulator_pdata);
 }
 
+static void enterprise_power_off(void)
+{
+	int ret;
+	pr_info("enterprise: Powering off the device\n");
+	ret = tps80031_power_off();
+	if (ret)
+		pr_err("enterprise: failed to power off\n");
+	while(1);
+}
+
 int __init enterprise_regulator_init(void)
 {
 	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
@@ -353,6 +363,7 @@ int __init enterprise_regulator_init(void)
 
 	i2c_register_board_info(4, enterprise_regulators, 1);
 	enterprise_gpio_switch_regulator_init();
+	pm_power_off = enterprise_power_off;
 	return 0;
 }
 
