@@ -920,6 +920,25 @@ static struct platform_device cardhu_nvmap_device = {
 	},
 };
 
+
+#if defined(CONFIG_TEGRA_NVAVP)
+static struct resource tegra_nvavp_resources[] = {
+	[0] = {
+		.start	= INT_SHR_SEM_INBOX_IBF,
+		.end	= INT_SHR_SEM_INBOX_IBF,
+		.flags	= IORESOURCE_IRQ,
+		.name	= "mbox_from_avp_pending",
+	},
+};
+
+static struct nvhost_device cardhu_nvavp_device = {
+	.name		= "tegra-avp",
+	.id		= -1,
+	.resource	= tegra_nvavp_resources,
+	.num_resources	= ARRAY_SIZE(tegra_nvavp_resources),
+};
+#endif
+
 static struct platform_device *cardhu_gfx_devices[] __initdata = {
 	&cardhu_nvmap_device,
 	&tegra_grhost_device,
@@ -967,5 +986,10 @@ int __init cardhu_panel_init(void)
 	res->end = tegra_fb2_start + tegra_fb2_size - 1;
 	if (!err)
 		err = nvhost_device_register(&cardhu_disp2_device);
+
+#if defined(CONFIG_TEGRA_NVAVP)
+	if (!err)
+		err = nvhost_device_register(&cardhu_nvavp_device);
+#endif
 	return err;
 }
