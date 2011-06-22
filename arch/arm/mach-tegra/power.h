@@ -54,7 +54,6 @@ void tegra_lp0_sched_clock_clear(void);
 #endif
 //20110213, , sched_clock mismatch issue after deepsleep [END]
 
-u64 tegra_rtc_read_ms(void);
 void tegra_lp2_set_trigger(unsigned long cycles);
 void __cortex_a9_save(unsigned int mode);
 void tegra_lp2_startup(void);

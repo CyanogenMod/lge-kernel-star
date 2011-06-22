@@ -26,7 +26,6 @@
 #include <asm/hardware/gic.h>
 
 #include <mach/iomap.h>
-#include <mach/suspend.h>
 
 #include "board.h"
 

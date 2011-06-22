@@ -27,7 +27,6 @@
 #include <asm/clkdev.h>
 
 #include <mach/iomap.h>
-#include <mach/suspend.h>
 
 #include "clock.h"
 

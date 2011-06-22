@@ -43,7 +43,6 @@
 #include <mach/irqs.h>
 #include <mach/nvrm_linux.h>
 #include <mach/pmc.h>
-#include <mach/suspend.h>
 
 #include <nvrm_memmgr.h>
 #include <nvrm_power_private.h>
@@ -690,7 +689,6 @@ static int tegra_suspend_enter(suspend_state_t state)
 		tegra_irq_suspend();
 		tegra_dma_suspend();
 		tegra_pinmux_suspend();
-                tegra_timer_suspend();
 		tegra_gpio_suspend();
 		tegra_clk_suspend();
 
@@ -728,7 +726,6 @@ static int tegra_suspend_enter(suspend_state_t state)
 
 		tegra_clk_resume();
 		tegra_gpio_resume();
-		tegra_timer_resume();
 		tegra_pinmux_resume();
 		tegra_dma_resume();
 		tegra_irq_resume();
