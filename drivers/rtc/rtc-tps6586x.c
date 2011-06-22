@@ -284,17 +284,17 @@ static int __devinit tps6586x_rtc_probe(struct platform_device *pdev)
 	int err;
 	struct tps6586x_epoch_start *epoch;
 
+	if (!pdata) {
+		dev_err(&pdev->dev, "no platform_data specified\n");
+		return -EINVAL;
+	}
+
 	rtc = kzalloc(sizeof(*rtc), GFP_KERNEL);
 
 	if (!rtc)
 		return -ENOMEM;
 
 	rtc->irq = -1;
-
-	if (!pdata) {
-		dev_err(&pdev->dev, "no platform_data specified\n");
-		return -EINVAL;
-	}
 
 	if (pdata->irq < 0)
 		dev_warn(&pdev->dev, "no IRQ specified, wakeup is disabled\n");
