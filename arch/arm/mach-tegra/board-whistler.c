@@ -229,7 +229,7 @@ static struct platform_device tegra_camera = {
 static struct platform_device *whistler_devices[] __initdata = {
 	&tegra_uartb_device,
 	&tegra_uartc_device,
-	&pmu_device,
+	&tegra_pmu_device,
 	&tegra_udc_device,
 	&tegra_gart_device,
 	&tegra_wdt_device,
@@ -371,7 +371,6 @@ static void __init tegra_whistler_init(void)
 {
 	char serial[20];
 
-	tegra_common_init();
 	tegra_clk_init_from_table(whistler_clk_init_table);
 	whistler_pinmux_init();
 	whistler_i2c_init();
@@ -411,11 +410,10 @@ void __init tegra_whistler_reserve(void)
 
 MACHINE_START(WHISTLER, "whistler")
 	.boot_params    = 0x00000100,
-	.phys_io        = IO_APB_PHYS,
-	.io_pg_offst    = ((IO_APB_VIRT) >> 18) & 0xfffc,
-	.init_irq       = tegra_init_irq,
-	.init_machine   = tegra_whistler_init,
 	.map_io         = tegra_map_common_io,
 	.reserve        = tegra_whistler_reserve,
+	.init_early	= tegra_init_early,
+	.init_irq       = tegra_init_irq,
 	.timer          = &tegra_timer,
+	.init_machine   = tegra_whistler_init,
 MACHINE_END
