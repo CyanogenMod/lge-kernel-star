@@ -45,6 +45,11 @@ static const u32 core_process_speedos[][CORE_PROCESS_CORNERS_NUM] = {
 	{170}, /* threshold_index 4: soc_speedo_id 1: AP30 char */
 	{190}, /* threshold_index 5: soc_speedo_id 2: T30  char */
 	{190}, /* threshold_index 6: soc_speedo_id 2: T30S char */
+
+/* T33 family: Numbers cloned from T30 family; FIXME: adjust these later */
+	{183}, /* threshold_index 7: soc_speedo_id = 1 - AP33 */
+	{197}, /* threshold_index 8: soc_speedo_id = 2 - T33  */
+	{197}, /* threshold_index 9: soc_speedo_id = 2 - T33S */
 };
 
 /* Maximum speedo levels for each CPU process corner */
@@ -61,6 +66,11 @@ static const u32 cpu_process_speedos[][CPU_PROCESS_CORNERS_NUM] = {
 	{295, 326, 348, 364}, /* threshold_index 4: cpu_speedo_id 1: AP30char */
 	{326, 326, 348, 364}, /* threshold_index 5: cpu_speedo_id 2: T30char  */
 	{326, 326, 348, 364}, /* threshold_index 6: cpu_speedo_id 3: T30Schar */
+
+/* T33 family: Numbers cloned from T30 family; FIXME: adjust these later */
+	{376, 376, 376, 376}, /* threshold_FIXME 7: cpu_speedo_id = 1 - AP33 */
+	{376, 376, 376, 376}, /* threshold_index 8: cpu_speedo_id = 2 - T33  */
+	{376, 376, 376, 376}, /* threshold_index 9: cpu_speedo_id = 3 - T33S */
 };
 
 /*
@@ -113,6 +123,31 @@ static void rev_sku_to_speedo_ids(int rev, int sku)
 				cpu_speedo_id = 2;
 				soc_speedo_id = 2;
 				threshold_index = 2;
+				break;
+			case 2: /* DSC => AP33 */
+				cpu_speedo_id = 1;
+				soc_speedo_id = 1;
+				threshold_index = 7;
+				break;
+			default:
+				pr_err("Tegra3 Rev-A02: Reserved pkg: %d\n",
+				       package_id);
+				BUG();
+				break;
+			}
+			break;
+
+		case 0x80: /* T33 or T33S */
+			switch (package_id) {
+			case 1: /* MID => T33 */
+				cpu_speedo_id = 2;
+				soc_speedo_id = 2;
+				threshold_index = 8;
+				break;
+			case 2: /* DSC => T33S */
+				cpu_speedo_id = 3;
+				soc_speedo_id = 2;
+				threshold_index = 9;
 				break;
 			default:
 				pr_err("Tegra3 Rev-A02: Reserved pkg: %d\n",
@@ -229,12 +264,12 @@ void tegra_init_speedo_data(void)
 	core_process_id = iv -1;
 
 	if (core_process_id == -1) {
-		pr_err("*****************************************************");
-		pr_err("*****************************************************");
+		pr_err("****************************************************");
+		pr_err("****************************************************");
 		pr_err("* tegra3_speedo: CORE speedo value %3d out of range *",
 		       core_speedo_val);
-		pr_err("*****************************************************");
-		pr_err("*****************************************************");
+		pr_err("****************************************************");
+		pr_err("****************************************************");
 
 		core_process_id = INVALID_PROCESS_ID;
 		soc_speedo_id = 0;
