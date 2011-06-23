@@ -111,6 +111,59 @@ static noinline void __init enterprise_bt_rfkill(void)
 static inline void enterprise_bt_rfkill(void) { }
 #endif
 
+static void __init enterprise_setup_bluesleep(void)
+{
+	struct platform_device *pdev = NULL;
+	struct resource *res;
+
+	pdev = platform_device_alloc("bluesleep", 0);
+	if (!pdev) {
+		pr_err("unable to allocate platform device for bluesleep");
+		return;
+	}
+
+	res = kzalloc(sizeof(struct resource) * 3, GFP_KERNEL);
+	if (!res) {
+		pr_err("unable to allocate resource for bluesleep\n");
+		goto err_free_dev;
+	}
+
+	res[0].name   = "gpio_host_wake";
+	res[0].start  = TEGRA_GPIO_PS2;
+	res[0].end    = TEGRA_GPIO_PS2;
+	res[0].flags  = IORESOURCE_IO;
+
+	res[1].name   = "gpio_ext_wake";
+	res[1].start  = TEGRA_GPIO_PE7;
+	res[1].end    = TEGRA_GPIO_PE7;
+	res[1].flags  = IORESOURCE_IO;
+
+	res[2].name   = "host_wake";
+	res[2].start  = gpio_to_irq(TEGRA_GPIO_PS2);
+	res[2].end    = gpio_to_irq(TEGRA_GPIO_PS2);
+	res[2].flags  = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE ;
+
+	if (platform_device_add_resources(pdev, res, 3)) {
+		pr_err("unable to add resources to bluesleep device\n");
+		goto err_free_res;
+	}
+
+	if (platform_device_add(pdev)) {
+		pr_err("unable to add bluesleep device\n");
+		goto err_free_res;
+	}
+	tegra_gpio_enable(TEGRA_GPIO_PS2);
+	tegra_gpio_enable(TEGRA_GPIO_PE7);
+
+	return;
+
+err_free_res:
+	kfree(res);
+err_free_dev:
+	platform_device_put(pdev);
+	return;
+}
+
 static __initdata struct tegra_clk_init_table enterprise_clk_init_table[] = {
 	/* name		parent		rate		enabled */
 	{ "pll_m",	NULL,		0,		true},
@@ -419,6 +472,7 @@ static void __init tegra_enterprise_init(void)
 	enterprise_baseband_init();
 	enterprise_panel_init();
 	enterprise_bt_rfkill();
+	enterprise_setup_bluesleep();
 	enterprise_emc_init();
 	enterprise_sensors_init();
 	enterprise_suspend_init();
