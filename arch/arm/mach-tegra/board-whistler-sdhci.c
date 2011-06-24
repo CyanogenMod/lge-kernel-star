@@ -17,12 +17,14 @@
 #include <linux/resource.h>
 #include <linux/platform_device.h>
 #include <linux/delay.h>
+#include <linux/gpio.h>
 
 #include <asm/mach-types.h>
 #include <mach/irqs.h>
 #include <mach/iomap.h>
 #include <mach/sdhci.h>
 
+#include "gpio-names.h"
 #include "board.h"
 
 #define WHISTLER_EXT_SDCARD_DETECT	TEGRA_GPIO_PI5

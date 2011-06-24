@@ -243,7 +243,6 @@ static struct tegra_suspend_platform_data whistler_suspend_data = {
 	.suspend_mode	= TEGRA_SUSPEND_LP0,
 	.core_timer	= 0x7e,
 	.core_off_timer = 0xc00,
-	.separate_req	= false,
 	.corereq_high	= true,
 	.sysclkreq_high	= true,
 };
