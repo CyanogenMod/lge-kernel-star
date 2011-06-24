@@ -292,7 +292,7 @@ static int max8907c_i2c_probe(struct i2c_client *i2c,
 	mutex_init(&max8907c->io_lock);
 
 	for (i = 0; i < ARRAY_SIZE(cells); i++)
-		cells[i].driver_data = max8907c;
+		cells[i].mfd_data = max8907c;
 	ret = mfd_add_devices(max8907c->dev, -1, cells, ARRAY_SIZE(cells),
 			      NULL, 0);
 	if (ret != 0) {
