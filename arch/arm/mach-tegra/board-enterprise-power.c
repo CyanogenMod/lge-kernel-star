@@ -279,18 +279,23 @@ static struct regulator_consumer_supply gpio_switch_sdmmc3_vdd_sel_supply[] = {
 	REGULATOR_SUPPLY("vddio_sdmmc3_2v85_1v8", NULL),
 	REGULATOR_SUPPLY("sdmmc3_compu_pu", NULL),
 	REGULATOR_SUPPLY("vddio_sdmmc3", NULL),
+	REGULATOR_SUPPLY("vsys_3v7", NULL),
 };
 static int gpio_switch_sdmmc3_vdd_sel_voltages[] = {2850};
 
 /* LCD-D23 (GPIO M7) from T30*/
+/* 2-0036 is dev_name of ar0832 */
 static struct regulator_consumer_supply gpio_switch_cam_ldo_2v8_en_supply[] = {
-	REGULATOR_SUPPLY("vdd_2v8_cam", NULL),
+	REGULATOR_SUPPLY("vaa", "2-0036"),
+	REGULATOR_SUPPLY("vaa", "2-0032"),
 };
 static int gpio_switch_cam_ldo_2v8_en_voltages[] = {2800};
 
 /* LCD-D9 (GPIO F1) from T30*/
+/* 2-0036 is dev_name of ar0832 */
 static struct regulator_consumer_supply gpio_switch_cam_ldo_1v8_en_supply[] = {
-	REGULATOR_SUPPLY("vdd_1v8_cam", NULL),
+	REGULATOR_SUPPLY("vdd", "2-0036"),
+	REGULATOR_SUPPLY("vdd", "2-0032"),
 };
 static int gpio_switch_cam_ldo_1v8_en_voltages[] = {1800};
 
@@ -326,10 +331,10 @@ GREG_INIT(0, pmu_5v15_en,     NULL,      ENT_TPS80031_GPIO_REGEN1, false, 0, 0, 
 GREG_INIT(1, pmu_3v3_en,      "vdd_5v15", ENT_TPS80031_GPIO_REGEN2, false, 0, 0, 0, 0);
 GREG_INIT(2, pmu_hdmi_5v0_en, "vdd_5v15", ENT_TPS80031_GPIO_SYSEN, false, 0, 0, 0, 0);
 
-GREG_INIT(3, vdd_fuse_en,    "avdd_usb_hdmi_3v3", TEGRA_GPIO_PM0, false, 0, 0, 0, 0);
+GREG_INIT(3, vdd_fuse_en, "avdd_usb_hdmi_3v3", TEGRA_GPIO_PM0, false, 0, 0, 0, 0);
 GREG_INIT(4, sdmmc3_vdd_sel, "vddio_sdmmc_2v85", TEGRA_GPIO_PM1, false, 0, 0, 0, 0);
-GREG_INIT(5, cam_ldo_2v8_en,    NULL, TEGRA_GPIO_PM7, false, 0, 0, 0, 0);
-GREG_INIT(6, cam_ldo_1v8_en,    NULL, TEGRA_GPIO_PF1, false, 0, 0, 0, 0);
+GREG_INIT(5, cam_ldo_2v8_en, NULL, TEGRA_GPIO_PM7, false, 0, 0, 0, 0);
+GREG_INIT(6, cam_ldo_1v8_en, NULL, TEGRA_GPIO_PF1, false, 0, 0, 0, 0);
 
 #define ADD_GPIO_REG(_name)	(&gpio_pdata_##_name)
 static struct gpio_switch_regulator_subdev_data *gswitch_subdevs[] = {
