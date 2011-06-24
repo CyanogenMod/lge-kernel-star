@@ -2648,6 +2648,8 @@ static void tegra_clk_shared_bus_update(struct clk *bus)
 {
 	struct clk *c;
 	unsigned long rate = bus->min_rate;
+	unsigned long bw = 0;
+	unsigned long ceiling = bus->max_rate;
 
 	if (detach_shared_bus)
 		return;
@@ -2657,9 +2659,22 @@ static void tegra_clk_shared_bus_update(struct clk *bus)
 		/* Ignore requests from disabled users and from users with
 		   fixed bus-to-client ratio */
 		if ((c->u.shared_bus_user.enabled) &&
-		    (!c->u.shared_bus_user.client_div))
-			rate = max(c->u.shared_bus_user.rate, rate);
+		    (!c->u.shared_bus_user.client_div)) {
+			switch (c->u.shared_bus_user.mode) {
+			case SHARED_BW:
+				bw += c->u.shared_bus_user.rate;
+				break;
+			case SHARED_CEILING:
+				ceiling = min(c->u.shared_bus_user.rate,
+					       ceiling);
+				break;
+			case SHARED_FLOOR:
+			default:
+				rate = max(c->u.shared_bus_user.rate, rate);
+			}
+		}
 	}
+	rate = min(max(rate, bw), ceiling);
 
 	if (rate != clk_get_rate(bus))
 		clk_set_rate(bus, rate);
@@ -3714,7 +3729,7 @@ static struct clk tegra_clk_cbus = {
 		},					\
 	}
 
-#define SHARED_CLK(_name, _dev, _con, _parent, _id, _div)\
+#define SHARED_CLK(_name, _dev, _con, _parent, _id, _div, _mode)\
 	{						\
 		.name      = _name,			\
 		.lookup    = {				\
@@ -3726,6 +3741,7 @@ static struct clk tegra_clk_cbus = {
 		.u.shared_bus_user = {			\
 			.client_id = _id,		\
 			.client_div = _div,		\
+			.mode = _mode,			\
 		},					\
 	}
 struct clk tegra_list_clks[] = {
@@ -3821,33 +3837,33 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("afi",	"tegra-pcie",		"afi",	72,	0,	250000000, mux_clk_m, 			0),
 	PERIPH_CLK("se",	"se",			NULL,	127,	0x42c,	520000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71| DIV_U71_INT),
 
-	SHARED_CLK("avp.sclk",	"tegra-avp",		"sclk",	&tegra_clk_sbus_cmplx, NULL, 0),
-	SHARED_CLK("bsea.sclk",	"tegra-aes",		"sclk",	&tegra_clk_sbus_cmplx, NULL, 0),
-	SHARED_CLK("usbd.sclk",	"fsl-tegra-udc",	"sclk",	&tegra_clk_sbus_cmplx, NULL, 0),
-	SHARED_CLK("usb1.sclk",	"tegra-ehci.0",		"sclk",	&tegra_clk_sbus_cmplx, NULL, 0),
-	SHARED_CLK("usb2.sclk",	"tegra-ehci.1",		"sclk",	&tegra_clk_sbus_cmplx, NULL, 0),
-	SHARED_CLK("usb3.sclk",	"tegra-ehci.2",		"sclk",	&tegra_clk_sbus_cmplx, NULL, 0),
-	SHARED_CLK("mon.avp",	"tegra_actmon",		"avp",	&tegra_clk_sbus_cmplx, NULL, 0),
-	SHARED_CLK("avp.emc",	"tegra-avp",		"emc",	&tegra_clk_emc, NULL, 0),
-	SHARED_CLK("cpu.emc",	"cpu",			"emc",	&tegra_clk_emc, NULL, 0),
-	SHARED_CLK("disp1.emc",	"tegradc.0",		"emc",	&tegra_clk_emc, NULL, 0),
-	SHARED_CLK("disp2.emc",	"tegradc.1",		"emc",	&tegra_clk_emc, NULL, 0),
-	SHARED_CLK("hdmi.emc",	"hdmi",			"emc",	&tegra_clk_emc, NULL, 0),
-	SHARED_CLK("host.emc",	"tegra_grhost",		"emc",	&tegra_clk_emc, NULL, 0),
-	SHARED_CLK("usbd.emc",	"fsl-tegra-udc",	"emc",	&tegra_clk_emc, NULL, 0),
-	SHARED_CLK("usb1.emc",	"tegra-ehci.0",		"emc",	&tegra_clk_emc, NULL, 0),
-	SHARED_CLK("usb2.emc",	"tegra-ehci.1",		"emc",	&tegra_clk_emc, NULL, 0),
-	SHARED_CLK("usb3.emc",	"tegra-ehci.2",		"emc",	&tegra_clk_emc, NULL, 0),
-	SHARED_CLK("mon.emc",	"tegra_actmon",		"emc",	&tegra_clk_emc, NULL, 0),
+	SHARED_CLK("avp.sclk",	"tegra-avp",		"sclk",	&tegra_clk_sbus_cmplx, NULL, 0, 0),
+	SHARED_CLK("bsea.sclk",	"tegra-aes",		"sclk",	&tegra_clk_sbus_cmplx, NULL, 0, 0),
+	SHARED_CLK("usbd.sclk",	"fsl-tegra-udc",	"sclk",	&tegra_clk_sbus_cmplx, NULL, 0, 0),
+	SHARED_CLK("usb1.sclk",	"tegra-ehci.0",		"sclk",	&tegra_clk_sbus_cmplx, NULL, 0, 0),
+	SHARED_CLK("usb2.sclk",	"tegra-ehci.1",		"sclk",	&tegra_clk_sbus_cmplx, NULL, 0, 0),
+	SHARED_CLK("usb3.sclk",	"tegra-ehci.2",		"sclk",	&tegra_clk_sbus_cmplx, NULL, 0, 0),
+	SHARED_CLK("mon.avp",	"tegra_actmon",		"avp",	&tegra_clk_sbus_cmplx, NULL, 0, 0),
+	SHARED_CLK("avp.emc",	"tegra-avp",		"emc",	&tegra_clk_emc, NULL, 0, 0),
+	SHARED_CLK("cpu.emc",	"cpu",			"emc",	&tegra_clk_emc, NULL, 0, 0),
+	SHARED_CLK("disp1.emc",	"tegradc.0",		"emc",	&tegra_clk_emc, NULL, 0, 0),
+	SHARED_CLK("disp2.emc",	"tegradc.1",		"emc",	&tegra_clk_emc, NULL, 0, 0),
+	SHARED_CLK("hdmi.emc",	"hdmi",			"emc",	&tegra_clk_emc, NULL, 0, 0),
+	SHARED_CLK("host.emc",	"tegra_grhost",		"emc",	&tegra_clk_emc, NULL, 0, 0),
+	SHARED_CLK("usbd.emc",	"fsl-tegra-udc",	"emc",	&tegra_clk_emc, NULL, 0, 0),
+	SHARED_CLK("usb1.emc",	"tegra-ehci.0",		"emc",	&tegra_clk_emc, NULL, 0, 0),
+	SHARED_CLK("usb2.emc",	"tegra-ehci.1",		"emc",	&tegra_clk_emc, NULL, 0, 0),
+	SHARED_CLK("usb3.emc",	"tegra-ehci.2",		"emc",	&tegra_clk_emc, NULL, 0, 0),
+	SHARED_CLK("mon.emc",	"tegra_actmon",		"emc",	&tegra_clk_emc, NULL, 0, 0),
 
-	SHARED_CLK("host1x.cbus","tegra_grhost",	"host1x", &tegra_clk_cbus, "host1x", 2),
-	SHARED_CLK("3d.cbus",	"tegra_grhost",		"gr3d",	&tegra_clk_cbus, "3d",  0),
-	SHARED_CLK("3d2.cbus",	"tegra_grhost",		"gr3d2",&tegra_clk_cbus, "3d2", 0),
-	SHARED_CLK("2d.cbus",	"tegra_grhost",		"gr2d",	&tegra_clk_cbus, "2d",  0),
-	SHARED_CLK("epp.cbus",	"tegra_grhost",		"epp",	&tegra_clk_cbus, "epp", 0),
-	SHARED_CLK("mpe.cbus",	"tegra_grhost",		"mpe",	&tegra_clk_cbus, "mpe", 0),
-	SHARED_CLK("vde.cbus",	"tegra-avp",		"vde",	&tegra_clk_cbus, "vde", 0),
-	SHARED_CLK("se.cbus",	"tegra-se",		NULL,	&tegra_clk_cbus, "se",  0),
+	SHARED_CLK("host1x.cbus","tegra_grhost",	"host1x", &tegra_clk_cbus, "host1x", 2, 0),
+	SHARED_CLK("3d.cbus",	"tegra_grhost",		"gr3d",	&tegra_clk_cbus, "3d",  0, 0),
+	SHARED_CLK("3d2.cbus",	"tegra_grhost",		"gr3d2",&tegra_clk_cbus, "3d2", 0, 0),
+	SHARED_CLK("2d.cbus",	"tegra_grhost",		"gr2d",	&tegra_clk_cbus, "2d",  0, 0),
+	SHARED_CLK("epp.cbus",	"tegra_grhost",		"epp",	&tegra_clk_cbus, "epp", 0, 0),
+	SHARED_CLK("mpe.cbus",	"tegra_grhost",		"mpe",	&tegra_clk_cbus, "mpe", 0, 0),
+	SHARED_CLK("vde.cbus",	"tegra-avp",		"vde",	&tegra_clk_cbus, "vde", 0, 0),
+	SHARED_CLK("se.cbus",	"tegra-se",		NULL,	&tegra_clk_cbus, "se",  0, 0),
 };
 
 #define CLK_DUPLICATE(_name, _dev, _con)		\

@@ -103,6 +103,12 @@ enum cpu_mode {
 	MODE_LP,
 };
 
+enum shared_bus_users_mode {
+	SHARED_FLOOR = 0,
+	SHARED_BW,
+	SHARED_CEILING,
+};
+
 enum clk_state {
 	UNINITIALIZED = 0,
 	ON,
@@ -181,6 +187,7 @@ struct clk {
 			const char			*client_id;
 			struct clk			*client;
 			u32				client_div;
+			enum shared_bus_users_mode	mode;
 		} shared_bus_user;
 	} u;
 
