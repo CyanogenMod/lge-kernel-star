@@ -44,20 +44,27 @@ static const int cpu_speedo_nominal_millivolts[] =
 #define KHZ 1000
 #define MHZ 1000000
 
-#define VDD_CPU_BELOW_VDD_CORE_MAX	300
+/* (VDD_CORE - cpu_below_core) <= VDD_CPU <= (VDD_CORE + core_below_cpu)]  */
+/* (VDD_CPU - core_below_cpu) <= VDD_CORE <= (VDD_CPU + cpu_below_core)]  */
+#define VDD_CPU_BELOW_VDD_CORE		300
+static int cpu_below_core = VDD_CPU_BELOW_VDD_CORE;
+#define VDD_CORE_BELOW_VDD_CPU		0
+static int core_below_cpu = VDD_CORE_BELOW_VDD_CPU;
+
+#define VDD_SAFE_STEP			100
 
 static struct dvfs_rail tegra3_dvfs_rail_vdd_cpu = {
 	.reg_id = "vdd_cpu",
 	.max_millivolts = 1150,
 	.min_millivolts = 750,
-	.step = VDD_CPU_BELOW_VDD_CORE_MAX,
+	.step = VDD_SAFE_STEP,
 };
 
 static struct dvfs_rail tegra3_dvfs_rail_vdd_core = {
 	.reg_id = "vdd_core",
 	.max_millivolts = 1300,
 	.min_millivolts = 950,
-	.step = VDD_CPU_BELOW_VDD_CORE_MAX,
+	.step = VDD_SAFE_STEP,
 };
 
 static struct dvfs_rail *tegra3_dvfs_rails[] = {
@@ -66,20 +73,21 @@ static struct dvfs_rail *tegra3_dvfs_rails[] = {
 };
 
 
-/* vdd_core must not be lower than vdd_cpu */
+/* vdd_core must be >= (vdd_cpu - core_below_cpu) */
 static int tegra3_dvfs_rel_vdd_cpu_vdd_core(struct dvfs_rail *vdd_cpu,
 	struct dvfs_rail *vdd_core)
 {
-	int core_floor = max(vdd_cpu->new_millivolts, vdd_cpu->millivolts);
+	int core_floor = max(vdd_cpu->new_millivolts, vdd_cpu->millivolts) -
+		core_below_cpu;
 	return max(vdd_core->new_millivolts, core_floor);
 }
 
-/* vdd_cpu must be within VDD_CPU_BELOW_VDD_CORE_MAX below vdd_core */
+/* vdd_cpu must be >= (vdd_core - cpu_below_core) */
 static int tegra3_dvfs_rel_vdd_core_vdd_cpu(struct dvfs_rail *vdd_core,
 	struct dvfs_rail *vdd_cpu)
 {
 	int cpu_floor = max(vdd_core->new_millivolts, vdd_core->millivolts) -
-		VDD_CPU_BELOW_VDD_CORE_MAX;
+		cpu_below_core;
 	return max(vdd_cpu->new_millivolts, cpu_floor);
 }
 
@@ -337,7 +345,8 @@ static int __init get_cpu_nominal_mv_index(
 	BUG_ON(speedo_id >= ARRAY_SIZE(cpu_speedo_nominal_millivolts));
 	mv = cpu_speedo_nominal_millivolts[speedo_id];
 	if (tegra3_dvfs_rail_vdd_core.nominal_millivolts)
-		mv = min(mv, tegra3_dvfs_rail_vdd_core.nominal_millivolts);
+		mv = min(mv, tegra3_dvfs_rail_vdd_core.nominal_millivolts +
+			core_below_cpu);
 
 	/*
 	 * Find matching cpu dvfs entry, and use it to determine index to the
@@ -427,6 +436,9 @@ void __init tegra_soc_init_dvfs(void)
 #ifndef CONFIG_TEGRA_CPU_DVFS
 	tegra_dvfs_cpu_disabled = true;
 #endif
+
+	BUG_ON(VDD_SAFE_STEP > (cpu_below_core + core_below_cpu));
+
 	/*
 	 * Find nominal voltages for core (1st) and cpu rails before rail
 	 * init. Nominal voltage index in the scaling ladder will also be
