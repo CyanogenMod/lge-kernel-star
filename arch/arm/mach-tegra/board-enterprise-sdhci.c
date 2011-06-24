@@ -33,15 +33,15 @@
 
 #define ENTERPRISE_SD_CD TEGRA_GPIO_PI5
 
-static struct resource sdhci_resource0[] = {
+static struct resource sdhci_resource2[] = {
 	[0] = {
-		.start  = INT_SDMMC1,
-		.end    = INT_SDMMC1,
+		.start  = INT_SDMMC3,
+		.end    = INT_SDMMC3,
 		.flags  = IORESOURCE_IRQ,
 	},
 	[1] = {
-		.start	= TEGRA_SDMMC1_BASE,
-		.end	= TEGRA_SDMMC1_BASE + TEGRA_SDMMC1_SIZE-1,
+		.start	= TEGRA_SDMMC3_BASE,
+		.end	= TEGRA_SDMMC3_BASE + TEGRA_SDMMC3_SIZE-1,
 		.flags	= IORESOURCE_MEM,
 	},
 };
@@ -61,44 +61,24 @@ static struct resource sdhci_resource3[] = {
 
 
 static struct tegra_sdhci_platform_data tegra_sdhci_platform_data2 = {
-	.clk_id = NULL,
-	.force_hs = 1,
 	.cd_gpio = -1,
 	.wp_gpio = -1,
 	.power_gpio = -1,
-	.tap_delay = 6,
-	.is_voltage_switch_supported = true,
-	.vdd_rail_name = "vddio_sdmmc3",
-	.slot_rail_name = "vddio_sd_slot",
-	.vdd_max_uv = 3320000,
-	.vdd_min_uv = 3280000,
-	.max_clk = 208000000,
-	.is_8bit_supported = false,
 };
 
 static struct tegra_sdhci_platform_data tegra_sdhci_platform_data3 = {
-	.clk_id = NULL,
-	.force_hs = 0,
 	.cd_gpio = -1,
 	.wp_gpio = -1,
 	.power_gpio = -1,
-	.tap_delay = 6,
-	.is_voltage_switch_supported = false,
-	.vdd_rail_name = NULL,
-	.slot_rail_name = NULL,
-	.vdd_max_uv = -1,
-	.vdd_min_uv = -1,
-	.max_clk = 48000000,
-	.is_8bit_supported = true,
 };
 
-static struct platform_device tegra_sdhci_device0 = {
+static struct platform_device tegra_sdhci_device2 = {
 	.name		= "sdhci-tegra",
-	.id		= 0,
-	.resource	= sdhci_resource0,
-	.num_resources	= ARRAY_SIZE(sdhci_resource0),
+	.id		= 2,
+	.resource	= sdhci_resource2,
+	.num_resources	= ARRAY_SIZE(sdhci_resource2),
 	.dev = {
-		.platform_data = &tegra_sdhci_platform_data0,
+		.platform_data = &tegra_sdhci_platform_data2,
 	},
 };
 
@@ -112,37 +92,13 @@ static struct platform_device tegra_sdhci_device3 = {
 	},
 };
 
-static int enterprise_sd_cd_gpio_init(void)
-{
-	unsigned int rc = 0;
-
-	rc = gpio_request(ENTERPRISE_SD_CD, "card_detect");
-	if (rc) {
-		pr_err("Card detect gpio request failed:%d\n", rc);
-		return rc;
-	}
-
-	tegra_gpio_enable(ENTERPRISE_SD_CD);
-
-	rc = gpio_direction_input(ENTERPRISE_SD_CD);
-	if (rc) {
-		pr_err("Unable to configure direction for card detect gpio:%d\n", rc);
-		return rc;
-	}
-
-	return 0;
-}
-
 int __init enterprise_sdhci_init(void)
 {
 	unsigned int rc = 0;
 	platform_device_register(&tegra_sdhci_device3);
 
-	rc = enterprise_sd_cd_gpio_init();
-	if (!rc) {
-		tegra_sdhci_platform_data2.cd_gpio = ENTERPRISE_SD_CD;
-		tegra_sdhci_platform_data2.cd_gpio_polarity = 0;
-	}
+	tegra_gpio_enable(ENTERPRISE_SD_CD);
+	tegra_sdhci_platform_data2.cd_gpio = ENTERPRISE_SD_CD;
 
 	platform_device_register(&tegra_sdhci_device2);
 

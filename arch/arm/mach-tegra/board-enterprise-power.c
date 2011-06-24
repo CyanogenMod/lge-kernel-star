@@ -26,7 +26,6 @@
 #include <linux/mfd/tps80031.h>
 #include <linux/regulator/tps80031-regulator.h>
 #include <linux/gpio.h>
-#include <mach/suspend.h>
 #include <linux/io.h>
 
 #include <mach/iomap.h>
@@ -35,7 +34,7 @@
 
 #include "gpio-names.h"
 #include "board-enterprise.h"
-#include "power.h"
+#include "pm.h"
 #include "wakeups-t3.h"
 
 /************************ TPS80031 based regulator ****************/
@@ -351,13 +350,8 @@ static struct tegra_suspend_platform_data enterprise_suspend_data = {
 	.suspend_mode	= TEGRA_SUSPEND_LP1,
 	.core_timer	= 0x7e7e,
 	.core_off_timer = 0,
-	.separate_req	= true,
 	.corereq_high	= true,
 	.sysclkreq_high	= true,
-	.wake_enb	= 0,
-	.wake_high	= 0,
-	.wake_low	= 0,
-	.wake_any	= 0,
 };
 
 int __init enterprise_suspend_init(void)

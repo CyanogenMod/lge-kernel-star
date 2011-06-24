@@ -232,7 +232,7 @@ static struct platform_device *enterprise_devices[] __initdata = {
 	&tegra_uartb_device,
 	&tegra_uartc_device,
 	&tegra_uarte_device,
-	&pmu_device,
+	&tegra_pmu_device,
 	&tegra_rtc_device,
 	&tegra_udc_device,
 #if defined(CONFIG_SND_HDA_TEGRA)
@@ -353,7 +353,6 @@ static void enterprise_gps_init(void)
 
 static void __init tegra_enterprise_init(void)
 {
-	tegra_common_init();
 	tegra_clk_init_from_table(enterprise_clk_init_table);
 	enterprise_pinmux_init();
 	enterprise_i2c_init();
@@ -382,11 +381,10 @@ static void __init tegra_enterprise_reserve(void)
 
 MACHINE_START(TEGRA_ENTERPRISE, "tegra_enterprise")
 	.boot_params    = 0x80000100,
-	.phys_io        = IO_APB_PHYS,
-	.io_pg_offst    = ((IO_APB_VIRT) >> 18) & 0xfffc,
-	.init_irq       = tegra_init_irq,
-	.init_machine   = tegra_enterprise_init,
 	.map_io         = tegra_map_common_io,
 	.reserve        = tegra_enterprise_reserve,
+	.init_early	= tegra_init_early,
+	.init_irq       = tegra_init_irq,
 	.timer          = &tegra_timer,
+	.init_machine   = tegra_enterprise_init,
 MACHINE_END
