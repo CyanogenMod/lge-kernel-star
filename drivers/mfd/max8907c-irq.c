@@ -180,16 +180,16 @@ static irqreturn_t max8907c_irq(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-static void max8907c_irq_lock(unsigned int irq)
+static void max8907c_irq_lock(struct irq_data *data)
 {
-	struct max8907c *chip = get_irq_chip_data(irq);
+	struct max8907c *chip = irq_data_get_irq_chip_data(data);
 
 	mutex_lock(&chip->irq_lock);
 }
 
-static void max8907c_irq_sync_unlock(unsigned int irq)
+static void max8907c_irq_sync_unlock(struct irq_data *data)
 {
-	struct max8907c *chip = get_irq_chip_data(irq);
+	struct max8907c *chip = irq_data_get_irq_chip_data(data);
 	struct max8907c_irq_data *irq_data;
 	unsigned char irq_chg[2], irq_on[2];
 	unsigned char irq_rtc;
@@ -251,38 +251,38 @@ static void max8907c_irq_sync_unlock(unsigned int irq)
 	mutex_unlock(&chip->irq_lock);
 }
 
-static void max8907c_irq_enable(unsigned int irq)
+static void max8907c_irq_enable(struct irq_data *data)
 {
-	struct max8907c *chip = get_irq_chip_data(irq);
-	max8907c_irqs[irq - chip->irq_base].enable
-		= max8907c_irqs[irq - chip->irq_base].offs;
+	struct max8907c *chip = irq_data_get_irq_chip_data(data);
+	max8907c_irqs[data->irq - chip->irq_base].enable
+		= max8907c_irqs[data->irq - chip->irq_base].offs;
 }
 
-static void max8907c_irq_disable(unsigned int irq)
+static void max8907c_irq_disable(struct irq_data *data)
 {
-	struct max8907c *chip = get_irq_chip_data(irq);
-	max8907c_irqs[irq - chip->irq_base].enable = 0;
+	struct max8907c *chip = irq_data_get_irq_chip_data(data);
+	max8907c_irqs[data->irq - chip->irq_base].enable = 0;
 }
 
-static int max8907c_irq_set_wake(unsigned int irq, unsigned int on)
+static int max8907c_irq_set_wake(struct irq_data *data, unsigned int on)
 {
-	struct max8907c *chip = get_irq_chip_data(irq);
+	struct max8907c *chip = irq_data_get_irq_chip_data(data);
 	if (on) {
-		max8907c_irqs[irq - chip->irq_base].wake
-			= max8907c_irqs[irq - chip->irq_base].enable;
+		max8907c_irqs[data->irq - chip->irq_base].wake
+			= max8907c_irqs[data->irq - chip->irq_base].enable;
 	} else {
-		max8907c_irqs[irq - chip->irq_base].wake = 0;
+		max8907c_irqs[data->irq - chip->irq_base].wake = 0;
 	}
 	return 0;
 }
 
 static struct irq_chip max8907c_irq_chip = {
-	.name		= "max8907c",
-	.bus_lock	= max8907c_irq_lock,
-	.bus_sync_unlock = max8907c_irq_sync_unlock,
-	.enable		= max8907c_irq_enable,
-	.disable	= max8907c_irq_disable,
-	.set_wake	= max8907c_irq_set_wake,
+	.name			= "max8907c",
+	.irq_bus_lock		= max8907c_irq_lock,
+	.irq_bus_sync_unlock	= max8907c_irq_sync_unlock,
+	.irq_enable		= max8907c_irq_enable,
+	.irq_disable		= max8907c_irq_disable,
+	.irq_set_wake		= max8907c_irq_set_wake,
 };
 
 int max8907c_irq_init(struct max8907c *chip, int irq, int irq_base)
@@ -323,14 +323,14 @@ int max8907c_irq_init(struct max8907c *chip, int irq, int irq_base)
 	/* register with genirq */
 	for (i = 0; i < ARRAY_SIZE(max8907c_irqs); i++) {
 		__irq = i + chip->irq_base;
-		set_irq_chip_data(__irq, chip);
-		set_irq_chip_and_handler(__irq, &max8907c_irq_chip,
+		irq_set_chip_data(__irq, chip);
+		irq_set_chip_and_handler(__irq, &max8907c_irq_chip,
 					 handle_edge_irq);
-		set_irq_nested_thread(__irq, 1);
+		irq_set_nested_thread(__irq, 1);
 #ifdef CONFIG_ARM
-		set_irq_flags(__irq, IRQF_VALID);
+		irq_set_status_flags(__irq, IRQF_VALID);
 #else
-		set_irq_noprobe(__irq);
+		irq_set_noprobe(__irq);
 #endif
 	}
 
