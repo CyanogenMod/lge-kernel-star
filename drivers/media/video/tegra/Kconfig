@@ -1,5 +1,6 @@
 source "drivers/media/video/tegra/avp/Kconfig"
 source "drivers/media/video/tegra/mediaserver/Kconfig"
+source "drivers/media/video/tegra/nvavp/Kconfig"
 
 config TEGRA_CAMERA
         bool "Enable support for tegra camera/isp hardware"
