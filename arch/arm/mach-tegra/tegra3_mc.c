@@ -33,7 +33,7 @@
 #include <linux/init.h>
 #include <mach/iomap.h>
 #include <asm/uaccess.h>
-#include "tegra3_mc_stats.h"
+#include "tegra3_mc.h"
 
 #define MC_STAT_SETS 2
 static unsigned int trace_mask = 0x0;

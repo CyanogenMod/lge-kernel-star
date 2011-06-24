@@ -81,7 +81,7 @@ obj-$(CONFIG_DEBUG_ICEDCC)              += sysfs-dcc.o
 obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += sysfs-cluster.o
 ifeq ($(CONFIG_TEGRA_MC_PROFILE),y)
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_mc.o
-obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += tegra3_mc_stats.o
+obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += tegra3_mc.o
 endif
 obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += tegra3_tsensor.o
 
