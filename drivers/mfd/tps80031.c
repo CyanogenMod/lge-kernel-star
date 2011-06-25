@@ -313,6 +313,29 @@ out:
 }
 EXPORT_SYMBOL_GPL(tps80031_update);
 
+int tps80031_force_update(struct device *dev, int sid, int reg, uint8_t val,
+			  uint8_t mask)
+{
+	struct tps80031 *tps80031 = dev_get_drvdata(dev);
+	struct tps80031_client *tps = &tps80031->tps_clients[sid];
+	uint8_t reg_val;
+	int ret = 0;
+
+	mutex_lock(&tps->lock);
+
+	ret = __tps80031_read(tps->client, reg, &reg_val);
+	if (ret)
+		goto out;
+
+	reg_val = (reg_val & ~mask) | (val & mask);
+	ret = __tps80031_write(tps->client, reg, reg_val);
+
+out:
+	mutex_unlock(&tps->lock);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(tps80031_force_update);
+
 static struct tps80031 *tps80031_dev;
 int tps80031_power_off(void)
 {

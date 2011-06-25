@@ -129,6 +129,8 @@ extern int tps80031_clr_bits(struct device *dev, int sid, int reg,
 				uint8_t bit_mask);
 extern int tps80031_update(struct device *dev, int sid, int reg, uint8_t val,
 			   uint8_t mask);
+extern int tps80031_force_update(struct device *dev, int sid, int reg,
+				 uint8_t val, uint8_t mask);
 extern int tps80031_power_off(void);
 
 #endif /*__LINUX_MFD_TPS80031_H */

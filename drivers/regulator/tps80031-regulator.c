@@ -169,8 +169,8 @@ static int tps80031_reg_enable(struct regulator_dev *rdev)
 	if (ri->platform_flags & EXT_PWR_REQ)
 		return 0;
 
-	ret = tps80031_update(parent, SLAVE_ID1, ri->state_reg, STATE_ON,
-					STATE_MASK);
+	ret = tps80031_force_update(parent, SLAVE_ID1, ri->state_reg, STATE_ON,
+				    STATE_MASK);
 	if (ret < 0) {
 		dev_err(&rdev->dev, "Error in updating the STATE register\n");
 		return ret;
@@ -188,8 +188,8 @@ static int tps80031_reg_disable(struct regulator_dev *rdev)
 	if (ri->platform_flags & EXT_PWR_REQ)
 		return 0;
 
-	ret = tps80031_update(parent, SLAVE_ID1, ri->state_reg, STATE_OFF,
-					STATE_MASK);
+	ret = tps80031_force_update(parent, SLAVE_ID1, ri->state_reg, STATE_OFF,
+				    STATE_MASK);
 	if (ret < 0)
 		dev_err(&rdev->dev, "Error in updating the STATE register\n");
 
@@ -848,11 +848,11 @@ static int tps80031_regulator_preinit(struct device *parent,
 	}
 
 	if (tps80031_pdata->init_enable)
-		ret = tps80031_update(parent, SLAVE_ID1, ri->state_reg,
-				STATE_ON, STATE_MASK);
+		ret = tps80031_force_update(parent, SLAVE_ID1, ri->state_reg,
+					    STATE_ON, STATE_MASK);
 	else
-		ret = tps80031_update(parent, SLAVE_ID1, ri->state_reg,
-				STATE_OFF, STATE_MASK);
+		ret = tps80031_force_update(parent, SLAVE_ID1, ri->state_reg,
+					    STATE_OFF, STATE_MASK);
 	if (ret < 0)
 		dev_err(ri->dev, "Not able to %s rail %d err %d\n",
 			(tps80031_pdata->init_enable) ? "enable" : "disable",
