@@ -501,8 +501,12 @@ static int tegra_pm_notify(struct notifier_block *nb, unsigned long event,
 		tegra_auto_hotplug_governor(
 			freq_table[suspend_index].frequency, true);
 	} else if (event == PM_POST_SUSPEND) {
+		unsigned int freq;
 		is_suspended = false;
 		tegra_cpu_edp_init(true);
+		tegra_cpu_cap_highest_speed(&freq);
+		pr_info("Tegra cpufreq resume: restoring frequency to %d kHz\n",
+			freq);
 	}
 	mutex_unlock(&tegra_cpu_lock);
 
