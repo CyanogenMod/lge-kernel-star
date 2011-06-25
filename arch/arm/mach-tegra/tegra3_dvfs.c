@@ -228,6 +228,7 @@ static struct dvfs core_dvfs_table[] = {
 	CORE_DVFS("sbc6",  -1, 1, KHZ,    40000,  60000,  60000,  60000, 100000,  100000,  100000),
 	CORE_DVFS("tvo",   -1, 1, KHZ,        1, 297000, 297000, 297000, 297000,  297000,  297000),
 	CORE_DVFS("dsi",   -1, 1, KHZ,   430000, 430000, 430000, 430000, 500000,  500000,  500000),
+	CORE_DVFS("fuse_burn", -1, 1, KHZ,        0,      0,      0,  26000,  26000,   26000,   26000),
 
 	/*
 	 * The clock rate for the display controllers that determines the
