@@ -1260,9 +1260,9 @@ static int star_motion_ioctl(struct inode *inode, struct file *file, unsigned in
 			}
 			/* 	buf[0], [1], [2] = accel_x,  accel_y,  accel_z;	 */
 
-			atomic_set(&accel_x, buf[0]);
-			atomic_set(&accel_y, buf[1]);
-			atomic_set(&accel_z, buf[2]);
+			atomic_set(&accel_x, buf[0]/10);
+			atomic_set(&accel_y, buf[1]/10);
+			atomic_set(&accel_z, buf[2]/10);
 #if 0 /*ACCEL_REPORT*/
 			motion_send_accel_detection(buf[0],buf[1],buf[2]);
 #endif
