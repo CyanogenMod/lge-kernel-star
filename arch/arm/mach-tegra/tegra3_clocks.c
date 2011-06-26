@@ -2569,8 +2569,9 @@ static int cbus_backup(struct clk *c)
 
 	list_for_each_entry(user, &c->shared_bus_list,
 			u.shared_bus_user.node) {
-		bool enabled = user->u.shared_bus_user.enabled ||
-			user->u.shared_bus_user.client->refcnt;
+		bool enabled = user->u.shared_bus_user.client &&
+			(user->u.shared_bus_user.enabled ||
+			user->u.shared_bus_user.client->refcnt);
 		if (enabled) {
 			ret = cbus_switch_one(user->u.shared_bus_user.client,
 					      c->shared_bus_backup.input,
@@ -2589,7 +2590,7 @@ static void cbus_restore(struct clk *c)
 
 	list_for_each_entry(user, &c->shared_bus_list,
 			u.shared_bus_user.node) {
-		bool back = (c->parent !=
+		bool back = user->u.shared_bus_user.client && (c->parent !=
 			user->u.shared_bus_user.client->parent);
 		if (back)
 			cbus_switch_one(user->u.shared_bus_user.client,
@@ -3844,10 +3845,12 @@ struct clk tegra_list_clks[] = {
 	SHARED_CLK("usb2.sclk",	"tegra-ehci.1",		"sclk",	&tegra_clk_sbus_cmplx, NULL, 0, 0),
 	SHARED_CLK("usb3.sclk",	"tegra-ehci.2",		"sclk",	&tegra_clk_sbus_cmplx, NULL, 0, 0),
 	SHARED_CLK("mon.avp",	"tegra_actmon",		"avp",	&tegra_clk_sbus_cmplx, NULL, 0, 0),
+	SHARED_CLK("cap.sclk",	"cap_sclk",		NULL,	&tegra_clk_sbus_cmplx, NULL, 0, SHARED_CEILING),
+
 	SHARED_CLK("avp.emc",	"tegra-avp",		"emc",	&tegra_clk_emc, NULL, 0, 0),
 	SHARED_CLK("cpu.emc",	"cpu",			"emc",	&tegra_clk_emc, NULL, 0, 0),
-	SHARED_CLK("disp1.emc",	"tegradc.0",		"emc",	&tegra_clk_emc, NULL, 0, 0),
-	SHARED_CLK("disp2.emc",	"tegradc.1",		"emc",	&tegra_clk_emc, NULL, 0, 0),
+	SHARED_CLK("disp1.emc",	"tegradc.0",		"emc",	&tegra_clk_emc, NULL, 0, SHARED_BW),
+	SHARED_CLK("disp2.emc",	"tegradc.1",		"emc",	&tegra_clk_emc, NULL, 0, SHARED_BW),
 	SHARED_CLK("hdmi.emc",	"hdmi",			"emc",	&tegra_clk_emc, NULL, 0, 0),
 	SHARED_CLK("host.emc",	"tegra_grhost",		"emc",	&tegra_clk_emc, NULL, 0, 0),
 	SHARED_CLK("usbd.emc",	"fsl-tegra-udc",	"emc",	&tegra_clk_emc, NULL, 0, 0),
@@ -3855,6 +3858,7 @@ struct clk tegra_list_clks[] = {
 	SHARED_CLK("usb2.emc",	"tegra-ehci.1",		"emc",	&tegra_clk_emc, NULL, 0, 0),
 	SHARED_CLK("usb3.emc",	"tegra-ehci.2",		"emc",	&tegra_clk_emc, NULL, 0, 0),
 	SHARED_CLK("mon.emc",	"tegra_actmon",		"emc",	&tegra_clk_emc, NULL, 0, 0),
+	SHARED_CLK("cap.emc",	"cap.emc",		NULL,	&tegra_clk_emc, NULL, 0, SHARED_CEILING),
 
 	SHARED_CLK("host1x.cbus","tegra_grhost",	"host1x", &tegra_clk_cbus, "host1x", 2, 0),
 	SHARED_CLK("3d.cbus",	"tegra_grhost",		"gr3d",	&tegra_clk_cbus, "3d",  0, 0),
@@ -3864,6 +3868,7 @@ struct clk tegra_list_clks[] = {
 	SHARED_CLK("mpe.cbus",	"tegra_grhost",		"mpe",	&tegra_clk_cbus, "mpe", 0, 0),
 	SHARED_CLK("vde.cbus",	"tegra-avp",		"vde",	&tegra_clk_cbus, "vde", 0, 0),
 	SHARED_CLK("se.cbus",	"tegra-se",		NULL,	&tegra_clk_cbus, "se",  0, 0),
+	SHARED_CLK("cap.cbus",	"cap.cbus",		NULL,	&tegra_clk_cbus, NULL,  0, SHARED_CEILING),
 };
 
 #define CLK_DUPLICATE(_name, _dev, _con)		\
