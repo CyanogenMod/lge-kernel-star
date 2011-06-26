@@ -383,8 +383,8 @@ static struct nvmap_platform_carveout enterprise_carveouts[] = {
 	[0] = {
 		.name		= "iram",
 		.usage_mask	= NVMAP_HEAP_CARVEOUT_IRAM,
-		.base		= TEGRA_IRAM_BASE + TEGRA_RESET_HANDLER_SIZE,
-		.size		= TEGRA_IRAM_SIZE - TEGRA_RESET_HANDLER_SIZE,
+		.base		= TEGRA_IRAM_BASE,
+		.size		= TEGRA_IRAM_SIZE,
 		.buddy_size	= 0, /* no buddy allocation for IRAM */
 	},
 	[1] = {
