@@ -393,7 +393,7 @@ static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
 	},
 };
 
-struct platform_device *tegra_usb_otg_host_register(void)
+static struct platform_device *tegra_usb_otg_host_register(void)
 {
 	struct platform_device *pdev;
 	void *platform_data;
@@ -435,7 +435,7 @@ error:
 	return NULL;
 }
 
-void tegra_usb_otg_host_unregister(struct platform_device *pdev)
+static void tegra_usb_otg_host_unregister(struct platform_device *pdev)
 {
 	platform_device_unregister(pdev);
 }
