@@ -29,6 +29,7 @@
 
 #include <mach/iomap.h>
 #include <mach/pinmux.h>
+#include <mach/suspend.h>
 #include "gpio-names.h"
 
 #define _mux(pg_name, f)				\
