@@ -960,13 +960,16 @@ static void clock_tree_show_one(struct seq_file *s, struct clk *c, int level)
 		}
 	}
 
-	seq_printf(s, "%*s%c%c%-*s%c %-6s %-3d %-8s %-10lu\n",
+	seq_printf(s, "%*s%c%c%-*s%c %-6s %-3d %-8s %-10lu",
 		level * 3 + 1, "",
 		rate > max_rate ? '!' : ' ',
 		!c->set ? '*' : ' ',
 		30 - level * 3, c->name,
 		c->cansleep ? '$' : ' ',
 		state, c->refcnt, div, rate);
+	if (c->parent && !list_empty(&c->parent->shared_bus_list))
+		seq_printf(s, " (%lu)", c->u.shared_bus_user.rate);
+	seq_printf(s, "\n");
 
 	if (c->dvfs)
 		dvfs_show_one(s, c->dvfs, level + 1);
@@ -982,8 +985,8 @@ static void clock_tree_show_one(struct seq_file *s, struct clk *c, int level)
 static int clock_tree_show(struct seq_file *s, void *data)
 {
 	struct clk *c;
-	seq_printf(s, "   clock                          state  ref div      rate\n");
-	seq_printf(s, "--------------------------------------------------------------\n");
+	seq_printf(s, "   clock                          state  ref div      rate       (shared rate)\n");
+	seq_printf(s, "------------------------------------------------------------------------------\n");
 
 	mutex_lock(&clock_list_lock);
 
