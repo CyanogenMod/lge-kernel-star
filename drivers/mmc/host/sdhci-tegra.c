@@ -358,6 +358,9 @@ static struct sdhci_ops tegra_sdhci_ops = {
 
 struct sdhci_pltfm_data sdhci_tegra_pdata = {
 	.quirks = SDHCI_QUIRK_BROKEN_TIMEOUT_VAL |
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+		  SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
+#endif
 		  SDHCI_QUIRK_SINGLE_POWER_WRITE |
 		  SDHCI_QUIRK_NO_HISPD_BIT |
 		  SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC,
