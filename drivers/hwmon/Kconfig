@@ -179,6 +179,16 @@ config SENSORS_ADT7411
 	  This driver can also be built as a module. If so, the module
 	  will be called adt7411.
 
+config SENSORS_ADT7461
+	tristate "Analog Devices ADT7461"
+	depends on I2C && EXPERIMENTAL
+	help
+	  If you say yes here you get support for the Analog Devices
+	  ADT7461 temperature monitoring chips.
+
+	  This driver can also be built as a module. If so, the module
+	  will be called adt7461.
+
 config SENSORS_ADT7462
 	tristate "Analog Devices ADT7462"
 	depends on I2C && EXPERIMENTAL
@@ -1284,6 +1294,13 @@ config SENSORS_MC13783_ADC
         depends on MFD_MC13783
         help
           Support for the A/D converter on MC13783 PMIC.
+
+config SENSORS_INA219
+	tristate "Texas Instruments INA219 POWER MONITOR SENSOR DRIVER"
+	depends on I2C
+	default n
+	help
+		Support for the TI INA219 power monitor sensor.
 
 if ACPI
 
