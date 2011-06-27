@@ -1,22 +1,21 @@
 /*
- * Driver for Nvidia TEGRA spi controller.
+ * Driver for Nvidia TEGRA spi controller in slave mode.
  *
- * Copyright (C) 2010 Google, Inc.
+ * Copyright (c) 2011, NVIDIA Corporation.
  *
- * Author:
- *     Erik Gilling <konkers@android.com>
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- * Copyright (C) 2010-2011 NVIDIA Corporation
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
- * This software is licensed under the terms of the GNU General Public
- * License version 2, as published by the Free Software Foundation, and
- * may be copied, distributed, and modified under those terms.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
 /*#define DEBUG           1*/
@@ -39,6 +38,7 @@
 
 #include <mach/dma.h>
 #include <mach/clk.h>
+#include <mach/spi.h>
 
 #define SLINK_COMMAND		0x000
 #define   SLINK_BIT_LENGTH(x)		(((x) & 0x1f) << 0)
@@ -177,7 +177,7 @@ struct spi_tegra_data {
 
 	struct clk		*clk;
 	void __iomem		*base;
-	phys_addr_t		phys;
+	unsigned long		phys;
 	unsigned		irq;
 
 	u32			cur_speed;
@@ -233,6 +233,9 @@ struct spi_tegra_data {
 	u32			dma_control_reg;
 	u32			def_command_reg;
 	u32			def_command2_reg;
+
+	callback		client_slave_ready_cb;
+	void			*client_data;
 };
 
 static inline unsigned long spi_tegra_readl(struct spi_tegra_data *tspi,
@@ -250,6 +253,19 @@ static inline void spi_tegra_writel(struct spi_tegra_data *tspi,
 		BUG();
 	writel(val, tspi->base + reg);
 }
+
+int spi_tegra_register_callback(struct spi_device *spi, callback func,
+			void *client_data)
+{
+	struct spi_tegra_data *tspi = spi_master_get_devdata(spi->master);
+
+	if (!tspi || !func)
+		return -EINVAL;
+	tspi->client_slave_ready_cb = func;
+	tspi->client_data = client_data;
+	return 0;
+}
+EXPORT_SYMBOL(spi_tegra_register_callback);
 
 static void spi_tegra_clear_status(struct spi_tegra_data *tspi)
 {
@@ -327,6 +343,12 @@ static unsigned spi_tegra_calculate_curr_xfer_param(
 		max_word = min(max_word, tspi->max_buf_size/4);
 		tspi->curr_dma_words = max_word;
 		total_fifo_words = remain_len/tspi->bytes_per_word;
+	}
+	/* All transfer should be in one shot */
+	if (tspi->curr_dma_words * tspi->bytes_per_word != t->len) {
+		dev_err(&tspi->pdev->dev, "The requested length can not be"
+					" transferred in one shot\n");
+		BUG();
 	}
 	return total_fifo_words;
 }
@@ -568,22 +590,15 @@ static int spi_tegra_start_cpu_based_transfer(
 }
 
 static void spi_tegra_start_transfer(struct spi_device *spi,
-		    struct spi_transfer *t, bool is_first_of_msg,
-		    bool is_single_xfer)
+		    struct spi_transfer *t)
 {
 	struct spi_tegra_data *tspi = spi_master_get_devdata(spi->master);
 	u32 speed;
 	u8 bits_per_word;
 	unsigned total_fifo_words;
 	int ret;
-	struct tegra_spi_device_controller_data *cdata = spi->controller_data;
 	unsigned long command;
 	unsigned long command2;
-#ifndef CONFIG_ARCH_TEGRA_2x_SOC
-	unsigned long status2;
-#endif
-	int cs_setup_count;
-	int cs_hold_count;
 
 	unsigned int cs_pol_bit[] = {
 			SLINK_CS_POLARITY,
@@ -611,61 +626,29 @@ static void spi_tegra_start_transfer(struct spi_device *spi,
 	total_fifo_words = spi_tegra_calculate_curr_xfer_param(spi, tspi, t);
 
 	command2 = tspi->def_command2_reg;
-	if (is_first_of_msg) {
-		if (!tspi->is_clkon_always) {
-			if (!tspi->clk_state) {
-				clk_enable(tspi->clk);
-				tspi->clk_state = 1;
-			}
+	if (!tspi->is_clkon_always) {
+		if (!tspi->clk_state) {
+			clk_enable(tspi->clk);
+			tspi->clk_state = 1;
 		}
-
-		spi_tegra_clear_status(tspi);
-
-		command = tspi->def_command_reg;
-		command |= SLINK_BIT_LENGTH(bits_per_word - 1);
-
-		/* possibly use the hw based chip select */
-		tspi->is_hw_based_cs = false;
-		if (cdata && cdata->is_hw_based_cs && is_single_xfer) {
-			if ((tspi->curr_dma_words * tspi->bytes_per_word) ==
-						(t->len - tspi->cur_pos)) {
-				cs_setup_count = cdata->cs_setup_clk_count >> 1;
-				if (cs_setup_count > 3)
-					cs_setup_count = 3;
-				cs_hold_count = cdata->cs_hold_clk_count;
-				if (cs_hold_count > 0xF)
-					cs_hold_count = 0xF;
-				tspi->is_hw_based_cs = true;
-
-				command &= ~SLINK_CS_SW;
-				command2 &= ~SLINK_SS_SETUP(3);
-				command2 |= SLINK_SS_SETUP(cs_setup_count);
-#ifndef CONFIG_ARCH_TEGRA_2x_SOC
-				status2 = spi_tegra_readl(tspi, SLINK_STATUS2);
-				status2 &= ~SLINK_SS_HOLD_TIME(0xF);
-				status2 |= SLINK_SS_HOLD_TIME(cs_hold_count);
-				spi_tegra_writel(tspi, status2, SLINK_STATUS2);
-#endif
-			}
-		}
-		if (!tspi->is_hw_based_cs) {
-			command |= SLINK_CS_SW;
-			command ^= cs_pol_bit[spi->chip_select];
-		}
-
-		command &= ~SLINK_IDLE_SCLK_MASK & ~SLINK_CK_SDA;
-		if (spi->mode & SPI_CPHA)
-			command |= SLINK_CK_SDA;
-
-		if (spi->mode & SPI_CPOL)
-			command |= SLINK_IDLE_SCLK_DRIVE_HIGH;
-		else
-			command |= SLINK_IDLE_SCLK_DRIVE_LOW;
-	} else {
-		command = tspi->command_reg;
-		command &= ~SLINK_BIT_LENGTH(~0);
-		command |= SLINK_BIT_LENGTH(bits_per_word - 1);
 	}
+
+	spi_tegra_clear_status(tspi);
+
+	command = tspi->def_command_reg;
+	command |= SLINK_BIT_LENGTH(bits_per_word - 1);
+
+	command |= SLINK_CS_SW;
+	command ^= cs_pol_bit[spi->chip_select];
+
+	command &= ~SLINK_IDLE_SCLK_MASK & ~SLINK_CK_SDA;
+	if (spi->mode & SPI_CPHA)
+		command |= SLINK_CK_SDA;
+
+	if (spi->mode & SPI_CPOL)
+		command |= SLINK_IDLE_SCLK_DRIVE_HIGH;
+	else
+		command |= SLINK_IDLE_SCLK_DRIVE_LOW;
 
 	spi_tegra_writel(tspi, command, SLINK_COMMAND);
 	tspi->command_reg = command;
@@ -692,20 +675,19 @@ static void spi_tegra_start_transfer(struct spi_device *spi,
 	else
 		ret = spi_tegra_start_cpu_based_transfer(tspi, t);
 	WARN_ON(ret < 0);
+
+	if (tspi->client_slave_ready_cb)
+		tspi->client_slave_ready_cb(tspi->client_data);
 }
 
 static void spi_tegra_start_message(struct spi_device *spi,
 				    struct spi_message *m)
 {
 	struct spi_transfer *t;
-	int single_xfer = 0;
-
-	single_xfer = list_is_singular(&m->transfers);
 	m->actual_length = 0;
 	m->status = 0;
-
 	t = list_first_entry(&m->transfers, struct spi_transfer, transfer_list);
-	spi_tegra_start_transfer(spi, t, true, single_xfer);
+	spi_tegra_start_transfer(spi, t);
 }
 
 static int spi_tegra_setup(struct spi_device *spi)
@@ -772,29 +754,40 @@ static int spi_tegra_transfer(struct spi_device *spi, struct spi_message *m)
 	unsigned long flags;
 	int was_empty;
 	int bytes_per_word;
+	u8 bits_per_word;
+	int fifo_word;
+
+	/* Support only one transfer per message */
+	if (!list_is_singular(&m->transfers))
+		return -EINVAL;
 
 	if (list_empty(&m->transfers) || !m->complete)
 		return -EINVAL;
 
-	list_for_each_entry(t, &m->transfers, transfer_list) {
-		if (t->bits_per_word < 0 || t->bits_per_word > 32)
-			return -EINVAL;
+	t = list_first_entry(&m->transfers, struct spi_transfer, transfer_list);
+	if (t->bits_per_word < 0 || t->bits_per_word > 32)
+		return -EINVAL;
 
-		if (t->len == 0)
-			return -EINVAL;
+	if (t->len == 0)
+		return -EINVAL;
 
-		/* Check that the all words are available */
-		if (t->bits_per_word)
-			bytes_per_word = (t->bits_per_word + 7)/8;
-		else
-			bytes_per_word = (spi->bits_per_word + 7)/8;
+	bits_per_word = (t->bits_per_word) ? : spi->bits_per_word;
 
-		if (t->len % bytes_per_word != 0)
-			return -EINVAL;
+	/* Check that the all words are available */
+	bytes_per_word = (bits_per_word + 7)/8;
 
-		if (!t->rx_buf && !t->tx_buf)
-			return -EINVAL;
-	}
+	if (t->len % bytes_per_word != 0)
+		return -EINVAL;
+
+	if (!t->rx_buf && !t->tx_buf)
+		return -EINVAL;
+
+	if ((bits_per_word == 8) || (bits_per_word == 16))
+		fifo_word = t->len/4;
+	else
+		fifo_word = t->len/bytes_per_word;
+	if (fifo_word >= tspi->max_buf_size/4)
+		return -EINVAL;
 
 	spin_lock_irqsave(&tspi->lock, flags);
 
@@ -822,43 +815,28 @@ static void spi_tegra_curr_transfer_complete(struct spi_tegra_data *tspi,
 	struct spi_message *m;
 	struct spi_device *spi;
 
-	/* Check if CS need to be toggele here */
-	if (tspi->cur && tspi->cur->cs_change &&
-				tspi->cur->delay_usecs) {
-		udelay(tspi->cur->delay_usecs);
-	}
-
 	m = list_first_entry(&tspi->queue, struct spi_message, queue);
 	if (err)
 		m->status = -EIO;
 	spi = m->state;
 
 	m->actual_length += cur_xfer_size;
-	if (!list_is_last(&tspi->cur->transfer_list, &m->transfers)) {
-		tspi->cur = list_first_entry(&tspi->cur->transfer_list,
-			struct spi_transfer, transfer_list);
-		spi_tegra_start_transfer(spi, tspi->cur, false, 0);
+	list_del(&m->queue);
+	m->complete(m->context);
+	if (!list_empty(&tspi->queue)) {
+		m = list_first_entry(&tspi->queue, struct spi_message, queue);
+		spi = m->state;
+		spi_tegra_start_message(spi, m);
 	} else {
-		list_del(&m->queue);
-		m->complete(m->context);
-		if (!list_empty(&tspi->queue)) {
-			m = list_first_entry(&tspi->queue, struct spi_message,
-				queue);
-			spi = m->state;
-			spi_tegra_start_message(spi, m);
-		} else {
-			spi_tegra_writel(tspi, tspi->def_command_reg,
-								SLINK_COMMAND);
-			spi_tegra_writel(tspi, tspi->def_command2_reg,
-								SLINK_COMMAND2);
-			if (!tspi->is_clkon_always) {
-				if (tspi->clk_state) {
-					/* Provide delay to stablize the signal
-					   state */
-					udelay(10);
-					clk_disable(tspi->clk);
-					tspi->clk_state = 0;
-				}
+		spi_tegra_writel(tspi, tspi->def_command_reg, SLINK_COMMAND);
+		spi_tegra_writel(tspi, tspi->def_command2_reg, SLINK_COMMAND2);
+		if (!tspi->is_clkon_always) {
+			if (tspi->clk_state) {
+				/* Provide delay to stablize the signal
+				   state */
+				udelay(10);
+				clk_disable(tspi->clk);
+				tspi->clk_state = 0;
 			}
 		}
 	}
@@ -916,8 +894,8 @@ static void handle_cpu_based_xfer(void *context_data)
 		goto exit;
 	}
 
-	spi_tegra_calculate_curr_xfer_param(tspi->cur_spi, tspi, t);
-	spi_tegra_start_cpu_based_transfer(tspi, t);
+	/* There should not be remaining transfer */
+	BUG();
 exit:
 	spin_unlock_irqrestore(&tspi->lock, flags);
 	return;
@@ -929,7 +907,6 @@ static irqreturn_t spi_tegra_isr_thread(int irq, void *context_data)
 	struct spi_transfer *t = tspi->cur;
 	long wait_status;
 	int err = 0;
-	unsigned total_fifo_words;
 	unsigned long flags;
 
 	if (!tspi->is_curr_dma_xfer) {
@@ -1000,16 +977,10 @@ static irqreturn_t spi_tegra_isr_thread(int irq, void *context_data)
 		return IRQ_HANDLED;
 	}
 
-	/* Continue transfer in current message */
-	total_fifo_words = spi_tegra_calculate_curr_xfer_param(tspi->cur_spi,
-							tspi, t);
-	if (total_fifo_words > SPI_FIFO_DEPTH)
-		err = spi_tegra_start_dma_based_transfer(tspi, t);
-	else
-		err = spi_tegra_start_cpu_based_transfer(tspi, t);
-
 	spin_unlock_irqrestore(&tspi->lock, flags);
-	WARN_ON(err < 0);
+
+	/* There should not be remaining transfer */
+	BUG();
 	return IRQ_HANDLED;
 }
 
@@ -1099,7 +1070,7 @@ static int __init spi_tegra_probe(struct platform_device *pdev)
 	}
 
 	tspi->clk = clk_get(&pdev->dev, NULL);
-	if (IS_ERR(tspi->clk)) {
+	if (IS_ERR_OR_NULL(tspi->clk)) {
 		dev_err(&pdev->dev, "can not get clock\n");
 		ret = PTR_ERR(tspi->clk);
 		goto fail_clk_get;
@@ -1184,12 +1155,13 @@ static int __init spi_tegra_probe(struct platform_device *pdev)
 	tspi->tx_dma_req.req_sel = spi_tegra_req_sels[pdev->id];
 	tspi->tx_dma_req.dev = tspi;
 	tspi->max_buf_size = tspi->dma_buf_size;
-	tspi->def_command_reg  = SLINK_CS_SW | SLINK_M_S;
+	tspi->def_command_reg  = SLINK_CS_SW;
 	tspi->def_command2_reg = SLINK_CS_ACTIVE_BETWEEN;
 
 skip_dma_alloc:
 	clk_enable(tspi->clk);
 	tspi->clk_state = 1;
+	spi_tegra_writel(tspi, tspi->def_command2_reg, SLINK_COMMAND2);
 	ret = spi_register_master(master);
 	if (!tspi->is_clkon_always) {
 		if (tspi->clk_state) {
@@ -1320,11 +1292,11 @@ static int spi_tegra_resume(struct platform_device *pdev)
 }
 #endif
 
-MODULE_ALIAS("platform:spi_tegra");
+MODULE_ALIAS("platform:spi_slave_tegra");
 
 static struct platform_driver spi_tegra_driver = {
 	.driver = {
-		.name =		"spi_tegra",
+		.name =		"spi_slave_tegra",
 		.owner =	THIS_MODULE,
 	},
 	.remove =	__devexit_p(spi_tegra_remove),
