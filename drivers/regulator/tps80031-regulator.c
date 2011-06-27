@@ -49,6 +49,22 @@
 #define STATE_ON	0x01
 #define STATE_MASK	0x03
 
+#define TPS80031_MISC2_ADD	0xE5
+#define MISC2_LDOUSB_IN_VSYS	0x10
+#define MISC2_LDOUSB_IN_PMID	0x08
+#define MISC2_LDOUSB_IN_MASK	0x18
+
+#define MISC2_LDO3_SEL_VIB_VAL	BIT(0)
+#define MISC2_LDO3_SEL_VIB_MASK	0x1
+
+#define CHARGERUSB_CTRL3_ADD	0xEA
+#define BOOST_HW_PWR_EN		BIT(5)
+#define BOOST_HW_PWR_EN_MASK	BIT(5)
+
+#define CHARGERUSB_CTRL1_ADD	0xE8
+#define OPA_MODE_EN		BIT(6)
+#define OPA_MODE_EN_MASK	BIT(6)
+
 struct tps80031_regulator {
 
 	/* Regulator register address.*/
@@ -69,6 +85,7 @@ struct tps80031_regulator {
 	u16			delay;
 
 	u8			flags;
+	unsigned int		platform_flags;
 
 	/* used by regulator core */
 	struct regulator_desc	desc;
@@ -508,6 +525,89 @@ static int tps80031ldo_get_voltage(struct regulator_dev *rdev)
 	return (1000 + (100 * (vsel - 1))) * 1000;
 }
 
+/* VBUS */
+static int tps80031_vbus_is_enabled(struct regulator_dev *rdev)
+{
+	struct tps80031_regulator *ri = rdev_get_drvdata(rdev);
+	struct device *parent = to_tps80031_dev(rdev);
+	uint8_t ctrl1, ctrl3;
+	int ret;
+
+	if (ri->platform_flags & VBUS_SW_ONLY) {
+		ret = tps80031_read(parent, SLAVE_ID2,
+				CHARGERUSB_CTRL1_ADD, &ctrl1);
+		if (!ret)
+			ret = tps80031_read(parent, SLAVE_ID2,
+					CHARGERUSB_CTRL3_ADD, &ctrl3);
+		if (ret < 0) {
+			dev_err(&rdev->dev, "Error in reading control reg\n");
+			return ret;
+		}
+		if ((ctrl1 & OPA_MODE_EN) && (ctrl3 & BOOST_HW_PWR_EN))
+			return 1;
+		return 0;
+	} else {
+		return -EIO;
+	}
+}
+
+static int tps80031_vbus_enable(struct regulator_dev *rdev)
+{
+	struct tps80031_regulator *ri = rdev_get_drvdata(rdev);
+	struct device *parent = to_tps80031_dev(rdev);
+	int ret;
+
+	if (ri->platform_flags & VBUS_SW_ONLY) {
+		ret = tps80031_set_bits(parent, SLAVE_ID2,
+				CHARGERUSB_CTRL1_ADD,  OPA_MODE_EN);
+		if (!ret)
+			ret = tps80031_set_bits(parent, SLAVE_ID2,
+					CHARGERUSB_CTRL3_ADD, BOOST_HW_PWR_EN);
+		if (ret < 0) {
+			dev_err(&rdev->dev, "Error in reading control reg\n");
+			return ret;
+		}
+		udelay(ri->delay);
+		return ret;
+	}
+	dev_err(&rdev->dev, "%s() is not supported with flag 0x%08x\n",
+		 __func__, ri->platform_flags);
+	return -EIO;
+}
+
+static int tps80031_vbus_disable(struct regulator_dev *rdev)
+{
+	struct tps80031_regulator *ri = rdev_get_drvdata(rdev);
+	struct device *parent = to_tps80031_dev(rdev);
+	int ret;
+
+	if (ri->platform_flags & VBUS_SW_ONLY) {
+		ret = tps80031_clr_bits(parent, SLAVE_ID2,
+				CHARGERUSB_CTRL1_ADD,  OPA_MODE_EN);
+		if (!ret)
+			ret = tps80031_clr_bits(parent, SLAVE_ID2,
+					CHARGERUSB_CTRL3_ADD, BOOST_HW_PWR_EN);
+		if (ret < 0) {
+			dev_err(&rdev->dev, "Error in reading control reg\n");
+			return ret;
+		}
+		udelay(ri->delay);
+		return ret;
+	}
+	dev_err(&rdev->dev, "%s() is not supported with flag 0x%08x\n",
+		 __func__, ri->platform_flags);
+	return -EIO;
+}
+
+static int tps80031vbus_get_voltage(struct regulator_dev *rdev)
+{
+	int ret;
+	ret = tps80031_vbus_is_enabled(rdev);
+	if (ret > 0)
+		return 5000000;
+	return ret;
+}
+
 static struct regulator_ops tps80031dcdc_ops = {
 	.list_voltage	= tps80031dcdc_list_voltage,
 	.set_voltage	= tps80031dcdc_set_voltage,
@@ -525,6 +625,14 @@ static struct regulator_ops tps80031ldo_ops = {
 	.enable		= tps80031_reg_enable,
 	.disable	= tps80031_reg_disable,
 	.is_enabled	= tps80031_reg_is_enabled,
+	.enable_time	= tps80031_regulator_enable_time,
+};
+
+static struct regulator_ops tps80031vbus_ops = {
+	.get_voltage	= tps80031vbus_get_voltage,
+	.enable		= tps80031_vbus_enable,
+	.disable	= tps80031_vbus_disable,
+	.is_enabled	= tps80031_vbus_is_enabled,
 	.enable_time	= tps80031_regulator_enable_time,
 };
 
@@ -567,14 +675,42 @@ static struct tps80031_regulator tps80031_regulator[] = {
 	TPS80031_REG(LDOUSB, 0xA1, 0xA2, 0x00, 0xA3, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
 	TPS80031_REG(LDOLN,  0x95, 0x96, 0x00, 0x97, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
 	TPS80031_REG(VANA,   0x81, 0x82, 0x00, 0x83, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
+	TPS80031_REG(VBUS,   0x0,  0x0,  0x00, 0x0,  SLAVE_ID1, 0,    5000, tps80031vbus_ops, 2, 500),
 };
-
 
 static inline int tps80031_regulator_preinit(struct device *parent,
 		struct tps80031_regulator *ri,
 		struct tps80031_regulator_platform_data *tps80031_pdata)
 {
-	int ret;
+	int ret = 0;
+
+	if (ri->desc.id == TPS80031_ID_LDOUSB) {
+		if (ri->platform_flags & USBLDO_INPUT_VSYS)
+			ret = tps80031_update(parent, SLAVE_ID1,
+				TPS80031_MISC2_ADD,
+				MISC2_LDOUSB_IN_VSYS, MISC2_LDOUSB_IN_MASK);
+		if (ri->platform_flags & USBLDO_INPUT_PMID)
+			ret = tps80031_update(parent, SLAVE_ID1,
+				TPS80031_MISC2_ADD,
+				MISC2_LDOUSB_IN_PMID, MISC2_LDOUSB_IN_MASK);
+		if (ret < 0) {
+			dev_err(ri->dev, "Not able to configure the rail "
+				"LDOUSB as per platform data error %d\n", ret);
+			return ret;
+		}
+	}
+
+	if (ri->desc.id == TPS80031_ID_LDO3) {
+		if (ri->platform_flags & LDO3_OUTPUT_VIB)
+			ret = tps80031_update(parent, SLAVE_ID1,
+				TPS80031_MISC2_ADD,
+				MISC2_LDO3_SEL_VIB_VAL,MISC2_LDO3_SEL_VIB_MASK);
+		if (ret < 0) {
+			dev_err(ri->dev, "Not able to configure the rail "
+				"LDO3 as per platform data error %d\n", ret);
+			return ret;
+		}
+	}
 
 	if (!tps80031_pdata->init_apply)
 		return 0;
@@ -693,6 +829,7 @@ static int __devinit tps80031_regulator_probe(struct platform_device *pdev)
 	ri->dev = &pdev->dev;
 
 	check_smps_mode_mult(pdev->dev.parent, ri);
+	ri->platform_flags = tps_pdata->flags;
 
 	err = tps80031_regulator_preinit(pdev->dev.parent, ri, tps_pdata);
 	if (err)
