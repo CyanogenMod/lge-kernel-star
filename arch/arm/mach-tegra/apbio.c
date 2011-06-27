@@ -66,10 +66,12 @@ static inline u32 apb_readl(unsigned long offset)
 	tegra_dma_enqueue_req(tegra_apb_dma, &req);
 
 	ret = wait_for_completion_timeout(&tegra_apb_wait,
-		msecs_to_jiffies(50));
+		msecs_to_jiffies(400));
 
-	if (WARN(ret == 0, "apb read dma timed out"))
+	if (WARN(ret == 0, "apb read dma timed out")) {
+		tegra_dma_dequeue_req(tegra_apb_dma, &req);
 		*(u32 *)tegra_apb_bb = 0;
+	}
 
 	mutex_unlock(&tegra_apb_dma_lock);
 	return *((u32 *)tegra_apb_bb);
@@ -103,7 +105,10 @@ static inline void apb_writel(u32 value, unsigned long offset)
 	tegra_dma_enqueue_req(tegra_apb_dma, &req);
 
 	ret = wait_for_completion_timeout(&tegra_apb_wait,
-		msecs_to_jiffies(50));
+		msecs_to_jiffies(400));
+
+	if (WARN(ret == 0, "apb write dma timed out"))
+		tegra_dma_dequeue_req(tegra_apb_dma, &req);
 
 	mutex_unlock(&tegra_apb_dma_lock);
 }
@@ -133,7 +138,7 @@ static int tegra_init_apb_dma(void)
 {
 #ifdef CONFIG_TEGRA_SYSTEM_DMA
 	tegra_apb_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT |
-		TEGRA_DMA_SHARED);
+		TEGRA_DMA_SHARED, "apbio");
 	if (!tegra_apb_dma) {
 		pr_err("%s: can not allocate dma channel\n", __func__);
 		return -ENODEV;

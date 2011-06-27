@@ -23,21 +23,24 @@
 
 #define SBK_DEVKEY_STATUS_SZ	sizeof(u32)
 
-/* fuse io parameters */
+/*
+ * fuse io parameters: params with sizes less than a byte are
+ * explicitly mentioned
+ */
 enum fuse_io_param {
 	DEVKEY,
-	JTAG_DIS,
+	JTAG_DIS, /* 1 bit long */
 	/*
 	 * Programming the odm production fuse at the same
 	 * time as the sbk or dev_key is not allowed as it is not possible to
 	 * verify that the sbk or dev_key were programmed correctly.
 	 */
-	ODM_PROD_MODE,
+	ODM_PROD_MODE, /* 1 bit long */
 	SEC_BOOT_DEV_CFG,
-	SEC_BOOT_DEV_SEL,
+	SEC_BOOT_DEV_SEL, /* 3 bits long */
 	SBK,
-	SW_RSVD,
-	IGNORE_DEV_SEL_STRAPS,
+	SW_RSVD, /* 4 bits long */
+	IGNORE_DEV_SEL_STRAPS, /* 1 bit long */
 	ODM_RSVD,
 	SBK_DEVKEY_STATUS,
 	MASTER_ENB,
@@ -76,16 +79,16 @@ enum {
  * @param: io_param_type - param type enum
  * @param: size - read size in bytes
  */
-int tegra_fuse_read(u32 io_param_type, u32 *data, int size);
+int tegra_fuse_read(enum fuse_io_param io_param_type, u32 *data, int size);
 
 #define FLAGS_DEVKEY			BIT(DEVKEY)
 #define FLAGS_JTAG_DIS			BIT(JTAG_DIS)
-#define FLAGS_SBK_DEVKEY_STATUS	BIT(SBK_DEVKEY_STATUS)
+#define FLAGS_SBK_DEVKEY_STATUS		BIT(SBK_DEVKEY_STATUS)
 #define FLAGS_ODM_PROD_MODE		BIT(ODM_PROD_MODE)
-#define FLAGS_SEC_BOOT_DEV_CFG	BIT(SEC_BOOT_DEV_CFG)
-#define FLAGS_SEC_BOOT_DEV_SEL	BIT(SEC_BOOT_DEV_SEL)
+#define FLAGS_SEC_BOOT_DEV_CFG		BIT(SEC_BOOT_DEV_CFG)
+#define FLAGS_SEC_BOOT_DEV_SEL		BIT(SEC_BOOT_DEV_SEL)
 #define FLAGS_SBK			BIT(SBK)
-#define FLAGS_SW_RSVD		BIT(SW_RSVD)
+#define FLAGS_SW_RSVD			BIT(SW_RSVD)
 #define FLAGS_IGNORE_DEV_SEL_STRAPS	BIT(IGNORE_DEV_SEL_STRAPS)
 #define FLAGS_ODMRSVD			BIT(ODM_RSVD)
 

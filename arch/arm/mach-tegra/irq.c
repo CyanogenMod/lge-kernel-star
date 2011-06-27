@@ -4,7 +4,7 @@
  * Author:
  *	Colin Cross <ccross@android.com>
  *
- * Copyright (C) 2010, NVIDIA Corporation
+ * Copyright (C) 2010-2011, NVIDIA Corporation
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -49,7 +49,7 @@
 #define ICTLR_COP_IER_CLR	0x38
 #define ICTLR_COP_IEP_CLASS	0x3c
 
-#define NUM_ICTLRS 4
+#define NUM_ICTLRS (INT_MAIN_NR/32)
 #define FIRST_LEGACY_IRQ 32
 
 static void __iomem *ictlr_reg_base[] = {
@@ -57,6 +57,9 @@ static void __iomem *ictlr_reg_base[] = {
 	IO_ADDRESS(TEGRA_SECONDARY_ICTLR_BASE),
 	IO_ADDRESS(TEGRA_TERTIARY_ICTLR_BASE),
 	IO_ADDRESS(TEGRA_QUATERNARY_ICTLR_BASE),
+#if (NUM_ICTLRS > 4)
+	IO_ADDRESS(TEGRA_QUINARY_ICTLR_BASE),
+#endif
 };
 
 #ifdef CONFIG_PM

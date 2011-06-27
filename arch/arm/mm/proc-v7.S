@@ -206,7 +206,7 @@ cpu_v7_name:
 	 *   NOS = PRRR[24+n] = 1	- not outer shareable
 	 */
 .equ	PRRR,	0xff0a89a8
-.equ	NMRR,	0x40e044e0
+.equ	NMRR,	0xc0e044e0
 
 /* Suspend/resume support: derived from arch/arm/mach-s5pv210/sleep.S */
 .globl	cpu_v7_suspend_size

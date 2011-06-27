@@ -26,6 +26,7 @@
 void tegra_assert_system_reset(char mode, const char *cmd);
 
 void __init tegra_init_early(void);
+void __init tegra_mc_init(void);
 void __init tegra_map_common_io(void);
 void __init tegra_init_irq(void);
 void __init tegra_init_clock(void);
@@ -36,6 +37,7 @@ void tegra_init_cache(void);
 void __init tegra_protected_aperture_init(unsigned long aperture);
 void tegra_move_framebuffer(unsigned long to, unsigned long from,
 	unsigned long size);
+bool is_tegra_debug_uartport_hs(void);
 
 extern unsigned long tegra_bootloader_fb_start;
 extern unsigned long tegra_bootloader_fb_size;
@@ -50,4 +52,31 @@ extern unsigned long tegra_lp0_vec_size;
 extern unsigned long tegra_grhost_aperture;
 
 extern struct sys_timer tegra_timer;
+
+enum board_fab {
+	BOARD_FAB_A = 0,
+	BOARD_FAB_B,
+	BOARD_FAB_C,
+	BOARD_FAB_D,
+};
+
+struct board_info {
+	u16 board_id;
+	u16 sku;
+	u8  fab;
+	u8  major_revision;
+	u8  minor_revision;
+};
+
+enum panel_type {
+	panel_type_lvds = 0,
+	panel_type_dsi,
+};
+
+void tegra_get_board_info(struct board_info *);
+void tegra_get_pmu_board_info(struct board_info *bi);
+
+int get_core_edp(void);
+enum panel_type get_panel_type(void);
+
 #endif

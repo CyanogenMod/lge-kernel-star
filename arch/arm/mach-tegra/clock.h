@@ -6,6 +6,8 @@
  * Author:
  *	Colin Cross <ccross@google.com>
  *
+ * Copyright (C) 2010-2011, NVIDIA Corporation.
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -20,10 +22,13 @@
 #ifndef __MACH_TEGRA_CLOCK_H
 #define __MACH_TEGRA_CLOCK_H
 
-#include <linux/clkdev.h>
-#include <linux/list.h>
-#include <linux/mutex.h>
-#include <linux/spinlock.h>
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+#define USE_PLL_LOCK_BITS 0	/* Never use lock bits on Tegra2 */
+#else
+/* !!!FIXME!!! PLL lock bits should work on Tegra3 */
+#define USE_PLL_LOCK_BITS 0	/* Use lock bits for PLL stabiliation */
+#define USE_PLLE_SS 1		/* Use spread spectrum coefficients for PLLE */
+#endif
 
 #define DIV_BUS			(1 << 0)
 #define DIV_U71			(1 << 1)
@@ -40,7 +45,26 @@
 #define PERIPH_MANUAL_RESET	(1 << 12)
 #define PLL_ALT_MISC_REG	(1 << 13)
 #define PLLU			(1 << 14)
+#define PLLX			(1 << 15)
+#define MUX_PWM			(1 << 16)
+#define MUX8			(1 << 17)
+#define DIV_U71_UART		(1 << 18)
+#define MUX_CLK_OUT		(1 << 19)
+#define PLLM			(1 << 20)
+#define DIV_U71_INT		(1 << 21)
 #define ENABLE_ON_INIT		(1 << 28)
+#define PERIPH_ON_APB		(1 << 29)
+
+#ifndef __ASSEMBLY__
+
+#include <linux/clkdev.h>
+#include <linux/list.h>
+#include <linux/mutex.h>
+#include <linux/spinlock.h>
+#include <asm/cputime.h>
+
+#include <mach/clk.h>
+#define MAX_SAME_LIMIT_SKU_IDS	16
 
 struct clk;
 
@@ -65,7 +89,18 @@ struct clk_ops {
 	int		(*set_parent)(struct clk *, struct clk *);
 	int		(*set_rate)(struct clk *, unsigned long);
 	long		(*round_rate)(struct clk *, unsigned long);
+	int		(*clk_cfg_ex)(struct clk *, enum tegra_clk_ex_param, u32);
 	void		(*reset)(struct clk *, bool);
+};
+
+struct clk_stats {
+	cputime64_t 	time_on;
+	u64 		last_update;
+};
+
+enum cpu_mode {
+	MODE_G = 0,
+	MODE_LP,
 };
 
 enum clk_state {
@@ -99,6 +134,7 @@ struct clk {
 	struct clk		*parent;
 	u32			div;
 	u32			mul;
+	struct clk_stats 	stats;
 
 	const struct clk_mux_sel	*inputs;
 	u32				reg;
@@ -119,6 +155,7 @@ struct clk {
 			unsigned long			vco_max;
 			const struct clk_pll_freq_table	*freq_table;
 			int				lock_delay;
+			unsigned long			fixed_rate;
 		} pll;
 		struct {
 			u32				sel;
@@ -127,7 +164,15 @@ struct clk {
 		struct {
 			struct clk			*main;
 			struct clk			*backup;
+			enum cpu_mode			mode;
 		} cpu;
+		struct {
+			struct clk			*pclk;
+			struct clk			*hclk;
+			struct clk			*sclk_low;
+			struct clk			*sclk_high;
+			unsigned long			threshold;
+		} system;
 		struct {
 			struct list_head		node;
 			bool				enabled;
@@ -151,18 +196,29 @@ struct tegra_clk_init_table {
 	bool enabled;
 };
 
-void tegra2_init_clocks(void);
-void tegra2_periph_reset_deassert(struct clk *c);
-void tegra2_periph_reset_assert(struct clk *c);
+struct tegra_sku_rate_limit {
+	const char *clk_name;
+	unsigned long max_rate;
+	int sku_ids[MAX_SAME_LIMIT_SKU_IDS];
+};
+
+void tegra_soc_init_clocks(void);
+void tegra_init_max_rate(struct clk *c, unsigned long max_rate);
 void clk_init(struct clk *clk);
 struct clk *tegra_get_clock_by_name(const char *name);
 unsigned long clk_measure_input_freq(void);
 int clk_reparent(struct clk *c, struct clk *parent);
 void tegra_clk_init_from_table(struct tegra_clk_init_table *table);
 void clk_set_cansleep(struct clk *c);
+unsigned long clk_get_max_rate(struct clk *c);
+unsigned long clk_get_min_rate(struct clk *c);
 unsigned long clk_get_rate_locked(struct clk *c);
 int clk_set_rate_locked(struct clk *c, unsigned long rate);
 void tegra2_sdmmc_tap_delay(struct clk *c, int delay);
+int tegra_emc_set_rate(unsigned long rate);
+long tegra_emc_round_rate(unsigned long rate);
+struct clk *tegra_emc_predict_parent(unsigned long rate, u32 *div_value);
+void tegra_emc_timing_invalidate(void);
 
 static inline bool clk_is_auto_dvfs(struct clk *c)
 {
@@ -203,4 +259,18 @@ static inline void clk_lock_init(struct clk *c)
 	spin_lock_init(&c->spinlock);
 }
 
+#ifdef CONFIG_CPU_FREQ
+struct cpufreq_frequency_table;
+
+struct tegra_cpufreq_table_data {
+	struct cpufreq_frequency_table *freq_table;
+	int throttle_lowest_index;
+	int throttle_highest_index;
+	int suspend_index;
+};
+struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void);
+unsigned long tegra_emc_to_cpu_ratio(unsigned long cpu_rate);
+#endif
+
+#endif
 #endif

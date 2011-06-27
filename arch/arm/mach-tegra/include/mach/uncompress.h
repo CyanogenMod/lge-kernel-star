@@ -7,6 +7,8 @@
  *	Colin Cross <ccross@google.com>
  *	Erik Gilling <konkers@google.com>
  *
+ * Copyright (C) 2010-2011 NVIDIA Corporation
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -25,6 +27,50 @@
 #include <linux/serial_reg.h>
 
 #include <mach/iomap.h>
+
+#if defined(CONFIG_TEGRA_DEBUG_UARTA)
+#define DEBUG_UART_CLK_SRC		(TEGRA_CLK_RESET_BASE + 0x178)
+#define DEBUG_UART_CLK_ENB_SET_REG	(TEGRA_CLK_RESET_BASE + 0x320)
+#define DEBUG_UART_CLK_ENB_SET_BIT	(1 << 6)
+#define DEBUG_UART_RST_CLR_REG		(TEGRA_CLK_RESET_BASE + 0x304)
+#define DEBUG_UART_RST_CLR_BIT		(1 << 6)
+#elif defined(CONFIG_TEGRA_DEBUG_UARTB)
+#define DEBUG_UART_CLK_SRC		(TEGRA_CLK_RESET_BASE + 0x17c)
+#define DEBUG_UART_CLK_ENB_SET_REG	(TEGRA_CLK_RESET_BASE + 0x320)
+#define DEBUG_UART_CLK_ENB_SET_BIT	(1 << 7)
+#define DEBUG_UART_RST_CLR_REG		(TEGRA_CLK_RESET_BASE + 0x304)
+#define DEBUG_UART_RST_CLR_BIT		(1 << 7)
+#elif defined(CONFIG_TEGRA_DEBUG_UARTC)
+#define DEBUG_UART_CLK_SRC		(TEGRA_CLK_RESET_BASE + 0x1a0)
+#define DEBUG_UART_CLK_ENB_SET_REG	(TEGRA_CLK_RESET_BASE + 0x328)
+#define DEBUG_UART_CLK_ENB_SET_BIT	(1 << 23)
+#define DEBUG_UART_RST_CLR_REG		(TEGRA_CLK_RESET_BASE + 0x30C)
+#define DEBUG_UART_RST_CLR_BIT		(1 << 23)
+#elif defined(CONFIG_TEGRA_DEBUG_UARTD)
+#define DEBUG_UART_CLK_SRC		(TEGRA_CLK_RESET_BASE + 0x1c0)
+#define DEBUG_UART_CLK_ENB_SET_REG	(TEGRA_CLK_RESET_BASE + 0x330)
+#define DEBUG_UART_CLK_ENB_SET_BIT	(1 << 1)
+#define DEBUG_UART_RST_CLR_REG		(TEGRA_CLK_RESET_BASE + 0x314)
+#define DEBUG_UART_RST_CLR_BIT		(1 << 1)
+#elif defined(CONFIG_TEGRA_DEBUG_UARTE)
+#define DEBUG_UART_CLK_SRC		(TEGRA_CLK_RESET_BASE + 0x1c4)
+#define DEBUG_UART_CLK_ENB_SET_REG	(TEGRA_CLK_RESET_BASE + 0x330)
+#define DEBUG_UART_CLK_ENB_SET_BIT	(1 << 2)
+#define DEBUG_UART_RST_CLR_REG		(TEGRA_CLK_RESET_BASE + 0x314)
+#define DEBUG_UART_RST_CLR_BIT		(1 << 2)
+#else
+#define DEBUG_UART_CLK_SRC		0
+#define DEBUG_UART_CLK_ENB_SET_REG	0
+#define DEBUG_UART_CLK_ENB_SET_BIT	0
+#define DEBUG_UART_RST_CLR_REG		0
+#define DEBUG_UART_RST_CLR_BIT		0
+#endif
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+#define DEBUG_UART_DLL			0x75
+#else
+#define DEBUG_UART_DLL			0xdd
+#endif
 
 static void putc(int c)
 {
@@ -62,59 +108,25 @@ static inline void arch_decomp_setup(void)
 	if (uart == NULL)
 		return;
 
-/*
-	addr = (volatile u32 *)0x70000014;
-	*addr &= ~(1<<29);
-
-	addr = (volatile u32 *)0x70000084;
-	*addr &= ~(3<<2);
-
-	addr = (volatile u32 *)0x700000b0;
-	*addr &= ~(3<<24);
-
-	konk_delay(5);
-
-*/
-
-	/* OSC_CTRL_0 */
-	/*addr = (volatile u32 *)0x60006050;*/
-
-	/* PLLP_BASE_0 */
-	addr = (volatile u32 *)0x600060a0;
-	*addr = 0x5011b00c;
-
-	/* PLLP_OUTA_0 */
-	addr = (volatile u32 *)0x600060a4;
-	*addr = 0x10031c03;
-
-	/* PLLP_OUTB_0 */
-	addr = (volatile u32 *)0x600060a8;
-	*addr = 0x06030a03;
-
-	/* PLLP_MISC_0 */
-	addr = (volatile u32 *)0x600060ac;
-	*addr = 0x00000800;
-
-	konk_delay(1000);
-
-	/* UARTD clock source is PLLP_OUT0 */
-	addr = (volatile u32 *)0x600061c0;
+	/* Debug UART clock source is PLLP_OUT0. */
+	addr = (volatile u32 *)DEBUG_UART_CLK_SRC;
 	*addr = 0;
 
-	/* Enable clock to UARTD */
-	addr = (volatile u32 *)0x60006018;
-	*addr |= (1<<1);
+	/* Enable clock to debug UART. */
+	addr = (volatile u32 *)DEBUG_UART_CLK_ENB_SET_REG;
+	*addr = DEBUG_UART_CLK_ENB_SET_BIT;
 
 	konk_delay(5);
 
-	/* Deassert reset to UARTD */
-	addr = (volatile u32 *)0x6000600c;
-	*addr &= ~(1<<1);
+	/* Deassert reset to debug UART. */
+	addr = (volatile u32 *)DEBUG_UART_RST_CLR_REG;
+	*addr = DEBUG_UART_RST_CLR_BIT;
 
 	konk_delay(5);
 
+	/* Set up debug UART. */
 	uart[UART_LCR << shift] |= UART_LCR_DLAB;
-	uart[UART_DLL << shift] = 0x75;
+	uart[UART_DLL << shift] = DEBUG_UART_DLL;
 	uart[UART_DLM << shift] = 0x0;
 	uart[UART_LCR << shift] = 3;
 }

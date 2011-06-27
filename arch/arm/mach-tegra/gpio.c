@@ -6,6 +6,8 @@
  * Author:
  *	Erik Gilling <konkers@google.com>
  *
+ * Copyright (c) 2011 NVIDIA Corporation.
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -20,6 +22,7 @@
 #include <linux/init.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
+#include <linux/delay.h>
 
 #include <linux/io.h>
 #include <linux/gpio.h>
@@ -35,10 +38,6 @@
 #define GPIO_PORT(x)		(((x) >> 3) & 0x3)
 #define GPIO_BIT(x)		((x) & 0x7)
 
-#define GPIO_REG(x)		(IO_TO_VIRT(TEGRA_GPIO_BASE) +	\
-				 GPIO_BANK(x) * 0x80 +		\
-				 GPIO_PORT(x) * 4)
-
 #define GPIO_CNF(x)		(GPIO_REG(x) + 0x00)
 #define GPIO_OE(x)		(GPIO_REG(x) + 0x10)
 #define GPIO_OUT(x)		(GPIO_REG(x) + 0X20)
@@ -48,12 +47,29 @@
 #define GPIO_INT_LVL(x)		(GPIO_REG(x) + 0x60)
 #define GPIO_INT_CLR(x)		(GPIO_REG(x) + 0x70)
 
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
+#define GPIO_REG(x)		(IO_TO_VIRT(TEGRA_GPIO_BASE) +	\
+				 GPIO_BANK(x) * 0x80 +		\
+				 GPIO_PORT(x) * 4)
+
 #define GPIO_MSK_CNF(x)		(GPIO_REG(x) + 0x800)
 #define GPIO_MSK_OE(x)		(GPIO_REG(x) + 0x810)
 #define GPIO_MSK_OUT(x)		(GPIO_REG(x) + 0X820)
 #define GPIO_MSK_INT_STA(x)	(GPIO_REG(x) + 0x840)
 #define GPIO_MSK_INT_ENB(x)	(GPIO_REG(x) + 0x850)
 #define GPIO_MSK_INT_LVL(x)	(GPIO_REG(x) + 0x860)
+#else
+#define GPIO_REG(x)		(IO_TO_VIRT(TEGRA_GPIO_BASE) +	\
+				 GPIO_BANK(x) * 0x100 +		\
+				 GPIO_PORT(x) * 4)
+
+#define GPIO_MSK_CNF(x)		(GPIO_REG(x) + 0x80)
+#define GPIO_MSK_OE(x)		(GPIO_REG(x) + 0x90)
+#define GPIO_MSK_OUT(x)		(GPIO_REG(x) + 0XA0)
+#define GPIO_MSK_INT_STA(x)	(GPIO_REG(x) + 0xC0)
+#define GPIO_MSK_INT_ENB(x)	(GPIO_REG(x) + 0xD0)
+#define GPIO_MSK_INT_LVL(x)	(GPIO_REG(x) + 0xE0)
+#endif
 
 #define GPIO_INT_LVL_MASK		0x010101
 #define GPIO_INT_LVL_EDGE_RISING	0x000101
@@ -84,6 +100,9 @@ static struct tegra_gpio_bank tegra_gpio_banks[] = {
 	{.bank = 4, .irq = INT_GPIO5},
 	{.bank = 5, .irq = INT_GPIO6},
 	{.bank = 6, .irq = INT_GPIO7},
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	{.bank = 7, .irq = INT_GPIO8},
+#endif
 };
 
 static int tegra_gpio_compose(int bank, int port, int bit)
@@ -152,6 +171,15 @@ static void tegra_gpio_irq_ack(struct irq_data *d)
 	int gpio = d->irq - INT_GPIO_BASE;
 
 	__raw_writel(1 << GPIO_BIT(gpio), GPIO_INT_CLR(gpio));
+
+#ifdef CONFIG_TEGRA_FPGA_PLATFORM
+	/* FPGA platforms have a serializer between the GPIO
+	   block and interrupt controller. Allow time for
+	   clearing of the GPIO interrupt to propagate to the
+	   interrupt controller before re-enabling the IRQ
+	   to prevent double interrupts. */
+	udelay(15);
+#endif
 }
 
 static void tegra_gpio_irq_mask(struct irq_data *d)
@@ -351,7 +379,7 @@ static int __init tegra_gpio_init(void)
 	int i;
 	int j;
 
-	for (i = 0; i < 7; i++) {
+	for (i = 0; i < ARRAY_SIZE(tegra_gpio_banks); i++) {
 		for (j = 0; j < 4; j++) {
 			int gpio = tegra_gpio_compose(i, j, 0);
 			__raw_writel(0x00, GPIO_INT_ENB(gpio));
@@ -409,7 +437,8 @@ static int dbg_gpio_show(struct seq_file *s, void *unused)
 	int i;
 	int j;
 
-	for (i = 0; i < 7; i++) {
+	seq_printf(s, "Bank:Port CNF OE OUT IN INT_STA INT_ENB INT_LVL\n");
+	for (i = 0; i < ARRAY_SIZE(tegra_gpio_banks); i++) {
 		for (j = 0; j < 4; j++) {
 			int gpio = tegra_gpio_compose(i, j, 0);
 			seq_printf(s,

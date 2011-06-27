@@ -34,11 +34,13 @@
  *	 Initial secondary processor boot vector; jumps to kernel's
  *	 secondary_startup routine
  */
+#ifdef CONFIG_SMP
 ENTRY(tegra_secondary_startup)
 	bl	tegra_invalidate_l1
 	bl	tegra_enable_coresite
 	b	secondary_startup
 ENDPROC(tegra_secondary_startup)
+#endif
 
 #ifdef CONFIG_PM
 /*
@@ -65,6 +67,16 @@ ENDPROC(tegra_secondary_resume)
 ENTRY(tegra_resume)
 	bl	tegra_invalidate_l1
 	bl	tegra_enable_coresite
+
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	@ Clear the flow controller flags for this CPU.
+	mov32	r2, TEGRA_FLOW_CTRL_BASE+8	@ CPU0 CSR
+	ldr	r1, [r2]
+	orr	r1, r1, #(1 << 15) | (1 << 14)	@ write to clear event & intr
+	movw	r0, #0x0FFD	@ enable, cluster_switch, immed, & bitmaps
+	bic	r1, r1, r0
+	str	r1, [r2]
+#endif
 
 	/* enable SCU */
 	ldr	r0, =TEGRA_ARM_PERIF_BASE

@@ -2,11 +2,10 @@ if ARCH_TEGRA
 
 comment "NVIDIA Tegra options"
 
-choice
-	prompt "Select Tegra processor family for target system"
-
 config ARCH_TEGRA_2x_SOC
-	bool "Tegra 2 family"
+	bool "Tegra 2 family SOC"
+	default y
+	depends on !ARCH_TEGRA_3x_SOC
 	select CPU_V7
 	select ARM_GIC
 	select ARCH_REQUIRE_GPIOLIB
@@ -21,7 +20,19 @@ config ARCH_TEGRA_2x_SOC
 	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
 
-endchoice
+config ARCH_TEGRA_3x_SOC
+	bool "Tegra 3 family SOC"
+	select CPU_V7
+	select ARM_GIC
+	select ARCH_REQUIRE_GPIOLIB
+	select TEGRA_IOVMM
+	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+	select USB_EHCI_TEGRA if USB_SUPPORT
+	select USB_ULPI if USB_SUPPORT
+	select USB_ULPI_VIEWPORT if USB_SUPPORT
+	help
+	  Support for NVIDIA Tegra 3 family of SoCs, based upon the
+	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
 
 config TEGRA_PCI
 	bool "PCI Express support"
@@ -31,12 +42,14 @@ comment "Tegra board type"
 
 config MACH_HARMONY
        bool "Harmony board"
+       depends on ARCH_TEGRA_2x_SOC
        select MACH_HAS_SND_SOC_TEGRA_WM8903
        help
          Support for NVIDIA Harmony development platform
 
 config MACH_VENTANA
        bool "Ventana board"
+       depends on ARCH_TEGRA_2x_SOC
        select MACH_HAS_SND_SOC_TEGRA_WM8903
        help
          Support for NVIDIA Ventana development platform
@@ -81,6 +94,14 @@ config MACH_WARIO
 
 # Enterprise
 
+config TEGRA_FPGA_PLATFORM
+       bool "Support for NVIDIA Tegra FPGA platform"
+       default n
+       help
+         This enables the NVIDIA Tegra FPGA platform support.
+         Select this only if you are an NVIDIA developer working on
+         an FPGA platforms. All others must leave this unselected.
+
 choice
         prompt "Low-level debug console UART"
         default TEGRA_DEBUG_UART_NONE
@@ -112,6 +133,13 @@ config TEGRA_SYSTEM_DMA
 	  Adds system DMA functionality for NVIDIA Tegra SoCs, used by
 	  several Tegra device drivers
 
+config TEGRA_SPI_SLAVE
+       tristate "Nvidia Tegra SPI slave driver"
+       depends on ARCH_TEGRA
+       select TEGRA_SYSTEM_DMA
+       help
+         SPI slave driver for NVIDIA Tegra SoCs
+
 config TEGRA_PWM
 	tristate "Enable PWM driver"
 	select HAVE_PWM
@@ -120,15 +148,19 @@ config TEGRA_PWM
 
 config TEGRA_EMC_SCALING_ENABLE
 	bool "Enable scaling the memory frequency"
+	depends on !TEGRA_FPGA_PLATFORM
+	default n
 
 endif
 
 config TEGRA_CPU_DVFS
 	bool "Enable voltage scaling on Tegra CPU"
+	depends on !TEGRA_FPGA_PLATFORM
 	default y
 
 config TEGRA_CORE_DVFS
 	bool "Enable voltage scaling on Tegra core"
+	depends on !TEGRA_FPGA_PLATFORM
 	depends on TEGRA_CPU_DVFS
 	default y
 
@@ -142,20 +174,91 @@ config TEGRA_IOVMM_GART
 	  shared with the operating system into contiguous I/O virtual
 	  space through the GART hardware included on Tegra SoCs
 
+config TEGRA_IOVMM_SMMU
+	bool "Enable I/O virtual memory manager for SMMU"
+	depends on ARCH_TEGRA_3x_SOC
+	default y
+	select TEGRA_IOVMM
+	help
+	  Enables support for remapping discontiguous physical memory
+	  shared with the operating system into contiguous I/O virtual
+	  space through the SMMU hardware included on Tegra SoCs
+
 config TEGRA_IOVMM
 	bool
+
+config TEGRA_AVP_KERNEL_ON_MMU
+	bool "Use AVP MMU to relocate AVP kernel"
+	depends on ARCH_TEGRA_2x_SOC
+	default y
+	help
+	  Use AVP MMU to relocate AVP kernel (nvrm_avp.bin).
+
+config TEGRA_AVP_KERNEL_ON_SMMU
+	bool "Use SMMU to relocate AVP kernel"
+	depends on TEGRA_IOVMM_SMMU
+	default y
+	help
+	  Use SMMU to relocate AVP kernel (nvrm_avp.bin).
 
 config TEGRA_ARB_SEMAPHORE
 	bool
 
 config TEGRA_THERMAL_THROTTLE
-       bool "Enable throttling of CPU speed on overtemp"
-       depends on CPU_FREQ
-       default y
-       help
-         Also requires enabling a temperature sensor such as NCT1008.
+	bool "Enable throttling of CPU speed on overtemp"
+	depends on !TEGRA_FPGA_PLATFORM
+	depends on CPU_FREQ
+	default y
+	help
+	  Also requires enabling a temperature sensor such as NCT1008.
 
 config WIFI_CONTROL_FUNC
 	bool "Enable WiFi control function abstraction"
 	help
 	  Enables Power/Reset/Carddetect function abstraction
+
+config TEGRA_CLOCK_DEBUG_WRITE
+	bool "Enable debugfs write access to clock tree"
+	depends on DEBUG_FS
+	default n
+
+config TEGRA_AUTO_HOTPLUG
+	bool "Enable automatic CPU hot-plugging"
+	depends on HOTPLUG_CPU && CPU_FREQ && !ARCH_CPU_PROBE_RELEASE
+	default y
+	help
+	  This option enables turning CPUs off/on and switching tegra
+	  high/low power CPU clusters automatically, corresponding to
+	  CPU frequency scaling.
+
+config TEGRA_MC_PROFILE
+	tristate "Enable profiling memory controller utilization"
+	default n
+	help
+	  When enabled, provides a mechanism to perform statistical
+	  sampling of the memory controller usage on a client-by-client
+	  basis, and report the log through sysfs.
+
+config TEGRA_EDP_LIMITS
+	bool "Enforce electrical design limits"
+	depends on !TEGRA_FPGA_PLATFORM
+	depends on CPU_FREQ
+	default y if ARCH_TEGRA_3x_SOC
+	default n
+	help
+	  Limit maximum CPU frequency based on temperature and number
+	  of on-line CPUs to keep CPU rail current within power supply
+	  capabilities.
+
+config TEGRA_EMC_TO_DDR_CLOCK
+	int "EMC to DDR clocks ratio"
+	default "2" if ARCH_TEGRA_2x_SOC
+	default "1"
+
+config TEGRA_LEGACY_AUDIO
+	bool "Enable Tegra Legacy Audio APIs"
+	default n
+	help
+	  Say Y if you want to add support legacy (non-ALSA) audio APIs on
+	  Tegra. This will disable ALSA (ASoC) support.
+

@@ -3,7 +3,7 @@
  *
  * CPU idle driver for Tegra CPUs
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010-2011, NVIDIA Corporation.
  * Copyright (c) 2011 Google, Inc.
  * Author: Colin Cross <ccross@android.com>
  *         Gary King <gking@nvidia.com>
@@ -43,9 +43,6 @@
 #include "pm.h"
 #include "sleep.h"
 
-#define TEGRA_CPUIDLE_BOTH_IDLE		INT_QUAD_RES_24
-#define TEGRA_CPUIDLE_TEAR_DOWN		INT_QUAD_RES_25
-
 static bool lp2_in_idle __read_mostly = true;
 module_param(lp2_in_idle, bool, 0644);
 
@@ -61,14 +58,14 @@ static struct {
 	unsigned int last_lp2_int_count[NR_IRQS];
 } idle_stats;
 
+static unsigned int tegra_lp2_min_residency;
+
 struct cpuidle_driver tegra_idle = {
 	.name = "tegra_idle",
 	.owner = THIS_MODULE,
 };
 
 static DEFINE_PER_CPU(struct cpuidle_device *, idle_devices);
-
-#define CLK_RESET_CLK_MASK_ARM 0x44
 
 static inline unsigned int time_to_bin(unsigned int time)
 {
@@ -103,7 +100,6 @@ static int tegra_idle_enter_lp2(struct cpuidle_device *dev,
 	s64 us;
 
 	local_irq_disable();
-	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
 	enter = ktime_get();
 
 	idle_stats.cpu_ready_count[dev->cpu]++;
@@ -115,10 +111,14 @@ static int tegra_idle_enter_lp2(struct cpuidle_device *dev,
 	exit = ktime_sub(ktime_get(), enter);
 	us = ktime_to_us(exit);
 
-	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
 	local_irq_enable();
 
+	/* cpu clockevents may have been reset by powerdown */
+	hrtimer_peek_ahead_timers();
+
 	smp_rmb();
+	if (state->target_residency < tegra_lp2_min_residency)
+		state->target_residency = tegra_lp2_min_residency;
 
 	idle_stats.cpu_wants_lp2_time[dev->cpu] += us;
 
@@ -147,6 +147,8 @@ static int tegra_idle_enter(unsigned int cpu)
 	dev->state_count = 0;
 	dev->cpu = cpu;
 
+	tegra_lp2_min_residency = tegra_cpu_lp2_min_residency();
+
 	state = &dev->states[0];
 	snprintf(state->name, CPUIDLE_NAME_LEN, "LP3");
 	snprintf(state->desc, CPUIDLE_DESC_LEN, "CPU flow-controlled");
@@ -165,6 +167,8 @@ static int tegra_idle_enter(unsigned int cpu)
 
 	state->target_residency = tegra_cpu_power_off_time() +
 		tegra_cpu_power_good_time();
+	if (state->target_residency < tegra_lp2_min_residency)
+		state->target_residency = tegra_lp2_min_residency;
 	state->power_usage = 0;
 	state->flags = CPUIDLE_FLAG_TIME_VALID;
 	state->enter = tegra_idle_enter_lp2;
@@ -186,14 +190,7 @@ static int tegra_idle_enter(unsigned int cpu)
 static int __init tegra_cpuidle_init(void)
 {
 	unsigned int cpu;
-	void __iomem *mask_arm;
-	unsigned int reg;
 	int ret;
-
-	mask_arm = IO_ADDRESS(TEGRA_CLK_RESET_BASE) + CLK_RESET_CLK_MASK_ARM;
-
-	reg = readl(mask_arm);
-	writel(reg | (1<<31), mask_arm);
 
 	ret = cpuidle_register_driver(&tegra_idle);
 

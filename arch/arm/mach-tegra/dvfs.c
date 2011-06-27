@@ -5,6 +5,8 @@
  * Author:
  *	Colin Cross <ccross@google.com>
  *
+ * Copyright (C) 2010-2011 NVIDIA Corporation.
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -29,6 +31,7 @@
 #include <linux/slab.h>
 #include <linux/suspend.h>
 #include <linux/delay.h>
+#include <linux/reboot.h>
 
 #include <mach/clk.h>
 
@@ -105,6 +108,7 @@ static int dvfs_rail_set_voltage(struct dvfs_rail *rail, int millivolts)
 	if (rail->disabled)
 		return 0;
 
+	rail->resolving_to = true;
 	steps = DIV_ROUND_UP(abs(millivolts - rail->millivolts), rail->step);
 
 	for (i = 0; i < steps; i++) {
@@ -122,17 +126,19 @@ static int dvfs_rail_set_voltage(struct dvfs_rail *rail, int millivolts)
 		list_for_each_entry(rel, &rail->relationships_to, to_node) {
 			ret = dvfs_rail_update(rel->to);
 			if (ret)
-				return ret;
+				goto out;
 		}
 
 		if (!rail->disabled) {
+			rail->updating = true;
 			ret = regulator_set_voltage(rail->reg,
 				rail->new_millivolts * 1000,
 				rail->max_millivolts * 1000);
+			rail->updating = false;
 		}
 		if (ret) {
 			pr_err("Failed to set dvfs regulator %s\n", rail->reg_id);
-			return ret;
+			goto out;
 		}
 
 		rail->millivolts = rail->new_millivolts;
@@ -144,16 +150,18 @@ static int dvfs_rail_set_voltage(struct dvfs_rail *rail, int millivolts)
 		list_for_each_entry(rel, &rail->relationships_to, to_node) {
 			ret = dvfs_rail_update(rel->to);
 			if (ret)
-				return ret;
+				goto out;
 		}
 	}
 
 	if (unlikely(rail->millivolts != millivolts)) {
 		pr_err("%s: rail didn't reach target %d in %d steps (%d)\n",
 			__func__, millivolts, steps, rail->millivolts);
-		return -EINVAL;
+		ret = -EINVAL;
 	}
 
+out:
+	rail->resolving_to = false;
 	return ret;
 }
 
@@ -176,6 +184,11 @@ static int dvfs_rail_update(struct dvfs_rail *rail)
 	if (!rail->reg)
 		return 0;
 
+	/* if rail update is entered while resolving circular dependencies,
+	   abort recursion */
+	if (rail->resolving_to)
+		return 0;
+
 	/* Find the maximum voltage requested by any clock */
 	list_for_each_entry(d, &rail->dvfs, reg_node)
 		millivolts = max(d->cur_millivolts, millivolts);
@@ -195,15 +208,23 @@ static int dvfs_rail_update(struct dvfs_rail *rail)
 static int dvfs_rail_connect_to_regulator(struct dvfs_rail *rail)
 {
 	struct regulator *reg;
+	int v;
 
 	if (!rail->reg) {
 		reg = regulator_get(NULL, rail->reg_id);
 		if (IS_ERR(reg))
 			return -EINVAL;
+		rail->reg = reg;
 	}
 
-	rail->reg = reg;
-
+	v = regulator_get_voltage(rail->reg);
+	if (v < 0) {
+		pr_err("tegra_dvfs: failed initial get %s voltage\n",
+		       rail->reg_id);
+		return v;
+	}
+	rail->millivolts = v / 1000;
+	rail->new_millivolts = rail->millivolts;
 	return 0;
 }
 
@@ -229,6 +250,12 @@ __tegra_dvfs_set_rate(struct dvfs *d, unsigned long rate)
 			i++;
 
 		d->cur_millivolts = d->millivolts[i];
+		if ((d->max_millivolts) &&
+		    (d->cur_millivolts > d->max_millivolts)) {
+			pr_warn("tegra_dvfs: voltage %d too high for dvfs on"
+				" %s\n", d->cur_millivolts, d->clk_name);
+			return -EINVAL;
+		}
 	}
 
 	d->cur_rate = rate;
@@ -307,13 +334,14 @@ static bool tegra_dvfs_all_rails_suspended(void)
 	return all_suspended;
 }
 
-static bool tegra_dvfs_from_rails_suspended(struct dvfs_rail *to)
+static bool tegra_dvfs_from_rails_suspended_or_solved(struct dvfs_rail *to)
 {
 	struct dvfs_relationship *rel;
 	bool all_suspended = true;
 
 	list_for_each_entry(rel, &to->relationships_from, from_node)
-		if (!rel->from->suspended && !rel->from->disabled)
+		if (!rel->from->suspended && !rel->from->disabled &&
+			!rel->solved_at_nominal)
 			all_suspended = false;
 
 	return all_suspended;
@@ -326,7 +354,7 @@ static int tegra_dvfs_suspend_one(void)
 
 	list_for_each_entry(rail, &dvfs_rail_list, node) {
 		if (!rail->suspended && !rail->disabled &&
-		    tegra_dvfs_from_rails_suspended(rail)) {
+		    tegra_dvfs_from_rails_suspended_or_solved(rail)) {
 			ret = dvfs_rail_set_voltage(rail,
 				rail->nominal_millivolts);
 			if (ret)
@@ -394,6 +422,23 @@ static struct notifier_block tegra_dvfs_nb = {
 	.notifier_call = tegra_dvfs_pm_notify,
 };
 
+static int tegra_dvfs_reboot_notify(struct notifier_block *nb,
+				unsigned long event, void *data)
+{
+	switch (event) {
+	case SYS_RESTART:
+	case SYS_HALT:
+	case SYS_POWER_OFF:
+		tegra_dvfs_suspend();
+		return NOTIFY_OK;
+	}
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block tegra_dvfs_reboot_nb = {
+	.notifier_call = tegra_dvfs_reboot_notify,
+};
+
 /* must be called with dvfs lock held */
 static void __tegra_dvfs_rail_disable(struct dvfs_rail *rail)
 {
@@ -452,6 +497,14 @@ out:
 	return ret;
 }
 
+bool tegra_dvfs_rail_updating(struct clk *clk)
+{
+	return (!clk ? false :
+		(!clk->dvfs ? false :
+		 (!clk->dvfs->dvfs_rail ? false :
+		  (clk->dvfs->dvfs_rail->updating))));
+}
+
 /*
  * Iterate through all the dvfs regulators, finding the regulator exported
  * by the regulator api for each one.  Must be called in late init, after
@@ -472,6 +525,7 @@ int __init tegra_dvfs_late_init(void)
 	mutex_unlock(&dvfs_lock);
 
 	register_pm_notifier(&tegra_dvfs_nb);
+	register_reboot_notifier(&tegra_dvfs_reboot_nb);
 
 	return 0;
 }

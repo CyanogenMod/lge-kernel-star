@@ -1,7 +1,8 @@
 /*
- * arch/arm/mach-tegra/fuse.c
+ * arch/arm/mach-tegra/fuse.h
  *
  * Copyright (C) 2010 Google, Inc.
+ * Copyright (C) 2010-2011 NVIDIA Corp.
  *
  * Author:
  *	Colin Cross <ccross@android.com>
@@ -17,19 +18,49 @@
  *
  */
 
+enum tegra_chipid {
+	TEGRA_CHIPID_UNKNOWN = 0,
+	TEGRA_CHIPID_TEGRA2 = 0x20,
+	TEGRA_CHIPID_TEGRA3 = 0x30,
+};
+
 enum tegra_revision {
 	TEGRA_REVISION_UNKNOWN = 0,
+	TEGRA_REVISION_A01,
 	TEGRA_REVISION_A02,
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 	TEGRA_REVISION_A03,
 	TEGRA_REVISION_A03p,
+#endif
 	TEGRA_REVISION_MAX,
 };
 
+#define INVALID_PROCESS_ID	99 /* don't expect to have 100 process id's */
+
 unsigned long long tegra_chip_uid(void);
+unsigned int tegra_spare_fuse(int bit);
 int tegra_sku_id(void);
-int tegra_cpu_process_id(void);
-int tegra_core_process_id(void);
 void tegra_init_fuse(void);
 u32 tegra_fuse_readl(unsigned long offset);
 void tegra_fuse_writel(u32 value, unsigned long offset);
+enum tegra_chipid tegra_get_chipid(void);
 enum tegra_revision tegra_get_revision(void);
+const char *tegra_get_revision_name(void);
+
+#ifndef CONFIG_TEGRA_FPGA_PLATFORM
+
+int tegra_cpu_process_id(void);
+int tegra_core_process_id(void);
+int tegra_cpu_speedo_id(void);
+int tegra_soc_speedo_id(void);
+void tegra_init_speedo_data(void);
+
+#else /* CONFIG_TEGRA_FPGA_PLATFORM */
+
+static inline int tegra_cpu_process_id(void) { return 0; }
+static inline int tegra_core_process_id(void) { return 0; }
+static inline int tegra_cpu_speedo_id(void) { return 0; }
+static inline int tegra_soc_speedo_id(void) { return 0; }
+static inline void tegra_init_speedo_data(void) { }
+
+#endif /* CONFIG_TEGRA_FPGA_PLATFORM */

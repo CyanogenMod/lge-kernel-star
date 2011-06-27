@@ -24,7 +24,8 @@
 #define __MACH_TEGRA_ARB_SEMA_H
 
 enum tegra_arb_module {
-	TEGRA_ARB_AES = 0,
+	TEGRA_ARB_BSEV = 0,
+	TEGRA_ARB_BSEA,
 };
 
 int tegra_arb_mutex_lock_timeout(enum tegra_arb_module lock, int msecs);

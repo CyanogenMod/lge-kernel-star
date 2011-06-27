@@ -96,6 +96,51 @@ static char *tegra_mux_names[TEGRA_MAX_MUX] = {
 	[TEGRA_MUX_VI] = "VI",
 	[TEGRA_MUX_VI_SENSOR_CLK] = "VI_SENSOR_CLK",
 	[TEGRA_MUX_XIO] = "XIO",
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	[TEGRA_MUX_BLINK] = "BLINK",
+	[TEGRA_MUX_CEC] = "CEC",
+	[TEGRA_MUX_CLK12] = "CLK12",
+	[TEGRA_MUX_DAP] = "DAP",
+	[TEGRA_MUX_DAPSDMMC2] = "DAPSDMMC2",
+	[TEGRA_MUX_DDR] = "DDR",
+	[TEGRA_MUX_DEV3] = "DEV3",
+	[TEGRA_MUX_DTV] = "DTV",
+	[TEGRA_MUX_VI_ALT1] = "VI_ALT1",
+	[TEGRA_MUX_VI_ALT2] = "VI_ALT2",
+	[TEGRA_MUX_VI_ALT3] = "VI_ALT3",
+	[TEGRA_MUX_EMC_DLL] = "EMC_DLL",
+	[TEGRA_MUX_EXTPERIPH1] = "EXTPERIPH1",
+	[TEGRA_MUX_EXTPERIPH2] = "EXTPERIPH2",
+	[TEGRA_MUX_EXTPERIPH3] = "EXTPERIPH3",
+	[TEGRA_MUX_GMI_ALT] = "GMI_ALT",
+	[TEGRA_MUX_HDA] = "HDA",
+	[TEGRA_MUX_HSI] = "HSI",
+	[TEGRA_MUX_I2C4] = "I2C4",
+	[TEGRA_MUX_I2C5] = "I2C5",
+	[TEGRA_MUX_I2CPWR] = "I2CPWR",
+	[TEGRA_MUX_I2S0] = "I2S0",
+	[TEGRA_MUX_I2S1] = "I2S1",
+	[TEGRA_MUX_I2S2] = "I2S2",
+	[TEGRA_MUX_I2S3] = "I2S3",
+	[TEGRA_MUX_I2S4] = "I2S4",
+	[TEGRA_MUX_NAND_ALT] = "NAND_ALT",
+	[TEGRA_MUX_POPSDIO4] = "POPSDIO4",
+	[TEGRA_MUX_POPSDMMC4] = "POPSDMMC4",
+	[TEGRA_MUX_PWM0] = "PWM0",
+	[TEGRA_MUX_PWM1] = "PWM1",
+	[TEGRA_MUX_PWM2] = "PWM2",
+	[TEGRA_MUX_PWM3] = "PWM3",
+	[TEGRA_MUX_SATA] = "SATA",
+	[TEGRA_MUX_SPI5] = "SPI5",
+	[TEGRA_MUX_SPI6] = "SPI6",
+	[TEGRA_MUX_SYSCLK] = "SYSCLK",
+	[TEGRA_MUX_VGP1] = "VGP1",
+	[TEGRA_MUX_VGP2] = "VGP2",
+	[TEGRA_MUX_VGP3] = "VGP3",
+	[TEGRA_MUX_VGP4] = "VGP4",
+	[TEGRA_MUX_VGP5] = "VGP5",
+	[TEGRA_MUX_VGP6] = "VGP6",
+#endif
 	[TEGRA_MUX_SAFE] = "<safe>",
 };
 
@@ -140,6 +185,9 @@ static const char *func_name(enum tegra_mux_func func)
 	if (func == TEGRA_MUX_NONE)
 		return "NONE";
 
+	if (func == TEGRA_MUX_INVALID)
+		return "INVALID";
+
 	if (func < 0 || func >=  TEGRA_MAX_MUX)
 		return "<UNKNOWN>";
 
@@ -169,15 +217,78 @@ static const char *pupd_name(unsigned long val)
 	}
 }
 
+static const char *lock_name(unsigned long val)
+{
+	switch(val) {
+	case TEGRA_PIN_LOCK_DEFAULT:
+		return "LOCK_DEFUALT";
+
+	case TEGRA_PIN_LOCK_DISABLE:
+		return "LOCK_DISABLE";
+
+	case TEGRA_PIN_LOCK_ENABLE:
+		return "LOCK_ENABLE";
+	default:
+		return "LOCK_DEFAULT";
+	}
+}
+
+static const char *od_name(unsigned long val)
+{
+	switch(val) {
+	case TEGRA_PIN_OD_DEFAULT:
+		return "OD_DEFAULT";
+
+	case TEGRA_PIN_OD_DISABLE:
+		return "OD_DISABLE";
+
+	case TEGRA_PIN_OD_ENABLE:
+		return "OD_ENABLE";
+	default:
+		return "OD_DEFAULT";
+	}
+}
+
+static const char *ioreset_name(unsigned long val)
+{
+	switch(val) {
+	case TEGRA_PIN_IO_RESET_DEFAULT:
+		return "IO_RESET_DEFAULT";
+
+	case TEGRA_PIN_IO_RESET_DISABLE:
+		return "IO_RESET_DISABLE";
+
+	case TEGRA_PIN_IO_RESET_ENABLE:
+		return "IO_RESET_ENABLE";
+	default:
+		return "IO_RESET_DEFAULT";
+	}
+}
+
+#if defined(TEGRA_PINMUX_HAS_IO_DIRECTION)
+static const char *io_name(unsigned long val)
+{
+	switch (val) {
+	case 0:
+		return "OUTPUT";
+
+	case 1:
+		return "INPUT";
+
+	default:
+		return "RSVD";
+	}
+}
+#endif
 
 static inline unsigned long pg_readl(unsigned long offset)
 {
-	return readl(IO_TO_VIRT(TEGRA_APB_MISC_BASE + offset));
+	return readl(IO_TO_VIRT(TEGRA_APB_MISC_BASE) + offset);
 }
 
 static inline void pg_writel(unsigned long value, unsigned long offset)
 {
-	writel(value, IO_TO_VIRT(TEGRA_APB_MISC_BASE + offset));
+	writel(value, IO_TO_VIRT(TEGRA_APB_MISC_BASE) + offset);
 }
 
 static int tegra_pinmux_set_func(const struct tegra_pingroup_config *config)
@@ -194,6 +305,13 @@ static int tegra_pinmux_set_func(const struct tegra_pingroup_config *config)
 
 	if (pingroups[pg].mux_reg < 0)
 		return -EINVAL;
+
+	if (func == TEGRA_MUX_INVALID) {
+		pr_err("The pingroup %s is not recommended for option %s\n",
+				pingroup_name(pg), func_name(func));
+		WARN_ON(1);
+		return -EINVAL;
+	}
 
 	if (func < 0)
 		return -ERANGE;
@@ -220,11 +338,37 @@ static int tegra_pinmux_set_func(const struct tegra_pingroup_config *config)
 	reg = pg_readl(pingroups[pg].mux_reg);
 	reg &= ~(0x3 << pingroups[pg].mux_bit);
 	reg |= mux << pingroups[pg].mux_bit;
+#if defined(TEGRA_PINMUX_HAS_IO_DIRECTION)
+	reg &= ~(0x1 << 5);
+	reg |= ((config->io & 0x1) << 5);
+#endif
 	pg_writel(reg, pingroups[pg].mux_reg);
 
 	spin_unlock_irqrestore(&mux_lock, flags);
 
 	return 0;
+}
+
+int tegra_pinmux_get_func(enum tegra_pingroup pg)
+{
+	int mux = -1;
+	unsigned long reg;
+	unsigned long flags;
+
+	if (pg < 0 || pg >=  TEGRA_MAX_PINGROUP)
+		return -ERANGE;
+
+	if (pingroups[pg].mux_reg < 0)
+		return -EINVAL;
+
+	spin_lock_irqsave(&mux_lock, flags);
+
+	reg = pg_readl(pingroups[pg].mux_reg);
+	mux = (reg >> pingroups[pg].mux_bit) & 0x3;
+
+	spin_unlock_irqrestore(&mux_lock, flags);
+
+	return mux;
 }
 
 int tegra_pinmux_set_tristate(enum tegra_pingroup pg,
@@ -251,6 +395,94 @@ int tegra_pinmux_set_tristate(enum tegra_pingroup pg,
 
 	return 0;
 }
+
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+static int tegra_pinmux_set_lock(enum tegra_pingroup pg,
+	enum tegra_pin_lock lock)
+{
+	unsigned long reg;
+	unsigned long flags;
+
+	if (pg < 0 || pg >=  TEGRA_MAX_PINGROUP)
+		return -ERANGE;
+
+	if (pingroups[pg].mux_reg < 0)
+		return -EINVAL;
+
+	if ((lock == TEGRA_PIN_LOCK_DEFAULT) || (pingroups[pg].lock_bit < 0))
+		return 0;
+
+	spin_lock_irqsave(&mux_lock, flags);
+
+	reg = pg_readl(pingroups[pg].mux_reg);
+	reg &= ~(0x1 << pingroups[pg].lock_bit);
+	if (lock == TEGRA_PIN_LOCK_ENABLE)
+		reg |= (0x1 << pingroups[pg].lock_bit);
+
+	pg_writel(reg, pingroups[pg].mux_reg);
+
+	spin_unlock_irqrestore(&mux_lock, flags);
+	return 0;
+}
+
+static int tegra_pinmux_set_od(enum tegra_pingroup pg,
+	enum tegra_pin_od od)
+{
+	unsigned long reg;
+	unsigned long flags;
+
+	if (pg < 0 || pg >=  TEGRA_MAX_PINGROUP)
+		return -ERANGE;
+
+	if (pingroups[pg].mux_reg < 0)
+		return -EINVAL;
+
+	if ((od == TEGRA_PIN_OD_DEFAULT) || (pingroups[pg].od_bit < 0))
+		return 0;
+
+	spin_lock_irqsave(&mux_lock, flags);
+
+	reg = pg_readl(pingroups[pg].mux_reg);
+	reg &= ~(0x1 << pingroups[pg].od_bit);
+	if (od == TEGRA_PIN_OD_ENABLE)
+		reg |= 1 << pingroups[pg].od_bit;
+
+	pg_writel(reg, pingroups[pg].mux_reg);
+
+	spin_unlock_irqrestore(&mux_lock, flags);
+
+	return 0;
+}
+
+static int tegra_pinmux_set_ioreset(enum tegra_pingroup pg,
+	enum tegra_pin_ioreset ioreset)
+{
+	unsigned long reg;
+	unsigned long flags;
+
+	if (pg < 0 || pg >=  TEGRA_MAX_PINGROUP)
+		return -ERANGE;
+
+	if (pingroups[pg].mux_reg < 0)
+		return -EINVAL;
+
+	if ((ioreset == TEGRA_PIN_IO_RESET_DEFAULT) || (pingroups[pg].ioreset_bit < 0))
+		return 0;
+
+	spin_lock_irqsave(&mux_lock, flags);
+
+	reg = pg_readl(pingroups[pg].mux_reg);
+	reg &= ~(0x1 << pingroups[pg].ioreset_bit);
+	if (ioreset == TEGRA_PIN_IO_RESET_ENABLE)
+		reg |= 1 << pingroups[pg].ioreset_bit;
+
+	pg_writel(reg, pingroups[pg].mux_reg);
+
+	spin_unlock_irqrestore(&mux_lock, flags);
+
+	return 0;
+}
+#endif
 
 int tegra_pinmux_set_pullupdown(enum tegra_pingroup pg,
 	enum tegra_pullupdown pupd)
@@ -288,6 +520,11 @@ static void tegra_pinmux_config_pingroup(const struct tegra_pingroup_config *con
 	enum tegra_mux_func func     = config->func;
 	enum tegra_pullupdown pupd   = config->pupd;
 	enum tegra_tristate tristate = config->tristate;
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+	enum tegra_pin_lock lock     = config->lock;
+	enum tegra_pin_od od         = config->od;
+	enum tegra_pin_ioreset ioreset = config->ioreset;
+#endif
 	int err;
 
 	if (pingroups[pingroup].mux_reg >= 0) {
@@ -310,6 +547,29 @@ static void tegra_pinmux_config_pingroup(const struct tegra_pingroup_config *con
 			pr_err("pinmux: can't set pingroup %s tristate to %s: %d\n",
 			       pingroup_name(pingroup), tri_name(func), err);
 	}
+
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+	if (pingroups[pingroup].mux_reg >= 0) {
+		err = tegra_pinmux_set_lock(pingroup, lock);
+		if (err < 0)
+			pr_err("pinmux: can't set pingroup %s lock to %s: %d\n",
+			       pingroup_name(pingroup), lock_name(func), err);
+	}
+
+	if (pingroups[pingroup].mux_reg >= 0) {
+		err = tegra_pinmux_set_od(pingroup, od);
+		if (err < 0)
+			pr_err("pinmux: can't set pingroup %s od to %s: %d\n",
+			       pingroup_name(pingroup), od_name(func), err);
+	}
+
+	if (pingroups[pingroup].mux_reg >= 0) {
+		err = tegra_pinmux_set_ioreset(pingroup, ioreset);
+		if (err < 0)
+			pr_err("pinmux: can't set pingroup %s ioreset to %s: %d\n",
+			       pingroup_name(pingroup), ioreset_name(func), err);
+	}
+#endif
 }
 
 void tegra_pinmux_config_table(const struct tegra_pingroup_config *config, int len)
@@ -459,8 +719,8 @@ static int tegra_drive_pinmux_set_pull_up(enum tegra_drive_pingroup pg,
 	spin_lock_irqsave(&mux_lock, flags);
 
 	reg = pg_readl(drive_pingroups[pg].reg);
-	reg &= ~(0x1f << 12);
-	reg |= pull_up << 12;
+	reg &= ~(0x1f << 20);
+	reg |= pull_up << 20;
 	pg_writel(reg, drive_pingroups[pg].reg);
 
 	spin_unlock_irqrestore(&mux_lock, flags);
@@ -665,11 +925,6 @@ void tegra_pinmux_config_pullupdown_table(const struct tegra_pingroup_config *co
 	}
 }
 
-void tegra_init_pinmux(void)
-{
-	tegra2_init_pinmux();
-}
-
 #ifdef	CONFIG_DEBUG_FS
 
 #include <linux/debugfs.h>
@@ -695,7 +950,7 @@ static int dbg_pinmux_show(struct seq_file *s, void *unused)
 
 		seq_printf(s, "\t{TEGRA_PINGROUP_%s", pingroups[i].name);
 		len = strlen(pingroups[i].name);
-		dbg_pad_field(s, 5 - len);
+		dbg_pad_field(s, 15 - len);
 
 		if (pingroups[i].mux_reg < 0) {
 			seq_printf(s, "TEGRA_MUX_NONE");
@@ -703,10 +958,15 @@ static int dbg_pinmux_show(struct seq_file *s, void *unused)
 		} else {
 			mux = (pg_readl(pingroups[i].mux_reg) >>
 			       pingroups[i].mux_bit) & 0x3;
-			if (pingroups[i].funcs[mux] == TEGRA_MUX_RSVD) {
+			BUG_ON(pingroups[i].funcs[mux] == 0);
+			if (pingroups[i].funcs[mux] ==  TEGRA_MUX_INVALID) {
+				seq_printf(s, "TEGRA_MUX_INVALID");
+				len = 7;
+			} else if (pingroups[i].funcs[mux] & TEGRA_MUX_RSVD) {
 				seq_printf(s, "TEGRA_MUX_RSVD%1lu", mux+1);
 				len = 5;
 			} else {
+				BUG_ON(!tegra_mux_names[pingroups[i].funcs[mux]]);
 				seq_printf(s, "TEGRA_MUX_%s",
 					   tegra_mux_names[pingroups[i].funcs[mux]]);
 				len = strlen(tegra_mux_names[pingroups[i].funcs[mux]]);
@@ -714,6 +974,15 @@ static int dbg_pinmux_show(struct seq_file *s, void *unused)
 		}
 		dbg_pad_field(s, 13-len);
 
+#if defined(TEGRA_PINMUX_HAS_IO_DIRECTION)
+		{
+			unsigned long io;
+			io = (pg_readl(pingroups[i].mux_reg) >> 5) & 0x1;
+			seq_printf(s, "TEGRA_PIN_%s", io_name(io));
+			len = strlen(io_name(io));
+			dbg_pad_field(s, 6 - len);
+		}
+#endif
 		if (pingroups[i].pupd_reg < 0) {
 			seq_printf(s, "TEGRA_PUPD_NORMAL");
 			len = strlen("NORMAL");

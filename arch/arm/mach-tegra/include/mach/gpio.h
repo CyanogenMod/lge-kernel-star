@@ -24,6 +24,7 @@
 #include <mach/irqs.h>
 
 #define TEGRA_NR_GPIOS		INT_GPIO_NR
+#define ARCH_NR_GPIOS		(TEGRA_NR_GPIOS + 128)
 
 #include <asm-generic/gpio.h>
 
@@ -36,16 +37,23 @@
 
 static inline int gpio_to_irq(unsigned int gpio)
 {
+	/* SOC gpio */
 	if (gpio < TEGRA_NR_GPIOS)
 		return INT_GPIO_BASE + gpio;
-	return -EINVAL;
+
+	/* For non soc gpio, the external peripheral driver need to
+	 * provide the implementation */
+	return __gpio_to_irq(gpio);
 }
 
 static inline int irq_to_gpio(unsigned int irq)
 {
+	/* SOC gpio */
 	if ((irq >= INT_GPIO_BASE) && (irq < INT_GPIO_BASE + INT_GPIO_NR))
 		return irq - INT_GPIO_BASE;
-	return -EINVAL;
+
+	/* we don't supply reverse mappings for non-SOC gpios */
+	return -EIO;
 }
 
 struct tegra_gpio_table {

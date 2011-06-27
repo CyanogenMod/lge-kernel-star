@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/include/mach/dma.h
  *
- * Copyright (c) 2008-2009, NVIDIA Corporation.
+ * Copyright (c) 2008-2010, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -30,9 +30,13 @@ struct tegra_dma_channel;
 
 #define TEGRA_DMA_REQ_SEL_CNTR			0
 #define TEGRA_DMA_REQ_SEL_I2S_2			1
+#define TEGRA_DMA_REQ_SEL_APBIF_CH0		TEGRA_DMA_REQ_SEL_I2S_2
 #define TEGRA_DMA_REQ_SEL_I2S_1			2
+#define TEGRA_DMA_REQ_SEL_APBIF_CH1		TEGRA_DMA_REQ_SEL_I2S_1
 #define TEGRA_DMA_REQ_SEL_SPD_I			3
+#define TEGRA_DMA_REQ_SEL_APBIF_CH2		TEGRA_DMA_REQ_SEL_SPD_I
 #define TEGRA_DMA_REQ_SEL_UI_I			4
+#define TEGRA_DMA_REQ_SEL_APBIF_CH3		TEGRA_DMA_REQ_SEL_UI_I
 #define TEGRA_DMA_REQ_SEL_MIPI			5
 #define TEGRA_DMA_REQ_SEL_I2S2_2		6
 #define TEGRA_DMA_REQ_SEL_I2S2_1		7
@@ -40,6 +44,7 @@ struct tegra_dma_channel;
 #define TEGRA_DMA_REQ_SEL_UARTB			9
 #define TEGRA_DMA_REQ_SEL_UARTC			10
 #define TEGRA_DMA_REQ_SEL_SPI			11
+#define TEGRA_DMA_REQ_SEL_DTV			TEGRA_DMA_REQ_SEL_SPI
 #define TEGRA_DMA_REQ_SEL_AC97			12
 #define TEGRA_DMA_REQ_SEL_ACMODEM		13
 #define TEGRA_DMA_REQ_SEL_SL4B			14
@@ -54,6 +59,10 @@ struct tegra_dma_channel;
 #define TEGRA_DMA_REQ_SEL_I2C3			23
 #define TEGRA_DMA_REQ_SEL_DVC_I2C		24
 #define TEGRA_DMA_REQ_SEL_OWR			25
+#define TEGRA_DMA_REQ_SEL_OWR			25
+#define TEGRA_DMA_REQ_SEL_I2C4			26
+#define TEGRA_DMA_REQ_SEL_SL2B5			27
+#define TEGRA_DMA_REQ_SEL_SL2B6			28
 #define TEGRA_DMA_REQ_SEL_INVALID		31
 
 #define TEGRA_DMA_MAX_TRANSFER_SIZE		0x10000
@@ -147,10 +156,12 @@ void tegra_dma_flush(struct tegra_dma_channel *ch);
 
 bool tegra_dma_is_req_inflight(struct tegra_dma_channel *ch,
 	struct tegra_dma_req *req);
+int tegra_dma_get_transfer_count(struct tegra_dma_channel *ch,
+			struct tegra_dma_req *req, bool is_stop_dma);
 bool tegra_dma_is_empty(struct tegra_dma_channel *ch);
 bool tegra_dma_is_stopped(struct tegra_dma_channel *ch);
 
-struct tegra_dma_channel *tegra_dma_allocate_channel(int mode);
+struct tegra_dma_channel *tegra_dma_allocate_channel(int mode, const char namefmt [ ],...);
 void tegra_dma_free_channel(struct tegra_dma_channel *ch);
 int tegra_dma_cancel(struct tegra_dma_channel *ch);
 

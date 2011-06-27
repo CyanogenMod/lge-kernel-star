@@ -5,6 +5,8 @@
  * Author:
  *	Colin Cross <ccross@google.com>
  *
+ * Copyright (C) 2010-2011 NVIDIA Corporation
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -26,12 +28,16 @@
 #include <linux/module.h>
 #include <linux/seq_file.h>
 #include <linux/slab.h>
+#include <linux/uaccess.h>
+#include <trace/events/power.h>
 
 #include <mach/clk.h>
 
 #include "board.h"
 #include "clock.h"
 #include "dvfs.h"
+
+#define DISABLE_BOOT_CLOCKS 1
 
 /*
  * Locking:
@@ -60,16 +66,12 @@
  *     clk_get_rate_all_locked.
  *
  * Within a single clock, no clock operation can call another clock operation
- * on itself, except for clk_get_rate_locked and clk_set_rate_locked.  Any
- * clock operation can call any other clock operation on any of it's possible
- * parents.
+ * on itself, except for clk_xxx_locked.  Any clock operation can call any other
+ * clock operation on any of it's possible parents.
  *
  * clk_set_cansleep is used to mark a clock as sleeping.  It is called during
  * dvfs (Dynamic Voltage and Frequency Scaling) init on any clock that has a
- * dvfs requirement.  It can only be called on clocks that are the sole parent
- * of all of their child clocks, meaning the child clock can not be reparented
- * onto a different, possibly non-sleeping, clock.  This is inherently true
- * of all leaf clocks in the clock tree
+ * dvfs requirement, and propagated to all possible children of sleeping clock.
  *
  * An additional mutex, clock_list_lock, is used to protect the list of all
  * clocks.
@@ -77,6 +79,10 @@
  * The clock operations must lock internally to protect against
  * read-modify-write on registers that are shared by multiple clocks
  */
+
+/* FIXME: remove and never ignore overclock */
+#define IGNORE_PARENT_OVERCLOCK 0
+
 static DEFINE_MUTEX(clock_list_lock);
 static LIST_HEAD(clocks);
 
@@ -95,6 +101,18 @@ struct clk *tegra_get_clock_by_name(const char *name)
 	return ret;
 }
 
+static void clk_stats_update(struct clk *c)
+{
+	u64 cur_jiffies = get_jiffies_64();
+
+	if (c->refcnt) {
+		c->stats.time_on = cputime64_add(c->stats.time_on,
+			cputime64_sub(cur_jiffies, c->stats.last_update));
+	}
+
+	c->stats.last_update = cur_jiffies;
+}
+
 /* Must be called with clk_lock(c) held */
 static unsigned long clk_predict_rate_from_parent(struct clk *c, struct clk *p)
 {
@@ -109,6 +127,16 @@ static unsigned long clk_predict_rate_from_parent(struct clk *c, struct clk *p)
 	}
 
 	return rate;
+}
+
+unsigned long clk_get_max_rate(struct clk *c)
+{
+		return c->max_rate;
+}
+
+unsigned long clk_get_min_rate(struct clk *c)
+{
+		return c->min_rate;
 }
 
 /* Must be called with clk_lock(c) held */
@@ -142,19 +170,27 @@ EXPORT_SYMBOL(clk_get_rate);
 static void __clk_set_cansleep(struct clk *c)
 {
 	struct clk *child;
+	int i;
 	BUG_ON(mutex_is_locked(&c->mutex));
 	BUG_ON(spin_is_locked(&c->spinlock));
 
+	/* Make sure that all possible descendants of sleeping clock are
+	   marked as sleeping (to eliminate "sleeping parent - non-sleeping
+	   child" relationship */
 	list_for_each_entry(child, &clocks, node) {
-		if (child->parent != c)
-			continue;
+		bool possible_parent = (child->parent == c);
 
-		WARN(child->ops && child->ops->set_parent,
-			"can't make child clock %s of %s "
-			"sleepable if it's parent could change",
-			child->name, c->name);
+		if (!possible_parent && child->inputs) {
+			for (i = 0; child->inputs[i].input; i++) {
+				if (child->inputs[i].input == c) {
+					possible_parent = true;
+					break;
+				}
+			}
+		}
 
-		__clk_set_cansleep(child);
+		if (possible_parent)
+			__clk_set_cansleep(child);
 	}
 
 	c->cansleep = true;
@@ -190,11 +226,48 @@ void clk_init(struct clk *c)
 		else
 			c->state = ON;
 	}
+	c->stats.last_update = get_jiffies_64();
 
 	mutex_lock(&clock_list_lock);
 	list_add(&c->node, &clocks);
 	mutex_unlock(&clock_list_lock);
 }
+
+static int clk_enable_locked(struct clk *c)
+{
+	int ret = 0;
+
+	if (clk_is_auto_dvfs(c)) {
+		ret = tegra_dvfs_set_rate(c, clk_get_rate_locked(c));
+		if (ret)
+			return ret;
+	}
+
+	if (c->refcnt == 0) {
+		if (c->parent) {
+			ret = clk_enable(c->parent);
+			if (ret)
+				return ret;
+		}
+
+		if (c->ops && c->ops->enable) {
+			ret = c->ops->enable(c);
+			trace_clock_enable(c->name, 1, 0);
+			if (ret) {
+				if (c->parent)
+					clk_disable(c->parent);
+				return ret;
+			}
+			c->state = ON;
+			c->set = true;
+		}
+		clk_stats_update(c);
+	}
+	c->refcnt++;
+
+	return ret;
+}
+
 
 int clk_enable(struct clk *c)
 {
@@ -202,63 +275,41 @@ int clk_enable(struct clk *c)
 	unsigned long flags;
 
 	clk_lock_save(c, &flags);
-
-	if (clk_is_auto_dvfs(c)) {
-		ret = tegra_dvfs_set_rate(c, clk_get_rate_locked(c));
-		if (ret)
-			goto out;
-	}
-
-	if (c->refcnt == 0) {
-		if (c->parent) {
-			ret = clk_enable(c->parent);
-			if (ret)
-				goto out;
-		}
-
-		if (c->ops && c->ops->enable) {
-			ret = c->ops->enable(c);
-			if (ret) {
-				if (c->parent)
-					clk_disable(c->parent);
-				goto out;
-			}
-			c->state = ON;
-			c->set = true;
-		}
-	}
-	c->refcnt++;
-out:
+	ret = clk_enable_locked(c);
 	clk_unlock_restore(c, &flags);
 	return ret;
 }
 EXPORT_SYMBOL(clk_enable);
+
+static void clk_disable_locked(struct clk *c)
+{
+	if (c->refcnt == 0) {
+		WARN(1, "Attempting to disable clock %s with refcnt 0", c->name);
+		return;
+	}
+	if (c->refcnt == 1) {
+		if (c->ops && c->ops->disable) {
+			trace_clock_disable(c->name, 0, 0);
+			c->ops->disable(c);
+		}
+		if (c->parent)
+			clk_disable(c->parent);
+
+		c->state = OFF;
+		clk_stats_update(c);
+	}
+	c->refcnt--;
+
+	if (clk_is_auto_dvfs(c) && c->refcnt == 0)
+		tegra_dvfs_set_rate(c, 0);
+}
 
 void clk_disable(struct clk *c)
 {
 	unsigned long flags;
 
 	clk_lock_save(c, &flags);
-
-	if (c->refcnt == 0) {
-		WARN(1, "Attempting to disable clock %s with refcnt 0", c->name);
-		clk_unlock_restore(c, &flags);
-		return;
-	}
-	if (c->refcnt == 1) {
-		if (c->ops && c->ops->disable)
-			c->ops->disable(c);
-
-		if (c->parent)
-			clk_disable(c->parent);
-
-		c->state = OFF;
-	}
-	c->refcnt--;
-
-	if (clk_is_auto_dvfs(c) && c->refcnt == 0)
-		tegra_dvfs_set_rate(c, 0);
-
+	clk_disable_locked(c);
 	clk_unlock_restore(c, &flags);
 }
 EXPORT_SYMBOL(clk_disable);
@@ -269,6 +320,7 @@ int clk_set_parent(struct clk *c, struct clk *parent)
 	unsigned long flags;
 	unsigned long new_rate;
 	unsigned long old_rate;
+	bool disable = false;
 
 	clk_lock_save(c, &flags);
 
@@ -279,6 +331,30 @@ int clk_set_parent(struct clk *c, struct clk *parent)
 
 	new_rate = clk_predict_rate_from_parent(c, parent);
 	old_rate = clk_get_rate_locked(c);
+
+	if (new_rate > clk_get_max_rate(c)) {
+
+		pr_err("Failed to set parent %s for %s (violates clock limit"
+		       " %lu)\n", parent->name, c->name, clk_get_max_rate(c));
+#if !IGNORE_PARENT_OVERCLOCK
+		ret = -EINVAL;
+		goto out;
+#endif
+	}
+
+	/* The new clock control register setting does not take effect if
+	 * clock is disabled. Later, when the clock is enabled it would run
+	 * for several cycles on the old parent, which may hang h/w if the
+	 * parent is already disabled. To guarantee h/w switch to the new
+	 * setting enable clock while setting parent.
+	 */
+	if ((c->refcnt == 0) && (c->flags & MUX)) {
+		pr_warn("Setting parent of clock %s with refcnt 0", c->name);
+		disable = true;
+		ret = clk_enable_locked(c);
+		if (ret)
+			goto out;
+	}
 
 	if (clk_is_auto_dvfs(c) && c->refcnt > 0 &&
 			(!c->parent || new_rate > old_rate)) {
@@ -296,6 +372,8 @@ int clk_set_parent(struct clk *c, struct clk *parent)
 		ret = tegra_dvfs_set_rate(c, new_rate);
 
 out:
+	if (disable)
+		clk_disable_locked(c);
 	clk_unlock_restore(c, &flags);
 	return ret;
 }
@@ -310,13 +388,15 @@ EXPORT_SYMBOL(clk_get_parent);
 int clk_set_rate_locked(struct clk *c, unsigned long rate)
 {
 	int ret = 0;
-	unsigned long old_rate;
+	unsigned long old_rate, max_rate;
 	long new_rate;
+	bool disable = false;
 
 	old_rate = clk_get_rate_locked(c);
 
-	if (rate > c->max_rate)
-		rate = c->max_rate;
+	max_rate = clk_get_max_rate(c);
+	if (rate > max_rate)
+		rate = max_rate;
 
 	if (c->ops && c->ops->round_rate) {
 		new_rate = c->ops->round_rate(c, rate);
@@ -329,19 +409,38 @@ int clk_set_rate_locked(struct clk *c, unsigned long rate)
 		rate = new_rate;
 	}
 
+	/* The new clock control register setting does not take effect if
+	 * clock is disabled. Later, when the clock is enabled it would run
+	 * for several cycles on the old rate, which may over-clock module
+	 * at given voltage. To guarantee h/w switch to the new setting
+	 * enable clock while setting rate.
+	 */
+	if ((c->refcnt == 0) && (c->flags & (DIV_U71 | DIV_U16)) &&
+		clk_is_auto_dvfs(c)) {
+		pr_warn("Setting rate of clock %s with refcnt 0", c->name);
+		disable = true;
+		ret = clk_enable_locked(c);
+		if (ret)
+			goto out;
+	}
+
 	if (clk_is_auto_dvfs(c) && rate > old_rate && c->refcnt > 0) {
 		ret = tegra_dvfs_set_rate(c, rate);
 		if (ret)
-			return ret;
+			goto out;
 	}
 
+	trace_clock_set_rate(c->name, rate, 0);
 	ret = c->ops->set_rate(c, rate);
 	if (ret)
-		return ret;
+		goto out;
 
 	if (clk_is_auto_dvfs(c) && rate < old_rate && c->refcnt > 0)
 		ret = tegra_dvfs_set_rate(c, rate);
 
+out:
+	if (disable)
+		clk_disable_locked(c);
 	return ret;
 }
 
@@ -389,7 +488,7 @@ unsigned long clk_get_rate_all_locked(struct clk *c)
 
 long clk_round_rate(struct clk *c, unsigned long rate)
 {
-	unsigned long flags;
+	unsigned long flags, max_rate;
 	long ret;
 
 	clk_lock_save(c, &flags);
@@ -399,8 +498,9 @@ long clk_round_rate(struct clk *c, unsigned long rate)
 		goto out;
 	}
 
-	if (rate > c->max_rate)
-		rate = c->max_rate;
+	max_rate = clk_get_max_rate(c);
+	if (rate > max_rate)
+		rate = max_rate;
 
 	ret = c->ops->round_rate(c, rate);
 
@@ -409,6 +509,28 @@ out:
 	return ret;
 }
 EXPORT_SYMBOL(clk_round_rate);
+
+static int tegra_clk_clip_rate_for_parent(struct clk *c, struct clk *p)
+{
+	unsigned long flags, max_rate, old_rate, new_rate;
+
+	clk_lock_save(c, &flags);
+
+	max_rate = clk_get_max_rate(c);
+	new_rate = clk_predict_rate_from_parent(c, p);
+	old_rate = clk_get_rate_locked(c);
+
+	clk_unlock_restore(c, &flags);
+
+	if (new_rate > max_rate) {
+		u64 rate = max_rate;
+		rate *= old_rate;
+		do_div(rate, new_rate);
+
+		return clk_set_rate(c, (unsigned long)rate);
+	}
+	return 0;
+}
 
 static int tegra_clk_init_one_from_table(struct tegra_clk_init_table *table)
 {
@@ -434,6 +556,14 @@ static int tegra_clk_init_one_from_table(struct tegra_clk_init_table *table)
 		}
 
 		if (c->parent != p) {
+			ret = tegra_clk_clip_rate_for_parent(c, p);
+			if (ret) {
+				pr_warning("Unable to clip rate for parent %s"
+					   " of clock %s: %d\n",
+					   table->parent, table->name, ret);
+				return -EINVAL;
+			}
+
 			ret = clk_set_parent(c, p);
 			if (ret) {
 				pr_warning("Unable to set parent %s of clock %s: %d\n",
@@ -473,35 +603,55 @@ EXPORT_SYMBOL(tegra_clk_init_from_table);
 
 void tegra_periph_reset_deassert(struct clk *c)
 {
-	tegra2_periph_reset_deassert(c);
+	BUG_ON(!c->ops->reset);
+	c->ops->reset(c, false);
 }
 EXPORT_SYMBOL(tegra_periph_reset_deassert);
 
 void tegra_periph_reset_assert(struct clk *c)
 {
-	tegra2_periph_reset_assert(c);
+	BUG_ON(!c->ops->reset);
+	c->ops->reset(c, true);
 }
 EXPORT_SYMBOL(tegra_periph_reset_assert);
 
-void __init tegra_init_clock(void)
+/* dvfs initialization may lower default maximum rate */
+void __init tegra_init_max_rate(struct clk *c, unsigned long max_rate)
 {
-	tegra2_init_clocks();
-	tegra2_init_dvfs();
+	struct clk *shared_bus_user;
+
+	if (c->max_rate <= max_rate)
+		return;
+
+	pr_warning("Lowering %s maximum rate from %lu to %lu\n",
+		c->name, c->max_rate, max_rate);
+
+	c->max_rate = max_rate;
+	list_for_each_entry(shared_bus_user,
+			    &c->shared_bus_list, u.shared_bus_user.node) {
+		shared_bus_user->max_rate = max_rate;
+	}
 }
 
-/*
- * The SDMMC controllers have extra bits in the clock source register that
- * adjust the delay between the clock and data to compenstate for delays
- * on the PCB.
- */
-void tegra_sdmmc_tap_delay(struct clk *c, int delay)
+void __init tegra_init_clock(void)
 {
+	tegra_soc_init_clocks();
+	tegra_soc_init_dvfs();
+}
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+/* On tegra 2 SoC the SDMMC clock source register have extra bits that
+ * adjust the SDMMC controller delay between the clock and data to
+ * compenstate  for delays on the PCB. */
+void tegra_sdmmc_tap_delay(struct clk *c, int delay) {
 	unsigned long flags;
 
 	clk_lock_save(c, &flags);
 	tegra2_sdmmc_tap_delay(c, delay);
+
 	clk_unlock_restore(c, &flags);
 }
+#endif
 
 static bool tegra_keep_boot_clocks = false;
 static int __init tegra_keep_boot_clocks_setup(char *__unused)
@@ -512,11 +662,33 @@ static int __init tegra_keep_boot_clocks_setup(char *__unused)
 __setup("tegra_keep_boot_clocks", tegra_keep_boot_clocks_setup);
 
 /*
+ * Bootloader may not match kernel restrictions on CPU clock sources.
+ * Make sure CPU clock is sourced from either main or backup parent.
+ */
+static int tegra_sync_cpu_clock(void)
+{
+	int ret;
+	unsigned long rate;
+	struct clk *c = tegra_get_clock_by_name("cpu");
+
+	BUG_ON(!c);
+	rate = clk_get_rate(c);
+	ret = clk_set_rate(c, rate);
+	if (ret)
+		pr_err("%s: Failed to sync CPU at rate %lu\n", __func__, rate);
+	else
+		pr_info("CPU rate: %lu MHz\n", clk_get_rate(c) / 1000000);
+	return ret;
+}
+late_initcall(tegra_sync_cpu_clock);
+
+/*
  * Iterate through all clocks, disabling any for which the refcount is 0
  * but the clock init detected the bootloader left the clock on.
  */
 static int __init tegra_init_disable_boot_clocks(void)
 {
+#if DISABLE_BOOT_CLOCKS
 	unsigned long flags;
 	struct clk *c;
 
@@ -542,9 +714,31 @@ static int __init tegra_init_disable_boot_clocks(void)
 	}
 
 	mutex_unlock(&clock_list_lock);
+#endif
 	return 0;
 }
 late_initcall(tegra_init_disable_boot_clocks);
+
+/* Several extended clock configuration bits (e.g., clock routing, clock
+ * phase control) are included in PLL and peripheral clock source
+ * registers. */
+int tegra_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting)
+{
+	int ret = 0;
+	unsigned long flags;
+
+	clk_lock_save(c, &flags);
+
+	if (!c->ops || !c->ops->clk_cfg_ex) {
+		ret = -ENOSYS;
+		goto out;
+	}
+	ret = c->ops->clk_cfg_ex(c, p, setting);
+
+out:
+	clk_unlock_restore(c, &flags);
+	return ret;
+}
 
 #ifdef CONFIG_DEBUG_FS
 
@@ -675,6 +869,8 @@ static void clock_tree_show_one(struct seq_file *s, struct clk *c, int level)
 	struct clk *child;
 	const char *state = "uninit";
 	char div[8] = {0};
+	unsigned long rate = clk_get_rate_all_locked(c);
+	unsigned long max_rate = clk_get_max_rate(c);;
 
 	if (c->state == ON)
 		state = "on";
@@ -698,12 +894,13 @@ static void clock_tree_show_one(struct seq_file *s, struct clk *c, int level)
 		}
 	}
 
-	seq_printf(s, "%*s%c%c%-*s %-6s %-3d %-8s %-10lu\n",
+	seq_printf(s, "%*s%c%c%-*s%c %-6s %-3d %-8s %-10lu\n",
 		level * 3 + 1, "",
-		c->rate > c->max_rate ? '!' : ' ',
+		rate > max_rate ? '!' : ' ',
 		!c->set ? '*' : ' ',
 		30 - level * 3, c->name,
-		state, c->refcnt, div, clk_get_rate_all_locked(c));
+		c->cansleep ? '$' : ' ',
+		state, c->refcnt, div, rate);
 
 	if (c->dvfs)
 		dvfs_show_one(s, c->dvfs, level + 1);
@@ -773,6 +970,124 @@ static const struct file_operations possible_parents_fops = {
 	.release	= single_release,
 };
 
+static int parent_show(struct seq_file *s, void *data)
+{
+	struct clk *c = s->private;
+	struct clk *p = clk_get_parent(c);
+
+	seq_printf(s, "%s\n", p ? p->name : "clk_root");
+	return 0;
+}
+
+static int parent_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, parent_show, inode->i_private);
+}
+
+static int rate_get(void *data, u64 *val)
+{
+	struct clk *c = (struct clk *)data;
+	*val = (u64)clk_get_rate(c);
+	return 0;
+}
+
+static int state_get(void *data, u64 *val)
+{
+	struct clk *c = (struct clk *)data;
+	*val = (u64)((c->state == ON) ? 1 : 0);
+	return 0;
+}
+
+#ifdef CONFIG_TEGRA_CLOCK_DEBUG_WRITE
+
+static const mode_t parent_rate_mode =  S_IRUGO | S_IWUGO;
+
+static ssize_t parent_write(struct file *file,
+	const char __user *userbuf, size_t count, loff_t *ppos)
+{
+	struct seq_file *s = file->private_data;
+	struct clk *c = s->private;
+	struct clk *p = NULL;
+	char buf[32];
+
+	if (sizeof(buf) <= count)
+		return -EINVAL;
+
+	if (copy_from_user(buf, userbuf, count))
+		return -EFAULT;
+
+	/* terminate buffer and trim - white spaces may be appended
+	 *  at the end when invoked from shell command line */
+	buf[count]='\0';
+	strim(buf);
+
+	p = tegra_get_clock_by_name(buf);
+	if (!p)
+		return -EINVAL;
+
+	if (clk_set_parent(c, p))
+		return -EINVAL;
+
+	return count;
+}
+
+static const struct file_operations parent_fops = {
+	.open		= parent_open,
+	.read		= seq_read,
+	.write		= parent_write,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static int rate_set(void *data, u64 val)
+{
+	struct clk *c = (struct clk *)data;
+	return clk_set_rate(c, (unsigned long)val);
+}
+DEFINE_SIMPLE_ATTRIBUTE(rate_fops, rate_get, rate_set, "%llu\n");
+
+static int state_set(void *data, u64 val)
+{
+	struct clk *c = (struct clk *)data;
+
+	if (val)
+		return clk_enable(c);
+	else {
+		clk_disable(c);
+		return 0;
+	}
+}
+DEFINE_SIMPLE_ATTRIBUTE(state_fops, state_get, state_set, "%llu\n");
+
+#else
+
+static const mode_t parent_rate_mode =  S_IRUGO;
+
+static const struct file_operations parent_fops = {
+	.open		= parent_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+DEFINE_SIMPLE_ATTRIBUTE(rate_fops, rate_get, NULL, "%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(state_fops, state_get, NULL, "%llu\n");
+#endif
+
+static int time_on_get(void *data, u64 *val)
+{
+	unsigned long flags;
+	struct clk *c = (struct clk *)data;
+
+	clk_lock_save(c, &flags);
+	clk_stats_update(c);
+	*val = cputime64_to_clock_t(c->stats.time_on);
+	clk_unlock_restore(c, &flags);
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(time_on_fops, time_on_get, NULL, "%llu\n");
+
 static int clk_debugfs_register_one(struct clk *c)
 {
 	struct dentry *d, *child, *child_tmp;
@@ -786,11 +1101,31 @@ static int clk_debugfs_register_one(struct clk *c)
 	if (!d)
 		goto err_out;
 
-	d = debugfs_create_u32("rate", S_IRUGO, c->dent, (u32 *)&c->rate);
+	d = debugfs_create_x32("flags", S_IRUGO, c->dent, (u32 *)&c->flags);
 	if (!d)
 		goto err_out;
 
-	d = debugfs_create_x32("flags", S_IRUGO, c->dent, (u32 *)&c->flags);
+	d = debugfs_create_u32("max", S_IRUGO, c->dent, (u32 *)&c->max_rate);
+	if (!d)
+		goto err_out;
+
+	d = debugfs_create_file(
+		"parent", parent_rate_mode, c->dent, c, &parent_fops);
+	if (!d)
+		goto err_out;
+
+	d = debugfs_create_file(
+		"rate", parent_rate_mode, c->dent, c, &rate_fops);
+	if (!d)
+		goto err_out;
+
+	d = debugfs_create_file(
+		"state", parent_rate_mode, c->dent, c, &state_fops);
+	if (!d)
+		goto err_out;
+
+	d = debugfs_create_file(
+		"time_on", S_IRUGO, c->dent, c, &time_on_fops);
 	if (!d)
 		goto err_out;
 

@@ -38,7 +38,67 @@
 
 #define PWRGATE_STATUS		0x38
 
+#define MC_CLIENT_HOTRESET_CTRL	0x200
+#define MC_CLIENT_HOTRESET_STAT	0x204
+
+typedef enum {
+	MC_CLIENT_AFI	= 0,
+	MC_CLIENT_AVPC	= 1,
+	MC_CLIENT_DC	= 2,
+	MC_CLIENT_DCB	= 3,
+	MC_CLIENT_EPP	= 4,
+	MC_CLIENT_G2	= 5,
+	MC_CLIENT_HC	= 6,
+	MC_CLIENT_HDA	= 7,
+	MC_CLIENT_ISP	= 8,
+	MC_CLIENT_MPCORE	= 9,
+	MC_CLIENT_MPCORELP	= 10,
+	MC_CLIENT_MPE	= 11,
+	MC_CLIENT_NV	= 12,
+	MC_CLIENT_NV2	= 13,
+	MC_CLIENT_PPCS	= 14,
+	MC_CLIENT_SATA	= 15,
+	MC_CLIENT_VDE	= 16,
+	MC_CLIENT_VI	= 17,
+	MC_CLIENT_LAST	= -1,
+} MC_CLIENT;
+
 static DEFINE_SPINLOCK(tegra_powergate_lock);
+
+#define MAX_HOTRESET_CLIENT_NUM		3
+
+typedef struct {
+	const char * name;
+	MC_CLIENT hot_reset_clients[MAX_HOTRESET_CLIENT_NUM];
+	/* add clocks for each partition*/
+} powergate_partition;
+
+static powergate_partition powergate_partition_info[TEGRA_NUM_POWERGATE] = {
+	[TEGRA_POWERGATE_CPU]	= { "cpu0",	{MC_CLIENT_LAST} },
+	[TEGRA_POWERGATE_L2]	= { "l2",	{MC_CLIENT_LAST} },
+	[TEGRA_POWERGATE_3D]	= { "3d0",
+						{MC_CLIENT_NV, MC_CLIENT_LAST} },
+	[TEGRA_POWERGATE_PCIE]	= { "pcie",
+						{MC_CLIENT_AFI, MC_CLIENT_LAST} },
+	[TEGRA_POWERGATE_VDEC]	= { "vde",
+						{MC_CLIENT_VDE, MC_CLIENT_LAST} },
+	[TEGRA_POWERGATE_MPE]	= { "mpe",
+						{MC_CLIENT_MPE, MC_CLIENT_LAST} },
+	[TEGRA_POWERGATE_VENC]	= { "ve",
+						{MC_CLIENT_ISP, MC_CLIENT_VI, MC_CLIENT_LAST} },
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+	[TEGRA_POWERGATE_CPU1]	= { "cpu1",	{MC_CLIENT_LAST}},
+	[TEGRA_POWERGATE_CPU2]	= { "cpu2",	{MC_CLIENT_LAST}},
+	[TEGRA_POWERGATE_CPU3]	= { "cpu3",	{MC_CLIENT_LAST}},
+	[TEGRA_POWERGATE_A9LP]	= { "a9lp",	{MC_CLIENT_LAST}},
+	[TEGRA_POWERGATE_SATA]	= { "sata",
+						{MC_CLIENT_SATA, MC_CLIENT_LAST} },
+	[TEGRA_POWERGATE_3D1]	= { "3d1",
+						{MC_CLIENT_NV2, MC_CLIENT_LAST} },
+	[TEGRA_POWERGATE_HEG]	= { "heg",
+						{MC_CLIENT_G2, MC_CLIENT_EPP, MC_CLIENT_HC} },
+#endif
+};
 
 static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
 
@@ -52,6 +112,76 @@ static void pmc_write(u32 val, unsigned long reg)
 	writel(val, pmc + reg);
 }
 
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+static void __iomem *mc = IO_ADDRESS(TEGRA_MC_BASE);
+
+static u32 mc_read(unsigned long reg)
+{
+	return readl(mc + reg);
+}
+
+static void mc_write(u32 val, unsigned long reg)
+{
+	writel(val, mc + reg);
+}
+
+static void mc_flush(int id)
+{
+	u32 idx, rst_ctrl, rst_stat;
+	MC_CLIENT mcClientBit;
+	unsigned long flags;
+
+	BUG_ON(id < 0 || id >= TEGRA_NUM_POWERGATE);
+
+	for (idx = 0; idx < MAX_HOTRESET_CLIENT_NUM; idx++) {
+		mcClientBit = powergate_partition_info[id].hot_reset_clients[idx];
+		if (mcClientBit == MC_CLIENT_LAST)
+			break;
+
+		spin_lock_irqsave(&tegra_powergate_lock, flags);
+
+		rst_ctrl = mc_read(MC_CLIENT_HOTRESET_CTRL);
+		rst_ctrl |= (1 << mcClientBit);
+		mc_write(rst_ctrl, MC_CLIENT_HOTRESET_CTRL);
+
+		spin_unlock_irqrestore(&tegra_powergate_lock, flags);
+
+		do {
+			udelay(10);
+			rst_stat = mc_read(MC_CLIENT_HOTRESET_STAT);
+		} while (!(rst_stat & (1 << mcClientBit)));
+	}
+}
+
+static void mc_flush_done(int id)
+{
+	u32 idx, rst_ctrl;
+	MC_CLIENT mcClientBit;
+	unsigned long flags;
+
+	BUG_ON(id < 0 || id >= TEGRA_NUM_POWERGATE);
+
+	for (idx = 0; idx < MAX_HOTRESET_CLIENT_NUM; idx++) {
+		mcClientBit = powergate_partition_info[id].hot_reset_clients[idx];
+		if (mcClientBit == MC_CLIENT_LAST)
+			break;
+
+		spin_lock_irqsave(&tegra_powergate_lock, flags);
+
+		rst_ctrl = mc_read(MC_CLIENT_HOTRESET_CTRL);
+		rst_ctrl &= ~(1 << mcClientBit);
+		mc_write(rst_ctrl, MC_CLIENT_HOTRESET_CTRL);
+
+		spin_unlock_irqrestore(&tegra_powergate_lock, flags);
+	}
+
+	wmb();
+}
+#else
+static void mc_flush(int id) {}
+static void mc_flush_done(int id) {}
+#endif
+
 static int tegra_powergate_set(int id, bool new_state)
 {
 	bool status;
@@ -59,7 +189,7 @@ static int tegra_powergate_set(int id, bool new_state)
 
 	spin_lock_irqsave(&tegra_powergate_lock, flags);
 
-	status = pmc_read(PWRGATE_STATUS) & (1 << id);
+	status = !!(pmc_read(PWRGATE_STATUS) & (1 << id));
 
 	if (status == new_state) {
 		spin_unlock_irqrestore(&tegra_powergate_lock, flags);
@@ -86,6 +216,8 @@ int tegra_powergate_power_off(int id)
 	if (id < 0 || id >= TEGRA_NUM_POWERGATE)
 		return -EINVAL;
 
+	mc_flush(id);
+
 	return tegra_powergate_set(id, false);
 }
 
@@ -108,12 +240,12 @@ int tegra_powergate_remove_clamping(int id)
 		return -EINVAL;
 
 	/*
-	 * Tegra 2 has a bug where PCIE and VDE clamping masks are
-	 * swapped relatively to the partition ids
+	 * PCIE and VDE clamping masks are swapped with respect to their
+	 * partition ids
 	 */
 	if (id ==  TEGRA_POWERGATE_VDEC)
 		mask = (1 << TEGRA_POWERGATE_PCIE);
-	else if	(id == TEGRA_POWERGATE_PCIE)
+	else if (id == TEGRA_POWERGATE_PCIE)
 		mask = (1 << TEGRA_POWERGATE_VDEC);
 	else
 		mask = (1 << id);
@@ -170,6 +302,8 @@ int tegra_powergate_sequence_power_up(int id, struct clk *clk)
 	udelay(10);
 	tegra_periph_reset_deassert(clk);
 
+	mc_flush_done(id);
+
 	return 0;
 
 err_clamp:
@@ -180,17 +314,15 @@ err_power:
 	return ret;
 }
 
-#ifdef CONFIG_DEBUG_FS
+const char* tegra_powergate_get_name(int id)
+{
+	if (id < 0 || id >= TEGRA_NUM_POWERGATE)
+		return "invalid";
 
-static const char * const powergate_name[] = {
-	[TEGRA_POWERGATE_CPU]	= "cpu",
-	[TEGRA_POWERGATE_3D]	= "3d",
-	[TEGRA_POWERGATE_VENC]	= "venc",
-	[TEGRA_POWERGATE_VDEC]	= "vdec",
-	[TEGRA_POWERGATE_PCIE]	= "pcie",
-	[TEGRA_POWERGATE_L2]	= "l2",
-	[TEGRA_POWERGATE_MPE]	= "mpe",
-};
+	return powergate_partition_info[id].name;
+}
+
+#ifdef CONFIG_DEBUG_FS
 
 static int powergate_show(struct seq_file *s, void *data)
 {
@@ -200,7 +332,7 @@ static int powergate_show(struct seq_file *s, void *data)
 	seq_printf(s, "------------------\n");
 
 	for (i = 0; i < TEGRA_NUM_POWERGATE; i++)
-		seq_printf(s, " %9s %7s\n", powergate_name[i],
+		seq_printf(s, " %9s %7s\n", powergate_partition_info[i].name,
 			tegra_powergate_is_powered(i) ? "yes" : "no");
 	return 0;
 }
