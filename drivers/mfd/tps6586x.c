@@ -27,6 +27,10 @@
 #include <linux/mfd/core.h>
 #include <linux/mfd/tps6586x.h>
 
+#define TPS6586X_SUPPLYENE  0x14
+#define EXITSLREQ_BIT       BIT(1) /* Exit sleep mode request */
+#define SLEEP_MODE_BIT      BIT(3) /* Sleep mode */
+
 /* GPIO control registers */
 #define TPS6586X_GPIOSET1	0x5d
 #define TPS6586X_GPIOSET2	0x5e
@@ -251,6 +255,28 @@ out:
 }
 EXPORT_SYMBOL_GPL(tps6586x_update);
 
+static struct i2c_client *tps6586x_i2c_client = NULL;
+int tps6586x_power_off(void)
+{
+	struct device *dev = NULL;
+	int ret = -EINVAL;
+
+	if (!tps6586x_i2c_client)
+		return ret;
+
+	dev = &tps6586x_i2c_client->dev;
+
+	ret = tps6586x_clr_bits(dev, TPS6586X_SUPPLYENE, EXITSLREQ_BIT);
+	if (ret)
+		return ret;
+
+	ret = tps6586x_set_bits(dev, TPS6586X_SUPPLYENE, SLEEP_MODE_BIT);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
 static int tps6586x_gpio_get(struct gpio_chip *gc, unsigned offset)
 {
 	struct tps6586x *tps6586x = container_of(gc, struct tps6586x, gpio);
@@ -274,13 +300,24 @@ static void tps6586x_gpio_set(struct gpio_chip *chip, unsigned offset,
 			 value << offset);
 }
 
+static int tps6586x_gpio_input(struct gpio_chip *gc, unsigned offset)
+{
+	/* FIXME: add handling of GPIOs as dedicated inputs */
+	return -ENOSYS;
+}
+
 static int tps6586x_gpio_output(struct gpio_chip *gc, unsigned offset,
 				int value)
 {
 	struct tps6586x *tps6586x = container_of(gc, struct tps6586x, gpio);
 	uint8_t val, mask;
+	int ret;
 
-	tps6586x_gpio_set(gc, offset, value);
+	val = value << offset;
+	mask = 0x1 << offset;
+	ret = tps6586x_update(tps6586x->dev, TPS6586X_GPIOSET2, val, mask);
+	if (ret)
+		return ret;
 
 	val = 0x1 << (offset * 2);
 	mask = 0x3 << (offset * 2);
@@ -300,7 +337,7 @@ static int tps6586x_gpio_init(struct tps6586x *tps6586x, int gpio_base)
 	tps6586x->gpio.ngpio		= 4;
 	tps6586x->gpio.can_sleep	= 1;
 
-	/* FIXME: add handling of GPIOs as dedicated inputs */
+	tps6586x->gpio.direction_input	= tps6586x_gpio_input;
 	tps6586x->gpio.direction_output	= tps6586x_gpio_output;
 	tps6586x->gpio.set		= tps6586x_gpio_set;
 	tps6586x->gpio.get		= tps6586x_gpio_get;
@@ -524,6 +561,8 @@ static int __devinit tps6586x_i2c_probe(struct i2c_client *client,
 		dev_err(&client->dev, "add devices failed: %d\n", ret);
 		goto err_add_devs;
 	}
+
+	tps6586x_i2c_client = client;
 
 	return 0;
 

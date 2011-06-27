@@ -335,6 +335,16 @@ config MFD_MAX8998
 	  additional drivers must be enabled in order to use the functionality
 	  of the device.
 
+config MFD_MAX8907C
+	tristate "Maxim Semiconductor MAX8907C PMIC Support"
+	select MFD_CORE
+	depends on I2C
+	help
+	  Say yes here to support for Maxim Semiconductor MAX8907C. This is
+	  a Power Management IC. This driver provies common support for
+	  accessing the device, additional drivers must be enabled in order
+	  to use the functionality of the device.
+
 config MFD_WM8400
 	tristate "Support Wolfson Microelectronics WM8400"
 	select MFD_CORE
@@ -670,6 +680,35 @@ config MFD_OMAP_USB_HOST
 	  This is the core driver for the OAMP EHCI and OHCI drivers.
 	  This MFD driver does the required setup functionalities for
 	  OMAP USB Host drivers.
+
+config MFD_TPS6591X
+	bool "TPS6591x Power Management chips"
+	depends on I2C && GPIOLIB && GENERIC_HARDIRQS
+	select MFD_CORE
+	help
+	  If you say yes here you get support for the TPS6591X series of
+	  Power Management chips.
+	  This driver provides common support for accessing the device,
+	  additional drivers must be enabled in order to use the
+	  functionality of the device.
+
+config MFD_AAT2870_CORE
+	bool "Support for the AnalogicTech AAT2870"
+	select MFD_CORE
+	depends on I2C=y && GPIOLIB
+	help
+	  If you say yes here you get support for the AAT2870.
+
+config MFD_TPS80031
+	bool "TI TPS80031 Power Management chips"
+	depends on I2C && GPIOLIB && GENERIC_HARDIRQS
+	select MFD_CORE
+	help
+	  If you say yes here you get support for the TPS80031 Power
+	  Management chips.
+	  This driver provides common support for accessing the device,
+	  additional drivers must be enabled in order to use the
+	  functionality of the device.
 
 endif # MFD_SUPPORT
 

@@ -82,6 +82,10 @@
 #define TWL_MODULE_RTC		TWL4030_MODULE_RTC
 #define TWL_MODULE_PWM		TWL4030_MODULE_PWM0
 
+#define TWL6030_MODULE_CHARGER	TWL4030_MODULE_MAIN_CHARGE
+#define TWL6025_MODULE_CHARGER	0x18
+
+#define TWL6030_MODULE_GASGAUGE 0x0B
 #define TWL6030_MODULE_ID0	0x0D
 #define TWL6030_MODULE_ID1	0x0E
 #define TWL6030_MODULE_ID2	0x0F
@@ -91,6 +95,7 @@
 #define BCI_INTR_OFFSET		2
 #define MADC_INTR_OFFSET	3
 #define USB_INTR_OFFSET		4
+#define CHARGERFAULT_INTR_OFFSET 5
 #define BCI_PRES_INTR_OFFSET	9
 #define USB_PRES_INTR_OFFSET	10
 #define RTC_INTR_OFFSET		11
@@ -107,6 +112,7 @@
 #define GASGAUGE_INTR_OFFSET	17
 #define USBOTG_INTR_OFFSET	4
 #define CHARGER_INTR_OFFSET	2
+#define GPADCSW_INTR_OFFSET	1
 #define RSV_INTR_OFFSET		0
 
 /* INT register offsets */
@@ -165,11 +171,23 @@ static inline int twl_class_is_ ##class(void)	\
 TWL_CLASS_IS(4030, TWL4030_CLASS_ID)
 TWL_CLASS_IS(6030, TWL6030_CLASS_ID)
 
+#define TWL6025_SUBCLASS	BIT(4)  /* TWL6025 has changed registers */
+#define MPU80031_SUBCLASS	BIT(5)  /* MPU80031 has changed registers */
+
+/* So we can recover the features in other parts of twl stack */
+unsigned int twl_features(void);
+
+/* so we can get at the EPROM SMPS OFFSET/MULT stuff */
+u8 twl_get_smps_offset(void);
+u8 twl_get_smps_mult(void);
+
 /*
  * Read and write single 8-bit registers
  */
 int twl_i2c_write_u8(u8 mod_no, u8 val, u8 reg);
 int twl_i2c_read_u8(u8 mod_no, u8 *val, u8 reg);
+
+void twl_reg_dump(int module, int start, int end);
 
 /*
  * Read and write several 8-bit registers at once.
@@ -204,6 +222,10 @@ static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
 	return -EIO;
 }
 #endif
+
+int twl6030_set_usb_charge_enable(int enable);
+int twl6030_set_usb_in_current(int currentmA);
+
 /*----------------------------------------------------------------------*/
 
 /*
@@ -534,11 +556,27 @@ static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
 
 struct twl4030_clock_init_data {
 	bool ck32k_lowpwr_enable;
+	bool clk32_active_state_on;
 };
 
 struct twl4030_bci_platform_data {
 	int *battery_tmp_tbl;
-	unsigned int tblsize;
+	unsigned int battery_tmp_tblsize;
+	int *battery_volt_tbl;
+	unsigned int battery_volt_tblsize;
+	unsigned int monitoring_interval;
+
+	unsigned int max_charger_currentmA;
+	unsigned int max_charger_voltagemV;
+	unsigned int termination_currentmA;
+
+	unsigned int max_bat_voltagemV;
+	unsigned int low_bat_voltagemV;
+
+	/* twl6025 */
+	unsigned int use_hw_charger;
+	unsigned int use_eeprom_config;
+	unsigned int power_path;
 };
 
 /* TWL4030_GPIO_MAX (18) GPIOs, with interrupts */
@@ -602,6 +640,7 @@ struct twl4030_usb_data {
 	int		(*phy_set_clock)(struct device *dev, int on);
 	/* suspend/resume of phy */
 	int		(*phy_suspend)(struct device *dev, int suspend);
+	int		(*board_control_power)(struct device *dev, int on);
 };
 
 struct twl4030_ins {
@@ -664,6 +703,10 @@ struct twl4030_codec_data {
 
 struct twl4030_platform_data {
 	unsigned				irq_base, irq_end;
+
+	/* Callback for boar regulator initialisation */
+	int (*init)(void);
+
 	struct twl4030_clock_init_data		*clock;
 	struct twl4030_bci_platform_data	*bci;
 	struct twl4030_gpio_platform_data	*gpio;
@@ -699,6 +742,20 @@ struct twl4030_platform_data {
 	struct regulator_init_data              *vcxio;
 	struct regulator_init_data              *vusb;
 	struct regulator_init_data		*clk32kg;
+	/* TWL6025 LDO regulators */
+	struct regulator_init_data		*ldo1;
+	struct regulator_init_data		*ldo2;
+	struct regulator_init_data		*ldo3;
+	struct regulator_init_data		*ldo4;
+	struct regulator_init_data		*ldo5;
+	struct regulator_init_data		*ldo6;
+	struct regulator_init_data		*ldo7;
+	struct regulator_init_data		*ldoln;
+	struct regulator_init_data		*ldousb;
+	/* TWL6025 DCDC regulators */
+	struct regulator_init_data		*smps3;
+	struct regulator_init_data		*smps4;
+	struct regulator_init_data		*vio6025;
 };
 
 /*----------------------------------------------------------------------*/
@@ -775,6 +832,22 @@ static inline int twl4030charger_usb_en(int enable) { return 0; }
 #define TWL6030_REG_VCXIO	44
 #define TWL6030_REG_VDAC	45
 #define TWL6030_REG_VUSB	46
+
+/* These are renamed in 6025 but same registers */
+#define TWL6025_REG_LDO2	48
+#define TWL6025_REG_LDO4	49
+#define TWL6025_REG_LDO3	50
+#define TWL6025_REG_LDO5	51
+#define TWL6025_REG_LDO1	52
+#define TWL6025_REG_LDO7	53
+#define TWL6025_REG_LDO6	54
+#define TWL6025_REG_LDOLN	55
+#define TWL6025_REG_LDOUSB	56
+
+/* 6025 DCDC supplies */
+#define TWL6025_REG_SMPS3	57
+#define TWL6025_REG_SMPS4	58
+#define TWL6025_REG_VIO		59
 
 /* INTERNAL LDOs */
 #define TWL6030_REG_VRTC	47
