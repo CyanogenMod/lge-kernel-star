@@ -171,6 +171,13 @@ config TEGRA_PWM
 	help
 	  Enable support for the Tegra PWM controller(s).
 
+config TEGRA_FIQ_DEBUGGER
+	bool "Enable the FIQ serial debugger on Tegra"
+	default y
+	select FIQ_DEBUGGER
+	help
+	  Enables the FIQ serial debugger on Tegra"
+
 config TEGRA_CARDHU_DSI
 	bool "Support DSI panel on Cardhu"
 	depends on MACH_CARDHU

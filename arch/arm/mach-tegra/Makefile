@@ -23,6 +23,7 @@ obj-$(CONFIG_TEGRA_LEGACY_AUDIO)        += tegra_spdif_audio.o
 obj-y                                   += mc.o
 obj-$(CONFIG_USB_SUPPORT)               += usb_phy.o
 obj-$(CONFIG_FIQ)                       += fiq.o
+obj-$(CONFIG_TEGRA_FIQ_DEBUGGER)        += tegra_fiq_debugger.o
 obj-$(CONFIG_TEGRA_PWM)                 += pwm.o
 obj-$(CONFIG_TEGRA_ARB_SEMAPHORE)       += arb_sema.o
 

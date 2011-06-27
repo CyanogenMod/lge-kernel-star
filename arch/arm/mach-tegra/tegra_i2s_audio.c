@@ -44,6 +44,7 @@
 #include <linux/io.h>
 #include <linux/ktime.h>
 #include <linux/sysfs.h>
+#include <linux/wakelock.h>
 #include <linux/delay.h>
 #include <linux/tegra_audio.h>
 #include <linux/pm.h>
@@ -89,6 +90,8 @@ struct audio_stream {
 	spinlock_t dma_req_lock;
 
 	struct work_struct allow_suspend_work;
+	struct wake_lock wake_lock;
+	char wake_lock_name[100];
 };
 
 /* per i2s controller */
@@ -199,6 +202,7 @@ static inline void prevent_suspend(struct audio_stream *as)
 {
 	pr_debug("%s\n", __func__);
 	cancel_work_sync(&as->allow_suspend_work);
+	wake_lock(&as->wake_lock);
 }
 
 static void allow_suspend_worker(struct work_struct *w)
@@ -206,6 +210,7 @@ static void allow_suspend_worker(struct work_struct *w)
 	struct audio_stream *as = container_of(w,
 			struct audio_stream, allow_suspend_work);
 	pr_debug("%s\n", __func__);
+	wake_unlock(&as->wake_lock);
 }
 
 static inline void allow_suspend(struct audio_stream *as)
@@ -1822,6 +1827,12 @@ static int tegra_audio_probe(struct platform_device *pdev)
 
 		INIT_WORK(&state->out.allow_suspend_work, allow_suspend_worker);
 
+		snprintf(state->out.wake_lock_name,
+			sizeof(state->out.wake_lock_name),
+			"i2s.%d-audio-out", state->pdev->id);
+		wake_lock_init(&state->out.wake_lock, WAKE_LOCK_SUSPEND,
+			state->out.wake_lock_name);
+
 		rc = setup_misc_device(&state->misc_out,
 			&tegra_audio_out_fops,
 			"audio%d_out", state->pdev->id);
@@ -1857,6 +1868,12 @@ static int tegra_audio_probe(struct platform_device *pdev)
 			return rc;
 
 		INIT_WORK(&state->in.allow_suspend_work, allow_suspend_worker);
+
+		snprintf(state->in.wake_lock_name,
+			sizeof(state->in.wake_lock_name),
+			"i2s.%d-audio-in", state->pdev->id);
+		wake_lock_init(&state->in.wake_lock, WAKE_LOCK_SUSPEND,
+			state->in.wake_lock_name);
 
 		rc = setup_misc_device(&state->misc_in,
 			&tegra_audio_in_fops,

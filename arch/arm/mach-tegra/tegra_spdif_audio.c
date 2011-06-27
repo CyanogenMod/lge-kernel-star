@@ -43,6 +43,7 @@
 #include <linux/io.h>
 #include <linux/ktime.h>
 #include <linux/sysfs.h>
+#include <linux/wakelock.h>
 #include <linux/delay.h>
 #include <linux/tegra_audio.h>
 #include <linux/pm.h>
@@ -83,6 +84,8 @@ struct audio_stream {
 	spinlock_t dma_req_lock;
 
 	struct work_struct allow_suspend_work;
+	struct wake_lock wake_lock;
+	char wake_lock_name[100];
 };
 
 struct audio_driver_state {
@@ -147,6 +150,7 @@ static inline void prevent_suspend(struct audio_stream *as)
 {
 	pr_debug("%s\n", __func__);
 	cancel_work_sync(&as->allow_suspend_work);
+	wake_lock(&as->wake_lock);
 }
 
 static void allow_suspend_worker(struct work_struct *w)
@@ -154,6 +158,7 @@ static void allow_suspend_worker(struct work_struct *w)
 	struct audio_stream *as = container_of(w,
 			struct audio_stream, allow_suspend_work);
 	pr_debug("%s\n", __func__);
+	wake_unlock(&as->wake_lock);
 }
 
 static inline void allow_suspend(struct audio_stream *as)
@@ -1104,6 +1109,10 @@ static int tegra_spdif_probe(struct platform_device *pdev)
 		return rc;
 
 	INIT_WORK(&state->out.allow_suspend_work, allow_suspend_worker);
+	snprintf(state->out.wake_lock_name, sizeof(state->out.wake_lock_name),
+		"tegra-audio-spdif");
+	wake_lock_init(&state->out.wake_lock, WAKE_LOCK_SUSPEND,
+			state->out.wake_lock_name);
 
 	if (request_irq(state->irq, spdif_interrupt,
 			IRQF_DISABLED, state->pdev->name, state) < 0) {
