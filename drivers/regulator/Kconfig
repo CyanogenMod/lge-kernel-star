@@ -125,6 +125,14 @@ config REGULATOR_MAX8998
 	  via I2C bus. The provided regulator is suitable for S3C6410
 	  and S5PC1XX chips to control VCC_CORE and VCC_USIM voltages.
 
+config REGULATOR_MAX8907C
+	tristate "Maxim 8907C voltage regulator"
+	depends on MFD_MAX8907C
+	help
+	  This driver controls a Maxim 8907C voltage output regulator
+	  via I2C bus. The provided regulator is suitable for Tegra
+	  chip to control Step-Down DC-DC and LDOs.
+
 config REGULATOR_TWL4030
 	bool "TI TWL4030/TWL5030/TWL6030/TPS659x0 PMIC"
 	depends on TWL4030_CORE
@@ -289,6 +297,41 @@ config REGULATOR_TPS6524X
 	  voltage regulators.  This device is interfaced using a customized
 	  serial interface currently supported on the sequencer serial
 	  port controller.
+
+config REGULATOR_TPS6591X
+	tristate "TI TPS6591X Power regulators"
+	depends on MFD_TPS6591X
+	default n
+	help
+	  This driver supports TPS6591X voltage regulator chips.
+
+config REGULATOR_TPS6236X
+	tristate "TI TPS6236X DC-DC core power suply regulators"
+	default n
+	help
+	  This driver supports TPS6236X DC-DC Processor core supply.
+
+config REGULATOR_TPS80031
+	tristate "TI TPS80031 Power regulators"
+	depends on MFD_TPS80031
+	default n
+	help
+	  This driver supports TPS80031 voltage regulator chips.
+
+config REGULATOR_GPIO_SWITCH
+	bool "GPIO based enable/disable of power rails."
+	default n
+	help
+	  This driver supports gpio based switch control of the power rails.
+	  Say Yes if the given platform have the rail enable through the
+	  gpios.
+
+config REGULATOR_AAT2870
+	bool "AnalogicTech AAT2870 Regulators"
+	depends on MFD_AAT2870_CORE
+	help
+	  If you have a AnalogicTech AAT2870 say Y to enable the
+	  regulator driver.
 
 endif
 
