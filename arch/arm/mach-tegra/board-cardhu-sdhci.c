@@ -111,9 +111,7 @@ static struct resource sdhci_resource3[] = {
 	},
 };
 
-
-static struct tegra_sdhci_platform_data tegra_sdhci_platform_data2 = {
-	.register_status_notify	= cardhu_wifi_status_register,
+static struct embedded_sdio_data embedded_sdio_data2 = {
 	.cccr   = {
 		.sdio_vsn       = 2,
 		.multi_block    = 1,
@@ -125,6 +123,13 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data2 = {
 	.cis  = {
 		.vendor         = 0x02d0,
 		.device         = 0x4329,
+	},
+};
+
+static struct tegra_sdhci_platform_data tegra_sdhci_platform_data2 = {
+	.mmc_data = {
+		.register_status_notify	= cardhu_wifi_status_register,
+		.embedded_sdio = &embedded_sdio_data2,
 	},
 	.cd_gpio = -1,
 	.wp_gpio = -1,
