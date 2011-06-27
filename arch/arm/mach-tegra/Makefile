@@ -107,6 +107,15 @@ obj-${CONFIG_MACH_ARUBA}                += board-aruba-sdhci.o
 obj-${CONFIG_MACH_ARUBA}                += board-aruba-sensors.o
 
 # Whistler
+obj-${CONFIG_MACH_WHISTLER}             += board-whistler.o
+obj-${CONFIG_MACH_WHISTLER}             += board-whistler-pinmux.o
+obj-${CONFIG_MACH_WHISTLER}             += board-whistler-sdhci.o
+obj-${CONFIG_MACH_WHISTLER}             += board-whistler-power.o
+obj-${CONFIG_MACH_WHISTLER}             += board-whistler-panel.o
+obj-${CONFIG_MACH_WHISTLER}             += board-whistler-sensors.o
+#obj-${CONFIG_MACH_WHISTLER}             += board-whistler-kbc.o
+obj-${CONFIG_MACH_WHISTLER}             += board-whistler-baseband.o
+obj-${CONFIG_MACH_WHISTLER}             += board-whistler-memory.o
 
 # Cardhu
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu.o
