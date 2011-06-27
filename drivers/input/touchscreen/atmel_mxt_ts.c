@@ -1426,12 +1426,12 @@ static void mxt_early_resume(struct early_suspend *es)
 		dev_err(&mxt->client->dev, "%s: failed\n", __func__);
 	dev_info(dev, "MXT Early Resumed\n");
 }
-#endif
-
+#else
 static const struct dev_pm_ops mxt_pm_ops = {
 	.suspend	= mxt_suspend,
 	.resume		= mxt_resume,
 };
+#endif
 #endif
 
 static const struct i2c_device_id mxt_id[] = {
@@ -1446,7 +1446,7 @@ static struct i2c_driver mxt_driver = {
 	.driver = {
 		.name	= "atmel_mxt_ts",
 		.owner	= THIS_MODULE,
-#ifdef CONFIG_PM
+#if !defined(CONFIG_HAS_EARLYSUSPEND)
 		.pm	= &mxt_pm_ops,
 #endif
 	},
