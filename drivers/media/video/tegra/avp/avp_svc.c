@@ -579,12 +579,12 @@ static int avp_svc_thread(void *data)
 	u8 buf[TEGRA_RPC_MAX_MSG_LEN];
 	struct svc_msg *msg = (struct svc_msg *)buf;
 	int ret;
+	long timeout;
 
 	BUG_ON(!avp_svc->cpu_ep);
 
 	ret = trpc_wait_peer(avp_svc->cpu_ep, -1);
 	if (ret) {
-		/* XXX: teardown?! */
 		pr_err("%s: no connection from AVP (%d)\n", __func__, ret);
 		goto err;
 	}
@@ -596,12 +596,19 @@ static int avp_svc_thread(void *data)
 		ret = trpc_recv_msg(avp_svc->rpc_node, avp_svc->cpu_ep, buf,
 				    TEGRA_RPC_MAX_MSG_LEN, -1);
 		DBG(AVP_DBG_TRACE_SVC, "%s: got message\n", __func__);
-		if (ret < 0) {
-			pr_err("%s: couldn't receive msg\n", __func__);
-			/* XXX: port got closed? we should exit? */
-			goto err;
-		} else if (!ret) {
-			pr_err("%s: received msg of len 0?!\n", __func__);
+
+		if (ret == -ECONNRESET || ret == -ENOTCONN) {
+			pr_info("%s: AVP seems to be down; "
+				"wait for kthread_stop\n", __func__);
+			timeout = msecs_to_jiffies(100);
+			timeout = schedule_timeout_interruptible(timeout);
+			if (timeout == 0)
+				pr_err("%s: timed out while waiting for "
+					"kthread_stop\n", __func__);
+			continue;
+		} else if (ret <= 0) {
+			pr_err("%s: couldn't receive msg (ret=%d)\n",
+				__func__, ret);
 			continue;
 		}
 		dispatch_svc_message(avp_svc, msg, ret);
@@ -609,7 +616,7 @@ static int avp_svc_thread(void *data)
 
 err:
 	trpc_put(avp_svc->cpu_ep);
-	pr_info("%s: done\n", __func__);
+	pr_info("%s: exiting\n", __func__);
 	return ret;
 }
 
