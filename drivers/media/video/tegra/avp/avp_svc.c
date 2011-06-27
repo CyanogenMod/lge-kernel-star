@@ -51,6 +51,7 @@ enum {
 	CLK_REQUEST_VCP		= 0,
 	CLK_REQUEST_BSEA	= 1,
 	CLK_REQUEST_VDE		= 2,
+	CLK_REQUEST_AVP		= 3,
 	NUM_CLK_REQUESTS,
 };
 
@@ -60,6 +61,10 @@ struct avp_module {
 };
 
 static struct avp_module avp_modules[] = {
+	[AVP_MODULE_ID_AVP] = {
+		.name		= "cop",
+		.clk_req	= CLK_REQUEST_AVP,
+	},
 	[AVP_MODULE_ID_VCP] = {
 		.name		= "vcp",
 		.clk_req	= CLK_REQUEST_VCP,
@@ -496,6 +501,36 @@ static void do_svc_unsupported_msg(struct avp_svc_info *avp_svc,
 			sizeof(resp), GFP_KERNEL);
 }
 
+static void do_svc_module_clock_get(struct avp_svc_info *avp_svc,
+				struct svc_msg *_msg,
+				size_t len)
+{
+	struct svc_clock_ctrl *msg = (struct svc_clock_ctrl *)_msg;
+	struct svc_clock_ctrl_response resp;
+	struct avp_module *mod;
+	struct avp_clk *aclk;
+	int ret = 0;
+
+	mod = find_avp_module(avp_svc, msg->module_id);
+	if (!mod) {
+		pr_err("avp_svc: unknown module get clock requested: %d\n",
+		       msg->module_id);
+		resp.err = AVP_ERR_EINVAL;
+		goto send_response;
+	}
+
+	mutex_lock(&avp_svc->clk_lock);
+	aclk = &avp_svc->clks[mod->clk_req];
+	resp.act_freq = clk_get_rate(aclk->clk);
+	mutex_unlock(&avp_svc->clk_lock);
+	resp.err = 0;
+
+send_response:
+	resp.svc_id = SVC_MODULE_CLOCK_GET_RESPONSE;
+	trpc_send_msg(avp_svc->rpc_node, avp_svc->cpu_ep, &resp,
+			sizeof(resp), GFP_KERNEL);
+}
+
 static int dispatch_svc_message(struct avp_svc_info *avp_svc,
 				struct svc_msg *msg,
 				size_t len)
@@ -581,6 +616,10 @@ static int dispatch_svc_message(struct avp_svc_info *avp_svc,
 	case SVC_MODULE_CLOCK_SET:
 		DBG(AVP_DBG_TRACE_SVC, "%s: got module_clock_set\n", __func__);
 		do_svc_module_clock_set(avp_svc, msg, len);
+		break;
+	case SVC_MODULE_CLOCK_GET:
+		DBG(AVP_DBG_TRACE_SVC, "%s: got module_clock_get\n", __func__);
+		do_svc_module_clock_get(avp_svc, msg, len);
 		break;
 	default:
 		pr_warning("avp_svc: Unsupported SVC call 0x%x\n", msg->svc_id);
