@@ -387,6 +387,19 @@
 #define HDMI_NV_PDISP_AUDIO_PULSE_WIDTH				0x89
 #define HDMI_NV_PDISP_AUDIO_THRESHOLD				0x8a
 #define HDMI_NV_PDISP_AUDIO_CNTRL0				0x8b
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+#define HDMI_NV_PDISP_SOR_AUDIO_CNTRL0_0		0xac
+#define HDMI_NV_PDISP_SOR_AUDIO_HDA_ELD_BUFWR_0		0xbc
+#define HDMI_NV_PDISP_SOR_AUDIO_HDA_PRESENSE_0		0xbd
+#define HDMI_NV_PDISP_SOR_AUDIO_AVAL_0320_0			0xbf
+#define HDMI_NV_PDISP_SOR_AUDIO_AVAL_0441_0			0xc0
+#define HDMI_NV_PDISP_SOR_AUDIO_AVAL_0882_0			0xc1
+#define HDMI_NV_PDISP_SOR_AUDIO_AVAL_1764_0			0xc2
+#define HDMI_NV_PDISP_SOR_AUDIO_AVAL_0480_0			0xc3
+#define HDMI_NV_PDISP_SOR_AUDIO_AVAL_0960_0			0xc4
+#define HDMI_NV_PDISP_SOR_AUDIO_AVAL_1920_0			0xc5
+#define HDMI_NV_PDISP_SOR_AUDIO_AVAL_DEFAULT_0			0xc6
+#endif
 #define  AUDIO_CNTRL0_ERROR_TOLERANCE(x)	(((x) & 0xff) << 0)
 #define  AUDIO_CNTRL0_SOFT_RESET		(1 << 8)
 #define  AUDIO_CNTRL0_SOFT_RESET_ALL		(1 << 12)
@@ -428,6 +441,22 @@
 #define  PE_CURRENT1(x)				(((x) & 0xf) << 8)
 #define  PE_CURRENT2(x)				(((x) & 0xf) << 16)
 #define  PE_CURRENT3(x)				(((x) & 0xf) << 24)
+#define  PE_CURRENT_0_0_mA			0x0
+#define  PE_CURRENT_0_5_mA			0x1
+#define  PE_CURRENT_1_0_mA			0x2
+#define  PE_CURRENT_1_5_mA			0x3
+#define  PE_CURRENT_2_0_mA			0x4
+#define  PE_CURRENT_2_5_mA			0x5
+#define  PE_CURRENT_3_0_mA			0x6
+#define  PE_CURRENT_3_5_mA			0x7
+#define  PE_CURRENT_4_0_mA			0x8
+#define  PE_CURRENT_4_5_mA			0x9
+#define  PE_CURRENT_5_0_mA			0xa
+#define  PE_CURRENT_5_5_mA			0xb
+#define  PE_CURRENT_6_0_mA			0xc
+#define  PE_CURRENT_6_5_mA			0xd
+#define  PE_CURRENT_7_0_mA			0xe
+#define  PE_CURRENT_7_5_mA			0xf
 
 #define HDMI_NV_PDISP_KEY_CTRL					0x9a
 #define  LOCAL_KEYS				(1 << 0)

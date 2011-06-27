@@ -3,7 +3,7 @@
  *
  * GPU memory management driver for Tegra
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010-2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -61,15 +61,18 @@ struct nvmap_pgalloc {
 	struct list_head mru_list;	/* MRU entry for IOVMM reclamation */
 	bool contig;			/* contiguous system memory */
 	bool dirty;			/* area is invalid and needs mapping */
+	u32 iovm_addr;	/* is non-zero, if client need specific iova mapping */
 };
 
 struct nvmap_handle {
 	struct rb_node node;	/* entry on global handle tree */
 	atomic_t ref;		/* reference count (i.e., # of duplications) */
 	atomic_t pin;		/* pin count */
+	unsigned int usecount;	/* how often is used */
 	unsigned long flags;
 	size_t size;		/* padded (as-allocated) size */
 	size_t orig_size;	/* original (as-requested) size */
+	size_t align;
 	struct nvmap_client *owner;
 	struct nvmap_device *dev;
 	union {
@@ -106,7 +109,7 @@ struct nvmap_client {
 	struct rb_root			handle_refs;
 	atomic_t			iovm_commit;
 	size_t				iovm_limit;
-	spinlock_t			ref_lock;
+	struct mutex			ref_lock;
 	bool				super;
 	atomic_t			count;
 	struct task_struct		*task;
@@ -132,12 +135,12 @@ struct nvmap_vma_priv {
 
 static inline void nvmap_ref_lock(struct nvmap_client *priv)
 {
-	spin_lock(&priv->ref_lock);
+	mutex_lock(&priv->ref_lock);
 }
 
 static inline void nvmap_ref_unlock(struct nvmap_client *priv)
 {
-	spin_unlock(&priv->ref_lock);
+	mutex_unlock(&priv->ref_lock);
 }
 
 struct device *nvmap_client_to_device(struct nvmap_client *client);
@@ -148,10 +151,12 @@ pte_t **nvmap_alloc_pte_irq(struct nvmap_device *dev, void **vaddr);
 
 void nvmap_free_pte(struct nvmap_device *dev, pte_t **pte);
 
+void nvmap_usecount_inc(struct nvmap_handle *h);
+void nvmap_usecount_dec(struct nvmap_handle *h);
+
 struct nvmap_heap_block *nvmap_carveout_alloc(struct nvmap_client *dev,
-					      size_t len, size_t align,
-					      unsigned long usage,
-					      unsigned int prot);
+					      struct nvmap_handle *handle,
+					      unsigned long type);
 
 unsigned long nvmap_carveout_usage(struct nvmap_client *c,
 				   struct nvmap_heap_block *b);
@@ -234,5 +239,10 @@ static inline pgprot_t nvmap_pgprot(struct nvmap_handle *h, pgprot_t prot)
 }
 
 int is_nvmap_vma(struct vm_area_struct *vma);
+
+struct nvmap_handle_ref *nvmap_alloc_iovm(struct nvmap_client *client,
+	size_t size, size_t align, unsigned int flags, unsigned int iova_start);
+
+void nvmap_free_iovm(struct nvmap_client *client, struct nvmap_handle_ref *r);
 
 #endif

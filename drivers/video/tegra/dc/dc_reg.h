@@ -4,6 +4,8 @@
  * Copyright (C) 2010 Google, Inc.
  * Author: Erik Gilling <konkers@android.com>
  *
+ * Copyright (C) 2010-2011 NVIDIA Corporation
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -32,6 +34,14 @@
 #define DC_CMD_WIN_C_INCR_SYNCPT_ERROR		0x01a
 #define DC_CMD_CONT_SYNCPT_VSYNC		0x028
 #define DC_CMD_DISPLAY_COMMAND_OPTION0		0x031
+#define  MSF_POLARITY_HIGH			(0 << 0)
+#define  MSF_POLARITY_LOW			(1 << 0)
+#define  MSF_DISABLE				(0 << 1)
+#define  MSF_ENABLE				(1 << 1)
+#define  MSF_LSPI				(0 << 2)
+#define  MSF_LDC				(1 << 2)
+#define  MSF_LSDI				(2 << 2)
+
 #define DC_CMD_DISPLAY_COMMAND			0x032
 #define  DISP_COMMAND_RAISE		(1 << 0)
 #define  DISP_CTRL_MODE_STOP		(0 << 5)
@@ -93,6 +103,7 @@
 #define  WIN_A_UPDATE		(1 << 9)
 #define  WIN_B_UPDATE		(1 << 10)
 #define  WIN_C_UPDATE		(1 << 11)
+#define  NC_HOST_TRIG		(1 << 24)
 
 #define DC_CMD_DISPLAY_WINDOW_HEADER		0x042
 #define  WINDOW_A_SELECT		(1 << 4)
@@ -107,10 +118,20 @@
 #define DC_COM_PIN_OUTPUT_ENABLE1		0x303
 #define DC_COM_PIN_OUTPUT_ENABLE2		0x304
 #define DC_COM_PIN_OUTPUT_ENABLE3		0x305
+#define  PIN_OUTPUT_LSPI_OUTPUT_EN		(1 << 8)
+#define  PIN_OUTPUT_LSPI_OUTPUT_DIS		(1 << 8)
 #define DC_COM_PIN_OUTPUT_POLARITY0		0x306
+
 #define DC_COM_PIN_OUTPUT_POLARITY1		0x307
+#define  LHS_OUTPUT_POLARITY_LOW	(1 << 30)
+#define  LVS_OUTPUT_POLARITY_LOW	(1 << 28)
+#define  LSC0_OUTPUT_POLARITY_LOW	(1 << 24)
+
 #define DC_COM_PIN_OUTPUT_POLARITY2		0x308
+
 #define DC_COM_PIN_OUTPUT_POLARITY3		0x309
+#define  LSPI_OUTPUT_POLARITY_LOW	(1 << 8)
+
 #define DC_COM_PIN_OUTPUT_DATA0			0x30a
 #define DC_COM_PIN_OUTPUT_DATA1			0x30b
 #define DC_COM_PIN_OUTPUT_DATA2			0x30c
@@ -119,6 +140,8 @@
 #define DC_COM_PIN_INPUT_ENABLE1		0x30f
 #define DC_COM_PIN_INPUT_ENABLE2		0x310
 #define DC_COM_PIN_INPUT_ENABLE3		0x311
+#define  PIN_INPUT_LSPI_INPUT_EN		(1 << 8)
+#define  PIN_INPUT_LSPI_INPUT_DIS		(1 << 8)
 #define DC_COM_PIN_INPUT_DATA0			0x312
 #define DC_COM_PIN_INPUT_DATA1			0x313
 #define DC_COM_PIN_OUTPUT_SELECT0		0x314
@@ -129,6 +152,11 @@
 #define DC_COM_PIN_OUTPUT_SELECT5		0x319
 #define DC_COM_PIN_OUTPUT_SELECT6		0x31a
 
+#define PIN5_LM1_LCD_M1_OUTPUT_MASK	(7 << 4)
+#define PIN5_LM1_LCD_M1_OUTPUT_M1	(0 << 4)
+#define PIN5_LM1_LCD_M1_OUTPUT_LD21	(2 << 4)
+#define PIN5_LM1_LCD_M1_OUTPUT_PM1	(3 << 4)
+
 #define  PIN1_LHS_OUTPUT		(1 << 30)
 #define  PIN1_LVS_OUTPUT		(1 << 28)
 
@@ -137,6 +165,10 @@
 #define DC_COM_PM0_DUTY_CYCLE			0x31d
 #define DC_COM_PM1_CONTROL			0x31e
 #define DC_COM_PM1_DUTY_CYCLE			0x31f
+
+#define PM_PERIOD_SHIFT                 18
+#define PM_CLK_DIVIDER_SHIFT		4
+
 #define DC_COM_SPI_CONTROL			0x320
 #define DC_COM_SPI_START_BYTE			0x321
 #define DC_COM_HSPI_WRITE_DATA_AB		0x322
@@ -382,6 +414,10 @@
 #define DC_WIN_BUF_STRIDE			0x70b
 #define DC_WIN_UV_BUF_STRIDE			0x70c
 #define DC_WIN_BUFFER_ADDR_MODE			0x70d
+#define  DC_WIN_BUFFER_ADDR_MODE_LINEAR		(0 << 0)
+#define  DC_WIN_BUFFER_ADDR_MODE_LINEAR_UV	(0 << 16)
+#define  DC_WIN_BUFFER_ADDR_MODE_TILE		(1 << 0)
+#define  DC_WIN_BUFFER_ADDR_MODE_TILE_UV	(1 << 16)
 #define DC_WIN_DV_CONTROL			0x70e
 #define DC_WIN_BLEND_NOKEY			0x70f
 #define DC_WIN_BLEND_1WIN			0x710
@@ -415,5 +451,70 @@
 #define DC_WINBUF_ADDR_V_OFFSET			0x808
 #define DC_WINBUF_ADDR_V_OFFSET_NS		0x809
 #define DC_WINBUF_UFLOW_STATUS			0x80a
+
+
+#define DC_DISP_SD_CONTROL			0x4c2
+#define  SD_ENABLE_NORMAL		(1 << 0)
+#define  SD_ENABLE_ONESHOT		(2 << 0)
+#define  SD_USE_VID_LUMA		(1 << 2)
+#define  SD_BIN_WIDTH_ONE		(0 << 3)
+#define  SD_BIN_WIDTH_TWO		(1 << 3)
+#define  SD_BIN_WIDTH_FOUR		(2 << 3)
+#define  SD_BIN_WIDTH_EIGHT		(3 << 3)
+#define  SD_AGGRESSIVENESS(x)	   	(((x) & 0x7) << 5)
+#define  SD_HW_UPDATE_DLY(x)		(((x) & 0x3) << 8)
+#define  SD_ONESHOT_ENABLE		(1 << 10)
+#define  SD_CORRECTION_MODE_AUTO	(0 << 11)
+#define  SD_CORRECTION_MODE_MAN		(1 << 11)
+
+#define DC_DISP_SD_CSC_COEFF			0x4c3
+#define  SD_CSC_COEFF_R(x)		(((x) & 0xf) << 4)
+#define  SD_CSC_COEFF_G(x)		(((x) & 0xf) << 12)
+#define  SD_CSC_COEFF_B(x)		(((x) & 0xf) << 20)
+
+#define DC_DISP_SD_LUT(i)			(0x4c4 + i)
+#define DC_DISP_SD_LUT_NUM			9
+#define  SD_LUT_R(x)			(((x) & 0xff) << 0)
+#define  SD_LUT_G(x)			(((x) & 0xff) << 8)
+#define  SD_LUT_B(x)			(((x) & 0xff) << 16)
+
+#define DC_DISP_SD_FLICKER_CONTROL		0x4cd
+#define  SD_FC_TIME_LIMIT(x)		(((x) & 0xff) << 0)
+#define  SD_FC_THRESHOLD(x)		(((x) & 0xff) << 8)
+
+#define DC_DISP_SD_PIXEL_COUNT			0x4ce
+
+#define DC_DISP_SD_HISTOGRAM(i)			(0x4cf + i)
+#define DC_DISP_SD_HISTOGRAM_NUM		8
+#define  SD_HISTOGRAM_BIN_0(val)	(((val) & (0xff << 0)) >> 0)
+#define  SD_HISTOGRAM_BIN_1(val)	(((val) & (0xff << 8)) >> 8)
+#define  SD_HISTOGRAM_BIN_2(val)	(((val) & (0xff << 16)) >> 16)
+#define  SD_HISTOGRAM_BIN_3(val)	(((val) & (0xff << 24)) >> 24)
+
+#define DC_DISP_SD_BL_PARAMETERS		0x4d7
+#define  SD_BLP_TIME_CONSTANT(x)	(((x) & 0x7ff) << 0)
+#define  SD_BLP_STEP(x)			(((x) & 0xff) << 8)
+
+#define DC_DISP_SD_BL_TF(i)			(0x4d8 + i)
+#define DC_DISP_SD_BL_TF_NUM			4
+#define  SD_BL_TF_POINT_0(x)		(((x) & 0xff) << 0)
+#define  SD_BL_TF_POINT_1(x)		(((x) & 0xff) << 8)
+#define  SD_BL_TF_POINT_2(x)		(((x) & 0xff) << 16)
+#define  SD_BL_TF_POINT_3(x)		(((x) & 0xff) << 24)
+
+#define DC_DISP_SD_BL_CONTROL			0x4dc
+#define  SD_BLC_MODE_MAN		(0 << 0)
+#define  SD_BLC_MODE_AUTO		(1 << 1)
+#define  SD_BLC_BRIGHTNESS(val)	 	(((val) & (0xff << 8)) >> 8)
+
+#define DC_DISP_SD_HW_K_VALUES			0x4dd
+#define  SD_HW_K_R(val)			(((val) & (0x3ff << 0)) >> 0)
+#define  SD_HW_K_G(val)			(((val) & (0x3ff << 10)) >> 10)
+#define  SD_HW_K_B(val)			(((val) & (0x3ff << 20)) >> 20)
+
+#define DC_DISP_SD_MAN_K_VALUES			0x4de
+#define  SD_MAN_K_R(x)			(((x) & 0x3ff) << 0)
+#define  SD_MAN_K_G(x)			(((x) & 0x3ff) << 10)
+#define  SD_MAN_K_B(x)			(((x) & 0x3ff) << 20)
 
 #endif

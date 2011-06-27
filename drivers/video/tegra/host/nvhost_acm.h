@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Automatic Clock Management
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010-2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -51,13 +51,14 @@ struct nvhost_module {
 	wait_queue_head_t idle;
 	struct nvhost_module *parent;
 	int powergate_id;
+	int powergate_id2;
 };
 
 int nvhost_module_init(struct nvhost_module *mod, const char *name,
 		nvhost_modulef func, struct nvhost_module *parent,
 		struct device *dev);
 void nvhost_module_deinit(struct nvhost_module *mod);
-void nvhost_module_suspend(struct nvhost_module *mod);
+void nvhost_module_suspend(struct nvhost_module *mod, bool system_suspend);
 
 void nvhost_module_busy(struct nvhost_module *mod);
 void nvhost_module_idle_mult(struct nvhost_module *mod, int refs);

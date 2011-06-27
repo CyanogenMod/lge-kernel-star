@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Automatic Clock Management
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010-2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-#include "nvhost_acm.h"
+#include "dev.h"
 #include <linux/string.h>
 #include <linux/sched.h>
 #include <linux/err.h>
@@ -28,29 +28,26 @@
 #include <mach/powergate.h>
 #include <mach/clk.h>
 
-#include "dev.h"
-
-#define ACM_TIMEOUT 1*HZ
+#define ACM_TIMEOUT_MSEC 25
 
 #define DISABLE_3D_POWERGATING
-#define DISABLE_MPE_POWERGATING
 
 void nvhost_module_busy(struct nvhost_module *mod)
 {
 	mutex_lock(&mod->lock);
 	cancel_delayed_work(&mod->powerdown);
 	if ((atomic_inc_return(&mod->refcount) == 1) && !mod->powered) {
+		int i = 0;
 		if (mod->parent)
 			nvhost_module_busy(mod->parent);
-		if (mod->powergate_id != -1) {
-			BUG_ON(mod->num_clks != 1);
+		if (mod->powergate_id != -1)
 			tegra_powergate_sequence_power_up(
-				mod->powergate_id, mod->clk[0]);
-		} else {
-			int i;
-			for (i = 0; i < mod->num_clks; i++)
-				clk_enable(mod->clk[i]);
-		}
+				mod->powergate_id, mod->clk[i++]);
+		if (mod->powergate_id2 != -1)
+			tegra_powergate_sequence_power_up(
+				mod->powergate_id2, mod->clk[i++]);
+		while (i < mod->num_clks)
+			clk_enable(mod->clk[i++]);
 		if (mod->func)
 			mod->func(mod, NVHOST_POWER_ACTION_ON);
 		mod->powered = true;
@@ -67,12 +64,15 @@ static void powerdown_handler(struct work_struct *work)
 		int i;
 		if (mod->func)
 			mod->func(mod, NVHOST_POWER_ACTION_OFF);
-		for (i = 0; i < mod->num_clks; i++) {
+		for (i = 0; i < mod->num_clks; i++)
 			clk_disable(mod->clk[i]);
-		}
 		if (mod->powergate_id != -1) {
 			tegra_periph_reset_assert(mod->clk[0]);
 			tegra_powergate_power_off(mod->powergate_id);
+		}
+		if (mod->powergate_id2 != -1) {
+			tegra_periph_reset_assert(mod->clk[1]);
+			tegra_powergate_power_off(mod->powergate_id2);
 		}
 		mod->powered = false;
 		if (mod->parent)
@@ -88,7 +88,8 @@ void nvhost_module_idle_mult(struct nvhost_module *mod, int refs)
 	mutex_lock(&mod->lock);
 	if (atomic_sub_return(refs, &mod->refcount) == 0) {
 		BUG_ON(!mod->powered);
-		schedule_delayed_work(&mod->powerdown, ACM_TIMEOUT);
+		schedule_delayed_work(
+			&mod->powerdown, msecs_to_jiffies(ACM_TIMEOUT_MSEC));
 		kick = true;
 	}
 	mutex_unlock(&mod->lock);
@@ -99,26 +100,30 @@ void nvhost_module_idle_mult(struct nvhost_module *mod, int refs)
 
 static const char *get_module_clk_id(const char *module, int index)
 {
-	if (index == 1 && strcmp(module, "gr2d") == 0)
-		return "epp";
-	else if (index == 2 && strcmp(module, "gr2d") == 0)
-		return "emc";
-	else if (index == 1 && strcmp(module, "gr3d") == 0)
-		return "emc";
-	else if (index == 1 && strcmp(module, "mpe") == 0)
-		return "emc";
-	else if (index == 0)
+	if (index == 0)
 		return module;
+	if (strcmp(module, "gr2d") == 0) {
+		if (index == 1)
+			return "epp";
+		if (index == 2)
+			return "emc";
+	}
+	if (strcmp(module, "gr3d") == 0) {
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+		if (index == 1)
+			return "emc";
+#else
+		if (index == 1)
+			return "gr3d2";
+		if (index == 2)
+			return "emc";
+#endif
+	}
+	if (strcmp(module, "mpe") == 0) {
+		if (index == 1)
+			return "emc";
+	}
 	return NULL;
-}
-
-static int get_module_powergate_id(const char *module)
-{
-	if (strcmp(module, "gr3d") == 0)
-		return TEGRA_POWERGATE_3D;
-	else if (strcmp(module, "mpe") == 0)
-		return TEGRA_POWERGATE_MPE;
-	return -1;
 }
 
 int nvhost_module_init(struct nvhost_module *mod, const char *name,
@@ -126,6 +131,7 @@ int nvhost_module_init(struct nvhost_module *mod, const char *name,
 		struct device *dev)
 {
 	int i = 0;
+
 	mod->name = name;
 
 	while (i < NVHOST_MODULE_MAX_CLOCKS) {
@@ -140,7 +146,9 @@ int nvhost_module_init(struct nvhost_module *mod, const char *name,
 			break;
 		}
 		if (rate != clk_get_rate(mod->clk[i])) {
+			clk_enable(mod->clk[i]);
 			clk_set_rate(mod->clk[i], rate);
+			clk_disable(mod->clk[i]);
 		}
 		i++;
 	}
@@ -149,7 +157,16 @@ int nvhost_module_init(struct nvhost_module *mod, const char *name,
 	mod->func = func;
 	mod->parent = parent;
 	mod->powered = false;
-	mod->powergate_id = get_module_powergate_id(name);
+	mod->powergate_id = -1;
+	mod->powergate_id2 = -1;
+
+	if (strcmp(name, "gr3d") == 0) {
+		mod->powergate_id = TEGRA_POWERGATE_3D;
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+		mod->powergate_id2 = TEGRA_POWERGATE_3D1;
+#endif
+	} else if (strcmp(name, "mpe") == 0)
+		mod->powergate_id = TEGRA_POWERGATE_MPE;
 
 #ifdef DISABLE_3D_POWERGATING
 	/*
@@ -163,19 +180,14 @@ int nvhost_module_init(struct nvhost_module *mod, const char *name,
 		clk_disable(mod->clk[0]);
 		mod->powergate_id = -1;
 	}
-#endif
-
-#ifdef DISABLE_MPE_POWERGATING
-	/*
-	 * Disable power gating for MPE as it seems to cause issues with
-	 * camera record stress tests when run in loop.
-	 */
-	if (mod->powergate_id == TEGRA_POWERGATE_MPE) {
-		tegra_powergate_sequence_power_up(mod->powergate_id,
-			mod->clk[0]);
-		clk_disable(mod->clk[0]);
-		mod->powergate_id = -1;
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	if (mod->powergate_id2 == TEGRA_POWERGATE_3D1) {
+		tegra_powergate_sequence_power_up(mod->powergate_id2,
+			mod->clk[1]);
+		clk_disable(mod->clk[1]);
+		mod->powergate_id2 = -1;
 	}
+#endif
 #endif
 
 	mutex_init(&mod->lock);
@@ -194,22 +206,60 @@ static int is_module_idle(struct nvhost_module *mod)
 	return (count == 0);
 }
 
-void nvhost_module_suspend(struct nvhost_module *mod)
+static void debug_not_idle(struct nvhost_master *dev)
+{
+	int i;
+	bool lock_released = true;
+
+	for (i = 0; i < NVHOST_NUMCHANNELS; i++) {
+		struct nvhost_module *m = &dev->channels[i].mod;
+		if (m->name)
+			printk("tegra_grhost: %s: refcnt %d\n",
+				m->name, atomic_read(&m->refcount));
+	}
+
+	for (i = 0; i < NV_HOST1X_SYNC_MLOCK_NUM; i++) {
+		int c = atomic_read(&dev->cpuaccess.lock_counts[i]);
+		if (c) {
+			printk("tegra_grhost: lock id %d: refcnt %d\n", i, c);
+			lock_released = false;
+		}
+	}
+	if (lock_released)
+		printk("tegra_grhost: all locks released\n");
+}
+
+void nvhost_module_suspend(struct nvhost_module *mod, bool system_suspend)
 {
 	int ret;
+	struct nvhost_master *dev;
+
+	if (system_suspend) {
+		dev = container_of(mod, struct nvhost_master, mod);
+		if (!is_module_idle(mod))
+			debug_not_idle(dev);
+	} else {
+		dev = container_of(mod, struct nvhost_channel, mod)->dev;
+	}
 
 	ret = wait_event_timeout(mod->idle, is_module_idle(mod),
-			   ACM_TIMEOUT + msecs_to_jiffies(500));
+			   msecs_to_jiffies(ACM_TIMEOUT_MSEC + 500));
 	if (ret == 0)
-		nvhost_debug_dump();
+		nvhost_debug_dump(dev);
+
+	if (system_suspend)
+		printk("tegra_grhost: entered idle\n");
+
 	flush_delayed_work(&mod->powerdown);
+	if (system_suspend)
+		printk("tegra_grhost: flushed delayed work\n");
 	BUG_ON(mod->powered);
 }
 
 void nvhost_module_deinit(struct nvhost_module *mod)
 {
 	int i;
-	nvhost_module_suspend(mod);
+	nvhost_module_suspend(mod, false);
 	for (i = 0; i < mod->num_clks; i++)
 		clk_put(mod->clk[i]);
 }

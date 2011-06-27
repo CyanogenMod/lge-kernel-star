@@ -4,6 +4,8 @@
  * Copyright (C) 2010 Google, Inc.
  * Author: Erik Gilling <konkers@android.com>
  *
+ * Copyright (C) 2010-2011 NVIDIA Corporation
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -30,6 +32,7 @@
 #include <linux/ktime.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
+#include <linux/backlight.h>
 
 #include <mach/clk.h>
 #include <mach/dc.h>
@@ -39,6 +42,8 @@
 
 #include "dc_reg.h"
 #include "dc_priv.h"
+#include "overlay.h"
+#include "nvsd.h"
 
 static int no_vsync;
 
@@ -47,6 +52,7 @@ module_param_named(no_vsync, no_vsync, int, S_IRUGO | S_IWUSR);
 struct tegra_dc *tegra_dcs[TEGRA_MAX_DC];
 
 DEFINE_MUTEX(tegra_dc_lock);
+DEFINE_MUTEX(shared_lock);
 
 static inline int tegra_dc_fmt_bpp(int fmt)
 {
@@ -257,6 +263,18 @@ static void _dump_regs(struct tegra_dc *dc, void *data,
 		DUMP_REG(DC_WIN_CSC_KVB);
 	}
 
+	DUMP_REG(DC_CMD_DISPLAY_POWER_CONTROL);
+	DUMP_REG(DC_COM_PIN_OUTPUT_ENABLE2);
+	DUMP_REG(DC_COM_PIN_OUTPUT_POLARITY2);
+	DUMP_REG(DC_COM_PIN_OUTPUT_DATA2);
+	DUMP_REG(DC_COM_PIN_INPUT_ENABLE2);
+	DUMP_REG(DC_COM_PIN_OUTPUT_SELECT5);
+	DUMP_REG(DC_DISP_DISP_SIGNAL_OPTIONS0);
+	DUMP_REG(DC_DISP_M1_CONTROL);
+	DUMP_REG(DC_COM_PM1_CONTROL);
+	DUMP_REG(DC_COM_PM1_DUTY_CYCLE);
+	DUMP_REG(DC_DISP_SD_CONTROL);
+
 	clk_disable(dc->clk);
 	tegra_dc_io_end(dc);
 }
@@ -274,11 +292,11 @@ static void dump_regs(struct tegra_dc *dc)
 {
 	_dump_regs(dc, dc, dump_regs_print);
 }
-#else
+#else /* !DEBUG */
 
 static void dump_regs(struct tegra_dc *dc) {}
 
-#endif
+#endif /* DEBUG */
 
 #ifdef CONFIG_DEBUG_FS
 
@@ -306,25 +324,126 @@ static int dbg_dc_open(struct inode *inode, struct file *file)
 	return single_open(file, dbg_dc_show, inode->i_private);
 }
 
-static const struct file_operations dbg_fops = {
+static const struct file_operations regs_fops = {
 	.open		= dbg_dc_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
 
-static void tegra_dc_dbg_add(struct tegra_dc *dc)
+static int dbg_dc_mode_show(struct seq_file *s, void *unused)
 {
-	char name[32];
+	struct tegra_dc *dc = s->private;
+	struct tegra_dc_mode *m;
 
-	snprintf(name, sizeof(name), "tegra_dc%d_regs", dc->ndev->id);
-	(void) debugfs_create_file(name, S_IRUGO, NULL, dc, &dbg_fops);
+	mutex_lock(&dc->lock);
+	m = &dc->mode;
+	seq_printf(s,
+		"pclk: %d\n"
+		"h_ref_to_sync: %d\n"
+		"v_ref_to_sync: %d\n"
+		"h_sync_width: %d\n"
+		"v_sync_width: %d\n"
+		"h_back_porch: %d\n"
+		"v_back_porch: %d\n"
+		"h_active: %d\n"
+		"v_active: %d\n"
+		"h_front_porch: %d\n"
+		"v_front_porch: %d\n"
+		"stereo_mode: %d\n",
+		m->pclk, m->h_ref_to_sync, m->v_ref_to_sync,
+		m->h_sync_width, m->v_sync_width,
+		m->h_back_porch, m->v_back_porch,
+		m->h_active, m->v_active,
+		m->h_front_porch, m->v_front_porch,
+		m->stereo_mode);
+	mutex_unlock(&dc->lock);
+	return 0;
 }
-#else
-static void tegra_dc_dbg_add(struct tegra_dc *dc) {}
 
-#endif
+static int dbg_dc_mode_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, dbg_dc_mode_show, inode->i_private);
+}
 
+static const struct file_operations mode_fops = {
+	.open		= dbg_dc_mode_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static int dbg_dc_stats_show(struct seq_file *s, void *unused)
+{
+	struct tegra_dc *dc = s->private;
+
+	mutex_lock(&dc->lock);
+	seq_printf(s,
+		"underflows: %u\n"
+		"underflows_a: %u\n"
+		"underflows_b: %u\n"
+		"underflows_c: %u\n",
+		dc->stats.underflows,
+		dc->stats.underflows_a,
+		dc->stats.underflows_b,
+		dc->stats.underflows_c);
+	mutex_unlock(&dc->lock);
+
+	return 0;
+}
+
+static int dbg_dc_stats_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, dbg_dc_stats_show, inode->i_private);
+}
+
+static const struct file_operations stats_fops = {
+	.open		= dbg_dc_stats_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static void __devexit tegra_dc_remove_debugfs(struct tegra_dc *dc)
+{
+	if (dc->debugdir)
+		debugfs_remove_recursive(dc->debugdir);
+	dc->debugdir = NULL;
+}
+
+static void tegra_dc_create_debugfs(struct tegra_dc *dc)
+{
+	struct dentry *retval;
+
+	dc->debugdir = debugfs_create_dir(dev_name(&dc->ndev->dev), NULL);
+	if (!dc->debugdir)
+		goto remove_out;
+
+	retval = debugfs_create_file("regs", S_IRUGO, dc->debugdir, dc,
+		&regs_fops);
+	if (!retval)
+		goto remove_out;
+
+	retval = debugfs_create_file("mode", S_IRUGO, dc->debugdir, dc,
+		&mode_fops);
+	if (!retval)
+		goto remove_out;
+
+	retval = debugfs_create_file("stats", S_IRUGO, dc->debugdir, dc,
+		&stats_fops);
+	if (!retval)
+		goto remove_out;
+
+	return;
+remove_out:
+	dev_err(&dc->ndev->dev, "could not create debugfs\n");
+	tegra_dc_remove_debugfs(dc);
+}
+
+#else /* !CONFIG_DEBUGFS */
+static inline void tegra_dc_create_debugfs(struct tegra_dc *dc) { };
+static inline void __devexit tegra_dc_remove_debugfs(struct tegra_dc *dc) { };
+#endif /* CONFIG_DEBUGFS */
 
 static int tegra_dc_add(struct tegra_dc *dc, int index)
 {
@@ -547,7 +666,9 @@ int tegra_dc_update_windows(struct tegra_dc_win *windows[], int n)
 
 		tegra_dc_writel(dc, 0, DC_WIN_BUF_STRIDE);
 		tegra_dc_writel(dc, 0, DC_WIN_UV_BUF_STRIDE);
-		tegra_dc_writel(dc, (unsigned long)win->phys_addr,
+		tegra_dc_writel(dc,
+				(unsigned long)win->phys_addr +
+				(unsigned long)win->offset,
 				DC_WINBUF_START_ADDR);
 
 		if (!yuvp) {
@@ -566,6 +687,17 @@ int tegra_dc_update_windows(struct tegra_dc_win *windows[], int n)
 					UV_LINE_STRIDE(win->stride_uv),
 					DC_WIN_LINE_STRIDE);
 		}
+
+		if (win->flags & TEGRA_WIN_FLAG_TILED)
+			tegra_dc_writel(dc,
+					DC_WIN_BUFFER_ADDR_MODE_TILE |
+					DC_WIN_BUFFER_ADDR_MODE_TILE_UV,
+					DC_WIN_BUFFER_ADDR_MODE);
+		else
+			tegra_dc_writel(dc,
+					DC_WIN_BUFFER_ADDR_MODE_LINEAR |
+					DC_WIN_BUFFER_ADDR_MODE_LINEAR_UV,
+					DC_WIN_BUFFER_ADDR_MODE);
 
 		tegra_dc_writel(dc, win->x * tegra_dc_fmt_bpp(win->fmt) / 8,
 				DC_WINBUF_ADDR_H_OFFSET);
@@ -609,6 +741,7 @@ int tegra_dc_update_windows(struct tegra_dc_win *windows[], int n)
 	}
 
 	tegra_dc_writel(dc, update_mask, DC_CMD_STATE_CONTROL);
+
 	mutex_unlock(&dc->lock);
 
 	return 0;
@@ -626,7 +759,8 @@ u32 tegra_dc_incr_syncpt_max(struct tegra_dc *dc)
 	u32 max;
 
 	mutex_lock(&dc->lock);
-	max = nvhost_syncpt_incr_max(&dc->ndev->host->syncpt, dc->syncpt_id, 1);
+	max = nvhost_syncpt_incr_max(&dc->ndev->host->syncpt, dc->syncpt_id,
+					((dc->enabled) ? 1 : 0) );
 	dc->syncpt_max = max;
 	mutex_unlock(&dc->lock);
 
@@ -636,10 +770,12 @@ u32 tegra_dc_incr_syncpt_max(struct tegra_dc *dc)
 void tegra_dc_incr_syncpt_min(struct tegra_dc *dc, u32 val)
 {
 	mutex_lock(&dc->lock);
-	while (dc->syncpt_min < val) {
-		dc->syncpt_min++;
-		nvhost_syncpt_cpu_incr(&dc->ndev->host->syncpt, dc->syncpt_id);
-	}
+	if ( dc->enabled )
+		while (dc->syncpt_min < val) {
+			dc->syncpt_min++;
+			nvhost_syncpt_cpu_incr(&dc->ndev->host->syncpt,
+				dc->syncpt_id);
+		}
 	mutex_unlock(&dc->lock);
 }
 
@@ -671,12 +807,21 @@ int tegra_dc_sync_windows(struct tegra_dc_win *windows[], int n)
 }
 EXPORT_SYMBOL(tegra_dc_sync_windows);
 
+static unsigned long tegra_dc_clk_get_rate(struct tegra_dc *dc)
+{
+#ifdef CONFIG_TEGRA_FPGA_PLATFORM
+	return 27000000;
+#else
+	return clk_get_rate(dc->clk);
+#endif
+}
+
 static unsigned long tegra_dc_pclk_round_rate(struct tegra_dc *dc, int pclk)
 {
 	unsigned long rate;
 	unsigned long div;
 
-	rate = clk_get_rate(dc->clk);
+	rate = tegra_dc_clk_get_rate(dc);
 
 	div = DIV_ROUND_CLOSEST(rate * 2, pclk);
 
@@ -689,6 +834,14 @@ static unsigned long tegra_dc_pclk_round_rate(struct tegra_dc *dc, int pclk)
 void tegra_dc_setup_clk(struct tegra_dc *dc, struct clk *clk)
 {
 	int pclk;
+
+	if (dc->out->type == TEGRA_DC_OUT_RGB) {
+		struct clk *parent_clk =
+			clk_get_sys(NULL, dc->out->parent_clk ? : "pll_p");
+
+		if (clk_get_parent(clk) != parent_clk)
+			clk_set_parent(clk, parent_clk);
+	}
 
 	if (dc->out->type == TEGRA_DC_OUT_HDMI) {
 		unsigned long rate;
@@ -709,10 +862,143 @@ void tegra_dc_setup_clk(struct tegra_dc *dc, struct clk *clk)
 			clk_set_parent(clk, pll_d_out0_clk);
 	}
 
+	if (dc->out->type == TEGRA_DC_OUT_DSI) {
+		unsigned long rate;
+		struct clk *pll_d_out0_clk;
+		struct clk *pll_d_clk;
+
+		if (clk == dc->clk) {
+			pll_d_out0_clk = clk_get_sys(NULL, "pll_d_out0");
+			pll_d_clk = clk_get_sys(NULL, "pll_d");
+		} else {
+			if (dc->pdata->default_out->dsi->dsi_instance) {
+				pll_d_out0_clk = clk_get_sys(NULL, "pll_d2_out0");
+				pll_d_clk = clk_get_sys(NULL, "pll_d2");
+				tegra_clk_cfg_ex(pll_d_clk, TEGRA_CLK_PLLD_CSI_OUT_ENB, 1);
+			} else {
+				pll_d_out0_clk = clk_get_sys(NULL, "pll_d_out0");
+				pll_d_clk = clk_get_sys(NULL, "pll_d");
+			}
+		}
+
+		rate = dc->mode.pclk;
+		if (rate != clk_get_rate(pll_d_clk))
+			clk_set_rate(pll_d_clk, rate);
+
+		if (clk_get_parent(clk) != pll_d_out0_clk)
+			clk_set_parent(clk, pll_d_out0_clk);
+	}
+
 	pclk = tegra_dc_pclk_round_rate(dc, dc->mode.pclk);
 	tegra_dvfs_set_rate(clk, pclk);
-
 }
+
+/* return non-zero if constraint is violated */
+static int calc_h_ref_to_sync(const struct tegra_dc_mode *mode, int *href)
+{
+	long a, b;
+
+	/* Constraint 5: H_REF_TO_SYNC >= 0 */
+	a = 0;
+
+	/* Constraint 6: H_FRONT_PORT >= (H_REF_TO_SYNC + 1) */
+	b = mode->h_front_porch - 1;
+
+	/* Constraint 1: H_REF_TO_SYNC + H_SYNC_WIDTH + H_BACK_PORCH > 11 */
+	if (a + mode->h_sync_width + mode->h_back_porch <= 11)
+		a = 1 + 11 - mode->h_sync_width - mode->h_back_porch;
+	/* check Constraint 1 and 6 */
+	if (a > b)
+		return 1;
+
+	/* Constraint 4: H_SYNC_WIDTH >= 1 */
+	if (mode->h_sync_width < 1)
+		return 4;
+
+	/* Constraint 7: H_DISP_ACTIVE >= 16 */
+	if (mode->h_active < 16)
+		return 7;
+
+	if (href) {
+		if (b > a && a % 2)
+			*href = a + 1; /* use smallest even value */
+		else
+			*href = a; /* even or only possible value */
+	}
+
+	return 0;
+}
+
+static int calc_v_ref_to_sync(const struct tegra_dc_mode *mode, int *vref)
+{
+	long a;
+	a = 1; /* Constraint 5: V_REF_TO_SYNC >= 1 */
+
+	/* Constraint 2: V_REF_TO_SYNC + V_SYNC_WIDTH + V_BACK_PORCH > 1 */
+	if (a + mode->v_sync_width + mode->v_back_porch <= 1)
+		a = 1 + 1 - mode->v_sync_width - mode->v_back_porch;
+
+	/* Constraint 6 */
+	if (mode->v_front_porch < a + 1)
+		a = mode->v_front_porch - 1;
+
+	/* Constraint 4: V_SYNC_WIDTH >= 1 */
+	if (mode->v_sync_width < 1)
+		return 4;
+
+	/* Constraint 7: V_DISP_ACTIVE >= 16 */
+	if (mode->v_active < 16)
+		return 7;
+
+        if (vref)
+                *vref = a;
+	return 0;
+}
+
+static int calc_ref_to_sync(struct tegra_dc_mode *mode)
+{
+	int ret;
+	ret = calc_h_ref_to_sync(mode, &mode->h_ref_to_sync);
+	if (ret)
+		return ret;
+	ret = calc_v_ref_to_sync(mode, &mode->v_ref_to_sync);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+#ifdef DEBUG
+/* return in 1000ths of a Hertz */
+static int calc_refresh(const struct tegra_dc_mode *m)
+{
+	long h_total, v_total, refresh;
+	h_total = m->h_active + m->h_front_porch + m->h_back_porch +
+		m->h_sync_width;
+	v_total = m->v_active + m->v_front_porch + m->v_back_porch +
+		m->v_sync_width;
+	refresh = m->pclk / h_total;
+	refresh *= 1000;
+	refresh /= v_total;
+	return refresh;
+}
+
+static void print_mode(struct tegra_dc *dc,
+			const struct tegra_dc_mode *mode, const char *note)
+{
+	if (mode) {
+		int refresh = calc_refresh(mode);
+		dev_info(&dc->ndev->dev, "%s():MODE:%dx%d@%d.%03uHz pclk=%d\n",
+			note ? note : "",
+			mode->h_active, mode->v_active,
+			refresh / 1000, refresh % 1000,
+			mode->pclk);
+	}
+}
+#else /* !DEBUG */
+static inline void print_mode(struct tegra_dc *dc,
+			const struct tegra_dc_mode *mode, const char *note) { }
+#endif /* DEBUG */
 
 static int tegra_dc_program_mode(struct tegra_dc *dc, struct tegra_dc_mode *mode)
 {
@@ -720,6 +1006,8 @@ static int tegra_dc_program_mode(struct tegra_dc *dc, struct tegra_dc_mode *mode
 	unsigned long rate;
 	unsigned long div;
 	unsigned long pclk;
+
+	print_mode(dc, mode, __func__);
 
 	tegra_dc_writel(dc, 0x0, DC_DISP_DISP_TIMING_OPTIONS);
 	tegra_dc_writel(dc, mode->h_ref_to_sync | (mode->v_ref_to_sync << 16),
@@ -764,7 +1052,7 @@ static int tegra_dc_program_mode(struct tegra_dc *dc, struct tegra_dc_mode *mode
 
 	tegra_dc_writel(dc, val, DC_DISP_DISP_INTERFACE_CONTROL);
 
-	rate = clk_get_rate(dc->clk);
+	rate = tegra_dc_clk_get_rate(dc);
 
 	pclk = tegra_dc_pclk_round_rate(dc, mode->pclk);
 	if (pclk < (mode->pclk / 100 * 99) ||
@@ -792,9 +1080,172 @@ int tegra_dc_set_mode(struct tegra_dc *dc, const struct tegra_dc_mode *mode)
 {
 	memcpy(&dc->mode, mode, sizeof(dc->mode));
 
+	print_mode(dc, mode, __func__);
+
 	return 0;
 }
 EXPORT_SYMBOL(tegra_dc_set_mode);
+
+int tegra_dc_set_fb_mode(struct tegra_dc *dc,
+		const struct fb_videomode *fbmode, bool stereo_mode)
+{
+	struct tegra_dc_mode mode;
+
+	mode.pclk = PICOS2KHZ(fbmode->pixclock) * 1000;
+	mode.h_sync_width = fbmode->hsync_len;
+	mode.v_sync_width = fbmode->vsync_len;
+	mode.h_back_porch = fbmode->left_margin;
+	mode.v_back_porch = fbmode->upper_margin;
+	mode.h_active = fbmode->xres;
+	mode.v_active = fbmode->yres;
+	mode.h_front_porch = fbmode->right_margin;
+	mode.v_front_porch = fbmode->lower_margin;
+	mode.stereo_mode = stereo_mode;
+	if (calc_ref_to_sync(&mode)) {
+		dev_err(&dc->ndev->dev, "bad href/vref values, overriding.\n");
+		mode.h_ref_to_sync = 11;
+		mode.v_ref_to_sync = 1;
+	}
+	dev_info(&dc->ndev->dev, "Using mode %dx%d pclk=%d href=%d vref=%d\n",
+		mode.h_active, mode.v_active, mode.pclk,
+		mode.h_ref_to_sync, mode.v_ref_to_sync
+	);
+
+	if (mode.stereo_mode) {
+		mode.pclk *= 2;
+		/* total v_active = yres*2 + activespace */
+		mode.v_active = fbmode->yres*2 +
+				fbmode->vsync_len +
+				fbmode->upper_margin +
+				fbmode->lower_margin;
+	}
+
+	mode.flags = 0;
+
+	if (!(fbmode->sync & FB_SYNC_HOR_HIGH_ACT))
+		mode.flags |= TEGRA_DC_MODE_FLAG_NEG_H_SYNC;
+
+	if (!(fbmode->sync & FB_SYNC_VERT_HIGH_ACT))
+		mode.flags |= TEGRA_DC_MODE_FLAG_NEG_V_SYNC;
+
+	return tegra_dc_set_mode(dc, &mode);
+}
+EXPORT_SYMBOL(tegra_dc_set_fb_mode);
+
+void
+tegra_dc_config_pwm(struct tegra_dc *dc, struct tegra_dc_pwm_params *cfg)
+{
+	unsigned int ctrl;
+	unsigned long out_sel;
+	unsigned long cmd_state;
+
+	mutex_lock(&dc->lock);
+	if (!dc->enabled) {
+		mutex_unlock(&dc->lock);
+		return;
+	}
+
+	ctrl = ((cfg->period << PM_PERIOD_SHIFT) |
+		(cfg->clk_div << PM_CLK_DIVIDER_SHIFT) |
+		cfg->clk_select);
+
+	/* The new value should be effected immediately */
+	cmd_state = tegra_dc_readl(dc, DC_CMD_STATE_ACCESS);
+	tegra_dc_writel(dc, (cmd_state | (1 << 2)), DC_CMD_STATE_ACCESS);
+
+	switch (cfg->which_pwm) {
+	case TEGRA_PWM_PM0:
+		/* Select the LM0 on PM0 */
+		out_sel = tegra_dc_readl(dc, DC_COM_PIN_OUTPUT_SELECT5);
+		out_sel &= ~(7 << 0);
+		out_sel |= (3 << 0);
+		tegra_dc_writel(dc, out_sel, DC_COM_PIN_OUTPUT_SELECT5);
+		tegra_dc_writel(dc, ctrl, DC_COM_PM0_CONTROL);
+		tegra_dc_writel(dc, cfg->duty_cycle, DC_COM_PM0_DUTY_CYCLE);
+		break;
+	case TEGRA_PWM_PM1:
+		/* Select the LM1 on PM1 */
+		out_sel = tegra_dc_readl(dc, DC_COM_PIN_OUTPUT_SELECT5);
+		out_sel &= ~(7 << 4);
+		out_sel |= (3 << 4);
+		tegra_dc_writel(dc, out_sel, DC_COM_PIN_OUTPUT_SELECT5);
+		tegra_dc_writel(dc, ctrl, DC_COM_PM1_CONTROL);
+		tegra_dc_writel(dc, cfg->duty_cycle, DC_COM_PM1_DUTY_CYCLE);
+		break;
+	default:
+		dev_err(&dc->ndev->dev, "Error\n");
+		break;
+	}
+	tegra_dc_writel(dc, cmd_state, DC_CMD_STATE_ACCESS);
+	mutex_unlock(&dc->lock);
+}
+EXPORT_SYMBOL(tegra_dc_config_pwm);
+
+static void tegra_dc_set_out_pin_polars(struct tegra_dc *dc,
+				const struct tegra_dc_out_pin *pins,
+				const unsigned int n_pins)
+{
+	unsigned int i;
+
+	int name;
+	int pol;
+
+	u32 pol1, pol3;
+
+	u32 set1, unset1;
+	u32 set3, unset3;
+
+	set1 = set3 = unset1 = unset3 = 0;
+
+	for (i = 0; i < n_pins; i++) {
+		name = (pins + i)->name;
+		pol  = (pins + i)->pol;
+
+		/* set polarity by name */
+		switch (name) {
+		case TEGRA_DC_OUT_PIN_DATA_ENABLE:
+			if (pol == TEGRA_DC_OUT_PIN_POL_LOW)
+				set3 |= LSPI_OUTPUT_POLARITY_LOW;
+			else
+				unset3 |= LSPI_OUTPUT_POLARITY_LOW;
+			break;
+		case TEGRA_DC_OUT_PIN_H_SYNC:
+			if (pol == TEGRA_DC_OUT_PIN_POL_LOW)
+				set1 |= LHS_OUTPUT_POLARITY_LOW;
+			else
+				unset1 |= LHS_OUTPUT_POLARITY_LOW;
+			break;
+		case TEGRA_DC_OUT_PIN_V_SYNC:
+			if (pol == TEGRA_DC_OUT_PIN_POL_LOW)
+				set1 |= LVS_OUTPUT_POLARITY_LOW;
+			else
+				unset1 |= LVS_OUTPUT_POLARITY_LOW;
+			break;
+		case TEGRA_DC_OUT_PIN_PIXEL_CLOCK:
+			if (pol == TEGRA_DC_OUT_PIN_POL_LOW)
+				set1 |= LSC0_OUTPUT_POLARITY_LOW;
+			else
+				unset1 |= LSC0_OUTPUT_POLARITY_LOW;
+			break;
+		default:
+			printk("Invalid argument in function %s\n",
+			       __FUNCTION__);
+			break;
+		}
+	}
+
+	pol1 = tegra_dc_readl(dc, DC_COM_PIN_OUTPUT_POLARITY1);
+	pol3 = tegra_dc_readl(dc, DC_COM_PIN_OUTPUT_POLARITY3);
+
+	pol1 |= set1;
+	pol1 &= ~unset1;
+
+	pol3 |= set3;
+	pol3 &= ~unset3;
+
+	tegra_dc_writel(dc, pol1, DC_COM_PIN_OUTPUT_POLARITY1);
+	tegra_dc_writel(dc, pol3, DC_COM_PIN_OUTPUT_POLARITY3);
+}
 
 static void tegra_dc_set_out(struct tegra_dc *dc, struct tegra_dc_out *out)
 {
@@ -810,6 +1261,10 @@ static void tegra_dc_set_out(struct tegra_dc *dc, struct tegra_dc_out *out)
 
 	case TEGRA_DC_OUT_HDMI:
 		dc->out_ops = &tegra_dc_hdmi_ops;
+		break;
+
+	case TEGRA_DC_OUT_DSI:
+		dc->out_ops = &tegra_dc_dsi_ops;
 		break;
 
 	default:
@@ -840,8 +1295,32 @@ unsigned tegra_dc_get_out_width(struct tegra_dc *dc)
 }
 EXPORT_SYMBOL(tegra_dc_get_out_width);
 
+static void tegra_dc_vblank(struct work_struct *work)
+{
+	struct tegra_dc *dc = container_of(work, struct tegra_dc, vblank_work);
+	bool nvsd_updated = false;
+
+	mutex_lock(&dc->lock);
+
+	/* Update the SD brightness */
+	nvsd_updated = nvsd_update_brightness(dc);
+
+	mutex_unlock(&dc->lock);
+
+	/* Do the actual brightness update outside of the mutex */
+	if (nvsd_updated && dc->out->sd_settings &&
+	    dc->out->sd_settings->bl_device) {
+
+		struct platform_device *pdev = dc->out->sd_settings->bl_device;
+		struct backlight_device *bl = platform_get_drvdata(pdev);
+		if (bl)
+			backlight_update_status(bl);
+	}
+}
+
 static irqreturn_t tegra_dc_irq(int irq, void *ptr)
 {
+#ifndef CONFIG_TEGRA_FPGA_PLATFORM
 	struct tegra_dc *dc = ptr;
 	unsigned long status;
 	unsigned long val;
@@ -850,6 +1329,63 @@ static irqreturn_t tegra_dc_irq(int irq, void *ptr)
 
 	status = tegra_dc_readl(dc, DC_CMD_INT_STATUS);
 	tegra_dc_writel(dc, status, DC_CMD_INT_STATUS);
+
+	/*
+	 * Overlays can get thier internal state corrupted during and underflow
+	 * condition.  The only way to fix this state is to reset the DC.
+	 * if we get 4 consecutive frames with underflows, assume we're
+	 * hosed and reset.
+	 */
+	underflow_mask = status & (WIN_A_UF_INT | WIN_B_UF_INT | WIN_C_UF_INT);
+
+	if (underflow_mask) {
+		val = tegra_dc_readl(dc, DC_CMD_INT_ENABLE);
+		val |= V_BLANK_INT;
+		tegra_dc_writel(dc, val, DC_CMD_INT_ENABLE);
+		dc->underflow_mask |= underflow_mask;
+		dc->stats.underflows++;
+		if (status & WIN_A_UF_INT)
+			dc->stats.underflows_a++;
+		if (status & WIN_B_UF_INT)
+			dc->stats.underflows_b++;
+		if (status & WIN_C_UF_INT)
+			dc->stats.underflows_c++;
+	}
+
+	if (status & V_BLANK_INT) {
+		int i;
+
+		/* Check for any underflow reset conditions */
+		for (i = 0; i< DC_N_WINDOWS; i++) {
+			if (dc->underflow_mask & (WIN_A_UF_INT <<i)) {
+				dc->windows[i].underflows++;
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+				if (dc->windows[i].underflows > 4)
+					schedule_work(&dc->reset_work);
+#endif
+			} else {
+				dc->windows[i].underflows = 0;
+			}
+		}
+
+		if (!dc->underflow_mask) {
+			/* If we have no underflow to check, go ahead
+			   and disable the interrupt */
+			val = tegra_dc_readl(dc, DC_CMD_INT_ENABLE);
+			val &= ~V_BLANK_INT;
+			tegra_dc_writel(dc, val, DC_CMD_INT_ENABLE);
+		}
+
+		/* Clear the underflow mask now that we've checked it. */
+		dc->underflow_mask = 0;
+
+		/* Schedule any additional bottom-half vblank actvities. */
+		schedule_work(&dc->vblank_work);
+
+		/* Mark the vblank as complete. */
+		complete(&dc->vblank_complete);
+	}
 
 	if (status & FRAME_END_INT) {
 		int completed = 0;
@@ -871,50 +1407,28 @@ static irqreturn_t tegra_dc_irq(int irq, void *ptr)
 			tegra_dc_writel(dc, val, DC_CMD_INT_ENABLE);
 		}
 
-		if (completed)
-			wake_up(&dc->wq);
-	}
+		if (completed) {
+			if (!dirty) {
+				/* With the last completed window, go ahead
+				   and enable the vblank interrupt for nvsd. */
+				val = tegra_dc_readl(dc, DC_CMD_INT_ENABLE);
+				val |= V_BLANK_INT;
+				tegra_dc_writel(dc, val, DC_CMD_INT_ENABLE);
 
-
-	/*
-	 * Overlays can get thier internal state corrupted during and underflow
-	 * condition.  The only way to fix this state is to reset the DC.
-	 * if we get 4 consecutive frames with underflows, assume we're
-	 * hosed and reset.
-	 */
-	underflow_mask = status & (WIN_A_UF_INT | WIN_B_UF_INT | WIN_C_UF_INT);
-	if (underflow_mask) {
-		val = tegra_dc_readl(dc, DC_CMD_INT_ENABLE);
-		val |= V_BLANK_INT;
-		tegra_dc_writel(dc, val, DC_CMD_INT_ENABLE);
-		dc->underflow_mask |= underflow_mask;
-	}
-
-	if (status & V_BLANK_INT) {
-		int i;
-
-		for (i = 0; i< DC_N_WINDOWS; i++) {
-			if (dc->underflow_mask & (WIN_A_UF_INT <<i)) {
-				dc->windows[i].underflows++;
-
-				if (dc->windows[i].underflows > 4)
-					schedule_work(&dc->reset_work);
-			} else {
-				dc->windows[i].underflows = 0;
+				val = tegra_dc_readl(dc, DC_CMD_INT_MASK);
+				val |= V_BLANK_INT;
+				tegra_dc_writel(dc, val, DC_CMD_INT_MASK);
 			}
-		}
 
-		if (!dc->underflow_mask) {
-			val = tegra_dc_readl(dc, DC_CMD_INT_ENABLE);
-			val &= ~V_BLANK_INT;
-			tegra_dc_writel(dc, val, DC_CMD_INT_ENABLE);
+			/* Wake up the workqueue regardless. */
+			wake_up(&dc->wq);
 		}
-
-		dc->underflow_mask = 0;
 	}
-
 
 	return IRQ_HANDLED;
+#else /* CONFIG_TEGRA_FPGA_PLATFORM */
+	return IRQ_NONE;
+#endif /* !CONFIG_TEGRA_FPGA_PLATFORM */
 }
 
 static void tegra_dc_set_color_control(struct tegra_dc *dc)
@@ -959,13 +1473,31 @@ static void tegra_dc_set_color_control(struct tegra_dc *dc)
 		break;
 	}
 
+	switch (dc->out->dither) {
+	case TEGRA_DC_DISABLE_DITHER:
+		color_control |= DITHER_CONTROL_DISABLE;
+		break;
+	case TEGRA_DC_ORDERED_DITHER:
+		color_control |= DITHER_CONTROL_ORDERED;
+		break;
+	case TEGRA_DC_ERRDIFF_DITHER:
+		/* The line buffer for error-diffusion dither is limited
+		 * to 640 pixels per line. This limits the maximum
+		 * horizontal active area size to 640 pixels when error
+		 * diffusion is enabled.
+		 */
+		BUG_ON(dc->mode.h_active > 640);
+		color_control |= DITHER_CONTROL_ERRDIFF;
+		break;
+	}
+
 	tegra_dc_writel(dc, color_control, DC_DISP_DISP_COLOR_CONTROL);
 }
 
 static void tegra_dc_init(struct tegra_dc *dc)
 {
-	u32 disp_syncpt;
-	u32 vblank_syncpt;
+	u32 disp_syncpt = 0;
+	u32 vblank_syncpt = 0;
 	int i;
 
 	tegra_dc_writel(dc, 0x00000100, DC_CMD_GENERAL_INCR_SYNCPT_CNTRL);
@@ -1029,26 +1561,78 @@ static void tegra_dc_init(struct tegra_dc *dc)
 	dc->syncpt_min = dc->syncpt_max =
 		nvhost_syncpt_read(&dc->ndev->host->syncpt, disp_syncpt);
 
+	print_mode(dc, &dc->mode, __func__);
+
 	if (dc->mode.pclk)
 		tegra_dc_program_mode(dc, &dc->mode);
+
+	/* Initialize SD AFTER the modeset.
+	   nvsd_init handles the sd_settings = NULL case. */
+	nvsd_init(dc, dc->out->sd_settings);
 }
 
-static bool _tegra_dc_enable(struct tegra_dc *dc)
+static bool _tegra_dc_controller_enable(struct tegra_dc *dc)
 {
-	if (dc->mode.pclk == 0)
-		return false;
-
-	tegra_dc_io_start(dc);
-
-	if (dc->out && dc->out->enable)
+	if (dc->out->enable)
 		dc->out->enable();
 
 	tegra_dc_setup_clk(dc, dc->clk);
-	tegra_periph_reset_assert(dc->clk);
+
 	clk_enable(dc->clk);
 	clk_enable(dc->emc_clk);
+	enable_irq(dc->irq);
+
+	tegra_dc_init(dc);
+
+	if (dc->out_ops && dc->out_ops->enable)
+		dc->out_ops->enable(dc);
+
+	if (dc->out->out_pins)
+		tegra_dc_set_out_pin_polars(dc, dc->out->out_pins,
+					    dc->out->n_out_pins);
+
+	if (dc->out->postpoweron)
+		dc->out->postpoweron();
+
+	/* force a full blending update */
+	dc->blend.z[0] = -1;
+
+	return true;
+}
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+static bool _tegra_dc_controller_reset_enable(struct tegra_dc *dc)
+{
+	if (dc->out->enable)
+		dc->out->enable();
+
+	tegra_dc_setup_clk(dc, dc->clk);
+	clk_enable(dc->clk);
+	clk_enable(dc->emc_clk);
+
+	if (dc->ndev->id == 0 && tegra_dcs[1] != NULL) {
+		mutex_lock(&tegra_dcs[1]->lock);
+		disable_irq(tegra_dcs[1]->irq);
+	} else if (dc->ndev->id == 1 && tegra_dcs[0] != NULL) {
+		mutex_lock(&tegra_dcs[0]->lock);
+		disable_irq(tegra_dcs[0]->irq);
+	}
+
+	msleep(5);
+	tegra_periph_reset_assert(dc->clk);
+	msleep(2);
+#ifndef CONFIG_TEGRA_FPGA_PLATFORM
 	tegra_periph_reset_deassert(dc->clk);
-	msleep(10);
+	msleep(1);
+#endif
+
+	if (dc->ndev->id == 0 && tegra_dcs[1] != NULL) {
+		enable_irq(tegra_dcs[1]->irq);
+		mutex_unlock(&tegra_dcs[1]->lock);
+	} else if (dc->ndev->id == 1 && tegra_dcs[0] != NULL) {
+		enable_irq(tegra_dcs[0]->irq);
+		mutex_unlock(&tegra_dcs[0]->lock);
+	}
 
 	enable_irq(dc->irq);
 
@@ -1057,10 +1641,31 @@ static bool _tegra_dc_enable(struct tegra_dc *dc)
 	if (dc->out_ops && dc->out_ops->enable)
 		dc->out_ops->enable(dc);
 
+	if (dc->out->out_pins)
+		tegra_dc_set_out_pin_polars(dc, dc->out->out_pins,
+					    dc->out->n_out_pins);
+
+	if (dc->out->postpoweron)
+		dc->out->postpoweron();
+
 	/* force a full blending update */
 	dc->blend.z[0] = -1;
 
 	return true;
+}
+#endif
+
+static bool _tegra_dc_enable(struct tegra_dc *dc)
+{
+	if (dc->mode.pclk == 0)
+		return false;
+
+	if (!dc->out)
+		return false;
+
+	tegra_dc_io_start(dc);
+
+	return _tegra_dc_controller_enable(dc);
 }
 
 void tegra_dc_enable(struct tegra_dc *dc)
@@ -1073,7 +1678,7 @@ void tegra_dc_enable(struct tegra_dc *dc)
 	mutex_unlock(&dc->lock);
 }
 
-static void _tegra_dc_disable(struct tegra_dc *dc)
+static void _tegra_dc_controller_disable(struct tegra_dc *dc)
 {
 	disable_irq(dc->irq);
 
@@ -1092,13 +1697,52 @@ static void _tegra_dc_disable(struct tegra_dc *dc)
 		dc->syncpt_min++;
 		nvhost_syncpt_cpu_incr(&dc->ndev->host->syncpt, dc->syncpt_id);
 	}
+}
 
+void tegra_dc_stats_enable(struct tegra_dc *dc, bool enable)
+{
+#if 0 /* underflow interrupt is already enabled by dc reset worker */
+	u32 val;
+	if (dc->enabled)  {
+		val = tegra_dc_readl(dc, DC_CMD_INT_ENABLE);
+		if (enable)
+			val |= (WIN_A_UF_INT | WIN_B_UF_INT | WIN_C_UF_INT);
+		else
+			val &= ~(WIN_A_UF_INT | WIN_B_UF_INT | WIN_C_UF_INT);
+		tegra_dc_writel(dc, val, DC_CMD_INT_ENABLE);
+	}
+#endif
+}
+
+bool tegra_dc_stats_get(struct tegra_dc *dc)
+{
+#if 0 /* right now it is always enabled */
+	u32 val;
+	bool res;
+
+	if (dc->enabled)  {
+		val = tegra_dc_readl(dc, DC_CMD_INT_ENABLE);
+		res = !!(val & (WIN_A_UF_INT | WIN_B_UF_INT | WIN_C_UF_INT));
+	} else {
+		res = false;
+	}
+
+	return res;
+#endif
+	return true;
+}
+
+static void _tegra_dc_disable(struct tegra_dc *dc)
+{
+	_tegra_dc_controller_disable(dc);
 	tegra_dc_io_end(dc);
 }
 
-
 void tegra_dc_disable(struct tegra_dc *dc)
 {
+	if (dc->overlay)
+		tegra_overlay_disable(dc->overlay);
+
 	mutex_lock(&dc->lock);
 
 	if (dc->enabled) {
@@ -1111,22 +1755,49 @@ void tegra_dc_disable(struct tegra_dc *dc)
 	mutex_unlock(&dc->lock);
 }
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 static void tegra_dc_reset_worker(struct work_struct *work)
 {
 	struct tegra_dc *dc =
 		container_of(work, struct tegra_dc, reset_work);
 
+	unsigned long val = 0;
+
 	dev_warn(&dc->ndev->dev, "overlay stuck in underflow state.  resetting.\n");
 
+	mutex_lock(&shared_lock);
 	mutex_lock(&dc->lock);
-	if (dc->enabled && !dc->suspended) {
-		_tegra_dc_disable(dc);
 
-		/* _tegra_dc_enable deasserts reset */
-		_tegra_dc_enable(dc);
-	}
+	if (dc->enabled == false || dc->suspended)
+		goto unlock;
+
+	dc->enabled = false;
+
+	/*
+	 * off host read bus
+	 */
+	val = tegra_dc_readl(dc, DC_CMD_CONT_SYNCPT_VSYNC);
+	val &= ~(0x00000100);
+	tegra_dc_writel(dc, val, DC_CMD_CONT_SYNCPT_VSYNC);
+
+	/*
+	 * set DC to STOP mode
+	 */
+	tegra_dc_writel(dc, DISP_CTRL_MODE_STOP, DC_CMD_DISPLAY_COMMAND);
+
+	msleep(10);
+
+	_tegra_dc_controller_disable(dc);
+
+	/* _tegra_dc_controller_reset_enable deasserts reset */
+	_tegra_dc_controller_reset_enable(dc);
+
+	dc->enabled = true;
+unlock:
 	mutex_unlock(&dc->lock);
+	mutex_unlock(&shared_lock);
 }
+#endif
 
 
 static int tegra_dc_probe(struct nvhost_device *ndev)
@@ -1217,8 +1888,12 @@ static int tegra_dc_probe(struct nvhost_device *ndev)
 		dc->enabled = true;
 
 	mutex_init(&dc->lock);
+	init_completion(&dc->vblank_complete);
 	init_waitqueue_head(&dc->wq);
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	INIT_WORK(&dc->reset_work, tegra_dc_reset_worker);
+#endif
+	INIT_WORK(&dc->vblank_work, tegra_dc_vblank);
 
 	dc->n_windows = DC_N_WINDOWS;
 	for (i = 0; i < dc->n_windows; i++) {
@@ -1249,10 +1924,12 @@ static int tegra_dc_probe(struct nvhost_device *ndev)
 	else
 		dev_err(&ndev->dev, "No default output specified.  Leaving output disabled.\n");
 
+	mutex_lock(&dc->lock);
 	if (dc->enabled)
 		_tegra_dc_enable(dc);
+	mutex_unlock(&dc->lock);
 
-	tegra_dc_dbg_add(dc);
+	tegra_dc_create_debugfs(dc);
 
 	dev_info(&ndev->dev, "probed\n");
 
@@ -1273,8 +1950,19 @@ static int tegra_dc_probe(struct nvhost_device *ndev)
 			dc->fb = NULL;
 	}
 
+	if (dc->fb) {
+		dc->overlay = tegra_overlay_register(ndev, dc);
+		if (IS_ERR_OR_NULL(dc->overlay))
+			dc->overlay = NULL;
+	}
+
+	if (dc->out && dc->out->hotplug_init)
+		dc->out->hotplug_init();
+
 	if (dc->out_ops && dc->out_ops->detect)
 		dc->out_ops->detect(dc);
+
+	tegra_dc_create_sysfs(&dc->ndev->dev);
 
 	return 0;
 
@@ -1299,6 +1987,13 @@ err_free:
 static int tegra_dc_remove(struct nvhost_device *ndev)
 {
 	struct tegra_dc *dc = nvhost_get_drvdata(ndev);
+
+	tegra_dc_remove_sysfs(&dc->ndev->dev);
+	tegra_dc_remove_debugfs(dc);
+
+	if (dc->overlay) {
+		tegra_overlay_unregister(dc->overlay);
+	}
 
 	if (dc->fb) {
 		tegra_fb_unregister(dc->fb);
@@ -1327,6 +2022,9 @@ static int tegra_dc_suspend(struct nvhost_device *ndev, pm_message_t state)
 
 	dev_info(&ndev->dev, "suspend\n");
 
+	if (dc->overlay)
+		tegra_overlay_disable(dc->overlay);
+
 	mutex_lock(&dc->lock);
 
 	if (dc->out_ops && dc->out_ops->suspend)
@@ -1338,6 +2036,12 @@ static int tegra_dc_suspend(struct nvhost_device *ndev, pm_message_t state)
 
 		dc->suspended = true;
 	}
+
+	if (dc->out && dc->out->postsuspend) {
+		dc->out->postsuspend();
+		msleep(100); /* avoid resume event due to voltage falling */
+	}
+
 	mutex_unlock(&dc->lock);
 
 	return 0;
@@ -1355,6 +2059,9 @@ static int tegra_dc_resume(struct nvhost_device *ndev)
 	if (dc->enabled)
 		_tegra_dc_enable(dc);
 
+	if (dc->out && dc->out->hotplug_init)
+		dc->out->hotplug_init();
+
 	if (dc->out_ops && dc->out_ops->resume)
 		dc->out_ops->resume(dc);
 	mutex_unlock(&dc->lock);
@@ -1362,7 +2069,7 @@ static int tegra_dc_resume(struct nvhost_device *ndev)
 	return 0;
 }
 
-#endif
+#endif /* CONFIG_PM */
 
 extern int suspend_set(const char *val, struct kernel_param *kp)
 {

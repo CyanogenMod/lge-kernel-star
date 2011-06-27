@@ -6,6 +6,8 @@
  * Author:
  *	Erik Gilling <konkers@google.com>
  *
+ * Copyright (C) 2010-2011 NVIDIA Corporation
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -21,9 +23,156 @@
 #define __MACH_TEGRA_DC_H
 
 #include <linux/pm.h>
+#include <linux/types.h>
 
 #define TEGRA_MAX_DC		2
 #define DC_N_WINDOWS		3
+
+
+/* DSI pixel data format */
+enum {
+	TEGRA_DSI_PIXEL_FORMAT_16BIT_P,
+	TEGRA_DSI_PIXEL_FORMAT_18BIT_P,
+	TEGRA_DSI_PIXEL_FORMAT_18BIT_NP,
+	TEGRA_DSI_PIXEL_FORMAT_24BIT_P,
+};
+
+/* DSI virtual channel number */
+enum {
+	TEGRA_DSI_VIRTUAL_CHANNEL_0,
+	TEGRA_DSI_VIRTUAL_CHANNEL_1,
+	TEGRA_DSI_VIRTUAL_CHANNEL_2,
+	TEGRA_DSI_VIRTUAL_CHANNEL_3,
+};
+
+/* DSI transmit method for video data */
+enum {
+	TEGRA_DSI_VIDEO_TYPE_VIDEO_MODE,
+	TEGRA_DSI_VIDEO_TYPE_COMMAND_MODE,
+};
+
+/* DSI HS clock mode */
+enum {
+	TEGRA_DSI_VIDEO_CLOCK_CONTINUOUS,
+	TEGRA_DSI_VIDEO_CLOCK_TX_ONLY,
+};
+
+/* DSI burst mode setting in video mode */
+enum {
+	TEGRA_DSI_VIDEO_NONE_BURST_MODE,
+	TEGRA_DSI_VIDEO_NONE_BURST_MODE_WITH_SYNC_END,
+	TEGRA_DSI_VIDEO_BURST_MODE_LOWEST_SPEED,
+	TEGRA_DSI_VIDEO_BURST_MODE_LOW_SPEED,
+	TEGRA_DSI_VIDEO_BURST_MODE_MEDIUM_SPEED,
+	TEGRA_DSI_VIDEO_BURST_MODE_FAST_SPEED,
+	TEGRA_DSI_VIDEO_BURST_MODE_FASTEST_SPEED,
+	TEGRA_DSI_VIDEO_BURST_MODE_MANUAL,
+};
+
+enum {
+	TEGRA_DSI_PACKET_CMD,
+	TEGRA_DSI_DELAY_MS,
+};
+
+struct tegra_dsi_cmd {
+	u8	cmd_type;
+	u8	data_id;
+	union {
+		u16 data_len;
+		u16 delay_ms;
+		struct{
+			u8 data0;
+			u8 data1;
+		}sp;
+	}sp_len_dly;
+	u8	*pdata;
+};
+
+#define DSI_CMD_SHORT(di, p0, p1)	{ \
+					.cmd_type = TEGRA_DSI_PACKET_CMD, \
+					.data_id = di, \
+					.sp_len_dly.sp.data0 = p0, \
+					.sp_len_dly.sp.data1 = p1, \
+					}
+#define DSI_DLY_MS(ms)	{ \
+			.cmd_type = TEGRA_DSI_DELAY_MS, \
+			.sp_len_dly.delay_ms = ms, \
+			}
+
+#define DSI_CMD_LONG(di, ptr)	{ \
+				.cmd_type = TEGRA_DSI_PACKET_CMD, \
+				.data_id = di, \
+				.sp_len_dly.data_len = ARRAY_SIZE(ptr), \
+				.pdata = ptr, \
+				}
+
+struct dsi_phy_timing_ns {
+	u16		t_hsdexit_ns;
+	u16		t_hstrail_ns;
+	u16		t_hsprepr_ns;
+	u16		t_datzero_ns;
+
+	u16		t_clktrail_ns;
+	u16		t_clkpost_ns;
+	u16		t_clkzero_ns;
+	u16		t_tlpx_ns;
+};
+
+struct tegra_dsi_out {
+	u8		n_data_lanes;			/* required */
+	u8		pixel_format;			/* required */
+	u8		refresh_rate;			/* required */
+	u8		panel_reset;			/* required */
+	u8		virtual_channel;		/* required */
+	u8		dsi_instance;
+
+	bool		panel_has_frame_buffer;	/* required*/
+
+	struct tegra_dsi_cmd*	dsi_init_cmd;		/* required */
+	u16		n_init_cmd;			/* required */
+
+	struct tegra_dsi_cmd*	dsi_suspend_cmd;	/* required */
+	u16		n_suspend_cmd;			/* required */
+
+	u8		video_data_type;		/* required */
+	u8		video_clock_mode;
+	u8		video_burst_mode;
+
+	u16		panel_buffer_size_byte;
+	u16		panel_reset_timeout_msec;
+
+	bool		hs_cmd_mode_supported;
+	bool		hs_cmd_mode_on_blank_supported;
+	bool		enable_hs_clock_on_lp_cmd_mode;
+	bool		no_pkt_seq_eot; /* 1st generation panel may not
+					 * support eot. Don't set it for
+					 * most panels. */
+
+	u32		max_panel_freq_khz;
+	u32		lp_cmd_mode_freq_khz;
+	u32		hs_clk_in_lp_cmd_mode_freq_khz;
+	u32		burst_mode_freq_khz;
+
+	struct dsi_phy_timing_ns phy_timing;
+};
+
+enum {
+	TEGRA_DC_STEREO_MODE_2D,
+	TEGRA_DC_STEREO_MODE_3D
+};
+
+enum {
+	TEGRA_DC_STEREO_LANDSCAPE,
+	TEGRA_DC_STEREO_PORTRAIT
+};
+
+struct tegra_stereo_out {
+	int  mode_2d_3d;
+	int  orientation;
+
+	void (*set_mode)(int mode);
+	void (*set_orientation)(int orientation);
+};
 
 struct tegra_dc_mode {
 	int	pclk;
@@ -37,6 +186,7 @@ struct tegra_dc_mode {
 	int	v_active;
 	int	h_front_porch;
 	int	v_front_porch;
+	int	stereo_mode;
 	u32	flags;
 };
 
@@ -46,31 +196,124 @@ struct tegra_dc_mode {
 enum {
 	TEGRA_DC_OUT_RGB,
 	TEGRA_DC_OUT_HDMI,
+	TEGRA_DC_OUT_DSI,
+};
+
+struct tegra_dc_out_pin {
+	int	name;
+	int	pol;
+};
+
+enum {
+	TEGRA_DC_OUT_PIN_DATA_ENABLE,
+	TEGRA_DC_OUT_PIN_H_SYNC,
+	TEGRA_DC_OUT_PIN_V_SYNC,
+	TEGRA_DC_OUT_PIN_PIXEL_CLOCK,
+};
+
+enum {
+	TEGRA_DC_OUT_PIN_POL_LOW,
+	TEGRA_DC_OUT_PIN_POL_HIGH,
+};
+
+enum {
+	TEGRA_DC_DISABLE_DITHER = 1,
+	TEGRA_DC_ORDERED_DITHER,
+	TEGRA_DC_ERRDIFF_DITHER,
+};
+
+struct tegra_dc_sd_blp {
+	u16 time_constant;
+	u8 step;
+};
+
+struct tegra_dc_sd_fc {
+	u8 time_limit;
+	u8 threshold;
+};
+
+struct tegra_dc_sd_rgb {
+	u8 r;
+	u8 g;
+	u8 b;
+};
+
+struct tegra_dc_sd_settings {
+	unsigned enable;
+	bool use_auto_pwm;
+	u8 hw_update_delay;
+	unsigned bin_width;
+	u8 aggressiveness;
+
+	bool use_vid_luma;
+	struct tegra_dc_sd_rgb coeff;
+
+	struct tegra_dc_sd_fc fc;
+	struct tegra_dc_sd_blp blp;
+	u8 bltf[4][4];
+	struct tegra_dc_sd_rgb lut[9];
+
+	atomic_t *sd_brightness;
+	struct platform_device *bl_device;
+};
+
+enum {
+	TEGRA_PIN_OUT_CONFIG_SEL_LHP0_LD21,
+	TEGRA_PIN_OUT_CONFIG_SEL_LHP1_LD18,
+	TEGRA_PIN_OUT_CONFIG_SEL_LHP2_LD19,
+	TEGRA_PIN_OUT_CONFIG_SEL_LVP0_LVP0_Out,
+	TEGRA_PIN_OUT_CONFIG_SEL_LVP1_LD20,
+
+	TEGRA_PIN_OUT_CONFIG_SEL_LM1_M1,
+	TEGRA_PIN_OUT_CONFIG_SEL_LM1_LD21,
+	TEGRA_PIN_OUT_CONFIG_SEL_LM1_PM1,
+
+	TEGRA_PIN_OUT_CONFIG_SEL_LDI_LD22,
+	TEGRA_PIN_OUT_CONFIG_SEL_LPP_LD23,
+	TEGRA_PIN_OUT_CONFIG_SEL_LDC_SDC,
+	TEGRA_PIN_OUT_CONFIG_SEL_LSPI_DE,
 };
 
 struct tegra_dc_out {
-	int			type;
-	unsigned		flags;
+	int				type;
+	unsigned			flags;
 
 	/* size in mm */
-	unsigned		h_size;
-	unsigned		v_size;
+	unsigned			h_size;
+	unsigned			v_size;
 
-	int			dcc_bus;
-	int			hotplug_gpio;
+	int				dcc_bus;
+	int				hotplug_gpio;
+	const char			*parent_clk;
 
-	unsigned		order;
-	unsigned		align;
-	unsigned		depth;
+	unsigned			order;
+	unsigned			align;
+	unsigned			depth;
+	unsigned			dither;
 
-	unsigned		height; /* mm */
-	unsigned		width; /* mm */
+	struct tegra_dc_mode		*modes;
+	int				n_modes;
 
-	struct tegra_dc_mode	*modes;
-	int			n_modes;
+	struct tegra_dsi_out		*dsi;
+	struct tegra_stereo_out		*stereo;
+
+	unsigned			height; /* mm */
+	unsigned			width; /* mm */
+
+	struct tegra_dc_out_pin		*out_pins;
+	unsigned			n_out_pins;
+
+	struct tegra_dc_sd_settings	*sd_settings;
+
+	u8			*out_sel_configs;
+	unsigned		n_out_sel_configs;
 
 	int	(*enable)(void);
+	int	(*postpoweron)(void);
 	int	(*disable)(void);
+
+	int	(*hotplug_init)(void);
+	int	(*postsuspend)(void);
 };
 
 /* bits for tegra_dc_out.flags */
@@ -97,6 +340,7 @@ struct tegra_dc_win {
 
 	void			*virt_addr;
 	dma_addr_t		phys_addr;
+	unsigned		offset;
 	unsigned		offset_u;
 	unsigned		offset_v;
 	unsigned		stride;
@@ -122,6 +366,7 @@ struct tegra_dc_win {
 #define TEGRA_WIN_FLAG_ENABLED		(1 << 0)
 #define TEGRA_WIN_FLAG_BLEND_PREMULT	(1 << 1)
 #define TEGRA_WIN_FLAG_BLEND_COVERAGE	(1 << 2)
+#define TEGRA_WIN_FLAG_TILED		(1 << 3)
 
 #define TEGRA_WIN_BLEND_FLAGS_MASK \
 	(TEGRA_WIN_FLAG_BLEND_PREMULT | TEGRA_WIN_FLAG_BLEND_COVERAGE)
@@ -190,8 +435,25 @@ int tegra_dc_update_windows(struct tegra_dc_win *windows[], int n);
 int tegra_dc_sync_windows(struct tegra_dc_win *windows[], int n);
 
 int tegra_dc_set_mode(struct tegra_dc *dc, const struct tegra_dc_mode *mode);
+struct fb_videomode;
+int tegra_dc_set_fb_mode(struct tegra_dc *dc, const struct fb_videomode *fbmode,
+	bool stereo_mode);
 
 unsigned tegra_dc_get_out_height(struct tegra_dc *dc);
 unsigned tegra_dc_get_out_width(struct tegra_dc *dc);
+
+/* PM0 and PM1 signal control */
+#define TEGRA_PWM_PM0 0
+#define TEGRA_PWM_PM1 1
+
+struct tegra_dc_pwm_params {
+	int which_pwm;
+	unsigned int period;
+	unsigned int clk_div;
+	unsigned int clk_select;
+	unsigned int duty_cycle;
+};
+
+void tegra_dc_config_pwm(struct tegra_dc *dc, struct tegra_dc_pwm_params *cfg);
 
 #endif

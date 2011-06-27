@@ -1,9 +1,9 @@
 /*
- * drivers/video/tegra/nvmap_handle.c
+ * drivers/video/tegra/nvmap/nvmap_handle.c
  *
  * Handle allocation and freeing routines for nvmap
  *
- * Copyright (c) 2009-2010, NVIDIA Corporation.
+ * Copyright (c) 2009-2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,6 +27,7 @@
 #include <linux/rbtree.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/fs.h>
 
 #include <asm/cacheflush.h>
 #include <asm/outercache.h>
@@ -35,8 +36,19 @@
 #include <mach/iovmm.h>
 #include <mach/nvmap.h>
 
+#include <linux/vmstat.h>
+#include <linux/swap.h>
+
 #include "nvmap.h"
 #include "nvmap_mru.h"
+#include "nvmap_common.h"
+
+#define PRINT_CARVEOUT_CONVERSION 0
+#if PRINT_CARVEOUT_CONVERSION
+#define PR_INFO pr_info
+#else
+#define PR_INFO(...)
+#endif
 
 #define NVMAP_SECURE_HEAPS	(NVMAP_HEAP_CARVEOUT_IRAM | NVMAP_HEAP_IOVMM)
 #ifdef CONFIG_NVMAP_HIGHMEM_ONLY
@@ -81,6 +93,7 @@ void _nvmap_handle_free(struct nvmap_handle *h)
 		goto out;
 
 	if (!h->heap_pgalloc) {
+		nvmap_usecount_inc(h);
 		nvmap_heap_free(h->carveout);
 		goto out;
 	}
@@ -106,7 +119,8 @@ out:
 
 extern void __flush_dcache_page(struct address_space *, struct page *);
 
-static struct page *nvmap_alloc_pages_exact(gfp_t gfp, size_t size)
+static struct page *nvmap_alloc_pages_exact(gfp_t gfp,
+	size_t size, bool flush_inner)
 {
 	struct page *page, *p, *e;
 	unsigned int order;
@@ -126,8 +140,10 @@ static struct page *nvmap_alloc_pages_exact(gfp_t gfp, size_t size)
 		__free_page(p);
 
 	e = page + (size >> PAGE_SHIFT);
-	for (p = page; p < e; p++)
-		__flush_dcache_page(page_mapping(p), p);
+	if (flush_inner) {
+		for (p = page; p < e; p++)
+			__flush_dcache_page(page_mapping(p), p);
+	}
 
 	base = page_to_phys(page);
 	outer_flush_range(base, base + size);
@@ -142,6 +158,7 @@ static int handle_page_alloc(struct nvmap_client *client,
 	pgprot_t prot;
 	unsigned int i = 0;
 	struct page **pages;
+	bool flush_inner = true;
 
 	pages = altalloc(nr_page * sizeof(*pages));
 	if (!pages)
@@ -154,10 +171,14 @@ static int handle_page_alloc(struct nvmap_client *client,
 		contiguous = true;
 #endif
 
+	if (size >= FLUSH_CLEAN_BY_SET_WAY_THRESHOLD) {
+		inner_flush_cache_all();
+		flush_inner = false;
+	}
 	h->pgalloc.area = NULL;
 	if (contiguous) {
 		struct page *page;
-		page = nvmap_alloc_pages_exact(GFP_NVMAP, size);
+		page = nvmap_alloc_pages_exact(GFP_NVMAP, size, flush_inner);
 		if (!page)
 			goto fail;
 
@@ -166,14 +187,16 @@ static int handle_page_alloc(struct nvmap_client *client,
 
 	} else {
 		for (i = 0; i < nr_page; i++) {
-			pages[i] = nvmap_alloc_pages_exact(GFP_NVMAP, PAGE_SIZE);
+			pages[i] = nvmap_alloc_pages_exact(GFP_NVMAP, PAGE_SIZE,
+				flush_inner);
 			if (!pages[i])
 				goto fail;
 		}
 
 #ifndef CONFIG_NVMAP_RECLAIM_UNPINNED_VM
 		h->pgalloc.area = tegra_iovmm_create_vm(client->share->iovmm,
-							NULL, size, prot);
+					NULL, size, h->align, prot,
+					h->pgalloc.iovm_addr);
 		if (!h->pgalloc.area)
 			goto fail;
 
@@ -192,37 +215,67 @@ fail:
 	while (i--)
 		__free_page(pages[i]);
 	altfree(pages, nr_page * sizeof(*pages));
+	wmb();
 	return -ENOMEM;
 }
 
-static void alloc_handle(struct nvmap_client *client, size_t align,
+static void alloc_handle(struct nvmap_client *client,
 			 struct nvmap_handle *h, unsigned int type)
 {
 	BUG_ON(type & (type - 1));
 
-	if (type & NVMAP_HEAP_CARVEOUT_MASK) {
+#ifdef CONFIG_NVMAP_CONVERT_CARVEOUT_TO_IOVMM
+#define __NVMAP_HEAP_CARVEOUT	NVMAP_HEAP_CARVEOUT_IRAM
+#define __NVMAP_HEAP_IOVMM	(NVMAP_HEAP_IOVMM | NVMAP_HEAP_CARVEOUT_GENERIC)
+	if (type & NVMAP_HEAP_CARVEOUT_GENERIC) {
+#ifdef CONFIG_NVMAP_ALLOW_SYSMEM
+		if (h->size <= PAGE_SIZE) {
+			PR_INFO("###CARVEOUT CONVERTED TO SYSMEM "
+				"0x%x bytes %s(%d)###\n",
+				h->size, current->comm, current->pid);
+			goto sysheap;
+		}
+#endif
+		PR_INFO("###CARVEOUT CONVERTED TO IOVM "
+			"0x%x bytes %s(%d)###\n",
+			h->size, current->comm, current->pid);
+	}
+#else
+#define __NVMAP_HEAP_CARVEOUT	NVMAP_HEAP_CARVEOUT_MASK
+#define __NVMAP_HEAP_IOVMM	NVMAP_HEAP_IOVMM
+#endif
+
+	if (type & __NVMAP_HEAP_CARVEOUT) {
 		struct nvmap_heap_block *b;
-		b = nvmap_carveout_alloc(client, h->size, align,
-					 type, h->flags);
+#ifdef CONFIG_NVMAP_CONVERT_CARVEOUT_TO_IOVMM
+		PR_INFO("###IRAM REQUEST RETAINED "
+			"0x%x bytes %s(%d)###\n",
+			h->size, current->comm, current->pid);
+#endif
+		/* Protect handle from relocation */
+		nvmap_usecount_inc(h);
+
+		b = nvmap_carveout_alloc(client, h, type);
 		if (b) {
-			h->carveout = b;
 			h->heap_pgalloc = false;
 			h->alloc = true;
 			nvmap_carveout_commit_add(client,
 				nvmap_heap_to_arg(nvmap_block_to_heap(b)),
 				h->size);
 		}
-	} else if (type & NVMAP_HEAP_IOVMM) {
-		size_t reserved = PAGE_ALIGN(h->size);
-		int commit;
-		int ret;
+		nvmap_usecount_dec(h);
 
-		BUG_ON(align > PAGE_SIZE);
+	} else if (type & __NVMAP_HEAP_IOVMM) {
+		size_t reserved = PAGE_ALIGN(h->size);
+		int commit = 0;
+		int ret;
 
 		/* increment the committed IOVM space prior to allocation
 		 * to avoid race conditions with other threads simultaneously
 		 * allocating. */
-		commit = atomic_add_return(reserved, &client->iovm_commit);
+		if (!client->super)
+			commit = atomic_add_return(reserved,
+						   &client->iovm_commit);
 
 		if (commit < client->iovm_limit)
 			ret = handle_page_alloc(client, h, false);
@@ -233,11 +286,15 @@ static void alloc_handle(struct nvmap_client *client, size_t align,
 			h->heap_pgalloc = true;
 			h->alloc = true;
 		} else {
-			atomic_sub(reserved, &client->iovm_commit);
+			if (!client->super)
+				atomic_sub(reserved, &client->iovm_commit);
 		}
 
 	} else if (type & NVMAP_HEAP_SYSMEM) {
-
+#if defined(CONFIG_NVMAP_CONVERT_CARVEOUT_TO_IOVMM) && \
+	defined(CONFIG_NVMAP_ALLOW_SYSMEM)
+sysheap:
+#endif
 		if (handle_page_alloc(client, h, true) == 0) {
 			BUG_ON(!h->pgalloc.contig);
 			h->heap_pgalloc = true;
@@ -270,6 +327,10 @@ static const unsigned int heap_policy_large[] = {
 	0,
 };
 
+/* Do not override single page policy if there is not much space to
+avoid invoking system oom killer. */
+#define NVMAP_SMALL_POLICY_SYSMEM_THRESHOLD 50000000
+
 int nvmap_alloc_handle_id(struct nvmap_client *client,
 			  unsigned long id, unsigned int heap_mask,
 			  size_t align, unsigned int flags)
@@ -278,12 +339,6 @@ int nvmap_alloc_handle_id(struct nvmap_client *client,
 	const unsigned int *alloc_policy;
 	int nr_page;
 	int err = -ENOMEM;
-
-	align = max_t(size_t, align, L1_CACHE_BYTES);
-
-	/* can't do greater than page size alignment with page alloc */
-	if (align > PAGE_SIZE)
-		heap_mask &= NVMAP_HEAP_CARVEOUT_MASK;
 
 	h = nvmap_get_handle_id(client, id);
 
@@ -296,7 +351,35 @@ int nvmap_alloc_handle_id(struct nvmap_client *client,
 	nr_page = ((h->size + PAGE_SIZE - 1) >> PAGE_SHIFT);
 	h->secure = !!(flags & NVMAP_HANDLE_SECURE);
 	h->flags = (flags & NVMAP_HANDLE_CACHE_FLAG);
+	h->align = max_t(size_t, align, L1_CACHE_BYTES);
 
+#ifndef CONFIG_NVMAP_CONVERT_CARVEOUT_TO_IOVMM
+#ifdef CONFIG_NVMAP_ALLOW_SYSMEM
+	/* Allow single pages allocations in system memory to save
+	 * carveout space and avoid extra iovm mappings */
+	if (nr_page == 1) {
+		if (heap_mask & NVMAP_HEAP_IOVMM)
+			heap_mask |= NVMAP_HEAP_SYSMEM;
+		else if (heap_mask & NVMAP_HEAP_CARVEOUT_GENERIC) {
+			/* Calculate size of free physical pages
+			 * managed by kernel */
+			unsigned long freeMem =
+				(global_page_state(NR_FREE_PAGES) +
+				global_page_state(NR_FILE_PAGES) -
+				total_swapcache_pages) << PAGE_SHIFT;
+
+			if (freeMem > NVMAP_SMALL_POLICY_SYSMEM_THRESHOLD)
+				heap_mask |= NVMAP_HEAP_SYSMEM;
+		}
+	}
+#endif
+
+	/* This restriction is deprecated as alignments greater than
+	   PAGE_SIZE are now correctly handled, but it is retained for
+	   AP20 compatibility. */
+	if (h->align > PAGE_SIZE)
+		heap_mask &= NVMAP_HEAP_CARVEOUT_MASK;
+#endif
 	/* secure allocations can only be served from secure heaps */
 	if (h->secure)
 		heap_mask &= NVMAP_SECURE_HEAPS;
@@ -325,7 +408,7 @@ int nvmap_alloc_handle_id(struct nvmap_client *client,
 			/* iterate possible heaps MSB-to-LSB, since higher-
 			 * priority carveouts will have higher usage masks */
 			heap = 1 << __fls(heap_type);
-			alloc_handle(client, align, h, heap);
+			alloc_handle(client, h, heap);
 			heap_type &= ~heap;
 		}
 	}
@@ -362,13 +445,16 @@ void nvmap_free_handle_id(struct nvmap_client *client, unsigned long id)
 	pins = atomic_read(&ref->pin);
 	rb_erase(&ref->node, &client->handle_refs);
 
-	if (h->alloc && h->heap_pgalloc && !h->pgalloc.contig)
+	if (h->alloc && h->heap_pgalloc && !h->pgalloc.contig && !client->super)
 		atomic_sub(h->size, &client->iovm_commit);
 
-	if (h->alloc && !h->heap_pgalloc)
+	if (h->alloc && !h->heap_pgalloc) {
+		mutex_lock(&h->lock);
 		nvmap_carveout_commit_subtract(client,
-		nvmap_heap_to_arg(nvmap_block_to_heap(h->carveout)),
-		h->size);
+			nvmap_heap_to_arg(nvmap_block_to_heap(h->carveout)),
+			h->size);
+		mutex_unlock(&h->lock);
+	}
 
 	nvmap_ref_unlock(client);
 
@@ -505,10 +591,13 @@ struct nvmap_handle_ref *nvmap_duplicate_handle_id(struct nvmap_client *client,
 		return ERR_PTR(-ENOMEM);
 	}
 
-	if (!h->heap_pgalloc)
+	if (!h->heap_pgalloc) {
+		mutex_lock(&h->lock);
 		nvmap_carveout_commit_add(client,
 			nvmap_heap_to_arg(nvmap_block_to_heap(h->carveout)),
 			h->size);
+		mutex_unlock(&h->lock);
+	}
 
 	atomic_set(&ref->dupes, 1);
 	ref->handle = h;

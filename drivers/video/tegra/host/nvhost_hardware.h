@@ -38,7 +38,7 @@ enum {
 #define NV_HOST1X_CHANNELS 8
 #define NV_HOST1X_CHANNEL0_BASE 0
 #define NV_HOST1X_CHANNEL_MAP_SIZE_BYTES 16384
-
+#define NV_HOST1X_SYNC_MLOCK_NUM 16
 
 #define HOST1X_CHANNEL_FIFOSTAT		0x00
 #define HOST1X_CHANNEL_INDDATA		0x0c
@@ -88,8 +88,7 @@ enum {
 	HOST1X_SYNC_HINTSTATUS_EXT = 0x28,
 	HOST1X_SYNC_HINTMASK_EXT = 0x2c,
 	HOST1X_SYNC_SYNCPT_THRESH_CPU0_INT_STATUS = 0x40,
-	HOST1X_SYNC_SYNCPT_THRESH_INT_MASK_0 = 0x50,
-	HOST1X_SYNC_SYNCPT_THRESH_INT_MASK_1 = 0x54,
+	HOST1X_SYNC_SYNCPT_THRESH_CPU1_INT_STATUS = 0x48,
 	HOST1X_SYNC_SYNCPT_THRESH_INT_DISABLE = 0x60,
 	HOST1X_SYNC_SYNCPT_THRESH_INT_ENABLE_CPU0 = 0x68,
 	HOST1X_SYNC_USEC_CLK = 0x1a4,
@@ -216,9 +215,9 @@ static inline u32 nvhost_opcode_restart(unsigned address)
 	return (5 << 28) | (address >> 4);
 }
 
-static inline u32 nvhost_opcode_gather(unsigned offset, unsigned count)
+static inline u32 nvhost_opcode_gather(unsigned count)
 {
-	return (6 << 28) | (offset << 16) | count;
+	return (6 << 28) | count;
 }
 
 static inline u32 nvhost_opcode_gather_nonincr(unsigned offset,	unsigned count)
@@ -233,7 +232,10 @@ static inline u32 nvhost_opcode_gather_incr(unsigned offset, unsigned count)
 
 #define NVHOST_OPCODE_NOOP nvhost_opcode_nonincr(0, 0)
 
-
+static inline u32 nvhost_mask2(unsigned x, unsigned y)
+{
+	return 1 | (1 << (y - x));
+}
 
 #endif /* __NVHOST_HARDWARE_H */
 

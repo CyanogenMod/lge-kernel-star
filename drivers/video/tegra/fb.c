@@ -6,6 +6,8 @@
  *         Colin Cross <ccross@android.com>
  *         Travis Geiselbrecht <travis@palm.com>
  *
+ * Copyright (C) 2010-2011 NVIDIA Corporation
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -39,6 +41,7 @@
 
 #include "host/dev.h"
 #include "nvmap/nvmap.h"
+#include "dc/dc_priv.h"
 
 struct tegra_fb_info {
 	struct tegra_dc_win	*win;
@@ -173,7 +176,7 @@ static int tegra_fb_set_par(struct fb_info *info)
 	}
 
 	if (var->pixclock) {
-		struct tegra_dc_mode mode;
+		bool stereo;
 
 		info->mode = (struct fb_videomode *)
 			fb_find_best_mode(var, &info->modelist);
@@ -182,27 +185,14 @@ static int tegra_fb_set_par(struct fb_info *info)
 			return -EINVAL;
 		}
 
-		mode.pclk = PICOS2KHZ(info->mode->pixclock) * 1000;
-		mode.h_ref_to_sync = 1;
-		mode.v_ref_to_sync = 1;
-		mode.h_sync_width = info->mode->hsync_len;
-		mode.v_sync_width = info->mode->vsync_len;
-		mode.h_back_porch = info->mode->left_margin;
-		mode.v_back_porch = info->mode->upper_margin;
-		mode.h_active = info->mode->xres;
-		mode.v_active = info->mode->yres;
-		mode.h_front_porch = info->mode->right_margin;
-		mode.v_front_porch = info->mode->lower_margin;
+		/*
+		 * only enable stereo if the mode supports it and
+		 * client requests it
+		 */
+		stereo = !!(var->vmode & info->mode->vmode &
+					FB_VMODE_STEREO_FRAME_PACK);
 
-		mode.flags = 0;
-
-		if (!(info->mode->sync & FB_SYNC_HOR_HIGH_ACT))
-			mode.flags |= TEGRA_DC_MODE_FLAG_NEG_H_SYNC;
-
-		if (!(info->mode->sync & FB_SYNC_VERT_HIGH_ACT))
-			mode.flags |= TEGRA_DC_MODE_FLAG_NEG_V_SYNC;
-
-		tegra_dc_set_mode(tegra_fb->win->dc, &mode);
+		tegra_dc_set_fb_mode(tegra_fb->win->dc, info->mode, stereo);
 
 		tegra_fb->win->w = info->mode->xres;
 		tegra_fb->win->h = info->mode->yres;
@@ -248,6 +238,9 @@ static int tegra_fb_blank(int blank, struct fb_info *info)
 		tegra_dc_enable(tegra_fb->win->dc);
 		return 0;
 
+	case FB_BLANK_NORMAL:
+	case FB_BLANK_VSYNC_SUSPEND:
+	case FB_BLANK_HSYNC_SUSPEND:
 	case FB_BLANK_POWERDOWN:
 		dev_dbg(&tegra_fb->ndev->dev, "blank\n");
 		flush_workqueue(tegra_fb->flip_wq);
@@ -376,11 +369,15 @@ static int tegra_fb_set_windowattr(struct tegra_fb_info *tegra_fb,
 				   struct tegra_dc_win *win,
 				   const struct tegra_fb_flip_win *flip_win)
 {
+	int xres, yres;
 	if (flip_win->handle == NULL) {
 		win->flags = 0;
 		win->cur_handle = NULL;
 		return 0;
 	}
+
+	xres = tegra_fb->win->dc->mode.h_active;
+	yres = tegra_fb->win->dc->mode.v_active;
 
 	win->flags = TEGRA_WIN_FLAG_ENABLED;
 	if (flip_win->attr.blend == TEGRA_FB_WIN_BLEND_PREMULT)
@@ -396,13 +393,39 @@ static int tegra_fb_set_windowattr(struct tegra_fb_info *tegra_fb,
 	win->out_y = flip_win->attr.out_y;
 	win->out_w = flip_win->attr.out_w;
 	win->out_h = flip_win->attr.out_h;
+
+	WARN_ONCE(win->out_x >= xres,
+		"%s:application window x offset(%d) exceeds display width(%d)\n",
+		dev_name(&win->dc->ndev->dev), win->out_x, xres);
+	WARN_ONCE(win->out_y >= yres,
+		"%s:application window y offset(%d) exceeds display height(%d)\n",
+		dev_name(&win->dc->ndev->dev), win->out_y, yres);
+	WARN_ONCE(win->out_x + win->out_w > xres && win->out_x < xres,
+		"%s:application window width(%d) exceeds display width(%d)\n",
+		dev_name(&win->dc->ndev->dev), win->out_x + win->out_w, xres);
+	WARN_ONCE(win->out_y + win->out_h > yres && win->out_y < yres,
+		"%s:application window height(%d) exceeds display height(%d)\n",
+		dev_name(&win->dc->ndev->dev), win->out_y + win->out_h, yres);
+
+	if (((win->out_x + win->out_w) > xres) && (win->out_x < xres)) {
+		long new_w = xres - win->out_x;
+		win->w = win->w * new_w / win->out_w;
+	        win->out_w = new_w;
+	}
+	if (((win->out_y + win->out_h) > yres) && (win->out_y < yres)) {
+		long new_h = yres - win->out_y;
+		win->h = win->h * new_h / win->out_h;
+	        win->out_h = new_h;
+	}
+
 	win->z = flip_win->attr.z;
 	win->cur_handle = flip_win->handle;
 
 	/* STOPSHIP verify that this won't read outside of the surface */
-	win->phys_addr = flip_win->phys_addr + flip_win->attr.offset;
-	win->offset_u = flip_win->attr.offset_u + flip_win->attr.offset;
-	win->offset_v = flip_win->attr.offset_v + flip_win->attr.offset;
+	win->phys_addr = flip_win->phys_addr;
+	win->offset = flip_win->attr.offset;
+	win->offset_u = flip_win->attr.offset_u;
+	win->offset_v = flip_win->attr.offset_v;
 	win->stride = flip_win->attr.stride;
 	win->stride_uv = flip_win->attr.stride_uv;
 
@@ -410,7 +433,8 @@ static int tegra_fb_set_windowattr(struct tegra_fb_info *tegra_fb,
 		nvhost_syncpt_wait_timeout(&tegra_fb->ndev->host->syncpt,
 					   flip_win->attr.pre_syncpt_id,
 					   flip_win->attr.pre_syncpt_val,
-					   msecs_to_jiffies(500));
+					   msecs_to_jiffies(500),
+					   NULL);
 	}
 
 
@@ -580,6 +604,17 @@ static int tegra_fb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long 
 					 &var, sizeof(var)))
 				return -EFAULT;
 			i++;
+
+			if (var.vmode & FB_VMODE_STEREO_MASK) {
+				if (i >= modedb.modedb_len)
+					break;
+				var.vmode &= ~FB_VMODE_STEREO_MASK;
+				if (copy_to_user(
+					(void __user *)&modedb.modedb[i],
+					 &var, sizeof(var)))
+					return -EFAULT;
+				i++;
+			}
 		}
 		modedb.modedb_len = i;
 

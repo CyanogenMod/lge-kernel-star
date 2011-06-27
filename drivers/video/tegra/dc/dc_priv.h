@@ -22,6 +22,8 @@
 #include <linux/list.h>
 #include <linux/mutex.h>
 #include <linux/wait.h>
+#include <linux/completion.h>
+
 #include "../host/dev.h"
 
 struct tegra_dc;
@@ -82,12 +84,29 @@ struct tegra_dc {
 	struct resource			*fb_mem;
 	struct tegra_fb_info		*fb;
 
+	struct tegra_overlay_info	*overlay;
+
 	u32				syncpt_id;
 	u32				syncpt_min;
 	u32				syncpt_max;
 
 	unsigned long			underflow_mask;
 	struct work_struct		reset_work;
+
+	struct completion		vblank_complete;
+
+	struct work_struct		vblank_work;
+
+	struct {
+		unsigned		underflows;
+		unsigned		underflows_a;
+		unsigned		underflows_b;
+		unsigned		underflows_c;
+	} stats;
+
+#ifdef CONFIG_DEBUG_FS
+	struct dentry			*debugdir;
+#endif
 };
 
 static inline void tegra_dc_io_start(struct tegra_dc *dc)
@@ -140,5 +159,14 @@ void tegra_dc_setup_clk(struct tegra_dc *dc, struct clk *clk);
 
 extern struct tegra_dc_out_ops tegra_dc_rgb_ops;
 extern struct tegra_dc_out_ops tegra_dc_hdmi_ops;
+extern struct tegra_dc_out_ops tegra_dc_dsi_ops;
 
+/* defined in dc_sysfs.c, used by dc.c */
+void __devexit tegra_dc_remove_sysfs(struct device *dev);
+void tegra_dc_create_sysfs(struct device *dev);
+
+/* defined in dc.c, used by dc_sysfs.c */
+void tegra_dc_stats_enable(struct tegra_dc *dc, bool enable);
+bool tegra_dc_stats_get(struct tegra_dc *dc);
 #endif
+

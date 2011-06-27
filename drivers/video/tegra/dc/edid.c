@@ -4,6 +4,8 @@
  * Copyright (C) 2010 Google, Inc.
  * Author: Erik Gilling <konkers@android.com>
  *
+ * Copyright (C) 2010-2011 NVIDIA Corporation
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -32,6 +34,8 @@ struct tegra_edid {
 
 	u8			*data;
 	unsigned		len;
+	u8			support_stereo;
+	struct tegra_edid_hdmi_eld		eld;
 };
 
 #if defined(DEBUG) || defined(CONFIG_DEBUG_FS)
@@ -162,21 +166,151 @@ int tegra_edid_read_block(struct tegra_edid *edid, int block, u8 *data)
 	return 0;
 }
 
+int tegra_edid_parse_ext_block(u8 *raw, int idx, struct tegra_edid *edid)
+{
+	u8 *ptr;
+	u8 tmp;
+	u8 code;
+	int len;
+	int i;
+
+	ptr = &raw[0];
+
+	/* If CEA 861 block get info for eld struct */
+	if (edid && ptr) {
+		if (*ptr <= 3)
+			edid->eld.eld_ver = 0x02;
+		edid->eld.cea_edid_ver = ptr[1];
+	}
+	ptr = &raw[4];
+
+	while (ptr < &raw[idx]) {
+		tmp = *ptr;
+		len = tmp & 0x1f;
+
+		/* HDMI Specification v1.4a, section 8.3.2:
+		 * see Table 8-16 for HDMI VSDB format.
+		 * data blocks have tags in top 3 bits:
+		 * tag code 2: video data block
+		 * tag code 3: vendor specific data block
+		 */
+		code = (tmp >> 5) & 0x7;
+		switch (code) {
+		case 1:
+		{
+			edid->eld.sad_count = len;
+			edid->eld.conn_type = 0x00;
+			edid->eld.support_hdcp = 0x00;
+			for (i = 0; (i < len) && (i < ELD_MAX_SAD); i ++)
+				edid->eld.sad[i] = ptr[i + 1];
+			len++;
+			ptr += len; /* adding the header */
+			break;
+		}
+		/* case 2 is commented out for now */
+		case 3:
+		{
+			int j = 0;
+
+			if ((ptr[1] == 0x03) &&
+				(ptr[2] == 0x0c) &&
+				(ptr[3] == 0)) {
+				edid->eld.port_id[0] = ptr[4];
+				edid->eld.port_id[1] = ptr[5];
+			}
+			if ((len >= 8) &&
+				(ptr[1] == 0x03) &&
+				(ptr[2] == 0x0c) &&
+				(ptr[3] == 0)) {
+				j = 8;
+				tmp = ptr[j++];
+				/* HDMI_Video_present? */
+				if (tmp & 0x20) {
+					/* Latency_Fields_present? */
+					if (tmp & 0x80)
+						j += 2;
+					/* I_Latency_Fields_present? */
+					if (tmp & 0x40)
+						j += 2;
+					/* 3D_present? */
+					if (j <= len && (ptr[j] & 0x80))
+						edid->support_stereo = 1;
+				}
+			}
+			if ((len > 5) &&
+				(ptr[1] == 0x03) &&
+				(ptr[2] == 0x0c) &&
+				(ptr[3] == 0)) {
+
+				edid->eld.support_ai = (ptr[6] & 0x80);
+			}
+
+			if ((len > 9) &&
+				(ptr[1] == 0x03) &&
+				(ptr[2] == 0x0c) &&
+				(ptr[3] == 0)) {
+
+				edid->eld.aud_synch_delay = ptr[10];
+			}
+			len++;
+			ptr += len; /* adding the header */
+			break;
+		}
+		case 4:
+		{
+			edid->eld.spk_alloc = ptr[1];
+			len++;
+			ptr += len; /* adding the header */
+			break;
+		}
+		default:
+			len++; /* len does not include header */
+			ptr += len;
+			break;
+		}
+	}
+
+	return 0;
+}
+
+int tegra_edid_mode_support_stereo(struct fb_videomode *mode)
+{
+	if (!mode)
+		return 0;
+
+	if (mode->xres == 1280 && mode->yres == 720 && mode->refresh == 60)
+		return 1;
+
+	if (mode->xres == 1280 && mode->yres == 720 && mode->refresh == 50)
+		return 1;
+
+	return 0;
+}
 
 int tegra_edid_get_monspecs(struct tegra_edid *edid, struct fb_monspecs *specs)
 {
 	int i;
+	int j;
 	int ret;
 	int extension_blocks;
+
+	edid->support_stereo = 0;
 
 	ret = tegra_edid_read_block(edid, 0, edid->data);
 	if (ret)
 		return ret;
 
 	memset(specs, 0x0, sizeof(struct fb_monspecs));
+	memset(&edid->eld, 0x0, sizeof(struct tegra_edid_hdmi_eld));
 	fb_edid_to_monspecs(edid->data, specs);
 	if (specs->modedb == NULL)
 		return -EINVAL;
+	memcpy(edid->eld.monitor_name, specs->monitor, sizeof(specs->monitor));
+	edid->eld.mnl = strlen(edid->eld.monitor_name) + 1;
+	edid->eld.product_id[0] = edid->data[0x8];
+	edid->eld.product_id[1] = edid->data[0x9];
+	edid->eld.manufacture_id[0] = edid->data[0xA];
+	edid->eld.manufacture_id[1] = edid->data[0xB];
 
 	extension_blocks = edid->data[0x7e];
 
@@ -185,13 +319,35 @@ int tegra_edid_get_monspecs(struct tegra_edid *edid, struct fb_monspecs *specs)
 		if (ret < 0)
 			break;
 
-		if (edid->data[i * 128] == 0x2)
+		if (edid->data[i * 128] == 0x2) {
 			fb_edid_add_monspecs(edid->data + i * 128, specs);
+
+			tegra_edid_parse_ext_block(edid->data + i * 128,
+					edid->data[i * 128 + 2], edid);
+
+			if (edid->support_stereo) {
+				for (j = 0; j < specs->modedb_len; j++) {
+					if (tegra_edid_mode_support_stereo(
+						&specs->modedb[j]))
+						specs->modedb[j].vmode |=
+						FB_VMODE_STEREO_FRAME_PACK;
+				}
+			}
+		}
 	}
 
 	edid->len = i * 128;
 
 	tegra_edid_dump(edid);
+	return 0;
+}
+
+int tegra_edid_get_eld(struct tegra_edid *edid, struct tegra_edid_hdmi_eld *elddata)
+{
+	if (!elddata)
+		return -EFAULT;
+
+	memcpy(elddata,&edid->eld,sizeof(struct tegra_edid_hdmi_eld));
 
 	return 0;
 }

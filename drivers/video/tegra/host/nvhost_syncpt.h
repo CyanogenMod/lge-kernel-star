@@ -32,12 +32,13 @@
 #include "nvhost_hardware.h"
 
 #define NVSYNCPT_GRAPHICS_HOST		     (0)
-#define NVSYNCPT_VI_ISP_0		     (12)
-#define NVSYNCPT_VI_ISP_1		     (13)
-#define NVSYNCPT_VI_ISP_2		     (14)
-#define NVSYNCPT_VI_ISP_3		     (15)
-#define NVSYNCPT_VI_ISP_4		     (16)
-#define NVSYNCPT_VI_ISP_5		     (17)
+#define NVSYNCPT_CSI_VI_0		     (11)
+#define NVSYNCPT_CSI_VI_1		     (12)
+#define NVSYNCPT_VI_ISP_0		     (13)
+#define NVSYNCPT_VI_ISP_1		     (14)
+#define NVSYNCPT_VI_ISP_2		     (15)
+#define NVSYNCPT_VI_ISP_3		     (16)
+#define NVSYNCPT_VI_ISP_4		     (17)
 #define NVSYNCPT_2D_0			     (18)
 #define NVSYNCPT_2D_1			     (19)
 #define NVSYNCPT_3D			     (22)
@@ -59,8 +60,9 @@
 /* sync points that are wholly managed by the client */
 #define NVSYNCPTS_CLIENT_MANAGED ( \
 	BIT(NVSYNCPT_DISP0) | BIT(NVSYNCPT_DISP1) | BIT(NVSYNCPT_DSI) | \
-	BIT(NVSYNCPT_VI_ISP_0) | BIT(NVSYNCPT_VI_ISP_2) | \
-	BIT(NVSYNCPT_VI_ISP_3) | BIT(NVSYNCPT_VI_ISP_4) | BIT(NVSYNCPT_VI_ISP_5) | \
+	BIT(NVSYNCPT_CSI_VI_0) | BIT(NVSYNCPT_CSI_VI_1) | \
+	BIT(NVSYNCPT_VI_ISP_1) | BIT(NVSYNCPT_VI_ISP_2) | \
+	BIT(NVSYNCPT_VI_ISP_3) | BIT(NVSYNCPT_VI_ISP_4) | \
 	BIT(NVSYNCPT_MPE_EBM_EOF) | BIT(NVSYNCPT_MPE_WR_SAFE) | \
 	BIT(NVSYNCPT_2D_1))
 
@@ -101,6 +103,12 @@ static inline u32 nvhost_syncpt_read_max(struct nvhost_syncpt *sp, u32 id)
 	return (u32)atomic_read(&sp->max_val[id]);
 }
 
+static inline u32 nvhost_syncpt_read_min(struct nvhost_syncpt *sp, u32 id)
+{
+	smp_rmb();
+	return (u32)atomic_read(&sp->min_val[id]);
+}
+
 /**
  * Returns true if syncpoint has reached threshold
  */
@@ -138,16 +146,29 @@ u32 nvhost_syncpt_read(struct nvhost_syncpt *sp, u32 id);
 void nvhost_syncpt_incr(struct nvhost_syncpt *sp, u32 id);
 
 int nvhost_syncpt_wait_timeout(struct nvhost_syncpt *sp, u32 id, u32 thresh,
-			u32 timeout);
+			u32 timeout, u32 *value);
 
 static inline int nvhost_syncpt_wait(struct nvhost_syncpt *sp, u32 id, u32 thresh)
 {
-	return nvhost_syncpt_wait_timeout(sp, id, thresh, MAX_SCHEDULE_TIMEOUT);
+	return nvhost_syncpt_wait_timeout(sp, id, thresh,
+	                                  MAX_SCHEDULE_TIMEOUT, NULL);
 }
 
+/*
+ * Check driver supplied waitchk structs for syncpt thresholds
+ * that have already been satisfied and NULL the comparison (to
+ * avoid a wrap condition in the HW).
+ *
+ * @param: nvmap - needed to access command buffer
+ * @param: sp - global shadowed syncpt struct
+ * @param: mask - bit mask of syncpt IDs referenced in WAITs
+ * @param: wait - start of filled in array of waitchk structs
+ * @param: waitend - end ptr (one beyond last valid waitchk)
+ */
 int nvhost_syncpt_wait_check(struct nvmap_client *nvmap,
 			struct nvhost_syncpt *sp, u32 mask,
-			struct nvhost_waitchk *waitp, u32 num_waits);
+			struct nvhost_waitchk *wait,
+			struct nvhost_waitchk *waitend);
 
 const char *nvhost_syncpt_name(u32 id);
 

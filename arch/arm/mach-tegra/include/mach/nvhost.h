@@ -3,7 +3,7 @@
  *
  * Tegra graphics host driver
  *
- * Copyright (c) 2009-2010, NVIDIA Corporation.
+ * Copyright (c) 2009-2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -76,13 +76,28 @@ int nvhost_bus_register(struct nvhost_master *host);
 #define NVHOST_NO_TIMEOUT (-1)
 #define NVHOST_IOCTL_MAGIC 'H'
 
+/* version 0 header (used with write() submit interface) */
 struct nvhost_submit_hdr {
 	__u32 syncpt_id;
 	__u32 syncpt_incrs;
 	__u32 num_cmdbufs;
 	__u32 num_relocs;
+};
+
+#define NVHOST_SUBMIT_VERSION_V0		0x0
+#define NVHOST_SUBMIT_VERSION_V1		0x1
+#define NVHOST_SUBMIT_VERSION_MAX_SUPPORTED	NVHOST_SUBMIT_VERSION_V1
+
+/* version 1 header (used with ioctl() submit interface) */
+struct nvhost_submit_hdr_ext {
+	__u32 syncpt_id;	/* version 0 fields */
+	__u32 syncpt_incrs;
+	__u32 num_cmdbufs;
+	__u32 num_relocs;
+	__u32 submit_version;	/* version 1 fields */
 	__u32 num_waitchks;
 	__u32 waitchk_mask;
+	__u32 pad[5];		/* future expansion */
 };
 
 struct nvhost_cmdbuf {
@@ -123,9 +138,13 @@ struct nvhost_set_nvmap_fd_args {
 	_IOR(NVHOST_IOCTL_MAGIC, 4, struct nvhost_get_param_args)
 #define NVHOST_IOCTL_CHANNEL_SET_NVMAP_FD	\
 	_IOW(NVHOST_IOCTL_MAGIC, 5, struct nvhost_set_nvmap_fd_args)
+#define NVHOST_IOCTL_CHANNEL_NULL_KICKOFF	\
+	_IOR(NVHOST_IOCTL_MAGIC, 6, struct nvhost_get_param_args)
+#define NVHOST_IOCTL_CHANNEL_SUBMIT_EXT		\
+	_IOW(NVHOST_IOCTL_MAGIC, 7, struct nvhost_submit_hdr_ext)
 #define NVHOST_IOCTL_CHANNEL_LAST		\
-	_IOC_NR(NVHOST_IOCTL_CHANNEL_SET_NVMAP_FD)
-#define NVHOST_IOCTL_CHANNEL_MAX_ARG_SIZE sizeof(struct nvhost_get_param_args)
+	_IOC_NR(NVHOST_IOCTL_CHANNEL_SUBMIT_EXT)
+#define NVHOST_IOCTL_CHANNEL_MAX_ARG_SIZE sizeof(struct nvhost_submit_hdr_ext)
 
 struct nvhost_ctrl_syncpt_read_args {
 	__u32 id;
@@ -140,6 +159,13 @@ struct nvhost_ctrl_syncpt_wait_args {
 	__u32 id;
 	__u32 thresh;
 	__s32 timeout;
+};
+
+struct nvhost_ctrl_syncpt_waitex_args {
+	__u32 id;
+	__u32 thresh;
+	__s32 timeout;
+	__u32 value;
 };
 
 struct nvhost_ctrl_module_mutex_args {
@@ -168,8 +194,11 @@ struct nvhost_ctrl_module_regrdwr_args {
 #define NVHOST_IOCTL_CTRL_MODULE_REGRDWR	\
 	_IOWR(NVHOST_IOCTL_MAGIC, 5, struct nvhost_ctrl_module_regrdwr_args)
 
+#define NVHOST_IOCTL_CTRL_SYNCPT_WAITEX		\
+	_IOWR(NVHOST_IOCTL_MAGIC, 6, struct nvhost_ctrl_syncpt_waitex_args)
+
 #define NVHOST_IOCTL_CTRL_LAST			\
-	_IOC_NR(NVHOST_IOCTL_CTRL_MODULE_REGRDWR)
+	_IOC_NR(NVHOST_IOCTL_CTRL_SYNCPT_WAITEX)
 #define NVHOST_IOCTL_CTRL_MAX_ARG_SIZE sizeof(struct nvhost_ctrl_module_regrdwr_args)
 
 #endif
