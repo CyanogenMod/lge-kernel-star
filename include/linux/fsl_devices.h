@@ -79,6 +79,7 @@ struct fsl_usb2_platform_data {
 	unsigned	have_sysif_regs:1;
 	unsigned	invert_drvvbus:1;
 	unsigned	invert_pwr_fault:1;
+        void		*phy_config;
 };
 
 /* Flags in fsl_usb2_mph_platform_data */

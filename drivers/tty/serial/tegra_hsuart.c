@@ -255,19 +255,30 @@ static int tegra_start_dma_rx(struct tegra_uart_port *t)
 static void tegra_rx_dma_threshold_callback(struct tegra_dma_req *req)
 {
 	struct tegra_uart_port *t = req->dev;
+	struct uart_port *u = &t->uport;
 	unsigned long flags;
 
-	spin_lock_irqsave(&t->uport.lock, flags);
+	spin_lock_irqsave(&u->lock, flags);
 
 	do_handle_rx_dma(t);
 
-	spin_unlock_irqrestore(&t->uport.lock, flags);
+	spin_unlock_irqrestore(&u->lock, flags);
 }
 
-/* must be called with uart lock held */
-static void tegra_rx_dma_complete_req(struct tegra_uart_port *t,
-	struct tegra_dma_req *req)
+/* It is expected that the callers take the UART lock when this API is called.
+ *
+ * There are 2 contexts when this function is called:
+ *
+ * 1. DMA ISR - DMA ISR triggers the threshold complete calback, which calls the
+ * dequue API which in-turn calls this callback. UART lock is taken during
+ * the call to the threshold callback.
+ *
+ * 2. UART ISR - UART calls the dequue API which in-turn will call this API.
+ * In this case, UART ISR takes the UART lock.
+ * */
+static void tegra_rx_dma_complete_callback(struct tegra_dma_req *req)
 {
+	struct tegra_uart_port *t = req->dev;
 	struct uart_port *u = &t->uport;
 	struct tty_struct *tty = u->state->port.tty;
 
@@ -288,24 +299,9 @@ static void tegra_rx_dma_complete_req(struct tegra_uart_port *t,
 	if (req->status == -TEGRA_DMA_REQ_ERROR_ABORTED)
 		return;
 
+	spin_unlock(&u->lock);
 	tty_flip_buffer_push(u->state->port.tty);
-}
-
-static void tegra_rx_dma_complete_callback(struct tegra_dma_req *req)
-{
-	struct tegra_uart_port *t = req->dev;
-	unsigned long flags;
-
-	/*
-	 * should never get called, dma should be dequeued during threshold
-	 * callback
-	 */
-
-	dev_warn(t->uport.dev, "possible rx overflow\n");
-
-	spin_lock_irqsave(&t->uport.lock, flags);
-	tegra_rx_dma_complete_req(t, req);
-	spin_unlock_irqrestore(&t->uport.lock, flags);
+	spin_lock(&u->lock);
 }
 
 /* Lock already taken */
@@ -314,9 +310,7 @@ static void do_handle_rx_dma(struct tegra_uart_port *t)
 	struct uart_port *u = &t->uport;
 	if (t->rts_active)
 		set_rts(t, false);
-	if (!tegra_dma_dequeue_req(t->rx_dma, &t->rx_dma_req))
-		tegra_rx_dma_complete_req(t, &t->rx_dma_req);
-
+	tegra_dma_dequeue(t->rx_dma);
 	tty_flip_buffer_push(u->state->port.tty);
 	/* enqueue the request again */
 	tegra_start_dma_rx(t);
@@ -487,31 +481,22 @@ static void tegra_tx_dma_complete_work(struct work_struct *work)
 	spin_unlock_irqrestore(&t->uport.lock, flags);
 }
 
-/* must be called with uart lock held */
-static void tegra_tx_dma_complete_req(struct tegra_uart_port *t,
-	struct tegra_dma_req *req)
+static void tegra_tx_dma_complete_callback(struct tegra_dma_req *req)
 {
+	struct tegra_uart_port *t = req->dev;
 	struct circ_buf *xmit = &t->uport.state->xmit;
 	int count = req->bytes_transferred;
+	unsigned long flags;
 
+	dev_vdbg(t->uport.dev, "%s: %d\n", __func__, count);
+
+	spin_lock_irqsave(&t->uport.lock, flags);
 	xmit->tail = (xmit->tail + count) & (UART_XMIT_SIZE - 1);
 
 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
 		uart_write_wakeup(&t->uport);
 
 	schedule_work(&t->tx_work);
-}
-
-static void tegra_tx_dma_complete_callback(struct tegra_dma_req *req)
-{
-	struct tegra_uart_port *t = req->dev;
-	unsigned long flags;
-
-	dev_vdbg(t->uport.dev, "%s: %d\n", __func__, req->bytes_transferred);
-
-	spin_lock_irqsave(&t->uport.lock, flags);
-
-	tegra_tx_dma_complete_req(t, req);
 
 	spin_unlock_irqrestore(&t->uport.lock, flags);
 }
@@ -607,12 +592,11 @@ static void tegra_stop_rx(struct uart_port *u)
 		uart_writeb(t, ier, UART_IER);
 		t->rx_in_progress = 0;
 
-		if (t->use_rx_dma && t->rx_dma) {
-			if (!tegra_dma_dequeue_req(t->rx_dma, &t->rx_dma_req))
-				tegra_rx_dma_complete_req(t, &t->rx_dma_req);
-		} else {
+		if (t->use_rx_dma && t->rx_dma)
+			tegra_dma_dequeue(t->rx_dma);
+		else
 			do_handle_rx_pio(t);
-		}
+
 		tty_flip_buffer_push(u->state->port.tty);
 	}
 
@@ -1002,10 +986,8 @@ static void tegra_stop_tx(struct uart_port *u)
 
 	t = container_of(u, struct tegra_uart_port, uport);
 
-	if (t->use_tx_dma) {
-		if (!tegra_dma_dequeue_req(t->tx_dma, &t->tx_dma_req))
-			tegra_tx_dma_complete_req(t, &t->tx_dma_req);
-	}
+	if (t->use_tx_dma)
+		tegra_dma_dequeue_req(t->tx_dma, &t->tx_dma_req);
 
 	return;
 }
@@ -1156,8 +1138,7 @@ static void tegra_flush_buffer(struct uart_port *u)
 	t = container_of(u, struct tegra_uart_port, uport);
 
 	if (t->use_tx_dma) {
-		if (!tegra_dma_dequeue_req(t->tx_dma, &t->tx_dma_req))
-			tegra_tx_dma_complete_req(t, &t->tx_dma_req);
+		tegra_dma_dequeue_req(t->tx_dma, &t->tx_dma_req);
 		t->tx_dma_req.size = 0;
 	}
 	return;
