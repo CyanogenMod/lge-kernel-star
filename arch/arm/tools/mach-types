@@ -1104,3 +1104,4 @@ aruba			MACH_ARUBA		ARUBA			3437
 # Cardhu
 cardhu			MACH_CARDHU		CARDHU			3436
 # Enterprise
+tegra_enterprise	MACH_TEGRA_ENTERPRISE	TEGRA_ENTERPRISE	3512

@@ -117,3 +117,12 @@ obj-${CONFIG_MACH_CARDHU}               += board-cardhu-memory.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-powermon.o
 
 # Enterprise
+obj-${CONFIG_MACH_TEGRA_ENTERPRISE}     += board-enterprise.o
+obj-${CONFIG_MACH_TEGRA_ENTERPRISE}     += board-enterprise-panel.o
+obj-${CONFIG_MACH_TEGRA_ENTERPRISE}     += board-enterprise-pinmux.o
+obj-${CONFIG_MACH_TEGRA_ENTERPRISE}     += board-enterprise-sdhci.o
+obj-${CONFIG_MACH_TEGRA_ENTERPRISE}     += board-enterprise-memory.o
+obj-${CONFIG_MACH_TEGRA_ENTERPRISE}     += board-enterprise-power.o
+obj-${CONFIG_MACH_TEGRA_ENTERPRISE}     += board-enterprise-baseband.o
+obj-${CONFIG_MACH_TEGRA_ENTERPRISE}     += board-enterprise-kbc.o
+obj-${CONFIG_MACH_TEGRA_ENTERPRISE}     += board-enterprise-sensors.o

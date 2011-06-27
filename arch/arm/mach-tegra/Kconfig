@@ -105,6 +105,11 @@ config MACH_CARDHU
          Support for NVIDIA Cardhu development platform
 
 # Enterprise
+config MACH_TEGRA_ENTERPRISE
+       bool "Enterprise board"
+       depends on ARCH_TEGRA_3x_SOC
+       help
+         Support for NVIDIA Enterprise development platform
 
 config TEGRA_VERBIER_E1187
        bool "Support for NVIDIA VERBIER E1187 platform"
