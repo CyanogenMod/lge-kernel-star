@@ -1102,4 +1102,5 @@ sam9repeater		MACH_SAM9REPEATER	SAM9REPEATER		3424
 # Aruba
 aruba			MACH_ARUBA		ARUBA			3437
 # Cardhu
+cardhu			MACH_CARDHU		CARDHU			3436
 # Enterprise
