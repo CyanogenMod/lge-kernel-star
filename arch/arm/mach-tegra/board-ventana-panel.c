@@ -34,11 +34,17 @@
 
 #include "devices.h"
 #include "gpio-names.h"
+#include "board.h"
 
+#define ventana_pnl_pwr_enb	TEGRA_GPIO_PC6
 #define ventana_bl_enb		TEGRA_GPIO_PD4
 #define ventana_lvds_shutdown	TEGRA_GPIO_PB2
 #define ventana_hdmi_hpd	TEGRA_GPIO_PN7
 #define ventana_hdmi_enb	TEGRA_GPIO_PV5
+
+static struct regulator *ventana_hdmi_reg = NULL;
+static struct regulator *ventana_hdmi_pll = NULL;
+
 
 static int ventana_backlight_init(struct device *dev) {
 	int ret;
@@ -68,6 +74,8 @@ static int ventana_backlight_notify(struct device *unused, int brightness)
 	return brightness;
 }
 
+static int ventana_disp1_check_fb(struct device *dev, struct fb_info *info);
+
 static struct platform_pwm_backlight_data ventana_backlight_data = {
 	.pwm_id		= 2,
 	.max_brightness	= 255,
@@ -76,6 +84,8 @@ static struct platform_pwm_backlight_data ventana_backlight_data = {
 	.init		= ventana_backlight_init,
 	.exit		= ventana_backlight_exit,
 	.notify		= ventana_backlight_notify,
+	/* Only toggle backlight on fb blank notifications for disp1 */
+	.check_fb   = ventana_disp1_check_fb,
 };
 
 static struct platform_device ventana_backlight_device = {
@@ -88,17 +98,12 @@ static struct platform_device ventana_backlight_device = {
 
 static int ventana_panel_enable(void)
 {
-	static struct regulator *reg = NULL;
+	struct regulator *reg = regulator_get(NULL, "vdd_ldo4");
 
-	if (reg == NULL) {
-		reg = regulator_get(NULL, "avdd_lvds");
-		if (WARN_ON(IS_ERR(reg)))
-			pr_err("%s: couldn't get regulator avdd_lvds: %ld\n",
-			       __func__, PTR_ERR(reg));
-		else
-			regulator_enable(reg);
-	}
+	regulator_enable(reg);
+	regulator_put(reg);
 
+	gpio_set_value(ventana_pnl_pwr_enb, 1);
 	gpio_set_value(ventana_lvds_shutdown, 1);
 	return 0;
 }
@@ -106,18 +111,40 @@ static int ventana_panel_enable(void)
 static int ventana_panel_disable(void)
 {
 	gpio_set_value(ventana_lvds_shutdown, 0);
+	gpio_set_value(ventana_pnl_pwr_enb, 0);
 	return 0;
 }
 
 static int ventana_hdmi_enable(void)
 {
-	gpio_set_value(ventana_hdmi_enb, 1);
+	if (!ventana_hdmi_reg) {
+		ventana_hdmi_reg = regulator_get(NULL, "avdd_hdmi"); /* LD07 */
+		if (IS_ERR_OR_NULL(ventana_hdmi_reg)) {
+			pr_err("hdmi: couldn't get regulator avdd_hdmi\n");
+			ventana_hdmi_reg = NULL;
+			return PTR_ERR(ventana_hdmi_reg);
+		}
+	}
+	regulator_enable(ventana_hdmi_reg);
+
+	if (!ventana_hdmi_pll) {
+		ventana_hdmi_pll = regulator_get(NULL, "avdd_hdmi_pll"); /* LD08 */
+		if (IS_ERR_OR_NULL(ventana_hdmi_pll)) {
+			pr_err("hdmi: couldn't get regulator avdd_hdmi_pll\n");
+			ventana_hdmi_pll = NULL;
+			regulator_disable(ventana_hdmi_reg);
+			ventana_hdmi_reg = NULL;
+			return PTR_ERR(ventana_hdmi_pll);
+		}
+	}
+	regulator_enable(ventana_hdmi_pll);
 	return 0;
 }
 
 static int ventana_hdmi_disable(void)
 {
-	gpio_set_value(ventana_hdmi_enb, 0);
+	regulator_disable(ventana_hdmi_reg);
+	regulator_disable(ventana_hdmi_pll);
 	return 0;
 }
 
@@ -136,8 +163,6 @@ static struct resource ventana_disp1_resources[] = {
 	},
 	{
 		.name	= "fbmem",
-		.start	= 0x18012000,
-		.end	= 0x18414000 - 1, /* enough for 1080P 16bpp */
 		.flags	= IORESOURCE_MEM,
 	},
 };
@@ -158,8 +183,6 @@ static struct resource ventana_disp2_resources[] = {
 	{
 		.name	= "fbmem",
 		.flags	= IORESOURCE_MEM,
-		.start	= 0x18414000,
-		.end	= 0x18BFD000 - 1,
 	},
 	{
 		.name	= "hdmi_regs",
@@ -171,7 +194,7 @@ static struct resource ventana_disp2_resources[] = {
 
 static struct tegra_dc_mode ventana_panel_modes[] = {
 	{
-		.pclk = 62200000,
+		.pclk = 72072000,
 		.h_ref_to_sync = 11,
 		.v_ref_to_sync = 1,
 		.h_sync_width = 58,
@@ -189,14 +212,14 @@ static struct tegra_fb_data ventana_fb_data = {
 	.win		= 0,
 	.xres		= 1366,
 	.yres		= 768,
-	.bits_per_pixel	= 16,
+	.bits_per_pixel	= 32,
 };
 
 static struct tegra_fb_data ventana_hdmi_fb_data = {
 	.win		= 0,
-	.xres		= 1280,
-	.yres		= 720,
-	.bits_per_pixel	= 16,
+	.xres		= 1366,
+	.yres		= 768,
+	.bits_per_pixel	= 32,
 };
 
 static struct tegra_dc_out ventana_disp1_out = {
@@ -204,6 +227,8 @@ static struct tegra_dc_out ventana_disp1_out = {
 
 	.align		= TEGRA_DC_ALIGN_MSB,
 	.order		= TEGRA_DC_ORDER_RED_BLUE,
+	.depth		= 18,
+	.dither		= TEGRA_DC_ORDERED_DITHER,
 
 	.modes	 	= ventana_panel_modes,
 	.n_modes 	= ARRAY_SIZE(ventana_panel_modes),
@@ -233,7 +258,7 @@ static struct tegra_dc_platform_data ventana_disp1_pdata = {
 };
 
 static struct tegra_dc_platform_data ventana_disp2_pdata = {
-	.flags		= TEGRA_DC_FLAG_ENABLED,
+	.flags		= 0,
 	.default_out	= &ventana_disp2_out,
 	.fb		= &ventana_hdmi_fb_data,
 };
@@ -247,6 +272,11 @@ static struct nvhost_device ventana_disp1_device = {
 		.platform_data = &ventana_disp1_pdata,
 	},
 };
+
+static int ventana_disp1_check_fb(struct device *dev, struct fb_info *info)
+{
+	return info->device == &ventana_disp1_device.dev;
+}
 
 static struct nvhost_device ventana_disp2_device = {
 	.name		= "tegradc",
@@ -269,8 +299,6 @@ static struct nvmap_platform_carveout ventana_carveouts[] = {
 	[1] = {
 		.name		= "generic-0",
 		.usage_mask	= NVMAP_HEAP_CARVEOUT_GENERIC,
-		.base		= 0x18C00000,
-		.size		= SZ_128M - 0xC00000,
 		.buddy_size	= SZ_32K,
 	},
 };
@@ -298,21 +326,40 @@ static struct platform_device *ventana_gfx_devices[] __initdata = {
 int __init ventana_panel_init(void)
 {
 	int err;
+	struct resource *res;
+
+	gpio_request(ventana_pnl_pwr_enb, "pnl_pwr_enb");
+	gpio_direction_output(ventana_pnl_pwr_enb, 1);
+	tegra_gpio_enable(ventana_pnl_pwr_enb);
 
 	gpio_request(ventana_lvds_shutdown, "lvds_shdn");
 	gpio_direction_output(ventana_lvds_shutdown, 1);
 	tegra_gpio_enable(ventana_lvds_shutdown);
 
-	gpio_request(ventana_hdmi_enb, "hdmi_5v_en");
-	gpio_direction_output(ventana_hdmi_enb, 0);
 	tegra_gpio_enable(ventana_hdmi_enb);
+	gpio_request(ventana_hdmi_enb, "hdmi_5v_en");
+	gpio_direction_output(ventana_hdmi_enb, 1);
 
+	tegra_gpio_enable(ventana_hdmi_hpd);
 	gpio_request(ventana_hdmi_hpd, "hdmi_hpd");
 	gpio_direction_input(ventana_hdmi_hpd);
-	tegra_gpio_enable(ventana_hdmi_hpd);
+
+	ventana_carveouts[1].base = tegra_carveout_start;
+	ventana_carveouts[1].size = tegra_carveout_size;
 
 	err = platform_add_devices(ventana_gfx_devices,
 				   ARRAY_SIZE(ventana_gfx_devices));
+
+
+	res = nvhost_get_resource_byname(&ventana_disp1_device,
+		IORESOURCE_MEM, "fbmem");
+	res->start = tegra_fb_start;
+	res->end = tegra_fb_start + tegra_fb_size - 1;
+
+	res = nvhost_get_resource_byname(&ventana_disp2_device,
+		IORESOURCE_MEM, "fbmem");
+	res->start = tegra_fb2_start;
+	res->end = tegra_fb2_start + tegra_fb2_size - 1;
 
 	if (!err)
 		err = nvhost_device_register(&ventana_disp1_device);
