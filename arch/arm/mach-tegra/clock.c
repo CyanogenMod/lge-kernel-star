@@ -644,6 +644,16 @@ int tegra_is_clk_enabled(struct clk *c)
 }
 EXPORT_SYMBOL(tegra_is_clk_enabled);
 
+int tegra_clk_shared_bus_update(struct clk *c)
+{
+	int ret = 0;
+
+	if (c->ops && c->ops->shared_bus_update)
+		ret = c->ops->shared_bus_update(c);
+
+	return ret;
+}
+
 /* dvfs initialization may lower default maximum rate */
 void __init tegra_init_max_rate(struct clk *c, unsigned long max_rate)
 {

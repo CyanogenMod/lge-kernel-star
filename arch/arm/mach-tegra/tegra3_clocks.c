@@ -295,6 +295,8 @@
 /* FIXME: recommended safety delay after lock is detected */
 #define PLL_POST_LOCK_DELAY		100
 
+static int tegra3_clk_shared_bus_update(struct clk *bus);
+
 static bool detach_shared_bus;
 module_param(detach_shared_bus, bool, 0644);
 
@@ -1162,6 +1164,7 @@ static struct clk_ops tegra_sbus_cmplx_ops = {
 	.init = tegra3_sbus_cmplx_init,
 	.set_rate = tegra3_sbus_cmplx_set_rate,
 	.round_rate = tegra3_sbus_cmplx_round_rate,
+	.shared_bus_update = tegra3_clk_shared_bus_update,
 };
 
 /* Blink output functions */
@@ -2359,6 +2362,7 @@ static struct clk_ops tegra_emc_clk_ops = {
 	.set_rate		= &tegra3_emc_clk_set_rate,
 	.round_rate		= &tegra3_emc_clk_round_rate,
 	.reset			= &tegra3_periph_clk_reset,
+	.shared_bus_update	= &tegra3_clk_shared_bus_update,
 };
 
 /* Clock doubler ops */
@@ -2641,6 +2645,7 @@ static struct clk_ops tegra_clk_cbus_ops = {
 	.enable = tegra3_clk_cbus_enable,
 	.set_rate = tegra3_clk_cbus_set_rate,
 	.round_rate = tegra3_clk_cbus_round_rate,
+	.shared_bus_update = tegra3_clk_shared_bus_update,
 };
 
 /* shared bus ops */
@@ -2651,7 +2656,7 @@ static struct clk_ops tegra_clk_cbus_ops = {
  * enabled shared_bus_user clock, with a minimum value set by the
  * shared bus.
  */
-static void tegra_clk_shared_bus_update(struct clk *bus)
+static int tegra3_clk_shared_bus_update(struct clk *bus)
 {
 	struct clk *c;
 	unsigned long rate = bus->min_rate;
@@ -2659,7 +2664,7 @@ static void tegra_clk_shared_bus_update(struct clk *bus)
 	unsigned long ceiling = bus->max_rate;
 
 	if (detach_shared_bus)
-		return;
+		return 0;
 
 	list_for_each_entry(c, &bus->shared_bus_list,
 			u.shared_bus_user.node) {
@@ -2683,8 +2688,10 @@ static void tegra_clk_shared_bus_update(struct clk *bus)
 	}
 	rate = min(max(rate, bw), ceiling);
 
-	if (rate != clk_get_rate(bus))
-		clk_set_rate(bus, rate);
+	if (rate == clk_get_rate_locked(bus))
+		return 0;
+
+	return clk_set_rate_locked(bus, rate);
 };
 
 static void tegra_clk_shared_bus_init(struct clk *c)
