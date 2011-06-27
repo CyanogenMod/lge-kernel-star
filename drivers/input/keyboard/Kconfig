@@ -193,6 +193,23 @@ config KEYBOARD_GPIO_POLLED
 	  To compile this driver as a module, choose M here: the
 	  module will be called gpio_keys_polled.
 
+config KEYBOARD_INTERRUPT
+	tristate "Interrupt Buttons"
+	default n
+	help
+	  This driver implements support for buttons connected
+	  directly to interrupt pins of peripheral and peripheral
+	  does not support any othe functionality like gpio
+	  through that pins.
+
+	  Say Y here if your device has buttons connected
+	  directly to such interrupt pins.  Your board-specific
+	  setup logic must also provide a platform device,
+	  with configuration data saying which interrupts are used.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called interrupt_keys.
+
 config KEYBOARD_TCA6416
 	tristate "TCA6416/TCA6408A Keypad Support"
 	depends on I2C

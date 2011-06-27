@@ -467,4 +467,20 @@ config INPUT_XEN_KBDDEV_FRONTEND
 	  To compile this driver as a module, choose M here: the
 	  module will be called xen-kbdfront.
 
+config INPUT_ALPS_GPIO_SCROLLWHEEL
+	tristate "Alps GPIO Scrollwheel"
+	depends on GENERIC_GPIO
+	help
+	  This driver implements support for Alps SRBE
+          ScrollWheel connected to GPIO pins of various
+          CPUs (and some other chips).
+
+	  Say Y here if your device has ScrollWheel connected
+	  directly to such GPIO pins.  Your board-specific
+	  setup logic must also provide a platform device,
+	  with configuration data saying which GPIOs are used.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called alps_gpio_scrollwheel.
+
 endif
