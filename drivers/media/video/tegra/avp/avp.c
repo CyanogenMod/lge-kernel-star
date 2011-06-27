@@ -2,6 +2,8 @@
  * Copyright (C) 2010 Google, Inc.
  * Author: Dima Zavin <dima@android.com>
  *
+ * Copyright (C) 2010-2011 NVIDIA Corporation
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -48,6 +50,7 @@
 #include "avp_msg.h"
 #include "trpc.h"
 #include "avp.h"
+#include "nvavp.h"
 
 enum {
 	AVP_DBG_TRACE_XPC	= 1U << 0,
@@ -59,7 +62,15 @@ enum {
 	AVP_DBG_TRACE_LIB	= 1U << 6,
 };
 
-static u32 avp_debug_mask = 0;
+static u32 avp_debug_mask =
+	AVP_DBG_TRACE_XPC	|
+	/* AVP_DBG_TRACE_XPC_IRQ	| */
+	/* AVP_DBG_TRACE_XPC_MSG	| */
+	/* AVP_DBG_TRACE_TRPC_MSG	| */
+	AVP_DBG_TRACE_XPC_CONN	|
+	AVP_DBG_TRACE_TRPC_CONN	|
+	AVP_DBG_TRACE_LIB;
+
 module_param_named(debug_mask, avp_debug_mask, uint, S_IWUSR | S_IRUGO);
 
 #define DBG(flag, args...) \
@@ -67,9 +78,7 @@ module_param_named(debug_mask, avp_debug_mask, uint, S_IWUSR | S_IRUGO);
 
 #define TEGRA_AVP_NAME			"tegra-avp"
 
-#define TEGRA_AVP_KERNEL_FW		"nvrm_avp.bin"
-
-#define TEGRA_AVP_RESET_VECTOR_ADDR	\
+#define TEGRA_AVP_RESET_VECTOR_ADDR \
 		(IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x200)
 
 #define TEGRA_AVP_RESUME_ADDR		IO_ADDRESS(TEGRA_IRAM_BASE)
@@ -82,94 +91,95 @@ module_param_named(debug_mask, avp_debug_mask, uint, S_IWUSR | S_IRUGO);
 #define MBOX_TO_AVP			IO_ADDRESS(TEGRA_RES_SEMA_BASE + 0x20)
 
 /* Layout of the mailbox registers:
- * bit 31	- pending message interrupt enable (mailbox full, i.e. valid=1)
- * bit 30	- message cleared interrupt enable (mailbox empty, i.e. valid=0)
- * bit 29	- message valid. peer clears this bit after reading msg
- * bits 27:0	- message data
+ * bit 31    - pending message interrupt enable (mailbox full, i.e. valid=1)
+ * bit 30    - message cleared interrupt enable (mailbox empty, i.e. valid=0)
+ * bit 29    - message valid. peer clears this bit after reading msg
+ * bits 27:0 - message data
  */
 #define MBOX_MSG_PENDING_INT_EN		(1 << 31)
 #define MBOX_MSG_READ_INT_EN		(1 << 30)
 #define MBOX_MSG_VALID			(1 << 29)
 
-#define AVP_MSG_MAX_CMD_LEN		16
+#define AVP_MSG_MAX_CMD_LEN	16
 #define AVP_MSG_AREA_SIZE	(AVP_MSG_MAX_CMD_LEN + TEGRA_RPC_MAX_MSG_LEN)
 
-struct avp_info {
-	struct clk			*cop_clk;
+struct tegra_avp_info {
+	struct clk		*cop_clk;
 
-	int				mbox_from_avp_pend_irq;
+	int			mbox_from_avp_pend_irq;
 
-	dma_addr_t			msg_area_addr;
-	u32				msg;
-	void				*msg_to_avp;
-	void				*msg_from_avp;
-	struct mutex			to_avp_lock;
-	struct mutex			from_avp_lock;
+	dma_addr_t		msg_area_addr;
+	u32			msg;
+	void			*msg_to_avp;
+	void			*msg_from_avp;
+	struct mutex		to_avp_lock;
+	struct mutex		from_avp_lock;
 
-	struct work_struct		recv_work;
-	struct workqueue_struct		*recv_wq;
+	struct work_struct	recv_work;
+	struct workqueue_struct	*recv_wq;
 
-	struct trpc_node		*rpc_node;
-	struct miscdevice		misc_dev;
-	bool				opened;
-	struct mutex			open_lock;
+	struct trpc_node	*rpc_node;
+	struct miscdevice	misc_dev;
+	int			refcount;
+	struct mutex		open_lock;
 
-	spinlock_t			state_lock;
-	bool				initialized;
-	bool				shutdown;
-	bool				suspending;
-	bool				defer_remote;
+	spinlock_t		state_lock;
+	bool			initialized;
+	bool			shutdown;
+	bool			suspending;
+	bool			defer_remote;
 
-	struct mutex			libs_lock;
-	struct list_head		libs;
-	struct nvmap_client		*nvmap_libs;
+	struct mutex		libs_lock;
+	struct list_head	libs;
+	struct nvmap_client	*nvmap_libs;
 
 	/* client for driver allocations, persistent */
-	struct nvmap_client		*nvmap_drv;
-	struct nvmap_handle_ref		*kernel_handle;
-	void				*kernel_data;
-	unsigned long			kernel_phys;
+	struct nvmap_client	*nvmap_drv;
+	struct nvmap_handle_ref	*kernel_handle;
+	void			*kernel_data;
+	phys_addr_t		kernel_phys;
 
-	struct nvmap_handle_ref		*iram_backup_handle;
-	void				*iram_backup_data;
-	unsigned long			iram_backup_phys;
-	unsigned long			resume_addr;
+	struct nvmap_handle_ref *iram_backup_handle;
+	void			*iram_backup_data;
+	phys_addr_t		iram_backup_phys;
+	unsigned long		resume_addr;
+	unsigned long		reset_addr;
 
-	struct trpc_endpoint		*avp_ep;
-	struct rb_root			endpoints;
+	struct trpc_endpoint	*avp_ep;
+	struct rb_root		endpoints;
 
-	struct avp_svc_info		*avp_svc;
+	struct avp_svc_info	*avp_svc;
 };
 
 struct remote_info {
-	u32				loc_id;
-	u32				rem_id;
-	struct kref			ref;
+	u32			loc_id;
+	u32			rem_id;
+	struct kref		ref;
 
-	struct trpc_endpoint		*trpc_ep;
-	struct rb_node			rb_node;
+	struct trpc_endpoint	*trpc_ep;
+	struct rb_node		rb_node;
 };
 
 struct lib_item {
-	struct list_head		list;
-	u32				handle;
-	char				name[TEGRA_AVP_LIB_MAX_NAME];
+	struct list_head	list;
+	u32			handle;
+	char			name[TEGRA_AVP_LIB_MAX_NAME];
 };
 
-static struct avp_info *tegra_avp;
+static struct tegra_avp_info *tegra_avp;
 
 static int avp_trpc_send(struct trpc_endpoint *ep, void *buf, size_t len);
 static void avp_trpc_close(struct trpc_endpoint *ep);
 static void avp_trpc_show(struct seq_file *s, struct trpc_endpoint *ep);
-static void libs_cleanup(struct avp_info *avp);
+static void libs_cleanup(struct tegra_avp_info *avp);
 
 static struct trpc_ep_ops remote_ep_ops = {
-	.send	= avp_trpc_send,
-	.close	= avp_trpc_close,
-	.show	= avp_trpc_show,
+	.send   = avp_trpc_send,
+	.close  = avp_trpc_close,
+	.show   = avp_trpc_show,
 };
 
-static struct remote_info *rinfo_alloc(struct avp_info *avp)
+static struct remote_info *rinfo_alloc(struct tegra_avp_info *avp)
 {
 	struct remote_info *rinfo;
 
@@ -196,7 +206,7 @@ static inline void rinfo_put(struct remote_info *rinfo)
 	kref_put(&rinfo->ref, _rinfo_release);
 }
 
-static int remote_insert(struct avp_info *avp, struct remote_info *rinfo)
+static int remote_insert(struct tegra_avp_info *avp, struct remote_info *rinfo)
 {
 	struct rb_node **p;
 	struct rb_node *parent;
@@ -225,7 +235,7 @@ static int remote_insert(struct avp_info *avp, struct remote_info *rinfo)
 	return 0;
 }
 
-static struct remote_info *remote_find(struct avp_info *avp, u32 local_id)
+static struct remote_info *remote_find(struct tegra_avp_info *avp, u32 local_id)
 {
 	struct rb_node *n = avp->endpoints.rb_node;
 	struct remote_info *rinfo;
@@ -243,7 +253,7 @@ static struct remote_info *remote_find(struct avp_info *avp, u32 local_id)
 	return NULL;
 }
 
-static void remote_remove(struct avp_info *avp, struct remote_info *rinfo)
+static void remote_remove(struct tegra_avp_info *avp, struct remote_info *rinfo)
 {
 	rb_erase(&rinfo->rb_node, &avp->endpoints);
 	rinfo_put(rinfo);
@@ -251,8 +261,8 @@ static void remote_remove(struct avp_info *avp, struct remote_info *rinfo)
 
 /* test whether or not the trpc endpoint provided is a valid AVP node
  * endpoint */
-static struct remote_info *validate_trpc_ep(struct avp_info *avp,
-					    struct trpc_endpoint *ep)
+static struct remote_info *validate_trpc_ep(struct tegra_avp_info *avp,
+						struct trpc_endpoint *ep)
 {
 	struct remote_info *tmp = trpc_priv(ep);
 	struct remote_info *rinfo;
@@ -267,7 +277,7 @@ static struct remote_info *validate_trpc_ep(struct avp_info *avp,
 
 static void avp_trpc_show(struct seq_file *s, struct trpc_endpoint *ep)
 {
-	struct avp_info *avp = tegra_avp;
+	struct tegra_avp_info *avp = tegra_avp;
 	struct remote_info *rinfo;
 	unsigned long flags;
 
@@ -277,7 +287,7 @@ static void avp_trpc_show(struct seq_file *s, struct trpc_endpoint *ep)
 		seq_printf(s, "    <unknown>\n");
 		goto out;
 	}
-	seq_printf(s, "    loc_id:0x%x\n    rem_id:0x%x\n",
+	seq_printf(s, "    loc_id:0x%x\n	rem_id:0x%x\n",
 		   rinfo->loc_id, rinfo->rem_id);
 out:
 	spin_unlock_irqrestore(&avp->state_lock, flags);
@@ -293,7 +303,7 @@ static inline u32 mbox_readl(void __iomem *mbox)
 	return readl(mbox);
 }
 
-static inline void msg_ack_remote(struct avp_info *avp, u32 cmd, u32 arg)
+static inline void msg_ack_remote(struct tegra_avp_info *avp, u32 cmd, u32 arg)
 {
 	struct msg_ack *ack = avp->msg_from_avp;
 
@@ -304,15 +314,15 @@ static inline void msg_ack_remote(struct avp_info *avp, u32 cmd, u32 arg)
 	wmb();
 }
 
-static inline u32 msg_recv_get_cmd(struct avp_info *avp)
+static inline u32 msg_recv_get_cmd(struct tegra_avp_info *avp)
 {
 	volatile u32 *cmd = avp->msg_from_avp;
 	rmb();
 	return *cmd;
 }
 
-static inline int __msg_write(struct avp_info *avp, void *hdr, size_t hdr_len,
-			      void *buf, size_t len)
+static inline int __msg_write(struct tegra_avp_info *avp, void *hdr,
+			      size_t hdr_len, void *buf, size_t len)
 {
 	memcpy(avp->msg_to_avp, hdr, hdr_len);
 	if (buf && len)
@@ -321,8 +331,8 @@ static inline int __msg_write(struct avp_info *avp, void *hdr, size_t hdr_len,
 	return 0;
 }
 
-static inline int msg_write(struct avp_info *avp, void *hdr, size_t hdr_len,
-			    void *buf, size_t len)
+static inline int msg_write(struct tegra_avp_info *avp, void *hdr,
+			    size_t hdr_len, void *buf, size_t len)
 {
 	/* rem_ack is a pointer into shared memory that the AVP modifies */
 	volatile u32 *rem_ack = avp->msg_to_avp;
@@ -341,7 +351,7 @@ static inline int msg_write(struct avp_info *avp, void *hdr, size_t hdr_len,
 	return 0;
 }
 
-static inline int msg_check_ack(struct avp_info *avp, u32 cmd, u32 *arg)
+static inline int msg_check_ack(struct tegra_avp_info *avp, u32 cmd, u32 *arg)
 {
 	struct msg_ack ack;
 
@@ -355,7 +365,7 @@ static inline int msg_check_ack(struct avp_info *avp, u32 cmd, u32 *arg)
 }
 
 /* XXX: add timeout */
-static int msg_wait_ack_locked(struct avp_info *avp, u32 cmd, u32 *arg)
+static int msg_wait_ack_locked(struct tegra_avp_info *avp, u32 cmd, u32 *arg)
 {
 	/* rem_ack is a pointer into shared memory that the AVP modifies */
 	volatile u32 *rem_ack = avp->msg_to_avp;
@@ -379,14 +389,14 @@ static int msg_wait_ack_locked(struct avp_info *avp, u32 cmd, u32 *arg)
 
 static int avp_trpc_send(struct trpc_endpoint *ep, void *buf, size_t len)
 {
-	struct avp_info *avp = tegra_avp;
+	struct tegra_avp_info *avp = tegra_avp;
 	struct remote_info *rinfo;
 	struct msg_port_data msg;
 	int ret;
 	unsigned long flags;
 
 	DBG(AVP_DBG_TRACE_TRPC_MSG, "%s: ep=%p priv=%p buf=%p len=%d\n",
-	    __func__, ep, trpc_priv(ep), buf, len);
+		__func__, ep, trpc_priv(ep), buf, len);
 
 	spin_lock_irqsave(&avp->state_lock, flags);
 	if (unlikely(avp->suspending && trpc_peer(ep) != avp->avp_ep)) {
@@ -413,7 +423,7 @@ static int avp_trpc_send(struct trpc_endpoint *ep, void *buf, size_t len)
 	mutex_unlock(&avp->to_avp_lock);
 
 	DBG(AVP_DBG_TRACE_TRPC_MSG, "%s: msg sent for %s (%x->%x) (%d)\n",
-	    __func__, trpc_name(ep), rinfo->loc_id, rinfo->rem_id, ret);
+		__func__, trpc_name(ep), rinfo->loc_id, rinfo->rem_id, ret);
 	rinfo_put(rinfo);
 	return ret;
 
@@ -422,7 +432,7 @@ err_state_locked:
 	return ret;
 }
 
-static int _send_disconnect(struct avp_info *avp, u32 port_id)
+static int _send_disconnect(struct tegra_avp_info *avp, u32 port_id)
 {
 	struct msg_disconnect msg;
 	int ret;
@@ -434,19 +444,19 @@ static int _send_disconnect(struct avp_info *avp, u32 port_id)
 	ret = msg_write(avp, &msg, sizeof(msg), NULL, 0);
 	if (ret) {
 		pr_err("%s: remote has not acked last message (%x)\n", __func__,
-		       port_id);
+			   port_id);
 		goto err_msg_write;
 	}
 
 	ret = msg_wait_ack_locked(avp, CMD_ACK, NULL);
 	if (ret) {
 		pr_err("%s: remote end won't respond for %x\n", __func__,
-		       port_id);
+			   port_id);
 		goto err_wait_ack;
 	}
 
 	DBG(AVP_DBG_TRACE_XPC_CONN, "%s: sent disconnect msg for %x\n",
-	    __func__, port_id);
+		__func__, port_id);
 
 err_wait_ack:
 err_msg_write:
@@ -471,7 +481,7 @@ static inline void remote_close(struct remote_info *rinfo)
 
 static void avp_trpc_close(struct trpc_endpoint *ep)
 {
-	struct avp_info *avp = tegra_avp;
+	struct tegra_avp_info *avp = tegra_avp;
 	struct remote_info *rinfo;
 	unsigned long flags;
 	int ret;
@@ -485,7 +495,7 @@ static void avp_trpc_close(struct trpc_endpoint *ep)
 	rinfo = validate_trpc_ep(avp, ep);
 	if (!rinfo) {
 		pr_err("%s: tried to close invalid port '%s' endpoint (%p)\n",
-		       __func__, trpc_name(ep), ep);
+			   __func__, trpc_name(ep), ep);
 		spin_unlock_irqrestore(&avp->state_lock, flags);
 		return;
 	}
@@ -494,18 +504,18 @@ static void avp_trpc_close(struct trpc_endpoint *ep)
 	spin_unlock_irqrestore(&avp->state_lock, flags);
 
 	DBG(AVP_DBG_TRACE_TRPC_CONN, "%s: closing '%s' (%x)\n", __func__,
-	    trpc_name(ep), rinfo->rem_id);
+		trpc_name(ep), rinfo->rem_id);
 
 	ret = _send_disconnect(avp, rinfo->rem_id);
 	if (ret)
 		pr_err("%s: error while closing remote port '%s' (%x)\n",
-		       __func__, trpc_name(ep), rinfo->rem_id);
+			   __func__, trpc_name(ep), rinfo->rem_id);
 	remote_close(rinfo);
 	rinfo_put(rinfo);
 }
 
 /* takes and holds avp->from_avp_lock */
-static void recv_msg_lock(struct avp_info *avp)
+static void recv_msg_lock(struct tegra_avp_info *avp)
 {
 	unsigned long flags;
 
@@ -516,7 +526,7 @@ static void recv_msg_lock(struct avp_info *avp)
 }
 
 /* MUST be called with avp->from_avp_lock held */
-static void recv_msg_unlock(struct avp_info *avp)
+static void recv_msg_unlock(struct tegra_avp_info *avp)
 {
 	unsigned long flags;
 
@@ -530,7 +540,7 @@ static int avp_node_try_connect(struct trpc_node *node,
 				struct trpc_node *src_node,
 				struct trpc_endpoint *from)
 {
-	struct avp_info *avp = tegra_avp;
+	struct tegra_avp_info *avp = tegra_avp;
 	const char *port_name = trpc_name(from);
 	struct remote_info *rinfo;
 	struct msg_connect msg;
@@ -539,14 +549,14 @@ static int avp_node_try_connect(struct trpc_node *node,
 	int len;
 
 	DBG(AVP_DBG_TRACE_TRPC_CONN, "%s: trying connect from %s\n", __func__,
-	    port_name);
+		port_name);
 
 	if (node != avp->rpc_node || node->priv != avp)
 		return -ENODEV;
 
 	len = strlen(port_name);
 	if (len > XPC_PORT_NAME_LEN) {
-		pr_err("%s: port name (%s) to long\n", __func__, port_name);
+		pr_err("%s: port name (%s) too long\n", __func__, port_name);
 		return -EINVAL;
 	}
 
@@ -595,7 +605,7 @@ static int avp_node_try_connect(struct trpc_node *node,
 	ret = msg_write(avp, &msg, sizeof(msg), NULL, 0);
 	if (ret) {
 		pr_err("%s: remote has not acked last message (%s)\n", __func__,
-		       port_name);
+			   port_name);
 		mutex_unlock(&avp->to_avp_lock);
 		goto err_msg_write;
 	}
@@ -604,7 +614,7 @@ static int avp_node_try_connect(struct trpc_node *node,
 
 	if (ret) {
 		pr_err("%s: remote end won't respond for '%s'\n", __func__,
-		       port_name);
+			   port_name);
 		goto err_wait_ack;
 	}
 	if (!rinfo->rem_id) {
@@ -614,10 +624,10 @@ static int avp_node_try_connect(struct trpc_node *node,
 	}
 
 	DBG(AVP_DBG_TRACE_TRPC_CONN, "%s: got conn ack '%s' (%x <-> %x)\n",
-	    __func__, port_name, rinfo->loc_id, rinfo->rem_id);
+		__func__, port_name, rinfo->loc_id, rinfo->rem_id);
 
 	rinfo->trpc_ep = trpc_create_peer(node, from, &remote_ep_ops,
-					       rinfo);
+						   rinfo);
 	if (!rinfo->trpc_ep) {
 		pr_err("%s: cannot create peer for %s\n", __func__, port_name);
 		ret = -EINVAL;
@@ -646,19 +656,19 @@ err_alloc_rinfo:
 	return ret;
 }
 
-static void process_disconnect_locked(struct avp_info *avp,
-				      struct msg_data *raw_msg)
+static void process_disconnect_locked(struct tegra_avp_info *avp,
+					  struct msg_data *raw_msg)
 {
 	struct msg_disconnect *disconn_msg = (struct msg_disconnect *)raw_msg;
 	unsigned long flags;
 	struct remote_info *rinfo;
 
 	DBG(AVP_DBG_TRACE_XPC_CONN, "%s: got disconnect (%x)\n", __func__,
-	    disconn_msg->port_id);
+		disconn_msg->port_id);
 
 	if (avp_debug_mask & AVP_DBG_TRACE_XPC_MSG)
 		print_hex_dump_bytes("", DUMP_PREFIX_OFFSET, disconn_msg,
-				     sizeof(struct msg_disconnect));
+					 sizeof(struct msg_disconnect));
 
 	spin_lock_irqsave(&avp->state_lock, flags);
 	rinfo = remote_find(avp, disconn_msg->port_id);
@@ -678,7 +688,7 @@ ack:
 	msg_ack_remote(avp, CMD_ACK, 0);
 }
 
-static void process_connect_locked(struct avp_info *avp,
+static void process_connect_locked(struct tegra_avp_info *avp,
 				   struct msg_data *raw_msg)
 {
 	struct msg_connect *conn_msg = (struct msg_connect *)raw_msg;
@@ -690,10 +700,10 @@ static void process_connect_locked(struct avp_info *avp,
 	unsigned long flags;
 
 	DBG(AVP_DBG_TRACE_XPC_CONN, "%s: got connect (%x)\n", __func__,
-	    conn_msg->port_id);
+		conn_msg->port_id);
 	if (avp_debug_mask & AVP_DBG_TRACE_XPC_MSG)
 		print_hex_dump_bytes("", DUMP_PREFIX_OFFSET,
-				     conn_msg, sizeof(struct msg_connect));
+					 conn_msg, sizeof(struct msg_connect));
 
 	rinfo = rinfo_alloc(avp);
 	if (!rinfo) {
@@ -707,10 +717,10 @@ static void process_connect_locked(struct avp_info *avp,
 	memcpy(name, conn_msg->name, XPC_PORT_NAME_LEN);
 	name[XPC_PORT_NAME_LEN] = '\0';
 	trpc_ep = trpc_create_connect(avp->rpc_node, name, &remote_ep_ops,
-				      rinfo, 0);
+					  rinfo, 0);
 	if (IS_ERR(trpc_ep)) {
 		pr_err("%s: remote requested unknown port '%s' (%d)\n",
-		       __func__, name, (int)PTR_ERR(trpc_ep));
+			   __func__, name, (int)PTR_ERR(trpc_ep));
 		goto nack;
 	}
 	rinfo->trpc_ep = trpc_ep;
@@ -733,8 +743,8 @@ ack:
 	msg_ack_remote(avp, CMD_RESPONSE, local_port_id);
 }
 
-static int process_message(struct avp_info *avp, struct msg_data *raw_msg,
-			    gfp_t gfp_flags)
+static int process_message(struct tegra_avp_info *avp, struct msg_data *raw_msg,
+				gfp_t gfp_flags)
 {
 	struct msg_port_data *port_msg = (struct msg_port_data *)raw_msg;
 	struct remote_info *rinfo;
@@ -748,12 +758,12 @@ static int process_message(struct avp_info *avp, struct msg_data *raw_msg,
 		pr_info("%s: got message cmd=%x port=%x len=%d\n", __func__,
 			port_msg->cmd, port_msg->port_id, port_msg->msg_len);
 		print_hex_dump_bytes("", DUMP_PREFIX_OFFSET, port_msg,
-				     sizeof(struct msg_port_data) + len);
+					 sizeof(struct msg_port_data) + len);
 	}
 
 	if (len != port_msg->msg_len)
 		pr_err("%s: message sent is too long (%d bytes)\n", __func__,
-		       port_msg->msg_len);
+			   port_msg->msg_len);
 
 	spin_lock_irqsave(&avp->state_lock, flags);
 	rinfo = remote_find(avp, port_msg->port_id);
@@ -776,8 +786,8 @@ static int process_message(struct avp_info *avp, struct msg_data *raw_msg,
 		goto no_ack;
 	} else if (ret) {
 		pr_err("%s: cannot queue message for port %s/%x (%d)\n",
-		       __func__, trpc_name(rinfo->trpc_ep), rinfo->loc_id,
-		       ret);
+			   __func__, trpc_name(rinfo->trpc_ep), rinfo->loc_id,
+			   ret);
 	} else {
 		DBG(AVP_DBG_TRACE_XPC_MSG, "%s: msg queued\n", __func__);
 	}
@@ -792,7 +802,8 @@ no_ack:
 
 static void process_avp_message(struct work_struct *work)
 {
-	struct avp_info *avp = container_of(work, struct avp_info, recv_work);
+	struct tegra_avp_info *avp = container_of(work, struct tegra_avp_info,
+						  recv_work);
 	struct msg_data *msg = avp->msg_from_avp;
 
 	mutex_lock(&avp->from_avp_lock);
@@ -816,7 +827,7 @@ static void process_avp_message(struct work_struct *work)
 
 static irqreturn_t avp_mbox_pending_isr(int irq, void *data)
 {
-	struct avp_info *avp = data;
+	struct tegra_avp_info *avp = data;
 	struct msg_data *msg = avp->msg_from_avp;
 	u32 mbox_msg;
 	unsigned long flags;
@@ -862,7 +873,7 @@ done:
 	return IRQ_HANDLED;
 }
 
-static int avp_reset(struct avp_info *avp, unsigned long reset_addr)
+static int avp_reset(struct tegra_avp_info *avp, unsigned long reset_addr)
 {
 	unsigned long stub_code_phys = virt_to_phys(_tegra_avp_boot_stub);
 	dma_addr_t stub_data_phys;
@@ -880,6 +891,9 @@ static int avp_reset(struct avp_info *avp, unsigned long reset_addr)
 
 	writel(stub_code_phys, TEGRA_AVP_RESET_VECTOR_ADDR);
 
+	pr_debug("%s: TEGRA_AVP_RESET_VECTOR=%x\n", __func__, readl(TEGRA_AVP_RESET_VECTOR_ADDR));
+	pr_info("%s: Resetting AVP: reset_addr=%lx\n", __func__, reset_addr);
+
 	tegra_periph_reset_assert(avp->cop_clk);
 	udelay(10);
 	tegra_periph_reset_deassert(avp->cop_clk);
@@ -890,12 +904,16 @@ static int avp_reset(struct avp_info *avp, unsigned long reset_addr)
 	 * starts, so a dead kernel can be detected by polling this value */
 	timeout = jiffies + msecs_to_jiffies(2000);
 	while (time_before(jiffies, timeout)) {
+		pr_debug("%s: TEGRA_AVP_RESET_VECTOR=%x\n", __func__, readl(TEGRA_AVP_RESET_VECTOR_ADDR));
 		if (readl(TEGRA_AVP_RESET_VECTOR_ADDR) != stub_code_phys)
 			break;
 		cpu_relax();
 	}
-	if (readl(TEGRA_AVP_RESET_VECTOR_ADDR) == stub_code_phys)
+	if (readl(TEGRA_AVP_RESET_VECTOR_ADDR) == stub_code_phys) {
+		pr_err("%s: Timed out waiting for AVP kernel to start\n", __func__);
 		ret = -EINVAL;
+	}
+	pr_debug("%s: TEGRA_AVP_RESET_VECTOR=%x\n", __func__, readl(TEGRA_AVP_RESET_VECTOR_ADDR));
 	WARN_ON(ret);
 	dma_unmap_single(NULL, stub_data_phys,
 			 sizeof(_tegra_avp_boot_stub_data),
@@ -903,7 +921,7 @@ static int avp_reset(struct avp_info *avp, unsigned long reset_addr)
 	return ret;
 }
 
-static void avp_halt(struct avp_info *avp)
+static void avp_halt(struct tegra_avp_info *avp)
 {
 	/* ensure the AVP is halted */
 	writel(FLOW_MODE_STOP, FLOW_CTRL_HALT_COP_EVENTS);
@@ -922,14 +940,15 @@ static void avp_halt(struct avp_info *avp)
  * of the char dev for receiving replies for managing remote
  * libraries/modules. */
 
-static int avp_init(struct avp_info *avp, const char *fw_file)
+static int avp_init(struct tegra_avp_info *avp)
 {
 	const struct firmware *avp_fw;
 	int ret;
 	struct trpc_endpoint *ep;
+	char fw_file[30];
 
 	avp->nvmap_libs = nvmap_create_client(nvmap_dev, "avp_libs");
-	if (IS_ERR(avp->nvmap_libs)) {
+	if (IS_ERR_OR_NULL(avp->nvmap_libs)) {
 		pr_err("%s: cannot create libs nvmap client\n", __func__);
 		ret = PTR_ERR(avp->nvmap_libs);
 		goto err_nvmap_create_libs_client;
@@ -939,19 +958,64 @@ static int avp_init(struct avp_info *avp, const char *fw_file)
 	 * to read out when its kernel boots. */
 	mbox_writel(avp->msg, MBOX_TO_AVP);
 
+#if defined(CONFIG_TEGRA_AVP_KERNEL_ON_MMU) /* Tegra2 with AVP MMU */
+	/* paddr is any address returned from nvmap_pin */
+	/* vaddr is AVP_KERNEL_VIRT_BASE */
+	pr_info("%s: Using AVP MMU to relocate AVP kernel\n", __func__);
+	sprintf(fw_file, "nvrm_avp.bin");
+	avp->reset_addr = AVP_KERNEL_VIRT_BASE;
+#elif defined(CONFIG_TEGRA_AVP_KERNEL_ON_SMMU) /* Tegra3 with SMMU */
+	/* paddr is any address behind SMMU */
+	/* vaddr is TEGRA_SMMU_BASE */
+	pr_info("%s: Using SMMU at %lx to load AVP kernel\n",
+		__func__, (unsigned long)avp->kernel_phys);
+	BUG_ON(avp->kernel_phys != 0xe0000000
+		&& avp->kernel_phys != 0x00001000);
+	sprintf(fw_file, "nvrm_avp_%08lx.bin", (unsigned long)avp->kernel_phys);
+	avp->reset_addr = avp->kernel_phys;
+#else /* nvmem= carveout */
+	/* paddr is found in nvmem= carveout */
+	/* vaddr is same as paddr */
+	/* Find nvmem carveout */
+	if (!pfn_valid(__phys_to_pfn(0x8e000000))) {
+		avp->kernel_phys = 0x8e000000;
+	}
+	else if (!pfn_valid(__phys_to_pfn(0x9e000000))) {
+		avp->kernel_phys = 0x9e000000;
+	}
+	else if (!pfn_valid(__phys_to_pfn(0xbe000000))) {
+		avp->kernel_phys = 0xbe000000;
+	}
+	else {
+		pr_err("Cannot find nvmem= carveout to load AVP kernel\n");
+		pr_err("Check kernel command line "
+			"to see if nvmem= is defined\n");
+		BUG();
+	}
+	pr_info("%s: Using nvmem= carveout at %lx to load AVP kernel\n",
+		__func__, avp->kernel_phys);
+	sprintf(fw_file, "nvrm_avp_%08lx.bin", avp->kernel_phys);
+	avp->reset_addr = avp->kernel_phys;
+	avp->kernel_data = ioremap(avp->kernel_phys, SZ_1M);
+#endif
+
 	ret = request_firmware(&avp_fw, fw_file, avp->misc_dev.this_device);
 	if (ret) {
 		pr_err("%s: Cannot read firmware '%s'\n", __func__, fw_file);
 		goto err_req_fw;
 	}
-	pr_info("%s: read firmware from '%s' (%d bytes)\n", __func__,
+	pr_info("%s: Reading firmware from '%s' (%d bytes)\n", __func__,
 		fw_file, avp_fw->size);
+
+	pr_info("%s: Loading AVP kernel at vaddr=%p paddr=%lx\n",
+		__func__, avp->kernel_data, (unsigned long)(avp->kernel_phys));
 	memcpy(avp->kernel_data, avp_fw->data, avp_fw->size);
 	memset(avp->kernel_data + avp_fw->size, 0, SZ_1M - avp_fw->size);
+
 	wmb();
 	release_firmware(avp_fw);
 
-	ret = avp_reset(avp, AVP_KERNEL_VIRT_BASE);
+	ret = avp_reset(avp, avp->reset_addr);
 	if (ret) {
 		pr_err("%s: cannot reset the AVP.. aborting..\n", __func__);
 		goto err_reset;
@@ -967,7 +1031,7 @@ static int avp_init(struct avp_info *avp, const char *fw_file)
 		goto err_avp_svc_start;
 
 	ep = trpc_create_connect(avp->rpc_node, "RPC_AVP_PORT", NULL,
-				      NULL, -1);
+					  NULL, -1);
 	if (IS_ERR(ep)) {
 		pr_err("%s: can't connect to RPC_AVP_PORT server\n", __func__);
 		ret = PTR_ERR(ep);
@@ -993,7 +1057,7 @@ err_nvmap_create_libs_client:
 	return ret;
 }
 
-static void avp_uninit(struct avp_info *avp)
+static void avp_uninit(struct tegra_avp_info *avp)
 {
 	unsigned long flags;
 	struct rb_node *n;
@@ -1038,7 +1102,8 @@ static void avp_uninit(struct avp_info *avp)
 }
 
 /* returns the remote lib handle in lib->handle */
-static int _load_lib(struct avp_info *avp, struct tegra_avp_lib *lib)
+static int _load_lib(struct tegra_avp_info *avp, struct tegra_avp_lib *lib,
+		     bool from_user)
 {
 	struct svc_lib_attach svc;
 	struct svc_lib_attach_resp resp;
@@ -1046,7 +1111,7 @@ static int _load_lib(struct avp_info *avp, struct tegra_avp_lib *lib)
 	void *args;
 	struct nvmap_handle_ref *lib_handle;
 	void *lib_data;
-	unsigned long lib_phys;
+	phys_addr_t lib_phys;
 	int ret;
 
 	DBG(AVP_DBG_TRACE_LIB, "avp_lib: loading library '%s'\n", lib->name);
@@ -1057,7 +1122,10 @@ static int _load_lib(struct avp_info *avp, struct tegra_avp_lib *lib)
 			lib->args_len);
 		return -ENOMEM;
 	}
-	if (copy_from_user(args, lib->args, lib->args_len)) {
+
+	if (!from_user)
+		memcpy(args, lib->args, lib->args_len);
+	else if (copy_from_user(args, lib->args, lib->args_len)) {
 		pr_err("avp_lib: can't copy lib args\n");
 		ret = -EFAULT;
 		goto err_cp_args;
@@ -1071,7 +1139,7 @@ static int _load_lib(struct avp_info *avp, struct tegra_avp_lib *lib)
 
 	lib_handle = nvmap_alloc(avp->nvmap_libs, fw->size, L1_CACHE_BYTES,
 				 NVMAP_HANDLE_WRITE_COMBINE);
-	if (IS_ERR(lib_handle)) {
+	if (IS_ERR_OR_NULL(lib_handle)) {
 		pr_err("avp_lib: can't nvmap alloc for lib '%s'\n", lib->name);
 		ret = PTR_ERR(lib_handle);
 		goto err_nvmap_alloc;
@@ -1085,7 +1153,7 @@ static int _load_lib(struct avp_info *avp, struct tegra_avp_lib *lib)
 	}
 
 	lib_phys = nvmap_pin(avp->nvmap_libs, lib_handle);
-	if (IS_ERR((void *)lib_phys)) {
+	if (IS_ERR_OR_NULL((void *)lib_phys)) {
 		pr_err("avp_lib: can't nvmap pin for lib '%s'\n", lib->name);
 		ret = PTR_ERR(lib_handle);
 		goto err_nvmap_pin;
@@ -1115,15 +1183,15 @@ static int _load_lib(struct avp_info *avp, struct tegra_avp_lib *lib)
 		goto err_recv_msg;
 	} else if (resp.err) {
 		pr_err("avp_lib: got remote error (%d) while loading lib %s\n",
-		       resp.err, lib->name);
+			   resp.err, lib->name);
 		ret = -EPROTO;
 		goto err_recv_msg;
 	}
 	lib->handle = resp.lib_id;
 	ret = 0;
 	DBG(AVP_DBG_TRACE_LIB,
-	    "avp_lib: Successfully loaded library %s (lib_id=%x)\n",
-	    lib->name, resp.lib_id);
+		"avp_lib: Successfully loaded library %s (lib_id=%x)\n",
+		lib->name, resp.lib_id);
 
 	/* We free the memory here because by this point the AVP has already
 	 * requested memory for the library for all the sections since it does
@@ -1146,8 +1214,8 @@ err_cp_args:
 	return ret;
 }
 
-static int send_unload_lib_msg(struct avp_info *avp, u32 handle,
-			       const char *name)
+static int send_unload_lib_msg(struct tegra_avp_info *avp, u32 handle,
+				   const char *name)
 {
 	struct svc_lib_detach svc;
 	struct svc_lib_detach_resp resp;
@@ -1161,26 +1229,33 @@ static int send_unload_lib_msg(struct avp_info *avp, u32 handle,
 				 GFP_KERNEL);
 	if (ret) {
 		pr_err("avp_lib: can't send unload message to avp for '%s'\n",
-		       name);
+			   name);
 		goto err;
 	}
+
+	/* Give it a few extra moments to unload. */
+	msleep(20);
 
 	ret = trpc_recv_msg(avp->rpc_node, avp->avp_ep, &resp,
 				 sizeof(resp), -1);
 	if (ret != sizeof(resp)) {
 		pr_err("avp_lib: Couldn't get unload reply for '%s' (%d)\n",
-		       name, ret);
+			   name, ret);
 	} else if (resp.err) {
 		pr_err("avp_lib: remote error (%d) while unloading lib %s\n",
-		       resp.err, name);
+			   resp.err, name);
 		ret = -EPROTO;
-	} else
+	} else {
+		pr_info("avp_lib: Successfully unloaded '%s'\n",
+			   name);
 		ret = 0;
+	}
+
 err:
 	return ret;
 }
 
-static struct lib_item *_find_lib_locked(struct avp_info *avp, u32 handle)
+static struct lib_item *_find_lib_locked(struct tegra_avp_info *avp, u32 handle)
 {
 	struct lib_item *item;
 
@@ -1191,7 +1266,8 @@ static struct lib_item *_find_lib_locked(struct avp_info *avp, u32 handle)
 	return NULL;
 }
 
-static int _insert_lib_locked(struct avp_info *avp, u32 handle, char *name)
+static int _insert_lib_locked(struct tegra_avp_info *avp, u32 handle,
+			      char *name)
 {
 	struct lib_item *item;
 
@@ -1204,17 +1280,19 @@ static int _insert_lib_locked(struct avp_info *avp, u32 handle, char *name)
 	return 0;
 }
 
-static void _delete_lib_locked(struct avp_info *avp, struct lib_item *item)
+static void _delete_lib_locked(struct tegra_avp_info *avp,
+			       struct lib_item *item)
 {
 	list_del(&item->list);
 	kfree(item);
 }
 
-static int handle_load_lib_ioctl(struct avp_info *avp, unsigned long arg)
+static int handle_load_lib_ioctl(struct tegra_avp_info *avp, unsigned long arg)
 {
 	struct tegra_avp_lib lib;
 	int ret;
 
+	pr_debug("%s: ioctl\n", __func__);
 	if (copy_from_user(&lib, (void __user *)arg, sizeof(lib)))
 		return -EFAULT;
 	lib.name[TEGRA_AVP_LIB_MAX_NAME - 1] = '\0';
@@ -1226,7 +1304,7 @@ static int handle_load_lib_ioctl(struct avp_info *avp, unsigned long arg)
 	}
 
 	mutex_lock(&avp->libs_lock);
-	ret = _load_lib(avp, &lib);
+	ret = _load_lib(avp, &lib, true);
 	if (ret)
 		goto err_load_lib;
 
@@ -1253,33 +1331,7 @@ err_load_lib:
 	return ret;
 }
 
-static int handle_unload_lib_ioctl(struct avp_info *avp, unsigned long arg)
-{
-	struct lib_item *item;
-	int ret;
-
-	mutex_lock(&avp->libs_lock);
-	item = _find_lib_locked(avp, (u32)arg);
-	if (!item) {
-		pr_err("avp_lib: avp lib with handle 0x%x not found\n",
-		       (u32)arg);
-		ret = -ENOENT;
-		goto err_find;
-	}
-	ret = send_unload_lib_msg(avp, item->handle, item->name);
-	if (!ret)
-		DBG(AVP_DBG_TRACE_LIB, "avp_lib: unloaded '%s'\n", item->name);
-	else
-		pr_err("avp_lib: can't unload lib '%s'/0x%x (%d)\n", item->name,
-		       item->handle, ret);
-	_delete_lib_locked(avp, item);
-
-err_find:
-	mutex_unlock(&avp->libs_lock);
-	return ret;
-}
-
-static void libs_cleanup(struct avp_info *avp)
+static void libs_cleanup(struct tegra_avp_info *avp)
 {
 	struct lib_item *lib;
 	struct lib_item *lib_tmp;
@@ -1295,14 +1347,14 @@ static void libs_cleanup(struct avp_info *avp)
 }
 
 static long tegra_avp_ioctl(struct file *file, unsigned int cmd,
-			    unsigned long arg)
+				unsigned long arg)
 {
-	struct avp_info *avp = tegra_avp;
+	struct tegra_avp_info *avp = tegra_avp;
 	int ret;
 
 	if (_IOC_TYPE(cmd) != TEGRA_AVP_IOCTL_MAGIC ||
-	    _IOC_NR(cmd) < TEGRA_AVP_IOCTL_MIN_NR ||
-	    _IOC_NR(cmd) > TEGRA_AVP_IOCTL_MAX_NR)
+		_IOC_NR(cmd) < TEGRA_AVP_IOCTL_MIN_NR ||
+		_IOC_NR(cmd) > TEGRA_AVP_IOCTL_MAX_NR)
 		return -ENOTTY;
 
 	switch (cmd) {
@@ -1310,7 +1362,7 @@ static long tegra_avp_ioctl(struct file *file, unsigned int cmd,
 		ret = handle_load_lib_ioctl(avp, arg);
 		break;
 	case TEGRA_AVP_IOCTL_UNLOAD_LIB:
-		ret = handle_unload_lib_ioctl(avp, arg);
+		ret = tegra_avp_unload_lib(avp, arg);
 		break;
 	default:
 		pr_err("avp_lib: Unknown tegra_avp ioctl 0x%x\n", _IOC_NR(cmd));
@@ -1320,50 +1372,70 @@ static long tegra_avp_ioctl(struct file *file, unsigned int cmd,
 	return ret;
 }
 
-static int tegra_avp_open(struct inode *inode, struct file *file)
+int tegra_avp_open(struct tegra_avp_info **avp)
 {
-	struct avp_info *avp = tegra_avp;
+	struct tegra_avp_info *new_avp = tegra_avp;
 	int ret = 0;
 
-	nonseekable_open(inode, file);
+	pr_debug("%s: open\n", __func__);
+	mutex_lock(&new_avp->open_lock);
 
-	mutex_lock(&avp->open_lock);
-	/* only one userspace client at a time */
-	if (avp->opened) {
-		pr_err("%s: already have client, aborting\n", __func__);
-		ret = -EBUSY;
+	if (!new_avp->refcount)
+		ret = avp_init(new_avp);
+
+	if (ret < 0) {
+		mutex_unlock(&new_avp->open_lock);
+		new_avp = 0;
 		goto out;
 	}
 
-	ret = avp_init(avp, TEGRA_AVP_KERNEL_FW);
-	avp->opened = !ret;
+	new_avp->refcount++;
+
+	mutex_unlock(&new_avp->open_lock);
 out:
-	mutex_unlock(&avp->open_lock);
+	*avp = new_avp;
 	return ret;
 }
 
-static int tegra_avp_release(struct inode *inode, struct file *file)
+static int tegra_avp_open_fops(struct inode *inode, struct file *file)
 {
-	struct avp_info *avp = tegra_avp;
+	struct tegra_avp_info *avp;
+
+	nonseekable_open(inode, file);
+	return tegra_avp_open(&avp);
+}
+
+int tegra_avp_release(struct tegra_avp_info *avp)
+{
 	int ret = 0;
 
-	pr_info("%s: release\n", __func__);
+	pr_info("%s: WORKAROUND: ignoring AVP release\n", __func__);
+	return 0;
+
+	pr_debug("%s: close\n", __func__);
 	mutex_lock(&avp->open_lock);
-	if (!avp->opened) {
+	if (!avp->refcount) {
 		pr_err("%s: releasing while in invalid state\n", __func__);
 		ret = -EINVAL;
 		goto out;
 	}
+	if (avp->refcount > 0)
+		avp->refcount--;
+	if (!avp->refcount)
+		avp_uninit(avp);
 
-	avp_uninit(avp);
-
-	avp->opened = false;
 out:
 	mutex_unlock(&avp->open_lock);
 	return ret;
 }
 
-static int avp_enter_lp0(struct avp_info *avp)
+static int tegra_avp_release_fops(struct inode *inode, struct file *file)
+{
+	struct tegra_avp_info *avp = tegra_avp;
+	return tegra_avp_release(avp);
+}
+
+static int avp_enter_lp0(struct tegra_avp_info *avp)
 {
 	volatile u32 *avp_suspend_done =
 		avp->iram_backup_data + TEGRA_IRAM_SIZE;
@@ -1408,7 +1480,7 @@ err:
 
 static int tegra_avp_suspend(struct platform_device *pdev, pm_message_t state)
 {
-	struct avp_info *avp = tegra_avp;
+	struct tegra_avp_info *avp = tegra_avp;
 	unsigned long flags;
 	int ret;
 
@@ -1450,7 +1522,7 @@ err:
 
 static int tegra_avp_resume(struct platform_device *pdev)
 {
-	struct avp_info *avp = tegra_avp;
+	struct tegra_avp_info *avp = tegra_avp;
 	int ret = 0;
 
 	pr_info("%s()+\n", __func__);
@@ -1474,9 +1546,9 @@ out:
 
 static const struct file_operations tegra_avp_fops = {
 	.owner		= THIS_MODULE,
-	.open		= tegra_avp_open,
-	.release	= tegra_avp_release,
-	.unlocked_ioctl	= tegra_avp_ioctl,
+	.open		= tegra_avp_open_fops,
+	.release	= tegra_avp_release_fops,
+	.unlocked_ioctl = tegra_avp_ioctl,
 };
 
 static struct trpc_node avp_trpc_node = {
@@ -1485,12 +1557,51 @@ static struct trpc_node avp_trpc_node = {
 	.try_connect	= avp_node_try_connect,
 };
 
+static struct nvmap_client *avp_early_nvmap_drv;
+static struct nvmap_handle_ref *avp_early_kernel_handle;
+static void *avp_early_kernel_data;
+static phys_addr_t avp_early_kernel_phys;
+
+void avp_early_init(void)
+{
+	int ret;
+
+	avp_early_nvmap_drv = nvmap_create_client(nvmap_dev, "avp_early");
+	if (IS_ERR_OR_NULL(avp_early_nvmap_drv))
+		pr_crit("%s: nvmap_create_client error\n", __func__);
+
+	avp_early_kernel_handle =
+		nvmap_create_handle(avp_early_nvmap_drv, SZ_1M);
+	if (IS_ERR_OR_NULL(avp_early_kernel_handle))
+		pr_crit("%s: nvmap_create_handle error\n", __func__);
+
+	ret = nvmap_alloc_handle_id(avp_early_nvmap_drv,
+				nvmap_ref_to_id(avp_early_kernel_handle),
+				NVMAP_HEAP_IOVMM, PAGE_SIZE,
+				NVMAP_HANDLE_WRITE_COMBINE);
+	if (ret)
+		pr_crit("%s: nvmap_alloc_handle_id error\n", __func__);
+
+	avp_early_kernel_data = nvmap_mmap(avp_early_kernel_handle);
+	if (!avp_early_kernel_data)
+		pr_crit("%s: nvmap_mmap error\n", __func__);
+
+	avp_early_kernel_phys =
+		nvmap_pin(avp_early_nvmap_drv, avp_early_kernel_handle);
+	if (IS_ERR_OR_NULL((void *)avp_early_kernel_phys))
+		pr_crit("%s: nvmap_pin error\n", __func__);
+
+	pr_info("%s: allocated memory at %x for AVP kernel\n",
+		__func__, avp_early_kernel_phys);
+}
+
 static int tegra_avp_probe(struct platform_device *pdev)
 {
 	void *msg_area;
-	struct avp_info *avp;
+	struct tegra_avp_info *avp;
 	int ret = 0;
 	int irq;
+	unsigned int heap_mask;
 
 	irq = platform_get_irq_byname(pdev, "mbox_from_avp_pending");
 	if (irq < 0) {
@@ -1498,39 +1609,60 @@ static int tegra_avp_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	avp = kzalloc(sizeof(struct avp_info), GFP_KERNEL);
+	avp = kzalloc(sizeof(struct tegra_avp_info), GFP_KERNEL);
 	if (!avp) {
-		pr_err("%s: cannot allocate avp_info\n", __func__);
+		pr_err("%s: cannot allocate tegra_avp_info\n", __func__);
 		return -ENOMEM;
 	}
 
 	avp->nvmap_drv = nvmap_create_client(nvmap_dev, "avp_core");
-	if (IS_ERR(avp->nvmap_drv)) {
+	if (IS_ERR_OR_NULL(avp->nvmap_drv)) {
 		pr_err("%s: cannot create drv nvmap client\n", __func__);
 		ret = PTR_ERR(avp->nvmap_drv);
 		goto err_nvmap_create_drv_client;
 	}
 
-	avp->kernel_handle = nvmap_alloc(avp->nvmap_drv, SZ_1M, SZ_1M,
-					 NVMAP_HANDLE_WRITE_COMBINE);
-	if (IS_ERR(avp->kernel_handle)) {
-		pr_err("%s: cannot create handle\n", __func__);
-		ret = PTR_ERR(avp->kernel_handle);
-		goto err_nvmap_alloc;
+#if defined(CONFIG_TEGRA_AVP_KERNEL_ON_MMU) /* Tegra2 with AVP MMU */
+	heap_mask = NVMAP_HEAP_CARVEOUT_GENERIC;
+#elif defined(CONFIG_TEGRA_AVP_KERNEL_ON_SMMU) /* Tegra3 with SMMU */
+	heap_mask = NVMAP_HEAP_IOVMM;
+#else /* nvmem= carveout */
+	heap_mask = 0;
+#endif
+
+	if (heap_mask == NVMAP_HEAP_IOVMM) {
+		avp->nvmap_drv = avp_early_nvmap_drv;
+		avp->kernel_handle = avp_early_kernel_handle;
+		avp->kernel_data = avp_early_kernel_data;
+		avp->kernel_phys = avp_early_kernel_phys;
 	}
 
-	avp->kernel_data = nvmap_mmap(avp->kernel_handle);
-	if (!avp->kernel_data) {
-		pr_err("%s: cannot map kernel handle\n", __func__);
-		ret = -ENOMEM;
-		goto err_nvmap_mmap;
-	}
+	if (heap_mask == NVMAP_HEAP_CARVEOUT_GENERIC) {
+		avp->kernel_handle = nvmap_alloc(avp->nvmap_drv, SZ_1M, SZ_1M,
+						NVMAP_HANDLE_WRITE_COMBINE);
+		if (IS_ERR_OR_NULL(avp->kernel_handle)) {
+			pr_err("%s: cannot create handle\n", __func__);
+			ret = PTR_ERR(avp->kernel_handle);
+			goto err_nvmap_alloc;
+		}
 
-	avp->kernel_phys = nvmap_pin(avp->nvmap_drv, avp->kernel_handle);
-	if (IS_ERR((void *)avp->kernel_phys)) {
-		pr_err("%s: cannot pin kernel handle\n", __func__);
-		ret = PTR_ERR((void *)avp->kernel_phys);
-		goto err_nvmap_pin;
+		avp->kernel_data = nvmap_mmap(avp->kernel_handle);
+		if (!avp->kernel_data) {
+			pr_err("%s: cannot map kernel handle\n", __func__);
+			ret = -ENOMEM;
+			goto err_nvmap_mmap;
+		}
+
+		avp->kernel_phys = nvmap_pin(avp->nvmap_drv,
+					avp->kernel_handle);
+		if (IS_ERR_OR_NULL((void *)avp->kernel_phys)) {
+			pr_err("%s: cannot pin kernel handle\n", __func__);
+			ret = PTR_ERR((void *)avp->kernel_phys);
+			goto err_nvmap_pin;
+		}
+
+		pr_info("%s: allocated carveout memory at %lx for AVP kernel\n",
+			__func__, (unsigned long)avp->kernel_phys);
 	}
 
 	/* allocate an extra 4 bytes at the end which AVP uses to signal to
@@ -1538,8 +1670,8 @@ static int tegra_avp_probe(struct platform_device *pdev)
 	 */
 	avp->iram_backup_handle =
 		nvmap_alloc(avp->nvmap_drv, TEGRA_IRAM_SIZE + 4,
-			    L1_CACHE_BYTES, NVMAP_HANDLE_WRITE_COMBINE);
-	if (IS_ERR(avp->iram_backup_handle)) {
+				L1_CACHE_BYTES, NVMAP_HANDLE_WRITE_COMBINE);
+	if (IS_ERR_OR_NULL(avp->iram_backup_handle)) {
 		pr_err("%s: cannot create handle for iram backup\n", __func__);
 		ret = PTR_ERR(avp->iram_backup_handle);
 		goto err_iram_nvmap_alloc;
@@ -1552,7 +1684,7 @@ static int tegra_avp_probe(struct platform_device *pdev)
 	}
 	avp->iram_backup_phys = nvmap_pin(avp->nvmap_drv,
 					  avp->iram_backup_handle);
-	if (IS_ERR((void *)avp->iram_backup_phys)) {
+	if (IS_ERR_OR_NULL((void *)avp->iram_backup_phys)) {
 		pr_err("%s: cannot pin iram backup handle\n", __func__);
 		ret = PTR_ERR((void *)avp->iram_backup_phys);
 		goto err_iram_nvmap_pin;
@@ -1570,7 +1702,7 @@ static int tegra_avp_probe(struct platform_device *pdev)
 	INIT_LIST_HEAD(&avp->libs);
 
 	avp->recv_wq = alloc_workqueue("avp-msg-recv",
-				       WQ_NON_REENTRANT | WQ_HIGHPRI, 1);
+					   WQ_NON_REENTRANT | WQ_HIGHPRI, 1);
 	if (!avp->recv_wq) {
 		pr_err("%s: can't create recve workqueue\n", __func__);
 		ret = -ENOMEM;
@@ -1578,14 +1710,14 @@ static int tegra_avp_probe(struct platform_device *pdev)
 	}
 
 	avp->cop_clk = clk_get(&pdev->dev, "cop");
-	if (IS_ERR(avp->cop_clk)) {
+	if (IS_ERR_OR_NULL(avp->cop_clk)) {
 		pr_err("%s: Couldn't get cop clock\n", TEGRA_AVP_NAME);
 		ret = -ENOENT;
 		goto err_get_cop_clk;
 	}
 
 	msg_area = dma_alloc_coherent(&pdev->dev, AVP_MSG_AREA_SIZE * 2,
-				      &avp->msg_area_addr, GFP_KERNEL);
+					  &avp->msg_area_addr, GFP_KERNEL);
 	if (!msg_area) {
 		pr_err("%s: cannot allocate msg_area\n", __func__);
 		ret = -ENOMEM;
@@ -1608,7 +1740,7 @@ static int tegra_avp_probe(struct platform_device *pdev)
 	avp->rpc_node = &avp_trpc_node;
 
 	avp->avp_svc = avp_svc_init(pdev, avp->rpc_node);
-	if (IS_ERR(avp->avp_svc)) {
+	if (IS_ERR_OR_NULL(avp->avp_svc)) {
 		pr_err("%s: Cannot initialize avp_svc\n", __func__);
 		ret = PTR_ERR(avp->avp_svc);
 		goto err_avp_svc_init;
@@ -1633,8 +1765,7 @@ static int tegra_avp_probe(struct platform_device *pdev)
 
 	tegra_avp = avp;
 
-	pr_info("%s: driver registered, kernel %lx(%p), msg area %lx/%lx\n",
-		__func__, avp->kernel_phys, avp->kernel_data,
+	pr_info("%s: message area %lx/%lx\n", __func__,
 		(unsigned long)avp->msg_area_addr,
 		(unsigned long)avp->msg_area_addr + AVP_MSG_AREA_SIZE);
 
@@ -1675,18 +1806,17 @@ err_nvmap_create_drv_client:
 
 static int tegra_avp_remove(struct platform_device *pdev)
 {
-	struct avp_info *avp = tegra_avp;
+	struct tegra_avp_info *avp = tegra_avp;
 
 	if (!avp)
 		return 0;
 
 	mutex_lock(&avp->open_lock);
-	if (avp->opened) {
+	/* ensure that noone can open while we tear down */
+	if (avp->refcount) {
 		mutex_unlock(&avp->open_lock);
 		return -EBUSY;
 	}
-	/* ensure that noone can open while we tear down */
-	avp->opened = true;
 	mutex_unlock(&avp->open_lock);
 
 	misc_deregister(&avp->misc_dev);
@@ -1711,12 +1841,85 @@ static int tegra_avp_remove(struct platform_device *pdev)
 	return 0;
 }
 
+int tegra_avp_load_lib(struct tegra_avp_info *avp, struct tegra_avp_lib *lib)
+{
+	int ret;
+
+	if (!avp)
+		return -ENODEV;
+
+	if (!lib)
+		return -EFAULT;
+
+	lib->name[TEGRA_AVP_LIB_MAX_NAME - 1] = '\0';
+
+	if (lib->args_len > TEGRA_AVP_LIB_MAX_ARGS) {
+		pr_err("%s: library args too long (%d)\n", __func__,
+			lib->args_len);
+		return -E2BIG;
+	}
+
+	mutex_lock(&avp->libs_lock);
+	ret = _load_lib(avp, lib, false);
+	if (ret)
+		goto err_load_lib;
+
+	ret = _insert_lib_locked(avp, lib->handle, lib->name);
+	if (ret) {
+		pr_err("%s: can't insert lib (%d)\n", __func__, ret);
+		goto err_insert_lib;
+	}
+
+	mutex_unlock(&avp->libs_lock);
+	return 0;
+
+err_insert_lib:
+	ret = send_unload_lib_msg(avp, lib->handle, lib->name);
+	if (!ret)
+		DBG(AVP_DBG_TRACE_LIB, "avp_lib: unloaded '%s'\n", lib->name);
+	else
+		pr_err("avp_lib: can't unload lib '%s' (%d)\n", lib->name, ret);
+	lib->handle = 0;
+err_load_lib:
+	mutex_unlock(&avp->libs_lock);
+	return ret;
+}
+
+int tegra_avp_unload_lib(struct tegra_avp_info *avp, unsigned long handle)
+{
+	struct lib_item *item;
+	int ret;
+
+	if (!avp)
+		return -ENODEV;
+
+	mutex_lock(&avp->libs_lock);
+	item = _find_lib_locked(avp, handle);
+	if (!item) {
+		pr_err("avp_lib: avp lib with handle 0x%x not found\n",
+			   (u32)handle);
+		ret = -ENOENT;
+		goto err_find;
+	}
+	ret = send_unload_lib_msg(avp, item->handle, item->name);
+	if (!ret)
+		DBG(AVP_DBG_TRACE_LIB, "avp_lib: unloaded '%s'\n", item->name);
+	else
+		pr_err("avp_lib: can't unload lib '%s'/0x%x (%d)\n", item->name,
+			   item->handle, ret);
+	_delete_lib_locked(avp, item);
+
+err_find:
+	mutex_unlock(&avp->libs_lock);
+	return ret;
+}
+
 static struct platform_driver tegra_avp_driver = {
 	.probe		= tegra_avp_probe,
 	.remove		= tegra_avp_remove,
 	.suspend	= tegra_avp_suspend,
 	.resume		= tegra_avp_resume,
-	.driver	= {
+	.driver = {
 		.name	= TEGRA_AVP_NAME,
 		.owner	= THIS_MODULE,
 	},

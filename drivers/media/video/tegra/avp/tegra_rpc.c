@@ -70,7 +70,7 @@ enum {
 	TRPC_TRACE_PORT	= 1U << 2,
 };
 
-static u32 trpc_debug_mask = 0;
+static u32 trpc_debug_mask;
 module_param_named(debug_mask, trpc_debug_mask, uint, S_IWUSR | S_IRUGO);
 
 #define DBG(flag, args...) \
@@ -724,7 +724,7 @@ static int trpc_debug_ports_show(struct seq_file *s, void *data)
 		for (i = 0; i < ARRAY_SIZE(port->peers); i++) {
 			struct trpc_endpoint *ep = &port->peers[i];
 			seq_printf(s, "  peer%d: %s\n    ready:%s\n", i,
-				   ep->owner ? ep->owner->name: "<none>",
+				   ep->owner ? ep->owner->name : "<none>",
 				   ep->ready ? "yes" : "no");
 			if (ep->ops && ep->ops->show)
 				ep->ops->show(s, ep);
@@ -741,7 +741,7 @@ static int trpc_debug_ports_open(struct inode *inode, struct file *file)
 	return single_open(file, trpc_debug_ports_show, inode->i_private);
 }
 
-static struct file_operations trpc_debug_ports_fops = {
+static const struct file_operations trpc_debug_ports_fops = {
 	.open = trpc_debug_ports_open,
 	.read = seq_read,
 	.llseek = seq_lseek,

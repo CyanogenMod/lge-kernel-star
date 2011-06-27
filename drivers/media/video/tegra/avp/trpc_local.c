@@ -33,10 +33,11 @@
 
 #include "trpc.h"
 #include "trpc_sema.h"
+#include "nvavp.h"
 
-struct rpc_info {
+struct tegra_rpc_info {
 	struct trpc_endpoint	*rpc_ep;
-	struct file		*sema_file;
+	struct tegra_sema_info  *sema;
 };
 
 /* ports names reserved for system functions, i.e. communicating with the
@@ -55,26 +56,39 @@ static struct trpc_ep_ops ep_ops = {
 };
 
 static struct trpc_node rpc_node = {
-	.name	= "local",
-	.type	= TRPC_NODE_LOCAL,
+	.name   = "local",
+	.type   = TRPC_NODE_LOCAL,
 };
 
 static void rpc_notify_recv(struct trpc_endpoint *ep)
 {
-	struct rpc_info *info = trpc_priv(ep);
+	struct tegra_rpc_info *info = trpc_priv(ep);
 
 	if (WARN_ON(!info))
 		return;
-	if (info->sema_file)
-		trpc_sema_signal(info->sema_file);
+	if (info->sema)
+		tegra_sema_signal(info->sema);
+}
+
+int tegra_rpc_open(struct tegra_rpc_info **info)
+{
+	struct tegra_rpc_info *new_info;
+
+	new_info = kzalloc(sizeof(struct tegra_rpc_info), GFP_KERNEL);
+	if (!new_info)
+		return -ENOMEM;
+
+	*info = new_info;
+	return 0;
 }
 
 static int local_rpc_open(struct inode *inode, struct file *file)
 {
-	struct rpc_info *info;
+	struct tegra_rpc_info *info;
+	int ret = 0;
 
-	info = kzalloc(sizeof(struct rpc_info), GFP_KERNEL);
-	if (!info)
+	ret = tegra_rpc_open(&info);
+	if (ret < 0)
 		return -ENOMEM;
 
 	nonseekable_open(inode, file);
@@ -82,30 +96,23 @@ static int local_rpc_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int local_rpc_release(struct inode *inode, struct file *file)
+int tegra_rpc_release(struct tegra_rpc_info *info)
 {
-	struct rpc_info *info = file->private_data;
-
 	if (info->rpc_ep)
 		trpc_close(info->rpc_ep);
-	if (info->sema_file)
-		fput(info->sema_file);
+	if (info->sema)
+		trpc_sema_put(info->sema);
 	kfree(info);
-	file->private_data = NULL;
 	return 0;
 }
+EXPORT_SYMBOL(tegra_rpc_release);
 
-static int __get_port_desc(struct tegra_rpc_port_desc *desc,
-			   unsigned int cmd, unsigned long arg)
+static int local_rpc_release(struct inode *inode, struct file *file)
 {
-	unsigned int size = _IOC_SIZE(cmd);
+	struct tegra_rpc_info *info = file->private_data;
 
-	if (size != sizeof(struct tegra_rpc_port_desc))
-		return -EINVAL;
-	if (copy_from_user(desc, (void __user *)arg, sizeof(*desc)))
-		return -EFAULT;
-
-	desc->name[TEGRA_RPC_MAX_NAME_LEN - 1] = '\0';
+	tegra_rpc_release(info);
+	file->private_data = NULL;
 	return 0;
 }
 
@@ -138,55 +145,98 @@ static int _validate_port_name(const char *name)
 	return 0;
 }
 
-static long local_rpc_ioctl(struct file *file, unsigned int cmd,
-			    unsigned long arg)
+int tegra_rpc_port_create(struct tegra_rpc_info *info, char *name,
+			  struct tegra_sema_info *sema)
 {
-	struct rpc_info *info = file->private_data;
-	struct tegra_rpc_port_desc desc;
 	struct trpc_endpoint *ep;
 	int ret = 0;
 
+	if (info->rpc_ep) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	name[TEGRA_RPC_MAX_NAME_LEN - 1] = '\0';
+	if (name[0]) {
+		ret = _validate_port_name(name);
+		if (ret)
+			goto err;
+	} else {
+		_gen_port_name(name);
+	}
+	ep = trpc_create(&rpc_node, name, &ep_ops, info);
+	if (IS_ERR(ep)) {
+		ret = PTR_ERR(ep);
+		goto err;
+	}
+	info->rpc_ep = ep;
+	info->sema = sema;
+	return 0;
+
+err:
+	return ret;
+}
+
+int tegra_rpc_get_name(struct tegra_rpc_info *info, char* name)
+{
+	if (!info->rpc_ep)
+		return -EINVAL;
+
+	strcpy(name, trpc_name(info->rpc_ep));
+	return 0;
+}
+
+int tegra_rpc_port_connect(struct tegra_rpc_info *info, long timeout)
+{
+	if (!info->rpc_ep)
+		return -EINVAL;
+
+	return trpc_connect(info->rpc_ep, timeout);
+
+}
+
+int tegra_rpc_port_listen(struct tegra_rpc_info *info, long timeout)
+{
+	if (!info->rpc_ep)
+		return -EINVAL;
+
+	return trpc_wait_peer(info->rpc_ep, timeout);
+}
+
+static long local_rpc_ioctl(struct file *file, unsigned int cmd,
+				unsigned long arg)
+{
+	struct tegra_rpc_info *info = file->private_data;
+	struct tegra_rpc_port_desc desc;
+	struct tegra_sema_info *sema = NULL;
+	int ret = 0;
+
 	if (_IOC_TYPE(cmd) != TEGRA_RPC_IOCTL_MAGIC ||
-	    _IOC_NR(cmd) < TEGRA_RPC_IOCTL_MIN_NR ||
-	    _IOC_NR(cmd) > TEGRA_RPC_IOCTL_MAX_NR) {
+		_IOC_NR(cmd) < TEGRA_RPC_IOCTL_MIN_NR ||
+		_IOC_NR(cmd) > TEGRA_RPC_IOCTL_MAX_NR) {
 		ret = -ENOTTY;
 		goto err;
 	}
 
 	switch (cmd) {
 	case TEGRA_RPC_IOCTL_PORT_CREATE:
-		if (info->rpc_ep) {
-			ret = -EINVAL;
-			goto err;
-		}
-		ret = __get_port_desc(&desc, cmd, arg);
-		if (ret)
-			goto err;
-		if (desc.name[0]) {
-			ret = _validate_port_name(desc.name);
-			if (ret)
-				goto err;
-		} else {
-			_gen_port_name(desc.name);
-		}
+
+		if (_IOC_SIZE(cmd) != sizeof(struct tegra_rpc_port_desc))
+			return -EINVAL;
+		if (copy_from_user(&desc, (void __user *)arg, sizeof(desc)))
+			return -EFAULT;
 		if (desc.notify_fd != -1) {
-			/* grab a reference to the trpc_sema fd */
-			info->sema_file = trpc_sema_get_from_fd(desc.notify_fd);
-			if (IS_ERR(info->sema_file)) {
-				ret = PTR_ERR(info->sema_file);
-				info->sema_file = NULL;
+			sema = trpc_sema_get_from_fd(desc.notify_fd);
+			if (IS_ERR(sema)) {
+				ret = PTR_ERR(sema);
 				goto err;
 			}
 		}
-		ep = trpc_create(&rpc_node, desc.name, &ep_ops, info);
-		if (IS_ERR(ep)) {
-			ret = PTR_ERR(ep);
-			if (info->sema_file)
-				fput(info->sema_file);
-			info->sema_file = NULL;
+
+		ret = tegra_rpc_port_create(info, desc.name, sema);
+		if (ret < 0)
 			goto err;
-		}
-		info->rpc_ep = ep;
+
 		break;
 	case TEGRA_RPC_IOCTL_PORT_GET_NAME:
 		if (!info->rpc_ep) {
@@ -208,7 +258,7 @@ static long local_rpc_ioctl(struct file *file, unsigned int cmd,
 		ret = trpc_connect(info->rpc_ep, (long)arg);
 		if (ret) {
 			pr_err("%s: can't connect to '%s' (%d)\n", __func__,
-			       trpc_name(info->rpc_ep), ret);
+				   trpc_name(info->rpc_ep), ret);
 			goto err;
 		}
 		break;
@@ -220,7 +270,7 @@ static long local_rpc_ioctl(struct file *file, unsigned int cmd,
 		ret = trpc_wait_peer(info->rpc_ep, (long)arg);
 		if (ret) {
 			pr_err("%s: error waiting for peer for '%s' (%d)\n",
-			       __func__, trpc_name(info->rpc_ep), ret);
+				   __func__, trpc_name(info->rpc_ep), ret);
 			goto err;
 		}
 		break;
@@ -235,14 +285,31 @@ static long local_rpc_ioctl(struct file *file, unsigned int cmd,
 err:
 	if (ret && ret != -ERESTARTSYS)
 		pr_err("tegra_rpc: pid=%d ioctl=%x/%lx (%x) ret=%d\n",
-		       current->pid, cmd, arg, _IOC_NR(cmd), ret);
+			   current->pid, cmd, arg, _IOC_NR(cmd), ret);
 	return (long)ret;
 }
 
-static ssize_t local_rpc_write(struct file *file, const char __user *buf,
-			       size_t count, loff_t *ppos)
+int tegra_rpc_write(struct tegra_rpc_info *info, u8* buf, size_t size)
 {
-	struct rpc_info *info = file->private_data;
+	int ret;
+
+	if (!info->rpc_ep)
+		return -EINVAL;
+
+	if (TEGRA_RPC_MAX_MSG_LEN < size)
+		return -EINVAL;
+
+	ret = trpc_send_msg(&rpc_node, info->rpc_ep, buf, size,
+						GFP_KERNEL);
+	if (ret)
+		return ret;
+	return size;
+}
+
+static ssize_t local_rpc_write(struct file *file, const char __user *buf,
+				   size_t count, loff_t *ppos)
+{
+	struct tegra_rpc_info *info = file->private_data;
 	u8 data[TEGRA_RPC_MAX_MSG_LEN];
 	int ret;
 
@@ -255,16 +322,35 @@ static ssize_t local_rpc_write(struct file *file, const char __user *buf,
 		return -EFAULT;
 
 	ret = trpc_send_msg(&rpc_node, info->rpc_ep, data, count,
-			    GFP_KERNEL);
+				GFP_KERNEL);
 	if (ret)
 		return ret;
 	return count;
 }
 
-static ssize_t local_rpc_read(struct file *file, char __user *buf, size_t max,
-			      loff_t *ppos)
+int tegra_rpc_read(struct tegra_rpc_info *info, u8 *buf, size_t max)
 {
-	struct rpc_info *info = file->private_data;
+	int ret;
+
+	if (max > TEGRA_RPC_MAX_MSG_LEN)
+		return -EINVAL;
+
+	ret = trpc_recv_msg(&rpc_node, info->rpc_ep, buf,
+				TEGRA_RPC_MAX_MSG_LEN, 0);
+	if (ret == 0)
+		return 0;
+	else if (ret < 0)
+		return ret;
+	else if (ret > max)
+		return -ENOSPC;
+
+	return ret;
+}
+
+static ssize_t local_rpc_read(struct file *file, char __user *buf, size_t max,
+				  loff_t *ppos)
+{
+	struct tegra_rpc_info *info = file->private_data;
 	int ret;
 	u8 data[TEGRA_RPC_MAX_MSG_LEN];
 
@@ -272,7 +358,7 @@ static ssize_t local_rpc_read(struct file *file, char __user *buf, size_t max,
 		return -EINVAL;
 
 	ret = trpc_recv_msg(&rpc_node, info->rpc_ep, data,
-			    TEGRA_RPC_MAX_MSG_LEN, 0);
+				TEGRA_RPC_MAX_MSG_LEN, 0);
 	if (ret == 0)
 		return 0;
 	else if (ret < 0)
@@ -295,9 +381,9 @@ static const struct file_operations local_rpc_misc_fops = {
 };
 
 static struct miscdevice local_rpc_misc_device = {
-	.minor	= MISC_DYNAMIC_MINOR,
-	.name	= "tegra_rpc",
-	.fops	= &local_rpc_misc_fops,
+	.minor  = MISC_DYNAMIC_MINOR,
+	.name   = "tegra_rpc",
+	.fops   = &local_rpc_misc_fops,
 };
 
 int __init rpc_local_init(void)

@@ -48,12 +48,14 @@
 ENTRY(_tegra_avp_boot_stub)
 	adr	r4, _tegra_avp_boot_stub_data
 	ldmia	r4, {r0-r3}
+#ifdef CONFIG_TEGRA_AVP_KERNEL_ON_MMU
 	str	r2, [r0, #PTE0_COMPARE]
 	bic	r3, r3, #0xff0
 	bic	r3, r3, #0x00f
 	orr	r3, r3, #TRANSLATE_OPT
 	orr	r3, r3, #TRANSLATE_EN
 	str	r3, [r0, #PTE0_TRANSLATE]
+#endif
 	bx	r1
 	b	.
 ENDPROC(_tegra_avp_boot_stub)
