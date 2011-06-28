@@ -257,6 +257,9 @@
 #define UTMIP_BIAS_CFG0		0x80c
 #define   UTMIP_OTGPD			(1 << 11)
 #define   UTMIP_BIASPD			(1 << 10)
+#define   UTMIP_HSSQUELCH_LEVEL(x)	(((x) & 0x2) << 0)
+#define   UTMIP_HSDISCON_LEVEL(x)	(((x) & 0x2) << 2)
+#define   UTMIP_HSDISCON_LEVEL_MSB	(1 << 24)
 
 #define UTMIP_HSRX_CFG0		0x810
 #define   UTMIP_ELASTIC_LIMIT(x)	(((x) & 0x1f) << 10)
@@ -561,6 +564,10 @@ static int utmip_pad_power_on(struct tegra_usb_phy *phy)
 	if (utmip_pad_count++ == 0) {
 		val = readl(base + UTMIP_BIAS_CFG0);
 		val &= ~(UTMIP_OTGPD | UTMIP_BIASPD);
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+		val |= UTMIP_HSSQUELCH_LEVEL(0x2) | UTMIP_HSDISCON_LEVEL(0x2) |
+			UTMIP_HSDISCON_LEVEL_MSB;
+#endif
 		writel(val, base + UTMIP_BIAS_CFG0);
 	}
 
@@ -588,6 +595,10 @@ static int utmip_pad_power_off(struct tegra_usb_phy *phy, bool is_dpd)
 	if (--utmip_pad_count == 0 && is_dpd) {
 		val = readl(base + UTMIP_BIAS_CFG0);
 		val |= UTMIP_OTGPD | UTMIP_BIASPD;
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+		val &= ~(UTMIP_HSSQUELCH_LEVEL(~0) | UTMIP_HSDISCON_LEVEL(~0) |
+			UTMIP_HSDISCON_LEVEL_MSB);
+#endif
 		writel(val, base + UTMIP_BIAS_CFG0);
 	}
 
@@ -789,6 +800,10 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	val |= UTMIP_XCVR_SETUP(config->xcvr_setup);
 	val |= UTMIP_XCVR_LSFSLEW(config->xcvr_lsfslew);
 	val |= UTMIP_XCVR_LSRSLEW(config->xcvr_lsrslew);
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	if (phy->instance == 0)
+		val |= UTMIP_XCVR_HSSLEW_MSB(0x8);
+#endif
 	writel(val, base + UTMIP_XCVR_CFG0);
 
 	val = readl(base + UTMIP_XCVR_CFG1);
