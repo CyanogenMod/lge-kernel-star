@@ -44,6 +44,24 @@
 #define TPS80031_INT_MSK_STS_B		0xD7
 #define TPS80031_INT_MSK_STS_C		0xD8
 
+#define TPS80031_CONTROLLER_STAT1		0xE3
+#define CONTROLLER_STAT1_BAT_TEMP		0
+#define CONTROLLER_STAT1_BAT_REMOVED		1
+#define CONTROLLER_STAT1_VBUS_DET		2
+#define CONTROLLER_STAT1_VAC_DET		3
+#define CONTROLLER_STAT1_FAULT_WDG		4
+#define CONTROLLER_STAT1_LINCH_GATED		6
+
+#define TPS80031_CONTROLLER_INT_MASK		0xE0
+#define CONTROLLER_INT_MASK_MVAC_DET		0
+#define CONTROLLER_INT_MASK_MVBUS_DET		1
+#define CONTROLLER_INT_MASK_MBAT_TEMP		2
+#define CONTROLLER_INT_MASK_MFAULT_WDG		3
+#define CONTROLLER_INT_MASK_MBAT_REMOVED	4
+#define CONTROLLER_INT_MASK_MLINCH_GATED	5
+
+#define CHARGE_CONTROL_SUB_INT_MASK		0x3F
+
 /* Version number related register */
 #define TPS80031_JTAGVERNUM		0x87
 
@@ -78,13 +96,32 @@ static u8 pmc_ext_control_base[] = {
 struct tps80031_irq_data {
 	u8	mask_reg;
 	u8	mask_mask;
+	u8	is_sec_int;
+	u8	parent_int;
+	u8	mask_sec_int_reg;
+	u8	int_mask_bit;
+	u8	int_sec_sts_reg;
+	u8	int_sts_bit;
 };
 
-#define TPS80031_IRQ(_reg, _mask)				\
+#define TPS80031_IRQ(_reg, _mask)	\
 	{							\
 		.mask_reg = (TPS80031_INT_MSK_LINE_##_reg) -	\
 				TPS80031_INT_MSK_LINE_A,	\
 		.mask_mask = (_mask),				\
+	}
+
+#define TPS80031_IRQ_SEC(_reg, _mask, _pint, _sint_mask_bit, _sint_sts_bit) \
+	{								\
+		.mask_reg = (TPS80031_INT_MSK_LINE_##_reg) -		\
+				TPS80031_INT_MSK_LINE_A,		\
+		.mask_mask = (_mask),					\
+		.is_sec_int = true,					\
+		.parent_int = TPS80031_INT_##_pint,			\
+		.mask_sec_int_reg = TPS80031_CONTROLLER_INT_MASK,	\
+		.int_mask_bit = CONTROLLER_INT_MASK_##_sint_mask_bit,	\
+		.int_sec_sts_reg = TPS80031_CONTROLLER_STAT1,		\
+		.int_sts_bit = CONTROLLER_STAT1_##_sint_sts_bit		\
 	}
 
 static const struct tps80031_irq_data tps80031_irqs[] = {
@@ -113,6 +150,29 @@ static const struct tps80031_irq_data tps80031_irqs[] = {
 	[TPS80031_INT_EXT_CHRG]		= TPS80031_IRQ(C, 5),
 	[TPS80031_INT_INT_CHRG]		= TPS80031_IRQ(C, 6),
 	[TPS80031_INT_RES2]		= TPS80031_IRQ(C, 7),
+	[TPS80031_INT_BAT_TEMP_OVRANGE]	= TPS80031_IRQ_SEC(C, 4, CHRG_CTRL,
+						MBAT_TEMP,	BAT_TEMP),
+	[TPS80031_INT_BAT_REMOVED]	= TPS80031_IRQ_SEC(C, 4, CHRG_CTRL,
+						MBAT_REMOVED,	BAT_REMOVED),
+	[TPS80031_INT_VBUS_DET]		= TPS80031_IRQ_SEC(C, 4, CHRG_CTRL,
+						MVBUS_DET,	VBUS_DET),
+	[TPS80031_INT_VAC_DET]		= TPS80031_IRQ_SEC(C, 4, CHRG_CTRL,
+						MVAC_DET,	VAC_DET),
+	[TPS80031_INT_FAULT_WDG]	= TPS80031_IRQ_SEC(C, 4, CHRG_CTRL,
+						MFAULT_WDG,	FAULT_WDG),
+	[TPS80031_INT_LINCH_GATED]	= TPS80031_IRQ_SEC(C, 4, CHRG_CTRL,
+						MLINCH_GATED,	LINCH_GATED),
+};
+
+static const int controller_stat1_irq_nr[] = {
+	TPS80031_INT_BAT_TEMP_OVRANGE,
+	TPS80031_INT_BAT_REMOVED,
+	TPS80031_INT_VBUS_DET,
+	TPS80031_INT_VAC_DET,
+	TPS80031_INT_FAULT_WDG,
+	0,
+	TPS80031_INT_LINCH_GATED,
+	0
 };
 
 /* Structure for TPS80031 Slaves */
@@ -132,6 +192,10 @@ struct tps80031 {
 	u32			irq_en;
 	u8			mask_cache[3];
 	u8			mask_reg[3];
+	u8			cont_int_mask_reg;
+	u8			cont_int_mask_cache;
+	u8			cont_int_en;
+	u8			prev_cont_stat1;
 	struct tps80031_client	tps_clients[TPS_NUM_SLAVES];
 };
 
@@ -470,7 +534,14 @@ static void tps80031_irq_enable(struct irq_data *data)
 	unsigned int __irq = data->irq - tps80031->irq_base;
 	const struct tps80031_irq_data *irq_data = &tps80031_irqs[__irq];
 
-	tps80031->mask_reg[irq_data->mask_reg] &= ~(1 << irq_data->mask_mask);
+	if (irq_data->is_sec_int) {
+		tps80031->cont_int_mask_reg &= ~(1 << irq_data->int_mask_bit);
+		tps80031->cont_int_en |= (1 << irq_data->int_mask_bit);
+		tps80031->mask_reg[irq_data->mask_reg] &= ~(1 << irq_data->mask_mask);
+		tps80031->irq_en |= (1 << irq_data->parent_int);
+	} else
+		tps80031->mask_reg[irq_data->mask_reg] &= ~(1 << irq_data->mask_mask);
+
 	tps80031->irq_en |= (1 << __irq);
 }
 
@@ -481,7 +552,18 @@ static void tps80031_irq_disable(struct irq_data *data)
 	unsigned int __irq = data->irq - tps80031->irq_base;
 	const struct tps80031_irq_data *irq_data = &tps80031_irqs[__irq];
 
-	tps80031->mask_reg[irq_data->mask_reg] |= (1 << irq_data->mask_mask);
+	if (irq_data->is_sec_int) {
+		tps80031->cont_int_mask_reg |= (1 << irq_data->int_mask_bit);
+		tps80031->cont_int_en &= ~(1 << irq_data->int_mask_bit);
+		if (!tps80031->cont_int_en) {
+			tps80031->mask_reg[irq_data->mask_reg] |=
+						(1 << irq_data->mask_mask);
+			tps80031->irq_en &= ~(1 << irq_data->parent_int);
+		}
+		tps80031->irq_en &= ~(1 << __irq);
+	} else
+		tps80031->mask_reg[irq_data->mask_reg] |= (1 << irq_data->mask_mask);
+
 	tps80031->irq_en &= ~(1 << __irq);
 }
 
@@ -504,7 +586,55 @@ static void tps80031_irq_sync_unlock(struct irq_data *data)
 		}
 	}
 
+	if (tps80031->cont_int_mask_reg != tps80031->cont_int_mask_cache) {
+		if (!WARN_ON(tps80031_write(tps80031->dev, SLAVE_ID2,
+				TPS80031_CONTROLLER_INT_MASK,
+				tps80031->cont_int_mask_reg)))
+			tps80031->cont_int_mask_cache =
+						tps80031->cont_int_mask_reg;
+	}
+
 	mutex_unlock(&tps80031->irq_lock);
+}
+
+static irqreturn_t tps80031_charge_control_irq(int irq, void *data)
+{
+	struct tps80031 *tps80031 = data;
+	int ret = 0;
+	int i;
+	u8 cont_sts;
+	u8 org_sts;
+
+	if (irq != (tps80031->irq_base + TPS80031_INT_CHRG_CTRL)) {
+		dev_err(tps80031->dev, "%s() Got the illegal interrupt %d\n",
+					__func__, irq);
+		return IRQ_NONE;
+	}
+
+	ret = tps80031_read(tps80031->dev, SLAVE_ID2,
+			TPS80031_CONTROLLER_STAT1, &org_sts);
+	if (ret < 0) {
+		dev_err(tps80031->dev, "%s(): failed to read controller state1 "
+				"status %d\n", __func__, ret);
+		return IRQ_NONE;
+	}
+
+	/* Get change from last interrupt and mask for interested interrupt
+	 * for charge control interrupt */
+	cont_sts = org_sts ^ tps80031->prev_cont_stat1;
+	tps80031->prev_cont_stat1 = org_sts;
+	cont_sts &= 0x5F;
+
+	for (i = 0; i < 8; ++i) {
+		if (!controller_stat1_irq_nr[i])
+			continue;
+		if ((cont_sts & BIT(i)) &&
+			(tps80031->irq_en & BIT(controller_stat1_irq_nr[i])))
+			handle_nested_irq(tps80031->irq_base +
+						controller_stat1_irq_nr[i]);
+		cont_sts &= ~BIT(i);
+	}
+	return IRQ_HANDLED;
 }
 
 static irqreturn_t tps80031_irq(int irq, void *data)
@@ -567,6 +697,35 @@ static int __devinit tps80031_irq_init(struct tps80031 *tps80031, int irq,
 					TPS80031_INT_STS_A + i, 0xFF);
 	}
 
+	ret = tps80031_read(tps80031->dev, SLAVE_ID2,
+				TPS80031_CONTROLLER_INT_MASK,
+				&tps80031->cont_int_mask_reg);
+	if (ret < 0) {
+		dev_err(tps80031->dev, "Error in reading the controller_mask "
+					"register %d\n", ret);
+		return ret;
+	}
+
+	tps80031->cont_int_mask_reg |= CHARGE_CONTROL_SUB_INT_MASK;
+	tps80031->cont_int_mask_cache = tps80031->cont_int_mask_reg;
+	tps80031->cont_int_en = 0;
+	ret = tps80031_write(tps80031->dev, SLAVE_ID2,
+				TPS80031_CONTROLLER_INT_MASK,
+				tps80031->cont_int_mask_reg);
+	if (ret < 0) {
+		dev_err(tps80031->dev, "Error in writing the controller_mask "
+					"register %d\n", ret);
+		return ret;
+	}
+
+	ret = tps80031_read(tps80031->dev, SLAVE_ID2,
+			TPS80031_CONTROLLER_STAT1, &tps80031->prev_cont_stat1);
+	if (ret < 0) {
+		dev_err(tps80031->dev, "%s(): failed to read controller state1 "
+				"status %d\n", __func__, ret);
+		return ret;
+	}
+
 	tps80031->irq_base = irq_base;
 
 	tps80031->irq_chip.name = "tps80031";
@@ -588,7 +747,13 @@ static int __devinit tps80031_irq_init(struct tps80031 *tps80031, int irq,
 
 	ret = request_threaded_irq(irq, NULL, tps80031_irq, IRQF_ONESHOT,
 				"tps80031", tps80031);
+	/* register the isr for the secondary interrupt */
+	if (!ret)
+		ret = request_threaded_irq(irq_base + TPS80031_INT_CHRG_CTRL,
+				NULL, tps80031_charge_control_irq,
+				IRQF_ONESHOT, "80031_chg_ctl", tps80031);
 	if (!ret) {
+
 		device_init_wakeup(tps80031->dev, 1);
 		enable_irq_wake(irq);
 	}
@@ -710,6 +875,7 @@ static int dbg_tps_show(struct seq_file *s, void *unused)
 	print_regs("INT Regs",       s, SLAVE_ID2, 0xD0, 0xD8);
 	print_regs("PREQ Regs",      s, SLAVE_ID1, 0xD7, 0xDF);
 	print_regs("MASK_PH Regs",   s, SLAVE_ID1, 0x20, 0x21);
+	print_regs("CONT_STATE",     s, SLAVE_ID2, 0xE0, 0xE4);
 	print_regs("VERNUM Regs",    s, SLAVE_ID1, 0x87, 0x87);
 	return 0;
 }
