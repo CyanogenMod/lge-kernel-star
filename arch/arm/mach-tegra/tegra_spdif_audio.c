@@ -1144,7 +1144,7 @@ static int tegra_spdif_probe(struct platform_device *pdev)
 	return 0;
 }
 
-#ifdef CONFIG_PM
+#ifdef CONFIG_PM_SLEEP
 static int tegra_spdif_suspend(struct platform_device *pdev, pm_message_t mesg)
 {
 	/* dev_info(&pdev->dev, "%s\n", __func__); */
@@ -1155,7 +1155,7 @@ static int tegra_spdif_resume(struct platform_device *pdev)
 {
 	return spdif_configure(pdev);
 }
-#endif /* CONFIG_PM */
+#endif /* CONFIG_PM_SLEEP */
 
 static struct platform_driver tegra_spdif_driver = {
 	.driver = {
@@ -1163,7 +1163,7 @@ static struct platform_driver tegra_spdif_driver = {
 		.owner = THIS_MODULE,
 	},
 	.probe = tegra_spdif_probe,
-#ifdef CONFIG_PM
+#ifdef CONFIG_PM_SLEEP
 	.suspend = tegra_spdif_suspend,
 	.resume = tegra_spdif_resume,
 #endif

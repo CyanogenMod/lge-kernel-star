@@ -17,8 +17,6 @@
 #ifndef __MACH_TEGRA_PINMUX_T3_H
 #define __MACH_TEGRA_PINMUX_T3_H
 
-void tegra_init_pinmux(void);
-
 #define TEGRA_PINMUX_HAS_IO_DIRECTION	1
 
 enum tegra_pingroup {

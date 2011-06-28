@@ -358,7 +358,7 @@ const struct tegra_pingroup_desc tegra_soc_pingroups[TEGRA_MAX_PINGROUP] = {
 	PINGROUP(HDMI_CEC, 	  SYS,      CEC,	RSVD1,	    RSVD2,	RSVD3,	    RSVD,	INPUT,	0x33e0),
 };
 
-#ifdef CONFIG_PM
+#ifdef CONFIG_PM_SLEEP
 
 static u32 pinmux_reg[TEGRA_MAX_PINGROUP +
 		      ARRAY_SIZE(tegra_soc_drive_pingroups)];

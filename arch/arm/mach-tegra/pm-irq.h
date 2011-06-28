@@ -18,7 +18,7 @@
 #ifndef _MACH_TERA_PM_IRQ_H_
 #define _MACH_TERA_PM_IRQ_H_
 
-#ifdef CONFIG_PM
+#ifdef CONFIG_PM_SLEEP
 int tegra_pm_irq_set_wake(int irq, int enable);
 int tegra_pm_irq_set_wake_type(int irq, int flow_type);
 bool tegra_pm_irq_lp0_allowed(void);

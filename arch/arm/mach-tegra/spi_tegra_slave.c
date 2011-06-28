@@ -892,7 +892,7 @@ void spi_tegra_abort_transfer(struct spi_device *spi)
 }
 EXPORT_SYMBOL(spi_tegra_abort_transfer);
 
-#ifdef CONFIG_PM
+#ifdef CONFIG_PM_SLEEP
 static int spi_tegra_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct spi_master	*master;
@@ -944,7 +944,7 @@ static struct platform_driver spi_tegra_driver = {
 		.owner =	THIS_MODULE,
 	},
 	.remove =	__devexit_p(spi_tegra_remove),
-#ifdef CONFIG_PM
+#ifdef CONFIG_PM_SLEEP
 	.suspend =	spi_tegra_suspend,
 	.resume  =	spi_tegra_resume,
 #endif

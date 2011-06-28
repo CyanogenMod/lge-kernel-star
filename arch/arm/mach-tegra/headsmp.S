@@ -42,7 +42,7 @@ ENTRY(tegra_secondary_startup)
 ENDPROC(tegra_secondary_startup)
 #endif
 
-#ifdef CONFIG_PM
+#ifdef CONFIG_PM_SLEEP
 /*
  *	tegra_secondary_resume
  *
@@ -56,7 +56,7 @@ ENDPROC(tegra_secondary_resume)
 #endif
 #endif
 
-#ifdef CONFIG_PM
+#ifdef CONFIG_PM_SLEEP
 /*
  *	tegra_resume
  *

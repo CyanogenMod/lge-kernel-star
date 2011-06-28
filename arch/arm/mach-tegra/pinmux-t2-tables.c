@@ -222,7 +222,7 @@ const struct tegra_pingroup_desc tegra_soc_pingroups[TEGRA_MAX_PINGROUP] = {
 	PINGROUP(XM2D,  DDR,   RSVD,      RSVD,      RSVD,      RSVD,          RSVD,      -1,   -1, -1,   -1, 0xA8, 28),
 };
 
-#ifdef CONFIG_PM
+#ifdef CONFIG_PM_SLEEP
 #define TRISTATE_REG_A         0x14
 #define TRISTATE_REG_NUM       4
 #define PIN_MUX_CTL_REG_A      0x80

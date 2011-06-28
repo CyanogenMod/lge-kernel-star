@@ -1914,7 +1914,7 @@ static int tegra_audio_probe(struct platform_device *pdev)
 	return 0;
 }
 
-#ifdef CONFIG_PM
+#ifdef CONFIG_PM_SLEEP
 static int tegra_audio_suspend(struct platform_device *pdev, pm_message_t mesg)
 {
 	/* dev_info(&pdev->dev, "%s\n", __func__); */
@@ -1925,7 +1925,7 @@ static int tegra_audio_resume(struct platform_device *pdev)
 {
 	return i2s_configure(pdev);
 }
-#endif /* CONFIG_PM */
+#endif /* CONFIG_PM_SLEEP */
 
 static struct platform_driver tegra_audio_driver = {
 	.driver = {
@@ -1933,7 +1933,7 @@ static struct platform_driver tegra_audio_driver = {
 		.owner = THIS_MODULE,
 	},
 	.probe = tegra_audio_probe,
-#ifdef CONFIG_PM
+#ifdef CONFIG_PM_SLEEP
 	.suspend = tegra_audio_suspend,
 	.resume = tegra_audio_resume,
 #endif

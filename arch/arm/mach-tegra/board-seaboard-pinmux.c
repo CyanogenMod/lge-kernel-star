@@ -17,7 +17,6 @@
 #include <linux/gpio.h>
 
 #include <mach/pinmux.h>
-#include <mach/pinmux-t2.h>
 
 #include "gpio-names.h"
 #include "board-seaboard.h"

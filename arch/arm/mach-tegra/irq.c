@@ -62,7 +62,7 @@ static void __iomem *ictlr_reg_base[] = {
 #endif
 };
 
-#ifdef CONFIG_PM
+#ifdef CONFIG_PM_SLEEP
 static u32 cop_ier[NUM_ICTLRS];
 static u32 cpu_ier[NUM_ICTLRS];
 static u32 cpu_iep[NUM_ICTLRS];
@@ -130,7 +130,7 @@ static int tegra_set_type(struct irq_data *d, unsigned int flow_type)
 }
 
 
-#ifdef CONFIG_PM
+#ifdef CONFIG_PM_SLEEP
 static int tegra_set_wake(struct irq_data *d, unsigned int enable)
 {
 	return tegra_pm_irq_set_wake(d->irq, enable);
