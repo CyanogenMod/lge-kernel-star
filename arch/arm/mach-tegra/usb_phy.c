@@ -948,7 +948,11 @@ static int utmi_phy_power_off(struct tegra_usb_phy *phy, bool is_dpd)
 		val |= UTMIP_RESET;
 		writel(val, base + USB_SUSP_CTRL);
 	}
+#ifdef CONFIG_USB_HOTPLUG
 	utmip_pad_power_off(phy, is_dpd);
+#else
+	utmip_pad_power_off(phy, true);
+#endif
 	return 0;
 }
 

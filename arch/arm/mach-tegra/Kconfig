@@ -304,4 +304,7 @@ config TEGRA_LEGACY_AUDIO
 	  Say Y if you want to add support legacy (non-ALSA) audio APIs on
 	  Tegra. This will disable ALSA (ASoC) support.
 
+config USB_HOTPLUG
+	bool "Enabling the USB hotplug"
+	default n
 endif
