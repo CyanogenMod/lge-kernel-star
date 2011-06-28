@@ -1150,7 +1150,7 @@ static int ulpi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	ulpi_set_trimmer(base, 4, 4, 4);
 
 /* HACK! FIXME */
-#if CONFIG_ARCH_TEGRA_2x_SOC
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	val = 0;
 	val |= ULPI_WAKEUP;
 	val |= ULPI_RD_WR;

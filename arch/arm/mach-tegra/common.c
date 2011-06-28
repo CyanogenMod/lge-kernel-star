@@ -98,7 +98,7 @@ void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
 
 void tegra_assert_system_reset(char mode, const char *cmd)
 {
-#ifdef defined(CONFIG_TEGRA_FPGA_PLATFORM) || NEVER_RESET
+#if defined(CONFIG_TEGRA_FPGA_PLATFORM) || NEVER_RESET
 	printk("tegra_assert_system_reset() ignored.....");
 	do { } while (1);
 #else
