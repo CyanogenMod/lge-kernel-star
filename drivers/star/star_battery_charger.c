@@ -3383,7 +3383,11 @@ static int tegra_battery_suspend(struct platform_device *dev,
 			}
 			else if ( (batt_dev->old_alarm_sec <= alarm_sec) && (batt_dev->old_alarm_sec <= checkbat_sec) )
 			{
-				next_alarm_sec = batt_dev->old_alarm_sec;
+				if (now_sec <= batt_dev->old_alarm_sec) {
+					next_alarm_sec = checkbat_sec;
+				} else {
+					next_alarm_sec = batt_dev->old_alarm_sec;
+				}
 				batt_dev->old_alarm_sec = 0;
 				batt_dev->old_checkbat_sec = 0;
 				NvRmPmuWriteAlarm(s_hRmGlobal, next_alarm_sec);
