@@ -184,6 +184,7 @@ struct tps80031_client {
 
 struct tps80031 {
 	struct device		*dev;
+	unsigned long		chip_info;
 
 	struct gpio_chip	gpio;
 	struct irq_chip		irq_chip;
@@ -399,6 +400,13 @@ out:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(tps80031_force_update);
+
+unsigned long tps80031_get_chip_info(struct device *dev)
+{
+	struct tps80031 *tps80031 = dev_get_drvdata(dev);
+	return tps80031->chip_info;
+}
+EXPORT_SYMBOL_GPL(tps80031_get_chip_info);
 
 static struct tps80031 *tps80031_dev;
 int tps80031_power_off(void)
@@ -957,6 +965,7 @@ static int __devinit tps80031_i2c_probe(struct i2c_client *client,
 
 	tps80031->dev = &client->dev;
 	i2c_set_clientdata(client, tps80031);
+	tps80031->chip_info = id->driver_data;
 
 	/* Set up slaves */
 	tps80031->tps_clients[SLAVE_ID0].addr = I2C_ID0_ADDR;
@@ -1027,8 +1036,8 @@ static int tps80031_i2c_resume(struct i2c_client *client)
 
 
 static const struct i2c_device_id tps80031_id_table[] = {
-	{ "tps80031", 0 },
-	{ },
+	{ "tps80031", TPS80031 },
+	{ "tps80032", TPS80032 },
 };
 MODULE_DEVICE_TABLE(i2c, tps80031_id_table);
 
