@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010-2011, NVIDIA Corporation.
  * Copyright (c) 2011, Google, Inc.
  *
  * Author: Colin Cross <ccross@android.com>
@@ -68,6 +68,9 @@
 #define FLOW_CTRL_JTAG_RESUME		(1 << 28)
 #define FLOW_CTRL_IRQ_RESUME		(1 << 10)
 #define FLOW_CTRL_FIQ_RESUME		(1 << 8)
+
+#define FLOW_CTRL_CSR_INTR_FLAG		(1<<15)
+#define FLOW_CTRL_CSR_EVENT_FLAG	(1<<14)
 
 #define TEGRA_PMC_VIRT		(TEGRA_PMC_BASE - IO_APB_PHYS + IO_APB_VIRT)
 #define TEGRA_ARM_PERIF_VIRT	(TEGRA_ARM_PERIF_BASE - IO_CPU_PHYS + IO_CPU_VIRT)
@@ -193,25 +196,26 @@ ENDPROC(tegra_cpu_save)
  * tegra_cpu_wfi
  *
  * puts current CPU in clock-gated wfi using the flow controller
- * if the state is saved before calling tegra_cpu_wfi, the cpu can go from
- * wfi directly to reset
  *
- * corrupts r0-r2
+ * corrupts r0-r3
  * must be called with MMU on
  */
 ENTRY(tegra_cpu_wfi)
 	cpu_id	r0
 	cpu_to_halt_reg r1, r0
+	cpu_to_csr_reg r2, r0
 	mov32	r0, TEGRA_FLOW_CTRL_VIRT
-	mov	r2, #FLOW_CTRL_WAITEVENT | FLOW_CTRL_JTAG_RESUME
-	str	r2, [r0, r1]		@ put flow controller in wait event mode
-	ldr	r2, [r0, r1]
-	isb
+	mov	r3, #FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
+	str	r3, [r0, r2]		@ clear event & interrupt status
+	mov	r3, #FLOW_CTRL_STOP_UNTIL_IRQ | FLOW_CTRL_JTAG_RESUME
+	str	r3, [r0, r1]		@ put flow controller in wait irq mode
 	dsb
 	wfi
-	mov	r2, #0
-	str	r2, [r0, r1]
-	ldr	r2, [r0, r1]
+	mov	r3, #0
+	str	r3, [r0, r1]		@ clear flow controller halt status
+	mov	r3, #FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
+	str	r3, [r0, r2]		@ clear event & interrupt status
+	dsb
 	mov	pc, lr
 ENDPROC(tegra_cpu_wfi)
 

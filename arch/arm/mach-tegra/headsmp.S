@@ -70,7 +70,6 @@ ENTRY(tegra_resume)
 	bl	tegra_invalidate_l1
 	bl	tegra_enable_coresite
 
-#if 0
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	@ Clear the flow controller flags for this CPU.
 	mov32	r2, TEGRA_FLOW_CTRL_BASE+8	@ CPU0 CSR
@@ -79,7 +78,6 @@ ENTRY(tegra_resume)
 	movw	r0, #0x0FFD	@ enable, cluster_switch, immed, & bitmaps
 	bic	r1, r1, r0
 	str	r1, [r2]
-#endif
 #endif
 
 	/* enable SCU */
