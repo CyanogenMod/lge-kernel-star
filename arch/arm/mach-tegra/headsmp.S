@@ -27,6 +27,8 @@
 
 #include <mach/iomap.h>
 
+#include "asm_macros.h"
+
 #ifdef CONFIG_SMP
 /*
  *	tegra_secondary_startup
@@ -81,7 +83,7 @@ ENTRY(tegra_resume)
 #endif
 
 	/* enable SCU */
-	ldr	r0, =TEGRA_ARM_PERIF_BASE
+	mov32	r0, TEGRA_ARM_PERIF_BASE
 	ldr	r1, [r0]
 	orr	r1, r1, #1
 	str	r1, [r0]
@@ -131,6 +133,6 @@ tegra_invalidate_l1:
 
 	/* Enable Coresight access on cpu */
 tegra_enable_coresite:
-	ldr	r0, =0xC5ACCE55
+	mov32	r0, 0xC5ACCE55
 	mcr	p14, 0, r0, c7, c12, 6
 	mov	pc, lr
