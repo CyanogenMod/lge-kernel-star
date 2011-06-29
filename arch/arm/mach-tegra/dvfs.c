@@ -268,6 +268,27 @@ __tegra_dvfs_set_rate(struct dvfs *d, unsigned long rate)
 	return ret;
 }
 
+int tegra_dvfs_predict_millivolts(struct clk *c, unsigned long rate)
+{
+	int i;
+
+	if (!rate || !c->dvfs)
+		return 0;
+
+	if (!c->dvfs->millivolts)
+		return -ENODEV;
+
+	for (i = 0; i < c->dvfs->num_freqs; i++) {
+		if (rate <= c->dvfs->freqs[i])
+			break;
+	}
+
+	if (i == c->dvfs->num_freqs)
+		return -EINVAL;
+
+	return c->dvfs->millivolts[i];
+}
+
 int tegra_dvfs_set_rate(struct clk *c, unsigned long rate)
 {
 	int ret;
