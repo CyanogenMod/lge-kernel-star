@@ -285,17 +285,22 @@ static int gpio_switch_sdmmc3_vdd_sel_voltages[] = {2850};
 
 /* LCD-D23 (GPIO M7) from T30*/
 /* 2-0036 is dev_name of ar0832 */
+/* 2-0010 is dev_name of ov9726 */
 static struct regulator_consumer_supply gpio_switch_cam_ldo_2v8_en_supply[] = {
 	REGULATOR_SUPPLY("vaa", "2-0036"),
 	REGULATOR_SUPPLY("vaa", "2-0032"),
+	REGULATOR_SUPPLY("avdd", "2-0010"),
+	REGULATOR_SUPPLY("vdd_2v8_cam", NULL),
 };
 static int gpio_switch_cam_ldo_2v8_en_voltages[] = {2800};
 
 /* LCD-D9 (GPIO F1) from T30*/
 /* 2-0036 is dev_name of ar0832 */
+/* 2-0010 is dev_name of ov9726 */
 static struct regulator_consumer_supply gpio_switch_cam_ldo_1v8_en_supply[] = {
 	REGULATOR_SUPPLY("vdd", "2-0036"),
 	REGULATOR_SUPPLY("vdd", "2-0032"),
+	REGULATOR_SUPPLY("dovdd", "2-0010"),
 	REGULATOR_SUPPLY("vdd_1v8_cam", NULL),
 };
 static int gpio_switch_cam_ldo_1v8_en_voltages[] = {1800};
