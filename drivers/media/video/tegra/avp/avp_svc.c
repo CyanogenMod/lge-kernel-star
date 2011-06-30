@@ -459,7 +459,7 @@ static void do_svc_module_clock_set(struct avp_svc_info *avp_svc,
 	aclk = &avp_svc->clks[mod->clk_req];
 	ret = clk_set_rate(aclk->clk, msg->clk_freq);
 	if (ret) {
-		pr_err("avp_svc: Failed to set module (id = %d) frequency to %d kHz\n",
+		pr_err("avp_svc: Failed to set module (id = %d) frequency to %d Hz\n",
 			msg->module_id, msg->clk_freq);
 		resp.err = AVP_ERR_EINVAL;
 		resp.act_freq = 0;
@@ -476,6 +476,17 @@ send_response:
 	resp.svc_id = SVC_MODULE_CLOCK_SET_RESPONSE;
 	trpc_send_msg(avp_svc->rpc_node, avp_svc->cpu_ep, &resp,
 		      sizeof(resp), GFP_KERNEL);
+}
+
+static void do_svc_unsupported_msg(struct avp_svc_info *avp_svc,
+			u32 resp_svc_id)
+{
+	struct svc_common_resp resp;
+
+	resp.err = AVP_ERR_ENOTSUP;
+	resp.svc_id = resp_svc_id;
+	trpc_send_msg(avp_svc->rpc_node, avp_svc->cpu_ep, &resp,
+			sizeof(resp), GFP_KERNEL);
 }
 
 static int dispatch_svc_message(struct avp_svc_info *avp_svc,
@@ -565,7 +576,8 @@ static int dispatch_svc_message(struct avp_svc_info *avp_svc,
 		do_svc_module_clock_set(avp_svc, msg, len);
 		break;
 	default:
-		pr_err("avp_svc: invalid SVC call 0x%x\n", msg->svc_id);
+		pr_warning("avp_svc: Unsupported SVC call 0x%x\n", msg->svc_id);
+		do_svc_unsupported_msg(avp_svc, msg->svc_id);
 		ret = -ENOMSG;
 		break;
 	}
