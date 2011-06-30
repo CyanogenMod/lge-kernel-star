@@ -254,6 +254,7 @@ static struct usb_phy_plat_data tegra_usb_phy_pdata[] = {
 	[0] = {
 			.instance = 0,
 			.vbus_gpio = -1,
+			.vbus_reg_supply = "usb_vbus",
 	},
 	[1] = {
 			.instance = 1,
