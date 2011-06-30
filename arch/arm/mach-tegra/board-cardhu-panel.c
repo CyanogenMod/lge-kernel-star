@@ -511,6 +511,7 @@ static struct tegra_fb_data cardhu_hdmi_fb_data = {
 static struct tegra_dc_out cardhu_disp2_out = {
 	.type		= TEGRA_DC_OUT_HDMI,
 	.flags		= TEGRA_DC_OUT_HOTPLUG_HIGH,
+	.parent_clk	= "pll_d2_out0",
 
 	.dcc_bus	= 3,
 	.hotplug_gpio	= cardhu_hdmi_hpd,
@@ -787,10 +788,10 @@ static struct tegra_dc_out cardhu_disp1_out = {
 	.align		= TEGRA_DC_ALIGN_MSB,
 	.order		= TEGRA_DC_ORDER_RED_BLUE,
 	.sd_settings	= &cardhu_sd_settings,
-	.parent_clk	= "pll_p",
 
 #ifndef CONFIG_TEGRA_CARDHU_DSI
 	.type		= TEGRA_DC_OUT_RGB,
+	.parent_clk	= "pll_d_out0",
 
 	.modes	 	= cardhu_panel_modes,
 	.n_modes 	= ARRAY_SIZE(cardhu_panel_modes),
@@ -882,15 +883,10 @@ int __init cardhu_panel_init(void)
 	cardhu_carveouts[1].base = tegra_carveout_start;
 	cardhu_carveouts[1].size = tegra_carveout_size;
 
-	if (board_info.board_id == BOARD_PM269) {
+	if (board_info.board_id == BOARD_PM269)
 		gpio_request(pm269_lvds_shutdown, "lvds_shutdown");
-		gpio_direction_output(pm269_lvds_shutdown, 0);
-		tegra_gpio_enable(pm269_lvds_shutdown);
-	} else {
+	else
 		gpio_request(cardhu_lvds_shutdown, "lvds_shutdown");
-		gpio_direction_output(cardhu_lvds_shutdown, 0);
-		tegra_gpio_enable(cardhu_lvds_shutdown);
-	}
 
 	tegra_gpio_enable(cardhu_hdmi_hpd);
 	gpio_request(cardhu_hdmi_hpd, "hdmi_hpd");
