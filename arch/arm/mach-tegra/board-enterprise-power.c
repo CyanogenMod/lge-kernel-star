@@ -162,10 +162,10 @@ static struct regulator_consumer_supply tps80031_vbus_supply[] = {
 		.flags = _flags,					\
 	}
 
-TPS_PDATA_INIT(vio,   600, 2100, 0, 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(vio,   600, 2100, 0, 1, 0, 0, -1, 0, 0, 0);
 TPS_PDATA_INIT(smps1, 600, 2100, 0, 0, 0, 0, -1, 0, 0, PWR_REQ_INPUT_PREQ2);
 TPS_PDATA_INIT(smps2, 600, 2100, 0, 0, 0, 0, -1, 0, 0, 0);
-TPS_PDATA_INIT(smps3, 600, 2100, 0, 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(smps3, 600, 2100, 0, 1, 0, 0, -1, 0, 0, 0);
 TPS_PDATA_INIT(smps4, 600, 2100, 0, 0, 0, 0, -1, 0, 0, 0);
 
 TPS_PDATA_INIT(ldo1, 1000, 3300, tps80031_rails(VIO), 0, 0, 0, -1, 0, 0, 0);
