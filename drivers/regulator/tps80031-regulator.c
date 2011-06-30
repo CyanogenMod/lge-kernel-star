@@ -65,6 +65,13 @@
 #define OPA_MODE_EN		BIT(6)
 #define OPA_MODE_EN_MASK	BIT(6)
 
+#define EXT_PWR_REQ (PWR_REQ_INPUT_PREQ1 | PWR_REQ_INPUT_PREQ2 | \
+			PWR_REQ_INPUT_PREQ3)
+#define TPS80031_PREQ1_RES_ASS_A	0xD7
+#define TPS80031_PREQ2_RES_ASS_A	0xDA
+#define TPS80031_PREQ3_RES_ASS_A	0xDD
+#define TPS80031_PHOENIX_MSK_TRANSITION	0x20
+
 struct tps80031_regulator {
 
 	/* Regulator register address.*/
@@ -92,6 +99,9 @@ struct tps80031_regulator {
 
 	/* Device */
 	struct device		*dev;
+
+	/*Power request bits */
+	int preq_bit;
 };
 
 static inline struct device *to_tps80031_dev(struct regulator_dev *rdev)
@@ -139,6 +149,9 @@ static int tps80031_reg_is_enabled(struct regulator_dev *rdev)
 	uint8_t state;
 	int ret;
 
+	if (ri->platform_flags & EXT_PWR_REQ)
+		return true;
+
 	ret = tps80031_read(parent, SLAVE_ID1, ri->state_reg, &state);
 	if (ret < 0) {
 		dev_err(&rdev->dev, "Error in reading the STATE register\n");
@@ -152,6 +165,9 @@ static int tps80031_reg_enable(struct regulator_dev *rdev)
 	struct tps80031_regulator *ri = rdev_get_drvdata(rdev);
 	struct device *parent = to_tps80031_dev(rdev);
 	int ret;
+
+	if (ri->platform_flags & EXT_PWR_REQ)
+		return 0;
 
 	ret = tps80031_update(parent, SLAVE_ID1, ri->state_reg, STATE_ON,
 					STATE_MASK);
@@ -168,6 +184,9 @@ static int tps80031_reg_disable(struct regulator_dev *rdev)
 	struct tps80031_regulator *ri = rdev_get_drvdata(rdev);
 	struct device *parent = to_tps80031_dev(rdev);
 	int ret;
+
+	if (ri->platform_flags & EXT_PWR_REQ)
+		return 0;
 
 	ret = tps80031_update(parent, SLAVE_ID1, ri->state_reg, STATE_OFF,
 					STATE_MASK);
@@ -637,7 +656,8 @@ static struct regulator_ops tps80031vbus_ops = {
 };
 
 #define TPS80031_REG(_id, _trans_reg, _state_reg, _force_reg, _volt_reg, \
-		_volt_id, min_mVolts, max_mVolts, _ops, _n_volt, _delay) \
+		_volt_id, min_mVolts, max_mVolts, _ops, _n_volt, _delay, \
+		_preq_bit)						 \
 {								\
 	.trans_reg = _trans_reg,				\
 	.state_reg = _state_reg,				\
@@ -656,29 +676,101 @@ static struct regulator_ops tps80031vbus_ops = {
 		.owner = THIS_MODULE,				\
 	},							\
 	.delay = _delay,					\
+	.preq_bit = _preq_bit,					\
 }
 
 static struct tps80031_regulator tps80031_regulator[] = {
-	TPS80031_REG(VIO,   0x47, 0x48, 0x49, 0x4A, SLAVE_ID0, 600, 2100, tps80031dcdc_ops, 63, 500),
-	TPS80031_REG(SMPS1, 0x53, 0x54, 0x55, 0x56, SLAVE_ID0, 600, 2100, tps80031dcdc_ops, 63, 500),
-	TPS80031_REG(SMPS2, 0x59, 0x5A, 0x5B, 0x5C, SLAVE_ID0, 600, 2100, tps80031dcdc_ops, 63, 500),
-	TPS80031_REG(SMPS3, 0x65, 0x66, 0x00, 0x68, SLAVE_ID1, 600, 2100, tps80031dcdc_ops, 63, 500),
-	TPS80031_REG(SMPS4, 0x41, 0x42, 0x00, 0x44, SLAVE_ID1, 600, 2100, tps80031dcdc_ops, 63, 500),
+	TPS80031_REG(VIO,   0x47, 0x48, 0x49, 0x4A, SLAVE_ID0, 600, 2100,
+				tps80031dcdc_ops, 63, 500, 4),
+	TPS80031_REG(SMPS1, 0x53, 0x54, 0x55, 0x56, SLAVE_ID0, 600, 2100,
+				tps80031dcdc_ops, 63, 500, 0),
+	TPS80031_REG(SMPS2, 0x59, 0x5A, 0x5B, 0x5C, SLAVE_ID0, 600, 2100,
+				tps80031dcdc_ops, 63, 500, 1),
+	TPS80031_REG(SMPS3, 0x65, 0x66, 0x00, 0x68, SLAVE_ID1, 600, 2100,
+				tps80031dcdc_ops, 63, 500, 2),
+	TPS80031_REG(SMPS4, 0x41, 0x42, 0x00, 0x44, SLAVE_ID1, 600, 2100,
+				tps80031dcdc_ops, 63, 500, 3),
 
-	TPS80031_REG(LDO1,   0x9D, 0x9E, 0x00, 0x9F, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
-	TPS80031_REG(LDO2,   0x85, 0x86, 0x00, 0x87, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
-	TPS80031_REG(LDO3,   0x8D, 0x8E, 0x00, 0x8F, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
-	TPS80031_REG(LDO4,   0x89, 0x8A, 0x00, 0x8B, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
-	TPS80031_REG(LDO5,   0x99, 0x9A, 0x00, 0x9B, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
-	TPS80031_REG(LDO6,   0x91, 0x92, 0x00, 0x93, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
-	TPS80031_REG(LDO7,   0xA5, 0xA6, 0x00, 0xA7, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
-	TPS80031_REG(LDOUSB, 0xA1, 0xA2, 0x00, 0xA3, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
-	TPS80031_REG(LDOLN,  0x95, 0x96, 0x00, 0x97, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
-	TPS80031_REG(VANA,   0x81, 0x82, 0x00, 0x83, SLAVE_ID1, 1100, 3300, tps80031ldo_ops, 24, 500),
-	TPS80031_REG(VBUS,   0x0,  0x0,  0x00, 0x0,  SLAVE_ID1, 0,    5000, tps80031vbus_ops, 2, 500),
+	TPS80031_REG(LDO1,   0x9D, 0x9E, 0x00, 0x9F, SLAVE_ID1, 1100, 3300,
+				tps80031ldo_ops, 24, 500, 8),
+	TPS80031_REG(LDO2,   0x85, 0x86, 0x00, 0x87, SLAVE_ID1, 1100, 3300,
+				tps80031ldo_ops, 24, 500, 9),
+	TPS80031_REG(LDO3,   0x8D, 0x8E, 0x00, 0x8F, SLAVE_ID1, 1100, 3300,
+				tps80031ldo_ops, 24, 500, 10),
+	TPS80031_REG(LDO4,   0x89, 0x8A, 0x00, 0x8B, SLAVE_ID1, 1100, 3300,
+				tps80031ldo_ops, 24, 500, 11),
+	TPS80031_REG(LDO5,   0x99, 0x9A, 0x00, 0x9B, SLAVE_ID1, 1100, 3300,
+				tps80031ldo_ops, 24, 500, 12),
+	TPS80031_REG(LDO6,   0x91, 0x92, 0x00, 0x93, SLAVE_ID1, 1100, 3300,
+				tps80031ldo_ops, 24, 500, 13),
+	TPS80031_REG(LDO7,   0xA5, 0xA6, 0x00, 0xA7, SLAVE_ID1, 1100, 3300,
+				tps80031ldo_ops, 24, 500, 14),
+	TPS80031_REG(LDOUSB, 0xA1, 0xA2, 0x00, 0xA3, SLAVE_ID1, 1100, 3300,
+				tps80031ldo_ops, 24, 500, 5),
+	TPS80031_REG(LDOLN,  0x95, 0x96, 0x00, 0x97, SLAVE_ID1, 1100, 3300,
+				tps80031ldo_ops, 24, 500, 15),
+	TPS80031_REG(VANA,   0x81, 0x82, 0x00, 0x83, SLAVE_ID1, 1100, 3300,
+				tps80031ldo_ops, 24, 500, -1),
+	TPS80031_REG(VBUS,   0x0,  0x0,  0x00, 0x0,  SLAVE_ID1, 0,    5000,
+				tps80031vbus_ops, 2, 500, -1),
 };
 
-static inline int tps80031_regulator_preinit(struct device *parent,
+static int tps80031_power_req_config(struct device *parent,
+		struct tps80031_regulator *ri,
+		struct tps80031_regulator_platform_data *tps80031_pdata)
+{
+	u8 res_ass_reg;
+	int preq_bit;
+	int preq_mask_bit;
+	int ret;
+
+	if (!(ri->platform_flags & EXT_PWR_REQ))
+		return 0;
+
+	preq_bit = ri->preq_bit & 0x7;
+	if (ri->platform_flags & PWR_REQ_INPUT_PREQ1) {
+		res_ass_reg = TPS80031_PREQ1_RES_ASS_A + (ri->preq_bit >> 3);
+		preq_mask_bit = 5;
+	} else if (ri->platform_flags & PWR_REQ_INPUT_PREQ2) {
+		res_ass_reg = TPS80031_PREQ2_RES_ASS_A + (ri->preq_bit >> 3);
+		preq_mask_bit = 6;
+	} else if (ri->platform_flags & PWR_REQ_INPUT_PREQ3) {
+		res_ass_reg = TPS80031_PREQ3_RES_ASS_A + (ri->preq_bit >> 3);
+		preq_mask_bit = 7;
+	}
+
+	/* Configure REQ_ASS registers */
+	ret = tps80031_set_bits(parent, SLAVE_ID1, res_ass_reg, BIT(preq_bit));
+	if (ret < 0) {
+		dev_err(ri->dev, "%s() Not able to set bit %d of "
+			"reg %d error %d\n",
+			__func__, preq_bit, res_ass_reg, ret);
+		return ret;
+	}
+
+	/* Unmask the PREQ */
+	ret = tps80031_clr_bits(parent, SLAVE_ID1,
+			TPS80031_PHOENIX_MSK_TRANSITION, BIT(preq_mask_bit));
+	if (ret < 0) {
+		dev_err(ri->dev, "%s() Not able to clear bit %d of "
+			"reg %d error %d\n",
+			 __func__, preq_mask_bit,
+			TPS80031_PHOENIX_MSK_TRANSITION, ret);
+		return ret;
+	}
+
+	/* Switch regulator control to resource now */
+	ret = tps80031_update(parent, SLAVE_ID1, ri->state_reg, 0x0,
+					STATE_MASK);
+	if (ret < 0) {
+		dev_err(ri->dev, "%s() Error in updating the STATE "
+				"register error %d\n", __func__, ret);
+		return ret;
+	}
+	return ret;
+}
+
+static int tps80031_regulator_preinit(struct device *parent,
 		struct tps80031_regulator *ri,
 		struct tps80031_regulator_platform_data *tps80031_pdata)
 {
@@ -704,7 +796,8 @@ static inline int tps80031_regulator_preinit(struct device *parent,
 		if (ri->platform_flags & LDO3_OUTPUT_VIB)
 			ret = tps80031_update(parent, SLAVE_ID1,
 				TPS80031_MISC2_ADD,
-				MISC2_LDO3_SEL_VIB_VAL,MISC2_LDO3_SEL_VIB_MASK);
+				MISC2_LDO3_SEL_VIB_VAL,
+				MISC2_LDO3_SEL_VIB_MASK);
 		if (ret < 0) {
 			dev_err(ri->dev, "Not able to configure the rail "
 				"LDO3 as per platform data error %d\n", ret);
@@ -832,6 +925,10 @@ static int __devinit tps80031_regulator_probe(struct platform_device *pdev)
 	ri->platform_flags = tps_pdata->flags;
 
 	err = tps80031_regulator_preinit(pdev->dev.parent, ri, tps_pdata);
+	if (err)
+		return err;
+
+	err = tps80031_power_req_config(pdev->dev.parent, ri, tps_pdata);
 	if (err)
 		return err;
 

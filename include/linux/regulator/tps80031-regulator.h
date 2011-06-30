@@ -37,6 +37,11 @@ enum {
 	/* VBUS configuration */
 	VBUS_SW_ONLY		= 0x00000008,
 	VBUS_SW_N_ID		= 0x00000010,
+
+	/* Power requests */
+	PWR_REQ_INPUT_PREQ1	= 0x00000020,
+	PWR_REQ_INPUT_PREQ2	= 0x00000040,
+	PWR_REQ_INPUT_PREQ3	= 0x00000080,
 };
 
 /*

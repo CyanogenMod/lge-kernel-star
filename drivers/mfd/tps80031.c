@@ -685,6 +685,8 @@ static int dbg_tps_show(struct seq_file *s, void *unused)
 	print_regs("CLK32KG Regs",   s, SLAVE_ID1, 0xBD, 0xBE);
 	print_regs("CLK32KAUD Regs", s, SLAVE_ID1, 0xC0, 0xC1);
 	print_regs("INT Regs",       s, SLAVE_ID2, 0xD0, 0xD8);
+	print_regs("PREQ Regs",      s, SLAVE_ID1, 0xD7, 0xDF);
+	print_regs("MASK_PH Regs",   s, SLAVE_ID1, 0x20, 0x21);
 	print_regs("VERNUM Regs",    s, SLAVE_ID1, 0x87, 0x87);
 	return 0;
 }
