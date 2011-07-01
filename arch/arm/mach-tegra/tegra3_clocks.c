@@ -1674,7 +1674,7 @@ static int tegra3_plle_configure(struct clk *c, bool force_training)
 #if USE_PLLE_SS
 	/* configure spread spectrum coefficients */
 	/* FIXME: coefficients for 216MHZ input? */
-#ifndef CONFIG_TEGRA_FPGA_PLATFORM
+#ifdef CONFIG_TEGRA_SILICON_PLATFORM
 	if (input_rate == 12000000)
 #endif
 	{
@@ -2935,7 +2935,7 @@ static struct clk tegra_pll_p = {
 		.vco_max   = 1400000000,
 		.freq_table = tegra_pll_p_freq_table,
 		.lock_delay = 300,
-#ifndef CONFIG_TEGRA_FPGA_PLATFORM
+#ifdef CONFIG_TEGRA_SILICON_PLATFORM
 		.fixed_rate = 408000000,
 #else
 		.fixed_rate = 216000000,
@@ -3197,7 +3197,7 @@ static struct clk_pll_freq_table tegra_pll_e_freq_table[] = {
 	/* PLLE special case: use cpcon field to store cml divider value */
 	{ 12000000,  100000000, 150, 1,  18, 11},
 	{ 216000000, 100000000, 200, 18, 24, 13},
-#ifdef CONFIG_TEGRA_FPGA_PLATFORM
+#ifndef CONFIG_TEGRA_SILICON_PLATFORM
 	{ 13000000,  100000000, 200, 1,  26, 13},
 #endif
 	{ 0, 0, 0, 0, 0, 0 },
@@ -3542,7 +3542,7 @@ static struct clk tegra_clk_sbus_cmplx = {
 		.hclk = &tegra_clk_hclk,
 		.sclk_low = &tegra_pll_p_out4,
 		.sclk_high = &tegra_pll_m_out1,
-#ifndef CONFIG_TEGRA_FPGA_PLATFORM
+#ifdef CONFIG_TEGRA_SILICON_PLATFORM
 		.threshold = 204000000, /* exact factor of low range pll_p */
 #else
 		.threshold = 108000000, /* exact factor of low range pll_p */

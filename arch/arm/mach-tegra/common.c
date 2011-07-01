@@ -118,7 +118,7 @@ void tegra_assert_system_reset(char mode, const char *cmd)
 static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 	/* name		parent		rate		enabled */
 	{ "clk_m",	NULL,		0,		true },
-#ifndef CONFIG_TEGRA_FPGA_PLATFORM
+#ifdef CONFIG_TEGRA_SILICON_PLATFORM
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	{ "pll_p",	NULL,		216000000,	true },
 	{ "pll_p_out1",	"pll_p",	28800000,	true },
@@ -180,10 +180,7 @@ void tegra_init_cache(void)
 	writel_relaxed(0x441, p + L2X0_DATA_LATENCY_CTRL);
 
 #elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
-#ifdef CONFIG_TEGRA_FPGA_PLATFORM
-	writel(0x770, p + L2X0_TAG_LATENCY_CTRL);
-	writel(0x770, p + L2X0_DATA_LATENCY_CTRL);
-#else
+#ifdef CONFIG_TEGRA_SILICON_PLATFORM
 	/* PL310 RAM latency is CPU dependent. NOTE: Changes here
 	   must also be reflected in __cortex_a9_l2x0_restart */
 
@@ -194,6 +191,9 @@ void tegra_init_cache(void)
 		writel(0x331, p + L2X0_TAG_LATENCY_CTRL);
 		writel(0x441, p + L2X0_DATA_LATENCY_CTRL);
 	}
+#else
+	writel(0x770, p + L2X0_TAG_LATENCY_CTRL);
+	writel(0x770, p + L2X0_DATA_LATENCY_CTRL);
 #endif
 
 	/* Enable PL310 double line fill feature. */
