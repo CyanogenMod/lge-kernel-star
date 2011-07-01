@@ -341,6 +341,9 @@ static int tegra_otg_probe(struct platform_device *pdev)
 	}
 	INIT_WORK (&tegra->work, irq_work);
 
+#ifndef CONFIG_USB_HOTPLUG
+	clk_disable(tegra->clk);
+#endif
 	dev_info(&pdev->dev, "otg transceiver registered\n");
 	return 0;
 
