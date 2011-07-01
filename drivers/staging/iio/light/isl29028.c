@@ -51,6 +51,8 @@
 
 #define CONFIGURE_ALS_RANGE_LOW_LUX	0
 #define CONFIGURE_ALS_RANGE_HIGH_LUX	1
+#define CONFIGURE_ALS_RANGE_SH		1
+#define CONFIGURE_ALS_RANGE_MASK	(1 << CONFIGURE_ALS_RANGE_SH)
 
 #define CONFIGURE_ALS_IR_MODE_MASK	1
 #define CONFIGURE_ALS_IR_MODE_SH	0
@@ -310,6 +312,12 @@ static bool isl29018_set_als_ir_mode(struct i2c_client *client, bool is_enable,
 				CONFIGURE_ALS_IR_MODE_ALS,
 				CONFIGURE_ALS_IR_MODE_MASK,
 				CONFIGURE_ALS_IR_MODE_SH);
+			if (st)
+				st = isl29028_write_data(client,
+					ISL29028_REG_ADD_CONFIGURE,
+					CONFIGURE_ALS_RANGE_HIGH_LUX,
+					CONFIGURE_ALS_RANGE_MASK,
+					CONFIGURE_ALS_RANGE_SH);
 			if (st)
 				st = isl29018_set_irals_high_threshold(client,
 					chip->als_high_thres);
@@ -878,6 +886,14 @@ static ssize_t show_als_data(struct device *dev,
 	if (chip->als_ir_mode == MODE_ALS) {
 		st = isl29028_read_als_ir(chip->client, &als_ir_data);
 		if (st) {
+			/* convert als data count to lux */
+			/* if als_range = 0, lux = count * 0.0326 */
+			/* if als_range = 1, lux = count * 0.522 */
+			if (!chip->als_range)
+				als_ir_data = (als_ir_data * 326) / 10000;
+			else
+				als_ir_data = (als_ir_data * 522) / 1000;
+
 			buf_count = sprintf(buf, "%d\n", als_ir_data);
 			chip->als_reading = als_ir_data;
 		}
@@ -1071,7 +1087,7 @@ static int isl29028_chip_init(struct i2c_client *client)
 
 	chip->als_low_thres = 0;
 	chip->als_high_thres = 0xFFF;
-	chip->als_range = 0;
+	chip->als_range = 1;
 	chip->als_reading = 0;
 	chip->als_ir_mode = 0;
 
