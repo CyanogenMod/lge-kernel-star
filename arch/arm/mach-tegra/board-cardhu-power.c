@@ -727,7 +727,7 @@ GREG_INIT(3, en_3v3_sys_a04,	en_3v3_sys,	NULL,			TPS6591X_GPIO_GP6,	false,	0,	0,
 
 
 /*Specific to pm269*/
-GREG_INIT(4, en_vdd_bl_p269,		en_vdd_bl,		NULL,
+GREG_INIT(4, en_vdd_bl_pm269,		en_vdd_bl,		NULL,
 	TEGRA_GPIO_PH3,	false,	1,	0,	0,	0);
 GREG_INIT(6, en_vdd_pnl1_pm269,		en_vdd_pnl1,		"vdd_3v3_devices",
 	TEGRA_GPIO_PW1,	false,	1,	0,	0,	0);
@@ -821,10 +821,10 @@ GREG_INIT(22, en_vbrtr,		en_vbrtr,	"vdd_3v3_devices",	PMU_TCA6416_GPIO_PORT12,	f
 	ADD_GPIO_REG(en_5v_cp),			\
 	ADD_GPIO_REG(en_5v0),			\
 	ADD_GPIO_REG(en_ddr),			\
-	ADD_GPIO_REG(en_vdd_bl),		\
+	ADD_GPIO_REG(en_vdd_bl_pm269),		\
 	ADD_GPIO_REG(en_3v3_sys),		\
 	ADD_GPIO_REG(en_3v3_modem),		\
-	ADD_GPIO_REG(en_vdd_pnl1),		\
+	ADD_GPIO_REG(en_vdd_pnl1_pm269),		\
 	ADD_GPIO_REG(cam3_ldo_en),		\
 	ADD_GPIO_REG(en_vdd_com),		\
 	ADD_GPIO_REG(en_3v3_fuse_pm269),	\
