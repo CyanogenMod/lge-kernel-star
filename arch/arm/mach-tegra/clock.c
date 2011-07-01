@@ -1311,7 +1311,7 @@ static int __init clk_debugfs_init(void)
 	if (!d)
 		goto err_out;
 
-	d = debugfs_create_file("syncevents", S_IWUGO, clk_debugfs_root, NULL,
+	d = debugfs_create_file("syncevents", S_IRUGO|S_IWUSR, clk_debugfs_root, NULL,
 		&syncevent_fops);
 
 	if (dvfs_debugfs_init(clk_debugfs_root))
