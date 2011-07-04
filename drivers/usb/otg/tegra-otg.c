@@ -387,12 +387,9 @@ static int tegra_otg_suspend(struct platform_device *pdev, pm_message_t state)
 	tegra_otg->intr_reg_data = readl(tegra_otg->regs + USB_PHY_WAKEUP);
 	clk_disable(tegra_otg->clk);
 
-	if (from == OTG_STATE_A_HOST)
-		tegra_stop_host(tegra_otg);
-	else if (from == OTG_STATE_B_PERIPHERAL && otg->gadget)
+	if (from == OTG_STATE_B_PERIPHERAL && otg->gadget)
 		usb_gadget_vbus_disconnect(otg->gadget);
 
-	otg->state = OTG_STATE_A_SUSPEND;
 	tegra_otg_disable_clk();
 	return 0;
 }
