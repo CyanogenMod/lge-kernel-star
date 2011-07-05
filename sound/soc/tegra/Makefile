@@ -1,5 +1,6 @@
 # Tegra platform Support
 snd-soc-tegra-pcm-objs := tegra_pcm.o
+snd-soc-tegra-spdif-objs := tegra_spdif.o
 snd-soc-tegra-utils-objs += tegra_asoc_utils.o
 snd-soc-tegra20-das-objs := tegra20_das.o
 snd-soc-tegra20-i2s-objs := tegra20_i2s.o
@@ -12,6 +13,7 @@ obj-$(CONFIG_SND_SOC_TEGRA20_DAS) += snd-soc-tegra20-das.o
 obj-$(CONFIG_SND_SOC_TEGRA20_I2S) += snd-soc-tegra20-i2s.o
 obj-$(CONFIG_SND_SOC_TEGRA30_AHUB) += snd-soc-tegra30-ahub.o
 obj-$(CONFIG_SND_SOC_TEGRA30_I2S) += snd-soc-tegra30-i2s.o
+obj-$(CONFIG_SND_SOC_TEGRA_SPDIF) += snd-soc-tegra-spdif.o
 
 # Tegra machine Support
 snd-soc-tegra-wm8903-objs := tegra_wm8903.o
