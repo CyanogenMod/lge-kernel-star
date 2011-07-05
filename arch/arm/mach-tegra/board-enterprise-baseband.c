@@ -27,6 +27,7 @@
 #include <linux/err.h>
 #include <linux/device.h>
 #include <linux/usb.h>
+#include <linux/wakelock.h>
 #include <linux/platform_data/tegra_usb.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -54,6 +55,7 @@ struct ph450_priv {
 	unsigned int wake_cnt;
 	unsigned int restart_gpio;
 	struct mutex lock;
+	struct wake_lock wake_lock;
 	unsigned int vid;
 	unsigned int pid;
 	struct usb_device *udev;
@@ -170,6 +172,8 @@ static irqreturn_t mdm_start_thread(int irq, void *data)
 
 	if (gpio_get_value(priv->restart_gpio)) {
 		pr_info("BB_RST_OUT high\n");
+		/* hold wait lock to complete the enumeration */
+		wake_lock_timeout(&priv->wake_lock, HZ * 2);
 	} else {
 		pr_info("BB_RST_OUT low\n");
 	}
@@ -181,6 +185,7 @@ static irqreturn_t mdm_wake_thread(int irq, void *data)
 {
 	struct ph450_priv *priv = (struct ph450_priv *)data;
 
+	wake_lock_timeout(&priv->wake_lock, HZ);
 	mutex_lock(&priv->lock);
 	if (priv->udev) {
 		usb_lock_device(priv->udev);
@@ -303,6 +308,8 @@ static int __init ph450_init(void)
 	ph450_priv.restart_gpio = TEGRA_GPIO_PV1;
 
 	mutex_init(&(ph450_priv.lock));
+	wake_lock_init(&(ph450_priv.wake_lock), WAKE_LOCK_SUSPEND,
+		       "mdm_wake_lock");
 
 	/* create work queue */
 	ph450_priv.wq = create_workqueue("mdm_queue");
