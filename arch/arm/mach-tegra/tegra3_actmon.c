@@ -80,7 +80,7 @@ enum actmon_state {
 	ACTMON_SUSPENDED = 2,
 };
 
-#define ACTMON_DEFAULT_SAMPLING_PERIOD		10
+#define ACTMON_DEFAULT_SAMPLING_PERIOD		12
 static u8 actmon_sampling_period;
 
 static unsigned long actmon_clk_freq;
