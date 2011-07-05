@@ -52,7 +52,7 @@ static struct regulator_consumer_supply tps6591x_vdd1_supply_skubit0_1[] = {
 	REGULATOR_SUPPLY("en_vddio_ddr_1v2", NULL),
 };
 
-static struct regulator_consumer_supply tps6591x_vdd2_supply[] = {
+static struct regulator_consumer_supply tps6591x_vdd2_supply_0[] = {
 	REGULATOR_SUPPLY("vdd_gen1v5", NULL),
 	REGULATOR_SUPPLY("vcore_lcd", NULL),
 	REGULATOR_SUPPLY("track_ldo1", NULL),
@@ -61,13 +61,13 @@ static struct regulator_consumer_supply tps6591x_vdd2_supply[] = {
 	REGULATOR_SUPPLY("vcore_cam2", NULL),
 };
 
-static struct regulator_consumer_supply tps6591x_vddctrl_supply[] = {
+static struct regulator_consumer_supply tps6591x_vddctrl_supply_0[] = {
 	REGULATOR_SUPPLY("vdd_cpu_pmu", NULL),
 	REGULATOR_SUPPLY("vdd_cpu", NULL),
 	REGULATOR_SUPPLY("vdd_sys", NULL),
 };
 
-static struct regulator_consumer_supply tps6591x_vio_supply[] = {
+static struct regulator_consumer_supply tps6591x_vio_supply_0[] = {
 	REGULATOR_SUPPLY("vdd_gen1v8", NULL),
 	REGULATOR_SUPPLY("avdd_hdmi_pll", NULL),
 	REGULATOR_SUPPLY("avdd_usb_pll", NULL),
@@ -93,7 +93,7 @@ static struct regulator_consumer_supply tps6591x_vio_supply[] = {
 	REGULATOR_SUPPLY("avdd_ic_usb", NULL),
 };
 
-static struct regulator_consumer_supply tps6591x_ldo1_supply[] = {
+static struct regulator_consumer_supply tps6591x_ldo1_supply_0[] = {
 	REGULATOR_SUPPLY("avdd_pexb", NULL),
 	REGULATOR_SUPPLY("vdd_pexb", NULL),
 	REGULATOR_SUPPLY("avdd_pex_pll", NULL),
@@ -101,7 +101,7 @@ static struct regulator_consumer_supply tps6591x_ldo1_supply[] = {
 	REGULATOR_SUPPLY("vdd_pexa", NULL),
 };
 
-static struct regulator_consumer_supply tps6591x_ldo2_supply[] = {
+static struct regulator_consumer_supply tps6591x_ldo2_supply_0[] = {
 	REGULATOR_SUPPLY("avdd_sata", NULL),
 	REGULATOR_SUPPLY("vdd_sata", NULL),
 	REGULATOR_SUPPLY("avdd_sata_pll", NULL),
@@ -116,7 +116,7 @@ static struct regulator_consumer_supply tps6591x_ldo3_supply_e1198[] = {
 	REGULATOR_SUPPLY("unused_rail_ldo3", NULL),
 };
 
-static struct regulator_consumer_supply tps6591x_ldo4_supply[] = {
+static struct regulator_consumer_supply tps6591x_ldo4_supply_0[] = {
 	REGULATOR_SUPPLY("vdd_rtc", NULL),
 };
 
@@ -129,10 +129,10 @@ static struct regulator_consumer_supply tps6591x_ldo5_supply_e1198[] = {
 	REGULATOR_SUPPLY("vddio_sdmmc1", NULL),
 };
 
-static struct regulator_consumer_supply tps6591x_ldo6_supply[] = {
+static struct regulator_consumer_supply tps6591x_ldo6_supply_0[] = {
 	REGULATOR_SUPPLY("avdd_dsi_csi", NULL),
 };
-static struct regulator_consumer_supply tps6591x_ldo7_supply[] = {
+static struct regulator_consumer_supply tps6591x_ldo7_supply_0[] = {
 	REGULATOR_SUPPLY("avdd_plla_p_c_s", NULL),
 	REGULATOR_SUPPLY("avdd_pllm", NULL),
 	REGULATOR_SUPPLY("avdd_pllu_d", NULL),
@@ -140,13 +140,13 @@ static struct regulator_consumer_supply tps6591x_ldo7_supply[] = {
 	REGULATOR_SUPPLY("avdd_pllx", NULL),
 };
 
-static struct regulator_consumer_supply tps6591x_ldo8_supply[] = {
+static struct regulator_consumer_supply tps6591x_ldo8_supply_0[] = {
 	REGULATOR_SUPPLY("vdd_ddr_hs", NULL),
 };
 
-#define TPS_PDATA_INIT_SUPPLY(_id, _minmv, _maxmv, _supply_reg, _always_on, \
+#define TPS_PDATA_INIT(_name, _sname, _minmv, _maxmv, _supply_reg, _always_on, \
 	_boot_on, _apply_uv, _init_uV, _init_enable, _init_apply, _ectrl) \
-	static struct tps6591x_regulator_platform_data pdata_##_id =	\
+	static struct tps6591x_regulator_platform_data pdata_##_name##_##_sname = \
 	{								\
 		.regulator = {						\
 			.constraints = {				\
@@ -162,9 +162,9 @@ static struct regulator_consumer_supply tps6591x_ldo8_supply[] = {
 				.apply_uV = _apply_uv,			\
 			},						\
 			.num_consumer_supplies =			\
-				ARRAY_SIZE(tps6591x_##_id##_supply),	\
-			.consumer_supplies = tps6591x_##_id##_supply,	\
-			.supply_regulator = tps6591x_rails(_supply_reg), \
+				ARRAY_SIZE(tps6591x_##_name##_supply_##_sname),	\
+			.consumer_supplies = tps6591x_##_name##_supply_##_sname,	\
+			.supply_regulator = _supply_reg,		\
 		},							\
 		.init_uV =  _init_uV * 1000,				\
 		.init_enable = _init_enable,				\
@@ -172,78 +172,24 @@ static struct regulator_consumer_supply tps6591x_ldo8_supply[] = {
 		.ectrl = _ectrl						\
 	}
 
-#define TPS_PDATA_INIT(_id, _minmv, _maxmv, _supply_reg, _always_on,	\
-	_boot_on, _apply_uv, _init_uV, _init_enable, _init_apply, _ectrl) \
-	static struct tps6591x_regulator_platform_data pdata_##_id =	\
-	{								\
-		.regulator = {						\
-			.constraints = {				\
-				.min_uV = (_minmv)*1000,		\
-				.max_uV = (_maxmv)*1000,		\
-				.valid_modes_mask = (REGULATOR_MODE_NORMAL |  \
-						     REGULATOR_MODE_STANDBY), \
-				.valid_ops_mask = (REGULATOR_CHANGE_MODE |    \
-						   REGULATOR_CHANGE_STATUS |  \
-						   REGULATOR_CHANGE_VOLTAGE), \
-				.always_on = _always_on,		\
-				.boot_on = _boot_on,			\
-				.apply_uV = _apply_uv,			\
-			},						\
-			.num_consumer_supplies =			\
-				ARRAY_SIZE(tps6591x_##_id##_supply),	\
-			.consumer_supplies = tps6591x_##_id##_supply,	\
-		},							\
-		.init_uV =  _init_uV * 1000,				\
-		.init_enable = _init_enable,				\
-		.init_apply = _init_apply,				\
-		.ectrl = _ectrl						\
-	}
+TPS_PDATA_INIT(vdd1, skubit0_0, 600,  1500, 0, 1, 1, 0, -1, 0, 0, EXT_CTRL_SLEEP_OFF);
+TPS_PDATA_INIT(vdd1, skubit0_1, 600,  1500, 0, 1, 1, 0, -1, 0, 0, EXT_CTRL_SLEEP_OFF);
+TPS_PDATA_INIT(vdd2, 0,         600,  1500, 0, 1, 1, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(vddctrl, 0,      600,  1400, 0, 1, 1, 0, -1, 0, 0, EXT_CTRL_EN1);
+TPS_PDATA_INIT(vio,  0,         1500, 3300, 0, 1, 1, 0, -1, 0, 0, 0);
 
-#define TPS_PDATA_INIT_BOARD(_id, _board, _minmv, _maxmv, _supply_reg, _always_on,	\
-	_boot_on, _apply_uv, _init_uV, _init_enable, _init_apply, _ectrl) \
-	static struct tps6591x_regulator_platform_data pdata_##_id##_##_board =	\
-	{								\
-		.regulator = {						\
-			.constraints = {				\
-				.min_uV = (_minmv)*1000,		\
-				.max_uV = (_maxmv)*1000,		\
-				.valid_modes_mask = (REGULATOR_MODE_NORMAL |  \
-						     REGULATOR_MODE_STANDBY), \
-				.valid_ops_mask = (REGULATOR_CHANGE_MODE |    \
-						   REGULATOR_CHANGE_STATUS |  \
-						   REGULATOR_CHANGE_VOLTAGE), \
-				.always_on = _always_on,		\
-				.boot_on = _boot_on,			\
-				.apply_uV = _apply_uv,			\
-			},						\
-			.num_consumer_supplies =			\
-				ARRAY_SIZE(tps6591x_##_id##_supply##_##_board),	 \
-			.consumer_supplies = tps6591x_##_id##_supply##_##_board, \
-		},							\
-		.init_uV =  _init_uV * 1000,				\
-		.init_enable = _init_enable,				\
-		.init_apply = _init_apply,				\
-		.ectrl = _ectrl						\
-	}
+TPS_PDATA_INIT(ldo1, 0,         1000, 3300, tps6591x_rails(VDD_2), 0, 0, 0, -1, 0, 1, 0);
+TPS_PDATA_INIT(ldo2, 0,         1000, 3300, tps6591x_rails(VDD_2), 0, 0, 0, -1, 0, 1, 0);
 
-TPS_PDATA_INIT_BOARD(vdd1, skubit0_0, 600, 1500, 0, 1, 1, 0, -1, 0, 0, EXT_CTRL_SLEEP_OFF);
-TPS_PDATA_INIT_BOARD(vdd1, skubit0_1, 600, 1500, 0, 1, 1, 0, -1, 0, 0, EXT_CTRL_SLEEP_OFF);
-TPS_PDATA_INIT(vdd2,    600, 1500, 0, 1, 1, 0, -1, 0, 0, 0);
-TPS_PDATA_INIT(vddctrl, 600, 1400, 0, 1, 1, 0, -1, 0, 0, EXT_CTRL_EN1);
-TPS_PDATA_INIT(vio,    1500, 3300, 0, 1, 1, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(ldo3, e118x,     1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(ldo3, e1198,     1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(ldo4, 0,         1000, 3300, 0, 1, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(ldo5, e118x,     1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(ldo5, e1198,     1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
 
-TPS_PDATA_INIT_SUPPLY(ldo1, 1000, 3300, VDD_2, 0, 0, 0, -1, 0, 1, 0);
-TPS_PDATA_INIT_SUPPLY(ldo2, 1000, 3300, VDD_2, 0, 0, 0, -1, 0, 1, 0);
-
-TPS_PDATA_INIT_BOARD(ldo3, e118x, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
-TPS_PDATA_INIT_BOARD(ldo3, e1198, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
-TPS_PDATA_INIT(ldo4, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
-TPS_PDATA_INIT_BOARD(ldo5, e118x, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
-TPS_PDATA_INIT_BOARD(ldo5, e1198, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
-
-TPS_PDATA_INIT_SUPPLY(ldo6, 1000, 3300, VIO, 0, 0, 0, -1, 0, 0, 0);
-TPS_PDATA_INIT_SUPPLY(ldo7, 1000, 3300, VIO, 0, 0, 0, -1, 0, 0, 0);
-TPS_PDATA_INIT_SUPPLY(ldo8, 1000, 3300, VIO, 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(ldo6, 0,         1000, 3300, tps6591x_rails(VIO), 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(ldo7, 0,         1000, 3300, tps6591x_rails(VIO), 1, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(ldo8, 0,         1000, 3300, tps6591x_rails(VIO), 1, 0, 0, -1, 0, 0, 0);
 
 #if defined(CONFIG_RTC_DRV_TPS6591x)
 static struct tps6591x_rtc_platform_data rtc_data = {
@@ -258,36 +204,36 @@ static struct tps6591x_rtc_platform_data rtc_data = {
 	},
 };
 
-#define TPS_RTC_REG()				\
+#define TPS_RTC_REG()					\
 	{						\
-		.id	= 0,		\
-		.name	= "rtc_tps6591x",	\
-		.platform_data = &rtc_data,	\
+		.id	= 0,				\
+		.name	= "rtc_tps6591x",		\
+		.platform_data = &rtc_data,		\
 	}
 #endif
 
-#define TPS_REG(_id, _data)				\
-	{						\
-		.id	= TPS6591X_ID_##_id,		\
-		.name	= "tps6591x-regulator",		\
-		.platform_data	= &pdata_##_data,	\
+#define TPS_REG(_id, _name, _sname)				\
+	{							\
+		.id	= TPS6591X_ID_##_id,			\
+		.name	= "tps6591x-regulator",			\
+		.platform_data	= &pdata_##_name##_##_sname,	\
 	}
 
-#define TPS6591X_DEV_COMMON_E118X \
-	TPS_REG(VDD_2, vdd2),		\
-	TPS_REG(VDDCTRL, vddctrl),	\
-	TPS_REG(LDO_1, ldo1),		\
-	TPS_REG(LDO_2, ldo2),		\
-	TPS_REG(LDO_3, ldo3_e118x),	\
-	TPS_REG(LDO_4, ldo4),		\
-	TPS_REG(LDO_5, ldo5_e118x),	\
-	TPS_REG(LDO_6, ldo6),		\
-	TPS_REG(LDO_7, ldo7),		\
-	TPS_REG(LDO_8, ldo8)
+#define TPS6591X_DEV_COMMON_E118X 		\
+	TPS_REG(VDD_2, vdd2, 0),		\
+	TPS_REG(VDDCTRL, vddctrl, 0),		\
+	TPS_REG(LDO_1, ldo1, 0),		\
+	TPS_REG(LDO_2, ldo2, 0),		\
+	TPS_REG(LDO_3, ldo3, e118x),		\
+	TPS_REG(LDO_4, ldo4, 0),		\
+	TPS_REG(LDO_5, ldo5, e118x),		\
+	TPS_REG(LDO_6, ldo6, 0),		\
+	TPS_REG(LDO_7, ldo7, 0),		\
+	TPS_REG(LDO_8, ldo8, 0)
 
 static struct tps6591x_subdev_info tps_devs_e118x_skubit0_0[] = {
-	TPS_REG(VIO, vio),
-	TPS_REG(VDD_1, vdd1_skubit0_0),
+	TPS_REG(VIO, vio, 0),
+	TPS_REG(VDD_1, vdd1, skubit0_0),
 	TPS6591X_DEV_COMMON_E118X,
 #if defined(CONFIG_RTC_DRV_TPS6591x)
 	TPS_RTC_REG(),
@@ -295,29 +241,29 @@ static struct tps6591x_subdev_info tps_devs_e118x_skubit0_0[] = {
 };
 
 static struct tps6591x_subdev_info tps_devs_e118x_skubit0_1[] = {
-	TPS_REG(VIO, vio),
-	TPS_REG(VDD_1, vdd1_skubit0_1),
+	TPS_REG(VIO, vio, 0),
+	TPS_REG(VDD_1, vdd1, skubit0_1),
 	TPS6591X_DEV_COMMON_E118X,
 #if defined(CONFIG_RTC_DRV_TPS6591x)
 	TPS_RTC_REG(),
 #endif
 };
 
-#define TPS6591X_DEV_COMMON_CARDHU	\
-	TPS_REG(VDD_2, vdd2),		\
-	TPS_REG(VDDCTRL, vddctrl),	\
-	TPS_REG(LDO_1, ldo1),		\
-	TPS_REG(LDO_2, ldo2),		\
-	TPS_REG(LDO_3, ldo3_e1198),	\
-	TPS_REG(LDO_4, ldo4),		\
-	TPS_REG(LDO_5, ldo5_e1198),	\
-	TPS_REG(LDO_6, ldo6),		\
-	TPS_REG(LDO_7, ldo7),		\
-	TPS_REG(LDO_8, ldo8)
+#define TPS6591X_DEV_COMMON_CARDHU		\
+	TPS_REG(VDD_2, vdd2, 0),		\
+	TPS_REG(VDDCTRL, vddctrl, 0),		\
+	TPS_REG(LDO_1, ldo1, 0),		\
+	TPS_REG(LDO_2, ldo2, 0),		\
+	TPS_REG(LDO_3, ldo3, e1198),		\
+	TPS_REG(LDO_4, ldo4, 0),		\
+	TPS_REG(LDO_5, ldo5, e1198),		\
+	TPS_REG(LDO_6, ldo6, 0),		\
+	TPS_REG(LDO_7, ldo7, 0),		\
+	TPS_REG(LDO_8, ldo8, 0)
 
 static struct tps6591x_subdev_info tps_devs_e1198_skubit0_0[] = {
-	TPS_REG(VIO, vio),
-	TPS_REG(VDD_1, vdd1_skubit0_0),
+	TPS_REG(VIO, vio, 0),
+	TPS_REG(VDD_1, vdd1, skubit0_0),
 	TPS6591X_DEV_COMMON_CARDHU,
 #if defined(CONFIG_RTC_DRV_TPS6591x)
 	TPS_RTC_REG(),
@@ -325,8 +271,8 @@ static struct tps6591x_subdev_info tps_devs_e1198_skubit0_0[] = {
 };
 
 static struct tps6591x_subdev_info tps_devs_e1198_skubit0_1[] = {
-	TPS_REG(VIO, vio),
-	TPS_REG(VDD_1, vdd1_skubit0_1),
+	TPS_REG(VIO, vio, 0),
+	TPS_REG(VDD_1, vdd1, skubit0_1),
 	TPS6591X_DEV_COMMON_CARDHU,
 #if defined(CONFIG_RTC_DRV_TPS6591x)
 	TPS_RTC_REG(),
@@ -419,6 +365,9 @@ int __init cardhu_regulator_init(void)
 
 	pmc_ctrl = readl(pmc + PMC_CTRL);
 	writel(pmc_ctrl | PMC_CTRL_INTR_LOW, pmc + PMC_CTRL);
+
+	/* The regulator details have complete constraints */
+	regulator_has_full_constraints();
 
 	tegra_get_board_info(&board_info);
 	tegra_get_pmu_board_info(&pmu_board_info);
@@ -677,8 +626,8 @@ static int disable_load_switch_rail(
 
 
 /* Macro for defining gpio switch regulator sub device data */
-#define GREG_INIT(_id, _var, _name, _input_supply, _gpio_nr, _active_low, \
-			_init_state, _pg, _enable, _disable)		\
+#define GREG_INIT(_id, _var, _name, _input_supply, _always_on, _boot_on, \
+	_gpio_nr, _active_low, _init_state, _pg, _enable, _disable)	 \
 	static struct gpio_switch_regulator_subdev_data gpio_pdata_##_var =  \
 	{								\
 		.regulator_name	= "gpio-switch-"#_name,			\
@@ -699,91 +648,93 @@ static int disable_load_switch_rail(
 			.valid_ops_mask = (REGULATOR_CHANGE_MODE |	\
 					   REGULATOR_CHANGE_STATUS |	\
 					   REGULATOR_CHANGE_VOLTAGE),	\
+			.always_on = _always_on,			\
+			.boot_on = _boot_on,				\
 		},							\
 		.enable_rail = _enable,					\
 		.disable_rail = _disable,				\
 	}
 
 /* common to most of boards*/
-GREG_INIT(0, en_5v_cp,		en_5v_cp,	NULL,			TPS6591X_GPIO_GP0,	false,	1,	0,	0,	0);
-GREG_INIT(1, en_5v0,		en_5v0,		NULL,			TPS6591X_GPIO_GP2,	false,	0,	0,	0,	0);
-GREG_INIT(2, en_ddr,		en_ddr,		NULL,			TPS6591X_GPIO_GP6,	false,	0,	0,	0,	0);
-GREG_INIT(3, en_3v3_sys,	en_3v3_sys,	NULL,			TPS6591X_GPIO_GP7,	false,	0,	0,	0,	0);
-GREG_INIT(4, en_vdd_bl,		en_vdd_bl,	NULL,			TEGRA_GPIO_PK3,		false,	1,	0,	0,	0);
-GREG_INIT(5, en_3v3_modem,	en_3v3_modem,	NULL,			TEGRA_GPIO_PD6,		false,	1,	0,	0,	0);
-GREG_INIT(6, en_vdd_pnl1,	en_vdd_pnl1,	"vdd_3v3_devices",	TEGRA_GPIO_PL4,		false,	1,	0,	0,	0);
-GREG_INIT(7, cam3_ldo_en,	cam3_ldo_en,	"vdd_3v3_devices",	TEGRA_GPIO_PS0,		false,	0,	0,	0,	0);
-GREG_INIT(8, en_vdd_com,	en_vdd_com,	"vdd_3v3_devices",	TEGRA_GPIO_PD0,		false,	1,	0,	0,	0);
-GREG_INIT(9, en_3v3_fuse,	en_3v3_fuse,	"vdd_3v3_devices",	TEGRA_GPIO_PL6,		false,	0,	0,	0,	0);
-GREG_INIT(10, en_3v3_emmc,	en_3v3_emmc,	"vdd_3v3_devices",	TEGRA_GPIO_PD1,		false,	1,	0,	0,	0);
-GREG_INIT(11, en_vdd_sdmmc1,	en_vdd_sdmmc1,	"vdd_3v3_devices",	TEGRA_GPIO_PD7,		false,	1,	0,	0,	0);
-GREG_INIT(12, en_3v3_pex_hvdd,	en_3v3_pex_hvdd, "vdd_3v3_devices",	TEGRA_GPIO_PL7,		false,	0,	0,	0,	0);
-GREG_INIT(13, en_1v8_cam,	en_1v8_cam,	"vdd_gen1v8",		TEGRA_GPIO_PBB4,	false,	0,	0,	0,	0);
+GREG_INIT(0, en_5v_cp,		en_5v_cp,	NULL,			1,	0,	TPS6591X_GPIO_GP0,	false,	1,	0,	0,	0);
+GREG_INIT(1, en_5v0,		en_5v0,		NULL,			0,      0,      TPS6591X_GPIO_GP2,	false,	0,	0,	0,	0);
+GREG_INIT(2, en_ddr,		en_ddr,		NULL,			0,      0,      TPS6591X_GPIO_GP6,	false,	0,	0,	0,	0);
+GREG_INIT(3, en_3v3_sys,	en_3v3_sys,	NULL,			0,      0,      TPS6591X_GPIO_GP7,	false,	0,	0,	0,	0);
+GREG_INIT(4, en_vdd_bl,		en_vdd_bl,	NULL,			1,      0,      TEGRA_GPIO_PK3,		false,	1,	0,	0,	0);
+GREG_INIT(5, en_3v3_modem,	en_3v3_modem,	NULL,			1,      0,      TEGRA_GPIO_PD6,		false,	1,	0,	0,	0);
+GREG_INIT(6, en_vdd_pnl1,	en_vdd_pnl1,	"vdd_3v3_devices",	1,      0,      TEGRA_GPIO_PL4,		false,	1,	0,	0,	0);
+GREG_INIT(7, cam3_ldo_en,	cam3_ldo_en,	"vdd_3v3_devices",	0,      0,      TEGRA_GPIO_PS0,		false,	0,	0,	0,	0);
+GREG_INIT(8, en_vdd_com,	en_vdd_com,	"vdd_3v3_devices",	1,      0,      TEGRA_GPIO_PD0,		false,	1,	0,	0,	0);
+GREG_INIT(9, en_3v3_fuse,	en_3v3_fuse,	"vdd_3v3_devices",	0,      0,      TEGRA_GPIO_PL6,		false,	0,	0,	0,	0);
+GREG_INIT(10, en_3v3_emmc,	en_3v3_emmc,	"vdd_3v3_devices",	1,      0,      TEGRA_GPIO_PD1,		false,	1,	0,	0,	0);
+GREG_INIT(11, en_vdd_sdmmc1,	en_vdd_sdmmc1,	"vdd_3v3_devices",	1,      0,      TEGRA_GPIO_PD7,		false,	1,	0,	0,	0);
+GREG_INIT(12, en_3v3_pex_hvdd,	en_3v3_pex_hvdd, "vdd_3v3_devices",	0,      0,      TEGRA_GPIO_PL7,		false,	0,	0,	0,	0);
+GREG_INIT(13, en_1v8_cam,	en_1v8_cam,	"vdd_gen1v8",		0,      0,      TEGRA_GPIO_PBB4,	false,	0,	0,	0,	0);
 
 /* E1291-A04 specific */
-GREG_INIT(1, en_5v0_a04,	en_5v0,		NULL,			TPS6591X_GPIO_GP8,	false,	0,	0,	0,	0);
-GREG_INIT(2, en_ddr_a04,	en_ddr,		NULL,			TPS6591X_GPIO_GP7,	false,	0,	0,	0,	0);
-GREG_INIT(3, en_3v3_sys_a04,	en_3v3_sys,	NULL,			TPS6591X_GPIO_GP6,	false,	0,	0,	0,	0);
+GREG_INIT(1, en_5v0_a04,	en_5v0,		NULL,			0,      0,      TPS6591X_GPIO_GP8,	false,	0,	0,	0,	0);
+GREG_INIT(2, en_ddr_a04,	en_ddr,		NULL,			0,      0,      TPS6591X_GPIO_GP7,	false,	0,	0,	0,	0);
+GREG_INIT(3, en_3v3_sys_a04,	en_3v3_sys,	NULL,			0,      0,      TPS6591X_GPIO_GP6,	false,	0,	0,	0,	0);
 
 
 /*Specific to pm269*/
 GREG_INIT(4, en_vdd_bl_pm269,		en_vdd_bl,		NULL,
-	TEGRA_GPIO_PH3,	false,	1,	0,	0,	0);
+	1,      0,      TEGRA_GPIO_PH3,	false,	1,	0,	0,	0);
 GREG_INIT(6, en_vdd_pnl1_pm269,		en_vdd_pnl1,		"vdd_3v3_devices",
-	TEGRA_GPIO_PW1,	false,	1,	0,	0,	0);
+	1,      0,      TEGRA_GPIO_PW1,	false,	1,	0,	0,	0);
 GREG_INIT(9, en_3v3_fuse_pm269,		en_3v3_fuse,		"vdd_3v3_devices",
-	TEGRA_GPIO_PC1,	false,	0,	0,	0,	0);
+	0,      0,      TEGRA_GPIO_PC1,	false,	0,	0,	0,	0);
 GREG_INIT(11, en_vdd_sdmmc1_pm269,	en_vdd_sdmmc1,		"vdd_3v3_devices",
-	TEGRA_GPIO_PP1,	false,	1,	0,	0,	0);
+	1,      0,      TEGRA_GPIO_PP1,	false,	1,	0,	0,	0);
 GREG_INIT(12, en_3v3_pex_hvdd_pm269,	en_3v3_pex_hvdd,	"vdd_3v3_devices",
-	TEGRA_GPIO_PC6,	false,	0,	0,	0,	0);
+	0,      0,      TEGRA_GPIO_PC6,	false,	0,	0,	0,	0);
 GREG_INIT(17, en_vddio_vid_oc_pm269,	en_vddio_vid_oc,	"master_5v_switch",
-	TEGRA_GPIO_PP2,	false,	0,	TEGRA_PINGROUP_DAP3_DOUT,
+	0,      0,      TEGRA_GPIO_PP2,	false,	0,	TEGRA_PINGROUP_DAP3_DOUT,
 	enable_load_switch_rail, disable_load_switch_rail);
 
 /* Specific to E1187/E1186 */
 GREG_INIT(14, dis_5v_switch_e118x,	dis_5v_switch,		"vdd_5v0_sys",
-		TEGRA_GPIO_PX2,		true,	0,	0,	0,	0);
+		0,      0,      TEGRA_GPIO_PX2,		true,	0,	0,	0,	0);
 GREG_INIT(15, en_usb1_vbus_oc_e118x,	en_usb1_vbus_oc,	"master_5v_switch",
-		TEGRA_GPIO_PI4,		false,	0,	TEGRA_PINGROUP_GMI_RST_N,
+		0,      0,      TEGRA_GPIO_PI4,		false,	0,	TEGRA_PINGROUP_GMI_RST_N,
 		enable_load_switch_rail, disable_load_switch_rail);
 GREG_INIT(16, en_usb3_vbus_oc_e118x,	en_usb3_vbus_oc,	"master_5v_switch",
-		TEGRA_GPIO_PH7,		false,	0,	TEGRA_PINGROUP_GMI_AD15,
+		0,      0,      TEGRA_GPIO_PH7,		false,	0,	TEGRA_PINGROUP_GMI_AD15,
 		enable_load_switch_rail, disable_load_switch_rail);
 GREG_INIT(17, en_vddio_vid_oc_e118x,	en_vddio_vid_oc,	"master_5v_switch",
-		TEGRA_GPIO_PT0,		false,	0,	TEGRA_PINGROUP_VI_PCLK,
+		0,      0,      TEGRA_GPIO_PT0,		false,	0,	TEGRA_PINGROUP_VI_PCLK,
 		enable_load_switch_rail, disable_load_switch_rail);
 
 /* E1198/E1291 specific  fab < A03 */
 GREG_INIT(15, en_usb1_vbus_oc,		en_usb1_vbus_oc,	"vdd_5v0_sys",
-		TEGRA_GPIO_PI4,		false,	0,	TEGRA_PINGROUP_GMI_RST_N,
+		0,      0,      TEGRA_GPIO_PI4,		false,	0,	TEGRA_PINGROUP_GMI_RST_N,
 		enable_load_switch_rail, disable_load_switch_rail);
 GREG_INIT(16, en_usb3_vbus_oc,		en_usb3_vbus_oc,	"vdd_5v0_sys",
-		TEGRA_GPIO_PH7,		false,	0,	TEGRA_PINGROUP_GMI_AD15,
+		0,      0,      TEGRA_GPIO_PH7,		false,	0,	TEGRA_PINGROUP_GMI_AD15,
 		enable_load_switch_rail, disable_load_switch_rail);
 
 /* E1198/E1291 specific  fab >= A03 */
 GREG_INIT(15, en_usb1_vbus_oc_a03,	en_usb1_vbus_oc,	"vdd_5v0_sys",
-		TEGRA_GPIO_PDD6,		false,	0,	TEGRA_PINGROUP_PEX_L1_CLKREQ_N,
+		0,      0,      TEGRA_GPIO_PDD6,		false,	0,	TEGRA_PINGROUP_PEX_L1_CLKREQ_N,
 		enable_load_switch_rail, disable_load_switch_rail);
 GREG_INIT(16, en_usb3_vbus_oc_a03,		en_usb3_vbus_oc,	"vdd_5v0_sys",
-		TEGRA_GPIO_PDD4,		false,	0,	TEGRA_PINGROUP_PEX_L1_PRSNT_N,
+		0,      0,      TEGRA_GPIO_PDD4,		false,	0,	TEGRA_PINGROUP_PEX_L1_PRSNT_N,
 		enable_load_switch_rail, disable_load_switch_rail);
 
 /* E1198/E1291 specific */
 GREG_INIT(17, en_vddio_vid_oc,		en_vddio_vid_oc,	"vdd_5v0_sys",
-		TEGRA_GPIO_PT0,		false,	0,	TEGRA_PINGROUP_VI_PCLK,
+		0,      0,      TEGRA_GPIO_PT0,		false,	0,	TEGRA_PINGROUP_VI_PCLK,
 		enable_load_switch_rail, disable_load_switch_rail);
 
 /* E1198/E1291 specific*/
-GREG_INIT(18, cam1_ldo_en,	cam1_ldo_en,	"vdd_3v3_cam",	TEGRA_GPIO_PR6,		false,	0,	0,	0,	0);
-GREG_INIT(19, cam2_ldo_en,	cam2_ldo_en,	"vdd_3v3_cam",	TEGRA_GPIO_PR7,		false,	0,	0,	0,	0);
+GREG_INIT(18, cam1_ldo_en,	cam1_ldo_en,	"vdd_3v3_cam",	0,      0,      TEGRA_GPIO_PR6,		false,	0,	0,	0,	0);
+GREG_INIT(19, cam2_ldo_en,	cam2_ldo_en,	"vdd_3v3_cam",	0,      0,      TEGRA_GPIO_PR7,		false,	0,	0,	0,	0);
 
 /* E1291 A03 specific */
-GREG_INIT(20, en_vdd_bl1_a03,	en_vdd_bl,	NULL,		TEGRA_GPIO_PDD2,	false,	1,	0,	0,	0);
-GREG_INIT(21, en_vdd_bl2_a03,	en_vdd_bl2,	NULL,		TEGRA_GPIO_PDD0,	false,	1,	0,	0,	0);
+GREG_INIT(20, en_vdd_bl1_a03,	en_vdd_bl,	NULL,		1,      0,      TEGRA_GPIO_PDD2,	false,	1,	0,	0,	0);
+GREG_INIT(21, en_vdd_bl2_a03,	en_vdd_bl2,	NULL,		1,      0,      TEGRA_GPIO_PDD0,	false,	1,	0,	0,	0);
 
-GREG_INIT(22, en_vbrtr,		en_vbrtr,	"vdd_3v3_devices",	PMU_TCA6416_GPIO_PORT12,	false,	0,	0,	0,	0);
+GREG_INIT(22, en_vbrtr,		en_vbrtr,	"vdd_3v3_devices",	0,      0,      PMU_TCA6416_GPIO_PORT12,	false,	0,	0,	0,	0);
 
 #define ADD_GPIO_REG(_name) &gpio_pdata_##_name
 
