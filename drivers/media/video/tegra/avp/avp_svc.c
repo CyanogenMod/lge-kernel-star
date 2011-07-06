@@ -455,9 +455,12 @@ static void do_svc_module_clock_set(struct avp_svc_info *avp_svc,
 	}
 
 	mutex_lock(&avp_svc->clk_lock);
-
-	aclk = &avp_svc->clks[mod->clk_req];
-	ret = clk_set_rate(aclk->clk, msg->clk_freq);
+	if (msg->module_id == AVP_MODULE_ID_AVP) {
+		ret = clk_set_rate(avp_svc->sclk, msg->clk_freq);
+	} else {
+		aclk = &avp_svc->clks[mod->clk_req];
+		ret = clk_set_rate(aclk->clk, msg->clk_freq);
+	}
 	if (ret) {
 		pr_err("avp_svc: Failed to set module (id = %d) frequency to %d Hz\n",
 			msg->module_id, msg->clk_freq);
@@ -467,7 +470,10 @@ static void do_svc_module_clock_set(struct avp_svc_info *avp_svc,
 		goto send_response;
 	}
 
-	resp.act_freq = clk_get_rate(aclk->clk);
+	if (msg->module_id == AVP_MODULE_ID_AVP)
+		resp.act_freq = clk_get_rate(avp_svc->sclk);
+	else
+		resp.act_freq = clk_get_rate(aclk->clk);
 
 	mutex_unlock(&avp_svc->clk_lock);
 	resp.err = 0;
