@@ -42,6 +42,7 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 	unsigned long fb2_size);
 int __init tegra_pcie_init(bool init_port0, bool init_port1);
 void tegra_init_cache(void);
+void __init tegra_release_bootloader_fb(void);
 void __init tegra_protected_aperture_init(unsigned long aperture);
 void __init tegra_tsensor_init(void);
 void tegra_move_framebuffer(unsigned long to, unsigned long from,

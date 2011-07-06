@@ -309,7 +309,8 @@ static struct tegra_fb_data enterprise_hdmi_fb_data = {
 	.win		= 0,
 	.xres		= 1366,
 	.yres		= 768,
-	.bits_per_pixel	= 16,
+	.bits_per_pixel	= 32,
+	.flags		= TEGRA_FB_FLIP_ON_PROBE,
 };
 
 static struct tegra_dc_out enterprise_disp2_out = {
@@ -499,6 +500,7 @@ static struct tegra_fb_data enterprise_dsi_fb_data = {
 	.xres		= 540,
 	.yres		= 960,
 	.bits_per_pixel	= 32,
+	.flags		= TEGRA_FB_FLIP_ON_PROBE,
 };
 
 
@@ -610,6 +612,10 @@ int __init enterprise_panel_init(void)
 					 IORESOURCE_MEM, "fbmem");
 	res->start = tegra_fb_start;
 	res->end = tegra_fb_start + tegra_fb_size - 1;
+
+	/* Copy the bootloader fb to the fb. */
+	tegra_move_framebuffer(tegra_fb_start, tegra_bootloader_fb_start,
+		min(tegra_fb_size, tegra_bootloader_fb_size));
 
 	if (!err)
 		err = nvhost_device_register(&enterprise_disp1_device);

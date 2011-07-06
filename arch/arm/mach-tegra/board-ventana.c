@@ -540,6 +540,7 @@ static void __init tegra_ventana_init(void)
 	ventana_bt_rfkill();
 	ventana_power_off_init();
 	ventana_emc_init();
+	tegra_release_bootloader_fb();
 }
 
 int __init tegra_ventana_protected_aperture_init(void)

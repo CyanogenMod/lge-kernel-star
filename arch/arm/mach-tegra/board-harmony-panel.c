@@ -45,7 +45,7 @@ static struct tegra_fb_lcd_data tegra_fb_lcd_platform_data = {
 	.lcd_yres	= 600,
 	.fb_xres	= 1024,
 	.fb_yres	= 600,
-	.bits_per_pixel	= 16,
+	.bits_per_pixel	= 32,
 };
 
 static struct platform_device tegra_fb_device = {

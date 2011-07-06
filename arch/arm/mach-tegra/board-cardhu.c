@@ -668,6 +668,7 @@ static void __init tegra_cardhu_init(void)
 	//audio_wired_jack_init();
 	cardhu_pins_state_init();
 	cardhu_emc_init();
+	tegra_release_bootloader_fb();
 }
 
 static void __init tegra_cardhu_reserve(void)

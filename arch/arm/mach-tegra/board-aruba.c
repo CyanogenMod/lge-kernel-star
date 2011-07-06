@@ -536,6 +536,7 @@ static void __init tegra_aruba_init(void)
 	aruba_sensors_init();
 	aruba_bt_rfkill();
 	aruba_sata_init();
+	tegra_release_bootloader_fb();
 }
 
 static void __init tegra_aruba_reserve(void)

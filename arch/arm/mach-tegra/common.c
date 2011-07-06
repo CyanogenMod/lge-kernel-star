@@ -499,7 +499,7 @@ void tegra_move_framebuffer(unsigned long to, unsigned long from,
 			goto out;
 		}
 
-		for (i = 0; i < size; i+= 4)
+		for (i = 0; i < size; i += 4)
 			writel(readl(from_io + i), to_io + i);
 
 		iounmap(from_io);
@@ -542,16 +542,15 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 				carveout_size, tegra_carveout_start);
 			tegra_carveout_start = 0;
 			tegra_carveout_size = 0;
-		}
-		else
+		} else
 			tegra_carveout_size = carveout_size;
 	}
 
 	if (fb2_size) {
 		tegra_fb2_start = memblock_end_of_DRAM() - fb2_size;
 		if (memblock_remove(tegra_fb2_start, fb2_size)) {
-			pr_err("Failed to remove second framebuffer %08lx@%08lx "
-				"from memory map\n",
+			pr_err("Failed to remove second framebuffer "
+				"%08lx@%08lx from memory map\n",
 				fb2_size, tegra_fb2_start);
 			tegra_fb2_start = 0;
 			tegra_fb2_size = 0;
@@ -606,17 +605,20 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 #endif
 
 	/*
-	 * TODO: We should copy the bootloader's framebuffer to the framebuffer
-	 * allocated above, and then free this one.
-	 */
-	if (tegra_bootloader_fb_size)
+	 * We copy the bootloader's framebuffer to the framebuffer allocated
+	 * above, and then free this one.
+	 * */
+	if (tegra_bootloader_fb_size) {
+		tegra_bootloader_fb_size = PAGE_ALIGN(tegra_bootloader_fb_size);
 		if (memblock_reserve(tegra_bootloader_fb_start,
 				tegra_bootloader_fb_size)) {
-			pr_err("Failed to reserve bootloader frame buffer %08lx@%08lx\n",
-				tegra_bootloader_fb_size, tegra_bootloader_fb_start);
+			pr_err("Failed to reserve bootloader frame buffer "
+				"%08lx@%08lx\n", tegra_bootloader_fb_size,
+				tegra_bootloader_fb_start);
 			tegra_bootloader_fb_start = 0;
 			tegra_bootloader_fb_size = 0;
 		}
+	}
 
 	pr_info("Tegra reserved memory:\n"
 		"LP0:                    %08lx - %08lx\n"
@@ -645,4 +647,13 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 		pr_info("SMMU:                   %08x - %08x\n",
 			smmu_window->start, smmu_window->end);
 #endif
+}
+
+void __init tegra_release_bootloader_fb(void)
+{
+	/* Since bootloader fb is reserved in common.c, it is freed here. */
+	if (tegra_bootloader_fb_size)
+		if (memblock_free(tegra_bootloader_fb_start,
+						tegra_bootloader_fb_size))
+			pr_err("Failed to free bootloader fb.\n");
 }
