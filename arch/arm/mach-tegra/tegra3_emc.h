@@ -51,6 +51,7 @@ void tegra_init_emc(const struct tegra_emc_table *table, int table_size);
 #define EMC_CFG					0xc
 #define EMC_CFG_PERIODIC_QRST			(0x1 << 21)
 #define EMC_CFG_DYN_SREF_ENABLE			(0x1 << 28)
+#define EMC_CFG_PWR_MASK			(0xF << 28)
 
 #define EMC_REFCTRL				0x20
 #define EMC_REFCTRL_DEV_SEL_SHIFT		0
