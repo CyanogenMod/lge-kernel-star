@@ -57,6 +57,7 @@
 #include "cpuidle.h"
 #include "pm.h"
 #include "pm-irq.h"
+#include "reset.h"
 #include "sleep.h"
 #include "fuse.h"
 
@@ -88,8 +89,6 @@ static u8 *iram_save;
 static unsigned long iram_save_size;
 static void __iomem *iram_code = IO_ADDRESS(TEGRA_IRAM_CODE_AREA);
 static void __iomem *clk_rst = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
-static void __iomem *evp_reset =
-	IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100;
 static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
 #endif
 
@@ -366,6 +365,7 @@ static void suspend_cpu_complex(void)
 	reg = readl(FLOW_CTRL_CPU_CSR(cpu));
 	reg &= ~FLOW_CTRL_CSR_WFE_BITMAP;	/* clear wfe bitmap */
 	reg &= ~FLOW_CTRL_CSR_WFI_BITMAP;	/* clear wfi bitmap */
+	reg |= FLOW_CTRL_CSR_INTR_FLAG;		/* clear intr flag */
 	reg |= FLOW_CTRL_CSR_EVENT_FLAG;	/* clear event flag */
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	reg |= FLOW_CTRL_CSR_WFE_CPU0 << cpu;	/* enable power gating on wfe */
@@ -390,6 +390,13 @@ void tegra_clear_cpu_in_lp2(int cpu)
 {
 	spin_lock(&tegra_lp2_lock);
 	cpumask_clear_cpu(cpu, &tegra_in_lp2);
+
+	/* Update the IRAM copy used by the reset handler. The IRAM copy
+	   can't use used directly by cpumask_clear_cpu() because it uses
+	   LDREX/STREX which requires the addressed location to be inner
+	   cacheable and sharable which IRAM isn't. */
+	*tegra_cpu_lp2_mask = tegra_in_lp2;
+
 	spin_unlock(&tegra_lp2_lock);
 }
 
@@ -398,8 +405,14 @@ bool tegra_set_cpu_in_lp2(int cpu)
 	bool last_cpu = false;
 
 	spin_lock(&tegra_lp2_lock);
-
 	cpumask_set_cpu(cpu, &tegra_in_lp2);
+
+	/* Update the IRAM copy used by the reset handler. The IRAM copy
+	   can't use used directly by cpumask_set_cpu() because it uses
+	   LDREX/STREX which requires the addressed location to be inner
+	   cacheable and sharable which IRAM isn't. */
+	*tegra_cpu_lp2_mask = tegra_in_lp2;
+
 	if (cpumask_equal(&tegra_in_lp2, cpu_online_mask))
 		last_cpu = true;
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
@@ -425,8 +438,6 @@ unsigned int tegra_idle_lp2_last(unsigned int sleep_time, unsigned int flags)
 	pmc_32kwritel(reg, PMC_CTRL);
 
 	tegra_cluster_switch_time(flags, tegra_cluster_switch_time_id_start);
-
-	writel(virt_to_phys(tegra_resume), evp_reset);
 
 	/*
 	 * We can use clk_get_rate_all_locked() here, because all other cpus
@@ -565,21 +576,8 @@ static void tegra_pm_set(enum tegra_suspend_mode mode)
 		writel(0x1, pmc + PMC_DPD_SAMPLE);
 		break;
 	case TEGRA_SUSPEND_LP1:
-		/*
-		 * LP1 boots through the normal cpu reset vector pointing to
-		 * tegra_lp1_reset in IRAM, which resumes the CPU to
-		 * the address in scratch 41 to tegra_resume
-		 */
-		writel(tegra_lp1_reset() - tegra_iram_start() +
-			TEGRA_IRAM_CODE_AREA, evp_reset);
-		__raw_writel(virt_to_phys(tegra_resume), pmc + PMC_SCRATCH41);
 		break;
 	case TEGRA_SUSPEND_LP2:
-		/*
-		 * LP2 boots through the normal cpu reset vector directly to
-		 * tegra_resume
-		 */
-		writel(virt_to_phys(tegra_resume), evp_reset);
 		rate = clk_get_rate(tegra_pclk);
 		break;
 	default:

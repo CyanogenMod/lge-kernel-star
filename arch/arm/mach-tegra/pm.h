@@ -194,4 +194,10 @@ static inline void tegra_cluster_switch_set_parameters(
 { }
 #endif
 
+#ifdef CONFIG_SMP
+extern bool tegra_all_cpus_booted __read_mostly;
+#else
+#define tegra_all_cpus_booted (true)
+#endif
+
 #endif /* _MACH_TEGRA_PM_H_ */

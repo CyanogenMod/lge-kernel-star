@@ -211,7 +211,7 @@ ENTRY(tegra2_sleep_wfi)
 
 	/*
 	 * cpu may be reset while in wfi, which will return through
-	 * tegra_secondary_resume to cpu_resume to tegra_cpu_resume
+	 * tegra_resume to cpu_resume to tegra_cpu_resume
 	 * or interrupt may wake wfi, which will return here
 	 * cpu state is unchanged - MMU is on, cache is on, coherency is off
 	 *

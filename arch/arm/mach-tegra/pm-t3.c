@@ -31,6 +31,7 @@
 #include "clock.h"
 #include "gpio-names.h"
 #include "pm.h"
+#include "sleep.h"
 #include "tegra3_emc.h"
 
 #define CAR_CCLK_BURST_POLICY \

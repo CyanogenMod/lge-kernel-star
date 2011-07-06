@@ -90,7 +90,6 @@ void tegra_cpu_wfi(void);
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 extern void tegra2_iram_start;
 extern void tegra2_iram_end;
-extern void tegra2_lp1_reset;
 int  tegra2_cpu_is_resettable_soon(void);
 void tegra2_cpu_reset(int cpu);
 void tegra2_cpu_set_resettable_soon(void);
@@ -113,13 +112,6 @@ static inline void *tegra_iram_end(void)
 #endif
 }
 
-static inline void *tegra_lp1_reset(void)
-{
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-	return &tegra2_lp1_reset;
-#endif
-}
-
 static inline void tegra_sleep_core(unsigned long v2p)
 {
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
@@ -129,7 +121,6 @@ static inline void tegra_sleep_core(unsigned long v2p)
 
 void tegra_sleep_cpu(unsigned long v2p);
 void tegra_resume(void);
-void tegra_secondary_resume(void);
 
 #endif
 

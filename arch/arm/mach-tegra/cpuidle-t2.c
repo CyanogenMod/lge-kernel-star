@@ -70,7 +70,6 @@ static inline unsigned int time_to_bin(unsigned int time)
 #ifdef CONFIG_SMP
 
 static void __iomem *clk_rst = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
-static void __iomem *evp_reset = IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100;
 static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
 static s64 tegra_cpu1_idle_time = LLONG_MAX;
 
@@ -94,8 +93,6 @@ static int tegra2_reset_sleeping_cpu(int cpu)
 static void tegra2_wake_reset_cpu(int cpu)
 {
 	u32 reg;
-
-	writel(virt_to_phys(tegra_secondary_resume), evp_reset);
 
 	/* enable cpu clock on cpu */
 	reg = readl(clk_rst + 0x4c);
