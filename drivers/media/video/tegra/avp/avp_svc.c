@@ -656,10 +656,14 @@ static int avp_svc_thread(void *data)
 		DBG(AVP_DBG_TRACE_SVC, "%s: got message\n", __func__);
 
 		if (ret == -ECONNRESET || ret == -ENOTCONN) {
+			wait_queue_head_t wq;
+			init_waitqueue_head(&wq);
+
 			pr_info("%s: AVP seems to be down; "
 				"wait for kthread_stop\n", __func__);
 			timeout = msecs_to_jiffies(100);
-			timeout = schedule_timeout_interruptible(timeout);
+			timeout = wait_event_interruptible_timeout(wq,
+					kthread_should_stop(), timeout);
 			if (timeout == 0)
 				pr_err("%s: timed out while waiting for "
 					"kthread_stop\n", __func__);
