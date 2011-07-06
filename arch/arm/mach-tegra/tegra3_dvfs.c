@@ -18,6 +18,9 @@
 #include <linux/init.h>
 #include <linux/string.h>
 #include <linux/module.h>
+#include <linux/clk.h>
+#include <linux/kobject.h>
+#include <linux/err.h>
 
 #include "clock.h"
 #include "dvfs.h"
@@ -170,9 +173,9 @@ static struct dvfs core_dvfs_table[] = {
 	CORE_DVFS("emc",    1, 1, KHZ,   408000, 408000, 408000, 408000,  667000,  667000,  667000),
 	CORE_DVFS("emc",    2, 1, KHZ,   408000, 408000, 408000, 408000,  667000,  667000,  800000),
 
-	CORE_DVFS("sbus",   0, 1, KHZ,   136000, 163000, 191000, 216000,  216000,  216000,  216000),
-	CORE_DVFS("sbus",   1, 1, KHZ,   136000, 163000, 191000, 216000,  245000,  245000,  245000),
-	CORE_DVFS("sbus",   2, 1, KHZ,   140000, 169000, 203000, 228000,  254000,  279000,  300000),
+	CORE_DVFS("sbus",   0, 1, KHZ,   136000, 164000, 191000, 216000,  216000,  216000,  216000),
+	CORE_DVFS("sbus",   1, 1, KHZ,   136000, 164000, 191000, 216000,  245000,  245000,  245000),
+	CORE_DVFS("sbus",   2, 1, KHZ,   140000, 169000, 204000, 228000,  254000,  279000,  300000),
 
 	CORE_DVFS("vde",    0, 1, KHZ,   228000, 275000, 332000, 380000,  416000,  416000,  416000),
 	CORE_DVFS("mpe",    0, 1, KHZ,   234000, 285000, 332000, 380000,  416000,  416000,  416000),
@@ -491,3 +494,175 @@ void __init tegra_soc_init_dvfs(void)
 		tegra3_dvfs_rail_vdd_core.nominal_millivolts,
 		tegra_dvfs_core_disabled ? "disabled" : "enabled");
 }
+
+/*
+ * sysfs interface to cap tegra dvsf domains frequencies
+ */
+static struct kobject *cap_kobj;
+static int core_cap_count;
+static int core_cap_level;
+
+/* Arranged in order required for enabling/lowering the cap */
+static struct {
+	const char *cap_name;
+	struct clk *cap_clk;
+	unsigned long freqs[MAX_DVFS_FREQS];
+} core_cap_table[] = {
+	{ .cap_name = "cap.cbus" },
+	{ .cap_name = "cap.sclk" },
+	{ .cap_name = "cap.emc" },
+};
+
+static ssize_t
+core_cap_state_show(struct kobject *kobj, struct kobj_attribute *attr,
+		    char *buf)
+{
+	return sprintf(buf, "%d\n", core_cap_count ? 1 : 0);
+}
+static ssize_t
+core_cap_state_store(struct kobject *kobj, struct kobj_attribute *attr,
+		     const char *buf, size_t count)
+{
+	int i, state;
+
+	if (sscanf(buf, "%d", &state) != 1)
+		return -1;
+
+	if (state) {
+		core_cap_count++;
+		for (i = 0; i < ARRAY_SIZE(core_cap_table); i++)
+			if (core_cap_table[i].cap_clk)
+				clk_enable(core_cap_table[i].cap_clk);
+	} else if (core_cap_count) {
+		core_cap_count--;
+		for (i = ARRAY_SIZE(core_cap_table) - 1; i >= 0; i--)
+			if (core_cap_table[i].cap_clk)
+				clk_disable(core_cap_table[i].cap_clk);
+	}
+	return count;
+}
+
+static ssize_t
+core_cap_level_show(struct kobject *kobj, struct kobj_attribute *attr,
+		    char *buf)
+{
+	return sprintf(buf, "%d\n", core_cap_level);
+}
+static ssize_t
+core_cap_level_store(struct kobject *kobj, struct kobj_attribute *attr,
+		     const char *buf, size_t count)
+{
+	int i, j, level;
+
+	if (sscanf(buf, "%d", &level) != 1)
+		return -1;
+
+	for (j = 0; j < ARRAY_SIZE(core_millivolts); j++) {
+		int v = core_millivolts[j];
+		if ((v == 0) || (level < v))
+			break;
+	}
+	j = (j == 0) ? : j - 1;
+	level = core_millivolts[j];
+
+	if (level < core_cap_level) {
+		for (i = 0; i < ARRAY_SIZE(core_cap_table); i++)
+			if (core_cap_table[i].cap_clk)
+				clk_set_rate(core_cap_table[i].cap_clk,
+					     core_cap_table[i].freqs[j]);
+	} else if (level > core_cap_level) {
+		for (i = ARRAY_SIZE(core_cap_table) - 1; i >= 0; i--)
+			if (core_cap_table[i].cap_clk)
+				clk_set_rate(core_cap_table[i].cap_clk,
+					     core_cap_table[i].freqs[j]);
+	}
+	core_cap_level = level;
+	return count;
+}
+
+static struct kobj_attribute cap_state_attribute =
+	__ATTR(core_cap_state, 0666, core_cap_state_show, core_cap_state_store);
+static struct kobj_attribute cap_level_attribute =
+	__ATTR(core_cap_level, 0666, core_cap_level_show, core_cap_level_store);
+
+const struct attribute *cap_attributes[] = {
+	&cap_state_attribute.attr,
+	&cap_level_attribute.attr,
+	NULL,
+};
+
+static int __init init_core_cap_one(struct clk *c, unsigned long *freqs)
+{
+	int i, v, next_v;
+	unsigned long rate, next_rate = 0;
+
+	for (i = 0; i < ARRAY_SIZE(core_millivolts); i++) {
+		v = core_millivolts[i];
+		if (v == 0)
+			break;
+
+		for (;;) {
+			rate = next_rate;
+			next_rate = clk_round_rate(c, rate + 1000);
+			if (IS_ERR_VALUE(next_rate)) {
+				pr_debug("tegra3_dvfs: failed to round %s"
+					   " rate %lu", c->name, rate);
+				return -EINVAL;
+			}
+			if (rate == next_rate)
+				break;
+
+			next_v = tegra_dvfs_predict_millivolts(
+				c->parent, next_rate);
+			if (IS_ERR_VALUE(next_rate)) {
+				pr_debug("tegra3_dvfs: failed to predict %s mV"
+					 " for rate %lu", c->name, next_rate);
+				return -EINVAL;
+			}
+			if (next_v > v)
+				break;
+		}
+
+		if (rate == 0) {
+			rate = next_rate;
+			pr_warn("tegra3_dvfs: minimum %s cap %lu requires"
+				" %d mV", c->name, rate, next_v);
+		}
+		freqs[i] = rate;
+		next_rate = rate;
+	}
+	return 0;
+}
+
+static int __init tegra_dvfs_init_core_cap(void)
+{
+	int i;
+	struct clk *c = NULL;
+
+	for (i = 0; i < ARRAY_SIZE(core_cap_table); i++) {
+		c = tegra_get_clock_by_name(core_cap_table[i].cap_name);
+		if (!c || !c->parent ||
+		    init_core_cap_one(c, core_cap_table[i].freqs)) {
+			pr_err("tegra3_dvfs: failed to initialize %s frequency"
+			       " table", core_cap_table[i].cap_name);
+			continue;
+		}
+		core_cap_table[i].cap_clk = c;
+	}
+	core_cap_level = tegra3_dvfs_rail_vdd_core.max_millivolts;
+
+	cap_kobj = kobject_create_and_add("tegra_cap", kernel_kobj);
+	if (!cap_kobj) {
+		pr_err("tegra3_dvfs: failed to create sysfs cap object");
+		return 0;
+	}
+
+	if (sysfs_create_files(cap_kobj, cap_attributes)) {
+		pr_err("tegra3_dvfs: failed to create sysfs cap interface");
+		return 0;
+	}
+	pr_info("tegra dvfs: tegra sysfs cap interface is initialized\n");
+
+	return 0;
+}
+late_initcall(tegra_dvfs_init_core_cap);
