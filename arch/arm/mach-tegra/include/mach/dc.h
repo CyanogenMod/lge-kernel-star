@@ -223,6 +223,9 @@ enum {
 	TEGRA_DC_ERRDIFF_DITHER,
 };
 
+typedef u8 tegra_dc_bl_output[256];
+typedef u8 *p_tegra_dc_bl_output;
+
 struct tegra_dc_sd_blp {
 	u16 time_constant;
 	u8 step;
