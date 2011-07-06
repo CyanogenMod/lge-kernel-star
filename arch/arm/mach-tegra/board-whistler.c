@@ -36,6 +36,7 @@
 #include <linux/platform_data/tegra_usb.h>
 #include <linux/mfd/max8907c.h>
 #include <linux/memblock.h>
+#include <linux/tegra_uart.h>
 
 #include <mach/clk.h>
 #include <mach/iomap.h>
@@ -54,6 +55,7 @@
 #include "devices.h"
 #include "gpio-names.h"
 #include "fuse.h"
+#include "pm.h"
 #include "board-whistler-baseband.h"
 
 static struct plat_serial8250_port debug_uart_platform_data[] = {
@@ -78,6 +80,81 @@ static struct platform_device debug_uart = {
 		.platform_data = debug_uart_platform_data,
 	},
 };
+static struct platform_device *whistler_uart_devices[] __initdata = {
+	&tegra_uarta_device,
+	&tegra_uartb_device,
+	&tegra_uartc_device,
+};
+
+struct uart_clk_parent uart_parent_clk[] = {
+	[0] = {.name = "pll_p"},
+	[1] = {.name = "pll_m"},
+	[2] = {.name = "clk_m"},
+};
+
+static struct tegra_uart_platform_data whistler_uart_pdata;
+
+static void __init uart_debug_init(void)
+{
+	unsigned long rate;
+	struct clk *debug_uart_clk;
+	struct clk *c;
+
+	/* UARTA is the debug port. */
+	pr_info("Selecting UARTA as the debug console\n");
+	whistler_uart_devices[0] = &debug_uart;
+	debug_uart_port_base = ((struct plat_serial8250_port *)(
+				debug_uarta_device.dev.platform_data))->mapbase;
+	debug_uart_clk = clk_get_sys("serial8250.0", "uarta");
+
+	/* Clock enable for the debug channel */
+	if (!IS_ERR_OR_NULL(debug_uart_clk)) {
+		rate = debug_uart_platform_data[0].uartclk;
+		pr_info("The debug console clock name is %s\n",
+						debug_uart_clk->name);
+		c = tegra_get_clock_by_name("pll_p");
+		if (IS_ERR_OR_NULL(c))
+			pr_err("Not getting the parent clock pll_p\n");
+		else
+			clk_set_parent(debug_uart_clk, c);
+
+		clk_enable(debug_uart_clk);
+		clk_set_rate(debug_uart_clk, rate);
+	} else {
+		pr_err("Not getting the clock %s for debug console\n",
+					debug_uart_clk->name);
+	}
+}
+
+static void __init whistler_uart_init(void)
+{
+	int i;
+	struct clk *c;
+
+	for (i = 0; i < ARRAY_SIZE(uart_parent_clk); ++i) {
+		c = tegra_get_clock_by_name(uart_parent_clk[i].name);
+		if (IS_ERR_OR_NULL(c)) {
+			pr_err("Not able to get the clock for %s\n",
+						uart_parent_clk[i].name);
+			continue;
+		}
+		uart_parent_clk[i].parent_clk = c;
+		uart_parent_clk[i].fixed_clk_rate = clk_get_rate(c);
+	}
+	whistler_uart_pdata.parent_clk_list = uart_parent_clk;
+	whistler_uart_pdata.parent_clk_count = ARRAY_SIZE(uart_parent_clk);
+
+	tegra_uarta_device.dev.platform_data = &whistler_uart_pdata;
+	tegra_uartb_device.dev.platform_data = &whistler_uart_pdata;
+	tegra_uartc_device.dev.platform_data = &whistler_uart_pdata;
+
+	/* Register low speed only if it is selected */
+	if (!is_tegra_debug_uartport_hs())
+		uart_debug_init();
+
+	platform_add_devices(whistler_uart_devices,
+				ARRAY_SIZE(whistler_uart_devices));
+}
 
 #ifdef CONFIG_BCM4329_RFKILL
 
@@ -134,8 +211,6 @@ static struct tegra_ulpi_config ulpi_phy_config = {
 
 static __initdata struct tegra_clk_init_table whistler_clk_init_table[] = {
 	/* name		parent		rate		enabled */
-	{ "uarta",	"pll_p",	216000000,	true},
-	{ "uartc",	"pll_m",	600000000,	false},
 	{ "pwm",	"clk_32k",	32768,		false},
 	{ "kbc",	"clk_32k",	32768,		true},
 	{ "sdmmc2",	"pll_p",	25000000,	false},
@@ -227,8 +302,6 @@ static struct platform_device tegra_camera = {
 };
 
 static struct platform_device *whistler_devices[] __initdata = {
-	&tegra_uartb_device,
-	&tegra_uartc_device,
 	&tegra_pmu_device,
 	&tegra_udc_device,
 	&tegra_gart_device,
@@ -374,10 +447,7 @@ static void __init tegra_whistler_init(void)
 	tegra_clk_init_from_table(whistler_clk_init_table);
 	whistler_pinmux_init();
 	whistler_i2c_init();
-	if (is_tegra_debug_uartport_hs() == true)
-		platform_device_register(&tegra_uarta_device);
-	else
-		platform_device_register(&debug_uart);
+	whistler_uart_init();
 	platform_add_devices(whistler_devices, ARRAY_SIZE(whistler_devices));
 
 	whistler_sdhci_init();
