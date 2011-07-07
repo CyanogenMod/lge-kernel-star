@@ -45,6 +45,8 @@ struct tegra_emc_table {
 
 void tegra_init_emc(const struct tegra_emc_table *table, int table_size);
 
+int tegra_emc_get_dram_type(void);
+
 #define EMC_INTSTATUS				0x0
 #define EMC_INTSTATUS_CLKCHANGE_COMPLETE	(0x1 << 4)
 

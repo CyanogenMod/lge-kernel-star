@@ -42,6 +42,31 @@ void tegra_mc_set_priority(unsigned long client, unsigned long prio)
 	spin_unlock_irqrestore(&tegra_mc_lock, flags);
 
 }
+
+int tegra_mc_get_tiled_memory_bandwidth_multiplier(void)
+{
+	return 1;
+}
+
 #else
-	/* !!!FIXME!!! IMPLEMENT ME */
+	/* !!!FIXME!!! IMPLEMENT tegra_mc_set_priority() */
+
+#include "tegra3_emc.h"
+
+/*
+ * If using T30/DDR3, the 2nd 16 bytes part of DDR3 atom is 2nd line and is
+ * discarded in tiling mode.
+ */
+int tegra_mc_get_tiled_memory_bandwidth_multiplier(void)
+{
+	int type;
+
+	type = tegra_emc_get_dram_type();
+	WARN_ONCE(type == -1, "unknown type DRAM because DVFS is disabled\n");
+
+	if (type == DRAM_TYPE_DDR3)
+		return 2;
+	else
+		return 1;
+}
 #endif

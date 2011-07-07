@@ -193,10 +193,10 @@ static bool emc_timing_in_sync;
 static const struct tegra_emc_table *tegra_emc_table;
 static int tegra_emc_table_size;
 
-static u32 dram_type;
 static u32 dram_dev_num;
 static u32 emc_cfg_saved;
 
+static u32 dram_type = -1;
 static struct clk *emc;
 
 static struct {
@@ -876,6 +876,11 @@ void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
 void tegra_emc_timing_invalidate(void)
 {
 	emc_timing_in_sync = false;
+}
+
+int tegra_emc_get_dram_type(void)
+{
+	return dram_type;
 }
 
 #ifdef CONFIG_DEBUG_FS
