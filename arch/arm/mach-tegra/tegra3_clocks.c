@@ -4175,7 +4175,7 @@ unsigned long tegra_emc_to_cpu_ratio(unsigned long cpu_rate)
 
 #ifdef CONFIG_PM_SLEEP
 static u32 clk_rst_suspend[RST_DEVICES_NUM + CLK_OUT_ENB_NUM +
-			   PERIPH_CLK_SOURCE_NUM + 18];
+			   PERIPH_CLK_SOURCE_NUM + 22];
 
 void tegra_clk_suspend(void)
 {
@@ -4188,6 +4188,10 @@ void tegra_clk_suspend(void)
 	*ctx++ = clk_readl(tegra_pll_c.reg + PLL_MISC(&tegra_pll_c));
 	*ctx++ = clk_readl(tegra_pll_a.reg + PLL_BASE);
 	*ctx++ = clk_readl(tegra_pll_a.reg + PLL_MISC(&tegra_pll_a));
+	*ctx++ = clk_readl(tegra_pll_d.reg + PLL_BASE);
+	*ctx++ = clk_readl(tegra_pll_d.reg + PLL_MISC(&tegra_pll_d));
+	*ctx++ = clk_readl(tegra_pll_d2.reg + PLL_BASE);
+	*ctx++ = clk_readl(tegra_pll_d2.reg + PLL_MISC(&tegra_pll_d2));
 
 	*ctx++ = clk_readl(tegra_pll_m_out1.reg);
 	*ctx++ = clk_readl(tegra_pll_a_out0.reg);
@@ -4236,13 +4240,14 @@ void tegra_clk_resume(void)
 	u32 val;
 	u32 pllc_base;
 	u32 plla_base;
+	u32 plld_base;
+	u32 plld2_base;
 
 	val = clk_readl(OSC_CTRL) & ~OSC_CTRL_MASK;
 	val |= *ctx++;
 	clk_writel(val, OSC_CTRL);
 	clk_writel(*ctx++, CPU_SOFTRST_CTRL);
 
-	/* FIXME: add plld, and wait for lock */
 	/* Since we are going to reset devices in this function, pllc/a is
 	 * required to be enabled. The actual value will be restore back later.
 	 */
@@ -4253,7 +4258,16 @@ void tegra_clk_resume(void)
 	plla_base = *ctx++;
 	clk_writel(plla_base | PLL_BASE_ENABLE, tegra_pll_a.reg + PLL_BASE);
 	clk_writel(*ctx++, tegra_pll_a.reg + PLL_MISC(&tegra_pll_a));
-	udelay(300);
+
+	plld_base = *ctx++;
+	clk_writel(plld_base | PLL_BASE_ENABLE, tegra_pll_d.reg + PLL_BASE);
+	clk_writel(*ctx++, tegra_pll_d.reg + PLL_MISC(&tegra_pll_d));
+
+	plld2_base = *ctx++;
+	clk_writel(plld2_base | PLL_BASE_ENABLE, tegra_pll_d2.reg + PLL_BASE);
+	clk_writel(*ctx++, tegra_pll_d2.reg + PLL_MISC(&tegra_pll_d2));
+
+	udelay(1000);
 
 	clk_writel(*ctx++, tegra_pll_m_out1.reg);
 	clk_writel(*ctx++, tegra_pll_a_out0.reg);
@@ -4318,6 +4332,8 @@ void tegra_clk_resume(void)
 	/* Restore back the actual pllc/a value */
 	clk_writel(pllc_base, tegra_pll_c.reg + PLL_BASE);
 	clk_writel(plla_base, tegra_pll_a.reg + PLL_BASE);
+	clk_writel(plld_base, tegra_pll_d.reg + PLL_BASE);
+	clk_writel(plld2_base, tegra_pll_d2.reg + PLL_BASE);
 
 	/* Since EMC clock is not restored update current state, and mark
 	   EMC DFS as out of sync */
