@@ -23,6 +23,7 @@
 
 #include <mach/gpio.h>
 #include <mach/irqs.h>
+#include <linux/mfd/tps80031.h>
 
 int enterprise_charge_init(void);
 int enterprise_sdhci_init(void);
@@ -44,16 +45,16 @@ int enterprise_suspend_init(void);
 
 /*****************External GPIO tables ******************/
 /* External peripheral gpio base. */
-#define TPS80031_GPIO_BASE	TEGRA_NR_GPIOS
-#define TPS80031_GPIO_REGEN1	(TPS80031_GPIO_BASE + 0)
-#define TPS80031_GPIO_REGEN2	(TPS80031_GPIO_BASE + 1)
-#define TPS80031_GPIO_SYSEN	(TPS80031_GPIO_BASE + 2)
-#define TPS80031_GPIO_END	(TPS80031_GPIO_BASE + 3)
+#define ENT_TPS80031_GPIO_BASE	   TEGRA_NR_GPIOS
+#define ENT_TPS80031_GPIO_REGEN1 (ENT_TPS80031_GPIO_BASE + TPS80031_GPIO_REGEN1)
+#define ENT_TPS80031_GPIO_REGEN2 (ENT_TPS80031_GPIO_BASE + TPS80031_GPIO_REGEN2)
+#define ENT_TPS80031_GPIO_SYSEN	 (ENT_TPS80031_GPIO_BASE + TPS80031_GPIO_SYSEN)
+#define ENT_TPS80031_GPIO_END	(ENT_TPS80031_GPIO_BASE + TPS80031_GPIO_NR)
 
 /*****************External Interrupt tables ******************/
 /* External peripheral irq base */
-#define TPS80031_IRQ_BASE	TEGRA_NR_IRQS
-#define TPS80031_IRQ_END	(TPS80031_IRQ_BASE + 24)
+#define ENT_TPS80031_IRQ_BASE	TEGRA_NR_IRQS
+#define ENT_TPS80031_IRQ_END  (ENT_TPS80031_IRQ_BASE + TPS80031_INT_NR)
 
 /*****************Camera GPIOs ******************/
 #define CAM_CSI_MUX_SEL_GPIO	TEGRA_GPIO_PM3

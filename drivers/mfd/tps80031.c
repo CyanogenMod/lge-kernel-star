@@ -503,7 +503,7 @@ static void tps80031_gpio_init(struct tps80031 *tps80031,
 	tps80031->gpio.label		= tps->client->name;
 	tps80031->gpio.dev		= tps80031->dev;
 	tps80031->gpio.base		= gpio_base;
-	tps80031->gpio.ngpio		= 3;
+	tps80031->gpio.ngpio		= TPS80031_GPIO_NR;
 	tps80031->gpio.can_sleep	= 1;
 
 	tps80031->gpio.request		= tps80031_gpio_enable;
@@ -742,7 +742,7 @@ static int __devinit tps80031_irq_init(struct tps80031 *tps80031, int irq,
 	tps80031->irq_chip.irq_bus_lock = tps80031_irq_lock;
 	tps80031->irq_chip.irq_bus_sync_unlock = tps80031_irq_sync_unlock;
 
-	for (i = 0; i < ARRAY_SIZE(tps80031_irqs); i++) {
+	for (i = 0; i < TPS80031_INT_NR; i++) {
 		int __irq = i + tps80031->irq_base;
 		irq_set_chip_data(__irq, tps80031);
 		irq_set_chip_and_handler(__irq, &tps80031->irq_chip,

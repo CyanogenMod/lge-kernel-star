@@ -86,7 +86,16 @@ enum {
 	TPS80031_INT_LINCH_GATED,
 
 	/* Last interrupt id to get the end number */
-	TPS80031_INT_END,
+	TPS80031_INT_NR,
+};
+
+enum TPS80031_GPIO {
+	TPS80031_GPIO_REGEN1,
+	TPS80031_GPIO_REGEN2,
+	TPS80031_GPIO_SYSEN,
+
+	/* Last entry */
+	TPS80031_GPIO_NR,
 };
 
 enum {

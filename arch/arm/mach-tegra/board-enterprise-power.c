@@ -181,7 +181,7 @@ TPS_PDATA_INIT(vana,  1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
 TPS_PDATA_INIT(vbus,  0, 5000, 0, 0, 0, 0, -1, 0, 0, VBUS_SW_ONLY);
 
 static struct tps80031_rtc_platform_data rtc_data = {
-	.irq = TPS80031_IRQ_BASE + TPS80031_INT_RTC_ALARM,
+	.irq = ENT_TPS80031_IRQ_BASE + TPS80031_INT_RTC_ALARM,
 	.time = {
 		.tm_year = 2011,
 		.tm_mon = 0,
@@ -232,8 +232,8 @@ struct tps80031_32kclock_plat_data clk32k_pdata = {
 static struct tps80031_platform_data tps_platform = {
 	.num_subdevs	= ARRAY_SIZE(tps80031_devs),
 	.subdevs	= tps80031_devs,
-	.irq_base	= TPS80031_IRQ_BASE,
-	.gpio_base	= TPS80031_GPIO_BASE,
+	.irq_base	= ENT_TPS80031_IRQ_BASE,
+	.gpio_base	= ENT_TPS80031_GPIO_BASE,
 	.clk32k_pdata	= &clk32k_pdata,
 };
 
@@ -322,9 +322,9 @@ static int gpio_switch_cam_ldo_1v8_en_voltages[] = {1800};
 		.disable_rail = _disable,				\
 	}
 
-GREG_INIT(0, pmu_5v15_en,     NULL,      TPS80031_GPIO_REGEN1, false, 0, 0, 0, 0);
-GREG_INIT(1, pmu_3v3_en,      "vdd_5v15", TPS80031_GPIO_REGEN2, false, 0, 0, 0, 0);
-GREG_INIT(2, pmu_hdmi_5v0_en, "vdd_5v15", TPS80031_GPIO_SYSEN, false, 0, 0, 0, 0);
+GREG_INIT(0, pmu_5v15_en,     NULL,      ENT_TPS80031_GPIO_REGEN1, false, 0, 0, 0, 0);
+GREG_INIT(1, pmu_3v3_en,      "vdd_5v15", ENT_TPS80031_GPIO_REGEN2, false, 0, 0, 0, 0);
+GREG_INIT(2, pmu_hdmi_5v0_en, "vdd_5v15", ENT_TPS80031_GPIO_SYSEN, false, 0, 0, 0, 0);
 
 GREG_INIT(3, vdd_fuse_en,    "avdd_usb_hdmi_3v3", TEGRA_GPIO_PM0, false, 0, 0, 0, 0);
 GREG_INIT(4, sdmmc3_vdd_sel, "vddio_sdmmc_2v85", TEGRA_GPIO_PM1, false, 0, 0, 0, 0);
