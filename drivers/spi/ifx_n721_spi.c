@@ -162,6 +162,7 @@ struct ifx_spi_data {
 #ifdef WAKE_LOCK_RESUME
 	struct wake_lock wake_lock;
 	unsigned int		wake_lock_flag;
+	unsigned int            srdy_high_counter;
 #endif
 //20100927, , Hold wake-lock for cp interrupt [END]
 };
@@ -189,6 +190,8 @@ struct GpioHandle{
 
 static NvOdmServicesGpioHandle hGpio = NULL;
 static NvOdmGpioPinHandle hPin = NULL; 
+static NvOdmGpioPinHandle hSrdyPin = NULL; 
+static NvOdmServicesGpioIntrHandle hSrdyInterrupt =  NULL;
 
 struct ifx_spi_data	*gspi_data;
 struct tty_driver 	*ifx_spi_tty_driver;
@@ -307,24 +310,15 @@ ifx_spi_write(struct tty_struct *tty, const unsigned char *buf, int count)
 	ifx_master_initiated_transfer = 1;
 	ifx_spi_buf = buf;
 	ifx_spi_count = count;
-	//printk("%s - %d\n", __FUNCTION__, __LINE__); 
 	ifx_spi_set_mrdy_signal(1);  
-//20101127-2, , Add spi 10sec wait_timeout of SRDY [START]	
-	//wait_for_completion(&spi_data->ifx_read_write_completion);	
-	//printk("%s - %d\n", __FUNCTION__, __LINE__); 	
 	wait_for_completion_timeout(&spi_data->ifx_read_write_completion, 2*HZ);	
-	//printk("%s - %d\n", __FUNCTION__, __LINE__); 	
 	if(ifx_ret_count==0)
-	{	
+	{
+		ifx_spi_set_mrdy_signal(0);	
 		u32register = readl(IO_ADDRESS(0x6000d1b8));
-		//printk("%s - %d\n", __FUNCTION__, __LINE__);	
 		//lge_debug[D_SPI].enable = 1;
 		printk("%s -u32register = %08X, SRDY = %d\n", __FUNCTION__, u32register, ((u32register>>5)&0x00000001)); 
-		//printk("%s - %d\n", __FUNCTION__, __LINE__);	
-		ifx_spi_set_mrdy_signal(0);  
-		//printk("%s - timeout!! Can't get SRDY from CP for 1sec. Set MRDY high to low\n", __FUNCTION__); 		
 	}
-//20101127-2, , Add spi 10sec wait_timeout of SRDY [END]	
 	init_completion(&spi_data->ifx_read_write_completion);
 
 	SPI_DEBUG_PRINT("%s - %d\n", __FUNCTION__, __LINE__); 
@@ -430,6 +424,7 @@ ifx_spi_probe(struct spi_device *spi)
 #ifdef WAKE_LOCK_RESUME
 	wake_lock_init(&spi_data->wake_lock, WAKE_LOCK_SUSPEND, "mspi_wake");
 	spi_data->wake_lock_flag = 0;
+	spi_data->srdy_high_counter = 0;
 #endif
 //20100927-1, , Hold wake-lock for cp interrupt [END]
 
@@ -452,7 +447,6 @@ ifx_spi_probe(struct spi_device *spi)
 	NvOdmGpioConfig(hGpio, hPin, NvOdmGpioPinMode_Output);
 //20100607, , add MRDY pin setup[END] 
 
-	/* Enable SRDY Interrupt request - If the SRDY signal is high then ifx_spi_handle_srdy_irq() is called */
 	status = request_irq(spi->irq, ifx_spi_handle_srdy_irq,  IRQF_TRIGGER_RISING, spi->dev.driver->name, spi_data);
 	if (status != 0){
 		printk(KERN_ERR "Failed to request IRQ for SRDY\n");
@@ -492,7 +486,9 @@ ifx_spi_remove(struct spi_device *spi)
 	}
         if(spi_data){
 		kfree(spi_data);
-        }          
+        }
+	NvOdmGpioReleasePinHandle(hGpio, hPin);
+	NvOdmGpioClose(hGpio);
         return 0;
 }
 
@@ -751,7 +747,7 @@ ifx_spi_setup_transmission(void)
 	}
 }
 
-
+#define MAX_SRDY_ABNORMAL_HIGH 10
 /*
  * Function starts Read and write operation and transfers received data to TTY core. It pulls down MRDY signal
  * in case of single frame transfer then sets "ifx_read_write_completion" to indicate transfer complete.
@@ -772,8 +768,47 @@ ifx_spi_send_and_receive_data(struct ifx_spi_data *spi_data)
 
 	// hgahn
 	if(memcmp(rx_dummy, ifx_rx_buffer, IFX_SPI_HEADER_SIZE) ==0) {
+#ifdef WAKE_LOCK_RESUME
+		/*
+		   CP wake up AP with SRDY interrupt, but CP didn't send any data!!
+		   Count up the SRDY state when SRDY is still high
+		   */
+		if(spi_data->wake_lock_flag)
+		{
+			unsigned int u32register = 0 ;
+			u32register = readl(IO_ADDRESS(0x6000d1b8));
+			if(((u32register>>5)&0x00000001))
+			{
+				spi_data->srdy_high_counter++;
+				printk("%s -u32register = %08X, SRDY = %d, spi_data->srdy_high_counter = %d\n", 
+						__FUNCTION__, u32register, ((u32register>>5)&0x00000001), spi_data->srdy_high_counter); 
+			}
+			if(spi_data->srdy_high_counter>MAX_SRDY_ABNORMAL_HIGH)
+			{       //CP SRDY is still high for max counter times, start RIL Recovery
+				const char g_FAKE_RX_DATA[] = 
+				{0x19,0x00,0xfc,0x07,0xf9,0x05,0xef,0x27,0x0d,0x0a,0x2b,'X','C','A','L','L','S','T','A','T',':',' ','1',',','6',0x0d,0x0a,0x8a,0xf9,0x00};
+				//Send fake unsol '+XCALLSTAT=1,6' to rild
+				memcpy(ifx_rx_buffer, g_FAKE_RX_DATA, g_FAKE_RX_DATA[0]+IFX_SPI_HEADER_SIZE);
+				printk("%s : Send fake unsol '+XCALLSTAT=1,6' to rild!! : spi_data->srdy_high_counter = %d\n", 
+						__FUNCTION__, spi_data->srdy_high_counter); 
+			}
+			else
+			{
+				ifx_receiver_buf_size = 0;
+				return;
+			}
+		}
+		else
+		{       //This is not a resume case, just normal operation case
+			spi_data->srdy_high_counter = 0;
+			//printk("%s : Normal case : spi_data->srdy_high_counter = %d\n", __FUNCTION__, spi_data->srdy_high_counter); 
+			ifx_receiver_buf_size = 0;
+			return;
+		}
+#else          
 		ifx_receiver_buf_size = 0;
 		return;
+#endif
 	}
 
 	/* Handling Received data */
@@ -791,13 +826,16 @@ ifx_spi_send_and_receive_data(struct ifx_spi_data *spi_data)
 	handle RTS and CTS in SPI flow control
 	Reject the packet as of now 
 	}*/
+#ifdef WAKE_LOCK_RESUME
 		if(spi_data->wake_lock_flag)
 		{
 			spi_data->wake_lock_flag = 0;
 #ifdef CONFIG_LPRINTK
 			lge_debug[D_SPI].enable = 0;
 #endif
+			spi_data->srdy_high_counter = 0;
 		}
+#endif
 }
 
 /*
@@ -843,7 +881,7 @@ static irqreturn_t
 ifx_spi_handle_srdy_irq(int irq, void *handle)
 {
 	struct ifx_spi_data *spi_data = (struct ifx_spi_data *)handle;
-	//SPI_DEBUG_PRINT("ifx_spi_handle_srdy_irq\n");	
+
 	queue_work(spi_data->ifx_wq, &spi_data->ifx_work);    
 	return IRQ_HANDLED; 
 }

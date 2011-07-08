@@ -584,12 +584,17 @@ Ap20EmcTimingSetFinish(
         return;
 
     a = (((NvU32)(s_pEmcBaseReg)) + EMC_INTSTATUS_0);
+//20110318, , nVidia recommandation for no LCD response [START]
+#if 0
     for (;;)
     {
         d = NV_DRF_VAL(EMC, INTSTATUS, CLKCHANGE_COMPLETE_INT, NV_READ32(a));
         if (d)
             break;
     }
+#endif
+    NvOsWaitUS(10);
+//20110318, , nVidia recommandation for no LCD response [END]
 
     a = (((NvU32)(s_pEmcBaseReg)) + EMC_CFG_DIG_DLL_0);
     NV_WRITE32(a, pEmcConfig->EmcDigDll);

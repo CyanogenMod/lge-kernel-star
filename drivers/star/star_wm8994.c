@@ -208,16 +208,20 @@ void star_headsetdet_bias(int bias)
     ReadWolfsonRegister(g_wm8994, 0x0001, &r_data);
     if(bias == 0)
     {
-        r_data = r_data & (~0x0020);
-		printk("star_headsetdet_bias headset disabled %4x\n",r_data);
+        if(r_data & 0x0020){
+            r_data = r_data & (~0x0020);
+            printk("star_headsetdet_bias headset disabled %4x\n",r_data);
+        }
     }
-	else
-	{
-        r_data = r_data | (0x0020);
-		printk("star_headsetdet_bias headset enabled %4x\n",r_data);
-	}
-	WriteWolfsonRegister(g_wm8994, 0x0001, r_data);
-	return;
+    else
+    {
+        if( (r_data & 0x0020) == 0){
+            r_data = r_data | (0x0023);
+            WriteWolfsonRegister(g_wm8994, 0x0001, r_data);
+            printk("star_headsetdet_bias headset enabled %4x\n",r_data);
+        }
+    }
+    return;
 }
 
 /**

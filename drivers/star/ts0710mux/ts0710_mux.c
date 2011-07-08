@@ -70,6 +70,25 @@
 #include <asm/bitops.h>
 #include <asm/mach-types.h>
 
+/*
+	RECOVERY_MODE
+		description : This mode is used to recover the at command pending state
+				     Step.1 : CP reset
+				     Step.2 : Close all mux channels
+				     Step.3 : Wait until CP is rebooting for 5 seconds
+*/
+#define RECOVERY_MODE
+#ifdef RECOVERY_MODE
+#include "nvos.h"
+#include "nvcommon.h"
+#include "nvodm_services.h"
+#include "nvodm_query_discovery.h"
+
+static NvOdmServicesGpioHandle hGpio = NULL;
+static NvOdmGpioPinHandle hPin = NULL; 
+#endif
+
+
 #ifdef LGE_KERNEL_MUX
 #include <linux/spinlock.h>
 #include <linux/semaphore.h>
@@ -84,6 +103,19 @@
 
 #include "ts0710.h"
 #include "ts0710_mux.h"
+
+/*
+	macro : ENABLE_MUX_WAKE_LOCK
+	description : This macro enables wakelock if ts_ldisc_close function is called because of RILD exit
+*/
+#define ENABLE_MUX_WAKE_LOCK
+#ifdef ENABLE_MUX_WAKE_LOCK
+
+#include <linux/wakelock.h>
+#define MUX_WAKELOCK_TIME		(30*HZ)
+struct wake_lock	 	s_wake_lock;
+static unsigned int	s_wake_lock_flag;
+#endif
 
 #define LOCK_T          spinlock_t
 #define CREATELOCK(_l)  spin_lock_init(&(_l))
@@ -2021,24 +2053,6 @@ static int ts_ldisc_open(struct tty_struct *tty)
 	return 0;
 }
 
-/*
-	RECOVERY_MODE
-		description : This mode is used to recover the at command pending state
-				     Step.1 : CP reset
-				     Step.2 : Close all mux channels
-				     Step.3 : Wait until CP is rebooting for 5 seconds
-*/
-#define RECOVERY_MODE
-#ifdef RECOVERY_MODE
-#include "nvos.h"
-#include "nvcommon.h"
-#include "nvodm_services.h"
-#include "nvodm_query_discovery.h"
-
-static NvOdmServicesGpioHandle hGpio = NULL;
-static NvOdmGpioPinHandle hPin = NULL; 
-#endif
-
 static void ts_ldisc_close(struct tty_struct *tty)
 {
 	ipc_tty = 0;
@@ -2058,7 +2072,33 @@ static void ts_ldisc_close(struct tty_struct *tty)
 #ifdef RECOVERY_MODE
 	{
 		ts0710_con *ts0710 = &ts0710_connection;
-		u8 j;
+		u8 i;
+
+#ifdef ENABLE_MUX_WAKE_LOCK
+		wake_lock_timeout(&s_wake_lock, MUX_WAKELOCK_TIME);
+#endif
+		LOCK(frame_nodes_lock);
+		for(i = 0; i < TS0710MAX_PRIORITY_NUMBER ; i++)
+		{
+			if(frame_to_send[i] != NULL && frame_to_send[i]->data !=NULL)
+			{
+				TS0710_PRINTK("%s - frame_to_send[%d]->data = %x\n", __FUNCTION__, i, frame_to_send[i]->data);
+				kfree(frame_to_send[i]->data);
+				frame_to_send[i]->size = 0;
+				frame_to_send[i]->data = NULL;
+				frame_to_send[i]->next = NULL;
+			}
+		}
+		UNLOCK(frame_nodes_lock);
+
+		ts0710_upon_disconnect();
+		tty_ldisc_flush(tty);
+		if(tty->disc_data)
+		{
+			TS0710_PRINTK("%s - tty->disc_data = %x\n", __FUNCTION__, tty->disc_data);
+			kfree(tty->disc_data);
+			tty->disc_data = NULL;
+		}
 
 		TS0710_PRINTK("%s - start recovery mode!!\n", __FUNCTION__);
 		if(hGpio==NULL)
@@ -2072,11 +2112,7 @@ static void ts_ldisc_close(struct tty_struct *tty)
 		NvOsSleepMS(200);
 		NvOdmGpioSetState(hGpio,hPin, 1);	//20100607, , remain only this code
 		//NvOdmGpioReleasePinHandle(hGpio, hPin);
-		
-		ts0710_upon_disconnect();
-		//TS0710_PRINTK("%s - wait 5 seconds until cp rebooting!!\n", __FUNCTION__);
-		tty_ldisc_flush(tty);
-		NvOsSleepMS(1000);
+		//NvOsSleepMS(1000);
 		TS0710_PRINTK("%s - end recovery mode!!\n", __FUNCTION__);
 	}
 #endif //RECOVERY_MODE
@@ -2227,6 +2263,10 @@ static int __init mux_init(void)
 #endif
 		printk("TS0710 :oops. cant register ldisc\n");
         }
+
+#ifdef ENABLE_MUX_WAKE_LOCK
+	wake_lock_init(&s_wake_lock, WAKE_LOCK_SUSPEND, "mux_wake");
+#endif
 
 	return 0;
 }

@@ -152,6 +152,16 @@ static int tegra_spi_do_message(struct tegra_spi *spi, struct spi_message *m)
 	struct spi_transfer *t;
 	unsigned int len = 0;
 	int i = 0;
+	/**
+	  <Only for AP20(NVIDIA BSP)>
+	  5. Restart rm_spi handle if rm_spi error happens
+	  - android/kernel/arch/arm/mach-tegra/include/rm_spi.h
+	  - android/kernel/arch/arm/mach-tegra/nvrm/io/ap15/rm_spi_slink.c
+	  - android/kernel/drivers/spi/tegra_spi.c
+	  : Modify rm_spi API function to return error of Master SPI transaction
+	  : This recovers repeated spi timeout error
+	 **/
+	NvError nvErr = NvSuccess;
 
 	list_for_each_entry(t, &m->transfers, transfer_list) {
 		if (i==ARRAY_SIZE(trans))
@@ -171,7 +181,7 @@ static int tegra_spi_do_message(struct tegra_spi *spi, struct spi_message *m)
 			trans[i].len = t->len;
 			len += t->len;
 #if 1			
-			NvRmSpiTransaction(spi->rm_spi, 
+			nvErr = NvRmSpiTransaction(spi->rm_spi, 
 				spi->pinmux, 
 				m->spi->chip_select, 
 				m->spi->max_speed_hz/1000,
@@ -179,6 +189,14 @@ static int tegra_spi_do_message(struct tegra_spi *spi, struct spi_message *m)
 				(NvU8*)t->tx_buf,
 				t->len,
 				m->spi->bits_per_word);
+			if(nvErr != NvSuccess)
+			{       //20110120-1, , Add workaround code for spi error
+				printk("%s[ID:%d] : error %d\n", __FUNCTION__, 0, nvErr);
+				NvRmSpiClose(spi->rm_spi);
+				nvErr = NvRmSpiOpen(s_hRmGlobal, NvOdmIoModule_Spi, 0, NV_TRUE, &spi->rm_spi);
+				printk("%s[ID:%d] : Restart NvRmSpiOpen %d\n", __FUNCTION__, 0, nvErr);
+				break;
+			}
 #endif
 		}
 

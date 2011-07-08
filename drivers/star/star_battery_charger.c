@@ -183,8 +183,6 @@ static NvBool ELT_test_mode = NV_FALSE;
 
 static NvU32 previous_guage=100;
 
-static int bat_shutdown = 0;
-
 //20100706, , For Full Battery process [START]
 typedef enum {
 	FULL_BATT_BOTH_NO = 0,
@@ -882,7 +880,6 @@ static void true_valid_cbc_process(NvU32 cbc_value)
 static void valid_cbc_check_and_process(NvU32 cbc_value)
 {
 	static NvU32 display_cbc = 0;
-	if (bat_shutdown) return;
 
 	//if  ( at_charge_index == NV_FALSE )
 	{
@@ -1988,6 +1985,7 @@ static NvBool determine_capacity_for_demo(void)
 		batt_dev->vol_for_capacity = batt_dev->batt_vol + 200;
 	}
 
+/*
 	switch (get_charging_ic_status())
 	{
 		case CHG_IC_DEFAULT_MODE:
@@ -2028,8 +2026,8 @@ static NvBool determine_capacity_for_demo(void)
 			}
 			break;
 	}
-/*      The values provided by this are WAAY wrong
-	star_capacity_from_voltage_via_calculate(); */
+*/
+	star_capacity_from_voltage_via_calculate(); 
 	valid_capacity_gauge();
 
 	return NV_TRUE;
@@ -2069,7 +2067,7 @@ static ssize_t star_at_charge_store_property(
 	if ( value == 1 )
 	{
 		at_charge_index = NV_TRUE;
-		//batt_dev->repeat_index = NV_FALSE;
+		batt_dev->repeat_index = NV_FALSE;
 
 		star_battery_infomation_update();
 		star_battery_data_onetime_update(Update_Battery_Data);
@@ -3219,8 +3217,6 @@ static void tegra_battery_shutdown(struct platform_device *pdev)
 	   printk("battery_gauge_timer deleted\n");
 	}
 #endif
-	bat_shutdown = 1;
-
 	NvOdmGpioInterruptUnregister(charging_ic->hGpio, charging_ic->hStatusPin, charging_ic->hCHGDone_int);
 	NvOdmGpioSetState( charging_ic->hGpio, charging_ic->hStatusPin, 0x0);
 	NvOdmGpioConfig( charging_ic->hGpio, charging_ic->hStatusPin, NvOdmGpioPinMode_Output);

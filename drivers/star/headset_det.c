@@ -259,6 +259,7 @@ static void type_det_work(struct work_struct *work)
 		star_headsetdet_bias(0);	//20100419   for Headset MIC Bias  ==> framwork function used in kernel ==> error [LGE]
 	}
 	else{
+	star_headsetdet_bias(1);
         block_hook_int =0;
 	}
 	star_unset_i2c_busy();
@@ -360,7 +361,7 @@ static void hook_det_work(struct work_struct *work)
     
 	if(hook_status == HOOK_RELEASED){
 		#if HOOK_USE_ADC
-        hookkey_gpio_status = headset_get_hook_adc_average(5);
+		hookkey_gpio_status = headset_get_hook_adc_value(); //jongik2.kim 20110202 hook_bias
 		if( hookkey_gpio_status <= hok_adc_value )
 		{
 		    hook_status = HOOK_PRESSED; 

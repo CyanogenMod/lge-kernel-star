@@ -45,6 +45,7 @@ EXPORT_SYMBOL_GPL(drm_mutex);
 static long drm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int rv = 0;
+	drm_diffTime = 0;
 
 	switch (cmd) {
 	default:

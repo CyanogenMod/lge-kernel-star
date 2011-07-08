@@ -744,11 +744,18 @@ WaitForTransferCompletion(
     if (Error == NvError_Timeout)
     {
 	pr_err("Spi%d: %dms Timeout Error\n", hRmSpiSlink->InstanceId, WaitTimeOutMS);
-#ifdef CONFIG_MACH_STAR_REV_F
 //20101221-1, , Workaround code to recover repeated spi transaction timeout error [START]
-         hRmSpiSlink->IsIntDoneDue = NV_TRUE;
+/**
+<Only for AP20(NVIDIA BSP)>
+5. Restart rm_spi handle if rm_spi error happens
+       - android/kernel/arch/arm/mach-tegra/include/rm_spi.h
+       - android/kernel/arch/arm/mach-tegra/nvrm/io/ap15/rm_spi_slink.c
+       - android/kernel/drivers/spi/tegra_spi.c
+               : Modify rm_spi API function to return error of Master SPI transaction
+               : This recovers repeated spi timeout error
+**/
+               //hRmSpiSlink->IsIntDoneDue = NV_TRUE;
 //20101221-1, , Workaround code to recover repeated spi transaction timeout error [END]
-#endif
         // Disable the data flow first.
         hHwInt->HwSetDataFlowFxn(&hRmSpiSlink->HwRegs,
                                     hRmSpiSlink->CurrentDirection, NV_FALSE);
@@ -789,9 +796,7 @@ WaitForTransferCompletion(
             // All requested transfer has been done.
             CurrentSlinkPacketTransfer = hRmSpiSlink->CurrTransInfo.CurrPacketCount;
 		pr_err("Spi%d: CurrentSlinkPacketTransfer = %d, IsReady = %d\n", hRmSpiSlink->InstanceId, CurrentSlinkPacketTransfer, IsReady);
-#ifdef CONFIG_MACH_STAR_REV_F
-                Error = NvSuccess;
-#endif
+                //Error = NvSuccess;
         }
         else
         {
@@ -1996,6 +2001,7 @@ static NvError MasterModeReadWriteDma(
     NvU32 PacketBitLength)
 {
     NvError Error = NvSuccess;
+    NvError nvError = NvSuccess;
     NvU32 CurrentTransWord;
     NvU32 BufferOffset = 0;
     NvU32 BytesPerPacket = (PacketBitLength +7)/8;
@@ -2159,9 +2165,9 @@ static NvError MasterModeReadWriteDma(
 
         if (!Error)
 #ifdef CONFIG_MACH_STAR_TMUS
-            WaitForTransferCompletion(hRmSpiSlink, 1000, NV_FALSE);	////20101218-3, , NVIDIA patch to protect infinite loop : WaitForTransferCompletion(hRmSpiSlink, NV_WAIT_INFINITE, NV_FALSE);
+            nvError = WaitForTransferCompletion(hRmSpiSlink, 1000, NV_FALSE);	////20101218-3, , NVIDIA patch to protect infinite loop : WaitForTransferCompletion(hRmSpiSlink, NV_WAIT_INFINITE, NV_FALSE);
 #else
-            WaitForTransferCompletion(hRmSpiSlink, 500, NV_FALSE);	////20101218-3, , NVIDIA patch to protect infinite loop : WaitForTransferCompletion(hRmSpiSlink, NV_WAIT_INFINITE, NV_FALSE);
+            nvError = WaitForTransferCompletion(hRmSpiSlink, 500, NV_FALSE);	////20101218-3, , NVIDIA patch to protect infinite loop : WaitForTransferCompletion(hRmSpiSlink, NV_WAIT_INFINITE, NV_FALSE);
 #endif
 
         Error = (hRmSpiSlink->RxTransferStatus)? hRmSpiSlink->RxTransferStatus:
@@ -2189,6 +2195,10 @@ static NvError MasterModeReadWriteDma(
                                     hRmSpiSlink->CurrentDirection, NV_FALSE);
 
     *pPacketsTransferred = PacketsRequested - PacketsRemaining;
+
+    if(nvError!=NvSuccess)
+        Error = nvError;
+
     return Error;
 }
 static NvError SlaveModeSpiStartReadWriteCpu(
@@ -2796,7 +2806,7 @@ cleanup:
 /**
  * Perform the data transfer.
  */
-void NvRmSpiTransaction(
+NvError NvRmSpiTransaction(
     NvRmSpiHandle hRmSpi,
     NvU32 SpiPinMap,
     NvU32 ChipSelectId,
@@ -2956,6 +2966,8 @@ cleanup:
     NvOsMutexUnlock(hRmSpi->hChannelAccessMutex);
 
     NV_ASSERT(Error == NvSuccess);
+
+    return Error;
 
 }
 

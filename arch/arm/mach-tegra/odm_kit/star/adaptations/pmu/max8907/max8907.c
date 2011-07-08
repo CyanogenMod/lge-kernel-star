@@ -2224,12 +2224,8 @@ Max8907Setup(NvOdmPmuDeviceHandle hDevice)
     }
 #endif
 
-    //20100624, , revB [START]
-    #if defined(CONFIG_MACH_STAR_REV_B)
-    if (!Max8907I2cWrite8(hDevice, 0x9C, 0x1C))
-        return NV_FALSE;
-    #endif 
-    //20100624, , revB [END]
+    //emmc : for voltage margin
+    Max8907SetVoltage(hDevice, Max8907PmuSupply_LDO5, 3000, NULL);
 
     //20100928, , enable PMU interrupt for RTC wakeup [START]
     Max8907SetupInterrupt(hDevice);
