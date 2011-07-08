@@ -23,6 +23,10 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 
+/* Family ID */
+#define MXT224_ID		0x80
+#define MXT1386_ID		0xA0
+
 /* Version */
 #define MXT_VER_20		20
 #define MXT_VER_21		21
@@ -172,8 +176,13 @@
 #define MXT_BOOT_VALUE		0xa5
 #define MXT_BACKUP_VALUE	0x55
 #define MXT_BACKUP_TIME		200	/* msec */
-#define MXT_RESET_TIME		650	/* msec */
-#define MXT_SAFE_CYCLE_TIME     30      /* msec */
+#define MXT224_RESET_TIME       65      /* msec */
+#define MXT1386_RESET_TIME      200     /* msec */
+#define MXT_RESET_TIME		200	/* msec */
+#define MXT_RESET_NOCHGREAD     400     /* msec */
+
+#define MXT_RESET_TIME		200	/* msec */
+#define MXT_WAKEUP_TIME		25
 
 #define MXT_FWRESET_TIME	175	/* msec */
 
@@ -207,7 +216,12 @@
 /* Touchscreen absolute values */
 #define MXT_MAX_AREA		0xff
 
+/* Fixed Report ID values */
+#define MXT_RPTID_NOMSG		0xFF	/* No messages available to read */
+
 #define MXT_MAX_FINGER		10
+
+#define RESUME_READS		100
 
 struct mxt_info {
 	u8 family_id;
@@ -650,16 +664,41 @@ end:
 	return IRQ_HANDLED;
 }
 
+static int mxt_make_highchg(struct mxt_data *data)
+{
+	struct device *dev = &data->client->dev;
+	struct mxt_message message;
+	int count = 30;
+	int error;
+
+	/* Read dummy message to make high CHG pin */
+	do {
+		error = mxt_read_message(data, &message);
+		if (error)
+			return error;
+	} while (message.reportid != 0xff && --count);
+
+	if (!count) {
+		dev_err(dev, "CHG pin isn't cleared\n");
+		return -EBUSY;
+	}
+
+	return 0;
+}
+
 static int mxt_check_reg_init(struct mxt_data *data)
 {
+	struct i2c_client *client = data->client;
 	const struct mxt_platform_data *pdata = data->pdata;
 	struct mxt_object *object;
 	struct mxt_message message;
 	struct device *dev = &data->client->dev;
 	int index = 0;
+	int timeout_counter;
 	int i, j, config_offset;
 	int error;
 	unsigned long current_crc;
+	u8 command_register;
 
 	if (!pdata->config) {
 		dev_dbg(dev, "No cfg data defined, skipping reg init\n");
@@ -668,7 +707,7 @@ static int mxt_check_reg_init(struct mxt_data *data)
 
 	/* Try to read the config checksum of the existing cfg */
 	mxt_write_object(data, MXT_GEN_COMMAND,
-			 MXT_COMMAND_CALIBRATE, 1);
+			 MXT_COMMAND_REPORTALL, 1);
 	msleep(30);
 
 	error = mxt_read_message(data, &message);
@@ -724,30 +763,62 @@ static int mxt_check_reg_init(struct mxt_data *data)
 		index += (object->size + 1) * (object->instances + 1);
 	}
 	dev_info(dev, "Config written!");
-	return 0;
-}
 
-static int mxt_make_highchg(struct mxt_data *data)
-{
-	struct device *dev = &data->client->dev;
-	struct mxt_message message;
-	int count = 10;
-	int error;
+	error = mxt_make_highchg(data);
+	if (error)
+		return error;
 
-	/* Read dummy message to make high CHG pin */
+	/* Backup to memory */
+	mxt_write_object(data, MXT_GEN_COMMAND,
+			MXT_COMMAND_BACKUPNV,
+			MXT_BACKUP_VALUE);
+	msleep(MXT_BACKUP_TIME);
 	do {
-		error = mxt_read_message(data, &message);
-		if (error)
-			return error;
-	} while (message.reportid != 0xff && --count);
+                error =  mxt_read_object(data, MXT_GEN_COMMAND,
+					MXT_COMMAND_BACKUPNV,
+					&command_register);
+                if (error)
+                        return error;
+		msleep(2);
+        } while ((command_register != 0) && (timeout_counter++ <= 100));
+	if (timeout_counter >= 100) {
+		dev_err(&client->dev, "No response after backup!\n");
+		return -EIO;
+	}
 
-	if (!count) {
-		dev_err(dev, "CHG pin isn't cleared\n");
-		return -EBUSY;
+	/* Clear the interrupt line */
+	error = mxt_make_highchg(data);
+	if (error)
+		return error;
+
+	/* Soft reset */
+	mxt_write_object(data, MXT_GEN_COMMAND,
+			MXT_COMMAND_RESET, 1);
+	if (data->pdata->read_chg == NULL) {
+		msleep(MXT_RESET_NOCHGREAD);
+	} else {
+		switch (data->info.family_id) {
+		case MXT224_ID:
+			msleep(MXT224_RESET_TIME);
+			break;
+		case MXT1386_ID:
+			msleep(MXT1386_RESET_TIME);
+			break;
+		default:
+			msleep(MXT_RESET_TIME);
+		}
+		timeout_counter = 0;
+		while ((timeout_counter++ <= 100) && data->pdata->read_chg())
+			msleep(2);
+		if (timeout_counter >= 100) {
+			dev_err(&client->dev, "No response after reset!\n");
+			return -EIO;
+		}
 	}
 
 	return 0;
 }
+
 
 static void mxt_handle_pdata(struct mxt_data *data)
 {
@@ -836,7 +907,6 @@ static int mxt_initialize(struct mxt_data *data)
 	struct i2c_client *client = data->client;
 	struct mxt_info *info = &data->info;
 	int error;
-	u8 val;
 	u8 idle_cycle_time;
 	u8 actv_cycle_time;
 
@@ -873,70 +943,6 @@ static int mxt_initialize(struct mxt_data *data)
 				&actv_cycle_time);
 	if (error)
 		return error;
-
-	error = mxt_make_highchg(data);
-	if (error)
-		return error;
-
-	/* Backup to memory */
-	mxt_write_object(data, MXT_GEN_COMMAND,
-			MXT_COMMAND_BACKUPNV,
-			MXT_BACKUP_VALUE);
-
-	if (data->pdata->read_chg == NULL) {
-		msleep(MXT_BACKUP_TIME +
-			(actv_cycle_time > idle_cycle_time) ?
-			actv_cycle_time : idle_cycle_time);
-	} else {
-		msleep(MXT_SAFE_CYCLE_TIME);
-		while (data->pdata->read_chg()) {
-			dev_info(&client->dev,
-				 "Waiting for backup to complete...\n");
-			msleep(2);
-		}
-	}
-
-	/* Clear the interrupt line */
-	error = mxt_make_highchg(data);
-	if (error)
-		return error;
-
-	/* Soft reset */
-	mxt_write_object(data, MXT_GEN_COMMAND,
-			MXT_COMMAND_RESET, 1);
-	if (data->pdata->read_chg == NULL) {
-		msleep(MXT_RESET_TIME + MXT_SAFE_CYCLE_TIME);
-	} else {
-		msleep(MXT_SAFE_CYCLE_TIME);
-		while (data->pdata->read_chg()) {
-			dev_info(&client->dev,
-				 "Waiting for reset to complete...\n");
-			msleep(2);
-		}
-	}
-
-	/* Restore the cycle time settings */
-	error = mxt_write_object(data, MXT_GEN_POWER,
-			 MXT_POWER_IDLEACQINT, idle_cycle_time);
-	if (error)
-		return error;
-
-	error = mxt_write_object(data, MXT_GEN_POWER,
-			 MXT_POWER_ACTVACQINT, actv_cycle_time);
-	if (error)
-		return error;
-
-	/* Update matrix size at info struct */
-	error = mxt_read_reg(client, MXT_MATRIX_X_SIZE, &val);
-	if (error)
-		return error;
-	info->matrix_xsize = val;
-
-	error = mxt_read_reg(client, MXT_MATRIX_Y_SIZE, &val);
-	if (error)
-		return error;
-	info->matrix_ysize = val;
-
 	dev_info(&client->dev,
 			"Family ID: %d Variant ID: %d Version: %d Build: %d\n",
 			info->family_id, info->variant_id, info->version,
@@ -1328,12 +1334,18 @@ static int mxt_resume(struct device *dev)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct mxt_data *data = i2c_get_clientdata(client);
 	struct input_dev *input_dev = data->input_dev;
+	struct mxt_message message;
+	struct mxt_object *object;
+	int id;
+	int max_retry = RESUME_READS;	/* Set max retry default value */
+	u8 reportid;
+	u8 max_reportid;
+	u8 min_reportid;
+	u8 n;
 
-	/* Soft reset */
-	mxt_write_object(data, MXT_GEN_COMMAND,
-			MXT_COMMAND_RESET, 1);
-
-	msleep(MXT_RESET_TIME);
+	/* A dummy read to wake up the chip */
+	mxt_read_object(data, MXT_GEN_POWER, MXT_POWER_IDLEACQINT, &n);
+	msleep(MXT_WAKEUP_TIME);
 
 	mutex_lock(&input_dev->mutex);
 
@@ -1342,6 +1354,31 @@ static int mxt_resume(struct device *dev)
 
 	mutex_unlock(&input_dev->mutex);
 
+	do {
+		if (mxt_read_message(data, &message)) {
+			dev_err(dev, "Failed to read message\n");
+			goto end;
+		}
+		reportid = message.reportid;
+
+		/* whether reportid is thing of MXT_TOUCH_MULTI */
+		object = mxt_get_object(data, MXT_TOUCH_MULTI);
+		if (!object)
+			goto end;
+
+		max_reportid = object->max_reportid;
+		min_reportid = max_reportid - object->num_report_ids + 1;
+		id = reportid - min_reportid;
+
+		if (reportid >= min_reportid && reportid <= max_reportid)
+			mxt_input_touchevent(data, &message, id);
+		else
+			mxt_dump_message(dev, &message);
+	} while (reportid != MXT_RPTID_NOMSG && --max_retry);
+	if (!max_retry)
+		dev_info(dev, "Read %d messages at resume(), and there's still more!\n", RESUME_READS);
+
+end:
 	return 0;
 }
 
