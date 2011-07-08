@@ -116,8 +116,14 @@
 #define PERIPH_CLK_SOURCE_NUM2 \
 	((PERIPH_CLK_SOURCE_SE - PERIPH_CLK_SOURCE_G3D2) / 4 + 1)
 
+#define AUDIO_DLY_CLK			0x49c
+#define AUDIO_SYNC_CLK_SPDIF		0x4b4
+#define PERIPH_CLK_SOURCE_NUM3 \
+	((AUDIO_SYNC_CLK_SPDIF - AUDIO_DLY_CLK) / 4 + 1)
+
 #define PERIPH_CLK_SOURCE_NUM		(PERIPH_CLK_SOURCE_NUM1 + \
-					 PERIPH_CLK_SOURCE_NUM2)
+					 PERIPH_CLK_SOURCE_NUM2 + \
+					 PERIPH_CLK_SOURCE_NUM3)
 
 #define CPU_SOFTRST_CTRL		0x380
 
@@ -4216,6 +4222,9 @@ void tegra_clk_suspend(void)
 			off+=4) {
 		*ctx++ = clk_readl(off);
 	}
+	for (off = AUDIO_DLY_CLK; off <= AUDIO_SYNC_CLK_SPDIF; off+=4) {
+		*ctx++ = clk_readl(off);
+	}
 
 	*ctx++ = clk_readl(RST_DEVICES_L);
 	*ctx++ = clk_readl(RST_DEVICES_H);
@@ -4298,6 +4307,9 @@ void tegra_clk_resume(void)
 	}
 	for (off = PERIPH_CLK_SOURCE_G3D2; off <= PERIPH_CLK_SOURCE_SE;
 			off += 4) {
+		clk_writel(*ctx++, off);
+	}
+	for (off = AUDIO_DLY_CLK; off <= AUDIO_SYNC_CLK_SPDIF; off+=4) {
 		clk_writel(*ctx++, off);
 	}
 	wmb();
