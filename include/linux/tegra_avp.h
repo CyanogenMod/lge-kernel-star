@@ -30,6 +30,9 @@ struct tegra_avp_lib {
 	unsigned long	handle;
 };
 
+struct tegra_avp_platform_data {
+	unsigned long emc_clk_rate;
+};
 #define TEGRA_AVP_IOCTL_MAGIC		'r'
 
 #define TEGRA_AVP_IOCTL_LOAD_LIB	_IOWR(TEGRA_AVP_IOCTL_MAGIC, 0x40, struct tegra_avp_lib)

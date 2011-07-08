@@ -25,6 +25,7 @@
 #include <linux/mutex.h>
 #include <linux/slab.h>
 #include <linux/tegra_rpc.h>
+#include <linux/tegra_avp.h>
 #include <linux/types.h>
 
 #include <mach/clk.h>
@@ -719,6 +720,7 @@ void avp_svc_stop(struct avp_svc_info *avp_svc)
 struct avp_svc_info *avp_svc_init(struct platform_device *pdev,
 				  struct trpc_node *rpc_node)
 {
+	struct tegra_avp_platform_data *pdata;
 	struct avp_svc_info *avp_svc;
 	int ret;
 	int i;
@@ -733,6 +735,8 @@ struct avp_svc_info *avp_svc_init(struct platform_device *pdev,
 	}
 
 	BUILD_BUG_ON(NUM_CLK_REQUESTS > BITS_PER_LONG);
+
+	pdata = pdev->dev.platform_data;
 
 	for (i = 0; i < NUM_AVP_MODULES; i++) {
 		struct avp_module *mod = &avp_modules[i];
@@ -769,11 +773,14 @@ struct avp_svc_info *avp_svc_init(struct platform_device *pdev,
 	}
 
 	/*
-	 * The emc is a shared clock, it will be set to the highest
-	 * requested rate from any user.  Set the rate to ULONG_MAX to
-	 * always request the max rate whenever this request is enabled
+	 * The emc is a shared clock, it will be set to the rate
+	 * requested in platform data.  Set the rate to ULONG_MAX
+	 * if platform data is NULL.
 	 */
-	clk_set_rate(avp_svc->emcclk, ULONG_MAX);
+	if (pdata)
+		clk_set_rate(avp_svc->emcclk, pdata->emc_clk_rate);
+	else
+		clk_set_rate(avp_svc->emcclk, ULONG_MAX);
 
 	avp_svc->rpc_node = rpc_node;
 
