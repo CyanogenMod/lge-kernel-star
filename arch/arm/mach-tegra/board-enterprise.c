@@ -55,6 +55,10 @@
 #include "fuse.h"
 #include "pm.h"
 
+#define USB_MANUFACTURER_NAME	"NVIDIA"
+#define USB_PRODUCT_ID_RNDIS	0x7103
+#define USB_VENDOR_ID			0x0955
+
 static struct usb_mass_storage_platform_data tegra_usb_fsg_platform = {
 	.vendor = "NVIDIA",
 	.product = "Tegra 3",
@@ -192,8 +196,23 @@ static __initdata struct tegra_clk_init_table enterprise_clk_init_table[] = {
 	{ NULL,		NULL,		0,		0},
 };
 
-static char *usb_functions[] = { "mtp", "usb_mass_storage" };
-static char *usb_functions_adb[] = { "mtp", "adb", "usb_mass_storage" };
+#ifdef CONFIG_USB_ANDROID_RNDIS
+static char *usb_functions_rndis[] = { "rndis" };
+static char *usb_functions_rndis_adb[] = { "rndis", "adb" };
+#endif
+
+static char *usb_functions[] = {
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	"rndis",
+#endif
+	"mtp",
+	"usb_mass_storage" };
+
+static char *usb_functions_adb[] = {
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	"rndis",
+#endif
+	"mtp", "adb", "usb_mass_storage" };
 
 static struct android_usb_product usb_products[] = {
 	{
@@ -206,6 +225,18 @@ static struct android_usb_product usb_products[] = {
 		.num_functions  = ARRAY_SIZE(usb_functions_adb),
 		.functions      = usb_functions_adb,
 	},
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	{
+		.product_id     = USB_PRODUCT_ID_RNDIS,
+		.num_functions  = ARRAY_SIZE(usb_functions_rndis),
+		.functions      = usb_functions_rndis,
+	},
+	{
+		.product_id     = USB_PRODUCT_ID_RNDIS,
+		.num_functions  = ARRAY_SIZE(usb_functions_rndis_adb),
+		.functions      = usb_functions_rndis_adb,
+	},
+#endif
 };
 
 /* standard android USB platform data */
@@ -228,6 +259,22 @@ static struct platform_device androidusb_device = {
 		.platform_data  = &andusb_plat,
 	},
 };
+
+#ifdef CONFIG_USB_ANDROID_RNDIS
+static struct usb_ether_platform_data rndis_pdata = {
+	.ethaddr = {0, 0, 0, 0, 0, 0},
+	.vendorID = USB_VENDOR_ID,
+	.vendorDescr = USB_MANUFACTURER_NAME,
+};
+
+static struct platform_device rndis_device = {
+	.name   = "rndis",
+	.id     = -1,
+	.dev    = {
+		.platform_data  = &rndis_pdata,
+	},
+};
+#endif
 
 static struct i2c_board_info __initdata enterprise_i2c_bus1_board_info[] = {
 	{
@@ -509,8 +556,17 @@ static struct tegra_otg_platform_data tegra_otg_pdata = {
 	.host_unregister = &tegra_usb_otg_host_unregister,
 };
 
+#ifdef CONFIG_USB_ANDROID_RNDIS
+#define SERIAL_NUMBER_LENGTH 20
+static char usb_serial_num[SERIAL_NUMBER_LENGTH];
+#endif
+
 static void enterprise_usb_init(void)
 {
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	char *src = usb_serial_num;
+	int i;
+#endif
 	struct	fsl_usb2_platform_data *udc_pdata;
 
 	tegra_usb_phy_init(tegra_usb_phy_pdata, ARRAY_SIZE(tegra_usb_phy_pdata));
@@ -523,6 +579,19 @@ static void enterprise_usb_init(void)
 
 	udc_pdata = tegra_udc_device.dev.platform_data;
 	udc_pdata->charge_regulator ="usb_bat_chg";
+
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	/* create a fake MAC address from our serial number.
+	 * first byte is 0x02 to signify locally administered.
+	 */
+	rndis_pdata.ethaddr[0] = 0x02;
+	for (i = 0; *src; i++) {
+		/* XOR the USB serial across the remaining bytes */
+		rndis_pdata.ethaddr[i % (ETH_ALEN - 1) + 1] ^= *src++;
+	}
+	platform_device_register(&rndis_device);
+#endif
+
 }
 
 static void enterprise_gps_init(void)
