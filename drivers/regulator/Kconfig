@@ -326,6 +326,13 @@ config REGULATOR_TPS80031
 	help
 	  This driver supports TPS80031 voltage regulator chips.
 
+config REGULATOR_RICOH583
+	tristate "RICOH 583 Power regulators"
+	depends on MFD_RICOH583
+	default n
+	help
+	  This driver supports regulator driver for RICOH583 PMIC.
+
 config REGULATOR_GPIO_SWITCH
 	bool "GPIO based enable/disable of power rails."
 	default n
