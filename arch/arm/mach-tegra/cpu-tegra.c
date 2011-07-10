@@ -56,7 +56,6 @@ static bool is_suspended;
 static int suspend_index;
 
 unsigned int tegra_getspeed(unsigned int cpu);
-static int tegra_update_cpu_speed(unsigned long rate);
 
 #ifdef CONFIG_TEGRA_THERMAL_THROTTLE
 /* CPU frequency is gradually lowered when throttling is enabled */
@@ -81,7 +80,7 @@ static void tegra_throttle_work_func(struct work_struct *work)
 	throttle_index = throttle_next_index;
 
 	if (freq_table[throttle_index].frequency < current_freq)
-		tegra_update_cpu_speed(freq_table[throttle_index].frequency);
+		tegra_cpu_set_speed_cap(NULL);
 
 	if (throttle_index > throttle_lowest_index) {
 		throttle_next_index = throttle_index - 1;
@@ -277,7 +276,7 @@ static int tegra_cpu_edp_notify(
 		cpu_speed = tegra_getspeed(0);
 		new_speed = edp_governor_speed(cpu_speed);
 		if (new_speed < cpu_speed) {
-			ret = tegra_update_cpu_speed(new_speed);
+			ret = tegra_cpu_set_speed_cap(NULL);
 			if (ret) {
 				cpu_clear(cpu, edp_cpumask);
 				edp_update_limit();
@@ -444,13 +443,21 @@ unsigned long tegra_cpu_highest_speed(void) {
 
 int tegra_cpu_set_speed_cap(unsigned int *speed_cap)
 {
+	int ret = 0;
 	unsigned int new_speed = tegra_cpu_highest_speed();
+
+	if (is_suspended)
+		return -EBUSY;
 
 	new_speed = throttle_governor_speed(new_speed);
 	new_speed = edp_governor_speed(new_speed);
 	if (speed_cap)
 		*speed_cap = new_speed;
-	return tegra_update_cpu_speed(new_speed);
+
+	ret = tegra_update_cpu_speed(new_speed);
+	if (ret == 0)
+		tegra_auto_hotplug_governor(new_speed, false);
+	return ret;
 }
 
 static int tegra_target(struct cpufreq_policy *policy,
@@ -464,11 +471,6 @@ static int tegra_target(struct cpufreq_policy *policy,
 
 	mutex_lock(&tegra_cpu_lock);
 
-	if (is_suspended) {
-		ret = -EBUSY;
-		goto out;
-	}
-
 	cpufreq_frequency_table_target(policy, freq_table, target_freq,
 		relation, &idx);
 
@@ -476,9 +478,7 @@ static int tegra_target(struct cpufreq_policy *policy,
 
 	target_cpu_speed[policy->cpu] = freq;
 	ret = tegra_cpu_set_speed_cap(&new_speed);
-	if (ret == 0)
-		tegra_auto_hotplug_governor(new_speed, false);
-out:
+
 	mutex_unlock(&tegra_cpu_lock);
 
 	return ret;
