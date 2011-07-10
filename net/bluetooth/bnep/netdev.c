@@ -207,11 +207,21 @@ static netdev_tx_t bnep_net_xmit(struct sk_buff *skb,
 	return NETDEV_TX_OK;
 }
 
+static int bnep_validate_addr(struct net_device *dev)
+{
+	u8 *addr = dev->dev_addr;
+	/* Make sure the 6th byte is even */
+	if (addr[0] & 0x1) {
+		addr[0]--;
+	}
+	return eth_validate_addr(dev);
+}
+
 static const struct net_device_ops bnep_netdev_ops = {
 	.ndo_open            = bnep_net_open,
 	.ndo_stop            = bnep_net_close,
 	.ndo_start_xmit	     = bnep_net_xmit,
-	.ndo_validate_addr   = eth_validate_addr,
+	.ndo_validate_addr   = bnep_validate_addr,
 	.ndo_set_multicast_list = bnep_net_set_mc_list,
 	.ndo_set_mac_address = bnep_net_set_mac_addr,
 	.ndo_tx_timeout      = bnep_net_timeout,
