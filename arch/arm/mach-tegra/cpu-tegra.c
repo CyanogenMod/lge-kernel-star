@@ -61,21 +61,23 @@ unsigned int tegra_getspeed(unsigned int cpu);
 /* CPU frequency is gradually lowered when throttling is enabled */
 #define THROTTLE_DELAY		msecs_to_jiffies(2000)
 
-static bool is_throttling;
+static int is_throttling;
 static int throttle_lowest_index;
 static int throttle_highest_index;
 static int throttle_index;
 static int throttle_next_index;
 static struct delayed_work throttle_work;
 static struct workqueue_struct *workqueue;
-
-#define tegra_cpu_is_throttling() (is_throttling)
+static DEFINE_MUTEX(tegra_throttle_lock);
 
 static void tegra_throttle_work_func(struct work_struct *work)
 {
 	unsigned int current_freq;
 
 	mutex_lock(&tegra_cpu_lock);
+	if (!is_throttling)
+		goto out;
+
 	current_freq = tegra_getspeed(0);
 	throttle_index = throttle_next_index;
 
@@ -86,7 +88,7 @@ static void tegra_throttle_work_func(struct work_struct *work)
 		throttle_next_index = throttle_index - 1;
 		queue_delayed_work(workqueue, &throttle_work, THROTTLE_DELAY);
 	}
-
+out:
 	mutex_unlock(&tegra_cpu_lock);
 }
 
@@ -96,12 +98,11 @@ static void tegra_throttle_work_func(struct work_struct *work)
  */
 void tegra_throttling_enable(bool enable)
 {
+	mutex_lock(&tegra_throttle_lock);
 	mutex_lock(&tegra_cpu_lock);
 
-	if (enable && !is_throttling) {
+	if (enable && !(is_throttling++)) {
 		unsigned int current_freq = tegra_getspeed(0);
-
-		is_throttling = true;
 
 		for (throttle_index = throttle_highest_index;
 		     throttle_index >= throttle_lowest_index;
@@ -114,19 +115,24 @@ void tegra_throttling_enable(bool enable)
 		throttle_next_index = throttle_index;
 		queue_delayed_work(workqueue, &throttle_work, 0);
 	} else if (!enable && is_throttling) {
-		cancel_delayed_work_sync(&throttle_work);
-		is_throttling = false;
-		/* restore speed requested by governor */
-		tegra_cpu_set_speed_cap(NULL);
-	}
+		if (!(--is_throttling)) {
+			/* restore speed requested by governor */
+			tegra_cpu_set_speed_cap(NULL);
 
+			mutex_unlock(&tegra_cpu_lock);
+			cancel_delayed_work_sync(&throttle_work);
+			mutex_unlock(&tegra_throttle_lock);
+			return;
+		}
+	}
 	mutex_unlock(&tegra_cpu_lock);
+	mutex_unlock(&tegra_throttle_lock);
 }
 EXPORT_SYMBOL_GPL(tegra_throttling_enable);
 
 static unsigned int throttle_governor_speed(unsigned int requested_speed)
 {
-	return tegra_cpu_is_throttling() ?
+	return is_throttling ?
 		min(requested_speed, freq_table[throttle_index].frequency) :
 		requested_speed;
 }
@@ -182,7 +188,6 @@ module_exit(tegra_cpu_debug_exit);
 #endif /* CONFIG_DEBUG_FS */
 
 #else /* CONFIG_TEGRA_THERMAL_THROTTLE */
-#define tegra_cpu_is_throttling() (0)
 #define throttle_governor_speed(requested_speed) (requested_speed)
 #endif /* CONFIG_TEGRA_THERMAL_THROTTLE */
 
