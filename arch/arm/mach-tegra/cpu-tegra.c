@@ -41,7 +41,7 @@
 #include <mach/edp.h>
 
 #include "clock.h"
-#include "pm.h"
+#include "cpu-tegra.h"
 
 /* tegra throttling and edp governors require frequencies in the table
    to be in ascending order */
@@ -118,7 +118,7 @@ void tegra_throttling_enable(bool enable)
 		cancel_delayed_work_sync(&throttle_work);
 		is_throttling = false;
 		/* restore speed requested by governor */
-		tegra_cpu_cap_highest_speed(NULL);
+		tegra_cpu_set_speed_cap(NULL);
 	}
 
 	mutex_unlock(&tegra_cpu_lock);
@@ -253,7 +253,7 @@ int tegra_edp_update_thermal_zone(int temperature)
 	/* Update cpu rate if cpufreq (at least on cpu0) is already started */
 	if (target_cpu_speed[0]) {
 		edp_update_limit();
-		tegra_cpu_cap_highest_speed(NULL);
+		tegra_cpu_set_speed_cap(NULL);
 	}
 	mutex_unlock(&tegra_cpu_lock);
 
@@ -292,7 +292,7 @@ static int tegra_cpu_edp_notify(
 		mutex_lock(&tegra_cpu_lock);
 		cpu_clear(cpu, edp_cpumask);
 		edp_update_limit();
-		tegra_cpu_cap_highest_speed(NULL);
+		tegra_cpu_set_speed_cap(NULL);
 		mutex_unlock(&tegra_cpu_lock);
 		break;
 	}
@@ -442,7 +442,7 @@ unsigned long tegra_cpu_highest_speed(void) {
 	return rate;
 }
 
-int tegra_cpu_cap_highest_speed(unsigned int *speed_cap)
+int tegra_cpu_set_speed_cap(unsigned int *speed_cap)
 {
 	unsigned int new_speed = tegra_cpu_highest_speed();
 
@@ -475,7 +475,7 @@ static int tegra_target(struct cpufreq_policy *policy,
 	freq = freq_table[idx].frequency;
 
 	target_cpu_speed[policy->cpu] = freq;
-	ret = tegra_cpu_cap_highest_speed(&new_speed);
+	ret = tegra_cpu_set_speed_cap(&new_speed);
 	if (ret == 0)
 		tegra_auto_hotplug_governor(new_speed, false);
 out:
@@ -500,7 +500,7 @@ static int tegra_pm_notify(struct notifier_block *nb, unsigned long event,
 		unsigned int freq;
 		is_suspended = false;
 		tegra_cpu_edp_init(true);
-		tegra_cpu_cap_highest_speed(&freq);
+		tegra_cpu_set_speed_cap(&freq);
 		pr_info("Tegra cpufreq resume: restoring frequency to %d kHz\n",
 			freq);
 	}

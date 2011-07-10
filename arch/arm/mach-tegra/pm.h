@@ -81,26 +81,6 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode);
 
 void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat);
 
-unsigned int tegra_count_slow_cpus(unsigned long speed_limit);
-unsigned int tegra_get_slowest_cpu_n(void);
-unsigned long tegra_cpu_lowest_speed(void);
-unsigned long tegra_cpu_highest_speed(void);
-int tegra_cpu_cap_highest_speed(unsigned int *speed_cap);
-
-#if defined(CONFIG_TEGRA_AUTO_HOTPLUG) && !defined(CONFIG_ARCH_TEGRA_2x_SOC)
-int tegra_auto_hotplug_init(struct mutex *cpu_lock);
-void tegra_auto_hotplug_exit(void);
-void tegra_auto_hotplug_governor(unsigned int cpu_freq, bool suspend);
-#else
-static inline int tegra_auto_hotplug_init(struct mutex *cpu_lock)
-{ return 0; }
-static inline void tegra_auto_hotplug_exit(void)
-{ }
-static inline void tegra_auto_hotplug_governor(unsigned int cpu_freq,
-						bool suspend)
-{ }
-#endif
-
 u64 tegra_rtc_read_ms(void);
 
 /*

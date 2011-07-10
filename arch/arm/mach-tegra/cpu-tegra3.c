@@ -34,6 +34,7 @@
 #include <linux/seq_file.h>
 
 #include "pm.h"
+#include "cpu-tegra.h"
 #include "clock.h"
 
 #define INITIAL_STATE		TEGRA_HP_DISABLED
@@ -228,7 +229,7 @@ static void tegra_auto_hotplug_work_func(struct work_struct *work)
 				hp_stats_update(CONFIG_NR_CPUS, false);
 				hp_stats_update(0, true);
 				/* catch-up with governor target speed */
-				tegra_cpu_cap_highest_speed(NULL);
+				tegra_cpu_set_speed_cap(NULL);
 			}
 		} else {
 			switch (tegra_cpu_speed_balance()) {
