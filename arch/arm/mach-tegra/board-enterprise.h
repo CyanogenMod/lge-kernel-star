@@ -33,7 +33,7 @@ int touch_init(void);
 int enterprise_kbc_init(void);
 int enterprise_emc_init(void);
 int enterprise_regulator_init(void);
-int enterprise_baseband_init(void);
+int enterprise_modem_init(void);
 int enterprise_suspend_init(void);
 
 /* Touchscreen GPIO addresses   */
