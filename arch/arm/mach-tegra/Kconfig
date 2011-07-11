@@ -173,7 +173,7 @@ config TEGRA_PWM
 
 config TEGRA_FIQ_DEBUGGER
 	bool "Enable the FIQ serial debugger on Tegra"
-	default y
+	default n
 	select FIQ_DEBUGGER
 	help
 	  Enables the FIQ serial debugger on Tegra"
