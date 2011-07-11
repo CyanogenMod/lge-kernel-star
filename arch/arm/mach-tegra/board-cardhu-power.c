@@ -692,7 +692,7 @@ GREG_INIT(17, en_vddio_vid_oc_pm269,	en_vddio_vid_oc,	"master_5v_switch",
 	0,      0,      TEGRA_GPIO_PP2,	false,	0,	TEGRA_PINGROUP_DAP3_DOUT,
 	enable_load_switch_rail, disable_load_switch_rail);
 
-/* Specific to E1187/E1186 */
+/* Specific to E1187/E1186/E1256 */
 GREG_INIT(14, dis_5v_switch_e118x,	dis_5v_switch,		"vdd_5v0_sys",
 		0,      0,      TEGRA_GPIO_PX2,		true,	0,	0,	0,	0);
 GREG_INIT(15, en_usb1_vbus_oc_e118x,	en_usb1_vbus_oc,	"master_5v_switch",
@@ -812,9 +812,7 @@ GREG_INIT(22, en_vbrtr,		en_vbrtr,	"vdd_3v3_devices",	0,      0,      PMU_TCA641
 	ADD_GPIO_REG(en_vdd_bl1_a03), \
 	ADD_GPIO_REG(en_vdd_bl2_a03),
 
-/* Gpio switch regulator platform data  for E1186/E1187*/
-
-/* Gpio switch regulator platform data  for E1186/E1187*/
+/* Gpio switch regulator platform data  for E1186/E1187/E1256*/
 static struct gpio_switch_regulator_subdev_data *gswitch_subdevs_e118x[] = {
 	COMMON_GPIO_REG
 	E118x_GPIO_REG
@@ -939,6 +937,7 @@ int __init cardhu_suspend_init(void)
 		break;
 	case BOARD_E1187:
 	case BOARD_E1186:
+	case BOARD_E1256:
 		cardhu_suspend_data.cpu_timer = 5000;
 		cardhu_suspend_data.cpu_off_timer = 5000;
 		break;

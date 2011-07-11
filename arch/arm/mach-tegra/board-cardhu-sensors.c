@@ -567,7 +567,8 @@ static int cardhu_nct1008_init(void)
 		(board_info.board_id == BOARD_E1291)) {
 		nct1008_port = TEGRA_GPIO_PCC2;
 	} else if ((board_info.board_id == BOARD_E1186) ||
-		(board_info.board_id == BOARD_E1187)) {
+		(board_info.board_id == BOARD_E1187) ||
+		(board_info.board_id == BOARD_E1256)) {
 		/* FIXME: seems to be conflicting with usb3 vbus on E1186 */
 		/* nct1008_port = TEGRA_GPIO_PH7; */
 	}

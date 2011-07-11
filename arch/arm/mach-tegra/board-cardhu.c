@@ -306,6 +306,7 @@ static void __init uart_debug_init(void)
 	if (board_info.sku & SKU_SLT_ULPI_SUPPORT) {
 		if ((board_info.board_id == BOARD_E1186) ||
 			(board_info.board_id == BOARD_E1187) ||
+			(board_info.board_id == BOARD_E1256) ||
 			(board_info.board_id == BOARD_PM269)) {
 				/* UARTB is the debug port. */
 				pr_info("Selecting UARTB as the debug console\n");
@@ -584,7 +585,7 @@ static void cardhu_usb_init(void)
 			PM267_SMSC4640_HSIC_HUB_RESET_GPIO;
 		tegra_ehci2_device.dev.platform_data = &tegra_ehci_uhsic_pdata;
 	} else if ((bi.board_id == BOARD_PM269) ||
-		(bi.board_id == BOARD_E1186)) {
+		(bi.board_id == BOARD_E1186) || (bi.board_id == BOARD_E1256)) {
 		tegra_ehci2_device.dev.platform_data = &tegra_ehci_uhsic_pdata;
 	} else {
 		tegra_ehci2_device.dev.platform_data = &tegra_ehci_pdata[1];
