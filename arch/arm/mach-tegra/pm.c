@@ -87,7 +87,7 @@ struct suspend_context tegra_sctx;
 
 static void __iomem *iram_code = IO_ADDRESS(TEGRA_IRAM_CODE_AREA);
 static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
-#ifdef CONFIG_PM
+#ifdef CONFIG_PM_SLEEP
 static void __iomem *clk_rst = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
 static void __iomem *evp_reset =
 	IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100;
@@ -220,7 +220,7 @@ static void tegra_suspend_check_pwr_stats(void)
 		(1 << TEGRA_POWERGATE_PCIE)	|
 		(1 << TEGRA_POWERGATE_VDEC)	|
 		(1 << TEGRA_POWERGATE_MPE);
-	
+
 	int partid;
 
 	for (partid = 0; partid < TEGRA_NUM_POWERGATE; partid++)
@@ -354,7 +354,7 @@ static void tegra_wake_reset_cpu(int cpu)
 }
 #endif
 
-#ifdef CONFIG_PM
+#ifdef CONFIG_PM_SLEEP
 /*
  * restore_cpu_complex
  *
@@ -890,20 +890,21 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 
 	create_suspend_pgtable();
 
-#ifdef CONFIG_PM
+#ifdef CONFIG_PM_SLEEP
 
 	if ((tegra_get_chipid() == TEGRA_CHIPID_TEGRA3) &&
 	    (tegra_get_revision() == TEGRA_REVISION_A01) &&
 	    (plat->suspend_mode == TEGRA_SUSPEND_LP0)) {
 		/* Tegra 3 A01 supports only LP1 */
-		pr_warning("Suspend mode LP0 is not supported on A01\n");
-		pr_warning("Disabling LP0\n");
+		pr_warning("%s: Suspend mode LP0 is not supported on A01 "
+			   "-- disabling LP0\n", __func__);
 		plat->suspend_mode = TEGRA_SUSPEND_LP1;
 	}
 
 	if (plat->suspend_mode == TEGRA_SUSPEND_LP0 && !tegra_lp0_vec_size) {
-		pr_warning("Suspend mode LP0 requested, no lp0_vec\n");
-		pr_warning("Disabling LP0\n");
+		pr_warning("%s: Suspend mode LP0 requested, no lp0_vec "
+			   "provided by bootlader -- disabling LP0\n",
+			   __func__);
 		plat->suspend_mode = TEGRA_SUSPEND_LP1;
 	}
 
@@ -912,10 +913,11 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 	iram_save = kmalloc(iram_save_size, GFP_KERNEL);
 	if (!iram_save) {
 		pr_err("%s: unable to allocate memory for SDRAM self-refresh "
-		       "LP0/LP1 unavailable\n", __func__);
+		       "-- LP0/LP1 unavailable\n", __func__);
 		plat->suspend_mode = TEGRA_SUSPEND_LP2;
 	}
 
+	/* !!!FIXME!!! THIS IS TEGRA2 ONLY */
 	/* Initialize scratch registers used for CPU LP2 synchronization */
 	writel(0, pmc + PMC_SCRATCH37);
 	writel(0, pmc + PMC_SCRATCH38);
@@ -963,9 +965,21 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 	if (suspend_kobj) {
 		if (sysfs_create_file(suspend_kobj, \
 						&suspend_mode_attribute.attr))
-			pr_err("%s: sysfs_create_file suspend type failed!", \
+			pr_err("%s: sysfs_create_file suspend type failed!\n",
 								__func__);
 	}
+#else
+	if ((plat->suspend_mode == TEGRA_SUSPEND_LP0) ||
+	    (plat->suspend_mode == TEGRA_SUSPEND_LP1)) {
+		pr_warning("%s: Suspend mode LP0 or LP1 requires "
+			   "CONFIG_PM_SLEEP -- limiting to LP2\n", __func__);
+		plat->suspend_mode = TEGRA_SUSPEND_LP2;
+	}
+#endif
+
+#ifdef CONFIG_CPU_IDLE
+	if (plat->suspend_mode == TEGRA_SUSPEND_NONE)
+		tegra_lp2_in_idle(false);
 #endif
 
 	current_suspend_mode = plat->suspend_mode;

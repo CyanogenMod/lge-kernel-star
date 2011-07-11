@@ -3879,7 +3879,7 @@ unsigned long tegra_emc_to_cpu_ratio(unsigned long cpu_rate)
 }
 #endif
 
-#ifdef CONFIG_PM
+#ifdef CONFIG_PM_SLEEP
 static u32 clk_rst_suspend[RST_DEVICES_NUM + CLK_OUT_ENB_NUM +
 			   PERIPH_CLK_SOURCE_NUM + 18];
 
