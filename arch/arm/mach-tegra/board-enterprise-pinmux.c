@@ -18,6 +18,8 @@
 #include <linux/init.h>
 #include <mach/pinmux.h>
 #include "board.h"
+#include "board-enterprise.h"
+#include "gpio-names.h"
 
 #define DEFAULT_DRIVE(_name)					\
 	{							\
@@ -136,8 +138,6 @@ static __initdata struct tegra_pingroup_config enterprise_pinmux[] = {
 	DEFAULT_PINMUX(SDMMC3_DAT1,     SDMMC3,          PULL_UP,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SDMMC3_DAT2,     SDMMC3,          PULL_UP,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SDMMC3_DAT3,     SDMMC3,          PULL_UP,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(SDMMC3_DAT6,     SDMMC3,           NORMAL,     NORMAL,     INPUT),
-	DEFAULT_PINMUX(SDMMC3_DAT7,     SDMMC3,           NORMAL,     NORMAL,     INPUT),
 
 	/* SDMMC4 pinmux */
 	DEFAULT_PINMUX(SDMMC4_CLK,      SDMMC4,          NORMAL,     NORMAL,     INPUT),
@@ -190,21 +190,11 @@ static __initdata struct tegra_pingroup_config enterprise_pinmux[] = {
 	DEFAULT_PINMUX(DAP3_SCLK,       I2S2,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GPIO_PV2,        RSVD1,           NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(GPIO_PV3,        RSVD1,           NORMAL,    NORMAL,     OUTPUT),
-	DEFAULT_PINMUX(CLK2_OUT,        EXTPERIPH2,      NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(CLK2_REQ,        DAP,             NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(LCD_PWR1,        DISPLAYA,        NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(LCD_PWR2,        DISPLAYA,        NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(LCD_SDIN,        DISPLAYA,        NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(LCD_SDOUT,       DISPLAYA,        NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(LCD_WR_N,        DISPLAYA,        NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(LCD_CS0_N,       DISPLAYA,        NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(LCD_DC0,         DISPLAYA,        NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(LCD_SCK,         DISPLAYA,        NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(LCD_PWR0,        DISPLAYA,        NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(LCD_PCLK,        DISPLAYA,        NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(LCD_DE,          DISPLAYA,        NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(LCD_HSYNC,       DISPLAYA,        NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(LCD_VSYNC,       DISPLAYA,        NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(LCD_D0,          DISPLAYA,        NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(LCD_D1,          DISPLAYA,        NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(LCD_D2,          DISPLAYA,        NORMAL,    NORMAL,     INPUT),
@@ -215,8 +205,6 @@ static __initdata struct tegra_pingroup_config enterprise_pinmux[] = {
 	DEFAULT_PINMUX(LCD_D7,          RSVD1,           NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(LCD_D8,          DISPLAYA,        NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(LCD_D9,          DISPLAYA,        NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(LCD_D10,         DISPLAYA,        NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(LCD_D11,         DISPLAYA,        NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(LCD_D12,         DISPLAYA,        NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(LCD_D13,         DISPLAYA,        NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(LCD_D14,         DISPLAYA,        NORMAL,    NORMAL,     INPUT),
@@ -232,8 +220,6 @@ static __initdata struct tegra_pingroup_config enterprise_pinmux[] = {
 	DEFAULT_PINMUX(LCD_CS1_N,       DISPLAYA,        NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(LCD_M1,          DISPLAYA,        NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(LCD_DC1,         DISPLAYA,        NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(CRT_HSYNC,       CRT,             NORMAL,    NORMAL,     OUTPUT),
-	DEFAULT_PINMUX(CRT_VSYNC,       CRT,             NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(VI_D0,           RSVD1,           NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(VI_D1,           SDMMC2,          NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(VI_D2,           SDMMC2,          NORMAL,    NORMAL,     INPUT),
@@ -256,18 +242,12 @@ static __initdata struct tegra_pingroup_config enterprise_pinmux[] = {
 	DEFAULT_PINMUX(GPIO_PU1,        UARTA,           NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GPIO_PU2,        UARTA,           NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GPIO_PU3,        UARTA,           NORMAL,    NORMAL,     OUTPUT),
-	DEFAULT_PINMUX(GPIO_PU4,        PWM1,            NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(GPIO_PU5,        PWM2,            NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(GPIO_PU6,        PWM3,            NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(DAP4_FS,         I2S3,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(DAP4_DIN,        I2S3,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(DAP4_DOUT,       I2S3,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(DAP4_SCLK,       I2S3,            NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(CLK3_OUT,        EXTPERIPH3,      NORMAL,    NORMAL,     OUTPUT),
-	DEFAULT_PINMUX(CLK3_REQ,        DEV3,            NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(GMI_WP_N,        RSVD1,           NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(GMI_CS2_N,       NAND,            NORMAL,    NORMAL,     OUTPUT),
-	DEFAULT_PINMUX(GMI_RST_N,       RSVD3,           PULL_UP,   TRISTATE,   INPUT),
 	DEFAULT_PINMUX(GMI_AD8,         PWM0,            NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(GMI_AD9,         NAND,            NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(GMI_AD10,        NAND,            NORMAL,    NORMAL,     OUTPUT),
@@ -279,8 +259,6 @@ static __initdata struct tegra_pingroup_config enterprise_pinmux[] = {
 	DEFAULT_PINMUX(GPIO_PCC1,       RSVD1,           NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GPIO_PBB0,       RSVD1,           NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GPIO_PBB3,       VGP3,            NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(GPIO_PBB5,       VGP5,            NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(GPIO_PBB6,       VGP6,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GPIO_PBB7,       I2S4,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GPIO_PCC2,       I2S4,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(JTAG_RTCK,       RTCK,            NORMAL,    NORMAL,     OUTPUT),
@@ -310,7 +288,6 @@ static __initdata struct tegra_pingroup_config enterprise_pinmux[] = {
 #else
 	DEFAULT_PINMUX(SPDIF_IN,        SPDIF,           NORMAL,    NORMAL,     INPUT),
 #endif
-	DEFAULT_PINMUX(SPDIF_OUT,       SPDIF,           NORMAL,    NORMAL,     OUTPUT),
 #ifdef CONFIG_SND_HDA_CODEC_REALTEK
 	DEFAULT_PINMUX(DAP2_FS,         HDA,             PULL_DOWN, NORMAL,     INPUT),
 	DEFAULT_PINMUX(DAP2_DIN,        HDA,             PULL_DOWN, NORMAL,     INPUT),
@@ -323,10 +300,8 @@ static __initdata struct tegra_pingroup_config enterprise_pinmux[] = {
 	DEFAULT_PINMUX(DAP2_SCLK,       I2S1,            NORMAL,    NORMAL,     INPUT),
 #endif
 	DEFAULT_PINMUX(SPI2_CS1_N,      SPI2,            PULL_UP,   NORMAL,     INPUT),
-	DEFAULT_PINMUX(SPI2_SCK,        SPI2,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SPI1_MOSI,       SPI1,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SPI1_SCK,        SPI1,            NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(SPI1_CS0_N,      SPI1,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(SPI1_MISO,       SPI1,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(PEX_L0_PRSNT_N,  PCIE,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(PEX_L0_RST_N,    PCIE,            NORMAL,    NORMAL,     OUTPUT),
@@ -357,10 +332,7 @@ static __initdata struct tegra_pingroup_config enterprise_pinmux[] = {
 	DEFAULT_PINMUX(GMI_AD15,        NAND,            PULL_UP,   TRISTATE,   INPUT),
 
 	/* Power rails GPIO */
-	DEFAULT_PINMUX(GPIO_PBB4,       VGP4,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(KB_ROW8,         KBC,             PULL_UP,   NORMAL,     INPUT),
-	DEFAULT_PINMUX(SDMMC3_DAT5,     SDMMC3,          PULL_UP,   NORMAL,     INPUT),
-	DEFAULT_PINMUX(SDMMC3_DAT4,     SDMMC3,          PULL_UP,   NORMAL,     INPUT),
 
 	VI_PINMUX(VI_D6,           VI,              NORMAL,    NORMAL,     OUTPUT, DISABLE, DISABLE),
 	VI_PINMUX(VI_D8,           SDMMC2,          NORMAL,    NORMAL,     INPUT,  DISABLE, DISABLE),
@@ -370,10 +342,180 @@ static __initdata struct tegra_pingroup_config enterprise_pinmux[] = {
 	VI_PINMUX(VI_VSYNC,        RSVD1,           NORMAL,    NORMAL,     INPUT,  DISABLE, DISABLE),
 };
 
+static __initdata struct tegra_pingroup_config enterprise_unused_pinmux[] = {
+	DEFAULT_PINMUX(CLK2_OUT,       EXTPERIPH2,       PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(CLK2_REQ,       DAP,              PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(CLK3_OUT,       EXTPERIPH3,       PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(CLK3_REQ,       DEV3,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GPIO_PBB4,      VGP4,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GPIO_PBB5,      VGP5,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GPIO_PBB6,      VGP6,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GPIO_PU4,        PWM1,            PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GMI_AD0,         GMI,             NORMAL,       TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GMI_AD1,         GMI,             NORMAL,       TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GMI_AD2,         GMI,             NORMAL,       TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GMI_AD3,         GMI,             NORMAL,       TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GMI_AD4,         GMI,             NORMAL,       TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GMI_AD5,         GMI,             NORMAL,       TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GMI_AD6,         GMI,             NORMAL,       TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GMI_AD7,         GMI,             NORMAL,       TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GMI_AD11,        GMI,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GMI_CS0_N,       GMI,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GMI_CS2_N,       GMI,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GMI_CS3_N,       GMI,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GMI_CS6_N,       GMI,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GMI_CS7_N,       GMI,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GMI_DQS,         GMI,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GMI_RST_N,       GMI,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GMI_WAIT,        GMI,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(GMI_WP_N,        GMI,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(KB_ROW6,         KBC,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(KB_ROW7,         KBC,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(KB_ROW9,         KBC,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(KB_ROW11,        KBC,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(KB_ROW13,        KBC,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(KB_ROW14,        KBC,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(KB_ROW15,        KBC,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(LCD_PCLK,        DISPLAYA,        PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(LCD_WR_N,        DISPLAYA,        PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(LCD_HSYNC,       DISPLAYA,        PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(LCD_VSYNC,       DISPLAYA,        PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(LCD_D10,         DISPLAYA,        PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(LCD_D11,         DISPLAYA,        PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(LCD_PWR0,        DISPLAYA,        PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(LCD_SCK,        DISPLAYA,        PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(LCD_SDOUT,       DISPLAYA,        PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(LCD_SDIN,        DISPLAYA,        PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(CRT_HSYNC,       CRT,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(CRT_VSYNC,       CRT,             PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(SDMMC3_DAT4,     SDMMC3,          PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(SDMMC3_DAT5,     SDMMC3,          PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(SDMMC3_DAT6,     SDMMC3,          PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(SDMMC3_DAT7,     SDMMC3,          PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(SPDIF_OUT,       DAP2,            PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(SPI1_CS0_N,      SPI1,            PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(SPI2_SCK,        SPI2,            PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(SPI2_CS0_N,      SPI2,            PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(SPI2_MOSI,       SPI2,            PULL_DOWN,    TRISTATE,  OUTPUT),
+	DEFAULT_PINMUX(SPI2_MISO,       SPI2,            PULL_DOWN,    TRISTATE,  OUTPUT),
+};
+
+struct pin_info_low_power_mode {
+	char name[16];
+	int gpio_nr;
+	bool is_gpio;
+	bool is_input;
+	int value; /* Value if it is output*/
+};
+
+#define PIN_GPIO_LPM(_name, _gpio, _is_input, _value)	\
+	{					\
+		.name		= _name,	\
+		.gpio_nr	= _gpio,	\
+		.is_gpio	= true,		\
+		.is_input	= _is_input,	\
+		.value		= _value,	\
+	}
+static __initdata struct pin_info_low_power_mode enterprise_unused_gpio_pins[] = {
+	PIN_GPIO_LPM("CLK2_OUT",     TEGRA_GPIO_PW5,   0, 0),
+	PIN_GPIO_LPM("CLK2_REQ",     TEGRA_GPIO_PCC5,  0, 0),
+	PIN_GPIO_LPM("CLK3_OUT",     TEGRA_GPIO_PEE0,  0, 0),
+	PIN_GPIO_LPM("CLK3_REQ",     TEGRA_GPIO_PEE1,  0, 0),
+	PIN_GPIO_LPM("GPIO_PBB4",    TEGRA_GPIO_PBB4,  0, 0),
+	PIN_GPIO_LPM("GPIO_PBB5",    TEGRA_GPIO_PBB5,  0, 0),
+	PIN_GPIO_LPM("GPIO_PBB6",    TEGRA_GPIO_PBB6,  0, 0),
+	PIN_GPIO_LPM("GPIO_PU4",     TEGRA_GPIO_PU4,  0, 0),
+	PIN_GPIO_LPM("GMI_AD0",      TEGRA_GPIO_PG0,  0, 0),
+	PIN_GPIO_LPM("GMI_AD1",      TEGRA_GPIO_PG1,  0, 0),
+	PIN_GPIO_LPM("GMI_AD2",      TEGRA_GPIO_PG2,  0, 0),
+	PIN_GPIO_LPM("GMI_AD3",      TEGRA_GPIO_PG3,  0, 0),
+	PIN_GPIO_LPM("GMI_AD4",      TEGRA_GPIO_PG4,  0, 0),
+	PIN_GPIO_LPM("GMI_AD5",      TEGRA_GPIO_PG5,  0, 0),
+	PIN_GPIO_LPM("GMI_AD6",      TEGRA_GPIO_PG6,  0, 0),
+	PIN_GPIO_LPM("GMI_AD7",      TEGRA_GPIO_PG7,  0, 0),
+	PIN_GPIO_LPM("GMI_AD11",     TEGRA_GPIO_PH3,  0, 0),
+	PIN_GPIO_LPM("GMI_CS0_N",    TEGRA_GPIO_PJ0,  0, 0),
+	PIN_GPIO_LPM("GMI_CS2_N",    TEGRA_GPIO_PK3,  0, 0),
+	PIN_GPIO_LPM("GMI_CS3_N",    TEGRA_GPIO_PK4,  0, 0),
+	PIN_GPIO_LPM("GMI_CS6_N",    TEGRA_GPIO_PI3,  0, 0),
+	PIN_GPIO_LPM("GMI_CS7_N",    TEGRA_GPIO_PI6,  0, 0),
+	PIN_GPIO_LPM("GMI_DQS",      TEGRA_GPIO_PI2,  0, 0),
+	PIN_GPIO_LPM("GMI_RST_N",    TEGRA_GPIO_PI4,  0, 0),
+	PIN_GPIO_LPM("GMI_WAIT",     TEGRA_GPIO_PI7,  0, 0),
+	PIN_GPIO_LPM("GMI_WP_N",     TEGRA_GPIO_PC7,  0, 0),
+	PIN_GPIO_LPM("KB_ROW6",      TEGRA_GPIO_PR6,  0, 0),
+	PIN_GPIO_LPM("KB_ROW7",      TEGRA_GPIO_PR7,  0, 0),
+	PIN_GPIO_LPM("KB_ROW9",      TEGRA_GPIO_PS1,  0, 0),
+	PIN_GPIO_LPM("KB_ROW11",     TEGRA_GPIO_PS3,  0, 0),
+	PIN_GPIO_LPM("KB_ROW13",     TEGRA_GPIO_PS5,  0, 0),
+	PIN_GPIO_LPM("KB_ROW14",     TEGRA_GPIO_PS6,  0, 0),
+	PIN_GPIO_LPM("KB_ROW15",     TEGRA_GPIO_PS7,  0, 0),
+	PIN_GPIO_LPM("LCD_PCLK",     TEGRA_GPIO_PB3,  0, 0),
+	PIN_GPIO_LPM("LCD_WR_N",     TEGRA_GPIO_PZ3,  0, 0),
+	PIN_GPIO_LPM("LCD_HSYNC",    TEGRA_GPIO_PJ3,  0, 0),
+	PIN_GPIO_LPM("LCD_VSYNC",    TEGRA_GPIO_PJ4,  0, 0),
+	PIN_GPIO_LPM("LCD_D10",      TEGRA_GPIO_PF2,  0, 0),
+	PIN_GPIO_LPM("LCD_D12",      TEGRA_GPIO_PF3,  0, 0),
+	PIN_GPIO_LPM("LCD_PWR0",     TEGRA_GPIO_PB2,  0, 0),
+	PIN_GPIO_LPM("LCD_SCK",      TEGRA_GPIO_PZ4,  0, 0),
+	PIN_GPIO_LPM("LCD_SDOUT",    TEGRA_GPIO_PN5,  0, 0),
+	PIN_GPIO_LPM("LCD_SDIN",     TEGRA_GPIO_PZ2,  0, 0),
+	PIN_GPIO_LPM("CRT_HSYNC",    TEGRA_GPIO_PV6,  0, 0),
+	PIN_GPIO_LPM("CRT_VSYNC",    TEGRA_GPIO_PV7,  0, 0),
+	PIN_GPIO_LPM("SDMMC3_DAT4",  TEGRA_GPIO_PD1,  0, 0),
+	PIN_GPIO_LPM("SDMMC3_DAT5",  TEGRA_GPIO_PD0,  0, 0),
+	PIN_GPIO_LPM("SDMMC3_DAT6",  TEGRA_GPIO_PD3,  0, 0),
+	PIN_GPIO_LPM("SDMMC3_DAT7",  TEGRA_GPIO_PD4,  0, 0),
+	PIN_GPIO_LPM("SPDIF_OUT",    TEGRA_GPIO_PK5,  0, 0),
+	PIN_GPIO_LPM("SPI1_CS0_N",   TEGRA_GPIO_PX6,  0, 0),
+	PIN_GPIO_LPM("SPI2_SCK",     TEGRA_GPIO_PX2,  0, 0),
+	PIN_GPIO_LPM("SPI2_CS0_N",   TEGRA_GPIO_PX3,  0, 0),
+	PIN_GPIO_LPM("SPI2_MOSI",    TEGRA_GPIO_PX0,  0, 0),
+	PIN_GPIO_LPM("SPI2_MISO",    TEGRA_GPIO_PX1,  0, 0),
+};
+
+static void enterprise_set_unused_pin_gpio(struct pin_info_low_power_mode *lpm_pin_info,
+		int list_count)
+{
+	int i;
+	struct pin_info_low_power_mode *pin_info;
+	int ret;
+
+	for (i = 0; i < list_count; ++i) {
+		pin_info = (struct pin_info_low_power_mode *)(lpm_pin_info + i);
+		if (!pin_info->is_gpio)
+			continue;
+
+		ret = gpio_request(pin_info->gpio_nr, pin_info->name);
+		if (ret < 0) {
+			pr_err("%s() Error in gpio_request() for gpio %d\n",
+					__func__, pin_info->gpio_nr);
+			continue;
+		}
+		if (pin_info->is_input)
+			ret = gpio_direction_input(pin_info->gpio_nr);
+		else
+			ret = gpio_direction_output(pin_info->gpio_nr,
+							pin_info->value);
+		if (ret < 0) {
+			pr_err("%s() Error in setting gpio %d to in/out\n",
+				__func__, pin_info->gpio_nr);
+			gpio_free(pin_info->gpio_nr);
+			continue;
+		}
+		tegra_gpio_enable(pin_info->gpio_nr);
+	}
+}
+
 int __init enterprise_pinmux_init(void)
 {
 	tegra_pinmux_config_table(enterprise_pinmux, ARRAY_SIZE(enterprise_pinmux));
 	tegra_drive_pinmux_config_table(enterprise_drive_pinmux,
 					ARRAY_SIZE(enterprise_drive_pinmux));
+	tegra_pinmux_config_table(enterprise_unused_pinmux,
+				ARRAY_SIZE(enterprise_unused_pinmux));
+
+	enterprise_set_unused_pin_gpio(enterprise_unused_gpio_pins,
+			ARRAY_SIZE(enterprise_unused_gpio_pins));
 	return 0;
 }
