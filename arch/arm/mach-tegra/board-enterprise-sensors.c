@@ -24,10 +24,10 @@
 #include <linux/mpu.h>
 #include <linux/nct1008.h>
 #include <linux/regulator/consumer.h>
-
 #include <mach/gpio.h>
-
 #include <media/ar0832_main.h>
+#include <media/tps61050.h>
+
 #include "cpu-tegra.h"
 #include "gpio-names.h"
 #include "board-enterprise.h"
@@ -291,6 +291,52 @@ static int enterprise_ar0832_le_power_off(int is_stereo)
 	return ret;
 }
 
+static struct tps61050_pin_state enterprise_tps61050_pinstate = {
+	.mask		= 0x0008, /*VGP3*/
+	.values		= 0x0008,
+};
+
+/* I2C bus becomes active when vdd_1v8_cam is enabled */
+static int enterprise_tps61050_pm(int pwr)
+{
+	static struct regulator *enterprise_flash_reg = NULL;
+	int ret = 0;
+
+	pr_info("%s: ++%d\n", __func__, pwr);
+	switch (pwr) {
+	case TPS61050_PWR_OFF:
+		if (enterprise_flash_reg) {
+			regulator_disable(enterprise_flash_reg);
+			regulator_put(enterprise_flash_reg);
+			enterprise_flash_reg = NULL;
+		}
+		break;
+	case TPS61050_PWR_STDBY:
+	case TPS61050_PWR_COMM:
+	case TPS61050_PWR_ON:
+		enterprise_flash_reg = regulator_get(NULL, "vdd_1v8_cam");
+		if (IS_ERR_OR_NULL(enterprise_flash_reg)) {
+			pr_err("%s: failed to get flash pwr\n", __func__);
+			return PTR_ERR(enterprise_flash_reg);
+		}
+		ret = regulator_enable(enterprise_flash_reg);
+		if (ret) {
+			pr_err("%s: failed to enable flash pwr\n", __func__);
+			goto fail_regulator_flash_reg;
+		}
+		enterprise_msleep(10);
+		break;
+	default:
+		ret = -1;
+	}
+	return ret;
+
+fail_regulator_flash_reg:
+	regulator_put(enterprise_flash_reg);
+	enterprise_flash_reg = NULL;
+	return ret;
+}
+
 struct enterprise_cam_gpio {
 	int gpio;
 	const char *label;
@@ -310,18 +356,32 @@ static struct enterprise_cam_gpio enterprise_cam_gpio_data[] = {
 	[2] = TEGRA_CAMERA_GPIO(CAM2_RST_L_GPIO, "cam2_rst_lo", 0),
 	[3] = TEGRA_CAMERA_GPIO(CAM3_RST_L_GPIO, "cam3_rst_lo", 0),
 	[4] = TEGRA_CAMERA_GPIO(CAM3_PWDN_GPIO, "cam3_pwdn", 1),
+	[5] = TEGRA_CAMERA_GPIO(CAM_FLASH_EN_GPIO, "flash_en", 1),
 };
 
-struct ar0832_platform_data enterprise_ar0832_ri_data = {
+static struct ar0832_platform_data enterprise_ar0832_ri_data = {
 	.power_on = enterprise_ar0832_ri_power_on,
 	.power_off = enterprise_ar0832_ri_power_off,
 	.id = "right",
 };
 
-struct ar0832_platform_data enterprise_ar0832_le_data = {
+static struct ar0832_platform_data enterprise_ar0832_le_data = {
 	.power_on = enterprise_ar0832_le_power_on,
 	.power_off = enterprise_ar0832_le_power_off,
 	.id = "left",
+};
+
+static struct tps61050_platform_data enterprise_tps61050_data = {
+	.cfg		= 0,
+	.num		= 1,
+	.max_amp_torch	= CAM_FLASH_MAX_TORCH_AMP,
+	.max_amp_flash	= CAM_FLASH_MAX_FLASH_AMP,
+	.pinstate	= &enterprise_tps61050_pinstate,
+	.init		= NULL,
+	.exit		= NULL,
+	.pm		= &enterprise_tps61050_pm,
+	.gpio_envm	= NULL,
+	.gpio_sync	= NULL,
 };
 
 /*
@@ -340,6 +400,10 @@ static struct i2c_board_info ar0832_i2c2_boardinfo[] = {
 		/* 0x31: alternative slave address */
 		I2C_BOARD_INFO("ar0832", 0x32),
 		.platform_data = &enterprise_ar0832_le_data,
+	},
+	{
+		I2C_BOARD_INFO("tps61050", 0x33),
+		.platform_data = &enterprise_tps61050_data,
 	},
 };
 
