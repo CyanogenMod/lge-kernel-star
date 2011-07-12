@@ -4459,7 +4459,9 @@ void tegra_clk_resume(void)
 	clk_writel(*ctx++, CLK_MASK_ARM);
 
 	/* Restore back the actual pllc/a value */
-	clk_writel(pllc_base, tegra_pll_c.reg + PLL_BASE);
+	/* FIXME: need to root cause why pllc is required to be on
+	 * clk_writel(pllc_base, tegra_pll_c.reg + PLL_BASE);
+	 */
 	clk_writel(plla_base, tegra_pll_a.reg + PLL_BASE);
 	clk_writel(plld_base, tegra_pll_d.reg + PLL_BASE);
 	clk_writel(plld2_base, tegra_pll_d2.reg + PLL_BASE);
