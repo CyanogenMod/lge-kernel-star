@@ -907,8 +907,8 @@ static int tegra_ehci_probe(struct platform_device *pdev)
 
 	clk_enable(tegra->emc_clk);
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
-	/* Set DDR busy hints to 200MHz. For Tegra 2x SOC, DDR rate is half of EMC rate */
-	clk_set_rate(tegra->emc_clk, 400000000);
+	/* Set DDR busy hints to 150MHz. For Tegra 2x SOC, DDR rate is half of EMC rate */
+	clk_set_rate(tegra->emc_clk, 300000000);
 #else
 	/* Set DDR busy hints to 150MHz. For Tegra 3x SOC DDR rate equals to EMC rate */
 	clk_set_rate(tegra->emc_clk, 150000000);
