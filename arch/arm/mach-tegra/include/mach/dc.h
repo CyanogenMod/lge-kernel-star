@@ -154,6 +154,7 @@ struct tegra_dsi_out {
 	bool		no_pkt_seq_eot; /* 1st generation panel may not
 					 * support eot. Don't set it for
 					 * most panels. */
+	bool		te_polarity_low;
 
 	u32		max_panel_freq_khz;
 	u32		lp_cmd_mode_freq_khz;
@@ -334,6 +335,8 @@ struct tegra_dc_out {
 #define TEGRA_DC_OUT_NVHDCP_POLICY_ALWAYS_ON	(0 << 2)
 #define TEGRA_DC_OUT_NVHDCP_POLICY_ON_DEMAND	(1 << 2)
 #define TEGRA_DC_OUT_NVHDCP_POLICY_MASK		(1 << 2)
+#define TEGRA_DC_OUT_CONTINUOUS_MODE		(0 << 3)
+#define TEGRA_DC_OUT_ONE_SHOT_MODE		(1 << 3)
 
 #define TEGRA_DC_ALIGN_MSB		0
 #define TEGRA_DC_ALIGN_LSB		1
