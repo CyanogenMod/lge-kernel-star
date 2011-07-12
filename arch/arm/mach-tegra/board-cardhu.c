@@ -57,6 +57,7 @@
 #include "devices.h"
 #include "gpio-names.h"
 #include "fuse.h"
+#include "pm.h"
 
 
 /* !!!TODO: Change for cardhu (Taken from Ventana) */
@@ -281,8 +282,35 @@ static struct tegra_uart_platform_data cardhu_uart_pdata;
 static void __init uart_debug_init(void)
 {
 	struct board_info board_info;
-	int i;
+
+	tegra_get_board_info(&board_info);
+	if (board_info.sku & SKU_SLT_ULPI_SUPPORT) {
+		if ((board_info.board_id == BOARD_E1186) ||
+			(board_info.board_id == BOARD_E1187) ||
+			(board_info.board_id == BOARD_PM269)) {
+			/* UARTB is the debug port. */
+			pr_info("Selecting UARTB as the debug console\n");
+			cardhu_uart_devices[1] = &debug_uartb_device;
+			debug_uart_clk =  clk_get_sys("serial8250.0", "uartb");
+			debug_uart_port_base = ((struct plat_serial8250_port *)(
+				debug_uartb_device.dev.platform_data))->mapbase;
+			return;
+		}
+		pr_err("%s(): Unhandled SKU information for Board 0x%04x\n",
+				__func__, board_info.board_id);
+	}
+	/* UARTA is the debug port. */
+	pr_info("Selecting UARTA as the debug console\n");
+	cardhu_uart_devices[0] = &debug_uarta_device;
+	debug_uart_clk = clk_get_sys("serial8250.0", "uarta");
+	debug_uart_port_base = ((struct plat_serial8250_port *)(
+			debug_uarta_device.dev.platform_data))->mapbase;
+}
+
+static void __init cardhu_uart_init(void)
+{
 	struct clk *c;
+	int i;
 
 	for (i = 0; i < ARRAY_SIZE(uart_parent_clk); ++i) {
 		c = tegra_get_clock_by_name(uart_parent_clk[i].name);
@@ -302,31 +330,6 @@ static void __init uart_debug_init(void)
 	tegra_uartd_device.dev.platform_data = &cardhu_uart_pdata;
 	tegra_uarte_device.dev.platform_data = &cardhu_uart_pdata;
 
-	tegra_get_board_info(&board_info);
-	if (board_info.sku & SKU_SLT_ULPI_SUPPORT) {
-		if ((board_info.board_id == BOARD_E1186) ||
-			(board_info.board_id == BOARD_E1187) ||
-			(board_info.board_id == BOARD_E1256) ||
-			(board_info.board_id == BOARD_PM269)) {
-				/* UARTB is the debug port. */
-				pr_info("Selecting UARTB as the debug console\n");
-				cardhu_uart_devices[1] = &debug_uartb_device;
-				debug_uart_clk =
-					clk_get_sys("serial8250.0", "uartb");
-				return;
-		}
-		pr_err("%s(): Unhandled SKU information for Board 0x%04x\n",
-				__func__, board_info.board_id);
-	}
-	/* UARTA is the debug port. */
-	pr_info("Selecting UARTA as the debug console\n");
-	cardhu_uart_devices[0] = &debug_uarta_device;
-	debug_uart_clk = clk_get_sys("serial8250.0", "uarta");
-}
-
-static void __init cardhu_uart_init(void)
-{
-	struct clk *c;
 	/* Register low speed only if it is selected */
 	if (!is_tegra_debug_uartport_hs()) {
 		uart_debug_init();

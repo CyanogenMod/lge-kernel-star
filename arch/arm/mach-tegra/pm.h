@@ -36,6 +36,16 @@ enum tegra_suspend_mode {
 	TEGRA_MAX_SUSPEND_MODE,
 };
 
+enum suspend_stage {
+	TEGRA_SUSPEND_BEFORE_PERIPHERAL,
+	TEGRA_SUSPEND_BEFORE_CPU,
+};
+
+enum resume_stage {
+	TEGRA_RESUME_AFTER_PERIPHERAL,
+	TEGRA_RESUME_AFTER_CPU,
+};
+
 struct tegra_suspend_platform_data {
 	unsigned long cpu_timer;   /* CPU power good time in us,  LP2/LP1 */
 	unsigned long cpu_off_timer;	/* CPU power off time us, LP2/LP1 */
@@ -45,6 +55,9 @@ struct tegra_suspend_platform_data {
 	bool sysclkreq_high;       /* System clock request is active-high */
 	enum tegra_suspend_mode suspend_mode;
 	unsigned long cpu_lp2_min_residency; /* Min LP2 state residency in us */
+	void (*board_suspend)(int lp_state, enum suspend_stage stg);
+	/* lp_state = 0 for LP0 state, 1 for LP1 state, 2 for LP2 state */
+	void (*board_resume)(int lp_state, enum resume_stage stg);
 };
 
 unsigned long tegra_cpu_power_good_time(void);
@@ -196,5 +209,8 @@ extern bool tegra_all_cpus_booted __read_mostly;
 #else
 #define tegra_all_cpus_booted (true)
 #endif
+
+/* The debug channel uart base physical address */
+extern unsigned long  debug_uart_port_base;
 
 #endif /* _MACH_TEGRA_PM_H_ */

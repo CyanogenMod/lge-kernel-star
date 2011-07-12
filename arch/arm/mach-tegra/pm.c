@@ -693,7 +693,17 @@ static const char *lp_state[TEGRA_MAX_SUSPEND_MODE] = {
 
 static int tegra_suspend_enter(suspend_state_t state)
 {
-	return tegra_suspend_dram(current_suspend_mode);
+	int ret;
+
+	if (pdata && pdata->board_suspend)
+		pdata->board_suspend(current_suspend_mode, TEGRA_SUSPEND_BEFORE_PERIPHERAL);
+
+	ret = tegra_suspend_dram(current_suspend_mode);
+
+	if (pdata && pdata->board_resume)
+		pdata->board_resume(current_suspend_mode, TEGRA_RESUME_AFTER_PERIPHERAL);
+
+	return ret;
 }
 
 static void tegra_suspend_check_pwr_stats(void)
@@ -740,6 +750,9 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode)
 
 	tegra_pm_set(mode);
 
+	if (pdata && pdata->board_suspend)
+		pdata->board_suspend(mode, TEGRA_SUSPEND_BEFORE_CPU);
+
 	local_fiq_disable();
 
 	cpu_pm_enter();
@@ -771,6 +784,9 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode)
 
 	cpu_complex_pm_exit();
 	cpu_pm_exit();
+
+	if (pdata && pdata->board_resume)
+		pdata->board_resume(mode, TEGRA_RESUME_AFTER_CPU);
 
 	local_fiq_enable();
 
@@ -973,15 +989,18 @@ fail:
 	current_suspend_mode = plat->suspend_mode;
 }
 
+unsigned long debug_uart_port_base = 0;
+EXPORT_SYMBOL(debug_uart_port_base);
+
 static int tegra_debug_uart_suspend(void)
 {
 	void __iomem *uart;
 	u32 lcr;
 
-	if (TEGRA_DEBUG_UART_BASE == 0)
+	if (!debug_uart_port_base)
 		return 0;
 
-	uart = IO_ADDRESS(TEGRA_DEBUG_UART_BASE);
+	uart = IO_ADDRESS(debug_uart_port_base);
 
 	lcr = readb(uart + UART_LCR * 4);
 
@@ -1009,10 +1028,10 @@ static void tegra_debug_uart_resume(void)
 	void __iomem *uart;
 	u32 lcr;
 
-	if (TEGRA_DEBUG_UART_BASE == 0)
+	if (!debug_uart_port_base)
 		return;
 
-	uart = IO_ADDRESS(TEGRA_DEBUG_UART_BASE);
+	uart = IO_ADDRESS(debug_uart_port_base);
 
 	lcr = tegra_sctx.uart[0];
 

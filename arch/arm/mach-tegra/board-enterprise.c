@@ -51,7 +51,7 @@
 #include "devices.h"
 #include "gpio-names.h"
 #include "fuse.h"
-
+#include "pm.h"
 
 /* !!!TODO: Change for enterprise (Taken from Cardhu) */
 static struct tegra_utmip_config utmi_phy_config[] = {
@@ -252,6 +252,8 @@ static void __init uart_debug_init(void)
 	/* UARTD is the debug port. */
 	pr_info("Selecting UARTD as the debug console\n");
 	enterprise_uart_devices[3] = &debug_uartd_device;
+	debug_uart_port_base = ((struct plat_serial8250_port *)(
+			debug_uartd_device.dev.platform_data))->mapbase;
 	debug_uart_clk = clk_get_sys("serial8250.0", "uartd");
 
 	/* Clock enable for the debug channel */

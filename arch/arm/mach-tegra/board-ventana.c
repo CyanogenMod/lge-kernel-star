@@ -56,6 +56,7 @@
 #include "devices.h"
 #include "gpio-names.h"
 #include "wakeups-t2.h"
+#include "pm.h"
 
 static struct tegra_utmip_config utmi_phy_config[] = {
 	[0] = {
@@ -211,6 +212,8 @@ static void __init uart_debug_init(void)
 	/* UARTD is the debug port. */
 	pr_info("Selecting UARTD as the debug console\n");
 	ventana_uart_devices[2] = &debug_uartd_device;
+	debug_uart_port_base = ((struct plat_serial8250_port *)(
+			debug_uartd_device.dev.platform_data))->mapbase;
 	debug_uart_clk = clk_get_sys("serial8250.0", "uartd");
 
 	/* Clock enable for the debug channel */
