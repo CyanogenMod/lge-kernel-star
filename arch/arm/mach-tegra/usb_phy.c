@@ -71,6 +71,7 @@
 #define   USB_WAKE_ON_CNNT_EN_DEV	(1 << 3)
 #define   USB_WAKE_ON_DISCON_EN_DEV	(1 << 4)
 #define   USB_SUSP_CLR		(1 << 5)
+#define   USB_CLKEN             (1 << 6)
 #define   USB_PHY_CLK_VALID	(1 << 7)
 #define   USB_PHY_CLK_VALID_INT_ENB    (1 << 9)
 #define   UTMIP_RESET		(1 << 11)
@@ -598,7 +599,7 @@ static int utmip_pad_power_off(struct tegra_usb_phy *phy, bool is_dpd)
 
 static int utmi_wait_register(void __iomem *reg, u32 mask, u32 result)
 {
-	unsigned long timeout = 2000;
+	unsigned long timeout = 2500;
 	do {
 		if ((readl(reg) & mask) == result)
 			return 0;
@@ -666,7 +667,7 @@ static void utmi_phy_clk_enable(struct tegra_usb_phy *phy)
 #endif
 
 	if (utmi_wait_register(base + USB_SUSP_CTRL, USB_PHY_CLK_VALID,
-						     USB_PHY_CLK_VALID))
+						     USB_PHY_CLK_VALID) < 0)
 		pr_err("%s: timeout waiting for phy to stabilize\n", __func__);
 }
 
@@ -735,6 +736,8 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 
 	val = readl(base + UTMIP_TX_CFG0);
 	val |= UTMIP_FS_PREABMLE_J;
+	if (phy->instance == 2)
+		val |= UTMIP_HS_DISCON_DISABLE;
 	writel(val, base + UTMIP_TX_CFG0);
 
 	val = readl(base + UTMIP_HSRX_CFG0);
@@ -1107,7 +1110,6 @@ static int ulpi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	struct tegra_ulpi_config *config = phy->config;
 #endif
-	unsigned long timeout = 2000;
 
 	clk_enable(phy->clk);
 	msleep(1);
@@ -1135,41 +1137,29 @@ static int ulpi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	val = readl(base + USB_SUSP_CTRL);
 	val |= USB_SUSP_CLR;
 	writel(val, base + USB_SUSP_CTRL);
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	if (utmi_wait_register(base + USB_SUSP_CTRL, USB_PHY_CLK_VALID,
+						     USB_PHY_CLK_VALID) < 0)
+		pr_err("%s: timeout waiting for phy to stabilize\n", __func__);
+
+	if (utmi_wait_register(base + USB_SUSP_CTRL, USB_CLKEN, USB_CLKEN) < 0)
+		pr_err("%s: timeout waiting for AHB clock\n", __func__);
+#else
 	udelay(100);
+#endif
 
 	val = readl(base + USB_SUSP_CTRL);
 	val &= ~USB_SUSP_CLR;
 	writel(val, base + USB_SUSP_CTRL);
-
-	if (utmi_wait_register(base + USB_SUSP_CTRL, USB_PHY_CLK_VALID, USB_PHY_CLK_VALID))
-		pr_err("%s: timeout waiting for phy to stabilize\n", __func__);
 
 	val = 0;
 	writel(val, base + ULPI_TIMING_CTRL_1);
 
 	ulpi_set_trimmer(base, 4, 4, 4);
 
-/* HACK! FIXME */
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-	val = 0;
-	val |= ULPI_WAKEUP;
-	val |= ULPI_RD_WR;
-	writel(val, base + ULPI_VIEWPORT);
-
-
-	do {
-		if ((readl(base + ULPI_VIEWPORT) & ULPI_WAKEUP))
-			udelay(1);
-		else
-			break;
-		timeout--;
-	} while (timeout);
-	if (!timeout)
-		pr_err("%s: timeout on ULPI Wakeup\n", __func__);
-#endif
-
 	/* Fix VbusInvalid due to floating VBUS */
-	ret = otg_io_write(phy->ulpi, 0xC0, 0x08);
+	ret = otg_io_write(phy->ulpi, 0x40, 0x08);
 	if (ret) {
 		pr_err("%s: ulpi write failed\n", __func__);
 		return ret;
