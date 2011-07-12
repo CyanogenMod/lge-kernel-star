@@ -133,7 +133,7 @@ enum {
 	DEFINE_REG(TEGRA_EMC_BASE, EMC_XM2CMDPADCTRL)		\
 	DEFINE_REG(TEGRA_EMC_BASE, EMC_XM2DQSPADCTRL2)		\
 	DEFINE_REG(TEGRA_EMC_BASE, EMC_XM2DQPADCTRL2)		\
-	DEFINE_REG(TEGRA_EMC_BASE, EMC_XM2CLKPADCTRL)		\
+	DEFINE_REG(0		 , EMC_XM2CLKPADCTRL)		\
 	DEFINE_REG(TEGRA_EMC_BASE, EMC_XM2COMPPADCTRL)		\
 	DEFINE_REG(TEGRA_EMC_BASE, EMC_XM2VTTGENPADCTRL)	\
 	DEFINE_REG(TEGRA_EMC_BASE, EMC_XM2VTTGENPADCTRL2)	\
@@ -167,7 +167,7 @@ enum {
 	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_MISC0)		\
 	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_RING1_THROTTLE)
 
-#define DEFINE_REG(base, reg)	((u32)IO_ADDRESS((base)) + (reg)),
+#define DEFINE_REG(base, reg) ((base) ? ((u32)IO_ADDRESS((base)) + (reg)) : 0),
 static const u32 burst_reg_addr[TEGRA_EMC_NUM_REGS] = {
 	BURST_REG_LIST
 };
@@ -367,14 +367,6 @@ static inline void periodic_qrst_enable(u32 emc_cfg_reg, u32 emc_dbg_reg)
 	emc_writel(emc_dbg_reg, EMC_DBG);
 }
 
-static inline void periodic_qrst_restore(u32 emc_cfg_reg, u32 emc_dbg_reg)
-{
-	/* enable write mux => restore periodic QRST => restore mux */
-	emc_writel(emc_dbg_reg | EMC_DBG_WRITE_MUX_ACTIVE, EMC_DBG);
-	emc_writel(emc_cfg_reg, EMC_CFG);
-	emc_writel(emc_dbg_reg, EMC_DBG);
-}
-
 static inline int get_dll_change(const struct tegra_emc_table *next_timing,
 				 const struct tegra_emc_table *last_timing)
 {
@@ -483,8 +475,11 @@ static noinline void emc_set_clock(const struct tegra_emc_table *next_timing,
 		auto_cal_disable();
 
 	/* 4. program burst shadow registers */
-	for (i = 0; i < TEGRA_EMC_NUM_REGS; i++)
+	for (i = 0; i < TEGRA_EMC_NUM_REGS; i++) {
+		if (!burst_reg_addr[i])
+			continue;
 		__raw_writel(next_timing->burst_regs[i], burst_reg_addr[i]);
+	}
 	wmb();
 	barrier();
 
@@ -518,18 +513,24 @@ static noinline void emc_set_clock(const struct tegra_emc_table *next_timing,
 	/* 8. flow control marker 2 */
 	emc_writel(1, EMC_STALL_AFTER_CLKCHANGE);
 
-	/* 9. exit self-refresh on DDR3 */
-	if (dram_type == DRAM_TYPE_DDR3)
-		emc_writel(DRAM_BROADCAST(dram_dev_num), EMC_SELF_REF);
+	/* 8.1 enable write mux, update unshadowed pad control */
+	emc_writel(emc_dbg_reg | EMC_DBG_WRITE_MUX_ACTIVE, EMC_DBG);
+	emc_writel(next_timing->burst_regs[EMC_XM2CLKPADCTRL_INDEX],
+		   EMC_XM2CLKPADCTRL);
 
-	/* 10. restore periodic QRST */
+	/* 9. restore periodic QRST, and disable write mux */
 	if ((qrst_used) || (next_timing->emc_periodic_qrst !=
 			    last_timing->emc_periodic_qrst)) {
 		emc_cfg_reg = next_timing->emc_periodic_qrst ?
 			emc_cfg_reg | EMC_CFG_PERIODIC_QRST :
 			emc_cfg_reg & (~EMC_CFG_PERIODIC_QRST);
-		periodic_qrst_restore(emc_cfg_reg, emc_dbg_reg);
+		emc_writel(emc_cfg_reg, EMC_CFG);
 	}
+	emc_writel(emc_dbg_reg, EMC_DBG);
+
+	/* 10. exit self-refresh on DDR3 */
+	if (dram_type == DRAM_TYPE_DDR3)
+		emc_writel(DRAM_BROADCAST(dram_dev_num), EMC_SELF_REF);
 
 	/* 11. set dram mode registers */
 	set_dram_mode(next_timing, last_timing, dll_change);
@@ -576,8 +577,12 @@ static inline void emc_get_timing(struct tegra_emc_table *timing)
 {
 	int i;
 
-	for (i = 0; i < TEGRA_EMC_NUM_REGS; i++)
-		timing->burst_regs[i] = __raw_readl(burst_reg_addr[i]);
+	for (i = 0; i < TEGRA_EMC_NUM_REGS; i++) {
+		if (burst_reg_addr[i])
+			timing->burst_regs[i] = __raw_readl(burst_reg_addr[i]);
+		else
+			timing->burst_regs[i] = 0;
+	}
 	timing->emc_acal_interval = 0;
 	timing->emc_zcal_cnt_long = 0;
 	timing->emc_mode_reset = 0;
