@@ -165,7 +165,10 @@ enum {
 	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_DA_TURNS)		\
 	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_DA_COVERS)	\
 	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_MISC0)		\
-	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_RING1_THROTTLE)
+	DEFINE_REG(TEGRA_MC_BASE, MC_EMEM_ARB_RING1_THROTTLE)	\
+								\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_FBIO_SPARE)		\
+	DEFINE_REG(TEGRA_EMC_BASE, EMC_CFG_RSV)
 
 #define DEFINE_REG(base, reg) ((base) ? ((u32)IO_ADDRESS((base)) + (reg)) : 0),
 static const u32 burst_reg_addr[TEGRA_EMC_NUM_REGS] = {
@@ -178,6 +181,8 @@ enum {
 	BURST_REG_LIST
 };
 #undef DEFINE_REG
+
+static int emc_num_burst_regs;
 
 static struct clk_mux_sel tegra_emc_clk_sel[TEGRA_EMC_TABLE_MAX_SIZE];
 static int emc_last_sel;
@@ -475,7 +480,7 @@ static noinline void emc_set_clock(const struct tegra_emc_table *next_timing,
 		auto_cal_disable();
 
 	/* 4. program burst shadow registers */
-	for (i = 0; i < TEGRA_EMC_NUM_REGS; i++) {
+	for (i = 0; i < emc_num_burst_regs; i++) {
 		if (!burst_reg_addr[i])
 			continue;
 		__raw_writel(next_timing->burst_regs[i], burst_reg_addr[i]);
@@ -577,7 +582,7 @@ static inline void emc_get_timing(struct tegra_emc_table *timing)
 {
 	int i;
 
-	for (i = 0; i < TEGRA_EMC_NUM_REGS; i++) {
+	for (i = 0; i < emc_num_burst_regs; i++) {
 		if (burst_reg_addr[i])
 			timing->burst_regs[i] = __raw_readl(burst_reg_addr[i]);
 		else
@@ -792,6 +797,19 @@ void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
 	}
 
 	tegra_emc_table_size = min(table_size, TEGRA_EMC_TABLE_MAX_SIZE);
+	switch (table[0].rev) {
+	case 0x30:
+		emc_num_burst_regs = 105;
+		break;
+	case 0x31:
+		emc_num_burst_regs = 107;
+		break;
+	default:
+		pr_warn("tegra: invalid EMC DFS table: unknown rev 0x%x\n",
+			table[0].rev);
+		return;
+	}
+
 	for (i = 0; i < tegra_emc_table_size; i++) {
 		unsigned long table_rate = table[i].rate;
 		if (!table_rate)

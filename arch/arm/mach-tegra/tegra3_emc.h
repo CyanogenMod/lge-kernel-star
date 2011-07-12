@@ -22,7 +22,7 @@
 #ifndef _MACH_TEGRA_TEGRA3_EMC_H
 #define _MACH_TEGRA_TEGRA3_EMC_H
 
-#define TEGRA_EMC_NUM_REGS	105
+#define TEGRA_EMC_NUM_REGS	110
 
 #define TEGRA_EMC_BRIDGE_RATE_MIN	300000000
 #define TEGRA_EMC_BRIDGE_MVOLTS_MIN	1200
@@ -134,6 +134,7 @@ enum {
 #define EMC_MRR					0xec
 #define EMC_XM2DQSPADCTRL3			0xf8
 #define EMC_XM2DQSPADCTRL3_VREF_ENABLE		(0x1 << 5)
+#define EMC_FBIO_SPARE				0x100
 
 #define EMC_FBIO_CFG5				0x104
 #define EMC_CFG5_TYPE_SHIFT			0x0
@@ -153,6 +154,7 @@ enum {
 };
 
 #define EMC_FBIO_CFG6				0x114
+#define EMC_CFG_RSV				0x120
 #define EMC_AUTO_CAL_CONFIG			0x2a4
 #define EMC_AUTO_CAL_INTERVAL			0x2a8
 #define EMC_AUTO_CAL_STATUS			0x2ac
