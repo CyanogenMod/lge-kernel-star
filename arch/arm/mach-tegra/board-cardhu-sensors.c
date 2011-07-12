@@ -514,7 +514,7 @@ static struct i2c_board_info cardhu_i2c8_board_info[] = {
 
 static struct nct1008_platform_data cardhu_nct1008_pdata = {
 	.supported_hwrev = true,
-	.ext_range = false,
+	.ext_range = true,
 	.conv_rate = 0x08,
 /*
  * BugID 844025 requires 11C guardband (9.7C for hotspot offset + 1.5C
