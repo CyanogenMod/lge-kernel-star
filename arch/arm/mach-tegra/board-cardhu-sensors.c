@@ -516,10 +516,14 @@ static struct nct1008_platform_data cardhu_nct1008_pdata = {
 	.supported_hwrev = true,
 	.ext_range = false,
 	.conv_rate = 0x08,
-	.offset = 0,
+/*
+ * BugID 844025 requires 11C guardband (9.7C for hotspot offset + 1.5C
+ * for sensor accuracy). FIXME: Move sensor accuracy to sensor driver.
+ */
+	.offset = 11,
 	.hysteresis = 5,
-	.shutdown_ext_limit = 75,
-	.shutdown_local_limit = 75,
+	.shutdown_ext_limit = 90,
+	.shutdown_local_limit = 90,
 	.throttling_ext_limit = 90,
 	.alarm_fn = tegra_throttling_enable,
 };
@@ -556,6 +560,7 @@ static int cardhu_nct1008_init(void)
 	struct tegra_edp_limits *z;
 	int zones_sz;
 	int i;
+	bool throttle_ok = false;
 #endif
 
 	if ((board_info.board_id == BOARD_E1198) ||
@@ -585,8 +590,21 @@ static int cardhu_nct1008_init(void)
 #ifdef CONFIG_TEGRA_EDP_LIMITS
 	cardhu_thermal_zones_info(&z, &zones_sz);
 	zones_sz = min(zones_sz, MAX_ZONES);
-	for (i = 0; i < zones_sz; i++)
+	for (i = 0; i < zones_sz; i++) {
 		cardhu_nct1008_pdata.thermal_zones[i] = z[i].temperature;
+		if (cardhu_nct1008_pdata.thermal_zones[i] ==
+		    cardhu_nct1008_pdata.throttling_ext_limit) {
+			throttle_ok = true;
+		}
+	}
+
+	if (throttle_ok != true)
+		pr_warn("%s: WARNING! Throttling limit %dC would be inaccurate"
+			" as it is NOT one of the EDP points\n",
+			__func__, cardhu_nct1008_pdata.throttling_ext_limit);
+	else
+		pr_info("%s: Throttling limit %dC OK\n",
+			__func__, cardhu_nct1008_pdata.throttling_ext_limit);
 
 	cardhu_nct1008_pdata.thermal_zones_sz = zones_sz;
 #endif
