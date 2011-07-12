@@ -2613,6 +2613,9 @@ static void star_battery_id_poll_work(struct work_struct *work)
 }
 //20100917, , Battery ID polling function [END]
 
+/* Used to avoid waking userspace with the same values */
+static int prev_reported_val = 0;
+
 static void star_battery_data_onetime_update(NvU8 update_option)
 {
 	//LDB("[bat_poll] OneTime_Update(%d)", update_option);
@@ -2620,7 +2623,10 @@ static void star_battery_data_onetime_update(NvU8 update_option)
 	switch ((OneTime_Update)update_option)
 	{
 		case Update_Battery_Data:
-			power_supply_changed(&tegra_supplies[NvCharger_Type_Battery]);
+			if (batt_dev->BatteryLifePercent != prev_reported_val) {
+				power_supply_changed(&tegra_supplies[NvCharger_Type_Battery]);
+				prev_reported_val = batt_dev->BatteryLifePercent;
+			}
 			//LDB("[bat_poll] OneTime_Update(Update_Battery_Data:%d)", update_option);
 			break;
 
@@ -3345,6 +3351,8 @@ static int tegra_battery_suspend(struct platform_device *dev,
 		//20100929, , RTC setting for checking battery status during sleep [START]
 	if(NvRmPmuReadAlarm(s_hRmGlobal, &alarm_sec) && NvRmPmuReadRtc(s_hRmGlobal, &now_sec) )
 	{
+/* Why all these checks? Just schedule the next poll... */
+#if 0
 		if ( alarm_sec == batt_dev->old_checkbat_sec )
 			alarm_sec = batt_dev->old_alarm_sec;
 		checkbat_sec = now_sec + batt_dev->sleep_bat_check_period;
@@ -3365,7 +3373,7 @@ static int tegra_battery_suspend(struct platform_device *dev,
 				batt_dev->old_checkbat_sec = checkbat_sec;
 				NvRmPmuWriteAlarm(s_hRmGlobal, next_alarm_sec);
 				printk("[CHG_RTC : final] next_alarm_sec=0x%x, old_alarm_sec=0x%x\n", next_alarm_sec, batt_dev->old_alarm_sec);
-			}
+			 }
 		}
 		else
 		{
@@ -3390,6 +3398,11 @@ static int tegra_battery_suspend(struct platform_device *dev,
 				printk("[CHG_RTC : final] next_alarm_sec=0x%x, old_alarm_sec=0x%x\n", next_alarm_sec, batt_dev->old_alarm_sec);
 			}
 		}
+#else
+	checkbat_sec = now_sec + batt_dev->sleep_bat_check_period;
+	NvRmPmuWriteAlarm(s_hRmGlobal, checkbat_sec);
+	printk("[CHG_RTC : final] next_alarm_sec=0x%x now_sec=0x%x\n", checkbat_sec, now_sec);
+#endif
 	}
 	else
 		LDB("[Critical]: ReadAlarm && ReadRTC are failed!!!");
