@@ -1628,6 +1628,14 @@ static int tsensor_suspend(struct platform_device *pdev,
 	pm_message_t state)
 {
 	struct tegra_tsensor_data *data = platform_get_drvdata(pdev);
+	unsigned int config0;
+	int i;
+	/* set STOP bit, else OVERFLOW interrupt seen in LP1 */
+	for (i = 0; i < TSENSOR_COUNT; i++) {
+		config0 = tsensor_readl(data, ((i << 16) | SENSOR_CFG0));
+		config0 |= (1 << SENSOR_CFG0_STOP_SHIFT);
+		tsensor_writel(data, config0, ((i << 16) | SENSOR_CFG0));
+	}
 	/* TBD: check anything else that could be needed for suspend */
 	tsensor_clk_enable(data, false);
 
@@ -1637,8 +1645,16 @@ static int tsensor_suspend(struct platform_device *pdev,
 static int tsensor_resume(struct platform_device *pdev)
 {
 	struct tegra_tsensor_data *data = platform_get_drvdata(pdev);
+	unsigned int config0;
+	int i;
 	/* TBD: check anything else that could be needed for resume */
 	tsensor_clk_enable(data, true);
+	/* clear STOP bit */
+	for (i = 0; i < TSENSOR_COUNT; i++) {
+		config0 = tsensor_readl(data, ((i << 16) | SENSOR_CFG0));
+		config0 &= ~(1 << SENSOR_CFG0_STOP_SHIFT);
+		tsensor_writel(data, config0, ((i << 16) | SENSOR_CFG0));
+	}
 
 	return 0;
 }
