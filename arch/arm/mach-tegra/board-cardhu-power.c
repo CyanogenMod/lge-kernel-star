@@ -660,14 +660,14 @@ GREG_INIT(0, en_5v_cp,		en_5v_cp,	NULL,			1,	0,	TPS6591X_GPIO_GP0,	false,	1,	0,	
 GREG_INIT(1, en_5v0,		en_5v0,		NULL,			0,      0,      TPS6591X_GPIO_GP2,	false,	0,	0,	0,	0);
 GREG_INIT(2, en_ddr,		en_ddr,		NULL,			0,      0,      TPS6591X_GPIO_GP6,	false,	0,	0,	0,	0);
 GREG_INIT(3, en_3v3_sys,	en_3v3_sys,	NULL,			0,      0,      TPS6591X_GPIO_GP7,	false,	0,	0,	0,	0);
-GREG_INIT(4, en_vdd_bl,		en_vdd_bl,	NULL,			1,      0,      TEGRA_GPIO_PK3,		false,	1,	0,	0,	0);
+GREG_INIT(4, en_vdd_bl,		en_vdd_bl,	NULL,			0,      0,      TEGRA_GPIO_PK3,		false,	1,	0,	0,	0);
 GREG_INIT(5, en_3v3_modem,	en_3v3_modem,	NULL,			1,      0,      TEGRA_GPIO_PD6,		false,	1,	0,	0,	0);
-GREG_INIT(6, en_vdd_pnl1,	en_vdd_pnl1,	"vdd_3v3_devices",	1,      0,      TEGRA_GPIO_PL4,		false,	1,	0,	0,	0);
+GREG_INIT(6, en_vdd_pnl1,	en_vdd_pnl1,	"vdd_3v3_devices",	0,      0,      TEGRA_GPIO_PL4,		false,	1,	0,	0,	0);
 GREG_INIT(7, cam3_ldo_en,	cam3_ldo_en,	"vdd_3v3_devices",	0,      0,      TEGRA_GPIO_PS0,		false,	0,	0,	0,	0);
 GREG_INIT(8, en_vdd_com,	en_vdd_com,	"vdd_3v3_devices",	1,      0,      TEGRA_GPIO_PD0,		false,	1,	0,	0,	0);
 GREG_INIT(9, en_3v3_fuse,	en_3v3_fuse,	"vdd_3v3_devices",	0,      0,      TEGRA_GPIO_PL6,		false,	0,	0,	0,	0);
 GREG_INIT(10, en_3v3_emmc,	en_3v3_emmc,	"vdd_3v3_devices",	1,      0,      TEGRA_GPIO_PD1,		false,	1,	0,	0,	0);
-GREG_INIT(11, en_vdd_sdmmc1,	en_vdd_sdmmc1,	"vdd_3v3_devices",	1,      0,      TEGRA_GPIO_PD7,		false,	1,	0,	0,	0);
+GREG_INIT(11, en_vdd_sdmmc1,	en_vdd_sdmmc1,	"vdd_3v3_devices",	0,      0,      TEGRA_GPIO_PD7,		false,	1,	0,	0,	0);
 GREG_INIT(12, en_3v3_pex_hvdd,	en_3v3_pex_hvdd, "vdd_3v3_devices",	0,      0,      TEGRA_GPIO_PL7,		false,	0,	0,	0,	0);
 GREG_INIT(13, en_1v8_cam,	en_1v8_cam,	"vdd_gen1v8",		0,      0,      TEGRA_GPIO_PBB4,	false,	0,	0,	0,	0);
 
@@ -679,13 +679,13 @@ GREG_INIT(3, en_3v3_sys_a04,	en_3v3_sys,	NULL,			0,      0,      TPS6591X_GPIO_G
 
 /*Specific to pm269*/
 GREG_INIT(4, en_vdd_bl_pm269,		en_vdd_bl,		NULL,
-	1,      0,      TEGRA_GPIO_PH3,	false,	1,	0,	0,	0);
+	0,      0,      TEGRA_GPIO_PH3,	false,	1,	0,	0,	0);
 GREG_INIT(6, en_vdd_pnl1_pm269,		en_vdd_pnl1,		"vdd_3v3_devices",
-	1,      0,      TEGRA_GPIO_PW1,	false,	1,	0,	0,	0);
+	0,      0,      TEGRA_GPIO_PW1,	false,	1,	0,	0,	0);
 GREG_INIT(9, en_3v3_fuse_pm269,		en_3v3_fuse,		"vdd_3v3_devices",
 	0,      0,      TEGRA_GPIO_PC1,	false,	0,	0,	0,	0);
 GREG_INIT(11, en_vdd_sdmmc1_pm269,	en_vdd_sdmmc1,		"vdd_3v3_devices",
-	1,      0,      TEGRA_GPIO_PP1,	false,	1,	0,	0,	0);
+	0,      0,      TEGRA_GPIO_PP1,	false,	1,	0,	0,	0);
 GREG_INIT(12, en_3v3_pex_hvdd_pm269,	en_3v3_pex_hvdd,	"vdd_3v3_devices",
 	0,      0,      TEGRA_GPIO_PC6,	false,	0,	0,	0,	0);
 GREG_INIT(17, en_vddio_vid_oc_pm269,	en_vddio_vid_oc,	"master_5v_switch",
@@ -731,8 +731,8 @@ GREG_INIT(18, cam1_ldo_en,	cam1_ldo_en,	"vdd_3v3_cam",	0,      0,      TEGRA_GPI
 GREG_INIT(19, cam2_ldo_en,	cam2_ldo_en,	"vdd_3v3_cam",	0,      0,      TEGRA_GPIO_PR7,		false,	0,	0,	0,	0);
 
 /* E1291 A03 specific */
-GREG_INIT(20, en_vdd_bl1_a03,	en_vdd_bl,	NULL,		1,      0,      TEGRA_GPIO_PDD2,	false,	1,	0,	0,	0);
-GREG_INIT(21, en_vdd_bl2_a03,	en_vdd_bl2,	NULL,		1,      0,      TEGRA_GPIO_PDD0,	false,	1,	0,	0,	0);
+GREG_INIT(20, en_vdd_bl1_a03,	en_vdd_bl,	NULL,		0,      0,      TEGRA_GPIO_PDD2,	false,	1,	0,	0,	0);
+GREG_INIT(21, en_vdd_bl2_a03,	en_vdd_bl2,	NULL,		0,      0,      TEGRA_GPIO_PDD0,	false,	1,	0,	0,	0);
 
 GREG_INIT(22, en_vbrtr,		en_vbrtr,	"vdd_3v3_devices",	0,      0,      PMU_TCA6416_GPIO_PORT12,	false,	0,	0,	0,	0);
 
