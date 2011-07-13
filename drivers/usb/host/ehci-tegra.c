@@ -43,6 +43,8 @@
 
 #define STS_SRI	(1<<7)	/*	SOF Recieved	*/
 
+#define TEGRA_HSIC_CONNECTION_MAX_RETRIES 5
+
 struct tegra_ehci_hcd {
 	struct ehci_hcd *ehci;
 	struct tegra_usb_phy *phy;
@@ -59,6 +61,7 @@ struct tegra_ehci_hcd {
 	struct work_struct clk_timer_work;
 	struct timer_list clk_timer;
 	bool clock_enabled;
+	int hsic_connect_retries;
 };
 
 static void tegra_ehci_power_up(struct usb_hcd *hcd, bool is_dpd)
@@ -477,6 +480,7 @@ restart:
 			usb_set_device_state(udev, USB_STATE_CONFIGURED);
 		}
 		tegra_usb_phy_bus_idle(tegra->phy);
+		tegra->hsic_connect_retries = 0;
 		if (!tegra_usb_phy_is_device_connected(tegra->phy))
 			schedule_delayed_work(&tegra->work, 50);
 	} else {
@@ -679,6 +683,11 @@ static void tegra_hsic_connection_work(struct work_struct *work)
 		cancel_delayed_work(&tegra->work);
 		return;
 	}
+	/* Few cases HSIC device may not be connected, so   *
+	** skip this check after configured max re-tries.   */
+	if (tegra->hsic_connect_retries++ > TEGRA_HSIC_CONNECTION_MAX_RETRIES)
+		return;
+
 	schedule_delayed_work(&tegra->work, jiffies + msecs_to_jiffies(50));
 	return;
 }
