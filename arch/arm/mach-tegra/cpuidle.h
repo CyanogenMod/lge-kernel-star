@@ -75,15 +75,6 @@ static inline int tegra_lp2_debug_show(struct seq_file *s, void *data)
 }
 #endif
 
-static inline int tegra_pending_interrupt(void)
-{
-	void __iomem *gic_cpu = IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100);
-	u32 reg = readl(gic_cpu + 0x18);
-	reg &= 0x3FF;
-
-	return reg;
-}
-
 #ifdef CONFIG_CPU_IDLE
 void tegra_lp2_in_idle(bool enable);
 #else

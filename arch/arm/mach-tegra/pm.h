@@ -23,6 +23,8 @@
 #define _MACH_TEGRA_PM_H_
 
 #include <linux/mutex.h>
+#include <linux/init.h>
+#include <linux/errno.h>
 
 enum tegra_suspend_mode {
 	TEGRA_SUSPEND_NONE = 0,

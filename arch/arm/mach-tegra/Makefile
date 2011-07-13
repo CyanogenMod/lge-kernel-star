@@ -15,6 +15,7 @@ obj-y                                   += delay.o
 obj-y                                   += powergate.o
 obj-y                                   += pm.o
 obj-$(CONFIG_PM_SLEEP)                  += pm-irq.o
+obj-y                                   += gic.o
 obj-y                                   += sleep.o
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += sleep-t2.o
 obj-y                                   += fuse.o

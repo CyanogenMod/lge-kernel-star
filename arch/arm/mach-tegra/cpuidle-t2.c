@@ -45,6 +45,7 @@
 #include <mach/irqs.h>
 
 #include "cpuidle.h"
+#include "gic.h"
 #include "pm.h"
 #include "sleep.h"
 
@@ -187,8 +188,10 @@ static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
 
 		if (tegra_idle_lp2_last(sleep_time, 0) == 0)
 			sleep_completed = true;
-		else
-			idle_stats.lp2_int_count[tegra_pending_interrupt()]++;
+		else {
+			int irq = tegra_gic_pending_interrupt();
+			idle_stats.lp2_int_count[irq]++;
+		}
 	}
 
 	for_each_online_cpu(i) {
