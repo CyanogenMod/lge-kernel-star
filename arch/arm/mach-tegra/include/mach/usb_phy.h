@@ -50,11 +50,14 @@ struct tegra_ulpi_config {
 };
 
 struct tegra_uhsic_config {
+	int enable_gpio;
+	int reset_gpio;
 	u8 sync_start_delay;
 	u8 idle_wait_delay;
 	u8 term_range_adj;
 	u8 elastic_underrun_limit;
 	u8 elastic_overrun_limit;
+	int (*postsuspend)(void);
 };
 
 enum tegra_usb_phy_port_speed {
@@ -108,6 +111,8 @@ void tegra_usb_phy_clk_disable(struct tegra_usb_phy *phy);
 void tegra_usb_phy_clk_enable(struct tegra_usb_phy *phy);
 
 void tegra_usb_phy_power_off(struct tegra_usb_phy *phy, bool is_dpd);
+
+void tegra_usb_phy_postsuspend(struct tegra_usb_phy *phy, bool is_dpd);
 
 void tegra_usb_phy_preresume(struct tegra_usb_phy *phy, bool is_dpd);
 

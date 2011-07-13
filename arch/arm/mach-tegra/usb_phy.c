@@ -510,14 +510,6 @@ static struct tegra_utmip_config utmip_default[] = {
 	},
 };
 
-static struct tegra_uhsic_config uhsic_default = {
-	.sync_start_delay = 9,
-	.idle_wait_delay = 17,
-	.term_range_adj = 0,
-	.elastic_underrun_limit = 16,
-	.elastic_overrun_limit = 16,
-};
-
 struct usb_phy_plat_data usb_phy_data[] = {
 	{ 0, 0, -1, NULL},
 	{ 0, 0, -1, NULL},
@@ -977,6 +969,16 @@ static int utmi_phy_postresume(struct tegra_usb_phy *phy, bool is_dpd)
 	return 0;
 }
 
+static int uhsic_phy_postsuspend(struct tegra_usb_phy *phy, bool is_dpd)
+{
+	struct tegra_uhsic_config *uhsic_config = phy->config;
+
+	if (uhsic_config->postsuspend)
+		uhsic_config->postsuspend();
+
+	return 0;
+}
+
 static int uhsic_phy_postresume(struct tegra_usb_phy *phy, bool is_dpd)
 {
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
@@ -1413,11 +1415,7 @@ static int uhsic_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
-	struct tegra_uhsic_config *config = &uhsic_default;
-	struct tegra_ulpi_config *ulpi_config = phy->config;
-
-	if (ulpi_config->preinit)
-		ulpi_config->preinit();
+	struct tegra_uhsic_config *uhsic_config = phy->config;
 
 	val = readl(base + UHSIC_PADS_CFG1);
 	val &= ~(UHSIC_PD_BG | UHSIC_PD_TX | UHSIC_PD_TRK | UHSIC_PD_RX |
@@ -1436,13 +1434,13 @@ static int uhsic_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	writel(val, base + USB_SUSP_CTRL);
 
 	val = readl(base + UHSIC_HSRX_CFG0);
-	val |= UHSIC_IDLE_WAIT(config->idle_wait_delay);
-	val |= UHSIC_ELASTIC_UNDERRUN_LIMIT(config->elastic_underrun_limit);
-	val |= UHSIC_ELASTIC_OVERRUN_LIMIT(config->elastic_overrun_limit);
+	val |= UHSIC_IDLE_WAIT(uhsic_config->idle_wait_delay);
+	val |= UHSIC_ELASTIC_UNDERRUN_LIMIT(uhsic_config->elastic_underrun_limit);
+	val |= UHSIC_ELASTIC_OVERRUN_LIMIT(uhsic_config->elastic_overrun_limit);
 	writel(val, base + UHSIC_HSRX_CFG0);
 
 	val = readl(base + UHSIC_HSRX_CFG1);
-	val |= UHSIC_HS_SYNC_START_DLY(config->sync_start_delay);
+	val |= UHSIC_HS_SYNC_START_DLY(uhsic_config->sync_start_delay);
 	writel(val, base + UHSIC_HSRX_CFG1);
 
 	val = readl(base + UHSIC_MISC_CFG0);
@@ -1547,6 +1545,7 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 {
 	struct tegra_usb_phy *phy;
 	struct tegra_ulpi_config *ulpi_config;
+	struct tegra_ulpi_config *uhsic_config;
 	unsigned long parent_rate;
 	int i;
 	int err;
@@ -1630,29 +1629,29 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 	}
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	else if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_HSIC) {
-		ulpi_config = config;
-		gpio_request(ulpi_config->enable_gpio,
+		uhsic_config = config;
+		gpio_request(uhsic_config->enable_gpio,
 			"uhsic_enable");
-		if (ulpi_config->reset_gpio != -1)
-			gpio_request(ulpi_config->reset_gpio,
+		if (uhsic_config->reset_gpio != -1)
+			gpio_request(uhsic_config->reset_gpio,
 				"uhsic_reset");
 		/* hsic enable signal deasserted, hsic reset asserted */
-		gpio_direction_output(ulpi_config->enable_gpio,
+		gpio_direction_output(uhsic_config->enable_gpio,
 			0 /* deasserted */);
-		if (ulpi_config->reset_gpio != -1)
-			gpio_direction_output(ulpi_config->reset_gpio,
+		if (uhsic_config->reset_gpio != -1)
+			gpio_direction_output(uhsic_config->reset_gpio,
 				0 /* asserted */);
-		tegra_gpio_enable(ulpi_config->enable_gpio);
-		if (ulpi_config->reset_gpio != -1)
-			tegra_gpio_enable(ulpi_config->reset_gpio);
+		tegra_gpio_enable(uhsic_config->enable_gpio);
+		if (uhsic_config->reset_gpio != -1)
+			tegra_gpio_enable(uhsic_config->reset_gpio);
 		/* keep hsic reset asserted for 1 ms */
 		udelay(1000);
 		/* enable (power on) hsic */
-		gpio_set_value_cansleep(ulpi_config->enable_gpio, 1);
+		gpio_set_value_cansleep(uhsic_config->enable_gpio, 1);
 		udelay(1000);
 		/* deassert reset */
-		if (ulpi_config->reset_gpio != -1)
-			gpio_set_value_cansleep(ulpi_config->reset_gpio, 1);
+		if (uhsic_config->reset_gpio != -1)
+			gpio_set_value_cansleep(uhsic_config->reset_gpio, 1);
 	}
 #endif
 
@@ -1764,6 +1763,20 @@ void tegra_usb_phy_preresume(struct tegra_usb_phy *phy, bool is_dpd)
 
 	if (preresume[phy->usb_phy_type])
 		preresume[phy->usb_phy_type](phy, is_dpd);
+}
+
+void tegra_usb_phy_postsuspend(struct tegra_usb_phy *phy, bool is_dpd)
+
+{
+	const tegra_phy_fp postsuspend[] = {
+		NULL,
+		NULL,
+		NULL,
+		uhsic_phy_postsuspend,
+	};
+
+	if (postsuspend[phy->usb_phy_type])
+		postsuspend[phy->usb_phy_type](phy, is_dpd);
 }
 
 void tegra_usb_phy_postresume(struct tegra_usb_phy *phy, bool is_dpd)
