@@ -44,7 +44,7 @@ struct tegra_overlay_windowattr {
 	__u32	pre_syncpt_val;
 	__u32	hfilter;
 	__u32	vfilter;
-	__u32	tiled;
+	__u32	do_not_use__tiled; /* compatibility */
 	__u32	flags;
 };
 
