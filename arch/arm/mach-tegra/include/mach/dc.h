@@ -132,6 +132,12 @@ struct tegra_dsi_out {
 	struct tegra_dsi_cmd*	dsi_init_cmd;		/* required */
 	u16		n_init_cmd;			/* required */
 
+	struct tegra_dsi_cmd*	dsi_early_suspend_cmd;
+	u16		n_early_suspend_cmd;
+
+	struct tegra_dsi_cmd*	dsi_late_resume_cmd;
+	u16		n_late_resume_cmd;
+
 	struct tegra_dsi_cmd*	dsi_suspend_cmd;	/* required */
 	u16		n_suspend_cmd;			/* required */
 
