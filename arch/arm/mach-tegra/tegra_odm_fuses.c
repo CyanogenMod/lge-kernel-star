@@ -758,9 +758,6 @@ static ssize_t fuse_store(struct kobject *kobj, struct kobj_attribute *attr,
 		return -EINVAL;
 	}
 
-	if (!isxdigit(*buf))
-		return -EINVAL;
-
 	if (fuse_odm_prod_mode()) {
 		pr_err("%s: device locked. odm fuse already blown\n", __func__);
 		return -EPERM;
@@ -771,6 +768,15 @@ static ssize_t fuse_store(struct kobject *kobj, struct kobj_attribute *attr,
 		pr_err("%s: fuse parameter too long, should be %d character(s)\n",
 			__func__, fuse_info_tbl[param].sz * 2);
 		return -EINVAL;
+	}
+
+	/* see if the string has 0x/x at the start */
+	if (*buf == 'x') {
+		count -= 1;
+		buf++;
+	} else if (*(buf + 1) == 'x') {
+		count -= 2;
+		buf += 2;
 	}
 
 	/* we need to fit each character into a single nibble */
@@ -842,7 +848,7 @@ static ssize_t fuse_show(struct kobject *kobj, struct kobj_attribute *attr, char
 		return ret;
 	}
 
-	strcpy(buf, "");
+	strcpy(buf, "0x");
 	for (i = (fuse_info_tbl[param].sz/sizeof(u32)) - 1; i >= 0 ; i--) {
 		sprintf(str, "%08x", data[i]);
 		strcat(buf, str);
