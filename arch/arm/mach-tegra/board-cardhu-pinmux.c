@@ -442,6 +442,10 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_cardhu_a03[] = {
 	DEFAULT_PINMUX(PEX_L1_PRSNT_N,  RSVD3,           PULL_UP,   TRISTATE,   INPUT),
 };
 
+static __initdata struct tegra_pingroup_config cardhu_pinmux_e1291_a04[] = {
+	DEFAULT_PINMUX(GMI_AD15,        NAND,            PULL_DOWN,   NORMAL,   OUTPUT),
+};
+
 static __initdata struct tegra_pingroup_config cardhu_pinmux_e1198[] = {
 	/* SPI2 */
 	DEFAULT_PINMUX(SPI2_SCK,        SPI2,            PULL_UP,    NORMAL,     INPUT),
@@ -533,6 +537,9 @@ int __init cardhu_pinmux_init(void)
 			tegra_pinmux_config_table(cardhu_pinmux_cardhu_a03,
 					ARRAY_SIZE(cardhu_pinmux_cardhu_a03));
 		}
+		if (board_info.fab >= BOARD_FAB_A04)
+			tegra_pinmux_config_table(cardhu_pinmux_e1291_a04,
+					ARRAY_SIZE(cardhu_pinmux_e1291_a04));
 		break;
 
 	case BOARD_PM269:
