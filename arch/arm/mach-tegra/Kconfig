@@ -149,19 +149,23 @@ config TEGRA_DEBUG_UART_NONE
 
 config TEGRA_DEBUG_UARTA
         bool "UART-A"
+	depends on DEBUG_LL
 
 config TEGRA_DEBUG_UARTB
         bool "UART-B"
+	depends on DEBUG_LL
 
 config TEGRA_DEBUG_UARTC
         bool "UART-C"
+	depends on DEBUG_LL
 
 config TEGRA_DEBUG_UARTD
         bool "UART-D"
+	depends on DEBUG_LL
 
 config TEGRA_DEBUG_UARTE
         bool "UART-E"
-
+	depends on DEBUG_LL
 endchoice
 
 config TEGRA_SYSTEM_DMA
