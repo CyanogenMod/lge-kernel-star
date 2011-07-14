@@ -410,7 +410,7 @@ static void tps6591x_gpio_init(struct tps6591x *tps6591x,
 	tps6591x->gpio.label		= tps6591x->client->name;
 	tps6591x->gpio.dev		= tps6591x->dev;
 	tps6591x->gpio.base		= gpio_base;
-	tps6591x->gpio.ngpio		= 9;
+	tps6591x->gpio.ngpio		= TPS6591X_GPIO_NR;
 	tps6591x->gpio.can_sleep	= 1;
 
 	tps6591x->gpio.direction_input	= tps6591x_gpio_input;

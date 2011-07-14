@@ -49,6 +49,22 @@ enum {
 	TPS6591X_INT_NR,
 };
 
+/* Gpio definitions */
+enum {
+	TPS6591X_GPIO_GP0 = 0,
+	TPS6591X_GPIO_GP1 = 1,
+	TPS6591X_GPIO_GP2 = 2,
+	TPS6591X_GPIO_GP3 = 3,
+	TPS6591X_GPIO_GP4 = 4,
+	TPS6591X_GPIO_GP5 = 5,
+	TPS6591X_GPIO_GP6 = 6,
+	TPS6591X_GPIO_GP7 = 7,
+	TPS6591X_GPIO_GP8 = 8,
+
+	/* Last entry */
+	TPS6591X_GPIO_NR,
+};
+
 struct tps6591x_subdev_info {
 	int		id;
 	const char	*name;
