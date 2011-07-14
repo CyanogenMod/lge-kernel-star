@@ -82,6 +82,9 @@ static __initdata struct tegra_drive_pingroup_config cardhu_drive_pinmux[] = {
 
 	/* PWR_I2C */
 	SET_DRIVE(AO1,		DISABLE, ENABLE, DIV_1, 31, 31, FASTEST, FASTEST),
+
+	/* UART3 */
+	SET_DRIVE(UART3,	DISABLE, ENABLE, DIV_1, 31, 31, FASTEST, FASTEST),
 };
 
 #define DEFAULT_PINMUX(_pingroup, _mux, _pupd, _tri, _io)	\
