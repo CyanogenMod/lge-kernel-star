@@ -37,6 +37,7 @@
 #include <mach/clk.h>
 #include <mach/delay.h>
 #include <mach/tsensor.h>
+#include <mach/tegra_fuse.h>
 
 /* We have multiple tsensor instances with following registers */
 #define SENSOR_CFG0				0x40
@@ -77,14 +78,6 @@
 #define MAX_STR_LINE				100
 #define MAX_TSENSOR_LOOP1			(1000 * 2)
 
-/* fuse spare bits are used to get Tj-ADT values */
-#define FUSE_SPARE_BIT_0_0			0x244
-#define FUSE_SPARE_BIT_6_0			0x25c
-#define FUSE_SPARE_BIT_20_0			0x294
-#define NUM_FUSE_REGS				7
-
-#define FUSE_TSENSOR_CALIB_0			0x198
-
 #define TSENSOR_COUNTER_TOLERANCE		100
 
 #define SENSOR_CTRL_RST_SHIFT			1
@@ -93,6 +86,10 @@
 #define TEGRA_REV_REG_OFFSET			0x804
 #define CCLK_G_BURST_POLICY_REG_REL_OFFSET	0x368
 #define TSENSOR_SLOWDOWN_BIT			23
+
+/* tsensor instance used for temperature calculation */
+#define TSENSOR_FUSE_REVISION_DECIMAL_REV1	8
+#define TSENSOR_FUSE_REVISION_DECIMAL_REV2	21
 
 /* macros used for temperature calculations */
 #define get_temperature_int(X)			((X) / 100)
@@ -300,7 +297,7 @@ static void get_chip_rev(unsigned short *p_id, unsigned short *p_major,
 	*p_major = (reg >> 4) & 0xf;
 	*p_minor = (reg >> 16) & 0xf;
 	pr_info("\n Tegra chip revision for tsensor detected as: "
-		" Chip Id=%d, Major=%d, Minor=%d ", (int)*p_id,
+		" Chip Id=%x, Major=%d, Minor=%d ", (int)*p_id,
 		(int)*p_major, (int)*p_minor);
 }
 
@@ -411,6 +408,8 @@ static ssize_t tsensor_show_counters(struct device *dev,
 
 	if (attr->index == TSENSOR_TEMPERATURE)
 		snprintf(fixed_str, MAX_STR_LINE, "temperature: ");
+	else
+		goto error;
 	for (i = 0; i < TSENSOR_COUNT; i++) {
 		err = tsensor_read_counter(data, i,
 			&curr_avg[i], &min_max[i]);
@@ -436,20 +435,12 @@ static ssize_t tsensor_show_counters(struct device *dev,
 		snprintf(buf, (((LOCAL_STR_SIZE1 << 1) + 3) +
 			strlen(fixed_str)),
 			"%s "
-			"[1]: current counter=0x%x, %d.%d"
+			"[%d]: current counter=0x%x, %d.%d"
 			" deg Celsius ", fixed_str,
-			((curr_avg[1] & 0xFFFF0000) >> 16),
+			tsensor_index,
+			((curr_avg[tsensor_index] & 0xFFFF0000) >> 16),
 			get_temperature_int(temp1),
 			get_temperature_fraction(temp1));
-	} else {
-		snprintf(buf, ((LOCAL_STR_SIZE1 << 1) + 3) +
-			strlen(fixed_str),
-			"%s[%d %d %d %d] ",
-			fixed_str,
-			((curr_avg[0] >> 16) & 0xffff),
-			(curr_avg[0] & 0xffff),
-			((min_max[0] >> 16) & 0xffff),
-			(min_max[0] & 0xffff));
 	}
 	strcat(buf, "\n");
 	return strlen(buf);
@@ -520,13 +511,25 @@ static ssize_t show_tsensor_param(struct device *dev,
 	unsigned int sft;
 	unsigned int msk;
 	int err;
+	int temp;
 
 	err = get_param_values(attr->index, &reg, &sft, &msk);
 	if (err < 0)
 		goto labelErr;
 	val = tsensor_get_reg_field(data, reg, sft, msk);
-	snprintf(buf, LOCAL_STR_SIZE1 + strlen(my_fixed_str), "%s%d",
-		my_fixed_str, val);
+	if (val == MAX_THRESHOLD)
+		snprintf(buf, LOCAL_STR_SIZE1 + strlen(my_fixed_str),
+			"%s un-initialized threshold ",
+			my_fixed_str);
+	else {
+		err = tsensor_count_2_temp(data, val, &temp);
+		if (err != 0)
+			goto labelErr;
+		snprintf(buf, LOCAL_STR_SIZE1 + strlen(my_fixed_str),
+			"%s threshold: %d.%d Celsius ",
+			my_fixed_str, get_temperature_int(temp),
+			get_temperature_fraction(temp));
+	}
 	strcat(buf, "\n");
 	return strlen(buf);
 labelErr:
@@ -547,6 +550,7 @@ static ssize_t set_tsensor_param(struct device *dev,
 	unsigned int msk;
 	int err;
 	unsigned int counter;
+	unsigned int val;
 
 	if (strict_strtoul(buf, 0, (long int *)&num)) {
 		dev_err(dev, "\n file: %s, line=%d return %s() ",
@@ -569,6 +573,8 @@ static ssize_t set_tsensor_param(struct device *dev,
 		msleep(20);
 		(void)cclkg_check_hwdiv2_sensor(data);
 	}
+	val = tsensor_get_reg_field(data, reg, sft, msk);
+	dev_dbg(dev, "\n %s 0x%x ", my_fixed_str, val);
 	return count;
 labelErr:
 	dev_err(dev, "\n file: %s, line=%d, %s(), error=0x%x ", __FILE__,
@@ -658,10 +664,10 @@ static irqreturn_t tegra_tsensor_isr(int irq, void *arg_data)
  */
 static int read_tsensor_fuse_regs(struct tegra_tsensor_data *data)
 {
-	unsigned int reg1, reg2;
-	int i;
-	unsigned int start, offset1;
-	unsigned int T1, T2;
+	unsigned int reg1;
+	unsigned int T1 = 0, T2 = 0;
+	unsigned int spare_bits;
+	int err;
 
 	/* read tsensor calibration register */
 	/*
@@ -670,9 +676,17 @@ static int read_tsensor_fuse_regs(struct tegra_tsensor_data *data)
 	 * Low (~25 deg C) Temperature Calibration value (lower 16 bits of
 	 *          FUSE_TSENSOR_CALIB_0) - F1
 	 */
-	reg1 = readl(IO_ADDRESS(TEGRA_FUSE_BASE + FUSE_TSENSOR_CALIB_0));
+	err = tegra_fuse_get_tsensor_calibration_data(&reg1);
+	if (err)
+		goto errLabel;
 	fuse_F1 = reg1 & 0xFFFF;
 	fuse_F2 = (reg1 >> 16) & 0xFFFF;
+
+	err = tegra_fuse_get_tsensor_spare_bits(&spare_bits);
+	if (err) {
+		pr_err("\n tsensor spare bit fuse read error=%d ", err);
+		goto errLabel;
+	}
 
 	/*
 	 * FUSE_TJ_ADT_LOWT = T1, FUSE_TJ_ADJ = T2
@@ -682,47 +696,23 @@ static int read_tsensor_fuse_regs(struct tegra_tsensor_data *data)
 	 * Low temp is:
 	 * FUSE_TJ_ADT_LOWT = bits [20:14] or’ed with bits [27:21]
 	 */
+	T1 = ((spare_bits >> 14) & 0x7F) |
+		((spare_bits >> 21) & 0x7F);
 	dev_vdbg(data->hwmon_dev, "\n Tsensor low temp (T1) fuse : ");
-	T1 = 0;
-	start = FUSE_SPARE_BIT_20_0;
-	offset1 = NUM_FUSE_REGS * 4;
-	for (i = 0; i < NUM_FUSE_REGS; i++) {
-		reg1 = readl(IO_ADDRESS((unsigned int)TEGRA_FUSE_BASE +
-			start - (i << 2)));
-		dev_vdbg(data->hwmon_dev, "\n FUSE_SPARE_BIT_%d_0: 0x%x ",
-			(((start - FUSE_SPARE_BIT_0_0) >> 2) - i), reg1);
-		reg2 = readl(IO_ADDRESS((unsigned int)TEGRA_FUSE_BASE +
-			start + offset1 - (i << 2)));
-		dev_vdbg(data->hwmon_dev, "\n FUSE_SPARE_BIT_%d_0: 0x%x ",
-			((((start + offset1) - FUSE_SPARE_BIT_0_0) >> 2)
-			- i), reg2);
-		T1 = (T1 << 1) + ((reg1 | reg2) & 0x1);
-	}
 
 	/*
 	 * High temp is:
 	 * FUSE_TJ_ADJ = bits [6:0] or’ed with bits [13:7]
 	 */
 	dev_vdbg(data->hwmon_dev, "\n Tsensor low temp (T2) fuse : ");
-	start = FUSE_SPARE_BIT_6_0;
-	T2 = 0;
-	for (i = 0; i < NUM_FUSE_REGS; i++) {
-		reg1 = readl(IO_ADDRESS(TEGRA_FUSE_BASE + start -
-			(i << 2)));
-		dev_vdbg(data->hwmon_dev, "\n FUSE_SPARE_BIT_%d_0: 0x%x ",
-			(((start - FUSE_SPARE_BIT_0_0) >> 2) - i), reg1);
-		reg2 = readl(IO_ADDRESS(TEGRA_FUSE_BASE + start + offset1
-			- (i << 2)));
-		dev_vdbg(data->hwmon_dev, "\n FUSE_SPARE_BIT_%d_0: 0x%x ",
-			((((start + offset1) - FUSE_SPARE_BIT_0_0) >> 2)
-			- i), reg2);
-		T2 = (T2 << 1) + ((reg1 | reg2) & 0x1);
-	}
+	T2 = (spare_bits & 0x7F) | ((spare_bits >> 7) & 0x7F);
 	pr_info("\n Tsensor fuse calibration F1=%d, F2=%d, T1=%d, T2=%d "
 		, fuse_F1, fuse_F2, T1, T2);
 	fuse_T1 = T1;
 	fuse_T2 = T2;
 	return 0;
+errLabel:
+	return err;
 }
 
 /* function to calculate interim temperature */
@@ -942,7 +932,7 @@ static void get_quadratic_roots(struct tegra_tsensor_data *data,
 	expr3_e_minus4 = expr3_e_minus4_1 + expr3_e_minus4_2;
 	dev_vdbg(data->hwmon_dev, "\n expr3=%d ", expr3_e_minus4);
 	expr4_e_minus2_1 = DIV_ROUND_CLOSEST((expr3_e_minus4 +
-		(p_e_minus2 * 1000)), 100);
+		(p_e_minus2 * 100)), 100);
 	dev_vdbg(data->hwmon_dev, "\n expr4_e_minus2_1=%d ",
 		expr4_e_minus2_1);
 	expr4_e_minus6_2 = (4 * m_e_minus6);
@@ -1042,14 +1032,20 @@ static void tsensor_temp_2_count(struct tegra_tsensor_data *data,
  * function to compare computed and expected values with
  * certain tolerance setting hard coded here
  */
-static bool cmp_counter(unsigned int actual, unsigned int exp)
+static bool cmp_counter(
+	struct tegra_tsensor_data *data,
+	unsigned int actual, unsigned int exp)
 {
 	unsigned int smaller;
 	unsigned int larger;
 	smaller = (actual > exp) ? exp : actual;
 	larger = (smaller == actual) ? exp : actual;
-	if ((larger - smaller) > TSENSOR_COUNTER_TOLERANCE)
+	if ((larger - smaller) > TSENSOR_COUNTER_TOLERANCE) {
+		dev_dbg(data->hwmon_dev, "\n actual=%d, exp=%d, larger=%d, "
+		"smaller=%d, tolerance=%d ", actual, exp, larger, smaller,
+		TSENSOR_COUNTER_TOLERANCE);
 		return false;
+	}
 	return true;
 }
 
@@ -1112,7 +1108,7 @@ static bool test_temperature_algo(struct tegra_tsensor_data *data)
 	bool result = false;
 
 	/* read actual counter */
-	err = tsensor_read_counter(data, 0, &curr_avg, &min_max);
+	err = tsensor_read_counter(data, tsensor_index, &curr_avg, &min_max);
 	if (err < 0) {
 		pr_err("\n Error: tsensor0 counter read, err=%d ", err);
 		goto endLabel;
@@ -1139,8 +1135,8 @@ static bool test_temperature_algo(struct tegra_tsensor_data *data)
 		get_temperature_round(T1), counter1, counter2);
 
 	/* compare counter calculated with actual original counter */
-	result1 = cmp_counter(actual_counter, counter1);
-	result2 = cmp_counter(actual_counter, counter2);
+	result1 = cmp_counter(data, actual_counter, counter1);
+	result2 = cmp_counter(data, actual_counter, counter2);
 	if (result1) {
 		dev_dbg(data->hwmon_dev, "\n counter1 matches: actual=%d,"
 			" calc=%d ", actual_counter, counter1);
@@ -1167,21 +1163,20 @@ static unsigned int tsensor_get_threshold_counter(
 	int err;
 
 	tsensor_temp_2_count(data, temp_threshold, &counter1, &counter2);
-	err = tsensor_read_counter(data, 0, &curr_avg, &min_max);
+	err = tsensor_read_counter(data, tsensor_index, &curr_avg, &min_max);
 	if (err < 0) {
 		pr_err("\n Error: tsensor0 counter read, err=%d ", err);
 		return MAX_THRESHOLD;
 	}
 	if (counter2 > ((curr_avg & 0xFFFF0000) >> 16)) {
-		dev_dbg(data->hwmon_dev, "\n choosing counter2=0x%x as "
+		dev_dbg(data->hwmon_dev, "\n choosing counter 2=0x%x as "
 			"root ", counter2);
-		counter = counter2;
 	} else {
-		pr_err("\n Error: choosing counter1=0x%x as root, "
-			"counter=0x%x ", counter1,
-			((curr_avg & 0xFFFF0000) >> 16));
-		counter = counter1;
+		pr_err("\n Warning: tsensor choosing counter 2=0x%x as "
+			"root, counter 1=0x%x, counter=0x%x ", counter2,
+			counter1, ((curr_avg & 0xFFFF0000) >> 16));
 	}
+	counter = counter2;
 	return counter;
 }
 
@@ -1204,7 +1199,7 @@ static void tsensor_threshold_setup(
 
 	/* Choose thresholds for sensor0 and sensor1 */
 	/* set to very high values initially - DEFAULT_THRESHOLD */
-	if ((!is_default_threshold) && (i == 0)) {
+	if ((!is_default_threshold) && (i == tsensor_index)) {
 		dev_dbg(data->hwmon_dev, "\n before div2 temp_2_count ");
 		th2_count = tsensor_get_threshold_counter(data,
 			data->div2_temp);
@@ -1476,13 +1471,14 @@ static int tegra_tsensor_setup(struct platform_device *pdev)
 	if (!test_temperature_algo(data)) {
 		dev_err(&pdev->dev, " Error: read temperature "
 			"algorithm broken ");
+		goto err_setup;
 	}
 
 	print_temperature_2_counter_table(data);
 
 	dev_dbg(&pdev->dev, "\n before tsensor_threshold_setup ");
-	/* change tsensor threshold for instance 0 */
-	tsensor_threshold_setup(data, 0, false);
+	/* change tsensor threshold for active instance */
+	tsensor_threshold_setup(data, tsensor_index, false);
 	dev_dbg(&pdev->dev, "\n end tsensor_threshold_setup ");
 
 	return 0;
@@ -1500,6 +1496,7 @@ static int __devinit tegra_tsensor_probe(struct platform_device *pdev)
 	struct tegra_tsensor_data *data;
 	struct resource *r;
 	int err;
+	unsigned int reg;
 
 	data = kzalloc(sizeof(struct tegra_tsensor_data), GFP_KERNEL);
 	if (!data) {
@@ -1578,6 +1575,18 @@ static int __devinit tegra_tsensor_probe(struct platform_device *pdev)
 		err = -ENOMEM;
 		goto err3;
 	}
+
+	/* tsensor active instance decided based on fuse revision */
+	err = tegra_fuse_get_revision(&reg);
+	if (err)
+		goto err4;
+	/* instance 1 is used for fuse revision 8 till 20 */
+	/* instance 0 is used for fuse revision 21 onwards */
+	if ((reg & 0xf) >= TSENSOR_FUSE_REVISION_DECIMAL_REV1)
+		tsensor_index = 1;
+	else if ((reg & 0xf) >= TSENSOR_FUSE_REVISION_DECIMAL_REV2)
+		tsensor_index = 0;
+	pr_info("\n tsensor active instance=%d ", tsensor_index);
 
 	/* tegra tsensor - setup and init */
 	if (tegra_tsensor_setup(pdev) != 0)
