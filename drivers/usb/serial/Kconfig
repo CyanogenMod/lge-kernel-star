@@ -670,4 +670,17 @@ config USB_SERIAL_DEBUG
 	  To compile this driver as a module, choose M here: the
 	  module will be called usb-debug.
 
+config USB_SERIAL_BASEBAND
+	tristate "USB Baseband Driver"
+	help
+	  Say Y here if you want to use USB baseband character driver.
+
+	  This driver may be used as a raw character device driver for
+	  USB modems.  For example, downloading modem firmware upon
+	  modem boot up (for flashless modems), or sending modem
+	  AT commands after modem software is running on device.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called baseband_chr.
+
 endif # USB_SERIAL
