@@ -274,9 +274,25 @@ static int star_hall_remove( struct platform_device *pdev )
 	return 0;
 }
 
+int star_hall_suspend(struct platform_device *dev, pm_message_t state)
+{
+        star_hall_set_power_rail(g_hall->vdd_id, NV_FALSE);
+
+        return 0;
+}
+
+int star_hall_resume(struct platform_device *dev)
+{
+        star_hall_set_power_rail(g_hall->vdd_id, NV_TRUE);
+
+        return 0;
+}
+
 static struct platform_driver star_hall_driver = {
 	.probe = star_hall_probe,
 	.remove = star_hall_remove,
+	.suspend = star_hall_suspend,
+	.resume = star_hall_resume,
 	.driver = {
 		.name = "star_hall",
 	},
