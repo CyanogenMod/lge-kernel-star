@@ -4368,6 +4368,7 @@ void tegra_clk_resume(void)
 	u32 plla_base;
 	u32 plld_base;
 	u32 plld2_base;
+	struct clk *p;
 
 	val = clk_readl(OSC_CTRL) & ~OSC_CTRL_MASK;
 	val |= *ctx++;
@@ -4466,9 +4467,22 @@ void tegra_clk_resume(void)
 	clk_writel(plld_base, tegra_pll_d.reg + PLL_BASE);
 	clk_writel(plld2_base, tegra_pll_d2.reg + PLL_BASE);
 
-	/* Since EMC clock is not restored update current state, and mark
-	   EMC DFS as out of sync */
+	/* Since EMC clock is not restored, and may not preserve parent across
+	   suspend, update current state, and mark EMC DFS as out of sync */
+	p = tegra_clk_emc.parent;
 	tegra3_periph_clk_init(&tegra_clk_emc);
+
+	if (p != tegra_clk_emc.parent) {
+		/* FIXME: old parent is left enabled here even if EMC was its
+		   only child before suspend (never happens on Tegra3) */
+		pr_debug("EMC parent(refcount) across suspend: %s(%d) : %s(%d)",
+			p->name, p->refcnt, tegra_clk_emc.parent->name,
+			tegra_clk_emc.parent->refcnt);
+
+		BUG_ON(!p->refcnt);
+		p->refcnt--;
+		tegra_clk_emc.parent->refcnt++;
+	}
 	tegra_emc_timing_invalidate();
 
 	tegra3_pll_clk_init(&tegra_pll_u); /* Re-init utmi parameters */
