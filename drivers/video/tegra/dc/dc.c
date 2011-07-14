@@ -1365,6 +1365,15 @@ static irqreturn_t tegra_dc_irq(int irq, void *ptr)
 	unsigned long underflow_mask;
 	int i;
 
+	if (!nvhost_module_powered(&dc->ndev->host->mod)) {
+		WARN(1, "IRQ when DC not powered!\n");
+		tegra_dc_io_start(dc);
+		status = tegra_dc_readl(dc, DC_CMD_INT_STATUS);
+		tegra_dc_writel(dc, status, DC_CMD_INT_STATUS);
+		tegra_dc_io_end(dc);
+		return IRQ_HANDLED;
+	}
+
 	status = tegra_dc_readl(dc, DC_CMD_INT_STATUS);
 	tegra_dc_writel(dc, status, DC_CMD_INT_STATUS);
 
