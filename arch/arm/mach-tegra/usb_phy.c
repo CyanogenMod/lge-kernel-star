@@ -561,15 +561,14 @@ static int utmip_pad_power_on(struct tegra_usb_phy *phy)
 
 	spin_lock_irqsave(&utmip_pad_lock, flags);
 
-	if (utmip_pad_count++ == 0) {
-		val = readl(base + UTMIP_BIAS_CFG0);
-		val &= ~(UTMIP_OTGPD | UTMIP_BIASPD);
+	utmip_pad_count++;
+	val = readl(base + UTMIP_BIAS_CFG0);
+	val &= ~(UTMIP_OTGPD | UTMIP_BIASPD);
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
-		val |= UTMIP_HSSQUELCH_LEVEL(0x2) | UTMIP_HSDISCON_LEVEL(0x2) |
-			UTMIP_HSDISCON_LEVEL_MSB;
+	val |= UTMIP_HSSQUELCH_LEVEL(0x2) | UTMIP_HSDISCON_LEVEL(0x2) |
+		UTMIP_HSDISCON_LEVEL_MSB;
 #endif
-		writel(val, base + UTMIP_BIAS_CFG0);
-	}
+	writel(val, base + UTMIP_BIAS_CFG0);
 
 	spin_unlock_irqrestore(&utmip_pad_lock, flags);
 
@@ -843,11 +842,9 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 		writel(val, base + USB_SUSP_CTRL);
 	}
 #else
-	if ((phy->instance == 1) || (phy->instance == 2)) {
-		val = readl(base + USB_SUSP_CTRL);
-		val |= UTMIP_PHY_ENABLE;
-		writel(val, base + USB_SUSP_CTRL);
-	}
+	val = readl(base + USB_SUSP_CTRL);
+	val |= UTMIP_PHY_ENABLE;
+	writel(val, base + USB_SUSP_CTRL);
 #endif
 
 	val = readl(base + USB_SUSP_CTRL);
