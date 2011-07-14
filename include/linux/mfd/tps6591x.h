@@ -25,23 +25,6 @@
 
 #include <linux/rtc.h>
 
-#define tps6591x_rails(_name) "tps6591x_"#_name
-
-enum {
-	TPS6591X_ID_VIO,
-	TPS6591X_ID_VDD_1,
-	TPS6591X_ID_VDD_2,
-	TPS6591X_ID_VDDCTRL,
-	TPS6591X_ID_LDO_1,
-	TPS6591X_ID_LDO_2,
-	TPS6591X_ID_LDO_3,
-	TPS6591X_ID_LDO_4,
-	TPS6591X_ID_LDO_5,
-	TPS6591X_ID_LDO_6,
-	TPS6591X_ID_LDO_7,
-	TPS6591X_ID_LDO_8,
-};
-
 enum {
 	TPS6591X_INT_PWRHOLD_F,
 	TPS6591X_INT_VMBHI,
@@ -61,6 +44,9 @@ enum {
 	TPS6591X_INT_VMBCH2_H,
 	TPS6591X_INT_VMBCH2_L,
 	TPS6591X_INT_PWRDN,
+
+	/* Last entry */
+	TPS6591X_INT_NR,
 };
 
 struct tps6591x_subdev_info {

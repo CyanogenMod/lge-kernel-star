@@ -26,6 +26,23 @@
 
 #include <linux/regulator/machine.h>
 
+#define tps6591x_rails(_name) "tps6591x_"#_name
+
+enum {
+	TPS6591X_ID_VIO,
+	TPS6591X_ID_VDD_1,
+	TPS6591X_ID_VDD_2,
+	TPS6591X_ID_VDDCTRL,
+	TPS6591X_ID_LDO_1,
+	TPS6591X_ID_LDO_2,
+	TPS6591X_ID_LDO_3,
+	TPS6591X_ID_LDO_4,
+	TPS6591X_ID_LDO_5,
+	TPS6591X_ID_LDO_6,
+	TPS6591X_ID_LDO_7,
+	TPS6591X_ID_LDO_8,
+};
+
 enum tps6591x_ext_control {
 	EXT_CTRL_NONE = 0x0,
 	EXT_CTRL_EN1,
