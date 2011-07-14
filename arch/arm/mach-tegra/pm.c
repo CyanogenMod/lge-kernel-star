@@ -574,6 +574,12 @@ static void tegra_pm_set(enum tegra_suspend_mode mode)
 		/* Enable DPD sample to trigger sampling pads data and direction
 		 * in which pad will be driven during lp0 mode*/
 		writel(0x1, pmc + PMC_DPD_SAMPLE);
+
+		/* Set warmboot flag */
+		reg = readl(pmc + PMC_SCRATCH0);
+		pmc_32kwritel(reg | 1, PMC_SCRATCH0);
+
+		pmc_32kwritel(tegra_lp0_vec_start, PMC_SCRATCH1);
 		break;
 	case TEGRA_SUSPEND_LP1:
 		break;
@@ -587,12 +593,6 @@ static void tegra_pm_set(enum tegra_suspend_mode mode)
 	set_power_timers(pdata->cpu_timer, pdata->cpu_off_timer, rate);
 
 	pmc_32kwritel(reg, PMC_CTRL);
-
-	/* Set warmboot flag */
-	reg = readl(pmc + PMC_SCRATCH0);
-	pmc_32kwritel(reg | 1, PMC_SCRATCH0);
-
-	pmc_32kwritel(tegra_lp0_vec_start, PMC_SCRATCH1);
 }
 
 static const char *lp_state[TEGRA_MAX_SUSPEND_MODE] = {
