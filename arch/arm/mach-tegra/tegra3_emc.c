@@ -43,6 +43,7 @@ static bool emc_enable;
 #endif
 module_param(emc_enable, bool, 0644);
 
+#define EMC_MIN_RATE_DDR3		50000000
 #define EMC_STATUS_UPDATE_TIMEOUT	100
 #define TEGRA_EMC_TABLE_MAX_SIZE 	16
 
@@ -847,6 +848,9 @@ void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
 		pr_err("Not supported DRAM type %u\n", dram_type);
 		return;
 	}
+	if (dram_type == DRAM_TYPE_DDR3)
+		emc->min_rate = EMC_MIN_RATE_DDR3;
+
 	reg = emc_readl(EMC_CFG_2) & (~EMC_CFG_2_MODE_MASK);
 	reg |= ((dram_type == DRAM_TYPE_LPDDR2) ? EMC_CFG_2_PD_MODE :
 		EMC_CFG_2_SREF_MODE) << EMC_CFG_2_MODE_SHIFT;
