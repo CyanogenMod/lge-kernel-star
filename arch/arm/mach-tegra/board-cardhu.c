@@ -36,6 +36,7 @@
 #include <linux/spi/spi.h>
 #include <linux/i2c/atmel_mxt_ts.h>
 #include <linux/tegra_uart.h>
+#include <linux/console.h>
 
 #include <sound/wm8903.h>
 
@@ -353,6 +354,18 @@ static void __init cardhu_uart_init(void)
 
 	platform_add_devices(cardhu_uart_devices,
 				ARRAY_SIZE(cardhu_uart_devices));
+}
+
+void cardhu_debug_uart_suspend(void)
+{
+	if (console_suspend_enabled)
+		clk_disable(debug_uart_clk);
+}
+
+void cardhu_debug_uart_resume(void)
+{
+	if (console_suspend_enabled)
+		clk_enable(debug_uart_clk);
 }
 
 static struct platform_device tegra_camera = {

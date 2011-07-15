@@ -899,6 +899,18 @@ int __init cardhu_gpio_switch_regulator_init(void)
 	return platform_device_register(&gswitch_regulator_pdata);
 }
 
+static void cardhu_board_suspend(int lp_state, enum suspend_stage stg)
+{
+	if ((lp_state == TEGRA_SUSPEND_LP1) && (stg == TEGRA_SUSPEND_BEFORE_CPU))
+		cardhu_debug_uart_suspend();
+}
+
+static void cardhu_board_resume(int lp_state, enum resume_stage stg)
+{
+	if ((lp_state == TEGRA_SUSPEND_LP1) && (stg == TEGRA_RESUME_AFTER_CPU))
+		cardhu_debug_uart_resume();
+}
+
 static struct tegra_suspend_platform_data cardhu_suspend_data = {
 	.cpu_timer	= 2000,
 	.cpu_off_timer	= 200,
@@ -908,6 +920,8 @@ static struct tegra_suspend_platform_data cardhu_suspend_data = {
 	.corereq_high	= true,
 	.sysclkreq_high	= true,
 	.cpu_lp2_min_residency = 2000,
+	.board_suspend = cardhu_board_suspend,
+	.board_resume = cardhu_board_resume,
 };
 
 int __init cardhu_suspend_init(void)

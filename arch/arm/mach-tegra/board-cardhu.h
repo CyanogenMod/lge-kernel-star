@@ -171,4 +171,7 @@ int cardhu_power_off_init(void);
 int cardhu_edp_init(void);
 int cardhu_pmon_init(void);
 
+void cardhu_debug_uart_suspend(void);
+void cardhu_debug_uart_resume(void);
+
 #endif
