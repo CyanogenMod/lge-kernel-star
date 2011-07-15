@@ -43,6 +43,7 @@
 #define CARDHU_PM269_ROW_COUNT	2
 #define CARDHU_PM269_COL_COUNT	4
 
+#if 0
 static int plain_kbd_keycode[] = {
 	KEY_POWER,	KEY_RESERVED,
 	KEY_HOME,	KEY_BACK,
@@ -137,6 +138,12 @@ int __init cardhu_kbc_init(void)
 
 	return 0;
 }
+#else
+int __init cardhu_kbc_init(void)
+{
+	return 0;
+}
+#endif
 
 int __init cardhu_scroll_init(void)
 {
