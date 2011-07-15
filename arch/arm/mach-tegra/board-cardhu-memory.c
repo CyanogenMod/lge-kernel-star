@@ -1203,7 +1203,7 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 
 static const struct tegra_emc_table cardhu_emc_tables_k4p8g304eb[] = {
 	{
-		0x30,       /* Rev 3.0 */
+		0x31,       /* Rev 3.1 */
 		25500,      /* SDRAM frequency */
 		{
 			0x00000001, /* EMC_RC */
@@ -1311,6 +1311,8 @@ static const struct tegra_emc_table cardhu_emc_tables_k4p8g304eb[] = {
 			0x00060402, /* MC_EMEM_ARB_DA_COVERS */
 			0x74030303, /* MC_EMEM_ARB_MISC0 */
 			0x001f0000, /* MC_EMEM_ARB_RING1_THROTTLE */
+			0x50000000, /* EMC_FBIO_SPARE */
+			0xff00ff00, /* EMC_CFG_RSV */
 		},
 		0x00000009, /* EMC_ZCAL_WAIT_CNT after clock change */
 		0x001fffff, /* EMC_AUTO_CAL_INTERVAL */
@@ -1320,7 +1322,7 @@ static const struct tegra_emc_table cardhu_emc_tables_k4p8g304eb[] = {
 		0x00020001, /* Mode Register 2 */
 	},
 	{
-		0x30,       /* Rev 3.0 */
+		0x31,       /* Rev 3.1 */
 		51000,      /* SDRAM frequency */
 		{
 			0x00000003, /* EMC_RC */
@@ -1428,6 +1430,8 @@ static const struct tegra_emc_table cardhu_emc_tables_k4p8g304eb[] = {
 			0x00060402, /* MC_EMEM_ARB_DA_COVERS */
 			0x72c30303, /* MC_EMEM_ARB_MISC0 */
 			0x001f0000, /* MC_EMEM_ARB_RING1_THROTTLE */
+			0x50000000, /* EMC_FBIO_SPARE */
+			0xff00ff00, /* EMC_CFG_RSV */
 		},
 		0x00000009, /* EMC_ZCAL_WAIT_CNT after clock change */
 		0x001fffff, /* EMC_AUTO_CAL_INTERVAL */
@@ -1437,7 +1441,7 @@ static const struct tegra_emc_table cardhu_emc_tables_k4p8g304eb[] = {
 		0x00020001, /* Mode Register 2 */
 	},
 	{
-		0x30,       /* Rev 3.0 */
+		0x31,       /* Rev 3.1 */
 		102000,     /* SDRAM frequency */
 		{
 			0x00000006, /* EMC_RC */
@@ -1545,6 +1549,8 @@ static const struct tegra_emc_table cardhu_emc_tables_k4p8g304eb[] = {
 			0x00060403, /* MC_EMEM_ARB_DA_COVERS */
 			0x72430504, /* MC_EMEM_ARB_MISC0 */
 			0x001f0000, /* MC_EMEM_ARB_RING1_THROTTLE */
+			0x10000000, /* EMC_FBIO_SPARE */
+			0xff00ff00, /* EMC_CFG_RSV */
 		},
 		0x0000000a, /* EMC_ZCAL_WAIT_CNT after clock change */
 		0x001fffff, /* EMC_AUTO_CAL_INTERVAL */
@@ -1554,7 +1560,7 @@ static const struct tegra_emc_table cardhu_emc_tables_k4p8g304eb[] = {
 		0x00020001, /* Mode Register 2 */
 	},
 	{
-		0x30,       /* Rev 3.0 */
+		0x31,       /* Rev 3.1 */
 		204000,     /* SDRAM frequency */
 		{
 			0x0000000c, /* EMC_RC */
@@ -1662,6 +1668,8 @@ static const struct tegra_emc_table cardhu_emc_tables_k4p8g304eb[] = {
 			0x00070506, /* MC_EMEM_ARB_DA_COVERS */
 			0x71e40a07, /* MC_EMEM_ARB_MISC0 */
 			0x001f0000, /* MC_EMEM_ARB_RING1_THROTTLE */
+			0x50000000, /* EMC_FBIO_SPARE */
+			0xff00ff00, /* EMC_CFG_RSV */
 		},
 		0x00000013, /* EMC_ZCAL_WAIT_CNT after clock change */
 		0x001fffff, /* EMC_AUTO_CAL_INTERVAL */
@@ -1671,7 +1679,7 @@ static const struct tegra_emc_table cardhu_emc_tables_k4p8g304eb[] = {
 		0x00020001, /* Mode Register 2 */
 	},
 	{
-		0x30,       /* Rev 3.0 */
+		0x31,       /* Rev 3.1 */
 		533000,     /* SDRAM frequency */
 		{
 			0x0000001f, /* EMC_RC */
@@ -1779,6 +1787,8 @@ static const struct tegra_emc_table cardhu_emc_tables_k4p8g304eb[] = {
 			0x00110b10, /* MC_EMEM_ARB_DA_COVERS */
 			0x71c81811, /* MC_EMEM_ARB_MISC0 */
 			0x001f0000, /* MC_EMEM_ARB_RING1_THROTTLE */
+			0xd0000000, /* EMC_FBIO_SPARE */
+			0xff00ff00, /* EMC_CFG_RSV */
 		},
 		0x00000030, /* EMC_ZCAL_WAIT_CNT after clock change */
 		0x001fffff, /* EMC_AUTO_CAL_INTERVAL */
