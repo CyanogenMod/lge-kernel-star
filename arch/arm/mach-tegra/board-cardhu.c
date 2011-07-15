@@ -297,28 +297,6 @@ static void __init cardhu_uart_init(void)
 				ARRAY_SIZE(cardhu_uart_devices));
 }
 
-#if defined(CONFIG_RTC_DRV_TEGRA)
-static struct resource tegra_rtc_resources[] = {
-	[0] = {
-		.start = TEGRA_RTC_BASE,
-		.end = TEGRA_RTC_BASE + TEGRA_RTC_SIZE - 1,
-		.flags = IORESOURCE_MEM,
-	},
-	[1] = {
-		.start = INT_RTC,
-		.end = INT_RTC,
-		.flags = IORESOURCE_IRQ,
-	},
-};
-
-static struct platform_device tegra_rtc_device = {
-	.name = "tegra_rtc",
-	.id   = -1,
-	.resource = tegra_rtc_resources,
-	.num_resources = ARRAY_SIZE(tegra_rtc_resources),
-};
-#endif
-
 static struct platform_device tegra_camera = {
 	.name = "tegra_camera",
 	.id = -1,
@@ -326,9 +304,6 @@ static struct platform_device tegra_camera = {
 
 static struct platform_device *cardhu_devices[] __initdata = {
 	&tegra_pmu_device,
-#if defined(CONFIG_RTC_DRV_TEGRA)
-	&tegra_rtc_device,
-#endif
 	&tegra_udc_device,
 #if defined(CONFIG_SND_HDA_TEGRA)
 	&tegra_hda_device,
