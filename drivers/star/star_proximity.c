@@ -80,6 +80,10 @@ static bool proxi_enabled = false;
 static ProximityDevice s_proximity;
 static int reset_flag = 0;
 
+int star_proxi_get_status(void) {
+    return (proxi_enabled ? 1 : 0);
+}
+
 static NvBool star_proxi_write_reg(ProximityDevice* proximity, NvU8 reg, NvU8 val)
 {
     NvOdmI2cStatus Error;

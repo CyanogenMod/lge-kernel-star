@@ -1321,18 +1321,22 @@ static int star_accel_remove( struct platform_device *pdev )
 	return 0;
 }
 
+extern int star_proxi_get_status(void);
+
 int star_accel_suspend(struct platform_device *dev, pm_message_t state)
 {
-	star_accel_set_power_rail(g_accel->vdd_id, NV_FALSE);
+    if (!star_proxi_get_status())
+        star_accel_set_power_rail(g_accel->vdd_id, NV_FALSE);
 
-	return 0;
+    return 0;
 }
 
 int star_accel_resume(struct platform_device *dev)
 {
-	star_accel_set_power_rail(g_accel->vdd_id, NV_TRUE);
+    if (!star_proxi_get_status())
+        star_accel_set_power_rail(g_accel->vdd_id, NV_TRUE);
 
-	return 0;
+    return 0;
 }
 
 static struct platform_driver star_accel_driver = {
