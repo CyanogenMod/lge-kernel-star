@@ -305,6 +305,8 @@ static struct notifier_block tegra_cpu_edp_notifier = {
 
 static void tegra_cpu_edp_init(bool resume)
 {
+	tegra_get_cpu_edp_limits(&cpu_edp_limits, &cpu_edp_limits_size);
+
 	if (!cpu_edp_limits) {
 		if (!resume)
 			pr_info("cpu-tegra: no EDP table is provided\n");
@@ -331,12 +333,6 @@ static void tegra_cpu_edp_exit(void)
 		return;
 
 	unregister_hotcpu_notifier(&tegra_cpu_edp_notifier);
-}
-
-void tegra_init_cpu_edp_limits(const struct tegra_edp_limits *limits, int size)
-{
-	cpu_edp_limits = limits;
-	cpu_edp_limits_size = size;
 }
 
 #else	/* CONFIG_TEGRA_EDP_LIMITS */

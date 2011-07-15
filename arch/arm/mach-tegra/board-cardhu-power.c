@@ -982,27 +982,12 @@ int __init cardhu_power_off_init(void)
 }
 
 #ifdef CONFIG_TEGRA_EDP_LIMITS
-/*
- * placeholder for now. needs to be changed with characterized data.
- * step size cannot be less than 4C
- */
-static struct tegra_edp_limits cardhu_edp_limits[] = {
-/* Temperature	 1 CPU	  2 CPUs   3 CPUs   4 CPUs */
-	{60,	{1400000, 1300000, 1300000, 1300000} },
-	{70,	{1400000, 1300000, 1300000, 1260000} },
-	{80,	{1400000, 1300000, 1300000, 1200000} },
-	{90,	{1400000, 1300000, 1300000, 1100000} },
-};
-
-void cardhu_thermal_zones_info(struct tegra_edp_limits **z, int *sz)
-{
-	*z = cardhu_edp_limits;
-	*sz = ARRAY_SIZE(cardhu_edp_limits);
-}
 
 int __init cardhu_edp_init(void)
 {
-	tegra_init_cpu_edp_limits(cardhu_edp_limits, ARRAY_SIZE(cardhu_edp_limits));
+	/* Temporary initalization, needs to be set to the actual
+	   regulator current */
+	tegra_init_cpu_edp_limits(5000);
 	return 0;
 }
 #endif

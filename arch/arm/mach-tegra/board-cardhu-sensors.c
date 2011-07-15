@@ -548,16 +548,13 @@ static struct i2c_board_info cardhu_i2c4_nct1008_board_info[] = {
 	}
 };
 
-#ifdef CONFIG_TEGRA_EDP_LIMITS
-extern void cardhu_thermal_zones_info(struct tegra_edp_limits **, int *);
-#endif
 
 static int cardhu_nct1008_init(void)
 {
 	int nct1008_port = -1;
 	int ret;
 #ifdef CONFIG_TEGRA_EDP_LIMITS
-	struct tegra_edp_limits *z;
+	const struct tegra_edp_limits *z;
 	int zones_sz;
 	int i;
 	bool throttle_ok = false;
@@ -589,7 +586,7 @@ static int cardhu_nct1008_init(void)
 	}
 
 #ifdef CONFIG_TEGRA_EDP_LIMITS
-	cardhu_thermal_zones_info(&z, &zones_sz);
+	tegra_get_cpu_edp_limits(&z, &zones_sz);
 	zones_sz = min(zones_sz, MAX_ZONES);
 	for (i = 0; i < zones_sz; i++) {
 		cardhu_nct1008_pdata.thermal_zones[i] = z[i].temperature;

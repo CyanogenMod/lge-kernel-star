@@ -4086,9 +4086,6 @@ struct clk *tegra_ptr_clks[] = {
 	&tegra_clk_cbus,
 };
 
-static struct tegra_edp_limits default_cpu_edp_limits[] = {
-	{90, { 1000000, 1000000, 1000000, 1000000 } },
-};
 
 static void tegra3_init_one_clock(struct clk *c)
 {
@@ -4134,9 +4131,10 @@ void __init tegra_soc_init_clocks(void)
 	for (i = 0; i < ARRAY_SIZE(tegra_clk_out_list); i++)
 		tegra3_init_one_clock(&tegra_clk_out_list[i]);
 
-	tegra_init_cpu_edp_limits(default_cpu_edp_limits,
-				  ARRAY_SIZE(default_cpu_edp_limits));
 	emc_bridge = &tegra_clk_emc_bridge;
+
+	/* Initialize to default */
+	tegra_init_cpu_edp_limits(0);
 }
 
 #ifdef CONFIG_CPU_FREQ
