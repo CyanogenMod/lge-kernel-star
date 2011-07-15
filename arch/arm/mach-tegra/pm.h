@@ -58,9 +58,9 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode);
 #define TEGRA_POWER_CLUSTER_FORCE	0x8000	/* Force switch */
 
 #define FLOW_CTRL_HALT_CPU(cpu)	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + \
-	((cpu) == 0 ? 0x8 : (0x18 + 8 * ((cpu) - 1))))
+	((cpu) == 0 ? 0x0 : 0x14 + ((cpu) - 1) * 0x8))
 #define FLOW_CTRL_CPU_CSR(cpu)	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + \
-	((cpu) == 0 ? 0x0 : (0x4 + cpu * 0x10)))
+	((cpu) == 0 ? 0x8 : 0x18 + ((cpu) - 1) * 0x8))
 
 #define FLOW_CTRL_CLUSTER_CONTROL \
 	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + 0x2c)
