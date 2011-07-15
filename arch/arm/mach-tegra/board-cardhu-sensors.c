@@ -703,9 +703,6 @@ static struct i2c_board_info __initdata mpu3050_i2c0_boardinfo[] = {
 
 static void cardhu_mpuirq_init(void)
 {
-	if (board_info.board_id != BOARD_E1291)
-		return;
-
 	pr_info("*** MPU START *** cardhu_mpuirq_init...\n");
 	tegra_gpio_enable(TEGRA_GPIO_PX1);
 	gpio_request(TEGRA_GPIO_PX1, SENSOR_MPU_NAME);
