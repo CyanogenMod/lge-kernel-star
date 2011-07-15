@@ -53,7 +53,7 @@
 #define PNOSETUP_SET_CMD			"PNOSETUP " 
 #define PNOENABLE_SET_CMD			"PNOFORCE"
 #define PNODEBUG_SET_CMD			"PNODEBUG"
-#define TXPOWER_SET_CMD				"TXPOWER"
+#define TXPOWER_SET_CMD			"TXPOWER"
 
 #define MAC2STR(a) (a)[0], (a)[1], (a)[2], (a)[3], (a)[4], (a)[5]
 #define MACSTR "%02x:%02x:%02x:%02x:%02x:%02x"
@@ -207,7 +207,6 @@ extern int net_os_wake_lock_timeout_enable(struct net_device *dev);
 extern int net_os_set_suspend_disable(struct net_device *dev, int val);
 extern int net_os_set_suspend(struct net_device *dev, int val);
 extern int net_os_set_dtim_skip(struct net_device *dev, int val);
-extern int net_os_set_packet_filter(struct net_device *dev, int val);
 extern int net_os_send_hang_message(struct net_device *dev);
 extern void get_customized_country_code(char *country_iso_code, wl_country_t *cspec);
 
@@ -226,18 +225,6 @@ extern void get_customized_country_code(char *country_iso_code, wl_country_t *cs
 #define IWE_STREAM_ADD_POINT(info, stream, ends, iwe, extra) \
 	iwe_stream_add_point(stream, ends, iwe, extra)
 #endif
-
-extern int dhd_pno_enable(dhd_pub_t *dhd, int pfn_enabled);
-extern int dhd_pno_clean(dhd_pub_t *dhd);
-extern int dhd_pno_set(dhd_pub_t *dhd, wlc_ssid_t* ssids_local, int nssid,
-                       ushort  scan_fr, int pno_repeat, int pno_freq_expo_max);
-extern int dhd_pno_get_status(dhd_pub_t *dhd);
-extern int dhd_dev_pno_reset(struct net_device *dev);
-extern int dhd_dev_pno_set(struct net_device *dev, wlc_ssid_t* ssids_local,
-                           int nssid, ushort  scan_fr, int pno_repeat, int pno_freq_expo_max);
-extern int dhd_dev_pno_enable(struct net_device *dev,  int pfn_enabled);
-extern int dhd_dev_get_pno_status(struct net_device *dev);
-extern int dhd_get_dtim_skip(dhd_pub_t *dhd);
 
 void	dhd_bus_country_set(struct net_device *dev, wl_country_t *cspec);
 

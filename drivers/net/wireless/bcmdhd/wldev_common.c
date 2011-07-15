@@ -24,8 +24,12 @@
  * $Id: wldev_common.c,v 1.1.4.1.2.14 2011-02-09 01:40:07 Exp $
  */
 
-#include <wlioctl.h>
+#include <linux/module.h>
+#include <linux/netdevice.h>
+
+#include <wldev_common.h>
 #include <bcmutils.h>
+#include <dhd_dbg.h>
 
 #define htod32(i) i
 #define htod16(i) i
@@ -67,7 +71,7 @@ s32 wldev_ioctl(
  * taken care of in dhd_ioctl_entry. Internal use only, not exposed to
  * wl_iw, wl_cfg80211 and wl_cfgp2p
  */
-s32 wldev_mkiovar(
+static s32 wldev_mkiovar(
 	s8 *iovar_name, s8 *param, s32 paramlen,
 	s8 *iovar_buf, u32 buflen)
 {
@@ -156,7 +160,7 @@ s32 wldev_mkiovar_bsscfg(
 
 	if (buflen < 0 || iolen > (u32)buflen)
 	{
-		printk("wldev_mkiovar_bsscfg buffer is too short\n");
+		DHD_ERROR(("%s: buffer is too short\n", __FUNCTION__));
 		return BCME_BUFTOOSHORT;
 	}
 
@@ -235,4 +239,106 @@ s32 wldev_iovar_getint_bsscfg(
 		*pval = dtoh32(*pval);
 	}
 	return err;
+}
+
+int wldev_get_link_speed(
+	struct net_device *dev, int *plink_speed)
+{
+	int error;
+
+	if (!plink_speed)
+		return -ENOMEM;
+	error = wldev_ioctl(dev, WLC_GET_RATE, plink_speed, sizeof(int), 0);
+	if (unlikely(error))
+		return error;
+
+	/* Convert internal 500Kbps to Kbps */
+	*plink_speed *= 500;
+	return error;
+}
+
+int wldev_get_rssi(
+	struct net_device *dev, int *prssi)
+{
+	scb_val_t scb_val;
+	int error;
+
+	if (!prssi)
+		return -ENOMEM;
+	bzero(&scb_val, sizeof(scb_val_t));
+
+	error = wldev_ioctl(dev, WLC_GET_RSSI, &scb_val, sizeof(scb_val_t), 0);
+	if (unlikely(error))
+		return error;
+
+	*prssi = dtoh32(scb_val.val);
+	return error;
+}
+
+int wldev_get_ssid(
+	struct net_device *dev, wlc_ssid_t *pssid)
+{
+	int error;
+
+	if (!pssid)
+		return -ENOMEM;
+	error = wldev_ioctl(dev, WLC_GET_SSID, pssid, sizeof(wlc_ssid_t), 0);
+	if (unlikely(error))
+		return error;
+	pssid->SSID_len = dtoh32(pssid->SSID_len);
+	return error;
+}
+
+int wldev_get_band(
+	struct net_device *dev, uint *pband)
+{
+	int error;
+
+	error = wldev_ioctl(dev, WLC_GET_BAND, pband, sizeof(uint), 0);
+	return error;
+}
+
+int wldev_set_band(
+	struct net_device *dev, uint band)
+{
+	int error = -1;
+
+	if ((band == WLC_BAND_AUTO) || (band == WLC_BAND_5G) || (band == WLC_BAND_2G)) {
+		error = wldev_ioctl(dev, WLC_SET_BAND, &band, sizeof(band), 1);
+	}
+	return error;
+}
+
+int wldev_set_country(
+	struct net_device *dev, char *country_code)
+{
+	int error = -1;
+	wl_country_t cspec = {{0}, 0, {0}};
+	scb_val_t scbval;
+	char smbuf[WLC_IOCTL_SMLEN];
+
+	if (!country_code)
+		return error;
+
+	bzero(&scbval, sizeof(scb_val_t));
+	error = wldev_ioctl(dev, WLC_DISASSOC, &scbval, sizeof(scb_val_t), 1);
+	if (error < 0) {
+		DHD_ERROR(("%s: set country failed due to Disassoc error\n", __FUNCTION__));
+		return error;
+	}
+	cspec.rev = -1;
+	memcpy(cspec.country_abbrev, country_code, WLC_CNTRY_BUF_SZ);
+	memcpy(cspec.ccode, country_code, WLC_CNTRY_BUF_SZ);
+	get_customized_country_code((char *)&cspec.country_abbrev, &cspec);
+	error = wldev_iovar_setbuf(dev, "country", &cspec, sizeof(cspec),
+					smbuf, sizeof(smbuf));
+	if (error < 0) {
+		DHD_ERROR(("%s: set country for %s as %s rev %d failed\n",
+			__FUNCTION__, country_code, cspec.ccode, cspec.rev));
+		return error;
+	}
+	dhd_bus_country_set(dev, &cspec);
+	DHD_INFO(("%s: set country for %s as %s rev %d\n",
+		__FUNCTION__, country_code, cspec.ccode, cspec.rev));
+	return 0;
 }
