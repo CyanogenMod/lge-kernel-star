@@ -370,9 +370,8 @@ struct tegra_dc_win {
 
 	void			*virt_addr;
 	dma_addr_t		phys_addr;
-	unsigned		offset;
-	unsigned		offset_u;
-	unsigned		offset_v;
+	dma_addr_t		phys_addr_u;
+	dma_addr_t		phys_addr_v;
 	unsigned		stride;
 	unsigned		stride_uv;
 	fixed20_12		x;
