@@ -91,9 +91,9 @@ static bool sampling(void)
 	return ret;
 }
 
-/* /sys/devices/system/tegra_mc_stats */
+/* /sys/devices/system/tegra_mc */
 static struct sysdev_class tegra_mc_sysclass = {
-	.name = "tegra_mc_stats",
+	.name = "tegra_mc",
 };
 
 static ssize_t tegra_mc_enable_show(struct sysdev_class *class,
@@ -234,16 +234,16 @@ TEGRA_MC_ATTRIBUTES(enable, 0644, log, 0444, quantum, 0644)
 #define TEGRA_MC_EXPAND(_attr,_mode) \
 	&attr_##_attr,
 
-/* /sys/devices/system/tegra_mc_stats/enable */
-/* /sys/devices/system/tegra_mc_stats/log */
-/* /sys/devices/system/tegra_mc_stats/quantum */
+/* /sys/devices/system/tegra_mc/enable */
+/* /sys/devices/system/tegra_mc/log */
+/* /sys/devices/system/tegra_mc/quantum */
 static struct sysdev_class_attribute *tegra_mc_attrs[] = {
 	TEGRA_MC_ATTRIBUTES(enable, 0644, log, 0444, quantum, 0644)
 	NULL
 };
 
-/* /sys/devices/system/tegra_mc_stats/client/ */
-/* /sys/devices/system/tegra_mc_stats/client/0/ */
+/* /sys/devices/system/tegra_mc/client/ */
+/* /sys/devices/system/tegra_mc/client/0/ */
 static bool tegra_mc_client_0_enabled = CLIENT_ENABLED_DEFAULT;
 static u8 tegra_mc_client_0_on_schedule_buffer[CLIENT_ON_SCHEDULE_LENGTH_IN_BYTES];
 static struct kobject *tegra_mc_client_kobj, *tegra_mc_client_0_kobj;
@@ -1103,7 +1103,7 @@ static enum hrtimer_restart sample_timer_function(struct hrtimer *handle)
 		return -EINVAL; \
 	}
 
-static int tegra_mc_stats_init(void)
+static int tegra_mc_init(void)
 {
 	int i;
 	int rc;
@@ -1181,7 +1181,7 @@ out:
 			   &tegra_mc_dram_##_name##_attr_group);	\
 	kobject_put(tegra_mc_dram_##_name##_kobj);
 
-static void tegra_mc_stats_exit(void)
+static void tegra_mc_exit(void)
 {
 	int i;
 
@@ -1208,6 +1208,6 @@ static void tegra_mc_stats_exit(void)
 	sysdev_class_unregister(&tegra_mc_sysclass);
 }
 
-module_init(tegra_mc_stats_init);
-module_exit(tegra_mc_stats_exit);
+module_init(tegra_mc_init);
+module_exit(tegra_mc_exit);
 MODULE_LICENSE("Dual BSD/GPL");
