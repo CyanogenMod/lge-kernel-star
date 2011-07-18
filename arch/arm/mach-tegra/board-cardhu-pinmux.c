@@ -564,7 +564,7 @@ struct pin_info_low_power_mode pin_lpm_cardhu_common[] = {
 };
 
 struct pin_info_low_power_mode vddio_gmi_pins_pm269[] = {
-	PIN_GPIO_LPM("GMI_CS2",   TEGRA_GPIO_PK3, 0, 0),
+	PIN_GPIO_LPM("GMI_CS2",   TEGRA_GPIO_PK3, 1, 0),
 	PIN_GPIO_LPM("GMI_CS3_N", TEGRA_GPIO_PK4, 0, 0),
 	PIN_GPIO_LPM("GMI_CS4_N", TEGRA_GPIO_PK2, 1, 0),
 	PIN_GPIO_LPM("GMI_AD9",   TEGRA_GPIO_PH1, 0, 0),
