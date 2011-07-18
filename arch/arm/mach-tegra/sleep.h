@@ -3,7 +3,7 @@
  *
  * Declarations for power state transition code
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010-2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,23 +39,63 @@
 #define CPU_RESETTABLE_SOON		1
 #define CPU_NOT_RESETTABLE		0
 
+#define FLOW_CTRL_WAITEVENT		(2 << 29)
+#define FLOW_CTRL_STOP_UNTIL_IRQ	(4 << 29)
+#define FLOW_CTRL_JTAG_RESUME		(1 << 28)
+#define FLOW_CTRL_IRQ_RESUME		(1 << 10)
+#define FLOW_CTRL_FIQ_RESUME		(1 << 8)
+
+#define FLOW_CTRL_CSR_INTR_FLAG		(1<<15)
+#define FLOW_CTRL_CSR_EVENT_FLAG	(1<<14)
+
+#define TEGRA_FLOW_CTRL_VIRT (TEGRA_FLOW_CTRL_BASE - IO_PPSB_PHYS + IO_PPSB_VIRT)
+
 #ifndef __ASSEMBLY__
-/* assembly routines implemented in sleep.S */
 void tegra_pen_lock(void);
 void tegra_pen_unlock(void);
 void tegra_cpu_wfi(void);
-void tegra_cpu_reset(int cpu);
-void tegra_cpu_set_resettable_soon(void);
-int tegra_cpu_is_resettable_soon(void);
 
-extern void tegra_lp1_reset;
-extern void tegra_iram_start;
-extern void tegra_iram_end;
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+extern void tegra2_iram_start;
+extern void tegra2_iram_end;
+extern void tegra2_lp1_reset;
+int  tegra2_cpu_is_resettable_soon(void);
+void tegra2_cpu_reset(int cpu);
+void tegra2_cpu_set_resettable_soon(void);
+void tegra2_sleep_core(unsigned long v2p);
+void tegra2_sleep_reset(void);
+void tegra2_sleep_wfi(unsigned long v2p);
+#endif
 
-void tegra_sleep_reset(void);
-void tegra_sleep_wfi(unsigned long v2p);
+static inline void *tegra_iram_start(void)
+{
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	return &tegra2_iram_start;
+#endif
+}
+
+static inline void *tegra_iram_end(void)
+{
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	return &tegra2_iram_end;
+#endif
+}
+
+static inline void *tegra_lp1_reset(void)
+{
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	return &tegra2_lp1_reset;
+#endif
+}
+
+static inline void tegra_sleep_core(unsigned long v2p)
+{
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	tegra2_sleep_core(v2p);
+#endif
+}
+
 void tegra_sleep_cpu(unsigned long v2p);
-void tegra_sleep_core(unsigned long v2p);
 void tegra_resume(void);
 void tegra_secondary_resume(void);
 

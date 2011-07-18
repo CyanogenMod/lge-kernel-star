@@ -74,7 +74,7 @@ static int tegra2_reset_sleeping_cpu(int cpu)
 	tegra_pen_lock();
 
 	if (readl(pmc + PMC_SCRATCH41) == CPU_RESETTABLE)
-		tegra_cpu_reset(cpu);
+		tegra2_cpu_reset(cpu);
 	else
 		ret = -EINVAL;
 
@@ -140,7 +140,7 @@ static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
 {
 	int i;
 
-	while (tegra_cpu_is_resettable_soon())
+	while (tegra2_cpu_is_resettable_soon())
 		cpu_relax();
 
 	if (tegra2_reset_other_cpus(dev->cpu))
@@ -176,7 +176,7 @@ void tegra2_idle_lp2(struct cpuidle_device *dev,
 			}
 		}
 	} else
-		tegra_sleep_wfi(PLAT_PHYS_OFFSET - PAGE_OFFSET);
+		tegra2_sleep_wfi(PLAT_PHYS_OFFSET - PAGE_OFFSET);
 
 	cpu_pm_exit();
 	tegra_clear_cpu_in_lp2(dev->cpu);

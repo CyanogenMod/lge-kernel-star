@@ -448,7 +448,7 @@ bool tegra_set_cpu_in_lp2(int cpu)
 		last_cpu = true;
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	else
-		tegra_cpu_set_resettable_soon();
+		tegra2_cpu_set_resettable_soon();
 #endif
 
 	spin_unlock(&tegra_lp2_lock);
@@ -527,7 +527,7 @@ static int tegra_common_suspend(void)
 
 	/* copy the reset vector and SDRAM shutdown code into IRAM */
 	memcpy(iram_save, iram_code, iram_save_size);
-	memcpy(iram_code, &tegra_iram_start, iram_save_size);
+	memcpy(iram_code, tegra_iram_start(), iram_save_size);
 
 	return 0;
 }
@@ -604,7 +604,7 @@ static void tegra_pm_set(enum tegra_suspend_mode mode)
 		 * tegra_lp1_reset in IRAM, which resumes the CPU to
 		 * the address in scratch 41 to tegra_resume
 		 */
-		writel(&tegra_lp1_reset - &tegra_iram_start +
+		writel(tegra_lp1_reset() - tegra_iram_start() +
 			TEGRA_IRAM_CODE_AREA, evp_reset);
 		__raw_writel(virt_to_phys(tegra_resume), pmc + PMC_SCRATCH41);
 		break;
@@ -804,7 +804,7 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 		plat->suspend_mode = TEGRA_SUSPEND_LP1;
 	}
 
-	iram_save_size = &tegra_iram_end - &tegra_iram_start;
+	iram_save_size = tegra_iram_end() - tegra_iram_start();
 
 	iram_save = kmalloc(iram_save_size, GFP_KERNEL);
 	if (!iram_save) {

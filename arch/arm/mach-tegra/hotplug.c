@@ -51,7 +51,9 @@ int platform_cpu_kill(unsigned int cpu)
 
 void platform_cpu_die(unsigned int cpu)
 {
-	tegra_sleep_reset();
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	tegra2_sleep_reset();
+#endif
 
 	/*
 	 * tegra_cpu_suspend can return through tegra_cpu_resume, but that
