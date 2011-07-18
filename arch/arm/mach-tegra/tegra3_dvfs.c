@@ -581,9 +581,9 @@ core_cap_level_store(struct kobject *kobj, struct kobj_attribute *attr,
 }
 
 static struct kobj_attribute cap_state_attribute =
-	__ATTR(core_cap_state, 0666, core_cap_state_show, core_cap_state_store);
+	__ATTR(core_cap_state, 0644, core_cap_state_show, core_cap_state_store);
 static struct kobj_attribute cap_level_attribute =
-	__ATTR(core_cap_level, 0666, core_cap_level_show, core_cap_level_store);
+	__ATTR(core_cap_level, 0644, core_cap_level_show, core_cap_level_store);
 
 const struct attribute *cap_attributes[] = {
 	&cap_state_attribute.attr,
