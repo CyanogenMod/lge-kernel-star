@@ -1,5 +1,5 @@
 /*
- * arch/arm/mach-tegra/include/mach/suspend.h
+ * arch/arm/mach-tegra/include/mach/pm.h
  *
  * Copyright (C) 2010 Google, Inc.
  * Copyright (C) 2010-2011 NVIDIA Corporation
@@ -19,8 +19,8 @@
  */
 
 
-#ifndef _MACH_TEGRA_SUSPEND_H_
-#define _MACH_TEGRA_SUSPEND_H_
+#ifndef _MACH_TEGRA_PM_H_
+#define _MACH_TEGRA_PM_H_
 
 #include <linux/mutex.h>
 
@@ -171,4 +171,4 @@ static inline void flowctrl_writel(unsigned long val, void __iomem *addr)
 	(void)__raw_readl(addr);
 }
 
-#endif /* _MACH_TEGRA_SUSPEND_H_ */
+#endif /* _MACH_TEGRA_PM_H_ */

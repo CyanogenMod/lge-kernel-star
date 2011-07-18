@@ -1,5 +1,5 @@
 /*
- * arch/arm/mach-tegra/suspend.c
+ * arch/arm/mach-tegra/pm.c
  *
  * CPU complex suspend & resume functions for Tegra SoCs
  *
