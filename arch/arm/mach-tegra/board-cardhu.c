@@ -36,7 +36,6 @@
 #include <linux/spi/spi.h>
 #include <linux/i2c/atmel_mxt_ts.h>
 #include <linux/tegra_uart.h>
-#include <linux/console.h>
 
 #include <sound/wm8903.h>
 
@@ -277,7 +276,6 @@ static struct uart_clk_parent uart_parent_clk[] = {
 	[2] = {.name = "clk_m"},
 };
 
-static struct clk *debug_uart_clk;
 static struct tegra_uart_platform_data cardhu_uart_pdata;
 
 static void __init uart_debug_init(void)
@@ -354,18 +352,6 @@ static void __init cardhu_uart_init(void)
 
 	platform_add_devices(cardhu_uart_devices,
 				ARRAY_SIZE(cardhu_uart_devices));
-}
-
-void cardhu_debug_uart_suspend(void)
-{
-	if (console_suspend_enabled)
-		clk_disable(debug_uart_clk);
-}
-
-void cardhu_debug_uart_resume(void)
-{
-	if (console_suspend_enabled)
-		clk_enable(debug_uart_clk);
 }
 
 static struct platform_device tegra_camera = {

@@ -241,7 +241,6 @@ static struct uart_clk_parent uart_parent_clk[] = {
 	[1] = {.name = "pll_m"},
 	[2] = {.name = "clk_m"},
 };
-static struct clk *debug_uart_clk;
 static struct tegra_uart_platform_data enterprise_uart_pdata;
 
 static void __init uart_debug_init(void)

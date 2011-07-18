@@ -25,6 +25,7 @@
 #include <linux/mutex.h>
 #include <linux/init.h>
 #include <linux/errno.h>
+#include <linux/clkdev.h>
 
 #include <mach/iomap.h>
 
@@ -212,5 +213,9 @@ extern bool tegra_all_cpus_booted __read_mostly;
 
 /* The debug channel uart base physical address */
 extern unsigned long  debug_uart_port_base;
+
+extern struct clk *debug_uart_clk;
+void tegra_console_uart_suspend(void);
+void tegra_console_uart_resume(void);
 
 #endif /* _MACH_TEGRA_PM_H_ */

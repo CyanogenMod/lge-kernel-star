@@ -40,6 +40,7 @@
 #include <linux/syscore_ops.h>
 #include <linux/vmalloc.h>
 #include <linux/memblock.h>
+#include <linux/console.h>
 
 #include <asm/cacheflush.h>
 #include <asm/cpu_pm.h>
@@ -1055,6 +1056,21 @@ static struct syscore_ops tegra_debug_uart_syscore_ops = {
 	.suspend = tegra_debug_uart_suspend,
 	.resume = tegra_debug_uart_resume,
 };
+
+struct clk *debug_uart_clk = NULL;
+EXPORT_SYMBOL(debug_uart_clk);
+
+void tegra_console_uart_suspend(void)
+{
+	if (console_suspend_enabled && debug_uart_clk)
+		clk_disable(debug_uart_clk);
+}
+
+void tegra_console_uart_resume(void)
+{
+	if (console_suspend_enabled && debug_uart_clk)
+		clk_enable(debug_uart_clk);
+}
 
 static int tegra_debug_uart_syscore_init(void)
 {
