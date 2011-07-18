@@ -1,5 +1,5 @@
 /*
- * arch/arm/mach-tegra/power.h
+ * arch/arm/mach-tegra/sleep.h
  *
  * Declarations for power state transition code
  *
@@ -20,8 +20,8 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-#ifndef __MACH_TEGRA_POWER_H
-#define __MACH_TEGRA_POWER_H
+#ifndef __MACH_TEGRA_SLEEP_H
+#define __MACH_TEGRA_SLEEP_H
 
 #include <mach/iomap.h>
 
