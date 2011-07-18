@@ -59,7 +59,10 @@ obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += cpu-tegra3.o
 endif
 obj-$(CONFIG_TEGRA_PCI)                 += pcie.o
 obj-$(CONFIG_USB_SUPPORT)               += usb_phy.o
-obj-$(CONFIG_CPU_IDLE)                  += cpuidle.o
+ifeq ($(CONFIG_CPU_IDLE),y)
+obj-y                                   += cpuidle.o
+obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += cpuidle-t2.o
+endif
 obj-$(CONFIG_TEGRA_IOVMM)               += iovmm.o
 obj-$(CONFIG_TEGRA_IOVMM_GART)          += iovmm-gart.o
 obj-$(CONFIG_TEGRA_IOVMM_SMMU)          += iovmm-smmu.o

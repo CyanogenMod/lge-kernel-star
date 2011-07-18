@@ -48,18 +48,6 @@ static bool lp2_in_idle __read_mostly = true;
 module_param(lp2_in_idle, bool, 0644);
 static bool lp2_disabled_by_suspend;
 
-static struct {
-	unsigned int cpu_ready_count[2];
-	unsigned long long cpu_wants_lp2_time[2];
-	unsigned long long in_lp2_time;
-	unsigned int both_idle_count;
-	unsigned int tear_down_count;
-	unsigned int lp2_count;
-	unsigned int lp2_count_bin[32];
-	unsigned int lp2_int_count[NR_IRQS];
-	unsigned int last_lp2_int_count[NR_IRQS];
-} idle_stats;
-
 static unsigned int tegra_lp2_min_residency;
 
 struct cpuidle_driver tegra_idle = {
@@ -112,7 +100,7 @@ static int tegra_idle_enter_lp2(struct cpuidle_device *dev,
 	local_irq_disable();
 	enter = ktime_get();
 
-	idle_stats.cpu_ready_count[dev->cpu]++;
+	tegra_cpu_idle_stats_lp2_ready(dev->cpu);
 
 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
 	tegra_idle_lp2();
@@ -130,7 +118,7 @@ static int tegra_idle_enter_lp2(struct cpuidle_device *dev,
 	if (state->target_residency < tegra_lp2_min_residency)
 		state->target_residency = tegra_lp2_min_residency;
 
-	idle_stats.cpu_wants_lp2_time[dev->cpu] += us;
+	tegra_cpu_idle_stats_lp2_time(dev->cpu, us);
 
 	return (int)us;
 }
@@ -241,68 +229,6 @@ module_init(tegra_cpuidle_init);
 module_exit(tegra_cpuidle_exit);
 
 #ifdef CONFIG_DEBUG_FS
-static int tegra_lp2_debug_show(struct seq_file *s, void *data)
-{
-	int bin;
-	int i;
-	seq_printf(s, "                                    cpu0     cpu1\n");
-	seq_printf(s, "-------------------------------------------------\n");
-	seq_printf(s, "cpu ready:                      %8u %8u\n",
-		idle_stats.cpu_ready_count[0],
-		idle_stats.cpu_ready_count[1]);
-	seq_printf(s, "both idle:      %8u        %7u%% %7u%%\n",
-		idle_stats.both_idle_count,
-		idle_stats.both_idle_count * 100 /
-			(idle_stats.cpu_ready_count[0] ?: 1),
-		idle_stats.both_idle_count * 100 /
-			(idle_stats.cpu_ready_count[1] ?: 1));
-	seq_printf(s, "tear down:      %8u %7u%%\n", idle_stats.tear_down_count,
-		idle_stats.tear_down_count * 100 /
-			(idle_stats.both_idle_count ?: 1));
-	seq_printf(s, "lp2:            %8u %7u%%\n", idle_stats.lp2_count,
-		idle_stats.lp2_count * 100 /
-			(idle_stats.both_idle_count ?: 1));
-
-	seq_printf(s, "\n");
-	seq_printf(s, "cpu ready time:                 %8llu %8llu ms\n",
-		div64_u64(idle_stats.cpu_wants_lp2_time[0], 1000),
-		div64_u64(idle_stats.cpu_wants_lp2_time[1], 1000));
-	seq_printf(s, "lp2 time:       %8llu ms     %7d%% %7d%%\n",
-		div64_u64(idle_stats.in_lp2_time, 1000),
-		(int)div64_u64(idle_stats.in_lp2_time * 100,
-			idle_stats.cpu_wants_lp2_time[0] ?: 1),
-		(int)div64_u64(idle_stats.in_lp2_time * 100,
-			idle_stats.cpu_wants_lp2_time[1] ?: 1));
-
-	seq_printf(s, "\n");
-	seq_printf(s, "%19s %8s\n", "", "lp2");
-	seq_printf(s, "-------------------------------------------------\n");
-	for (bin = 0; bin < 32; bin++) {
-		if (idle_stats.lp2_count_bin[bin] == 0)
-			continue;
-		seq_printf(s, "%6u - %6u ms: %8u\n",
-			1 << (bin - 1), 1 << bin,
-			idle_stats.lp2_count_bin[bin]);
-	}
-
-	seq_printf(s, "\n");
-	seq_printf(s, "%3s %20s %6s %10s\n",
-		"int", "name", "count", "last count");
-	seq_printf(s, "--------------------------------------------\n");
-	for (i = 0; i < NR_IRQS; i++) {
-		if (idle_stats.lp2_int_count[i] == 0)
-			continue;
-		seq_printf(s, "%3d %20s %6d %10d\n",
-			i, irq_to_desc(i)->action ?
-				irq_to_desc(i)->action->name ?: "???" : "???",
-			idle_stats.lp2_int_count[i],
-			idle_stats.lp2_int_count[i] -
-				idle_stats.last_lp2_int_count[i]);
-		idle_stats.last_lp2_int_count[i] = idle_stats.lp2_int_count[i];
-	};
-	return 0;
-}
-
 static int tegra_lp2_debug_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, tegra_lp2_debug_show, inode->i_private);
