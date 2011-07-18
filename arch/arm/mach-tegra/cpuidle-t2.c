@@ -60,6 +60,128 @@ static struct {
 	unsigned int last_lp2_int_count[NR_IRQS];
 } idle_stats;
 
+#ifdef CONFIG_SMP
+
+static void __iomem *clk_rst = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
+static void __iomem *evp_reset = IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100;
+static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
+
+static int tegra2_reset_sleeping_cpu(int cpu)
+{
+	int ret = 0;
+
+	BUG_ON(cpu == smp_processor_id());
+	tegra_pen_lock();
+
+	if (readl(pmc + PMC_SCRATCH41) == CPU_RESETTABLE)
+		tegra_cpu_reset(cpu);
+	else
+		ret = -EINVAL;
+
+	tegra_pen_unlock();
+
+	return ret;
+}
+
+static void tegra2_wake_reset_cpu(int cpu)
+{
+	u32 reg;
+
+	writel(virt_to_phys(tegra_secondary_resume), evp_reset);
+
+	/* enable cpu clock on cpu */
+	reg = readl(clk_rst + 0x4c);
+	writel(reg & ~(1 << (8 + cpu)), clk_rst + 0x4c);
+
+	reg = 0x1111 << cpu;
+	writel(reg, clk_rst + 0x344);
+
+	/* unhalt the cpu */
+	flowctrl_writel(0, FLOW_CTRL_HALT_CPU(1));
+}
+
+static int tegra2_reset_other_cpus(int cpu)
+{
+	int i;
+	int abort = -1;
+
+	for_each_online_cpu(i) {
+		if (i != cpu) {
+			if (tegra2_reset_sleeping_cpu(i)) {
+				abort = i;
+				break;
+			}
+		}
+	}
+
+	if (abort >= 0) {
+		for_each_online_cpu(i) {
+			if (i != cpu && i < abort)
+				tegra2_wake_reset_cpu(i);
+		}
+		return -EINVAL;
+	}
+
+	return 0;
+}
+#else
+static void tegra2_wake_reset_cpu(int cpu)
+{
+}
+
+static int tegra2_reset_other_cpus(int cpu)
+{
+	return 0;
+}
+#endif
+
+static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
+			struct cpuidle_state *state)
+{
+	int i;
+
+	while (tegra_cpu_is_resettable_soon())
+		cpu_relax();
+
+	if (tegra2_reset_other_cpus(dev->cpu))
+		return -EBUSY;
+
+	tegra_idle_lp2_last(0);
+
+	for_each_online_cpu(i) {
+		if (i != dev->cpu) {
+			tegra2_wake_reset_cpu(i);
+			tegra_clear_cpu_in_lp2(i);
+		}
+	}
+
+	return 0;
+}
+
+void tegra2_idle_lp2(struct cpuidle_device *dev,
+			struct cpuidle_state *state)
+{
+	bool last_cpu = tegra_set_cpu_in_lp2(dev->cpu);
+
+	cpu_pm_enter();
+
+	if (last_cpu) {
+		if (tegra2_idle_lp2_last(dev, state) < 0) {
+			int i;
+			for_each_online_cpu(i) {
+				if (i != dev->cpu) {
+					tegra2_wake_reset_cpu(i);
+					tegra_clear_cpu_in_lp2(i);
+				}
+			}
+		}
+	} else
+		tegra_sleep_wfi(PLAT_PHYS_OFFSET - PAGE_OFFSET);
+
+	cpu_pm_exit();
+	tegra_clear_cpu_in_lp2(dev->cpu);
+}
+
 void tegra2_cpu_idle_stats_lp2_ready(unsigned int cpu)
 {
 	idle_stats.cpu_ready_count[cpu]++;

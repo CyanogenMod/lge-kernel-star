@@ -19,7 +19,10 @@
 #ifndef __MACH_TEGRA_CPUIDLE_H
 #define __MACH_TEGRA_CPUIDLE_H
 
+#include <linux/cpuidle.h>
+
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
+void tegra2_idle_lp2(struct cpuidle_device *dev, struct cpuidle_state *state);
 void tegra2_cpu_idle_stats_lp2_ready(unsigned int cpu);
 void tegra2_cpu_idle_stats_lp2_time(unsigned int cpu, s64 us);
 #ifdef CONFIG_DEBUG_FS
@@ -38,6 +41,14 @@ static inline void tegra_cpu_idle_stats_lp2_time(unsigned int cpu, s64 us)
 {
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	tegra2_cpu_idle_stats_lp2_time(cpu, us);
+#endif
+}
+
+static inline void tegra_idle_lp2(struct cpuidle_device *dev,
+			struct cpuidle_state *state)
+{
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	tegra2_idle_lp2(dev, state);
 #endif
 }
 

@@ -86,6 +86,10 @@ static unsigned long iram_save_size;
 
 struct suspend_context tegra_sctx;
 
+#ifdef CONFIG_PM_SLEEP
+static DEFINE_SPINLOCK(tegra_lp2_lock);
+static cpumask_t tegra_in_lp2;
+#endif
 static void __iomem *iram_code = IO_ADDRESS(TEGRA_IRAM_CODE_AREA);
 static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
 #ifdef CONFIG_PM_SLEEP
@@ -166,9 +170,6 @@ static int tegra_last_pclk;
 static struct clk *tegra_pclk;
 static const struct tegra_suspend_platform_data *pdata;
 static enum tegra_suspend_mode current_suspend_mode = TEGRA_SUSPEND_NONE;
-
-static DEFINE_SPINLOCK(tegra_lp2_lock);
-static cpumask_t tegra_in_lp2;
 
 static struct kobject *suspend_kobj;
 
@@ -310,51 +311,6 @@ static int create_suspend_pgtable(void)
 	return 0;
 }
 
-#ifdef CONFIG_SMP
-static int tegra_reset_sleeping_cpu(int cpu)
-{
-	int ret = 0;
-
-	BUG_ON(cpu == smp_processor_id());
-	tegra_pen_lock();
-
-	if (readl(pmc + PMC_SCRATCH41) == CPU_RESETTABLE)
-		tegra_cpu_reset(cpu);
-	else
-		ret = -EINVAL;
-
-	tegra_pen_unlock();
-
-	return ret;
-}
-
-static void tegra_wake_reset_cpu(int cpu)
-{
-	u32 reg;
-
-	writel(virt_to_phys(tegra_secondary_resume), evp_reset);
-
-	/* enable cpu clock on cpu */
-	reg = readl(clk_rst + 0x4c);
-	writel(reg & ~(1 << (8 + cpu)), clk_rst + 0x4c);
-
-	reg = 0x1111 << cpu;
-	writel(reg, clk_rst + 0x344);
-
-	/* unhalt the cpu */
-	flowctrl_writel(0, FLOW_CTRL_HALT_CPU(1));
-}
-#else
-static int tegra_reset_sleeping_cpu(int cpu)
-{
-	return 0;
-}
-
-static void tegra_wake_reset_cpu(int cpu)
-{
-}
-#endif
-
 #ifdef CONFIG_PM_SLEEP
 /*
  * restore_cpu_complex
@@ -473,50 +429,34 @@ static void suspend_cpu_complex(void)
 	}
 }
 
-#ifdef CONFIG_SMP
-int tegra_reset_other_cpus(int cpu)
+void tegra_clear_cpu_in_lp2(int cpu)
 {
-	int i;
-	int abort = -1;
-
-	for_each_online_cpu(i) {
-		if (i != cpu) {
-			if (tegra_reset_sleeping_cpu(i)) {
-				abort = i;
-				break;
-			}
-		}
-	}
-
-	if (abort >= 0) {
-		for_each_online_cpu(i) {
-			if (i != cpu && i < abort)
-				tegra_wake_reset_cpu(i);
-		}
-		return -EINVAL;
-	}
-
-	return 0;
+	spin_lock(&tegra_lp2_lock);
+	cpumask_clear_cpu(cpu, &tegra_in_lp2);
+	spin_unlock(&tegra_lp2_lock);
 }
-#else
-int tegra_reset_other_cpus(int cpu)
+
+bool tegra_set_cpu_in_lp2(int cpu)
 {
-	return 0;
-}
+	bool last_cpu = false;
+
+	spin_lock(&tegra_lp2_lock);
+
+	cpumask_set_cpu(cpu, &tegra_in_lp2);
+	if (cpumask_equal(&tegra_in_lp2, cpu_online_mask))
+		last_cpu = true;
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	else
+		tegra_cpu_set_resettable_soon();
 #endif
 
-#ifdef CONFIG_SMP
+	spin_unlock(&tegra_lp2_lock);
+	return last_cpu;
+}
+
 void tegra_idle_lp2_last(unsigned int flags)
 {
 	u32 reg;
-	int i;
-	int cpu = smp_processor_id();
-
-	while (tegra_cpu_is_resettable_soon())
-		cpu_relax();
-
-	if (tegra_reset_other_cpus(cpu))
-		return;
 
 	/* Only the last cpu down does the final suspend steps */
 	reg = readl(pmc + PMC_CTRL);
@@ -558,18 +498,6 @@ void tegra_idle_lp2_last(unsigned int flags)
 	if (flags & TEGRA_POWER_CLUSTER_MASK)
 		tegra_cluster_switch_epilog(reg);
 
-	spin_lock(&tegra_lp2_lock);
-
-	cpumask_clear_cpu(cpu, &tegra_in_lp2);
-
-	for_each_online_cpu(i) {
-		if (i != cpu) {
-			tegra_wake_reset_cpu(i);
-			cpumask_clear_cpu(i, &tegra_in_lp2);
-		}
-	}
-
-	spin_unlock(&tegra_lp2_lock);
 	tegra_cluster_switch_time(flags, tegra_cluster_switch_time_id_epilog);
 
 #if INSTRUMENT_CLUSTER_SWITCH
@@ -586,42 +514,6 @@ void tegra_idle_lp2_last(unsigned int flags)
 			tegra_cluster_switch_times[tegra_cluster_switch_time_id_start]);
 	}
 #endif
-}
-#else
-void tegra_idle_lp2_last(unsigned int flags)
-{
-}
-#endif
-
-void tegra_idle_lp2(void)
-{
-	bool last_cpu = false;
-	int cpu = smp_processor_id();
-
-	spin_lock(&tegra_lp2_lock);
-
-	cpumask_set_cpu(cpu, &tegra_in_lp2);
-	if (cpumask_equal(&tegra_in_lp2, cpu_online_mask))
-		last_cpu = true;
-	else
-		tegra_cpu_set_resettable_soon();
-
-	spin_unlock(&tegra_lp2_lock);
-
-	cpu_pm_enter();
-
-#ifdef CONFIG_SMP
-	if (last_cpu)
-		tegra_idle_lp2_last(0);
-	else
-#endif
-		tegra_sleep_wfi(PLAT_PHYS_OFFSET - PAGE_OFFSET);
-
-	cpu_pm_exit();
-
-	spin_lock(&tegra_lp2_lock);
-	cpumask_clear_cpu(cpu, &tegra_in_lp2);
-	spin_unlock(&tegra_lp2_lock);
 }
 
 static int tegra_common_suspend(void)

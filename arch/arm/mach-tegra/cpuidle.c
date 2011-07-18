@@ -103,7 +103,7 @@ static int tegra_idle_enter_lp2(struct cpuidle_device *dev,
 	tegra_cpu_idle_stats_lp2_ready(dev->cpu);
 
 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
-	tegra_idle_lp2();
+	tegra_idle_lp2(dev, state);
 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
 
 	exit = ktime_sub(ktime_get(), enter);

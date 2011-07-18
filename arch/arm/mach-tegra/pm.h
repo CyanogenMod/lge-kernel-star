@@ -46,6 +46,8 @@ struct tegra_suspend_platform_data {
 unsigned long tegra_cpu_power_good_time(void);
 unsigned long tegra_cpu_power_off_time(void);
 unsigned long tegra_cpu_lp2_min_residency(void);
+void tegra_clear_cpu_in_lp2(int cpu);
+bool tegra_set_cpu_in_lp2(int cpu);
 
 int tegra_suspend_dram(enum tegra_suspend_mode mode);
 
@@ -80,8 +82,6 @@ static inline void tegra2_lp0_suspend_init(void)
 }
 #endif
 void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat);
-
-void tegra_idle_lp2(void);
 
 unsigned int tegra_count_slow_cpus(unsigned long speed_limit);
 unsigned int tegra_get_slowest_cpu_n(void);
