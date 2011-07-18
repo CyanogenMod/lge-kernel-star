@@ -409,12 +409,12 @@ static void actmon_dev_suspend(struct actmon_dev *dev)
 static void actmon_dev_resume(struct actmon_dev *dev)
 {
 	u32 val;
-	unsigned long flags, freq;
+	unsigned long flags;
+	unsigned long freq = clk_get_rate(dev->clk) / 1000;
 
 	spin_lock_irqsave(&dev->lock, flags);
 
 	if (dev->state == ACTMON_SUSPENDED) {
-		freq = clk_get_rate(dev->clk) / 1000;
 		actmon_dev_configure(dev, freq);
 		dev->state = dev->saved_state;
 		if (dev->state == ACTMON_ON) {
