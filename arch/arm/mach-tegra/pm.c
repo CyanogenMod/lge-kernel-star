@@ -81,22 +81,19 @@ struct suspend_context {
 	u8 uart[5];
 };
 
-static u8 *iram_save;
-static unsigned long iram_save_size;
-
-struct suspend_context tegra_sctx;
-
 #ifdef CONFIG_PM_SLEEP
 static DEFINE_SPINLOCK(tegra_lp2_lock);
 static cpumask_t tegra_in_lp2;
-#endif
+static u8 *iram_save;
+static unsigned long iram_save_size;
 static void __iomem *iram_code = IO_ADDRESS(TEGRA_IRAM_CODE_AREA);
-static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
-#ifdef CONFIG_PM_SLEEP
 static void __iomem *clk_rst = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
 static void __iomem *evp_reset =
 	IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100;
+static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
 #endif
+
+struct suspend_context tegra_sctx;
 
 #define TEGRA_POWER_PWRREQ_POLARITY	(1 << 8)   /* core power request polarity */
 #define TEGRA_POWER_PWRREQ_OE		(1 << 9)   /* core power request enable */
@@ -166,12 +163,12 @@ static void __iomem *evp_reset =
 phys_addr_t tegra_pgd_phys;  /* pgd used by hotplug & LP2 bootup */
 static pgd_t *tegra_pgd;
 
+#ifdef CONFIG_PM_SLEEP
 static int tegra_last_pclk;
+#endif
 static struct clk *tegra_pclk;
 static const struct tegra_suspend_platform_data *pdata;
 static enum tegra_suspend_mode current_suspend_mode = TEGRA_SUSPEND_NONE;
-
-static struct kobject *suspend_kobj;
 
 static const char *tegra_suspend_name[TEGRA_MAX_SUSPEND_MODE] = {
 	[TEGRA_SUSPEND_NONE]	= "none",
@@ -180,7 +177,7 @@ static const char *tegra_suspend_name[TEGRA_MAX_SUSPEND_MODE] = {
 	[TEGRA_SUSPEND_LP0]	= "lp0",
 };
 
-#if INSTRUMENT_CLUSTER_SWITCH
+#if defined(CONFIG_PM_SLEEP) && INSTRUMENT_CLUSTER_SWITCH
 enum tegra_cluster_switch_time_id {
 	tegra_cluster_switch_time_id_start = 0,
 	tegra_cluster_switch_time_id_prolog,
@@ -208,6 +205,7 @@ static unsigned long
 #define tegra_cluster_switch_time(flags, id) do {} while(0)
 #endif
 
+#ifdef CONFIG_PM_SLEEP
 static void tegra_suspend_check_pwr_stats(void)
 {
 	/* cpus and l2 are powered off later */
@@ -233,6 +231,7 @@ static void tegra_suspend_check_pwr_stats(void)
 
 	return;
 }
+#endif
 
 unsigned long tegra_cpu_power_good_time(void)
 {
@@ -258,6 +257,7 @@ unsigned long tegra_cpu_lp2_min_residency(void)
 	return pdata->cpu_lp2_min_residency;
 }
 
+#ifdef CONFIG_PM_SLEEP
 /* ensures that sufficient time is passed for a register write to
  * serialize into the 32KHz domain */
 static void pmc_32kwritel(u32 val, unsigned long offs)
@@ -289,6 +289,7 @@ static void set_power_timers(unsigned long us_on, unsigned long us_off,
 	}
 	tegra_last_pclk = pclk;
 }
+#endif
 
 /*
  * create_suspend_pgtable
@@ -766,6 +767,8 @@ bad_name:
 
 static struct kobj_attribute suspend_mode_attribute =
 	__ATTR(mode, 0666, suspend_mode_show, suspend_mode_store);
+
+static struct kobject *suspend_kobj;
 #endif
 
 void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
