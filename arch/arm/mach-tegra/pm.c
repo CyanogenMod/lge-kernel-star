@@ -861,18 +861,17 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 			pr_err("%s: sysfs_create_file suspend type failed!\n",
 								__func__);
 	}
-#else
-	if ((plat->suspend_mode == TEGRA_SUSPEND_LP0) ||
-	    (plat->suspend_mode == TEGRA_SUSPEND_LP1)) {
-		pr_warning("%s: Suspend mode LP0 or LP1 requires "
-			   "CONFIG_PM_SLEEP -- limiting to LP2\n", __func__);
-		plat->suspend_mode = TEGRA_SUSPEND_LP2;
-	}
-#endif
 
 #ifdef CONFIG_CPU_IDLE
 	if (plat->suspend_mode == TEGRA_SUSPEND_NONE)
 		tegra_lp2_in_idle(false);
+#endif
+#else
+	if (plat->suspend_mode != TEGRA_SUSPEND_NONE) {
+		pr_warning("%s: Suspend requires CONFIG_PM_SLEEP -- "
+			   "disabling suspend\n", __func__);
+		plat->suspend_mode = TEGRA_SUSPEND_NONE;
+	}
 #endif
 
 	current_suspend_mode = plat->suspend_mode;

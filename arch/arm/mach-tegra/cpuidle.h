@@ -21,6 +21,8 @@
 
 #include <linux/cpuidle.h>
 
+#ifdef CONFIG_PM_SLEEP
+
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 void tegra2_idle_lp2(struct cpuidle_device *dev, struct cpuidle_state *state);
 void tegra2_cpu_idle_stats_lp2_ready(unsigned int cpu);
@@ -66,5 +68,6 @@ void tegra_lp2_in_idle(bool enable);
 #else
 static inline void tegra_lp2_in_idle(bool enable) {}
 #endif
+#endif /* CONFIG_PM_SLEEP */
 
 #endif
