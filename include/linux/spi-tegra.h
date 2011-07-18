@@ -21,10 +21,21 @@
 #ifndef _LINUX_SPI_TEGRA_H
 #define _LINUX_SPI_TEGRA_H
 
+#include <linux/clk.h>
+
+struct spi_clk_parent {
+	const char *name;
+	struct clk *parent_clk;
+	unsigned long fixed_clk_rate;
+};
+
 struct tegra_spi_platform_data {
 	bool is_dma_based;
 	int max_dma_buffer;
 	bool is_clkon_always;
+	unsigned int max_rate;
+	struct spi_clk_parent *parent_clk_list;
+	int  parent_clk_count;
 };
 
 /* Controller data from device to pass some info like
