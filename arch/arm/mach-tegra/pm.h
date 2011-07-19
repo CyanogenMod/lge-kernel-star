@@ -148,6 +148,25 @@ void tegra_lp0_suspend_mc(void);
 void tegra_lp0_resume_mc(void);
 #endif
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+void tegra2_lp2_set_trigger(unsigned long cycles);
+unsigned long tegra2_lp2_timer_remain(void);
+#endif
+
+static inline void tegra_lp2_set_trigger(unsigned long cycles)
+{
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	tegra2_lp2_set_trigger(cycles);
+#endif
+}
+
+static inline unsigned long tegra_lp2_timer_remain(void)
+{
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	return tegra2_lp2_timer_remain();
+#endif
+}
+
 #if DEBUG_CLUSTER_SWITCH
 extern unsigned int tegra_cluster_debug;
 #define DEBUG_CLUSTER(x) do { if (tegra_cluster_debug) printk x; } while (0)

@@ -295,3 +295,18 @@ static void __init tegra_init_timer(void)
 struct sys_timer tegra_timer = {
 	.init = tegra_init_timer,
 };
+
+void tegra2_lp2_set_trigger(unsigned long cycles)
+{
+	timer_writel(0, TIMER4_OFFSET + TIMER_PTV);
+	if (cycles) {
+		u32 reg = 0x80000000ul | min(0x1ffffffful, cycles);
+		timer_writel(reg, TIMER4_OFFSET + TIMER_PTV);
+	}
+}
+EXPORT_SYMBOL(tegra2_lp2_set_trigger);
+
+unsigned long tegra2_lp2_timer_remain(void)
+{
+	return timer_readl(TIMER4_OFFSET + TIMER_PCR) & 0x1ffffffful;
+}
