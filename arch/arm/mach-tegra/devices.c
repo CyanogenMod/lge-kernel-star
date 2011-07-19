@@ -849,13 +849,84 @@ struct platform_device tegra_i2s_device2 = {
 	.resource	= i2s_resource2,
 	.num_resources	= ARRAY_SIZE(i2s_resource2),
 };
-
-struct platform_device tegra_pcm_device = {
-	.name = "tegra-pcm-audio",
-	.id = -1,
+#else
+static struct resource i2s_resource0[] = {
+	[0] = {
+		.start	= TEGRA_I2S0_BASE,
+		.end	= TEGRA_I2S0_BASE + TEGRA_I2S0_SIZE - 1,
+		.flags	= IORESOURCE_MEM
+	}
 };
 
+struct platform_device tegra_i2s_device0 = {
+	.name		= "tegra30-i2s",
+	.id		= 0,
+	.resource	= i2s_resource0,
+	.num_resources	= ARRAY_SIZE(i2s_resource0),
+};
 
+static struct resource i2s_resource1[] = {
+	[0] = {
+		.start	= TEGRA_I2S1_BASE,
+		.end	= TEGRA_I2S1_BASE + TEGRA_I2S1_SIZE - 1,
+		.flags	= IORESOURCE_MEM
+	}
+};
+
+struct platform_device tegra_i2s_device1 = {
+	.name		= "tegra30-i2s",
+	.id		= 1,
+	.resource	= i2s_resource1,
+	.num_resources	= ARRAY_SIZE(i2s_resource1),
+};
+
+static struct resource i2s_resource2[] = {
+	[0] = {
+		.start	= TEGRA_I2S2_BASE,
+		.end	= TEGRA_I2S2_BASE + TEGRA_I2S2_SIZE - 1,
+		.flags	= IORESOURCE_MEM
+	}
+};
+
+struct platform_device tegra_i2s_device2 = {
+	.name		= "tegra30-i2s",
+	.id		= 2,
+	.resource	= i2s_resource2,
+	.num_resources	= ARRAY_SIZE(i2s_resource2),
+};
+
+static struct resource i2s_resource3[] = {
+	[0] = {
+		.start	= TEGRA_I2S3_BASE,
+		.end	= TEGRA_I2S3_BASE + TEGRA_I2S3_SIZE - 1,
+		.flags	= IORESOURCE_MEM
+	}
+};
+
+struct platform_device tegra_i2s_device3 = {
+	.name		= "tegra30-i2s",
+	.id		= 3,
+	.resource	= i2s_resource3,
+	.num_resources	= ARRAY_SIZE(i2s_resource3),
+};
+
+static struct resource i2s_resource4[] = {
+	[0] = {
+		.start	= TEGRA_I2S4_BASE,
+		.end	= TEGRA_I2S4_BASE + TEGRA_I2S4_SIZE - 1,
+		.flags	= IORESOURCE_MEM
+	}
+};
+
+struct platform_device tegra_i2s_device4 = {
+	.name		= "tegra30-i2s",
+	.id		= 4,
+	.resource	= i2s_resource4,
+	.num_resources	= ARRAY_SIZE(i2s_resource4),
+};
+#endif
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 static struct resource spdif_resource[] = {
 	[0] = {
 		.start	= INT_SPDIF,
@@ -873,18 +944,7 @@ static struct resource spdif_resource[] = {
 		.flags	= IORESOURCE_MEM
 	}
 };
-
 #else
-struct platform_device tegra_i2s_device0 = {
-	.name		= "i2s",
-	.id		= 0,
-};
-
-struct platform_device tegra_audio_device = {
-	.name		= "audio",
-	.id		= 1,
-};
-
 /* FIXME : Temporarly adding - find the right solution */
 
 static struct resource spdif_resource[] = {
@@ -906,6 +966,33 @@ struct platform_device tegra_spdif_device = {
 	.id		= -1,
 	.resource	= spdif_resource,
 	.num_resources	= ARRAY_SIZE(spdif_resource),
+};
+
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+static struct resource ahub_resource[] = {
+	[0] = {
+		.start	= TEGRA_APBIF0_BASE,
+		.end	= TEGRA_APBIF3_BASE + TEGRA_APBIF3_SIZE - 1,
+		.flags	= IORESOURCE_MEM
+	},
+	[1] = {
+		.start	= TEGRA_AHUB_BASE,
+		.end	= TEGRA_AHUB_BASE + TEGRA_AHUB_SIZE - 1,
+		.flags	= IORESOURCE_MEM
+	}
+};
+
+struct platform_device tegra_ahub_device = {
+	.name	= "tegra30-ahub",
+	.id	= -1,
+	.resource	= ahub_resource,
+	.num_resources	= ARRAY_SIZE(ahub_resource),
+};
+#endif
+
+struct platform_device tegra_pcm_device = {
+	.name = "tegra-pcm-audio",
+	.id = -1,
 };
 
 #if defined(CONFIG_SND_HDA_TEGRA)
