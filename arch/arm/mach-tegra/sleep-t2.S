@@ -70,15 +70,28 @@
 #define TEGRA_CLK_RESET_VIRT	(TEGRA_CLK_RESET_BASE - IO_PPSB_PHYS + IO_PPSB_VIRT)
 
 /*
- * tegra2_sleep_reset(unsigned long v2p)
+ * tegra2_sleep_reset(void)
  *
  * puts the current cpu in reset
- * uses tegra_cpu_save to take the cpu out of coherence
  * should never return
  */
 ENTRY(tegra2_sleep_reset)
-	bl	tegra_cpu_save
 	cpu_id	r0
+
+	/* Exit coherency. */
+	mrc	p15, 0, r3, c1, c0, 1		@ ACTLR
+	bic	r3, r3, #(1<<6)			@ exit coherency SCTLR.SMP
+	mcr	p15, 0, r3, c1, c0, 1		@ ACTLR
+	isb
+
+	/* Invalidate the SCU tags for this CPU. */
+	mov32	r3, TEGRA_ARM_PERIF_VIRT + 0xC	@ SCUIAR
+	mov	r2, r0, lsl #2
+	mov	r1, #0xf
+	mov	r1, r1, lsl r2			@ 0xF << (cpu * 4)
+	str	r1, [r3]			@ invalidate SCU tags for CPU
+
+	/* Put this CPU into reset. */
 	bl	tegra2_cpu_reset
 	mov	pc, lr
 ENDPROC(tegra2_sleep_reset)
