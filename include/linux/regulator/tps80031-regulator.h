@@ -58,6 +58,7 @@ enum {
 	LDO3_OUTPUT_VIB		= 0x00000004,
 
 	/* VBUS configuration */
+	VBUS_DISCHRG_EN_PDN	= 0x00000004,
 	VBUS_SW_ONLY		= 0x00000008,
 	VBUS_SW_N_ID		= 0x00000010,
 
@@ -76,6 +77,7 @@ enum {
  * @init_apply: Init parameter applied or not.
  * @flags: Configuration flag to configure the rails. It should be ORed of
  *	 above enums.
+ * @delay_us: Delay in microsecond after setting the desired voltage.
  */
 
 struct tps80031_regulator_platform_data {
@@ -84,6 +86,7 @@ struct tps80031_regulator_platform_data {
 	unsigned init_enable:1;
 	unsigned init_apply:1;
 	unsigned int flags;
+	int delay_us;
 };
 
 #endif	/* __REGULATOR_TPS80031_H */

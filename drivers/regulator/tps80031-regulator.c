@@ -69,6 +69,10 @@
 #define OPA_MODE_EN		BIT(6)
 #define OPA_MODE_EN_MASK	BIT(6)
 
+#define USB_VBUS_CTRL_SET	0x04
+#define USB_VBUS_CTRL_CLR	0x05
+#define VBUS_DISCHRG		0x20
+
 #define EXT_PWR_REQ (PWR_REQ_INPUT_PREQ1 | PWR_REQ_INPUT_PREQ2 | \
 			PWR_REQ_INPUT_PREQ3)
 #define TPS80031_PREQ1_RES_ASS_A	0xD7
@@ -93,7 +97,7 @@ struct tps80031_regulator {
 	u16			max_mV;
 
 	/* regulator specific turn-on delay */
-	u16			delay;
+	int			delay;
 
 	u8			flags;
 	unsigned int		platform_flags;
@@ -550,6 +554,11 @@ static int tps80031ldo_get_voltage(struct regulator_dev *rdev)
 }
 
 /* VBUS */
+static int tps80031_vbus_enable_time(struct regulator_dev *rdev)
+{
+	/* Enable and settling time for vbus is 3ms */
+	return 3000;
+}
 static int tps80031_vbus_is_enabled(struct regulator_dev *rdev)
 {
 	struct tps80031_regulator *ri = rdev_get_drvdata(rdev);
@@ -603,19 +612,28 @@ static int tps80031_vbus_disable(struct regulator_dev *rdev)
 {
 	struct tps80031_regulator *ri = rdev_get_drvdata(rdev);
 	struct device *parent = to_tps80031_dev(rdev);
-	int ret;
+	int ret = 0;
 
 	if (ri->platform_flags & VBUS_SW_ONLY) {
-		ret = tps80031_clr_bits(parent, SLAVE_ID2,
+
+		if (ri->platform_flags & VBUS_DISCHRG_EN_PDN)
+			ret = tps80031_write(parent, SLAVE_ID2,
+				USB_VBUS_CTRL_SET, VBUS_DISCHRG);
+		if (!ret)
+			ret = tps80031_clr_bits(parent, SLAVE_ID2,
 				CHARGERUSB_CTRL1_ADD,  OPA_MODE_EN);
 		if (!ret)
 			ret = tps80031_clr_bits(parent, SLAVE_ID2,
 					CHARGERUSB_CTRL3_ADD, BOOST_HW_PWR_EN);
-		if (ret < 0) {
+		if (!ret)
+			mdelay((ri->delay + 999)/1000);
+
+		if (ri->platform_flags & VBUS_DISCHRG_EN_PDN)
+			tps80031_write(parent, SLAVE_ID2,
+				USB_VBUS_CTRL_CLR, VBUS_DISCHRG);
+
+		if (ret < 0)
 			dev_err(&rdev->dev, "Error in reading control reg\n");
-			return ret;
-		}
-		udelay(ri->delay);
 		return ret;
 	}
 	dev_err(&rdev->dev, "%s() is not supported with flag 0x%08x\n",
@@ -657,7 +675,7 @@ static struct regulator_ops tps80031vbus_ops = {
 	.enable		= tps80031_vbus_enable,
 	.disable	= tps80031_vbus_disable,
 	.is_enabled	= tps80031_vbus_is_enabled,
-	.enable_time	= tps80031_regulator_enable_time,
+	.enable_time	= tps80031_vbus_enable_time,
 };
 
 #define TPS80031_REG(_id, _trans_reg, _state_reg, _force_reg, _volt_reg, \
@@ -717,7 +735,7 @@ static struct tps80031_regulator tps80031_regulator[] = {
 	TPS80031_REG(VANA,   0x81, 0x82, 0x00, 0x83, SLAVE_ID1, 1000, 3300,
 				tps80031ldo_ops, 25, 500, -1),
 	TPS80031_REG(VBUS,   0x0,  0x0,  0x00, 0x0,  SLAVE_ID1, 0,    5000,
-				tps80031vbus_ops, 2, 500, -1),
+				tps80031vbus_ops, 2, 200000, -1),
 };
 
 static int tps80031_power_req_config(struct device *parent,
@@ -925,6 +943,8 @@ static int __devinit tps80031_regulator_probe(struct platform_device *pdev)
 	}
 	tps_pdata = pdev->dev.platform_data;
 	ri->dev = &pdev->dev;
+	if (tps_pdata->delay_us > 0)
+		ri->delay = tps_pdata->delay_us;
 
 	check_smps_mode_mult(pdev->dev.parent, ri);
 	ri->platform_flags = tps_pdata->flags;
