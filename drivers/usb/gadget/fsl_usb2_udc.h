@@ -428,7 +428,11 @@ struct ep_td_struct {
                                                DTD_STATUS_DATA_BUFF_ERR | \
                                                DTD_STATUS_TRANSACTION_ERR)
 /* Alignment requirements; must be a power of two */
+#if defined(CONFIG_ARCH_TEGRA)
+#define DTD_ALIGNMENT				0x80
+#else
 #define DTD_ALIGNMENT				0x20
+#endif
 #define QH_ALIGNMENT				2048
 #define QH_OFFSET				0x1000
 
