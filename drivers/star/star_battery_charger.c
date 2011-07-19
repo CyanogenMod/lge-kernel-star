@@ -3400,8 +3400,17 @@ static int tegra_battery_suspend(struct platform_device *dev,
 		}
 #else
 	checkbat_sec = now_sec + batt_dev->sleep_bat_check_period;
-	NvRmPmuWriteAlarm(s_hRmGlobal, checkbat_sec);
-	printk("[CHG_RTC : final] next_alarm_sec=0x%x now_sec=0x%x\n", checkbat_sec, now_sec);
+	if(checkbat_sec <= alarm_sec)
+	{
+		next_alarm_sec = checkbat_sec;
+		
+	} else if( (checkbat_sec > alarm_sec) && (now_sec <= alarm_sec))
+	{
+		next_alarm_sec = alarm_sec;
+		
+	}
+	NvRmPmuWriteAlarm(s_hRmGlobal, next_alarm_sec);
+	printk("[CHG_RTC : final] next_alarm_sec=0x%x now_sec=0x%x\n", next_alarm_sec, now_sec);
 #endif
 	}
 	else
