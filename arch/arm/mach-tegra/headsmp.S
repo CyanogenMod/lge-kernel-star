@@ -3,7 +3,7 @@
  *
  * SMP initialization routines for Tegra SoCs
  *
- * Copyright (c) 2009-2010, NVIDIA Corporation.
+ * Copyright (c) 2009-2011, NVIDIA Corporation.
  * Copyright (c) 2011 Google, Inc.
  * Author: Colin Cross <ccross@android.com>
  *         Gary King <gking@nvidia.com>
@@ -36,7 +36,6 @@
  *	 Initial secondary processor boot vector; jumps to kernel's
  *	 secondary_startup routine
  */
-#ifdef CONFIG_SMP
 ENTRY(tegra_secondary_startup)
 	bl	tegra_invalidate_l1
 	bl	tegra_enable_coresite
@@ -45,6 +44,7 @@ ENDPROC(tegra_secondary_startup)
 #endif
 
 #ifdef CONFIG_PM_SLEEP
+#ifdef CONFIG_SMP
 /*
  *	tegra_secondary_resume
  *
@@ -56,9 +56,7 @@ ENTRY(tegra_secondary_resume)
 	b	cpu_resume
 ENDPROC(tegra_secondary_resume)
 #endif
-#endif
 
-#ifdef CONFIG_PM_SLEEP
 /*
  *	tegra_resume
  *
