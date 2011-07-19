@@ -45,9 +45,47 @@
 #include "sleep.h"
 
 #ifdef CONFIG_PM_SLEEP
-static bool lp2_in_idle __read_mostly = true;
-module_param(lp2_in_idle, bool, 0644);
 static bool lp2_disabled_by_suspend;
+static bool lp2_in_idle __read_mostly = true;
+static bool lp2_in_idle_modifiable __read_mostly = true;
+
+void tegra_lp2_in_idle(bool enable)
+{
+#ifdef CONFIG_PM_SLEEP
+	/* If LP2 in idle is permanently disabled it can't be re-enabled. */
+	if (lp2_in_idle_modifiable) {
+		lp2_in_idle = enable;
+		lp2_in_idle_modifiable = enable;
+		if (!enable)
+			pr_warn("LP2 in idle disabled\n");
+	}
+#endif
+}
+
+static int lp2_in_idle_set(const char *arg, const struct kernel_param *kp)
+{
+#ifdef CONFIG_PM_SLEEP
+	int ret;
+
+	/* If LP2 in idle is permanently disabled it can't be re-enabled. */
+	if (lp2_in_idle_modifiable) {
+		ret = param_set_bool(arg, kp);
+		return ret;
+	}
+#endif
+	return -ENODEV;
+}
+
+static int lp2_in_idle_get(char *buffer, const struct kernel_param *kp)
+{
+	return param_get_bool(buffer, kp);
+}
+
+static struct kernel_param_ops lp2_in_idle_ops = {
+	.set = lp2_in_idle_set,
+	.get = lp2_in_idle_get,
+};
+module_param_cb(lp2_in_idle, &lp2_in_idle_ops, &lp2_in_idle, 0644);
 
 int tegra_lp2_exit_latency;
 static unsigned int tegra_lp2_min_residency;
@@ -79,13 +117,6 @@ static int tegra_idle_enter_lp3(struct cpuidle_device *dev,
 	local_fiq_enable();
 	local_irq_enable();
 	return (int)us;
-}
-
-void tegra_lp2_in_idle(bool enable)
-{
-#ifdef CONFIG_PM_SLEEP
-	lp2_in_idle = enable;
-#endif
 }
 
 #ifdef CONFIG_PM_SLEEP
