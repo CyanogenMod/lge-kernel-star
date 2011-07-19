@@ -105,10 +105,14 @@ ENDPROC(tegra2_sleep_reset)
  * and puts the CPU in reset
  * can be called on the current cpu or another cpu
  * if called on the current cpu, does not return
+ * MUST NOT BE CALLED FOR CPU 0.
  *
  * corrupts r0-r3, r12
  */
 ENTRY(tegra2_cpu_reset)
+	cmp	r0, #0
+	moveq	pc, lr  		@ must not be called for CPU 0
+
 	mov32	r3, TEGRA_PMC_VIRT
 	add	r1, r3, #PMC_SCRATCH41
 	mov	r12, #CPU_RESETTABLE
