@@ -39,6 +39,12 @@
 #include "nvidlcmd.h"
 #include "nvrm_i2c.h"
 
+#ifdef CONFIG_STAR_WM8994_VOODOO
+extern unsigned int voodoo_hook_wm8994_write(int codec,
+                                             unsigned int reg,
+                                             unsigned int value);
+#endif
+
 #define OFFSET( s, e ) (NvU32)(void *)(&(((s*)0)->e))
 
 
@@ -131,6 +137,10 @@ static NvError NvRmI2cTransaction_dispatch_( void *InBuffer, NvU32 InSize, void 
     NvRmI2cTransaction_out *p_out;
     NvU8  *Data = NULL;
     NvRmI2cTransactionInfo *Transaction = NULL;
+#ifdef CONFIG_STAR_WM8994_VOODOO
+	unsigned int reg;
+	unsigned int value;
+#endif
 
     p_in = (NvRmI2cTransaction_in *)InBuffer;
     p_out = (NvRmI2cTransaction_out *)((NvU8 *)OutBuffer + OFFSET(NvRmI2cTransaction_params, out) - OFFSET(NvRmI2cTransaction_params, inout));
@@ -171,6 +181,21 @@ static NvError NvRmI2cTransaction_dispatch_( void *InBuffer, NvU32 InSize, void 
             }
         }
     }
+
+#ifdef CONFIG_STAR_WM8994_VOODOO
+    // only single write transactions, targeting WM8994 address
+    if (p_in->NumOfTransactions == 1 && p_in->Transaction->Address == 0x34) {
+        // unpack i2c data
+        reg = (p_in->Data[0] << 8) | p_in->Data[1];
+        value = (p_in->Data[2] << 8) | p_in->Data[3];
+
+        value = voodoo_hook_wm8994_write(0, reg, value);
+
+        // repack value only into i2c data
+        p_in->Data[2] = value >> 8;
+        p_in->Data[3] = value & 0x00ff;
+    }
+#endif
 
     p_out->ret_ = NvRmI2cTransaction( p_in->hI2c, p_in->I2cPinMap, p_in->WaitTimeoutInMilliSeconds, p_in->ClockSpeedKHz, Data, p_in->DataLen, Transaction, p_in->NumOfTransactions );
 
