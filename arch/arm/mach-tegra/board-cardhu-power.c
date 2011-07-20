@@ -74,19 +74,27 @@ static struct regulator_consumer_supply tps6591x_vio_supply_0[] = {
 	REGULATOR_SUPPLY("avdd_osc", NULL),
 	REGULATOR_SUPPLY("vddio_sys", NULL),
 	REGULATOR_SUPPLY("vddio_sdmmc4", NULL),
+	REGULATOR_SUPPLY("pwrdet_sdmmc4", NULL),
 	REGULATOR_SUPPLY("vdd1v8_satelite", NULL),
 	REGULATOR_SUPPLY("vddio_uart", NULL),
+	REGULATOR_SUPPLY("pwrdet_uart", NULL),
 	REGULATOR_SUPPLY("vddio_audio", NULL),
+	REGULATOR_SUPPLY("pwrdet_audio", NULL),
 	REGULATOR_SUPPLY("vddio_bb", NULL),
+	REGULATOR_SUPPLY("pwrdet_bb", NULL),
 	REGULATOR_SUPPLY("vddio_lcd_pmu", NULL),
+	REGULATOR_SUPPLY("pwrdet_lcd", NULL),
 	REGULATOR_SUPPLY("vddio_cam", NULL),
+	REGULATOR_SUPPLY("pwrdet_cam", NULL),
 	REGULATOR_SUPPLY("vddio_vi", NULL),
+	REGULATOR_SUPPLY("pwrdet_vi", NULL),
 	REGULATOR_SUPPLY("ldo6", NULL),
 	REGULATOR_SUPPLY("ldo7", NULL),
 	REGULATOR_SUPPLY("ldo8", NULL),
 	REGULATOR_SUPPLY("vcore_audio", NULL),
 	REGULATOR_SUPPLY("avcore_audio", NULL),
 	REGULATOR_SUPPLY("vddio_sdmmc3", NULL),
+	REGULATOR_SUPPLY("pwrdet_sdmmc3", NULL),
 	REGULATOR_SUPPLY("vcore1_lpddr2", NULL),
 	REGULATOR_SUPPLY("vcom_1v8", NULL),
 	REGULATOR_SUPPLY("pmuio_1v8", NULL),
@@ -110,6 +118,7 @@ static struct regulator_consumer_supply tps6591x_ldo2_supply_0[] = {
 
 static struct regulator_consumer_supply tps6591x_ldo3_supply_e118x[] = {
 	REGULATOR_SUPPLY("vddio_sdmmc1", NULL),
+	REGULATOR_SUPPLY("pwrdet_sdmmc1", NULL),
 };
 
 static struct regulator_consumer_supply tps6591x_ldo3_supply_e1198[] = {
@@ -127,10 +136,12 @@ static struct regulator_consumer_supply tps6591x_ldo5_supply_e118x[] = {
 static struct regulator_consumer_supply tps6591x_ldo5_supply_e1198[] = {
 	REGULATOR_SUPPLY("avdd_vdac", NULL),
 	REGULATOR_SUPPLY("vddio_sdmmc1", NULL),
+	REGULATOR_SUPPLY("pwrdet_sdmmc1", NULL),
 };
 
 static struct regulator_consumer_supply tps6591x_ldo6_supply_0[] = {
 	REGULATOR_SUPPLY("avdd_dsi_csi", NULL),
+	REGULATOR_SUPPLY("pwrdet_mipi", NULL),
 };
 static struct regulator_consumer_supply tps6591x_ldo7_supply_0[] = {
 	REGULATOR_SUPPLY("avdd_plla_p_c_s", NULL),
@@ -442,6 +453,7 @@ static struct regulator_consumer_supply gpio_switch_en_3v3_sys_supply[] = {
 	REGULATOR_SUPPLY("vdd_3v3", NULL),
 	REGULATOR_SUPPLY("vcore_mmc", NULL),
 	REGULATOR_SUPPLY("vddio_pex_ctl", NULL),
+	REGULATOR_SUPPLY("pwrdet_pex_ctl", NULL),
 	REGULATOR_SUPPLY("hvdd_pex", NULL),
 	REGULATOR_SUPPLY("avdd_hdmi", NULL),
 	REGULATOR_SUPPLY("vpp_fuse", NULL),
@@ -450,6 +462,7 @@ static struct regulator_consumer_supply gpio_switch_en_3v3_sys_supply[] = {
 	REGULATOR_SUPPLY("vcore_nand", NULL),
 	REGULATOR_SUPPLY("hvdd_sata", NULL),
 	REGULATOR_SUPPLY("vddio_gmi_pmu", NULL),
+	REGULATOR_SUPPLY("pwrdet_nand", NULL),
 	REGULATOR_SUPPLY("avdd_cam1", NULL),
 	REGULATOR_SUPPLY("vdd_af", NULL),
 	REGULATOR_SUPPLY("avdd_cam2", NULL),
