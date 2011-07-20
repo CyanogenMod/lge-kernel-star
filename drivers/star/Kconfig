@@ -93,6 +93,12 @@ config STAR_WM8994_TEST
 	help
 	 Support for wm8994 driver.
 
+config STAR_WM8994_VOODOO
+	bool "Star wm8994 Voodoo Sound"
+	default y
+	help
+	 Support for wm8994 driver.
+
 config STAR_ERS_TEST
 	bool "Star ERS Test Driver"
 	default y
