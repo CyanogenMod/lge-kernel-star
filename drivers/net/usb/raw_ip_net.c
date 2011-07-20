@@ -127,9 +127,27 @@ static int baseband_usb_driver_probe(struct usb_interface *intf,
 
 static void baseband_usb_driver_disconnect(struct usb_interface *intf)
 {
-	pr_debug("%s(%d) { intf %p\n", __func__, __LINE__, intf);
-	pr_debug("%s(%d) }\n", __func__, __LINE__);
+	pr_debug("%s intf %p\n", __func__, intf);
 }
+
+#ifdef CONFIG_PM
+static int baseband_usb_driver_suspend(struct usb_interface *intf,
+	pm_message_t message)
+{
+	pr_debug("%s intf %p\n", __func__, intf);
+	return 0;
+}
+static int baseband_usb_driver_resume(struct usb_interface *intf)
+{
+	pr_debug("%s intf %p\n", __func__, intf);
+	return 0;
+}
+static int baseband_usb_driver_reset_resume(struct usb_interface *intf)
+{
+	pr_debug("%s intf %p\n", __func__, intf);
+	return baseband_usb_driver_resume(intf);
+}
+#endif /* CONFIG_PM */
 
 static struct usb_device_id baseband_usb_driver_id_table[MAX_INTFS][2];
 
@@ -141,18 +159,36 @@ static struct usb_driver baseband_usb_driver[MAX_INTFS] = {
 		.probe = baseband_usb_driver_probe,
 		.disconnect = baseband_usb_driver_disconnect,
 		.id_table = baseband_usb_driver_id_table[0],
+#ifdef CONFIG_PM
+		.suspend = baseband_usb_driver_suspend,
+		.resume = baseband_usb_driver_resume,
+		.reset_resume = baseband_usb_driver_reset_resume,
+		.supports_autosuspend = 1,
+#endif
 	},
 	{
 		.name = baseband_usb_driver_name[1],
 		.probe = baseband_usb_driver_probe,
 		.disconnect = baseband_usb_driver_disconnect,
 		.id_table = baseband_usb_driver_id_table[1],
+#ifdef CONFIG_PM
+		.suspend = baseband_usb_driver_suspend,
+		.resume = baseband_usb_driver_resume,
+		.reset_resume = baseband_usb_driver_reset_resume,
+		.supports_autosuspend = 1,
+#endif
 	},
 	{
 		.name = baseband_usb_driver_name[2],
 		.probe = baseband_usb_driver_probe,
 		.disconnect = baseband_usb_driver_disconnect,
 		.id_table = baseband_usb_driver_id_table[2],
+#ifdef CONFIG_PM
+		.suspend = baseband_usb_driver_suspend,
+		.resume = baseband_usb_driver_resume,
+		.reset_resume = baseband_usb_driver_reset_resume,
+		.supports_autosuspend = 1,
+#endif
 	},
 };
 
@@ -317,7 +353,7 @@ static netdev_tx_t baseband_usb_netdev_start_xmit(
 	int i = 0;
 	struct baseband_usb *usb = baseband_usb_net[i];
 	struct urb *urb;
-	unsigned char *buf, *src;
+	unsigned char *buf;
 	int err;
 
 	pr_debug("baseband_usb_netdev_start_xmit\n");
@@ -528,7 +564,7 @@ static void usb_net_raw_ip_tx_urb_comp(struct urb *urb)
 
 static int usb_net_raw_ip_init(void)
 {
-	int i, j;
+	int i;
 	int err;
 
 	pr_debug("usb_net_raw_ip_init {\n");
@@ -561,8 +597,9 @@ static int usb_net_raw_ip_init(void)
 			pr_err("cannot register network device - %d\n", err);
 			goto error_exit;
 		}
-		pr_debug("registered baseband usb network device - dev %p name %s\n",
-			usb_net_raw_ip_dev[i], BASEBAND_USB_NET_DEV_NAME);
+		pr_debug("registered baseband usb network device"
+				" - dev %p name %s\n", usb_net_raw_ip_dev[i],
+				 BASEBAND_USB_NET_DEV_NAME);
 		/* start usb rx */
 		err = usb_net_raw_ip_rx_urb_submit(baseband_usb_net[i]);
 		if (err < 0) {
