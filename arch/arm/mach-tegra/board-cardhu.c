@@ -59,6 +59,7 @@
 #include "gpio-names.h"
 #include "fuse.h"
 #include "pm.h"
+#include "baseband-xmm-power.h"
 
 
 /* !!!TODO: Change for cardhu (Taken from Ventana) */
@@ -506,6 +507,22 @@ static int __init cardhu_touch_init(void)
 	return 0;
 }
 
+static struct tegra_uhsic_config uhsic_phy_config = {
+	.enable_gpio = EN_HSIC_GPIO,
+	.reset_gpio = -1,
+	.sync_start_delay = 9,
+	.idle_wait_delay = 17,
+	.term_range_adj = 0,
+	.elastic_underrun_limit = 16,
+	.elastic_overrun_limit = 16,
+};
+
+static struct tegra_ehci_platform_data tegra_ehci_uhsic_pdata = {
+	.phy_type = TEGRA_USB_PHY_TYPE_HSIC,
+	.phy_config = &uhsic_phy_config,
+	.operating_mode = TEGRA_USB_HOST,
+	.power_down_on_bus_suspend = 1,
+};
 
 static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
 	[0] = {
@@ -594,18 +611,6 @@ static struct usb_phy_plat_data tegra_usb_phy_pdata[] = {
 	},
 };
 
-static struct tegra_ulpi_config uhsic_phy_config = {
-	.enable_gpio = EN_HSIC_GPIO,
-	.reset_gpio = -1,
-};
-
-static struct tegra_ehci_platform_data tegra_ehci_uhsic_pdata = {
-	.phy_type = TEGRA_USB_PHY_TYPE_HSIC,
-	.phy_config = &uhsic_phy_config,
-	.operating_mode = TEGRA_USB_HOST,
-	.power_down_on_bus_suspend = 1,
-};
-
 static struct tegra_otg_platform_data tegra_otg_pdata = {
 	.host_register = &tegra_usb_otg_host_register,
 	.host_unregister = &tegra_usb_otg_host_unregister,
@@ -618,22 +623,28 @@ static void cardhu_usb_init(void)
 
 	tegra_get_board_info(&bi);
 
-	tegra_usb_phy_init(tegra_usb_phy_pdata, ARRAY_SIZE(tegra_usb_phy_pdata));
+	tegra_usb_phy_init(tegra_usb_phy_pdata,
+			ARRAY_SIZE(tegra_usb_phy_pdata));
 
 	tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
 	platform_device_register(&tegra_otg_device);
-
 	if (bi.board_id == BOARD_PM267) {
 		uhsic_phy_config.reset_gpio =
 			PM267_SMSC4640_HSIC_HUB_RESET_GPIO;
 		tegra_ehci2_device.dev.platform_data = &tegra_ehci_uhsic_pdata;
+		platform_device_register(&tegra_ehci2_device);
 	} else if ((bi.board_id == BOARD_PM269) ||
-		(bi.board_id == BOARD_E1186) || (bi.board_id == BOARD_E1256)) {
+			(bi.board_id == BOARD_E1256)) {
 		tegra_ehci2_device.dev.platform_data = &tegra_ehci_uhsic_pdata;
+		platform_device_register(&tegra_ehci2_device);
+	} else if ((bi.board_id == BOARD_E1186) ||
+			(bi.board_id == BOARD_E1197)) {
+		tegra_ehci2_device.dev.platform_data = &tegra_ehci_uhsic_pdata;
+		/* baseband registartion happens in baseband-xmm-power  */
 	} else {
 		tegra_ehci2_device.dev.platform_data = &tegra_ehci_pdata[1];
+		platform_device_register(&tegra_ehci2_device);
 	}
-	platform_device_register(&tegra_ehci2_device);
 
 	tegra_ehci3_device.dev.platform_data = &tegra_ehci_pdata[2];
 	platform_device_register(&tegra_ehci3_device);
@@ -649,6 +660,29 @@ static void cardhu_gps_init(void)
 	tegra_gpio_enable(TEGRA_GPIO_PU2);
 	tegra_gpio_enable(TEGRA_GPIO_PU3);
 }
+
+static struct baseband_power_platform_data tegra_baseband_power_data = {
+	.baseband_type = BASEBAND_XMM,
+	.modem = {
+	.xmm = {
+			.bb_rst = XMM_GPIO_BB_RST,
+			.bb_on = XMM_GPIO_BB_ON,
+			.ipc_bb_wake = XMM_GPIO_IPC_BB_WAKE,
+			.ipc_ap_wake = XMM_GPIO_IPC_AP_WAKE,
+			.ipc_hsic_active = XMM_GPIO_IPC_HSIC_ACTIVE,
+			.ipc_hsic_sus_req = XMM_GPIO_IPC_HSIC_SUS_REQ,
+			.hsic_device = &tegra_ehci2_device,
+		},
+	},
+};
+
+static struct platform_device tegra_baseband_power_device = {
+	.name = "baseband_xmm_power",
+	.id = -1,
+	.dev = {
+		.platform_data = &tegra_baseband_power_data,
+	},
+};
 
 static void cardhu_modem_init(void)
 {
@@ -671,9 +705,26 @@ static void cardhu_modem_init(void)
 		else
 			gpio_direction_input(w_disable_gpio);
 		break;
+	case BOARD_E1186:
+	case BOARD_E1197:
+		tegra_gpio_enable(
+			tegra_baseband_power_data.modem.xmm.bb_rst);
+		tegra_gpio_enable(
+			tegra_baseband_power_data.modem.xmm.bb_on);
+		tegra_gpio_enable(
+			tegra_baseband_power_data.modem.xmm.ipc_bb_wake);
+		tegra_gpio_enable(
+			tegra_baseband_power_data.modem.xmm.ipc_ap_wake);
+		tegra_gpio_enable(
+			tegra_baseband_power_data.modem.xmm.ipc_hsic_active);
+		tegra_gpio_enable(
+			tegra_baseband_power_data.modem.xmm.ipc_hsic_sus_req);
+		platform_device_register(&tegra_baseband_power_device);
+		break;
 	default:
 		break;
 	}
+
 }
 
 #ifdef CONFIG_SATA_AHCI_TEGRA

@@ -273,7 +273,7 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_common[] = {
 	DEFAULT_PINMUX(GPIO_PU2,        RSVD1,           NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GPIO_PU3,        RSVD1,           NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GPIO_PU4,        PWM1,            NORMAL,    NORMAL,     OUTPUT),
-	DEFAULT_PINMUX(GPIO_PU5,        PWM2,            NORMAL,    NORMAL,     OUTPUT),
+	DEFAULT_PINMUX(GPIO_PU5,        PWM2,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GPIO_PU6,        RSVD1,           NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(DAP4_FS,         I2S3,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(DAP4_DIN,        I2S3,            NORMAL,    NORMAL,     INPUT),
@@ -282,6 +282,11 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_common[] = {
 	DEFAULT_PINMUX(CLK3_OUT,        EXTPERIPH3,      NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(CLK3_REQ,        DEV3,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GMI_WP_N,        GMI,             NORMAL,    NORMAL,     INPUT),
+
+	DEFAULT_PINMUX(KB_ROW5,         OWR,             NORMAL,    NORMAL,     OUTPUT),
+	DEFAULT_PINMUX(KB_ROW12,        MIO,             NORMAL,    NORMAL,     OUTPUT),
+	DEFAULT_PINMUX(KB_ROW14,        MIO,             NORMAL,    NORMAL,     OUTPUT),
+	DEFAULT_PINMUX(KB_ROW15,        MIO,             NORMAL,    NORMAL,     OUTPUT),
 
 #if 0 /* for testing on Verbier */
 	DEFAULT_PINMUX(GMI_WAIT,        NAND,            NORMAL,    NORMAL,     INPUT),

@@ -28,6 +28,7 @@
 /* Processor Board  ID */
 #define BOARD_E1187   0x0B57
 #define BOARD_E1186   0x0B56
+#define BOARD_E1197   0x0B61
 #define BOARD_E1198   0x0B62
 #define BOARD_E1256   0x0C38
 #define BOARD_E1291   0x0C5B
@@ -170,5 +171,20 @@ int cardhu_emc_init(void);
 int cardhu_power_off_init(void);
 int cardhu_edp_init(void);
 int cardhu_pmon_init(void);
+
+/* Baseband GPIO addresses */
+#define BB_GPIO_BB_EN			TEGRA_GPIO_PR5
+#define BB_GPIO_BB_RST			TEGRA_GPIO_PS4
+#define BB_GPIO_SPI_INT			TEGRA_GPIO_PS6
+#define BB_GPIO_SPI_SS			TEGRA_GPIO_PV0
+#define BB_GPIO_AWR			TEGRA_GPIO_PS7
+#define BB_GPIO_CWR			TEGRA_GPIO_PU5
+
+#define XMM_GPIO_BB_ON			BB_GPIO_BB_EN
+#define XMM_GPIO_BB_RST			BB_GPIO_BB_RST
+#define XMM_GPIO_IPC_HSIC_ACTIVE	BB_GPIO_SPI_INT
+#define XMM_GPIO_IPC_HSIC_SUS_REQ	BB_GPIO_SPI_SS
+#define XMM_GPIO_IPC_BB_WAKE		BB_GPIO_AWR
+#define XMM_GPIO_IPC_AP_WAKE		BB_GPIO_CWR
 
 #endif
