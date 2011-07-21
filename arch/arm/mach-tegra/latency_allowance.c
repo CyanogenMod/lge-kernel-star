@@ -17,6 +17,8 @@
 #include <linux/types.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/debugfs.h>
+#include <linux/seq_file.h>
 #include <linux/err.h>
 #include <linux/spinlock_types.h>
 #include <linux/spinlock.h>
@@ -94,6 +96,8 @@
 	if (ENABLE_LA_DEBUG) { \
 		printk(KERN_INFO pr_fmt(fmt), ##__VA_ARGS__); \
 	}
+
+static struct dentry *latency_debug_dir;
 
 struct la_client_info {
 	unsigned int fifo_size_in_atoms;
@@ -477,6 +481,48 @@ void tegra_disable_latency_scaling(enum tegra_la_id id)
 	}
 	spin_unlock(&safety_lock);
 }
+
+static int la_regs_show(struct seq_file *s, void *unused)
+{
+	unsigned i;
+	unsigned long la;
+
+	/* iterate the list, but don't print MAX_ID */
+	for (i = 0; i < ARRAY_SIZE(la_info) - 1; i++) {
+		la = (readl(la_info[i].reg_addr) & la_info[i].mask)
+			>> la_info[i].shift;
+		seq_printf(s, "%-16s: %4u\n", la_info[i].name, la);
+	}
+
+        return 0;
+}
+
+static int dbg_la_regs_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, la_regs_show, inode->i_private);
+}
+
+static const struct file_operations regs_fops = {
+	.open           = dbg_la_regs_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+
+static int __init tegra_latency_allowance_debugfs_init(void)
+{
+	if (latency_debug_dir)
+		return 0;
+
+	latency_debug_dir = debugfs_create_dir("tegra_latency", NULL);
+
+	debugfs_create_file("la_info", S_IRUGO, latency_debug_dir, NULL,
+		&regs_fops);
+
+	return 0;
+}
+
+late_initcall(tegra_latency_allowance_debugfs_init);
 
 static int __init tegra_latency_allowance_init(void)
 {
