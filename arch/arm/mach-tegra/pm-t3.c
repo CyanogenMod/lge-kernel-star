@@ -26,6 +26,8 @@
 #include <mach/gpio.h>
 #include <mach/iomap.h>
 #include <mach/irqs.h>
+
+#include <asm/cpu_pm.h>
 #include <asm/hardware/gic.h>
 
 #include "clock.h"
@@ -310,8 +312,11 @@ int tegra_cluster_control(unsigned int us, unsigned int flags)
 
 		if (us)
 			tegra_lp2_set_trigger(0);
-	} else
+	} else {
+		cpu_pm_enter();
 		tegra_idle_lp2_last(0, flags);
+		cpu_pm_exit();
+	}
 	local_irq_enable();
 
 	DEBUG_CLUSTER(("%s: %s\r\n", __func__, is_lp_cluster() ? "LP" : "G"));
