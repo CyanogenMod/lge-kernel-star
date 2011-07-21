@@ -40,6 +40,10 @@
 #include <linux/err.h>
 #include <linux/adt7461.h>
 #include <generated/mach-types.h>
+#include <linux/gpio.h>
+#include <linux/i2c/pca953x.h>
+
+#include <mach/tegra_odm_fuses.h>
 
 #include "gpio-names.h"
 #include "cpu-tegra.h"
@@ -49,8 +53,11 @@
 #define CAMERA2_PWDN_GPIO		TEGRA_GPIO_PBB5
 #define CAMERA2_RESET_GPIO		TEGRA_GPIO_PBB1
 #define CAMERA_AF_PD_GPIO		TEGRA_GPIO_PT3
-#define CAMERA_FLASH_EN1_GPIO	TEGRA_GPIO_PBB4
-#define CAMERA_FLASH_EN2_GPIO	TEGRA_GPIO_PA0
+#define CAMERA_FLASH_EN1_GPIO		TEGRA_GPIO_PBB4
+#define CAMERA_FLASH_EN2_GPIO		TEGRA_GPIO_PA0
+
+#define TCA6416_GPIO_BASE		(TEGRA_NR_GPIOS)
+#define FUSE_POWER_EN_GPIO		(TCA6416_GPIO_BASE + 2)
 
 #define ADXL34X_IRQ_GPIO		TEGRA_GPIO_PAA1
 #define ISL29018_IRQ_GPIO		TEGRA_GPIO_PK2
@@ -246,6 +253,30 @@ struct soc380_platform_data whistler_soc380_data = {
 	.power_off = whistler_soc380_power_off,
 };
 
+static int whistler_fuse_power_en(int enb)
+{
+	int ret;
+
+	ret = gpio_request(FUSE_POWER_EN_GPIO, "fuse_power_en");
+	if (ret) {
+		pr_err("%s: gpio_request fail (%d)\n", __func__, ret);
+		return ret;
+	}
+
+	ret = gpio_direction_output(FUSE_POWER_EN_GPIO, enb);
+	if (ret) {
+		pr_err("%s: gpio_direction_output fail (%d)\n", __func__, ret);
+		return ret;
+	}
+
+	gpio_free(FUSE_POWER_EN_GPIO);
+	return 0;
+}
+
+static struct pca953x_platform_data whistler_tca6416_data = {
+	.gpio_base = TCA6416_GPIO_BASE,
+};
+
 static struct i2c_board_info whistler_i2c3_board_info[] = {
 	{
 		I2C_BOARD_INFO("ov5650", 0x36),
@@ -311,6 +342,10 @@ static struct i2c_board_info whistler_i2c4_board_info[] = {
 		.irq = TEGRA_GPIO_TO_IRQ(ADT7461_IRQ_GPIO),
 		.platform_data = &whistler_adt7461_pdata,
 	},
+	{
+		I2C_BOARD_INFO("tca6416", 0x20),
+		.platform_data = &whistler_tca6416_data,
+	},
 };
 
 int __init whistler_sensors_init(void)
@@ -331,6 +366,8 @@ int __init whistler_sensors_init(void)
 
 	i2c_register_board_info(3, whistler_i2c3_board_info,
 		ARRAY_SIZE(whistler_i2c3_board_info));
+
+	tegra_fuse_regulator_en = whistler_fuse_power_en;
 
 	return 0;
 }
