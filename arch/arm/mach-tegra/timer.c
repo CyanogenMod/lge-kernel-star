@@ -33,6 +33,7 @@
 
 #include <asm/mach/time.h>
 #include <asm/localtimer.h>
+#include <asm/smp_twd.h>
 #include <asm/sched_clock.h>
 
 #include <mach/iomap.h>
@@ -213,6 +214,21 @@ static struct syscore_ops tegra_timer_syscore_ops = {
 	.suspend = tegra_timer_suspend,
 	.resume = tegra_timer_resume,
 };
+
+#ifdef CONFIG_HAVE_ARM_TWD
+void tegra_twd_suspend(struct tegra_twd_context *context)
+{
+	context->twd_ctrl = readl(twd_base + TWD_TIMER_CONTROL);
+	context->twd_load = readl(twd_base + TWD_TIMER_LOAD);
+	__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
+}
+
+void tegra_twd_resume(struct tegra_twd_context *context)
+{
+	writel(context->twd_load, twd_base + TWD_TIMER_LOAD);
+	writel(context->twd_ctrl, twd_base + TWD_TIMER_CONTROL);
+}
+#endif
 
 static void __init tegra_init_timer(void)
 {

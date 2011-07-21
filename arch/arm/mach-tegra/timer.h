@@ -35,4 +35,17 @@ void __init tegra2_init_timer(u32 *offset, int *irq);
 void __init tegra3_init_timer(u32 *offset, int *irq);
 #endif
 
+struct tegra_twd_context {
+	u32 twd_ctrl;
+	u32 twd_load;
+};
+
+#ifdef CONFIG_HAVE_ARM_TWD
+void tegra_twd_suspend(struct tegra_twd_context *context);
+void tegra_twd_resume(struct tegra_twd_context *context);
+#else
+static inline void tegra_twd_suspend(struct tegra_twd_context *context) {}
+static inline void tegra_twd_resume(struct tegra_twd_context *context) {}
+#endif
+
 #endif /* _MACH_TEGRA_TIMER_H_ */
