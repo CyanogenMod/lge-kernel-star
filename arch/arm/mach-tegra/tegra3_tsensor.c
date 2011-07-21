@@ -20,6 +20,8 @@
 
 #ifdef CONFIG_SENSORS_TEGRA_TSENSOR
 #include <mach/tsensor.h>
+#include <mach/tegra_fuse.h>
+
 #include "devices.h"
 #include "fuse.h"
 
@@ -31,15 +33,17 @@ static struct tegra_tsensor_platform_data tsensor_data = {
 };
 
 /* fuse revision constants used for tsensor */
-#define FUSE_TEST_PROGRAM_REVISION_0 0x128
 #define TSENSOR_FUSE_REVISION_DECIMAL 8
 #define TSENSOR_FUSE_REVISION_INTEGER 0
 
 void __init tegra_tsensor_init(void)
 {
 	unsigned int reg, fuse_rev_integer, fuse_rev_decimal;
+	int err;
 	/* tsensor driver is instantiated based on fuse revision */
-	reg = tegra_fuse_readl(FUSE_TEST_PROGRAM_REVISION_0);
+	err = tegra_fuse_get_revision(&reg);
+	if (err)
+		goto errLabel;
 	fuse_rev_decimal = (reg & 0xf);
 	fuse_rev_integer = ((reg >> 4) & 0x7);
 	pr_info("\nTegra3 fuse revision %d.%d \n", fuse_rev_integer,
@@ -50,7 +54,10 @@ void __init tegra_tsensor_init(void)
 		tegra_tsensor_device.dev.platform_data = &tsensor_data;
 		platform_device_register(&tegra_tsensor_device);
 	}
+errLabel:
+	return;
 }
+
 #else
 void __init tegra_tsensor_init(void) { }
 #endif
