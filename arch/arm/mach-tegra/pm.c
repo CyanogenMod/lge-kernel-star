@@ -273,16 +273,16 @@ static void set_power_timers(unsigned long us_on, unsigned long us_off,
  *
  * restores cpu clock setting, clears flow controller
  *
- * always called on cpu 0, even when suspend_cpu_complex was called on cpu 1
- * in idle
+ * Always called on CPU 0.
  */
 static void restore_cpu_complex(void)
 {
+	int cpu = smp_processor_id();
 	unsigned int reg;
-	int i;
 
-	/* restore original burst policy setting */
+	BUG_ON(cpu != 0);
 
+	/* restore original PLL settings */
 	writel(tegra_sctx.pllx_misc, clk_rst + CLK_RESET_PLLX_MISC);
 	writel(tegra_sctx.pllx_base, clk_rst + CLK_RESET_PLLX_BASE);
 	writel(tegra_sctx.pllp_misc, clk_rst + CLK_RESET_PLLP_MISC);
@@ -322,16 +322,14 @@ static void restore_cpu_complex(void)
 
 	writel(tegra_sctx.clk_csite_src, clk_rst + CLK_RESET_SOURCE_CSITE);
 
-	/* do not power-gate the CPU when flow controlled */
-	for (i = 0; i < num_possible_cpus(); i++) {
-		reg = readl(FLOW_CTRL_CPU_CSR(i));
-		reg &= ~FLOW_CTRL_CSR_WFE_BITMAP;	/* clear wfe bitmap */
-		reg &= ~FLOW_CTRL_CSR_WFI_BITMAP;	/* clear wfi bitmap */
-		reg &= ~FLOW_CTRL_CSR_ENABLE;		/* clear enable */
-		reg |= FLOW_CTRL_CSR_INTR_FLAG;		/* clear intr */
-		reg |= FLOW_CTRL_CSR_EVENT_FLAG;	/* clear event */
-		flowctrl_writel(reg, FLOW_CTRL_CPU_CSR(i));
-	}
+	/* Do not power-gate CPU 0 when flow controlled */
+	reg = readl(FLOW_CTRL_CPU_CSR(cpu));
+	reg &= ~FLOW_CTRL_CSR_WFE_BITMAP;	/* clear wfe bitmap */
+	reg &= ~FLOW_CTRL_CSR_WFI_BITMAP;	/* clear wfi bitmap */
+	reg &= ~FLOW_CTRL_CSR_ENABLE;		/* clear enable */
+	reg |= FLOW_CTRL_CSR_INTR_FLAG;		/* clear intr */
+	reg |= FLOW_CTRL_CSR_EVENT_FLAG;	/* clear event */
+	flowctrl_writel(reg, FLOW_CTRL_CPU_CSR(cpu));
 }
 
 /*
@@ -340,14 +338,15 @@ static void restore_cpu_complex(void)
  * saves pll state for use by restart_plls, prepares flow controller for
  * transition to suspend state
  *
- * in suspend, always called on cpu 0
- * in idle, called on the last cpu to request lp2
+ * Must always be called on cpu 0.
  */
 static void suspend_cpu_complex(void)
 {
+	int cpu = smp_processor_id();
 	unsigned int reg;
 	int i;
-	int cpu = smp_processor_id();
+
+	BUG_ON(cpu != 0);
 
 	/* switch coresite to clk_m, save off original source */
 	tegra_sctx.clk_csite_src = readl(clk_rst + CLK_RESET_SOURCE_CSITE);
@@ -382,7 +381,6 @@ static void suspend_cpu_complex(void)
 		reg |= FLOW_CTRL_CSR_EVENT_FLAG;
 		reg |= FLOW_CTRL_CSR_INTR_FLAG;
 		flowctrl_writel(reg, FLOW_CTRL_CPU_CSR(i));
-		flowctrl_writel(0, FLOW_CTRL_HALT_CPU(i));
 	}
 }
 
