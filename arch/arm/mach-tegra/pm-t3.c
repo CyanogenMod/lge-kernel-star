@@ -31,6 +31,7 @@
 #include <asm/hardware/gic.h>
 
 #include "clock.h"
+#include "cpuidle.h"
 #include "gpio-names.h"
 #include "pm.h"
 #include "sleep.h"
@@ -313,9 +314,11 @@ int tegra_cluster_control(unsigned int us, unsigned int flags)
 		if (us)
 			tegra_lp2_set_trigger(0);
 	} else {
+		tegra_set_cpu_in_lp2(0);
 		cpu_pm_enter();
 		tegra_idle_lp2_last(0, flags);
 		cpu_pm_exit();
+		tegra_clear_cpu_in_lp2(0);
 	}
 	local_irq_enable();
 

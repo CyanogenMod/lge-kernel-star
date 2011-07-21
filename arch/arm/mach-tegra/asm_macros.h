@@ -19,6 +19,16 @@
 
 #ifdef __ASSEMBLY__
 
+/* waits until the microsecond counter (base) is > rn */
+.macro	wait_until, rn, base, tmp
+	add	\rn, \rn, #1
+1002:	ldr	\tmp, [\base]
+	sub	\tmp, \tmp, \rn
+	ands	\tmp, \tmp, #0x80000000
+	dmb
+	bne	1002b
+.endm
+
 /* returns the offset of the flow controller halt register for a cpu */
 .macro cpu_to_halt_reg rd, rcpu
 	cmp	\rcpu, #0

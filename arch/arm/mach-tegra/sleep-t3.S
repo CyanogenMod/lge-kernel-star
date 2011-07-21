@@ -69,7 +69,9 @@ ENTRY(tegra3_hotplug_shutdown)
 	bl	tegra3_cpu_reset
 	mov	pc, lr				@ should never get here
 ENDPROC(tegra3_hotplug_shutdown)
+#endif
 
+#if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_PM_SLEEP)
 /*
  * tegra3_cpu_reset(unsigned long flags)
  *
@@ -126,4 +128,95 @@ wfe_war:
 	b 	.					@ should never get here
 
 ENDPROC(tegra3_cpu_reset)
+#endif
+
+#ifdef CONFIG_PM_SLEEP
+/*
+ * tegra3_sleep_cpu(unsigned long v2p)
+ *
+ * enters suspend in LP2 by turning off the mmu and jumping to
+ * tegra3_tear_down_cpu
+ */
+ENTRY(tegra3_sleep_cpu)
+	mov	r3, lr			@ set resume address to lr
+	bl	tegra_cpu_save
+
+	mov32	r1, tegra3_tear_down_cpu
+	add	r1, r1, r0
+	b	tegra_turn_off_mmu
+ENDPROC(tegra3_sleep_cpu)
+
+/*
+ * tegra3_tear_down_cpu
+ *
+ * Switches the CPU cluster to PLL-P and enters sleep.
+ */
+ENTRY(tegra3_tear_down_cpu)
+	bl	tegra_cpu_pllp
+	b	tegra3_enter_sleep
+ENDPROC(tegra3_tear_down_cpu)
+
+/* START OF ROUTINES COPIED TO IRAM */
+	.align L1_CACHE_SHIFT
+	.globl tegra3_iram_start
+tegra3_iram_start:
+
+/*
+ * tegra3_lp1_reset
+ *
+ * reset vector for LP1 restore; copied into IRAM during suspend.
+ * brings the system back up to a safe starting point (SDRAM out of
+ * self-refresh, PLLC, PLLM and PLLP reenabled, CPU running on PLLP,
+ * system clock running on the same PLL that it suspended at), and
+ * jumps to tegra_lp2_startup to restore PLLX and virtual addressing.
+ * physical address of tegra_lp2_startup expected to be stored in
+ * PMC_SCRATCH41
+ *
+ * NOTE: THIS *MUST* BE RELOCATED TO TEGRA_IRAM_CODE_AREA AND MUST BE FIRST.
+ */
+
+/* !!!FIXME!!! Add LP1/LP1 code */
+
+/*
+ * tegra3_enter_sleep
+ *
+ * uses flow controller to enter sleep state
+ * executes from IRAM with SDRAM in selfrefresh when target state is LP0 or LP1
+ * executes from SDRAM with target state is LP2
+ */
+tegra3_enter_sleep:
+	mov32	r7, TEGRA_TMRUS_BASE
+	ldr	r1, [r7]
+	mov32	r4, TEGRA_PMC_BASE
+	str	r1, [r4, #PMC_SCRATCH38]
+	dsb
+	mov32	r6, TEGRA_FLOW_CTRL_BASE
+	cpu_id	r1
+
+	cpu_to_csr_reg	r2, r1
+	ldr	r0, [r6, r2]
+	orr	r0, r0, #FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
+	str	r0, [r6, r2]
+
+	mov	r0, #FLOW_CTRL_WAIT_FOR_INTERRUPT
+	orr	r0, r0, #FLOW_CTRL_HALT_CPU_IRQ | FLOW_CTRL_HALT_CPU_FIQ
+	cpu_to_halt_reg r2, r1
+	str	r0, [r6, r2]
+	dsb
+	ldr	r0, [r6, r2] /* memory barrier */
+
+halted:
+	dsb
+	isb
+	wfi	/* CPU should be power gated here */
+
+	/* !!!FIXME!!! Implement halt failure handler */
+	b	halted
+
+	.ltorg
+/* dummy symbol for end of IRAM */
+	.align L1_CACHE_SHIFT
+	.globl tegra3_iram_end
+tegra3_iram_end:
+	b	.
 #endif

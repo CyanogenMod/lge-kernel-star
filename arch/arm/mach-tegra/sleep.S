@@ -187,6 +187,8 @@ ENTRY(tegra_sleep_cpu)
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	mov32	r1, tegra2_tear_down_cpu
+#else
+	mov32	r1, tegra3_tear_down_cpu
 #endif
 	add	r1, r1, r0
 	b	tegra_turn_off_mmu
