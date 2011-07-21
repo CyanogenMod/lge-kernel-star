@@ -33,6 +33,7 @@
 #include <linux/input.h>
 #include <linux/platform_data/tegra_usb.h>
 #include <linux/usb/android_composite.h>
+#include <linux/usb/f_accessory.h>
 #include <linux/spi/spi.h>
 #include <linux/tegra_uart.h>
 #include <linux/fsl_devices.h>
@@ -208,35 +209,57 @@ static __initdata struct tegra_clk_init_table enterprise_clk_init_table[] = {
 	{ NULL,		NULL,		0,		0},
 };
 
+static char *usb_functions_mtp_ums[] = { "mtp", "usb_mass_storage" };
+static char *usb_functions_adb[] = { "mtp", "adb", "usb_mass_storage" };
+
 #ifdef CONFIG_USB_ANDROID_RNDIS
 static char *usb_functions_rndis[] = { "rndis" };
 static char *usb_functions_rndis_adb[] = { "rndis", "adb" };
 #endif
 
-static char *usb_functions[] = {
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
+static char *usb_functions_accessory[] = { "accessory" };
+static char *usb_functions_accessory_adb[] = { "accessory", "adb" };
+#endif
+
+static char *usb_functions_all[] = {
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
+	"accessory",
+#endif
 #ifdef CONFIG_USB_ANDROID_RNDIS
 	"rndis",
 #endif
 	"mtp",
-	"usb_mass_storage" };
+	"adb",
+	"usb_mass_storage"
+};
 
-static char *usb_functions_adb[] = {
-#ifdef CONFIG_USB_ANDROID_RNDIS
-	"rndis",
-#endif
-	"mtp", "adb", "usb_mass_storage" };
 
 static struct android_usb_product usb_products[] = {
 	{
 		.product_id     = 0x7102,
-		.num_functions  = ARRAY_SIZE(usb_functions),
-		.functions      = usb_functions,
+		.num_functions  = ARRAY_SIZE(usb_functions_mtp_ums),
+		.functions      = usb_functions_mtp_ums,
 	},
 	{
 		.product_id     = 0x7100,
 		.num_functions  = ARRAY_SIZE(usb_functions_adb),
 		.functions      = usb_functions_adb,
 	},
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
+	{
+		.vendor_id	= USB_ACCESSORY_VENDOR_ID,
+		.product_id	= USB_ACCESSORY_PRODUCT_ID,
+		.num_functions	= ARRAY_SIZE(usb_functions_accessory),
+		.functions	= usb_functions_accessory,
+	},
+	{
+		.vendor_id	= USB_ACCESSORY_VENDOR_ID,
+		.product_id	= USB_ACCESSORY_ADB_PRODUCT_ID,
+		.num_functions	= ARRAY_SIZE(usb_functions_accessory_adb),
+		.functions	= usb_functions_accessory_adb,
+	},
+#endif
 #ifdef CONFIG_USB_ANDROID_RNDIS
 	{
 		.product_id     = USB_PRODUCT_ID_RNDIS,
@@ -260,8 +283,8 @@ static struct android_usb_platform_data andusb_plat = {
 	.serial_number          = NULL,
 	.num_products = ARRAY_SIZE(usb_products),
 	.products = usb_products,
-	.num_functions = ARRAY_SIZE(usb_functions_adb),
-	.functions = usb_functions_adb,
+	.num_functions = ARRAY_SIZE(usb_functions_all),
+	.functions = usb_functions_all,
 };
 
 static struct platform_device androidusb_device = {
