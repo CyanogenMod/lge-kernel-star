@@ -71,6 +71,7 @@
 #define TEGRA_ARM_PERIF_VIRT	(TEGRA_ARM_PERIF_BASE - IO_CPU_PHYS + IO_CPU_VIRT)
 #define TEGRA_CLK_RESET_VIRT	(TEGRA_CLK_RESET_BASE - IO_PPSB_PHYS + IO_PPSB_VIRT)
 
+#ifdef CONFIG_HOTPLUG_CPU
 /*
  * tegra2_sleep_reset(void)
  *
@@ -97,8 +98,9 @@ ENTRY(tegra2_sleep_reset)
 	bl	tegra2_cpu_reset
 	mov	pc, lr
 ENDPROC(tegra2_sleep_reset)
+#endif
 
-#if defined(CONFIG_PM_SLEEP)
+#if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_PM_SLEEP)
 /*
  * tegra2_cpu_reset(int cpu)
  *
@@ -139,7 +141,9 @@ ENTRY(tegra2_cpu_reset)
 	beq	.
 	mov	pc, lr
 ENDPROC(tegra2_cpu_reset)
+#endif
 
+#ifdef CONFIG_PM_SLEEP
 /*
  * tegra2_cpu_set_resettable_soon(void)
  *
