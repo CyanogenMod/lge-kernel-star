@@ -526,7 +526,7 @@ static struct tegra_dc_out enterprise_disp1_out = {
 static struct tegra_dc_platform_data enterprise_disp1_pdata = {
 	.flags		= TEGRA_DC_FLAG_ENABLED,
 	.default_out	= &enterprise_disp1_out,
-	.emc_clk_rate	= 300000000,
+	.emc_clk_rate	= 204000000,
 	.fb		= &enterprise_dsi_fb_data,
 };
 static struct nvhost_device enterprise_disp1_device = {
