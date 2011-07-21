@@ -126,9 +126,24 @@ void tegra2_lp0_suspend_init(void);
 #define INSTRUMENT_CLUSTER_SWITCH 1	/* Should be zero for shipping code */
 #define DEBUG_CLUSTER_SWITCH 1		/* Should be zero for shipping code */
 #define PARAMETERIZE_CLUSTER_SWITCH 1	/* Should be zero for shipping code */
+
+#ifdef CONFIG_PM_SLEEP
 int tegra_cluster_control(unsigned int us, unsigned int flags);
 void tegra_cluster_switch_prolog(unsigned int flags);
 void tegra_cluster_switch_epilog(unsigned int flags);
+void tegra_lp0_suspend_mc(void);
+void tegra_lp0_resume_mc(void);
+#else
+static inline int tegra_cluster_control(unsigned int us, unsigned int flags)
+{
+	return -EPERM;
+}
+static inline void tegra_cluster_switch_prolog(unsigned int flags) {}
+static inline void tegra_cluster_switch_epilog(unsigned int flags) {}
+static inline void tegra_lp0_suspend_mc(void) {}
+static inline void tegra_lp0_resume_mc(void) {}
+#endif
+
 static inline bool is_g_cluster_present(void)
 {
 	u32 fuse_sku = readl(FUSE_SKU_DIRECT_CONFIG);
@@ -142,8 +157,6 @@ static inline unsigned int is_lp_cluster(void)
 	reg = readl(FLOW_CTRL_CLUSTER_CONTROL);
 	return (reg & 1); /* 0 == G, 1 == LP*/
 }
-void tegra_lp0_suspend_mc(void);
-void tegra_lp0_resume_mc(void);
 #endif
 
 static inline void tegra_lp0_suspend_init(void)
