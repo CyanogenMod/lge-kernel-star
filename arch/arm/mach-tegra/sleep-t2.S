@@ -426,8 +426,8 @@ tegra2_enter_sleep:
 	dsb
 	mov32	r6, TEGRA_FLOW_CTRL_BASE
 
-	mov	r0, #FLOW_CTRL_STOP_UNTIL_IRQ
-	orr	r0, r0, #FLOW_CTRL_IRQ_RESUME | FLOW_CTRL_FIQ_RESUME
+	mov	r0, #FLOW_CTRL_WAIT_FOR_INTERRUPT
+	orr	r0, r0, #FLOW_CTRL_HALT_CPU_IRQ | FLOW_CTRL_HALT_CPU_FIQ
 	cpu_id	r1
 	cpu_to_halt_reg r1, r1
 	str	r0, [r6, r1]

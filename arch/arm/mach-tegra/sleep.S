@@ -119,7 +119,7 @@ ENTRY(tegra_cpu_wfi)
 	mov32	r0, TEGRA_FLOW_CTRL_VIRT
 	mov	r3, #FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
 	str	r3, [r0, r2]		@ clear event & interrupt status
-	mov	r3, #FLOW_CTRL_STOP_UNTIL_IRQ | FLOW_CTRL_JTAG_RESUME
+	mov	r3, #FLOW_CTRL_WAIT_FOR_INTERRUPT | FLOW_CTRL_JTAG_RESUME
 	str	r3, [r0, r1]		@ put flow controller in wait irq mode
 	dsb
 	wfi
