@@ -25,6 +25,15 @@
 
 #include <mach/iomap.h>
 
+#define TEGRA_POWER_SDRAM_SELFREFRESH	(1 << 26) /* SDRAM is in self-refresh */
+#define TEGRA_POWER_HOTPLUG_SHUTDOWN	(1 << 27) /* Hotplug shutdown */
+#define TEGRA_POWER_CLUSTER_G		(1 << 28) /* G CPU */
+#define TEGRA_POWER_CLUSTER_LP		(1 << 29) /* LP CPU */
+#define TEGRA_POWER_CLUSTER_MASK	(TEGRA_POWER_CLUSTER_G | \
+						TEGRA_POWER_CLUSTER_LP)
+#define TEGRA_POWER_CLUSTER_IMMEDIATE	(1 << 30) /* Immediate wake */
+#define TEGRA_POWER_CLUSTER_FORCE	(1 << 31) /* Force switch */
+
 #define TEGRA_IRAM_CODE_AREA		(TEGRA_IRAM_BASE + SZ_4K)
 
 /* PMC_SCRATCH37-39 and 41 are used for tegra_pen_lock in Tegra2 idle */
@@ -35,9 +44,11 @@
 /* PMC_SCRATCH41 stores the reset vector of the CPU after LP0 and LP1 */
 #define PMC_SCRATCH41                   0x140
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 #define CPU_RESETTABLE			2
 #define CPU_RESETTABLE_SOON		1
 #define CPU_NOT_RESETTABLE		0
+#endif
 
 #define FLOW_CTRL_HALT_CPU0_EVENTS	0x0
 #define   FLOW_CTRL_WAITEVENT		(2 << 29)

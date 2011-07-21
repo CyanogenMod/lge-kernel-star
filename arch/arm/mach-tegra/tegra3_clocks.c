@@ -38,6 +38,7 @@
 #include "fuse.h"
 #include "dvfs.h"
 #include "pm.h"
+#include "sleep.h"
 
 #define RST_DEVICES_L			0x004
 #define RST_DEVICES_H			0x008

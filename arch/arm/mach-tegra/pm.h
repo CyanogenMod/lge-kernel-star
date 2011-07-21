@@ -53,14 +53,6 @@ bool tegra_set_cpu_in_lp2(int cpu);
 
 int tegra_suspend_dram(enum tegra_suspend_mode mode);
 
-#define TEGRA_POWER_SDRAM_SELFREFRESH	0x400	/* SDRAM is in self-refresh */
-
-#define TEGRA_POWER_CLUSTER_G		0x1000	/* G CPU */
-#define TEGRA_POWER_CLUSTER_LP		0x2000	/* LP CPU */
-#define TEGRA_POWER_CLUSTER_MASK	0x3000
-#define TEGRA_POWER_CLUSTER_IMMEDIATE	0x4000	/* Immediate wake */
-#define TEGRA_POWER_CLUSTER_FORCE	0x8000	/* Force switch */
-
 #define FLOW_CTRL_CLUSTER_CONTROL \
 	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + 0x2c)
 #define FLOW_CTRL_CPU_CSR_IMMEDIATE_WAKE	(1<<3)
