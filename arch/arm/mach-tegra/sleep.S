@@ -105,6 +105,34 @@ ENTRY(tegra_pen_unlock)
 ENDPROC(tegra_pen_unlock)
 
 /*
+ * tegra_cpu_wfi
+ *
+ * puts current CPU in clock-gated wfi using the flow controller
+ *
+ * corrupts r0-r3
+ * must be called with MMU on
+ */
+ENTRY(tegra_cpu_wfi)
+	cpu_id	r0
+	cpu_to_halt_reg r1, r0
+	cpu_to_csr_reg r2, r0
+	mov32	r0, TEGRA_FLOW_CTRL_VIRT
+	mov	r3, #FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
+	str	r3, [r0, r2]		@ clear event & interrupt status
+	mov	r3, #FLOW_CTRL_STOP_UNTIL_IRQ | FLOW_CTRL_JTAG_RESUME
+	str	r3, [r0, r1]		@ put flow controller in wait irq mode
+	dsb
+	wfi
+	mov	r3, #0
+	str	r3, [r0, r1]		@ clear flow controller halt status
+	mov	r3, #FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
+	str	r3, [r0, r2]		@ clear event & interrupt status
+	dsb
+	mov	pc, lr
+ENDPROC(tegra_cpu_wfi)
+
+#ifdef CONFIG_PM_SLEEP
+/*
  * tegra_cpu_save
  *
  * r0 = v2p
@@ -146,35 +174,6 @@ ENTRY(tegra_cpu_save)
 
 	mov	pc, lr
 ENDPROC(tegra_cpu_save)
-
-/*
- * tegra_cpu_wfi
- *
- * puts current CPU in clock-gated wfi using the flow controller
- *
- * corrupts r0-r3
- * must be called with MMU on
- */
-ENTRY(tegra_cpu_wfi)
-	cpu_id	r0
-	cpu_to_halt_reg r1, r0
-	cpu_to_csr_reg r2, r0
-	mov32	r0, TEGRA_FLOW_CTRL_VIRT
-	mov	r3, #FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
-	str	r3, [r0, r2]		@ clear event & interrupt status
-	mov	r3, #FLOW_CTRL_STOP_UNTIL_IRQ | FLOW_CTRL_JTAG_RESUME
-	str	r3, [r0, r1]		@ put flow controller in wait irq mode
-	dsb
-	wfi
-	mov	r3, #0
-	str	r3, [r0, r1]		@ clear flow controller halt status
-	mov	r3, #FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
-	str	r3, [r0, r2]		@ clear event & interrupt status
-	dsb
-	mov	pc, lr
-ENDPROC(tegra_cpu_wfi)
-
-.word
 
 /*
  * tegra_sleep_cpu(unsigned long v2p)
@@ -285,4 +284,4 @@ ENTRY(tegra_cpu_pllp)
 	str	r0, [r5, #CLK_RESET_CCLK_DIVIDER]
 	mov	pc, lr
 ENDPROC(tegra_cpu_pllp)
-
+#endif

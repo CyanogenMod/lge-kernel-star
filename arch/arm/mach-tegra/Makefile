@@ -15,10 +15,8 @@ obj-y                                   += delay.o
 obj-y                                   += powergate.o
 obj-y                                   += pm.o
 obj-$(CONFIG_PM_SLEEP)                  += pm-irq.o
-ifeq ($(CONFIG_PM_SLEEP),y)
 obj-y                                   += sleep.o
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += sleep-t2.o
-endif
 obj-y                                   += fuse.o
 obj-y                                   += kfuse.o
 obj-$(CONFIG_TEGRA_LEGACY_AUDIO)        += tegra_i2s_audio.o

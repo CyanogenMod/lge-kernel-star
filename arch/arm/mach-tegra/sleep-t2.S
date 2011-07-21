@@ -98,6 +98,7 @@ ENTRY(tegra2_sleep_reset)
 	mov	pc, lr
 ENDPROC(tegra2_sleep_reset)
 
+#if defined(CONFIG_PM_SLEEP)
 /*
  * tegra2_cpu_reset(int cpu)
  *
@@ -533,3 +534,4 @@ tegra2_sdram_pad_save:
 	.globl tegra2_iram_end
 tegra2_iram_end:
 	b	.
+#endif
