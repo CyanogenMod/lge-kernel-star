@@ -848,7 +848,7 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 	pmc_32kwritel(reg, PMC_CTRL);
 
 	if (pdata->suspend_mode == TEGRA_SUSPEND_LP0)
-		tegra2_lp0_suspend_init();
+		tegra_lp0_suspend_init();
 
 	suspend_set_ops(&tegra_suspend_ops);
 

@@ -74,13 +74,6 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode);
 #define FUSE_SKU_DISABLE_ALL_CPUS	(1<<5)
 #define FUSE_SKU_NUM_DISABLED_CPUS(x)	(((x) >> 3) & 3)
 
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-void tegra2_lp0_suspend_init(void);
-#else
-static inline void tegra2_lp0_suspend_init(void)
-{
-}
-#endif
 void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat);
 
 unsigned int tegra_count_slow_cpus(unsigned long speed_limit);
@@ -124,7 +117,10 @@ static inline unsigned int is_lp_cluster(void)
 { return 0; }
 #define tegra_lp0_suspend_mc() do {} while(0)
 #define tegra_lp0_resume_mc() do {} while(0)
+void tegra2_lp0_suspend_init(void);
+
 #else
+
 #define INSTRUMENT_CLUSTER_SWITCH 1	/* Should be zero for shipping code */
 #define DEBUG_CLUSTER_SWITCH 1		/* Should be zero for shipping code */
 #define PARAMETERIZE_CLUSTER_SWITCH 1	/* Should be zero for shipping code */
@@ -147,6 +143,13 @@ static inline unsigned int is_lp_cluster(void)
 void tegra_lp0_suspend_mc(void);
 void tegra_lp0_resume_mc(void);
 #endif
+
+static inline void tegra_lp0_suspend_init(void)
+{
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	tegra2_lp0_suspend_init();
+#endif
+}
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 void tegra2_lp2_set_trigger(unsigned long cycles);
