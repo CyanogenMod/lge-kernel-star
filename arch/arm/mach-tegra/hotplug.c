@@ -16,6 +16,7 @@
 
 #include <mach/iomap.h>
 
+#include "gic.h"
 #include "sleep.h"
 
 #define CPU_CLOCK(cpu) (0x1<<(8+cpu))
@@ -58,6 +59,18 @@ void platform_cpu_die(unsigned int cpu)
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	/* Place the current CPU in reset. */
 	tegra2_hotplug_shutdown();
+#else
+	/* Disable GIC CPU interface for this CPU. */
+	tegra_gic_cpu_disable();
+
+	/* Tegra3 enters LPx states via WFI - do not propagate legacy IRQs
+	   to CPU core to avoid fall through WFI; then GIC output will be
+	   enabled, however at this time - CPU is dying - no interrupt should
+	   have affinity to this CPU. */
+	tegra_gic_pass_through_disable();
+
+	/* Shut down the current CPU. */
+	tegra3_hotplug_shutdown();
 #endif
 
 	/*

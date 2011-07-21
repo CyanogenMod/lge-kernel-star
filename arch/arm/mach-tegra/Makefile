@@ -19,6 +19,7 @@ obj-$(CONFIG_PM_SLEEP)                  += pm-irq.o
 obj-y                                   += gic.o
 obj-y                                   += sleep.o
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += sleep-t2.o
+obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += sleep-t3.o
 obj-y                                   += fuse.o
 obj-y                                   += kfuse.o
 obj-$(CONFIG_TEGRA_LEGACY_AUDIO)        += tegra_i2s_audio.o

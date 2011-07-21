@@ -107,6 +107,8 @@ void tegra2_cpu_set_resettable_soon(void);
 void tegra2_sleep_core(unsigned long v2p);
 void tegra2_hotplug_shutdown(void);
 void tegra2_sleep_wfi(unsigned long v2p);
+#else
+void tegra3_hotplug_shutdown(void);
 #endif
 
 static inline void *tegra_iram_start(void)
