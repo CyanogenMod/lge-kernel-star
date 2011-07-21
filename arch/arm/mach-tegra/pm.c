@@ -586,6 +586,8 @@ static void tegra_pm_set(enum tegra_suspend_mode mode)
 	case TEGRA_SUSPEND_LP2:
 		rate = clk_get_rate(tegra_pclk);
 		break;
+	case TEGRA_SUSPEND_NONE:
+		return;
 	default:
 		BUG();
 	}
@@ -796,7 +798,7 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 	iram_save_size = tegra_iram_end() - tegra_iram_start();
 
 	iram_save = kmalloc(iram_save_size, GFP_KERNEL);
-	if (!iram_save) {
+	if (!iram_save && (plat->suspend_mode >= TEGRA_SUSPEND_LP1)) {
 		pr_err("%s: unable to allocate memory for SDRAM self-refresh "
 		       "-- LP0/LP1 unavailable\n", __func__);
 		plat->suspend_mode = TEGRA_SUSPEND_LP2;
