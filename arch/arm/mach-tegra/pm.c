@@ -553,7 +553,6 @@ static void tegra_pm_set(enum tegra_suspend_mode mode)
 	reg &= ~TEGRA_POWER_EFFECT_LP0;
 
 	switch (mode) {
-#ifdef CONFIG_SMP
 	case TEGRA_SUSPEND_LP0:
 		/*
 		 * lp0 boots through the AVP, which then resumes the AVP to
@@ -586,7 +585,6 @@ static void tegra_pm_set(enum tegra_suspend_mode mode)
 		writel(virt_to_phys(tegra_resume), evp_reset);
 		rate = clk_get_rate(tegra_pclk);
 		break;
-#endif
 	default:
 		BUG();
 	}
