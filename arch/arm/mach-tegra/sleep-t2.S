@@ -65,6 +65,8 @@
 #define CLK_RESET_PLLX_BASE		0xe0
 #define CLK_RESET_PLLX_MISC		0xe4
 
+#define CLK_RESET_RST_CPU_CMPLX_SET 	0x340
+
 #define TEGRA_PMC_VIRT		(TEGRA_PMC_BASE - IO_APB_PHYS + IO_APB_VIRT)
 #define TEGRA_ARM_PERIF_VIRT	(TEGRA_ARM_PERIF_BASE - IO_CPU_PHYS + IO_CPU_VIRT)
 #define TEGRA_CLK_RESET_VIRT	(TEGRA_CLK_RESET_BASE - IO_PPSB_PHYS + IO_PPSB_VIRT)
@@ -128,7 +130,7 @@ ENTRY(tegra2_cpu_reset)
 	movw	r1, 0x1011
 	mov	r1, r1, lsl r0
 	mov32	r3, TEGRA_CLK_RESET_VIRT
-	str	r1, [r3, #0x340]	@ put slave CPU in reset
+	str	r1, [r3, #CLK_RESET_RST_CPU_CMPLX_SET]	@ put slave CPU in reset
 	isb
 	dsb
 	cpu_id	r3
