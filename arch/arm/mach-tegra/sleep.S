@@ -260,6 +260,7 @@ tegra_pgd_phys_address:
  * called with VA=PA mapping
  * turns off MMU, icache, dcache and branch prediction
  */
+	.align	L1_CACHE_SHIFT
 tegra_shut_off_mmu:
 	mrc	p15, 0, r3, c1, c0, 0
 	movw	r2, #(1 << 12) | (1 << 11) | (1 << 2) | (1 << 0)
