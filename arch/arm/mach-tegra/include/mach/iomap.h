@@ -36,6 +36,10 @@
 #define TEGRA_IRAM_BASE			0x40000000
 #define TEGRA_IRAM_SIZE			SZ_256K
 
+/* First 1K of IRAM is reserved for cpu reset handler. */
+#define TEGRA_RESET_HANDLER_BASE	TEGRA_IRAM_BASE
+#define TEGRA_RESET_HANDLER_SIZE	SZ_1K
+
 #define TEGRA_HOST1X_BASE		0x50000000
 #define TEGRA_HOST1X_SIZE		0x24000
 
