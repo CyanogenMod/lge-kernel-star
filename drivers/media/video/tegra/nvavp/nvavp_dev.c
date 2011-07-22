@@ -607,10 +607,12 @@ static int nvavp_pushbuffer_submit_ioctl(struct file *filp, unsigned int cmd,
 			goto err_reloc_info;
 		}
 
-	reloc_addr = cmdbuf_data + (clientctx->relocs[i].cmdbuf_offset >> 2);
+		reloc_addr = cmdbuf_data +
+			     (clientctx->relocs[i].cmdbuf_offset >> 2);
+
 		target_phys_addr = nvmap_handle_address(clientctx->nvmap,
 					    clientctx->relocs[i].target);
-		target_phys_addr += (clientctx->relocs[i].target_offset >> 2);
+		target_phys_addr += clientctx->relocs[i].target_offset;
 		writel(target_phys_addr, reloc_addr);
 	}
 
