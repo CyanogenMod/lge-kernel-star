@@ -54,6 +54,7 @@
 
 #include "board.h"
 #include "clock.h"
+#include "cpuidle.h"
 #include "pm.h"
 #include "pm-irq.h"
 #include "sleep.h"
