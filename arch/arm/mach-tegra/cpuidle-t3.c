@@ -56,6 +56,7 @@
 #include "pm.h"
 #include "reset.h"
 #include "sleep.h"
+#include "timer.h"
 
 #define CLK_RST_CONTROLLER_CPU_CMPLX_STATUS \
 	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x470)
@@ -263,6 +264,7 @@ static void tegra3_idle_enter_lp2_cpu_n(struct cpuidle_device *dev,
 {
 #ifdef CONFIG_SMP
 	s64 sleep_time = request - tegra_lp2_exit_latency;
+	struct tegra_twd_context twd_context;
 
 	tegra_lp2_set_trigger(sleep_time);
 
@@ -274,6 +276,8 @@ static void tegra3_idle_enter_lp2_cpu_n(struct cpuidle_device *dev,
 	tegra_cpu_wake_by_time[dev->cpu] = ktime_to_us(ktime_get()) + request;
 	smp_wmb();
 
+	tegra_twd_suspend(&twd_context);
+
 	flush_cache_all();
 	barrier();
 /* !!!FIXME!!! __cortex_a9_save(0); */
@@ -283,6 +287,8 @@ static void tegra3_idle_enter_lp2_cpu_n(struct cpuidle_device *dev,
 	barrier();
 
 	tegra_cpu_wake_by_time[dev->cpu] = LLONG_MAX;
+
+	tegra_twd_resume(&twd_context);
 
 	if (sleep_time)
 		tegra_lp2_set_trigger(0);
