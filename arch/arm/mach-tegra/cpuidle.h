@@ -27,6 +27,8 @@
 void tegra2_idle_lp2(struct cpuidle_device *dev, struct cpuidle_state *state);
 void tegra2_cpu_idle_stats_lp2_ready(unsigned int cpu);
 void tegra2_cpu_idle_stats_lp2_time(unsigned int cpu, s64 us);
+bool tegra2_lp2_is_allowed(struct cpuidle_device *dev,
+			struct cpuidle_state *state);
 #ifdef CONFIG_DEBUG_FS
 int tegra2_lp2_debug_show(struct seq_file *s, void *data);
 #endif
@@ -51,6 +53,14 @@ static inline void tegra_idle_lp2(struct cpuidle_device *dev,
 {
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	tegra2_idle_lp2(dev, state);
+#endif
+}
+
+static inline bool tegra_lp2_is_allowed(struct cpuidle_device *dev,
+			struct cpuidle_state *state)
+{
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	return tegra2_lp2_is_allowed(dev, state);
 #endif
 }
 

@@ -135,6 +135,19 @@ static int tegra2_reset_other_cpus(int cpu)
 }
 #endif
 
+bool tegra2_lp2_is_allowed(struct cpuidle_device *dev,
+			struct cpuidle_state *state)
+{
+	s64 request = ktime_to_us(tick_nohz_get_sleep_length());
+
+	if (request < state->target_residency) {
+		/* Not enough time left to enter LP2 */
+		return false;
+	}
+
+	return true;
+}
+
 static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
 			struct cpuidle_state *state, s64 request)
 {
@@ -145,6 +158,12 @@ static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
 
 	if (tegra2_reset_other_cpus(dev->cpu))
 		return -EBUSY;
+
+	if (request < state->target_residency) {
+		/* Not enough time left to enter LP2 */
+		tegra_cpu_wfi();
+		return -EBUSY;
+	}
 
 	tegra_idle_lp2_last(request, 0);
 

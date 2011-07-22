@@ -99,7 +99,8 @@ static int tegra_idle_enter_lp2(struct cpuidle_device *dev,
 	ktime_t enter, exit;
 	s64 us;
 
-	if (!lp2_in_idle || lp2_disabled_by_suspend)
+	if (!lp2_in_idle || lp2_disabled_by_suspend ||
+	    !tegra_lp2_is_allowed(dev, state))
 		return tegra_idle_enter_lp3(dev, state);
 
 	local_irq_disable();
