@@ -46,7 +46,6 @@
 #define enterprise_hdmi_hpd		TEGRA_GPIO_PN7
 
 #define enterprise_dsi_panel_reset	TEGRA_GPIO_PW0
-#define enterprise_dsi_panel_bl		TEGRA_GPIO_PW1
 
 #define enterprise_lcd_2d_3d		TEGRA_GPIO_PH1
 #define ENTERPRISE_STEREO_3D		0
@@ -81,6 +80,7 @@ static struct platform_device enterprise_disp1_backlight_device = {
 		.platform_data = &enterprise_disp1_backlight_data,
 	},
 };
+
 static int enterprise_hdmi_vddio_enable(void)
 {
 	int ret;
@@ -375,25 +375,11 @@ static int enterprise_dsi_panel_enable(void)
 	mdelay(20);
 #endif
 
-	ret = gpio_request(enterprise_dsi_panel_bl, "DSIa backlight");
-	if (ret < 0)
-		return ret;
-
-	ret = gpio_direction_output(enterprise_dsi_panel_bl, 1);
-	if (ret < 0) {
-		gpio_free(enterprise_dsi_panel_bl);
-		return ret;
-	}
-	tegra_gpio_enable(enterprise_dsi_panel_bl);
-
 	return ret;
 }
 
 static int enterprise_dsi_panel_disable(void)
 {
-	tegra_gpio_disable(enterprise_dsi_panel_bl);
-	gpio_free(enterprise_dsi_panel_bl);
-
 #if DSI_PANEL_RESET
 	tegra_gpio_disable(enterprise_dsi_panel_reset);
 	gpio_free(enterprise_dsi_panel_reset);
