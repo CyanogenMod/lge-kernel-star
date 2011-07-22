@@ -785,13 +785,7 @@ static struct nvhost_device cardhu_disp2_device = {
 };
 
 static struct nvmap_platform_carveout cardhu_carveouts[] = {
-	[0] = {
-		.name		= "iram",
-		.usage_mask	= NVMAP_HEAP_CARVEOUT_IRAM,
-		.base		= TEGRA_IRAM_BASE,
-		.size		= TEGRA_IRAM_SIZE,
-		.buddy_size	= 0, /* no buddy allocation for IRAM */
-	},
+	[0] = NVMAP_HEAP_CARVEOUT_IRAM_INIT,
 	[1] = {
 		.name		= "generic-0",
 		.usage_mask	= NVMAP_HEAP_CARVEOUT_GENERIC,
