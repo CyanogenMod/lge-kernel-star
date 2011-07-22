@@ -81,7 +81,8 @@ module_param_named(debug_mask, avp_debug_mask, uint, S_IWUSR | S_IRUGO);
 #define TEGRA_AVP_RESET_VECTOR_ADDR \
 		(IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x200)
 
-#define TEGRA_AVP_RESUME_ADDR		IO_ADDRESS(TEGRA_IRAM_BASE)
+#define TEGRA_AVP_RESUME_ADDR		IO_ADDRESS(TEGRA_IRAM_BASE + \
+						TEGRA_RESET_HANDLER_SIZE)
 
 #define FLOW_CTRL_HALT_COP_EVENTS	IO_ADDRESS(TEGRA_FLOW_CTRL_BASE + 0x4)
 #define FLOW_MODE_STOP			(0x2 << 29)
@@ -1444,9 +1445,9 @@ static int avp_enter_lp0(struct tegra_avp_info *avp)
 	int ret;
 
 	svc.svc_id = SVC_ENTER_LP0;
-	svc.src_addr = (u32)TEGRA_IRAM_BASE;
+	svc.src_addr = (u32)TEGRA_IRAM_BASE + TEGRA_RESET_HANDLER_SIZE;
 	svc.buf_addr = (u32)avp->iram_backup_phys;
-	svc.buf_size = TEGRA_IRAM_SIZE;
+	svc.buf_size = TEGRA_IRAM_SIZE - TEGRA_RESET_HANDLER_SIZE;
 
 	*avp_suspend_done = 0;
 	wmb();
