@@ -49,6 +49,7 @@ static bool lp2_in_idle __read_mostly = true;
 module_param(lp2_in_idle, bool, 0644);
 static bool lp2_disabled_by_suspend;
 
+int tegra_lp2_exit_latency;
 static unsigned int tegra_lp2_min_residency;
 #endif
 

@@ -154,6 +154,7 @@ static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
 	ktime_t entry_time;
 	ktime_t exit_time;
 	bool sleep_completed = false;
+	s64 sleep_time;
 	int i;
 
 	while (tegra2_cpu_is_resettable_soon())
@@ -170,7 +171,9 @@ static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
 
 	entry_time = ktime_get();
 
-	if (tegra_idle_lp2_last(request, 0) == 0)
+	sleep_time = request - tegra_lp2_exit_latency;
+
+	if (tegra_idle_lp2_last(sleep_time, 0) == 0)
 		sleep_completed = true;
 	else
 		idle_stats.lp2_int_count[tegra_pending_interrupt()]++;
@@ -185,10 +188,15 @@ static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
 	exit_time = ktime_get();
 	if (sleep_completed) {
 		/*
-		 * Stayed in LP2 for the full time until the next tick
+		 * Stayed in LP2 for the full time until the next tick,
+		 * adjust the exit latency based on measurement
 		 */
 		s64 actual_time = ktime_to_us(ktime_sub(exit_time, entry_time));
 		long offset = (long)(actual_time - request);
+		int latency = tegra_lp2_exit_latency + offset / 16;
+		latency = clamp(latency, 0, 10000);
+		tegra_lp2_exit_latency = latency;
+		smp_wmb();
 
 		pr_debug("%lld %lld %ld\n", request, actual_time,
 			offset);
