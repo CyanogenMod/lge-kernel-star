@@ -102,8 +102,10 @@ u64 tegra_rtc_read_ms(void);
  */
 extern void (*tegra_deep_sleep)(int);
 
-void tegra_idle_lp2_last(unsigned int flags);
+void tegra_idle_lp2_last(unsigned int us, unsigned int flags);
+
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
+
 #define INSTRUMENT_CLUSTER_SWITCH 0	/* Must be zero for ARCH_TEGRA_2x_SOC */
 #define DEBUG_CLUSTER_SWITCH 0		/* Must be zero for ARCH_TEGRA_2x_SOC */
 #define PARAMETERIZE_CLUSTER_SWITCH 0	/* Must be zero for ARCH_TEGRA_2x_SOC */

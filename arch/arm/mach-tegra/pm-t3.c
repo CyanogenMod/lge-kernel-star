@@ -310,7 +310,7 @@ int tegra_cluster_control(unsigned int us, unsigned int flags)
 		if (us)
 			tegra_lp2_set_trigger(0);
 	} else
-		tegra_idle_lp2_last(flags);
+		tegra_idle_lp2_last(0, flags);
 	local_irq_enable();
 
 	DEBUG_CLUSTER(("%s: %s\r\n", __func__, is_lp_cluster() ? "LP" : "G"));

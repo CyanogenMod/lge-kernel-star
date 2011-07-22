@@ -425,7 +425,7 @@ bool tegra_set_cpu_in_lp2(int cpu)
 	return last_cpu;
 }
 
-void tegra_idle_lp2_last(unsigned int flags)
+void tegra_idle_lp2_last(unsigned int sleep_time, unsigned int flags)
 {
 	u32 reg;
 
@@ -442,14 +442,17 @@ void tegra_idle_lp2_last(unsigned int flags)
 	writel(virt_to_phys(tegra_resume), evp_reset);
 
 	/*
-	 * we can use the locked call here, because all other cpus are in reset
-	 * and irqs are disabled
+	 * We can use clk_get_rate_all_locked() here, because all other cpus
+	 * are in LP2 state and irqs are disabled
 	 */
 	set_power_timers(pdata->cpu_timer, pdata->cpu_off_timer,
 		clk_get_rate_all_locked(tegra_pclk));
 
 	if (flags & TEGRA_POWER_CLUSTER_MASK)
 		tegra_cluster_switch_prolog(reg);
+
+	if (sleep_time)
+		tegra_lp2_set_trigger(sleep_time);
 
 	cpu_complex_pm_enter();
 
@@ -465,6 +468,9 @@ void tegra_idle_lp2_last(unsigned int flags)
 	tegra_cluster_switch_time(flags, tegra_cluster_switch_time_id_switch);
 	restore_cpu_complex();
 	cpu_complex_pm_exit();
+
+	if (sleep_time)
+		tegra_lp2_set_trigger(0);
 
 	if (flags & TEGRA_POWER_CLUSTER_MASK)
 		tegra_cluster_switch_epilog(reg);

@@ -136,7 +136,7 @@ static int tegra2_reset_other_cpus(int cpu)
 #endif
 
 static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
-			struct cpuidle_state *state)
+			struct cpuidle_state *state, s64 request)
 {
 	int i;
 
@@ -146,7 +146,7 @@ static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
 	if (tegra2_reset_other_cpus(dev->cpu))
 		return -EBUSY;
 
-	tegra_idle_lp2_last(0);
+	tegra_idle_lp2_last(request, 0);
 
 	for_each_online_cpu(i) {
 		if (i != dev->cpu) {
@@ -161,12 +161,13 @@ static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
 void tegra2_idle_lp2(struct cpuidle_device *dev,
 			struct cpuidle_state *state)
 {
+	s64 request = ktime_to_us(tick_nohz_get_sleep_length());
 	bool last_cpu = tegra_set_cpu_in_lp2(dev->cpu);
 
 	cpu_pm_enter();
 
 	if (last_cpu) {
-		if (tegra2_idle_lp2_last(dev, state) < 0) {
+		if (tegra2_idle_lp2_last(dev, state, request) < 0) {
 			int i;
 			for_each_online_cpu(i) {
 				if (i != dev->cpu) {
