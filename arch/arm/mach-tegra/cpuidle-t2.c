@@ -55,10 +55,17 @@ static struct {
 	unsigned int both_idle_count;
 	unsigned int tear_down_count;
 	unsigned int lp2_count;
+	unsigned int lp2_completed_count;
 	unsigned int lp2_count_bin[32];
+	unsigned int lp2_completed_count_bin[32];
 	unsigned int lp2_int_count[NR_IRQS];
 	unsigned int last_lp2_int_count[NR_IRQS];
 } idle_stats;
+
+static inline unsigned int time_to_bin(unsigned int time)
+{
+	return fls(time);
+}
 
 #ifdef CONFIG_SMP
 
@@ -155,6 +162,7 @@ static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
 	ktime_t entry_time;
 	ktime_t exit_time;
 	bool sleep_completed = false;
+	int bin;
 	int i;
 
 	while (tegra2_cpu_is_resettable_soon())
@@ -169,11 +177,16 @@ static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
 		return -EBUSY;
 	}
 
+	idle_stats.tear_down_count++;
 	request = min_t(s64, request, tegra_cpu1_idle_time);
 	entry_time = ktime_get();
 
 	if (request > state->target_residency) {
 		s64 sleep_time = request - tegra_lp2_exit_latency;
+
+		bin = time_to_bin((u32)request / 1000);
+		idle_stats.lp2_count++;
+		idle_stats.lp2_count_bin[bin]++;
 
 		if (tegra_idle_lp2_last(sleep_time, 0) == 0)
 			sleep_completed = true;
@@ -201,8 +214,12 @@ static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
 		tegra_lp2_exit_latency = latency;
 		smp_wmb();
 
-		pr_debug("%lld %lld %ld\n", request, actual_time,
-			offset);
+		idle_stats.lp2_completed_count++;
+		idle_stats.lp2_completed_count_bin[bin]++;
+		idle_stats.in_lp2_time += actual_time;
+
+		pr_debug("%lld %lld %ld %d\n", request, actual_time,
+			offset, bin);
 	}
 
 	return 0;
@@ -267,6 +284,10 @@ int tegra2_lp2_debug_show(struct seq_file *s, void *data)
 	seq_printf(s, "lp2:            %8u %7u%%\n", idle_stats.lp2_count,
 		idle_stats.lp2_count * 100 /
 			(idle_stats.both_idle_count ?: 1));
+	seq_printf(s, "lp2 completed:  %8u %7u%%\n",
+		idle_stats.lp2_completed_count,
+		idle_stats.lp2_completed_count * 100 /
+			(idle_stats.lp2_count ?: 1));
 
 	seq_printf(s, "\n");
 	seq_printf(s, "cpu ready time:                 %8llu %8llu ms\n",
@@ -280,14 +301,17 @@ int tegra2_lp2_debug_show(struct seq_file *s, void *data)
 			idle_stats.cpu_wants_lp2_time[1] ?: 1));
 
 	seq_printf(s, "\n");
-	seq_printf(s, "%19s %8s\n", "", "lp2");
+	seq_printf(s, "%19s %8s %8s %8s\n", "", "lp2", "comp", "%");
 	seq_printf(s, "-------------------------------------------------\n");
 	for (bin = 0; bin < 32; bin++) {
 		if (idle_stats.lp2_count_bin[bin] == 0)
 			continue;
-		seq_printf(s, "%6u - %6u ms: %8u\n",
+		seq_printf(s, "%6u - %6u ms: %8u %8u %7u%%\n",
 			1 << (bin - 1), 1 << bin,
-			idle_stats.lp2_count_bin[bin]);
+			idle_stats.lp2_count_bin[bin],
+			idle_stats.lp2_completed_count_bin[bin],
+			idle_stats.lp2_completed_count_bin[bin] * 100 /
+				idle_stats.lp2_count_bin[bin]);
 	}
 
 	seq_printf(s, "\n");

@@ -60,11 +60,6 @@ struct cpuidle_driver tegra_idle = {
 
 static DEFINE_PER_CPU(struct cpuidle_device *, idle_devices);
 
-static inline unsigned int time_to_bin(unsigned int time)
-{
-	return fls(time);
-}
-
 static int tegra_idle_enter_lp3(struct cpuidle_device *dev,
 	struct cpuidle_state *state)
 {
