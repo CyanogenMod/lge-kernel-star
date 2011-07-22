@@ -148,8 +148,8 @@ struct suspend_context tegra_sctx;
 #define FLOW_CTRL_CSR_WFI_BITMAP	(0xF << 8)
 #endif
 
-#define FLOW_CTRL_CSR_CLEAR_INTR	(1 << 15)
-#define FLOW_CTRL_CSR_CLEAR_EVENT	(1 << 14)
+#define FLOW_CTRL_CSR_INTR_FLAG		(1 << 15)
+#define FLOW_CTRL_CSR_EVENT_FLAG	(1 << 14)
 #define FLOW_CTRL_CSR_ENABLE		(1 << 0)
 
 #define EMC_MRW_0		0x0e8
@@ -343,8 +343,8 @@ static void restore_cpu_complex(void)
 		reg &= ~FLOW_CTRL_CSR_WFE_BITMAP;	/* clear wfe bitmap */
 		reg &= ~FLOW_CTRL_CSR_WFI_BITMAP;	/* clear wfi bitmap */
 		reg &= ~FLOW_CTRL_CSR_ENABLE;		/* clear enable */
-		reg |= FLOW_CTRL_CSR_CLEAR_INTR;	/* clear intr */
-		reg |= FLOW_CTRL_CSR_CLEAR_EVENT;	/* clear event */
+		reg |= FLOW_CTRL_CSR_INTR_FLAG;		/* clear intr */
+		reg |= FLOW_CTRL_CSR_EVENT_FLAG;	/* clear event */
 		flowctrl_writel(reg, FLOW_CTRL_CPU_CSR(i));
 	}
 }
@@ -380,7 +380,7 @@ static void suspend_cpu_complex(void)
 	reg = readl(FLOW_CTRL_CPU_CSR(cpu));
 	reg &= ~FLOW_CTRL_CSR_WFE_BITMAP;	/* clear wfe bitmap */
 	reg &= ~FLOW_CTRL_CSR_WFI_BITMAP;	/* clear wfi bitmap */
-	reg |= FLOW_CTRL_CSR_CLEAR_EVENT;	/* clear event flag */
+	reg |= FLOW_CTRL_CSR_EVENT_FLAG;	/* clear event flag */
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	reg |= FLOW_CTRL_CSR_WFE_CPU0 << cpu;	/* enable power gating on wfe */
 #else
@@ -393,8 +393,8 @@ static void suspend_cpu_complex(void)
 		if (i == cpu)
 			continue;
 		reg = readl(FLOW_CTRL_CPU_CSR(i));
-		reg |= FLOW_CTRL_CSR_CLEAR_EVENT;
-		reg |= FLOW_CTRL_CSR_CLEAR_INTR;
+		reg |= FLOW_CTRL_CSR_EVENT_FLAG;
+		reg |= FLOW_CTRL_CSR_INTR_FLAG;
 		flowctrl_writel(reg, FLOW_CTRL_CPU_CSR(i));
 		flowctrl_writel(0, FLOW_CTRL_HALT_CPU(i));
 	}
