@@ -102,7 +102,7 @@ u64 tegra_rtc_read_ms(void);
  */
 extern void (*tegra_deep_sleep)(int);
 
-void tegra_idle_lp2_last(unsigned int us, unsigned int flags);
+unsigned int tegra_idle_lp2_last(unsigned int us, unsigned int flags);
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 

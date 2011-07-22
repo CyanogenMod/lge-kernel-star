@@ -425,9 +425,10 @@ bool tegra_set_cpu_in_lp2(int cpu)
 	return last_cpu;
 }
 
-void tegra_idle_lp2_last(unsigned int sleep_time, unsigned int flags)
+unsigned int tegra_idle_lp2_last(unsigned int sleep_time, unsigned int flags)
 {
 	u32 reg;
+	unsigned int remain;
 
 	/* Only the last cpu down does the final suspend steps */
 	reg = readl(pmc + PMC_CTRL);
@@ -469,6 +470,7 @@ void tegra_idle_lp2_last(unsigned int sleep_time, unsigned int flags)
 	restore_cpu_complex();
 	cpu_complex_pm_exit();
 
+	remain = tegra_lp2_timer_remain();
 	if (sleep_time)
 		tegra_lp2_set_trigger(0);
 
@@ -491,6 +493,7 @@ void tegra_idle_lp2_last(unsigned int sleep_time, unsigned int flags)
 			tegra_cluster_switch_times[tegra_cluster_switch_time_id_start]);
 	}
 #endif
+	return remain;
 }
 
 static int tegra_common_suspend(void)

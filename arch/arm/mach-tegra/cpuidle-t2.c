@@ -151,6 +151,7 @@ bool tegra2_lp2_is_allowed(struct cpuidle_device *dev,
 static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
 			struct cpuidle_state *state, s64 request)
 {
+	bool sleep_completed = false;
 	int i;
 
 	while (tegra2_cpu_is_resettable_soon())
@@ -165,13 +166,23 @@ static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
 		return -EBUSY;
 	}
 
-	tegra_idle_lp2_last(request, 0);
+	if (tegra_idle_lp2_last(request, 0) == 0)
+		sleep_completed = true;
+	else
+		idle_stats.lp2_int_count[tegra_pending_interrupt()]++;
 
 	for_each_online_cpu(i) {
 		if (i != dev->cpu) {
 			tegra2_wake_reset_cpu(i);
 			tegra_clear_cpu_in_lp2(i);
 		}
+	}
+
+	if (sleep_completed) {
+		/*
+		 * Stayed in LP2 for the full time until the next tick
+		 */
+		pr_debug("%lld\n", request);
 	}
 
 	return 0;
