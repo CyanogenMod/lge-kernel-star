@@ -25,6 +25,7 @@
 struct tegra_pwm_bl_data {
 	struct device *dev;
 	int which_dc;
+	int (*notify)(struct device *, int brightness);
 	struct tegra_dc_pwm_params params;
 };
 
@@ -40,6 +41,9 @@ static int tegra_pwm_backlight_update_status(struct backlight_device *bl)
 
 	if (bl->props.fb_blank != FB_BLANK_UNBLANK)
 		brightness = 0;
+
+	if (tbl->notify)
+		brightness = tbl->notify(tbl->dev, brightness);
 
 	if (brightness > max)
 		dev_err(&bl->dev, "Invalid brightness value: %d max: %d\n",
@@ -95,6 +99,7 @@ static int tegra_pwm_backlight_probe(struct platform_device *pdev)
 
 	tbl->dev = &pdev->dev;
 	tbl->which_dc = data->which_dc;
+	tbl->notify = data->notify;
 	tbl->params.which_pwm = data->which_pwm;
 	tbl->params.gpio_conf_to_sfio = data->gpio_conf_to_sfio;
 	tbl->params.switch_to_sfio = data->switch_to_sfio;

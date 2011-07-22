@@ -22,6 +22,7 @@ struct platform_tegra_pwm_backlight_data {
 	unsigned int period;
 	unsigned int clk_div;
 	unsigned int clk_select;
+	int (*notify)(struct device *dev, int brightness);
 };
 
 #endif /* TERGA_PWM_BL_H */
