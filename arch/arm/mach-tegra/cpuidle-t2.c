@@ -151,6 +151,8 @@ bool tegra2_lp2_is_allowed(struct cpuidle_device *dev,
 static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
 			struct cpuidle_state *state, s64 request)
 {
+	ktime_t entry_time;
+	ktime_t exit_time;
 	bool sleep_completed = false;
 	int i;
 
@@ -166,6 +168,8 @@ static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
 		return -EBUSY;
 	}
 
+	entry_time = ktime_get();
+
 	if (tegra_idle_lp2_last(request, 0) == 0)
 		sleep_completed = true;
 	else
@@ -178,11 +182,16 @@ static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
 		}
 	}
 
+	exit_time = ktime_get();
 	if (sleep_completed) {
 		/*
 		 * Stayed in LP2 for the full time until the next tick
 		 */
-		pr_debug("%lld\n", request);
+		s64 actual_time = ktime_to_us(ktime_sub(exit_time, entry_time));
+		long offset = (long)(actual_time - request);
+
+		pr_debug("%lld %lld %ld\n", request, actual_time,
+			offset);
 	}
 
 	return 0;
