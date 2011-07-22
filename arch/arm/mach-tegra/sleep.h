@@ -39,18 +39,50 @@
 #define CPU_RESETTABLE_SOON		1
 #define CPU_NOT_RESETTABLE		0
 
-#define FLOW_CTRL_WAITEVENT		(2 << 29)
-#define FLOW_CTRL_WAIT_FOR_INTERRUPT	(4 << 29)
-#define FLOW_CTRL_JTAG_RESUME		(1 << 28)
-#define FLOW_CTRL_HALT_CPU_IRQ		(1 << 10)
-#define FLOW_CTRL_HALT_CPU_FIQ		(1 << 8)
+#define FLOW_CTRL_HALT_CPU0_EVENTS	0x0
+#define   FLOW_CTRL_WAITEVENT		(2 << 29)
+#define   FLOW_CTRL_WAIT_FOR_INTERRUPT	(4 << 29)
+#define   FLOW_CTRL_JTAG_RESUME		(1 << 28)
+#define   FLOW_CTRL_HALT_CPU_IRQ	(1 << 10)
+#define   FLOW_CTRL_HALT_CPU_FIQ	(1 << 8)
+#define FLOW_CTRL_CPU0_CSR		0x8
+#define   FLOW_CTRL_CSR_INTR_FLAG	(1 << 15)
+#define   FLOW_CTRL_CSR_EVENT_FLAG	(1 << 14)
+#define   FLOW_CTRL_CSR_ENABLE		(1 << 0)
+#define FLOW_CTRL_HALT_CPU1_EVENTS	0x14
+#define FLOW_CTRL_CPU1_CSR		0x18
 
-#define FLOW_CTRL_CSR_INTR_FLAG		(1<<15)
-#define FLOW_CTRL_CSR_EVENT_FLAG	(1<<14)
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+#define FLOW_CTRL_CSR_WFE_CPU0		(1 << 4)
+#define FLOW_CTRL_CSR_WFE_BITMAP	(3 << 4)
+#define FLOW_CTRL_CSR_WFI_BITMAP	0
+#else
+#define FLOW_CTRL_CSR_WFE_BITMAP	(0xF << 4)
+#define FLOW_CTRL_CSR_WFI_CPU0		(1 << 8)
+#define FLOW_CTRL_CSR_WFI_BITMAP	(0xF << 8)
+#endif
 
 #define TEGRA_FLOW_CTRL_VIRT (TEGRA_FLOW_CTRL_BASE - IO_PPSB_PHYS + IO_PPSB_VIRT)
 
 #ifndef __ASSEMBLY__
+
+#define FLOW_CTRL_HALT_CPU(cpu)	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) +	\
+	((cpu) ? (FLOW_CTRL_HALT_CPU1_EVENTS + 8 * ((cpu) - 1)) :	\
+	 FLOW_CTRL_HALT_CPU0_EVENTS))
+
+#define FLOW_CTRL_CPU_CSR(cpu)	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) +	\
+	((cpu) ? (FLOW_CTRL_CPU1_CSR + 8 * ((cpu) - 1)) :	\
+	 FLOW_CTRL_CPU0_CSR))
+
+static inline void flowctrl_writel(unsigned long val, void __iomem *addr)
+{
+	writel(val, addr);
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	wmb();
+#endif
+	(void)__raw_readl(addr);
+}
+
 void tegra_pen_lock(void);
 void tegra_pen_unlock(void);
 void tegra_cpu_wfi(void);

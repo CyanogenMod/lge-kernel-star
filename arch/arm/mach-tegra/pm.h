@@ -59,11 +59,6 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode);
 #define TEGRA_POWER_CLUSTER_IMMEDIATE	0x4000	/* Immediate wake */
 #define TEGRA_POWER_CLUSTER_FORCE	0x8000	/* Force switch */
 
-#define FLOW_CTRL_HALT_CPU(cpu)	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + \
-	((cpu) == 0 ? 0x0 : 0x14 + ((cpu) - 1) * 0x8))
-#define FLOW_CTRL_CPU_CSR(cpu)	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + \
-	((cpu) == 0 ? 0x8 : 0x18 + ((cpu) - 1) * 0x8))
-
 #define FLOW_CTRL_CLUSTER_CONTROL \
 	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + 0x2c)
 #define FLOW_CTRL_CPU_CSR_IMMEDIATE_WAKE	(1<<3)
@@ -198,14 +193,5 @@ static inline void tegra_cluster_switch_set_parameters(
 	unsigned int us, unsigned int flags)
 { }
 #endif
-
-static inline void flowctrl_writel(unsigned long val, void __iomem *addr)
-{
-	writel(val, addr);
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-	wmb();
-#endif
-	(void)__raw_readl(addr);
-}
 
 #endif /* _MACH_TEGRA_PM_H_ */

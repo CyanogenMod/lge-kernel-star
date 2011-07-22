@@ -138,20 +138,6 @@ struct suspend_context tegra_sctx;
 #define CLK_RESET_CCLK_BURST_POLICY_PLLM   3
 #define CLK_RESET_CCLK_BURST_POLICY_PLLX   8
 
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-#define FLOW_CTRL_CSR_WFE_CPU0		(1 << 4)
-#define FLOW_CTRL_CSR_WFE_BITMAP	(3 << 4)
-#define FLOW_CTRL_CSR_WFI_BITMAP	0
-#else
-#define FLOW_CTRL_CSR_WFE_BITMAP	(0xF << 4)
-#define FLOW_CTRL_CSR_WFI_CPU0		(1 << 8)
-#define FLOW_CTRL_CSR_WFI_BITMAP	(0xF << 8)
-#endif
-
-#define FLOW_CTRL_CSR_INTR_FLAG		(1 << 15)
-#define FLOW_CTRL_CSR_EVENT_FLAG	(1 << 14)
-#define FLOW_CTRL_CSR_ENABLE		(1 << 0)
-
 #define EMC_MRW_0		0x0e8
 #define EMC_MRW_DEV_SELECTN     30
 #define EMC_MRW_DEV_NONE	(3 << EMC_MRW_DEV_SELECTN)

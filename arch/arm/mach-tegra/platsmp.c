@@ -29,6 +29,7 @@
 
 #include "pm.h"
 #include "clock.h"
+#include "sleep.h"
 
 #define EVP_CPU_RESET_VECTOR \
 	(IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100)
