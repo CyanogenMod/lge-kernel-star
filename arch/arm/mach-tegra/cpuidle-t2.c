@@ -65,6 +65,7 @@ static struct {
 static void __iomem *clk_rst = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
 static void __iomem *evp_reset = IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100;
 static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
+static s64 tegra_cpu1_idle_time = LLONG_MAX;
 
 static int tegra2_reset_sleeping_cpu(int cpu)
 {
@@ -154,7 +155,6 @@ static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
 	ktime_t entry_time;
 	ktime_t exit_time;
 	bool sleep_completed = false;
-	s64 sleep_time;
 	int i;
 
 	while (tegra2_cpu_is_resettable_soon())
@@ -169,14 +169,17 @@ static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
 		return -EBUSY;
 	}
 
+	request = min_t(s64, request, tegra_cpu1_idle_time);
 	entry_time = ktime_get();
 
-	sleep_time = request - tegra_lp2_exit_latency;
+	if (request > state->target_residency) {
+		s64 sleep_time = request - tegra_lp2_exit_latency;
 
-	if (tegra_idle_lp2_last(sleep_time, 0) == 0)
-		sleep_completed = true;
-	else
-		idle_stats.lp2_int_count[tegra_pending_interrupt()]++;
+		if (tegra_idle_lp2_last(sleep_time, 0) == 0)
+			sleep_completed = true;
+		else
+			idle_stats.lp2_int_count[tegra_pending_interrupt()]++;
+	}
 
 	for_each_online_cpu(i) {
 		if (i != dev->cpu) {
@@ -223,8 +226,10 @@ void tegra2_idle_lp2(struct cpuidle_device *dev,
 				}
 			}
 		}
-	} else
+	} else {
+		tegra_cpu1_idle_time = request;
 		tegra2_sleep_wfi(PLAT_PHYS_OFFSET - PAGE_OFFSET);
+	}
 
 	cpu_pm_exit();
 	tegra_clear_cpu_in_lp2(dev->cpu);
