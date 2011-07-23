@@ -74,12 +74,13 @@ typedef struct TouchLEDRec{
     NvU8            keep_led_on;
 #ifdef CONFIG_LEDS_CLASS
     struct led_classdev leddev;
-    struct  workqueue_struct *blink_workqueue;
-    struct  delayed_work  blink_queue;
+    struct  workqueue_struct *pulse_workqueue;
+    struct  delayed_work  pulse_queue;
+    long            pulse_interval;
     struct wake_lock wlock;
     struct alarm alarm;
 #endif
-    NvU8			is_blinking;
+    NvU8			is_pulsing;
 } TouchLED;
 
 static TouchLED s_touchLED;
@@ -113,24 +114,30 @@ static NvBool touchLED_Control(NvU8 value)
 	return NV_TRUE;
 }
 
-static void star_blinker_alarm(struct alarm *alarm)
+static void star_pulser_alarm(struct alarm *alarm)
 {
     wake_lock(&s_touchLED.wlock);
-    queue_delayed_work(s_touchLED.blink_workqueue, &s_touchLED.blink_queue, msecs_to_jiffies(100));
+    queue_delayed_work(s_touchLED.pulse_workqueue, &s_touchLED.pulse_queue, msecs_to_jiffies(100));
 }
 
-static void star_blink_queue(struct work_struct *work)
+static void star_pulse_queue(struct work_struct *work)
 {
-    while (s_touchLED.is_blinking && s_touchLED.setVal) {
+    while (s_touchLED.is_pulsing && s_touchLED.setVal) {
         NvU32 settle_us;
         s_touchLED.setVal--;
         NvOdmServicesPmuSetVoltage(s_touchLED.hPmu, s_touchLED.conn->AddressList[0].Address, s_touchLED.setVal, &settle_us);
         mdelay(s_touchLED.delay);
     }
-    if (s_touchLED.is_blinking) {
-        /* Insert a 4 second pause between pulses */
-        ktime_t delay = ktime_add(alarm_get_elapsed_realtime(), ktime_set(4, 0));
-        s_touchLED.setVal = s_touchLED.is_blinking;
+    if (s_touchLED.is_pulsing) {
+        /* Insert a pause between pulses, defaults to 20% of duration */
+        long pause;
+        if (s_touchLED.pulse_interval) {
+            pause = s_touchLED.pulse_interval/1000;
+        } else {
+            pause = ((s_touchLED.delay/1000)*4);
+        }
+        ktime_t delay = ktime_add(alarm_get_elapsed_realtime(), ktime_set(pause, 0));
+        s_touchLED.setVal = s_touchLED.is_pulsing;
         alarm_start_range(&s_touchLED.alarm, delay, delay);
     } else {
         touchLED_Control(NV_FALSE);
@@ -140,7 +147,7 @@ static void star_blink_queue(struct work_struct *work)
 
 static void touchLED_timeout(struct work_struct *wq)
 {
-    if (!s_touchLED.is_blinking) {
+    if (!s_touchLED.is_pulsing) {
         touchLED_Control(NV_FALSE);
     }
 }
@@ -157,7 +164,7 @@ static void touchLED_early_suspend(struct early_suspend *es)
 {
 	printk("[LED] touchLED_early_suspend\n");
 	s_touchLED.is_working = 0;
-        if (s_touchLED.keep_led_on || s_touchLED.is_blinking)
+        if (s_touchLED.keep_led_on || s_touchLED.is_pulsing)
 		return;
 	touchLED_Control(NV_FALSE);
 	return;
@@ -167,7 +174,7 @@ static void touchLED_late_resume(struct early_suspend *es)
 {
 	printk("[LED] touchLED_late_resume\n");
 	s_touchLED.is_working = 1;
-        if (s_touchLED.keep_led_on || s_touchLED.is_blinking)
+        if (s_touchLED.keep_led_on || s_touchLED.is_pulsing)
 		return;
 	touchLED_Control(NV_TRUE);
 	return;
@@ -219,13 +226,13 @@ static ssize_t star_wled_store(struct device *dev,
 static DEVICE_ATTR(wled, 0666, star_wled_show, star_wled_store);
 
 #ifdef CONFIG_LEDS_CLASS
-static ssize_t star_blink_show(struct device *dev,
+static ssize_t star_pulse_show(struct device *dev,
                     struct device_attribute *attr, char *buf)
 {
     return 0;
 }
 
-static ssize_t star_blink_store(struct device *dev,
+static ssize_t star_pulse_store(struct device *dev,
                      struct device_attribute *attr,
                      const char *buf, size_t size)
 {
@@ -235,33 +242,49 @@ static ssize_t star_blink_store(struct device *dev,
     /* Input value is animation duration in msec */
     val = (NvU32)simple_strtoul(buf, NULL, 10);
 
-    if (!val && s_touchLED.is_blinking) {
+    if (!val && s_touchLED.is_pulsing) {
 	/*if (wake_lock_active(&s_touchLED.wlock))
         	wake_unlock(&s_touchLED.wlock);*/
     	s_touchLED.delay = TOUCH_DELAY_SEC;
-	s_touchLED.setVal = s_touchLED.is_blinking;
-	s_touchLED.is_blinking = 0;
+	s_touchLED.setVal = s_touchLED.is_pulsing;
+	s_touchLED.is_pulsing = 0;
         touchLED_Control(NV_FALSE);
     } else if (val) {
 	/*if (!wake_lock_active(&s_touchLED.wlock))
         	wake_lock(&s_touchLED.wlock);*/
-        if (s_touchLED.is_blinking) {
+        if (s_touchLED.is_pulsing) {
 	     /* config change, save original brighness! */
-             s_touchLED.setVal = s_touchLED.is_blinking;
+             s_touchLED.setVal = s_touchLED.is_pulsing;
         }
         if (s_touchLED.setVal < 10) {
 	     s_touchLED.setVal = 10;
         }
         step_duration = val / s_touchLED.setVal;
     	s_touchLED.delay = step_duration;
-	s_touchLED.is_blinking = s_touchLED.setVal;
+	s_touchLED.is_pulsing = s_touchLED.setVal;
         wake_lock(&s_touchLED.wlock);
-        queue_delayed_work(s_touchLED.blink_workqueue, &s_touchLED.blink_queue, msecs_to_jiffies(100));
+        queue_delayed_work(s_touchLED.pulse_workqueue, &s_touchLED.pulse_queue, msecs_to_jiffies(100));
     }
     return size;
 }
 
-static DEVICE_ATTR(blink, 0666, star_blink_show, star_blink_store);
+static ssize_t star_pulseint_store(struct device *dev,
+                     struct device_attribute *attr,
+                     const char *buf, size_t size)
+{
+    NvU32 val = (NvU32)simple_strtoul(buf, NULL, 10);
+    s_touchLED.pulse_interval = val;
+}
+
+static ssize_t star_pulseint_show(struct device *dev,
+                    struct device_attribute *attr, char *buf)
+{
+    return sprintf(buf, "%dmsec\n", (int)s_touchLED.pulse_interval);
+}
+
+
+static DEVICE_ATTR(pulse, 0666, star_pulse_show, star_pulse_store);
+static DEVICE_ATTR(pulse_interval, 0666, star_pulseint_show, star_pulseint_store);
 
 static ssize_t star_enable_show(struct device *dev,
                     struct device_attribute *attr, char *buf)
@@ -376,15 +399,17 @@ static int __init touchLED_probe(struct platform_device *pdev)
     s_touchLED.leddev.brightness_set = led_brightness_set;
     s_touchLED.leddev.max_brightness = 255;
     s_touchLED.leddev.flags = 0;
+    s_touchLED.pulse_interval = 0;
     led_classdev_register(&pdev->dev, &s_touchLED.leddev);
-    device_create_file(s_touchLED.leddev.dev, &dev_attr_blink);
+    device_create_file(s_touchLED.leddev.dev, &dev_attr_pulse);
+    device_create_file(s_touchLED.leddev.dev, &dev_attr_pulse_interval);
     device_create_file(s_touchLED.leddev.dev, &dev_attr_enable);
 
-    s_touchLED.blink_workqueue = create_singlethread_workqueue("star_ledpulse");
-    INIT_DELAYED_WORK(&s_touchLED.blink_queue, star_blink_queue);
+    s_touchLED.pulse_workqueue = create_singlethread_workqueue("star_ledpulse");
+    INIT_DELAYED_WORK(&s_touchLED.pulse_queue, star_pulse_queue);
     wake_lock_init(&s_touchLED.wlock, WAKE_LOCK_SUSPEND, "ledpulse_active");
     alarm_init(&s_touchLED.alarm, ANDROID_ALARM_ELAPSED_REALTIME_WAKEUP,
-                        star_blinker_alarm);
+                        star_pulser_alarm);
 #endif
 
 	s_touchLED.is_working = 1;
