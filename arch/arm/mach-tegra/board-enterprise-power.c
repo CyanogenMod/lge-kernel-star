@@ -46,21 +46,30 @@ static struct regulator_consumer_supply tps80031_vio_supply[] = {
 	REGULATOR_SUPPLY("avdd_osc", NULL),
 	REGULATOR_SUPPLY("vddio_sys", NULL),
 	REGULATOR_SUPPLY("vddio_uart", NULL),
+	REGULATOR_SUPPLY("pwrdet_uart", NULL),
 	REGULATOR_SUPPLY("vddio_lcd", NULL),
+	REGULATOR_SUPPLY("pwrdet_lcd", NULL),
 	REGULATOR_SUPPLY("vddio_audio", NULL),
+	REGULATOR_SUPPLY("pwrdet_audio", NULL),
 	REGULATOR_SUPPLY("vddio_bb", NULL),
+	REGULATOR_SUPPLY("pwrdet_bb", NULL),
 	REGULATOR_SUPPLY("vddio_gmi", NULL),
 	REGULATOR_SUPPLY("avdd_usb_pll", NULL),
 	REGULATOR_SUPPLY("vddio_cam", NULL),
+	REGULATOR_SUPPLY("pwrdet_cam", NULL),
 	REGULATOR_SUPPLY("vddio_sdmmc1", NULL),
+	REGULATOR_SUPPLY("pwrdet_sdmmc1", NULL),
 	REGULATOR_SUPPLY("vddio_sdmmc4", NULL),
+	REGULATOR_SUPPLY("pwrdet_sdmmc4", NULL),
 	REGULATOR_SUPPLY("avdd_hdmi_pll", NULL),
 	REGULATOR_SUPPLY("vddio_gps", NULL),
 	REGULATOR_SUPPLY("vdd_lcd_buffered", NULL),
 	REGULATOR_SUPPLY("vddio_nand", NULL),
+	REGULATOR_SUPPLY("pwrdet_nand", NULL),
 	REGULATOR_SUPPLY("vddio_sd", NULL),
 	REGULATOR_SUPPLY("vdd_bat", NULL),
 	REGULATOR_SUPPLY("vdd_io", NULL),
+	REGULATOR_SUPPLY("pwrdet_pex_ctl", NULL),
 };
 
 static struct regulator_consumer_supply tps80031_smps1_supply[] = {
@@ -80,6 +89,7 @@ static struct regulator_consumer_supply tps80031_smps3_supply[] = {
 
 static struct regulator_consumer_supply tps80031_smps4_supply[] = {
 	REGULATOR_SUPPLY("vddio_sdmmc_2v85", NULL),
+	REGULATOR_SUPPLY("pwrdet_sdmmc3", NULL),
 };
 
 static struct regulator_consumer_supply tps80031_vana_supply[] = {
@@ -88,6 +98,7 @@ static struct regulator_consumer_supply tps80031_vana_supply[] = {
 
 static struct regulator_consumer_supply tps80031_ldo1_supply[] = {
 	REGULATOR_SUPPLY("avdd_dsi_csi", NULL),
+	REGULATOR_SUPPLY("pwrdet_mipi", NULL),
 };
 
 static struct regulator_consumer_supply tps80031_ldo2_supply[] = {
