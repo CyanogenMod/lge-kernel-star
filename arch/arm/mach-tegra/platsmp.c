@@ -84,11 +84,10 @@ int boot_secondary(unsigned int cpu, struct task_struct *idle)
 	if (is_lp_cluster()) {
 		struct clk *cpu_clk, *cpu_g_clk;
 
-		/* The G CPU may not be available for a
-		   variety of reasons. */
+		/* The G CPU may not be available for a variety of reasons. */
 		status = is_g_cluster_available(cpu);
 		if (status)
-			return status;
+			goto done;
 
 		cpu_clk = tegra_get_clock_by_name("cpu");
 		cpu_g_clk = tegra_get_clock_by_name("cpu_g");
@@ -102,7 +101,7 @@ int boot_secondary(unsigned int cpu, struct task_struct *idle)
 			status = clk_set_parent(cpu_clk, cpu_g_clk);
 
 		if (status)
-			return status;
+			goto done;
 	}
 
 	smp_wmb();
@@ -150,7 +149,8 @@ done:
  */
 void __init smp_init_cpus(void)
 {
-	unsigned int i, ncores = available_cpus();
+	unsigned int ncores = available_cpus();
+	unsigned int i;
 
 	if (ncores > NR_CPUS) {
 		printk(KERN_ERR "Tegra: no. of cores (%u) greater than configured (%u), clipping\n",

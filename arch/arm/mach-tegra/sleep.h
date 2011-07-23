@@ -27,7 +27,7 @@
 
 #define TEGRA_IRAM_CODE_AREA		(TEGRA_IRAM_BASE + SZ_4K)
 
-/* PMC_SCRATCH37-39 and 41 are used for tegra_pen_lock in idle */
+/* PMC_SCRATCH37-39 and 41 are used for tegra_pen_lock in Tegra2 idle */
 #define PMC_SCRATCH37                   0x130
 #define PMC_SCRATCH38                   0x134
 /* PMC_SCRATCH39 stores the reset vector of the AVP (always 0) after LP0 */
