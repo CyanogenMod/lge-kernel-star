@@ -28,6 +28,7 @@
 #include <mach/iomap.h>
 
 #include "board.h"
+#include "fuse.h"
 
 #define PMC_PWR_IO_DISABLE	0x44
 #define PMC_PWR_DET_ENABLE	0x48
@@ -38,6 +39,7 @@ struct pwr_detect_cell {
 	const char		*reg_id;
 	u32			pwrdet_mask;
 	u32			pwrio_mask;
+	u32			package_mask;
 
 	struct notifier_block	regulator_nb;
 };
@@ -63,28 +65,39 @@ static inline u32 pmc_readl(unsigned long addr)
 }
 
 
-#define POWER_CELL(_reg_id, _pwrdet_mask, _pwrio_mask)		\
-	{							\
-		.reg_id = _reg_id,				\
-		.pwrdet_mask = _pwrdet_mask,			\
-		.pwrio_mask = _pwrio_mask,			\
+#define POWER_CELL(_reg_id, _pwrdet_mask, _pwrio_mask, _package_mask)	\
+	{								\
+		.reg_id = _reg_id,					\
+		.pwrdet_mask = _pwrdet_mask,				\
+		.pwrio_mask = _pwrio_mask,				\
+		.package_mask = _package_mask,				\
 	}
 
 /* Some IO pads does not have power detect cells, but still can/should be
  * turned off when no power - set pwrdet_mask=0 for such pads */
 static struct pwr_detect_cell pwr_detect_cells[] = {
-	POWER_CELL("pwrdet_nand",	(0x1 <<  1), (0x1 <<  1)),
-	POWER_CELL("pwrdet_uart",	(0x1 <<  2), (0x1 <<  2)),
-	POWER_CELL("pwrdet_bb",		(0x1 <<  3), (0x1 <<  3)),
-	POWER_CELL("pwrdet_vi",			  0, (0x1 <<  4)),
-	POWER_CELL("pwrdet_audio",	(0x1 <<  5), (0x1 <<  5)),
-	POWER_CELL("pwrdet_lcd",	(0x1 <<  6), (0x1 <<  6)),
-	POWER_CELL("pwrdet_mipi",		  0, (0x1 <<  9)),
-	POWER_CELL("pwrdet_cam",	(0x1 << 10), (0x1 << 10)),
-	POWER_CELL("pwrdet_pex_ctl",	(0x1 << 11), (0x1 << 11)),
-	POWER_CELL("pwrdet_sdmmc1",	(0x1 << 12), (0x1 << 12)),
-	POWER_CELL("pwrdet_sdmmc3",	(0x1 << 13), (0x1 << 13)),
-	POWER_CELL("pwrdet_sdmmc4",		  0, (0x1 << 14)),
+	POWER_CELL("pwrdet_nand",	(0x1 <<  1), (0x1 <<  1), 0xFFFFFFFF),
+	POWER_CELL("pwrdet_uart",	(0x1 <<  2), (0x1 <<  2), 0xFFFFFFFF),
+	POWER_CELL("pwrdet_bb",		(0x1 <<  3), (0x1 <<  3), 0xFFFFFFFF),
+#ifdef	CONFIG_ARCH_TEGRA_3x_SOC
+	/* Tegra3 VI is connected on MID package only (id = 1, mask = 0x2) */
+	POWER_CELL("pwrdet_vi",			  0, (0x1 <<  4), 0x00000002),
+#else
+	POWER_CELL("pwrdet_vi",			  0, (0x1 <<  4), 0xFFFFFFFF),
+#endif
+	POWER_CELL("pwrdet_audio",	(0x1 <<  5), (0x1 <<  5), 0xFFFFFFFF),
+	POWER_CELL("pwrdet_lcd",	(0x1 <<  6), (0x1 <<  6), 0xFFFFFFFF),
+#ifdef	CONFIG_ARCH_TEGRA_2x_SOC
+	POWER_CELL("pwrdet_sd",			  0, (0x1 <<  8), 0xFFFFFFFF),
+#endif
+	POWER_CELL("pwrdet_mipi",		  0, (0x1 <<  9), 0xFFFFFFFF),
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	POWER_CELL("pwrdet_cam",	(0x1 << 10), (0x1 << 10), 0xFFFFFFFF),
+	POWER_CELL("pwrdet_pex_ctl",	(0x1 << 11), (0x1 << 11), 0xFFFFFFFF),
+	POWER_CELL("pwrdet_sdmmc1",	(0x1 << 12), (0x1 << 12), 0xFFFFFFFF),
+	POWER_CELL("pwrdet_sdmmc3",	(0x1 << 13), (0x1 << 13), 0xFFFFFFFF),
+	POWER_CELL("pwrdet_sdmmc4",		  0, (0x1 << 14), 0xFFFFFFFF),
+#endif
 };
 
 static void pwr_detect_reset(u32 pwrdet_mask)
@@ -285,11 +298,26 @@ static int __init pwr_detect_cell_init_one(
 int __init tegra_pwr_detect_cell_init(void)
 {
 	int i, ret;
+	u32 package_mask;
 	unsigned long flags;
 	bool rails_found = true;
 
+	i = tegra_package_id();
+	if ((i != -1) && (i & (~0x1F))) {
+		pr_err("tegra: not supported package id %d - io power detection"
+		       " is left always on\n", i);
+		return 0;
+	}
+	package_mask = (i == -1) ? i : (0x1 << i);
+
 	for (i = 0; i < ARRAY_SIZE(pwr_detect_cells); i++) {
 		struct pwr_detect_cell *cell = &pwr_detect_cells[i];
+
+		if (!(cell->package_mask & package_mask)) {
+			pwrio_disabled_mask |= cell->pwrio_mask;
+			continue;
+		}
+
 		ret = pwr_detect_cell_init_one(cell, &pwrio_disabled_mask);
 		if (ret) {
 			pr_err("tegra: failed to map regulator to power detect"
@@ -299,7 +327,8 @@ int __init tegra_pwr_detect_cell_init(void)
 	}
 
 	if (!rails_found) {
-		pr_err("tegra: io power detection is left always on\n");
+		pr_err("tegra: failed regulators mapping - io power detection"
+		       " is left always on\n");
 		return 0;
 	}
 	pwrdet_rails_found = true;

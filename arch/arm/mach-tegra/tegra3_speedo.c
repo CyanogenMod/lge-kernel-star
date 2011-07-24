@@ -52,12 +52,7 @@ static int cpu_process_id;
 static int core_process_id;
 static int cpu_speedo_id;
 static int soc_speedo_id;
-
-static inline u8 fuse_package_info(void)
-{
-	/* Package info: 4 bits - 0,3:reserved 1:MID 2:DSC */
-	return tegra_fuse_readl(FUSE_PACKAGE_INFO) & 0x0F;
-}
+static int package_id;
 
 static void fuse_speedo_calib(u32 *speedo_g, u32 *speedo_lp)
 {
@@ -75,8 +70,6 @@ static void fuse_speedo_calib(u32 *speedo_g, u32 *speedo_lp)
 
 static void rev_sku_to_speedo_ids(int rev, int sku)
 {
-	u8 pkg;
-
 	switch (rev) {
 	case TEGRA_REVISION_A01:
 		cpu_speedo_id = 0;
@@ -98,8 +91,7 @@ static void rev_sku_to_speedo_ids(int rev, int sku)
 			break;
 		case 0:    /* ENG - check PKG_SKU */
 			pr_info("Tegra3 ENG SKU: Checking pkg info\n");
-			pkg = fuse_package_info();
-			switch (pkg) {
+			switch (package_id) {
 			case 1: /* MID => assume T30 */
 				cpu_speedo_id = 2;
 				soc_speedo_id = 2;
@@ -110,7 +102,7 @@ static void rev_sku_to_speedo_ids(int rev, int sku)
 				break;
 			default:
 				pr_err("Tegra3 Rev-A02: Reserved pkg info %d\n",
-				       pkg);
+				       package_id);
 				BUG();
 				break;
 			}
@@ -133,6 +125,9 @@ void tegra_init_speedo_data(void)
 {
 	u32 cpu_speedo_val, core_speedo_val;
 	int iv;
+
+	/* Package info: 4 bits - 0,3:reserved 1:MID 2:DSC */
+	package_id = tegra_fuse_readl(FUSE_PACKAGE_INFO) & 0x0F;
 
 	rev_sku_to_speedo_ids(tegra_get_revision(), tegra_sku_id());
 	BUG_ON(cpu_speedo_id >= ARRAY_SIZE(cpu_process_speedos));
@@ -210,4 +205,9 @@ int tegra_cpu_speedo_id(void)
 int tegra_soc_speedo_id(void)
 {
 	return soc_speedo_id;
+}
+
+int tegra_package_id(void)
+{
+	return package_id;
 }
