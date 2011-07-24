@@ -1055,64 +1055,70 @@ static void tegra3_sbus_cmplx_init(struct clk *c)
 	BUG_ON(!(c->u.system.sclk_high->flags & DIV_U71));
 }
 
-static long tegra3_sbus_div_round_rate(
-	struct clk *d, unsigned long max_rate, unsigned long rate)
-{
-	int divider;
-	unsigned long d_input = clk_get_rate(d->parent);
-
-	/* This special sbus round function is implemented because:
-
-	   (a) system bus clock duty cycle requirements can not be met by
-	   1 : 1.5 divider, but we do need fractional division for better
-	   granularity - hence, special case with only 1.5 fraction skipped
-
-	   (b) since sbus is a shared bus, and its frequency is set to the
-	   highest enabled shared_bus_user clock, the target rate should be
-	   rounded up divider ladder (if max limit allows it) - for pll_div
-	   and peripheral_div common is rounding down - special case again.
-
-	   Note that final rate is trimmed, not rounded up to avoid multiple
-	   round spiral up. Lost 1Hz is added in tegra3_sbus_cmplx_set_rate
-	   just before actually setting divider rate */
-
-	if (rate > d_input / 2)
-		return (d_input > max_rate) ? (d_input / 2) : d_input;
-
-	/* round divider down => round rate up */
-	divider = clk_div71_get_divider(
-		d_input, rate, d->flags, ROUND_DIVIDER_DOWN);
-	if (divider < 0)
-		return divider;
-
-	rate = 2 * d_input / (divider + 2);
-	if (rate > max_rate)
-		rate = 2 * d_input / (divider + 3);
-
-	return rate;
-}
+/* This special sbus round function is implemented because:
+ *
+ * (a) fractional dividers can not be used to derive system bus clock with one
+ * exception: 1 : 2.5 divider is allowed at 1.2V and above (and we do need this
+ * divider to reach top sbus frequencies from high frequency source).
+ *
+ * (b) since sbus is a shared bus, and its frequency is set to the highest
+ * enabled shared_bus_user clock, the target rate should be rounded up divider
+ * ladder (if max limit allows it) - for pll_div and peripheral_div common is
+ * rounding down - special case again.
+ *
+ * Note that final rate is trimmed (not rounded up) to avoid spiraling up in
+ * recursive calls. Lost 1Hz is added in tegra3_sbus_cmplx_set_rate before
+ * actually setting divider rate.
+ */
+static unsigned long sclk_high_2_5_rate;
+static bool sclk_high_2_5_valid;
 
 static long tegra3_sbus_cmplx_round_rate(struct clk *c, unsigned long rate)
 {
+	int i, divider;
+	unsigned long source_rate, round_rate;
 	struct clk *new_parent;
-	struct clk *new_parent_after_round;
 
 	rate = max(rate, c->min_rate);
 
+	if (!sclk_high_2_5_rate) {
+		source_rate = clk_get_rate(c->u.system.sclk_high->parent);
+		sclk_high_2_5_rate = 2 * source_rate / 5;
+		i = tegra_dvfs_predict_millivolts(c, sclk_high_2_5_rate);
+		if (!IS_ERR_VALUE(i) && (i >= 1200) &&
+		    (sclk_high_2_5_rate <= c->max_rate))
+			sclk_high_2_5_valid = true;
+	}
+
 	new_parent = (rate <= c->u.system.threshold) ?
 		c->u.system.sclk_low : c->u.system.sclk_high;
+	source_rate = clk_get_rate(new_parent->parent);
 
-	rate = tegra3_sbus_div_round_rate(new_parent, c->max_rate, rate);
+	divider = clk_div71_get_divider(source_rate, rate,
+		new_parent->flags | DIV_U71_INT, ROUND_DIVIDER_DOWN);
+	if (divider < 0)
+		return divider;
 
-	if(!IS_ERR_VALUE(rate)) {
-		new_parent_after_round = (rate <= c->u.system.threshold) ?
-			c->u.system.sclk_low : c->u.system.sclk_high;
-		/* if parent is oscillating across threshold -
-		   use threshold as a target */
-		if (new_parent != new_parent_after_round)
-			return c->u.system.threshold;
+	round_rate = source_rate * 2 / (divider + 2);
+	if (round_rate > c->max_rate) {
+		divider += 2;
+		round_rate = source_rate * 2 / (divider + 2);
 	}
-	return rate;
+
+	if (new_parent == c->u.system.sclk_high) {
+		/* Check if 1 : 2.5 ratio provides better approximation */
+		if (sclk_high_2_5_valid) {
+			if (((sclk_high_2_5_rate < round_rate) &&
+			    (sclk_high_2_5_rate >= rate)) ||
+			    ((round_rate < sclk_high_2_5_rate) &&
+			     (round_rate < rate)))
+				round_rate = sclk_high_2_5_rate;
+		}
+
+		if (round_rate <= c->u.system.threshold)
+			round_rate = c->u.system.threshold;
+	}
+	return round_rate;
 }
 
 static int tegra3_sbus_cmplx_set_rate(struct clk *c, unsigned long rate)
