@@ -30,6 +30,7 @@
 #include <linux/io.h>
 #include <linux/smp.h>
 #include <linux/syscore_ops.h>
+#include <linux/cpu.h>
 
 #include <asm/mach/time.h>
 #include <asm/localtimer.h>
@@ -40,20 +41,23 @@
 
 #include "board.h"
 #include "clock.h"
+#include "cpuidle.h"
 #include "timer.h"
+
+#define TEST_LP2_WAKE_TIMERS	0
 
 /*
  * Timers usage:
- * TMR1 - used as general cpu timer.
+ * TMR1 - used as general CPU timer.
  * TMR2 - used by AVP.
- * TMR3 - used by CPU0 for Lp2 wakeup.
- * TMR4 - used by CPU1 for Lp2 wakeup.
- * TMR5 - used by CPU2 for Lp2 wakeup.
- * TMR6 - used by CPU3 for Lp2 wakeup.
+ * TMR3 - used by CPU0 for LP2 wakeup.
+ * TMR4 - used by CPU1 for LP2 wakeup.
+ * TMR5 - used by CPU2 for LP2 wakeup.
+ * TMR6 - used by CPU3 for LP2 wakeup.
  * TMR7 - Free.
  * TMR8 - Free.
  * TMR9 - Free.
- * TMR10 - used as src for watchdog controller 0.
+ * TMR10 - used as source for watchdog controller 0.
 */
 
 #define TIMER1_OFFSET (TEGRA_TMR1_BASE-TEGRA_TMR1_BASE)
@@ -71,8 +75,8 @@ static void __iomem *timer_reg_base = IO_ADDRESS(TEGRA_TMR1_BASE);
 	__raw_readl((u32)timer_reg_base + (reg))
 
 
-#if 0
-static int lp2_wake_timers[] = {
+#ifdef CONFIG_PM_SLEEP
+static u32 lp2_wake_timers[] = {
 	TIMER3_OFFSET,
 	TIMER4_OFFSET,
 	TIMER5_OFFSET,
@@ -82,84 +86,135 @@ static int lp2_wake_timers[] = {
 static irqreturn_t tegra_lp2wake_interrupt(int irq, void *dev_id)
 {
 	int cpu = (int)dev_id;
-	int timer_base;
+	int base;
 
-	timer_base = lp2_wake_timers[cpu];
-	timer_writel(1<<30, timer_base + TIMER_PCR);
+	base = lp2_wake_timers[cpu];
+	timer_writel(1<<30, base + TIMER_PCR);
 	return IRQ_HANDLED;
 }
 
-#define LP2_TIMER_IRQ_ACTION(n, i) \
-static struct irqaction tegra_lp2wake_irq_cpu##n = { \
-	.name		= "tmr_lp2wake_cpu" __stringify(n), \
-	.flags		= IRQF_DISABLED, \
-	.handler	= tegra_lp2wake_interrupt, \
-	.dev_id		= (void*)n, \
-	.irq		= i, \
+#define LP2_TIMER_IRQ_ACTION(n, i) {				\
+	.name		= "tmr_lp2wake_cpu" __stringify(n),	\
+	.flags		= IRQF_DISABLED,			\
+	.handler	= tegra_lp2wake_interrupt,		\
+	.dev_id		= (void *)n,				\
+	.irq		= i }
+
+static struct irqaction tegra_lp2wake_irq[] = {
+	LP2_TIMER_IRQ_ACTION(0, INT_TMR3),
+	LP2_TIMER_IRQ_ACTION(1, INT_TMR4),
+	LP2_TIMER_IRQ_ACTION(2, INT_TMR5),
+	LP2_TIMER_IRQ_ACTION(3, INT_TMR6),
 };
 
-#define LP2_TIMER_IRQ_ACTIONS() \
-	LP2_TIMER_IRQ_ACTION(0, INT_TMR3); \
-	LP2_TIMER_IRQ_ACTION(1, INT_TMR4); \
-	LP2_TIMER_IRQ_ACTION(2, INT_TMR5); \
-	LP2_TIMER_IRQ_ACTION(3, INT_TMR6);
-
-LP2_TIMER_IRQ_ACTIONS();
-
-#define REGISTER_LP2_WAKE_IRQ(n) \
-	ret = setup_irq(tegra_lp2wake_irq_cpu##n.irq, &tegra_lp2wake_irq_cpu##n); \
-	if (ret) { \
-		printk(KERN_ERR "Failed to register LP2 timer IRQ: " \
-			"irq=%d, ret=%d\n", tegra_lp2wake_irq_cpu##n.irq, ret); \
-		BUG(); \
-	} \
-	ret = irq_set_affinity(tegra_lp2wake_irq_cpu##n.irq, cpumask_of(n)); \
-	if (ret) { \
-		printk(KERN_ERR "Failed to set affinity for LP2 timer IRQ: " \
-			"irq=%d, ret=%d\n", tegra_lp2wake_irq_cpu##n.irq, ret); \
-		BUG(); \
-	}
-
-#define REGISTER_LP2_WAKE_IRQS() \
-do { \
-	REGISTER_LP2_WAKE_IRQ(0); \
-	REGISTER_LP2_WAKE_IRQ(1); \
-	REGISTER_LP2_WAKE_IRQ(2); \
-	REGISTER_LP2_WAKE_IRQ(3); \
-} while (0)
+#ifdef CONFIG_SMP
+#define hard_smp_processor_id()						\
+	({								\
+		unsigned int cpunum;					\
+		__asm__("\n"						\
+			"1:	mrc p15, 0, %0, c0, c0, 5\n"		\
+			"	.pushsection \".alt.smp.init\", \"a\"\n"\
+			"	.long	1b\n"				\
+			"	mov	%0, #0\n"			\
+			"	.popsection"				\
+			: "=r" (cpunum));				\
+		cpunum &= 0x0F;						\
+	})
+#define cpu_number()	hard_smp_processor_id()
+#else
+#define cpu_number()	0
+#endif
 
 /*
- * To sanity test timer interrupts for cpu 0-3, enable this flag and check
- * /proc/interrupts for timer interrupts. Cpu's 0-3 would have one interrupt
- * counted against them for tmr_lp2wake_cpu0,1,2,3.
+ * To sanity test LP2 timer interrupts for CPU 0-3, enable this flag and check
+ * /proc/interrupts for timer interrupts. CPUs 0-3 should have one interrupt
+ * counted against them for tmr_lp2wake_cpu<n>, where <n> is the CPU number.
  */
-#define TEST_LP2_WAKE_TIMERS 0
 #if TEST_LP2_WAKE_TIMERS
-static void test_lp2_wake_timers(void)
+static void test_lp2_wake_timer(unsigned int cpu)
 {
-	unsigned int cpu;
-	unsigned int timer_base;
 	unsigned long cycles = 50000;
+	unsigned int base = lp2_wake_timers[cpu];
+	static bool tested[4] = {false, false, false, false};
 
-	for_each_possible_cpu(cpu) {
-		timer_base = lp2_wake_timers[cpu];
-		timer_writel(0, timer_base + TIMER_PTV);
+	/* Don't repeat the test process on hotplug restart. */
+	if (!tested[cpu]) {
+		timer_writel(0, base + TIMER_PTV);
 		if (cycles) {
 			u32 reg = 0x80000000ul | min(0x1ffffffful, cycles);
-			timer_writel(reg, timer_base + TIMER_PTV);
+			timer_writel(reg, base + TIMER_PTV);
+			tested[cpu] = true;
 		}
 	}
 }
 #else
-static void test_lp2_wake_timers(void){}
+static inline void test_lp2_wake_timer(unsigned int cpu) {}
 #endif
+
+static void tegra3_register_wake_timer(unsigned int cpu)
+{
+	int ret;
+
+	ret = setup_irq(tegra_lp2wake_irq[cpu].irq, &tegra_lp2wake_irq[cpu]);
+	if (ret) {
+		pr_err("Failed to register LP2 timer IRQ for CPU %d: "
+			"irq=%d, ret=%d\n", cpu,
+			tegra_lp2wake_irq[cpu].irq, ret);
+		goto fail;
+	}
+
+	ret = irq_set_affinity(tegra_lp2wake_irq[cpu].irq, cpumask_of(cpu));
+	if (ret) {
+		pr_err("Failed to set affinity for LP2 timer IRQ to "
+			"CPU %d: irq=%d, ret=%d\n", cpu,
+			tegra_lp2wake_irq[cpu].irq, ret);
+		goto fail;
+	}
+
+	test_lp2_wake_timer(cpu);
+	return;
+fail:
+	tegra_lp2_in_idle(false);
+}
+
+static void tegra3_unregister_wake_timer(unsigned int cpu)
+{
+	/* Reassign the affinity of the wake IRQ to CPU 0. */
+	(void)irq_set_affinity(tegra_lp2wake_irq[cpu].irq, cpumask_of(0));
+
+	/* Dispose of this IRQ. */
+	remove_irq(tegra_lp2wake_irq[cpu].irq, &tegra_lp2wake_irq[cpu]);
+}
+
+void tegra3_lp2_set_trigger(unsigned long cycles)
+{
+	int cpu = cpu_number();
+	int base;
+
+	base = lp2_wake_timers[cpu];
+	timer_writel(0, base + TIMER_PTV);
+	if (cycles) {
+		u32 reg = 0x80000000ul | min(0x1ffffffful, cycles);
+		timer_writel(reg, base + TIMER_PTV);
+	}
+}
+EXPORT_SYMBOL(tegra3_lp2_set_trigger);
+
+unsigned long tegra3_lp2_timer_remain(void)
+{
+	int cpu = cpu_number();
+
+	return timer_readl(lp2_wake_timers[cpu] + TIMER_PCR) & 0x1ffffffful;
+}
 #endif
 
 void __init tegra3_init_timer(u32 *offset, int *irq)
 {
 	unsigned long rate = clk_measure_input_freq();
+#ifdef CONFIG_PM_SLEEP
 	void __iomem *chip_id = IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x804;
-	unsigned long id;
+	unsigned long id = readl(chip_id);
+#endif
 
 	switch (rate) {
 	case 12000000:
@@ -187,75 +242,48 @@ void __init tegra3_init_timer(u32 *offset, int *irq)
 		WARN(1, "Unknown clock rate");
 	}
 
-#if 0
+#ifdef CONFIG_PM_SLEEP
 	/* For T30.A01 use INT_TMR_SHARED instead of INT_TMR6. */
-	id = readl(chip_id);
 	if (((id & 0xFF00) >> 8) == 0x30) {
-#ifndef CONFIG_TEGRA_FPGA_PLATFORM
-		if (((id >> 16) & 0xf) == 1) {
-			tegra_lp2wake_irq_cpu3.irq = INT_TMR_SHARED;
-		}
-#else
+#ifdef CONFIG_TEGRA_FPGA_PLATFORM
 		void __iomem *emu_rev = IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x860;
 		unsigned long reg = readl(emu_rev);
 		unsigned long netlist = reg & 0xFFFF;
 		unsigned long patch = (reg >> 16) & 0xFF;
-		if ((netlist == 12) && (patch < 14)) {
-			tegra_lp2wake_irq_cpu3.irq = INT_TMR_SHARED;
-		}
+		if ((netlist == 12) && (patch < 14))
+			tegra_lp2wake_irq[3].irq = INT_TMR_SHARED;
+#else
+		if (((id >> 16) & 0xf) == 1)
+			tegra_lp2wake_irq[3].irq = INT_TMR_SHARED;
 #endif
 	}
 
-	REGISTER_LP2_WAKE_IRQS();
-#endif
-
-#if 0
-	test_lp2_wake_timers();
+	tegra3_register_wake_timer(0);
 #endif
 
 	*offset = TIMER1_OFFSET;
 	*irq = INT_TMR1;
 }
 
-#if 0
-#ifdef CONFIG_SMP
-#define hard_smp_processor_id()						\
-	({								\
-		unsigned int cpunum;					\
-		__asm__("\n"						\
-			"1:	mrc p15, 0, %0, c0, c0, 5\n"		\
-			"	.pushsection \".alt.smp.init\", \"a\"\n"\
-			"	.long	1b\n"				\
-			"	mov	%0, #0\n"			\
-			"	.popsection"				\
-			: "=r" (cpunum));				\
-		cpunum &= 0x0F;						\
-	})
-#define cpu_number()	hard_smp_processor_id()
-#else
-#define cpu_number()	0
-#endif
-
-void tegra_lp2_set_trigger(unsigned long cycles)
+#if defined(CONFIG_PM_SLEEP) && defined(CONFIG_HOTPLUG_CPU)
+static int hotplug_notify(struct notifier_block *self,
+				      unsigned long action, void *cpu)
 {
-	int cpu = cpu_number();
-	int timer_base;
+	if (action == CPU_ONLINE)
+		tegra3_register_wake_timer((unsigned int)cpu);
+	else if (action == CPU_DOWN_PREPARE)
+		tegra3_unregister_wake_timer((unsigned int)cpu);
 
-	timer_base = lp2_wake_timers[cpu];
-	timer_writel(0, timer_base + TIMER_PTV);
-	if (cycles) {
-		u32 reg = 0x80000000ul | min(0x1ffffffful, cycles);
-		timer_writel(reg, timer_base + TIMER_PTV);
-	}
+	return NOTIFY_OK;
 }
-EXPORT_SYMBOL(tegra_lp2_set_trigger);
 
-unsigned long tegra_lp2_timer_remain(void)
+static struct notifier_block __cpuinitdata hotplug_notifier_block = {
+	.notifier_call = hotplug_notify,
+};
+
+static int __init hotplug_cpu_register(void)
 {
-	int cpu = cpu_number();
-	int timer_base;
-
-	timer_base = lp2_wake_timers[cpu];
-	return timer_readl(timer_base + TIMER_PCR) & 0x1ffffffful;
+	return register_cpu_notifier(&hotplug_notifier_block);
 }
+early_initcall(hotplug_cpu_register);
 #endif

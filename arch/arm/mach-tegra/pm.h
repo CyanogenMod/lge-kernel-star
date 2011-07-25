@@ -167,11 +167,18 @@ static inline void tegra_lp0_suspend_init(void)
 void tegra2_lp2_set_trigger(unsigned long cycles);
 unsigned long tegra2_lp2_timer_remain(void);
 #endif
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+void tegra3_lp2_set_trigger(unsigned long cycles);
+unsigned long tegra3_lp2_timer_remain(void);
+#endif
 
 static inline void tegra_lp2_set_trigger(unsigned long cycles)
 {
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	tegra2_lp2_set_trigger(cycles);
+#endif
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+	tegra3_lp2_set_trigger(cycles);
 #endif
 }
 
@@ -179,6 +186,9 @@ static inline unsigned long tegra_lp2_timer_remain(void)
 {
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	return tegra2_lp2_timer_remain();
+#endif
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+	return tegra3_lp2_timer_remain();
 #endif
 }
 
