@@ -28,6 +28,7 @@
 #include <media/ar0832_main.h>
 #include <media/tps61050.h>
 #include <media/ov9726.h>
+#include <mach/edp.h>
 #include "cpu-tegra.h"
 #include "gpio-names.h"
 #include "board-enterprise.h"
@@ -36,11 +37,15 @@ static struct nct1008_platform_data enterprise_nct1008_pdata = {
 	.supported_hwrev = true,
 	.ext_range = true,
 	.conv_rate = 0x08,
-	.offset = 0,
+/*
+ * BugID 844025 requires 11C guardband (9.7C for hotspot offset + 1.5C
+ * for sensor accuracy). FIXME: Move sensor accuracy to sensor driver.
+ */
+	.offset = 11,
 	.hysteresis = 5,
-	.shutdown_ext_limit = 75,
-	.shutdown_local_limit = 75,
-	.throttling_ext_limit = 90,
+	.shutdown_ext_limit = 90,
+	.shutdown_local_limit = 90,
+	.throttling_ext_limit = 75,
 	.alarm_fn = tegra_throttling_enable,
 };
 
@@ -55,6 +60,12 @@ static struct i2c_board_info enterprise_i2c4_nct1008_board_info[] = {
 static void enterprise_nct1008_init(void)
 {
 	int ret;
+#ifdef CONFIG_TEGRA_EDP_LIMITS
+	const struct tegra_edp_limits *z;
+	int zones_sz;
+	int i;
+	bool throttle_ok = false;
+#endif
 
 	tegra_gpio_enable(TEGRA_GPIO_PH7);
 	ret = gpio_request(TEGRA_GPIO_PH7, "temp_alert");
@@ -72,6 +83,27 @@ static void enterprise_nct1008_init(void)
 
 	i2c_register_board_info(4, enterprise_i2c4_nct1008_board_info,
 				ARRAY_SIZE(enterprise_i2c4_nct1008_board_info));
+#ifdef CONFIG_TEGRA_EDP_LIMITS
+	tegra_get_cpu_edp_limits(&z, &zones_sz);
+	zones_sz = min(zones_sz, MAX_ZONES);
+	for (i = 0; i < zones_sz; i++) {
+		enterprise_nct1008_pdata.thermal_zones[i] = z[i].temperature;
+		if (enterprise_nct1008_pdata.thermal_zones[i] ==
+		    enterprise_nct1008_pdata.throttling_ext_limit) {
+			throttle_ok = true;
+		}
+	}
+
+	if (throttle_ok != true)
+		pr_warn("%s: WARNING! Throttling limit %dC would be inaccurate"
+			" as it is NOT one of the EDP points\n",
+			__func__, enterprise_nct1008_pdata.throttling_ext_limit);
+	else
+		pr_info("%s: Throttling limit %dC OK\n",
+			__func__, enterprise_nct1008_pdata.throttling_ext_limit);
+
+	enterprise_nct1008_pdata.thermal_zones_sz = zones_sz;
+#endif
 }
 
 #define SENSOR_MPU_NAME "mpu3050"

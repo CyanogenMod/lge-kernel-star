@@ -28,6 +28,7 @@
 #include <linux/gpio.h>
 #include <linux/io.h>
 
+#include <mach/edp.h>
 #include <mach/iomap.h>
 #include <mach/irqs.h>
 #include <mach/pinmux.h>
@@ -445,3 +446,12 @@ int __init enterprise_suspend_init(void)
 	tegra_init_suspend(&enterprise_suspend_data);
 	return 0;
 }
+
+#ifdef CONFIG_TEGRA_EDP_LIMITS
+
+int __init enterprise_edp_init(void)
+{
+	tegra_init_cpu_edp_limits(2500); /* 2.5A regulator */
+	return 0;
+}
+#endif

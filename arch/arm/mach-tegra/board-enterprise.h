@@ -36,6 +36,7 @@ int enterprise_emc_init(void);
 int enterprise_regulator_init(void);
 int enterprise_modem_init(void);
 int enterprise_suspend_init(void);
+int enterprise_edp_init(void);
 
 /* Touchscreen GPIO addresses   */
 #ifdef CONFIG_TOUCHSCREEN_ATMEL_MT_T9
