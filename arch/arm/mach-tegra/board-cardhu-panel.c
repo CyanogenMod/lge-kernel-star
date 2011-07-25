@@ -957,10 +957,15 @@ int __init cardhu_panel_init(void)
 	cardhu_carveouts[1].base = tegra_carveout_start;
 	cardhu_carveouts[1].size = tegra_carveout_size;
 
-	if (board_info.board_id == BOARD_PM269)
+	if (board_info.board_id == BOARD_PM269) {
 		gpio_request(pm269_lvds_shutdown, "lvds_shutdown");
-	else
+		gpio_direction_output(pm269_lvds_shutdown, 1);
+		tegra_gpio_enable(pm269_lvds_shutdown);
+	} else {
 		gpio_request(cardhu_lvds_shutdown, "lvds_shutdown");
+		gpio_direction_output(cardhu_lvds_shutdown, 1);
+		tegra_gpio_enable(cardhu_lvds_shutdown);
+	}
 
 	tegra_gpio_enable(cardhu_hdmi_hpd);
 	gpio_request(cardhu_hdmi_hpd, "hdmi_hpd");
