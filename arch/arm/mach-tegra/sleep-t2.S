@@ -73,12 +73,12 @@
 
 #ifdef CONFIG_HOTPLUG_CPU
 /*
- * tegra2_sleep_reset(void)
+ * tegra2_hotplug_shutdown(void)
  *
  * puts the current cpu in reset
  * should never return
  */
-ENTRY(tegra2_sleep_reset)
+ENTRY(tegra2_hotplug_shutdown)
 	cpu_id	r0
 
 	/* Exit coherency. */
@@ -97,7 +97,7 @@ ENTRY(tegra2_sleep_reset)
 	/* Put this CPU into reset. */
 	bl	tegra2_cpu_reset
 	mov	pc, lr
-ENDPROC(tegra2_sleep_reset)
+ENDPROC(tegra2_hotplug_shutdown)
 #endif
 
 #if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_PM_SLEEP)

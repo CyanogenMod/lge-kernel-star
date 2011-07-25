@@ -57,7 +57,7 @@ void platform_cpu_die(unsigned int cpu)
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	/* Place the current CPU in reset. */
-	tegra2_sleep_reset();
+	tegra2_hotplug_shutdown();
 #endif
 
 	/*
