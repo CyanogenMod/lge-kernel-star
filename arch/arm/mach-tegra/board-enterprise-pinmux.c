@@ -63,7 +63,6 @@
 static __initdata struct tegra_drive_pingroup_config enterprise_drive_pinmux[] = {
 	/* DEFAULT_DRIVE(<pin_group>), */
 	/* SET_DRIVE(ATA, DISABLE, DISABLE, DIV_1, 31, 31, FAST, FAST) */
-	SET_DRIVE(DAP2, 	DISABLE, ENABLE, DIV_1, 31, 31, FASTEST, FASTEST),
 
 	/* All I2C pins are driven to maximum drive strength */
 	/* GEN1 I2C */
