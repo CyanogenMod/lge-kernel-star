@@ -40,6 +40,14 @@
 #include "clock.h"
 #include "timer.h"
 
+/*
+ * Timers usage:
+ * TMR1 - Free.
+ * TMR2 - used by AVP.
+ * TMR3 - used as general CPU timer.
+ * TMR4 - used for LP2 wakeup.
+*/
+
 #define TIMER1_OFFSET (TEGRA_TMR1_BASE-TEGRA_TMR1_BASE)
 #define TIMER2_OFFSET (TEGRA_TMR2_BASE-TEGRA_TMR1_BASE)
 #define TIMER3_OFFSET (TEGRA_TMR3_BASE-TEGRA_TMR1_BASE)
@@ -53,9 +61,41 @@
 
 static void __iomem *timer_reg_base = IO_ADDRESS(TEGRA_TMR1_BASE);
 
+#ifdef CONFIG_PM_SLEEP
+static irqreturn_t tegra_lp2wake_interrupt(int irq, void *dev_id)
+{
+	timer_writel(1<<30, TIMER4_OFFSET + TIMER_PCR);
+	return IRQ_HANDLED;
+}
+
+static struct irqaction tegra_lp2wake_irq = {
+	.name		= "timer_lp2wake",
+	.flags		= IRQF_DISABLED,
+	.handler	= tegra_lp2wake_interrupt,
+	.dev_id		= NULL,
+	.irq		= INT_TMR4,
+};
+
+void tegra2_lp2_set_trigger(unsigned long cycles)
+{
+	timer_writel(0, TIMER4_OFFSET + TIMER_PTV);
+	if (cycles) {
+		u32 reg = 0x80000000ul | min(0x1ffffffful, cycles);
+		timer_writel(reg, TIMER4_OFFSET + TIMER_PTV);
+	}
+}
+EXPORT_SYMBOL(tegra2_lp2_set_trigger);
+
+unsigned long tegra2_lp2_timer_remain(void)
+{
+	return timer_readl(TIMER4_OFFSET + TIMER_PCR) & 0x1ffffffful;
+}
+#endif
+
 void __init tegra2_init_timer(u32 *offset, int *irq)
 {
 	unsigned long rate = clk_measure_input_freq();
+	int ret;
 
 	switch (rate) {
 	case 12000000:
@@ -74,21 +114,14 @@ void __init tegra2_init_timer(u32 *offset, int *irq)
 		WARN(1, "Unknown clock rate");
 	}
 
+#ifdef CONFIG_PM_SLEEP
+	ret = setup_irq(tegra_lp2wake_irq.irq, &tegra_lp2wake_irq);
+	if (ret) {
+		pr_err("Failed to register LP2 timer IRQ: %d\n", ret);
+		BUG();
+	}
+#endif
+
 	*offset = TIMER3_OFFSET;
 	*irq = INT_TMR3;
-}
-
-void tegra2_lp2_set_trigger(unsigned long cycles)
-{
-	timer_writel(0, TIMER4_OFFSET + TIMER_PTV);
-	if (cycles) {
-		u32 reg = 0x80000000ul | min(0x1ffffffful, cycles);
-		timer_writel(reg, TIMER4_OFFSET + TIMER_PTV);
-	}
-}
-EXPORT_SYMBOL(tegra2_lp2_set_trigger);
-
-unsigned long tegra2_lp2_timer_remain(void)
-{
-	return timer_readl(TIMER4_OFFSET + TIMER_PCR) & 0x1ffffffful;
 }
