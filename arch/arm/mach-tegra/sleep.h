@@ -111,6 +111,7 @@ void tegra2_sleep_wfi(unsigned long v2p);
 extern void tegra3_iram_start;
 extern void tegra3_iram_end;
 void tegra3_sleep_core(unsigned long v2p);
+void tegra3_sleep_cpu_secondary(unsigned long v2p);
 void tegra3_hotplug_shutdown(void);
 #endif
 

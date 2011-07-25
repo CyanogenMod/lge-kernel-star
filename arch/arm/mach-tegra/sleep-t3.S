@@ -136,6 +136,22 @@ ENTRY(tegra3_sleep_cpu)
 ENDPROC(tegra3_sleep_cpu)
 
 /*
+ * tegra3_sleep_cpu_secondary(unsigned long v2p)
+ *
+ * Enters LP2 on secondary CPU by exiting coherency and powergating the CPU.
+ */
+ENTRY(tegra3_sleep_cpu_secondary)
+	mov	r3, lr				@ set resume address to lr
+	bl	tegra_cpu_save
+	bl	tegra_cpu_exit_coherency
+
+	/* Powergate this CPU. */
+	mov	r0, #0				@ power mode flags (!hotplug)
+	bl	tegra3_cpu_reset
+	b	.				@ should never get here
+ENDPROC(tegra3_sleep_cpu_secondary)
+
+/*
  * tegra3_tear_down_cpu
  *
  * Switches the CPU cluster to PLL-P and enters sleep.

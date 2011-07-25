@@ -266,6 +266,14 @@ static void tegra3_idle_enter_lp2_cpu_n(struct cpuidle_device *dev,
 	s64 sleep_time = request - tegra_lp2_exit_latency;
 	struct tegra_twd_context twd_context;
 
+	if (request < tegra_lp2_exit_latency) {
+		/*
+		 * Not enough time left to enter LP2
+		 */
+		tegra_cpu_wfi();
+		return;
+	}
+
 	tegra_lp2_set_trigger(sleep_time);
 
 	idle_stats.tear_down_count[cpu_number(dev->cpu)]++;
@@ -278,13 +286,7 @@ static void tegra3_idle_enter_lp2_cpu_n(struct cpuidle_device *dev,
 
 	tegra_twd_suspend(&twd_context);
 
-	flush_cache_all();
-	barrier();
-/* !!!FIXME!!! __cortex_a9_save(0); */
-	/* CPUn is powergated */
-
-	/* CPUn woke up */
-	barrier();
+	tegra3_sleep_cpu_secondary(PLAT_PHYS_OFFSET - PAGE_OFFSET);
 
 	tegra_cpu_wake_by_time[dev->cpu] = LLONG_MAX;
 
