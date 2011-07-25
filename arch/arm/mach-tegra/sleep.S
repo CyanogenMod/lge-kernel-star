@@ -133,6 +133,26 @@ ENDPROC(tegra_cpu_wfi)
 
 #ifdef CONFIG_PM_SLEEP
 /*
+ * tegra_cpu_exit_coherency
+ *
+ * Exits SMP coherency.
+ * corrupts r4-r5
+ */
+ENTRY(tegra_cpu_exit_coherency)
+	mrc	p15, 0, r4, c1, c0, 1	@ ACTLR
+	bic	r4, r4, #(1<<6)		@ exit coherency: clear ACTLR.SMP
+	mcr	p15, 0, r4, c1, c0, 1	@ ACTLR
+	isb
+	cpu_id	r4
+	mov	r4, r4, lsl #2
+	mov	r5, #0xf
+	mov	r5, r5, lsl r4
+	mov32	r4, TEGRA_ARM_PERIF_VIRT + 0xC
+	str	r5, [r4]		@ invalidate SCU tags for CPU
+	mov	pc, lr
+ENDPROC(tegra_cpu_exit_coherency)
+
+/*
  * tegra_cpu_save
  *
  * r0 = v2p
@@ -161,17 +181,6 @@ ENTRY(tegra_cpu_save)
 	mov	r0, r5
 	mov	r2, r6
 	mov	sp, r7
-
-	mov	r4, #0
-	mcr	p15, 0, r4, c1, c0, 1	@ exit coherency
-	isb
-	cpu_id	r4
-	mov32	r5, TEGRA_ARM_PERIF_VIRT + 0xC
-	mov	r4, r4, lsl #2
-	mov	r6, #0xf
-	mov	r6, r6, lsl r4
-	str	r6, [r5]		@ invalidate SCU tags for CPU
-
 	mov	pc, lr
 ENDPROC(tegra_cpu_save)
 
@@ -184,6 +193,7 @@ ENDPROC(tegra_cpu_save)
 ENTRY(tegra_sleep_cpu)
 	mov	r3, lr			@ set resume address to lr
 	bl	tegra_cpu_save
+	bl	tegra_cpu_exit_coherency
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	mov32	r1, tegra2_tear_down_cpu
