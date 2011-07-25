@@ -89,6 +89,7 @@ struct suspend_context {
 #ifdef CONFIG_PM_SLEEP
 static DEFINE_SPINLOCK(tegra_lp2_lock);
 static cpumask_t tegra_in_lp2;
+static cpumask_t *iram_cpu_lp2_mask;
 static u8 *iram_save;
 static unsigned long iram_save_size;
 static void __iomem *iram_code = IO_ADDRESS(TEGRA_IRAM_CODE_AREA);
@@ -417,7 +418,7 @@ void tegra_clear_cpu_in_lp2(int cpu)
 	   can't use used directly by cpumask_clear_cpu() because it uses
 	   LDREX/STREX which requires the addressed location to be inner
 	   cacheable and sharable which IRAM isn't. */
-	*tegra_cpu_lp2_mask = tegra_in_lp2;
+	*iram_cpu_lp2_mask = tegra_in_lp2;
 
 	spin_unlock(&tegra_lp2_lock);
 }
@@ -433,7 +434,7 @@ bool tegra_set_cpu_in_lp2(int cpu)
 	   can't use used directly by cpumask_set_cpu() because it uses
 	   LDREX/STREX which requires the addressed location to be inner
 	   cacheable and sharable which IRAM isn't. */
-	*tegra_cpu_lp2_mask = tegra_in_lp2;
+	*iram_cpu_lp2_mask = tegra_in_lp2;
 
 	if (cpumask_equal(&tegra_in_lp2, cpu_online_mask))
 		last_cpu = true;
@@ -877,6 +878,7 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 								__func__);
 	}
 
+	iram_cpu_lp2_mask = tegra_cpu_lp2_mask;
 #ifdef CONFIG_CPU_IDLE
 	if (plat->suspend_mode == TEGRA_SUSPEND_NONE)
 		tegra_lp2_in_idle(false);
