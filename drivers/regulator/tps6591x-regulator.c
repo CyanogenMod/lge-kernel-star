@@ -86,6 +86,7 @@ struct tps6591x_regulator {
 	int *voltages;
 
 	int delay; /* delay in us for regulator to stabilize */
+	enum tps6591x_ext_control ectrl;
 };
 
 static inline struct device *to_tps6591x_dev(struct regulator_dev *rdev)
@@ -731,6 +732,7 @@ static int __devinit tps6591x_regulator_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 	tps_pdata = pdev->dev.platform_data;
+	ri->ectrl = tps_pdata->ectrl;
 
 	err = tps6591x_regulator_preinit(pdev->dev.parent, ri, tps_pdata);
 	if (err)
@@ -757,6 +759,21 @@ static int __devexit tps6591x_regulator_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static void tps6591x_regulator_shutdown(struct platform_device *pdev)
+{
+	struct regulator_dev *rdev = platform_get_drvdata(pdev);
+	struct tps6591x_regulator *ri = rdev_get_drvdata(rdev);
+	struct device *parent = to_tps6591x_dev(rdev);
+	int ret;
+
+	if (ri->ectrl == EXT_CTRL_EN1) {
+		ret = tps6591x_clr_bits(parent, ri->en1_reg.addr,
+				(1 << ri->en1_reg.shift_bits));
+		if (ret < 0)
+			dev_err(&pdev->dev, "Error in clearing external control\n");
+	}
+}
+
 static struct platform_driver tps6591x_regulator_driver = {
 	.driver	= {
 		.name	= "tps6591x-regulator",
@@ -764,6 +781,7 @@ static struct platform_driver tps6591x_regulator_driver = {
 	},
 	.probe		= tps6591x_regulator_probe,
 	.remove		= __devexit_p(tps6591x_regulator_remove),
+	.shutdown	= tps6591x_regulator_shutdown,
 };
 
 static int __init tps6591x_regulator_init(void)
