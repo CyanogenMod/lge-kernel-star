@@ -819,7 +819,7 @@ static struct resource i2s_resource1[] = {
 };
 
 struct platform_device tegra_i2s_device1 = {
-	.name		= "tegra-i2s",
+	.name		= "tegra20-i2s",
 	.id		= 0,
 	.resource	= i2s_resource1,
 	.num_resources	= ARRAY_SIZE(i2s_resource1),
@@ -844,7 +844,7 @@ static struct resource i2s_resource2[] = {
 };
 
 struct platform_device tegra_i2s_device2 = {
-	.name		= "tegra-i2s",
+	.name		= "tegra20-i2s",
 	.id		= 1,
 	.resource	= i2s_resource2,
 	.num_resources	= ARRAY_SIZE(i2s_resource2),
@@ -1052,7 +1052,7 @@ static struct resource das_resource[] = {
 };
 
 struct platform_device tegra_das_device = {
-	.name		= "tegra-das",
+	.name		= "tegra20-das",
 	.id		= -1,
 	.resource	= das_resource,
 	.num_resources	= ARRAY_SIZE(das_resource),
