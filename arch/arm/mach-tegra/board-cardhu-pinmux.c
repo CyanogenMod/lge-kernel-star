@@ -453,6 +453,15 @@ static __initdata struct tegra_pingroup_config unused_pins_lowpower[] = {
 	DEFAULT_PINMUX(GMI_DQS,         NAND,           NORMAL,     TRISTATE,     OUTPUT),
 };
 
+static void __init cardhu_pinmux_audio_init(void)
+{
+	tegra_gpio_enable(TEGRA_GPIO_CDC_IRQ);
+	gpio_request(TEGRA_GPIO_CDC_IRQ, "wm8903");
+	gpio_direction_input(TEGRA_GPIO_CDC_IRQ);
+
+	tegra_gpio_enable(TEGRA_GPIO_HP_DET);
+}
+
 int __init cardhu_pinmux_init(void)
 {
 	struct board_info board_info;
@@ -486,6 +495,9 @@ int __init cardhu_pinmux_init(void)
 					ARRAY_SIZE(cardhu_pinmux_e118x));
 		break;
 	}
+
+	cardhu_pinmux_audio_init();
+
 	return 0;
 }
 

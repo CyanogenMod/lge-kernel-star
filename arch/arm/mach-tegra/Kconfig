@@ -106,6 +106,7 @@ config MACH_ARUBA
 config MACH_CARDHU
        bool "Cardhu board"
        depends on ARCH_TEGRA_3x_SOC
+       select MACH_HAS_SND_SOC_TEGRA_WM8903
        help
          Support for NVIDIA Cardhu development platform
 
