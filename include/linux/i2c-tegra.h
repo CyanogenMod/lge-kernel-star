@@ -35,6 +35,9 @@ struct tegra_i2c_platform_data {
 	int retries;
 	int timeout;	/* in jiffies */
 	u16 slave_addr;
+	int scl_gpio;
+	int sda_gpio;
+	int (*arb_recovery)(void);
 };
 
 struct tegra_i2c_slave_platform_data {
