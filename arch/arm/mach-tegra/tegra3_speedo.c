@@ -76,6 +76,7 @@ static void rev_sku_to_speedo_ids(int rev, int sku)
 		soc_speedo_id = 0;
 		break;
 	case TEGRA_REVISION_A02:
+	case TEGRA_REVISION_A03:
 		switch (sku) {
 		case 0x87: /* AP30 */
 			cpu_speedo_id = 1;
