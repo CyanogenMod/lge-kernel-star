@@ -31,6 +31,7 @@ struct tegra_asoc_utils_data {
 	struct clk *clk_pll_a;
 	struct clk *clk_pll_a_out0;
 	struct clk *clk_cdev1;
+	struct clk *clk_out1;
 	int set_baseclock;
 	int set_mclk;
 };

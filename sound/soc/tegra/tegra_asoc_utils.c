@@ -39,7 +39,11 @@ int tegra_asoc_utils_set_rate(struct tegra_asoc_utils_data *data, int srate,
 	case 22050:
 	case 44100:
 	case 88200:
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 		new_baseclock = 56448000;
+#else
+		new_baseclock = 564480000;
+#endif
 		break;
 	case 8000:
 	case 16000:
@@ -47,7 +51,11 @@ int tegra_asoc_utils_set_rate(struct tegra_asoc_utils_data *data, int srate,
 	case 48000:
 	case 64000:
 	case 96000:
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 		new_baseclock = 73728000;
+#else
+		new_baseclock = 552960000;
+#endif
 		break;
 	default:
 		return -EINVAL;
@@ -77,7 +85,7 @@ int tegra_asoc_utils_set_rate(struct tegra_asoc_utils_data *data, int srate,
 		return err;
 	}
 
-	/* Don't set cdev1 rate; its locked to pll_a_out0 */
+	/* Don't set cdev1/extern1 rate; it's locked to pll_a_out0 */
 
 	err = clk_enable(data->clk_pll_a);
 	if (err) {
@@ -125,15 +133,75 @@ int tegra_asoc_utils_init(struct tegra_asoc_utils_data *data,
 		goto err_put_pll_a;
 	}
 
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 	data->clk_cdev1 = clk_get_sys(NULL, "cdev1");
+#else
+	data->clk_cdev1 = clk_get_sys("extern1", NULL);
+#endif
 	if (IS_ERR(data->clk_cdev1)) {
 		dev_err(data->dev, "Can't retrieve clk cdev1\n");
 		ret = PTR_ERR(data->clk_cdev1);
 		goto err_put_pll_a_out0;
 	}
 
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
+	data->clk_out1 = ERR_PTR(-ENOENT);
+#else
+	data->clk_out1 = clk_get_sys("clk_out_1", "extern1");
+	if (IS_ERR(data->clk_out1)) {
+		dev_err(data->dev, "Can't retrieve clk out1\n");
+		ret = PTR_ERR(data->clk_out1);
+		goto err_put_cdev1;
+	}
+#endif
+
+	ret = clk_enable(data->clk_pll_a);
+	if (ret) {
+		dev_err(data->dev, "Can't enable clk pll_a");
+		goto err_put_out1;
+	}
+
+	ret = clk_enable(data->clk_pll_a_out0);
+	if (ret) {
+		dev_err(data->dev, "Can't enable clk pll_a_out0");
+		goto err_put_out1;
+	}
+
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+	ret = clk_set_parent(data->clk_cdev1, data->clk_pll_a_out0);
+	if (ret) {
+		dev_err(data->dev, "Can't set clk cdev1/extern1 parent");
+		goto err_put_out1;
+	}
+#endif
+
+	ret = clk_enable(data->clk_cdev1);
+	if (ret) {
+		dev_err(data->dev, "Can't enable clk cdev1/extern1");
+		goto err_put_out1;
+	}
+
+	if (!IS_ERR(data->clk_out1)) {
+		ret = clk_enable(data->clk_out1);
+		if (ret) {
+			dev_err(data->dev, "Can't enable clk out1");
+			goto err_put_out1;
+		}
+	}
+
+	ret = tegra_asoc_utils_set_rate(data, 48000, 256 * 48000);
+	if (ret)
+		goto err_put_out1;
+
 	return 0;
 
+err_put_out1:
+	if (!IS_ERR(data->clk_out1))
+		clk_put(data->clk_out1);
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+err_put_cdev1:
+#endif
+	clk_put(data->clk_cdev1);
 err_put_pll_a_out0:
 	clk_put(data->clk_pll_a_out0);
 err_put_pll_a:
@@ -145,6 +213,8 @@ EXPORT_SYMBOL_GPL(tegra_asoc_utils_init);
 
 void tegra_asoc_utils_fini(struct tegra_asoc_utils_data *data)
 {
+	if (!IS_ERR(data->clk_out1))
+		clk_put(data->clk_out1);
 	clk_put(data->clk_cdev1);
 	clk_put(data->clk_pll_a_out0);
 	clk_put(data->clk_pll_a);
