@@ -63,11 +63,13 @@ config MACH_KAEN
 
 config MACH_PAZ00
        bool "Paz00 board"
+       depends on ARCH_TEGRA_2x_SOC
        help
          Support for the Toshiba AC100/Dynabook AZ netbook
 
 config MACH_SEABOARD
        bool "Seaboard board"
+       depends on ARCH_TEGRA_2x_SOC
        select MACH_HAS_SND_SOC_TEGRA_WM8903
        help
          Support for nVidia Seaboard development platform. It will
@@ -76,12 +78,14 @@ config MACH_SEABOARD
 
 config MACH_TRIMSLICE
        bool "TrimSlice board"
+       depends on ARCH_TEGRA_2x_SOC
        select TEGRA_PCI
        help
          Support for CompuLab TrimSlice platform
 
 config MACH_WARIO
        bool "Wario board"
+       depends on ARCH_TEGRA_2x_SOC
        select MACH_SEABOARD
        help
          Support for the Wario version of Seaboard
