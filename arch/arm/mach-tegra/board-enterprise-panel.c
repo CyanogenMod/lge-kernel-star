@@ -26,7 +26,7 @@
 #include <linux/platform_device.h>
 #include <linux/tegra_pwm_bl.h>
 #include <asm/atomic.h>
-#include <mach/nvhost.h>
+#include <linux/nvhost.h>
 #include <mach/nvmap.h>
 #include <mach/irqs.h>
 #include <mach/iomap.h>

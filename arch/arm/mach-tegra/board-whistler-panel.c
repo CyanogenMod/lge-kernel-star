@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/board-whistler-panel.c
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010-2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@
 #include <linux/platform_device.h>
 #include <linux/pwm_backlight.h>
 #include <linux/tegra_pwm_bl.h>
-#include <mach/nvhost.h>
+#include <linux/nvhost.h>
 #include <mach/nvmap.h>
 #include <mach/irqs.h>
 #include <mach/iomap.h>

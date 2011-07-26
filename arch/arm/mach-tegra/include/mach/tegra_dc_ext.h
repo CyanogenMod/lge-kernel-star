@@ -19,8 +19,6 @@
 #ifndef __MACH_TEGRA_DC_EXT_H
 #define __MACH_TEGRA_DC_EXT_H
 
-#include <mach/nvhost.h>
-
 struct tegra_dc_ext;
 
 #ifdef CONFIG_TEGRA_DC_EXTENSIONS

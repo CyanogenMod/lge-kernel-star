@@ -1,5 +1,5 @@
 /*
- * include/linux/nvhost.h
+ * include/linux/nvhost_ioctl.h
  *
  * Tegra graphics host driver
  *
@@ -20,60 +20,19 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-#ifndef __LINUX_NVHOST_H
-#define __LINUX_NVHOST_H
+#ifndef __LINUX_NVHOST_IOCTL_H
+#define __LINUX_NVHOST_IOCTL_H
 
-#include <linux/device.h>
 #include <linux/ioctl.h>
 #include <linux/types.h>
-
-struct nvhost_master;
-
-struct nvhost_device {
-	const char		*name;
-	struct device		dev;
-	int			id;
-	u32			num_resources;
-	struct resource		*resource;
-
-	struct nvhost_master	*host;
-};
-
-extern int nvhost_device_register(struct nvhost_device *);
-extern void nvhost_device_unregister(struct nvhost_device *);
-
-extern struct bus_type nvhost_bus_type;
-
-struct nvhost_driver {
-	int (*probe)(struct nvhost_device *);
-	int (*remove)(struct nvhost_device *);
-	void (*shutdown)(struct nvhost_device *);
-	int (*suspend)(struct nvhost_device *, pm_message_t state);
-	int (*resume)(struct nvhost_device *);
-	struct device_driver driver;
-};
-
-extern int nvhost_driver_register(struct nvhost_driver *);
-extern void nvhost_driver_unregister(struct nvhost_driver *);
-extern struct resource *nvhost_get_resource(struct nvhost_device *, unsigned int, unsigned int);
-extern int nvhost_get_irq(struct nvhost_device *, unsigned int);
-extern struct resource *nvhost_get_resource_byname(struct nvhost_device *, unsigned int, const char *);
-extern int nvhost_get_irq_byname(struct nvhost_device *, const char *);
-
-#define to_nvhost_device(x) container_of((x), struct nvhost_device, dev)
-#define to_nvhost_driver(drv)	(container_of((drv), struct nvhost_driver, \
-				 driver))
-
-#define nvhost_get_drvdata(_dev)	dev_get_drvdata(&(_dev)->dev)
-#define nvhost_set_drvdata(_dev,data)	dev_set_drvdata(&(_dev)->dev, (data))
-
-int nvhost_bus_register(struct nvhost_master *host);
 
 #if !defined(__KERNEL__)
 #define __user
 #endif
 
+#define NVHOST_INVALID_SYNCPOINT 0xFFFFFFFF
 #define NVHOST_NO_TIMEOUT (-1)
+#define NVHOST_NO_CONTEXT 0x0
 #define NVHOST_IOCTL_MAGIC 'H'
 
 /* version 0 header (used with write() submit interface) */
@@ -214,6 +173,7 @@ struct nvhost_ctrl_module_regrdwr_args {
 
 #define NVHOST_IOCTL_CTRL_LAST			\
 	_IOC_NR(NVHOST_IOCTL_CTRL_SYNCPT_WAITEX)
-#define NVHOST_IOCTL_CTRL_MAX_ARG_SIZE sizeof(struct nvhost_ctrl_module_regrdwr_args)
+#define NVHOST_IOCTL_CTRL_MAX_ARG_SIZE	\
+	sizeof(struct nvhost_ctrl_module_regrdwr_args)
 
 #endif

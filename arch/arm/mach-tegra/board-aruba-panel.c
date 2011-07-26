@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/board-aruba-panel.c
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010-2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@
 #include <asm/mach-types.h>
 #include <linux/platform_device.h>
 #include <linux/pwm_backlight.h>
-#include <mach/nvhost.h>
+#include <linux/nvhost.h>
 #include <mach/nvmap.h>
 #include <mach/irqs.h>
 #include <mach/iomap.h>
