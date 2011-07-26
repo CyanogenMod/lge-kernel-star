@@ -305,7 +305,7 @@ void tegra3_idle_lp2(struct cpuidle_device *dev,
 
 	cpu_pm_enter();
 
-	if (last_cpu)
+	if (last_cpu && (dev->cpu == 0))
 		tegra3_idle_enter_lp2_cpu_0(dev, state, request);
 	else
 		tegra3_idle_enter_lp2_cpu_n(dev, state, request);
