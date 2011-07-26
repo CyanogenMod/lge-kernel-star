@@ -439,7 +439,7 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_cardhu_a03[] = {
 	DEFAULT_PINMUX(PEX_L0_PRSNT_N,  PCIE,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(PEX_L0_CLKREQ_N, PCIE,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(PEX_L1_CLKREQ_N, RSVD3,           PULL_UP,   TRISTATE,   INPUT),
-	DEFAULT_PINMUX(PEX_L1_PRSNT_N,  NAND,            PULL_UP,   TRISTATE,   INPUT),
+	DEFAULT_PINMUX(PEX_L1_PRSNT_N,  RSVD3,           PULL_UP,   TRISTATE,   INPUT),
 };
 
 static __initdata struct tegra_pingroup_config cardhu_pinmux_e1198[] = {
