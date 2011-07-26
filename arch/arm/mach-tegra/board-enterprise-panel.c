@@ -508,6 +508,9 @@ static struct tegra_dc_out enterprise_disp1_out = {
 	.enable		= enterprise_dsi_panel_enable,
 	.disable	= enterprise_dsi_panel_disable,
 	.postsuspend	= enterprise_dsi_panel_postsuspend,
+
+	.width		= 53,
+	.height		= 95,
 };
 static struct tegra_dc_platform_data enterprise_disp1_pdata = {
 	.flags		= TEGRA_DC_FLAG_ENABLED,
