@@ -567,7 +567,6 @@ static struct tegra_fb_data cardhu_hdmi_fb_data = {
 static struct tegra_dc_out cardhu_disp2_out = {
 	.type		= TEGRA_DC_OUT_HDMI,
 	.flags		= TEGRA_DC_OUT_HOTPLUG_HIGH,
-	.parent_clk	= "pll_d2_out0",
 
 	.dcc_bus	= 3,
 	.hotplug_gpio	= cardhu_hdmi_hpd,
@@ -848,10 +847,10 @@ static struct tegra_dc_out cardhu_disp1_out = {
 	.align		= TEGRA_DC_ALIGN_MSB,
 	.order		= TEGRA_DC_ORDER_RED_BLUE,
 	.sd_settings	= &cardhu_sd_settings,
+	.parent_clk	= "pll_p",
 
 #ifndef CONFIG_TEGRA_CARDHU_DSI
 	.type		= TEGRA_DC_OUT_RGB,
-	.parent_clk	= "pll_d_out0",
 
 	.modes	 	= cardhu_panel_modes,
 	.n_modes 	= ARRAY_SIZE(cardhu_panel_modes),
