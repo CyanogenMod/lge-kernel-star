@@ -28,7 +28,6 @@
 /* Processor Board  ID */
 #define BOARD_E1187   0x0B57
 #define BOARD_E1186   0x0B56
-#define BOARD_E1197   0x0B61
 #define BOARD_E1198   0x0B62
 #define BOARD_E1256   0x0C38
 #define BOARD_E1291   0x0C5B

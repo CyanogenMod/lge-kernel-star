@@ -284,9 +284,9 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_common[] = {
 	DEFAULT_PINMUX(GMI_WP_N,        GMI,             NORMAL,    NORMAL,     INPUT),
 
 	DEFAULT_PINMUX(KB_ROW5,         OWR,             NORMAL,    NORMAL,     OUTPUT),
-	DEFAULT_PINMUX(KB_ROW12,        MIO,             NORMAL,    NORMAL,     OUTPUT),
-	DEFAULT_PINMUX(KB_ROW14,        MIO,             NORMAL,    NORMAL,     OUTPUT),
-	DEFAULT_PINMUX(KB_ROW15,        MIO,             NORMAL,    NORMAL,     OUTPUT),
+	DEFAULT_PINMUX(KB_ROW12,        KBC,             NORMAL,    NORMAL,     OUTPUT),
+	DEFAULT_PINMUX(KB_ROW14,        KBC,             NORMAL,    NORMAL,     OUTPUT),
+	DEFAULT_PINMUX(KB_ROW15,        KBC,             NORMAL,    NORMAL,     OUTPUT),
 
 #if 0 /* for testing on Verbier */
 	DEFAULT_PINMUX(GMI_WAIT,        NAND,            NORMAL,    NORMAL,     INPUT),
