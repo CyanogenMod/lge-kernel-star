@@ -458,7 +458,7 @@ struct tegra_dsi_out enterprise_dsi = {
 	.n_suspend_cmd = ARRAY_SIZE(dsi_suspend_cmd),
 	.dsi_suspend_cmd = dsi_suspend_cmd,
 	.video_data_type = TEGRA_DSI_VIDEO_TYPE_COMMAND_MODE,
-	.lp_cmd_mode_freq_khz = 430000,
+	.lp_cmd_mode_freq_khz = 20000,
 };
 
 static struct tegra_stereo_out enterprise_stereo = {

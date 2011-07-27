@@ -1386,12 +1386,6 @@ static int tegra3_pll_clk_enable(struct clk *c)
 	val |= PLL_BASE_ENABLE;
 	clk_writel(val, c->reg + PLL_BASE);
 
-	if (c->flags & PLLD) {
-		val = clk_readl(c->reg + PLL_MISC(c) + PLL_BASE);
-		val |= PLLD_MISC_CLKENABLE;
-		clk_writel(val, c->reg + PLL_MISC(c) + PLL_BASE);
-	}
-
 	tegra3_pll_clk_wait_for_lock(c, c->reg + PLL_BASE, PLL_BASE_LOCK);
 
 	return 0;
@@ -1405,12 +1399,6 @@ static void tegra3_pll_clk_disable(struct clk *c)
 	val = clk_readl(c->reg);
 	val &= ~(PLL_BASE_BYPASS | PLL_BASE_ENABLE);
 	clk_writel(val, c->reg);
-
-	if (c->flags & PLLD) {
-		val = clk_readl(c->reg + PLL_MISC(c) + PLL_BASE);
-		val &= ~PLLD_MISC_CLKENABLE;
-		clk_writel(val, c->reg + PLL_MISC(c) + PLL_BASE);
-	}
 }
 
 static int tegra3_pll_clk_set_rate(struct clk *c, unsigned long rate)
