@@ -2352,7 +2352,7 @@ static NvBool sensor_poweron()
 
 	} while ( mvolt_ldo7 !=0 || mvolt_ldo8  != 0 );
 
-	msleep(400);
+	msleep(3000);
 	
         do {
 

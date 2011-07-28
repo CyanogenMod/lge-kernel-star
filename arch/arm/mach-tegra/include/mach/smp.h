@@ -17,6 +17,7 @@
  */
 static inline void smp_cross_call(const struct cpumask *mask, int ipi)
 {
+	dsb();
 	gic_raise_softirq(mask, ipi);
 }
 

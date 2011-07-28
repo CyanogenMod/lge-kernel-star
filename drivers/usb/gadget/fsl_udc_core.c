@@ -635,7 +635,7 @@ static int fsl_ep_disable(struct usb_ep *_ep)
 
 #if defined(CONFIG_ARCH_TEGRA)
 	/* Touch the registers if cable is connected and phy is on */
-	if (fsl_readl(&usb_sys_regs->vbus_wakeup) & USB_SYS_VBUS_STATUS)
+	if (udc_controller->vbus_active)
 #endif
 	{
 		/* disable ep on controller */
@@ -955,7 +955,7 @@ static int fsl_ep_dequeue(struct usb_ep *_ep, struct usb_request *_req)
 
 #if defined(CONFIG_ARCH_TEGRA)
 	/* Touch the registers if cable is connected and phy is on */
-	if (fsl_readl(&usb_sys_regs->vbus_wakeup) & USB_SYS_VBUS_STATUS)
+	if (udc_controller->vbus_active)
 #endif
 	{
 		epctrl = fsl_readl(&dr_regs->endptctrl[ep_num]);
@@ -1010,7 +1010,7 @@ static int fsl_ep_dequeue(struct usb_ep *_ep, struct usb_request *_req)
 out:
 #if defined(CONFIG_ARCH_TEGRA)
 	/* Touch the registers if cable is connected and phy is on */
-	if (fsl_readl(&usb_sys_regs->vbus_wakeup) & USB_SYS_VBUS_STATUS)
+	if (udc_controller->vbus_active)
 #endif
 	{
 		epctrl = fsl_readl(&dr_regs->endptctrl[ep_num]);
@@ -1089,7 +1089,7 @@ static void fsl_ep_fifo_flush(struct usb_ep *_ep)
 
 #if defined(CONFIG_ARCH_TEGRA)
 	/* Touch the registers if cable is connected and phy is on */
-	if (!(fsl_readl(&usb_sys_regs->vbus_wakeup) & USB_SYS_VBUS_STATUS))
+	if (!udc_controller->vbus_active)
 		return;
 #endif
 
@@ -1997,6 +1997,28 @@ static void fsl_udc_charger_detection(struct work_struct* work)
 	}
 }
 
+static void fsl_ep_fifo_flush_all(void)
+{
+	u32 bits = 0xFFFFFFFF;
+	unsigned long timeout;
+#define FSL_UDC_FLUSH_TIMEOUT 1000
+
+	timeout = jiffies + FSL_UDC_FLUSH_TIMEOUT;
+	do {
+		fsl_writel(bits, &dr_regs->endptflush);
+
+		/* Wait until flush complete */
+		while (fsl_readl(&dr_regs->endptflush)) {
+			if (time_after(jiffies, timeout)) {
+				ERR("ep flush timeout\n");
+				return;
+			}
+			cpu_relax();
+		}
+		/* See if we need to flush again */
+	} while (fsl_readl(&dr_regs->endptstatus) & bits);
+}
+
 #if defined(CONFIG_ARCH_TEGRA)
 /*
  * Restart device controller in the OTG mode on VBUS detection
@@ -2029,6 +2051,7 @@ static void fsl_udc_vbus_work(struct work_struct* vbus_work)
 		spin_lock(&udc->lock);
 		reset_queues(udc);
 		spin_unlock(&udc->lock);
+		fsl_ep_fifo_flush_all();
 		dr_controller_stop(udc);
 		platform_udc_clk_suspend();
 	}
@@ -2100,10 +2123,12 @@ static void fsl_udc_irq_work(struct work_struct* irq_work)
 		spin_lock(&udc->lock);
 		reset_queues(udc);
 		spin_unlock(&udc->lock);
+		/* flush all the eps before turing off the clocks */
+		fsl_ep_fifo_flush_all();
 		/* stop the controller and turn off the clocks */
 		dr_controller_stop(udc);
-		platform_udc_clk_suspend();
 		udc->vbus_active = 0;
+		platform_udc_clk_suspend();
 		udc->usb_state = USB_STATE_DEFAULT;
 		udc->current_limit_ma = 0;
 		if (udc->transceiver)

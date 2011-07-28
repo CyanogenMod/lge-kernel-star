@@ -1503,9 +1503,9 @@ static int star_battery_infomation_update(void)
 
 		if ((BatData.batteryVoltage != NVODM_BATTERY_DATA_UNKNOWN) && (BatData.batteryTemperature != NVODM_BATTERY_DATA_UNKNOWN))
 		{
-			if (3250 > BatData.batteryVoltage) BatData.batteryVoltage = 3250;
-			if (4250 < BatData.batteryVoltage) BatData.batteryVoltage = 4250;
-			if ((1500 < BatData.batteryVoltage) && (BatData.batteryVoltage < 5000))
+			//if (3250 > BatData.batteryVoltage) BatData.batteryVoltage = 3250;
+			//if (4250 < BatData.batteryVoltage) BatData.batteryVoltage = 4250;
+			if ((3200 < BatData.batteryVoltage) && (BatData.batteryVoltage < 4400))
 			{
 				if (batt_dev->Capacity_first_time)
 				{
@@ -1524,7 +1524,29 @@ static int star_battery_infomation_update(void)
 				}
 			}
 			else
-				LDB("[Critical]: Battery voltage range is out of range for normal battery");
+			{
+				LDB("[Warning]: Battery voltage range is out of range for normal battery (old:%d, now:%d)", batt_dev->batt_vol, BatData.batteryVoltage);
+				if (3200 > BatData.batteryVoltage)
+				{
+					if ( 3400 >= batt_dev->batt_vol ) // previous value also Low Battery state... use this value.
+					{
+						batt_dev->batt_vol = (NvU32)BatData.batteryVoltage;
+					}
+					else // previous value is high... why this is occur??
+					{
+						if (NvRmPmuUpdateBatteryInfo(s_hRmGlobal, &AcStatus, &BatStatus, &BatData)) // Recheck Battery Data
+						{
+							LDB("[Warning]: Recheck Battery because of abnormal battery voltage (old:%d, now:%d)", batt_dev->batt_vol, BatData.batteryVoltage);
+							batt_dev->batt_vol = (NvU32)BatData.batteryVoltage; // system will be shut down when low voltage again. if not, use re-read value.
+						}
+						else
+						{
+							LDB("[Critical]: NvRmPmuUpdateBatteryInfo failed!!!");
+							return NV_FALSE;
+						}
+					}
+				}
+			}
 
 			if (batt_dev->batt_vol <= 3400)
 			{
