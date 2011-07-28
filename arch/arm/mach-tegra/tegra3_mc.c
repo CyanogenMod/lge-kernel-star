@@ -76,6 +76,8 @@ static u8 *sample_log_wptr = sample_log, *sample_log_rptr = sample_log;
 static int sample_log_size = SAMPLE_LOG_SIZE - 1;
 static struct hrtimer sample_timer;
 
+static bool aggregate = false;
+
 static void stat_start(void);
 static void stat_stop(void);
 static void stat_log(void);
@@ -306,7 +308,8 @@ static int tegra_mc_client_parse(const char *buf, size_t count,
 		{opt_err, NULL},
 	};
 	int ret = 0, i, token, num_clients;
-	bool aggregate = false;
+	bool write_tally = false;
+	bool read_tally = false;
 	int  period, *client_ids, mode;
 	bool fperiod = false, fmode = false, fclient = false;
 	u64 address_low = 0;
@@ -365,17 +368,23 @@ static int tegra_mc_client_parse(const char *buf, size_t count,
 				if (client_ids[i] < MC_STAT_END)
 					continue;
 
-				if ((client_ids[i] != MC_STAT_AGGREGATE) ||
-				    client_ids[0] != 1) {
-					ret = -EINVAL;
-					goto end;
-				} else {
+				if ((client_ids[i] == MC_STAT_OVERALL_AGGREGATE) &&
+						client_ids[0] == 1) {
 					aggregate = true;
 					emc_trace(TRACE_OPT,
 						  "aggregate=true\n");
 					client_ids[0] = 1;
-					client_ids[1] = MC_STAT_AGGREGATE;
+					client_ids[1] = MC_STAT_OVERALL_AGGREGATE;
 					break;
+				} else if (client_ids[i] == MC_STAT_OVERALL_WRITETALLY) {
+					write_tally = true;
+					emc_trace(TRACE_OPT, "write_tally = true\n");
+				} else if (client_ids[i] == MC_STAT_OVERALL_READTALLY) {
+					read_tally = true;
+					emc_trace(TRACE_OPT, "read_tally = true\n");
+				} else {
+					ret = -EINVAL;
+					goto end;
 				}
 			}
 
@@ -430,7 +439,34 @@ static int tegra_mc_client_parse(const char *buf, size_t count,
 	} else if (mode == FILTER_ADDR || mode == FILTER_NONE) {
 		/* emc_trace(TRACE_ERR,
 		   "\n****using unsupported addr mode****\n"); */
-		if (aggregate) {
+		if (write_tally || read_tally) {
+			/* assume both counters use the same address filter or nothing */
+			llp->enabled = false;
+			if (write_tally && (!read_tally)) {
+				counter = counter1;
+				counter->clients[0] = MC_STAT_OVERALL_WRITETALLY;
+				counter0->enabled = false;
+			} else if ((!write_tally) && (read_tally)) {
+				counter = counter0;
+				counter->clients[0] = MC_STAT_OVERALL_READTALLY;
+				counter1->enabled = false;
+			} else {
+				counter = counter1;
+				counter->clients[0] = MC_STAT_OVERALL_WRITETALLY;
+				counter0->enabled = true;
+
+				counter0->num_clients = 1;
+				counter0->clients[0] = MC_STAT_OVERALL_READTALLY;
+				counter0->reschedule = (mode != FILTER_NONE);
+
+				counter0->mode = mode;
+				counter0->address_low = (u32)address_low;
+				counter0->address_length_1 = (u32)(address_length-1);
+				counter0->address_window_size_1 = (u32)(address_window_size-1);
+				if (fperiod)
+					counter0->period = period;
+			}
+		} else if (aggregate) {
 			counter = counter1;
 			llp->enabled = true; /* NOTE: was false in tegra2. */
 			counter0->enabled = false;
@@ -440,7 +476,8 @@ static int tegra_mc_client_parse(const char *buf, size_t count,
 			llp->enabled = false;
 		}
 		counter->num_clients = 1;
-		counter->clients[0] = client_ids[1];
+		if ((!write_tally) && (!read_tally))
+			counter->clients[0] = client_ids[1];
 		counter->reschedule = (mode != FILTER_NONE);
 	} else {
 		ret = -EINVAL;
@@ -651,9 +688,39 @@ static tegra_device_t emc = {
 	.mmio = IO_ADDRESS(TEGRA_EMC_BASE),
 };
 
+#define MC_STAT_EMC_FILTER_SET_MISCELLANEOUS_0_COALESCED_DIS(setIndex)\
+    (setIndex ? MC_STAT_EMC_FILTER_SET1_MISCELLANEOUS_0_COALESCED_DIS \
+     : MC_STAT_EMC_FILTER_SET0_MISCELLANEOUS_0_COALESCED_DIS)
+#define MC_STAT_EMC_FILTER_SET_MISCELLANEOUS_0_COALESCED_SHIFT(setIndex)\
+    (setIndex ? MC_STAT_EMC_FILTER_SET1_MISCELLANEOUS_0_COALESCED_SHIFT \
+     : MC_STAT_EMC_FILTER_SET0_MISCELLANEOUS_0_COALESCED_SHIFT)
+#define MC_STAT_EMC_FILTER_SET_ADDR__LIMIT_LO_0(setIndex)\
+    (setIndex ? MC_STAT_EMC_FILTER_SET1_ADDR__LIMIT_LO_0 \
+     : MC_STAT_EMC_FILTER_SET0_ADDR__LIMIT_LO_0)
+#define MC_STAT_EMC_FILTER_SET_ADDR_LIMIT_HI_0(setIndex)\
+    (setIndex ? MC_STAT_EMC_FILTER_SET1_ADDR_LIMIT_HI_0 \
+     : MC_STAT_EMC_FILTER_SET0_ADDR_LIMIT_HI_0)
+#define MC_STAT_EMC_FILTER_SET_MISCELLANEOUS_0(setIndex)\
+    (setIndex ? MC_STAT_EMC_FILTER_SET1_MISCELLANEOUS_0 \
+     : MC_STAT_EMC_FILTER_SET0_MISCELLANEOUS_0)
+#define MC_STAT_EMC_FILTER_SET_CLIENT_0_0(setIndex)\
+    (setIndex ? MC_STAT_EMC_FILTER_SET1_CLIENT_0_0 \
+     : MC_STAT_EMC_FILTER_SET0_CLIENT_0_0)
+#define MC_STAT_EMC_FILTER_SET_CLIENT_1_0(setIndex)\
+    (setIndex ? MC_STAT_EMC_FILTER_SET1_CLIENT_1_0 \
+     : MC_STAT_EMC_FILTER_SET0_CLIENT_1_0)
+#define MC_STAT_EMC_FILTER_SET_CLIENT_2_0(setIndex)\
+    (setIndex ? MC_STAT_EMC_FILTER_SET1_CLIENT_2_0 \
+     : MC_STAT_EMC_FILTER_SET0_CLIENT_2_0)
+
 void mc_stat_start(tegra_mc_counter_t *counter0, tegra_mc_counter_t *counter1)
 {
+	int i = 0;
 	struct tegra_mc_counter *c;
+	struct tegra_mc_counter *counters[] = {
+		counter0,
+		counter1
+	};
 
 	emc_trace(TRACE_OPT, "tegra_mc_client_0_enabled=%d\n",
 		  tegra_mc_client_0_enabled);
@@ -662,63 +729,80 @@ void mc_stat_start(tegra_mc_counter_t *counter0, tegra_mc_counter_t *counter1)
 	if (!tegra_mc_client_0_enabled)
 		return;
 
-	c = (counter0->enabled) ? counter0 : counter1;
-
 	/* disable statistics */
 	writel((MC_STAT_CONTROL_0_EMC_GATHER_DISABLE <<
 		MC_STAT_CONTROL_0_EMC_GATHER_SHIFT),
 		mc.mmio + MC_STAT_CONTROL_0);
 
-	if (c->enabled) {
-		u32 reg = 0;
-		u32 reg_num;
-		reg |= (MC_STAT_EMC_FILTER_SET0_MISCELLANEOUS_0_COALESCED_DIS <<
-			MC_STAT_EMC_FILTER_SET0_MISCELLANEOUS_0_COALESCED_SHIFT);
-		/* Note these registers are shared */
-		writel(c->current_address_low,
-		       mc.mmio + MC_STAT_EMC_FILTER_SET0_ADDR__LIMIT_LO_0);
-		writel(c->current_address_high,
-		       mc.mmio + MC_STAT_EMC_FILTER_SET0_ADDR_LIMIT_HI_0);
-		emc_trace(TRACE_REG, "addr_limit low=0x%x, high=0x%x\n",
-			readl(mc.mmio + MC_STAT_EMC_FILTER_SET0_ADDR__LIMIT_LO_0),
-			readl(mc.mmio + MC_STAT_EMC_FILTER_SET0_ADDR_LIMIT_HI_0));
-		writel(0xFFFFFFFF, mc.mmio + MC_STAT_EMC_CLOCK_LIMIT_0);
-		writel(0xFFFF, mc.mmio + MC_STAT_EMC_CLOCK_LIMIT_MSBS_0);
-		writel(reg, mc.mmio + MC_STAT_EMC_FILTER_SET0_MISCELLANEOUS_0);
+	for (i = 0; i < ARRAY_SIZE(counters); i++) {
+		c = counters[i];
+		if (c->enabled) {
+			u32 reg = 0;
+			u32 reg_num;
+			reg |= (MC_STAT_EMC_FILTER_SET_MISCELLANEOUS_0_COALESCED_DIS(i) <<
+				MC_STAT_EMC_FILTER_SET_MISCELLANEOUS_0_COALESCED_SHIFT(i));
+			/* Note these registers are shared */
+			writel(c->current_address_low,
+				   mc.mmio + MC_STAT_EMC_FILTER_SET_ADDR__LIMIT_LO_0(i));
+			writel(c->current_address_high,
+				   mc.mmio + MC_STAT_EMC_FILTER_SET_ADDR_LIMIT_HI_0(i));
+			emc_trace(TRACE_REG, "addr_limit low=0x%x, high=0x%x\n",
+				readl(mc.mmio + MC_STAT_EMC_FILTER_SET_ADDR__LIMIT_LO_0(i)),
+				readl(mc.mmio + MC_STAT_EMC_FILTER_SET_ADDR_LIMIT_HI_0(i)));
+			writel(0xFFFFFFFF, mc.mmio + MC_STAT_EMC_CLOCK_LIMIT_0);
+			writel(0xFFFF, mc.mmio + MC_STAT_EMC_CLOCK_LIMIT_MSBS_0);
+			writel(reg, mc.mmio + MC_STAT_EMC_FILTER_SET_MISCELLANEOUS_0(i));
 
-		if (c->clients[0] == MC_STAT_AGGREGATE) {
-			/* enable all clients */
-			writel(0xFFFFFFFF,
-			       mc.mmio + MC_STAT_EMC_FILTER_SET0_CLIENT_0_0);
-			writel(0xFFFFFFFF,
-			       mc.mmio + MC_STAT_EMC_FILTER_SET0_CLIENT_1_0);
-			writel(0x00000003,
-			       mc.mmio + MC_STAT_EMC_FILTER_SET0_CLIENT_2_0);
-			emc_trace(TRACE_REG, "select all clients\n");
-		} else {
-			/* enable a selected client at a time */
-			writel(0, mc.mmio + MC_STAT_EMC_FILTER_SET0_CLIENT_0_0);
-			writel(0, mc.mmio + MC_STAT_EMC_FILTER_SET0_CLIENT_1_0);
-			writel(0, mc.mmio + MC_STAT_EMC_FILTER_SET0_CLIENT_2_0);
-			reg_num = c->clients[c->current_client] / 32;
-			reg = 1 << (c->clients[c->current_client] % 32);
-			writel(reg,
-			       mc.mmio + MC_STAT_EMC_FILTER_SET0_CLIENT_0_0 +
-			       (reg_num * 4));
-			emc_trace(TRACE_REG,
-				  "idx=%d, client=%d, reg=0x%x, val=0x%x\n",
-				  c->current_client,
-				  c->clients[c->current_client],
-				  MC_STAT_EMC_FILTER_SET0_CLIENT_0_0 +
-				  (reg_num * 4), reg);
-			emc_trace(TRACE_REG,
-				  "client_0=0x%x, client_1=0x%x, client_2=0x%x\n",
-				  readl(mc.mmio +
-					MC_STAT_EMC_FILTER_SET0_CLIENT_0_0),
-				  readl(mc.mmio +
-					MC_STAT_EMC_FILTER_SET0_CLIENT_1_0),
-				  readl(mc.mmio +
-					MC_STAT_EMC_FILTER_SET0_CLIENT_2_0));
+			if (c->clients[0] == MC_STAT_OVERALL_AGGREGATE) {
+				/* enable all clients */
+				writel(0xFFFFFFFF,
+					   mc.mmio + MC_STAT_EMC_FILTER_SET_CLIENT_0_0(i));
+				writel(0xFFFFFFFF,
+					   mc.mmio + MC_STAT_EMC_FILTER_SET_CLIENT_1_0(i));
+				writel(0x00000003,
+					   mc.mmio + MC_STAT_EMC_FILTER_SET_CLIENT_2_0(i));
+				emc_trace(TRACE_REG, "select all clients\n");
+			} else if (c->clients[0] == MC_STAT_OVERALL_WRITETALLY) {
+				writel(0,
+					   mc.mmio + MC_STAT_EMC_FILTER_SET_CLIENT_0_0(i));
+				writel(0xFFFFFF00,
+					   mc.mmio + MC_STAT_EMC_FILTER_SET_CLIENT_1_0(i));
+				writel(0x00000003,
+					   mc.mmio + MC_STAT_EMC_FILTER_SET_CLIENT_2_0(i));
+				emc_trace(TRACE_REG, "select all write clients\n");
+			} else if (c->clients[0] == MC_STAT_OVERALL_READTALLY) {
+				writel(0xFFFFFFFF,
+					   mc.mmio + MC_STAT_EMC_FILTER_SET_CLIENT_0_0(i));
+				writel(0x000000FF,
+					   mc.mmio + MC_STAT_EMC_FILTER_SET_CLIENT_1_0(i));
+				writel(0,
+					   mc.mmio + MC_STAT_EMC_FILTER_SET_CLIENT_2_0(i));
+				emc_trace(TRACE_REG, "select all read clients\n");
+			} else {
+				/* enable a selected client at a time */
+				writel(0, mc.mmio + MC_STAT_EMC_FILTER_SET_CLIENT_0_0(i));
+				writel(0, mc.mmio + MC_STAT_EMC_FILTER_SET_CLIENT_1_0(i));
+				writel(0, mc.mmio + MC_STAT_EMC_FILTER_SET_CLIENT_2_0(i));
+				reg_num = c->clients[c->current_client] / 32;
+				reg = 1 << (c->clients[c->current_client] % 32);
+				writel(reg,
+					   mc.mmio + MC_STAT_EMC_FILTER_SET_CLIENT_0_0(i) +
+					   (reg_num * 4));
+				emc_trace(TRACE_REG,
+					  "idx=%d, client=%d, reg=0x%x, val=0x%x\n",
+					  c->current_client,
+					  c->clients[c->current_client],
+					  MC_STAT_EMC_FILTER_SET_CLIENT_0_0(i) +
+					  (reg_num * 4), reg);
+				emc_trace(TRACE_REG,
+					  "client_0=0x%x, client_1=0x%x, client_2=0x%x\n",
+					  readl(mc.mmio +
+						MC_STAT_EMC_FILTER_SET_CLIENT_0_0(i)),
+					  readl(mc.mmio +
+						MC_STAT_EMC_FILTER_SET_CLIENT_1_0(i)),
+					  readl(mc.mmio +
+						MC_STAT_EMC_FILTER_SET_CLIENT_2_0(i)));
+			}
 		}
 	}
 
@@ -739,12 +823,12 @@ void mc_stat_stop(tegra_mc_counter_t *counter0,
 	if (counter0->enabled) {
 		counter0->value = (((u64)readl(mc.mmio + MC_STAT_EMC_SET0_COUNT_MSBS_0)) << 32);
 		counter0->value |= readl(mc.mmio + MC_STAT_EMC_SET0_COUNT_0);
-		emc_trace(TRACE_REG,"%s:counter0->value=0x%llx\n ", __func__, counter0->value);
+		emc_trace(TRACE_REG, "%s:counter0->value=0x%llx\n ", __func__, counter0->value);
 	}
-	else {
+	if (counter1->enabled) {
 		counter1->value = (((u64)readl(mc.mmio + MC_STAT_EMC_SET1_COUNT_MSBS_0)) << 32);
 		counter1->value = readl(mc.mmio + MC_STAT_EMC_SET1_COUNT_0);
-		emc_trace(TRACE_REG,"%s:counter0->value=0x%llx\n  ", __func__, counter1->value);
+		emc_trace(TRACE_REG, "%s:counter1->value=0x%llx\n  ", __func__, counter1->value);
 	}
 }
 
@@ -967,7 +1051,7 @@ static size_t stat_log_counter(struct tegra_mc_counter *c,
 
 	e->word0.enabled = 1;
 	e->word0.address_range_change = c->address_range_change;
-	e->word0.event_id = (l) ? MC_STAT_AGGREGATE :
+	e->word0.event_id = (l) ? MC_STAT_OVERALL_AGGREGATE :
 		c->clients[c->current_client];
 	e->word0.address_range_low_pfn = __phys_to_pfn(c->current_address_low);
 	size += sizeof(e->word0);
@@ -1005,15 +1089,17 @@ static void stat_log(void)
 	required_log_size += sizeof(header);
 
 	if (tegra_mc_client_0_enabled) {
-		elem = stat_log_counter(&mc_counter0, NULL, &event[count],
-					&value[count]);
+		elem = stat_log_counter(&mc_counter0, NULL, &event[count], &value[count]);
 		if (elem) {
 			required_log_size += elem;
 			count++;
 		}
 
-		elem = stat_log_counter(&mc_counter1, &emc_dram_counter,
-					&event[count], &value[count]);
+		if (aggregate)
+			elem = stat_log_counter(&mc_counter1, &emc_dram_counter, &event[count],
+					&value[count]);
+		else
+			elem = stat_log_counter(&mc_counter1, NULL, &event[count], &value[count]);
 
 		if (elem) {
 			required_log_size += elem;
