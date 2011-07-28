@@ -508,7 +508,7 @@ static int tegra3_clk_m_enable(struct clk *c)
 static void tegra3_clk_m_disable(struct clk *c)
 {
 	pr_debug("%s on clock %s\n", __func__, c->name);
-	BUG();
+	WARN(1, "Attempting to disable main SoC clock\n");
 }
 
 static struct clk_ops tegra_clk_m_ops = {
