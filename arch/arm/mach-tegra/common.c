@@ -324,6 +324,12 @@ void __init tegra_init_early(void)
 {
 	arm_pm_restart = tegra_pm_restart;
 	register_reboot_notifier(&tegra_reboot_notifier);
+#ifndef CONFIG_SMP
+	/* For SMP system, initializing the reset handler here is too
+	   late. For non-SMP systems, the function that calls the reset
+	   handler initializer is not called, so do it here for non-SMP. */
+	tegra_cpu_reset_handler_init();
+#endif
 	tegra_init_fuse();
 	tegra_gpio_resume_init();
 	tegra_init_clock();
