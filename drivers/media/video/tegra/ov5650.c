@@ -188,7 +188,7 @@ static struct ov5650_reg mode_2592x1944[] = {
 };
 
 static struct ov5650_reg mode_1296x972[] = {
-	{0x3621, 0xaf}, /* analog horizontal binning/sampling not enabled.
+	{0x3621, 0xaf}, /* analog horizontal binning/sampling enabled.
 			   pg 108 */
 	{0x3632, 0x5a}, /* analog pg 108 */
 	{0x3703, 0xb0}, /* analog pg 108 */
@@ -379,7 +379,7 @@ static struct ov5650_reg mode_1264x704[] = {
 	{0x3503, 0x00}, /* AEC auto AGC auto gain has no latch delay. pg 38 */
 	{0x3613, 0xc4}, /* analog pg 108 */
 
-	{0x3621, 0xaf}, /* analog horizontal binning/sampling not enabled.
+	{0x3621, 0xaf}, /* analog horizontal binning/sampling enabled.
 			   pg 108 */
 	{0x3632, 0x55}, /* analog pg 108 */
 	{0x3703, 0x9a}, /* analog pg 108 */
@@ -467,7 +467,8 @@ enum {
 	OV5650_MODE_2592x1944,
 	OV5650_MODE_1296x972,
 	OV5650_MODE_2080x1164,
-	OV5650_MODE_1264x704
+	OV5650_MODE_1264x704,
+	OV5650_MODE_INVALID
 };
 
 static struct ov5650_reg *mode_table[] = {
@@ -506,6 +507,63 @@ static inline void ov5650_get_gain_reg(struct ov5650_reg *regs, u16 gain)
 	regs->val = gain;
 }
 
+static int ov5650_read_reg(struct i2c_client *client, u16 addr, u8 *val)
+{
+	int err;
+	struct i2c_msg msg[2];
+	unsigned char data[3];
+
+	if (!client->adapter)
+		return -ENODEV;
+
+	msg[0].addr = client->addr;
+	msg[0].flags = 0;
+	msg[0].len = 2;
+	msg[0].buf = data;
+
+	/* high byte goes out first */
+	data[0] = (u8) (addr >> 8);;
+	data[1] = (u8) (addr & 0xff);
+
+	msg[1].addr = client->addr;
+	msg[1].flags = I2C_M_RD;
+	msg[1].len = 1;
+	msg[1].buf = data + 2;
+
+	err = i2c_transfer(client->adapter, msg, 2);
+
+	if (err != 1)
+		return -EINVAL;
+
+	*val = data[2];
+
+	return 0;
+}
+
+static int ov5650_read_reg_helper(struct ov5650_info *info,
+					u16 addr, u8 *val)
+{
+	int ret;
+	switch (info->camera_mode) {
+	case Main:
+	case StereoCameraMode_Left:
+		ret = ov5650_read_reg(info->left.i2c_client, addr, val);
+		break;
+	case StereoCameraMode_Stereo:
+		ret = ov5650_read_reg(info->left.i2c_client, addr, val);
+		if (ret)
+			break;
+		ret = ov5650_read_reg(info->right.i2c_client, addr, val);
+		break;
+	case StereoCameraMode_Right:
+		ret = ov5650_read_reg(info->right.i2c_client, addr, val);
+		break;
+	default:
+		return -1;
+	}
+	return ret;
+}
+
 static int ov5650_write_reg(struct i2c_client *client, u16 addr, u8 val)
 {
 	int err;
@@ -532,7 +590,7 @@ static int ov5650_write_reg(struct i2c_client *client, u16 addr, u8 val)
 		retry++;
 		pr_err("ov5650: i2c transfer failed, retrying %x %x\n",
 			addr, val);
-		msleep(3);
+		usleep_range(3000, 3250);
 	} while (retry <= OV5650_MAX_RETRIES);
 
 	return err;
@@ -709,6 +767,140 @@ static int ov5650_set_gain(struct ov5650_info *info, u16 gain)
 	return ret;
 }
 
+static int ov5650_set_binning(struct ov5650_info *info, u8 enable)
+{
+	s32 ret;
+	u8  array_ctrl_reg, analog_ctrl_reg, timing_reg;
+	u32 val;
+
+	if (info->mode == OV5650_MODE_2592x1944
+	 || info->mode == OV5650_MODE_2080x1164
+	 || info->mode >= OV5650_MODE_INVALID) {
+		return -EINVAL;
+	}
+
+	ov5650_read_reg_helper(info, OV5650_ARRAY_CONTROL_01, &array_ctrl_reg);
+	ov5650_read_reg_helper(info, OV5650_ANALOG_CONTROL_D, &analog_ctrl_reg);
+	ov5650_read_reg_helper(info, OV5650_TIMING_TC_REG_18, &timing_reg);
+
+	/* Group 3 begin (pg.78) */
+	ret = ov5650_write_reg_helper(info,
+			OV5650_SRM_GRUP_ACCESS,
+			OV5650_GROUP_ID(3));
+	if (ret < 0)
+		return -EIO;
+
+	if (!enable) {
+		/* 2x2 subsampling
+		 * ----------------
+		 * address | value
+		 * --------+-------
+		 *  0x3621 | 0xEF
+		 *  0x370D | 0x02
+		 *  0x3818 | 0xC1
+		 * ----------------
+		 */
+	ret = ov5650_write_reg_helper(info,
+		OV5650_ARRAY_CONTROL_01,
+		array_ctrl_reg |
+		(OV5650_H_BINNING_BIT | OV5650_H_SUBSAMPLING_BIT));
+
+	if (ret < 0)
+		goto exit;
+
+	ret = ov5650_write_reg_helper(info,
+		OV5650_ANALOG_CONTROL_D,
+		analog_ctrl_reg & ~OV5650_V_BINNING_BIT);
+
+	if (ret < 0)
+		goto exit;
+
+	ret = ov5650_write_reg_helper(info,
+		OV5650_TIMING_TC_REG_18,
+		timing_reg | OV5650_V_SUBSAMPLING_BIT);
+
+	if (ret < 0)
+		goto exit;
+
+	if (info->mode == OV5650_MODE_1296x972)
+		val = 0x1A2;
+	else
+		/* FIXME: this value is not verified yet. */
+		val = 0x1A8;
+
+	ret = ov5650_write_reg_helper(info,
+		OV5650_TIMING_CONTROL_HS_HIGH,
+		(val >> 8));
+
+	if (ret < 0)
+		goto exit;
+
+	ret = ov5650_write_reg_helper(info,
+		OV5650_TIMING_CONTROL_HS_LOW,
+		(val & 0xFF));
+	} else {
+		/* 2x2 binning
+		 * ----------------
+		 * address | value
+		 * --------+-------
+		 *  0x3621 | 0xAF
+		 *  0x370D | 0x42
+		 *  0x3818 | 0xC1
+		 * ----------------
+		 */
+		ret = ov5650_write_reg_helper(info,
+			OV5650_ARRAY_CONTROL_01,
+			(array_ctrl_reg | OV5650_H_BINNING_BIT)
+			& ~OV5650_H_SUBSAMPLING_BIT);
+
+		if (ret < 0)
+			goto exit;
+
+		ret = ov5650_write_reg_helper(info,
+			OV5650_ANALOG_CONTROL_D,
+			analog_ctrl_reg | OV5650_V_BINNING_BIT);
+
+		if (ret < 0)
+			goto exit;
+
+		ret = ov5650_write_reg_helper(info,
+			OV5650_TIMING_TC_REG_18,
+			timing_reg | OV5650_V_SUBSAMPLING_BIT);
+
+		if (ret < 0)
+			goto exit;
+
+		if (info->mode == OV5650_MODE_1296x972)
+			val = 0x33C;
+		else
+			val = 0x254;
+
+		ret = ov5650_write_reg_helper(info,
+			OV5650_TIMING_CONTROL_HS_HIGH,
+			(val >> 8));
+
+		if (ret < 0)
+			goto exit;
+
+		ret = ov5650_write_reg_helper(info,
+			OV5650_TIMING_CONTROL_HS_LOW,
+			(val & 0xFF));
+	}
+
+exit:
+	/* Group 3 end (pg.78) */
+	ret = ov5650_write_reg_helper(info,
+		OV5650_SRM_GRUP_ACCESS,
+		(OV5650_GROUP_HOLD_END_BIT | OV5650_GROUP_ID(3)));
+
+	/* Group3 launch (pg.78) */
+	ret |= ov5650_write_reg_helper(info,
+		OV5650_SRM_GRUP_ACCESS,
+		(OV5650_GROUP_HOLD_BIT | OV5650_GROUP_LAUNCH_BIT | OV5650_GROUP_ID(3)));
+
+	return ret;
+}
+
 static int ov5650_test_pattern(struct ov5650_info *info,
 			       enum ov5650_test_pattern pattern)
 {
@@ -790,6 +982,8 @@ static long ov5650_ioctl(struct file *file,
 		return ov5650_set_coarse_time(info, (u32)arg);
 	case OV5650_IOCTL_SET_GAIN:
 		return ov5650_set_gain(info, (u16)arg);
+	case OV5650_IOCTL_SET_BINNING:
+		return ov5650_set_binning(info, (u8)arg);
 	case OV5650_IOCTL_GET_STATUS:
 	{
 		u16 status = 0;
