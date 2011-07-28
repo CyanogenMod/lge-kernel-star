@@ -137,6 +137,8 @@ int tegra_usb_phy_bus_idle(struct tegra_usb_phy *phy);
 
 bool tegra_usb_phy_is_device_connected(struct tegra_usb_phy *phy);
 
+bool tegra_usb_phy_charger_detect(struct tegra_usb_phy *phy);
+
 int __init tegra_usb_phy_init(struct usb_phy_plat_data *pdata, int size);
 
 #endif /* __MACH_USB_PHY_H */
