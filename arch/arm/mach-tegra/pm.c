@@ -436,7 +436,7 @@ bool tegra_set_cpu_in_lp2(int cpu)
 	   cacheable and sharable which IRAM isn't. */
 	*iram_cpu_lp2_mask = tegra_in_lp2;
 
-	if (cpumask_equal(&tegra_in_lp2, cpu_online_mask))
+	if ((cpu == 0) && cpumask_equal(&tegra_in_lp2, cpu_online_mask))
 		last_cpu = true;
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	else

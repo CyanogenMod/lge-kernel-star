@@ -202,11 +202,6 @@ __is_not_lp1:
 	ldr	r9, [r12, #RESET_DATA(MASK_LP2)]
 	tst	r9, r11				@ if in_lp2
 	beq	__is_not_lp2
-#if defined(CONFIG_SMP) && defined(CONFIG_ARCH_TEGRA_2x_SOC)
-	/* Tegra2 CPU1 LP2 wakeup uses the secondary startup handler */
-	cmp	r10, #1
-	bne	__is_not_lp2
-#endif
 	ldr	lr, [r12, #RESET_DATA(STARTUP_LP2)]
 	cmp	lr, #0
 	bleq	__die				@ no LP2 startup handler

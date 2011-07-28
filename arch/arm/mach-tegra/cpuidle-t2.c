@@ -48,6 +48,7 @@
 #include "gic.h"
 #include "pm.h"
 #include "sleep.h"
+#include "timer.h"
 
 static struct {
 	unsigned int cpu_ready_count[2];
@@ -99,6 +100,7 @@ static void tegra2_wake_reset_cpu(int cpu)
 	reg = readl(clk_rst + 0x4c);
 	writel(reg & ~(1 << (8 + cpu)), clk_rst + 0x4c);
 
+	/* take the CPU out of reset */
 	reg = 0x1111 << cpu;
 	writel(reg, clk_rst + 0x344);
 
@@ -154,8 +156,8 @@ bool tegra2_lp2_is_allowed(struct cpuidle_device *dev,
 	return true;
 }
 
-static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
-			struct cpuidle_state *state, s64 request)
+static int tegra2_idle_lp2_cpu_0(struct cpuidle_device *dev,
+			   struct cpuidle_state *state, s64 request)
 {
 	ktime_t entry_time;
 	ktime_t exit_time;
@@ -195,10 +197,8 @@ static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
 	}
 
 	for_each_online_cpu(i) {
-		if (i != dev->cpu) {
+		if (i != dev->cpu)
 			tegra2_wake_reset_cpu(i);
-			tegra_clear_cpu_in_lp2(i);
-		}
 	}
 
 	exit_time = ktime_get();
@@ -225,6 +225,35 @@ static int tegra2_idle_lp2_last(struct cpuidle_device *dev,
 	return 0;
 }
 
+static noinline int tegra2_idle_lp2_cpu_1(struct cpuidle_device *dev,
+			   struct cpuidle_state *state, s64 request)
+{
+#ifdef CONFIG_SMP
+	struct tegra_twd_context twd_context;
+
+	if (request < tegra_lp2_exit_latency) {
+		/*
+		 * Not enough time left to enter LP2
+		 */
+		tegra_cpu_wfi();
+		return;
+	}
+
+	tegra_gic_cpu_disable();
+
+	tegra_cpu1_idle_time = request - tegra_lp2_exit_latency;
+	smp_wmb();
+
+	tegra_twd_suspend(&twd_context);
+
+	tegra2_sleep_wfi(PLAT_PHYS_OFFSET - PAGE_OFFSET);
+
+	tegra_cpu1_idle_time = LLONG_MAX;
+
+	tegra_twd_resume(&twd_context);
+#endif
+}
+
 void tegra2_idle_lp2(struct cpuidle_device *dev,
 			struct cpuidle_state *state)
 {
@@ -233,19 +262,20 @@ void tegra2_idle_lp2(struct cpuidle_device *dev,
 
 	cpu_pm_enter();
 
-	if (last_cpu) {
-		if (tegra2_idle_lp2_last(dev, state, request) < 0) {
-			int i;
-			for_each_online_cpu(i) {
-				if (i != dev->cpu) {
-					tegra2_wake_reset_cpu(i);
-					tegra_clear_cpu_in_lp2(i);
+	if (dev->cpu == 0) {
+		if (last_cpu) {
+			if (tegra2_idle_lp2_cpu_0(dev, state, request) < 0) {
+				int i;
+				for_each_online_cpu(i) {
+					if (i != dev->cpu)
+						tegra2_wake_reset_cpu(i);
 				}
 			}
-		}
+		} else
+			tegra_cpu_wfi();
 	} else {
-		tegra_cpu1_idle_time = request;
-		tegra2_sleep_wfi(PLAT_PHYS_OFFSET - PAGE_OFFSET);
+		BUG_ON(last_cpu);
+		tegra2_idle_lp2_cpu_1(dev, state, request);
 	}
 
 	cpu_pm_exit();
