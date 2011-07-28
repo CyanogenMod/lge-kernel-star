@@ -218,6 +218,7 @@ ENTRY(tegra2_sleep_wfi)
 	 * r11 contains the original actlr
 	 */
 
+	mov	sp, r7			@ restore SP for aborted suspend
 	bl	tegra_pen_lock
 
 	mov32	r3, TEGRA_PMC_VIRT
@@ -238,6 +239,8 @@ ENTRY(tegra2_sleep_wfi)
 	bl	__cpuc_flush_kern_all
 #endif
 
+	/* FIXME: The next two instructions should be removed if our change to
+	   save the diagnostic regsiter in the CPU context is accepted. */
 	ldmfd	sp!, {r4}
 	mcr	p15, 0, r4, c15, c0, 1	@ write diagnostic register
 	ldmfd	sp!, {lr}

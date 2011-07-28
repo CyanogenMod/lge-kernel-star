@@ -155,17 +155,23 @@ ENDPROC(tegra_cpu_exit_coherency)
 /*
  * tegra_cpu_save
  *
- * r0 = v2p
- * r3 = resume address
- * saves r4-r11 on the stack
- * modifies sp, returns the sp after saving registers but before cpu_suspend,
- *   appropriate for restoring an aborted suspend that does not call cpu_resume
- * corrupts r1, r3-r6, r9, r10
+ * Input:
+ *	r0 = v:p offset
+ *	r3 = resume address
+ * Output:
+ *	r0 = v:p offset
+ *	r7 = SP after saving the registers but before cpu_suspend, suitable
+ *	     for restoring an aborted suspend that does not call cpu_resume
+ *	sp = SP after cpu_suspend (the 'real' SP)
+ * Saves r4-r11 on the stack
+ * Corrupts r1, r3-r10
  */
 
 ENTRY(tegra_cpu_save)
 	stmfd	sp!, {r4 - r11}
 	stmfd	sp!, {r3}
+	/* FIXME: The next two instructions should be removed if our change to
+	   save the diagnostic regsiter in the CPU context is accepted. */
 	mrc	p15, 0, r4, c15, c0, 1	@ read diagnostic register
 	stmfd	sp!, {r4}
 
@@ -180,7 +186,6 @@ ENTRY(tegra_cpu_save)
 	mov	lr, r4
 	mov	r0, r5
 	mov	r2, r6
-	mov	sp, r7
 	mov	pc, lr
 ENDPROC(tegra_cpu_save)
 
@@ -221,6 +226,8 @@ tegra_cpu_resume:
 
 	bl	cpu_init
 
+	/* FIXME: The next two instructions should be removed if our change to
+	   save the diagnostic regsiter in the CPU context is accepted. */
 	ldmfd	sp!, {r4}
 	mcr	p15, 0, r4, c15, c0, 1	@ write diagnostic register
 	ldmfd	sp!, {lr}
