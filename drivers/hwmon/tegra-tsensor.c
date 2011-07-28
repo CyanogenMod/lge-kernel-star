@@ -1471,6 +1471,7 @@ static int tegra_tsensor_setup(struct platform_device *pdev)
 	if (!test_temperature_algo(data)) {
 		dev_err(&pdev->dev, " Error: read temperature "
 			"algorithm broken ");
+		err = -EIO;
 		goto err_setup;
 	}
 
