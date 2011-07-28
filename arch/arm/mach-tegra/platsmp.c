@@ -261,8 +261,10 @@ void __init smp_init_cpus(void)
 	   here. If there is more than one CPU, we must wait until after
 	   the cpu_present_mask has been updated with all present CPUs in
 	   platform_smp_prepare_cpus() before initializing the reset handler. */
-	if (ncores == 1)
+	if (ncores == 1) {
 		tegra_cpu_reset_handler_init();
+		tegra_all_cpus_booted = true;
+	}
 }
 
 void __init platform_smp_prepare_cpus(unsigned int max_cpus)
