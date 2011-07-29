@@ -283,7 +283,7 @@ static int gpio_switch_pmu_hdmi_5v0_en_voltages[] = {5000};
 
 /* LCD-D16 (GPIO M0) from T30*/
 static struct regulator_consumer_supply gpio_switch_vdd_fuse_en_supply[] = {
-	REGULATOR_SUPPLY("vpp_fuse", NULL),
+	REGULATOR_SUPPLY("vdd_fuse", NULL),
 };
 static int gpio_switch_vdd_fuse_en_voltages[] = {3300};
 
