@@ -274,6 +274,7 @@ void tegra_cluster_switch_epilog(unsigned int flags)
 
 int tegra_cluster_control(unsigned int us, unsigned int flags)
 {
+#ifdef CONFIG_PM_SLEEP
 	unsigned int target_cluster = flags & TEGRA_POWER_CLUSTER_MASK;
 	unsigned int current_cluster = is_lp_cluster()
 					? TEGRA_POWER_CLUSTER_LP
@@ -325,6 +326,9 @@ int tegra_cluster_control(unsigned int us, unsigned int flags)
 	DEBUG_CLUSTER(("%s: %s\r\n", __func__, is_lp_cluster() ? "LP" : "G"));
 
 	return 0;
+#else
+	return -ENODEV;
+#endif
 }
 
 static u32 mc_reserved_rsv;
