@@ -412,6 +412,7 @@ static void suspend_cpu_complex(u32 mode)
 void tegra_clear_cpu_in_lp2(int cpu)
 {
 	spin_lock(&tegra_lp2_lock);
+	BUG_ON(!cpumask_test_cpu(cpu, &tegra_in_lp2));
 	cpumask_clear_cpu(cpu, &tegra_in_lp2);
 
 	/* Update the IRAM copy used by the reset handler. The IRAM copy
@@ -428,6 +429,7 @@ bool tegra_set_cpu_in_lp2(int cpu)
 	bool last_cpu = false;
 
 	spin_lock(&tegra_lp2_lock);
+	BUG_ON(cpumask_test_cpu(cpu, &tegra_in_lp2));
 	cpumask_set_cpu(cpu, &tegra_in_lp2);
 
 	/* Update the IRAM copy used by the reset handler. The IRAM copy
