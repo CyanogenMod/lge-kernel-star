@@ -52,6 +52,7 @@
 #define MUX_CLK_OUT		(1 << 19)
 #define PLLM			(1 << 20)
 #define DIV_U71_INT		(1 << 21)
+#define DIV_U71_IDLE		(1 << 22)
 #define ENABLE_ON_INIT		(1 << 28)
 #define PERIPH_ON_APB		(1 << 29)
 

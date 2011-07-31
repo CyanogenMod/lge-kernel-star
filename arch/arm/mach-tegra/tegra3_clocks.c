@@ -132,6 +132,8 @@
 #define PERIPH_CLK_SOURCE_DIVU71_MASK	0xFF
 #define PERIPH_CLK_SOURCE_DIVU16_MASK	0xFFFF
 #define PERIPH_CLK_SOURCE_DIV_SHIFT	0
+#define PERIPH_CLK_SOURCE_DIVIDLE_SHIFT	8
+#define PERIPH_CLK_SOURCE_DIVIDLE_VAL	50
 #define PERIPH_CLK_UART_DIV_ENB		(1<<24)
 #define PERIPH_CLK_VI_SEL_EX_SHIFT	24
 #define PERIPH_CLK_VI_SEL_EX_MASK	(0x3<<PERIPH_CLK_VI_SEL_EX_SHIFT)
@@ -1913,6 +1915,13 @@ static void tegra3_periph_clk_init(struct clk *c)
 		if ((c->flags & DIV_U71_UART) &&
 		    (!(val & PERIPH_CLK_UART_DIV_ENB))) {
 			divu71 = 0;
+		}
+		if (c->flags & DIV_U71_IDLE) {
+			val &= ~(PERIPH_CLK_SOURCE_DIVU71_MASK <<
+				PERIPH_CLK_SOURCE_DIVIDLE_SHIFT);
+			val |= (PERIPH_CLK_SOURCE_DIVIDLE_VAL <<
+				PERIPH_CLK_SOURCE_DIVIDLE_SHIFT);
+			clk_writel(val, c->reg);
 		}
 		c->div = divu71 + 2;
 		c->mul = 2;
@@ -3955,10 +3964,10 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("uartc_dbg",	"serial8250.0",		"uartc",55,	0x1a0,	800000000, mux_pllp_clkm,		MUX | DIV_U71 | DIV_U71_UART | PERIPH_ON_APB),
 	PERIPH_CLK("uartd_dbg",	"serial8250.0",		"uartd",65,	0x1c0,	800000000, mux_pllp_clkm,		MUX | DIV_U71 | DIV_U71_UART | PERIPH_ON_APB),
 	PERIPH_CLK("uarte_dbg",	"serial8250.0",		"uarte",66,	0x1c4,	800000000, mux_pllp_clkm,		MUX | DIV_U71 | DIV_U71_UART | PERIPH_ON_APB),
-	PERIPH_CLK("3d",	"3d",			NULL,	24,	0x158,	520000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | DIV_U71_INT | PERIPH_MANUAL_RESET),
-	PERIPH_CLK("3d2",       "3d2",			NULL,	98,	0x3b0,	520000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | DIV_U71_INT | PERIPH_MANUAL_RESET),
-	PERIPH_CLK("2d",	"2d",			NULL,	21,	0x15c,	520000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | DIV_U71_INT),
 	PERIPH_CLK_EX("vi",	"tegra_camera",		"vi",	20,	0x148,	425000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | DIV_U71_INT,	&tegra_vi_clk_ops),
+	PERIPH_CLK("3d",	"3d",			NULL,	24,	0x158,	520000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | DIV_U71_INT | DIV_U71_IDLE | PERIPH_MANUAL_RESET),
+	PERIPH_CLK("3d2",       "3d2",			NULL,	98,	0x3b0,	520000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | DIV_U71_INT | DIV_U71_IDLE | PERIPH_MANUAL_RESET),
+	PERIPH_CLK("2d",	"2d",			NULL,	21,	0x15c,	520000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | DIV_U71_INT | DIV_U71_IDLE),
 	PERIPH_CLK("vi_sensor",	"tegra_camera",		"vi_sensor",	20,	0x1a8,	150000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | PERIPH_NO_RESET),
 	PERIPH_CLK("epp",	"epp",			NULL,	19,	0x16c,	520000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | DIV_U71_INT),
 	PERIPH_CLK("mpe",	"mpe",			NULL,	60,	0x170,	520000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | DIV_U71_INT),
