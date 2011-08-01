@@ -1825,9 +1825,9 @@ static const struct tegra_emc_table cardhu_emc_tables_k4p8g304eb[] = {
 			0x00000003, /* EMC_REXT */
 			0x00000000, /* EMC_WEXT */
 			0x00000004, /* EMC_WDV */
-			0x0000000a, /* EMC_QUSE */
+			0x00000009, /* EMC_QUSE */
 			0x00000006, /* EMC_QRST */
-			0x0000000b, /* EMC_QSAFE */
+			0x0000000c, /* EMC_QSAFE */
 			0x00000010, /* EMC_RDV */
 			0x000007df, /* EMC_REFRESH */
 			0x00000000, /* EMC_BURST_REFRESH_NUM */
@@ -1847,7 +1847,7 @@ static const struct tegra_emc_table cardhu_emc_tables_k4p8g304eb[] = {
 			0x00000002, /* EMC_TCLKSTOP */
 			0x000008aa, /* EMC_TREFBW */
 			0x00000000, /* EMC_QUSE_EXTRA */
-			0x00000004, /* EMC_FBIO_CFG6 */
+			0x00000006, /* EMC_FBIO_CFG6 */
 			0x00000000, /* EMC_ODT_WRITE */
 			0x00000000, /* EMC_ODT_READ */
 			0x00006282, /* EMC_FBIO_CFG5 */
@@ -1916,8 +1916,8 @@ static const struct tegra_emc_table cardhu_emc_tables_k4p8g304eb[] = {
 			0x00110b10, /* MC_EMEM_ARB_DA_COVERS */
 			0x71c81811, /* MC_EMEM_ARB_MISC0 */
 			0x001f0000, /* MC_EMEM_ARB_RING1_THROTTLE */
-			0xd0000000, /* EMC_FBIO_SPARE */
-			0xff00ff00, /* EMC_CFG_RSV */
+			0xe0000000, /* EMC_FBIO_SPARE */
+			0xff00ff88, /* EMC_CFG_RSV */
 		},
 		0x00000030, /* EMC_ZCAL_WAIT_CNT after clock change */
 		0x001fffff, /* EMC_AUTO_CAL_INTERVAL */
@@ -1928,7 +1928,7 @@ static const struct tegra_emc_table cardhu_emc_tables_k4p8g304eb[] = {
 	},
 };
 
-static const struct tegra_emc_table cardhu_emc_tables_edb8032b2ma[] = {
+static const struct tegra_emc_table cardhu_emc_tables_edb8132b2ma[] = {
 	{
 		0x31,       /* Rev 3.1 */
 		25500,      /* SDRAM frequency */
@@ -2426,7 +2426,7 @@ static const struct tegra_emc_table cardhu_emc_tables_edb8032b2ma[] = {
 			0x00000009, /* EMC_QUSE */
 			0x00000006, /* EMC_QRST */
 			0x0000000c, /* EMC_QSAFE */
-			0x00000011, /* EMC_RDV */
+			0x00000010, /* EMC_RDV */
 			0x000007df, /* EMC_REFRESH */
 			0x00000000, /* EMC_BURST_REFRESH_NUM */
 			0x000001f7, /* EMC_PRE_REFRESH_REQ_CNT */
@@ -2535,8 +2535,8 @@ int cardhu_emc_init(void)
 	switch (board.board_id) {
 	case BOARD_PM269:
 		if (MEMORY_TYPE(board.sku) == SKU_MEMORY_ELPIDA)
-			tegra_init_emc(cardhu_emc_tables_edb8032b2ma,
-					ARRAY_SIZE(cardhu_emc_tables_edb8032b2ma));
+			tegra_init_emc(cardhu_emc_tables_edb8132b2ma,
+					ARRAY_SIZE(cardhu_emc_tables_edb8132b2ma));
 		else
 			tegra_init_emc(cardhu_emc_tables_k4p8g304eb,
 					ARRAY_SIZE(cardhu_emc_tables_k4p8g304eb));
