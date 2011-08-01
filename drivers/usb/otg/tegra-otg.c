@@ -188,12 +188,13 @@ static irqreturn_t tegra_otg_irq(int irq, void *data)
 	spin_lock_irqsave(&tegra->lock, flags);
 
 	val = otg_readl(tegra, USB_PHY_WAKEUP);
-	otg_writel(tegra, val, USB_PHY_WAKEUP);
-
-	if ((val & USB_ID_INT_STATUS) || (val & USB_VBUS_INT_STATUS)) {
-		tegra->int_status = val;
-		tegra->detect_vbus = false;
-		schedule_work(&tegra->work);
+	if (val & (USB_VBUS_INT_EN | USB_ID_INT_EN)) {
+		otg_writel(tegra, val, USB_PHY_WAKEUP);
+		if ((val & USB_ID_INT_STATUS) || (val & USB_VBUS_INT_STATUS)) {
+			tegra->int_status = val;
+			tegra->detect_vbus = false;
+			schedule_work(&tegra->work);
+		}
 	}
 
 	spin_unlock_irqrestore(&tegra->lock, flags);
@@ -377,8 +378,9 @@ static int __exit tegra_otg_remove(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_PM
-static int tegra_otg_suspend(struct platform_device *pdev, pm_message_t state)
+static int tegra_otg_suspend(struct device *dev)
 {
+	struct platform_device *pdev = to_platform_device(dev);
 	struct tegra_otg_data *tegra_otg = platform_get_drvdata(pdev);
 	struct otg_transceiver *otg = &tegra_otg->otg;
 	enum usb_otg_state from = otg->state;
@@ -394,8 +396,9 @@ static int tegra_otg_suspend(struct platform_device *pdev, pm_message_t state)
 	return 0;
 }
 
-static int tegra_otg_resume(struct platform_device * pdev)
+static void tegra_otg_resume(struct device *dev)
 {
+	struct platform_device *pdev = to_platform_device(dev);
 	struct tegra_otg_data *tegra_otg = platform_get_drvdata(pdev);
 
 	tegra_otg_enable_clk();
@@ -410,20 +413,24 @@ static int tegra_otg_resume(struct platform_device * pdev)
 	writel(tegra_otg->intr_reg_data, (tegra_otg->regs + USB_PHY_WAKEUP));
 	clk_disable(tegra_otg->clk);
 
-	return 0;
+	return;
 }
+
+static const struct dev_pm_ops tegra_otg_pm_ops = {
+	.complete = tegra_otg_resume,
+	.suspend = tegra_otg_suspend,
+};
 #endif
 
 static struct platform_driver tegra_otg_driver = {
 	.driver = {
 		.name  = "tegra-otg",
+#ifdef CONFIG_PM
+		.pm    = &tegra_otg_pm_ops,
+#endif
 	},
 	.remove  = __exit_p(tegra_otg_remove),
 	.probe   = tegra_otg_probe,
-#ifdef CONFIG_PM
-	.suspend = tegra_otg_suspend,
-	.resume = tegra_otg_resume,
-#endif
 };
 
 static int __init tegra_otg_init(void)
