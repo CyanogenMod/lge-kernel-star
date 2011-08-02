@@ -38,6 +38,7 @@
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
 #include <linux/syscore_ops.h>
+#include <linux/vmalloc.h>
 
 #include <asm/cacheflush.h>
 #include <asm/cpu_pm.h>
@@ -87,6 +88,9 @@ struct suspend_context {
 };
 
 #ifdef CONFIG_PM_SLEEP
+#ifdef CONFIG_CACHE_L2X0
+void *tegra_cpu_context;	/* non-cacheable page for CPU context */
+#endif
 phys_addr_t tegra_pgd_phys;	/* pgd used by hotplug & LP2 bootup */
 static pgd_t *tegra_pgd;
 static DEFINE_SPINLOCK(tegra_lp2_lock);
@@ -227,7 +231,7 @@ unsigned long tegra_cpu_lp2_min_residency(void)
  * Creates a page table with identity mappings of physical memory and IRAM
  * for use when the MMU is off, in addition to all the regular kernel mappings.
  */
-static int create_suspend_pgtable(void)
+static __init int create_suspend_pgtable(void)
 {
 	tegra_pgd = pgd_alloc(&init_mm);
 	if (!tegra_pgd)
@@ -240,6 +244,40 @@ static int create_suspend_pgtable(void)
 	tegra_pgd_phys = virt_to_phys(tegra_pgd);
 
 	return 0;
+}
+
+/*
+ * alloc_suspend_context
+ *
+ * Allocate a non-cacheable page to hold the CPU contexts.
+ * The standard ARM CPU context save functions don't work if there's
+ * an external L2 cache controller (like a PL310) in system.
+ */
+static __init int alloc_suspend_context(void)
+{
+#ifdef CONFIG_CACHE_L2X0
+	pgprot_t prot = __pgprot_modify(pgprot_kernel, L_PTE_MT_MASK,
+					 L_PTE_MT_UNCACHED | L_PTE_XN);
+	struct page *ctx_page;
+
+	ctx_page = alloc_pages(GFP_KERNEL, 0);
+	if (IS_ERR_OR_NULL(ctx_page))
+		goto fail;
+
+	tegra_cpu_context = vm_map_ram(&ctx_page, 1, -1, prot);
+	if (IS_ERR_OR_NULL(tegra_cpu_context))
+		goto fail;
+
+	return 0;
+
+fail:
+	if (ctx_page)
+		__free_page(ctx_page);
+	tegra_cpu_context = NULL;
+	return -ENOMEM;
+#else
+	return 0;
+#endif
 }
 
 /* ensures that sufficient time is passed for a register write to
@@ -802,7 +840,14 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 
 #ifdef CONFIG_PM_SLEEP
 	if (create_suspend_pgtable() < 0) {
-		pr_err("%s: Memory allocation failed -- LP0/LP1/LP2 unavailable\n",
+		pr_err("%s: PGD memory alloc failed -- LP0/LP1/LP2 unavailable\n",
+				__func__);
+		plat->suspend_mode = TEGRA_SUSPEND_NONE;
+		goto fail;
+	}
+
+	if (alloc_suspend_context() < 0) {
+		pr_err("%s: CPU context alloc failed -- LP0/LP1/LP2 unavailable\n",
 				__func__);
 		plat->suspend_mode = TEGRA_SUSPEND_NONE;
 		goto fail;
