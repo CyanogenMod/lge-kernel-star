@@ -1,7 +1,7 @@
 # Tegra platform Support
-snd-soc-tegra-das-objs := tegra_das.o
+snd-soc-tegra-das-objs := tegra20_das.o
 snd-soc-tegra-pcm-objs := tegra_pcm.o
-snd-soc-tegra-i2s-objs := tegra_i2s.o
+snd-soc-tegra-i2s-objs := tegra20_i2s.o
 snd-soc-tegra-utils-objs += tegra_asoc_utils.o
 
 obj-$(CONFIG_SND_SOC_TEGRA) += snd-soc-tegra-utils.o
