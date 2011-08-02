@@ -96,6 +96,8 @@ static int tegra_pwm_backlight_probe(struct platform_device *pdev)
 	tbl->dev = &pdev->dev;
 	tbl->which_dc = data->which_dc;
 	tbl->params.which_pwm = data->which_pwm;
+	tbl->params.gpio_conf_to_sfio = data->gpio_conf_to_sfio;
+	tbl->params.switch_to_sfio = data->switch_to_sfio;
 	tbl->params.period = data->period;
 	tbl->params.clk_div = data->clk_div;
 	tbl->params.clk_select = data->clk_select;

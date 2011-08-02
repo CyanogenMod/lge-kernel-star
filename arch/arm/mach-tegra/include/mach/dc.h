@@ -469,6 +469,8 @@ unsigned tegra_dc_get_out_max_pixclock(const struct tegra_dc *dc);
 
 struct tegra_dc_pwm_params {
 	int which_pwm;
+	void (*switch_to_sfio)(int);
+	int gpio_conf_to_sfio;
 	unsigned int period;
 	unsigned int clk_div;
 	unsigned int clk_select;

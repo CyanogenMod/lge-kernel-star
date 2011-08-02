@@ -15,6 +15,8 @@
 struct platform_tegra_pwm_backlight_data {
 	int which_dc;
 	int which_pwm;
+	void (*switch_to_sfio)(int);
+	int gpio_conf_to_sfio;
 	unsigned int dft_brightness;
 	unsigned int max_brightness;
 	unsigned int period;
