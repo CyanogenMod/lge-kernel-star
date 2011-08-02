@@ -403,9 +403,30 @@ static struct syscore_ops tegra_pinmux_syscore_ops = {
 	.suspend = tegra_pinmux_suspend,
 	.resume = tegra_pinmux_resume,
 };
+#endif
+
+#define SET_DRIVE(_name, _hsm, _schmitt, _drive, _pulldn_drive, _pullup_drive, _pulldn_slew, _pullup_slew) \
+	{							\
+		.pingroup = TEGRA_DRIVE_PINGROUP_##_name,	\
+		.hsm = TEGRA_HSM_##_hsm,			\
+		.schmitt = TEGRA_SCHMITT_##_schmitt,		\
+		.drive = TEGRA_DRIVE_##_drive,			\
+		.pull_down = TEGRA_PULL_##_pulldn_drive,	\
+		.pull_up = TEGRA_PULL_##_pullup_drive,		\
+		.slew_rising = TEGRA_SLEW_##_pulldn_slew,	\
+		.slew_falling = TEGRA_SLEW_##_pullup_slew,	\
+	}
+
+static __initdata struct tegra_drive_pingroup_config t30_def_drive_pinmux[] = {
+	SET_DRIVE(DAP2, DISABLE, ENABLE, DIV_1, 31, 31, FASTEST, FASTEST),
+};
 
 void tegra_init_pinmux(void)
 {
+#ifdef CONFIG_PM_SLEEP
 	register_syscore_ops(&tegra_pinmux_syscore_ops);
-}
 #endif
+
+	tegra_drive_pinmux_config_table(t30_def_drive_pinmux,
+					ARRAY_SIZE(t30_def_drive_pinmux));
+}
