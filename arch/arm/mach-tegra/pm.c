@@ -39,6 +39,7 @@
 #include <linux/uaccess.h>
 #include <linux/syscore_ops.h>
 #include <linux/vmalloc.h>
+#include <linux/memblock.h>
 
 #include <asm/cacheflush.h>
 #include <asm/cpu_pm.h>
@@ -237,7 +238,8 @@ static __init int create_suspend_pgtable(void)
 	if (!tegra_pgd)
 		return -ENOMEM;
 
-	identity_mapping_add(tegra_pgd, PLAT_PHYS_OFFSET, IO_IRAM_PHYS);
+	identity_mapping_add(tegra_pgd, PLAT_PHYS_OFFSET,
+			     PLAT_PHYS_OFFSET + memblock_phys_mem_size());
 	identity_mapping_add(tegra_pgd, IO_IRAM_PHYS,
 		IO_IRAM_PHYS + SECTION_SIZE);
 
