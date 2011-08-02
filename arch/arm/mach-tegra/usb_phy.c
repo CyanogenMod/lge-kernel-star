@@ -1033,9 +1033,13 @@ static void utmi_phy_restore_end(struct tegra_usb_phy *phy)
 
 static void ulpi_set_tristate(bool enable)
 {
-#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	int tristate = (enable)? TEGRA_TRI_TRISTATE : TEGRA_TRI_NORMAL;
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UAA, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UAB, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UDA, tristate);
+#else
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA0, tristate);
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA1, tristate);
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA2, tristate);
@@ -1105,9 +1109,7 @@ static void ulpi_phy_restore_start(struct tegra_usb_phy *phy,
 	void __iomem *base = phy->regs;
 
 	/*Tristate ulpi interface before USB controller resume*/
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UAA, TEGRA_TRI_TRISTATE);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UAB, TEGRA_TRI_TRISTATE);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UDA, TEGRA_TRI_TRISTATE);
+	ulpi_set_tristate(true);
 
 	val = readl(base + ULPI_TIMING_CTRL_0);
 	val &= ~ULPI_OUTPUT_PINMUX_BYP;
@@ -1125,9 +1127,7 @@ static void ulpi_phy_restore_end(struct tegra_usb_phy *phy)
 	val |= ULPI_OUTPUT_PINMUX_BYP;
 	writel(val, base + ULPI_TIMING_CTRL_0);
 
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UAA, TEGRA_TRI_NORMAL);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UAB, TEGRA_TRI_NORMAL);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UDA, TEGRA_TRI_NORMAL);
+	ulpi_set_tristate(false);
 #endif
 }
 
@@ -1278,7 +1278,7 @@ static int null_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 
 	ulpi_set_host(base);
 
-	if (config->preinit && config->preinit())
+	if (config->pre_phy_on && config->pre_phy_on())
 		return -EAGAIN;
 
 	val = readl(base + USB_SUSP_CTRL);
@@ -1362,7 +1362,7 @@ static int null_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	writel(val, base + ULPI_TIMING_CTRL_0);
 	udelay(10);
 
-	if (config->postinit && config->postinit())
+	if (config->post_phy_on && config->post_phy_on())
 		return -EAGAIN;
 
 	return 0;
@@ -1372,12 +1372,20 @@ static int null_phy_power_off(struct tegra_usb_phy *phy, bool is_dpd)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
+	struct tegra_ulpi_config *config = phy->config;
+
+	if (config->pre_phy_off && config->pre_phy_off())
+		return -EAGAIN;
 
 	val = readl(base + ULPI_TIMING_CTRL_0);
 	val &= ~ULPI_CLK_PADOUT_ENA;
 	writel(val, base + ULPI_TIMING_CTRL_0);
 
 	ulpi_set_tristate(true);
+
+	if (config->post_phy_off && config->post_phy_off())
+		return -EAGAIN;
+
 	return 0;
 }
 
