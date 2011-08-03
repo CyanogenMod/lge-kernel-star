@@ -205,8 +205,8 @@ static struct tegra_ulpi_trimmer e951_trimmer = { 10, 1, 1, 1 };
 
 static struct tegra_ulpi_config ehci2_null_ulpi_phy_config = {
 	.trimmer = &e951_trimmer,
-	.preinit = rainbow_570_reset,
-	.postinit = rainbow_570_handshake,
+/*	.preinit = rainbow_570_reset,
+	.postinit = rainbow_570_handshake, */
 };
 
 static struct tegra_ehci_platform_data ehci2_null_ulpi_platform_data = {

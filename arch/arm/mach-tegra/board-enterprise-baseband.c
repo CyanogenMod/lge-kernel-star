@@ -70,16 +70,16 @@ static struct usb_device_id modem_list[] = {
 	{},
 };
 
-static int ph450_reset(void);
-static int ph450_handshake(void);
+static int ph450_phy_on(void);
+static int ph450_phy_off(void);
 
 static struct ph450_priv ph450_priv;
 static struct tegra_ulpi_trimmer e1219_trimmer = { 10, 1, 1, 1 };
 
 static struct tegra_ulpi_config ehci2_null_ulpi_phy_config = {
 	.trimmer = &e1219_trimmer,
-	.preinit = NULL,
-	.postinit = ph450_handshake,
+	.post_phy_on = ph450_phy_on,
+	.pre_phy_off = ph450_phy_off,
 };
 
 static struct tegra_ehci_platform_data ehci2_null_ulpi_platform_data = {
@@ -170,10 +170,8 @@ static irqreturn_t mdm_start_thread(int irq, void *data)
 
 	if (gpio_get_value(priv->restart_gpio)) {
 		pr_info("BB_RST_OUT high\n");
-		gpio_set_value(AP2MDM_ACK2, 1);
 	} else {
 		pr_info("BB_RST_OUT low\n");
-		gpio_set_value(AP2MDM_ACK2, 0);
 	}
 
 	return IRQ_HANDLED;
@@ -183,19 +181,15 @@ static irqreturn_t mdm_wake_thread(int irq, void *data)
 {
 	struct ph450_priv *priv = (struct ph450_priv *)data;
 
-	if (gpio_get_value(priv->wake_gpio) == 0) {
-		pr_info("MDM2AP_ACK2 low\n");
-
-		mutex_lock(&priv->lock);
-		if (priv->udev) {
-			usb_lock_device(priv->udev);
-			pr_info("mdm wake (%u)\n", ++(priv->wake_cnt));
-			if (usb_autopm_get_interface(priv->intf) == 0)
-				usb_autopm_put_interface_async(priv->intf);
-			usb_unlock_device(priv->udev);
-		}
-		mutex_unlock(&priv->lock);
+	mutex_lock(&priv->lock);
+	if (priv->udev) {
+		usb_lock_device(priv->udev);
+		pr_info("mdm wake (%u)\n", ++(priv->wake_cnt));
+		if (usb_autopm_get_interface(priv->intf) == 0)
+			usb_autopm_put_interface_async(priv->intf);
+		usb_unlock_device(priv->udev);
 	}
+	mutex_unlock(&priv->lock);
 
 	return IRQ_HANDLED;
 }
@@ -215,11 +209,19 @@ static int ph450_reset(void)
 	return 0;
 }
 
-static int ph450_handshake(void)
+static int ph450_phy_on(void)
 {
 	/* set AP2MDM_ACK2 low */
 	gpio_set_value(AP2MDM_ACK2, 0);
+	pr_info("%s\n", __func__);
+	return 0;
+}
 
+static int ph450_phy_off(void)
+{
+	/* set AP2MDM_ACK2 high */
+	gpio_set_value(AP2MDM_ACK2, 1);
+	pr_info("%s\n", __func__);
 	return 0;
 }
 
@@ -290,8 +292,8 @@ static int __init ph450_init(void)
 	gpio_direction_input(MDM2AP_ACK2);
 	gpio_direction_input(BB_RST_OUT);
 
-	/* reset modem */
-	ph450_reset();
+	/* phy init */
+	tegra_null_ulpi_init();
 
 	ph450_priv.wake_gpio = TEGRA_GPIO_PV0;
 	ph450_priv.restart_gpio = TEGRA_GPIO_PV1;
@@ -340,6 +342,9 @@ static int __init ph450_init(void)
 		return ret;
 	}
 
+	/* reset modem */
+	ph450_reset();
+
 	return 0;
 }
 
@@ -352,8 +357,6 @@ int __init enterprise_modem_init(void)
 		pr_err("modem init failed\n");
 		return ret;
 	}
-
-	tegra_null_ulpi_init();
 
 	return 0;
 }
