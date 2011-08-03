@@ -912,7 +912,37 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 			   "-- disabling LP0\n", __func__);
 		plat->suspend_mode = TEGRA_SUSPEND_LP1;
 	}
+	if (plat->suspend_mode == TEGRA_SUSPEND_LP0 && tegra_lp0_vec_size) {
+		unsigned char *reloc_lp0;
+		unsigned long tmp;
+		void __iomem *orig;
+		reloc_lp0 = kmalloc(tegra_lp0_vec_size + L1_CACHE_BYTES - 1,
+					GFP_KERNEL);
+		WARN_ON(!reloc_lp0);
+		if (!reloc_lp0) {
+			pr_err("%s: Failed to allocate reloc_lp0\n",
+				__func__);
+			goto out;
+		}
 
+		orig = ioremap(tegra_lp0_vec_start, tegra_lp0_vec_size);
+		WARN_ON(!orig);
+		if (!orig) {
+			pr_err("%s: Failed to map tegra_lp0_vec_start %08lx\n",
+				__func__, tegra_lp0_vec_start);
+			kfree(reloc_lp0);
+			goto out;
+		}
+
+		tmp = (unsigned long) reloc_lp0;
+		tmp = (tmp + L1_CACHE_BYTES - 1) & ~(L1_CACHE_BYTES - 1);
+		reloc_lp0 = (unsigned char *)tmp;
+		memcpy(reloc_lp0, orig, tegra_lp0_vec_size);
+		iounmap(orig);
+		tegra_lp0_vec_start = virt_to_phys(reloc_lp0);
+	}
+
+out:
 	if (plat->suspend_mode == TEGRA_SUSPEND_LP0 && !tegra_lp0_vec_size) {
 		pr_warning("%s: Suspend mode LP0 requested, no lp0_vec "
 			   "provided by bootlader -- disabling LP0\n",

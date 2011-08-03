@@ -523,13 +523,6 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 		    platform_get_resource_byname(&tegra_smmu_device,
 						IORESOURCE_MEM, "smmu");
 #endif
-	if (tegra_lp0_vec_size)
-		if (memblock_reserve(tegra_lp0_vec_start, tegra_lp0_vec_size)) {
-			pr_err("Failed to reserve lp0_vec %08lx@%08lx\n",
-				tegra_lp0_vec_size, tegra_lp0_vec_start);
-			tegra_lp0_vec_start = 0;
-			tegra_lp0_vec_size = 0;
-		}
 
 	if (carveout_size) {
 		tegra_carveout_start = memblock_end_of_DRAM() - carveout_size;
