@@ -79,24 +79,13 @@
  * should never return
  */
 ENTRY(tegra2_hotplug_shutdown)
-	cpu_id	r0
-
-	/* Exit coherency. */
-	mrc	p15, 0, r3, c1, c0, 1		@ ACTLR
-	bic	r3, r3, #(1<<6)			@ exit coherency SCTLR.SMP
-	mcr	p15, 0, r3, c1, c0, 1		@ ACTLR
-	isb
-
-	/* Invalidate the SCU tags for this CPU. */
-	mov32	r3, TEGRA_ARM_PERIF_VIRT + 0xC	@ SCUIAR
-	mov	r2, r0, lsl #2
-	mov	r1, #0xf
-	mov	r1, r1, lsl r2			@ 0xF << (cpu * 4)
-	str	r1, [r3]			@ invalidate SCU tags for CPU
+	mov	r6, lr
+	bl	tegra_cpu_exit_coherency
 
 	/* Put this CPU into reset. */
+	cpu_id	r0
 	bl	tegra2_cpu_reset
-	mov	pc, lr
+	mov	pc, r6
 ENDPROC(tegra2_hotplug_shutdown)
 #endif
 
