@@ -1,7 +1,7 @@
 /*
- *  linux/arch/arm/mach-tegra/hotplug.c
+ *  arch/arm/mach-tegra/hotplug.c
  *
- *  Copyright (C) 2010 NVIDIA Corporation
+ *  Copyright (C) 2010-2011 NVIDIA Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -12,9 +12,11 @@
 #include <linux/smp.h>
 
 #include <asm/cpu_pm.h>
+#include <asm/cacheflush.h>
 
 #include <mach/iomap.h>
 
+#include "gic.h"
 #include "sleep.h"
 
 #define CPU_CLOCK(cpu) (0x1<<(8+cpu))
@@ -51,7 +53,25 @@ int platform_cpu_kill(unsigned int cpu)
 
 void platform_cpu_die(unsigned int cpu)
 {
-	tegra_sleep_reset();
+	/* Flush the L1 data cache. */
+	flush_cache_all();
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	/* Place the current CPU in reset. */
+	tegra2_hotplug_shutdown();
+#else
+	/* Disable GIC CPU interface for this CPU. */
+	tegra_gic_cpu_disable();
+
+	/* Tegra3 enters LPx states via WFI - do not propagate legacy IRQs
+	   to CPU core to avoid fall through WFI; then GIC output will be
+	   enabled, however at this time - CPU is dying - no interrupt should
+	   have affinity to this CPU. */
+	tegra_gic_pass_through_disable();
+
+	/* Shut down the current CPU. */
+	tegra3_hotplug_shutdown();
+#endif
 
 	/*
 	 * tegra_cpu_suspend can return through tegra_cpu_resume, but that

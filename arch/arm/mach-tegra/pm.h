@@ -1,8 +1,8 @@
 /*
- * arch/arm/mach-tegra/include/mach/suspend.h
+ * arch/arm/mach-tegra/include/mach/pm.h
  *
  * Copyright (C) 2010 Google, Inc.
- * Copyright (C) 2011 NVIDIA Corporation
+ * Copyright (C) 2010-2011 NVIDIA Corporation
  *
  * Author:
  *	Colin Cross <ccross@google.com>
@@ -19,10 +19,12 @@
  */
 
 
-#ifndef _MACH_TEGRA_SUSPEND_H_
-#define _MACH_TEGRA_SUSPEND_H_
+#ifndef _MACH_TEGRA_PM_H_
+#define _MACH_TEGRA_PM_H_
 
 #include <linux/mutex.h>
+#include <linux/init.h>
+#include <linux/errno.h>
 
 enum tegra_suspend_mode {
 	TEGRA_SUSPEND_NONE = 0,
@@ -46,21 +48,10 @@ struct tegra_suspend_platform_data {
 unsigned long tegra_cpu_power_good_time(void);
 unsigned long tegra_cpu_power_off_time(void);
 unsigned long tegra_cpu_lp2_min_residency(void);
+void tegra_clear_cpu_in_lp2(int cpu);
+bool tegra_set_cpu_in_lp2(int cpu);
 
 int tegra_suspend_dram(enum tegra_suspend_mode mode);
-
-#define TEGRA_POWER_SDRAM_SELFREFRESH	0x400	/* SDRAM is in self-refresh */
-
-#define TEGRA_POWER_CLUSTER_G		0x1000	/* G CPU */
-#define TEGRA_POWER_CLUSTER_LP		0x2000	/* LP CPU */
-#define TEGRA_POWER_CLUSTER_MASK	0x3000
-#define TEGRA_POWER_CLUSTER_IMMEDIATE	0x4000	/* Immediate wake */
-#define TEGRA_POWER_CLUSTER_FORCE	0x8000	/* Force switch */
-
-#define FLOW_CTRL_HALT_CPU(cpu)	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + \
-	((cpu) == 0 ? 0x0 : 0x14 + ((cpu) - 1) * 0x8))
-#define FLOW_CTRL_CPU_CSR(cpu)	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + \
-	((cpu) == 0 ? 0x8 : 0x18 + ((cpu) - 1) * 0x8))
 
 #define FLOW_CTRL_CLUSTER_CONTROL \
 	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + 0x2c)
@@ -72,16 +63,7 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode);
 #define FUSE_SKU_DISABLE_ALL_CPUS	(1<<5)
 #define FUSE_SKU_NUM_DISABLED_CPUS(x)	(((x) >> 3) & 3)
 
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-void tegra2_lp0_suspend_init(void);
-#else
-static inline void tegra2_lp0_suspend_init(void)
-{
-}
-#endif
 void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat);
-
-void tegra_idle_lp2(void);
 
 unsigned int tegra_count_slow_cpus(unsigned long speed_limit);
 unsigned int tegra_get_slowest_cpu_n(void);
@@ -109,28 +91,36 @@ u64 tegra_rtc_read_ms(void);
  */
 extern void (*tegra_deep_sleep)(int);
 
-void tegra_idle_lp2_last(unsigned int flags);
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-#define INSTRUMENT_CLUSTER_SWITCH 0	/* Must be zero for ARCH_TEGRA_2x_SOC */
-#define DEBUG_CLUSTER_SWITCH 0		/* Must be zero for ARCH_TEGRA_2x_SOC */
-#define PARAMETERIZE_CLUSTER_SWITCH 0	/* Must be zero for ARCH_TEGRA_2x_SOC */
-static inline int tegra_cluster_control(unsigned int us, unsigned int flags)
-{ return -EPERM; }
-#define tegra_cluster_switch_prolog(flags) do {} while(0)
-#define tegra_cluster_switch_epilog(flags) do {} while(0)
-static inline bool is_g_cluster_present(void)
-{ return true; }
-static inline unsigned int is_lp_cluster(void)
-{ return 0; }
-#define tegra_lp0_suspend_mc() do {} while(0)
-#define tegra_lp0_resume_mc() do {} while(0)
-#else
+unsigned int tegra_idle_lp2_last(unsigned int us, unsigned int flags);
+
+#if defined(CONFIG_PM_SLEEP) && !defined(CONFIG_ARCH_TEGRA_2x_SOC)
 #define INSTRUMENT_CLUSTER_SWITCH 1	/* Should be zero for shipping code */
-#define DEBUG_CLUSTER_SWITCH 1		/* Should be zero for shipping code */
+#define DEBUG_CLUSTER_SWITCH 0		/* Should be zero for shipping code */
 #define PARAMETERIZE_CLUSTER_SWITCH 1	/* Should be zero for shipping code */
 int tegra_cluster_control(unsigned int us, unsigned int flags);
 void tegra_cluster_switch_prolog(unsigned int flags);
 void tegra_cluster_switch_epilog(unsigned int flags);
+void tegra_lp0_suspend_mc(void);
+void tegra_lp0_resume_mc(void);
+#else
+static inline int tegra_cluster_control(unsigned int us, unsigned int flags)
+#define INSTRUMENT_CLUSTER_SWITCH 0	/* Must be zero for ARCH_TEGRA_2x_SOC */
+#define DEBUG_CLUSTER_SWITCH 0		/* Must be zero for ARCH_TEGRA_2x_SOC */
+#define PARAMETERIZE_CLUSTER_SWITCH 0	/* Must be zero for ARCH_TEGRA_2x_SOC */
+{
+	return -EPERM;
+}
+static inline void tegra_cluster_switch_prolog(unsigned int flags) {}
+static inline void tegra_cluster_switch_epilog(unsigned int flags) {}
+static inline void tegra_lp0_suspend_mc(void) {}
+static inline void tegra_lp0_resume_mc(void) {}
+#endif
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+static inline bool is_g_cluster_present(void)   { return true; }
+static inline unsigned int is_lp_cluster(void)  { return 0; }
+void tegra2_lp0_suspend_init(void);
+#else
 static inline bool is_g_cluster_present(void)
 {
 	u32 fuse_sku = readl(FUSE_SKU_DIRECT_CONFIG);
@@ -144,11 +134,45 @@ static inline unsigned int is_lp_cluster(void)
 	reg = readl(FLOW_CTRL_CLUSTER_CONTROL);
 	return (reg & 1); /* 0 == G, 1 == LP*/
 }
-void tegra_lp0_suspend_mc(void);
-void tegra_lp0_resume_mc(void);
 #endif
 
-#if DEBUG_CLUSTER_SWITCH
+static inline void tegra_lp0_suspend_init(void)
+{
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	tegra2_lp0_suspend_init();
+#endif
+}
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+void tegra2_lp2_set_trigger(unsigned long cycles);
+unsigned long tegra2_lp2_timer_remain(void);
+#endif
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+void tegra3_lp2_set_trigger(unsigned long cycles);
+unsigned long tegra3_lp2_timer_remain(void);
+#endif
+
+static inline void tegra_lp2_set_trigger(unsigned long cycles)
+{
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	tegra2_lp2_set_trigger(cycles);
+#endif
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+	tegra3_lp2_set_trigger(cycles);
+#endif
+}
+
+static inline unsigned long tegra_lp2_timer_remain(void)
+{
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	return tegra2_lp2_timer_remain();
+#endif
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+	return tegra3_lp2_timer_remain();
+#endif
+}
+
+#if DEBUG_CLUSTER_SWITCH && 0 /* !!!FIXME!!! THIS IS BROKEN */
 extern unsigned int tegra_cluster_debug;
 #define DEBUG_CLUSTER(x) do { if (tegra_cluster_debug) printk x; } while (0)
 #else
@@ -162,13 +186,10 @@ static inline void tegra_cluster_switch_set_parameters(
 { }
 #endif
 
-static inline void flowctrl_writel(unsigned long val, void __iomem *addr)
-{
-	writel(val, addr);
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-	wmb();
+#ifdef CONFIG_SMP
+extern bool tegra_all_cpus_booted __read_mostly;
+#else
+#define tegra_all_cpus_booted (true)
 #endif
-	(void)__raw_readl(addr);
-}
 
-#endif /* _MACH_TEGRA_SUSPEND_H_ */
+#endif /* _MACH_TEGRA_PM_H_ */

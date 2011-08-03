@@ -20,6 +20,7 @@
 #include <linux/smp.h>
 #include <linux/delay.h>
 #include <linux/clk.h>
+#include <linux/cpumask.h>
 
 #include <asm/hardware/gic.h>
 #include <asm/smp_scu.h>
@@ -29,9 +30,15 @@
 
 #include "pm.h"
 #include "clock.h"
+#include "reset.h"
+#include "sleep.h"
 
-#define EVP_CPU_RESET_VECTOR \
-	(IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100)
+bool tegra_all_cpus_booted;
+
+static DECLARE_BITMAP(tegra_cpu_init_bits, CONFIG_NR_CPUS) __read_mostly;
+const struct cpumask *const tegra_cpu_init_mask = to_cpumask(tegra_cpu_init_bits);
+#define tegra_cpu_init_map	(*(cpumask_t *)tegra_cpu_init_mask)
+
 #define CLK_RST_CONTROLLER_CLK_CPU_CMPLX \
 	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x4c)
 #define CLK_RST_CONTROLLER_RST_CPU_CMPLX_SET \
@@ -42,141 +49,57 @@
 #define CPU_CLOCK(cpu)	(0x1<<(8+cpu))
 #define CPU_RESET(cpu)	(0x1111ul<<(cpu))
 
-static unsigned int available_cpus(void);
-#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
-static inline int is_g_cluster_available(unsigned int cpu)
-{ return -EPERM; }
-static inline bool is_cpu_powered(unsigned int cpu)
-{ return true; }
-static inline int power_up_cpu(unsigned int cpu)
-{ return 0; }
-
-/* For Tegra2 use the software-written value of the reset regsiter for status.*/
-#define CLK_RST_CONTROLLER_CPU_CMPLX_STATUS CLK_RST_CONTROLLER_RST_CPU_CMPLX_SET
-
-#else
-static int is_g_cluster_available(unsigned int cpu);
-static bool is_cpu_powered(unsigned int cpu);
-static int power_up_cpu(unsigned int cpu);
-
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+#define CLK_RST_CONTROLLER_CLK_CPU_CMPLX_CLR \
+	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x34c)
 #define CAR_BOND_OUT_V \
 	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x390)
 #define CAR_BOND_OUT_V_CPU_G	(1<<0)
-#define CLK_RST_CONTROLLER_CPU_CMPLX_STATUS \
-	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x470)
-
 #endif
-
-extern void tegra_secondary_startup(void);
 
 static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
 
-void __cpuinit platform_secondary_init(unsigned int cpu)
+static unsigned int available_cpus(void)
 {
-	gic_secondary_init(0);
-}
+	static unsigned int ncores;
 
-int boot_secondary(unsigned int cpu, struct task_struct *idle)
-{
-	int status;
-
-	if (is_lp_cluster()) {
-		struct clk *cpu_clk, *cpu_g_clk;
-
-		/* The G CPU may not be available for a
-		   variety of reasons. */
-		status = is_g_cluster_available(cpu);
-		if (status)
-			return status;
-
-		cpu_clk = tegra_get_clock_by_name("cpu");
-		cpu_g_clk = tegra_get_clock_by_name("cpu_g");
-
-		/* Switch to G CPU before continuing. */
-		if (!cpu_clk || !cpu_g_clk) {
-			/* Early boot, clock infrastructure is not initialized
-			   - CPU mode switch is not allowed */
-			status = -EINVAL;
-		} else
-			status = clk_set_parent(cpu_clk, cpu_g_clk);
-
-		if (status)
-			return status;
-	}
-
-	smp_wmb();
-
-	/* set the reset vector to point to the secondary_startup routine */
-	writel(virt_to_phys(tegra_secondary_startup), EVP_CPU_RESET_VECTOR);
-
-	/* Force the CPU into reset. The CPU must remain in reset when the
-	   flow controller state is cleared (which will cause the flow
-	   controller to stop driving reset if the CPU has been power-gated
-	   via the flow controller). This will have no effect on first boot
-	   of the CPU since it should already be in reset. */
-	writel(CPU_RESET(cpu), CLK_RST_CONTROLLER_RST_CPU_CMPLX_SET);
-	dmb();
-
-	/* Unhalt the CPU. If the flow controller was used to power-gate the
-	   CPU this will cause the flow controller to stop driving reset.
-	   The CPU will remain in reset because the clock and reset block
-	   is now driving reset. */
-	flowctrl_writel(0, FLOW_CTRL_HALT_CPU(cpu));
-
-#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
-	{
-		/* enable cpu clock on cpu */
-		u32 reg = readl(CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
-		writel(reg & ~CPU_CLOCK(cpu), CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
-		dmb();
-	}
+	if (ncores == 0) {
+		ncores = scu_get_core_count(scu_base);
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+		if (ncores > 1) {
+			u32 fuse_sku = readl(FUSE_SKU_DIRECT_CONFIG);
+			ncores -= FUSE_SKU_NUM_DISABLED_CPUS(fuse_sku);
+			BUG_ON((int)ncores <= 0);
+		}
 #endif
-	status = power_up_cpu(cpu);
-	if (status)
-		goto done;
-
-	dmb();
-	udelay(10);	/* power up delay */
-	writel(CPU_RESET(cpu), CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR);
-
-done:
-	return status;
-}
-
-/*
- * Initialise the CPU possible map early - this describes the CPUs
- * which may be present or become present in the system.
- */
-void __init smp_init_cpus(void)
-{
-	unsigned int i, ncores = available_cpus();
-
-	if (ncores > NR_CPUS) {
-		printk(KERN_ERR "Tegra: no. of cores (%u) greater than configured (%u), clipping\n",
-			ncores, NR_CPUS);
-		ncores = NR_CPUS;
 	}
-
-	for (i = 0; i < ncores; i++)
-		cpu_set(i, cpu_possible_map);
+	return ncores;
 }
 
-void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+static int is_g_cluster_available(unsigned int cpu)
 {
-	int i;
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	return -EPERM;
+#else
+	u32 fuse_sku = readl(FUSE_SKU_DIRECT_CONFIG);
+	u32 bond_out = readl(CAR_BOND_OUT_V);
 
-	/*
-	 * Initialise the present map, which describes the set of CPUs
-	 * actually populated at the present time.
-	 */
-	for (i = 0; i < max_cpus; i++)
-		set_cpu_present(i, true);
+	/* Does the G CPU complex exist at all? */
+	if ((fuse_sku & FUSE_SKU_DISABLE_ALL_CPUS) ||
+	    (bond_out & CAR_BOND_OUT_V_CPU_G))
+		return -EPERM;
 
-	scu_enable(scu_base);
+	if (cpu >= available_cpus())
+		return -EPERM;
+
+	/* FIXME: The G CPU can be unavailable for a number of reasons
+	 *	  (e.g., low battery, over temperature, etc.). Add checks for
+	 *	  these conditions. */
+	return 0;
+#endif
 }
 
-#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
-
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 static bool is_cpu_powered(unsigned int cpu)
 {
 	if (is_lp_cluster())
@@ -184,11 +107,13 @@ static bool is_cpu_powered(unsigned int cpu)
 	else
 		return tegra_powergate_is_powered(TEGRA_CPU_POWERGATE_ID(cpu));
 }
+#endif
 
 static int power_up_cpu(unsigned int cpu)
 {
-	int ret;
 	u32 reg;
+	int ret = 0;
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	unsigned long timeout;
 
 	BUG_ON(cpu == smp_processor_id());
@@ -199,9 +124,7 @@ static int power_up_cpu(unsigned int cpu)
 	 * for confirmation that cpu is powered and remove clamps.
 	 * On first boot entry do not wait - go to direct ungate.
 	 */
-#if 0 /* FIXME! */
-	if (cpu_isset(cpu,*(cpumask_t*)&tegra_cpu_init_map))
-	{
+	if (cpu_isset(cpu, tegra_cpu_init_map)) {
 		timeout = jiffies + HZ;
 		do {
 			if (is_cpu_powered(cpu))
@@ -209,11 +132,10 @@ static int power_up_cpu(unsigned int cpu)
 			udelay(10);
 		} while (time_before(jiffies, timeout));
 	}
-#endif
-	/* 1'st boot or Flow controller did not work as expected - try directly toggle
-	   power gates. Bail out if direct power on also failed */
-	if (!is_cpu_powered(cpu))
-	{
+
+	/* First boot or Flow controller did not work as expected. Try to
+	   directly toggle power gates. Error if direct power on also fails. */
+	if (!is_cpu_powered(cpu)) {
 		ret = tegra_powergate_power_on(TEGRA_CPU_POWERGATE_ID(cpu));
 		if (ret)
 			goto fail;
@@ -231,52 +153,140 @@ static int power_up_cpu(unsigned int cpu)
 	}
 
 remove_clamps:
-	/* now CPU is up: enable clock, propagate reset, and remove clamps */
+	/* CPU partition is powered. Enable the CPU clock. */
+	writel(CPU_CLOCK(cpu), CLK_RST_CONTROLLER_CLK_CPU_CMPLX_CLR);
+	reg = readl(CLK_RST_CONTROLLER_CLK_CPU_CMPLX_CLR);
+	udelay(10);
+
+	/* Remove I/O clamps. */
+	ret = tegra_powergate_remove_clamping(TEGRA_CPU_POWERGATE_ID(cpu));
+	udelay(10);
+fail:
+#else
+	/* Enable the CPU clock. */
 	reg = readl(CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
 	writel(reg & ~CPU_CLOCK(cpu), CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
 	barrier();
 	reg = readl(CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
-
-	udelay(10);
-	ret = tegra_powergate_remove_clamping(TEGRA_CPU_POWERGATE_ID(cpu));
-fail:
+#endif
+	/* Clear flow controller CSR. */
+	flowctrl_writel(0, FLOW_CTRL_CPU_CSR(cpu));
 	return ret;
 }
 
-static int is_g_cluster_available(unsigned int cpu)
+void __cpuinit platform_secondary_init(unsigned int cpu)
 {
-	u32 fuse_sku = readl(FUSE_SKU_DIRECT_CONFIG);
-	u32 bond_out = readl(CAR_BOND_OUT_V);
+	gic_secondary_init(0);
 
-	/* Does the G CPU complex exist at all? */
-	if ((fuse_sku & FUSE_SKU_DISABLE_ALL_CPUS) ||
-	    (bond_out & CAR_BOND_OUT_V_CPU_G))
-		return -EPERM;
-
-	if (cpu >= available_cpus())
-		return -EPERM;
-
-	/* FIXME: The G CPU can be unavailable for a number of reasons
-	 *	  (e.g., low battery, over temperature, etc.). Add checks for
-	 *	  these conditions. */
-
-	return 0;
+	cpumask_set_cpu(cpu, to_cpumask(tegra_cpu_init_bits));
+	if (!tegra_all_cpus_booted)
+		if (cpumask_equal(tegra_cpu_init_mask, cpu_present_mask))
+			tegra_all_cpus_booted = true;
 }
-#endif
 
-static unsigned int available_cpus(void)
+int boot_secondary(unsigned int cpu, struct task_struct *idle)
 {
-	static unsigned int ncores = 0;
+	int status;
 
-	if (ncores == 0) {
-		ncores = scu_get_core_count(scu_base);
-#ifndef CONFIG_ARCH_TEGRA_2x_SOC
-		if (ncores > 1) {
-			u32 fuse_sku = readl(FUSE_SKU_DIRECT_CONFIG);
-			ncores -= FUSE_SKU_NUM_DISABLED_CPUS(fuse_sku);
-			BUG_ON((int)ncores <= 0);
-		}
-#endif
+	if (is_lp_cluster()) {
+		struct clk *cpu_clk, *cpu_g_clk;
+
+		/* The G CPU may not be available for a variety of reasons. */
+		status = is_g_cluster_available(cpu);
+		if (status)
+			goto done;
+
+		cpu_clk = tegra_get_clock_by_name("cpu");
+		cpu_g_clk = tegra_get_clock_by_name("cpu_g");
+
+		/* Switch to G CPU before continuing. */
+		if (!cpu_clk || !cpu_g_clk) {
+			/* Early boot, clock infrastructure is not initialized
+			   - CPU mode switch is not allowed */
+			status = -EINVAL;
+		} else
+			status = clk_set_parent(cpu_clk, cpu_g_clk);
+
+		if (status)
+			goto done;
 	}
-	return ncores;
+
+	smp_wmb();
+
+	/* Force the CPU into reset. The CPU must remain in reset when the
+	   flow controller state is cleared (which will cause the flow
+	   controller to stop driving reset if the CPU has been power-gated
+	   via the flow controller). This will have no effect on first boot
+	   of the CPU since it should already be in reset. */
+	writel(CPU_RESET(cpu), CLK_RST_CONTROLLER_RST_CPU_CMPLX_SET);
+	dmb();
+
+	/* Unhalt the CPU. If the flow controller was used to power-gate the
+	   CPU this will cause the flow controller to stop driving reset.
+	   The CPU will remain in reset because the clock and reset block
+	   is now driving reset. */
+	flowctrl_writel(0, FLOW_CTRL_HALT_CPU(cpu));
+
+	status = power_up_cpu(cpu);
+	if (status)
+		goto done;
+
+	/* Take the CPU out of reset. */
+	writel(CPU_RESET(cpu), CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR);
+	wmb();
+done:
+	return status;
+}
+
+/*
+ * Initialise the CPU possible map early - this describes the CPUs
+ * which may be present or become present in the system.
+ */
+void __init smp_init_cpus(void)
+{
+	unsigned int ncores = available_cpus();
+	unsigned int i;
+
+	if (ncores > NR_CPUS) {
+		printk(KERN_ERR "Tegra: no. of cores (%u) greater than configured (%u), clipping\n",
+			ncores, NR_CPUS);
+		ncores = NR_CPUS;
+	}
+
+	for (i = 0; i < ncores; i++)
+		cpu_set(i, cpu_possible_map);
+
+	/* If only one CPU is possible, platform_smp_prepare_cpus() will
+	   never get called. We must therefore initialize the reset handler
+	   here. If there is more than one CPU, we must wait until after
+	   the cpu_present_mask has been updated with all present CPUs in
+	   platform_smp_prepare_cpus() before initializing the reset handler. */
+	if (ncores == 1) {
+		tegra_cpu_reset_handler_init();
+		tegra_all_cpus_booted = true;
+	}
+}
+
+void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+{
+	int i;
+
+	/*
+	 * Initialise the present map, which describes the set of CPUs
+	 * actually populated at the present time.
+	 */
+	for (i = 0; i < max_cpus; i++)
+		set_cpu_present(i, true);
+
+	/* Always mark the boot CPU as initialized. */
+	cpumask_set_cpu(0, to_cpumask(tegra_cpu_init_bits));
+
+	if (max_cpus == 1)
+		tegra_all_cpus_booted = true;
+
+	/* If we're here, it means that more than one CPU was found by
+	   smp_init_cpus() which also means that it did not initialize the
+	   reset handler. Do it now before the secondary CPUs are started. */
+	tegra_cpu_reset_handler_init();
+	scu_enable(scu_base);
 }

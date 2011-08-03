@@ -1,7 +1,7 @@
 /*
- * arch/arm/mach-tegra/suspend-t2.c
+ * arch/arm/mach-tegra/pm-t2.c
  *
- * BootROM LP0 scratch register preservation for Tegra 2
+ * Tegra 2 LP0 scratch register preservation
  *
  * Copyright (c) 2009-2010, NVIDIA Corporation.
  *

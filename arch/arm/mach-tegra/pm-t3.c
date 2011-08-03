@@ -1,5 +1,9 @@
 /*
- * Copyright (c) 2009-2010, NVIDIA Corporation.
+ * arch/arm/mach-tegra/pm-t3.c
+ *
+ * Tegra3 SOC-specific power and cluster management
+ *
+ * Copyright (c) 2009-2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,11 +26,15 @@
 #include <mach/gpio.h>
 #include <mach/iomap.h>
 #include <mach/irqs.h>
+
+#include <asm/cpu_pm.h>
 #include <asm/hardware/gic.h>
 
 #include "clock.h"
+#include "cpuidle.h"
 #include "gpio-names.h"
 #include "pm.h"
+#include "sleep.h"
 #include "tegra3_emc.h"
 
 #define CAR_CCLK_BURST_POLICY \
@@ -85,7 +93,7 @@
 #define CPU_CLOCK(cpu)	(0x1<<(8+cpu))
 #define CPU_RESET(cpu)	(0x1111ul<<(cpu))
 
-
+#ifdef CONFIG_PM_SLEEP
 static int cluster_switch_prolog_clock(unsigned int flags)
 {
 	u32 reg;
@@ -266,6 +274,7 @@ void tegra_cluster_switch_epilog(unsigned int flags)
 
 int tegra_cluster_control(unsigned int us, unsigned int flags)
 {
+#ifdef CONFIG_PM_SLEEP
 	unsigned int target_cluster = flags & TEGRA_POWER_CLUSTER_MASK;
 	unsigned int current_cluster = is_lp_cluster()
 					? TEGRA_POWER_CLUSTER_LP
@@ -298,24 +307,28 @@ int tegra_cluster_control(unsigned int us, unsigned int flags)
 
 	local_irq_disable();
 	if (flags & TEGRA_POWER_SDRAM_SELFREFRESH) {
-#if 0 /* FIXME! */
 		if (us)
 			tegra_lp2_set_trigger(us);
-#endif
 
 		tegra_suspend_dram(TEGRA_SUSPEND_LP1);
 
-#if 0 /* FIXME! */
 		if (us)
 			tegra_lp2_set_trigger(0);
-#endif
-	} else
-		tegra_idle_lp2_last(flags);
+	} else {
+		tegra_set_cpu_in_lp2(0);
+		cpu_pm_enter();
+		tegra_idle_lp2_last(0, flags);
+		cpu_pm_exit();
+		tegra_clear_cpu_in_lp2(0);
+	}
 	local_irq_enable();
 
 	DEBUG_CLUSTER(("%s: %s\r\n", __func__, is_lp_cluster() ? "LP" : "G"));
 
 	return 0;
+#else
+	return -ENODEV;
+#endif
 }
 
 static u32 mc_reserved_rsv;
@@ -334,3 +347,4 @@ void tegra_lp0_resume_mc(void)
 	writel(mc_reserved_rsv, mc + MC_RESERVED_RSV);
 	writel(mc_emem_arb_override, mc + MC_EMEM_ARB_OVERRIDE);
 }
+#endif
