@@ -59,6 +59,7 @@ extern unsigned long tegra_carveout_start;
 extern unsigned long tegra_carveout_size;
 extern unsigned long tegra_lp0_vec_start;
 extern unsigned long tegra_lp0_vec_size;
+extern bool tegra_lp0_vec_relocate;
 extern unsigned long tegra_grhost_aperture;
 
 extern struct sys_timer tegra_timer;
