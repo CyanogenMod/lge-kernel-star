@@ -33,6 +33,7 @@
 #include <mach/irqs.h>
 #include <mach/pinmux.h>
 #include <mach/edp.h>
+#include <mach/tsensor.h>
 
 #include "gpio-names.h"
 #include "board.h"
@@ -992,6 +993,22 @@ int __init cardhu_power_off_init(void)
 {
 	pm_power_off = cardhu_power_off;
 	return 0;
+}
+
+static struct tegra_tsensor_pmu_data  tpdata = {
+	.poweroff_reg_addr = 0x3F,
+	.poweroff_reg_data = 0x80,
+	.reset_tegra = 1,
+	.controller_type = 0,
+	.i2c_controller_id = 4,
+	.pinmux = 0,
+	.pmu_16bit_ops = 0,
+	.pmu_i2c_addr = 0x2D,
+};
+
+void __init cardhu_tsensor_init(void)
+{
+	tegra3_tsensor_init(&tpdata);
 }
 
 #ifdef CONFIG_TEGRA_EDP_LIMITS

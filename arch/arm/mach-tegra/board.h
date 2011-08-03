@@ -44,7 +44,6 @@ int __init tegra_pcie_init(bool init_port0, bool init_port1);
 void tegra_init_cache(void);
 void __init tegra_release_bootloader_fb(void);
 void __init tegra_protected_aperture_init(unsigned long aperture);
-void __init tegra_tsensor_init(void);
 void tegra_move_framebuffer(unsigned long to, unsigned long from,
 	unsigned long size);
 bool is_tegra_debug_uartport_hs(void);

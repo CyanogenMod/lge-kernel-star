@@ -476,7 +476,7 @@ static void __init tegra_enterprise_init(void)
 	enterprise_pinmux_init();
 	enterprise_i2c_init();
 	enterprise_uart_init();
-	tegra_tsensor_init();
+	enterprise_tsensor_init();
 	platform_add_devices(enterprise_devices, ARRAY_SIZE(enterprise_devices));
 	enterprise_regulator_init();
 	enterprise_sdhci_init();

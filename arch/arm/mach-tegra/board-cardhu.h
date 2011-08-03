@@ -170,6 +170,7 @@ int cardhu_emc_init(void);
 int cardhu_power_off_init(void);
 int cardhu_edp_init(void);
 int cardhu_pmon_init(void);
+void __init cardhu_tsensor_init(void);
 
 /* Baseband GPIO addresses */
 #define BB_GPIO_BB_EN			TEGRA_GPIO_PR5
