@@ -469,12 +469,12 @@ static struct tegra_dc_mode cardhu_panel_modes_55hz[] = {
 #endif
 
 static struct tegra_dc_sd_settings cardhu_sd_settings = {
-	.enable = 0, /* Disabled by default. */
+	.enable = 1, /* enabled by default. */
 	.use_auto_pwm = false,
 	.hw_update_delay = 0,
 	.bin_width = -1,
-	.aggressiveness = 3,
-	.use_vid_luma = true,
+	.aggressiveness = 1,
+	.use_vid_luma = false,
 	/* Default video coefficients */
 	.coeff = {5, 9, 2},
 	.fc = {0, 0},

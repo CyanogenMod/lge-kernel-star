@@ -288,8 +288,8 @@ static struct tegra_dc_sd_settings enterprise_sd_settings = {
 	.use_auto_pwm = false,
 	.hw_update_delay = 0,
 	.bin_width = -1,
-	.aggressiveness = 5,
-	.use_vid_luma = true,
+	.aggressiveness = 1,
+	.use_vid_luma = false,
 	/* Default video coefficients */
 	.coeff = {5, 9, 2},
 	.fc = {0, 0},
