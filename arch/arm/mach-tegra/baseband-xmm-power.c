@@ -46,9 +46,7 @@ static struct gpio tegra_baseband_gpios[] = {
 	{ -1, GPIOF_OUT_INIT_LOW,  "IPC_BB_WAKE" },
 	{ -1, GPIOF_IN,            "IPC_AP_WAKE" },
 	{ -1, GPIOF_OUT_INIT_HIGH, "IPC_HSIC_ACTIVE" },
-#if BB_INITIATED_L2_SUSPEND
 	{ -1, GPIOF_IN,            "IPC_HSIC_SUS_REQ" },
-#endif
 };
 
 #if BB_INITIATED_L2_SUSPEND
@@ -247,9 +245,7 @@ static int baseband_xmm_power_driver_probe(struct platform_device *device)
 	tegra_baseband_gpios[2].gpio = data->modem.xmm.ipc_bb_wake;
 	tegra_baseband_gpios[3].gpio = data->modem.xmm.ipc_ap_wake;
 	tegra_baseband_gpios[4].gpio = data->modem.xmm.ipc_hsic_active;
-#if BB_INITIATED_L2_SUSPEND
 	tegra_baseband_gpios[5].gpio = data->modem.xmm.ipc_hsic_sus_req;
-#endif
 	err = gpio_request_array(tegra_baseband_gpios,
 		ARRAY_SIZE(tegra_baseband_gpios));
 	if (err < 0) {
@@ -346,7 +342,8 @@ static int baseband_xmm_power_driver_remove(struct platform_device *device)
 		ARRAY_SIZE(tegra_baseband_gpios));
 
 	/* unregister usb host controller */
-	platform_device_unregister(&tegra_ehci2_device);
+	platform_device_unregister(baseband_power_driver_data->
+		modem.xmm.hsic_device);
 
 	return 0;
 }

@@ -654,7 +654,7 @@ static void cardhu_usb_init(void)
 		platform_device_register(&tegra_ehci2_device);
 	} else if (bi.board_id == BOARD_E1186) {
 		tegra_ehci2_device.dev.platform_data = &tegra_ehci_uhsic_pdata;
-		/* baseband registartion happens in baseband-xmm-power  */
+		/* baseband registration happens in baseband-xmm-power  */
 	} else {
 		tegra_ehci2_device.dev.platform_data = &tegra_ehci_pdata[1];
 		platform_device_register(&tegra_ehci2_device);
@@ -698,6 +698,14 @@ static struct platform_device tegra_baseband_power_device = {
 	},
 };
 
+static struct platform_device tegra_baseband_power2_device = {
+	.name = "baseband_xmm_power2",
+	.id = -1,
+	.dev = {
+		.platform_data = &tegra_baseband_power_data,
+	},
+};
+
 static void cardhu_modem_init(void)
 {
 	struct board_info board_info;
@@ -733,6 +741,7 @@ static void cardhu_modem_init(void)
 		tegra_gpio_enable(
 			tegra_baseband_power_data.modem.xmm.ipc_hsic_sus_req);
 		platform_device_register(&tegra_baseband_power_device);
+		platform_device_register(&tegra_baseband_power2_device);
 		break;
 	default:
 		break;
