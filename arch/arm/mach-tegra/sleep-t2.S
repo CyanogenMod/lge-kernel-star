@@ -226,7 +226,7 @@ ENTRY(tegra2_sleep_wfi)
 	bl	__cpuc_flush_kern_all
 #endif
 
-	pop_ctx_regs			@ restore context registers
+	pop_ctx_regs r0, r1		@ restore context registers
 	mov	pc, lr
 ENDPROC(tegra2_sleep_wfi)
 

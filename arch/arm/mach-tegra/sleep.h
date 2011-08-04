@@ -93,7 +93,28 @@
 	dsb
 .endm
 
-.macro push_ctx_regs
+#define DEBUG_CONTEXT_STACK	0
+
+/* pops a debug check token from the stack */
+.macro	pop_stack_token tmp1, tmp2
+#if DEBUG_CONTEXT_STACK
+	mov32	\tmp1, 0xBAB1F00D
+	ldmfd	sp!, {\tmp2}
+	cmp	\tmp1, \tmp2
+	movne	pc, #0
+#endif
+.endm
+
+/* pushes a debug check token onto the stack */
+.macro	push_stack_token tmp1
+#if DEBUG_CONTEXT_STACK
+	mov32	\tmp1, 0xBAB1F00D
+	stmfd	sp!, {\tmp1}
+#endif
+.endm
+
+.macro push_ctx_regs, tmp1
+	push_stack_token \tmp1		@ debug check word
 	stmfd	sp!, {r4 - r11, lr}
 	/* FIXME: The next two instructions should be removed if our change to
 	   save the diagnostic regsiter in the CPU context is accepted. */
@@ -101,12 +122,13 @@
 	stmfd	sp!, {r4}
 .endm
 
-.macro pop_ctx_regs
+.macro pop_ctx_regs, tmp1, tmp2
 	/* FIXME: The next two instructions should be removed if our change to
 	   save the diagnostic regsiter in the CPU context is accepted. */
 	ldmfd	sp!, {r4}
 	mcr	p15, 0, r4, c15, c0, 1	@ write diagnostic register
 	ldmfd	sp!, {r4 - r11, lr}
+	pop_stack_token \tmp1, \tmp2	@ debug stack debug token
 .endm
 
 #else

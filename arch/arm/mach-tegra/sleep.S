@@ -179,7 +179,7 @@ ENDPROC(tegra_cpu_suspend)
  */
 
 ENTRY(tegra_cpu_save)
-	push_ctx_regs			@ save context registers
+	push_ctx_regs r1		@ save context registers
 
 	adr	r3, tegra_cpu_resume
 
@@ -230,7 +230,7 @@ tegra_cpu_resume:
 
 	bl	cpu_init
 
-	pop_ctx_regs			@ restore context registers
+	pop_ctx_regs r1, r2		@ restore context registers
 	mov	pc, lr
 
 /*
