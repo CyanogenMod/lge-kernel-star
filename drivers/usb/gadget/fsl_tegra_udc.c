@@ -138,3 +138,13 @@ void fsl_udc_clk_resume(bool is_dpd)
 	clk_enable(udc_clk);
 	tegra_usb_phy_power_on(phy,  is_dpd);
 }
+
+void fsl_udc_clk_enable()
+{
+	clk_enable(udc_clk);
+}
+
+void fsl_udc_clk_disable()
+{
+	clk_disable(udc_clk);
+}
