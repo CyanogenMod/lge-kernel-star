@@ -179,12 +179,7 @@ ENDPROC(tegra_cpu_suspend)
  */
 
 ENTRY(tegra_cpu_save)
-	stmfd	sp!, {r4 - r11}
-	stmfd	sp!, {lr}
-	/* FIXME: The next two instructions should be removed if our change to
-	   save the diagnostic regsiter in the CPU context is accepted. */
-	mrc	p15, 0, r4, c15, c0, 1	@ read diagnostic register
-	stmfd	sp!, {r4}
+	push_ctx_regs			@ save context registers
 
 	adr	r3, tegra_cpu_resume
 
@@ -235,12 +230,7 @@ tegra_cpu_resume:
 
 	bl	cpu_init
 
-	/* FIXME: The next two instructions should be removed if our change to
-	   save the diagnostic regsiter in the CPU context is accepted. */
-	ldmfd	sp!, {r4}
-	mcr	p15, 0, r4, c15, c0, 1	@ write diagnostic register
-	ldmfd	sp!, {lr}
-	ldmfd	sp!, {r4 - r11}
+	pop_ctx_regs			@ restore context registers
 	mov	pc, lr
 
 /*

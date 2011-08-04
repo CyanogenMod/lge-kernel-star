@@ -93,6 +93,22 @@
 	dsb
 .endm
 
+.macro push_ctx_regs
+	stmfd	sp!, {r4 - r11, lr}
+	/* FIXME: The next two instructions should be removed if our change to
+	   save the diagnostic regsiter in the CPU context is accepted. */
+	mrc	p15, 0, r4, c15, c0, 1	@ read diagnostic register
+	stmfd	sp!, {r4}
+.endm
+
+.macro pop_ctx_regs
+	/* FIXME: The next two instructions should be removed if our change to
+	   save the diagnostic regsiter in the CPU context is accepted. */
+	ldmfd	sp!, {r4}
+	mcr	p15, 0, r4, c15, c0, 1	@ write diagnostic register
+	ldmfd	sp!, {r4 - r11, lr}
+.endm
+
 #else
 
 #define FLOW_CTRL_HALT_CPU(cpu)	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) +	\

@@ -226,12 +226,7 @@ ENTRY(tegra2_sleep_wfi)
 	bl	__cpuc_flush_kern_all
 #endif
 
-	/* FIXME: The next two instructions should be removed if our change to
-	   save the diagnostic regsiter in the CPU context is accepted. */
-	ldmfd	sp!, {r4}
-	mcr	p15, 0, r4, c15, c0, 1	@ write diagnostic register
-	ldmfd	sp!, {lr}
-	ldmfd	sp!, {r4 - r11}
+	pop_ctx_regs			@ restore context registers
 	mov	pc, lr
 ENDPROC(tegra2_sleep_wfi)
 
