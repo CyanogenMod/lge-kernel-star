@@ -47,7 +47,6 @@
 #define CLK_RESET_CCLK_DIVIDER		0x24
 
 #define TEGRA_PMC_VIRT		(TEGRA_PMC_BASE - IO_APB_PHYS + IO_APB_VIRT)
-#define TEGRA_ARM_PERIF_VIRT	(TEGRA_ARM_PERIF_BASE - IO_CPU_PHYS + IO_CPU_VIRT)
 #define TEGRA_CLK_RESET_VIRT	(TEGRA_CLK_RESET_BASE - IO_PPSB_PHYS + IO_PPSB_VIRT)
 
 /*
@@ -139,16 +138,7 @@ ENDPROC(tegra_cpu_wfi)
  * corrupts r4-r5
  */
 ENTRY(tegra_cpu_exit_coherency)
-	mrc	p15, 0, r4, c1, c0, 1	@ ACTLR
-	bic	r4, r4, #(1<<6)		@ exit coherency: clear ACTLR.SMP
-	mcr	p15, 0, r4, c1, c0, 1	@ ACTLR
-	isb
-	cpu_id	r4
-	mov	r4, r4, lsl #2
-	mov	r5, #0xf
-	mov	r5, r5, lsl r4
-	mov32	r4, TEGRA_ARM_PERIF_VIRT + 0xC
-	str	r5, [r4]		@ invalidate SCU tags for CPU
+	exit_smp r4, r5
 	mov	pc, lr
 ENDPROC(tegra_cpu_exit_coherency)
 

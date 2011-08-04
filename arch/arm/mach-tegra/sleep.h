@@ -74,8 +74,26 @@
 #endif
 
 #define TEGRA_FLOW_CTRL_VIRT (TEGRA_FLOW_CTRL_BASE - IO_PPSB_PHYS + IO_PPSB_VIRT)
+#define TEGRA_ARM_PERIF_VIRT (TEGRA_ARM_PERIF_BASE - IO_CPU_PHYS + IO_CPU_VIRT)
 
-#ifndef __ASSEMBLY__
+#ifdef __ASSEMBLY__
+
+/* Macro to exit SMP coherency. */
+.macro exit_smp, tmp1, tmp2
+	mrc	p15, 0, \tmp1, c1, c0, 1	@ ACTLR
+	bic	\tmp1, \tmp1, #(1<<6)		@ clear ACTLR.SMP
+	mcr	p15, 0, \tmp1, c1, c0, 1	@ ACTLR
+	isb
+	cpu_id	\tmp1
+	mov	\tmp1, \tmp1, lsl #2
+	mov	\tmp2, #0xf
+	mov	\tmp2, \tmp2, lsl \tmp1
+	mov32	\tmp1, TEGRA_ARM_PERIF_VIRT + 0xC
+	str	\tmp2, [\tmp1]			@ invalidate SCU tags for CPU
+	dsb
+.endm
+
+#else
 
 #define FLOW_CTRL_HALT_CPU(cpu)	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) +	\
 	((cpu) ? (FLOW_CTRL_HALT_CPU1_EVENTS + 8 * ((cpu) - 1)) :	\
