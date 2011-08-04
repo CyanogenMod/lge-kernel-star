@@ -461,7 +461,6 @@ static const struct tegra_xtal_freq tegra_uhsic_freq_table[] = {
 		.stable_count = 0x2F,
 		.active_delay = 0x0,
 		.xtal_freq_count = 0x1CA,
-		.pdtrk_count = 5,
 	},
 	{
 		.freq = 13000000,
@@ -469,7 +468,6 @@ static const struct tegra_xtal_freq tegra_uhsic_freq_table[] = {
 		.stable_count = 0x33,
 		.active_delay = 0x0,
 		.xtal_freq_count = 0x1F0,
-		.pdtrk_count = 5,
 	},
 	{
 		.freq = 19200000,
@@ -477,7 +475,6 @@ static const struct tegra_xtal_freq tegra_uhsic_freq_table[] = {
 		.stable_count = 0x4B,
 		.active_delay = 0x0,
 		.xtal_freq_count = 0x2DD,
-		.pdtrk_count = 5,
 	},
 	{
 		.freq = 26000000,
@@ -485,7 +482,6 @@ static const struct tegra_xtal_freq tegra_uhsic_freq_table[] = {
 		.stable_count = 0x66,
 		.active_delay = 0x0,
 		.xtal_freq_count = 0x3E0,
-		.pdtrk_count = 5,
 	},
 };
 
