@@ -55,7 +55,7 @@ int fsl_udc_clk_init(struct platform_device *pdev)
 	clk_enable(emc_clk);
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	/* Set DDR busy hints to 150MHz. For Tegra 2x SOC, DDR rate is half of EMC rate */
-	clk_set_rate(emc_clk, 300000000);
+	clk_set_rate(emc_clk, ULONG_MAX);
 #else
 	/* Set DDR busy hints to 150MHz. For Tegra 3x SOC DDR rate equals to EMC rate */
 	clk_set_rate(emc_clk, 150000000);

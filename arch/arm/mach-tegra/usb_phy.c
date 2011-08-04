@@ -461,6 +461,7 @@ static const struct tegra_xtal_freq tegra_uhsic_freq_table[] = {
 		.stable_count = 0x2F,
 		.active_delay = 0x0,
 		.xtal_freq_count = 0x1CA,
+		.pdtrk_count = 5,
 	},
 	{
 		.freq = 13000000,
@@ -468,6 +469,7 @@ static const struct tegra_xtal_freq tegra_uhsic_freq_table[] = {
 		.stable_count = 0x33,
 		.active_delay = 0x0,
 		.xtal_freq_count = 0x1F0,
+		.pdtrk_count = 5,
 	},
 	{
 		.freq = 19200000,
@@ -475,6 +477,7 @@ static const struct tegra_xtal_freq tegra_uhsic_freq_table[] = {
 		.stable_count = 0x4B,
 		.active_delay = 0x0,
 		.xtal_freq_count = 0x2DD,
+		.pdtrk_count = 5,
 	},
 	{
 		.freq = 26000000,
@@ -482,6 +485,7 @@ static const struct tegra_xtal_freq tegra_uhsic_freq_table[] = {
 		.stable_count = 0x66,
 		.active_delay = 0x0,
 		.xtal_freq_count = 0x3E0,
+		.pdtrk_count = 5,
 	},
 };
 
@@ -736,8 +740,6 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 
 	val = readl(base + UTMIP_TX_CFG0);
 	val |= UTMIP_FS_PREABMLE_J;
-	if (phy->instance == 2)
-		val |= UTMIP_HS_DISCON_DISABLE;
 	writel(val, base + UTMIP_TX_CFG0);
 
 	val = readl(base + UTMIP_HSRX_CFG0);
@@ -784,7 +786,7 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 
 	val = readl(base + UTMIP_XCVR_CFG0);
 	val &= ~(UTMIP_XCVR_LSBIAS_SEL | UTMIP_FORCE_PD_POWERDOWN |
-		 UTMIP_FORCE_PD2_POWERDOWN |UTMIP_FORCE_PDZI_POWERDOWN |
+		 UTMIP_FORCE_PD2_POWERDOWN | UTMIP_FORCE_PDZI_POWERDOWN |
 		 UTMIP_XCVR_SETUP(~0) | UTMIP_XCVR_LSFSLEW(~0) |
 		 UTMIP_XCVR_LSRSLEW(~0) | UTMIP_XCVR_HSSLEW_MSB(~0));
 	val |= UTMIP_XCVR_SETUP(config->xcvr_setup);
