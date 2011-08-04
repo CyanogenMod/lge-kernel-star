@@ -263,28 +263,28 @@ static void tegra_touch_adjust_position(NvU32 finger_num, NvU32 x_value, NvU32 y
 
 		if(distant <= ADJUST_BASIS_LEVEL_5)
 		{
-			adjust_X[finger_num] = (adjust_X[finger_num] * ADJUST_FACTOR_LEVEL_5 + x_value * ADJUST_FACTOR_BASE) / (ADJUST_FACTOR_LEVEL_5 + ADJUST_FACTOR_BASE);
-			adjust_Y[finger_num] = (adjust_Y[finger_num] * ADJUST_FACTOR_LEVEL_5 + y_value * ADJUST_FACTOR_BASE) / (ADJUST_FACTOR_LEVEL_5 + ADJUST_FACTOR_BASE);
+			adjust_X[finger_num] = (adjust_X[finger_num] * ADJUST_FACTOR_LEVEL_5 + x_value * ADJUST_FACTOR_BASE + (ADJUST_FACTOR_LEVEL_5 + ADJUST_FACTOR_BASE)/2) / (ADJUST_FACTOR_LEVEL_5 + ADJUST_FACTOR_BASE);
+			adjust_Y[finger_num] = (adjust_Y[finger_num] * ADJUST_FACTOR_LEVEL_5 + y_value * ADJUST_FACTOR_BASE + (ADJUST_FACTOR_LEVEL_5 + ADJUST_FACTOR_BASE)/2) / (ADJUST_FACTOR_LEVEL_5 + ADJUST_FACTOR_BASE);
 		}		
 		else if(distant <= ADJUST_BASIS_LEVEL_4)
 		{
-			adjust_X[finger_num] = (adjust_X[finger_num] * ADJUST_FACTOR_LEVEL_4 + x_value * ADJUST_FACTOR_BASE) / (ADJUST_FACTOR_LEVEL_4 + ADJUST_FACTOR_BASE);
-			adjust_Y[finger_num] = (adjust_Y[finger_num] * ADJUST_FACTOR_LEVEL_4 + y_value * ADJUST_FACTOR_BASE) / (ADJUST_FACTOR_LEVEL_4 + ADJUST_FACTOR_BASE);
+			adjust_X[finger_num] = (adjust_X[finger_num] * ADJUST_FACTOR_LEVEL_4 + x_value * ADJUST_FACTOR_BASE + (ADJUST_FACTOR_LEVEL_4 + ADJUST_FACTOR_BASE)/2) / (ADJUST_FACTOR_LEVEL_4 + ADJUST_FACTOR_BASE);
+			adjust_Y[finger_num] = (adjust_Y[finger_num] * ADJUST_FACTOR_LEVEL_4 + y_value * ADJUST_FACTOR_BASE + (ADJUST_FACTOR_LEVEL_4 + ADJUST_FACTOR_BASE)/2) / (ADJUST_FACTOR_LEVEL_4 + ADJUST_FACTOR_BASE);
 		}
 		else if(distant <= ADJUST_BASIS_LEVEL_3)
 		{
-			adjust_X[finger_num] = (adjust_X[finger_num] * ADJUST_FACTOR_LEVEL_3 + x_value * ADJUST_FACTOR_BASE) / (ADJUST_FACTOR_LEVEL_3 + ADJUST_FACTOR_BASE);
-			adjust_Y[finger_num] = (adjust_Y[finger_num] * ADJUST_FACTOR_LEVEL_3 + y_value * ADJUST_FACTOR_BASE) / (ADJUST_FACTOR_LEVEL_3 + ADJUST_FACTOR_BASE);
+			adjust_X[finger_num] = (adjust_X[finger_num] * ADJUST_FACTOR_LEVEL_3 + x_value * ADJUST_FACTOR_BASE + (ADJUST_FACTOR_LEVEL_3 + ADJUST_FACTOR_BASE)/2) / (ADJUST_FACTOR_LEVEL_3 + ADJUST_FACTOR_BASE);
+			adjust_Y[finger_num] = (adjust_Y[finger_num] * ADJUST_FACTOR_LEVEL_3 + y_value * ADJUST_FACTOR_BASE + (ADJUST_FACTOR_LEVEL_3 + ADJUST_FACTOR_BASE)/2) / (ADJUST_FACTOR_LEVEL_3 + ADJUST_FACTOR_BASE);
 		}
 		else if(distant <= ADJUST_BASIS_LEVEL_2)
 		{
-			adjust_X[finger_num] = (adjust_X[finger_num] * ADJUST_FACTOR_LEVEL_2 + x_value * ADJUST_FACTOR_BASE) / (ADJUST_FACTOR_LEVEL_2 + ADJUST_FACTOR_BASE);
-			adjust_Y[finger_num] = (adjust_Y[finger_num] * ADJUST_FACTOR_LEVEL_2 + y_value * ADJUST_FACTOR_BASE) / (ADJUST_FACTOR_LEVEL_2 + ADJUST_FACTOR_BASE);
+			adjust_X[finger_num] = (adjust_X[finger_num] * ADJUST_FACTOR_LEVEL_2 + x_value * ADJUST_FACTOR_BASE + (ADJUST_FACTOR_LEVEL_2 + ADJUST_FACTOR_BASE)/2) / (ADJUST_FACTOR_LEVEL_2 + ADJUST_FACTOR_BASE);
+			adjust_Y[finger_num] = (adjust_Y[finger_num] * ADJUST_FACTOR_LEVEL_2 + y_value * ADJUST_FACTOR_BASE + (ADJUST_FACTOR_LEVEL_2 + ADJUST_FACTOR_BASE)/2) / (ADJUST_FACTOR_LEVEL_2 + ADJUST_FACTOR_BASE);
 		}
 		else if(distant <= ADJUST_BASIS_LEVEL_1)
 		{
-			adjust_X[finger_num] = (adjust_X[finger_num] * ADJUST_FACTOR_LEVEL_1 + x_value * ADJUST_FACTOR_BASE) / (ADJUST_FACTOR_LEVEL_1 + ADJUST_FACTOR_BASE);
-			adjust_Y[finger_num] = (adjust_Y[finger_num] * ADJUST_FACTOR_LEVEL_1 + y_value * ADJUST_FACTOR_BASE) / (ADJUST_FACTOR_LEVEL_1 + ADJUST_FACTOR_BASE);
+			adjust_X[finger_num] = (adjust_X[finger_num] * ADJUST_FACTOR_LEVEL_1 + x_value * ADJUST_FACTOR_BASE + (ADJUST_FACTOR_LEVEL_1 + ADJUST_FACTOR_BASE)/2) / (ADJUST_FACTOR_LEVEL_1 + ADJUST_FACTOR_BASE);
+			adjust_Y[finger_num] = (adjust_Y[finger_num] * ADJUST_FACTOR_LEVEL_1 + y_value * ADJUST_FACTOR_BASE + (ADJUST_FACTOR_LEVEL_1 + ADJUST_FACTOR_BASE)/2) / (ADJUST_FACTOR_LEVEL_1 + ADJUST_FACTOR_BASE);
 		}
 		else
 		{
@@ -317,6 +317,7 @@ static int tegra_touch_thread(void *pdata)
 	NvU16 pressed_button_type = KEY_REJECT;
 
 	NvU8 grip_suppression_value = 0;
+	NvU8 touch_active_crop = 1;
 	NvU8 valid_fingers = 0;
 	
 	NvU8 lcd_finger_num = 0;
@@ -359,12 +360,36 @@ static int tegra_touch_thread(void *pdata)
 			for (i = 0; i < LGE_SUPPORT_FINGERS_NUM; i++)
 			{
 				Prev_ToolDown[i] = ToolDown[i];
+#ifdef FEATURE_LGE_TOUCH_ACTIVE_CROP
+#ifdef FEATURE_LGE_TOUCH_GRIP_SUPPRESSION
+				touch_active_crop = getTouchGripSuppressionValue();	// default = 2
+#endif /* FEATURE_LGE_TOUCH_GRIP_SUPPRESSION */
+				if(c.additionalInfo.multi_XYCoords[i][0] < touch_active_crop && c.additionalInfo.multi_XYCoords[i][0] >= 0) 
+				{
+					touch_fingerprint(DebugMsgPrint, "[TOUCH] DEBUG: clipping by %d from X= %d\n",touch_active_crop,c.additionalInfo.multi_XYCoords[i][0]);
+					c.additionalInfo.multi_XYCoords[i][0] = touch_active_crop;
+				}
+				if(c.additionalInfo.multi_XYCoords[i][0] < LGE_TOUCH_RESOLUTION_X && c.additionalInfo.multi_XYCoords[i][0] >= LGE_TOUCH_RESOLUTION_X - touch_active_crop) 
+				{
+					touch_fingerprint(DebugMsgPrint, "[TOUCH] DEBUG: clipping by %d from X= %d\n",touch_active_crop,c.additionalInfo.multi_XYCoords[i][0]);
+					c.additionalInfo.multi_XYCoords[i][0] = LGE_TOUCH_RESOLUTION_X 				}
+				if(c.additionalInfo.multi_XYCoords[i][1] < TOUCH_LCD_ACTIVE_AREA_Y && c.additionalInfo.multi_XYCoords[i][1] >= LGE_TOUCH_RESOLUTION_Y - touch_active_crop) 
+				{
+					touch_fingerprint(DebugMsgPrint, "[TOUCH] DEBUG: clipping by %d from Y= %d\n",touch_active_crop,c.additionalInfo.multi_XYCoords[i][1]);
+					c.additionalInfo.multi_XYCoords[i][1] = LGE_TOUCH_RESOLUTION_Y - 1 - touch_active_crop;
+				}
+				else if(c.additionalInfo.multi_XYCoords[i][1] < TOUCH_BUTTON_AREA_Y && c.additionalInfo.multi_XYCoords[i][1] >= TOUCH_LCD_ACTIVE_AREA_Y ) 
+				{
+					touch_fingerprint(DebugMsgPrint, "[TOUCH] DEBUG: dead zone Y= %d\n",c.additionalInfo.multi_XYCoords[i][1]);
+					c.additionalInfo.multi_fingerstate[i] = 0;
+				}
+#endif /* FEATURE_LGE_TOUCH_ACTIVE_CROP */
 
 // 20100718  grip suppression [START]
 #ifdef FEATURE_LGE_TOUCH_GRIP_SUPPRESSION
 				grip_suppression_value = getTouchGripSuppressionValue();
 
-				if(c.additionalInfo.multi_XYCoords[i][0] >= grip_suppression_value && c.additionalInfo.multi_XYCoords[i][0] <= LGE_TOUCH_RESOLUTION_X - grip_suppression_value)
+				if(c.additionalInfo.multi_XYCoords[i][0] >= grip_suppression_value && c.additionalInfo.multi_XYCoords[i][0] < LGE_TOUCH_RESOLUTION_X - grip_suppression_value)
 				{
 #endif /* FEATURE_LGE_TOUCH_GRIP_SUPPRESSION */
 // 20100718  grip suppression [END]	
