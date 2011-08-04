@@ -166,6 +166,7 @@ static int tegra_ehci_hub_control(
 		temp &= ~PORT_WKCONN_E;
 		temp |= PORT_WKDISC_E | PORT_WKOC_E;
 		ehci_writel(ehci, temp | PORT_SUSPEND, status_reg);
+
 		/* Need a 4ms delay before the controller goes to suspend */
 		mdelay(4);
 
@@ -446,6 +447,7 @@ static int tegra_usb_resume(struct usb_hcd *hcd, bool is_dpd)
 	if ((val & PORT_POWER) && (val & PORT_PE)) {
 		val |= PORT_SUSPEND;
 		writel(val, &hw->port_status[0]);
+
 		/* Need a 4ms delay before the controller goes to suspend */
 		mdelay(4);
 
