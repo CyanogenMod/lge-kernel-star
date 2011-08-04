@@ -70,6 +70,7 @@
 #include <linux/pci.h>
 #include <linux/interrupt.h>
 #include <linux/netdevice.h>
+#include <linux/semaphore.h>
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 28))
 #undef IP_TOS
 #endif 
@@ -123,10 +124,8 @@ typedef irqreturn_t(*FN_ISR) (int irq, void *dev_id, struct pt_regs *ptregs);
 #endif	
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 67)
-#ifndef SANDGATE2G
 #define MOD_INC_USE_COUNT
 #define MOD_DEC_USE_COUNT
-#endif 
 #endif 
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 32)
@@ -481,11 +480,7 @@ typedef struct {
 #define DBG_THR(x)
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 0))
-#define SMP_RD_BARRIER_DEPENDS(x) smp_read_barrier_depends(x)
-#else
 #define SMP_RD_BARRIER_DEPENDS(x) smp_rmb(x)
-#endif
 
 
 #define PROC_START(thread_func, owner, tsk_ctl, flags) \
