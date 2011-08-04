@@ -81,7 +81,7 @@
 /* Macro to exit SMP coherency. */
 .macro exit_smp, tmp1, tmp2
 	mrc	p15, 0, \tmp1, c1, c0, 1	@ ACTLR
-	bic	\tmp1, \tmp1, #(1<<6)		@ clear ACTLR.SMP
+	bic	\tmp1, \tmp1, #(1<<6) | (1<<0)	@ clear ACTLR.SMP | ACTLR.FW
 	mcr	p15, 0, \tmp1, c1, c0, 1	@ ACTLR
 	isb
 	cpu_id	\tmp1
