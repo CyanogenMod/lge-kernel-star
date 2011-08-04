@@ -73,10 +73,7 @@ void platform_cpu_die(unsigned int cpu)
 	tegra3_hotplug_shutdown();
 #endif
 
-	/*
-	 * tegra_cpu_suspend can return through tegra_cpu_resume, but that
-	 * should never happen for a hotplugged cpu
-	 */
+	/* Should never return here. */
 	BUG();
 }
 

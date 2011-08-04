@@ -143,6 +143,26 @@ ENTRY(tegra_cpu_exit_coherency)
 ENDPROC(tegra_cpu_exit_coherency)
 
 /*
+ * tegra_cpu_suspend
+ *
+ * Save CPU suspend state
+ *
+ * Input:
+ *	r1 = v:p offset
+ *	r3 = virtual return function
+ * Output:
+ *	sp is decremented to allocate space for CPU state on stack
+ * r0-r3,r8-r10,lr corrupted
+ */
+
+ENTRY(tegra_cpu_suspend)
+	mov	r8, lr
+	bl	cpu_suspend
+	exit_smp r0, r2
+	mov	pc, r8
+ENDPROC(tegra_cpu_suspend)
+
+/*
  * tegra_cpu_save
  *
  * Input:
@@ -151,7 +171,7 @@ ENDPROC(tegra_cpu_exit_coherency)
  * Output:
  *	r0 = v:p offset
  *	r7 = SP after saving the registers but before cpu_suspend, suitable
- *	     for restoring an aborted suspend that does not call cpu_resume
+ *	     for restoring an aborted suspend
  *	sp = SP after cpu_suspend (the 'real' SP)
  * Saves r4-r11 on the stack
  * Corrupts r1, r3-r10
@@ -172,7 +192,7 @@ ENTRY(tegra_cpu_save)
 	mov	r5, r0
 	mov	r6, r2
 	mov	r1, r0
-	bl	cpu_suspend
+	bl	tegra_cpu_suspend
 	mov	lr, r4
 	mov	r0, r5
 	mov	r2, r6
@@ -188,7 +208,6 @@ ENDPROC(tegra_cpu_save)
 ENTRY(tegra_sleep_cpu)
 	mov	r3, lr			@ set resume address to lr
 	bl	tegra_cpu_save
-	bl	tegra_cpu_exit_coherency
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	mov32	r1, tegra2_tear_down_cpu
