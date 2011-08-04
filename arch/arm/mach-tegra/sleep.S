@@ -291,7 +291,7 @@ tegra_pgd_phys_address:
 	.align	L1_CACHE_SHIFT
 tegra_shut_off_mmu:
 	mrc	p15, 0, r3, c1, c0, 0
-	movw	r2, #(1 << 12) | (1 << 11) | (1 << 2) | (1 << 0)
+	movw	r2, #CR_I | CR_Z | CR_C | CR_M
 	bic	r3, r3, r2
 	dsb
 	mcr	p15, 0, r3, c1, c0, 0
