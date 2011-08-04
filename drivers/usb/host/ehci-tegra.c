@@ -1090,10 +1090,11 @@ static int tegra_ehci_remove(struct platform_device *pdev)
 	clk_disable(tegra->clk);
 	clk_put(tegra->clk);
 
-	clk_disable(tegra->sclk_clk);
+	if (tegra->clock_enabled){
+		clk_disable(tegra->sclk_clk);
+		clk_disable(tegra->emc_clk);
+	}
 	clk_put(tegra->sclk_clk);
-
-	clk_disable(tegra->emc_clk);
 	clk_put(tegra->emc_clk);
 
 	kfree(tegra);
