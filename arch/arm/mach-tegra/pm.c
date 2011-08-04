@@ -89,7 +89,7 @@ struct suspend_context {
 };
 
 #ifdef CONFIG_PM_SLEEP
-#ifdef CONFIG_CACHE_L2X0
+#if USE_TEGRA_CPU_SUSPEND
 void *tegra_cpu_context;	/* non-cacheable page for CPU context */
 #endif
 phys_addr_t tegra_pgd_phys;	/* pgd used by hotplug & LP2 bootup */
@@ -257,7 +257,7 @@ static __init int create_suspend_pgtable(void)
  */
 static __init int alloc_suspend_context(void)
 {
-#ifdef CONFIG_CACHE_L2X0
+#if USE_TEGRA_CPU_SUSPEND
 	pgprot_t prot = __pgprot_modify(pgprot_kernel, L_PTE_MT_MASK,
 					 L_PTE_MT_UNCACHED | L_PTE_XN);
 	struct page *ctx_page;

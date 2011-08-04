@@ -143,9 +143,60 @@ ENTRY(tegra_cpu_exit_coherency)
 ENDPROC(tegra_cpu_exit_coherency)
 
 /*
+ * Restore CPU state for a suspend
+ *
+ * NOTE: This is a copy of cpu_resume in arch/arm/sleep.S that has been
+ *	 modified to work with an L2 cache.
+ */
+	.align	L1_CACHE_SHIFT
+ENTRY(tegra_cpu_resume_phys)
+#if USE_TEGRA_CPU_SUSPEND
+#ifdef CONFIG_SMP
+	adr	r0, tegra_phys_sleep_sp
+	ALT_SMP(mrc p15, 0, r1, c0, c0, 5)
+	ALT_UP(mov r1, #0)
+	and	r1, r1, #15
+	ldr	r0, [r0, r1, lsl #2]		@ stack phys addr
+#else
+	ldr	r0, tegra_phys_sleep_sp		@ stack phys addr
+#endif
+	setmode	PSR_I_BIT | PSR_F_BIT | SVC_MODE, r1  @ set SVC, irqs off
+#ifdef MULTI_CPU
+	@ load v:p, stack, return fn, resume fn
+  ARM(	ldmia	r0!, {r1, sp, lr, pc}	)
+THUMB(	ldmia	r0!, {r1, r2, r3, r4}	)
+THUMB(	mov	sp, r2			)
+THUMB(	mov	lr, r3			)
+THUMB(	bx	r4			)
+#else
+	@ load v:p, stack, return fn
+  ARM(	ldmia	r0!, {r1, sp, lr}	)
+THUMB(	ldmia	r0!, {r1, r2, lr}	)
+THUMB(	mov	sp, r2			)
+	b	cpu_do_resume
+#endif
+#else
+	/* Use the standard cpu_resume. */
+	b	cpu_resume
+#endif
+ENDPROC(tegra_cpu_resume_phys)
+
+#if USE_TEGRA_CPU_SUSPEND
+	.align	L1_CACHE_SHIFT
+	.globl	tegra_phys_sleep_sp
+tegra_phys_sleep_sp:
+	.rept	CONFIG_NR_CPUS
+	.long	0		@ preserve stack phys ptr here
+	.endr
+	.align	L1_CACHE_SHIFT  @ nothing else must be in this cache line
+#endif
+
+/*
  * tegra_cpu_suspend
  *
  * Save CPU suspend state
+ * NOTE: This is a copy of cpu_suspend in arch/arm/sleep.S that has been
+ *	 modified to work with an L2 cache.
  *
  * Input:
  *	r1 = v:p offset
@@ -154,12 +205,102 @@ ENDPROC(tegra_cpu_exit_coherency)
  *	sp is decremented to allocate space for CPU state on stack
  * r0-r3,r8-r10,lr corrupted
  */
-
+	.align	L1_CACHE_SHIFT
 ENTRY(tegra_cpu_suspend)
+#if USE_TEGRA_CPU_SUSPEND
+	mov	r9, lr
+#ifdef MULTI_CPU
+	mov32	r10, processor
+	mov	r2, sp			@ current virtual SP
+	ldr	r0, [r10, #CPU_SLEEP_SIZE] @ size of CPU sleep state
+	ldr	ip, [r10, #CPU_DO_RESUME] @ virtual resume function
+	sub	sp, sp, r0		@ allocate CPU state on stack
+	mov	r0, sp			@ save pointer
+	add	ip, ip, r1		@ convert resume fn to phys
+	stmfd	sp!, {r1, r2, r3, ip}	@ save v:p, virt SP, retfn, phys resume fn
+	mov	lr, pc
+	ldr	pc, [r10, #CPU_DO_SUSPEND] @ save CPU state
+#else
+	mov	r2, sp			@ current virtual SP
+	mov32	r0, cpu_suspend_size
+	sub	sp, sp, r0		@ allocate CPU state on stack
+	mov	r0, sp			@ save pointer
+	stmfd	sp!, {r1, r2, r3}	@ save v:p, virt SP, return fn
+	bl	cpu_do_suspend
+#endif
+
+	/* Disable the data cache */
+	mrc	p15, 0, r10, c1, c0, 0
+	bic	r10, r10, #CR_C
+	dsb
+	mcr	p15, 0, r10, c1, c0, 0
+	isb
+
+	/* Flush data cache */
+#ifdef MULTI_CACHE
+	mov32	r10, cpu_cache
+	mov	lr, pc
+	ldr	pc, [r10, #CACHE_FLUSH_KERN_ALL]
+#else
+	bl	__cpuc_flush_kern_all
+#endif
+
+	/* Invalidate the TLBs & BTAC */
+	mov	r1, #0
+	mcr	p15, 0, r1, c8, c3, 0	@ invalidate shared TLBs
+	mcr	p15, 0, r1, c7, c1, 6	@ invalidate shared BTAC
+	dsb
+	isb
+
+	/* Turn off SMP coherency */
+	exit_smp r1, r2
+
+	/* Convert SP from virtual to physical address. */
+	movw	r1, #0xFFF
+	bic	r2, sp, r1		@ VA & 0xFFFFF000
+	mcr	p15, 0, r2, c7, c8, 0	@ V2PPRPC
+	mrc	p15, 0, r2, c7, c4, 0	@ PAR
+	bic	r2, r2, r1		@ PA & 0xFFFFF000
+	and	r0, sp, r1		@ VA & 0x00000FFF
+	orr	r2, r0, r2		@ (PA & 0xFFFFF000) | (VA & 0x00000FFF)
+
+	mov32	r3, tegra_phys_sleep_sp	@ per-CPU phys SP save area
+
+#ifdef CONFIG_SMP
+	ALT_SMP(mrc p15, 0, lr, c0, c0, 5)
+	ALT_UP(mov lr, #0)
+	and	lr, lr, #15
+#else
+	mov	lr, #0
+#endif
+
+	/* Save the normal PRRR value */
+	mrc	p15, 0, r0, c10, c2, 0	@ PRRR
+
+	/* Override all remappings to strongly ordered */
+	mov	r1, #0
+	mcr	p15, 0, r1, c10, c2, 0	@ PRRR
+	mcr	p15, 0, r1, c8, c7, 0	@ invalidate local TLBs
+	dsb
+	isb
+
+	/* Save the physical stack pointer */
+	str	r2, [r3, lr, lsl #2]	@ save phys SP
+
+	/* Restore the regular remappings */
+	mcr	p15, 0, r0, c10, c2, 0	@ PRRR
+	mcr	p15, 0, r1, c8, c7, 0	@ invalidate local TLBs
+	dsb
+	isb
+
+	mov	pc, r9
+#else
+	/* Use the standard cpu_suspend. */
 	mov	r8, lr
 	bl	cpu_suspend
 	exit_smp r0, r2
 	mov	pc, r8
+#endif
 ENDPROC(tegra_cpu_suspend)
 
 /*
@@ -173,7 +314,7 @@ ENDPROC(tegra_cpu_suspend)
  *	r0 = v:p offset
  *	r7 = SP after saving the registers but before cpu_suspend, suitable
  *	     for restoring an aborted suspend
- *	sp = SP after cpu_suspend (the 'real' SP)
+ *	sp = SP after tegra_cpu_suspend (the 'real' SP)
  * Saves r4-r11 on the stack
  * Corrupts r1, r3-r10
  */
@@ -183,7 +324,20 @@ ENTRY(tegra_cpu_save)
 
 	adr	r3, tegra_cpu_resume
 
-	mov	r7, sp
+	mov	r7, sp			@ SP after reg save, before suspend
+
+#if USE_TEGRA_CPU_SUSPEND
+	cpu_id	r4
+	mov32	r5, tegra_cpu_context   @ address of non-cacheable context page
+	ldr	r5, [r5]		@ non-cacheable context save area
+	mov	r6, #0x400		@ size of one CPU context stack area
+	add	r4, r4, #1
+	smlabb	sp, r6, r4, r5		@ context area for this CPU
+	push_stack_token r4		@ debug check word
+	stmfd	sp!, {r7}		@ save the real stack pointer
+	push_stack_token r4		@ debug check word
+#endif
+
 	mov	r4, r12
 	mov	r5, r0
 	mov	r6, r2
@@ -217,6 +371,7 @@ ENDPROC(tegra_sleep_cpu)
  * tegra_cpu_resume
  *
  * reloads the volatile CPU state from the context area
+ * initializes the processor mode stacks
  * the mmu should be on and the CPU should be coherent before this is called
  */
 	.align L1_CACHE_SHIFT
@@ -227,6 +382,13 @@ tegra_cpu_resume:
 	mcr	p15, 0, r0, c7, c5, 0	@ flush instruction cache
 	dsb
 	isb
+
+#if USE_TEGRA_CPU_SUSPEND
+	pop_stack_token r4, r5		@ check stack debug token
+	ldmfd	sp!, {r0}		@ get the real stack pointer
+	pop_stack_token r4, r5		@ check stack debug token
+	mov	sp, r0			@ switch to the real stack pointer
+#endif
 
 	bl	cpu_init
 

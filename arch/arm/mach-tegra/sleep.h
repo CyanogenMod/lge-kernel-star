@@ -25,6 +25,12 @@
 
 #include <mach/iomap.h>
 
+#ifdef CONFIG_CACHE_L2X0
+#define USE_TEGRA_CPU_SUSPEND	1
+#else
+#define USE_TEGRA_CPU_SUSPEND	0
+#endif
+
 #define TEGRA_POWER_SDRAM_SELFREFRESH	(1 << 26) /* SDRAM is in self-refresh */
 #define TEGRA_POWER_HOTPLUG_SHUTDOWN	(1 << 27) /* Hotplug shutdown */
 #define TEGRA_POWER_CLUSTER_G		(1 << 28) /* G CPU */

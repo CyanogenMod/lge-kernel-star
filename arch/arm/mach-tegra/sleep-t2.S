@@ -198,9 +198,10 @@ ENTRY(tegra2_sleep_wfi)
 
 	/*
 	 * cpu may be reset while in wfi, which will return through
-	 * tegra_resume to cpu_resume to tegra_cpu_resume
+	 * tegra_resume to tegra_cpu_resume_phys to tegra_cpu_resume
 	 * or interrupt may wake wfi, which will return here
-	 * cpu state is unchanged - MMU is on, cache is on, coherency is off
+	 * cpu state is unchanged - MMU is on, cache is on, coherency
+	 * is off, and the data cache is off
 	 *
 	 * r11 contains the original actlr
 	 */
@@ -215,6 +216,12 @@ ENTRY(tegra2_sleep_wfi)
 
 	bl	tegra_pen_unlock
 
+	/* Enable the data cache and SMP coherency */
+	mrc	p15, 0, r10, c1, c0, 0
+	orr	r10, r10, #CR_C
+	dsb
+	mcr	p15, 0, r10, c1, c0, 0
+	isb
 	mcr	p15, 0, r11, c1, c0, 1	@ reenable coherency
 
 	@ the cpu was running with coherency disabled, caches may be out of date
