@@ -167,7 +167,8 @@ ENDPROC(tegra_cpu_suspend)
  *
  * Input:
  *	r0 = v:p offset
- *	r3 = resume address
+ *	r12 = return to the caller of this function
+ *	lr = resume address
  * Output:
  *	r0 = v:p offset
  *	r7 = SP after saving the registers but before cpu_suspend, suitable
@@ -179,7 +180,7 @@ ENDPROC(tegra_cpu_suspend)
 
 ENTRY(tegra_cpu_save)
 	stmfd	sp!, {r4 - r11}
-	stmfd	sp!, {r3}
+	stmfd	sp!, {lr}
 	/* FIXME: The next two instructions should be removed if our change to
 	   save the diagnostic regsiter in the CPU context is accepted. */
 	mrc	p15, 0, r4, c15, c0, 1	@ read diagnostic register
@@ -188,15 +189,14 @@ ENTRY(tegra_cpu_save)
 	adr	r3, tegra_cpu_resume
 
 	mov	r7, sp
-	mov	r4, lr
+	mov	r4, r12
 	mov	r5, r0
 	mov	r6, r2
 	mov	r1, r0
 	bl	tegra_cpu_suspend
-	mov	lr, r4
 	mov	r0, r5
 	mov	r2, r6
-	mov	pc, lr
+	mov	pc, r4
 ENDPROC(tegra_cpu_save)
 
 /*
@@ -206,8 +206,8 @@ ENDPROC(tegra_cpu_save)
  * tegra?_tear_down_cpu
  */
 ENTRY(tegra_sleep_cpu)
-	mov	r3, lr			@ set resume address to lr
-	bl	tegra_cpu_save
+	mov	r12, pc 		@ return here is via r12
+	b	tegra_cpu_save
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	mov32	r1, tegra2_tear_down_cpu

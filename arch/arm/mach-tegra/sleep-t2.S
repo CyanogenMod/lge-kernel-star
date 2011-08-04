@@ -170,8 +170,8 @@ ENDPROC(tegra2_cpu_is_resettable_soon)
  * tegra2_tear_down_core in IRAM
  */
 ENTRY(tegra2_sleep_core)
-	mov	r3, lr			@ set resume address to lr
-	bl	tegra_cpu_save
+	mov	r12, pc 		@ return here is via r12
+	b	tegra_cpu_save
 	mov32	r1, tegra2_tear_down_core
 	mov32	r2, tegra2_iram_start
 	sub	r1, r1, r2
@@ -184,9 +184,9 @@ ENDPROC(tegra2_sleep_core)
  * tegra2_sleep_wfi(unsigned long v2p)
  */
 ENTRY(tegra2_sleep_wfi)
-	mov	r3, lr			@ set resume address to lr
 	mrc	p15, 0, r2, c1, c0, 1	@ save actlr before exiting coherency
-	bl	tegra_cpu_save
+	mov	r12, pc 		@ return here is via r12
+	b	tegra_cpu_save
 	mov	r11, r2
 
 	mov32	r3, TEGRA_PMC_VIRT
