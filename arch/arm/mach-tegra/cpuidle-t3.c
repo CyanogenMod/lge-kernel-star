@@ -149,13 +149,13 @@ bool tegra3_lp2_is_allowed(struct cpuidle_device *dev,
 static void tegra3_idle_enter_lp2_cpu_0(struct cpuidle_device *dev,
 			   struct cpuidle_state *state, s64 request)
 {
-	ktime_t enter;
-	ktime_t exit;
+	ktime_t entry_time;
+	ktime_t exit_time;
 	bool sleep_completed = false;
 	int bin;
 
 	/* LP2 entry time */
-	enter = ktime_get();
+	entry_time = ktime_get();
 
 	if (request < state->target_residency) {
 		/* Not enough time left to enter LP2 */
@@ -191,7 +191,7 @@ static void tegra3_idle_enter_lp2_cpu_0(struct cpuidle_device *dev,
 		tegra_gic_dist_enable();
 
 		/* LP2 initial targeted wake time */
-		wake_time = ktime_to_us(enter) + request;
+		wake_time = ktime_to_us(entry_time) + request;
 
 		/* CPU0 must wake up before any of the other CPUs. */
 		smp_rmb();
@@ -200,7 +200,7 @@ static void tegra3_idle_enter_lp2_cpu_0(struct cpuidle_device *dev,
 				tegra_cpu_wake_by_time[i]);
 
 		/* LP2 actual targeted wake time */
-		request = wake_time - ktime_to_us(enter);
+		request = wake_time - ktime_to_us(entry_time);
 		BUG_ON(wake_time < 0LL);
 	}
 #endif
@@ -237,13 +237,14 @@ static void tegra3_idle_enter_lp2_cpu_0(struct cpuidle_device *dev,
 	}
 #endif
 
-	exit = ktime_get();
+	exit_time = ktime_get();
 	if (sleep_completed) {
 		/*
 		 * Stayed in LP2 for the full time until the next tick,
 		 * adjust the exit latency based on measurement
 		 */
-		int offset = ktime_to_us(ktime_sub(exit, enter)) - request;
+		int offset = ktime_to_us(ktime_sub(exit_time, entry_time))
+			- request;
 		int latency = tegra_lp2_exit_latency + offset / 16;
 		latency = clamp(latency, 0, 10000);
 		tegra_lp2_exit_latency = latency;
@@ -251,10 +252,11 @@ static void tegra3_idle_enter_lp2_cpu_0(struct cpuidle_device *dev,
 
 		idle_stats.lp2_completed_count++;
 		idle_stats.lp2_completed_count_bin[bin]++;
-		idle_stats.in_lp2_time += ktime_to_us(ktime_sub(exit, enter));
+		idle_stats.in_lp2_time += ktime_to_us(
+			ktime_sub(exit_time, entry_time));
 
 		pr_debug("%lld %lld %d %d\n", request,
-			ktime_to_us(ktime_sub(exit, enter)),
+			ktime_to_us(ktime_sub(exit_time, entry_time)),
 			offset, bin);
 	}
 }
