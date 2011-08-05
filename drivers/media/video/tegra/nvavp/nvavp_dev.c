@@ -79,6 +79,9 @@ struct nvavp_info {
 	/* os information */
 	struct nvavp_os_info		os_info;
 
+	/* ucode information */
+	struct nvavp_ucode_info		ucode_info;
+
 	/* client for driver allocations, persistent */
 	struct nvmap_client		*nvmap;
 
@@ -319,10 +322,11 @@ static void nvavp_pushbuffer_deinit(struct nvavp_info *nvavp)
 }
 
 static int nvavp_pushbuffer_update(struct nvavp_info *nvavp, u32 phys_addr,
-			u32 gather_count, struct nvavp_syncpt *syncpt)
+			u32 gather_count, struct nvavp_syncpt *syncpt,
+			u32 ext_ucode_flag)
 {
 	struct nv_e276_control *control = nvavp->os_control;
-	u32 gather_cmd, sync = 0;
+	u32 gather_cmd, setucode_cmd, sync = 0;
 	u32 wordcount = 0;
 	u32 index, value = -1;
 
@@ -331,6 +335,27 @@ static int nvavp_pushbuffer_update(struct nvavp_info *nvavp, u32 phys_addr,
 	/* check for pushbuffer wrapping */
 	if (nvavp->pushbuf_index >= nvavp->pushbuf_fence)
 		nvavp->pushbuf_index = 0;
+
+	if (!ext_ucode_flag) {
+		setucode_cmd =
+			NVE26E_CH_OPCODE_INCR(NVE276_SET_MICROCODE_A, 3);
+
+		index = wordcount + nvavp->pushbuf_index;
+		writel(setucode_cmd, (nvavp->pushbuf_data + index));
+		wordcount += sizeof(u32);
+
+		index = wordcount + nvavp->pushbuf_index;
+		writel(0, (nvavp->pushbuf_data + index));
+		wordcount += sizeof(u32);
+
+		index = wordcount + nvavp->pushbuf_index;
+		writel(nvavp->ucode_info.phys, (nvavp->pushbuf_data + index));
+		wordcount += sizeof(u32);
+
+		index = wordcount + nvavp->pushbuf_index;
+		writel(nvavp->ucode_info.size, (nvavp->pushbuf_data + index));
+		wordcount += sizeof(u32);
+	}
 
 	gather_cmd = NVE26E_CH_OPCODE_GATHER(0, 0, 0, gather_count);
 
@@ -376,44 +401,186 @@ static int nvavp_pushbuffer_update(struct nvavp_info *nvavp, u32 phys_addr,
 	return 0;
 }
 
-static int nvavp_load_os(struct nvavp_os_info *os, struct device *dev,
-		struct nvmap_client *nvmap, void *fw_data)
+static void nvavp_unload_ucode(struct nvavp_info *nvavp)
 {
-	void *ptr = (void *)fw_data;
-	u32 size;
+	nvmap_unpin(nvavp->nvmap, nvavp->ucode_info.handle);
+	nvmap_munmap(nvavp->ucode_info.handle, nvavp->ucode_info.data);
+	nvmap_free(nvavp->nvmap, nvavp->ucode_info.handle);
+	kfree(nvavp->ucode_info.ucode_bin);
+}
 
-	if (strncmp((const char *)ptr, "NVAVP-OS", 8)) {
-		dev_info(dev, "os hdr string mismatch\n");
-		return -EINVAL;
+static int nvavp_load_ucode(struct nvavp_info *nvavp)
+{
+	struct nvavp_ucode_info *ucode_info = &nvavp->ucode_info;
+	const struct firmware *nvavp_ucode_fw;
+	char fw_ucode_file[32];
+	void *ptr;
+	int ret = 0;
+
+	if (!ucode_info->ucode_bin) {
+		sprintf(fw_ucode_file, "nvavp_vid_ucode.bin");
+
+		ret = request_firmware(&nvavp_ucode_fw, fw_ucode_file,
+					nvavp->misc_dev.this_device);
+		if (ret) {
+			dev_err(&nvavp->nvhost_dev->dev,
+				"cannot read ucode firmware '%s'\n",
+				fw_ucode_file);
+			goto err_req_ucode;
+		}
+		dev_info(&nvavp->nvhost_dev->dev,
+			"read ucode firmware from '%s' (%d bytes)\n",
+			fw_ucode_file, nvavp_ucode_fw->size);
+
+		ptr = (void *)nvavp_ucode_fw->data;
+
+		if (strncmp((const char *)ptr, "NVAVPAPP", 8)) {
+			dev_info(&nvavp->nvhost_dev->dev,
+				"ucode hdr string mismatch\n");
+			ret = -EINVAL;
+			goto err_req_ucode;
+		}
+		ptr += 8;
+		ucode_info->size = nvavp_ucode_fw->size - 8;
+
+		ucode_info->ucode_bin = kzalloc(ucode_info->size,
+						GFP_KERNEL);
+		if (!ucode_info->ucode_bin) {
+			dev_err(&nvavp->nvhost_dev->dev,
+				"cannot allocate ucode bin\n");
+			ret = -ENOMEM;
+			goto err_ubin_alloc;
+		}
+
+		ucode_info->handle = nvmap_alloc(nvavp->nvmap,
+						nvavp->ucode_info.size,
+					SZ_1M, NVMAP_HANDLE_UNCACHEABLE);
+		if (IS_ERR(ucode_info->handle)) {
+			dev_err(&nvavp->nvhost_dev->dev,
+				"cannot create ucode handle\n");
+			ret = PTR_ERR(ucode_info->handle);
+			goto err_ucode_alloc;
+		}
+		ucode_info->data = (u8 *)nvmap_mmap(ucode_info->handle);
+		if (!ucode_info->data) {
+			dev_err(&nvavp->nvhost_dev->dev,
+				"cannot map ucode handle\n");
+			ret = -ENOMEM;
+			goto err_ucode_mmap;
+		}
+		ucode_info->phys = nvmap_pin(nvavp->nvmap, ucode_info->handle);
+		if (IS_ERR((void *)ucode_info->phys)) {
+			dev_err(&nvavp->nvhost_dev->dev,
+				"cannot pin ucode handle\n");
+			ret = PTR_ERR((void *)ucode_info->phys);
+			goto err_ucode_pin;
+		}
+		memcpy(ucode_info->ucode_bin, ptr, ucode_info->size);
+		release_firmware(nvavp_ucode_fw);
 	}
 
-	ptr += 8;
-	os->entry_offset = *((u32 *)ptr);
-	ptr += sizeof(u32);
-	os->control_offset = *((u32 *)ptr);
-	ptr += sizeof(u32);
-	os->debug_offset = *((u32 *)ptr);
-	ptr += sizeof(u32);
-
-	size = *((u32 *)ptr);    ptr += sizeof(u32);
-
-	memcpy(os->data, ptr, size);
-	memset(os->data + size, 0, SZ_1M - size);
-
-	dev_info(dev, "entry=%08x control=%08x debug=%08x size=%d\n",
-		os->entry_offset, os->control_offset, os->debug_offset, size);
-
-	os->reset_addr = os->phys + os->entry_offset;
-
-	dev_info(dev, "AVP os at vaddr=%p paddr=%lx reset_addr=%p\n",
-		os->data, (unsigned long)(os->phys), (void *)os->reset_addr);
-
+	memcpy(ucode_info->data, ucode_info->ucode_bin, ucode_info->size);
 	return 0;
+
+err_ucode_pin:
+	nvmap_munmap(ucode_info->handle, ucode_info->data);
+err_ucode_mmap:
+	nvmap_free(nvavp->nvmap, ucode_info->handle);
+err_ucode_alloc:
+	kfree(nvavp);
+err_ubin_alloc:
+	release_firmware(nvavp_ucode_fw);
+err_req_ucode:
+	return ret;
+}
+
+static void nvavp_unload_os(struct nvavp_info *nvavp)
+{
+#if defined(CONFIG_TEGRA_AVP_KERNEL_ON_MMU)
+	nvmap_unpin(nvavp->nvmap, nvavp->os_info.handle);
+	nvmap_munmap(nvavp->os_info.handle, nvavp->os_info.data);
+	nvmap_free(nvavp->nvmap, nvavp->os_info.handle);
+#endif
+	kfree(nvavp->os_info.os_bin);
+}
+
+static int nvavp_load_os(struct nvavp_info *nvavp, char *fw_os_file)
+{
+	struct nvavp_os_info *os_info = &nvavp->os_info;
+	const struct firmware *nvavp_os_fw;
+	void *ptr;
+	u32 size;
+	int ret = 0;
+
+	if (!os_info->os_bin) {
+		ret = request_firmware(&nvavp_os_fw, fw_os_file,
+					nvavp->misc_dev.this_device);
+		if (ret) {
+			dev_err(&nvavp->nvhost_dev->dev,
+				"cannot read os firmware '%s'\n", fw_os_file);
+			goto err_req_fw;
+		}
+
+		dev_info(&nvavp->nvhost_dev->dev,
+			"read firmware from '%s' (%d bytes)\n",
+			fw_os_file, nvavp_os_fw->size);
+
+		ptr = (void *)nvavp_os_fw->data;
+
+		if (strncmp((const char *)ptr, "NVAVP-OS", 8)) {
+			dev_info(&nvavp->nvhost_dev->dev,
+				"os hdr string mismatch\n");
+			ret = -EINVAL;
+			goto err_os_bin;
+		}
+
+		ptr += 8;
+		os_info->entry_offset = *((u32 *)ptr);
+		ptr += sizeof(u32);
+		os_info->control_offset = *((u32 *)ptr);
+		ptr += sizeof(u32);
+		os_info->debug_offset = *((u32 *)ptr);
+		ptr += sizeof(u32);
+
+		size = *((u32 *)ptr);    ptr += sizeof(u32);
+
+		os_info->size = size;
+		os_info->os_bin = kzalloc(os_info->size,
+						GFP_KERNEL);
+		if (!os_info->os_bin) {
+			dev_err(&nvavp->nvhost_dev->dev,
+				"cannot allocate os bin\n");
+			ret = -ENOMEM;
+			goto err_os_bin;
+		}
+
+		memcpy(os_info->os_bin, ptr, os_info->size);
+		memset(os_info->data + os_info->size, 0, SZ_1M - os_info->size);
+
+		dev_info(&nvavp->nvhost_dev->dev,
+			"entry=%08x control=%08x debug=%08x size=%d\n",
+			os_info->entry_offset, os_info->control_offset,
+			os_info->debug_offset, os_info->size);
+		release_firmware(nvavp_os_fw);
+	}
+
+	memcpy(os_info->data, os_info->os_bin, os_info->size);
+	os_info->reset_addr = os_info->phys + os_info->entry_offset;
+
+	dev_info(&nvavp->nvhost_dev->dev,
+		"AVP os at vaddr=%p paddr=%lx reset_addr=%p\n",
+		os_info->data, (unsigned long)(os_info->phys),
+				(void *)os_info->reset_addr);
+	return 0;
+
+err_os_bin:
+	release_firmware(nvavp_os_fw);
+err_req_fw:
+	return ret;
 }
 
 static int nvavp_init(struct nvavp_info *nvavp)
 {
-	const struct firmware *nvavp_os_fw;
 	char fw_os_file[32];
 	int ret = 0;
 
@@ -461,30 +628,25 @@ static int nvavp_init(struct nvavp_info *nvavp)
 	nvavp->os_info.data = ioremap(nvavp->os_info.phys, SZ_1M);
 #endif
 
-	ret = request_firmware(&nvavp_os_fw, fw_os_file,
-				nvavp->misc_dev.this_device);
-	if (ret) {
-		dev_err(&nvavp->nvhost_dev->dev,
-			"cannot read os firmware '%s'\n", fw_os_file);
-		goto err_req_fw;
-	}
-	dev_info(&nvavp->nvhost_dev->dev,
-		"read firmware from '%s' (%d bytes)\n",
-		fw_os_file, nvavp_os_fw->size);
-
-	ret = nvavp_load_os(&nvavp->os_info, &nvavp->nvhost_dev->dev,
-				nvavp->nvmap, (void *)nvavp_os_fw->data);
+	ret = nvavp_load_os(nvavp, fw_os_file);
 	if (ret) {
 		dev_err(&nvavp->nvhost_dev->dev,
 			"unable to load os firmware '%s'\n", fw_os_file);
-		goto err_req_fw;
+		goto err_exit;
 	}
 
 	ret = nvavp_pushbuffer_init(nvavp);
 	if (ret) {
 		dev_err(&nvavp->nvhost_dev->dev,
 			"unable to init pushbuffer\n");
-		goto err_req_fw;
+		goto err_exit;
+	}
+
+	ret = nvavp_load_ucode(nvavp);
+	if (ret) {
+		dev_err(&nvavp->nvhost_dev->dev,
+			"unable to load ucode\n");
+		goto err_exit;
 	}
 
 	tegra_init_legacy_irq_cop();
@@ -493,8 +655,7 @@ static int nvavp_init(struct nvavp_info *nvavp)
 	nvavp_reset_avp(nvavp, nvavp->os_info.reset_addr);
 	enable_irq(nvavp->mbox_from_avp_pend_irq);
 
-err_req_fw:
-	release_firmware(nvavp_os_fw);
+err_exit:
 	return ret;
 }
 
@@ -619,7 +780,8 @@ static int nvavp_pushbuffer_submit_ioctl(struct file *filp, unsigned int cmd,
 	if (hdr.syncpt) {
 		ret = nvavp_pushbuffer_update(nvavp,
 					     (phys_addr + hdr.cmdbuf.offset),
-					      hdr.cmdbuf.words, &syncpt);
+					      hdr.cmdbuf.words, &syncpt,
+					      (hdr.flags & NVAVP_UCODE_EXT));
 
 		if (copy_to_user((void __user *)user_hdr->syncpt, &syncpt,
 				sizeof(struct nvavp_syncpt))) {
@@ -629,7 +791,8 @@ static int nvavp_pushbuffer_submit_ioctl(struct file *filp, unsigned int cmd,
 	} else {
 		ret = nvavp_pushbuffer_update(nvavp,
 					     (phys_addr + hdr.cmdbuf.offset),
-					      hdr.cmdbuf.words, NULL);
+					      hdr.cmdbuf.words, NULL,
+					      (hdr.flags & NVAVP_UCODE_EXT));
 	}
 
 err_reloc_info:
@@ -688,6 +851,7 @@ static int tegra_nvavp_release(struct inode *inode, struct file *filp)
 		ret = -EINVAL;
 		goto out;
 	}
+
 	if (nvavp->refcount > 0)
 		nvavp->refcount--;
 	if (!nvavp->refcount)
@@ -940,6 +1104,9 @@ static int tegra_nvavp_remove(struct nvhost_device *ndev)
 		return -EBUSY;
 	}
 	mutex_unlock(&nvavp->open_lock);
+
+	nvavp_unload_ucode(nvavp);
+	nvavp_unload_os(nvavp);
 
 	misc_deregister(&nvavp->misc_dev);
 

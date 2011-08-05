@@ -16,6 +16,10 @@
 
 #define NVAVP_MAX_RELOCATION_COUNT 64
 
+/* avp submit flags */
+#define NVAVP_FLAG_NONE		0x00000000
+#define NVAVP_UCODE_EXT		0x00000001 /*use external ucode provided */
+
 struct nvavp_cmdbuf {
 	__u32 mem;
 	__u32 offset;
@@ -39,6 +43,7 @@ struct nvavp_pushbuffer_submit_hdr {
 	struct nvavp_reloc	*relocs;
 	__u32			num_relocs;
 	struct nvavp_syncpt	*syncpt;
+	__u32			flags;
 };
 
 struct nvavp_set_nvmap_fd_args {

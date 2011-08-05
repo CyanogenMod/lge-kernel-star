@@ -44,6 +44,10 @@ struct nv_e276_control {
 #define NVE26E_HOST1X_INCR_SYNCPT		(0x00000000)
 #define NVE26E_HOST1X_INCR_SYNCPT_COND_OP_DONE	(0x00000001)
 
+#define NVE26E_CH_OPCODE_INCR(Addr, Count) \
+	/* op, addr, count */ \
+	((1UL << 28) | ((Addr) << 16) | (Count))
+
 #define NVE26E_CH_OPCODE_IMM(addr, value) \
 	/* op, addr, count */ \
 	((4UL << 28) | ((addr) << 16) | (value))
@@ -52,6 +56,12 @@ struct nv_e276_control {
 	/* op, offset, insert, type, count */ \
 	((6UL << 28) | ((off) << 16) | ((ins) << 15) | ((type) << 14) | cnt)
 
+/* AVP OS methods */
+#define NVE276_NOP				(0x00000080)
+#define NVE276_SET_APP_TIMEOUT			(0x00000084)
+#define NVE276_SET_MICROCODE_A			(0x00000085)
+#define NVE276_SET_MICROCODE_B			(0x00000086)
+#define NVE276_SET_MICROCODE_C			(0x00000087)
 
 /* Interrupt codes through inbox/outbox data codes (cpu->avp or avp->cpu) */
 #define NVE276_OS_INTERRUPT_NOP			(0x00000000) /* wake up avp */
@@ -70,8 +80,18 @@ struct nvavp_os_info {
 
 	struct nvmap_handle_ref	*handle;
 	void			*data;
+	u32			size;
 	phys_addr_t		phys;
+	void			*os_bin;
 	phys_addr_t		reset_addr;
+};
+
+struct nvavp_ucode_info {
+	struct nvmap_handle_ref	*handle;
+	void			*data;
+	u32			size;
+	phys_addr_t		phys;
+	void			*ucode_bin;
 };
 
 #endif /* __MEDIA_VIDEO_TEGRA_NVAVP_OS_H */
