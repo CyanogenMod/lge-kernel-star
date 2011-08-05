@@ -40,6 +40,9 @@
 #include <mach/tsensor.h>
 #include <mach/tegra_fuse.h>
 
+/* macro to enable tsensor hw reset and clock divide */
+#define ENABLE_TSENSOR_HW_RESET 0
+
 /* We have multiple tsensor instances with following registers */
 #define SENSOR_CFG0				0x40
 #define SENSOR_CFG1				0x48
@@ -211,7 +214,7 @@ static unsigned int init_flag;
 static int tsensor_count_2_temp(struct tegra_tsensor_data *data,
 	unsigned int count, int *p_temperature);
 static unsigned int tsensor_get_threshold_counter(
-	struct tegra_tsensor_data *data, unsigned int temp);
+	struct tegra_tsensor_data *data, int temp);
 
 /* tsensor register access functions */
 
@@ -1146,13 +1149,15 @@ endLabel:
 /* tsensor threshold temperature to threshold counter conversion function */
 static unsigned int tsensor_get_threshold_counter(
 	struct tegra_tsensor_data *data,
-	unsigned int temp_threshold)
+	int temp_threshold)
 {
 	unsigned int counter1, counter2;
 	unsigned int curr_avg, min_max;
 	unsigned int counter;
 	int err;
 
+	if (temp_threshold < 0)
+		return MAX_THRESHOLD;
 	tsensor_temp_2_count(data, temp_threshold, &counter1, &counter2);
 	err = tsensor_read_counter(data, tsensor_index, &curr_avg, &min_max);
 	if (err < 0) {
@@ -1212,7 +1217,9 @@ static void tsensor_threshold_setup(
 		dev_dbg(data->hwmon_dev, "\n hysteresis_temp=%d, count=%d ",
 			(unsigned int)(data->sw_intr_temp - data->hysteresis),
 			hysteresis_count);
-		th0_diff = th1_count - hysteresis_count;
+		th0_diff = (th1_count == DEFAULT_THRESHOLD_TH1) ?
+			DEFAULT_THRESHOLD_TH0 :
+			(th1_count - hysteresis_count);
 		dev_dbg(data->hwmon_dev, "\n th0_diff=%d ", th0_diff);
 	}
 	dev_dbg(data->hwmon_dev, "\n before threshold program TH dump: ");
@@ -1265,12 +1272,12 @@ static int tsensor_config_setup(struct tegra_tsensor_data *data)
 			SENSOR_CFG0_M_SHIFT) |
 			((DEFAULT_TSENSOR_N & SENSOR_CFG0_N_MASK) <<
 			SENSOR_CFG0_N_SHIFT) |
+#if ENABLE_TSENSOR_HW_RESET
 			(1 << SENSOR_CFG0_OVERFLOW_INTR) |
-			/*(1 << SENSOR_CFG0_RST_INTR_SHIFT) |
-			(1 << SENSOR_CFG0_HW_DIV2_INTR_SHIFT) |*/
-			(1 << SENSOR_CFG0_STOP_SHIFT) |
 			(1 << SENSOR_CFG0_RST_ENABLE_SHIFT) |
-			(1 << SENSOR_CFG0_HW_DIV2_ENABLE_SHIFT));
+			(1 << SENSOR_CFG0_HW_DIV2_ENABLE_SHIFT) |
+#endif
+			(1 << SENSOR_CFG0_STOP_SHIFT));
 
 		tsensor_writel(data, config0, ((i << 16) | SENSOR_CFG0));
 		tsensor_threshold_setup(data, i, true);
@@ -1427,6 +1434,13 @@ static int tegra_tsensor_setup(struct platform_device *pdev)
 	dev_dbg(&pdev->dev, "\n before tsensor get platform data %s ",
 		__func__);
 	tsensor_data = pdev->dev.platform_data;
+#if !ENABLE_TSENSOR_HW_RESET
+	/* FIXME: remove this once tsensor temperature is reliable */
+	tsensor_data->hw_clk_div_temperature = -1;
+	tsensor_data->hw_reset_temperature = -1;
+	tsensor_data->sw_intr_temperature = -1;
+	tsensor_data->hysteresis = -1;
+#endif
 	dev_dbg(&pdev->dev, "\n tsensor platform_data=0x%x ",
 		(unsigned int)pdev->dev.platform_data);
 	dev_dbg(&pdev->dev, "\n clk_div temperature=%d ",
