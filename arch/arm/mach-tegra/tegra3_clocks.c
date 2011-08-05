@@ -4474,7 +4474,12 @@ void tegra_clk_resume(void)
 
 		BUG_ON(!p->refcnt);
 		p->refcnt--;
-		tegra_clk_emc.parent->refcnt++;
+
+		/* the new parent is enabled by low level code, but ref count
+		   need to be updated up to the root */
+		p = tegra_clk_emc.parent;
+		while (p && ((p->refcnt++) == 0))
+			p = p->parent;
 	}
 	tegra_emc_timing_invalidate();
 
