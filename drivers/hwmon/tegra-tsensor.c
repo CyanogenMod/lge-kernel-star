@@ -300,8 +300,8 @@ static void get_chip_rev(unsigned short *p_id, unsigned short *p_major,
 	*p_id = (reg >> 8) & 0xff;
 	*p_major = (reg >> 4) & 0xf;
 	*p_minor = (reg >> 16) & 0xf;
-	pr_info("\n Tegra chip revision for tsensor detected as: "
-		" Chip Id=%x, Major=%d, Minor=%d ", (int)*p_id,
+	pr_info("Tegra chip revision for tsensor detected as: "
+		"Chip Id=%x, Major=%d, Minor=%d\n", (int)*p_id,
 		(int)*p_major, (int)*p_minor);
 }
 
@@ -317,12 +317,12 @@ static int get_chip_tsensor_coeff(void)
 	get_chip_rev(&chip_id, &major_rev, &minor_rev);
 	switch (minor_rev) {
 	case 2:
-		pr_info("\n Warning: tsensor coefficient for chip pending ");
+		pr_info("Warning: tsensor coefficient for chip pending\n");
 	case 1:
 		coeff_index = TSENSOR_COEFF_SET1;
 		break;
 	default:
-		pr_err("\n Error: tsensor unsupported for detected chip ");
+		pr_err("Error: tsensor unsupported for detected chip\n");
 		return -ENOENT;
 	}
 	m_e_minus6 = coeff_table[coeff_index].e_minus6_m;
@@ -345,8 +345,8 @@ static unsigned int tsensor_read_counter(
 		config0 = tsensor_readl(data, ((instance << 16) |
 			SENSOR_CFG0));
 		if (config0 & (1 << SENSOR_CFG0_STOP_SHIFT)) {
-			dev_dbg(data->hwmon_dev, "\n Error: tsensor "
-				"counter read with STOP bit not supported ");
+			dev_dbg(data->hwmon_dev, "Error: tsensor "
+				"counter read with STOP bit not supported\n");
 			*p_counterA = 0;
 			*p_counterB = 0;
 			return 0;
@@ -364,7 +364,7 @@ static unsigned int tsensor_read_counter(
 			break;
 		}
 		if (!(iter_count % 10))
-			dev_dbg(data->hwmon_dev, "\n retry %d ", iter_count);
+			dev_dbg(data->hwmon_dev, "retry %d\n", iter_count);
 		msleep(1);
 		iter_count++;
 	} while (iter_count < max_loop);
@@ -383,15 +383,15 @@ static void dump_threshold(struct tegra_tsensor_data *data)
 	for (i = 0; i < TSENSOR_COUNT; i++) {
 		TH_2_1 = tsensor_readl(data, ((i << 16) | SENSOR_CFG1));
 		TH_0_3 = tsensor_readl(data, ((i << 16) | SENSOR_CFG2));
-		dev_dbg(data->hwmon_dev, "\n Tsensor[%d]: TH_2_1=0x%x, "
-			"TH_0_3=0x%x ", i, TH_2_1, TH_0_3);
+		dev_dbg(data->hwmon_dev, "Tsensor[%d]: TH_2_1=0x%x, "
+			"TH_0_3=0x%x\n", i, TH_2_1, TH_0_3);
 		err = tsensor_read_counter(data, i, &curr_avg, &min_max);
 		if (err < 0)
-			pr_err("\n Error: tsensor %d counter read, "
-				"err=%d ", i, err);
+			pr_err("Error: tsensor %d counter read, "
+				"err=%d\n", i, err);
 		else
-			dev_dbg(data->hwmon_dev, "\n Tsensor[%d]: "
-				"curr_avg=0x%x, min_max=0x%x ",
+			dev_dbg(data->hwmon_dev, "Tsensor[%d]: "
+				"curr_avg=0x%x, min_max=0x%x\n",
 				i, curr_avg, min_max);
 	}
 }
@@ -424,15 +424,15 @@ static ssize_t tsensor_show_counters(struct device *dev,
 		/* use current counter value to calculate temperature */
 		err = tsensor_count_2_temp(data,
 			((curr_avg[0] & 0xFFFF0000) >> 16), &temp0);
-		dev_vdbg(data->hwmon_dev, "\n %s has curr_avg=0x%x, "
-			"minmax=0x%x, temp0=%d ", __func__,
+		dev_vdbg(data->hwmon_dev, "%s has curr_avg=0x%x, "
+			"minmax=0x%x, temp0=%d\n", __func__,
 			curr_avg[0], min_max[0], temp0);
 		if (err < 0)
 			goto error;
 		err = tsensor_count_2_temp(data,
 			((curr_avg[1] & 0xFFFF0000) >> 16), &temp1);
-		dev_vdbg(data->hwmon_dev, "\n %s has curr_avg=0x%x, "
-			"minmax=0x%x, temp1=%d ", __func__,
+		dev_vdbg(data->hwmon_dev, "%s has curr_avg=0x%x, "
+			"minmax=0x%x, temp1=%d\n", __func__,
 			curr_avg[1], min_max[1], temp1);
 		if (err < 0)
 			goto error;
@@ -460,8 +460,8 @@ static bool cclkg_check_hwdiv2_sensor(struct tegra_tsensor_data *data)
 	val = readl(IO_ADDRESS(TEGRA_CLK_RESET_BASE +
 		CCLK_G_BURST_POLICY_REG_REL_OFFSET));
 	if ((1 << TSENSOR_SLOWDOWN_BIT) & val) {
-		dev_err(data->hwmon_dev, "\n Warning: ***** tsensor "
-			"slowdown bit detected ");
+		dev_err(data->hwmon_dev, "Warning: ***** tsensor "
+			"slowdown bit detected\n");
 		return true;
 	} else {
 		return false;
@@ -557,7 +557,7 @@ static ssize_t set_tsensor_param(struct device *dev,
 	unsigned int val;
 
 	if (strict_strtoul(buf, 0, (long int *)&num)) {
-		dev_err(dev, "\n file: %s, line=%d return %s() ",
+		dev_err(dev, "file: %s, line=%d return %s()\n",
 			__FILE__, __LINE__, __func__);
 		return -EINVAL;
 	}
@@ -578,23 +578,23 @@ static ssize_t set_tsensor_param(struct device *dev,
 		(void)cclkg_check_hwdiv2_sensor(data);
 	}
 	val = tsensor_get_reg_field(data, reg, sft, msk);
-	dev_dbg(dev, "\n %s 0x%x ", my_fixed_str, val);
+	dev_dbg(dev, "%s 0x%x\n", my_fixed_str, val);
 	return count;
 labelErr:
-	dev_err(dev, "\n file: %s, line=%d, %s(), error=0x%x ", __FILE__,
+	dev_err(dev, "file: %s, line=%d, %s(), error=0x%x\n", __FILE__,
 		__LINE__, __func__, err);
 	return 0;
 }
 
 static struct sensor_device_attribute tsensor_nodes[] = {
 	SENSOR_ATTR(tsensor_TH1, S_IRUGO | S_IWUSR,
-			show_tsensor_param, set_tsensor_param, TSENSOR_PARAM_TH1),
+		show_tsensor_param, set_tsensor_param, TSENSOR_PARAM_TH1),
 	SENSOR_ATTR(tsensor_TH2, S_IRUGO | S_IWUSR,
-			show_tsensor_param, set_tsensor_param, TSENSOR_PARAM_TH2),
+		show_tsensor_param, set_tsensor_param, TSENSOR_PARAM_TH2),
 	SENSOR_ATTR(tsensor_TH3, S_IRUGO | S_IWUSR,
-			show_tsensor_param, set_tsensor_param, TSENSOR_PARAM_TH3),
+		show_tsensor_param, set_tsensor_param, TSENSOR_PARAM_TH3),
 	SENSOR_ATTR(tsensor_temperature, S_IRUGO | S_IWUSR,
-			tsensor_show_counters, NULL, TSENSOR_TEMPERATURE),
+		tsensor_show_counters, NULL, TSENSOR_TEMPERATURE),
 };
 
 /*
@@ -631,16 +631,16 @@ static irqreturn_t tegra_tsensor_isr(int irq, void *arg_data)
 		val = tsensor_readl(data, ((i << 16) | SENSOR_STATUS0));
 		tsensor_writel(data, val, ((i << 16) | SENSOR_STATUS0));
 		if (val & TSENSOR_SENSOR_X_STATUS0_0_INTR_MASK) {
-			dev_err(data->hwmon_dev, "\n tsensor instance-%d "
-				"interrupt ", i);
+			dev_err(data->hwmon_dev, "tsensor instance-%d "
+				"interrupt\n", i);
 			get_ts_state(data, (unsigned char)i, &new_state);
 			/* counter overflow check */
 			if (new_state.state == TS_OVERFLOW)
-				dev_err(data->hwmon_dev, "\nWarning: "
-					"***** OVERFLOW tsensor ");
+				dev_err(data->hwmon_dev, "Warning: "
+					"***** OVERFLOW tsensor\n");
 			if (new_state.state != data->ts_state_saved[i]) {
-				dev_err(data->hwmon_dev, "\nTS state "
-					"change: old=%d, new=%d ",
+				dev_err(data->hwmon_dev, "TS state "
+					"change: old=%d, new=%d\n",
 					data->ts_state_saved[i],
 					new_state.state);
 				data->ts_state_saved[i] = new_state.state;
@@ -678,7 +678,7 @@ static int read_tsensor_fuse_regs(struct tegra_tsensor_data *data)
 
 	err = tegra_fuse_get_tsensor_spare_bits(&spare_bits);
 	if (err) {
-		pr_err("\n tsensor spare bit fuse read error=%d ", err);
+		pr_err("tsensor spare bit fuse read error=%d\n", err);
 		goto errLabel;
 	}
 
@@ -692,15 +692,15 @@ static int read_tsensor_fuse_regs(struct tegra_tsensor_data *data)
 	 */
 	T1 = ((spare_bits >> 14) & 0x7F) |
 		((spare_bits >> 21) & 0x7F);
-	dev_vdbg(data->hwmon_dev, "\n Tsensor low temp (T1) fuse : ");
+	dev_vdbg(data->hwmon_dev, "Tsensor low temp (T1) fuse :\n");
 
 	/*
 	 * High temp is:
 	 * FUSE_TJ_ADJ = bits [6:0] or’ed with bits [13:7]
 	 */
-	dev_vdbg(data->hwmon_dev, "\n Tsensor low temp (T2) fuse : ");
+	dev_vdbg(data->hwmon_dev, "Tsensor low temp (T2) fuse :\n");
 	T2 = (spare_bits & 0x7F) | ((spare_bits >> 7) & 0x7F);
-	pr_info("\n Tsensor fuse calibration F1=%d, F2=%d, T1=%d, T2=%d "
+	pr_info("Tsensor fuse calibration F1=%d, F2=%d, T1=%d, T2=%d\n"
 		, fuse_F1, fuse_F2, T1, T2);
 	fuse_T1 = T1;
 	fuse_T2 = T2;
@@ -719,9 +719,9 @@ static int calc_interim_temp(struct tegra_tsensor_data *data,
 	 * (Counter is the sensor frequency output)
 	 */
 	if ((fuse_F2 - fuse_F1) <= (fuse_T2 - fuse_T1)) {
-		dev_err(data->hwmon_dev, "\n Error: F2=%d, F1=%d "
+		dev_err(data->hwmon_dev, "Error: F2=%d, F1=%d "
 			"difference unexpectedly low. "
-			"Aborting temperature processing ", fuse_F2, fuse_F1);
+			"Aborting temperature processing\n", fuse_F2, fuse_F1);
 		return -EINVAL;
 	} else {
 		/* expression modified after assuming s_A is 10^6 times,
@@ -729,12 +729,12 @@ static int calc_interim_temp(struct tegra_tsensor_data *data,
 		 * actual value
 		 */
 		val1 = DIV_ROUND_CLOSEST((A_e_minus6 * counter) , 10000);
-		dev_vdbg(data->hwmon_dev, "\n A*counter / 100 = %d ",
+		dev_vdbg(data->hwmon_dev, "A*counter / 100 = %d\n",
 			val1);
 		*p_interim_temp = (val1 + B_e_minus2);
 	}
-	dev_dbg(data->hwmon_dev, "\n tsensor: counter=0x%x, interim "
-		"temp*100=%d ",
+	dev_dbg(data->hwmon_dev, "tsensor: counter=0x%x, interim "
+		"temp*100=%d\n",
 		counter, *p_interim_temp);
 	return 0;
 }
@@ -754,32 +754,32 @@ static void calc_final_temp(struct tegra_tsensor_data *data,
 	 * p = -7.3
 	 */
 
-	dev_vdbg(data->hwmon_dev, "\n interim_temp=%d ", interim_temp);
+	dev_vdbg(data->hwmon_dev, "interim_temp=%d\n", interim_temp);
 	temp1 = (DIV_ROUND_CLOSEST((interim_temp * interim_temp) , 100));
-	dev_vdbg(data->hwmon_dev, "\n temp1=%d ", temp1);
+	dev_vdbg(data->hwmon_dev, "temp1=%d\n", temp1);
 	temp1 *= (DIV_ROUND_CLOSEST(m_e_minus6 , 10));
-	dev_vdbg(data->hwmon_dev, "\n m*T-int^2=%d ", temp1);
+	dev_vdbg(data->hwmon_dev, "m*T-int^2=%d\n", temp1);
 	temp1 = (DIV_ROUND_CLOSEST(temp1, 10000));
 	/* we want to keep 3 decimal point digits */
-	dev_vdbg(data->hwmon_dev, "\n m*T-int^2 / 10000=%d ", temp1);
-	dev_dbg(data->hwmon_dev, "\n temp1*100=%d ", temp1);
+	dev_vdbg(data->hwmon_dev, "m*T-int^2 / 10000=%d\n", temp1);
+	dev_dbg(data->hwmon_dev, "temp1*100=%d\n", temp1);
 
 	temp2 = (DIV_ROUND_CLOSEST(interim_temp * (
 		DIV_ROUND_CLOSEST(n_e_minus6, 100)
 		), 1000)); /* 1000 times actual */
-	dev_vdbg(data->hwmon_dev, "\n n*T-int =%d ", temp2);
+	dev_vdbg(data->hwmon_dev, "n*T-int =%d\n", temp2);
 
 	temp = temp1 + temp2;
-	dev_vdbg(data->hwmon_dev, "\n m*T-int^2 + n*T-int =%d ", temp);
+	dev_vdbg(data->hwmon_dev, "m*T-int^2 + n*T-int =%d\n", temp);
 	temp += (p_e_minus2 * 10);
 	temp = DIV_ROUND_CLOSEST(temp, 10);
 	/* final temperature(temp) is 100 times actual value
 	 * to preserve 2 decimal digits and enable fixed point
 	 * computation
 	 */
-	dev_vdbg(data->hwmon_dev, "\n m*T-int^2 + n*T-int + p =%d ",
+	dev_vdbg(data->hwmon_dev, "m*T-int^2 + n*T-int + p =%d\n",
 		temp);
-	dev_dbg(data->hwmon_dev, "\n Final temp=%d.%d ",
+	dev_dbg(data->hwmon_dev, "Final temp=%d.%d\n",
 		get_temperature_int(temp), get_temperature_fraction(temp));
 	*p_final_temp = (int)(temp);
 }
@@ -799,17 +799,17 @@ static int tsensor_get_const_AB(struct tegra_tsensor_data *data)
 	 */
 	err = read_tsensor_fuse_regs(data);
 	if (err) {
-		dev_err(data->hwmon_dev, "\n Fuse register read required "
-			"for internal tsensor returns err=%d ", err);
+		dev_err(data->hwmon_dev, "Fuse register read required "
+			"for internal tsensor returns err=%d\n", err);
 		return err;
 	}
 
 	if (fuse_F2 != fuse_F1) {
 		if ((fuse_F2 - fuse_F1) <= (fuse_T2 - fuse_T1)) {
-			dev_err(data->hwmon_dev, "\n Error: F2=%d, "
+			dev_err(data->hwmon_dev, "Error: F2=%d, "
 				"F1=%d, difference"
 				" unexpectedly low. Aborting temperature"
-				"computation ", fuse_F2, fuse_F1);
+				"computation\n", fuse_F2, fuse_F1);
 			return -EINVAL;
 		} else {
 			A_e_minus6 = ((fuse_T2 - fuse_T1) * 1000000);
@@ -820,8 +820,8 @@ static int tsensor_get_const_AB(struct tegra_tsensor_data *data)
 			/* B is 100 times now */
 		}
 	}
-	dev_dbg(data->hwmon_dev, "\n A_e_minus6 = %d ", A_e_minus6);
-	dev_dbg(data->hwmon_dev, "\n B_e_minus2 = %d ", B_e_minus2);
+	dev_dbg(data->hwmon_dev, "A_e_minus6 = %d\n", A_e_minus6);
+	dev_dbg(data->hwmon_dev, "B_e_minus2 = %d\n", B_e_minus2);
 	return 0;
 }
 
@@ -843,7 +843,7 @@ static int tsensor_count_2_temp(struct tegra_tsensor_data *data,
 	 */
 	err = calc_interim_temp(data, count, &interim_temp);
 	if (err < 0) {
-		dev_err(data->hwmon_dev, "\n cannot read temperature\n");
+		dev_err(data->hwmon_dev, "tsensor: cannot read temperature\n");
 		*p_temperature = -1;
 		return err;
 	}
@@ -901,83 +901,83 @@ static void get_quadratic_roots(struct tegra_tsensor_data *data,
 	int expr10_e_minus6, expr11_e_minus6;
 	int expr12, expr13;
 
-	dev_vdbg(data->hwmon_dev, "\n A_e_minus6=%d, B_e_minus2=%d, "
+	dev_vdbg(data->hwmon_dev, "A_e_minus6=%d, B_e_minus2=%d, "
 		"m_e_minus6=%d, n_e_minus6=%d, p_e_minus2=%d, "
-		"temp=%d ", A_e_minus6, B_e_minus2, m_e_minus6,
+		"temp=%d\n", A_e_minus6, B_e_minus2, m_e_minus6,
 		n_e_minus6, p_e_minus2, (int)temp);
 	expr1_e_minus6 = (DIV_ROUND_CLOSEST((2 * m_e_minus6 * B_e_minus2),
 		100) + n_e_minus6);
-	dev_vdbg(data->hwmon_dev, "\n 2_m_B_plun_e_minus6=%d ",
+	dev_vdbg(data->hwmon_dev, "2_m_B_plun_e_minus6=%d\n",
 		expr1_e_minus6);
 	expr2_e_minus6 = (DIV_ROUND_CLOSEST(expr1_e_minus6, 1000)) *
 		(DIV_ROUND_CLOSEST(expr1_e_minus6, 1000));
-	dev_vdbg(data->hwmon_dev, "\n expr1^2=%d ", expr2_e_minus6);
+	dev_vdbg(data->hwmon_dev, "expr1^2=%d\n", expr2_e_minus6);
 	expr3_e_minus4_1 = (DIV_ROUND_CLOSEST((
 		(DIV_ROUND_CLOSEST((m_e_minus6 * B_e_minus2), 1000)) *
 		(DIV_ROUND_CLOSEST(B_e_minus2, 10))
 		), 100));
-	dev_vdbg(data->hwmon_dev, "\n expr3_e_minus4_1=%d ",
+	dev_vdbg(data->hwmon_dev, "expr3_e_minus4_1=%d\n",
 		expr3_e_minus4_1);
 	expr3_e_minus4_2 = DIV_ROUND_CLOSEST(
 		(DIV_ROUND_CLOSEST(n_e_minus6, 100) * B_e_minus2),
 		100);
-	dev_vdbg(data->hwmon_dev, "\n expr3_e_minus4_2=%d ",
+	dev_vdbg(data->hwmon_dev, "expr3_e_minus4_2=%d\n",
 		expr3_e_minus4_2);
 	expr3_e_minus4 = expr3_e_minus4_1 + expr3_e_minus4_2;
-	dev_vdbg(data->hwmon_dev, "\n expr3=%d ", expr3_e_minus4);
+	dev_vdbg(data->hwmon_dev, "expr3=%d\n", expr3_e_minus4);
 	expr4_e_minus2_1 = DIV_ROUND_CLOSEST((expr3_e_minus4 +
 		(p_e_minus2 * 100)), 100);
-	dev_vdbg(data->hwmon_dev, "\n expr4_e_minus2_1=%d ",
+	dev_vdbg(data->hwmon_dev, "expr4_e_minus2_1=%d\n",
 		expr4_e_minus2_1);
 	expr4_e_minus6_2 = (4 * m_e_minus6);
-	dev_vdbg(data->hwmon_dev, "\n expr4_e_minus6_2=%d ",
+	dev_vdbg(data->hwmon_dev, "expr4_e_minus6_2=%d\n",
 		expr4_e_minus6_2);
 	expr4_e_minus6 = DIV_ROUND_CLOSEST((expr4_e_minus2_1 *
 		expr4_e_minus6_2), 100);
-	dev_vdbg(data->hwmon_dev, "\n expr4_minus6=%d ", expr4_e_minus6);
+	dev_vdbg(data->hwmon_dev, "expr4_minus6=%d\n", expr4_e_minus6);
 	expr5_e_minus6_1 = expr2_e_minus6 - expr4_e_minus6;
-	dev_vdbg(data->hwmon_dev, "\n expr5_e_minus6_1=%d ",
+	dev_vdbg(data->hwmon_dev, "expr5_e_minus6_1=%d\n",
 		expr5_e_minus6_1);
 	expr4_e_minus6_3 = (expr4_e_minus6_2 * temp);
-	dev_vdbg(data->hwmon_dev, "\n expr4_e_minus6_3=%d ",
+	dev_vdbg(data->hwmon_dev, "expr4_e_minus6_3=%d\n",
 		expr4_e_minus6_3);
 	expr5_e_minus6 = (expr5_e_minus6_1 + expr4_e_minus6_3);
-	dev_vdbg(data->hwmon_dev, "\n expr5_e_minus6=%d ",
+	dev_vdbg(data->hwmon_dev, "expr5_e_minus6=%d\n",
 		expr5_e_minus6);
 	multiplier = my_ceil_pow10(expr5_e_minus6);
-	dev_vdbg(data->hwmon_dev, "\n multiplier=%d ", multiplier);
+	dev_vdbg(data->hwmon_dev, "multiplier=%d\n", multiplier);
 	expr6 = int_sqrt(expr5_e_minus6);
-	dev_vdbg(data->hwmon_dev, "\n sqrt top=%d ", expr6);
+	dev_vdbg(data->hwmon_dev, "sqrt top=%d\n", expr6);
 	expr7 = int_sqrt(multiplier);
-	dev_vdbg(data->hwmon_dev, "\n sqrt bot=%d ", expr7);
+	dev_vdbg(data->hwmon_dev, "sqrt bot=%d\n", expr7);
 	if (expr7 == 0) {
-		pr_err("\n Error: %s line=%d, expr7=%d ",
+		pr_err("Error: %s line=%d, expr7=%d\n",
 			__func__, __LINE__, expr7);
 		return;
 	} else {
 		expr8_e_minus6 = (expr6 * multiplier2) / expr7;
 	}
-	dev_vdbg(data->hwmon_dev, "\n sqrt final=%d ", expr8_e_minus6);
-	dev_vdbg(data->hwmon_dev, "\n 2_m_B_plus_n_e_minus6=%d ",
+	dev_vdbg(data->hwmon_dev, "sqrt final=%d\n", expr8_e_minus6);
+	dev_vdbg(data->hwmon_dev, "2_m_B_plus_n_e_minus6=%d\n",
 		expr1_e_minus6);
 	expr9_e_minus6 = DIV_ROUND_CLOSEST((2 * m_e_minus6 * A_e_minus6),
 		1000000);
-	dev_vdbg(data->hwmon_dev, "\n denominator=%d ", expr9_e_minus6);
+	dev_vdbg(data->hwmon_dev, "denominator=%d\n", expr9_e_minus6);
 	if (expr9_e_minus6 == 0) {
-		pr_err("\n Error: %s line=%d, expr9_e_minus6=%d ",
+		pr_err("Error: %s line=%d, expr9_e_minus6=%d\n",
 			__func__, __LINE__, expr9_e_minus6);
 		return;
 	}
 	expr10_e_minus6 = -expr1_e_minus6 - expr8_e_minus6;
-	dev_vdbg(data->hwmon_dev, "\n expr10_e_minus6=%d ",
+	dev_vdbg(data->hwmon_dev, "expr10_e_minus6=%d\n",
 		expr10_e_minus6);
 	expr11_e_minus6 = -expr1_e_minus6 + expr8_e_minus6;
-	dev_vdbg(data->hwmon_dev, "\n expr11_e_minus6=%d ",
+	dev_vdbg(data->hwmon_dev, "expr11_e_minus6=%d\n",
 		expr11_e_minus6);
 	expr12 = (expr10_e_minus6 / expr9_e_minus6);
-	dev_vdbg(data->hwmon_dev, "\ncounter1=%d ", expr12);
+	dev_vdbg(data->hwmon_dev, "counter1=%d\n", expr12);
 	expr13 = (expr11_e_minus6 / expr9_e_minus6);
-	dev_vdbg(data->hwmon_dev, "\ncounter2=%d ", expr13);
+	dev_vdbg(data->hwmon_dev, "counter2=%d\n", expr13);
 	*p_counter1 = expr12;
 	*p_counter2 = expr13;
 }
@@ -993,9 +993,9 @@ static void tsensor_temp_2_count(struct tegra_tsensor_data *data,
 				unsigned int *p_counter2)
 {
 	if (temp > 0) {
-		dev_dbg(data->hwmon_dev, "\n Trying to calculate counter"
+		dev_dbg(data->hwmon_dev, "Trying to calculate counter"
 			" for requested temperature"
-			" threshold=%d ", temp);
+			" threshold=%d\n", temp);
 		/*
 		 * calculate the constants needed to get roots of
 		 * following quadratic eqn:
@@ -1035,8 +1035,8 @@ static bool cmp_counter(
 	smaller = (actual > exp) ? exp : actual;
 	larger = (smaller == actual) ? exp : actual;
 	if ((larger - smaller) > TSENSOR_COUNTER_TOLERANCE) {
-		dev_dbg(data->hwmon_dev, "\n actual=%d, exp=%d, larger=%d, "
-		"smaller=%d, tolerance=%d ", actual, exp, larger, smaller,
+		dev_dbg(data->hwmon_dev, "actual=%d, exp=%d, larger=%d, "
+		"smaller=%d, tolerance=%d\n", actual, exp, larger, smaller,
 		TSENSOR_COUNTER_TOLERANCE);
 		return false;
 	}
@@ -1075,16 +1075,16 @@ static void print_temperature_2_counter_table(
 		120
 	};
 	unsigned int counter1, counter2;
-	dev_dbg(data->hwmon_dev, "\n Temperature and counter1 and "
-		"counter2 chart ********** ");
+	dev_dbg(data->hwmon_dev, "Temperature and counter1 and "
+		"counter2 chart **********\n");
 	for (i = 0; i < ARRAY_SIZE(temp_list); i++) {
 		tsensor_temp_2_count(data, temp_list[i],
 			&counter1, &counter2);
-		dev_dbg(data->hwmon_dev, "\n temperature[%d]=%d, "
-			"counter1=0x%x, counter2=0x%x ",
+		dev_dbg(data->hwmon_dev, "temperature[%d]=%d, "
+			"counter1=0x%x, counter2=0x%x\n",
 			i, temp_list[i], counter1, counter2);
 	}
-	dev_dbg(data->hwmon_dev, "\n\n ");
+	dev_dbg(data->hwmon_dev, "\n\n");
 }
 
 /*
@@ -1104,41 +1104,41 @@ static bool test_temperature_algo(struct tegra_tsensor_data *data)
 	/* read actual counter */
 	err = tsensor_read_counter(data, tsensor_index, &curr_avg, &min_max);
 	if (err < 0) {
-		pr_err("\n Error: tsensor0 counter read, err=%d ", err);
+		pr_err("Error: tsensor0 counter read, err=%d\n", err);
 		goto endLabel;
 	}
 	actual_counter = ((curr_avg & 0xFFFF0000) >> 16);
-	dev_dbg(data->hwmon_dev, "\n counter read=0x%x ", actual_counter);
+	dev_dbg(data->hwmon_dev, "counter read=0x%x\n", actual_counter);
 
 	/* calculate temperature */
 	err = tsensor_count_2_temp(data, actual_counter, &T1);
-	dev_dbg(data->hwmon_dev, "\n %s actual counter=0x%x, calculated "
-		"temperature=%d.%d ", __func__,
+	dev_dbg(data->hwmon_dev, "%s actual counter=0x%x, calculated "
+		"temperature=%d.%d\n", __func__,
 		actual_counter, get_temperature_int(T1),
 		get_temperature_fraction(T1));
 	if (err < 0) {
-		pr_err("\n Error: calculate temperature step ");
+		pr_err("Error: calculate temperature step\n");
 		goto endLabel;
 	}
 
 	/* calculate counter corresponding to read temperature */
 	tsensor_temp_2_count(data, get_temperature_round(T1),
 		&counter1, &counter2);
-	dev_dbg(data->hwmon_dev, "\n given temperature=%d, counter1=0x%x,"
-		" counter2=0x%x ",
+	dev_dbg(data->hwmon_dev, "given temperature=%d, counter1=0x%x,"
+		" counter2=0x%x\n",
 		get_temperature_round(T1), counter1, counter2);
 
 	/* compare counter calculated with actual original counter */
 	result1 = cmp_counter(data, actual_counter, counter1);
 	result2 = cmp_counter(data, actual_counter, counter2);
 	if (result1) {
-		dev_dbg(data->hwmon_dev, "\n counter1 matches: actual=%d,"
-			" calc=%d ", actual_counter, counter1);
+		dev_dbg(data->hwmon_dev, "counter1 matches: actual=%d,"
+			" calc=%d\n", actual_counter, counter1);
 		result = true;
 	}
 	if (result2) {
-		dev_dbg(data->hwmon_dev, "\n counter2 matches: actual=%d,"
-			" calc=%d ", actual_counter, counter2);
+		dev_dbg(data->hwmon_dev, "counter2 matches: actual=%d,"
+			" calc=%d\n", actual_counter, counter2);
 		result = true;
 	}
 
@@ -1161,15 +1161,15 @@ static unsigned int tsensor_get_threshold_counter(
 	tsensor_temp_2_count(data, temp_threshold, &counter1, &counter2);
 	err = tsensor_read_counter(data, tsensor_index, &curr_avg, &min_max);
 	if (err < 0) {
-		pr_err("\n Error: tsensor0 counter read, err=%d ", err);
+		pr_err("Error: tsensor0 counter read, err=%d\n", err);
 		return MAX_THRESHOLD;
 	}
 	if (counter2 > ((curr_avg & 0xFFFF0000) >> 16)) {
-		dev_dbg(data->hwmon_dev, "\n choosing counter 2=0x%x as "
-			"root ", counter2);
+		dev_dbg(data->hwmon_dev, "choosing counter 2=0x%x as "
+			"root\n", counter2);
 	} else {
-		pr_err("\n Warning: tsensor choosing counter 2=0x%x as "
-			"root, counter 1=0x%x, counter=0x%x ", counter2,
+		pr_err("Warning: tsensor choosing counter 2=0x%x as "
+			"root, counter 1=0x%x, counter=0x%x\n", counter2,
 			counter1, ((curr_avg & 0xFFFF0000) >> 16));
 	}
 	counter = counter2;
@@ -1189,42 +1189,42 @@ static void tsensor_threshold_setup(
 	unsigned int hysteresis_count;
 	int th0_diff = (DEFAULT_THRESHOLD_TH1 - MIN_THRESHOLD);
 
-	dev_dbg(data->hwmon_dev, "\n started tsensor_threshold_setup %d ",
+	dev_dbg(data->hwmon_dev, "started tsensor_threshold_setup %d\n",
 		index);
 	config0 = tsensor_readl(data, ((i << 16) | SENSOR_CFG0));
 
 	/* Choose thresholds for sensor0 and sensor1 */
 	/* set to very high values initially - DEFAULT_THRESHOLD */
 	if ((!is_default_threshold) && (i == tsensor_index)) {
-		dev_dbg(data->hwmon_dev, "\n before div2 temp_2_count ");
+		dev_dbg(data->hwmon_dev, "before div2 temp_2_count\n");
 		th2_count = tsensor_get_threshold_counter(data,
 			data->div2_temp);
-		dev_dbg(data->hwmon_dev, "\n div2_temp=%d, count=%d ",
+		dev_dbg(data->hwmon_dev, "div2_temp=%d, count=%d\n",
 			data->div2_temp, th2_count);
-		dev_dbg(data->hwmon_dev, "\n before reset temp_2_count ");
+		dev_dbg(data->hwmon_dev, "before reset temp_2_count\n");
 		th3_count = tsensor_get_threshold_counter(data,
 			data->reset_temp);
-		dev_dbg(data->hwmon_dev, "\n reset_temp=%d, count=%d ",
+		dev_dbg(data->hwmon_dev, "reset_temp=%d, count=%d\n",
 			(unsigned int)data->reset_temp, th3_count);
-		dev_dbg(data->hwmon_dev, "\n before sw_intr temp_2_count ");
+		dev_dbg(data->hwmon_dev, "before sw_intr temp_2_count\n");
 		th1_count = tsensor_get_threshold_counter(data,
 			data->sw_intr_temp);
-		dev_dbg(data->hwmon_dev, "\n sw_intr_temp=%d, count=%d ",
+		dev_dbg(data->hwmon_dev, "sw_intr_temp=%d, count=%d\n",
 			(unsigned int)data->sw_intr_temp, th1_count);
-		dev_dbg(data->hwmon_dev, "\n before hysteresis temp_2_count ");
+		dev_dbg(data->hwmon_dev, "before hysteresis temp_2_count\n");
 		hysteresis_count = tsensor_get_threshold_counter(data,
 			(data->sw_intr_temp - data->hysteresis));
-		dev_dbg(data->hwmon_dev, "\n hysteresis_temp=%d, count=%d ",
+		dev_dbg(data->hwmon_dev, "hysteresis_temp=%d, count=%d\n",
 			(unsigned int)(data->sw_intr_temp - data->hysteresis),
 			hysteresis_count);
 		th0_diff = (th1_count == DEFAULT_THRESHOLD_TH1) ?
 			DEFAULT_THRESHOLD_TH0 :
 			(th1_count - hysteresis_count);
-		dev_dbg(data->hwmon_dev, "\n th0_diff=%d ", th0_diff);
+		dev_dbg(data->hwmon_dev, "th0_diff=%d\n", th0_diff);
 	}
-	dev_dbg(data->hwmon_dev, "\n before threshold program TH dump: ");
+	dev_dbg(data->hwmon_dev, "before threshold program TH dump:\n");
 	dump_threshold(data);
-	dev_dbg(data->hwmon_dev, "\n th3=0x%x, th2=0x%x, th1=0x%x, th0=0x%x ",
+	dev_dbg(data->hwmon_dev, "th3=0x%x, th2=0x%x, th1=0x%x, th0=0x%x\n",
 		th3_count, th2_count, th1_count, th0_diff);
 	config0 = (((th2_count & SENSOR_CFG_X_TH_X_MASK)
 		<< SENSOR_CFG1_TH2_SHIFT) |
@@ -1236,7 +1236,7 @@ static void tsensor_threshold_setup(
 		((th3_count & SENSOR_CFG_X_TH_X_MASK) <<
 		SENSOR_CFG2_TH3_SHIFT));
 	tsensor_writel(data, config0, ((i << 16) | SENSOR_CFG2));
-	dev_dbg(data->hwmon_dev, "\n after threshold program TH dump: ");
+	dev_dbg(data->hwmon_dev, "after threshold program TH dump:\n");
 	dump_threshold(data);
 }
 
@@ -1314,8 +1314,8 @@ static int tsensor_config_setup(struct tegra_tsensor_data *data)
 					loop_count++;
 					if (!(loop_count % 200))
 						dev_err(data->hwmon_dev,
-						"\n Warning: Tsensor Counter "
-						"sensor%d not Valid yet. ", i);
+						" Warning: Tsensor Counter "
+						"sensor%d not Valid yet.\n", i);
 					if (loop_count > MAX_TSENSOR_LOOP1) {
 						no_resp_count++;
 						break;
@@ -1396,21 +1396,21 @@ static int tegra_tsensor_setup(struct platform_device *pdev)
 		goto err_irq;
 
 	/* Reset tsensor */
-	dev_dbg(&pdev->dev, "\n before tsensor reset %s ", __func__);
+	dev_dbg(&pdev->dev, "before tsensor reset %s\n", __func__);
 	tegra_periph_reset_assert(data->dev_clk);
 	msleep(1);
 	tegra_periph_reset_deassert(data->dev_clk);
 	msleep(1);
 
-	dev_dbg(&pdev->dev, "\n before tsensor chk pmc reset %s ",
+	dev_dbg(&pdev->dev, "before tsensor chk pmc reset %s\n",
 		__func__);
 	/* Check for previous resets in pmc */
 	if (pmc_check_rst_sensor(data)) {
-		dev_err(data->hwmon_dev, "\n Warning: ***** Last PMC "
-			"Reset source: tsensor detected ");
+		dev_err(data->hwmon_dev, "Warning: ***** Last PMC "
+			"Reset source: tsensor detected\n");
 	}
 
-	dev_dbg(&pdev->dev, "\n before tsensor pmc reset enable %s ",
+	dev_dbg(&pdev->dev, "before tsensor pmc reset enable %s\n",
 		__func__);
 	/* Enable the sensor reset in PMC */
 	pmc_rst_enable(data, true);
@@ -1431,7 +1431,7 @@ static int tegra_tsensor_setup(struct platform_device *pdev)
 	}
 
 	/* tsensor thresholds are read from board/platform specific files */
-	dev_dbg(&pdev->dev, "\n before tsensor get platform data %s ",
+	dev_dbg(&pdev->dev, "before tsensor get platform data %s\n",
 		__func__);
 	tsensor_data = pdev->dev.platform_data;
 #if !ENABLE_TSENSOR_HW_RESET
@@ -1441,32 +1441,32 @@ static int tegra_tsensor_setup(struct platform_device *pdev)
 	tsensor_data->sw_intr_temperature = -1;
 	tsensor_data->hysteresis = -1;
 #endif
-	dev_dbg(&pdev->dev, "\n tsensor platform_data=0x%x ",
+	dev_dbg(&pdev->dev, "tsensor platform_data=0x%x\n",
 		(unsigned int)pdev->dev.platform_data);
-	dev_dbg(&pdev->dev, "\n clk_div temperature=%d ",
+	dev_dbg(&pdev->dev, "clk_div temperature=%d\n",
 		tsensor_data->hw_clk_div_temperature);
 	data->div2_temp = tsensor_data->hw_clk_div_temperature;
-	dev_dbg(&pdev->dev, "\n reset temperature=%d ",
+	dev_dbg(&pdev->dev, "reset temperature=%d\n",
 		tsensor_data->hw_reset_temperature);
 	data->reset_temp = tsensor_data->hw_reset_temperature;
-	dev_dbg(&pdev->dev, "\n sw_intr temperature=%d ",
+	dev_dbg(&pdev->dev, "sw_intr temperature=%d\n",
 		tsensor_data->sw_intr_temperature);
 	data->sw_intr_temp = tsensor_data->sw_intr_temperature;
-	dev_dbg(&pdev->dev, "\n hysteresis temperature=%d ",
+	dev_dbg(&pdev->dev, "hysteresis temperature=%d\n",
 		tsensor_data->hysteresis);
 	data->hysteresis = tsensor_data->hysteresis;
 
-	dev_dbg(&pdev->dev, "\n before tsensor_config_setup ");
+	dev_dbg(&pdev->dev, "before tsensor_config_setup\n");
 	if (tsensor_config_setup(data)) {
-		dev_err(&pdev->dev, " [%s,line=%d]: tsensor counters dead! ",
+		dev_err(&pdev->dev, "[%s,line=%d]: tsensor counters dead!\n",
 			__func__, __LINE__);
 		goto err_setup;
 	}
-	dev_dbg(&pdev->dev, "\n before tsensor_get_const_AB ");
+	dev_dbg(&pdev->dev, "before tsensor_get_const_AB\n");
 	/* calculate constants needed for temperature conversion */
 	err = tsensor_get_const_AB(data);
 	if (err < 0) {
-		dev_err(&pdev->dev, " Failed to extract temperature "
+		dev_err(&pdev->dev, "Failed to extract temperature\n"
 			"const\n");
 		goto err_setup;
 	}
@@ -1474,18 +1474,18 @@ static int tegra_tsensor_setup(struct platform_device *pdev)
 	/* test if counter-to-temperature and temperature-to-counter
 	 * are matching */
 	if (!test_temperature_algo(data)) {
-		dev_err(&pdev->dev, " Error: read temperature "
-			"algorithm broken ");
+		dev_err(&pdev->dev, "Error: read temperature\n"
+			"algorithm broken\n");
 		err = -EIO;
 		goto err_setup;
 	}
 
 	print_temperature_2_counter_table(data);
 
-	dev_dbg(&pdev->dev, "\n before tsensor_threshold_setup ");
+	dev_dbg(&pdev->dev, "before tsensor_threshold_setup\n");
 	/* change tsensor threshold for active instance */
 	tsensor_threshold_setup(data, tsensor_index, false);
-	dev_dbg(&pdev->dev, "\n end tsensor_threshold_setup ");
+	dev_dbg(&pdev->dev, "end tsensor_threshold_setup\n");
 
 	return 0;
 err_setup:
@@ -1493,7 +1493,7 @@ err_setup:
 err_irq:
 	tsensor_clk_enable(data, false);
 fail:
-	dev_err(&pdev->dev, "\n %s error=%d returned ", __func__, err);
+	dev_err(&pdev->dev, "%s error=%d returned\n", __func__, err);
 	return err;
 }
 
@@ -1507,7 +1507,7 @@ static int __devinit tegra_tsensor_probe(struct platform_device *pdev)
 
 	data = kzalloc(sizeof(struct tegra_tsensor_data), GFP_KERNEL);
 	if (!data) {
-		dev_err(&pdev->dev, " [%s,line=%d]: Failed to allocate "
+		dev_err(&pdev->dev, "[%s,line=%d]: Failed to allocate "
 			"memory\n", __func__, __LINE__);
 		err = -ENOMEM;
 		goto exit;
@@ -1516,7 +1516,8 @@ static int __devinit tegra_tsensor_probe(struct platform_device *pdev)
 
 	/* Register sysfs hooks */
 	for (i = 0; i < ARRAY_SIZE(tsensor_nodes); i++) {
-		err = device_create_file(&pdev->dev, &tsensor_nodes[i].dev_attr);
+		err = device_create_file(&pdev->dev,
+			&tsensor_nodes[i].dev_attr);
 		if (err) {
 			dev_err(&pdev->dev, "device_create_file failed.\n");
 			goto err0;
@@ -1536,7 +1537,7 @@ static int __devinit tegra_tsensor_probe(struct platform_device *pdev)
 	/* map tsensor register space */
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (r == NULL) {
-		dev_err(&pdev->dev, " [%s,line=%d]: Failed to get io "
+		dev_err(&pdev->dev, "[%s,line=%d]: Failed to get io "
 			"resource\n", __func__, __LINE__);
 		err = -ENODEV;
 		goto err2;
@@ -1544,7 +1545,7 @@ static int __devinit tegra_tsensor_probe(struct platform_device *pdev)
 
 	if (!request_mem_region(r->start, (r->end - r->start) + 1,
 				dev_name(&pdev->dev))) {
-		dev_err(&pdev->dev, " [%s,line=%d]: Error mem busy\n",
+		dev_err(&pdev->dev, "[%s,line=%d]: Error mem busy\n",
 			__func__, __LINE__);
 		err = -EBUSY;
 		goto err2;
@@ -1554,7 +1555,7 @@ static int __devinit tegra_tsensor_probe(struct platform_device *pdev)
 	data->phys_end = r->end;
 	data->base = ioremap(r->start, r->end - r->start + 1);
 	if (!data->base) {
-		dev_err(&pdev->dev, " [%s, line=%d]: can't ioremap "
+		dev_err(&pdev->dev, "[%s, line=%d]: can't ioremap "
 			"tsensor iomem\n", __FILE__, __LINE__);
 		err = -ENOMEM;
 		goto err3;
@@ -1563,7 +1564,7 @@ static int __devinit tegra_tsensor_probe(struct platform_device *pdev)
 	/* map pmc rst_status register  */
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	if (r == NULL) {
-		dev_err(&pdev->dev, " [%s,line=%d]: Failed to get io "
+		dev_err(&pdev->dev, "[%s,line=%d]: Failed to get io "
 			"resource\n", __func__, __LINE__);
 		err = -ENODEV;
 		goto err4;
@@ -1571,7 +1572,7 @@ static int __devinit tegra_tsensor_probe(struct platform_device *pdev)
 
 	if (!request_mem_region(r->start, (r->end - r->start) + 1,
 				dev_name(&pdev->dev))) {
-		dev_err(&pdev->dev, " [%s, line=%d]: Error mem busy\n",
+		dev_err(&pdev->dev, "[%s, line=%d]: Error mem busy\n",
 			__func__, __LINE__);
 		err = -EBUSY;
 		goto err4;
@@ -1581,7 +1582,7 @@ static int __devinit tegra_tsensor_probe(struct platform_device *pdev)
 	data->pmc_phys_end = r->end;
 	data->pmc_rst_base = ioremap(r->start, r->end - r->start + 1);
 	if (!data->pmc_rst_base) {
-		dev_err(&pdev->dev, " [%s, line=%d]: can't ioremap "
+		dev_err(&pdev->dev, "[%s, line=%d]: can't ioremap "
 			"pmc iomem\n", __FILE__, __LINE__);
 		err = -ENOMEM;
 		goto err5;
@@ -1597,13 +1598,13 @@ static int __devinit tegra_tsensor_probe(struct platform_device *pdev)
 		tsensor_index = 1;
 	else if ((reg & 0xf) >= TSENSOR_FUSE_REVISION_DECIMAL_REV2)
 		tsensor_index = 0;
-	pr_info("\n tsensor active instance=%d ", tsensor_index);
+	pr_info("tsensor active instance=%d\n", tsensor_index);
 
 	/* tegra tsensor - setup and init */
 	if (tegra_tsensor_setup(pdev) != 0)
 		goto err6;
 
-	dev_dbg(&pdev->dev, "\n end tegra_tsensor_probe ");
+	dev_dbg(&pdev->dev, "end tegra_tsensor_probe\n");
 	return 0;
 err6:
 	iounmap(data->pmc_rst_base);
@@ -1623,7 +1624,7 @@ err1:
 err0:
 	kfree(data);
 exit:
-	dev_err(&pdev->dev, "\n %s error=%d returned ", __func__, err);
+	dev_err(&pdev->dev, "%s error=%d returned\n", __func__, err);
 	return err;
 }
 
@@ -1653,7 +1654,7 @@ static int __devexit tegra_tsensor_remove(struct platform_device *pdev)
 static void dump_a_tsensor_reg(struct tegra_tsensor_data *data,
 	unsigned int addr)
 {
-	dev_dbg(data->hwmon_dev, "\n tsensor[%d][0x%x]: 0x%x ", (addr >> 16),
+	dev_dbg(data->hwmon_dev, "tsensor[%d][0x%x]: 0x%x\n", (addr >> 16),
 		addr & 0xFFFF, tsensor_readl(data, addr));
 }
 
@@ -1710,7 +1711,7 @@ static int tsensor_suspend(struct platform_device *pdev,
 	struct tegra_tsensor_data *data = platform_get_drvdata(pdev);
 	unsigned int config0;
 	int i;
-	dev_dbg(data->hwmon_dev, "\n tsensor before suspend reg dump: ");
+	dev_dbg(data->hwmon_dev, "tsensor before suspend reg dump:\n");
 	dump_tsensor_regs(data);
 	/* set STOP bit, else OVERFLOW interrupt seen in LP1 */
 	for (i = 0; i < TSENSOR_COUNT; i++) {
@@ -1741,7 +1742,7 @@ static int tsensor_resume(struct platform_device *pdev)
 		tsensor_writel(data, config0, ((i << 16) | SENSOR_CFG0));
 	}
 	msleep(1);
-	dev_dbg(data->hwmon_dev, "\n tsensor after resume reg dump: ");
+	dev_dbg(data->hwmon_dev, "tsensor after resume reg dump:\n");
 	dump_tsensor_regs(data);
 
 	return 0;
