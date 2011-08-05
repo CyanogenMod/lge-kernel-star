@@ -43,32 +43,34 @@ comment "Tegra board type"
 config MACH_HARMONY
        bool "Harmony board"
        depends on ARCH_TEGRA_2x_SOC
-       select MACH_HAS_SND_SOC_TEGRA_WM8903
+       select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
        help
          Support for NVIDIA Harmony development platform
 
 config MACH_VENTANA
        bool "Ventana board"
        depends on ARCH_TEGRA_2x_SOC
-       select MACH_HAS_SND_SOC_TEGRA_WM8903
+       select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
        help
          Support for NVIDIA Ventana development platform
 
 config MACH_KAEN
        bool "Kaen board"
        select MACH_SEABOARD
-       select MACH_HAS_SND_SOC_TEGRA_WM8903
+       select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
        help
          Support for the Kaen version of Seaboard
 
 config MACH_PAZ00
        bool "Paz00 board"
+       depends on ARCH_TEGRA_2x_SOC
        help
          Support for the Toshiba AC100/Dynabook AZ netbook
 
 config MACH_SEABOARD
        bool "Seaboard board"
-       select MACH_HAS_SND_SOC_TEGRA_WM8903
+       depends on ARCH_TEGRA_2x_SOC
+       select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
        help
          Support for nVidia Seaboard development platform. It will
 	 also be included for some of the derivative boards that
@@ -76,12 +78,14 @@ config MACH_SEABOARD
 
 config MACH_TRIMSLICE
        bool "TrimSlice board"
+       depends on ARCH_TEGRA_2x_SOC
        select TEGRA_PCI
        help
          Support for CompuLab TrimSlice platform
 
 config MACH_WARIO
        bool "Wario board"
+       depends on ARCH_TEGRA_2x_SOC
        select MACH_SEABOARD
        help
          Support for the Wario version of Seaboard
@@ -102,6 +106,7 @@ config MACH_ARUBA
 config MACH_CARDHU
        bool "Cardhu board"
        depends on ARCH_TEGRA_3x_SOC
+       select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
        help
          Support for NVIDIA Cardhu development platform
 

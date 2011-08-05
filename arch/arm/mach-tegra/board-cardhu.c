@@ -37,6 +37,8 @@
 #include <linux/spi/spi.h>
 #include <linux/i2c/atmel_mxt_ts.h>
 
+#include <sound/wm8903.h>
+
 #include <mach/clk.h>
 #include <mach/iomap.h>
 #include <mach/irqs.h>
@@ -44,7 +46,7 @@
 #include <mach/iomap.h>
 #include <mach/io.h>
 #include <mach/i2s.h>
-#include <mach/audio.h>
+#include <mach/tegra_wm8903_pdata.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <mach/usb_phy.h>
@@ -193,12 +195,7 @@ static __initdata struct tegra_clk_init_table cardhu_clk_init_table[] = {
 	{ "hda2codec_2x","pll_p",	48000000,	false},
 	{ "pwm",	"clk_32k",	32768,		false},
 	{ "blink",	"clk_32k",	32768,		true},
-	{ "pll_a",	NULL,		552960000,	true},
-	{ "pll_a_out0",	NULL,		11289600,	true},
-	{ "i2s1",	"pll_a_out0",	11289600,	true},
-	{ "i2s2",	"pll_a_out0",	11289600,	true},
-	{ "audio",	"pll_a_out0",	11289600,	true},
-	{ "audio_2x",	"audio",	22579200,	true},
+	{ "i2s1",	"pll_a_out0",	0,		false},
 	{ NULL,		NULL,		0,		0},
 };
 
@@ -326,6 +323,26 @@ struct tegra_wired_jack_conf audio_wr_jack_conf = {
 };
 #endif
 
+static struct wm8903_platform_data cardhu_wm8903_pdata = {
+	.irq_active_low = 0,
+	.micdet_cfg = 0,
+	.micdet_delay = 100,
+	.gpio_base = CARDHU_GPIO_WM8903(0),
+	.gpio_cfg = {
+		WM8903_GPIO_NO_CONFIG,
+		WM8903_GPIO_NO_CONFIG,
+		0,
+		WM8903_GPIO_NO_CONFIG,
+		WM8903_GPIO_NO_CONFIG,
+	},
+};
+
+static struct i2c_board_info __initdata wm8903_board_info = {
+	I2C_BOARD_INFO("wm8903", 0x1a),
+	.platform_data = &cardhu_wm8903_pdata,
+	.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_CDC_IRQ),
+};
+
 static void cardhu_i2c_init(void)
 {
 	tegra_i2c_device1.dev.platform_data = &cardhu_i2c1_platform_data;
@@ -339,6 +356,8 @@ static void cardhu_i2c_init(void)
 	platform_device_register(&tegra_i2c_device3);
 	platform_device_register(&tegra_i2c_device2);
 	platform_device_register(&tegra_i2c_device1);
+
+	i2c_register_board_info(4, &wm8903_board_info, 1);
 }
 
 static struct platform_device *cardhu_uart_devices[] __initdata = {
@@ -401,6 +420,22 @@ static struct platform_device tegra_camera = {
 	.id = -1,
 };
 
+static struct tegra_wm8903_platform_data cardhu_audio_pdata = {
+	.gpio_spkr_en		= TEGRA_GPIO_SPKR_EN,
+	.gpio_hp_det		= TEGRA_GPIO_HP_DET,
+	.gpio_hp_mute		= -1,
+	.gpio_int_mic_en	= -1,
+	.gpio_ext_mic_en	= -1,
+};
+
+static struct platform_device cardhu_audio_device = {
+	.name	= "tegra-snd-wm8903",
+	.id	= 0,
+	.dev	= {
+		.platform_data  = &cardhu_audio_pdata,
+	},
+};
+
 static struct platform_device *cardhu_devices[] __initdata = {
 	&tegra_pmu_device,
 	&tegra_udc_device,
@@ -419,6 +454,10 @@ static struct platform_device *cardhu_devices[] __initdata = {
 #if defined(CONFIG_CRYPTO_DEV_TEGRA_SE)
 	&tegra_se_device,
 #endif
+	&tegra_ahub_device,
+	&tegra_i2s_device1,
+	&tegra_pcm_device,
+	&cardhu_audio_device,
 };
 
 #define MXT_CONFIG_CRC  0xD62DE8

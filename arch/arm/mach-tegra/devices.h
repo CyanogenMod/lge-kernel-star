@@ -73,6 +73,7 @@ extern struct platform_device tegra_i2s_device2;
 extern struct platform_device tegra_i2s_device0;
 extern struct platform_device tegra_i2s_device3;
 extern struct platform_device tegra_i2s_device4;
+extern struct platform_device tegra_ahub_device;
 extern struct platform_device tegra_apbif0_device;
 extern struct platform_device tegra_apbif1_device;
 extern struct platform_device tegra_apbif2_device;

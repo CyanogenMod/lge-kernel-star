@@ -5,9 +5,27 @@ config SND_SOC_TEGRA
 	help
 	  Say Y or M here if you want support for SoC audio on Tegra.
 
-config SND_SOC_TEGRA_I2S
-	tristate
-	depends on SND_SOC_TEGRA
+config SND_SOC_TEGRA20_DAS
+	tristate "Tegra 20 Digital Audio Switch driver"
+	depends on SND_SOC_TEGRA && ARCH_TEGRA_2x_SOC
+
+config SND_SOC_TEGRA20_I2S
+	tristate "Tegra 20 I2S driver"
+	depends on SND_SOC_TEGRA && ARCH_TEGRA_2x_SOC
+	select SND_SOC_TEGRA20_DAS
+	help
+	  Say Y or M if you want to add support for codecs attached to the
+	  Tegra I2S interface. You will also need to select the individual
+	  machine drivers to support below.
+
+config SND_SOC_TEGRA30_AHUB
+	tristate "Tegra 30 Audio Hub driver"
+	depends on SND_SOC_TEGRA && ARCH_TEGRA_3x_SOC
+
+config SND_SOC_TEGRA30_I2S
+	tristate "Tegra 30 I2S driver"
+	depends on SND_SOC_TEGRA && ARCH_TEGRA_3x_SOC
+	select SND_SOC_TEGRA20_AHUB
 	help
 	  Say Y or M if you want to add support for codecs attached to the
 	  Tegra I2S interface. You will also need to select the individual
@@ -24,7 +42,8 @@ config SND_SOC_TEGRA_WM8903
 	tristate "SoC Audio support for Tegra boards using a WM8903 codec"
 	depends on SND_SOC_TEGRA && I2C
 	depends on MACH_HAS_SND_SOC_TEGRA_WM8903
-	select SND_SOC_TEGRA_I2S
+	select SND_SOC_TEGRA20_I2S if ARCH_TEGRA_2x_SOC
+	select SND_SOC_TEGRA30_I2S if ARCH_TEGRA_3x_SOC
 	select SND_SOC_WM8903
 	help
 	  Say Y or M here if you want to add support for SoC audio on Tegra
