@@ -53,9 +53,9 @@ static const u32 cpu_process_speedos[][CPU_PROCESS_CORNERS_NUM] = {
 	{306, 338, 360, 376}, /* threshold_index 0: cpu_speedo_id 0: any A01 */
 
 /* T30 family */
-	{306, 338, 360, 376}, /* threshold_index 1: cpu_speedo_id 1: AP30 */
-	{338, 338, 360, 376}, /* threshold_index 2: cpu_speedo_id 2: T30  */
-	{338, 338, 360, 376}, /* threshold_index 3: cpu_speedo_id 3: T30S */
+	{305, 336, 358, 375}, /* threshold_index 1: cpu_speedo_id 1: AP30 */
+	{336, 336, 358, 375}, /* threshold_index 2: cpu_speedo_id 2: T30  */
+	{336, 336, 358, 375}, /* threshold_index 3: cpu_speedo_id 3: T30S */
 
 /* Characterization SKUs */
 	{295, 326, 348, 364}, /* threshold_index 4: cpu_speedo_id 1: AP30char */
