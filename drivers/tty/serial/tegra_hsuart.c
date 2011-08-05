@@ -864,6 +864,14 @@ static void tegra_shutdown(struct uart_port *u)
 	dev_vdbg(u->dev, "-tegra_shutdown\n");
 }
 
+static void tegra_wake_peer(struct uart_port *u)
+{
+	struct tegra_uart_platform_data *pdata = u->dev->platform_data;
+
+	if (pdata && pdata->wake_peer)
+		pdata->wake_peer(u);
+}
+
 static unsigned int tegra_get_mctrl(struct uart_port *u)
 {
 	/* RI - Ring detector is active
@@ -1180,6 +1188,7 @@ static struct uart_ops tegra_uart_ops = {
 	.break_ctl	= tegra_break_ctl,
 	.startup	= tegra_startup,
 	.shutdown	= tegra_shutdown,
+	.wake_peer	= tegra_wake_peer,
 	.set_termios	= tegra_set_termios,
 	.pm		= tegra_pm,
 	.type		= tegra_type,
