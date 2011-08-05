@@ -572,17 +572,24 @@ static const struct usb_device_id	products [] = {
 
 /* PH450 */
 {
-         .match_flags = USB_DEVICE_ID_MATCH_INT_INFO
-                | USB_DEVICE_ID_MATCH_DEVICE,
-         USB_DEVICE(0x1983,0x0310),
-         .driver_info = (unsigned long)&wwan_info,
+	.match_flags = USB_DEVICE_ID_MATCH_INT_INFO
+		| USB_DEVICE_ID_MATCH_DEVICE,
+	USB_DEVICE(0x1983,0x0310),
+	.driver_info = (unsigned long)&wwan_info,
 }, {
-         .match_flags = USB_DEVICE_ID_MATCH_INT_INFO
-                | USB_DEVICE_ID_MATCH_DEVICE,
-         USB_DEVICE(0x1983,0x0321),
-         .driver_info = (unsigned long)&wwan_info,
+	.match_flags = USB_DEVICE_ID_MATCH_INT_INFO
+		| USB_DEVICE_ID_MATCH_DEVICE,
+	USB_DEVICE(0x1983,0x0321),
+	.driver_info = (unsigned long)&wwan_info,
 },
 
+/* Tango module */
+{
+	.match_flags = USB_DEVICE_ID_MATCH_INT_INFO
+		 | USB_DEVICE_ID_MATCH_DEVICE,
+	USB_DEVICE(0x0489,0xE03A),
+	.driver_info = (unsigned long)&wwan_info,
+},
 /*
  * WHITELIST!!!
  *
