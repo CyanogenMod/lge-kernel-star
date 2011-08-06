@@ -384,6 +384,29 @@ static struct clk_ops tegra_super_ops = {
 	.set_rate		= tegra2_super_clk_set_rate,
 };
 
+static int tegra2_twd_clk_set_rate(struct clk *c, unsigned long rate)
+{
+	/* The input value 'rate' is the clock rate of the CPU complex. */
+	c->rate = (rate * c->mul) / c->div;
+	return 0;
+}
+
+static struct clk_ops tegra2_twd_ops = {
+	.set_rate	= tegra2_twd_clk_set_rate,
+};
+
+static struct clk tegra2_clk_twd = {
+	/* NOTE: The twd clock must have *NO* parent. It's rate is directly
+		 updated by tegra3_cpu_cmplx_clk_set_rate() because the
+		 frequency change notifer for the twd is called in an
+		 atomic context which cannot take a mutex. */
+	.name     = "twd",
+	.ops      = &tegra2_twd_ops,
+	.max_rate = 1000000000,	/* Same as tegra_clk_virtual_cpu.max_rate */
+	.mul      = 1,
+	.div      = 4,
+};
+
 /* virtual cpu clock functions */
 /* some clocks can not be stopped (cpu, memory bus) while the SoC is running.
    To change the frequency of these clocks, the parent pll may need to be
@@ -437,6 +460,12 @@ static int tegra2_cpu_clk_set_rate(struct clk *c, unsigned long rate)
 		pr_err("Failed to switch cpu to clock %s\n", c->u.cpu.main->name);
 		goto out;
 	}
+
+	/* We can't parent the twd to directly to the CPU complex because
+	   the TWD frequency update notifier is called in an atomic context
+	   and the CPU frequency update requires a mutex. Update the twd
+	   clock rate with the new CPU complex rate. */
+	clk_set_rate(&tegra2_clk_twd, clk_get_rate_locked(c));
 
 out:
 	clk_disable(c->u.cpu.main);
@@ -2069,15 +2098,6 @@ static struct clk tegra_clk_virtual_cpu = {
 	},
 };
 
-static struct clk tegra_clk_twd = {
-	.name     = "twd",
-	.parent   = &tegra_clk_cclk,
-	.ops      = NULL,
-	.max_rate = 250000000,
-	.mul      = 1,
-	.div      = 4,
-};
-
 static struct clk tegra_clk_cop = {
 	.name      = "cop",
 	.parent    = &tegra_clk_sclk,
@@ -2452,7 +2472,7 @@ struct clk *tegra_ptr_clks[] = {
 	&tegra_clk_blink,
 	&tegra_clk_cop,
 	&tegra_clk_emc,
-	&tegra_clk_twd,
+	&tegra2_clk_twd,
 };
 
 /* For some clocks maximum rate limits depend on tegra2 SKU */
