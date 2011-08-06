@@ -114,7 +114,7 @@ static int cardhu_backlight_init(struct device *dev) {
 
 	bl_output = cardhu_bl_output_measured;
 
-	if (WARN_ON(ARRAY_SIZE(cardhu_bl_output_measured) == 256))
+	if (WARN_ON(ARRAY_SIZE(cardhu_bl_output_measured) != 256))
 		pr_err("bl_output array does not have 256 elements\n");
 
 #ifndef CONFIG_TEGRA_CARDHU_DSI
