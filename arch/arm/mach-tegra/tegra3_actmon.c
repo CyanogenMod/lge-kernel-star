@@ -441,7 +441,9 @@ static int __init actmon_dev_init(struct actmon_dev *dev)
 		       dev->dev_id, dev->con_id);
 		return -ENODEV;
 	}
-	dev->max_freq = clk_get_max_rate(dev->clk) / 1000;
+	dev->max_freq = clk_round_rate(dev->clk, ULONG_MAX);
+	clk_set_rate(dev->clk, dev->max_freq);
+	dev->max_freq /= 1000;
 	freq = clk_get_rate(dev->clk) / 1000;
 	actmon_dev_configure(dev, freq);
 
