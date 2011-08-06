@@ -483,7 +483,7 @@ struct tegra_dsi_out enterprise_dsi = {
 	.dsi_instance = 0,
 
 	.panel_reset = DSI_PANEL_RESET,
-
+	.power_saving_suspend = true,
 	.n_init_cmd = ARRAY_SIZE(dsi_init_cmd),
 	.dsi_init_cmd = dsi_init_cmd,
 
