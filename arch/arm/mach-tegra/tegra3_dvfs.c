@@ -47,12 +47,10 @@ static const int cpu_speedo_nominal_millivolts[] =
 #define KHZ 1000
 #define MHZ 1000000
 
-/* (VDD_CORE - cpu_below_core) <= VDD_CPU <= (VDD_CORE + core_below_cpu)]  */
-/* (VDD_CPU - core_below_cpu) <= VDD_CORE <= (VDD_CPU + cpu_below_core)]  */
+/* VDD_CPU >= (VDD_CORE - cpu_below_core) */
+/* VDD_CORE >= min_level(VDD_CPU), see tegra3_get_core_floor_mv() below */
 #define VDD_CPU_BELOW_VDD_CORE		300
 static int cpu_below_core = VDD_CPU_BELOW_VDD_CORE;
-#define VDD_CORE_BELOW_VDD_CPU		0
-static int core_below_cpu = VDD_CORE_BELOW_VDD_CPU;
 
 #define VDD_SAFE_STEP			100
 
@@ -75,13 +73,27 @@ static struct dvfs_rail *tegra3_dvfs_rails[] = {
 	&tegra3_dvfs_rail_vdd_core,
 };
 
+static int tegra3_get_core_floor_mv(int cpu_mv)
+{
+	if (cpu_mv <= 875)
+		return 1000;
+	if (cpu_mv <=  975)
+		return 1100;
+	if (tegra_cpu_speedo_id() < 2)
+		return 1200;
+	if (cpu_mv <= 1075)
+		return 1200;
+	if (cpu_mv <= 1150)
+		return 1300;
+	BUG();
+}
 
-/* vdd_core must be >= (vdd_cpu - core_below_cpu) */
+/* vdd_core must be >= min_level as a function of vdd_cpu */
 static int tegra3_dvfs_rel_vdd_cpu_vdd_core(struct dvfs_rail *vdd_cpu,
 	struct dvfs_rail *vdd_core)
 {
-	int core_floor = max(vdd_cpu->new_millivolts, vdd_cpu->millivolts) -
-		core_below_cpu;
+	int core_floor = max(vdd_cpu->new_millivolts, vdd_cpu->millivolts);
+	core_floor = tegra3_get_core_floor_mv(core_floor);
 	return max(vdd_core->new_millivolts, core_floor);
 }
 
@@ -220,7 +232,7 @@ static struct dvfs core_dvfs_table[] = {
 	CORE_DVFS("mipi",   1, 1, KHZ,        1,      1,      1,      1,  60000,   60000,   60000),
 	CORE_DVFS("mipi",   2, 1, KHZ,        1,      1,      1,      1,  60000,   60000,   60000),
 
-	CORE_DVFS("fuse_burn", -1, 1, KHZ,    0,      0,      0,  26000,  26000,   26000,   26000),
+	CORE_DVFS("fuse_burn", -1, 1, KHZ,    1,      1,      1,  26000,  26000,   26000,   26000),
 	CORE_DVFS("sdmmc1",-1, 1, KHZ,   104000, 104000, 104000, 104000, 208000,  208000,  208000),
 	CORE_DVFS("sdmmc3",-1, 1, KHZ,   104000, 104000, 104000, 104000, 208000,  208000,  208000),
 	CORE_DVFS("ndflash", -1, 1, KHZ, 120000, 120000, 120000, 200000, 200000,  200000,  200000),
@@ -356,9 +368,12 @@ static int __init get_cpu_nominal_mv_index(
 	 */
 	BUG_ON(speedo_id >= ARRAY_SIZE(cpu_speedo_nominal_millivolts));
 	mv = cpu_speedo_nominal_millivolts[speedo_id];
-	if (tegra3_dvfs_rail_vdd_core.nominal_millivolts)
-		mv = min(mv, tegra3_dvfs_rail_vdd_core.nominal_millivolts +
-			core_below_cpu);
+	if (tegra3_dvfs_rail_vdd_core.nominal_millivolts) {
+		int core_mv = tegra3_dvfs_rail_vdd_core.nominal_millivolts;
+		while ((mv > tegra3_dvfs_rail_vdd_cpu.min_millivolts) &&
+		       (tegra3_get_core_floor_mv(mv) > core_mv))
+			mv -= 25;
+	}
 
 	/*
 	 * Find matching cpu dvfs entry, and use it to determine index to the
@@ -448,8 +463,6 @@ void __init tegra_soc_init_dvfs(void)
 #ifndef CONFIG_TEGRA_CPU_DVFS
 	tegra_dvfs_cpu_disabled = true;
 #endif
-
-	BUG_ON(VDD_SAFE_STEP > (cpu_below_core + core_below_cpu));
 
 	/*
 	 * Find nominal voltages for core (1st) and cpu rails before rail
