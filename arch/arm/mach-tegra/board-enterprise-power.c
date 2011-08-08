@@ -34,6 +34,7 @@
 #include <mach/pinmux.h>
 
 #include "gpio-names.h"
+#include "board.h"
 #include "board-enterprise.h"
 #include "pm.h"
 #include "wakeups-t3.h"
@@ -437,7 +438,7 @@ static void enterprise_board_resume(int lp_state, enum resume_stage stg)
 static struct tegra_suspend_platform_data enterprise_suspend_data = {
 	.cpu_timer	= 2000,
 	.cpu_off_timer	= 200,
-	.suspend_mode	= TEGRA_SUSPEND_LP1,
+	.suspend_mode	= TEGRA_SUSPEND_LP0,
 	.core_timer	= 0x7e7e,
 	.core_off_timer = 0,
 	.corereq_high	= true,
@@ -446,8 +447,17 @@ static struct tegra_suspend_platform_data enterprise_suspend_data = {
 	.board_resume = enterprise_board_resume,
 };
 
+static void enterprise_init_deep_sleep_mode(void)
+{
+	struct board_info bi;
+	tegra_get_board_info(&bi);
+	if (bi.board_id == BOARD_1205 && bi.fab == ENTERPRISE_FAB_A01)
+		enterprise_suspend_data.suspend_mode = TEGRA_SUSPEND_LP1;
+}
+
 int __init enterprise_suspend_init(void)
 {
+	enterprise_init_deep_sleep_mode();
 	tegra_init_suspend(&enterprise_suspend_data);
 	return 0;
 }
