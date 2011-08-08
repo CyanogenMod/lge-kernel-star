@@ -439,6 +439,23 @@ static struct resource cardhu_disp2_resources[] = {
 #ifndef CONFIG_TEGRA_CARDHU_DSI
 static struct tegra_dc_mode cardhu_panel_modes[] = {
 	{
+		/* 1366x768@60Hz */
+		.pclk = 74180000,
+		.h_ref_to_sync = 1,
+		.v_ref_to_sync = 1,
+		.h_sync_width = 30,
+		.v_sync_width = 5,
+		.h_back_porch = 52,
+		.v_back_porch = 20,
+		.h_active = 1366,
+		.v_active = 768,
+		.h_front_porch = 64,
+		.v_front_porch = 25,
+	},
+};
+
+static struct tegra_dc_mode cardhu_panel_modes_55hz[] = {
+	{
 		/* 1366x768p 55Hz */
 		.pclk = 68000000,
 		.h_ref_to_sync = 0,
@@ -960,6 +977,14 @@ int __init cardhu_panel_init(void)
 
 	cardhu_carveouts[1].base = tegra_carveout_start;
 	cardhu_carveouts[1].size = tegra_carveout_size;
+
+	if (board_info.board_id == BOARD_E1291 &&
+		((board_info.sku & SKU_TOUCHSCREEN_MECH_FIX) == 0)) {
+		/* use 55Hz panel timings to reduce noise on sensitive touch */
+		printk("Using cardhu_panel_modes_55hz\n");
+		cardhu_disp1_out.modes = cardhu_panel_modes_55hz;
+		cardhu_disp1_out.n_modes = ARRAY_SIZE(cardhu_panel_modes_55hz);
+	}
 
 	if (board_info.board_id == BOARD_PM269) {
 		gpio_request(pm269_lvds_shutdown, "lvds_shutdown");
