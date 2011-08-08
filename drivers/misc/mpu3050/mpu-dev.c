@@ -1036,9 +1036,17 @@ int mpu3050_probe(struct i2c_client *client,
 	mpu->timeout.data = (u_long) mpu;
 	init_timer(&mpu->timeout);
 
+	/* FIXME:
+	 * Do not register the pm_notifier as it causes
+	 * issues with resume sequence as there is no response
+	 * from user-space for power notifications for approx
+	 * 60 sec. Refer NV bug 858630 for more details.
+	 */
+#if 0
 	mpu->nb.notifier_call = mpu_pm_notifier_callback;
 	mpu->nb.priority = 0;
 	register_pm_notifier(&mpu->nb);
+#endif
 
 	pdata = (struct mpu3050_platform_data *) client->dev.platform_data;
 	if (!pdata) {
