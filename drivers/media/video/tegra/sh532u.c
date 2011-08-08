@@ -575,7 +575,7 @@ static long sh532u_ioctl(
 		if (ret)
 			return ret;
 
-		if (StereoCameraMode_Stereo & stereo_info->camera_mode) {
+		if (stereo_info->camera_mode == StereoCameraMode_Stereo) {
 			/* To be finalized for stereo */
 			if (cmd != SH532U_IOCTL_GET_CONFIG)
 				ret = sh532u_ioctl_helper(stereo_info->right,
