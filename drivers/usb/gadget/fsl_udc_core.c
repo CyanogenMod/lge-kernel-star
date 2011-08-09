@@ -41,6 +41,7 @@
 #include <linux/fsl_devices.h>
 #include <linux/dmapool.h>
 #include <linux/delay.h>
+#include <linux/workqueue.h>
 
 #include <asm/byteorder.h>
 #include <asm/io.h>
@@ -72,6 +73,9 @@ static struct usb_dr_device *dr_regs;
 #ifndef CONFIG_ARCH_MXC
 static struct usb_sys_interface *usb_sys_regs;
 #endif
+
+/* 1 sec wait time for charger detection after vbus is detected */
+#define USB_CHARGER_DETECTION_WAIT_TIME_MS 1000
 
 /* it is initialized in probe()  */
 static struct fsl_udc *udc_controller = NULL;
@@ -1238,6 +1242,8 @@ static int fsl_vbus_session(struct usb_gadget *gadget, int is_active)
 
 	if (udc->transceiver) {
 		if (udc->vbus_active && !is_active) {
+			/* If cable disconnected, cancel any delayed work */
+			cancel_delayed_work(&udc->work);
 			spin_lock_irqsave(&udc->lock, flags);
 			/* reset all internal Queues and inform client driver */
 			reset_queues(udc);
@@ -1261,6 +1267,9 @@ static int fsl_vbus_session(struct usb_gadget *gadget, int is_active)
 			udc->vbus_active = 1;
 			/* start the controller */
 			dr_controller_run(udc);
+			/* Schedule work to wait for 1000 msec and check for
+			 * charger if setup packet is not received */
+			schedule_delayed_work(&udc->work, USB_CHARGER_DETECTION_WAIT_TIME_MS);
 		}
 		return 0;
 	}
@@ -2030,6 +2039,18 @@ static void reset_irq(struct fsl_udc *udc)
 #endif
 }
 
+/*
+ * If VBUS is detected and setup packet is not received in 100ms then
+ * work thread starts and checks for the USB charger detection.
+ */
+static void fsl_udc_charger_detect_work(struct work_struct* work)
+{
+	/* check for the platform charger detection */
+	if (fsl_udc_charger_detect()) {
+		printk(KERN_INFO "USB compliant charger detected\n");
+	}
+}
+
 #if defined(CONFIG_ARCH_TEGRA)
 /*
  * Restart device controller in the OTG mode on VBUS detection
@@ -2091,6 +2112,9 @@ static irqreturn_t fsl_udc_irq(int irq, void *_udc)
 		VDBG("Packet int");
 		/* Setup package, we only support ep0 as control ep */
 		if (fsl_readl(&dr_regs->endptsetupstat) & EP_SETUP_STATUS_EP0) {
+			/* Setup packet received, we are connected to host and
+			 * not charger. Cancel any delayed work */
+			__cancel_delayed_work(&udc->work);
 			tripwire_handler(udc, 0,
 					(u8 *) (&udc->local_setup_buff));
 			setup_received_irq(udc, &udc->local_setup_buff);
@@ -2802,6 +2826,9 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
 	}
 	create_proc_file();
 
+	/* create a delayed work for detecting the USB charger */
+	INIT_DELAYED_WORK(&udc_controller->work, fsl_udc_charger_detect_work);
+
 #ifdef CONFIG_USB_OTG_UTILS
 	udc_controller->transceiver = otg_get_transceiver();
 	if (udc_controller->transceiver) {
@@ -2851,6 +2878,7 @@ static int __exit fsl_udc_remove(struct platform_device *pdev)
 		return -ENODEV;
 	udc_controller->done = &done;
 
+	cancel_delayed_work(&udc_controller->work);
 	if (udc_controller->transceiver)
 		otg_set_peripheral(udc_controller->transceiver, NULL);
 
