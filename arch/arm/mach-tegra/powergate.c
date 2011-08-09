@@ -413,6 +413,11 @@ static int tegra_powergate_set(int id, bool new_state)
 {
 	bool status;
 	unsigned long flags;
+	/* 10us timeout for toggle operation if it takes affect*/
+	int toggle_timeout = 10;
+	/* 100 * 10 = 1000us timeout for toggle command to take affect in case
+	   of contention with h/w initiated CPU power gating */
+	int contention_timeout = 100;
 
 	spin_lock_irqsave(&tegra_powergate_lock, flags);
 
@@ -423,9 +428,32 @@ static int tegra_powergate_set(int id, bool new_state)
 		return -EINVAL;
 	}
 
-	pmc_write(PWRGATE_TOGGLE_START | id, PWRGATE_TOGGLE);
+	if (TEGRA_IS_CPU_POWERGATE_ID(id)) {
+		/* CPU ungated in s/w only during boot/resume with outer
+		   waiting loop and no contention from other CPUs */
+		pmc_write(PWRGATE_TOGGLE_START | id, PWRGATE_TOGGLE);
+		spin_unlock_irqrestore(&tegra_powergate_lock, flags);
+		return 0;
+	}
+
+	do {
+		pmc_write(PWRGATE_TOGGLE_START | id, PWRGATE_TOGGLE);
+		do {
+			udelay(1);
+			status = !!(pmc_read(PWRGATE_STATUS) & (1 << id));
+
+			toggle_timeout--;
+		} while ((status != new_state) && (toggle_timeout > 0));
+
+		contention_timeout--;
+	} while ((status != new_state) && (contention_timeout > 0));
 
 	spin_unlock_irqrestore(&tegra_powergate_lock, flags);
+
+	if (status != new_state) {
+		WARN(1, "Could not set powergate %d to %d", id, new_state);
+		return -EBUSY;
+	}
 
 	return 0;
 }
