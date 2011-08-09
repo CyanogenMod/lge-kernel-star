@@ -2545,7 +2545,7 @@ int cardhu_emc_init(void)
 		if (tegra_get_revision() == TEGRA_REVISION_A01)
 			tegra_init_emc(cardhu_emc_tables_h5tc2g,
 				ARRAY_SIZE(cardhu_emc_tables_h5tc2g));
-		else
+		else if (MEMORY_TYPE(board.sku) == SKU_MEMORY_CARDHU_1GB_1R)
 			tegra_init_emc(cardhu_emc_tables_h5tc2g_a2,
 				ARRAY_SIZE(cardhu_emc_tables_h5tc2g_a2));
 		break;
