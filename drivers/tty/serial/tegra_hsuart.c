@@ -54,6 +54,7 @@
 #define UART_RX_DMA_BUFFER_SIZE    (2048*4)
 
 #define UART_LSR_FIFOE		0x80
+#define UART_LSR_TXFIFO_FULL	0x100
 #define UART_IER_EORD		0x20
 #define UART_MCR_RTS_EN		0x40
 #define UART_MCR_CTS_EN		0x20
@@ -134,6 +135,14 @@ static inline u8 uart_readb(struct tegra_uart_port *t, unsigned long reg)
 	return val;
 }
 
+static inline u32 uart_readl(struct tegra_uart_port *t, unsigned long reg)
+{
+	u32 val = readl(t->uport.membase + (reg << t->uport.regshift));
+	dev_vdbg(t->uport.dev, "%s: %p %03lx = %02x\n", __func__,
+		t->uport.membase, reg << t->uport.regshift, val);
+	return val;
+}
+
 static inline void uart_writeb(struct tegra_uart_port *t, u8 val,
 	unsigned long reg)
 {
@@ -161,9 +170,17 @@ static void fill_tx_fifo(struct tegra_uart_port *t, int max_bytes)
 {
 	int i;
 	struct circ_buf *xmit = &t->uport.state->xmit;
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	unsigned long lsr;
+#endif
 
 	for (i = 0; i < max_bytes; i++) {
 		BUG_ON(uart_circ_empty(xmit));
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+		lsr = uart_readl(t, UART_LSR);
+		if ((lsr & UART_LSR_TXFIFO_FULL))
+			break;
+#endif
 		uart_writeb(t, xmit->buf[xmit->tail], UART_TX);
 		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
 		t->uport.icount.tx++;
