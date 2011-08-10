@@ -205,10 +205,6 @@ static int cardhu_backlight_notify(struct device *unused, int brightness)
 
 	/* SD brightness is a percentage, 8-bit value. */
 	brightness = (brightness * cur_sd_brightness) / 255;
-	if (cur_sd_brightness != 255) {
-		printk("NVSD BL - in: %d, sd: %d, out: %d\n",
-			orig_brightness, cur_sd_brightness, brightness);
-	}
 
 	/* Apply any backlight response curve */
 	if (brightness > 255) {
