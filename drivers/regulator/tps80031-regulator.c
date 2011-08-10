@@ -378,7 +378,7 @@ out:
 }
 
 static int tps80031dcdc_set_voltage(struct regulator_dev *rdev,
-			int min_uV, int max_uV)
+			int min_uV, int max_uV, unsigned *selector)
 {
 	struct tps80031_regulator *ri = rdev_get_drvdata(rdev);
 	struct device *parent = to_tps80031_dev(rdev);
@@ -517,7 +517,7 @@ static int __tps80031_ldo_set_voltage(struct device *parent,
 }
 
 static int tps80031ldo_set_voltage(struct regulator_dev *rdev,
-		int min_uV, int max_uV)
+		int min_uV, int max_uV, unsigned *selector)
 {
 	struct tps80031_regulator *ri = rdev_get_drvdata(rdev);
 	struct device *parent = to_tps80031_dev(rdev);
