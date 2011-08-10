@@ -216,12 +216,16 @@ ENTRY(tegra2_sleep_wfi)
 
 	bl	tegra_pen_unlock
 
+#if USE_TEGRA_CPU_SUSPEND
 	/* Enable the data cache and SMP coherency */
 	mrc	p15, 0, r10, c1, c0, 0
 	orr	r10, r10, #CR_C
 	dsb
 	mcr	p15, 0, r10, c1, c0, 0
 	isb
+	mcr	p15, 0, r11, c1, c0, 1	@ reenable coherency
+
+#else
 	mcr	p15, 0, r11, c1, c0, 1	@ reenable coherency
 
 	@ the cpu was running with coherency disabled, caches may be out of date
@@ -231,6 +235,7 @@ ENTRY(tegra2_sleep_wfi)
 	ldr	pc, [r10, #CACHE_FLUSH_KERN_ALL]
 #else
 	bl	__cpuc_flush_kern_all
+#endif
 #endif
 
 	pop_ctx_regs r0, r1		@ restore context registers
