@@ -32,6 +32,7 @@
 #include <mach/iomap.h>
 #include <mach/dc.h>
 #include <mach/fb.h>
+#include <mach/hardware.h>
 
 #include "board.h"
 #include "board-enterprise.h"
@@ -681,6 +682,9 @@ int __init enterprise_panel_init(void)
 
 	if (WARN_ON(ARRAY_SIZE(enterprise_bl_output_measured) != 256))
 		pr_err("bl_output array does not have 256 elements\n");
+
+	enterprise_dsi.chip_id = tegra_get_chipid();
+	enterprise_dsi.chip_rev = tegra_get_revision();
 
 	enterprise_carveouts[1].base = tegra_carveout_start;
 	enterprise_carveouts[1].size = tegra_carveout_size;
