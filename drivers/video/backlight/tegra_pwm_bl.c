@@ -101,6 +101,7 @@ static int tegra_pwm_backlight_probe(struct platform_device *pdev)
 	tbl->params.clk_select = data->clk_select;
 
 	memset(&props, 0, sizeof(struct backlight_properties));
+	props.type = BACKLIGHT_RAW;
 	props.max_brightness = data->max_brightness;
 	bl = backlight_device_register(dev_name(&pdev->dev), &pdev->dev, tbl,
 			&tegra_pwm_backlight_ops, &props);
