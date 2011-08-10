@@ -219,6 +219,9 @@ static int tegra_ehci_hub_control(
 			pr_err("%s: timeout waiting for SUSPEND\n", __func__);
 
 		set_bit((wIndex & 0xff) - 1, &ehci->suspended_ports);
+
+		tegra_usb_phy_postsuspend(tegra->phy, false);
+
 		goto done;
 	}
 
