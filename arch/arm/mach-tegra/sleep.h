@@ -125,17 +125,54 @@
 .macro push_ctx_regs, tmp1
 	push_stack_token \tmp1		@ debug check word
 	stmfd	sp!, {r4 - r11, lr}
+	/* Save the current TTB0 and CONTEXTID registers. */
+	mrc	p15, 0, r5, c2, c0, 0	@ TTB 0
+	mrc	p15, 0, r6, c13, c0, 1	@ CONTEXTID
 #if USE_TEGRA_DIAG_REG_SAVE
 	mrc	p15, 0, r4, c15, c0, 1	@ read diagnostic register
-	stmfd	sp!, {r4}
+	stmfd	sp!, {r4-r6}
+#else
+	stmfd	sp!, {r5-r6}
 #endif
+	/* Switch to the tegra_pgd so that IRAM and the MMU shut-off code
+	   will be flat mapped (VA==PA). We also do this because the common
+	   ARM CPU state save/restore code doesn't support an external L2
+	   cache controller. If the current PGD is left active, the common
+	   ARM MMU restore may (and eventually will) damage the currently
+	   running page tables by adding a temporary flat section mapping
+	   that could be picked up by other CPUs from the L2 cache
+	   resulting in a kernel panic. */
+	ldr	r6, tegra_pgd_phys_address
+	ldr	r6, [r6]
+	mov	r7, #0
+	dsb
+	mcr	p15, 0, r7, c13, c0, 1	@ CONTEXTID = reserved context
+	isb
+	mcr	p15, 0, r6, c2, c0, 0	@ TTB 0
+	isb
+	mcr	p15, 0, r7, c8, c3, 0	@ invalidate TLB
+	mcr	p15, 0, r7, c7, c5, 6	@ flush BTAC
+	mcr	p15, 0, r7, c7, c5, 0	@ flush instruction cache
+	dsb
 .endm
 
 .macro pop_ctx_regs, tmp1, tmp2
 #if USE_TEGRA_DIAG_REG_SAVE
-	ldmfd	sp!, {r4}
+	ldmfd	sp!, {r4-r6}
 	mcr	p15, 0, r4, c15, c0, 1	@ write diagnostic register
+#else
+	ldmfd	sp!, {r5-r6}
 #endif
+	dsb
+	mcr	p15, 0, r5, c2, c0, 0	@ TTB 0
+	isb
+	mcr	p15, 0, r6, c13, c0, 1	@ CONTEXTID = reserved context
+	isb
+	mov	r7, #0
+	mcr	p15, 0, r7, c8, c3, 0	@ invalidate TLB
+	mcr	p15, 0, r7, c7, c5, 6	@ flush BTAC
+	mcr	p15, 0, r7, c7, c5, 0	@ flush instruction cache
+	dsb
 	ldmfd	sp!, {r4 - r11, lr}
 	pop_stack_token \tmp1, \tmp2	@ debug stack debug token
 .endm

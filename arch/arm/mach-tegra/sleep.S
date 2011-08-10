@@ -402,27 +402,6 @@ tegra_cpu_resume:
  * r1 = physical address to jump to with mmu off
  */
 ENTRY(tegra_turn_off_mmu)
-	/*
-	 * change page table pointer to tegra_pgd_phys, so that IRAM
-	 * and MMU shut-off will be mapped virtual == physical
-	 */
-	mrc	p15, 0, r2, c2, c0, 0	@ TTB 0
-	mov32	r3, ~PAGE_MASK
-	and	r2, r2, r3
-	ldr	r3, tegra_pgd_phys_address
-	ldr	r3, [r3]
-	orr	r3, r3, r2
-	mov	r2, #0
-	mcr	p15, 0, r2, c13, c0, 1	@ reserved context
-	isb
-	mcr	p15, 0, r3, c2, c0, 0	@ TTB 0
-	isb
-
-	mov	r2, #0
-	mcr	p15, 0, r2, c8, c3, 0	@ invalidate TLB
-	mcr	p15, 0, r2, c7, c5, 6	@ flush BTAC
-	mcr	p15, 0, r2, c7, c5, 0	@ flush instruction cache
-
 	mov32	r3, tegra_shut_off_mmu
 	add	r3, r3, r0
 	mov	r0, r1
