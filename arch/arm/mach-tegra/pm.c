@@ -47,6 +47,7 @@
 #include <asm/hardware/gic.h>
 #include <asm/localtimer.h>
 #include <asm/pgalloc.h>
+#include <asm/pgtable.h>
 #include <asm/tlbflush.h>
 
 #include <mach/clk.h>
@@ -257,6 +258,9 @@ static __init int alloc_suspend_context(void)
 	pgprot_t prot = __pgprot_modify(pgprot_kernel, L_PTE_MT_MASK,
 					 L_PTE_MT_UNCACHED | L_PTE_XN);
 	struct page *ctx_page;
+	unsigned long ctx_virt;
+	phys_addr_t ctx_phys;
+	pmd_t *pmd;
 
 	ctx_page = alloc_pages(GFP_KERNEL, 0);
 	if (IS_ERR_OR_NULL(ctx_page))
@@ -265,6 +269,16 @@ static __init int alloc_suspend_context(void)
 	tegra_cpu_context = vm_map_ram(&ctx_page, 1, -1, prot);
 	if (IS_ERR_OR_NULL(tegra_cpu_context))
 		goto fail;
+
+	/* Add the context page to our private pgd. */
+	ctx_virt = (unsigned long)tegra_cpu_context;
+	ctx_phys = virt_to_phys(tegra_cpu_context);
+	pmd = pmd_offset(tegra_pgd + pgd_index(ctx_virt), ctx_virt);
+	*pmd = __pmd((ctx_phys & PGDIR_MASK) |
+		     PMD_TYPE_SECT | PMD_SECT_AP_WRITE |
+		     PMD_SECT_XN | PMD_SECT_UNCACHED);
+	flush_pmd_entry(pmd);
+	outer_clean_range(__pa(pmd), __pa(pmd + 1));
 
 	return 0;
 
