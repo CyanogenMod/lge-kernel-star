@@ -77,6 +77,9 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += cpuidle-t2.o
 obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += cpuidle-t3.o
 endif
 endif
+ifeq ($(CONFIG_TEGRA_THERMAL_THROTTLE),y)
+obj-y                                   += tegra2-throttle.o
+endif
 obj-$(CONFIG_TEGRA_IOVMM)               += iovmm.o
 obj-$(CONFIG_TEGRA_IOVMM_GART)          += iovmm-gart.o
 obj-$(CONFIG_TEGRA_IOVMM_SMMU)          += iovmm-smmu.o

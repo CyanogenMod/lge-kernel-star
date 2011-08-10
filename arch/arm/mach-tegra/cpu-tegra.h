@@ -21,6 +21,7 @@
 #ifndef __MACH_TEGRA_CPU_TEGRA_H
 #define __MACH_TEGRA_CPU_TEGRA_H
 
+unsigned int tegra_getspeed(unsigned int cpu);
 int tegra_cpu_set_speed_cap(unsigned int *speed_cap);
 unsigned int tegra_count_slow_cpus(unsigned long speed_limit);
 unsigned int tegra_get_slowest_cpu_n(void);
@@ -28,8 +29,25 @@ unsigned long tegra_cpu_lowest_speed(void);
 unsigned long tegra_cpu_highest_speed(void);
 
 #ifdef CONFIG_TEGRA_THERMAL_THROTTLE
+int tegra_throttle_init(struct mutex *cpu_lock);
+void tegra_throttle_exit(void);
+bool tegra_is_throttling(void);
+unsigned int tegra_throttle_governor_speed(unsigned int requested_speed);
+int tegra_throttle_debug_init(struct dentry *cpu_tegra_debugfs_root);
 void tegra_throttling_enable(bool enable);
 #else
+static inline int tegra_throttle_init(struct mutex *cpu_lock)
+{ return 0; }
+static inline void tegra_throttle_exit(void)
+{}
+static inline bool tegra_is_throttling(void)
+{ return false; }
+static inline unsigned int tegra_throttle_governor_speed(
+	unsigned int requested_speed)
+{ return requested_speed; }
+static inline int tegra_throttle_debug_init(
+	struct dentry *cpu_tegra_debugfs_root)
+{ return 0; }
 #define tegra_throttling_enable NULL
 #endif /* CONFIG_TEGRA_THERMAL_THROTTLE */
 
