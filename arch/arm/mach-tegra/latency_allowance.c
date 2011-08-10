@@ -496,7 +496,7 @@ static int la_regs_show(struct seq_file *s, void *unused)
 	for (i = 0; i < ARRAY_SIZE(la_info) - 1; i++) {
 		la = (readl(la_info[i].reg_addr) & la_info[i].mask)
 			>> la_info[i].shift;
-		seq_printf(s, "%-16s: %4u\n", la_info[i].name, la);
+		seq_printf(s, "%-16s: %4lu\n", la_info[i].name, la);
 	}
 
         return 0;
