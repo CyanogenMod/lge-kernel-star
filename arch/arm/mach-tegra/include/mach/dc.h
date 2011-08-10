@@ -127,6 +127,8 @@ struct tegra_dsi_out {
 	u8		panel_reset;			/* required */
 	u8		virtual_channel;		/* required */
 	u8		dsi_instance;
+	u8		chip_id;
+	u8		chip_rev;
 
 	bool		panel_has_frame_buffer;	/* required*/
 
