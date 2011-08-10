@@ -273,6 +273,10 @@ static int __init ph450_init(void)
 		return ret;
 	}
 
+	/* enable pull-up for ULPI STP */
+	tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_ULPI_STP,
+				    TEGRA_PUPD_PULL_UP);
+
 	/* enable pull-up for MDM2AP_ACK2 and BB_RST_OUT */
 	tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_GPIO_PV0,
 				    TEGRA_PUPD_PULL_UP);
