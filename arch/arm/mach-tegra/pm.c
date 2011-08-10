@@ -102,6 +102,7 @@ static unsigned long iram_save_size;
 static void __iomem *iram_code = IO_ADDRESS(TEGRA_IRAM_CODE_AREA);
 static void __iomem *clk_rst = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
 static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
+static int tegra_last_pclk;
 #endif
 
 struct suspend_context tegra_sctx;
@@ -157,11 +158,6 @@ struct suspend_context tegra_sctx;
 #define MC_SECURITY_SIZE	0x70
 #define MC_SECURITY_CFG2	0x7c
 
-#ifdef CONFIG_PM_SLEEP
-phys_addr_t tegra_pgd_phys;  /* pgd used by hotplug & LP2 bootup */
-static pgd_t *tegra_pgd;
-static int tegra_last_pclk;
-#endif
 static struct clk *tegra_pclk;
 static const struct tegra_suspend_platform_data *pdata;
 static enum tegra_suspend_mode current_suspend_mode = TEGRA_SUSPEND_NONE;
