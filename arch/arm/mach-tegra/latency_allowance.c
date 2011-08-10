@@ -398,6 +398,11 @@ int tegra_set_latency_allowance(enum tegra_la_id id,
 	la_to_set = (la_to_set < 0) ? 0 : la_to_set;
 	la_to_set = (la_to_set > 255) ? 255 : la_to_set;
 
+	/* until display can use latency allowance scaling, use a more
+	 * aggressive LA setting. Bug 862709 */
+	if (id >= ID(DISPLAY_0A) && id <= ID(DISPLAY_HCB))
+		la_to_set /= 3;
+
 	spin_lock(&safety_lock);
 	reg_read = readl(la_info[id].reg_addr);
 	reg_write = (reg_read & ~la_info[id].mask) |
