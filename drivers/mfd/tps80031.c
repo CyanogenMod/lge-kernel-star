@@ -457,37 +457,37 @@ static int tps80031_remove_subdevs(struct tps80031 *tps80031)
 	return device_for_each_child(tps80031->dev, NULL, __remove_subdev);
 }
 
-static void tps80031_irq_lock(unsigned int irq)
+static void tps80031_irq_lock(struct irq_data *data)
 {
-	struct tps80031 *tps80031 = get_irq_chip_data(irq);
+	struct tps80031 *tps80031 = irq_data_get_irq_chip_data(data);
 
 	mutex_lock(&tps80031->irq_lock);
 }
 
-static void tps80031_irq_enable(unsigned int irq)
+static void tps80031_irq_enable(struct irq_data *data)
 {
-	struct tps80031 *tps80031 = get_irq_chip_data(irq);
-	unsigned int __irq = irq - tps80031->irq_base;
-	const struct tps80031_irq_data *data = &tps80031_irqs[__irq];
+	struct tps80031 *tps80031 = irq_data_get_irq_chip_data(data);
+	unsigned int __irq = data->irq - tps80031->irq_base;
+	const struct tps80031_irq_data *irq_data = &tps80031_irqs[__irq];
 
-	tps80031->mask_reg[data->mask_reg] &= ~(1 << data->mask_mask);
+	tps80031->mask_reg[irq_data->mask_reg] &= ~(1 << irq_data->mask_mask);
 	tps80031->irq_en |= (1 << __irq);
 }
 
-static void tps80031_irq_disable(unsigned int irq)
+static void tps80031_irq_disable(struct irq_data *data)
 {
-	struct tps80031 *tps80031 = get_irq_chip_data(irq);
+	struct tps80031 *tps80031 = irq_data_get_irq_chip_data(data);
 
-	unsigned int __irq = irq - tps80031->irq_base;
-	const struct tps80031_irq_data *data = &tps80031_irqs[__irq];
+	unsigned int __irq = data->irq - tps80031->irq_base;
+	const struct tps80031_irq_data *irq_data = &tps80031_irqs[__irq];
 
-	tps80031->mask_reg[data->mask_reg] |= (1 << data->mask_mask);
+	tps80031->mask_reg[irq_data->mask_reg] |= (1 << irq_data->mask_mask);
 	tps80031->irq_en &= ~(1 << __irq);
 }
 
-static void tps80031_irq_sync_unlock(unsigned int irq)
+static void tps80031_irq_sync_unlock(struct irq_data *data)
 {
-	struct tps80031 *tps80031 = get_irq_chip_data(irq);
+	struct tps80031 *tps80031 = irq_data_get_irq_chip_data(data);
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(tps80031->mask_reg); i++) {
@@ -570,19 +570,19 @@ static int __devinit tps80031_irq_init(struct tps80031 *tps80031, int irq,
 	tps80031->irq_base = irq_base;
 
 	tps80031->irq_chip.name = "tps80031";
-	tps80031->irq_chip.enable = tps80031_irq_enable;
-	tps80031->irq_chip.disable = tps80031_irq_disable;
-	tps80031->irq_chip.bus_lock = tps80031_irq_lock;
-	tps80031->irq_chip.bus_sync_unlock = tps80031_irq_sync_unlock;
+	tps80031->irq_chip.irq_enable = tps80031_irq_enable;
+	tps80031->irq_chip.irq_disable = tps80031_irq_disable;
+	tps80031->irq_chip.irq_bus_lock = tps80031_irq_lock;
+	tps80031->irq_chip.irq_bus_sync_unlock = tps80031_irq_sync_unlock;
 
 	for (i = 0; i < ARRAY_SIZE(tps80031_irqs); i++) {
 		int __irq = i + tps80031->irq_base;
-		set_irq_chip_data(__irq, tps80031);
-		set_irq_chip_and_handler(__irq, &tps80031->irq_chip,
+		irq_set_chip_data(__irq, tps80031);
+		irq_set_chip_and_handler(__irq, &tps80031->irq_chip,
 					 handle_simple_irq);
-		set_irq_nested_thread(__irq, 1);
+		irq_set_nested_thread(__irq, 1);
 #ifdef CONFIG_ARM
-		set_irq_flags(__irq, IRQF_VALID);
+		irq_set_status_flags(__irq, IRQF_VALID);
 #endif
 	}
 
