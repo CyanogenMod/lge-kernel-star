@@ -30,6 +30,9 @@
 #else
 #define USE_TEGRA_CPU_SUSPEND	0
 #endif
+/* FIXME: The core associated with this should be removed if our change to
+   save the diagnostic regsiter in the CPU context is accepted. */
+#define USE_TEGRA_DIAG_REG_SAVE	1
 
 #define TEGRA_POWER_SDRAM_SELFREFRESH	(1 << 26) /* SDRAM is in self-refresh */
 #define TEGRA_POWER_HOTPLUG_SHUTDOWN	(1 << 27) /* Hotplug shutdown */
@@ -122,17 +125,17 @@
 .macro push_ctx_regs, tmp1
 	push_stack_token \tmp1		@ debug check word
 	stmfd	sp!, {r4 - r11, lr}
-	/* FIXME: The next two instructions should be removed if our change to
-	   save the diagnostic regsiter in the CPU context is accepted. */
+#if USE_TEGRA_DIAG_REG_SAVE
 	mrc	p15, 0, r4, c15, c0, 1	@ read diagnostic register
 	stmfd	sp!, {r4}
+#endif
 .endm
 
 .macro pop_ctx_regs, tmp1, tmp2
-	/* FIXME: The next two instructions should be removed if our change to
-	   save the diagnostic regsiter in the CPU context is accepted. */
+#if USE_TEGRA_DIAG_REG_SAVE
 	ldmfd	sp!, {r4}
 	mcr	p15, 0, r4, c15, c0, 1	@ write diagnostic register
+#endif
 	ldmfd	sp!, {r4 - r11, lr}
 	pop_stack_token \tmp1, \tmp2	@ debug stack debug token
 .endm
