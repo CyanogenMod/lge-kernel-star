@@ -546,7 +546,15 @@ static struct tegra_dsi_cmd dsi_suspend_cmd[] = {
 struct tegra_dsi_out enterprise_dsi = {
 	.n_data_lanes = 2,
 	.pixel_format = TEGRA_DSI_PIXEL_FORMAT_24BIT_P,
+#if(DC_CTRL_MODE & TEGRA_DC_OUT_ONE_SHOT_MODE)
+	/* For one-shot mode, mismatch between freq of DC and TE signal
+	 * may cause frame drop. We increase refreash rate a little bit
+	 * more than target value to avoid missing TE signal.
+	 */
+	.refresh_rate = 66,
+#else
 	.refresh_rate = 60,
+#endif
 	.virtual_channel = TEGRA_DSI_VIRTUAL_CHANNEL_0,
 
 	.panel_has_frame_buffer = true,
