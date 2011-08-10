@@ -136,7 +136,7 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data3 = {
 
 static struct platform_device tegra_sdhci_device0 = {
 	.name		= "sdhci-tegra",
-	.id		= 2,
+	.id		= 0,
 	.resource	= sdhci_resource0,
 	.num_resources	= ARRAY_SIZE(sdhci_resource0),
 	.dev = {
