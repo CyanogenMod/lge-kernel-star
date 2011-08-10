@@ -212,11 +212,18 @@ static __initdata struct tegra_clk_init_table cardhu_clk_init_table[] = {
 
 static char *usb_functions_mtp_ums[] = { "mtp", "usb_mass_storage" };
 static char *usb_functions_mtp_adb_ums[] = { "mtp", "adb", "usb_mass_storage" };
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
+static char *usb_functions_accessory[] = { "accessory" };
+static char *usb_functions_accessory_adb[] = { "accessory", "adb" };
+#endif
 #ifdef CONFIG_USB_ANDROID_RNDIS
 static char *usb_functions_rndis[] = { "rndis" };
 static char *usb_functions_rndis_adb[] = { "rndis", "adb" };
 #endif
 static char *usb_functions_all[] = {
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
+	"accessory",
+#endif
 #ifdef CONFIG_USB_ANDROID_RNDIS
 	"rndis",
 #endif
@@ -236,6 +243,20 @@ static struct android_usb_product usb_products[] = {
 		.num_functions  = ARRAY_SIZE(usb_functions_mtp_adb_ums),
 		.functions      = usb_functions_mtp_adb_ums,
 	},
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
+	{
+		.vendor_id	= USB_ACCESSORY_VENDOR_ID,
+		.product_id	= USB_ACCESSORY_PRODUCT_ID,
+		.num_functions	= ARRAY_SIZE(usb_functions_accessory),
+		.functions	= usb_functions_accessory,
+	},
+	{
+		.vendor_id	= USB_ACCESSORY_VENDOR_ID,
+		.product_id	= USB_ACCESSORY_ADB_PRODUCT_ID,
+		.num_functions	= ARRAY_SIZE(usb_functions_accessory_adb),
+		.functions	= usb_functions_accessory_adb,
+	},
+#endif
 #ifdef CONFIG_USB_ANDROID_RNDIS
 	{
 		.product_id     = USB_PRODUCT_ID_RNDIS,
@@ -684,7 +705,6 @@ static char usb_serial_num[SERIAL_NUMBER_LENGTH];
 
 static void cardhu_usb_init(void)
 {
-#if 0
 	struct board_info bi;
 	char *src = NULL;
 	int i;
@@ -723,7 +743,6 @@ static void cardhu_usb_init(void)
 		rndis_pdata.ethaddr[i % (ETH_ALEN - 1) + 1] ^= *src++;
 	}
 	platform_device_register(&rndis_device);
-#endif
 #endif
 }
 
