@@ -387,8 +387,24 @@ config TEGRA_USB_MODEM_POWER
 	  This option enables support for out-of_band remote wakeup, selective
 	  suspend and system suspend/resume.
 
+config TEGRA_BB_XMM_POWER
+	bool "Enable power driver for XMM modem"
+	default n
+	help
+	  Enables power driver which controls gpio signals to XMM modem.
+
+config TEGRA_BB_XMM_POWER2
+	tristate "Enable power driver for XMM modem (flashless)"
+	default n
+	help
+	  Enables power driver which controls gpio signals to XMM modem
+	  (in flashless configuration).  User-mode application must
+	  insert this LKM to initiate 2nd USB enumeration power sequence
+	  - after modem software has been downloaded to flashless device.
+
 config TEGRA_THERMAL_SYSFS
 	bool "Enable Thermal driver to use Thermal Sysfs infrastructure"
 	depends on THERMAL
 	default n
 endif
+

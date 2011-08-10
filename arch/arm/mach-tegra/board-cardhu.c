@@ -877,13 +877,17 @@ static struct usb_phy_plat_data tegra_usb_phy_pdata[] = {
 
 static int cardu_usb_hsic_postsupend(void)
 {
+#ifdef CONFIG_TEGRA_BB_XMM_POWER
 	baseband_xmm_set_power_status(BBXMM_PS_L2);
+#endif
 	return 0;
 }
 
 static int cardu_usb_hsic_preresume(void)
 {
+#ifdef CONFIG_TEGRA_BB_XMM_POWER
 	baseband_xmm_set_power_status(BBXMM_PS_L2TOL0);
+#endif
 	return 0;
 }
 

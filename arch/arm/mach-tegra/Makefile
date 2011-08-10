@@ -154,8 +154,6 @@ obj-${CONFIG_MACH_CARDHU}               += board-cardhu-sdhci.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-sensors.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-memory.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-powermon.o
-obj-${CONFIG_MACH_CARDHU}               += baseband-xmm-power.o
-obj-m += baseband-xmm-power2.o
 
 obj-${CONFIG_MACH_TEGRA_ENTERPRISE}     += board-enterprise.o
 obj-${CONFIG_MACH_TEGRA_ENTERPRISE}     += board-enterprise-panel.o
@@ -166,3 +164,7 @@ obj-${CONFIG_MACH_TEGRA_ENTERPRISE}     += board-enterprise-power.o
 obj-${CONFIG_MACH_TEGRA_ENTERPRISE}     += board-enterprise-baseband.o
 obj-${CONFIG_MACH_TEGRA_ENTERPRISE}     += board-enterprise-kbc.o
 obj-${CONFIG_MACH_TEGRA_ENTERPRISE}     += board-enterprise-sensors.o
+
+obj-${CONFIG_TEGRA_BB_XMM_POWER}        += baseband-xmm-power.o
+obj-${CONFIG_TEGRA_BB_XMM_POWER2}       += baseband-xmm-power2.o
+
