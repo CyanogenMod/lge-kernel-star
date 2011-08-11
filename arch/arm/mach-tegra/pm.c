@@ -256,7 +256,7 @@ static __init int alloc_suspend_context(void)
 {
 #if USE_TEGRA_CPU_SUSPEND
 	pgprot_t prot = __pgprot_modify(pgprot_kernel, L_PTE_MT_MASK,
-					 L_PTE_MT_UNCACHED | L_PTE_XN);
+					L_PTE_MT_BUFFERABLE | L_PTE_XN);
 	struct page *ctx_page;
 	unsigned long ctx_virt;
 	phys_addr_t ctx_phys;
@@ -276,7 +276,7 @@ static __init int alloc_suspend_context(void)
 	pmd = pmd_offset(tegra_pgd + pgd_index(ctx_virt), ctx_virt);
 	*pmd = __pmd((ctx_phys & PGDIR_MASK) |
 		     PMD_TYPE_SECT | PMD_SECT_AP_WRITE |
-		     PMD_SECT_XN | PMD_SECT_UNCACHED);
+		     PMD_SECT_XN | PMD_SECT_BUFFERED);
 	flush_pmd_entry(pmd);
 	outer_clean_range(__pa(pmd), __pa(pmd + 1));
 

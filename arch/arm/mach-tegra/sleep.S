@@ -229,6 +229,7 @@ ENTRY(tegra_cpu_suspend)
 	stmfd	sp!, {r1, r2, r3}	@ save v:p, virt SP, return fn
 	bl	cpu_do_suspend
 #endif
+	dsb
 
 	/* Disable the data cache */
 	mrc	p15, 0, r10, c1, c0, 0
