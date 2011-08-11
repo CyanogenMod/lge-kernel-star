@@ -760,14 +760,14 @@ void clk_timer_callback(unsigned long data)
 	struct tegra_ehci_hcd *tegra = (struct tegra_ehci_hcd*) data;
 	unsigned long flags;
 
-	spin_lock_irqsave(&tegra->ehci->lock, flags);
-
 	if (!timer_pending(&tegra->clk_timer)) {
 		clk_disable(tegra->emc_clk);
 		clk_disable(tegra->sclk_clk);
+		spin_lock_irqsave(&tegra->ehci->lock, flags);
 		tegra->clock_enabled = 0;
+		spin_unlock_irqrestore(&tegra->ehci->lock, flags);
 	}
-	spin_unlock_irqrestore(&tegra->ehci->lock, flags);
+
 }
 
 static void clk_timer_work_handler(struct work_struct* clk_timer_work) {
@@ -775,23 +775,26 @@ static void clk_timer_work_handler(struct work_struct* clk_timer_work) {
 						struct tegra_ehci_hcd, clk_timer_work);
 	int ret;
 	unsigned long flags;
+	bool clock_enabled;
 
 	spin_lock_irqsave(&tegra->ehci->lock, flags);
-	if ((!tegra->clock_enabled)) {
+	clock_enabled = tegra->clock_enabled;
+	spin_unlock_irqrestore(&tegra->ehci->lock, flags);
+	if ((!clock_enabled)) {
 		ret = mod_timer(&tegra->clk_timer, jiffies + msecs_to_jiffies(2000));
-
 		if (ret)
 			pr_err("tegra_ehci_urb_enqueue timer modify failed \n");
 		clk_enable(tegra->emc_clk);
 		clk_enable(tegra->sclk_clk);
+		spin_lock_irqsave(&tegra->ehci->lock, flags);
 		tegra->clock_enabled = 1;
+		spin_unlock_irqrestore(&tegra->ehci->lock, flags);
 	} else {
 		if (timer_pending(&tegra->clk_timer)) {
 			mod_timer_pending (&tegra->clk_timer, jiffies
 						+ msecs_to_jiffies(2000));
 		}
 	}
-	spin_unlock_irqrestore(&tegra->ehci->lock, flags);
 }
 
 static int tegra_ehci_urb_enqueue (
@@ -803,9 +806,12 @@ static int tegra_ehci_urb_enqueue (
 	int xfertype;
 	int transfer_buffer_length;
 	pdata = dev_get_drvdata(hcd->self.controller);
+	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
+	unsigned long flags;
 
 	xfertype = usb_endpoint_type(&urb->ep->desc);
 	transfer_buffer_length = urb->transfer_buffer_length;
+	spin_lock_irqsave(&ehci->lock,flags);
 	/* Turn on the USB busy hints */
 	switch (xfertype) {
 		case USB_ENDPOINT_XFER_INT:
@@ -826,6 +832,7 @@ static int tegra_ehci_urb_enqueue (
 			/* Do nothing special here */
 		break;
 	}
+	spin_unlock_irqrestore(&ehci->lock,flags);
 	return ehci_urb_enqueue(hcd, urb, mem_flags);
 }
 
