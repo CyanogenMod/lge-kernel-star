@@ -470,7 +470,8 @@ void tegra_clear_cpu_in_lp2(int cpu)
 	   can't use used directly by cpumask_clear_cpu() because it uses
 	   LDREX/STREX which requires the addressed location to be inner
 	   cacheable and sharable which IRAM isn't. */
-	*iram_cpu_lp2_mask = tegra_in_lp2;
+	writel(tegra_in_lp2.bits[0], iram_cpu_lp2_mask);
+	dsb();
 
 	spin_unlock(&tegra_lp2_lock);
 }
@@ -487,7 +488,8 @@ bool tegra_set_cpu_in_lp2(int cpu)
 	   can't use used directly by cpumask_set_cpu() because it uses
 	   LDREX/STREX which requires the addressed location to be inner
 	   cacheable and sharable which IRAM isn't. */
-	*iram_cpu_lp2_mask = tegra_in_lp2;
+	writel(tegra_in_lp2.bits[0], iram_cpu_lp2_mask);
+	dsb();
 
 	if ((cpu == 0) && cpumask_equal(&tegra_in_lp2, cpu_online_mask))
 		last_cpu = true;

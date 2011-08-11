@@ -107,8 +107,7 @@ ENTRY(tegra2_cpu_reset)
 	cmp	r0, #0
 	moveq	pc, lr  		@ must not be called for CPU 0
 
-	mov32	r3, TEGRA_PMC_VIRT
-	add	r1, r3, #PMC_SCRATCH41
+	mov32	r1, TEGRA_PMC_VIRT + PMC_SCRATCH41
 	mov	r12, #CPU_RESETTABLE
 	str	r12, [r1]
 
@@ -134,14 +133,26 @@ ENDPROC(tegra2_cpu_reset)
 
 #ifdef CONFIG_PM_SLEEP
 /*
+ * tegra2_cpu_clear_resettable(void)
+ *
+ * Called to clear the "resettable soon" flag in PMC_SCRATCH41 when
+ * it is expected that the secondary CPU will be idle soon.
+ */
+ENTRY(tegra2_cpu_clear_resettable)
+	mov32	r1, TEGRA_PMC_VIRT + PMC_SCRATCH41
+	mov	r12, #CPU_NOT_RESETTABLE
+	str	r12, [r1]
+	mov	pc, lr
+ENDPROC(tegra2_cpu_clear_resettable)
+
+/*
  * tegra2_cpu_set_resettable_soon(void)
  *
  * Called to set the "resettable soon" flag in PMC_SCRATCH41 when
  * it is expected that the secondary CPU will be idle soon.
  */
 ENTRY(tegra2_cpu_set_resettable_soon)
-	mov32	r3, TEGRA_PMC_VIRT
-	add	r1, r3, #PMC_SCRATCH41
+	mov32	r1, TEGRA_PMC_VIRT + PMC_SCRATCH41
 	mov	r12, #CPU_RESETTABLE_SOON
 	str	r12, [r1]
 	mov	pc, lr
@@ -154,8 +165,7 @@ ENDPROC(tegra2_cpu_set_resettable_soon)
  * set because it is expected that the secondary CPU will be idle soon.
  */
 ENTRY(tegra2_cpu_is_resettable_soon)
-	mov32	r3, TEGRA_PMC_VIRT
-	add	r1, r3, #PMC_SCRATCH41
+	mov32	r1, TEGRA_PMC_VIRT + PMC_SCRATCH41
 	ldr	r12, [r1]
 	cmp	r12, #CPU_RESETTABLE_SOON
 	moveq	r0, #1
@@ -189,12 +199,15 @@ ENTRY(tegra2_sleep_wfi)
 	b	tegra_cpu_save
 	mov	r11, r2
 
-	mov32	r3, TEGRA_PMC_VIRT
-	add	r0, r3, #PMC_SCRATCH41
+	mov32	r0, TEGRA_PMC_VIRT + PMC_SCRATCH41
 	mov	r3, #CPU_RESETTABLE
 	str	r3, [r0]
 
 	bl	tegra_cpu_wfi
+
+	mov32	r0, TEGRA_PMC_VIRT + PMC_SCRATCH41
+	mov	r3, #CPU_NOT_RESETTABLE
+	str	r3, [r0]
 
 	/*
 	 * cpu may be reset while in wfi, which will return through

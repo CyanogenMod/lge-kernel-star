@@ -184,6 +184,14 @@ ENTRY(__tegra_cpu_reset_handler)
 	bleq	__die				@ CPU not present (to OS)
 #endif
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	/* If CPU1, don't let CPU0 reset CPU1 now that CPU1 is coming up. */
+	mov32	r6, TEGRA_PMC_BASE
+	mov	r0, #0
+	cmp	r10, #0
+	strne	r0, [r6, #PMC_SCRATCH41]
+#endif
+
 #ifdef CONFIG_PM_SLEEP
 	/* Waking up from LP1? */
 	ldr	r8, [r12, #RESET_DATA(MASK_LP1)]

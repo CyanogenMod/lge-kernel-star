@@ -71,6 +71,9 @@ static inline unsigned int time_to_bin(unsigned int time)
 
 #ifdef CONFIG_SMP
 
+#define CLK_RST_CONTROLLER_CLK_CPU_CMPLX	0x4C
+#define CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR	0x344
+
 static void __iomem *clk_rst = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
 static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
 static s64 tegra_cpu1_wake_by_time = LLONG_MAX;
@@ -79,6 +82,7 @@ static int tegra2_reset_sleeping_cpu(int cpu)
 {
 	int ret = 0;
 
+	BUG_ON(cpu == 0);
 	BUG_ON(cpu == smp_processor_id());
 	tegra_pen_lock();
 
@@ -96,38 +100,51 @@ static void tegra2_wake_reset_cpu(int cpu)
 {
 	u32 reg;
 
+	BUG_ON(cpu == 0);
+	BUG_ON(cpu == smp_processor_id());
+
+	tegra_pen_lock();
+
+	tegra2_cpu_clear_resettable();
+
 	/* enable cpu clock on cpu */
 	reg = readl(clk_rst + 0x4c);
-	writel(reg & ~(1 << (8 + cpu)), clk_rst + 0x4c);
+	writel(reg & ~(1 << (8 + cpu)),
+	       clk_rst + CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
 
 	/* take the CPU out of reset */
 	reg = 0x1111 << cpu;
-	writel(reg, clk_rst + 0x344);
+	writel(reg, clk_rst +
+	       CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR);
 
 	/* unhalt the cpu */
 	flowctrl_writel(0, FLOW_CTRL_HALT_CPU(1));
+
+	tegra_pen_unlock();
 }
 
 static int tegra2_reset_other_cpus(int cpu)
 {
 	int i;
-	int abort = -1;
+	int ret = 0;
+
+	BUG_ON(cpu != 0);
 
 	for_each_online_cpu(i) {
 		if (i != cpu) {
 			if (tegra2_reset_sleeping_cpu(i)) {
-				abort = i;
+				ret = -EBUSY;
 				break;
 			}
 		}
 	}
 
-	if (abort >= 0) {
+	if (ret) {
 		for_each_online_cpu(i) {
-			if (i != cpu && i < abort)
+			if (i != cpu)
 				tegra2_wake_reset_cpu(i);
 		}
-		return -EINVAL;
+		return ret;
 	}
 
 	return 0;
@@ -249,6 +266,7 @@ static void tegra2_idle_lp2_cpu_1(struct cpuidle_device *dev,
 		/*
 		 * Not enough time left to enter LP2
 		 */
+		tegra2_cpu_clear_resettable();
 		tegra_cpu_wfi();
 		return;
 	}
@@ -262,6 +280,8 @@ static void tegra2_idle_lp2_cpu_1(struct cpuidle_device *dev,
 	tegra_twd_suspend(&twd_context);
 
 	tegra2_sleep_wfi(PLAT_PHYS_OFFSET - PAGE_OFFSET);
+
+	tegra2_cpu_clear_resettable();
 
 	tegra_cpu1_wake_by_time = LLONG_MAX;
 
