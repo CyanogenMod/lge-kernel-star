@@ -1087,6 +1087,33 @@ static void print_temperature_2_counter_table(
 	dev_dbg(data->hwmon_dev, "\n\n");
 }
 
+static void dump_a_tsensor_reg(struct tegra_tsensor_data *data,
+	unsigned int addr)
+{
+	dev_dbg(data->hwmon_dev, "tsensor[%d][0x%x]: 0x%x\n", (addr >> 16),
+		addr & 0xFFFF, tsensor_readl(data, addr));
+}
+
+static void dump_tsensor_regs(struct tegra_tsensor_data *data)
+{
+	int i;
+	for (i = 0; i < TSENSOR_COUNT; i++) {
+		/* if STOP bit is set skip this check */
+		dump_a_tsensor_reg(data, ((i << 16) | SENSOR_CFG0));
+		dump_a_tsensor_reg(data, ((i << 16) | SENSOR_CFG1));
+		dump_a_tsensor_reg(data, ((i << 16) | SENSOR_CFG2));
+		dump_a_tsensor_reg(data, ((i << 16) | SENSOR_STATUS0));
+		dump_a_tsensor_reg(data, ((i << 16) | SENSOR_TS_STATUS1));
+		dump_a_tsensor_reg(data, ((i << 16) | SENSOR_TS_STATUS2));
+		dump_a_tsensor_reg(data, ((i << 16) | 0x0));
+		dump_a_tsensor_reg(data, ((i << 16) | 0x44));
+		dump_a_tsensor_reg(data, ((i << 16) | 0x50));
+		dump_a_tsensor_reg(data, ((i << 16) | 0x54));
+		dump_a_tsensor_reg(data, ((i << 16) | 0x64));
+		dump_a_tsensor_reg(data, ((i << 16) | 0x68));
+	}
+}
+
 /*
  * function to test if conversion of counter to temperature
  * and vice-versa is working
@@ -1605,6 +1632,7 @@ static int __devinit tegra_tsensor_probe(struct platform_device *pdev)
 	if (err)
 		goto err6;
 
+	dump_tsensor_regs(data);
 	dev_dbg(&pdev->dev, "end tegra_tsensor_probe\n");
 	return 0;
 err6:
@@ -1652,33 +1680,6 @@ static int __devexit tegra_tsensor_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static void dump_a_tsensor_reg(struct tegra_tsensor_data *data,
-	unsigned int addr)
-{
-	dev_dbg(data->hwmon_dev, "tsensor[%d][0x%x]: 0x%x\n", (addr >> 16),
-		addr & 0xFFFF, tsensor_readl(data, addr));
-}
-
-static void dump_tsensor_regs(struct tegra_tsensor_data *data)
-{
-	int i;
-	for (i = 0; i < TSENSOR_COUNT; i++) {
-		/* if STOP bit is set skip this check */
-		dump_a_tsensor_reg(data, ((i << 16) | SENSOR_CFG0));
-		dump_a_tsensor_reg(data, ((i << 16) | SENSOR_CFG1));
-		dump_a_tsensor_reg(data, ((i << 16) | SENSOR_CFG2));
-		dump_a_tsensor_reg(data, ((i << 16) | SENSOR_STATUS0));
-		dump_a_tsensor_reg(data, ((i << 16) | SENSOR_TS_STATUS1));
-		dump_a_tsensor_reg(data, ((i << 16) | SENSOR_TS_STATUS2));
-		dump_a_tsensor_reg(data, ((i << 16) | 0x0));
-		dump_a_tsensor_reg(data, ((i << 16) | 0x44));
-		dump_a_tsensor_reg(data, ((i << 16) | 0x50));
-		dump_a_tsensor_reg(data, ((i << 16) | 0x54));
-		dump_a_tsensor_reg(data, ((i << 16) | 0x64));
-		dump_a_tsensor_reg(data, ((i << 16) | 0x68));
-	}
-}
-
 static void save_tsensor_regs(struct tegra_tsensor_data *data)
 {
 	int i;
@@ -1712,8 +1713,6 @@ static int tsensor_suspend(struct platform_device *pdev,
 	struct tegra_tsensor_data *data = platform_get_drvdata(pdev);
 	unsigned int config0;
 	int i;
-	dev_dbg(data->hwmon_dev, "tsensor before suspend reg dump:\n");
-	dump_tsensor_regs(data);
 	/* set STOP bit, else OVERFLOW interrupt seen in LP1 */
 	for (i = 0; i < TSENSOR_COUNT; i++) {
 		config0 = tsensor_readl(data, ((i << 16) | SENSOR_CFG0));
@@ -1742,9 +1741,6 @@ static int tsensor_resume(struct platform_device *pdev)
 		config0 &= ~(1 << SENSOR_CFG0_STOP_SHIFT);
 		tsensor_writel(data, config0, ((i << 16) | SENSOR_CFG0));
 	}
-	msleep(1);
-	dev_dbg(data->hwmon_dev, "tsensor after resume reg dump:\n");
-	dump_tsensor_regs(data);
 
 	return 0;
 }
