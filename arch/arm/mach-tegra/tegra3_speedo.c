@@ -253,7 +253,7 @@ void tegra_init_speedo_data(void)
 		pr_err("****************************************************");
 
 		cpu_process_id = INVALID_PROCESS_ID;
-		cpu_speedo_id = 0;
+		cpu_speedo_id = 1;
 	}
 
 	for (iv = 0; iv < CORE_PROCESS_CORNERS_NUM; iv++) {
@@ -273,7 +273,7 @@ void tegra_init_speedo_data(void)
 		pr_err("****************************************************");
 
 		core_process_id = INVALID_PROCESS_ID;
-		soc_speedo_id = 0;
+		soc_speedo_id = 1;
 	}
 
 	pr_info("Tegra3: CPU Speedo ID %d, Soc Speedo ID %d",
