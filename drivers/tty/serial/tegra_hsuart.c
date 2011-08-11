@@ -496,7 +496,6 @@ static void tegra_tx_dma_complete_callback(struct tegra_dma_req *req)
 	unsigned long flags;
 
 	dev_vdbg(t->uport.dev, "%s: %d\n", __func__, count);
-	udelay(30);
 
 	spin_lock_irqsave(&t->uport.lock, flags);
 	xmit->tail = (xmit->tail + count) & (UART_XMIT_SIZE - 1);
