@@ -58,6 +58,8 @@
 #define ENTERPRISE_STEREO_LANDSCAPE	0
 #define ENTERPRISE_STEREO_PORTRAIT	1
 
+#define enterprise_lcd_te		TEGRA_GPIO_PJ1
+
 static struct regulator *enterprise_dsi_reg = NULL;
 
 static struct regulator *enterprise_hdmi_reg;
@@ -702,6 +704,12 @@ int __init enterprise_panel_init(void)
 	gpio_request(enterprise_lcd_swp_pl, "lcd_swp_pl");
 	gpio_direction_output(enterprise_lcd_swp_pl, 0);
 	enterprise_stereo_set_orientation(enterprise_stereo.orientation);
+
+#if(DC_CTRL_MODE != TEGRA_DC_OUT_ONE_SHOT_MODE)
+	tegra_gpio_enable(enterprise_lcd_te);
+	gpio_request(enterprise_lcd_swp_pl, "lcd_te");
+	gpio_direction_input(enterprise_lcd_te);
+#endif
 
 	err = platform_add_devices(enterprise_gfx_devices,
 				ARRAY_SIZE(enterprise_gfx_devices));
