@@ -20,10 +20,6 @@
 #include <linux/input.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
-#if defined(CONFIG_HAS_EARLYSUSPEND)
-#include <linux/earlysuspend.h>
-#endif
-
 
 /* Version */
 #define MXT_VER_20		20
@@ -173,9 +169,8 @@
 /* Define for MXT_GEN_COMMAND */
 #define MXT_BOOT_VALUE		0xa5
 #define MXT_BACKUP_VALUE	0x55
-#define MXT_BACKUP_TIME		200	/* msec */
-#define MXT_RESET_TIME		650	/* msec */
-#define MXT_SAFE_CYCLE_TIME     30      /* msec */
+#define MXT_BACKUP_TIME		25	/* msec */
+#define MXT_RESET_TIME		65	/* msec */
 
 #define MXT_FWRESET_TIME	175	/* msec */
 
@@ -201,12 +196,9 @@
 #define MXT_PRESS		(1 << 6)
 #define MXT_DETECT		(1 << 7)
 
-/* Touch orient bits */
-#define MXT_XY_SWITCH		(1 << 0)
-#define MXT_X_INVERT		(1 << 1)
-#define MXT_Y_INVERT		(1 << 2)
-
 /* Touchscreen absolute values */
+#define MXT_MAX_XC		0x3ff
+#define MXT_MAX_YC		0x3ff
 #define MXT_MAX_AREA		0xff
 
 #define MXT_MAX_FINGER		10
@@ -254,24 +246,7 @@ struct mxt_data {
 	struct mxt_info info;
 	struct mxt_finger finger[MXT_MAX_FINGER];
 	unsigned int irq;
-	unsigned int max_x;
-	unsigned int max_y;
-	u8(*read_chg) (void);
-	u16 msg_address;
-	u16 last_address;
-	u8 actv_cycle_time;
-	u8 idle_cycle_time;
-	u8 is_suspended;
-#if defined(CONFIG_HAS_EARLYSUSPEND)
-	struct early_suspend early_suspend;
-#endif
 };
-
-
-#if defined(CONFIG_HAS_EARLYSUSPEND)
-static void mxt_early_suspend(struct early_suspend *es);
-static void mxt_early_resume(struct early_suspend *es);
-#endif
 
 static bool mxt_object_readable(unsigned int type)
 {
@@ -318,7 +293,6 @@ static bool mxt_object_writable(unsigned int type)
 	case MXT_SPT_GPIOPWM:
 	case MXT_SPT_SELFTEST:
 	case MXT_SPT_CTECONFIG:
-	case MXT_SPT_COMMSCONFIG:
 		return true;
 	default:
 		return false;
@@ -402,18 +376,6 @@ static int __mxt_read_reg(struct i2c_client *client,
 {
 	struct i2c_msg xfer[2];
 	u8 buf[2];
-	struct mxt_data *data = i2c_get_clientdata(client);
-
-	if ((data->last_address == reg) &&
-	    (reg == data->msg_address)) {
-		if (i2c_master_recv(client, val, len) != len) {
-			dev_err(&client->dev,
-				"%s: Failure reading maxTouch device\n",
-				__func__);
-			return -EIO;
-		}
-		return 0;
-	}
 
 	buf[0] = reg & 0xff;
 	buf[1] = (reg >> 8) & 0xff;
@@ -435,7 +397,6 @@ static int __mxt_read_reg(struct i2c_client *client,
 		return -EIO;
 	}
 
-	data->last_address = reg;
 	return 0;
 }
 
@@ -447,7 +408,6 @@ static int mxt_read_reg(struct i2c_client *client, u16 reg, u8 *val)
 static int mxt_write_reg(struct i2c_client *client, u16 reg, u8 val)
 {
 	u8 buf[3];
-	struct mxt_data *data = i2c_get_clientdata(client);
 
 	buf[0] = reg & 0xff;
 	buf[1] = (reg >> 8) & 0xff;
@@ -458,7 +418,6 @@ static int mxt_write_reg(struct i2c_client *client, u16 reg, u8 val)
 		return -EIO;
 	}
 
-	data->last_address = reg + 1;
 	return 0;
 }
 
@@ -590,13 +549,8 @@ static void mxt_input_touchevent(struct mxt_data *data,
 	if (!(status & (MXT_PRESS | MXT_MOVE)))
 		return;
 
-	x = (message->message[1] << 4) | ((message->message[3] >> 4) & 0xf);
-	y = (message->message[2] << 4) | ((message->message[3] & 0xf));
-	if (data->max_x < 1024)
-		x = x >> 2;
-	if (data->max_y < 1024)
-		y = y >> 2;
-
+	x = (message->message[1] << 2) | ((message->message[3] & ~0x3f) >> 6);
+	y = (message->message[2] << 2) | ((message->message[3] & ~0xf3) >> 2);
 	area = message->message[4];
 
 	dev_dbg(dev, "[%d] %s x: %d, y: %d, area: %d\n", id,
@@ -628,6 +582,7 @@ static irqreturn_t mxt_interrupt(int irq, void *dev_id)
 			dev_err(dev, "Failed to read message\n");
 			goto end;
 		}
+
 		reportid = message.reportid;
 
 		/* whether reportid is thing of MXT_TOUCH_MULTI */
@@ -653,53 +608,13 @@ static int mxt_check_reg_init(struct mxt_data *data)
 {
 	const struct mxt_platform_data *pdata = data->pdata;
 	struct mxt_object *object;
-	struct mxt_message message;
 	struct device *dev = &data->client->dev;
 	int index = 0;
 	int i, j, config_offset;
-	int error;
-	unsigned long current_crc;
 
 	if (!pdata->config) {
 		dev_dbg(dev, "No cfg data defined, skipping reg init\n");
 		return 0;
-	}
-
-	/* Try to read the config checksum of the existing cfg */
-	mxt_write_object(data, MXT_GEN_COMMAND,
-			 MXT_COMMAND_CALIBRATE, 1);
-	msleep(30);
-
-	error = mxt_read_message(data, &message);
-	if (error)
-		return error;
-
-	object = mxt_get_object(data, MXT_GEN_COMMAND);
-	if (!object)
-		return -EIO;
-
-	/* Check if this message is from command processor (which has
-	   only one reporting ID), if so, bytes 1-3 are the checksum. */
-	if (message.reportid == object->max_reportid) {
-		current_crc = message.message[1] | (message.message[2] << 8) |
-			      (message.message[3] << 16);
-	} else {
-		dev_info(dev, "Couldn't retrieve the current cfg checksum, "
-			 "forcing load\n");
-		current_crc = 0xFFFFFFFF;
-	}
-	dev_info(dev,
-		 "Config CRC read from the mXT: %X\n", 
-		 (unsigned int) current_crc);
-
-	if (current_crc == pdata->config_crc) {
-		dev_info(dev,
-			 "Matching CRC's, skipping CFG load.\n");
-		return 0;
-	} else {
-		dev_info(dev, "Doesn't match platform data config CRC (%X), "
-			 "writing config from platform data...\n",
-			 (unsigned int) pdata->config_crc);
 	}
 
 	for (i = 0; i < data->info.object_num; i++) {
@@ -708,9 +623,7 @@ static int mxt_check_reg_init(struct mxt_data *data)
 		if (!mxt_object_writable(object->type))
 			continue;
 
-		for (j = 0; 
-		     j < ((object->size + 1) * (object->instances + 1));
-		     j++) {
+		for (j = 0; j < object->size + 1; j++) {
 			config_offset = index + j;
 			if (config_offset > pdata->config_length) {
 				dev_err(dev, "Not enough config data!\n");
@@ -719,9 +632,9 @@ static int mxt_check_reg_init(struct mxt_data *data)
 			mxt_write_object(data, object->type, j,
 					 pdata->config[config_offset]);
 		}
-		index += (object->size + 1) * (object->instances + 1);
+		index += object->size + 1;
 	}
-	dev_info(dev, "Config written!");
+
 	return 0;
 }
 
@@ -793,10 +706,6 @@ static void mxt_handle_pdata(struct mxt_data *data)
 		mxt_write_object(data, MXT_SPT_CTECONFIG,
 				MXT_CTE_VOLTAGE, voltage);
 	}
-
-	if (pdata->read_chg != NULL)
-		data->read_chg = pdata->read_chg;
-
 }
 
 static int mxt_get_info(struct mxt_data *data)
@@ -861,13 +770,6 @@ static int mxt_get_object_table(struct mxt_data *data)
 					(object->instances + 1);
 			object->max_reportid = reportid;
 		}
-
-		/* Store message window address so we don't have to
-		   search the object table every time we read message */
-		if (object->type == MXT_GEN_MESSAGE) {
-			data->msg_address = object->start_address;
-		}
-
 	}
 
 	return 0;
@@ -879,8 +781,6 @@ static int mxt_initialize(struct mxt_data *data)
 	struct mxt_info *info = &data->info;
 	int error;
 	u8 val;
-	u8 idle_cycle_time;
-	u8 actv_cycle_time;
 
 	error = mxt_get_info(data);
 	if (error)
@@ -904,75 +804,23 @@ static int mxt_initialize(struct mxt_data *data)
 	if (error)
 		return error;
 
-	mxt_handle_pdata(data);
-
-	/* Read current cycle times */
-	error = mxt_read_object(data, MXT_GEN_POWER, MXT_POWER_IDLEACQINT,
-				&idle_cycle_time);
-	if (error)
-		return error;
-	error = mxt_read_object(data, MXT_GEN_POWER, MXT_POWER_ACTVACQINT,
-				&actv_cycle_time);
-	if (error)
-		return error;
-
-	mxt_write_object(data, MXT_GEN_POWER,
-			 MXT_POWER_IDLEACQINT, MXT_SAFE_CYCLE_TIME);
-	mxt_write_object(data, MXT_GEN_POWER,
-			 MXT_POWER_ACTVACQINT, MXT_SAFE_CYCLE_TIME);
-
 	error = mxt_make_highchg(data);
 	if (error)
 		return error;
+
+	mxt_handle_pdata(data);
 
 	/* Backup to memory */
 	mxt_write_object(data, MXT_GEN_COMMAND,
 			MXT_COMMAND_BACKUPNV,
 			MXT_BACKUP_VALUE);
-
-	if (data->pdata->read_chg == NULL) {
-		msleep(MXT_BACKUP_TIME + 
-			(actv_cycle_time > idle_cycle_time) ? 
-			actv_cycle_time : idle_cycle_time);
-	} else {
-		msleep(MXT_SAFE_CYCLE_TIME);
-		while (data->pdata->read_chg()) {
-			dev_info(&client->dev,
-				 "Waiting for backup to complete...\n");
-			msleep(2);
-		}
-	}
-
-	/* Clear the interrupt line */
-	error = mxt_make_highchg(data);
-	if (error)
-		return error;
+	msleep(MXT_BACKUP_TIME);
 
 	/* Soft reset */
 	mxt_write_object(data, MXT_GEN_COMMAND,
 			MXT_COMMAND_RESET, 1);
-	if (data->pdata->read_chg == NULL) {
-		msleep(MXT_RESET_TIME + MXT_SAFE_CYCLE_TIME);
-	} else {
-		msleep(MXT_SAFE_CYCLE_TIME);
-		while (data->pdata->read_chg()) {
-			dev_info(&client->dev,
-				 "Waiting for reset to complete...\n");
-			msleep(2);
-		}
-	}
+	msleep(MXT_RESET_TIME);
 
-	/* Restore the cycle time settings */
-	error = mxt_write_object(data, MXT_GEN_POWER,
-			 MXT_POWER_IDLEACQINT, idle_cycle_time);
-	if (error)
-		return error;
-	
-	error = mxt_write_object(data, MXT_GEN_POWER,
-			 MXT_POWER_ACTVACQINT, actv_cycle_time);
-	if (error)
-		return error;
-	
 	/* Update matrix size at info struct */
 	error = mxt_read_reg(client, MXT_MATRIX_X_SIZE, &val);
 	if (error)
@@ -995,20 +843,6 @@ static int mxt_initialize(struct mxt_data *data)
 			info->object_num);
 
 	return 0;
-}
-
-static void mxt_calc_resolution(struct mxt_data *data)
-{
-	unsigned int max_x = data->pdata->x_size - 1;
-	unsigned int max_y = data->pdata->y_size - 1;
-
-	if (data->pdata->orient & MXT_XY_SWITCH) {
-		data->max_x = max_y;
-		data->max_y = max_x;
-	} else {
-		data->max_x = max_x;
-		data->max_y = max_y;
-	}
 }
 
 static ssize_t mxt_object_show(struct device *dev,
@@ -1147,10 +981,6 @@ static ssize_t mxt_update_fw_store(struct device *dev,
 
 	enable_irq(data->irq);
 
-	error = mxt_make_highchg(data);
-	if (error)
-		return error;
-
 	return count;
 }
 
@@ -1169,69 +999,24 @@ static const struct attribute_group mxt_attr_group = {
 
 static void mxt_start(struct mxt_data *data)
 {
-	int error;
-	/* Restore the cycle time settings to wake from sleep */
-	error = mxt_write_object(data, MXT_GEN_POWER, MXT_POWER_ACTVACQINT,
-				 data->actv_cycle_time);
-	if (error)
-	   printk("\n\nresume failed!");
-	error = mxt_write_object(data, MXT_GEN_POWER, MXT_POWER_IDLEACQINT,
-				 data->idle_cycle_time);
-	if (error)
-	   printk("\n\nresume failed!");
-
-	printk(KERN_WARNING "Restored ACTV %d, IDLE %d", data->actv_cycle_time,
-	       data->idle_cycle_time);
-	data->is_suspended = 0;
+	/* Touch enable */
+	mxt_write_object(data,
+			MXT_TOUCH_MULTI, MXT_TOUCH_CTRL, 0x83);
 }
 
 static void mxt_stop(struct mxt_data *data)
 {
-	u8 actv_cycle_time;
-	u8 idle_cycle_time;
-	int error;
-
-	if(data->is_suspended)
-		return;
-
-	error = mxt_read_object(data, MXT_GEN_POWER, MXT_POWER_ACTVACQINT,
-			&actv_cycle_time);
-	if (error)
-		goto i2c_error;
-
-	data->actv_cycle_time = actv_cycle_time;
-
-	error = mxt_read_object(data, MXT_GEN_POWER, MXT_POWER_IDLEACQINT,
-			&idle_cycle_time);
-	if (error)
-		goto i2c_error;
-
-	data->idle_cycle_time = idle_cycle_time;
-
-	/* Set to deep sleep mode for maximum power savings */
-	error = mxt_write_object(data, MXT_GEN_POWER, MXT_POWER_ACTVACQINT, 0);
-	if (error)
-		goto i2c_error;
-
-	error = mxt_write_object(data, MXT_GEN_POWER, MXT_POWER_IDLEACQINT, 0);
-	if (error)
-		goto i2c_error;
-
-	printk(KERN_WARNING "MXT Suspended, saved ACTV %d and IDLE %d",
-	       actv_cycle_time, idle_cycle_time);
-	data->is_suspended = 1;
-	return;
-
- i2c_error:
-	printk(KERN_WARNING "MXT Suspend failed!");
-
+	/* Touch disable */
+	mxt_write_object(data,
+			MXT_TOUCH_MULTI, MXT_TOUCH_CTRL, 0);
 }
 
 static int mxt_input_open(struct input_dev *dev)
 {
-	/*
 	struct mxt_data *data = input_get_drvdata(dev);
-	*/
+
+	mxt_start(data);
+
 	return 0;
 }
 
@@ -1261,19 +1046,11 @@ static int __devinit mxt_probe(struct i2c_client *client,
 		goto err_free_mem;
 	}
 
-	input_dev->name = "atmel-maxtouch";
+	input_dev->name = "Atmel maXTouch Touchscreen";
 	input_dev->id.bustype = BUS_I2C;
 	input_dev->dev.parent = &client->dev;
 	input_dev->open = mxt_input_open;
 	input_dev->close = mxt_input_close;
-
-	data->client = client;
-	data->input_dev = input_dev;
-	data->pdata = pdata;
-	data->irq = client->irq;
-	data->is_suspended = 0;
-
-	mxt_calc_resolution(data);
 
 	__set_bit(EV_ABS, input_dev->evbit);
 	__set_bit(EV_KEY, input_dev->evbit);
@@ -1281,19 +1058,25 @@ static int __devinit mxt_probe(struct i2c_client *client,
 
 	/* For single touch */
 	input_set_abs_params(input_dev, ABS_X,
-			     0, data->max_x, 0, 0);
+			     0, MXT_MAX_XC, 0, 0);
 	input_set_abs_params(input_dev, ABS_Y,
-			     0, data->max_y, 0, 0);
+			     0, MXT_MAX_YC, 0, 0);
 
 	/* For multi touch */
 	input_set_abs_params(input_dev, ABS_MT_TOUCH_MAJOR,
 			     0, MXT_MAX_AREA, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_POSITION_X,
-			     0, data->max_x, 0, 0);
+			     0, MXT_MAX_XC, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_POSITION_Y,
-			     0, data->max_y, 0, 0);
+			     0, MXT_MAX_YC, 0, 0);
 
 	input_set_drvdata(input_dev, data);
+
+	data->client = client;
+	data->input_dev = input_dev;
+	data->pdata = pdata;
+	data->irq = client->irq;
+
 	i2c_set_clientdata(client, data);
 
 	error = mxt_initialize(data);
@@ -1306,17 +1089,6 @@ static int __devinit mxt_probe(struct i2c_client *client,
 		dev_err(&client->dev, "Failed to register interrupt\n");
 		goto err_free_object;
 	}
-
-#if defined(CONFIG_HAS_EARLYSUSPEND)
-	data->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
-	data->early_suspend.suspend = mxt_early_suspend;
-	data->early_suspend.resume = mxt_early_resume;
-	register_early_suspend(&data->early_suspend);
-#endif
-
-	error = mxt_make_highchg(data);
-	if (error)
-		goto err_free_irq;
 
 	error = input_register_device(input_dev);
 	if (error)
@@ -1392,30 +1164,6 @@ static int mxt_resume(struct device *dev)
 
 	return 0;
 }
-
-#if defined(CONFIG_HAS_EARLYSUSPEND)
-static void mxt_early_suspend(struct early_suspend *es)
-{
-	struct mxt_data *mxt;
-	printk(KERN_WARNING "MXT Early Suspend entered\n");
-	mxt = container_of(es, struct mxt_data, early_suspend);
-
-	if (mxt_suspend(&mxt->client->dev) != 0)
-		dev_err(&mxt->client->dev, "%s: failed\n", __func__);
-	printk(KERN_WARNING "MXT Early Suspended\n");
-}
-
-static void mxt_early_resume(struct early_suspend *es)
-{
-	struct mxt_data *mxt;
-	printk(KERN_WARNING "MXT Early Resume entered\n");
-	mxt = container_of(es, struct mxt_data, early_suspend);
-
-	if (mxt_resume(&mxt->client->dev) != 0)
-		dev_err(&mxt->client->dev, "%s: failed\n", __func__);
-	printk(KERN_WARNING "MXT Early Resumed\n");
-}
-#endif
 
 static const struct dev_pm_ops mxt_pm_ops = {
 	.suspend	= mxt_suspend,
