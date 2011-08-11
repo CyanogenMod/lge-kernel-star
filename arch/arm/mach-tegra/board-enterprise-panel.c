@@ -65,6 +65,64 @@ static struct regulator *enterprise_hdmi_vddio;
 
 static atomic_t sd_brightness = ATOMIC_INIT(255);
 
+static tegra_dc_bl_output enterprise_bl_output_measured = {
+	1, 5, 9, 10, 11, 12, 12, 13,
+	13, 14, 14, 15, 15, 16, 16, 17,
+	17, 18, 18, 19, 19, 20, 21, 21,
+	22, 22, 23, 24, 24, 25, 26, 26,
+	27, 27, 28, 29, 29, 31, 31, 32,
+	32, 33, 34, 35, 36, 36, 37, 38,
+	39, 39, 40, 41, 41, 42, 43, 43,
+	44, 45, 45, 46, 47, 47, 48, 49,
+	49, 50, 51, 51, 52, 53, 53, 54,
+	55, 56, 56, 57, 58, 59, 60, 61,
+	61, 62, 63, 64, 65, 65, 66, 67,
+	67, 68, 69, 69, 70, 71, 71, 72,
+	73, 73, 74, 74, 75, 76, 76, 77,
+	77, 78, 79, 79, 80, 81, 82, 83,
+	83, 84, 85, 85, 86, 86, 88, 89,
+	90, 91, 91, 92, 93, 93, 94, 95,
+	95, 96, 97, 97, 98, 99, 99, 100,
+	101, 101, 102, 103, 103, 104, 105, 105,
+	107, 107, 108, 109, 110, 111, 111, 112,
+	113, 113, 114, 115, 115, 116, 117, 117,
+	118, 119, 119, 120, 121, 122, 123, 124,
+	124, 125, 126, 126, 127, 128, 129, 129,
+	130, 131, 131, 132, 133, 133, 134, 135,
+	135, 136, 137, 137, 138, 139, 139, 140,
+	142, 142, 143, 144, 145, 146, 147, 147,
+	148, 149, 149, 150, 151, 152, 153, 153,
+	153, 154, 155, 156, 157, 158, 158, 159,
+	160, 161, 162, 163, 163, 164, 165, 165,
+	166, 166, 167, 168, 169, 169, 170, 170,
+	171, 172, 173, 173, 174, 175, 175, 176,
+	176, 178, 178, 179, 180, 181, 182, 182,
+	183, 184, 185, 186, 186, 187, 188, 188
+};
+
+static p_tegra_dc_bl_output bl_output;
+
+static int enterprise_backlight_notify(struct device *unused, int brightness)
+{
+	int cur_sd_brightness = atomic_read(&sd_brightness);
+	int orig_brightness = brightness;
+
+	/* SD brightness is a percentage, 8-bit value. */
+	brightness = (brightness * cur_sd_brightness) / 255;
+	if (cur_sd_brightness != 255) {
+		pr_info("NVSD BL - in: %d, sd: %d, out: %d\n",
+			orig_brightness, cur_sd_brightness, brightness);
+	}
+
+	/* Apply any backlight response curve */
+	if (brightness > 255)
+		pr_info("Error: Brightness > 255!\n");
+	else
+		brightness = bl_output[brightness];
+
+	return brightness;
+}
+
 /*
  * In case which_pwm is TEGRA_PWM_PM0,
  * gpio_conf_to_sfio should be TEGRA_GPIO_PW0: set LCD_CS1_N pin to SFIO
@@ -81,6 +139,7 @@ static struct platform_tegra_pwm_backlight_data enterprise_disp1_backlight_data 
 	.period			= 0x3F,
 	.clk_div		= 1,
 	.clk_select		= 2,
+	.notify		= enterprise_backlight_notify,
 };
 
 static struct platform_device enterprise_disp1_backlight_device = {
@@ -225,7 +284,7 @@ static struct resource enterprise_disp2_resources[] = {
 };
 
 static struct tegra_dc_sd_settings enterprise_sd_settings = {
-	.enable = 1, /* Normal mode operation */
+	.enable = 0, /* Normal mode operation */
 	.use_auto_pwm = false,
 	.hw_update_delay = 0,
 	.bin_width = -1,
@@ -617,6 +676,11 @@ int __init enterprise_panel_init(void)
 {
 	int err;
 	struct resource *res;
+
+	bl_output = enterprise_bl_output_measured;
+
+	if (WARN_ON(ARRAY_SIZE(enterprise_bl_output_measured) != 256))
+		pr_err("bl_output array does not have 256 elements\n");
 
 	enterprise_carveouts[1].base = tegra_carveout_start;
 	enterprise_carveouts[1].size = tegra_carveout_size;
