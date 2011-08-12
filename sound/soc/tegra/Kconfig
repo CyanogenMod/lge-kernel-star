@@ -25,7 +25,7 @@ config SND_SOC_TEGRA30_AHUB
 config SND_SOC_TEGRA30_I2S
 	tristate "Tegra 30 I2S driver"
 	depends on SND_SOC_TEGRA && ARCH_TEGRA_3x_SOC
-	select SND_SOC_TEGRA20_AHUB
+	select SND_SOC_TEGRA30_AHUB
 	help
 	  Say Y or M if you want to add support for codecs attached to the
 	  Tegra I2S interface. You will also need to select the individual
