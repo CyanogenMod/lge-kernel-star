@@ -1615,16 +1615,22 @@ static int __devinit tegra_tsensor_probe(struct platform_device *pdev)
 		goto err5;
 	}
 
+	/* fuse revisions less than TSENSOR_FUSE_REVISION_DECIMAL_REV1
+	 bypass tsensor driver init */
 	/* tsensor active instance decided based on fuse revision */
 	err = tegra_fuse_get_revision(&reg);
 	if (err)
 		goto err6;
-	/* instance 1 is used for fuse revision 8 till 20 */
-	/* instance 0 is used for fuse revision 21 onwards */
-	if ((reg & 0xf) >= TSENSOR_FUSE_REVISION_DECIMAL_REV1)
-		tsensor_index = 1;
-	else if ((reg & 0xf) >= TSENSOR_FUSE_REVISION_DECIMAL_REV2)
+	/* check for higher revision done first */
+	/* instance 0 is used for fuse revision
+	 TSENSOR_FUSE_REVISION_DECIMAL_REV2 onwards */
+	if (reg >= TSENSOR_FUSE_REVISION_DECIMAL_REV2)
 		tsensor_index = 0;
+	/* instance 1 is used for fuse revision
+	 TSENSOR_FUSE_REVISION_DECIMAL_REV1 till
+	 TSENSOR_FUSE_REVISION_DECIMAL_REV2 */
+	else if (reg >= TSENSOR_FUSE_REVISION_DECIMAL_REV1)
+		tsensor_index = 1;
 	pr_info("tsensor active instance=%d\n", tsensor_index);
 
 	/* tegra tsensor - setup and init */
