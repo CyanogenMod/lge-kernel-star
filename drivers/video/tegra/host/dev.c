@@ -41,6 +41,7 @@
 #include <linux/nvhost_ioctl.h>
 #include <mach/nvmap.h>
 #include <mach/gpufuse.h>
+#include <mach/hardware.h>
 
 #include "nvhost_scale.h"
 #include "debug.h"
@@ -805,16 +806,12 @@ static void nvhost_remove_chip_support(struct nvhost_master *host)
 static int __devinit nvhost_init_chip_support(struct nvhost_master *host)
 {
 	int err;
-	err = tegra_get_chip_info(&host->chip_info);
-	if (err)
-		return err;
-
-	switch (host->chip_info.arch) {
-	case TEGRA_SOC_CHIP_ARCH_T20:
+	switch (tegra_get_chipid()) {
+	case TEGRA_CHIPID_TEGRA2:
 		err = nvhost_init_t20_support(host);
 		break;
 
-	case TEGRA_SOC_CHIP_ARCH_T30:
+	case TEGRA_CHIPID_TEGRA3:
 		err = nvhost_init_t30_support(host);
 		break;
 	default:
