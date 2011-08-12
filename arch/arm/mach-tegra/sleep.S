@@ -48,6 +48,7 @@
 
 #define TEGRA_PMC_VIRT		(TEGRA_PMC_BASE - IO_APB_PHYS + IO_APB_VIRT)
 #define TEGRA_CLK_RESET_VIRT	(TEGRA_CLK_RESET_BASE - IO_PPSB_PHYS + IO_PPSB_VIRT)
+#define TEGRA_PL310_VIRT	(TEGRA_ARM_PL310_BASE - IO_PPSB_PHYS + IO_PPSB_VIRT)
 
 /*
  * tegra_pen_lock
@@ -243,6 +244,15 @@ ENTRY(tegra_cpu_suspend)
 	ldr	pc, [r10, #CACHE_FLUSH_KERN_ALL]
 #else
 	bl	__cpuc_flush_kern_all
+#endif
+#ifdef CONFIG_CACHE_L2X0
+	/* Issue a PL310 cache sync operation */
+	dsb
+	mov32	r2, TEGRA_PL310_VIRT
+	movw	r1, 0x730		@ cache sync
+	add	r2, r2, r1
+	mov	r1, #0
+	str	r1, [r2]
 #endif
 
 	/* Invalidate the TLBs & BTAC */
