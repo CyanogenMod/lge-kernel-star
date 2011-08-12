@@ -48,8 +48,8 @@ static const u32 core_process_speedos[][CORE_PROCESS_CORNERS_NUM] = {
 
 /* T33 family: Numbers cloned from T30 family; FIXME: adjust these later */
 	{180}, /* threshold_index 7: soc_speedo_id = 1 - AP33 */
-	{196}, /* threshold_index 8: soc_speedo_id = 2 - T33  */
-	{196}, /* threshold_index 9: soc_speedo_id = 2 - T33S */
+	{204}, /* threshold_index 8: soc_speedo_id = 2 - T33  */
+	{192}, /* threshold_index 9: soc_speedo_id = 2 - T33S */
 };
 
 /* Maximum speedo levels for each CPU process corner */
@@ -67,10 +67,10 @@ static const u32 cpu_process_speedos[][CPU_PROCESS_CORNERS_NUM] = {
 	{324, 324, 348, 364}, /* threshold_index 5: cpu_speedo_id 2: T30char  */
 	{324, 324, 348, 364}, /* threshold_index 6: cpu_speedo_id 3: T30Schar */
 
-/* T33 family: Numbers cloned from T30 family; FIXME: adjust these later */
-	{376, 376, 376, 376}, /* threshold_FIXME 7: cpu_speedo_id = 1 - AP33 */
-	{368, 368, 368, 368}, /* threshold_index 8: cpu_speedo_id = 2 - T33  */
-	{372, 372, 372, 372}, /* threshold_index 9: cpu_speedo_id = 3 - T33S */
+/* T33 family */
+	{376, 376, 376, 376}, /* threshold_FIXME 7: cpu_speedo_id = 4 - AP33 */
+	{368, 368, 368, 368}, /* threshold_index 8: cpu_speedo_id = 5 - T33  */
+	{372, 372, 372, 372}, /* threshold_index 9: cpu_speedo_id = 6 - T33S */
 };
 
 /*
@@ -126,7 +126,7 @@ static void rev_sku_to_speedo_ids(int rev, int sku)
 				threshold_index = 2;
 				break;
 			case 2: /* DSC => AP33 */
-				cpu_speedo_id = 1;
+				cpu_speedo_id = 4;
 				soc_speedo_id = 1;
 				threshold_index = 7;
 				break;
@@ -141,12 +141,12 @@ static void rev_sku_to_speedo_ids(int rev, int sku)
 		case 0x80: /* T33 or T33S */
 			switch (package_id) {
 			case 1: /* MID => T33 */
-				cpu_speedo_id = 2;
+				cpu_speedo_id = 5;
 				soc_speedo_id = 2;
 				threshold_index = 8;
 				break;
 			case 2: /* DSC => T33S */
-				cpu_speedo_id = 3;
+				cpu_speedo_id = 6;
 				soc_speedo_id = 2;
 				threshold_index = 9;
 				break;
