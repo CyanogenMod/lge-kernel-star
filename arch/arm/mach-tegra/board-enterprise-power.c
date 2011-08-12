@@ -32,6 +32,7 @@
 #include <mach/iomap.h>
 #include <mach/irqs.h>
 #include <mach/pinmux.h>
+#include <mach/tsensor.h>
 
 #include "gpio-names.h"
 #include "board.h"
@@ -403,7 +404,7 @@ static void enterprise_power_off(void)
 
 void __init enterprise_tsensor_init(void)
 {
-/* To be implemented */
+	tegra3_tsensor_init(NULL);
 }
 
 int __init enterprise_regulator_init(void)
