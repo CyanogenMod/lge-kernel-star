@@ -1601,7 +1601,8 @@ static int __devinit tegra_tsensor_probe(struct platform_device *pdev)
 	pr_info("tsensor active instance=%d\n", tsensor_index);
 
 	/* tegra tsensor - setup and init */
-	if (tegra_tsensor_setup(pdev) != 0)
+	err = tegra_tsensor_setup(pdev);
+	if (err)
 		goto err6;
 
 	dev_dbg(&pdev->dev, "end tegra_tsensor_probe\n");
