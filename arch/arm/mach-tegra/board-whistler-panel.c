@@ -42,11 +42,19 @@
 static struct regulator *whistler_hdmi_reg = NULL;
 static struct regulator *whistler_hdmi_pll = NULL;
 
+/*
+ * In case which_pwm is TEGRA_PWM_PM0,
+ * gpio_conf_to_sfio should be TEGRA_GPIO_PW0: set LCD_CS1_N pin to SFIO
+ * In case which_pwm is TEGRA_PWM_PM1,
+ * gpio_conf_to_sfio should be TEGRA_GPIO_PW1: set LCD_M1 pin to SFIO
+ */
 static struct platform_tegra_pwm_backlight_data whistler_disp1_backlight_data = {
 	.which_dc = 0,
 	.which_pwm = TEGRA_PWM_PM1,
 	.max_brightness	= 256,
 	.dft_brightness	= 77,
+	.gpio_conf_to_sfio	= TEGRA_GPIO_PW1,
+	.switch_to_sfio		= &tegra_gpio_disable,
 	.period	= 0x1F,
 	.clk_div = 3,
 	.clk_select = 2,
