@@ -65,66 +65,63 @@ static struct tegra_tsensor_platform_data tsensor_data = {
 
 void __init tegra3_tsensor_init(struct tegra_tsensor_pmu_data *data)
 {
-	unsigned int reg, fuse_rev_integer, fuse_rev_decimal;
+	unsigned int reg;
 	int err;
 	u32 val, checksum;
 	void __iomem *pMem = NULL;
 	/* tsensor driver is instantiated based on fuse revision */
 	err = tegra_fuse_get_revision(&reg);
 	if (err)
-		goto errLabel;
-	fuse_rev_decimal = (reg & 0xf);
-	fuse_rev_integer = ((reg >> 4) & 0x7);
-	pr_info("\nTegra3 fuse revision %d.%d \n", fuse_rev_integer,
-		fuse_rev_decimal);
-	if ((fuse_rev_decimal >= TSENSOR_FUSE_REVISION_DECIMAL) &&
-		(fuse_rev_integer >= TSENSOR_FUSE_REVISION_INTEGER)) {
+		goto labelEnd;
+	pr_info("\nTegra3 fuse revision %d ", reg);
+	if (reg < TSENSOR_FUSE_REVISION_DECIMAL)
+		goto labelEnd;
 
-		if (!request_mem_region(TEGRA_PMC_BASE + SCRATCH54_OFFSET,
-			8, "tegra-tsensor")) {
-			pr_err(" [%s, line=%d]: Error mem busy\n",
-				__func__, __LINE__);
-		}
+	if (!data)
+		goto labelSkipPowerOff;
 
-		pMem = ioremap(TEGRA_PMC_BASE + SCRATCH54_OFFSET, 8);
-		if (!pMem) {
-			pr_err(" [%s, line=%d]: can't ioremap "
-				"pmc iomem\n", __FILE__, __LINE__);
-		}
+	if (!request_mem_region(TEGRA_PMC_BASE +
+		SCRATCH54_OFFSET, 8, "tegra-tsensor"))
+		pr_err(" [%s, line=%d]: Error mem busy\n",
+			__func__, __LINE__);
 
-		/*
-			Fill scratch registers to power off the device
-			in case if temperature crosses threshold TH3
-		*/
-		val = (data->poweroff_reg_data << PMU_OFF_DATA_OFFSET) |
-			data->poweroff_reg_addr;
-		writel(val, pMem);
+	pMem = ioremap(TEGRA_PMC_BASE + SCRATCH54_OFFSET, 8);
+	if (!pMem)
+		pr_err(" [%s, line=%d]: can't ioremap "
+			"pmc iomem\n", __FILE__, __LINE__);
 
-		val = ((data->reset_tegra & RESET_TEGRA_MASK) <<
-				RESET_TEGRA_OFFSET) |
-			((data->controller_type & CONTROLLER_TYPE_MASK) <<
-				CONTROLLER_TYPE_OFFSET) |
-			((data->i2c_controller_id & I2C_CONTROLLER_ID_MASK) <<
-				I2C_CONTROLLER_ID_OFFSET) |
-			((data->pinmux & PINMUX_MASK) << PINMUX_OFFSET) |
-			((data->pmu_16bit_ops & PMU_16BIT_SUPPORT_MASK) <<
-				PMU_16BIT_SUPPORT_OFFSET) |
-			data->pmu_i2c_addr;
+	/*
+	 * Fill scratch registers to power off the device
+	 * in case if temperature crosses threshold TH3
+	 */
+	val = (data->poweroff_reg_data << PMU_OFF_DATA_OFFSET) |
+		data->poweroff_reg_addr;
+	writel(val, pMem);
 
-		checksum = data->poweroff_reg_addr +
-			data->poweroff_reg_data + (val & 0xFF) +
-			((val >> 8) & 0xFF) + ((val >> 24) & 0xFF);
-		checksum &= 0xFF;
-		checksum = 0x100 - checksum;
+	val = ((data->reset_tegra & RESET_TEGRA_MASK) << RESET_TEGRA_OFFSET) |
+		((data->controller_type & CONTROLLER_TYPE_MASK) <<
+		CONTROLLER_TYPE_OFFSET) |
+		((data->i2c_controller_id & I2C_CONTROLLER_ID_MASK) <<
+		I2C_CONTROLLER_ID_OFFSET) |
+		((data->pinmux & PINMUX_MASK) << PINMUX_OFFSET) |
+		((data->pmu_16bit_ops & PMU_16BIT_SUPPORT_MASK) <<
+		PMU_16BIT_SUPPORT_OFFSET) | data->pmu_i2c_addr;
 
-		val |= (checksum << CHECKSUM_OFFSET);
-		writel(val, pMem + 4);
+	checksum = data->poweroff_reg_addr +
+		data->poweroff_reg_data + (val & 0xFF) +
+		((val >> 8) & 0xFF) + ((val >> 24) & 0xFF);
+	checksum &= 0xFF;
+	checksum = 0x100 - checksum;
 
-		/* set platform data for device before register */
-		tegra_tsensor_device.dev.platform_data = &tsensor_data;
-		platform_device_register(&tegra_tsensor_device);
-	}
-errLabel:
+	val |= (checksum << CHECKSUM_OFFSET);
+	writel(val, pMem + 4);
+
+labelSkipPowerOff:
+	/* set platform data for device before register */
+	tegra_tsensor_device.dev.platform_data = &tsensor_data;
+	platform_device_register(&tegra_tsensor_device);
+
+labelEnd:
 	return;
 }
 
