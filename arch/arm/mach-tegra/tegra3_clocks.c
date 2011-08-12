@@ -4195,9 +4195,9 @@ static struct cpufreq_frequency_table freq_table_1p4GHz[] = {
 
 static struct tegra_cpufreq_table_data cpufreq_tables[] = {
 	{ freq_table_300MHz, 0, 1 },
-	{ freq_table_1p0GHz, 2, 7, 2},
-	{ freq_table_1p3GHz, 2, 9, 2},
-	{ freq_table_1p4GHz, 2, 10, 2},
+	{ freq_table_1p0GHz, 1, 7, 2},
+	{ freq_table_1p3GHz, 1, 9, 2},
+	{ freq_table_1p4GHz, 1, 10, 2},
 };
 
 static int clip_cpu_rate_limits(

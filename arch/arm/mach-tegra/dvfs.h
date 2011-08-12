@@ -98,6 +98,8 @@ void tegra_dvfs_rail_enable(struct dvfs_rail *rail);
 void tegra_dvfs_rail_disable(struct dvfs_rail *rail);
 bool tegra_dvfs_rail_updating(struct clk *clk);
 int tegra_dvfs_predict_millivolts(struct clk *c, unsigned long rate);
+void tegra_dvfs_core_cap_enable(bool enable);
+void tegra_dvfs_core_cap_level_set(int level);
 #else
 static inline void tegra_soc_init_dvfs(void)
 {}
@@ -119,6 +121,10 @@ static inline bool tegra_dvfs_rail_updating(struct clk *clk)
 { return false; }
 static inline int tegra_dvfs_predict_millivolts(struct clk *c, unsigned long rate)
 { return 0; }
+static inline void tegra_dvfs_core_cap_enable(bool enable)
+{}
+static inline void tegra_dvfs_core_cap_level_set(int level)
+{}
 #endif
 
 #endif
