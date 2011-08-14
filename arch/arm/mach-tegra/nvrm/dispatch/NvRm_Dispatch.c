@@ -179,8 +179,8 @@ static NvU32 s_FuncAllowedInNvrmModulePackage =
     (0 << 4)  | //err_ = NvRmModuleResetWithHold_dispatch_( InBuffer, InSize, OutBuffer, OutSize, Ctx );
     (0 << 3)  | //err_ = NvRmModuleReset_dispatch_( InBuffer, InSize, OutBuffer, OutSize, Ctx );
     (1 << 2)  | //err_ = NvRmModuleGetNumInstances_dispatch_( InBuffer, InSize, OutBuffer, OutSize, Ctx );
-    (1 << 1)  | //err_ = NvRmModuleGetBaseAddress_dispatch_( InBuffer, InSize, OutBuffer, OutSize, Ctx );
-    (1 << 0);   //err_ = NvRmModuleGetModuleInfo_dispatch_( InBuffer, InSize, OutBuffer, OutSize, Ctx );
+    (0 << 1)  | //err_ = NvRmModuleGetBaseAddress_dispatch_( InBuffer, InSize, OutBuffer, OutSize, Ctx );
+    (0 << 0);   //err_ = NvRmModuleGetModuleInfo_dispatch_( InBuffer, InSize, OutBuffer, OutSize, Ctx );
 
 static NvU32 s_FuncAllowedInNvrmInitPackage =
     (1 << 3)  | //err_ = NvRmClose_dispatch_( InBuffer, InSize, OutBuffer, OutSize, Ctx );

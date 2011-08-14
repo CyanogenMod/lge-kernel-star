@@ -963,7 +963,7 @@ RegisterSpiSlinkInterrupt(
             &hIntHandlers, hRmSpiSlink, &hRmSpiSlink->SpiInterruptHandle, NV_TRUE));
 }
 // Boosting the Emc/Ahb/Apb/Cpu frequency
-static void BoostFrequency(NvRmSpiHandle hRmSpiSlink, NvBool IsBoost, NvU32 TransactionSize)
+static void BoostFrequency(NvRmSpiHandle hRmSpiSlink, NvBool IsBoost, NvU32 TransactionSize, NvU32 ClockSpeedInKHz)
 {
     if (IsBoost)
     {
@@ -972,17 +972,17 @@ static void BoostFrequency(NvRmSpiHandle hRmSpiSlink, NvBool IsBoost, NvU32 Tran
             if (!(hRmSpiSlink->IsPmuInterface))
             {
                 hRmSpiSlink->BusyHints[0].BoostKHz = 150000; // Emc
-                hRmSpiSlink->BusyHints[0].BoostDurationMs = NV_WAIT_INFINITE;
-//                    = 1000;	//20101218-1, , NVIDIA patch for RxTransfer error	: 10 + ((4 * (TransactionSize * 8))) / ClockSpeedInKHz;
+                hRmSpiSlink->BusyHints[0].BoostDurationMs
+                    = 1000;	//20101218-1, , NVIDIA patch for RxTransfer error	: 10 + ((4 * (TransactionSize * 8))) / ClockSpeedInKHz;
                 hRmSpiSlink->BusyHints[1].BoostKHz = 150000; // Ahb
-                hRmSpiSlink->BusyHints[1].BoostDurationMs = NV_WAIT_INFINITE;
-//                    = 1000;	//20101218-1, , NVIDIA patch for RxTransfer error	: 10 + ((4 * (TransactionSize * 8))) / ClockSpeedInKHz;
+                hRmSpiSlink->BusyHints[1].BoostDurationMs
+                    = 1000;	//20101218-1, , NVIDIA patch for RxTransfer error	: 10 + ((4 * (TransactionSize * 8))) / ClockSpeedInKHz;
                 hRmSpiSlink->BusyHints[2].BoostKHz = 150000; // Apb
-                hRmSpiSlink->BusyHints[2].BoostDurationMs = NV_WAIT_INFINITE;
-//                    = 1000;	//20101218-1, , NVIDIA patch for RxTransfer error	: 10 + ((4 * (TransactionSize * 8))) / ClockSpeedInKHz;
+                hRmSpiSlink->BusyHints[2].BoostDurationMs
+                    = 1000;	//20101218-1, , NVIDIA patch for RxTransfer error	: 10 + ((4 * (TransactionSize * 8))) / ClockSpeedInKHz;
                 hRmSpiSlink->BusyHints[3].BoostKHz = 600000; // Cpu
-                hRmSpiSlink->BusyHints[3].BoostDurationMs = NV_WAIT_INFINITE;
-//                    = 1000;	//20101218-1, , NVIDIA patch for RxTransfer error	: 10 + ((4 * (TransactionSize * 8))) / ClockSpeedInKHz;
+                hRmSpiSlink->BusyHints[3].BoostDurationMs
+                    = 1000;	//20101218-1, , NVIDIA patch for RxTransfer error	: 10 + ((4 * (TransactionSize * 8))) / ClockSpeedInKHz;
                 NvRmPowerBusyHintMulti(hRmSpiSlink->hDevice, hRmSpiSlink->RmPowerClientId,
                                        hRmSpiSlink->BusyHints, 4,
                                        NvRmDfsBusyHintSyncMode_Async);
@@ -997,13 +997,9 @@ static void BoostFrequency(NvRmSpiHandle hRmSpiSlink, NvBool IsBoost, NvU32 Tran
             if (!(hRmSpiSlink->IsPmuInterface))
             {
                 hRmSpiSlink->BusyHints[0].BoostKHz = 0; // Emc
-                hRmSpiSlink->BusyHints[0].BoostDurationMs = 0;
                 hRmSpiSlink->BusyHints[1].BoostKHz = 0; // Ahb
-                hRmSpiSlink->BusyHints[1].BoostDurationMs = 0;
                 hRmSpiSlink->BusyHints[2].BoostKHz = 0; // Apb
-                hRmSpiSlink->BusyHints[2].BoostDurationMs = 0;
                 hRmSpiSlink->BusyHints[3].BoostKHz = 0; // Cpu
-                hRmSpiSlink->BusyHints[3].BoostDurationMs = 0;
                 NvRmPowerBusyHintMulti(hRmSpiSlink->hDevice, hRmSpiSlink->RmPowerClientId,
                                        hRmSpiSlink->BusyHints, 4,
                                        NvRmDfsBusyHintSyncMode_Async);
@@ -2693,7 +2689,7 @@ void NvRmSpiMultipleTransactions(
         TotalTransByte += pTrans->len;
     }
 
-    BoostFrequency(hRmSpi, NV_TRUE, TotalTransByte);
+    BoostFrequency(hRmSpi, NV_TRUE, TotalTransByte, ClockSpeedInKHz);
 
     hRmSpi->CurrTransInfo.PacketsPerWord = PacketsPerWord;
     if (SpiPinMap)
@@ -2783,7 +2779,6 @@ void NvRmSpiMultipleTransactions(
 
 cleanup:
 
-    BoostFrequency(hRmSpi, NV_FALSE, TotalTransByte);
     //  Re-tristate multi-plexed controllers, and re-multiplex the controller.
     if (SpiPinMap)
     {
@@ -2863,7 +2858,7 @@ NvError NvRmSpiTransaction(
     Error = SetPowerControl(hRmSpi, NV_TRUE);
     if (Error != NvSuccess)
         goto cleanup;
-    BoostFrequency(hRmSpi, NV_TRUE, BytesRequested);
+    BoostFrequency(hRmSpi, NV_TRUE, BytesRequested, ClockSpeedInKHz);
 
     hRmSpi->CurrTransInfo.PacketsPerWord = PacketsPerWord;
 
@@ -2947,7 +2942,6 @@ NvError NvRmSpiTransaction(
 
 cleanup:
 
-    BoostFrequency(hRmSpi, NV_FALSE, BytesRequested);
     //  Re-tristate multi-plexed controllers, and re-multiplex the controller.
     if (SpiPinMap)
     {
@@ -3058,7 +3052,7 @@ NvError NvRmSpiStartTransaction(
     // Enable Power/Clock.
     Error = SetPowerControl(hRmSpi, NV_TRUE);
     if (!Error)
-        BoostFrequency(hRmSpi, NV_TRUE, BytesRequested);
+        BoostFrequency(hRmSpi, NV_TRUE, BytesRequested, ClockSpeedInKHz);
 
     if (!Error)
         Error = SetChipSelectSignalLevel(hRmSpi, ChipSelectId, ClockSpeedInKHz,
@@ -3106,7 +3100,7 @@ NvError NvRmSpiStartTransaction(
 cleanup:
 
     (void)SetChipSelectSignalLevel(hRmSpi, ChipSelectId, ClockSpeedInKHz, NV_FALSE, NV_TRUE);
-    BoostFrequency(hRmSpi, NV_FALSE, BytesRequested);
+
     if (hRmSpi->IsIdleSignalTristate)
         NvRmPinMuxConfigSetTristate(hRmSpi->hDevice,hRmSpi->RmIoModuleId,
             hRmSpi->InstanceId, hRmSpi->SpiPinMap, NV_TRUE);
@@ -3144,7 +3138,6 @@ NvRmSpiGetTransactionData(
 
     // Disable Power/Clock.
     SetPowerControl(hRmSpiSlink, NV_FALSE);
-    BoostFrequency(hRmSpiSlink, NV_FALSE, BytesRequested);
     NvOsMutexUnlock(hRmSpiSlink->hChannelAccessMutex);
     return Error;
 }
