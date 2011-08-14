@@ -41,6 +41,7 @@
 #include <linux/fsl_devices.h>
 #include <linux/dmapool.h>
 #include <linux/delay.h>
+#include <linux/regulator/consumer.h>
 #include <linux/workqueue.h>
 
 #include <asm/byteorder.h>
@@ -74,6 +75,8 @@ static struct usb_dr_device *dr_regs;
 static struct usb_sys_interface *usb_sys_regs;
 #endif
 
+/* Charger current limit=1800mA, as per the USB charger spec */
+#define USB_CHARGING_CURRENT_LIMIT_MA 1800
 /* 1 sec wait time for charger detection after vbus is detected */
 #define USB_CHARGER_DETECTION_WAIT_TIME_MS 1000
 
@@ -1254,6 +1257,11 @@ static int fsl_vbus_session(struct usb_gadget *gadget, int is_active)
 			udc->usb_state = USB_STATE_DEFAULT;
 			spin_unlock_irqrestore(&udc->lock, flags);
 			fsl_udc_clk_suspend(false);
+			if (udc->vbus_regulator) {
+				/* set the current limit to 0mA */
+				regulator_set_current_limit(
+					udc->vbus_regulator, 0, 0);
+			}
 		} else if (!udc->vbus_active && is_active) {
 			fsl_udc_clk_resume(false);
 			/* setup the controller in the device mode */
@@ -1267,9 +1275,15 @@ static int fsl_vbus_session(struct usb_gadget *gadget, int is_active)
 			udc->vbus_active = 1;
 			/* start the controller */
 			dr_controller_run(udc);
+			if (udc->vbus_regulator) {
+				/* set the current limit to 100mA */
+				regulator_set_current_limit(
+					udc->vbus_regulator, 0, 100);
+			}
 			/* Schedule work to wait for 1000 msec and check for
 			 * charger if setup packet is not received */
-			schedule_delayed_work(&udc->work, USB_CHARGER_DETECTION_WAIT_TIME_MS);
+			schedule_delayed_work(&udc->work,
+				USB_CHARGER_DETECTION_WAIT_TIME_MS);
 		}
 		return 0;
 	}
@@ -1298,6 +1312,13 @@ static int fsl_vbus_draw(struct usb_gadget *gadget, unsigned mA)
 	struct fsl_udc *udc;
 
 	udc = container_of(gadget, struct fsl_udc, gadget);
+	/* check udc regulator is available for drawing the vbus current */
+	if (udc->vbus_regulator) {
+		/* set the current limit in uA and return */
+		return regulator_set_current_limit(
+				udc->vbus_regulator, 0, mA*1000);
+	}
+
 	if (udc->transceiver)
 		return otg_set_power(udc->transceiver, mA);
 	return -ENOTSUPP;
@@ -2045,9 +2066,18 @@ static void reset_irq(struct fsl_udc *udc)
  */
 static void fsl_udc_charger_detect_work(struct work_struct* work)
 {
+	struct fsl_udc *udc = container_of (work, struct fsl_udc, work.work);
+
 	/* check for the platform charger detection */
 	if (fsl_udc_charger_detect()) {
 		printk(KERN_INFO "USB compliant charger detected\n");
+		/* check udc regulator is available for drawing vbus current*/
+		if (udc->vbus_regulator) {
+			/* set the current limit in uA */
+			regulator_set_current_limit(
+				udc->vbus_regulator, 0,
+				USB_CHARGING_CURRENT_LIMIT_MA*1000);
+		}
 	}
 }
 
@@ -2676,6 +2706,7 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
 	u32 dccparams;
 #if defined(CONFIG_ARCH_TEGRA)
 	struct resource *res_sys = NULL;
+	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
 #endif
 
 	if (strcmp(pdev->name, driver_name)) {
@@ -2847,6 +2878,18 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
 #endif
 #endif
 
+	/* Get the regulator for drawing the vbus current in udc driver */
+	if (pdata->charge_regulator) {
+		udc_controller->vbus_regulator = regulator_get(NULL,
+							pdata->charge_regulator);
+		if (IS_ERR(udc_controller->vbus_regulator)) {
+			dev_err(&pdev->dev,
+				"can't get charge regulator,err:%ld\n",
+				PTR_ERR(udc_controller->vbus_regulator));
+			udc_controller->vbus_regulator = NULL;
+		}
+	}
+
 	return 0;
 
 err_unregister:
@@ -2879,6 +2922,9 @@ static int __exit fsl_udc_remove(struct platform_device *pdev)
 	udc_controller->done = &done;
 
 	cancel_delayed_work(&udc_controller->work);
+	if (udc_controller->vbus_regulator)
+		regulator_put(udc_controller->vbus_regulator);
+
 	if (udc_controller->transceiver)
 		otg_set_peripheral(udc_controller->transceiver, NULL);
 
