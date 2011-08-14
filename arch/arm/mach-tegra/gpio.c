@@ -394,7 +394,7 @@ const struct tegra_init_gpio_info tegra_sleep_gpio_info_array[] = {
     { 'h'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW/*GPIO_HIGH*/,  /*TRISTATE_SKIP*/ATD},   // TEST_GPIO2(Sleep status)
 #endif
     { 't'-'a',      4, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   DTA},   // 8MN_CAM_VCM_EN
-    { 'd'-'a',      5, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_HIGH,  DTA},   // VT_CAM_PWDN 
+    { 'd'-'a',      5, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   DTA},   // VT_CAM_PWDN 
     { 't'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   DTB},   // FLASH_LED_TOURCH
     { 't'-'a',      3, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   DTB},   // FLASH_LED_INH
     { 'z'-'a' + 2,  1, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   DTE},   // VT_RESET_N 
@@ -463,8 +463,8 @@ const struct tegra_init_gpio_info tegra_sleep_gpio_info_array[] = {
     { 'o'-'a',      6, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   UAB},   // output검토필요. APTEMP_POWER_OFF_N
     { 'o'-'a',      7, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   UAB},   // SPI2_CLK
     { 'k'-'a',      2, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATC},   // THERMAL_IRQ
-    { 'g'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATC},   // VOL_KEY_UP
-    { 'g'-'a',      1, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATC},   // VOL_KEY_DOWN
+    { 'g'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_HIGH,  ATC},   // VOL_KEY_UP
+    { 'g'-'a',      1, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_HIGH,  ATC},   // VOL_KEY_DOWN
     { 'g'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATC},   // EARJACK_SENSE
     { 'i'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATC},   // MOTION_INT
     { 'x'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   SPIE},  // TOUCH_MAKER_ID
@@ -947,7 +947,9 @@ void tegra_gpio_suspend(void)
 		}
 
 	}
+#if SLEEP_GPIO_LOG
 	pr_info("\n[POWER] <<< Suspend GPIO Setting value (before) [END] >>>  \n");
+#endif
 
 #if APPLY_SLEEP_GPIO_TABLE
 	//20100724  for gpio setting while sleep [LGE_START]
