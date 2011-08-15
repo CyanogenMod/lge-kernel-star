@@ -89,6 +89,9 @@
 #define VI_RESERVE_3		(0x97 * 4)
 #define VI_RESERVE_4		(0x98 * 4)
 
+/* maximum valid value for latency allowance */
+#define MC_LA_MAX_VALUE		255
+
 #define ENABLE_LA_DEBUG		0
 #define TEST_LA_CODE		0
 
@@ -382,6 +385,7 @@ int tegra_set_latency_allowance(enum tegra_la_id id,
 	unsigned long reg_read;
 	unsigned long reg_write;
 	int bytes_per_atom = normal_atom_size;
+	struct la_client_info *ci;
 
 	VALIDATE_ID(id);
 	VALIDATE_BW(bandwidth_in_mbps);
@@ -389,14 +393,21 @@ int tegra_set_latency_allowance(enum tegra_la_id id,
 		id == ID(FDCDRD2) || id == ID(FDCDWR2))
 		bytes_per_atom = fdc_atom_size;
 
-	ideal_la = (la_info[id].fifo_size_in_atoms * bytes_per_atom * 1000) /
-		    (bandwidth_in_mbps * ns_per_tick);
-	la_to_set = ideal_la - (la_info[id].expiration_in_ns/ns_per_tick) - 1;
-	scaling_info[id].actual_la_to_set = la_to_set;
+	ci = &la_info[id];
+
+	if (bandwidth_in_mbps == 0) {
+		la_to_set = MC_LA_MAX_VALUE;
+	} else {
+		ideal_la = (ci->fifo_size_in_atoms * bytes_per_atom * 1000) /
+			   (bandwidth_in_mbps * ns_per_tick);
+		la_to_set = ideal_la - (ci->expiration_in_ns/ns_per_tick) - 1;
+	}
+
 	la_debug("\n%s:id=%d,bw=%dmbps, la_to_set=%d",
 		__func__, id, bandwidth_in_mbps, la_to_set);
 	la_to_set = (la_to_set < 0) ? 0 : la_to_set;
-	la_to_set = (la_to_set > 255) ? 255 : la_to_set;
+	la_to_set = (la_to_set > MC_LA_MAX_VALUE) ? MC_LA_MAX_VALUE : la_to_set;
+	scaling_info[id].actual_la_to_set = la_to_set;
 
 	/* until display can use latency allowance scaling, use a more
 	 * aggressive LA setting. Bug 862709 */
@@ -404,13 +415,13 @@ int tegra_set_latency_allowance(enum tegra_la_id id,
 		la_to_set /= 3;
 
 	spin_lock(&safety_lock);
-	reg_read = readl(la_info[id].reg_addr);
-	reg_write = (reg_read & ~la_info[id].mask) |
-			(la_to_set << la_info[id].shift);
-	writel(reg_write, la_info[id].reg_addr);
+	reg_read = readl(ci->reg_addr);
+	reg_write = (reg_read & ~ci->mask) |
+			(la_to_set << ci->shift);
+	writel(reg_write, ci->reg_addr);
 	scaling_info[id].la_set = la_to_set;
 	la_debug("reg_addr=0x%x, read=0x%x, write=0x%x",
-		(u32)la_info[id].reg_addr, (u32)reg_read, (u32)reg_write);
+		(u32)ci->reg_addr, (u32)reg_read, (u32)reg_write);
 	spin_unlock(&safety_lock);
 	return 0;
 }
