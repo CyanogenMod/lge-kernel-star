@@ -24,19 +24,23 @@
 #include <mach/usb_phy.h>
 #include <mach/iomap.h>
 
-#define TEGRA_USB_PORTSC_PHCD			(1 << 23)
+#define TEGRA_USB_PORTSC_PHCD		(1 << 23)
 
-#define TEGRA_USB_SUSP_CTRL_OFFSET		0x400
+#define TEGRA_USB_SUSP_CTRL_OFFSET	0x400
 #define TEGRA_USB_SUSP_CLR			(1 << 5)
 #define TEGRA_USB_PHY_CLK_VALID			(1 << 7)
 #define TEGRA_USB_SRT				(1 << 25)
-#define TEGRA_USB_PHY_CLK_VALID_INT_ENB        (1 << 9)
-#define TEGRA_USB_PHY_CLK_VALID_INT_STS        (1 << 8)
+#define TEGRA_USB_PHY_CLK_VALID_INT_ENB		(1 << 9)
+#define TEGRA_USB_PHY_CLK_VALID_INT_STS		(1 << 8)
 
-#define TEGRA_USB_PORTSC1_OFFSET		0x184
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+#define TEGRA_USB_PORTSC1_OFFSET	0x184
+#else
+#define TEGRA_USB_PORTSC1_OFFSET	0x174
+#endif
 #define TEGRA_USB_PORTSC1_WKCN			(1 << 20)
 
-#define TEGRA_LVL2_CLK_GATE_OVRB		0xfc
+#define TEGRA_LVL2_CLK_GATE_OVRB	0xfc
 #define TEGRA_USB2_CLK_OVR_ON			(1 << 10)
 
 #define TEGRA_USB_DMA_ALIGN 32
@@ -63,6 +67,7 @@ struct tegra_ehci_hcd {
 	struct timer_list clk_timer;
 	bool clock_enabled;
 	int hsic_connect_retries;
+	struct work_struct irq_work;
 };
 
 static void tegra_ehci_power_up(struct usb_hcd *hcd, bool is_dpd)
@@ -87,6 +92,16 @@ static void tegra_ehci_power_down(struct usb_hcd *hcd, bool is_dpd)
 #endif
 }
 
+static void irq_work(struct work_struct *irq_work)
+{
+	struct usb_hcd *hcd;
+	struct tegra_ehci_hcd *tegra =
+		container_of(irq_work, struct tegra_ehci_hcd, irq_work);
+	hcd = ehci_to_hcd(tegra->ehci);
+	if (!tegra->host_resumed)
+		tegra_ehci_power_up(hcd, false);
+}
+
 static irqreturn_t tegra_ehci_irq (struct usb_hcd *hcd)
 {
 	struct ehci_hcd *ehci = hcd_to_ehci (hcd);
@@ -94,8 +109,16 @@ static irqreturn_t tegra_ehci_irq (struct usb_hcd *hcd)
 	struct tegra_ehci_hcd *tegra = dev_get_drvdata(hcd->self.controller);
 	u32 val;
 
-	if (tegra->phy->usb_phy_type == TEGRA_USB_PHY_TYPE_UTMIP) {
+	if (tegra->phy->instance == 2) {
 		spin_lock(&ehci->lock);
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+		val = tegra_usb_phy_clear_connect_intr(tegra->phy);
+		if (!val) {
+			schedule_work(&tegra->irq_work);
+			spin_unlock(&ehci->lock);
+			return 0;
+		}
+#endif
 		val = readl(hcd->regs + TEGRA_USB_SUSP_CTRL_OFFSET);
 		if ((val  & TEGRA_USB_PHY_CLK_VALID_INT_STS)) {
 			val &= ~TEGRA_USB_PHY_CLK_VALID_INT_ENB |
@@ -953,6 +976,7 @@ static int tegra_ehci_probe(struct platform_device *pdev)
 	INIT_DELAYED_WORK(&tegra->work, tegra_hsic_connection_work);
 
 	INIT_WORK(&tegra->clk_timer_work, clk_timer_work_handler);
+	INIT_WORK (&tegra->irq_work, irq_work);
 
 	tegra->phy = tegra_usb_phy_open(instance, hcd->regs, pdata->phy_config,
 					TEGRA_USB_PHY_MODE_HOST, pdata->phy_type);
