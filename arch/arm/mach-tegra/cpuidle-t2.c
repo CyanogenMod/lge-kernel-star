@@ -271,8 +271,6 @@ static void tegra2_idle_lp2_cpu_1(struct cpuidle_device *dev,
 		return;
 	}
 
-	tegra_gic_cpu_disable();
-
 	/* Save time this CPU must be awakened by. */
 	tegra_cpu1_wake_by_time = ktime_to_us(ktime_get()) + request;
 	smp_wmb();
