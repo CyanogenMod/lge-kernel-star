@@ -453,6 +453,29 @@ static __initdata struct tegra_pingroup_config unused_pins_lowpower[] = {
 	DEFAULT_PINMUX(GMI_DQS,         NAND,           NORMAL,     TRISTATE,     OUTPUT),
 };
 
+static __initdata struct tegra_pingroup_config gmi_pins_269[] = {
+	/* Continuation of table unused_pins_lowpower only for PM269 */
+	DEFAULT_PINMUX(GMI_CS0_N,       NAND,           PULL_UP,    NORMAL,       OUTPUT),
+	DEFAULT_PINMUX(GMI_CS1_N,       NAND,           PULL_UP,    TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_CS2_N,       RSVD1,          NORMAL,     NORMAL,       INPUT),
+	DEFAULT_PINMUX(GMI_CS3_N,       NAND,           NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_CS4_N,       NAND,           PULL_UP,    NORMAL,       INPUT),
+	DEFAULT_PINMUX(GMI_CS6_N,       SATA,           NORMAL,     TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_CS7_N,       NAND,           PULL_UP,    NORMAL,       INPUT),
+	DEFAULT_PINMUX(GMI_AD8,         PWM0,           NORMAL,     NORMAL,       OUTPUT),
+	DEFAULT_PINMUX(GMI_AD9,         PWM1,           NORMAL,     NORMAL,       OUTPUT),
+	DEFAULT_PINMUX(GMI_AD10,        NAND,           NORMAL,     NORMAL,       OUTPUT),
+	DEFAULT_PINMUX(GMI_AD11,        NAND,           NORMAL,     NORMAL,       OUTPUT),
+	DEFAULT_PINMUX(GMI_AD13,        NAND,           PULL_UP,    TRISTATE,     OUTPUT),
+	DEFAULT_PINMUX(GMI_AD15,        NAND,           PULL_UP,    TRISTATE,     INPUT),
+	DEFAULT_PINMUX(GMI_A16,         SPI4,           NORMAL,     NORMAL,       INPUT),
+	DEFAULT_PINMUX(GMI_A17,         SPI4,           NORMAL,     NORMAL,       INPUT),
+	DEFAULT_PINMUX(GMI_A18,         SPI4,           PULL_UP,    NORMAL,       INPUT),
+	DEFAULT_PINMUX(GMI_A19,         SPI4,           NORMAL,     NORMAL,       INPUT),
+	DEFAULT_PINMUX(GMI_RST_N,       NAND,           PULL_UP,    NORMAL,       INPUT),
+	DEFAULT_PINMUX(GMI_WP_N,        NAND,           NORMAL,     NORMAL,       INPUT),
+};
+
 static void __init cardhu_pinmux_audio_init(void)
 {
 	tegra_gpio_enable(TEGRA_GPIO_CDC_IRQ);
@@ -490,6 +513,15 @@ int __init cardhu_pinmux_init(void)
 					ARRAY_SIZE(cardhu_pinmux_cardhu_a03));
 		}
 		break;
+
+	case BOARD_PM269:
+		tegra_pinmux_config_table(cardhu_pinmux_e118x,
+					ARRAY_SIZE(cardhu_pinmux_e118x));
+		tegra_pinmux_config_table(unused_pins_lowpower,
+					ARRAY_SIZE(unused_pins_lowpower));
+		tegra_pinmux_config_table(gmi_pins_269,
+					ARRAY_SIZE(gmi_pins_269));
+		break;
 	default:
 		tegra_pinmux_config_table(cardhu_pinmux_e118x,
 					ARRAY_SIZE(cardhu_pinmux_e118x));
@@ -526,6 +558,21 @@ struct pin_info_low_power_mode pin_lpm_cardhu_common[] = {
 	PIN_GPIO_LPM("GMI_CS0",   TEGRA_GPIO_PJ0, 1, 0),
 	PIN_GPIO_LPM("GMI_CS1",   TEGRA_GPIO_PJ2, 1, 0),
 	PIN_GPIO_LPM("GMI_WP_N",  TEGRA_GPIO_PC7, 1, 0),
+};
+
+struct pin_info_low_power_mode vddio_gmi_pins_pm269[] = {
+	PIN_GPIO_LPM("GMI_CS2",   TEGRA_GPIO_PK3, 0, 0),
+	PIN_GPIO_LPM("GMI_CS3_N", TEGRA_GPIO_PK4, 0, 0),
+	PIN_GPIO_LPM("GMI_CS4_N", TEGRA_GPIO_PK2, 1, 0),
+	PIN_GPIO_LPM("GMI_AD9",   TEGRA_GPIO_PH1, 0, 0),
+	PIN_GPIO_LPM("GMI_CS7",   TEGRA_GPIO_PI6, 1, 0),
+	PIN_GPIO_LPM("GMI_CS0",   TEGRA_GPIO_PJ0, 1, 0),
+	PIN_GPIO_LPM("GMI_CS1",   TEGRA_GPIO_PJ2, 1, 0),
+	PIN_GPIO_LPM("GMI_WP_N",  TEGRA_GPIO_PC7, 1, 0),
+	PIN_GPIO_LPM("GMI_A16",   TEGRA_GPIO_PJ7, 0, 0),
+	PIN_GPIO_LPM("GMI_A17",   TEGRA_GPIO_PB0, 0, 0),
+	PIN_GPIO_LPM("GMI_A18",   TEGRA_GPIO_PB1, 1, 0),
+	PIN_GPIO_LPM("GMI_A19",   TEGRA_GPIO_PK7, 0, 0),
 };
 
 static void set_unused_pin_gpio(struct pin_info_low_power_mode *lpm_pin_info,
@@ -572,5 +619,9 @@ int __init cardhu_pins_state_init(void)
 		(board_info.board_id == BOARD_E1198))
 			set_unused_pin_gpio(&pin_lpm_cardhu_common[0],
 					ARRAY_SIZE(pin_lpm_cardhu_common));
+
+	if (board_info.board_id == BOARD_PM269)
+		set_unused_pin_gpio(&vddio_gmi_pins_pm269[0],
+				ARRAY_SIZE(vddio_gmi_pins_pm269));
 	return 0;
 }

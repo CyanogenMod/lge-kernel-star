@@ -481,7 +481,7 @@ static int tegra_target(struct cpufreq_policy *policy,
 	target_cpu_speed[policy->cpu] = freq;
 	ret = tegra_cpu_cap_highest_speed(&new_speed);
 	if (ret == 0)
-		tegra_auto_hotplug_governor(new_speed);
+		tegra_auto_hotplug_governor(new_speed, false);
 out:
 	mutex_unlock(&tegra_cpu_lock);
 
@@ -498,9 +498,15 @@ static int tegra_pm_notify(struct notifier_block *nb, unsigned long event,
 		pr_info("Tegra cpufreq suspend: setting frequency to %d kHz\n",
 			freq_table[suspend_index].frequency);
 		tegra_update_cpu_speed(freq_table[suspend_index].frequency);
+		tegra_auto_hotplug_governor(
+			freq_table[suspend_index].frequency, true);
 	} else if (event == PM_POST_SUSPEND) {
+		unsigned int freq;
 		is_suspended = false;
 		tegra_cpu_edp_init(true);
+		tegra_cpu_cap_highest_speed(&freq);
+		pr_info("Tegra cpufreq resume: restoring frequency to %d kHz\n",
+			freq);
 	}
 	mutex_unlock(&tegra_cpu_lock);
 
@@ -580,7 +586,9 @@ static int __init tegra_cpufreq_init(void)
 
 	struct tegra_cpufreq_table_data *table_data =
 		tegra_cpufreq_table_get();
-	BUG_ON(!table_data);
+	if (IS_ERR_OR_NULL(table_data))
+		return -EINVAL;
+
 	suspend_index = table_data->suspend_index;
 
 #ifdef CONFIG_TEGRA_THERMAL_THROTTLE

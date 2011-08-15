@@ -24,6 +24,8 @@
 #ifndef __LINUX_MFD_TPS80031_H
 #define __LINUX_MFD_TPS80031_H
 
+#include <linux/rtc.h>
+
 #define tps80031_rails(_name) "tps80031_"#_name
 
 enum {
@@ -42,6 +44,7 @@ enum {
 	TPS80031_ID_LDO7,
 	TPS80031_ID_LDOLN,
 	TPS80031_ID_LDOUSB,
+	TPS80031_ID_VBUS,
 };
 
 enum {
@@ -91,6 +94,11 @@ struct tps80031_subdev_info {
 	void		*platform_data;
 };
 
+struct tps80031_rtc_platform_data {
+	int irq;
+	struct rtc_time time;
+};
+
 struct tps80031_32kclock_plat_data {
 	unsigned en_clk32kao:1;
 	unsigned en_clk32kg:1;
@@ -121,6 +129,8 @@ extern int tps80031_clr_bits(struct device *dev, int sid, int reg,
 				uint8_t bit_mask);
 extern int tps80031_update(struct device *dev, int sid, int reg, uint8_t val,
 			   uint8_t mask);
+extern int tps80031_force_update(struct device *dev, int sid, int reg,
+				 uint8_t val, uint8_t mask);
 extern int tps80031_power_off(void);
 
 #endif /*__LINUX_MFD_TPS80031_H */

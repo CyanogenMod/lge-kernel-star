@@ -22,6 +22,7 @@
 #include <linux/smp.h>
 #include <linux/interrupt.h>
 #include <linux/clk.h>
+#include <linux/delay.h>
 
 #include <mach/gpio.h>
 #include <mach/iomap.h>
@@ -29,6 +30,8 @@
 
 #include <asm/cpu_pm.h>
 #include <asm/hardware/gic.h>
+
+#include <trace/events/power.h>
 
 #include "clock.h"
 #include "cpuidle.h"
@@ -275,10 +278,13 @@ void tegra_cluster_switch_epilog(unsigned int flags)
 int tegra_cluster_control(unsigned int us, unsigned int flags)
 {
 #ifdef CONFIG_PM_SLEEP
+	static ktime_t last_g2lp;
+
 	unsigned int target_cluster = flags & TEGRA_POWER_CLUSTER_MASK;
 	unsigned int current_cluster = is_lp_cluster()
 					? TEGRA_POWER_CLUSTER_LP
 					: TEGRA_POWER_CLUSTER_G;
+	unsigned long irq_flags;
 
 	if ((target_cluster == TEGRA_POWER_CLUSTER_MASK) || !target_cluster)
 		return -EINVAL;
@@ -294,8 +300,21 @@ int tegra_cluster_control(unsigned int us, unsigned int flags)
 		if (!is_g_cluster_present())
 			return -EPERM;
 
+	trace_power_start(POWER_PSTATE, target_cluster, 0);
+
 	if (flags & TEGRA_POWER_CLUSTER_IMMEDIATE)
 		us = 0;
+
+	if (current_cluster != target_cluster) {
+		if (target_cluster == TEGRA_POWER_CLUSTER_G) {
+			s64 t = ktime_to_us(ktime_sub(ktime_get(), last_g2lp));
+			s64 t_off = tegra_cpu_power_off_time();
+			if (t_off > t)
+				udelay((unsigned int)(t_off - t));
+		}
+		else
+			last_g2lp = ktime_get();
+	}
 
 	DEBUG_CLUSTER(("%s(LP%d): %s->%s %s %s %d\r\n", __func__,
 		(flags & TEGRA_POWER_SDRAM_SELFREFRESH) ? 1 : 2,
@@ -305,7 +324,7 @@ int tegra_cluster_control(unsigned int us, unsigned int flags)
 		(flags & TEGRA_POWER_CLUSTER_FORCE) ? "force" : "",
 	        us));
 
-	local_irq_disable();
+	local_irq_save(irq_flags);
 	if (flags & TEGRA_POWER_SDRAM_SELFREFRESH) {
 		if (us)
 			tegra_lp2_set_trigger(us);
@@ -321,7 +340,7 @@ int tegra_cluster_control(unsigned int us, unsigned int flags)
 		cpu_pm_exit();
 		tegra_clear_cpu_in_lp2(0);
 	}
-	local_irq_enable();
+	local_irq_restore(irq_flags);
 
 	DEBUG_CLUSTER(("%s: %s\r\n", __func__, is_lp_cluster() ? "LP" : "G"));
 
@@ -346,5 +365,20 @@ void tegra_lp0_resume_mc(void)
 	void __iomem *mc = IO_ADDRESS(TEGRA_MC_BASE);
 	writel(mc_reserved_rsv, mc + MC_RESERVED_RSV);
 	writel(mc_emem_arb_override, mc + MC_EMEM_ARB_OVERRIDE);
+}
+
+void tegra_lp0_cpu_mode(bool enter)
+{
+	static bool entered_on_g = false;
+	unsigned int flags;
+
+	if (enter)
+		entered_on_g = !is_lp_cluster();
+
+	if (entered_on_g) {
+		flags = enter ? TEGRA_POWER_CLUSTER_LP : TEGRA_POWER_CLUSTER_G;
+		flags |= TEGRA_POWER_CLUSTER_IMMEDIATE;
+		tegra_cluster_control(0, flags);
+	}
 }
 #endif

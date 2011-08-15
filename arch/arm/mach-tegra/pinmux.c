@@ -295,6 +295,7 @@ static int tegra_pinmux_set_func(const struct tegra_pingroup_config *config)
 {
 	int mux = -1;
 	int i;
+	int find = 0;
 	unsigned long reg;
 	unsigned long flags;
 	enum tegra_pingroup pg = config->pingroup;
@@ -320,18 +321,37 @@ static int tegra_pinmux_set_func(const struct tegra_pingroup_config *config)
 		func = pingroups[pg].func_safe;
 
 	if (func & TEGRA_MUX_RSVD) {
-		mux = func & 0x3;
+		for (i = 0; i < 4; i++) {
+			if (pingroups[pg].funcs[i] & func)
+				mux = i;
+
+			if (pingroups[pg].funcs[i] == func) {
+				mux = i;
+				find = 1;
+				break;
+			}
+		}
 	} else {
 		for (i = 0; i < 4; i++) {
 			if (pingroups[pg].funcs[i] == func) {
 				mux = i;
+				find = 1;
 				break;
 			}
 		}
 	}
 
-	if (mux < 0)
+	if (mux < 0) {
+		pr_err("The pingroup %s is not supported option %s\n",
+			pingroup_name(pg), func_name(func));
+		WARN_ON(1);
 		return -EINVAL;
+	}
+
+	if (!find)
+		pr_warn("The pingroup %s was configured to %s instead of %s\n",
+			pingroup_name(pg), func_name(pingroups[pg].funcs[mux]),
+			func_name(func));
 
 	spin_lock_irqsave(&mux_lock, flags);
 

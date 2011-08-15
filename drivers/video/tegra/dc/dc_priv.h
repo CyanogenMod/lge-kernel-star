@@ -27,6 +27,34 @@
 
 #include "../host/dev.h"
 
+#define WIN_IS_TILED(win)	((win)->flags & TEGRA_WIN_FLAG_TILED)
+#define WIN_IS_ENABLED(win)	((win)->flags & TEGRA_WIN_FLAG_ENABLED)
+#define WIN_USE_V_FILTER(win)	((win)->h != (win)->out_h)
+#define WIN_USE_H_FILTER(win)	((win)->w != (win)->out_w)
+
+#define NEED_UPDATE_EMC_ON_EVERY_FRAME (windows_idle_detection_time == 0)
+
+/* DDR: 8 bytes transfer per clock */
+#define DDR_BW_TO_FREQ(bw) ((bw) / 8)
+
+#if defined(CONFIG_TEGRA_EMC_TO_DDR_CLOCK)
+#define EMC_BW_TO_FREQ(bw) (DDR_BW_TO_FREQ(bw) * CONFIG_TEGRA_EMC_TO_DDR_CLOCK)
+#else
+#define EMC_BW_TO_FREQ(bw) (DDR_BW_TO_FREQ(bw) * 2)
+#endif
+
+/*
+ * If using T30/DDR3, the 2nd 16 bytes part of DDR3 atom is 2nd line and is
+ * discarded in tiling mode.
+ */
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
+#define TILED_WINDOWS_BW_MULTIPLIER 1
+#elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
+#define TILED_WINDOWS_BW_MULTIPLIER 2
+#else
+#warning "need to revisit memory tiling effects on DC"
+#endif
+
 struct tegra_dc;
 
 struct tegra_dc_blend {
@@ -53,8 +81,6 @@ struct tegra_dc_out_ops {
 };
 
 struct tegra_dc {
-	struct list_head		list;
-
 	struct nvhost_device		*ndev;
 	struct tegra_dc_platform_data	*pdata;
 
@@ -62,8 +88,11 @@ struct tegra_dc {
 	void __iomem			*base;
 	int				irq;
 
+	int				pixel_clk;
 	struct clk			*clk;
 	struct clk			*emc_clk;
+	int				emc_clk_rate;
+	int				new_emc_clk_rate;
 
 	bool				enabled;
 	bool				suspended;
@@ -93,6 +122,7 @@ struct tegra_dc {
 
 	unsigned long			underflow_mask;
 	struct work_struct		reset_work;
+	struct delayed_work		reduce_emc_clk_work;
 
 	struct switch_dev		modeset_switch;
 
@@ -156,6 +186,12 @@ static inline void tegra_dc_set_outdata(struct tegra_dc *dc, void *data)
 static inline void *tegra_dc_get_outdata(struct tegra_dc *dc)
 {
 	return dc->out_data;
+}
+
+static inline unsigned long tegra_dc_get_default_emc_clk_rate(
+							struct tegra_dc *dc)
+{
+	return dc->pdata->emc_clk_rate ? dc->pdata->emc_clk_rate : ULONG_MAX;
 }
 
 void tegra_dc_setup_clk(struct tegra_dc *dc, struct clk *clk);

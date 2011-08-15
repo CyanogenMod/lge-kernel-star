@@ -76,13 +76,14 @@ int tegra_cpu_cap_highest_speed(unsigned int *speed_cap);
 #if defined(CONFIG_TEGRA_AUTO_HOTPLUG) && !defined(CONFIG_ARCH_TEGRA_2x_SOC)
 int tegra_auto_hotplug_init(struct mutex *cpu_lock);
 void tegra_auto_hotplug_exit(void);
-void tegra_auto_hotplug_governor(unsigned int cpu_freq);
+void tegra_auto_hotplug_governor(unsigned int cpu_freq, bool suspend);
 #else
 static inline int tegra_auto_hotplug_init(struct mutex *cpu_lock)
 { return 0; }
 static inline void tegra_auto_hotplug_exit(void)
 { }
-static inline void tegra_auto_hotplug_governor(unsigned int cpu_freq)
+static inline void tegra_auto_hotplug_governor(unsigned int cpu_freq,
+						bool suspend)
 { }
 #endif
 
@@ -104,6 +105,7 @@ void tegra_cluster_switch_prolog(unsigned int flags);
 void tegra_cluster_switch_epilog(unsigned int flags);
 void tegra_lp0_suspend_mc(void);
 void tegra_lp0_resume_mc(void);
+void tegra_lp0_cpu_mode(bool enter);
 #else
 static inline int tegra_cluster_control(unsigned int us, unsigned int flags)
 #define INSTRUMENT_CLUSTER_SWITCH 0	/* Must be zero for ARCH_TEGRA_2x_SOC */
@@ -116,6 +118,7 @@ static inline void tegra_cluster_switch_prolog(unsigned int flags) {}
 static inline void tegra_cluster_switch_epilog(unsigned int flags) {}
 static inline void tegra_lp0_suspend_mc(void) {}
 static inline void tegra_lp0_resume_mc(void) {}
+static inline void tegra_lp0_cpu_mode(bool enter) {}
 #endif
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC

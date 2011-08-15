@@ -175,6 +175,7 @@ static void irq_work(struct work_struct *work)
 			tegra_start_host(tegra);
 		}
 	}
+	clk_disable(tegra->clk);
 	tegra_otg_disable_clk();
 }
 
@@ -341,7 +342,6 @@ static int tegra_otg_probe(struct platform_device *pdev)
 	INIT_WORK (&tegra->work, irq_work);
 
 	dev_info(&pdev->dev, "otg transceiver registered\n");
-	clk_disable(tegra->clk);
 	return 0;
 
 err_irq:

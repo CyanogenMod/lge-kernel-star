@@ -37,6 +37,9 @@
 #include "pm.h"
 #include "wakeups-t3.h"
 
+#define PMC_CTRL		0x0
+#define PMC_CTRL_INTR_LOW	(1 << 17)
+
 /************************ TPS80031 based regulator ****************/
 static struct regulator_consumer_supply tps80031_vio_supply[] = {
 	REGULATOR_SUPPLY("vio_1v8", NULL),
@@ -128,8 +131,12 @@ static struct regulator_consumer_supply tps80031_ldousb_supply[] = {
 	REGULATOR_SUPPLY("unused_ldousb", NULL),
 };
 
+static struct regulator_consumer_supply tps80031_vbus_supply[] = {
+	REGULATOR_SUPPLY("usb_vbus", NULL),
+};
+
 #define TPS_PDATA_INIT(_id, _minmv, _maxmv, _supply_reg, _always_on,	\
-	_boot_on, _apply_uv, _init_uV, _init_enable, _init_apply)	\
+	_boot_on, _apply_uv, _init_uV, _init_enable, _init_apply, _flags) \
 	static struct tps80031_regulator_platform_data pdata_##_id = {	\
 		.regulator = {						\
 			.constraints = {				\
@@ -152,24 +159,45 @@ static struct regulator_consumer_supply tps80031_ldousb_supply[] = {
 		.init_uV =  _init_uV * 1000,				\
 		.init_enable = _init_enable,				\
 		.init_apply = _init_apply,				\
+		.flags = _flags,					\
 	}
 
-TPS_PDATA_INIT(vio,   600, 2100, 0, 0, 0, 0, -1, 0, 0);
-TPS_PDATA_INIT(smps1, 600, 2100, 0, 0, 0, 0, -1, 0, 0);
-TPS_PDATA_INIT(smps2, 600, 2100, 0, 0, 0, 0, -1, 0, 0);
-TPS_PDATA_INIT(smps3, 600, 2100, 0, 0, 0, 0, -1, 0, 0);
-TPS_PDATA_INIT(smps4, 600, 2100, 0, 0, 0, 0, -1, 0, 0);
+TPS_PDATA_INIT(vio,   600, 2100, 0, 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(smps1, 600, 2100, 0, 0, 0, 0, -1, 0, 0, PWR_REQ_INPUT_PREQ2);
+TPS_PDATA_INIT(smps2, 600, 2100, 0, 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(smps3, 600, 2100, 0, 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(smps4, 600, 2100, 0, 0, 0, 0, -1, 0, 0, 0);
 
-TPS_PDATA_INIT(ldo1, 1000, 3300, tps80031_rails(VIO), 0, 0, 0, -1, 0, 0);
-TPS_PDATA_INIT(ldo2, 1000, 3300, 0, 0, 0, 0, -1, 0, 0);
-TPS_PDATA_INIT(ldo3, 1000, 3300, tps80031_rails(VIO), 0, 0, 0, -1, 0, 0);
-TPS_PDATA_INIT(ldo4, 1000, 3300, 0, 0, 0, 0, -1, 0, 0);
-TPS_PDATA_INIT(ldo5, 1000, 3300, 0, 0, 0, 0, -1, 0, 0);
-TPS_PDATA_INIT(ldo6, 1000, 3300, 0, 0, 0, 0, -1, 0, 0);
-TPS_PDATA_INIT(ldo7, 1000, 3300, tps80031_rails(VIO), 0, 0, 0, -1, 0, 0);
-TPS_PDATA_INIT(ldoln, 1000, 3300, tps80031_rails(SMPS3), 0, 0, 0, -1, 0, 0);
-TPS_PDATA_INIT(ldousb, 1000, 3300, 0, 0, 0, 0, -1, 0, 0);
-TPS_PDATA_INIT(vana,  1000, 3300, 0, 0, 0, 0, -1, 0, 0);
+TPS_PDATA_INIT(ldo1, 1000, 3300, tps80031_rails(VIO), 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(ldo2, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(ldo3, 1000, 3300, tps80031_rails(VIO), 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(ldo4, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(ldo5, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(ldo6, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(ldo7, 1000, 3300, tps80031_rails(VIO), 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(ldoln, 1000, 3300, tps80031_rails(SMPS3), 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(ldousb, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, USBLDO_INPUT_VSYS);
+TPS_PDATA_INIT(vana,  1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(vbus,  0, 5000, 0, 0, 0, 0, -1, 0, 0, VBUS_SW_ONLY);
+
+static struct tps80031_rtc_platform_data rtc_data = {
+	.irq = TPS80031_IRQ_BASE + TPS80031_INT_RTC_ALARM,
+	.time = {
+		.tm_year = 2011,
+		.tm_mon = 0,
+		.tm_mday = 1,
+		.tm_hour = 1,
+		.tm_min = 2,
+		.tm_sec = 3,
+	},
+};
+
+#define TPS_RTC()				\
+	{						\
+		.id	= 0,		\
+		.name	= "rtc_tps80031",	\
+		.platform_data = &rtc_data,	\
+	}
 
 #define TPS_REG(_id, _data)				\
 	{						\
@@ -194,6 +222,8 @@ static struct tps80031_subdev_info tps80031_devs[] = {
 	TPS_REG(LDOLN, ldoln),
 	TPS_REG(LDOUSB, ldousb),
 	TPS_REG(VANA, vana),
+	TPS_REG(VBUS, vbus),
+	TPS_RTC(),
 };
 
 struct tps80031_32kclock_plat_data clk32k_pdata = {
@@ -337,10 +367,30 @@ static int __init enterprise_gpio_switch_regulator_init(void)
 	return platform_device_register(&gswitch_regulator_pdata);
 }
 
+static void enterprise_power_off(void)
+{
+	int ret;
+	pr_info("enterprise: Powering off the device\n");
+	ret = tps80031_power_off();
+	if (ret)
+		pr_err("enterprise: failed to power off\n");
+	while(1);
+}
+
 int __init enterprise_regulator_init(void)
 {
+	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
+	u32 pmc_ctrl;
+
+	/* configure the power management controller to trigger PMU
+	 * interrupts when low */
+
+	pmc_ctrl = readl(pmc + PMC_CTRL);
+	writel(pmc_ctrl | PMC_CTRL_INTR_LOW, pmc + PMC_CTRL);
+
 	i2c_register_board_info(4, enterprise_regulators, 1);
 	enterprise_gpio_switch_regulator_init();
+	pm_power_off = enterprise_power_off;
 	return 0;
 }
 

@@ -324,6 +324,13 @@ void clk_disable(struct clk *c)
 }
 EXPORT_SYMBOL(clk_disable);
 
+static int clk_rate_change_notify(struct clk *c, unsigned long rate)
+{
+	if (!c->rate_change_nh)
+		return -ENOSYS;
+	return raw_notifier_call_chain(c->rate_change_nh, rate, NULL);
+}
+
 int clk_set_parent(struct clk *c, struct clk *parent)
 {
 	int ret = 0;
@@ -359,7 +366,7 @@ int clk_set_parent(struct clk *c, struct clk *parent)
 	 * setting enable clock while setting parent.
 	 */
 	if ((c->refcnt == 0) && (c->flags & MUX)) {
-		pr_warn("Setting parent of clock %s with refcnt 0", c->name);
+		pr_debug("Setting parent of clock %s with refcnt 0\n", c->name);
 		disable = true;
 		ret = clk_enable_locked(c);
 		if (ret)
@@ -380,6 +387,9 @@ int clk_set_parent(struct clk *c, struct clk *parent)
 	if (clk_is_auto_dvfs(c) && c->refcnt > 0 &&
 			new_rate < old_rate)
 		ret = tegra_dvfs_set_rate(c, new_rate);
+
+	if (new_rate != old_rate)
+		clk_rate_change_notify(c, new_rate);
 
 out:
 	if (disable)
@@ -427,7 +437,7 @@ int clk_set_rate_locked(struct clk *c, unsigned long rate)
 	 */
 	if ((c->refcnt == 0) && (c->flags & (DIV_U71 | DIV_U16)) &&
 		clk_is_auto_dvfs(c)) {
-		pr_warn("Setting rate of clock %s with refcnt 0", c->name);
+		pr_debug("Setting rate of clock %s with refcnt 0\n", c->name);
 		disable = true;
 		ret = clk_enable_locked(c);
 		if (ret)
@@ -447,6 +457,9 @@ int clk_set_rate_locked(struct clk *c, unsigned long rate)
 
 	if (clk_is_auto_dvfs(c) && rate < old_rate && c->refcnt > 0)
 		ret = tegra_dvfs_set_rate(c, rate);
+
+	if (rate != old_rate)
+		clk_rate_change_notify(c, rate);
 
 out:
 	if (disable)
@@ -639,6 +652,7 @@ void __init tegra_init_max_rate(struct clk *c, unsigned long max_rate)
 	c->max_rate = max_rate;
 	list_for_each_entry(shared_bus_user,
 			    &c->shared_bus_list, u.shared_bus_user.node) {
+		shared_bus_user->u.shared_bus_user.rate = max_rate;
 		shared_bus_user->max_rate = max_rate;
 	}
 }
@@ -763,6 +777,33 @@ int tegra_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting)
 out:
 	clk_unlock_restore(c, &flags);
 	return ret;
+}
+
+int tegra_register_clk_rate_notifier(struct clk *c, struct notifier_block *nb)
+{
+	int ret;
+	unsigned long flags;
+
+	if (!c->rate_change_nh)
+		return -ENOSYS;
+
+	clk_lock_save(c, &flags);
+	ret = raw_notifier_chain_register(c->rate_change_nh, nb);
+	clk_unlock_restore(c, &flags);
+	return ret;
+}
+
+void tegra_unregister_clk_rate_notifier(
+	struct clk *c, struct notifier_block *nb)
+{
+	unsigned long flags;
+
+	if (!c->rate_change_nh)
+		return;
+
+	clk_lock_save(c, &flags);
+	raw_notifier_chain_unregister(c->rate_change_nh, nb);
+	clk_unlock_restore(c, &flags);
 }
 
 #ifdef CONFIG_DEBUG_FS
@@ -919,13 +960,16 @@ static void clock_tree_show_one(struct seq_file *s, struct clk *c, int level)
 		}
 	}
 
-	seq_printf(s, "%*s%c%c%-*s%c %-6s %-3d %-8s %-10lu\n",
+	seq_printf(s, "%*s%c%c%-*s%c %-6s %-3d %-8s %-10lu",
 		level * 3 + 1, "",
 		rate > max_rate ? '!' : ' ',
 		!c->set ? '*' : ' ',
 		30 - level * 3, c->name,
 		c->cansleep ? '$' : ' ',
 		state, c->refcnt, div, rate);
+	if (c->parent && !list_empty(&c->parent->shared_bus_list))
+		seq_printf(s, " (%lu)", c->u.shared_bus_user.rate);
+	seq_printf(s, "\n");
 
 	if (c->dvfs)
 		dvfs_show_one(s, c->dvfs, level + 1);
@@ -941,8 +985,8 @@ static void clock_tree_show_one(struct seq_file *s, struct clk *c, int level)
 static int clock_tree_show(struct seq_file *s, void *data)
 {
 	struct clk *c;
-	seq_printf(s, "   clock                          state  ref div      rate\n");
-	seq_printf(s, "--------------------------------------------------------------\n");
+	seq_printf(s, "   clock                          state  ref div      rate       (shared rate)\n");
+	seq_printf(s, "------------------------------------------------------------------------------\n");
 
 	mutex_lock(&clock_list_lock);
 
@@ -968,6 +1012,61 @@ static const struct file_operations clock_tree_fops = {
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= single_release,
+};
+
+static void syncevent_one(struct clk *c)
+{
+	struct clk *child;
+
+	if (c->state == ON)
+		trace_clock_enable(c->name, 1, smp_processor_id());
+	else
+		trace_clock_disable(c->name, 0, smp_processor_id());
+
+	trace_clock_set_rate(c->name, clk_get_rate_all_locked(c),
+				smp_processor_id());
+
+	list_for_each_entry(child, &clocks, node) {
+		if (child->parent != c)
+			continue;
+
+		syncevent_one(child);
+	}
+}
+
+static int syncevent_write(struct file *file, const char __user *user_buf,
+				size_t count, loff_t *ppos)
+{
+	struct clk *c;
+	char buffer[40];
+	int buf_size;
+
+	memset(buffer, 0, sizeof(buffer));
+	buf_size = min(count, (sizeof(buffer)-1));
+
+	if (copy_from_user(buffer, user_buf, buf_size))
+		return -EFAULT;
+
+	if (!strnicmp("all", buffer, 3)) {
+		mutex_lock(&clock_list_lock);
+
+		clk_lock_all();
+
+		list_for_each_entry(c, &clocks, node) {
+			if (c->parent == NULL)
+				syncevent_one(c);
+		}
+
+		clk_unlock_all();
+
+		mutex_unlock(&clock_list_lock);
+	}
+
+	return count;
+}
+
+static const struct file_operations syncevent_fops = {
+	.write		= syncevent_write,
 };
 
 static int possible_parents_show(struct seq_file *s, void *data)
@@ -1025,7 +1124,7 @@ static int state_get(void *data, u64 *val)
 
 #ifdef CONFIG_TEGRA_CLOCK_DEBUG_WRITE
 
-static const mode_t parent_rate_mode =  S_IRUGO | S_IWUGO;
+static const mode_t parent_rate_mode =  S_IRUGO | S_IWUSR;
 
 static ssize_t parent_write(struct file *file,
 	const char __user *userbuf, size_t count, loff_t *ppos)
@@ -1205,6 +1304,9 @@ static int __init clk_debugfs_init(void)
 		&clock_tree_fops);
 	if (!d)
 		goto err_out;
+
+	d = debugfs_create_file("syncevents", S_IWUGO, clk_debugfs_root, NULL,
+		&syncevent_fops);
 
 	if (dvfs_debugfs_init(clk_debugfs_root))
 		goto err_out;

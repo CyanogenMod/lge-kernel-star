@@ -271,12 +271,17 @@ static void tegra_auto_hotplug_work_func(struct work_struct *work)
 	}
 }
 
-void tegra_auto_hotplug_governor(unsigned int cpu_freq)
+void tegra_auto_hotplug_governor(unsigned int cpu_freq, bool suspend)
 {
 	unsigned long up_delay;
 
 	if (!is_g_cluster_present())
 		return;
+
+	if (suspend && (hp_state != TEGRA_HP_DISABLED)) {
+		hp_state = TEGRA_HP_IDLE;
+		return;
+	}
 
 	up_delay = is_lp_cluster() ? up2g0_delay : up2gn_delay;
 

@@ -244,7 +244,7 @@ static int mediasrv_alloc(struct tegra_mediasrv_node *node,
 	{
 		struct tegra_mediasrv_block *block;
 
-		block = kzalloc(sizeof(struct tegra_mediasrv_node),
+		block = kzalloc(sizeof(struct tegra_mediasrv_block),
 				GFP_KERNEL);
 		CHECK_NULL(block, block_alloc_fail);
 
@@ -269,7 +269,8 @@ block_done:
 			if (!mediasrv->nr_iram_shared) {
 				size_t align, size;
 				struct nvmap_handle_ref *r = NULL;
-				unsigned long id, physical_address;
+				unsigned long id;
+				int physical_address;
 
 				size = PAGE_ALIGN(in->in.u.iram.size);
 				r = nvmap_create_handle(mediasrv->nvmap, size);
@@ -339,7 +340,7 @@ static void mediasrv_free(struct tegra_mediasrv_node *node,
 	switch (in->in.tegra_mediaserver_resource_type) {
 	case TEGRA_MEDIASERVER_RESOURCE_BLOCK:
 	{
-		struct tegra_mediasrv_block *block;
+		struct tegra_mediasrv_block *block = NULL;
 		struct tegra_mediasrv_block *temp;
 		struct list_head *entry;
 
@@ -392,7 +393,7 @@ static int mediasrv_update_block_info(
 	union tegra_mediaserver_update_block_info *in
 )
 {
-	struct tegra_mediasrv_block *entry;
+	struct tegra_mediasrv_block *entry = NULL;
 	struct tegra_mediasrv_block *block;
 	int e;
 

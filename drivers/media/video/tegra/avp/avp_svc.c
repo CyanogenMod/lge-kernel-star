@@ -436,6 +436,48 @@ static void do_svc_printf(struct avp_svc_info *avp_svc, struct svc_msg *_msg,
 	pr_info("[AVP]: %s", tmp_str);
 }
 
+static void do_svc_module_clock_set(struct avp_svc_info *avp_svc,
+				    struct svc_msg *_msg,
+				    size_t len)
+{
+	struct svc_clock_ctrl *msg = (struct svc_clock_ctrl *)_msg;
+	struct svc_clock_ctrl_response resp;
+	struct avp_module *mod;
+	struct avp_clk *aclk;
+	int ret = 0;
+
+	mod = find_avp_module(avp_svc, msg->module_id);
+	if (!mod) {
+		pr_err("avp_svc: unknown module clock requested: %d\n",
+		       msg->module_id);
+		resp.err = AVP_ERR_EINVAL;
+		goto send_response;
+	}
+
+	mutex_lock(&avp_svc->clk_lock);
+
+	aclk = &avp_svc->clks[mod->clk_req];
+	ret = clk_set_rate(aclk->clk, msg->clk_freq);
+	if (ret) {
+		pr_err("avp_svc: Failed to set module (id = %d) frequency to %d kHz\n",
+			msg->module_id, msg->clk_freq);
+		resp.err = AVP_ERR_EINVAL;
+		resp.act_freq = 0;
+		mutex_unlock(&avp_svc->clk_lock);
+		goto send_response;
+	}
+
+	resp.act_freq = clk_get_rate(aclk->clk);
+
+	mutex_unlock(&avp_svc->clk_lock);
+	resp.err = 0;
+
+send_response:
+	resp.svc_id = SVC_MODULE_CLOCK_SET_RESPONSE;
+	trpc_send_msg(avp_svc->rpc_node, avp_svc->cpu_ep, &resp,
+		      sizeof(resp), GFP_KERNEL);
+}
+
 static int dispatch_svc_message(struct avp_svc_info *avp_svc,
 				struct svc_msg *msg,
 				size_t len)
@@ -518,6 +560,10 @@ static int dispatch_svc_message(struct avp_svc_info *avp_svc,
 	case SVC_AVP_WDT_RESET:
 		pr_err("avp_svc: AVP has been reset by watchdog\n");
 		break;
+	case SVC_MODULE_CLOCK_SET:
+		DBG(AVP_DBG_TRACE_SVC, "%s: got module_clock_set\n", __func__);
+		do_svc_module_clock_set(avp_svc, msg, len);
+		break;
 	default:
 		pr_err("avp_svc: invalid SVC call 0x%x\n", msg->svc_id);
 		ret = -ENOMSG;
@@ -533,12 +579,12 @@ static int avp_svc_thread(void *data)
 	u8 buf[TEGRA_RPC_MAX_MSG_LEN];
 	struct svc_msg *msg = (struct svc_msg *)buf;
 	int ret;
+	long timeout;
 
 	BUG_ON(!avp_svc->cpu_ep);
 
 	ret = trpc_wait_peer(avp_svc->cpu_ep, -1);
 	if (ret) {
-		/* XXX: teardown?! */
 		pr_err("%s: no connection from AVP (%d)\n", __func__, ret);
 		goto err;
 	}
@@ -550,12 +596,19 @@ static int avp_svc_thread(void *data)
 		ret = trpc_recv_msg(avp_svc->rpc_node, avp_svc->cpu_ep, buf,
 				    TEGRA_RPC_MAX_MSG_LEN, -1);
 		DBG(AVP_DBG_TRACE_SVC, "%s: got message\n", __func__);
-		if (ret < 0) {
-			pr_err("%s: couldn't receive msg\n", __func__);
-			/* XXX: port got closed? we should exit? */
-			goto err;
-		} else if (!ret) {
-			pr_err("%s: received msg of len 0?!\n", __func__);
+
+		if (ret == -ECONNRESET || ret == -ENOTCONN) {
+			pr_info("%s: AVP seems to be down; "
+				"wait for kthread_stop\n", __func__);
+			timeout = msecs_to_jiffies(100);
+			timeout = schedule_timeout_interruptible(timeout);
+			if (timeout == 0)
+				pr_err("%s: timed out while waiting for "
+					"kthread_stop\n", __func__);
+			continue;
+		} else if (ret <= 0) {
+			pr_err("%s: couldn't receive msg (ret=%d)\n",
+				__func__, ret);
 			continue;
 		}
 		dispatch_svc_message(avp_svc, msg, ret);
@@ -563,7 +616,7 @@ static int avp_svc_thread(void *data)
 
 err:
 	trpc_put(avp_svc->cpu_ep);
-	pr_info("%s: done\n", __func__);
+	pr_info("%s: exiting\n", __func__);
 	return ret;
 }
 
@@ -718,6 +771,7 @@ err_get_clks:
 		clk_put(avp_svc->sclk);
 	if (!IS_ERR_OR_NULL(avp_svc->emcclk))
 		clk_put(avp_svc->emcclk);
+	kfree(avp_svc);
 err_alloc:
 	return ERR_PTR(ret);
 }

@@ -57,7 +57,7 @@ static int wait_for_done(void)
 	int retries = 50;
 	do {
 		reg = tegra_kfuse_readl(KFUSE_STATE);
-		if (reg & KFUSE_STATE_DONE);
+		if (reg & KFUSE_STATE_DONE)
 			return 0;
 		msleep(10);
 	} while(--retries);

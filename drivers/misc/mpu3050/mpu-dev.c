@@ -1009,7 +1009,6 @@ int mpu3050_probe(struct i2c_client *client,
 	struct i2c_adapter *accel_adapter = NULL;
 	struct i2c_adapter *compass_adapter = NULL;
 	struct i2c_adapter *pressure_adapter = NULL;
-	printk("Ameer's changes...\n");
 	dev_dbg(&client->adapter->dev, "%s\n", __func__);
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {

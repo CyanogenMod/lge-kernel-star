@@ -18,22 +18,7 @@
  *
  */
 
-enum tegra_chipid {
-	TEGRA_CHIPID_UNKNOWN = 0,
-	TEGRA_CHIPID_TEGRA2 = 0x20,
-	TEGRA_CHIPID_TEGRA3 = 0x30,
-};
-
-enum tegra_revision {
-	TEGRA_REVISION_UNKNOWN = 0,
-	TEGRA_REVISION_A01,
-	TEGRA_REVISION_A02,
-#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
-	TEGRA_REVISION_A03,
-	TEGRA_REVISION_A03p,
-#endif
-	TEGRA_REVISION_MAX,
-};
+#include <mach/hardware.h>
 
 #define INVALID_PROCESS_ID	99 /* don't expect to have 100 process id's */
 

@@ -24,6 +24,7 @@
 
 struct clk;
 struct dvfs;
+struct notifier_block;
 
 enum tegra_clk_ex_param {
 	TEGRA_CLK_VI_INP_SEL,
@@ -53,5 +54,8 @@ static inline void tegra_sdmmc_tap_delay(struct clk *c, int delay)
 #endif
 int tegra_dvfs_rail_disable_by_name(const char *reg_id);
 int tegra_clk_cfg_ex(struct clk *c, enum tegra_clk_ex_param p, u32 setting);
+int tegra_register_clk_rate_notifier(struct clk *c, struct notifier_block *nb);
+void tegra_unregister_clk_rate_notifier(
+	struct clk *c, struct notifier_block *nb);
 
 #endif

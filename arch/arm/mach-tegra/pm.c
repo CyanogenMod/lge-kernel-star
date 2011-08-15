@@ -256,7 +256,7 @@ static __init int alloc_suspend_context(void)
 {
 #if USE_TEGRA_CPU_SUSPEND
 	pgprot_t prot = __pgprot_modify(pgprot_kernel, L_PTE_MT_MASK,
-					 L_PTE_MT_UNCACHED | L_PTE_XN);
+					L_PTE_MT_BUFFERABLE | L_PTE_XN);
 	struct page *ctx_page;
 	unsigned long ctx_virt;
 	phys_addr_t ctx_phys;
@@ -276,7 +276,7 @@ static __init int alloc_suspend_context(void)
 	pmd = pmd_offset(tegra_pgd + pgd_index(ctx_virt), ctx_virt);
 	*pmd = __pmd((ctx_phys & PGDIR_MASK) |
 		     PMD_TYPE_SECT | PMD_SECT_AP_WRITE |
-		     PMD_SECT_XN | PMD_SECT_UNCACHED);
+		     PMD_SECT_XN | PMD_SECT_BUFFERED);
 	flush_pmd_entry(pmd);
 	outer_clean_range(__pa(pmd), __pa(pmd + 1));
 
@@ -303,6 +303,7 @@ static void pmc_32kwritel(u32 val, unsigned long offs)
 static void set_power_timers(unsigned long us_on, unsigned long us_off,
 			     long rate)
 {
+	static unsigned long last_us_off = 0;
 	unsigned long long ticks;
 	unsigned long long pclk;
 
@@ -311,7 +312,7 @@ static void set_power_timers(unsigned long us_on, unsigned long us_off,
 	else
 		pclk = rate;
 
-	if (rate != tegra_last_pclk) {
+	if ((rate != tegra_last_pclk) || (us_off != last_us_off)) {
 		ticks = (us_on * pclk) + 999999ull;
 		do_div(ticks, 1000000);
 		writel((unsigned long)ticks, pmc + PMC_CPUPWRGOOD_TIMER);
@@ -322,6 +323,7 @@ static void set_power_timers(unsigned long us_on, unsigned long us_off,
 		wmb();
 	}
 	tegra_last_pclk = pclk;
+	last_us_off = us_off;
 }
 
 /*
@@ -354,8 +356,10 @@ static void restore_cpu_complex(u32 mode)
 		 * by CPU boot-up code - wait for PLL stabilization if PLLX
 		 * was enabled */
 
-		BUG_ON(readl(clk_rst + CLK_RESET_PLLX_BASE) !=
-		       tegra_sctx.pllx_base);
+		reg = readl(clk_rst + CLK_RESET_PLLX_BASE);
+		/* mask out bit 27 - not to check PLL lock bit */
+		BUG_ON((reg & (~(1 << 27))) !=
+				(tegra_sctx.pllx_base & (~(1 << 27))));
 
 		if (tegra_sctx.pllx_base & (1<<30)) {
 #if USE_PLL_LOCK_BITS
@@ -521,11 +525,14 @@ unsigned int tegra_idle_lp2_last(unsigned int sleep_time, unsigned int flags)
 	 * We can use clk_get_rate_all_locked() here, because all other cpus
 	 * are in LP2 state and irqs are disabled
 	 */
-	set_power_timers(pdata->cpu_timer, pdata->cpu_off_timer,
-		clk_get_rate_all_locked(tegra_pclk));
-
-	if (flags & TEGRA_POWER_CLUSTER_MASK)
+	if (flags & TEGRA_POWER_CLUSTER_MASK) {
+		set_power_timers(pdata->cpu_timer, 0,
+			clk_get_rate_all_locked(tegra_pclk));
 		tegra_cluster_switch_prolog(mode);
+	} else {
+		set_power_timers(pdata->cpu_timer, pdata->cpu_off_timer,
+			clk_get_rate_all_locked(tegra_pclk));
+	}
 
 	if (sleep_time)
 		tegra_lp2_set_trigger(sleep_time);
@@ -735,8 +742,10 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode)
 	cpu_pm_enter();
 	cpu_complex_pm_enter();
 
-	if (mode == TEGRA_SUSPEND_LP0)
+	if (mode == TEGRA_SUSPEND_LP0) {
+		tegra_lp0_cpu_mode(true);
 		tegra_lp0_suspend_mc();
+	}
 
 	suspend_cpu_complex(0);
 	flush_cache_all();
@@ -750,8 +759,10 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode)
 
 	tegra_init_cache();
 
-	if (mode == TEGRA_SUSPEND_LP0)
+	if (mode == TEGRA_SUSPEND_LP0) {
 		tegra_lp0_resume_mc();
+		tegra_lp0_cpu_mode(false);
+	}
 
 	restore_cpu_complex(0);
 
@@ -834,7 +845,7 @@ bad_name:
 }
 
 static struct kobj_attribute suspend_mode_attribute =
-	__ATTR(mode, 0666, suspend_mode_show, suspend_mode_store);
+	__ATTR(mode, 0644, suspend_mode_show, suspend_mode_store);
 
 static struct kobject *suspend_kobj;
 #endif

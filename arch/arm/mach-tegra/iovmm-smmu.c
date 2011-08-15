@@ -39,8 +39,6 @@
 #include <mach/iomap.h>
 
 /* For debugging */
-/*#define HIT_MISS_STAT */
-/*#define SMMU_SYSFS */
 /*#define SMMU_DEBUG*/
 
 #ifdef SMMU_DEBUG
@@ -58,12 +56,14 @@
 #define MC_SMMU_CONFIG_0_SMMU_ENABLE_ENABLE		1
 
 #define MC_SMMU_TLB_CONFIG_0				0x14
+#define MC_SMMU_TLB_CONFIG_0_TLB_STATS__MASK		(1<<31)
 #define MC_SMMU_TLB_CONFIG_0_TLB_STATS__ENABLE		(1<<31)
 #define MC_SMMU_TLB_CONFIG_0_TLB_HIT_UNDER_MISS__ENABLE	(1<<29)
 #define MC_SMMU_TLB_CONFIG_0_TLB_ACTIVE_LINES__VALUE	0x10
 #define MC_SMMU_TLB_CONFIG_0_RESET_VAL			0x20000010
 
 #define MC_SMMU_PTC_CONFIG_0				0x18
+#define MC_SMMU_PTC_CONFIG_0_PTC_STATS__MASK		(1<<31)
 #define MC_SMMU_PTC_CONFIG_0_PTC_STATS__ENABLE		(1<<31)
 #define MC_SMMU_PTC_CONFIG_0_PTC_CACHE__ENABLE		(1<<29)
 #define MC_SMMU_PTC_CONFIG_0_PTC_INDEX_MAP__PATTERN	0x3f
@@ -398,24 +398,10 @@ static void smmu_setup_regs(struct smmu_device *smmu)
 		smmu->regs + MC_SMMU_TRANSLATION_ENABLE_2_0);
 	writel(smmu->asid_security_0,
 		smmu->regs + MC_SMMU_ASID_SECURITY_0);
-#ifdef HIT_MISS_STAT
-	writel(
-		MC_SMMU_TLB_CONFIG_0_TLB_STATS__ENABLE |
-		MC_SMMU_TLB_CONFIG_0_TLB_HIT_UNDER_MISS__ENABLE |
-		MC_SMMU_TLB_CONFIG_0_TLB_ACTIVE_LINES__VALUE,
-		smmu->regs + MC_SMMU_TLB_CONFIG_0);
-
-	writel(
-		MC_SMMU_PTC_CONFIG_0_PTC_STATS__ENABLE |
-		MC_SMMU_PTC_CONFIG_0_PTC_CACHE__ENABLE |
-		MC_SMMU_PTC_CONFIG_0_PTC_INDEX_MAP__PATTERN,
-		smmu->regs + MC_SMMU_PTC_CONFIG_0);
-#else
 	writel(MC_SMMU_TLB_CONFIG_0_RESET_VAL,
 		smmu->regs + MC_SMMU_TLB_CONFIG_0);
 	writel(MC_SMMU_PTC_CONFIG_0_RESET_VAL,
 		smmu->regs + MC_SMMU_PTC_CONFIG_0);
-#endif
 
 	smmu_flush_regs(smmu, 1);
 	writel(
@@ -1074,7 +1060,6 @@ static void __exit smmu_exit(void)
 subsys_initcall(smmu_init);
 module_exit(smmu_exit);
 
-#ifdef SMMU_SYSFS
 /*
  * SMMU-global sysfs interface for debugging
  */
@@ -1165,7 +1150,33 @@ static ssize_t _sysfs_store_reg(struct device *d,
 	if (offset < 0)
 		return offset;
 	value = simple_strtoul(buf, NULL, 16);
+#ifdef CONFIG_TEGRA_SMMU_SYSFS
 	writel(value, smmu->regs + offset);
+#else
+	/* Allow writing to reg only for TLB/PTC stats enabling/disabling */
+	{
+		unsigned long mask = 0;
+		switch (offset)
+		{
+		case MC_SMMU_TLB_CONFIG_0:
+			mask = MC_SMMU_TLB_CONFIG_0_TLB_STATS__MASK;
+			break;
+		case MC_SMMU_PTC_CONFIG_0:
+			mask = MC_SMMU_PTC_CONFIG_0_PTC_STATS__MASK;
+			break;
+		default:
+			break;
+		}
+
+		if (mask) {
+			unsigned long currval = readl(smmu->regs + offset);
+			currval &= ~mask;
+			value &= mask;
+			value |= currval;
+			writel(value, smmu->regs + offset);
+		}
+	}
+#endif
 	return count;
 }
 
@@ -1200,6 +1211,10 @@ static ssize_t _sysfs_show_##name(struct device *d,	\
 	return rv;					\
 }
 
+#ifdef CONFIG_TEGRA_SMMU_SYSFS
+static void (*_sysfs_null_callback)(struct smmu_device *, unsigned long *) =
+	NULL;
+
 #define _SYSFS_SET_VALUE(name, field, base, ceil, callback)	\
 static ssize_t _sysfs_set_##name(struct device *d,		\
 		struct device_attribute *da, const char *buf, size_t count) \
@@ -1214,9 +1229,15 @@ static ssize_t _sysfs_set_##name(struct device *d,		\
 	}							\
 	return count;						\
 }
+#else
+#define _SYSFS_SET_VALUE(name, field, base, ceil, callback)	\
+static ssize_t _sysfs_set_##name(struct device *d,		\
+		struct device_attribute *da, const char *buf, size_t count) \
+{								\
+	return count;						\
+}
+#endif
 
-static void (*_sysfs_null_callback)(struct smmu_device *, unsigned long *) =
-	NULL;
 _SYSFS_SHOW_VALUE(lowest_asid, lowest_asid, "%lu")
 _SYSFS_SET_VALUE(lowest_asid, lowest_asid, 10,
 		MC_SMMU_NUM_ASIDS, _sysfs_null_callback)
@@ -1226,6 +1247,7 @@ _SYSFS_SET_VALUE(debug_asid, debug_asid, 10,
 _SYSFS_SHOW_VALUE(verbose, verbose, "%lu")
 _SYSFS_SET_VALUE(verbose, verbose, 10, 3, _sysfs_null_callback)
 
+#ifdef CONFIG_TEGRA_SMMU_SYSFS
 static void _sysfs_mask_attr(struct smmu_device *smmu, unsigned long *field)
 {
 	*field &= _MASK_ATTR;
@@ -1250,6 +1272,8 @@ static void (*_sysfs_mask_attr_callback)(struct smmu_device *,
 				unsigned long *field) = &_sysfs_mask_attr;
 static void (*_sysfs_mask_pdir_attr_callback)(struct smmu_device *,
 				unsigned long *field) = &_sysfs_mask_pdir_attr;
+#endif
+
 _SYSFS_SHOW_VALUE(pdir_attr, as[smmu->debug_asid].pdir_attr, "%lx")
 _SYSFS_SET_VALUE(pdir_attr, as[smmu->debug_asid].pdir_attr, 16,
 		_PDIR_ATTR+1, _sysfs_mask_pdir_attr_callback)
@@ -1311,11 +1335,8 @@ static void _sysfs_smmu(struct smmu_device *smmu, struct device *parent)
 		return;
 	}
 }
-#endif
 
 static void _sysfs_create(struct smmu_as *as, struct device *parent)
 {
-#ifdef SMMU_SYSFS
 	_sysfs_smmu(as->smmu, parent);
-#endif
 }

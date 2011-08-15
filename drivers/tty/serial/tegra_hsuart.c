@@ -1002,8 +1002,110 @@ static void tegra_enable_ms(struct uart_port *u)
 {
 }
 
-#define UART_CLOCK_ACCURACY 5
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+static int clk_div71_get_divider(unsigned long parent_rate,
+		unsigned long rate)
+{
+	s64 divider_u71 = parent_rate;
+	if (!rate)
+		return -EINVAL;
 
+	divider_u71 *= 2;
+	divider_u71 += rate - 1;
+	do_div(divider_u71, rate);
+
+	if ((divider_u71 - 2) < 0)
+		return 0;
+
+	if ((divider_u71 - 2) > 255)
+		return -EINVAL;
+
+	return divider_u71 - 2;
+}
+#endif
+
+static int clk_div16_get_divider(unsigned long parent_rate, unsigned long rate)
+{
+	s64 divider_u16;
+
+	divider_u16 = parent_rate;
+	if (!rate)
+		return -EINVAL;
+	divider_u16 += rate - 1;
+	do_div(divider_u16, rate);
+
+	if (divider_u16 > 0xFFFF)
+		return -EINVAL;
+
+	return divider_u16;
+}
+
+static unsigned long find_best_clock_source(struct tegra_uart_port *t,
+		unsigned long rate)
+{
+	struct uart_port *u = &t->uport;
+	struct tegra_uart_platform_data *pdata;
+	int i;
+	int divider;
+	unsigned long parent_rate;
+	unsigned long new_rate;
+	unsigned long err_rate;
+	unsigned int fin_err = rate;
+	unsigned long fin_rate = rate;
+	int final_index = -1;
+	int count;
+
+	pdata = u->dev->platform_data;
+	if (!pdata || !pdata->parent_clk_count)
+		return fin_rate;
+
+	for (count = 0; count < pdata->parent_clk_count; ++count) {
+		parent_rate = pdata->parent_clk_list[count].fixed_clk_rate;
+
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+		divider = clk_div71_get_divider(parent_rate, rate);
+
+		/* Get the best divider around calculated value */
+		if (divider > 2) {
+			for (i = divider - 2; i < (divider + 2); ++i) {
+				new_rate = ((parent_rate << 1) + i + 1) /
+								(i + 2);
+				err_rate = abs(new_rate - rate);
+				if (err_rate < fin_err) {
+					final_index = count;
+					fin_err = err_rate;
+					fin_rate = new_rate;
+				}
+			}
+		}
+#endif
+		/* Get the divisor by uart controller dll/dlm */
+		divider = clk_div16_get_divider(parent_rate, rate);
+
+		/* Get the best divider around calculated value */
+		if (divider > 2) {
+			for (i = divider - 2; i < (divider + 2); ++i) {
+				new_rate = parent_rate/i;
+				err_rate = abs(new_rate - rate);
+				if (err_rate < fin_err) {
+					final_index = count;
+					fin_err = err_rate;
+					fin_rate = parent_rate;
+				}
+			}
+		}
+	}
+
+	if (final_index >= 0) {
+		dev_info(t->uport.dev, "Setting clk_src %s\n",
+				pdata->parent_clk_list[final_index].name);
+		clk_set_parent(t->clk,
+			pdata->parent_clk_list[final_index].parent_clk);
+	}
+	return fin_rate;
+}
+
+#define UART_CLOCK_ACCURACY 5
 static void tegra_set_baudrate(struct tegra_uart_port *t, unsigned int baud)
 {
 	unsigned long rate;
@@ -1011,12 +1113,15 @@ static void tegra_set_baudrate(struct tegra_uart_port *t, unsigned int baud)
 	unsigned char lcr;
 	unsigned int baud_actual;
 	unsigned int baud_delta;
+	unsigned long best_rate;
 
 	if (t->baud == baud)
 		return;
 
 	rate = baud * 16;
-	clk_set_rate(t->clk, rate);
+	best_rate = find_best_clock_source(t, rate);
+	clk_set_rate(t->clk, best_rate);
+
 	rate = clk_get_rate(t->clk);
 
 	divisor = rate;

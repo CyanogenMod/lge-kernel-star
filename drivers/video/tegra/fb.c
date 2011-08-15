@@ -279,6 +279,8 @@ static int tegra_fb_pan_display(struct fb_var_screeninfo *var,
 		tegra_fb->win->phys_addr = addr;
 		/* TODO: update virt_addr */
 
+		tegra_dc_set_default_emc(tegra_fb->win->dc);
+		tegra_dc_set_dynamic_emc(&tegra_fb->win, 1);
 		tegra_dc_update_windows(&tegra_fb->win, 1);
 		tegra_dc_sync_windows(&tegra_fb->win, 1);
 	}
@@ -489,6 +491,7 @@ static void tegra_fb_flip_worker(struct work_struct *work)
 #endif
 	}
 
+	tegra_dc_set_dynamic_emc(wins, nr_win);
 	tegra_dc_update_windows(wins, nr_win);
 	/* TODO: implement swapinterval here */
 	tegra_dc_sync_windows(wins, nr_win);
@@ -545,6 +548,12 @@ static int tegra_fb_flip(struct tegra_fb_info *tegra_fb,
 	data->syncpt_max = syncpt_max;
 
 	queue_work(tegra_fb->flip_wq, &data->work);
+
+	/*
+	 * Before the queued flip_wq get scheduled, we set the EMC clock to the
+	 * default value in order to do FLIP without glitch.
+	 */
+	tegra_dc_set_default_emc(tegra_fb->win->dc);
 
 	args->post_syncpt_val = syncpt_max;
 	args->post_syncpt_id = tegra_dc_get_syncpt_id(tegra_fb->win->dc);
@@ -657,7 +666,8 @@ static struct fb_ops tegra_fb_ops = {
 
 void tegra_fb_update_monspecs(struct tegra_fb_info *fb_info,
 			      struct fb_monspecs *specs,
-			      bool (*mode_filter)(struct fb_videomode *mode))
+			      bool (*mode_filter)(const struct tegra_dc *dc,
+						  struct fb_videomode *mode))
 {
 	struct fb_event event;
 	struct fb_modelist *m;
@@ -683,7 +693,7 @@ void tegra_fb_update_monspecs(struct tegra_fb_info *fb_info,
 
 	for (i = 0; i < specs->modedb_len; i++) {
 		if (mode_filter) {
-			if (mode_filter(&specs->modedb[i]))
+			if (mode_filter(fb_info->win->dc, &specs->modedb[i]))
 				fb_add_videomode(&specs->modedb[i],
 						 &fb_info->info->modelist);
 		} else {
@@ -839,6 +849,8 @@ struct tegra_fb_info *tegra_fb_register(struct nvhost_device *ndev,
 	dev_info(&ndev->dev, "probed\n");
 
 	if (fb_data->flags & TEGRA_FB_FLIP_ON_PROBE) {
+		tegra_dc_set_default_emc(tegra_fb->win->dc);
+		tegra_dc_set_dynamic_emc(&tegra_fb->win, 1);
 		tegra_dc_update_windows(&tegra_fb->win, 1);
 		tegra_dc_sync_windows(&tegra_fb->win, 1);
 	}

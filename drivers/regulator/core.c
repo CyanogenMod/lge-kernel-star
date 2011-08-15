@@ -2988,7 +2988,7 @@ static const struct file_operations regulator_syncevent_fops = {
 
 static int __init regulator_init_debugfs(void)
 {
-	debugfs_create_file("syncevent_regulators", S_IWUGO, NULL, NULL,
+	debugfs_create_file("syncevent_regulators", S_IWUSR, NULL, NULL,
 			&regulator_syncevent_fops);
 
 	return 0;

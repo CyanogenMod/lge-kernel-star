@@ -57,16 +57,17 @@ enum {
 	TEGRA_DSI_VIDEO_CLOCK_TX_ONLY,
 };
 
-/* DSI burst mode setting in video mode */
+/* DSI burst mode setting in video mode. Each mode is assigned with a
+ * fixed value. The rationale behind this is to avoid change of these
+ * values, since the calculation of dsi clock depends on them. */
 enum {
-	TEGRA_DSI_VIDEO_NONE_BURST_MODE,
-	TEGRA_DSI_VIDEO_NONE_BURST_MODE_WITH_SYNC_END,
-	TEGRA_DSI_VIDEO_BURST_MODE_LOWEST_SPEED,
-	TEGRA_DSI_VIDEO_BURST_MODE_LOW_SPEED,
-	TEGRA_DSI_VIDEO_BURST_MODE_MEDIUM_SPEED,
-	TEGRA_DSI_VIDEO_BURST_MODE_FAST_SPEED,
-	TEGRA_DSI_VIDEO_BURST_MODE_FASTEST_SPEED,
-	TEGRA_DSI_VIDEO_BURST_MODE_MANUAL,
+	TEGRA_DSI_VIDEO_NONE_BURST_MODE = 0,
+	TEGRA_DSI_VIDEO_NONE_BURST_MODE_WITH_SYNC_END = 1,
+	TEGRA_DSI_VIDEO_BURST_MODE_LOWEST_SPEED = 2,
+	TEGRA_DSI_VIDEO_BURST_MODE_LOW_SPEED = 3,
+	TEGRA_DSI_VIDEO_BURST_MODE_MEDIUM_SPEED = 4,
+	TEGRA_DSI_VIDEO_BURST_MODE_FAST_SPEED = 5,
+	TEGRA_DSI_VIDEO_BURST_MODE_FASTEST_SPEED = 6,
 };
 
 enum {
@@ -286,6 +287,7 @@ struct tegra_dc_out {
 	int				hotplug_gpio;
 	const char			*parent_clk;
 
+	unsigned			max_pixclock;
 	unsigned			order;
 	unsigned			align;
 	unsigned			depth;
@@ -430,6 +432,9 @@ u32 tegra_dc_get_syncpt_id(const struct tegra_dc *dc);
 u32 tegra_dc_incr_syncpt_max(struct tegra_dc *dc);
 void tegra_dc_incr_syncpt_min(struct tegra_dc *dc, u32 val);
 
+int tegra_dc_set_default_emc(struct tegra_dc *dc);
+int tegra_dc_set_dynamic_emc(struct tegra_dc_win *windows[], int n);
+
 /* tegra_dc_update_windows and tegra_dc_sync_windows do not support windows
  * with differenct dcs in one call
  */
@@ -441,8 +446,9 @@ struct fb_videomode;
 int tegra_dc_set_fb_mode(struct tegra_dc *dc, const struct fb_videomode *fbmode,
 	bool stereo_mode);
 
-unsigned tegra_dc_get_out_height(struct tegra_dc *dc);
-unsigned tegra_dc_get_out_width(struct tegra_dc *dc);
+unsigned tegra_dc_get_out_height(const struct tegra_dc *dc);
+unsigned tegra_dc_get_out_width(const struct tegra_dc *dc);
+unsigned tegra_dc_get_out_max_pixclock(const struct tegra_dc *dc);
 
 /* PM0 and PM1 signal control */
 #define TEGRA_PWM_PM0 0

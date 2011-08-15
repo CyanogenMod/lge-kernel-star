@@ -299,12 +299,16 @@ static struct platform_device *enterprise_devices[] __initdata = {
 	&tegra_avp_device,
 	&tegra_camera,
 	&tegra_spi_device4,
+#if defined(CONFIG_CRYPTO_DEV_TEGRA_SE)
+	&tegra_se_device,
+#endif
 };
 
 static struct usb_phy_plat_data tegra_usb_phy_pdata[] = {
 	[0] = {
 			.instance = 0,
 			.vbus_gpio = -1,
+			.vbus_reg_supply = "usb_vbus",
 	},
 	[1] = {
 			.instance = 1,

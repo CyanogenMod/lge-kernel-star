@@ -397,6 +397,8 @@ static int sh532u_power_control(void *cdata, int is_enable) {
 		if (WARN_ON(IS_ERR_OR_NULL(vdd_2v8_cam1_af))) {
 			pr_err("%s: couldn't get regulator vdd_2v8_cam1_af:"
 				" %ld\n", __func__, PTR_ERR(vdd_2v8_cam1_af));
+
+			vdd_2v8_cam1_af = NULL;
 			return -ENODEV;
 		}
 	}
@@ -701,15 +703,15 @@ struct ov5650_gpios {
 static struct ov5650_gpios ov5650_gpio_keys[] = {
 	[0] = OV5650_GPIO("cam1_pwdn", CAM1_PWR_DN_GPIO, 0),
 	[1] = OV5650_GPIO("cam1_rst_lo", CAM1_RST_L_GPIO, 1),
-	[2] = OV5650_GPIO("cam1_af_pwdn_lo", CAM1_AF_PWR_DN_L_GPIO, 1),
+	[2] = OV5650_GPIO("cam1_af_pwdn_lo", CAM1_AF_PWR_DN_L_GPIO, 0),
 	[3] = OV5650_GPIO("cam1_ldo_shdn_lo", CAM1_LDO_SHUTDN_L_GPIO, 1),
 	[4] = OV5650_GPIO("cam2_pwdn", CAM2_PWR_DN_GPIO, 0),
 	[5] = OV5650_GPIO("cam2_rst_lo", CAM2_RST_L_GPIO, 1),
-	[6] = OV5650_GPIO("cam2_af_pwdn_lo", CAM2_AF_PWR_DN_L_GPIO, 1),
+	[6] = OV5650_GPIO("cam2_af_pwdn_lo", CAM2_AF_PWR_DN_L_GPIO, 0),
 	[7] = OV5650_GPIO("cam2_ldo_shdn_lo", CAM2_LDO_SHUTDN_L_GPIO, 1),
 	[8] = OV5650_GPIO("cam3_pwdn", CAM_FRONT_PWR_DN_GPIO, 0),
 	[9] = OV5650_GPIO("cam3_rst_lo", CAM_FRONT_RST_L_GPIO, 1),
-	[10] = OV5650_GPIO("cam3_af_pwdn_lo", CAM_FRONT_AF_PWR_DN_L_GPIO, 1),
+	[10] = OV5650_GPIO("cam3_af_pwdn_lo", CAM_FRONT_AF_PWR_DN_L_GPIO, 0),
 	[11] = OV5650_GPIO("cam3_ldo_shdn_lo", CAM_FRONT_LDO_SHUTDN_L_GPIO, 1),
 	[12] = OV5650_GPIO("cam_led_exp", CAM_FRONT_LED_EXP, 1),
 	[13] = OV5650_GPIO("cam_led_rear_exp", CAM_SNN_LED_REAR_EXP, 1),

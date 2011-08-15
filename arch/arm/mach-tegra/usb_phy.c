@@ -257,6 +257,9 @@
 #define UTMIP_BIAS_CFG0		0x80c
 #define   UTMIP_OTGPD			(1 << 11)
 #define   UTMIP_BIASPD			(1 << 10)
+#define   UTMIP_HSSQUELCH_LEVEL(x)	(((x) & 0x2) << 0)
+#define   UTMIP_HSDISCON_LEVEL(x)	(((x) & 0x2) << 2)
+#define   UTMIP_HSDISCON_LEVEL_MSB	(1 << 24)
 
 #define UTMIP_HSRX_CFG0		0x810
 #define   UTMIP_ELASTIC_LIMIT(x)	(((x) & 0x1f) << 10)
@@ -307,6 +310,7 @@
 #define TEGRA_PMC_USB_AO		0xf0
 #define   TEGRA_PMC_USB_AO_VBUS_WAKEUP_PD_P0	(1 << 2)
 #define   TEGRA_PMC_USB_AO_ID_PD_P0		(1 << 3)
+#define   TEGRA_PMC_USB_AO_PD_P2		(0xf << 8)
 
 #define ICUSB_CTRL		0x15c
 
@@ -560,6 +564,10 @@ static int utmip_pad_power_on(struct tegra_usb_phy *phy)
 	if (utmip_pad_count++ == 0) {
 		val = readl(base + UTMIP_BIAS_CFG0);
 		val &= ~(UTMIP_OTGPD | UTMIP_BIASPD);
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+		val |= UTMIP_HSSQUELCH_LEVEL(0x2) | UTMIP_HSDISCON_LEVEL(0x2) |
+			UTMIP_HSDISCON_LEVEL_MSB;
+#endif
 		writel(val, base + UTMIP_BIAS_CFG0);
 	}
 
@@ -587,6 +595,10 @@ static int utmip_pad_power_off(struct tegra_usb_phy *phy, bool is_dpd)
 	if (--utmip_pad_count == 0 && is_dpd) {
 		val = readl(base + UTMIP_BIAS_CFG0);
 		val |= UTMIP_OTGPD | UTMIP_BIASPD;
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+		val &= ~(UTMIP_HSSQUELCH_LEVEL(~0) | UTMIP_HSDISCON_LEVEL(~0) |
+			UTMIP_HSDISCON_LEVEL_MSB);
+#endif
 		writel(val, base + UTMIP_BIAS_CFG0);
 	}
 
@@ -788,6 +800,10 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	val |= UTMIP_XCVR_SETUP(config->xcvr_setup);
 	val |= UTMIP_XCVR_LSFSLEW(config->xcvr_lsfslew);
 	val |= UTMIP_XCVR_LSRSLEW(config->xcvr_lsrslew);
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	if (phy->instance == 0)
+		val |= UTMIP_XCVR_HSSLEW_MSB(0x8);
+#endif
 	writel(val, base + UTMIP_XCVR_CFG0);
 
 	val = readl(base + UTMIP_XCVR_CFG1);
@@ -893,6 +909,12 @@ static int utmi_phy_power_off(struct tegra_usb_phy *phy, bool is_dpd)
 		writel(val, base + UTMIP_BAT_CHRG_CFG0);
 	}
 
+	if (phy->instance != 2) {
+		val = readl(base + UTMIP_XCVR_CFG0);
+		val |= (UTMIP_FORCE_PD_POWERDOWN | UTMIP_FORCE_PD2_POWERDOWN |
+			 UTMIP_FORCE_PDZI_POWERDOWN);
+		writel(val, base + UTMIP_XCVR_CFG0);
+	}
 	val = readl(base + UTMIP_XCVR_CFG1);
 	val |= UTMIP_FORCE_PDDISC_POWERDOWN | UTMIP_FORCE_PDCHRP_POWERDOWN |
 	       UTMIP_FORCE_PDDR_POWERDOWN;
@@ -909,6 +931,11 @@ static int utmi_phy_power_off(struct tegra_usb_phy *phy, bool is_dpd)
 		val |= USB_PORTSC1_WKCN;
 		writel(val, base + USB_PORTSC1);
 	}
+	if (phy->instance != 0) {
+		val = readl(base + UTMIP_BIAS_CFG0);
+		val |= UTMIP_OTGPD;
+		writel(val, base + UTMIP_BIAS_CFG0);
+	}
 
 	utmi_phy_clk_disable(phy);
 
@@ -916,8 +943,16 @@ static int utmi_phy_power_off(struct tegra_usb_phy *phy, bool is_dpd)
 		val = readl(base + USB_SUSP_CTRL);
 		val |= USB_PHY_CLK_VALID_INT_ENB;
 		writel(val, base + USB_SUSP_CTRL);
+	} else {
+		val = readl(base + USB_SUSP_CTRL);
+		val |= UTMIP_RESET;
+		writel(val, base + USB_SUSP_CTRL);
 	}
+#ifdef CONFIG_USB_HOTPLUG
 	utmip_pad_power_off(phy, is_dpd);
+#else
+	utmip_pad_power_off(phy, true);
+#endif
 	return 0;
 }
 
@@ -1650,6 +1685,11 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 				goto err1;
 			}
 		}
+	}
+	if (instance == 2) {
+		writel(readl((IO_ADDRESS(TEGRA_PMC_BASE) + TEGRA_PMC_USB_AO)) &
+			(TEGRA_PMC_USB_AO_PD_P2),
+			(IO_ADDRESS(TEGRA_PMC_BASE) + TEGRA_PMC_USB_AO));
 	}
 #endif
 	if (((instance == 2) || (instance == 0)) &&

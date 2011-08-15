@@ -52,6 +52,10 @@
 #define REGEN2_BASE_ADD		0xB1
 #define SYSEN_BASE_ADD		0xB4
 
+/* device control registers */
+#define TPS80031_PHOENIX_DEV_ON	0x25
+#define DEVOFF	1
+
 #define CLK32KAO_BASE_ADD	0xBA
 #define CLK32KG_BASE_ADD	0xBD
 #define CLK32KAUDIO_BASE_ADD	0xC0
@@ -309,19 +313,38 @@ out:
 }
 EXPORT_SYMBOL_GPL(tps80031_update);
 
+int tps80031_force_update(struct device *dev, int sid, int reg, uint8_t val,
+			  uint8_t mask)
+{
+	struct tps80031 *tps80031 = dev_get_drvdata(dev);
+	struct tps80031_client *tps = &tps80031->tps_clients[sid];
+	uint8_t reg_val;
+	int ret = 0;
+
+	mutex_lock(&tps->lock);
+
+	ret = __tps80031_read(tps->client, reg, &reg_val);
+	if (ret)
+		goto out;
+
+	reg_val = (reg_val & ~mask) | (val & mask);
+	ret = __tps80031_write(tps->client, reg, reg_val);
+
+out:
+	mutex_unlock(&tps->lock);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(tps80031_force_update);
+
 static struct tps80031 *tps80031_dev;
 int tps80031_power_off(void)
 {
 	struct tps80031_client *tps = &tps80031_dev->tps_clients[SLAVE_ID1];
-	struct device *dev;
 
 	if (!tps->client)
 		return -EINVAL;
-
-	dev = &tps->client->dev;
-
-	/* FIXME!! Put the logic here to switch off pmu*/
-	return 0;
+	dev_info(&tps->client->dev, "switching off PMU\n");
+	return __tps80031_write(tps->client, TPS80031_PHOENIX_DEV_ON, DEVOFF);
 }
 
 static int tps80031_gpio_get(struct gpio_chip *gc, unsigned offset)
@@ -434,37 +457,37 @@ static int tps80031_remove_subdevs(struct tps80031 *tps80031)
 	return device_for_each_child(tps80031->dev, NULL, __remove_subdev);
 }
 
-static void tps80031_irq_lock(unsigned int irq)
+static void tps80031_irq_lock(struct irq_data *data)
 {
-	struct tps80031 *tps80031 = get_irq_chip_data(irq);
+	struct tps80031 *tps80031 = irq_data_get_irq_chip_data(data);
 
 	mutex_lock(&tps80031->irq_lock);
 }
 
-static void tps80031_irq_enable(unsigned int irq)
+static void tps80031_irq_enable(struct irq_data *data)
 {
-	struct tps80031 *tps80031 = get_irq_chip_data(irq);
-	unsigned int __irq = irq - tps80031->irq_base;
-	const struct tps80031_irq_data *data = &tps80031_irqs[__irq];
+	struct tps80031 *tps80031 = irq_data_get_irq_chip_data(data);
+	unsigned int __irq = data->irq - tps80031->irq_base;
+	const struct tps80031_irq_data *irq_data = &tps80031_irqs[__irq];
 
-	tps80031->mask_reg[data->mask_reg] &= ~(1 << data->mask_mask);
+	tps80031->mask_reg[irq_data->mask_reg] &= ~(1 << irq_data->mask_mask);
 	tps80031->irq_en |= (1 << __irq);
 }
 
-static void tps80031_irq_disable(unsigned int irq)
+static void tps80031_irq_disable(struct irq_data *data)
 {
-	struct tps80031 *tps80031 = get_irq_chip_data(irq);
+	struct tps80031 *tps80031 = irq_data_get_irq_chip_data(data);
 
-	unsigned int __irq = irq - tps80031->irq_base;
-	const struct tps80031_irq_data *data = &tps80031_irqs[__irq];
+	unsigned int __irq = data->irq - tps80031->irq_base;
+	const struct tps80031_irq_data *irq_data = &tps80031_irqs[__irq];
 
-	tps80031->mask_reg[data->mask_reg] |= (1 << data->mask_mask);
+	tps80031->mask_reg[irq_data->mask_reg] |= (1 << irq_data->mask_mask);
 	tps80031->irq_en &= ~(1 << __irq);
 }
 
-static void tps80031_irq_sync_unlock(unsigned int irq)
+static void tps80031_irq_sync_unlock(struct irq_data *data)
 {
-	struct tps80031 *tps80031 = get_irq_chip_data(irq);
+	struct tps80031 *tps80031 = irq_data_get_irq_chip_data(data);
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(tps80031->mask_reg); i++) {
@@ -547,19 +570,19 @@ static int __devinit tps80031_irq_init(struct tps80031 *tps80031, int irq,
 	tps80031->irq_base = irq_base;
 
 	tps80031->irq_chip.name = "tps80031";
-	tps80031->irq_chip.enable = tps80031_irq_enable;
-	tps80031->irq_chip.disable = tps80031_irq_disable;
-	tps80031->irq_chip.bus_lock = tps80031_irq_lock;
-	tps80031->irq_chip.bus_sync_unlock = tps80031_irq_sync_unlock;
+	tps80031->irq_chip.irq_enable = tps80031_irq_enable;
+	tps80031->irq_chip.irq_disable = tps80031_irq_disable;
+	tps80031->irq_chip.irq_bus_lock = tps80031_irq_lock;
+	tps80031->irq_chip.irq_bus_sync_unlock = tps80031_irq_sync_unlock;
 
 	for (i = 0; i < ARRAY_SIZE(tps80031_irqs); i++) {
 		int __irq = i + tps80031->irq_base;
-		set_irq_chip_data(__irq, tps80031);
-		set_irq_chip_and_handler(__irq, &tps80031->irq_chip,
+		irq_set_chip_data(__irq, tps80031);
+		irq_set_chip_and_handler(__irq, &tps80031->irq_chip,
 					 handle_simple_irq);
-		set_irq_nested_thread(__irq, 1);
+		irq_set_nested_thread(__irq, 1);
 #ifdef CONFIG_ARM
-		set_irq_flags(__irq, IRQF_VALID);
+		irq_set_status_flags(__irq, IRQF_VALID);
 #endif
 	}
 
@@ -685,6 +708,8 @@ static int dbg_tps_show(struct seq_file *s, void *unused)
 	print_regs("CLK32KG Regs",   s, SLAVE_ID1, 0xBD, 0xBE);
 	print_regs("CLK32KAUD Regs", s, SLAVE_ID1, 0xC0, 0xC1);
 	print_regs("INT Regs",       s, SLAVE_ID2, 0xD0, 0xD8);
+	print_regs("PREQ Regs",      s, SLAVE_ID1, 0xD7, 0xDF);
+	print_regs("MASK_PH Regs",   s, SLAVE_ID1, 0x20, 0x21);
 	print_regs("VERNUM Regs",    s, SLAVE_ID1, 0x87, 0x87);
 	return 0;
 }
