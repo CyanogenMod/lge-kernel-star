@@ -32,7 +32,7 @@ enum tegra_chipid tegra_get_chipid(void);
 enum tegra_revision tegra_get_revision(void);
 const char *tegra_get_revision_name(void);
 
-#ifndef CONFIG_TEGRA_FPGA_PLATFORM
+#ifdef CONFIG_TEGRA_SILICON_PLATFORM
 
 int tegra_cpu_process_id(void);
 int tegra_core_process_id(void);
@@ -40,7 +40,7 @@ int tegra_cpu_speedo_id(void);
 int tegra_soc_speedo_id(void);
 void tegra_init_speedo_data(void);
 
-#else /* CONFIG_TEGRA_FPGA_PLATFORM */
+#else
 
 static inline int tegra_cpu_process_id(void) { return 0; }
 static inline int tegra_core_process_id(void) { return 0; }
@@ -48,4 +48,4 @@ static inline int tegra_cpu_speedo_id(void) { return 0; }
 static inline int tegra_soc_speedo_id(void) { return 0; }
 static inline void tegra_init_speedo_data(void) { }
 
-#endif /* CONFIG_TEGRA_FPGA_PLATFORM */
+#endif

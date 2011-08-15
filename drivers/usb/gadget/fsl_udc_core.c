@@ -125,11 +125,11 @@ static const u8 fsl_udc_test_packet[53] = {
 static inline bool vbus_enabled(void)
 {
 	bool status = false;
-#ifdef CONFIG_TEGRA_FPGA_PLATFORM
+#ifdef CONFIG_TEGRA_SILICON_PLATFORM
+	status = (fsl_readl(&usb_sys_regs->vbus_wakeup) & USB_SYS_VBUS_STATUS);
+#else
 	/*On FPGA VBUS is detected through VBUS A Session instead of VBUS status. */
 	status = (fsl_readl(&usb_sys_regs->vbus_sensors) & USB_SYS_VBUS_ASESSION);
-#else
-	status = (fsl_readl(&usb_sys_regs->vbus_wakeup) & USB_SYS_VBUS_STATUS);
 #endif
 	return status;
 }
@@ -350,14 +350,7 @@ static void dr_controller_run(struct fsl_udc *udc)
 
 /* If OTG transceiver is available, then it handles the VBUS detection */
 	if (!udc_controller->transceiver) {
-#ifdef CONFIG_TEGRA_FPGA_PLATFORM
-		/*On FPGA VBUS is detected through VBUS A Session instead of VBUS
-		 * status. */
-		temp = fsl_readl(&usb_sys_regs->vbus_sensors);
-		temp |= USB_SYS_VBUS_ASESSION_INT_EN;
-		temp &= ~USB_SYS_VBUS_ASESSION_CHANGED;
-		fsl_writel(temp, &usb_sys_regs->vbus_sensors);
-#else
+#ifdef CONFIG_TEGRA_SILICON_PLATFORM
 		/* Enable cable detection interrupt, without setting the
 		 * USB_SYS_VBUS_WAKEUP_INT bit. USB_SYS_VBUS_WAKEUP_INT is
 		 * clear on write */
@@ -365,6 +358,13 @@ static void dr_controller_run(struct fsl_udc *udc)
 		temp |= (USB_SYS_VBUS_WAKEUP_INT_ENABLE | USB_SYS_VBUS_WAKEUP_ENABLE);
 		temp &= ~USB_SYS_VBUS_WAKEUP_INT_STATUS;
 		fsl_writel(temp, &usb_sys_regs->vbus_wakeup);
+#else
+		/*On FPGA VBUS is detected through VBUS A Session instead of VBUS
+		 * status. */
+		temp = fsl_readl(&usb_sys_regs->vbus_sensors);
+		temp |= USB_SYS_VBUS_ASESSION_INT_EN;
+		temp &= ~USB_SYS_VBUS_ASESSION_CHANGED;
+		fsl_writel(temp, &usb_sys_regs->vbus_sensors);
 #endif
 	}
 	/* Enable DR irq reg */

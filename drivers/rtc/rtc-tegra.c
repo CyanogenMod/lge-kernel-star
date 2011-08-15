@@ -377,7 +377,7 @@ static int __devinit tegra_rtc_probe(struct platform_device *pdev)
 
 	dev_notice(&pdev->dev, "Tegra internal Real Time Clock\n");
 
-#ifdef CONFIG_TEGRA_FPGA_PLATFORM
+#ifndef CONFIG_TEGRA_SILICON_PLATFORM
 	{
 		struct rtc_time tm;
 

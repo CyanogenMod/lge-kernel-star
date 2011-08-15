@@ -1034,10 +1034,10 @@ EXPORT_SYMBOL(tegra_dc_sync_windows);
 
 static unsigned long tegra_dc_clk_get_rate(struct tegra_dc *dc)
 {
-#ifdef CONFIG_TEGRA_FPGA_PLATFORM
-	return 27000000;
-#else
+#ifdef CONFIG_TEGRA_SILICON_PLATFORM
 	return clk_get_rate(dc->clk);
+#else
+	return 27000000;
 #endif
 }
 
@@ -1227,11 +1227,11 @@ static inline void print_mode(struct tegra_dc *dc,
 
 static inline void enable_dc_irq(unsigned int irq)
 {
-#ifdef CONFIG_TEGRA_FPGA_PLATFORM
+#ifdef CONFIG_TEGRA_SILICON_PLATFORM
+	enable_irq(irq);
+#else
 	/* Always disable DC interrupts on FPGA. */
 	disable_irq(irq);
-#else
-	enable_irq(irq);
 #endif
 }
 
@@ -1574,7 +1574,7 @@ static void tegra_dc_vblank(struct work_struct *work)
 
 static irqreturn_t tegra_dc_irq(int irq, void *ptr)
 {
-#ifndef CONFIG_TEGRA_FPGA_PLATFORM
+#ifdef CONFIG_TEGRA_SILICON_PLATFORM
 	struct tegra_dc *dc = ptr;
 	unsigned long status;
 	unsigned long val;
@@ -1689,9 +1689,9 @@ static irqreturn_t tegra_dc_irq(int irq, void *ptr)
 	}
 
 	return IRQ_HANDLED;
-#else /* CONFIG_TEGRA_FPGA_PLATFORM */
+#else /* CONFIG_TEGRA_SILICON_PLATFORM */
 	return IRQ_NONE;
-#endif /* !CONFIG_TEGRA_FPGA_PLATFORM */
+#endif /* !CONFIG_TEGRA_SILICON_PLATFORM */
 }
 
 static void tegra_dc_set_color_control(struct tegra_dc *dc)
@@ -1884,7 +1884,7 @@ static bool _tegra_dc_controller_reset_enable(struct tegra_dc *dc)
 	msleep(5);
 	tegra_periph_reset_assert(dc->clk);
 	msleep(2);
-#ifndef CONFIG_TEGRA_FPGA_PLATFORM
+#ifdef CONFIG_TEGRA_SILICON_PLATFORM
 	tegra_periph_reset_deassert(dc->clk);
 	msleep(1);
 #endif

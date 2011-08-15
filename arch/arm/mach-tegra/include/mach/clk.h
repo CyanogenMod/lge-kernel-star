@@ -38,7 +38,7 @@ enum tegra_clk_ex_param {
 void tegra_periph_reset_deassert(struct clk *c);
 void tegra_periph_reset_assert(struct clk *c);
 
-#ifndef CONFIG_TEGRA_FPGA_PLATFORM
+#ifdef CONFIG_TEGRA_SILICON_PLATFORM
 int tegra_dvfs_set_rate(struct clk *c, unsigned long rate);
 #else
 static inline int tegra_dvfs_set_rate(struct clk *c, unsigned long rate)
