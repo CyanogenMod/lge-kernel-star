@@ -79,24 +79,13 @@
  * should never return
  */
 ENTRY(tegra2_hotplug_shutdown)
-	cpu_id	r0
-
-	/* Exit coherency. */
-	mrc	p15, 0, r3, c1, c0, 1		@ ACTLR
-	bic	r3, r3, #(1<<6)			@ exit coherency SCTLR.SMP
-	mcr	p15, 0, r3, c1, c0, 1		@ ACTLR
-	isb
-
-	/* Invalidate the SCU tags for this CPU. */
-	mov32	r3, TEGRA_ARM_PERIF_VIRT + 0xC	@ SCUIAR
-	mov	r2, r0, lsl #2
-	mov	r1, #0xf
-	mov	r1, r1, lsl r2			@ 0xF << (cpu * 4)
-	str	r1, [r3]			@ invalidate SCU tags for CPU
+	mov	r6, lr
+	bl	tegra_cpu_exit_coherency
 
 	/* Put this CPU into reset. */
+	cpu_id	r0
 	bl	tegra2_cpu_reset
-	mov	pc, lr
+	mov	pc, r6
 ENDPROC(tegra2_hotplug_shutdown)
 #endif
 
@@ -118,8 +107,7 @@ ENTRY(tegra2_cpu_reset)
 	cmp	r0, #0
 	moveq	pc, lr  		@ must not be called for CPU 0
 
-	mov32	r3, TEGRA_PMC_VIRT
-	add	r1, r3, #PMC_SCRATCH41
+	mov32	r1, TEGRA_PMC_VIRT + PMC_SCRATCH41
 	mov	r12, #CPU_RESETTABLE
 	str	r12, [r1]
 
@@ -145,14 +133,26 @@ ENDPROC(tegra2_cpu_reset)
 
 #ifdef CONFIG_PM_SLEEP
 /*
+ * tegra2_cpu_clear_resettable(void)
+ *
+ * Called to clear the "resettable soon" flag in PMC_SCRATCH41 when
+ * it is expected that the secondary CPU will be idle soon.
+ */
+ENTRY(tegra2_cpu_clear_resettable)
+	mov32	r1, TEGRA_PMC_VIRT + PMC_SCRATCH41
+	mov	r12, #CPU_NOT_RESETTABLE
+	str	r12, [r1]
+	mov	pc, lr
+ENDPROC(tegra2_cpu_clear_resettable)
+
+/*
  * tegra2_cpu_set_resettable_soon(void)
  *
  * Called to set the "resettable soon" flag in PMC_SCRATCH41 when
  * it is expected that the secondary CPU will be idle soon.
  */
 ENTRY(tegra2_cpu_set_resettable_soon)
-	mov32	r3, TEGRA_PMC_VIRT
-	add	r1, r3, #PMC_SCRATCH41
+	mov32	r1, TEGRA_PMC_VIRT + PMC_SCRATCH41
 	mov	r12, #CPU_RESETTABLE_SOON
 	str	r12, [r1]
 	mov	pc, lr
@@ -165,8 +165,7 @@ ENDPROC(tegra2_cpu_set_resettable_soon)
  * set because it is expected that the secondary CPU will be idle soon.
  */
 ENTRY(tegra2_cpu_is_resettable_soon)
-	mov32	r3, TEGRA_PMC_VIRT
-	add	r1, r3, #PMC_SCRATCH41
+	mov32	r1, TEGRA_PMC_VIRT + PMC_SCRATCH41
 	ldr	r12, [r1]
 	cmp	r12, #CPU_RESETTABLE_SOON
 	moveq	r0, #1
@@ -181,9 +180,8 @@ ENDPROC(tegra2_cpu_is_resettable_soon)
  * tegra2_tear_down_core in IRAM
  */
 ENTRY(tegra2_sleep_core)
-	mov	r3, lr			@ set resume address to lr
-	bl	tegra_cpu_save
-	bl	tegra_cpu_exit_coherency
+	mov	r12, pc 		@ return here is via r12
+	b	tegra_cpu_save
 	mov32	r1, tegra2_tear_down_core
 	mov32	r2, tegra2_iram_start
 	sub	r1, r1, r2
@@ -196,24 +194,27 @@ ENDPROC(tegra2_sleep_core)
  * tegra2_sleep_wfi(unsigned long v2p)
  */
 ENTRY(tegra2_sleep_wfi)
-	mov	r3, lr			@ set resume address to lr
 	mrc	p15, 0, r2, c1, c0, 1	@ save actlr before exiting coherency
-	bl	tegra_cpu_save
-	bl	tegra_cpu_exit_coherency
+	mov	r12, pc 		@ return here is via r12
+	b	tegra_cpu_save
 	mov	r11, r2
 
-	mov32	r3, TEGRA_PMC_VIRT
-	add	r0, r3, #PMC_SCRATCH41
+	mov32	r0, TEGRA_PMC_VIRT + PMC_SCRATCH41
 	mov	r3, #CPU_RESETTABLE
 	str	r3, [r0]
 
 	bl	tegra_cpu_wfi
 
+	mov32	r0, TEGRA_PMC_VIRT + PMC_SCRATCH41
+	mov	r3, #CPU_NOT_RESETTABLE
+	str	r3, [r0]
+
 	/*
 	 * cpu may be reset while in wfi, which will return through
-	 * tegra_resume to cpu_resume to tegra_cpu_resume
+	 * tegra_resume to tegra_cpu_resume_phys to tegra_cpu_resume
 	 * or interrupt may wake wfi, which will return here
-	 * cpu state is unchanged - MMU is on, cache is on, coherency is off
+	 * cpu state is unchanged - MMU is on, cache is on, coherency
+	 * is off, and the data cache is off
 	 *
 	 * r11 contains the original actlr
 	 */
@@ -228,6 +229,16 @@ ENTRY(tegra2_sleep_wfi)
 
 	bl	tegra_pen_unlock
 
+#if USE_TEGRA_CPU_SUSPEND
+	/* Enable the data cache and SMP coherency */
+	mrc	p15, 0, r10, c1, c0, 0
+	orr	r10, r10, #CR_C
+	dsb
+	mcr	p15, 0, r10, c1, c0, 0
+	isb
+	mcr	p15, 0, r11, c1, c0, 1	@ reenable coherency
+
+#else
 	mcr	p15, 0, r11, c1, c0, 1	@ reenable coherency
 
 	@ the cpu was running with coherency disabled, caches may be out of date
@@ -238,13 +249,9 @@ ENTRY(tegra2_sleep_wfi)
 #else
 	bl	__cpuc_flush_kern_all
 #endif
+#endif
 
-	/* FIXME: The next two instructions should be removed if our change to
-	   save the diagnostic regsiter in the CPU context is accepted. */
-	ldmfd	sp!, {r4}
-	mcr	p15, 0, r4, c15, c0, 1	@ write diagnostic register
-	ldmfd	sp!, {lr}
-	ldmfd	sp!, {r4 - r11}
+	pop_ctx_regs r0, r1		@ restore context registers
 	mov	pc, lr
 ENDPROC(tegra2_sleep_wfi)
 

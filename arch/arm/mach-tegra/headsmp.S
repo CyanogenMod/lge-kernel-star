@@ -68,7 +68,7 @@ ENTRY(tegra_resume)
 
 	cpu_id	r0
 	cmp	r0, #0				@ CPU0?
-	bne	cpu_resume      		@ no
+	bne	tegra_cpu_resume_phys		@ no
 
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	@ Clear the flow controller flags for this CPU.
@@ -86,7 +86,7 @@ ENTRY(tegra_resume)
 	orr	r1, r1, #1
 	str	r1, [r0]
 
-	b	cpu_resume
+	b	tegra_cpu_resume_phys
 ENDPROC(tegra_resume)
 #endif
 
@@ -182,6 +182,14 @@ ENTRY(__tegra_cpu_reset_handler)
 	ldr	r7, [r12, #RESET_DATA(MASK_PRESENT)]
 	tst	r7, r11 			@ if !present
 	bleq	__die				@ CPU not present (to OS)
+#endif
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	/* If CPU1, don't let CPU0 reset CPU1 now that CPU1 is coming up. */
+	mov32	r6, TEGRA_PMC_BASE
+	mov	r0, #0
+	cmp	r10, #0
+	strne	r0, [r6, #PMC_SCRATCH41]
 #endif
 
 #ifdef CONFIG_PM_SLEEP

@@ -26,6 +26,8 @@
 #include <linux/init.h>
 #include <linux/errno.h>
 
+#include <mach/iomap.h>
+
 enum tegra_suspend_mode {
 	TEGRA_SUSPEND_NONE = 0,
 	TEGRA_SUSPEND_LP2,	/* CPU voltage off */

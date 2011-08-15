@@ -105,7 +105,7 @@ delay_1:
 __cpu_reset_again:
 	dsb
 	.align 5
-	wfe						@ CPU should be power gated here
+	wfe					@ CPU should be power gated here
 wfe_war:
 	b	__cpu_reset_again
 
@@ -113,37 +113,20 @@ wfe_war:
 	.rept 38
 	nop
 	.endr
-	b 	.					@ should never get here
+	b 	.				@ should never get here
 
 ENDPROC(tegra3_cpu_reset)
 #endif
 
 #ifdef CONFIG_PM_SLEEP
 /*
- * tegra3_sleep_cpu(unsigned long v2p)
- *
- * enters suspend in LP2 by turning off the mmu and jumping to
- * tegra3_tear_down_cpu
- */
-ENTRY(tegra3_sleep_cpu)
-	mov	r3, lr			@ set resume address to lr
-	bl	tegra_cpu_save
-	bl	tegra_cpu_exit_coherency
-
-	mov32	r1, tegra3_tear_down_cpu
-	add	r1, r1, r0
-	b	tegra_turn_off_mmu
-ENDPROC(tegra3_sleep_cpu)
-
-/*
  * tegra3_sleep_cpu_secondary(unsigned long v2p)
  *
  * Enters LP2 on secondary CPU by exiting coherency and powergating the CPU.
  */
 ENTRY(tegra3_sleep_cpu_secondary)
-	mov	r3, lr				@ set resume address to lr
-	bl	tegra_cpu_save
-	bl	tegra_cpu_exit_coherency
+	mov	r12, pc 			@ return here is via r12
+	b	tegra_cpu_save
 
 	/* Powergate this CPU. */
 	mov	r0, #0				@ power mode flags (!hotplug)

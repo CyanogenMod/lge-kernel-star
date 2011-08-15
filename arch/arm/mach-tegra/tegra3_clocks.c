@@ -684,6 +684,29 @@ static struct clk_ops tegra_super_ops = {
 	.set_rate		= tegra3_super_clk_set_rate,
 };
 
+static int tegra3_twd_clk_set_rate(struct clk *c, unsigned long rate)
+{
+	/* The input value 'rate' is the clock rate of the CPU complex. */
+	c->rate = (rate * c->mul) / c->div;
+	return 0;
+}
+
+static struct clk_ops tegra3_twd_ops = {
+	.set_rate	= tegra3_twd_clk_set_rate,
+};
+
+static struct clk tegra3_clk_twd = {
+	/* NOTE: The twd clock must have *NO* parent. It's rate is directly
+		 updated by tegra3_cpu_cmplx_clk_set_rate() because the
+		 frequency change notifer for the twd is called in an
+		 atomic context which cannot take a mutex. */
+	.name     = "twd",
+	.ops      = &tegra3_twd_ops,
+	.max_rate = 1400000000,	/* Same as tegra_clk_cpu_cmplx.max_rate */
+	.mul      = 1,
+	.div      = 2,
+};
+
 /* virtual cpu clock functions */
 /* some clocks can not be stopped (cpu, memory bus) while the SoC is running.
    To change the frequency of these clocks, the parent pll may need to be
@@ -812,7 +835,26 @@ static void tegra3_cpu_cmplx_clk_disable(struct clk *c)
 
 static int tegra3_cpu_cmplx_clk_set_rate(struct clk *c, unsigned long rate)
 {
-	return clk_set_rate(c->parent, rate);
+	unsigned long flags;
+	int ret;
+	struct clk *parent = c->parent;
+
+	if (!parent->ops || !parent->ops->set_rate)
+		return -ENOSYS;
+
+	clk_lock_save(parent, &flags);
+
+	ret = clk_set_rate_locked(parent, rate);
+
+	/* We can't parent the twd to directly to the CPU complex because
+	   the TWD frequency update notifier is called in an atomic context
+	   and the CPU frequency update requires a mutex. Update the twd
+	   clock rate with the new CPU complex rate. */
+	clk_set_rate(&tegra3_clk_twd, clk_get_rate_locked(parent));
+
+	clk_unlock_restore(parent, &flags);
+
+	return ret;
 }
 
 static int tegra3_cpu_cmplx_clk_set_parent(struct clk *c, struct clk *p)
@@ -3268,15 +3310,6 @@ static struct clk tegra_clk_cpu_cmplx = {
 	.max_rate  = 1400000000,
 };
 
-static struct clk tegra_clk_twd = {
-	.name     = "twd",
-	.parent   = &tegra_clk_cpu_cmplx, /* FIXME??? */
-	.ops      = NULL,
-	.max_rate = 400000000,
-	.mul      = 1,
-	.div      = 2,
-};
-
 static struct clk tegra_clk_cop = {
 	.name      = "cop",
 	.parent    = &tegra_clk_sclk,
@@ -3695,7 +3728,7 @@ struct clk *tegra_ptr_clks[] = {
 	&tegra_clk_cop,
 	&tegra_clk_sbus_cmplx,
 	&tegra_clk_emc,
-	&tegra_clk_twd,
+	&tegra3_clk_twd,
 };
 
 static struct tegra_edp_limits default_cpu_edp_limits[] = {

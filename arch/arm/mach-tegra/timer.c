@@ -219,12 +219,19 @@ static struct syscore_ops tegra_timer_syscore_ops = {
 void tegra_twd_suspend(struct tegra_twd_context *context)
 {
 	context->twd_ctrl = readl(twd_base + TWD_TIMER_CONTROL);
-	context->twd_load = readl(twd_base + TWD_TIMER_LOAD);
+	context->twd_load = readl(twd_base + TWD_TIMER_COUNTER);
+	if ((context->twd_load == 0) && (context->twd_ctrl &
+		(TWD_TIMER_CONTROL_ENABLE | TWD_TIMER_CONTROL_IT_ENABLE))) {
+		WARN("%s: TWD enabled but counter was 0\n", __func__);
+		context->twd_load = 1;
+	}
 	__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
 }
 
 void tegra_twd_resume(struct tegra_twd_context *context)
 {
+	BUG_ON((context->twd_load == 0) && (context->twd_ctrl &
+		(TWD_TIMER_CONTROL_ENABLE | TWD_TIMER_CONTROL_IT_ENABLE)));
 	writel(context->twd_load, twd_base + TWD_TIMER_LOAD);
 	writel(context->twd_ctrl, twd_base + TWD_TIMER_CONTROL);
 }

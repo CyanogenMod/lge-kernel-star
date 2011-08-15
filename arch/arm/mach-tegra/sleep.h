@@ -25,6 +25,15 @@
 
 #include <mach/iomap.h>
 
+#ifdef CONFIG_CACHE_L2X0
+#define USE_TEGRA_CPU_SUSPEND	1
+#else
+#define USE_TEGRA_CPU_SUSPEND	0
+#endif
+/* FIXME: The core associated with this should be removed if our change to
+   save the diagnostic regsiter in the CPU context is accepted. */
+#define USE_TEGRA_DIAG_REG_SAVE	1
+
 #define TEGRA_POWER_SDRAM_SELFREFRESH	(1 << 26) /* SDRAM is in self-refresh */
 #define TEGRA_POWER_HOTPLUG_SHUTDOWN	(1 << 27) /* Hotplug shutdown */
 #define TEGRA_POWER_CLUSTER_G		(1 << 28) /* G CPU */
@@ -74,8 +83,101 @@
 #endif
 
 #define TEGRA_FLOW_CTRL_VIRT (TEGRA_FLOW_CTRL_BASE - IO_PPSB_PHYS + IO_PPSB_VIRT)
+#define TEGRA_ARM_PERIF_VIRT (TEGRA_ARM_PERIF_BASE - IO_CPU_PHYS + IO_CPU_VIRT)
 
-#ifndef __ASSEMBLY__
+#ifdef __ASSEMBLY__
+
+/* Macro to exit SMP coherency. */
+.macro exit_smp, tmp1, tmp2
+	mrc	p15, 0, \tmp1, c1, c0, 1	@ ACTLR
+	bic	\tmp1, \tmp1, #(1<<6) | (1<<0)	@ clear ACTLR.SMP | ACTLR.FW
+	mcr	p15, 0, \tmp1, c1, c0, 1	@ ACTLR
+	isb
+	cpu_id	\tmp1
+	mov	\tmp1, \tmp1, lsl #2
+	mov	\tmp2, #0xf
+	mov	\tmp2, \tmp2, lsl \tmp1
+	mov32	\tmp1, TEGRA_ARM_PERIF_VIRT + 0xC
+	str	\tmp2, [\tmp1]			@ invalidate SCU tags for CPU
+	dsb
+.endm
+
+#define DEBUG_CONTEXT_STACK	0
+
+/* pops a debug check token from the stack */
+.macro	pop_stack_token tmp1, tmp2
+#if DEBUG_CONTEXT_STACK
+	mov32	\tmp1, 0xBAB1F00D
+	ldmfd	sp!, {\tmp2}
+	cmp	\tmp1, \tmp2
+	movne	pc, #0
+#endif
+.endm
+
+/* pushes a debug check token onto the stack */
+.macro	push_stack_token tmp1
+#if DEBUG_CONTEXT_STACK
+	mov32	\tmp1, 0xBAB1F00D
+	stmfd	sp!, {\tmp1}
+#endif
+.endm
+
+.macro push_ctx_regs, tmp1
+	push_stack_token \tmp1		@ debug check word
+	stmfd	sp!, {r4 - r11, lr}
+	/* Save the current TTB0 and CONTEXTID registers. */
+	mrc	p15, 0, r5, c2, c0, 0	@ TTB 0
+	mrc	p15, 0, r6, c13, c0, 1	@ CONTEXTID
+#if USE_TEGRA_DIAG_REG_SAVE
+	mrc	p15, 0, r4, c15, c0, 1	@ read diagnostic register
+	stmfd	sp!, {r4-r6}
+#else
+	stmfd	sp!, {r5-r6}
+#endif
+	/* Switch to the tegra_pgd so that IRAM and the MMU shut-off code
+	   will be flat mapped (VA==PA). We also do this because the common
+	   ARM CPU state save/restore code doesn't support an external L2
+	   cache controller. If the current PGD is left active, the common
+	   ARM MMU restore may (and eventually will) damage the currently
+	   running page tables by adding a temporary flat section mapping
+	   that could be picked up by other CPUs from the L2 cache
+	   resulting in a kernel panic. */
+	ldr	r6, tegra_pgd_phys_address
+	ldr	r6, [r6]
+	mov	r7, #0
+	dsb
+	mcr	p15, 0, r7, c13, c0, 1	@ CONTEXTID = reserved context
+	isb
+	mcr	p15, 0, r6, c2, c0, 0	@ TTB 0
+	isb
+	mcr	p15, 0, r7, c8, c3, 0	@ invalidate TLB
+	mcr	p15, 0, r7, c7, c5, 6	@ flush BTAC
+	mcr	p15, 0, r7, c7, c5, 0	@ flush instruction cache
+	dsb
+.endm
+
+.macro pop_ctx_regs, tmp1, tmp2
+#if USE_TEGRA_DIAG_REG_SAVE
+	ldmfd	sp!, {r4-r6}
+	mcr	p15, 0, r4, c15, c0, 1	@ write diagnostic register
+#else
+	ldmfd	sp!, {r5-r6}
+#endif
+	dsb
+	mcr	p15, 0, r5, c2, c0, 0	@ TTB 0
+	isb
+	mcr	p15, 0, r6, c13, c0, 1	@ CONTEXTID = reserved context
+	isb
+	mov	r7, #0
+	mcr	p15, 0, r7, c8, c3, 0	@ invalidate TLB
+	mcr	p15, 0, r7, c7, c5, 6	@ flush BTAC
+	mcr	p15, 0, r7, c7, c5, 0	@ flush instruction cache
+	dsb
+	ldmfd	sp!, {r4 - r11, lr}
+	pop_stack_token \tmp1, \tmp2	@ debug stack debug token
+.endm
+
+#else
 
 #define FLOW_CTRL_HALT_CPU(cpu)	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) +	\
 	((cpu) ? (FLOW_CTRL_HALT_CPU1_EVENTS + 8 * ((cpu) - 1)) :	\
@@ -104,6 +206,7 @@ extern void tegra2_iram_end;
 int  tegra2_cpu_is_resettable_soon(void);
 void tegra2_cpu_reset(int cpu);
 void tegra2_cpu_set_resettable_soon(void);
+void tegra2_cpu_clear_resettable(void);
 void tegra2_sleep_core(unsigned long v2p);
 void tegra2_hotplug_shutdown(void);
 void tegra2_sleep_wfi(unsigned long v2p);

@@ -38,6 +38,8 @@
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
 #include <linux/syscore_ops.h>
+#include <linux/vmalloc.h>
+#include <linux/memblock.h>
 
 #include <asm/cacheflush.h>
 #include <asm/cpu_pm.h>
@@ -45,6 +47,7 @@
 #include <asm/hardware/gic.h>
 #include <asm/localtimer.h>
 #include <asm/pgalloc.h>
+#include <asm/pgtable.h>
 #include <asm/tlbflush.h>
 
 #include <mach/clk.h>
@@ -87,6 +90,11 @@ struct suspend_context {
 };
 
 #ifdef CONFIG_PM_SLEEP
+#if USE_TEGRA_CPU_SUSPEND
+void *tegra_cpu_context;	/* non-cacheable page for CPU context */
+#endif
+phys_addr_t tegra_pgd_phys;	/* pgd used by hotplug & LP2 bootup */
+static pgd_t *tegra_pgd;
 static DEFINE_SPINLOCK(tegra_lp2_lock);
 static cpumask_t tegra_in_lp2;
 static cpumask_t *iram_cpu_lp2_mask;
@@ -95,6 +103,7 @@ static unsigned long iram_save_size;
 static void __iomem *iram_code = IO_ADDRESS(TEGRA_IRAM_CODE_AREA);
 static void __iomem *clk_rst = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
 static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
+static int tegra_last_pclk;
 #endif
 
 struct suspend_context tegra_sctx;
@@ -150,12 +159,6 @@ struct suspend_context tegra_sctx;
 #define MC_SECURITY_SIZE	0x70
 #define MC_SECURITY_CFG2	0x7c
 
-phys_addr_t tegra_pgd_phys;  /* pgd used by hotplug & LP2 bootup */
-static pgd_t *tegra_pgd;
-
-#ifdef CONFIG_PM_SLEEP
-static int tegra_last_pclk;
-#endif
 static struct clk *tegra_pclk;
 static const struct tegra_suspend_platform_data *pdata;
 static enum tegra_suspend_mode current_suspend_mode = TEGRA_SUSPEND_NONE;
@@ -195,6 +198,7 @@ static unsigned long
 #define tegra_cluster_switch_time(flags, id) do {} while(0)
 #endif
 
+#ifdef CONFIG_PM_SLEEP
 unsigned long tegra_cpu_power_good_time(void)
 {
 	if (WARN_ON_ONCE(!pdata))
@@ -225,13 +229,14 @@ unsigned long tegra_cpu_lp2_min_residency(void)
  * Creates a page table with identity mappings of physical memory and IRAM
  * for use when the MMU is off, in addition to all the regular kernel mappings.
  */
-static int create_suspend_pgtable(void)
+static __init int create_suspend_pgtable(void)
 {
 	tegra_pgd = pgd_alloc(&init_mm);
 	if (!tegra_pgd)
 		return -ENOMEM;
 
-	identity_mapping_add(tegra_pgd, PLAT_PHYS_OFFSET, IO_IRAM_PHYS);
+	identity_mapping_add(tegra_pgd, PLAT_PHYS_OFFSET,
+			     PLAT_PHYS_OFFSET + memblock_phys_mem_size());
 	identity_mapping_add(tegra_pgd, IO_IRAM_PHYS,
 		IO_IRAM_PHYS + SECTION_SIZE);
 
@@ -240,7 +245,53 @@ static int create_suspend_pgtable(void)
 	return 0;
 }
 
-#ifdef CONFIG_PM_SLEEP
+/*
+ * alloc_suspend_context
+ *
+ * Allocate a non-cacheable page to hold the CPU contexts.
+ * The standard ARM CPU context save functions don't work if there's
+ * an external L2 cache controller (like a PL310) in system.
+ */
+static __init int alloc_suspend_context(void)
+{
+#if USE_TEGRA_CPU_SUSPEND
+	pgprot_t prot = __pgprot_modify(pgprot_kernel, L_PTE_MT_MASK,
+					 L_PTE_MT_UNCACHED | L_PTE_XN);
+	struct page *ctx_page;
+	unsigned long ctx_virt;
+	phys_addr_t ctx_phys;
+	pmd_t *pmd;
+
+	ctx_page = alloc_pages(GFP_KERNEL, 0);
+	if (IS_ERR_OR_NULL(ctx_page))
+		goto fail;
+
+	tegra_cpu_context = vm_map_ram(&ctx_page, 1, -1, prot);
+	if (IS_ERR_OR_NULL(tegra_cpu_context))
+		goto fail;
+
+	/* Add the context page to our private pgd. */
+	ctx_virt = (unsigned long)tegra_cpu_context;
+	ctx_phys = virt_to_phys(tegra_cpu_context);
+	pmd = pmd_offset(tegra_pgd + pgd_index(ctx_virt), ctx_virt);
+	*pmd = __pmd((ctx_phys & PGDIR_MASK) |
+		     PMD_TYPE_SECT | PMD_SECT_AP_WRITE |
+		     PMD_SECT_XN | PMD_SECT_UNCACHED);
+	flush_pmd_entry(pmd);
+	outer_clean_range(__pa(pmd), __pa(pmd + 1));
+
+	return 0;
+
+fail:
+	if (ctx_page)
+		__free_page(ctx_page);
+	tegra_cpu_context = NULL;
+	return -ENOMEM;
+#else
+	return 0;
+#endif
+}
+
 /* ensures that sufficient time is passed for a register write to
  * serialize into the 32KHz domain */
 static void pmc_32kwritel(u32 val, unsigned long offs)
@@ -419,7 +470,8 @@ void tegra_clear_cpu_in_lp2(int cpu)
 	   can't use used directly by cpumask_clear_cpu() because it uses
 	   LDREX/STREX which requires the addressed location to be inner
 	   cacheable and sharable which IRAM isn't. */
-	*iram_cpu_lp2_mask = tegra_in_lp2;
+	writel(tegra_in_lp2.bits[0], iram_cpu_lp2_mask);
+	dsb();
 
 	spin_unlock(&tegra_lp2_lock);
 }
@@ -436,7 +488,8 @@ bool tegra_set_cpu_in_lp2(int cpu)
 	   can't use used directly by cpumask_set_cpu() because it uses
 	   LDREX/STREX which requires the addressed location to be inner
 	   cacheable and sharable which IRAM isn't. */
-	*iram_cpu_lp2_mask = tegra_in_lp2;
+	writel(tegra_in_lp2.bits[0], iram_cpu_lp2_mask);
+	dsb();
 
 	if ((cpu == 0) && cpumask_equal(&tegra_in_lp2, cpu_online_mask))
 		last_cpu = true;
@@ -799,9 +852,20 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 
 	preset_lpj = loops_per_jiffy;
 
-	create_suspend_pgtable();
-
 #ifdef CONFIG_PM_SLEEP
+	if (create_suspend_pgtable() < 0) {
+		pr_err("%s: PGD memory alloc failed -- LP0/LP1/LP2 unavailable\n",
+				__func__);
+		plat->suspend_mode = TEGRA_SUSPEND_NONE;
+		goto fail;
+	}
+
+	if (alloc_suspend_context() < 0) {
+		pr_err("%s: CPU context alloc failed -- LP0/LP1/LP2 unavailable\n",
+				__func__);
+		plat->suspend_mode = TEGRA_SUSPEND_NONE;
+		goto fail;
+	}
 
 	if ((tegra_get_chipid() == TEGRA_CHIPID_TEGRA3) &&
 	    (tegra_get_revision() == TEGRA_REVISION_A01) &&
@@ -881,10 +945,6 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 	}
 
 	iram_cpu_lp2_mask = tegra_cpu_lp2_mask;
-#ifdef CONFIG_CPU_IDLE
-	if (plat->suspend_mode == TEGRA_SUSPEND_NONE)
-		tegra_lp2_in_idle(false);
-#endif
 #else
 	if (plat->suspend_mode != TEGRA_SUSPEND_NONE) {
 		pr_warning("%s: Suspend requires CONFIG_PM_SLEEP -- "
@@ -892,6 +952,9 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 		plat->suspend_mode = TEGRA_SUSPEND_NONE;
 	}
 #endif
+fail:
+	if (plat->suspend_mode == TEGRA_SUSPEND_NONE)
+		tegra_lp2_in_idle(false);
 
 	current_suspend_mode = plat->suspend_mode;
 }

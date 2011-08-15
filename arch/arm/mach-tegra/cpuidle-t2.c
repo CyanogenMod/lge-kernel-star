@@ -71,14 +71,18 @@ static inline unsigned int time_to_bin(unsigned int time)
 
 #ifdef CONFIG_SMP
 
+#define CLK_RST_CONTROLLER_CLK_CPU_CMPLX	0x4C
+#define CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR	0x344
+
 static void __iomem *clk_rst = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
 static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
-static s64 tegra_cpu1_idle_time = LLONG_MAX;
+static s64 tegra_cpu1_wake_by_time = LLONG_MAX;
 
 static int tegra2_reset_sleeping_cpu(int cpu)
 {
 	int ret = 0;
 
+	BUG_ON(cpu == 0);
 	BUG_ON(cpu == smp_processor_id());
 	tegra_pen_lock();
 
@@ -96,38 +100,51 @@ static void tegra2_wake_reset_cpu(int cpu)
 {
 	u32 reg;
 
+	BUG_ON(cpu == 0);
+	BUG_ON(cpu == smp_processor_id());
+
+	tegra_pen_lock();
+
+	tegra2_cpu_clear_resettable();
+
 	/* enable cpu clock on cpu */
 	reg = readl(clk_rst + 0x4c);
-	writel(reg & ~(1 << (8 + cpu)), clk_rst + 0x4c);
+	writel(reg & ~(1 << (8 + cpu)),
+	       clk_rst + CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
 
 	/* take the CPU out of reset */
 	reg = 0x1111 << cpu;
-	writel(reg, clk_rst + 0x344);
+	writel(reg, clk_rst +
+	       CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR);
 
 	/* unhalt the cpu */
 	flowctrl_writel(0, FLOW_CTRL_HALT_CPU(1));
+
+	tegra_pen_unlock();
 }
 
 static int tegra2_reset_other_cpus(int cpu)
 {
 	int i;
-	int abort = -1;
+	int ret = 0;
+
+	BUG_ON(cpu != 0);
 
 	for_each_online_cpu(i) {
 		if (i != cpu) {
 			if (tegra2_reset_sleeping_cpu(i)) {
-				abort = i;
+				ret = -EBUSY;
 				break;
 			}
 		}
 	}
 
-	if (abort >= 0) {
+	if (ret) {
 		for_each_online_cpu(i) {
-			if (i != cpu && i < abort)
+			if (i != cpu)
 				tegra2_wake_reset_cpu(i);
 		}
-		return -EINVAL;
+		return ret;
 	}
 
 	return 0;
@@ -161,6 +178,7 @@ static int tegra2_idle_lp2_cpu_0(struct cpuidle_device *dev,
 {
 	ktime_t entry_time;
 	ktime_t exit_time;
+	s64 wake_time;
 	bool sleep_completed = false;
 	int bin;
 	int i;
@@ -177,8 +195,21 @@ static int tegra2_idle_lp2_cpu_0(struct cpuidle_device *dev,
 		return -EBUSY;
 	}
 
+	/* LP2 entry time */
+	entry_time = ktime_get();
+
+	/* LP2 initial targeted wake time */
+	wake_time = ktime_to_us(entry_time) + request;
+
+	/* CPU0 must wake up before CPU1. */
+	smp_rmb();
+	wake_time = min_t(s64, wake_time, tegra_cpu1_wake_by_time);
+
+	/* LP2 actual targeted wake time */
+	request = wake_time - ktime_to_us(entry_time);
+	BUG_ON(wake_time < 0LL);
+
 	idle_stats.tear_down_count++;
-	request = min_t(s64, request, tegra_cpu1_idle_time);
 	entry_time = ktime_get();
 
 	if (request > state->target_residency) {
@@ -225,7 +256,7 @@ static int tegra2_idle_lp2_cpu_0(struct cpuidle_device *dev,
 	return 0;
 }
 
-static noinline int tegra2_idle_lp2_cpu_1(struct cpuidle_device *dev,
+static void tegra2_idle_lp2_cpu_1(struct cpuidle_device *dev,
 			   struct cpuidle_state *state, s64 request)
 {
 #ifdef CONFIG_SMP
@@ -235,20 +266,22 @@ static noinline int tegra2_idle_lp2_cpu_1(struct cpuidle_device *dev,
 		/*
 		 * Not enough time left to enter LP2
 		 */
+		tegra2_cpu_clear_resettable();
 		tegra_cpu_wfi();
 		return;
 	}
 
-	tegra_gic_cpu_disable();
-
-	tegra_cpu1_idle_time = request - tegra_lp2_exit_latency;
+	/* Save time this CPU must be awakened by. */
+	tegra_cpu1_wake_by_time = ktime_to_us(ktime_get()) + request;
 	smp_wmb();
 
 	tegra_twd_suspend(&twd_context);
 
 	tegra2_sleep_wfi(PLAT_PHYS_OFFSET - PAGE_OFFSET);
 
-	tegra_cpu1_idle_time = LLONG_MAX;
+	tegra2_cpu_clear_resettable();
+
+	tegra_cpu1_wake_by_time = LLONG_MAX;
 
 	tegra_twd_resume(&twd_context);
 #endif
