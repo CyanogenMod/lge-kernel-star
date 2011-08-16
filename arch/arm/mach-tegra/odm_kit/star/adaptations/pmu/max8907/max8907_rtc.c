@@ -366,7 +366,7 @@ Max8907RtcAlarmCountWrite(
     }
     //20100928, , RTC alarm enable [END]
 
-    return NV_FALSE;
+    return NV_TRUE;
 }
 
 NvBool

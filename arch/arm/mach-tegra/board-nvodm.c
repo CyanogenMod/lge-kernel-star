@@ -1735,7 +1735,7 @@ static struct platform_device *nvodm_devices[] __initdata = {
 
 //20100419  for headset detection [LGE_START]
 #if defined(CONFIG_MACH_STAR)
-    &star_headset_device,			//for not boot
+    &star_wm8994_pdevice,                       // 20110621
 #endif /* CONFIG_MACH_STAR */
 //20100419  for headset detection [LGE_END]
 
@@ -1745,7 +1745,7 @@ static struct platform_device *nvodm_devices[] __initdata = {
 
 //20100704  jongik's wm8994 driver porting [LGE_START]
 #if defined(CONFIG_MACH_STAR)
-    &star_wm8994_pdevice,		//for not boot
+    &star_headset_device,                       // 20110621
 #endif /* CONFIG_MACH_STAR */
 //20100704  jongik's wm8994 driver porting [LGE_END]
 #if defined(CONFIG_ANDROID_RAM_CONSOLE)
@@ -1838,6 +1838,7 @@ static void __init tegra_register_ifxn721(void)
     if (pSpiDeviceInfo && pSpiDeviceInfo->IsSlave)
         return;
 
+#ifndef CONFIG_MACH_STAR_TMUS
  //Set SRDY pin as interrupt 	
     err = NvRmGpioAcquirePinHandle(s_hGpioGlobal, port, pin, &hPin);
     if (err)
@@ -1851,6 +1852,7 @@ static void __init tegra_register_ifxn721(void)
     printk("[tegra_spi]Register ifxn721 SPI driver\n");
 
     tegra_spi_board_info[0].irq = irq; //SRDY
+#endif
     /* FIXME, instance need not be same as bus number. */
     tegra_spi_board_info[0].bus_num = instance;
     tegra_spi_board_info[0].chip_select = cs;
@@ -2071,6 +2073,7 @@ static void __init register_mdm6600(void)
 //20100613-1, , add spi slave mode [START]
 	if (pSpiDeviceInfo && pSpiDeviceInfo->IsSlave)
 	{	//slave mode ; mrdy pin works as interrupt
+#ifndef CONFIG_MACH_STAR_TMUS
 			err = NvRmGpioAcquirePinHandle(s_hGpioGlobal, port[0], pin[0], &hPin);
 		if (err)
 		{
@@ -2080,6 +2083,7 @@ static void __init register_mdm6600(void)
 		NvRmGpioConfigPins(s_hGpioGlobal, &hPin, 1, NvRmGpioPinMode_InputInterruptFallingEdge);
 		NvRmGpioGetIrqs(s_hRmGlobal, &hPin, &irq, 1);
 			tegra_spi_board_info[id].irq = irq; //SRDY
+#endif
 		/* FIXME, instance need not be same as bus number. */
 			tegra_spi_board_info[id].bus_num = instance;
 			tegra_spi_board_info[id].chip_select = cs;
