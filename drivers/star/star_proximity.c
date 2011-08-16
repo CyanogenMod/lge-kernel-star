@@ -227,6 +227,7 @@ static void star_proxi_vddio_vi_power_onoff( NvU32 vdd_id, NvBool is_enable )
 	NvOdmServicesPmuClose(h_pmu);
 }
 
+#if	0
 static NvU8 star_read_vo_bit(ProximityDevice *data)
 {
     NvU8 vo = 0;
@@ -281,6 +282,28 @@ static void star_proxi_workqueue_func(struct work_struct *work)
 		star_proxi_write_reg(&s_proximity, 0x04, 0x03 );
 	}
 }
+#else
+// LGE_CHANGE_S [] 2011-05-22, [P999_GB] : status update
+static void star_proxi_workqueue_func(struct work_struct *work)
+{
+	NvU8	status;
+
+    star_proxi_read_reg(&s_proximity, 0x00, &status);
+	status	=	(status & 1);
+
+	if (status == s_proximity.MVO) {	// Interrupt mode
+		atomic_set(&proxi_status, status ? 0 : 1);
+
+		input_report_abs(s_proximity.input_dev, ABS_DISTANCE, atomic_read(&proxi_status));
+		input_sync(s_proximity.input_dev);
+
+		star_proxi_write_reg(&s_proximity, 0x06, 0x00 );
+
+		printk("proximity value(1) = %d\n", atomic_read(&proxi_status));
+	}
+}
+// LGE_CHANGE_E [] 2011-05-22, [P999_GB] : status update
+#endif
 
 static void star_proxi_interrupt_handler(void *arg)
 {
@@ -334,6 +357,11 @@ static void star_proxi_enable(ProximityDevice *data)
         hrtimer_start(&data->timer, ktime_set(1, 0), HRTIMER_MODE_REL);
 
     proxi_enabled = true;
+
+	atomic_set(&proxi_status, 1);
+
+	input_report_abs(s_proximity.input_dev, ABS_DISTANCE, atomic_read(&proxi_status));
+	input_sync(s_proximity.input_dev);
 }
 
 static void star_proxi_disable(ProximityDevice *data)
@@ -509,6 +537,7 @@ static int __init proximity_probe(struct platform_device *pdev)
 	port = 'w'-'a';
 	pin = 2;
 	#else
+	#error PROXI_OUT PIN not assigned
 	#endif
 
     lprintk(D_PROXI, "[star Proximity] start!!!--------------------------------------------------------------------------\n");
