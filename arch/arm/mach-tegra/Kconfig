@@ -338,4 +338,12 @@ config TEGRA_DYNAMIC_PWRDET
 	  only during power transitions, otherwise, the cells are active
 	  always
 
+config TEGRA_EDP_EXACT_FREQ
+	bool "Use maximum possible cpu frequency when EDP capping"
+	depends on TEGRA_EDP_LIMITS
+	default n
+	help
+	  When enabled the cpu will run at the exact frequency
+	  specified in the EDP table when EDP capping is applied; when
+	  disabled the next lower cpufreq frequency will be used.
 endif
