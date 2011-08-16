@@ -253,7 +253,7 @@ static struct tps80031_platform_data tps_platform = {
 
 static struct i2c_board_info __initdata enterprise_regulators[] = {
 	{
-		I2C_BOARD_INFO("tps80031", 0x48),
+		I2C_BOARD_INFO("tps80031", 0x4A),
 		.irq		= INT_EXTERNAL_PMU,
 		.platform_data	= &tps_platform,
 	},
