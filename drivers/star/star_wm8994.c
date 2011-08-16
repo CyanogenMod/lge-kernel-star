@@ -223,6 +223,27 @@ void star_headsetdet_bias(int bias)
     }
     return;
 }
+// 20110726 mic_bias [start]
+
+void star_Mic_bias(int bias)
+{
+    NvU32 r_data = 0;
+    ReadWolfsonRegister(g_wm8994, 0x0001, &r_data);
+    if(bias == 0)
+    {
+        r_data = r_data & (~0x0003);
+		printk("star_headsetdet_bias headset disabled %4x\n",r_data);
+    }
+	else
+	{
+        r_data = r_data | (0x0003);
+		printk("star_headsetdet_bias headset enabled %4x\n",r_data);
+	}
+	WriteWolfsonRegister(g_wm8994, 0x0001, r_data);
+	return;
+}
+// 20110726 mic_bias [end]
+
 
 /**
  * All the device spefic initializations happen here. 

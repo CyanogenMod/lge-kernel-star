@@ -122,6 +122,7 @@ int suspend_status = 0;
 
 
 extern void star_headsetdet_bias(int bias);	//20100421  for framwork function used in kernel ==> error [LGE]
+extern void star_Mic_bias(int bias); // 20110726 detecting headset when resuming
 #define HEADSET_GUID                NV_ODM_GUID('h','e','a','d','s','e','t','_')
 typedef struct HeadsetDeviceRec
 {
@@ -210,7 +211,7 @@ static void type_det_work(struct work_struct *work)
 {
     NvU32 hook_value =0;
     if (headset_off) return;
-
+	
     if(star_get_i2c_busy())
     {
         schedule_delayed_work(&headset_sw_data->delayed_work,	msecs_to_jiffies(type_detection_time));	
@@ -218,7 +219,7 @@ static void type_det_work(struct work_struct *work)
 		return;
     }
     star_set_i2c_busy();
-
+	
     NvOdmGpioGetState(s_hHeadsetHandle.hGpio, s_hHeadsetHandle.h_Headset_Detection, &headset_gpio_status);	
 	headset_status = headset_gpio_status;
     
@@ -228,7 +229,7 @@ static void type_det_work(struct work_struct *work)
 	    #if HOOK_USE_ADC
 		hook_value = headset_get_hook_adc_value();	
 		
-        if(hook_value > 400)
+        if(hook_value > 100)
 			headset_type = STAR_HEADSET;	
 		else
 			headset_type = STAR_HEADPHONE;
@@ -259,7 +260,6 @@ static void type_det_work(struct work_struct *work)
 		star_headsetdet_bias(0);	//20100419   for Headset MIC Bias  ==> framwork function used in kernel ==> error [LGE]
 	}
 	else{
-	star_headsetdet_bias(1);
         block_hook_int =0;
 	}
 	star_unset_i2c_busy();
@@ -301,7 +301,7 @@ static void type_det_work(struct work_struct *work)
 		else
 			headset_type = STAR_HEADPHONE;
 	#else
-		NvOdmGpioGetState(s_hHeadsetHandle.hGpio, s_hHeadsetHandle.h_Hookkey_Detection, &hookkey_gpio_status);	//LGE_UPDATE_ 20100419 for nVidia headset driver
+		NvOdmGpioGetState(s_hHeadsetHandle.hGpio, s_hHeadsetHandle.h_Hookkey_Detection, &hookkey_gpio_status);	// 20100419 for nVidia headset driver
 		if(hookkey_gpio_status == 0){ 
 		   headset_type = STAR_HEADPHONE;
 			hook_value = 1111;
@@ -361,7 +361,7 @@ static void hook_det_work(struct work_struct *work)
     
 	if(hook_status == HOOK_RELEASED){
 		#if HOOK_USE_ADC
-		hookkey_gpio_status = headset_get_hook_adc_value(); //jongik2.kim 20110202 hook_bias
+        hookkey_gpio_status = headset_get_hook_adc_average(5);
 		if( hookkey_gpio_status <= hok_adc_value )
 		{
 		    hook_status = HOOK_PRESSED; 
@@ -370,7 +370,7 @@ static void hook_det_work(struct work_struct *work)
 			lprintk(D_AUDIO, KERN_ERR "##(hook_det_work)## HOOK PRESSED ADC %d\n", hookkey_gpio_status);
 		}
 		#else
-		NvOdmGpioGetState(s_hHeadsetHandle.hGpio, s_hHeadsetHandle.h_Hookkey_Detection, &hookkey_gpio_status);	//LGE_UPDATE_ 20100419 for nVidia headset driver
+		NvOdmGpioGetState(s_hHeadsetHandle.hGpio, s_hHeadsetHandle.h_Hookkey_Detection, &hookkey_gpio_status);	// 20100419 for nVidia headset driver
 		if(hookkey_gpio_status == 0){ 
 		    hook_status = HOOK_PRESSED; 
 		    input_report_key(headset_sw_data->ip_dev, KEY_HOOK, 1);
@@ -390,7 +390,7 @@ static void hook_det_work(struct work_struct *work)
 			lprintk(D_AUDIO, KERN_ERR "##(hook_det_work)## HOOK RELEASED ADC %d\n", hookkey_gpio_status);
 		}
 		#else
-		NvOdmGpioGetState(s_hHeadsetHandle.hGpio, s_hHeadsetHandle.h_Hookkey_Detection, &hookkey_gpio_status);	//LGE_UPDATE_ 20100419 for nVidia headset driver
+		NvOdmGpioGetState(s_hHeadsetHandle.hGpio, s_hHeadsetHandle.h_Hookkey_Detection, &hookkey_gpio_status);	// 20100419 for nVidia headset driver
 		if(hookkey_gpio_status == 1){ 
 		    hook_status = HOOK_RELEASED; 
 		    input_report_key(headset_sw_data->ip_dev, KEY_HOOK, 0);
@@ -565,7 +565,7 @@ static int headsetdet_probe(struct platform_device *pdev)
 
 	struct input_dev *ip_dev;  
     struct input_dev *ip_dev_wake; 
-    
+
     int i, j;
     NvU32 I2cInstance = 0;
     NvU32 pin[4], port[4];
@@ -671,7 +671,7 @@ static int headsetdet_probe(struct platform_device *pdev)
 	set_bit(KEY_VOLUMEDOWN, switch_data->ip_dev_wake->keybit); 
 	switch_data->ip_dev_wake->name = "star_headset_wake";
 
-    
+		
 	ret = input_register_device(switch_data->ip_dev);  
 	INIT_DELAYED_WORK(&switch_data->hook_delayed_work, hook_det_work);
     if (NvOdmGpioInterruptRegister(s_hHeadsetHandle.hGpio, &s_hHeadsetHandle.hhookInterrupt,
@@ -852,9 +852,9 @@ static int headset_suspend(struct platform_device *pdev, pm_message_t state)
     suspend_status = 1;
 //20101117, , gpio wakeup from LP1 [END]
     if(core_lock_on == 0){
-        block_hook_int =1;
+    block_hook_int =1;
 	headset_type = STAR_NONE;
-        lprintk(D_AUDIO, KERN_ERR "##(Headset_det.c)## headset_suspend()!! disable hook int\n");
+    lprintk(D_AUDIO, KERN_ERR "##(Headset_det.c)## headset_suspend()!! disable hook int\n");
     }
 	cancel_delayed_work_sync(&headset_sw_data->delayed_work);
 	cancel_delayed_work_sync(&headset_sw_data->hook_delayed_work);
@@ -871,7 +871,11 @@ static int headset_resume(struct platform_device *pdev)
     suspend_status = 0;
 //20101117, , gpio wakeup from LP1 [END]
 
-    
+
+	// 20110726 detecting headset when resuming [START]
+     star_Mic_bias(1);
+     headset_det_work(&headset_sw_data->work);
+    // 20110726 detecting headset when resuming [END]
     
     if(core_lock_on){
         lprintk(D_AUDIO, KERN_ERR "##(Headset_det.c)## headset_resume()!! wakeup form LP1 headset detect\n");
