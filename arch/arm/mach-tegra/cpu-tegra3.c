@@ -331,7 +331,7 @@ int tegra_auto_hotplug_init(struct mutex *cpu_lock)
 	 * task, single-threaded, freezable.
 	 */
 	hotplug_wq = alloc_workqueue(
-		"cpu-tegra3", WQ_UNBOUND | WQ_RESCUER | WQ_FREEZEABLE, 1);
+		"cpu-tegra3", WQ_UNBOUND | WQ_RESCUER | WQ_FREEZABLE, 1);
 	if (!hotplug_wq)
 		return -ENOMEM;
 	INIT_DELAYED_WORK(&hotplug_work, tegra_auto_hotplug_work_func);
