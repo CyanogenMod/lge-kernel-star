@@ -189,6 +189,8 @@ static int tegra2_idle_lp2_cpu_0(struct cpuidle_device *dev,
 	if (tegra2_reset_other_cpus(dev->cpu))
 		return -EBUSY;
 
+	idle_stats.both_idle_count++;
+
 	if (request < state->target_residency) {
 		/* Not enough time left to enter LP2 */
 		tegra_cpu_wfi();
