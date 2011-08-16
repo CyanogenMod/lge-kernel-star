@@ -269,8 +269,8 @@
 #define UTMIP_BIAS_CFG0		0x80c
 #define   UTMIP_OTGPD			(1 << 11)
 #define   UTMIP_BIASPD			(1 << 10)
-#define   UTMIP_HSSQUELCH_LEVEL(x)	(((x) & 0x2) << 0)
-#define   UTMIP_HSDISCON_LEVEL(x)	(((x) & 0x2) << 2)
+#define   UTMIP_HSSQUELCH_LEVEL(x)	(((x) & 0x3) << 0)
+#define   UTMIP_HSDISCON_LEVEL(x)	(((x) & 0x3) << 2)
 #define   UTMIP_HSDISCON_LEVEL_MSB	(1 << 24)
 
 #define UTMIP_HSRX_CFG0		0x810
@@ -509,6 +509,7 @@
 
 #define UTMIP_SPARE_CFG0	0x834
 #define   FUSE_SETUP_SEL		(1 << 3)
+#define   FUSE_ATERM_SEL		(1 << 4)
 
 #define UHSIC_PLL_CFG0		0x800
 
@@ -675,7 +676,7 @@ static int utmip_pad_power_on(struct tegra_usb_phy *phy)
 	val = readl(base + UTMIP_BIAS_CFG0);
 	val &= ~(UTMIP_OTGPD | UTMIP_BIASPD);
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
-	val |= UTMIP_HSSQUELCH_LEVEL(0x2) | UTMIP_HSDISCON_LEVEL(0x2) |
+	val |= UTMIP_HSSQUELCH_LEVEL(0x2) | UTMIP_HSDISCON_LEVEL(0x1) |
 		UTMIP_HSDISCON_LEVEL_MSB;
 #endif
 	writel(val, base + UTMIP_BIAS_CFG0);
@@ -910,8 +911,7 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	val |= UTMIP_XCVR_LSFSLEW(config->xcvr_lsfslew);
 	val |= UTMIP_XCVR_LSRSLEW(config->xcvr_lsrslew);
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
-	if (phy->instance == 0)
-		val |= UTMIP_XCVR_HSSLEW_MSB(0x8);
+	val |= UTMIP_XCVR_HSSLEW_MSB(0x8);
 #endif
 	writel(val, base + UTMIP_XCVR_CFG0);
 
@@ -933,6 +933,7 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	val |= UTMIP_BIAS_PDTRK_COUNT(phy->freq->pdtrk_count);
 	writel(val, base + UTMIP_BIAS_CFG1);
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	if (phy->instance == 0) {
 		val = readl(base + UTMIP_SPARE_CFG0);
 		if (phy->mode == TEGRA_USB_PHY_MODE_DEVICE)
@@ -941,7 +942,7 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 			val |= FUSE_SETUP_SEL;
 		writel(val, base + UTMIP_SPARE_CFG0);
 	}
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+
 	if (phy->instance == 2) {
 		val = readl(base + UTMIP_SPARE_CFG0);
 		val |= FUSE_SETUP_SEL;
@@ -952,6 +953,10 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 		writel(val, base + USB_SUSP_CTRL);
 	}
 #else
+	val = readl(base + UTMIP_SPARE_CFG0);
+	val |= FUSE_SETUP_SEL | FUSE_ATERM_SEL;
+	writel(val, base + UTMIP_SPARE_CFG0);
+
 	val = readl(base + USB_SUSP_CTRL);
 	val |= UTMIP_PHY_ENABLE;
 	writel(val, base + USB_SUSP_CTRL);
