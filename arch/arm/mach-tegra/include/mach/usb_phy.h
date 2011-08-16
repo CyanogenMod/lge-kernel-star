@@ -60,6 +60,7 @@ struct tegra_uhsic_config {
 	u8 elastic_underrun_limit;
 	u8 elastic_overrun_limit;
 	int (*postsuspend)(void);
+	int (*preresume)(void);
 };
 
 enum tegra_usb_phy_port_speed {
