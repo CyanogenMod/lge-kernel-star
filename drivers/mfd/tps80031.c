@@ -64,6 +64,8 @@
 
 /* Version number related register */
 #define TPS80031_JTAGVERNUM		0x87
+/* Epprom version */
+#define TPS80031_EPROM_REV		0xDF
 
 /* External control register */
 #define REGEN1_BASE_ADD		0xAE
@@ -943,6 +945,8 @@ static int __devinit tps80031_i2c_probe(struct i2c_client *client,
 	struct tps80031 *tps80031;
 	struct tps80031_client *tps;
 	int ret;
+	int jtag_ver;
+	int ep_ver;
 	int i;
 
 	if (!pdata) {
@@ -950,14 +954,22 @@ static int __devinit tps80031_i2c_probe(struct i2c_client *client,
 		return -ENOTSUPP;
 	}
 
-	ret = i2c_smbus_read_byte_data(client, TPS80031_JTAGVERNUM);
-	if (ret < 0) {
+	jtag_ver = i2c_smbus_read_byte_data(client, TPS80031_JTAGVERNUM);
+	if (jtag_ver < 0) {
 		dev_err(&client->dev, "Silicon version number read"
-				" failed: %d\n", ret);
+				" failed: %d\n", jtag_ver);
 		return -EIO;
 	}
 
-	dev_info(&client->dev, "VERNUM is %02x\n", ret);
+	ep_ver = i2c_smbus_read_byte_data(client, TPS80031_EPROM_REV);
+	if (ep_ver < 0) {
+		dev_err(&client->dev, "Silicon eeprom version read"
+				" failed: %d\n", ep_ver);
+		return -EIO;
+	}
+
+	dev_info(&client->dev, "Jtag version 0x%02x and Eeprom version 0x%02x\n",
+						jtag_ver, ep_ver);
 
 	tps80031 = kzalloc(sizeof(struct tps80031), GFP_KERNEL);
 	if (tps80031 == NULL)
