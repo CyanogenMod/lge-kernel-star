@@ -14,6 +14,8 @@
 #include <asm/mach/arch.h>
 #include <mach/gpio.h>
 
+#include <linux/wakelock.h>
+
 //GPIO control 을 위해서 추가 함. 
 #include <nvodm_services.h>
 #include "nvodm_query_discovery.h" //NvOdmPeripheralConnectivity *pConnectivity = NULL;
@@ -28,6 +30,7 @@ typedef struct GPSDeviceRec
     NvOdmGpioPinHandle s_hStandbyGPSGpioPin;
     NvOdmGpioPinHandle s_hExtLNAGPSGpioPin;
     NvU32 pin[3], port[3];
+    struct wake_lock gps_wakelock;
 
 } GPS_Device;
 
@@ -91,6 +94,11 @@ static ssize_t gps_gpio_poweron_store(
 */
 	NvOdmGpioSetState(s_hGPSHandle.hGpio, s_hGPSHandle.s_hStandbyGPSGpioPin, value);
 	NvOdmGpioSetState(s_hGPSHandle.hGpio, s_hGPSHandle.s_hExtLNAGPSGpioPin, value);
+	if (value) {
+		wake_lock(&s_hGPSHandle.gps_wakelock);
+	} else {
+		wake_unlock(&s_hGPSHandle.gps_wakelock);
+	}
 
 	return size;
 }
@@ -145,6 +153,9 @@ static int tegra_gps_gpio_probe(struct platform_device *pdev)
 	retval = device_create_file(&pdev->dev, &dev_attr_poweron);
 	if (retval)
 		goto error;
+
+	wake_lock_init(&s_hGPSHandle.gps_wakelock, WAKE_LOCK_SUSPEND, "gps_wakelock");
+	
 
 	return retval;
 error:
