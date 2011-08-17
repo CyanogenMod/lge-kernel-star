@@ -79,7 +79,6 @@ extern struct platform_device tegra_apbif1_device;
 extern struct platform_device tegra_apbif2_device;
 extern struct platform_device tegra_apbif3_device;
 extern struct platform_device tegra_hda_device;
-extern struct platform_device tegra_audio_device;
 extern struct platform_device tegra_sata_device;
 #endif
 #if defined(CONFIG_ARCH_TEGRA_2x_SOC)

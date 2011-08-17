@@ -99,12 +99,12 @@ static inline int tegra_lp2_debug_show(struct seq_file *s, void *data)
 #endif
 }
 #endif
+#endif /* CONFIG_PM_SLEEP */
 
-#ifdef CONFIG_CPU_IDLE
+#if defined(CONFIG_CPU_IDLE) && defined(CONFIG_PM_SLEEP)
 void tegra_lp2_in_idle(bool enable);
 #else
 static inline void tegra_lp2_in_idle(bool enable) {}
 #endif
-#endif /* CONFIG_PM_SLEEP */
 
 #endif
