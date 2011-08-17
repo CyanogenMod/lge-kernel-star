@@ -126,15 +126,6 @@
 #define   UTMIP_FS_PREABMLE_J		(1 << 19)
 #define   UTMIP_HS_DISCON_DISABLE	(1 << 8)
 
-#define UTMIP_MISC_CFG0		0x824
-#define   UTMIP_DPDM_OBSERVE		(1 << 26)
-#define   UTMIP_DPDM_OBSERVE_SEL(x)	(((x) & 0xf) << 27)
-#define   UTMIP_DPDM_OBSERVE_SEL_FS_J	UTMIP_DPDM_OBSERVE_SEL(0xf)
-#define   UTMIP_DPDM_OBSERVE_SEL_FS_K	UTMIP_DPDM_OBSERVE_SEL(0xe)
-#define   UTMIP_DPDM_OBSERVE_SEL_FS_SE1 UTMIP_DPDM_OBSERVE_SEL(0xd)
-#define   UTMIP_DPDM_OBSERVE_SEL_FS_SE0 UTMIP_DPDM_OBSERVE_SEL(0xc)
-#define   UTMIP_SUSPEND_EXIT_ON_EDGE	(1 << 22)
-
 #define UTMIP_MISC_CFG1		0x828
 #define   UTMIP_PLL_ACTIVE_DLY_COUNT(x)	(((x) & 0x1f) << 18)
 #define   UTMIP_PLLU_STABLE_COUNT(x)	(((x) & 0xfff) << 6)
@@ -283,9 +274,6 @@
 #define UTMIP_TX_CFG0		0x820
 #define   UTMIP_FS_PREABMLE_J		(1 << 19)
 #define   UTMIP_HS_DISCON_DISABLE	(1 << 8)
-
-#define UTMIP_MISC_CFG0		0x824
-#define   UTMIP_SUSPEND_EXIT_ON_EDGE	(1 << 22)
 
 #define UTMIP_MISC_CFG1		0x828
 #define   UTMIP_PLL_ACTIVE_DLY_COUNT(x)	(((x) & 0x1f) << 18)
@@ -473,6 +461,18 @@
 #endif
 
 /* Common registers */
+#define UTMIP_MISC_CFG0		0x824
+#define   UTMIP_DPDM_OBSERVE		(1 << 26)
+#define   UTMIP_DPDM_OBSERVE_SEL(x)	(((x) & 0xf) << 27)
+#define   UTMIP_DPDM_OBSERVE_SEL_FS_J	UTMIP_DPDM_OBSERVE_SEL(0xf)
+#define   UTMIP_DPDM_OBSERVE_SEL_FS_K	UTMIP_DPDM_OBSERVE_SEL(0xe)
+#define   UTMIP_DPDM_OBSERVE_SEL_FS_SE1 UTMIP_DPDM_OBSERVE_SEL(0xd)
+#define   UTMIP_DPDM_OBSERVE_SEL_FS_SE0 UTMIP_DPDM_OBSERVE_SEL(0xc)
+#define   UTMIP_SUSPEND_EXIT_ON_EDGE	(1 << 22)
+#define   FORCE_PULLDN_DM	(1 << 8)
+#define   FORCE_PULLDN_DP	(1 << 9)
+#define   COMB_TERMS		(1 << 0)
+#define   ALWAYS_FREE_RUNNING_TERMS	(1 << 1)
 
 #define ULPIS2S_CTRL		0x418
 #define   ULPIS2S_ENA			(1 << 0)
@@ -1127,9 +1127,8 @@ static void utmip_setup_pmc_wake_detect(struct tegra_usb_phy *phy)
 	  val = readl(pmc_base + PMC_SLEEP_CFG);
 	  val &= ~UTMIP_WAKE_VAL(inst, ~0);
 	  val |= UTMIP_WAKE_VAL(inst, WAKE_VAL_FSJ);
-	  val |= UTMIP_MASTER_ENABLE(inst);
+	  val |= UTMIP_MASTER_ENABLE(inst) | UTMIP_FSLS_USE_PMC(inst);
 	  writel(val, pmc_base + PMC_SLEEP_CFG);
-
 }
 #endif
 
@@ -1213,10 +1212,20 @@ static int utmi_phy_preresume(struct tegra_usb_phy *phy, bool is_dpd)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
+	void __iomem *pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
+	unsigned  int inst = phy->instance;
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	val = readl(base + UTMIP_TX_CFG0);
 	val |= UTMIP_HS_DISCON_DISABLE;
 	writel(val, base + UTMIP_TX_CFG0);
+#else
+	/* Disable PMC master mode by clearing MASTER_EN */
+	val = readl(pmc_base + PMC_SLEEP_CFG);
+	val &= ~(UTMIP_RCTRL_USE_PMC(inst) | UTMIP_TCTRL_USE_PMC(inst) |
+			UTMIP_FSLS_USE_PMC(inst) | UTMIP_MASTER_ENABLE(inst));
+	writel(val, pmc_base + PMC_SLEEP_CFG);
+#endif
 
 	return 0;
 }
@@ -1226,10 +1235,32 @@ static int utmi_phy_postresume(struct tegra_usb_phy *phy, bool is_dpd)
 	unsigned long val;
 	void __iomem *base = phy->regs;
 
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	/* Change the UTMIP OBS bus to drive SE0 */
+	val = readl(base + UTMIP_MISC_CFG0);
+	val &= ~UTMIP_DPDM_OBSERVE_SEL(~0);
+	val |= UTMIP_DPDM_OBSERVE_SEL_FS_SE0;
+	writel(val, base + UTMIP_MISC_CFG0);
+
+	/* Wait for 3us(2 LS bit times) */
+	udelay (3);
+
+	/* Release UTMIP OBS bus */
+	val = readl(base + UTMIP_MISC_CFG0);
+	val &= ~UTMIP_DPDM_OBSERVE;
+	writel(val, base + UTMIP_MISC_CFG0);
+
+	/* Release DP/DM pulldown for Host mode */
+	val = readl(base + UTMIP_MISC_CFG0);
+	val &= ~(FORCE_PULLDN_DM | FORCE_PULLDN_DP |
+			COMB_TERMS | ALWAYS_FREE_RUNNING_TERMS);
+	writel(val, base + UTMIP_MISC_CFG0);
+
+#else
 	val = readl(base + UTMIP_TX_CFG0);
 	val &= ~UTMIP_HS_DISCON_DISABLE;
 	writel(val, base + UTMIP_TX_CFG0);
-
+#endif
 	return 0;
 }
 
@@ -1262,16 +1293,30 @@ static int uhsic_phy_postresume(struct tegra_usb_phy *phy, bool is_dpd)
 static void utmi_phy_restore_start(struct tegra_usb_phy *phy,
 				   enum tegra_usb_phy_port_speed port_speed)
 {
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	unsigned long val;
 	void __iomem *base = phy->regs;
 
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	/* Force DP/DM pulldown active for Host mode */
+	val = readl(base + UTMIP_MISC_CFG0);
+	val |= FORCE_PULLDN_DM | FORCE_PULLDN_DP |
+			COMB_TERMS | ALWAYS_FREE_RUNNING_TERMS;
+	writel(val, base + UTMIP_MISC_CFG0);
+#endif
+
 	val = readl(base + UTMIP_MISC_CFG0);
 	val &= ~UTMIP_DPDM_OBSERVE_SEL(~0);
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	if (port_speed == TEGRA_USB_PHY_PORT_SPEED_LOW)
+		val |= UTMIP_DPDM_OBSERVE_SEL_FS_J;
+	else
+		val |= UTMIP_DPDM_OBSERVE_SEL_FS_K;
+#else
 	if (port_speed == TEGRA_USB_PHY_PORT_SPEED_LOW)
 		val |= UTMIP_DPDM_OBSERVE_SEL_FS_K;
 	else
 		val |= UTMIP_DPDM_OBSERVE_SEL_FS_J;
+#endif
 	writel(val, base + UTMIP_MISC_CFG0);
 	udelay(1);
 
@@ -1279,7 +1324,7 @@ static void utmi_phy_restore_start(struct tegra_usb_phy *phy,
 	val |= UTMIP_DPDM_OBSERVE;
 	writel(val, base + UTMIP_MISC_CFG0);
 	udelay(10);
-#endif
+
 }
 
 static void utmi_phy_restore_end(struct tegra_usb_phy *phy)
