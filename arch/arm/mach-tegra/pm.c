@@ -883,7 +883,13 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 
 	preset_lpj = loops_per_jiffy;
 
-#ifdef CONFIG_PM_SLEEP
+#ifndef CONFIG_PM_SLEEP
+	if (plat->suspend_mode != TEGRA_SUSPEND_NONE) {
+		pr_warning("%s: Suspend requires CONFIG_PM_SLEEP -- "
+			   "disabling suspend\n", __func__);
+		plat->suspend_mode = TEGRA_SUSPEND_NONE;
+	}
+#else
 	if (create_suspend_pgtable() < 0) {
 		pr_err("%s: PGD memory alloc failed -- LP0/LP1/LP2 unavailable\n",
 				__func__);
@@ -976,14 +982,8 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 	}
 
 	iram_cpu_lp2_mask = tegra_cpu_lp2_mask;
-#else
-	if (plat->suspend_mode != TEGRA_SUSPEND_NONE) {
-		pr_warning("%s: Suspend requires CONFIG_PM_SLEEP -- "
-			   "disabling suspend\n", __func__);
-		plat->suspend_mode = TEGRA_SUSPEND_NONE;
-	}
-#endif
 fail:
+#endif
 	if (plat->suspend_mode == TEGRA_SUSPEND_NONE)
 		tegra_lp2_in_idle(false);
 
