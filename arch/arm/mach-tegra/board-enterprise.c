@@ -34,6 +34,7 @@
 #include <linux/platform_data/tegra_usb.h>
 #include <linux/spi/spi.h>
 #include <linux/tegra_uart.h>
+#include <linux/fsl_devices.h>
 
 #include <mach/clk.h>
 #include <mach/iomap.h>
@@ -456,6 +457,8 @@ static struct tegra_otg_platform_data tegra_otg_pdata = {
 
 static void enterprise_usb_init(void)
 {
+	struct	fsl_usb2_platform_data *udc_pdata;
+
 	tegra_usb_phy_init(tegra_usb_phy_pdata, ARRAY_SIZE(tegra_usb_phy_pdata));
 
 	tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
@@ -464,6 +467,8 @@ static void enterprise_usb_init(void)
 	tegra_ehci3_device.dev.platform_data = &tegra_ehci_pdata[2];
 	platform_device_register(&tegra_ehci3_device);
 
+	udc_pdata = tegra_udc_device.dev.platform_data;
+	udc_pdata->charge_regulator ="usb_bat_chg";
 }
 
 static void enterprise_gps_init(void)
@@ -491,11 +496,11 @@ static void __init tegra_enterprise_init(void)
 	enterprise_pinmux_init();
 	enterprise_i2c_init();
 	enterprise_uart_init();
+	enterprise_usb_init();
 	enterprise_tsensor_init();
 	platform_add_devices(enterprise_devices, ARRAY_SIZE(enterprise_devices));
 	enterprise_regulator_init();
 	enterprise_sdhci_init();
-	enterprise_usb_init();
 #ifdef CONFIG_TEGRA_EDP_LIMITS
 	enterprise_edp_init();
 #endif
