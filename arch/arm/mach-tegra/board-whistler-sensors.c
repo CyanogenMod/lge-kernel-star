@@ -398,6 +398,7 @@ int __init whistler_sensor_late_init(void)
 
 fail_put_regulator:
 	regulator_put(reg_vddio_vi);
+	reg_vddio_vi = NULL;
 	return ret;
 }
 
