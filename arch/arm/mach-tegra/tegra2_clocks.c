@@ -790,13 +790,25 @@ static int tegra2_pll_clk_set_rate(struct clk *c, unsigned long rate)
 				 PLL_BASE_DIVM_MASK);
 			val |= (sel->m << PLL_BASE_DIVM_SHIFT) |
 				(sel->n << PLL_BASE_DIVN_SHIFT);
-			BUG_ON(sel->p < 1 || sel->p > 2);
+			BUG_ON(sel->p < 1 || sel->p > 128);
 			if (c->flags & PLLU) {
 				if (sel->p == 1)
 					val |= PLLU_BASE_POST_DIV;
 			} else {
 				if (sel->p == 2)
 					val |= 1 << PLL_BASE_DIVP_SHIFT;
+				else if (sel->p == 4)
+					val |= 2 << PLL_BASE_DIVP_SHIFT;
+				else if (sel->p == 8)
+					val |= 3 << PLL_BASE_DIVP_SHIFT;
+				else if (sel->p == 16)
+					val |= 4 << PLL_BASE_DIVP_SHIFT;
+				else if (sel->p == 32)
+					val |= 5 << PLL_BASE_DIVP_SHIFT;
+				else if (sel->p == 64)
+					val |= 6 << PLL_BASE_DIVP_SHIFT;
+				else if (sel->p == 128)
+					val |= 7 << PLL_BASE_DIVP_SHIFT;
 			}
 			clk_writel(val, c->reg + PLL_BASE);
 
