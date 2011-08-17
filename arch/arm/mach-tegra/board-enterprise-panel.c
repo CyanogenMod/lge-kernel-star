@@ -39,7 +39,7 @@
 #include "devices.h"
 #include "gpio-names.h"
 
-#define DC_CTRL_MODE	TEGRA_DC_OUT_CONTINUOUS_MODE
+#define DC_CTRL_MODE    TEGRA_DC_OUT_ONE_SHOT_MODE
 
 /* Select panel to be used. */
 #define AVDD_LCD PMU_TCA6416_GPIO_PORT17
@@ -139,10 +139,10 @@ static struct platform_tegra_pwm_backlight_data enterprise_disp1_backlight_data 
 	.switch_to_sfio		= &tegra_gpio_disable,
 	.max_brightness		= 255,
 	.dft_brightness		= 224,
-	.period			= 0x3F,
-	.clk_div		= 1,
-	.clk_select		= 2,
 	.notify		= enterprise_backlight_notify,
+	.period			= 0xFF,
+	.clk_div		= 0x3FF,
+	.clk_select		= 0,
 };
 
 static struct platform_device enterprise_disp1_backlight_device = {
