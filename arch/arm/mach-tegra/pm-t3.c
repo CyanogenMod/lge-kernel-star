@@ -123,7 +123,7 @@ static int cluster_switch_prolog_clock(unsigned int flags)
 		if (flags & TEGRA_POWER_SDRAM_SELFREFRESH) {
 			/* In LP1 power mode come up on CLKM (oscillator) */
 			CclkBurstPolicy = readl(CAR_CCLKG_BURST_POLICY);
-			CclkBurstPolicy |= ~0xF;
+			CclkBurstPolicy &= ~0xF;
 			SuperCclkDivier = 0;
 
 			writel(CclkBurstPolicy, CAR_CCLKG_BURST_POLICY);
@@ -161,7 +161,7 @@ static int cluster_switch_prolog_clock(unsigned int flags)
 		if (flags & TEGRA_POWER_SDRAM_SELFREFRESH) {
 			/* In LP1 power mode come up on CLKM (oscillator) */
 			CclkBurstPolicy = readl(CAR_CCLKLP_BURST_POLICY);
-			CclkBurstPolicy |= ~0xF;
+			CclkBurstPolicy &= ~0xF;
 			SuperCclkDivier = 0;
 
 			writel(CclkBurstPolicy, CAR_CCLKLP_BURST_POLICY);
@@ -304,7 +304,7 @@ int tegra_cluster_control(unsigned int us, unsigned int flags)
 	if (flags & TEGRA_POWER_CLUSTER_IMMEDIATE)
 		us = 0;
 
-	if ((current_cluster != target_cluster) && (!timekeeping_suspended)) {
+	if (current_cluster != target_cluster) {
 		if (target_cluster == TEGRA_POWER_CLUSTER_G) {
 			s64 t = ktime_to_us(ktime_sub(ktime_get(), last_g2lp));
 			s64 t_off = tegra_cpu_power_off_time();
