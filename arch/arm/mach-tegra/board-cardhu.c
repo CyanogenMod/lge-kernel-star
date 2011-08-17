@@ -648,8 +648,7 @@ static void cardhu_usb_init(void)
 			PM267_SMSC4640_HSIC_HUB_RESET_GPIO;
 		tegra_ehci2_device.dev.platform_data = &tegra_ehci_uhsic_pdata;
 		platform_device_register(&tegra_ehci2_device);
-	} else if ((bi.board_id == BOARD_PM269) ||
-			(bi.board_id == BOARD_E1256)) {
+	} else if (bi.board_id == BOARD_E1256) {
 		tegra_ehci2_device.dev.platform_data = &tegra_ehci_uhsic_pdata;
 		platform_device_register(&tegra_ehci2_device);
 	} else if (bi.board_id == BOARD_E1186) {
