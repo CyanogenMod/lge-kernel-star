@@ -254,28 +254,6 @@ static struct tegra_i2c_platform_data aruba_i2c5_platform_data = {
 	.bus_clk_rate	= { 100000, 0 },
 };
 
-static struct tegra_audio_platform_data tegra_audio_pdata[] = {
-	[0] = {
-		.dma_on		= true,  /* use dma by default */
-		.i2s_clk_rate	= 240000000,
-		.dap_clk	= "extern1",
-		.audio_sync_clk = "audio_2x",
-		.mode		= I2S_BIT_FORMAT_I2S,
-		.fifo_fmt	= I2S_FIFO_16_LSB,
-		.bit_size	= I2S_BIT_SIZE_16,
-		.i2s_bus_width = 32,
-		.dsp_bus_width = 16,
-	}
-};
-
-#if 0
-struct tegra_wired_jack_conf audio_wr_jack_conf = {
-	.hp_det_n = TEGRA_GPIO_PW2,
-	.en_mic_ext = TEGRA_GPIO_PX1,
-	.en_mic_int = TEGRA_GPIO_PX0,
-};
-#endif
-
 static void aruba_i2c_init(void)
 {
 	tegra_i2c_device1.dev.platform_data = &aruba_i2c1_platform_data;
@@ -435,7 +413,6 @@ static struct platform_device *aruba_devices[] __initdata = {
 #endif
 	&aruba_keys_device,
 	&tegra_wdt_device,
-	&tegra_audio_device,
 #if defined(CONFIG_SND_HDA_TEGRA)
 	&tegra_hda_device,
 #endif
@@ -547,7 +524,6 @@ static void __init tegra_aruba_init(void)
 
 	snprintf(serial, sizeof(serial), "%llx", tegra_chip_uid());
 	andusb_plat.serial_number = kstrdup(serial, GFP_KERNEL);
-	tegra_audio_device.dev.platform_data = &tegra_audio_pdata[0];
 	platform_add_devices(aruba_devices, ARRAY_SIZE(aruba_devices));
 
 	aruba_sdhci_init();
