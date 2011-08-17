@@ -582,7 +582,8 @@ static int cardhu_nct1008_init(void)
 #endif
 
 	if ((board_info.board_id == BOARD_E1198) ||
-		(board_info.board_id == BOARD_E1291)) {
+		(board_info.board_id == BOARD_E1291) ||
+		(board_info.board_id == BOARD_PM269)) {
 		nct1008_port = TEGRA_GPIO_PCC2;
 	} else if ((board_info.board_id == BOARD_E1186) ||
 		(board_info.board_id == BOARD_E1187) ||
