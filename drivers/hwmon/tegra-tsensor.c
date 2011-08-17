@@ -1170,6 +1170,11 @@ static bool test_temperature_algo(struct tegra_tsensor_data *data)
 	}
 
 endLabel:
+	if (!result)
+		pr_info("NO Match: actual=%d,"
+			" calc counter2=%d, counter1=%d\n", actual_counter,
+			counter2, counter1);
+
 	return result;
 }
 
