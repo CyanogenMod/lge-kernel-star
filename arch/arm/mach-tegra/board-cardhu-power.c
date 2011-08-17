@@ -384,6 +384,13 @@ int __init cardhu_regulator_init(void)
 	tegra_get_board_info(&board_info);
 	tegra_get_pmu_board_info(&pmu_board_info);
 
+	/* PMU-E1208-A03, the ldo2 should be set to 1200mV */
+	if ((pmu_board_info.board_id == BOARD_E1208) &&
+		(pmu_board_info.fab == BOARD_FAB_A03)) {
+		pdata_ldo2_0.regulator.constraints.min_uV = 1200000;
+		pdata_ldo2_0.regulator.constraints.max_uV = 1200000;
+	}
+
 	if ((board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1291)) {
 		if (board_info.sku & SKU_DCDC_TPS62361_SUPPORT) {

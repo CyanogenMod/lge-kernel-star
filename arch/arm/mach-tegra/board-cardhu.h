@@ -33,6 +33,7 @@
 #define BOARD_E1291   0x0C5B
 #define BOARD_PM267   0x0243
 #define BOARD_PM269   0x0245
+#define BOARD_E1208   0x0C08
 
 /* SKU Information */
 #define SKU_DCDC_TPS62361_SUPPORT	0x1
