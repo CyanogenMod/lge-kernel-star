@@ -287,7 +287,7 @@ static struct resource enterprise_disp2_resources[] = {
 };
 
 static struct tegra_dc_sd_settings enterprise_sd_settings = {
-	.enable = 0, /* Normal mode operation */
+	.enable = 1, /* Normal mode operation */
 	.use_auto_pwm = false,
 	.hw_update_delay = 0,
 	.bin_width = -1,
