@@ -64,16 +64,29 @@
 #define MAX77663_REG_LDO8_CFG		0x33
 #define MAX77663_REG_LDO8_CFG2		0x34
 
+/* Power Mode */
 #define POWER_MODE_NORMAL		3
 #define POWER_MODE_LPM			2
 #define POWER_MODE_GLPM			1
 #define POWER_MODE_DISABLE		0
-
 #define SD_POWER_MODE_MASK		0x30
 #define SD_POWER_MODE_SHIFT		4
 #define LDO_POWER_MODE_MASK		0xC0
 #define LDO_POWER_MODE_SHIFT		6
 
+/* SD Slew Rate */
+#define SD_SR_13_75			0
+#define SD_SR_27_5			1
+#define SD_SR_55			2
+#define SD_SR_100			3
+#define SD_SR_MASK			0xC0
+#define SD_SR_SHIFT			6
+
+/* SD Forced PWM Mode */
+#define SD_FPWM_MASK			0x04
+#define SD_FPWM_SHIFT			2
+
+/* Voltage */
 #define SDX_VOLT_MASK			0xFF
 #define SD1_VOLT_MASK			0x3F
 #define LDO_VOLT_MASK			0x3F
@@ -126,7 +139,7 @@ struct max77663_regulator {
 	u8 cfg_reg;
 	u8 fps_reg;
 
-	int fps_src;
+	enum max77663_regulator_fps_src fps_src;
 
 	u8 volt_mask;
 
@@ -158,8 +171,9 @@ static inline struct device *_to_parent(struct max77663_regulator *reg)
 	return reg->dev->parent;
 }
 
-static int max77663_regulator_set_fps_src(struct max77663_regulator *reg,
-					  int fps_src)
+static int
+max77663_regulator_set_fps_src(struct max77663_regulator *reg,
+			       enum max77663_regulator_fps_src fps_src)
 {
 	struct device *parent = _to_parent(reg);
 	int ret;
@@ -220,42 +234,46 @@ static int max77663_regulator_set_fps(struct max77663_regulator *reg)
 	return ret;
 }
 
-static int max77663_regulator_set_fps_cfg(struct max77663_regulator *reg)
+static int
+max77663_regulator_set_fps_cfg(struct max77663_regulator *reg,
+			       struct max77663_regulator_fps_cfg *fps_cfg)
 {
-	struct max77663_regulator_platform_data *pdata = _to_pdata(reg);
 	struct device *parent = _to_parent(reg);
-	int i;
-	int ret = 0;
+	u8 addr, val, mask;
+
+	if ((fps_cfg->src < FPS_SRC_0) || (fps_cfg->src > FPS_SRC_2))
+		return -EINVAL;
+
+	addr = fps_cfg_reg[fps_cfg->src];
+	val = (fps_cfg->en_src << FPS_EN_SRC_SHIFT);
+	mask = FPS_EN_SRC_MASK;
+
+	if (fps_cfg->time_period != FPS_TIME_PERIOD_DEF) {
+		val |= (fps_cfg->time_period << FPS_TIME_PERIOD_SHIFT);
+		mask |= FPS_TIME_PERIOD_MASK;
+	}
+
+	return max77663_set_bits(parent, addr, mask, val, 0);
+}
+
+static int
+max77663_regulator_set_fps_cfgs(struct max77663_regulator *reg,
+				struct max77663_regulator_fps_cfg *fps_cfgs,
+				int num_fps_cfgs)
+{
+	int i, ret;
 
 	if (fps_cfg_init)
 		return 0;
 
-	for (i = FPS_SRC_0; i <= FPS_SRC_2; i++) {
-		struct max77663_regulator_fps_cfg *fps_cfg;
-		u8 fps_cfg_val = 0, fps_cfg_mask = 0;
-
-		fps_cfg = &pdata->fps_cfg[i];
-
-		/* FPS enable source setting */
-		fps_cfg_val = (fps_cfg->en_src << FPS_EN_SRC_SHIFT);
-		fps_cfg_mask = FPS_EN_SRC_MASK;
-
-		/* FPS time period setting */
-		if (fps_cfg->time_period != FPS_TIME_PERIOD_DEF) {
-			fps_cfg_val |= (fps_cfg->time_period
-					<< FPS_TIME_PERIOD_SHIFT);
-			fps_cfg_mask |= FPS_TIME_PERIOD_MASK;
-		}
-
-		ret = max77663_set_bits(parent, fps_cfg_reg[i], fps_cfg_mask,
-					fps_cfg_val, 0);
+	for (i = 0; i < num_fps_cfgs; i++) {
+		ret = max77663_regulator_set_fps_cfg(reg, &fps_cfgs[i]);
 		if (ret < 0)
-			goto out;
+			return ret;
 	}
-
 	fps_cfg_init = 1;
-out:
-	return ret;
+
+	return 0;
 }
 
 static int
@@ -346,11 +364,20 @@ static int max77663_regulator_get_voltage(struct regulator_dev *rdev)
 static int max77663_regulator_enable(struct regulator_dev *rdev)
 {
 	struct max77663_regulator *reg = rdev_get_drvdata(rdev);
+	struct max77663_regulator_platform_data *pdata = _to_pdata(reg);
 	int power_mode = POWER_MODE_NORMAL;
 
 	if (reg->fps_src != FPS_SRC_NONE) {
-		dev_warn(&rdev->dev, "enable: Regulator %s using %s\n",
-			 rdev->desc->name, fps_src_name(reg->fps_src));
+		dev_dbg(&rdev->dev, "enable: Regulator %s using %s\n",
+			rdev->desc->name, fps_src_name(reg->fps_src));
+		return 0;
+	}
+
+	if ((reg->id == MAX77663_REGULATOR_ID_SD0)
+			&& (pdata->flags & EN2_CTRL_SD0)) {
+		dev_dbg(&rdev->dev,
+			"enable: Regulator %s is controlled by EN2\n",
+			rdev->desc->name);
 		return 0;
 	}
 
@@ -363,11 +390,20 @@ static int max77663_regulator_enable(struct regulator_dev *rdev)
 static int max77663_regulator_disable(struct regulator_dev *rdev)
 {
 	struct max77663_regulator *reg = rdev_get_drvdata(rdev);
+	struct max77663_regulator_platform_data *pdata = _to_pdata(reg);
 	int power_mode = POWER_MODE_DISABLE;
 
 	if (reg->fps_src != FPS_SRC_NONE) {
-		dev_warn(&rdev->dev, "disable: Regulator %s using %s\n",
-			 rdev->desc->name, fps_src_name(reg->fps_src));
+		dev_dbg(&rdev->dev, "disable: Regulator %s using %s\n",
+			rdev->desc->name, fps_src_name(reg->fps_src));
+		return 0;
+	}
+
+	if ((reg->id == MAX77663_REGULATOR_ID_SD0)
+			&& (pdata->flags & EN2_CTRL_SD0)) {
+		dev_dbg(&rdev->dev,
+			"disable: Regulator %s is controlled by EN2\n",
+			rdev->desc->name);
 		return 0;
 	}
 
@@ -377,16 +413,24 @@ static int max77663_regulator_disable(struct regulator_dev *rdev)
 static int max77663_regulator_is_enabled(struct regulator_dev *rdev)
 {
 	struct max77663_regulator *reg = rdev_get_drvdata(rdev);
-	int power_mode = max77663_regulator_get_power_mode(reg);
+	struct max77663_regulator_platform_data *pdata = _to_pdata(reg);
 	int ret = 1;
 
 	if (reg->fps_src != FPS_SRC_NONE) {
-		dev_warn(&rdev->dev, "is_enable: Regulator %s using %s\n",
-			 rdev->desc->name, fps_src_name(reg->fps_src));
+		dev_dbg(&rdev->dev, "is_enable: Regulator %s using %s\n",
+			rdev->desc->name, fps_src_name(reg->fps_src));
 		return 1;
 	}
 
-	if (power_mode == POWER_MODE_DISABLE)
+	if ((reg->id == MAX77663_REGULATOR_ID_SD0)
+			&& (pdata->flags & EN2_CTRL_SD0)) {
+		dev_dbg(&rdev->dev,
+			"is_enable: Regulator %s is controlled by EN2\n",
+			rdev->desc->name);
+		return 1;
+	}
+
+	if (max77663_regulator_get_power_mode(reg) == POWER_MODE_DISABLE)
 		ret = 0;
 
 	return ret;
@@ -452,7 +496,7 @@ static int max77663_regulator_preinit(struct max77663_regulator *reg)
 
 	/* Set initial state */
 	if (!pdata->init_apply)
-		goto set_fps_cfg;
+		goto skip_init_apply;
 
 	if (pdata->init_uV >= 0) {
 		ret = max77663_regulator_do_set_voltage(reg, pdata->init_uV,
@@ -476,29 +520,64 @@ static int max77663_regulator_preinit(struct max77663_regulator *reg)
 		return ret;
 	}
 
-	if ((reg->id == MAX77663_REGULATOR_ID_SD0)
-			&& (pdata->flags & EN2_CTRL_SD0)) {
-		val = POWER_MODE_DISABLE;
-		ret = max77663_regulator_set_power_mode(reg, val);
-		if (ret < 0) {
-			dev_err(reg->dev, "preinit: Failed to set power mode to"
-				"%d for EN2_CTRL_SD0\n", val);
-			return ret;
+
+skip_init_apply:
+	if (reg->type == REGULATOR_TYPE_SD) {
+		if (pdata->flags & SD_SLEW_RATE_MASK) {
+			if (pdata->flags & SD_SLEW_RATE_SLOWEST)
+				val = SD_SR_13_75 << SD_SR_SHIFT;
+			else if (pdata->flags & SD_SLEW_RATE_SLOW)
+				val = SD_SR_27_5 << SD_SR_SHIFT;
+			else if (pdata->flags & SD_SLEW_RATE_FAST)
+				val = SD_SR_55 << SD_SR_SHIFT;
+			else
+				val = SD_SR_100 << SD_SR_SHIFT;
+
+			ret = max77663_set_bits(parent, reg->cfg_reg,
+						SD_SR_MASK, val, 0);
+			if (ret < 0) {
+				dev_err(reg->dev,
+					"preinit: Failed to set slew rate\n");
+				return ret;
+			}
 		}
 
-		if (reg->fps_src == FPS_SRC_NONE)
-			return 0;
+		if (pdata->flags & SD_FORCED_PWM_MODE) {
+			ret = max77663_set_bits(parent, reg->cfg_reg,
+						SD_FPWM_MASK, SD_FPWM_MASK, 0);
+			if (ret < 0) {
+				dev_err(reg->dev, "preinit: "
+					"Failed to set forced pwm mode\n");
+				return ret;
+			}
+		}
 
-		ret = max77663_regulator_set_fps_src(reg, FPS_SRC_NONE);
-		if (ret < 0) {
-			dev_err(reg->dev, "preinit: Failed to set FPSSRC to "
-				"FPS_SRC_NONE for EN2_CTRL_SD0\n");
-			return ret;
+		if ((reg->id == MAX77663_REGULATOR_ID_SD0)
+				&& (pdata->flags & EN2_CTRL_SD0)) {
+			val = POWER_MODE_DISABLE;
+			ret = max77663_regulator_set_power_mode(reg, val);
+			if (ret < 0) {
+				dev_err(reg->dev, "preinit: "
+					"Failed to set power mode to %d for "
+					"EN2_CTRL_SD0\n", val);
+				return ret;
+			}
+
+			if (reg->fps_src == FPS_SRC_NONE)
+				return 0;
+
+			ret = max77663_regulator_set_fps_src(reg, FPS_SRC_NONE);
+			if (ret < 0) {
+				dev_err(reg->dev, "preinit: "
+					"Failed to set FPSSRC to FPS_SRC_NONE "
+					"for EN2_CTRL_SD0\n");
+				return ret;
+			}
 		}
 	}
 
-set_fps_cfg:
-	ret = max77663_regulator_set_fps_cfg(reg);
+	ret = max77663_regulator_set_fps_cfgs(reg, pdata->fps_cfgs,
+					      pdata->num_fps_cfgs);
 	if (ret < 0) {
 		dev_err(reg->dev, "preinit: Failed to set FPSCFG\n");
 		return ret;

@@ -85,12 +85,23 @@ enum max77663_regulator_fps_src {
 /*
  * Flags
  */
-/* SD0 is controlled by EN2 input. */
+/* SD0 is controlled by EN2 */
 #define EN2_CTRL_SD0		0x01
 
+/* SD Slew Rate */
+#define SD_SLEW_RATE_SLOWEST	0x02	/*  13.75mV/us */
+#define SD_SLEW_RATE_SLOW	0x04	/*  27.50mV/us */
+#define SD_SLEW_RATE_FAST	0x08	/*  55.00mV/us */
+#define SD_SLEW_RATE_FASTEST	0x10	/* 100.00mV/us */
+#define SD_SLEW_RATE_MASK	0x1E
+
+/* SD Forced PWM Mode */
+#define SD_FORCED_PWM_MODE	0x20
+
 struct max77663_regulator_fps_cfg {
-	int en_src;
-	int time_period;
+	enum max77663_regulator_fps_src src;
+	enum max77663_regulator_fps_en_src en_src;
+	enum max77663_regulator_fps_time_period time_period;
 };
 
 struct max77663_regulator_platform_data {
@@ -98,11 +109,12 @@ struct max77663_regulator_platform_data {
 	bool init_apply;
 	bool init_enable;
 	int init_uV;
+	enum max77663_regulator_fps_src fps_src;
+	enum max77663_regulator_fps_power_period fps_pu_period;
+	enum max77663_regulator_fps_power_period fps_pd_period;
 
-	int fps_src;
-	int fps_pu_period;
-	int fps_pd_period;
-	struct max77663_regulator_fps_cfg *fps_cfg;
+	int num_fps_cfgs;
+	struct max77663_regulator_fps_cfg *fps_cfgs;
 
 	unsigned int flags;
 };
