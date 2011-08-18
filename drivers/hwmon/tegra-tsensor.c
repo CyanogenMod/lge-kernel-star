@@ -309,26 +309,22 @@ static void get_chip_rev(unsigned short *p_id, unsigned short *p_major,
  * function to get chip revision specific tsensor coefficients
  * obtained after chip characterization
  */
-static int get_chip_tsensor_coeff(void)
+static void get_chip_tsensor_coeff(void)
 {
 	unsigned short chip_id, major_rev, minor_rev;
 	unsigned short coeff_index;
 
 	get_chip_rev(&chip_id, &major_rev, &minor_rev);
 	switch (minor_rev) {
-	case 2:
+	default:
 		pr_info("Warning: tsensor coefficient for chip pending\n");
 	case 1:
 		coeff_index = TSENSOR_COEFF_SET1;
 		break;
-	default:
-		pr_err("Error: tsensor unsupported for detected chip\n");
-		return -ENOENT;
 	}
 	m_e_minus6 = coeff_table[coeff_index].e_minus6_m;
 	n_e_minus6 = coeff_table[coeff_index].e_minus6_n;
 	p_e_minus2 = coeff_table[coeff_index].e_minus2_p;
-	return 0;
 }
 
 /* tsensor counter read function */
@@ -1118,13 +1114,13 @@ static void dump_tsensor_regs(struct tegra_tsensor_data *data)
  * function to test if conversion of counter to temperature
  * and vice-versa is working
  */
-static bool test_temperature_algo(struct tegra_tsensor_data *data)
+static int test_temperature_algo(struct tegra_tsensor_data *data)
 {
 	unsigned int actual_counter;
 	unsigned int curr_avg, min_max;
 	unsigned int counter1, counter2;
 	unsigned int T1;
-	int err;
+	int err = 0;
 	bool result1, result2;
 	bool result = false;
 
@@ -1168,14 +1164,15 @@ static bool test_temperature_algo(struct tegra_tsensor_data *data)
 			" calc=%d\n", actual_counter, counter2);
 		result = true;
 	}
-
-endLabel:
-	if (!result)
+	if (!result) {
 		pr_info("NO Match: actual=%d,"
 			" calc counter2=%d, counter1=%d\n", actual_counter,
 			counter2, counter1);
+		err = -EIO;
+	}
 
-	return result;
+endLabel:
+	return err;
 }
 
 /* tsensor threshold temperature to threshold counter conversion function */
@@ -1279,7 +1276,7 @@ static int tsensor_config_setup(struct tegra_tsensor_data *data)
 	unsigned int i;
 	unsigned int status_reg;
 	unsigned int no_resp_count;
-	int err;
+	int err = 0;
 	struct tsensor_state curr_state;
 
 	for (i = 0; i < TSENSOR_COUNT; i++) {
@@ -1357,15 +1354,18 @@ static int tsensor_config_setup(struct tegra_tsensor_data *data)
 				(1 << SENSOR_STATUS_AVG_VALID_SHIFT)) ||
 				(!(status_reg &
 				(1 << SENSOR_STATUS_CURR_VALID_SHIFT))));
-			if (no_resp_count == TSENSOR_COUNT)
-				return -ENODEV;
+			if (no_resp_count == TSENSOR_COUNT) {
+				err = -ENODEV;
+				goto skip_all;
+			}
 		}
 		/* check initial state */
 		get_ts_state(data, (unsigned char)i, &curr_state);
 		data->ts_state_saved[i] = curr_state.state;
 	}
 	/* initialize tsensor chip coefficients */
-	err = get_chip_tsensor_coeff();
+	get_chip_tsensor_coeff();
+skip_all:
 	return err;
 }
 
@@ -1412,7 +1412,7 @@ static int tegra_tsensor_setup(struct platform_device *pdev)
 {
 	struct tegra_tsensor_data *data = platform_get_drvdata(pdev);
 	struct resource *r;
-	int err;
+	int err = 0;
 	struct tegra_tsensor_platform_data *tsensor_data;
 
 	data->dev_clk = clk_get(&pdev->dev, NULL);
@@ -1489,7 +1489,8 @@ static int tegra_tsensor_setup(struct platform_device *pdev)
 	data->hysteresis = tsensor_data->hysteresis;
 
 	dev_dbg(&pdev->dev, "before tsensor_config_setup\n");
-	if (tsensor_config_setup(data)) {
+	err = tsensor_config_setup(data);
+	if (err) {
 		dev_err(&pdev->dev, "[%s,line=%d]: tsensor counters dead!\n",
 			__func__, __LINE__);
 		goto err_setup;
@@ -1505,10 +1506,10 @@ static int tegra_tsensor_setup(struct platform_device *pdev)
 
 	/* test if counter-to-temperature and temperature-to-counter
 	 * are matching */
-	if (!test_temperature_algo(data)) {
+	err = test_temperature_algo(data);
+	if (err) {
 		dev_err(&pdev->dev, "Error: read temperature\n"
 			"algorithm broken\n");
-		err = -EIO;
 		goto err_setup;
 	}
 
