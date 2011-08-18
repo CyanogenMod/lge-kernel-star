@@ -240,7 +240,8 @@ static __init int create_suspend_pgtable(void)
 	identity_mapping_add(tegra_pgd, IO_IRAM_PHYS,
 		IO_IRAM_PHYS + SECTION_SIZE);
 
-	tegra_pgd_phys = virt_to_phys(tegra_pgd);
+	/* inner/outer write-back/write-allocate, sharable */
+	tegra_pgd_phys = (virt_to_phys(tegra_pgd) & PAGE_MASK) | 0x4A;
 
 	return 0;
 }
@@ -636,7 +637,7 @@ static void tegra_suspend_wake(void)
 
 static void tegra_pm_set(enum tegra_suspend_mode mode)
 {
-	u32 reg;
+	u32 reg, boot_flag;
 	unsigned long rate = 32768;
 
 	reg = readl(pmc + PMC_CTRL);
@@ -653,17 +654,19 @@ static void tegra_pm_set(enum tegra_suspend_mode mode)
 		 */
 		writel(0x0, pmc + PMC_SCRATCH39);
 		__raw_writel(virt_to_phys(tegra_resume), pmc + PMC_SCRATCH41);
-		reg |= TEGRA_POWER_EFFECT_LP0;
+		wmb();
 
 		/* Enable DPD sample to trigger sampling pads data and direction
 		 * in which pad will be driven during lp0 mode*/
 		writel(0x1, pmc + PMC_DPD_SAMPLE);
 
 		/* Set warmboot flag */
-		reg = readl(pmc + PMC_SCRATCH0);
-		pmc_32kwritel(reg | 1, PMC_SCRATCH0);
+		boot_flag = readl(pmc + PMC_SCRATCH0);
+		pmc_32kwritel(boot_flag | 1, PMC_SCRATCH0);
 
 		pmc_32kwritel(tegra_lp0_vec_start, PMC_SCRATCH1);
+
+		reg |= TEGRA_POWER_EFFECT_LP0;
 		break;
 	case TEGRA_SUSPEND_LP1:
 		break;
