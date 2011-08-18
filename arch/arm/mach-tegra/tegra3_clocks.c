@@ -4019,6 +4019,7 @@ struct clk_duplicate tegra_clk_duplicates[] = {
 	CLK_DUPLICATE("cop", "tegra-avp", "cop"),
 	CLK_DUPLICATE("bsev", "tegra-avp", "bsev"),
 	CLK_DUPLICATE("vde", "tegra-aes", "vde"),
+	CLK_DUPLICATE("bsea", "tegra-aes", "bsea"),
 	CLK_DUPLICATE("cml1", "tegra_sata_cml", NULL),
 	CLK_DUPLICATE("cml0", "tegra_pcie", "cml"),
 	CLK_DUPLICATE("pciex", "tegra_pcie", "pciex"),
