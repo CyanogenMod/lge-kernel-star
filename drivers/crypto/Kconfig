@@ -18,7 +18,7 @@ config CRYPTO_DEV_PADLOCK
 	  (so called VIA PadLock ACE, Advanced Cryptography Engine)
 	  that provides instructions for very fast cryptographic
 	  operations with supported algorithms.
-	  
+
 	  The instructions are used only when the CPU supports them.
 	  Otherwise software encryption is used.
 
@@ -271,7 +271,7 @@ config CRYPTO_DEV_PICOXCELL
 
 config CRYPTO_DEV_TEGRA_AES
 	tristate "Support for TEGRA AES hw engine"
-	depends on ARCH_TEGRA_2x_SOC
+	depends on ARCH_TEGRA_2x_SOC || ARCH_TEGRA_3x_SOC
 	select CRYPTO_AES
 	select TEGRA_ARB_SEMAPHORE
 	help
@@ -283,6 +283,7 @@ config CRYPTO_DEV_TEGRA_SE
 	depends on ARCH_TEGRA_3x_SOC
 	select CRYPTO_AES
 	help
-	  This option allows you to have support of Security Engine for crypto acceleration.
+	  This option allows you to have support of Security Engine for crypto
+	  acceleration.
 
 endif # CRYPTO_HW
