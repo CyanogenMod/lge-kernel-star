@@ -24,6 +24,7 @@
 #include <linux/list.h>
 #include <linux/miscdevice.h>
 #include <linux/mutex.h>
+#include <linux/nvhost.h>
 #include <linux/platform_device.h>
 #include <linux/rbtree.h>
 #include <linux/seq_file.h>
@@ -38,7 +39,6 @@
 #include <mach/iomap.h>
 #include <mach/legacy_irq.h>
 #include <mach/nvmap.h>
-#include <mach/nvhost.h>
 
 #include "../../../../video/tegra/nvmap/nvmap.h"
 #include "../../../../video/tegra/host/t20/syncpt_t20.h"
