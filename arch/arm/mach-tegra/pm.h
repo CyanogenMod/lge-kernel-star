@@ -67,7 +67,7 @@ unsigned long tegra_cpu_lp2_min_residency(void);
 void tegra_clear_cpu_in_lp2(int cpu);
 bool tegra_set_cpu_in_lp2(int cpu);
 
-int tegra_suspend_dram(enum tegra_suspend_mode mode);
+int tegra_suspend_dram(enum tegra_suspend_mode mode, unsigned int flags);
 
 #define FLOW_CTRL_CLUSTER_CONTROL \
 	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + 0x2c)
