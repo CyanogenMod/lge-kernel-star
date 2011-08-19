@@ -269,7 +269,7 @@ static struct platform_device *cardhu_uart_devices[] __initdata = {
 	&tegra_uartd_device,
 	&tegra_uarte_device,
 };
-struct uart_clk_parent uart_parent_clk[] = {
+static struct uart_clk_parent uart_parent_clk[] = {
 	[0] = {.name = "pll_p"},
 	[1] = {.name = "pll_m"},
 	[2] = {.name = "clk_m"},
