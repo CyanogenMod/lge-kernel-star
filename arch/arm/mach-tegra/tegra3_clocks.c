@@ -38,6 +38,7 @@
 #include "dvfs.h"
 #include "pm.h"
 #include "sleep.h"
+#include "tegra3_emc.h"
 
 #define RST_DEVICES_L			0x004
 #define RST_DEVICES_H			0x008
@@ -276,8 +277,8 @@
 #define PLLE_SS_COEFFICIENTS_MASK	\
 	(PLLE_SS_INCINTRV_MASK | PLLE_SS_INC_MASK | PLLE_SS_MAX_MASK)
 #define PLLE_SS_COEFFICIENTS_12MHZ	\
-	((0x1d<<PLLE_SS_INCINTRV_SHIFT) | (0x1<<PLLE_SS_INC_SHIFT) | \
-	 (0x29<<PLLE_SS_MAX_SHIFT))
+	((0x18<<PLLE_SS_INCINTRV_SHIFT) | (0x1<<PLLE_SS_INC_SHIFT) | \
+	 (0x24<<PLLE_SS_MAX_SHIFT))
 #define PLLE_SS_DISABLE			((1<<12) | (1<<11) | (1<<10))
 
 #define PLLE_AUX			0x48c
@@ -296,6 +297,8 @@
 #define PLL_POST_LOCK_DELAY		100
 
 static int tegra3_clk_shared_bus_update(struct clk *bus);
+
+static struct clk *emc_bridge;
 
 static bool detach_shared_bus;
 module_param(detach_shared_bus, bool, 0644);
@@ -2530,6 +2533,10 @@ static long tegra3_clk_cbus_round_rate(struct clk *c, unsigned long rate)
 	if (!c->dvfs)
 		return rate;
 
+	/* update min now, since no dvfs table was available during init */
+	if (!c->min_rate)
+		c->min_rate = c->dvfs->freqs[0];
+
 	for (i = 0; i < (c->dvfs->num_freqs - 1); i++) {
 		unsigned long f = c->dvfs->freqs[i];
 		if (f >= rate)
@@ -2656,9 +2663,69 @@ static struct clk_ops tegra_clk_cbus_ops = {
  * enabled shared_bus_user clock, with a minimum value set by the
  * shared bus.
  */
+
+static int shared_bus_set_rate(struct clk *bus,
+				unsigned long rate, unsigned long old_rate)
+{
+	int ret, mv, old_mv;
+	unsigned long bridge_rate = emc_bridge->u.shared_bus_user.rate;
+
+	/* If bridge is not needed (LPDDR2) just set bus rate */
+	if (bridge_rate < TEGRA_EMC_BRIDGE_RATE_MIN) {
+		return clk_set_rate_locked(bus, rate);
+	}
+
+	mv = tegra_dvfs_predict_millivolts(bus, rate);
+	old_mv = tegra_dvfs_predict_millivolts(bus, old_rate);
+	if (IS_ERR_VALUE(mv) || IS_ERR_VALUE(old_mv)) {
+		pr_err("%s: Failed to predict %s voltage for %lu => %lu\n",
+		       __func__, bus->name, old_rate, rate);
+	}
+
+	/* emc bus: set bridge rate as intermediate step when crossing
+	 * bridge threshold in any direction
+	 */
+	if (bus->flags & PERIPH_EMC_ENB) {
+		if (((mv > TEGRA_EMC_BRIDGE_MVOLTS_MIN) &&
+		     (old_rate < bridge_rate)) ||
+		    ((old_mv > TEGRA_EMC_BRIDGE_MVOLTS_MIN) &&
+		     (rate < bridge_rate))) {
+			ret = clk_set_rate_locked(bus, bridge_rate);
+			if (ret) {
+				pr_err("%s: Failed to set emc bridge rate %lu\n",
+					__func__, bridge_rate);
+				return ret;
+			}
+		}
+		return clk_set_rate_locked(bus, rate);
+	}
+
+	/* sbus and cbus: enable/disable emc bridge user when crossing voltage
+	 * threshold up/down respectively; hence, emc rate is kept above the
+	 * bridge rate as long as any sbus or cbus user requires high voltage
+	 */
+	if ((mv > TEGRA_EMC_BRIDGE_MVOLTS_MIN) &&
+	    (old_mv <= TEGRA_EMC_BRIDGE_MVOLTS_MIN)) {
+		ret = clk_enable(emc_bridge);
+		if (ret) {
+			pr_err("%s: Failed to enable emc bridge\n", __func__);
+			return ret;
+		}
+	}
+
+	ret = clk_set_rate_locked(bus, rate);
+
+	if ((mv <= TEGRA_EMC_BRIDGE_MVOLTS_MIN) &&
+	    (old_mv > TEGRA_EMC_BRIDGE_MVOLTS_MIN))
+		clk_disable(emc_bridge);
+
+	return ret;
+}
+
 static int tegra3_clk_shared_bus_update(struct clk *bus)
 {
 	struct clk *c;
+	unsigned long old_rate;
 	unsigned long rate = bus->min_rate;
 	unsigned long bw = 0;
 	unsigned long ceiling = bus->max_rate;
@@ -2688,10 +2755,11 @@ static int tegra3_clk_shared_bus_update(struct clk *bus)
 	}
 	rate = min(max(rate, bw), ceiling);
 
-	if (rate == clk_get_rate_locked(bus))
+	old_rate = clk_get_rate_locked(bus);
+	if (rate == old_rate)
 		return 0;
 
-	return clk_set_rate_locked(bus, rate);
+	return shared_bus_set_rate(bus, rate, old_rate);
 };
 
 static void tegra_clk_shared_bus_init(struct clk *c)
@@ -2766,6 +2834,38 @@ static struct clk_ops tegra_clk_shared_bus_ops = {
 	.reset = tegra_clk_shared_bus_reset,
 };
 
+/* emc bridge ops */
+/* On Tegra3 platforms emc configurations for DDR3 low rates can not work
+ * at high core voltage; the intermediate step (bridge) is mandatory whenever
+ * core voltage is crossing the threshold: TEGRA_EMC_BRIDGE_MVOLTS_MIN (fixed
+ * for the entire Tegra3 arch); also emc must run above bridge rate if any
+ * other than emc clock requires high voltage. EMC bridge is implemented as a
+ * special emc shared user: initialized at minimum rate until updated once by
+ * emc dvfs setup; then only enabled/disabled when sbus and/or cbus voltage is
+ * crossing the threshold (sbus and cbus together include all clocks that may
+ * require voltage above threshold - other peripherals can reach their maximum
+ * rates below threshold)
+ */
+static void tegra3_clk_emc_bridge_init(struct clk *c)
+{
+	tegra_clk_shared_bus_init(c);
+	c->u.shared_bus_user.rate = 0;
+}
+
+static int tegra3_clk_emc_bridge_set_rate(struct clk *c, unsigned long rate)
+{
+	if (c->u.shared_bus_user.rate == 0)
+		c->u.shared_bus_user.rate = rate;
+	return 0;
+}
+
+static struct clk_ops tegra_clk_emc_bridge_ops = {
+	.init = tegra3_clk_emc_bridge_init,
+	.enable = tegra_clk_shared_bus_enable,
+	.disable = tegra_clk_shared_bus_disable,
+	.set_rate = tegra3_clk_emc_bridge_set_rate,
+	.round_rate = tegra_clk_shared_bus_round_rate,
+};
 
 /* Clock definitions */
 static struct clk tegra_clk_32k = {
@@ -3697,6 +3797,12 @@ static struct clk tegra_clk_emc = {
 	.rate_change_nh = &emc_rate_change_nh,
 };
 
+static struct clk tegra_clk_emc_bridge = {
+	.name      = "bridge.emc",
+	.ops       = &tegra_clk_emc_bridge_ops,
+	.parent    = &tegra_clk_emc,
+};
+
 static struct clk tegra_clk_cbus = {
 	.name	   = "cbus",
 	.parent    = &tegra_pll_c,
@@ -3976,6 +4082,7 @@ struct clk *tegra_ptr_clks[] = {
 	&tegra_clk_sbus_cmplx,
 	&tegra_clk_emc,
 	&tegra3_clk_twd,
+	&tegra_clk_emc_bridge,
 	&tegra_clk_cbus,
 };
 
@@ -4029,6 +4136,7 @@ void __init tegra_soc_init_clocks(void)
 
 	tegra_init_cpu_edp_limits(default_cpu_edp_limits,
 				  ARRAY_SIZE(default_cpu_edp_limits));
+	emc_bridge = &tegra_clk_emc_bridge;
 }
 
 #ifdef CONFIG_CPU_FREQ

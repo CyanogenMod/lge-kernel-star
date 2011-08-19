@@ -510,6 +510,19 @@ static void enterprise_gps_init(void)
 	tegra_gpio_enable(TEGRA_GPIO_PE5);
 }
 
+static void enterprise_baseband_init(void)
+{
+	int modem_id = tegra_get_modem_id();
+
+	switch (modem_id) {
+	case 1: /* PH450 ULPI */
+		enterprise_modem_init();
+		break;
+	case 2: /* 6260 HSIC */
+		break;
+	}
+}
+
 static void __init tegra_enterprise_init(void)
 {
 	char serial[20];

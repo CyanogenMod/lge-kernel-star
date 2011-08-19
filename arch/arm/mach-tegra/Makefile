@@ -27,6 +27,7 @@ obj-y                                   += tegra_odm_fuses.o
 obj-$(CONFIG_TEGRA_LEGACY_AUDIO)        += tegra_i2s_audio.o
 obj-$(CONFIG_TEGRA_LEGACY_AUDIO)        += tegra_spdif_audio.o
 obj-y                                   += mc.o
+obj-$(CONFIG_TEGRA_STAT_MON)			+= tegra2_statmon.o
 obj-$(CONFIG_USB_SUPPORT)               += usb_phy.o
 obj-$(CONFIG_FIQ)                       += fiq.o
 obj-$(CONFIG_TEGRA_FIQ_DEBUGGER)        += tegra_fiq_debugger.o
@@ -82,7 +83,7 @@ obj-$(CONFIG_DEBUG_ICEDCC)              += sysfs-dcc.o
 obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += sysfs-cluster.o
 ifeq ($(CONFIG_TEGRA_MC_PROFILE),y)
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_mc.o
-obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += tegra3_mc_stats.o
+obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += tegra3_mc.o
 endif
 obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += tegra3_tsensor.o
 

@@ -334,6 +334,13 @@ config TEGRA_LEGACY_AUDIO
 	  Say Y if you want to add support legacy (non-ALSA) audio APIs on
 	  Tegra. This will disable ALSA (ASoC) support.
 
+config TEGRA_STAT_MON
+        bool "Enable H/W statistics monitor"
+        depends on ARCH_TEGRA_2x_SOC
+        default n
+        help
+          Enables support for hardware statistics monitor for AVP.
+
 config USB_HOTPLUG
 	bool "Enabling the USB hotplug"
 	default n

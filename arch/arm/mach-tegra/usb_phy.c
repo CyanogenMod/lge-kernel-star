@@ -1056,9 +1056,6 @@ static void ulpi_phy_reset(void __iomem *base)
 {
 	unsigned long val;
 
-#ifndef CONFIG_ARCH_TEGRA_2x_SOC
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_CLK, TEGRA_TRI_TRISTATE);
-#endif
 	val = readl(base + USB_SUSP_CTRL);
 	val |= UHSIC_RESET;
 	writel(val, base + USB_SUSP_CTRL);
@@ -1275,14 +1272,15 @@ static int null_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 		config->trimmer = &default_trimmer;
 
 	ulpi_phy_reset(base);
-	ulpi_set_host(base);
-
-	if (config->preinit)
-		config->preinit();
 
 	val = readl(base + ULPI_TIMING_CTRL_0);
 	val |= ULPI_OUTPUT_PINMUX_BYP | ULPI_CLKOUT_PINMUX_BYP;
 	writel(val, base + ULPI_TIMING_CTRL_0);
+
+	ulpi_set_host(base);
+
+	if (config->preinit && config->preinit())
+		return -EAGAIN;
 
 	val = readl(base + USB_SUSP_CTRL);
 	val |= ULPI_PHY_ENABLE;
@@ -1341,6 +1339,7 @@ static int null_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 
 	val = readl(base + ULPIS2S_CTRL);
 	val |= ULPIS2S_ENA;
+	val |= ULPIS2S_SUPPORT_DISCONNECT;
 	val |= ULPIS2S_SPARE((phy->mode == TEGRA_USB_PHY_MODE_HOST)? 3 : 1);
 	writel(val, base + ULPIS2S_CTRL);
 
@@ -1364,8 +1363,8 @@ static int null_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	writel(val, base + ULPI_TIMING_CTRL_0);
 	udelay(10);
 
-	if (config->postinit)
-		config->postinit();
+	if (config->postinit && config->postinit())
+		return -EAGAIN;
 
 	return 0;
 }

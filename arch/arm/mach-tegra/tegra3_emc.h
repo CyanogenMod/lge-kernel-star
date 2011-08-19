@@ -24,6 +24,9 @@
 
 #define TEGRA_EMC_NUM_REGS	105
 
+#define TEGRA_EMC_BRIDGE_RATE_MIN	300000000
+#define TEGRA_EMC_BRIDGE_MVOLTS_MIN	1200
+
 struct tegra_emc_table {
 	u8 rev;
 	unsigned long rate;

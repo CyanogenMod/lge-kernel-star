@@ -55,10 +55,10 @@ static int plain_kbd_keycode[] = {
 };
 #else
 static int plain_kbd_keycode[] = {
-	KEY_POWER,      KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
-	KEY_HOME,       KEY_BACK,     KEY_RESERVED, KEY_RESERVED,
-	KEY_RESERVED,   KEY_RESERVED, KEY_RESERVED, KEY_RESERVED,
-	KEY_VOLUMEDOWN, KEY_VOLUMEUP, KEY_RESERVED, KEY_RESERVED,
+	KEY_POWER,      KEY_RESERVED,
+	KEY_HOME,       KEY_BACK,
+	KEY_RESERVED,   KEY_MENU,
+	KEY_RESERVED,   KEY_RESERVED
 };
 #endif
 static struct tegra_kbc_wake_key whistler_wake_cfg[] = {

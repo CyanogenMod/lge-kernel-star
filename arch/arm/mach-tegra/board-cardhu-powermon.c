@@ -54,7 +54,7 @@ static struct ina219_platform_data power_mon_info[] = {
 		.divisor = 20,
 	},
 	{
-		.calibration_data  = 0xa000,
+		.calibration_data  = 0x4000,
 		.power_lsb = 1,
 		.rail_name = "VDD_DISPLAY_IN",
 		.divisor = 20,

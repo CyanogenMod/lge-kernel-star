@@ -429,6 +429,7 @@ static void __init uart_debug_init(void)
 	if (board_info.sku & SKU_SLT_ULPI_SUPPORT) {
 		if ((board_info.board_id == BOARD_E1186) ||
 			(board_info.board_id == BOARD_E1187) ||
+			(board_info.board_id == BOARD_E1256) ||
 			(board_info.board_id == BOARD_PM269)) {
 				/* UARTB is the debug port. */
 				pr_info("Selecting UARTB as the debug console\n");
@@ -724,7 +725,7 @@ static void cardhu_usb_init(void)
 			PM267_SMSC4640_HSIC_HUB_RESET_GPIO;
 		tegra_ehci2_device.dev.platform_data = &tegra_ehci_uhsic_pdata;
 	} else if ((bi.board_id == BOARD_PM269) ||
-		(bi.board_id == BOARD_E1186)) {
+		(bi.board_id == BOARD_E1186) || (bi.board_id == BOARD_E1256)) {
 		tegra_ehci2_device.dev.platform_data = &tegra_ehci_uhsic_pdata;
 	} else {
 		tegra_ehci2_device.dev.platform_data = &tegra_ehci_pdata[1];
@@ -761,7 +762,7 @@ static void cardhu_gps_init(void)
 static void cardhu_modem_init(void)
 {
 	struct board_info board_info;
-	int w_disable_gpio;
+	int w_disable_gpio, ret;
 
 	tegra_get_board_info(&board_info);
 	switch (board_info.board_id) {
@@ -772,7 +773,12 @@ static void cardhu_modem_init(void)
 			w_disable_gpio = TEGRA_GPIO_PDD5;
 		}
 		tegra_gpio_enable(w_disable_gpio);
-		gpio_direction_input(w_disable_gpio);
+		ret = gpio_request(w_disable_gpio, "w_disable_gpio");
+		if (ret < 0)
+			pr_err("%s: gpio_request failed for gpio %d\n",
+				__func__, w_disable_gpio);
+		else
+			gpio_direction_input(w_disable_gpio);
 		break;
 	default:
 		break;

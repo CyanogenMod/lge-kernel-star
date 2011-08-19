@@ -96,5 +96,6 @@ void cpufreq_set_conservative_governor_param(int up_th, int down_th);
 #endif
 int get_core_edp(void);
 enum panel_type get_panel_type(void);
+int tegra_get_modem_id(void);
 
 #endif

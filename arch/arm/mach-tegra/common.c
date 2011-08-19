@@ -112,6 +112,7 @@ void tegra_assert_system_reset(char mode, const char *cmd)
 	writel_relaxed(reg, reset);
 #endif
 }
+static int modem_id;
 
 /* WARNING: There is implicit client of pllp_out3 like i2c, uart, dsi
  * and so this clock (pllp_out3) should never be disabled.
@@ -165,7 +166,7 @@ static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 	{ "sdmmc3",	"pll_p",	48000000,	false},
 	{ "sdmmc4",	"clk_m",	12000000,	true},
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
-	{ "cbus",	"pll_c",	ULONG_MAX,	false },
+	{ "cbus",	"pll_c",	416000000,	false },
 	{ "pll_c_out1",	"pll_c",	208000000,	false },
 #endif
 	{ NULL,		NULL,		0,		0},
@@ -428,6 +429,20 @@ void tegra_get_pmu_board_info(struct board_info *bi)
 
 __setup("pmuboard=", tegra_pmu_board_info);
 
+static int __init tegra_modem_id(char *id)
+{
+	char *p = id;
+
+	modem_id = memparse(p, &p);
+	return 1;
+}
+
+int tegra_get_modem_id(void)
+{
+	return modem_id;
+}
+
+__setup("modem_id=", tegra_modem_id);
 
 /*
  * Tegra has a protected aperture that prevents access by most non-CPU

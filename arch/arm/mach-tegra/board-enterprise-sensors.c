@@ -34,7 +34,7 @@
 
 static struct nct1008_platform_data enterprise_nct1008_pdata = {
 	.supported_hwrev = true,
-	.ext_range = false,
+	.ext_range = true,
 	.conv_rate = 0x08,
 	.offset = 0,
 	.hysteresis = 5,

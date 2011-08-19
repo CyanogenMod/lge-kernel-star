@@ -145,7 +145,7 @@ static int ph450_handshake(void)
 	return 0;
 }
 
-int __init enterprise_baseband_init(void)
+int __init enterprise_modem_init(void)
 {
 	int ret;
 

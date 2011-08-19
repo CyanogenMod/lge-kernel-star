@@ -33,6 +33,7 @@
 #include <mach/iomap.h>
 
 #include "clock.h"
+#include "dvfs.h"
 #include "tegra3_emc.h"
 
 #ifdef CONFIG_TEGRA_EMC_SCALING_ENABLE
@@ -730,6 +731,36 @@ static const struct clk_mux_sel *find_matching_input(
 	return NULL;
 }
 
+static bool is_emc_bridge(void)
+{
+	int mv;
+	unsigned long rate;
+	struct clk *bridge = tegra_get_clock_by_name("bridge.emc");
+	BUG_ON(!bridge);
+
+	/* LPDDR2 does not need a bridge entry in DFS table: just lock bridge
+	   rate at minimum so it won't interfere with emc bus operations */
+	if (dram_type == DRAM_TYPE_LPDDR2) {
+		clk_set_rate(bridge, 0);
+		return true;
+	}
+
+	/* DDR3 requires EMC DFS table to include a bridge entry with frequency
+	   above minimum bridge threshold, and voltage below bridge threshold */
+	rate = clk_round_rate(bridge, TEGRA_EMC_BRIDGE_RATE_MIN);
+	if (IS_ERR_VALUE(rate))
+		return false;
+
+	mv = tegra_dvfs_predict_millivolts(emc, rate);
+	if (IS_ERR_VALUE(mv) || (mv > TEGRA_EMC_BRIDGE_MVOLTS_MIN))
+		return false;
+
+	if (clk_set_rate(bridge, rate))
+		return false;
+
+	return true;
+}
+
 void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
 {
 	int i;
@@ -805,8 +836,14 @@ void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
 		       " %lu kHz is not found\n", max_rate);
 		return;
 	}
-	pr_info("tegra: validated EMC DFS table\n");
+
 	tegra_emc_table = table;
+
+	if (!is_emc_bridge()) {
+		tegra_emc_table = NULL;
+		pr_err("tegra: invalid EMC DFS table: emc bridge not found");
+	}
+	pr_info("tegra: validated EMC DFS table\n");
 }
 
 void tegra_emc_timing_invalidate(void)
