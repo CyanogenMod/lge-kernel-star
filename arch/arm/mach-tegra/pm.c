@@ -881,8 +881,6 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 	(void)reg;
 	(void)mode;
 
-	preset_lpj = loops_per_jiffy;
-
 #ifndef CONFIG_PM_SLEEP
 	if (plat->suspend_mode != TEGRA_SUSPEND_NONE) {
 		pr_warning("%s: Suspend requires CONFIG_PM_SLEEP -- "
