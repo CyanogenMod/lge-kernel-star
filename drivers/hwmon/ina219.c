@@ -106,6 +106,14 @@ static s32 power_down_INA219(struct i2c_client *client)
 	return retval;
 }
 
+static s32 show_rail_name(struct device *dev,
+			struct device_attribute *attr,
+			char *buf)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct ina219_data *data = i2c_get_clientdata(client);
+	return sprintf(buf, "%s\n", data->pInfo->rail_name);
+}
 
 static s32 show_voltage(struct device *dev,
 			struct device_attribute *attr,
@@ -304,6 +312,7 @@ error:
 }
 
 static struct sensor_device_attribute ina219[] = {
+	SENSOR_ATTR(rail_name, S_IRUGO, show_rail_name, NULL, 0),
 	SENSOR_ATTR(in1_input, S_IRUGO, show_voltage, NULL, 0),
 	SENSOR_ATTR(curr1_input, S_IRUGO, show_current, NULL, 0),
 	SENSOR_ATTR(power1_input, S_IRUGO, show_power, NULL, 0),
