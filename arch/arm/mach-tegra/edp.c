@@ -26,7 +26,6 @@
 
 #include "fuse.h"
 
-
 static const struct tegra_edp_limits *edp_limits;
 static int edp_limits_size;
 
@@ -180,6 +179,11 @@ void tegra_get_cpu_edp_limits(const struct tegra_edp_limits **limits, int *size)
 
 #ifdef CONFIG_DEBUG_FS
 
+static int edp_limit_debugfs_show(struct seq_file *s, void *data)
+{
+	seq_printf(s, "%u\n", tegra_get_edp_limit());
+}
+
 static int edp_debugfs_show(struct seq_file *s, void *data)
 {
 	int i;
@@ -207,6 +211,11 @@ static int edp_debugfs_open(struct inode *inode, struct file *file)
 	return single_open(file, edp_debugfs_show, inode->i_private);
 }
 
+static int edp_limit_debugfs_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, edp_limit_debugfs_show, inode->i_private);
+}
+
 
 static const struct file_operations edp_debugfs_fops = {
 	.open		= edp_debugfs_open,
@@ -215,6 +224,12 @@ static const struct file_operations edp_debugfs_fops = {
 	.release	= single_release,
 };
 
+static const struct file_operations edp_limit_debugfs_fops = {
+	.open		= edp_limit_debugfs_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
 
 static int __init tegra_edp_debugfs_init()
 {
@@ -224,6 +239,9 @@ static int __init tegra_edp_debugfs_init()
 				&edp_debugfs_fops);
 	if (!d)
 		return -ENOMEM;
+
+	d = debugfs_create_file("edp_limit", S_IRUGO, NULL, NULL,
+				&edp_limit_debugfs_fops);
 
 	return 0;
 }
