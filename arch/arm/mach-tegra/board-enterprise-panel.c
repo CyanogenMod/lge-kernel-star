@@ -388,6 +388,7 @@ static struct tegra_fb_data enterprise_hdmi_fb_data = {
 static struct tegra_dc_out enterprise_disp2_out = {
 	.type		= TEGRA_DC_OUT_HDMI,
 	.flags		= TEGRA_DC_OUT_HOTPLUG_HIGH,
+	.parent_clk	= "pll_d2_out0",
 
 	.dcc_bus	= 3,
 	.hotplug_gpio	= enterprise_hdmi_hpd,
