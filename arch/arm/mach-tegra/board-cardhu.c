@@ -805,6 +805,18 @@ static struct tegra_otg_platform_data tegra_otg_pdata = {
 	.host_unregister = &tegra_usb_otg_host_unregister,
 };
 
+static int cardu_usb_hsic_postsupend(void)
+{
+	baseband_xmm_set_power_status(BBXMM_PS_L2);
+	return 0;
+}
+
+static int cardu_usb_hsic_preresume(void)
+{
+	baseband_xmm_set_power_status(BBXMM_PS_L2TOL0);
+	return 0;
+}
+
 static void cardhu_usb_init(void)
 {
 	struct board_info bi;
@@ -827,6 +839,10 @@ static void cardhu_usb_init(void)
 		tegra_ehci2_device.dev.platform_data = &tegra_ehci_uhsic_pdata;
 		platform_device_register(&tegra_ehci2_device);
 	} else if (bi.board_id == BOARD_E1186) {
+		/* for baseband devices do not switch off phy during suspend */
+		tegra_ehci_uhsic_pdata.power_down_on_bus_suspend = 0;
+		uhsic_phy_config.postsuspend = cardu_usb_hsic_postsupend;
+		uhsic_phy_config.preresume = cardu_usb_hsic_preresume;
 		tegra_ehci2_device.dev.platform_data = &tegra_ehci_uhsic_pdata;
 		/* baseband registration happens in baseband-xmm-power  */
 	} else {
