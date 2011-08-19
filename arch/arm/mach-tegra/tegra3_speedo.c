@@ -43,8 +43,8 @@ static const u32 core_process_speedos[][CORE_PROCESS_CORNERS_NUM] = {
 
 /* Characterization SKUs */
 	{170}, /* threshold_index 4: soc_speedo_id 1: AP30 char */
-	{190}, /* threshold_index 5: soc_speedo_id 2: T30  char */
-	{190}, /* threshold_index 6: soc_speedo_id 2: T30S char */
+	{195}, /* threshold_index 5: soc_speedo_id 2: T30  char */
+	{185}, /* threshold_index 6: soc_speedo_id 2: T30S char */
 
 /* T33 family: Numbers cloned from T30 family; FIXME: adjust these later */
 	{183}, /* threshold_index 7: soc_speedo_id = 1 - AP33 */
