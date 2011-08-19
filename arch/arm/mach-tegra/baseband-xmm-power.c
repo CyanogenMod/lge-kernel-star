@@ -25,6 +25,7 @@
 #include <linux/delay.h>
 #include <linux/fs.h>
 #include <linux/uaccess.h>
+#include <linux/wakelock.h>
 #include <mach/usb_phy.h>
 #include "board.h"
 #include "devices.h"
@@ -72,24 +73,13 @@ static enum {
 	IPC_AP_WAKE_H,
 } ipc_ap_wake_state;
 
-static enum {
-	BBXMM_PS_UNINIT   = 0,
-	BBXMM_PS_INIT     = 1,
-	BBXMM_PS_L0       = 2,
-	BBXMM_PS_L0TOL2   = 3,
-	BBXMM_PS_L2       = 4,
-	BBXMM_PS_L2TOL0   = 5,
-	BBXMM_PS_L2TOL3   = 6,
-	BBXMM_PS_L3       = 7,
-	BBXMM_PS_L3TOL0   = 8,
-	BBXMM_PS_LAST     = -1,
-} baseband_xmm_powerstate;
-
 static struct workqueue_struct *workqueue;
 static struct work_struct init1_work;
 static struct work_struct init2_work;
+static struct work_struct init3_work;
 static struct baseband_power_platform_data *baseband_power_driver_data;
 static bool register_hsic_device;
+static struct wake_lock wakelock;
 
 /* static functions */
 static int baseband_xmm_power_on(struct platform_device *device);
@@ -216,11 +206,26 @@ static int baseband_xmm_power_off(struct platform_device *device)
 	return 0;
 }
 
-static void baseband_xmm_set_power_status(unsigned int status)
+void baseband_xmm_set_power_status(unsigned int status)
 {
+	switch (status) {
+	case BBXMM_PS_L0:
+		wake_lock(&wakelock);
+	break;
+	case BBXMM_PS_L2:
+		wake_unlock(&wakelock);
+	break;
+	case BBXMM_PS_L2TOL0:
+		/* do this only from L2 state */
+		if (baseband_xmm_powerstate == BBXMM_PS_L2)
+			queue_work(workqueue, &init3_work);
+	default:
+	break;
+	}
 	baseband_xmm_powerstate = status;
 	pr_debug("BB XMM POWER STATE = %d\n", status);
 }
+EXPORT_SYMBOL_GPL(baseband_xmm_set_power_status);
 
 #if BB_INITIATED_L2_SUSPEND
 static irqreturn_t ipc_hsic_sus_req_irq(int irq, void *dev_id)
@@ -354,6 +359,15 @@ static void baseband_xmm_power_init2_work(struct work_struct *work)
 
 }
 
+/* Do the work for AP initiated L2->L0 */
+static void baseband_xmm_power_init3_work(struct work_struct *work)
+{
+	pr_debug("%s\n", __func__);
+	/* set the slave wakeup request */
+	gpio_set_value(baseband_power_driver_data->
+		modem.xmm.ipc_bb_wake, 1);
+}
+
 static int baseband_xmm_power_driver_probe(struct platform_device *device)
 {
 	struct device *dev = &device->dev;
@@ -434,9 +448,12 @@ static int baseband_xmm_power_driver_probe(struct platform_device *device)
 		return -1;
 	}
 
+	wake_lock_init(&wakelock, WAKE_LOCK_SUSPEND, "baseband_xmm_power");
+
 	baseband_xmm_powerstate = BBXMM_PS_INIT;
 	INIT_WORK(&init1_work, baseband_xmm_power_init1_work);
 	INIT_WORK(&init2_work, baseband_xmm_power_init2_work);
+	INIT_WORK(&init3_work, baseband_xmm_power_init3_work);
 
 	/* reset / power on sequence */
 	mdelay(40);
@@ -484,6 +501,7 @@ static int baseband_xmm_power_driver_remove(struct platform_device *device)
 		ARRAY_SIZE(tegra_baseband_gpios));
 
 	device_remove_file(dev, &dev_attr_xmm_onoff);
+	wake_lock_destroy(&wakelock);
 
 	/* unregister usb host controller */
 	platform_device_unregister(baseband_power_driver_data->

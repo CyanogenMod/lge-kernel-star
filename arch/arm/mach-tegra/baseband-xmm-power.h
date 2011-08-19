@@ -44,3 +44,18 @@ struct baseband_power_platform_data {
 		} xmm;
 	} modem;
 };
+
+static enum {
+	BBXMM_PS_UNINIT	= 0,
+	BBXMM_PS_INIT	= 1,
+	BBXMM_PS_L0	= 2,
+	BBXMM_PS_L0TOL2	= 3,
+	BBXMM_PS_L2	= 4,
+	BBXMM_PS_L2TOL0	= 5,
+	BBXMM_PS_L2TOL3	= 6,
+	BBXMM_PS_L3	= 7,
+	BBXMM_PS_L3TOL0	= 8,
+	BBXMM_PS_LAST	= -1,
+} baseband_xmm_powerstate;
+
+void baseband_xmm_set_power_status(unsigned int status);
