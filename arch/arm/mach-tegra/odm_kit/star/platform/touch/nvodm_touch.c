@@ -177,7 +177,7 @@ NvOdmTouchInterruptMask(NvOdmTouchDeviceHandle hDevice, NvBool mask)
 
 
 // 20100718  grip suppression [START]
-NvU8 touch_grip_suppression_value = 2;
+NvU8 touch_grip_suppression_value = 0;
 
 void setTouchGripSuppressionValue(int value)
 {
