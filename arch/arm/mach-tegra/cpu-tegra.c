@@ -107,6 +107,9 @@ static unsigned int edp_limit;
 static void edp_update_limit(void)
 {
 	unsigned int limit = cpumask_weight(&edp_cpumask);
+#ifndef CONFIG_TEGRA_EDP_EXACT_FREQ
+	int i;
+#endif
 
 	if (!cpu_edp_limits)
 		return;
@@ -117,7 +120,6 @@ static void edp_update_limit(void)
 #else
 	limit = cpu_edp_limits[edp_thermal_index].freq_limits[limit - 1];
 
-	int i;
 	for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++) {
 		if (freq_table[i].frequency > limit) {
 			break;
