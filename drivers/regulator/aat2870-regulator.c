@@ -82,8 +82,8 @@ static int aat2870_ldo_set_voltage(struct regulator_dev *rdev,
 	if (i >= ri->desc.n_voltages)
 		return -EINVAL;
 
-	return aat2870->update_bits(aat2870, ri->voltage_addr,
-				    ri->voltage_mask, val);
+	return aat2870->update(aat2870, ri->voltage_addr, ri->voltage_mask,
+			       val);
 }
 
 static int aat2870_ldo_get_voltage(struct regulator_dev *rdev)
@@ -109,8 +109,8 @@ static int aat2870_ldo_enable(struct regulator_dev *rdev)
 	struct aat2870_regulator *ri = rdev_get_drvdata(rdev);
 	struct aat2870_data *aat2870 = dev_get_drvdata(ri->pdev->dev.parent);
 
-	return aat2870->update_bits(aat2870, ri->enable_addr,
-				    ri->enable_mask, ri->enable_mask);
+	return aat2870->update(aat2870, ri->enable_addr, ri->enable_mask,
+			       ri->enable_mask);
 }
 
 static int aat2870_ldo_disable(struct regulator_dev *rdev)
@@ -118,8 +118,7 @@ static int aat2870_ldo_disable(struct regulator_dev *rdev)
 	struct aat2870_regulator *ri = rdev_get_drvdata(rdev);
 	struct aat2870_data *aat2870 = dev_get_drvdata(ri->pdev->dev.parent);
 
-	return aat2870->update_bits(aat2870, ri->enable_addr,
-				    ri->enable_mask, 0);
+	return aat2870->update(aat2870, ri->enable_addr, ri->enable_mask, 0);
 }
 
 static int aat2870_ldo_is_enabled(struct regulator_dev *rdev)
@@ -202,14 +201,8 @@ static struct aat2870_regulator *aat2870_get_regulator(int id)
 
 static int aat2870_regulator_probe(struct platform_device *pdev)
 {
-	struct regulator_init_data *init_data = pdev->dev.platform_data;
 	struct aat2870_regulator *ri;
 	struct regulator_dev *rdev;
-
-	if (!init_data) {
-		dev_err(&pdev->dev, "No regulator init data\n");
-		return -ENXIO;
-	}
 
 	ri = aat2870_get_regulator(pdev->id);
 	if (!ri) {
@@ -218,7 +211,8 @@ static int aat2870_regulator_probe(struct platform_device *pdev)
 	}
 	ri->pdev = pdev;
 
-	rdev = regulator_register(&ri->desc, &pdev->dev, init_data, ri);
+	rdev = regulator_register(&ri->desc, &pdev->dev,
+				  pdev->dev.platform_data, ri);
 	if (IS_ERR(rdev)) {
 		dev_err(&pdev->dev, "Failed to register regulator %s\n",
 			ri->desc.name);

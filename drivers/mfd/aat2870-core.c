@@ -103,53 +103,41 @@ static struct mfd_cell aat2870_devs[] = {
 	},
 };
 
-static int aat2870_read(struct aat2870_data *aat2870, u8 addr, u8 *val)
+static int __aat2870_read(struct aat2870_data *aat2870, u8 addr, u8 *val)
 {
-	struct i2c_client *client = aat2870->client;
-	int ret = 0;
+	int ret;
 
 	if (addr >= AAT2870_REG_NUM) {
 		dev_err(aat2870->dev, "Invalid address, 0x%02x\n", addr);
 		return -EINVAL;
 	}
 
-	mutex_lock(&aat2870->io_lock);
-
 	if (!aat2870->reg_cache[addr].readable) {
 		*val = aat2870->reg_cache[addr].value;
-		goto out_unlock;
+		goto out;
 	}
 
-	ret = i2c_master_send(client, &addr, 1);
+	ret = i2c_master_send(aat2870->client, &addr, 1);
 	if (ret < 0)
-		goto out_unlock;
-	if (ret != 1) {
-		ret = -EIO;
-		goto out_unlock;
-	}
+		return ret;
+	if (ret != 1)
+		return -EIO;
 
-	ret = i2c_master_recv(client, val, 1);
+	ret = i2c_master_recv(aat2870->client, val, 1);
 	if (ret < 0)
-		goto out_unlock;
-	if (ret != 1) {
-		ret = -EIO;
-		goto out_unlock;
-	}
+		return ret;
+	if (ret != 1)
+		return -EIO;
 
-	ret = 0;
-
-out_unlock:
-	mutex_unlock(&aat2870->io_lock);
-	dev_dbg(&client->dev, "read: addr=0x%02x, val=0x%02x\n", addr, *val);
-
-	return ret;
+out:
+	dev_dbg(aat2870->dev, "read: addr=0x%02x, val=0x%02x\n", addr, *val);
+	return 0;
 }
 
-static int aat2870_write(struct aat2870_data *aat2870, u8 addr, u8 val)
+static int __aat2870_write(struct aat2870_data *aat2870, u8 addr, u8 val)
 {
-	struct i2c_client *client = aat2870->client;
 	u8 msg[2];
-	int ret = 0;
+	int ret;
 
 	if (addr >= AAT2870_REG_NUM) {
 		dev_err(aat2870->dev, "Invalid address, 0x%02x\n", addr);
@@ -162,47 +150,62 @@ static int aat2870_write(struct aat2870_data *aat2870, u8 addr, u8 val)
 		return -EINVAL;
 	}
 
-	mutex_lock(&aat2870->io_lock);
-
 	msg[0] = addr;
 	msg[1] = val;
-	ret = i2c_master_send(client, msg, 2);
+	ret = i2c_master_send(aat2870->client, msg, 2);
 	if (ret < 0)
-		goto out_unlock;
-	if (ret != 2) {
-		ret = -EIO;
-		goto out_unlock;
-	}
+		return ret;
+	if (ret != 2)
+		return -EIO;
 
 	aat2870->reg_cache[addr].value = val;
-	ret = 0;
 
-out_unlock:
+	dev_dbg(aat2870->dev, "write: addr=0x%02x, val=0x%02x\n", addr, val);
+	return 0;
+}
+
+static int aat2870_read(struct aat2870_data *aat2870, u8 addr, u8 *val)
+{
+	int ret;
+
+	mutex_lock(&aat2870->io_lock);
+	ret = __aat2870_read(aat2870, addr, val);
 	mutex_unlock(&aat2870->io_lock);
-	dev_dbg(&client->dev, "write: addr=0x%02x, val=0x%02x\n", addr, val);
 
 	return ret;
 }
 
-static int aat2870_update_bits(struct aat2870_data *aat2870, u8 addr,
-			       u8 mask, u8 val)
+static int aat2870_write(struct aat2870_data *aat2870, u8 addr, u8 val)
+{
+	int ret;
+
+	mutex_lock(&aat2870->io_lock);
+	ret = __aat2870_write(aat2870, addr, val);
+	mutex_unlock(&aat2870->io_lock);
+
+	return ret;
+}
+
+static int aat2870_update(struct aat2870_data *aat2870, u8 addr, u8 mask,
+			  u8 val)
 {
 	int change;
 	u8 old_val, new_val;
 	int ret;
 
-	ret = aat2870->read(aat2870, addr, &old_val);
+	mutex_lock(&aat2870->io_lock);
+
+	ret = __aat2870_read(aat2870, addr, &old_val);
 	if (ret)
-		return ret;
+		goto out_unlock;
 
 	new_val = (old_val & ~mask) | (val & mask);
 	change = old_val != new_val;
 	if (change)
-		ret = aat2870->write(aat2870, addr, new_val);
+		ret = __aat2870_write(aat2870, addr, new_val);
 
-	dev_dbg(&aat2870->client->dev,
-		"update_bits: change=%d, addr=0x%02x, old=0x%02x, new=0x%02x\n",
-		change, addr, old_val, new_val);
+out_unlock:
+	mutex_unlock(&aat2870->io_lock);
 
 	return ret;
 }
@@ -396,7 +399,7 @@ static int aat2870_i2c_probe(struct i2c_client *client,
 	aat2870->uninit = pdata->uninit;
 	aat2870->read = aat2870_read;
 	aat2870->write = aat2870_write;
-	aat2870->update_bits = aat2870_update_bits;
+	aat2870->update = aat2870_update;
 
 	mutex_init(&aat2870->io_lock);
 
