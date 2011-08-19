@@ -228,6 +228,10 @@ int __init aruba_panel_init(void)
 	res->start = tegra_fb_start;
 	res->end = tegra_fb_start + tegra_fb_size - 1;
 
+	/* Copy the bootloader fb to the fb. */
+	tegra_move_framebuffer(tegra_fb_start, tegra_bootloader_fb_start,
+				min(tegra_fb_size, tegra_bootloader_fb_size));
+
 	if (!err)
 		err = nvhost_device_register(&aruba_disp1_device);
 

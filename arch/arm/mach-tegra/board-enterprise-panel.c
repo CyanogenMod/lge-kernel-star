@@ -219,7 +219,7 @@ static struct tegra_dc_sd_settings enterprise_sd_settings = {
 	.enable = 1, /* Normal mode operation */
 	.use_auto_pwm = false,
 	.hw_update_delay = 0,
-	.bin_width = 0,
+	.bin_width = -1,
 	.aggressiveness = 5,
 	.use_vid_luma = true,
 	/* Default video coefficients */
@@ -227,24 +227,80 @@ static struct tegra_dc_sd_settings enterprise_sd_settings = {
 	.fc = {0, 0},
 	/* Immediate backlight changes */
 	.blp = {1024, 255},
+	/* Gammas: R: 2.2 G: 2.2 B: 2.2 */
 	/* Default BL TF */
 	.bltf = {
-			{128, 136, 144, 152},
-			{160, 168, 176, 184},
-			{192, 200, 208, 216},
-			{224, 232, 240, 248}
+			{
+				{57, 65, 74, 83},
+				{93, 103, 114, 126},
+				{138, 151, 165, 179},
+				{194, 209, 225, 242},
+			},
+			{
+				{58, 66, 75, 84},
+				{94, 105, 116, 127},
+				{140, 153, 166, 181},
+				{196, 211, 227, 244},
+			},
+			{
+				{60, 68, 77, 87},
+				{97, 107, 119, 130},
+				{143, 156, 170, 184},
+				{199, 215, 231, 248},
+			},
+			{
+				{64, 73, 82, 91},
+				{102, 113, 124, 137},
+				{149, 163, 177, 192},
+				{207, 223, 240, 255},
+			},
 		},
 	/* Default LUT */
 	.lut = {
-			{255, 255, 255},
-			{199, 199, 199},
-			{153, 153, 153},
-			{116, 116, 116},
-			{85, 85, 85},
-			{59, 59, 59},
-			{36, 36, 36},
-			{17, 17, 17},
-			{0, 0, 0}
+			{
+				{250, 250, 250},
+				{194, 194, 194},
+				{149, 149, 149},
+				{113, 113, 113},
+				{82, 82, 82},
+				{56, 56, 56},
+				{34, 34, 34},
+				{15, 15, 15},
+				{0, 0, 0},
+			},
+			{
+				{246, 246, 246},
+				{191, 191, 191},
+				{147, 147, 147},
+				{111, 111, 111},
+				{80, 80, 80},
+				{55, 55, 55},
+				{33, 33, 33},
+				{14, 14, 14},
+				{0, 0, 0},
+			},
+			{
+				{239, 239, 239},
+				{185, 185, 185},
+				{142, 142, 142},
+				{107, 107, 107},
+				{77, 77, 77},
+				{52, 52, 52},
+				{30, 30, 30},
+				{12, 12, 12},
+				{0, 0, 0},
+			},
+			{
+				{224, 224, 224},
+				{173, 173, 173},
+				{133, 133, 133},
+				{99, 99, 99},
+				{70, 70, 70},
+				{46, 46, 46},
+				{25, 25, 25},
+				{7, 7, 7},
+				{0, 0, 0},
+			},
 		},
 	.sd_brightness = &sd_brightness,
 	.bl_device = &enterprise_disp1_backlight_device,
@@ -254,7 +310,8 @@ static struct tegra_fb_data enterprise_hdmi_fb_data = {
 	.win		= 0,
 	.xres		= 1366,
 	.yres		= 768,
-	.bits_per_pixel	= 16,
+	.bits_per_pixel	= 32,
+	.flags		= TEGRA_FB_FLIP_ON_PROBE,
 };
 
 static struct tegra_dc_out enterprise_disp2_out = {
@@ -263,6 +320,8 @@ static struct tegra_dc_out enterprise_disp2_out = {
 
 	.dcc_bus	= 3,
 	.hotplug_gpio	= enterprise_hdmi_hpd,
+
+	.max_pixclock	= KHZ2PICOS(148500),
 
 	.align		= TEGRA_DC_ALIGN_MSB,
 	.order		= TEGRA_DC_ORDER_RED_BLUE,
@@ -444,6 +503,7 @@ static struct tegra_fb_data enterprise_dsi_fb_data = {
 	.xres		= 540,
 	.yres		= 960,
 	.bits_per_pixel	= 32,
+	.flags		= TEGRA_FB_FLIP_ON_PROBE,
 };
 
 
@@ -593,6 +653,10 @@ int __init enterprise_panel_init(void)
 					 IORESOURCE_MEM, "fbmem");
 	res->start = tegra_fb_start;
 	res->end = tegra_fb_start + tegra_fb_size - 1;
+
+	/* Copy the bootloader fb to the fb. */
+	tegra_move_framebuffer(tegra_fb_start, tegra_bootloader_fb_start,
+		min(tegra_fb_size, tegra_bootloader_fb_size));
 
 	if (!err)
 		err = nvhost_device_register(&enterprise_disp1_device);

@@ -116,8 +116,14 @@
 #define PERIPH_CLK_SOURCE_NUM2 \
 	((PERIPH_CLK_SOURCE_SE - PERIPH_CLK_SOURCE_G3D2) / 4 + 1)
 
+#define AUDIO_DLY_CLK			0x49c
+#define AUDIO_SYNC_CLK_SPDIF		0x4b4
+#define PERIPH_CLK_SOURCE_NUM3 \
+	((AUDIO_SYNC_CLK_SPDIF - AUDIO_DLY_CLK) / 4 + 1)
+
 #define PERIPH_CLK_SOURCE_NUM		(PERIPH_CLK_SOURCE_NUM1 + \
-					 PERIPH_CLK_SOURCE_NUM2)
+					 PERIPH_CLK_SOURCE_NUM2 + \
+					 PERIPH_CLK_SOURCE_NUM3)
 
 #define CPU_SOFTRST_CTRL		0x380
 
@@ -288,6 +294,8 @@
 
 /* FIXME: recommended safety delay after lock is detected */
 #define PLL_POST_LOCK_DELAY		100
+
+static int tegra3_clk_shared_bus_update(struct clk *bus);
 
 static bool detach_shared_bus;
 module_param(detach_shared_bus, bool, 0644);
@@ -1156,6 +1164,7 @@ static struct clk_ops tegra_sbus_cmplx_ops = {
 	.init = tegra3_sbus_cmplx_init,
 	.set_rate = tegra3_sbus_cmplx_set_rate,
 	.round_rate = tegra3_sbus_cmplx_round_rate,
+	.shared_bus_update = tegra3_clk_shared_bus_update,
 };
 
 /* Blink output functions */
@@ -2353,6 +2362,7 @@ static struct clk_ops tegra_emc_clk_ops = {
 	.set_rate		= &tegra3_emc_clk_set_rate,
 	.round_rate		= &tegra3_emc_clk_round_rate,
 	.reset			= &tegra3_periph_clk_reset,
+	.shared_bus_update	= &tegra3_clk_shared_bus_update,
 };
 
 /* Clock doubler ops */
@@ -2635,6 +2645,7 @@ static struct clk_ops tegra_clk_cbus_ops = {
 	.enable = tegra3_clk_cbus_enable,
 	.set_rate = tegra3_clk_cbus_set_rate,
 	.round_rate = tegra3_clk_cbus_round_rate,
+	.shared_bus_update = tegra3_clk_shared_bus_update,
 };
 
 /* shared bus ops */
@@ -2645,7 +2656,7 @@ static struct clk_ops tegra_clk_cbus_ops = {
  * enabled shared_bus_user clock, with a minimum value set by the
  * shared bus.
  */
-static void tegra_clk_shared_bus_update(struct clk *bus)
+static int tegra3_clk_shared_bus_update(struct clk *bus)
 {
 	struct clk *c;
 	unsigned long rate = bus->min_rate;
@@ -2653,7 +2664,7 @@ static void tegra_clk_shared_bus_update(struct clk *bus)
 	unsigned long ceiling = bus->max_rate;
 
 	if (detach_shared_bus)
-		return;
+		return 0;
 
 	list_for_each_entry(c, &bus->shared_bus_list,
 			u.shared_bus_user.node) {
@@ -2677,8 +2688,10 @@ static void tegra_clk_shared_bus_update(struct clk *bus)
 	}
 	rate = min(max(rate, bw), ceiling);
 
-	if (rate != clk_get_rate(bus))
-		clk_set_rate(bus, rate);
+	if (rate == clk_get_rate_locked(bus))
+		return 0;
+
+	return clk_set_rate_locked(bus, rate);
 };
 
 static void tegra_clk_shared_bus_init(struct clk *c)
@@ -3751,6 +3764,8 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("kbc",	"tegra-kbc",		NULL,	36,	0,	32768,	   mux_clk_32k, 		PERIPH_NO_RESET | PERIPH_ON_APB),
 	PERIPH_CLK("timer",	"timer",		NULL,	5,	0,	26000000,  mux_clk_m,			0),
 	PERIPH_CLK("kfuse",	"kfuse-tegra",		NULL,	40,	0,	26000000,  mux_clk_m,			0),
+	PERIPH_CLK("fuse",	"fuse-tegra",		"fuse",	39,	0,	26000000,  mux_clk_m,			PERIPH_ON_APB),
+	PERIPH_CLK("fuse_burn",	"fuse-tegra",		"fuse_burn",	39,	0,	26000000,  mux_clk_m,		PERIPH_ON_APB),
 	PERIPH_CLK("apbif",	"tegra30-ahub",		"apbif", 107,	0,	26000000,  mux_clk_m,			0),
 	PERIPH_CLK("i2s0",	"tegra30-i2s.0",	NULL,	30,	0x1d8,	26000000,  mux_pllaout0_audio0_2x_pllp_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
 	PERIPH_CLK("i2s1",	"tegra30-i2s.1",	NULL,	11,	0x100,	26000000,  mux_pllaout0_audio1_2x_pllp_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
@@ -4175,7 +4190,7 @@ unsigned long tegra_emc_to_cpu_ratio(unsigned long cpu_rate)
 
 #ifdef CONFIG_PM_SLEEP
 static u32 clk_rst_suspend[RST_DEVICES_NUM + CLK_OUT_ENB_NUM +
-			   PERIPH_CLK_SOURCE_NUM + 18];
+			   PERIPH_CLK_SOURCE_NUM + 22];
 
 void tegra_clk_suspend(void)
 {
@@ -4188,6 +4203,10 @@ void tegra_clk_suspend(void)
 	*ctx++ = clk_readl(tegra_pll_c.reg + PLL_MISC(&tegra_pll_c));
 	*ctx++ = clk_readl(tegra_pll_a.reg + PLL_BASE);
 	*ctx++ = clk_readl(tegra_pll_a.reg + PLL_MISC(&tegra_pll_a));
+	*ctx++ = clk_readl(tegra_pll_d.reg + PLL_BASE);
+	*ctx++ = clk_readl(tegra_pll_d.reg + PLL_MISC(&tegra_pll_d));
+	*ctx++ = clk_readl(tegra_pll_d2.reg + PLL_BASE);
+	*ctx++ = clk_readl(tegra_pll_d2.reg + PLL_MISC(&tegra_pll_d2));
 
 	*ctx++ = clk_readl(tegra_pll_m_out1.reg);
 	*ctx++ = clk_readl(tegra_pll_a_out0.reg);
@@ -4210,6 +4229,9 @@ void tegra_clk_suspend(void)
 	}
 	for (off = PERIPH_CLK_SOURCE_G3D2; off <= PERIPH_CLK_SOURCE_SE;
 			off+=4) {
+		*ctx++ = clk_readl(off);
+	}
+	for (off = AUDIO_DLY_CLK; off <= AUDIO_SYNC_CLK_SPDIF; off+=4) {
 		*ctx++ = clk_readl(off);
 	}
 
@@ -4236,13 +4258,14 @@ void tegra_clk_resume(void)
 	u32 val;
 	u32 pllc_base;
 	u32 plla_base;
+	u32 plld_base;
+	u32 plld2_base;
 
 	val = clk_readl(OSC_CTRL) & ~OSC_CTRL_MASK;
 	val |= *ctx++;
 	clk_writel(val, OSC_CTRL);
 	clk_writel(*ctx++, CPU_SOFTRST_CTRL);
 
-	/* FIXME: add plld, and wait for lock */
 	/* Since we are going to reset devices in this function, pllc/a is
 	 * required to be enabled. The actual value will be restore back later.
 	 */
@@ -4253,7 +4276,16 @@ void tegra_clk_resume(void)
 	plla_base = *ctx++;
 	clk_writel(plla_base | PLL_BASE_ENABLE, tegra_pll_a.reg + PLL_BASE);
 	clk_writel(*ctx++, tegra_pll_a.reg + PLL_MISC(&tegra_pll_a));
-	udelay(300);
+
+	plld_base = *ctx++;
+	clk_writel(plld_base | PLL_BASE_ENABLE, tegra_pll_d.reg + PLL_BASE);
+	clk_writel(*ctx++, tegra_pll_d.reg + PLL_MISC(&tegra_pll_d));
+
+	plld2_base = *ctx++;
+	clk_writel(plld2_base | PLL_BASE_ENABLE, tegra_pll_d2.reg + PLL_BASE);
+	clk_writel(*ctx++, tegra_pll_d2.reg + PLL_MISC(&tegra_pll_d2));
+
+	udelay(1000);
 
 	clk_writel(*ctx++, tegra_pll_m_out1.reg);
 	clk_writel(*ctx++, tegra_pll_a_out0.reg);
@@ -4284,6 +4316,9 @@ void tegra_clk_resume(void)
 	}
 	for (off = PERIPH_CLK_SOURCE_G3D2; off <= PERIPH_CLK_SOURCE_SE;
 			off += 4) {
+		clk_writel(*ctx++, off);
+	}
+	for (off = AUDIO_DLY_CLK; off <= AUDIO_SYNC_CLK_SPDIF; off+=4) {
 		clk_writel(*ctx++, off);
 	}
 	wmb();
@@ -4318,6 +4353,8 @@ void tegra_clk_resume(void)
 	/* Restore back the actual pllc/a value */
 	clk_writel(pllc_base, tegra_pll_c.reg + PLL_BASE);
 	clk_writel(plla_base, tegra_pll_a.reg + PLL_BASE);
+	clk_writel(plld_base, tegra_pll_d.reg + PLL_BASE);
+	clk_writel(plld2_base, tegra_pll_d2.reg + PLL_BASE);
 
 	/* Since EMC clock is not restored update current state, and mark
 	   EMC DFS as out of sync */

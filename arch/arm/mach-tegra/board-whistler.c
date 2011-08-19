@@ -470,6 +470,7 @@ static void __init tegra_whistler_init(void)
 	whistler_power_off_init();
 	whistler_emc_init();
 	whistler_baseband_init();
+	tegra_release_bootloader_fb();
 }
 
 int __init tegra_whistler_protected_aperture_init(void)

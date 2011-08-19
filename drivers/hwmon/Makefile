@@ -116,6 +116,7 @@ obj-$(CONFIG_SENSORS_W83L786NG)	+= w83l786ng.o
 obj-$(CONFIG_SENSORS_WM831X)	+= wm831x-hwmon.o
 obj-$(CONFIG_SENSORS_WM8350)	+= wm8350-hwmon.o
 obj-$(CONFIG_SENSORS_INA219)	+= ina219.o
+obj-$(CONFIG_SENSORS_TEGRA_TSENSOR) += tegra-tsensor.o
 
 # PMBus drivers
 obj-$(CONFIG_PMBUS)		+= pmbus_core.o

@@ -1027,6 +1027,14 @@ config SENSORS_AMC6821
 	  This driver can also be build as a module.  If so, the module
 	  will be called amc6821.
 
+config SENSORS_TEGRA_TSENSOR
+	tristate "Nvidia Tegra Integrated temperature sensor"
+	depends on ARCH_TEGRA_3x_SOC
+	default n
+	help
+	  If you say yes here you get support for integrated
+	  temperature sensor in Nvidia tegra chipset.
+
 config SENSORS_THMC50
 	tristate "Texas Instruments THMC50 / Analog Devices ADM1022"
 	depends on I2C

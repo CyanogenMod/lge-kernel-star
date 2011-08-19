@@ -102,6 +102,9 @@ extern struct platform_device tegra_grhost_device;
 extern struct platform_device tegra_spdif_device;
 extern struct platform_device tegra_avp_device;
 extern struct platform_device tegra_aes_device;
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+extern struct platform_device tegra_tsensor_device;
+#endif
 
 extern struct platform_device debug_uarta_device;
 extern struct platform_device debug_uartb_device;

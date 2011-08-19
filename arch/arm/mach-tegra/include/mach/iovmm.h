@@ -168,6 +168,9 @@ void tegra_iovmm_unzap_vm(struct tegra_iovmm_area *vm);
 /* called by clients to return an iovmm_area to the free pool for the domain */
 void tegra_iovmm_free_vm(struct tegra_iovmm_area *vm);
 
+/* returns size of largest free iovm block */
+size_t tegra_iovmm_get_max_free(struct tegra_iovmm_client *client);
+
 /* called by client software to map the page-aligned I/O address vaddr to
  * a specific physical address pfn. I/O VMA should have been created with
  * a NULL tegra_iovmm_area_ops structure. */

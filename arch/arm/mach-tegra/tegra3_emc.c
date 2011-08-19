@@ -188,6 +188,7 @@ static int tegra_emc_table_size;
 
 static u32 dram_type;
 static u32 dram_dev_num;
+static u32 emc_cfg_saved;
 
 static struct clk *emc;
 
@@ -585,6 +586,20 @@ static inline void emc_get_timing(struct tegra_emc_table *timing)
 				     EMC_CFG_PERIODIC_QRST) ? 1 : 0;
 }
 
+/* After deep sleep EMC power features are not restored.
+ * Do it at run-time after the 1st clock change.
+ */
+static inline void emc_cfg_power_restore(void)
+{
+	u32 reg = emc_readl(EMC_CFG);
+	if ((reg ^ emc_cfg_saved) & EMC_CFG_PWR_MASK) {
+		reg = (reg & (~EMC_CFG_PWR_MASK)) |
+			(emc_cfg_saved & EMC_CFG_PWR_MASK);
+		emc_writel(reg, EMC_CFG);
+		emc_timing_update();
+	}
+}
+
 /* The EMC registers have shadow registers. When the EMC clock is updated
  * in the clock controller, the shadow registers are copied to the active
  * registers, allowing glitchless memory bus frequency changes.
@@ -625,6 +640,8 @@ int tegra_emc_set_rate(unsigned long rate)
 
 	clk_setting = tegra_emc_clk_sel[i].value;
 	emc_set_clock(&tegra_emc_table[i], last_timing, clk_setting);
+	if (!emc_timing_in_sync)
+		emc_cfg_power_restore();
 	emc_timing_in_sync = true;
 	emc_last_stats_update(i);
 
@@ -720,6 +737,8 @@ void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
 	bool max_entry = false;
 	unsigned long boot_rate, max_rate;
 	const struct clk_mux_sel *sel;
+
+	emc_cfg_saved = emc_readl(EMC_CFG);
 
 	emc_stats.clkchange_count = 0;
 	spin_lock_init(&emc_stats.spinlock);

@@ -19,10 +19,15 @@
  */
 
 #include <linux/i2c.h>
+#include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/mpu.h>
 #include <linux/nct1008.h>
+#include <linux/regulator/consumer.h>
+
 #include <mach/gpio.h>
+
+#include <media/ar0832_main.h>
 #include "cpu-tegra.h"
 #include "gpio-names.h"
 #include "board-enterprise.h"
@@ -46,6 +51,16 @@ static struct i2c_board_info enterprise_i2c4_nct1008_board_info[] = {
 		.platform_data = &enterprise_nct1008_pdata,
 	}
 };
+
+static inline void enterprise_msleep(u32 t)
+{
+	/*
+	If timer value is between ( 10us - 20ms),
+	usleep_range() is recommended.
+	Please read Documentation/timers/timers-howto.txt.
+	*/
+	usleep_range(t*1000, t*1000 + 500);
+}
 
 static void enterprise_nct1008_init(void)
 {
@@ -138,11 +153,163 @@ static void enterprise_isl_init(void)
 				ARRAY_SIZE(enterprise_i2c0_isl_board_info));
 }
 
+
+static struct regulator *cam_reg;
+static struct regulator *csi_reg;
+
+static int enterprise_ar0832_power_on(void)
+{
+	int ret = 0;
+
+	csi_reg = regulator_get(NULL, "avdd_dsi_csi");
+	if (IS_ERR_OR_NULL(csi_reg)) {
+		pr_err("%s: get csi pwr err\n", __func__);
+		return PTR_ERR(cam_reg);
+	}
+
+	ret = regulator_enable(csi_reg);
+	if (ret) {
+		pr_err("%s: enable csi pwr err\n", __func__);
+		goto fail_regulator_csi_reg;
+	}
+
+	cam_reg = regulator_get(NULL, "vddio_cam");
+	if (IS_ERR_OR_NULL(cam_reg)) {
+		pr_err("%s: get cam pwr err\n", __func__);
+		return PTR_ERR(cam_reg);
+	}
+
+	ret = regulator_enable(cam_reg);
+	if (ret) {
+		pr_err("%s: enable cam pwr err\n", __func__);
+		goto fail_regulator_cam_reg;
+	}
+
+	pr_info("%s: enable 1.8V...\n", __func__);
+	gpio_set_value(CAM_LDO_1V8_EN_L_GPIO, 1);
+	enterprise_msleep(20);
+	pr_info("%s: enable 2.8V...\n", __func__);
+	gpio_set_value(CAM_LDO_2V8_EN_L_GPIO, 1);
+
+	gpio_set_value(CAM1_PWDN_GPIO, 1);
+	enterprise_msleep(5);
+	gpio_set_value(CAM1_RST_L_GPIO, 1);
+	/*
+	It takes 2400 EXTCLK for ar0832 to be ready for I2c.
+	EXTCLK is 10 ~ 24MCK. 1 ms should be enough to cover
+	at least 2400 EXTCLK within frequency range.
+	*/
+	enterprise_msleep(1);
+	return 0;
+
+fail_regulator_cam_reg:
+	regulator_put(cam_reg);
+fail_regulator_csi_reg:
+	regulator_put(csi_reg);
+
+	return ret;
+}
+
+static int enterprise_ar0832_power_off(void)
+{
+	if (cam_reg) {
+		regulator_disable(cam_reg);
+		regulator_put(cam_reg);
+	}
+	if (csi_reg) {
+		regulator_disable(csi_reg);
+		regulator_put(csi_reg);
+	}
+
+	gpio_set_value(CAM_LDO_2V8_EN_L_GPIO, 0);
+	mdelay(20);
+	gpio_set_value(CAM_LDO_1V8_EN_L_GPIO, 0);
+
+	return 0;
+}
+
+struct enterprise_cam_gpio {
+	int gpio;
+	const char *label;
+	int value;
+};
+
+#define TEGRA_CAMERA_GPIO(_gpio, _label, _value)	\
+	{						\
+		.gpio = _gpio,				\
+		.label = _label,				\
+		.value = _value,			\
+	}
+
+static struct enterprise_cam_gpio enterprise_cam_gpio_data[] = {
+	[0] = TEGRA_CAMERA_GPIO(CAM_LDO_1V8_EN_L_GPIO, "cam_ldo_1v8", 0),
+	[1] = TEGRA_CAMERA_GPIO(CAM_LDO_2V8_EN_L_GPIO, "cam_ldo_2v8", 0),
+	[2] = TEGRA_CAMERA_GPIO(CAM_CSI_MUX_SEL_GPIO, "cam_csi_sel", 1),
+
+	[3] = TEGRA_CAMERA_GPIO(CAM1_RST_L_GPIO, "cam1_rst_lo", 0),
+	[4] = TEGRA_CAMERA_GPIO(CAM1_PWDN_GPIO, "cam1_pwdn", 1),
+
+	[5] = TEGRA_CAMERA_GPIO(CAM2_RST_L_GPIO, "cam2_rst_lo", 0),
+	[6] = TEGRA_CAMERA_GPIO(CAM2_PWDN_GPIO, "cam2_pwdn", 1),
+
+	[7] = TEGRA_CAMERA_GPIO(CAM3_RST_L_GPIO, "cam3_rst_lo", 0),
+	[8] = TEGRA_CAMERA_GPIO(CAM3_PWDN_GPIO, "cam3_pwdn", 1),
+};
+
+struct ar0832_platform_data enterprise_ar0832_data = {
+	.power_on = enterprise_ar0832_power_on,
+	.power_off = enterprise_ar0832_power_off,
+};
+
+static struct i2c_board_info ar0832_i2c2_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("ar0832", 0x36),
+		.platform_data = &enterprise_ar0832_data,
+	},
+	{
+		I2C_BOARD_INFO("ar0832_focuser", 0x36),
+	},
+};
+
+static int enterprise_cam_init(void)
+{
+	int ret;
+	int i;
+
+	pr_info("%s:++\n", __func__);
+
+	for (i = 0; i < ARRAY_SIZE(enterprise_cam_gpio_data); i++) {
+		ret = gpio_request(enterprise_cam_gpio_data[i].gpio,
+				   enterprise_cam_gpio_data[i].label);
+		if (ret < 0) {
+			pr_err("%s: gpio_request failed for gpio #%d\n",
+				__func__, i);
+			goto fail_free_gpio;
+		}
+		gpio_direction_output(enterprise_cam_gpio_data[i].gpio,
+				      enterprise_cam_gpio_data[i].value);
+		gpio_export(enterprise_cam_gpio_data[i].gpio, false);
+		tegra_gpio_enable(enterprise_cam_gpio_data[i].gpio);
+	}
+
+	i2c_register_board_info(2, ar0832_i2c2_boardinfo,
+		ARRAY_SIZE(ar0832_i2c2_boardinfo));
+
+	return 0;
+
+fail_free_gpio:
+	pr_err("%s enterprise_cam_init failed!\n", __func__);
+	while (i--)
+		gpio_free(enterprise_cam_gpio_data[i].gpio);
+	return ret;
+}
+
 int __init enterprise_sensors_init(void)
 {
 	enterprise_isl_init();
 	enterprise_nct1008_init();
 	enterprise_mpuirq_init();
+	enterprise_cam_init();
 
 	return 0;
 }

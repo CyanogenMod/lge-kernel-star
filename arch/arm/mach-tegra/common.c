@@ -159,6 +159,7 @@ static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 	{ "emc",	NULL,		0,		true },
 	{ "cpu",	NULL,		0,		true },
 	{ "kfuse",	NULL,		0,		true },
+	{ "fuse",	NULL,		0,		true },
 	{ "pll_u",	NULL,		480000000,	false },
 	{ "sdmmc1",	"pll_p",	48000000,	false},
 	{ "sdmmc3",	"pll_p",	48000000,	false},
@@ -209,15 +210,10 @@ void tegra_init_cache(void)
 
 static void __init tegra_init_power(void)
 {
-	tegra_powergate_power_off(TEGRA_POWERGATE_MPE);
-	tegra_powergate_power_off(TEGRA_POWERGATE_3D);
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-	/* for TEGRA_3x_SOC it will be handled seperately */
-	tegra_powergate_power_off(TEGRA_POWERGATE_PCIE);
-#endif
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
-	tegra_powergate_power_off(TEGRA_POWERGATE_3D1);
+        tegra_powergate_partition_with_clk_off(TEGRA_POWERGATE_SATA);
 #endif
+	tegra_powergate_partition_with_clk_off(TEGRA_POWERGATE_PCIE);
 }
 
 static inline unsigned long gizmo_readl(unsigned long offset)
@@ -279,14 +275,12 @@ static void __init tegra_init_ahb_gizmo_settings(void)
 static bool console_flushed;
 
 static int tegra_pm_flush_console(struct notifier_block *this,
-	unsigned long code,
-	void *unused)
+	unsigned long code, void *unused)
 {
 	if (console_flushed)
 		return NOTIFY_NONE;
 	console_flushed = true;
 
-	printk("\n");
 	pr_emerg("Restarting %s\n", linux_banner);
 	if (console_trylock()) {
 		console_unlock();
@@ -297,9 +291,9 @@ static int tegra_pm_flush_console(struct notifier_block *this,
 
 	local_irq_disable();
 	if (!console_trylock())
-		pr_emerg("tegra_restart: Console was locked! Busting\n");
+		pr_emerg("%s: Console was locked! Busting\n", __func__);
 	else
-		pr_emerg("tegra_restart: Console was locked!\n");
+		pr_emerg("%s: Console was locked!\n", __func__);
 	console_unlock();
 	return NOTIFY_NONE;
 }
@@ -308,14 +302,8 @@ static struct notifier_block tegra_reboot_notifier = {
 	.notifier_call = tegra_pm_flush_console,
 };
 
-static void tegra_pm_restart(char mode, const char *cmd)
-{
-	arm_machine_restart(mode, cmd);
-}
-
 void __init tegra_init_early(void)
 {
-	arm_pm_restart = tegra_pm_restart;
 	register_reboot_notifier(&tegra_reboot_notifier);
 #ifndef CONFIG_SMP
 	/* For SMP system, initializing the reset handler here is too
@@ -499,7 +487,7 @@ void tegra_move_framebuffer(unsigned long to, unsigned long from,
 			goto out;
 		}
 
-		for (i = 0; i < size; i+= 4)
+		for (i = 0; i < size; i += 4)
 			writel(readl(from_io + i), to_io + i);
 
 		iounmap(from_io);
@@ -542,16 +530,15 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 				carveout_size, tegra_carveout_start);
 			tegra_carveout_start = 0;
 			tegra_carveout_size = 0;
-		}
-		else
+		} else
 			tegra_carveout_size = carveout_size;
 	}
 
 	if (fb2_size) {
 		tegra_fb2_start = memblock_end_of_DRAM() - fb2_size;
 		if (memblock_remove(tegra_fb2_start, fb2_size)) {
-			pr_err("Failed to remove second framebuffer %08lx@%08lx "
-				"from memory map\n",
+			pr_err("Failed to remove second framebuffer "
+				"%08lx@%08lx from memory map\n",
 				fb2_size, tegra_fb2_start);
 			tegra_fb2_start = 0;
 			tegra_fb2_size = 0;
@@ -606,17 +593,20 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 #endif
 
 	/*
-	 * TODO: We should copy the bootloader's framebuffer to the framebuffer
-	 * allocated above, and then free this one.
-	 */
-	if (tegra_bootloader_fb_size)
+	 * We copy the bootloader's framebuffer to the framebuffer allocated
+	 * above, and then free this one.
+	 * */
+	if (tegra_bootloader_fb_size) {
+		tegra_bootloader_fb_size = PAGE_ALIGN(tegra_bootloader_fb_size);
 		if (memblock_reserve(tegra_bootloader_fb_start,
 				tegra_bootloader_fb_size)) {
-			pr_err("Failed to reserve bootloader frame buffer %08lx@%08lx\n",
-				tegra_bootloader_fb_size, tegra_bootloader_fb_start);
+			pr_err("Failed to reserve bootloader frame buffer "
+				"%08lx@%08lx\n", tegra_bootloader_fb_size,
+				tegra_bootloader_fb_start);
 			tegra_bootloader_fb_start = 0;
 			tegra_bootloader_fb_size = 0;
 		}
+	}
 
 	pr_info("Tegra reserved memory:\n"
 		"LP0:                    %08lx - %08lx\n"
@@ -645,6 +635,15 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 		pr_info("SMMU:                   %08x - %08x\n",
 			smmu_window->start, smmu_window->end);
 #endif
+}
+
+void __init tegra_release_bootloader_fb(void)
+{
+	/* Since bootloader fb is reserved in common.c, it is freed here. */
+	if (tegra_bootloader_fb_size)
+		if (memblock_free(tegra_bootloader_fb_start,
+						tegra_bootloader_fb_size))
+			pr_err("Failed to free bootloader fb.\n");
 }
 
 #ifdef CONFIG_TEGRA_CONVSERVATIVE_GOV_ON_EARLYSUPSEND

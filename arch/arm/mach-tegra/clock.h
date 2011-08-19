@@ -91,6 +91,7 @@ struct clk_ops {
 	long		(*round_rate)(struct clk *, unsigned long);
 	int		(*clk_cfg_ex)(struct clk *, enum tegra_clk_ex_param, u32);
 	void		(*reset)(struct clk *, bool);
+	int		(*shared_bus_update)(struct clk *);
 };
 
 struct clk_stats {
@@ -227,6 +228,7 @@ unsigned long clk_get_max_rate(struct clk *c);
 unsigned long clk_get_min_rate(struct clk *c);
 unsigned long clk_get_rate_locked(struct clk *c);
 int clk_set_rate_locked(struct clk *c, unsigned long rate);
+int tegra_clk_shared_bus_update(struct clk *c);
 void tegra2_sdmmc_tap_delay(struct clk *c, int delay);
 int tegra_emc_set_rate(unsigned long rate);
 long tegra_emc_round_rate(unsigned long rate);

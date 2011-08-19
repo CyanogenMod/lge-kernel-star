@@ -24,6 +24,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/fsl_devices.h>
 #include <linux/serial_8250.h>
+#include <linux/tegra_avp.h>
 #include <asm/pmu.h>
 #include <mach/irqs.h>
 #include <mach/iomap.h>
@@ -1348,6 +1349,14 @@ struct platform_device tegra_grhost_device = {
 	.num_resources = ARRAY_SIZE(tegra_grhost_resources),
 };
 
+static struct tegra_avp_platform_data tegra_avp_pdata = {
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	.emc_clk_rate = ULONG_MAX,
+#else
+	.emc_clk_rate = 200000000,
+#endif
+};
+
 static struct resource tegra_avp_resources[] = {
 	[0] = {
 		.start	= INT_SHR_SEM_INBOX_IBF,
@@ -1364,6 +1373,7 @@ struct platform_device tegra_avp_device = {
 	.resource	= tegra_avp_resources,
 	.dev  = {
 		.coherent_dma_mask	= 0xffffffffULL,
+		.platform_data		= &tegra_avp_pdata,
 	},
 };
 
@@ -1417,6 +1427,37 @@ struct platform_device tegra_kbc_device = {
 };
 
 #if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+static struct resource tegra_tsensor_resources[]= {
+	{
+		.start 	= TEGRA_TSENSOR_BASE,
+		.end	= TEGRA_TSENSOR_BASE + TEGRA_TSENSOR_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.start	= INT_TSENSOR,
+		.end	= INT_TSENSOR,
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.start 	= TEGRA_PMC_BASE + 0x1B0,
+		/* 2 pmc registers mapped */
+		.end	= TEGRA_PMC_BASE + 0x1B0 + (2 * 4),
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+struct platform_device tegra_tsensor_device = {
+	.name	= "tegra-tsensor",
+	.id	= -1,
+	.num_resources	= ARRAY_SIZE(tegra_tsensor_resources),
+	.resource	= tegra_tsensor_resources,
+	.dev = {
+		.platform_data = 0,
+	},
+};
+#endif
+
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
 static u64 tegra_se_dma_mask = DMA_BIT_MASK(32);
 
 struct resource tegra_se_resources[] = {
@@ -1443,3 +1484,4 @@ struct platform_device tegra_se_device = {
 	.num_resources = ARRAY_SIZE(tegra_se_resources),
 };
 #endif
+

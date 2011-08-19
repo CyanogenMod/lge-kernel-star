@@ -77,9 +77,6 @@ struct tegra_dc_hdmi_data {
 
 	struct clk			*disp1_clk;
 	struct clk			*disp2_clk;
-	struct clk			*hda_clk;
-	struct clk			*hda2codec_clk;
-	struct clk			*hda2hdmicodec_clk;
 
 	struct switch_dev		hpd_switch;
 
@@ -172,8 +169,6 @@ const struct fb_videomode tegra_dc_hdmi_supported_modes[] = {
 		.vmode =	FB_VMODE_NONINTERLACED,
 		.sync = 0,
 	},
-
-#ifdef CONFIG_TEGRA_ENABLE_SUPPORT_FOR_1080p_30HZ
 	/* 1920x1080p 30Hz EIA/CEA-861-B Format 34 */
 	{
 		.xres =		1920,
@@ -188,7 +183,6 @@ const struct fb_videomode tegra_dc_hdmi_supported_modes[] = {
 		.vmode =	FB_VMODE_NONINTERLACED,
 		.sync = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 	},
-#else
 	/* 1920x1080p 59.94/60hz EIA/CEA-861-B Format 16 */
 	{
 		.xres =		1920,
@@ -203,7 +197,6 @@ const struct fb_videomode tegra_dc_hdmi_supported_modes[] = {
 		.vmode =	FB_VMODE_NONINTERLACED,
 		.sync = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 	},
-#endif
 };
 
 /* table of electrical settings, must be in acending order. */
@@ -874,29 +867,6 @@ static int tegra_dc_hdmi_init(struct tegra_dc *dc)
 		goto err_put_clock;
 	}
 
-#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
-	hdmi->hda_clk = clk_get_sys("hda", NULL);
-	if (IS_ERR_OR_NULL(hdmi->hda_clk)) {
-		dev_err(&dc->ndev->dev, "hdmi: can't get hda clock\n");
-		err = -ENOENT;
-		goto err_put_clock;
-	}
-
-	hdmi->hda2codec_clk = clk_get_sys("hda2codec_2x", NULL);
-	if (IS_ERR_OR_NULL(hdmi->hda2codec_clk)) {
-		dev_err(&dc->ndev->dev, "hdmi: can't get hda2codec clock\n");
-		err = -ENOENT;
-		goto err_put_clock;
-	}
-
-	hdmi->hda2hdmicodec_clk = clk_get_sys("hda2hdmi", NULL);
-	if (IS_ERR_OR_NULL(hdmi->hda2hdmicodec_clk)) {
-		dev_err(&dc->ndev->dev, "hdmi: can't get hda2hdmi clock\n");
-		err = -ENOENT;
-		goto err_put_clock;
-	}
-#endif
-
 	/* TODO: support non-hotplug */
 	if (request_irq(gpio_to_irq(dc->out->hotplug_gpio), tegra_dc_hdmi_irq,
 			IRQF_DISABLED | IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
@@ -964,14 +934,6 @@ err_edid_destroy:
 err_free_irq:
 	free_irq(gpio_to_irq(dc->out->hotplug_gpio), dc);
 err_put_clock:
-#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
-	if (!IS_ERR_OR_NULL(hdmi->hda2hdmicodec_clk))
-		clk_put(hdmi->hda2hdmicodec_clk);
-	if (!IS_ERR_OR_NULL(hdmi->hda2codec_clk))
-		clk_put(hdmi->hda2codec_clk);
-	if (!IS_ERR_OR_NULL(hdmi->hda_clk))
-		clk_put(hdmi->hda_clk);
-#endif
 	if (!IS_ERR_OR_NULL(disp2_clk))
 		clk_put(disp2_clk);
 	if (!IS_ERR_OR_NULL(disp1_clk))
@@ -996,11 +958,6 @@ static void tegra_dc_hdmi_destroy(struct tegra_dc *dc)
 	switch_dev_unregister(&hdmi->hpd_switch);
 	iounmap(hdmi->base);
 	release_resource(hdmi->base_res);
-#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
-	clk_put(hdmi->hda2hdmicodec_clk);
-	clk_put(hdmi->hda2codec_clk);
-	clk_put(hdmi->hda_clk);
-#endif
 	clk_put(hdmi->clk);
 	clk_put(hdmi->disp1_clk);
 	clk_put(hdmi->disp2_clk);
@@ -1440,13 +1397,6 @@ static void tegra_dc_hdmi_enable(struct tegra_dc *dc)
 	clk_enable(hdmi->disp1_clk);
 	clk_enable(hdmi->disp2_clk);
 
-#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
-	/* Enabling HDA clocks before asserting HDA PD and ELDV bits */
-	clk_enable(hdmi->hda_clk);
-	clk_enable(hdmi->hda2codec_clk);
-	clk_enable(hdmi->hda2hdmicodec_clk);
-#endif
-
 	/* back off multiplier before attaching to parent at new rate. */
 	oldrate = clk_get_rate(hdmi->clk);
 	clk_set_rate(hdmi->clk, oldrate / 2);
@@ -1642,16 +1592,12 @@ static void tegra_dc_hdmi_disable(struct tegra_dc *dc)
 
 #if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
 	tegra_hdmi_writel(hdmi, 0, HDMI_NV_PDISP_SOR_AUDIO_HDA_PRESENSE_0);
-	// sleep 1ms before disabling clocks to ensure HDA gets the interrupt
-	msleep(1);
-	clk_disable(hdmi->hda2hdmicodec_clk);
-	clk_disable(hdmi->hda2codec_clk);
-	clk_disable(hdmi->hda_clk);
 #endif
 	hdmi->eld_retrieved = false;
 	tegra_periph_reset_assert(hdmi->clk);
 	hdmi->clk_enabled = false;
 	clk_disable(hdmi->clk);
+	tegra_dvfs_set_rate(hdmi->clk, 0);
 }
 
 struct tegra_dc_out_ops tegra_dc_hdmi_ops = {

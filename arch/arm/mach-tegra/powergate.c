@@ -31,8 +31,10 @@
 #include <mach/iomap.h>
 #include <mach/powergate.h>
 
+#include "clock.h"
+
 #define PWRGATE_TOGGLE		0x30
-#define  PWRGATE_TOGGLE_START	(1 << 8)
+#define PWRGATE_TOGGLE_START	(1 << 8)
 
 #define REMOVE_CLAMPING		0x34
 
@@ -41,7 +43,7 @@
 #define MC_CLIENT_HOTRESET_CTRL	0x200
 #define MC_CLIENT_HOTRESET_STAT	0x204
 
-typedef enum {
+enum mc_client {
 	MC_CLIENT_AFI	= 0,
 	MC_CLIENT_AVPC	= 1,
 	MC_CLIENT_DC	= 2,
@@ -61,42 +63,64 @@ typedef enum {
 	MC_CLIENT_VDE	= 16,
 	MC_CLIENT_VI	= 17,
 	MC_CLIENT_LAST	= -1,
-} MC_CLIENT;
+};
+
+#define MAX_CLK_EN_NUM			4
 
 static DEFINE_SPINLOCK(tegra_powergate_lock);
 
 #define MAX_HOTRESET_CLIENT_NUM		3
 
-typedef struct {
-	const char * name;
-	MC_CLIENT hot_reset_clients[MAX_HOTRESET_CLIENT_NUM];
-	/* add clocks for each partition*/
-} powergate_partition;
+struct partition_clk_info {
+	const char *clk_name;
+	bool only_reset;
+	/* true if clk is only used in assert/deassert reset and not while enable-den*/
+	struct clk *clk_ptr;
+};
 
-static powergate_partition powergate_partition_info[TEGRA_NUM_POWERGATE] = {
-	[TEGRA_POWERGATE_CPU]	= { "cpu0",	{MC_CLIENT_LAST} },
-	[TEGRA_POWERGATE_L2]	= { "l2",	{MC_CLIENT_LAST} },
+struct powergate_partition {
+	const char *name;
+	enum mc_client hot_reset_clients[MAX_HOTRESET_CLIENT_NUM];
+	struct partition_clk_info clk_info[MAX_CLK_EN_NUM];
+};
+
+static struct powergate_partition powergate_partition_info[TEGRA_NUM_POWERGATE] = {
+	[TEGRA_POWERGATE_CPU]	= { "cpu0",	{MC_CLIENT_LAST}, },
+	[TEGRA_POWERGATE_L2]	= { "l2",	{MC_CLIENT_LAST}, },
 	[TEGRA_POWERGATE_3D]	= { "3d0",
-						{MC_CLIENT_NV, MC_CLIENT_LAST} },
+						{MC_CLIENT_NV, MC_CLIENT_LAST},
+						{{"3d", false} }, },
 	[TEGRA_POWERGATE_PCIE]	= { "pcie",
-						{MC_CLIENT_AFI, MC_CLIENT_LAST} },
+						{MC_CLIENT_AFI, MC_CLIENT_LAST},
+						{{"afi", false},
+						{"pcie", false},
+						{"pciex", true} }, },
 	[TEGRA_POWERGATE_VDEC]	= { "vde",
-						{MC_CLIENT_VDE, MC_CLIENT_LAST} },
+						{MC_CLIENT_VDE, MC_CLIENT_LAST},
+						{{"vde", false} }, },
 	[TEGRA_POWERGATE_MPE]	= { "mpe",
-						{MC_CLIENT_MPE, MC_CLIENT_LAST} },
+						{MC_CLIENT_MPE, MC_CLIENT_LAST},
+						{{"mpe", false} }, },
 	[TEGRA_POWERGATE_VENC]	= { "ve",
-						{MC_CLIENT_ISP, MC_CLIENT_VI, MC_CLIENT_LAST} },
+						{MC_CLIENT_ISP, MC_CLIENT_VI, MC_CLIENT_LAST},
+						{{"isp", false}, {"vi", false},
+						{"csi", false} }, },
 #if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
-	[TEGRA_POWERGATE_CPU1]	= { "cpu1",	{MC_CLIENT_LAST}},
-	[TEGRA_POWERGATE_CPU2]	= { "cpu2",	{MC_CLIENT_LAST}},
-	[TEGRA_POWERGATE_CPU3]	= { "cpu3",	{MC_CLIENT_LAST}},
-	[TEGRA_POWERGATE_A9LP]	= { "a9lp",	{MC_CLIENT_LAST}},
-	[TEGRA_POWERGATE_SATA]	= { "sata",
-						{MC_CLIENT_SATA, MC_CLIENT_LAST} },
+	[TEGRA_POWERGATE_CPU1]	= { "cpu1",	{MC_CLIENT_LAST}, },
+	[TEGRA_POWERGATE_CPU2]	= { "cpu2",	{MC_CLIENT_LAST}, },
+	[TEGRA_POWERGATE_CPU3]	= { "cpu3",	{MC_CLIENT_LAST}, },
+	[TEGRA_POWERGATE_A9LP]	= { "a9lp",	{MC_CLIENT_LAST}, },
+	[TEGRA_POWERGATE_SATA]	= { "sata",     {MC_CLIENT_SATA, MC_CLIENT_LAST},
+						{{"sata", false},
+						{"sata_cold", true} }, },
 	[TEGRA_POWERGATE_3D1]	= { "3d1",
-						{MC_CLIENT_NV2, MC_CLIENT_LAST} },
+						{MC_CLIENT_NV2, MC_CLIENT_LAST},
+						{{"3d2", false} }, },
 	[TEGRA_POWERGATE_HEG]	= { "heg",
-						{MC_CLIENT_G2, MC_CLIENT_EPP, MC_CLIENT_HC} },
+						{MC_CLIENT_G2, MC_CLIENT_EPP, MC_CLIENT_HC},
+						{{"2d", false}, {"epp", false},
+						{"host1x", false},
+						{"3d", true} }, },
 #endif
 };
 
@@ -128,7 +152,7 @@ static void mc_write(u32 val, unsigned long reg)
 static void mc_flush(int id)
 {
 	u32 idx, rst_ctrl, rst_stat;
-	MC_CLIENT mcClientBit;
+	enum mc_client mcClientBit;
 	unsigned long flags;
 
 	BUG_ON(id < 0 || id >= TEGRA_NUM_POWERGATE);
@@ -156,7 +180,7 @@ static void mc_flush(int id)
 static void mc_flush_done(int id)
 {
 	u32 idx, rst_ctrl;
-	MC_CLIENT mcClientBit;
+	enum mc_client mcClientBit;
 	unsigned long flags;
 
 	BUG_ON(id < 0 || id >= TEGRA_NUM_POWERGATE);
@@ -203,21 +227,19 @@ static int tegra_powergate_set(int id, bool new_state)
 	return 0;
 }
 
-int tegra_powergate_power_on(int id)
+static int unpowergate_module(int id)
 {
 	if (id < 0 || id >= TEGRA_NUM_POWERGATE)
 		return -EINVAL;
-
 	return tegra_powergate_set(id, true);
 }
 
-int tegra_powergate_power_off(int id)
+static int powergate_module(int id)
 {
 	if (id < 0 || id >= TEGRA_NUM_POWERGATE)
 		return -EINVAL;
 
 	mc_flush(id);
-
 	return tegra_powergate_set(id, false);
 }
 
@@ -235,7 +257,6 @@ bool tegra_powergate_is_powered(int id)
 int tegra_powergate_remove_clamping(int id)
 {
 	u32 mask;
-
 	if (id < 0 || id >= TEGRA_NUM_POWERGATE)
 		return -EINVAL;
 
@@ -255,43 +276,173 @@ int tegra_powergate_remove_clamping(int id)
 	return 0;
 }
 
-/* Must be called with clk disabled, and returns with clk enabled */
-static int tegra_powergate_reset_module(struct clk *clk)
+static void get_clk_info(int id)
+{
+	int idx;
+
+	for (idx = 0; idx < MAX_CLK_EN_NUM; idx++) {
+		if (!powergate_partition_info[id].clk_info[idx].clk_name)
+			break;
+		powergate_partition_info[id].
+				clk_info[idx].clk_ptr =
+					tegra_get_clock_by_name(
+			powergate_partition_info[id].clk_info[idx].clk_name);
+	}
+}
+
+static int partition_clk_enable(int id)
+{
+	int ret;
+	u32 idx;
+	struct clk *clk;
+
+	BUG_ON(id < 0 || id >= TEGRA_NUM_POWERGATE);
+
+	for (idx = 0; idx < MAX_CLK_EN_NUM; idx++) {
+		clk = powergate_partition_info[id].clk_info[idx].clk_ptr;
+		if (!clk)
+			break;
+
+		if (!powergate_partition_info[id].clk_info[idx].only_reset) {
+			ret = clk_enable(clk);
+			if (ret)
+				goto err_clk_en;
+		}
+	}
+
+	return 0;
+
+err_clk_en:
+	WARN(1, "Could not enable clk %s", clk->name);
+	while (idx--) {
+		if (!powergate_partition_info[id].clk_info[idx].only_reset) {
+			clk = powergate_partition_info[id].
+						clk_info[idx].clk_ptr;
+			clk_disable(clk);
+		}
+	}
+
+	return ret;
+}
+
+static int is_partition_clk_disabled(int id)
+{
+	u32 idx;
+	struct clk *clk;
+	int ret = 0;
+
+	BUG_ON(id < 0 || id >= TEGRA_NUM_POWERGATE);
+
+	for (idx = 0; idx < MAX_CLK_EN_NUM; idx++) {
+		clk = powergate_partition_info[id].clk_info[idx].clk_ptr;
+		if (!clk)
+			break;
+
+		if (!powergate_partition_info[id].clk_info[idx].only_reset) {
+			if (tegra_is_clk_enabled(clk)) {
+				ret = -1;
+				break;
+			}
+		}
+	}
+
+	return ret;
+}
+
+static void partition_clk_disable(int id)
+{
+	u32 idx;
+	struct clk *clk;
+
+	BUG_ON(id < 0 || id >= TEGRA_NUM_POWERGATE);
+
+	for (idx = 0; idx < MAX_CLK_EN_NUM; idx++) {
+		clk = powergate_partition_info[id].clk_info[idx].clk_ptr;
+		if (!clk)
+			break;
+
+		if (!powergate_partition_info[id].clk_info[idx].only_reset)
+			clk_disable(clk);
+	}
+}
+
+static void powergate_partition_assert_reset(int id)
+{
+	u32 idx;
+
+	BUG_ON(id < 0 || id >= TEGRA_NUM_POWERGATE);
+
+	for (idx = 0; idx < MAX_CLK_EN_NUM; idx++) {
+		if (!powergate_partition_info[id].clk_info[idx].clk_ptr)
+			break;
+		tegra_periph_reset_assert(
+			powergate_partition_info[id].
+						clk_info[idx].clk_ptr);
+		}
+}
+
+static void powergate_partition_deassert_reset(int id)
+{
+	u32 idx;
+
+	BUG_ON(id < 0 || id >= TEGRA_NUM_POWERGATE);
+
+	for (idx = 0; idx < MAX_CLK_EN_NUM; idx++) {
+		if (!powergate_partition_info[id].clk_info[idx].clk_ptr)
+			break;
+		tegra_periph_reset_deassert(
+			powergate_partition_info[id].clk_info[idx].clk_ptr);
+	}
+}
+
+/* Must be called with clk disabled, and returns with clk disabled */
+static int tegra_powergate_reset_module(int id)
 {
 	int ret;
 
-	tegra_periph_reset_assert(clk);
+	powergate_partition_assert_reset(id);
 
 	udelay(10);
 
-	ret = clk_enable(clk);
+	ret = partition_clk_enable(id);
 	if (ret)
 		return ret;
 
 	udelay(10);
 
-	tegra_periph_reset_deassert(clk);
+	powergate_partition_deassert_reset(id);
+
+	partition_clk_disable(id);
 
 	return 0;
 }
 
-/* Must be called with clk disabled, and returns with clk enabled */
-int tegra_powergate_sequence_power_up(int id, struct clk *clk)
+/*
+ * Must be called with clk disabled, and returns with clk disabled
+ * Drivers should enable clks for partition. Unpowergates only the
+ * partition.
+ */
+int tegra_unpowergate_partition(int id)
 {
 	int ret;
 
+	/* If first clk_ptr is null, fill clk info for the partition */
+	if (!powergate_partition_info[id].clk_info[0].clk_ptr)
+		get_clk_info(id);
+
 	if (tegra_powergate_is_powered(id))
-		return tegra_powergate_reset_module(clk);
+		return tegra_powergate_reset_module(id);
 
-	tegra_periph_reset_assert(clk);
-
-	ret = tegra_powergate_power_on(id);
+	ret = unpowergate_module(id);
 	if (ret)
 		goto err_power;
 
-	ret = clk_enable(clk);
+	powergate_partition_assert_reset(id);
+
+	/* Un-Powergating fails if all clks are not enabled */
+	ret = partition_clk_enable(id);
 	if (ret)
-		goto err_clk;
+		goto err_clk_on;
 
 	udelay(10);
 
@@ -300,21 +451,122 @@ int tegra_powergate_sequence_power_up(int id, struct clk *clk)
 		goto err_clamp;
 
 	udelay(10);
-	tegra_periph_reset_deassert(clk);
+	powergate_partition_deassert_reset(id);
 
 	mc_flush_done(id);
+
+	/* Disable all clks enabled earlier. Drivers should enable clks */
+	partition_clk_disable(id);
 
 	return 0;
 
 err_clamp:
-	clk_disable(clk);
-err_clk:
-	tegra_powergate_power_off(id);
+	partition_clk_disable(id);
+err_clk_on:
+	powergate_module(id);
 err_power:
+	WARN(1, "Could not Un-Powergate %d", id);
 	return ret;
 }
 
-const char* tegra_powergate_get_name(int id)
+/*
+ * Must be called with clk disabled, and returns with clk enabled
+ * Unpowergates the partition and enables all required clks.
+ */
+int tegra_unpowergate_partition_with_clk_on(int id)
+{
+	int ret = 0;
+
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	/* Restrict this functions use to few partitions */
+	BUG_ON(id != TEGRA_POWERGATE_SATA && id != TEGRA_POWERGATE_PCIE);
+#else
+	/* Restrict this functions use to few partitions */
+	BUG_ON(id != TEGRA_POWERGATE_PCIE);
+#endif
+
+	ret = tegra_unpowergate_partition(id);
+	if (ret)
+		goto err_unpowergating;
+
+	/* Enable clks for the partition */
+	ret = partition_clk_enable(id);
+	if (ret)
+		goto err_unpowergate_clk;
+
+	return ret;
+
+err_unpowergate_clk:
+	tegra_powergate_partition(id);
+	WARN(1, "Could not Un-Powergate %d, err in enabling clk", id);
+err_unpowergating:
+	WARN(1, "Could not Un-Powergate %d", id);
+	return ret;
+}
+
+/*
+ * Must be called with clk disabled. Powergates the partition only
+ */
+int tegra_powergate_partition(int id)
+{
+	int ret;
+
+	/* If first clk_ptr is null, fill clk info for the partition */
+	if (powergate_partition_info[id].clk_info[0].clk_ptr)
+		get_clk_info(id);
+	powergate_partition_assert_reset(id);
+
+	/* Powergating is done only if refcnt of all clks is 0 */
+	ret = is_partition_clk_disabled(id);
+	if (ret)
+		goto err_clk_off;
+
+	ret = powergate_module(id);
+	if (ret)
+		goto err_power_off;
+
+	return 0;
+
+err_power_off:
+	WARN(1, "Could not Powergate Partition %d", id);
+err_clk_off:
+	WARN(1, "Could not Powergate Partition %d, all clks not disabled", id);
+	return ret;
+}
+
+int tegra_powergate_partition_with_clk_off(int id)
+{
+	int ret = 0;
+
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	/* Restrict functions use to selected partitions */
+	BUG_ON(id != TEGRA_POWERGATE_PCIE && id != TEGRA_POWERGATE_SATA);
+#else
+	/* Restrict functions use to selected partitions */
+	BUG_ON(id != TEGRA_POWERGATE_PCIE);
+#endif
+	/* Disable clks for the partition */
+	partition_clk_disable(id);
+
+	ret = is_partition_clk_disabled(id);
+	if (ret)
+		goto err_powergate_clk;
+
+	ret = tegra_powergate_partition(id);
+	if (ret)
+		goto err_powergating;
+
+	return ret;
+
+err_powergate_clk:
+	WARN(1, "Could not Powergate Partition %d, all clks not disabled", id);
+err_powergating:
+	partition_clk_enable(id);
+	WARN(1, "Could not Powergate Partition %d", id);
+	return ret;
+}
+
+const char *tegra_powergate_get_name(int id)
 {
 	if (id < 0 || id >= TEGRA_NUM_POWERGATE)
 		return "invalid";

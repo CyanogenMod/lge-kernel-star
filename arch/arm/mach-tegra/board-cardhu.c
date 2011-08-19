@@ -392,7 +392,7 @@ static struct platform_device *cardhu_uart_devices[] __initdata = {
 	&tegra_uartd_device,
 	&tegra_uarte_device,
 };
-struct uart_clk_parent uart_parent_clk[] = {
+static struct uart_clk_parent uart_parent_clk[] = {
 	[0] = {.name = "pll_p"},
 	[1] = {.name = "pll_m"},
 	[2] = {.name = "clk_m"},
@@ -601,34 +601,6 @@ static int __init cardhu_touch_init(void)
 	return 0;
 }
 
-static struct usb_phy_plat_data tegra_usb_phy_pdata[] = {
-	[0] = {
-			.instance = 0,
-			.vbus_gpio = -1,
-			.vbus_reg_supply = "vdd_vbus_micro_usb",
-	},
-	[1] = {
-			.instance = 1,
-			.vbus_gpio = -1,
-	},
-	[2] = {
-			.instance = 2,
-			.vbus_gpio = -1,
-			.vbus_reg_supply = "vdd_vbus_typea_usb",
-	},
-};
-
-static struct tegra_ulpi_config uhsic_phy_config = {
-	.enable_gpio = EN_HSIC_GPIO,
-	.reset_gpio = -1,
-};
-
-static struct tegra_ehci_platform_data tegra_ehci_uhsic_pdata = {
-	.phy_type = TEGRA_USB_PHY_TYPE_HSIC,
-	.phy_config = &uhsic_phy_config,
-	.operating_mode = TEGRA_USB_HOST,
-	.power_down_on_bus_suspend = 1,
-};
 
 static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
 	[0] = {
@@ -695,13 +667,44 @@ static void tegra_usb_otg_host_unregister(struct platform_device *pdev)
 	platform_device_unregister(pdev);
 }
 
+
+#define SERIAL_NUMBER_LENGTH 20
+static char usb_serial_num[SERIAL_NUMBER_LENGTH];
+
+#ifdef CONFIG_USB_SUPPORT
+static struct usb_phy_plat_data tegra_usb_phy_pdata[] = {
+	[0] = {
+			.instance = 0,
+			.vbus_gpio = -1,
+			.vbus_reg_supply = "vdd_vbus_micro_usb",
+	},
+	[1] = {
+			.instance = 1,
+			.vbus_gpio = -1,
+	},
+	[2] = {
+			.instance = 2,
+			.vbus_gpio = -1,
+			.vbus_reg_supply = "vdd_vbus_typea_usb",
+	},
+};
+
+static struct tegra_ulpi_config uhsic_phy_config = {
+	.enable_gpio = EN_HSIC_GPIO,
+	.reset_gpio = -1,
+};
+
+static struct tegra_ehci_platform_data tegra_ehci_uhsic_pdata = {
+	.phy_type = TEGRA_USB_PHY_TYPE_HSIC,
+	.phy_config = &uhsic_phy_config,
+	.operating_mode = TEGRA_USB_HOST,
+	.power_down_on_bus_suspend = 1,
+};
+
 static struct tegra_otg_platform_data tegra_otg_pdata = {
 	.host_register = &tegra_usb_otg_host_register,
 	.host_unregister = &tegra_usb_otg_host_unregister,
 };
-
-#define SERIAL_NUMBER_LENGTH 20
-static char usb_serial_num[SERIAL_NUMBER_LENGTH];
 
 static void cardhu_usb_init(void)
 {
@@ -745,6 +748,9 @@ static void cardhu_usb_init(void)
 	platform_device_register(&rndis_device);
 #endif
 }
+#else
+static void cardhu_usb_init(void) { }
+#endif
 
 static void cardhu_gps_init(void)
 {
@@ -803,6 +809,7 @@ static void __init tegra_cardhu_init(void)
 	snprintf(usb_serial_num, sizeof(usb_serial_num), "%llx", tegra_chip_uid());
 	andusb_plat.serial_number = kstrdup(usb_serial_num, GFP_KERNEL);
 	cardhu_ramconsole_init();
+	tegra_tsensor_init();
 	platform_add_devices(cardhu_devices, ARRAY_SIZE(cardhu_devices));
 	cardhu_sdhci_init();
 	cardhu_regulator_init();
@@ -824,6 +831,7 @@ static void __init tegra_cardhu_init(void)
 	//audio_wired_jack_init();
 	cardhu_pins_state_init();
 	cardhu_emc_init();
+	tegra_release_bootloader_fb();
 }
 
 static void __init tegra_cardhu_reserve(void)

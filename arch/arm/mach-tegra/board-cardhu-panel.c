@@ -57,17 +57,19 @@
 #define cardhu_dsi_panel_reset	TEGRA_GPIO_PD2
 #endif
 
-static struct regulator *cardhu_dsi_reg = NULL;
-
 static struct regulator *cardhu_hdmi_reg = NULL;
 static struct regulator *cardhu_hdmi_pll = NULL;
 static struct regulator *cardhu_hdmi_vddio = NULL;
 
 static atomic_t sd_brightness = ATOMIC_INIT(255);
 
+#ifdef CONFIG_TEGRA_CARDHU_DSI
+static struct regulator *cardhu_dsi_reg = NULL;
+#else
 static struct regulator *cardhu_lvds_reg = NULL;
 static struct regulator *cardhu_lvds_vdd_bl = NULL;
 static struct regulator *cardhu_lvds_vdd_panel = NULL;
+#endif
 
 static struct board_info board_info;
 
@@ -152,9 +154,7 @@ static int cardhu_backlight_notify(struct device *unused, int brightness)
 	/* Set the backlight GPIO pin mode to 'backlight_enable' */
 	gpio_request(cardhu_bl_enb, "backlight_enb");
 	gpio_set_value(cardhu_bl_enb, !!brightness);
-	goto final;
-#endif
-#if DSI_PANEL_219 || DSI_PANEL_218
+#elif DSI_PANEL_219 || DSI_PANEL_218
 	/* DSIa */
 	gpio_set_value(cardhu_dsia_bl_enb, !!brightness);
 
@@ -162,7 +162,6 @@ static int cardhu_backlight_notify(struct device *unused, int brightness)
 	gpio_set_value(cardhu_dsib_bl_enb, !!brightness);
 #endif
 
-final:
 	/* SD brightness is a percentage, 8-bit value. */
 	brightness = (brightness * cur_sd_brightness) / 255;
 	if (cur_sd_brightness != 255) {
@@ -191,6 +190,7 @@ static struct platform_device cardhu_backlight_device = {
 	},
 };
 
+#ifndef CONFIG_TEGRA_CARDHU_DSI
 static int cardhu_panel_enable(void)
 {
 	if (cardhu_lvds_reg == NULL) {
@@ -246,6 +246,7 @@ static int cardhu_panel_disable(void)
 		gpio_set_value(cardhu_lvds_shutdown, 0);
 	return 0;
 }
+#endif
 
 static int cardhu_hdmi_vddio_enable(void)
 {
@@ -387,6 +388,7 @@ static struct resource cardhu_disp2_resources[] = {
 	},
 };
 
+#ifndef CONFIG_TEGRA_CARDHU_DSI
 static struct tegra_dc_mode cardhu_panel_modes[] = {
 	{
 		/* 1366x768@59Hz */
@@ -403,12 +405,13 @@ static struct tegra_dc_mode cardhu_panel_modes[] = {
 		.v_front_porch = 3,
 	},
 };
+#endif
 
 static struct tegra_dc_sd_settings cardhu_sd_settings = {
 	.enable = 0, /* Disabled by default. */
 	.use_auto_pwm = false,
 	.hw_update_delay = 0,
-	.bin_width = 0,
+	.bin_width = -1,
 	.aggressiveness = 3,
 	.use_vid_luma = true,
 	/* Default video coefficients */
@@ -416,49 +419,112 @@ static struct tegra_dc_sd_settings cardhu_sd_settings = {
 	.fc = {0, 0},
 	/* Immediate backlight changes */
 	.blp = {1024, 255},
+	/* Gammas: R: 2.2 G: 2.2 B: 2.2 */
 	/* Default BL TF */
 	.bltf = {
-			{128, 136, 144, 152},
-			{160, 168, 176, 184},
-			{192, 200, 208, 216},
-			{224, 232, 240, 248}
+			{
+				{57, 65, 74, 83},
+				{93, 103, 114, 126},
+				{138, 151, 165, 179},
+				{194, 209, 225, 242},
+			},
+			{
+				{58, 66, 75, 84},
+				{94, 105, 116, 127},
+				{140, 153, 166, 181},
+				{196, 211, 227, 244},
+			},
+			{
+				{60, 68, 77, 87},
+				{97, 107, 119, 130},
+				{143, 156, 170, 184},
+				{199, 215, 231, 248},
+			},
+			{
+				{64, 73, 82, 91},
+				{102, 113, 124, 137},
+				{149, 163, 177, 192},
+				{207, 223, 240, 255},
+			},
 		},
 	/* Default LUT */
 	.lut = {
-			{255, 255, 255},
-			{199, 199, 199},
-			{153, 153, 153},
-			{116, 116, 116},
-			{85, 85, 85},
-			{59, 59, 59},
-			{36, 36, 36},
-			{17, 17, 17},
-			{0, 0, 0}
+			{
+				{250, 250, 250},
+				{194, 194, 194},
+				{149, 149, 149},
+				{113, 113, 113},
+				{82, 82, 82},
+				{56, 56, 56},
+				{34, 34, 34},
+				{15, 15, 15},
+				{0, 0, 0},
+			},
+			{
+				{246, 246, 246},
+				{191, 191, 191},
+				{147, 147, 147},
+				{111, 111, 111},
+				{80, 80, 80},
+				{55, 55, 55},
+				{33, 33, 33},
+				{14, 14, 14},
+				{0, 0, 0},
+			},
+			{
+				{239, 239, 239},
+				{185, 185, 185},
+				{142, 142, 142},
+				{107, 107, 107},
+				{77, 77, 77},
+				{52, 52, 52},
+				{30, 30, 30},
+				{12, 12, 12},
+				{0, 0, 0},
+			},
+			{
+				{224, 224, 224},
+				{173, 173, 173},
+				{133, 133, 133},
+				{99, 99, 99},
+				{70, 70, 70},
+				{46, 46, 46},
+				{25, 25, 25},
+				{7, 7, 7},
+				{0, 0, 0},
+			},
 		},
 	.sd_brightness = &sd_brightness,
 	.bl_device = &cardhu_backlight_device,
 };
 
+#ifndef CONFIG_TEGRA_CARDHU_DSI
 static struct tegra_fb_data cardhu_fb_data = {
 	.win		= 0,
 	.xres		= 1366,
 	.yres		= 768,
 	.bits_per_pixel	= 32,
+	.flags		= TEGRA_FB_FLIP_ON_PROBE,
 };
+#endif
 
 static struct tegra_fb_data cardhu_hdmi_fb_data = {
 	.win		= 0,
 	.xres		= 1366,
 	.yres		= 768,
 	.bits_per_pixel	= 32,
+	.flags		= TEGRA_FB_FLIP_ON_PROBE,
 };
 
 static struct tegra_dc_out cardhu_disp2_out = {
 	.type		= TEGRA_DC_OUT_HDMI,
 	.flags		= TEGRA_DC_OUT_HOTPLUG_HIGH,
+	.parent_clk	= "pll_d2_out0",
 
 	.dcc_bus	= 3,
 	.hotplug_gpio	= cardhu_hdmi_hpd,
+
+	.max_pixclock	= KHZ2PICOS(148500),
 
 	.align		= TEGRA_DC_ALIGN_MSB,
 	.order		= TEGRA_DC_ORDER_RED_BLUE,
@@ -477,6 +543,7 @@ static struct tegra_dc_platform_data cardhu_disp2_pdata = {
 	.emc_clk_rate	= 300000000,
 };
 
+#ifdef CONFIG_TEGRA_CARDHU_DSI
 static int cardhu_dsi_panel_enable(void)
 {
 	int ret;
@@ -725,17 +792,18 @@ static struct tegra_fb_data cardhu_dsi_fb_data = {
 	.yres		= 480,
 	.bits_per_pixel	= 32,
 #endif
+	.flags		= TEGRA_FB_FLIP_ON_PROBE,
 };
-
+#endif
 
 static struct tegra_dc_out cardhu_disp1_out = {
 	.align		= TEGRA_DC_ALIGN_MSB,
 	.order		= TEGRA_DC_ORDER_RED_BLUE,
 	.sd_settings	= &cardhu_sd_settings,
-	.parent_clk	= "pll_p",
 
 #ifndef CONFIG_TEGRA_CARDHU_DSI
 	.type		= TEGRA_DC_OUT_RGB,
+	.parent_clk	= "pll_d_out0",
 
 	.modes	 	= cardhu_panel_modes,
 	.n_modes 	= ARRAY_SIZE(cardhu_panel_modes),
@@ -858,15 +926,10 @@ int __init cardhu_panel_init(void)
 	cardhu_carveouts[1].base = tegra_carveout_start;
 	cardhu_carveouts[1].size = tegra_carveout_size;
 
-	if (board_info.board_id == BOARD_PM269) {
+	if (board_info.board_id == BOARD_PM269)
 		gpio_request(pm269_lvds_shutdown, "lvds_shutdown");
-		gpio_direction_output(pm269_lvds_shutdown, 0);
-		tegra_gpio_enable(pm269_lvds_shutdown);
-	} else {
+	else
 		gpio_request(cardhu_lvds_shutdown, "lvds_shutdown");
-		gpio_direction_output(cardhu_lvds_shutdown, 0);
-		tegra_gpio_enable(cardhu_lvds_shutdown);
-	}
 
 	tegra_gpio_enable(cardhu_hdmi_hpd);
 	gpio_request(cardhu_hdmi_hpd, "hdmi_hpd");
@@ -886,6 +949,10 @@ int __init cardhu_panel_init(void)
 					 IORESOURCE_MEM, "fbmem");
 	res->start = tegra_fb_start;
 	res->end = tegra_fb_start + tegra_fb_size - 1;
+
+	/* Copy the bootloader fb to the fb. */
+	tegra_move_framebuffer(tegra_fb_start, tegra_bootloader_fb_start,
+				min(tegra_fb_size, tegra_bootloader_fb_size));
 
 	if (!err)
 		err = nvhost_device_register(&cardhu_disp1_device);

@@ -25,6 +25,7 @@
 #include <linux/mutex.h>
 #include <linux/slab.h>
 #include <linux/tegra_rpc.h>
+#include <linux/tegra_avp.h>
 #include <linux/types.h>
 
 #include <mach/clk.h>
@@ -50,6 +51,7 @@ enum {
 	CLK_REQUEST_VCP		= 0,
 	CLK_REQUEST_BSEA	= 1,
 	CLK_REQUEST_VDE		= 2,
+	CLK_REQUEST_AVP		= 3,
 	NUM_CLK_REQUESTS,
 };
 
@@ -59,6 +61,10 @@ struct avp_module {
 };
 
 static struct avp_module avp_modules[] = {
+	[AVP_MODULE_ID_AVP] = {
+		.name		= "cop",
+		.clk_req	= CLK_REQUEST_AVP,
+	},
 	[AVP_MODULE_ID_VCP] = {
 		.name		= "vcp",
 		.clk_req	= CLK_REQUEST_VCP,
@@ -455,11 +461,14 @@ static void do_svc_module_clock_set(struct avp_svc_info *avp_svc,
 	}
 
 	mutex_lock(&avp_svc->clk_lock);
-
-	aclk = &avp_svc->clks[mod->clk_req];
-	ret = clk_set_rate(aclk->clk, msg->clk_freq);
+	if (msg->module_id == AVP_MODULE_ID_AVP) {
+		ret = clk_set_rate(avp_svc->sclk, msg->clk_freq);
+	} else {
+		aclk = &avp_svc->clks[mod->clk_req];
+		ret = clk_set_rate(aclk->clk, msg->clk_freq);
+	}
 	if (ret) {
-		pr_err("avp_svc: Failed to set module (id = %d) frequency to %d kHz\n",
+		pr_err("avp_svc: Failed to set module (id = %d) frequency to %d Hz\n",
 			msg->module_id, msg->clk_freq);
 		resp.err = AVP_ERR_EINVAL;
 		resp.act_freq = 0;
@@ -467,7 +476,10 @@ static void do_svc_module_clock_set(struct avp_svc_info *avp_svc,
 		goto send_response;
 	}
 
-	resp.act_freq = clk_get_rate(aclk->clk);
+	if (msg->module_id == AVP_MODULE_ID_AVP)
+		resp.act_freq = clk_get_rate(avp_svc->sclk);
+	else
+		resp.act_freq = clk_get_rate(aclk->clk);
 
 	mutex_unlock(&avp_svc->clk_lock);
 	resp.err = 0;
@@ -476,6 +488,47 @@ send_response:
 	resp.svc_id = SVC_MODULE_CLOCK_SET_RESPONSE;
 	trpc_send_msg(avp_svc->rpc_node, avp_svc->cpu_ep, &resp,
 		      sizeof(resp), GFP_KERNEL);
+}
+
+static void do_svc_unsupported_msg(struct avp_svc_info *avp_svc,
+			u32 resp_svc_id)
+{
+	struct svc_common_resp resp;
+
+	resp.err = AVP_ERR_ENOTSUP;
+	resp.svc_id = resp_svc_id;
+	trpc_send_msg(avp_svc->rpc_node, avp_svc->cpu_ep, &resp,
+			sizeof(resp), GFP_KERNEL);
+}
+
+static void do_svc_module_clock_get(struct avp_svc_info *avp_svc,
+				struct svc_msg *_msg,
+				size_t len)
+{
+	struct svc_clock_ctrl *msg = (struct svc_clock_ctrl *)_msg;
+	struct svc_clock_ctrl_response resp;
+	struct avp_module *mod;
+	struct avp_clk *aclk;
+	int ret = 0;
+
+	mod = find_avp_module(avp_svc, msg->module_id);
+	if (!mod) {
+		pr_err("avp_svc: unknown module get clock requested: %d\n",
+		       msg->module_id);
+		resp.err = AVP_ERR_EINVAL;
+		goto send_response;
+	}
+
+	mutex_lock(&avp_svc->clk_lock);
+	aclk = &avp_svc->clks[mod->clk_req];
+	resp.act_freq = clk_get_rate(aclk->clk);
+	mutex_unlock(&avp_svc->clk_lock);
+	resp.err = 0;
+
+send_response:
+	resp.svc_id = SVC_MODULE_CLOCK_GET_RESPONSE;
+	trpc_send_msg(avp_svc->rpc_node, avp_svc->cpu_ep, &resp,
+			sizeof(resp), GFP_KERNEL);
 }
 
 static int dispatch_svc_message(struct avp_svc_info *avp_svc,
@@ -564,8 +617,13 @@ static int dispatch_svc_message(struct avp_svc_info *avp_svc,
 		DBG(AVP_DBG_TRACE_SVC, "%s: got module_clock_set\n", __func__);
 		do_svc_module_clock_set(avp_svc, msg, len);
 		break;
+	case SVC_MODULE_CLOCK_GET:
+		DBG(AVP_DBG_TRACE_SVC, "%s: got module_clock_get\n", __func__);
+		do_svc_module_clock_get(avp_svc, msg, len);
+		break;
 	default:
-		pr_err("avp_svc: invalid SVC call 0x%x\n", msg->svc_id);
+		pr_warning("avp_svc: Unsupported SVC call 0x%x\n", msg->svc_id);
+		do_svc_unsupported_msg(avp_svc, msg->svc_id);
 		ret = -ENOMSG;
 		break;
 	}
@@ -598,10 +656,14 @@ static int avp_svc_thread(void *data)
 		DBG(AVP_DBG_TRACE_SVC, "%s: got message\n", __func__);
 
 		if (ret == -ECONNRESET || ret == -ENOTCONN) {
+			wait_queue_head_t wq;
+			init_waitqueue_head(&wq);
+
 			pr_info("%s: AVP seems to be down; "
 				"wait for kthread_stop\n", __func__);
 			timeout = msecs_to_jiffies(100);
-			timeout = schedule_timeout_interruptible(timeout);
+			timeout = wait_event_interruptible_timeout(wq,
+					kthread_should_stop(), timeout);
 			if (timeout == 0)
 				pr_err("%s: timed out while waiting for "
 					"kthread_stop\n", __func__);
@@ -701,6 +763,7 @@ void avp_svc_stop(struct avp_svc_info *avp_svc)
 struct avp_svc_info *avp_svc_init(struct platform_device *pdev,
 				  struct trpc_node *rpc_node)
 {
+	struct tegra_avp_platform_data *pdata;
 	struct avp_svc_info *avp_svc;
 	int ret;
 	int i;
@@ -715,6 +778,8 @@ struct avp_svc_info *avp_svc_init(struct platform_device *pdev,
 	}
 
 	BUILD_BUG_ON(NUM_CLK_REQUESTS > BITS_PER_LONG);
+
+	pdata = pdev->dev.platform_data;
 
 	for (i = 0; i < NUM_AVP_MODULES; i++) {
 		struct avp_module *mod = &avp_modules[i];
@@ -741,7 +806,7 @@ struct avp_svc_info *avp_svc_init(struct platform_device *pdev,
 		ret = -ENOENT;
 		goto err_get_clks;
 	}
-	clk_set_rate(avp_svc->sclk, ULONG_MAX);
+	clk_set_rate(avp_svc->sclk, 0);
 
 	avp_svc->emcclk = clk_get(&pdev->dev, "emc");
 	if (IS_ERR(avp_svc->emcclk)) {
@@ -751,11 +816,14 @@ struct avp_svc_info *avp_svc_init(struct platform_device *pdev,
 	}
 
 	/*
-	 * The emc is a shared clock, it will be set to the highest
-	 * requested rate from any user.  Set the rate to ULONG_MAX to
-	 * always request the max rate whenever this request is enabled
+	 * The emc is a shared clock, it will be set to the rate
+	 * requested in platform data.  Set the rate to ULONG_MAX
+	 * if platform data is NULL.
 	 */
-	clk_set_rate(avp_svc->emcclk, ULONG_MAX);
+	if (pdata)
+		clk_set_rate(avp_svc->emcclk, pdata->emc_clk_rate);
+	else
+		clk_set_rate(avp_svc->emcclk, ULONG_MAX);
 
 	avp_svc->rpc_node = rpc_node;
 

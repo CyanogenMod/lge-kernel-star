@@ -36,6 +36,7 @@ struct ov2710_info {
 #define OV2710_TABLE_END 1
 #define OV2710_MAX_RETRIES 3
 
+#if 0
 static struct ov2710_reg mode_start[] = {
 	{0x3008, 0x82}, /* reset registers pg 72 */
 	{OV2710_TABLE_WAIT_MS, 5},
@@ -94,6 +95,7 @@ static struct ov2710_reg mode_start[] = {
 	{0x3613, 0x44}, /* analog pg 108 */
 	{OV2710_TABLE_END, 0x0},
 };
+#endif
 
 static struct ov2710_reg mode_1920x1080[] = {
 	{0x3103, 0x93},
@@ -290,6 +292,7 @@ static struct ov2710_reg mode_1280x720[] = {
 	{OV2710_TABLE_END, 0x0000}
 };
 
+#if 0
 static struct ov2710_reg mode_end[] = {
 	{0x3212, 0x00}, /* SRM_GROUP_ACCESS (group hold begin) */
 	{0x3003, 0x01}, /* reset DVP pg 97 */
@@ -300,6 +303,7 @@ static struct ov2710_reg mode_end[] = {
 	/*	{FAST_SETMODE_END, 0}, */
 	{OV2710_TABLE_END, 0x0000}
 };
+#endif
 
 enum {
 	OV2710_MODE_1920x1080,

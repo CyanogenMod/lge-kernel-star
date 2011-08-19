@@ -689,7 +689,7 @@ static void tegra_pcie_power_off(void)
 	tegra_periph_reset_assert(tegra_pcie.afi_clk);
 	tegra_periph_reset_assert(tegra_pcie.pex_clk);
 
-	tegra_powergate_power_off(TEGRA_POWERGATE_PCIE);
+	tegra_powergate_partition(TEGRA_POWERGATE_PCIE);
 	tegra_pcie_xclk_clamp(true);
 }
 
@@ -704,8 +704,7 @@ static int tegra_pcie_power_regate(void)
 	tegra_periph_reset_assert(tegra_pcie.pcie_xclk);
 	tegra_periph_reset_assert(tegra_pcie.afi_clk);
 
-	err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_PCIE,
-						tegra_pcie.pex_clk);
+	err = tegra_unpowergate_partition(TEGRA_POWERGATE_PCIE);
 	if (err) {
 		pr_err("PCIE: powerup sequence failed: %d\n", err);
 		return err;

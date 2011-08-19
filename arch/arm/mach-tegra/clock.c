@@ -367,10 +367,10 @@ int clk_set_parent(struct clk *c, struct clk *parent)
 	 */
 	if ((c->refcnt == 0) && (c->flags & MUX)) {
 		pr_debug("Setting parent of clock %s with refcnt 0\n", c->name);
-		disable = true;
 		ret = clk_enable_locked(c);
 		if (ret)
 			goto out;
+		disable = true;
 	}
 
 	if (clk_is_auto_dvfs(c) && c->refcnt > 0 &&
@@ -438,10 +438,10 @@ int clk_set_rate_locked(struct clk *c, unsigned long rate)
 	if ((c->refcnt == 0) && (c->flags & (DIV_U71 | DIV_U16)) &&
 		clk_is_auto_dvfs(c)) {
 		pr_debug("Setting rate of clock %s with refcnt 0\n", c->name);
-		disable = true;
 		ret = clk_enable_locked(c);
 		if (ret)
 			goto out;
+		disable = true;
 	}
 
 	if (clk_is_auto_dvfs(c) && rate > old_rate && c->refcnt > 0) {
@@ -637,6 +637,22 @@ void tegra_periph_reset_assert(struct clk *c)
 	c->ops->reset(c, true);
 }
 EXPORT_SYMBOL(tegra_periph_reset_assert);
+
+int tegra_is_clk_enabled(struct clk *c)
+{
+	return c->refcnt;
+}
+EXPORT_SYMBOL(tegra_is_clk_enabled);
+
+int tegra_clk_shared_bus_update(struct clk *c)
+{
+	int ret = 0;
+
+	if (c->ops && c->ops->shared_bus_update)
+		ret = c->ops->shared_bus_update(c);
+
+	return ret;
+}
 
 /* dvfs initialization may lower default maximum rate */
 void __init tegra_init_max_rate(struct clk *c, unsigned long max_rate)
@@ -1305,7 +1321,7 @@ static int __init clk_debugfs_init(void)
 	if (!d)
 		goto err_out;
 
-	d = debugfs_create_file("syncevents", S_IWUGO, clk_debugfs_root, NULL,
+	d = debugfs_create_file("syncevents", S_IRUGO|S_IWUSR, clk_debugfs_root, NULL,
 		&syncevent_fops);
 
 	if (dvfs_debugfs_init(clk_debugfs_root))

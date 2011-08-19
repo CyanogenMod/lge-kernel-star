@@ -251,8 +251,8 @@ struct tegra_dc_sd_settings {
 
 	struct tegra_dc_sd_fc fc;
 	struct tegra_dc_sd_blp blp;
-	u8 bltf[4][4];
-	struct tegra_dc_sd_rgb lut[9];
+	u8 bltf[4][4][4];
+	struct tegra_dc_sd_rgb lut[4][9];
 
 	atomic_t *sd_brightness;
 	struct platform_device *bl_device;

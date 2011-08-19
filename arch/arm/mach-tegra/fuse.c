@@ -354,12 +354,12 @@ static int __init tegra_bootloader_tegraid(char *str)
 	return 0;
 }
 
-static unsigned int get_chip_id(const char *val, struct kernel_param *kp)
+static unsigned int get_chip_id(char *val, struct kernel_param *kp)
 {
 	tegra_chip_id = (unsigned int)tegra_get_chipid();
 	return param_get_uint(val, kp);
 }
-static unsigned int get_chip_rev(const char *val, struct kernel_param *kp)
+static unsigned int get_chip_rev(char *val, struct kernel_param *kp)
 {
 	tegra_chip_rev = (unsigned int)tegra_get_revision();
 	return param_get_uint(val, kp);

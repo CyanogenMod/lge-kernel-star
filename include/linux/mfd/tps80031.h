@@ -26,6 +26,12 @@
 
 #include <linux/rtc.h>
 
+/* Supported chips */
+enum chips {
+	TPS80031 = 0x00000001,
+	TPS80032 = 0x00000002,
+};
+
 #define tps80031_rails(_name) "tps80031_"#_name
 
 enum {
@@ -72,6 +78,15 @@ enum {
 	TPS80031_INT_EXT_CHRG,
 	TPS80031_INT_INT_CHRG,
 	TPS80031_INT_RES2,
+	TPS80031_INT_BAT_TEMP_OVRANGE,
+	TPS80031_INT_BAT_REMOVED,
+	TPS80031_INT_VBUS_DET,
+	TPS80031_INT_VAC_DET,
+	TPS80031_INT_FAULT_WDG,
+	TPS80031_INT_LINCH_GATED,
+
+	/* Last interrupt id to get the end number */
+	TPS80031_INT_END,
 };
 
 enum {
@@ -132,5 +147,7 @@ extern int tps80031_update(struct device *dev, int sid, int reg, uint8_t val,
 extern int tps80031_force_update(struct device *dev, int sid, int reg,
 				 uint8_t val, uint8_t mask);
 extern int tps80031_power_off(void);
+
+extern unsigned long tps80031_get_chip_info(struct device *dev);
 
 #endif /*__LINUX_MFD_TPS80031_H */

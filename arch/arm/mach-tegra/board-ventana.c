@@ -38,6 +38,7 @@
 #include <linux/mfd/tps6586x.h>
 #include <linux/memblock.h>
 #include <linux/i2c/atmel_mxt_ts.h>
+#include <linux/tegra_uart.h>
 
 #include <mach/clk.h>
 #include <mach/iomap.h>
@@ -69,29 +70,6 @@ static struct platform_device tegra_usb_fsg_device = {
 	.id = -1,
 	.dev = {
 		.platform_data = &tegra_usb_fsg_platform,
-	},
-};
-
-static struct plat_serial8250_port debug_uart_platform_data[] = {
-	{
-		.membase	= IO_ADDRESS(TEGRA_UARTD_BASE),
-		.mapbase	= TEGRA_UARTD_BASE,
-		.irq		= INT_UARTD,
-		.flags		= UPF_BOOT_AUTOCONF | UPF_FIXED_TYPE,
-		.type           = PORT_TEGRA,
-		.iotype		= UPIO_MEM,
-		.regshift	= 2,
-		.uartclk	= 216000000,
-	}, {
-		.flags		= 0,
-	}
-};
-
-static struct platform_device debug_uart = {
-	.name = "serial8250",
-	.id = PLAT8250_DEV_PLATFORM,
-	.dev = {
-		.platform_data = debug_uart_platform_data,
 	},
 };
 
@@ -213,8 +191,6 @@ static inline void tegra_setup_bluesleep(void) { }
 
 static __initdata struct tegra_clk_init_table ventana_clk_init_table[] = {
 	/* name		parent		rate		enabled */
-	{ "uartd",	"pll_p",	216000000,	true},
-	{ "uartc",	"pll_m",	600000000,	false},
 	{ "blink",	"clk_32k",	32768,		false},
 	{ "pll_p_out4",	"pll_p",	24000000,	true },
 	{ "pwm",	"clk_32k",	32768,		false},
@@ -370,7 +346,79 @@ static void ventana_i2c_init(void)
 	platform_device_register(&tegra_i2c_device3);
 	platform_device_register(&tegra_i2c_device4);
 }
+static struct platform_device *ventana_uart_devices[] __initdata = {
+	&tegra_uartb_device,
+	&tegra_uartc_device,
+	&tegra_uartd_device,
+};
 
+static struct uart_clk_parent uart_parent_clk[] = {
+	[0] = {.name = "pll_p"},
+	[1] = {.name = "pll_m"},
+	[2] = {.name = "clk_m"},
+};
+
+static struct clk *debug_uart_clk;
+static struct tegra_uart_platform_data ventana_uart_pdata;
+
+static void __init uart_debug_init(void)
+{
+	unsigned long rate;
+	struct clk *c;
+
+	/* UARTD is the debug port. */
+	pr_info("Selecting UARTD as the debug console\n");
+	ventana_uart_devices[2] = &debug_uartd_device;
+	debug_uart_clk = clk_get_sys("serial8250.0", "uartd");
+
+	/* Clock enable for the debug channel */
+	if (!IS_ERR_OR_NULL(debug_uart_clk)) {
+		rate = ((struct plat_serial8250_port *)(
+			debug_uartd_device.dev.platform_data))->uartclk;
+		pr_info("The debug console clock name is %s\n",
+						debug_uart_clk->name);
+		c = tegra_get_clock_by_name("pll_p");
+		if (IS_ERR_OR_NULL(c))
+			pr_err("Not getting the parent clock pll_p\n");
+		else
+			clk_set_parent(debug_uart_clk, c);
+
+		clk_enable(debug_uart_clk);
+		clk_set_rate(debug_uart_clk, rate);
+	} else {
+		pr_err("Not getting the clock %s for debug console\n",
+					debug_uart_clk->name);
+	}
+}
+
+static void __init ventana_uart_init(void)
+{
+	int i;
+	struct clk *c;
+
+	for (i = 0; i < ARRAY_SIZE(uart_parent_clk); ++i) {
+		c = tegra_get_clock_by_name(uart_parent_clk[i].name);
+		if (IS_ERR_OR_NULL(c)) {
+			pr_err("Not able to get the clock for %s\n",
+						uart_parent_clk[i].name);
+			continue;
+		}
+		uart_parent_clk[i].parent_clk = c;
+		uart_parent_clk[i].fixed_clk_rate = clk_get_rate(c);
+	}
+	ventana_uart_pdata.parent_clk_list = uart_parent_clk;
+	ventana_uart_pdata.parent_clk_count = ARRAY_SIZE(uart_parent_clk);
+	tegra_uartb_device.dev.platform_data = &ventana_uart_pdata;
+	tegra_uartc_device.dev.platform_data = &ventana_uart_pdata;
+	tegra_uartd_device.dev.platform_data = &ventana_uart_pdata;
+
+	/* Register low speed only if it is selected */
+	if (!is_tegra_debug_uartport_hs())
+		uart_debug_init();
+
+	platform_add_devices(ventana_uart_devices,
+				ARRAY_SIZE(ventana_uart_devices));
+}
 
 #ifdef CONFIG_KEYBOARD_GPIO
 #define GPIO_KEY(_id, _gpio, _iswake)		\
@@ -435,8 +483,6 @@ static struct platform_device tegra_camera = {
 static struct platform_device *ventana_devices[] __initdata = {
 	&tegra_usb_fsg_device,
 	&androidusb_device,
-	&tegra_uartb_device,
-	&tegra_uartc_device,
 	&tegra_pmu_device,
 	&tegra_udc_device,
 	&tegra_ehci2_device,
@@ -641,12 +687,9 @@ static void __init tegra_ventana_init(void)
 	tegra_clk_init_from_table(ventana_clk_init_table);
 	ventana_pinmux_init();
 	ventana_i2c_init();
+	ventana_uart_init();
 	snprintf(usb_serial_num, sizeof(usb_serial_num), "%llx", tegra_chip_uid());
 	andusb_plat.serial_number = kstrdup(usb_serial_num, GFP_KERNEL);
-	if (is_tegra_debug_uartport_hs() == true)
-		platform_device_register(&tegra_uartd_device);
-	else
-		platform_device_register(&debug_uart);
 	tegra_ehci2_device.dev.platform_data
 		= &ventana_ehci2_ulpi_platform_data;
 	platform_add_devices(ventana_devices, ARRAY_SIZE(ventana_devices));
@@ -682,6 +725,7 @@ static void __init tegra_ventana_init(void)
 #ifdef CONFIG_BT_BLUESLEEP
 	tegra_setup_bluesleep();
 #endif
+	tegra_release_bootloader_fb();
 }
 
 int __init tegra_ventana_protected_aperture_init(void)

@@ -45,9 +45,13 @@
 #define PMC_SMPS_OFFSET_ADD	0xE0
 #define PMC_SMPS_MULT_ADD	0xE3
 
-#define STATE_OFF	0x00
-#define STATE_ON	0x01
-#define STATE_MASK	0x03
+#define STATE_OFF		0x00
+#define STATE_ON		0x01
+#define STATE_MASK		0x03
+
+#define SMPS_CMD_MASK		0xC0
+#define SMPS_VSEL_MASK		0x3F
+#define LDO_VSEL_MASK		0x1F
 
 #define TPS80031_MISC2_ADD	0xE5
 #define MISC2_LDOUSB_IN_VSYS	0x10
@@ -390,20 +394,17 @@ static int tps80031dcdc_get_voltage(struct regulator_dev *rdev)
 	struct tps80031_regulator *ri = rdev_get_drvdata(rdev);
 	struct device *parent = to_tps80031_dev(rdev);
 	uint8_t vsel = 0;
-	uint8_t force = 0;
 	int ret;
 	int voltage = 0;
 
 	if (ri->force_reg) {
-		ret = tps80031_read(parent, ri->volt_id, ri->force_reg, &force);
+		ret = tps80031_read(parent, ri->volt_id, ri->force_reg, &vsel);
 		if (ret < 0) {
 			dev_err(&rdev->dev, "Error in reading the force register\n");
 			return ret;
 		}
-		if (((force >> 6) & 0x3) == 0) {
-			vsel = force & 0x3F;
+		if ((vsel & SMPS_CMD_MASK) == 0)
 			goto decode;
-		}
 	}
 
 	ret = tps80031_read(parent, ri->volt_id, ri->volt_reg, &vsel);
@@ -413,6 +414,8 @@ static int tps80031dcdc_get_voltage(struct regulator_dev *rdev)
 	}
 
 decode:
+	vsel &= SMPS_VSEL_MASK;
+
 	switch (ri->flags) {
 	case 0:
 		if (vsel == 0)
@@ -493,7 +496,7 @@ static int tps80031ldo_list_voltage(struct regulator_dev *rdev, unsigned index)
 	if (index == 0)
 		return 0;
 
-	return (ri->min_mV + (index * 100)) * 1000;
+	return (ri->min_mV + ((index - 1) * 100)) * 1000;
 }
 
 static int __tps80031_ldo_set_voltage(struct device *parent,
@@ -537,6 +540,8 @@ static int tps80031ldo_get_voltage(struct regulator_dev *rdev)
 		dev_err(&rdev->dev, "Error in reading the Voltage register\n");
 		return ret;
 	}
+	vsel &= LDO_VSEL_MASK;
+
 	/*
 	 * Use the below formula to calculate vsel
 	 * mV = 1000mv + 100mv * (vsel - 1)
@@ -691,26 +696,26 @@ static struct tps80031_regulator tps80031_regulator[] = {
 	TPS80031_REG(SMPS4, 0x41, 0x42, 0x00, 0x44, SLAVE_ID1, 600, 2100,
 				tps80031dcdc_ops, 63, 500, 3),
 
-	TPS80031_REG(LDO1,   0x9D, 0x9E, 0x00, 0x9F, SLAVE_ID1, 1100, 3300,
-				tps80031ldo_ops, 24, 500, 8),
-	TPS80031_REG(LDO2,   0x85, 0x86, 0x00, 0x87, SLAVE_ID1, 1100, 3300,
-				tps80031ldo_ops, 24, 500, 9),
-	TPS80031_REG(LDO3,   0x8D, 0x8E, 0x00, 0x8F, SLAVE_ID1, 1100, 3300,
-				tps80031ldo_ops, 24, 500, 10),
-	TPS80031_REG(LDO4,   0x89, 0x8A, 0x00, 0x8B, SLAVE_ID1, 1100, 3300,
-				tps80031ldo_ops, 24, 500, 11),
-	TPS80031_REG(LDO5,   0x99, 0x9A, 0x00, 0x9B, SLAVE_ID1, 1100, 3300,
-				tps80031ldo_ops, 24, 500, 12),
-	TPS80031_REG(LDO6,   0x91, 0x92, 0x00, 0x93, SLAVE_ID1, 1100, 3300,
-				tps80031ldo_ops, 24, 500, 13),
-	TPS80031_REG(LDO7,   0xA5, 0xA6, 0x00, 0xA7, SLAVE_ID1, 1100, 3300,
-				tps80031ldo_ops, 24, 500, 14),
-	TPS80031_REG(LDOUSB, 0xA1, 0xA2, 0x00, 0xA3, SLAVE_ID1, 1100, 3300,
-				tps80031ldo_ops, 24, 500, 5),
-	TPS80031_REG(LDOLN,  0x95, 0x96, 0x00, 0x97, SLAVE_ID1, 1100, 3300,
-				tps80031ldo_ops, 24, 500, 15),
-	TPS80031_REG(VANA,   0x81, 0x82, 0x00, 0x83, SLAVE_ID1, 1100, 3300,
-				tps80031ldo_ops, 24, 500, -1),
+	TPS80031_REG(LDO1,   0x9D, 0x9E, 0x00, 0x9F, SLAVE_ID1, 1000, 3300,
+				tps80031ldo_ops, 25, 500, 8),
+	TPS80031_REG(LDO2,   0x85, 0x86, 0x00, 0x87, SLAVE_ID1, 1000, 3300,
+				tps80031ldo_ops, 25, 500, 9),
+	TPS80031_REG(LDO3,   0x8D, 0x8E, 0x00, 0x8F, SLAVE_ID1, 1000, 3300,
+				tps80031ldo_ops, 25, 500, 10),
+	TPS80031_REG(LDO4,   0x89, 0x8A, 0x00, 0x8B, SLAVE_ID1, 1000, 3300,
+				tps80031ldo_ops, 25, 500, 11),
+	TPS80031_REG(LDO5,   0x99, 0x9A, 0x00, 0x9B, SLAVE_ID1, 1000, 3300,
+				tps80031ldo_ops, 25, 500, 12),
+	TPS80031_REG(LDO6,   0x91, 0x92, 0x00, 0x93, SLAVE_ID1, 1000, 3300,
+				tps80031ldo_ops, 25, 500, 13),
+	TPS80031_REG(LDO7,   0xA5, 0xA6, 0x00, 0xA7, SLAVE_ID1, 1000, 3300,
+				tps80031ldo_ops, 25, 500, 14),
+	TPS80031_REG(LDOUSB, 0xA1, 0xA2, 0x00, 0xA3, SLAVE_ID1, 1000, 3300,
+				tps80031ldo_ops, 25, 500, 5),
+	TPS80031_REG(LDOLN,  0x95, 0x96, 0x00, 0x97, SLAVE_ID1, 1000, 3300,
+				tps80031ldo_ops, 25, 500, 15),
+	TPS80031_REG(VANA,   0x81, 0x82, 0x00, 0x83, SLAVE_ID1, 1000, 3300,
+				tps80031ldo_ops, 25, 500, -1),
 	TPS80031_REG(VBUS,   0x0,  0x0,  0x00, 0x0,  SLAVE_ID1, 0,    5000,
 				tps80031vbus_ops, 2, 500, -1),
 };
