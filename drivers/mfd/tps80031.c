@@ -887,6 +887,7 @@ static int dbg_tps_show(struct seq_file *s, void *unused)
 	print_regs("MASK_PH Regs",   s, SLAVE_ID1, 0x20, 0x21);
 	print_regs("CONT_STATE",     s, SLAVE_ID2, 0xE0, 0xE4);
 	print_regs("VERNUM Regs",    s, SLAVE_ID1, 0x87, 0x87);
+	print_regs("CHARGE Regs",    s, SLAVE_ID2, 0xDA, 0xF5);
 	return 0;
 }
 
