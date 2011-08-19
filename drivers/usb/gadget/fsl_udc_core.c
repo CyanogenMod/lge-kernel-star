@@ -1332,13 +1332,16 @@ static int fsl_pullup(struct usb_gadget *gadget, int is_on)
 
 	udc = container_of(gadget, struct fsl_udc, gadget);
 	udc->softconnect = (is_on != 0);
-	if (can_pullup(udc))
-		fsl_writel((fsl_readl(&dr_regs->usbcmd) | USB_CMD_RUN_STOP),
-				&dr_regs->usbcmd);
-	else
-		fsl_writel((fsl_readl(&dr_regs->usbcmd) & ~USB_CMD_RUN_STOP),
-				&dr_regs->usbcmd);
-
+	if (udc_controller->transceiver) {
+		if (udc_controller->transceiver->state == OTG_STATE_B_PERIPHERAL) {
+			if (can_pullup(udc))
+				fsl_writel((fsl_readl(&dr_regs->usbcmd) | USB_CMD_RUN_STOP),
+						&dr_regs->usbcmd);
+			else
+				fsl_writel((fsl_readl(&dr_regs->usbcmd) & ~USB_CMD_RUN_STOP),
+						&dr_regs->usbcmd);
+		}
+	}
 	return 0;
 }
 
