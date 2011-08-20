@@ -43,7 +43,7 @@
 
 /* Select panel to be used. */
 #define AVDD_LCD PMU_TCA6416_GPIO_PORT17
-#define DSI_PANEL_RESET 0
+#define DSI_PANEL_RESET 1
 
 #define enterprise_lvds_shutdown	TEGRA_GPIO_PL2
 #define enterprise_hdmi_hpd		TEGRA_GPIO_PN7
