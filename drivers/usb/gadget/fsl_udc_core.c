@@ -1314,9 +1314,8 @@ static int fsl_vbus_draw(struct usb_gadget *gadget, unsigned mA)
 	udc = container_of(gadget, struct fsl_udc, gadget);
 	/* check udc regulator is available for drawing the vbus current */
 	if (udc->vbus_regulator) {
-		/* set the current limit in uA and return */
-		return regulator_set_current_limit(
-				udc->vbus_regulator, 0, mA*1000);
+		udc->current_limit = mA;
+		schedule_work(&udc->charger_work);
 	}
 
 	if (udc->transceiver)
@@ -2058,6 +2057,19 @@ static void reset_irq(struct fsl_udc *udc)
 		udc->usb_state = USB_STATE_ATTACHED;
 	}
 #endif
+}
+
+static void fsl_udc_set_current_limit_work(struct work_struct* work)
+{
+	struct fsl_udc *udc = container_of (work, struct fsl_udc, charger_work);
+
+	/* check udc regulator is available for drawing vbus current*/
+	if (udc->vbus_regulator) {
+		/* set the current limit in uA */
+		regulator_set_current_limit(
+			udc->vbus_regulator, 0,
+			udc->current_limit *1000);
+	}
 }
 
 /*
@@ -2859,6 +2871,7 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
 
 	/* create a delayed work for detecting the USB charger */
 	INIT_DELAYED_WORK(&udc_controller->work, fsl_udc_charger_detect_work);
+	INIT_WORK(&udc_controller->charger_work, fsl_udc_set_current_limit_work);
 
 #ifdef CONFIG_USB_OTG_UTILS
 	udc_controller->transceiver = otg_get_transceiver();

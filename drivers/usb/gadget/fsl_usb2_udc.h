@@ -634,6 +634,8 @@ struct fsl_udc {
 	u8 device_address;	/* Device USB address */
 	struct delayed_work work;	/* delayed work for charger detection */
 	struct regulator *vbus_regulator;	/* regulator for drawing VBUS */
+	u32 current_limit;
+	struct work_struct charger_work; /* work for settting regulator current limit */
 };
 
 /*-------------------------------------------------------------------------*/
