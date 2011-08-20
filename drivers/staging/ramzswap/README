@@ -1,0 +1,89 @@
+ramzswap: Compressed RAM based swap device
+-------------------------------------------
+
+Project home: http://compcache.googlecode.com/
+
+* Introduction
+The ramzswap module creates RAM based block devices which can (only) be used as
+swap disks. Pages swapped to these devices are compressed and stored in memory
+itself. See project home for use cases, performance numbers and a lot more.
+
+Help page:
+  http://compcache.googlecode.com/CompilingAndUsingNew
+
+* Compiling
+  - 'make':	This will compile all modules against your kernel
+  - 'make doc':	This will compile rzscontrol manual page:
+		sub-projects/rzscontrol/man/rzscontrol.1
+  - Optional (HIGHLY RECOMMENDED):
+	- Apply the patch found in compcache/patches/ directory and just
+	  compile the kernel as usual. Currently, the patch is against 2.6.33
+	  but it should apply to slightly older kernels too. This will enable
+	  'swap free notify' feature which allows kernel to send callback to
+	  ramzswap as soon as a swap slot becomes free. So, we can immediately
+	  free memory allocated for this page, eliminating any stale data in
+	  (compressed) memory.
+	- Uncomment '#define CONFIG_SWAP_FREE_NOTIFY' in compcache/compat.h
+	  before compiling compcache against this patched kernel. Otherwise,
+          this swap notify callback will not be used.
+
+Following binaries are created:
+  - ramzswap.ko (kernel driver)
+  - sub-projects/rzscontrol/rzscontrol (userspace tool)
+
+* Using
+Following shows a typical sequence of steps for using ramzswap.
+
+  1) Load Modules:
+     # load dependency modules
+     modprobe lzo_compress
+     modprobe lzo_decompress
+
+     # example1: load ramzswap module
+     insmod ramzswap.ko num_devices=4
+
+     This creates 4 devices (/dev/ramzswap{0,1,2,3}) which are left
+     uninitialized.
+
+     # example2: load ramzswap module and initialize the first device
+     insmod ramzswap.ko num_devices=4 disksize_kb=20480
+
+     This initializes first device (/dev/ramzswap0) with disksize of 20MB.
+     Other 3 devices (/dev/ramzswap{1,2,3}) are left uninitialized.
+
+  2) Initialize:
+     Use rzscontrol utility to configure and initialize individual
+     ramzswap devices. Example:
+        rzscontrol /dev/ramzswap0 --init # uses default value of disksize_kb
+
+     *See rzscontrol manpage for more details and examples*
+
+  3) Activate:
+     swapon /dev/ramzswap2 # or any other initialized ramzswap device
+
+  4) Stats:
+     rzscontrol /dev/ramzswap2 --stats
+
+  5) Deactivate:
+     swapoff /dev/ramzswap2
+
+  6) Reset:
+     rzscontrol /dev/ramzswap2 --reset
+
+  7) Unload Modules:
+     rmmod ramzswap
+     rmmod lzo_compress
+     rmmod lzo_decompress
+
+* Common Problems
+  - If you get lots of compiler errors, make sure you have the package for
+    kernel source installed. For e.g., on Fedora its 'kernel-devel' package.
+
+
+Please consider using Issue Tracker:
+http://code.google.com/p/compcache/issues/list
+for reporting any bugs/feature requests.
+
+
+Author: Nitin Gupta (ngupta at vflare dot org)
+Last Updated: 24/1/2010

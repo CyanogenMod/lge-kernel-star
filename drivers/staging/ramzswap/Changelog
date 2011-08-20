@@ -1,0 +1,137 @@
+version 0.6.2	(25/1/2010)
+ - Sync-up with mainline version which includes changes below.
+ - Lots and lots of cleanups.
+ - Use small case for ramzswap module parameter: NUM_DEVICES -> num_devices.
+ - Add three module parameters: backing_swap, memlimit_kb and disksize_kb to
+   allow initializing the first device (/dev/ramzswap0) without using
+   rzscontrol utility (see Issue #50).
+ - Use 'struct page' instead of 32-bit PFNs in ramzswap driver and xvmalloc.
+   This is to make these 64-bit safe.
+ - xvmalloc is no longer a separate module and does not export any symbols.
+   Its compiled directly with ramzswap block driver.
+ - Removed useless {load,unload}_modules.sh scripts.
+ - Fix to make sure disksize matches usable pages in backing swap file.
+ - Fix memory leak in (rare) error condition in init_device().
+ - Fix memory leak in (rare) failure in create_device().
+ - Remove swap discard hooks. Swap notifiers makes these redundant.
+ - Unify init_device() fail path and reset_device().
+ - Do not accept backing swap with bad pages.
+ - Fix zero-page accounting.
+ - Use lock for 64-bit stats to prevent value corruption.
+ - Rewrite swap notify patch.
+ - Fix crash when reset is called when there are pending I/Os.
+
+version 0.6	(20/8/2009)
+ - Re-init notify callback to NULL on device reset.
+ - Use block_device to set notify callback.
+ - Proper locking in set_swap_free_notify() callback.
+
+version 0.6pre3	(6/8/2009)
+ - Fix invalid stats reporting on ARM (Issue 34).
+ - Add KERNEL_BUILD_PATH option to Makefile (Issue 35).
+ - Experimental support for 'swap free notification' feature.
+   See README for details.
+ - Patch for Linux kernel 2.6.31-rc5 to support notify feature.
+ - Removed compatibility with kernels older than 2.6.28. This
+   resulted in lot of cleanups.
+
+version 0.6pre2	(21/7/2009)
+ - Fix crashes on ARM (Issue 33).
+ - Close backing swap file on device reset.
+ - Do not change backing swap device block size.
+ - Reset stats on device reset.
+ - Do not allow active device to be reset.
+ - Set ramzswap SSD flag only if backing swap if SSD.
+
+version 0.6pre1	(14/7/2009)
+ - Support for multiple ramzswap devices.
+ - Support for *file* as backing swap.
+ - New rzscontrol utility to control individual
+   ramzswap devices.
+ - Manual page for rzscontrol.
+ - Removed {use,unuse}_compcache.sh scripts.
+ - Above replaced with {load,unload}_modules.sh
+   scripts as all other work is now done with rzscontrol.
+
+version 0.5.3	(8/4/2009)
+ - Major cleanups.
+ - Rename module: compcache.ko -> ramzswap.ko
+ - Rename params: backing_dev -> backing_swap
+ - Updated use_compcache.sh script with detailed
+   documentation on parameters.
+ - LZO de/compress modules are no longer packaged
+   with compcache. Most distros now include these.
+
+version 0.5.2	(11/3/2009)
+ - Can forward incompressible pages to physical swap disk.
+ - New module params:
+ 	- memlimit_kb
+	- disksize_kb
+	- backing_dev
+   See use_compcache.sh for documentation on these params.
+ - Modified use_compcache.sh script to handle new params.
+ - Detect zero-filled pages and don't allocate any memory
+   for them.
+
+version 0.5.1	(22/1/2009)
+ - Fix crash on x86 systems with higmem (mem > ~1G).
+   This required minor changes to atomic (un)map functions (see Issue #20).
+
+version 0.5	(16/1/2009)
+ - Fix crash in case compcache init fails.
+
+version 0.5pre4	(10/1/2009)
+ - Support discarding pages for freed swap blocks (requires 2.6.28-git14).
+   This feature will be disabled if compiled for older kernel.
+ - Mark ramzswap as "solid-state" block device (requires 2.6.26-git14).
+ - Fixed incorrect stats reporting in /proc/compcache (some
+   new stats added too).
+
+version 0.5pre3	(5/1/2009)
+ - Use kmap_atomic() in xvMalloc. This fixes issue #19
+ - Remove xvMapPage() and xvUnmapMap() from xvMalloc.
+
+version 0.5pre2 (28/10/2008)
+ - Alloc full page for uncompressible pages instead
+   of returning I/O error.
+ - Warn users when using ramzswap > (2 x RAM size)
+
+version 0.5pre1 (15/10/2008)
+ - Replaced TLSF with xvMalloc memory allocator
+   http://code.google.com/p/compcache/wiki/xvMalloc
+
+version 0.4	(13/8/2008)
+ - Enable debug and stats option for compcache and tlsf by default
+   proc nodes: /proc/{tlsfinfo,compcache}
+ - Fix crash when reading /proc/tlsfinfo
+ - Lots of cleanups: clean compile on x64
+
+version 0.3	(17/3/2008)
+ - Fix spurious swap read failures
+ - Better swap request filtering
+ - Swap device again renamed to /dev/ramzswap0
+   This is to prevent Ubuntu installer from presenting
+   this device as possible installation target (see Issue #5)
+ - use_compcache.sh script now waits for disk node to be created
+   instead of arbitrary sleep (see Issue #6).
+ - Modified scripts: use_compcache.sh and unuse_compcache.sh
+   to now use new device name (compcache0 -> ramzswap0).
+
+version 0.2	(3/3/2008)
+ - Fixed bug on systems with highmem
+ - Better filtering-out of non-swap requests
+ - Export statistics through proc nodes:
+   - /proc/compcache
+   - /proc/tlsfinfo
+ - Debug and Statistics support for allocator
+   and compcache can now be individually turned
+   on/off by setting DEBUG, STATS to 0/1 in
+   respective header files
+ - Swap device now renamed to /dev/compcache0
+ - Added scripts: use_compcache.sh and unuse_compcache.sh
+   See README for usage
+ - Default compcache size set to 25% of RAM
+ - Lots of code cleanups
+ - Updated README
+ - Created Changelog :)
+
