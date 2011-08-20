@@ -32,7 +32,12 @@ typedef enum {
 	STAR_GYRO			= 0x100,
 	STAR_COMPASS		= 0x200,
 	STAR_CALIBRATION	= 0x400,
-	STAR_COMPOSITE	= 0x800,	
+	STAR_COMPOSITE		= 0x800,	
+//LGE_CHANGE_S [dongjin73.kim@lge.com] 2011-03-04, [LGE_AP20] Virtual sensor supports
+	STAR_GRAVITY		= 0x1000,
+	STAR_LINEARACCEL	= 0x2000,
+	STAR_ROTATIONVECTOR	= 0x4000
+//LGE_CHANGE_E [dongjin73.kim@lge.com] 2011-03-04, [LGE_AP20] Virtual sensor supports
 } star_sensor_enum_type;
 
 
@@ -52,11 +57,15 @@ typedef enum {
 #define MOTION_IOCTL_SNAP        	    	    _IOWR(MOTION_MAGIC, 0x07, int[5])
 #define MOTION_IOCTL_FLIP        	    	    _IOWR(MOTION_MAGIC, 0x08, int[5])
 #define MOTION_IOCTL_TAP             	    	_IOWR(MOTION_MAGIC, 0x09, int[5])
-#define MOTION_IOCTL_COMPOSITE         	    _IOWR(MOTION_MAGIC, 0x0A, int[5])
+#define MOTION_IOCTL_COMPOSITE         	    	_IOWR(MOTION_MAGIC, 0x0A, int[5])
 #define MOTION_IOCTL_YAWIMAGE         	    	_IOWR(MOTION_MAGIC, 0x0B, int[5])
-#define MOTION_IOCTL_MAGNETIC_RAW      	    		_IOWR(MOTION_MAGIC, 0x10, int[5])
+#define MOTION_IOCTL_MAGNETIC_RAW      	    	_IOWR(MOTION_MAGIC, 0x10, int[5])
 #define MOTION_IOCTL_GYRO_RAW      	    		_IOWR(MOTION_MAGIC, 0x11, int[5])
-
+//LGE_CHANGE_S [dongjin73.kim@lge.com] 2011-03-04, [LGE_AP20] Virtual sensor supports
+#define MOTION_IOCTL_GRAVITY					_IOWR(MOTION_MAGIC, 0x20, int[5])
+#define MOTION_IOCTL_LINEARACCEL				_IOWR(MOTION_MAGIC, 0x21, int[5])
+#define MOTION_IOCTL_ROTVECTOR					_IOWR(MOTION_MAGIC, 0x22, int[5])
+//LGE_CHANGE_E [dongjin73.kim@lge.com] 2011-03-04, [LGE_AP20] Virtual sensor supports
 
 // for  MPL library - MPU3050 Gyroscpoe
 #define MOTION_IOCTL_ACCEL_COMPASS_SLEEP_WAKE_UP 		_IOWR(MOTION_MAGIC, 0x0C, short)

@@ -206,7 +206,6 @@ void NvCompassSetPowerRail(NvOdmServicesPmuHandle hPMUDevice, NvU32 Id, NvBool I
 		if (settletime)
 			NvOdmOsWaitUS(settletime);  // wait to settle power
 	}
-	NvOdmServicesPmuClose(hPMUDevice);
 }
 
 
@@ -356,6 +355,11 @@ NvBool NvCompassI2CSetRegs(NvOdmCompassHandle hDevice, NvU8 offset, NvU8* value,
         NvOdmI2cStatus i2c_status = NvOdmI2cStatus_Timeout;
 	NvOdmI2cTransactionInfo TransactionInfo;
 
+// LGE_CHANGE_S [dongjin73.kim@lge.com] 2011-05-28, [LGE_AP20] sensors: I2C recovery
+	if (reboot == 1)
+		return	NV_FALSE;
+// LGE_CHANGE_E [dongjin73.kim@lge.com] 2011-05-28, [LGE_AP20] sensors: I2C recovery
+
 	if ((NULL == hDevice) || (NULL == value) || (len > I2C_COMPASS_PACKET_SIZE-1)) {
 		return NV_FALSE;
 	}
@@ -403,6 +407,11 @@ NvBool NvCompassI2CGetRegs(NvOdmCompassHandle hDevice, NvU8 offset, NvU8* value,
         int i;
         NvOdmI2cStatus i2c_status = NvOdmI2cStatus_Timeout;
 	NvOdmI2cTransactionInfo TransactionInfo[2];
+
+// LGE_CHANGE_S [dongjin73.kim@lge.com] 2011-05-28, [LGE_AP20] sensors: I2C recovery
+	if (reboot == 1)
+		return	NV_FALSE;
+// LGE_CHANGE_E [dongjin73.kim@lge.com] 2011-05-28, [LGE_AP20] sensors: I2C recovery
 
 	if ((NULL == hDevice) || (NULL == value) || (len > I2C_COMPASS_PACKET_SIZE-1)) {
 		return NV_FALSE;
@@ -488,7 +497,9 @@ NvOdmCompassOpen(NvOdmCompassHandle* hDevice)
 		switch(pConnectivity->AddressList[i].Interface) {
 			case NvOdmIoModule_I2c:
 				hCompass->I2CChannelId = pConnectivity->AddressList[i].Instance;
+#if DEBUG_LOG
 				printk("## AMI304 (pConnectivity->AddressList[i].Address  i2c address = %x. (1)##\n", pConnectivity->AddressList[i].Address);
+#endif
 				hCompass->nDevAddr = (pConnectivity->AddressList[i].Address  << 1 ) ;
 				foundI2cModule = NV_TRUE;
 #if DEBUG_LOG
