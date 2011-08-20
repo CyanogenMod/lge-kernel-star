@@ -55,6 +55,8 @@ struct nvmem_create_handle {
 
 #define NVMEM_HANDLE_SECURE          (0x1ul << 2)
 
+#define NVMEM_HANDLE_NO_COKILLER   (0x1ul << 4)
+
 struct nvmem_alloc_handle {
 	__u32 handle;
 	__u32 heap_mask;
@@ -178,6 +180,8 @@ void nvmap_unpin(struct nvmap_handle **h, int num_handles);
 int nvmap_add_carveout_heap(unsigned long base, size_t size,
 	const char *name, unsigned int bitmask);
 
+int nvmap_patch_wait(struct nvmap_handle *h,
+	u32 patch_offset, u32 patch_value);
 #endif
 
 #endif
