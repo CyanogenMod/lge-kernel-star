@@ -614,7 +614,6 @@ static irqreturn_t tps80031_charge_control_irq(int irq, void *data)
 	int i;
 	u8 cont_sts;
 	u8 org_sts;
-
 	if (irq != (tps80031->irq_base + TPS80031_INT_CHRG_CTRL)) {
 		dev_err(tps80031->dev, "%s() Got the illegal interrupt %d\n",
 					__func__, irq);
@@ -633,11 +632,14 @@ static irqreturn_t tps80031_charge_control_irq(int irq, void *data)
 	 * for charge control interrupt */
 	cont_sts = org_sts ^ tps80031->prev_cont_stat1;
 	tps80031->prev_cont_stat1 = org_sts;
+	/* Clear watchdog timer state */
+	tps80031->prev_cont_stat1 &= ~(1 << 4);
 	cont_sts &= 0x5F;
 
 	for (i = 0; i < 8; ++i) {
 		if (!controller_stat1_irq_nr[i])
 			continue;
+
 		if ((cont_sts & BIT(i)) &&
 			(tps80031->irq_en & BIT(controller_stat1_irq_nr[i])))
 			handle_nested_irq(tps80031->irq_base +
@@ -735,6 +737,9 @@ static int __devinit tps80031_irq_init(struct tps80031 *tps80031, int irq,
 				"status %d\n", __func__, ret);
 		return ret;
 	}
+
+	/* Clear watch dog interrupt status in status */
+	tps80031->prev_cont_stat1 &= ~(1 << 4);
 
 	tps80031->irq_base = irq_base;
 
