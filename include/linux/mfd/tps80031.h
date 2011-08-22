@@ -116,6 +116,10 @@ struct tps80031_platform_data {
 	struct tps80031_32kclock_plat_data *clk32k_pdata;
 };
 
+struct tps80031_bg_platform_data {
+	int irq_base;
+};
+
 /*
  * NOTE: the functions below are not intended for use outside
  * of the TPS80031 sub-device drivers
