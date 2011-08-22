@@ -841,10 +841,33 @@ static struct gpio_switch_regulator_subdev_data *gswitch_subdevs_e118x[] = {
 };
 
 /* Gpio switch regulator platform data for E1198 and E1291*/
-static struct gpio_switch_regulator_subdev_data *gswitch_subdevs_e1198[] = {
+static struct gpio_switch_regulator_subdev_data *gswitch_subdevs_e1198_base[] = {
 	COMMON_GPIO_REG
 	E1291_1198_A00_GPIO_REG
 	E1198_GPIO_REG
+};
+
+static struct gpio_switch_regulator_subdev_data *gswitch_subdevs_e1198_a02[] = {
+	ADD_GPIO_REG(en_5v_cp),
+	ADD_GPIO_REG(en_5v0),
+	ADD_GPIO_REG(en_ddr_a04),
+	ADD_GPIO_REG(en_3v3_sys_a04),
+	ADD_GPIO_REG(en_3v3_modem),
+	ADD_GPIO_REG(en_vdd_pnl1),
+	ADD_GPIO_REG(cam3_ldo_en),
+	ADD_GPIO_REG(en_vdd_com),
+	ADD_GPIO_REG(en_3v3_fuse),
+	ADD_GPIO_REG(en_3v3_emmc),
+	ADD_GPIO_REG(en_vdd_sdmmc1),
+	ADD_GPIO_REG(en_3v3_pex_hvdd),
+	ADD_GPIO_REG(en_1v8_cam),
+	ADD_GPIO_REG(en_usb1_vbus_oc_a03),
+	ADD_GPIO_REG(en_usb3_vbus_oc_a03),
+	ADD_GPIO_REG(en_vdd_bl1_a03),
+	ADD_GPIO_REG(en_vdd_bl2_a03),
+	ADD_GPIO_REG(en_vddio_vid_oc),
+	ADD_GPIO_REG(cam1_ldo_en),
+	ADD_GPIO_REG(cam2_ldo_en),
 };
 
 /* Gpio switch regulator platform data for PM269*/
@@ -883,9 +906,15 @@ int __init cardhu_gpio_switch_regulator_init(void)
 	tegra_get_board_info(&board_info);
 	switch (board_info.board_id) {
 	case BOARD_E1198:
-		gswitch_pdata.num_subdevs = ARRAY_SIZE(gswitch_subdevs_e1198);
-		gswitch_pdata.subdevs = gswitch_subdevs_e1198;
+		if (board_info.fab <= BOARD_FAB_A01) {
+			gswitch_pdata.num_subdevs = ARRAY_SIZE(gswitch_subdevs_e1198_base);
+			gswitch_pdata.subdevs = gswitch_subdevs_e1198_base;
+		} else {
+			gswitch_pdata.num_subdevs = ARRAY_SIZE(gswitch_subdevs_e1198_a02);
+			gswitch_pdata.subdevs = gswitch_subdevs_e1198_a02;
+		}
 		break;
+
 	case BOARD_E1291:
 		if (board_info.fab == BOARD_FAB_A03) {
 			gswitch_pdata.num_subdevs =
@@ -897,10 +926,11 @@ int __init cardhu_gpio_switch_regulator_init(void)
 			gswitch_pdata.subdevs = gswitch_subdevs_e1291_a04;
 		} else {
 			gswitch_pdata.num_subdevs =
-					ARRAY_SIZE(gswitch_subdevs_e1198);
-			gswitch_pdata.subdevs = gswitch_subdevs_e1198;
+					ARRAY_SIZE(gswitch_subdevs_e1198_base);
+			gswitch_pdata.subdevs = gswitch_subdevs_e1198_base;
 		}
 		break;
+
 	case BOARD_PM269:
 		gswitch_pdata.num_subdevs = ARRAY_SIZE(gswitch_subdevs_pm269);
 		gswitch_pdata.subdevs = gswitch_subdevs_pm269;

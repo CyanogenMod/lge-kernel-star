@@ -520,12 +520,13 @@ int __init cardhu_pinmux_init(void)
 	tegra_get_board_info(&board_info);
 	switch (board_info.board_id) {
 	case BOARD_E1198:
-		tegra_pinmux_config_table(cardhu_pinmux_cardhu,
-					ARRAY_SIZE(cardhu_pinmux_cardhu));
 		tegra_pinmux_config_table(cardhu_pinmux_e1198,
 					ARRAY_SIZE(cardhu_pinmux_e1198));
 		tegra_pinmux_config_table(unused_pins_lowpower,
 					ARRAY_SIZE(unused_pins_lowpower));
+		if (board_info.fab >= BOARD_FAB_A02)
+			tegra_pinmux_config_table(cardhu_pinmux_cardhu_a03,
+					ARRAY_SIZE(cardhu_pinmux_cardhu_a03));
 		break;
 	case BOARD_E1291:
 		if (board_info.fab < BOARD_FAB_A03) {
