@@ -17,7 +17,6 @@
  *
  */
 
-#define DEBUG
 
 #include <linux/debugfs.h>
 #include <linux/fb.h>
@@ -173,6 +172,7 @@ int tegra_edid_parse_ext_block(u8 *raw, int idx, struct tegra_edid *edid)
 	u8 code;
 	int len;
 	int i;
+	bool basic_audio = false;
 
 	ptr = &raw[0];
 
@@ -181,6 +181,14 @@ int tegra_edid_parse_ext_block(u8 *raw, int idx, struct tegra_edid *edid)
 		if (*ptr <= 3)
 			edid->eld.eld_ver = 0x02;
 		edid->eld.cea_edid_ver = ptr[1];
+
+		/* check for basic audio support in CEA 861 block */
+		if(raw[3] & (1<<6)) {
+			/* For basic audio, set spk_alloc to Left+Right.
+			 * If there is a Speaker Alloc block this will
+			 * get over written with that value */
+			basic_audio = true;
+		}
 	}
 	ptr = &raw[4];
 
@@ -205,6 +213,9 @@ int tegra_edid_parse_ext_block(u8 *raw, int idx, struct tegra_edid *edid)
 				edid->eld.sad[i] = ptr[i + 1];
 			len++;
 			ptr += len; /* adding the header */
+			/* Got an audio data block so enable audio */
+			if(basic_audio == true)
+				edid->eld.spk_alloc = 1;
 			break;
 		}
 		/* case 2 is commented out for now */
@@ -278,10 +289,12 @@ int tegra_edid_mode_support_stereo(struct fb_videomode *mode)
 	if (!mode)
 		return 0;
 
-	if (mode->xres == 1280 && mode->yres == 720 && mode->refresh == 60)
+	if (mode->xres == 1280 &&
+		mode->yres == 720 &&
+		((mode->refresh == 60) || (mode->refresh == 50)))
 		return 1;
 
-	if (mode->xres == 1280 && mode->yres == 720 && mode->refresh == 50)
+	if (mode->xres == 1920 && mode->yres == 1080 && mode->refresh == 24)
 		return 1;
 
 	return 0;

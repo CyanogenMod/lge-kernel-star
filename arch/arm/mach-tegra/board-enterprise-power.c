@@ -28,11 +28,14 @@
 #include <linux/gpio.h>
 #include <linux/io.h>
 
+#include <mach/edp.h>
 #include <mach/iomap.h>
 #include <mach/irqs.h>
 #include <mach/pinmux.h>
+#include <mach/tsensor.h>
 
 #include "gpio-names.h"
+#include "board.h"
 #include "board-enterprise.h"
 #include "pm.h"
 #include "wakeups-t3.h"
@@ -46,21 +49,30 @@ static struct regulator_consumer_supply tps80031_vio_supply[] = {
 	REGULATOR_SUPPLY("avdd_osc", NULL),
 	REGULATOR_SUPPLY("vddio_sys", NULL),
 	REGULATOR_SUPPLY("vddio_uart", NULL),
+	REGULATOR_SUPPLY("pwrdet_uart", NULL),
 	REGULATOR_SUPPLY("vddio_lcd", NULL),
+	REGULATOR_SUPPLY("pwrdet_lcd", NULL),
 	REGULATOR_SUPPLY("vddio_audio", NULL),
+	REGULATOR_SUPPLY("pwrdet_audio", NULL),
 	REGULATOR_SUPPLY("vddio_bb", NULL),
+	REGULATOR_SUPPLY("pwrdet_bb", NULL),
 	REGULATOR_SUPPLY("vddio_gmi", NULL),
 	REGULATOR_SUPPLY("avdd_usb_pll", NULL),
 	REGULATOR_SUPPLY("vddio_cam", NULL),
+	REGULATOR_SUPPLY("pwrdet_cam", NULL),
 	REGULATOR_SUPPLY("vddio_sdmmc1", NULL),
+	REGULATOR_SUPPLY("pwrdet_sdmmc1", NULL),
 	REGULATOR_SUPPLY("vddio_sdmmc4", NULL),
+	REGULATOR_SUPPLY("pwrdet_sdmmc4", NULL),
 	REGULATOR_SUPPLY("avdd_hdmi_pll", NULL),
 	REGULATOR_SUPPLY("vddio_gps", NULL),
 	REGULATOR_SUPPLY("vdd_lcd_buffered", NULL),
 	REGULATOR_SUPPLY("vddio_nand", NULL),
+	REGULATOR_SUPPLY("pwrdet_nand", NULL),
 	REGULATOR_SUPPLY("vddio_sd", NULL),
 	REGULATOR_SUPPLY("vdd_bat", NULL),
 	REGULATOR_SUPPLY("vdd_io", NULL),
+	REGULATOR_SUPPLY("pwrdet_pex_ctl", NULL),
 };
 
 static struct regulator_consumer_supply tps80031_smps1_supply[] = {
@@ -80,6 +92,7 @@ static struct regulator_consumer_supply tps80031_smps3_supply[] = {
 
 static struct regulator_consumer_supply tps80031_smps4_supply[] = {
 	REGULATOR_SUPPLY("vddio_sdmmc_2v85", NULL),
+	REGULATOR_SUPPLY("pwrdet_sdmmc3", NULL),
 };
 
 static struct regulator_consumer_supply tps80031_vana_supply[] = {
@@ -88,6 +101,7 @@ static struct regulator_consumer_supply tps80031_vana_supply[] = {
 
 static struct regulator_consumer_supply tps80031_ldo1_supply[] = {
 	REGULATOR_SUPPLY("avdd_dsi_csi", NULL),
+	REGULATOR_SUPPLY("pwrdet_mipi", NULL),
 };
 
 static struct regulator_consumer_supply tps80031_ldo2_supply[] = {
@@ -181,7 +195,7 @@ TPS_PDATA_INIT(vana,  1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
 TPS_PDATA_INIT(vbus,  0, 5000, 0, 0, 0, 0, -1, 0, 0, VBUS_SW_ONLY);
 
 static struct tps80031_rtc_platform_data rtc_data = {
-	.irq = TPS80031_IRQ_BASE + TPS80031_INT_RTC_ALARM,
+	.irq = ENT_TPS80031_IRQ_BASE + TPS80031_INT_RTC_ALARM,
 	.time = {
 		.tm_year = 2011,
 		.tm_mon = 0,
@@ -232,14 +246,14 @@ struct tps80031_32kclock_plat_data clk32k_pdata = {
 static struct tps80031_platform_data tps_platform = {
 	.num_subdevs	= ARRAY_SIZE(tps80031_devs),
 	.subdevs	= tps80031_devs,
-	.irq_base	= TPS80031_IRQ_BASE,
-	.gpio_base	= TPS80031_GPIO_BASE,
+	.irq_base	= ENT_TPS80031_IRQ_BASE,
+	.gpio_base	= ENT_TPS80031_GPIO_BASE,
 	.clk32k_pdata	= &clk32k_pdata,
 };
 
 static struct i2c_board_info __initdata enterprise_regulators[] = {
 	{
-		I2C_BOARD_INFO("tps80031", 0x48),
+		I2C_BOARD_INFO("tps80031", 0x4A),
 		.irq		= INT_EXTERNAL_PMU,
 		.platform_data	= &tps_platform,
 	},
@@ -270,7 +284,7 @@ static int gpio_switch_pmu_hdmi_5v0_en_voltages[] = {5000};
 
 /* LCD-D16 (GPIO M0) from T30*/
 static struct regulator_consumer_supply gpio_switch_vdd_fuse_en_supply[] = {
-	REGULATOR_SUPPLY("vpp_fuse", NULL),
+	REGULATOR_SUPPLY("vdd_fuse", NULL),
 };
 static int gpio_switch_vdd_fuse_en_voltages[] = {3300};
 
@@ -279,17 +293,28 @@ static struct regulator_consumer_supply gpio_switch_sdmmc3_vdd_sel_supply[] = {
 	REGULATOR_SUPPLY("vddio_sdmmc3_2v85_1v8", NULL),
 	REGULATOR_SUPPLY("sdmmc3_compu_pu", NULL),
 	REGULATOR_SUPPLY("vddio_sdmmc3", NULL),
+	REGULATOR_SUPPLY("vsys_3v7", NULL),
 };
 static int gpio_switch_sdmmc3_vdd_sel_voltages[] = {2850};
 
 /* LCD-D23 (GPIO M7) from T30*/
+/* 2-0036 is dev_name of ar0832 */
+/* 2-0010 is dev_name of ov9726 */
 static struct regulator_consumer_supply gpio_switch_cam_ldo_2v8_en_supply[] = {
+	REGULATOR_SUPPLY("vaa", "2-0036"),
+	REGULATOR_SUPPLY("vaa", "2-0032"),
+	REGULATOR_SUPPLY("avdd", "2-0010"),
 	REGULATOR_SUPPLY("vdd_2v8_cam", NULL),
 };
 static int gpio_switch_cam_ldo_2v8_en_voltages[] = {2800};
 
 /* LCD-D9 (GPIO F1) from T30*/
+/* 2-0036 is dev_name of ar0832 */
+/* 2-0010 is dev_name of ov9726 */
 static struct regulator_consumer_supply gpio_switch_cam_ldo_1v8_en_supply[] = {
+	REGULATOR_SUPPLY("vdd", "2-0036"),
+	REGULATOR_SUPPLY("vdd", "2-0032"),
+	REGULATOR_SUPPLY("dovdd", "2-0010"),
 	REGULATOR_SUPPLY("vdd_1v8_cam", NULL),
 };
 static int gpio_switch_cam_ldo_1v8_en_voltages[] = {1800};
@@ -322,14 +347,14 @@ static int gpio_switch_cam_ldo_1v8_en_voltages[] = {1800};
 		.disable_rail = _disable,				\
 	}
 
-GREG_INIT(0, pmu_5v15_en,     NULL,      TPS80031_GPIO_REGEN1, false, 0, 0, 0, 0);
-GREG_INIT(1, pmu_3v3_en,      "vdd_5v15", TPS80031_GPIO_REGEN2, false, 0, 0, 0, 0);
-GREG_INIT(2, pmu_hdmi_5v0_en, "vdd_5v15", TPS80031_GPIO_SYSEN, false, 0, 0, 0, 0);
+GREG_INIT(0, pmu_5v15_en,     NULL,      ENT_TPS80031_GPIO_REGEN1, false, 0, 0, 0, 0);
+GREG_INIT(1, pmu_3v3_en,      "vdd_5v15", ENT_TPS80031_GPIO_REGEN2, false, 0, 0, 0, 0);
+GREG_INIT(2, pmu_hdmi_5v0_en, "vdd_5v15", ENT_TPS80031_GPIO_SYSEN, false, 0, 0, 0, 0);
 
-GREG_INIT(3, vdd_fuse_en,    "avdd_usb_hdmi_3v3", TEGRA_GPIO_PM0, false, 0, 0, 0, 0);
+GREG_INIT(3, vdd_fuse_en, "avdd_usb_hdmi_3v3", TEGRA_GPIO_PM0, false, 0, 0, 0, 0);
 GREG_INIT(4, sdmmc3_vdd_sel, "vddio_sdmmc_2v85", TEGRA_GPIO_PM1, false, 0, 0, 0, 0);
-GREG_INIT(5, cam_ldo_2v8_en,    NULL, TEGRA_GPIO_PM7, false, 0, 0, 0, 0);
-GREG_INIT(6, cam_ldo_1v8_en,    NULL, TEGRA_GPIO_PF1, false, 0, 0, 0, 0);
+GREG_INIT(5, cam_ldo_2v8_en, NULL, TEGRA_GPIO_PM7, false, 0, 0, 0, 0);
+GREG_INIT(6, cam_ldo_1v8_en, NULL, TEGRA_GPIO_PF1, false, 0, 0, 0, 0);
 
 #define ADD_GPIO_REG(_name)	(&gpio_pdata_##_name)
 static struct gpio_switch_regulator_subdev_data *gswitch_subdevs[] = {
@@ -377,6 +402,11 @@ static void enterprise_power_off(void)
 	while(1);
 }
 
+void __init enterprise_tsensor_init(void)
+{
+	tegra3_tsensor_init(NULL);
+}
+
 int __init enterprise_regulator_init(void)
 {
 	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
@@ -394,18 +424,50 @@ int __init enterprise_regulator_init(void)
 	return 0;
 }
 
+static void enterprise_board_suspend(int lp_state, enum suspend_stage stg)
+{
+	if ((lp_state == TEGRA_SUSPEND_LP1) && (stg == TEGRA_SUSPEND_BEFORE_CPU))
+		tegra_console_uart_suspend();
+}
+
+static void enterprise_board_resume(int lp_state, enum resume_stage stg)
+{
+	if ((lp_state == TEGRA_SUSPEND_LP1) && (stg == TEGRA_RESUME_AFTER_CPU))
+		tegra_console_uart_resume();
+}
+
 static struct tegra_suspend_platform_data enterprise_suspend_data = {
 	.cpu_timer	= 2000,
 	.cpu_off_timer	= 200,
-	.suspend_mode	= TEGRA_SUSPEND_LP1,
+	.suspend_mode	= TEGRA_SUSPEND_LP0,
 	.core_timer	= 0x7e7e,
 	.core_off_timer = 0,
 	.corereq_high	= true,
 	.sysclkreq_high	= true,
+	.board_suspend = enterprise_board_suspend,
+	.board_resume = enterprise_board_resume,
 };
+
+static void enterprise_init_deep_sleep_mode(void)
+{
+	struct board_info bi;
+	tegra_get_board_info(&bi);
+	if (bi.board_id == BOARD_1205 && bi.fab == ENTERPRISE_FAB_A01)
+		enterprise_suspend_data.suspend_mode = TEGRA_SUSPEND_LP1;
+}
 
 int __init enterprise_suspend_init(void)
 {
+	enterprise_init_deep_sleep_mode();
 	tegra_init_suspend(&enterprise_suspend_data);
 	return 0;
 }
+
+#ifdef CONFIG_TEGRA_EDP_LIMITS
+
+int __init enterprise_edp_init(void)
+{
+	tegra_init_cpu_edp_limits(2500); /* 2.5A regulator */
+	return 0;
+}
+#endif

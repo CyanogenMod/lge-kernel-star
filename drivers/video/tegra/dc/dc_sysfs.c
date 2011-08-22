@@ -1,3 +1,23 @@
+/*
+ * drivers/video/tegra/dc/dc_sysfs.c
+ *
+ * Copyright (c) 2011, NVIDIA Corporation.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ */
+
 #include <linux/platform_device.h>
 #include <linux/kernel.h>
 
@@ -8,9 +28,6 @@
 #include "dc_priv.h"
 #include "nvsd.h"
 
-/****************
- * Current mode *
- ****************/
 static ssize_t mode_show(struct device *device,
 	struct device_attribute *attr, char *buf)
 {
@@ -47,9 +64,6 @@ static ssize_t mode_show(struct device *device,
 
 static DEVICE_ATTR(mode, S_IRUGO, mode_show, NULL);
 
-/*******************
- * DC Stat Enabled *
- *******************/
 static ssize_t stats_enable_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
@@ -86,10 +100,6 @@ static ssize_t stats_enable_store(struct device *dev,
 static DEVICE_ATTR(stats_enable, S_IRUGO|S_IWUSR,
 	stats_enable_show, stats_enable_store);
 
-
-/**************
- * DC Enabled *
- **************/
 static ssize_t enable_show(struct device *device,
 	struct device_attribute *attr, char *buf)
 {
@@ -123,6 +133,53 @@ static ssize_t enable_store(struct device *dev,
 }
 
 static DEVICE_ATTR(enable, S_IRUGO|S_IWUSR, enable_show, enable_store);
+
+static ssize_t crc_checksum_latched_show(struct device *device,
+	struct device_attribute *attr, char *buf)
+{
+	struct nvhost_device *ndev = to_nvhost_device(device);
+	struct tegra_dc *dc = nvhost_get_drvdata(ndev);
+
+	u32 crc;
+
+	if (!dc->enabled) {
+		dev_err(&dc->ndev->dev, "Failed to get dc.\n");
+		return -EFAULT;
+	}
+
+	crc = tegra_dc_read_checksum_latched(dc);
+
+	return snprintf(buf, PAGE_SIZE, "%u", crc);
+}
+
+static ssize_t crc_checksum_latched_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct nvhost_device *ndev = to_nvhost_device(dev);
+	struct tegra_dc *dc = nvhost_get_drvdata(ndev);
+	unsigned long val = 0;
+
+	if (!dc->enabled) {
+		dev_err(&dc->ndev->dev, "Failed to get dc.\n");
+		return -EFAULT;
+	}
+
+	if (strict_strtoul(buf, 10, &val) < 0)
+		return -EINVAL;
+
+	if (val == 1) {
+		tegra_dc_enable_crc(dc);
+		dev_err(&dc->ndev->dev, "crc is enabled.\n");
+	} else if (val == 0) {
+		tegra_dc_disable_crc(dc);
+		dev_err(&dc->ndev->dev, "crc is disabled.\n");
+	} else
+		dev_err(&dc->ndev->dev, "Invalid input.\n");
+
+	return count;
+}
+static DEVICE_ATTR(crc_checksum_latched, S_IRUGO|S_IWUSR|S_IWGRP,
+		crc_checksum_latched_show, crc_checksum_latched_store);
 
 #define ORIENTATION_PORTRAIT	"portrait"
 #define ORIENTATION_LANDSCAPE	"landscape"
@@ -173,7 +230,7 @@ static ssize_t orientation_3d_store(struct device *dev,
 }
 
 static DEVICE_ATTR(stereo_orientation,
-	S_IRUGO|S_IWUGO, orientation_3d_show, orientation_3d_store);
+	S_IRUGO|S_IWUSR, orientation_3d_show, orientation_3d_store);
 
 #define MODE_2D		"2d"
 #define MODE_3D		"3d"
@@ -223,30 +280,26 @@ static ssize_t mode_3d_store(struct device *dev,
 }
 
 static DEVICE_ATTR(stereo_mode,
-	S_IRUGO|S_IWUGO, mode_3d_show, mode_3d_store);
+	S_IRUGO|S_IWUSR, mode_3d_show, mode_3d_store);
 
-
-/********
- * Init *
- ********/
 void __devexit tegra_dc_remove_sysfs(struct device *dev)
 {
 	struct nvhost_device *ndev = to_nvhost_device(dev);
 	struct tegra_dc *dc = nvhost_get_drvdata(ndev);
 	struct tegra_dc_sd_settings *sd_settings = dc->out->sd_settings;
 
-	device_remove_file(dev, &dev_attr_stats_enable);
 	device_remove_file(dev, &dev_attr_mode);
 	device_remove_file(dev, &dev_attr_enable);
+	device_remove_file(dev, &dev_attr_stats_enable);
+	device_remove_file(dev, &dev_attr_crc_checksum_latched);
 
 	if (dc->out->stereo) {
 		device_remove_file(dev, &dev_attr_stereo_orientation);
 		device_remove_file(dev, &dev_attr_stereo_mode);
 	}
 
-	if(sd_settings) {
+	if (sd_settings)
 		nvsd_remove_sysfs(dev);
-	}
 }
 
 void tegra_dc_create_sysfs(struct device *dev)
@@ -259,18 +312,16 @@ void tegra_dc_create_sysfs(struct device *dev)
 	error |= device_create_file(dev, &dev_attr_mode);
 	error |= device_create_file(dev, &dev_attr_enable);
 	error |= device_create_file(dev, &dev_attr_stats_enable);
+	error |= device_create_file(dev, &dev_attr_crc_checksum_latched);
 
 	if (dc->out->stereo) {
 		error |= device_create_file(dev, &dev_attr_stereo_orientation);
 		error |= device_create_file(dev, &dev_attr_stereo_mode);
 	}
 
-	if(sd_settings) {
+	if (sd_settings)
 		error |= nvsd_create_sysfs(dev);
-	}
 
-	if(error) {
-		printk("Failed to create sysfs attributes!\n");
-	}
+	if (error)
+		dev_err(&ndev->dev, "Failed to create sysfs attributes!\n");
 }
-

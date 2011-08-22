@@ -5,6 +5,9 @@
  * Author: Dima Zavin <dima@android.com>
  *         Colin Cross <ccross@android.com>
  *
+ * Copyright (C) 2010-2011 Nvidia Graphics Pvt. Ltd.
+ * http://www.nvidia.com
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -17,8 +20,6 @@
  * Derived from: drivers/mtd/nand/nand_base.c
  *               drivers/mtd/nand/pxa3xx.c
  *
- * TODO:
- *      - Add support for 16bit bus width
  */
 
 #include <linux/delay.h>
@@ -35,6 +36,7 @@
 #include <linux/types.h>
 #include <linux/clk.h>
 #include <linux/slab.h>
+#include <linux/gpio.h>
 
 #include <mach/nand.h>
 
@@ -64,66 +66,75 @@
 #define SCAN_TIMING_VAL		0x3f0bd214
 #define SCAN_TIMING2_VAL	0xb
 
+#define TIMEOUT (2 * HZ)
 /* TODO: pull in the register defs (fields, masks, etc) from Nvidia files
  * so we don't have to redefine them */
 
 #ifdef CONFIG_MTD_PARTITIONS
-static const char *part_probes[] = { "cmdlinepart", NULL,  };
+static const char *part_probes[] = { "cmdlinepart", NULL, };
 #endif
 
 struct tegra_nand_chip {
-	spinlock_t		lock;
-	uint32_t		chipsize;
-	int			num_chips;
-	int			curr_chip;
+	spinlock_t lock;
+	uint32_t chipsize;
+	int num_chips;
+	int curr_chip;
 
 	/* addr >> chip_shift == chip number */
-	uint32_t		chip_shift;
+	uint32_t chip_shift;
 	/* (addr >> page_shift) & page_mask == page number within chip */
-	uint32_t		page_shift;
-	uint32_t		page_mask;
+	uint32_t page_shift;
+	uint32_t page_mask;
 	/* column within page */
-	uint32_t		column_mask;
+	uint32_t column_mask;
 	/* addr >> block_shift == block number (across the whole mtd dev, not
 	 * just a single chip. */
-	uint32_t		block_shift;
+	uint32_t block_shift;
 
-	void			*priv;
+	void *priv;
 };
 
 struct tegra_nand_info {
-	struct tegra_nand_chip		chip;
-	struct mtd_info			mtd;
-	struct tegra_nand_platform	*plat;
-	struct device			*dev;
-	struct mtd_partition		*parts;
+	struct tegra_nand_chip chip;
+	struct mtd_info mtd;
+	struct tegra_nand_platform *plat;
+	struct device *dev;
+	struct mtd_partition *parts;
 
 	/* synchronizes access to accessing the actual NAND controller */
-	struct mutex			lock;
+	struct mutex lock;
+	/* partial_unaligned_rw_buffer is temporary buffer used during
+	   reading of unaligned data from nand pages or if data to be read
+	   is less than nand page size.
+	 */
+	uint8_t *partial_unaligned_rw_buffer;
 
-
-	void				*oob_dma_buf;
-	dma_addr_t			oob_dma_addr;
+	void *oob_dma_buf;
+	dma_addr_t oob_dma_addr;
 	/* ecc error vector info (offset into page and data mask to apply */
-	void				*ecc_buf;
-	dma_addr_t			ecc_addr;
+	void *ecc_buf;
+	dma_addr_t ecc_addr;
 	/* ecc error status (page number, err_cnt) */
-	uint32_t			*ecc_errs;
-	uint32_t			num_ecc_errs;
-	uint32_t			max_ecc_errs;
-	spinlock_t			ecc_lock;
+	uint32_t *ecc_errs;
+	uint32_t num_ecc_errs;
+	uint32_t max_ecc_errs;
+	spinlock_t ecc_lock;
 
-	uint32_t			command_reg;
-	uint32_t			config_reg;
-	uint32_t			dmactrl_reg;
+	uint32_t command_reg;
+	uint32_t config_reg;
+	uint32_t dmactrl_reg;
 
-	struct completion		cmd_complete;
-	struct completion		dma_complete;
+	struct completion cmd_complete;
+	struct completion dma_complete;
 
 	/* bad block bitmap: 1 == good, 0 == bad/unknown */
-	unsigned long			*bb_bitmap;
+	unsigned long *bb_bitmap;
 
-	struct clk			*clk;
+	struct clk *clk;
+	uint32_t is_data_bus_width_16;
+	uint32_t device_id;
+	uint32_t vendor_id;
+	uint32_t num_bad_blocks;
 };
 #define MTD_TO_INFO(mtd)	container_of((mtd), struct tegra_nand_info, mtd)
 
@@ -141,21 +152,44 @@ struct tegra_nand_info {
 static struct nand_ecclayout tegra_nand_oob_64 = {
 	.eccbytes = 36,
 	.eccpos = {
-		4,  5,  6,  7,  8,  9,  10, 11, 12,
-		13, 14, 15, 16, 17, 18, 19, 20, 21,
-		22, 23, 24, 25, 26, 27, 28, 29, 30,
-		31, 32, 33, 34, 35, 36, 37, 38, 39,
-	},
+		   4, 5, 6, 7, 8, 9, 10, 11, 12,
+		   13, 14, 15, 16, 17, 18, 19, 20, 21,
+		   22, 23, 24, 25, 26, 27, 28, 29, 30,
+		   31, 32, 33, 34, 35, 36, 37, 38, 39,
+		   },
 	.oobavail = 20,
 	.oobfree = {
-		{ .offset = 40,
-		  .length = 20,
-		},
-	},
+		    {.offset = 40,
+		     .length = 20,
+		     },
+		    },
 };
 
-static struct nand_flash_dev *
-find_nand_flash_device(int dev_id)
+static struct nand_ecclayout tegra_nand_oob_128 = {
+	.eccbytes = 72,
+	.eccpos = {
+		   4, 5, 6, 7, 8, 9, 10, 11, 12,
+		   13, 14, 15, 16, 17, 18, 19, 20, 21,
+		   22, 23, 24, 25, 26, 27, 28, 29, 30,
+		   31, 32, 33, 34, 35, 36, 37, 38, 39,
+		   40, 41, 42, 43, 44, 45, 46, 47, 48,
+		   49, 50, 51, 52, 53, 54, 55, 56, 57,
+		   58, 59, 60, 61, 62, 63, 64, 65, 66,
+		   /* ECC POS is only of size 64 bytes  so commenting the remaining
+		    * bytes here. As driver uses the Hardware ECC so it there is
+		    * no issue with it
+		    */
+		   /*67, 68, 69, 70, 71, 72, 73, 74, 75, */
+		   },
+	.oobavail = 48,
+	.oobfree = {
+		    {.offset = 76,
+		     .length = 48,
+		     },
+		    },
+};
+
+static struct nand_flash_dev *find_nand_flash_device(int dev_id)
 {
 	struct nand_flash_dev *dev = &nand_flash_ids[0];
 
@@ -164,8 +198,7 @@ find_nand_flash_device(int dev_id)
 	return dev->name ? dev : NULL;
 }
 
-static struct nand_manufacturers *
-find_nand_flash_vendor(int vendor_id)
+static struct nand_manufacturers *find_nand_flash_vendor(int vendor_id)
 {
 	struct nand_manufacturers *vendor = &nand_manuf_ids[0];
 
@@ -201,54 +234,47 @@ static struct {
 	REG_NAME(DEC_STATUS_REG),
 	REG_NAME(HWSTATUS_CMD_REG),
 	REG_NAME(HWSTATUS_MASK_REG),
-	{ 0, NULL },
+	{0, NULL},
 };
+
 #undef REG_NAME
 
-
-static int
-dump_nand_regs(void)
+static int dump_nand_regs(void)
 {
 	int i = 0;
 
 	TEGRA_DBG("%s: dumping registers\n", __func__);
 	while (reg_names[i].name != NULL) {
-		TEGRA_DBG("%s = 0x%08x\n", reg_names[i].name, readl(reg_names[i].addr));
+		TEGRA_DBG("%s = 0x%08x\n", reg_names[i].name,
+			  readl(reg_names[i].addr));
 		i++;
 	}
 	TEGRA_DBG("%s: end of reg dump\n", __func__);
 	return 1;
 }
 
-
-static inline void
-enable_ints(struct tegra_nand_info *info, uint32_t mask)
+static inline void enable_ints(struct tegra_nand_info *info, uint32_t mask)
 {
 	(void)info;
 	writel(readl(IER_REG) | mask, IER_REG);
 }
 
-
-static inline void
-disable_ints(struct tegra_nand_info *info, uint32_t mask)
+static inline void disable_ints(struct tegra_nand_info *info, uint32_t mask)
 {
 	(void)info;
 	writel(readl(IER_REG) & ~mask, IER_REG);
 }
 
-
 static inline void
-split_addr(struct tegra_nand_info *info, loff_t offset, int *chipnr, uint32_t *page,
-	   uint32_t *column)
+split_addr(struct tegra_nand_info *info, loff_t offset, int *chipnr,
+	   uint32_t *page, uint32_t *column)
 {
 	*chipnr = (int)(offset >> info->chip.chip_shift);
 	*page = (offset >> info->chip.page_shift) & info->chip.page_mask;
 	*column = offset & info->chip.column_mask;
 }
 
-
-static irqreturn_t
-tegra_nand_irq(int irq, void *dev_id)
+static irqreturn_t tegra_nand_irq(int irq, void *dev_id)
 {
 	struct tegra_nand_info *info = dev_id;
 	uint32_t isr;
@@ -301,16 +327,14 @@ tegra_nand_irq(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static inline int
-tegra_nand_is_cmd_done(struct tegra_nand_info *info)
+static inline int tegra_nand_is_cmd_done(struct tegra_nand_info *info)
 {
 	return (readl(COMMAND_REG) & COMMAND_GO) ? 0 : 1;
 }
 
-static int
-tegra_nand_wait_cmd_done(struct tegra_nand_info *info)
+static int tegra_nand_wait_cmd_done(struct tegra_nand_info *info)
 {
-	uint32_t timeout = (2 * HZ); /* TODO: make this realistic */
+	uint32_t timeout = TIMEOUT; /* TODO: make this realistic */
 	int ret;
 
 	ret = wait_for_completion_timeout(&info->cmd_complete, timeout);
@@ -322,15 +346,13 @@ tegra_nand_wait_cmd_done(struct tegra_nand_info *info)
 	return ret ? 0 : ret;
 }
 
-static inline void
-select_chip(struct tegra_nand_info *info, int chipnr)
+static inline void select_chip(struct tegra_nand_info *info, int chipnr)
 {
 	BUG_ON(chipnr != -1 && chipnr >= info->plat->max_chips);
 	info->chip.curr_chip = chipnr;
 }
 
-static void
-cfg_hwstatus_mon(struct tegra_nand_info *info)
+static void cfg_hwstatus_mon(struct tegra_nand_info *info)
 {
 	uint32_t val;
 
@@ -343,8 +365,7 @@ cfg_hwstatus_mon(struct tegra_nand_info *info)
 }
 
 /* Tells the NAND controller to initiate the command. */
-static int
-tegra_nand_go(struct tegra_nand_info *info)
+static int tegra_nand_go(struct tegra_nand_info *info)
 {
 	BUG_ON(!tegra_nand_is_cmd_done(info));
 
@@ -361,12 +382,12 @@ tegra_nand_go(struct tegra_nand_info *info)
 	return 0;
 }
 
-static void
-tegra_nand_prep_readid(struct tegra_nand_info *info)
+static void tegra_nand_prep_readid(struct tegra_nand_info *info)
 {
-	info->command_reg = (COMMAND_CLE | COMMAND_ALE | COMMAND_PIO | COMMAND_RX  |
-			     COMMAND_ALE_BYTE_SIZE(0) | COMMAND_TRANS_SIZE(3) |
-			     (COMMAND_CE(info->chip.curr_chip)));
+	info->command_reg =
+	    (COMMAND_CLE | COMMAND_ALE | COMMAND_PIO | COMMAND_RX |
+	     COMMAND_ALE_BYTE_SIZE(0) | COMMAND_TRANS_SIZE(3) |
+	     (COMMAND_CE(info->chip.curr_chip)));
 	writel(NAND_CMD_READID, CMD_REG1);
 	writel(0, CMD_REG2);
 	writel(0, ADDR_REG1);
@@ -392,15 +413,14 @@ tegra_nand_cmd_readid(struct tegra_nand_info *info, uint32_t *chip_id)
 	return 0;
 }
 
-
 /* assumes right locks are held */
-static int
-nand_cmd_get_status(struct tegra_nand_info *info, uint32_t *status)
+static int nand_cmd_get_status(struct tegra_nand_info *info, uint32_t *status)
 {
 	int err;
 
-	info->command_reg = (COMMAND_CLE | COMMAND_PIO | COMMAND_RX  |
-			     COMMAND_RBSY_CHK | (COMMAND_CE(info->chip.curr_chip)));
+	info->command_reg = (COMMAND_CLE | COMMAND_PIO | COMMAND_RX |
+			     COMMAND_RBSY_CHK |
+			     (COMMAND_CE(info->chip.curr_chip)));
 	writel(NAND_CMD_STATUS, CMD_REG1);
 	writel(0, CMD_REG2);
 	writel(0, ADDR_REG1);
@@ -415,10 +435,8 @@ nand_cmd_get_status(struct tegra_nand_info *info, uint32_t *status)
 	return 0;
 }
 
-
 /* must be called with lock held */
-static int
-check_block_isbad(struct mtd_info *mtd, loff_t offs)
+static int check_block_isbad(struct mtd_info *mtd, loff_t offs)
 {
 	struct tegra_nand_info *info = MTD_TO_INFO(mtd);
 	uint32_t block = offs >> info->chip.block_shift;
@@ -433,9 +451,10 @@ check_block_isbad(struct mtd_info *mtd, loff_t offs)
 
 	offs &= ~(mtd->erasesize - 1);
 
-	/* Only set COM_BSY. */
-	/* TODO: should come from board file */
-	writel(CONFIG_COM_BSY, CONFIG_REG);
+	if (info->is_data_bus_width_16)
+		writel(CONFIG_COM_BSY | CONFIG_BUS_WIDTH, CONFIG_REG);
+	else
+		writel(CONFIG_COM_BSY, CONFIG_REG);
 
 	split_addr(info, offs, &chipnr, &page, &column);
 	select_chip(info, chipnr);
@@ -443,12 +462,14 @@ check_block_isbad(struct mtd_info *mtd, loff_t offs)
 	column = mtd->writesize & 0xffff; /* force to be the offset of OOB */
 
 	/* check fist two pages of the block */
+	if (info->is_data_bus_width_16)
+		column = column >> 1;
 	for (i = 0; i < 2; ++i) {
 		info->command_reg =
-			COMMAND_CE(info->chip.curr_chip) | COMMAND_CLE | COMMAND_ALE |
-			COMMAND_ALE_BYTE_SIZE(4) | COMMAND_RX | COMMAND_PIO |
-			COMMAND_TRANS_SIZE(1) | COMMAND_A_VALID | COMMAND_RBSY_CHK |
-			COMMAND_SEC_CMD;
+		    COMMAND_CE(info->chip.curr_chip) | COMMAND_CLE |
+		    COMMAND_ALE | COMMAND_ALE_BYTE_SIZE(4) | COMMAND_RX |
+		    COMMAND_PIO | COMMAND_TRANS_SIZE(1) | COMMAND_A_VALID |
+		    COMMAND_RBSY_CHK | COMMAND_SEC_CMD;
 		writel(NAND_CMD_READ0, CMD_REG1);
 		writel(NAND_CMD_READSTART, CMD_REG2);
 
@@ -481,9 +502,7 @@ out:
 	return ret;
 }
 
-
-static int
-tegra_nand_block_isbad(struct mtd_info *mtd, loff_t offs)
+static int tegra_nand_block_isbad(struct mtd_info *mtd, loff_t offs)
 {
 	struct tegra_nand_info *info = MTD_TO_INFO(mtd);
 	int ret;
@@ -505,9 +524,7 @@ tegra_nand_block_isbad(struct mtd_info *mtd, loff_t offs)
 	return ret;
 }
 
-
-static int
-tegra_nand_block_markbad(struct mtd_info *mtd, loff_t offs)
+static int tegra_nand_block_markbad(struct mtd_info *mtd, loff_t offs)
 {
 	struct tegra_nand_info *info = MTD_TO_INFO(mtd);
 	uint32_t block = offs >> info->chip.block_shift;
@@ -529,22 +546,24 @@ tegra_nand_block_markbad(struct mtd_info *mtd, loff_t offs)
 	clear_bit(block, info->bb_bitmap);
 	mtd->ecc_stats.badblocks++;
 
-	/* Only set COM_BSY. */
-	/* TODO: should come from board file */
-	writel(CONFIG_COM_BSY, CONFIG_REG);
+	if (info->is_data_bus_width_16)
+		writel(CONFIG_COM_BSY | CONFIG_BUS_WIDTH, CONFIG_REG);
+	else
+		writel(CONFIG_COM_BSY, CONFIG_REG);
 
 	split_addr(info, offs, &chipnr, &page, &column);
 	select_chip(info, chipnr);
 
 	column = mtd->writesize & 0xffff; /* force to be the offset of OOB */
-
+	if (info->is_data_bus_width_16)
+		column = column >> 1;
 	/* write to fist two pages in the block */
 	for (i = 0; i < 2; ++i) {
 		info->command_reg =
-			COMMAND_CE(info->chip.curr_chip) | COMMAND_CLE | COMMAND_ALE |
-			COMMAND_ALE_BYTE_SIZE(4) | COMMAND_TX | COMMAND_PIO |
-			COMMAND_TRANS_SIZE(1) | COMMAND_A_VALID | COMMAND_RBSY_CHK |
-			COMMAND_AFT_DAT | COMMAND_SEC_CMD;
+		    COMMAND_CE(info->chip.curr_chip) | COMMAND_CLE |
+		    COMMAND_ALE | COMMAND_ALE_BYTE_SIZE(4) | COMMAND_TX |
+		    COMMAND_PIO | COMMAND_TRANS_SIZE(1) | COMMAND_A_VALID |
+		    COMMAND_RBSY_CHK | COMMAND_AFT_DAT | COMMAND_SEC_CMD;
 		writel(NAND_CMD_SEQIN, CMD_REG1);
 		writel(NAND_CMD_PAGEPROG, CMD_REG2);
 
@@ -565,9 +584,7 @@ out:
 	return ret;
 }
 
-
-static int
-tegra_nand_erase(struct mtd_info *mtd, struct erase_info *instr)
+static int tegra_nand_erase(struct mtd_info *mtd, struct erase_info *instr)
 {
 	struct tegra_nand_info *info = MTD_TO_INFO(mtd);
 	uint32_t num_blocks;
@@ -578,7 +595,7 @@ tegra_nand_erase(struct mtd_info *mtd, struct erase_info *instr)
 	uint32_t status = 0;
 
 	TEGRA_DBG("tegra_nand_erase: addr=0x%08llx len=%lld\n", instr->addr,
-	       instr->len);
+		  instr->len);
 
 	if ((instr->addr + instr->len) > mtd->size) {
 		pr_err("tegra_nand_erase: Can't erase past end of device\n");
@@ -615,16 +632,19 @@ tegra_nand_erase(struct mtd_info *mtd, struct erase_info *instr)
 		split_addr(info, offs, &chipnr, &page, &column);
 		if (chipnr != info->chip.curr_chip)
 			select_chip(info, chipnr);
-		TEGRA_DBG("tegra_nand_erase: addr=0x%08x, page=0x%08x\n", offs, page);
+		TEGRA_DBG("tegra_nand_erase: addr=0x%08x, page=0x%08x\n", offs,
+			  page);
 
 		if (check_block_isbad(mtd, offs)) {
-			pr_info("%s: skipping bad block @ 0x%08x\n", __func__, offs);
+			pr_info("%s: skipping bad block @ 0x%08x\n", __func__,
+				offs);
 			goto next_block;
 		}
 
 		info->command_reg =
-			COMMAND_CE(info->chip.curr_chip) | COMMAND_CLE | COMMAND_ALE |
-			COMMAND_ALE_BYTE_SIZE(2) | COMMAND_RBSY_CHK | COMMAND_SEC_CMD;
+		    COMMAND_CE(info->chip.curr_chip) | COMMAND_CLE |
+		    COMMAND_ALE | COMMAND_ALE_BYTE_SIZE(2) |
+		    COMMAND_RBSY_CHK | COMMAND_SEC_CMD;
 		writel(NAND_CMD_ERASE1, CMD_REG1);
 		writel(NAND_CMD_ERASE2, CMD_REG2);
 
@@ -661,15 +681,14 @@ out_err:
 	return -EIO;
 }
 
-
-static inline void
-dump_mtd_oob_ops(struct mtd_oob_ops *ops)
+static inline void dump_mtd_oob_ops(struct mtd_oob_ops *ops)
 {
 	pr_info("%s: oob_ops: mode=%s len=0x%x ooblen=0x%x "
 		"ooboffs=0x%x dat=0x%p oob=0x%p\n", __func__,
 		(ops->mode == MTD_OOB_AUTO ? "MTD_OOB_AUTO" :
-		 (ops->mode == MTD_OOB_PLACE ? "MTD_OOB_PLACE" : "MTD_OOB_RAW")),
-		ops->len, ops->ooblen, ops->ooboffs, ops->datbuf, ops->oobbuf);
+		 (ops->mode ==
+		  MTD_OOB_PLACE ? "MTD_OOB_PLACE" : "MTD_OOB_RAW")), ops->len,
+		ops->ooblen, ops->ooboffs, ops->datbuf, ops->oobbuf);
 }
 
 static int
@@ -690,7 +709,10 @@ tegra_nand_read(struct mtd_info *mtd, loff_t from, size_t len,
 }
 
 static void
-correct_ecc_errors_on_blank_page(struct tegra_nand_info *info, u8 *datbuf, u8 *oobbuf, unsigned int a_len, unsigned int b_len) {
+correct_ecc_errors_on_blank_page(struct tegra_nand_info *info, u8 *datbuf,
+				 u8 *oobbuf, unsigned int a_len,
+				 unsigned int b_len)
+{
 	int i;
 	int all_ff = 1;
 	unsigned long flags;
@@ -713,8 +735,7 @@ correct_ecc_errors_on_blank_page(struct tegra_nand_info *info, u8 *datbuf, u8 *o
 	spin_unlock_irqrestore(&info->ecc_lock, flags);
 }
 
-static void
-update_ecc_counts(struct tegra_nand_info *info, int check_oob)
+static void update_ecc_counts(struct tegra_nand_info *info, int check_oob)
 {
 	unsigned long flags;
 	int i;
@@ -723,7 +744,7 @@ update_ecc_counts(struct tegra_nand_info *info, int check_oob)
 	for (i = 0; i < info->num_ecc_errs; ++i) {
 		/* correctable */
 		info->mtd.ecc_stats.corrected +=
-			DEC_STATUS_ERR_CNT(info->ecc_errs[i]);
+		    DEC_STATUS_ERR_CNT(info->ecc_errs[i]);
 
 		/* uncorrectable */
 		if (info->ecc_errs[i] & DEC_STATUS_ECC_FAIL_A)
@@ -735,8 +756,7 @@ update_ecc_counts(struct tegra_nand_info *info, int check_oob)
 	spin_unlock_irqrestore(&info->ecc_lock, flags);
 }
 
-static inline void
-clear_regs(struct tegra_nand_info *info)
+static inline void clear_regs(struct tegra_nand_info *info)
 {
 	info->command_reg = 0;
 	info->config_reg = 0;
@@ -744,27 +764,28 @@ clear_regs(struct tegra_nand_info *info)
 }
 
 static void
-prep_transfer_dma(struct tegra_nand_info *info, int rx, int do_ecc, uint32_t page,
-		  uint32_t column, dma_addr_t data_dma,
+prep_transfer_dma(struct tegra_nand_info *info, int rx, int do_ecc,
+		  uint32_t page, uint32_t column, dma_addr_t data_dma,
 		  uint32_t data_len, dma_addr_t oob_dma, uint32_t oob_len)
 {
 	uint32_t tag_sz = oob_len;
 
+	uint32_t page_size_sel = (info->mtd.writesize >> 11) + 2;
 #if 0
 	pr_info("%s: rx=%d ecc=%d  page=%d col=%d data_dma=0x%x "
 		"data_len=0x%08x oob_dma=0x%x ooblen=%d\n", __func__,
-		rx, do_ecc, page, column, data_dma, data_len, oob_dma,
-		oob_len);
+		rx, do_ecc, page, column, data_dma, data_len, oob_dma, oob_len);
 #endif
 
 	info->command_reg =
-		COMMAND_CE(info->chip.curr_chip) | COMMAND_CLE | COMMAND_ALE |
-		COMMAND_ALE_BYTE_SIZE(4) | COMMAND_SEC_CMD | COMMAND_RBSY_CHK |
-		COMMAND_TRANS_SIZE(8);
+	    COMMAND_CE(info->chip.curr_chip) | COMMAND_CLE | COMMAND_ALE |
+	    COMMAND_ALE_BYTE_SIZE(4) | COMMAND_SEC_CMD | COMMAND_RBSY_CHK |
+	    COMMAND_TRANS_SIZE(8);
 
-	info->config_reg = (CONFIG_PAGE_SIZE_SEL(3) | CONFIG_PIPELINE_EN |
+	info->config_reg = (CONFIG_PIPELINE_EN | CONFIG_EDO_MODE |
 			    CONFIG_COM_BSY);
-
+	if (info->is_data_bus_width_16)
+		info->config_reg |= CONFIG_BUS_WIDTH;
 	info->dmactrl_reg = (DMA_CTRL_DMA_GO |
 			     DMA_CTRL_DMA_PERF_EN | DMA_CTRL_IE_DMA_DONE |
 			     DMA_CTRL_IS_DMA_DONE | DMA_CTRL_BURST_SIZE(4));
@@ -785,9 +806,10 @@ prep_transfer_dma(struct tegra_nand_info *info, int rx, int do_ecc, uint32_t pag
 
 	if (data_len) {
 		if (do_ecc)
-			info->config_reg |=
-				CONFIG_HW_ECC | CONFIG_ECC_SEL | CONFIG_TVALUE(0) |
-				CONFIG_SKIP_SPARE | CONFIG_SKIP_SPARE_SEL(0);
+			info->config_reg |= CONFIG_HW_ECC | CONFIG_ECC_SEL;
+		info->config_reg |=
+		    CONFIG_PAGE_SIZE_SEL(page_size_sel) | CONFIG_TVALUE(0) |
+		    CONFIG_SKIP_SPARE | CONFIG_SKIP_SPARE_SEL(0);
 		info->command_reg |= COMMAND_A_VALID;
 		info->dmactrl_reg |= DMA_CTRL_DMA_EN_A;
 		writel(DMA_CFG_BLOCK_SIZE(data_len - 1), DMA_CFG_A_REG);
@@ -801,10 +823,10 @@ prep_transfer_dma(struct tegra_nand_info *info, int rx, int do_ecc, uint32_t pag
 	}
 
 	if (oob_len) {
-		oob_len = info->mtd.oobavail;
-		tag_sz = info->mtd.oobavail;
 		if (do_ecc) {
-			tag_sz += 4; /* size of tag ecc */
+			oob_len = info->mtd.oobavail;
+			tag_sz = info->mtd.oobavail;
+			tag_sz += 4;	/* size of tag ecc */
 			if (rx)
 				oob_len += 4; /* size of tag ecc */
 			info->config_reg |= CONFIG_ECC_EN_TAG;
@@ -821,14 +843,16 @@ prep_transfer_dma(struct tegra_nand_info *info, int rx, int do_ecc, uint32_t pag
 		writel(0, DMA_CFG_B_REG);
 		writel(0, TAG_PTR_REG);
 	}
-
+	/* For x16 bit we needs to divide the column number by 2 */
+	if (info->is_data_bus_width_16)
+		column = column >> 1;
 	writel((column & 0xffff) | ((page & 0xffff) << 16), ADDR_REG1);
 	writel((page >> 16) & 0xff, ADDR_REG2);
 }
 
 static dma_addr_t
 tegra_nand_dma_map(struct device *dev, void *addr, size_t size,
-		 enum dma_data_direction dir)
+		   enum dma_data_direction dir)
 {
 	struct page *page;
 	unsigned long offset = (unsigned long)addr & ~PAGE_MASK;
@@ -842,11 +866,67 @@ tegra_nand_dma_map(struct device *dev, void *addr, size_t size,
 	return dma_map_page(dev, page, offset, size, dir);
 }
 
-/* if mode == RAW, then we read data only, with no ECC
- * if mode == PLACE, we read ONLY the OOB data from a raw offset into the spare
- * area (ooboffs).
- * if mode == AUTO, we read main data and the OOB data from the oobfree areas as
- * specified by nand_ecclayout.
+static ssize_t show_vendor_id(struct device *dev, struct device_attribute *attr,
+			      char *buf)
+{
+	struct tegra_nand_info *info = dev_get_drvdata(dev);
+	return sprintf(buf, "0x%x\n", info->vendor_id);
+}
+
+static DEVICE_ATTR(vendor_id, S_IRUSR, show_vendor_id, NULL);
+
+static ssize_t show_device_id(struct device *dev, struct device_attribute *attr,
+			      char *buf)
+{
+	struct tegra_nand_info *info = dev_get_drvdata(dev);
+	return sprintf(buf, "0x%x\n", info->device_id);
+}
+
+static DEVICE_ATTR(device_id, S_IRUSR, show_device_id, NULL);
+
+static ssize_t show_flash_size(struct device *dev,
+			       struct device_attribute *attr, char *buf)
+{
+	struct tegra_nand_info *info = dev_get_drvdata(dev);
+	struct mtd_info *mtd = &info->mtd;
+	return sprintf(buf, "%llu bytes\n", mtd->size);
+}
+
+static DEVICE_ATTR(flash_size, S_IRUSR, show_flash_size, NULL);
+
+static ssize_t show_num_bad_blocks(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	struct tegra_nand_info *info = dev_get_drvdata(dev);
+	return sprintf(buf, "%d\n", info->num_bad_blocks);
+}
+
+static DEVICE_ATTR(num_bad_blocks, S_IRUSR, show_num_bad_blocks, NULL);
+
+static ssize_t show_bb_bitmap(struct device *dev, struct device_attribute *attr,
+			      char *buf)
+{
+	struct tegra_nand_info *info = dev_get_drvdata(dev);
+	struct mtd_info *mtd = &info->mtd;
+	int num_blocks = mtd->size >> info->chip.block_shift, i, ret = 0, size =
+	    0;
+
+	for (i = 0; i < num_blocks / (8 * sizeof(unsigned long)); i++) {
+		size = sprintf(buf, "0x%lx\n", info->bb_bitmap[i]);
+		ret += size;
+		buf += size;
+	}
+	return ret;
+}
+
+static DEVICE_ATTR(bb_bitmap, S_IRUSR, show_bb_bitmap, NULL);
+
+/*
+ * Independent of Mode, we read main data and the OOB data from the oobfree areas as
+ * specified nand_ecclayout
+ * This function also checks buffer pool partial_unaligned_rw_buffer
+ * if the address is already present and is not 'unused' then it will use
+ * data in buffer else it will go for DMA.
  */
 static int
 do_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops)
@@ -858,43 +938,33 @@ do_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops)
 	uint32_t column;
 	uint8_t *datbuf = ops->datbuf;
 	uint8_t *oobbuf = ops->oobbuf;
-	uint32_t len = datbuf ? ops->len : 0;
 	uint32_t ooblen = oobbuf ? ops->ooblen : 0;
 	uint32_t oobsz;
 	uint32_t page_count;
 	int err;
+	int unaligned = from & info->chip.column_mask;
+	uint32_t len = datbuf ? ((ops->len) + unaligned) : 0;
 	int do_ecc = 1;
 	dma_addr_t datbuf_dma_addr = 0;
 
 #if 0
-	dump_mtd_oob_ops(mtd, ops);
+	dump_mtd_oob_ops(ops);
 #endif
-
 	ops->retlen = 0;
 	ops->oobretlen = 0;
+	from = from - unaligned;
 
-	/* TODO: Worry about reads from non-page boundaries later */
-	if (unlikely(from & info->chip.column_mask)) {
-		pr_err("%s: Unaligned read (from 0x%llx) not supported\n",
-		       __func__, from);
-		return -EINVAL;
-	}
-
-	if (likely(ops->mode == MTD_OOB_AUTO)) {
-		oobsz = mtd->oobavail;
-	} else {
-		oobsz = mtd->oobsize;
-		do_ecc = 0;
-	}
-
+	/* Don't care about the MTD_OOB_  value field always use oobavail and ecc. */
+	oobsz = mtd->oobavail;
 	if (unlikely(ops->oobbuf && ops->ooblen > oobsz)) {
-		pr_err("%s: can't read OOB from multiple pages (%d > %d)\n", __func__,
-		       ops->ooblen, oobsz);
+		pr_err("%s: can't read OOB from multiple pages (%d > %d)\n",
+		       __func__, ops->ooblen, oobsz);
 		return -EINVAL;
-	} else if (ops->oobbuf) {
+	} else if (ops->oobbuf && !len) {
 		page_count = 1;
 	} else {
-		page_count = max((uint32_t)(ops->len / mtd->writesize), (uint32_t)1);
+		page_count =
+		    (uint32_t) ((len + mtd->writesize - 1) / mtd->writesize);
 	}
 
 	mutex_lock(&info->lock);
@@ -916,7 +986,16 @@ do_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops)
 	while (page_count--) {
 		int a_len = min(mtd->writesize - column, len);
 		int b_len = min(oobsz, ooblen);
-
+		int temp_len = 0;
+		char *temp_buf = NULL;
+		/* Take care when read is of less than page size.
+		 * Otherwise there will be kernel Panic due to DMA timeout */
+		if (((a_len < mtd->writesize) && len) || unaligned) {
+			temp_len = a_len;
+			a_len = mtd->writesize;
+			temp_buf = datbuf;
+			datbuf = info->partial_unaligned_rw_buffer;
+		}
 #if 0
 		pr_info("%s: chip:=%d page=%d col=%d\n", __func__, chipnr,
 			page, column);
@@ -924,10 +1003,12 @@ do_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops)
 
 		clear_regs(info);
 		if (datbuf)
-			datbuf_dma_addr = tegra_nand_dma_map(info->dev, datbuf, a_len, DMA_FROM_DEVICE);
+			datbuf_dma_addr =
+			    tegra_nand_dma_map(info->dev, datbuf, a_len,
+					       DMA_FROM_DEVICE);
 
-		prep_transfer_dma(info, 1, do_ecc, page, column, datbuf_dma_addr,
-				  a_len, info->oob_dma_addr,
+		prep_transfer_dma(info, 1, do_ecc, page, column,
+				  datbuf_dma_addr, a_len, info->oob_dma_addr,
 				  b_len);
 		writel(info->config_reg, CONFIG_REG);
 		writel(info->dmactrl_reg, DMA_MST_CTRL_REG);
@@ -937,30 +1018,38 @@ do_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops)
 		if (err != 0)
 			goto out_err;
 
-		if (!wait_for_completion_timeout(&info->dma_complete, 2*HZ)) {
+		if (!wait_for_completion_timeout(&info->dma_complete, TIMEOUT)) {
 			pr_err("%s: dma completion timeout\n", __func__);
 			dump_nand_regs();
 			err = -ETIMEDOUT;
 			goto out_err;
 		}
 
-		/*pr_info("tegra_read_oob: DMA complete\n");*/
+		/*pr_info("tegra_read_oob: DMA complete\n"); */
 
 		/* if we are here, transfer is done */
 		if (datbuf)
-			dma_unmap_page(info->dev, datbuf_dma_addr, a_len, DMA_FROM_DEVICE);
+			dma_unmap_page(info->dev, datbuf_dma_addr, a_len,
+				       DMA_FROM_DEVICE);
 
 		if (oobbuf) {
 			uint32_t ofs = datbuf && oobbuf ? 4 : 0; /* skipped bytes */
 			memcpy(oobbuf, info->oob_dma_buf + ofs, b_len);
 		}
 
-		correct_ecc_errors_on_blank_page(info, datbuf, oobbuf, a_len, b_len);
-
+		correct_ecc_errors_on_blank_page(info, datbuf, oobbuf, a_len,
+						 b_len);
+		/* Take care when read is of less than page size */
+		if (temp_len) {
+			memcpy(temp_buf, datbuf + unaligned,
+			       temp_len - unaligned);
+			a_len = temp_len;
+			datbuf = temp_buf;
+		}
 		if (datbuf) {
 			len -= a_len;
-			datbuf += a_len;
-			ops->retlen += a_len;
+			datbuf += a_len - unaligned;
+			ops->retlen += a_len - unaligned;
 		}
 
 		if (oobbuf) {
@@ -969,6 +1058,7 @@ do_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops)
 			ops->oobretlen += b_len;
 		}
 
+		unaligned = 0;
 		update_ecc_counts(info, oobbuf != NULL);
 
 		if (!page_count)
@@ -1013,7 +1103,8 @@ tegra_nand_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops)
 	}
 
 	if (unlikely(ops->oobbuf && !ops->ooblen)) {
-		pr_err("%s: Reading 0 bytes from OOB is meaningless\n", __func__);
+		pr_err("%s: Reading 0 bytes from OOB is meaningless\n",
+		       __func__);
 		return -EINVAL;
 	}
 
@@ -1025,7 +1116,7 @@ tegra_nand_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops)
 		}
 		if ((ops->mode == MTD_OOB_RAW) && !ops->datbuf) {
 			pr_err("%s: Raw mode only supports reading data area.\n",
-			       __func__);
+			     __func__);
 			return -EINVAL;
 		}
 	}
@@ -1043,7 +1134,7 @@ tegra_nand_write(struct mtd_info *mtd, loff_t to, size_t len,
 	pr_debug("%s: write: to=0x%llx len=0x%x\n", __func__, to, len);
 	ops.mode = MTD_OOB_AUTO;
 	ops.len = len;
-	ops.datbuf = (uint8_t *)buf;
+	ops.datbuf = (uint8_t *) buf;
 	ops.oobbuf = NULL;
 	ret = mtd->write_oob(mtd, to, &ops);
 	*retlen = ops.retlen;
@@ -1068,7 +1159,7 @@ do_write_oob(struct mtd_info *mtd, loff_t to, struct mtd_oob_ops *ops)
 	dma_addr_t datbuf_dma_addr = 0;
 
 #if 0
-	dump_mtd_oob_ops(mtd, ops);
+	dump_mtd_oob_ops(ops);
 #endif
 
 	ops->retlen = 0;
@@ -1077,22 +1168,17 @@ do_write_oob(struct mtd_info *mtd, loff_t to, struct mtd_oob_ops *ops)
 	if (!ops->len)
 		return 0;
 
-
-	if (likely(ops->mode == MTD_OOB_AUTO)) {
-		oobsz = mtd->oobavail;
-	} else {
-		oobsz = mtd->oobsize;
-		do_ecc = 0;
-	}
+	oobsz = mtd->oobavail;
 
 	if (unlikely(ops->oobbuf && ops->ooblen > oobsz)) {
-			pr_err("%s: can't write OOB to multiple pages (%d > %d)\n",
-			       __func__, ops->ooblen, oobsz);
-			return -EINVAL;
-	} else if (ops->oobbuf) {
+		pr_err("%s: can't write OOB to multiple pages (%d > %d)\n",
+		       __func__, ops->ooblen, oobsz);
+		return -EINVAL;
+	} else if (ops->oobbuf && !len) {
 		page_count = 1;
 	} else
-		page_count = max((uint32_t)(ops->len / mtd->writesize), (uint32_t)1);
+		page_count =
+		    max((uint32_t) (ops->len / mtd->writesize), (uint32_t) 1);
 
 	mutex_lock(&info->lock);
 
@@ -1102,15 +1188,30 @@ do_write_oob(struct mtd_info *mtd, loff_t to, struct mtd_oob_ops *ops)
 	while (page_count--) {
 		int a_len = min(mtd->writesize, len);
 		int b_len = min(oobsz, ooblen);
+		int temp_len = 0;
+		char *temp_buf = NULL;
+		/* Take care when write is of less than page size. Otherwise
+		 * there will be kernel panic due to dma timeout */
+		if ((a_len < mtd->writesize) && len) {
+			temp_len = a_len;
+			a_len = mtd->writesize;
+			temp_buf = datbuf;
+			datbuf = info->partial_unaligned_rw_buffer;
+			memset(datbuf, 0xff, a_len);
+			memcpy(datbuf, temp_buf, temp_len);
+		}
 
 		if (datbuf)
-			datbuf_dma_addr = tegra_nand_dma_map(info->dev, datbuf, a_len, DMA_TO_DEVICE);
+			datbuf_dma_addr =
+			    tegra_nand_dma_map(info->dev, datbuf, a_len,
+					       DMA_TO_DEVICE);
 		if (oobbuf)
 			memcpy(info->oob_dma_buf, oobbuf, b_len);
 
 		clear_regs(info);
-		prep_transfer_dma(info, 0, do_ecc, page, column, datbuf_dma_addr,
-				  a_len, info->oob_dma_addr, b_len);
+		prep_transfer_dma(info, 0, do_ecc, page, column,
+				  datbuf_dma_addr, a_len, info->oob_dma_addr,
+				  b_len);
 
 		writel(info->config_reg, CONFIG_REG);
 		writel(info->dmactrl_reg, DMA_MST_CTRL_REG);
@@ -1120,14 +1221,19 @@ do_write_oob(struct mtd_info *mtd, loff_t to, struct mtd_oob_ops *ops)
 		if (err != 0)
 			goto out_err;
 
-		if (!wait_for_completion_timeout(&info->dma_complete, 2*HZ)) {
+		if (!wait_for_completion_timeout(&info->dma_complete, TIMEOUT)) {
 			pr_err("%s: dma completion timeout\n", __func__);
 			dump_nand_regs();
 			goto out_err;
 		}
+		if (temp_len) {
+			a_len = temp_len;
+			datbuf = temp_buf;
+		}
 
 		if (datbuf) {
-			dma_unmap_page(info->dev, datbuf_dma_addr, a_len, DMA_TO_DEVICE);
+			dma_unmap_page(info->dev, datbuf_dma_addr, a_len,
+				       DMA_TO_DEVICE);
 			len -= a_len;
 			datbuf += a_len;
 			ops->retlen += a_len;
@@ -1179,24 +1285,22 @@ tegra_nand_write_oob(struct mtd_info *mtd, loff_t to, struct mtd_oob_ops *ops)
 	return do_write_oob(mtd, to, ops);
 }
 
-static int
-tegra_nand_suspend(struct mtd_info *mtd)
+static int tegra_nand_suspend(struct mtd_info *mtd)
 {
 	return 0;
 }
 
-static void
-tegra_nand_resume(struct mtd_info *mtd)
+static void tegra_nand_resume(struct mtd_info *mtd)
 {
 }
 
-static int
-scan_bad_blocks(struct tegra_nand_info *info)
+static int scan_bad_blocks(struct tegra_nand_info *info)
 {
 	struct mtd_info *mtd = &info->mtd;
 	int num_blocks = mtd->size >> info->chip.block_shift;
 	uint32_t block;
 	int is_bad = 0;
+	info->num_bad_blocks = 0;
 
 	for (block = 0; block < num_blocks; ++block) {
 		/* make sure the bit is cleared, meaning it's bad/unknown before
@@ -1206,9 +1310,10 @@ scan_bad_blocks(struct tegra_nand_info *info)
 
 		if (is_bad == 0)
 			set_bit(block, info->bb_bitmap);
-		else if (is_bad > 0)
-			pr_info("block 0x%08x is bad.\n", block);
-		else {
+		else if (is_bad > 0) {
+			info->num_bad_blocks++;
+			pr_debug("block 0x%08x is bad.\n", block);
+		} else {
 			pr_err("Fatal error (%d) while scanning for "
 			       "bad blocks\n", is_bad);
 			return is_bad;
@@ -1218,15 +1323,28 @@ scan_bad_blocks(struct tegra_nand_info *info)
 }
 
 static void
-set_chip_timing(struct tegra_nand_info *info)
+set_chip_timing(struct tegra_nand_info *info, uint32_t vendor_id,
+		uint32_t dev_id, uint32_t fourth_id_field)
 {
-	struct tegra_nand_chip_parms *chip_parms = &info->plat->chip_parms[0];
+	struct tegra_nand_chip_parms *chip_parms = NULL;
 	uint32_t tmp;
+	int i = 0;
+	unsigned long nand_clk_freq_khz = clk_get_rate(info->clk) / 1000;
+	for (i = 0; i < info->plat->nr_chip_parms; i++)
+		if (info->plat->chip_parms[i].vendor_id == vendor_id &&
+		    info->plat->chip_parms[i].device_id == dev_id &&
+		    info->plat->chip_parms[i].read_id_fourth_byte ==
+		    fourth_id_field)
+			chip_parms = &info->plat->chip_parms[i];
 
-	/* TODO: Actually search the chip_parms list for the correct device. */
-	/* TODO: Get the appropriate frequency from the clock subsystem */
-#define NAND_CLK_FREQ	108000
-#define CNT(t)		(((((t) * NAND_CLK_FREQ) + 1000000 - 1) / 1000000) - 1)
+	if (!chip_parms) {
+		pr_warn("WARNING:tegra_nand: timing for vendor-id: "
+			"%x device-id: %x fourth-id-field: %x not found. Using Bootloader timing",
+			vendor_id, dev_id, fourth_id_field);
+		return;
+	}
+	/* TODO: Handle the change of frequency if DVFS is enabled */
+#define CNT(t)	(((((t) * nand_clk_freq_khz) + 1000000 - 1) / 1000000) - 1)
 	tmp = (TIMING_TRP_RESP(CNT(chip_parms->timing.trp_resp)) |
 	       TIMING_TWB(CNT(chip_parms->timing.twb)) |
 	       TIMING_TCR_TAR_TRR(CNT(chip_parms->timing.tcr_tar_trr)) |
@@ -1239,13 +1357,11 @@ set_chip_timing(struct tegra_nand_info *info)
 	writel(tmp, TIMING_REG);
 	writel(TIMING2_TADL(CNT(chip_parms->timing.tadl)), TIMING2_REG);
 #undef CNT
-#undef NAND_CLK_FREQ
 }
 
 /* Scans for nand flash devices, identifies them, and fills in the
  * device info. */
-static int
-tegra_nand_scan(struct mtd_info *mtd, int maxchips)
+static int tegra_nand_scan(struct mtd_info *mtd, int maxchips)
 {
 	struct tegra_nand_info *info = MTD_TO_INFO(mtd);
 	struct nand_flash_dev *dev_info;
@@ -1274,16 +1390,16 @@ tegra_nand_scan(struct mtd_info *mtd, int maxchips)
 
 	dev_info = find_nand_flash_device(dev_id);
 	if (dev_info == NULL) {
-		pr_err("%s: unknown flash device id (0x%02x) found.\n", __func__,
-			dev_id);
+		pr_err("%s: unknown flash device id (0x%02x) found.\n",
+		       __func__, dev_id);
 		err = -ENODEV;
 		goto out_error;
 	}
 
 	vendor_info = find_nand_flash_vendor(vendor_id);
 	if (vendor_info == NULL) {
-		pr_err("%s: unknown flash vendor id (0x%02x) found.\n", __func__,
-			vendor_id);
+		pr_err("%s: unknown flash vendor id (0x%02x) found.\n",
+		       __func__, vendor_id);
 		err = -ENODEV;
 		goto out_error;
 	}
@@ -1301,8 +1417,10 @@ tegra_nand_scan(struct mtd_info *mtd, int maxchips)
 	}
 
 	pr_info("%s: %d NAND chip(s) found (vend=0x%02x, dev=0x%02x) (%s %s)\n",
-	       DRIVER_NAME, cnt, vendor_id, dev_id, vendor_info->name,
-	       dev_info->name);
+		DRIVER_NAME, cnt, vendor_id, dev_id, vendor_info->name,
+		dev_info->name);
+	info->vendor_id = vendor_id;
+	info->device_id = dev_id;
 	info->chip.num_chips = cnt;
 	info->chip.chipsize = dev_info->chipsize << 20;
 	mtd->size = info->chip.num_chips * info->chip.chipsize;
@@ -1316,18 +1434,13 @@ tegra_nand_scan(struct mtd_info *mtd, int maxchips)
 	 *   bits  1:0 = page size. 1kb * (2^val)
 	 */
 
-	/* TODO: we should reconcile the information read from chip and
-	 *       the data given to us in tegra_nand_platform->chip_parms??
-	 *       platform data will give us timing information. */
-
 	/* page_size */
 	tmp = dev_parms & 0x3;
 	mtd->writesize = 1024 << tmp;
 	info->chip.column_mask = mtd->writesize - 1;
 
-	/* Note: See oob layout description of why we only support 2k pages. */
-	if (mtd->writesize > 2048) {
-		pr_err("%s: Large page devices with pagesize > 2kb are NOT "
+	if (mtd->writesize > 4096) {
+		pr_err("%s: Large page devices with pagesize > 4kb are NOT "
 		       "supported\n", __func__);
 		goto out_error;
 	} else if (mtd->writesize < 2048) {
@@ -1343,22 +1456,28 @@ tegra_nand_scan(struct mtd_info *mtd, int maxchips)
 		goto out_error;
 	}
 	mtd->oobsize = tmp;
-	mtd->oobavail = tegra_nand_oob_64.oobavail;
 
 	/* data block size (erase size) (w/o spare) */
 	tmp = (dev_parms >> 4) & 0x3;
 	mtd->erasesize = (64 * 1024) << tmp;
 	info->chip.block_shift = ffs(mtd->erasesize) - 1;
-
+	/* bus width of the nand chip 8/16 */
+	tmp = (dev_parms >> 6) & 0x1;
+	info->is_data_bus_width_16 = tmp;
 	/* used to select the appropriate chip/page in case multiple devices
 	 * are connected */
 	info->chip.chip_shift = ffs(info->chip.chipsize) - 1;
 	info->chip.page_shift = ffs(mtd->writesize) - 1;
 	info->chip.page_mask =
-		(info->chip.chipsize >> info->chip.page_shift) - 1;
+	    (info->chip.chipsize >> info->chip.page_shift) - 1;
 
 	/* now fill in the rest of the mtd fields */
-	mtd->ecclayout = &tegra_nand_oob_64;
+	if (mtd->oobsize == 64)
+		mtd->ecclayout = &tegra_nand_oob_64;
+	else
+		mtd->ecclayout = &tegra_nand_oob_128;
+
+	mtd->oobavail = mtd->ecclayout->oobavail;
 	mtd->type = MTD_NANDFLASH;
 	mtd->flags = MTD_CAP_NANDFLASH;
 
@@ -1376,8 +1495,7 @@ tegra_nand_scan(struct mtd_info *mtd, int maxchips)
 	mtd->block_isbad = tegra_nand_block_isbad;
 	mtd->block_markbad = tegra_nand_block_markbad;
 
-	/* TODO: should take vendor_id/device_id */
-	set_chip_timing(info);
+	set_chip_timing(info, vendor_id, dev_id, dev_parms);
 
 	return 0;
 
@@ -1386,8 +1504,7 @@ out_error:
 	return err;
 }
 
-static int __devinit
-tegra_nand_probe(struct platform_device *pdev)
+static int __devinit tegra_nand_probe(struct platform_device *pdev)
 {
 	struct tegra_nand_platform *plat = pdev->dev.platform_data;
 	struct tegra_nand_info *info = NULL;
@@ -1433,8 +1550,8 @@ tegra_nand_probe(struct platform_device *pdev)
 	mtd->owner = THIS_MODULE;
 
 	/* HACK: allocate a dma buffer to hold 1 page oob data */
-	info->oob_dma_buf = dma_alloc_coherent(NULL, 64,
-					   &info->oob_dma_addr, GFP_KERNEL);
+	info->oob_dma_buf = dma_alloc_coherent(NULL, 128,
+					       &info->oob_dma_addr, GFP_KERNEL);
 	if (!info->oob_dma_buf) {
 		err = -ENOMEM;
 		goto out_free_info;
@@ -1459,13 +1576,26 @@ tegra_nand_probe(struct platform_device *pdev)
 			  IRQF_SHARED, DRIVER_NAME, info);
 	if (err) {
 		pr_err("Unable to request IRQ %d (%d)\n",
-				pdev->resource[0].start, err);
+		       pdev->resource[0].start, err);
 		goto out_free_ecc_buf;
 	}
 
 	/* TODO: configure pinmux here?? */
 	info->clk = clk_get(&pdev->dev, NULL);
-	clk_set_rate(info->clk, 108000000);
+
+	if (IS_ERR(info->clk)) {
+		err = PTR_ERR(info->clk);
+		goto out_free_ecc_buf;
+	}
+	err = clk_enable(info->clk);
+	if (err != 0)
+		goto out_free_ecc_buf;
+
+	if (plat->wp_gpio) {
+		gpio_request(plat->wp_gpio, "nand_wp");
+		tegra_gpio_enable(plat->wp_gpio);
+		gpio_direction_output(plat->wp_gpio, 1);
+	}
 
 	cfg_hwstatus_mon(info);
 
@@ -1477,7 +1607,8 @@ tegra_nand_probe(struct platform_device *pdev)
 
 	/* enable interrupts */
 	disable_ints(info, 0xffffffff);
-	enable_ints(info, IER_ERR_TRIG_VAL(4) | IER_UND | IER_OVR | IER_CMD_DONE |
+	enable_ints(info,
+		    IER_ERR_TRIG_VAL(4) | IER_UND | IER_OVR | IER_CMD_DONE |
 		    IER_ECC_ERR | IER_GIE);
 
 	if (tegra_nand_scan(mtd, plat->max_chips)) {
@@ -1523,13 +1654,51 @@ tegra_nand_probe(struct platform_device *pdev)
 	} else
 #endif
 		err = add_mtd_device(mtd);
-		if (err != 0)
-			goto out_free_bbbmap;
+	if (err != 0)
+		goto out_free_bbbmap;
 
 	dev_set_drvdata(&pdev->dev, info);
 
+	info->partial_unaligned_rw_buffer = kzalloc(mtd->writesize, GFP_KERNEL);
+	if (!info->partial_unaligned_rw_buffer) {
+		err = -ENOMEM;
+		goto out_free_bbbmap;
+	}
+
+	err = device_create_file(&pdev->dev, &dev_attr_device_id);
+	if (err != 0)
+		goto out_free_bbbmap;
+
+	err = device_create_file(&pdev->dev, &dev_attr_vendor_id);
+	if (err != 0)
+		goto err_nand_sysfs_vendorid_failed;
+
+	err = device_create_file(&pdev->dev, &dev_attr_flash_size);
+	if (err != 0)
+		goto err_nand_sysfs_flash_size_failed;
+
+	err = device_create_file(&pdev->dev, &dev_attr_num_bad_blocks);
+	if (err != 0)
+		goto err_nand_sysfs_num_bad_blocks_failed;
+
+	err = device_create_file(&pdev->dev, &dev_attr_bb_bitmap);
+	if (err != 0)
+		goto err_nand_sysfs_bb_bitmap_failed;
+
 	pr_debug("%s: probe done.\n", __func__);
 	return 0;
+
+err_nand_sysfs_bb_bitmap_failed:
+	device_remove_file(&pdev->dev, &dev_attr_num_bad_blocks);
+
+err_nand_sysfs_num_bad_blocks_failed:
+	device_remove_file(&pdev->dev, &dev_attr_flash_size);
+
+err_nand_sysfs_flash_size_failed:
+	device_remove_file(&pdev->dev, &dev_attr_vendor_id);
+
+err_nand_sysfs_vendorid_failed:
+	device_remove_file(&pdev->dev, &dev_attr_device_id);
 
 out_free_bbbmap:
 	kfree(info->bb_bitmap);
@@ -1545,8 +1714,7 @@ out_free_ecc_buf:
 	dma_free_coherent(NULL, ECC_BUF_SZ, info->ecc_buf, info->ecc_addr);
 
 out_free_dma_buf:
-	dma_free_coherent(NULL, 64, info->oob_dma_buf,
-			  info->oob_dma_addr);
+	dma_free_coherent(NULL, 128, info->oob_dma_buf, info->oob_dma_addr);
 
 out_free_info:
 	platform_set_drvdata(pdev, NULL);
@@ -1555,8 +1723,7 @@ out_free_info:
 	return err;
 }
 
-static int __devexit
-tegra_nand_remove(struct platform_device *pdev)
+static int __devexit tegra_nand_remove(struct platform_device *pdev)
 {
 	struct tegra_nand_info *info = dev_get_drvdata(&pdev->dev);
 
@@ -1566,7 +1733,16 @@ tegra_nand_remove(struct platform_device *pdev)
 		free_irq(pdev->resource[0].start, info);
 		kfree(info->bb_bitmap);
 		kfree(info->ecc_errs);
-		dma_free_coherent(NULL, ECC_BUF_SZ, info->ecc_buf, info->ecc_addr);
+		kfree(info->partial_unaligned_rw_buffer);
+
+		device_remove_file(&pdev->dev, &dev_attr_device_id);
+		device_remove_file(&pdev->dev, &dev_attr_vendor_id);
+		device_remove_file(&pdev->dev, &dev_attr_flash_size);
+		device_remove_file(&pdev->dev, &dev_attr_num_bad_blocks);
+		device_remove_file(&pdev->dev, &dev_attr_bb_bitmap);
+
+		dma_free_coherent(NULL, ECC_BUF_SZ, info->ecc_buf,
+				  info->ecc_addr);
 		dma_free_coherent(NULL, info->mtd.writesize + info->mtd.oobsize,
 				  info->oob_dma_buf, info->oob_dma_addr);
 		kfree(info);
@@ -1576,24 +1752,22 @@ tegra_nand_remove(struct platform_device *pdev)
 }
 
 static struct platform_driver tegra_nand_driver = {
-	.probe   = tegra_nand_probe,
-	.remove  = __devexit_p(tegra_nand_remove),
+	.probe = tegra_nand_probe,
+	.remove = __devexit_p(tegra_nand_remove),
 	.suspend = NULL,
-	.resume  = NULL,
-	.driver  = {
-		.name  = "tegra_nand",
-		.owner = THIS_MODULE,
-	},
+	.resume = NULL,
+	.driver = {
+		   .name = "tegra_nand",
+		   .owner = THIS_MODULE,
+		   },
 };
 
-static int __init
-tegra_nand_init(void)
+static int __init tegra_nand_init(void)
 {
 	return platform_driver_register(&tegra_nand_driver);
 }
 
-static void __exit
-tegra_nand_exit(void)
+static void __exit tegra_nand_exit(void)
 {
 	platform_driver_unregister(&tegra_nand_driver);
 }

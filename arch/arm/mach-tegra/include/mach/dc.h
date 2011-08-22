@@ -24,6 +24,7 @@
 
 #include <linux/pm.h>
 #include <linux/types.h>
+#include <drm/drm_fixed.h>
 
 #define TEGRA_MAX_DC		2
 #define DC_N_WINDOWS		3
@@ -126,11 +127,19 @@ struct tegra_dsi_out {
 	u8		panel_reset;			/* required */
 	u8		virtual_channel;		/* required */
 	u8		dsi_instance;
+	u8		chip_id;
+	u8		chip_rev;
 
 	bool		panel_has_frame_buffer;	/* required*/
 
 	struct tegra_dsi_cmd*	dsi_init_cmd;		/* required */
 	u16		n_init_cmd;			/* required */
+
+	struct tegra_dsi_cmd*	dsi_early_suspend_cmd;
+	u16		n_early_suspend_cmd;
+
+	struct tegra_dsi_cmd*	dsi_late_resume_cmd;
+	u16		n_late_resume_cmd;
 
 	struct tegra_dsi_cmd*	dsi_suspend_cmd;	/* required */
 	u16		n_suspend_cmd;			/* required */
@@ -148,6 +157,8 @@ struct tegra_dsi_out {
 	bool		no_pkt_seq_eot; /* 1st generation panel may not
 					 * support eot. Don't set it for
 					 * most panels. */
+	bool		te_polarity_low;
+	bool		power_saving_suspend;
 
 	u32		max_panel_freq_khz;
 	u32		lp_cmd_mode_freq_khz;
@@ -222,6 +233,9 @@ enum {
 	TEGRA_DC_ORDERED_DITHER,
 	TEGRA_DC_ERRDIFF_DITHER,
 };
+
+typedef u8 tegra_dc_bl_output[256];
+typedef u8 *p_tegra_dc_bl_output;
 
 struct tegra_dc_sd_blp {
 	u16 time_constant;
@@ -325,6 +339,8 @@ struct tegra_dc_out {
 #define TEGRA_DC_OUT_NVHDCP_POLICY_ALWAYS_ON	(0 << 2)
 #define TEGRA_DC_OUT_NVHDCP_POLICY_ON_DEMAND	(1 << 2)
 #define TEGRA_DC_OUT_NVHDCP_POLICY_MASK		(1 << 2)
+#define TEGRA_DC_OUT_CONTINUOUS_MODE		(0 << 3)
+#define TEGRA_DC_OUT_ONE_SHOT_MODE		(1 << 3)
 
 #define TEGRA_DC_ALIGN_MSB		0
 #define TEGRA_DC_ALIGN_LSB		1
@@ -334,6 +350,17 @@ struct tegra_dc_out {
 
 struct tegra_dc;
 struct nvmap_handle_ref;
+
+struct tegra_dc_csc {
+	unsigned short yof;
+	unsigned short kyrgb;
+	unsigned short kur;
+	unsigned short kvr;
+	unsigned short kug;
+	unsigned short kvg;
+	unsigned short kub;
+	unsigned short kvb;
+};
 
 struct tegra_dc_win {
 	u8			idx;
@@ -347,21 +374,25 @@ struct tegra_dc_win {
 	unsigned		offset_v;
 	unsigned		stride;
 	unsigned		stride_uv;
-	unsigned		x;
-	unsigned		y;
-	unsigned		w;
-	unsigned		h;
+	fixed20_12		x;
+	fixed20_12		y;
+	fixed20_12		w;
+	fixed20_12		h;
 	unsigned		out_x;
 	unsigned		out_y;
 	unsigned		out_w;
 	unsigned		out_h;
 	unsigned		z;
 
+	struct tegra_dc_csc	csc;
+
 	int			dirty;
 	int			underflows;
 	struct tegra_dc		*dc;
 
 	struct nvmap_handle_ref	*cur_handle;
+	unsigned		bandwidth;
+	unsigned		new_bandwidth;
 };
 
 
@@ -371,6 +402,8 @@ struct tegra_dc_win {
 #define TEGRA_WIN_FLAG_INVERT_H		(1 << 3)
 #define TEGRA_WIN_FLAG_INVERT_V		(1 << 4)
 #define TEGRA_WIN_FLAG_TILED		(1 << 5)
+#define TEGRA_WIN_FLAG_H_FILTER		(1 << 6)
+#define TEGRA_WIN_FLAG_V_FILTER		(1 << 7)
 
 #define TEGRA_WIN_BLEND_FLAGS_MASK \
 	(TEGRA_WIN_FLAG_BLEND_PREMULT | TEGRA_WIN_FLAG_BLEND_COVERAGE)
@@ -424,16 +457,14 @@ struct tegra_dc_platform_data {
 
 struct tegra_dc *tegra_dc_get_dc(unsigned idx);
 struct tegra_dc_win *tegra_dc_get_window(struct tegra_dc *dc, unsigned win);
+bool tegra_dc_get_connected(struct tegra_dc *);
 
 void tegra_dc_enable(struct tegra_dc *dc);
 void tegra_dc_disable(struct tegra_dc *dc);
 
-u32 tegra_dc_get_syncpt_id(const struct tegra_dc *dc);
-u32 tegra_dc_incr_syncpt_max(struct tegra_dc *dc);
-void tegra_dc_incr_syncpt_min(struct tegra_dc *dc, u32 val);
-
-int tegra_dc_set_default_emc(struct tegra_dc *dc);
-int tegra_dc_set_dynamic_emc(struct tegra_dc_win *windows[], int n);
+u32 tegra_dc_get_syncpt_id(const struct tegra_dc *dc, int i);
+u32 tegra_dc_incr_syncpt_max(struct tegra_dc *dc, int i);
+void tegra_dc_incr_syncpt_min(struct tegra_dc *dc, int i, u32 val);
 
 /* tegra_dc_update_windows and tegra_dc_sync_windows do not support windows
  * with differenct dcs in one call
@@ -456,6 +487,8 @@ unsigned tegra_dc_get_out_max_pixclock(const struct tegra_dc *dc);
 
 struct tegra_dc_pwm_params {
 	int which_pwm;
+	void (*switch_to_sfio)(int);
+	int gpio_conf_to_sfio;
 	unsigned int period;
 	unsigned int clk_div;
 	unsigned int clk_select;
@@ -463,5 +496,7 @@ struct tegra_dc_pwm_params {
 };
 
 void tegra_dc_config_pwm(struct tegra_dc *dc, struct tegra_dc_pwm_params *cfg);
+
+int tegra_dc_update_csc(struct tegra_dc *dc, int win_index);
 
 #endif

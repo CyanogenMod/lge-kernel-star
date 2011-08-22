@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Syncpoints
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010-2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+#include <linux/nvhost_ioctl.h>
 #include "nvhost_syncpt.h"
 #include "dev.h"
 
@@ -114,8 +115,14 @@ int nvhost_syncpt_wait_timeout(struct nvhost_syncpt *sp, u32 id,
 
 	if (value)
 		*value = 0;
+
 	BUG_ON(!syncpt_op(sp).update_min);
-	BUG_ON(!nvhost_syncpt_check_max(sp, id, thresh));
+	if (!nvhost_syncpt_check_max(sp, id, thresh)) {
+		WARN(1, "wait %d (%s) for (%d) wouldn't be met (max %d)\n",
+			id, syncpt_op(sp).name(sp, id), thresh,
+			nvhost_syncpt_read_max(sp, id));
+		return -EINVAL;
+	}
 
 	/* first check cache */
 	if (nvhost_syncpt_min_cmp(sp, id, thresh)) {

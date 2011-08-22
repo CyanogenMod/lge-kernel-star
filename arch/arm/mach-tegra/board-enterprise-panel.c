@@ -27,17 +27,20 @@
 #include <linux/earlysuspend.h>
 #include <linux/tegra_pwm_bl.h>
 #include <asm/atomic.h>
-#include <mach/nvhost.h>
+#include <linux/nvhost.h>
 #include <mach/nvmap.h>
 #include <mach/irqs.h>
 #include <mach/iomap.h>
 #include <mach/dc.h>
 #include <mach/fb.h>
+#include <mach/hardware.h>
 
 #include "board.h"
 #include "board-enterprise.h"
 #include "devices.h"
 #include "gpio-names.h"
+
+#define DC_CTRL_MODE    TEGRA_DC_OUT_ONE_SHOT_MODE
 
 /* Select panel to be used. */
 #define AVDD_LCD PMU_TCA6416_GPIO_PORT17
@@ -47,7 +50,6 @@
 #define enterprise_hdmi_hpd		TEGRA_GPIO_PN7
 
 #define enterprise_dsi_panel_reset	TEGRA_GPIO_PW0
-#define enterprise_dsi_panel_bl		TEGRA_GPIO_PW1
 
 #define enterprise_lcd_2d_3d		TEGRA_GPIO_PH1
 #define ENTERPRISE_STEREO_3D		0
@@ -57,6 +59,8 @@
 #define ENTERPRISE_STEREO_LANDSCAPE	0
 #define ENTERPRISE_STEREO_PORTRAIT	1
 
+#define enterprise_lcd_te		TEGRA_GPIO_PJ1
+
 static struct regulator *enterprise_dsi_reg = NULL;
 
 static struct regulator *enterprise_hdmi_reg;
@@ -65,14 +69,81 @@ static struct regulator *enterprise_hdmi_vddio;
 
 static atomic_t sd_brightness = ATOMIC_INIT(255);
 
+static tegra_dc_bl_output enterprise_bl_output_measured = {
+	1, 5, 9, 10, 11, 12, 12, 13,
+	13, 14, 14, 15, 15, 16, 16, 17,
+	17, 18, 18, 19, 19, 20, 21, 21,
+	22, 22, 23, 24, 24, 25, 26, 26,
+	27, 27, 28, 29, 29, 31, 31, 32,
+	32, 33, 34, 35, 36, 36, 37, 38,
+	39, 39, 40, 41, 41, 42, 43, 43,
+	44, 45, 45, 46, 47, 47, 48, 49,
+	49, 50, 51, 51, 52, 53, 53, 54,
+	55, 56, 56, 57, 58, 59, 60, 61,
+	61, 62, 63, 64, 65, 65, 66, 67,
+	67, 68, 69, 69, 70, 71, 71, 72,
+	73, 73, 74, 74, 75, 76, 76, 77,
+	77, 78, 79, 79, 80, 81, 82, 83,
+	83, 84, 85, 85, 86, 86, 88, 89,
+	90, 91, 91, 92, 93, 93, 94, 95,
+	95, 96, 97, 97, 98, 99, 99, 100,
+	101, 101, 102, 103, 103, 104, 105, 105,
+	107, 107, 108, 109, 110, 111, 111, 112,
+	113, 113, 114, 115, 115, 116, 117, 117,
+	118, 119, 119, 120, 121, 122, 123, 124,
+	124, 125, 126, 126, 127, 128, 129, 129,
+	130, 131, 131, 132, 133, 133, 134, 135,
+	135, 136, 137, 137, 138, 139, 139, 140,
+	142, 142, 143, 144, 145, 146, 147, 147,
+	148, 149, 149, 150, 151, 152, 153, 153,
+	153, 154, 155, 156, 157, 158, 158, 159,
+	160, 161, 162, 163, 163, 164, 165, 165,
+	166, 166, 167, 168, 169, 169, 170, 170,
+	171, 172, 173, 173, 174, 175, 175, 176,
+	176, 178, 178, 179, 180, 181, 182, 182,
+	183, 184, 185, 186, 186, 187, 188, 188
+};
+
+static p_tegra_dc_bl_output bl_output;
+
+static int enterprise_backlight_notify(struct device *unused, int brightness)
+{
+	int cur_sd_brightness = atomic_read(&sd_brightness);
+	int orig_brightness = brightness;
+
+	/* SD brightness is a percentage, 8-bit value. */
+	brightness = (brightness * cur_sd_brightness) / 255;
+	if (cur_sd_brightness != 255) {
+		pr_info("NVSD BL - in: %d, sd: %d, out: %d\n",
+			orig_brightness, cur_sd_brightness, brightness);
+	}
+
+	/* Apply any backlight response curve */
+	if (brightness > 255)
+		pr_info("Error: Brightness > 255!\n");
+	else
+		brightness = bl_output[brightness];
+
+	return brightness;
+}
+
+/*
+ * In case which_pwm is TEGRA_PWM_PM0,
+ * gpio_conf_to_sfio should be TEGRA_GPIO_PW0: set LCD_CS1_N pin to SFIO
+ * In case which_pwm is TEGRA_PWM_PM1,
+ * gpio_conf_to_sfio should be TEGRA_GPIO_PW1: set LCD_M1 pin to SFIO
+ */
 static struct platform_tegra_pwm_backlight_data enterprise_disp1_backlight_data = {
-	.which_dc	= 0,
-	.which_pwm	= TEGRA_PWM_PM1,
-	.max_brightness	= 255,
-	.dft_brightness	= 224,
-	.period		= 0x3F,
-	.clk_div	= 1,
-	.clk_select	= 2,
+	.which_dc		= 0,
+	.which_pwm		= TEGRA_PWM_PM1,
+	.gpio_conf_to_sfio	= TEGRA_GPIO_PW1,
+	.switch_to_sfio		= &tegra_gpio_disable,
+	.max_brightness		= 255,
+	.dft_brightness		= 224,
+	.notify		= enterprise_backlight_notify,
+	.period			= 0xFF,
+	.clk_div		= 0x3FF,
+	.clk_select		= 0,
 };
 
 static struct platform_device enterprise_disp1_backlight_device = {
@@ -82,6 +153,7 @@ static struct platform_device enterprise_disp1_backlight_device = {
 		.platform_data = &enterprise_disp1_backlight_data,
 	},
 };
+
 static int enterprise_hdmi_vddio_enable(void)
 {
 	int ret;
@@ -216,12 +288,12 @@ static struct resource enterprise_disp2_resources[] = {
 };
 
 static struct tegra_dc_sd_settings enterprise_sd_settings = {
-	.enable = 1, /* Normal mode operation */
+	.enable = 0, /* Normal mode operation */
 	.use_auto_pwm = false,
 	.hw_update_delay = 0,
 	.bin_width = -1,
-	.aggressiveness = 5,
-	.use_vid_luma = true,
+	.aggressiveness = 1,
+	.use_vid_luma = false,
 	/* Default video coefficients */
 	.coeff = {5, 9, 2},
 	.fc = {0, 0},
@@ -317,6 +389,7 @@ static struct tegra_fb_data enterprise_hdmi_fb_data = {
 static struct tegra_dc_out enterprise_disp2_out = {
 	.type		= TEGRA_DC_OUT_HDMI,
 	.flags		= TEGRA_DC_OUT_HOTPLUG_HIGH,
+	.parent_clk	= "pll_d2_out0",
 
 	.dcc_bus	= 3,
 	.hotplug_gpio	= enterprise_hdmi_hpd,
@@ -376,25 +449,11 @@ static int enterprise_dsi_panel_enable(void)
 	mdelay(20);
 #endif
 
-	ret = gpio_request(enterprise_dsi_panel_bl, "DSIa backlight");
-	if (ret < 0)
-		return ret;
-
-	ret = gpio_direction_output(enterprise_dsi_panel_bl, 1);
-	if (ret < 0) {
-		gpio_free(enterprise_dsi_panel_bl);
-		return ret;
-	}
-	tegra_gpio_enable(enterprise_dsi_panel_bl);
-
 	return ret;
 }
 
 static int enterprise_dsi_panel_disable(void)
 {
-	tegra_gpio_disable(enterprise_dsi_panel_bl);
-	gpio_free(enterprise_dsi_panel_bl);
-
 #if DSI_PANEL_RESET
 	tegra_gpio_disable(enterprise_dsi_panel_reset);
 	gpio_free(enterprise_dsi_panel_reset);
@@ -445,6 +504,25 @@ static int enterprise_dsi_panel_postsuspend(void)
 static struct tegra_dsi_cmd dsi_init_cmd[]= {
 	DSI_CMD_SHORT(0x05, 0x11, 0x00),
 	DSI_DLY_MS(150),
+#if(DC_CTRL_MODE == TEGRA_DC_OUT_ONE_SHOT_MODE)
+	DSI_CMD_SHORT(0x15, 0x35, 0x00),
+#endif
+	DSI_CMD_SHORT(0x05, 0x29, 0x00),
+	DSI_DLY_MS(20),
+};
+
+static struct tegra_dsi_cmd dsi_early_suspend_cmd[] = {
+	DSI_CMD_SHORT(0x05, 0x28, 0x00),
+	DSI_DLY_MS(20),
+#if(DC_CTRL_MODE == TEGRA_DC_OUT_ONE_SHOT_MODE)
+	DSI_CMD_SHORT(0x05, 0x34, 0x00),
+#endif
+};
+
+static struct tegra_dsi_cmd dsi_late_resume_cmd[] = {
+#if(DC_CTRL_MODE == TEGRA_DC_OUT_ONE_SHOT_MODE)
+	DSI_CMD_SHORT(0x15, 0x35, 0x00),
+#endif
 	DSI_CMD_SHORT(0x05, 0x29, 0x00),
 	DSI_DLY_MS(20),
 };
@@ -452,6 +530,9 @@ static struct tegra_dsi_cmd dsi_init_cmd[]= {
 static struct tegra_dsi_cmd dsi_suspend_cmd[] = {
 	DSI_CMD_SHORT(0x05, 0x28, 0x00),
 	DSI_DLY_MS(20),
+#if(DC_CTRL_MODE == TEGRA_DC_OUT_ONE_SHOT_MODE)
+	DSI_CMD_SHORT(0x05, 0x34, 0x00),
+#endif
 	DSI_CMD_SHORT(0x05, 0x10, 0x00),
 	DSI_DLY_MS(5),
 };
@@ -466,14 +547,21 @@ struct tegra_dsi_out enterprise_dsi = {
 	.dsi_instance = 0,
 
 	.panel_reset = DSI_PANEL_RESET,
-
+	.power_saving_suspend = true,
 	.n_init_cmd = ARRAY_SIZE(dsi_init_cmd),
 	.dsi_init_cmd = dsi_init_cmd,
 
+	.n_early_suspend_cmd = ARRAY_SIZE(dsi_early_suspend_cmd),
+	.dsi_early_suspend_cmd = dsi_early_suspend_cmd,
+
+	.n_late_resume_cmd = ARRAY_SIZE(dsi_late_resume_cmd),
+	.dsi_late_resume_cmd = dsi_late_resume_cmd,
+
 	.n_suspend_cmd = ARRAY_SIZE(dsi_suspend_cmd),
 	.dsi_suspend_cmd = dsi_suspend_cmd,
+
 	.video_data_type = TEGRA_DSI_VIDEO_TYPE_COMMAND_MODE,
-	.lp_cmd_mode_freq_khz = 430000,
+	.lp_cmd_mode_freq_khz = 20000,
 };
 
 static struct tegra_stereo_out enterprise_stereo = {
@@ -512,6 +600,8 @@ static struct tegra_dc_out enterprise_disp1_out = {
 	.order		= TEGRA_DC_ORDER_RED_BLUE,
 	.sd_settings	= &enterprise_sd_settings,
 
+	.flags		= DC_CTRL_MODE,
+
 	.type		= TEGRA_DC_OUT_DSI,
 
 	.modes		= enterprise_dsi_modes,
@@ -523,11 +613,14 @@ static struct tegra_dc_out enterprise_disp1_out = {
 	.enable		= enterprise_dsi_panel_enable,
 	.disable	= enterprise_dsi_panel_disable,
 	.postsuspend	= enterprise_dsi_panel_postsuspend,
+
+	.width		= 53,
+	.height		= 95,
 };
 static struct tegra_dc_platform_data enterprise_disp1_pdata = {
 	.flags		= TEGRA_DC_FLAG_ENABLED,
 	.default_out	= &enterprise_disp1_out,
-	.emc_clk_rate	= 300000000,
+	.emc_clk_rate	= 204000000,
 	.fb		= &enterprise_dsi_fb_data,
 };
 static struct nvhost_device enterprise_disp1_device = {
@@ -620,6 +713,14 @@ int __init enterprise_panel_init(void)
 	int err;
 	struct resource *res;
 
+	bl_output = enterprise_bl_output_measured;
+
+	if (WARN_ON(ARRAY_SIZE(enterprise_bl_output_measured) != 256))
+		pr_err("bl_output array does not have 256 elements\n");
+
+	enterprise_dsi.chip_id = tegra_get_chipid();
+	enterprise_dsi.chip_rev = tegra_get_revision();
+
 	enterprise_carveouts[1].base = tegra_carveout_start;
 	enterprise_carveouts[1].size = tegra_carveout_size;
 
@@ -637,14 +738,18 @@ int __init enterprise_panel_init(void)
 	gpio_direction_output(enterprise_lcd_swp_pl, 0);
 	enterprise_stereo_set_orientation(enterprise_stereo.orientation);
 
+#if(DC_CTRL_MODE != TEGRA_DC_OUT_ONE_SHOT_MODE)
+	tegra_gpio_enable(enterprise_lcd_te);
+	gpio_request(enterprise_lcd_swp_pl, "lcd_te");
+	gpio_direction_input(enterprise_lcd_te);
+#endif
+
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	enterprise_panel_early_suspender.suspend = enterprise_panel_early_suspend;
 	enterprise_panel_early_suspender.resume = enterprise_panel_late_resume;
 	enterprise_panel_early_suspender.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
 	register_early_suspend(&enterprise_panel_early_suspender);
 #endif
-
-	tegra_gpio_disable(TEGRA_GPIO_PW1);
 
 	err = platform_add_devices(enterprise_gfx_devices,
 				ARRAY_SIZE(enterprise_gfx_devices));

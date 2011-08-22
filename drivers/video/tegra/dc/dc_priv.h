@@ -24,13 +24,15 @@
 #include <linux/completion.h>
 #include <linux/switch.h>
 
+#include <mach/dc.h>
+
 #include "../host/dev.h"
 #include "../host/t20/syncpt_t20.h"
 
+#include <mach/tegra_dc_ext.h>
+
 #define WIN_IS_TILED(win)	((win)->flags & TEGRA_WIN_FLAG_TILED)
 #define WIN_IS_ENABLED(win)	((win)->flags & TEGRA_WIN_FLAG_ENABLED)
-#define WIN_USE_V_FILTER(win)	((win)->h != (win)->out_h)
-#define WIN_USE_H_FILTER(win)	((win)->w != (win)->out_w)
 
 #define NEED_UPDATE_EMC_ON_EVERY_FRAME (windows_idle_detection_time == 0)
 
@@ -41,18 +43,6 @@
 #define EMC_BW_TO_FREQ(bw) (DDR_BW_TO_FREQ(bw) * CONFIG_TEGRA_EMC_TO_DDR_CLOCK)
 #else
 #define EMC_BW_TO_FREQ(bw) (DDR_BW_TO_FREQ(bw) * 2)
-#endif
-
-/*
- * If using T30/DDR3, the 2nd 16 bytes part of DDR3 atom is 2nd line and is
- * discarded in tiling mode.
- */
-#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
-#define TILED_WINDOWS_BW_MULTIPLIER 1
-#elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
-#define TILED_WINDOWS_BW_MULTIPLIER 2
-#else
-#warning "need to revisit memory tiling effects on DC"
 #endif
 
 struct tegra_dc;
@@ -94,6 +84,7 @@ struct tegra_dc {
 	int				emc_clk_rate;
 	int				new_emc_clk_rate;
 
+	bool				connected;
 	bool				enabled;
 	bool				suspended;
 
@@ -116,13 +107,15 @@ struct tegra_dc {
 
 	struct tegra_overlay_info	*overlay;
 
-	u32				syncpt_id;
-	u32				syncpt_min;
-	u32				syncpt_max;
+	struct {
+		u32			id;
+		u32			min;
+		u32			max;
+	} syncpt[DC_N_WINDOWS];
+	u32				vblank_syncpt;
 
 	unsigned long			underflow_mask;
 	struct work_struct		reset_work;
-	struct delayed_work		reduce_emc_clk_work;
 
 	struct switch_dev		modeset_switch;
 
@@ -136,6 +129,8 @@ struct tegra_dc {
 		unsigned		underflows_b;
 		unsigned		underflows_c;
 	} stats;
+
+	struct tegra_dc_ext		*ext;
 
 #ifdef CONFIG_DEBUG_FS
 	struct dentry			*debugdir;
@@ -207,5 +202,14 @@ void tegra_dc_create_sysfs(struct device *dev);
 /* defined in dc.c, used by dc_sysfs.c */
 void tegra_dc_stats_enable(struct tegra_dc *dc, bool enable);
 bool tegra_dc_stats_get(struct tegra_dc *dc);
+
+/* defined in dc.c, used by overlay.c */
+unsigned int tegra_dc_has_multiple_dc(void);
+unsigned long tegra_dc_get_bandwidth(struct tegra_dc_win *wins[], int n);
+
+/* defined in dc.c, used by dc_sysfs.c */
+u32 tegra_dc_read_checksum_latched(struct tegra_dc *dc);
+void tegra_dc_enable_crc(struct tegra_dc *dc);
+void tegra_dc_disable_crc(struct tegra_dc *dc);
 #endif
 

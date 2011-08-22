@@ -233,6 +233,12 @@ struct spi_tegra_data {
 	u32			dma_control_reg;
 	u32			def_command_reg;
 	u32			def_command2_reg;
+
+	struct spi_clk_parent	*parent_clk_list;
+	int			parent_clk_count;
+	unsigned long		max_rate;
+	unsigned long		max_parent_rate;
+	int			min_div;
 };
 
 static inline unsigned long spi_tegra_readl(struct spi_tegra_data *tspi,
@@ -567,6 +573,64 @@ static int spi_tegra_start_cpu_based_transfer(
 	return 0;
 }
 
+static void set_best_clk_source(struct spi_tegra_data *tspi,
+		unsigned long speed)
+{
+	long new_rate;
+	unsigned long err_rate;
+	int rate = speed * 4;
+	unsigned int fin_err = speed * 4;
+	int final_index = -1;
+	int count;
+	int ret;
+	struct clk *pclk;
+	unsigned long prate, crate, nrate;
+	unsigned long cdiv;
+
+	if (!tspi->parent_clk_count || !tspi->parent_clk_list)
+		return;
+
+	/* make sure divisor is more than min_div */
+	pclk = clk_get_parent(tspi->clk);
+	prate = clk_get_rate(pclk);
+	crate = clk_get_rate(tspi->clk);
+	cdiv = DIV_ROUND_UP(prate, crate);
+	if (cdiv < tspi->min_div) {
+		nrate = DIV_ROUND_UP(prate, tspi->min_div);
+		clk_set_rate(tspi->clk, nrate);
+	}
+
+	for (count = 0; count < tspi->parent_clk_count; ++count) {
+		if (!tspi->parent_clk_list[count].parent_clk)
+			continue;
+		ret = clk_set_parent(tspi->clk,
+			tspi->parent_clk_list[count].parent_clk);
+		if (ret < 0) {
+			dev_warn(&tspi->pdev->dev, "Error in setting parent "
+				" clk src %s\n",
+				tspi->parent_clk_list[count].name);
+			continue;
+		}
+
+		new_rate = clk_round_rate(tspi->clk, rate);
+		if (new_rate < 0)
+			continue;
+
+		err_rate = abs(new_rate - rate);
+		if (err_rate < fin_err) {
+			final_index = count;
+			fin_err = err_rate;
+		}
+	}
+
+	if (final_index >= 0) {
+		dev_info(&tspi->pdev->dev, "Setting clk_src %s\n",
+				tspi->parent_clk_list[final_index].name);
+		clk_set_parent(tspi->clk,
+			tspi->parent_clk_list[final_index].parent_clk);
+	}
+}
+
 static void spi_tegra_start_transfer(struct spi_device *spi,
 		    struct spi_transfer *t, bool is_first_of_msg,
 		    bool is_single_xfer)
@@ -597,6 +661,7 @@ static void spi_tegra_start_transfer(struct spi_device *spi,
 
 	speed = t->speed_hz ? t->speed_hz : spi->max_speed_hz;
 	if (speed != tspi->cur_speed) {
+		set_best_clk_source(tspi, speed);
 		clk_set_rate(tspi->clk, speed * 4);
 		tspi->cur_speed = speed;
 	}
@@ -1038,6 +1103,7 @@ static int __init spi_tegra_probe(struct platform_device *pdev)
 	struct resource		*r;
 	struct tegra_spi_platform_data *pdata = pdev->dev.platform_data;
 	int ret, spi_irq;
+	int i;
 
 	master = spi_alloc_master(&pdev->dev, sizeof *tspi);
 	if (master == NULL) {
@@ -1113,10 +1179,30 @@ static int __init spi_tegra_probe(struct platform_device *pdev)
 		tspi->is_dma_allowed = pdata->is_dma_based;
 		tspi->dma_buf_size = (pdata->max_dma_buffer) ?
 				pdata->max_dma_buffer : DEFAULT_SPI_DMA_BUF_LEN;
+		tspi->parent_clk_count = pdata->parent_clk_count;
+		tspi->parent_clk_list = pdata->parent_clk_list;
+		tspi->max_rate = pdata->max_rate;
 	} else {
 		tspi->is_clkon_always = false;
 		tspi->is_dma_allowed = true;
 		tspi->dma_buf_size = DEFAULT_SPI_DMA_BUF_LEN;
+		tspi->parent_clk_count = 0;
+		tspi->parent_clk_list = NULL;
+		tspi->max_rate = 0;
+	}
+
+	tspi->max_parent_rate = 0;
+	tspi->min_div = 0;
+
+	if (tspi->parent_clk_count) {
+		tspi->max_parent_rate = tspi->parent_clk_list[0].fixed_clk_rate;
+		for (i = 1; i < tspi->parent_clk_count; ++i) {
+			tspi->max_parent_rate = max(tspi->max_parent_rate,
+				tspi->parent_clk_list[i].fixed_clk_rate);
+		}
+		if (tspi->max_rate)
+			tspi->min_div = DIV_ROUND_UP(tspi->max_parent_rate,
+						tspi->max_rate);
 	}
 	tspi->max_buf_size = SLINK_FIFO_DEPTH << 2;
 

@@ -262,4 +262,5 @@
 #define TEGRA_GPIO_PEE0		240
 #define TEGRA_GPIO_PEE1		241
 #define TEGRA_GPIO_PEE2		242
+#define TEGRA_GPIO_PEE3		243
 #endif

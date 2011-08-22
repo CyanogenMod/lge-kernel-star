@@ -24,6 +24,7 @@
 #define __VIDEO_TEGRA_NVMAP_NVMAP_H
 
 #include <linux/list.h>
+#include <linux/mm.h>
 #include <linux/mutex.h>
 #include <linux/rbtree.h>
 #include <linux/sched.h>
@@ -113,6 +114,7 @@ struct nvmap_client {
 	bool				super;
 	atomic_t			count;
 	struct task_struct		*task;
+	struct list_head		list;
 	struct nvmap_carveout_commit	carveout_commit[0];
 };
 
@@ -230,7 +232,7 @@ static inline void nvmap_handle_put(struct nvmap_handle *h)
 static inline pgprot_t nvmap_pgprot(struct nvmap_handle *h, pgprot_t prot)
 {
 	if (h->flags == NVMAP_HANDLE_UNCACHEABLE)
-		return pgprot_dmacoherent(prot);
+		return pgprot_noncached(prot);
 	else if (h->flags == NVMAP_HANDLE_WRITE_COMBINE)
 		return pgprot_writecombine(prot);
 	else if (h->flags == NVMAP_HANDLE_INNER_CACHEABLE)

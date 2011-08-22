@@ -30,6 +30,7 @@ config ARCH_TEGRA_3x_SOC
 	select USB_EHCI_TEGRA if USB_SUPPORT
 	select USB_ULPI if USB_SUPPORT
 	select USB_ULPI_VIEWPORT if USB_SUPPORT
+	select REPORT_PRESENT_CPUS if TEGRA_AUTO_HOTPLUG
 	help
 	  Support for NVIDIA Tegra 3 family of SoCs, based upon the
 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
@@ -116,14 +117,6 @@ config MACH_TEGRA_ENTERPRISE
        help
          Support for NVIDIA Enterprise development platform
 
-config TEGRA_VERBIER_E1187
-       bool "Support for NVIDIA VERBIER E1187 platform"
-       default n
-       help
-         This enables the NVIDIA Tegra Verbier E1187 platform support.
-         Select this only if you are an NVIDIA developer working on
-         an verbier E1187 platforms. All others must leave this unselected.
-
 choice
        prompt "Tegra platform type"
        default TEGRA_SILICON_PLATFORM
@@ -157,19 +150,23 @@ config TEGRA_DEBUG_UART_NONE
 
 config TEGRA_DEBUG_UARTA
         bool "UART-A"
+	depends on DEBUG_LL
 
 config TEGRA_DEBUG_UARTB
         bool "UART-B"
+	depends on DEBUG_LL
 
 config TEGRA_DEBUG_UARTC
         bool "UART-C"
+	depends on DEBUG_LL
 
 config TEGRA_DEBUG_UARTD
         bool "UART-D"
+	depends on DEBUG_LL
 
 config TEGRA_DEBUG_UARTE
         bool "UART-E"
-
+	depends on DEBUG_LL
 endchoice
 
 config TEGRA_SYSTEM_DMA
@@ -344,4 +341,23 @@ config TEGRA_STAT_MON
 config USB_HOTPLUG
 	bool "Enabling the USB hotplug"
 	default n
+
+config TEGRA_DYNAMIC_PWRDET
+	bool "Enable dynamic activation of IO level auto-detection"
+	depends on TEGRA_SILICON_PLATFORM
+	default n
+	help
+	  This option allows turning off tegra IO level auto-detection
+	  when IO power is stable. If set auto-detection cells are active
+	  only during power transitions, otherwise, the cells are active
+	  always
+
+config TEGRA_EDP_EXACT_FREQ
+	bool "Use maximum possible cpu frequency when EDP capping"
+	depends on TEGRA_EDP_LIMITS
+	default n
+	help
+	  When enabled the cpu will run at the exact frequency
+	  specified in the EDP table when EDP capping is applied; when
+	  disabled the next lower cpufreq frequency will be used.
 endif

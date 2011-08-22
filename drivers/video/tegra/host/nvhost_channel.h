@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Channel
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010-2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -35,6 +35,7 @@
 #define NVHOST_MAX_HANDLES 1280
 
 struct nvhost_master;
+struct nvhost_waitchk;
 
 struct nvhost_channeldesc {
 	const char *name;
@@ -49,6 +50,8 @@ struct nvhost_channeldesc {
 
 struct nvhost_channel {
 	int refcount;
+	int chid;
+	u32 syncpt_id;
 	struct mutex reflock;
 	struct mutex submitlock;
 	void __iomem *aperture;
@@ -89,6 +92,8 @@ int nvhost_channel_submit(
 	int nr_unpins,
 	u32 syncpt_id,
 	u32 syncpt_incrs,
+	u32 timeout,
+	void *timeout_ctx,
 	u32 *syncpt_value,
 	bool null_kickoff);
 
@@ -99,4 +104,14 @@ void nvhost_channel_suspend(struct nvhost_channel *ch);
 #define channel_cdma_op(ch) (ch->dev->op.cdma)
 #define channel_op(ch) (ch->dev->op.channel)
 #define host_channel_op(host) (host->op.channel)
+
+int nvhost_channel_drain_read_fifo(void __iomem *chan_regs,
+			u32 *ptr, unsigned int count, unsigned int *pending);
+
+int nvhost_channel_read_3d_reg(
+	struct nvhost_channel *channel,
+	struct nvhost_hwctx *hwctx,
+	u32 offset,
+	u32 *value);
+
 #endif

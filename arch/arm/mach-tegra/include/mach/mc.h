@@ -104,4 +104,6 @@ void tegra_mc_set_priority(unsigned long client, unsigned long prio);
 	do { /* nothing for now */ } while (0)
 #endif
 
+int tegra_mc_get_tiled_memory_bandwidth_multiplier(void);
+
 #endif

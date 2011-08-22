@@ -24,6 +24,7 @@ obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += sleep-t3.o
 obj-y                                   += fuse.o
 obj-y                                   += kfuse.o
 obj-y                                   += tegra_odm_fuses.o
+obj-y                                   += i2c_error_recovery.o
 obj-$(CONFIG_TEGRA_LEGACY_AUDIO)        += tegra_i2s_audio.o
 obj-$(CONFIG_TEGRA_LEGACY_AUDIO)        += tegra_spdif_audio.o
 obj-y                                   += mc.o
@@ -42,6 +43,7 @@ obj-y                                   += dvfs.o
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_dvfs.o
 obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += tegra3_dvfs.o
 obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += latency_allowance.o
+obj-$(CONFIG_TEGRA_EDP_LIMITS)          += edp.o
 endif
 ifeq ($(CONFIG_TEGRA_SILICON_PLATFORM),y)
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_speedo.o
@@ -76,6 +78,9 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += cpuidle-t2.o
 obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += cpuidle-t3.o
 endif
 endif
+ifeq ($(CONFIG_TEGRA_THERMAL_THROTTLE),y)
+obj-y                                   += tegra2-throttle.o
+endif
 obj-$(CONFIG_TEGRA_IOVMM)               += iovmm.o
 obj-$(CONFIG_TEGRA_IOVMM_GART)          += iovmm-gart.o
 obj-$(CONFIG_TEGRA_IOVMM_SMMU)          += iovmm-smmu.o
@@ -86,6 +91,7 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_mc.o
 obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += tegra3_mc.o
 endif
 obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += tegra3_tsensor.o
+obj-$(CONFIG_TEGRA_DYNAMIC_PWRDET)      += powerdetect.o
 
 obj-${CONFIG_TEGRA_SPI_SLAVE}           += spi_tegra_slave.o
 
@@ -139,6 +145,8 @@ obj-${CONFIG_MACH_CARDHU}               += board-cardhu-sdhci.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-sensors.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-memory.o
 obj-${CONFIG_MACH_CARDHU}               += board-cardhu-powermon.o
+obj-m += baseband-xmm-power.o
+obj-m += baseband-xmm-power2.o
 
 obj-${CONFIG_MACH_TEGRA_ENTERPRISE}     += board-enterprise.o
 obj-${CONFIG_MACH_TEGRA_ENTERPRISE}     += board-enterprise-panel.o

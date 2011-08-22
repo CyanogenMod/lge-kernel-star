@@ -161,23 +161,6 @@ int __init cardhu_scroll_init(void)
 		.debounce_interval = 10,	\
 	}
 
-static struct gpio_keys_button cardhu_keys_pm269[] = {
-	[0] = GPIO_KEY(KEY_POWER, PV0, 1),
-};
-
-static struct gpio_keys_platform_data cardhu_keys_pm269_platform_data = {
-	.buttons	= cardhu_keys_pm269,
-	.nbuttons	= ARRAY_SIZE(cardhu_keys_pm269),
-};
-
-static struct platform_device cardhu_keys_pm269_device = {
-	.name   = "gpio-keys",
-	.id     = 0,
-	.dev    = {
-		.platform_data  = &cardhu_keys_pm269_platform_data,
-	},
-};
-
 static struct gpio_keys_button cardhu_keys_e1198[] = {
 	[0] = GPIO_KEY(KEY_HOME, PQ0, 0),
 	[1] = GPIO_KEY(KEY_BACK, PQ1, 0),
@@ -251,6 +234,24 @@ static struct platform_device cardhu_int_keys_e1291_device = {
 	},
 };
 
+static struct interrupt_keys_button cardhu_int_keys_pm269[] = {
+	[0] = INT_KEY(KEY_POWER, TPS6591X_IRQ_BASE + TPS6591X_INT_PWRON, 0, 100),
+	[1] = INT_KEY(KEY_POWER, TPS6591X_IRQ_BASE + TPS6591X_INT_PWRON_LP, 0, 8000),
+};
+
+static struct interrupt_keys_platform_data cardhu_int_keys_pm269_pdata = {
+	.int_buttons	= cardhu_int_keys_pm269,
+	.nbuttons	= ARRAY_SIZE(cardhu_int_keys_pm269),
+};
+
+static struct platform_device cardhu_int_keys_pm269_device = {
+	.name   = "interrupt-keys",
+	.id     = 0,
+	.dev    = {
+		.platform_data  = &cardhu_int_keys_pm269_pdata,
+	},
+};
+
 int __init cardhu_keys_init(void)
 {
 	int i;
@@ -272,10 +273,7 @@ int __init cardhu_keys_init(void)
 		platform_device_register(&cardhu_keys_e1291_device);
 		platform_device_register(&cardhu_int_keys_e1291_device);
 	} else if (board_info.board_id == BOARD_PM269) {
-		for (i = 0; i < ARRAY_SIZE(cardhu_keys_pm269); i++)
-			tegra_gpio_enable(cardhu_keys_pm269[i].gpio);
-
-		platform_device_register(&cardhu_keys_pm269_device);
+		platform_device_register(&cardhu_int_keys_pm269_device);
 	} else {
 		/* For E1198 */
 		for (i = 0; i < ARRAY_SIZE(cardhu_keys_e1198); i++)

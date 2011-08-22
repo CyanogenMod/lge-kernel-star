@@ -27,12 +27,13 @@
 #include <linux/spinlock.h>
 #include <linux/tegra_overlay.h>
 #include <linux/uaccess.h>
+#include <drm/drm_fixed.h>
 
 #include <asm/atomic.h>
 
 #include <mach/dc.h>
 #include <mach/fb.h>
-#include <mach/nvhost.h>
+#include <linux/nvhost.h>
 
 #include "dc_priv.h"
 #include "../nvmap/nvmap.h"
@@ -159,10 +160,10 @@ static int tegra_overlay_set_windowattr(struct tegra_overlay_info *overlay,
 		win->flags |= TEGRA_WIN_FLAG_TILED;
 
 	win->fmt = flip_win->attr.pixformat;
-	win->x = flip_win->attr.x;
-	win->y = flip_win->attr.y;
-	win->w = flip_win->attr.w;
-	win->h = flip_win->attr.h;
+	win->x.full = dfixed_const(flip_win->attr.x);
+	win->y.full = dfixed_const(flip_win->attr.y);
+	win->w.full = dfixed_const(flip_win->attr.w);
+	win->h.full = dfixed_const(flip_win->attr.h);
 	win->out_x = flip_win->attr.out_x;
 	win->out_y = flip_win->attr.out_y;
 	win->out_w = flip_win->attr.out_w;
@@ -183,12 +184,16 @@ static int tegra_overlay_set_windowattr(struct tegra_overlay_info *overlay,
 
 	if (((win->out_x + win->out_w) > xres) && (win->out_x < xres)) {
 		long new_w = xres - win->out_x;
-		win->w = win->w * new_w / win->out_w;
+		u64 in_w = win->w.full * new_w;
+		do_div(in_w, win->out_w);
+		win->w.full = lower_32_bits(in_w);
 	        win->out_w = new_w;
 	}
 	if (((win->out_y + win->out_h) > yres) && (win->out_y < yres)) {
 		long new_h = yres - win->out_y;
-		win->h = win->h * new_h / win->out_h;
+		u64 in_h = win->h.full * new_h;
+		do_div(in_h, win->out_h);
+		win->h.full = lower_32_bits(in_h);
 	        win->out_h = new_h;
 	}
 
@@ -310,17 +315,15 @@ static void tegra_overlay_flip_worker(struct work_struct *work)
 			dcwins[i] = tegra_dc_get_window(overlay->dc, i);
 
 		tegra_overlay_blend_reorder(&overlay->blend, dcwins);
-		tegra_dc_set_dynamic_emc(dcwins, DC_N_WINDOWS);
 		tegra_dc_update_windows(dcwins, DC_N_WINDOWS);
 		tegra_dc_sync_windows(dcwins, DC_N_WINDOWS);
 	} else {
-		tegra_dc_set_dynamic_emc(wins, nr_win);
 		tegra_dc_update_windows(wins, nr_win);
 		/* TODO: implement swapinterval here */
 		tegra_dc_sync_windows(wins, nr_win);
 	}
 
-		tegra_dc_incr_syncpt_min(overlay->dc, data->syncpt_max);
+	tegra_dc_incr_syncpt_min(overlay->dc, 0, data->syncpt_max);
 
 	/* unpin and deref previous front buffers */
 	for (i = 0; i < nr_unpin; i++) {
@@ -344,10 +347,13 @@ static int tegra_overlay_flip(struct tegra_overlay_info *overlay,
 		return -EFAULT;
 
 	mutex_lock(&tegra_flip_lock);
+	mutex_lock(&overlay->dc->lock);
 	if (!overlay->dc->enabled) {
+		mutex_unlock(&overlay->dc->lock);
 		mutex_unlock(&tegra_flip_lock);
 		return -EFAULT;
 	}
+	mutex_unlock(&overlay->dc->lock);
 
 	data = kzalloc(sizeof(*data), GFP_KERNEL);
 	if (data == NULL) {
@@ -377,19 +383,13 @@ static int tegra_overlay_flip(struct tegra_overlay_info *overlay,
 		}
 	}
 
-	syncpt_max = tegra_dc_incr_syncpt_max(overlay->dc);
+	syncpt_max = tegra_dc_incr_syncpt_max(overlay->dc, 0);
 	data->syncpt_max = syncpt_max;
 
 	queue_work(overlay->flip_wq, &data->work);
 
-	/*
-	 * Before the queued flip_wq get scheduled, we set the EMC clock to the
-	 * default value in order to do FLIP without glitch.
-	 */
-	tegra_dc_set_default_emc(overlay->dc);
-
 	args->post_syncpt_val = syncpt_max;
-	args->post_syncpt_id = tegra_dc_get_syncpt_id(overlay->dc);
+	args->post_syncpt_id = tegra_dc_get_syncpt_id(overlay->dc, 0);
 	mutex_unlock(&tegra_flip_lock);
 
 	return 0;
@@ -407,17 +407,26 @@ surf_err:
 	mutex_unlock(&tegra_flip_lock);
 	return err;
 }
+
 static void tegra_overlay_set_emc_freq(struct tegra_overlay_info *dev)
 {
-	unsigned long emc_freq = 0;
+	unsigned long new_rate;
 	int i;
+	struct tegra_dc_win *win;
+	struct tegra_dc_win *wins[DC_N_WINDOWS];
 
-	for (i = 0; i < dev->dc->n_windows; i++) {
-		if (dev->overlays[i].owner != NULL)
-			emc_freq += dev->dc->mode.pclk*(i==1?2:1) *
-					CONFIG_TEGRA_EMC_TO_DDR_CLOCK;
+	for (i = 0; i < DC_N_WINDOWS; i++) {
+		win = tegra_dc_get_window(dev->dc, i);
+		wins[i] = win;
 	}
-	clk_set_rate(dev->dc->emc_clk, emc_freq);
+
+	new_rate = tegra_dc_get_bandwidth(wins, dev->dc->n_windows);
+	new_rate = EMC_BW_TO_FREQ(new_rate);
+
+	if (tegra_dc_has_multiple_dc())
+		new_rate = ULONG_MAX;
+
+	clk_set_rate(dev->dc->emc_clk, new_rate);
 }
 
 /* Overlay functions */
@@ -519,11 +528,16 @@ static int tegra_overlay_ioctl_flip(struct overlay_client *client,
 {
 	int i = 0;
 	int idx = 0;
+	int err;
 	bool found_one = false;
 	struct tegra_overlay_flip_args flip_args;
 
-	if (!client->dev->dc->enabled)
+	mutex_lock(&client->dev->dc->lock);
+	if (!client->dev->dc->enabled) {
+		mutex_unlock(&client->dev->dc->lock);
 		return -EPIPE;
+	}
+	mutex_unlock(&client->dev->dc->lock);
 
 	if (copy_from_user(&flip_args, arg, sizeof(flip_args)))
 		return -EFAULT;
@@ -557,7 +571,10 @@ static int tegra_overlay_ioctl_flip(struct overlay_client *client,
 	if (!found_one)
 		return -EFAULT;
 
-	tegra_overlay_flip(client->dev, &flip_args, client->user_nvmap);
+	err = tegra_overlay_flip(client->dev, &flip_args, client->user_nvmap);
+
+	if (err)
+		return err;
 
 	if (copy_to_user(arg, &flip_args, sizeof(flip_args)))
 		return -EFAULT;
@@ -637,6 +654,7 @@ static int tegra_overlay_release(struct inode *inode, struct file *filp)
 	list_del(&client->list);
 	spin_unlock_irqrestore(&client->dev->clients_lock, flags);
 
+	nvmap_client_put(client->user_nvmap);
 	put_task_struct(client->task);
 
 	kfree(client);

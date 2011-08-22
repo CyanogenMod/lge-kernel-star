@@ -103,4 +103,5 @@ int tegra_fuse_program(struct fuse_data *pgm_data, u32 flags);
 /* Disables the fuse programming until the next system reset */
 void tegra_fuse_program_disable(void);
 
+extern int (*tegra_fuse_regulator_en)(int);
 #endif

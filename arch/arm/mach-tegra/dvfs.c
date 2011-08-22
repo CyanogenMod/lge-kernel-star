@@ -175,6 +175,7 @@ static int dvfs_rail_update(struct dvfs_rail *rail)
 	struct dvfs *d;
 	struct dvfs_relationship *rel;
 	int ret = 0;
+	int steps;
 
 	/* if dvfs is suspended, return and handle it during resume */
 	if (rail->suspended)
@@ -193,14 +194,21 @@ static int dvfs_rail_update(struct dvfs_rail *rail)
 	list_for_each_entry(d, &rail->dvfs, reg_node)
 		millivolts = max(d->cur_millivolts, millivolts);
 
-	rail->new_millivolts = millivolts;
+	/* retry update if limited by from-relationship to account for
+	   circular dependencies */
+	steps = DIV_ROUND_UP(abs(millivolts - rail->millivolts), rail->step);
+	for (; steps >= 0; steps--) {
+		rail->new_millivolts = millivolts;
 
-	/* Check any rails that this rail depends on */
-	list_for_each_entry(rel, &rail->relationships_from, from_node)
-		rail->new_millivolts = dvfs_solve_relationship(rel);
+		/* Check any rails that this rail depends on */
+		list_for_each_entry(rel, &rail->relationships_from, from_node)
+			rail->new_millivolts = dvfs_solve_relationship(rel);
 
-	if (rail->new_millivolts != rail->millivolts)
+		if (rail->new_millivolts == rail->millivolts)
+			break;
+
 		ret = dvfs_rail_set_voltage(rail, rail->new_millivolts);
+	}
 
 	return ret;
 }

@@ -322,7 +322,7 @@ static int tegra_pinmux_set_func(const struct tegra_pingroup_config *config)
 
 	if (func & TEGRA_MUX_RSVD) {
 		for (i = 0; i < 4; i++) {
-			if (pingroups[pg].funcs[i] & func)
+			if (pingroups[pg].funcs[i] & TEGRA_MUX_RSVD)
 				mux = i;
 
 			if (pingroups[pg].funcs[i] == func) {

@@ -78,64 +78,67 @@ __tagtable(ATAG_NVIDIA, parse_tag_nvidia);
 static struct tegra_nand_chip_parms nand_chip_parms[] = {
 	/* Samsung K5E2G1GACM */
 	[0] = {
-		.vendor_id   = 0xEC,
-		.device_id   = 0xAA,
-		.capacity    = 256,
-		.timing      = {
-			.trp		= 21,
-			.trh		= 15,
-			.twp		= 21,
-			.twh		= 15,
-			.tcs		= 31,
-			.twhr		= 60,
-			.tcr_tar_trr	= 20,
-			.twb		= 100,
-			.trp_resp	= 30,
-			.tadl		= 100,
-		},
-	},
+	       .vendor_id = 0xEC,
+	       .device_id = 0xAA,
+	       .read_id_fourth_byte = 0x15,
+	       .capacity  = 256,
+	       .timing = {
+			  .trp = 21,
+			  .trh = 15,
+			  .twp = 21,
+			  .twh = 15,
+			  .tcs = 31,
+			  .twhr = 60,
+			  .tcr_tar_trr = 20,
+			  .twb = 100,
+			  .trp_resp = 30,
+			  .tadl = 100,
+			  },
+	       },
 	/* Hynix H5PS1GB3EFR */
 	[1] = {
-		.vendor_id   = 0xAD,
-		.device_id   = 0xDC,
-		.capacity    = 512,
-		.timing      = {
-			.trp		= 12,
-			.trh		= 10,
-			.twp		= 12,
-			.twh		= 10,
-			.tcs		= 20,
-			.twhr		= 80,
-			.tcr_tar_trr	= 20,
-			.twb		= 100,
-			.trp_resp	= 20,
-			.tadl		= 70,
-		},
-	},
+	       .vendor_id = 0xAD,
+	       .device_id = 0xDC,
+	       .read_id_fourth_byte = 0x95,
+	       .capacity  = 512,
+	       .timing = {
+			  .trp = 12,
+			  .trh = 10,
+			  .twp = 12,
+			  .twh = 10,
+			  .tcs = 20,
+			  .twhr = 80,
+			  .tcr_tar_trr = 20,
+			  .twb = 100,
+			  .trp_resp = 20,
+			  .tadl = 70,
+			  },
+	       },
 };
 
 struct tegra_nand_platform harmony_nand_data = {
-	.max_chips	= 8,
-	.chip_parms	= nand_chip_parms,
-	.nr_chip_parms  = ARRAY_SIZE(nand_chip_parms),
+	.max_chips = 8,
+	.chip_parms = nand_chip_parms,
+	.nr_chip_parms = ARRAY_SIZE(nand_chip_parms),
+	.wp_gpio = TEGRA_GPIO_PC7,
 };
 
 static struct resource resources_nand[] = {
 	[0] = {
-		.start  = INT_NANDFLASH,
-		.end    = INT_NANDFLASH,
-		.flags  = IORESOURCE_IRQ,
-	},
+	       .start = INT_NANDFLASH,
+	       .end = INT_NANDFLASH,
+	       .flags = IORESOURCE_IRQ,
+	       },
 };
 
 struct platform_device tegra_nand_device = {
-	.name           = "tegra_nand",
-	.id             = -1,
-	.num_resources  = ARRAY_SIZE(resources_nand),
-	.resource       = resources_nand,
-	.dev            = {
+	.name = "tegra_nand",
+	.id = -1,
+	.num_resources = ARRAY_SIZE(resources_nand),
+	.resource = resources_nand,
+	.dev = {
 		.platform_data = &harmony_nand_data,
-	},
+		},
 };
 
 static struct plat_serial8250_port debug_uart_platform_data[] = {
@@ -331,6 +334,7 @@ static __initdata struct tegra_clk_init_table harmony_clk_init_table[] = {
 	{ "sdmmc1",	"clk_m",	48000000,	true },
 	{ "sdmmc2",	"clk_m",	48000000,	true },
 	{ "sdmmc4",	"clk_m",	48000000,	true },
+	{ "ndflash",	"pll_p",	108000000,	true},
 	{ NULL,		NULL,		0,		0},
 };
 

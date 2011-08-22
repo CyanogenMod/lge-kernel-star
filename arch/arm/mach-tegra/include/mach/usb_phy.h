@@ -45,16 +45,22 @@ struct tegra_ulpi_config {
 	int reset_gpio;
 	const char *clk;
 	const struct tegra_ulpi_trimmer *trimmer;
-	int (*preinit)(void);
-	int (*postinit)(void);
+	int (*pre_phy_on)(void);
+	int (*post_phy_on)(void);
+	int (*pre_phy_off)(void);
+	int (*post_phy_off)(void);
 };
 
 struct tegra_uhsic_config {
+	int enable_gpio;
+	int reset_gpio;
 	u8 sync_start_delay;
 	u8 idle_wait_delay;
 	u8 term_range_adj;
 	u8 elastic_underrun_limit;
 	u8 elastic_overrun_limit;
+	int (*postsuspend)(void);
+	int (*preresume)(void);
 };
 
 enum tegra_usb_phy_port_speed {
@@ -93,6 +99,7 @@ struct tegra_usb_phy {
 	bool regulator_on;
 	struct otg_transceiver *ulpi;
 	int initialized;
+	bool power_on;
 };
 
 typedef int (*tegra_phy_fp)(struct tegra_usb_phy *phy, bool is_dpd);
@@ -108,6 +115,8 @@ void tegra_usb_phy_clk_disable(struct tegra_usb_phy *phy);
 void tegra_usb_phy_clk_enable(struct tegra_usb_phy *phy);
 
 void tegra_usb_phy_power_off(struct tegra_usb_phy *phy, bool is_dpd);
+
+void tegra_usb_phy_postsuspend(struct tegra_usb_phy *phy, bool is_dpd);
 
 void tegra_usb_phy_preresume(struct tegra_usb_phy *phy, bool is_dpd);
 
@@ -130,6 +139,10 @@ int tegra_usb_phy_bus_idle(struct tegra_usb_phy *phy);
 
 bool tegra_usb_phy_is_device_connected(struct tegra_usb_phy *phy);
 
+bool tegra_usb_phy_charger_detect(struct tegra_usb_phy *phy);
+
 int __init tegra_usb_phy_init(struct usb_phy_plat_data *pdata, int size);
+
+int tegra_usb_phy_clear_connect_intr(struct tegra_usb_phy *phy);
 
 #endif /* __MACH_USB_PHY_H */

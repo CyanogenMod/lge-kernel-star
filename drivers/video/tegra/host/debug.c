@@ -27,6 +27,10 @@
 
 pid_t nvhost_debug_null_kickoff_pid;
 
+pid_t nvhost_debug_force_timeout_pid;
+u32 nvhost_debug_force_timeout_val;
+u32 nvhost_debug_force_timeout_channel;
+
 void nvhost_debug_output(struct output *o, const char* fmt, ...)
 {
 	va_list args;
@@ -111,6 +115,14 @@ void nvhost_debug_init(struct nvhost_master *master)
 
 	debugfs_create_u32("null_kickoff_pid", S_IRUGO|S_IWUSR, de,
 			&nvhost_debug_null_kickoff_pid);
+
+	nvhost_debug_scale_init(de);
+	debugfs_create_u32("force_timeout_pid", S_IRUGO|S_IWUSR, de,
+			&nvhost_debug_force_timeout_pid);
+	debugfs_create_u32("force_timeout_val", S_IRUGO|S_IWUSR, de,
+			&nvhost_debug_force_timeout_val);
+	debugfs_create_u32("force_timeout_channel", S_IRUGO|S_IWUSR, de,
+			&nvhost_debug_force_timeout_channel);
 }
 #else
 void nvhost_debug_init(struct nvhost_master *master)

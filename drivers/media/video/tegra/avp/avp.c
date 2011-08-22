@@ -43,6 +43,7 @@
 #include <mach/io.h>
 #include <mach/iomap.h>
 #include <mach/nvmap.h>
+#include <mach/legacy_irq.h>
 
 #include "../../../../video/tegra/nvmap/nvmap.h"
 
@@ -1031,6 +1032,8 @@ static int avp_init(struct tegra_avp_info *avp)
 	wmb();
 	release_firmware(avp_fw);
 
+	tegra_init_legacy_irq_cop();
+
 	ret = avp_reset(avp, avp->reset_addr);
 	if (ret) {
 		pr_err("%s: cannot reset the AVP.. aborting..\n", __func__);
@@ -1154,7 +1157,7 @@ static int _load_lib(struct tegra_avp_info *avp, struct tegra_avp_lib *lib,
 	}
 
 	lib_handle = nvmap_alloc(avp->nvmap_libs, fw->size, L1_CACHE_BYTES,
-				 NVMAP_HANDLE_WRITE_COMBINE);
+				 NVMAP_HANDLE_UNCACHEABLE);
 	if (IS_ERR_OR_NULL(lib_handle)) {
 		pr_err("avp_lib: can't nvmap alloc for lib '%s'\n", lib->name);
 		ret = PTR_ERR(lib_handle);
@@ -1425,9 +1428,6 @@ int tegra_avp_release(struct tegra_avp_info *avp)
 {
 	int ret = 0;
 
-	pr_info("%s: WORKAROUND: ignoring AVP release\n", __func__);
-	return 0;
-
 	pr_debug("%s: close\n", __func__);
 	mutex_lock(&avp->open_lock);
 	if (!avp->refcount) {
@@ -1594,7 +1594,7 @@ void avp_early_init(void)
 	ret = nvmap_alloc_handle_id(avp_early_nvmap_drv,
 				nvmap_ref_to_id(avp_early_kernel_handle),
 				NVMAP_HEAP_IOVMM, PAGE_SIZE,
-				NVMAP_HANDLE_WRITE_COMBINE);
+				NVMAP_HANDLE_UNCACHEABLE);
 	if (ret)
 		pr_crit("%s: nvmap_alloc_handle_id error\n", __func__);
 
@@ -1655,7 +1655,7 @@ static int tegra_avp_probe(struct platform_device *pdev)
 
 	if (heap_mask == NVMAP_HEAP_CARVEOUT_GENERIC) {
 		avp->kernel_handle = nvmap_alloc(avp->nvmap_drv, SZ_1M, SZ_1M,
-						NVMAP_HANDLE_WRITE_COMBINE);
+						NVMAP_HANDLE_UNCACHEABLE);
 		if (IS_ERR_OR_NULL(avp->kernel_handle)) {
 			pr_err("%s: cannot create handle\n", __func__);
 			ret = PTR_ERR(avp->kernel_handle);
@@ -1686,7 +1686,7 @@ static int tegra_avp_probe(struct platform_device *pdev)
 	 */
 	avp->iram_backup_handle =
 		nvmap_alloc(avp->nvmap_drv, TEGRA_IRAM_SIZE + 4,
-				L1_CACHE_BYTES, NVMAP_HANDLE_WRITE_COMBINE);
+				L1_CACHE_BYTES, NVMAP_HANDLE_UNCACHEABLE);
 	if (IS_ERR_OR_NULL(avp->iram_backup_handle)) {
 		pr_err("%s: cannot create handle for iram backup\n", __func__);
 		ret = PTR_ERR(avp->iram_backup_handle);

@@ -37,9 +37,13 @@
 
 #include <asm/io.h>
 
-#include <mach/nvhost.h>
+#include <linux/nvhost.h>
+#include <linux/nvhost_ioctl.h>
 #include <mach/nvmap.h>
 #include <mach/gpufuse.h>
+
+#include "nvhost_scale.h"
+#include "debug.h"
 
 #define DRIVER_NAME "tegra_grhost"
 #define IFACE_NAME "nvhost"
@@ -61,6 +65,7 @@ struct nvhost_channel_userctx {
 	struct nvmap_client *nvmap;
 	struct nvhost_waitchk waitchks[NVHOST_MAX_WAIT_CHECKS];
 	struct nvhost_waitchk *cur_waitchk;
+	struct nvhost_userctx_timeout timeout;
 };
 
 struct nvhost_ctrl_userctx {
@@ -76,6 +81,7 @@ static int nvhost_channelrelease(struct inode *inode, struct file *filp)
 
 	filp->private_data = NULL;
 
+	nvhost_module_remove_client(&priv->ch->mod, priv);
 	nvhost_putchannel(priv->ch, priv->hwctx);
 
 	if (priv->hwctx)
@@ -111,6 +117,7 @@ static int nvhost_channelopen(struct inode *inode, struct file *filp)
 	}
 	filp->private_data = priv;
 	priv->ch = ch;
+	nvhost_module_add_client(&ch->mod, priv);
 	priv->gather_mem = nvmap_alloc(ch->dev->nvmap,
 				sizeof(u32) * 2 * NVHOST_MAX_GATHERS, 32,
 				NVMAP_HANDLE_CACHEABLE);
@@ -121,6 +128,7 @@ static int nvhost_channelopen(struct inode *inode, struct file *filp)
 		priv->hwctx = ch->ctxhandler.alloc(ch);
 		if (!priv->hwctx)
 			goto fail;
+		priv->hwctx->timeout = &priv->timeout;
 	}
 
 	priv->gathers = nvmap_mmap(priv->gather_mem);
@@ -307,6 +315,12 @@ static int nvhost_ioctl_channel_flush(
 	if (nvhost_debug_null_kickoff_pid == current->tgid)
 		null_kickoff = 1;
 
+	if ((nvhost_debug_force_timeout_pid == current->tgid) &&
+	    (nvhost_debug_force_timeout_channel == ctx->ch->chid)) {
+		ctx->timeout.timeout = nvhost_debug_force_timeout_val;
+	}
+	ctx->timeout.syncpt_id = ctx->hdr.syncpt_id;
+
 	/* context switch if needed, and submit user's gathers to the channel */
 	BUG_ON(!channel_op(ctx->ch).submit);
 	err = channel_op(ctx->ch).submit(ctx->ch, ctx->hwctx, ctx->nvmap,
@@ -315,12 +329,23 @@ static int nvhost_ioctl_channel_flush(
 				ctx->hdr.waitchk_mask,
 				ctx->unpinarray, num_unpin,
 				ctx->hdr.syncpt_id, ctx->hdr.syncpt_incrs,
+				&ctx->timeout,
 				&args->value,
 				null_kickoff);
 	if (err)
 		nvmap_unpin_handles(ctx->nvmap, ctx->unpinarray, num_unpin);
 
 	return 0;
+}
+
+static int nvhost_ioctl_channel_read_3d_reg(
+	struct nvhost_channel_userctx *ctx,
+	struct nvhost_read_3d_reg_args *args)
+{
+	BUG_ON(!channel_op(ctx->ch).read3dreg);
+	return channel_op(ctx->ch).read3dreg(ctx->ch, ctx->hwctx,
+			&ctx->timeout,
+			args->offset, &args->value);
 }
 
 static long nvhost_channelctl(struct file *filp,
@@ -410,6 +435,40 @@ static long nvhost_channelctl(struct file *filp,
 		priv->nvmap = new_client;
 		break;
 	}
+	case NVHOST_IOCTL_CHANNEL_READ_3D_REG:
+		err = nvhost_ioctl_channel_read_3d_reg(priv, (void *)buf);
+		break;
+	case NVHOST_IOCTL_CHANNEL_GET_CLK_RATE:
+	{
+		unsigned long rate;
+		struct nvhost_clk_rate_args *arg =
+				(struct nvhost_clk_rate_args *)buf;
+
+		err = nvhost_module_get_rate(&priv->ch->mod, &rate, 0);
+		if (err == 0)
+			arg->rate = rate;
+		break;
+	}
+	case NVHOST_IOCTL_CHANNEL_SET_CLK_RATE:
+	{
+		struct nvhost_clk_rate_args *arg =
+				(struct nvhost_clk_rate_args *)buf;
+		unsigned long rate = (unsigned long)arg->rate;
+
+		err = nvhost_module_set_rate(&priv->ch->mod, priv, rate, 0);
+		break;
+	}
+	case NVHOST_IOCTL_CHANNEL_SET_TIMEOUT:
+		priv->timeout.timeout =
+			(u32)((struct nvhost_set_timeout_args *)buf)->timeout;
+		dev_dbg(&priv->ch->dev->pdev->dev,
+			"%s: setting buffer timeout (%d ms) for userctx 0x%p\n",
+			__func__, priv->timeout.timeout, priv);
+		break;
+	case NVHOST_IOCTL_CHANNEL_GET_TIMEDOUT:
+		((struct nvhost_get_param_args *)buf)->value =
+				priv->timeout.has_timedout;
+		break;
 	default:
 		err = -ENOTTY;
 		break;
@@ -641,10 +700,6 @@ static void power_host(struct nvhost_module *mod, enum nvhost_power_action actio
 
 	if (action == NVHOST_POWER_ACTION_ON) {
 		nvhost_intr_start(&dev->intr, clk_get_rate(mod->clk[0]));
-		/* don't do it, as display may have changed syncpt
-		 * after the last save
-		 * nvhost_syncpt_reset(&dev->syncpt);
-		 */
 	} else if (action == NVHOST_POWER_ACTION_OFF) {
 		int i;
 		for (i = 0; i < dev->nb_channels; i++)
@@ -804,6 +859,46 @@ static int __devinit nvhost_init_chip_support(struct nvhost_master *host)
 
 	return 0;
 }
+
+
+static ssize_t enable_3d_scaling_show(struct device *device,
+	struct device_attribute *attr, char *buf)
+{
+	ssize_t res;
+
+	res = snprintf(buf, PAGE_SIZE, "%d\n", scale3d_is_enabled());
+
+	return res;
+}
+
+static ssize_t enable_3d_scaling_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	unsigned long val = 0;
+
+	if (strict_strtoul(buf, 10, &val) < 0)
+		return -EINVAL;
+
+	scale3d_enable(val);
+
+	return count;
+}
+
+static DEVICE_ATTR(enable_3d_scaling, S_IRUGO | S_IWUSR,
+	enable_3d_scaling_show, enable_3d_scaling_store);
+
+void nvhost_remove_sysfs(struct device *dev)
+{
+	device_remove_file(dev, &dev_attr_enable_3d_scaling);
+}
+
+void nvhost_create_sysfs(struct device *dev)
+{
+	int error = device_create_file(dev, &dev_attr_enable_3d_scaling);
+	if (error)
+		dev_err(dev, "failed to create sysfs attributes");
+}
+
 static int __devinit nvhost_probe(struct platform_device *pdev)
 {
 	struct nvhost_master *host;
@@ -862,7 +957,6 @@ static int __devinit nvhost_probe(struct platform_device *pdev)
 		}
 	}
 
-
 	err = nvhost_cpuaccess_init(&host->cpuaccess, pdev);
 	if (err)
 		goto fail;
@@ -890,6 +984,8 @@ static int __devinit nvhost_probe(struct platform_device *pdev)
 
 	nvhost_debug_init(host);
 
+	nvhost_create_sysfs(&pdev->dev);
+
 	dev_info(&pdev->dev, "initialized\n");
 	return 0;
 
@@ -897,7 +993,6 @@ fail:
 	nvhost_remove_chip_support(host);
 	if (host->nvmap)
 		nvmap_client_put(host->nvmap);
-	/* TODO: [ahatala 2010-05-04] */
 	kfree(host);
 	return err;
 }
@@ -906,7 +1001,7 @@ static int __exit nvhost_remove(struct platform_device *pdev)
 {
 	struct nvhost_master *host = platform_get_drvdata(pdev);
 	nvhost_remove_chip_support(host);
-	/*kfree(host);?*/
+	nvhost_remove_sysfs(&pdev->dev);
 	return 0;
 }
 
@@ -929,6 +1024,7 @@ static int nvhost_resume(struct platform_device *pdev)
 	clk_enable(host->mod.clk[0]);
 	nvhost_syncpt_reset(&host->syncpt);
 	clk_disable(host->mod.clk[0]);
+	scale3d_reset();
 	dev_info(&pdev->dev, "resumed\n");
 	return 0;
 }

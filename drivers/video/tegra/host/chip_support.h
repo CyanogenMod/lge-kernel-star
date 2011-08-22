@@ -23,6 +23,8 @@
 #define _NVHOST_CHIP_SUPPORT_H_
 
 struct output;
+struct nvhost_waitchk;
+struct nvhost_userctx_timeout;
 
 struct nvhost_chip_support {
 	struct {
@@ -41,14 +43,38 @@ struct nvhost_chip_support {
 			      int nr_unpins,
 			      u32 syncpt_id,
 			      u32 syncpt_incrs,
+			      struct nvhost_userctx_timeout *timeout,
 			      u32 *syncpt_value,
 			      bool null_kickoff);
+		int (*read3dreg)(struct nvhost_channel *channel,
+				struct nvhost_hwctx *hwctx,
+				struct nvhost_userctx_timeout *timeout,
+				u32 offset,
+				u32 *value);
 	} channel;
 
 	struct {
 		void (*start)(struct nvhost_cdma *);
 		void (*stop)(struct nvhost_cdma *);
 		void (*kick)(struct  nvhost_cdma *);
+		int (*timeout_init)(struct nvhost_cdma *,
+				    u32 syncpt_id);
+		void (*timeout_destroy)(struct nvhost_cdma *);
+		void (*timeout_teardown_begin)(struct nvhost_cdma *);
+		void (*timeout_teardown_end)(struct nvhost_cdma *,
+					     u32 getptr);
+		void (*timeout_cpu_incr)(struct nvhost_cdma *,
+					 u32 getptr,
+					 u32 syncpt_incrs,
+					 u32 nr_slots);
+		void (*timeout_pb_incr)(struct nvhost_cdma *,
+					u32 getptr,
+					u32 syncpt_incrs,
+					u32 nr_slots,
+					bool exec_ctxsave);
+		void (*timeout_clear_ctxsave)(struct nvhost_cdma *,
+					u32 getptr,
+					u32 nr_slots);
 	} cdma;
 
 	struct {
@@ -56,6 +82,7 @@ struct nvhost_chip_support {
 		int (*init)(struct push_buffer *);
 		void (*destroy)(struct push_buffer *);
 		void (*push_to)(struct push_buffer *,
+				struct nvmap_handle *,
 				u32 op1, u32 op2);
 		void (*pop_from)(struct push_buffer *,
 				 unsigned int slots);

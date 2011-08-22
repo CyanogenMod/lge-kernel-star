@@ -291,4 +291,8 @@ void tegra_init_pinmux(void)
 {
 	register_syscore_ops(&tegra_pinmux_syscore_ops);
 }
+#else
+void tegra_init_pinmux(void)
+{
+}
 #endif

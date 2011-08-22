@@ -24,10 +24,11 @@
 #include <linux/mpu.h>
 #include <linux/nct1008.h>
 #include <linux/regulator/consumer.h>
-
 #include <mach/gpio.h>
-
 #include <media/ar0832_main.h>
+#include <media/tps61050.h>
+#include <media/ov9726.h>
+#include <mach/edp.h>
 #include "cpu-tegra.h"
 #include "gpio-names.h"
 #include "board-enterprise.h"
@@ -36,11 +37,15 @@ static struct nct1008_platform_data enterprise_nct1008_pdata = {
 	.supported_hwrev = true,
 	.ext_range = true,
 	.conv_rate = 0x08,
-	.offset = 0,
+/*
+ * BugID 844025 requires 11C guardband (9.7C for hotspot offset + 1.5C
+ * for sensor accuracy). FIXME: Move sensor accuracy to sensor driver.
+ */
+	.offset = 11,
 	.hysteresis = 5,
-	.shutdown_ext_limit = 75,
-	.shutdown_local_limit = 75,
-	.throttling_ext_limit = 90,
+	.shutdown_ext_limit = 90,
+	.shutdown_local_limit = 90,
+	.throttling_ext_limit = 75,
 	.alarm_fn = tegra_throttling_enable,
 };
 
@@ -52,19 +57,15 @@ static struct i2c_board_info enterprise_i2c4_nct1008_board_info[] = {
 	}
 };
 
-static inline void enterprise_msleep(u32 t)
-{
-	/*
-	If timer value is between ( 10us - 20ms),
-	usleep_range() is recommended.
-	Please read Documentation/timers/timers-howto.txt.
-	*/
-	usleep_range(t*1000, t*1000 + 500);
-}
-
 static void enterprise_nct1008_init(void)
 {
 	int ret;
+#ifdef CONFIG_TEGRA_EDP_LIMITS
+	const struct tegra_edp_limits *z;
+	int zones_sz;
+	int i;
+	bool throttle_ok = false;
+#endif
 
 	tegra_gpio_enable(TEGRA_GPIO_PH7);
 	ret = gpio_request(TEGRA_GPIO_PH7, "temp_alert");
@@ -82,6 +83,27 @@ static void enterprise_nct1008_init(void)
 
 	i2c_register_board_info(4, enterprise_i2c4_nct1008_board_info,
 				ARRAY_SIZE(enterprise_i2c4_nct1008_board_info));
+#ifdef CONFIG_TEGRA_EDP_LIMITS
+	tegra_get_cpu_edp_limits(&z, &zones_sz);
+	zones_sz = min(zones_sz, MAX_ZONES);
+	for (i = 0; i < zones_sz; i++) {
+		enterprise_nct1008_pdata.thermal_zones[i] = z[i].temperature;
+		if (enterprise_nct1008_pdata.thermal_zones[i] ==
+		    enterprise_nct1008_pdata.throttling_ext_limit) {
+			throttle_ok = true;
+		}
+	}
+
+	if (throttle_ok != true)
+		pr_warn("%s: WARNING! Throttling limit %dC would be inaccurate"
+			" as it is NOT one of the EDP points\n",
+			__func__, enterprise_nct1008_pdata.throttling_ext_limit);
+	else
+		pr_info("%s: Throttling limit %dC OK\n",
+			__func__, enterprise_nct1008_pdata.throttling_ext_limit);
+
+	enterprise_nct1008_pdata.thermal_zones_sz = zones_sz;
+#endif
 }
 
 #define SENSOR_MPU_NAME "mpu3050"
@@ -119,6 +141,16 @@ static struct i2c_board_info __initdata mpu3050_i2c0_boardinfo[] = {
 	},
 };
 
+static inline void enterprise_msleep(u32 t)
+{
+	/*
+	If timer value is between ( 10us - 20ms),
+	usleep_range() is recommended.
+	Please read Documentation/timers/timers-howto.txt.
+	*/
+	usleep_range(t*1000, t*1000 + 500);
+}
+
 static void enterprise_mpuirq_init(void)
 {
 	int ret = 0;
@@ -153,80 +185,234 @@ static void enterprise_isl_init(void)
 				ARRAY_SIZE(enterprise_i2c0_isl_board_info));
 }
 
+enum CAMERA_INDEX {
+	CAM_REAR_LEFT,
+	CAM_REAR_RIGHT,
+	CAM_FRONT,
+	NUM_OF_CAM
+};
 
-static struct regulator *cam_reg;
-static struct regulator *csi_reg;
+struct enterprise_power_rail {
+	struct regulator *cam_reg;
+	struct regulator *csi_reg;
+};
 
-static int enterprise_ar0832_power_on(void)
+static struct enterprise_power_rail ent_vicsi_pwr[NUM_OF_CAM];
+
+static int enterprise_cam_pwr(enum CAMERA_INDEX cam, bool pwr_on)
 {
+	struct enterprise_power_rail *reg_cam = &ent_vicsi_pwr[cam];
 	int ret = 0;
 
-	csi_reg = regulator_get(NULL, "avdd_dsi_csi");
-	if (IS_ERR_OR_NULL(csi_reg)) {
-		pr_err("%s: get csi pwr err\n", __func__);
-		return PTR_ERR(cam_reg);
-	}
-
-	ret = regulator_enable(csi_reg);
-	if (ret) {
-		pr_err("%s: enable csi pwr err\n", __func__);
-		goto fail_regulator_csi_reg;
-	}
-
-	cam_reg = regulator_get(NULL, "vddio_cam");
-	if (IS_ERR_OR_NULL(cam_reg)) {
-		pr_err("%s: get cam pwr err\n", __func__);
-		return PTR_ERR(cam_reg);
-	}
-
-	ret = regulator_enable(cam_reg);
-	if (ret) {
-		pr_err("%s: enable cam pwr err\n", __func__);
-		goto fail_regulator_cam_reg;
-	}
-
-	pr_info("%s: enable 1.8V...\n", __func__);
-	gpio_set_value(CAM_LDO_1V8_EN_L_GPIO, 1);
-	enterprise_msleep(20);
-	pr_info("%s: enable 2.8V...\n", __func__);
-	gpio_set_value(CAM_LDO_2V8_EN_L_GPIO, 1);
-
-	gpio_set_value(CAM1_PWDN_GPIO, 1);
-	enterprise_msleep(5);
-	gpio_set_value(CAM1_RST_L_GPIO, 1);
 	/*
-	It takes 2400 EXTCLK for ar0832 to be ready for I2c.
-	EXTCLK is 10 ~ 24MCK. 1 ms should be enough to cover
-	at least 2400 EXTCLK within frequency range.
+	* SW must turn on 1.8V first then 2.8V
+	* SW must turn off 2.8V first then 1.8V
 	*/
-	enterprise_msleep(1);
+	if (pwr_on) {
+		if (reg_cam->csi_reg == NULL) {
+			reg_cam->csi_reg = regulator_get(NULL,
+						"avdd_dsi_csi");
+			if (IS_ERR_OR_NULL(reg_cam->csi_reg)) {
+				pr_err("%s: csi pwr err\n", __func__);
+				ret = PTR_ERR(reg_cam->csi_reg);
+				goto enterprise_cam_pwr_fail;
+			}
+		}
+
+		ret = regulator_enable(reg_cam->csi_reg);
+		if (ret) {
+			pr_err("%s: enable csi pwr err\n", __func__);
+			goto enterprise_cam_pwr_fail;
+		}
+
+		if (reg_cam->cam_reg == NULL) {
+			reg_cam->cam_reg = regulator_get(NULL,
+						"vddio_cam");
+			if (IS_ERR_OR_NULL(reg_cam->cam_reg)) {
+				pr_err("%s: vddio pwr err\n", __func__);
+				ret = PTR_ERR(reg_cam->cam_reg);
+				regulator_disable(reg_cam->csi_reg);
+				goto enterprise_cam_pwr_fail;
+			}
+		}
+
+		ret = regulator_enable(reg_cam->cam_reg);
+		if (ret) {
+			pr_err("%s: enable vddio pwr err\n", __func__);
+			regulator_disable(reg_cam->csi_reg);
+			goto enterprise_cam_pwr_fail;
+		}
+	} else {
+		if (reg_cam->cam_reg)
+			regulator_disable(reg_cam->cam_reg);
+
+		if (reg_cam->csi_reg)
+			regulator_disable(reg_cam->csi_reg);
+	}
 	return 0;
 
-fail_regulator_cam_reg:
-	regulator_put(cam_reg);
-fail_regulator_csi_reg:
-	regulator_put(csi_reg);
+enterprise_cam_pwr_fail:
+	if (!IS_ERR_OR_NULL(reg_cam->cam_reg))
+		regulator_put(reg_cam->cam_reg);
+	reg_cam->cam_reg = NULL;
+
+	if (!IS_ERR_OR_NULL(reg_cam->csi_reg))
+		regulator_put(reg_cam->csi_reg);
+	reg_cam->csi_reg = NULL;
 
 	return ret;
 }
 
-static int enterprise_ar0832_power_off(void)
+static int enterprise_ar0832_ri_power_on(int is_stereo)
 {
-	if (cam_reg) {
-		regulator_disable(cam_reg);
-		regulator_put(cam_reg);
-	}
-	if (csi_reg) {
-		regulator_disable(csi_reg);
-		regulator_put(csi_reg);
-	}
+	int ret = 0;
 
-	gpio_set_value(CAM_LDO_2V8_EN_L_GPIO, 0);
-	mdelay(20);
-	gpio_set_value(CAM_LDO_1V8_EN_L_GPIO, 0);
+	ret = enterprise_cam_pwr(CAM_REAR_RIGHT, true);
+
+	/* Release Reset */
+	if (is_stereo) {
+		gpio_set_value(CAM1_RST_L_GPIO, 1);
+		gpio_set_value(CAM2_RST_L_GPIO, 1);
+	} else
+		gpio_set_value(CAM1_RST_L_GPIO, 1);
+	/*
+	It takes 2400 EXTCLK for ar0832 to be ready for I2c.
+	EXTCLK is 10 ~ 24MHz. 1 ms should be enough to cover
+	at least 2400 EXTCLK within frequency range.
+	*/
+	enterprise_msleep(1);
+
+	return ret;
+}
+
+static int enterprise_ar0832_le_power_on(int is_stereo)
+{
+	int ret = 0;
+
+	pr_info("%s: ++\n", __func__);
+	ret = enterprise_cam_pwr(CAM_REAR_LEFT, true);
+
+	/* Release Reset */
+	gpio_set_value(CAM2_RST_L_GPIO, 1);
+
+	/*
+	It takes 2400 EXTCLK for ar0832 to be ready for I2c.
+	EXTCLK is 10 ~ 24MHz. 1 ms should be enough to cover
+	at least 2400 EXTCLK within frequency range.
+	*/
+	enterprise_msleep(1);
+
+	/* CSI B is shared between Front camera and Rear Left camera */
+	gpio_set_value(CAM_CSI_MUX_SEL_GPIO, 1);
+
+	return ret;
+}
+
+static int enterprise_ar0832_ri_power_off(int is_stereo)
+{
+	int ret;
+
+	pr_info("%s: ++\n", __func__);
+	ret = enterprise_cam_pwr(CAM_REAR_RIGHT, false);
+
+	/* Assert Reset */
+	if (is_stereo) {
+		gpio_set_value(CAM1_RST_L_GPIO, 0);
+		gpio_set_value(CAM2_RST_L_GPIO, 0);
+	} else
+		gpio_set_value(CAM1_RST_L_GPIO, 0);
+
+	return ret;
+}
+
+static int enterprise_ar0832_le_power_off(int is_stereo)
+{
+	int ret;
+
+	pr_info("%s: ++\n", __func__);
+	ret = enterprise_cam_pwr(CAM_REAR_LEFT, false);
+
+	/* Assert Reset */
+	gpio_set_value(CAM2_RST_L_GPIO, 0);
+
+	return ret;
+}
+
+static int enterprise_ov9726_power_on(void)
+{
+	pr_info("ov9726 power on\n");
+
+	/* switch mipi mux to front camera */
+	gpio_set_value(CAM_CSI_MUX_SEL_GPIO, CAM_CSI_MUX_SEL_FRONT);
+	enterprise_cam_pwr(CAM_FRONT, true);
 
 	return 0;
 }
+
+static int enterprise_ov9726_power_off(void)
+{
+	pr_info("ov9726 power off\n");
+
+	enterprise_cam_pwr(CAM_FRONT, false);
+
+	return 0;
+}
+
+struct ov9726_platform_data enterprise_ov9726_data = {
+	.power_on = enterprise_ov9726_power_on,
+	.power_off = enterprise_ov9726_power_off,
+	.gpio_rst = CAM3_RST_L_GPIO,
+	.rst_low_active = true,
+	.gpio_pwdn = CAM3_PWDN_GPIO,
+	.pwdn_low_active = false,
+};
+
+static struct tps61050_pin_state enterprise_tps61050_pinstate = {
+	.mask		= 0x0008, /*VGP3*/
+	.values		= 0x0008,
+};
+
+/* I2C bus becomes active when vdd_1v8_cam is enabled */
+static int enterprise_tps61050_pm(int pwr)
+{
+	static struct regulator *enterprise_flash_reg = NULL;
+	int ret = 0;
+
+	pr_info("%s: ++%d\n", __func__, pwr);
+	switch (pwr) {
+	case TPS61050_PWR_OFF:
+		if (enterprise_flash_reg) {
+			regulator_disable(enterprise_flash_reg);
+			regulator_put(enterprise_flash_reg);
+			enterprise_flash_reg = NULL;
+		}
+		break;
+	case TPS61050_PWR_STDBY:
+	case TPS61050_PWR_COMM:
+	case TPS61050_PWR_ON:
+		enterprise_flash_reg = regulator_get(NULL, "vdd_1v8_cam");
+		if (IS_ERR_OR_NULL(enterprise_flash_reg)) {
+			pr_err("%s: failed to get flash pwr\n", __func__);
+			return PTR_ERR(enterprise_flash_reg);
+		}
+		ret = regulator_enable(enterprise_flash_reg);
+		if (ret) {
+			pr_err("%s: failed to enable flash pwr\n", __func__);
+			goto fail_regulator_flash_reg;
+		}
+		enterprise_msleep(10);
+		break;
+	default:
+		ret = -1;
+	}
+	return ret;
+
+fail_regulator_flash_reg:
+	regulator_put(enterprise_flash_reg);
+	enterprise_flash_reg = NULL;
+	return ret;
+}
+
 
 struct enterprise_cam_gpio {
 	int gpio;
@@ -237,37 +423,68 @@ struct enterprise_cam_gpio {
 #define TEGRA_CAMERA_GPIO(_gpio, _label, _value)	\
 	{						\
 		.gpio = _gpio,				\
-		.label = _label,				\
+		.label = _label,			\
 		.value = _value,			\
 	}
 
 static struct enterprise_cam_gpio enterprise_cam_gpio_data[] = {
-	[0] = TEGRA_CAMERA_GPIO(CAM_LDO_1V8_EN_L_GPIO, "cam_ldo_1v8", 0),
-	[1] = TEGRA_CAMERA_GPIO(CAM_LDO_2V8_EN_L_GPIO, "cam_ldo_2v8", 0),
-	[2] = TEGRA_CAMERA_GPIO(CAM_CSI_MUX_SEL_GPIO, "cam_csi_sel", 1),
-
-	[3] = TEGRA_CAMERA_GPIO(CAM1_RST_L_GPIO, "cam1_rst_lo", 0),
-	[4] = TEGRA_CAMERA_GPIO(CAM1_PWDN_GPIO, "cam1_pwdn", 1),
-
-	[5] = TEGRA_CAMERA_GPIO(CAM2_RST_L_GPIO, "cam2_rst_lo", 0),
-	[6] = TEGRA_CAMERA_GPIO(CAM2_PWDN_GPIO, "cam2_pwdn", 1),
-
-	[7] = TEGRA_CAMERA_GPIO(CAM3_RST_L_GPIO, "cam3_rst_lo", 0),
-	[8] = TEGRA_CAMERA_GPIO(CAM3_PWDN_GPIO, "cam3_pwdn", 1),
+	[0] = TEGRA_CAMERA_GPIO(CAM_CSI_MUX_SEL_GPIO, "cam_csi_sel", 1),
+	[1] = TEGRA_CAMERA_GPIO(CAM1_RST_L_GPIO, "cam1_rst_lo", 0),
+	[2] = TEGRA_CAMERA_GPIO(CAM2_RST_L_GPIO, "cam2_rst_lo", 0),
+	[3] = TEGRA_CAMERA_GPIO(CAM3_RST_L_GPIO, "cam3_rst_lo", 0),
+	[4] = TEGRA_CAMERA_GPIO(CAM3_PWDN_GPIO, "cam3_pwdn", 1),
+	[5] = TEGRA_CAMERA_GPIO(CAM_FLASH_EN_GPIO, "flash_en", 1),
 };
 
-struct ar0832_platform_data enterprise_ar0832_data = {
-	.power_on = enterprise_ar0832_power_on,
-	.power_off = enterprise_ar0832_power_off,
+static struct ar0832_platform_data enterprise_ar0832_ri_data = {
+	.power_on = enterprise_ar0832_ri_power_on,
+	.power_off = enterprise_ar0832_ri_power_off,
+	.id = "right",
 };
 
+static struct ar0832_platform_data enterprise_ar0832_le_data = {
+	.power_on = enterprise_ar0832_le_power_on,
+	.power_off = enterprise_ar0832_le_power_off,
+	.id = "left",
+};
+
+static struct tps61050_platform_data enterprise_tps61050_data = {
+	.cfg		= 0,
+	.num		= 1,
+	.max_amp_torch	= CAM_FLASH_MAX_TORCH_AMP,
+	.max_amp_flash	= CAM_FLASH_MAX_FLASH_AMP,
+	.pinstate	= &enterprise_tps61050_pinstate,
+	.init		= NULL,
+	.exit		= NULL,
+	.pm		= &enterprise_tps61050_pm,
+	.gpio_envm	= NULL,
+	.gpio_sync	= NULL,
+};
+
+/*
+ * Since ar0832 driver should support multiple devices, slave
+ * address should be changed after it is open. Default slave
+ * address of ar0832 is 0x36. It will be changed to alternate
+ * address defined below when device is open.
+ */
 static struct i2c_board_info ar0832_i2c2_boardinfo[] = {
 	{
+		/* 0x30: alternative slave address */
 		I2C_BOARD_INFO("ar0832", 0x36),
-		.platform_data = &enterprise_ar0832_data,
+		.platform_data = &enterprise_ar0832_ri_data,
 	},
 	{
-		I2C_BOARD_INFO("ar0832_focuser", 0x36),
+		/* 0x31: alternative slave address */
+		I2C_BOARD_INFO("ar0832", 0x32),
+		.platform_data = &enterprise_ar0832_le_data,
+	},
+	{
+		I2C_BOARD_INFO("tps61050", 0x33),
+		.platform_data = &enterprise_tps61050_data,
+	},
+	{
+		I2C_BOARD_INFO("ov9726", OV9726_I2C_ADDR >> 1),
+		.platform_data = &enterprise_ov9726_data,
 	},
 };
 
@@ -278,6 +495,7 @@ static int enterprise_cam_init(void)
 
 	pr_info("%s:++\n", __func__);
 
+	memset(ent_vicsi_pwr, 0, sizeof(ent_vicsi_pwr));
 	for (i = 0; i < ARRAY_SIZE(enterprise_cam_gpio_data); i++) {
 		ret = gpio_request(enterprise_cam_gpio_data[i].gpio,
 				   enterprise_cam_gpio_data[i].label);
@@ -306,10 +524,12 @@ fail_free_gpio:
 
 int __init enterprise_sensors_init(void)
 {
+	int ret;
 	enterprise_isl_init();
 	enterprise_nct1008_init();
 	enterprise_mpuirq_init();
-	enterprise_cam_init();
+	ret = enterprise_cam_init();
 
-	return 0;
+	return ret;
 }
+

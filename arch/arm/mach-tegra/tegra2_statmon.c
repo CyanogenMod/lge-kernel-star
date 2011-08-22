@@ -243,12 +243,14 @@ void tegra2_statmon_stop(void)
 	tegra2_stat_mon_write(reg_val, COP_MON_CTRL);
 
 	clk_disable(stat_mon->stat_mon_clock);
+	clk_disable(stat_mon->avp_sampler.clock);
 }
 
 int tegra2_statmon_start(void)
 {
 	u32 reg_val = 0;
 
+	clk_enable(stat_mon->avp_sampler.clock);
 	clk_enable(stat_mon->stat_mon_clock);
 
 	/* disable AVP monitor */
@@ -344,9 +346,9 @@ static int sampler_init(struct sampler *s)
 	s->enable = false;
 	s->sample_time = 9;
 
-	clock = tegra_get_clock_by_name("avp.sclk");
+	clock = tegra_get_clock_by_name("mon.sclk");
 	if (IS_ERR(clock)) {
-		pr_err("%s: Couldn't get avp clock\n", __func__);
+		pr_err("%s: Couldn't get mon.sckl\n", __func__);
 		return -1;
 	}
 

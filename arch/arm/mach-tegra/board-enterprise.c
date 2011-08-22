@@ -35,6 +35,7 @@
 #include <linux/usb/android_composite.h>
 #include <linux/spi/spi.h>
 #include <linux/tegra_uart.h>
+#include <linux/fsl_devices.h>
 
 #include <mach/clk.h>
 #include <mach/iomap.h>
@@ -52,7 +53,7 @@
 #include "devices.h"
 #include "gpio-names.h"
 #include "fuse.h"
-
+#include "pm.h"
 
 static struct usb_mass_storage_platform_data tegra_usb_fsg_platform = {
 	.vendor = "NVIDIA",
@@ -238,6 +239,9 @@ static struct tegra_i2c_platform_data enterprise_i2c1_platform_data = {
 	.adapter_nr	= 0,
 	.bus_count	= 1,
 	.bus_clk_rate	= { 100000, 0 },
+	.scl_gpio		= {TEGRA_GPIO_PC4, 0},
+	.sda_gpio		= {TEGRA_GPIO_PC5, 0},
+	.arb_recovery = arb_lost_recovery,
 };
 
 static struct tegra_i2c_platform_data enterprise_i2c2_platform_data = {
@@ -245,24 +249,36 @@ static struct tegra_i2c_platform_data enterprise_i2c2_platform_data = {
 	.bus_count	= 1,
 	.bus_clk_rate	= { 100000, 0 },
 	.is_clkon_always = true,
+	.scl_gpio		= {TEGRA_GPIO_PT5, 0},
+	.sda_gpio		= {TEGRA_GPIO_PT6, 0},
+	.arb_recovery = arb_lost_recovery,
 };
 
 static struct tegra_i2c_platform_data enterprise_i2c3_platform_data = {
 	.adapter_nr	= 2,
 	.bus_count	= 1,
 	.bus_clk_rate	= { 100000, 0 },
+	.scl_gpio		= {TEGRA_GPIO_PBB1, 0},
+	.sda_gpio		= {TEGRA_GPIO_PBB2, 0},
+	.arb_recovery = arb_lost_recovery,
 };
 
 static struct tegra_i2c_platform_data enterprise_i2c4_platform_data = {
 	.adapter_nr	= 3,
 	.bus_count	= 1,
 	.bus_clk_rate	= { 100000, 0 },
+	.scl_gpio		= {TEGRA_GPIO_PV4, 0},
+	.sda_gpio		= {TEGRA_GPIO_PV5, 0},
+	.arb_recovery = arb_lost_recovery,
 };
 
 static struct tegra_i2c_platform_data enterprise_i2c5_platform_data = {
 	.adapter_nr	= 4,
 	.bus_count	= 1,
 	.bus_clk_rate	= { 100000, 0 },
+	.scl_gpio		= {TEGRA_GPIO_PZ6, 0},
+	.sda_gpio		= {TEGRA_GPIO_PZ7, 0},
+	.arb_recovery = arb_lost_recovery,
 };
 
 static void enterprise_i2c_init(void)
@@ -293,7 +309,6 @@ static struct uart_clk_parent uart_parent_clk[] = {
 	[1] = {.name = "pll_m"},
 	[2] = {.name = "clk_m"},
 };
-static struct clk *debug_uart_clk;
 static struct tegra_uart_platform_data enterprise_uart_pdata;
 
 static void __init uart_debug_init(void)
@@ -304,6 +319,8 @@ static void __init uart_debug_init(void)
 	/* UARTD is the debug port. */
 	pr_info("Selecting UARTD as the debug console\n");
 	enterprise_uart_devices[3] = &debug_uartd_device;
+	debug_uart_port_base = ((struct plat_serial8250_port *)(
+			debug_uartd_device.dev.platform_data))->mapbase;
 	debug_uart_clk = clk_get_sys("serial8250.0", "uartd");
 
 	/* Clock enable for the debug channel */
@@ -494,6 +511,8 @@ static struct tegra_otg_platform_data tegra_otg_pdata = {
 
 static void enterprise_usb_init(void)
 {
+	struct	fsl_usb2_platform_data *udc_pdata;
+
 	tegra_usb_phy_init(tegra_usb_phy_pdata, ARRAY_SIZE(tegra_usb_phy_pdata));
 
 	tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
@@ -502,6 +521,8 @@ static void enterprise_usb_init(void)
 	tegra_ehci3_device.dev.platform_data = &tegra_ehci_pdata[2];
 	platform_device_register(&tegra_ehci3_device);
 
+	udc_pdata = tegra_udc_device.dev.platform_data;
+	udc_pdata->charge_regulator ="usb_bat_chg";
 }
 
 static void enterprise_gps_init(void)
@@ -531,13 +552,16 @@ static void __init tegra_enterprise_init(void)
 	enterprise_pinmux_init();
 	enterprise_i2c_init();
 	enterprise_uart_init();
+	enterprise_usb_init();
 	snprintf(serial, sizeof(serial), "%llx", tegra_chip_uid());
 	andusb_plat.serial_number = kstrdup(serial, GFP_KERNEL);
-	tegra_tsensor_init();
+	enterprise_tsensor_init();
 	platform_add_devices(enterprise_devices, ARRAY_SIZE(enterprise_devices));
 	enterprise_regulator_init();
 	enterprise_sdhci_init();
-	enterprise_usb_init();
+#ifdef CONFIG_TEGRA_EDP_LIMITS
+	enterprise_edp_init();
+#endif
 	/* enterprise_kbc_init(); */
 	enterprise_gps_init();
 	enterprise_baseband_init();

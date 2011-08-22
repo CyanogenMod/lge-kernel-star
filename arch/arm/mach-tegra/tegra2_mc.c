@@ -701,6 +701,7 @@ void emc_stat_start(tegra_mc_counter_t *llp_counter,
 	writel(0xFFFFFFFF, emc.mmio + EMC_STAT_DRAM_CLOCK_LIMIT_LO_0);
 	writel(0xFF, emc.mmio + EMC_STAT_DRAM_CLOCK_LIMIT_HI_0);
 
+	llmc_stat = 0;
 	/* Reset then enable statistics */
 	llmc_stat |= (EMC_STAT_CONTROL_0_LLMC_GATHER_CLEAR <<
 			EMC_STAT_CONTROL_0_LLMC_GATHER_SHIFT);
@@ -708,6 +709,7 @@ void emc_stat_start(tegra_mc_counter_t *llp_counter,
 			EMC_STAT_CONTROL_0_DRAM_GATHER_SHIFT);
 	writel(llmc_stat, emc.mmio + EMC_STAT_CONTROL_0);
 
+	llmc_stat = 0;
 	llmc_stat |= (EMC_STAT_CONTROL_0_LLMC_GATHER_ENABLE <<
 			EMC_STAT_CONTROL_0_LLMC_GATHER_SHIFT);
 	llmc_stat |= (EMC_STAT_CONTROL_0_DRAM_GATHER_ENABLE <<

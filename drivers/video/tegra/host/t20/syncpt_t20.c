@@ -20,6 +20,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+#include <linux/nvhost_ioctl.h>
 #include "../nvhost_syncpt.h"
 #include "../dev.h"
 
@@ -127,7 +128,7 @@ static int t20_syncpt_wait_check(struct nvhost_syncpt *sp,
 	while (wait != waitend) {
 		u32 syncpt, override;
 
-		BUG_ON(wait->syncpt_id > NV_HOST1X_SYNCPT_NB_PTS);
+		BUG_ON(wait->syncpt_id >= NV_HOST1X_SYNCPT_NB_PTS);
 
 		syncpt = atomic_read(&sp->min_val[wait->syncpt_id]);
 		if (nvhost_syncpt_wrapping_comparison(syncpt, wait->thresh)) {
@@ -161,7 +162,7 @@ static int t20_syncpt_wait_check(struct nvhost_syncpt *sp,
 
 
 static const char *s_syncpt_names[32] = {
-	"gfx_host", "", "", "", "", "", "", "", "", "", "",
+	"gfx_host", "", "", "", "", "", "", "", "", "", "avp_0",
 	"csi_vi_0", "csi_vi_1", "vi_isp_0", "vi_isp_1", "vi_isp_2", "vi_isp_3", "vi_isp_4",
 	"2d_0", "2d_1",
 	"", "",
@@ -171,7 +172,7 @@ static const char *s_syncpt_names[32] = {
 
 static const char *t20_syncpt_name(struct nvhost_syncpt *s, u32 id)
 {
-	BUG_ON(id > ARRAY_SIZE(s_syncpt_names));
+	BUG_ON(id >= ARRAY_SIZE(s_syncpt_names));
 	return s_syncpt_names[id];
 }
 

@@ -254,6 +254,21 @@ enum tegra_pull_strength {
 	TEGRA_PULL_29,
 	TEGRA_PULL_30,
 	TEGRA_PULL_31,
+	TEGRA_PULL_32,
+	TEGRA_PULL_33,
+	TEGRA_PULL_34,
+	TEGRA_PULL_35,
+	TEGRA_PULL_36,
+	TEGRA_PULL_37,
+	TEGRA_PULL_38,
+	TEGRA_PULL_39,
+	TEGRA_PULL_40,
+	TEGRA_PULL_41,
+	TEGRA_PULL_42,
+	TEGRA_PULL_43,
+	TEGRA_PULL_44,
+	TEGRA_PULL_45,
+	TEGRA_PULL_46,
 	TEGRA_MAX_PULL,
 };
 
@@ -331,9 +346,5 @@ void tegra_pinmux_config_tristate_table(const struct tegra_pingroup_config *conf
 void tegra_pinmux_config_pullupdown_table(const struct tegra_pingroup_config *config,
 	int len, enum tegra_pullupdown pupd);
 
-#ifdef CONFIG_PM_SLEEP
 void tegra_init_pinmux(void);
-#else
-static inline void tegra_init_pinmux(void) {}
-#endif
 #endif

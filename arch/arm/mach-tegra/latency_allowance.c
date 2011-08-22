@@ -17,6 +17,8 @@
 #include <linux/types.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/debugfs.h>
+#include <linux/seq_file.h>
 #include <linux/err.h>
 #include <linux/spinlock_types.h>
 #include <linux/spinlock.h>
@@ -87,6 +89,9 @@
 #define VI_RESERVE_3		(0x97 * 4)
 #define VI_RESERVE_4		(0x98 * 4)
 
+/* maximum valid value for latency allowance */
+#define MC_LA_MAX_VALUE		255
+
 #define ENABLE_LA_DEBUG		0
 #define TEST_LA_CODE		0
 
@@ -94,6 +99,8 @@
 	if (ENABLE_LA_DEBUG) { \
 		printk(KERN_INFO pr_fmt(fmt), ##__VA_ARGS__); \
 	}
+
+static struct dentry *latency_debug_dir;
 
 struct la_client_info {
 	unsigned int fifo_size_in_atoms;
@@ -378,6 +385,7 @@ int tegra_set_latency_allowance(enum tegra_la_id id,
 	unsigned long reg_read;
 	unsigned long reg_write;
 	int bytes_per_atom = normal_atom_size;
+	struct la_client_info *ci;
 
 	VALIDATE_ID(id);
 	VALIDATE_BW(bandwidth_in_mbps);
@@ -385,23 +393,35 @@ int tegra_set_latency_allowance(enum tegra_la_id id,
 		id == ID(FDCDRD2) || id == ID(FDCDWR2))
 		bytes_per_atom = fdc_atom_size;
 
-	ideal_la = (la_info[id].fifo_size_in_atoms * bytes_per_atom * 1000) /
-		    (bandwidth_in_mbps * ns_per_tick);
-	la_to_set = ideal_la - (la_info[id].expiration_in_ns/ns_per_tick) - 1;
-	scaling_info[id].actual_la_to_set = la_to_set;
+	ci = &la_info[id];
+
+	if (bandwidth_in_mbps == 0) {
+		la_to_set = MC_LA_MAX_VALUE;
+	} else {
+		ideal_la = (ci->fifo_size_in_atoms * bytes_per_atom * 1000) /
+			   (bandwidth_in_mbps * ns_per_tick);
+		la_to_set = ideal_la - (ci->expiration_in_ns/ns_per_tick) - 1;
+	}
+
 	la_debug("\n%s:id=%d,bw=%dmbps, la_to_set=%d",
 		__func__, id, bandwidth_in_mbps, la_to_set);
 	la_to_set = (la_to_set < 0) ? 0 : la_to_set;
-	la_to_set = (la_to_set > 255) ? 255 : la_to_set;
+	la_to_set = (la_to_set > MC_LA_MAX_VALUE) ? MC_LA_MAX_VALUE : la_to_set;
+	scaling_info[id].actual_la_to_set = la_to_set;
+
+	/* until display can use latency allowance scaling, use a more
+	 * aggressive LA setting. Bug 862709 */
+	if (id >= ID(DISPLAY_0A) && id <= ID(DISPLAY_HCB))
+		la_to_set /= 3;
 
 	spin_lock(&safety_lock);
-	reg_read = readl(la_info[id].reg_addr);
-	reg_write = (reg_read & ~la_info[id].mask) |
-			(la_to_set << la_info[id].shift);
-	writel(reg_write, la_info[id].reg_addr);
+	reg_read = readl(ci->reg_addr);
+	reg_write = (reg_read & ~ci->mask) |
+			(la_to_set << ci->shift);
+	writel(reg_write, ci->reg_addr);
 	scaling_info[id].la_set = la_to_set;
 	la_debug("reg_addr=0x%x, read=0x%x, write=0x%x",
-		(u32)la_info[id].reg_addr, (u32)reg_read, (u32)reg_write);
+		(u32)ci->reg_addr, (u32)reg_read, (u32)reg_write);
 	spin_unlock(&safety_lock);
 	return 0;
 }
@@ -477,6 +497,48 @@ void tegra_disable_latency_scaling(enum tegra_la_id id)
 	}
 	spin_unlock(&safety_lock);
 }
+
+static int la_regs_show(struct seq_file *s, void *unused)
+{
+	unsigned i;
+	unsigned long la;
+
+	/* iterate the list, but don't print MAX_ID */
+	for (i = 0; i < ARRAY_SIZE(la_info) - 1; i++) {
+		la = (readl(la_info[i].reg_addr) & la_info[i].mask)
+			>> la_info[i].shift;
+		seq_printf(s, "%-16s: %4lu\n", la_info[i].name, la);
+	}
+
+        return 0;
+}
+
+static int dbg_la_regs_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, la_regs_show, inode->i_private);
+}
+
+static const struct file_operations regs_fops = {
+	.open           = dbg_la_regs_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+
+static int __init tegra_latency_allowance_debugfs_init(void)
+{
+	if (latency_debug_dir)
+		return 0;
+
+	latency_debug_dir = debugfs_create_dir("tegra_latency", NULL);
+
+	debugfs_create_file("la_info", S_IRUGO, latency_debug_dir, NULL,
+		&regs_fops);
+
+	return 0;
+}
+
+late_initcall(tegra_latency_allowance_debugfs_init);
 
 static int __init tegra_latency_allowance_init(void)
 {

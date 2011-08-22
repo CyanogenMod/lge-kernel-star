@@ -216,11 +216,12 @@ static void setup_restore_v0(u32 *ptr)
 /*** save ***/
 
 /* the same context save command sequence is used for all contexts. */
-static struct nvmap_handle_ref *save_buf = NULL;
-static phys_addr_t save_phys = 0;
-static unsigned int save_size = 0;
-static unsigned int save_incrs = 0;
-static unsigned int save_thresh = 0;
+static struct nvmap_handle_ref *save_buf;
+static phys_addr_t save_phys;
+static unsigned int save_size;
+static unsigned int save_incrs;
+static unsigned int save_thresh;
+static unsigned int save_slots;
 
 static void __init setup_save_regs(const struct ctx_saver *saver,
 			struct save_info *info,
@@ -392,7 +393,8 @@ static void __init setup_save(const struct ctx_saver *saver, u32 *ptr)
 static void save_push_v0(struct nvhost_cdma *cdma,
 			struct nvhost_hwctx *ctx)
 {
-	nvhost_cdma_push(cdma,
+	nvhost_cdma_push_gather(cdma,
+			nvmap_ref_to_handle(save_buf),
 			nvhost_opcode_gather(save_size),
 			save_phys);
 }
@@ -451,48 +453,13 @@ static void __init save_end_v0(u32 *ptr)
 }
 #define SAVE_END_V0_SIZE 5
 
-static void save_registers_from_fifo(u32 *ptr, unsigned int count,
-					void __iomem *chan_regs,
-					unsigned int *pending)
-{
-	unsigned int entries = *pending;
-	while (count) {
-		unsigned int num;
-
-		while (!entries) {
-			/* query host for number of entries in fifo */
-			entries = nvhost_channel_fifostat_outfentries(
-				readl(chan_regs + HOST1X_CHANNEL_FIFOSTAT));
-			if (!entries)
-				cpu_relax();
-			/* TODO: [ahowe 2010-06-14] timeout */
-		}
-		num = min(entries, count);
-		entries -= num;
-		count -= num;
-
-		while (num & ~0x3) {
-			u32 arr[4];
-			arr[0] = readl(chan_regs + HOST1X_CHANNEL_INDDATA);
-			arr[1] = readl(chan_regs + HOST1X_CHANNEL_INDDATA);
-			arr[2] = readl(chan_regs + HOST1X_CHANNEL_INDDATA);
-			arr[3] = readl(chan_regs + HOST1X_CHANNEL_INDDATA);
-			memcpy(ptr, arr, 4*sizeof(u32));
-			ptr += 4;
-			num -= 4;
-		}
-		while (num--)
-			*ptr++ = readl(chan_regs + HOST1X_CHANNEL_INDDATA);
-	}
-	*pending = entries;
-}
-
 static u32 *save_regs_v0(u32 *ptr, unsigned int *pending,
 			void __iomem *chan_regs,
 			const struct hwctx_reginfo *regs,
 			unsigned int nr_regs)
 {
 	const struct hwctx_reginfo *rend = regs + nr_regs;
+	int drain_result = 0;
 
 	for ( ; regs != rend; ++regs) {
 		u32 count = regs->count;
@@ -507,7 +474,9 @@ static u32 *save_regs_v0(u32 *ptr, unsigned int *pending,
 			ptr += RESTORE_INDIRECT_SIZE;
 			break;
 		}
-		save_registers_from_fifo(ptr, count, chan_regs, pending);
+		drain_result = nvhost_drain_read_fifo(chan_regs,
+			ptr, count, pending);
+		BUG_ON(drain_result < 0);
 		ptr += count;
 	}
 	return ptr;
@@ -557,7 +526,8 @@ static void save_push_v1(struct nvhost_cdma *cdma,
 			nvhost_opcode_nonincr(0x904, 1),
 			ctx->restore_phys);
 	/* gather the save buffer */
-	nvhost_cdma_push(cdma,
+	nvhost_cdma_push_gather(cdma,
+			nvmap_ref_to_handle(save_buf),
 			nvhost_opcode_gather(save_size),
 			save_phys);
 }
@@ -679,6 +649,7 @@ static struct nvhost_hwctx *ctx3d_alloc_common(struct nvhost_channel *ch,
 	ctx->save = save_buf;
 	ctx->save_incrs = save_incrs;
 	ctx->save_thresh = save_thresh;
+	ctx->save_slots = save_slots;
 	ctx->restore_phys = nvmap_pin(nvmap, ctx->restore);
 	ctx->restore_size = restore_size;
 	ctx->restore_incrs = restore_incrs;
@@ -798,6 +769,15 @@ int __init t20_nvhost_3dctx_handler_init(struct nvhost_hwctx_handler *h)
 		int err = PTR_ERR(save_buf);
 		save_buf = NULL;
 		return err;
+	}
+
+	save_slots = 1;		/* save_push_v0() */
+	if (s_is_v1) {
+		save_slots = 6;	/* save_push_v1() */
+		if (register_sets == 2)
+			save_slots += 2;
+		if (s_war_insert_syncpoints)
+			save_slots += 1;
 	}
 
 	save_ptr = nvmap_mmap(save_buf);

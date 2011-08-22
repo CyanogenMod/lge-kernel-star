@@ -21,20 +21,36 @@
 #ifndef __MACH_EDP_H
 #define __MACH_EDP_H
 
+#include <linux/debugfs.h>
+
+struct tegra_edp_entry {
+	char speedo_id;
+	char regulator_100mA;
+	char temperature;
+	char freq_limits[4];
+};
+
 struct tegra_edp_limits {
-	int	temperature;
+	int temperature;
 	unsigned int freq_limits[4];
 };
 
+
 #ifdef CONFIG_TEGRA_EDP_LIMITS
+
+
 int tegra_edp_update_thermal_zone(int temperature);
-void tegra_init_cpu_edp_limits(const struct tegra_edp_limits *limits, int size);
+void tegra_init_cpu_edp_limits(unsigned int regulator_mA);
+void tegra_get_cpu_edp_limits(const struct tegra_edp_limits **limits, int *size);
+
 #else
-static inline void tegra_init_cpu_edp_limits(
-	const struct tegra_edp_limits *limits, int size)
-{ }
+static inline void tegra_init_cpu_edp_limits(int regulator_mA)
+{}
 static inline int tegra_edp_update_thermal_zone(int temperature)
 { return -1; }
+static inline void tegra_get_cpu_edp_limits(struct tegra_edp_limits **limits,
+					    int *size)
+{}
 #endif
 
 #endif	/* __MACH_EDP_H */

@@ -23,6 +23,7 @@
 
 #include <mach/gpio.h>
 #include <mach/irqs.h>
+#include <linux/mfd/tps80031.h>
 
 int enterprise_charge_init(void);
 int enterprise_sdhci_init(void);
@@ -35,6 +36,8 @@ int enterprise_emc_init(void);
 int enterprise_regulator_init(void);
 int enterprise_modem_init(void);
 int enterprise_suspend_init(void);
+int enterprise_edp_init(void);
+void __init enterprise_tsensor_init(void);
 
 /* Touchscreen GPIO addresses   */
 #ifdef CONFIG_TOUCHSCREEN_ATMEL_MT_T9
@@ -44,29 +47,36 @@ int enterprise_suspend_init(void);
 
 /*****************External GPIO tables ******************/
 /* External peripheral gpio base. */
-#define TPS80031_GPIO_BASE	TEGRA_NR_GPIOS
-#define TPS80031_GPIO_REGEN1	(TPS80031_GPIO_BASE + 0)
-#define TPS80031_GPIO_REGEN2	(TPS80031_GPIO_BASE + 1)
-#define TPS80031_GPIO_SYSEN	(TPS80031_GPIO_BASE + 2)
-#define TPS80031_GPIO_END	(TPS80031_GPIO_BASE + 3)
+#define ENT_TPS80031_GPIO_BASE	   TEGRA_NR_GPIOS
+#define ENT_TPS80031_GPIO_REGEN1 (ENT_TPS80031_GPIO_BASE + TPS80031_GPIO_REGEN1)
+#define ENT_TPS80031_GPIO_REGEN2 (ENT_TPS80031_GPIO_BASE + TPS80031_GPIO_REGEN2)
+#define ENT_TPS80031_GPIO_SYSEN	 (ENT_TPS80031_GPIO_BASE + TPS80031_GPIO_SYSEN)
+#define ENT_TPS80031_GPIO_END	(ENT_TPS80031_GPIO_BASE + TPS80031_GPIO_NR)
 
 /*****************External Interrupt tables ******************/
 /* External peripheral irq base */
-#define TPS80031_IRQ_BASE	TEGRA_NR_IRQS
-#define TPS80031_IRQ_END	(TPS80031_IRQ_BASE + 24)
+#define ENT_TPS80031_IRQ_BASE	TEGRA_NR_IRQS
+#define ENT_TPS80031_IRQ_END  (ENT_TPS80031_IRQ_BASE + TPS80031_INT_NR)
 
 /*****************Camera GPIOs ******************/
 #define CAM_CSI_MUX_SEL_GPIO	TEGRA_GPIO_PM3
-#define CAM_LDO_1V8_EN_L_GPIO	TEGRA_GPIO_PF1
-#define CAM_LDO_2V8_EN_L_GPIO	TEGRA_GPIO_PM7
+#define CAM_CSI_MUX_SEL_REAR	1
+#define CAM_CSI_MUX_SEL_FRONT	0
+
 #define CAM1_RST_L_GPIO		TEGRA_GPIO_PM5 /*REAR RIGHT*/
 #define CAM1_PWDN_GPIO		TEGRA_GPIO_PF3 /*REAR RIGHT*/
 #define CAM2_RST_L_GPIO		TEGRA_GPIO_PF4 /*REAR LEFT*/
 #define CAM2_PWDN_GPIO		TEGRA_GPIO_PF2 /*REAR LEFT*/
 #define CAM3_RST_L_GPIO		TEGRA_GPIO_PM2 /*FRONT*/
+#define CAM3_RST_L_TRUE		0
+#define CAM3_RST_L_FALSE	1
 #define CAM3_PWDN_GPIO		TEGRA_GPIO_PN4 /*FRONT*/
+#define CAM3_PWDN_TRUE		1
+#define CAM3_PWDN_FALSE		0
 #define CAM_FLASH_EN_GPIO	TEGRA_GPIO_PBB3
 #define CAM_FLASH_MAX_TORCH_AMP	7
 #define CAM_FLASH_MAX_FLASH_AMP	7
 
+#define BOARD_1205		(0x0C05)
+#define ENTERPRISE_FAB_A01	(0x01)
 #endif

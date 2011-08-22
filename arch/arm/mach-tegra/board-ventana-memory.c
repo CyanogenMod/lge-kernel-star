@@ -563,19 +563,30 @@ static const struct tegra_emc_chip ventana_t25_emc_chips[] = {
 	},
 };
 
+static const struct tegra_emc_chip ventana_siblings_emc_chips[] = {
+};
+
 #define TEGRA25_SKU		0x0B00
+#define board_is_ventana(bi) (bi.board_id == 0x24b || bi.board_id == 0x252)
 
 int ventana_emc_init(void)
 {
 	struct board_info BoardInfo;
 
 	tegra_get_board_info(&BoardInfo);
-	if (BoardInfo.sku == TEGRA25_SKU) {
-		tegra_init_emc(ventana_t25_emc_chips,
-			ARRAY_SIZE(ventana_t25_emc_chips));
+
+	if (board_is_ventana(BoardInfo)) {
+		if (BoardInfo.sku == TEGRA25_SKU)
+			tegra_init_emc(ventana_t25_emc_chips,
+				       ARRAY_SIZE(ventana_t25_emc_chips));
+		else
+			tegra_init_emc(ventana_emc_chips,
+				       ARRAY_SIZE(ventana_emc_chips));
 	} else {
-		tegra_init_emc(ventana_emc_chips,
-			ARRAY_SIZE(ventana_emc_chips));
+		pr_info("ventana_emc_init: using ventana_siblings_emc_chips\n");
+		tegra_init_emc(ventana_siblings_emc_chips,
+			       ARRAY_SIZE(ventana_siblings_emc_chips));
 	}
+
 	return 0;
 }

@@ -269,6 +269,7 @@ static int cardhu_right_ov5650_power_off(void)
 		(board_info.board_id == BOARD_E1291)) {
 		gpio_direction_output(CAM1_POWER_DWN_GPIO, 1);
 		gpio_direction_output(CAM2_POWER_DWN_GPIO, 1);
+		gpio_direction_output(CAM3_POWER_DWN_GPIO, 1);
 	}
 
 	if (cardhu_1v8_cam2)
@@ -391,37 +392,54 @@ static const struct i2c_board_info cardhu_i2c3_board_info[] = {
 	},
 };
 
-static int sh532u_power_control(void *cdata, int is_enable) {
+static int sh532u_power_control(void *cdata, int is_enable, int which) {
 	static struct regulator *vdd_2v8_cam1_af = NULL;
-	if (vdd_2v8_cam1_af == NULL) {
-		vdd_2v8_cam1_af = regulator_get(NULL, "vdd_2v8_cam1_af");
-		if (WARN_ON(IS_ERR_OR_NULL(vdd_2v8_cam1_af))) {
-			pr_err("%s: couldn't get regulator vdd_2v8_cam1_af:"
-				" %ld\n", __func__, PTR_ERR(vdd_2v8_cam1_af));
+	static struct regulator *vdd_2v8_cam2_af = NULL;
 
-			vdd_2v8_cam1_af = NULL;
+	struct regulator *vdd_2v8_camx_af = (1 == which) ? vdd_2v8_cam1_af : vdd_2v8_cam2_af;
+	char *vdd_2v8_camx_tag = (1 == which) ? "vdd_2v8_cam1_af" : "vdd_2v8_cam2_af";
+
+	if (vdd_2v8_camx_af == NULL) {
+		vdd_2v8_camx_af = regulator_get(NULL, vdd_2v8_camx_tag);
+		if (WARN_ON(IS_ERR_OR_NULL(vdd_2v8_camx_af))) {
+			pr_err("%s: couldn't get regulator %s:"
+				" %ld\n", __func__, vdd_2v8_camx_tag, PTR_ERR(vdd_2v8_camx_af));
+			vdd_2v8_camx_af = NULL;
 			return -ENODEV;
 		}
 	}
 	if (is_enable) {
-		regulator_enable(vdd_2v8_cam1_af);
+		regulator_enable(vdd_2v8_camx_af);
 		mdelay(20);
 	} else
-		regulator_disable(vdd_2v8_cam1_af);
+		regulator_disable(vdd_2v8_camx_af);
+
 	return 0;
 }
-static int sh532u_init(void *cdata) {
-	return sh532u_power_control(cdata, true);
+
+static int sh532u_left_init(void *cdata) {
+	return sh532u_power_control(cdata, true, 1);
 }
-static int sh532u_deinit(void *cdata) {
-	return sh532u_power_control(cdata, false);
+static int sh532u_left_deinit(void *cdata) {
+	return sh532u_power_control(cdata, false, 1);
 }
 
-struct sh532u_platform_data sh532u_pdata = {
-	.board_init = sh532u_init,
-	.board_deinit = sh532u_deinit,
+static int sh532u_right_init(void *cdata) {
+	return sh532u_power_control(cdata, true, 2);
+}
+static int sh532u_right_deinit(void *cdata) {
+	return sh532u_power_control(cdata, false, 2);
+}
+
+struct sh532u_platform_data sh532u_left_pdata = {
+	.board_init = sh532u_left_init,
+	.board_deinit = sh532u_left_deinit,
 };
 
+struct sh532u_platform_data sh532u_right_pdata = {
+	.board_init = sh532u_right_init,
+	.board_deinit = sh532u_right_deinit,
+};
 
 static bool cardhu_tps61050_pm_flag = 0;
 
@@ -486,15 +504,14 @@ static const struct i2c_board_info cardhu_i2c_board_info_tps61050[] = {
 	},
 };
 
-
 static struct i2c_board_info cardhu_i2c6_board_info[] = {
 	{
 		I2C_BOARD_INFO("ov5650L", 0x36),
 		.platform_data = &cardhu_left_ov5650_data,
 	},
 	{
-		I2C_BOARD_INFO("sh532u", 0x72),
-		.platform_data = &sh532u_pdata,
+		I2C_BOARD_INFO("sh532uL", 0x72),
+		.platform_data = &sh532u_left_pdata,
 	},
 };
 
@@ -502,6 +519,10 @@ static struct i2c_board_info cardhu_i2c7_board_info[] = {
 	{
 		I2C_BOARD_INFO("ov5650R", 0x36),
 		.platform_data = &cardhu_right_ov5650_data,
+	},
+	{
+		I2C_BOARD_INFO("sh532uR", 0x72),
+		.platform_data = &sh532u_right_pdata,
 	},
 };
 
@@ -524,7 +545,7 @@ static struct nct1008_platform_data cardhu_nct1008_pdata = {
 	.hysteresis = 5,
 	.shutdown_ext_limit = 90,
 	.shutdown_local_limit = 90,
-	.throttling_ext_limit = 90,
+	.throttling_ext_limit = 75,
 	.alarm_fn = tegra_throttling_enable,
 };
 
@@ -548,23 +569,21 @@ static struct i2c_board_info cardhu_i2c4_nct1008_board_info[] = {
 	}
 };
 
-#ifdef CONFIG_TEGRA_EDP_LIMITS
-extern void cardhu_thermal_zones_info(struct tegra_edp_limits **, int *);
-#endif
 
 static int cardhu_nct1008_init(void)
 {
 	int nct1008_port = -1;
 	int ret;
 #ifdef CONFIG_TEGRA_EDP_LIMITS
-	struct tegra_edp_limits *z;
+	const struct tegra_edp_limits *z;
 	int zones_sz;
 	int i;
 	bool throttle_ok = false;
 #endif
 
 	if ((board_info.board_id == BOARD_E1198) ||
-		(board_info.board_id == BOARD_E1291)) {
+		(board_info.board_id == BOARD_E1291) ||
+		(board_info.board_id == BOARD_PM269)) {
 		nct1008_port = TEGRA_GPIO_PCC2;
 	} else if ((board_info.board_id == BOARD_E1186) ||
 		(board_info.board_id == BOARD_E1187) ||
@@ -589,7 +608,7 @@ static int cardhu_nct1008_init(void)
 	}
 
 #ifdef CONFIG_TEGRA_EDP_LIMITS
-	cardhu_thermal_zones_info(&z, &zones_sz);
+	tegra_get_cpu_edp_limits(&z, &zones_sz);
 	zones_sz = min(zones_sz, MAX_ZONES);
 	for (i = 0; i < zones_sz; i++) {
 		cardhu_nct1008_pdata.thermal_zones[i] = z[i].temperature;
@@ -706,9 +725,6 @@ static struct i2c_board_info __initdata mpu3050_i2c0_boardinfo[] = {
 
 static void cardhu_mpuirq_init(void)
 {
-	if (board_info.board_id != BOARD_E1291)
-		return;
-
 	pr_info("*** MPU START *** cardhu_mpuirq_init...\n");
 	tegra_gpio_enable(TEGRA_GPIO_PX1);
 	gpio_request(TEGRA_GPIO_PX1, SENSOR_MPU_NAME);

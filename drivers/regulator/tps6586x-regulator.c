@@ -375,6 +375,30 @@ static inline int tps6586x_regulator_set_pwm_mode(struct platform_device *pdev)
 	return ret;
 }
 
+static inline int tps6586x_regulator_set_slew_rate(struct platform_device *pdev)
+{
+	struct device *parent = pdev->dev.parent;
+	struct regulator_init_data *p = pdev->dev.platform_data;
+	struct tps6586x_settings *setting = p->driver_data;
+	uint8_t reg;
+
+	if (setting == NULL)
+		return 0;
+
+	/* only SM0 and SM1 can have the slew rate settings */
+	switch (pdev->id) {
+	case TPS6586X_ID_SM_0:
+		reg = TPS6586X_SM0SL;
+		break;
+	case TPS6586X_ID_SM_1:
+		reg = TPS6586X_SM1SL;
+		break;
+	default:
+		return 0;
+	}
+	return tps6586x_write(parent, reg, setting->slew_rate);
+}
+
 static inline struct tps6586x_regulator *find_regulator_info(int id)
 {
 	struct tps6586x_regulator *ri;
@@ -416,6 +440,10 @@ static int __devinit tps6586x_regulator_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, rdev);
+
+	err = tps6586x_regulator_set_slew_rate(pdev);
+	if (err)
+		return err;
 
 	return tps6586x_regulator_set_pwm_mode(pdev);
 }

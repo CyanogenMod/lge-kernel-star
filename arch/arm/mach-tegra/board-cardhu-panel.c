@@ -27,7 +27,7 @@
 #include <linux/earlysuspend.h>
 #include <linux/pwm_backlight.h>
 #include <asm/atomic.h>
-#include <mach/nvhost.h>
+#include <linux/nvhost.h>
 #include <mach/nvmap.h>
 #include <mach/irqs.h>
 #include <mach/iomap.h>
@@ -73,8 +73,50 @@ static struct regulator *cardhu_lvds_vdd_panel = NULL;
 
 static struct board_info board_info;
 
+static tegra_dc_bl_output cardhu_bl_output_measured = {
+	0, 1, 2, 3, 4, 5, 6, 7,
+	8, 9, 10, 11, 12, 13, 14, 15,
+	16, 17, 18, 19, 20, 21, 22, 23,
+	24, 25, 26, 27, 28, 29, 30, 31,
+	32, 33, 34, 35, 36, 37, 38, 39,
+	40, 41, 42, 43, 44, 45, 46, 47,
+	48, 49, 49, 50, 51, 52, 53, 54,
+	55, 56, 57, 58, 59, 60, 61, 62,
+	63, 64, 65, 66, 67, 68, 69, 70,
+	70, 72, 73, 74, 75, 76, 77, 78,
+	79, 80, 81, 82, 83, 84, 85, 86,
+	87, 88, 89, 90, 91, 92, 93, 94,
+	95, 96, 97, 98, 99, 100, 101, 102,
+	103, 104, 105, 106, 107, 108, 110, 111,
+	112, 113, 114, 115, 116, 117, 118, 119,
+	120, 121, 122, 123, 124, 124, 125, 126,
+	127, 128, 129, 130, 131, 132, 133, 133,
+	134, 135, 136, 137, 138, 139, 140, 141,
+	142, 143, 144, 145, 146, 147, 148, 148,
+	149, 150, 151, 152, 153, 154, 155, 156,
+	157, 158, 159, 160, 161, 162, 163, 164,
+	165, 166, 167, 168, 169, 170, 171, 172,
+	173, 174, 175, 176, 177, 179, 180, 181,
+	182, 184, 185, 186, 187, 188, 189, 190,
+	191, 192, 193, 194, 195, 196, 197, 198,
+	199, 200, 201, 202, 203, 204, 205, 206,
+	207, 208, 209, 211, 212, 213, 214, 215,
+	216, 217, 218, 219, 220, 221, 222, 223,
+	224, 225, 226, 227, 228, 229, 230, 231,
+	232, 233, 234, 235, 236, 237, 238, 239,
+	240, 241, 242, 243, 244, 245, 246, 247,
+	248, 249, 250, 251, 252, 253, 254, 255
+};
+
+static p_tegra_dc_bl_output bl_output;
+
 static int cardhu_backlight_init(struct device *dev) {
 	int ret;
+
+	bl_output = cardhu_bl_output_measured;
+
+	if (WARN_ON(ARRAY_SIZE(cardhu_bl_output_measured) != 256))
+		pr_err("bl_output array does not have 256 elements\n");
 
 #ifndef CONFIG_TEGRA_CARDHU_DSI
 	tegra_gpio_disable(cardhu_bl_pwm);
@@ -164,22 +206,29 @@ static int cardhu_backlight_notify(struct device *unused, int brightness)
 
 	/* SD brightness is a percentage, 8-bit value. */
 	brightness = (brightness * cur_sd_brightness) / 255;
-	if (cur_sd_brightness != 255) {
-		printk("NVSD BL - in: %d, sd: %d, out: %d\n",
-			orig_brightness, cur_sd_brightness, brightness);
+
+	/* Apply any backlight response curve */
+	if (brightness > 255) {
+		pr_info("Error: Brightness > 255!\n");
+	} else {
+		brightness = bl_output[brightness];
 	}
 
 	return brightness;
 }
 
+static int cardhu_disp1_check_fb(struct device *dev, struct fb_info *info);
+
 static struct platform_pwm_backlight_data cardhu_backlight_data = {
 	.pwm_id		= 0,
 	.max_brightness	= 255,
 	.dft_brightness	= 224,
-	.pwm_period_ns	= 5000000,
+	.pwm_period_ns	= 1000000,
 	.init		= cardhu_backlight_init,
 	.exit		= cardhu_backlight_exit,
 	.notify		= cardhu_backlight_notify,
+	/* Only toggle backlight on fb blank notifications for disp1 */
+	.check_fb	= cardhu_disp1_check_fb,
 };
 
 static struct platform_device cardhu_backlight_device = {
@@ -391,29 +440,46 @@ static struct resource cardhu_disp2_resources[] = {
 #ifndef CONFIG_TEGRA_CARDHU_DSI
 static struct tegra_dc_mode cardhu_panel_modes[] = {
 	{
-		/* 1366x768@59Hz */
-		.pclk = 68000000,
-		.h_ref_to_sync = 4,
-		.v_ref_to_sync = 2,
+		/* 1366x768@60Hz */
+		.pclk = 74180000,
+		.h_ref_to_sync = 1,
+		.v_ref_to_sync = 1,
 		.h_sync_width = 30,
 		.v_sync_width = 5,
-		.h_back_porch = 18,
-		.v_back_porch = 12,
+		.h_back_porch = 52,
+		.v_back_porch = 20,
 		.h_active = 1366,
 		.v_active = 768,
-		.h_front_porch = 48,
-		.v_front_porch = 3,
+		.h_front_porch = 64,
+		.v_front_porch = 25,
+	},
+};
+
+static struct tegra_dc_mode cardhu_panel_modes_55hz[] = {
+	{
+		/* 1366x768p 55Hz */
+		.pclk = 68000000,
+		.h_ref_to_sync = 0,
+		.v_ref_to_sync = 12,
+		.h_sync_width = 30,
+		.v_sync_width = 5,
+		.h_back_porch = 52,
+		.v_back_porch = 20,
+		.h_active = 1366,
+		.v_active = 768,
+		.h_front_porch = 64,
+		.v_front_porch = 25,
 	},
 };
 #endif
 
 static struct tegra_dc_sd_settings cardhu_sd_settings = {
-	.enable = 0, /* Disabled by default. */
+	.enable = 1, /* enabled by default. */
 	.use_auto_pwm = false,
 	.hw_update_delay = 0,
 	.bin_width = -1,
-	.aggressiveness = 3,
-	.use_vid_luma = true,
+	.aggressiveness = 1,
+	.use_vid_luma = false,
 	/* Default video coefficients */
 	.coeff = {5, 9, 2},
 	.fc = {0, 0},
@@ -519,7 +585,6 @@ static struct tegra_fb_data cardhu_hdmi_fb_data = {
 static struct tegra_dc_out cardhu_disp2_out = {
 	.type		= TEGRA_DC_OUT_HDMI,
 	.flags		= TEGRA_DC_OUT_HOTPLUG_HIGH,
-	.parent_clk	= "pll_d2_out0",
 
 	.dcc_bus	= 3,
 	.hotplug_gpio	= cardhu_hdmi_hpd,
@@ -800,10 +865,10 @@ static struct tegra_dc_out cardhu_disp1_out = {
 	.align		= TEGRA_DC_ALIGN_MSB,
 	.order		= TEGRA_DC_ORDER_RED_BLUE,
 	.sd_settings	= &cardhu_sd_settings,
+	.parent_clk	= "pll_p",
 
 #ifndef CONFIG_TEGRA_CARDHU_DSI
 	.type		= TEGRA_DC_OUT_RGB,
-	.parent_clk	= "pll_d_out0",
 
 	.modes	 	= cardhu_panel_modes,
 	.n_modes 	= ARRAY_SIZE(cardhu_panel_modes),
@@ -843,6 +908,11 @@ static struct nvhost_device cardhu_disp1_device = {
 	},
 };
 
+static int cardhu_disp1_check_fb(struct device *dev, struct fb_info *info)
+{
+	return info->device == &cardhu_disp1_device.dev;
+}
+
 static struct nvhost_device cardhu_disp2_device = {
 	.name		= "tegradc",
 	.id		= 1,
@@ -876,6 +946,25 @@ static struct platform_device cardhu_nvmap_device = {
 		.platform_data = &cardhu_nvmap_data,
 	},
 };
+
+
+#if defined(CONFIG_TEGRA_NVAVP)
+static struct resource tegra_nvavp_resources[] = {
+	[0] = {
+		.start	= INT_SHR_SEM_INBOX_IBF,
+		.end	= INT_SHR_SEM_INBOX_IBF,
+		.flags	= IORESOURCE_IRQ,
+		.name	= "mbox_from_avp_pending",
+	},
+};
+
+static struct nvhost_device cardhu_nvavp_device = {
+	.name		= "tegra-avp",
+	.id		= -1,
+	.resource	= tegra_nvavp_resources,
+	.num_resources	= ARRAY_SIZE(tegra_nvavp_resources),
+};
+#endif
 
 static struct platform_device *cardhu_gfx_devices[] __initdata = {
 	&cardhu_nvmap_device,
@@ -926,10 +1015,23 @@ int __init cardhu_panel_init(void)
 	cardhu_carveouts[1].base = tegra_carveout_start;
 	cardhu_carveouts[1].size = tegra_carveout_size;
 
-	if (board_info.board_id == BOARD_PM269)
+	if (board_info.board_id == BOARD_E1291 &&
+		((board_info.sku & SKU_TOUCHSCREEN_MECH_FIX) == 0)) {
+		/* use 55Hz panel timings to reduce noise on sensitive touch */
+		printk("Using cardhu_panel_modes_55hz\n");
+		cardhu_disp1_out.modes = cardhu_panel_modes_55hz;
+		cardhu_disp1_out.n_modes = ARRAY_SIZE(cardhu_panel_modes_55hz);
+	}
+
+	if (board_info.board_id == BOARD_PM269) {
 		gpio_request(pm269_lvds_shutdown, "lvds_shutdown");
-	else
+		gpio_direction_output(pm269_lvds_shutdown, 1);
+		tegra_gpio_enable(pm269_lvds_shutdown);
+	} else {
 		gpio_request(cardhu_lvds_shutdown, "lvds_shutdown");
+		gpio_direction_output(cardhu_lvds_shutdown, 1);
+		tegra_gpio_enable(cardhu_lvds_shutdown);
+	}
 
 	tegra_gpio_enable(cardhu_hdmi_hpd);
 	gpio_request(cardhu_hdmi_hpd, "hdmi_hpd");
@@ -963,5 +1065,10 @@ int __init cardhu_panel_init(void)
 	res->end = tegra_fb2_start + tegra_fb2_size - 1;
 	if (!err)
 		err = nvhost_device_register(&cardhu_disp2_device);
+
+#if defined(CONFIG_TEGRA_NVAVP)
+	if (!err)
+		err = nvhost_device_register(&cardhu_nvavp_device);
+#endif
 	return err;
 }

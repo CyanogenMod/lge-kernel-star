@@ -75,7 +75,11 @@ static int show_stat(struct seq_file *p, void *v)
 		(unsigned long long)cputime64_to_clock_t(steal),
 		(unsigned long long)cputime64_to_clock_t(guest),
 		(unsigned long long)cputime64_to_clock_t(guest_nice));
+#if defined(CONFIG_REPORT_PRESENT_CPUS)
+	for_each_present_cpu(i) {
+#else
 	for_each_online_cpu(i) {
+#endif
 
 		/* Copy values here to work around gcc-2.95.3, gcc-2.96 */
 		user = kstat_cpu(i).cpustat.user;

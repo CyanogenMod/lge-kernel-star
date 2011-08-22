@@ -25,6 +25,7 @@
 #include <linux/mutex.h>
 #include <linux/init.h>
 #include <linux/errno.h>
+#include <linux/clkdev.h>
 
 #include <mach/iomap.h>
 
@@ -36,6 +37,16 @@ enum tegra_suspend_mode {
 	TEGRA_MAX_SUSPEND_MODE,
 };
 
+enum suspend_stage {
+	TEGRA_SUSPEND_BEFORE_PERIPHERAL,
+	TEGRA_SUSPEND_BEFORE_CPU,
+};
+
+enum resume_stage {
+	TEGRA_RESUME_AFTER_PERIPHERAL,
+	TEGRA_RESUME_AFTER_CPU,
+};
+
 struct tegra_suspend_platform_data {
 	unsigned long cpu_timer;   /* CPU power good time in us,  LP2/LP1 */
 	unsigned long cpu_off_timer;	/* CPU power off time us, LP2/LP1 */
@@ -45,6 +56,9 @@ struct tegra_suspend_platform_data {
 	bool sysclkreq_high;       /* System clock request is active-high */
 	enum tegra_suspend_mode suspend_mode;
 	unsigned long cpu_lp2_min_residency; /* Min LP2 state residency in us */
+	void (*board_suspend)(int lp_state, enum suspend_stage stg);
+	/* lp_state = 0 for LP0 state, 1 for LP1 state, 2 for LP2 state */
+	void (*board_resume)(int lp_state, enum resume_stage stg);
 };
 
 unsigned long tegra_cpu_power_good_time(void);
@@ -66,26 +80,6 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode);
 #define FUSE_SKU_NUM_DISABLED_CPUS(x)	(((x) >> 3) & 3)
 
 void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat);
-
-unsigned int tegra_count_slow_cpus(unsigned long speed_limit);
-unsigned int tegra_get_slowest_cpu_n(void);
-unsigned long tegra_cpu_lowest_speed(void);
-unsigned long tegra_cpu_highest_speed(void);
-int tegra_cpu_cap_highest_speed(unsigned int *speed_cap);
-
-#if defined(CONFIG_TEGRA_AUTO_HOTPLUG) && !defined(CONFIG_ARCH_TEGRA_2x_SOC)
-int tegra_auto_hotplug_init(struct mutex *cpu_lock);
-void tegra_auto_hotplug_exit(void);
-void tegra_auto_hotplug_governor(unsigned int cpu_freq, bool suspend);
-#else
-static inline int tegra_auto_hotplug_init(struct mutex *cpu_lock)
-{ return 0; }
-static inline void tegra_auto_hotplug_exit(void)
-{ }
-static inline void tegra_auto_hotplug_governor(unsigned int cpu_freq,
-						bool suspend)
-{ }
-#endif
 
 u64 tegra_rtc_read_ms(void);
 
@@ -196,5 +190,12 @@ extern bool tegra_all_cpus_booted __read_mostly;
 #else
 #define tegra_all_cpus_booted (true)
 #endif
+
+/* The debug channel uart base physical address */
+extern unsigned long  debug_uart_port_base;
+
+extern struct clk *debug_uart_clk;
+void tegra_console_uart_suspend(void);
+void tegra_console_uart_resume(void);
 
 #endif /* _MACH_TEGRA_PM_H_ */

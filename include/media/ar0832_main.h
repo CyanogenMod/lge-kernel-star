@@ -13,18 +13,18 @@
 
 #include <linux/ioctl.h> /* For IOCTL macros */
 
-#define AR0832_IOCTL_SET_MODE			_IOW('o', 1, struct ar0832_mode)
-#define AR0832_IOCTL_SET_FRAME_LENGTH		_IOW('o', 2, __u32)
-#define AR0832_IOCTL_SET_COARSE_TIME		_IOW('o', 3, __u32)
-#define AR0832_IOCTL_SET_GAIN			_IOW('o', 4, __u16)
-#define AR0832_IOCTL_GET_STATUS			_IOR('o', 5, __u8)
-#define AR0832_IOCTL_GET_OTP			_IOR('o', 6, struct ar0832_otp_data)
-#define AR0832_IOCTL_TEST_PATTERN		_IOW('o', 7, enum ar0832_test_pattern)
-#define AR0832_IOCTL_SET_POWER_ON		_IOW('o', 10, __u32)
-#define AR0832_IOCTL_SET_SENSOR_REGION		_IOW('o', 11, struct ar0832_stereo_region)
+#define AR0832_IOCTL_SET_MODE			_IOW('o', 0x01, struct ar0832_mode)
+#define AR0832_IOCTL_SET_FRAME_LENGTH		_IOW('o', 0x02, __u32)
+#define AR0832_IOCTL_SET_COARSE_TIME		_IOW('o', 0x03, __u32)
+#define AR0832_IOCTL_SET_GAIN			_IOW('o', 0x04, __u16)
+#define AR0832_IOCTL_GET_STATUS			_IOR('o', 0x05, __u8)
+#define AR0832_IOCTL_GET_OTP			_IOR('o', 0x06, struct ar0832_otp_data)
+#define AR0832_IOCTL_TEST_PATTERN		_IOW('o', 0x07, enum ar0832_test_pattern)
+#define AR0832_IOCTL_SET_POWER_ON		_IOW('o', 0x08, struct ar0832_mode)
+#define AR0832_IOCTL_SET_SENSOR_REGION		_IOW('o', 0x09, struct ar0832_stereo_region)
 
-#define AR0832_FOCUSER_IOCTL_GET_CONFIG		_IOR('o', 12, struct ar0832_focuser_config)
-#define AR0832_FOCUSER_IOCTL_SET_POSITION	_IOW('o', 13, __u32)
+#define AR0832_FOCUSER_IOCTL_GET_CONFIG		_IOR('o', 0x10, struct ar0832_focuser_config)
+#define AR0832_FOCUSER_IOCTL_SET_POSITION	_IOW('o', 0x11, __u32)
 
 enum ar0832_test_pattern {
 	TEST_PATTERN_NONE,
@@ -61,6 +61,7 @@ struct ar0832_mode {
 	__u32 frame_length;
 	__u32 coarse_time;
 	__u16 gain;
+	int stereo;
 };
 
 struct ar0832_point{
@@ -84,19 +85,16 @@ struct ar0832_focuser_config {
 	__u32 actuator_range;
 	__u32 pos_low;
 	__u32 pos_high;
-	/* To-Do */
-	/*
-	float focal_length;
-	float fnumber;
-	float max_aperture;
-	*/
+	__u32 focal_length;
+	__u32 fnumber;
+	__u32 max_aperture;
 };
 
 #ifdef __KERNEL__
 struct ar0832_platform_data {
-	int (*power_on)(void);
-	int (*power_off)(void);
-
+	int (*power_on)(int is_stereo);
+	int (*power_off)(int is_stereo);
+	char *id;
 };
 #endif /* __KERNEL__ */
 

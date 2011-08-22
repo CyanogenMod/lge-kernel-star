@@ -34,7 +34,7 @@
 #include <mach/clk.h>
 #include <mach/dc.h>
 #include <mach/fb.h>
-#include <mach/nvhost.h>
+#include <linux/nvhost.h>
 #include <mach/hdmi-audio.h>
 
 #include <video/tegrafb.h>
@@ -169,6 +169,23 @@ const struct fb_videomode tegra_dc_hdmi_supported_modes[] = {
 		.vmode =	FB_VMODE_NONINTERLACED,
 		.sync = 0,
 	},
+
+	/* 1920x1080p 23.98/24hz: EIA/CEA-861-B Format 32 (Stereo)*/
+	{
+		.xres =		1920,
+		.yres =		1080,
+		.pixclock =	KHZ2PICOS(74250),
+		.hsync_len =	44,	/* h_sync_width */
+		.vsync_len =	5,	/* v_sync_width */
+		.left_margin =	148,	/* h_back_porch */
+		.upper_margin =	36,	/* v_back_porch */
+		.right_margin =	638,	/* h_front_porch */
+		.lower_margin =	4,	/* v_front_porch */
+		.vmode = FB_VMODE_NONINTERLACED |
+				 FB_VMODE_STEREO_FRAME_PACK,
+		.sync = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	},
+
 	/* 1920x1080p 30Hz EIA/CEA-861-B Format 34 */
 	{
 		.xres =		1920,
@@ -640,11 +657,24 @@ static inline void tegra_dc_hdmi_debug_create(struct tegra_dc_hdmi_data *hdmi)
 
 #define PIXCLOCK_TOLERANCE	200
 
+static int tegra_dc_calc_clock_per_frame(const struct fb_videomode *mode)
+{
+	return (mode->left_margin + mode->xres +
+		mode->right_margin + mode->hsync_len) *
+	       (mode->upper_margin + mode->yres +
+		mode->lower_margin + mode->vsync_len);
+}
 static bool tegra_dc_hdmi_mode_equal(const struct fb_videomode *mode1,
 					const struct fb_videomode *mode2)
 {
+	int clock_per_frame = tegra_dc_calc_clock_per_frame(mode1);
+
+	/* allows up to 1Hz of pixclock difference */
 	return mode1->xres	== mode2->xres &&
 		mode1->yres	== mode2->yres &&
+		(mode1->pixclock == mode2->pixclock ||
+		(abs(PICOS2KHZ(mode1->pixclock - mode2->pixclock)) *
+		1000 / clock_per_frame <= 1)) &&
 		mode1->vmode	== mode2->vmode;
 }
 
@@ -666,7 +696,10 @@ static bool tegra_dc_hdmi_mode_filter(const struct tegra_dc *dc,
 					struct fb_videomode *mode)
 {
 	int i;
-	int clocks;
+	int clock_per_frame;
+
+	if (!mode->pixclock)
+		return false;
 
 	for (i = 0; i < ARRAY_SIZE(tegra_dc_hdmi_supported_modes); i++) {
 		const struct fb_videomode *supported_mode
@@ -675,9 +708,9 @@ static bool tegra_dc_hdmi_mode_filter(const struct tegra_dc *dc,
 		    tegra_dc_hdmi_valid_pixclock(dc, supported_mode)) {
 			memcpy(mode, supported_mode, sizeof(*mode));
 			mode->flag = FB_MODE_IS_DETAILED;
-			clocks = (mode->left_margin + mode->xres + mode->right_margin + mode->hsync_len) *
-				(mode->upper_margin + mode->yres + mode->lower_margin + mode->vsync_len);
-			mode->refresh = (PICOS2KHZ(mode->pixclock) * 1000) / clocks;
+			clock_per_frame = tegra_dc_calc_clock_per_frame(mode);
+			mode->refresh = (PICOS2KHZ(mode->pixclock) * 1000)
+					/ clock_per_frame;
 			return true;
 		}
 	}
@@ -733,9 +766,14 @@ static bool tegra_dc_hdmi_detect(struct tegra_dc *dc)
 	hdmi->hpd_switch.state = 0;
 	switch_set_state(&hdmi->hpd_switch, 1);
 	dev_info(&dc->ndev->dev, "display detected\n");
+
+	dc->connected = true;
+	tegra_dc_ext_process_hotplug(dc->ndev->id);
+
 	return true;
 
 fail:
+	hdmi->eld_retrieved = false;
 	switch_set_state(&hdmi->hpd_switch, 0);
 	tegra_nvhdcp_set_plug(hdmi->nvhdcp, 0);
 	return false;
@@ -753,6 +791,9 @@ static void tegra_dc_hdmi_detect_worker(struct work_struct *work)
 	if (!tegra_dc_hdmi_detect(dc)) {
 		tegra_dc_disable(dc);
 		tegra_fb_update_monspecs(dc->fb, NULL, NULL);
+
+		dc->connected = false;
+		tegra_dc_ext_process_hotplug(dc->ndev->id);
 	}
 }
 
@@ -805,6 +846,9 @@ static void tegra_dc_hdmi_resume(struct tegra_dc *dc)
 			queue_delayed_work(system_nrt_wq, &hdmi->work,
 					   msecs_to_jiffies(30));
 		hdmi->hpd_pending = false;
+	} else if (tegra_dc_hdmi_hpd(dc)) { /* Check for HDMI Peripheral */
+		queue_delayed_work(system_nrt_wq, &hdmi->work,
+					   msecs_to_jiffies(100));
 	}
 	spin_unlock_irqrestore(&hdmi->suspend_lock, flags);
 	tegra_nvhdcp_resume(hdmi->nvhdcp);
@@ -1287,7 +1331,9 @@ static void tegra_dc_hdmi_setup_avi_infoframe(struct tegra_dc *dc, bool dvi)
 			avi.vic = 4; /* 60 Hz */
 		else
 			avi.vic = 19; /* 50 Hz */
-	} else if (dc->mode.v_active == 1080) {
+	} else if (dc->mode.v_active == 1080 ||
+		(dc->mode.v_active == 2205 && dc->mode.stereo_mode)) {
+		/* VIC for both 1080p and 1080p 3D mode */
 		avi.m = HDMI_AVI_M_16_9;
 		if (dc->mode.h_front_porch == 88)
 			avi.vic = 16; /* 60 Hz */
@@ -1595,7 +1641,6 @@ static void tegra_dc_hdmi_disable(struct tegra_dc *dc)
 #if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
 	tegra_hdmi_writel(hdmi, 0, HDMI_NV_PDISP_SOR_AUDIO_HDA_PRESENSE_0);
 #endif
-	hdmi->eld_retrieved = false;
 	tegra_periph_reset_assert(hdmi->clk);
 	hdmi->clk_enabled = false;
 	clk_disable(hdmi->clk);

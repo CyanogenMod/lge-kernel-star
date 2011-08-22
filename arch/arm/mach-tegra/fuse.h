@@ -28,8 +28,6 @@ int tegra_sku_id(void);
 void tegra_init_fuse(void);
 u32 tegra_fuse_readl(unsigned long offset);
 void tegra_fuse_writel(u32 value, unsigned long offset);
-enum tegra_chipid tegra_get_chipid(void);
-enum tegra_revision tegra_get_revision(void);
 const char *tegra_get_revision_name(void);
 
 #ifdef CONFIG_TEGRA_SILICON_PLATFORM
@@ -39,6 +37,12 @@ int tegra_core_process_id(void);
 int tegra_cpu_speedo_id(void);
 int tegra_soc_speedo_id(void);
 void tegra_init_speedo_data(void);
+
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+int tegra_package_id(void);
+#else
+static inline int tegra_package_id(void) { return -1; }
+#endif
 
 #else
 

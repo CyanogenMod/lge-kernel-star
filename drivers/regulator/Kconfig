@@ -133,6 +133,14 @@ config REGULATOR_MAX8907C
 	  via I2C bus. The provided regulator is suitable for Tegra
 	  chip to control Step-Down DC-DC and LDOs.
 
+config REGULATOR_MAX77663
+	tristate "Maxim 77663 voltage regulator"
+	depends on MFD_MAX77663
+	help
+	  This driver controls a Maxim 77663 voltage output regulator
+	  via I2C bus. The provided regulator is suitable for Tegra
+	  chip to control Step-Down DC-DC and LDOs.
+
 config REGULATOR_TWL4030
 	bool "TI TWL4030/TWL5030/TWL6030/TPS659x0 PMIC"
 	depends on TWL4030_CORE
@@ -318,6 +326,13 @@ config REGULATOR_TPS80031
 	help
 	  This driver supports TPS80031 voltage regulator chips.
 
+config REGULATOR_RICOH583
+	tristate "RICOH 583 Power regulators"
+	depends on MFD_RICOH583
+	default n
+	help
+	  This driver supports regulator driver for RICOH583 PMIC.
+
 config REGULATOR_GPIO_SWITCH
 	bool "GPIO based enable/disable of power rails."
 	default n
@@ -327,7 +342,7 @@ config REGULATOR_GPIO_SWITCH
 	  gpios.
 
 config REGULATOR_AAT2870
-	bool "AnalogicTech AAT2870 Regulators"
+	tristate "AnalogicTech AAT2870 Regulators"
 	depends on MFD_AAT2870_CORE
 	help
 	  If you have a AnalogicTech AAT2870 say Y to enable the

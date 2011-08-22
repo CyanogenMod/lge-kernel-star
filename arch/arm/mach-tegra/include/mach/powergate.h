@@ -32,6 +32,7 @@
 #if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 #define TEGRA_NUM_POWERGATE	7
 #define TEGRA_CPU_POWERGATE_ID(cpu)	(TEGRA_POWERGATE_CPU)
+#define TEGRA_IS_CPU_POWERGATE_ID(id)	((id) == TEGRA_POWERGATE_CPU)
 #elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
 #define TEGRA_POWERGATE_HEG	7
 #define TEGRA_POWERGATE_SATA	8
@@ -43,11 +44,19 @@
 #define TEGRA_NUM_POWERGATE	14
 #define TEGRA_CPU_POWERGATE_ID(cpu)	((cpu == 0) ? TEGRA_POWERGATE_CPU0 : \
 						(cpu + TEGRA_POWERGATE_CPU1 - 1))
+#define TEGRA_IS_CPU_POWERGATE_ID(id)  (((id) == TEGRA_POWERGATE_CPU)  || \
+					((id) == TEGRA_POWERGATE_CPU1) || \
+					((id) == TEGRA_POWERGATE_CPU2) || \
+					((id) == TEGRA_POWERGATE_CPU3))
 #endif
 
 struct clk;
 
 bool tegra_powergate_is_powered(int id);
+int tegra_powergate_mc_disable(int id);
+int tegra_powergate_mc_enable(int id);
+int tegra_powergate_mc_flush(int id);
+int tegra_powergate_mc_flush_done(int id);
 int tegra_powergate_remove_clamping(int id);
 const char *tegra_powergate_get_name(int id);
 

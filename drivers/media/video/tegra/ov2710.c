@@ -165,6 +165,7 @@ static struct ov2710_reg mode_1920x1080[] = {
 
 	{0x350c, 0xff}, /* peak VTS reg, set to highest limit */
 	{0x350d, 0xff}, /* peak VTS reg, set to highest limit */
+	{0x3406, 0x01}, /* AWB manual, 0-auto, 1-manual */
 	{0x3503, 0x07}, /* enable manual gain and manual exposure */
 	{0x3500, 0x00}, /* write default to AEC PK EXPO */
 	{0x3501, 0x00}, /* write default to AEC PK EXPO */
@@ -282,6 +283,7 @@ static struct ov2710_reg mode_1280x720[] = {
 
 	{0x350c, 0xff}, /* peak VTS reg, set to highest limit */
 	{0x350d, 0xff}, /* peak VTS reg, set to highest limit */
+	{0x3406, 0x01}, /* AWB manual, 0-auto, 1-manual */
 	{0x3503, 0x07}, /* enable manual gain and manual exposure */
 	{0x3500, 0x00}, /* write default to AEC PK EXPO */
 	{0x3501, 0x00}, /* write default to AEC PK EXPO */

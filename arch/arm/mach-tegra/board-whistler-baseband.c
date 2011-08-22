@@ -187,8 +187,6 @@ int whistler_baseband_init(void)
 
 static int rainbow_570_reset(void);
 static int rainbow_570_handshake(void);
-static int ph450_reset(void);
-static int ph450_handshake(void);
 
 static __initdata struct tegra_pingroup_config whistler_null_ulpi_pinmux[] = {
 	{TEGRA_PINGROUP_UAA, TEGRA_MUX_ULPI, TEGRA_PUPD_NORMAL,
@@ -205,8 +203,8 @@ static struct tegra_ulpi_trimmer e951_trimmer = { 10, 1, 1, 1 };
 
 static struct tegra_ulpi_config ehci2_null_ulpi_phy_config = {
 	.trimmer = &e951_trimmer,
-	.preinit = rainbow_570_reset,
-	.postinit = rainbow_570_handshake,
+	.pre_phy_on = rainbow_570_reset,
+	.post_phy_on = rainbow_570_handshake,
 };
 
 static struct tegra_ehci_platform_data ehci2_null_ulpi_platform_data = {
@@ -286,82 +284,6 @@ static int rainbow_570_handshake(void)
 	gpio_set_value(AWR, 1);
 
 	/* wait for CWR high if modem firmware requires */
-
-	return 0;
-}
-
-static int __init ph450_init(void)
-{
-	int ret;
-
-	ret = gpio_request(MODEM_PWR_ON, "mdm_power");
-	if (ret)
-		return ret;
-
-	ret = gpio_request(MODEM_RESET, "mdm_reset");
-	if (ret) {
-		gpio_free(MODEM_PWR_ON);
-		return ret;
-	}
-	ret = gpio_request(AP2MDM_ACK2, "ap2mdm_ack2");
-	if (ret) {
-		gpio_free(MODEM_PWR_ON);
-		gpio_free(MODEM_RESET);
-		return ret;
-	}
-	ret = gpio_request(MDM2AP_ACK2, "mdm2ap_ack2");
-	if (ret) {
-		gpio_free(MODEM_PWR_ON);
-		gpio_free(MODEM_RESET);
-		gpio_free(AP2MDM_ACK2);
-		return ret;
-	}
-
-	/* enable pull-up for MDM2AP_ACK2 */
-	tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_UAC, TEGRA_PUPD_PULL_UP);
-
-	tegra_gpio_enable(MODEM_PWR_ON);
-	tegra_gpio_enable(MODEM_RESET);
-	tegra_gpio_enable(AP2MDM_ACK2);
-	tegra_gpio_enable(MDM2AP_ACK2);
-
-	gpio_direction_output(MODEM_PWR_ON, 0);
-	gpio_direction_output(MODEM_RESET, 0);
-	gpio_direction_output(AP2MDM_ACK2, 1);
-	gpio_direction_input(MDM2AP_ACK2);
-
-	return 0;
-}
-
-static int ph450_reset(void)
-{
-	int retry = 100; /* retry for 10 sec */
-
-	gpio_set_value(AP2MDM_ACK2, 1);
-	gpio_set_value(MODEM_PWR_ON, 0);
-	gpio_set_value(MODEM_RESET, 0);
-	mdelay(200);
-	gpio_set_value(MODEM_RESET, 1);
-	mdelay(30);
-	gpio_set_value(MODEM_PWR_ON, 1);
-
-	while (retry) {
-		/* wait for MDM2AP_ACK2 low */
-		int val = gpio_get_value(MDM2AP_ACK2);
-		if (!val)
-			break;
-		else
-			retry--;
-			mdelay(100);
-	}
-
-	return 1;
-}
-
-static int ph450_handshake(void)
-{
-	/* set AP2MDM_ACK2 low */
-	gpio_set_value(AP2MDM_ACK2, 0);
 
 	return 0;
 }

@@ -92,6 +92,10 @@
  * FORCE_DISABLE  Regulator forcibly shut down by software.
  * VOLTAGE_CHANGE Regulator voltage changed.
  * DISABLE        Regulator was disabled.
+ * PRE_ENABLE     Regulator is to be enabled
+ * POST_ENABLE    Regulator was enabled
+ * OUT_PRECHANGE  Regulator is enabled and its voltage is to be changed
+ * OUT_POSTCHANGE Regulator is enabled and its voltage was changed
  *
  * NOTE: These events can be OR'ed together when passed into handler.
  */
@@ -104,6 +108,10 @@
 #define REGULATOR_EVENT_FORCE_DISABLE		0x20
 #define REGULATOR_EVENT_VOLTAGE_CHANGE		0x40
 #define REGULATOR_EVENT_DISABLE 		0x80
+#define REGULATOR_EVENT_PRE_ENABLE		0x100
+#define REGULATOR_EVENT_POST_ENABLE		0x200
+#define REGULATOR_EVENT_OUT_PRECHANGE		0x400
+#define REGULATOR_EVENT_OUT_POSTCHANGE		0x800
 
 struct regulator;
 

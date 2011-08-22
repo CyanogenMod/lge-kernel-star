@@ -26,6 +26,29 @@
 
 #include <linux/regulator/machine.h>
 
+#define tps80031_rails(_name) "tps80031_"#_name
+
+enum {
+	TPS80031_ID_VIO,
+	TPS80031_ID_SMPS1,
+	TPS80031_ID_SMPS2,
+	TPS80031_ID_SMPS3,
+	TPS80031_ID_SMPS4,
+	TPS80031_ID_VANA,
+	TPS80031_ID_LDO1,
+	TPS80031_ID_LDO2,
+	TPS80031_ID_LDO3,
+	TPS80031_ID_LDO4,
+	TPS80031_ID_LDO5,
+	TPS80031_ID_LDO6,
+	TPS80031_ID_LDO7,
+	TPS80031_ID_LDOLN,
+	TPS80031_ID_LDOUSB,
+	TPS80031_ID_VBUS,
+	TPS80031_ID_CHARGER,
+};
+
+
 enum {
 	/* USBLDO input selection */
 	USBLDO_INPUT_VSYS	= 0x00000001,
@@ -52,7 +75,7 @@ enum {
  * @init_enable: Enable or do not enable the rails during initialization.
  * @init_apply: Init parameter applied or not.
  * @flags: Configuration flag to configure the rails. It should be ORed of
- *         above enums.
+ *	 above enums.
  */
 
 struct tps80031_regulator_platform_data {

@@ -41,7 +41,7 @@
 #include <mach/edp.h>
 
 #include "clock.h"
-#include "pm.h"
+#include "cpu-tegra.h"
 
 /* tegra throttling and edp governors require frequencies in the table
    to be in ascending order */
@@ -55,103 +55,16 @@ static DEFINE_MUTEX(tegra_cpu_lock);
 static bool is_suspended;
 static int suspend_index;
 
-unsigned int tegra_getspeed(unsigned int cpu);
-static int tegra_update_cpu_speed(unsigned long rate);
-
 #ifdef CONFIG_TEGRA_THERMAL_THROTTLE
-/* CPU frequency is gradually lowered when throttling is enabled */
-#define THROTTLE_DELAY		msecs_to_jiffies(2000)
-
-static bool is_throttling;
-static int throttle_lowest_index;
-static int throttle_highest_index;
-static int throttle_index;
-static int throttle_next_index;
-static struct delayed_work throttle_work;
-static struct workqueue_struct *workqueue;
-
-#define tegra_cpu_is_throttling() (is_throttling)
-
-static void tegra_throttle_work_func(struct work_struct *work)
-{
-	unsigned int current_freq;
-
-	mutex_lock(&tegra_cpu_lock);
-	current_freq = tegra_getspeed(0);
-	throttle_index = throttle_next_index;
-
-	if (freq_table[throttle_index].frequency < current_freq)
-		tegra_update_cpu_speed(freq_table[throttle_index].frequency);
-
-	if (throttle_index > throttle_lowest_index) {
-		throttle_next_index = throttle_index - 1;
-		queue_delayed_work(workqueue, &throttle_work, THROTTLE_DELAY);
-	}
-
-	mutex_unlock(&tegra_cpu_lock);
-}
-
-/*
- * tegra_throttling_enable
- * This function may sleep
- */
-void tegra_throttling_enable(bool enable)
-{
-	mutex_lock(&tegra_cpu_lock);
-
-	if (enable && !is_throttling) {
-		unsigned int current_freq = tegra_getspeed(0);
-
-		is_throttling = true;
-
-		for (throttle_index = throttle_highest_index;
-		     throttle_index >= throttle_lowest_index;
-		     throttle_index--)
-			if (freq_table[throttle_index].frequency
-			    < current_freq)
-				break;
-
-		throttle_index = max(throttle_index, throttle_lowest_index);
-		throttle_next_index = throttle_index;
-		queue_delayed_work(workqueue, &throttle_work, 0);
-	} else if (!enable && is_throttling) {
-		cancel_delayed_work_sync(&throttle_work);
-		is_throttling = false;
-		/* restore speed requested by governor */
-		tegra_cpu_cap_highest_speed(NULL);
-	}
-
-	mutex_unlock(&tegra_cpu_lock);
-}
-EXPORT_SYMBOL_GPL(tegra_throttling_enable);
-
-static unsigned int throttle_governor_speed(unsigned int requested_speed)
-{
-	return tegra_cpu_is_throttling() ?
-		min(requested_speed, freq_table[throttle_index].frequency) :
-		requested_speed;
-}
 
 static ssize_t show_throttle(struct cpufreq_policy *policy, char *buf)
 {
-	return sprintf(buf, "%u\n", is_throttling);
+	return sprintf(buf, "%u\n", tegra_is_throttling());
 }
 
 cpufreq_freq_attr_ro(throttle);
 
 #ifdef CONFIG_DEBUG_FS
-static int throttle_debug_set(void *data, u64 val)
-{
-	tegra_throttling_enable(val);
-	return 0;
-}
-static int throttle_debug_get(void *data, u64 *val)
-{
-	*val = (u64) is_throttling;
-	return 0;
-}
-
-DEFINE_SIMPLE_ATTRIBUTE(throttle_fops, throttle_debug_get, throttle_debug_set, "%llu\n");
 
 static struct dentry *cpu_tegra_debugfs_root;
 
@@ -162,7 +75,7 @@ static int __init tegra_cpu_debug_init(void)
 	if (!cpu_tegra_debugfs_root)
 		return -ENOMEM;
 
-	if (!debugfs_create_file("throttle", 0644, cpu_tegra_debugfs_root, NULL, &throttle_fops))
+	if (tegra_throttle_debug_init(cpu_tegra_debugfs_root))
 		goto err_out;
 
 	return 0;
@@ -181,10 +94,6 @@ static void __exit tegra_cpu_debug_exit(void)
 late_initcall(tegra_cpu_debug_init);
 module_exit(tegra_cpu_debug_exit);
 #endif /* CONFIG_DEBUG_FS */
-
-#else /* CONFIG_TEGRA_THERMAL_THROTTLE */
-#define tegra_cpu_is_throttling() (0)
-#define throttle_governor_speed(requested_speed) (requested_speed)
 #endif /* CONFIG_TEGRA_THERMAL_THROTTLE */
 
 #ifdef CONFIG_TEGRA_EDP_LIMITS
@@ -197,15 +106,18 @@ static unsigned int edp_limit;
 
 static void edp_update_limit(void)
 {
-	int i;
 	unsigned int limit = cpumask_weight(&edp_cpumask);
 
 	if (!cpu_edp_limits)
 		return;
 
 	BUG_ON((edp_thermal_index >= cpu_edp_limits_size) || (limit == 0));
+#ifdef CONFIG_TEGRA_EDP_EXACT_FREQ
+	edp_limit = cpu_edp_limits[edp_thermal_index].freq_limits[limit - 1];
+#else
 	limit = cpu_edp_limits[edp_thermal_index].freq_limits[limit - 1];
 
+	int i;
 	for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++) {
 		if (freq_table[i].frequency > limit) {
 			break;
@@ -213,6 +125,7 @@ static void edp_update_limit(void)
 	}
 	BUG_ON(i == 0);	/* min freq above the limit or table empty */
 	edp_limit = freq_table[i-1].frequency;
+#endif
 }
 
 static unsigned int edp_governor_speed(unsigned int requested_speed)
@@ -253,7 +166,7 @@ int tegra_edp_update_thermal_zone(int temperature)
 	/* Update cpu rate if cpufreq (at least on cpu0) is already started */
 	if (target_cpu_speed[0]) {
 		edp_update_limit();
-		tegra_cpu_cap_highest_speed(NULL);
+		tegra_cpu_set_speed_cap(NULL);
 	}
 	mutex_unlock(&tegra_cpu_lock);
 
@@ -277,7 +190,7 @@ static int tegra_cpu_edp_notify(
 		cpu_speed = tegra_getspeed(0);
 		new_speed = edp_governor_speed(cpu_speed);
 		if (new_speed < cpu_speed) {
-			ret = tegra_update_cpu_speed(new_speed);
+			ret = tegra_cpu_set_speed_cap(NULL);
 			if (ret) {
 				cpu_clear(cpu, edp_cpumask);
 				edp_update_limit();
@@ -292,7 +205,7 @@ static int tegra_cpu_edp_notify(
 		mutex_lock(&tegra_cpu_lock);
 		cpu_clear(cpu, edp_cpumask);
 		edp_update_limit();
-		tegra_cpu_cap_highest_speed(NULL);
+		tegra_cpu_set_speed_cap(NULL);
 		mutex_unlock(&tegra_cpu_lock);
 		break;
 	}
@@ -305,6 +218,8 @@ static struct notifier_block tegra_cpu_edp_notifier = {
 
 static void tegra_cpu_edp_init(bool resume)
 {
+	tegra_get_cpu_edp_limits(&cpu_edp_limits, &cpu_edp_limits_size);
+
 	if (!cpu_edp_limits) {
 		if (!resume)
 			pr_info("cpu-tegra: no EDP table is provided\n");
@@ -331,12 +246,6 @@ static void tegra_cpu_edp_exit(void)
 		return;
 
 	unregister_hotcpu_notifier(&tegra_cpu_edp_notifier);
-}
-
-void tegra_init_cpu_edp_limits(const struct tegra_edp_limits *limits, int size)
-{
-	cpu_edp_limits = limits;
-	cpu_edp_limits_size = size;
 }
 
 #else	/* CONFIG_TEGRA_EDP_LIMITS */
@@ -446,15 +355,23 @@ unsigned long tegra_cpu_highest_speed(void) {
 	return rate;
 }
 
-int tegra_cpu_cap_highest_speed(unsigned int *speed_cap)
+int tegra_cpu_set_speed_cap(unsigned int *speed_cap)
 {
+	int ret = 0;
 	unsigned int new_speed = tegra_cpu_highest_speed();
 
-	new_speed = throttle_governor_speed(new_speed);
+	if (is_suspended)
+		return -EBUSY;
+
+	new_speed = tegra_throttle_governor_speed(new_speed);
 	new_speed = edp_governor_speed(new_speed);
 	if (speed_cap)
 		*speed_cap = new_speed;
-	return tegra_update_cpu_speed(new_speed);
+
+	ret = tegra_update_cpu_speed(new_speed);
+	if (ret == 0)
+		tegra_auto_hotplug_governor(new_speed, false);
+	return ret;
 }
 
 static int tegra_target(struct cpufreq_policy *policy,
@@ -468,21 +385,14 @@ static int tegra_target(struct cpufreq_policy *policy,
 
 	mutex_lock(&tegra_cpu_lock);
 
-	if (is_suspended) {
-		ret = -EBUSY;
-		goto out;
-	}
-
 	cpufreq_frequency_table_target(policy, freq_table, target_freq,
 		relation, &idx);
 
 	freq = freq_table[idx].frequency;
 
 	target_cpu_speed[policy->cpu] = freq;
-	ret = tegra_cpu_cap_highest_speed(&new_speed);
-	if (ret == 0)
-		tegra_auto_hotplug_governor(new_speed, false);
-out:
+	ret = tegra_cpu_set_speed_cap(&new_speed);
+
 	mutex_unlock(&tegra_cpu_lock);
 
 	return ret;
@@ -504,7 +414,7 @@ static int tegra_pm_notify(struct notifier_block *nb, unsigned long event,
 		unsigned int freq;
 		is_suspended = false;
 		tegra_cpu_edp_init(true);
-		tegra_cpu_cap_highest_speed(&freq);
+		tegra_cpu_set_speed_cap(&freq);
 		pr_info("Tegra cpufreq resume: restoring frequency to %d kHz\n",
 			freq);
 	}
@@ -591,21 +501,10 @@ static int __init tegra_cpufreq_init(void)
 
 	suspend_index = table_data->suspend_index;
 
-#ifdef CONFIG_TEGRA_THERMAL_THROTTLE
-	/*
-	 * High-priority, others flags default: not bound to a specific
-	 * CPU, has rescue worker task (in case of allocation deadlock,
-	 * etc.).  Single-threaded.
-	 */
-	workqueue = alloc_workqueue("cpu-tegra",
-				    WQ_HIGHPRI | WQ_UNBOUND | WQ_RESCUER, 1);
-	if (!workqueue)
-		return -ENOMEM;
-	INIT_DELAYED_WORK(&throttle_work, tegra_throttle_work_func);
+	ret = tegra_throttle_init(&tegra_cpu_lock);
+	if (ret)
+		return ret;
 
-	throttle_lowest_index = table_data->throttle_lowest_index;
-	throttle_highest_index = table_data->throttle_highest_index;
-#endif
 	ret = tegra_auto_hotplug_init(&tegra_cpu_lock);
 	if (ret)
 		return ret;
@@ -617,9 +516,7 @@ static int __init tegra_cpufreq_init(void)
 
 static void __exit tegra_cpufreq_exit(void)
 {
-#ifdef CONFIG_TEGRA_THERMAL_THROTTLE
-	destroy_workqueue(workqueue);
-#endif
+	tegra_throttle_exit();
 	tegra_cpu_edp_exit();
 	tegra_auto_hotplug_exit();
 	cpufreq_unregister_driver(&tegra_cpufreq_driver);

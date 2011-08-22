@@ -113,6 +113,14 @@
 #define DC_CMD_REG_ACT_CONTROL			0x043
 
 #define DC_COM_CRC_CONTROL			0x300
+#define  CRC_ALWAYS_ENABLE		(1 << 3)
+#define  CRC_ALWAYS_DISABLE		(0 << 3)
+#define  CRC_INPUT_DATA_ACTIVE_DATA	(1 << 2)
+#define  CRC_INPUT_DATA_FULL_FRAME	(0 << 2)
+#define  CRC_WAIT_TWO_VSYNC		(1 << 1)
+#define  CRC_WAIT_ONE_VSYNC		(0 << 1)
+#define  CRC_ENABLE_ENABLE		(1 << 0)
+#define  CRC_ENABLE_DISABLE		(0 << 0)
 #define DC_COM_CRC_CHECKSUM			0x301
 #define DC_COM_PIN_OUTPUT_ENABLE0		0x302
 #define DC_COM_PIN_OUTPUT_ENABLE1		0x303
@@ -330,11 +338,22 @@
 #define DC_DISP_COLOR_KEY0_UPPER		0x437
 #define DC_DISP_COLOR_KEY1_LOWER		0x438
 #define DC_DISP_COLOR_KEY1_UPPER		0x439
+
 #define DC_DISP_CURSOR_FOREGROUND		0x43c
 #define DC_DISP_CURSOR_BACKGROUND		0x43d
+#define   CURSOR_COLOR(_r, _g, _b) ((_r) | ((_g) << 8) | ((_b) << 16))
+
 #define DC_DISP_CURSOR_START_ADDR		0x43e
 #define DC_DISP_CURSOR_START_ADDR_NS		0x43f
+#define   CURSOR_START_ADDR_MASK	(((1 << 22) - 1) << 10)
+#define   CURSOR_START_ADDR(_addr)	((_addr) >> 10)
+#define	  CURSOR_SIZE_64		(1 << 24)
+
 #define DC_DISP_CURSOR_POSITION			0x440
+#define   CURSOR_POSITION(_x, _y)		\
+	(((_x) & ((1 << 16) - 1)) |		\
+	(((_y) & ((1 << 16) - 1)) << 16))
+
 #define DC_DISP_CURSOR_POSITION_NS		0x441
 #define DC_DISP_INIT_SEQ_CONTROL		0x442
 #define DC_DISP_SPI_INIT_SEQ_DATA_A		0x443

@@ -89,7 +89,7 @@ enum aat2870_id {
 
 /* Backlight current magnitude (mA) */
 enum aat2870_current {
-	AAT2870_CURRENT_0_45,
+	AAT2870_CURRENT_0_45 = 1,
 	AAT2870_CURRENT_0_90,
 	AAT2870_CURRENT_1_80,
 	AAT2870_CURRENT_2_70,
@@ -145,8 +145,7 @@ struct aat2870_data {
 	/* i2c io funcntions */
 	int (*read)(struct aat2870_data *aat2870, u8 addr, u8 *val);
 	int (*write)(struct aat2870_data *aat2870, u8 addr, u8 val);
-	int (*update_bits)(struct aat2870_data *aat2870, u8 addr, u8 mask,
-			   u8 val);
+	int (*update)(struct aat2870_data *aat2870, u8 addr, u8 mask, u8 val);
 
 	/* for debugfs */
 	struct dentry *dentry_root;

@@ -119,12 +119,10 @@ out:
 
 extern void __flush_dcache_page(struct address_space *, struct page *);
 
-static struct page *nvmap_alloc_pages_exact(gfp_t gfp,
-	size_t size, bool flush_inner)
+static struct page *nvmap_alloc_pages_exact(gfp_t gfp, size_t size)
 {
 	struct page *page, *p, *e;
 	unsigned int order;
-	unsigned long base;
 
 	size = PAGE_ALIGN(size);
 	order = get_order(size);
@@ -134,19 +132,10 @@ static struct page *nvmap_alloc_pages_exact(gfp_t gfp,
 		return NULL;
 
 	split_page(page, order);
-
 	e = page + (1 << order);
 	for (p = page + (size >> PAGE_SHIFT); p < e; p++)
 		__free_page(p);
 
-	e = page + (size >> PAGE_SHIFT);
-	if (flush_inner) {
-		for (p = page; p < e; p++)
-			__flush_dcache_page(page_mapping(p), p);
-	}
-
-	base = page_to_phys(page);
-	outer_flush_range(base, base + size);
 	return page;
 }
 
@@ -159,6 +148,7 @@ static int handle_page_alloc(struct nvmap_client *client,
 	unsigned int i = 0;
 	struct page **pages;
 	bool flush_inner = true;
+	unsigned long base;
 
 	pages = altalloc(nr_page * sizeof(*pages));
 	if (!pages)
@@ -171,14 +161,10 @@ static int handle_page_alloc(struct nvmap_client *client,
 		contiguous = true;
 #endif
 
-	if (size >= FLUSH_CLEAN_BY_SET_WAY_THRESHOLD) {
-		inner_flush_cache_all();
-		flush_inner = false;
-	}
 	h->pgalloc.area = NULL;
 	if (contiguous) {
 		struct page *page;
-		page = nvmap_alloc_pages_exact(GFP_NVMAP, size, flush_inner);
+		page = nvmap_alloc_pages_exact(GFP_NVMAP, size);
 		if (!page)
 			goto fail;
 
@@ -187,8 +173,8 @@ static int handle_page_alloc(struct nvmap_client *client,
 
 	} else {
 		for (i = 0; i < nr_page; i++) {
-			pages[i] = nvmap_alloc_pages_exact(GFP_NVMAP, PAGE_SIZE,
-				flush_inner);
+			pages[i] = nvmap_alloc_pages_exact(GFP_NVMAP,
+				PAGE_SIZE);
 			if (!pages[i])
 				goto fail;
 		}
@@ -204,6 +190,17 @@ static int handle_page_alloc(struct nvmap_client *client,
 #endif
 	}
 
+	/* Flush the cache for allocated pages*/
+	if (size >= FLUSH_CLEAN_BY_SET_WAY_THRESHOLD) {
+		inner_flush_cache_all();
+		flush_inner = false;
+	}
+	for (i = 0; i < nr_page; i++) {
+		if (flush_inner)
+			__flush_dcache_page(page_mapping(pages[i]), pages[i]);
+		base = page_to_phys(pages[i]);
+		outer_flush_range(base, base + PAGE_SIZE);
+	}
 
 	h->size = size;
 	h->pgalloc.pages = pages;
@@ -273,11 +270,10 @@ static void alloc_handle(struct nvmap_client *client,
 		/* increment the committed IOVM space prior to allocation
 		 * to avoid race conditions with other threads simultaneously
 		 * allocating. */
-		if (!client->super)
-			commit = atomic_add_return(reserved,
-						   &client->iovm_commit);
+		commit = atomic_add_return(reserved,
+					    &client->iovm_commit);
 
-		if (commit < client->iovm_limit)
+		if (commit < client->iovm_limit || client->super)
 			ret = handle_page_alloc(client, h, false);
 		else
 			ret = -ENOMEM;
@@ -286,8 +282,7 @@ static void alloc_handle(struct nvmap_client *client,
 			h->heap_pgalloc = true;
 			h->alloc = true;
 		} else {
-			if (!client->super)
-				atomic_sub(reserved, &client->iovm_commit);
+			atomic_sub(reserved, &client->iovm_commit);
 		}
 
 	} else if (type & NVMAP_HEAP_SYSMEM) {
@@ -445,7 +440,7 @@ void nvmap_free_handle_id(struct nvmap_client *client, unsigned long id)
 	pins = atomic_read(&ref->pin);
 	rb_erase(&ref->node, &client->handle_refs);
 
-	if (h->alloc && h->heap_pgalloc && !h->pgalloc.contig && !client->super)
+	if (h->alloc && h->heap_pgalloc && !h->pgalloc.contig)
 		atomic_sub(h->size, &client->iovm_commit);
 
 	if (h->alloc && !h->heap_pgalloc) {
@@ -501,6 +496,9 @@ struct nvmap_handle_ref *nvmap_create_handle(struct nvmap_client *client,
 {
 	struct nvmap_handle *h;
 	struct nvmap_handle_ref *ref = NULL;
+
+	if (!client )
+		return ERR_PTR(-EINVAL);
 
 	if (!size)
 		return ERR_PTR(-EINVAL);
@@ -572,10 +570,10 @@ struct nvmap_handle_ref *nvmap_duplicate_handle_id(struct nvmap_client *client,
 
 	/* verify that adding this handle to the process' access list
 	 * won't exceed the IOVM limit */
-	if (h->heap_pgalloc && !h->pgalloc.contig && !client->super) {
+	if (h->heap_pgalloc && !h->pgalloc.contig) {
 		int oc;
 		oc = atomic_add_return(h->size, &client->iovm_commit);
-		if (oc > client->iovm_limit) {
+		if (oc > client->iovm_limit && !client->super) {
 			atomic_sub(h->size, &client->iovm_commit);
 			nvmap_handle_put(h);
 			nvmap_err(client, "duplicating %p in %s over-commits"
