@@ -237,6 +237,10 @@ static struct tps80031_charger_platform_data bcharger_pdata = {
 	.board_data = NULL,
 };
 
+static struct tps80031_bg_platform_data battery_gauge_data = {
+	.irq_base = ENT_TPS80031_IRQ_BASE,
+};
+
 #define TPS_RTC()				\
 	{						\
 		.id	= 0,		\
@@ -254,6 +258,11 @@ static struct tps80031_charger_platform_data bcharger_pdata = {
 	{						\
 		.name   = "tps80031-charger",		\
 		.platform_data = &bcharger_pdata,	\
+	}
+#define TPS_BATTERY_GAUGE()				\
+	{						\
+		.name   = "tps80031-battery-gauge",	\
+		.platform_data = &battery_gauge_data,	\
 	}
 
 static struct tps80031_subdev_info tps80031_devs[] = {
@@ -275,6 +284,7 @@ static struct tps80031_subdev_info tps80031_devs[] = {
 	TPS_REG(VBUS, vbus),
 	TPS_RTC(),
 	TPS_BATTERY(),
+	TPS_BATTERY_GAUGE(),
 };
 
 struct tps80031_32kclock_plat_data clk32k_pdata = {
