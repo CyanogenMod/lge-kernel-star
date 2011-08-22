@@ -437,7 +437,8 @@ void android_enable_function(struct usb_function *f, int enable)
 		    /* disable everything else (and keep adb for now) */
 			list_for_each_entry(func, &android_config_driver.functions, list) {
 				if (strcmp(func->name, "accessory")
-					&& strcmp(func->name, "adb")) {
+					&& strcmp(func->name, "adb")
+					&& strcmp(func->name, "rndis")) {
 					usb_function_set_enabled(func, 0);
 				}
 			}
