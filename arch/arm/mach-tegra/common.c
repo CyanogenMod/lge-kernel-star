@@ -914,6 +914,7 @@ static char *cpufreq_gov_conservative_param="/sys/devices/system/cpu/cpufreq/con
 static void cpufreq_set_governor(char *governor)
 {
 	struct file *scaling_gov = NULL;
+	mm_segment_t old_fs;
 	char    buf[128];
 	int i;
 	loff_t offset = 0;
@@ -921,10 +922,16 @@ static void cpufreq_set_governor(char *governor)
 	if (governor == NULL)
 		return;
 
+	/* change to KERNEL_DS address limit */
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+
 	for_each_online_cpu(i) {
 		sprintf(buf, cpufreq_sysfs_place_holder, i);
 		scaling_gov = filp_open(buf, O_RDWR, 0);
-		if (scaling_gov != NULL) {
+		if (IS_ERR_OR_NULL(scaling_gov)) {
+			pr_err("%s. Can't open %s\n", __func__, buf);
+		} else {
 			if (scaling_gov->f_op != NULL &&
 				scaling_gov->f_op->write != NULL)
 				scaling_gov->f_op->write(scaling_gov,
@@ -935,22 +942,28 @@ static void cpufreq_set_governor(char *governor)
 				pr_err("f_op might be null\n");
 
 			filp_close(scaling_gov, NULL);
-		} else {
-			pr_err("%s. Can't open %s\n", __func__, buf);
 		}
 	}
+	set_fs(old_fs);
 }
 
 void cpufreq_save_default_governor(void)
 {
 	struct file *scaling_gov = NULL;
+	mm_segment_t old_fs;
 	char    buf[128];
 	loff_t offset = 0;
+
+	/* change to KERNEL_DS address limit */
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
 
 	buf[127] = 0;
 	sprintf(buf, cpufreq_sysfs_place_holder,0);
 	scaling_gov = filp_open(buf, O_RDONLY, 0);
-	if (scaling_gov != NULL) {
+	if (IS_ERR_OR_NULL(scaling_gov)) {
+		pr_err("%s. Can't open %s\n", __func__, buf);
+	} else {
 		if (scaling_gov->f_op != NULL &&
 			scaling_gov->f_op->read != NULL)
 			scaling_gov->f_op->read(scaling_gov,
@@ -961,9 +974,8 @@ void cpufreq_save_default_governor(void)
 			pr_err("f_op might be null\n");
 
 		filp_close(scaling_gov, NULL);
-	} else {
-		pr_err("%s. Can't open %s\n", __func__, buf);
 	}
+	set_fs(old_fs);
 }
 
 void cpufreq_restore_default_governor(void)
@@ -976,6 +988,7 @@ void cpufreq_set_conservative_governor_param(int up_th, int down_th)
 	struct file *gov_param = NULL;
 	static char buf[128],parm[8];
 	loff_t offset = 0;
+	mm_segment_t old_fs;
 
 	if (up_th <= down_th) {
 		printk(KERN_ERR "%s: up_th(%d) is lesser than down_th(%d)\n",
@@ -983,10 +996,16 @@ void cpufreq_set_conservative_governor_param(int up_th, int down_th)
 		return;
 	}
 
+	/* change to KERNEL_DS address limit */
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+
 	sprintf(parm, "%d", up_th);
 	sprintf(buf, cpufreq_gov_conservative_param ,"up_threshold");
 	gov_param = filp_open(buf, O_RDONLY, 0);
-	if (gov_param != NULL) {
+	if (IS_ERR_OR_NULL(gov_param)) {
+		pr_err("%s. Can't open %s\n", __func__, buf);
+	} else {
 		if (gov_param->f_op != NULL &&
 			gov_param->f_op->write != NULL)
 			gov_param->f_op->write(gov_param,
@@ -997,14 +1016,14 @@ void cpufreq_set_conservative_governor_param(int up_th, int down_th)
 			pr_err("f_op might be null\n");
 
 		filp_close(gov_param, NULL);
-	} else {
-		pr_err("%s. Can't open %s\n", __func__, buf);
 	}
 
 	sprintf(parm, "%d", down_th);
 	sprintf(buf, cpufreq_gov_conservative_param ,"down_threshold");
 	gov_param = filp_open(buf, O_RDONLY, 0);
-	if (gov_param != NULL) {
+	if (IS_ERR_OR_NULL(gov_param)) {
+		pr_err("%s. Can't open %s\n", __func__, buf);
+	} else {
 		if (gov_param->f_op != NULL &&
 			gov_param->f_op->write != NULL)
 			gov_param->f_op->write(gov_param,
@@ -1015,9 +1034,8 @@ void cpufreq_set_conservative_governor_param(int up_th, int down_th)
 			pr_err("f_op might be null\n");
 
 		filp_close(gov_param, NULL);
-	} else {
-		pr_err("%s. Can't open %s\n", __func__, buf);
 	}
+	set_fs(old_fs);
 }
 
 void cpufreq_set_conservative_governor(void)
