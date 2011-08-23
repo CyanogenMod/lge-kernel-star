@@ -660,3 +660,4 @@ void __init tegra_release_bootloader_fb(void)
 						tegra_bootloader_fb_size))
 			pr_err("Failed to free bootloader fb.\n");
 }
+
