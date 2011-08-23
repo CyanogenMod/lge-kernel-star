@@ -289,6 +289,7 @@ static struct tps80031_subdev_info tps80031_devs[] = {
 
 struct tps80031_32kclock_plat_data clk32k_pdata = {
 	.en_clk32kg = 1,
+	.en_clk32kaudio = 1,
 };
 static struct tps80031_platform_data tps_platform = {
 	.num_subdevs	= ARRAY_SIZE(tps80031_devs),
