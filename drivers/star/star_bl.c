@@ -252,9 +252,12 @@ static struct aat2870_ctl_tbl_t aat2870bl_normal_tbl[] = {
 #endif
 };
 
+//#define ORIGINAL_ALC_VALUES
+
 /* Set to ALC mode HW-high gain mode*/
 static struct aat2870_ctl_tbl_t aat2870bl_alc_tbl[] = {
     /* ALC table 0~15 20101218 tunning ver. */
+#if ORIGINAL_ALC_VALUES
     {0x12,0x19},  /* ALS current setting 5.6mA */
     {0x13,0x20},  /* ALS current setting 7.2mA */
     {0x14,0x21},  /* ALS current setting 7.4mA */
@@ -271,6 +274,24 @@ static struct aat2870_ctl_tbl_t aat2870bl_alc_tbl[] = {
     {0x1F,0x35},  /* ALS current setting 13.5mA */
     {0x20,0x36},  /* ALS current setting 14.2mA */
     {0x21,0x37},  /* ALS current setting 14.6mA */
+#else
+    {0x12,0x0C},  /* ALS current setting 2.64mA  - 0 lux */
+    {0x13,0x0E},  /* ALS current setting 3.08mA  - 50 lux*/
+    {0x14,0x0F},  /* ALS current setting 3.3mA   - 100 lux */
+    {0x15,0x10},  /* ALS current setting 3.52mA  - 130 lux */
+    {0x16,0x11},  /* ALS current setting 3.74mA  - 160 lux */
+    {0x17,0x12},  /* ALS current setting 3.96mA  - 200 lux */
+    {0x18,0x13},  /* ALS current setting 4.18mA  - 250 lux */
+    {0x19,0x15},  /* ALS current setting 4.62mA  - 300 lux */
+    {0x1A,0x16},  /* ALS current setting 4.84mA  - 400 lux */
+    {0x1B,0x17},  /* ALS current setting 5.06mA  - 500 lux */
+    {0x1C,0x18},  /* ALS current setting 5.28mA  - 650 lux */
+    {0x1D,0x19},  /* ALS current setting 5.5mA   - 800 lux */
+    {0x1E,0x1a},  /* ALS current setting 5.72mA  - 1000 lux */
+    {0x1F,0x20},  /* ALS current setting 7.04mA  - 1400 lux */
+    {0x20,0x25},  /* ALS current setting 8.14mA  - 2000 lux */
+    {0x21,0x37},  /* ALS current setting 12.38mA - 3000 lux */
+#endif
 
     { 0x0E, 0x73 },  /* SNSR_LIN_LOG=linear, ALSOUT_LIN_LOG=log, RSET=16k~64k,
                                    * GAIN=low, GM=man gain, ALS_EN=on */
