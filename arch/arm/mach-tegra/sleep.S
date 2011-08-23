@@ -131,7 +131,6 @@ ENTRY(tegra_cpu_wfi)
 	mov	pc, lr
 ENDPROC(tegra_cpu_wfi)
 
-#ifdef CONFIG_PM_SLEEP
 /*
  * tegra_cpu_exit_coherency
  *
@@ -143,6 +142,7 @@ ENTRY(tegra_cpu_exit_coherency)
 	mov	pc, lr
 ENDPROC(tegra_cpu_exit_coherency)
 
+#ifdef CONFIG_PM_SLEEP
 /*
  * Restore CPU state for a suspend
  *
