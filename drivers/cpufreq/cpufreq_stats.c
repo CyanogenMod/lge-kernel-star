@@ -159,10 +159,10 @@ static struct attribute_group stats_attr_group = {
 static int freq_table_get_index(struct cpufreq_stats *stat, unsigned int freq)
 {
 	int index;
-	for (index = 0; index < stat->max_state; index++)
-		if (stat->freq_table[index] == freq)
-			return index;
-	return -1;
+	for (index = 0; index < stat->state_num; index++)
+		if (stat->freq_table[index] > freq)
+			break;
+	return index - 1; /* below lowest freq in table: return -1 */
 }
 
 static void cpufreq_stats_free_table(unsigned int cpu)
@@ -183,7 +183,7 @@ static void cpufreq_stats_free_table(unsigned int cpu)
 static int cpufreq_stats_create_table(struct cpufreq_policy *policy,
 		struct cpufreq_frequency_table *table)
 {
-	unsigned int i, j, count = 0, ret = 0;
+	unsigned int i, j, k, l, count = 0, ret = 0;
 	struct cpufreq_stats *stat;
 	struct cpufreq_policy *data;
 	unsigned int alloc_size;
@@ -235,8 +235,16 @@ static int cpufreq_stats_create_table(struct cpufreq_policy *policy,
 		unsigned int freq = table[i].frequency;
 		if (freq == CPUFREQ_ENTRY_INVALID)
 			continue;
-		if (freq_table_get_index(stat, freq) == -1)
-			stat->freq_table[j++] = freq;
+
+		/* Insert in sorted stat->freq_table */
+		for (k = 0; k < j && stat->freq_table[k] < freq; k++)
+			;
+		if (stat->freq_table[k] == freq)
+			continue;
+		for (l = j; l > k; l--)
+			stat->freq_table[l] = stat->freq_table[l - 1];
+		stat->freq_table[k] = freq;
+		j++;
 	}
 	stat->state_num = j;
 	spin_lock(&cpufreq_stats_lock);

@@ -341,6 +341,7 @@ struct tegra_dc_out {
 #define TEGRA_DC_OUT_NVHDCP_POLICY_MASK		(1 << 2)
 #define TEGRA_DC_OUT_CONTINUOUS_MODE		(0 << 3)
 #define TEGRA_DC_OUT_ONE_SHOT_MODE		(1 << 3)
+#define TEGRA_DC_OUT_N_SHOT_MODE		(1 << 4)
 
 #define TEGRA_DC_ALIGN_MSB		0
 #define TEGRA_DC_ALIGN_LSB		1

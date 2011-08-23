@@ -25,9 +25,6 @@
 #include <linux/delay.h>
 #include <linux/highmem.h>
 #include <linux/memblock.h>
-#include <linux/notifier.h>
-#include <linux/reboot.h>
-#include <linux/mqueue.h>
 #include <linux/bitops.h>
 
 #include <asm/hardware/cache-l2x0.h>
@@ -86,6 +83,7 @@ unsigned long tegra_carveout_start;
 unsigned long tegra_carveout_size;
 unsigned long tegra_lp0_vec_start;
 unsigned long tegra_lp0_vec_size;
+bool tegra_lp0_vec_relocate;
 unsigned long tegra_grhost_aperture = ~0ul;
 static   bool is_tegra_debug_uart_hsport;
 static struct board_info pmu_board_info;
@@ -191,8 +189,8 @@ void tegra_init_cache(void)
 		writel(0x221, p + L2X0_TAG_LATENCY_CTRL);
 		writel(0x221, p + L2X0_DATA_LATENCY_CTRL);
 	} else {
-		writel(0x331, p + L2X0_TAG_LATENCY_CTRL);
-		writel(0x441, p + L2X0_DATA_LATENCY_CTRL);
+		writel(0x777, p + L2X0_TAG_LATENCY_CTRL);
+		writel(0x777, p + L2X0_DATA_LATENCY_CTRL);
 	}
 #else
 	writel(0x770, p + L2X0_TAG_LATENCY_CTRL);
@@ -272,17 +270,16 @@ static void __init tegra_init_ahb_gizmo_settings(void)
 
 static bool console_flushed;
 
-static int tegra_pm_flush_console(struct notifier_block *this,
-	unsigned long code, void *unused)
+static void tegra_pm_flush_console(void)
 {
 	if (console_flushed)
-		return NOTIFY_NONE;
+		return;
 	console_flushed = true;
 
 	pr_emerg("Restarting %s\n", linux_banner);
 	if (console_trylock()) {
 		console_unlock();
-		return NOTIFY_NONE;
+		return;
 	}
 
 	mdelay(50);
@@ -293,16 +290,17 @@ static int tegra_pm_flush_console(struct notifier_block *this,
 	else
 		pr_emerg("%s: Console was locked!\n", __func__);
 	console_unlock();
-	return NOTIFY_NONE;
 }
 
-static struct notifier_block tegra_reboot_notifier = {
-	.notifier_call = tegra_pm_flush_console,
-};
+static void tegra_pm_restart(char mode, const char *cmd)
+{
+	tegra_pm_flush_console();
+	arm_machine_restart(mode, cmd);
+}
 
 void __init tegra_init_early(void)
 {
-	register_reboot_notifier(&tegra_reboot_notifier);
+	arm_pm_restart = tegra_pm_restart;
 #ifndef CONFIG_SMP
 	/* For SMP system, initializing the reset handler here is too
 	   late. For non-SMP systems, the function that calls the reset
@@ -526,13 +524,6 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 		    platform_get_resource_byname(&tegra_smmu_device,
 						IORESOURCE_MEM, "smmu");
 #endif
-	if (tegra_lp0_vec_size)
-		if (memblock_reserve(tegra_lp0_vec_start, tegra_lp0_vec_size)) {
-			pr_err("Failed to reserve lp0_vec %08lx@%08lx\n",
-				tegra_lp0_vec_size, tegra_lp0_vec_start);
-			tegra_lp0_vec_start = 0;
-			tegra_lp0_vec_size = 0;
-		}
 
 	if (carveout_size) {
 		tegra_carveout_start = memblock_end_of_DRAM() - carveout_size;
@@ -603,6 +594,18 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 		}
 	}
 #endif
+
+	if (tegra_lp0_vec_size &&
+	   (tegra_lp0_vec_start < memblock_end_of_DRAM())) {
+		if (memblock_reserve(tegra_lp0_vec_start, tegra_lp0_vec_size)) {
+			pr_err("Failed to reserve lp0_vec %08lx@%08lx\n",
+				tegra_lp0_vec_size, tegra_lp0_vec_start);
+			tegra_lp0_vec_start = 0;
+			tegra_lp0_vec_size = 0;
+		}
+		tegra_lp0_vec_relocate = false;
+	} else
+		tegra_lp0_vec_relocate = true;
 
 	/*
 	 * We copy the bootloader's framebuffer to the framebuffer allocated

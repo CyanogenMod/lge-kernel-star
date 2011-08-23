@@ -496,7 +496,6 @@ static void tegra_tx_dma_complete_callback(struct tegra_dma_req *req)
 	unsigned long flags;
 
 	dev_vdbg(t->uport.dev, "%s: %d\n", __func__, count);
-	udelay(30);
 
 	spin_lock_irqsave(&t->uport.lock, flags);
 	xmit->tail = (xmit->tail + count) & (UART_XMIT_SIZE - 1);
@@ -940,6 +939,10 @@ static void tegra_set_mctrl(struct uart_port *u, unsigned int mctrl)
 
 	dev_dbg(u->dev, "tegra_set_mctrl called with %d\n", mctrl);
 	t = container_of(u, struct tegra_uart_port, uport);
+	if (t->uart_state != TEGRA_UART_OPENED) {
+		dev_err(t->uport.dev, "Uart is in invalid state\n");
+		return;
+	}
 
 	mcr = t->mcr_shadow;
 	if (mctrl & TIOCM_RTS) {

@@ -188,6 +188,11 @@ int boot_secondary(unsigned int cpu, struct task_struct *idle)
 {
 	int status;
 
+	/* Avoid timer calibration on slave cpus. Use the value calibrated
+	 * on master cpu. This reduces the bringup time for each slave cpu
+	 * by around 260ms.
+	 */
+	preset_lpj = loops_per_jiffy;
 	if (is_lp_cluster()) {
 		struct clk *cpu_clk, *cpu_g_clk;
 

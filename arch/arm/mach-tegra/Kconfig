@@ -355,7 +355,7 @@ config TEGRA_DYNAMIC_PWRDET
 config TEGRA_EDP_EXACT_FREQ
 	bool "Use maximum possible cpu frequency when EDP capping"
 	depends on TEGRA_EDP_LIMITS
-	default n
+	default y
 	help
 	  When enabled the cpu will run at the exact frequency
 	  specified in the EDP table when EDP capping is applied; when

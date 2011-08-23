@@ -44,7 +44,7 @@
 
 /* Select panel to be used. */
 #define AVDD_LCD PMU_TCA6416_GPIO_PORT17
-#define DSI_PANEL_RESET 0
+#define DSI_PANEL_RESET 1
 
 #define enterprise_lvds_shutdown	TEGRA_GPIO_PL2
 #define enterprise_hdmi_hpd		TEGRA_GPIO_PN7
@@ -288,7 +288,7 @@ static struct resource enterprise_disp2_resources[] = {
 };
 
 static struct tegra_dc_sd_settings enterprise_sd_settings = {
-	.enable = 0, /* Normal mode operation */
+	.enable = 1, /* Normal mode operation */
 	.use_auto_pwm = false,
 	.hw_update_delay = 0,
 	.bin_width = -1,
@@ -504,7 +504,7 @@ static int enterprise_dsi_panel_postsuspend(void)
 static struct tegra_dsi_cmd dsi_init_cmd[]= {
 	DSI_CMD_SHORT(0x05, 0x11, 0x00),
 	DSI_DLY_MS(150),
-#if(DC_CTRL_MODE == TEGRA_DC_OUT_ONE_SHOT_MODE)
+#if(DC_CTRL_MODE & TEGRA_DC_OUT_ONE_SHOT_MODE)
 	DSI_CMD_SHORT(0x15, 0x35, 0x00),
 #endif
 	DSI_CMD_SHORT(0x05, 0x29, 0x00),
@@ -514,13 +514,13 @@ static struct tegra_dsi_cmd dsi_init_cmd[]= {
 static struct tegra_dsi_cmd dsi_early_suspend_cmd[] = {
 	DSI_CMD_SHORT(0x05, 0x28, 0x00),
 	DSI_DLY_MS(20),
-#if(DC_CTRL_MODE == TEGRA_DC_OUT_ONE_SHOT_MODE)
+#if(DC_CTRL_MODE & TEGRA_DC_OUT_ONE_SHOT_MODE)
 	DSI_CMD_SHORT(0x05, 0x34, 0x00),
 #endif
 };
 
 static struct tegra_dsi_cmd dsi_late_resume_cmd[] = {
-#if(DC_CTRL_MODE == TEGRA_DC_OUT_ONE_SHOT_MODE)
+#if(DC_CTRL_MODE & TEGRA_DC_OUT_ONE_SHOT_MODE)
 	DSI_CMD_SHORT(0x15, 0x35, 0x00),
 #endif
 	DSI_CMD_SHORT(0x05, 0x29, 0x00),
@@ -530,7 +530,7 @@ static struct tegra_dsi_cmd dsi_late_resume_cmd[] = {
 static struct tegra_dsi_cmd dsi_suspend_cmd[] = {
 	DSI_CMD_SHORT(0x05, 0x28, 0x00),
 	DSI_DLY_MS(20),
-#if(DC_CTRL_MODE == TEGRA_DC_OUT_ONE_SHOT_MODE)
+#if(DC_CTRL_MODE & TEGRA_DC_OUT_ONE_SHOT_MODE)
 	DSI_CMD_SHORT(0x05, 0x34, 0x00),
 #endif
 	DSI_CMD_SHORT(0x05, 0x10, 0x00),
@@ -738,7 +738,7 @@ int __init enterprise_panel_init(void)
 	gpio_direction_output(enterprise_lcd_swp_pl, 0);
 	enterprise_stereo_set_orientation(enterprise_stereo.orientation);
 
-#if(DC_CTRL_MODE != TEGRA_DC_OUT_ONE_SHOT_MODE)
+#if !(DC_CTRL_MODE & TEGRA_DC_OUT_ONE_SHOT_MODE)
 	tegra_gpio_enable(enterprise_lcd_te);
 	gpio_request(enterprise_lcd_swp_pl, "lcd_te");
 	gpio_direction_input(enterprise_lcd_te);
