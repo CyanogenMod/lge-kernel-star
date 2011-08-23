@@ -316,21 +316,34 @@ typedef struct {
 #define valid_dlci(x) ( (x>0) && (x<TS0710_MAX_CHN) )
 #define valid_line(x) ( (x>0) && (x<NR_MUXS) )
 
-/* #define TS0710DEBUG */ 
+//LGE_TELECA_CR1317_DATA_THROUGHPUT START
+//20101028-1, , add mux log style [START]
+#define LG_TS0710_MUX
+//#undef LG_TS0710_MUX
+#include <mach/lprintk.h>
+#ifdef LG_TS0710_MUX
+#define LTMUX(format, args...) lprintk(D_MUX, "%s %d: " format "\n", __FUNCTION__, __LINE__, ## args)
+#else
+#define LTMUX(...)
+#endif
+//20101028, , add mux log style [END]
+
+//#define TS0710DEBUG
 #ifdef TS0710DEBUG
-#define TS0710_DEBUG(fmt, arg...) printk(KERN_INFO "\nTS07.10: " fmt , ## arg)
+#define TS0710_DEBUG LTMUX
 #else
-#define TS0710_DEBUG(fmt...)
+#define TS0710_DEBUG(...)
 #endif
 
-/* #define TS0710LOG */ 
+//#define TS0710LOG
 #ifdef TS0710LOG
-#define TS0710_LOG(fmt, arg...) printk("\nTS07.10: "fmt, ## arg)
+#define TS0710_LOG	LTMUX
 #else
-#define TS0710_LOG(fmt...)
+#define TS0710_LOG(...)
 #endif
+//LGE_TELECA_CR1317_DATA_THROUGHPUT END
 
-#define TS0710_PRINTK(fmt, arg...) printk(KERN_INFO "TS07.10: " fmt, ## arg) 
+#define TS0710_PRINTK LTMUX
 #define MUX_EA			1
 #define MUX_BASIC_FLAG_SEQ	0xf9
 #define MUX_ADVANCED_FLAG_SEQ	0x7e
