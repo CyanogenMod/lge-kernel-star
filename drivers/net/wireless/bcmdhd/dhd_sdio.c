@@ -52,6 +52,7 @@
 #include <sbsdio.h>
 #include <sbsdpcmdev.h>
 #include <bcmsdpcm.h>
+#include <bcmsdbus.h>
 
 #include <proto/ethernet.h>
 #include <proto/802.1d.h>
@@ -360,7 +361,7 @@ static const uint retry_limit = 2;
 static bool forcealign;
 
 /* Flag to indicate if we should download firmware on driver load */
-uint dhd_download_fw_on_driverload = TRUE;
+uint dhd_download_fw_on_driverload = FALSE;
 
 #define ALIGNMENT  4
 
@@ -1026,7 +1027,9 @@ dhdsdio_txpkt(dhd_bus_t *bus, void *pkt, uint chan, bool free_pkt)
 	htol32_ua_store(0, frame + SDPCM_FRAMETAG_LEN + sizeof(swheader));
 
 #ifdef DHD_DEBUG
-	tx_packets[PKTPRIO(pkt)]++;
+	if (PKTPRIO(pkt) < ARRAYSIZE(tx_packets)) {
+		tx_packets[PKTPRIO(pkt)]++;
+	}
 	if (DHD_BYTES_ON() &&
 	    (((DHD_CTL_ON() && (chan == SDPCM_CONTROL_CHANNEL)) ||
 	      (DHD_DATA_ON() && (chan != SDPCM_CONTROL_CHANNEL))))) {
@@ -6219,10 +6222,13 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 
 			dhd_os_sdunlock(dhdp);
 		} else {
-			bcmerror = BCME_NOTDOWN;
-			DHD_ERROR(("%s: Set DEVRESET=FALSE invoked when device is on\n",
+			DHD_INFO(("%s called when dongle is not in reset\n",
 				__FUNCTION__));
-			bcmerror = BCME_SDIO_ERROR;
+			DHD_INFO(("Will call dhd_bus_start instead\n"));
+			sdioh_start(NULL, 1);
+			if ((bcmerror = dhd_bus_start(dhdp)) != 0)
+				DHD_ERROR(("%s: dhd_bus_start fail with %d\n",
+					__FUNCTION__, bcmerror));
 		}
 	}
 	return bcmerror;
