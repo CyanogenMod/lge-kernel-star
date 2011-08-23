@@ -260,9 +260,10 @@ static __init int alloc_suspend_context(void)
 	pgprot_t prot = __pgprot_modify(pgprot_kernel, L_PTE_MT_MASK,
 					L_PTE_MT_BUFFERABLE | L_PTE_XN);
 	struct page *ctx_page;
-	unsigned long ctx_virt;
-	phys_addr_t ctx_phys;
+	unsigned long ctx_virt = 0;
+	pgd_t *pgd;
 	pmd_t *pmd;
+	pte_t *pte;
 
 	ctx_page = alloc_pages(GFP_KERNEL, 0);
 	if (IS_ERR_OR_NULL(ctx_page))
@@ -274,12 +275,19 @@ static __init int alloc_suspend_context(void)
 
 	/* Add the context page to our private pgd. */
 	ctx_virt = (unsigned long)tegra_cpu_context;
-	ctx_phys = virt_to_phys(tegra_cpu_context);
-	pmd = pmd_offset(tegra_pgd + pgd_index(ctx_virt), ctx_virt);
-	*pmd = __pmd((ctx_phys & PGDIR_MASK) |
-		     PMD_TYPE_SECT | PMD_SECT_AP_WRITE |
-		     PMD_SECT_XN | PMD_SECT_BUFFERED);
-	flush_pmd_entry(pmd);
+
+	pgd = tegra_pgd + pgd_index(ctx_virt);
+	if (!pgd_present(*pgd))
+		goto fail;
+	pmd = pmd_offset(pgd, ctx_virt);
+	if (!pmd_none(*pmd))
+		goto fail;
+	pte = pte_alloc_kernel(pmd, ctx_virt);
+	if (!pte)
+		goto fail;
+
+	set_pte_ext(pte, mk_pte(ctx_page, prot), 0);
+
 	outer_clean_range(__pa(pmd), __pa(pmd + 1));
 
 	return 0;
@@ -287,6 +295,8 @@ static __init int alloc_suspend_context(void)
 fail:
 	if (ctx_page)
 		__free_page(ctx_page);
+	if (ctx_virt)
+		vm_unmap_ram((void*)ctx_virt, 1);
 	tegra_cpu_context = NULL;
 	return -ENOMEM;
 #else
