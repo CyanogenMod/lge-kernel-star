@@ -91,35 +91,20 @@ extern void (*tegra_deep_sleep)(int);
 unsigned int tegra_idle_lp2_last(unsigned int us, unsigned int flags);
 
 #if defined(CONFIG_PM_SLEEP) && !defined(CONFIG_ARCH_TEGRA_2x_SOC)
-#define INSTRUMENT_CLUSTER_SWITCH 1	/* Should be zero for shipping code */
-#define DEBUG_CLUSTER_SWITCH 0		/* Should be zero for shipping code */
-#define PARAMETERIZE_CLUSTER_SWITCH 1	/* Should be zero for shipping code */
-int tegra_cluster_control(unsigned int us, unsigned int flags);
-void tegra_cluster_switch_prolog(unsigned int flags);
-void tegra_cluster_switch_epilog(unsigned int flags);
 void tegra_lp0_suspend_mc(void);
 void tegra_lp0_resume_mc(void);
 void tegra_lp0_cpu_mode(bool enter);
 #else
-static inline int tegra_cluster_control(unsigned int us, unsigned int flags)
-#define INSTRUMENT_CLUSTER_SWITCH 0	/* Must be zero for ARCH_TEGRA_2x_SOC */
-#define DEBUG_CLUSTER_SWITCH 0		/* Must be zero for ARCH_TEGRA_2x_SOC */
-#define PARAMETERIZE_CLUSTER_SWITCH 0	/* Must be zero for ARCH_TEGRA_2x_SOC */
-{
-	return -EPERM;
-}
-static inline void tegra_cluster_switch_prolog(unsigned int flags) {}
-static inline void tegra_cluster_switch_epilog(unsigned int flags) {}
 static inline void tegra_lp0_suspend_mc(void) {}
 static inline void tegra_lp0_resume_mc(void) {}
 static inline void tegra_lp0_cpu_mode(bool enter) {}
 #endif
 
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-static inline bool is_g_cluster_present(void)   { return true; }
-static inline unsigned int is_lp_cluster(void)  { return 0; }
-void tegra2_lp0_suspend_init(void);
-#else
+#ifdef CONFIG_TEGRA_CLUSTER_CONTROL
+#define INSTRUMENT_CLUSTER_SWITCH 1	/* Should be zero for shipping code */
+#define DEBUG_CLUSTER_SWITCH 0		/* Should be zero for shipping code */
+#define PARAMETERIZE_CLUSTER_SWITCH 1	/* Should be zero for shipping code */
+
 static inline bool is_g_cluster_present(void)
 {
 	u32 fuse_sku = readl(FUSE_SKU_DIRECT_CONFIG);
@@ -133,6 +118,32 @@ static inline unsigned int is_lp_cluster(void)
 	reg = readl(FLOW_CTRL_CLUSTER_CONTROL);
 	return (reg & 1); /* 0 == G, 1 == LP*/
 }
+int tegra_cluster_control(unsigned int us, unsigned int flags);
+void tegra_cluster_switch_prolog(unsigned int flags);
+void tegra_cluster_switch_epilog(unsigned int flags);
+#else
+#define INSTRUMENT_CLUSTER_SWITCH 0	/* Must be zero for ARCH_TEGRA_2x_SOC */
+#define DEBUG_CLUSTER_SWITCH 0		/* Must be zero for ARCH_TEGRA_2x_SOC */
+#define PARAMETERIZE_CLUSTER_SWITCH 0	/* Must be zero for ARCH_TEGRA_2x_SOC */
+
+static inline bool is_g_cluster_present(void)   { return true; }
+static inline unsigned int is_lp_cluster(void)  { return 0; }
+static inline int tegra_cluster_control(unsigned int us, unsigned int flags)
+{
+	return -EPERM;
+}
+static inline void tegra_cluster_switch_prolog(unsigned int flags) {}
+static inline void tegra_cluster_switch_epilog(unsigned int flags) {}
+#endif
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+void tegra2_lp0_suspend_init(void);
+void tegra2_lp2_set_trigger(unsigned long cycles);
+unsigned long tegra2_lp2_timer_remain(void);
+#endif
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+void tegra3_lp2_set_trigger(unsigned long cycles);
+unsigned long tegra3_lp2_timer_remain(void);
 #endif
 
 static inline void tegra_lp0_suspend_init(void)
@@ -141,15 +152,6 @@ static inline void tegra_lp0_suspend_init(void)
 	tegra2_lp0_suspend_init();
 #endif
 }
-
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-void tegra2_lp2_set_trigger(unsigned long cycles);
-unsigned long tegra2_lp2_timer_remain(void);
-#endif
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-void tegra3_lp2_set_trigger(unsigned long cycles);
-unsigned long tegra3_lp2_timer_remain(void);
-#endif
 
 static inline void tegra_lp2_set_trigger(unsigned long cycles)
 {
