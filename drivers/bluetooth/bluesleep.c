@@ -97,6 +97,7 @@ DECLARE_DELAYED_WORK(sleep_workqueue, bluesleep_sleep_work);
 #define BT_TXDATA	 0x02
 #define BT_ASLEEP	 0x04
 #define BT_EXT_WAKE	0x08
+#define BT_SUSPEND	0x10
 
 /* global pointer to a single hci device. */
 static struct hci_dev *bluesleep_hdev;
@@ -142,6 +143,8 @@ struct proc_dir_entry *bluetooth_dir, *sleep_dir;
  */
 static void hsuart_power(int on)
 {
+	if (test_bit(BT_SUSPEND, &flags))
+		return;
 	if (on) {
 		tegra_uart_request_clock_on(bsi->uport);
 		tegra_uart_set_mctrl(bsi->uport, TIOCM_RTS);
@@ -661,6 +664,7 @@ static int bluesleep_probe(struct platform_device *pdev)
 		bsi->irq_polarity = POLARITY_HIGH;/*anything else*/
 
 	wake_lock_init(&bsi->wake_lock, WAKE_LOCK_SUSPEND, "bluesleep");
+	clear_bit(BT_SUSPEND, &flags);
 
 	return 0;
 
@@ -682,9 +686,34 @@ static int bluesleep_remove(struct platform_device *pdev)
 	return 0;
 }
 
+
+static int bluesleep_resume(struct platform_device *pdev)
+{
+	if (test_bit(BT_SUSPEND, &flags)) {
+		BT_DBG("bluesleep resuming...\n");
+	if ((bsi->uport != NULL) &&
+		(gpio_get_value(bsi->host_wake) == bsi->irq_polarity)) {
+			BT_DBG("bluesleep resume form BT event...\n");
+			tegra_uart_request_clock_on(bsi->uport);
+			tegra_uart_set_mctrl(bsi->uport, TIOCM_RTS);
+		}
+		clear_bit(BT_SUSPEND, &flags);
+	}
+	return 0;
+}
+
+static int bluesleep_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	BT_DBG("bluesleep suspending...\n");
+	set_bit(BT_SUSPEND, &flags);
+	return 0;
+}
+
 static struct platform_driver bluesleep_driver = {
 	.probe = bluesleep_probe,
 	.remove = bluesleep_remove,
+	.suspend = bluesleep_suspend,
+	.resume = bluesleep_resume,
 	.driver = {
 		.name = "bluesleep",
 		.owner = THIS_MODULE,
