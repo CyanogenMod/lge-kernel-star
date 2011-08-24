@@ -60,8 +60,8 @@
 #define MAX77663_REG_RTC_IRQ		0x00
 #define MAX77663_REG_RTC_IRQ_MASK	0x01
 
-#define IRQ_TOP_LBT_MASK		(1 << 7)
-#define IRQ_TOP_LBT_SHIFT		7
+#define IRQ_TOP_GLBL_MASK		(1 << 7)
+#define IRQ_TOP_GLBL_SHIFT		7
 #define IRQ_TOP_SD_MASK			(1 << 6)
 #define IRQ_TOP_SD_SHIFT		6
 #define IRQ_TOP_LDO_MASK		(1 << 5)
@@ -76,6 +76,8 @@
 #define IRQ_TOP_ONOFF_SHIFT		1
 #define IRQ_TOP_NVER_MASK		(1 << 0)
 #define IRQ_TOP_NVER_SHIFT		0
+
+#define IRQ_GLBL_MASK			(1 << 0)
 
 #define IRQ_LBT_BASE			MAX77663_IRQ_LBT_LB
 #define IRQ_LBT_END			MAX77663_IRQ_LBT_THERM_ALRM2
@@ -163,8 +165,8 @@ struct max77663_chip *max77663_chip;
 	[MAX77663_IRQ_LBT_##_name] = {			\
 		.mask_reg = MAX77663_REG_LBT_IRQ_MASK,	\
 		.mask = (1 << _shift),			\
-		.top_mask = IRQ_TOP_LBT_MASK,		\
-		.top_shift = IRQ_TOP_LBT_SHIFT,		\
+		.top_mask = IRQ_TOP_GLBL_MASK,		\
+		.top_shift = IRQ_TOP_GLBL_SHIFT,	\
 		.cache_idx = CACHE_IRQ_LBT,		\
 	}
 
@@ -687,8 +689,8 @@ static void max77663_irq_sync_unlock(unsigned int irq)
 	struct max77663_irq_data *irq_data =
 			&max77663_irqs[irq - chip->irq_base];
 	int idx = irq_data->cache_idx;
-	u8 irq_top_mask = 0;
-	u16 irq_mask = 0;
+	u8 irq_top_mask = chip->cache_irq_top_mask;
+	u16 irq_mask = chip->cache_irq_mask[idx];
 	int update_irq_top = 0;
 	u32 len = 1;
 	int ret;
@@ -698,9 +700,11 @@ static void max77663_irq_sync_unlock(unsigned int irq)
 			update_irq_top = 1;
 		chip->irq_top_count[irq_data->top_shift]++;
 
-		irq_top_mask = chip->cache_irq_top_mask & ~irq_data->top_mask;
+		if (irq_data->top_mask != IRQ_TOP_GLBL_MASK)
+			irq_top_mask &= ~irq_data->top_mask;
+
 		if (idx != -1)
-			irq_mask = chip->cache_irq_mask[idx] & ~irq_data->mask;
+			irq_mask &= ~irq_data->mask;
 	} else {
 		if (chip->irq_top_count[irq_data->top_shift] == 1)
 			update_irq_top = 1;
@@ -708,9 +712,11 @@ static void max77663_irq_sync_unlock(unsigned int irq)
 		if (--chip->irq_top_count[irq_data->top_shift] < 0)
 			chip->irq_top_count[irq_data->top_shift] = 0;
 
-		irq_top_mask = chip->cache_irq_top_mask | irq_data->top_mask;
+		if (irq_data->top_mask != IRQ_TOP_GLBL_MASK)
+			irq_top_mask |= irq_data->top_mask;
+
 		if (idx != -1)
-			irq_mask = chip->cache_irq_mask[idx] | irq_data->mask;
+			irq_mask |= irq_data->mask;
 	}
 
 	if ((idx != -1) && (irq_mask != chip->cache_irq_mask[idx])) {
@@ -745,7 +751,7 @@ static void max77663_irq_sync_unlock(unsigned int irq)
 	}
 
 	if (update_irq_top && (irq_top_mask != chip->cache_irq_top_mask)) {
-		ret = max77663_cache_write(chip->dev, MAX77663_REG_IRQ_TOP,
+		ret = max77663_cache_write(chip->dev, MAX77663_REG_IRQ_TOP_MASK,
 					   irq_data->top_mask, irq_top_mask,
 					   &chip->cache_irq_top_mask);
 		if (ret < 0)
@@ -789,8 +795,8 @@ static int max77663_irq_gpio_set_type(unsigned int irq, unsigned int type)
 				    &chip->cache_gpio_ctrl[offset]);
 }
 
-static int max77663_do_irq(struct max77663_chip *chip, u8 addr, int irq_base,
-			   int irq_end)
+static inline int max77663_do_irq(struct max77663_chip *chip, u8 addr,
+				  int irq_base, int irq_end)
 {
 	struct max77663_irq_data *irq_data = NULL;
 	int irqs_to_handle[irq_end - irq_base + 1];
@@ -834,7 +840,7 @@ static irqreturn_t max77663_irq(int irq, void *data)
 		return IRQ_NONE;
 	}
 
-	if (irq_top & IRQ_TOP_LBT_MASK) {
+	if (irq_top & IRQ_TOP_GLBL_MASK) {
 		ret = max77663_do_irq(chip, MAX77663_REG_LBT_IRQ, IRQ_LBT_BASE,
 				      IRQ_LBT_END);
 		if (ret < 0)
@@ -904,7 +910,7 @@ static int max77663_irq_init(struct max77663_chip *chip)
 
 	/* Mask all interrupts */
 	chip->cache_irq_top_mask = 0xFF;
-	chip->cache_irq_mask[CACHE_IRQ_LBT] = 0xFF;
+	chip->cache_irq_mask[CACHE_IRQ_LBT] = 0x0F;
 	chip->cache_irq_mask[CACHE_IRQ_SD] = 0xFF;
 	chip->cache_irq_mask[CACHE_IRQ_LDO] = 0xFFFF;
 	chip->cache_irq_mask[CACHE_IRQ_RTC] = 0xFF;
@@ -957,11 +963,21 @@ static int max77663_irq_init(struct max77663_chip *chip)
 
 	ret = request_threaded_irq(chip->i2c_power->irq, NULL, max77663_irq,
 				   flags, "max77663", chip);
-	if (ret)
+	if (ret) {
 		dev_err(chip->dev, "irq_init: Failed to request irq %d\n",
 			chip->i2c_power->irq);
+		return ret;
+	}
 
-	return ret;
+	chip->cache_irq_top_mask &= ~IRQ_TOP_GLBL_MASK;
+	max77663_write(chip->dev, MAX77663_REG_IRQ_TOP_MASK,
+		       &chip->cache_irq_top_mask, 1, 0);
+
+	chip->cache_irq_mask[CACHE_IRQ_LBT] &= ~IRQ_GLBL_MASK;
+	max77663_write(chip->dev, MAX77663_REG_LBT_IRQ_MASK,
+		       &chip->cache_irq_mask[CACHE_IRQ_LBT], 1, 0);
+
+	return 0;
 }
 
 static void max77663_irq_exit(struct max77663_chip *chip)
@@ -1042,7 +1058,7 @@ static ssize_t max77663_debugfs_regs_read(struct file *file,
 	};
 	u8 osc_32k_regs[] = { 0x03 };
 	u8 bbc_regs[] = { 0x04 };
-	u8 onoff_regs[] = { 0x12, 0x41, 0x42 };
+	u8 onoff_regs[] = { 0x12, 0x15, 0x41, 0x42 };
 	u8 fps_regs[] = {
 		0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C,
 		0x4D, 0x4E, 0x4F, 0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56,
