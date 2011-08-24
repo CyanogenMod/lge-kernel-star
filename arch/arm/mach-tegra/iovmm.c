@@ -75,7 +75,7 @@ struct iovmm_share_group {
 static LIST_HEAD(iovmm_devices);
 static LIST_HEAD(iovmm_groups);
 static DEFINE_MUTEX(iovmm_group_list_lock);
-static DEFINE_SPINLOCK(iovmm_device_list_lock);
+static DEFINE_MUTEX(iovmm_device_list_lock);
 static struct kmem_cache *iovmm_cache;
 
 static tegra_iovmm_addr_t iovmm_align_up(struct tegra_iovmm_device *dev,
@@ -814,12 +814,12 @@ struct tegra_iovmm_client *tegra_iovmm_alloc_client(const char *name,
 			kfree(grp);
 			goto fail_lock;
 		}
-		spin_lock_irqsave(&iovmm_device_list_lock, flags);
+		mutex_lock(&iovmm_device_list_lock);
 		list_for_each_entry(dev, &iovmm_devices, list) {
 			grp->domain = dev->ops->alloc_domain(dev, c);
 			if (grp->domain) break;
 		}
-		spin_unlock_irqrestore(&iovmm_device_list_lock, flags);
+		mutex_unlock(&iovmm_device_list_lock);
 		if (!grp->domain) {
 			pr_err("%s: alloc_domain failed for %s\n",
 				__func__, c->name);
@@ -887,7 +887,7 @@ static int tegra_iovmm_suspend(void)
 	struct tegra_iovmm_device *dev;
 	unsigned long flags;
 
-	spin_lock_irqsave(&iovmm_device_list_lock, flags);
+	mutex_lock(&iovmm_device_list_lock);
 	list_for_each_entry(dev, &iovmm_devices, list) {
 
 		if (!dev->ops->suspend)
@@ -897,11 +897,11 @@ static int tegra_iovmm_suspend(void)
 		if (rc) {
 			pr_err("%s: %s suspend returned %d\n",
 			       __func__, dev->name, rc);
-			spin_unlock_irqrestore(&iovmm_device_list_lock, flags);
+			mutex_unlock(&iovmm_device_list_lock);
 			return rc;
 		}
 	}
-	spin_unlock_irqrestore(&iovmm_device_list_lock, flags);
+	mutex_unlock(&iovmm_device_list_lock);
 	return 0;
 }
 
@@ -910,14 +910,14 @@ static void tegra_iovmm_resume(void)
 	struct tegra_iovmm_device *dev;
 	unsigned long flags;
 
-	spin_lock_irqsave(&iovmm_device_list_lock, flags);
+	mutex_lock(&iovmm_device_list_lock);
 
 	list_for_each_entry(dev, &iovmm_devices, list) {
 		if (dev->ops->resume)
 			dev->ops->resume(dev);
 	}
 
-	spin_unlock_irqrestore(&iovmm_device_list_lock, flags);
+	mutex_unlock(&iovmm_device_list_lock);
 }
 
 static struct syscore_ops tegra_iovmm_syscore_ops = {
