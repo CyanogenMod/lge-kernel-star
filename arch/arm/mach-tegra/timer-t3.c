@@ -36,6 +36,7 @@
 #include <asm/localtimer.h>
 #include <asm/sched_clock.h>
 
+#include <mach/hardware.h>
 #include <mach/iomap.h>
 #include <mach/irqs.h>
 
@@ -211,10 +212,6 @@ unsigned long tegra3_lp2_timer_remain(void)
 void __init tegra3_init_timer(u32 *offset, int *irq)
 {
 	unsigned long rate = clk_measure_input_freq();
-#ifdef CONFIG_PM_SLEEP
-	void __iomem *chip_id = IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x804;
-	unsigned long id = readl(chip_id);
-#endif
 
 	switch (rate) {
 	case 12000000:
@@ -244,19 +241,9 @@ void __init tegra3_init_timer(u32 *offset, int *irq)
 
 #ifdef CONFIG_PM_SLEEP
 	/* For T30.A01 use INT_TMR_SHARED instead of INT_TMR6. */
-	if (((id & 0xFF00) >> 8) == 0x30) {
-#ifdef CONFIG_TEGRA_SILICON_PLATFORM
-		if (((id >> 16) & 0xf) == 1)
+	if ((tegra_get_chipid() == TEGRA_CHIPID_TEGRA3) &&
+		(tegra_get_revision() == TEGRA_REVISION_A01))
 			tegra_lp2wake_irq[3].irq = INT_TMR_SHARED;
-#else
-		void __iomem *emu_rev = IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x860;
-		unsigned long reg = readl(emu_rev);
-		unsigned long netlist = reg & 0xFFFF;
-		unsigned long patch = (reg >> 16) & 0xFF;
-		if ((netlist == 12) && (patch < 14))
-			tegra_lp2wake_irq[3].irq = INT_TMR_SHARED;
-#endif
-	}
 
 	tegra3_register_wake_timer(0);
 #endif
