@@ -373,7 +373,7 @@
 
 #define INT_BOARD_BASE			TEGRA_NR_IRQS
 
-#define NR_BOARD_IRQS			32
+#define NR_BOARD_IRQS			64
 
 #define NR_IRQS				(INT_BOARD_BASE + NR_BOARD_IRQS)
 
