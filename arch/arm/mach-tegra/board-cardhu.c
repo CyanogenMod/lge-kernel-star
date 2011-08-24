@@ -958,7 +958,11 @@ static void cardhu_modem_init(void)
 	tegra_get_board_info(&board_info);
 	switch (board_info.board_id) {
 	case BOARD_E1291:
-		if (board_info.fab < BOARD_FAB_A03) {
+	case BOARD_E1198:
+		if (((board_info.board_id == BOARD_E1291) &&
+				(board_info.fab < BOARD_FAB_A03)) ||
+			((board_info.board_id == BOARD_E1198) &&
+					(board_info.fab < BOARD_FAB_A02))) {
 			w_disable_gpio = TEGRA_GPIO_PH5;
 		} else {
 			w_disable_gpio = TEGRA_GPIO_PDD5;
@@ -971,8 +975,11 @@ static void cardhu_modem_init(void)
 		else
 			gpio_direction_input(w_disable_gpio);
 
-		/* E1291-A04: Set PERST signal to low */
-		if (board_info.fab >= BOARD_FAB_A04) {
+		/* E1291-A04 & E1198:A02: Set PERST signal to low */
+		if (((board_info.board_id == BOARD_E1291) &&
+				(board_info.fab >= BOARD_FAB_A04)) ||
+			((board_info.board_id == BOARD_E1198) &&
+					(board_info.fab >= BOARD_FAB_A02))) {
 			ret = gpio_request(TEGRA_GPIO_PH7, "modem_perst");
 			if (ret < 0) {
 				pr_err("%s(): Error in allocating gpio "
