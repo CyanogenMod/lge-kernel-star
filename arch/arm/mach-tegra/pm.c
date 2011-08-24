@@ -414,18 +414,9 @@ void tegra_idle_lp2_last(void)
 	restore_cpu_complex();
 	cpu_complex_pm_exit();
 
-	spin_lock(&tegra_lp2_lock);
-
-	cpumask_clear_cpu(cpu, &tegra_in_lp2);
-
-	for_each_online_cpu(i) {
-		if (i != cpu) {
+	for_each_online_cpu(i)
+		if (i != cpu)
 			tegra_wake_reset_cpu(i);
-			cpumask_clear_cpu(i, &tegra_in_lp2);
-		}
-	}
-
-	spin_unlock(&tegra_lp2_lock);
 }
 
 void tegra_idle_lp2(void)
@@ -454,6 +445,19 @@ void tegra_idle_lp2(void)
 
 	spin_lock(&tegra_lp2_lock);
 	cpumask_clear_cpu(cpu, &tegra_in_lp2);
+
+	/*
+	 * cpus coming out of idle muck with page tables that belong to the
+	 * last process executed before idle.  Don't release any cpus back to
+	 * the scheduler until all cpus have booted to avoid modifying the
+	 * page table of a running process on another cpu.
+	 */
+	while (!cpumask_empty(&tegra_in_lp2)) {
+		spin_unlock(&tegra_lp2_lock);
+		cpu_relax();
+		spin_lock(&tegra_lp2_lock);
+	}
+
 	spin_unlock(&tegra_lp2_lock);
 }
 
