@@ -316,6 +316,9 @@ ENTRY(tegra_sleep_wfi)
 	mcr	p15, 0, r11, c1, c0, 1	@ reenable coherency
 
 	@ the cpu was running with coherency disabled, caches may be out of date
+	mov     r0, #0
+	mcr     p15, 0, r0, c8, c3, 0   @ invalidate TLB
+	mcr     p15, 0, r0, c7, c5, 6   @ flush BTAC
 #ifdef MULTI_CACHE
 	ldr	r10, =cpu_cache
 	mov	lr, pc
