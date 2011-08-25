@@ -177,12 +177,6 @@ static __initdata struct tegra_clk_init_table enterprise_clk_init_table[] = {
 	{ NULL,		NULL,		0,		0},
 };
 
-static struct i2c_board_info __initdata enterprise_i2c_bus1_board_info[] = {
-	{
-		I2C_BOARD_INFO("wm8903", 0x1a),
-	},
-};
-
 static struct tegra_i2c_platform_data enterprise_i2c1_platform_data = {
 	.adapter_nr	= 0,
 	.bus_count	= 1,

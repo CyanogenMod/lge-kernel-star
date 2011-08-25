@@ -94,7 +94,6 @@ static struct platform_device tegra_sdhci_device3 = {
 
 int __init enterprise_sdhci_init(void)
 {
-	unsigned int rc = 0;
 	platform_device_register(&tegra_sdhci_device3);
 
 	tegra_gpio_enable(ENTERPRISE_SD_CD);
