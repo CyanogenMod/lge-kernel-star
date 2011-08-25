@@ -373,8 +373,12 @@ pci_find_parent_resource(const struct pci_dev *dev, struct resource *res)
 			continue;	/* Wrong type */
 		if (!((res->flags ^ r->flags) & IORESOURCE_PREFETCH))
 			return r;	/* Exact match */
-		if ((res->flags & IORESOURCE_PREFETCH) && !(r->flags & IORESOURCE_PREFETCH))
-			best = r;	/* Approximating prefetchable by non-prefetchable */
+		/* We can't insert a non-prefetch resource inside a prefetchable parent .. */
+		if (r->flags & IORESOURCE_PREFETCH)
+			continue;
+		/* .. but we can put a prefetchable resource inside a non-prefetchable one */
+		if (!best)
+			best = r;
 	}
 	return best;
 }
@@ -1503,7 +1507,7 @@ void pci_enable_ari(struct pci_dev *dev)
 {
 	int pos;
 	u32 cap;
-	u16 ctrl;
+	u16 flags, ctrl;
 	struct pci_dev *bridge;
 
 	if (!dev->is_pcie || dev->devfn)
@@ -1519,6 +1523,11 @@ void pci_enable_ari(struct pci_dev *dev)
 
 	pos = pci_find_capability(bridge, PCI_CAP_ID_EXP);
 	if (!pos)
+		return;
+
+	/* ARI is a PCIe v2 feature */
+	pci_read_config_word(bridge, pos + PCI_EXP_FLAGS, &flags);
+	if ((flags & PCI_EXP_FLAGS_VERS) < 2)
 		return;
 
 	pci_read_config_dword(bridge, pos + PCI_EXP_DEVCAP2, &cap);
