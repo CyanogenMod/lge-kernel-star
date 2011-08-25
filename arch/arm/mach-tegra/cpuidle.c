@@ -116,13 +116,7 @@ static int tegra_idle_enter_lp2(struct cpuidle_device *dev,
 	enter = ktime_get();
 
 	tegra_cpu_idle_stats_lp2_ready(dev->cpu);
-
-	/* Shut down the CPU local timer and switch timekeeping to the
-	   global system timer. */
-	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
 	tegra_idle_lp2(dev, state);
-	/* Switch timekeeping back to the CPU local timer. */
-	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
 
 	exit = ktime_sub(ktime_get(), enter);
 	us = ktime_to_us(exit);

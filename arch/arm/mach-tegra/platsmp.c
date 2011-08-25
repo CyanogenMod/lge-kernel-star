@@ -78,9 +78,7 @@ static unsigned int available_cpus(void)
 
 static int is_g_cluster_available(unsigned int cpu)
 {
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-	return -EPERM;
-#else
+#ifdef CONFIG_TEGRA_CLUSTER_CONTROL
 	u32 fuse_sku = readl(FUSE_SKU_DIRECT_CONFIG);
 	u32 bond_out = readl(CAR_BOND_OUT_V);
 
@@ -96,6 +94,8 @@ static int is_g_cluster_available(unsigned int cpu)
 	 *	  (e.g., low battery, over temperature, etc.). Add checks for
 	 *	  these conditions. */
 	return 0;
+#else
+	return -EPERM;
 #endif
 }
 

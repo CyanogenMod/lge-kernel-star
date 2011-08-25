@@ -26,6 +26,7 @@ config ARCH_TEGRA_3x_SOC
 	select ARM_GIC
 	select ARCH_REQUIRE_GPIOLIB
 	select TEGRA_IOVMM
+	select TEGRA_CLUSTER_CONTROL if PM_SLEEP
 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
 	select USB_EHCI_TEGRA if USB_SUPPORT
 	select USB_ULPI if USB_SUPPORT
@@ -283,6 +284,9 @@ config TEGRA_CLOCK_DEBUG_WRITE
 	bool "Enable debugfs write access to clock tree"
 	depends on DEBUG_FS
 	default n
+
+config TEGRA_CLUSTER_CONTROL
+	bool
 
 config TEGRA_AUTO_HOTPLUG
 	bool "Enable automatic CPU hot-plugging"

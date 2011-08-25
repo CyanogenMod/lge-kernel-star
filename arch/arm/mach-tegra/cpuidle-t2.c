@@ -221,12 +221,16 @@ static int tegra2_idle_lp2_cpu_0(struct cpuidle_device *dev,
 		idle_stats.lp2_count++;
 		idle_stats.lp2_count_bin[bin]++;
 
+		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
+
 		if (tegra_idle_lp2_last(sleep_time, 0) == 0)
 			sleep_completed = true;
 		else {
 			int irq = tegra_gic_pending_interrupt();
 			idle_stats.lp2_int_count[irq]++;
 		}
+
+		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
 	}
 
 	for_each_online_cpu(i) {

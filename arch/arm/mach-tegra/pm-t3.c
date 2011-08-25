@@ -40,6 +40,7 @@
 #include "sleep.h"
 #include "tegra3_emc.h"
 
+#ifdef CONFIG_TEGRA_CLUSTER_CONTROL
 #define CAR_CCLK_BURST_POLICY \
 	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x20)
 
@@ -96,7 +97,6 @@
 #define CPU_CLOCK(cpu)	(0x1<<(8+cpu))
 #define CPU_RESET(cpu)	(0x1111ul<<(cpu))
 
-#ifdef CONFIG_PM_SLEEP
 static int cluster_switch_prolog_clock(unsigned int flags)
 {
 	u32 reg;
@@ -277,7 +277,6 @@ void tegra_cluster_switch_epilog(unsigned int flags)
 
 int tegra_cluster_control(unsigned int us, unsigned int flags)
 {
-#ifdef CONFIG_PM_SLEEP
 	static ktime_t last_g2lp;
 
 	unsigned int target_cluster = flags & TEGRA_POWER_CLUSTER_MASK;
@@ -345,11 +344,10 @@ int tegra_cluster_control(unsigned int us, unsigned int flags)
 	DEBUG_CLUSTER(("%s: %s\r\n", __func__, is_lp_cluster() ? "LP" : "G"));
 
 	return 0;
-#else
-	return -ENODEV;
-#endif
 }
+#endif
 
+#ifdef CONFIG_PM_SLEEP
 static u32 mc_reserved_rsv;
 static u32 mc_emem_arb_override;
 
