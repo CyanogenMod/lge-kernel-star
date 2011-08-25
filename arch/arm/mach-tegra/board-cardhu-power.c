@@ -462,7 +462,7 @@ static struct regulator_consumer_supply gpio_switch_en_3v3_sys_supply[] = {
 	REGULATOR_SUPPLY("vcore_mmc", NULL),
 	REGULATOR_SUPPLY("vddio_pex_ctl", NULL),
 	REGULATOR_SUPPLY("pwrdet_pex_ctl", NULL),
-	REGULATOR_SUPPLY("hvdd_pex", NULL),
+	REGULATOR_SUPPLY("hvdd_pex_pmu", NULL),
 	REGULATOR_SUPPLY("avdd_hdmi", NULL),
 	REGULATOR_SUPPLY("vpp_fuse", NULL),
 	REGULATOR_SUPPLY("avdd_usb", NULL),
@@ -591,7 +591,7 @@ static int gpio_switch_en_3v3_emmc_voltages[] = { 3300};
 
 /* EN_3V3_PEX_HVDD from AP GPIO VI_D09 L07*/
 static struct regulator_consumer_supply gpio_switch_en_3v3_pex_hvdd_supply[] = {
-	REGULATOR_SUPPLY("hvdd_pex_3v3", NULL),
+	REGULATOR_SUPPLY("hvdd_pex", NULL),
 };
 static int gpio_switch_en_3v3_pex_hvdd_voltages[] = { 3300};
 
@@ -690,7 +690,7 @@ GREG_INIT(8, en_vdd_com,	en_vdd_com,	"vdd_3v3_devices",	1,      0,      TEGRA_GP
 GREG_INIT(9, en_3v3_fuse,	en_3v3_fuse,	"vdd_3v3_devices",	0,      0,      TEGRA_GPIO_PL6,		false,	0,	0,	0,	0);
 GREG_INIT(10, en_3v3_emmc,	en_3v3_emmc,	"vdd_3v3_devices",	1,      0,      TEGRA_GPIO_PD1,		false,	1,	0,	0,	0);
 GREG_INIT(11, en_vdd_sdmmc1,	en_vdd_sdmmc1,	"vdd_3v3_devices",	0,      0,      TEGRA_GPIO_PD7,		false,	1,	0,	0,	0);
-GREG_INIT(12, en_3v3_pex_hvdd,	en_3v3_pex_hvdd, "vdd_3v3_devices",	0,      0,      TEGRA_GPIO_PL7,		false,	0,	0,	0,	0);
+GREG_INIT(12, en_3v3_pex_hvdd,	en_3v3_pex_hvdd, "hvdd_pex_pmu",	0,      0,      TEGRA_GPIO_PL7,		false,	0,	0,	0,	0);
 GREG_INIT(13, en_1v8_cam,	en_1v8_cam,	"vdd_gen1v8",		0,      0,      TEGRA_GPIO_PBB4,	false,	0,	0,	0,	0);
 
 /* E1291-A04 specific */
@@ -708,7 +708,7 @@ GREG_INIT(9, en_3v3_fuse_pm269,		en_3v3_fuse,		"vdd_3v3_devices",
 	0,      0,      TEGRA_GPIO_PC1,	false,	0,	0,	0,	0);
 GREG_INIT(11, en_vdd_sdmmc1_pm269,	en_vdd_sdmmc1,		"vdd_3v3_devices",
 	0,      0,      TEGRA_GPIO_PP1,	false,	1,	0,	0,	0);
-GREG_INIT(12, en_3v3_pex_hvdd_pm269,	en_3v3_pex_hvdd,	"vdd_3v3_devices",
+GREG_INIT(12, en_3v3_pex_hvdd_pm269,	en_3v3_pex_hvdd,	"hvdd_pex_pmu",
 	0,      0,      TEGRA_GPIO_PC6,	false,	0,	0,	0,	0);
 GREG_INIT(17, en_vddio_vid_oc_pm269,	en_vddio_vid_oc,	"master_5v_switch",
 	0,      0,      TEGRA_GPIO_PP2,	false,	0,	TEGRA_PINGROUP_DAP3_DOUT,
