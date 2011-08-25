@@ -224,7 +224,7 @@ static inline void tegra_iovmm_client_unlock(struct tegra_iovmm_client *client)
 
 static inline struct tegra_iovmm_area *tegra_iovmm_create_vm(
 	struct tegra_iovmm_client *client, struct tegra_iovmm_area_ops *ops,
-	unsigned long size, pgprot_t pgprot, unsigned long iovm_start)
+	size_t size, size_t align, pgprot_t pgprot, unsigned long iovm_start)
 {
 	return NULL;
 }
@@ -234,6 +234,10 @@ static inline void tegra_iovmm_zap_vm(struct tegra_iovmm_area *vm) { }
 static inline void tegra_iovmm_unzap_vm(struct tegra_iovmm_area *vm) { }
 
 static inline void tegra_iovmm_free_vm(struct tegra_iovmm_area *vm) { }
+static inline size_t tegra_iovmm_get_max_free(struct tegra_iovmm_client *client)
+{
+	return 0;
+}
 
 static inline void tegra_iovmm_vm_insert_pfn(struct tegra_iovmm_area *area,
 	tegra_iovmm_addr_t vaddr, unsigned long pfn) { }
