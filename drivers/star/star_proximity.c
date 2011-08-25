@@ -533,7 +533,7 @@ static int __init proximity_probe(struct platform_device *pdev)
 	#if defined(CONFIG_MACH_STAR_MDM_C)
 	port = 'r' - 'a';//'a' - 'a';
 	pin = 2;//0;
-	#elif defined (CONFIG_MACH_STAR_REV_F)
+	#elif defined (CONFIG_MACH_STAR_REV_F) || defined (CONFIG_MACH_STAR_TMUS)
 	port = 'w'-'a';
 	pin = 2;
 	#else
