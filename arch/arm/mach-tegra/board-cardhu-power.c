@@ -798,6 +798,8 @@ GREG_INIT(22, en_vbrtr,		en_vbrtr,	"vdd_3v3_devices",	0,      0,      PMU_TCA641
 	ADD_GPIO_REG(en_3v3_sys),		\
 	ADD_GPIO_REG(en_3v3_modem),		\
 	ADD_GPIO_REG(en_vdd_pnl1_pm269),		\
+	ADD_GPIO_REG(cam1_ldo_en),		\
+	ADD_GPIO_REG(cam2_ldo_en),		\
 	ADD_GPIO_REG(cam3_ldo_en),		\
 	ADD_GPIO_REG(en_vdd_com),		\
 	ADD_GPIO_REG(en_3v3_fuse_pm269),	\

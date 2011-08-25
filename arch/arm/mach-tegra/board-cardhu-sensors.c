@@ -171,6 +171,13 @@ static int cardhu_left_ov5650_power_on(void)
 		mdelay(100);
 		gpio_direction_output(OV5650_RESETN_GPIO, 1);
 	}
+
+	if (board_info.board_id == BOARD_PM269) {
+		gpio_direction_output(CAM1_RST_L_GPIO, 0);
+		mdelay(100);
+		gpio_direction_output(CAM1_RST_L_GPIO, 1);
+	}
+
 	return 0;
 
 reg_alloc_fail:
@@ -245,6 +252,13 @@ static int cardhu_right_ov5650_power_on(void)
 	regulator_enable(cardhu_1v8_cam2);
 
 	mdelay(5);
+
+	if (board_info.board_id == BOARD_PM269) {
+		gpio_direction_output(CAM2_RST_L_GPIO, 0);
+		mdelay(100);
+		gpio_direction_output(CAM2_RST_L_GPIO, 1);
+	}
+
 	return 0;
 
 reg_alloc_fail:
