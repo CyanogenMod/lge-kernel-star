@@ -336,8 +336,6 @@ early_param("lp0_vec", tegra_lp0_vec_arg);
 static int __init tegra_bootloader_fb_arg(char *options)
 {
 	char *p = options;
-	unsigned long start;
-	unsigned long size;
 
 	tegra_bootloader_fb_size = memparse(p, &p);
 	if (*p == '@')

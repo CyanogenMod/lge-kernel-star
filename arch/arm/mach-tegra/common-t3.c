@@ -185,10 +185,11 @@ out:
 	return IRQ_HANDLED;
 }
 
-void __init tegra_mc_init(void)
+int __init tegra_mc_init(void)
 {
 	void __iomem *mc = IO_ADDRESS(TEGRA_MC_BASE);
 	u32 reg;
+	int ret = 0;
 
 	reg = 0x0A7F1010;
 	writel(reg, mc + MC_RESERVED_RSV);
@@ -200,10 +201,13 @@ void __init tegra_mc_init(void)
 	if (request_irq(INT_MC_GENERAL, tegra_mc_error_isr, 0,
 			"mc_status", NULL)) {
 		pr_err("%s: unable to register MC error interrupt\n", __func__);
+		ret = -ENXIO;
 	} else {
 		reg = MC_INT_DECERR_EMEM | MC_INT_SECURITY_VIOLATION |
 				MC_INT_INVALID_SMMU_PAGE;
 		writel(reg, mc + MC_INT_MASK);
 	}
+
+	return ret;
 }
 arch_initcall(tegra_mc_init);

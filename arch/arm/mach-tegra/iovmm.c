@@ -101,10 +101,10 @@ size_t tegra_iovmm_get_max_free(struct tegra_iovmm_client *client)
 	struct rb_node *n;
 	struct tegra_iovmm_block *b;
 	struct tegra_iovmm_domain *domain = client->domain;
+	tegra_iovmm_addr_t max_free = 0;
 
 	spin_lock(&domain->block_lock);
 	n = rb_first(&domain->all_blocks);
-	tegra_iovmm_addr_t max_free = 0;
 	while (n) {
 		b = rb_entry(n, struct tegra_iovmm_block, all_node);
 		n = rb_next(n);
@@ -902,7 +902,7 @@ static int tegra_iovmm_suspend(void)
 		}
 	}
 	spin_unlock_irqrestore(&iovmm_device_list_lock, flags);
-	return 0;	
+	return 0;
 }
 
 static void tegra_iovmm_resume(void)
