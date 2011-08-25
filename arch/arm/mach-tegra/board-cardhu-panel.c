@@ -189,7 +189,6 @@ static void cardhu_backlight_exit(struct device *dev) {
 static int cardhu_backlight_notify(struct device *unused, int brightness)
 {
 	int cur_sd_brightness = atomic_read(&sd_brightness);
-	int orig_brightness = brightness;
 
 #ifndef CONFIG_TEGRA_CARDHU_DSI
 	/* Set the backlight GPIO pin mode to 'backlight_enable' */

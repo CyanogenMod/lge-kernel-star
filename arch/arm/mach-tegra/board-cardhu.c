@@ -765,7 +765,7 @@ static void cardhu_modem_init(void)
 		if (board_info.fab >= BOARD_FAB_A04) {
 			ret = gpio_request(TEGRA_GPIO_PH7, "modem_perst");
 			if (ret < 0) {
-				pr_err("%d(): Error in allocating gpio "
+				pr_err("%s(): Error in allocating gpio "
 					"TEGRA_GPIO_PH7\n", __func__);
 				break;
 			}
