@@ -2366,6 +2366,15 @@ int tegra_usb_phy_bus_idle(struct tegra_usb_phy *phy)
 	void __iomem *base = phy->regs;
 
 	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_HSIC) {
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+		/* Change the USB controller PHY type to HSIC */
+		val = readl(base + HOSTPC1_DEVLC);
+		val &= ~HOSTPC1_DEVLC_PTS(HOSTPC1_DEVLC_PTS_MASK);
+		val |= HOSTPC1_DEVLC_PTS(HOSTPC1_DEVLC_PTS_HSIC);
+		val &= ~HOSTPC1_DEVLC_PSPD(HOSTPC1_DEVLC_PSPD_MASK);
+		val |= HOSTPC1_DEVLC_PSPD(HOSTPC1_DEVLC_PSPD_HIGH_SPEED);
+		writel(val, base + HOSTPC1_DEVLC);
+#endif
 		val = readl(base + UHSIC_MISC_CFG0);
 		val |= UHSIC_DETECT_SHORT_CONNECT;
 		writel(val, base + UHSIC_MISC_CFG0);
@@ -2377,7 +2386,9 @@ int tegra_usb_phy_bus_idle(struct tegra_usb_phy *phy)
 
 		val = readl(base + UHSIC_PADS_CFG1);
 		val &= ~UHSIC_RPD_STROBE;
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 		val |= UHSIC_RPU_STROBE;
+#endif
 		writel(val, base + UHSIC_PADS_CFG1);
 	}
 	return 0;
