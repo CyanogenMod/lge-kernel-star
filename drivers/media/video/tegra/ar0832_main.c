@@ -54,8 +54,10 @@ struct ar0832_dev {
 };
 
 /* stereo */
+#if 0
 static u16 DefaultImageWidth =  1200;
 static u16 DefaultImageHeight =  680;
+#endif
 #define UpperByte16to8(x) ((u8)((x & 0xFF00) >> 8))
 #define LowerByte16to8(x) ((u8)(x & 0x00FF))
 

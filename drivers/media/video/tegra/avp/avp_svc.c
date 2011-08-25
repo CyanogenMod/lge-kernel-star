@@ -509,7 +509,6 @@ static void do_svc_module_clock_get(struct avp_svc_info *avp_svc,
 	struct svc_clock_ctrl_response resp;
 	struct avp_module *mod;
 	struct avp_clk *aclk;
-	int ret = 0;
 
 	mod = find_avp_module(avp_svc, msg->module_id);
 	if (!mod) {
