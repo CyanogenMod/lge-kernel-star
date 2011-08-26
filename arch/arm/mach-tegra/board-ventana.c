@@ -39,12 +39,16 @@
 #include <linux/i2c/atmel_mxt_ts.h>
 #include <linux/tegra_uart.h>
 
+#include <sound/wm8903.h>
+
 #include <mach/clk.h>
 #include <mach/iomap.h>
 #include <mach/irqs.h>
 #include <mach/pinmux.h>
 #include <mach/iomap.h>
 #include <mach/io.h>
+#include <mach/i2s.h>
+#include <mach/tegra_wm8903_pdata.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -122,6 +126,7 @@ static __initdata struct tegra_clk_init_table ventana_clk_init_table[] = {
 	{ "pll_p_out4",	"pll_p",	24000000,	true },
 	{ "pwm",	"clk_32k",	32768,		false},
 	{ "kbc",	"clk_32k",	32768,		true},
+	{ "i2s1",	"pll_a_out0",	0,		false},
 	{ NULL,		NULL,		0,		0},
 };
 
@@ -177,6 +182,26 @@ static struct tegra_i2c_platform_data ventana_dvc_platform_data = {
 	.is_dvc		= true,
 };
 
+static struct wm8903_platform_data ventana_wm8903_pdata = {
+	.irq_active_low = 0,
+	.micdet_cfg = 0,
+	.micdet_delay = 100,
+	.gpio_base = VENTANA_GPIO_WM8903(0),
+	.gpio_cfg = {
+		WM8903_GPIO_NO_CONFIG,
+		WM8903_GPIO_NO_CONFIG,
+		0,
+		WM8903_GPIO_NO_CONFIG,
+		WM8903_GPIO_NO_CONFIG,
+	},
+};
+
+static struct i2c_board_info __initdata wm8903_board_info = {
+	I2C_BOARD_INFO("wm8903", 0x1a),
+	.platform_data = &ventana_wm8903_pdata,
+	.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_CDC_IRQ),
+};
+
 static void ventana_i2c_init(void)
 {
 	tegra_i2c_device1.dev.platform_data = &ventana_i2c1_platform_data;
@@ -188,6 +213,8 @@ static void ventana_i2c_init(void)
 	platform_device_register(&tegra_i2c_device2);
 	platform_device_register(&tegra_i2c_device3);
 	platform_device_register(&tegra_i2c_device4);
+
+	i2c_register_board_info(0, &wm8903_board_info, 1);
 }
 static struct platform_device *ventana_uart_devices[] __initdata = {
 	&tegra_uartb_device,
@@ -324,6 +351,22 @@ static struct platform_device tegra_camera = {
 	.id = -1,
 };
 
+static struct tegra_wm8903_platform_data ventana_audio_pdata = {
+	.gpio_spkr_en		= TEGRA_GPIO_SPKR_EN,
+	.gpio_hp_det		= TEGRA_GPIO_HP_DET,
+	.gpio_hp_mute		= -1,
+	.gpio_int_mic_en	= TEGRA_GPIO_INT_MIC_EN,
+	.gpio_ext_mic_en	= TEGRA_GPIO_EXT_MIC_EN,
+};
+
+static struct platform_device ventana_audio_device = {
+	.name	= "tegra-snd-wm8903",
+	.id	= 0,
+	.dev	= {
+		.platform_data  = &ventana_audio_pdata,
+	},
+};
+
 static struct platform_device *ventana_devices[] __initdata = {
 	&tegra_pmu_device,
 	&tegra_udc_device,
@@ -336,6 +379,10 @@ static struct platform_device *ventana_devices[] __initdata = {
 	&tegra_wdt_device,
 	&tegra_avp_device,
 	&tegra_camera,
+	&tegra_i2s_device1,
+	&tegra_das_device,
+	&tegra_pcm_device,
+	&ventana_audio_device,
 };
 
 
