@@ -50,11 +50,6 @@ static struct nct1008_platform_data enterprise_nct1008_pdata = {
 	.supported_hwrev = true,
 	.ext_range = true,
 	.conv_rate = 0x08,
-/*
- * BugID 844025 requires 11C guardband (9.7C for hotspot offset + 1.5C
- * for sensor accuracy). FIXME: Move sensor accuracy to sensor driver.
- */
-	.offset = 11,
 	.hysteresis = 5,
 	.shutdown_ext_limit = 90,
 	.shutdown_local_limit = 90,
@@ -73,6 +68,7 @@ static struct i2c_board_info enterprise_i2c4_nct1008_board_info[] = {
 static void enterprise_nct1008_init(void)
 {
 	int ret;
+	struct nct1008_platform_data *pdata;
 #ifdef CONFIG_TEGRA_EDP_LIMITS
 	const struct tegra_edp_limits *z;
 	int zones_sz;
@@ -93,6 +89,10 @@ static void enterprise_nct1008_init(void)
 		gpio_free(TEGRA_GPIO_PH7);
 		return;
 	}
+
+	/* Temperature guardband AP30S DSC: bug 844025 */
+	pdata = enterprise_i2c4_nct1008_board_info[0].platform_data;
+	pdata->offset = 33; /* 4 * 8.25C */
 
 	i2c_register_board_info(4, enterprise_i2c4_nct1008_board_info,
 				ARRAY_SIZE(enterprise_i2c4_nct1008_board_info));
