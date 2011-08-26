@@ -194,7 +194,6 @@ static int cardhu_backlight_notify(struct device *unused, int brightness)
 
 #ifndef CONFIG_TEGRA_CARDHU_DSI
 	/* Set the backlight GPIO pin mode to 'backlight_enable' */
-	gpio_request(cardhu_bl_enb, "backlight_enb");
 	gpio_set_value(cardhu_bl_enb, !!brightness);
 #elif DSI_PANEL_219 || DSI_PANEL_218
 	/* DSIa */
