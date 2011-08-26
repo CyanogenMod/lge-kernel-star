@@ -300,6 +300,19 @@ get_rom_info_error:
 	info->config.pos_low = POS_LOW;
 }
 
+static void init_hvca_pos(struct sh532u_sensor *info)
+{
+	struct i2c_client *client = info->i2c_client;
+	short sBottomLimit, sTopLimit;
+
+	get_rom_info(info);
+	sBottomLimit = (((int)info->config.limit_low * 5) >> 3) & 0xFFC0;
+	lens_move_pulse(client, sBottomLimit);
+	sTopLimit = (((int)info->config.limit_high * 5) >> 3) & 0xFFC0;
+	lens_move_pulse(client, sTopLimit);
+	lens_move_pulse(client, info->config.pos_high);
+}
+
 static unsigned int a2buf[] = {
 	0x0018019c,
 	0x0018019d,
@@ -463,6 +476,9 @@ static void init_driver(struct sh532u_sensor *info)
 			}
 		}
 	}
+	msleep(300);
+
+	init_hvca_pos(info);
 }
 
 

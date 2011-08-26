@@ -42,6 +42,7 @@ struct tegra_edp_limits {
 int tegra_edp_update_thermal_zone(int temperature);
 void tegra_init_cpu_edp_limits(unsigned int regulator_mA);
 void tegra_get_cpu_edp_limits(const struct tegra_edp_limits **limits, int *size);
+unsigned int tegra_get_edp_limit(void);
 
 #else
 static inline void tegra_init_cpu_edp_limits(int regulator_mA)
@@ -51,6 +52,8 @@ static inline int tegra_edp_update_thermal_zone(int temperature)
 static inline void tegra_get_cpu_edp_limits(struct tegra_edp_limits **limits,
 					    int *size)
 {}
+static inline unsigned int tegra_get_edp_limit(void)
+{ return -1; }
 #endif
 
 #endif	/* __MACH_EDP_H */

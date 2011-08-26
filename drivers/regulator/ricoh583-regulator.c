@@ -122,7 +122,7 @@ static int ricoh583_list_voltage(struct regulator_dev *rdev, unsigned index)
 {
 	struct ricoh583_regulator *ri = rdev_get_drvdata(rdev);
 
-	return ri->min_uV * 1000 + (ri->step_uV * index);
+	return ri->min_uV + (ri->step_uV * index);
 }
 
 static int __ricoh583_set_ds_voltage(struct device *parent,
@@ -230,33 +230,33 @@ static struct regulator_ops ricoh583_ops = {
 
 static struct ricoh583_regulator ricoh583_regulator[] = {
 	RICOH583_REG(DC0, 0x30, 0, 0x30, 1, 0x31, 0x7F, 0x60, 700, 1500,
-			12500, 0x40, ricoh583_ops, 500),
+			12500, 0x41, ricoh583_ops, 500),
 	RICOH583_REG(DC1, 0x34, 0, 0x34, 1, 0x35, 0x7F, 0x61, 700, 1500,
-			12500, 0x40, ricoh583_ops, 500),
+			12500, 0x41, ricoh583_ops, 500),
 	RICOH583_REG(DC2, 0x38, 0, 0x38, 1, 0x39, 0x7F, 0x62, 900, 2400,
-			12500, 0x78, ricoh583_ops, 500),
+			12500, 0x79, ricoh583_ops, 500),
 	RICOH583_REG(DC3, 0x3C, 0, 0x3C, 1, 0x3D, 0x7F, 0x63, 900, 2400,
-			12500, 0x78, ricoh583_ops, 500),
+			12500, 0x79, ricoh583_ops, 500),
 	RICOH583_REG(LDO0, 0x51, 0, 0x53, 0, 0x54, 0x7F, 0x64, 900, 3400,
-			25000, 0x64, ricoh583_ops, 500),
+			25000, 0x65, ricoh583_ops, 500),
 	RICOH583_REG(LDO1, 0x51, 1, 0x53, 1, 0x55, 0x7F, 0x65, 900, 3400,
-			25000, 0x64, ricoh583_ops, 500),
+			25000, 0x65, ricoh583_ops, 500),
 	RICOH583_REG(LDO2, 0x51, 2, 0x53, 2, 0x56, 0x7F, 0x66, 900, 3400,
-			25000, 0x64, ricoh583_ops, 500),
+			25000, 0x65, ricoh583_ops, 500),
 	RICOH583_REG(LDO3, 0x51, 3, 0x53, 3, 0x57, 0x7F, 0x67, 900, 3400,
-			25000, 0x64, ricoh583_ops, 500),
+			25000, 0x65, ricoh583_ops, 500),
 	RICOH583_REG(LDO4, 0x51, 4, 0x53, 4, 0x58, 0x3F, 0x68, 750, 1500,
-			12500, 0x3C, ricoh583_ops, 500),
+			12500, 0x3D, ricoh583_ops, 500),
 	RICOH583_REG(LDO5, 0x51, 5, 0x53, 5, 0x59, 0x7F, 0x69, 900, 3400,
-			25000, 0x64, ricoh583_ops, 500),
+			25000, 0x65, ricoh583_ops, 500),
 	RICOH583_REG(LDO6, 0x51, 6, 0x53, 6, 0x5A, 0x7F, 0x6A, 900, 3400,
-			25000, 0x64, ricoh583_ops, 500),
+			25000, 0x65, ricoh583_ops, 500),
 	RICOH583_REG(LDO7, 0x51, 7, 0x53, 7, 0x5B, 0x7F, 0x6B, 900, 3400,
-			25000, 0x64, ricoh583_ops, 500),
+			25000, 0x65, ricoh583_ops, 500),
 	RICOH583_REG(LDO8, 0x50, 0, 0x52, 0, 0x5C, 0x7F, 0x6C, 900, 3400,
-			25000, 0x64, ricoh583_ops, 500),
-	RICOH583_REG(LDO9, 0x50, 1, 0x50, 1, 0x5D, 0x7F, 0x6D, 900, 3400,
-			25000, 0x64, ricoh583_ops, 500),
+			25000, 0x65, ricoh583_ops, 500),
+	RICOH583_REG(LDO9, 0x50, 1, 0x52, 1, 0x5D, 0x7F, 0x6D, 900, 3400,
+			25000, 0x65, ricoh583_ops, 500),
 };
 static inline struct ricoh583_regulator *find_regulator_info(int id)
 {
@@ -280,24 +280,29 @@ static int ricoh583_regulator_preinit(struct device *parent,
 	if (!ricoh583_pdata->init_apply)
 		return 0;
 
-	ret = __ricoh583_set_ds_voltage(parent, ri,
-		ricoh583_pdata->deepsleep_uV, ricoh583_pdata->deepsleep_uV);
-	if (ret < 0) {
-		dev_err(ri->dev, "Not able to initialize ds voltage %d "
-			"for rail %d err %d\n", ricoh583_pdata->deepsleep_uV,
-			ri->desc.id, ret);
-		return ret;
+	if (ricoh583_pdata->deepsleep_uV) {
+		ret = __ricoh583_set_ds_voltage(parent, ri,
+				ricoh583_pdata->deepsleep_uV,
+				ricoh583_pdata->deepsleep_uV);
+		if (ret < 0) {
+			dev_err(ri->dev, "Not able to initialize ds voltage %d"
+				" for rail %d err %d\n",
+				ricoh583_pdata->deepsleep_uV, ri->desc.id, ret);
+			return ret;
+		}
 	}
 
-	ret = __ricoh583_set_voltage(parent, ri, ricoh583_pdata->init_uV,
-			ricoh583_pdata->init_uV);
-	if (ret < 0) {
-		dev_err(ri->dev, "Not able to initialize voltage %d "
-			"for rail %d err %d\n", ricoh583_pdata->init_uV,
-			ri->desc.id, ret);
-		return ret;
+	if (ricoh583_pdata->init_uV >= 0) {
+		ret = __ricoh583_set_voltage(parent, ri,
+				ricoh583_pdata->init_uV,
+				ricoh583_pdata->init_uV);
+		if (ret < 0) {
+			dev_err(ri->dev, "Not able to initialize voltage %d "
+				"for rail %d err %d\n", ricoh583_pdata->init_uV,
+				ri->desc.id, ret);
+			return ret;
+		}
 	}
-
 
 	if (ricoh583_pdata->init_enable)
 		ret = ricoh583_set_bits(parent, ri->reg_en_reg,

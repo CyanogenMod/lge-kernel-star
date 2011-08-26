@@ -1,9 +1,9 @@
 /*
- * include/linux/nct1008.h
+ * include/linux/tps80031-charger.h
  *
- * NCT1008, temperature monitoring device from ON Semiconductors
+ * Battery charger driver interface for TI TPS80031 PMIC
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (C) 2011 NVIDIA Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,29 +18,26 @@
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ *
  */
 
-#ifndef _LINUX_NCT1008_H
-#define _LINUX_NCT1008_H
+#ifndef __LINUX_TPS80031_CHARGER_H
+#define __LINUX_TPS80031_CHARGER_H
 
-#include <linux/types.h>
+#include <linux/regulator/machine.h>
 
-#include <mach/edp.h>
-
-#define MAX_ZONES	16
-
-struct nct1008_platform_data {
-	bool supported_hwrev;
-	bool ext_range;
-	u8 conv_rate;
-	u8 offset;
-	u8 hysteresis;
-	s8 shutdown_ext_limit;
-	s8 shutdown_local_limit;
-	s8 throttling_ext_limit;
-	s8 thermal_zones[MAX_ZONES];
-	u8 thermal_zones_sz;
-	void (*alarm_fn)(bool raised);
+struct tps80031_charger_platform_data {
+	int regulator_id;
+	int max_charge_volt_mV;
+	int max_charge_current_mA;
+	int charging_term_current_mA;
+	int refresh_time;
+	int irq_base;
+	int watch_time_sec;
+	struct regulator_consumer_supply *consumer_supplies;
+	int num_consumer_supplies;
+	int (*board_init)(void *board_data);
+	void *board_data;
 };
 
-#endif /* _LINUX_NCT1008_H */
+#endif /*__LINUX_TPS80031_CHARGER_H */

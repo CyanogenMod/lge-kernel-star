@@ -25,6 +25,7 @@
 #include <linux/regulator/gpio-switch-regulator.h>
 #include <linux/mfd/tps80031.h>
 #include <linux/regulator/tps80031-regulator.h>
+#include <linux/tps80031-charger.h>
 #include <linux/gpio.h>
 #include <linux/io.h>
 
@@ -149,6 +150,10 @@ static struct regulator_consumer_supply tps80031_vbus_supply[] = {
 	REGULATOR_SUPPLY("usb_vbus", NULL),
 };
 
+static struct regulator_consumer_supply tps80031_battery_charge_supply[] = {
+	REGULATOR_SUPPLY("usb_bat_chg", NULL),
+};
+
 #define TPS_PDATA_INIT(_id, _minmv, _maxmv, _supply_reg, _always_on,	\
 	_boot_on, _apply_uv, _init_uV, _init_enable, _init_apply, 	\
 	_flags, _delay)							\
@@ -183,7 +188,6 @@ TPS_PDATA_INIT(smps1, 600, 2100, 0, 0, 0, 0, -1, 0, 0, PWR_REQ_INPUT_PREQ2, 0);
 TPS_PDATA_INIT(smps2, 600, 2100, 0, 0, 0, 0, -1, 0, 0, 0, 0);
 TPS_PDATA_INIT(smps3, 600, 2100, 0, 1, 0, 0, -1, 0, 0, 0, 0);
 TPS_PDATA_INIT(smps4, 600, 2100, 0, 0, 0, 0, -1, 0, 0, 0, 0);
-
 TPS_PDATA_INIT(ldo1, 1000, 3300, tps80031_rails(VIO), 0, 0, 0, -1, 0, 0, 0, 0);
 TPS_PDATA_INIT(ldo2, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0);
 TPS_PDATA_INIT(ldo3, 1000, 3300, tps80031_rails(VIO), 0, 0, 0, -1, 0, 0, 0, 0);
@@ -208,6 +212,35 @@ static struct tps80031_rtc_platform_data rtc_data = {
 	},
 };
 
+int battery_charger_init(void *board_data)
+{
+	int ret;
+	ret = gpio_request(TEGRA_GPIO_PF6, "lcd_d14-bat_charge");
+	if (ret < 0) {
+		pr_err("%s() The gpio_request for battery"
+				" charger fails\n", __func__);
+	}
+	gpio_direction_output(TEGRA_GPIO_PF6, 1);
+	tegra_gpio_enable(TEGRA_GPIO_PF6);
+	return 0;
+}
+
+static struct tps80031_charger_platform_data bcharger_pdata = {
+	.max_charge_volt_mV = 4100,
+	.max_charge_current_mA = 1000,
+	.charging_term_current_mA = 100,
+	.watch_time_sec = 100,
+	.irq_base = ENT_TPS80031_IRQ_BASE,
+	.consumer_supplies = tps80031_battery_charge_supply,
+	.num_consumer_supplies = ARRAY_SIZE(tps80031_battery_charge_supply),
+	.board_init = battery_charger_init,
+	.board_data = NULL,
+};
+
+static struct tps80031_bg_platform_data battery_gauge_data = {
+	.irq_base = ENT_TPS80031_IRQ_BASE,
+};
+
 #define TPS_RTC()				\
 	{						\
 		.id	= 0,		\
@@ -220,6 +253,16 @@ static struct tps80031_rtc_platform_data rtc_data = {
 		.id	 = TPS80031_ID_##_id,		\
 		.name   = "tps80031-regulator",		\
 		.platform_data  = &pdata_##_data,	\
+	}
+#define TPS_BATTERY()					\
+	{						\
+		.name   = "tps80031-charger",		\
+		.platform_data = &bcharger_pdata,	\
+	}
+#define TPS_BATTERY_GAUGE()				\
+	{						\
+		.name   = "tps80031-battery-gauge",	\
+		.platform_data = &battery_gauge_data,	\
 	}
 
 static struct tps80031_subdev_info tps80031_devs[] = {
@@ -240,10 +283,13 @@ static struct tps80031_subdev_info tps80031_devs[] = {
 	TPS_REG(VANA, vana),
 	TPS_REG(VBUS, vbus),
 	TPS_RTC(),
+	TPS_BATTERY(),
+	TPS_BATTERY_GAUGE(),
 };
 
 struct tps80031_32kclock_plat_data clk32k_pdata = {
 	.en_clk32kg = 1,
+	.en_clk32kaudio = 1,
 };
 static struct tps80031_platform_data tps_platform = {
 	.num_subdevs	= ARRAY_SIZE(tps80031_devs),
@@ -423,6 +469,7 @@ int __init enterprise_regulator_init(void)
 	i2c_register_board_info(4, enterprise_regulators, 1);
 	enterprise_gpio_switch_regulator_init();
 	pm_power_off = enterprise_power_off;
+
 	return 0;
 }
 

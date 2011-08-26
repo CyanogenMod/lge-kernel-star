@@ -39,7 +39,7 @@ static struct tps61050_flash_capabilities flash_capabilities = {
 		{ 500,  558,        2 },
 		{ 700,  558,        2 },
 		{ 900,  558,        2 },
-		{ 1200, 558,        2 }
+		{ 900,  558,        2 }
 	}
 };
 
@@ -52,8 +52,8 @@ static struct tps61050_torch_capabilities torch_capabilities = {
 		100,
 		150,
 		200,
-		250,
-		250
+		491,
+		491
 	}
 };
 

@@ -50,6 +50,9 @@
 #define TEGRA_HSIC_CONNECTION_MAX_RETRIES 5
 #define HOSTPC_REG_OFFSET       0x1b4
 
+#define HOSTPC1_DEVLC_STS 		(1 << 28)
+#define HOSTPC1_DEVLC_PTS(x)		(((x) & 0x7) << 29)
+
 struct tegra_ehci_hcd {
 	struct ehci_hcd *ehci;
 	struct tegra_usb_phy *phy;
@@ -65,9 +68,9 @@ struct tegra_ehci_hcd {
 	enum tegra_usb_phy_port_speed port_speed;
 	struct work_struct clk_timer_work;
 	struct timer_list clk_timer;
+	struct timer_list timer_device_detect;
 	bool clock_enabled;
 	int hsic_connect_retries;
-	struct work_struct irq_work;
 	struct mutex tegra_ehci_hcd_mutex;
 };
 
@@ -91,16 +94,13 @@ static void tegra_ehci_power_down(struct usb_hcd *hcd, bool is_dpd)
 #ifndef CONFIG_USB_HOTPLUG
 	clk_disable(tegra->clk);
 #endif
-}
-
-static void irq_work(struct work_struct *irq_work)
-{
-	struct usb_hcd *hcd;
-	struct tegra_ehci_hcd *tegra =
-		container_of(irq_work, struct tegra_ehci_hcd, irq_work);
-	hcd = ehci_to_hcd(tegra->ehci);
-	if (!tegra->host_resumed)
-		tegra_ehci_power_up(hcd, false);
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	if (tegra->phy->instance == 2) {
+		if (mod_timer(&tegra->timer_device_detect,
+			jiffies + msecs_to_jiffies(2000)))
+			pr_err("timer configuration failed \n");
+	}
+#endif
 }
 
 static irqreturn_t tegra_ehci_irq (struct usb_hcd *hcd)
@@ -112,14 +112,6 @@ static irqreturn_t tegra_ehci_irq (struct usb_hcd *hcd)
 
 	if (tegra->phy->instance == 2) {
 		spin_lock(&ehci->lock);
-#ifndef CONFIG_ARCH_TEGRA_2x_SOC
-		val = tegra_usb_phy_clear_connect_intr(tegra->phy);
-		if (!val) {
-			schedule_work(&tegra->irq_work);
-			spin_unlock(&ehci->lock);
-			return 0;
-		}
-#endif
 		val = readl(hcd->regs + TEGRA_USB_SUSP_CTRL_OFFSET);
 		if ((val  & TEGRA_USB_PHY_CLK_VALID_INT_STS)) {
 			val &= ~TEGRA_USB_PHY_CLK_VALID_INT_ENB |
@@ -154,7 +146,9 @@ static int tegra_ehci_hub_control(
 	int		ports = HCS_N_PORTS(ehci->hcs_params);
 	u32		temp, status;
 	u32 __iomem	*status_reg;
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	u32		usbsts_reg;
+#endif
 	unsigned long	flags;
 	int		retval = 0;
 	unsigned	selector;
@@ -439,8 +433,18 @@ static int tegra_usb_resume(struct usb_hcd *hcd, bool is_dpd)
 	/* Force the phy to keep data lines in suspend state */
 	tegra_ehci_phy_restore_start(tegra->phy, tegra->port_speed);
 
+	if (tegra->ehci->has_hostpc)
+		ehci_reset(ehci);
+
 	/* Enable host mode */
 	tdi_reset(ehci);
+
+	if (tegra->ehci->has_hostpc) {
+		val = readl(hcd->regs + HOSTPC_REG_OFFSET);
+		val &= ~HOSTPC1_DEVLC_PTS(~0);
+		val |= HOSTPC1_DEVLC_STS;
+		writel(val, hcd->regs + HOSTPC_REG_OFFSET);
+	}
 
 	/* Enable Port Power */
 	val = readl(&hw->port_status[0]);
@@ -809,7 +813,34 @@ void clk_timer_callback(unsigned long data)
 		tegra->clock_enabled = 0;
 		spin_unlock_irqrestore(&tegra->ehci->lock, flags);
 	}
+}
 
+void timer_callback_device_detect(unsigned long data)
+{
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	struct tegra_ehci_hcd *tegra = (struct tegra_ehci_hcd*) data;
+	int ret;
+	u32 val;
+	struct usb_hcd *hcd;
+	u32 timer_deactivated;
+	hcd = ehci_to_hcd(tegra->ehci);
+
+	if(tegra->phy->instance == 2) {
+		val = tegra_usb_phy_is_device_detected(tegra->phy);
+		if (val) {
+			timer_deactivated = del_timer(
+				&tegra->timer_device_detect);
+			if (timer_deactivated)
+				pr_err("timer deactivation failed \n");
+			tegra_ehci_power_up(hcd, false);
+		} else {
+			ret = mod_timer(&tegra->timer_device_detect,
+					jiffies + msecs_to_jiffies(2000));
+			if (ret)
+				pr_err("tegra device detect failed \n");
+		}
+	}
+#endif
 }
 
 static void clk_timer_work_handler(struct work_struct* clk_timer_work) {
@@ -847,9 +878,9 @@ static int tegra_ehci_urb_enqueue (
 	struct tegra_ehci_hcd *pdata;
 	int xfertype;
 	int transfer_buffer_length;
-	pdata = dev_get_drvdata(hcd->self.controller);
 	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
 	unsigned long flags;
+	pdata = dev_get_drvdata(hcd->self.controller);
 
 	xfertype = usb_endpoint_type(&urb->ep->desc);
 	transfer_buffer_length = urb->transfer_buffer_length;
@@ -971,6 +1002,11 @@ static int tegra_ehci_probe(struct platform_device *pdev)
 	init_timer(&tegra->clk_timer);
 	tegra->clk_timer.function = clk_timer_callback;
 	tegra->clk_timer.data = (unsigned long) tegra;
+
+	init_timer(&tegra->timer_device_detect);
+	tegra->timer_device_detect.function = timer_callback_device_detect;
+	tegra->timer_device_detect.data = (unsigned long) tegra;
+
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	/* Set DDR busy hints to 150MHz. For Tegra 2x SOC, DDR rate is half of EMC rate */
 	clk_set_rate(tegra->emc_clk, 300000000);
@@ -997,7 +1033,6 @@ static int tegra_ehci_probe(struct platform_device *pdev)
 	INIT_DELAYED_WORK(&tegra->work, tegra_hsic_connection_work);
 
 	INIT_WORK(&tegra->clk_timer_work, clk_timer_work_handler);
-	INIT_WORK (&tegra->irq_work, irq_work);
 
 	tegra->phy = tegra_usb_phy_open(instance, hcd->regs, pdata->phy_config,
 					TEGRA_USB_PHY_MODE_HOST, pdata->phy_type);
@@ -1085,9 +1120,16 @@ static int tegra_ehci_resume(struct platform_device *pdev)
 	struct tegra_ehci_hcd *tegra = platform_get_drvdata(pdev);
 	struct usb_hcd *hcd = ehci_to_hcd(tegra->ehci);
 
-	if ((tegra->bus_suspended) && (tegra->power_down_on_bus_suspend))
+	if ((tegra->bus_suspended) && (tegra->power_down_on_bus_suspend)) {
+#ifdef CONFIG_USB_HOTPLUG
+		clk_enable(tegra->clk);
+#endif
 		return 0;
+	}
 
+#ifdef CONFIG_USB_HOTPLUG
+	clk_enable(tegra->clk);
+#endif
 	return tegra_usb_resume(hcd, true);
 }
 
@@ -1095,14 +1137,23 @@ static int tegra_ehci_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct tegra_ehci_hcd *tegra = platform_get_drvdata(pdev);
 	struct usb_hcd *hcd = ehci_to_hcd(tegra->ehci);
+	int ret;
 
-	if ((tegra->bus_suspended) && (tegra->power_down_on_bus_suspend))
+	if ((tegra->bus_suspended) && (tegra->power_down_on_bus_suspend)) {
+#ifdef CONFIG_USB_HOTPLUG
+		clk_disable(tegra->clk);
+#endif
 		return 0;
+	}
 
 	if (time_before(jiffies, tegra->ehci->next_statechange))
 		msleep(10);
 
-	return tegra_usb_suspend(hcd, true);
+	ret = tegra_usb_suspend(hcd, true);
+#ifdef CONFIG_USB_HOTPLUG
+	clk_disable(tegra->clk);
+#endif
+	return ret;
 }
 #endif
 
@@ -1142,6 +1193,7 @@ static int tegra_ehci_remove(struct platform_device *pdev)
 	iounmap(hcd->regs);
 
 	del_timer_sync(&tegra->clk_timer);
+	del_timer_sync(&tegra->timer_device_detect);
 
 	clk_disable(tegra->clk);
 	clk_put(tegra->clk);

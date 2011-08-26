@@ -104,6 +104,11 @@ static int edp_thermal_index;
 static cpumask_t edp_cpumask;
 static unsigned int edp_limit;
 
+unsigned int tegra_get_edp_limit(void)
+{
+	return edp_limit;
+}
+
 static void edp_update_limit(void)
 {
 	unsigned int limit = cpumask_weight(&edp_cpumask);
