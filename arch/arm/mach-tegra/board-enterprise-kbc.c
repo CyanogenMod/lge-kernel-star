@@ -43,6 +43,18 @@ static struct tegra_kbc_wake_key enterprise_wake_cfg[] = {
 		.row = 0,
 		.col = 0,
 	},
+	[1] = {
+		.row = 1,
+		.col = 0,
+	},
+	[2] = {
+		.row = 1,
+		.col = 1,
+	},
+	[3] = {
+		.row = 2,
+		.col = 0,
+	},
 };
 
 static struct tegra_kbc_platform_data enterprise_kbc_platform_data = {
@@ -53,7 +65,7 @@ static struct tegra_kbc_platform_data enterprise_kbc_platform_data = {
 	.fn_keycode = NULL,
 	.is_filter_keys = false,
 	.is_wake_on_any_key = false,
-	.wake_key_cnt = 1,
+	.wake_key_cnt = 4,
 	.wake_cfg = &enterprise_wake_cfg[0],
 };
 
