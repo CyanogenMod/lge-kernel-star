@@ -4,8 +4,7 @@ comment "NVIDIA Tegra Display Driver options"
 
 config TEGRA_GRHOST
 	tristate "Tegra graphics host driver"
-	depends on TEGRA_IOVMM
-        default n
+	default y
 	help
 	  Driver for the Tegra graphics host hardware.
 
