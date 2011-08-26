@@ -866,6 +866,8 @@ static struct tegra_dc_out cardhu_disp1_out = {
 
 #ifndef CONFIG_TEGRA_CARDHU_DSI
 	.type		= TEGRA_DC_OUT_RGB,
+	.depth		= 18,
+	.dither		= TEGRA_DC_ORDERED_DITHER,
 
 	.modes	 	= cardhu_panel_modes,
 	.n_modes 	= ARRAY_SIZE(cardhu_panel_modes),
