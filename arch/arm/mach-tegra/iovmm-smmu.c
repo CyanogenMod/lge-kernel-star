@@ -30,6 +30,7 @@
 #include <linux/pagemap.h>
 #include <linux/sysfs.h>
 #include <linux/device.h>
+#include <linux/sched.h>
 #include <asm/io.h>
 #include <asm/cacheflush.h>
 #include <asm/page.h>
@@ -329,6 +330,7 @@ struct smmu_device {
 	unsigned long lowest_asid;	/* Variables for hardware testing */
 	unsigned long debug_asid;
 	unsigned long verbose;
+	unsigned long signature_pid;	/* For debugging aid */
 };
 
 #define VA_PAGE_TO_PA(va, page)	\
@@ -583,6 +585,21 @@ static smmu_pte_t *locate_pte(struct smmu_as *as,
 	return &ptbl[ptn % SMMU_PTBL_COUNT];
 }
 
+static void put_signature(struct smmu_as *as,
+			unsigned long addr, unsigned long pfn)
+{
+	if (as->smmu->signature_pid == current->pid) {
+		struct page *page = pfn_to_page(pfn);
+		unsigned long *vaddr = kmap(page);
+		if (vaddr) {
+			vaddr[0] = addr;
+			vaddr[1] = pfn << PAGE_SHIFT;
+			FLUSH_CPU_DCACHE(vaddr, page, sizeof(vaddr[0]) * 2);
+			kunmap(page);
+		}
+	}
+}
+
 static int smmu_map(struct tegra_iovmm_domain *domain,
 		struct tegra_iovmm_area *iovma)
 {
@@ -624,6 +641,7 @@ static int smmu_map(struct tegra_iovmm_domain *domain,
 		flush_ptc_and_tlb(as->smmu, as, addr, pte, ptpage, 0);
 		kunmap(ptpage);
 		up(&as->sem);
+		put_signature(as, addr, pfn);
 		addr += SMMU_PAGE_SIZE;
 	}
 	return 0;
@@ -719,6 +737,7 @@ static void smmu_map_pfn(struct tegra_iovmm_domain *domain,
 		FLUSH_CPU_DCACHE(pte, ptpage, sizeof *pte);
 		flush_ptc_and_tlb(smmu, as, addr, pte, ptpage, 0);
 		kunmap(ptpage);
+		put_signature(as, addr, pfn);
 	}
 	up(&as->sem);
 }
@@ -1211,11 +1230,10 @@ static ssize_t _sysfs_show_##name(struct device *d,	\
 	return rv;					\
 }
 
-#ifdef CONFIG_TEGRA_SMMU_SYSFS
 static void (*_sysfs_null_callback)(struct smmu_device *, unsigned long *) =
 	NULL;
 
-#define _SYSFS_SET_VALUE(name, field, base, ceil, callback)	\
+#define _SYSFS_SET_VALUE_DO(name, field, base, ceil, callback)	\
 static ssize_t _sysfs_set_##name(struct device *d,		\
 		struct device_attribute *da, const char *buf, size_t count) \
 {								\
@@ -1229,6 +1247,8 @@ static ssize_t _sysfs_set_##name(struct device *d,		\
 	}							\
 	return count;						\
 }
+#ifdef CONFIG_TEGRA_SMMU_SYSFS
+#define _SYSFS_SET_VALUE	_SYSFS_SET_VALUE_DO
 #else
 #define _SYSFS_SET_VALUE(name, field, base, ceil, callback)	\
 static ssize_t _sysfs_set_##name(struct device *d,		\
@@ -1246,6 +1266,9 @@ _SYSFS_SET_VALUE(debug_asid, debug_asid, 10,
 		MC_SMMU_NUM_ASIDS, _sysfs_null_callback)
 _SYSFS_SHOW_VALUE(verbose, verbose, "%lu")
 _SYSFS_SET_VALUE(verbose, verbose, 10, 3, _sysfs_null_callback)
+_SYSFS_SHOW_VALUE(signature_pid, signature_pid, "%lu")
+_SYSFS_SET_VALUE_DO(signature_pid, signature_pid, 10, PID_MAX_LIMIT+1,
+		_sysfs_null_callback)
 
 #ifdef CONFIG_TEGRA_SMMU_SYSFS
 static void _sysfs_mask_attr(struct smmu_device *smmu, unsigned long *field)
@@ -1291,6 +1314,8 @@ static struct device_attribute _attr_values[] = {
 		_sysfs_show_debug_asid, _sysfs_set_debug_asid),
 	__ATTR(verbose, S_IRUGO|S_IWUSR,
 		_sysfs_show_verbose, _sysfs_set_verbose),
+	__ATTR(signature_pid, S_IRUGO|S_IWUSR,
+		_sysfs_show_signature_pid, _sysfs_set_signature_pid),
 
 	__ATTR(pdir_attr, S_IRUGO|S_IWUSR,
 		_sysfs_show_pdir_attr, _sysfs_set_pdir_attr),
