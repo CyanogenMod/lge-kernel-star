@@ -186,7 +186,7 @@ ENDPROC(tegra_cpu_resume_phys)
 	.align	L1_CACHE_SHIFT
 	.globl	tegra_phys_sleep_sp
 tegra_phys_sleep_sp:
-	.rept	CONFIG_NR_CPUS
+	.rept	4
 	.long	0		@ preserve stack phys ptr here
 	.endr
 	.align	L1_CACHE_SHIFT  @ nothing else must be in this cache line
