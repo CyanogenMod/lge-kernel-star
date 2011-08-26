@@ -532,19 +532,29 @@ static int baseband_xmm_power_driver_resume(struct platform_device *device)
 	struct baseband_power_platform_data *data
 	 = (struct baseband_power_platform_data *) device->dev.platform_data;
 	int value;
+	int delay = 10000; /* maxmum delay in msec */
 
 	pr_debug("%s\n", __func__);
 
-	/* wake bb */
-	gpio_set_value(data->modem.xmm.ipc_bb_wake, 1);
+	value = gpio_get_value(data->modem.xmm.ipc_ap_wake);
+	if (!value) {
+		pr_info("AP Initiated L3 -> L0\n");
+		/* wake bb */
+		gpio_set_value(data->modem.xmm.ipc_bb_wake, 1);
 
-	pr_debug("waiting for host wakeup\n");
-	do {
-		mdelay(1);
-		value = gpio_get_value(baseband_power_driver_data
-			->modem.xmm.ipc_ap_wake);
-	} while (!value);
-	pr_debug("gpio host wakeup high <-\n");
+		pr_debug("waiting for host wakeup\n");
+		do {
+			mdelay(1);
+			value = gpio_get_value(data->modem.xmm.ipc_ap_wake);
+			delay--;
+		} while ((!value) && (delay));
+		if (delay)
+			pr_debug("gpio host wakeup high <-\n");
+		else
+			pr_err("%s host wakeup not happened\n", __func__);
+	} else {
+		pr_info("CP Initiated L3 -> L0\n");
+	}
 
 	/* signal bb to resume hsic */
 	gpio_set_value(data->modem.xmm.ipc_hsic_active, 1);
