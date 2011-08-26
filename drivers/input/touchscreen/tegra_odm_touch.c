@@ -364,7 +364,7 @@ static int tegra_touch_thread(void *pdata)
 #ifdef FEATURE_LGE_TOUCH_GRIP_SUPPRESSION
 				grip_suppression_value = getTouchGripSuppressionValue();
 
-				if(c.additionalInfo.multi_XYCoords[i][0] >= grip_suppression_value && c.additionalInfo.multi_XYCoords[i][0] <= LGE_TOUCH_RESOLUTION_X - grip_suppression_value)
+				if(c.additionalInfo.multi_XYCoords[i][0] >= grip_suppression_value && c.additionalInfo.multi_XYCoords[i][0] < LGE_TOUCH_RESOLUTION_X - grip_suppression_value)
 				{
 #endif /* FEATURE_LGE_TOUCH_GRIP_SUPPRESSION */
 // 20100718  grip suppression [END]	
@@ -430,7 +430,9 @@ static int tegra_touch_thread(void *pdata)
 #else
 							if((y[i] < LGE_TOUCH_RESOLUTION_Y && prev_event_type == TOUCH_EVENT_NULL) || prev_event_type == TOUCH_EVENT_ABS)
 								curr_event_type = TOUCH_EVENT_ABS;
-							else if((y[i] >= LGE_TOUCH_RESOLUTION_Y && prev_event_type == TOUCH_EVENT_NULL) || prev_event_type == TOUCH_EVENT_BUTTON)
+							else if(y[i] >= LGE_TOUCH_RESOLUTION_Y && y[i] < TOUCH_BUTTON_AREA_Y)
+								curr_event_type = TOUCH_EVENT_NULL;
+							else if((y[i] >= TOUCH_BUTTON_AREA_Y && prev_event_type == TOUCH_EVENT_NULL) || prev_event_type == TOUCH_EVENT_BUTTON)
 								curr_event_type = TOUCH_EVENT_BUTTON;
 #endif
 
@@ -450,15 +452,22 @@ static int tegra_touch_thread(void *pdata)
 										}
 									}
 #endif
-									input_report_abs(touch->input_dev, ABS_MT_TOUCH_MAJOR, pressure[i]);
-									input_report_abs(touch->input_dev, ABS_MT_WIDTH_MAJOR, width[i]);
-									input_report_abs(touch->input_dev, ABS_MT_POSITION_X, x[i]);
-									input_report_abs(touch->input_dev, ABS_MT_POSITION_Y, y[i]);
+									if(y[i] >= LGE_TOUCH_RESOLUTION_Y && y[i] < TOUCH_BUTTON_AREA_Y)
+									{
+										touch_fingerprint(DebugMsgPrint, "[TOUCH] Finger1 Inactive Zone x = %d, y = %d, width = %d\n", x[i], y[i], width[i]);
+									}
+									else
+									{
+										input_report_abs(touch->input_dev, ABS_MT_TOUCH_MAJOR, pressure[i]);
+										input_report_abs(touch->input_dev, ABS_MT_WIDTH_MAJOR, width[i]);
+										input_report_abs(touch->input_dev, ABS_MT_POSITION_X, x[i]);
+										input_report_abs(touch->input_dev, ABS_MT_POSITION_Y, y[i]);
 
-									input_mt_sync(touch->input_dev);
-									touch_fingerprint(DebugMsgPrint, "[TOUCH] Finger1 Press x = %d, y = %d, width = %d\n", x[i], y[i], width[i]);
+										input_mt_sync(touch->input_dev);
+										touch_fingerprint(DebugMsgPrint, "[TOUCH] Finger1 Press x = %d, y = %d, width = %d\n", x[i], y[i], width[i]);
 
-									lcd_finger_num++;
+										lcd_finger_num++;
+									}
 								}
 							}
 							else if(curr_event_type == TOUCH_EVENT_BUTTON)
