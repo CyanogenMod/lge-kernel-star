@@ -229,6 +229,7 @@ static int __devinit max8907c_rtc_probe(struct platform_device *pdev)
 		goto out_irq;
 	}
 
+	dev_set_drvdata(&pdev->dev, info);
 	info->rtc_dev = rtc_device_register("max8907c-rtc", &pdev->dev,
 					&max8907c_rtc_ops, THIS_MODULE);
 	ret = PTR_ERR(info->rtc_dev);
@@ -238,8 +239,6 @@ static int __devinit max8907c_rtc_probe(struct platform_device *pdev)
 	}
 
 	max8907c_set_bits(chip->i2c_power, MAX8907C_REG_SYSENSEL, 0x2, 0x2);
-
-	dev_set_drvdata(&pdev->dev, info);
 
 	platform_set_drvdata(pdev, info);
 
