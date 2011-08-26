@@ -79,9 +79,11 @@ static void __iomem *timer_reg_base = IO_ADDRESS(TEGRA_TMR1_BASE);
 #ifdef CONFIG_PM_SLEEP
 static u32 lp2_wake_timers[] = {
 	TIMER3_OFFSET,
+#ifdef CONFIG_SMP
 	TIMER4_OFFSET,
 	TIMER5_OFFSET,
 	TIMER6_OFFSET,
+#endif
 };
 
 static irqreturn_t tegra_lp2wake_interrupt(int irq, void *dev_id)
@@ -94,18 +96,20 @@ static irqreturn_t tegra_lp2wake_interrupt(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-#define LP2_TIMER_IRQ_ACTION(n, i) {				\
-	.name		= "tmr_lp2wake_cpu" __stringify(n),	\
+#define LP2_TIMER_IRQ_ACTION(cpu, irqnum) {			\
+	.name		= "tmr_lp2wake_cpu" __stringify(cpu),	\
 	.flags		= IRQF_DISABLED,			\
 	.handler	= tegra_lp2wake_interrupt,		\
-	.dev_id		= (void *)n,				\
-	.irq		= i }
+	.dev_id		= (void*)cpu,				\
+	.irq		= irqnum }
 
 static struct irqaction tegra_lp2wake_irq[] = {
 	LP2_TIMER_IRQ_ACTION(0, INT_TMR3),
+#ifdef CONFIG_SMP
 	LP2_TIMER_IRQ_ACTION(1, INT_TMR4),
 	LP2_TIMER_IRQ_ACTION(2, INT_TMR5),
 	LP2_TIMER_IRQ_ACTION(3, INT_TMR6),
+#endif
 };
 
 #ifdef CONFIG_SMP
@@ -164,6 +168,7 @@ static void tegra3_register_wake_timer(unsigned int cpu)
 		goto fail;
 	}
 
+#ifdef CONFIG_SMP
 	ret = irq_set_affinity(tegra_lp2wake_irq[cpu].irq, cpumask_of(cpu));
 	if (ret) {
 		pr_err("Failed to set affinity for LP2 timer IRQ to "
@@ -171,6 +176,7 @@ static void tegra3_register_wake_timer(unsigned int cpu)
 			tegra_lp2wake_irq[cpu].irq, ret);
 		goto fail;
 	}
+#endif
 
 	test_lp2_wake_timer(cpu);
 	return;
@@ -180,8 +186,10 @@ fail:
 
 static void tegra3_unregister_wake_timer(unsigned int cpu)
 {
+#ifdef CONFIG_SMP
 	/* Reassign the affinity of the wake IRQ to CPU 0. */
 	(void)irq_set_affinity(tegra_lp2wake_irq[cpu].irq, cpumask_of(0));
+#endif
 
 	/* Dispose of this IRQ. */
 	remove_irq(tegra_lp2wake_irq[cpu].irq, &tegra_lp2wake_irq[cpu]);
@@ -240,10 +248,12 @@ void __init tegra3_init_timer(u32 *offset, int *irq)
 	}
 
 #ifdef CONFIG_PM_SLEEP
-	/* For T30.A01 use INT_TMR_SHARED instead of INT_TMR6. */
+#ifdef CONFIG_SMP
+	/* For T30.A01 use INT_TMR_SHARED instead of INT_TMR6 for CPU3. */
 	if ((tegra_get_chipid() == TEGRA_CHIPID_TEGRA3) &&
 		(tegra_get_revision() == TEGRA_REVISION_A01))
 			tegra_lp2wake_irq[3].irq = INT_TMR_SHARED;
+#endif
 
 	tegra3_register_wake_timer(0);
 #endif
