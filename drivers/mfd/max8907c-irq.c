@@ -328,7 +328,10 @@ int max8907c_irq_init(struct max8907c *chip, int irq, int irq_base)
 					 handle_edge_irq);
 		irq_set_nested_thread(__irq, 1);
 #ifdef CONFIG_ARM
-		irq_set_status_flags(__irq, IRQF_VALID);
+		/* ARM requires an extra step to clear IRQ_NOREQUEST, which it
+		 * sets on behalf of every irq_chip.
+		 */
+		set_irq_flags(__irq, IRQF_VALID);
 #else
 		irq_set_noprobe(__irq);
 #endif
