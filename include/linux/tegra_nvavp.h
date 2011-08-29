@@ -54,8 +54,11 @@ struct nvavp_set_nvmap_fd_args {
 
 #define NVAVP_IOCTL_SET_NVMAP_FD	_IOW(NVAVP_IOCTL_MAGIC, 0x60, \
 					struct nvavp_set_nvmap_fd_args)
+#define NVAVP_IOCTL_GET_SYNCPOINT_ID	_IOR(NVAVP_IOCTL_MAGIC, 0x61, \
+					__u32)
 #define NVAVP_IOCTL_PUSH_BUFFER_SUBMIT	_IOWR(NVAVP_IOCTL_MAGIC, 0x63, \
 					struct nvavp_pushbuffer_submit_hdr)
+
 
 #define NVAVP_IOCTL_MIN_NR		_IOC_NR(NVAVP_IOCTL_SET_NVMAP_FD)
 #define NVAVP_IOCTL_MAX_NR		_IOC_NR(NVAVP_IOCTL_PUSH_BUFFER_SUBMIT)
