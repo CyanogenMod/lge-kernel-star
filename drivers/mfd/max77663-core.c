@@ -57,9 +57,6 @@
 #define MAX77663_REG_GPIO_PD		0x3F
 #define MAX77663_REG_GPIO_ALT		0x40
 
-#define MAX77663_REG_RTC_IRQ		0x00
-#define MAX77663_REG_RTC_IRQ_MASK	0x01
-
 #define IRQ_TOP_GLBL_MASK		(1 << 7)
 #define IRQ_TOP_GLBL_SHIFT		7
 #define IRQ_TOP_SD_MASK			(1 << 6)
@@ -84,9 +81,6 @@
 
 #define IRQ_GPIO_BASE			MAX77663_IRQ_GPIO0
 #define IRQ_GPIO_END			MAX77663_IRQ_GPIO7
-
-#define IRQ_RTC_BASE			MAX77663_IRQ_RTC_1SEC
-#define IRQ_RTC_END			MAX77663_IRQ_RTC_SMPL
 
 #define IRQ_ONOFF_BASE			MAX77663_IRQ_ONOFF_HRDPOWRN
 #define IRQ_ONOFF_END			MAX77663_IRQ_ONOFF_ACOK_RISING
@@ -120,7 +114,6 @@ enum {
 	CACHE_IRQ_LBT,
 	CACHE_IRQ_SD,
 	CACHE_IRQ_LDO,
-	CACHE_IRQ_RTC,
 	CACHE_IRQ_ONOFF,
 	CACHE_IRQ_NR,
 };
@@ -178,16 +171,6 @@ struct max77663_chip *max77663_chip;
 		.cache_idx = -1,			\
 	}
 
-#define IRQ_DATA_RTC(_name, _shift)			\
-	[MAX77663_IRQ_RTC_##_name] = {			\
-		.mask_reg = MAX77663_REG_RTC_IRQ_MASK,	\
-		.mask = (1 << _shift),			\
-		.top_mask = IRQ_TOP_RTC_MASK,		\
-		.top_shift = IRQ_TOP_RTC_SHIFT,		\
-		.cache_idx = CACHE_IRQ_RTC,		\
-		.is_rtc = 1,				\
-	}
-
 #define IRQ_DATA_ONOFF(_name, _shift)			\
 	[MAX77663_IRQ_ONOFF_##_name] = {		\
 		.mask_reg = MAX77663_REG_ONOFF_IRQ_MASK,\
@@ -209,11 +192,6 @@ static struct max77663_irq_data max77663_irqs[MAX77663_IRQ_NR] = {
 	IRQ_DATA_GPIO(5),
 	IRQ_DATA_GPIO(6),
 	IRQ_DATA_GPIO(7),
-	IRQ_DATA_RTC(1SEC,  4),
-	IRQ_DATA_RTC(60SEC, 0),
-	IRQ_DATA_RTC(ALRM1, 1),
-	IRQ_DATA_RTC(ALRM2, 2),
-	IRQ_DATA_RTC(SMPL,  3),
 	IRQ_DATA_ONOFF(HRDPOWRN,     0),
 	IRQ_DATA_ONOFF(EN0_1SEC,     1),
 	IRQ_DATA_ONOFF(EN0_FALLING,  2),
@@ -222,6 +200,12 @@ static struct max77663_irq_data max77663_irqs[MAX77663_IRQ_NR] = {
 	IRQ_DATA_ONOFF(LID_RISING,   5),
 	IRQ_DATA_ONOFF(ACOK_FALLING, 6),
 	IRQ_DATA_ONOFF(ACOK_RISING,  7),
+	[MAX77663_IRQ_RTC] = {
+		.top_mask = IRQ_TOP_RTC_MASK,
+		.top_shift = IRQ_TOP_RTC_SHIFT,
+		.cache_idx = -1,
+		.is_rtc = 1,
+	},
 	[MAX77663_IRQ_SD_PF] = {
 		.mask_reg = MAX77663_REG_SD_IRQ_MASK,
 		.mask = 0xF8,
@@ -802,15 +786,11 @@ static inline int max77663_do_irq(struct max77663_chip *chip, u8 addr,
 	int irqs_to_handle[irq_end - irq_base + 1];
 	int handled = 0;
 	u16 val;
-	int is_rtc = 0;
 	u32 len = 1;
 	int i;
 	int ret;
 
-	if (addr == MAX77663_REG_RTC_IRQ)
-		is_rtc = 1;
-
-	ret = max77663_read(chip->dev, addr, &val, len, is_rtc);
+	ret = max77663_read(chip->dev, addr, &val, len, 0);
 	if (ret < 0)
 		return ret;
 
@@ -854,19 +834,15 @@ static irqreturn_t max77663_irq(int irq, void *data)
 			return IRQ_NONE;
 	}
 
-	if (irq_top & IRQ_TOP_RTC_MASK) {
-		ret = max77663_do_irq(chip, MAX77663_REG_RTC_IRQ, IRQ_RTC_BASE,
-				      IRQ_RTC_END);
-		if (ret < 0)
-			return IRQ_NONE;
-	}
-
 	if (irq_top & IRQ_TOP_ONOFF_MASK) {
 		ret = max77663_do_irq(chip, MAX77663_REG_ONOFF_IRQ,
 				      IRQ_ONOFF_BASE, IRQ_ONOFF_END);
 		if (ret < 0)
 			return IRQ_NONE;
 	}
+
+	if (irq_top & IRQ_TOP_RTC_MASK)
+		handle_nested_irq(MAX77663_IRQ_RTC + chip->irq_base);
 
 	if (irq_top & IRQ_TOP_SD_MASK)
 		handle_nested_irq(MAX77663_IRQ_SD_PF + chip->irq_base);
@@ -913,7 +889,6 @@ static int max77663_irq_init(struct max77663_chip *chip)
 	chip->cache_irq_mask[CACHE_IRQ_LBT] = 0x0F;
 	chip->cache_irq_mask[CACHE_IRQ_SD] = 0xFF;
 	chip->cache_irq_mask[CACHE_IRQ_LDO] = 0xFFFF;
-	chip->cache_irq_mask[CACHE_IRQ_RTC] = 0xFF;
 	chip->cache_irq_mask[CACHE_IRQ_ONOFF] = 0xFF;
 
 	max77663_write(chip->dev, MAX77663_REG_IRQ_TOP_MASK,
@@ -924,8 +899,6 @@ static int max77663_irq_init(struct max77663_chip *chip)
 		       &chip->cache_irq_mask[CACHE_IRQ_SD], 1, 0);
 	max77663_write(chip->dev, MAX77663_REG_LDOX_IRQ_MASK,
 		       &chip->cache_irq_mask[CACHE_IRQ_LDO], 2, 0);
-	max77663_write(chip->dev, MAX77663_REG_RTC_IRQ_MASK,
-		       &chip->cache_irq_mask[CACHE_IRQ_RTC], 1, 1);
 	max77663_write(chip->dev, MAX77663_REG_ONOFF_IRQ_MASK,
 		       &chip->cache_irq_mask[CACHE_IRQ_ONOFF], 1, 0);
 
@@ -934,7 +907,6 @@ static int max77663_irq_init(struct max77663_chip *chip)
 	max77663_read(chip->dev, MAX77663_REG_SD_IRQ, &temp, 1, 0);
 	max77663_read(chip->dev, MAX77663_REG_LDOX_IRQ, &temp, 2, 0);
 	max77663_read(chip->dev, MAX77663_REG_GPIO_IRQ, &temp, 1, 0);
-	max77663_read(chip->dev, MAX77663_REG_RTC_IRQ, &temp, 1, 1);
 	max77663_read(chip->dev, MAX77663_REG_ONOFF_IRQ, &temp, 1, 0);
 
 	for (i = chip->irq_base; i < (MAX77663_IRQ_NR + chip->irq_base); i++) {
