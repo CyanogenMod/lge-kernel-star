@@ -287,7 +287,7 @@ static struct irq_chip max8907c_irq_chip = {
 
 int max8907c_irq_init(struct max8907c *chip, int irq, int irq_base)
 {
-	unsigned long flags = IRQF_TRIGGER_FALLING | IRQF_ONESHOT;
+	unsigned long flags = IRQF_ONESHOT;
 	struct irq_desc *desc;
 	int i, ret;
 	int __irq;
