@@ -271,7 +271,7 @@ int spi_tegra_register_callback(struct spi_device *spi, callback func,
 	tspi->client_data = client_data;
 	return 0;
 }
-EXPORT_SYMBOL(spi_tegra_register_callback);
+EXPORT_SYMBOL_GPL(spi_tegra_register_callback);
 
 static void spi_tegra_clear_status(struct spi_tegra_data *tspi)
 {
