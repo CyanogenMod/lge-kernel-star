@@ -353,6 +353,9 @@ void android_enable_function(struct usb_function *f, int enable)
 			 */
 			list_for_each_entry(func, &android_config_driver.functions, list) {
 				if (!strcmp(func->name, "usb_mass_storage")
+					|| !strcmp(func->name, "acm")
+					|| !strcmp(func->name, "gser")
+					|| !strcmp(func->name, "gps")
 					|| !strcmp(func->name, "mtp")) {
 					usb_function_set_enabled(func, !enable);
 				}
