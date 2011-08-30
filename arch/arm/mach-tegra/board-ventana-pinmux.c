@@ -16,7 +16,11 @@
 
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/gpio.h>
 #include <mach/pinmux.h>
+
+#include "board-ventana.h"
+#include "gpio-names.h"
 
 #define DEFAULT_DRIVE(_name)					\
 	{							\
@@ -172,9 +176,19 @@ static __initdata struct tegra_pingroup_config ventana_pinmux[] = {
 	{TEGRA_PINGROUP_XM2D,  TEGRA_MUX_NONE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
 };
 
-void __init ventana_pinmux_init(void)
+static struct tegra_gpio_table gpio_table[] = {
+	{ .gpio = TEGRA_GPIO_CDC_IRQ,		.enable = true	},
+	{ .gpio = TEGRA_GPIO_HP_DET,		.enable = true	},
+	{ .gpio = TEGRA_GPIO_INT_MIC_EN,	.enable = true	},
+	{ .gpio = TEGRA_GPIO_EXT_MIC_EN,	.enable = true	},
+};
+
+int __init ventana_pinmux_init(void)
 {
 	tegra_pinmux_config_table(ventana_pinmux, ARRAY_SIZE(ventana_pinmux));
 	tegra_drive_pinmux_config_table(ventana_drive_pinmux,
 					ARRAY_SIZE(ventana_drive_pinmux));
+
+	tegra_gpio_config(gpio_table, ARRAY_SIZE(gpio_table));
+	return 0;
 }
