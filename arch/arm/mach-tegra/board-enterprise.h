@@ -78,5 +78,7 @@ void __init enterprise_tsensor_init(void);
 #define CAM_FLASH_MAX_FLASH_AMP	7
 
 #define BOARD_1205		(0x0C05)
+#define BOARD_E1197		(0x0B61)
 #define ENTERPRISE_FAB_A01	(0x01)
+#define SKU_BATTERY_SUPPORT	0x1
 #endif

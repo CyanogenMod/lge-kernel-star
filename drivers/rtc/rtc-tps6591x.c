@@ -461,13 +461,6 @@ static int __devinit tps6591x_rtc_probe(struct platform_device *pdev)
 		return -EBUSY;
 	}
 
-	reg = ENABLE_ALARM_INT;
-	tps6591x_write_regs(&pdev->dev, RTC_INT, 1, &reg);
-	if (err) {
-		dev_err(&pdev->dev, "unable to program Interrupt Mask reg\n");
-		return -EBUSY;
-	}
-
 	tps6591x_rtc_read_time(&pdev->dev, &tm);
 	if ((tm.tm_year < RTC_YEAR_OFFSET || tm.tm_year > (RTC_YEAR_OFFSET + 99))){
 		if (pdata->time.tm_year < 2000 || pdata->time.tm_year > 2100)	{
@@ -477,6 +470,20 @@ static int __devinit tps6591x_rtc_probe(struct platform_device *pdev)
 		} else
 		pdata->time.tm_year -= OS_REF_YEAR;
 		tps6591x_rtc_set_time(&pdev->dev, &pdata->time);
+	}
+
+	reg = ALARM_INT_STATUS;
+	err = tps6591x_write_regs(&pdev->dev, RTC_STATUS, 1, &reg);
+	if (err) {
+		dev_err(&pdev->dev, "unable to program RTC_STATUS reg\n");
+		return -EBUSY;
+	}
+
+	reg = ENABLE_ALARM_INT;
+	tps6591x_write_regs(&pdev->dev, RTC_INT, 1, &reg);
+	if (err) {
+		dev_err(&pdev->dev, "unable to program Interrupt Mask reg\n");
+		return -EBUSY;
 	}
 
 	if (pdata && (pdata->irq >= 0)) {

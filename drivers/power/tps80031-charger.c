@@ -295,6 +295,17 @@ static int tps80031_charger_probe(struct platform_device *pdev)
 	struct tps80031_charger_platform_data *pdata = pdev->dev.platform_data;
 
 	dev_info(dev, "%s()\n", __func__);
+
+	if (!pdata) {
+		dev_err(dev, "%s() No platform data, exiting..\n", __func__);
+		return -ENODEV;
+	}
+
+	if (!pdata->num_consumer_supplies) {
+		dev_err(dev, "%s() No consumer supply list, exiting..\n", __func__);
+		return -ENODEV;
+	}
+
 	charger = kzalloc(sizeof(*charger), GFP_KERNEL);
 	if (!charger) {
 		dev_err(dev, "failed to allocate memory status\n");
