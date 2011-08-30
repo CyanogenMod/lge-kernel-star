@@ -178,6 +178,10 @@
 					 INT_SYNCPT_THRESH_NR)
 #define INT_GPIO_NR			(28 * 8)
 
+#define INT_PCI_MSI_BASE		(INT_GPIO_BASE + \
+					 INT_GPIO_NR)
+#define INT_PCI_MSI_NR			(0)
+
 #elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
 
 /* Primary Interrupt Controller */
@@ -366,11 +370,16 @@
 					 INT_SYNCPT_THRESH_NR)
 #define INT_GPIO_NR			(32 * 8)
 
+#define INT_PCI_MSI_BASE		(INT_GPIO_BASE + \
+					 INT_GPIO_NR)
+#define INT_PCI_MSI_NR			(32 * 8)
+
 #endif
 
 #define FIQ_START			INT_GIC_BASE
 
-#define TEGRA_NR_IRQS			(INT_GPIO_BASE + INT_GPIO_NR)
+#define TEGRA_NR_IRQS			(INT_PCI_MSI_BASE + \
+							INT_PCI_MSI_NR)
 
 #define INT_BOARD_BASE			TEGRA_NR_IRQS
 

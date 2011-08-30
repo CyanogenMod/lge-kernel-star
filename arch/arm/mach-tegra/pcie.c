@@ -1242,3 +1242,218 @@ static void __exit tegra_pci_exit_driver(void)
 
 module_init(tegra_pci_init_driver);
 module_exit(tegra_pci_exit_driver);
+
+static struct irq_chip tegra_irq_chip_msi_pcie = {
+	.name = "PCIe-MSI",
+	.irq_mask = mask_msi_irq,
+	.irq_unmask = unmask_msi_irq,
+	.irq_enable = unmask_msi_irq,
+	.irq_disable = mask_msi_irq,
+};
+
+/* 1:1 matching of these to the MSI vectors, 1 per bit */
+/* and each mapping matches one of the available interrupts */
+/*   irq should equal INT_PCI_MSI_BASE + index */
+struct msi_map_entry {
+	bool used;
+	u8 index;
+	int irq;
+};
+
+/* hardware supports 256 max*/
+#if (INT_PCI_MSI_NR > 256)
+#error "INT_PCI_MSI_NR too big"
+#endif
+
+#define MSI_MAP_SIZE  (INT_PCI_MSI_NR)
+static struct msi_map_entry msi_map[MSI_MAP_SIZE];
+
+static void msi_map_init(void)
+{
+	int i;
+
+	for (i = 0; i < MSI_MAP_SIZE; i++) {
+		msi_map[i].used = false;
+		msi_map[i].index = i;
+		msi_map[i].irq = 0;
+	}
+}
+
+/* returns an index into the map*/
+static struct msi_map_entry *msi_map_get(void)
+{
+	struct msi_map_entry *retval = NULL;
+	int i;
+
+	for (i = 0; i < MSI_MAP_SIZE; i++) {
+		if (!msi_map[i].used) {
+			retval = msi_map + i;
+			retval->irq = INT_PCI_MSI_BASE + i;
+			retval->used = true;
+			break;
+		}
+	}
+
+	return retval;
+}
+
+void msi_map_release(struct msi_map_entry *entry)
+{
+	if (entry) {
+		entry->used = false;
+		entry->irq = 0;
+	}
+}
+
+static irqreturn_t pci_tegra_msi_isr(int irq, void *arg)
+{
+	int i;
+	int offset;
+	int index;
+	u32 reg;
+
+	for (i = 0; i < 8; i++) {
+		reg = afi_readl(AFI_MSI_VEC0_0 + i * 4);
+		while (reg != 0x00000000) {
+			offset = find_first_bit((unsigned long int *)&reg, 32);
+			index = i * 32 + offset;
+			if (index < MSI_MAP_SIZE) {
+				if (msi_map[index].used)
+					generic_handle_irq(msi_map[index].irq);
+				else
+					printk(KERN_INFO "unexpected MSI (1)\n");
+			} else {
+				/* that's weird who triggered this?*/
+				/* just clear it*/
+				printk(KERN_INFO "unexpected MSI (2)\n");
+			}
+			/* clear the interrupt */
+			afi_writel(1ul << index, AFI_MSI_VEC0_0 + i * 4);
+			/* see if there's any more pending in this vector */
+			reg = afi_readl(AFI_MSI_VEC0_0 + i * 4);
+		}
+	}
+
+	return 0;
+}
+
+static bool pci_tegra_enable_msi(void)
+{
+	bool retval = false;
+	static bool already_done;
+	u32 reg;
+	u32 msi_base = 0;
+	u32 msi_aligned = 0;
+
+	/* enables MSI interrupts.  */
+	/* this only happens once. */
+	if (already_done) {
+		retval = true;
+		goto exit;
+	}
+
+	msi_map_init();
+
+	if (request_irq(INT_PCIE_MSI, pci_tegra_msi_isr,
+		IRQF_SHARED, "PCIe-MSI",
+		pci_tegra_msi_isr)) {
+			pr_err("%s: Cannot register IRQ %u\n",
+				__func__, INT_PCIE_MSI);
+			goto exit;
+	}
+
+	/* setup AFI/FPCI range */
+	/* FIXME do this better! should be based on PAGE_SIZE */
+	msi_base = __get_free_pages(GFP_KERNEL, 3);
+	msi_aligned = ((msi_base + ((1<<12) - 1)) & ~((1<<12) - 1));
+	msi_aligned = virt_to_bus((void *)msi_aligned);
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	afi_writel(msi_aligned, AFI_MSI_FPCI_BAR_ST_0);
+#else
+	/* different from T20!*/
+	afi_writel(msi_aligned>>8, AFI_MSI_FPCI_BAR_ST_0);
+#endif
+	afi_writel(msi_aligned, AFI_MSI_AXI_BAR_ST_0);
+	/* this register is in 4K increments */
+	afi_writel(1, AFI_MSI_BAR_SZ_0);
+
+	/* enable all MSI vectors */
+	afi_writel(0xffffffff, AFI_MSI_EN_VEC0_0);
+	afi_writel(0xffffffff, AFI_MSI_EN_VEC1_0);
+	afi_writel(0xffffffff, AFI_MSI_EN_VEC2_0);
+	afi_writel(0xffffffff, AFI_MSI_EN_VEC3_0);
+	afi_writel(0xffffffff, AFI_MSI_EN_VEC4_0);
+	afi_writel(0xffffffff, AFI_MSI_EN_VEC5_0);
+	afi_writel(0xffffffff, AFI_MSI_EN_VEC6_0);
+	afi_writel(0xffffffff, AFI_MSI_EN_VEC7_0);
+
+	/* and unmask the MSI interrupt */
+	reg = 0;
+	reg |= ((1 << AFI_INTR_MASK_0_INT_MASK) |
+			(1 << AFI_INTR_MASK_0_MSI_MASK));
+	afi_writel(reg, AFI_INTR_MASK_0);
+
+	set_irq_flags(INT_PCIE_MSI, IRQF_VALID);
+
+	already_done = true;
+	retval = true;
+exit:
+	if (!retval) {
+		if (msi_base)
+			free_pages(msi_base, 3);
+	}
+	return retval;
+}
+
+
+/* called by arch_setup_msi_irqs in drivers/pci/msi.c */
+int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
+{
+	int retval = -EINVAL;
+	struct msi_msg msg;
+	struct msi_map_entry *map_entry = NULL;
+
+	if (!pci_tegra_enable_msi())
+		goto exit;
+
+	map_entry = msi_map_get();
+	if (map_entry == NULL)
+		goto exit;
+
+
+	dynamic_irq_init(map_entry->irq);
+	irq_set_chip_and_handler_name(map_entry->irq,
+				&tegra_irq_chip_msi_pcie,
+				handle_simple_irq, "PCIe-MSI");
+
+	irq_set_msi_desc(map_entry->irq, desc);
+
+	msg.address_lo = afi_readl(AFI_MSI_AXI_BAR_ST_0);
+	/* 32 bit address only */
+	msg.address_hi = 0;
+	msg.data = map_entry->index;
+
+	write_msi_msg(map_entry->irq, &msg);
+
+	retval = 0;
+exit:
+	if (retval != 0) {
+		if (map_entry)
+			msi_map_release(map_entry);
+	}
+
+	return retval;
+}
+
+void arch_teardown_msi_irq(unsigned int irq)
+{
+	int i;
+	for (i = 0; i < MSI_MAP_SIZE; i++) {
+		if ((msi_map[i].used) && (msi_map[i].irq == irq)) {
+			dynamic_irq_cleanup(msi_map[i].irq);
+			msi_map_release(msi_map + i);
+			break;
+		}
+	}
+}
