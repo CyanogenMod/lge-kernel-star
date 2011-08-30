@@ -26,6 +26,11 @@
 #define AR0832_FOCUSER_IOCTL_GET_CONFIG		_IOR('o', 0x10, struct ar0832_focuser_config)
 #define AR0832_FOCUSER_IOCTL_SET_POSITION	_IOW('o', 0x11, __u32)
 
+#define AR0832_IOCTL_GET_SENSOR_ID		_IOR('o', 0x12, __u16)
+
+#define AR0832_SENSOR_ID_8141			0x1006
+#define AR0832_SENSOR_ID_8140			0x3006
+
 enum ar0832_test_pattern {
 	TEST_PATTERN_NONE,
 	TEST_PATTERN_COLORBARS,
