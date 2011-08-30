@@ -44,6 +44,8 @@
 #include <mach/pinmux.h>
 #include <mach/iomap.h>
 #include <mach/io.h>
+#include <mach/i2s.h>
+#include <mach/tegra_wm8753_pdata.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -214,6 +216,7 @@ static __initdata struct tegra_clk_init_table whistler_clk_init_table[] = {
 	{ "pwm",	"clk_32k",	32768,		false},
 	{ "kbc",	"clk_32k",	32768,		true},
 	{ "sdmmc2",	"pll_p",	25000000,	false},
+	{ "i2s1",	"pll_a_out0",	0,		false},
 	{ NULL,		NULL,		0,		0},
 };
 
@@ -254,6 +257,10 @@ static struct tegra_i2c_platform_data whistler_dvc_platform_data = {
 	.is_dvc		= true,
 };
 
+static struct i2c_board_info __initdata wm8753_board_info = {
+	I2C_BOARD_INFO("wm8753", 0x1a),
+};
+
 static void whistler_i2c_init(void)
 {
 	tegra_i2c_device1.dev.platform_data = &whistler_i2c1_platform_data;
@@ -265,6 +272,8 @@ static void whistler_i2c_init(void)
 	platform_device_register(&tegra_i2c_device3);
 	platform_device_register(&tegra_i2c_device2);
 	platform_device_register(&tegra_i2c_device1);
+
+	i2c_register_board_info(4, &wm8753_board_info, 1);
 }
 
 #define GPIO_SCROLL(_pinaction, _gpio, _desc)	\
@@ -301,6 +310,22 @@ static struct platform_device tegra_camera = {
 	.id = -1,
 };
 
+static struct tegra_wm8753_platform_data whistler_audio_pdata = {
+	.gpio_spkr_en = TEGRA_GPIO_SPKR_EN,
+	.gpio_hp_det = TEGRA_GPIO_HP_DET,
+	.gpio_hp_mute = -1,
+	.gpio_int_mic_en = -1,
+	.gpio_ext_mic_en = -1,
+};
+
+static struct platform_device whistler_audio_device = {
+	.name	= "tegra-snd-wm8753",
+	.id	= 0,
+	.dev	= {
+		.platform_data  = &whistler_audio_pdata,
+	},
+};
+
 static struct platform_device *whistler_devices[] __initdata = {
 	&tegra_pmu_device,
 	&tegra_udc_device,
@@ -309,6 +334,10 @@ static struct platform_device *whistler_devices[] __initdata = {
 	&tegra_avp_device,
 	&whistler_scroll_device,
 	&tegra_camera,
+	&tegra_i2s_device1,
+	&tegra_das_device,
+	&tegra_pcm_device,
+	&whistler_audio_device,
 };
 
 static int __init whistler_scroll_init(void)

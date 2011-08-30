@@ -111,6 +111,7 @@ config MACH_WARIO
 config MACH_WHISTLER
        bool "Whistler board"
        depends on ARCH_TEGRA_2x_SOC
+       select MACH_HAS_SND_SOC_TEGRA_WM8753 if SND_SOC
        help
          Support for NVIDIA Whistler development platform
 
