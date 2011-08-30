@@ -113,7 +113,8 @@ int __init cardhu_kbc_init(void)
 			(board_info.board_id == BOARD_E1291))
 		return 0;
 
-	if (board_info.board_id == BOARD_PM269) {
+	if ((board_info.board_id == BOARD_PM269) ||
+		(board_info.board_id == BOARD_PM305)) {
 		cardhu_kbc_platform_data.plain_keycode = plain_kbd_keycode_pm269;
 		row_count = CARDHU_PM269_ROW_COUNT;
 		col_count = CARDHU_PM269_COL_COUNT;
@@ -260,6 +261,7 @@ int __init cardhu_keys_init(void)
 	tegra_get_board_info(&board_info);
 	if (!((board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1291) ||
+		(board_info.board_id == BOARD_PM305) ||
 		(board_info.board_id == BOARD_PM269)))
 		return 0;
 
@@ -272,7 +274,8 @@ int __init cardhu_keys_init(void)
 
 		platform_device_register(&cardhu_keys_e1291_device);
 		platform_device_register(&cardhu_int_keys_e1291_device);
-	} else if (board_info.board_id == BOARD_PM269) {
+	} else if ((board_info.board_id == BOARD_PM269)  ||
+			(board_info.board_id == BOARD_PM305)) {
 		platform_device_register(&cardhu_int_keys_pm269_device);
 	} else {
 		/* For E1198 */
