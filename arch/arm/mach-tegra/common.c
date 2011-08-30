@@ -486,7 +486,7 @@ void tegra_move_framebuffer(unsigned long to, unsigned long from,
 		for (i = 0 ; i < size; i += PAGE_SIZE) {
 			page = phys_to_page(from + i);
 			from_virt = kmap(page);
-			memcpy_toio(to_io + i, from_virt, PAGE_SIZE);
+			memcpy(to_io + i, from_virt, PAGE_SIZE);
 			kunmap(page);
 		}
 	} else {
