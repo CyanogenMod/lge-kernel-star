@@ -176,6 +176,8 @@ static irqreturn_t mdm_start_thread(int irq, void *data)
 		wake_lock_timeout(&priv->wake_lock, HZ * 2);
 	} else {
 		pr_info("BB_RST_OUT low\n");
+		/* hold wait lock to complete the enumeration */
+		wake_lock_timeout(&priv->wake_lock, HZ * 10);
 	}
 
 	return IRQ_HANDLED;
