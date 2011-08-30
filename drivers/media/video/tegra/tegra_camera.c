@@ -25,6 +25,7 @@
 #include <linux/delay.h>
 #include <mach/iomap.h>
 #include <mach/clk.h>
+#include <mach/powergate.h>
 
 #include <media/tegra_camera.h>
 
@@ -47,6 +48,7 @@ static struct clk *vi_sensor_clk;
 static struct clk *csus_clk;
 static struct clk *csi_clk;
 static struct regulator *tegra_camera_regulator_csi;
+static int tegra_camera_powergate;
 
 static int tegra_camera_enable_isp(void)
 {
@@ -216,6 +218,19 @@ static long tegra_camera_ioctl(struct file *file,
 		int ret = 0;
 
 		mutex_lock(&tegra_camera_lock);
+		/* Unpowergate camera blocks (vi, csi and isp)
+		   before enabling clocks */
+		if (tegra_camera_powergate++ == 0) {
+			ret = tegra_unpowergate_partition(TEGRA_POWERGATE_VENC);
+			if (ret) {
+				tegra_powergate_partition(TEGRA_POWERGATE_VENC);
+				pr_err("%s: Unpowergating failed.\n", __func__);
+				tegra_camera_powergate = 0;
+				mutex_unlock(&tegra_camera_lock);
+				return ret;
+			}
+		}
+
 		if (!tegra_camera_block[id].is_enabled) {
 			ret = tegra_camera_block[id].enable();
 			tegra_camera_block[id].is_enabled = true;
@@ -231,6 +246,15 @@ static long tegra_camera_ioctl(struct file *file,
 		if (tegra_camera_block[id].is_enabled) {
 			ret = tegra_camera_block[id].disable();
 			tegra_camera_block[id].is_enabled = false;
+		}
+		/* Powergate camera blocks (vi, csi and isp)
+		   after disabling all the clocks */
+		if (!ret) {
+			if (--tegra_camera_powergate == 0) {
+				ret = tegra_powergate_partition(TEGRA_POWERGATE_VENC);
+				if (ret)
+					pr_err("%s: Powergating failed.\n", __func__);
+			}
 		}
 		mutex_unlock(&tegra_camera_lock);
 		return ret;
@@ -266,13 +290,22 @@ static long tegra_camera_ioctl(struct file *file,
 
 static int tegra_camera_release(struct inode *inode, struct file *file)
 {
-	int i;
+	int i, err = 0;
 
 	for (i = 0; i < ARRAY_SIZE(tegra_camera_block); i++)
 		if (tegra_camera_block[i].is_enabled) {
 			tegra_camera_block[i].disable();
 			tegra_camera_block[i].is_enabled = false;
 		}
+	/* If camera blocks are not powergated yet, do it now */
+	if (tegra_camera_powergate > 0) {
+		mutex_lock(&tegra_camera_lock);
+		tegra_camera_powergate = 0;
+		err = tegra_powergate_partition(TEGRA_POWERGATE_VENC);
+		if (err)
+			pr_err("%s: Powergating failed.\n", __func__);
+		mutex_unlock(&tegra_camera_lock);
+	}
 
 	return 0;
 }
@@ -306,6 +339,14 @@ static int tegra_camera_probe(struct platform_device *pdev)
 	int err;
 
 	pr_info("%s: probe\n", TEGRA_CAMERA_NAME);
+
+	mutex_lock(&tegra_camera_lock);
+	tegra_camera_powergate = 0;
+	err = tegra_powergate_partition(TEGRA_POWERGATE_VENC);
+	if (err)
+		pr_err("%s: Powergating failed.\n", __func__);
+	mutex_unlock(&tegra_camera_lock);
+
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	tegra_camera_regulator_csi = regulator_get(&pdev->dev, "vcsi");
 #else
