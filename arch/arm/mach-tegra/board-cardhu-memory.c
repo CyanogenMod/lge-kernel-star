@@ -2534,13 +2534,16 @@ int cardhu_emc_init(void)
 
 	switch (board.board_id) {
 	case BOARD_PM269:
-	case BOARD_PM305:
 		if (MEMORY_TYPE(board.sku) == SKU_MEMORY_ELPIDA)
 			tegra_init_emc(cardhu_emc_tables_edb8132b2ma,
 					ARRAY_SIZE(cardhu_emc_tables_edb8132b2ma));
 		else
 			tegra_init_emc(cardhu_emc_tables_k4p8g304eb,
 					ARRAY_SIZE(cardhu_emc_tables_k4p8g304eb));
+		break;
+
+	case BOARD_PM305:
+	case BOARD_PM311:
 		break;
 	default:
 		if (tegra_get_revision() == TEGRA_REVISION_A01)

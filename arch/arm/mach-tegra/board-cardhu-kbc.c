@@ -114,7 +114,8 @@ int __init cardhu_kbc_init(void)
 		return 0;
 
 	if ((board_info.board_id == BOARD_PM269) ||
-		(board_info.board_id == BOARD_PM305)) {
+		(board_info.board_id == BOARD_PM305) ||
+		(board_info.board_id == BOARD_PM311)) {
 		cardhu_kbc_platform_data.plain_keycode = plain_kbd_keycode_pm269;
 		row_count = CARDHU_PM269_ROW_COUNT;
 		col_count = CARDHU_PM269_COL_COUNT;
@@ -244,6 +245,7 @@ int __init cardhu_keys_init(void)
 	if (!((board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1291) ||
 		(board_info.board_id == BOARD_PM305) ||
+		(board_info.board_id == BOARD_PM311) ||
 		(board_info.board_id == BOARD_PM269)))
 		return 0;
 
@@ -266,6 +268,7 @@ int __init cardhu_keys_init(void)
 	/* Register on-key through pmu interrupt */
 	if ((board_info.board_id == BOARD_E1291) ||
 		(board_info.board_id == BOARD_PM305) ||
+		(board_info.board_id == BOARD_PM311) ||
 		(board_info.board_id == BOARD_PM269))
 		platform_device_register(&cardhu_int_keys_device);
 	return 0;

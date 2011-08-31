@@ -267,7 +267,8 @@ static int cardhu_panel_enable(void)
 			regulator_enable(cardhu_lvds_vdd_panel);
 	}
 	if ((board_info.board_id == BOARD_PM269) ||
-		(board_info.board_id == BOARD_PM305))
+		(board_info.board_id == BOARD_PM305) ||
+		(board_info.board_id == BOARD_PM311))
 		gpio_set_value(pm269_lvds_shutdown, 1);
 	else
 		gpio_set_value(cardhu_lvds_shutdown, 1);
@@ -289,7 +290,8 @@ static int cardhu_panel_disable(void)
 	regulator_put(cardhu_lvds_vdd_panel);
 	cardhu_lvds_vdd_panel= NULL;
 	if ((board_info.board_id == BOARD_PM269) ||
-		(board_info.board_id == BOARD_PM305))
+		(board_info.board_id == BOARD_PM305) ||
+		(board_info.board_id == BOARD_PM311))
 		gpio_set_value(pm269_lvds_shutdown, 0);
 	else
 		gpio_set_value(cardhu_lvds_shutdown, 0);
@@ -1012,7 +1014,8 @@ int __init cardhu_panel_init(void)
 	}
 
 	if ((board_info.board_id == BOARD_PM269) ||
-		(board_info.board_id == BOARD_PM305)) {
+		(board_info.board_id == BOARD_PM305) ||
+		(board_info.board_id == BOARD_PM311)) {
 		gpio_request(pm269_lvds_shutdown, "lvds_shutdown");
 		gpio_direction_output(pm269_lvds_shutdown, 1);
 		tegra_gpio_enable(pm269_lvds_shutdown);
