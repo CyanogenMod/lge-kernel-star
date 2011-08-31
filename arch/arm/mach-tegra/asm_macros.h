@@ -19,6 +19,15 @@
 
 #ifdef __ASSEMBLY__
 
+/* waits until the microsecond counter (base) ticks, for exact timing loops */
+.macro  wait_for_us, rd, base, tmp
+	ldr    \rd, [\base]
+1001:   ldr    \tmp, [\base]
+	cmp    \rd, \tmp
+	beq    1001b
+	mov    \tmp, \rd
+.endm
+
 /* waits until the microsecond counter (base) is > rn */
 .macro	wait_until, rn, base, tmp
 	add	\rn, \rn, #1

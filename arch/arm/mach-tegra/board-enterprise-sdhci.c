@@ -229,7 +229,6 @@ static int __init enterprise_wifi_init(void)
 
 int __init enterprise_sdhci_init(void)
 {
-	unsigned int rc = 0;
 	platform_device_register(&tegra_sdhci_device3);
 	platform_device_register(&tegra_sdhci_device0);
 

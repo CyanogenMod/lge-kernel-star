@@ -241,8 +241,7 @@ static inline void tegra_sleep_core(unsigned long v2p)
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	tegra2_sleep_core(v2p);
 #else
-	/* tegra3_sleep_core(v2p);    !!!FIXME!!! not supported yet */
-	BUG();
+	tegra3_sleep_core(v2p);
 #endif
 }
 

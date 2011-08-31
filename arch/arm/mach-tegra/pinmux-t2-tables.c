@@ -287,12 +287,12 @@ static struct syscore_ops tegra_pinmux_syscore_ops = {
 	.resume = tegra_pinmux_resume,
 };
 
-void tegra_init_pinmux(void)
+void __init tegra_init_pinmux(void)
 {
 	register_syscore_ops(&tegra_pinmux_syscore_ops);
 }
 #else
-void tegra_init_pinmux(void)
+void __init tegra_init_pinmux(void)
 {
 }
 #endif

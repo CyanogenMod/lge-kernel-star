@@ -346,5 +346,5 @@ void tegra_pinmux_config_tristate_table(const struct tegra_pingroup_config *conf
 void tegra_pinmux_config_pullupdown_table(const struct tegra_pingroup_config *config,
 	int len, enum tegra_pullupdown pupd);
 
-void tegra_init_pinmux(void);
+void __init tegra_init_pinmux(void);
 #endif

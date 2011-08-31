@@ -681,7 +681,6 @@ static int sh532u_probe_init(struct i2c_client *client,
 
 static int sh532u_probe_helper(struct i2c_client *client)
 {
-	struct sh532u_platform_data *pdata = client->dev.platform_data;
 	int err;
 
 	if (!stereo_sh532u_info) {

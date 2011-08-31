@@ -66,6 +66,7 @@
 #include "reset.h"
 #include "sleep.h"
 #include "timer.h"
+#include "reset.h"
 
 struct suspend_context {
 	/*
@@ -99,6 +100,7 @@ static pgd_t *tegra_pgd;
 static DEFINE_SPINLOCK(tegra_lp2_lock);
 static cpumask_t tegra_in_lp2;
 static cpumask_t *iram_cpu_lp2_mask;
+static unsigned long *iram_cpu_lp1_mask;
 static u8 *iram_save;
 static unsigned long iram_save_size;
 static void __iomem *iram_code = IO_ADDRESS(TEGRA_IRAM_CODE_AREA);
@@ -260,9 +262,10 @@ static __init int alloc_suspend_context(void)
 	pgprot_t prot = __pgprot_modify(pgprot_kernel, L_PTE_MT_MASK,
 					L_PTE_MT_BUFFERABLE | L_PTE_XN);
 	struct page *ctx_page;
-	unsigned long ctx_virt;
-	phys_addr_t ctx_phys;
+	unsigned long ctx_virt = 0;
+	pgd_t *pgd;
 	pmd_t *pmd;
+	pte_t *pte;
 
 	ctx_page = alloc_pages(GFP_KERNEL, 0);
 	if (IS_ERR_OR_NULL(ctx_page))
@@ -274,12 +277,19 @@ static __init int alloc_suspend_context(void)
 
 	/* Add the context page to our private pgd. */
 	ctx_virt = (unsigned long)tegra_cpu_context;
-	ctx_phys = virt_to_phys(tegra_cpu_context);
-	pmd = pmd_offset(tegra_pgd + pgd_index(ctx_virt), ctx_virt);
-	*pmd = __pmd((ctx_phys & PGDIR_MASK) |
-		     PMD_TYPE_SECT | PMD_SECT_AP_WRITE |
-		     PMD_SECT_XN | PMD_SECT_BUFFERED);
-	flush_pmd_entry(pmd);
+
+	pgd = tegra_pgd + pgd_index(ctx_virt);
+	if (!pgd_present(*pgd))
+		goto fail;
+	pmd = pmd_offset(pgd, ctx_virt);
+	if (!pmd_none(*pmd))
+		goto fail;
+	pte = pte_alloc_kernel(pmd, ctx_virt);
+	if (!pte)
+		goto fail;
+
+	set_pte_ext(pte, mk_pte(ctx_page, prot), 0);
+
 	outer_clean_range(__pa(pmd), __pa(pmd + 1));
 
 	return 0;
@@ -287,6 +297,8 @@ static __init int alloc_suspend_context(void)
 fail:
 	if (ctx_page)
 		__free_page(ctx_page);
+	if (ctx_virt)
+		vm_unmap_ram((void*)ctx_virt, 1);
 	tegra_cpu_context = NULL;
 	return -ENOMEM;
 #else
@@ -654,8 +666,6 @@ static void tegra_pm_set(enum tegra_suspend_mode mode)
 		 * scratch 41 to tegra_resume
 		 */
 		writel(0x0, pmc + PMC_SCRATCH39);
-		__raw_writel(virt_to_phys(tegra_resume), pmc + PMC_SCRATCH41);
-		wmb();
 
 		/* Enable DPD sample to trigger sampling pads data and direction
 		 * in which pad will be driven during lp0 mode*/
@@ -668,8 +678,10 @@ static void tegra_pm_set(enum tegra_suspend_mode mode)
 		pmc_32kwritel(tegra_lp0_vec_start, PMC_SCRATCH1);
 
 		reg |= TEGRA_POWER_EFFECT_LP0;
-		break;
+		/* No break here. LP0 code falls through to write SCRATCH41 */
 	case TEGRA_SUSPEND_LP1:
+		__raw_writel(virt_to_phys(tegra_resume), pmc + PMC_SCRATCH41);
+		wmb();
 		break;
 	case TEGRA_SUSPEND_LP2:
 		rate = clk_get_rate(tegra_pclk);
@@ -699,7 +711,7 @@ static int tegra_suspend_enter(suspend_state_t state)
 	if (pdata && pdata->board_suspend)
 		pdata->board_suspend(current_suspend_mode, TEGRA_SUSPEND_BEFORE_PERIPHERAL);
 
-	ret = tegra_suspend_dram(current_suspend_mode);
+	ret = tegra_suspend_dram(current_suspend_mode, 0);
 
 	if (pdata && pdata->board_resume)
 		pdata->board_resume(current_suspend_mode, TEGRA_RESUME_AFTER_PERIPHERAL);
@@ -733,7 +745,7 @@ static void tegra_suspend_check_pwr_stats(void)
 	return;
 }
 
-int tegra_suspend_dram(enum tegra_suspend_mode mode)
+int tegra_suspend_dram(enum tegra_suspend_mode mode, unsigned int flags)
 {
 	BUG_ON(mode < 0 || mode >= TEGRA_MAX_SUSPEND_MODE);
 
@@ -751,6 +763,9 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode)
 
 	tegra_pm_set(mode);
 
+	if (flags & TEGRA_POWER_CLUSTER_MASK)
+		tegra_cluster_switch_prolog(flags);
+
 	if (pdata && pdata->board_suspend)
 		pdata->board_suspend(mode, TEGRA_SUSPEND_BEFORE_CPU);
 
@@ -764,7 +779,11 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode)
 		tegra_lp0_suspend_mc();
 	}
 
-	suspend_cpu_complex(0);
+	suspend_cpu_complex(flags);
+
+	if (mode == TEGRA_SUSPEND_LP1)
+		*iram_cpu_lp1_mask = 1;
+
 	flush_cache_all();
 	outer_flush_all();
 	outer_disable();
@@ -779,9 +798,10 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode)
 	if (mode == TEGRA_SUSPEND_LP0) {
 		tegra_lp0_resume_mc();
 		tegra_lp0_cpu_mode(false);
-	}
+	} else if (mode == TEGRA_SUSPEND_LP1)
+		*iram_cpu_lp1_mask = 0;
 
-	restore_cpu_complex(0);
+	restore_cpu_complex(flags);
 
 	cpu_complex_pm_exit();
 	cpu_pm_exit();
@@ -792,6 +812,11 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode)
 	local_fiq_enable();
 
 	tegra_common_resume();
+
+	if (flags & TEGRA_POWER_CLUSTER_MASK)
+		tegra_cluster_switch_epilog(mode);
+
+	pr_info("Exited suspend state %s\n", lp_state[mode]);
 
 	return 0;
 }
@@ -1011,6 +1036,7 @@ out:
 	}
 
 	iram_cpu_lp2_mask = tegra_cpu_lp2_mask;
+	iram_cpu_lp1_mask = tegra_cpu_lp1_mask;
 fail:
 #endif
 	if (plat->suspend_mode == TEGRA_SUSPEND_NONE)

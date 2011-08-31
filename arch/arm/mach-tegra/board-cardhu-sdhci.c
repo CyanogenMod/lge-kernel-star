@@ -337,8 +337,8 @@ static int __init cardhu_wifi_init(void)
 
 int __init cardhu_sdhci_init(void)
 {
-	unsigned int rc = 0;
 #if 0
+	unsigned int rc = 0;
 	struct board_info board_info;
 	tegra_get_board_info(&board_info);
 	if (board_info.board_id == BOARD_PM269) {
@@ -359,20 +359,25 @@ int __init cardhu_sdhci_init(void)
 #endif
 
 	platform_device_register(&tegra_sdhci_device3);
-//	platform_device_register(&tegra_sdhci_device2);
-
 #if 0
+	platform_device_register(&tegra_sdhci_device2);
+
 	/* Fix ME: The gpios have to enabled for hot plug support */
 	rc = cardhu_sd_cd_gpio_init();
 	if (!rc) {
 		tegra_sdhci_platform_data0.cd_gpio = CARDHU_SD_CD;
 		tegra_sdhci_platform_data0.cd_gpio_polarity = 0;
 	}
+
+	platform_device_register(&tegra_sdhci_device0);
+
+#else
+	(void)tegra_sdhci_device0;
+	(void)tegra_sdhci_device2;
+	(void)cardhu_sd_cd_gpio_init;
+	(void)cardhu_sd_wp_gpio_init;
+	(void)pm269_sd_wp_gpio_init;
 #endif
-
-
-
-//	platform_device_register(&tegra_sdhci_device0);
 
 	cardhu_wifi_init();
 	return 0;

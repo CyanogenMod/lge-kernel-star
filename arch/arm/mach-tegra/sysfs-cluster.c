@@ -93,7 +93,7 @@
 
 #define SYSFS_CLUSTER_PRINTS	   1	/* Nonzero: enable status prints */
 #define SYSFS_CLUSTER_TRACE_PRINTS 0	/* Nonzero: enable trace prints */
-#define SYSFS_CLUSTER_POWER_MODE   0	/* Nonzero: use power modes other than LP2*/
+#define SYSFS_CLUSTER_POWER_MODE   1	/* Nonzero: use power modes other than LP2*/
 
 #if SYSFS_CLUSTER_TRACE_PRINTS
 #define TRACE_CLUSTER(x) printk x
