@@ -328,7 +328,9 @@ int tegra_cluster_control(unsigned int us, unsigned int flags)
 		if (us)
 			tegra_lp2_set_trigger(us);
 
+		tegra_cluster_switch_prolog(flags);
 		tegra_suspend_dram(TEGRA_SUSPEND_LP1, flags);
+		tegra_cluster_switch_epilog(flags);
 
 		if (us)
 			tegra_lp2_set_trigger(0);

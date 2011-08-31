@@ -763,9 +763,6 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode, unsigned int flags)
 
 	tegra_pm_set(mode);
 
-	if (flags & TEGRA_POWER_CLUSTER_MASK)
-		tegra_cluster_switch_prolog(flags);
-
 	if (pdata && pdata->board_suspend)
 		pdata->board_suspend(mode, TEGRA_SUSPEND_BEFORE_CPU);
 
@@ -814,9 +811,6 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode, unsigned int flags)
 	local_fiq_enable();
 
 	tegra_common_resume();
-
-	if (flags & TEGRA_POWER_CLUSTER_MASK)
-		tegra_cluster_switch_epilog(mode);
 
 	pr_info("Exited suspend state %s\n", lp_state[mode]);
 
