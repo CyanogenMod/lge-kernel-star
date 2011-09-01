@@ -86,6 +86,10 @@
 #define SD_FPWM_MASK			0x04
 #define SD_FPWM_SHIFT			2
 
+/* SD Failling slew rate Active-Discharge Mode */
+#define SD_FSRADE_MASK			0x01
+#define SD_FSRADE_SHIFT		0
+
 /* Voltage */
 #define SDX_VOLT_MASK			0xFF
 #define SD1_VOLT_MASK			0x3F
@@ -548,6 +552,16 @@ skip_init_apply:
 			if (ret < 0) {
 				dev_err(reg->dev, "preinit: "
 					"Failed to set forced pwm mode\n");
+				return ret;
+			}
+		}
+
+		if (pdata->flags & SD_FSRADE_DISABLE) {
+			ret = max77663_set_bits(parent, reg->cfg_reg,
+						SD_FSRADE_MASK, SD_FSRADE_MASK, 0);
+			if (ret < 0) {
+				dev_err(reg->dev, "preinit: "
+					"Failed to set falling slew-rate discharge mode\n");
 				return ret;
 			}
 		}
