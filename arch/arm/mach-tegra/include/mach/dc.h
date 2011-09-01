@@ -258,8 +258,14 @@ struct tegra_dc_sd_settings {
 	unsigned enable;
 	bool use_auto_pwm;
 	u8 hw_update_delay;
-	unsigned bin_width;
+	short bin_width;
 	u8 aggressiveness;
+	u8 phase_in;
+	u8 cmd;
+	u16 cur_agg_step;
+	u8 final_agg;
+	u16 cur_phase_step;
+	u16 phase_in_steps;
 
 	bool use_vid_luma;
 	struct tegra_dc_sd_rgb coeff;
@@ -271,6 +277,14 @@ struct tegra_dc_sd_settings {
 
 	atomic_t *sd_brightness;
 	struct platform_device *bl_device;
+};
+
+enum {
+	NO_CMD = 0x0,
+	ENABLE = 0x1,
+	DISABLE = 0x2,
+	PHASE_IN = 0x4,
+	AGG_CHG = 0x8,
 };
 
 enum {
