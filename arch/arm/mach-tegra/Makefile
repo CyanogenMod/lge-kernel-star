@@ -8,8 +8,13 @@ obj-y                                   += irq.o
 obj-y                                   += syncpt.o
 obj-y                                   += clock.o
 obj-y                                   += timer.o
-obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += timer-t2.o
-obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += timer-t3.o
+ifeq ($(CONFIG_ARCH_TEGRA_2x_SOC),y)
+obj-y                                   += tegra2_clocks.o
+obj-y                                   += timer-t2.o
+else
+obj-y                                   += tegra3_clocks.o
+obj-y                                   += timer-t3.o
+endif
 obj-y                                   += gpio.o
 obj-y                                   += pinmux.o
 obj-y                                   += devices.o
@@ -28,15 +33,12 @@ obj-y                                   += i2c_error_recovery.o
 obj-$(CONFIG_TEGRA_LEGACY_AUDIO)        += tegra_i2s_audio.o
 obj-$(CONFIG_TEGRA_LEGACY_AUDIO)        += tegra_spdif_audio.o
 obj-y                                   += mc.o
-obj-$(CONFIG_TEGRA_STAT_MON)			+= tegra2_statmon.o
+obj-$(CONFIG_TEGRA_STAT_MON)            += tegra2_statmon.o
 obj-$(CONFIG_USB_SUPPORT)               += usb_phy.o
 obj-$(CONFIG_FIQ)                       += fiq.o
 obj-$(CONFIG_TEGRA_PWM)                 += pwm.o
 obj-$(CONFIG_TEGRA_ARB_SEMAPHORE)       += arb_sema.o
 
-obj-y                                   += clock.o
-obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
-obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += tegra3_clocks.o
 ifeq ($(CONFIG_TEGRA_SILICON_PLATFORM),y)
 obj-y                                   += dvfs.o
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_dvfs.o
