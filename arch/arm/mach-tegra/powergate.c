@@ -140,7 +140,7 @@ static struct powergate_partition powergate_partition_info[TEGRA_NUM_POWERGATE] 
 	[TEGRA_POWERGATE_CPU1]	= { "cpu1",	{MC_CLIENT_LAST}, },
 	[TEGRA_POWERGATE_CPU2]	= { "cpu2",	{MC_CLIENT_LAST}, },
 	[TEGRA_POWERGATE_CPU3]	= { "cpu3",	{MC_CLIENT_LAST}, },
-	[TEGRA_POWERGATE_A9LP]	= { "a9lp",	{MC_CLIENT_LAST}, },
+	[TEGRA_POWERGATE_CELP]	= { "celp",	{MC_CLIENT_LAST}, },
 	[TEGRA_POWERGATE_SATA]	= { "sata",     {MC_CLIENT_SATA, MC_CLIENT_LAST},
 						{{"sata", CLK_AND_RST},
 						{"sata_oob", CLK_AND_RST},
