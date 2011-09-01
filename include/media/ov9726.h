@@ -15,7 +15,7 @@
 
 #define OV9726_I2C_ADDR			0x20
 
-#define OV9726_IOCTL_SET_MODE		_IOW('o', 1, struct ov9726_cust_mode)
+#define OV9726_IOCTL_SET_MODE		_IOW('o', 1, struct ov9726_mode)
 #define OV9726_IOCTL_SET_FRAME_LENGTH	_IOW('o', 2, __u32)
 #define OV9726_IOCTL_SET_COARSE_TIME	_IOW('o', 3, __u32)
 #define OV9726_IOCTL_SET_GAIN		_IOW('o', 4, __u16)
@@ -35,15 +35,6 @@ struct ov9726_reg {
 	__u16	val;
 };
 
-struct ov9726_cust_mode {
-	struct ov9726_mode	mode;
-	__u16			reg_num;
-	struct ov9726_reg	*reg_seq;
-};
-
-#define OV9726_TABLE_WAIT_MS		0
-#define OV9726_TABLE_END		1
-
 #ifdef __KERNEL__
 #define OV9726_REG_FRAME_LENGTH_HI	0x340
 #define OV9726_REG_FRAME_LENGTH_LO	0x341
@@ -53,6 +44,9 @@ struct ov9726_cust_mode {
 #define OV9726_REG_GAIN_LO		0x205
 
 #define OV9726_MAX_RETRIES		3
+
+#define OV9726_TABLE_WAIT_MS		0
+#define OV9726_TABLE_END		1
 
 struct ov9726_platform_data {
 	int	(*power_on)(void);

@@ -40,6 +40,120 @@ struct ov9726_devinfo {
 	__u32				mode;
 };
 
+static struct ov9726_reg mode_1280x720[] = {
+	/*
+	(1) clock setting
+	clock formula:	(Ref_clk / pre_pll_clk_div) * pll_multiplier /
+			vt_sys_clk_div / vt_pix_clk_div / divmip
+	input clk at        24Mhz
+	pre_pll_clk_div     0305[3:0] => 4
+	pll_multiplier      0307[6:0] => 100
+	vt_sys_clk_div      0303[3:0] => 1
+	vt_pix_clk_div      0301[3:0] => 10
+	divmip              3010[2:0] => 1
+
+	Overall timing:
+	line length:  1664 (reg 0x342/0x343)
+	frame length: 840  (reg 0x340/0x341)
+	coarse integration time: 835 lines (reg 0x202/0x203) => change to 836
+
+	visible pixels: (0,40) - (1280, 720+40) with size 1280x720
+	Output pixels (1280x720)
+
+	Frame rate if MCLK=24MHz:
+	24Mhz/4 *100/1/10/1 = 60 Mhz
+	60Mhz/1664/840 = 42.9 fps
+	*/
+
+	{0x0103, 0x01},
+
+	{OV9726_TABLE_WAIT_MS, 10},
+
+	{0x3026, 0x00},
+	{0x3027, 0x00},
+	{0x3705, 0x45},
+	{0x3603, 0xaa},
+	{0x3632, 0x2f},
+	{0x3620, 0x66},
+	{0x3621, 0xc0},
+	{0x0202, 0x03},
+	{0x0203, 0x13},
+	{0x3833, 0x04},
+	{0x3835, 0x02},
+	{0x4702, 0x04},
+	{0x4704, 0x00},
+	{0x4706, 0x08},
+	{0x5052, 0x01},
+	{0x3819, 0x6c},
+	{0x3817, 0x94},
+	{0x404e, 0x7e},
+	{0x3601, 0x40},
+	{0x3610, 0xa0},
+	{0x0344, 0x00},
+	{0x0345, 0x00},
+	{0x0346, 0x00},
+	{0x0347, 0x28},
+
+	{0x034c, 0x05},
+	{0x034d, 0x00},
+	{0x034e, 0x02},
+	{0x034f, 0xd8},
+	{0x3002, 0x00},
+	{0x3004, 0x00},
+	{0x3005, 0x00},
+	{0x4800, 0x44},
+	{0x4801, 0x0f},
+	{0x4803, 0x05},
+	{0x4601, 0x16},
+	{0x3014, 0x05},
+	{0x0101, 0x01},
+	{0x3707, 0x14},
+	{0x3622, 0x9f},
+	{0x4002, 0x45},
+	{0x5001, 0x00},
+	{0x3406, 0x01},
+	{0x3503, 0x17},
+	{0x0205, 0x3f},
+	{0x0100, 0x01},
+	{0x0112, 0x0a},
+	{0x0113, 0x0a},
+	{0x3013, 0x20},
+	{0x4837, 0x2f},
+	{0x3615, 0xf0},
+	{0x0340, 0x03},
+	{0x0341, 0x48},
+	{0x0342, 0x06},
+	{0x0343, 0x80},
+	{0x3702, 0x1e},
+	{0x3703, 0x3c},
+	{0x3704, 0x0e},
+
+	{0x3104, 0x20},
+	{0x0305, 0x04},
+	{0x0307, 0x46},
+	{0x0303, 0x01},
+	{0x0301, 0x0a},
+	{0x3010, 0x01},
+	{0x460e, 0x00},
+
+	{0x5000, 0x00},
+	{0x5002, 0x00},
+	{0x3017, 0xd2},
+	{0x3018, 0x69},
+	{0x3019, 0x96},
+	{0x5047, 0x61},
+	{0x3604, 0x1c},
+	{0x3602, 0x10},
+	{0x3612, 0x21},
+	{0x3630, 0x0a},
+	{0x3631, 0x53},
+	{0x3633, 0x70},
+	{0x4005, 0x1a},
+	{0x4009, 0x10},
+
+	{OV9726_TABLE_END, 0x0000}
+};
+
 static inline void
 msleep_range(unsigned int delay_base)
 {
@@ -403,18 +517,17 @@ static int ov9726_get_status(struct i2c_client *i2c_client, u8 *status)
 static int
 ov9726_set_mode(
 	struct ov9726_devinfo *dev,
-	struct ov9726_mode *mode,
-	struct ov9726_reg *reg_list)
+	struct ov9726_mode *mode)
 {
 	struct i2c_client	*i2c_client = dev->i2c_client;
+	struct ov9726_reg	reg_override[6];
 	int			err = 0;
 
 	dev_info(&i2c_client->dev, "%s.\n", __func__);
 
-	if (!reg_list) {
-		dev_err(&i2c_client->dev, "%s: empty reg list\n", __func__);
-		return -EINVAL;
-	}
+	ov9726_get_frame_length_regs(reg_override, mode->frame_length);
+	ov9726_get_coarse_time_regs(reg_override + 2, mode->coarse_time);
+	ov9726_get_gain_reg(reg_override + 4, mode->gain);
 
 	if (dev->mode != mode->mode_id) {
 		dev_info(&i2c_client->dev,
@@ -422,22 +535,14 @@ ov9726_set_mode(
 			__func__, mode->xres, mode->yres, mode->frame_length,
 			mode->coarse_time, mode->gain);
 
-		err = ov9726_write_table(i2c_client, reg_list, NULL, 0);
-		if (err)
-			goto ov9726_set_mode_exit;
-
-		err = ov9726_set_frame_length(i2c_client, mode->frame_length);
-		if (err)
-			goto ov9726_set_mode_exit;
-
-		err = ov9726_set_coarse_time(i2c_client, mode->coarse_time);
+		err = ov9726_write_table(i2c_client,
+			mode_1280x720, reg_override,
+			sizeof(reg_override) / sizeof(reg_override[0]));
 		if (err)
 			goto ov9726_set_mode_exit;
 
 		dev->mode = mode->mode_id;
 	}
-
-	err = ov9726_set_gain(i2c_client, mode->gain);
 
 ov9726_set_mode_exit:
 	return err;
@@ -453,36 +558,17 @@ ov9726_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case OV9726_IOCTL_SET_MODE:
 	{
-		struct ov9726_cust_mode	cust_mode;
-		struct ov9726_reg	*reg_list = NULL;
+		struct ov9726_mode	mode;
 
-		if (copy_from_user(&cust_mode,
+		if (copy_from_user(&mode,
 				   (const void __user *)arg,
-				   sizeof(struct ov9726_cust_mode))) {
+				   sizeof(struct ov9726_mode))) {
 			err = -EFAULT;
 			break;
 		}
 
-		reg_list = kzalloc(
-			sizeof(struct ov9726_reg) * cust_mode.reg_num,
-			GFP_KERNEL);
+		err = ov9726_set_mode(dev, &mode);
 
-		if (!reg_list) {
-			dev_err(&i2c_client->dev,
-				"ov9726: Unable to allocate memory!\n");
-			err = -ENOMEM;
-			break;
-		}
-
-		if (copy_from_user(reg_list,
-			   (const void __user *)cust_mode.reg_seq,
-			   sizeof(struct ov9726_reg) * cust_mode.reg_num))
-			err = -EFAULT;
-
-		if (!err)
-			err = ov9726_set_mode(dev, &(cust_mode.mode), reg_list);
-
-		kfree(reg_list);
 		break;
 	}
 
