@@ -759,8 +759,6 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode, unsigned int flags)
 
 	tegra_common_suspend();
 
-	pr_info("Entering suspend state %s\n", lp_state[mode]);
-
 	tegra_pm_set(mode);
 
 	if (pdata && pdata->board_suspend)
@@ -772,7 +770,6 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode, unsigned int flags)
 	cpu_complex_pm_enter();
 
 	if (mode == TEGRA_SUSPEND_LP0) {
-		tegra_lp0_cpu_mode(true);
 		tegra_lp0_suspend_mc();
 		tegra_cpu_reset_handler_save();
 	}
@@ -796,7 +793,6 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode, unsigned int flags)
 	if (mode == TEGRA_SUSPEND_LP0) {
 		tegra_cpu_reset_handler_restore();
 		tegra_lp0_resume_mc();
-		tegra_lp0_cpu_mode(false);
 	} else if (mode == TEGRA_SUSPEND_LP1)
 		*iram_cpu_lp1_mask = 0;
 
@@ -811,8 +807,6 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode, unsigned int flags)
 	local_fiq_enable();
 
 	tegra_common_resume();
-
-	pr_info("Exited suspend state %s\n", lp_state[mode]);
 
 	return 0;
 }
@@ -890,6 +884,33 @@ static struct kobj_attribute suspend_mode_attribute =
 
 static struct kobject *suspend_kobj;
 #endif
+
+static int tegra_pm_enter_suspend(void)
+{
+	pr_info("Entering suspend state %s\n", lp_state[current_suspend_mode]);
+	if (current_suspend_mode == TEGRA_SUSPEND_LP0)
+		tegra_lp0_cpu_mode(true);
+	return 0;
+}
+
+static void tegra_pm_enter_resume(void)
+{
+	if (current_suspend_mode == TEGRA_SUSPEND_LP0)
+		tegra_lp0_cpu_mode(false);
+	pr_info("Exited suspend state %s\n", lp_state[current_suspend_mode]);
+}
+
+static struct syscore_ops tegra_pm_enter_syscore_ops = {
+	.suspend = tegra_pm_enter_suspend,
+	.resume = tegra_pm_enter_resume,
+};
+
+static __init int tegra_pm_enter_syscore_init(void)
+{
+	register_syscore_ops(&tegra_pm_enter_syscore_ops);
+	return 0;
+}
+subsys_initcall(tegra_pm_enter_syscore_init);
 
 void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 {
