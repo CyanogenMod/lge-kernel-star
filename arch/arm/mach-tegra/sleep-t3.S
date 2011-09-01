@@ -58,6 +58,9 @@
 #define EMC_XM2VTTGENPADCTRL		0x310
 #define EMC_XM2VTTGENPADCTRL2		0x314
 
+#define PMC_CTRL			0x0
+#define PMC_CTRL_SIDE_EFFECT_LP0	(1 << 14)  /* enter LP0 when CPU pwr gated */
+
 #define PMC_PWRGATE_TOGGLE		0x30
 #define PMC_REMOVE_CLAMPING_CMD		0x34
 #define PMC_PWRGATE_STATUS		0x38
@@ -516,11 +519,23 @@ tegra3_cpu_clk32k:
 	mov	r0, #0	/* burst policy = 32KHz */
 	str	r0, [r5, #CLK_RESET_SCLK_BURST]
 #endif
-	/* disable PLLM via PMC in LP0 and LP1 states */
+
+	/* disable PLLM via PMC in LP1 */
+	ldr	r0, [r4, #PMC_CTRL]
+	tst	r0, #PMC_CTRL_SIDE_EFFECT_LP0
+	bne	enable_pllm_lp0
 	ldr	r0, [r4, #PMC_PLLP_WB0_OVERRIDE]
 	bic	r0, r0, #(1<<12)
 	str	r0, [r4, #PMC_PLLP_WB0_OVERRIDE]
+	b	powerdown_pll_pcx
 
+enable_pllm_lp0:
+	/* enable PLLM via PMC in LP0 */
+	ldr	r0, [r4, #PMC_PLLP_WB0_OVERRIDE]
+	orr	r0, r0, #((1<<12) | (1 << 11))
+	str	r0, [r4, #PMC_PLLP_WB0_OVERRIDE]
+
+powerdown_pll_pcx:
 	/* disable PLLP, PLLA, PLLC, and PLLX in LP0 and LP1 states */
 	ldr	r0, [r5, #CLK_RESET_PLLP_BASE]
 	bic	r0, r0, #(1<<30)
@@ -534,6 +549,7 @@ tegra3_cpu_clk32k:
 	ldr	r0, [r5, #CLK_RESET_PLLX_BASE]
 	bic	r0, r0, #(1<<30)
 	str	r0, [r5, #CLK_RESET_PLLX_BASE]
+
 	mov	pc, lr
 
 /*
@@ -556,6 +572,7 @@ tegra3_enter_sleep:
 	cpu_to_csr_reg	r2, r1
 	ldr	r0, [r6, r2]
 	orr	r0, r0, #FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
+	orr	r0, r0, #FLOW_CTRL_CSR_ENABLE
 	str	r0, [r6, r2]
 
 	mov	r0, #FLOW_CTRL_WAIT_FOR_INTERRUPT
@@ -654,8 +671,12 @@ emcself:
 
 	emc_timing_update r1, r0
 
+	ldr	r1, [r4, #PMC_CTRL]
+	tst	r1, #PMC_CTRL_SIDE_EFFECT_LP0
+	bne	pmc_io_dpd_skip
 	mov32	r1, 0x8EC00000
 	str	r1, [r4, #PMC_IO_DPD_REQ]
+pmc_io_dpd_skip:
 
 	dsb
 
