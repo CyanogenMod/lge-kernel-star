@@ -733,7 +733,7 @@ static struct mpu3050_platform_data mpu3050_data = {
 	.adapt_num   = 2,
 	.bus         = EXT_SLAVE_BUS_PRIMARY,
 	.address     = 0x0C,
-	.orientation = { 0, -1, 0, 1, 0, 0, 0, 0, 1 },  /* Orientation matrix for AKM on cardhu */
+	.orientation = { 1, 0, 0, 0, 1, 0, 0, 0, 1 },  /* Orientation matrix for AKM on cardhu */
 	},
 };
 
