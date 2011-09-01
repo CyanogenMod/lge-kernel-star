@@ -79,11 +79,11 @@ static struct pwr_detect_cell pwr_detect_cells[] = {
 	POWER_CELL("pwrdet_nand",	(0x1 <<  1), (0x1 <<  1), 0xFFFFFFFF),
 	POWER_CELL("pwrdet_uart",	(0x1 <<  2), (0x1 <<  2), 0xFFFFFFFF),
 	POWER_CELL("pwrdet_bb",		(0x1 <<  3), (0x1 <<  3), 0xFFFFFFFF),
-#ifdef	CONFIG_ARCH_TEGRA_3x_SOC
+#ifdef	CONFIG_ARCH_TEGRA_2x_SOC
+	POWER_CELL("pwrdet_vi",			  0, (0x1 <<  4), 0xFFFFFFFF),
+#else
 	/* Tegra3 VI is connected on MID package only (id = 1, mask = 0x2) */
 	POWER_CELL("pwrdet_vi",			  0, (0x1 <<  4), 0x00000002),
-#else
-	POWER_CELL("pwrdet_vi",			  0, (0x1 <<  4), 0xFFFFFFFF),
 #endif
 	POWER_CELL("pwrdet_audio",	(0x1 <<  5), (0x1 <<  5), 0xFFFFFFFF),
 	POWER_CELL("pwrdet_lcd",	(0x1 <<  6), (0x1 <<  6), 0xFFFFFFFF),
