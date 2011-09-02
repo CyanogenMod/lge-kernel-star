@@ -28,6 +28,7 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += sleep-t2.o
 obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += sleep-t3.o
 obj-y                                   += fuse.o
 obj-y                                   += kfuse.o
+obj-y                                   += csi.o
 obj-$(CONFIG_TEGRA_SILICON_PLATFORM)    += tegra_odm_fuses.o
 obj-y                                   += i2c_error_recovery.o
 obj-$(CONFIG_TEGRA_LEGACY_AUDIO)        += tegra_i2s_audio.o
