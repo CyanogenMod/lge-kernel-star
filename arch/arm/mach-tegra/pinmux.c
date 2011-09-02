@@ -709,6 +709,7 @@ static int tegra_drive_pinmux_set_pull_down(enum tegra_drive_pingroup pg,
 {
 	unsigned long flags;
 	u32 reg;
+
 	if (pg < 0 || pg >=  TEGRA_MAX_DRIVE_PINGROUP)
 		return -ERANGE;
 
@@ -718,8 +719,9 @@ static int tegra_drive_pinmux_set_pull_down(enum tegra_drive_pingroup pg,
 	spin_lock_irqsave(&mux_lock, flags);
 
 	reg = pg_readl(drive_pingroups[pg].reg);
-	reg &= ~(0x1f << 12);
-	reg |= pull_down << 12;
+	reg &= ~(drive_pingroups[pg].drvdown_mask <<
+		drive_pingroups[pg].drvdown_offset);
+	reg |= pull_down << drive_pingroups[pg].drvdown_offset;
 	pg_writel(reg, drive_pingroups[pg].reg);
 
 	spin_unlock_irqrestore(&mux_lock, flags);
@@ -732,6 +734,7 @@ static int tegra_drive_pinmux_set_pull_up(enum tegra_drive_pingroup pg,
 {
 	unsigned long flags;
 	u32 reg;
+
 	if (pg < 0 || pg >=  TEGRA_MAX_DRIVE_PINGROUP)
 		return -ERANGE;
 
@@ -741,8 +744,9 @@ static int tegra_drive_pinmux_set_pull_up(enum tegra_drive_pingroup pg,
 	spin_lock_irqsave(&mux_lock, flags);
 
 	reg = pg_readl(drive_pingroups[pg].reg);
-	reg &= ~(0x1f << 20);
-	reg |= pull_up << 20;
+	reg &= ~(drive_pingroups[pg].drvup_mask <<
+		drive_pingroups[pg].drvup_offset);
+	reg |= pull_up << drive_pingroups[pg].drvup_offset;
 	pg_writel(reg, drive_pingroups[pg].reg);
 
 	spin_unlock_irqrestore(&mux_lock, flags);

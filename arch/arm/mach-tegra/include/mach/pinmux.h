@@ -304,6 +304,10 @@ struct tegra_drive_pingroup_config {
 struct tegra_drive_pingroup_desc {
 	const char *name;
 	s16 reg;
+	u8 drvup_offset;
+	u16 drvup_mask;
+	u8 drvdown_offset;
+	u16 drvdown_mask;
 };
 
 struct tegra_pingroup_desc {
