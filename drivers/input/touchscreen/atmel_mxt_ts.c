@@ -785,13 +785,13 @@ static int mxt_check_reg_init(struct mxt_data *data)
 			MXT_BACKUP_VALUE);
 	msleep(MXT_BACKUP_TIME);
 	do {
-                error =  mxt_read_object(data, MXT_GEN_COMMAND,
+		error =  mxt_read_object(data, MXT_GEN_COMMAND,
 					MXT_COMMAND_BACKUPNV,
 					&command_register);
-                if (error)
-                        return error;
+		if (error)
+			return error;
 		msleep(2);
-        } while ((command_register != 0) && (timeout_counter++ <= 100));
+	} while ((command_register != 0) && (timeout_counter++ <= 100));
 	if (timeout_counter >= 100) {
 		dev_err(&client->dev, "No response after backup!\n");
 		return -EIO;
@@ -954,6 +954,13 @@ static int mxt_initialize(struct mxt_data *data)
 				&actv_cycle_time);
 	if (error)
 		return error;
+
+	dev_info(&client->dev, "in mxt_initialize(), Active Cycle Time: %d Idle Cycle Time: %d\n",
+		actv_cycle_time, idle_cycle_time);
+
+	data->actv_cycle_time = actv_cycle_time;
+	data->idle_cycle_time = idle_cycle_time;
+
 	dev_info(&client->dev,
 			"Family ID: %d Variant ID: %d Version: %d Build: %d\n",
 			info->family_id, info->variant_id, info->version,
@@ -1141,6 +1148,10 @@ static void mxt_start(struct mxt_data *data)
 {
 	int error;
 	struct device *dev = &data->client->dev;
+
+	if (data->is_stopped == 0)
+		return;
+
 	dev_info(dev, "in MXT_START(), idle time: %d %d", data->idle_cycle_time, data->actv_cycle_time);
 	/* Restore the cycle time settings to wake from sleep */
 	error = mxt_write_object(data, MXT_GEN_POWER, MXT_POWER_ACTVACQINT,
@@ -1203,9 +1214,15 @@ i2c_error:
 
 static int mxt_input_open(struct input_dev *dev)
 {
-	/*
 	struct mxt_data *data = input_get_drvdata(dev);
-	*/
+	u8 n;
+
+	/* A dummy read to wake up the chip */
+	mxt_read_object(data, MXT_GEN_POWER, MXT_POWER_IDLEACQINT, &n);
+	msleep(MXT_WAKEUP_TIME);
+
+	mxt_start(data);
+
 	return 0;
 }
 
