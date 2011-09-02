@@ -1426,7 +1426,7 @@ struct platform_device tegra_kbc_device = {
 	},
 };
 
-#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+#if defined(CONFIG_ARCH_TEGRA_3x_SOC)
 static struct resource tegra_tsensor_resources[]= {
 	{
 		.start	= TEGRA_TSENSOR_BASE,

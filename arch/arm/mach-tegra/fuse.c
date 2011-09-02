@@ -281,16 +281,14 @@ int tegra_sku_id(void)
 
 int tegra_gpu_register_sets(void)
 {
-#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
-	return 1;
-#elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
+#ifdef CONFIG_ARCH_TEGRA_DUAL_3D
 	u32 reg = readl(IO_TO_VIRT(TEGRA_CLK_RESET_BASE + FUSE_GPU_INFO));
 	if (reg & FUSE_GPU_INFO_MASK)
 		return 1;
 	else
 		return 2;
 #else
-#error ERROR! Neither 2x or 3x Tegra present
+	return 1;
 #endif
 }
 

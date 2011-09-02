@@ -29,11 +29,7 @@
 #ifndef _MACH_TEGRA_IOVMM_H_
 #define _MACH_TEGRA_IOVMM_H_
 
-#if defined(CONFIG_ARCH_TEGRA_2x_SOC) || defined(CONFIG_ARCH_TEGRA_3x_SOC)
 typedef u32 tegra_iovmm_addr_t;
-#else
-#error "Unsupported tegra architecture family"
-#endif
 
 struct tegra_iovmm_device_ops;
 
