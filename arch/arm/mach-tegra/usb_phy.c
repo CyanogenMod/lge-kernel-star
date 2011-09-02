@@ -2107,6 +2107,8 @@ static int uhsic_phy_power_off(struct tegra_usb_phy *phy, bool is_dpd)
 		/* keep hsic reset de-asserted for 1 ms */
 		udelay(1000);
 	}
+	if (uhsic_config->post_phy_off && uhsic_config->post_phy_off())
+		return -EAGAIN;
 
 	return 0;
 }
@@ -2485,6 +2487,7 @@ int tegra_usb_phy_bus_connect(struct tegra_usb_phy *phy)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
+	struct tegra_uhsic_config *uhsic_config = phy->config;
 
 	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_HSIC) {
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
@@ -2511,6 +2514,10 @@ int tegra_usb_phy_bus_connect(struct tegra_usb_phy *phy)
 		val |= UHSIC_RPU_STROBE;
 #endif
 		writel(val, base + UHSIC_PADS_CFG1);
+
+		if (uhsic_config->usb_phy_ready &&
+					uhsic_config->usb_phy_ready())
+			return -EAGAIN;
 
 		if (utmi_wait_register(base + UHSIC_STAT_CFG0, UHSIC_CONNECT_DETECT, UHSIC_CONNECT_DETECT) < 0) {
 			pr_err("%s: timeout waiting for hsic connect detect\n", __func__);
@@ -2605,6 +2612,7 @@ int tegra_usb_phy_bus_idle(struct tegra_usb_phy *phy)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
+	struct tegra_uhsic_config *uhsic_config = phy->config;
 
 	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_HSIC) {
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
@@ -2631,6 +2639,10 @@ int tegra_usb_phy_bus_idle(struct tegra_usb_phy *phy)
 		val |= UHSIC_RPU_STROBE;
 #endif
 		writel(val, base + UHSIC_PADS_CFG1);
+
+		if (uhsic_config->usb_phy_ready &&
+					uhsic_config->usb_phy_ready())
+			return -EAGAIN;
 	}
 	return 0;
 }
