@@ -622,7 +622,7 @@ static int tegra_ehci_bus_suspend(struct usb_hcd *hcd)
 	error_status = ehci_bus_suspend(hcd);
 	if (!error_status && tegra->power_down_on_bus_suspend) {
 		port_status = ehci_readl(ehci, &ehci->regs->port_status[0]);
-		if (!port_status & PORT_CONNECT) {
+		if (!(port_status & PORT_CONNECT)) {
 			tegra_usb_suspend(hcd, false);
 			tegra->bus_suspended = 1;
 		}
