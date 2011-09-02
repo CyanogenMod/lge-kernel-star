@@ -756,7 +756,7 @@ static int __devinit tps80031_irq_init(struct tps80031 *tps80031, int irq,
 					 handle_simple_irq);
 		irq_set_nested_thread(__irq, 1);
 #ifdef CONFIG_ARM
-		irq_set_status_flags(__irq, IRQF_VALID);
+		set_irq_flags(__irq, IRQF_VALID);
 #endif
 	}
 

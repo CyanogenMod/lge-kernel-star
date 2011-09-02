@@ -597,7 +597,7 @@ static int __devinit tps6591x_irq_init(struct tps6591x *tps6591x, int irq,
 					 handle_simple_irq);
 		irq_set_nested_thread(__irq, 1);
 #ifdef CONFIG_ARM
-		irq_set_status_flags(__irq, IRQF_VALID);
+		set_irq_flags(__irq, IRQF_VALID);
 #endif
 	}
 
