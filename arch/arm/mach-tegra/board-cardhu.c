@@ -300,10 +300,15 @@ static void __init uart_debug_init(void)
 	struct board_info board_info;
 
 	tegra_get_board_info(&board_info);
-	if (board_info.sku & SKU_SLT_ULPI_SUPPORT) {
-		if ((board_info.board_id == BOARD_E1186) ||
-			(board_info.board_id == BOARD_E1187) ||
-			(board_info.board_id == BOARD_PM269)) {
+	/* UARTB is debug port
+	 *       for SLT - E1186/E1187/PM269
+	 *       for E1256
+	 */
+	if (((board_info.sku & SKU_SLT_ULPI_SUPPORT) &&
+		((board_info.board_id == BOARD_E1186) ||
+		(board_info.board_id == BOARD_E1187) ||
+		(board_info.board_id == BOARD_PM269))) ||
+		(board_info.board_id == BOARD_E1256)) {
 			/* UARTB is the debug port. */
 			pr_info("Selecting UARTB as the debug console\n");
 			cardhu_uart_devices[1] = &debug_uartb_device;
@@ -311,9 +316,6 @@ static void __init uart_debug_init(void)
 			debug_uart_port_base = ((struct plat_serial8250_port *)(
 				debug_uartb_device.dev.platform_data))->mapbase;
 			return;
-		}
-		pr_err("%s(): Unhandled SKU information for Board 0x%04x\n",
-				__func__, board_info.board_id);
 	}
 	/* UARTA is the debug port. */
 	pr_info("Selecting UARTA as the debug console\n");
