@@ -359,6 +359,8 @@ int __init cardhu_sdhci_init(void)
 #endif
 
 	platform_device_register(&tegra_sdhci_device3);
+	platform_device_register(&tegra_sdhci_device2);
+
 #if 0
 	platform_device_register(&tegra_sdhci_device2);
 

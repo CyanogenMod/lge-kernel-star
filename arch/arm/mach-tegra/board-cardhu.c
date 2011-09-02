@@ -203,6 +203,7 @@ static __initdata struct tegra_clk_init_table cardhu_clk_init_table[] = {
 	{ "pwm",	"pll_p",	3187500,	false},
 	{ "blink",	"clk_32k",	32768,		true},
 	{ "i2s1",	"pll_a_out0",	0,		false},
+	{ "sdmmc3",	"clk_m",	12000000,	true},
 	{ NULL,		NULL,		0,		0},
 };
 
