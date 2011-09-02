@@ -35,6 +35,7 @@
 #include <linux/vmalloc.h>
 
 #include <mach/clk.h>
+#include <mach/hardware.h>
 #include <mach/io.h>
 #include <mach/iomap.h>
 #include <mach/legacy_irq.h>
@@ -599,8 +600,8 @@ static int nvavp_init(struct nvavp_info *nvavp)
 	dev_info(&nvavp->nvhost_dev->dev,
 		"using SMMU at %lx to load AVP kernel\n",
 		(unsigned long)nvavp->os_info.phys);
-	BUG_ON(nvavp->os_info.phys != 0xe0000000
-		&& nvavp->os_info.phys != 0x00001000);
+	BUG_ON(nvavp->os_info.phys != 0xeff00000
+		&& nvavp->os_info.phys != 0x0ff00000);
 	sprintf(fw_os_file, "nvavp_os_%08lx.bin",
 		(unsigned long)nvavp->os_info.phys);
 	nvavp->os_info.reset_addr = nvavp->os_info.phys;
@@ -908,44 +909,6 @@ static long tegra_nvavp_ioctl(struct file *filp, unsigned int cmd,
 	return ret;
 }
 
-static struct nvmap_client *avp_early_nvmap_drv;
-static struct nvmap_handle_ref *avp_early_kernel_handle;
-static void *avp_early_kernel_data;
-static phys_addr_t avp_early_kernel_phys;
-
-void avp_early_init(void)
-{
-	int ret;
-
-	avp_early_nvmap_drv = nvmap_create_client(nvmap_dev, "avp_early");
-	if (IS_ERR_OR_NULL(avp_early_nvmap_drv))
-		pr_crit("%s: nvmap_create_client error\n", __func__);
-
-	avp_early_kernel_handle =
-		nvmap_create_handle(avp_early_nvmap_drv, SZ_1M);
-	if (IS_ERR_OR_NULL(avp_early_kernel_handle))
-		pr_crit("%s: nvmap_create_handle error\n", __func__);
-
-	ret = nvmap_alloc_handle_id(avp_early_nvmap_drv,
-				nvmap_ref_to_id(avp_early_kernel_handle),
-				NVMAP_HEAP_IOVMM, PAGE_SIZE,
-				NVMAP_HANDLE_WRITE_COMBINE);
-	if (ret)
-		pr_crit("%s: nvmap_alloc_handle_id error\n", __func__);
-
-	avp_early_kernel_data = nvmap_mmap(avp_early_kernel_handle);
-	if (!avp_early_kernel_data)
-		pr_crit("%s: nvmap_mmap error\n", __func__);
-
-	avp_early_kernel_phys =
-		nvmap_pin(avp_early_nvmap_drv, avp_early_kernel_handle);
-	if (IS_ERR_OR_NULL((void *)avp_early_kernel_phys))
-		pr_crit("%s: nvmap_pin error\n", __func__);
-
-	pr_info("%s: allocated memory at %x for AVP kernel\n",
-		__func__, avp_early_kernel_phys);
-}
-
 static const struct file_operations tegra_nvavp_fops = {
 	.owner		= THIS_MODULE,
 	.open		= tegra_nvavp_open,
@@ -958,6 +921,7 @@ static int tegra_nvavp_probe(struct nvhost_device *ndev)
 	struct nvavp_info *nvavp;
 	int irq;
 	unsigned int heap_mask;
+	u32 iovmm_addr;
 	int ret = 0;
 
 	irq = nvhost_get_irq_byname(ndev, "mbox_from_avp_pending");
@@ -982,6 +946,13 @@ static int tegra_nvavp_probe(struct nvhost_device *ndev)
 		goto err_get_syncpt;
 	}
 
+	nvavp->nvmap = nvmap_create_client(nvmap_dev, "nvavp_drv");
+	if (IS_ERR_OR_NULL(nvavp->nvmap)) {
+		dev_err(&ndev->dev, "cannot create nvmap client\n");
+		ret = PTR_ERR(nvavp->nvmap);
+		goto err_nvmap_create_drv_client;
+	}
+
 #if defined(CONFIG_TEGRA_AVP_KERNEL_ON_MMU) /* Tegra2 with AVP MMU */
 	heap_mask = NVMAP_HEAP_CARVEOUT_GENERIC;
 #elif defined(CONFIG_TEGRA_AVP_KERNEL_ON_SMMU) /* Tegra3 with SMMU */
@@ -991,21 +962,49 @@ static int tegra_nvavp_probe(struct nvhost_device *ndev)
 #endif
 	switch (heap_mask) {
 	case NVMAP_HEAP_IOVMM:
-		nvavp->nvmap = avp_early_nvmap_drv;
-		nvavp->os_info.handle = avp_early_kernel_handle;
-		nvavp->os_info.data = avp_early_kernel_data;
-		nvavp->os_info.phys = avp_early_kernel_phys;
-		break;
-	case NVMAP_HEAP_CARVEOUT_GENERIC:
-		nvavp->nvmap = nvmap_create_client(nvmap_dev, "nvavp_drv");
-		if (IS_ERR(nvavp->nvmap)) {
-			dev_err(&ndev->dev, "cannot create drv nvmap client\n");
-			ret = PTR_ERR(nvavp->nvmap);
-			goto err_nvmap_create_drv_client;
+		iovmm_addr = 0x0ff00000;
+
+		/* Tegra3 A01 has different SMMU address */
+		if (tegra_get_chipid() == TEGRA_CHIPID_TEGRA3
+			&& tegra_get_revision() == TEGRA_REVISION_A01) {
+			iovmm_addr = 0xeff00000;
 		}
 
+		nvavp->os_info.handle = nvmap_alloc_iovm(nvavp->nvmap, SZ_1M,
+						L1_CACHE_BYTES,
+						NVMAP_HANDLE_UNCACHEABLE,
+						iovmm_addr);
+		if (IS_ERR_OR_NULL(nvavp->os_info.handle)) {
+			dev_err(&ndev->dev,
+				"cannot create os handle\n");
+			ret = PTR_ERR(nvavp->os_info.handle);
+			goto err_nvmap_alloc;
+		}
+
+		nvavp->os_info.data = nvmap_mmap(nvavp->os_info.handle);
+		if (!nvavp->os_info.data) {
+			dev_err(&ndev->dev,
+				"cannot map os handle\n");
+			ret = -ENOMEM;
+			goto err_nvmap_mmap;
+		}
+
+		nvavp->os_info.phys =
+			nvmap_pin(nvavp->nvmap, nvavp->os_info.handle);
+		if (IS_ERR_OR_NULL((void *)nvavp->os_info.phys)) {
+			dev_err(&ndev->dev,
+				"cannot pin os handle\n");
+			ret = PTR_ERR((void *)nvavp->os_info.phys);
+			goto err_nvmap_pin;
+		}
+
+		dev_info(&ndev->dev,
+			"allocated IOVM at %lx for AVP os\n",
+			(unsigned long)nvavp->os_info.phys);
+		break;
+	case NVMAP_HEAP_CARVEOUT_GENERIC:
 		nvavp->os_info.handle = nvmap_alloc(nvavp->nvmap, SZ_1M, SZ_1M,
-						NVMAP_HANDLE_WRITE_COMBINE);
+						NVMAP_HANDLE_UNCACHEABLE);
 		if (IS_ERR_OR_NULL(nvavp->os_info.handle)) {
 			dev_err(&ndev->dev, "cannot create AVP os handle\n");
 			ret = PTR_ERR(nvavp->os_info.handle);
