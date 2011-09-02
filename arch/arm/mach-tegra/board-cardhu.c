@@ -399,6 +399,9 @@ static void __init cardhu_spi_init(void)
 {
 	int i;
 	struct clk *c;
+	struct board_info board_info;
+
+	tegra_get_board_info(&board_info);
 
 	for (i = 0; i < ARRAY_SIZE(spi_parent_clk); ++i) {
 		c = tegra_get_clock_by_name(spi_parent_clk[i].name);
@@ -415,6 +418,11 @@ static void __init cardhu_spi_init(void)
 	tegra_spi_device4.dev.platform_data = &cardhu_spi_pdata;
 	platform_add_devices(cardhu_spi_devices,
 				ARRAY_SIZE(cardhu_spi_devices));
+
+	if (board_info.board_id == BOARD_E1198) {
+		tegra_spi_device2.dev.platform_data = &cardhu_spi_pdata;
+		platform_device_register(&tegra_spi_device2);
+	}
 }
 
 static struct tegra_wm8903_platform_data cardhu_audio_pdata = {
