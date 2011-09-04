@@ -92,6 +92,7 @@ static struct board_info pmu_board_info;
 
 static int pmu_core_edp = 1200;	/* default 1.2V EDP limit */
 static int board_panel_type;
+static enum power_supply_type pow_supply_type = POWER_SUPPLY_TYPE_MAINS;
 
 void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
 
@@ -368,6 +369,24 @@ static int __init tegra_board_panel_type(char *options)
 	return 1;
 }
 __setup("panel=", tegra_board_panel_type);
+
+enum power_supply_type get_power_supply_type(void)
+{
+	return pow_supply_type;
+}
+static int __init tegra_board_power_supply_type(char *options)
+{
+	if (!strcmp(options, "Adapter"))
+		pow_supply_type = POWER_SUPPLY_TYPE_MAINS;
+	if (!strcmp(options, "Mains"))
+		pow_supply_type = POWER_SUPPLY_TYPE_MAINS;
+	else if (!strcmp(options, "Battery"))
+		pow_supply_type = POWER_SUPPLY_TYPE_BATTERY;
+	else
+		return 0;
+	return 1;
+}
+__setup("power_supply=", tegra_board_power_supply_type);
 
 int get_core_edp(void)
 {

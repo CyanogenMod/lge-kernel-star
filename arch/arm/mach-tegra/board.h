@@ -23,6 +23,7 @@
 #define __MACH_TEGRA_BOARD_H
 
 #include <linux/types.h>
+#include <linux/power_supply.h>
 
 #define NVMAP_HEAP_CARVEOUT_IRAM_INIT	\
 	{	.name		= "iram",					\
@@ -100,5 +101,6 @@ void cpufreq_set_conservative_governor_param(int up_th, int down_th);
 int get_core_edp(void);
 enum panel_type get_panel_type(void);
 int tegra_get_modem_id(void);
+enum power_supply_type get_power_supply_type(void);
 
 #endif
