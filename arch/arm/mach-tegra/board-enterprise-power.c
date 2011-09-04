@@ -473,7 +473,6 @@ int __init enterprise_regulator_init(void)
 {
 	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
 	u32 pmc_ctrl;
-	struct board_info board_info;
 
 	/* configure the power management controller to trigger PMU
 	 * interrupts when low */
@@ -481,11 +480,8 @@ int __init enterprise_regulator_init(void)
 	pmc_ctrl = readl(pmc + PMC_CTRL);
 	writel(pmc_ctrl | PMC_CTRL_INTR_LOW, pmc + PMC_CTRL);
 
-	tegra_get_board_info(&board_info);
-
-	/* Disable battery charging for board whose sku does not
-	   have battery support */
-	if (!(board_info.sku & SKU_BATTERY_SUPPORT)) {
+	/* Disable battery charging if power adapter is connected. */
+	if (get_power_supply_type() == POWER_SUPPLY_TYPE_MAINS) {
 		bcharger_pdata.num_consumer_supplies = 0;
 		bcharger_pdata.consumer_supplies = NULL;
 	}
