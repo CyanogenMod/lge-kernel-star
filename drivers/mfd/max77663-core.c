@@ -941,6 +941,9 @@ static int max77663_irq_init(struct max77663_chip *chip)
 		return ret;
 	}
 
+	device_init_wakeup(chip->dev, 1);
+	enable_irq_wake(chip->i2c_power->irq);
+
 	chip->cache_irq_top_mask &= ~IRQ_TOP_GLBL_MASK;
 	max77663_write(chip->dev, MAX77663_REG_IRQ_TOP_MASK,
 		       &chip->cache_irq_top_mask, 1, 0);
