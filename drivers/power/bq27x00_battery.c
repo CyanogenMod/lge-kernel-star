@@ -874,11 +874,11 @@ static int bq27x00_battery_remove(struct i2c_client *client)
 }
 
 #ifdef CONFIG_PM
-static int bq27x00_battery_suspend(struct i2c_client *client,
-	pm_message_t state)
+static int bq27x00_battery_suspend(struct device *dev)
 {
 	int ret;
-	struct bq27x00_device_info *di = i2c_get_clientdata(client);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct bq27x00_device_info *di = platform_get_drvdata(pdev);
 
 	if (di->chip == BQ27510) {
 		ret = bq27x00_write(di, BQ27510_CNTL,
@@ -896,10 +896,11 @@ static int bq27x00_battery_suspend(struct i2c_client *client,
 	return 0;
 }
 
-static int bq27x00_battery_resume(struct i2c_client *client)
+static int bq27x00_battery_resume(struct device *dev)
 {
 	int ret;
-	struct bq27x00_device_info *di = i2c_get_clientdata(client);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct bq27x00_device_info *di = platform_get_drvdata(pdev);
 
 	if (di->chip == BQ27510) {
 		ret = bq27x00_write(di, BQ27510_CNTL,
@@ -916,6 +917,12 @@ static int bq27x00_battery_resume(struct i2c_client *client)
 	}
 	return 0;
 }
+
+static const struct dev_pm_ops bq27x00_battery_pm_ops = {
+	.suspend	= bq27x00_battery_suspend,
+	.resume		= bq27x00_battery_resume,
+};
+
 #endif
 
 static const struct i2c_device_id bq27x00_id[] = {
@@ -929,13 +936,12 @@ MODULE_DEVICE_TABLE(i2c, bq27x00_id);
 static struct i2c_driver bq27x00_battery_driver = {
 	.probe		= bq27x00_battery_probe,
 	.remove		= bq27x00_battery_remove,
-#if defined(CONFIG_PM)
-	.suspend	= bq27x00_battery_suspend,
-	.resume		= bq27x00_battery_resume,
-#endif
 	.id_table = bq27x00_id,
 	.driver = {
 		.name = "bq27x00-battery",
+#if defined(CONFIG_PM)
+		.pm		= &bq27x00_battery_pm_ops,
+#endif
 	},
 };
 
