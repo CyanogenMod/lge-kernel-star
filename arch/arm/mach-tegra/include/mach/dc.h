@@ -162,6 +162,7 @@ struct tegra_dsi_out {
 
 	u32		max_panel_freq_khz;
 	u32		lp_cmd_mode_freq_khz;
+	u32		lp_read_cmd_mode_freq_khz;
 	u32		hs_clk_in_lp_cmd_mode_freq_khz;
 	u32		burst_mode_freq_khz;
 
