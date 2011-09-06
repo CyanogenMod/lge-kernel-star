@@ -562,6 +562,9 @@ struct tegra_dsi_out enterprise_dsi = {
 
 	.video_data_type = TEGRA_DSI_VIDEO_TYPE_COMMAND_MODE,
 	.lp_cmd_mode_freq_khz = 20000,
+
+	/* TODO: Get the vender recommended freq */
+	.lp_read_cmd_mode_freq_khz = 200000,
 };
 
 static struct tegra_stereo_out enterprise_stereo = {
