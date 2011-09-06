@@ -32,10 +32,22 @@
 
 #define ENTERPRISE_ROW_COUNT	3
 #define ENTERPRISE_COL_COUNT	3
-static int plain_kbd_keycode[] = {
-	KEY_POWER,	KEY_RESERVED,	KEY_RESERVED,
-	KEY_HOME,	KEY_BACK,	KEY_VOLUMEDOWN,
-	KEY_MENU,	KEY_SEARCH,	KEY_VOLUMEUP,
+
+static const u32 kbd_keymap[] = {
+	KEY(0, 0, KEY_POWER),
+
+	KEY(1, 0, KEY_HOME),
+	KEY(1, 1, KEY_BACK),
+	KEY(1, 2, KEY_VOLUMEDOWN),
+
+	KEY(2, 0, KEY_MENU),
+	KEY(2, 1, KEY_SEARCH),
+	KEY(2, 2, KEY_VOLUMEUP),
+};
+
+static const struct matrix_keymap_data keymap_data = {
+	.keymap		= kbd_keymap,
+	.keymap_size	= ARRAY_SIZE(kbd_keymap),
 };
 
 static struct tegra_kbc_wake_key enterprise_wake_cfg[] = {
@@ -58,14 +70,11 @@ static struct tegra_kbc_wake_key enterprise_wake_cfg[] = {
 };
 
 static struct tegra_kbc_platform_data enterprise_kbc_platform_data = {
-	.debounce_cnt = 20,
-	.repeat_cnt = 50 * 32,
-	.scan_timeout_cnt = 3000 * 32,
-	.plain_keycode = plain_kbd_keycode,
-	.fn_keycode = NULL,
-	.is_filter_keys = false,
-	.is_wake_on_any_key = false,
-	.wake_key_cnt = 4,
+	.debounce_cnt = 2,
+	.repeat_cnt = 5 * 32,
+	.wakeup = true,
+	.keymap_data = &keymap_data,
+	.wake_cnt = 4,
 	.wake_cfg = &enterprise_wake_cfg[0],
 };
 
@@ -75,19 +84,15 @@ int __init enterprise_kbc_init(void)
 	int i;
 	tegra_kbc_device.dev.platform_data = &enterprise_kbc_platform_data;
 	pr_info("Registering tegra-kbc\n");
-	 /* Setup the pin configuration information. */
-	for (i = 0; i < KBC_MAX_GPIO; i++) {
-		data->pin_cfg[i].num = 0;
-		data->pin_cfg[i].pin_type = kbc_pin_unused;
-	}
-	for (i = 0; i < ENTERPRISE_ROW_COUNT; i++) {
+
+	BUG_ON((KBC_MAX_ROW + KBC_MAX_COL) > KBC_MAX_GPIO);
+	for (i = 0; i < KBC_MAX_ROW; i++) {
 		data->pin_cfg[i].num = i;
-		data->pin_cfg[i].pin_type = kbc_pin_row;
+		data->pin_cfg[i].is_row = true;
 	}
 
-	for (i = 0; i < ENTERPRISE_COL_COUNT; i++) {
-		data->pin_cfg[i + ENTERPRISE_ROW_COUNT].num = i;
-		data->pin_cfg[i + ENTERPRISE_ROW_COUNT].pin_type = kbc_pin_col;
+	for (i = 0; i < KBC_MAX_COL; i++) {
+		data->pin_cfg[i + KBC_MAX_ROW].num = i;
 	}
 	platform_device_register(&tegra_kbc_device);
 	pr_info("Registering successful tegra-kbc\n");

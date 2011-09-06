@@ -716,7 +716,7 @@ static void __init tegra_enterprise_init(void)
 #ifdef CONFIG_TEGRA_EDP_LIMITS
 	enterprise_edp_init();
 #endif
-	/* enterprise_kbc_init(); */
+	enterprise_kbc_init();
 	enterprise_touch_init();
 	enterprise_gps_init();
 	enterprise_baseband_init();
