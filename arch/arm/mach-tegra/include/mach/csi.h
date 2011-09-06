@@ -17,6 +17,13 @@
 #ifndef __MACH_TEGRA_CSI_H
 #define __MACH_TEGRA_CSI_H
 
+#define CSI_CILA_MIPI_CAL_CONFIG_0 0x22a
+#define  MIPI_CAL_TERMOSA(x)		(((x) & 0x1f) << 0)
+
+#define CSI_CILB_MIPI_CAL_CONFIG_0 0x22b
+#define  MIPI_CAL_TERMOSB(x)		(((x) & 0x1f) << 0)
+
+
 #define CSI_DSI_MIPI_CAL_CONFIG	0x234
 #define  MIPI_CAL_HSPDOSD(x)		(((x) & 0x1f) << 16)
 #define  MIPI_CAL_HSPUOSD(x)		(((x) & 0x1f) << 8)
