@@ -2877,15 +2877,12 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
 	INIT_WORK(&udc_controller->charger_work, fsl_udc_set_current_limit_work);
 
 	/* Get the regulator for drawing the vbus current in udc driver */
-	if (pdata->charge_regulator) {
-		udc_controller->vbus_regulator = regulator_get(NULL,
-			pdata->charge_regulator);
-		if (IS_ERR(udc_controller->vbus_regulator)) {
-			dev_err(&pdev->dev,
-				"can't get charge regulator,err:%ld\n",
-				PTR_ERR(udc_controller->vbus_regulator));
-			udc_controller->vbus_regulator = NULL;
-		}
+	udc_controller->vbus_regulator = regulator_get(NULL, "usb_bat_chg");
+	if (IS_ERR(udc_controller->vbus_regulator)) {
+		dev_err(&pdev->dev,
+			"can't get charge regulator,err:%ld\n",
+			PTR_ERR(udc_controller->vbus_regulator));
+		udc_controller->vbus_regulator = NULL;
 	}
 
 #ifdef CONFIG_USB_OTG_UTILS
