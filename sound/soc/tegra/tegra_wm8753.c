@@ -34,6 +34,7 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/gpio.h>
+#include <linux/regulator/consumer.h>
 
 #include <mach/tegra_wm8753_pdata.h>
 
@@ -58,6 +59,7 @@
 struct tegra_wm8753 {
 	struct tegra_asoc_utils_data util_data;
 	struct tegra_wm8753_platform_data *pdata;
+	struct regulator *audio_reg;
 	int gpio_requested;
 };
 
@@ -230,6 +232,23 @@ static int tegra_wm8753_init(struct snd_soc_pcm_runtime *rtd)
 	struct tegra_wm8753_platform_data *pdata = machine->pdata;
 	int ret;
 
+	if (machine_is_whistler()) {
+		machine->audio_reg = regulator_get(NULL, "avddio_audio");
+		if (IS_ERR(machine->audio_reg)) {
+			dev_err(card->dev, "cannot get avddio_audio reg\n");
+			ret = PTR_ERR(machine->audio_reg);
+			return ret;
+		}
+
+		ret = regulator_enable(machine->audio_reg);
+		if (ret) {
+			dev_err(card->dev, "cannot enable avddio_audio reg\n");
+			regulator_put(machine->audio_reg);
+			machine->audio_reg = NULL;
+			return ret;
+		}
+	}
+
 	if (gpio_is_valid(pdata->gpio_spkr_en)) {
 		ret = gpio_request(pdata->gpio_spkr_en, "spkr_en");
 		if (ret) {
@@ -389,6 +408,10 @@ static int __devexit tegra_wm8753_driver_remove(struct platform_device *pdev)
 		gpio_free(pdata->gpio_hp_mute);
 	if (machine->gpio_requested & GPIO_SPKR_EN)
 		gpio_free(pdata->gpio_spkr_en);
+	if (machine->audio_reg) {
+		regulator_disable(machine->audio_reg);
+		regulator_put(machine->audio_reg);
+	}
 
 	kfree(machine);
 
