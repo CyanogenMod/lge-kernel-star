@@ -181,6 +181,40 @@ int tegra_edp_update_thermal_zone(int temperature)
 }
 EXPORT_SYMBOL_GPL(tegra_edp_update_thermal_zone);
 
+bool tegra_cpu_edp_favor_up(unsigned int n, int mp_overhead)
+{
+	unsigned int current_limit, next_limit;
+
+	if (n == 0)
+		return true;
+
+	if (n >= ARRAY_SIZE(cpu_edp_limits->freq_limits))
+		return false;
+
+	current_limit = cpu_edp_limits[edp_thermal_index].freq_limits[n-1];
+	next_limit = cpu_edp_limits[edp_thermal_index].freq_limits[n];
+
+	return ((next_limit * (n + 1)) >
+		(current_limit * n * (100 + mp_overhead) / 100));
+}
+
+bool tegra_cpu_edp_favor_down(unsigned int n, int mp_overhead)
+{
+	unsigned int current_limit, next_limit;
+
+	if (n <= 1)
+		return false;
+
+	if (n > ARRAY_SIZE(cpu_edp_limits->freq_limits))
+		return true;
+
+	current_limit = cpu_edp_limits[edp_thermal_index].freq_limits[n-1];
+	next_limit = cpu_edp_limits[edp_thermal_index].freq_limits[n-2];
+
+	return ((next_limit * (n - 1) * (100 + mp_overhead) / 100)) >
+		(current_limit * n);
+}
+
 static int tegra_cpu_edp_notify(
 	struct notifier_block *nb, unsigned long event, void *hcpu)
 {

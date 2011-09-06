@@ -199,7 +199,7 @@ TPS_PDATA_INIT(ldo4, 0,         1000, 3300, 0, 1, 0, 0, -1, 0, 0, 0);
 TPS_PDATA_INIT(ldo5, e118x,     1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
 TPS_PDATA_INIT(ldo5, e1198,     1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0);
 
-TPS_PDATA_INIT(ldo6, 0,         1000, 3300, tps6591x_rails(VIO), 0, 0, 0, -1, 0, 0, 0);
+TPS_PDATA_INIT(ldo6, 0,         1200, 1200, tps6591x_rails(VIO), 0, 0, 1, -1, 0, 0, 0);
 TPS_PDATA_INIT(ldo7, 0,         1200, 1200, tps6591x_rails(VIO), 1, 1, 1, -1, 0, 0, 0);
 TPS_PDATA_INIT(ldo8, 0,         1000, 3300, tps6591x_rails(VIO), 1, 0, 0, -1, 0, 0, 0);
 
@@ -798,6 +798,8 @@ GREG_INIT(22, en_vbrtr,		en_vbrtr,	"vdd_3v3_devices",	0,      0,      PMU_TCA641
 	ADD_GPIO_REG(en_3v3_sys),		\
 	ADD_GPIO_REG(en_3v3_modem),		\
 	ADD_GPIO_REG(en_vdd_pnl1_pm269),		\
+	ADD_GPIO_REG(cam1_ldo_en),		\
+	ADD_GPIO_REG(cam2_ldo_en),		\
 	ADD_GPIO_REG(cam3_ldo_en),		\
 	ADD_GPIO_REG(en_vdd_com),		\
 	ADD_GPIO_REG(en_3v3_fuse_pm269),	\
@@ -932,6 +934,7 @@ int __init cardhu_gpio_switch_regulator_init(void)
 		break;
 
 	case BOARD_PM269:
+	case BOARD_PM305:
 		gswitch_pdata.num_subdevs = ARRAY_SIZE(gswitch_subdevs_pm269);
 		gswitch_pdata.subdevs = gswitch_subdevs_pm269;
 		break;
@@ -1000,6 +1003,7 @@ int __init cardhu_suspend_init(void)
 		break;
 	case BOARD_E1198:
 	case BOARD_PM269:
+	case BOARD_PM305:
 		break;
 	case BOARD_E1187:
 	case BOARD_E1186:

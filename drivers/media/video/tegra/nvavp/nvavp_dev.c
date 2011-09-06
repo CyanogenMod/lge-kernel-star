@@ -148,6 +148,8 @@ static int nvavp_service(struct nvavp_info *nvavp)
 	}
 	if (inbox & NVE276_OS_INTERRUPT_AVP_BREAKPOINT)
 		dev_err(&nvavp->nvhost_dev->dev, "AVP breakpoint hit\n");
+	if (inbox & NVE276_OS_INTERRUPT_TIMEOUT)
+		dev_err(&nvavp->nvhost_dev->dev, "AVP timeout\n");
 
 	return 0;
 }
@@ -668,6 +670,22 @@ static void nvavp_uninit(struct nvavp_info *nvavp)
 	nvavp_halt_avp(nvavp);
 }
 
+static int nvavp_get_syncpointid_ioctl(struct file *filp, unsigned int cmd,
+							unsigned long arg)
+{
+	struct nvavp_clientctx *clientctx = filp->private_data;
+	struct nvavp_info *nvavp = clientctx->nvavp;
+	u32 id = nvavp->syncpt_id;
+
+	if (_IOC_DIR(cmd) & _IOC_READ) {
+		if (copy_to_user((void __user *)arg, &id, sizeof(u32)))
+			return -EFAULT;
+		else
+			return 0;
+	}
+	return -EFAULT;
+}
+
 static int nvavp_set_nvmapfd_ioctl(struct file *filp, unsigned int cmd,
 							unsigned long arg)
 {
@@ -876,6 +894,9 @@ static long tegra_nvavp_ioctl(struct file *filp, unsigned int cmd,
 	switch (cmd) {
 	case NVAVP_IOCTL_SET_NVMAP_FD:
 		ret = nvavp_set_nvmapfd_ioctl(filp, cmd, arg);
+		break;
+	case NVAVP_IOCTL_GET_SYNCPOINT_ID:
+		ret = nvavp_get_syncpointid_ioctl(filp, cmd, arg);
 		break;
 	case NVAVP_IOCTL_PUSH_BUFFER_SUBMIT:
 		ret = nvavp_pushbuffer_submit_ioctl(filp, cmd, arg);

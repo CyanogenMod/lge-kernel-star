@@ -234,6 +234,16 @@ config RTC_DRV_MAX8907C
 	  This driver can also be built as a module. If so, the module
 	  will be called rtc-max8907c.
 
+config RTC_DRV_MAX77663
+	tristate "Maxim MAX77663"
+	depends on MFD_MAX77663
+	help
+	  If you say yes here you will get support for the
+	  RTC of Maxim MAX77663 PMIC.
+
+	  This driver can also be built as a module. If so, the module
+	  will be called rtc-max77663.
+
 config RTC_DRV_RS5C372
 	tristate "Ricoh R2025S/D, RS5C372A/B, RV5C386, RV5C387A"
 	help

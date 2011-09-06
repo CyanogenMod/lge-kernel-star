@@ -370,9 +370,8 @@ struct tegra_dc_win {
 
 	void			*virt_addr;
 	dma_addr_t		phys_addr;
-	unsigned		offset;
-	unsigned		offset_u;
-	unsigned		offset_v;
+	dma_addr_t		phys_addr_u;
+	dma_addr_t		phys_addr_v;
 	unsigned		stride;
 	unsigned		stride_uv;
 	fixed20_12		x;
@@ -499,5 +498,19 @@ struct tegra_dc_pwm_params {
 void tegra_dc_config_pwm(struct tegra_dc *dc, struct tegra_dc_pwm_params *cfg);
 
 int tegra_dc_update_csc(struct tegra_dc *dc, int win_index);
+
+/*
+ * In order to get a dc's current EDID, first call tegra_dc_get_edid() from an
+ * interruptible context.  The returned value (if non-NULL) points to a
+ * snapshot of the current state; after copying data from it, call
+ * tegra_dc_put_edid() on that pointer.  Do not dereference anything through
+ * that pointer after calling tegra_dc_put_edid().
+ */
+struct tegra_dc_edid {
+	size_t		len;
+	u8		buf[0];
+};
+struct tegra_dc_edid *tegra_dc_get_edid(struct tegra_dc *dc);
+void tegra_dc_put_edid(struct tegra_dc_edid *edid);
 
 #endif

@@ -171,6 +171,13 @@ static int cardhu_left_ov5650_power_on(void)
 		mdelay(100);
 		gpio_direction_output(OV5650_RESETN_GPIO, 1);
 	}
+
+	if (board_info.board_id == BOARD_PM269) {
+		gpio_direction_output(CAM1_RST_L_GPIO, 0);
+		mdelay(100);
+		gpio_direction_output(CAM1_RST_L_GPIO, 1);
+	}
+
 	return 0;
 
 reg_alloc_fail:
@@ -245,6 +252,13 @@ static int cardhu_right_ov5650_power_on(void)
 	regulator_enable(cardhu_1v8_cam2);
 
 	mdelay(5);
+
+	if (board_info.board_id == BOARD_PM269) {
+		gpio_direction_output(CAM2_RST_L_GPIO, 0);
+		mdelay(100);
+		gpio_direction_output(CAM2_RST_L_GPIO, 1);
+	}
+
 	return 0;
 
 reg_alloc_fail:
@@ -537,11 +551,6 @@ static struct nct1008_platform_data cardhu_nct1008_pdata = {
 	.supported_hwrev = true,
 	.ext_range = true,
 	.conv_rate = 0x08,
-/*
- * BugID 844025 requires 11C guardband (9.7C for hotspot offset + 1.5C
- * for sensor accuracy). FIXME: Move sensor accuracy to sensor driver.
- */
-	.offset = 11,
 	.hysteresis = 5,
 	.shutdown_ext_limit = 90,
 	.shutdown_local_limit = 90,
@@ -574,6 +583,7 @@ static int cardhu_nct1008_init(void)
 {
 	int nct1008_port = -1;
 	int ret;
+	struct nct1008_platform_data *pdata;
 #ifdef CONFIG_TEGRA_EDP_LIMITS
 	const struct tegra_edp_limits *z;
 	int zones_sz;
@@ -583,7 +593,8 @@ static int cardhu_nct1008_init(void)
 
 	if ((board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1291) ||
-		(board_info.board_id == BOARD_PM269)) {
+		(board_info.board_id == BOARD_PM269) ||
+		(board_info.board_id == BOARD_PM305)) {
 		nct1008_port = TEGRA_GPIO_PCC2;
 	} else if ((board_info.board_id == BOARD_E1186) ||
 		(board_info.board_id == BOARD_E1187) ||
@@ -605,6 +616,17 @@ static int cardhu_nct1008_init(void)
 			gpio_free(nct1008_port);
 		else
 			tegra_gpio_enable(nct1008_port);
+	}
+
+	/* Temperature guardband: bug 844025 */
+	if (board_info.board_id == BOARD_PM269) {
+		/* T30S DSC */
+		pdata = cardhu_i2c4_nct1008_board_info[0].platform_data;
+		pdata->offset = 41; /* 4 * 10.25C */
+	} else {
+		/* T30 MID */
+		pdata = cardhu_i2c4_nct1008_board_info[0].platform_data;
+		pdata->offset = 43; /* 4 * 10.75C */
 	}
 
 #ifdef CONFIG_TEGRA_EDP_LIMITS
@@ -711,7 +733,7 @@ static struct mpu3050_platform_data mpu3050_data = {
 	.adapt_num   = 2,
 	.bus         = EXT_SLAVE_BUS_PRIMARY,
 	.address     = 0x0C,
-	.orientation = { 0, -1, 0, 1, 0, 0, 0, 0, 1 },  /* Orientation matrix for AKM on cardhu */
+	.orientation = { 1, 0, 0, 0, 1, 0, 0, 0, 1 },  /* Orientation matrix for AKM on cardhu */
 	},
 };
 

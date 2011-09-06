@@ -341,7 +341,8 @@ int __init cardhu_sdhci_init(void)
 	unsigned int rc = 0;
 	struct board_info board_info;
 	tegra_get_board_info(&board_info);
-	if (board_info.board_id == BOARD_PM269) {
+	if ((board_info.board_id == BOARD_PM269) ||
+		(board_info.board_id == BOARD_PM305)) {
 		tegra_sdhci_platform_data2.max_clk = 12000000;
 		rc = pm269_sd_wp_gpio_init();
 		if (!rc) {

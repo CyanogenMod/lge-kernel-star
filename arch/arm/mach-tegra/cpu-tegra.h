@@ -65,4 +65,14 @@ static inline void tegra_auto_hotplug_governor(unsigned int cpu_freq,
 { }
 #endif
 
+#ifdef CONFIG_TEGRA_EDP_LIMITS
+bool tegra_cpu_edp_favor_up(unsigned int n, int mp_overhead);
+bool tegra_cpu_edp_favor_down(unsigned int n, int mp_overhead);
+#else
+static inline bool tegra_cpu_edp_favor_up(unsigned int n, int mp_overhead)
+{ return true; }
+static inline bool tegra_cpu_edp_favor_down(unsigned int n, int mp_overhead)
+{ return false; }
+#endif
+
 #endif /* __MACH_TEGRA_CPU_TEGRA_H */

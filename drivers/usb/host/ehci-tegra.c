@@ -609,15 +609,26 @@ static int tegra_ehci_setup(struct usb_hcd *hcd)
 #ifdef CONFIG_PM
 static int tegra_ehci_bus_suspend(struct usb_hcd *hcd)
 {
+	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
 	struct tegra_ehci_hcd *tegra = dev_get_drvdata(hcd->self.controller);
+	u32 port_status;
 	int error_status = 0;
 
+	mutex_lock(&tegra->tegra_ehci_hcd_mutex);
+	/* ehci_shutdown touches the USB controller registers, make sure
+	 * controller has clocks to it */
+	if (!tegra->host_resumed)
+		tegra_ehci_power_up(hcd, false);
 	error_status = ehci_bus_suspend(hcd);
 	if (!error_status && tegra->power_down_on_bus_suspend) {
-		tegra_usb_suspend(hcd, false);
-		tegra->bus_suspended = 1;
+		port_status = ehci_readl(ehci, &ehci->regs->port_status[0]);
+		if (!(port_status & PORT_CONNECT)) {
+			tegra_usb_suspend(hcd, false);
+			tegra->bus_suspended = 1;
+		}
 	}
 	tegra_usb_phy_postsuspend(tegra->phy, false);
+	mutex_unlock(&tegra->tegra_ehci_hcd_mutex);
 
 	return error_status;
 }

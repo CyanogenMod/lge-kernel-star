@@ -34,6 +34,7 @@
 #define BOARD_PM267   0x0243
 #define BOARD_PM269   0x0245
 #define BOARD_E1208   0x0C08
+#define BOARD_PM305   0x0305
 
 /* SKU Information */
 #define SKU_DCDC_TPS62361_SUPPORT	0x1
@@ -46,9 +47,14 @@
 
 #define SKU_MEMORY_TYPE_BIT		0x4
 #define SKU_MEMORY_TYPE_MASK		0x3
+/* If BOARD_PM269 */
 #define SKU_MEMORY_SAMSUNG_EC		0x0
 #define SKU_MEMORY_ELPIDA		0x1
 #define SKU_MEMORY_SAMSUNG_EB		0x2
+/* If other BOARD_ variants */
+#define SKU_MEMORY_CARDHU_1GB_1R	0x0
+#define SKU_MEMORY_CARDHU_2GB_2R	0x1
+#define SKU_MEMORY_CARDHU_2GB_1R	0x2
 #define MEMORY_TYPE(sku) (((sku) >> SKU_MEMORY_TYPE_BIT) & SKU_MEMORY_TYPE_MASK)
 
 /* Board Fab version */

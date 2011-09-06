@@ -412,9 +412,9 @@ static struct platform_device *cardhu_uart_devices[] __initdata = {
 	&tegra_uarte_device,
 };
 static struct uart_clk_parent uart_parent_clk[] = {
-	[0] = {.name = "pll_p"},
-	[1] = {.name = "pll_m"},
-	[2] = {.name = "clk_m"},
+	[0] = {.name = "clk_m"},
+	[1] = {.name = "pll_p"},
+	[2] = {.name = "pll_m"},
 };
 
 static struct tegra_uart_platform_data cardhu_uart_pdata;
@@ -424,10 +424,15 @@ static void __init uart_debug_init(void)
 	struct board_info board_info;
 
 	tegra_get_board_info(&board_info);
-	if (board_info.sku & SKU_SLT_ULPI_SUPPORT) {
-		if ((board_info.board_id == BOARD_E1186) ||
-			(board_info.board_id == BOARD_E1187) ||
-			(board_info.board_id == BOARD_PM269)) {
+	/* UARTB is debug port
+	 *       for SLT - E1186/E1187/PM269
+	 *       for E1256
+	 */
+	if (((board_info.sku & SKU_SLT_ULPI_SUPPORT) &&
+		((board_info.board_id == BOARD_E1186) ||
+		(board_info.board_id == BOARD_E1187) ||
+		(board_info.board_id == BOARD_PM269))) ||
+		(board_info.board_id == BOARD_E1256)) {
 			/* UARTB is the debug port. */
 			pr_info("Selecting UARTB as the debug console\n");
 			cardhu_uart_devices[1] = &debug_uartb_device;
@@ -435,9 +440,6 @@ static void __init uart_debug_init(void)
 			debug_uart_port_base = ((struct plat_serial8250_port *)(
 				debug_uartb_device.dev.platform_data))->mapbase;
 			return;
-		}
-		pr_err("%s(): Unhandled SKU information for Board 0x%04x\n",
-				__func__, board_info.board_id);
 	}
 	/* UARTA is the debug port. */
 	pr_info("Selecting UARTA as the debug console\n");
@@ -521,6 +523,9 @@ static void __init cardhu_spi_init(void)
 {
 	int i;
 	struct clk *c;
+	struct board_info board_info;
+
+	tegra_get_board_info(&board_info);
 
 	for (i = 0; i < ARRAY_SIZE(spi_parent_clk); ++i) {
 		c = tegra_get_clock_by_name(spi_parent_clk[i].name);
@@ -537,6 +542,11 @@ static void __init cardhu_spi_init(void)
 	tegra_spi_device4.dev.platform_data = &cardhu_spi_pdata;
 	platform_add_devices(cardhu_spi_devices,
 				ARRAY_SIZE(cardhu_spi_devices));
+
+	if (board_info.board_id == BOARD_E1198) {
+		tegra_spi_device2.dev.platform_data = &cardhu_spi_pdata;
+		platform_device_register(&tegra_spi_device2);
+	}
 }
 
 static struct tegra_wm8903_platform_data cardhu_audio_pdata = {

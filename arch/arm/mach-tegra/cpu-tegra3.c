@@ -62,6 +62,12 @@ static unsigned int idle_bottom_freq;
 module_param(idle_top_freq, uint, 0644);
 module_param(idle_bottom_freq, uint, 0644);
 
+static int mp_overhead = 10;
+module_param(mp_overhead, int, 0644);
+
+static int balance_level = 75;
+module_param(balance_level, int, 0644);
+
 static struct clk *cpu_clk;
 static struct clk *cpu_g_clk;
 static struct clk *cpu_lp_clk;
@@ -182,16 +188,21 @@ enum {
 	TEGRA_CPU_SPEED_SKEWED,
 };
 
-static int tegra_cpu_speed_balance(void)
+static noinline int tegra_cpu_speed_balance(void)
 {
 	unsigned long highest_speed = tegra_cpu_highest_speed();
+	unsigned long balanced_speed = highest_speed * balance_level / 100;
+	unsigned long skewed_speed = balanced_speed / 2;
+	unsigned int nr_cpus = num_online_cpus();
 
 	/* balanced: freq targets for all CPUs are above 50% of highest speed
 	   biased: freq target for at least one CPU is below 50% threshold
 	   skewed: freq targets for at least 2 CPUs are below 25% threshold */
-	if (tegra_count_slow_cpus(highest_speed / 4) >= 2)
+	if ((tegra_count_slow_cpus(skewed_speed) >= 2) ||
+	    tegra_cpu_edp_favor_down(nr_cpus, mp_overhead))
 		return TEGRA_CPU_SPEED_SKEWED;
-	else if (tegra_count_slow_cpus(highest_speed / 2) >= 1)
+	else if ((tegra_count_slow_cpus(balanced_speed) >= 1) ||
+		 (!tegra_cpu_edp_favor_up(nr_cpus, mp_overhead)))
 		return TEGRA_CPU_SPEED_BIASED;
 	return TEGRA_CPU_SPEED_BALANCED;
 }

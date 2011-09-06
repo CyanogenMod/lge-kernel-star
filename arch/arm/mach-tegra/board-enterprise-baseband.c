@@ -282,11 +282,8 @@ static int __init ph450_init(void)
 	tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_ULPI_STP,
 				    TEGRA_PUPD_PULL_UP);
 
-	/* enable pull-up for MDM2AP_ACK2 and BB_RST_OUT */
+	/* enable pull-up for MDM2AP_ACK2 */
 	tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_GPIO_PV0,
-				    TEGRA_PUPD_PULL_UP);
-
-	tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_GPIO_PV1,
 				    TEGRA_PUPD_PULL_UP);
 
 	tegra_gpio_enable(MODEM_PWR_ON);
@@ -296,7 +293,11 @@ static int __init ph450_init(void)
 	tegra_gpio_enable(BB_RST_OUT);
 
 	gpio_direction_output(MODEM_PWR_ON, 0);
+	/* export GPIO for user space access through sysfs */
+	gpio_export(MODEM_PWR_ON, false);
 	gpio_direction_output(MODEM_RESET, 0);
+	/* export GPIO for user space access through sysfs */
+	gpio_export(MODEM_RESET, false);
 	gpio_direction_output(AP2MDM_ACK2, 1);
 	gpio_direction_input(MDM2AP_ACK2);
 	gpio_direction_input(BB_RST_OUT);

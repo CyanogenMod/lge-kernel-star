@@ -90,13 +90,13 @@ static __initdata struct tegra_drive_pingroup_config cardhu_drive_pinmux[] = {
 	SET_DRIVE(SDIO1,	DISABLE, DISABLE, DIV_1, 46, 42, FAST, FAST),
 
 	/* SDMMC3 */
-	SET_DRIVE(SDIO3,	DISABLE, ENABLE, DIV_1, 31, 31, FASTEST, FASTEST),
+	SET_DRIVE(SDIO3,	DISABLE, DISABLE, DIV_1, 46, 42, FAST, FAST),
 
 	/* SDMMC4 */
-	SET_DRIVE(GMA,		DISABLE, ENABLE, DIV_1, 31, 31, FASTEST, FASTEST),
-	SET_DRIVE(GMB,		DISABLE, ENABLE, DIV_1, 31, 31, FASTEST, FASTEST),
-	SET_DRIVE(GMC,		DISABLE, ENABLE, DIV_1, 31, 31, FASTEST, FASTEST),
-	SET_DRIVE(GMD,		DISABLE, ENABLE, DIV_1, 31, 31, FASTEST, FASTEST),
+	SET_DRIVE(GMA,		DISABLE, DISABLE, DIV_1, 9, 9, SLOWEST, SLOWEST),
+	SET_DRIVE(GMB,		DISABLE, DISABLE, DIV_1, 9, 9, SLOWEST, SLOWEST),
+	SET_DRIVE(GMC,		DISABLE, DISABLE, DIV_1, 9, 9, SLOWEST, SLOWEST),
+	SET_DRIVE(GMD,		DISABLE, DISABLE, DIV_1, 9, 9, SLOWEST, SLOWEST),
 
 };
 
@@ -544,6 +544,7 @@ int __init cardhu_pinmux_init(void)
 		break;
 
 	case BOARD_PM269:
+	case BOARD_PM305:
 		tegra_pinmux_config_table(cardhu_pinmux_e118x,
 					ARRAY_SIZE(cardhu_pinmux_e118x));
 		tegra_pinmux_config_table(unused_pins_lowpower,
@@ -649,7 +650,8 @@ int __init cardhu_pins_state_init(void)
 			set_unused_pin_gpio(&pin_lpm_cardhu_common[0],
 					ARRAY_SIZE(pin_lpm_cardhu_common));
 
-	if (board_info.board_id == BOARD_PM269)
+	if ((board_info.board_id == BOARD_PM269) ||
+		(board_info.board_id == BOARD_PM305))
 		set_unused_pin_gpio(&vddio_gmi_pins_pm269[0],
 				ARRAY_SIZE(vddio_gmi_pins_pm269));
 	return 0;

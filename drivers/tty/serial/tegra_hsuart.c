@@ -945,10 +945,6 @@ static void tegra_set_mctrl(struct uart_port *u, unsigned int mctrl)
 
 	dev_dbg(u->dev, "tegra_set_mctrl called with %d\n", mctrl);
 	t = container_of(u, struct tegra_uart_port, uport);
-	if (t->uart_state != TEGRA_UART_OPENED) {
-		dev_err(t->uport.dev, "Uart is in invalid state\n");
-		return;
-	}
 
 	mcr = t->mcr_shadow;
 	if (mctrl & TIOCM_RTS) {
@@ -1526,6 +1522,11 @@ void tegra_uart_set_mctrl(struct uart_port *uport, unsigned int mctrl)
 	struct tegra_uart_port *t;
 
 	t = container_of(uport, struct tegra_uart_port, uport);
+	if (t->uart_state != TEGRA_UART_OPENED) {
+		dev_err(t->uport.dev, "Uart is in invalid state\n");
+		return;
+	}
+
 	spin_lock_irqsave(&uport->lock, flags);
 	if (mctrl & TIOCM_RTS) {
 		t->rts_active = true;

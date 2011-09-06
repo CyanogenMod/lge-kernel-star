@@ -1031,20 +1031,17 @@ int tegra_dc_update_windows(struct tegra_dc_win *windows[], int n)
 		tegra_dc_writel(dc, 0, DC_WIN_BUF_STRIDE);
 		tegra_dc_writel(dc, 0, DC_WIN_UV_BUF_STRIDE);
 		tegra_dc_writel(dc,
-				(unsigned long)win->phys_addr +
-				(unsigned long)win->offset,
+				(unsigned long)win->phys_addr,
 				DC_WINBUF_START_ADDR);
 
 		if (!yuvp) {
 			tegra_dc_writel(dc, win->stride, DC_WIN_LINE_STRIDE);
 		} else {
 			tegra_dc_writel(dc,
-					(unsigned long)win->phys_addr +
-					(unsigned long)win->offset_u,
+					(unsigned long)win->phys_addr_u,
 					DC_WINBUF_START_ADDR_U);
 			tegra_dc_writel(dc,
-					(unsigned long)win->phys_addr +
-					(unsigned long)win->offset_v,
+					(unsigned long)win->phys_addr_v,
 					DC_WINBUF_START_ADDR_V);
 			tegra_dc_writel(dc,
 					LINE_STRIDE(win->stride) |
@@ -2059,11 +2056,11 @@ static void tegra_dc_set_color_control(struct tegra_dc *dc)
 		break;
 	case TEGRA_DC_ERRDIFF_DITHER:
 		/* The line buffer for error-diffusion dither is limited
-		 * to 640 pixels per line. This limits the maximum
-		 * horizontal active area size to 640 pixels when error
+		 * to 1280 pixels per line. This limits the maximum
+		 * horizontal active area size to 1280 pixels when error
 		 * diffusion is enabled.
 		 */
-		BUG_ON(dc->mode.h_active > 640);
+		BUG_ON(dc->mode.h_active > 1280);
 		color_control |= DITHER_CONTROL_ERRDIFF;
 		break;
 	}

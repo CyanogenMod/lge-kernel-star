@@ -306,7 +306,8 @@ static irqreturn_t tps80031_rtc_irq(int irq, void *data)
 		return -EBUSY;
 	}
 
-	err = tps80031_set_bits(dev->parent, 1, RTC_STATUS, ALARM_INT_STATUS);
+	err = tps80031_force_update(dev->parent, 1, RTC_STATUS,
+		ALARM_INT_STATUS, ALARM_INT_STATUS);
 	if (err) {
 		dev_err(dev->parent, "unable to set Alarm INT\n");
 		return -EBUSY;
@@ -359,13 +360,6 @@ static int __devinit tps80031_rtc_probe(struct platform_device *pdev)
 		goto fail;
 	}
 
-	err = tps80031_set_bits(pdev->dev.parent, 1, RTC_INT, ENABLE_ALARM_INT);
-	if (err) {
-		dev_err(&pdev->dev, "unable to program Interrupt Mask reg\n");
-		err = -EBUSY;
-		goto fail;
-	}
-
 	/* If RTC have POR values, set time using platform data*/
 	tps80031_rtc_read_time(&pdev->dev, &tm);
 	if ((tm.tm_year == RTC_YEAR_OFFSET + RTC_POR_YEAR) &&
@@ -379,6 +373,20 @@ static int __devinit tps80031_rtc_probe(struct platform_device *pdev)
 			pdata->time.tm_mday = 1;
 		}
 		tps80031_rtc_set_time(&pdev->dev, &pdata->time);
+	}
+
+	reg = ALARM_INT_STATUS;
+	err = tps80031_write_regs(&pdev->dev, RTC_STATUS, 1, &reg);
+	if (err) {
+		dev_err(&pdev->dev, "unable to program RTC_STATUS reg\n");
+		return -EBUSY;
+	}
+
+	err = tps80031_set_bits(pdev->dev.parent, 1, RTC_INT, ENABLE_ALARM_INT);
+	if (err) {
+		dev_err(&pdev->dev, "unable to program Interrupt Mask reg\n");
+		err = -EBUSY;
+		goto fail;
 	}
 
 	dev_set_drvdata(&pdev->dev, rtc);

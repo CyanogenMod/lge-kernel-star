@@ -34,12 +34,6 @@ enum {
 	MAX77663_IRQ_GPIO6,		/* GPIO6 edge detection */
 	MAX77663_IRQ_GPIO7,		/* GPIO7 edge detection */
 
-	MAX77663_IRQ_RTC_1SEC,		/* 1s timer expired */
-	MAX77663_IRQ_RTC_60SEC,		/* 60s timer expired */
-	MAX77663_IRQ_RTC_ALRM1,		/* Alarm 1 */
-	MAX77663_IRQ_RTC_ALRM2,		/* Alarm 2 */
-	MAX77663_IRQ_RTC_SMPL,		/* SMPL(Sudden Momentary Power Loss) */
-
 	MAX77663_IRQ_ONOFF_HRDPOWRN,	/* Hard power off warnning */
 	MAX77663_IRQ_ONOFF_EN0_1SEC,	/* EN0 active for 1s */
 	MAX77663_IRQ_ONOFF_EN0_FALLING,	/* EN0 falling */
@@ -49,6 +43,7 @@ enum {
 	MAX77663_IRQ_ONOFF_ACOK_FALLING,/* ACOK falling */
 	MAX77663_IRQ_ONOFF_ACOK_RISING,	/* ACOK rising */
 
+	MAX77663_IRQ_RTC,		/* RTC */
 	MAX77663_IRQ_SD_PF,		/* SD power fail */
 	MAX77663_IRQ_LDO_PF,		/* LDO power fail */
 	MAX77663_IRQ_32K,		/* 32kHz oscillator */

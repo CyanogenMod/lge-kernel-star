@@ -2534,6 +2534,7 @@ int cardhu_emc_init(void)
 
 	switch (board.board_id) {
 	case BOARD_PM269:
+	case BOARD_PM305:
 		if (MEMORY_TYPE(board.sku) == SKU_MEMORY_ELPIDA)
 			tegra_init_emc(cardhu_emc_tables_edb8132b2ma,
 					ARRAY_SIZE(cardhu_emc_tables_edb8132b2ma));
@@ -2545,7 +2546,7 @@ int cardhu_emc_init(void)
 		if (tegra_get_revision() == TEGRA_REVISION_A01)
 			tegra_init_emc(cardhu_emc_tables_h5tc2g,
 				ARRAY_SIZE(cardhu_emc_tables_h5tc2g));
-		else
+		else if (MEMORY_TYPE(board.sku) == SKU_MEMORY_CARDHU_1GB_1R)
 			tegra_init_emc(cardhu_emc_tables_h5tc2g_a2,
 				ARRAY_SIZE(cardhu_emc_tables_h5tc2g_a2));
 		break;
