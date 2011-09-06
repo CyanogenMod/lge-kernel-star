@@ -37,19 +37,19 @@ static const u32 core_process_speedos[][CORE_PROCESS_CORNERS_NUM] = {
 	{180}, /* threshold_index 0: soc_speedo_id 0: any A01 */
 
 /* T30 family */
-	{183}, /* threshold_index 1: soc_speedo_id 1: AP30 */
-	{197}, /* threshold_index 2: soc_speedo_id 2: T30  */
-	{197}, /* threshold_index 3: soc_speedo_id 2: T30S */
+	{180}, /* threshold_index 1: soc_speedo_id 1: AP30 */
+	{196}, /* threshold_index 2: soc_speedo_id 2: T30  */
+	{196}, /* threshold_index 3: soc_speedo_id 2: T30S */
 
 /* Characterization SKUs */
-	{170}, /* threshold_index 4: soc_speedo_id 1: AP30 char */
-	{195}, /* threshold_index 5: soc_speedo_id 2: T30  char */
-	{185}, /* threshold_index 6: soc_speedo_id 2: T30S char */
+	{168}, /* threshold_index 4: soc_speedo_id 1: AP30 char */
+	{192}, /* threshold_index 5: soc_speedo_id 2: T30  char */
+	{184}, /* threshold_index 6: soc_speedo_id 2: T30S char */
 
 /* T33 family: Numbers cloned from T30 family; FIXME: adjust these later */
-	{183}, /* threshold_index 7: soc_speedo_id = 1 - AP33 */
-	{197}, /* threshold_index 8: soc_speedo_id = 2 - T33  */
-	{197}, /* threshold_index 9: soc_speedo_id = 2 - T33S */
+	{180}, /* threshold_index 7: soc_speedo_id = 1 - AP33 */
+	{196}, /* threshold_index 8: soc_speedo_id = 2 - T33  */
+	{196}, /* threshold_index 9: soc_speedo_id = 2 - T33S */
 };
 
 /* Maximum speedo levels for each CPU process corner */
@@ -58,14 +58,14 @@ static const u32 cpu_process_speedos[][CPU_PROCESS_CORNERS_NUM] = {
 	{306, 338, 360, 376}, /* threshold_index 0: cpu_speedo_id 0: any A01 */
 
 /* T30 family */
-	{305, 336, 358, 375}, /* threshold_index 1: cpu_speedo_id 1: AP30 */
-	{336, 336, 358, 375}, /* threshold_index 2: cpu_speedo_id 2: T30  */
-	{336, 336, 358, 375}, /* threshold_index 3: cpu_speedo_id 3: T30S */
+	{304, 336, 359, 375}, /* threshold_index 1: cpu_speedo_id 1: AP30 */
+	{336, 336, 359, 375}, /* threshold_index 2: cpu_speedo_id 2: T30  */
+	{336, 336, 359, 375}, /* threshold_index 3: cpu_speedo_id 3: T30S */
 
 /* Characterization SKUs */
-	{295, 326, 348, 364}, /* threshold_index 4: cpu_speedo_id 1: AP30char */
-	{326, 326, 348, 364}, /* threshold_index 5: cpu_speedo_id 2: T30char  */
-	{326, 326, 348, 364}, /* threshold_index 6: cpu_speedo_id 3: T30Schar */
+	{292, 324, 348, 364}, /* threshold_index 4: cpu_speedo_id 1: AP30char */
+	{324, 324, 348, 364}, /* threshold_index 5: cpu_speedo_id 2: T30char  */
+	{324, 324, 348, 364}, /* threshold_index 6: cpu_speedo_id 3: T30Schar */
 
 /* T33 family: Numbers cloned from T30 family; FIXME: adjust these later */
 	{376, 376, 376, 376}, /* threshold_FIXME 7: cpu_speedo_id = 1 - AP33 */
