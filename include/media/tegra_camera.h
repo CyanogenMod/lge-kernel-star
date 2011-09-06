@@ -15,6 +15,10 @@
  */
 #ifndef TEGRA_CAMERA_H
 #define TEGRA_CAMERA_H
+
+/* this is to enable VI pattern generator (Null Sensor) */
+#define TEGRA_CAMERA_ENABLE_PD2VI_CLK 0x1
+
 enum {
 	TEGRA_CAMERA_MODULE_ISP = 0,
 	TEGRA_CAMERA_MODULE_VI,
