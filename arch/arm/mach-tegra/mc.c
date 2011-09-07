@@ -2,6 +2,7 @@
  * arch/arm/mach-tegra/mc.c
  *
  * Copyright (C) 2010 Google, Inc.
+ * Copyright (C) 2011 NVIDIA Corporation
  *
  * Author:
  *	Erik Gilling <konkers@google.com>

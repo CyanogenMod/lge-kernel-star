@@ -2,6 +2,7 @@
  * arch/arch/mach-tegra/timer.c
  *
  * Copyright (C) 2010 Google, Inc.
+ * Copyright (C) 2011 NVIDIA Corporation.
  *
  * Author:
  *	Colin Cross <ccross@google.com>
