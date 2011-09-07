@@ -71,7 +71,6 @@
 #define ALARM_EN_MASK			0x80
 #define ALARM_EN_SHIFT			7
 
-#define RTC_UPDATE_RETRIES		20
 #define RTC_YEAR_BASE			100
 #define RTC_YEAR_MAX			99
 
@@ -104,15 +103,11 @@ static inline int max77663_rtc_update_buffer(struct max77663_rtc *rtc,
 					     int write)
 {
 	struct device *parent = _to_parent(rtc);
-	int retries = RTC_UPDATE_RETRIES;
 	u8 val = FLAG_AUTO_CLEAR_MASK | RTC_WAKE_MASK | RB_UPDATE_MASK;
-	u8 flag_mask = RB_UPDATE_FLAG_MASK;
 	int ret;
 
-	if (write) {
+	if (write)
 		val = FLAG_AUTO_CLEAR_MASK | RTC_WAKE_MASK | WB_UPDATE_MASK;
-		flag_mask = WB_UPDATE_FLAG_MASK;
-	}
 
 	dev_dbg(rtc->dev, "rtc_update_buffer: write=%d, addr=0x%x, val=0x%x\n",
 		write, MAX77663_RTC_UPDATE0, val);
@@ -123,22 +118,12 @@ static inline int max77663_rtc_update_buffer(struct max77663_rtc *rtc,
 		return ret;
 	}
 
-	do {
-		ret = max77663_read(parent, MAX77663_RTC_UPDATE1, &val, 1, 1);
-		schedule_timeout_uninterruptible(msecs_to_jiffies(1));
-	} while (!ret && retries-- && !(val & flag_mask));
-
-	if (ret < 0) {
-		dev_err(rtc->dev,
-			"rtc_update_buffer: Failed to get rtc update1\n");
-		return ret;
-	}
-
-	if (retries <= 0) {
-		dev_err(rtc->dev, "rtc_update_buffer: "
-			"Timeout waiting for buffer update\n");
-		return -ETIMEDOUT;
-	}
+	/*
+	 * Must wait 14ms for buffer update.
+	 * If the sleeping time is 10us - 20ms, usleep_range() is recommended.
+	 * Please refer Documentation/timers/timers-howto.txt.
+	 */
+	usleep_range(14000, 14000);
 
 	return 0;
 }
