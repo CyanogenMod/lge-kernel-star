@@ -39,7 +39,7 @@
 * In case of using scrollwheel  Row3 and Col3/4/5
 * should NOT be configured as KBC
 */
-#ifdef CONFIG_INPUT_ALPS_GPIO_SCROLLWHEEL
+#if CONFIG_INPUT_ALPS_GPIO_SCROLLWHEEL
 #define WHISTLER_ROW_COUNT	3
 #define WHISTLER_COL_COUNT	2
 #else
@@ -48,19 +48,32 @@
 #endif
 
 #ifdef CONFIG_INPUT_ALPS_GPIO_SCROLLWHEEL
-static int plain_kbd_keycode[] = {
-	KEY_POWER,	KEY_RESERVED,
-	KEY_HOME,	KEY_BACK,
-	KEY_RESERVED,	KEY_MENU,
+static const u32 whistler_keymap[] = {
+	KEY(0, 0, KEY_POWER),
+	KEY(0, 1, KEY_RESERVED),
+	KEY(1, 0, KEY_HOME),
+	KEY(1, 1, KEY_BACK),
+	KEY(2, 0, KEY_RESERVED),
+	KEY(2, 1, KEY_MENU),
 };
 #else
-static int plain_kbd_keycode[] = {
-	KEY_POWER,      KEY_RESERVED,
-	KEY_HOME,       KEY_BACK,
-	KEY_RESERVED,   KEY_MENU,
-	KEY_RESERVED,   KEY_RESERVED
+static const u32 whistler_keymap[] = {
+	KEY(0, 0, KEY_POWER),
+	KEY(0, 1, KEY_RESERVED),
+	KEY(1, 0, KEY_HOME),
+	KEY(1, 1, KEY_BACK),
+	KEY(2, 0, KEY_RESERVED),
+	KEY(2, 1, KEY_MENU),
+	KEY(3, 0, KEY_RESERVED),
+	KEY(3, 1, KEY_RESERVED),
 };
 #endif
+
+static const struct matrix_keymap_data whistler_keymap_data = {
+	.keymap = whistler_keymap,
+	.keymap_size = ARRAY_SIZE(whistler_keymap),
+};
+
 static struct tegra_kbc_wake_key whistler_wake_cfg[] = {
 	[0] = {
 		.row = 0,
@@ -71,13 +84,11 @@ static struct tegra_kbc_wake_key whistler_wake_cfg[] = {
 static struct tegra_kbc_platform_data whistler_kbc_platform_data = {
 	.debounce_cnt = 20,
 	.repeat_cnt = 50 * 32,
-	.scan_timeout_cnt = 3000 * 32,
-	.plain_keycode = plain_kbd_keycode,
-	.fn_keycode = NULL,
-	.is_filter_keys = false,
-	.is_wake_on_any_key = false,
-	.wake_key_cnt = 1,
+	.wake_cnt = 1,
 	.wake_cfg = &whistler_wake_cfg[0],
+	.keymap_data = &whistler_keymap_data,
+	.use_fn_map = false,
+	.wakeup = true,
 };
 
 static struct resource whistler_kbc_resources[] = {
@@ -113,21 +124,16 @@ int __init whistler_kbc_init(void)
 	/* Setup the pin configuration information. */
 	for (i = 0; i < KBC_MAX_GPIO; i++) {
 		data->pin_cfg[i].num = 0;
-		data->pin_cfg[i].pin_type = kbc_pin_unused;
+		data->pin_cfg[i].is_row = false;
 	}
 
-	for (i = 0; i < WHISTLER_ROW_COUNT; i++) {
+	for (i = 0; i < KBC_MAX_ROW; i++) {
 		data->pin_cfg[i].num = i;
-		data->pin_cfg[i].pin_type = kbc_pin_row;
+		data->pin_cfg[i].is_row = true;
 	}
-	for (i = 0; i < WHISTLER_COL_COUNT; i++) {
-		data->pin_cfg[i + WHISTLER_ROW_COUNT].num = i;
-		data->pin_cfg[i + WHISTLER_ROW_COUNT].pin_type = kbc_pin_col;
-	}
+	for (i = 0; i < KBC_MAX_COL; i++)
+		data->pin_cfg[i + KBC_MAX_ROW].num = i;
 
 	platform_device_register(&whistler_kbc_device);
 	return 0;
 }
-
-
-
