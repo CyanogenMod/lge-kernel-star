@@ -133,7 +133,6 @@ static struct dvfs_relationship tegra3_dvfs_relationships[] = {
 	}
 
 static struct dvfs cpu_dvfs_table[] = {
-#if 0
 	/* Cpu voltages (mV):	     750, 775, 800, 825, 850, 875,  900,  925,  950,  975, 1000, 1025, 1050, 1075, 1100, 1125, 1150*/
 	CPU_DVFS("cpu_g", 0, 0, MHZ,   1,   1,   1,   1, 684, 684,  817,  817,  817, 1026, 1102, 1149, 1187, 1225, 1282, 1300),
 	CPU_DVFS("cpu_g", 0, 1, MHZ,   1,   1,   1,   1, 807, 807,  948,  948,  948, 1117, 1171, 1206, 1300),
@@ -153,7 +152,6 @@ static struct dvfs cpu_dvfs_table[] = {
 	CPU_DVFS("cpu_g", 3, 2, MHZ,   1,   1,   1,   1, 720, 720,  880,  880,  880, 1090, 1180, 1200, 1300, 1310, 1350, 1400),
 	CPU_DVFS("cpu_g", 3, 3, MHZ,   1,   1,   1,   1, 800, 800, 1000, 1000, 1000, 1180, 1230, 1300, 1320, 1350, 1400),
 
-#endif
 	/*
 	 * "Safe entry" to be used when no match for chip speedo, process
 	 *  corner is found (just to boot at low rate); must be the last one
@@ -174,7 +172,6 @@ static struct dvfs cpu_dvfs_table[] = {
 	}
 
 static struct dvfs core_dvfs_table[] = {
-#if 0
 	/* Core voltages (mV):		   1000,   1050,   1100,   1150,    1200,    1250,    1300 */
 	/* Clock limits for internal blocks, PLLs */
 	CORE_DVFS("cpu_lp", 0, 1, KHZ,   294000, 342000, 427000, 475000,  500000,  500000,  500000),
@@ -261,7 +258,6 @@ static struct dvfs core_dvfs_table[] = {
 	CORE_DVFS("disp2",  0, 0, KHZ,   120000, 120000, 120000, 120000, 190000,  190000,  190000),
 	CORE_DVFS("disp2",  1, 0, KHZ,   151000, 268000, 268000, 268000, 268000,  268000,  268000),
 	CORE_DVFS("disp2",  2, 0, KHZ,   151000, 268000, 268000, 268000, 268000,  268000,  268000),
-#endif
 };
 
 

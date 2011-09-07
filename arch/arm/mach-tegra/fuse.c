@@ -77,10 +77,8 @@ static const char *tegra_revision_name[TEGRA_REVISION_MAX] = {
 	[TEGRA_REVISION_UNKNOWN] = "unknown",
 	[TEGRA_REVISION_A01] = "A01",
 	[TEGRA_REVISION_A02] = "A02",
-#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 	[TEGRA_REVISION_A03] = "A03",
 	[TEGRA_REVISION_A03p] = "A03 prime",
-#endif
 };
 
 u32 tegra_fuse_readl(unsigned long offset)
@@ -292,55 +290,69 @@ int tegra_gpu_register_sets(void)
 #endif
 }
 
+struct chip_revision {
+	enum tegra_chipid	chipid;
+	unsigned int		major;
+	unsigned int		minor;
+	char			prime;
+	enum tegra_revision	revision;
+};
+
+#define CHIP_REVISION(id, m, n, p, rev) {	\
+	.chipid = TEGRA_CHIPID_##id,		\
+	.major = m,				\
+	.minor = n,				\
+	.prime = p,				\
+	.revision = TEGRA_REVISION_##rev }
+
+static struct chip_revision tegra_chip_revisions[] = {
+	CHIP_REVISION(TEGRA2, 1, 2, 0,   A02),
+	CHIP_REVISION(TEGRA2, 1, 3, 0,   A03),
+	CHIP_REVISION(TEGRA2, 1, 3, 'p', A03p),
+	CHIP_REVISION(TEGRA3, 1, 1, 0,   A01),
+	CHIP_REVISION(TEGRA3, 1, 2, 0,   A02),
+	CHIP_REVISION(TEGRA3, 1, 3, 0,   A03),
+};
+
 static enum tegra_revision tegra_decode_revision(const struct tegra_id *id)
 {
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-	if ((id->chipid & 0xf0) != TEGRA_CHIPID_TEGRA2)
-		return TEGRA_REVISION_UNKNOWN;
-#endif
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-	if ((id->chipid & 0xf0) != TEGRA_CHIPID_TEGRA3)
-		return TEGRA_REVISION_UNKNOWN;
+	enum tegra_revision revision = TEGRA_REVISION_UNKNOWN;
 
-	switch (id->major) {
-	case 0:
-		if (id->minor != 1)
-			return TEGRA_REVISION_UNKNOWN;
-		else if (id->netlist == 12 && (id->patch & 0xf) == 12)
-			return TEGRA_REVISION_A01;
-		else if (id->netlist == 12 && (id->patch & 0xf) > 12)
-			return TEGRA_REVISION_A02;
-		else if (id->netlist > 12)
-			return TEGRA_REVISION_A02;
-		else
-			return TEGRA_REVISION_UNKNOWN;
-	case 1:
+#if defined(CONFIG_TEGRA_SILICON_PLATFORM)
+	int i ;
+	char prime;
+
+	if (id->priv == NULL)
+		prime = 0;
+	else
+		prime = *(id->priv);
+
+	for (i = 0; i < ARRAY_SIZE(tegra_chip_revisions); i++) {
+		if ((id->chipid != tegra_chip_revisions[i].chipid) ||
+		    (id->minor != tegra_chip_revisions[i].minor) ||
+		    (id->major != tegra_chip_revisions[i].major) ||
+		    (prime != tegra_chip_revisions[i].prime))
+			continue;
+
+		revision = tegra_chip_revisions[i].revision;
 		break;
-	default:
-		return TEGRA_REVISION_UNKNOWN;
+	}
+
+#elif defined(CONFIG_TEGRA_FPGA_PLATFORM)
+	if ((id->chipid & 0xf0) == TEGRA_CHIPID_TEGRA3) {
+		if ((id->major == 0) && (id->minor == 1)) {
+			unsigned int patch = id->patch & 0xF;
+			if ((id->netlist == 12) && (patch == 12))
+				revision = TEGRA_REVISION_A01;
+			else if ((id->netlist == 12) && (patch > 12))
+				revision = TEGRA_REVISION_A02;
+			else if (id->netlist > 12)
+				revision = TEGRA_REVISION_A02;
+		}
 	}
 #endif
 
-	switch (id->minor) {
-	case 1:
-		BUG_ON((id->chipid & 0xf0) == TEGRA_CHIPID_TEGRA2);
-		return TEGRA_REVISION_A01;
-	case 2:
-		return TEGRA_REVISION_A02;
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-	case 3:
-		WARN_ON(id->priv == NULL);
-
-		return ((id->priv != NULL) &&
-			(*(id->priv) == 'p')) ? TEGRA_REVISION_A03p
-					      : TEGRA_REVISION_A03;
-#else
-	case 3:
-		return TEGRA_REVISION_A03;
-#endif
-	default:
-		return TEGRA_REVISION_UNKNOWN;
-	}
+	return revision;
 }
 
 static void tegra_set_tegraid(u32 chipid,
