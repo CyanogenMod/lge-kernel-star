@@ -684,6 +684,8 @@ static struct usb_phy_plat_data tegra_usb_phy_pdata[] = {
 			.instance = 0,
 			.vbus_gpio = -1,
 			.vbus_reg_supply = "usb_vbus",
+			.vbus_irq = ENT_TPS80031_IRQ_BASE +
+							TPS80031_INT_VBUS_DET,
 	},
 	[1] = {
 			.instance = 1,
