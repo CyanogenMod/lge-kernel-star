@@ -440,11 +440,11 @@ static struct ov5650_reg mode_1920x1080[] = {
 	{0x3804, 0x07}, // HREF width  higher 4 bits [3:0] pg 108
 	{0x3805, 0x80}, // HREF width  lower  8 bits [7:0] pg 108
 	{0x3806, 0x04}, // VREF height higher 4 bits [3:0] pg 109
-	{0x3807, 0x38}, // VREF height lower  8 bits [7:0] pg 109
+	{0x3807, 0x40}, // VREF height lower  8 bits [7:0] pg 109
 	{0x3808, 0x07}, // DVP horizontal output size higher 4 bits [3:0] pg 109
 	{0x3809, 0x80}, // DVP horizontal output size lower  8 bits [7:0] pg 109
 	{0x380a, 0x04}, // DVP vertical   output size higher 4 bits [3:0] pg 109
-	{0x380b, 0x38}, // DVP vertical   output size lower  8 bits [7:0] pg 109
+	{0x380b, 0x40}, // DVP vertical   output size lower  8 bits [7:0] pg 109
 	{0x380c, 0x0a}, // total horizontal size higher 5 bits [4:0] pg 109, line length
 	{0x380d, 0x84}, // total horizontal size lower  8 bits [7:0] pg 109, line length
 	{0x380e, 0x04}, // total vertical   size higher 5 bits [4:0] pg 109, frame length
