@@ -327,12 +327,12 @@ static int tegra_i2c_fill_tx_fifo(struct tegra_i2c_dev *i2c_dev)
 	if (words_to_transfer > tx_fifo_avail)
 		words_to_transfer = tx_fifo_avail;
 
+	i2c_writesl(i2c_dev, buf, I2C_TX_FIFO, words_to_transfer);
 	buf += words_to_transfer * BYTES_PER_FIFO_WORD;
 	buf_remaining -= words_to_transfer * BYTES_PER_FIFO_WORD;
 	tx_fifo_avail -= words_to_transfer;
 	i2c_dev->msg_buf_remaining = buf_remaining;
 	i2c_dev->msg_buf = buf;
-	i2c_writesl(i2c_dev, buf, I2C_TX_FIFO, words_to_transfer);
 
 	/*
 	 * If there is a partial word at the end of buf, handle it manually to
