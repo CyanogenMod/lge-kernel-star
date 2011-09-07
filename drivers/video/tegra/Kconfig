@@ -93,6 +93,14 @@ config NVMAP_CARVEOUT_COMPACTOR
 	  Say Y here to let nvmap to keep carveout fragmentation under control.
 
 
+config NVMAP_VPR
+	bool "Enable VPR Heap."
+	depends on TEGRA_NVMAP
+	default n
+	help
+	  Say Y here to enable Video Protection Region(VPR) heap.
+	  if unsure, say N.
+
 config TEGRA_DSI
 	bool "Enable DSI panel."
 	default n
