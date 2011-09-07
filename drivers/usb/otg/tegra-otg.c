@@ -223,6 +223,8 @@ static int tegra_otg_set_peripheral(struct otg_transceiver *otg,
 	val |= (USB_VBUS_INT_EN | USB_VBUS_WAKEUP_EN);
 	val |= (USB_ID_INT_EN | USB_ID_PIN_WAKEUP_EN);
 	otg_writel(tegra, val, USB_PHY_WAKEUP);
+	/* Add delay to make sure register is updated */
+	udelay(1);
 	clk_disable(tegra->clk);
 
 	if ((val & USB_ID_STATUS) && (val & USB_VBUS_STATUS)) {
