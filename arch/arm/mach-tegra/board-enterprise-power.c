@@ -320,7 +320,7 @@ static struct regulator_consumer_supply gpio_switch_pmu_3v3_en_supply[] = {
 	REGULATOR_SUPPLY("avdd_usb_hdmi_3v3", NULL),
 	REGULATOR_SUPPLY("avdd_usb", NULL),
 	REGULATOR_SUPPLY("avdd_hdmi", NULL),
-	REGULATOR_SUPPLY("vdd_nct1008", NULL),
+	REGULATOR_SUPPLY("vdd", "4-004c"),
 };
 static int gpio_switch_pmu_3v3_en_voltages[] = {3300};
 

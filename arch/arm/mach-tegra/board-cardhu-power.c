@@ -498,6 +498,7 @@ static struct regulator_consumer_supply gpio_switch_en_3v3_sys_supply[] = {
 	REGULATOR_SUPPLY("vdd_3v3_cam", NULL),
 	REGULATOR_SUPPLY("vdd_3v3_als", NULL),
 	REGULATOR_SUPPLY("debug_cons", NULL),
+	REGULATOR_SUPPLY("vdd", "4-004c"),
 };
 static int gpio_switch_en_3v3_sys_voltages[] = { 3300};
 
