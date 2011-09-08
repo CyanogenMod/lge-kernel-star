@@ -503,7 +503,7 @@ static int enterprise_dsi_panel_postsuspend(void)
 
 static struct tegra_dsi_cmd dsi_init_cmd[]= {
 	DSI_CMD_SHORT(0x05, 0x11, 0x00),
-	DSI_DLY_MS(150),
+	DSI_DLY_MS(20),
 #if(DC_CTRL_MODE & TEGRA_DC_OUT_ONE_SHOT_MODE)
 	DSI_CMD_SHORT(0x15, 0x35, 0x00),
 #endif
