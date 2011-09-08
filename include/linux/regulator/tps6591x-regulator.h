@@ -57,6 +57,7 @@ enum tps6591x_ext_control {
  * @init_uV: initial micro volts which need to be set.
  * @init_enable: Enable or do not enable the rails during initialization.
  * @init_apply: Init parameter applied or not.
+ * @slew_rate_uV_per_us: Slew rate microvolt per microsec.
  */
 
 struct tps6591x_regulator_platform_data {
@@ -65,6 +66,7 @@ struct tps6591x_regulator_platform_data {
 	unsigned init_enable:1;
 	unsigned init_apply:1;
 	enum tps6591x_ext_control ectrl;
+	int slew_rate_uV_per_us;
 };
 
 #endif	/* __REGULATOR_TPS6591X_H */

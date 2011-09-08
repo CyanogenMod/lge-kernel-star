@@ -85,8 +85,12 @@ struct tps6591x_regulator {
 
 	int *voltages;
 
-	int delay; /* delay in us for regulator to stabilize */
+	int enable_delay; /* delay in us for regulator to stabilize */
 	enum tps6591x_ext_control ectrl;
+	int current_volt_uv;
+
+	/* Time (micro sec) taken for 1uV change */
+	int voltage_change_uv_per_us;
 };
 
 static inline struct device *to_tps6591x_dev(struct regulator_dev *rdev)
@@ -98,7 +102,7 @@ static int tps6591x_regulator_enable_time(struct regulator_dev *rdev)
 {
 	struct tps6591x_regulator *ri = rdev_get_drvdata(rdev);
 
-	return ri->delay;
+	return ri->enable_delay;
 }
 
 static int __tps6591x_ext_control_set(struct device *parent,
@@ -155,6 +159,22 @@ static int __tps6591x_ext_control_set(struct device *parent,
 	return tps6591x_update(parent, addr, mask, mask);
 }
 
+static void wait_for_voltage_change(struct tps6591x_regulator *ri, int uV)
+{
+	int change_uv;
+	int change_us;
+
+	change_uv = abs(uV - ri->current_volt_uv);
+	change_us = change_uv/ri->voltage_change_uv_per_us + 1;
+	if (change_us >= 1000) {
+		mdelay(change_us/1000);
+		change_us -= (change_us/1000);
+	}
+	if (change_us)
+		udelay(change_us);
+	ri->current_volt_uv = uV;
+}
+
 static int __tps6591x_vio_set_voltage(struct device *parent,
 				      struct tps6591x_regulator *ri,
 				      int min_uV, int max_uV)
@@ -162,6 +182,7 @@ static int __tps6591x_vio_set_voltage(struct device *parent,
 	int uV;
 	uint8_t mask;
 	uint8_t val;
+	int ret;
 
 	for (val = 0; val < ri->desc.n_voltages; val++) {
 		uV = ri->voltages[val] * 1000;
@@ -173,8 +194,11 @@ static int __tps6591x_vio_set_voltage(struct device *parent,
 			mask = ((1 << ri->supply_reg.nbits) - 1) <<
 					ri->supply_reg.shift_bits;
 
-			return tps6591x_update(parent, ri->supply_reg.addr,
+			ret = tps6591x_update(parent, ri->supply_reg.addr,
 					val, mask);
+			if (ret >= 0)
+				wait_for_voltage_change(ri, uV);
+			return ret;
 		}
 	}
 
@@ -225,6 +249,7 @@ static int __tps6591x_ldo1_set_voltage(struct device *parent,
 {
 	int val, uV;
 	uint8_t mask;
+	int ret;
 
 	for (val = 0; val < ri->desc.n_voltages; val++) {
 		uV = ri->voltages[val] * 1000;
@@ -236,8 +261,11 @@ static int __tps6591x_ldo1_set_voltage(struct device *parent,
 			mask = ((1 << ri->supply_reg.nbits) - 1) <<
 					ri->supply_reg.shift_bits;
 
-			return tps6591x_update(parent, ri->supply_reg.addr,
+			ret = tps6591x_update(parent, ri->supply_reg.addr,
 					val, mask);
+			if (ret >= 0)
+				wait_for_voltage_change(ri, uV);
+			return ret;
 		}
 	}
 
@@ -284,6 +312,7 @@ static int __tps6591x_ldo3_set_voltage(struct device *parent,
 {
 	int val, uV;
 	uint8_t mask;
+	int ret;
 
 	for (val = 0; val < ri->desc.n_voltages; val++) {
 		uV = ri->voltages[val] * 1000;
@@ -295,8 +324,11 @@ static int __tps6591x_ldo3_set_voltage(struct device *parent,
 			mask = ((1 << ri->supply_reg.nbits) - 1) <<
 						ri->supply_reg.shift_bits;
 
-			return tps6591x_update(parent, ri->supply_reg.addr,
+			ret = tps6591x_update(parent, ri->supply_reg.addr,
 					val, mask);
+			if (ret >= 0)
+				wait_for_voltage_change(ri, uV);
+			return ret;
 		}
 	}
 
@@ -358,7 +390,7 @@ static int __tps6591x_vdd_set_voltage(struct device *parent,
 				val <<= ri->sr_reg.shift_bits;
 				mask = ((1 << ri->sr_reg.nbits) - 1)
 					<< ri->sr_reg.shift_bits;
-				return tps6591x_update(parent,
+				ret = tps6591x_update(parent,
 					ri->sr_reg.addr, val, mask);
 			} else {
 				val <<= ri->op_reg.shift_bits;
@@ -366,9 +398,10 @@ static int __tps6591x_vdd_set_voltage(struct device *parent,
 					<< ri->op_reg.shift_bits;
 				ret = tps6591x_update(parent,
 					ri->op_reg.addr, val, mask);
-				udelay(100);
-				return ret;
 			}
+			if (ret >= 0)
+				wait_for_voltage_change(ri, uV);
+			return ret;
 		}
 	}
 
@@ -532,7 +565,7 @@ static int tps6591x_vddctrl_voltages[] = {
 #define TPS6591X_REGULATOR(_id, vdata, _ops, s_addr, s_nbits, s_shift,		\
 			s_type, op_addr, op_nbits, op_shift, sr_addr,		\
 			sr_nbits, sr_shift, en1_addr, en1_shift, slp_off_addr,	\
-			slp_off_shift, en_time)					\
+			slp_off_shift, en_time, change_rate)			\
 	.desc	= {								\
 		.name	= tps6591x_rails(_id),					\
 		.ops	= &tps6591x_regulator_##_ops,				\
@@ -568,7 +601,8 @@ static int tps6591x_vddctrl_voltages[] = {
 		.shift_bits = slp_off_shift,					\
 	},									\
 	.voltages	= tps6591x_##vdata##_voltages,				\
-	.delay		= en_time,
+	.enable_delay		= en_time,					\
+	.voltage_change_uv_per_us = change_rate,
 
 #define TPS6591X_VIO(_id, vdata, s_addr, s_nbits, s_shift, s_type,	\
 			en1_shift, slp_off_shift, en_time)		\
@@ -576,7 +610,7 @@ static int tps6591x_vddctrl_voltages[] = {
 	TPS6591X_REGULATOR(_id, vdata, vio_ops, s_addr, s_nbits,	\
 			s_shift, s_type, INVALID, 0, 0,	INVALID, 0, 0,	\
 			EN1_SMPS, en1_shift, RES_OFF, slp_off_shift,	\
-			en_time)					\
+			en_time, 10000)					\
 }
 
 #define TPS6591X_LDO1(_id, vdata, s_addr, s_nbits, s_shift, s_type,	\
@@ -585,7 +619,7 @@ static int tps6591x_vddctrl_voltages[] = {
 	TPS6591X_REGULATOR(_id, vdata, ldo1_ops, s_addr, s_nbits,	\
 			s_shift, s_type, INVALID, 0, 0, INVALID, 0, 0,	\
 			EN1_LDO, en1_shift, LDO_OFF, slp_off_shift,	\
-			en_time)					\
+			en_time, 6000)					\
 }
 
 #define TPS6591X_LDO3(_id, vdata, s_addr, s_nbits, s_shift, s_type,	\
@@ -594,7 +628,7 @@ static int tps6591x_vddctrl_voltages[] = {
 	TPS6591X_REGULATOR(_id, vdata, ldo3_ops, s_addr, s_nbits,	\
 			s_shift, s_type, INVALID, 0, 0, INVALID, 0, 0,	\
 			EN1_LDO, en1_shift, LDO_OFF, slp_off_shift,	\
-			en_time)					\
+			en_time, 11000)					\
 }
 
 #define TPS6591X_VDD(_id, vdata, s_addr, s_nbits, s_shift, s_type,	\
@@ -604,7 +638,8 @@ static int tps6591x_vddctrl_voltages[] = {
 	TPS6591X_REGULATOR(_id, vdata, vdd_ops, s_addr, s_nbits,	\
 			s_shift, s_type, op_addr, op_nbits, op_shift,	\
 			sr_addr, sr_nbits, sr_shift, EN1_SMPS,		\
-			en1_shift, RES_OFF, slp_off_shift, en_time)	\
+			en1_shift, RES_OFF, slp_off_shift, en_time,	\
+			5000)						\
 }
 
 static struct tps6591x_regulator tps6591x_regulator[] = {
@@ -734,9 +769,13 @@ static int __devinit tps6591x_regulator_probe(struct platform_device *pdev)
 	tps_pdata = pdev->dev.platform_data;
 	ri->ectrl = tps_pdata->ectrl;
 
+	if (tps_pdata->slew_rate_uV_per_us)
+		ri->voltage_change_uv_per_us = tps_pdata->slew_rate_uV_per_us;
+
 	err = tps6591x_regulator_preinit(pdev->dev.parent, ri, tps_pdata);
 	if (err)
 		return err;
+
 
 	rdev = regulator_register(&ri->desc, &pdev->dev,
 				&tps_pdata->regulator, ri);
@@ -745,6 +784,7 @@ static int __devinit tps6591x_regulator_probe(struct platform_device *pdev)
 				ri->desc.name);
 		return PTR_ERR(rdev);
 	}
+	ri->current_volt_uv = ri->desc.ops->get_voltage(rdev);
 
 	platform_set_drvdata(pdev, rdev);
 
