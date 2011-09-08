@@ -113,6 +113,7 @@ void tegra_assert_system_reset(char mode, const char *cmd)
 #endif
 }
 static int modem_id;
+static int debug_uart_port_id;
 
 /* WARNING: There is implicit client of pllp_out3 like i2c, uart, dsi
  * and so this clock (pllp_out3) should never be disabled.
@@ -384,10 +385,16 @@ early_param("core_edp_mv", tegra_pmu_core_edp);
 
 static int __init tegra_debug_uartport(char *info)
 {
-	if (!strcmp(info, "hsport"))
+	char *p = info;
+	if (!strncmp(p, "hsport", 6))
 		is_tegra_debug_uart_hsport = true;
-	else if (!strcmp(info, "lsport"))
+	else if (!strncmp(p, "lsport", 6))
 		is_tegra_debug_uart_hsport = false;
+
+	if (p[6] == ',')
+		debug_uart_port_id = memparse(p + 7, &p);
+	else
+		debug_uart_port_id = -1;
 
 	return 1;
 }
@@ -397,6 +404,10 @@ bool is_tegra_debug_uartport_hs(void)
 	return is_tegra_debug_uart_hsport;
 }
 
+int get_tegra_uart_debug_port_id(void)
+{
+	return debug_uart_port_id;
+}
 __setup("debug_uartport=", tegra_debug_uartport);
 
 void tegra_get_board_info(struct board_info *bi)
