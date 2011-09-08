@@ -596,7 +596,7 @@ static int tegra2_bus_clk_set_rate(struct clk *c, unsigned long rate)
 
 	val = clk_readl(c->reg);
 	for (i = 1; i <= 4; i++) {
-		if (rate == parent_rate / i) {
+		if (rate >= parent_rate / i) {
 			val &= ~(BUS_CLK_DIV_MASK << c->reg_shift);
 			val |= (i - 1) << c->reg_shift;
 			clk_writel(val, c->reg);
