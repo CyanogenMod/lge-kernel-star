@@ -53,6 +53,7 @@ static struct nct1008_platform_data enterprise_nct1008_pdata = {
 	.ext_range = true,
 	.conv_rate = 0x08,
 	.hysteresis = 5,
+	.offset = 8, /* 4 * 2C. Bug 844025 - 1C for device accuracies */
 	.shutdown_ext_limit = 90,
 	.shutdown_local_limit = 90,
 	.throttling_ext_limit = 75,
@@ -70,7 +71,6 @@ static struct i2c_board_info enterprise_i2c4_nct1008_board_info[] = {
 static void enterprise_nct1008_init(void)
 {
 	int ret;
-	struct nct1008_platform_data *pdata;
 #ifdef CONFIG_TEGRA_EDP_LIMITS
 	const struct tegra_edp_limits *z;
 	int zones_sz;
@@ -91,10 +91,6 @@ static void enterprise_nct1008_init(void)
 		gpio_free(TEGRA_GPIO_PH7);
 		return;
 	}
-
-	/* Temperature guardband AP30S DSC: bug 844025 */
-	pdata = enterprise_i2c4_nct1008_board_info[0].platform_data;
-	pdata->offset = 33; /* 4 * 8.25C */
 
 	i2c_register_board_info(4, enterprise_i2c4_nct1008_board_info,
 				ARRAY_SIZE(enterprise_i2c4_nct1008_board_info));
