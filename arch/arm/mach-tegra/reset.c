@@ -67,15 +67,13 @@ void tegra_cpu_reset_handler_enable(void)
 }
 
 #ifdef CONFIG_PM_SLEEP
-static unsigned long cpu_reset_handler_save[TEGRA_RESET_DATA_SIZE];
-
 void tegra_cpu_reset_handler_save(void)
 {
 	unsigned int i;
 	BUG_ON(!is_enabled);
 	for (i = 0; i < TEGRA_RESET_DATA_SIZE; i++)
-		cpu_reset_handler_save[i] =
-					tegra_cpu_reset_handler_ptr[i];
+		__tegra_cpu_reset_handler_data[i] =
+			tegra_cpu_reset_handler_ptr[i];
 	is_enabled = false;
 }
 
@@ -83,9 +81,10 @@ void tegra_cpu_reset_handler_restore(void)
 {
 	unsigned int i;
 	BUG_ON(is_enabled);
+	tegra_cpu_reset_handler_enable();
 	for (i = 0; i < TEGRA_RESET_DATA_SIZE; i++)
 		tegra_cpu_reset_handler_ptr[i] =
-					cpu_reset_handler_save[i];
+			__tegra_cpu_reset_handler_data[i];
 	is_enabled = true;
 }
 #endif

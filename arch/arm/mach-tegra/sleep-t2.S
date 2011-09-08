@@ -241,6 +241,13 @@ ENTRY(tegra2_sleep_wfi)
 #else
 	mcr	p15, 0, r11, c1, c0, 1	@ reenable coherency
 
+	/* Invalidate the TLBs & BTAC */
+	mov	r1, #0
+	mcr	p15, 0, r1, c8, c3, 0	@ invalidate shared TLBs
+	mcr	p15, 0, r1, c7, c1, 6	@ invalidate shared BTAC
+	dsb
+	isb
+
 	@ the cpu was running with coherency disabled, caches may be out of date
 #ifdef MULTI_CACHE
 	mov32	r10, cpu_cache

@@ -2,6 +2,7 @@
  * drivers/regulator/tegra-regulator.c
  *
  * Copyright (c) 2010 Google, Inc
+ * Copyright (C) 2011 NVIDIA Corporation.
  *
  * Author:
  *	Colin Cross <ccross@google.com>

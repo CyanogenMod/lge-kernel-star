@@ -27,6 +27,7 @@
 #include <linux/io.h>
 #include <linux/clk.h>
 #include <linux/cpufreq.h>
+#include <linux/syscore_ops.h>
 
 #include <asm/clkdev.h>
 
@@ -4095,46 +4096,6 @@ static void tegra3_init_one_clock(struct clk *c)
 	clkdev_add(&c->lookup);
 }
 
-void __init tegra_soc_init_clocks(void)
-{
-	int i;
-	struct clk *c;
-
-	for (i = 0; i < ARRAY_SIZE(tegra_ptr_clks); i++)
-		tegra3_init_one_clock(tegra_ptr_clks[i]);
-
-	for (i = 0; i < ARRAY_SIZE(tegra_list_clks); i++)
-		tegra3_init_one_clock(&tegra_list_clks[i]);
-
-	for (i = 0; i < ARRAY_SIZE(tegra_clk_duplicates); i++) {
-		c = tegra_get_clock_by_name(tegra_clk_duplicates[i].name);
-		if (!c) {
-			pr_err("%s: Unknown duplicate clock %s\n", __func__,
-				tegra_clk_duplicates[i].name);
-			continue;
-		}
-
-		tegra_clk_duplicates[i].lookup.clk = c;
-		clkdev_add(&tegra_clk_duplicates[i].lookup);
-	}
-
-	for (i = 0; i < ARRAY_SIZE(tegra_sync_source_list); i++)
-		tegra3_init_one_clock(&tegra_sync_source_list[i]);
-	for (i = 0; i < ARRAY_SIZE(tegra_clk_audio_list); i++)
-		tegra3_init_one_clock(&tegra_clk_audio_list[i]);
-	for (i = 0; i < ARRAY_SIZE(tegra_clk_audio_2x_list); i++)
-		tegra3_init_one_clock(&tegra_clk_audio_2x_list[i]);
-
-	init_clk_out_mux();
-	for (i = 0; i < ARRAY_SIZE(tegra_clk_out_list); i++)
-		tegra3_init_one_clock(&tegra_clk_out_list[i]);
-
-	emc_bridge = &tegra_clk_emc_bridge;
-
-	/* Initialize to default */
-	tegra_init_cpu_edp_limits(0);
-}
-
 #ifdef CONFIG_CPU_FREQ
 
 /*
@@ -4296,7 +4257,7 @@ unsigned long tegra_emc_to_cpu_ratio(unsigned long cpu_rate)
 static u32 clk_rst_suspend[RST_DEVICES_NUM + CLK_OUT_ENB_NUM +
 			   PERIPH_CLK_SOURCE_NUM + 22];
 
-void tegra_clk_suspend(void)
+static int tegra_clk_suspend(void)
 {
 	unsigned long off;
 	u32 *ctx = clk_rst_suspend;
@@ -4353,9 +4314,11 @@ void tegra_clk_suspend(void)
 
 	*ctx++ = clk_readl(MISC_CLK_ENB);
 	*ctx++ = clk_readl(CLK_MASK_ARM);
+
+	return 0;
 }
 
-void tegra_clk_resume(void)
+static void tegra_clk_resume(void)
 {
 	unsigned long off;
 	const u32 *ctx = clk_rst_suspend;
@@ -4489,4 +4452,54 @@ void tegra_clk_resume(void)
 	tegra3_pll_clk_init(&tegra_pll_u); /* Re-init utmi parameters */
 	tegra3_pll_clk_init(&tegra_pll_p); /* Fire a bug if not restored */
 }
+#else
+#define tegra_clk_suspend NULL
+#define tegra_clk_resume NULL
 #endif
+
+static struct syscore_ops tegra_clk_syscore_ops = {
+	.suspend = tegra_clk_suspend,
+	.resume = tegra_clk_resume,
+};
+
+void __init tegra_soc_init_clocks(void)
+{
+	int i;
+	struct clk *c;
+
+	for (i = 0; i < ARRAY_SIZE(tegra_ptr_clks); i++)
+		tegra3_init_one_clock(tegra_ptr_clks[i]);
+
+	for (i = 0; i < ARRAY_SIZE(tegra_list_clks); i++)
+		tegra3_init_one_clock(&tegra_list_clks[i]);
+
+	for (i = 0; i < ARRAY_SIZE(tegra_clk_duplicates); i++) {
+		c = tegra_get_clock_by_name(tegra_clk_duplicates[i].name);
+		if (!c) {
+			pr_err("%s: Unknown duplicate clock %s\n", __func__,
+				tegra_clk_duplicates[i].name);
+			continue;
+		}
+
+		tegra_clk_duplicates[i].lookup.clk = c;
+		clkdev_add(&tegra_clk_duplicates[i].lookup);
+	}
+
+	for (i = 0; i < ARRAY_SIZE(tegra_sync_source_list); i++)
+		tegra3_init_one_clock(&tegra_sync_source_list[i]);
+	for (i = 0; i < ARRAY_SIZE(tegra_clk_audio_list); i++)
+		tegra3_init_one_clock(&tegra_clk_audio_list[i]);
+	for (i = 0; i < ARRAY_SIZE(tegra_clk_audio_2x_list); i++)
+		tegra3_init_one_clock(&tegra_clk_audio_2x_list[i]);
+
+	init_clk_out_mux();
+	for (i = 0; i < ARRAY_SIZE(tegra_clk_out_list); i++)
+		tegra3_init_one_clock(&tegra_clk_out_list[i]);
+
+	emc_bridge = &tegra_clk_emc_bridge;
+
+	/* Initialize to default */
+	tegra_init_cpu_edp_limits(0);
+
+	register_syscore_ops(&tegra_clk_syscore_ops);
+}

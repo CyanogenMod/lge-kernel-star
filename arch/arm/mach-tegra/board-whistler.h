@@ -28,6 +28,11 @@ int whistler_emc_init(void);
 
 /* Interrupt numbers from external peripherals */
 #define MAX8907C_INT_BASE       TEGRA_NR_IRQS
-#define MAX8907C_INT_END        (MAX8907C_INT_BASE + 32)
+#define MAX8907C_INT_END        (MAX8907C_INT_BASE + 31)
+
+/* Audio-related GPIOs */
+#define WHISTLER_GPIO_WM8753(_x_)	(MAX8907C_INT_END + 1 + (_x_))
+#define TEGRA_GPIO_SPKR_EN		WHISTLER_GPIO_WM8753(2)
+#define TEGRA_GPIO_HP_DET		TEGRA_GPIO_PW2
 
 #endif

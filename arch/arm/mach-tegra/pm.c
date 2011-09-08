@@ -133,9 +133,14 @@ struct suspend_context tegra_sctx;
 #define PMC_COREPWRGOOD_TIMER	0x3c
 #define PMC_SCRATCH0		0x50
 #define PMC_SCRATCH1		0x54
+#define PMC_SCRATCH4		0x60
 #define PMC_CPUPWRGOOD_TIMER	0xc8
 #define PMC_CPUPWROFF_TIMER	0xcc
 #define PMC_COREPWROFF_TIMER	PMC_WAKE_DELAY
+
+#ifdef CONFIG_TEGRA_CLUSTER_CONTROL
+#define PMC_SCRATCH4_WAKE_CLUSTER_MASK	(1<<31)
+#endif
 
 #define CLK_RESET_CCLK_BURST	0x20
 #define CLK_RESET_CCLK_DIVIDER  0x24
@@ -759,12 +764,7 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode, unsigned int flags)
 
 	tegra_common_suspend();
 
-	pr_info("Entering suspend state %s\n", lp_state[mode]);
-
 	tegra_pm_set(mode);
-
-	if (flags & TEGRA_POWER_CLUSTER_MASK)
-		tegra_cluster_switch_prolog(flags);
 
 	if (pdata && pdata->board_suspend)
 		pdata->board_suspend(mode, TEGRA_SUSPEND_BEFORE_CPU);
@@ -775,14 +775,22 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode, unsigned int flags)
 	cpu_complex_pm_enter();
 
 	if (mode == TEGRA_SUSPEND_LP0) {
-		tegra_lp0_cpu_mode(true);
+#ifdef CONFIG_TEGRA_CLUSTER_CONTROL
+		u32 reg = readl(pmc + PMC_SCRATCH4);
+		if (is_lp_cluster())
+			reg |= PMC_SCRATCH4_WAKE_CLUSTER_MASK;
+		else
+			reg &= (~PMC_SCRATCH4_WAKE_CLUSTER_MASK);
+		pmc_32kwritel(reg, PMC_SCRATCH4);
+#endif
 		tegra_lp0_suspend_mc();
+		tegra_cpu_reset_handler_save();
+
 	}
+	else if (mode == TEGRA_SUSPEND_LP1)
+		*iram_cpu_lp1_mask = 1;
 
 	suspend_cpu_complex(flags);
-
-	if (mode == TEGRA_SUSPEND_LP1)
-		*iram_cpu_lp1_mask = 1;
 
 	flush_cache_all();
 	outer_flush_all();
@@ -796,8 +804,8 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode, unsigned int flags)
 	tegra_init_cache();
 
 	if (mode == TEGRA_SUSPEND_LP0) {
+		tegra_cpu_reset_handler_restore();
 		tegra_lp0_resume_mc();
-		tegra_lp0_cpu_mode(false);
 	} else if (mode == TEGRA_SUSPEND_LP1)
 		*iram_cpu_lp1_mask = 0;
 
@@ -812,11 +820,6 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode, unsigned int flags)
 	local_fiq_enable();
 
 	tegra_common_resume();
-
-	if (flags & TEGRA_POWER_CLUSTER_MASK)
-		tegra_cluster_switch_epilog(mode);
-
-	pr_info("Exited suspend state %s\n", lp_state[mode]);
 
 	return 0;
 }
@@ -894,6 +897,33 @@ static struct kobj_attribute suspend_mode_attribute =
 
 static struct kobject *suspend_kobj;
 #endif
+
+static int tegra_pm_enter_suspend(void)
+{
+	pr_info("Entering suspend state %s\n", lp_state[current_suspend_mode]);
+	if (current_suspend_mode == TEGRA_SUSPEND_LP0)
+		tegra_lp0_cpu_mode(true);
+	return 0;
+}
+
+static void tegra_pm_enter_resume(void)
+{
+	if (current_suspend_mode == TEGRA_SUSPEND_LP0)
+		tegra_lp0_cpu_mode(false);
+	pr_info("Exited suspend state %s\n", lp_state[current_suspend_mode]);
+}
+
+static struct syscore_ops tegra_pm_enter_syscore_ops = {
+	.suspend = tegra_pm_enter_suspend,
+	.resume = tegra_pm_enter_resume,
+};
+
+static __init int tegra_pm_enter_syscore_init(void)
+{
+	register_syscore_ops(&tegra_pm_enter_syscore_ops);
+	return 0;
+}
+subsys_initcall(tegra_pm_enter_syscore_init);
 
 void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 {
