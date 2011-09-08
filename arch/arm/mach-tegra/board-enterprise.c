@@ -38,6 +38,7 @@
 #include <linux/tegra_uart.h>
 #include <linux/fsl_devices.h>
 #include <linux/i2c/atmel_mxt_ts.h>
+#include <linux/memblock.h>
 
 #include <sound/max98088.h>
 
@@ -593,6 +594,19 @@ static struct platform_device enterprise_audio_device = {
 	},
 };
 
+static struct resource ram_console_resources[] = {
+	{
+		.flags = IORESOURCE_MEM,
+	},
+};
+
+static struct platform_device ram_console_device = {
+	.name 		= "ram_console",
+	.id 		= -1,
+	.num_resources	= ARRAY_SIZE(ram_console_resources),
+	.resource	= ram_console_resources,
+};
+
 static struct platform_device *enterprise_devices[] __initdata = {
 	&tegra_usb_fsg_device,
 	&androidusb_device,
@@ -621,6 +635,7 @@ static struct platform_device *enterprise_devices[] __initdata = {
 #if defined(CONFIG_CRYPTO_DEV_TEGRA_AES)
 	&tegra_aes_device,
 #endif
+	&ram_console_device,
 };
 
 #define MXT_CONFIG_CRC 0x62F903
@@ -887,6 +902,26 @@ static void __init tegra_enterprise_init(void)
 	tegra_release_bootloader_fb();
 }
 
+static void __init tegra_enterprise_ramconsole_reserve(unsigned long size)
+{
+	struct resource *res;
+	long ret;
+
+	res = platform_get_resource(&ram_console_device, IORESOURCE_MEM, 0);
+	if (!res) {
+		pr_err("Failed to find memory resource for ram console\n");
+		return;
+	}
+	res->start = memblock_end_of_DRAM() - size;
+	res->end = res->start + size - 1;
+	ret = memblock_remove(res->start, size);
+	if (ret) {
+		ram_console_device.resource = NULL;
+		ram_console_device.num_resources = 0;
+		pr_err("Failed to reserve memory block for ram console\n");
+	}
+}
+
 static void __init tegra_enterprise_reserve(void)
 {
 #if defined(CONFIG_NVMAP_CONVERT_CARVEOUT_TO_IOVMM)
@@ -894,6 +929,7 @@ static void __init tegra_enterprise_reserve(void)
 #else
 	tegra_reserve(SZ_128M, SZ_4M, SZ_8M);
 #endif
+	tegra_enterprise_ramconsole_reserve(SZ_1M);
 }
 
 MACHINE_START(TEGRA_ENTERPRISE, "tegra_enterprise")
