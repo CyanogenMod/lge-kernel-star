@@ -406,6 +406,9 @@ int __init cardhu_regulator_init(void)
 			tps_platform.subdevs = tps_devs_e1198_skubit0_0;
 		}
 	} else {
+		if (board_info.board_id == BOARD_PM269)
+			pdata_ldo3_e118x.slew_rate_uV_per_us = 250;
+
 		if (pmu_board_info.sku & SKU_DCDC_TPS62361_SUPPORT) {
 			tps_platform.num_subdevs = ARRAY_SIZE(tps_devs_e118x_skubit0_1);
 			tps_platform.subdevs = tps_devs_e118x_skubit0_1;
