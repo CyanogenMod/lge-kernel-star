@@ -433,13 +433,14 @@ static void __init uart_debug_init(void)
 	tegra_get_board_info(&board_info);
 	/* UARTB is debug port
 	 *       for SLT - E1186/E1187/PM269
-	 *       for E1256
+	 *       for E1256/E1257
 	 */
 	if (((board_info.sku & SKU_SLT_ULPI_SUPPORT) &&
 		((board_info.board_id == BOARD_E1186) ||
 		(board_info.board_id == BOARD_E1187) ||
 		(board_info.board_id == BOARD_PM269))) ||
-		(board_info.board_id == BOARD_E1256)) {
+		(board_info.board_id == BOARD_E1256) ||
+		(board_info.board_id == BOARD_E1257)) {
 			/* UARTB is the debug port. */
 			pr_info("Selecting UARTB as the debug console\n");
 			cardhu_uart_devices[1] = &debug_uartb_device;

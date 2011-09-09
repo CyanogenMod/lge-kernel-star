@@ -587,6 +587,7 @@ static int cardhu_nct1008_init(void)
 
 	if ((board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1291) ||
+		(board_info.board_id == BOARD_E1257) ||
 		(board_info.board_id == BOARD_PM269) ||
 		(board_info.board_id == BOARD_PM305) ||
 		(board_info.board_id == BOARD_PM311)) {

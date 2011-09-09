@@ -30,6 +30,7 @@
 #define BOARD_E1186   0x0B56
 #define BOARD_E1198   0x0B62
 #define BOARD_E1256   0x0C38
+#define BOARD_E1257   0x0C39
 #define BOARD_E1291   0x0C5B
 #define BOARD_PM267   0x0243
 #define BOARD_PM269   0x0245
