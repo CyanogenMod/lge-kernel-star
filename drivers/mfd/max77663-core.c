@@ -360,7 +360,7 @@ static inline int max77663_cache_write(struct device *dev, u8 addr, u8 mask,
 		ret = max77663_write(dev, addr, &new_val, 1, 0);
 		if (ret < 0)
 			return ret;
-		*cache = val;
+		*cache = new_val;
 	}
 	return 0;
 }
