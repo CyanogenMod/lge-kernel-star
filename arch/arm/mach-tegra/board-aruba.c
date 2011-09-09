@@ -43,6 +43,7 @@
 #include <mach/io.h>
 #include <mach/i2s.h>
 #include <mach/audio.h>
+#include <mach/tegra_das.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <mach/usb_phy.h>
@@ -199,6 +200,78 @@ static struct platform_device androidusb_device = {
 	.id     = -1,
 	.dev    = {
 		.platform_data  = &andusb_plat,
+	},
+};
+
+struct tegra_das_platform_data tegra_das_pdata = {
+	.tegra_dap_port_info_table = {
+		/* I2S0 <--> NULL */
+		[0] = {
+			.dac_port = tegra_das_port_none,
+			.codec_type = tegra_audio_codec_type_none,
+			.device_property = {
+				.num_channels = 0,
+				.bits_per_sample = 0,
+				.rate = 0,
+				.master = 0,
+				.lrck_high_left = false,
+				.dac_dap_data_comm_format = 0,
+			},
+		},
+		/* I2S1 <--> Hifi Codec */
+		[1] = {
+			.dac_port = tegra_das_port_i2s1,
+			.codec_type = tegra_audio_codec_type_hifi,
+			.device_property = {
+				.num_channels = 2,
+				.bits_per_sample = 16,
+				.rate = 48000,
+				.master = 0,
+				.lrck_high_left = false,
+				.dac_dap_data_comm_format =
+						dac_dap_data_format_i2s,
+			},
+		},
+		/* I2s2 <--> BB */
+		[2] = {
+			.dac_port = tegra_das_port_i2s2,
+			.codec_type = tegra_audio_codec_type_baseband,
+			.device_property = {
+				.num_channels = 1,
+				.bits_per_sample = 16,
+				.rate = 16000,
+				.master = 0,
+				.lrck_high_left = true,
+				.dac_dap_data_comm_format =
+					dac_dap_data_format_dsp,
+			},
+		},
+		/* I2s3 <--> BT */
+		[3] = {
+			.dac_port = tegra_das_port_i2s3,
+			.codec_type = tegra_audio_codec_type_bluetooth,
+			.device_property = {
+				.num_channels = 1,
+				.bits_per_sample = 16,
+				.rate = 8000,
+				.master = 0,
+				.lrck_high_left = false,
+				.dac_dap_data_comm_format =
+					dac_dap_data_format_dsp,
+			},
+		},
+		[4] = {
+			.dac_port = tegra_das_port_none,
+			.codec_type = tegra_audio_codec_type_none,
+			.device_property = {
+				.num_channels = 0,
+				.bits_per_sample = 0,
+				.rate = 0,
+				.master = 0,
+				.lrck_high_left = false,
+				.dac_dap_data_comm_format = 0,
+			},
+		},
 	},
 };
 

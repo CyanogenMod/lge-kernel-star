@@ -69,3 +69,8 @@ int __init aruba_regulator_init(void)
 	tegra_init_suspend(&aruba_suspend_data);
 	return 0;
 }
+
+void __init tegra_tsensor_init(void)
+{
+	/* No tsensor on FPGAs */
+}
