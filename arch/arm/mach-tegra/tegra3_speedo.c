@@ -38,8 +38,8 @@ static const u32 core_process_speedos[][CORE_PROCESS_CORNERS_NUM] = {
 
 /* T30 family */
 	{180}, /* threshold_index 1: soc_speedo_id 1: AP30 */
-	{196}, /* threshold_index 2: soc_speedo_id 2: T30  */
-	{196}, /* threshold_index 3: soc_speedo_id 2: T30S */
+	{204}, /* threshold_index 2: soc_speedo_id 2: T30  */
+	{192}, /* threshold_index 3: soc_speedo_id 2: T30S */
 
 /* Characterization SKUs */
 	{168}, /* threshold_index 4: soc_speedo_id 1: AP30 char */
