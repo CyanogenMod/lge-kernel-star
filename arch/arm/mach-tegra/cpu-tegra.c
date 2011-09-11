@@ -50,10 +50,38 @@ static struct cpufreq_frequency_table *freq_table;
 static struct clk *cpu_clk;
 static struct clk *emc_clk;
 
+static unsigned long policy_max_speed[CONFIG_NR_CPUS];
 static unsigned long target_cpu_speed[CONFIG_NR_CPUS];
 static DEFINE_MUTEX(tegra_cpu_lock);
 static bool is_suspended;
 static int suspend_index;
+
+static bool force_policy_max;
+
+static int force_policy_max_set(const char *arg, const struct kernel_param *kp)
+{
+	int ret;
+	bool old_policy = force_policy_max;
+
+	ret = param_set_bool(arg, kp);
+
+	if ((ret == 0) && (old_policy != force_policy_max))
+		tegra_cpu_set_speed_cap(NULL);
+
+	return ret;
+}
+
+static int force_policy_max_get(char *buffer, const struct kernel_param *kp)
+{
+	return param_get_bool(buffer, kp);
+}
+
+static struct kernel_param_ops policy_ops = {
+	.set = force_policy_max_set,
+	.get = force_policy_max_get,
+};
+module_param_cb(force_policy_max, &policy_ops, &force_policy_max, 0644);
+
 
 #ifdef CONFIG_TEGRA_THERMAL_THROTTLE
 
@@ -388,11 +416,16 @@ unsigned long tegra_cpu_lowest_speed(void) {
 }
 
 unsigned long tegra_cpu_highest_speed(void) {
+	unsigned long policy_max = ULONG_MAX;
 	unsigned long rate = 0;
 	int i;
 
-	for_each_online_cpu(i)
+	for_each_online_cpu(i) {
+		if (force_policy_max)
+			policy_max = min(policy_max, policy_max_speed[i]);
 		rate = max(rate, target_cpu_speed[i]);
+	}
+	rate = min(rate, policy_max);
 	return rate;
 }
 
@@ -513,6 +546,25 @@ static int tegra_cpu_exit(struct cpufreq_policy *policy)
 	return 0;
 }
 
+static int tegra_cpufreq_policy_notifier(
+	struct notifier_block *nb, unsigned long event, void *data)
+{
+	int i, ret;
+	struct cpufreq_policy *policy = data;
+
+	if (event == CPUFREQ_NOTIFY) {
+		ret = cpufreq_frequency_table_target(policy, freq_table,
+			policy->max, CPUFREQ_RELATION_H, &i);
+		policy_max_speed[policy->cpu] =
+			ret ? policy->max : freq_table[i].frequency;
+	}
+	return NOTIFY_OK;
+}
+
+static struct notifier_block tegra_cpufreq_policy_nb = {
+	.notifier_call = tegra_cpufreq_policy_notifier,
+};
+
 static struct freq_attr *tegra_cpufreq_attr[] = {
 	&cpufreq_freq_attr_scaling_available_freqs,
 #ifdef CONFIG_TEGRA_THERMAL_THROTTLE
@@ -552,6 +604,12 @@ static int __init tegra_cpufreq_init(void)
 
 	freq_table = table_data->freq_table;
 	tegra_cpu_edp_init(false);
+
+	ret = cpufreq_register_notifier(
+		&tegra_cpufreq_policy_nb, CPUFREQ_POLICY_NOTIFIER);
+	if (ret)
+		return ret;
+
 	return cpufreq_register_driver(&tegra_cpufreq_driver);
 }
 
@@ -561,6 +619,8 @@ static void __exit tegra_cpufreq_exit(void)
 	tegra_cpu_edp_exit();
 	tegra_auto_hotplug_exit();
 	cpufreq_unregister_driver(&tegra_cpufreq_driver);
+	cpufreq_unregister_notifier(
+		&tegra_cpufreq_policy_nb, CPUFREQ_POLICY_NOTIFIER);
 }
 
 
