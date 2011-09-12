@@ -483,7 +483,6 @@ static void __init tegra_whistler_init(void)
 	whistler_regulator_init();
 	whistler_panel_init();
 	whistler_sensors_init();
-	whistler_touch_init();
 	whistler_kbc_init();
 	whistler_bt_rfkill();
 	whistler_gps_init();

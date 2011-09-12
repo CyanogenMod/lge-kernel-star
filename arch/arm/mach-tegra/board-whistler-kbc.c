@@ -39,7 +39,7 @@
 * In case of using scrollwheel  Row3 and Col3/4/5
 * should NOT be configured as KBC
 */
-#if CONFIG_INPUT_ALPS_GPIO_SCROLLWHEEL
+#ifdef CONFIG_INPUT_ALPS_GPIO_SCROLLWHEEL
 #define WHISTLER_ROW_COUNT	3
 #define WHISTLER_COL_COUNT	2
 #else
