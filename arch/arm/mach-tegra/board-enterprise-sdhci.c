@@ -96,9 +96,10 @@ int __init enterprise_sdhci_init(void)
 {
 	platform_device_register(&tegra_sdhci_device3);
 
+	tegra_gpio_enable(ENTERPRISE_SD_CD);
 	tegra_sdhci_platform_data2.cd_gpio = ENTERPRISE_SD_CD;
+
 	platform_device_register(&tegra_sdhci_device2);
 
-	platform_device_register(&tegra_sdhci_device0);
 	return 0;
 }
