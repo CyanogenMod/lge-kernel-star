@@ -898,6 +898,7 @@ static struct kobj_attribute suspend_mode_attribute =
 static struct kobject *suspend_kobj;
 #endif
 
+#ifdef CONFIG_PM_SLEEP
 static int tegra_pm_enter_suspend(void)
 {
 	pr_info("Entering suspend state %s\n", lp_state[current_suspend_mode]);
@@ -924,6 +925,7 @@ static __init int tegra_pm_enter_syscore_init(void)
 	return 0;
 }
 subsys_initcall(tegra_pm_enter_syscore_init);
+#endif
 
 void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 {

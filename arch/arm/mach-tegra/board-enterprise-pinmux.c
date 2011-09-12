@@ -400,6 +400,10 @@ static __initdata struct tegra_pingroup_config enterprise_unused_pinmux[] = {
 	DEFAULT_PINMUX(SPI2_MISO,       SPI2,            PULL_DOWN,    TRISTATE,  OUTPUT),
 };
 
+static struct tegra_gpio_table gpio_table[] = {
+	{ .gpio = TEGRA_GPIO_HP_DET,		.enable = true	},
+};
+
 struct pin_info_low_power_mode {
 	char name[16];
 	int gpio_nr;
@@ -515,6 +519,7 @@ int __init enterprise_pinmux_init(void)
 	tegra_pinmux_config_table(enterprise_unused_pinmux,
 				ARRAY_SIZE(enterprise_unused_pinmux));
 
+	tegra_gpio_config(gpio_table, ARRAY_SIZE(gpio_table));
 	enterprise_set_unused_pin_gpio(enterprise_unused_gpio_pins,
 			ARRAY_SIZE(enterprise_unused_gpio_pins));
 	return 0;

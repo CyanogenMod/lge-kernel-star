@@ -66,5 +66,24 @@ config SND_SOC_TEGRA_WM8753
 	select SND_SOC_WM8753
 	help
 	  Say Y or M here if you want to add support for SoC audio on Tegra
-	  boards using the WM8093 codec. Currently, only supported board is
+	  boards using the WM8753 codec. Currently, only supported board is
 	  Whistler.
+
+config MACH_HAS_SND_SOC_TEGRA_MAX98088
+	bool
+	help
+	  Machines that use the SND_SOC_TEGRA_MAX98088 driver should select
+	  this config option, in order to allow the user to enable
+	  SND_SOC_TEGRA_MAX98088.
+
+config SND_SOC_TEGRA_MAX98088
+	tristate "SoC Audio support for Tegra boards using a MAX98088 codec"
+	depends on SND_SOC_TEGRA && I2C
+	depends on MACH_HAS_SND_SOC_TEGRA_MAX98088
+	select SND_SOC_TEGRA20_I2S if ARCH_TEGRA_2x_SOC
+	select SND_SOC_TEGRA30_I2S if ARCH_TEGRA_3x_SOC
+	select SND_SOC_MAX98088
+	help
+	  Say Y or M here if you want to add support for SoC audio on Tegra
+	  boards using the MAX98088 codec. Currently, only supported board is
+	  Enterprise.
