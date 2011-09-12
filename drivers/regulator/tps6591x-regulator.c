@@ -65,6 +65,7 @@ struct tps6591x_register_info {
 	unsigned char addr;
 	unsigned char nbits;
 	unsigned char shift_bits;
+	uint8_t cache_val;
 };
 
 enum {
@@ -117,25 +118,21 @@ static int __tps6591x_ext_control_set(struct device *parent,
 	   sure that operational is used and clear sleep register to turn
 	   regulator off when external control is inactive */
 	if (ri->supply_type == supply_type_sr_op_reg) {
-		ret = tps6591x_read(parent, ri->op_reg.addr, &reg_val);
-		if (ret)
-			return ret;
-
+		reg_val = ri->op_reg.cache_val;
 		if (reg_val & 0x80) {	/* boot has used sr - switch to op */
-			ret = tps6591x_read(parent, ri->sr_reg.addr, &reg_val);
-			if (ret)
-				return ret;
-
+			reg_val = ri->sr_reg.cache_val;
 			mask = ((1 << ri->sr_reg.nbits) - 1)
 				<< ri->sr_reg.shift_bits;
 			reg_val &= mask;
 			ret = tps6591x_write(parent, ri->op_reg.addr, reg_val);
 			if (ret)
 				return ret;
+			ri->op_reg.cache_val = reg_val;
 		}
 		ret = tps6591x_write(parent, ri->sr_reg.addr, 0);
 		if (ret)
 			return ret;
+		ri->sr_reg.cache_val = 0;
 	}
 
 	offset = 0;
@@ -183,6 +180,7 @@ static int __tps6591x_vio_set_voltage(struct device *parent,
 	uint8_t mask;
 	uint8_t val;
 	int ret;
+	uint8_t reg_val;
 
 	for (val = 0; val < ri->desc.n_voltages; val++) {
 		uV = ri->voltages[val] * 1000;
@@ -190,14 +188,19 @@ static int __tps6591x_vio_set_voltage(struct device *parent,
 		/* use the first in-range value */
 		if (min_uV <= uV && uV <= max_uV) {
 
+			reg_val = ri->supply_reg.cache_val;
 			val <<= ri->supply_reg.shift_bits;
+
 			mask = ((1 << ri->supply_reg.nbits) - 1) <<
 					ri->supply_reg.shift_bits;
+			reg_val = (reg_val & ~mask) | (val & mask);
 
-			ret = tps6591x_update(parent, ri->supply_reg.addr,
-					val, mask);
-			if (ret >= 0)
+			ret = tps6591x_write(parent, ri->supply_reg.addr,
+					reg_val);
+			if (ret >= 0) {
 				wait_for_voltage_change(ri, uV);
+				ri->supply_reg.cache_val = reg_val;
+			}
 			return ret;
 		}
 	}
@@ -217,13 +220,9 @@ static int tps6591x_vio_set_voltage(struct regulator_dev *rdev,
 static int tps6591x_vio_get_voltage(struct regulator_dev *rdev)
 {
 	struct tps6591x_regulator *ri = rdev_get_drvdata(rdev);
-	struct device *parent = to_tps6591x_dev(rdev);
 	uint8_t val, mask;
-	int ret;
 
-	ret = tps6591x_read(parent, ri->supply_reg.addr, &val);
-	if (ret)
-		return ret;
+	val = ri->supply_reg.cache_val;
 
 	mask = ((1 << ri->supply_reg.nbits) - 1) << ri->supply_reg.shift_bits;
 	val = (val & mask) >> ri->supply_reg.shift_bits;
@@ -249,6 +248,7 @@ static int __tps6591x_ldo1_set_voltage(struct device *parent,
 {
 	int val, uV;
 	uint8_t mask;
+	uint8_t reg_val;
 	int ret;
 
 	for (val = 0; val < ri->desc.n_voltages; val++) {
@@ -256,15 +256,19 @@ static int __tps6591x_ldo1_set_voltage(struct device *parent,
 
 		/* use the first in-range value */
 		if (min_uV <= uV && uV <= max_uV) {
+			reg_val = ri->supply_reg.cache_val;
 			val += 4;
 			val <<= ri->supply_reg.shift_bits;
 			mask = ((1 << ri->supply_reg.nbits) - 1) <<
 					ri->supply_reg.shift_bits;
 
-			ret = tps6591x_update(parent, ri->supply_reg.addr,
-					val, mask);
-			if (ret >= 0)
+			reg_val = (reg_val & ~mask) | (val & mask);
+			ret = tps6591x_write(parent, ri->supply_reg.addr,
+					reg_val);
+			if (ret >= 0) {
 				wait_for_voltage_change(ri, uV);
+				ri->supply_reg.cache_val = reg_val;
+			}
 			return ret;
 		}
 	}
@@ -284,14 +288,9 @@ static int tps6591x_ldo1_set_voltage(struct regulator_dev *rdev,
 static int tps6591x_ldo1_get_voltage(struct regulator_dev *rdev)
 {
 	struct tps6591x_regulator *ri = rdev_get_drvdata(rdev);
-	struct device *parent = to_tps6591x_dev(rdev);
 	uint8_t val, mask;
-	int ret;
 
-	ret = tps6591x_read(parent, ri->supply_reg.addr, &val);
-	if (ret)
-		return ret;
-
+	val = ri->supply_reg.cache_val;
 	mask = ((1 << ri->supply_reg.nbits) - 1) << ri->supply_reg.shift_bits;
 	val = (val & mask) >> ri->supply_reg.shift_bits;
 
@@ -313,21 +312,27 @@ static int __tps6591x_ldo3_set_voltage(struct device *parent,
 	int val, uV;
 	uint8_t mask;
 	int ret;
+	uint8_t reg_val;
 
 	for (val = 0; val < ri->desc.n_voltages; val++) {
 		uV = ri->voltages[val] * 1000;
 
 		/* use the first in-range value */
 		if (min_uV <= uV && uV <= max_uV) {
+			reg_val = ri->supply_reg.cache_val;
 			val += 2;
 			val <<= ri->supply_reg.shift_bits;
 			mask = ((1 << ri->supply_reg.nbits) - 1) <<
 						ri->supply_reg.shift_bits;
 
-			ret = tps6591x_update(parent, ri->supply_reg.addr,
-					val, mask);
-			if (ret >= 0)
+			reg_val = (reg_val & ~mask) | (val & mask);
+
+			ret = tps6591x_write(parent, ri->supply_reg.addr,
+					reg_val);
+			if (ret >= 0) {
 				wait_for_voltage_change(ri, uV);
+				ri->supply_reg.cache_val = reg_val;
+			}
 			return ret;
 		}
 	}
@@ -347,14 +352,9 @@ static int tps6591x_ldo3_set_voltage(struct regulator_dev *rdev,
 static int tps6591x_ldo3_get_voltage(struct regulator_dev *rdev)
 {
 	struct tps6591x_regulator *ri = rdev_get_drvdata(rdev);
-	struct device *parent = to_tps6591x_dev(rdev);
 	uint8_t val, mask;
-	int ret;
 
-	ret = tps6591x_read(parent, ri->supply_reg.addr, &val);
-	if (ret)
-		return ret;
-
+	val = ri->supply_reg.cache_val;
 	mask = ((1 << ri->supply_reg.nbits) - 1) << ri->supply_reg.shift_bits;
 	val = (val & mask) >> ri->supply_reg.shift_bits;
 
@@ -375,29 +375,38 @@ static int __tps6591x_vdd_set_voltage(struct device *parent,
 				      int min_uV, int max_uV)
 {
 	int val, uV, ret;
-	uint8_t mask, reg_val;
+	uint8_t mask;
+	uint8_t op_reg_val;
+	uint8_t sr_reg_val;
 
 	for (val = 0; val < ri->desc.n_voltages; val++) {
 		uV = ri->voltages[val] * 1000;
 
 		/* use the first in-range value */
 		if (min_uV <= uV && uV <= max_uV) {
-			ret = tps6591x_read(parent, ri->op_reg.addr, &reg_val);
-			if (ret)
-				return ret;
+			op_reg_val = ri->op_reg.cache_val;
 			val += 3;
-			if (reg_val & 0x80) {
+			if (op_reg_val & 0x80) {
+				sr_reg_val = ri->sr_reg.cache_val;
 				val <<= ri->sr_reg.shift_bits;
 				mask = ((1 << ri->sr_reg.nbits) - 1)
 					<< ri->sr_reg.shift_bits;
-				ret = tps6591x_update(parent,
-					ri->sr_reg.addr, val, mask);
+				sr_reg_val = (sr_reg_val & ~mask) |
+							(val & mask);
+				ret = tps6591x_write(parent,
+					ri->sr_reg.addr, sr_reg_val);
+				if (!ret)
+					ri->sr_reg.cache_val = sr_reg_val;
 			} else {
 				val <<= ri->op_reg.shift_bits;
 				mask = ((1 << ri->op_reg.nbits) - 1)
 					<< ri->op_reg.shift_bits;
-				ret = tps6591x_update(parent,
-					ri->op_reg.addr, val, mask);
+				op_reg_val = (op_reg_val & ~mask) |
+							(val & mask);
+				ret = tps6591x_write(parent,
+					ri->op_reg.addr, op_reg_val);
+				if (!ret)
+					ri->op_reg.cache_val = op_reg_val;
 			}
 			if (ret >= 0)
 				wait_for_voltage_change(ri, uV);
@@ -420,17 +429,10 @@ static int tps6591x_vdd_set_voltage(struct regulator_dev *rdev,
 static int tps6591x_vdd_get_voltage(struct regulator_dev *rdev)
 {
 	struct tps6591x_regulator *ri = rdev_get_drvdata(rdev);
-	struct device *parent = to_tps6591x_dev(rdev);
 	uint8_t op_val, sr_val, val;
-	int ret;
 
-	ret = tps6591x_read(parent, ri->op_reg.addr, &op_val);
-	if (ret)
-		return ret;
-
-	ret = tps6591x_read(parent, ri->sr_reg.addr, &sr_val);
-	if (ret)
-		return ret;
+	op_val = ri->op_reg.cache_val;
+	sr_val = ri->sr_reg.cache_val;
 
 	val = (op_val & 0x80) ? (sr_val & 0x7F) : (op_val & 0x7F);
 
@@ -453,30 +455,41 @@ static int tps6591x_regulator_enable(struct regulator_dev *rdev)
 {
 	struct tps6591x_regulator *ri = rdev_get_drvdata(rdev);
 	struct device *parent = to_tps6591x_dev(rdev);
+	uint8_t reg_val;
+	int ret;
 
-	return tps6591x_set_bits(parent, ri->supply_reg.addr, 0x1);
+	reg_val = ri->supply_reg.cache_val;
+	reg_val |= 0x1;
+
+	ret = tps6591x_write(parent, ri->supply_reg.addr, reg_val);
+	if (!ret)
+		ri->supply_reg.cache_val = reg_val;
+	return ret;
 }
 
 static int tps6591x_regulator_disable(struct regulator_dev *rdev)
 {
 	struct tps6591x_regulator *ri = rdev_get_drvdata(rdev);
 	struct device *parent = to_tps6591x_dev(rdev);
+	uint8_t reg_val;
+	int ret;
 
-	return tps6591x_clr_bits(parent, ri->supply_reg.addr, 0x1);
+	reg_val = ri->supply_reg.cache_val;
+	reg_val &= ~0x1;
+	ret = tps6591x_write(parent, ri->supply_reg.addr, reg_val);
+	if (!ret)
+		ri->supply_reg.cache_val = reg_val;
+	return ret;
 }
 
 static int tps6591x_regulator_is_enabled(struct regulator_dev *rdev)
 {
 	struct tps6591x_regulator *ri = rdev_get_drvdata(rdev);
-	struct device *parent = to_tps6591x_dev(rdev);
 	uint8_t reg_val;
-	int ret;
 
-	ret = tps6591x_read(parent, ri->supply_reg.addr, &reg_val);
-	if (ret)
-		return ret;
-
-	return !!(reg_val & 0x1);
+	reg_val = ri->supply_reg.cache_val;
+	reg_val &= 0x1;
+	return reg_val & 0x1;
 }
 
 static struct regulator_ops tps6591x_regulator_vio_ops = {
@@ -562,46 +575,47 @@ static int tps6591x_vddctrl_voltages[] = {
 	1287, 1300, 1312, 1325, 1337, 1350, 1362, 1375, 1387, 1400,
 };
 
-#define TPS6591X_REGULATOR(_id, vdata, _ops, s_addr, s_nbits, s_shift,		\
-			s_type, op_addr, op_nbits, op_shift, sr_addr,		\
-			sr_nbits, sr_shift, en1_addr, en1_shift, slp_off_addr,	\
-			slp_off_shift, en_time, change_rate)			\
-	.desc	= {								\
-		.name	= tps6591x_rails(_id),					\
-		.ops	= &tps6591x_regulator_##_ops,				\
-		.type	= REGULATOR_VOLTAGE,					\
-		.id	= TPS6591X_ID_##_id,					\
-		.n_voltages = ARRAY_SIZE(tps6591x_##vdata##_voltages),		\
-		.owner	= THIS_MODULE,						\
-	},									\
-	.supply_type	= supply_type_##s_type,					\
-	.supply_reg	= {							\
-		.addr	= TPS6591X_##s_addr##_ADD,				\
-		.nbits	= s_nbits,						\
-		.shift_bits = s_shift,						\
-	},									\
-	.op_reg		= {							\
-		.addr	= TPS6591X_##op_addr##_ADD,				\
-		.nbits	= op_nbits,						\
-		.shift_bits = op_shift,						\
-	},									\
-	.sr_reg		= {							\
-		.addr	= TPS6591X_##sr_addr##_ADD,				\
-		.nbits	= sr_nbits,						\
-		.shift_bits = sr_shift,						\
-	},									\
-	.en1_reg	= {							\
-		.addr	= TPS6591X_##en1_addr##_ADD,				\
-		.nbits	= 1,							\
-		.shift_bits = en1_shift,					\
-	},									\
-	.slp_off_reg	= {							\
-		.addr	= TPS6591X_SLEEP_SET_##slp_off_addr##_ADD,		\
-		.nbits	= 1,							\
-		.shift_bits = slp_off_shift,					\
-	},									\
-	.voltages	= tps6591x_##vdata##_voltages,				\
-	.enable_delay		= en_time,					\
+#define TPS6591X_REGULATOR(_id, vdata, _ops, s_addr, s_nbits, s_shift,	\
+			s_type, op_addr, op_nbits, op_shift, sr_addr,	\
+			sr_nbits, sr_shift, en1_addr, en1_shift,	\
+			slp_off_addr, slp_off_shift, en_time,		\
+			change_rate)					\
+	.desc	= {							\
+		.name	= tps6591x_rails(_id),				\
+		.ops	= &tps6591x_regulator_##_ops,			\
+		.type	= REGULATOR_VOLTAGE,				\
+		.id	= TPS6591X_ID_##_id,				\
+		.n_voltages = ARRAY_SIZE(tps6591x_##vdata##_voltages),	\
+		.owner	= THIS_MODULE,					\
+	},								\
+	.supply_type	= supply_type_##s_type,				\
+	.supply_reg	= {						\
+		.addr	= TPS6591X_##s_addr##_ADD,			\
+		.nbits	= s_nbits,					\
+		.shift_bits = s_shift,					\
+	},								\
+	.op_reg		= {						\
+		.addr	= TPS6591X_##op_addr##_ADD,			\
+		.nbits	= op_nbits,					\
+		.shift_bits = op_shift,					\
+	},								\
+	.sr_reg		= {						\
+		.addr	= TPS6591X_##sr_addr##_ADD,			\
+		.nbits	= sr_nbits,					\
+		.shift_bits = sr_shift,					\
+	},								\
+	.en1_reg	= {						\
+		.addr	= TPS6591X_##en1_addr##_ADD,			\
+		.nbits	= 1,						\
+		.shift_bits = en1_shift,				\
+	},								\
+	.slp_off_reg	= {						\
+		.addr	= TPS6591X_SLEEP_SET_##slp_off_addr##_ADD,	\
+		.nbits	= 1,						\
+		.shift_bits = slp_off_shift,				\
+	},								\
+	.voltages	= tps6591x_##vdata##_voltages,			\
+	.enable_delay		= en_time,				\
 	.voltage_change_uv_per_us = change_rate,
 
 #define TPS6591X_VIO(_id, vdata, s_addr, s_nbits, s_shift, s_type,	\
@@ -665,6 +679,7 @@ static inline int tps6591x_regulator_preinit(struct device *parent,
 		struct tps6591x_regulator_platform_data *tps6591x_pdata)
 {
 	int ret;
+	uint8_t reg_val;
 
 	if (tps6591x_pdata->ectrl != EXT_CTRL_NONE) {
 		ret = __tps6591x_ext_control_set(
@@ -726,15 +741,35 @@ static inline int tps6591x_regulator_preinit(struct device *parent,
 		}
 	}
 
+	reg_val = ri->supply_reg.cache_val;
 	if (tps6591x_pdata->init_enable)
-		ret = tps6591x_set_bits(parent, ri->supply_reg.addr, 0x1);
+		reg_val |= 0x1;
 	else
-		ret = tps6591x_clr_bits(parent, ri->supply_reg.addr, 0x1);
+		reg_val &= ~0x1;
+	ret = tps6591x_write(parent, ri->supply_reg.addr, reg_val);
 
 	if (ret < 0)
 		pr_err("Not able to %s rail %d err %d\n",
 			(tps6591x_pdata->init_enable) ? "enable" : "disable",
 			ri->desc.id, ret);
+	else
+		ri->supply_reg.cache_val = reg_val;
+	return ret;
+}
+
+static inline int tps6591x_cache_regulator_register(struct device *parent,
+		struct tps6591x_regulator *ri)
+{
+	int ret;
+	ret = tps6591x_read(parent, ri->supply_reg.addr,
+				&ri->supply_reg.cache_val);
+	if (!ret && (ri->supply_type == supply_type_sr_op_reg)) {
+		ret = tps6591x_read(parent, ri->op_reg.addr,
+				&ri->op_reg.cache_val);
+		if (!ret)
+			ret = tps6591x_read(parent, ri->sr_reg.addr,
+				&ri->sr_reg.cache_val);
+	}
 	return ret;
 }
 
@@ -750,6 +785,7 @@ static inline struct tps6591x_regulator *find_regulator_info(int id)
 	}
 	return NULL;
 }
+
 
 static int __devinit tps6591x_regulator_probe(struct platform_device *pdev)
 {
@@ -772,10 +808,19 @@ static int __devinit tps6591x_regulator_probe(struct platform_device *pdev)
 	if (tps_pdata->slew_rate_uV_per_us)
 		ri->voltage_change_uv_per_us = tps_pdata->slew_rate_uV_per_us;
 
-	err = tps6591x_regulator_preinit(pdev->dev.parent, ri, tps_pdata);
-	if (err)
+	err = tps6591x_cache_regulator_register(pdev->dev.parent, ri);
+	if (err) {
+		dev_err(&pdev->dev, "Error in caching registers error %d\n",
+							err);
 		return err;
+	}
 
+	err = tps6591x_regulator_preinit(pdev->dev.parent, ri, tps_pdata);
+	if (err) {
+		dev_err(&pdev->dev, "Error in pre-initialization of regulator "
+					"error %d\n", err);
+		return err;
+	}
 
 	rdev = regulator_register(&ri->desc, &pdev->dev,
 				&tps_pdata->regulator, ri);
