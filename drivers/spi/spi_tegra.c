@@ -219,6 +219,7 @@ struct spi_tegra_data {
 
 	struct completion	rx_dma_complete;
 	struct completion	tx_dma_complete;
+	bool			is_transfer_in_progress;
 
 	u32			rx_complete;
 	u32			tx_complete;
@@ -677,6 +678,7 @@ static void spi_tegra_start_transfer(struct spi_device *spi,
 
 	command2 = tspi->def_command2_reg;
 	if (is_first_of_msg) {
+		tspi->is_transfer_in_progress = true;
 		if (!tspi->is_clkon_always) {
 			if (!tspi->clk_state) {
 				clk_enable(tspi->clk);
@@ -899,6 +901,7 @@ static void spi_tegra_curr_transfer_complete(struct spi_tegra_data *tspi,
 	spi = m->state;
 
 	m->actual_length += cur_xfer_size;
+
 	if (!list_is_last(&tspi->cur->transfer_list, &m->transfers)) {
 		tspi->cur = list_first_entry(&tspi->cur->transfer_list,
 			struct spi_transfer, transfer_list);
@@ -907,6 +910,8 @@ static void spi_tegra_curr_transfer_complete(struct spi_tegra_data *tspi,
 		list_del(&m->queue);
 		m->complete(m->context);
 		if (!list_empty(&tspi->queue)) {
+			if (tspi->is_suspended)
+				goto stop_transfer;
 			m = list_first_entry(&tspi->queue, struct spi_message,
 				queue);
 			spi = m->state;
@@ -925,8 +930,15 @@ static void spi_tegra_curr_transfer_complete(struct spi_tegra_data *tspi,
 					tspi->clk_state = 0;
 				}
 			}
+			tspi->is_transfer_in_progress = false;
 		}
 	}
+	return;
+stop_transfer:
+	spi_tegra_writel(tspi, tspi->def_command_reg, SLINK_COMMAND);
+	spi_tegra_writel(tspi, tspi->def_command2_reg, SLINK_COMMAND2);
+	tspi->is_transfer_in_progress = false;
+	return;
 }
 
 static void tegra_spi_tx_dma_complete(struct tegra_dma_req *req)
@@ -1125,6 +1137,7 @@ static int __init spi_tegra_probe(struct platform_device *pdev)
 	tspi = spi_master_get_devdata(master);
 	tspi->master = master;
 	tspi->pdev = pdev;
+	tspi->is_transfer_in_progress = false;
 	spin_lock_init(&tspi->lock);
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -1364,14 +1377,39 @@ static int spi_tegra_suspend(struct platform_device *pdev, pm_message_t state)
 	master = dev_get_drvdata(&pdev->dev);
 	tspi = spi_master_get_devdata(master);
 	spin_lock_irqsave(&tspi->lock, flags);
-	tspi->is_suspended = true;
 
-	WARN_ON(!list_empty(&tspi->queue));
+	/* Wait for all transfer completes */
+	if (!list_empty(&tspi->queue))
+		dev_warn(&pdev->dev, "The transfer list is not empty "
+			"Waiting for time %d ms to complete transfer\n",
+			limit * 20);
 
 	while (!list_empty(&tspi->queue) && limit--) {
 		spin_unlock_irqrestore(&tspi->lock, flags);
 		msleep(20);
 		spin_lock_irqsave(&tspi->lock, flags);
+	}
+
+	/* Wait for current transfer completes only */
+	tspi->is_suspended = true;
+	if (!list_empty(&tspi->queue)) {
+		limit = 50;
+		dev_err(&pdev->dev, "All transfer has not completed, "
+			"Waiting for %d ms current transfer to complete\n",
+			limit * 20);
+		while (tspi->is_transfer_in_progress && limit--) {
+			spin_unlock_irqrestore(&tspi->lock, flags);
+			msleep(20);
+			spin_lock_irqsave(&tspi->lock, flags);
+		}
+	}
+
+	if (tspi->is_transfer_in_progress) {
+		dev_err(&pdev->dev, "Spi transfer is in progress "
+			"Avoiding suspend\n");
+		tspi->is_suspended = false;
+		spin_unlock_irqrestore(&tspi->lock, flags);
+		return -EBUSY;
 	}
 
 	spin_unlock_irqrestore(&tspi->lock, flags);
@@ -1387,6 +1425,8 @@ static int spi_tegra_resume(struct platform_device *pdev)
 	struct spi_master	*master;
 	struct spi_tegra_data	*tspi;
 	unsigned long		flags;
+	struct spi_message *m;
+	struct spi_device *spi;
 
 	master = dev_get_drvdata(&pdev->dev);
 	tspi = spi_master_get_devdata(master);
@@ -1402,6 +1442,11 @@ static int spi_tegra_resume(struct platform_device *pdev)
 
 	tspi->cur_speed = 0;
 	tspi->is_suspended = false;
+	if (!list_empty(&tspi->queue)) {
+		m = list_first_entry(&tspi->queue, struct spi_message, queue);
+		spi = m->state;
+		spi_tegra_start_message(spi, m);
+	}
 	spin_unlock_irqrestore(&tspi->lock, flags);
 	return 0;
 }
