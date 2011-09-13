@@ -12,6 +12,8 @@
 #ifndef TEGRA_PWM_BL_H
 #define TEGRA_PWM_BL_H
 
+#include <linux/backlight.h>
+
 struct platform_tegra_pwm_backlight_data {
 	int which_dc;
 	int which_pwm;
@@ -23,6 +25,7 @@ struct platform_tegra_pwm_backlight_data {
 	unsigned int clk_div;
 	unsigned int clk_select;
 	int (*notify)(struct device *dev, int brightness);
+	int (*check_fb)(struct device *dev, struct fb_info *info);
 };
 
 #endif /* TERGA_PWM_BL_H */

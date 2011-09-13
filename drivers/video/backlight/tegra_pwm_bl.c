@@ -27,6 +27,7 @@ struct tegra_pwm_bl_data {
 	int which_dc;
 	int (*notify)(struct device *, int brightness);
 	struct tegra_dc_pwm_params params;
+	int (*check_fb)(struct device *dev, struct fb_info *info);
 };
 
 static int tegra_pwm_backlight_update_status(struct backlight_device *bl)
@@ -71,9 +72,17 @@ static int tegra_pwm_backlight_get_brightness(struct backlight_device *bl)
 	return bl->props.brightness;
 }
 
+static int tegra_pwm_backlight_check_fb(struct backlight_device *bl,
+					struct fb_info *info)
+{
+	struct tegra_pwm_bl_data *tbl = dev_get_drvdata(&bl->dev);
+	return !tbl->check_fb || tbl->check_fb(tbl->dev, info);
+}
+
 static const struct backlight_ops tegra_pwm_backlight_ops = {
 	.update_status	= tegra_pwm_backlight_update_status,
 	.get_brightness	= tegra_pwm_backlight_get_brightness,
+	.check_fb	= tegra_pwm_backlight_check_fb,
 };
 
 static int tegra_pwm_backlight_probe(struct platform_device *pdev)
@@ -100,6 +109,7 @@ static int tegra_pwm_backlight_probe(struct platform_device *pdev)
 	tbl->dev = &pdev->dev;
 	tbl->which_dc = data->which_dc;
 	tbl->notify = data->notify;
+	tbl->check_fb = data->check_fb;
 	tbl->params.which_pwm = data->which_pwm;
 	tbl->params.gpio_conf_to_sfio = data->gpio_conf_to_sfio;
 	tbl->params.switch_to_sfio = data->switch_to_sfio;
