@@ -125,6 +125,8 @@ static int enterprise_backlight_notify(struct device *unused, int brightness)
 	return brightness;
 }
 
+static int enterprise_disp1_check_fb(struct device *dev, struct fb_info *info);
+
 /*
  * In case which_pwm is TEGRA_PWM_PM0,
  * gpio_conf_to_sfio should be TEGRA_GPIO_PW0: set LCD_CS1_N pin to SFIO
@@ -142,6 +144,8 @@ static struct platform_tegra_pwm_backlight_data enterprise_disp1_backlight_data 
 	.period			= 0xFF,
 	.clk_div		= 0x3FF,
 	.clk_select		= 0,
+	/* Only toggle backlight on fb blank notifications for disp1 */
+	.check_fb	= enterprise_disp1_check_fb,
 };
 
 static struct platform_device enterprise_disp1_backlight_device = {
@@ -637,6 +641,11 @@ static struct nvhost_device enterprise_disp1_device = {
 		.platform_data = &enterprise_disp1_pdata,
 	},
 };
+
+static int enterprise_disp1_check_fb(struct device *dev, struct fb_info *info)
+{
+	return info->device == &enterprise_disp1_device.dev;
+}
 
 static struct nvhost_device enterprise_disp2_device = {
 	.name		= "tegradc",
