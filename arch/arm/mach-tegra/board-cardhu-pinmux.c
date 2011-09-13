@@ -398,6 +398,13 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_common[] = {
 	DEFAULT_PINMUX(GMI_IORDY,       RSVD1,           PULL_UP,   NORMAL,     INPUT),
 	/* SDMMC1 WP gpio */
 	DEFAULT_PINMUX(VI_D11,          RSVD1,           PULL_UP,   NORMAL,     INPUT),
+	/* Touch panel GPIO */
+	/* Touch IRQ */
+	DEFAULT_PINMUX(GMI_AD12,        NAND,            PULL_UP,   NORMAL,     INPUT),
+
+	/* Touch RESET */
+	DEFAULT_PINMUX(GMI_AD14,        NAND,            NORMAL,    NORMAL,     OUTPUT),
+
 
 	/* Power rails GPIO */
 	DEFAULT_PINMUX(SPI2_SCK,        GMI,             NORMAL,    NORMAL,     INPUT),
