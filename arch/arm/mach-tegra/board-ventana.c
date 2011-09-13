@@ -204,7 +204,6 @@ static __initdata struct tegra_clk_init_table ventana_clk_init_table[] = {
 	{ "blink",	"clk_32k",	32768,		false},
 	{ "pll_p_out4",	"pll_p",	24000000,	true },
 	{ "pwm",	"clk_32k",	32768,		false},
-	{ "kbc",	"clk_32k",	32768,		true},
 	{ "i2s1",	"pll_a_out0",	0,		false},
 	{ "spdif_out",	"pll_a_out0",	0,		false},
 	{ NULL,		NULL,		0,		0},
@@ -813,9 +812,6 @@ static void __init tegra_ventana_init(void)
 
 #ifdef CONFIG_KEYBOARD_GPIO
 	ventana_keys_init();
-#endif
-#ifdef CONFIG_KEYBOARD_TEGRA
-	ventana_kbc_init();
 #endif
 
 	ventana_usb_init();
