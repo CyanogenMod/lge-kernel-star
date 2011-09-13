@@ -33,7 +33,7 @@
 #define BASEBAND_USB_NET_DEV_NAME		"rmnet%d"
 
 /* ethernet packet ethertype for IP packets */
-#define NET_IP_ETHERTYPE		(0x08, 0x00)
+#define NET_IP_ETHERTYPE		0x08, 0x00
 
 #define	TX_TIMEOUT		10
 
