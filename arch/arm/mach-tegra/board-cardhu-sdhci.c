@@ -131,6 +131,7 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data2 = {
 	.mmc_data = {
 		.register_status_notify	= cardhu_wifi_status_register,
 		.embedded_sdio = &embedded_sdio_data2,
+		.built_in = 1,
 	},
 	.cd_gpio = -1,
 	.wp_gpio = -1,
@@ -146,8 +147,8 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data2 = {
 };
 
 static struct tegra_sdhci_platform_data tegra_sdhci_platform_data0 = {
-	.cd_gpio = -1,
-	.wp_gpio = -1,
+	.cd_gpio = CARDHU_SD_CD,
+	.wp_gpio = CARDHU_SD_WP,
 	.power_gpio = -1,
 /*	.tap_delay = 6,
 	.is_voltage_switch_supported = true,
@@ -163,6 +164,9 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data3 = {
 	.cd_gpio = -1,
 	.wp_gpio = -1,
 	.power_gpio = -1,
+	.mmc_data = {
+		.built_in = 1,
+	}
 /*	.tap_delay = 6,
 	.is_voltage_switch_supported = false,
 	.vdd_rail_name = NULL,
@@ -202,69 +206,6 @@ static struct platform_device tegra_sdhci_device3 = {
 		.platform_data = &tegra_sdhci_platform_data3,
 	},
 };
-
-static int cardhu_sd_cd_gpio_init(void)
-{
-	unsigned int rc = 0;
-
-	rc = gpio_request(CARDHU_SD_CD, "card_detect");
-	if (rc) {
-		pr_err("Card detect gpio request failed:%d\n", rc);
-		return rc;
-	}
-
-	tegra_gpio_enable(CARDHU_SD_CD);
-
-	rc = gpio_direction_input(CARDHU_SD_CD);
-	if (rc) {
-		pr_err("Unable to configure direction for card detect gpio:%d\n", rc);
-		return rc;
-	}
-
-	return 0;
-}
-
-static int cardhu_sd_wp_gpio_init(void)
-{
-	unsigned int rc = 0;
-
-	rc = gpio_request(CARDHU_SD_WP, "write_protect");
-	if (rc) {
-		pr_err("Write protect gpio request failed:%d\n", rc);
-		return rc;
-	}
-
-	tegra_gpio_enable(CARDHU_SD_WP);
-
-	rc = gpio_direction_input(CARDHU_SD_WP);
-	if (rc) {
-		pr_err("Unable to configure direction for write protect gpio:%d\n", rc);
-		return rc;
-	}
-
-	return 0;
-}
-
-static int pm269_sd_wp_gpio_init(void)
-{
-	unsigned int rc = 0;
-
-	rc = gpio_request(PM269_SD_WP, "write_protect");
-	if (rc) {
-		pr_err("Write protect gpio request failed:%d\n", rc);
-		return rc;
-	}
-
-	tegra_gpio_enable(PM269_SD_WP);
-
-	rc = gpio_direction_input(PM269_SD_WP);
-	if (rc) {
-		pr_err("Unable to configure direction for write protect gpio:%d\n", rc);
-		return rc;
-	}
-
-	return 0;
-}
 
 static int cardhu_wifi_status_register(
 		void (*callback)(int card_present, void *dev_id),
@@ -338,50 +279,16 @@ static int __init cardhu_wifi_init(void)
 
 int __init cardhu_sdhci_init(void)
 {
-#if 0
-	unsigned int rc = 0;
 	struct board_info board_info;
 	tegra_get_board_info(&board_info);
 	if ((board_info.board_id == BOARD_PM269) ||
 		(board_info.board_id == BOARD_PM305)) {
-		tegra_sdhci_platform_data2.max_clk = 12000000;
-		rc = pm269_sd_wp_gpio_init();
-		if (!rc) {
 			tegra_sdhci_platform_data0.wp_gpio = PM269_SD_WP;
-			tegra_sdhci_platform_data0.wp_gpio_polarity = 1;
-		}
-	} else {
-		tegra_sdhci_platform_data2.max_clk = 48000000;
-		rc = cardhu_sd_wp_gpio_init();
-		if (!rc) {
-			tegra_sdhci_platform_data0.wp_gpio = CARDHU_SD_WP;
-			tegra_sdhci_platform_data0.wp_gpio_polarity = 1;
-		}
 	}
-#endif
 
 	platform_device_register(&tegra_sdhci_device3);
 	platform_device_register(&tegra_sdhci_device2);
-
-#if 0
-	platform_device_register(&tegra_sdhci_device2);
-
-	/* Fix ME: The gpios have to enabled for hot plug support */
-	rc = cardhu_sd_cd_gpio_init();
-	if (!rc) {
-		tegra_sdhci_platform_data0.cd_gpio = CARDHU_SD_CD;
-		tegra_sdhci_platform_data0.cd_gpio_polarity = 0;
-	}
-
 	platform_device_register(&tegra_sdhci_device0);
-
-#else
-	(void)tegra_sdhci_device0;
-	(void)tegra_sdhci_device2;
-	(void)cardhu_sd_cd_gpio_init;
-	(void)cardhu_sd_wp_gpio_init;
-	(void)pm269_sd_wp_gpio_init;
-#endif
 
 	cardhu_wifi_init();
 	return 0;
