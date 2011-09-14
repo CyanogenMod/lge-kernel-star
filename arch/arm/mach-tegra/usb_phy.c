@@ -1161,10 +1161,6 @@ static int utmi_phy_power_off(struct tegra_usb_phy *phy, bool is_dpd)
 	unsigned long val;
 	void __iomem *base = phy->regs;
 
-#ifndef CONFIG_ARCH_TEGRA_2x_SOC
-	if (phy->mode == TEGRA_USB_PHY_MODE_HOST)
-		utmip_setup_pmc_wake_detect(phy);
-#endif
 	if (phy->mode == TEGRA_USB_PHY_MODE_DEVICE) {
 		val = readl(base + USB_SUSP_CTRL);
 		val &= ~USB_WAKEUP_DEBOUNCE_COUNT(~0);
@@ -1217,13 +1213,6 @@ static int utmi_phy_power_off(struct tegra_usb_phy *phy, bool is_dpd)
 		val |= UTMIP_RESET;
 		writel(val, base + USB_SUSP_CTRL);
 	}
-#ifndef CONFIG_ARCH_TEGRA_2x_SOC
-	if (phy->instance == 2) {
-		val = readl(base + USB_SUSP_CTRL);
-		val |= UTMIP_RESET;
-		writel(val, base + USB_SUSP_CTRL);
-	}
-#endif
 	utmip_pad_power_off(phy, true);
 	return 0;
 }
@@ -2476,40 +2465,3 @@ int __init tegra_usb_phy_init(struct usb_phy_plat_data *pdata, int size)
 	return 0;
 }
 
-bool tegra_usb_phy_is_device_detected(struct tegra_usb_phy *phy)
-{
-	bool ret = 0;
-#ifndef CONFIG_ARCH_TEGRA_2x_SOC
-	void __iomem *pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
-	unsigned  int inst = phy->instance;
-	u32 val;
-
-	/* Change wake event to FSK */
-	val = readl(pmc_base + PMC_SLEEP_CFG);
-	val |= UTMIP_WAKE_VAL(phy->instance, WAKE_VAL_FSK);
-	writel(val, pmc_base + PMC_SLEEP_CFG);
-
-	/* The minimum time for the registers to get updated */
-	udelay(130);
-
-	val = readl(pmc_base + UTMIP_UHSIC_STATUS);
-	if ((UTMIP_USBON_VAL(phy->instance) |
-			UTMIP_USBOP_VAL(phy->instance)) &val) {
-		val = readl(pmc_base + PMC_SLEEP_CFG);
-		val &= ~UTMIP_WAKE_VAL(inst, 0x0);
-		val |= UTMIP_WAKE_VAL(inst, WAKE_VAL_NONE);
-		writel(val, pmc_base + PMC_SLEEP_CFG);
-
-		val = readl(pmc_base + PMC_TRIGGERS);
-		val |= UTMIP_CLR_WAKE_ALARM(inst) | UTMIP_CLR_WALK_PTR(inst);
-		writel(val, pmc_base + PMC_TRIGGERS);
-
-		val = readl(pmc_base + PMC_SLEEP_CFG);
-		val &=  ~(UTMIP_MASTER_ENABLE(inst) |UTMIP_FSLS_USE_PMC(inst) |
-			UTMIP_RCTRL_USE_PMC(inst) |UTMIP_TCTRL_USE_PMC(inst));
-		writel(val, pmc_base + PMC_SLEEP_CFG);
-		ret = 1;
-	}
-#endif
-	return ret;
-}

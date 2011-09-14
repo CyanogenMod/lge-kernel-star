@@ -68,7 +68,6 @@ struct tegra_ehci_hcd {
 	enum tegra_usb_phy_port_speed port_speed;
 	struct work_struct clk_timer_work;
 	struct timer_list clk_timer;
-	struct timer_list timer_device_detect;
 	bool clock_enabled;
 	int hsic_connect_retries;
 	struct mutex tegra_ehci_hcd_mutex;
@@ -93,13 +92,6 @@ static void tegra_ehci_power_down(struct usb_hcd *hcd, bool is_dpd)
 	tegra_usb_phy_power_off(tegra->phy, is_dpd);
 #ifndef CONFIG_USB_HOTPLUG
 	clk_disable(tegra->clk);
-#endif
-#ifndef CONFIG_ARCH_TEGRA_2x_SOC
-	if (tegra->phy->instance == 2) {
-		if (mod_timer(&tegra->timer_device_detect,
-			jiffies + msecs_to_jiffies(2000)))
-			pr_err("timer configuration failed \n");
-	}
 #endif
 }
 
@@ -826,34 +818,6 @@ void clk_timer_callback(unsigned long data)
 	}
 }
 
-void timer_callback_device_detect(unsigned long data)
-{
-#ifndef CONFIG_ARCH_TEGRA_2x_SOC
-	struct tegra_ehci_hcd *tegra = (struct tegra_ehci_hcd*) data;
-	int ret;
-	u32 val;
-	struct usb_hcd *hcd;
-	u32 timer_deactivated;
-	hcd = ehci_to_hcd(tegra->ehci);
-
-	if(tegra->phy->instance == 2) {
-		val = tegra_usb_phy_is_device_detected(tegra->phy);
-		if (val) {
-			timer_deactivated = del_timer(
-				&tegra->timer_device_detect);
-			if (timer_deactivated)
-				pr_err("timer deactivation failed \n");
-			tegra_ehci_power_up(hcd, false);
-		} else {
-			ret = mod_timer(&tegra->timer_device_detect,
-					jiffies + msecs_to_jiffies(2000));
-			if (ret)
-				pr_err("tegra device detect failed \n");
-		}
-	}
-#endif
-}
-
 static void clk_timer_work_handler(struct work_struct* clk_timer_work) {
 	struct tegra_ehci_hcd *tegra = container_of(clk_timer_work,
 						struct tegra_ehci_hcd, clk_timer_work);
@@ -1013,10 +977,6 @@ static int tegra_ehci_probe(struct platform_device *pdev)
 	init_timer(&tegra->clk_timer);
 	tegra->clk_timer.function = clk_timer_callback;
 	tegra->clk_timer.data = (unsigned long) tegra;
-
-	init_timer(&tegra->timer_device_detect);
-	tegra->timer_device_detect.function = timer_callback_device_detect;
-	tegra->timer_device_detect.data = (unsigned long) tegra;
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	/* Set DDR busy hints to 150MHz. For Tegra 2x SOC, DDR rate is half of EMC rate */
@@ -1204,7 +1164,6 @@ static int tegra_ehci_remove(struct platform_device *pdev)
 	iounmap(hcd->regs);
 
 	del_timer_sync(&tegra->clk_timer);
-	del_timer_sync(&tegra->timer_device_detect);
 
 	clk_disable(tegra->clk);
 	clk_put(tegra->clk);
