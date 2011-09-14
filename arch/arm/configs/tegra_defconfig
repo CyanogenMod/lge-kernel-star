@@ -84,7 +84,10 @@ CONFIG_BCM4329=m
 CONFIG_BCM4329_FW_PATH="/lib/firmware/bcm4329/fw_bcm4329.bin"
 CONFIG_BCM4329_NVRAM_PATH="/lib/firmware/bcm4329/nvram.txt"
 CONFIG_BCM4329_WIFI_CONTROL_FUNC=y
-# CONFIG_INPUT is not set
+# CONFIG_INPUT_MOUSEDEV is not set
+CONFIG_INPUT_EVDEV=y
+# CONFIG_INPUT_KEYBOARD is not set
+# CONFIG_INPUT_MOUSE is not set
 # CONFIG_SERIO is not set
 # CONFIG_VT is not set
 # CONFIG_LEGACY_PTYS is not set
