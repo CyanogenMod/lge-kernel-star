@@ -704,7 +704,6 @@ static void spi_tegra_start_transfer(struct spi_device *spi,
 	command |= SLINK_BIT_LENGTH(bits_per_word - 1);
 
 	command |= SLINK_CS_SW;
-	command ^= cs_pol_bit[spi->chip_select];
 
 	command &= ~SLINK_IDLE_SCLK_MASK & ~SLINK_CK_SDA;
 	if (spi->mode & SPI_CPHA)
