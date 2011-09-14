@@ -88,6 +88,10 @@ struct tps80031_regulator {
 	u8		force_reg;
 	u8		volt_reg;
 	u8		volt_id;
+	uint8_t		trans_reg_cache;
+	uint8_t		state_reg_cache;
+	uint8_t		force_reg_cache;
+	uint8_t		volt_reg_cache;
 
 	/* twl resource ID, for resource control state machine */
 	u8			id;
@@ -153,19 +157,10 @@ static u8 tps80031_get_smps_mult(struct device *parent)
 static int tps80031_reg_is_enabled(struct regulator_dev *rdev)
 {
 	struct tps80031_regulator *ri = rdev_get_drvdata(rdev);
-	struct device *parent = to_tps80031_dev(rdev);
-	uint8_t state;
-	int ret;
 
 	if (ri->platform_flags & EXT_PWR_REQ)
 		return true;
-
-	ret = tps80031_read(parent, SLAVE_ID1, ri->state_reg, &state);
-	if (ret < 0) {
-		dev_err(&rdev->dev, "Error in reading the STATE register\n");
-		return ret;
-	}
-	return ((state & STATE_MASK) == STATE_ON);
+	return ((ri->state_reg_cache & STATE_MASK) == STATE_ON);
 }
 
 static int tps80031_reg_enable(struct regulator_dev *rdev)
@@ -173,16 +168,19 @@ static int tps80031_reg_enable(struct regulator_dev *rdev)
 	struct tps80031_regulator *ri = rdev_get_drvdata(rdev);
 	struct device *parent = to_tps80031_dev(rdev);
 	int ret;
+	uint8_t reg_val;
 
 	if (ri->platform_flags & EXT_PWR_REQ)
 		return 0;
 
-	ret = tps80031_force_update(parent, SLAVE_ID1, ri->state_reg, STATE_ON,
-				    STATE_MASK);
+	reg_val = (ri->state_reg_cache & ~STATE_MASK) |
+					(STATE_ON & STATE_MASK);
+	ret = tps80031_write(parent, SLAVE_ID1, ri->state_reg, reg_val);
 	if (ret < 0) {
-		dev_err(&rdev->dev, "Error in updating the STATE register\n");
+		dev_err(&rdev->dev, "Error in writing the STATE register\n");
 		return ret;
 	}
+	ri->state_reg_cache = reg_val;
 	udelay(ri->delay);
 	return ret;
 }
@@ -192,15 +190,18 @@ static int tps80031_reg_disable(struct regulator_dev *rdev)
 	struct tps80031_regulator *ri = rdev_get_drvdata(rdev);
 	struct device *parent = to_tps80031_dev(rdev);
 	int ret;
+	uint8_t reg_val;
 
 	if (ri->platform_flags & EXT_PWR_REQ)
 		return 0;
 
-	ret = tps80031_force_update(parent, SLAVE_ID1, ri->state_reg, STATE_OFF,
-				    STATE_MASK);
+	reg_val = (ri->state_reg_cache & ~STATE_MASK) |
+					(STATE_OFF & STATE_MASK);
+	ret = tps80031_write(parent, SLAVE_ID1, ri->state_reg, reg_val);
 	if (ret < 0)
-		dev_err(&rdev->dev, "Error in updating the STATE register\n");
-
+		dev_err(&rdev->dev, "Error in writing the STATE register\n");
+	else
+		ri->state_reg_cache = reg_val;
 	return ret;
 }
 
@@ -290,7 +291,6 @@ static int __tps80031_dcdc_set_voltage(struct device *parent,
 {
 	int vsel = 0;
 	int ret;
-	uint8_t force = 0;
 
 	switch (ri->flags) {
 	case 0:
@@ -365,23 +365,22 @@ static int __tps80031_dcdc_set_voltage(struct device *parent,
 	}
 
 	if (ri->force_reg) {
-		ret = tps80031_read(parent, ri->volt_id, ri->force_reg,
-						&force);
-		if (ret < 0) {
-			dev_err(ri->dev, "Error in reading the force register\n");
-			return ret;
-		}
-		if (((force >> 6) & 0x3) == 0) {
+		if (((ri->force_reg_cache >> 6) & 0x3) == 0) {
 			ret = tps80031_write(parent, ri->volt_id,
 						ri->force_reg, vsel);
-			goto out;
+			if (ret < 0)
+				dev_err(ri->dev, "Error in writing the "
+						"force register\n");
+			else
+				ri->force_reg_cache = vsel;
+			return ret;
 		}
 	}
 	ret = tps80031_write(parent, ri->volt_id, ri->volt_reg, vsel);
-
-out:
 	if (ret < 0)
-		dev_err(ri->dev, "Error in updating the Voltage register\n");
+		dev_err(ri->dev, "Error in writing the Voltage register\n");
+	else
+		ri->volt_reg_cache = vsel;
 	return ret;
 }
 
@@ -396,26 +395,16 @@ static int tps80031dcdc_set_voltage(struct regulator_dev *rdev,
 static int tps80031dcdc_get_voltage(struct regulator_dev *rdev)
 {
 	struct tps80031_regulator *ri = rdev_get_drvdata(rdev);
-	struct device *parent = to_tps80031_dev(rdev);
 	uint8_t vsel = 0;
-	int ret;
 	int voltage = 0;
 
 	if (ri->force_reg) {
-		ret = tps80031_read(parent, ri->volt_id, ri->force_reg, &vsel);
-		if (ret < 0) {
-			dev_err(&rdev->dev, "Error in reading the force register\n");
-			return ret;
-		}
+		vsel  = ri->force_reg_cache;
 		if ((vsel & SMPS_CMD_MASK) == 0)
 			goto decode;
 	}
 
-	ret = tps80031_read(parent, ri->volt_id, ri->volt_reg, &vsel);
-	if (ret < 0) {
-		dev_err(&rdev->dev, "Error in reading the Voltage register\n");
-		return ret;
-	}
+	vsel =  ri->volt_reg_cache;
 
 decode:
 	vsel &= SMPS_VSEL_MASK;
@@ -520,6 +509,8 @@ static int __tps80031_ldo_set_voltage(struct device *parent,
 	ret = tps80031_write(parent, ri->volt_id, ri->volt_reg, vsel);
 	if (ret < 0)
 		dev_err(ri->dev, "Error in writing the Voltage register\n");
+	else
+		ri->volt_reg_cache = vsel;
 	return ret;
 }
 
@@ -535,16 +526,9 @@ static int tps80031ldo_set_voltage(struct regulator_dev *rdev,
 static int tps80031ldo_get_voltage(struct regulator_dev *rdev)
 {
 	struct tps80031_regulator *ri = rdev_get_drvdata(rdev);
-	struct device *parent = to_tps80031_dev(rdev);
 	uint8_t vsel;
-	int ret;
 
-	ret = tps80031_read(parent, ri->volt_id, ri->volt_reg, &vsel);
-	if (ret < 0) {
-		dev_err(&rdev->dev, "Error in reading the Voltage register\n");
-		return ret;
-	}
-	vsel &= LDO_VSEL_MASK;
+	vsel = ri->volt_reg_cache & LDO_VSEL_MASK;
 
 	/*
 	 * Use the below formula to calculate vsel
@@ -746,6 +730,7 @@ static int tps80031_power_req_config(struct device *parent,
 	int preq_bit;
 	int preq_mask_bit;
 	int ret;
+	uint8_t reg_val;
 
 	if (!(ri->platform_flags & EXT_PWR_REQ))
 		return 0;
@@ -783,13 +768,13 @@ static int tps80031_power_req_config(struct device *parent,
 	}
 
 	/* Switch regulator control to resource now */
-	ret = tps80031_update(parent, SLAVE_ID1, ri->state_reg, 0x0,
-					STATE_MASK);
-	if (ret < 0) {
-		dev_err(ri->dev, "%s() Error in updating the STATE "
+	reg_val = (ri->state_reg_cache & ~STATE_MASK);
+	ret = tps80031_write(parent, SLAVE_ID1, ri->state_reg, reg_val);
+	if (ret < 0)
+		dev_err(ri->dev, "%s() Error in writing the STATE "
 				"register error %d\n", __func__, ret);
-		return ret;
-	}
+	else
+		ri->state_reg_cache = reg_val;
 	return ret;
 }
 
@@ -798,6 +783,7 @@ static int tps80031_regulator_preinit(struct device *parent,
 		struct tps80031_regulator_platform_data *tps80031_pdata)
 {
 	int ret = 0;
+	uint8_t reg_val;
 
 	if (ri->desc.id == TPS80031_ID_LDOUSB) {
 		if (ri->platform_flags & USBLDO_INPUT_VSYS)
@@ -871,15 +857,19 @@ static int tps80031_regulator_preinit(struct device *parent,
 	}
 
 	if (tps80031_pdata->init_enable)
-		ret = tps80031_force_update(parent, SLAVE_ID1, ri->state_reg,
-					    STATE_ON, STATE_MASK);
+		reg_val = (ri->state_reg_cache & ~STATE_MASK) |
+				(STATE_ON & STATE_MASK);
 	else
-		ret = tps80031_force_update(parent, SLAVE_ID1, ri->state_reg,
-					    STATE_OFF, STATE_MASK);
+		reg_val = (ri->state_reg_cache & ~STATE_MASK) |
+				(STATE_OFF & STATE_MASK);
+
+	ret = tps80031_write(parent, SLAVE_ID1, ri->state_reg, reg_val);
 	if (ret < 0)
 		dev_err(ri->dev, "Not able to %s rail %d err %d\n",
 			(tps80031_pdata->init_enable) ? "enable" : "disable",
 			ri->desc.id, ret);
+	else
+		ri->state_reg_cache = reg_val;
 	return ret;
 }
 
@@ -926,6 +916,25 @@ static void check_smps_mode_mult(struct device *parent,
 	return;
 }
 
+static inline int tps80031_cache_regulator_register(struct device *parent,
+	struct tps80031_regulator *ri)
+{
+	int ret;
+
+	ret = tps80031_read(parent, SLAVE_ID1, ri->trans_reg,
+			&ri->trans_reg_cache);
+	if (!ret && ri->state_reg)
+		ret = tps80031_read(parent, SLAVE_ID1, ri->state_reg,
+			&ri->state_reg_cache);
+	if (!ret && ri->force_reg)
+		ret = tps80031_read(parent, ri->volt_id, ri->force_reg,
+			&ri->force_reg_cache);
+	if (!ret && ri->volt_reg)
+		ret = tps80031_read(parent, ri->volt_id, ri->volt_reg,
+			&ri->volt_reg_cache);
+	return ret;
+}
+
 static int __devinit tps80031_regulator_probe(struct platform_device *pdev)
 {
 	struct tps80031_regulator *ri = NULL;
@@ -949,6 +958,11 @@ static int __devinit tps80031_regulator_probe(struct platform_device *pdev)
 	check_smps_mode_mult(pdev->dev.parent, ri);
 	ri->platform_flags = tps_pdata->flags;
 
+	err = tps80031_cache_regulator_register(pdev->dev.parent, ri);
+	if (err) {
+		dev_err(&pdev->dev, "Register access for caching is failed\n");
+		return err;
+	}
 	err = tps80031_regulator_preinit(pdev->dev.parent, ri, tps_pdata);
 	if (err)
 		return err;
