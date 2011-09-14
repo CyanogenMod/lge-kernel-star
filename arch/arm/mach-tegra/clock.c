@@ -100,6 +100,7 @@ struct clk *tegra_get_clock_by_name(const char *name)
 	mutex_unlock(&clock_list_lock);
 	return ret;
 }
+EXPORT_SYMBOL(tegra_get_clock_by_name);
 
 static void clk_stats_update(struct clk *c)
 {

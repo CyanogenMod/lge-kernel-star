@@ -197,6 +197,7 @@ int tegra_dma_cancel(struct tegra_dma_channel *ch)
 	spin_unlock_irqrestore(&ch->lock, irq_flags);
 	return 0;
 }
+EXPORT_SYMBOL(tegra_dma_cancel);
 
 static unsigned int get_channel_status(struct tegra_dma_channel *ch,
 			struct tegra_dma_req *req, bool is_stop_dma)

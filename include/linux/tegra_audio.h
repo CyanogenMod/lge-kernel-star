@@ -31,6 +31,15 @@ struct tegra_audio_in_config {
 	int stereo;
 };
 
+struct dam_srate {
+	unsigned int in_sample_rate;
+	unsigned int out_sample_rate;
+	unsigned int audio_bits;
+	unsigned int client_bits;
+	unsigned int audio_channels;
+	unsigned int client_channels;
+};
+
 #define TEGRA_AUDIO_IN_SET_CONFIG	_IOW(TEGRA_AUDIO_MAGIC, 2, \
 			const struct tegra_audio_in_config *)
 #define TEGRA_AUDIO_IN_GET_CONFIG	_IOR(TEGRA_AUDIO_MAGIC, 3, \
@@ -53,5 +62,8 @@ struct tegra_audio_in_config {
 			const unsigned int *)
 #define TEGRA_AUDIO_GET_BIT_FORMAT	_IOR(TEGRA_AUDIO_MAGIC, 12, \
 			unsigned int *)
+
+#define DAM_SRC_START	_IOW(TEGRA_AUDIO_MAGIC, 13, struct dam_srate *)
+#define DAM_SRC_STOP	_IOW(TEGRA_AUDIO_MAGIC, 14, struct dam_srate *)
 
 #endif/*_CPCAP_AUDIO_H*/
