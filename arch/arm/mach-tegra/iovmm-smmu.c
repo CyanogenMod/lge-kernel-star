@@ -35,9 +35,9 @@
 #include <asm/cacheflush.h>
 #include <asm/page.h>
 #include <asm/cacheflush.h>
-
 #include <mach/iovmm.h>
 #include <mach/iomap.h>
+#include "tegra_smmu.h"
 
 /* For debugging */
 /*#define SMMU_DEBUG*/
@@ -942,7 +942,8 @@ static struct tegra_iovmm_device_ops tegra_iovmm_smmu_ops = {
 static int smmu_probe(struct platform_device *pdev)
 {
 	struct smmu_device *smmu = NULL;
-	struct resource *regs = NULL, *window = NULL, *regs2 = NULL;
+	struct resource *regs = NULL, *regs2 = NULL;
+	struct tegra_smmu_window *window = NULL;
 	int e, asid;
 
 	if (!pdev) {
@@ -963,7 +964,7 @@ static int smmu_probe(struct platform_device *pdev)
 
 	regs = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mc");
 	regs2 = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ahbarb");
-	window = platform_get_resource_byname(pdev, IORESOURCE_MEM, "smmu");
+	window = tegra_smmu_window(0);
 
 	if (!regs || !regs2 || !window) {
 		pr_err(DRIVER_NAME ": No SMMU resources\n");
@@ -979,7 +980,7 @@ static int smmu_probe(struct platform_device *pdev)
 	smmu->iovmm_base = (tegra_iovmm_addr_t)window->start;
 	smmu->page_count = (window->end + 1 - window->start) >> SMMU_PAGE_SHIFT;
 	smmu->regs = ioremap(regs->start, regs->end + 1 - regs->start);
-	smmu->regs_ahbarb = ioremap(regs2->start, regs2->end + 1 - regs->start);
+	smmu->regs_ahbarb = ioremap(regs2->start, regs2->end+1 - regs2->start);
 	if (!smmu->regs || !smmu->regs_ahbarb) {
 		pr_err(DRIVER_NAME ": failed to remap SMMU registers\n");
 		e = -ENXIO;

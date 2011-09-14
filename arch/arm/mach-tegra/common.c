@@ -43,6 +43,7 @@
 #include "fuse.h"
 #include "pm.h"
 #include "reset.h"
+#include "tegra_smmu.h"
 
 #define MC_SECURITY_CFG2	0x7c
 
@@ -519,11 +520,8 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 	unsigned long fb2_size)
 {
 #ifdef SUPPORT_TEGRA_3_IOVMM_SMMU_A01
-	extern struct platform_device tegra_smmu_device;
 	int smmu_reserved = 0;
-	struct resource *smmu_window =
-		    platform_get_resource_byname(&tegra_smmu_device,
-						IORESOURCE_MEM, "smmu");
+	struct tegra_smmu_window *smmu_window = tegra_smmu_window(0);
 #endif
 
 	if (carveout_size) {
@@ -573,7 +571,7 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 
 #ifdef SUPPORT_TEGRA_3_IOVMM_SMMU_A01
 	if (!smmu_window) {
-		pr_err("No SMMU resources\n");
+		pr_err("No SMMU resource\n");
 	} else {
 		size_t smmu_window_size;
 
@@ -648,7 +646,7 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 
 #ifdef SUPPORT_TEGRA_3_IOVMM_SMMU_A01
 	if (smmu_reserved)
-		pr_info("SMMU:                   %08x - %08x\n",
+		pr_info("SMMU:                   %08lx - %08lx\n",
 			smmu_window->start, smmu_window->end);
 #endif
 }

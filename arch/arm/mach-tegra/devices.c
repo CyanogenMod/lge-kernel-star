@@ -30,6 +30,7 @@
 #include <mach/irqs.h>
 #include <mach/iomap.h>
 #include <mach/dma.h>
+#include "tegra_smmu.h"
 
 #if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
 #define UART_SOURCE_RATE 408000000
@@ -1193,12 +1194,6 @@ static struct resource tegra_smmu_resources[] = {
 		.end	= TEGRA_MC_BASE + TEGRA_MC_SIZE - 1,
 	},
 	[1] = {
-		.name	= "smmu",
-		.flags	= IORESOURCE_MEM,
-		.start	= TEGRA_SMMU_BASE,
-		.end	= TEGRA_SMMU_BASE + TEGRA_SMMU_SIZE - 1,
-	},
-	[2] = {
 		.name   = "ahbarb",
 		.flags  = IORESOURCE_MEM,
 		.start  = TEGRA_AHB_ARB_BASE,
@@ -1212,6 +1207,24 @@ struct platform_device tegra_smmu_device = {
 	.num_resources	= ARRAY_SIZE(tegra_smmu_resources),
 	.resource	= tegra_smmu_resources
 };
+
+
+static struct tegra_smmu_window tegra_smmu[] = {
+	[0] = {
+		.start	= TEGRA_SMMU_BASE,
+		.end	= TEGRA_SMMU_BASE + TEGRA_SMMU_SIZE - 1,
+	},
+};
+
+struct tegra_smmu_window *tegra_smmu_window(int wnum)
+{
+	return &tegra_smmu[wnum];
+}
+
+int tegra_smmu_window_count(void)
+{
+	return ARRAY_SIZE(tegra_smmu);
+}
 #endif
 
 #if defined(CONFIG_ARCH_TEGRA_2x_SOC)
