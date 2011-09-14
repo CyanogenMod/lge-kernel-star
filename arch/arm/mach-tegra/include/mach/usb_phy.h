@@ -29,6 +29,8 @@ struct tegra_utmip_config {
 	u8 idle_wait_delay;
 	u8 term_range_adj;
 	u8 xcvr_setup;
+	u8 xcvr_setup_offset;
+	u8 xcvr_use_fuses;
 	u8 xcvr_lsfslew;
 	u8 xcvr_lsrslew;
 };

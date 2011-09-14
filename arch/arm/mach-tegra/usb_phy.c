@@ -109,7 +109,12 @@
 #define   UTMIP_FORCE_PD2_POWERDOWN		(1 << 16)
 #define   UTMIP_FORCE_PDZI_POWERDOWN		(1 << 18)
 #define   UTMIP_XCVR_LSBIAS_SEL			(1 << 21)
+#define   UTMIP_XCVR_SETUP_MSB(x)		(((x) & 0x7) << 22)
 #define   UTMIP_XCVR_HSSLEW_MSB(x)		(((x) & 0x7f) << 25)
+
+#define UTMIP_XCVR_MAX_OFFSET		2
+#define UTMIP_XCVR_SETUP_MAX_VALUE	0x7f
+#define XCVR_SETUP_MSB_CALIB(x)	((x) >> 4)
 
 #define UTMIP_BIAS_CFG0		0x80c
 #define   UTMIP_OTGPD			(1 << 11)
@@ -255,7 +260,12 @@
 #define   UTMIP_FORCE_PD2_POWERDOWN		(1 << 16)
 #define   UTMIP_FORCE_PDZI_POWERDOWN		(1 << 18)
 #define   UTMIP_XCVR_LSBIAS_SEL			(1 << 21)
+#define   UTMIP_XCVR_SETUP_MSB(x)		(((x) & 0x7) << 22)
 #define   UTMIP_XCVR_HSSLEW_MSB(x)		(((x) & 0x7f) << 25)
+
+#define UTMIP_XCVR_MAX_OFFSET		5
+#define UTMIP_XCVR_SETUP_MAX_VALUE	0x7f
+#define XCVR_SETUP_MSB_CALIB(x)	((x) >> 4)
 
 #define UTMIP_BIAS_CFG0		0x80c
 #define   UTMIP_OTGPD			(1 << 11)
@@ -525,6 +535,9 @@
 #define   FUSE_SETUP_SEL		(1 << 3)
 #define   FUSE_ATERM_SEL		(1 << 4)
 
+#define FUSE_USB_CALIB_0		0x1F0
+#define FUSE_USB_CALIB_XCVR_SETUP(x)	(((x) & 0x7F) << 0)
+
 #define UHSIC_PLL_CFG0		0x800
 
 #define UHSIC_TX_CFG0				0x810
@@ -629,6 +642,8 @@ static struct tegra_utmip_config utmip_default[] = {
 		.elastic_limit = 16,
 		.term_range_adj = 6,
 		.xcvr_setup = 9,
+		.xcvr_setup_offset = 0,
+		.xcvr_use_fuses = 1,
 		.xcvr_lsfslew = 2,
 		.xcvr_lsrslew = 2,
 	},
@@ -637,6 +652,8 @@ static struct tegra_utmip_config utmip_default[] = {
 		.idle_wait_delay = 17,
 		.elastic_limit = 16,
 		.term_range_adj = 6,
+		.xcvr_setup_offset = 0,
+		.xcvr_use_fuses = 1,
 		.xcvr_setup = 9,
 		.xcvr_lsfslew = 2,
 		.xcvr_lsrslew = 2,
@@ -852,10 +869,33 @@ static void vbus_disable(struct tegra_usb_phy *phy)
 #endif
 }
 
+static unsigned int tegra_phy_xcvr_setup_value(struct tegra_utmip_config *cfg)
+{
+	unsigned long val;
+
+	if (cfg->xcvr_use_fuses) {
+		val = FUSE_USB_CALIB_XCVR_SETUP(
+				tegra_fuse_readl(FUSE_USB_CALIB_0));
+		if (cfg->xcvr_setup_offset <= UTMIP_XCVR_MAX_OFFSET)
+			val = val + cfg->xcvr_setup_offset;
+
+		if (val > UTMIP_XCVR_SETUP_MAX_VALUE) {
+			val = UTMIP_XCVR_SETUP_MAX_VALUE;
+			pr_info("%s: reset XCVR_SETUP to max value\n",
+				 __func__);
+		}
+	} else {
+		val = cfg->xcvr_setup;
+	}
+
+	return val;
+}
+
 static int utmi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
+	unsigned int xcvr_setup_value;
 	struct tegra_utmip_config *config = phy->config;
 
 	val = readl(base + USB_SUSP_CTRL);
@@ -916,12 +956,15 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 
 	utmip_pad_power_on(phy);
 
+	xcvr_setup_value = tegra_phy_xcvr_setup_value(config);
+
 	val = readl(base + UTMIP_XCVR_CFG0);
 	val &= ~(UTMIP_XCVR_LSBIAS_SEL | UTMIP_FORCE_PD_POWERDOWN |
 		 UTMIP_FORCE_PD2_POWERDOWN | UTMIP_FORCE_PDZI_POWERDOWN |
 		 UTMIP_XCVR_SETUP(~0) | UTMIP_XCVR_LSFSLEW(~0) |
 		 UTMIP_XCVR_LSRSLEW(~0) | UTMIP_XCVR_HSSLEW_MSB(~0));
-	val |= UTMIP_XCVR_SETUP(config->xcvr_setup);
+	val |= UTMIP_XCVR_SETUP(xcvr_setup_value);
+	val |= UTMIP_XCVR_SETUP_MSB(XCVR_SETUP_MSB_CALIB(xcvr_setup_value));
 	val |= UTMIP_XCVR_LSFSLEW(config->xcvr_lsfslew);
 	val |= UTMIP_XCVR_LSRSLEW(config->xcvr_lsrslew);
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
@@ -948,14 +991,9 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	writel(val, base + UTMIP_BIAS_CFG1);
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
-	if (phy->instance == 0) {
-		val = readl(base + UTMIP_SPARE_CFG0);
-		if (phy->mode == TEGRA_USB_PHY_MODE_DEVICE)
-			val &= ~FUSE_SETUP_SEL;
-		else
-			val |= FUSE_SETUP_SEL;
-		writel(val, base + UTMIP_SPARE_CFG0);
-	}
+	val = readl(base + UTMIP_SPARE_CFG0);
+	val &= ~FUSE_SETUP_SEL;
+	writel(val, base + UTMIP_SPARE_CFG0);
 
 	if (phy->instance == 2) {
 		val = readl(base + UTMIP_SPARE_CFG0);
@@ -968,7 +1006,8 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	}
 #else
 	val = readl(base + UTMIP_SPARE_CFG0);
-	val |= FUSE_SETUP_SEL | FUSE_ATERM_SEL;
+	val &= ~FUSE_SETUP_SEL;
+	val |= FUSE_ATERM_SEL;
 	writel(val, base + UTMIP_SPARE_CFG0);
 
 	val = readl(base + USB_SUSP_CTRL);
