@@ -32,7 +32,8 @@
 #include <mach/pinmux.h>
 #include "gpio-names.h"
 
-#define SET_DRIVE_PINGROUP(pg_name, r, drv_down_offset, drv_down_mask, drv_up_offset, drv_up_mask)	\
+#define SET_DRIVE_PINGROUP(pg_name, r, drv_down_offset, drv_down_mask, drv_up_offset, drv_up_mask,	\
+	slew_rise_offset, slew_rise_mask, slew_fall_offset, slew_fall_mask)	\
 	[TEGRA_DRIVE_PINGROUP_ ## pg_name] = {			\
 		.name = #pg_name,				\
 		.reg = r,					\
@@ -40,6 +41,10 @@
 		.drvup_mask = drv_up_mask,			\
 		.drvdown_offset = drv_down_offset,		\
 		.drvdown_mask = drv_down_mask,			\
+		.slewrise_offset = slew_rise_offset,		\
+		.slewrise_mask = slew_rise_mask,		\
+		.slewfall_offset = slew_fall_offset,		\
+		.slewfall_mask = slew_fall_mask,		\
 	}
 
 #define DEFAULT_DRIVE_PINGROUP(pg_name, r)		\
@@ -50,6 +55,10 @@
 		.drvup_mask = 0x1f,			\
 		.drvdown_offset = 12,			\
 		.drvdown_mask = 0x1f,			\
+		.slewrise_offset = 28,			\
+		.slewrise_mask = 0x3,			\
+		.slewfall_offset = 30,			\
+		.slewfall_mask = 0x3,			\
 	}
 
 const struct tegra_drive_pingroup_desc tegra_soc_drive_pingroups[TEGRA_MAX_DRIVE_PINGROUP] = {
@@ -70,21 +79,28 @@ const struct tegra_drive_pingroup_desc tegra_soc_drive_pingroups[TEGRA_MAX_DRIVE
 	DEFAULT_DRIVE_PINGROUP(DBG,		0x8a0),
 	DEFAULT_DRIVE_PINGROUP(LCD1,		0x8a4),
 	DEFAULT_DRIVE_PINGROUP(LCD2,		0x8a8),
-	SET_DRIVE_PINGROUP(SDIO2,		0x8ac,	12,	0x7f,	20,	0x7f),
-	SET_DRIVE_PINGROUP(SDIO3,		0x8b0,	12,	0x7f,	20,	0x7f),
+	SET_DRIVE_PINGROUP(SDIO2,		0x8ac,	12,	0x7f,	20,	0x7f,
+		28,	0x3,	30,	0x3),
+	SET_DRIVE_PINGROUP(SDIO3,		0x8b0,	12,	0x7f,	20,	0x7f,
+		28,	0x3,	30,	0x3),
 	DEFAULT_DRIVE_PINGROUP(SPI,		0x8b4),
 	DEFAULT_DRIVE_PINGROUP(UAA,		0x8b8),
 	DEFAULT_DRIVE_PINGROUP(UAB,		0x8bc),
 	DEFAULT_DRIVE_PINGROUP(UART2,		0x8c0),
 	DEFAULT_DRIVE_PINGROUP(UART3,		0x8c4),
 	DEFAULT_DRIVE_PINGROUP(VI1,		0x8c8),
-	SET_DRIVE_PINGROUP(SDIO1,		0x8ec,	12,	0x7f,	20,	0x7f),
+	SET_DRIVE_PINGROUP(SDIO1,		0x8ec,	12,	0x7f,	20,	0x7f,
+		28,	0x3,	30,	0x3),
 	DEFAULT_DRIVE_PINGROUP(CRT,		0x8f8),
 	DEFAULT_DRIVE_PINGROUP(DDC,		0x8fc),
-	SET_DRIVE_PINGROUP(GMA,			0x900,	14,	0x1f,	19,	0x1f),
-	SET_DRIVE_PINGROUP(GMB,			0x904,	14,	0x1f,	19,	0x1f),
-	SET_DRIVE_PINGROUP(GMC,			0x908,	14,	0x1f,	19,	0x1f),
-	SET_DRIVE_PINGROUP(GMD,			0x90c,	14,	0x1f,	19,	0x1f),
+	SET_DRIVE_PINGROUP(GMA,			0x900,	14,	0x1f,	19,	0x1f,
+		24,	0xf,	28,	0xf),
+	SET_DRIVE_PINGROUP(GMB,			0x904,	14,	0x1f,	19,	0x1f,
+		24,	0xf,	28,	0xf),
+	SET_DRIVE_PINGROUP(GMC,			0x908,	14,	0x1f,	19,	0x1f,
+		24,	0xf,	28,	0xf),
+	SET_DRIVE_PINGROUP(GMD,			0x90c,	14,	0x1f,	19,	0x1f,
+		24,	0xf,	28,	0xf),
 	DEFAULT_DRIVE_PINGROUP(GME,		0x910),
 	DEFAULT_DRIVE_PINGROUP(GMF,		0x914),
 	DEFAULT_DRIVE_PINGROUP(GMG,		0x918),

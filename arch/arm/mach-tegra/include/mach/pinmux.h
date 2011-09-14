@@ -309,6 +309,10 @@ struct tegra_drive_pingroup_desc {
 	u16 drvup_mask;
 	u8 drvdown_offset;
 	u16 drvdown_mask;
+	u8 slewrise_offset;
+	u16 slewrise_mask;
+	u8 slewfall_offset;
+	u16 slewfall_mask;
 };
 
 struct tegra_pingroup_desc {

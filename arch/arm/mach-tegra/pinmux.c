@@ -776,8 +776,9 @@ static int tegra_drive_pinmux_set_slew_rising(enum tegra_drive_pingroup pg,
 	spin_lock_irqsave(&mux_lock, flags);
 
 	reg = pg_readl(drive_pingroups[pg].reg);
-	reg &= ~(0x3 << 28);
-	reg |= slew_rising << 28;
+	reg &= ~(drive_pingroups[pg].slewrise_mask <<
+		drive_pingroups[pg].slewrise_offset);
+	reg |= slew_rising << drive_pingroups[pg].slewrise_offset;
 	pg_writel(reg, drive_pingroups[pg].reg);
 
 	spin_unlock_irqrestore(&mux_lock, flags);
@@ -799,8 +800,9 @@ static int tegra_drive_pinmux_set_slew_falling(enum tegra_drive_pingroup pg,
 	spin_lock_irqsave(&mux_lock, flags);
 
 	reg = pg_readl(drive_pingroups[pg].reg);
-	reg &= ~(0x3 << 30);
-	reg |= slew_falling << 30;
+	reg &= ~(drive_pingroups[pg].slewfall_mask <<
+		drive_pingroups[pg].slewfall_offset);
+	reg |= slew_falling << drive_pingroups[pg].slewfall_offset;
 	pg_writel(reg, drive_pingroups[pg].reg);
 
 	spin_unlock_irqrestore(&mux_lock, flags);
