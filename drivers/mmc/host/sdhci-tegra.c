@@ -21,6 +21,7 @@
 #include <linux/slab.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
+#include <linux/regulator/consumer.h>
 
 #include <mach/gpio.h>
 #include <mach/sdhci.h>
@@ -32,6 +33,8 @@
 
 struct tegra_sdhci_host {
 	bool	clk_enabled;
+	struct regulator *vdd_io_reg;
+	struct regulator *vdd_slot_reg;
 };
 
 static u32 tegra_sdhci_readl(struct sdhci_host *host, int reg)
@@ -261,6 +264,33 @@ static int tegra_sdhci_pltfm_init(struct sdhci_host *host,
 		gpio_direction_input(plat->wp_gpio);
 	}
 
+	if (!plat->mmc_data.built_in) {
+		tegra_host->vdd_io_reg = regulator_get(mmc_dev(host->mmc), "vddio_sdmmc");
+		if (WARN_ON(IS_ERR_OR_NULL(tegra_host->vdd_io_reg))) {
+			dev_err(mmc_dev(host->mmc), "%s regulator not found: %ld\n",
+				"vddio_sdmmc", PTR_ERR(tegra_host->vdd_io_reg));
+			tegra_host->vdd_io_reg = NULL;
+		} else {
+			rc = regulator_set_voltage(tegra_host->vdd_io_reg,
+				3280000, 3320000);
+			if (rc) {
+				dev_err(mmc_dev(host->mmc), "%s regulator_set_voltage failed: %d",
+					"vddio_sdmmc", rc);
+			} else {
+				regulator_enable(tegra_host->vdd_io_reg);
+			}
+		}
+
+		tegra_host->vdd_slot_reg = regulator_get(mmc_dev(host->mmc), "vddio_sd_slot");
+		if (WARN_ON(IS_ERR_OR_NULL(tegra_host->vdd_slot_reg))) {
+			dev_err(mmc_dev(host->mmc), "%s regulator not found: %ld\n",
+				"vddio_sd_slot", PTR_ERR(tegra_host->vdd_slot_reg));
+			tegra_host->vdd_slot_reg = NULL;
+		} else {
+			regulator_enable(tegra_host->vdd_slot_reg);
+		}
+	}
+
 	clk = clk_get(mmc_dev(host->mmc), NULL);
 	if (IS_ERR(clk)) {
 		dev_err(mmc_dev(host->mmc), "clk err\n");
@@ -323,6 +353,16 @@ static void tegra_sdhci_pltfm_exit(struct sdhci_host *host)
 	struct tegra_sdhci_platform_data *plat;
 
 	plat = pdev->dev.platform_data;
+
+	if (tegra_host->vdd_slot_reg) {
+		regulator_disable(tegra_host->vdd_slot_reg);
+		regulator_put(tegra_host->vdd_slot_reg);
+	}
+
+	if (tegra_host->vdd_io_reg) {
+		regulator_disable(tegra_host->vdd_io_reg);
+		regulator_put(tegra_host->vdd_io_reg);
+	}
 
 	if (gpio_is_valid(plat->wp_gpio)) {
 		tegra_gpio_disable(plat->wp_gpio);
