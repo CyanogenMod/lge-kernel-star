@@ -369,21 +369,17 @@ int tegra_cluster_control(unsigned int us, unsigned int flags)
 #endif
 
 #ifdef CONFIG_PM_SLEEP
-static u32 mc_reserved_rsv;
-static u32 mc_emem_arb_override;
 
 void tegra_lp0_suspend_mc(void)
 {
-	void __iomem *mc = IO_ADDRESS(TEGRA_MC_BASE);
-	mc_reserved_rsv = readl(mc + MC_RESERVED_RSV);
-	mc_emem_arb_override = readl(mc + MC_EMEM_ARB_OVERRIDE);
+	/* Since memory frequency after LP0 is restored to boot rate
+	   mc timing is saved during init, not on entry to LP0. Keep
+	   this hook just in case, anyway */
 }
 
 void tegra_lp0_resume_mc(void)
 {
-	void __iomem *mc = IO_ADDRESS(TEGRA_MC_BASE);
-	writel(mc_reserved_rsv, mc + MC_RESERVED_RSV);
-	writel(mc_emem_arb_override, mc + MC_EMEM_ARB_OVERRIDE);
+	tegra_mc_timing_restore();
 }
 
 void tegra_lp0_cpu_mode(bool enter)

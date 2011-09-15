@@ -47,6 +47,13 @@ void tegra_init_emc(const struct tegra_emc_table *table, int table_size);
 
 int tegra_emc_get_dram_type(void);
 
+#ifdef CONFIG_PM_SLEEP
+void tegra_mc_timing_restore(void);
+#else
+static inline void tegra_mc_timing_restore(void)
+{ }
+#endif
+
 #define EMC_INTSTATUS				0x0
 #define EMC_INTSTATUS_CLKCHANGE_COMPLETE	(0x1 << 4)
 
@@ -252,8 +259,11 @@ enum {
 #define MC_EMEM_ARB_DA_COVERS			0xd4
 #define MC_EMEM_ARB_MISC0			0xd8
 #define MC_EMEM_ARB_MISC0_EMC_SAME_FREQ		(0x1 << 27)
+#define MC_EMEM_ARB_MISC1			0xdc
 #define MC_EMEM_ARB_RING1_THROTTLE		0xe0
+#define MC_EMEM_ARB_RING3_THROTTLE		0xe4
 #define MC_EMEM_ARB_OVERRIDE			0xe8
+#define MC_TIMING_CONTROL			0xfc
 #define MC_RESERVED_RSV				0x3fc
 
 #endif

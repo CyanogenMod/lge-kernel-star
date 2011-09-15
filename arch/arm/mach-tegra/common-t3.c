@@ -40,6 +40,11 @@
 #define MC_ERROR_STATUS			0x8
 #define MC_ERROR_ADDRESS		0xC
 
+#define MC_TIMING_REG_NUM1 \
+	((MC_EMEM_ARB_TIMING_W2R - MC_EMEM_ARB_CFG) / 4 + 1)
+#define MC_TIMING_REG_NUM2 \
+	((MC_EMEM_ARB_MISC1 - MC_EMEM_ARB_DA_TURNS) / 4 + 1)
+
 struct mc_client {
 	const char *name;
 };
@@ -48,6 +53,57 @@ struct mc_client {
 	{				\
 		.name = _name,		\
 	}
+
+
+static void __iomem *mc = IO_ADDRESS(TEGRA_MC_BASE);
+
+
+#ifdef CONFIG_PM_SLEEP
+static u32 mc_boot_timing[MC_TIMING_REG_NUM1 + MC_TIMING_REG_NUM2 + 4];
+
+static void tegra_mc_timing_save(void)
+{
+	u32 off;
+	u32 *ctx = mc_boot_timing;
+
+	for (off = MC_EMEM_ARB_CFG; off <= MC_EMEM_ARB_TIMING_W2R; off += 4)
+		*ctx++ = readl((u32)mc + off);
+
+	for (off = MC_EMEM_ARB_DA_TURNS; off <= MC_EMEM_ARB_MISC1; off += 4)
+		*ctx++ = readl((u32)mc + off);
+
+	*ctx++ = readl((u32)mc + MC_EMEM_ARB_RING3_THROTTLE);
+	*ctx++ = readl((u32)mc + MC_EMEM_ARB_OVERRIDE);
+	*ctx++ = readl((u32)mc + MC_RESERVED_RSV);
+
+	*ctx++ = readl((u32)mc + MC_INT_MASK);
+}
+
+void tegra_mc_timing_restore(void)
+{
+	u32 off;
+	u32 *ctx = mc_boot_timing;
+
+	for (off = MC_EMEM_ARB_CFG; off <= MC_EMEM_ARB_TIMING_W2R; off += 4)
+		__raw_writel(*ctx++, (u32)mc + off);
+
+	for (off = MC_EMEM_ARB_DA_TURNS; off <= MC_EMEM_ARB_MISC1; off += 4)
+		__raw_writel(*ctx++, (u32)mc + off);
+
+	__raw_writel(*ctx++, (u32)mc + MC_EMEM_ARB_RING3_THROTTLE);
+	__raw_writel(*ctx++, (u32)mc + MC_EMEM_ARB_OVERRIDE);
+	__raw_writel(*ctx++, (u32)mc + MC_RESERVED_RSV);
+
+	writel(*ctx++, (u32)mc + MC_INT_MASK);
+	off = readl((u32)mc + MC_INT_MASK);
+
+	writel(0x1, (u32)mc + MC_TIMING_CONTROL);
+	off = readl((u32)mc + MC_TIMING_CONTROL);
+}
+#else
+#define tegra_mc_timing_save()
+#endif
+
 
 static const struct mc_client mc_clients[] = {
 	client("ptc"),
@@ -115,7 +171,6 @@ static DECLARE_DELAYED_WORK(unthrottle_prints_work, unthrottle_prints);
 
 static irqreturn_t tegra_mc_error_isr(int irq, void *data)
 {
-	void __iomem *mc = IO_ADDRESS(TEGRA_MC_BASE);
 	const struct mc_client *client = NULL;
 	const char *mc_err;
 	const char *mc_err_info;
@@ -187,7 +242,6 @@ out:
 
 int __init tegra_mc_init(void)
 {
-	void __iomem *mc = IO_ADDRESS(TEGRA_MC_BASE);
 	u32 reg;
 	int ret = 0;
 
@@ -207,6 +261,7 @@ int __init tegra_mc_init(void)
 				MC_INT_INVALID_SMMU_PAGE;
 		writel(reg, mc + MC_INT_MASK);
 	}
+	tegra_mc_timing_save();
 
 	return ret;
 }
