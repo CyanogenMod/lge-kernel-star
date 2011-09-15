@@ -102,6 +102,7 @@ struct tegra_usb_phy {
 	struct otg_transceiver *ulpi;
 	int initialized;
 	bool power_on;
+	bool remote_wakeup;
 };
 
 typedef int (*tegra_phy_fp)(struct tegra_usb_phy *phy, bool is_dpd);
@@ -144,5 +145,7 @@ bool tegra_usb_phy_is_device_connected(struct tegra_usb_phy *phy);
 bool tegra_usb_phy_charger_detect(struct tegra_usb_phy *phy);
 
 int __init tegra_usb_phy_init(struct usb_phy_plat_data *pdata, int size);
+
+bool tegra_usb_phy_is_remotewake_detected(struct tegra_usb_phy *phy);
 
 #endif /* __MACH_USB_PHY_H */

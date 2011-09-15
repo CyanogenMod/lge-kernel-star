@@ -48,7 +48,7 @@
 #define STS_SRI	(1<<7)	/*	SOF Recieved	*/
 
 #define TEGRA_HSIC_CONNECTION_MAX_RETRIES 5
-#define HOSTPC_REG_OFFSET       0x1b4
+#define HOSTPC_REG_OFFSET		0x1b4
 
 #define HOSTPC1_DEVLC_STS 		(1 << 28)
 #define HOSTPC1_DEVLC_PTS(x)		(((x) & 0x7) << 29)
@@ -102,6 +102,15 @@ static irqreturn_t tegra_ehci_irq (struct usb_hcd *hcd)
 	struct tegra_ehci_hcd *tegra = dev_get_drvdata(hcd->self.controller);
 	u32 val;
 
+	if ((tegra->phy->usb_phy_type == TEGRA_USB_PHY_TYPE_UTMIP) &&
+		(tegra->ehci->has_hostpc)) {
+		/* check if there is any remote wake event */
+		if (tegra_usb_phy_is_remotewake_detected(tegra->phy)) {
+			spin_lock (&ehci->lock);
+			usb_hcd_resume_root_hub(hcd);
+			spin_unlock (&ehci->lock);
+		}
+	}
 	if (tegra->phy->instance == 2) {
 		spin_lock(&ehci->lock);
 		val = readl(hcd->regs + TEGRA_USB_SUSP_CTRL_OFFSET);
@@ -178,8 +187,15 @@ static int tegra_ehci_hub_control(
 			ehci->reset_done[wIndex-1] = 0;
 			tegra_usb_phy_postresume(tegra->phy, false);
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
-			ehci->command |= CMD_RUN;
-			ehci_writel(ehci, ehci->command, &ehci->regs->command);
+			if (tegra->phy->usb_phy_type == TEGRA_USB_PHY_TYPE_UTMIP) {
+				ehci->command |= CMD_RUN;
+				/*
+				 * ehci run bit is disabled to avoid SOF.
+				 * 2LS WAR is executed by now enable the run bit.
+				 */
+				ehci_writel(ehci, ehci->command,
+					&ehci->regs->command);
+			}
 #endif
 		}
 	} else if (typeReq == SetPortFeature && wValue == USB_PORT_FEAT_SUSPEND) {
@@ -395,8 +411,15 @@ static int tegra_usb_suspend(struct usb_hcd *hcd, bool is_dpd)
 		tegra->port_speed = (readl(&hw->port_status[0]) >> 26) & 0x3;
 	ehci_halt(tegra->ehci);
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
-	tegra->ehci->command = ehci_readl(tegra->ehci,
-					&tegra->ehci->regs->command);
+	if (tegra->phy->usb_phy_type == TEGRA_USB_PHY_TYPE_UTMIP) {
+		/*
+		 * Ehci run bit is disabled by now read this into command variable
+		 * so that bus resume will not enable run bit immedialty.
+		 * this is required for 2LS WAR on UTMIP interface.
+		 */
+		tegra->ehci->command = ehci_readl(tegra->ehci,
+						&tegra->ehci->regs->command);
+	}
 #endif
 
 	spin_unlock_irqrestore(&tegra->ehci->lock, flags);
@@ -425,13 +448,16 @@ static int tegra_usb_resume(struct usb_hcd *hcd, bool is_dpd)
 	/* Force the phy to keep data lines in suspend state */
 	tegra_ehci_phy_restore_start(tegra->phy, tegra->port_speed);
 
-	if (tegra->ehci->has_hostpc)
+	if ((tegra->phy->usb_phy_type == TEGRA_USB_PHY_TYPE_UTMIP) &&
+		(tegra->ehci->has_hostpc)) {
 		ehci_reset(ehci);
+	}
 
 	/* Enable host mode */
 	tdi_reset(ehci);
 
-	if (tegra->ehci->has_hostpc) {
+	if ((tegra->phy->usb_phy_type == TEGRA_USB_PHY_TYPE_UTMIP) &&
+		(tegra->ehci->has_hostpc)) {
 		val = readl(hcd->regs + HOSTPC_REG_OFFSET);
 		val &= ~HOSTPC1_DEVLC_PTS(~0);
 		val |= HOSTPC1_DEVLC_STS;
@@ -443,6 +469,12 @@ static int tegra_usb_resume(struct usb_hcd *hcd, bool is_dpd)
 	val |= PORT_POWER;
 	writel(val, &hw->port_status[0]);
 	udelay(10);
+
+	if ((tegra->phy->usb_phy_type == TEGRA_USB_PHY_TYPE_UTMIP) &&
+		(tegra->ehci->has_hostpc) && (tegra->phy->remote_wakeup)) {
+		ehci->command |= CMD_RUN;
+		ehci_writel(ehci, ehci->command, &ehci->regs->command);
+	}
 
 	/* Check if the phy resume from LP0. When the phy resume from LP0
 	 * USB register will be reset. */
@@ -601,9 +633,7 @@ static int tegra_ehci_setup(struct usb_hcd *hcd)
 #ifdef CONFIG_PM
 static int tegra_ehci_bus_suspend(struct usb_hcd *hcd)
 {
-	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
 	struct tegra_ehci_hcd *tegra = dev_get_drvdata(hcd->self.controller);
-	u32 port_status;
 	int error_status = 0;
 
 	mutex_lock(&tegra->tegra_ehci_hcd_mutex);
@@ -613,11 +643,8 @@ static int tegra_ehci_bus_suspend(struct usb_hcd *hcd)
 		tegra_ehci_power_up(hcd, false);
 	error_status = ehci_bus_suspend(hcd);
 	if (!error_status && tegra->power_down_on_bus_suspend) {
-		port_status = ehci_readl(ehci, &ehci->regs->port_status[0]);
-		if (!(port_status & PORT_CONNECT)) {
-			tegra_usb_suspend(hcd, false);
-			tegra->bus_suspended = 1;
-		}
+		tegra_usb_suspend(hcd, false);
+		tegra->bus_suspended = 1;
 	}
 	tegra_usb_phy_postsuspend(tegra->phy, false);
 	mutex_unlock(&tegra->tegra_ehci_hcd_mutex);
