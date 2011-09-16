@@ -39,12 +39,6 @@ int enterprise_suspend_init(void);
 int enterprise_edp_init(void);
 void __init enterprise_tsensor_init(void);
 
-/* Touchscreen GPIO addresses   */
-#ifdef CONFIG_TOUCHSCREEN_ATMEL_MT_T9
-#define TOUCH_GPIO_IRQ_ATMEL_T9	TEGRA_GPIO_PH4
-#define TOUCH_GPIO_RST_ATMEL_T9	TEGRA_GPIO_PH6
-#endif
-
 /*****************External GPIO tables ******************/
 /* External peripheral gpio base. */
 #define ENT_TPS80031_GPIO_BASE	   TEGRA_NR_GPIOS

@@ -666,7 +666,7 @@ static int __init enterprise_touch_init(void)
 	tegra_gpio_enable(TEGRA_GPIO_PF5);
 
 	gpio_request(TEGRA_GPIO_PH6, "atmel-irq");
-	gpio_direction_input(TEGRA_GPIO_PH4);
+	gpio_direction_input(TEGRA_GPIO_PH6);
 
 	gpio_request(TEGRA_GPIO_PF5, "atmel-reset");
 	gpio_direction_output(TEGRA_GPIO_PF5, 0);
