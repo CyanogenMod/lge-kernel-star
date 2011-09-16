@@ -427,6 +427,10 @@ static int tegra_mc_client_parse(const char *buf, size_t count,
 	address_window_size &= ~((1ull << PAGE_SHIFT)-1ull);
 
 	if (mode == FILTER_CLIENT) {
+		if (write_tally || read_tally) {
+			ret = -EINVAL;
+			goto end;
+		}
 		counter = counter0;
 		counter->reschedule = (num_clients > 1);
 		counter->num_clients = num_clients;
