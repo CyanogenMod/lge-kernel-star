@@ -87,6 +87,11 @@ enum panel_type {
 	panel_type_dsi,
 };
 
+enum audio_codec_type {
+	audio_codec_none,
+	audio_codec_wm8903,
+};
+
 void tegra_get_board_info(struct board_info *);
 void tegra_get_pmu_board_info(struct board_info *bi);
 #ifdef CONFIG_TEGRA_CONVSERVATIVE_GOV_ON_EARLYSUPSEND
@@ -102,5 +107,6 @@ int get_core_edp(void);
 enum panel_type get_panel_type(void);
 int tegra_get_modem_id(void);
 enum power_supply_type get_power_supply_type(void);
+enum audio_codec_type get_audio_codec_type(void);
 
 #endif

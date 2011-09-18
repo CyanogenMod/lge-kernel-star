@@ -115,6 +115,7 @@ void tegra_assert_system_reset(char mode, const char *cmd)
 }
 static int modem_id;
 static int debug_uart_port_id;
+static enum audio_codec_type audio_codec_name;
 
 /* WARNING: There is implicit client of pllp_out3 like i2c, uart, dsi
  * and so this clock (pllp_out3) should never be disabled.
@@ -428,6 +429,24 @@ int get_tegra_uart_debug_port_id(void)
 	return debug_uart_port_id;
 }
 __setup("debug_uartport=", tegra_debug_uartport);
+
+static int __init tegra_audio_codec_type(char *info)
+{
+	char *p = info;
+	if (!strncmp(p, "wm8903", 6))
+		audio_codec_name = audio_codec_wm8903;
+	else
+		audio_codec_name = audio_codec_none;
+
+	return 1;
+}
+
+enum audio_codec_type get_audio_codec_type(void)
+{
+	return audio_codec_name;
+}
+__setup("audio_codec=", tegra_audio_codec_type);
+
 
 void tegra_get_board_info(struct board_info *bi)
 {
