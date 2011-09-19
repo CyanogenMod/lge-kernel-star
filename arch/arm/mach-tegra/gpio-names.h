@@ -264,4 +264,6 @@
 #define TEGRA_GPIO_PEE1		241
 #define TEGRA_GPIO_PEE2		242
 #define TEGRA_GPIO_PEE3		243
+#define TEGRA_GPIO_INVALID		244
+#define TEGRA_MAX_GPIO		245
 #endif

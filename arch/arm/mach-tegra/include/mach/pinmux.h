@@ -145,7 +145,7 @@ enum tegra_mux_func {
 	TEGRA_MUX_VGP5,
 	TEGRA_MUX_VGP6,
 #endif
-        TEGRA_MUX_SAFE,
+	TEGRA_MUX_SAFE,
 	TEGRA_MAX_MUX,
 };
 
@@ -316,24 +316,27 @@ struct tegra_pingroup_desc {
 	int funcs[4];
 	int func_safe;
 	int vddio;
-	s16 tri_reg; 	/* offset into the TRISTATE_REG_* register bank */
+	s16 tri_reg;	/* offset into the TRISTATE_REG_* register bank */
 	s16 mux_reg;	/* offset into the PIN_MUX_CTL_* register bank */
 	s16 pupd_reg;	/* offset into the PULL_UPDOWN_REG_* register bank */
-	s8 tri_bit; 	/* offset into the TRISTATE_REG_* register bit */
+	s8 tri_bit;	/* offset into the TRISTATE_REG_* register bit */
 	s8 mux_bit;	/* offset into the PIN_MUX_CTL_* register bit */
 	s8 pupd_bit;	/* offset into the PULL_UPDOWN_REG_* register bit */
 	s8 lock_bit;	/* offser of the LOCK bit into mux register bit */
 	s8 od_bit;	/* offset of the OD bit into mux register bit */
 	s8 ioreset_bit;	/* offset of the IO_RESET bit into mux register bit */
 	s8 io_default;
+	int gpionr;
 };
 
 extern const struct tegra_pingroup_desc tegra_soc_pingroups[];
 extern const struct tegra_drive_pingroup_desc tegra_soc_drive_pingroups[];
+extern const int gpio_to_pingroup[];
 
 int tegra_pinmux_get_func(enum tegra_pingroup pg);
 int tegra_pinmux_set_tristate(enum tegra_pingroup pg,
 	enum tegra_tristate tristate);
+int tegra_pinmux_get_pingroup(int gpio_nr);
 int tegra_pinmux_set_pullupdown(enum tegra_pingroup pg,
 	enum tegra_pullupdown pupd);
 

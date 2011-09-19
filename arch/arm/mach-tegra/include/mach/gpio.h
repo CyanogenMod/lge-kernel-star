@@ -27,6 +27,7 @@
 #define ARCH_NR_GPIOS		(TEGRA_NR_GPIOS + 128)
 
 #include <asm-generic/gpio.h>
+#include "pinmux.h"
 
 struct gpio_init_pin_info {
 	char name[16];
@@ -74,4 +75,5 @@ void tegra_gpio_enable(int gpio);
 void tegra_gpio_disable(int gpio);
 int tegra_gpio_resume_init(void);
 void tegra_gpio_init_configure(unsigned gpio, bool is_input, int value);
+void tegra_gpio_set_tristate(int gpio, enum tegra_tristate ts);
 #endif
