@@ -379,7 +379,7 @@ static int __init tegra_pmu_core_edp(char *options)
 		pmu_core_edp = core_edp;
 	return 1;
 }
-early_param("core_edp_mv", tegra_pmu_core_edp);
+__setup("core_edp_mv=", tegra_pmu_core_edp);
 
 static int __init tegra_debug_uartport(char *info)
 {
