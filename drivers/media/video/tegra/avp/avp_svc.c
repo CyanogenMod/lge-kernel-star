@@ -100,6 +100,8 @@ struct avp_svc_info {
 	/* client for remote allocations, for easy tear down */
 	struct nvmap_client		*nvmap_remote;
 	struct trpc_node		*rpc_node;
+	unsigned long			max_avp_rate;
+	unsigned long			emc_rate;
 };
 
 static void do_svc_nvmap_create(struct avp_svc_info *avp_svc,
@@ -462,6 +464,18 @@ static void do_svc_module_clock_set(struct avp_svc_info *avp_svc,
 
 	mutex_lock(&avp_svc->clk_lock);
 	if (msg->module_id == AVP_MODULE_ID_AVP) {
+		/* check if max avp clock is asked and set max emc frequency */
+		if (msg->clk_freq >= avp_svc->max_avp_rate) {
+			clk_set_rate(avp_svc->emcclk, ULONG_MAX);
+		}
+		else {
+			/* if no, set emc frequency as per platform data.
+			 * if no platform data is send, set it to maximum */
+			if (avp_svc->emc_rate)
+				clk_set_rate(avp_svc->emcclk, avp_svc->emc_rate);
+			else
+				clk_set_rate(avp_svc->emcclk, ULONG_MAX);
+		}
 		ret = clk_set_rate(avp_svc->sclk, msg->clk_freq);
 	} else {
 		aclk = &avp_svc->clks[mod->clk_req];
@@ -805,6 +819,7 @@ struct avp_svc_info *avp_svc_init(struct platform_device *pdev,
 		ret = -ENOENT;
 		goto err_get_clks;
 	}
+	avp_svc->max_avp_rate = clk_round_rate(avp_svc->sclk, ULONG_MAX);
 	clk_set_rate(avp_svc->sclk, 0);
 
 	avp_svc->emcclk = clk_get(&pdev->dev, "emc");
@@ -819,8 +834,11 @@ struct avp_svc_info *avp_svc_init(struct platform_device *pdev,
 	 * requested in platform data.  Set the rate to ULONG_MAX
 	 * if platform data is NULL.
 	 */
-	if (pdata)
+	avp_svc->emc_rate = 0;
+	if (pdata) {
 		clk_set_rate(avp_svc->emcclk, pdata->emc_clk_rate);
+		avp_svc->emc_rate = pdata->emc_clk_rate;
+	}
 	else
 		clk_set_rate(avp_svc->emcclk, ULONG_MAX);
 
