@@ -1172,7 +1172,7 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		if (!host->clock && !ios->clock) {
 			host->ops->set_clock(host, host->mmc->f_min);
 			host->clock = host->mmc->f_min;
-		} else if (ios->clock != host->clock) {
+		} else if (ios->clock && (ios->clock != host->clock)) {
 			host->ops->set_clock(host, ios->clock);
 		}
 	}
@@ -1196,12 +1196,7 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	else
 		sdhci_set_power(host, ios->vdd);
 
-	/*
-	 * Controller clock should be shutdown only after all the
-	 * register writes are done.
-	 */
-	if (ios->clock)
-		sdhci_set_clock(host, ios->clock);
+	sdhci_set_clock(host, ios->clock);
 
 	if (host->ops->platform_send_init_74_clocks)
 		host->ops->platform_send_init_74_clocks(host, ios->power_mode);
@@ -1249,15 +1244,15 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	if(host->quirks & SDHCI_QUIRK_RESET_CMD_DATA_ON_IOS)
 		sdhci_reset(host, SDHCI_RESET_CMD | SDHCI_RESET_DATA);
 
+out:
+	mmiowb();
+	spin_unlock_irqrestore(&host->lock, flags);
 	/*
 	 * Controller clock should only be disabled after all the register
 	 * writes are done.
 	 */
-	if (!ios->clock)
-		sdhci_set_clock(host, ios->clock);
-out:
-	mmiowb();
-	spin_unlock_irqrestore(&host->lock, flags);
+	if (!ios->clock && host->ops->set_clock)
+		host->ops->set_clock(host, ios->clock);
 }
 
 static int sdhci_get_ro(struct mmc_host *mmc)
