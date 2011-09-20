@@ -220,7 +220,7 @@ static struct syscore_ops tegra_timer_syscore_ops = {
 void tegra_twd_suspend(struct tegra_twd_context *context)
 {
 	context->twd_ctrl = readl(twd_base + TWD_TIMER_CONTROL);
-	context->twd_load = readl(twd_base + TWD_TIMER_COUNTER);
+	context->twd_load = readl(twd_base + TWD_TIMER_LOAD);
 	if ((context->twd_load == 0) && (context->twd_ctrl &
 		(TWD_TIMER_CONTROL_ENABLE | TWD_TIMER_CONTROL_IT_ENABLE))) {
 		WARN("%s: TWD enabled but counter was 0\n", __func__);
