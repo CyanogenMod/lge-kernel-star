@@ -232,7 +232,7 @@ static const struct file_operations edp_limit_debugfs_fops = {
 	.release	= single_release,
 };
 
-static int __init tegra_edp_debugfs_init()
+static int __init tegra_edp_debugfs_init(void)
 {
 	struct dentry *d;
 
