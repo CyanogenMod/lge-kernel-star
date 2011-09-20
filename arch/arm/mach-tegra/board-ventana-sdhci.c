@@ -44,24 +44,24 @@ static int ventana_wifi_power(int on);
 static int ventana_wifi_set_carddetect(int val);
 
 static struct wifi_platform_data ventana_wifi_control = {
-	.set_power      = ventana_wifi_power,
-	.set_reset      = ventana_wifi_reset,
+	.set_power	= ventana_wifi_power,
+	.set_reset	= ventana_wifi_reset,
 	.set_carddetect = ventana_wifi_set_carddetect,
 };
 
 static struct platform_device ventana_wifi_device = {
-	.name           = "bcm4329_wlan",
-	.id             = 1,
-	.dev            = {
+	.name		= "bcm4329_wlan",
+	.id		= 1,
+	.dev		= {
 		.platform_data = &ventana_wifi_control,
 	},
 };
 
 static struct resource sdhci_resource0[] = {
 	[0] = {
-		.start  = INT_SDMMC1,
-		.end    = INT_SDMMC1,
-		.flags  = IORESOURCE_IRQ,
+		.start	= INT_SDMMC1,
+		.end	= INT_SDMMC1,
+		.flags	= IORESOURCE_IRQ,
 	},
 	[1] = {
 		.start	= TEGRA_SDMMC1_BASE,
@@ -72,9 +72,9 @@ static struct resource sdhci_resource0[] = {
 
 static struct resource sdhci_resource2[] = {
 	[0] = {
-		.start  = INT_SDMMC3,
-		.end    = INT_SDMMC3,
-		.flags  = IORESOURCE_IRQ,
+		.start	= INT_SDMMC3,
+		.end	= INT_SDMMC3,
+		.flags	= IORESOURCE_IRQ,
 	},
 	[1] = {
 		.start	= TEGRA_SDMMC3_BASE,
@@ -85,9 +85,9 @@ static struct resource sdhci_resource2[] = {
 
 static struct resource sdhci_resource3[] = {
 	[0] = {
-		.start  = INT_SDMMC4,
-		.end    = INT_SDMMC4,
-		.flags  = IORESOURCE_IRQ,
+		.start	= INT_SDMMC4,
+		.end	= INT_SDMMC4,
+		.flags	= IORESOURCE_IRQ,
 	},
 	[1] = {
 		.start	= TEGRA_SDMMC4_BASE,
@@ -98,16 +98,16 @@ static struct resource sdhci_resource3[] = {
 
 static struct embedded_sdio_data embedded_sdio_data0 = {
 	.cccr   = {
-		.sdio_vsn       = 2,
-		.multi_block    = 1,
-		.low_speed      = 0,
-		.wide_bus       = 0,
-		.high_power     = 1,
-		.high_speed     = 1,
+		.sdio_vsn	= 2,
+		.multi_block	= 1,
+		.low_speed	= 0,
+		.wide_bus	= 0,
+		.high_power	= 1,
+		.high_speed	= 1,
 	},
 	.cis  = {
-		.vendor         = 0x02d0,
-		.device         = 0x4329,
+		.vendor 	= 0x02d0,
+		.device 	= 0x4329,
 	},
 };
 
@@ -115,6 +115,7 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data0 = {
 	.mmc_data = {
 		.register_status_notify	= ventana_wifi_status_register,
 		.embedded_sdio = &embedded_sdio_data0,
+		.built_in = 1,
 	},
 	.cd_gpio = -1,
 	.wp_gpio = -1,
@@ -131,6 +132,9 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data3 = {
 	.cd_gpio = -1,
 	.wp_gpio = -1,
 	.power_gpio = TEGRA_GPIO_PI6,
+	.mmc_data = {
+		.built_in = 1,
+	}
 };
 
 static struct platform_device tegra_sdhci_device0 = {
