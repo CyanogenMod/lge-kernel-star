@@ -26,9 +26,9 @@
 #include <linux/earlysuspend.h>
 #endif
 
-
 /* Family ID */
 #define MXT224_ID		0x80
+#define MXT768E_ID		0xA1
 #define MXT1386_ID		0xA0
 
 /* Version */
@@ -187,12 +187,13 @@
 #define MXT_BACKUP_VALUE	0x55
 #define MXT_BACKUP_TIME		200	/* msec */
 #define MXT224_RESET_TIME       65      /* msec */
+#define MXT768E_RESET_TIME	250	/* msec */
 #define MXT1386_RESET_TIME      200     /* msec */
 #define MXT_RESET_TIME		200	/* msec */
 #define MXT_RESET_NOCHGREAD     400     /* msec */
 
 #define MXT_RESET_TIME		200	/* msec */
-#define MXT_WAKEUP_TIME		25
+#define MXT_WAKEUP_TIME		25	/* msec */
 
 #define MXT_FWRESET_TIME	175	/* msec */
 
@@ -246,11 +247,12 @@ struct mxt_info {
 struct mxt_object {
 	u8 type;
 	u16 start_address;
-	u8 size;
-	u8 instances;
+	u16 size;
+	u16 instances;
 	u8 num_report_ids;
 
 	/* to map object and message */
+	u8 min_reportid;
 	u8 max_reportid;
 };
 
@@ -288,6 +290,9 @@ struct mxt_data {
 #if defined(CONFIG_HAS_EARLYSUSPEND)
 	struct early_suspend early_suspend;
 #endif
+	unsigned int driver_paused;
+	struct bin_attribute mem_access_attr;
+	int debug_enabled;
 };
 
 #if defined(CONFIG_HAS_EARLYSUSPEND)
@@ -435,41 +440,39 @@ static int mxt_fw_write(struct i2c_client *client,
 static int __mxt_read_reg(struct i2c_client *client,
 			       u16 reg, u16 len, void *val)
 {
-	struct i2c_msg xfer[2];
 	u8 buf[2];
 	int retval = 0;
 	struct mxt_data *data = i2c_get_clientdata(client);
 
-	if ((data->last_address == reg) && (reg == data->msg_address)) {
-		mutex_lock(&data->access_mutex);
-		if (i2c_master_recv(client, val, len) != len) {
-			dev_err(&client->dev,
-				"%s: Failure reading maxTouch device\n",
-				__func__);
-			retval = -EIO;
-		}
-		goto mxt_read_exit;
-	}
-
 	buf[0] = reg & 0xff;
 	buf[1] = (reg >> 8) & 0xff;
 
-	/* Write register */
-	xfer[0].addr = client->addr;
-	xfer[0].flags = 0;
-	xfer[0].len = 2;
-	xfer[0].buf = buf;
-
-	/* Read data */
-	xfer[1].addr = client->addr;
-	xfer[1].flags = I2C_M_RD;
-	xfer[1].len = len;
-	xfer[1].buf = val;
-
 	mutex_lock(&data->access_mutex);
-	if (i2c_transfer(client->adapter, xfer, 2) != 2) {
-		dev_err(&client->dev, "%s: i2c transfer failed\n", __func__);
-		retval = -EIO;
+
+	if ((data->last_address != reg) || (reg != data->msg_address)) {
+		if (i2c_master_send(client, (u8 *)buf, 2) != 2) {
+			dev_dbg(&client->dev, "i2c retry\n");
+			msleep(MXT_WAKEUP_TIME);
+
+			if (i2c_master_send(client, (u8 *)buf, 2) != 2) {
+				dev_err(&client->dev, "%s: i2c send failed\n",
+					__func__);
+				retval = -EIO;
+				goto mxt_read_exit;
+			}
+		}
+	}
+
+	if (i2c_master_recv(client, (u8 *)val, len) != len) {
+		dev_dbg(&client->dev, "i2c retry\n");
+		msleep(MXT_WAKEUP_TIME);
+
+		if (i2c_master_recv(client, (u8 *)val, len) != len) {
+			dev_err(&client->dev, "%s: i2c recv failed\n",
+				__func__);
+			retval = -EIO;
+			goto mxt_read_exit;
+		}
 	}
 
 	data->last_address = reg;
@@ -496,9 +499,14 @@ static int mxt_write_reg(struct i2c_client *client, u16 reg, u8 val)
 
 	mutex_lock(&data->access_mutex);
 	if (i2c_master_send(client, buf, 3) != 3) {
-		dev_err(&client->dev, "%s: i2c send failed\n", __func__);
-		retval = -EIO;
-		goto mxt_write_exit;
+		dev_dbg(&client->dev, "i2c retry\n");
+		msleep(MXT_WAKEUP_TIME);
+
+		if (i2c_master_send(client, buf, 3) != 3) {
+			dev_err(&client->dev, "%s: i2c send failed\n", __func__);
+			retval = -EIO;
+			goto mxt_write_exit;
+		}
 	}
 	data->last_address = reg + 1;
 
@@ -526,7 +534,7 @@ mxt_get_object(struct mxt_data *data, u8 type)
 			return object;
 	}
 
-	dev_err(&data->client->dev, "Invalid object type\n");
+	dev_err(&data->client->dev, "Invalid object type T%d\n", type);
 	return NULL;
 }
 
@@ -661,34 +669,34 @@ static irqreturn_t mxt_interrupt(int irq, void *dev_id)
 {
 	struct mxt_data *data = dev_id;
 	struct mxt_message message;
-	struct mxt_object *object;
+	struct mxt_object *touch_object;
 	struct device *dev = &data->client->dev;
-	int id;
+	int touchid;
 	u8 reportid;
-	u8 max_reportid;
-	u8 min_reportid;
 
 	do {
 		if (mxt_read_message(data, &message)) {
 			dev_err(dev, "Failed to read message\n");
 			goto end;
 		}
+
 		reportid = message.reportid;
 
-		/* whether reportid is thing of MXT_TOUCH_MULTI_T9 */
-		object = mxt_get_object(data, MXT_TOUCH_MULTI_T9);
-		if (!object)
+		touch_object = mxt_get_object(data, MXT_TOUCH_MULTI_T9);
+		if (!touch_object)
 			goto end;
 
-		max_reportid = object->max_reportid;
-		min_reportid = max_reportid - object->num_report_ids + 1;
-		id = reportid - min_reportid;
+		if (data->debug_enabled)
+			print_hex_dump(KERN_DEBUG, "MXT MSG:", DUMP_PREFIX_NONE,
+				16, 1, &message, sizeof(struct mxt_message), false);
 
-		if (reportid >= min_reportid && reportid <= max_reportid)
-			mxt_input_touchevent(data, &message, id);
-		else
+		if (reportid >= touch_object->min_reportid
+			&& reportid <= touch_object->max_reportid) {
+			touchid = reportid - touch_object->min_reportid;
+			mxt_input_touchevent(data, &message, touchid);
+		} else if (reportid != MXT_RPTID_NOMSG)
 			mxt_dump_message(dev, &message);
-	} while (reportid != 0xff);
+	} while (reportid != MXT_RPTID_NOMSG);
 
 end:
 	return IRQ_HANDLED;
@@ -706,7 +714,7 @@ static int mxt_make_highchg(struct mxt_data *data)
 		error = mxt_read_message(data, &message);
 		if (error)
 			return error;
-	} while (message.reportid != 0xff && --count);
+	} while (message.reportid != MXT_RPTID_NOMSG && --count);
 
 	if (!count) {
 		dev_err(dev, "CHG pin isn't cleared\n");
@@ -724,7 +732,7 @@ static int mxt_check_reg_init(struct mxt_data *data)
 	struct mxt_message message;
 	struct device *dev = &data->client->dev;
 	int index = 0;
-	int timeout_counter;
+	int timeout_counter = 0;
 	int i, j, config_offset;
 	int error;
 	unsigned long current_crc;
@@ -779,7 +787,7 @@ static int mxt_check_reg_init(struct mxt_data *data)
 			continue;
 		dev_info(dev, "Writing object type %d, config offset %d", data->object_table[i].type, index);
 		for (j = 0;
-		     j < ((object->size + 1) * (object->instances + 1));
+		     j < object->size * object->instances;
 		     j++) {
 			config_offset = index + j;
 			if (config_offset > pdata->config_length) {
@@ -790,7 +798,7 @@ static int mxt_check_reg_init(struct mxt_data *data)
 			mxt_write_object(data, object->type, j,
 					 pdata->config[config_offset]);
 		}
-		index += (object->size + 1) * (object->instances + 1);
+		index += object->size * object->instances;
 	}
 	dev_info(dev, "Config written!");
 
@@ -809,9 +817,9 @@ static int mxt_check_reg_init(struct mxt_data *data)
 					&command_register);
 		if (error)
 			return error;
-		msleep(2);
+		msleep(10);
 	} while ((command_register != 0) && (timeout_counter++ <= 100));
-	if (timeout_counter >= 100) {
+	if (timeout_counter > 100) {
 		dev_err(&client->dev, "No response after backup!\n");
 		return -EIO;
 	}
@@ -831,6 +839,9 @@ static int mxt_check_reg_init(struct mxt_data *data)
 		case MXT224_ID:
 			msleep(MXT224_RESET_TIME);
 			break;
+		case MXT768E_ID:
+			msleep(MXT768E_RESET_TIME);
+			break;
 		case MXT1386_ID:
 			msleep(MXT1386_RESET_TIME);
 			break;
@@ -839,8 +850,8 @@ static int mxt_check_reg_init(struct mxt_data *data)
 		}
 		timeout_counter = 0;
 		while ((timeout_counter++ <= 100) && data->pdata->read_chg())
-			msleep(2);
-		if (timeout_counter >= 100) {
+			msleep(10);
+		if (timeout_counter > 100) {
 			dev_err(&client->dev, "No response after reset!\n");
 			return -EIO;
 		}
@@ -856,7 +867,76 @@ static void mxt_handle_pdata(struct mxt_data *data)
 
 	if (pdata->read_chg != NULL)
 		data->read_chg = pdata->read_chg;
+}
 
+static int mxt_set_power_cfg(struct mxt_data *data, u8 sleep)
+{
+	struct device *dev = &data->client->dev;
+	int error;
+	u8 actv_cycle_time = 0;
+	u8 idle_cycle_time = 0;
+
+	if (!sleep) {
+		actv_cycle_time = data->actv_cycle_time;
+		idle_cycle_time = data->idle_cycle_time;
+	}
+
+	error = mxt_write_object(data, MXT_GEN_POWER_T7, MXT_POWER_ACTVACQINT,
+				 actv_cycle_time);
+	if (error)
+		goto i2c_error;
+
+	error = mxt_write_object(data, MXT_GEN_POWER_T7, MXT_POWER_IDLEACQINT,
+				 idle_cycle_time);
+	if (error)
+		goto i2c_error;
+
+	dev_dbg(dev, "%s: Set ACTV %d, IDLE %d", __func__,
+		actv_cycle_time, idle_cycle_time);
+
+	data->is_stopped = sleep;
+
+	return 0;
+
+i2c_error:
+	dev_err(dev, "Failed to set power cfg");
+	return error;
+}
+
+static int mxt_init_power_cfg(struct mxt_data *data)
+{
+	const struct mxt_platform_data *pdata = data->pdata;
+	struct device *dev = &data->client->dev;
+	int error;
+
+	if (pdata->actv_cycle_time > 0 && pdata->idle_cycle_time > 0) {
+		data->actv_cycle_time = pdata->actv_cycle_time;
+		data->idle_cycle_time = pdata->idle_cycle_time;
+	} else {
+		error = mxt_read_object(data, MXT_GEN_POWER_T7,
+			MXT_POWER_ACTVACQINT,
+			&data->actv_cycle_time);
+
+		if (error)
+			return error;
+
+		error = mxt_read_object(data, MXT_GEN_POWER_T7,
+			MXT_POWER_IDLEACQINT,
+			&data->idle_cycle_time);
+
+		if (error)
+			return error;
+	}
+
+	/* On init, power up */
+	error = mxt_set_power_cfg(data, 0);
+	if (error)
+		return error;
+
+	dev_info(dev, "Initialised power cfg: ACTV %d, IDLE %d",
+		data->actv_cycle_time, data->idle_cycle_time);
+
+	return 0;
 }
 
 static int mxt_get_info(struct mxt_data *data)
@@ -865,6 +945,9 @@ static int mxt_get_info(struct mxt_data *data)
 	struct mxt_info *info = &data->info;
 	int error;
 	u8 val;
+
+	/* force send of address pointer on first read during probe */
+	data->last_address = -1;
 
 	error = mxt_read_reg(client, MXT_FAMILY_ID, &val);
 	if (error)
@@ -896,6 +979,7 @@ static int mxt_get_info(struct mxt_data *data)
 
 static int mxt_get_object_table(struct mxt_data *data)
 {
+	struct device *dev = &data->client->dev;
 	int error;
 	int i;
 	u16 reg;
@@ -912,14 +996,15 @@ static int mxt_get_object_table(struct mxt_data *data)
 
 		object->type = buf[0];
 		object->start_address = (buf[2] << 8) | buf[1];
-		object->size = buf[3];
-		object->instances = buf[4];
+		object->size = buf[3] + 1;
+		object->instances = buf[4] + 1;
 		object->num_report_ids = buf[5];
 
 		if (object->num_report_ids) {
-			reportid += object->num_report_ids *
-					(object->instances + 1);
+			reportid += object->num_report_ids * object->instances;
 			object->max_reportid = reportid;
+			object->min_reportid = object->max_reportid -
+				object->instances * object->num_report_ids + 1;
 		}
 
 		/* Store message window address so we don't have to
@@ -927,6 +1012,11 @@ static int mxt_get_object_table(struct mxt_data *data)
 		if (object->type == MXT_GEN_MESSAGE_T5)
 			data->msg_address = object->start_address;
 
+		dev_dbg(dev, "T%d, start:%d size:%d instances:%d "
+			"min_reportid:%d max_reportid:%d\n",
+			object->type, object->start_address, object->size,
+			object->instances,
+			object->min_reportid, object->max_reportid);
 	}
 
 	return 0;
@@ -937,8 +1027,6 @@ static int mxt_initialize(struct mxt_data *data)
 	struct i2c_client *client = data->client;
 	struct mxt_info *info = &data->info;
 	int error;
-	u8 idle_cycle_time;
-	u8 actv_cycle_time;
 
 	error = mxt_get_info(data);
 	if (error)
@@ -954,31 +1042,25 @@ static int mxt_initialize(struct mxt_data *data)
 
 	/* Get object table information */
 	error = mxt_get_object_table(data);
-	if (error)
+	if (error) {
+		dev_err(&client->dev, "Failed to read object table\n");
 		return error;
+	}
 
 	/* Load initial touch chip configuration */
 	error = mxt_check_reg_init(data);
-	if (error)
+	if (error) {
+		dev_err(&client->dev, "Failed to initialize configuration\n");
 		return error;
+	}
 
 	mxt_handle_pdata(data);
 
-	/* Read current cycle times */
-	error = mxt_read_object(data, MXT_GEN_POWER_T7, MXT_POWER_IDLEACQINT,
-				&idle_cycle_time);
-	if (error)
+	error = mxt_init_power_cfg(data);
+	if (error) {
+		dev_err(&client->dev, "Failed to initialize power cfg\n");
 		return error;
-	error = mxt_read_object(data, MXT_GEN_POWER_T7, MXT_POWER_ACTVACQINT,
-				&actv_cycle_time);
-	if (error)
-		return error;
-
-	dev_info(&client->dev, "in mxt_initialize(), Active Cycle Time: %d Idle Cycle Time: %d\n",
-		actv_cycle_time, idle_cycle_time);
-
-	data->actv_cycle_time = actv_cycle_time;
-	data->idle_cycle_time = idle_cycle_time;
+	}
 
 	dev_info(&client->dev,
 			"Family ID: %d Variant ID: %d Version: %d Build: %d\n",
@@ -1020,26 +1102,35 @@ static ssize_t mxt_object_show(struct device *dev,
 	for (i = 0; i < data->info.object_num; i++) {
 		object = data->object_table + i;
 
-		count += sprintf(buf + count,
-				"Object Table Element %d(Type %d)\n",
+		count += snprintf(buf + count, PAGE_SIZE - count,
+				"Object[%d] (Type %d)\n",
 				i + 1, object->type);
+		if (count >= PAGE_SIZE)
+			return PAGE_SIZE - 1;
 
 		if (!mxt_object_readable(object->type)) {
-			count += sprintf(buf + count, "\n");
+			count += snprintf(buf + count, PAGE_SIZE - count,
+					"\n");
+			if (count >= PAGE_SIZE)
+				return PAGE_SIZE - 1;
 			continue;
 		}
 
-		for (j = 0; j < object->size + 1; j++) {
+		for (j = 0; j < object->size; j++) {
 			error = mxt_read_object(data,
 						object->type, j, &val);
 			if (error)
 				return error;
 
-			count += sprintf(buf + count,
-					"  Byte %d: 0x%x (%d)\n", j, val, val);
+			count += snprintf(buf + count, PAGE_SIZE - count,
+					"\t[%2d]: %02x (%d)\n", j, val, val);
+			if (count >= PAGE_SIZE)
+				return PAGE_SIZE - 1;
 		}
 
-		count += sprintf(buf + count, "\n");
+		count += snprintf(buf + count, PAGE_SIZE - count, "\n");
+		if (count >= PAGE_SIZE)
+			return PAGE_SIZE - 1;
 	}
 
 	return count;
@@ -1150,12 +1241,144 @@ static ssize_t mxt_update_fw_store(struct device *dev,
 	return count;
 }
 
+static ssize_t mxt_pause_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct mxt_data *data = dev_get_drvdata(dev);
+	int count = 0;
+
+	count += sprintf(buf + count, "%d", data->driver_paused);
+	count += sprintf(buf + count, "\n");
+
+	return count;
+}
+
+static ssize_t mxt_pause_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct mxt_data *data = dev_get_drvdata(dev);
+	int i;
+
+	if (sscanf(buf, "%u", &i) == 1 && i < 2) {
+		data->driver_paused = i;
+
+		dev_dbg(dev, "%s\n", i ? "paused" : "unpaused");
+	} else {
+		dev_dbg(dev, "pause_driver write error\n");
+	}
+	return count;
+}
+
+static ssize_t mxt_debug_enable_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct mxt_data *data = dev_get_drvdata(dev);
+	int count = 0;
+
+	count += sprintf(buf + count, "%d", data->debug_enabled);
+	count += sprintf(buf + count, "\n");
+
+	return count;
+}
+
+static ssize_t mxt_debug_enable_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct mxt_data *data = dev_get_drvdata(dev);
+	int i;
+
+	if (sscanf(buf, "%u", &i) == 1 && i < 2) {
+		data->debug_enabled = i;
+
+		dev_dbg(dev, "%s\n", i ? "debug enabled" : "debug disabled");
+	} else {
+		dev_dbg(dev, "debug_enabled write error\n");
+	}
+	return count;
+}
+
+static ssize_t mxt_mem_access_read(struct file *filp, struct kobject *kobj,
+	struct bin_attribute *bin_attr, char *buf, loff_t off, size_t count)
+{
+	struct device *dev = container_of(kobj, struct device, kobj);
+	struct mxt_data *data = dev_get_drvdata(dev);
+	int ret = 0;
+
+	if (off >= 32768)
+		return -EIO;
+
+	if (off + count > 32768)
+		count = 32768 - off;
+
+	if (count > 256)
+		count = 256;
+
+	if (count > 0)
+		ret = __mxt_read_reg(data->client, off, count, buf);
+
+	return ret == 0 ? count : ret;
+}
+
+int mxt_write_block(struct i2c_client *client, u16 addr, u16 length, u8 *value)
+{
+	int i;
+	struct {
+		__le16 le_addr;
+		u8  data[256];
+	} i2c_block_transfer;
+
+	struct mxt_data *mxt;
+
+	if (length > 256)
+		return -EINVAL;
+
+	i2c_get_clientdata(client);
+
+	for (i = 0; i < length; i++)
+		i2c_block_transfer.data[i] = *value++;
+
+	i2c_block_transfer.le_addr = cpu_to_le16(addr);
+
+	i = i2c_master_send(client, (u8 *) &i2c_block_transfer, length + 2);
+
+	if (i == (length + 2))
+		return 0;
+	else
+		return -EIO;
+}
+
+static ssize_t mxt_mem_access_write(struct file *filp, struct kobject *kobj,
+	struct bin_attribute *bin_attr, char *buf, loff_t off, size_t count)
+{
+	struct device *dev = container_of(kobj, struct device, kobj);
+	struct mxt_data *data = dev_get_drvdata(dev);
+	int ret = 0;
+
+	if (off >= 32768)
+		return -EIO;
+
+	if (off + count > 32768)
+		count = 32768 - off;
+
+	if (count > 256)
+		count = 256;
+
+	if (count > 0)
+		ret = mxt_write_block(data->client, off, count, buf);
+
+	return ret == 0 ? count : 0;
+}
+
 static DEVICE_ATTR(object, 0444, mxt_object_show, NULL);
 static DEVICE_ATTR(update_fw, 0664, NULL, mxt_update_fw_store);
+static DEVICE_ATTR(pause_driver, 0664, mxt_pause_show, mxt_pause_store);
+static DEVICE_ATTR(debug_enable, 0664, mxt_debug_enable_show, mxt_debug_enable_store);
 
 static struct attribute *mxt_attrs[] = {
 	&dev_attr_object.attr,
 	&dev_attr_update_fw.attr,
+	&dev_attr_pause_driver.attr,
+	&dev_attr_debug_enable.attr,
 	NULL
 };
 
@@ -1171,74 +1394,29 @@ static void mxt_start(struct mxt_data *data)
 	if (data->is_stopped == 0)
 		return;
 
-	dev_info(dev, "in MXT_START(), idle time: %d %d", data->idle_cycle_time, data->actv_cycle_time);
-	/* Restore the cycle time settings to wake from sleep */
-	error = mxt_write_object(data, MXT_GEN_POWER_T7, MXT_POWER_ACTVACQINT,
-				 data->actv_cycle_time);
-	if (error)
-		dev_info(dev, "\n\nResume failed!");
-	error = mxt_write_object(data, MXT_GEN_POWER_T7, MXT_POWER_IDLEACQINT,
-				 data->idle_cycle_time);
-	if (error)
-		dev_info(dev, "\n\nResume failed!");
+	error = mxt_set_power_cfg(data, 0);
 
-	dev_info(dev, "Restored ACTV %d, IDLE %d", data->actv_cycle_time,
-	       data->idle_cycle_time);
-	data->is_stopped = 0;
+	if (!error)
+		dev_dbg(dev, "MXT started\n");
 }
 
 static void mxt_stop(struct mxt_data *data)
 {
-	u8 actv_cycle_time;
-	u8 idle_cycle_time;
 	int error;
 	struct device *dev = &data->client->dev;
 
 	if (data->is_stopped)
 		return;
 
+	error = mxt_set_power_cfg(data, 1);
 
-	error = mxt_read_object(data, MXT_GEN_POWER_T7, MXT_POWER_ACTVACQINT,
-			&actv_cycle_time);
-	if (error)
-		goto i2c_error;
-
-	data->actv_cycle_time = actv_cycle_time;
-
-	error = mxt_read_object(data, MXT_GEN_POWER_T7, MXT_POWER_IDLEACQINT,
-			&idle_cycle_time);
-	if (error)
-		goto i2c_error;
-
-	data->idle_cycle_time = idle_cycle_time;
-
-	/* Set to deep sleep mode for maximum power savings */
-	error = mxt_write_object(data, MXT_GEN_POWER_T7, MXT_POWER_ACTVACQINT, 0);
-	if (error)
-		goto i2c_error;
-
-	error = mxt_write_object(data, MXT_GEN_POWER_T7, MXT_POWER_IDLEACQINT, 0);
-	if (error)
-		goto i2c_error;
-
-	dev_info(dev, "MXT Suspended, saved ACTV %d and IDLE %d",
-	       actv_cycle_time, idle_cycle_time);
-	data->is_stopped = 1;
-	return;
-
-i2c_error:
-	dev_info(dev, "MXT Suspend failed!");
-
+	if (!error)
+		dev_dbg(dev, "MXT suspended\n");
 }
 
 static int mxt_input_open(struct input_dev *dev)
 {
 	struct mxt_data *data = input_get_drvdata(dev);
-	u8 n;
-
-	/* A dummy read to wake up the chip */
-	mxt_read_object(data, MXT_GEN_POWER, MXT_POWER_IDLEACQINT, &n);
-	msleep(MXT_WAKEUP_TIME);
 
 	mxt_start(data);
 
@@ -1327,16 +1505,34 @@ static int __devinit mxt_probe(struct i2c_client *client,
 #endif
 
 	error = mxt_make_highchg(data);
-	if (error)
+	if (error) {
+		dev_err(&client->dev, "Failed to make high CHG\n");
 		goto err_free_irq;
+	}
 
 	error = input_register_device(input_dev);
-	if (error)
+	if (error) {
+		dev_err(&client->dev, "Failed to register input device\n");
 		goto err_free_irq;
+	}
 
 	error = sysfs_create_group(&client->dev.kobj, &mxt_attr_group);
-	if (error)
+	if (error) {
+		dev_err(&client->dev, "Failed to create sysfs group\n");
 		goto err_unregister_device;
+	}
+
+	sysfs_bin_attr_init(&data->mem_access_attr);
+	data->mem_access_attr.attr.name = "mem_access";
+	data->mem_access_attr.attr.mode = S_IRUGO | S_IWUGO;
+	data->mem_access_attr.read = mxt_mem_access_read;
+	data->mem_access_attr.write = mxt_mem_access_write;
+	data->mem_access_attr.size = 65535;
+
+	if (sysfs_create_bin_file(&client->dev.kobj, &data->mem_access_attr) < 0) {
+		dev_err(&client->dev, "Failed to create %s\n", data->mem_access_attr.attr.name);
+		goto err_unregister_device;
+	}
 
 	return 0;
 
@@ -1357,6 +1553,7 @@ static int __devexit mxt_remove(struct i2c_client *client)
 {
 	struct mxt_data *data = i2c_get_clientdata(client);
 
+	sysfs_remove_bin_file(&client->dev.kobj, &data->mem_access_attr);
 	sysfs_remove_group(&client->dev.kobj, &mxt_attr_group);
 	free_irq(data->irq, data);
 	input_unregister_device(data->input_dev);
@@ -1395,11 +1592,6 @@ static int mxt_resume(struct device *dev)
 	u8 reportid;
 	u8 max_reportid;
 	u8 min_reportid;
-	u8 n;
-
-	/* A dummy read to wake up the chip */
-	mxt_read_object(data, MXT_GEN_POWER_T7, MXT_POWER_IDLEACQINT, &n);
-	msleep(MXT_WAKEUP_TIME);
 
 	mutex_lock(&input_dev->mutex);
 
