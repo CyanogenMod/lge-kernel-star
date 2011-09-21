@@ -1846,11 +1846,18 @@ static int null_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 
 	ulpi_phy_reset(base);
 
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	/* remove ULPI PADS CLKEN reset */
+	val = readl(base + USB_SUSP_CTRL);
+	val &= ~ULPI_PADS_CLKEN_RESET;
+	writel(val, base + USB_SUSP_CTRL);
+	udelay(10);
+#endif
 	val = readl(base + ULPI_TIMING_CTRL_0);
 	val |= ULPI_OUTPUT_PINMUX_BYP | ULPI_CLKOUT_PINMUX_BYP;
 	writel(val, base + ULPI_TIMING_CTRL_0);
 
-	ulpi_set_host(base);
+	ulpi_set_tristate(false);
 
 	if (config->pre_phy_on && config->pre_phy_on())
 		return -EAGAIN;
@@ -1863,7 +1870,7 @@ static int null_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	/* set timming parameters */
 	val = readl(base + ULPI_TIMING_CTRL_0);
 	val |= ULPI_SHADOW_CLK_LOOPBACK_EN;
-	val |= ULPI_SHADOW_CLK_SEL;
+	val &= ~ULPI_SHADOW_CLK_SEL;
 	val &= ~ULPI_LBK_PAD_EN;
 	val |= ULPI_SHADOW_CLK_DELAY(config->trimmer->shadow_clk_delay);
 	val |= ULPI_CLOCK_OUT_DELAY(config->trimmer->clock_out_delay);
@@ -1874,7 +1881,11 @@ static int null_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	udelay(10);
 
 	/* start internal 60MHz clock */
-	val = ULPIS2S_PLLU_MASTER_BLASTER60;
+	val = readl(base + ULPIS2S_CTRL);
+	val |= ULPIS2S_ENA;
+	val |= ULPIS2S_SUPPORT_DISCONNECT;
+	val |= ULPIS2S_SPARE((phy->mode == TEGRA_USB_PHY_MODE_HOST) ? 3 : 1);
+	val |= ULPIS2S_PLLU_MASTER_BLASTER60;
 	writel(val, base + ULPIS2S_CTRL);
 
 	/* select ULPI_CORE_CLK_SEL to SHADOW_CLK */
@@ -1883,57 +1894,43 @@ static int null_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	writel(val, base + ULPI_TIMING_CTRL_0);
 	udelay(10);
 
-#ifndef CONFIG_ARCH_TEGRA_2x_SOC
-	/* remove slave0 reset */
-	val = readl(base + USB_SUSP_CTRL);
-	val &= ~ULPIS2S_SLV0_RESET;
-	writel(val, base + USB_SUSP_CTRL);
-	udelay(10);
-#endif
 	/* enable ULPI null phy clock - can't set the trimmers before this */
 	val = readl(base + ULPI_TIMING_CTRL_0);
 	val |= ULPI_CLK_OUT_ENA;
 	writel(val, base + ULPI_TIMING_CTRL_0);
 	udelay(10);
 
-	/* set trimmers */
-	ulpi_set_trimmer(base, config->trimmer->data_trimmer,
-			 config->trimmer->stpdirnxt_trimmer, 1);
-
-#ifndef CONFIG_ARCH_TEGRA_2x_SOC
-	/* remove various ULPIS2S resets */
-	val = readl(base + USB_SUSP_CTRL);
-	val &= ~ULPIS2S_LINE_RESET;
-	val &= ~ULPIS2S_SLV1_RESET;
-	val &= ~ULPI_PADS_RESET;
-	val &= ~ULPI_PADS_CLKEN_RESET;
-	writel(val, base + USB_SUSP_CTRL);
-#endif
-
-	val = readl(base + ULPIS2S_CTRL);
-	val |= ULPIS2S_ENA;
-	val |= ULPIS2S_SUPPORT_DISCONNECT;
-	val |= ULPIS2S_SPARE((phy->mode == TEGRA_USB_PHY_MODE_HOST)? 3 : 1);
-	writel(val, base + ULPIS2S_CTRL);
-
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-	val = readl(base + USB_SUSP_CTRL);
-	val |= USB_SUSP_CLR;
-	writel(val, base + USB_SUSP_CTRL);
-	udelay(100);
-	val = readl(base + USB_SUSP_CTRL);
-	val &= ~USB_SUSP_CLR;
-	writel(val, base + USB_SUSP_CTRL);
-#endif
 	if (utmi_wait_register(base + USB_SUSP_CTRL, USB_PHY_CLK_VALID,
 						     USB_PHY_CLK_VALID)) {
 		pr_err("%s: timeout waiting for phy to stabilize\n", __func__);
 		return -ETIMEDOUT;
 	}
 
+	/* set ULPI trimmers */
+	ulpi_set_trimmer(base, config->trimmer->data_trimmer,
+			 config->trimmer->stpdirnxt_trimmer, 1);
+
+	ulpi_set_host(base);
+
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	/* remove slave0 reset */
+	val = readl(base + USB_SUSP_CTRL);
+	val &= ~ULPIS2S_SLV0_RESET;
+	writel(val, base + USB_SUSP_CTRL);
+
+	/* remove slave1 and line reset */
+	val = readl(base + USB_SUSP_CTRL);
+	val &= ~ULPIS2S_SLV1_RESET;
+	val &= ~ULPIS2S_LINE_RESET;
+
+	/* remove ULPI PADS reset */
+	val &= ~ULPI_PADS_RESET;
+	writel(val, base + USB_SUSP_CTRL);
+#endif
 	val = readl(base + ULPI_TIMING_CTRL_0);
 	val |= ULPI_CLK_PADOUT_ENA;
 	writel(val, base + ULPI_TIMING_CTRL_0);
+
 	udelay(10);
 
 	if (config->post_phy_on && config->post_phy_on())
@@ -1951,10 +1948,6 @@ static int null_phy_power_off(struct tegra_usb_phy *phy, bool is_dpd)
 	if (config->pre_phy_off && config->pre_phy_off())
 		return -EAGAIN;
 
-	val = readl(base + ULPI_TIMING_CTRL_0);
-	val &= ~ULPI_CLK_PADOUT_ENA;
-	writel(val, base + ULPI_TIMING_CTRL_0);
-
 	ulpi_set_tristate(true);
 
 	if (config->post_phy_off && config->post_phy_off())
@@ -1963,7 +1956,7 @@ static int null_phy_power_off(struct tegra_usb_phy *phy, bool is_dpd)
 	return 0;
 }
 
-static int null_phy_post_usbcmd_reset(struct tegra_usb_phy *phy, bool is_dpd)
+static int null_phy_pre_usbcmd_reset(struct tegra_usb_phy *phy, bool is_dpd)
 {
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	unsigned long val;
@@ -1977,16 +1970,25 @@ static int null_phy_post_usbcmd_reset(struct tegra_usb_phy *phy, bool is_dpd)
 	val |= ULPIS2S_SLV0_RESET;
 	writel(val, base + USB_SUSP_CTRL);
 	udelay(10);
+#endif
+	return 0;
+}
+
+static int null_phy_post_usbcmd_reset(struct tegra_usb_phy *phy, bool is_dpd)
+{
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	unsigned long val;
+	void __iomem *base = phy->regs;
 
 	/* remove slave0 reset */
 	val = readl(base + USB_SUSP_CTRL);
 	val &= ~ULPIS2S_SLV0_RESET;
 	writel(val, base + USB_SUSP_CTRL);
-	udelay(10);
 
 	val = readl(base + ULPIS2S_CTRL);
 	val &=  ~ULPIS2S_SLV0_CLAMP_XMIT;
 	writel(val, base + ULPIS2S_CTRL);
+	udelay(10);
 
 	ulpi_set_host(base);
 #endif
@@ -2400,6 +2402,19 @@ void tegra_usb_phy_postresume(struct tegra_usb_phy *phy, bool is_dpd)
 
 	if (postresume[phy->usb_phy_type])
 		postresume[phy->usb_phy_type](phy, is_dpd);
+}
+
+void tegra_ehci_pre_reset(struct tegra_usb_phy *phy, bool is_dpd)
+{
+	const tegra_phy_fp pre_reset[] = {
+		NULL,
+		NULL,
+		null_phy_pre_usbcmd_reset,
+		NULL,
+	};
+
+	if (pre_reset[phy->usb_phy_type])
+		pre_reset[phy->usb_phy_type](phy, is_dpd);
 }
 
 void tegra_ehci_post_reset(struct tegra_usb_phy *phy, bool is_dpd)

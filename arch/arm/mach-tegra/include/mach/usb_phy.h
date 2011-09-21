@@ -125,6 +125,8 @@ void tegra_usb_phy_preresume(struct tegra_usb_phy *phy, bool is_dpd);
 
 void tegra_usb_phy_postresume(struct tegra_usb_phy *phy, bool is_dpd);
 
+void tegra_ehci_pre_reset(struct tegra_usb_phy *phy, bool is_dpd);
+
 void tegra_ehci_post_reset(struct tegra_usb_phy *phy, bool is_dpd);
 
 void tegra_ehci_phy_restore_start(struct tegra_usb_phy *phy,
