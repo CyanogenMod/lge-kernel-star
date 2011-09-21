@@ -31,7 +31,7 @@ config SND_SOC_TEGRA30_I2S
 	  Tegra I2S interface. You will also need to select the individual
 	  machine drivers to support below.
 
-config SND_SOC_TEGRA_SPDIF
+config SND_SOC_TEGRA20_SPDIF
 	tristate
 	depends on SND_SOC_TEGRA
 	default m
