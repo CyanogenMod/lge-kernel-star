@@ -127,6 +127,8 @@ static struct snd_soc_ops tegra_wm8903_ops = {
 	.hw_params = tegra_wm8903_hw_params,
 };
 
+static struct snd_soc_ops tegra_spdif_ops;
+
 static struct snd_soc_jack tegra_wm8903_hp_jack;
 
 static struct snd_soc_jack_pin tegra_wm8903_hp_jack_pins[] = {
@@ -366,21 +368,34 @@ static int tegra_wm8903_init(struct snd_soc_pcm_runtime *rtd)
 	return 0;
 }
 
-static struct snd_soc_dai_link tegra_wm8903_dai = {
-	.name = "WM8903",
-	.stream_name = "WM8903 PCM",
-	.codec_name = "wm8903.0-001a",
-	.platform_name = "tegra-pcm-audio",
-	.cpu_dai_name = "tegra20-i2s.0",
-	.codec_dai_name = "wm8903-hifi",
-	.init = tegra_wm8903_init,
-	.ops = &tegra_wm8903_ops,
+static struct snd_soc_dai_link tegra_wm8903_dai[] = {
+	{
+		.name = "WM8903",
+		.stream_name = "WM8903 PCM",
+		.codec_name = "wm8903.0-001a",
+		.platform_name = "tegra-pcm-audio",
+		.cpu_dai_name = "tegra20-i2s.0",
+		.codec_dai_name = "wm8903-hifi",
+		.init = tegra_wm8903_init,
+		.ops = &tegra_wm8903_ops,
+	},
+#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
+	{
+		.name = "SPDIF",
+		.stream_name = "SPDIF PCM",
+		.codec_name = "spdif-dit",
+		.platform_name = "tegra-pcm-audio",
+		.cpu_dai_name = "tegra20-spdif",
+		.codec_dai_name = "dit-hifi",
+		.ops = &tegra_spdif_ops,
+	}
+#endif
 };
 
 static struct snd_soc_card snd_soc_tegra_wm8903 = {
 	.name = "tegra-wm8903",
-	.dai_link = &tegra_wm8903_dai,
-	.num_links = 1,
+	.dai_link = tegra_wm8903_dai,
+	.num_links = ARRAY_SIZE(tegra_wm8903_dai),
 };
 
 static __devinit int tegra_wm8903_driver_probe(struct platform_device *pdev)
@@ -409,8 +424,8 @@ static __devinit int tegra_wm8903_driver_probe(struct platform_device *pdev)
 		goto err_free_machine;
 
 	if (machine_is_cardhu()) {
-		tegra_wm8903_dai.codec_name = "wm8903.4-001a",
-		tegra_wm8903_dai.cpu_dai_name = "tegra30-i2s.1";
+		tegra_wm8903_dai[0].codec_name = "wm8903.4-001a",
+		tegra_wm8903_dai[0].cpu_dai_name = "tegra30-i2s.1";
 	}
 
 	card->dev = &pdev->dev;
