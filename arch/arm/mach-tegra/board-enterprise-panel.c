@@ -108,6 +108,8 @@ static tegra_dc_bl_output enterprise_bl_output_measured = {
 
 static p_tegra_dc_bl_output bl_output;
 
+static bool kernel_1st_panel_init = true;
+
 static int enterprise_backlight_notify(struct device *unused, int brightness)
 {
 	int cur_sd_brightness = atomic_read(&sd_brightness);
@@ -436,21 +438,23 @@ static int enterprise_dsi_panel_enable(void)
 	}
 
 #if DSI_PANEL_RESET
-	ret = gpio_request(enterprise_dsi_panel_reset, "panel reset");
-	if (ret < 0)
-		return ret;
+	if (kernel_1st_panel_init != true) {
+		ret = gpio_request(enterprise_dsi_panel_reset, "panel reset");
+		if (ret < 0)
+			return ret;
 
-	ret = gpio_direction_output(enterprise_dsi_panel_reset, 0);
-	if (ret < 0) {
-		gpio_free(enterprise_dsi_panel_reset);
-		return ret;
+		ret = gpio_direction_output(enterprise_dsi_panel_reset, 0);
+		if (ret < 0) {
+			gpio_free(enterprise_dsi_panel_reset);
+			return ret;
+		}
+		tegra_gpio_enable(enterprise_dsi_panel_reset);
+
+		gpio_set_value(enterprise_dsi_panel_reset, 0);
+		udelay(2000);
+		gpio_set_value(enterprise_dsi_panel_reset, 1);
+		mdelay(20);
 	}
-	tegra_gpio_enable(enterprise_dsi_panel_reset);
-
-	gpio_set_value(enterprise_dsi_panel_reset, 0);
-	udelay(2000);
-	gpio_set_value(enterprise_dsi_panel_reset, 1);
-	mdelay(20);
 #endif
 
 	return ret;
@@ -459,8 +463,11 @@ static int enterprise_dsi_panel_enable(void)
 static int enterprise_dsi_panel_disable(void)
 {
 #if DSI_PANEL_RESET
-	tegra_gpio_disable(enterprise_dsi_panel_reset);
-	gpio_free(enterprise_dsi_panel_reset);
+	if (kernel_1st_panel_init != true) {
+		tegra_gpio_disable(enterprise_dsi_panel_reset);
+		gpio_free(enterprise_dsi_panel_reset);
+	} else
+		kernel_1st_panel_init = false;
 #endif
 	return 0;
 }
