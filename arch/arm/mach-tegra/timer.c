@@ -221,8 +221,10 @@ void tegra_twd_suspend(struct tegra_twd_context *context)
 {
 	context->twd_ctrl = readl(twd_base + TWD_TIMER_CONTROL);
 	context->twd_load = readl(twd_base + TWD_TIMER_LOAD);
-	if ((context->twd_load == 0) && (context->twd_ctrl &
-		(TWD_TIMER_CONTROL_ENABLE | TWD_TIMER_CONTROL_IT_ENABLE))) {
+	if ((context->twd_load == 0) &&
+	    (context->twd_ctrl & TWD_TIMER_CONTROL_PERIODIC) &&
+	    (context->twd_ctrl & (TWD_TIMER_CONTROL_ENABLE |
+				  TWD_TIMER_CONTROL_IT_ENABLE))) {
 		WARN("%s: TWD enabled but counter was 0\n", __func__);
 		context->twd_load = 1;
 	}
@@ -231,8 +233,10 @@ void tegra_twd_suspend(struct tegra_twd_context *context)
 
 void tegra_twd_resume(struct tegra_twd_context *context)
 {
-	BUG_ON((context->twd_load == 0) && (context->twd_ctrl &
-		(TWD_TIMER_CONTROL_ENABLE | TWD_TIMER_CONTROL_IT_ENABLE)));
+	BUG_ON((context->twd_load == 0) &&
+	       (context->twd_ctrl & TWD_TIMER_CONTROL_PERIODIC) &&
+	       (context->twd_ctrl & (TWD_TIMER_CONTROL_ENABLE |
+				     TWD_TIMER_CONTROL_IT_ENABLE)));
 	writel(context->twd_load, twd_base + TWD_TIMER_LOAD);
 	writel(context->twd_ctrl, twd_base + TWD_TIMER_CONTROL);
 }

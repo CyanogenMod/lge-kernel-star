@@ -411,9 +411,14 @@ static void restore_cpu_complex(u32 mode)
 	flowctrl_writel(reg, FLOW_CTRL_CPU_CSR(cpu));
 
 	/* If an immedidate cluster switch is being perfomed, restore the
-	   local timer registers. See save_cpu_complex() for the details. */
-	if (mode & (TEGRA_POWER_CLUSTER_MASK | TEGRA_POWER_CLUSTER_IMMEDIATE))
-		tegra_twd_resume(&tegra_sctx.twd);
+	   local timer registers. For calls resulting from CPU LP2 in
+	   idle or system suspend, the local timer was shut down and
+	   timekeeping switched over to the global system timer. In this
+	   case keep local timer disabled, and restore only periodic load. */
+	if (!(mode & (TEGRA_POWER_CLUSTER_MASK |
+		      TEGRA_POWER_CLUSTER_IMMEDIATE)))
+		tegra_sctx.twd.twd_ctrl = 0;
+	tegra_twd_resume(&tegra_sctx.twd);
 }
 
 /*
@@ -445,12 +450,7 @@ static void suspend_cpu_complex(u32 mode)
 	tegra_sctx.pllp_misc = readl(clk_rst + CLK_RESET_PLLP_MISC);
 	tegra_sctx.cclk_divider = readl(clk_rst + CLK_RESET_CCLK_DIVIDER);
 
-	/* If an immedidate cluster switch is being perfomed, save the
-	   local timer registers. For calls resulting from CPU LP2 in
-	   idle or system suspend, the local timer is shut down and
-	   timekeeping switches over to the global system timer. */
-	if (mode & (TEGRA_POWER_CLUSTER_MASK | TEGRA_POWER_CLUSTER_IMMEDIATE))
-		tegra_twd_suspend(&tegra_sctx.twd);
+	tegra_twd_suspend(&tegra_sctx.twd);
 
 	reg = readl(FLOW_CTRL_CPU_CSR(cpu));
 	reg &= ~FLOW_CTRL_CSR_WFE_BITMAP;	/* clear wfe bitmap */
