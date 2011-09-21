@@ -33,7 +33,7 @@ config SND_SOC_TEGRA30_I2S
 
 config SND_SOC_TEGRA20_SPDIF
 	tristate
-	depends on SND_SOC_TEGRA
+	depends on SND_SOC_TEGRA && ARCH_TEGRA_2x_SOC
 	default m
 	help
 	  Say Y or M if you want to add support for the SPDIF interface.
