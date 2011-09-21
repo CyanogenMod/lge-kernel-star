@@ -22,6 +22,7 @@
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
 #include <linux/regulator/consumer.h>
+#include <linux/delay.h>
 
 #include <mach/gpio.h>
 #include <mach/sdhci.h>
@@ -30,11 +31,28 @@
 #include "sdhci-pltfm.h"
 
 #define SDHCI_VENDOR_CLOCK_CNTRL       0x100
+#define SDHCI_VENDOR_CLOCK_CNTRL_PADPIPE_CLKEN_OVERRIDE	0x8
+
+static void tegra_3x_sdhci_set_card_clock(struct sdhci_host *sdhci, unsigned int clock);
+
+struct tegra_sdhci_hw_ops{
+	/* Set the internal clk and card clk.*/
+	void	(*set_card_clock)(struct sdhci_host *sdhci, unsigned int clock);
+};
+
+static struct tegra_sdhci_hw_ops tegra_2x_sdhci_ops = {
+};
+
+static struct tegra_sdhci_hw_ops tegra_3x_sdhci_ops = {
+	.set_card_clock = tegra_3x_sdhci_set_card_clock,
+};
 
 struct tegra_sdhci_host {
 	bool	clk_enabled;
 	struct regulator *vdd_io_reg;
 	struct regulator *vdd_slot_reg;
+	/* Pointer to the chip specific HW ops */
+	struct tegra_sdhci_hw_ops *hw_ops;
 };
 
 static u32 tegra_sdhci_readl(struct sdhci_host *host, int reg)
@@ -158,6 +176,92 @@ static int tegra_sdhci_8bit(struct sdhci_host *host, int bus_width)
 	return 0;
 }
 
+static void tegra_3x_sdhci_set_card_clock(struct sdhci_host *sdhci, unsigned int clock)
+{
+	int div;
+	u16 clk;
+	unsigned long timeout;
+	u8 ctrl;
+
+	if (clock && clock == sdhci->clock)
+		return;
+
+	sdhci_writew(sdhci, 0, SDHCI_CLOCK_CONTROL);
+
+	if (clock == 0)
+		goto out;
+
+	if (sdhci->version >= SDHCI_SPEC_300) {
+		/* Version 3.00 divisors must be a multiple of 2. */
+		if (sdhci->max_clk <= clock) {
+			div = 1;
+		} else {
+			for (div = 2; div < SDHCI_MAX_DIV_SPEC_300; div += 2) {
+				if ((sdhci->max_clk / div) <= clock)
+					break;
+			}
+		}
+	} else {
+		/* Version 2.00 divisors must be a power of 2. */
+		for (div = 1; div < SDHCI_MAX_DIV_SPEC_200; div *= 2) {
+			if ((sdhci->max_clk / div) <= clock)
+				break;
+		}
+	}
+	div >>= 1;
+
+	/*
+	 * Tegra3 sdmmc controller internal clock will not be stabilized when
+	 * we use a clock divider value greater than 4. The WAR is as follows.
+	 * - Enable PADPIPE_CLK_OVERRIDE in the vendr clk cntrl register.
+	 * - Enable internal clock.
+	 * - Wait for 5 usec and do a dummy write.
+	 * - Poll for clk stable and disable PADPIPE_CLK_OVERRIDE.
+	 */
+
+	/* Enable PADPIPE clk override */
+	ctrl = sdhci_readb(sdhci, SDHCI_VENDOR_CLOCK_CNTRL);
+	ctrl |= SDHCI_VENDOR_CLOCK_CNTRL_PADPIPE_CLKEN_OVERRIDE;
+	sdhci_writeb(sdhci, ctrl, SDHCI_VENDOR_CLOCK_CNTRL);
+
+	clk = (div & SDHCI_DIV_MASK) << SDHCI_DIVIDER_SHIFT;
+	clk |= ((div & SDHCI_DIV_HI_MASK) >> SDHCI_DIV_MASK_LEN)
+		<< SDHCI_DIVIDER_HI_SHIFT;
+	clk |= SDHCI_CLOCK_INT_EN;
+	sdhci_writew(sdhci, clk, SDHCI_CLOCK_CONTROL);
+
+	/* Wait for 5 usec */
+	udelay(5);
+
+	/* Do a dummy write */
+	ctrl = sdhci_readb(sdhci, SDHCI_CAPABILITIES);
+	ctrl |= 1;
+	sdhci_writeb(sdhci, ctrl, SDHCI_CAPABILITIES);
+
+	/* Wait max 20 ms */
+	timeout = 20;
+	while (!((clk = sdhci_readw(sdhci, SDHCI_CLOCK_CONTROL))
+		& SDHCI_CLOCK_INT_STABLE)) {
+		if (timeout == 0) {
+			dev_err(mmc_dev(sdhci->mmc), "Internal clock never stabilised\n");
+			return;
+		}
+		timeout--;
+		mdelay(1);
+	}
+
+	/* Disable PADPIPE clk override */
+	ctrl = sdhci_readb(sdhci, SDHCI_VENDOR_CLOCK_CNTRL);
+	ctrl &= ~SDHCI_VENDOR_CLOCK_CNTRL_PADPIPE_CLKEN_OVERRIDE;
+	sdhci_writeb(sdhci, ctrl, SDHCI_VENDOR_CLOCK_CNTRL);
+
+	clk |= SDHCI_CLOCK_CARD_EN;
+	sdhci_writew(sdhci, clk, SDHCI_CLOCK_CONTROL);
+
+out:
+	sdhci->clock = clock;
+}
+
 static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
@@ -166,11 +270,17 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 	pr_debug("%s %s %u enabled=%u\n", __func__,
 		mmc_hostname(sdhci->mmc), clock, tegra_host->clk_enabled);
 
-	if (clock && !tegra_host->clk_enabled) {
-		clk_enable(pltfm_host->clk);
-		sdhci_writeb(sdhci, 1, SDHCI_VENDOR_CLOCK_CNTRL);
-		tegra_host->clk_enabled = true;
+	if (clock) {
+		if (!tegra_host->clk_enabled) {
+			clk_enable(pltfm_host->clk);
+			sdhci_writeb(sdhci, 1, SDHCI_VENDOR_CLOCK_CNTRL);
+			tegra_host->clk_enabled = true;
+		}
+		if (tegra_host->hw_ops->set_card_clock)
+			tegra_host->hw_ops->set_card_clock(sdhci, clock);
 	} else if (!clock && tegra_host->clk_enabled) {
+		if (tegra_host->hw_ops->set_card_clock)
+			tegra_host->hw_ops->set_card_clock(sdhci, clock);
 		sdhci_writeb(sdhci, 0, SDHCI_VENDOR_CLOCK_CNTRL);
 		clk_disable(pltfm_host->clk);
 		tegra_host->clk_enabled = false;
@@ -314,6 +424,12 @@ static int tegra_sdhci_pltfm_init(struct sdhci_host *host,
 		host->mmc->pm_flags = MMC_PM_IGNORE_PM_NOTIFY;
 	}
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	tegra_host->hw_ops = &tegra_2x_sdhci_ops;
+#else
+	tegra_host->hw_ops = &tegra_3x_sdhci_ops;
+#endif
+
 	return 0;
 
 err_clkput:
@@ -396,7 +512,8 @@ static int tegra_sdhci_suspend(struct sdhci_host *sdhci, pm_message_t state)
 
 static int tegra_sdhci_resume(struct sdhci_host *sdhci)
 {
-	tegra_sdhci_set_clock(sdhci, 1);
+	/* Setting the min identification clock of freq 400KHz */
+	tegra_sdhci_set_clock(sdhci, 400000);
 
 	return 0;
 }
@@ -416,6 +533,9 @@ struct sdhci_pltfm_data sdhci_tegra_pdata = {
 	.quirks = SDHCI_QUIRK_BROKEN_TIMEOUT_VAL |
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
 		  SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
+#endif
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+		  SDHCI_QUIRK_NONSTANDARD_CLOCK |
 #endif
 		  SDHCI_QUIRK_SINGLE_POWER_WRITE |
 		  SDHCI_QUIRK_NO_HISPD_BIT |
