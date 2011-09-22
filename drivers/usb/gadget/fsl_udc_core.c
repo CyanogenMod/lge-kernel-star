@@ -2130,7 +2130,7 @@ static irqreturn_t fsl_udc_irq(int irq, void *_udc)
 		spin_unlock_irqrestore(&udc->lock, flags);
 		return IRQ_NONE;
 	}
-#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+#ifndef CONFIG_TEGRA_SILICON_PLATFORM
 	{
 		u32 temp = fsl_readl(&usb_sys_regs->vbus_sensors);
 		udc->vbus_active = (temp & USB_SYS_VBUS_ASESSION) ? true : false;
