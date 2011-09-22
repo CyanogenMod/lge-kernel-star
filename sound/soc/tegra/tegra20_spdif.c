@@ -128,6 +128,7 @@ static int tegra20_spdif_hw_params(struct snd_pcm_substream *substream,
 	struct device *dev = substream->pcm->card->dev;
 	struct tegra20_spdif *spdif = snd_soc_dai_get_drvdata(dai);
 	int ret, srate, spdifclock;
+	u32 ch_sta[2] = {0, 0};
 
 	spdif->reg_ctrl &= ~TEGRA20_SPDIF_CTRL_PACK;
 	spdif->reg_ctrl &= ~TEGRA20_SPDIF_CTRL_BIT_MODE_MASK;
@@ -141,27 +142,45 @@ static int tegra20_spdif_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	srate = params_rate(params);
+	ch_sta[0] = tegra20_spdif_read(spdif, TEGRA20_SPDIF_CH_STA_TX_A);
+	ch_sta[0] &= ~TEGRA20_SPDIF_CH_STA_TX_A_SAMP_FREQ_MASK;
+	ch_sta[1] = tegra20_spdif_read(spdif, TEGRA20_SPDIF_CH_STA_TX_B);
+	ch_sta[1] &= ~TEGRA20_SPDIF_CH_STA_TX_B_ORIG_SAMP_FREQ_MASK;
 	switch (params_rate(params)) {
 	case 32000:
 		spdifclock = 4096000;
+		ch_sta[0] |= TEGRA20_SPDIF_CH_STA_TX_A_SAMP_FREQ_32000;
+		ch_sta[1] |= TEGRA20_SPDIF_CH_STA_TX_B_ORIG_SAMP_FREQ_32000;
 		break;
 	case 44100:
 		spdifclock = 5644800;
+		ch_sta[0] |= TEGRA20_SPDIF_CH_STA_TX_A_SAMP_FREQ_44100;
+		ch_sta[1] |= TEGRA20_SPDIF_CH_STA_TX_B_ORIG_SAMP_FREQ_44100;
 		break;
 	case 48000:
 		spdifclock = 6144000;
+		ch_sta[0] |= TEGRA20_SPDIF_CH_STA_TX_A_SAMP_FREQ_48000;
+		ch_sta[1] |= TEGRA20_SPDIF_CH_STA_TX_B_ORIG_SAMP_FREQ_48000;
 		break;
 	case 88200:
 		spdifclock = 11289600;
+		ch_sta[0] |= TEGRA20_SPDIF_CH_STA_TX_A_SAMP_FREQ_88200;
+		ch_sta[1] |= TEGRA20_SPDIF_CH_STA_TX_B_ORIG_SAMP_FREQ_88200;
 		break;
 	case 96000:
 		spdifclock = 12288000;
+		ch_sta[0] |= TEGRA20_SPDIF_CH_STA_TX_A_SAMP_FREQ_96000;
+		ch_sta[1] |= TEGRA20_SPDIF_CH_STA_TX_B_ORIG_SAMP_FREQ_96000;
 		break;
 	case 176400:
 		spdifclock = 22579200;
+		ch_sta[0] |= TEGRA20_SPDIF_CH_STA_TX_A_SAMP_FREQ_176400;
+		ch_sta[1] |= TEGRA20_SPDIF_CH_STA_TX_B_ORIG_SAMP_FREQ_176400;
 		break;
 	case 192000:
 		spdifclock = 24576000;
+		ch_sta[0] |= TEGRA20_SPDIF_CH_STA_TX_A_SAMP_FREQ_192000;
+		ch_sta[1] |= TEGRA20_SPDIF_CH_STA_TX_B_ORIG_SAMP_FREQ_192000;
 		break;
 	default:
 		return -EINVAL;
@@ -173,18 +192,26 @@ static int tegra20_spdif_hw_params(struct snd_pcm_substream *substream,
 		return ret;
 	}
 
+	clk_enable(spdif->clk_spdif_out);
+
+	tegra20_spdif_write(spdif, TEGRA20_SPDIF_CH_STA_TX_A, ch_sta[0]);
+	tegra20_spdif_write(spdif, TEGRA20_SPDIF_CH_STA_TX_B, ch_sta[1]);
+
+	clk_disable(spdif->clk_spdif_out);
+
 	return 0;
 }
 
 static void tegra20_spdif_start_playback(struct tegra20_spdif *spdif)
 {
-	spdif->reg_ctrl |= TEGRA20_SPDIF_CTRL_TX_EN;
+	spdif->reg_ctrl |= TEGRA20_SPDIF_CTRL_TC_EN | TEGRA20_SPDIF_CTRL_TX_EN;
 	tegra20_spdif_write(spdif, TEGRA20_SPDIF_CTRL, spdif->reg_ctrl);
 }
 
 static void tegra20_spdif_stop_playback(struct tegra20_spdif *spdif)
 {
-	spdif->reg_ctrl &= ~TEGRA20_SPDIF_CTRL_TX_EN;
+	spdif->reg_ctrl &= ~(TEGRA20_SPDIF_CTRL_TX_EN |
+				TEGRA20_SPDIF_CTRL_TC_EN);
 	tegra20_spdif_write(spdif, TEGRA20_SPDIF_CTRL, spdif->reg_ctrl);
 }
 
@@ -197,18 +224,14 @@ static int tegra20_spdif_trigger(struct snd_pcm_substream *substream, int cmd,
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 	case SNDRV_PCM_TRIGGER_RESUME:
-		if (!spdif->clk_refs)
-			clk_enable(spdif->clk_spdif_out);
-		spdif->clk_refs++;
+		clk_enable(spdif->clk_spdif_out);
 		tegra20_spdif_start_playback(spdif);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 		tegra20_spdif_stop_playback(spdif);
-		spdif->clk_refs--;
-		if (!spdif->clk_refs)
-			clk_disable(spdif->clk_spdif_out);
+		clk_disable(spdif->clk_spdif_out);
 		break;
 	default:
 		return -EINVAL;
@@ -250,6 +273,7 @@ static __devinit int tegra20_spdif_platform_probe(struct platform_device *pdev)
 	struct tegra20_spdif *spdif;
 	struct resource *mem, *memregion, *dmareq;
 	int ret;
+	u32 reg_val;
 
 	spdif = kzalloc(sizeof(struct tegra20_spdif), GFP_KERNEL);
 	if (!spdif) {
@@ -299,6 +323,15 @@ static __devinit int tegra20_spdif_platform_probe(struct platform_device *pdev)
 	spdif->playback_dma_data.wrap = 4;
 	spdif->playback_dma_data.width = 32;
 	spdif->playback_dma_data.req_sel = dmareq->start;
+
+	clk_enable(spdif->clk_spdif_out);
+
+	reg_val = tegra20_spdif_read(spdif, TEGRA20_SPDIF_DATA_FIFO_CSR);
+	reg_val &= ~TEGRA20_SPDIF_DATA_FIFO_CSR_TX_ATN_LVL_MASK;
+	reg_val |= TEGRA20_SPDIF_DATA_FIFO_CSR_TX_ATN_LVL_TU4_WORD_FULL;
+	tegra20_spdif_write(spdif, TEGRA20_SPDIF_DATA_FIFO_CSR, reg_val);
+
+	clk_disable(spdif->clk_spdif_out);
 
 	ret = snd_soc_register_dai(&pdev->dev, &tegra20_spdif_dai);
 	if (ret) {
