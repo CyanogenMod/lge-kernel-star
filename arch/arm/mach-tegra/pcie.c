@@ -1334,7 +1334,7 @@ static irqreturn_t pci_tegra_msi_isr(int irq, void *arg)
 		}
 	}
 
-	return 0;
+	return IRQ_HANDLED;
 }
 
 static bool pci_tegra_enable_msi(void)
