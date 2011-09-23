@@ -41,15 +41,10 @@
 #define CHARGERUSB_CTRLLIMIT1	0xef
 #define CHARGERUSB_VICHRG_PC	0xdd
 #define CONTROLLER_WDG		0xe2
+#define LINEAR_CHRG_STS		0xde
 
 #define TPS80031_VBUS_DET	BIT(2)
 #define TPS80031_VAC_DET	BIT(3)
-
-enum charging_state {
-	INIT = 0,
-	PROGRESS = 1,
-	DONE = 2,
-};
 
 struct tps80031_charger {
 	int			max_charge_current_mA;
@@ -63,9 +58,13 @@ struct tps80031_charger {
 	void			*board_data;
 	int			irq_base;
 	int			watch_time_sec;
-	enum			charging_state state;
+	enum charging_states	state;
 	int			charging_term_current_mA;
+	charging_callback_t	charger_cb;
+	void			*charger_cb_data;
 };
+
+static struct tps80031_charger *charger_data;
 
 static int set_charge_current_limit(struct regulator_dev *rdev,
 		int min_uA, int max_uA)
@@ -90,7 +89,10 @@ static int set_charge_current_limit(struct regulator_dev *rdev,
 		if (ret < 0)
 			dev_err(charger->dev, "%s(): Failed in writing register 0x%02x\n",
 				__func__, CONTROLLER_WDG);
-		charger->state = INIT;
+		charger->state = charging_state_charging_stopped;
+		if (charger->charger_cb)
+			charger->charger_cb(charger->state,
+					charger->charger_cb_data);
 		return ret;
 	}
 
@@ -139,13 +141,28 @@ static int set_charge_current_limit(struct regulator_dev *rdev,
 				__func__, CONTROLLER_CTRL1);
 		return ret;
 	}
-	charger->state = PROGRESS;
+	charger->state = charging_state_charging_in_progress;
+	if (charger->charger_cb)
+		charger->charger_cb(charger->state,
+				charger->charger_cb_data);
 	return 0;
 }
 
 static struct regulator_ops tegra_regulator_ops = {
 	.set_current_limit = set_charge_current_limit,
 };
+
+int register_charging_state_callback(charging_callback_t cb, void *args)
+{
+	struct tps80031_charger *charger = charger_data;
+	if (!charger_data)
+		return -ENODEV;
+
+	charger->charger_cb = cb;
+	charger->charger_cb_data = args;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(register_charging_state_callback);
 
 static int configure_charging_parameter(struct tps80031_charger *charger)
 {
@@ -228,7 +245,7 @@ static int configure_charging_parameter(struct tps80031_charger *charger)
 	}
 
 	/* set Pre Charge current to 400mA */
-	ret = tps80031_write(charger->dev->parent, SLAVE_ID2, 0xDD, 0x3);
+	ret = tps80031_write(charger->dev->parent, SLAVE_ID2, 0xDE, 0x3);
 	if (ret < 0) {
 		dev_err(charger->dev, "%s(): Failed in writing register 0x%02x\n",
 				__func__, 0xDD);
@@ -255,9 +272,27 @@ static int configure_charging_parameter(struct tps80031_charger *charger)
 static irqreturn_t linch_status_isr(int irq, void *dev_id)
 {
 	struct tps80031_charger *charger = dev_id;
+	uint8_t linch_status;
+	int ret;
 	dev_info(charger->dev, "%s() got called\n", __func__);
-	return IRQ_HANDLED;
 
+	ret = tps80031_read(charger->dev->parent, SLAVE_ID2,
+			LINEAR_CHRG_STS, &linch_status);
+	if (ret < 0) {
+		dev_err(charger->dev, "%s(): Failed in reading register 0x%02x\n",
+				__func__, LINEAR_CHRG_STS);
+	} else {
+		dev_info(charger->dev, "%s():The status of LINEAR_CHRG_STS is 0x%02x\n",
+				 __func__, linch_status);
+		if (linch_status & 0x20) {
+			charger->state = charging_state_charging_completed;
+			if (charger->charger_cb)
+				charger->charger_cb(charger->state,
+					charger->charger_cb_data);
+		}
+	}
+
+	return IRQ_HANDLED;
 }
 
 static irqreturn_t watchdog_expire_isr(int irq, void *dev_id)
@@ -266,7 +301,7 @@ static irqreturn_t watchdog_expire_isr(int irq, void *dev_id)
 	int ret;
 
 	dev_info(charger->dev, "%s()\n", __func__);
-	if (charger->state != PROGRESS)
+	if (charger->state != charging_state_charging_in_progress)
 		return IRQ_HANDLED;
 
 	/* Enable watchdog timer again*/
@@ -277,12 +312,13 @@ static irqreturn_t watchdog_expire_isr(int irq, void *dev_id)
 				__func__, CONTROLLER_WDG);
 
 	/* Rewrite to enable the charging */
-	ret = tps80031_write(charger->dev->parent, SLAVE_ID2,
+	if (!ret) {
+		ret = tps80031_write(charger->dev->parent, SLAVE_ID2,
 			CONTROLLER_CTRL1, 0x30);
-	if (ret < 0) {
-		dev_err(charger->dev, "%s(): Failed in writing register 0x%02x\n",
+		if (ret < 0)
+			dev_err(charger->dev, "%s(): Failed in writing "
+				"register 0x%02x\n",
 				__func__, CONTROLLER_CTRL1);
-		return ret;
 	}
 	return IRQ_HANDLED;
 }
@@ -302,7 +338,8 @@ static int tps80031_charger_probe(struct platform_device *pdev)
 	}
 
 	if (!pdata->num_consumer_supplies) {
-		dev_err(dev, "%s() No consumer supply list, exiting..\n", __func__);
+		dev_err(dev, "%s() No consumer supply list, exiting..\n",
+				__func__);
 		return -ENODEV;
 	}
 
@@ -354,7 +391,7 @@ static int tps80031_charger_probe(struct platform_device *pdev)
 
 	charger->board_init = pdata->board_init;
 	charger->board_data = pdata->board_data;
-	charger->state = INIT;
+	charger->state = charging_state_idle;
 
 	charger->rdev = regulator_register(&charger->reg_desc, &pdev->dev,
 					&charger->reg_init_data, charger);
@@ -386,6 +423,7 @@ static int tps80031_charger_probe(struct platform_device *pdev)
 		goto config_fail;
 
 	dev_set_drvdata(&pdev->dev, charger);
+	charger_data = charger;
 	return ret;
 
 config_fail:

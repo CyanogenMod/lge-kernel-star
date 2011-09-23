@@ -26,6 +26,19 @@
 
 #include <linux/regulator/machine.h>
 
+enum charging_states {
+	charging_state_idle,
+	charging_state_charging_in_progress,
+	charging_state_charging_completed,
+	charging_state_charging_stopped,
+};
+
+/**
+ * Callback type definition which is called when any state changed in the
+ * charging.
+ */
+typedef void (*charging_callback_t)(enum charging_states state, void *args);
+
 struct tps80031_charger_platform_data {
 	int regulator_id;
 	int max_charge_volt_mV;
@@ -39,5 +52,11 @@ struct tps80031_charger_platform_data {
 	int (*board_init)(void *board_data);
 	void *board_data;
 };
+
+/**
+ * Register the callback function for the client. This callback gets called
+ * when there is any change in the chanrging states.
+ */
+extern int register_charging_state_callback(charging_callback_t cb, void *args);
 
 #endif /*__LINUX_TPS80031_CHARGER_H */
