@@ -776,7 +776,13 @@ int __init enterprise_panel_init(void)
 	if (!err)
 		err = nvhost_device_register(&enterprise_disp2_device);
 
-	err = platform_add_devices(enterprise_bl_devices,
+#if defined(CONFIG_TEGRA_NVAVP)
+	if (!err)
+		err = nvhost_device_register(&nvavp_device);
+#endif
+
+	if (!err)
+		err = platform_add_devices(enterprise_bl_devices,
 				ARRAY_SIZE(enterprise_bl_devices));
 	return err;
 }

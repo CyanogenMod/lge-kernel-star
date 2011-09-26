@@ -25,6 +25,7 @@
 #include <linux/fsl_devices.h>
 #include <linux/serial_8250.h>
 #include <linux/tegra_avp.h>
+#include <linux/nvhost.h>
 #include <asm/pmu.h>
 #include <mach/irqs.h>
 #include <mach/iomap.h>
@@ -1367,6 +1368,22 @@ static struct tegra_avp_platform_data tegra_avp_pdata = {
 #else
 	.emc_clk_rate = 200000000,
 #endif
+};
+
+struct resource tegra_nvavp_resources[] = {
+	[0] = {
+		.start  = INT_SHR_SEM_INBOX_IBF,
+		.end    = INT_SHR_SEM_INBOX_IBF,
+		.flags  = IORESOURCE_IRQ,
+		.name   = "mbox_from_nvavp_pending",
+	},
+};
+
+struct nvhost_device nvavp_device = {
+	.name           = "nvavp",
+	.id             = -1,
+	.resource       = tegra_nvavp_resources,
+	.num_resources  = ARRAY_SIZE(tegra_nvavp_resources),
 };
 
 static struct resource tegra_avp_resources[] = {
