@@ -557,6 +557,26 @@ static void __init cardhu_spi_init(void)
 	}
 }
 
+static struct resource tegra_rtc_resources[] = {
+	[0] = {
+		.start = TEGRA_RTC_BASE,
+		.end = TEGRA_RTC_BASE + TEGRA_RTC_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	[1] = {
+		.start = INT_RTC,
+		.end = INT_RTC,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device tegra_rtc_device = {
+	.name = "tegra_rtc",
+	.id   = -1,
+	.resource = tegra_rtc_resources,
+	.num_resources = ARRAY_SIZE(tegra_rtc_resources),
+};
+
 static struct tegra_wm8903_platform_data cardhu_audio_pdata = {
 	.gpio_spkr_en		= TEGRA_GPIO_SPKR_EN,
 	.gpio_hp_det		= TEGRA_GPIO_HP_DET,
@@ -588,6 +608,7 @@ static struct platform_device ram_console_device = {
 
 static struct platform_device *cardhu_devices[] __initdata = {
 	&tegra_pmu_device,
+	&tegra_rtc_device,
 	&tegra_udc_device,
 	&androidusb_device,
 	&tegra_usb_fsg_device,
