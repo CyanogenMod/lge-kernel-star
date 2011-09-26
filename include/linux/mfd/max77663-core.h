@@ -94,6 +94,7 @@ int max77663_write(struct device *dev, u8 addr, void *values, u32 len,
 		   bool is_rtc);
 int max77663_set_bits(struct device *dev, u8 addr, u8 mask, u8 value,
 		      bool is_rtc);
+int max77663_power_off(void);
 int max77663_gpio_set_alternate(int gpio, int alternate);
 
 #endif /* __LINUX_MFD_MAX77663_CORE_H__ */

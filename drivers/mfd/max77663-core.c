@@ -56,6 +56,7 @@
 #define MAX77663_REG_GPIO_PU		0x3E
 #define MAX77663_REG_GPIO_PD		0x3F
 #define MAX77663_REG_GPIO_ALT		0x40
+#define MAX77663_REG_ONOFF_CFG1		0x41
 
 #define IRQ_TOP_GLBL_MASK		(1 << 7)
 #define IRQ_TOP_GLBL_SHIFT		7
@@ -109,6 +110,8 @@
 #define GPIO_DBNC_8MS			1
 #define GPIO_DBNC_16MS			2
 #define GPIO_DBNC_32MS			3
+
+#define ONOFF_SFT_RST_MASK		(1 << 7)
 
 enum {
 	CACHE_IRQ_LBT,
@@ -348,6 +351,16 @@ int max77663_set_bits(struct device *dev, u8 addr, u8 mask, u8 value,
 	return ret;
 }
 EXPORT_SYMBOL(max77663_set_bits);
+
+int max77663_power_off(void)
+{
+	struct max77663_chip *chip = max77663_chip;
+
+	dev_info(chip->dev, "%s: Global shutdown\n", __func__);
+	return max77663_set_bits(chip->dev, MAX77663_REG_ONOFF_CFG1,
+				 ONOFF_SFT_RST_MASK, ONOFF_SFT_RST_MASK, 0);
+}
+EXPORT_SYMBOL(max77663_power_off);
 
 static inline int max77663_cache_write(struct device *dev, u8 addr, u8 mask,
 				       u8 val, u8 *cache)
