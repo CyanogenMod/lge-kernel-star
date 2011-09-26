@@ -384,10 +384,47 @@ struct max77663_chip *max77663_chip_from_gpio(struct gpio_chip *gpio)
 	return container_of(gpio, struct max77663_chip, gpio);
 }
 
+static int max77663_gpio_set_pull_up(struct max77663_chip *chip, int offset,
+				     int pull_up)
+{
+	u8 val = 0;
+
+	if ((offset < MAX77663_GPIO0) || (MAX77663_GPIO7 < offset))
+		return -EINVAL;
+
+	if (pull_up == GPIO_PU_ENABLE)
+		val = (1 << offset);
+
+	return max77663_cache_write(chip->dev, MAX77663_REG_GPIO_PU,
+				    (1 << offset), val, &chip->cache_gpio_pu);
+}
+
+static int max77663_gpio_set_pull_down(struct max77663_chip *chip, int offset,
+				       int pull_down)
+{
+	u8 val = 0;
+
+	if ((offset < MAX77663_GPIO0) || (MAX77663_GPIO7 < offset))
+		return -EINVAL;
+
+	if (pull_down == GPIO_PD_ENABLE)
+		val = (1 << offset);
+
+	return max77663_cache_write(chip->dev, MAX77663_REG_GPIO_PD,
+				    (1 << offset), val, &chip->cache_gpio_pd);
+}
+
+static inline
+int max77663_gpio_is_alternate(struct max77663_chip *chip, int offset)
+{
+	return (chip->cache_gpio_alt & (1 << offset)) ? 1 : 0;
+}
+
 int max77663_gpio_set_alternate(int gpio, int alternate)
 {
 	struct max77663_chip *chip = max77663_chip;
 	u8 val = 0;
+	int ret = 0;
 
 	if (!chip)
 		return -ENXIO;
@@ -396,17 +433,33 @@ int max77663_gpio_set_alternate(int gpio, int alternate)
 	if ((gpio < MAX77663_GPIO0) || (MAX77663_GPIO7 < gpio))
 		return -EINVAL;
 
-	if (alternate)
+	if (alternate == GPIO_ALT_ENABLE) {
 		val = (1 << gpio);
+		if (gpio == MAX77663_GPIO7) {
+			ret = max77663_gpio_set_pull_up(chip, gpio, 0);
+			if (ret < 0)
+				return ret;
 
-	return max77663_set_bits(chip->dev, MAX77663_REG_GPIO_ALT, (1 << gpio),
-				 val, 0);
+			ret = max77663_gpio_set_pull_down(chip, gpio, 0);
+			if (ret < 0)
+				return ret;
+		}
+	}
+
+	return max77663_cache_write(chip->dev, MAX77663_REG_GPIO_ALT,
+				    (1 << gpio), val, &chip->cache_gpio_alt);
 }
 EXPORT_SYMBOL(max77663_gpio_set_alternate);
 
 static int max77663_gpio_dir_input(struct gpio_chip *gpio, unsigned offset)
 {
 	struct max77663_chip *chip = max77663_chip_from_gpio(gpio);
+
+	if (max77663_gpio_is_alternate(chip, offset)) {
+		dev_warn(chip->dev, "gpio_dir_input: "
+			"gpio%u is used as alternate mode\n", offset);
+		return 0;
+	}
 
 	return max77663_cache_write(chip->dev, GPIO_REG_ADDR(offset),
 				    GPIO_CTRL_DIR_MASK, GPIO_CTRL_DIR_MASK,
@@ -418,6 +471,12 @@ static int max77663_gpio_get(struct gpio_chip *gpio, unsigned offset)
 	struct max77663_chip *chip = max77663_chip_from_gpio(gpio);
 	u8 val;
 	int ret;
+
+	if (max77663_gpio_is_alternate(chip, offset)) {
+		dev_warn(chip->dev, "gpio_get: "
+			"gpio%u is used as alternate mode\n", offset);
+		return 0;
+	}
 
 	ret = max77663_read(chip->dev, GPIO_REG_ADDR(offset), &val, 1, 0);
 	if (ret < 0)
@@ -434,6 +493,12 @@ static int max77663_gpio_dir_output(struct gpio_chip *gpio, unsigned offset,
 	u8 mask = GPIO_CTRL_DIR_MASK | GPIO_CTRL_DOUT_MASK;
 	u8 val = (value ? 1 : 0) << GPIO_CTRL_DOUT_SHIFT;
 
+	if (max77663_gpio_is_alternate(chip, offset)) {
+		dev_warn(chip->dev, "gpio_dir_output: "
+			"gpio%u is used as alternate mode\n", offset);
+		return 0;
+	}
+
 	return max77663_cache_write(chip->dev, GPIO_REG_ADDR(offset), mask, val,
 				    &chip->cache_gpio_ctrl[offset]);
 }
@@ -444,6 +509,12 @@ static int max77663_gpio_set_debounce(struct gpio_chip *gpio, unsigned offset,
 	struct max77663_chip *chip = max77663_chip_from_gpio(gpio);
 	u8 shift = GPIO_CTRL_DBNC_SHIFT;
 	u8 val = 0;
+
+	if (max77663_gpio_is_alternate(chip, offset)) {
+		dev_warn(chip->dev, "gpio_set_debounce: "
+			"gpio%u is used as alternate mode\n", offset);
+		return 0;
+	}
 
 	if (debounce == 0)
 		val = 0;
@@ -467,6 +538,12 @@ static void max77663_gpio_set(struct gpio_chip *gpio, unsigned offset,
 	struct max77663_chip *chip = max77663_chip_from_gpio(gpio);
 	u8 val = (value ? 1 : 0) << GPIO_CTRL_DOUT_SHIFT;
 
+	if (max77663_gpio_is_alternate(chip, offset)) {
+		dev_warn(chip->dev, "gpio_set: "
+			"gpio%u is used as alternate mode\n", offset);
+		return;
+	}
+
 	max77663_cache_write(chip->dev, GPIO_REG_ADDR(offset),
 			     GPIO_CTRL_DOUT_MASK, val,
 			     &chip->cache_gpio_ctrl[offset]);
@@ -486,7 +563,7 @@ static void max77663_gpio_dbg_show(struct seq_file *s, struct gpio_chip *gpio)
 	int i;
 
 	for (i = 0; i < gpio->ngpio; i++) {
-		int ctrl_val, alt_val;
+		u8 ctrl_val;
 		const char *label;
 		int is_out;
 		int ret;
@@ -498,14 +575,7 @@ static void max77663_gpio_dbg_show(struct seq_file *s, struct gpio_chip *gpio)
 		seq_printf(s, " gpio-%-3d (%-20.20s) ", i + chip->gpio_base,
 			   label);
 
-		ret = max77663_read(chip->dev, MAX77663_REG_GPIO_ALT, &alt_val,
-				    1, 0);
-		if (ret < 0) {
-			seq_printf(s, "\n");
-			continue;
-		}
-
-		if (alt_val & (1 << i)) {
+		if (chip->cache_gpio_alt & (1 << i)) {
 			seq_printf(s, "alt\n");
 			continue;
 		}
@@ -572,13 +642,74 @@ static void max77663_gpio_dbg_show(struct seq_file *s, struct gpio_chip *gpio)
 static int max77663_gpio_set_config(struct max77663_chip *chip,
 				    struct max77663_gpio_config *gpio_cfg)
 {
-	return max77663_gpio_set_alternate(gpio_cfg->gpio + chip->gpio_base,
-					   gpio_cfg->alternate);
+	int gpio = gpio_cfg->gpio;
+	u8 val = 0, mask = 0;
+	int ret = 0;
+
+	if ((gpio < MAX77663_GPIO0) || (MAX77663_GPIO7 < gpio))
+		return -EINVAL;
+
+	if (gpio_cfg->pull_up != GPIO_PU_DEF) {
+		ret = max77663_gpio_set_pull_up(chip, gpio, gpio_cfg->pull_up);
+		if (ret < 0) {
+			dev_err(chip->dev, "gpio_set_config: "
+				"Failed to set gpio%d pull-up\n", gpio);
+			return ret;
+		}
+	}
+
+	if (gpio_cfg->pull_down != GPIO_PD_DEF) {
+		ret = max77663_gpio_set_pull_down(chip, gpio,
+						  gpio_cfg->pull_down);
+		if (ret < 0) {
+			dev_err(chip->dev, "gpio_set_config: "
+				"Failed to set gpio%d pull-down\n", gpio);
+			return ret;
+		}
+	}
+
+	if (gpio_cfg->dir != GPIO_DIR_DEF) {
+		mask = GPIO_CTRL_DIR_MASK;
+		if (gpio_cfg->dir == GPIO_DIR_IN) {
+			val |= GPIO_CTRL_DIR_MASK;
+		} else {
+			if (gpio_cfg->dout != GPIO_DOUT_DEF) {
+				mask |= GPIO_CTRL_DOUT_MASK;
+				if (gpio_cfg->dout == GPIO_DOUT_HIGH)
+					val |= GPIO_CTRL_DOUT_MASK;
+			}
+
+			if (gpio_cfg->out_drv != GPIO_OUT_DRV_DEF) {
+				mask |= GPIO_CTRL_OUT_DRV_MASK;
+				if (gpio_cfg->out_drv == GPIO_OUT_DRV_PUSH_PULL)
+					val |= GPIO_CTRL_OUT_DRV_MASK;
+			}
+		}
+
+		ret = max77663_cache_write(chip->dev, GPIO_REG_ADDR(gpio), mask,
+					   val, &chip->cache_gpio_ctrl[gpio]);
+		if (ret < 0) {
+			dev_err(chip->dev, "gpio_set_config: "
+				"Failed to set gpio%d control\n", gpio);
+			return ret;
+		}
+	}
+
+	if (gpio_cfg->alternate != GPIO_ALT_DEF) {
+		ret = max77663_gpio_set_alternate(gpio + chip->gpio_base,
+						  gpio_cfg->alternate);
+		if (ret < 0) {
+			dev_err(chip->dev, "gpio_set_config: "
+				"Failed to set gpio%d alternate\n", gpio);
+			return ret;
+		}
+	}
+
+	return 0;
 }
 
 static int max77663_gpio_init(struct max77663_chip *chip)
 {
-	u8 val = 0;
 	int i;
 	int ret;
 
@@ -606,32 +737,25 @@ static int max77663_gpio_init(struct max77663_chip *chip)
 		return ret;
 	}
 
-	/*
-	 * FIXME: The GPIOs can controlled when disabled pu & pd and enabled
-	 *        output drive.
-	 */
-	ret = max77663_write(chip->dev, MAX77663_REG_GPIO_PU, &val, 1, 0);
+	ret = max77663_read(chip->dev, MAX77663_REG_GPIO_PU,
+			    &chip->cache_gpio_pu, 1, 0);
 	if (ret < 0) {
-		dev_err(chip->dev, "gpio_init: Failed to set gpio pull up\n");
+		dev_err(chip->dev, "gpio_init: Failed to get gpio pull-up\n");
 		return ret;
 	}
 
-	ret = max77663_write(chip->dev, MAX77663_REG_GPIO_PD, &val, 1, 0);
+	ret = max77663_read(chip->dev, MAX77663_REG_GPIO_PD,
+			    &chip->cache_gpio_pd, 1, 0);
 	if (ret < 0) {
-		dev_err(chip->dev, "gpio_init: Failed to set gpio pull down\n");
+		dev_err(chip->dev, "gpio_init: Failed to get gpio pull-down\n");
 		return ret;
 	}
 
-	for (i = 0; i < MAX77663_GPIO_NR; i++) {
-		ret = max77663_cache_write(chip->dev, GPIO_REG_ADDR(i),
-					   GPIO_CTRL_OUT_DRV_MASK,
-					   (1 << GPIO_CTRL_OUT_DRV_SHIFT),
-					   &chip->cache_gpio_ctrl[i]);
-		if (ret < 0) {
-			dev_err(chip->dev,
-				"gpio_init: Failed to set gpio control\n");
-			return ret;
-		}
+	ret = max77663_read(chip->dev, MAX77663_REG_GPIO_ALT,
+			    &chip->cache_gpio_alt, 1, 0);
+	if (ret < 0) {
+		dev_err(chip->dev, "gpio_init: Failed to get gpio alternate\n");
+		return ret;
 	}
 
 	ret = gpiochip_add(&chip->gpio);
@@ -641,8 +765,9 @@ static int max77663_gpio_init(struct max77663_chip *chip)
 	}
 	chip->gpio_base = chip->gpio.base;
 
-	for (i = 0; i < chip->pdata->num_gpio_cfg; i++) {
-		ret = max77663_gpio_set_config(chip, &chip->pdata->gpio_cfg[i]);
+	for (i = 0; i < chip->pdata->num_gpio_cfgs; i++) {
+		ret = max77663_gpio_set_config(chip,
+					       &chip->pdata->gpio_cfgs[i]);
 		if (ret < 0) {
 			dev_err(chip->dev,
 				"gpio_init: Failed to set gpio config\n");

@@ -68,21 +68,64 @@ enum {
 	MAX77663_GPIO_NR,
 };
 
-enum max77663_gpio_alternate {
-	GPIO_ALT_DISABLE,
+/* Direction */
+enum max77663_gpio_dir {
+	GPIO_DIR_DEF,
+	GPIO_DIR_IN,
+	GPIO_DIR_OUT,
+};
+
+/* Data output */
+enum max77663_gpio_data_out {
+	GPIO_DOUT_DEF,
+	GPIO_DOUT_HIGH,
+	GPIO_DOUT_LOW,
+};
+
+/* Output drive */
+enum max77663_gpio_out_drv {
+	GPIO_OUT_DRV_DEF,
+	GPIO_OUT_DRV_PUSH_PULL,
+	GPIO_OUT_DRV_OPEN_DRAIN,
+};
+
+/* Pull-up */
+enum max77663_gpio_pull_up {
+	GPIO_PU_DEF,
+	GPIO_PU_ENABLE,
+	GPIO_PU_DISABLE,
+};
+
+/* Pull-down */
+enum max77663_gpio_pull_down {
+	GPIO_PD_DEF,
+	GPIO_PD_ENABLE,
+	GPIO_PD_DISABLE,
+};
+
+/* Alternate */
+enum max77663_gpio_alt {
+	GPIO_ALT_DEF,
 	GPIO_ALT_ENABLE,
+	GPIO_ALT_DISABLE,
 };
 
 struct max77663_gpio_config {
 	int gpio;	/* gpio number */
-	bool alternate;	/* alternate mode */
+	enum max77663_gpio_dir dir;
+	enum max77663_gpio_data_out dout;
+	enum max77663_gpio_out_drv out_drv;
+	enum max77663_gpio_pull_up pull_up;
+	enum max77663_gpio_pull_down pull_down;
+	enum max77663_gpio_alt alternate;
 };
 
 struct max77663_platform_data {
 	int irq_base;
 	int gpio_base;
-	int num_gpio_cfg;
-	struct max77663_gpio_config *gpio_cfg;
+
+	int num_gpio_cfgs;
+	struct max77663_gpio_config *gpio_cfgs;
 
 	int num_subdevs;
 	struct mfd_cell *sub_devices;
