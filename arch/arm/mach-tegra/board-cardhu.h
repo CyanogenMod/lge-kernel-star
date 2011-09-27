@@ -65,6 +65,7 @@
 #define BOARD_FAB_A02			0x2
 #define BOARD_FAB_A03			0x3
 #define BOARD_FAB_A04			0x4
+#define BOARD_FAB_A05			0x5
 
 
 /* External peripheral act as gpio */

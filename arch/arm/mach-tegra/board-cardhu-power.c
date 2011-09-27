@@ -412,8 +412,10 @@ int __init cardhu_regulator_init(void)
 		}
 	}
 
-	/* E1291-A04: Enable DEV_SLP and enable sleep on GPIO2 */
-	if ((board_info.board_id == BOARD_E1291) && (board_info.fab == BOARD_FAB_A04)) {
+	/* E1291-A04/A05: Enable DEV_SLP and enable sleep on GPIO2 */
+	if ((board_info.board_id == BOARD_E1291) &&
+			((board_info.fab == BOARD_FAB_A04) ||
+			 (board_info.fab == BOARD_FAB_A05))) {
 		tps_platform.dev_slp_en = true;
 		tps_platform.gpio_init_data = tps_gpio_pdata_e1291_a04;
 		tps_platform.num_gpioinit_data =
@@ -694,7 +696,7 @@ GREG_INIT(11, en_vdd_sdmmc1,	en_vdd_sdmmc1,	"vdd_3v3_devices",	0,      0,      T
 GREG_INIT(12, en_3v3_pex_hvdd,	en_3v3_pex_hvdd, "hvdd_pex_pmu",	0,      0,      TEGRA_GPIO_PL7,		false,	0,	0,	0,	0);
 GREG_INIT(13, en_1v8_cam,	en_1v8_cam,	"vdd_gen1v8",		0,      0,      TEGRA_GPIO_PBB4,	false,	0,	0,	0,	0);
 
-/* E1291-A04 specific */
+/* E1291-A04/A05 specific */
 GREG_INIT(1, en_5v0_a04,	en_5v0,		NULL,			0,      0,      TPS6591X_GPIO_8,	false,	0,	0,	0,	0);
 GREG_INIT(2, en_ddr_a04,	en_ddr,		NULL,			0,      0,      TPS6591X_GPIO_7,	false,	0,	0,	0,	0);
 GREG_INIT(3, en_3v3_sys_a04,	en_3v3_sys,	NULL,			0,      0,      TPS6591X_GPIO_6,	false,	0,	0,	0,	0);
@@ -882,7 +884,7 @@ static struct gpio_switch_regulator_subdev_data *gswitch_subdevs_e1291_a03[] = {
 	E1198_GPIO_REG
 };
 
-/* Gpio switch regulator platform data for E1291 A04*/
+/* Gpio switch regulator platform data for E1291 A04/A05*/
 static struct gpio_switch_regulator_subdev_data *gswitch_subdevs_e1291_a04[] = {
 	COMMON_GPIO_REG_E1291_A04
 	E1291_A03_GPIO_REG
@@ -920,7 +922,8 @@ int __init cardhu_gpio_switch_regulator_init(void)
 			gswitch_pdata.num_subdevs =
 					ARRAY_SIZE(gswitch_subdevs_e1291_a03);
 			gswitch_pdata.subdevs = gswitch_subdevs_e1291_a03;
-		} else if (board_info.fab == BOARD_FAB_A04) {
+		} else if ((board_info.fab == BOARD_FAB_A04) ||
+				(board_info.fab == BOARD_FAB_A05)) {
 			gswitch_pdata.num_subdevs =
 					ARRAY_SIZE(gswitch_subdevs_e1291_a04);
 			gswitch_pdata.subdevs = gswitch_subdevs_e1291_a04;
@@ -986,8 +989,10 @@ int __init cardhu_suspend_init(void)
 	tegra_get_board_info(&board_info);
 	tegra_get_pmu_board_info(&pmu_board_info);
 
-	/* For PMU Fab A03 and A04 make core_pwr_req to high */
-	if ((pmu_board_info.fab == BOARD_FAB_A03) || (pmu_board_info.fab == BOARD_FAB_A04))
+	/* For PMU Fab A03, A04 and A05 make core_pwr_req to high */
+	if ((pmu_board_info.fab == BOARD_FAB_A03) ||
+		(pmu_board_info.fab == BOARD_FAB_A04) ||
+		 (pmu_board_info.fab == BOARD_FAB_A05))
 		cardhu_suspend_data.corereq_high = true;
 
 	/* CORE_PWR_REQ to be high for all processor/pmu board whose sku bit 0
