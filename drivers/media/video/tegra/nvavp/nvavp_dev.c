@@ -49,7 +49,7 @@
 #endif
 #include "nvavp_os.h"
 
-#define TEGRA_NVAVP_NAME			"tegra-avp"
+#define TEGRA_NVAVP_NAME			"nvavp"
 
 #define NVAVP_PUSHBUFFER_SIZE			4096
 
@@ -924,7 +924,7 @@ static int tegra_nvavp_probe(struct nvhost_device *ndev)
 	u32 iovmm_addr;
 	int ret = 0;
 
-	irq = nvhost_get_irq_byname(ndev, "mbox_from_avp_pending");
+	irq = nvhost_get_irq_byname(ndev, "mbox_from_nvavp_pending");
 	if (irq < 0) {
 		dev_err(&ndev->dev, "invalid nvhost data\n");
 		return -EINVAL;
