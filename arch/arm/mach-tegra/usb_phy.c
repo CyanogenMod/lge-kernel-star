@@ -1532,8 +1532,9 @@ static void utmi_phy_restore_start(struct tegra_usb_phy *phy,
 		}
 	}
 
-	/* (2LS WAR)is not required for LS devices and is only for HS */
-	if (port_speed == TEGRA_USB_PHY_PORT_SPEED_LOW) {
+	/* (2LS WAR)is not required for LS and FS devices and is only for HS */
+	if ((port_speed == TEGRA_USB_PHY_PORT_SPEED_LOW) ||
+		(port_speed == TEGRA_USB_PHY_PORT_SPEED_FULL)) {
 		/* do not enable the OBS bus */
 		val = readl(base + UTMIP_MISC_CFG0);
 		val &= ~UTMIP_DPDM_OBSERVE_SEL(~0);
