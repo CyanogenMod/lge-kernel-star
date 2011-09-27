@@ -25,6 +25,7 @@ int ventana_panel_init(void);
 int ventana_sensors_init(void);
 int ventana_kbc_init(void);
 int ventana_emc_init(void);
+int ventana_charger_init(void);
 
 /* external gpios */
 
@@ -60,6 +61,9 @@ int ventana_emc_init(void);
 #define TEGRA_GPIO_HP_DET		TEGRA_GPIO_PW2
 #define TEGRA_GPIO_INT_MIC_EN		TEGRA_GPIO_PX0
 #define TEGRA_GPIO_EXT_MIC_EN		TEGRA_GPIO_PX1
+
+/* AC detect GPIO */
+#define AC_PRESENT_GPIO			TEGRA_GPIO_PV3
 
 /* Interrupt numbers from external peripherals */
 #define TPS6586X_INT_BASE	TEGRA_NR_IRQS

@@ -23,6 +23,7 @@
 #include <linux/mfd/tps6586x.h>
 #include <linux/gpio.h>
 #include <linux/io.h>
+#include <linux/power/gpio-charger.h>
 
 #include <mach/iomap.h>
 #include <mach/irqs.h>
@@ -258,6 +259,33 @@ int __init ventana_regulator_init(void)
 
 	tegra_init_suspend(&ventana_suspend_data);
 
+	return 0;
+}
+
+static char *ventana_battery[] = {
+	"battery",
+};
+
+static struct gpio_charger_platform_data ventana_charger_pdata = {
+	.name = "ac",
+	.type = POWER_SUPPLY_TYPE_MAINS,
+	.gpio = AC_PRESENT_GPIO,
+	.gpio_active_low = 1,
+	.supplied_to = ventana_battery,
+	.num_supplicants = ARRAY_SIZE(ventana_battery),
+};
+
+static struct platform_device ventana_charger_device = {
+	.name = "gpio-charger",
+	.dev = {
+		.platform_data = &ventana_charger_pdata,
+	},
+};
+
+int __init ventana_charger_init(void)
+{
+	tegra_gpio_enable(AC_PRESENT_GPIO);
+	platform_device_register(&ventana_charger_device);
 	return 0;
 }
 

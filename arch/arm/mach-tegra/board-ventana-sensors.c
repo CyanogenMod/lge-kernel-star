@@ -58,7 +58,6 @@
 #define CAMERA_CSI_MUX_SEL_GPIO	TEGRA_GPIO_PBB4
 #define CAMERA_FLASH_ACT_GPIO	TEGRA_GPIO_PD2
 #define CAMERA_FLASH_STRB_GPIO	TEGRA_GPIO_PA0
-#define AC_PRESENT_GPIO		TEGRA_GPIO_PV3
 #define NCT1008_THERM2_GPIO	TEGRA_GPIO_PN6
 #define CAMERA_FLASH_OP_MODE		0 /*0=I2C mode, 1=GPIO mode*/
 #define CAMERA_FLASH_MAX_LED_AMP	7
@@ -236,13 +235,6 @@ static void ventana_akm8975_init(void)
 }
 #endif
 
-static void ventana_bq20z75_init(void)
-{
-	tegra_gpio_enable(AC_PRESENT_GPIO);
-	gpio_request(AC_PRESENT_GPIO, "ac_present");
-	gpio_direction_input(AC_PRESENT_GPIO);
-}
-
 static void ventana_nct1008_init(void)
 {
 	tegra_gpio_enable(NCT1008_THERM2_GPIO);
@@ -272,7 +264,6 @@ static const struct i2c_board_info ventana_i2c0_board_info[] = {
 static const struct i2c_board_info ventana_i2c2_board_info[] = {
 	{
 		I2C_BOARD_INFO("bq20z75", 0x0B),
-		.irq = TEGRA_GPIO_TO_IRQ(AC_PRESENT_GPIO),
 	},
 };
 
@@ -424,7 +415,6 @@ int __init ventana_sensors_init(void)
 	 * since they have the necessary hardware rework
 	 */
 	if (BoardInfo.sku > 0) {
-		ventana_bq20z75_init();
 		i2c_register_board_info(2, ventana_i2c2_board_info,
 			ARRAY_SIZE(ventana_i2c2_board_info));
 	}

@@ -798,6 +798,7 @@ static void __init tegra_ventana_init(void)
 	ventana_sdhci_init();
 	ventana_charge_init();
 	ventana_regulator_init();
+	ventana_charger_init();
 
 	tegra_get_board_info(&BoardInfo);
 
@@ -821,6 +822,7 @@ static void __init tegra_ventana_init(void)
 	ventana_bt_rfkill();
 	ventana_power_off_init();
 	ventana_emc_init();
+
 #ifdef CONFIG_BT_BLUESLEEP
 	tegra_setup_bluesleep();
 #endif
