@@ -64,6 +64,7 @@ struct tegra_ehci_hcd {
 	int bus_suspended;
 	int port_resuming;
 	int power_down_on_bus_suspend;
+	int hotplug;
 	struct delayed_work work;
 	enum tegra_usb_phy_port_speed port_speed;
 	struct work_struct clk_timer_work;
@@ -112,7 +113,7 @@ static irqreturn_t tegra_ehci_irq (struct usb_hcd *hcd)
 			spin_unlock (&ehci->lock);
 		}
 	}
-	if (tegra->phy->instance == 2) {
+	if (tegra->hotplug) {
 		spin_lock(&ehci->lock);
 		val = readl(hcd->regs + TEGRA_USB_SUSP_CTRL_OFFSET);
 		if ((val  & TEGRA_USB_PHY_CLK_VALID_INT_STS)) {
@@ -1062,6 +1063,7 @@ static int tegra_ehci_probe(struct platform_device *pdev)
 
 	tegra->host_resumed = 1;
 	tegra->power_down_on_bus_suspend = pdata->power_down_on_bus_suspend;
+	tegra->hotplug = pdata->hotplug;
 	tegra->ehci = hcd_to_ehci(hcd);
 
 	irq = platform_get_irq(pdev, 0);
