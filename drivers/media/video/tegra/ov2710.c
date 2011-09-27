@@ -36,67 +36,6 @@ struct ov2710_info {
 #define OV2710_TABLE_END 1
 #define OV2710_MAX_RETRIES 3
 
-#if 0
-static struct ov2710_reg mode_start[] = {
-	{0x3008, 0x82}, /* reset registers pg 72 */
-	{OV2710_TABLE_WAIT_MS, 5},
-	{0x3008, 0x42}, /* register power down pg 72 */
-	{OV2710_TABLE_WAIT_MS, 5},
-	{0x3103, 0x93}, /* power up system clock from PLL page 77 */
-	{0x3017, 0xff}, /* PAD output enable page 100 */
-	{0x3018, 0xfc}, /* PAD output enable page 100 */
-
-	{0x3600, 0x50}, /* analog pg 108 */
-	{0x3601, 0x0d}, /* analog pg 108 */
-	{0x3604, 0x50}, /* analog pg 108 */
-	{0x3605, 0x04}, /* analog pg 108 */
-	{0x3606, 0x3f}, /* analog pg 108 */
-	{0x3612, 0x1a}, /* analog pg 108 */
-	{0x3630, 0x22}, /* analog pg 108 */
-	{0x3631, 0x22}, /* analog pg 108 */
-	{0x3702, 0x3a}, /* analog pg 108 */
-	{0x3704, 0x18}, /* analog pg 108 */
-	{0x3705, 0xda}, /* analog pg 108 */
-	{0x3706, 0x41}, /* analog pg 108 */
-	{0x370a, 0x80}, /* analog pg 108 */
-	{0x370b, 0x40}, /* analog pg 108 */
-	{0x370e, 0x00}, /* analog pg 108 */
-	{0x3710, 0x28}, /* analog pg 108 */
-	{0x3712, 0x13}, /* analog pg 108 */
-	{0x3830, 0x50}, /* manual exposure gain bit [0] */
-	{0x3a18, 0x00}, /* AEC gain ceiling bit 8 pg 114 */
-	{0x3a19, 0xf8}, /* AEC gain ceiling pg 114 */
-	{0x3a00, 0x38}, /* AEC control 0 debug mode band low
-			   limit mode band func pg 112 */
-
-	{0x3603, 0xa7}, /* analog pg 108 */
-	{0x3615, 0x50}, /* analog pg 108 */
-	{0x3620, 0x56}, /* analog pg 108 */
-	{0x3810, 0x00}, /* TIMING HVOFFS both are zero pg 80 */
-	{0x3836, 0x00}, /* TIMING HVPAD both are zero pg 82 */
-	{0x3a1a, 0x06}, /* DIFF MAX an AEC register??? pg 114 */
-	{0x4000, 0x01}, /* BLC enabled pg 120 */
-	{0x401c, 0x48}, /* reserved pg 120 */
-	{0x401d, 0x28}, /* BLC control pg 120 */
-	{0x5000, 0x00}, /* ISP control00 features are disabled. pg 132 */
-	{0x5001, 0x00}, /* ISP control01 awb disabled. pg 132 */
-	{0x5002, 0x00}, /* ISP control02 debug mode disabled pg 132 */
-	{0x503d, 0x00}, /* ISP control3D features disabled pg 133 */
-	{0x5046, 0x00}, /* ISP control isp disable awbg disable pg 133 */
-
-	{0x300f, 0x8f}, /* PLL control00 R_SELD5 [7:6] div by 4 R_DIVL [2]
-			   two lane div 1 SELD2P5 [1:0] div 2.5 pg 99 */
-	{0x3010, 0x10}, /* PLL control01 DIVM [3:0] DIVS [7:4] div 1 pg 99 */
-	{0x3011, 0x14}, /* PLL control02 R_DIVP [5:0] div 20 pg 99 */
-	{0x3012, 0x02}, /* PLL CTR 03, default */
-	{0x3815, 0x82}, /* PCLK to SCLK ratio bit[4:0] is set to 2 pg 81 */
-	{0x3503, 0x33}, /* AEC auto AGC auto gain has no latch delay. pg 38 */
-	/*	{FAST_SETMODE_START, 0}, */
-	{0x3613, 0x44}, /* analog pg 108 */
-	{OV2710_TABLE_END, 0x0},
-};
-#endif
-
 static struct ov2710_reg mode_1920x1080[] = {
 	{0x3103, 0x93},
 	{0x3008, 0x82},
@@ -127,14 +66,13 @@ static struct ov2710_reg mode_1920x1080[] = {
 	{0x302d, 0x90},
 	{0x370b, 0x40},
 	{0x3716, 0x31},
+	{0x3707, 0x52},
 	{0x380d, 0x74},
 	{0x5181, 0x20},
 	{0x518f, 0x00},
 	{0x4301, 0xff},
 	{0x4303, 0x00},
 	{0x3a00, 0x78},
-	{0x3a18, 0x00}, /* AEC gain ceiling bit 8 pg 51 */
-	{0x3a19, 0xf8}, /* AEC gain ceiling pg 51 */
 	{0x300f, 0x88},
 	{0x3011, 0x28},
 	{0x3a1a, 0x06},
@@ -144,6 +82,32 @@ static struct ov2710_reg mode_1920x1080[] = {
 	{0x382e, 0x0f},
 	{0x381a, 0x1a},
 	{0x401d, 0x02},
+
+	/* resolution */
+	{0x381c, 0x00},
+	{0x381d, 0x02},
+	{0x381e, 0x04},
+	{0x381f, 0x38},
+	{0x3820, 0x00},
+	{0x3821, 0x98},
+	{0x3800, 0x01},
+	{0x3802, 0x00},
+	{0x3803, 0x0a},
+	{0x3804, 0x07},
+	{0x3805, 0x90},
+	{0x3806, 0x04},
+	{0x3807, 0x40},
+	{0x3808, 0x07},
+	{0x3809, 0x90},
+	{0x380a, 0x04},
+	{0x380b, 0x40},
+	{0x380e, 0x04},
+	{0x380f, 0x50},
+	{0x380c, 0x09},
+	{0x380d, 0x74},
+	{0x3810, 0x08},
+	{0x3811, 0x02},
+
 	{0x5688, 0x03},
 	{0x5684, 0x07},
 	{0x5685, 0xa0},
@@ -153,9 +117,17 @@ static struct ov2710_reg mode_1920x1080[] = {
 	{0x300f, 0x8a},
 	{0x3017, 0x00},
 	{0x3018, 0x00},
+	{0x4800, 0x24}, /* non-continuous mode */
 	{0x300e, 0x04},
 	{0x4801, 0x0f},
+
+	/* MIPI fullspeed PLL */
 	{0x300f, 0xc3},
+	{0x3010, 0x00},
+	{0x3011, 0x0a},
+	{0x3012, 0x01},
+
+	/* AE target */
 	{0x3a0f, 0x40},
 	{0x3a10, 0x38},
 	{0x3a1b, 0x48},
@@ -163,25 +135,36 @@ static struct ov2710_reg mode_1920x1080[] = {
 	{0x3a11, 0x90},
 	{0x3a1f, 0x10},
 
-	{0x350c, 0xff}, /* peak VTS reg, set to highest limit */
-	{0x350d, 0xff}, /* peak VTS reg, set to highest limit */
-	{0x3406, 0x01}, /* AWB manual, 0-auto, 1-manual */
-	{0x3503, 0x07}, /* enable manual gain and manual exposure */
-	{0x3500, 0x00}, /* write default to AEC PK EXPO */
-	{0x3501, 0x00}, /* write default to AEC PK EXPO */
-	{0x3502, 0x02}, /* write default to AEC PK EXPO */
-	{0x350a, 0x00}, /* write default to manual gain reg */
-	{0x350b, 0x10}, /* write default to manual gain reg */
+	/*  Anti-flicker */
+	{0x3a0e, 0x03},
+	{0x3a0d, 0x04},
+	{0x3a08, 0x14},
+	{0x3a09, 0xc0},
+	{0x3a0a, 0x11},
+	{0x3a0b, 0x40},
+
+	/* Eliminate stripe */
+	{0x300f, 0xc3}, /* PLL */
+	{0x3010, 0x00},
+	{0x3011, 0x0e},
+	{0x3012, 0x02},
+	{0x380c, 0x09}, /* extend HTS */
+	{0x380d, 0xec},
+	{0x3703, 0x61}, /* tx time */
+	{0x3704, 0x44},
+	{0x3801, 0xd2},
+
+	/* Disable sensor ISP */
+	{0x3503, 0x17}, /* manual AEC/AGC */
+	{0x5001, 0x4e}, /* [0]disable AWB */
+	{0x5000, 0x5f}, /* disable LenC[7], keep defect pixel correction */
 
 	{OV2710_TABLE_END, 0x0000}
 };
 
 static struct ov2710_reg mode_1280x720[] = {
-	{0x3008, 0x82},
-	{OV2710_TABLE_WAIT_MS, 5},
-	{0x3008, 0x02},
-	{OV2710_TABLE_WAIT_MS, 5},
 	{0x3103, 0x93},
+	{0x3008, 0x82},
 	{0x3017, 0x7f},
 	{0x3018, 0xfc},
 
@@ -209,14 +192,13 @@ static struct ov2710_reg mode_1280x720[] = {
 	{0x302d, 0x90},
 	{0x370b, 0x40},
 	{0x3716, 0x31},
+	{0x3707, 0x52},
 	{0x380d, 0x74},
 	{0x5181, 0x20},
 	{0x518f, 0x00},
 	{0x4301, 0xff},
 	{0x4303, 0x00},
 	{0x3a00, 0x78},
-	{0x3a18, 0x00}, /* AEC gain ceiling bit 8 pg 51 */
-	{0x3a19, 0xf8}, /* AEC gain ceiling pg 51 */
 	{0x300f, 0x88},
 	{0x3011, 0x28},
 	{0x3a1a, 0x06},
@@ -226,29 +208,38 @@ static struct ov2710_reg mode_1280x720[] = {
 	{0x382e, 0x0f},
 	{0x381a, 0x1a},
 	{0x401d, 0x02},
+
+	/* resolution */
 	{0x381c, 0x10},
-	{0x381d, 0xb8},
+	{0x381d, 0xb0},
 	{0x381e, 0x02},
-	{0x381f, 0xdc},
+	{0x381f, 0xec},
+	{0x3800, 0x01},
 	{0x3820, 0x0a},
-	{0x3821, 0x29},
+	{0x3821, 0x2a},
 	{0x3804, 0x05},
-	{0x3805, 0x00},
+	{0x3805, 0x10},
+	{0x3802, 0x00},
+	{0x3803, 0x04},
 	{0x3806, 0x02},
-	{0x3807, 0xd0},
+	{0x3807, 0xe0},
 	{0x3808, 0x05},
-	{0x3809, 0x00},
+	{0x3809, 0x10},
 	{0x380a, 0x02},
-	{0x380b, 0xd0},
+	{0x380b, 0xe0},
 	{0x380e, 0x02},
-	{0x380f, 0xe8},
+	{0x380f, 0xf0},
 	{0x380c, 0x07},
 	{0x380d, 0x00},
+	{0x3810, 0x10},
+	{0x3811, 0x06},
+
 	{0x5688, 0x03},
 	{0x5684, 0x05},
 	{0x5685, 0x00},
 	{0x5686, 0x02},
 	{0x5687, 0xd0},
+
 	{0x3a08, 0x1b},
 	{0x3a09, 0xe6},
 	{0x3a0a, 0x17},
@@ -259,10 +250,7 @@ static struct ov2710_reg mode_1280x720[] = {
 	{0x300f, 0x8a},
 	{0x3017, 0x00},
 	{0x3018, 0x00},
-
-	{0x4803, 0x50}, /* MIPI CTRL3 pg 91 */
-	{0x4800, 0x24}, /* MIPI CTRl0 idle and short line pg 89 */
-
+	{0x4800, 0x24}, /* non-continuous mode */
 	{0x300e, 0x04},
 	{0x4801, 0x0f},
 	{0x300f, 0xc3},
@@ -281,36 +269,29 @@ static struct ov2710_reg mode_1280x720[] = {
 	{0x3a0a, 0x0b},
 	{0x3a0b, 0xa0},
 
-	{0x350c, 0xff}, /* peak VTS reg, set to highest limit */
-	{0x350d, 0xff}, /* peak VTS reg, set to highest limit */
-	{0x3406, 0x01}, /* AWB manual, 0-auto, 1-manual */
-	{0x3503, 0x07}, /* enable manual gain and manual exposure */
-	{0x3500, 0x00}, /* write default to AEC PK EXPO */
-	{0x3501, 0x00}, /* write default to AEC PK EXPO */
-	{0x3502, 0x02}, /* write default to AEC PK EXPO */
-	{0x350a, 0x00}, /* write default to manual gain reg */
-	{0x350b, 0x10}, /* write default to manual gain reg */
+	/* Eliminate stripe */
+	{0x300f, 0xc3}, /* PLL */
+	{0x3011, 0x0e},
+	{0x3012, 0x02},
+	{0x380c, 0x07},
+	{0x380d, 0x6a},
+	{0x3703, 0x5c},
+	{0x3704, 0x40},
+	{0x3801, 0xbc},
+
+	/* Disable sensor ISP */
+	{0x3503, 0x17}, /* manual AEC/AGC */
+	{0x5001, 0x4e}, /* [0]disable AWB */
+	{0x5000, 0x5f}, /* disable LenC[7], keep defect pixel correction */
 
 	{OV2710_TABLE_END, 0x0000}
 };
-
-#if 0
-static struct ov2710_reg mode_end[] = {
-	{0x3212, 0x00}, /* SRM_GROUP_ACCESS (group hold begin) */
-	{0x3003, 0x01}, /* reset DVP pg 97 */
-	{0x3212, 0x10}, /* SRM_GROUP_ACCESS (group hold end) */
-	{0x3212, 0xa0}, /* SRM_GROUP_ACCESS (group hold launch) */
-	{0x3008, 0x02}, /* SYSTEM_CTRL0 mipi suspend mask pg 98 */
-
-	/*	{FAST_SETMODE_END, 0}, */
-	{OV2710_TABLE_END, 0x0000}
-};
-#endif
 
 enum {
 	OV2710_MODE_1920x1080,
 	OV2710_MODE_1280x720,
 };
+
 
 static struct ov2710_reg *mode_table[] = {
 	[OV2710_MODE_1920x1080] = mode_1920x1080,
@@ -372,6 +353,7 @@ static int ov2710_read_reg(struct i2c_client *client, u16 addr, u8 *val)
 	err = i2c_transfer(client->adapter, msg, 2);
 
 	if (err != 2)
+
 		return -EINVAL;
 
 	*val = data[2];
@@ -405,6 +387,7 @@ static int ov2710_write_reg(struct i2c_client *client, u16 addr, u8 val)
 		retry++;
 		pr_err("ov2710: i2c transfer failed, retrying %x %x\n",
 		       addr, val);
+
 		msleep(3);
 	} while (retry <= OV2710_MAX_RETRIES);
 
@@ -426,6 +409,7 @@ static int ov2710_write_table(struct i2c_client *client,
 			msleep(next->val);
 			continue;
 		}
+
 
 		val = next->val;
 
@@ -456,9 +440,10 @@ static int ov2710_set_mode(struct ov2710_info *info, struct ov2710_mode *mode)
 	pr_info("%s: xres %u yres %u framelength %u coarsetime %u gain %u\n",
 		__func__, mode->xres, mode->yres, mode->frame_length,
 		mode->coarse_time, mode->gain);
+
 	if (mode->xres == 1920 && mode->yres == 1080)
 		sensor_mode = OV2710_MODE_1920x1080;
-	else if (mode->xres == 1264 && mode->yres == 704)
+	else if (mode->xres == 1280 && mode->yres == 720)
 		sensor_mode = OV2710_MODE_1280x720;
 	else {
 		pr_err("%s: invalid resolution supplied to set mode %d %d\n",
