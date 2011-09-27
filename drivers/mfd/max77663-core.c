@@ -646,32 +646,32 @@ static void max77663_gpio_exit(struct max77663_chip *chip)
 		dev_err(chip->dev, "gpio_exit: Failed to remove gpiochip\n");
 }
 
-static void max77663_irq_mask(unsigned int irq)
+static void max77663_irq_mask(struct irq_data *data)
 {
-	struct max77663_chip *chip = get_irq_chip_data(irq);
+	struct max77663_chip *chip = irq_data_get_irq_chip_data(data);
 
-	max77663_irqs[irq - chip->irq_base].is_unmask = 0;
+	max77663_irqs[data->irq - chip->irq_base].is_unmask = 0;
 }
 
-static void max77663_irq_unmask(unsigned int irq)
+static void max77663_irq_unmask(struct irq_data *data)
 {
-	struct max77663_chip *chip = get_irq_chip_data(irq);
+	struct max77663_chip *chip = irq_data_get_irq_chip_data(data);
 
-	max77663_irqs[irq - chip->irq_base].is_unmask = 1;
+	max77663_irqs[data->irq - chip->irq_base].is_unmask = 1;
 }
 
-static void max77663_irq_lock(unsigned int irq)
+static void max77663_irq_lock(struct irq_data *data)
 {
-	struct max77663_chip *chip = get_irq_chip_data(irq);
+	struct max77663_chip *chip = irq_data_get_irq_chip_data(data);
 
 	mutex_lock(&chip->irq_lock);
 }
 
-static void max77663_irq_sync_unlock(unsigned int irq)
+static void max77663_irq_sync_unlock(struct irq_data *data)
 {
-	struct max77663_chip *chip = get_irq_chip_data(irq);
+	struct max77663_chip *chip = irq_data_get_irq_chip_data(data);
 	struct max77663_irq_data *irq_data =
-			&max77663_irqs[irq - chip->irq_base];
+			&max77663_irqs[data->irq - chip->irq_base];
 	int idx = irq_data->cache_idx;
 	u8 irq_top_mask = chip->cache_irq_top_mask;
 	u16 irq_mask = chip->cache_irq_mask[idx];
@@ -714,7 +714,7 @@ static void max77663_irq_sync_unlock(unsigned int irq)
 
 		chip->cache_irq_mask[idx] = irq_mask;
 	} else if ((idx == -1) && (irq_data->top_mask == IRQ_TOP_GPIO_MASK)) {
-		unsigned offset = irq - chip->irq_base - IRQ_GPIO_BASE;
+		unsigned offset = data->irq - chip->irq_base - IRQ_GPIO_BASE;
 		u8 shift = GPIO_CTRL_REFE_IRQ_SHIFT;
 
 		if (irq_data->is_unmask) {
@@ -746,12 +746,12 @@ out:
 	mutex_unlock(&chip->irq_lock);
 }
 
-static int max77663_irq_gpio_set_type(unsigned int irq, unsigned int type)
+static int max77663_irq_gpio_set_type(struct irq_data *data, unsigned int type)
 {
-	struct max77663_chip *chip = get_irq_chip_data(irq);
+	struct max77663_chip *chip = irq_data_get_irq_chip_data(data);
 	struct max77663_irq_data *irq_data =
-			&max77663_irqs[irq - chip->irq_base];
-	unsigned offset = irq - chip->irq_base - IRQ_GPIO_BASE;
+			&max77663_irqs[data->irq - chip->irq_base];
+	unsigned offset = data->irq - chip->irq_base - IRQ_GPIO_BASE;
 	u8 shift = GPIO_CTRL_REFE_IRQ_SHIFT;
 	u8 val;
 
@@ -861,19 +861,19 @@ static irqreturn_t max77663_irq(int irq, void *data)
 
 static struct irq_chip max77663_irq_gpio_chip = {
 	.name = "max77663-irq",
-	.mask = max77663_irq_mask,
-	.unmask = max77663_irq_unmask,
-	.set_type = max77663_irq_gpio_set_type,
-	.bus_lock = max77663_irq_lock,
-	.bus_sync_unlock = max77663_irq_sync_unlock,
+	.irq_mask = max77663_irq_mask,
+	.irq_unmask = max77663_irq_unmask,
+	.irq_set_type = max77663_irq_gpio_set_type,
+	.irq_bus_lock = max77663_irq_lock,
+	.irq_bus_sync_unlock = max77663_irq_sync_unlock,
 };
 
 static struct irq_chip max77663_irq_chip = {
 	.name = "max77663-irq",
-	.mask = max77663_irq_mask,
-	.unmask = max77663_irq_unmask,
-	.bus_lock = max77663_irq_lock,
-	.bus_sync_unlock = max77663_irq_sync_unlock,
+	.irq_mask = max77663_irq_mask,
+	.irq_unmask = max77663_irq_unmask,
+	.irq_bus_lock = max77663_irq_lock,
+	.irq_bus_sync_unlock = max77663_irq_sync_unlock,
 };
 
 static int max77663_irq_init(struct max77663_chip *chip)
@@ -916,21 +916,21 @@ static int max77663_irq_init(struct max77663_chip *chip)
 			continue;
 		}
 
-		set_irq_chip_data(i, chip);
+		irq_set_chip_data(i, chip);
 
 		if ((IRQ_GPIO_BASE <= i - chip->irq_base) &&
 				(i - chip->irq_base <= IRQ_GPIO_END))
-			set_irq_chip_and_handler(i, &max77663_irq_gpio_chip,
+			irq_set_chip_and_handler(i, &max77663_irq_gpio_chip,
 						 handle_edge_irq);
 		else
-			set_irq_chip_and_handler(i, &max77663_irq_chip,
+			irq_set_chip_and_handler(i, &max77663_irq_chip,
 						 handle_edge_irq);
 #ifdef CONFIG_ARM
 		set_irq_flags(i, IRQF_VALID);
 #else
-		set_irq_noprobe(i);
+		irq_set_noprobe(i);
 #endif
-		set_irq_nested_thread(i, 1);
+		irq_set_nested_thread(i, 1);
 	}
 
 	ret = request_threaded_irq(chip->i2c_power->irq, NULL, max77663_irq,
@@ -1107,7 +1107,7 @@ static int max77663_probe(struct i2c_client *client,
 {
 	struct max77663_platform_data *pdata = client->dev.platform_data;
 	struct max77663_chip *chip;
-	int i, ret = 0;
+	int ret = 0;
 
 	if (pdata == NULL) {
 		dev_err(&client->dev, "probe: Invalid platform_data\n");
@@ -1134,8 +1134,6 @@ static int max77663_probe(struct i2c_client *client,
 	chip->irq_base = pdata->irq_base;
 	chip->gpio_base = pdata->gpio_base;
 	mutex_init(&chip->io_lock);
-	for (i = 0; i < pdata->num_subdevs; i++)
-		pdata->sub_devices[i].driver_data = chip;
 
 	max77663_gpio_init(chip);
 	max77663_irq_init(chip);
