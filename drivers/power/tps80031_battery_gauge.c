@@ -38,17 +38,39 @@
 
 #include <linux/mfd/core.h>
 #include <linux/mfd/tps80031.h>
+#include <linux/tps80031-charger.h>
 
 #define CONTROLLER_STAT1	0xe3
 #define LINEAR_CHARGE_STS	0xde
 #define STS_HW_CONDITIONS	0x21
 #define TOGGLE1			0x90
+#define TOGGLE1_FGS		BIT(5)
+#define TOGGLE1_GPADCR		BIT(1)
 #define GPCH0_LSB		0x3b
 #define GPCH0_MSB		0x3c
+#define GPCH0_MSB_COLLISION_GP	BIT(4)
 #define GPSELECT_ISB		0x35
 #define GPADC_CTRL		0x2e
 #define MISC1			0xe4
 #define CTRL_P1			0x36
+#define CTRL_P1_SP1		BIT(3)
+#define CTRL_P1_EOCRT		BIT(2)
+#define CTRL_P1_EOCP1		BIT(1)
+#define CTRL_P1_BUSY		BIT(0)
+#define FG_REG_00		0xc0
+#define FG_REG_00_CC_CAL_EN	BIT(1)
+#define FG_REG_00_CC_AUTOCLEAR	BIT(2)
+#define FG_REG_01		0xc1	/* CONV_NR (unsigned) 0 - 7 */
+#define FG_REG_02		0xc2	/* CONV_NR (unsigned) 8 - 15 */
+#define FG_REG_03		0xc3	/* CONV_NR (unsigned) 16 - 23 */
+#define FG_REG_04		0xc4	/* ACCM	(signed) 0 - 7 */
+#define FG_REG_05		0xc5	/* ACCM	(signed) 8 - 15 */
+#define FG_REG_06		0xc6	/* ACCM	(signed) 16 - 23 */
+#define FG_REG_07		0xc7	/* ACCM	(signed) 24 - 31 */
+#define FG_REG_08		0xc8	/* OFFSET (signed) 0 - 7 */
+#define FG_REG_09		0xc9	/* OFFSET (signed) 8 - 9 */
+#define FG_REG_10		0xca	/* LAST_READ (signed) 0 - 7 */
+#define FG_REG_11		0xcb	/* LAST_READ (signed) 8 - 13 */
 
 #define TPS80031_VBUS_DET	BIT(2)
 #define TPS80031_VAC_DET	BIT(3)
@@ -57,6 +79,18 @@
 
 #define DRIVER_VERSION		"1.1.0"
 #define BATTERY_POLL_PERIOD	30000
+
+static int tps80031_temp_table[] = {
+	/* adc code for temperature in degree C */
+	929, 925, /* -2, -1 */
+	920, 917, 912, 908, 904, 899, 895, 890, 885, 880, /* 00 - 09 */
+	875, 869, 864, 858, 853, 847, 841, 835, 829, 823, /* 10 - 19 */
+	816, 810, 804, 797, 790, 783, 776, 769, 762, 755, /* 20 - 29 */
+	748, 740, 732, 725, 718, 710, 703, 695, 687, 679, /* 30 - 39 */
+	671, 663, 655, 647, 639, 631, 623, 615, 607, 599, /* 40 - 49 */
+	591, 583, 575, 567, 559, 551, 543, 535, 527, 519, /* 50 - 59 */
+	511, 504, 496 /* 60 - 62 */
+};
 
 struct tps80031_device_info {
 	struct device		*dev;
@@ -70,42 +104,63 @@ struct tps80031_device_info {
 	uint8_t capacity_sts;
 	uint8_t health;
 	uint8_t sys_vlow_intr;
+	uint8_t fg_calib_intr;
+	int16_t fg_offset;
+	struct mutex adc_lock;
 };
 
 static enum power_supply_property tps80031_bat_props[] = {
 	POWER_SUPPLY_PROP_TECHNOLOGY,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+	POWER_SUPPLY_PROP_TEMP,
+	POWER_SUPPLY_PROP_CAPACITY,
 	POWER_SUPPLY_PROP_HEALTH,
 	POWER_SUPPLY_PROP_STATUS,
-	POWER_SUPPLY_PROP_CAPACITY,
+	POWER_SUPPLY_PROP_CHARGE_NOW,
+	POWER_SUPPLY_PROP_CHARGE_COUNTER,
 };
 
 static enum power_supply_property tps80031_usb_props[] = {
 	POWER_SUPPLY_PROP_ONLINE,
 };
 
-static uint32_t vsys_min_hi = 3700;
+static int tps80031_reg_read(struct tps80031_device_info *di, int sid, int reg,
+					uint8_t *val)
+{
+	int ret;
+
+	ret = tps80031_read(di->dev->parent, sid, reg, val);
+	if (ret < 0)
+		dev_err(di->dev, "Failed read register 0x%02x\n",
+					reg);
+	return ret;
+}
+
+static int tps80031_reg_write(struct tps80031_device_info *di, int sid, int reg,
+					uint8_t val)
+{
+	int ret;
+
+	ret = tps80031_write(di->dev->parent, sid, reg, val);
+	if (ret < 0)
+		dev_err(di->dev, "Failed write register 0x%02x\n",
+					reg);
+	return ret;
+}
 
 static int tps80031_battery_capacity(struct tps80031_device_info *di,
 			union power_supply_propval *val)
 {
-	uint8_t hwsts, ret;
+	uint8_t hwsts;
+	int ret;
 
-	ret = tps80031_read(di->dev->parent, SLAVE_ID2, LINEAR_CHARGE_STS,
-								&hwsts);
-	if (ret < 0) {
-		dev_err(di->dev, "%s(): Failed in writin register 0x%02x\n",
-			__func__, LINEAR_CHARGE_STS);
+	ret = tps80031_reg_read(di, SLAVE_ID2, LINEAR_CHARGE_STS, &hwsts);
+	if (ret < 0)
 		return ret;
-	}
-	if (di->vsys < vsys_min_hi)
-		di->capacity_sts = 10;
-	else {
-		if (hwsts & END_OF_CHARGE)
-			di->capacity_sts = 100;
-		else
-			di->capacity_sts = 50;
-	}
+
+	di->capacity_sts = di->vsys;
+	if (hwsts & END_OF_CHARGE)
+		di->capacity_sts = 100;
 
 	if (di->sys_vlow_intr) {
 		di->capacity_sts = 10;
@@ -120,79 +175,95 @@ static int tps80031_battery_capacity(struct tps80031_device_info *di,
 	return  di->capacity_sts;
 }
 
-static int tps80031_gpadc_config(struct tps80031_device_info *di, uint8_t gpadc)
-{
-
-	uint8_t ret = 0;
-	ret = tps80031_write(di->dev->parent, SLAVE_ID2, TOGGLE1, 0x02);
-	if (ret < 0) {
-		dev_err(di->dev, "%s(): Failed in writin register 0x%02x\n",
-			__func__, TOGGLE1);
-		return ret;
-	}
-
-	ret = tps80031_write(di->dev->parent, SLAVE_ID2, GPSELECT_ISB, gpadc);
-	if (ret < 0) {
-		dev_err(di->dev, "%s(): Failed in writin register 0x%02x\n",
-			__func__, GPSELECT_ISB);
-		return ret;
-	}
-
-	ret = tps80031_write(di->dev->parent, SLAVE_ID2, GPADC_CTRL, 0xef);
-	if (ret < 0) {
-		dev_err(di->dev, "%s(): Failed in writin register 0x%02x\n",
-			__func__, GPADC_CTRL);
-		return ret;
-	}
-
-	ret = tps80031_write(di->dev->parent, SLAVE_ID1, MISC1, 0x02);
-	if (ret < 0) {
-		dev_err(di->dev, "%s(): Failed in writin register 0x%02x\n",
-			__func__, MISC1);
-		return ret;
-	}
-
-	ret = tps80031_write(di->dev->parent, SLAVE_ID2, CTRL_P1, 0x08);
-	if (ret < 0) {
-		dev_err(di->dev, "%s(): Failed in writin register 0x%02x\n",
-			__func__, CTRL_P1);
-		return ret;
-	}
-	return ret;
-	}
-
 static int tps80031_battery_voltage(struct tps80031_device_info *di,
 			union power_supply_propval *val)
 {
-	uint32_t voltage, ret = 0;
-	uint8_t lsb, msb;
+	int voltage;
 
-	ret = tps80031_gpadc_config(di, 0x07);
-	if (ret < 0) {
-		dev_err(di->dev, "Failed in gpadc config\n");
-		return ret;
-	}
+	voltage = tps80031_gpadc_conversion(SYSTEM_SUPPLY);
+	if (voltage < 0)
+		return voltage;
+	voltage = ((voltage * 1000) / 4) * 5;
 
-	ret = tps80031_read(di->dev->parent, SLAVE_ID2, GPCH0_LSB, &lsb);
-	if (ret < 0) {
-		dev_err(di->dev, "%s(): Failed in writin register 0x%02x\n",
-			__func__, GPCH0_LSB);
-		return ret;
-	}
-
-	ret = tps80031_read(di->dev->parent, SLAVE_ID2, GPCH0_MSB, &msb);
-	if (ret < 0) {
-		dev_err(di->dev, "%s(): Failed in writin register 0x%02x\n",
-			__func__, GPCH0_MSB);
-		return ret;
-	}
-
-	voltage = ((msb << 8) | lsb);
-	voltage = ((voltage * 1000) / 4096) * 5;
-
-	di->vsys = voltage;
+	if (voltage < 3700000)
+		di->vsys = 10;
+	else if (voltage > 3700000 && voltage <= 3800000)
+		di->vsys = 20;
+	else if (voltage > 3800000 && voltage <= 3900000)
+		di->vsys = 50;
+	else if (voltage > 3900000 && voltage <= 4000000)
+		di->vsys = 75;
+	else if (voltage >= 4000000)
+		di->vsys = 90;
 
 	return voltage;
+}
+
+static int tps80031_battery_charge_now(struct tps80031_device_info *di,
+			union power_supply_propval *val)
+{
+	int charge;
+
+	charge = tps80031_gpadc_conversion(BATTERY_CHARGING_CURRENT);
+	if (charge < 0)
+		return charge;
+	charge = charge * 78125 / 40;
+
+	return charge;
+}
+
+static int tps80031_battery_charge_counter(struct tps80031_device_info *di,
+			union power_supply_propval *val)
+{
+	int retval, ret;
+	uint32_t cnt_byte;
+	uint32_t acc_byte;
+
+	/* check if calibrated */
+	if (di->fg_calib_intr == 0)
+		return 0;
+
+	/* get current accumlator */
+	ret = tps80031_reads(di->dev->parent, SLAVE_ID2, FG_REG_04, 4,
+							(uint8_t *) &acc_byte);
+	if (ret < 0)
+		return ret;
+	/* counter value is mAs, need report uAh */
+	retval = (int32_t) acc_byte / 18 * 5;
+
+	/* get counter */
+	ret = tps80031_reads(di->dev->parent, SLAVE_ID2, FG_REG_01, 3,
+							(uint8_t *) &cnt_byte);
+	if (ret < 0)
+		return ret;
+	/* we need calibrate the offset current in uAh*/
+	retval = retval - (di->fg_offset / 4 * cnt_byte);
+
+	/* @todo, counter value will overflow if battery get continuously
+	 * charged discharged for more than 108Ah using 250mS integration
+	 * period althrough it is hightly impossible.
+	 */
+
+	return retval;
+}
+
+static int tps80031_battery_temp(struct tps80031_device_info *di,
+					union power_supply_propval *val)
+{
+	int adc_code, temp;
+
+	adc_code = tps80031_gpadc_conversion(BATTERY_TEMPERATURE);
+	if (adc_code < 0)
+		return adc_code;
+
+	for (temp = 0; temp < ARRAY_SIZE(tps80031_temp_table); temp++) {
+		if (adc_code >= tps80031_temp_table[temp])
+			break;
+	}
+	/* first 2 values are for negative temperature */
+	val->intval = (temp - 2) * 10; /* in tenths of degree Celsius */
+
+	return  val->intval;
 }
 
 #define to_tps80031_device_info_bat(x) container_of((x), \
@@ -217,12 +288,24 @@ static int tps80031_bat_get_property(struct power_supply *psy,
 		val->intval =  tps80031_battery_capacity(di, val);
 		break;
 
+	case POWER_SUPPLY_PROP_CHARGE_NOW:
+		val->intval =  tps80031_battery_charge_now(di, val);
+		break;
+
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		val->intval =  tps80031_battery_voltage(di, val);
 		break;
 
+	case POWER_SUPPLY_PROP_CHARGE_COUNTER:
+		val->intval =  tps80031_battery_charge_counter(di, val);
+		break;
+
 	case POWER_SUPPLY_PROP_STATUS:
 		val->intval = di->usb_status;
+		break;
+
+	case POWER_SUPPLY_PROP_TEMP:
+		val->intval = tps80031_battery_temp(di, val);
 		break;
 
 	default:
@@ -258,31 +341,61 @@ static irqreturn_t tps80031_sys_vlow(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-static irqreturn_t tps80031_vbus_det(int irq, void *data)
+static irqreturn_t tps80031_fg_calibrated(int irq, void *data)
 {
-	uint8_t value, ret;
+	struct tps80031_device_info *di = data;
+	uint8_t acc_byte0;
+	uint8_t acc_byte1;
+	int ret;
+
+	ret = tps80031_reg_read(di, SLAVE_ID2, FG_REG_08, &acc_byte0);
+	if (ret < 0)
+		return IRQ_HANDLED;
+	ret = tps80031_reg_read(di, SLAVE_ID2, FG_REG_09, &acc_byte1);
+	if (ret < 0)
+		return IRQ_HANDLED;
+	/* sign extension */
+	if (acc_byte1 & 0x02)
+		acc_byte1 = acc_byte1 | 0xFC;
+	else
+		acc_byte1 = acc_byte1 & 0x03;
+
+	di->fg_offset = (int16_t) ((acc_byte1 << 8) | acc_byte0);
+	/* fuel gauge auto calibration finished */
+	di->fg_calib_intr = 1;
+	return IRQ_HANDLED;
+}
+
+static int tps80031_fg_start_gas_gauge(struct tps80031_device_info *di)
+{
+	int ret = 0;
+	di->fg_calib_intr = 0;
+
+	/* start gas gauge */
+	ret = tps80031_reg_write(di, SLAVE_ID2, TOGGLE1, 0x20);
+	if (ret < 0)
+		return ret;
+	/* set ADC update time to 3.9ms and start calibration */
+	ret = tps80031_reg_write(di, SLAVE_ID2, FG_REG_00, FG_REG_00_CC_CAL_EN);
+	if (ret < 0)
+		return ret;
+	return ret;
+}
+
+void tps80031_battery_status(enum charging_states status, void *data)
+{
 	struct tps80031_device_info *di = data;
 
-	ret = tps80031_read(di->dev->parent, SLAVE_ID2, CONTROLLER_STAT1,
-								&value);
-	if (ret < 0) {
-		dev_err(di->dev, "%s(): Failed in writin register 0x%02x\n",
-			__func__, CONTROLLER_STAT1);
-		return ret;
-	}
-
-	if ((value & TPS80031_VAC_DET) | (value & TPS80031_VBUS_DET)) {
-		di->usb_status = POWER_SUPPLY_STATUS_CHARGING;
-		di->health = POWER_SUPPLY_HEALTH_GOOD;
+	if ((status == charging_state_charging_in_progress)) {
+		di->usb_status	= POWER_SUPPLY_STATUS_CHARGING;
+		di->health	= POWER_SUPPLY_HEALTH_GOOD;
 		di->usb_online = 1;
-	} else {
+	} else if (status == charging_state_charging_stopped) {
 		di->usb_status = POWER_SUPPLY_STATUS_DISCHARGING;
 		di->usb_online = 0;
 	}
 	power_supply_changed(&di->usb);
 	power_supply_changed(&di->bat);
-
-	return IRQ_HANDLED;
 }
 
 static void battery_poll_timer_func(unsigned long pdi)
@@ -295,27 +408,23 @@ static void battery_poll_timer_func(unsigned long pdi)
 
 static int tps80031_battery_probe(struct platform_device *pdev)
 {
-	int err, ret = 0;
+	int ret;
 	uint8_t retval;
 	struct device *dev = &pdev->dev;
 	struct tps80031_device_info *di;
 	struct tps80031_bg_platform_data *pdata = pdev->dev.platform_data;
 
-	di = kzalloc(sizeof(*di), GFP_KERNEL);
+	di = devm_kzalloc(&pdev->dev, sizeof *di, GFP_KERNEL);
 	if (!di) {
 		dev_err(dev->parent, "failed to allocate device info data\n");
-		ret = -ENOMEM;
+		return -ENOMEM;
 	}
 
 	di->dev =  &pdev->dev;
 
-	ret = tps80031_read(di->dev->parent, SLAVE_ID2, CONTROLLER_STAT1,
-								&retval);
-	if (ret < 0) {
-		dev_err(di->dev, "%s(): Failed in writin register 0x%02x\n",
-			__func__, CONTROLLER_STAT1);
+	ret = tps80031_reg_read(di, SLAVE_ID2, CONTROLLER_STAT1, &retval);
+	if (ret < 0)
 		return ret;
-	}
 
 	if ((retval & TPS80031_VAC_DET) | (retval & TPS80031_VBUS_DET)) {
 		di->usb_status = POWER_SUPPLY_STATUS_CHARGING;
@@ -334,9 +443,11 @@ static int tps80031_battery_probe(struct platform_device *pdev)
 	di->bat.num_properties	= ARRAY_SIZE(tps80031_bat_props);
 	di->bat.get_property	= tps80031_bat_get_property;
 
-	retval = power_supply_register(dev->parent, &di->bat);
-	if (retval)
+	ret = power_supply_register(dev->parent, &di->bat);
+	if (ret) {
 		dev_err(dev->parent, "failed to register bat power supply\n");
+		return ret;
+	}
 
 	di->usb.name		= "tps80031-usb";
 	di->usb.type		= POWER_SUPPLY_TYPE_USB;
@@ -344,31 +455,55 @@ static int tps80031_battery_probe(struct platform_device *pdev)
 	di->usb.num_properties	= ARRAY_SIZE(tps80031_usb_props);
 	di->usb.get_property	= tps80031_usb_get_property;
 
-	retval = power_supply_register(dev->parent, &di->usb);
-	if (retval)
+	ret = power_supply_register(dev->parent, &di->usb);
+	if (ret) {
 		dev_err(dev->parent, "failed to register ac power supply\n");
+		goto power_supply_fail2;
+	}
 
 	dev_set_drvdata(&pdev->dev, di);
 
-	err = request_threaded_irq(pdata->irq_base + TPS80031_INT_VBUS_DET,
-				NULL, tps80031_vbus_det,
-					IRQF_ONESHOT, "tps80031_vbus_det", di);
-	if (err < 0)
-		dev_err(dev->parent, "request IRQ %d fail\n", pdata->irq_base);
+	ret = register_charging_state_callback(tps80031_battery_status, di);
+	if (ret < 0)
+		goto power_supply_fail1;
 
-	err = request_threaded_irq(pdata->irq_base + TPS80031_INT_SYS_VLOW,
+	ret = request_threaded_irq(pdata->irq_base + TPS80031_INT_SYS_VLOW,
 				NULL, tps80031_sys_vlow,
 					IRQF_ONESHOT, "tps80031_sys_vlow", di);
-	if (err < 0)
+	if (ret < 0) {
 		dev_err(dev->parent, "request IRQ %d fail\n", pdata->irq_base);
+		goto power_supply_fail1;
+	}
 
+	ret = request_threaded_irq(pdata->irq_base + TPS80031_INT_CC_AUTOCAL,
+				NULL, tps80031_fg_calibrated, IRQF_ONESHOT,
+				"tps80031_fuel_gauge_calibration", di);
+	if (ret < 0) {
+		dev_err(dev->parent, "request IRQ %d fail\n", pdata->irq_base);
+		goto irq_fail2;
+	}
 	setup_timer(&di->battery_poll_timer,
 		battery_poll_timer_func, (unsigned long) di);
 	mod_timer(&di->battery_poll_timer,
 		jiffies + msecs_to_jiffies(BATTERY_POLL_PERIOD));
 
+	ret = tps80031_fg_start_gas_gauge(di);
+	if (ret < 0) {
+		dev_err(dev->parent, "failed to start fuel-gauge\n");
+		goto irq_fail1;
+	}
 	dev_info(dev->parent, "support ver. %s enabled\n", DRIVER_VERSION);
 
+	return ret;
+
+irq_fail1:
+	free_irq(pdata->irq_base + TPS80031_INT_CC_AUTOCAL, di);
+irq_fail2:
+	free_irq(pdata->irq_base + TPS80031_INT_SYS_VLOW, di);
+power_supply_fail1:
+	power_supply_unregister(&di->usb);
+power_supply_fail2:
+	power_supply_unregister(&di->bat);
 	return ret;
 }
 
@@ -378,7 +513,6 @@ static int tps80031_battery_remove(struct platform_device *pdev)
 
 	power_supply_unregister(&di->bat);
 	power_supply_unregister(&di->usb);
-	kfree(di);
 
 	return 0;
 }
