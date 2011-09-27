@@ -33,6 +33,7 @@
 
 #include <linux/i2c.h>
 #include <linux/delay.h>
+#include <linux/i2c/pca954x.h>
 #include <linux/err.h>
 #include <linux/mpu.h>
 #include <linux/nct1008.h>
@@ -45,6 +46,7 @@
 #include "cpu-tegra.h"
 #include "gpio-names.h"
 #include "board-enterprise.h"
+#include "board.h"
 
 static struct nct1008_platform_data enterprise_nct1008_pdata = {
 	.supported_hwrev = true,
@@ -280,6 +282,7 @@ static int enterprise_ar0832_ri_power_on(int is_stereo)
 {
 	int ret = 0;
 
+	pr_info("%s: ++\n", __func__);
 	ret = enterprise_cam_pwr(CAM_REAR_RIGHT, true);
 
 	/* Release Reset */
@@ -394,26 +397,25 @@ static int enterprise_tps61050_pm(int pwr)
 	pr_info("%s: ++%d\n", __func__, pwr);
 	switch (pwr) {
 	case TPS61050_PWR_OFF:
-		if (enterprise_flash_reg) {
+		if (enterprise_flash_reg)
 			regulator_disable(enterprise_flash_reg);
-			regulator_put(enterprise_flash_reg);
-			enterprise_flash_reg = NULL;
-		}
 		break;
 	case TPS61050_PWR_STDBY:
 	case TPS61050_PWR_COMM:
 	case TPS61050_PWR_ON:
-		enterprise_flash_reg = regulator_get(NULL, "vdd_1v8_cam");
-		if (IS_ERR_OR_NULL(enterprise_flash_reg)) {
-			pr_err("%s: failed to get flash pwr\n", __func__);
-			return PTR_ERR(enterprise_flash_reg);
+		if (!enterprise_flash_reg) {
+			enterprise_flash_reg = regulator_get(NULL, "vdd_1v8_cam");
+			if (IS_ERR_OR_NULL(enterprise_flash_reg)) {
+				pr_err("%s: failed to get flash pwr\n", __func__);
+				return PTR_ERR(enterprise_flash_reg);
+			}
 		}
 		ret = regulator_enable(enterprise_flash_reg);
 		if (ret) {
 			pr_err("%s: failed to enable flash pwr\n", __func__);
 			goto fail_regulator_flash_reg;
 		}
-		enterprise_msleep(10);
+		enterprise_msleep(1);
 		break;
 	default:
 		ret = -1;
@@ -447,6 +449,19 @@ static struct enterprise_cam_gpio enterprise_cam_gpio_data[] = {
 	[3] = TEGRA_CAMERA_GPIO(CAM3_RST_L_GPIO, "cam3_rst_lo", 0),
 	[4] = TEGRA_CAMERA_GPIO(CAM3_PWDN_GPIO, "cam3_pwdn", 1),
 	[5] = TEGRA_CAMERA_GPIO(CAM_FLASH_EN_GPIO, "flash_en", 1),
+	[6] = TEGRA_CAMERA_GPIO(CAM_I2C_MUX_RST_EXP, "cam_i2c_mux_rst", 1),
+};
+
+static struct pca954x_platform_mode enterprise_pca954x_modes[] = {
+	{ .adap_id = PCA954x_I2C_BUS0, .deselect_on_exit = true, },
+	{ .adap_id = PCA954x_I2C_BUS1, .deselect_on_exit = true, },
+	{ .adap_id = PCA954x_I2C_BUS2, .deselect_on_exit = true, },
+	{ .adap_id = PCA954x_I2C_BUS3, .deselect_on_exit = true, },
+};
+
+static struct pca954x_platform_data enterprise_pca954x_data = {
+	.modes    = enterprise_pca954x_modes,
+	.num_modes      = ARRAY_SIZE(enterprise_pca954x_modes),
 };
 
 static struct ar0832_platform_data enterprise_ar0832_ri_data = {
@@ -474,6 +489,21 @@ static struct tps61050_platform_data enterprise_tps61050_data = {
 	.gpio_sync	= NULL,
 };
 
+static const struct i2c_board_info enterprise_i2c2_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("pca9546", 0x70),
+		.platform_data = &enterprise_pca954x_data,
+	},
+	{
+		I2C_BOARD_INFO("tps61050", 0x33),
+		.platform_data = &enterprise_tps61050_data,
+	},
+	{
+		I2C_BOARD_INFO("ov9726", OV9726_I2C_ADDR >> 1),
+		.platform_data = &enterprise_ov9726_data,
+	},
+};
+
 /*
  * Since ar0832 driver should support multiple devices, slave
  * address should be changed after it is open. Default slave
@@ -482,12 +512,12 @@ static struct tps61050_platform_data enterprise_tps61050_data = {
  */
 static struct i2c_board_info ar0832_i2c2_boardinfo[] = {
 	{
-		/* 0x30: alternative slave address */
+		/* 0x36: alternative slave address */
 		I2C_BOARD_INFO("ar0832", 0x36),
 		.platform_data = &enterprise_ar0832_ri_data,
 	},
 	{
-		/* 0x31: alternative slave address */
+		/* 0x32: alternative slave address */
 		I2C_BOARD_INFO("ar0832", 0x32),
 		.platform_data = &enterprise_ar0832_le_data,
 	},
@@ -501,13 +531,27 @@ static struct i2c_board_info ar0832_i2c2_boardinfo[] = {
 	},
 };
 
+static struct i2c_board_info enterprise_i2c6_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("ar0832", 0x36),
+		.platform_data = &enterprise_ar0832_le_data,
+	},
+};
+
+static struct i2c_board_info enterprise_i2c7_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("ar0832", 0x36),
+		.platform_data = &enterprise_ar0832_ri_data,
+	},
+};
+
 static int enterprise_cam_init(void)
 {
 	int ret;
 	int i;
+	struct board_info bi;
 
 	pr_info("%s:++\n", __func__);
-
 	memset(ent_vicsi_pwr, 0, sizeof(ent_vicsi_pwr));
 	for (i = 0; i < ARRAY_SIZE(enterprise_cam_gpio_data); i++) {
 		ret = gpio_request(enterprise_cam_gpio_data[i].gpio,
@@ -523,8 +567,23 @@ static int enterprise_cam_init(void)
 		tegra_gpio_enable(enterprise_cam_gpio_data[i].gpio);
 	}
 
-	i2c_register_board_info(2, ar0832_i2c2_boardinfo,
-		ARRAY_SIZE(ar0832_i2c2_boardinfo));
+	tegra_get_board_info(&bi);
+
+	if (bi.fab == BOARD_FAB_A01)
+		i2c_register_board_info(2, ar0832_i2c2_boardinfo,
+			ARRAY_SIZE(ar0832_i2c2_boardinfo));
+	else if (bi.fab == BOARD_FAB_A02) {
+		i2c_register_board_info(2, enterprise_i2c2_boardinfo,
+			ARRAY_SIZE(enterprise_i2c2_boardinfo));
+		/*
+		 * Right  camera is on PCA954x's I2C BUS1,
+		 * Left camera is on BUS0
+		 */
+		i2c_register_board_info(PCA954x_I2C_BUS0, enterprise_i2c6_boardinfo,
+			ARRAY_SIZE(enterprise_i2c6_boardinfo));
+		i2c_register_board_info(PCA954x_I2C_BUS1, enterprise_i2c7_boardinfo,
+			ARRAY_SIZE(enterprise_i2c7_boardinfo));
+	}
 
 	return 0;
 
@@ -538,6 +597,7 @@ fail_free_gpio:
 int __init enterprise_sensors_init(void)
 {
 	int ret;
+
 	enterprise_isl_init();
 	enterprise_nct1008_init();
 	enterprise_mpuirq_init();

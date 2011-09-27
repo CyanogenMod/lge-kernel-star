@@ -25,6 +25,14 @@
 #include <mach/irqs.h>
 #include <linux/mfd/tps80031.h>
 
+/* Processor Board  ID */
+#define BOARD_E1205		0x0C05
+
+/* Board Fab version */
+#define BOARD_FAB_A00		0x0
+#define BOARD_FAB_A01		0x1
+#define BOARD_FAB_A02		0x2
+
 int enterprise_charge_init(void);
 int enterprise_sdhci_init(void);
 int enterprise_pinmux_init(void);
@@ -38,6 +46,13 @@ int enterprise_modem_init(void);
 int enterprise_suspend_init(void);
 int enterprise_edp_init(void);
 void __init enterprise_tsensor_init(void);
+
+/* PCA954x I2C bus expander bus addresses */
+#define PCA954x_I2C_BUS_BASE	6
+#define PCA954x_I2C_BUS0	(PCA954x_I2C_BUS_BASE + 0)
+#define PCA954x_I2C_BUS1	(PCA954x_I2C_BUS_BASE + 1)
+#define PCA954x_I2C_BUS2	(PCA954x_I2C_BUS_BASE + 2)
+#define PCA954x_I2C_BUS3	(PCA954x_I2C_BUS_BASE + 3)
 
 /*****************External GPIO tables ******************/
 /* External peripheral gpio base. */
@@ -58,9 +73,7 @@ void __init enterprise_tsensor_init(void);
 #define CAM_CSI_MUX_SEL_FRONT	0
 
 #define CAM1_RST_L_GPIO		TEGRA_GPIO_PM5 /*REAR RIGHT*/
-#define CAM1_PWDN_GPIO		TEGRA_GPIO_PF3 /*REAR RIGHT*/
 #define CAM2_RST_L_GPIO		TEGRA_GPIO_PF4 /*REAR LEFT*/
-#define CAM2_PWDN_GPIO		TEGRA_GPIO_PF2 /*REAR LEFT*/
 #define CAM3_RST_L_GPIO		TEGRA_GPIO_PM2 /*FRONT*/
 #define CAM3_RST_L_TRUE		0
 #define CAM3_RST_L_FALSE	1
@@ -70,6 +83,7 @@ void __init enterprise_tsensor_init(void);
 #define CAM_FLASH_EN_GPIO	TEGRA_GPIO_PBB3
 #define CAM_FLASH_MAX_TORCH_AMP	7
 #define CAM_FLASH_MAX_FLASH_AMP	7
+#define CAM_I2C_MUX_RST_EXP	TEGRA_GPIO_PF3 /*I2C Mux Reset*/
 
 /* Audio-related GPIOs */
 #define TEGRA_GPIO_HP_DET	TEGRA_GPIO_PW3
