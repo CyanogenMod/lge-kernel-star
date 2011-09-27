@@ -163,8 +163,6 @@
 #define TPS6591X_IRQ_BASE	TEGRA_NR_IRQS
 #define TPS6591X_IRQ_END	(TPS6591X_IRQ_BASE + 18)
 
-#define AC_PRESENT_INT		(TPS6591X_INT_GPIO4 + TPS6591X_IRQ_BASE)
-
 int cardhu_charge_init(void);
 int cardhu_regulator_init(void);
 int cardhu_suspend_init(void);

@@ -558,15 +558,9 @@ static struct nct1008_platform_data cardhu_nct1008_pdata = {
 	.alarm_fn = tegra_throttling_enable,
 };
 
-static struct bq27x00_platform_data cardhu_bq27510_pdata = {
-	.ac_persent_gpio = AC_PRESENT_GPIO,
-};
-
 static struct i2c_board_info cardhu_i2c4_bq27510_board_info[] = {
 	{
 		I2C_BOARD_INFO("bq27510", 0x55),
-		.irq = AC_PRESENT_INT,
-		.platform_data = &cardhu_bq27510_pdata,
 	},
 };
 
