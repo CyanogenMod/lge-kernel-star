@@ -583,8 +583,8 @@ tegra3_enter_sleep:
 	ldr	r0, [r6, r2] /* memory barrier */
 
 halted:
-	dsb
 	isb
+	dsb
 	wfi	/* CPU should be power gated here */
 
 	/* !!!FIXME!!! Implement halt failure handler */
@@ -594,7 +594,7 @@ halted:
  * tegra3_sdram_self_refresh
  *
  * called with MMU off and caches disabled
- * puts sdram in self refresh
+ /* puts sdram in self refresh
  * must execute from IRAM
  * r4 = TEGRA_PMC_BASE
  * r5 = TEGRA_CLK_RESET_BASE
