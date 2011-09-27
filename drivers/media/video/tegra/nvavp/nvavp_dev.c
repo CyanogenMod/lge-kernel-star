@@ -72,6 +72,10 @@ struct nvavp_info {
 	struct clk			*vde_clk;
 	struct clk			*cop_clk;
 
+	/* used for dvfs */
+	struct clk			*sclk;
+	struct clk			*emc_clk;
+
 	int				mbox_from_avp_pend_irq;
 
 	struct mutex			open_lock;
@@ -111,6 +115,21 @@ struct nvavp_clientctx {
 	int num_relocs;
 	struct nvavp_info *nvavp;
 };
+
+static struct clk *nvavp_clk_get(struct nvavp_info *nvavp, int id)
+{
+	if (!nvavp)
+		return NULL;
+
+	if (id == NVAVP_MODULE_ID_AVP)
+		return nvavp->sclk;
+	if (id == NVAVP_MODULE_ID_VDE)
+		return nvavp->vde_clk;
+	if (id == NVAVP_MODULE_ID_EMC)
+		return nvavp->emc_clk;
+
+	return NULL;
+}
 
 static int nvavp_service(struct nvavp_info *nvavp)
 {
@@ -170,6 +189,9 @@ static void nvavp_halt_avp(struct nvavp_info *nvavp)
 	writel(FLOW_MODE_STOP, FLOW_CTRL_HALT_COP_EVENTS);
 	tegra_periph_reset_assert(nvavp->cop_clk);
 
+	clk_disable(nvavp->sclk);
+	clk_disable(nvavp->emc_clk);
+
 	writel(0, NVAVP_OS_OUTBOX);
 	writel(0, NVAVP_OS_INBOX);
 }
@@ -192,6 +214,9 @@ static int nvavp_reset_avp(struct nvavp_info *nvavp, unsigned long reset_addr)
 	writel(FLOW_MODE_STOP, FLOW_CTRL_HALT_COP_EVENTS);
 
 	writel(reset_addr, TEGRA_NVAVP_RESET_VECTOR_ADDR);
+
+	clk_enable(nvavp->sclk);
+	clk_enable(nvavp->emc_clk);
 
 	tegra_periph_reset_assert(nvavp->cop_clk);
 	udelay(2);
@@ -671,6 +696,54 @@ static void nvavp_uninit(struct nvavp_info *nvavp)
 	nvavp_halt_avp(nvavp);
 }
 
+static int nvavp_set_clock_ioctl(struct file *filp, unsigned int cmd,
+							unsigned long arg)
+{
+	struct nvavp_clientctx *clientctx = filp->private_data;
+	struct nvavp_info *nvavp = clientctx->nvavp;
+	struct clk *c;
+	struct nvavp_clock_args config;
+
+	if (copy_from_user(&config, (void __user *)arg, sizeof(struct nvavp_clock_args)))
+		return -EFAULT;
+
+	c = nvavp_clk_get(nvavp, config.id);
+	if (IS_ERR_OR_NULL(c))
+		return -EINVAL;
+
+	clk_set_rate(c, config.rate);
+
+	config.rate = clk_get_rate(c);
+
+	if (copy_to_user((void __user *)arg, &config, sizeof(struct nvavp_clock_args)))
+		return -EFAULT;
+
+	return 0;
+}
+
+static int nvavp_get_clock_ioctl(struct file *filp, unsigned int cmd,
+							unsigned long arg)
+{
+	struct nvavp_clientctx *clientctx = filp->private_data;
+	struct nvavp_info *nvavp = clientctx->nvavp;
+	struct clk *c;
+	struct nvavp_clock_args config;
+
+	if (copy_from_user(&config, (void __user *)arg, sizeof(struct nvavp_clock_args)))
+		return -EFAULT;
+
+	c = nvavp_clk_get(nvavp, config.id);
+	if (IS_ERR_OR_NULL(c))
+		return -EINVAL;
+
+	config.rate = clk_get_rate(c);
+
+	if (copy_to_user((void __user *)arg, &config, sizeof(struct nvavp_clock_args)))
+		return -EFAULT;
+
+	return 0;
+}
+
 static int nvavp_get_syncpointid_ioctl(struct file *filp, unsigned int cmd,
 							unsigned long arg)
 {
@@ -902,6 +975,12 @@ static long tegra_nvavp_ioctl(struct file *filp, unsigned int cmd,
 	case NVAVP_IOCTL_PUSH_BUFFER_SUBMIT:
 		ret = nvavp_pushbuffer_submit_ioctl(filp, cmd, arg);
 		break;
+	case NVAVP_IOCTL_SET_CLOCK:
+		ret = nvavp_set_clock_ioctl(filp, cmd, arg);
+		break;
+	case NVAVP_IOCTL_GET_CLOCK:
+		ret = nvavp_get_clock_ioctl(filp, cmd, arg);
+		break;
 	default:
 		ret = -EINVAL;
 		break;
@@ -1062,6 +1141,20 @@ static int tegra_nvavp_probe(struct nvhost_device *ndev)
 		goto err_get_bsev_clk;
 	}
 
+	nvavp->sclk = clk_get(&ndev->dev, "sclk");
+	if (IS_ERR(nvavp->sclk)) {
+		dev_err(&ndev->dev, "cannot get avp.sclk clock\n");
+		ret = -ENOENT;
+		goto err_get_sclk;
+	}
+
+	nvavp->emc_clk = clk_get(&ndev->dev, "emc");
+	if (IS_ERR(nvavp->emc_clk)) {
+		dev_err(&ndev->dev, "cannot get emc clock\n");
+		ret = -ENOENT;
+		goto err_get_emc_clk;
+	}
+
 	nvavp_halt_avp(nvavp);
 
 	nvavp->misc_dev.minor = MISC_DYNAMIC_MINOR;
@@ -1092,6 +1185,10 @@ static int tegra_nvavp_probe(struct nvhost_device *ndev)
 err_req_irq_pend:
 	misc_deregister(&nvavp->misc_dev);
 err_misc_reg:
+	clk_put(nvavp->emc_clk);
+err_get_emc_clk:
+	clk_put(nvavp->sclk);
+err_get_sclk:
 	clk_put(nvavp->bsev_clk);
 err_get_bsev_clk:
 	clk_put(nvavp->vde_clk);

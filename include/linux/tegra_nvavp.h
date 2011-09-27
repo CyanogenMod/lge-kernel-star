@@ -20,6 +20,15 @@
 #define NVAVP_FLAG_NONE		0x00000000
 #define NVAVP_UCODE_EXT		0x00000001 /*use external ucode provided */
 
+enum {
+	NVAVP_MODULE_ID_AVP	= 2,
+	NVAVP_MODULE_ID_VCP	= 3,
+	NVAVP_MODULE_ID_BSEA	= 27,
+	NVAVP_MODULE_ID_VDE	= 28,
+	NVAVP_MODULE_ID_MPE	= 29,
+	NVAVP_MODULE_ID_EMC	= 75,
+};
+
 struct nvavp_cmdbuf {
 	__u32 mem;
 	__u32 offset;
@@ -50,6 +59,11 @@ struct nvavp_set_nvmap_fd_args {
 	__u32 fd;
 };
 
+struct nvavp_clock_args {
+	__u32 id;
+	__u32 rate;
+};
+
 #define NVAVP_IOCTL_MAGIC		'n'
 
 #define NVAVP_IOCTL_SET_NVMAP_FD	_IOW(NVAVP_IOCTL_MAGIC, 0x60, \
@@ -58,9 +72,13 @@ struct nvavp_set_nvmap_fd_args {
 					__u32)
 #define NVAVP_IOCTL_PUSH_BUFFER_SUBMIT	_IOWR(NVAVP_IOCTL_MAGIC, 0x63, \
 					struct nvavp_pushbuffer_submit_hdr)
+#define NVAVP_IOCTL_SET_CLOCK		_IOWR(NVAVP_IOCTL_MAGIC, 0x64, \
+					struct nvavp_clock_args)
+#define NVAVP_IOCTL_GET_CLOCK		_IOR(NVAVP_IOCTL_MAGIC, 0x65, \
+					struct nvavp_clock_args)
 
 
 #define NVAVP_IOCTL_MIN_NR		_IOC_NR(NVAVP_IOCTL_SET_NVMAP_FD)
-#define NVAVP_IOCTL_MAX_NR		_IOC_NR(NVAVP_IOCTL_PUSH_BUFFER_SUBMIT)
+#define NVAVP_IOCTL_MAX_NR		_IOC_NR(NVAVP_IOCTL_GET_CLOCK)
 
 #endif /* __LINUX_TEGRA_NVAVP_H */
