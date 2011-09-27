@@ -337,7 +337,8 @@ static int max77663_regulator_do_set_voltage(struct max77663_regulator *reg,
 }
 
 static int max77663_regulator_set_voltage(struct regulator_dev *rdev,
-					  int min_uV, int max_uV)
+					  int min_uV, int max_uV,
+					  unsigned *selector)
 {
 	struct max77663_regulator *reg = rdev_get_drvdata(rdev);
 
