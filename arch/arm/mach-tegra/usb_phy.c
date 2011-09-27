@@ -1525,6 +1525,11 @@ static void utmi_phy_restore_start(struct tegra_usb_phy *phy,
 	/* check whether we wake up from the remote resume */
 	if (UTMIP_WALK_PTR_VAL(inst) & val) {
 		phy->remote_wakeup = true;
+	} else {
+		if (!((UTMIP_USBON_VAL(phy->instance) |
+			UTMIP_USBOP_VAL(phy->instance)) & val)) {
+				utmip_phy_disable_pmc_bus_ctrl(phy);
+		}
 	}
 
 	/* (2LS WAR)is not required for LS devices and is only for HS */
