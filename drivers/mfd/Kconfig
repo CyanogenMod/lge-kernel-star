@@ -720,6 +720,13 @@ config MFD_TPS80031
 	  additional drivers must be enabled in order to use the
 	  functionality of the device.
 
+config GPADC_TPS80031
+	bool "Support for TI TPS80031 Gpadc driver"
+	depends on  MFD_TPS80031
+	help
+	  If you say yes here you get support for the TPS80031 gpadc
+	  Module.
+
 config MFD_RICOH583
 	bool "Ricoh RC5T583 Power Management system device"
 	depends on I2C && GPIOLIB && GENERIC_HARDIRQS

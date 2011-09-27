@@ -142,4 +142,6 @@ extern int tps80031_power_off(void);
 
 extern unsigned long tps80031_get_chip_info(struct device *dev);
 
+extern int tps80031_gpadc_conversion(int channle_no);
+
 #endif /*__LINUX_MFD_TPS80031_H */
