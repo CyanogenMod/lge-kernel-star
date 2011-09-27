@@ -294,39 +294,6 @@ static int max77663_rtc_alarm_irq_enable(struct device *dev,
 	return 0;
 }
 
-static int max77663_rtc_update_irq_enable(struct device *dev,
-					  unsigned int enabled)
-{
-	struct max77663_rtc *rtc = dev_get_drvdata(dev);
-	struct device *parent = _to_parent(rtc);
-	u8 val = 0;
-	int ret = 0;
-
-	if (rtc->irq < 0)
-		return -ENXIO;
-
-	mutex_lock(&rtc->io_lock);
-	if (enabled)
-		val = rtc->irq_mask & ~RTC_IRQ_1SEC_MASK;
-	else
-		val = rtc->irq_mask | RTC_IRQ_1SEC_MASK;
-
-	if (val != rtc->irq_mask) {
-		ret = max77663_write(parent, MAX77663_RTC_IRQ_MASK, &val, 1, 1);
-		if (ret < 0) {
-			dev_err(rtc->dev, "rtc_update_irq_enable: "
-				"Failed to set rtc irq mask\n");
-			mutex_unlock(&rtc->io_lock);
-			return ret;
-		}
-
-		rtc->irq_mask = val;
-	}
-	mutex_unlock(&rtc->io_lock);
-
-	return 0;
-}
-
 static int max77663_rtc_read_time(struct device *dev, struct rtc_time *tm)
 {
 	struct max77663_rtc *rtc = dev_get_drvdata(dev);
@@ -424,7 +391,6 @@ static const struct rtc_class_ops max77663_rtc_ops = {
 	.read_alarm = max77663_rtc_read_alarm,
 	.set_alarm = max77663_rtc_set_alarm,
 	.alarm_irq_enable = max77663_rtc_alarm_irq_enable,
-	.update_irq_enable = max77663_rtc_update_irq_enable,
 };
 
 static int max77663_rtc_preinit(struct max77663_rtc *rtc)
