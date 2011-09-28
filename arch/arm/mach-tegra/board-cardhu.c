@@ -207,6 +207,7 @@ static __initdata struct tegra_clk_init_table cardhu_clk_init_table[] = {
 	{ "pwm",	"pll_p",	3187500,	false},
 	{ "blink",	"clk_32k",	32768,		true},
 	{ "i2s1",	"pll_a_out0",	0,		false},
+	{ "spdif_out",	"pll_a_out0",	0,		false},
 	{ "sdmmc3",	"clk_m",	12000000,	true},
 	{ "vi_sensor",	"pll_p",	150000000,	false},
 	{ NULL,		NULL,		0,		0},
@@ -625,6 +626,8 @@ static struct platform_device *cardhu_devices[] __initdata = {
 #endif
 	&tegra_ahub_device,
 	&tegra_i2s_device1,
+	&tegra_spdif_device,
+	&spdif_dit_device,
 	&tegra_pcm_device,
 	&cardhu_audio_device,
 #if defined(CONFIG_CRYPTO_DEV_TEGRA_AES)

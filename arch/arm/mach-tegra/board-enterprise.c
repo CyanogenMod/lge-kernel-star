@@ -207,6 +207,7 @@ static __initdata struct tegra_clk_init_table enterprise_clk_init_table[] = {
 	{ "pll_a",	NULL,		564480000,	false},
 	{ "pll_a_out0",	NULL,		11289600,	false},
 	{ "i2s0",	"pll_a_out0",	0,		false},
+	{ "spdif_out",	"pll_a_out0",	0,		false},
 	{ NULL,		NULL,		0,		0},
 };
 
@@ -626,6 +627,8 @@ static struct platform_device *enterprise_devices[] __initdata = {
 	&tegra_camera,
 	&tegra_ahub_device,
 	&tegra_i2s_device0,
+	&tegra_spdif_device,
+	&spdif_dit_device,
 	&tegra_pcm_device,
 	&enterprise_audio_device,
 	&tegra_spi_device4,
