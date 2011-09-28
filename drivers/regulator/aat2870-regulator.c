@@ -57,7 +57,7 @@ static int aat2870_ldo_list_voltage(struct regulator_dev *rdev,
 }
 
 static int aat2870_ldo_set_voltage(struct regulator_dev *rdev,
-				   int min_uV, int max_uV)
+				   int min_uV, int max_uV, unsigned *selector)
 {
 	struct aat2870_regulator *ri = rdev_get_drvdata(rdev);
 	struct aat2870_data *aat2870 = dev_get_drvdata(ri->pdev->dev.parent);
