@@ -57,22 +57,6 @@ static inline u32 tegra20_i2s_read(struct tegra20_i2s *i2s, u32 reg)
 	return __raw_readl(i2s->regs + reg);
 }
 
-static void tegra20_i2s_inc_clock_ref(struct tegra20_i2s *i2s)
-{
-	i2s->clk_refs++;
-	if (i2s->clk_refs == 1)
-		clk_enable(i2s->clk_i2s);
-}
-
-static void tegra20_i2s_dec_clock_ref(struct tegra20_i2s *i2s)
-{
-	BUG_ON(!i2s->clk_refs);
-
-	i2s->clk_refs--;
-	if (!i2s->clk_refs)
-		clk_enable(i2s->clk_i2s);
-}
-
 #ifdef CONFIG_DEBUG_FS
 static int tegra20_i2s_show(struct seq_file *s, void *unused)
 {
@@ -95,14 +79,14 @@ static int tegra20_i2s_show(struct seq_file *s, void *unused)
 	struct tegra20_i2s *i2s = s->private;
 	int i;
 
-	tegra20_i2s_inc_clock_ref(i2s);
+	clk_enable(i2s->clk_i2s);
 
 	for (i = 0; i < ARRAY_SIZE(regs); i++) {
 		u32 val = tegra20_i2s_read(i2s, regs[i].offset);
 		seq_printf(s, "%s = %08x\n", regs[i].name, val);
 	}
 
-	tegra20_i2s_dec_clock_ref(i2s);
+	clk_disable(i2s->clk_i2s);
 
 	return 0;
 }
@@ -242,7 +226,7 @@ static int tegra20_i2s_hw_params(struct snd_pcm_substream *substream,
 	if (i2sclock % (2 * srate))
 		reg |= TEGRA20_I2S_TIMING_NON_SYM_ENABLE;
 
-	tegra20_i2s_inc_clock_ref(i2s);
+	clk_enable(i2s->clk_i2s);
 
 	tegra20_i2s_write(i2s, TEGRA20_I2S_TIMING, reg);
 
@@ -250,7 +234,7 @@ static int tegra20_i2s_hw_params(struct snd_pcm_substream *substream,
 		TEGRA20_I2S_FIFO_SCR_FIFO2_ATN_LVL_FOUR_SLOTS |
 		TEGRA20_I2S_FIFO_SCR_FIFO1_ATN_LVL_FOUR_SLOTS);
 
-	tegra20_i2s_dec_clock_ref(i2s);
+	clk_disable(i2s->clk_i2s);
 
 	return 0;
 }
@@ -288,7 +272,7 @@ static int tegra20_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 	case SNDRV_PCM_TRIGGER_RESUME:
-		tegra20_i2s_inc_clock_ref(i2s);
+		clk_enable(i2s->clk_i2s);
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 			tegra20_i2s_start_playback(i2s);
 		else
@@ -301,7 +285,7 @@ static int tegra20_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
 			tegra20_i2s_stop_playback(i2s);
 		else
 			tegra20_i2s_stop_capture(i2s);
-		tegra20_i2s_dec_clock_ref(i2s);
+		clk_disable(i2s->clk_i2s);
 		break;
 	default:
 		return -EINVAL;

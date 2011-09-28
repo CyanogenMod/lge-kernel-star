@@ -154,7 +154,6 @@
 
 struct tegra20_i2s {
 	struct clk *clk_i2s;
-	int clk_refs;
 	struct tegra_pcm_dma_params capture_dma_data;
 	struct tegra_pcm_dma_params playback_dma_data;
 	void __iomem *regs;

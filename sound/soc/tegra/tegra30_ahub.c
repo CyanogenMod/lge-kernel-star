@@ -68,24 +68,16 @@ static inline u32 tegra30_audio_read(u32 reg)
  * stopping streams should dynamically adjust the clock as required.  However,
  * this is not yet implemented.
  */
-static void tegra30_ahub_inc_clock_ref(void)
+void tegra30_ahub_enable_clocks(void)
 {
-	ahub->clk_refs++;
-	if (ahub->clk_refs == 1) {
-		clk_enable(ahub->clk_d_audio);
-		clk_enable(ahub->clk_apbif);
-	}
+	clk_enable(ahub->clk_d_audio);
+	clk_enable(ahub->clk_apbif);
 }
 
-static void tegra30_ahub_dec_clock_ref(void)
+void tegra30_ahub_disable_clocks(void)
 {
-	BUG_ON(!ahub->clk_refs);
-
-	ahub->clk_refs--;
-	if (!ahub->clk_refs) {
-		clk_enable(ahub->clk_apbif);
-		clk_enable(ahub->clk_d_audio);
-	}
+	clk_disable(ahub->clk_apbif);
+	clk_disable(ahub->clk_d_audio);
 }
 
 #ifdef CONFIG_DEBUG_FS
@@ -142,7 +134,7 @@ static int tegra30_ahub_show(struct seq_file *s, void *unused)
 
 	int i, j;
 
-	tegra30_ahub_inc_clock_ref();
+	tegra30_ahub_enable_clocks();
 
 	for (i = 0; i < ARRAY_SIZE(regs); i++) {
 		if (regs[i].count > 1) {
@@ -159,7 +151,7 @@ static int tegra30_ahub_show(struct seq_file *s, void *unused)
 		}
 	}
 
-	tegra30_ahub_dec_clock_ref();
+	tegra30_ahub_disable_clocks();
 
 	return 0;
 }
@@ -217,7 +209,7 @@ int tegra30_ahub_allocate_rx_fifo(enum tegra30_ahub_rxcif *rxcif,
 		   (channel * TEGRA30_AHUB_CHANNEL_RXFIFO_STRIDE);
 	*reqsel = TEGRA_DMA_REQ_SEL_APBIF_CH0 + channel;
 
-	tegra30_ahub_inc_clock_ref();
+	tegra30_ahub_enable_clocks();
 
 	reg = TEGRA30_AHUB_CHANNEL_CTRL +
 	      (channel * TEGRA30_AHUB_CHANNEL_CTRL_STRIDE);
@@ -239,7 +231,7 @@ int tegra30_ahub_allocate_rx_fifo(enum tegra30_ahub_rxcif *rxcif,
 	      TEGRA30_AUDIOCIF_CTRL_DIRECTION_RX;
 	tegra30_apbif_write(reg, val);
 
-	tegra30_ahub_dec_clock_ref();
+	tegra30_ahub_disable_clocks();
 
 	return 0;
 }
@@ -249,7 +241,7 @@ int tegra30_ahub_enable_rx_fifo(enum tegra30_ahub_rxcif rxcif)
 	int channel = rxcif - TEGRA30_AHUB_RXCIF_APBIF_RX0;
 	int reg, val;
 
-	tegra30_ahub_inc_clock_ref();
+	tegra30_ahub_enable_clocks();
 
 	reg = TEGRA30_AHUB_CHANNEL_CTRL +
 	      (channel * TEGRA30_AHUB_CHANNEL_CTRL_STRIDE);
@@ -271,7 +263,7 @@ int tegra30_ahub_disable_rx_fifo(enum tegra30_ahub_rxcif rxcif)
 	val &= ~TEGRA30_AHUB_CHANNEL_CTRL_RX_EN;
 	tegra30_apbif_write(reg, val);
 
-	tegra30_ahub_dec_clock_ref();
+	tegra30_ahub_disable_clocks();
 
 	return 0;
 }
@@ -304,7 +296,7 @@ int tegra30_ahub_allocate_tx_fifo(enum tegra30_ahub_txcif *txcif,
 		   (channel * TEGRA30_AHUB_CHANNEL_TXFIFO_STRIDE);
 	*reqsel = TEGRA_DMA_REQ_SEL_APBIF_CH0 + channel;
 
-	tegra30_ahub_inc_clock_ref();
+	tegra30_ahub_enable_clocks();
 
 	reg = TEGRA30_AHUB_CHANNEL_CTRL +
 	      (channel * TEGRA30_AHUB_CHANNEL_CTRL_STRIDE);
@@ -326,7 +318,7 @@ int tegra30_ahub_allocate_tx_fifo(enum tegra30_ahub_txcif *txcif,
 	      TEGRA30_AUDIOCIF_CTRL_DIRECTION_TX;
 	tegra30_apbif_write(reg, val);
 
-	tegra30_ahub_dec_clock_ref();
+	tegra30_ahub_disable_clocks();
 
 	return 0;
 }
@@ -336,7 +328,7 @@ int tegra30_ahub_enable_tx_fifo(enum tegra30_ahub_txcif txcif)
 	int channel = txcif - TEGRA30_AHUB_TXCIF_APBIF_TX0;
 	int reg, val;
 
-	tegra30_ahub_inc_clock_ref();
+	tegra30_ahub_enable_clocks();
 
 	reg = TEGRA30_AHUB_CHANNEL_CTRL +
 	      (channel * TEGRA30_AHUB_CHANNEL_CTRL_STRIDE);
@@ -358,7 +350,7 @@ int tegra30_ahub_disable_tx_fifo(enum tegra30_ahub_txcif txcif)
 	val &= ~TEGRA30_AHUB_CHANNEL_CTRL_TX_EN;
 	tegra30_apbif_write(reg, val);
 
-	tegra30_ahub_dec_clock_ref();
+	tegra30_ahub_disable_clocks();
 
 	return 0;
 }
@@ -378,13 +370,13 @@ int tegra30_ahub_set_rx_cif_source(enum tegra30_ahub_rxcif rxcif,
 	int channel = rxcif - TEGRA30_AHUB_RXCIF_APBIF_RX0;
 	int reg;
 
-	tegra30_ahub_inc_clock_ref();
+	tegra30_ahub_enable_clocks();
 
 	reg = TEGRA30_AHUB_AUDIO_RX +
 	      (channel * TEGRA30_AHUB_AUDIO_RX_STRIDE);
 	tegra30_audio_write(reg, 1 << txcif);
 
-	tegra30_ahub_dec_clock_ref();
+	tegra30_ahub_disable_clocks();
 
 	return 0;
 }
@@ -394,13 +386,13 @@ int tegra30_ahub_unset_rx_cif_source(enum tegra30_ahub_rxcif rxcif)
 	int channel = rxcif - TEGRA30_AHUB_RXCIF_APBIF_RX0;
 	int reg;
 
-	tegra30_ahub_inc_clock_ref();
+	tegra30_ahub_enable_clocks();
 
 	reg = TEGRA30_AHUB_AUDIO_RX +
 	      (channel * TEGRA30_AHUB_AUDIO_RX_STRIDE);
 	tegra30_audio_write(reg, 0);
 
-	tegra30_ahub_dec_clock_ref();
+	tegra30_ahub_disable_clocks();
 
 	return 0;
 }

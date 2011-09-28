@@ -454,6 +454,9 @@ enum tegra30_ahub_rxcif {
 	TEGRA30_AHUB_RXCIF_SPDIF_RX1,
 };
 
+extern void tegra30_ahub_enable_clocks(void);
+extern void tegra30_ahub_disable_clocks(void);
+
 extern int tegra30_ahub_allocate_rx_fifo(enum tegra30_ahub_rxcif *rxcif,
 					 unsigned long *fiforeg,
 					 unsigned long *reqsel);
@@ -476,7 +479,6 @@ struct tegra30_ahub {
 	struct device *dev;
 	struct clk *clk_d_audio;
 	struct clk *clk_apbif;
-	int clk_refs;
 	resource_size_t apbif_addr;
 	void __iomem *apbif_regs;
 	void __iomem *audio_regs;
