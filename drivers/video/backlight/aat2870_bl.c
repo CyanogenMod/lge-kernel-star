@@ -27,6 +27,7 @@
 #include <linux/delay.h>
 #include <linux/fb.h>
 #include <linux/backlight.h>
+#include <linux/mfd/core.h>
 #include <linux/mfd/aat2870.h>
 
 struct aat2870_bl_driver_data {
@@ -127,7 +128,7 @@ static const struct backlight_ops aat2870_bl_ops = {
 
 static int aat2870_bl_probe(struct platform_device *pdev)
 {
-	struct aat2870_bl_platform_data *pdata = pdev->dev.platform_data;
+	struct aat2870_bl_platform_data *pdata = mfd_get_data(pdev);
 	struct aat2870_bl_driver_data *aat2870_bl;
 	struct backlight_device *bd;
 	struct backlight_properties props;

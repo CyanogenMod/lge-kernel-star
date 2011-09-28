@@ -79,27 +79,22 @@ static struct mfd_cell aat2870_devs[] = {
 	{
 		.name = "aat2870-backlight",
 		.id = AAT2870_ID_BL,
-		.data_size = sizeof(struct aat2870_bl_platform_data),
 	},
 	{
 		.name = "aat2870-regulator",
 		.id = AAT2870_ID_LDOA,
-		.data_size = sizeof(struct regulator_init_data),
 	},
 	{
 		.name = "aat2870-regulator",
 		.id = AAT2870_ID_LDOB,
-		.data_size = sizeof(struct regulator_init_data),
 	},
 	{
 		.name = "aat2870-regulator",
 		.id = AAT2870_ID_LDOC,
-		.data_size = sizeof(struct regulator_init_data),
 	},
 	{
 		.name = "aat2870-regulator",
 		.id = AAT2870_ID_LDOD,
-		.data_size = sizeof(struct regulator_init_data),
 	},
 };
 
@@ -423,7 +418,7 @@ static int aat2870_i2c_probe(struct i2c_client *client,
 			if ((pdata->subdevs[i].id == aat2870_devs[j].id) &&
 					!strcmp(pdata->subdevs[i].name,
 						aat2870_devs[j].name)) {
-				aat2870_devs[j].platform_data =
+				aat2870_devs[j].mfd_data =
 					pdata->subdevs[i].platform_data;
 				break;
 			}
