@@ -133,6 +133,7 @@ static int tegra_max98088_hw_params(struct snd_pcm_substream *substream,
 static struct snd_soc_ops tegra_max98088_ops = {
 	.hw_params = tegra_max98088_hw_params,
 };
+static struct snd_soc_ops tegra_spdif_ops;
 
 static struct snd_soc_jack tegra_max98088_hp_jack;
 
@@ -301,21 +302,32 @@ static int tegra_max98088_init(struct snd_soc_pcm_runtime *rtd)
 	return 0;
 }
 
-static struct snd_soc_dai_link tegra_max98088_dai = {
-	.name = "MAX98088",
-	.stream_name = "MAX98088 HIFI",
-	.codec_name = "max98088.0-0010",
-	.platform_name = "tegra-pcm-audio",
-	.cpu_dai_name = "tegra30-i2s.0",
-	.codec_dai_name = "HiFi",
-	.init = tegra_max98088_init,
-	.ops = &tegra_max98088_ops,
+static struct snd_soc_dai_link tegra_max98088_dai[] = {
+	{
+		.name = "MAX98088",
+		.stream_name = "MAX98088 HIFI",
+		.codec_name = "max98088.0-0010",
+		.platform_name = "tegra-pcm-audio",
+		.cpu_dai_name = "tegra30-i2s.0",
+		.codec_dai_name = "HiFi",
+		.init = tegra_max98088_init,
+		.ops = &tegra_max98088_ops,
+	},
+	{
+		.name = "SPDIF",
+		.stream_name = "SPDIF PCM",
+		.codec_name = "spdif-dit",
+		.platform_name = "tegra-pcm-audio",
+		.cpu_dai_name = "tegra30-spdif",
+		.codec_dai_name = "dit-hifi",
+		.ops = &tegra_spdif_ops,
+	}
 };
 
 static struct snd_soc_card snd_soc_tegra_max98088 = {
 	.name = "tegra-max98088",
-	.dai_link = &tegra_max98088_dai,
-	.num_links = 1,
+	.dai_link = tegra_max98088_dai,
+	.num_links = ARRAY_SIZE(tegra_max98088_dai),
 };
 
 static __devinit int tegra_max98088_driver_probe(struct platform_device *pdev)

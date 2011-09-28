@@ -341,7 +341,6 @@ static struct snd_soc_dai_link tegra_wm8753_dai[] = {
 		.init = tegra_wm8753_init,
 		.ops = &tegra_wm8753_ops,
 	},
-#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 	{
 		.name = "SPDIF",
 		.stream_name = "SPDIF PCM",
@@ -351,7 +350,6 @@ static struct snd_soc_dai_link tegra_wm8753_dai[] = {
 		.codec_dai_name = "dit-hifi",
 		.ops = &tegra_spdif_ops,
 	}
-#endif
 };
 
 static struct snd_soc_card snd_soc_tegra_wm8753 = {
