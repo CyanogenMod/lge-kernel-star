@@ -47,6 +47,7 @@
 #include "sleep.h"
 
 int tegra_lp2_exit_latency;
+static int tegra_lp2_power_off_time;
 static unsigned int tegra_lp2_min_residency;
 
 struct cpuidle_driver tegra_idle = {
@@ -121,6 +122,9 @@ static int tegra_idle_enter_lp2(struct cpuidle_device *dev,
 	hrtimer_peek_ahead_timers();
 
 	smp_rmb();
+	state->exit_latency = tegra_lp2_exit_latency;
+	state->target_residency = tegra_lp2_exit_latency +
+		tegra_lp2_power_off_time;
 	if (state->target_residency < tegra_lp2_min_residency)
 		state->target_residency = tegra_lp2_min_residency;
 
@@ -222,8 +226,9 @@ static int __init tegra_cpuidle_init(void)
 		return ret;
 
 #ifdef CONFIG_PM_SLEEP
-	/* !!!FIXME!!! Add tegra_lp2_power_off_time */
 	tegra_lp2_min_residency = tegra_cpu_lp2_min_residency();
+	tegra_lp2_exit_latency = tegra_cpu_power_good_time();
+	tegra_lp2_power_off_time = tegra_cpu_power_off_time();
 #endif
 
 	for_each_possible_cpu(cpu) {
