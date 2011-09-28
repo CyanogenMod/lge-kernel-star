@@ -37,6 +37,7 @@
 #include <linux/slab.h>
 #include <linux/io.h>
 #include <mach/iomap.h>
+#include <mach/hdmi-audio.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -297,6 +298,12 @@ static int tegra30_spdif_hw_params(struct snd_pcm_substream *substream,
 						spdif->reg_ch_sta_b);
 
 	tegra30_spdif_disable_clocks(spdif);
+
+	ret = tegra_hdmi_setup_audio_freq_source(srate, SPDIF);
+	if (ret) {
+		dev_err(dev, "Can't set HDMI audio freq source: %d\n", ret);
+		return ret;
+	}
 
 	return 0;
 }
