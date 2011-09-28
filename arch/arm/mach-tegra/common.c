@@ -406,15 +406,22 @@ early_param("core_edp_mv", tegra_pmu_core_edp);
 static int __init tegra_debug_uartport(char *info)
 {
 	char *p = info;
+	unsigned long long port_id;
 	if (!strncmp(p, "hsport", 6))
 		is_tegra_debug_uart_hsport = true;
 	else if (!strncmp(p, "lsport", 6))
 		is_tegra_debug_uart_hsport = false;
 
-	if (p[6] == ',')
-		debug_uart_port_id = memparse(p + 7, &p);
-	else
+	if (p[6] == ',') {
+		if (p[7] == '-') {
+			debug_uart_port_id = -1;
+		} else {
+			port_id = memparse(p + 7, &p);
+			debug_uart_port_id = (int) port_id;
+		}
+	} else {
 		debug_uart_port_id = -1;
+	}
 
 	return 1;
 }
