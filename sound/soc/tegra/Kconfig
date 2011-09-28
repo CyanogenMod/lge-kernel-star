@@ -36,7 +36,16 @@ config SND_SOC_TEGRA20_SPDIF
 	depends on SND_SOC_TEGRA && ARCH_TEGRA_2x_SOC
 	default m
 	help
-	  Say Y or M if you want to add support for the SPDIF interface.
+	  Say Y or M if you want to add support for the TEGRA20 SPDIF interface.
+	  You will also need to select the individual machine drivers to support
+	  below.
+
+config SND_SOC_TEGRA30_SPDIF
+	tristate
+	depends on SND_SOC_TEGRA && ARCH_TEGRA_3x_SOC
+	select SND_SOC_TEGRA30_AHUB
+	help
+	  Say Y or M if you want to add support for the TEGRA30 SPDIF interface.
 	  You will also need to select the individual machine drivers to support
 	  below.
 
