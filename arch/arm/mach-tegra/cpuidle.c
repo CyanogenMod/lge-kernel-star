@@ -122,12 +122,15 @@ static int tegra_idle_enter_lp2(struct cpuidle_device *dev,
 	hrtimer_peek_ahead_timers();
 
 	smp_rmb();
-	state->exit_latency = tegra_lp2_exit_latency;
-	state->target_residency = tegra_lp2_exit_latency +
-		tegra_lp2_power_off_time;
-	if (state->target_residency < tegra_lp2_min_residency)
-		state->target_residency = tegra_lp2_min_residency;
 
+	/* Update LP2 latency provided no fall back to LP3 */
+	if (state == dev->last_state) {
+		state->exit_latency = tegra_lp2_exit_latency;
+		state->target_residency = tegra_lp2_exit_latency +
+			tegra_lp2_power_off_time;
+		if (state->target_residency < tegra_lp2_min_residency)
+			state->target_residency = tegra_lp2_min_residency;
+	}
 	tegra_cpu_idle_stats_lp2_time(dev->cpu, us);
 
 	return (int)us;

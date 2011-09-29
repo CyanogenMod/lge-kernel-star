@@ -80,7 +80,7 @@ static struct {
 	unsigned int cpu_ready_count[5];
 	unsigned int tear_down_count[5];
 	unsigned long long cpu_wants_lp2_time[5];
-	unsigned long long in_lp2_time;
+	unsigned long long in_lp2_time[5];
 	unsigned int lp2_count;
 	unsigned int lp2_completed_count;
 	unsigned int lp2_count_bin[32];
@@ -157,6 +157,13 @@ bool tegra3_lp2_is_allowed(struct cpuidle_device *dev,
 	return true;
 }
 
+static inline void tegra3_lp3_fall_back(struct cpuidle_device *dev)
+{
+	tegra_cpu_wfi();
+	/* fall back here from LP2 path - tell cpuidle governor */
+	dev->last_state = &dev->states[0];
+}
+
 static void tegra3_idle_enter_lp2_cpu_0(struct cpuidle_device *dev,
 			   struct cpuidle_state *state, s64 request)
 {
@@ -170,7 +177,7 @@ static void tegra3_idle_enter_lp2_cpu_0(struct cpuidle_device *dev,
 
 	if (request < state->target_residency) {
 		/* Not enough time left to enter LP2 */
-		tegra_cpu_wfi();
+		tegra3_lp3_fall_back(dev);
 		return;
 	}
 
@@ -190,7 +197,7 @@ static void tegra3_idle_enter_lp2_cpu_0(struct cpuidle_device *dev,
 		if (!tegra3_lp2_is_allowed(dev, state)) {
 			/* Yes, re-enable the distributor and LP3. */
 			tegra_gic_dist_enable();
-			tegra_cpu_wfi();
+			tegra3_lp3_fall_back(dev);
 			return;
 		}
 
@@ -266,8 +273,8 @@ static void tegra3_idle_enter_lp2_cpu_0(struct cpuidle_device *dev,
 
 		idle_stats.lp2_completed_count++;
 		idle_stats.lp2_completed_count_bin[bin]++;
-		idle_stats.in_lp2_time += ktime_to_us(
-			ktime_sub(exit_time, entry_time));
+		idle_stats.in_lp2_time[cpu_number(dev->cpu)] +=
+			ktime_to_us(ktime_sub(exit_time, entry_time));
 
 		pr_debug("%lld %lld %d %d\n", request,
 			ktime_to_us(ktime_sub(exit_time, entry_time)),
@@ -279,7 +286,7 @@ static void tegra3_idle_enter_lp2_cpu_n(struct cpuidle_device *dev,
 			   struct cpuidle_state *state, s64 request)
 {
 #ifdef CONFIG_SMP
-
+	ktime_t entery_time;
 	u32 twd_cnt;
 	u32 twd_ctrl = readl(twd_base + TWD_TIMER_CONTROL);
 	unsigned long twd_rate = clk_get_rate(twd_clk);
@@ -294,13 +301,15 @@ static void tegra3_idle_enter_lp2_cpu_n(struct cpuidle_device *dev,
 		/*
 		 * Not enough time left to enter LP2
 		 */
-		tegra_cpu_wfi();
+		tegra3_lp3_fall_back(dev);
 		return;
 	}
 
 	idle_stats.tear_down_count[cpu_number(dev->cpu)]++;
 
 	trace_power_start(POWER_CSTATE, 2, dev->cpu);
+
+	entery_time = ktime_get();
 
 	/* Save time this CPU must be awakened by. */
 	tegra_cpu_wake_by_time[dev->cpu] = ktime_to_us(ktime_get()) + request;
@@ -309,6 +318,9 @@ static void tegra3_idle_enter_lp2_cpu_n(struct cpuidle_device *dev,
 	tegra3_sleep_cpu_secondary(PLAT_PHYS_OFFSET - PAGE_OFFSET);
 
 	tegra_cpu_wake_by_time[dev->cpu] = LLONG_MAX;
+
+	idle_stats.in_lp2_time[cpu_number(dev->cpu)] +=
+		ktime_to_us(ktime_sub(ktime_get(), entery_time));
 #endif
 }
 
@@ -369,22 +381,28 @@ int tegra3_lp2_debug_show(struct seq_file *s, void *data)
 		div64_u64(idle_stats.cpu_wants_lp2_time[3], 1000),
 		div64_u64(idle_stats.cpu_wants_lp2_time[4], 1000));
 
-	seq_printf(s, "lp2 time:       %8llu ms      %7d%% %7d%% %7d%% %7d%% %7d%%\n",
-		div64_u64(idle_stats.in_lp2_time, 1000),
+	seq_printf(s, "lp2 time:                       %8llu %8llu %8llu %8llu %8llu ms\n",
+		div64_u64(idle_stats.in_lp2_time[0], 1000),
+		div64_u64(idle_stats.in_lp2_time[1], 1000),
+		div64_u64(idle_stats.in_lp2_time[2], 1000),
+		div64_u64(idle_stats.in_lp2_time[3], 1000),
+		div64_u64(idle_stats.in_lp2_time[4], 1000));
+
+	seq_printf(s, "lp2 %%:                         %7d%% %7d%% %7d%% %7d%% %7d%%\n",
 		(int)(idle_stats.cpu_wants_lp2_time[0] ?
-			div64_u64(idle_stats.in_lp2_time * 100,
+			div64_u64(idle_stats.in_lp2_time[0] * 100,
 			idle_stats.cpu_wants_lp2_time[0]) : 0),
 		(int)(idle_stats.cpu_wants_lp2_time[1] ?
-			div64_u64(idle_stats.in_lp2_time * 100,
+			div64_u64(idle_stats.in_lp2_time[1] * 100,
 			idle_stats.cpu_wants_lp2_time[1]) : 0),
 		(int)(idle_stats.cpu_wants_lp2_time[2] ?
-			div64_u64(idle_stats.in_lp2_time * 100,
+			div64_u64(idle_stats.in_lp2_time[2] * 100,
 			idle_stats.cpu_wants_lp2_time[2]) : 0),
 		(int)(idle_stats.cpu_wants_lp2_time[3] ?
-			div64_u64(idle_stats.in_lp2_time * 100,
+			div64_u64(idle_stats.in_lp2_time[3] * 100,
 			idle_stats.cpu_wants_lp2_time[3]) : 0),
 		(int)(idle_stats.cpu_wants_lp2_time[4] ?
-			div64_u64(idle_stats.in_lp2_time * 100,
+			div64_u64(idle_stats.in_lp2_time[4] * 100,
 			idle_stats.cpu_wants_lp2_time[4]) : 0));
 	seq_printf(s, "\n");
 
