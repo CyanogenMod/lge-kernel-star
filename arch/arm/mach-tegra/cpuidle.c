@@ -229,6 +229,10 @@ static int __init tegra_cpuidle_init(void)
 	tegra_lp2_min_residency = tegra_cpu_lp2_min_residency();
 	tegra_lp2_exit_latency = tegra_cpu_power_good_time();
 	tegra_lp2_power_off_time = tegra_cpu_power_off_time();
+
+	ret = tegra_cpudile_init_soc();
+	if (ret)
+		return ret;
 #endif
 
 	for_each_possible_cpu(cpu) {

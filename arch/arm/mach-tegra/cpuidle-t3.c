@@ -37,6 +37,7 @@
 #include <linux/smp.h>
 #include <linux/suspend.h>
 #include <linux/tick.h>
+#include <linux/clk.h>
 
 #include <asm/cacheflush.h>
 #include <asm/cpu_pm.h>
@@ -67,6 +68,7 @@ static s64 tegra_cpu_wake_by_time[4] = {
 #endif
 
 static struct clk *cpu_clk_for_dvfs;
+static struct clk *twd_clk;
 
 static struct {
 	unsigned int cpu_ready_count[5];
@@ -268,6 +270,17 @@ static void tegra3_idle_enter_lp2_cpu_n(struct cpuidle_device *dev,
 			   struct cpuidle_state *state, s64 request)
 {
 #ifdef CONFIG_SMP
+
+	u32 twd_cnt;
+	u32 twd_ctrl = readl(twd_base + TWD_TIMER_CONTROL);
+	unsigned long twd_rate = clk_get_rate(twd_clk);
+
+	if ((twd_ctrl & TWD_TIMER_CONTROL_ENABLE) &&
+	    (twd_ctrl & TWD_TIMER_CONTROL_IT_ENABLE)) {
+		twd_cnt = readl(twd_base + TWD_TIMER_COUNTER);
+		request = div_u64((u64)twd_cnt * 1000000, twd_rate);
+	}
+
 	if (request < tegra_lp2_exit_latency) {
 		/*
 		 * Not enough time left to enter LP2
@@ -307,9 +320,10 @@ void tegra3_idle_lp2(struct cpuidle_device *dev,
 	tegra_clear_cpu_in_lp2(dev->cpu);
 }
 
-int tegra_cpudile_init_soc(void)
+int tegra3_cpudile_init_soc(void)
 {
 	cpu_clk_for_dvfs = tegra_get_clock_by_name("cpu_g");
+	twd_clk = tegra_get_clock_by_name("twd");
 	return 0;
 }
 
