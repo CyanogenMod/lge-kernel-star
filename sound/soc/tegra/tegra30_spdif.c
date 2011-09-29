@@ -284,6 +284,10 @@ static int tegra30_spdif_hw_params(struct snd_pcm_substream *substream,
 		return -EINVAL;
 	}
 
+	// WAR: Apply 2x spdifclock to have proper audio (bug 838569)
+	//	Should be removed once HDA is up.
+	spdifclock *= 2;
+
 	ret = clk_set_rate(spdif->clk_spdif_out, spdifclock);
 	if (ret) {
 		dev_err(dev, "Can't set SPDIF clock rate: %d\n", ret);
