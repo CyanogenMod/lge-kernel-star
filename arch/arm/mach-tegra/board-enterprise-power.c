@@ -240,6 +240,7 @@ static struct tps80031_charger_platform_data bcharger_pdata = {
 
 static struct tps80031_bg_platform_data battery_gauge_data = {
 	.irq_base = ENT_TPS80031_IRQ_BASE,
+	.battery_present = 1,
 };
 
 #define TPS_RTC()				\
@@ -490,6 +491,7 @@ int __init enterprise_regulator_init(void)
 	if (get_power_supply_type() == POWER_SUPPLY_TYPE_MAINS) {
 		bcharger_pdata.num_consumer_supplies = 0;
 		bcharger_pdata.consumer_supplies = NULL;
+		battery_gauge_data.battery_present = 0;
 	}
 
 	i2c_register_board_info(4, enterprise_regulators, 1);
