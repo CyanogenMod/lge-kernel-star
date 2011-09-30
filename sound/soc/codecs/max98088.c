@@ -1949,25 +1949,6 @@ static void max98088_handle_pdata(struct snd_soc_codec *codec)
        }
 }
 
-#ifdef CONFIG_PM
-static int max98088_suspend(struct snd_soc_codec *codec, pm_message_t state)
-{
-       max98088_set_bias_level(codec, SND_SOC_BIAS_OFF);
-
-       return 0;
-}
-
-static int max98088_resume(struct snd_soc_codec *codec)
-{
-       max98088_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
-
-       return 0;
-}
-#else
-#define max98088_suspend NULL
-#define max98088_resume NULL
-#endif
-
 int max98088_report_jack(struct snd_soc_codec *codec)
 {
        struct max98088_priv *max98088 = snd_soc_codec_get_drvdata(codec);
@@ -2123,6 +2104,32 @@ static int max98088_remove(struct snd_soc_codec *codec)
 
        return 0;
 }
+
+#ifdef CONFIG_PM
+static int max98088_suspend(struct snd_soc_codec *codec, pm_message_t state)
+{
+	struct max98088_priv *max98088 = snd_soc_codec_get_drvdata(codec);
+
+	disable_irq(max98088->irq);
+	max98088_set_bias_level(codec, SND_SOC_BIAS_OFF);
+
+	return 0;
+}
+
+static int max98088_resume(struct snd_soc_codec *codec)
+{
+	struct max98088_priv *max98088 = snd_soc_codec_get_drvdata(codec);
+
+	max98088_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
+	max98088_report_jack(codec);
+	enable_irq(max98088->irq);
+
+	return 0;
+}
+#else
+#define max98088_suspend NULL
+#define max98088_resume NULL
+#endif
 
 static struct snd_soc_codec_driver soc_codec_dev_max98088 = {
        .probe   = max98088_probe,
