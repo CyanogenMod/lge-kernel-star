@@ -40,6 +40,7 @@
 #include <mach/fb.h>
 #include <mach/gpio.h>
 #include <media/ov5650.h>
+#include <media/ov14810.h>
 #include <media/ov2710.h>
 #include <media/tps61050.h>
 #include <generated/mach-types.h>
@@ -216,6 +217,62 @@ struct ov5650_platform_data cardhu_left_ov5650_data = {
 	.power_on = cardhu_left_ov5650_power_on,
 	.power_off = cardhu_left_ov5650_power_off,
 };
+
+#ifdef CONFIG_VIDEO_OV14810
+static int cardhu_ov14810_power_on(void)
+{
+	if (board_info.board_id == BOARD_E1198) {
+		gpio_direction_output(CAM1_POWER_DWN_GPIO, 1);
+		mdelay(20);
+		gpio_direction_output(OV14810_RESETN_GPIO, 0);
+		mdelay(100);
+		gpio_direction_output(OV14810_RESETN_GPIO, 1);
+	}
+
+	return 0;
+}
+
+static int cardhu_ov14810_power_off(void)
+{
+	if (board_info.board_id == BOARD_E1198) {
+		gpio_direction_output(CAM1_POWER_DWN_GPIO, 1);
+		gpio_direction_output(CAM2_POWER_DWN_GPIO, 1);
+		gpio_direction_output(CAM3_POWER_DWN_GPIO, 1);
+	}
+
+	return 0;
+}
+
+struct ov14810_platform_data cardhu_ov14810_data = {
+	.power_on = cardhu_ov14810_power_on,
+	.power_off = cardhu_ov14810_power_off,
+};
+
+struct ov14810_platform_data cardhu_ov14810uC_data = {
+	.power_on = NULL,
+	.power_off = NULL,
+};
+
+struct ov14810_platform_data cardhu_ov14810SlaveDev_data = {
+	.power_on = NULL,
+	.power_off = NULL,
+};
+
+static struct i2c_board_info cardhu_i2c_board_info_e1214[] = {
+	{
+		I2C_BOARD_INFO("ov14810", 0x36),
+		.platform_data = &cardhu_ov14810_data,
+	},
+	{
+		I2C_BOARD_INFO("ov14810uC", 0x67),
+		.platform_data = &cardhu_ov14810uC_data,
+	},
+	{
+		I2C_BOARD_INFO("ov14810SlaveDev", 0x69),
+		.platform_data = &cardhu_ov14810SlaveDev_data,
+	}
+};
+#endif
 
 static int cardhu_right_ov5650_power_on(void)
 {
@@ -776,6 +833,15 @@ int __init cardhu_sensors_init(void)
 	i2c_register_board_info(2, cardhu_i2c_board_info_tps61050,
 		ARRAY_SIZE(cardhu_i2c_board_info_tps61050));
 
+#ifdef CONFIG_VIDEO_OV14810
+	/* This is disabled by default; To enable this change Kconfig;
+	 * there should be some way to detect dynamically which board
+	 * is connected (E1211/E1214), till that time sensor selection
+	 * logic is static;
+	 * e1214 corresponds to ov14810 sensor */
+	i2c_register_board_info(2, cardhu_i2c_board_info_e1214,
+		ARRAY_SIZE(cardhu_i2c_board_info_e1214));
+#else
 	/* Left  camera is on PCA954x's I2C BUS0, Right camera is on BUS1 &
 	 * Front camera is on BUS2 */
 	i2c_register_board_info(PCA954x_I2C_BUS0, cardhu_i2c6_board_info,
@@ -787,6 +853,7 @@ int __init cardhu_sensors_init(void)
 	i2c_register_board_info(PCA954x_I2C_BUS2, cardhu_i2c8_board_info,
 		ARRAY_SIZE(cardhu_i2c8_board_info));
 
+#endif
 	pmu_tca6416_init();
 
 	if (board_info.board_id == BOARD_E1291)
