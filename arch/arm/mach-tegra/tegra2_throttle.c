@@ -1,5 +1,5 @@
 /*
- * arch/arm/mach-tegra/tegra2-throttle.c
+ * arch/arm/mach-tegra/tegra2_throttle.c
  *
  * Copyright (C) 2010 Google, Inc.
  *
