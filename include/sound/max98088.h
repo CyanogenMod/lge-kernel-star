@@ -31,6 +31,10 @@ struct max98088_pdata {
        struct max98088_eq_cfg *eq_cfg;
        unsigned int eq_cfgcnt;
 
+       /* has to be one of 25,50,100 or 200 ms
+       as per the data sheet */
+       unsigned int debounce_time_ms;
+
        /* Receiver output can be configured as power amplifier or LINE out */
        /* Set receiver_mode to:
         * 0 = amplifier output, or
