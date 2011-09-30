@@ -35,6 +35,9 @@
 #include <linux/slab.h>
 #include <linux/gpio.h>
 #include <linux/regulator/consumer.h>
+#ifdef CONFIG_SWITCH
+#include <linux/switch.h>
+#endif
 
 #include <mach/tegra_max98088_pdata.h>
 
@@ -137,19 +140,50 @@ static struct snd_soc_ops tegra_spdif_ops;
 
 static struct snd_soc_jack tegra_max98088_hp_jack;
 
+#ifdef CONFIG_SWITCH
+static struct switch_dev wired_switch_dev = {
+	.name = "h2w",
+};
+
+/* These values are copied from WiredAccessoryObserver */
+enum headset_state {
+	BIT_NO_HEADSET = 0,
+	BIT_HEADSET = (1 << 0),
+	BIT_HEADSET_NO_MIC = (1 << 1),
+};
+
+static int headset_switch_notify(struct notifier_block *self,
+	unsigned long action, void *dev)
+{
+	int state = 0;
+
+	switch (action) {
+	case SND_JACK_HEADPHONE:
+		state |= BIT_HEADSET_NO_MIC;
+		break;
+	case SND_JACK_HEADSET:
+		state |= BIT_HEADSET;
+		break;
+	default:
+		state |= BIT_NO_HEADSET;
+	}
+
+	switch_set_state(&wired_switch_dev, state);
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block headset_switch_nb = {
+	.notifier_call = headset_switch_notify,
+};
+#else
 static struct snd_soc_jack_pin tegra_max98088_hp_jack_pins[] = {
 	{
 		.pin = "Headphone Jack",
 		.mask = SND_JACK_HEADPHONE,
 	},
 };
-
-static struct snd_soc_jack_gpio tegra_max98088_hp_jack_gpio = {
-	.name = "headphone detect",
-	.report = SND_JACK_HEADPHONE,
-	.debounce_time = 150,
-	.invert = 0,
-};
+#endif
 
 static int tegra_max98088_event_int_spk(struct snd_soc_dapm_widget *w,
 					struct snd_kcontrol *k, int event)
@@ -280,17 +314,22 @@ static int tegra_max98088_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_add_routes(dapm, enterprise_audio_map,
 					ARRAY_SIZE(enterprise_audio_map));
 
-	if (gpio_is_valid(pdata->gpio_hp_det)) {
-		tegra_max98088_hp_jack_gpio.gpio = pdata->gpio_hp_det;
-		snd_soc_jack_new(codec, "Headphone Jack", SND_JACK_HEADPHONE,
-				&tegra_max98088_hp_jack);
-		snd_soc_jack_add_pins(&tegra_max98088_hp_jack,
-					ARRAY_SIZE(tegra_max98088_hp_jack_pins),
-					tegra_max98088_hp_jack_pins);
-		snd_soc_jack_add_gpios(&tegra_max98088_hp_jack,
-					1,
-					&tegra_max98088_hp_jack_gpio);
-	}
+	ret = snd_soc_jack_new(codec, "Headset Jack", SND_JACK_HEADSET,
+			&tegra_max98088_hp_jack);
+	if (ret < 0)
+		return ret;
+
+	max98088_headset_detect(codec, &tegra_max98088_hp_jack,
+		SND_JACK_HEADSET);
+
+#ifdef CONFIG_SWITCH
+	snd_soc_jack_notifier_register(&tegra_max98088_hp_jack,
+		&headset_switch_nb);
+#else /*gpio based headset detection*/
+	snd_soc_jack_add_pins(&tegra_max98088_hp_jack,
+		ARRAY_SIZE(tegra_max98088_hp_jack_pins),
+		tegra_max98088_hp_jack_pins);
+#endif
 
 	snd_soc_dapm_nc_pin(dapm, "INA1");
 	snd_soc_dapm_nc_pin(dapm, "INA2");
@@ -366,8 +405,20 @@ static __devinit int tegra_max98088_driver_probe(struct platform_device *pdev)
 		goto err_fini_utils;
 	}
 
+#ifdef CONFIG_SWITCH
+	/* Add h2w swith class support */
+	ret = switch_dev_register(&wired_switch_dev);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "not able to register switch device\n",
+			ret);
+		goto err_unregister_card;
+	}
+#endif
+
 	return 0;
 
+err_unregister_card:
+	snd_soc_unregister_card(card);
 err_fini_utils:
 	tegra_asoc_utils_fini(&machine->util_data);
 err_free_machine:
@@ -382,6 +433,10 @@ static int __devexit tegra_max98088_driver_remove(struct platform_device *pdev)
 	struct tegra_max98088_platform_data *pdata = machine->pdata;
 
 	snd_soc_unregister_card(card);
+
+#ifdef CONFIG_SWITCH
+	switch_dev_unregister(&wired_switch_dev);
+#endif
 
 	tegra_asoc_utils_fini(&machine->util_data);
 
