@@ -121,15 +121,14 @@ static irqreturn_t tegra_ehci_irq (struct usb_hcd *hcd)
 				TEGRA_USB_PHY_CLK_VALID_INT_STS;
 			writel(val , (hcd->regs + TEGRA_USB_SUSP_CTRL_OFFSET));
 
-			val = readl(hcd->regs + TEGRA_USB_PORTSC1_OFFSET);
-			val &= ~TEGRA_USB_PORTSC1_WKCN;
-			writel(val , (hcd->regs + TEGRA_USB_PORTSC1_OFFSET));
-
 			val = readl(&hw->status);
 			if (!(val  & STS_PCD)) {
 				spin_unlock(&ehci->lock);
 				return 0;
 			}
+			val = readl(hcd->regs + TEGRA_USB_PORTSC1_OFFSET);
+			val &= ~(TEGRA_USB_PORTSC1_WKCN | PORT_RWC_BITS);
+			writel(val , (hcd->regs + TEGRA_USB_PORTSC1_OFFSET));
 		}
 		spin_unlock(&ehci->lock);
 	}

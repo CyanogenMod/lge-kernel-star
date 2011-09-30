@@ -398,6 +398,7 @@
 #define WAKE_VAL_FSJ			0x2
 #define WAKE_VAL_FSK			0x1
 #define WAKE_VAL_SE0			0x0
+#define WAKE_VAL_ANY			0xf
 
 #define PMC_SLEEP_CFG			0x1fc
 #define UTMIP_TCTRL_USE_PMC(inst)	(1 << ((8*(inst))+3))
@@ -1288,10 +1289,7 @@ static void utmip_setup_pmc_wake_detect(struct tegra_usb_phy *phy)
 	/* Turn over pad configuration to PMC  for line wake events*/
 	val = readl(pmc_base + PMC_SLEEP_CFG);
 	val &= ~UTMIP_WAKE_VAL(inst, ~0);
-	if (port_speed == TEGRA_USB_PHY_PORT_SPEED_LOW)
-		val |= UTMIP_WAKE_VAL(inst, WAKE_VAL_FSJ);
-	else
-		val |= UTMIP_WAKE_VAL(inst, WAKE_VAL_FSK);
+	val |= UTMIP_WAKE_VAL(inst, WAKE_VAL_ANY);
 	val |= UTMIP_RCTRL_USE_PMC(inst) | UTMIP_TCTRL_USE_PMC(inst);
 	val |= UTMIP_MASTER_ENABLE(inst) | UTMIP_FSLS_USE_PMC(inst);
 	writel(val, pmc_base + PMC_SLEEP_CFG);
@@ -1583,8 +1581,11 @@ static void utmi_phy_restore_end(struct tegra_usb_phy *phy)
 		do {
 			val = readl(base + USB_PORTSC1);
 			udelay(1);
-			if (wait_time_us == 0)
+			if (wait_time_us == 0) {
+				utmip_phy_disable_pmc_bus_ctrl(phy);
+				tegra_usb_phy_postresume(phy, false);
 				return;
+			}
 			wait_time_us--;
 		} while (!(val & USB_PORTSC1_RESUME));
 		/* disable PMC master control */
