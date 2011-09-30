@@ -65,5 +65,5 @@ void tegra_gpio_config(struct tegra_gpio_table *table, int num);
 void tegra_gpio_enable(int gpio);
 void tegra_gpio_disable(int gpio);
 int tegra_gpio_resume_init(void);
-
+void tegra_gpio_init_configure(unsigned gpio, bool is_input, int value);
 #endif
