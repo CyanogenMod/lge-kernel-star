@@ -69,6 +69,7 @@ struct tegra_ehci_hcd {
 	struct work_struct clk_timer_work;
 	struct timer_list clk_timer;
 	bool clock_enabled;
+	bool timer_event;
 	int hsic_connect_retries;
 	struct mutex tegra_ehci_hcd_mutex;
 };
@@ -839,11 +840,10 @@ void clk_timer_callback(unsigned long data)
 	unsigned long flags;
 
 	if (!timer_pending(&tegra->clk_timer)) {
-		clk_disable(tegra->emc_clk);
-		clk_disable(tegra->sclk_clk);
 		spin_lock_irqsave(&tegra->ehci->lock, flags);
-		tegra->clock_enabled = 0;
+		tegra->timer_event = 1;
 		spin_unlock_irqrestore(&tegra->ehci->lock, flags);
+		schedule_work(&tegra->clk_timer_work);
 	}
 }
 
@@ -852,11 +852,23 @@ static void clk_timer_work_handler(struct work_struct* clk_timer_work) {
 						struct tegra_ehci_hcd, clk_timer_work);
 	int ret;
 	unsigned long flags;
-	bool clock_enabled;
+	bool clock_enabled, timer_event;
 
 	spin_lock_irqsave(&tegra->ehci->lock, flags);
 	clock_enabled = tegra->clock_enabled;
+	timer_event = tegra->timer_event;
 	spin_unlock_irqrestore(&tegra->ehci->lock, flags);
+
+	if (timer_event) {
+		clk_disable(tegra->emc_clk);
+		clk_disable(tegra->sclk_clk);
+		spin_lock_irqsave(&tegra->ehci->lock, flags);
+		tegra->clock_enabled = 0;
+		tegra->timer_event = 0;
+		spin_unlock_irqrestore(&tegra->ehci->lock, flags);
+		return;
+	}
+
 	if ((!clock_enabled)) {
 		ret = mod_timer(&tegra->clk_timer, jiffies + msecs_to_jiffies(2000));
 		if (ret)
