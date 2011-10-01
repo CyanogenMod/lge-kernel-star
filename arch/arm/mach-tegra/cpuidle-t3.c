@@ -67,6 +67,12 @@ static s64 tegra_cpu_wake_by_time[4] = {
 	LLONG_MAX, LLONG_MAX, LLONG_MAX, LLONG_MAX };
 #endif
 
+static bool lp2_0_in_idle = true;
+module_param(lp2_0_in_idle, bool, 0644);
+
+static bool lp2_n_in_idle = true;
+module_param(lp2_n_in_idle, bool, 0644);
+
 static struct clk *cpu_clk_for_dvfs;
 static struct clk *twd_clk;
 
@@ -115,6 +121,9 @@ bool tegra3_lp2_is_allowed(struct cpuidle_device *dev,
 	s64 request;
 
 	if (!tegra_all_cpus_booted)
+		return false;
+
+	if ((!lp2_0_in_idle && !dev->cpu) || (!lp2_n_in_idle && dev->cpu))
 		return false;
 
 	/* On A01, LP2 on slave CPU's cause ranhdom CPU hangs.
