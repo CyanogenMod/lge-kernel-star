@@ -97,6 +97,7 @@
 #define MSELECT_CLKM			(0x3 << 30)
 
 #define USE_PLL_LOCK_BITS 0
+#define USE_PLLP_ON_SLEEP_ENTRY 0
 
 .macro emc_device_mask, rd, base
 	ldr	\rd, [\base, #EMC_ADR_CFG]
@@ -247,8 +248,9 @@ ENTRY(tegra3_tear_down_cpu)
 	mov32	r5, TEGRA_CLK_RESET_BASE
 	mov32	r6, TEGRA_FLOW_CTRL_BASE
 	mov32	r7, TEGRA_TMRUS_BASE
-
+#if USE_PLLP_ON_SLEEP_ENTRY
 	bl	tegra_cpu_pllp
+#endif
 	b	tegra3_enter_sleep
 ENDPROC(tegra3_tear_down_cpu)
 
