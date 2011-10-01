@@ -396,6 +396,7 @@ static int __init tegra_gpio_init(void)
 		for (j = 0; j < 4; j++) {
 			int gpio = tegra_gpio_compose(i, j, 0);
 			__raw_writel(0x00, GPIO_INT_ENB(gpio));
+			__raw_writel(0x00, GPIO_INT_STA(gpio));
 		}
 	}
 
@@ -414,11 +415,12 @@ static int __init tegra_gpio_init(void)
 	for (i = 0; i < ARRAY_SIZE(tegra_gpio_banks); i++) {
 		bank = &tegra_gpio_banks[i];
 
-		irq_set_chained_handler(bank->irq, tegra_gpio_irq_handler);
-		irq_set_handler_data(bank->irq, bank);
-
 		for (j = 0; j < 4; j++)
 			spin_lock_init(&bank->lvl_lock[j]);
+
+		irq_set_handler_data(bank->irq, bank);
+		irq_set_chained_handler(bank->irq, tegra_gpio_irq_handler);
+
 	}
 
 	return 0;
