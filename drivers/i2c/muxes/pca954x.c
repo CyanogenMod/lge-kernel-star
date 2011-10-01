@@ -274,8 +274,7 @@ static int pca954x_probe(struct i2c_client *client,
 		if (ret) {
 			dev_err(&client->dev, "%s: failed to enable vcc_i2c\n",
 				__func__);
-			regulator_disable(data->vcc_reg);
-			goto exit_regulator_put;
+			goto exit_vcc_regulator_disable;
 		}
 	}
 
@@ -291,9 +290,7 @@ static int pca954x_probe(struct i2c_client *client,
 	 */
 	if (i2c_smbus_write_byte(client, 0) < 0) {
 		dev_warn(&client->dev, "probe failed\n");
-		regulator_disable(data->vcc_reg);
-		regulator_disable(data->i2c_reg);
-		goto exit_regulator_put;
+		goto exit_regulator_disable;
 	}
 
 	/* Decrease ref count for pca954x vcc */
@@ -343,9 +340,15 @@ static int pca954x_probe(struct i2c_client *client,
 virt_reg_failed:
 	for (num--; num >= 0; num--)
 		i2c_del_mux_adapter(data->virt_adaps[num]);
+exit_regulator_disable:
+	if (data->i2c_reg)
+		regulator_disable(data->i2c_reg);
+exit_vcc_regulator_disable:
+	if (data->vcc_reg)
+		regulator_disable(data->vcc_reg);
 exit_regulator_put:
-	regulator_put(data->vcc_reg);
 	regulator_put(data->i2c_reg);
+	regulator_put(data->vcc_reg);
 exit_free:
 	kfree(data);
 err:
