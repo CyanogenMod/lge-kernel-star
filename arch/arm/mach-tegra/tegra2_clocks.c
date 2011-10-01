@@ -1511,12 +1511,8 @@ static int tegra_clk_shared_bus_set_rate(struct clk *c, unsigned long rate)
 	if (new_rate < 0)
 		return new_rate;
 
-	clk_lock_save(c->parent, &flags);
-
 	c->u.shared_bus_user.rate = new_rate;
 	ret = tegra_clk_shared_bus_update(c->parent);
-
-	clk_unlock_restore(c->parent, &flags);
 
 	return ret;
 }
@@ -1531,14 +1527,10 @@ static int tegra_clk_shared_bus_enable(struct clk *c)
 	unsigned long flags;
 	int ret;
 
-	clk_lock_save(c->parent, &flags);
-
 	c->u.shared_bus_user.enabled = true;
 	ret = tegra_clk_shared_bus_update(c->parent);
 	if (strcmp(c->name, "avp.sclk") == 0)
 		tegra2_statmon_start();
-
-	clk_unlock_restore(c->parent, &flags);
 
 	return ret;
 }
@@ -1548,15 +1540,11 @@ static void tegra_clk_shared_bus_disable(struct clk *c)
 	unsigned long flags;
 	int ret;
 
-	clk_lock_save(c->parent, &flags);
-
 	if (strcmp(c->name, "avp.sclk") == 0)
 		tegra2_statmon_stop();
 	c->u.shared_bus_user.enabled = false;
 	ret = tegra_clk_shared_bus_update(c->parent);
 	WARN_ON_ONCE(ret);
-
-	clk_unlock_restore(c->parent, &flags);
 }
 
 static struct clk_ops tegra_clk_shared_bus_ops = {
