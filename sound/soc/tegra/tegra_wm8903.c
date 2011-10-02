@@ -35,6 +35,9 @@
 #include <linux/slab.h>
 #include <linux/gpio.h>
 #include <linux/regulator/consumer.h>
+#ifdef CONFIG_SWITCH
+#include <linux/switch.h>
+#endif
 
 #include <mach/tegra_wm8903_pdata.h>
 
@@ -63,6 +66,9 @@ struct tegra_wm8903 {
 	struct regulator *spk_reg;
 	struct regulator *dmic_reg;
 	int gpio_requested;
+#ifdef CONFIG_SWITCH
+	int jack_status;
+#endif
 };
 
 static int tegra_wm8903_hw_params(struct snd_pcm_substream *substream,
@@ -133,13 +139,7 @@ static struct snd_soc_ops tegra_wm8903_ops = {
 static struct snd_soc_ops tegra_spdif_ops;
 
 static struct snd_soc_jack tegra_wm8903_hp_jack;
-
-static struct snd_soc_jack_pin tegra_wm8903_hp_jack_pins[] = {
-	{
-		.pin = "Headphone Jack",
-		.mask = SND_JACK_HEADPHONE,
-	},
-};
+static struct snd_soc_jack tegra_wm8903_mic_jack;
 
 static struct snd_soc_jack_gpio tegra_wm8903_hp_jack_gpio = {
 	.name = "headphone detect",
@@ -148,7 +148,63 @@ static struct snd_soc_jack_gpio tegra_wm8903_hp_jack_gpio = {
 	.invert = 1,
 };
 
-static struct snd_soc_jack tegra_wm8903_mic_jack;
+#ifdef CONFIG_SWITCH
+/* These values are copied from Android WiredAccessoryObserver */
+enum headset_state {
+	BIT_NO_HEADSET = 0,
+	BIT_HEADSET = (1 << 0),
+	BIT_HEADSET_NO_MIC = (1 << 1),
+};
+
+static struct switch_dev tegra_wm8903_headset_switch = {
+	.name = "h2w",
+};
+
+static int tegra_wm8903_jack_notifier(struct notifier_block *self,
+			      unsigned long action, void *dev)
+{
+	struct snd_soc_jack *jack = dev;
+	struct snd_soc_codec *codec = jack->codec;
+	struct snd_soc_card *card = codec->card;
+	struct tegra_wm8903 *machine = snd_soc_card_get_drvdata(card);
+	enum headset_state state = BIT_NO_HEADSET;
+
+	if (jack == &tegra_wm8903_hp_jack) {
+		machine->jack_status &= ~SND_JACK_HEADPHONE;
+		machine->jack_status |= (action & SND_JACK_HEADPHONE);
+	} else {
+		machine->jack_status &= ~SND_JACK_MICROPHONE;
+		machine->jack_status |= (action & SND_JACK_MICROPHONE);
+	}
+
+	switch (machine->jack_status) {
+	case SND_JACK_HEADPHONE:
+		state = BIT_HEADSET_NO_MIC;
+		break;
+	case SND_JACK_HEADSET:
+		state = BIT_HEADSET;
+		break;
+	case SND_JACK_MICROPHONE:
+		/* mic: would not report */
+	default:
+		state = BIT_NO_HEADSET;
+	}
+
+	switch_set_state(&tegra_wm8903_headset_switch, state);
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block tegra_wm8903_jack_detect_nb = {
+	.notifier_call = tegra_wm8903_jack_notifier,
+};
+#else
+static struct snd_soc_jack_pin tegra_wm8903_hp_jack_pins[] = {
+	{
+		.pin = "Headphone Jack",
+		.mask = SND_JACK_HEADPHONE,
+	},
+};
 
 static struct snd_soc_jack_pin tegra_wm8903_mic_jack_pins[] = {
 	{
@@ -156,6 +212,7 @@ static struct snd_soc_jack_pin tegra_wm8903_mic_jack_pins[] = {
 		.mask = SND_JACK_MICROPHONE,
 	},
 };
+#endif
 
 static int tegra_wm8903_event_int_spk(struct snd_soc_dapm_widget *w,
 					struct snd_kcontrol *k, int event)
@@ -424,9 +481,14 @@ static int tegra_wm8903_init(struct snd_soc_pcm_runtime *rtd)
 		tegra_wm8903_hp_jack_gpio.gpio = pdata->gpio_hp_det;
 		snd_soc_jack_new(codec, "Headphone Jack", SND_JACK_HEADPHONE,
 				&tegra_wm8903_hp_jack);
+#ifndef CONFIG_SWITCH
 		snd_soc_jack_add_pins(&tegra_wm8903_hp_jack,
 					ARRAY_SIZE(tegra_wm8903_hp_jack_pins),
 					tegra_wm8903_hp_jack_pins);
+#else
+		snd_soc_jack_notifier_register(&tegra_wm8903_hp_jack,
+					&tegra_wm8903_jack_detect_nb);
+#endif
 		snd_soc_jack_add_gpios(&tegra_wm8903_hp_jack,
 					1,
 					&tegra_wm8903_hp_jack_gpio);
@@ -435,9 +497,14 @@ static int tegra_wm8903_init(struct snd_soc_pcm_runtime *rtd)
 
 	snd_soc_jack_new(codec, "Mic Jack", SND_JACK_MICROPHONE,
 			 &tegra_wm8903_mic_jack);
+#ifndef CONFIG_SWITCH
 	snd_soc_jack_add_pins(&tegra_wm8903_mic_jack,
 			      ARRAY_SIZE(tegra_wm8903_mic_jack_pins),
 			      tegra_wm8903_mic_jack_pins);
+#else
+	snd_soc_jack_notifier_register(&tegra_wm8903_mic_jack,
+				&tegra_wm8903_jack_detect_nb);
+#endif
 	wm8903_mic_detect(codec, &tegra_wm8903_mic_jack, SND_JACK_MICROPHONE,
 				0);
 
@@ -543,6 +610,13 @@ static __devinit int tegra_wm8903_driver_probe(struct platform_device *pdev)
 		tegra_wm8903_dai[1].cpu_dai_name = "tegra30-spdif";
 	}
 
+#ifdef CONFIG_SWITCH
+	/* Addd h2w swith class support */
+	ret = switch_dev_register(&tegra_wm8903_headset_switch);
+	if (ret < 0)
+		goto err_fini_utils;
+#endif
+
 	card->dev = &pdev->dev;
 	platform_set_drvdata(pdev, card);
 	snd_soc_card_set_drvdata(card, machine);
@@ -551,11 +625,15 @@ static __devinit int tegra_wm8903_driver_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n",
 			ret);
-		goto err_fini_utils;
+		goto err_unregister_switch;
 	}
 
 	return 0;
 
+err_unregister_switch:
+#ifdef CONFIG_SWITCH
+	switch_dev_unregister(&tegra_wm8903_headset_switch);
+#endif
 err_fini_utils:
 	tegra_asoc_utils_fini(&machine->util_data);
 err_free_machine:
@@ -592,6 +670,9 @@ static int __devexit tegra_wm8903_driver_remove(struct platform_device *pdev)
 
 	tegra_asoc_utils_fini(&machine->util_data);
 
+#ifdef CONFIG_SWITCH
+	switch_dev_unregister(&tegra_wm8903_headset_switch);
+#endif
 	kfree(machine);
 
 	return 0;
