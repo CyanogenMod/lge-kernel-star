@@ -494,7 +494,7 @@ static struct regulator_consumer_supply gpio_switch_en_3v3_sys_supply[] = {
 	REGULATOR_SUPPLY("vdd_3v3_edid", NULL),
 	REGULATOR_SUPPLY("vdd_3v3_hdmi_cec", NULL),
 	REGULATOR_SUPPLY("vdd_3v3_gmi", NULL),
-	REGULATOR_SUPPLY("vdd_3v3_spk_amp", NULL),
+	REGULATOR_SUPPLY("vdd_spk_amp", "tegra-snd-wm8903"),
 	REGULATOR_SUPPLY("vdd_3v3_sensor", NULL),
 	REGULATOR_SUPPLY("vdd_3v3_cam", NULL),
 	REGULATOR_SUPPLY("vdd_3v3_als", NULL),
