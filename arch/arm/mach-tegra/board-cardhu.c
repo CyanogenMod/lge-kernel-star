@@ -379,8 +379,9 @@ static struct wm8903_platform_data cardhu_wm8903_pdata = {
 	.micdet_delay = 100,
 	.gpio_base = CARDHU_GPIO_WM8903(0),
 	.gpio_cfg = {
-		WM8903_GPIO_NO_CONFIG,
-		WM8903_GPIO_NO_CONFIG,
+		(WM8903_GPn_FN_DMIC_LR_CLK_OUTPUT << WM8903_GP1_FN_SHIFT),
+		(WM8903_GPn_FN_DMIC_LR_CLK_OUTPUT << WM8903_GP2_FN_SHIFT) |
+			WM8903_GP2_DIR,
 		0,
 		WM8903_GPIO_NO_CONFIG,
 		WM8903_GPIO_NO_CONFIG,
