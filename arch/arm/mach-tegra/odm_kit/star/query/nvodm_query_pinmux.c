@@ -229,23 +229,24 @@ NvOdmQueryPinMux(
 	NvU32 Personality = 0;
 	NvU32 Ril = 0;
 	NvOdmServicesKeyListHandle hKeyList;
+	hKeyList = NvOdmServicesKeyListOpen();
 	if (hKeyList)
-    {   
-        CustomerOption =
-            NvOdmServicesGetKeyValue(hKeyList,
-                                     NvOdmKeyListId_ReservedBctCustomerOption);
-        NvOdmServicesKeyListClose(hKeyList);
-        Personality =
-            NV_DRF_VAL(TEGRA_DEVKIT, BCT_CUSTOPT, PERSONALITY, CustomerOption);
-    Ril =
-            NV_DRF_VAL(TEGRA_DEVKIT, BCT_CUSTOPT, RIL, CustomerOption);
-    }   
+	{   
+		CustomerOption =
+			NvOdmServicesGetKeyValue(hKeyList,
+				NvOdmKeyListId_ReservedBctCustomerOption);
+		NvOdmServicesKeyListClose(hKeyList);
+		Personality =
+			NV_DRF_VAL(TEGRA_DEVKIT, BCT_CUSTOPT, PERSONALITY, CustomerOption);
+		Ril =
+			NV_DRF_VAL(TEGRA_DEVKIT, BCT_CUSTOPT, RIL, CustomerOption);
+	}   
 
-    if (!Personality)
-        Personality = TEGRA_DEVKIT_DEFAULT_PERSONALITY;
+	if (!Personality)
+		Personality = TEGRA_DEVKIT_DEFAULT_PERSONALITY;
 
-    if (!Ril)
-        Ril = TEGRA_DEVKIT_BCT_CUSTOPT_0_RIL_DEFAULT;	
+	if (!Ril)
+		Ril = TEGRA_DEVKIT_BCT_CUSTOPT_0_RIL_DEFAULT;	
 	//20101023  add tegra-10.9.3[end] 
 
     switch (IoModule)
