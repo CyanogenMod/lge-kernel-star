@@ -66,8 +66,8 @@ static int tegra_rtc_read_time(struct device *dev, struct rtc_time *tm)
 
 static int tegra_rtc_set_time(struct device *dev, struct rtc_time *tm)
 {
-	unsigned long prevTime;	
-	unsigned long now;
+	NvU32 prevTime;		// pmu_hal.c: NvBool NvOdmPmuReadRtc(NvOdmPmuDeviceHandle, NvU32*)
+	unsigned long now;	// rtc_tm_to_time(struct rtc_time*, unsigned long*)
 	int ret;
 
 	if (hPmu == NULL)
