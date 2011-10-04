@@ -28,6 +28,14 @@
 
 #include <asm-generic/gpio.h>
 
+struct gpio_init_pin_info {
+	char name[16];
+	int gpio_nr;
+	bool is_gpio;
+	bool is_input;
+	int value; /* Value if it is output*/
+};
+
 #define gpio_get_value		__gpio_get_value
 #define gpio_set_value		__gpio_set_value
 #define gpio_cansleep		__gpio_cansleep

@@ -517,9 +517,71 @@ static void __init cardhu_pinmux_audio_init(void)
 	tegra_gpio_enable(TEGRA_GPIO_HP_DET);
 }
 
+#define GPIO_INIT_PIN_MODE(_gpio, _is_input, _value)	\
+	{					\
+		.gpio_nr	= _gpio,	\
+		.is_input	= _is_input,	\
+		.value		= _value,	\
+	}
+
+
+/* E1198-A01/E1291 specific  fab < A03 */
+static struct gpio_init_pin_info init_gpio_mode_e1291_a02[] = {
+	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PH7, false, 0),
+	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PI4, false, 0),
+};
+
+/* E1198-A02/E1291 specific  fab >= A03 */
+static struct gpio_init_pin_info init_gpio_mode_e1291_a03[] = {
+	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PDD6, false, 0),
+	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PDD4, false, 0),
+};
+
+static void __init cardhu_gpio_init_configure(void)
+{
+	struct board_info board_info;
+	int len;
+	int i;
+	struct gpio_init_pin_info *pins_info;
+
+	tegra_get_board_info(&board_info);
+
+	switch (board_info.board_id) {
+	case BOARD_E1198:
+		if (board_info.fab < BOARD_FAB_A02) {
+			len = ARRAY_SIZE(init_gpio_mode_e1291_a02);
+			pins_info = init_gpio_mode_e1291_a02;
+		} else {
+			len = ARRAY_SIZE(init_gpio_mode_e1291_a03);
+			pins_info = init_gpio_mode_e1291_a03;
+		}
+		break;
+	case BOARD_E1291:
+		if (board_info.fab < BOARD_FAB_A03) {
+			len = ARRAY_SIZE(init_gpio_mode_e1291_a02);
+			pins_info = init_gpio_mode_e1291_a02;
+		} else {
+			len = ARRAY_SIZE(init_gpio_mode_e1291_a03);
+			pins_info = init_gpio_mode_e1291_a03;
+		}
+		break;
+	default:
+		return;
+	}
+
+	for (i = 0; i < len; ++i) {
+		tegra_gpio_init_configure(pins_info->gpio_nr,
+			pins_info->is_input, pins_info->value);
+		pins_info++;
+	}
+}
+
 int __init cardhu_pinmux_init(void)
 {
 	struct board_info board_info;
+
+	cardhu_gpio_init_configure();
+
 	tegra_pinmux_config_table(cardhu_pinmux_common, ARRAY_SIZE(cardhu_pinmux_common));
 	tegra_drive_pinmux_config_table(cardhu_drive_pinmux,
 					ARRAY_SIZE(cardhu_drive_pinmux));
@@ -572,13 +634,6 @@ int __init cardhu_pinmux_init(void)
 	return 0;
 }
 
-struct pin_info_low_power_mode {
-	char name[16];
-	int gpio_nr;
-	bool is_gpio;
-	bool is_input;
-	int value; /* Value if it is output*/
-};
 #define PIN_GPIO_LPM(_name, _gpio, _is_input, _value)	\
 	{					\
 		.name		= _name,	\
@@ -588,7 +643,7 @@ struct pin_info_low_power_mode {
 		.value		= _value,	\
 	}
 
-struct pin_info_low_power_mode pin_lpm_cardhu_common[] = {
+struct gpio_init_pin_info pin_lpm_cardhu_common[] = {
 	PIN_GPIO_LPM("GMI_CS3_N", TEGRA_GPIO_PK4, 0, 0),
 	PIN_GPIO_LPM("GMI_CS4_N", TEGRA_GPIO_PK2, 1, 0),
 	PIN_GPIO_LPM("GMI_AD9",   TEGRA_GPIO_PH1, 0, 0),
@@ -599,7 +654,7 @@ struct pin_info_low_power_mode pin_lpm_cardhu_common[] = {
 	PIN_GPIO_LPM("GMI_WP_N",  TEGRA_GPIO_PC7, 1, 0),
 };
 
-struct pin_info_low_power_mode vddio_gmi_pins_pm269[] = {
+struct gpio_init_pin_info vddio_gmi_pins_pm269[] = {
 	PIN_GPIO_LPM("GMI_CS2",   TEGRA_GPIO_PK3, 1, 0),
 	PIN_GPIO_LPM("GMI_CS3_N", TEGRA_GPIO_PK4, 0, 0),
 	PIN_GPIO_LPM("GMI_CS4_N", TEGRA_GPIO_PK2, 1, 0),
@@ -614,15 +669,15 @@ struct pin_info_low_power_mode vddio_gmi_pins_pm269[] = {
 	PIN_GPIO_LPM("GMI_A19",   TEGRA_GPIO_PK7, 0, 0),
 };
 
-static void set_unused_pin_gpio(struct pin_info_low_power_mode *lpm_pin_info,
+static void set_unused_pin_gpio(struct gpio_init_pin_info *lpm_pin_info,
 		int list_count)
 {
 	int i;
-	struct pin_info_low_power_mode *pin_info;
+	struct gpio_init_pin_info *pin_info;
 	int ret;
 
 	for (i = 0; i < list_count; ++i) {
-		pin_info = (struct pin_info_low_power_mode *)(lpm_pin_info + i);
+		pin_info = (struct gpio_init_pin_info *)(lpm_pin_info + i);
 		if (!pin_info->is_gpio)
 			continue;
 
