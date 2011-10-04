@@ -1050,7 +1050,7 @@ int mpu3050_probe(struct i2c_client *client,
 
 	pdata = (struct mpu3050_platform_data *) client->dev.platform_data;
 	if (!pdata) {
-		dev_WARN(&this_client->adapter->dev,
+		dev_warn(&this_client->adapter->dev,
 			 "Missing platform data for mpu3050\n");
 	} else {
 		mldl_cfg->pdata = pdata;
@@ -1080,7 +1080,7 @@ int mpu3050_probe(struct i2c_client *client,
 				if (res)
 					goto out_accelirq_failed;
 			} else {
-				dev_WARN(&this_client->adapter->dev,
+				dev_warn(&this_client->adapter->dev,
 					"WARNING: Accel irq not assigned\n");
 			}
 		} else {
@@ -1167,7 +1167,7 @@ int mpu3050_probe(struct i2c_client *client,
 		if (res)
 			goto out_mpuirq_failed;
 	} else {
-		dev_WARN(&this_client->adapter->dev,
+		dev_warn(&this_client->adapter->dev,
 			"Missing %s IRQ\n", MPU_NAME);
 	}
 
