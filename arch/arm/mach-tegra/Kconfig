@@ -386,4 +386,9 @@ config TEGRA_USB_MODEM_POWER
 	help
 	  This option enables support for out-of_band remote wakeup, selective
 	  suspend and system suspend/resume.
+
+config TEGRA_THERMAL_SYSFS
+	bool "Enable Thermal driver to use Thermal Sysfs infrastructure"
+	depends on THERMAL
+	default n
 endif
