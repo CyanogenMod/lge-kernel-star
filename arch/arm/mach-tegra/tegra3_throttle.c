@@ -26,6 +26,7 @@
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
+#include <linux/thermal.h>
 
 #include "clock.h"
 #include "cpu-tegra.h"
@@ -53,6 +54,9 @@ static int throttle_index;
 static struct delayed_work throttle_work;
 static struct workqueue_struct *workqueue;
 static DEFINE_MUTEX(tegra_throttle_lock);
+#ifdef CONFIG_TEGRA_THERMAL_SYSFS
+static struct thermal_cooling_device *cdev;
+#endif
 
 static unsigned int clip_to_table(unsigned int cpu_freq)
 {
@@ -153,6 +157,69 @@ bool tegra_is_throttling(void)
 	return is_throttling;
 }
 
+#ifdef CONFIG_TEGRA_THERMAL_SYSFS
+
+static int
+tegra_throttle_get_max_state(struct thermal_cooling_device *cdev,
+				unsigned long *max_state)
+{
+	*max_state = ARRAY_SIZE(throttle_table);
+	return 0;
+}
+
+static int
+tegra_throttle_get_cur_state(struct thermal_cooling_device *cdev,
+				unsigned long *cur_state)
+{
+	mutex_lock(cpu_throttle_lock);
+	*cur_state = is_throttling ?
+			(ARRAY_SIZE(throttle_table) - throttle_index) :
+			0;
+	mutex_unlock(cpu_throttle_lock);
+
+	return 0;
+}
+
+static int
+tegra_throttle_set_cur_state(struct thermal_cooling_device *cdev,
+				unsigned long cur_state)
+{
+	int core_level;
+
+	mutex_lock(cpu_throttle_lock);
+	if (cur_state == 0) {
+		/* restore speed requested by governor */
+		if (is_throttling) {
+			tegra_dvfs_core_cap_enable(false);
+			is_throttling = false;
+		}
+
+		tegra_cpu_set_speed_cap(NULL);
+	} else {
+		if (!is_throttling) {
+			tegra_dvfs_core_cap_enable(true);
+			is_throttling = true;
+		}
+
+		throttle_index = ARRAY_SIZE(throttle_table) - cur_state;
+		core_level = throttle_table[throttle_index].core_cap_level;
+		tegra_dvfs_core_cap_level_set(core_level);
+
+		tegra_cpu_set_speed_cap(NULL);
+	}
+
+	mutex_unlock(cpu_throttle_lock);
+
+	return 0;
+}
+
+struct thermal_cooling_device_ops tegra_throttle_cooling_ops = {
+	.get_max_state = tegra_throttle_get_max_state,
+	.get_cur_state = tegra_throttle_get_cur_state,
+	.set_cur_state = tegra_throttle_set_cur_state,
+};
+#endif
+
 int __init tegra_throttle_init(struct mutex *cpu_lock)
 {
 	int i;
@@ -182,11 +249,27 @@ int __init tegra_throttle_init(struct mutex *cpu_lock)
 		throttle_table[i].cpu_freq = clip_to_table(cpu_freq);
 	}
 
+#ifdef CONFIG_TEGRA_THERMAL_SYSFS
+	cdev = thermal_cooling_device_register("Throttle", NULL,
+						&tegra_throttle_cooling_ops);
+
+	if (IS_ERR(cdev)) {
+		cdev = NULL;
+		return -ENODEV;
+	}
+#endif
+
 	return 0;
 }
 
 void tegra_throttle_exit(void)
 {
+#ifdef CONFIG_TEGRA_THERMAL_SYSFS
+	if (cdev) {
+		thermal_cooling_device_unregister(cdev);
+		cdev = NULL;
+	}
+#endif
 	destroy_workqueue(workqueue);
 }
 
