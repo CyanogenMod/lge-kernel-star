@@ -955,15 +955,8 @@ struct platform_device tegra_spdif_device = {
 	.num_resources	= ARRAY_SIZE(spdif_resource),
 };
 #else
-/* FIXME : Temporarly adding - find the right solution */
-
 static struct resource spdif_resource[] = {
 	[0] = {
-		.start	= TEGRA_DMA_REQ_SEL_APBIF_CH3,
-		.end	= TEGRA_DMA_REQ_SEL_APBIF_CH3,
-		.flags	= IORESOURCE_DMA
-	},
-	[1] = {
 		.start	= TEGRA_SPDIF_BASE,
 		.end	= TEGRA_SPDIF_BASE + TEGRA_SPDIF_SIZE - 1,
 		.flags	= IORESOURCE_MEM
