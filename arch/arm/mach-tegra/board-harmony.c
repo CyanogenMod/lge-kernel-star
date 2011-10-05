@@ -42,6 +42,7 @@
 #include <mach/sdhci.h>
 #include <mach/nand.h>
 #include <mach/clk.h>
+#include <mach/usb_phy.h>
 
 #include "clock.h"
 #include "board.h"
@@ -74,6 +75,22 @@ static int __init parse_tag_nvidia(const struct tag *tag)
 	return 0;
 }
 __tagtable(ATAG_NVIDIA, parse_tag_nvidia);
+
+static struct tegra_utmip_config utmi_phy_config = {
+	.hssync_start_delay = 0,
+	.idle_wait_delay = 17,
+	.elastic_limit = 16,
+	.term_range_adj = 6,
+	.xcvr_setup = 9,
+	.xcvr_lsfslew = 2,
+	.xcvr_lsrslew = 2,
+};
+
+static struct tegra_ehci_platform_data tegra_ehci_pdata = {
+	.phy_config = &utmi_phy_config,
+	.operating_mode = TEGRA_USB_HOST,
+	.power_down_on_bus_suspend = 1,
+};
 
 static struct tegra_nand_chip_parms nand_chip_parms[] = {
 	/* Samsung K5E2G1GACM */
@@ -310,6 +327,7 @@ static struct platform_device *harmony_devices[] __initdata = {
 	&tegra_nand_device,
 	&tegra_udc_device,
 	&pda_power_device,
+	&tegra_ehci3_device,
 	&tegra_spi_device1,
 	&tegra_spi_device2,
 	&tegra_spi_device3,
@@ -367,6 +385,8 @@ static void __init tegra_harmony_init(void)
 	tegra_sdhci_device1.dev.platform_data = &sdhci_pdata1;
 	tegra_sdhci_device2.dev.platform_data = &sdhci_pdata2;
 	tegra_sdhci_device4.dev.platform_data = &sdhci_pdata4;
+
+	tegra_ehci3_device.dev.platform_data = &tegra_ehci_pdata;
 
 	platform_add_devices(harmony_devices, ARRAY_SIZE(harmony_devices));
 	harmony_i2c_init();
