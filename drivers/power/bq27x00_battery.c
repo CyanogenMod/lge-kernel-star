@@ -757,21 +757,26 @@ static int bq27x00_battery_probe(struct i2c_client *client,
 	di->bat.name = name;
 	di->bus.read = &bq27x00_read_i2c;
 
-	if (bq27x00_powersupply_init(di))
-		goto batt_failed_3;
-
 	i2c_set_clientdata(client, di);
 
 	/* Let's see whether this adapter can support what we need. */
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		dev_err(&client->dev, "insufficient functionality!\n");
-		return -ENODEV;
+		retval = -ENODEV;
+		goto batt_failed_3;
 	}
 
 	read_data = i2c_smbus_read_word_data(di->client, BQ27x00_REG_FLAGS);
 
-	if (!(read_data & BQ27500_FLAG_BAT_DET))
+	if (!(read_data & BQ27500_FLAG_BAT_DET)) {
 		dev_err(&client->dev, "no battery present\n");
+		retval = -ENODEV;
+		goto batt_failed_3;
+	}
+
+	retval = bq27x00_powersupply_init(di);
+	if (retval < 0)
+		goto batt_failed_3;
 
 	return 0;
 
