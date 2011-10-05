@@ -1154,11 +1154,9 @@ int tegra_dc_update_windows(struct tegra_dc_win *windows[], int n)
 	if (update_blend) {
 		tegra_dc_set_blending(dc, &dc->blend);
 		for (i = 0; i < DC_N_WINDOWS; i++) {
-			if (WIN_IS_ENABLED(windows[i])) {
-				if (!no_vsync)
-					dc->windows[i].dirty = 1;
-				update_mask |= WIN_A_ACT_REQ << i;
-			}
+			if (!no_vsync)
+				dc->windows[i].dirty = 1;
+			update_mask |= WIN_A_ACT_REQ << i;
 		}
 	}
 
