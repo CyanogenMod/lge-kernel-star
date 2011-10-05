@@ -60,6 +60,8 @@ extern unsigned long tegra_fb2_start;
 extern unsigned long tegra_fb2_size;
 extern unsigned long tegra_carveout_start;
 extern unsigned long tegra_carveout_size;
+extern unsigned long tegra_vpr_start;
+extern unsigned long tegra_vpr_size;
 extern unsigned long tegra_lp0_vec_start;
 extern unsigned long tegra_lp0_vec_size;
 extern bool tegra_lp0_vec_relocate;
