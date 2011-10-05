@@ -238,7 +238,7 @@ unsigned long long tegra_chip_uid(void)
 	/* Lot code must be re-encoded from a 5 digit base-36 'BCD' number
 	   to a binary number. */
 	lot = 0;
-	reg = tegra_fuse_readl(FUSE_LOT_CODE_1) << 2;
+	reg = tegra_fuse_readl(FUSE_LOT_CODE_0) << 2;
 
 	for (i = 0; i < 5; ++i) {
 		u32 digit = (reg & 0xFC000000) >> 26;
