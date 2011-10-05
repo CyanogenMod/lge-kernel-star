@@ -595,7 +595,7 @@ static void __init tegra_aruba_init(void)
 	tegra_clk_init_from_table(aruba_clk_init_table);
 	aruba_pinmux_init();
 
-	snprintf(serial, sizeof(serial), "%llx", tegra_chip_uid());
+	snprintf(serial, sizeof(serial), "%016llx", tegra_chip_uid());
 	andusb_plat.serial_number = kstrdup(serial, GFP_KERNEL);
 	platform_add_devices(aruba_devices, ARRAY_SIZE(aruba_devices));
 

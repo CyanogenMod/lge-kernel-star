@@ -1020,7 +1020,7 @@ static void __init tegra_cardhu_init(void)
 	cardhu_edp_init();
 #endif
 	cardhu_uart_init();
-	snprintf(usb_serial_num, sizeof(usb_serial_num), "%llx", tegra_chip_uid());
+	snprintf(usb_serial_num, sizeof(usb_serial_num), "%016llx", tegra_chip_uid());
 	andusb_plat.serial_number = kstrdup(usb_serial_num, GFP_KERNEL);
 	cardhu_tsensor_init();
 	platform_add_devices(cardhu_devices, ARRAY_SIZE(cardhu_devices));

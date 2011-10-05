@@ -789,7 +789,7 @@ static void __init tegra_ventana_init(void)
 	ventana_pinmux_init();
 	ventana_i2c_init();
 	ventana_uart_init();
-	snprintf(usb_serial_num, sizeof(usb_serial_num), "%llx", tegra_chip_uid());
+	snprintf(usb_serial_num, sizeof(usb_serial_num), "%016llx", tegra_chip_uid());
 	andusb_plat.serial_number = kstrdup(usb_serial_num, GFP_KERNEL);
 	tegra_ehci2_device.dev.platform_data
 		= &ventana_ehci2_ulpi_platform_data;

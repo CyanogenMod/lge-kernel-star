@@ -880,7 +880,7 @@ static void __init tegra_enterprise_init(void)
 	enterprise_i2c_init();
 	enterprise_uart_init();
 	enterprise_usb_init();
-	snprintf(serial, sizeof(serial), "%llx", tegra_chip_uid());
+	snprintf(serial, sizeof(serial), "%016llx", tegra_chip_uid());
 	andusb_plat.serial_number = kstrdup(serial, GFP_KERNEL);
 	enterprise_tsensor_init();
 	platform_add_devices(enterprise_devices, ARRAY_SIZE(enterprise_devices));

@@ -638,7 +638,7 @@ static void __init tegra_whistler_init(void)
 	whistler_pinmux_init();
 	whistler_i2c_init();
 	whistler_uart_init();
-	snprintf(usb_serial_num, sizeof(usb_serial_num), "%llx", tegra_chip_uid());
+	snprintf(usb_serial_num, sizeof(usb_serial_num), "%016llx", tegra_chip_uid());
 	andusb_plat.serial_number = kstrdup(usb_serial_num, GFP_KERNEL);
 	platform_add_devices(whistler_devices, ARRAY_SIZE(whistler_devices));
 
