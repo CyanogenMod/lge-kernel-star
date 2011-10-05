@@ -38,6 +38,7 @@ struct dam_srate {
 	unsigned int client_bits;
 	unsigned int audio_channels;
 	unsigned int client_channels;
+	unsigned int apbif_chan;
 };
 
 #define TEGRA_AUDIO_IN_SET_CONFIG	_IOW(TEGRA_AUDIO_MAGIC, 2, \
@@ -64,6 +65,9 @@ struct dam_srate {
 			unsigned int *)
 
 #define DAM_SRC_START	_IOW(TEGRA_AUDIO_MAGIC, 13, struct dam_srate *)
-#define DAM_SRC_STOP	_IOW(TEGRA_AUDIO_MAGIC, 14, struct dam_srate *)
+#define DAM_SRC_STOP	_IO(TEGRA_AUDIO_MAGIC, 14)
+#define DAM_MIXING_START	_IOW(TEGRA_AUDIO_MAGIC, 15, struct dam_srate *)
+#define DAM_MIXING_STOP	_IO(TEGRA_AUDIO_MAGIC, 16)
+#define DAM_SET_MIXING_FLAG	_IO(TEGRA_AUDIO_MAGIC, 17)
 
 #endif/*_CPCAP_AUDIO_H*/
