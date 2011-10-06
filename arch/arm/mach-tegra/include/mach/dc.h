@@ -364,6 +364,13 @@ struct tegra_dc_csc {
 	unsigned short kvb;
 };
 
+/* palette lookup table */
+struct tegra_dc_lut {
+	u8 r[256];
+	u8 g[256];
+	u8 b[256];
+};
+
 struct tegra_dc_win {
 	u8			idx;
 	u8			fmt;
@@ -394,6 +401,7 @@ struct tegra_dc_win {
 	struct nvmap_handle_ref	*cur_handle;
 	unsigned		bandwidth;
 	unsigned		new_bandwidth;
+	struct tegra_dc_lut	lut;
 };
 
 
@@ -501,6 +509,8 @@ struct tegra_dc_pwm_params {
 void tegra_dc_config_pwm(struct tegra_dc *dc, struct tegra_dc_pwm_params *cfg);
 
 int tegra_dc_update_csc(struct tegra_dc *dc, int win_index);
+
+int tegra_dc_update_lut(struct tegra_dc *dc, int win_index, int start, int len);
 
 /*
  * In order to get a dc's current EDID, first call tegra_dc_get_edid() from an
