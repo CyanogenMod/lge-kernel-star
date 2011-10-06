@@ -76,7 +76,7 @@ static struct regulator_consumer_supply max77663_sd2_supply[] = {
 	REGULATOR_SUPPLY("ldo8", NULL),
 	REGULATOR_SUPPLY("vcore_audio", NULL),
 	REGULATOR_SUPPLY("avcore_audio", NULL),
-	REGULATOR_SUPPLY("vddio_sdmmc3", NULL),
+	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.2"),
 	REGULATOR_SUPPLY("pwrdet_sdmmc3", NULL),
 	REGULATOR_SUPPLY("vcore1_lpddr2", NULL),
 	REGULATOR_SUPPLY("vcom_1v8", NULL),
@@ -119,7 +119,7 @@ static struct regulator_consumer_supply max77663_ldo2_supply[] = {
 };
 
 static struct regulator_consumer_supply max77663_ldo3_supply[] = {
-	REGULATOR_SUPPLY("vddio_sdmmc4", NULL),
+	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.3"),
 	REGULATOR_SUPPLY("pwrdet_sdmmc4", NULL),
 };
 
@@ -128,7 +128,7 @@ static struct regulator_consumer_supply max77663_ldo4_supply[] = {
 };
 
 static struct regulator_consumer_supply max77663_ldo5_supply[] = {
-	REGULATOR_SUPPLY("vddio_sdmmc1", NULL),
+	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.0"),
 	REGULATOR_SUPPLY("pwrdet_sdmmc1", NULL),
 };
 
@@ -511,7 +511,7 @@ static int gpio_switch_en_vdd_com_voltages[] = { 3300};
 
 /* EN_VDD_SDMMC1 from AP GPIO VI_HSYNC D07*/
 static struct regulator_consumer_supply gpio_switch_en_vdd_sdmmc1_supply[] = {
-	REGULATOR_SUPPLY("vddio_sd_slot", NULL),
+	REGULATOR_SUPPLY("vddio_sd_slot", "sdhci-tegra.0"),
 };
 static int gpio_switch_en_vdd_sdmmc1_voltages[] = { 3300};
 
