@@ -632,8 +632,6 @@ GREG_INIT(6, en_vdd_pnl1_pm269,		en_vdd_pnl1,		"vdd_3v3_devices",
 	0,      0,      TEGRA_GPIO_PW1,	false,	1,	0,	0,	0);
 GREG_INIT(9, en_3v3_fuse_pm269,		en_3v3_fuse,		"vdd_3v3_devices",
 	0,      0,      TEGRA_GPIO_PC1,	false,	0,	0,	0,	0);
-GREG_INIT(11, en_vdd_sdmmc1_pm269,	en_vdd_sdmmc1,		"vdd_3v3_devices",
-	0,      0,      TEGRA_GPIO_PP1,	false,	1,	0,	0,	0);
 GREG_INIT(12, en_3v3_pex_hvdd_pm269,	en_3v3_pex_hvdd,	"hvdd_pex_pmu",
 	0,      0,      TEGRA_GPIO_PC6,	false,	0,	0,	0,	0);
 GREG_INIT(17, en_vddio_vid_oc_pm269,	en_vddio_vid_oc,	"master_5v_switch",
@@ -692,7 +690,6 @@ GREG_INIT(22, en_vbrtr,		en_vbrtr,	"vdd_3v3_devices",	0,      0,      PMU_TCA641
 	ADD_GPIO_REG(en_vdd_com),		\
 	ADD_GPIO_REG(en_3v3_fuse_pm269),	\
 	ADD_GPIO_REG(en_3v3_emmc),		\
-	ADD_GPIO_REG(en_vdd_sdmmc1_pm269),	\
 	ADD_GPIO_REG(en_3v3_pex_hvdd_pm269),	\
 	ADD_GPIO_REG(en_1v8_cam),		\
 	ADD_GPIO_REG(dis_5v_switch_e118x),	\
