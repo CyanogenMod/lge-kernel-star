@@ -733,6 +733,9 @@ int __init cardhu_pm298_gpio_switch_regulator_init(void)
 
 	switch (board_info.board_id) {
 	case BOARD_PM269:
+	case BOARD_PM305:
+	case BOARD_PM311:
+	case BOARD_E1257:
 		gswitch_pdata.num_subdevs = ARRAY_SIZE(gswitch_subdevs_pm269);
 		gswitch_pdata.subdevs = gswitch_subdevs_pm269;
 		break;
