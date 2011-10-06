@@ -318,6 +318,7 @@ struct tegra_pcie_info {
 	void __iomem		*regs;
 	struct resource		res_mmio;
 	int			power_rails_enabled;
+	int			pcie_power_enabled;
 
 	struct regulator	*regulator_hvdd;
 	struct regulator	*regulator_pexio;
@@ -538,8 +539,11 @@ static int tegra_pcie_setup(int nr, struct pci_sys_data *sys)
 		pp->res[0].end = IO_SPACE_LIMIT;
 	}
 	pp->res[0].flags = IORESOURCE_IO;
-	if (request_resource(&ioport_resource, &pp->res[0]))
-		panic("Request PCIe IO resource failed\n");
+	if (request_resource(&ioport_resource, &pp->res[0])) {
+		pr_err("Request PCIe IO resource failed\n");
+		/* return failure */
+		return -EBUSY;
+	}
 	sys->resource[0] = &pp->res[0];
 
 	/*
@@ -552,8 +556,11 @@ static int tegra_pcie_setup(int nr, struct pci_sys_data *sys)
 	pp->res[1].start = MEM_BASE_0;
 	pp->res[1].end = pp->res[1].start + MEM_SIZE - 1;
 	pp->res[1].flags = IORESOURCE_MEM;
-	if (request_resource(&iomem_resource, &pp->res[1]))
-		panic("Request PCIe Memory resource failed\n");
+	if (request_resource(&iomem_resource, &pp->res[1])) {
+		pr_err("Request PCIe Memory resource failed\n");
+		/* return failure */
+		return -EBUSY;
+	}
 	sys->resource[1] = &pp->res[1];
 
 	/*
@@ -566,8 +573,11 @@ static int tegra_pcie_setup(int nr, struct pci_sys_data *sys)
 	pp->res[2].start = PREFETCH_MEM_BASE_0;
 	pp->res[2].end = pp->res[2].start + PREFETCH_MEM_SIZE - 1;
 	pp->res[2].flags = IORESOURCE_MEM | IORESOURCE_PREFETCH;
-	if (request_resource(&iomem_resource, &pp->res[2]))
-		panic("Request PCIe Prefetch Memory resource failed\n");
+	if (request_resource(&iomem_resource, &pp->res[2])) {
+		pr_err("Request PCIe Prefetch Memory resource failed\n");
+		/* return failure */
+		return -EBUSY;
+	}
 	sys->resource[2] = &pp->res[2];
 	return 1;
 }
@@ -910,6 +920,8 @@ err_exit:
 static int tegra_pcie_power_on(void)
 {
 	int err = 0;
+	if (tegra_pcie.pcie_power_enabled)
+		return 0;
 	err = tegra_pci_enable_regulators();
 	if (err)
 		goto err_exit;
@@ -922,6 +934,8 @@ static int tegra_pcie_power_on(void)
 		clk_enable(tegra_pcie.clk_tera_pcie_cml);
 	if (tegra_pcie.pll_e)
 		clk_enable(tegra_pcie.pll_e);
+
+	tegra_pcie.pcie_power_enabled = 1;
 err_exit:
 	return err;
 }
@@ -929,10 +943,11 @@ err_exit:
 static int tegra_pcie_power_off(void)
 {
 	int err = 0;
+	if (tegra_pcie.pcie_power_enabled == 0)
+		return 0;
 	err = tegra_powergate_partition_with_clk_off(TEGRA_POWERGATE_PCIE);
 	if (err)
 		goto err_exit;
-	tegra_pcie_xclk_clamp(true);
 	if (tegra_pcie.clk_cml0)
 		clk_disable(tegra_pcie.clk_cml0);
 	if (tegra_pcie.clk_tera_pcie_cml)
@@ -940,6 +955,8 @@ static int tegra_pcie_power_off(void)
 	if (tegra_pcie.pll_e)
 		clk_disable(tegra_pcie.pll_e);
 	err = tegra_pci_disable_regulators();
+
+	tegra_pcie.pcie_power_enabled = 0;
 err_exit:
 	return err;
 }
@@ -1180,6 +1197,7 @@ static int tegra_pcie_init(void)
 			tegra_pcie_add_port(port, rp_offset, ctrl_offset);
 	}
 
+	tegra_pcie.pcie_power_enabled = 1;
 	if (tegra_pcie.num_ports)
 		pci_common_init(&tegra_pcie_hw);
 	else
@@ -1204,7 +1222,6 @@ static int tegra_pci_probe(struct platform_device *pdev)
 static int tegra_pci_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	return tegra_pcie_power_off();
-
 }
 
 static int tegra_pci_resume(struct platform_device *pdev)
