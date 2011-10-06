@@ -1,6 +1,6 @@
 config TEGRA_NVAVP
 	bool "Enable support for Tegra NVAVP driver"
-	depends on ARCH_TEGRA
+	depends on ARCH_TEGRA && TEGRA_GRHOST
 	default n
 	help
 	  Enables support for the push-buffer mechanism based driver for the Tegra

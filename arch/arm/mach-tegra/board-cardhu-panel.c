@@ -57,9 +57,11 @@
 #define cardhu_dsi_panel_reset	TEGRA_GPIO_PD2
 #endif
 
+#ifdef CONFIG_TEGRA_DC
 static struct regulator *cardhu_hdmi_reg = NULL;
 static struct regulator *cardhu_hdmi_pll = NULL;
 static struct regulator *cardhu_hdmi_vddio = NULL;
+#endif
 
 static atomic_t sd_brightness = ATOMIC_INIT(255);
 
@@ -301,6 +303,7 @@ static int cardhu_panel_disable(void)
 }
 #endif
 
+#ifdef CONFIG_TEGRA_DC
 static int cardhu_hdmi_vddio_enable(void)
 {
 	int ret;
@@ -378,6 +381,7 @@ static int cardhu_hdmi_disable(void)
 	cardhu_hdmi_pll = NULL;
 	return 0;
 }
+
 static struct resource cardhu_disp1_resources[] = {
 	{
 		.name	= "irq",
@@ -440,6 +444,7 @@ static struct resource cardhu_disp2_resources[] = {
 		.flags	= IORESOURCE_MEM,
 	},
 };
+#endif
 
 #ifndef CONFIG_TEGRA_CARDHU_DSI
 static struct tegra_dc_mode cardhu_panel_modes[] = {
@@ -568,6 +573,7 @@ static struct tegra_dc_sd_settings cardhu_sd_settings = {
 	.bl_device = &cardhu_backlight_device,
 };
 
+#ifdef CONFIG_TEGRA_DC
 #ifndef CONFIG_TEGRA_CARDHU_DSI
 static struct tegra_fb_data cardhu_fb_data = {
 	.win		= 0,
@@ -611,6 +617,7 @@ static struct tegra_dc_platform_data cardhu_disp2_pdata = {
 	.fb		= &cardhu_hdmi_fb_data,
 	.emc_clk_rate	= 300000000,
 };
+#endif
 
 #ifdef CONFIG_TEGRA_CARDHU_DSI
 static int cardhu_dsi_panel_enable(void)
@@ -894,6 +901,8 @@ static struct tegra_dc_out cardhu_disp1_out = {
 	.postsuspend	= cardhu_dsi_panel_postsuspend,
 #endif
 };
+
+#ifdef CONFIG_TEGRA_DC
 static struct tegra_dc_platform_data cardhu_disp1_pdata = {
 	.flags		= TEGRA_DC_FLAG_ENABLED,
 	.default_out	= &cardhu_disp1_out,
@@ -904,6 +913,7 @@ static struct tegra_dc_platform_data cardhu_disp1_pdata = {
 	.fb		= &cardhu_dsi_fb_data,
 #endif
 };
+
 static struct nvhost_device cardhu_disp1_device = {
 	.name		= "tegradc",
 	.id		= 0,
@@ -928,6 +938,12 @@ static struct nvhost_device cardhu_disp2_device = {
 		.platform_data = &cardhu_disp2_pdata,
 	},
 };
+#else
+static int cardhu_disp1_check_fb(struct device *dev, struct fb_info *info)
+{
+	return 0;
+}
+#endif
 
 static struct nvmap_platform_carveout cardhu_carveouts[] = {
 	[0] = NVMAP_HEAP_CARVEOUT_IRAM_INIT,
@@ -956,7 +972,9 @@ static struct platform_device cardhu_nvmap_device = {
 
 static struct platform_device *cardhu_gfx_devices[] __initdata = {
 	&cardhu_nvmap_device,
+#ifdef CONFIG_TEGRA_GRHOST
 	&tegra_grhost_device,
+#endif
 	&tegra_pwfm0_device,
 	&cardhu_backlight_device,
 };
@@ -1000,7 +1018,7 @@ static void cardhu_panel_late_resume(struct early_suspend *h)
 int __init cardhu_panel_init(void)
 {
 	int err;
-	struct resource *res;
+	struct resource __maybe_unused *res;
 
 	tegra_get_board_info(&board_info);
 
@@ -1042,15 +1060,18 @@ int __init cardhu_panel_init(void)
 	err = platform_add_devices(cardhu_gfx_devices,
 				ARRAY_SIZE(cardhu_gfx_devices));
 
+#if defined(CONFIG_TEGRA_GRHOST) && defined(CONFIG_TEGRA_DC)
 	res = nvhost_get_resource_byname(&cardhu_disp1_device,
 					 IORESOURCE_MEM, "fbmem");
 	res->start = tegra_fb_start;
 	res->end = tegra_fb_start + tegra_fb_size - 1;
+#endif
 
 	/* Copy the bootloader fb to the fb. */
 	tegra_move_framebuffer(tegra_fb_start, tegra_bootloader_fb_start,
 				min(tegra_fb_size, tegra_bootloader_fb_size));
 
+#if defined(CONFIG_TEGRA_GRHOST) && defined(CONFIG_TEGRA_DC)
 	if (!err)
 		err = nvhost_device_register(&cardhu_disp1_device);
 
@@ -1060,8 +1081,9 @@ int __init cardhu_panel_init(void)
 	res->end = tegra_fb2_start + tegra_fb2_size - 1;
 	if (!err)
 		err = nvhost_device_register(&cardhu_disp2_device);
+#endif
 
-#if defined(CONFIG_TEGRA_NVAVP)
+#if defined(CONFIG_TEGRA_GRHOST) && defined(CONFIG_TEGRA_NVAVP)
 	if (!err)
 		err = nvhost_device_register(&nvavp_device);
 #endif

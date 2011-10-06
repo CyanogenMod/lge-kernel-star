@@ -10,7 +10,7 @@ config TEGRA_GRHOST
 
 config TEGRA_DC
 	tristate "Tegra Display Contoller"
-	depends on ARCH_TEGRA
+	depends on ARCH_TEGRA && TEGRA_GRHOST
 	select FB_MODE_HELPERS
 	select I2C
 	help

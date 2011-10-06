@@ -33,7 +33,7 @@ config SND_SOC_TEGRA30_I2S
 
 config SND_SOC_TEGRA20_SPDIF
 	tristate
-	depends on SND_SOC_TEGRA && ARCH_TEGRA_2x_SOC
+	depends on SND_SOC_TEGRA && ARCH_TEGRA_2x_SOC && TEGRA_DC
 	default m
 	help
 	  Say Y or M if you want to add support for the TEGRA20 SPDIF interface.
@@ -42,7 +42,7 @@ config SND_SOC_TEGRA20_SPDIF
 
 config SND_SOC_TEGRA30_SPDIF
 	tristate
-	depends on SND_SOC_TEGRA && ARCH_TEGRA_3x_SOC
+	depends on SND_SOC_TEGRA && ARCH_TEGRA_3x_SOC && TEGRA_DC
 	select SND_SOC_TEGRA30_AHUB
 	help
 	  Say Y or M if you want to add support for the TEGRA30 SPDIF interface.
@@ -58,7 +58,7 @@ config MACH_HAS_SND_SOC_TEGRA_WM8903
 
 config SND_SOC_TEGRA_WM8903
 	tristate "SoC Audio support for Tegra boards using a WM8903 codec"
-	depends on SND_SOC_TEGRA && I2C
+	depends on SND_SOC_TEGRA && I2C && TEGRA_DC
 	depends on MACH_HAS_SND_SOC_TEGRA_WM8903
 	select SND_SOC_TEGRA20_I2S if ARCH_TEGRA_2x_SOC
 	select SND_SOC_TEGRA30_I2S if ARCH_TEGRA_3x_SOC
@@ -80,7 +80,7 @@ config MACH_HAS_SND_SOC_TEGRA_WM8753
 
 config SND_SOC_TEGRA_WM8753
 	tristate "SoC Audio support for Tegra boards using a WM8753 codec"
-	depends on SND_SOC_TEGRA && I2C
+	depends on SND_SOC_TEGRA && I2C && TEGRA_DC
 	depends on MACH_HAS_SND_SOC_TEGRA_WM8753
 	select SND_SOC_TEGRA20_I2S if ARCH_TEGRA_2x_SOC
 	select SND_SOC_TEGRA30_I2S if ARCH_TEGRA_3x_SOC
@@ -102,7 +102,7 @@ config MACH_HAS_SND_SOC_TEGRA_MAX98088
 
 config SND_SOC_TEGRA_MAX98088
 	tristate "SoC Audio support for Tegra boards using a MAX98088 codec"
-	depends on SND_SOC_TEGRA && I2C
+	depends on SND_SOC_TEGRA && I2C && TEGRA_DC
 	depends on MACH_HAS_SND_SOC_TEGRA_MAX98088
 	select SND_SOC_TEGRA20_I2S if ARCH_TEGRA_2x_SOC
 	select SND_SOC_TEGRA30_I2S if ARCH_TEGRA_3x_SOC

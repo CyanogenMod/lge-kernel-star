@@ -85,6 +85,7 @@ static struct platform_device aruba_backlight_device = {
 	},
 };
 
+#ifdef CONFIG_TEGRA_DC
 static int aruba_panel_enable(void)
 {
 	static struct regulator *reg = NULL;
@@ -180,6 +181,7 @@ static struct nvhost_device aruba_disp1_device = {
 		.platform_data = &aruba_disp1_pdata,
 	},
 };
+#endif
 
 static struct nvmap_platform_carveout aruba_carveouts[] = {
 	[0] = NVMAP_HEAP_CARVEOUT_IRAM_INIT,
@@ -207,7 +209,9 @@ static struct platform_device aruba_nvmap_device = {
 
 static struct platform_device *aruba_gfx_devices[] __initdata = {
 	&aruba_nvmap_device,
+#ifdef CONFIG_TEGRA_GRHOST
 	&tegra_grhost_device,
+#endif
 	&tegra_pwfm2_device,
 	&aruba_backlight_device,
 };
@@ -215,7 +219,7 @@ static struct platform_device *aruba_gfx_devices[] __initdata = {
 int __init aruba_panel_init(void)
 {
 	int err;
-	struct resource *res;
+	struct resource __maybe_unused *res;
 
 	aruba_carveouts[1].base = tegra_carveout_start;
 	aruba_carveouts[1].size = tegra_carveout_size;
@@ -223,17 +227,21 @@ int __init aruba_panel_init(void)
 	err = platform_add_devices(aruba_gfx_devices,
 				   ARRAY_SIZE(aruba_gfx_devices));
 
+#if defined(CONFIG_TEGRA_GRHOST) && defined(CONFIG_TEGRA_DC)
 	res = nvhost_get_resource_byname(&aruba_disp1_device,
 					 IORESOURCE_MEM, "fbmem");
 	res->start = tegra_fb_start;
 	res->end = tegra_fb_start + tegra_fb_size - 1;
+#endif
 
 	/* Copy the bootloader fb to the fb. */
 	tegra_move_framebuffer(tegra_fb_start, tegra_bootloader_fb_start,
 				min(tegra_fb_size, tegra_bootloader_fb_size));
 
+#if defined(CONFIG_TEGRA_GRHOST) && defined(CONFIG_TEGRA_DC)
 	if (!err)
 		err = nvhost_device_register(&aruba_disp1_device);
+#endif
 
 	return err;
 }
