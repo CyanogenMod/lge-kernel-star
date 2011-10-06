@@ -29,6 +29,7 @@
 static const struct tegra_edp_limits *edp_limits;
 static int edp_limits_size;
 
+static const unsigned int *system_edp_limits;
 
 /*
  * Temperature step size cannot be less than 4C because of hysteresis
@@ -166,6 +167,20 @@ static char __initdata tegra_edp_map[] = {
 };
 
 
+static struct system_edp_entry __initdata tegra_system_edp_map[] = {
+
+/* {SKU, power-limit (in 100mW), {freq limits (in 10Mhz)} } */
+
+	{  1,  49, {130, 120, 120, 120} },
+	{  1,  44, {130, 120, 120, 110} },
+	{  1,  37, {130, 120, 110, 100} },
+	{  1,  35, {130, 120, 110,  90} },
+	{  1,  29, {130, 120, 100,  80} },
+	{  1,  27, {130, 120,  90,  80} },
+	{  1,  25, {130, 110,  80,  60} },
+	{  1,  21, {130, 100,  80,  40} },
+};
+
 /*
  * "Safe entry" to be used when no match for speedo_id /
  * regulator_cur is found; must be the last one
@@ -227,16 +242,70 @@ void __init tegra_init_cpu_edp_limits(unsigned int regulator_mA)
 		e[j].freq_limits[3] = (unsigned int)t[i+j].freq_limits[3] * 10000;
 	}
 
-	if (edp_limits && edp_limits != edp_default_limits)
+	if (edp_limits != edp_default_limits)
 		kfree(edp_limits);
 
 	edp_limits = e;
 }
 
+
+void __init tegra_init_system_edp_limits(unsigned int power_limit_mW)
+{
+	int cpu_speedo_id = tegra_cpu_speedo_id();
+	int i;
+	unsigned int *e;
+	struct system_edp_entry *t =
+		(struct system_edp_entry *)tegra_system_edp_map;
+	int tsize = sizeof(tegra_system_edp_map) /
+		sizeof(struct system_edp_entry);
+
+	if (!power_limit_mW) {
+		e = NULL;
+		goto out;
+	}
+
+	for (i = 0; i < tsize; i++)
+		if (t[i].speedo_id == cpu_speedo_id)
+			break;
+
+	if (i >= tsize) {
+		e = NULL;
+		goto out;
+	}
+
+	do {
+		if (t[i].power_limit_100mW <= power_limit_mW / 100)
+			break;
+		i++;
+	} while (i < tsize && t[i].speedo_id == cpu_speedo_id);
+
+	if (i >= tsize || t[i].speedo_id != cpu_speedo_id)
+		i--; /* No low enough entry in the table, use best possible */
+
+	e = kmalloc(sizeof(unsigned int) * 4, GFP_KERNEL);
+	BUG_ON(!e);
+
+	e[0] = (unsigned int)t[i].freq_limits[0] * 10000;
+	e[1] = (unsigned int)t[i].freq_limits[1] * 10000;
+	e[2] = (unsigned int)t[i].freq_limits[2] * 10000;
+	e[3] = (unsigned int)t[i].freq_limits[3] * 10000;
+
+out:
+	kfree(system_edp_limits);
+
+	system_edp_limits = e;
+}
+
+
 void tegra_get_cpu_edp_limits(const struct tegra_edp_limits **limits, int *size)
 {
 	*limits = edp_limits;
 	*size = edp_limits_size;
+}
+
+void tegra_get_system_edp_limits(const unsigned int **limits)
+{
+	*limits = system_edp_limits;
 }
 
 #ifdef CONFIG_DEBUG_FS
@@ -250,19 +319,24 @@ static int edp_limit_debugfs_show(struct seq_file *s, void *data)
 static int edp_debugfs_show(struct seq_file *s, void *data)
 {
 	int i;
-	const struct tegra_edp_limits *limits;
-	int size;
 
-	tegra_get_cpu_edp_limits(&limits, &size);
+	seq_printf(s, "-- CPU EDP table --\n");
+	for (i = 0; i < edp_limits_size; i++) {
+		seq_printf(s, "%4dC: %10u %10u %10u %10u\n",
+			   edp_limits[i].temperature,
+			   edp_limits[i].freq_limits[0],
+			   edp_limits[i].freq_limits[1],
+			   edp_limits[i].freq_limits[2],
+			   edp_limits[i].freq_limits[3]);
+	}
 
-	seq_printf(s, "-- EDP table --\n");
-	for (i = 0; i < size; i++) {
-		seq_printf(s, "%4dC: %10d %10d %10d %10d\n",
-			   limits[i].temperature,
-			   limits[i].freq_limits[0],
-			   limits[i].freq_limits[1],
-			   limits[i].freq_limits[2],
-			   limits[i].freq_limits[3]);
+	if (system_edp_limits) {
+		seq_printf(s, "\n-- System EDP table --\n");
+		seq_printf(s, "%10u %10u %10u %10u\n",
+			   system_edp_limits[0],
+			   system_edp_limits[1],
+			   system_edp_limits[2],
+			   system_edp_limits[3]);
 	}
 
 	return 0;

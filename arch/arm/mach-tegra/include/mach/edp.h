@@ -35,17 +35,27 @@ struct tegra_edp_limits {
 	unsigned int freq_limits[4];
 };
 
+struct system_edp_entry {
+	char speedo_id;
+	char power_limit_100mW;
+	char freq_limits[4];
+};
 
 #ifdef CONFIG_TEGRA_EDP_LIMITS
 
 
 int tegra_edp_update_thermal_zone(int temperature);
 void tegra_init_cpu_edp_limits(unsigned int regulator_mA);
+void tegra_init_system_edp_limits(unsigned int power_limit_mW);
 void tegra_get_cpu_edp_limits(const struct tegra_edp_limits **limits, int *size);
 unsigned int tegra_get_edp_limit(void);
+void tegra_get_system_edp_limits(const unsigned int **limits);
+int tegra_system_edp_alarm(bool alarm);
 
 #else
 static inline void tegra_init_cpu_edp_limits(int regulator_mA)
+{}
+static inline void tegra_init_system_edp_limits(int power_limit_mW)
 {}
 static inline int tegra_edp_update_thermal_zone(int temperature)
 { return -1; }
@@ -53,6 +63,10 @@ static inline void tegra_get_cpu_edp_limits(struct tegra_edp_limits **limits,
 					    int *size)
 {}
 static inline unsigned int tegra_get_edp_limit(void)
+{ return -1; }
+static inline void tegra_get_system_edp_limits(unsigned int **limits)
+{}
+static inline int tegra_system_edp_alarm(bool alarm)
 { return -1; }
 #endif
 
