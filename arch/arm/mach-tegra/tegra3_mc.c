@@ -77,6 +77,7 @@ static int sample_log_size = SAMPLE_LOG_SIZE - 1;
 static struct hrtimer sample_timer;
 
 static bool aggregate = false;
+static bool warned = false;
 
 static void stat_start(void);
 static void stat_stop(void);
@@ -126,6 +127,7 @@ static ssize_t tegra_mc_enable_store(struct sysdev_class *class,
 	if (!sample_enable) {
 		stat_stop();
 		hrtimer_cancel(&sample_timer);
+		warned = false;
 		return count;
 	}
 
@@ -1138,8 +1140,10 @@ static void stat_log(void)
 	if (header.event_state_change != 0) {
 		spin_lock_irqsave(&sample_log_lock, flags);
 		if (unlikely(required_log_size > sample_log_size)) {
-			pr_err("%s: sample log too small!\n", __func__);
-			WARN_ON(1);
+			if (!warned) {
+				pr_err("%s: sample log too small!\n", __func__);
+				warned = true;
+			}
 			spin_unlock_irqrestore(&sample_log_lock, flags);
 			goto reschedule;
 		}
