@@ -287,7 +287,9 @@ static int tps80031dcdc_list_voltage(struct regulator_dev *rdev, unsigned index)
 }
 
 static int __tps80031_dcdc_set_voltage(struct device *parent,
-		struct tps80031_regulator *ri, int min_uV, int max_uV)
+				       struct tps80031_regulator *ri,
+				       int min_uV, int max_uV,
+				       unsigned *selector)
 {
 	int vsel = 0;
 	int ret;
@@ -364,6 +366,9 @@ static int __tps80031_dcdc_set_voltage(struct device *parent,
 		break;
 	}
 
+	if (selector)
+		*selector = vsel;
+
 	if (ri->force_reg) {
 		if (((ri->force_reg_cache >> 6) & 0x3) == 0) {
 			ret = tps80031_write(parent, ri->volt_id,
@@ -389,7 +394,8 @@ static int tps80031dcdc_set_voltage(struct regulator_dev *rdev,
 {
 	struct tps80031_regulator *ri = rdev_get_drvdata(rdev);
 	struct device *parent = to_tps80031_dev(rdev);
-	return __tps80031_dcdc_set_voltage(parent, ri, min_uV, max_uV);
+	return __tps80031_dcdc_set_voltage(parent, ri, min_uV, max_uV,
+					   selector);
 }
 
 static int tps80031dcdc_get_voltage(struct regulator_dev *rdev)
@@ -493,7 +499,9 @@ static int tps80031ldo_list_voltage(struct regulator_dev *rdev, unsigned index)
 }
 
 static int __tps80031_ldo_set_voltage(struct device *parent,
-		struct tps80031_regulator *ri, int min_uV, int max_uV)
+				      struct tps80031_regulator *ri,
+				      int min_uV, int max_uV,
+				      unsigned *selector)
 {
 	int vsel;
 	int ret;
@@ -520,7 +528,8 @@ static int tps80031ldo_set_voltage(struct regulator_dev *rdev,
 	struct tps80031_regulator *ri = rdev_get_drvdata(rdev);
 	struct device *parent = to_tps80031_dev(rdev);
 
-	return __tps80031_ldo_set_voltage(parent, ri, min_uV, max_uV);
+	return __tps80031_ldo_set_voltage(parent, ri, min_uV, max_uV,
+					  selector);
 }
 
 static int tps80031ldo_get_voltage(struct regulator_dev *rdev)
@@ -826,7 +835,7 @@ static int tps80031_regulator_preinit(struct device *parent,
 		case TPS80031_ID_SMPS4:
 			ret = __tps80031_dcdc_set_voltage(parent, ri,
 					tps80031_pdata->init_uV,
-					tps80031_pdata->init_uV);
+					tps80031_pdata->init_uV, 0);
 			break;
 
 		case TPS80031_ID_LDO1:
@@ -841,7 +850,7 @@ static int tps80031_regulator_preinit(struct device *parent,
 		case TPS80031_ID_VANA:
 			ret = __tps80031_ldo_set_voltage(parent, ri,
 					tps80031_pdata->init_uV,
-					tps80031_pdata->init_uV);
+					tps80031_pdata->init_uV, 0);
 			break;
 		default:
 			ret = -EINVAL;
