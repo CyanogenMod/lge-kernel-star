@@ -442,6 +442,9 @@ static struct max98088_pdata enterprise_max98088_pdata = {
 	.eq_cfg = max98088_eq_cfg,
 	.eq_cfgcnt = ARRAY_SIZE(max98088_eq_cfg),
 
+	/* debounce time */
+	.debounce_time_ms = 200,
+
 	/* microphone configuration */
 	.digmic_left_mode = 1,
 	.digmic_right_mode = 1,
