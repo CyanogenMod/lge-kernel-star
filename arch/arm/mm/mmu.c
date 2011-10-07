@@ -577,6 +577,7 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
 				      bool force_pages)
 {
 	pmd_t *pmd = pmd_offset(pud, addr);
+	unsigned long pages_2m = 0, pages_4k = 0;
 
 	/*
 	 * Try a section mapping - end, addr and phys must all be aligned
@@ -595,6 +596,8 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
 			phys += SECTION_SIZE;
 		} while (pmd++, addr += SECTION_SIZE, addr != end);
 
+		pages_2m += (end-addr) >> SECTION_SHIFT;
+
 		flush_pmd_entry(p);
 	} else {
 		/*
@@ -602,6 +605,12 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
 		 * individual L1 entries.
 		 */
 		alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
+		pages_4k += (end-addr) >> PAGE_SHIFT;
+	}
+
+	if ((addr < lowmem_limit) && (end < lowmem_limit)) {
+		update_page_count(PG_LEVEL_2M, pages_2m);
+		update_page_count(PG_LEVEL_4K, pages_4k);
 	}
 }
 
@@ -780,7 +789,7 @@ static int __init early_vmalloc(char *arg)
 }
 early_param("vmalloc", early_vmalloc);
 
-static phys_addr_t lowmem_limit __initdata = 0;
+phys_addr_t lowmem_limit;
 
 static void __init sanity_check_meminfo(void)
 {
