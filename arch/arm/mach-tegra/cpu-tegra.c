@@ -63,11 +63,13 @@ static int force_policy_max_set(const char *arg, const struct kernel_param *kp)
 	int ret;
 	bool old_policy = force_policy_max;
 
-	ret = param_set_bool(arg, kp);
+	mutex_lock(&tegra_cpu_lock);
 
+	ret = param_set_bool(arg, kp);
 	if ((ret == 0) && (old_policy != force_policy_max))
 		tegra_cpu_set_speed_cap(NULL);
 
+	mutex_unlock(&tegra_cpu_lock);
 	return ret;
 }
 
