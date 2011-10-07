@@ -43,8 +43,11 @@ static ssize_t bd_address_store(struct device *dev,struct device_attribute *attr
 
 static ssize_t bd_address_show(struct device *dev,struct device_attribute *attr,char *buf)
 {
-   
-   return sprintf(buf, "%s\n", mBDAddr);
+    return sprintf(buf,"%c%c:%c%c:%c%c:%c%c:%c%c:%c%c\n",
+                  mBDAddr[0], mBDAddr[1], mBDAddr[2],
+                  mBDAddr[3], mBDAddr[4], mBDAddr[5],
+                  mBDAddr[6], mBDAddr[7], mBDAddr[8],
+                  mBDAddr[9], mBDAddr[10], mBDAddr[11]);
 }
 static DEVICE_ATTR(bdaddr_if, 0666, bd_address_show, bd_address_store);
 
