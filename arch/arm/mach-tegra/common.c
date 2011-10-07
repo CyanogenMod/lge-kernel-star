@@ -202,7 +202,7 @@ void tegra_init_cache(void)
 #endif
 	aux_ctrl = readl(p + L2X0_CACHE_TYPE);
 	aux_ctrl = (aux_ctrl & 0x700) << (17-8);
-	aux_ctrl |= 0x6C000001;
+	aux_ctrl |= 0x7C000001;
 	l2x0_init(p, aux_ctrl, 0x8200c3fe);
 #endif
 }
