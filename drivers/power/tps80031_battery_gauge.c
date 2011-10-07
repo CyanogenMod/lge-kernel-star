@@ -420,6 +420,12 @@ static int tps80031_battery_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+	if (!pdata->battery_present) {
+		dev_err(dev, "%s() No battery detected, exiting..\n",
+				__func__);
+		return -ENODEV;
+	}
+
 	di->dev =  &pdev->dev;
 
 	ret = tps80031_reg_read(di, SLAVE_ID2, CONTROLLER_STAT1, &retval);

@@ -155,6 +155,7 @@ struct tps80031_platform_data {
 
 struct tps80031_bg_platform_data {
 	int irq_base;
+	int battery_present;
 };
 
 /*
