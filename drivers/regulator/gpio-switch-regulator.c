@@ -105,7 +105,7 @@ static int gpio_switch_list_voltage(struct regulator_dev *rdev,
 }
 
 static int gpio_switch_set_voltage(struct regulator_dev *rdev,
-				    int min_uV, int max_uV)
+				   int min_uV, int max_uV, unsigned *selector)
 {
 	struct gpio_switch_regulator *ri = rdev_get_drvdata(rdev);
 	int uV;
@@ -116,7 +116,7 @@ static int gpio_switch_set_voltage(struct regulator_dev *rdev,
 		uV = ri->voltages[val] * 1000;
 		if (min_uV <= uV && uV <= max_uV) {
 			found = true;
-			ri->curr_vol_sel = val;
+			*selector = ri->curr_vol_sel = val;
 			break;
 		}
 	}
