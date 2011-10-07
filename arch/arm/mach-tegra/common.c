@@ -378,7 +378,7 @@ static int __init tegra_pmu_core_edp(char *options)
 	int core_edp = memparse(p, &p);
 	if (core_edp != 0)
 		pmu_core_edp = core_edp;
-	return 1;
+	return 0;
 }
 early_param("core_edp_mv", tegra_pmu_core_edp);
 
