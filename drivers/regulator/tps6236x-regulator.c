@@ -129,7 +129,8 @@ static int tps6236x_reg_write(struct tps6236x_chip *tps, u8 reg, u8 val)
 	return err;
 }
 static int __tps6236x_dcdc_set_voltage(struct tps6236x_chip *tps,
-				int min_uV, int max_uV)
+				       int min_uV, int max_uV,
+				       unsigned *selector)
 {
 	int vsel;
 
@@ -146,6 +147,8 @@ static int __tps6236x_dcdc_set_voltage(struct tps6236x_chip *tps,
 		int mV = tps->voltages[vsel];
 		int uV = mV * 1000;
 		if (min_uV <= uV && uV <= max_uV) {
+			if (selector)
+				*selector = vsel;
 			return tps6236x_reg_write(tps, REG_VSET0 + tps->vsel_id,
 					vsel);
 		}
@@ -187,11 +190,12 @@ static int tps6236x_dcdc_get_voltage(struct regulator_dev *dev)
 }
 
 static int tps6236x_dcdc_set_voltage(struct regulator_dev *dev,
-				int min_uV, int max_uV)
+				     int min_uV, int max_uV,
+				     unsigned *selector)
 {
 	struct tps6236x_chip *tps = rdev_get_drvdata(dev);
 
-	return __tps6236x_dcdc_set_voltage(tps, min_uV, max_uV);
+	return __tps6236x_dcdc_set_voltage(tps, min_uV, max_uV, selector);
 }
 
 static int tps6236x_dcdc_list_voltage(struct regulator_dev *dev,
@@ -288,7 +292,7 @@ static int tps6236x_init_dcdc(struct i2c_client *client,
 		return 0;
 
 	init_mV = pdata->init_uV;
-	return __tps6236x_dcdc_set_voltage(tps, init_mV, init_mV);
+	return __tps6236x_dcdc_set_voltage(tps, init_mV, init_mV, 0);
 }
 
 static int __devinit tps6236x_probe(struct i2c_client *client,
