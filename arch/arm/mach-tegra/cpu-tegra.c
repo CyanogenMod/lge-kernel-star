@@ -85,6 +85,53 @@ static struct kernel_param_ops policy_ops = {
 module_param_cb(force_policy_max, &policy_ops, &force_policy_max, 0644);
 
 
+static unsigned int cpu_user_cap;
+
+static int cpu_user_cap_set(const char *arg, const struct kernel_param *kp)
+{
+	int ret;
+
+	mutex_lock(&tegra_cpu_lock);
+
+	ret = param_set_uint(arg, kp);
+	if (ret == 0) {
+#ifndef CONFIG_TEGRA_CPU_CAP_EXACT_FREQ
+		if (cpu_user_cap != 0) {
+			int i;
+			for (i = 0; freq_table[i].frequency !=
+				CPUFREQ_TABLE_END; i++) {
+				if (freq_table[i].frequency > cpu_user_cap)
+					break;
+			}
+			i = (i == 0) ? 0 : i - 1;
+			cpu_user_cap = freq_table[i].frequency;
+		}
+#endif
+		tegra_cpu_set_speed_cap(NULL);
+	}
+
+	mutex_unlock(&tegra_cpu_lock);
+	return ret;
+}
+
+static int cpu_user_cap_get(char *buffer, const struct kernel_param *kp)
+{
+	return param_get_uint(buffer, kp);
+}
+
+static struct kernel_param_ops cap_ops = {
+	.set = cpu_user_cap_set,
+	.get = cpu_user_cap_get,
+};
+module_param_cb(cpu_user_cap, &cap_ops, &cpu_user_cap, 0644);
+
+static unsigned int user_cap_speed(unsigned int requested_speed)
+{
+	if ((cpu_user_cap) && (requested_speed > cpu_user_cap))
+		return cpu_user_cap;
+	return requested_speed;
+}
+
 #ifdef CONFIG_TEGRA_THERMAL_THROTTLE
 
 static ssize_t show_throttle(struct cpufreq_policy *policy, char *buf)
@@ -445,6 +492,7 @@ int tegra_cpu_set_speed_cap(unsigned int *speed_cap)
 
 	new_speed = tegra_throttle_governor_speed(new_speed);
 	new_speed = edp_governor_speed(new_speed);
+	new_speed = user_cap_speed(new_speed);
 	if (speed_cap)
 		*speed_cap = new_speed;
 
