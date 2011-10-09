@@ -160,6 +160,8 @@ config TEGRA_FPGA_PLATFORM
           on a FPGA platform.
 endchoice
 
+source "arch/arm/mach-tegra/p852/Kconfig"
+
 choice
         prompt "Low-level debug console UART"
         default TEGRA_DEBUG_UART_NONE
