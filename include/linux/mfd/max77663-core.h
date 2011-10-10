@@ -131,6 +131,7 @@ struct max77663_platform_data {
 	struct mfd_cell *sub_devices;
 };
 
+#if defined(CONFIG_MFD_MAX77663)
 int max77663_read(struct device *dev, u8 addr, void *values, u32 len,
 		  bool is_rtc);
 int max77663_write(struct device *dev, u8 addr, void *values, u32 len,
@@ -139,5 +140,34 @@ int max77663_set_bits(struct device *dev, u8 addr, u8 mask, u8 value,
 		      bool is_rtc);
 int max77663_power_off(void);
 int max77663_gpio_set_alternate(int gpio, int alternate);
+#else
+static inline int max77663_read(struct device *dev, u8 addr, void *values,
+				u32 len, bool is_rtc)
+{
+	return 0;
+}
+
+static inline int max77663_write(struct device *dev, u8 addr, void *values,
+				 u32 len, bool is_rtc)
+{
+	return 0;
+}
+
+static inline int max77663_set_bits(struct device *dev, u8 addr, u8 mask,
+				    u8 value, bool is_rtc)
+{
+	return 0;
+}
+
+static inline int max77663_power_off(void)
+{
+	return 0;
+}
+
+static inline int max77663_gpio_set_alternate(int gpio, int alternate)
+{
+	return 0;
+}
+#endif /* defined(CONFIG_MFD_MAX77663) */
 
 #endif /* __LINUX_MFD_MAX77663_CORE_H__ */
