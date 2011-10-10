@@ -254,6 +254,11 @@ struct tegra_dc_sd_rgb {
 	u8 b;
 };
 
+struct tegra_dc_sd_agg_priorities {
+	u8 pri_lvl;
+	u8 agg[4];
+};
+
 struct tegra_dc_sd_settings {
 	unsigned enable;
 	bool use_auto_pwm;
@@ -266,6 +271,8 @@ struct tegra_dc_sd_settings {
 	u8 final_agg;
 	u16 cur_phase_step;
 	u16 phase_in_steps;
+
+	struct tegra_dc_sd_agg_priorities agg_priorities;
 
 	bool use_vid_luma;
 	struct tegra_dc_sd_rgb coeff;
