@@ -189,7 +189,7 @@ static int tegra_wm8753_event_hp(struct snd_soc_dapm_widget *w,
 
 static const struct snd_soc_dapm_widget tegra_wm8753_dapm_widgets[] = {
 	SND_SOC_DAPM_SPK("Int Spk", tegra_wm8753_event_int_spk),
-	SND_SOC_DAPM_OUTPUT("Earpiece"),
+	SND_SOC_DAPM_HP("Earpiece", NULL),
 	SND_SOC_DAPM_OUTPUT("Mono Out"),
 	SND_SOC_DAPM_HP("Headphone Jack", tegra_wm8753_event_hp),
 	SND_SOC_DAPM_MIC("Mic Jack", NULL),
@@ -198,14 +198,15 @@ static const struct snd_soc_dapm_widget tegra_wm8753_dapm_widgets[] = {
 };
 
 static const struct snd_soc_dapm_route whistler_audio_map[] = {
-	{"Int Spk", NULL, "ROUT1"},
-	{"Int Spk", NULL, "LOUT1"},
-	{"Earpiece", NULL, "ROUT2"},
-	{"Earpiece", NULL, "LOUT2"},
+	{"Int Spk", NULL, "ROUT2"},
+	{"Int Spk", NULL, "LOUT2"},
+	{"Earpiece", NULL, "OUT3"},
+	{"Earpiece", NULL, "LOUT1"},
 	{"Mono Out", NULL, "MONO1"},
 	{"Mono Out", NULL, "MONO2"},
 	{"Headphone Jack", NULL, "ROUT1"},
 	{"Headphone Jack", NULL, "LOUT1"},
+	{"Headphone Jack", NULL, "OUT4"},
 	{"Mic Bias", NULL, "Mic Jack"},
 	{"MIC1", NULL, "Mic Bias"},
 	{"Mic Bias", NULL, "Int Mic"},
