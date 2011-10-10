@@ -199,9 +199,7 @@ static struct max77663_regulator_fps_cfg max77663_fps_cfgs[] = {
 MAX77663_PDATA_INIT(sd0,  600000, 3387500, NULL, 1, 0, 0,
 		    0, 0, -1, FPS_SRC_NONE, -1, -1, EN2_CTRL_SD0 | SD_FSRADE_DISABLE);
 
-/* FIXME: MAX77663 Rev.3 has voltage undershooting issue when voltage scaling.
- *        To prevent system hang, SD1 min_uV was configured to 1050000. */
-MAX77663_PDATA_INIT(sd1,  1050000, 1587500, NULL, 1, 0, 0,
+MAX77663_PDATA_INIT(sd1,  800000, 1587500, NULL, 1, 0, 0,
 		    1, 1, -1, FPS_SRC_1, -1, -1, SD_FSRADE_DISABLE);
 
 MAX77663_PDATA_INIT(sd2,  600000, 3387500, NULL, 1, 0, 0,
