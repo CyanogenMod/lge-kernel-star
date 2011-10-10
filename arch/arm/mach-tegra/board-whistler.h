@@ -33,6 +33,6 @@ int whistler_emc_init(void);
 /* Audio-related GPIOs */
 #define WHISTLER_GPIO_WM8753(_x_)	(MAX8907C_INT_END + 1 + (_x_))
 #define TEGRA_GPIO_SPKR_EN		WHISTLER_GPIO_WM8753(2)
-#define TEGRA_GPIO_HP_DET		TEGRA_GPIO_PW2
+#define TEGRA_GPIO_HP_DET		TEGRA_GPIO_PW3
 
 #endif

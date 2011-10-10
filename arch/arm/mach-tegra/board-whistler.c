@@ -378,6 +378,7 @@ static struct tegra_i2c_platform_data whistler_dvc_platform_data = {
 
 static struct i2c_board_info __initdata wm8753_board_info = {
 	I2C_BOARD_INFO("wm8753", 0x1a),
+	.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_HP_DET),
 };
 
 static void whistler_i2c_init(void)
@@ -435,6 +436,7 @@ static struct tegra_wm8753_platform_data whistler_audio_pdata = {
 	.gpio_hp_mute = -1,
 	.gpio_int_mic_en = -1,
 	.gpio_ext_mic_en = -1,
+	.debounce_time_hp = 200,
 };
 
 static struct platform_device whistler_audio_device = {
