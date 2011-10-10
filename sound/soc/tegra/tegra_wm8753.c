@@ -146,13 +146,6 @@ static struct snd_soc_jack_pin tegra_wm8753_hp_jack_pins[] = {
 	},
 };
 
-static struct snd_soc_jack_gpio tegra_wm8753_hp_jack_gpio = {
-	.name = "headphone detect",
-	.report = SND_JACK_HEADPHONE,
-	.debounce_time = 150,
-	.invert = 0,
-};
-
 static int tegra_wm8753_event_int_spk(struct snd_soc_dapm_widget *w,
 					struct snd_kcontrol *k, int event)
 {
@@ -309,17 +302,13 @@ static int tegra_wm8753_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_add_routes(dapm, whistler_audio_map,
 					ARRAY_SIZE(whistler_audio_map));
 
-	if (gpio_is_valid(pdata->gpio_hp_det)) {
-		tegra_wm8753_hp_jack_gpio.gpio = pdata->gpio_hp_det;
-		snd_soc_jack_new(codec, "Headphone Jack", SND_JACK_HEADPHONE,
-				&tegra_wm8753_hp_jack);
-		snd_soc_jack_add_pins(&tegra_wm8753_hp_jack,
-					ARRAY_SIZE(tegra_wm8753_hp_jack_pins),
-					tegra_wm8753_hp_jack_pins);
-		snd_soc_jack_add_gpios(&tegra_wm8753_hp_jack,
-					1,
-					&tegra_wm8753_hp_jack_gpio);
-	}
+	snd_soc_jack_new(codec, "Headphone Jack", SND_JACK_HEADPHONE,
+		&tegra_wm8753_hp_jack);
+	wm8753_headphone_detect(codec, &tegra_wm8753_hp_jack,
+		SND_JACK_HEADPHONE, pdata->debounce_time_hp);
+	snd_soc_jack_add_pins(&tegra_wm8753_hp_jack,
+		ARRAY_SIZE(tegra_wm8753_hp_jack_pins),
+		tegra_wm8753_hp_jack_pins);
 
 	snd_soc_dapm_nc_pin(dapm, "ACIN");
 	snd_soc_dapm_nc_pin(dapm, "ACOP");
