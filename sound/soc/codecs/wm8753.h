@@ -112,7 +112,28 @@
 #define WM8753_VXCLK_DIV_8	(3 << 6)
 #define WM8753_VXCLK_DIV_16	(4 << 6)
 
-#define WM8753_DAI_HIFI		0
-#define WM8753_DAI_VOICE		1
+/* GPIO Control 2 */
+#define WM8753_GP2M_MASK	(7 << 3)
+#define WM8753_GP2M_INT 	(3 << 3)
 
+/* GPIO Control 1 */
+#define WM8753_INTCON_MASK	(3 << 7)
+#define WM8753_INTCON_AL	(3 << 7)
+
+/* Interrupt Polarity*/
+#define WM8753_GPIO4IPOL_MASK	(1 << 4)
+#define WM8753_GPIO4IPOL_LOW	(1 << 4)
+#define WM8753_GPIO4IPOL_HIGH	(0 << 4)
+
+/* Interrupt Enable*/
+#define WM8753_GPIO4IEN_MASK	(1 << 4)
+#define WM8753_GPIO4IEN_EN	(1 << 4)
+#define WM8753_GPIO4IEN_DIS	(0 << 4)
+
+#define WM8753_DAI_HIFI 	0
+#define WM8753_DAI_VOICE	1
+
+int wm8753_headphone_detect(struct snd_soc_codec *codec,
+	struct snd_soc_jack *jack, enum snd_jack_types type,
+	unsigned int debounce_time_hp);
 #endif
