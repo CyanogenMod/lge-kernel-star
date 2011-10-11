@@ -392,6 +392,9 @@ static void __init tegra_harmony_init(void)
 	harmony_i2c_init();
 	harmony_regulator_init();
 	harmony_panel_init();
+#ifdef CONFIG_KEYBOARD_TEGRA
+	harmony_kbc_init();
+#endif
 }
 
 MACHINE_START(HARMONY, "harmony")
