@@ -225,14 +225,30 @@ done:
 	writel(reg, FLOW_CTRL_CPU_CSR(0));
 }
 
+
+static void cluster_switch_epilog_actlr(void)
+{
+	u32 actlr;
+
+	/* TLB maintenance broadcast bit (FW) is stubbed out on LP CPU (reads
+	   as zero, writes ignored). Hence, it is not preserved across G=>LP=>G
+	   switch by CPU save/restore code, but SMP bit is restored correctly.
+	   Synchronize these two bits here after LP=>G transition. Note that
+	   only CPU0 core is powered on before and after the switch. See also
+	   bug 807595. */
+
+	__asm__("mrc p15, 0, %0, c1, c0, 1\n" : "=r" (actlr));
+
+	if (actlr & (0x1 << 6)) {
+		actlr |= 0x1;
+		__asm__("mcr p15, 0, %0, c1, c0, 1\n" : : "r" (actlr));
+	}
+}
+
 static void cluster_switch_epilog_gic(void)
 {
 	unsigned int max_irq, i;
 	void __iomem *gic_base = IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE);
-
-	/* Nothing to do if currently running on the LP CPU. */
-	if (is_lp_cluster())
-		return;
 
 	/* Reprogram the interrupt affinity because the on the LP CPU,
 	   the interrupt distributor affinity regsiters are stubbed out
@@ -261,8 +277,11 @@ void tegra_cluster_switch_epilog(unsigned int flags)
 		 FLOW_CTRL_CPU_CSR_SWITCH_CLUSTER);
 	writel(reg, FLOW_CTRL_CPU_CSR(0));
 
-	/* Perform post-switch clean-up of the interrupt distributor */
-	cluster_switch_epilog_gic();
+	/* Perform post-switch LP=>G clean-up */
+	if (!is_lp_cluster()) {
+		cluster_switch_epilog_actlr();
+		cluster_switch_epilog_gic();
+	}
 
 	#if DEBUG_CLUSTER_SWITCH
 	{
