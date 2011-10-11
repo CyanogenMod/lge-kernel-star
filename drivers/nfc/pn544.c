@@ -34,7 +34,7 @@
 #include <linux/gpio.h>
 #include <linux/miscdevice.h>
 #include <linux/spinlock.h>
-#include <linux/pn544.h>
+#include <linux/nfc/pn544.h>
 
 #define MAX_BUFFER_SIZE	512
 
@@ -172,10 +172,11 @@ static int pn544_dev_open(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static int pn544_dev_ioctl(struct inode *inode, struct file *filp,
-		unsigned int cmd, unsigned long arg)
+static int pn544_dev_ioctl(struct file *filp, unsigned cmd,
+				unsigned long arg)
 {
 	struct pn544_dev *pn544_dev = filp->private_data;
+	int ret=0;
 
 	switch (cmd) {
 	case PN544_SET_PWR:
@@ -183,27 +184,41 @@ static int pn544_dev_ioctl(struct inode *inode, struct file *filp,
 			/* power on with firmware download (requires hw reset)
 			 */
 			pr_info("%s power on with firmware\n", __func__);
-			gpio_set_value(pn544_dev->ven_gpio, 1);
-			gpio_set_value(pn544_dev->firm_gpio, 1);
+			if (pn544_dev->firm_gpio)
+				gpio_set_value(pn544_dev->firm_gpio, 1);
 			msleep(10);
-			gpio_set_value(pn544_dev->ven_gpio, 0);
-			msleep(10);
-			gpio_set_value(pn544_dev->ven_gpio, 1);
+			ret = gpio_direction_output(pn544_dev->ven_gpio, 0);
+			if (ret < 0) {
+				pr_err("%s : could not set it to 0\n", __func__);
+			}
+			msleep(100);
+			ret = gpio_direction_input(pn544_dev->ven_gpio);
+			if (ret < 0) {
+				pr_err("%s : could not set in input direction\n", __func__);
+			}
 			msleep(10);
 		} else if (arg == 1) {
 			/* power on */
 			pr_info("%s power on\n", __func__);
-			gpio_set_value(pn544_dev->firm_gpio, 0);
-			gpio_set_value(pn544_dev->ven_gpio, 1);
-			msleep(10);
+			if (pn544_dev->firm_gpio)
+				gpio_set_value(pn544_dev->firm_gpio, 0);
+			ret = gpio_direction_input(pn544_dev->ven_gpio);
+			if (ret < 0) {
+				pr_err("%s : could not set in input direction\n", __func__);
+			}
+			msleep(20);
 		} else  if (arg == 0) {
 			/* power off */
 			pr_info("%s power off\n", __func__);
-			gpio_set_value(pn544_dev->firm_gpio, 0);
-			gpio_set_value(pn544_dev->ven_gpio, 0);
-			msleep(10);
+			if (pn544_dev->firm_gpio)
+				gpio_set_value(pn544_dev->firm_gpio, 0);
+			ret = gpio_direction_output(pn544_dev->ven_gpio, 0);
+			if (ret < 0) {
+				pr_err("%s : could not set it to 0\n", __func__);
+			}
+			msleep(100);
 		} else {
-			pr_err("%s bad arg %u\n", __func__, arg);
+			pr_err("%s bad arg %lu\n", __func__, arg);
 			return -EINVAL;
 		}
 		break;
@@ -221,7 +236,7 @@ static const struct file_operations pn544_dev_fops = {
 	.read	= pn544_dev_read,
 	.write	= pn544_dev_write,
 	.open	= pn544_dev_open,
-	.ioctl  = pn544_dev_ioctl,
+	.unlocked_ioctl  = pn544_dev_ioctl,
 };
 
 static int pn544_probe(struct i2c_client *client,
@@ -249,9 +264,11 @@ static int pn544_probe(struct i2c_client *client,
 	ret = gpio_request(platform_data->ven_gpio, "nfc_ven");
 	if (ret)
 		goto err_ven;
-	ret = gpio_request(platform_data->firm_gpio, "nfc_firm");
-	if (ret)
-		goto err_firm;
+	if (platform_data->firm_gpio) {
+		ret = gpio_request(platform_data->firm_gpio, "nfc_firm");
+		if (ret)
+			goto err_firm;
+	}
 
 	pn544_dev = kzalloc(sizeof(*pn544_dev), GFP_KERNEL);
 	if (pn544_dev == NULL) {
@@ -265,6 +282,16 @@ static int pn544_probe(struct i2c_client *client,
 	pn544_dev->ven_gpio  = platform_data->ven_gpio;
 	pn544_dev->firm_gpio  = platform_data->firm_gpio;
 	pn544_dev->client   = client;
+
+	ret = gpio_direction_output(platform_data->ven_gpio, 0);
+	if (ret < 0) {
+		pr_err("%s : could not set it to 0\n", __func__);
+	}
+	msleep(100);
+	ret = gpio_direction_input(platform_data->ven_gpio);
+	if (ret < 0) {
+		pr_err("%s : could not set in input direction\n", __func__);
+	}
 
 	/* init mutex and queues */
 	init_waitqueue_head(&pn544_dev->read_wq);
@@ -303,7 +330,8 @@ err_misc_register:
 	mutex_destroy(&pn544_dev->read_mutex);
 	kfree(pn544_dev);
 err_exit:
-	gpio_free(platform_data->firm_gpio);
+	if (pn544_dev->firm_gpio)
+		gpio_free(platform_data->firm_gpio);
 err_firm:
 	gpio_free(platform_data->ven_gpio);
 err_ven:
@@ -321,7 +349,8 @@ static int pn544_remove(struct i2c_client *client)
 	mutex_destroy(&pn544_dev->read_mutex);
 	gpio_free(pn544_dev->irq_gpio);
 	gpio_free(pn544_dev->ven_gpio);
-	gpio_free(pn544_dev->firm_gpio);
+	if (pn544_dev->firm_gpio)
+		gpio_free(pn544_dev->firm_gpio);
 	kfree(pn544_dev);
 
 	return 0;
