@@ -798,9 +798,6 @@ static void enterprise_usb_init(void)
 	tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
 	platform_device_register(&tegra_otg_device);
 
-	tegra_ehci3_device.dev.platform_data = &tegra_ehci_pdata[2];
-	platform_device_register(&tegra_ehci3_device);
-
 	udc_pdata = tegra_udc_device.dev.platform_data;
 	udc_pdata->charge_regulator ="usb_bat_chg";
 
