@@ -263,14 +263,17 @@ struct tegra_dc_sd_settings {
 	unsigned enable;
 	bool use_auto_pwm;
 	u8 hw_update_delay;
-	short bin_width;
 	u8 aggressiveness;
+	short bin_width;
 	u8 phase_in;
+	u8 phase_in_video;
 	u8 cmd;
-	u16 cur_agg_step;
 	u8 final_agg;
+	u16 cur_agg_step;
 	u16 cur_phase_step;
 	u16 phase_in_steps;
+	short prev_k;
+	short phase_vid_step;
 
 	struct tegra_dc_sd_agg_priorities agg_priorities;
 
