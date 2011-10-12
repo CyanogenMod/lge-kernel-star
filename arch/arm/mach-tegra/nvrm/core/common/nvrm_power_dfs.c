@@ -1515,9 +1515,9 @@ static NvRmPmRequest DfsThread(NvRmDfs* pDfs)
         if (NeedClockUpdate || pDfs->VoltageScaler.UpdateFlag ||
             pDfs->ThermalThrottler.TcorePolicy.UpdateFlag)
         {
-            NvRmPrivLockSharedPll();
             if (!pDfs->VoltageScaler.StopFlag)
             {
+                NvRmPrivLockSharedPll();
                 // Check temperature and throttle DFS clocks if necessry. Make
                 // sure V/F scaling is running while throttling is in progress.
                 pDfs->VoltageScaler.UpdateFlag =
@@ -1533,8 +1533,8 @@ static NvRmPmRequest DfsThread(NvRmDfs* pDfs)
                 NvOsIntrMutexLock(pDfs->hIntrMutex);
                 pDfs->CurrentKHz = DfsKHz;
                 NvOsIntrMutexUnlock(pDfs->hIntrMutex);
-            }
             NvRmPrivUnlockSharedPll();
+            }
 
             // Complete synchronous busy hint processing.
             if (pDfs->BusySyncState == NvRmDfsBusySyncState_Execute)
@@ -2366,16 +2366,10 @@ void NvRmPrivDvsInit(void)
     }
     else if (pDfs->hRm->ChipId.Id == 0x20)
     {
-        pDvs->MinCoreMv = NV_MAX(pDvs->MinCoreMv,
-            NVRM_AP20_RELIABILITY_CORE_MV(pDfs->hRm->ChipId.SKU));
-        NV_ASSERT(pDvs->MinCoreMv <= pDvs->NominalCoreMv);
         pDvs->LowCornerCoreMv = NV_MAX(NVRM_AP20_LOW_CORE_MV, pDvs->MinCoreMv);
         pDvs->LowCornerCoreMv =
             NV_MIN(pDvs->LowCornerCoreMv, pDvs->NominalCoreMv);
 
-        pDvs->MinCpuMv = NV_MAX(pDvs->MinCpuMv,
-            NVRM_AP20_RELIABILITY_CPU_MV(pDfs->hRm->ChipId.SKU));
-        NV_ASSERT(pDvs->MinCpuMv <= pDvs->NominalCpuMv);
         pDvs->LowCornerCpuMv = NV_MAX(NVRM_AP20_LOW_CPU_MV, pDvs->MinCpuMv);
         pDvs->LowCornerCpuMv =
             NV_MIN(pDvs->LowCornerCpuMv, pDvs->NominalCpuMv);
@@ -2690,7 +2684,6 @@ void NvRmPrivDfsSuspend(NvOdmSocPowerState state)
             NvRmMilliVolts v = NV_MAX(pDvs->DvsCorner.SystemMv,
                                       NV_MAX(pDvs->DvsCorner.EmcMv,
                                              pDvs->DvsCorner.ModulesMv));
-            v = NV_MAX(v, pDvs->MinCoreMv);
 
             // If CPU rail returns to default level by PMU underneath DVFS
             // need to synchronize voltage after LP1 same way as after LP2

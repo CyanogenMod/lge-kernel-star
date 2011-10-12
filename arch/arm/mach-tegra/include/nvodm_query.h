@@ -236,6 +236,13 @@ typedef struct
     /// The value is in terms of the clock tick where the clock freq is
     /// the interface frequency.
     NvU32 CsHoldTimeInClock;
+
+// LGE_UPDATE_S  20110707
+    /// Upper layers will take care of settng the system clocks if the variable
+    /// is set to true.
+    NvBool bIgnoreClockBoost;
+// LGE_UPDATE_E  20110707
+
 } NvOdmQuerySpiDeviceInfo;
 
 /**

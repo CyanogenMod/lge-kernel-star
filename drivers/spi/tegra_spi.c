@@ -36,6 +36,11 @@
 #include <mach/nvrm_linux.h>
 #include <nvrm_spi.h>
 #include <nvodm_query.h>
+#include <linux/delay.h>
+#include <mach/io.h>
+#include <nvrm_power.h>
+#include <nvrm_power_private.h>
+
 
 #include <rm_spi_slink.h>
 
@@ -77,6 +82,7 @@ struct tegra_spi {
 	LOCK_T		lock;
 	struct work_struct	work;
 	struct workqueue_struct	*queue;
+	NvU32                   RmPowerClientId;
 }; 
 
 /* Only these signaling mode are supported */
@@ -217,10 +223,57 @@ static int tegra_spi_do_message(struct tegra_spi *spi, struct spi_message *m)
 static void tegra_spi_workerthread(struct work_struct *w)
 {
 	struct tegra_spi *spi;
+	NvRmDfsBusyHint BusyHints[4];
 
 	spi = container_of(w, struct tegra_spi, work);
 
 	SPI_DEBUG_PRINT("tegra_spi_transfer start\n");
+	BusyHints[0].ClockId = NvRmDfsClockId_Emc;
+	BusyHints[0].BoostDurationMs = NV_WAIT_INFINITE;
+	BusyHints[0].BusyAttribute = NV_TRUE;
+	BusyHints[0].BoostKHz = 150000; // Emc
+#if 0
+	BusyHints[1].ClockId = NvRmDfsClockId_Ahb;
+	BusyHints[1].BoostDurationMs = NV_WAIT_INFINITE;
+	BusyHints[1].BusyAttribute = NV_TRUE;
+	BusyHints[1].BoostKHz = 150000; // AHB
+
+	BusyHints[2].ClockId = NvRmDfsClockId_Apb;
+	BusyHints[2].BoostDurationMs = NV_WAIT_INFINITE;
+	BusyHints[2].BusyAttribute = NV_TRUE;
+	BusyHints[2].BoostKHz = 150000; // APB
+#else
+
+	BusyHints[1].ClockId = NvRmDfsClockId_Ahb;
+	BusyHints[1].BoostDurationMs = NV_WAIT_INFINITE;
+	BusyHints[1].BusyAttribute = NV_TRUE;
+	BusyHints[1].BoostKHz = 120000; // AHB
+
+	BusyHints[2].ClockId = NvRmDfsClockId_Apb;
+	BusyHints[2].BoostDurationMs = NV_WAIT_INFINITE;
+	BusyHints[2].BusyAttribute = NV_TRUE;
+	BusyHints[2].BoostKHz = 120000; // APB
+
+
+#endif
+	BusyHints[3].ClockId = NvRmDfsClockId_Cpu;
+	BusyHints[3].BoostDurationMs = NV_WAIT_INFINITE;
+	BusyHints[3].BusyAttribute = NV_TRUE;
+	BusyHints[3].BoostKHz = 800000; // CPU
+
+	NvRmPowerBusyHintMulti(s_hRmGlobal, spi->RmPowerClientId,
+			BusyHints, 4, NvRmDfsBusyHintSyncMode_Async);
+
+	if (NvRmDfsRunState_ClosedLoop == NvRmDfsGetState(s_hRmGlobal))
+	{
+		int wait_count = 500;
+		/* Wait for the clcok to stabilize */
+		while ((NvRmPrivDfsGetCurrentKHz(NvRmDfsClockId_Emc) < 150000)  && wait_count--)
+			msleep(1);
+
+		BUG_ON(wait_count <= 0);
+	}
+
 	LOCK(spi->lock);		//spin_lock(&spi->lock);
 
 	while (!list_empty(&spi->msg_queue)) {
@@ -241,6 +294,14 @@ static void tegra_spi_workerthread(struct work_struct *w)
 	}
 
 	UNLOCK(spi->lock);		//spin_unlock(&spi->lock);
+	/* Set the clocks to the low corner */
+	BusyHints[0].BoostKHz = 0; // Emc
+	BusyHints[1].BoostKHz = 0; // Ahb
+	BusyHints[2].BoostKHz = 0; // Apb
+	BusyHints[3].BoostKHz = 0; // Cpu
+
+	NvRmPowerBusyHintMulti(s_hRmGlobal, spi->RmPowerClientId, BusyHints, 4, NvRmDfsBusyHintSyncMode_Async);
+
 	SPI_DEBUG_PRINT("tegra_spi_transfer end\n");
 }
 
@@ -298,6 +359,14 @@ static int __init tegra_spi_probe(struct platform_device *pdev)
 		goto workQueueCreate_failed;
 	}
 
+	spi->RmPowerClientId = NVRM_POWER_CLIENT_TAG('S','P','I','S');
+	if (NvRmPowerRegister(s_hRmGlobal, NULL, &spi->RmPowerClientId)) 
+	{
+		dev_err(&pdev->dev, "Failed to create power client ID\n");
+		goto workQueueCreate_failed;
+	}
+
+
 	INIT_WORK(&spi->work, tegra_spi_workerthread);
 
 	CREATELOCK(spi->lock);		//(&spi->lock);
@@ -331,6 +400,7 @@ static int tegra_spi_remove(struct platform_device *pdev)
 	spi = spi_master_get_devdata(master);
 
 	spi_unregister_master(master);
+	NvRmPowerUnRegister(s_hRmGlobal, spi->RmPowerClientId);
 	NvRmSpiClose(spi->rm_spi);
 	destroy_workqueue(spi->queue);
 

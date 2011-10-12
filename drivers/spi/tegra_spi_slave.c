@@ -36,7 +36,17 @@
 
 #include <mach/spi.h>
 #include <mach/nvrm_linux.h>
+
+
+// LGE_UPDATE_S  ebs 0707
+#include <mach/io.h>
 #include <nvrm_spi.h>
+#include <nvrm_power.h>
+#include <nvrm_power_private.h>
+// LGE_UPDATE_E  ebs 0707
+
+
+
 #include <nvodm_query.h>
 #include <nvodm_services.h>
 #include <nvodm_query_discovery.h>
@@ -97,6 +107,11 @@ struct tegra_spi {
 	LOCK_T			lock;
 	struct work_struct	work;
 	struct workqueue_struct	*queue;
+// LGE_UPDATE_S  ebs 0707
+
+	NvU32			RmPowerClientId;
+// LGE_UPDATE_E  ebs 0707
+
 }; 
 
 static int spi_shutdown = 0;
@@ -321,10 +336,10 @@ static int tegra_spi_do_message(struct tegra_spi *spi, struct spi_message *m)
 #endif
 			if(nvErr != NvSuccess)
 			{	//20110120-1, , Add workaround code for short SCK
-				printk("%s[ID:%d] : WaitTimeout error %d\n", __FUNCTION__, spi->index, nvErr);
+				//printk("%s[ID:%d] : WaitTimeout error %d\n", __FUNCTION__, spi->index, nvErr);
 				NvRmSpiClose(spi->rm_spi);
 				nvErr = NvRmSpiOpen(s_hRmGlobal, NvOdmIoModule_Spi, spi->index, 0, &spi->rm_spi);
-				printk("%s[ID:%d] : Restart NvRmSpiOpen %d\n", __FUNCTION__, spi->index, nvErr);
+				printk("%s[ID:%d] : Recovery NvRmSpi instance Open %d\n", __FUNCTION__, spi->index, nvErr);
 				break;
 			}
 #if ENABLE_TX_RX_DUMP
@@ -379,19 +394,77 @@ static int tegra_spi_do_message(struct tegra_spi *spi, struct spi_message *m)
 static void tegra_spi_workerthread(struct work_struct *w)
 {
 	struct tegra_spi *spi;
+// LGE_UPDATE_S  ebs 0707
+	NvRmDfsBusyHint BusyHints[4];
+// LGE_UPDATE_E  ebs 0707
 
 	spi = container_of(w, struct tegra_spi, work);
 
 	SPI_DEBUG_PRINT("tegra_spi_transfer start\n");
+
+// LGE_UPDATE_S  ebs 0707
+
+	BusyHints[0].ClockId = NvRmDfsClockId_Emc;
+	BusyHints[0].BoostDurationMs = NV_WAIT_INFINITE;
+	BusyHints[0].BusyAttribute = NV_TRUE;
+	BusyHints[0].BoostKHz = 150000; // Emc
+#if 0
+	BusyHints[1].ClockId = NvRmDfsClockId_Ahb;
+	BusyHints[1].BoostDurationMs = NV_WAIT_INFINITE;
+	BusyHints[1].BusyAttribute = NV_TRUE;
+	BusyHints[1].BoostKHz = 150000; // AHB
+
+	BusyHints[2].ClockId = NvRmDfsClockId_Apb;
+	BusyHints[2].BoostDurationMs = NV_WAIT_INFINITE;
+	BusyHints[2].BusyAttribute = NV_TRUE;
+	BusyHints[2].BoostKHz = 150000; // APB
+#else
+
+	BusyHints[1].ClockId = NvRmDfsClockId_Ahb;
+	BusyHints[1].BoostDurationMs = NV_WAIT_INFINITE;
+	BusyHints[1].BusyAttribute = NV_TRUE;
+	BusyHints[1].BoostKHz = 120000; // AHB
+
+	BusyHints[2].ClockId = NvRmDfsClockId_Apb;
+	BusyHints[2].BoostDurationMs = NV_WAIT_INFINITE;
+	BusyHints[2].BusyAttribute = NV_TRUE;
+	BusyHints[2].BoostKHz = 120000; // APB
+
+
+#endif
+	BusyHints[3].ClockId = NvRmDfsClockId_Cpu;
+	BusyHints[3].BoostDurationMs = NV_WAIT_INFINITE;
+	BusyHints[3].BusyAttribute = NV_TRUE;
+	BusyHints[3].BoostKHz = 800000; // CPU
+
+	NvRmPowerBusyHintMulti(s_hRmGlobal, spi->RmPowerClientId,
+		BusyHints, 4, NvRmDfsBusyHintSyncMode_Async);
+
+    if (NvRmDfsRunState_ClosedLoop == NvRmDfsGetState(s_hRmGlobal))
+	{
+		int wait_count = 500;
+		/* Wait for the clcok to stabilize */
+		while ((NvRmPrivDfsGetCurrentKHz(NvRmDfsClockId_Emc) < 150000)	&& wait_count--)
+			msleep(1);
+		
+		BUG_ON(wait_count <= 0);
+	}
+ 
 	LOCK(spi->lock);
 
-	while (!list_empty(&spi->msg_queue)) {
+// LGE_UPDATE_E  ebs 0707
+
+	while (!list_empty(&spi->msg_queue))
+	{
+
 		struct spi_message *m;
+// LGE_UPDATE_S  ebs 0707 	 
         if (spi_shutdown )
         {
            printk("tegra_spi_workthread stopped\n");
 		   return;
         }  
+// LGE_UPDATE_E  ebs 0707
 		 
 		m = container_of(spi->msg_queue.next, struct spi_message, queue);
 		list_del_init(&m->queue);
@@ -408,6 +481,20 @@ static void tegra_spi_workerthread(struct work_struct *w)
 	}
 
 	UNLOCK(spi->lock);
+
+// LGE_UPDATE_S  ebs 0707	
+// ebs 0707
+	/* Set the clocks to the low corner */
+	BusyHints[0].BoostKHz = 0; // Emc
+	BusyHints[1].BoostKHz = 0; // Ahb
+	BusyHints[2].BoostKHz = 0; // Apb
+	BusyHints[3].BoostKHz = 0; // Cpu
+
+	NvRmPowerBusyHintMulti(s_hRmGlobal, spi->RmPowerClientId, BusyHints, 4, NvRmDfsBusyHintSyncMode_Async);
+
+// LGE_UPDATE_E  ebs 0707
+
+
 	SPI_DEBUG_PRINT("tegra_spi_transfer end\n");
 }
 
@@ -499,6 +586,19 @@ static int __init tegra_spi_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Failed to create work queue\n");
 		goto workQueueCreate_failed;
 	}
+// LGE_UPDATE_S  ebs 0707
+
+// ebs 0707
+	spi->RmPowerClientId = NVRM_POWER_CLIENT_TAG('S','P','I','S');
+	if (NvRmPowerRegister(s_hRmGlobal, NULL, &spi->RmPowerClientId)) 
+	{
+		dev_err(&pdev->dev, "Failed to create power client ID\n");
+		goto workQueueCreate_failed;
+	}
+	
+// ebs 0707 
+
+// LGE_UPDATE_E  ebs 0707
 
 	INIT_WORK(&spi->work, tegra_spi_workerthread);
 //LGE_TELECA_CR:568_DUAL_SPI START
@@ -540,6 +640,12 @@ static int tegra_spi_remove(struct platform_device *pdev)
 	spi = spi_master_get_devdata(master);
 
 	spi_unregister_master(master);
+
+// LGE_UPDATE_S  ebs 0707
+	NvRmPowerUnRegister(s_hRmGlobal, spi->RmPowerClientId);
+// LGE_UPDATE_E  ebs 0707
+
+	
 	NvRmSpiClose(spi->rm_spi);
 	destroy_workqueue(spi->queue);
 
@@ -618,9 +724,7 @@ static int tegra_spi_suspend(struct platform_device *pdev, pm_message_t msg)
 
 	pSpi = dev_get_drvdata(&pdev->dev);
 	pShimSpi = spi_master_get_devdata(pSpi);
-
-	printk( "tegra_spi_suspend\n");	//syblue.lee 100602 ; test
-
+	printk("[EBS] ### tegra_spi_suspend() \n");
 	return 0;
 }
 
@@ -631,9 +735,7 @@ static int tegra_spi_resume(struct platform_device *pdev)
 
 	pSpi = dev_get_drvdata(&pdev->dev);
 	pShimSpi = spi_master_get_devdata(pSpi);
-
-	printk( "tegra_spi_resume\n");
-
+	printk("[EBS] ### tegra_spi_resume() \n");
 	return 0;
 }
 #endif	
