@@ -390,10 +390,10 @@ static void ricoh583_gpio_set(struct gpio_chip *chip, unsigned offset,
 {
 	struct ricoh583 *ricoh583 = container_of(chip, struct ricoh583, gpio);
 	if (value)
-		ricoh583_clr_bits(ricoh583->dev, RICOH583_GPIO_IOOUT,
+		ricoh583_set_bits(ricoh583->dev, RICOH583_GPIO_IOOUT,
 						1 << offset);
 	else
-		ricoh583_set_bits(ricoh583->dev, RICOH583_GPIO_IOOUT,
+		ricoh583_clr_bits(ricoh583->dev, RICOH583_GPIO_IOOUT,
 						1 << offset);
 }
 
@@ -425,6 +425,31 @@ static int ricoh583_gpio_to_irq(struct gpio_chip *chip, unsigned off)
 	return -EIO;
 }
 
+static int ricoh583_gpio_request(struct gpio_chip *chip, unsigned offset)
+{
+	struct ricoh583 *ricoh583 = container_of(chip, struct ricoh583, gpio);
+	int ret;
+
+	ret = ricoh583_clr_bits(ricoh583->dev, RICOH583_GPIO_PGSEL,
+			1 << offset);
+	if (ret < 0)
+		dev_err(ricoh583->dev, "%s(): The error in writing register "
+			"0x%02x\n", __func__, RICOH583_GPIO_PGSEL);
+	return ret;
+}
+
+static void ricoh583_gpio_free(struct gpio_chip *chip, unsigned offset)
+{
+	struct ricoh583 *ricoh583 = container_of(chip, struct ricoh583, gpio);
+	int ret;
+
+	ret = ricoh583_set_bits(ricoh583->dev, RICOH583_GPIO_PGSEL,
+				1 << offset);
+	if (ret < 0)
+		dev_err(ricoh583->dev, "%s(): The error in writing register "
+			"0x%02x\n", __func__, RICOH583_GPIO_PGSEL);
+}
+
 static void __devinit ricoh583_gpio_init(struct ricoh583 *ricoh583,
 	struct ricoh583_platform_data *pdata)
 {
@@ -434,6 +459,13 @@ static void __devinit ricoh583_gpio_init(struct ricoh583 *ricoh583,
 
 	if (pdata->gpio_base  <= 0)
 		return;
+
+	ret = ricoh583_write(ricoh583->dev, RICOH583_GPIO_PGSEL, 0xEF);
+	if (ret < 0) {
+		dev_err(ricoh583->dev, "%s(): The error in writing register "
+			"0x%02x\n", __func__, RICOH583_GPIO_PGSEL);
+		return;
+	}
 
 	for (i = 0; i < pdata->num_gpioinit_data; ++i) {
 		ginit = &pdata->gpio_init_data[i];
@@ -451,10 +483,10 @@ static void __devinit ricoh583_gpio_init(struct ricoh583 *ricoh583,
 
 		if (ginit->output_mode_en) {
 			if (ginit->output_val)
-				ret = ricoh583_clr_bits(ricoh583->dev,
+				ret = ricoh583_set_bits(ricoh583->dev,
 					RICOH583_GPIO_IOOUT, 1 << i);
 			else
-				ret = ricoh583_set_bits(ricoh583->dev,
+				ret = ricoh583_clr_bits(ricoh583->dev,
 					RICOH583_GPIO_IOOUT, 1 << i);
 			if (!ret)
 				ret = ricoh583_set_bits(ricoh583->dev,
@@ -466,6 +498,11 @@ static void __devinit ricoh583_gpio_init(struct ricoh583 *ricoh583,
 		if (ret < 0)
 			dev_err(ricoh583->dev, "Gpio %d init "
 				"dir configuration failed: %d\n", i, ret);
+
+		ret = ricoh583_clr_bits(ricoh583->dev, RICOH583_GPIO_PGSEL, 1 << i);
+		if (ret < 0)
+			dev_err(ricoh583->dev, "%s(): The error in writing register "
+			"0x%02x\n", __func__, RICOH583_GPIO_PGSEL);
 	}
 
 	ricoh583->gpio.owner		= THIS_MODULE;
@@ -475,6 +512,8 @@ static void __devinit ricoh583_gpio_init(struct ricoh583 *ricoh583,
 	ricoh583->gpio.ngpio		= RICOH583_NR_GPIO;
 	ricoh583->gpio.can_sleep	= 1;
 
+	ricoh583->gpio.request	= ricoh583_gpio_request;
+	ricoh583->gpio.free	= ricoh583_gpio_free;
 	ricoh583->gpio.direction_input	= ricoh583_gpio_input;
 	ricoh583->gpio.direction_output	= ricoh583_gpio_output;
 	ricoh583->gpio.set		= ricoh583_gpio_set;
