@@ -41,6 +41,9 @@
 #include <linux/device.h>
 #include <linux/i2c.h>
 #include <linux/i2c-mux.h>
+#include <linux/regulator/consumer.h>
+#include <linux/err.h>
+#include <linux/delay.h>
 
 #include <linux/i2c/pca954x.h>
 
@@ -62,6 +65,8 @@ struct pca954x {
 	struct i2c_adapter *virt_adaps[PCA954X_MAX_NCHANS];
 
 	u8 last_chan;		/* last register value */
+	struct regulator *vcc_reg;
+	struct regulator *i2c_reg;
 };
 
 struct chip_desc {
@@ -123,6 +128,26 @@ static int pca954x_reg_write(struct i2c_adapter *adap,
 			     struct i2c_client *client, u8 val)
 {
 	int ret = -ENODEV;
+	struct pca954x *data = i2c_get_clientdata(client);
+
+	/* Increase ref count for pca954x vcc */
+	if (data->vcc_reg) {
+		ret = regulator_enable(data->vcc_reg);
+		if (ret) {
+			dev_err(&client->dev, "%s: failed to enable vcc\n",
+				__func__);
+			goto vcc_regulator_failed;
+		}
+	}
+	/* Increase ref count for pca954x vcc_i2c */
+	if (data->i2c_reg) {
+		ret = regulator_enable(data->i2c_reg);
+		if (ret) {
+			dev_err(&client->dev, "%s: failed to enable vcc_i2c\n",
+				__func__);
+			goto i2c_regulator_failed;
+		}
+	}
 
 	if (adap->algo->master_xfer) {
 		struct i2c_msg msg;
@@ -142,6 +167,15 @@ static int pca954x_reg_write(struct i2c_adapter *adap,
 					     val, I2C_SMBUS_BYTE, &data);
 	}
 
+	/* Decrease ref count for pca954x vcc_i2c */
+	if (data->i2c_reg)
+		regulator_disable(data->i2c_reg);
+
+i2c_regulator_failed:
+	/* Decrease ref count for pca954x vcc */
+	if (data->vcc_reg)
+		regulator_disable(data->vcc_reg);
+vcc_regulator_failed:
 	return ret;
 }
 
@@ -201,14 +235,73 @@ static int pca954x_probe(struct i2c_client *client,
 
 	i2c_set_clientdata(client, data);
 
+	/* Get regulator pointer for pca954x vcc */
+	data->vcc_reg = regulator_get(&client->dev, "vcc");
+	if (PTR_ERR(data->vcc_reg) == -ENODEV)
+		data->vcc_reg = NULL;
+	else if (IS_ERR(data->vcc_reg)) {
+		dev_err(&client->dev, "%s: failed to get vcc\n",
+			__func__);
+		ret = PTR_ERR(data->vcc_reg);
+		goto exit_free;
+	}
+	/* Get regulator pointer for pca954x vcc_i2c */
+	data->i2c_reg = regulator_get(&client->dev, "vcc_i2c");
+	if (PTR_ERR(data->i2c_reg) == -ENODEV)
+		data->i2c_reg = NULL;
+	else if (IS_ERR(data->i2c_reg)) {
+		dev_err(&client->dev, "%s: failed to get vcc_i2c\n",
+			__func__);
+		ret = PTR_ERR(data->i2c_reg);
+		regulator_put(data->vcc_reg);
+		goto exit_free;
+	}
+
+	/* Increase ref count for pca954x vcc */
+	if (data->vcc_reg) {
+		pr_info("%s: enable vcc\n", __func__);
+		ret = regulator_enable(data->vcc_reg);
+		if (ret) {
+			dev_err(&client->dev, "%s: failed to enable vcc\n",
+				__func__);
+			goto exit_regulator_put;
+		}
+	}
+	/* Increase ref count for pca954x vcc_i2c */
+	if (data->i2c_reg) {
+		pr_info("%s: enable vcc_i2c\n", __func__);
+		ret = regulator_enable(data->i2c_reg);
+		if (ret) {
+			dev_err(&client->dev, "%s: failed to enable vcc_i2c\n",
+				__func__);
+			regulator_disable(data->vcc_reg);
+			goto exit_regulator_put;
+		}
+	}
+
+	/*
+	 * Power-On Reset takes time.
+	 * I2C is ready after Power-On Reset.
+	 */
+	msleep(1);
+
 	/* Write the mux register at addr to verify
 	 * that the mux is in fact present. This also
 	 * initializes the mux to disconnected state.
 	 */
 	if (i2c_smbus_write_byte(client, 0) < 0) {
 		dev_warn(&client->dev, "probe failed\n");
-		goto exit_free;
+		regulator_disable(data->vcc_reg);
+		regulator_disable(data->i2c_reg);
+		goto exit_regulator_put;
 	}
+
+	/* Decrease ref count for pca954x vcc */
+	if (data->vcc_reg)
+		regulator_disable(data->vcc_reg);
+	/* Decrease ref count for pca954x vcc_i2c */
+	if (data->i2c_reg)
+		regulator_disable(data->i2c_reg);
 
 	data->type = id->driver_data;
 	data->last_chan = 0;		   /* force the first selection */
@@ -250,6 +343,9 @@ static int pca954x_probe(struct i2c_client *client,
 virt_reg_failed:
 	for (num--; num >= 0; num--)
 		i2c_del_mux_adapter(data->virt_adaps[num]);
+exit_regulator_put:
+	regulator_put(data->vcc_reg);
+	regulator_put(data->i2c_reg);
 exit_free:
 	kfree(data);
 err:
@@ -269,6 +365,9 @@ static int pca954x_remove(struct i2c_client *client)
 				return err;
 			data->virt_adaps[i] = NULL;
 		}
+
+	regulator_put(data->i2c_reg);
+	regulator_put(data->vcc_reg);
 
 	kfree(data);
 	return 0;
