@@ -149,9 +149,8 @@ static int tegra_ehci_hub_control(
 	int		ports = HCS_N_PORTS(ehci->hcs_params);
 	u32		temp, status;
 	u32 __iomem	*status_reg;
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	u32		usbsts_reg;
-#endif
+
 	unsigned long	flags;
 	int		retval = 0;
 	unsigned	selector;
@@ -251,7 +250,9 @@ static int tegra_ehci_hub_control(
 
 		/* Disable disconnect detection during port resume */
 		tegra_usb_phy_preresume(tegra->phy, false);
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+		if (tegra->phy->usb_phy_type != TEGRA_USB_PHY_TYPE_UTMIP) {
+#endif
 		ehci_dbg(ehci, "%s:USBSTS = 0x%x", __func__,
 			ehci_readl(ehci, &ehci->regs->status));
 		usbsts_reg = ehci_readl(ehci, &ehci->regs->status);
@@ -272,6 +273,8 @@ static int tegra_ehci_hub_control(
 			pr_err("%s: timeout set STS_SRI\n", __func__);
 
 		udelay(20);
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+		}
 #endif
 		temp &= ~(PORT_RWC_BITS | PORT_WAKE_BITS);
 		/* start resume signaling */
