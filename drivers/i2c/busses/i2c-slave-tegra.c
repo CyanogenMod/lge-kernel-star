@@ -413,7 +413,6 @@ static void handle_packet_byte_read(struct tegra_i2c_slave_dev *i2c_dev)
 
 	curr_xfer_size = BYTES_PER_FIFO_WORD * filled_slots;
 	if (i2c_dev->cont_status & I2C_SLV_TRANS_PREMATURE_END) {
-		i2c_dev->curr_packet_bytes_read = 0;
 		curr_xfer_size = readl(i2c_dev->base + I2C_SLV_PACKET_STATUS);
 		curr_xfer_size =
 			(curr_xfer_size & I2C_SLV_PACKET_STATUS_BYTENUM_MASK) >>
@@ -421,6 +420,7 @@ static void handle_packet_byte_read(struct tegra_i2c_slave_dev *i2c_dev)
 
 		BUG_ON(filled_slots != ((curr_xfer_size -
 				i2c_dev->curr_packet_bytes_read + 3) >> 2));
+		curr_xfer_size -= i2c_dev->curr_packet_bytes_read;
 	}
 
 	i2c_dev->curr_packet_bytes_read += curr_xfer_size;
@@ -465,7 +465,7 @@ static void handle_tx_transaction_end(struct tegra_i2c_slave_dev *i2c_dev)
 	unsigned long curr_packet_size;
 
 	i2c_dev->curr_transfer = TRANSFER_STATE_NONE;
-	curr_packet_size = readl(i2c_dev + I2C_SLV_PACKET_STATUS);
+	curr_packet_size = readl(i2c_dev->base + I2C_SLV_PACKET_STATUS);
 	curr_packet_size =
 		(curr_packet_size & I2C_SLV_PACKET_STATUS_BYTENUM_MASK) >>
 				I2C_SLV_PACKET_STATUS_BYTENUM_SHIFT;
@@ -511,7 +511,7 @@ static void handle_tx_trigger_int(struct tegra_i2c_slave_dev *i2c_dev)
 	int tx_tail;
 	int packet_len;
 
-	fifo_status = readl(i2c_dev + I2C_FIFO_STATUS);
+	fifo_status = readl(i2c_dev->base + I2C_FIFO_STATUS);
 	empty_slots = (fifo_status & I2C_FIFO_STATUS_SLV_TX_MASK) >>
 					I2C_FIFO_STATUS_SLV_TX_SHIFT;
 	BUG_ON(empty_slots <= 3);
@@ -550,10 +550,9 @@ static void handle_tx_trigger_int(struct tegra_i2c_slave_dev *i2c_dev)
 				tx_data = 0;
 				for (j = 0; j < bytes_in_curr_word; ++j) {
 					tx_data |= (i2c_dev->tx_msg_buff[
-						i2c_dev->tx_msg_tail++]<<(j*8));
-					if (i2c_dev->tx_msg_tail >=
-						i2c_dev->tx_msg_buf_size)
-						i2c_dev->tx_msg_tail = 0;
+						  tx_tail++]<<(j*8));
+					if (tx_tail >= i2c_dev->tx_msg_buf_size)
+						tx_tail = 0;
 				}
 				writel(tx_data, i2c_dev->base +
 							I2C_SLV_TX_FIFO);
