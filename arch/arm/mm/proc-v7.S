@@ -212,7 +212,7 @@ cpu_v7_name:
 
 /* Suspend/resume support: derived from arch/arm/mach-s5pv210/sleep.S */
 .globl	cpu_v7_suspend_size
-.equ	cpu_v7_suspend_size, (4 * (9 + 4 + (16 * 2) + (16 * 2)))
+.equ	cpu_v7_suspend_size, (4 * (10 + 4 + (16 * 2) + (16 * 2)))
 /* 9 CP15 registers
  * 4 CP14 registers
  * 16x2 CP14 breakpoint registers (maximum)
@@ -245,7 +245,8 @@ cpu_v7_name:
 
 #ifdef CONFIG_PM_SLEEP
 ENTRY(cpu_v7_do_suspend)
-	stmfd	sp!, {r0, r3 - r11, lr}
+	stmfd	sp!, {r0, r2 - r11, lr}
+	mrc	p15, 0, r2, c13, c0, 3	@ User r/o thread ID
 	mrc	p15, 0, r3, c15, c0, 1	@ diag
 	mrc	p15, 0, r4, c13, c0, 0	@ FCSE/PID
 	mrc	p15, 0, r5, c13, c0, 1	@ Context ID
@@ -255,7 +256,7 @@ ENTRY(cpu_v7_do_suspend)
 	mrc	p15, 0, r9, c1, c0, 0	@ Control register
 	mrc	p15, 0, r10, c1, c0, 1	@ Auxiliary control register
 	mrc	p15, 0, r11, c1, c0, 2	@ Co-processor access control
-	stmia	r0!, {r3 - r11}
+	stmia	r0!, {r2 - r11}
 
 	/* Save CP14 debug controller context */
 	mrc	p14, 0, r4, c0, c1, 0	@ DSCR
@@ -320,14 +321,15 @@ ENTRY(cpu_v7_do_suspend)
 	save_wpt	c1
 	save_wpt	c0
 
-	ldmfd	sp!, {r0, r3 - r11, pc}
+	ldmfd	sp!, {r0, r2 - r11, pc}
 ENDPROC(cpu_v7_do_suspend)
 
 ENTRY(cpu_v7_do_resume)
 	mov	ip, #0
 	mcr	p15, 0, ip, c8, c7, 0	@ invalidate TLBs
 	mcr	p15, 0, ip, c7, c5, 0	@ invalidate I cache
-	ldmia	r0!, {r3 - r11}
+	ldmia	r0!, {r2 - r11}
+	mcr	p15, 0, r2, c13, c0, 3	@ User r/o thread ID
 	mcr	p15, 0, r3, c15, c0, 1	@ diag
 	mcr	p15, 0, r4, c13, c0, 0	@ FCSE/PID
 	mcr	p15, 0, r5, c13, c0, 1	@ Context ID
