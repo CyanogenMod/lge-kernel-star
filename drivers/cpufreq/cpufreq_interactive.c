@@ -64,6 +64,9 @@ static unsigned long go_maxspeed_load;
 /* Base of exponential raise to max speed; if 0 - jump to maximum */
 static unsigned long boost_factor;
 
+/* Max frequency boost in Hz; if 0 - no max is enforced */
+static unsigned long max_boost;
+
 /*
  * Targeted sustainable load relatively to current frequency.
  * If 0, target is set realtively to the max speed
@@ -194,6 +197,9 @@ static unsigned int cpufreq_interactive_get_target(
 			return policy->max;
 
 		target_freq = policy->cur * boost_factor;
+
+		if (max_boost && target_freq > policy->cur + max_boost)
+			target_freq = policy->cur + max_boost;
 	}
 	else {
 		if (!sustain_load)
@@ -591,6 +597,22 @@ static ssize_t store_boost_factor(struct kobject *kobj,
 static struct global_attr boost_factor_attr = __ATTR(boost_factor, 0644,
 		show_boost_factor, store_boost_factor);
 
+static ssize_t show_max_boost(struct kobject *kobj,
+				     struct attribute *attr, char *buf)
+{
+	return sprintf(buf, "%lu\n", max_boost);
+}
+
+static ssize_t store_max_boost(struct kobject *kobj,
+			struct attribute *attr, const char *buf, size_t count)
+{
+	return strict_strtoul(buf, 0, &max_boost);
+}
+
+static struct global_attr max_boost_attr = __ATTR(max_boost, 0644,
+		show_max_boost, store_max_boost);
+
+
 static ssize_t show_sustain_load(struct kobject *kobj,
 				     struct attribute *attr, char *buf)
 {
@@ -624,6 +646,7 @@ static struct global_attr min_sample_time_attr = __ATTR(min_sample_time, 0644,
 static struct attribute *interactive_attributes[] = {
 	&go_maxspeed_load_attr.attr,
 	&boost_factor_attr.attr,
+	&max_boost_attr.attr,
 	&sustain_load_attr.attr,
 	&min_sample_time_attr.attr,
 	NULL,
