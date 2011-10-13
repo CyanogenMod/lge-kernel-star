@@ -1724,8 +1724,16 @@ int sdhci_resume_host(struct sdhci_host *host)
 	sdhci_init(host, (host->mmc->pm_flags & MMC_PM_KEEP_POWER));
 	mmiowb();
 
-	if (mmc->card && (mmc->card->type != MMC_TYPE_SDIO))
-		ret = mmc_resume_host(host->mmc);
+	if (mmc->card) {
+		if (mmc->card->type != MMC_TYPE_SDIO) {
+			ret = mmc_resume_host(host->mmc);
+		} else {
+			/* Enable card interrupt as it is overwritten in sdhci_init */
+			if ((mmc->caps & MMC_CAP_SDIO_IRQ) &&
+				(mmc->pm_flags & MMC_PM_KEEP_POWER))
+					mmc->ops->enable_sdio_irq(mmc, true);
+		}
+	}
 
 	sdhci_enable_card_detection(host);
 
