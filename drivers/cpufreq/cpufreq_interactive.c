@@ -581,7 +581,7 @@ static ssize_t store_go_maxspeed_load(struct kobject *kobj,
 	return -EINVAL;
 }
 
-static struct global_attr go_maxspeed_load_attr = __ATTR(go_maxspeed_load, 0644,
+static struct global_attr go_maxspeed_load_attr = __ATTR(go_maxspeed_load, 0666,
 		show_go_maxspeed_load, store_go_maxspeed_load);
 
 static ssize_t show_boost_factor(struct kobject *kobj,
@@ -615,7 +615,7 @@ static ssize_t store_max_boost(struct kobject *kobj,
 	return -EINVAL;
 }
 
-static struct global_attr max_boost_attr = __ATTR(max_boost, 0644,
+static struct global_attr max_boost_attr = __ATTR(max_boost, 0666,
 		show_max_boost, store_max_boost);
 
 
