@@ -374,6 +374,7 @@ struct tegra_dc_lut {
 struct tegra_dc_win {
 	u8			idx;
 	u8			fmt;
+	u8			ppflags; /* see TEGRA_WIN_PPFLAG* */
 	u32			flags;
 
 	void			*virt_addr;
@@ -404,6 +405,8 @@ struct tegra_dc_win {
 	struct tegra_dc_lut	lut;
 };
 
+#define TEGRA_WIN_PPFLAG_CP_ENABLE	(1 << 0) /* enable RGB color lut */
+#define TEGRA_WIN_PPFLAG_CP_FBOVERRIDE	(1 << 1) /* override fbdev color lut */
 
 #define TEGRA_WIN_FLAG_ENABLED		(1 << 0)
 #define TEGRA_WIN_FLAG_BLEND_PREMULT	(1 << 1)
@@ -413,6 +416,7 @@ struct tegra_dc_win {
 #define TEGRA_WIN_FLAG_TILED		(1 << 5)
 #define TEGRA_WIN_FLAG_H_FILTER		(1 << 6)
 #define TEGRA_WIN_FLAG_V_FILTER		(1 << 7)
+
 
 #define TEGRA_WIN_BLEND_FLAGS_MASK \
 	(TEGRA_WIN_FLAG_BLEND_PREMULT | TEGRA_WIN_FLAG_BLEND_COVERAGE)
@@ -510,7 +514,7 @@ void tegra_dc_config_pwm(struct tegra_dc *dc, struct tegra_dc_pwm_params *cfg);
 
 int tegra_dc_update_csc(struct tegra_dc *dc, int win_index);
 
-int tegra_dc_update_lut(struct tegra_dc *dc, int win_index, int start, int len);
+int tegra_dc_update_lut(struct tegra_dc *dc, int win_index, int fboveride);
 
 /*
  * In order to get a dc's current EDID, first call tegra_dc_get_edid() from an
