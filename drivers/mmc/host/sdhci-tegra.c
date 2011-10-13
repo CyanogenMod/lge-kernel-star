@@ -415,6 +415,7 @@ static int tegra_sdhci_pltfm_init(struct sdhci_host *host,
 	tegra_host->clk_enabled = true;
 
 	host->mmc->caps |= MMC_CAP_ERASE;
+	host->mmc->caps |= MMC_CAP_DISABLE;
 	if (plat->is_8bit)
 		host->mmc->caps |= MMC_CAP_8_BIT_DATA;
 	host->mmc->caps |= MMC_CAP_SDIO_IRQ;
