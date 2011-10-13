@@ -49,6 +49,10 @@
 #define STATE_ON		0x01
 #define STATE_MASK		0x03
 
+#define TRANS_SLEEP_OFF		0x00
+#define TRANS_SLEEP_ON		0x04
+#define TRANS_SLEEP_MASK	0x0C
+
 #define SMPS_CMD_MASK		0xC0
 #define SMPS_VSEL_MASK		0x3F
 #define LDO_VSEL_MASK		0x1F
@@ -741,6 +745,25 @@ static int tps80031_power_req_config(struct device *parent,
 	int ret;
 	uint8_t reg_val;
 
+	/* Clear all external control for this rail */
+	ret = tps80031_clr_bits(parent, SLAVE_ID1,
+			TPS80031_PREQ1_RES_ASS_A + (ri->preq_bit >> 3),
+			BIT(ri->preq_bit & 0x7));
+	if (!ret)
+		ret = tps80031_clr_bits(parent, SLAVE_ID1,
+				TPS80031_PREQ2_RES_ASS_A + (ri->preq_bit >> 3),
+				BIT(ri->preq_bit & 0x7));
+	if (!ret)
+		ret = tps80031_clr_bits(parent, SLAVE_ID1,
+				TPS80031_PREQ3_RES_ASS_A + (ri->preq_bit >> 3),
+				BIT(ri->preq_bit & 0x7));
+	if (ret < 0) {
+		dev_err(ri->dev, "%s() Not able to clr bit %d of "
+			"TPS80031_PREQ_RES_ASS error %d\n",
+			__func__, preq_bit, ret);
+		return ret;
+	}
+
 	if (!(ri->platform_flags & EXT_PWR_REQ))
 		return 0;
 
@@ -777,13 +800,24 @@ static int tps80031_power_req_config(struct device *parent,
 	}
 
 	/* Switch regulator control to resource now */
-	reg_val = (ri->state_reg_cache & ~STATE_MASK);
-	ret = tps80031_write(parent, SLAVE_ID1, ri->state_reg, reg_val);
-	if (ret < 0)
-		dev_err(ri->dev, "%s() Error in writing the STATE "
+	if (ri->platform_flags &  (PWR_REQ_INPUT_PREQ2 | PWR_REQ_INPUT_PREQ3)) {
+		reg_val = (ri->state_reg_cache & ~STATE_MASK);
+		ret = tps80031_write(parent, SLAVE_ID1, ri->state_reg, reg_val);
+		if (ret < 0)
+			dev_err(ri->dev, "%s() Error in writing the STATE "
 				"register error %d\n", __func__, ret);
-	else
-		ri->state_reg_cache = reg_val;
+		else
+			ri->state_reg_cache = reg_val;
+	} else {
+		reg_val = (ri->trans_reg_cache & ~TRANS_SLEEP_MASK) |
+					TRANS_SLEEP_OFF;
+		ret = tps80031_write(parent, SLAVE_ID1, ri->trans_reg, reg_val);
+		if (ret < 0)
+			dev_err(ri->dev, "%s() Error in writing the TRANS "
+				"register error %d\n", __func__, ret);
+		else
+			ri->trans_reg_cache = reg_val;
+	}
 	return ret;
 }
 
