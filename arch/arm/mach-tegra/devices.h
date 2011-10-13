@@ -80,6 +80,9 @@ extern struct platform_device tegra_apbif0_device;
 extern struct platform_device tegra_apbif1_device;
 extern struct platform_device tegra_apbif2_device;
 extern struct platform_device tegra_apbif3_device;
+extern struct platform_device tegra_dam_device0;
+extern struct platform_device tegra_dam_device1;
+extern struct platform_device tegra_dam_device2;
 extern struct platform_device tegra_hda_device;
 extern struct platform_device tegra_sata_device;
 #endif

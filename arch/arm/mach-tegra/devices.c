@@ -991,6 +991,51 @@ struct platform_device tegra_ahub_device = {
 	.resource	= ahub_resource,
 	.num_resources	= ARRAY_SIZE(ahub_resource),
 };
+
+static struct resource dam_resource0[] = {
+	[0] = {
+		.start = TEGRA_DAM0_BASE,
+		.end   = TEGRA_DAM0_BASE + TEGRA_DAM0_SIZE - 1,
+		.flags = IORESOURCE_MEM
+	}
+};
+
+struct platform_device tegra_dam_device0 = {
+	.name = "tegra30-dam",
+	.id = 0,
+	.resource      = dam_resource0,
+	.num_resources = ARRAY_SIZE(dam_resource0),
+};
+
+static struct resource dam_resource1[] = {
+	[0] = {
+		.start = TEGRA_DAM1_BASE,
+		.end   = TEGRA_DAM1_BASE + TEGRA_DAM1_SIZE - 1,
+		.flags = IORESOURCE_MEM
+	}
+};
+
+struct platform_device tegra_dam_device1 = {
+	.name = "tegra30-dam",
+	.id = 1,
+	.resource      = dam_resource1,
+	.num_resources = ARRAY_SIZE(dam_resource1),
+};
+
+static struct resource dam_resource2[] = {
+	[0] = {
+		.start = TEGRA_DAM2_BASE,
+		.end   = TEGRA_DAM2_BASE + TEGRA_DAM2_SIZE - 1,
+		.flags = IORESOURCE_MEM
+	}
+};
+
+struct platform_device tegra_dam_device2 = {
+	.name = "tegra30-dam",
+	.id = 2,
+	.resource      = dam_resource2,
+	.num_resources = ARRAY_SIZE(dam_resource2),
+};
 #endif
 
 struct platform_device spdif_dit_device = {
