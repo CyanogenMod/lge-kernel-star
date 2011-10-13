@@ -22,6 +22,11 @@ config SND_SOC_TEGRA30_AHUB
 	tristate "Tegra 30 Audio Hub driver"
 	depends on SND_SOC_TEGRA && ARCH_TEGRA_3x_SOC
 
+config SND_SOC_TEGRA30_DAM
+	tristate "Tegra 30 Audio Dam driver"
+	depends on SND_SOC_TEGRA && ARCH_TEGRA_3x_SOC
+	select SND_SOC_TEGRA30_AHUB
+
 config SND_SOC_TEGRA30_I2S
 	tristate "Tegra 30 I2S driver"
 	depends on SND_SOC_TEGRA && ARCH_TEGRA_3x_SOC
