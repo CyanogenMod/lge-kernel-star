@@ -4,7 +4,6 @@ comment "NVIDIA Tegra Display Driver options"
 
 config TEGRA_GRHOST
 	tristate "Tegra graphics host driver"
-	default y
 	help
 	  Driver for the Tegra graphics host hardware.
 
