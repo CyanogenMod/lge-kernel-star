@@ -79,6 +79,9 @@ struct tegra_dc_hdmi_data {
 
 	struct clk			*disp1_clk;
 	struct clk			*disp2_clk;
+	struct clk			*hda_clk;
+	struct clk			*hda2codec_clk;
+	struct clk			*hda2hdmi_clk;
 
 #ifdef CONFIG_SWITCH
 	struct switch_dev		hpd_switch;
@@ -966,6 +969,29 @@ static int tegra_dc_hdmi_init(struct tegra_dc *dc)
 		goto err_put_clock;
 	}
 
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+	hdmi->hda_clk = clk_get_sys("tegra30-hda", "hda");
+	if (IS_ERR_OR_NULL(hdmi->hda_clk)) {
+		dev_err(&dc->ndev->dev, "hdmi: can't get hda clock\n");
+		err = -ENOENT;
+		goto err_put_clock;
+	}
+
+	hdmi->hda2codec_clk = clk_get_sys("tegra30-hda", "hda2codec");
+	if (IS_ERR_OR_NULL(hdmi->hda2codec_clk)) {
+		dev_err(&dc->ndev->dev, "hdmi: can't get hda2codec clock\n");
+		err = -ENOENT;
+		goto err_put_clock;
+	}
+
+	hdmi->hda2hdmi_clk = clk_get_sys("tegra30-hda", "hda2hdmi");
+	if (IS_ERR_OR_NULL(hdmi->hda2hdmi_clk)) {
+		dev_err(&dc->ndev->dev, "hdmi: can't get hda2hdmi clock\n");
+		err = -ENOENT;
+		goto err_put_clock;
+	}
+#endif
+
 	/* TODO: support non-hotplug */
 	if (request_irq(gpio_to_irq(dc->out->hotplug_gpio), tegra_dc_hdmi_irq,
 			IRQF_DISABLED | IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
@@ -1034,6 +1060,14 @@ err_edid_destroy:
 err_free_irq:
 	free_irq(gpio_to_irq(dc->out->hotplug_gpio), dc);
 err_put_clock:
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+	if (!IS_ERR_OR_NULL(hdmi->hda2hdmi_clk))
+		clk_put(hdmi->hda2hdmi_clk);
+	if (!IS_ERR_OR_NULL(hdmi->hda2codec_clk))
+		clk_put(hdmi->hda2codec_clk);
+	if (!IS_ERR_OR_NULL(hdmi->hda_clk))
+		clk_put(hdmi->hda_clk);
+#endif
 	if (!IS_ERR_OR_NULL(disp2_clk))
 		clk_put(disp2_clk);
 	if (!IS_ERR_OR_NULL(disp1_clk))
@@ -1060,6 +1094,11 @@ static void tegra_dc_hdmi_destroy(struct tegra_dc *dc)
 #endif
 	iounmap(hdmi->base);
 	release_resource(hdmi->base_res);
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+	clk_put(hdmi->hda2hdmi_clk);
+	clk_put(hdmi->hda2codec_clk);
+	clk_put(hdmi->hda_clk);
+#endif
 	clk_put(hdmi->clk);
 	clk_put(hdmi->disp1_clk);
 	clk_put(hdmi->disp2_clk);
@@ -1502,6 +1541,13 @@ static void tegra_dc_hdmi_enable(struct tegra_dc *dc)
 	clk_enable(hdmi->disp1_clk);
 	clk_enable(hdmi->disp2_clk);
 
+#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+	/* Enabling HDA clocks before asserting HDA PD and ELDV bits */
+	clk_enable(hdmi->hda_clk);
+	clk_enable(hdmi->hda2codec_clk);
+	clk_enable(hdmi->hda2hdmi_clk);
+#endif
+
 	/* back off multiplier before attaching to parent at new rate. */
 	oldrate = clk_get_rate(hdmi->clk);
 	clk_set_rate(hdmi->clk, oldrate / 2);
@@ -1697,6 +1743,11 @@ static void tegra_dc_hdmi_disable(struct tegra_dc *dc)
 
 #if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
 	tegra_hdmi_writel(hdmi, 0, HDMI_NV_PDISP_SOR_AUDIO_HDA_PRESENSE_0);
+	/* sleep 1ms before disabling clocks to ensure HDA gets the interrupt */
+	msleep(1);
+	clk_disable(hdmi->hda2hdmi_clk);
+	clk_disable(hdmi->hda2codec_clk);
+	clk_disable(hdmi->hda_clk);
 #endif
 	tegra_periph_reset_assert(hdmi->clk);
 	hdmi->clk_enabled = false;
