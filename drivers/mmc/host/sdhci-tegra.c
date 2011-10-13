@@ -505,13 +505,30 @@ static void tegra_sdhci_pltfm_exit(struct sdhci_host *host)
 
 static int tegra_sdhci_suspend(struct sdhci_host *sdhci, pm_message_t state)
 {
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct tegra_sdhci_host *tegra_host = pltfm_host->priv;
+
 	tegra_sdhci_set_clock(sdhci, 0);
 
+	/* Disable the power rails if any */
+	if (tegra_host->vdd_slot_reg)
+		regulator_disable(tegra_host->vdd_slot_reg);
+	if (tegra_host->vdd_io_reg)
+		regulator_disable(tegra_host->vdd_io_reg);
 	return 0;
 }
 
 static int tegra_sdhci_resume(struct sdhci_host *sdhci)
 {
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct tegra_sdhci_host *tegra_host = pltfm_host->priv;
+
+	/* Enable the power rails if any */
+	if (tegra_host->vdd_io_reg)
+		regulator_enable(tegra_host->vdd_io_reg);
+	if (tegra_host->vdd_slot_reg)
+		regulator_enable(tegra_host->vdd_slot_reg);
+
 	/* Setting the min identification clock of freq 400KHz */
 	tegra_sdhci_set_clock(sdhci, 400000);
 
