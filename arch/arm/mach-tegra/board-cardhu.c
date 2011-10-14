@@ -999,7 +999,7 @@ static void cardhu_modem_init(void)
 		else
 			gpio_direction_input(w_disable_gpio);
 
-		/* E1291-A04 & E1198:A02: Set PERST signal to low */
+		/* E1291-A04 & E1198:A02: Set PERST signal to high */
 		if (((board_info.board_id == BOARD_E1291) &&
 				(board_info.fab >= BOARD_FAB_A04)) ||
 			((board_info.board_id == BOARD_E1198) &&
@@ -1010,7 +1010,7 @@ static void cardhu_modem_init(void)
 					"TEGRA_GPIO_PH7\n", __func__);
 				break;
 			}
-			gpio_direction_output(TEGRA_GPIO_PH7, 0);
+			gpio_direction_output(TEGRA_GPIO_PH7, 1);
 			tegra_gpio_enable(TEGRA_GPIO_PH7);
 		}
 		break;
