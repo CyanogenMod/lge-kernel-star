@@ -112,6 +112,15 @@ void __init enterprise_tsensor_init(void);
 
 /* Baseband GPIO addresses */
 
+#define GPIO_BB_RESET		TEGRA_GPIO_PE1
+#define GPIO_BB_PWRON		TEGRA_GPIO_PE0
+#define GPIO_BB_APACK		TEGRA_GPIO_PE3
+#define GPIO_BB_APACK2		TEGRA_GPIO_PE2
+#define GPIO_BB_CPACK		TEGRA_GPIO_PU5
+#define GPIO_BB_CPACK2		TEGRA_GPIO_PV0
+#define GPIO_BB_RSVD1		TEGRA_GPIO_PV1
+#define GPIO_BB_RSVD2		TEGRA_GPIO_PU4
+
 #define BB_GPIO_MDM_PWRON_AP2BB		TEGRA_GPIO_PE0 /* LCD_D0 */
 #define BB_GPIO_RESET_AP2BB		TEGRA_GPIO_PE1 /* LCD_D1 */
 #define BB_GPIO_LCD_PWR1		TEGRA_GPIO_PC1
@@ -127,5 +136,13 @@ void __init enterprise_tsensor_init(void);
 #define XMM_GPIO_IPC_AP_WAKE		BB_GPIO_HS1_BB2AP
 
 #define TDIODE_OFFSET	(9000)	/* in millicelsius */
+
+/* Baseband IDs */
+
+enum tegra_bb_type {
+	TEGRA_BB_PH450 = 1,
+	TEGRA_BB_XMM6260,
+	TEGRA_BB_M7400,
+};
 
 #endif

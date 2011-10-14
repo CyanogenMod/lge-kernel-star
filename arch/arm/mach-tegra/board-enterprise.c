@@ -53,7 +53,7 @@
 #include <mach/i2s.h>
 #include <mach/tegra_max98088_pdata.h>
 #include <mach/thermal.h>
-
+#include <mach/tegra-bb-power.h>
 #include "board.h"
 #include "clock.h"
 #include "board-enterprise.h"
@@ -825,15 +825,44 @@ static struct platform_device tegra_baseband_power2_device = {
 	},
 };
 
+#ifdef CONFIG_TEGRA_BB_M7400
+static union tegra_bb_gpio_id m7400_gpio_id = {
+	.m7400 = {
+		.pwr_status = GPIO_BB_RESET,
+		.pwr_on = GPIO_BB_PWRON,
+		.uart_awr = GPIO_BB_APACK,
+		.uart_cwr = GPIO_BB_CPACK,
+		.usb_awr = GPIO_BB_APACK2,
+		.usb_cwr = GPIO_BB_CPACK2,
+		.service = GPIO_BB_RSVD2,
+		.resout2 = GPIO_BB_RSVD1,
+	},
+};
+
+static struct tegra_bb_pdata m7400_pdata = {
+	.id = &m7400_gpio_id,
+	.device = &tegra_ehci2_device,
+	.bb_id = TEGRA_BB_M7400,
+};
+
+static struct platform_device tegra_baseband_m7400_device = {
+	.name = "tegra_baseband_power",
+	.id = -1,
+	.dev = {
+		.platform_data = &m7400_pdata,
+	},
+};
+#endif
+
 static void enterprise_baseband_init(void)
 {
 	int modem_id = tegra_get_modem_id();
 
 	switch (modem_id) {
-	case 1: /* PH450 ULPI */
+	case TEGRA_BB_PH450: /* PH450 ULPI */
 		enterprise_modem_init();
 		break;
-	case 2: /* XMM6260 HSIC */
+	case TEGRA_BB_XMM6260: /* XMM6260 HSIC */
 		/* xmm baseband - do not switch off phy during suspend */
 		tegra_ehci_uhsic_pdata.power_down_on_bus_suspend = 0;
 		uhsic_phy_config.postsuspend = enterprise_usb_hsic_postsupend;
@@ -860,6 +889,13 @@ static void enterprise_baseband_init(void)
 		platform_device_register(&tegra_baseband_power_device);
 		platform_device_register(&tegra_baseband_power2_device);
 		break;
+#ifdef CONFIG_TEGRA_BB_M7400
+	case TEGRA_BB_M7400: /* M7400 HSIC */
+		tegra_ehci2_device.dev.platform_data
+			= &tegra_ehci_uhsic_pdata;
+		platform_device_register(&tegra_baseband_m7400_device);
+		break;
+#endif
 	}
 }
 
