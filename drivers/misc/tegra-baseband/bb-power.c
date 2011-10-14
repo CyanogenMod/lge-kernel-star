@@ -37,14 +37,14 @@ static bb_init_cb init_cb_list[] = {
 	NULL,
 	NULL,
 	NULL,
-	NULL,
+	M7400_INIT_CB,
 };
 
 static bb_power_cb power_cb_list[] = {
 	NULL,
 	NULL,
 	NULL,
-	NULL,
+	M7400_PWR_CB,
 };
 
 static int tegra_bb_power_gpio_init(struct tegra_bb_power_gdata *gdata)
@@ -205,7 +205,8 @@ static int tegra_bb_power_probe(struct platform_device *device)
 	/* BB specific callback */
 	bb_id = pdata->bb_id;
 	if (init_cb_list[bb_id] != NULL) {
-		gdata = init_cb_list[pdata->bb_id](pdata, CB_CODE_INIT);
+		gdata = (struct tegra_bb_power_gdata *)
+		init_cb_list[pdata->bb_id]((void *)pdata, CB_CODE_INIT);
 
 		if (!gdata) {
 			pr_err("%s - Error: Gpio data is empty.\n", __func__);
@@ -237,7 +238,8 @@ static int tegra_bb_power_remove(struct platform_device *device)
 	/* BB specific callback */
 	if (init_cb_list[bb_id] != NULL) {
 		pdata = (struct tegra_bb_pdata *) dev->platform_data;
-		gdata = init_cb_list[bb_id](pdata, CB_CODE_DEINIT);
+		gdata = (struct tegra_bb_power_gdata *)
+			init_cb_list[bb_id]((void *)pdata, CB_CODE_DEINIT);
 
 		/* Deinitialize gpios */
 		if (gdata)

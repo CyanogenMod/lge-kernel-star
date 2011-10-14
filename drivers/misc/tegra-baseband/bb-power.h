@@ -44,3 +44,13 @@ struct tegra_bb_power_gdata {
 
 typedef void* (*bb_init_cb)(void *pdata, int code);
 typedef int (*bb_power_cb)(int code);
+
+#ifdef CONFIG_TEGRA_BB_M7400
+extern void *m7400_init(void *pdata, int code);
+#define M7400_INIT_CB m7400_init
+extern int m7400_power_callback(int code);
+#define M7400_PWR_CB m7400_power_callback
+#else
+#define M7400_INIT_CB NULL
+#define M7400_PWR_CB NULL
+#endif

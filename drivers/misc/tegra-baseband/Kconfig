@@ -22,4 +22,11 @@ config TEGRA_BB_POWER
 
 	 Disabled by default. Choose Y here if you want to build the driver.
 
+config TEGRA_BB_M7400
+	bool "Enable driver for M7400 modem"
+	---help---
+	 Enables driver for M7400 modem.
+
+	 Disabled by default. Choose Y here if you want to build the driver.
+
 endif # TEGRA_BB_SUPPORT
