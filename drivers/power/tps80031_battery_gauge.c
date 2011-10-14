@@ -40,6 +40,7 @@
 #include <linux/mfd/tps80031.h>
 #include <linux/tps80031-charger.h>
 
+#define CHARGERUSB_CINLIMIT	0xee
 #define CONTROLLER_STAT1	0xe3
 #define LINEAR_CHARGE_STS	0xde
 #define STS_HW_CONDITIONS	0x21
@@ -96,10 +97,12 @@ struct tps80031_device_info {
 	struct device		*dev;
 	struct i2c_client	*client;
 	struct power_supply	bat;
+	struct power_supply	ac;
 	struct power_supply	usb;
 	struct timer_list	battery_poll_timer;
 	uint32_t vsys;
 	uint8_t usb_online;
+	uint8_t ac_online;
 	uint8_t usb_status;
 	uint8_t capacity_sts;
 	uint8_t health;
@@ -121,6 +124,10 @@ static enum power_supply_property tps80031_bat_props[] = {
 };
 
 static enum power_supply_property tps80031_usb_props[] = {
+	POWER_SUPPLY_PROP_ONLINE,
+};
+
+static enum power_supply_property tps80031_ac_props[] = {
 	POWER_SUPPLY_PROP_ONLINE,
 };
 
@@ -332,6 +339,24 @@ static int tps80031_usb_get_property(struct power_supply *psy,
 	return 0;
 }
 
+#define to_tps80031_device_info_ac(x) container_of((x), \
+				struct tps80031_device_info, ac);
+
+static int tps80031_ac_get_property(struct power_supply *psy,
+		enum power_supply_property psp, union power_supply_propval *val)
+{
+	struct tps80031_device_info *di = to_tps80031_device_info_ac(psy);
+
+	switch (psp) {
+	case POWER_SUPPLY_PROP_ONLINE:
+		val->intval = di->ac_online;
+		break;
+	default:
+		return -EINVAL;
+	}
+	return 0;
+}
+
 static irqreturn_t tps80031_sys_vlow(int irq, void *data)
 {
 	struct tps80031_device_info *di = data;
@@ -385,17 +410,33 @@ static int tps80031_fg_start_gas_gauge(struct tps80031_device_info *di)
 void tps80031_battery_status(enum charging_states status, void *data)
 {
 	struct tps80031_device_info *di = data;
+	int ret;
+	uint8_t retval;
 
 	if ((status == charging_state_charging_in_progress)) {
 		di->usb_status	= POWER_SUPPLY_STATUS_CHARGING;
 		di->health	= POWER_SUPPLY_HEALTH_GOOD;
-		di->usb_online = 1;
+		ret = tps80031_reg_read(di, SLAVE_ID2,
+				CHARGERUSB_CINLIMIT, &retval);
+		if (ret < 0) {
+			di->ac_online = 0;
+			di->usb_online = 0;
+		}
+		if (retval == 0x9) {
+			di->ac_online = 0;
+			di->usb_online = 1;
+		} else {
+			di->usb_online = 0;
+			di->ac_online = 1;
+		}
 	} else if (status == charging_state_charging_stopped) {
 		di->usb_status = POWER_SUPPLY_STATUS_DISCHARGING;
+		di->ac_online = 0;
 		di->usb_online = 0;
 	}
 	power_supply_changed(&di->usb);
 	power_supply_changed(&di->bat);
+	power_supply_changed(&di->ac);
 }
 
 static void battery_poll_timer_func(unsigned long pdi)
@@ -467,18 +508,30 @@ static int tps80031_battery_probe(struct platform_device *pdev)
 		goto power_supply_fail2;
 	}
 
+	di->ac.name		= "tps80031-ac";
+	di->ac.type		= POWER_SUPPLY_TYPE_MAINS;
+	di->ac.properties	= tps80031_ac_props;
+	di->ac.num_properties	= ARRAY_SIZE(tps80031_ac_props);
+	di->ac.get_property	= tps80031_ac_get_property;
+
+	ret = power_supply_register(dev->parent, &di->ac);
+	if (ret) {
+		dev_err(dev->parent, "failed to register ac power supply\n");
+		goto power_supply_fail1;
+	}
+
 	dev_set_drvdata(&pdev->dev, di);
 
 	ret = register_charging_state_callback(tps80031_battery_status, di);
 	if (ret < 0)
-		goto power_supply_fail1;
+		goto power_supply_fail0;
 
 	ret = request_threaded_irq(pdata->irq_base + TPS80031_INT_SYS_VLOW,
 				NULL, tps80031_sys_vlow,
 					IRQF_ONESHOT, "tps80031_sys_vlow", di);
 	if (ret < 0) {
 		dev_err(dev->parent, "request IRQ %d fail\n", pdata->irq_base);
-		goto power_supply_fail1;
+		goto power_supply_fail0;
 	}
 
 	ret = request_threaded_irq(pdata->irq_base + TPS80031_INT_CC_AUTOCAL,
@@ -506,6 +559,8 @@ irq_fail1:
 	free_irq(pdata->irq_base + TPS80031_INT_CC_AUTOCAL, di);
 irq_fail2:
 	free_irq(pdata->irq_base + TPS80031_INT_SYS_VLOW, di);
+power_supply_fail0:
+	power_supply_unregister(&di->ac);
 power_supply_fail1:
 	power_supply_unregister(&di->usb);
 power_supply_fail2:
@@ -519,6 +574,7 @@ static int tps80031_battery_remove(struct platform_device *pdev)
 
 	power_supply_unregister(&di->bat);
 	power_supply_unregister(&di->usb);
+	power_supply_unregister(&di->ac);
 
 	return 0;
 }
