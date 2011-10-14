@@ -207,10 +207,14 @@
 #define	SUPER_IDLE_SOURCE_SHIFT		0
 
 #define SUPER_CLK_DIVIDER		0x04
+#define SUPER_CLOCK_SKIP_ENABLE		(0x1 << 31)
 #define SUPER_CLOCK_DIV_U71_SHIFT	16
 #define SUPER_CLOCK_DIV_U71_MASK	(0xff << SUPER_CLOCK_DIV_U71_SHIFT)
 /* guarantees safe cpu backup */
 #define SUPER_CLOCK_DIV_U71_MIN		0x2
+#define SUPER_CLOCK_SKIP_NOMIN_SHIFT	8
+#define SUPER_CLOCK_SKIP_DENOM_SHIFT	0
+#define SUPER_CLOCK_SKIP_MASK		(0xffff << SUPER_CLOCK_SKIP_DENOM_SHIFT)
 
 #define BUS_CLK_DISABLE			(1<<3)
 #define BUS_CLK_DIV_MASK		0x3
@@ -571,6 +575,7 @@ static void tegra3_super_clk_init(struct clk *c)
 	int source;
 	int shift;
 	const struct clk_mux_sel *sel;
+
 	val = clk_readl(c->reg + SUPER_CLK_MUX);
 	c->state = ON;
 	BUG_ON(((val & SUPER_STATE_MASK) != SUPER_STATE_RUN) &&
@@ -588,9 +593,12 @@ static void tegra3_super_clk_init(struct clk *c)
 	c->parent = sel->input;
 
 	if (c->flags & DIV_U71) {
-		/* Init safe 7.1 divider value (does not affect PLLX path) */
-		clk_writel(SUPER_CLOCK_DIV_U71_MIN << SUPER_CLOCK_DIV_U71_SHIFT,
-			   c->reg + SUPER_CLK_DIVIDER);
+		/* Init safe 7.1 divider value (does not affect PLLX path).
+		   Super skipper is enabled to be ready for emergency throttle,
+		   but set 1:1 */
+		val = SUPER_CLOCK_SKIP_ENABLE |
+			(SUPER_CLOCK_DIV_U71_MIN << SUPER_CLOCK_DIV_U71_SHIFT);
+		clk_writel(val, c->reg + SUPER_CLK_DIVIDER);
 		c->mul = 2;
 		c->div = 2;
 		if (!(c->parent->flags & PLLX))
@@ -667,6 +675,36 @@ static int tegra3_super_clk_set_parent(struct clk *c, struct clk *p)
 	return -EINVAL;
 }
 
+static DEFINE_SPINLOCK(super_divider_lock);
+
+static void tegra3_super_clk_divider_update(struct clk *c, u8 div)
+{
+	u32 val;
+	unsigned long flags;
+
+	spin_lock_irqsave(&super_divider_lock, flags);
+	val = clk_readl(c->reg + SUPER_CLK_DIVIDER);
+	val &= ~SUPER_CLOCK_DIV_U71_MASK;
+	val |= div << SUPER_CLOCK_DIV_U71_SHIFT;
+	clk_writel(val, c->reg + SUPER_CLK_DIVIDER);
+	spin_unlock_irqrestore(&super_divider_lock, flags);
+	udelay(2);
+}
+
+static void tegra3_super_clk_skipper_update(struct clk *c, u8 nomin, u8 denom)
+{
+	u32 val;
+	unsigned long flags;
+
+	spin_lock_irqsave(&super_divider_lock, flags);
+	val = clk_readl(c->reg + SUPER_CLK_DIVIDER);
+	val &= ~SUPER_CLOCK_SKIP_MASK;
+	val |= (nomin << SUPER_CLOCK_SKIP_NOMIN_SHIFT) |
+		(denom << SUPER_CLOCK_SKIP_DENOM_SHIFT);
+	clk_writel(val, c->reg + SUPER_CLK_DIVIDER);
+	spin_unlock_irqrestore(&super_divider_lock, flags);
+}
+
 /*
  * Do not use super clocks "skippers", since dividing using a clock skipper
  * does not allow the voltage to be scaled down. Instead adjust the rate of
@@ -682,9 +720,7 @@ static int tegra3_super_clk_set_rate(struct clk *c, unsigned long rate)
 		int div = clk_div71_get_divider(c->parent->u.pll.fixed_rate,
 					rate, c->flags, ROUND_DIVIDER_DOWN);
 		div = max(div, SUPER_CLOCK_DIV_U71_MIN);
-
-		clk_writel(div << SUPER_CLOCK_DIV_U71_SHIFT,
-			   c->reg + SUPER_CLK_DIVIDER);
+		tegra3_super_clk_divider_update(c, div);
 		c->div = div + 2;
 		c->mul = 2;
 		return 0;
@@ -4167,6 +4203,25 @@ static void tegra3_init_one_clock(struct clk *c)
 		c->lookup.con_id = c->name;
 	c->lookup.clk = c;
 	clkdev_add(&c->lookup);
+}
+
+/*
+ * Emergency throttle of G-CPU by setting G-super clock skipper underneath
+ * clock framework, dvfs, and cpufreq driver s/w layers. Can be called in
+ * ISR context for EDP events. When releasing throttle, LP-divider is cleared
+ * just in case it was set as a result of save/restore operations across
+ * cluster switch (should not happen)
+ */
+void tegra_edp_throttle_cpu_now(u8 factor)
+{
+	if (factor > 1) {
+		if (!is_lp_cluster())
+			tegra3_super_clk_skipper_update(
+				&tegra_clk_cclk_g, 0, factor - 1);
+	} else {
+		tegra3_super_clk_skipper_update(&tegra_clk_cclk_g, 0, 0);
+		tegra3_super_clk_skipper_update(&tegra_clk_cclk_lp, 0, 0);
+	}
 }
 
 #ifdef CONFIG_CPU_FREQ

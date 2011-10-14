@@ -56,4 +56,11 @@ static inline unsigned int tegra_get_edp_limit(void)
 { return -1; }
 #endif
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+static inline void tegra_edp_throttle_cpu_now(u8 factor)
+{}
+#else
+void tegra_edp_throttle_cpu_now(u8 factor);
+#endif
+
 #endif	/* __MACH_EDP_H */
