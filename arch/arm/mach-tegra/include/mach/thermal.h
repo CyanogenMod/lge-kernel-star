@@ -17,44 +17,38 @@
 #ifndef __MACH_THERMAL_H
 #define __MACH_THERMAL_H
 
-struct tegra_thermal_ops {
-	int (*get_temp) (void *, long *);
-	int (*set_limits) (void *, long, long);
+/* All units in millicelsius */
+struct tegra_thermal_data {
+	long temp_throttle;
+	long temp_shutdown;
+	long temp_offset;
+	long edp_offset;
+#ifndef CONFIG_TEGRA_THERMAL_SYSFS
+	long hysteresis_throttle;
+#endif
+	long hysteresis_edp;
 };
 
-struct tegra_thermal {
+struct tegra_thermal_device {
 	void *data;
-	struct tegra_thermal_ops *ops;
-#ifdef CONFIG_TEGRA_THERMAL_SYSFS
-	struct thermal_zone_device *thz;
-#endif
+	long offset;
+	int (*get_temp) (void *, long *);
+	int (*set_limits) (void *, long, long);
+	int (*set_alert)(void *, void (*)(void *), void *);
+	int (*set_shutdown_temp)(void *, long);
 };
 
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
-int tegra_thermal_init(void);
+int tegra_thermal_init(struct tegra_thermal_data *data);
+int tegra_thermal_set_device(struct tegra_thermal_device *device);
 int tegra_thermal_exit(void);
-
-struct tegra_thermal
-	*tegra_thermal_register(void *data, struct tegra_thermal_ops *ops);
-int tegra_thermal_unregister(struct tegra_thermal *thermal);
-int tegra_thermal_alert(struct tegra_thermal *thermal);
 #else
-static inline int tegra_thermal_init(void)
+static inline int tegra_thermal_init(struct tegra_thermal_data *data)
+{ return 0; }
+static inline int tegra_thermal_set_device(struct tegra_thermal_device *dev)
 { return 0; }
 static inline int tegra_thermal_exit(void)
 { return 0; }
-static inline struct tegra_thermal
-	*tegra_thermal_register(void *data, struct tegra_thermal_ops *ops)
-{ return NULL; }
-static inline int tegra_thermal_unregister(struct tegra_thermal *thermal)
-{ return 0; }
-static inline int tegra_thermal_alert(struct tegra_thermal *thermal)
-{ return 0; }
 #endif
-
-#define CELSIUS_TO_MILLICELSIUS(x) ((x)*1000)
-#define MILLICELSIUS_TO_CELSIUS(x) ((x)/1000)
-
-
 
 #endif	/* __MACH_THERMAL_H */

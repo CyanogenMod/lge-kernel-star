@@ -29,53 +29,34 @@
 #include <mach/edp.h>
 #include <linux/slab.h>
 
-
 #include "clock.h"
 #include "cpu-tegra.h"
 #include "dvfs.h"
 
 #define MAX_ZONES (16)
 
-/* Thermal sysfs handles hysteresis */
-#ifndef CONFIG_TEGRA_THERMAL_SYSFS
-#define ALERT_HYSTERESIS_THROTTLE	1
+struct tegra_thermal {
+	struct tegra_thermal_data data;
+	struct tegra_thermal_device *device;
+#ifdef CONFIG_TEGRA_THERMAL_SYSFS
+	struct thermal_zone_device *thz;
 #endif
+#ifdef CONFIG_TEGRA_EDP_LIMITS
+	int edp_thermal_zone_val;
+#endif
+};
 
-#define ALERT_HYSTERESIS_EDP	3
-
-#define THROTTLING_LIMIT	(85000)
-#define MAX_LIMIT		(90000)
-
-u8 thermal_zones[MAX_ZONES];
-int thermal_zones_sz;
-static int edp_thermal_zone_val = -1;
+static struct tegra_thermal thermal_state = {
+	.device = NULL,
+#ifdef CONFIG_TEGRA_EDP_LIMITS
+	.edp_thermal_zone_val = -1,
+#endif
+};
 
 #ifndef CONFIG_TEGRA_THERMAL_SYSFS
 static bool throttle_enb;
 struct mutex mutex;
 #endif
-
-
-int __init tegra_thermal_init()
-{
-	const struct tegra_edp_limits *z;
-	int zones_sz;
-	int i;
-
-#ifndef CONFIG_TEGRA_THERMAL_SYSFS
-	mutex_init(&mutex);
-#endif
-	tegra_get_cpu_edp_limits(&z, &zones_sz);
-	zones_sz = min(zones_sz, MAX_ZONES);
-
-	for (i = 0; i < zones_sz; i++)
-		thermal_zones[i] = z[i].temperature;
-
-	thermal_zones_sz = zones_sz;
-
-	return 0;
-}
-
 
 #ifdef CONFIG_TEGRA_THERMAL_SYSFS
 
@@ -95,7 +76,7 @@ static int tegra_thermal_zone_get_temp(struct thermal_zone_device *thz,
 						long *temp)
 {
 	struct tegra_thermal *thermal = thz->devdata;
-	thermal->ops->get_temp(thermal->data, temp);
+	thermal->device->get_temp(thermal->device_client, temp);
 
 	return 0;
 }
@@ -121,7 +102,9 @@ static int tegra_thermal_zone_get_trip_temp(struct thermal_zone_device *thermal,
 	if (trip != 0)
 		return -EINVAL;
 
-	*temp = THROTTLING_LIMIT;
+	*temp = thermal->data.temp_throttle +
+		thermal->data.temp_offset -
+		thermal->device->offset;
 
 	return 0;
 }
@@ -134,61 +117,6 @@ static struct thermal_zone_device_ops tegra_thermal_zone_ops = {
 	.get_trip_temp = tegra_thermal_zone_get_trip_temp,
 };
 #endif
-
-
-
-struct tegra_thermal
-*tegra_thermal_register(void *data, struct tegra_thermal_ops *thermal_ops)
-{
-	long temp_milli;
-	struct tegra_thermal *thermal;
-#ifdef CONFIG_THERMAL_SYSFS
-	struct thermal_zone_device *thz;
-#endif
-
-	thermal = kzalloc(sizeof(struct tegra_thermal), GFP_KERNEL);
-	if (!thermal)
-		return ERR_PTR(-ENOMEM);
-
-	thermal->ops = thermal_ops;
-	thermal->data = data;
-
-#ifdef CONFIG_TEGRA_THERMAL_SYSFS
-	thz = thermal_zone_device_register("nct1008",
-					1, /* trips */
-					thermal,
-					&tegra_thermal_zone_ops,
-					2, /* tc1 */
-					1, /* tc2 */
-					2000, /* passive delay */
-					0); /* polling delay */
-
-	if (IS_ERR(thz)) {
-		thz = NULL;
-		kfree(thermal);
-		return ERR_PTR(-ENODEV);
-	}
-
-	thermal->thz = thz;
-#endif
-
-	thermal->ops->get_temp(thermal->data, &temp_milli);
-	tegra_edp_update_thermal_zone(MILLICELSIUS_TO_CELSIUS(temp_milli));
-
-	return thermal;
-}
-
-int tegra_thermal_unregister(struct tegra_thermal *thermal)
-{
-#ifdef CONFIG_TEGRA_THERMAL_SYSFS
-	if (thermal->thz)
-		thermal_zone_device_unregister(thermal->thz);
-#endif
-
-	kfree(thermal);
-
-	return 0;
-}
 
 /* The thermal sysfs handles notifying the throttling
  * cooling device */
@@ -204,71 +132,23 @@ static void tegra_therm_throttle(bool enable)
 }
 #endif
 
-int tegra_thermal_alert(struct tegra_thermal *thermal)
+void tegra_thermal_alert(void *data)
 {
+	struct tegra_thermal *thermal = data;
 	int err;
-	int hysteresis;
-	long temp, tzone1, tzone2;
+	long temp;
+	long lo_limit_throttle, hi_limit_throttle;
+	long lo_limit_edp = 0, hi_limit_edp = 0;
+	long tj_temp, tj_throttle_temp, tj_shutdown_temp;
+	int lo_limit_tj = 0, hi_limit_tj = 0;
 	int lo_limit = 0, hi_limit = 0;
-	int nentries = thermal_zones_sz;
+	const struct tegra_edp_limits *z;
+	int zones_sz;
 	int i;
 
-	err = thermal->ops->get_temp(thermal->data, &temp);
-	if (err) {
-		pr_err("%s: get temp fail(%d)", __func__, err);
-		return err;
-	}
 
-	hysteresis = ALERT_HYSTERESIS_EDP;
-
-#ifndef CONFIG_TEGRA_THERMAL_SYSFS
-	if (temp >= THROTTLING_LIMIT) {
-		/* start throttling */
-		tegra_therm_throttle(true);
-		hysteresis = ALERT_HYSTERESIS_THROTTLE;
-	} else if (temp <=
-			(THROTTLING_LIMIT -
-			ALERT_HYSTERESIS_THROTTLE)) {
-		/* switch off throttling */
-		tegra_therm_throttle(false);
-	}
-#endif
-
-	if (temp < CELSIUS_TO_MILLICELSIUS(thermal_zones[0])) {
-		lo_limit = 0;
-		hi_limit = thermal_zones[0];
-	} else if (temp >=
-			CELSIUS_TO_MILLICELSIUS(thermal_zones[nentries-1])) {
-		lo_limit = thermal_zones[nentries-1] - hysteresis;
-		hi_limit = MILLICELSIUS_TO_CELSIUS(MAX_LIMIT);
-	} else {
-		for (i = 0; (i + 1) < nentries; i++) {
-			tzone1 = thermal_zones[i];
-			tzone2 = thermal_zones[i + 1];
-
-			if (temp >= CELSIUS_TO_MILLICELSIUS(tzone1) &&
-			    temp < CELSIUS_TO_MILLICELSIUS(tzone2)) {
-				lo_limit = tzone1 - hysteresis;
-				hi_limit = tzone2;
-				break;
-			}
-		}
-	}
-
-	err = thermal->ops->set_limits(thermal->data, lo_limit, hi_limit);
-
-	if (err)
-		return err;
-
-	/* inform edp governor */
-	if (edp_thermal_zone_val != temp)
-		/*
-		 * FIXME: Move this direct tegra_ function call to be called
-		 * via a pointer in 'struct nct1008_data' (like 'alarm_fn')
-		 */
-		tegra_edp_update_thermal_zone(MILLICELSIUS_TO_CELSIUS(temp));
-
-	edp_thermal_zone_val = temp;
+	if (thermal != &thermal_state)
+		BUG();
 
 #ifdef CONFIG_TEGRA_THERMAL_SYSFS
 	if (thermal->thz) {
@@ -277,10 +157,155 @@ int tegra_thermal_alert(struct tegra_thermal *thermal)
 	}
 #endif
 
+	err = thermal->device->get_temp(thermal->device->data, &temp);
+	if (err) {
+		pr_err("%s: get temp fail(%d)", __func__, err);
+		return;
+	}
+
+	tj_temp = temp + thermal->device->offset;
+	tj_throttle_temp = thermal->data.temp_throttle
+				+ thermal->data.temp_offset;
+	tj_shutdown_temp = thermal->data.temp_shutdown
+				+ thermal->data.temp_offset;
+
+	if ((tegra_is_throttling() &&
+		(tj_temp >
+			(tj_throttle_temp - thermal->data.hysteresis_throttle)))
+		|| (tj_temp >= tj_throttle_temp)) {
+		lo_limit_throttle = tj_throttle_temp -
+					thermal->data.hysteresis_throttle;
+		hi_limit_throttle = tj_shutdown_temp;
+	} else {
+		lo_limit_throttle = 0;
+		hi_limit_throttle = tj_throttle_temp;
+	}
+
+#ifdef CONFIG_TEGRA_EDP_LIMITS
+	tegra_get_cpu_edp_limits(&z, &zones_sz);
+
+/* edp table based off of tdiode measurements */
+#define EDP_TEMP(_index)	((z[_index].temperature * 1000)\
+				+ thermal->data.edp_offset)
+	if (tj_temp < EDP_TEMP(0)) {
+		lo_limit_edp = 0;
+		hi_limit_edp = EDP_TEMP(0);
+	} else if (tj_temp >= EDP_TEMP(zones_sz-1)) {
+		lo_limit_edp = EDP_TEMP(zones_sz-1) -
+				thermal->data.hysteresis_edp;
+		hi_limit_edp = tj_shutdown_temp;
+	} else {
+		for (i = 0; (i + 1) < zones_sz; i++) {
+			if ((tj_temp >= EDP_TEMP(i)) &&
+				(tj_temp < EDP_TEMP(i+1))) {
+				lo_limit_edp = EDP_TEMP(i) -
+						thermal->data.hysteresis_edp;
+				hi_limit_edp = EDP_TEMP(i+1);
+				break;
+			}
+		}
+	}
+#undef EDP_TEMP
+#else
+	lo_limit_edp = 0;
+	hi_limit_edp = tj_shutdown_temp;
+#endif
+
+	/* Get smallest window size */
+	lo_limit_tj = max(lo_limit_throttle, lo_limit_edp);
+	hi_limit_tj = min(hi_limit_throttle, hi_limit_edp);
+
+	/* Get corresponding device temps */
+	lo_limit = lo_limit_tj ? (lo_limit_tj - thermal->device->offset) : 0;
+	hi_limit = hi_limit_tj ? (hi_limit_tj - thermal->device->offset) : 0;
+
+	thermal->device->set_limits(thermal->device->data, lo_limit, hi_limit);
+
+#ifndef CONFIG_TEGRA_THERMAL_SYSFS
+	if (tj_temp >= tj_throttle_temp) {
+		/* start throttling */
+		if (!tegra_is_throttling())
+			tegra_therm_throttle(true);
+	} else if (tj_temp <=
+			(tj_throttle_temp -
+			thermal->data.hysteresis_throttle)) {
+		/* switch off throttling */
+		if (tegra_is_throttling())
+			tegra_therm_throttle(false);
+	}
+#endif
+
+#ifdef CONFIG_TEGRA_EDP_LIMITS
+	/* inform edp governor */
+	if (thermal->edp_thermal_zone_val != tj_temp)
+		tegra_edp_update_thermal_zone(
+			(tj_temp - thermal->data.edp_offset)/1000);
+
+	thermal->edp_thermal_zone_val = tj_temp;
+#endif
+}
+
+int tegra_thermal_set_device(struct tegra_thermal_device *device)
+{
+#ifdef CONFIG_THERMAL_SYSFS
+	struct thermal_zone_device *thz;
+#endif
+
+	/* only support one device */
+	if (thermal_state.device)
+		return -EINVAL;
+
+	thermal_state.device = device;
+
+#ifdef CONFIG_TEGRA_THERMAL_SYSFS
+	thz = thermal_zone_device_register("thermal",
+					1, /* trips */
+					&thermal_state,
+					&tegra_thermal_zone_ops,
+					2, /* tc1 */
+					1, /* tc2 */
+					2000, /* passive delay */
+					0); /* polling delay */
+
+	if (IS_ERR(thz)) {
+		thz = NULL;
+		kfree(thermal);
+		return -ENODEV;
+	}
+
+	thermal_state.thz = thz;
+#endif
+
+	thermal_state.device->set_alert(thermal_state.device->data,
+					tegra_thermal_alert,
+					&thermal_state);
+	thermal_state.device->set_shutdown_temp(thermal_state.device->data,
+					thermal_state.data.temp_shutdown +
+					thermal_state.data.temp_offset -
+					thermal_state.device->offset);
+	/* initialize limits */
+	tegra_thermal_alert(&thermal_state);
+
+	return 0;
+}
+
+int __init tegra_thermal_init(struct tegra_thermal_data *data)
+{
+#ifndef CONFIG_TEGRA_THERMAL_SYSFS
+	mutex_init(&mutex);
+#endif
+
+	memcpy(&thermal_state.data, data, sizeof(struct tegra_thermal_data));
+
 	return 0;
 }
 
 int tegra_thermal_exit(void)
 {
+#ifdef CONFIG_TEGRA_THERMAL_SYSFS
+	if (thermal->thz)
+		thermal_zone_device_unregister(thermal->thz);
+#endif
+
 	return 0;
 }

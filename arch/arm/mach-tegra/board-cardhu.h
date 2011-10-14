@@ -226,4 +226,6 @@ void __init cardhu_tsensor_init(void);
 #define XMM_GPIO_IPC_BB_WAKE		BB_GPIO_AWR
 #define XMM_GPIO_IPC_AP_WAKE		BB_GPIO_CWR
 
+#define TDIODE_OFFSET	(10000)	/* in millicelsius */
+
 #endif

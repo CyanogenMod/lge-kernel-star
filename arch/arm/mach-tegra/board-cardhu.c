@@ -53,6 +53,7 @@
 #include <asm/mach/arch.h>
 #include <mach/usb_phy.h>
 #include <linux/nfc/pn544.h>
+#include <mach/thermal.h>
 
 #include "board.h"
 #include "clock.h"
@@ -62,6 +63,18 @@
 #include "fuse.h"
 #include "pm.h"
 #include "baseband-xmm-power.h"
+
+/* All units are in millicelsius */
+static struct tegra_thermal_data thermal_data = {
+	.temp_throttle = 85000,
+	.temp_shutdown = 90000,
+	.temp_offset = TDIODE_OFFSET, /* temps based on tdiode */
+	.edp_offset = TDIODE_OFFSET,  /* edp based on tdiode */
+#ifndef CONFIG_TEGRA_THERMAL_SYSFS
+	.hysteresis_throttle = 1000,
+#endif
+	.hysteresis_edp = 3000,
+};
 
 /* !!!TODO: Change for cardhu (Taken from Ventana) */
 static struct tegra_utmip_config utmi_phy_config[] = {
@@ -913,6 +926,7 @@ static void cardhu_sata_init(void) { }
 
 static void __init tegra_cardhu_init(void)
 {
+	tegra_thermal_init(&thermal_data);
 	tegra_clk_init_from_table(cardhu_clk_init_table);
 	cardhu_pinmux_init();
 	cardhu_i2c_init();

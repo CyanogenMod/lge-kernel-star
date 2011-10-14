@@ -52,6 +52,7 @@
 #include <mach/usb_phy.h>
 #include <mach/i2s.h>
 #include <mach/tegra_max98088_pdata.h>
+#include <mach/thermal.h>
 
 #include "board.h"
 #include "clock.h"
@@ -61,6 +62,18 @@
 #include "gpio-names.h"
 #include "fuse.h"
 #include "pm.h"
+
+/* All units are in millicelsius */
+static struct tegra_thermal_data thermal_data = {
+	.temp_throttle = 85000,
+	.temp_shutdown = 90000,
+	.temp_offset = TDIODE_OFFSET, /* temps based on tdiode */
+	.edp_offset = TDIODE_OFFSET,  /* edp based on tdiode */
+#ifndef CONFIG_TEGRA_THERMAL_SYSFS
+	.hysteresis_throttle = 1000,
+#endif
+	.hysteresis_edp = 3000,
+};
 
 /* !!!TODO: Change for enterprise (Taken from Cardhu) */
 static struct tegra_utmip_config utmi_phy_config[] = {
@@ -805,6 +818,7 @@ static void enterprise_nfc_init(void)
 
 static void __init tegra_enterprise_init(void)
 {
+	tegra_thermal_init(&thermal_data);
 	tegra_clk_init_from_table(enterprise_clk_init_table);
 	enterprise_pinmux_init();
 	enterprise_i2c_init();

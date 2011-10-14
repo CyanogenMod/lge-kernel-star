@@ -51,6 +51,7 @@
 #include <linux/bq27x00.h>
 #include <mach/gpio.h>
 #include <mach/edp.h>
+#include <mach/thermal.h>
 
 #include "gpio-names.h"
 #include "board-cardhu.h"
@@ -569,6 +570,58 @@ static struct i2c_board_info cardhu_i2c8_board_info[] = {
 	},
 };
 
+#ifndef CONFIG_TEGRA_INTERNAL_TSENSOR_EDP_SUPPORT
+static int nct_get_temp(void *_data, long *temp)
+{
+	struct nct1008_data *data = _data;
+	return nct1008_thermal_get_temp(data, temp);
+}
+
+static int nct_set_limits(void *_data,
+			long lo_limit_milli,
+			long hi_limit_milli)
+{
+	struct nct1008_data *data = _data;
+	return nct1008_thermal_set_limits(data,
+					lo_limit_milli,
+					hi_limit_milli);
+}
+
+static int nct_set_alert(void *_data,
+				void (*alert_func)(void *),
+				void *alert_data)
+{
+	struct nct1008_data *data = _data;
+	return nct1008_thermal_set_alert(data, alert_func, alert_data);
+}
+
+static int nct_set_shutdown_temp(void *_data, long shutdown_temp)
+{
+	struct nct1008_data *data = _data;
+	return nct1008_thermal_set_shutdown_temp(data, shutdown_temp);
+}
+static void nct1008_probe_callback(struct nct1008_data *data)
+{
+	struct tegra_thermal_device *thermal_device;
+
+	thermal_device = kzalloc(sizeof(struct tegra_thermal_device),
+					GFP_KERNEL);
+	if (!thermal_device) {
+		pr_err("unable to allocate thermal device\n");
+		return;
+	}
+
+	thermal_device->data = data;
+	thermal_device->offset = TDIODE_OFFSET;
+	thermal_device->get_temp = nct_get_temp;
+	thermal_device->set_limits = nct_set_limits;
+	thermal_device->set_alert = nct_set_alert;
+	thermal_device->set_shutdown_temp = nct_set_shutdown_temp;
+
+	tegra_thermal_set_device(thermal_device);
+}
+#endif
+
 static struct nct1008_platform_data cardhu_nct1008_pdata = {
 	.supported_hwrev = true,
 	.ext_range = true,
@@ -579,6 +632,9 @@ static struct nct1008_platform_data cardhu_nct1008_pdata = {
 	.shutdown_local_limit = 90,
 	.throttling_ext_limit = 85,
 	.alarm_fn = tegra_throttling_enable,
+#ifndef CONFIG_TEGRA_INTERNAL_TSENSOR_EDP_SUPPORT
+	.probe_callback = nct1008_probe_callback,
+#endif
 };
 
 static struct i2c_board_info cardhu_i2c4_bq27510_board_info[] = {
@@ -594,7 +650,6 @@ static struct i2c_board_info cardhu_i2c4_nct1008_board_info[] = {
 		.irq = -1,
 	}
 };
-
 
 static int cardhu_nct1008_init(void)
 {

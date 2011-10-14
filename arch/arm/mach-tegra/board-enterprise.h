@@ -109,4 +109,6 @@ void __init enterprise_tsensor_init(void);
 #define XMM_GPIO_IPC_BB_WAKE		BB_GPIO_HS1_AP2BB
 #define XMM_GPIO_IPC_AP_WAKE		BB_GPIO_HS1_BB2AP
 
+#define TDIODE_OFFSET	(9000)	/* in millicelsius */
+
 #endif
