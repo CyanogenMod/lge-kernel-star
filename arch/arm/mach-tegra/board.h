@@ -108,5 +108,6 @@ enum panel_type get_panel_type(void);
 int tegra_get_modem_id(void);
 enum power_supply_type get_power_supply_type(void);
 enum audio_codec_type get_audio_codec_type(void);
+int get_maximum_cpu_current_supported(void);
 
 #endif
