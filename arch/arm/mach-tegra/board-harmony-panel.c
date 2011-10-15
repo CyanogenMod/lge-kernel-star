@@ -20,7 +20,11 @@
 #include <linux/nvhost.h>
 #include <mach/irqs.h>
 #include <mach/iomap.h>
+#include <mach/nvmap.h>
 #include <mach/tegra_fb.h>
+
+#include "devices.h"
+#include "board.h"
 
 /* Framebuffer */
 static struct resource fb_resource[] = {
@@ -59,7 +63,44 @@ static struct platform_device tegra_fb_device = {
 	},
 };
 
+static struct nvmap_platform_carveout harmony_carveouts[] = {
+	[0] = NVMAP_HEAP_CARVEOUT_IRAM_INIT,
+	[1] = {
+		.name		= "generic-0",
+		.usage_mask	= NVMAP_HEAP_CARVEOUT_GENERIC,
+		.buddy_size	= SZ_32K,
+	},
+};
+
+static struct nvmap_platform_data harmony_nvmap_data = {
+	.carveouts	= harmony_carveouts,
+	.nr_carveouts	= ARRAY_SIZE(harmony_carveouts),
+};
+
+static struct platform_device harmony_nvmap_device = {
+	.name	= "tegra-nvmap",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &harmony_nvmap_data,
+	},
+};
+
+static struct platform_device *harmony_gfx_devices[] __initdata = {
+	&harmony_nvmap_device,
+	&tegra_grhost_device,
+};
+
 int __init harmony_panel_init(void) {
+	int err;
+
+	harmony_carveouts[1].base = tegra_carveout_start;
+	harmony_carveouts[1].size = tegra_carveout_size;
+
+	err = platform_add_devices(harmony_gfx_devices,
+				   ARRAY_SIZE(harmony_gfx_devices));
+	if (err)
+		return err;
+
 	return platform_device_register(&tegra_fb_device);
 }
 
