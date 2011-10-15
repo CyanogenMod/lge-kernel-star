@@ -14,52 +14,121 @@
  *
  */
 
+#include <linux/delay.h>
 #include <linux/resource.h>
 #include <linux/platform_device.h>
 #include <asm/mach-types.h>
 #include <linux/nvhost.h>
+#include <linux/gpio.h>
+
+#include <mach/dc.h>
 #include <mach/irqs.h>
 #include <mach/iomap.h>
 #include <mach/nvmap.h>
 #include <mach/tegra_fb.h>
 
 #include "devices.h"
+#include "gpio-names.h"
 #include "board.h"
 
-/* Framebuffer */
-static struct resource fb_resource[] = {
-	[0] = {
+#define harmony_bl_enb		TEGRA_GPIO_PB5
+#define harmony_lvds_shutdown	TEGRA_GPIO_PB2
+#define harmony_en_vdd_pnl	TEGRA_GPIO_PC6
+#define harmony_bl_vdd		TEGRA_GPIO_PW0
+#define harmony_bl_pwm		TEGRA_GPIO_PB4
+
+/* panel power on sequence timing */
+#define harmony_pnl_to_lvds_ms	0
+#define harmony_lvds_to_bl_ms	200
+
+
+static int harmony_panel_enable(void)
+{
+	gpio_set_value(harmony_en_vdd_pnl, 1);
+	mdelay(harmony_pnl_to_lvds_ms);
+	gpio_set_value(harmony_lvds_shutdown, 1);
+	mdelay(harmony_lvds_to_bl_ms);
+	return 0;
+}
+
+static int harmony_panel_disable(void)
+{
+	gpio_set_value(harmony_lvds_shutdown, 0);
+	gpio_set_value(harmony_en_vdd_pnl, 0);
+	return 0;
+}
+
+static struct resource harmony_disp1_resources[] = {
+	{
+		.name = "irq",
 		.start  = INT_DISPLAY_GENERAL,
 		.end    = INT_DISPLAY_GENERAL,
 		.flags  = IORESOURCE_IRQ,
 	},
-	[1] = {
+	{
+		.name = "regs",
 		.start	= TEGRA_DISPLAY_BASE,
 		.end	= TEGRA_DISPLAY_BASE + TEGRA_DISPLAY_SIZE-1,
 		.flags	= IORESOURCE_MEM,
 	},
-	[2] = {
-		.start	= 0x1c012000,
-		.end	= 0x1c012000 + 0x500000 - 1,
+	{
+		.name = "fbmem",
 		.flags	= IORESOURCE_MEM,
 	},
 };
 
-static struct tegra_fb_lcd_data tegra_fb_lcd_platform_data = {
-	.lcd_xres	= 1024,
-	.lcd_yres	= 600,
-	.fb_xres	= 1024,
-	.fb_yres	= 600,
-	.bits_per_pixel	= 32,
+static struct tegra_dc_mode harmony_panel_modes[] = {
+	{
+		.pclk = 42430000,
+		.h_ref_to_sync = 4,
+		.v_ref_to_sync = 2,
+		.h_sync_width = 136,
+		.v_sync_width = 4,
+		.h_back_porch = 138,
+		.v_back_porch = 21,
+		.h_active = 1024,
+		.v_active = 600,
+		.h_front_porch = 34,
+		.v_front_porch = 4,
+	},
 };
 
-static struct platform_device tegra_fb_device = {
-	.name 		= "tegrafb",
+static struct tegra_fb_data harmony_fb_data = {
+	.win		= 0,
+	.xres		= 1024,
+	.yres		= 600,
+	.bits_per_pixel	= 32,
+	.flags		= TEGRA_FB_FLIP_ON_PROBE,
+};
+
+static struct tegra_dc_out harmony_disp1_out = {
+	.type		= TEGRA_DC_OUT_RGB,
+
+	.align		= TEGRA_DC_ALIGN_MSB,
+	.order		= TEGRA_DC_ORDER_RED_BLUE,
+	.depth		= 18,
+	.dither		= TEGRA_DC_ORDERED_DITHER,
+
+	.modes		= harmony_panel_modes,
+	.n_modes	= ARRAY_SIZE(harmony_panel_modes),
+
+	.enable		= harmony_panel_enable,
+	.disable	= harmony_panel_disable,
+};
+
+static struct tegra_dc_platform_data harmony_disp1_pdata = {
+	.flags		= TEGRA_DC_FLAG_ENABLED,
+	.default_out	= &harmony_disp1_out,
+	.fb		= &harmony_fb_data,
+};
+
+static struct nvhost_device harmony_disp1_device = {
+	.name		= "tegradc",
 	.id		= 0,
-	.resource	= fb_resource,
-	.num_resources 	= ARRAY_SIZE(fb_resource),
+	.resource	= harmony_disp1_resources,
+	.num_resources	= ARRAY_SIZE(harmony_disp1_resources),
 	.dev = {
-		.platform_data = &tegra_fb_lcd_platform_data,
+		.platform_data = &harmony_disp1_pdata,
 	},
 };
 
@@ -92,6 +161,19 @@ static struct platform_device *harmony_gfx_devices[] __initdata = {
 
 int __init harmony_panel_init(void) {
 	int err;
+	struct resource *res;
+
+	gpio_request(harmony_en_vdd_pnl, "en_vdd_pnl");
+	gpio_direction_output(harmony_en_vdd_pnl, 1);
+	tegra_gpio_enable(harmony_en_vdd_pnl);
+
+	gpio_request(harmony_bl_vdd, "bl_vdd");
+	gpio_direction_output(harmony_bl_vdd, 1);
+	tegra_gpio_enable(harmony_bl_vdd);
+
+	gpio_request(harmony_lvds_shutdown, "lvds_shdn");
+	gpio_direction_output(harmony_lvds_shutdown, 1);
+	tegra_gpio_enable(harmony_lvds_shutdown);
 
 	harmony_carveouts[1].base = tegra_carveout_start;
 	harmony_carveouts[1].size = tegra_carveout_size;
@@ -101,6 +183,23 @@ int __init harmony_panel_init(void) {
 	if (err)
 		return err;
 
-	return platform_device_register(&tegra_fb_device);
+	res = nvhost_get_resource_byname(&harmony_disp1_device,
+		IORESOURCE_MEM, "fbmem");
+	if (res) {
+		res->start = tegra_fb_start;
+		res->end = tegra_fb_start + tegra_fb_size - 1;
+
+		/* Copy the bootloader fb to the fb. */
+		if (tegra_bootloader_fb_start)
+			tegra_move_framebuffer(tegra_fb_start,
+				tegra_bootloader_fb_start,
+				min(tegra_fb_size, tegra_bootloader_fb_size));
+
+		err = nvhost_device_register(&harmony_disp1_device);
+		if (err)
+			return err;
+	}
+
+	return 0;
 }
 
