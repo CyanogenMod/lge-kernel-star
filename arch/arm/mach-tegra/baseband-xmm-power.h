@@ -14,8 +14,23 @@
  *
  */
 
+#ifndef BASEBAND_XMM_POWER_H
+#define BASREBAND_XMM_POWER_H
+
 #include <linux/pm.h>
 #include <linux/suspend.h>
+
+#define TEGRA_EHCI_DEVICE "/sys/devices/platform/tegra-ehci.1/ehci_power"
+
+#define XMM_MODEM_VER_1121	0x1121
+#define XMM_MODEM_VER_1130	0x1130
+
+/* shared between baseband-xmm-* modules so they can agree on same
+ * modem configuration
+ */
+extern unsigned long modem_ver;
+extern unsigned long modem_flash;
+extern unsigned long modem_pm;
 
 enum baseband_type {
 	BASEBAND_XMM,
@@ -45,7 +60,34 @@ struct baseband_power_platform_data {
 	} modem;
 };
 
-static enum {
+enum baseband_xmm_power_work_state_t {
+	BBXMM_WORK_UNINIT,
+	BBXMM_WORK_INIT,
+	/* initialize flash modem */
+	BBXMM_WORK_INIT_FLASH_STEP1,
+	/* initialize flash (with power management support) modem */
+	BBXMM_WORK_INIT_FLASH_PM_STEP1,
+	BBXMM_WORK_INIT_FLASH_PM_VER_LT_1130_STEP1,
+	BBXMM_WORK_INIT_FLASH_PM_VER_GE_1130_STEP1,
+	/* initialize flashless (with power management support) modem */
+	BBXMM_WORK_INIT_FLASHLESS_PM_STEP1,
+	BBXMM_WORK_INIT_FLASHLESS_PM_VER_LT_1130_WAIT_IRQ,
+	BBXMM_WORK_INIT_FLASHLESS_PM_VER_LT_1130_STEP1,
+	BBXMM_WORK_INIT_FLASHLESS_PM_VER_LT_1130_STEP2,
+	BBXMM_WORK_INIT_FLASHLESS_PM_VER_GE_1130_STEP1,
+	BBXMM_WORK_INIT_FLASHLESS_PM_VER_GE_1130_STEP2,
+	BBXMM_WORK_INIT_FLASHLESS_PM_VER_GE_1130_STEP3,
+	BBXMM_WORK_INIT_FLASHLESS_PM_VER_GE_1130_STEP4,
+};
+
+struct baseband_xmm_power_work_t {
+	/* work structure must be first structure member */
+	struct work_struct work;
+	/* xmm modem state */
+	enum baseband_xmm_power_work_state_t state;
+};
+
+enum baseband_xmm_powerstate_t {
 	BBXMM_PS_UNINIT	= 0,
 	BBXMM_PS_INIT	= 1,
 	BBXMM_PS_L0	= 2,
@@ -56,6 +98,10 @@ static enum {
 	BBXMM_PS_L3	= 7,
 	BBXMM_PS_L3TOL0	= 8,
 	BBXMM_PS_LAST	= -1,
-} baseband_xmm_powerstate;
+};
+
+irqreturn_t baseband_xmm_power_ipc_ap_wake_irq(int irq, void *dev_id);
 
 void baseband_xmm_set_power_status(unsigned int status);
+
+#endif  /* BASREBAND_XMM_POWER_H */
