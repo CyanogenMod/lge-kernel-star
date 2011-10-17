@@ -1605,29 +1605,16 @@ static void utmi_phy_restore_end(struct tegra_usb_phy *phy)
 #endif
 }
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 static void ulpi_set_tristate(bool enable)
 {
 	int tristate = (enable)? TEGRA_TRI_TRISTATE : TEGRA_TRI_NORMAL;
 
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UAA, tristate);
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UAB, tristate);
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UDA, tristate);
-#else
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA0, tristate);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA1, tristate);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA2, tristate);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA3, tristate);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA4, tristate);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA5, tristate);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA6, tristate);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA7, tristate);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_CLK, tristate);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DIR, tristate);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_STP, tristate);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_NXT, tristate);
-#endif
 }
+#endif
 
 static void ulpi_phy_reset(void __iomem *base)
 {
@@ -1834,12 +1821,75 @@ static int ulpi_phy_power_off(struct tegra_usb_phy *phy, bool is_dpd)
 	return 0;
 }
 
+static void null_phy_set_tristate(bool enable)
+{
+	int tristate = (enable) ? TEGRA_TRI_TRISTATE : TEGRA_TRI_NORMAL;
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UAA, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UAB, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UDA, tristate);
+#else
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA1, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA2, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA3, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA4, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA5, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA6, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA7, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_NXT, tristate);
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA0, tristate);
+
+	if (enable)
+		tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DIR, tristate);
+#endif
+}
+
+static void null_phy_restore_start(struct tegra_usb_phy *phy,
+				   enum tegra_usb_phy_port_speed port_speed)
+{
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	struct tegra_ulpi_config *config = phy->config;
+
+	if (config->phy_restore_start)
+		config->phy_restore_start();
+#endif
+}
+
+static void null_phy_restore_end(struct tegra_usb_phy *phy)
+{
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	unsigned long val;
+	void __iomem *base = phy->regs;
+	struct tegra_ulpi_config *config = phy->config;
+
+	if (config->phy_restore_end)
+		config->phy_restore_end();
+
+	val = readl(base + ULPI_TIMING_CTRL_0);
+	val |= ULPI_CLK_PADOUT_ENA;
+
+	udelay(500);
+
+	/* remove ULPI tristate except DIR */
+	null_phy_set_tristate(false);
+	udelay(20);
+
+	/* enable ULPI CLK output pad */
+	writel(val, base + ULPI_TIMING_CTRL_0);
+
+	/* remove DIR tristate */
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DIR, TEGRA_TRI_NORMAL);
+#endif
+}
+
 static int null_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 {
 	const struct tegra_ulpi_trimmer default_trimmer = {0, 0, 4, 4};
 	unsigned long val;
 	void __iomem *base = phy->regs;
 	struct tegra_ulpi_config *config = phy->config;
+	static bool cold_boot = true;
 
 	if (!config->trimmer)
 		config->trimmer = &default_trimmer;
@@ -1856,8 +1906,6 @@ static int null_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	val = readl(base + ULPI_TIMING_CTRL_0);
 	val |= ULPI_OUTPUT_PINMUX_BYP | ULPI_CLKOUT_PINMUX_BYP;
 	writel(val, base + ULPI_TIMING_CTRL_0);
-
-	ulpi_set_tristate(false);
 
 	if (config->pre_phy_on && config->pre_phy_on())
 		return -EAGAIN;
@@ -1927,9 +1975,12 @@ static int null_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	val &= ~ULPI_PADS_RESET;
 	writel(val, base + USB_SUSP_CTRL);
 #endif
-	val = readl(base + ULPI_TIMING_CTRL_0);
-	val |= ULPI_CLK_PADOUT_ENA;
-	writel(val, base + ULPI_TIMING_CTRL_0);
+	if (cold_boot) {
+		val = readl(base + ULPI_TIMING_CTRL_0);
+		val |= ULPI_CLK_PADOUT_ENA;
+		writel(val, base + ULPI_TIMING_CTRL_0);
+		cold_boot = false;
+	}
 
 	udelay(10);
 
@@ -1941,14 +1992,12 @@ static int null_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 
 static int null_phy_power_off(struct tegra_usb_phy *phy, bool is_dpd)
 {
-	unsigned long val;
-	void __iomem *base = phy->regs;
 	struct tegra_ulpi_config *config = phy->config;
 
 	if (config->pre_phy_off && config->pre_phy_off())
 		return -EAGAIN;
 
-	ulpi_set_tristate(true);
+	null_phy_set_tristate(true);
 
 	if (config->post_phy_off && config->post_phy_off())
 		return -EAGAIN;
@@ -1980,6 +2029,8 @@ static int null_phy_post_usbcmd_reset(struct tegra_usb_phy *phy, bool is_dpd)
 	unsigned long val;
 	void __iomem *base = phy->regs;
 
+	ulpi_set_host(base);
+
 	/* remove slave0 reset */
 	val = readl(base + USB_SUSP_CTRL);
 	val &= ~ULPIS2S_SLV0_RESET;
@@ -1989,8 +2040,6 @@ static int null_phy_post_usbcmd_reset(struct tegra_usb_phy *phy, bool is_dpd)
 	val &=  ~ULPIS2S_SLV0_CLAMP_XMIT;
 	writel(val, base + ULPIS2S_CTRL);
 	udelay(10);
-
-	ulpi_set_host(base);
 #endif
 	return 0;
 }
@@ -2435,18 +2484,28 @@ void tegra_ehci_post_reset(struct tegra_usb_phy *phy, bool is_dpd)
 void tegra_ehci_phy_restore_start(struct tegra_usb_phy *phy,
 				 enum tegra_usb_phy_port_speed port_speed)
 {
-	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_UTMIP)
-		utmi_phy_restore_start(phy, port_speed);
-	else
-		ulpi_phy_restore_start(phy, port_speed);
+	const tegra_phy_restore_start_fp phy_restore_start[] = {
+		utmi_phy_restore_start,
+		ulpi_phy_restore_start,
+		null_phy_restore_start,
+		NULL,
+	};
+
+	if (phy_restore_start[phy->usb_phy_type])
+		phy_restore_start[phy->usb_phy_type](phy, port_speed);
 }
 
 void tegra_ehci_phy_restore_end(struct tegra_usb_phy *phy)
 {
-	if (phy->usb_phy_type == TEGRA_USB_PHY_TYPE_UTMIP)
-		utmi_phy_restore_end(phy);
-	else
-		ulpi_phy_restore_end(phy);
+	const tegra_phy_restore_end_fp phy_restore_end[] = {
+		utmi_phy_restore_end,
+		ulpi_phy_restore_end,
+		null_phy_restore_end,
+		NULL,
+	};
+
+	if (phy_restore_end[phy->usb_phy_type])
+		phy_restore_end[phy->usb_phy_type](phy);
 }
 
 void tegra_usb_phy_clk_disable(struct tegra_usb_phy *phy)

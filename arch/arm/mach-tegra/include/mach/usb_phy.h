@@ -51,6 +51,8 @@ struct tegra_ulpi_config {
 	int (*post_phy_on)(void);
 	int (*pre_phy_off)(void);
 	int (*post_phy_off)(void);
+	void (*phy_restore_start)(void);
+	void (*phy_restore_end)(void);
 };
 
 struct tegra_uhsic_config {
@@ -108,6 +110,9 @@ struct tegra_usb_phy {
 };
 
 typedef int (*tegra_phy_fp)(struct tegra_usb_phy *phy, bool is_dpd);
+typedef void (*tegra_phy_restore_start_fp)(struct tegra_usb_phy *phy,
+					   enum tegra_usb_phy_port_speed);
+typedef void (*tegra_phy_restore_end_fp)(struct tegra_usb_phy *phy);
 
 struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 			void *config, enum tegra_usb_phy_mode phy_mode,
