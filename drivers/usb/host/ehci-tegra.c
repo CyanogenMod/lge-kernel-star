@@ -861,12 +861,12 @@ static void clk_timer_work_handler(struct work_struct* clk_timer_work) {
 	spin_unlock_irqrestore(&tegra->ehci->lock, flags);
 
 	if (timer_event) {
-		clk_disable(tegra->emc_clk);
-		clk_disable(tegra->sclk_clk);
 		spin_lock_irqsave(&tegra->ehci->lock, flags);
 		tegra->clock_enabled = 0;
 		tegra->timer_event = 0;
 		spin_unlock_irqrestore(&tegra->ehci->lock, flags);
+		clk_disable(tegra->emc_clk);
+		clk_disable(tegra->sclk_clk);
 		return;
 	}
 
