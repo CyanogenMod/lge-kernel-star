@@ -108,12 +108,7 @@ static struct nct1008_platform_data enterprise_nct1008_pdata = {
 	.supported_hwrev = true,
 	.ext_range = true,
 	.conv_rate = 0x08,
-	.hysteresis = 5,
 	.offset = 8, /* 4 * 2C. Bug 844025 - 1C for device accuracies */
-	.shutdown_ext_limit = 90,
-	.shutdown_local_limit = 90,
-	.throttling_ext_limit = 85,
-	.alarm_fn = tegra_throttling_enable,
 #ifndef CONFIG_TEGRA_INTERNAL_TSENSOR_EDP_SUPPORT
 	.probe_callback = nct1008_probe_callback,
 #endif
@@ -130,12 +125,6 @@ static struct i2c_board_info enterprise_i2c4_nct1008_board_info[] = {
 static void enterprise_nct1008_init(void)
 {
 	int ret;
-#ifdef CONFIG_TEGRA_EDP_LIMITS
-	const struct tegra_edp_limits *z;
-	int zones_sz;
-	int i;
-	bool throttle_ok = false;
-#endif
 
 	tegra_gpio_enable(TEGRA_GPIO_PH7);
 	ret = gpio_request(TEGRA_GPIO_PH7, "temp_alert");
@@ -153,27 +142,6 @@ static void enterprise_nct1008_init(void)
 
 	i2c_register_board_info(4, enterprise_i2c4_nct1008_board_info,
 				ARRAY_SIZE(enterprise_i2c4_nct1008_board_info));
-#ifdef CONFIG_TEGRA_EDP_LIMITS
-	tegra_get_cpu_edp_limits(&z, &zones_sz);
-	zones_sz = min(zones_sz, MAX_ZONES);
-	for (i = 0; i < zones_sz; i++) {
-		enterprise_nct1008_pdata.thermal_zones[i] = z[i].temperature;
-		if (enterprise_nct1008_pdata.thermal_zones[i] ==
-		    enterprise_nct1008_pdata.throttling_ext_limit) {
-			throttle_ok = true;
-		}
-	}
-
-	if (throttle_ok != true)
-		pr_warn("%s: WARNING! Throttling limit %dC would be inaccurate"
-			" as it is NOT one of the EDP points\n",
-			__func__, enterprise_nct1008_pdata.throttling_ext_limit);
-	else
-		pr_info("%s: Throttling limit %dC OK\n",
-			__func__, enterprise_nct1008_pdata.throttling_ext_limit);
-
-	enterprise_nct1008_pdata.thermal_zones_sz = zones_sz;
-#endif
 }
 
 #define SENSOR_MPU_NAME "mpu3050"
