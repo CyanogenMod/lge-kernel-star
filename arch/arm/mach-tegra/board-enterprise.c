@@ -208,6 +208,10 @@ static __initdata struct tegra_clk_init_table enterprise_clk_init_table[] = {
 	{ "pll_a_out0",	NULL,		11289600,	false},
 	{ "i2s0",	"pll_a_out0",	0,		false},
 	{ "spdif_out",	"pll_a_out0",	0,		false},
+	{ "d_audio",	"pll_a_out0",	0,		false},
+	{ "dam0",	"pll_a_out0",	0,		false},
+	{ "dam1",	"pll_a_out0",	0,		false},
+	{ "dam2",	"pll_a_out0",	0,		false},
 	{ NULL,		NULL,		0,		0},
 };
 
