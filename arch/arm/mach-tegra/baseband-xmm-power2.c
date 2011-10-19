@@ -347,11 +347,10 @@ static int __init baseband_xmm_power2_init(void)
 	return platform_driver_register(&baseband_power2_driver);
 }
 
-static int __exit baseband_xmm_power2_exit(void)
+static void __exit baseband_xmm_power2_exit(void)
 {
 	pr_debug("%s\n", __func__);
 	platform_driver_unregister(&baseband_power2_driver);
-	return 0;
 }
 
 module_init(baseband_xmm_power2_init)
