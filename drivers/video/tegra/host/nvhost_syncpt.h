@@ -25,10 +25,12 @@
 
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/nvhost.h>
 #include <asm/atomic.h>
 
 #include "nvhost_hardware.h"
 
+#define NVSYNCPT_GRAPHICS_HOST		     (0)
 #define NVSYNCPT_VI_ISP_0		     (12)
 #define NVSYNCPT_VI_ISP_1		     (13)
 #define NVSYNCPT_VI_ISP_2		     (14)
@@ -142,6 +144,8 @@ static inline int nvhost_syncpt_wait(struct nvhost_syncpt *sp, u32 id, u32 thres
 	return nvhost_syncpt_wait_timeout(sp, id, thresh, MAX_SCHEDULE_TIMEOUT);
 }
 
+int nvhost_syncpt_wait_check(struct nvhost_syncpt *sp, u32 mask,
+			struct nvhost_waitchk *waitp, u32 num_waits);
 
 const char *nvhost_syncpt_name(u32 id);
 

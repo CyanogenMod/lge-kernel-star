@@ -47,6 +47,8 @@ struct nvhost_channel_userctx {
 	u32 syncpt_incrs;
 	u32 cmdbufs_pending;
 	u32 relocs_pending;
+	u32 waitchk_pending;
+	u32 waitchk_ref;
 	u32 null_kickoff;
 	struct nvmap_handle *gather_mem;
 	struct nvhost_op_pair *gathers;
@@ -54,6 +56,10 @@ struct nvhost_channel_userctx {
 	int pinarray_size;
 	struct nvmap_pinarray_elem pinarray[NVHOST_MAX_HANDLES];
 	struct nvmap_handle *unpinarray[NVHOST_MAX_HANDLES];
+	struct nvhost_waitchk waitchks[NVHOST_MAX_WAIT_CHECKS];
+	u32 num_waitchks;
+	u32 waitchk_mask;
+	/* hw context (if needed) */
 };
 
 struct nvhost_ctrl_userctx {
@@ -128,6 +134,7 @@ static void reset_submit(struct nvhost_channel_userctx *ctx)
 {
 	ctx->cmdbufs_pending = 0;
 	ctx->relocs_pending = 0;
+	ctx->waitchk_pending = 0;
 }
 
 static ssize_t nvhost_channelwrite(struct file *filp, const char __user *buf,
@@ -139,7 +146,7 @@ static ssize_t nvhost_channelwrite(struct file *filp, const char __user *buf,
 
 	while (remaining) {
 		size_t consumed;
-		if (!priv->relocs_pending && !priv->cmdbufs_pending) {
+		if (!priv->relocs_pending && !priv->cmdbufs_pending && !priv->waitchk_pending) {
 			consumed = sizeof(struct nvhost_submit_hdr);
 			if (remaining < consumed)
 				break;
@@ -154,6 +161,7 @@ static ssize_t nvhost_channelwrite(struct file *filp, const char __user *buf,
 			/* leave room for ctx switch */
 			priv->num_gathers = 2;
 			priv->pinarray_size = 0;
+			priv->waitchk_mask |= priv->waitchk_ref;
 		} else if (priv->cmdbufs_pending) {
 			struct nvhost_cmdbuf cmdbuf;
 			consumed = sizeof(cmdbuf);
@@ -180,6 +188,18 @@ static ssize_t nvhost_channelwrite(struct file *filp, const char __user *buf,
 			}
 			priv->pinarray_size += numrelocs;
 			priv->relocs_pending -= numrelocs;
+		} else if (priv->waitchk_pending) {
+			struct nvhost_waitchk *waitp;
+			consumed = sizeof(struct nvhost_waitchk);
+			if (remaining < consumed)
+				break;
+			waitp = &priv->waitchks[priv->num_waitchks];
+			if (copy_from_user(waitp, buf, consumed)) {
+				err = -EFAULT;
+				break;
+			}
+			priv->num_waitchks++;
+			priv->waitchk_pending--;
 		} else {
 			err = -EFAULT;
 			break;
@@ -209,7 +229,7 @@ static int nvhost_ioctl_channel_flush(
 	int err;
 	int nulled_incrs = ctx->null_kickoff ? ctx->syncpt_incrs : 0;
 
-	if (ctx->relocs_pending || ctx->cmdbufs_pending) {
+	if (ctx->relocs_pending || ctx->cmdbufs_pending || ctx->waitchk_pending) {
 		reset_submit(ctx);
 		dev_err(&ctx->ch->dev->pdev->dev, "channel submit out of sync\n");
 		return -EFAULT;
@@ -239,6 +259,22 @@ static int nvhost_ioctl_channel_flush(
 		nvmap_unpin(ctx->unpinarray, num_unpin);
 		nvhost_module_idle(&ctx->ch->mod);
 		return err;
+	}
+
+	/* remove stale waits */
+	if (ctx->num_waitchks) {
+		err = nvhost_syncpt_wait_check(&ctx->ch->dev->syncpt, ctx->waitchk_mask,
+				ctx->waitchks, ctx->num_waitchks);
+		if (err) {
+			dev_warn(&ctx->ch->dev->pdev->dev,
+				"nvhost_syncpt_wait_check failed: %d\n", err);
+			mutex_unlock(&ctx->ch->submitlock);
+			nvmap_unpin(ctx->unpinarray, num_unpin);
+			nvhost_module_idle(&ctx->ch->mod);
+			return err;
+		}
+		ctx->num_waitchks = 0;
+		ctx->waitchk_mask = 0;
 	}
 
 	/* context switch */
@@ -324,6 +360,8 @@ static long nvhost_channelctl(struct file *filp,
 		err = nvhost_ioctl_channel_flush(priv, (void *)buf);
 		break;
 	case NVHOST_IOCTL_CHANNEL_GET_SYNCPOINTS:
+		/* host syncpt ID is used by the RM (and never be given out) */
+		BUG_ON(priv->ch->desc->syncpts & (1 << NVSYNCPT_GRAPHICS_HOST));
 		((struct nvhost_get_param_args *)buf)->value =
 			priv->ch->desc->syncpts;
 		break;

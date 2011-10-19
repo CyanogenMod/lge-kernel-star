@@ -178,6 +178,8 @@ void nvmap_unpin(struct nvmap_handle **h, int num_handles);
 int nvmap_add_carveout_heap(unsigned long base, size_t size,
 	const char *name, unsigned int bitmask);
 
+int nvmap_patch_wait(struct nvmap_handle *h,
+	u32 patch_offset, u32 patch_value);
 #endif
 
 #endif

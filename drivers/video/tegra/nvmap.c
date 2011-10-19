@@ -1613,12 +1613,6 @@ static int _nvmap_handle_unpin(struct nvmap_handle *h)
 {
 	int ret = 0;
 
-	if(!h || !h->alloc ) {
-		WARN_ON(1);
-		pr_err("%s invalid handle, returning -EINVAL\n",__func__);
-		return -EINVAL;
-	}
-
 	if (atomic_add_return(0, &h->pin)==0) {
 		pr_err("%s: %s attempting to unpin an unpinned handle\n",
 			__func__, current->comm);
@@ -1665,11 +1659,6 @@ static int _nvmap_handle_pin_fast(unsigned int nr, struct nvmap_handle **h)
 {
 	unsigned int i;
 	int ret = 0;
-
-	if ( !(h && *h && ((*h)->alloc)) ) {
-		pr_err("%s invalid handle, returning -EINVAL\n",__func__);
-		return -EINVAL;
-	}
 
 	mutex_lock(&nvmap_pin_lock);
 	for (i=0; i<nr && !ret; i++) {
@@ -1751,11 +1740,6 @@ static int _nvmap_do_pin(struct nvmap_file_priv *priv,
 	unsigned int i;
 	struct nvmap_handle **h = (struct nvmap_handle **)refs;
 	struct nvmap_handle_ref *r;
-
-	if ((*h==NULL) || ( !(*h)->alloc )) {
-		pr_err("%s invalid handle, returning -EINVAL\n",__func__);
-		return -EINVAL;
-	}
 
 	/* to optimize for the common case (client provided valid handle
 	 * references and the pin succeeds), increment the handle_ref pin
@@ -3012,10 +2996,7 @@ static ssize_t _nvmap_do_rw_handle(struct nvmap_handle *h, int is_read,
 	void *addr = NULL;
 
 	h = _nvmap_handle_get(h);
-	if ((!h)  || ( !h->alloc )) {
-		pr_err("%s invalid handle, returning -EINVAL\n",__func__);
-		return -EINVAL;
-	}
+	if (!h) return -EINVAL;
 
 	if (elem_size == h_stride &&
 	    elem_size == sys_stride) {
@@ -3569,12 +3550,6 @@ void NvRmMemPinMult(NvRmMemHandle *hMems, NvU32 *addrs, NvU32 Count)
 	struct nvmap_handle **h = (struct nvmap_handle **)hMems;
 	unsigned int i;
 	int ret;
-
-	if ( !(*h)->alloc ) {
-		pr_err("%s invalid handle\n",__func__);
-		*addrs=0;
-		return;
-	}
 
 	do {
 		ret = _nvmap_handle_pin_fast(Count, h);
@@ -4225,4 +4200,51 @@ void nvmap_unpin(struct nvmap_handle **h, int num_handles)
 int nvmap_validate_file(struct file *f)
 {
 	return (f->f_op==&knvmap_fops || f->f_op==&nvmap_fops) ? 0 : -EFAULT;
+}
+
+int nvmap_patch_wait(struct nvmap_handle *h_patch,
+		u32 patch_offset, u32 patch_value)
+{
+	void *pteaddr = NULL;
+	unsigned long pfn = 0;
+	struct page *page = NULL;
+	u32* patch_addr;
+	int ret = 0;
+
+	if (h_patch->kern_map) {
+		patch_addr = (u32*)((unsigned long)h_patch->kern_map +
+					patch_offset);
+	} else {
+		unsigned long phys, new_pfn;
+		if (h_patch->heap_pgalloc) {
+			page = h_patch->pgalloc.pages[patch_offset >> PAGE_SHIFT];
+			get_page(page);
+			phys = page_to_phys(page) + (patch_offset & ~PAGE_MASK);
+		} else {
+			phys = h_patch->carveout.base + patch_offset;
+		}
+
+		new_pfn = __phys_to_pfn(phys);
+		if (!pteaddr) {
+			ret = nvmap_map_pte(pfn, pgprot_kernel, &pteaddr);
+			if (unlikely(ret)) {
+				pr_err("%s: unable to map pfn 0x%lx\n", __func__, pfn);
+				return ret;
+			}
+		}
+		if (new_pfn != pfn) {
+			_nvmap_set_pte_at((unsigned long)pteaddr, new_pfn,
+					_nvmap_flag_to_pgprot(h_patch->flags, pgprot_kernel));
+			pfn = new_pfn;
+		}
+		patch_addr = (u32*)((unsigned long)pteaddr + (phys & ~PAGE_MASK));
+	}
+
+	*patch_addr = patch_value;
+
+	if (page)
+		put_page(page);
+	if (pteaddr)
+		nvmap_unmap_pte(pteaddr);
+	return ret;
 }
