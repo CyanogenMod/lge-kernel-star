@@ -372,7 +372,35 @@ struct platform_device tegra_spi_slave_device6 = {
 };
 #endif
 
+static struct resource resources_nor[] = {
+	[0] = {
+		.start = INT_SNOR,
+		.end = INT_SNOR,
+		.flags = IORESOURCE_IRQ,
+	},
+	[1] = {
+		/* Map SNOR Controller */
+		.start = TEGRA_SNOR_BASE,
+		.end = TEGRA_SNOR_BASE + TEGRA_SNOR_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	[2] = {
+		/* Map the size of flash */
+		.start = TEGRA_NOR_FLASH_BASE,
+		.end = TEGRA_NOR_FLASH_BASE + TEGRA_NOR_FLASH_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	}
+};
 
+struct platform_device tegra_nor_device = {
+	.name = "tegra-nor",
+	.id = -1,
+	.num_resources = ARRAY_SIZE(resources_nor),
+	.resource = resources_nor,
+	.dev = {
+		.coherent_dma_mask = 0xffffffff,
+	},
+};
 
 static struct resource sdhci_resource1[] = {
 	[0] = {
