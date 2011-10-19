@@ -409,8 +409,8 @@ static __devinit int tegra_max98088_driver_probe(struct platform_device *pdev)
 	/* Add h2w swith class support */
 	ret = switch_dev_register(&wired_switch_dev);
 	if (ret < 0) {
-		dev_err(&pdev->dev, "not able to register switch device\n",
-			ret);
+		dev_err(&pdev->dev, "not able to register switch device "
+			"(%d)\n", ret);
 		goto err_unregister_card;
 	}
 #endif
