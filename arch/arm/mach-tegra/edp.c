@@ -182,6 +182,7 @@ void tegra_get_cpu_edp_limits(const struct tegra_edp_limits **limits, int *size)
 static int edp_limit_debugfs_show(struct seq_file *s, void *data)
 {
 	seq_printf(s, "%u\n", tegra_get_edp_limit());
+	return 0;
 }
 
 static int edp_debugfs_show(struct seq_file *s, void *data)
