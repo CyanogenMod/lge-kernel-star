@@ -1988,8 +1988,6 @@ int max98088_headset_detect(struct snd_soc_codec *codec,
        struct max98088_priv *max98088 = snd_soc_codec_get_drvdata(codec);
        max98088->headset_jack = jack;
 
-       max98088_report_jack(codec);
-
        if (max98088->irq) {
                if (type & SND_JACK_HEADSET) {
                        /* headphone + microphone detection */
@@ -2003,6 +2001,18 @@ int max98088_headset_detect(struct snd_soc_codec *codec,
                /* Enable the Jack Detection Circuitry */
                snd_soc_update_bits(codec, M98088_REG_4B_CFG_JACKDET,
                        M98088_JDETEN, M98088_JDETEN);
+
+               /*JDET is always set the first time JDETEN is set,
+               so clear it*/
+               snd_soc_read(codec, M98088_REG_00_IRQ_STATUS);
+
+               /*after setting JDETEN, JKSNS would be set after hw
+               debounce time so wait before reading the status*/
+               msleep(max98088->pdata->debounce_time_ms);
+
+               /*report jack status at boot-up*/
+               max98088_report_jack(codec);
+
                /*Enable the jack detection interrupt*/
                snd_soc_update_bits(codec, M98088_REG_0F_IRQ_ENABLE,
                        M98088_IJDET, M98088_IJDET);
