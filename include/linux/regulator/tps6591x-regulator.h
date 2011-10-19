@@ -50,6 +50,10 @@ enum tps6591x_ext_control {
 	EXT_CTRL_SLEEP_OFF,
 };
 
+enum tps6591x_config_flags {
+	LDO_LOW_POWER_ON_SUSPEND = 0x1,
+};
+
 /*
  * struct tps6591x_regulator_platform_data - tps6591x regulator platform data.
  *
@@ -67,6 +71,7 @@ struct tps6591x_regulator_platform_data {
 	unsigned init_apply:1;
 	enum tps6591x_ext_control ectrl;
 	int slew_rate_uV_per_us;
+	unsigned int flags;
 };
 
 #endif	/* __REGULATOR_TPS6591X_H */
