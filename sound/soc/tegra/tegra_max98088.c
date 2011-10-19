@@ -319,9 +319,6 @@ static int tegra_max98088_init(struct snd_soc_pcm_runtime *rtd)
 	if (ret < 0)
 		return ret;
 
-	max98088_headset_detect(codec, &tegra_max98088_hp_jack,
-		SND_JACK_HEADSET);
-
 #ifdef CONFIG_SWITCH
 	snd_soc_jack_notifier_register(&tegra_max98088_hp_jack,
 		&headset_switch_nb);
@@ -330,6 +327,9 @@ static int tegra_max98088_init(struct snd_soc_pcm_runtime *rtd)
 		ARRAY_SIZE(tegra_max98088_hp_jack_pins),
 		tegra_max98088_hp_jack_pins);
 #endif
+
+	max98088_headset_detect(codec, &tegra_max98088_hp_jack,
+		SND_JACK_HEADSET);
 
 	snd_soc_dapm_nc_pin(dapm, "INA1");
 	snd_soc_dapm_nc_pin(dapm, "INA2");
@@ -397,27 +397,29 @@ static __devinit int tegra_max98088_driver_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, card);
 	snd_soc_card_set_drvdata(card, machine);
 
+#ifdef CONFIG_SWITCH
+	/* Add h2w switch class support */
+	ret = switch_dev_register(&wired_switch_dev);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "not able to register switch device\n",
+			ret);
+		goto err_fini_utils;
+	}
+#endif
+
 	ret = snd_soc_register_card(card);
 	if (ret) {
 		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n",
 			ret);
-		goto err_fini_utils;
+		goto err_switch_unregister;
 	}
-
-#ifdef CONFIG_SWITCH
-	/* Add h2w swith class support */
-	ret = switch_dev_register(&wired_switch_dev);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "not able to register switch device "
-			"(%d)\n", ret);
-		goto err_unregister_card;
-	}
-#endif
 
 	return 0;
 
-err_unregister_card:
-	snd_soc_unregister_card(card);
+err_switch_unregister:
+#ifdef CONFIG_SWITCH
+	switch_dev_unregister(&wired_switch_dev);
+#endif
 err_fini_utils:
 	tegra_asoc_utils_fini(&machine->util_data);
 err_free_machine:
