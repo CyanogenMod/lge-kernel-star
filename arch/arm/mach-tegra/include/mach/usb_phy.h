@@ -107,6 +107,7 @@ struct tegra_usb_phy {
 	int initialized;
 	bool power_on;
 	bool remote_wakeup;
+	unsigned int xcvr_setup_value;
 };
 
 typedef int (*tegra_phy_fp)(struct tegra_usb_phy *phy, bool is_dpd);
