@@ -1157,6 +1157,8 @@ static void composite_disconnect(struct usb_gadget *gadget)
 	if (composite->disconnect)
 		composite->disconnect(cdev);
 
+	/* while disconnecting resetting the delayed status */
+	cdev->delayed_status = 0;
 	cdev->connected = 0;
 	schedule_work(&cdev->switch_work);
 	spin_unlock_irqrestore(&cdev->lock, flags);
