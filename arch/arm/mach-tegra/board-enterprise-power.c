@@ -542,7 +542,15 @@ int __init enterprise_suspend_init(void)
 
 int __init enterprise_edp_init(void)
 {
-	tegra_init_cpu_edp_limits(2500); /* 2.5A regulator */
+	unsigned int regulator_mA;
+
+	regulator_mA = get_maximum_cpu_current_supported();
+	if (!regulator_mA) {
+		regulator_mA = 2500; /* regular AP30 */
+	}
+	pr_info("%s: CPU regulator %d mA\n", __func__, regulator_mA);
+
+	tegra_init_cpu_edp_limits(regulator_mA);
 	return 0;
 }
 #endif

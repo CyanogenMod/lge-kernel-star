@@ -1129,9 +1129,15 @@ void __init cardhu_tsensor_init(void)
 
 int __init cardhu_edp_init(void)
 {
-	/* Temporary initalization, needs to be set to the actual
-	   regulator current */
-	tegra_init_cpu_edp_limits(5000);
+	unsigned int regulator_mA;
+
+	regulator_mA = get_maximum_cpu_current_supported();
+	if (!regulator_mA) {
+		regulator_mA = 5000; /* regular T30/s */
+	}
+	pr_info("%s: CPU regulator %d mA\n", __func__, regulator_mA);
+
+	tegra_init_cpu_edp_limits(regulator_mA);
 	return 0;
 }
 #endif
