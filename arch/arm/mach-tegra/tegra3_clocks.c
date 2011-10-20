@@ -2866,13 +2866,17 @@ static struct clk_ops tegra_clk_shared_bus_ops = {
 /* On Tegra3 platforms emc configurations for DDR3 low rates can not work
  * at high core voltage; the intermediate step (bridge) is mandatory whenever
  * core voltage is crossing the threshold: TEGRA_EMC_BRIDGE_MVOLTS_MIN (fixed
- * for the entire Tegra3 arch); also emc must run above bridge rate if any
- * other than emc clock requires high voltage. EMC bridge is implemented as a
- * special emc shared user: initialized at minimum rate until updated once by
- * emc dvfs setup; then only enabled/disabled when sbus and/or cbus voltage is
- * crossing the threshold (sbus and cbus together include all clocks that may
- * require voltage above threshold - other peripherals can reach their maximum
- * rates below threshold)
+ * for the entire Tegra3 arch); also emc must run above the bridge rate if any
+ * other than emc clock requires high voltage. LP CPU, memory, sbus and cbus
+ * together include all clocks that may require core voltage above threshold
+ * (other peripherals can reach their maximum rates below threshold). LP CPU
+ * dependency is taken care of via tegra_emc_to_cpu_ratio() api. Memory clock
+ * transitions are forced to step through bridge rate; sbus and cbus control
+ * emc bridge to set emc clock floor as necessary.
+ *
+ * EMC bridge is implemented as a special emc shared bus user: initialized at
+ * minimum rate until updated once by emc dvfs setup; then it is only enabled
+ * or disabled when sbus and/or cbus voltage is crossing the threshold.
  */
 static void tegra3_clk_emc_bridge_init(struct clk *c)
 {
@@ -3943,8 +3947,6 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("hda",	"hda",			NULL,   125,	0x428,	108000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
 	PERIPH_CLK("hda2codec_2x",	"hda2codec_2x",	NULL,   111,	0x3e4,	48000000,  mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
 	PERIPH_CLK("hda2hdmi",	"hda2hdmi",		NULL,	128,	0,	48000000,  mux_clk_m,			0),
-	PERIPH_CLK("xio",	"xio",			NULL,	45,	0x120,	150000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
-	PERIPH_CLK("twc",	"twc",			NULL,	16,	0x12c,	150000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
 	PERIPH_CLK("sbc1",	"spi_tegra.0",		NULL,	41,	0x134,	160000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
 	PERIPH_CLK("sbc2",	"spi_tegra.1",		NULL,	44,	0x118,	160000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
 	PERIPH_CLK("sbc3",	"spi_tegra.2",		NULL,	46,	0x11c,	160000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
@@ -4223,11 +4225,28 @@ static struct cpufreq_frequency_table freq_table_1p4GHz[] = {
 	{12, CPUFREQ_TABLE_END },
 };
 
+static struct cpufreq_frequency_table freq_table_1p5GHz[] = {
+	{ 0,  102000 },
+	{ 1,  204000 },
+	{ 2,  340000 },
+	{ 3,  475000 },
+	{ 4,  640000 },
+	{ 5,  760000 },
+	{ 6,  880000 },
+	{ 7, 1000000 },
+	{ 8, 1100000 },
+	{ 9, 1200000 },
+	{10, 1300000 },
+	{11, 1400000 },
+	{12, 1500000 },
+	{13, CPUFREQ_TABLE_END },
+};
+
 static struct cpufreq_frequency_table freq_table_1p7GHz[] = {
 	{ 0,  102000 },
 	{ 1,  204000 },
 	{ 2,  370000 },
-	{ 3,  480000 },
+	{ 3,  475000 },
 	{ 4,  620000 },
 	{ 5,  800000 },
 	{ 6, 1000000 },
@@ -4245,7 +4264,8 @@ static struct tegra_cpufreq_table_data cpufreq_tables[] = {
 	{ freq_table_1p0GHz, 1, 7, 2},
 	{ freq_table_1p3GHz, 1, 9, 2},
 	{ freq_table_1p4GHz, 1, 10, 2},
-	{ freq_table_1p7GHz, 2, 11, 3},
+	{ freq_table_1p5GHz, 1, 11, 2},
+	{ freq_table_1p7GHz, 1, 11, 2},
 };
 
 static int clip_cpu_rate_limits(
@@ -4320,6 +4340,11 @@ struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void)
 	return NULL;
 }
 
+/* On DDR3 platforms there is an implicit dependency in this mapping: when cpu
+ * exceeds max dvfs level for LP CPU clock at TEGRA_EMC_BRIDGE_MVOLTS_MIN, the
+ * respective emc rate should be above TEGRA_EMC_BRIDGE_RATE_MIN
+ */
+/* FIXME: explicitly check this dependency */
 unsigned long tegra_emc_to_cpu_ratio(unsigned long cpu_rate)
 {
 	static unsigned long emc_max_rate = 0;
