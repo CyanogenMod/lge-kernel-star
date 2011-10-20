@@ -361,18 +361,21 @@ static int __init get_cpu_nominal_mv_index(
 	struct clk *c;
 
 	/*
-	 * Start with nominal level for the chips with this speedo_id. Then,
-	 * make sure cpu nominal voltage is below core ("solve from cpu to
-	 * core at nominal").
+	 * Find maximum cpu voltage that satisfies cpu_to_core dependency for
+	 * nominal core voltage ("solve from cpu to core at nominal"). Clip
+	 * result to the nominal cpu level for the chips with this speedo_id.
 	 */
 	BUG_ON(speedo_id >= ARRAY_SIZE(cpu_speedo_nominal_millivolts));
-	mv = cpu_speedo_nominal_millivolts[speedo_id];
-	if (tegra3_dvfs_rail_vdd_core.nominal_millivolts) {
-		int core_mv = tegra3_dvfs_rail_vdd_core.nominal_millivolts;
-		while ((mv > tegra3_dvfs_rail_vdd_cpu.min_millivolts) &&
-		       (tegra3_get_core_floor_mv(mv) > core_mv))
-			mv -= 25;
+	mv = tegra3_dvfs_rail_vdd_core.nominal_millivolts;
+	for (i = 0; i < MAX_DVFS_FREQS; i++) {
+		if ((cpu_millivolts[i] == 0) ||
+		    tegra3_get_core_floor_mv(cpu_millivolts[i]) > mv)
+			break;
 	}
+	BUG_ON(i == 0);
+	mv = cpu_millivolts[i - 1];
+	BUG_ON(mv < tegra3_dvfs_rail_vdd_cpu.min_millivolts);
+	mv = min(mv, cpu_speedo_nominal_millivolts[speedo_id]);
 
 	/*
 	 * Find matching cpu dvfs entry, and use it to determine index to the
