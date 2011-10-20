@@ -182,6 +182,10 @@
 #define MXT_VOLTAGE_DEFAULT	2700000
 #define MXT_VOLTAGE_STEP	10000
 
+/* Defines for MXT_TOUCH_CTRL */
+#define MXT_TOUCH_DISABLE	0
+#define MXT_TOUCH_ENABLE	0x83
+
 /* Define for MXT_GEN_COMMAND_T6 */
 #define MXT_BOOT_VALUE		0xa5
 #define MXT_BACKUP_VALUE	0x55
@@ -192,7 +196,6 @@
 #define MXT_RESET_TIME		200	/* msec */
 #define MXT_RESET_NOCHGREAD     400     /* msec */
 
-#define MXT_RESET_TIME		200	/* msec */
 #define MXT_WAKEUP_TIME		25	/* msec */
 
 #define MXT_FWRESET_TIME	175	/* msec */
@@ -894,8 +897,6 @@ static int mxt_set_power_cfg(struct mxt_data *data, u8 sleep)
 	dev_dbg(dev, "%s: Set ACTV %d, IDLE %d", __func__,
 		actv_cycle_time, idle_cycle_time);
 
-	data->is_stopped = sleep;
-
 	return 0;
 
 i2c_error:
@@ -1391,13 +1392,17 @@ static void mxt_start(struct mxt_data *data)
 	int error;
 	struct device *dev = &data->client->dev;
 
+	dev_info(dev, "mxt_start:  is_stopped = %d\n", data->is_stopped);
 	if (data->is_stopped == 0)
 		return;
 
-	error = mxt_set_power_cfg(data, 0);
+	/* Touch enable */
+	error = mxt_write_object(data, MXT_TOUCH_MULTI_T9, MXT_TOUCH_CTRL, MXT_TOUCH_ENABLE);
 
 	if (!error)
-		dev_dbg(dev, "MXT started\n");
+		dev_info(dev, "MXT started\n");
+
+	data->is_stopped = 0;
 }
 
 static void mxt_stop(struct mxt_data *data)
@@ -1405,13 +1410,17 @@ static void mxt_stop(struct mxt_data *data)
 	int error;
 	struct device *dev = &data->client->dev;
 
+	dev_info(dev, "mxt_stop:  is_stopped = %d\n", data->is_stopped);
 	if (data->is_stopped)
 		return;
 
-	error = mxt_set_power_cfg(data, 1);
+	/* Touch disable */
+	error = mxt_write_object(data, MXT_TOUCH_MULTI_T9, MXT_TOUCH_CTRL, MXT_TOUCH_DISABLE);
 
 	if (!error)
-		dev_dbg(dev, "MXT suspended\n");
+		dev_info(dev, "MXT suspended\n");
+
+	data->is_stopped = 1;
 }
 
 static int mxt_input_open(struct input_dev *dev)
@@ -1585,13 +1594,11 @@ static int mxt_resume(struct device *dev)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct mxt_data *data = i2c_get_clientdata(client);
 	struct input_dev *input_dev = data->input_dev;
-	struct mxt_message message;
-	struct mxt_object *object;
-	int id;
-	int max_retry = RESUME_READS;	/* Set max retry default value */
-	u8 reportid;
-	u8 max_reportid;
-	u8 min_reportid;
+
+	/* Soft reset */
+	mxt_write_object(data, MXT_GEN_COMMAND_T6, MXT_COMMAND_RESET, 1);
+
+	msleep(MXT_RESET_TIME);
 
 	mutex_lock(&input_dev->mutex);
 
@@ -1600,31 +1607,6 @@ static int mxt_resume(struct device *dev)
 
 	mutex_unlock(&input_dev->mutex);
 
-	do {
-		if (mxt_read_message(data, &message)) {
-			dev_err(dev, "Failed to read message\n");
-			goto end;
-		}
-		reportid = message.reportid;
-
-		/* whether reportid is thing of MXT_TOUCH_MULTI */
-		object = mxt_get_object(data, MXT_TOUCH_MULTI_T9);
-		if (!object)
-			goto end;
-
-		max_reportid = object->max_reportid;
-		min_reportid = max_reportid - object->num_report_ids + 1;
-		id = reportid - min_reportid;
-
-		if (reportid >= min_reportid && reportid <= max_reportid)
-			mxt_input_touchevent(data, &message, id);
-		else
-			mxt_dump_message(dev, &message);
-	} while (reportid != MXT_RPTID_NOMSG && --max_retry);
-	if (!max_retry)
-		dev_info(dev, "Read %d messages at resume(), and there's still more!\n", RESUME_READS);
-
-end:
 	return 0;
 }
 
