@@ -48,12 +48,15 @@ MODULE_LICENSE("GPL");
 
 int g_i;
 
+int max_intfs = MAX_INTFS;
 unsigned long usb_net_raw_ip_vid = 0x1519;
 unsigned long usb_net_raw_ip_pid = 0x0020;
 unsigned long usb_net_raw_ip_intf[MAX_INTFS] = { 0x03, 0x05, 0x07 };
 unsigned long usb_net_raw_ip_rx_debug;
 unsigned long usb_net_raw_ip_tx_debug;
 
+module_param(max_intfs, int, 0644);
+MODULE_PARM_DESC(max_intfs, "usb net (raw-ip) - max. interfaces supported");
 module_param(usb_net_raw_ip_vid, ulong, 0644);
 MODULE_PARM_DESC(usb_net_raw_ip_vid, "usb net (raw-ip) - USB VID");
 module_param(usb_net_raw_ip_pid, ulong, 0644);
@@ -142,7 +145,7 @@ static int baseband_usb_driver_suspend(struct usb_interface *intf,
 
 	pr_debug("%s intf %p\n", __func__, intf);
 
-	for (i = 0; i < MAX_INTFS; i++) {
+	for (i = 0; i < max_intfs; i++) {
 		pr_debug("[%d]\n", i);
 		if (!baseband_usb_net[i])
 			continue;
@@ -169,7 +172,7 @@ static int baseband_usb_driver_resume(struct usb_interface *intf)
 
 	pr_debug("%s intf %p\n", __func__, intf);
 
-	for (i = 0; i < MAX_INTFS; i++) {
+	for (i = 0; i < max_intfs; i++) {
 		pr_debug("[%d]\n", i);
 		if (!baseband_usb_net[i])
 			continue;
@@ -624,7 +627,7 @@ static int usb_net_raw_ip_init(void)
 	pr_debug("usb_net_raw_ip_init {\n");
 
 	/* create multiple raw-ip network devices */
-	for (i = 0; i < MAX_INTFS; i++) {
+	for (i = 0; i < max_intfs; i++) {
 		/* open baseband usb */
 		g_i = i;
 		baseband_usb_net[i] = baseband_usb_open(i, usb_net_raw_ip_vid,
@@ -667,7 +670,7 @@ static int usb_net_raw_ip_init(void)
 
 error_exit:
 	/* destroy multiple raw-ip network devices */
-	for (i = 0; i < MAX_INTFS; i++) {
+	for (i = 0; i < max_intfs; i++) {
 		/* unregister network device */
 		if (usb_net_raw_ip_dev[i]) {
 			unregister_netdev(usb_net_raw_ip_dev[i]);
@@ -691,7 +694,7 @@ static void usb_net_raw_ip_exit(void)
 	pr_debug("usb_net_raw_ip_exit {\n");
 
 	/* destroy multiple raw-ip network devices */
-	for (i = 0; i < MAX_INTFS; i++) {
+	for (i = 0; i < max_intfs; i++) {
 		/* unregister network device */
 		if (usb_net_raw_ip_dev[i]) {
 			unregister_netdev(usb_net_raw_ip_dev[i]);
