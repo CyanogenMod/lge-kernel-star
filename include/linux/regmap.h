@@ -78,5 +78,7 @@ int regmap_bulk_read(struct regmap *map, unsigned int reg, void *val,
 		     size_t val_count);
 int regmap_update_bits(struct regmap *map, unsigned int reg,
 		       unsigned int mask, unsigned int val);
+int regmap_update_bits_lazy(struct regmap *map, unsigned int reg,
+		       unsigned int mask, unsigned int val);
 
 #endif

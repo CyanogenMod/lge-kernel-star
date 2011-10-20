@@ -450,3 +450,39 @@ out:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(regmap_update_bits);
+
+/**
+ * remap_update_bits_lazy: Perform a read/modify/write cycle on the register
+ * map. Only write new contents if they differ from the previous ones.
+ *
+ * @map: Register map to update
+ * @reg: Register to update
+ * @mask: Bitmask to change
+ * @val: New value for bitmask
+ *
+ * Returns zero for success, a negative number on error.
+ */
+int regmap_update_bits_lazy(struct regmap *map, unsigned int reg,
+		       unsigned int mask, unsigned int val)
+{
+	int ret, new;
+	unsigned int tmp;
+
+	mutex_lock(&map->lock);
+
+	ret = _regmap_read(map, reg, &tmp);
+	if (ret != 0)
+		goto out;
+
+	new = tmp & ~mask;
+	new |= val & mask;
+	if (new != tmp) {
+		ret = _regmap_write(map, reg, new);
+	}
+
+out:
+	mutex_unlock(&map->lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(regmap_update_bits_lazy);
