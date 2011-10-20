@@ -67,6 +67,7 @@ static u16 DefaultImageHeight =  680;
 
 #define AR0832_RESET_REG	0x301A
 #define AR0832_ID_REG		0x31FC
+#define AR0832_GLOBAL_GAIN	0x305E
 
 /* AR0832_RESET_REG */
 #define AR0832_RESET_REG_GROUPED_PARAMETER_HOLD		(1 << 15)
@@ -843,16 +844,11 @@ static inline void ar0832_get_focuser_data_regs(struct ar0832_reg *regs,
 	regs->val = (value) & 0xFFFF;
 }
 
-static inline void ar0832_get_gain_reg(struct ar0832_reg *regs, u16 gain)
+static inline void ar0832_set_gain_reg(struct ar0832_reg *regs, u16 gain)
 {
-	regs->addr = 0x3056;
+	/* global_gain register*/
+	regs->addr = AR0832_GLOBAL_GAIN;
 	regs->val = gain;
-	(regs + 1)->addr = 0x3058;
-	(regs + 1)->val = gain;
-	(regs + 2)->addr = 0x305A;
-	(regs + 2)->val = gain;
-	(regs + 3)->addr = 0x305C;
-	(regs + 3)->val = gain;
 }
 
 static int ar0832_write_reg8(struct i2c_client *client, u16 addr, u8 val)
@@ -1041,22 +1037,21 @@ static int ar0832_set_coarse_time(struct ar0832_dev *dev,
 	return 0;
 }
 
-static int ar0832_set_gain(struct ar0832_dev *dev, __u16 gain)
+static int ar0832_set_gain(struct ar0832_dev *dev, u16 gain)
 {
 	int i;
 	int ret = 0;
-	struct ar0832_reg reg_list_gain[4];
+	struct ar0832_reg reg_list_gain;
 
-	ret |= ar0832_write_reg8(dev->i2c_client, 0x0104, 0x1);
+	ret = ar0832_write_reg8(dev->i2c_client, 0x0104, 0x1);
 	/* Gain Registers Start */
-	ar0832_get_gain_reg(reg_list_gain, gain);
-	for (i = 0; i < 4; i++)	{
-		ret = ar0832_write_reg16(dev->i2c_client,
-					reg_list_gain[i].addr,
-					reg_list_gain[i].val);
-		if (ret)
-			return ret;
-	}
+	ar0832_set_gain_reg(&reg_list_gain, gain);
+	ret |= ar0832_write_reg16(dev->i2c_client,
+				reg_list_gain.addr,
+				reg_list_gain.val);
+	if (ret)
+		return ret;
+
 	/* Gain register End */
 	ret |= ar0832_write_reg8(dev->i2c_client, 0x0104, 0x0);
 
