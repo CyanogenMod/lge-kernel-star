@@ -200,6 +200,13 @@
 
 #define MXT_FWRESET_TIME	175	/* msec */
 
+/* Defines for MXT_SLOWSCAN_EXTENSIONS */
+#define SLOSCAN_DISABLE		0	/* Disable slow scan */
+#define SLOSCAN_ENABLE		1	/* Enable slow scan */
+#define SLOSCAN_SET_ACTVACQINT	2	/* Set ACTV scan rate */
+#define SLOSCAN_SET_IDLEACQINT	3	/* Set IDLE scan rate */
+#define SLOSCAN_SET_ACTV2IDLETO 4	/* Set the ACTIVE to IDLE TimeOut */
+
 /* Command to unlock bootloader */
 #define MXT_UNLOCK_CMD_MSB	0xaa
 #define MXT_UNLOCK_CMD_LSB	0xdc
@@ -288,6 +295,7 @@ struct mxt_data {
 	u16 last_address;
 	u8 actv_cycle_time;
 	u8 idle_cycle_time;
+	u8 actv2idle_timeout;
 	u8 is_stopped;
 	struct mutex access_mutex;
 #if defined(CONFIG_HAS_EARLYSUSPEND)
@@ -296,6 +304,13 @@ struct mxt_data {
 	unsigned int driver_paused;
 	struct bin_attribute mem_access_attr;
 	int debug_enabled;
+	int slowscan_enabled;
+	u8 slowscan_actv_cycle_time;
+	u8 slowscan_idle_cycle_time;
+	u8 slowscan_actv2idle_timeout;
+	u8 slowscan_shad_actv_cycle_time;
+	u8 slowscan_shad_idle_cycle_time;
+	u8 slowscan_shad_actv2idle_timeout;
 };
 
 #if defined(CONFIG_HAS_EARLYSUSPEND)
@@ -878,6 +893,7 @@ static int mxt_set_power_cfg(struct mxt_data *data, u8 sleep)
 	int error;
 	u8 actv_cycle_time = 0;
 	u8 idle_cycle_time = 0;
+	u8 actv2idle_timeout = data->actv2idle_timeout;
 
 	if (!sleep) {
 		actv_cycle_time = data->actv_cycle_time;
@@ -891,6 +907,11 @@ static int mxt_set_power_cfg(struct mxt_data *data, u8 sleep)
 
 	error = mxt_write_object(data, MXT_GEN_POWER_T7, MXT_POWER_IDLEACQINT,
 				 idle_cycle_time);
+	if (error)
+		goto i2c_error;
+
+	error = mxt_write_object(data, MXT_GEN_POWER_T7, MXT_POWER_ACTV2IDLETO,
+				 actv2idle_timeout);
 	if (error)
 		goto i2c_error;
 
@@ -910,6 +931,9 @@ static int mxt_init_power_cfg(struct mxt_data *data)
 	struct device *dev = &data->client->dev;
 	int error;
 
+	data->slowscan_actv_cycle_time = 120;	/* 120mS */
+	data->slowscan_idle_cycle_time = 10;	/* 10mS */
+	data->slowscan_actv2idle_timeout = 100;	/* 10 seconds */
 	if (pdata->actv_cycle_time > 0 && pdata->idle_cycle_time > 0) {
 		data->actv_cycle_time = pdata->actv_cycle_time;
 		data->idle_cycle_time = pdata->idle_cycle_time;
@@ -928,6 +952,13 @@ static int mxt_init_power_cfg(struct mxt_data *data)
 		if (error)
 			return error;
 	}
+
+	error = mxt_read_object(data, MXT_GEN_POWER_T7,
+		MXT_POWER_ACTV2IDLETO,
+		&data->actv2idle_timeout);
+
+	if (error)
+		return error;
 
 	/* On init, power up */
 	error = mxt_set_power_cfg(data, 0);
@@ -1298,6 +1329,98 @@ static ssize_t mxt_debug_enable_store(struct device *dev,
 	return count;
 }
 
+static ssize_t mxt_slowscan_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct mxt_data *data = dev_get_drvdata(dev);
+	int count = 0;
+	int error;
+	u8 actv_cycle_time;
+	u8 idle_cycle_time;
+	u8 actv2idle_timeout;
+	dev_info(dev, "Calling mxt_slowscan_show()\n");
+
+	error = mxt_read_object(data, MXT_GEN_POWER_T7,
+		MXT_POWER_ACTVACQINT,
+		&actv_cycle_time);
+
+	if (error)
+		return error;
+
+	error = mxt_read_object(data, MXT_GEN_POWER_T7,
+		MXT_POWER_IDLEACQINT,
+		&idle_cycle_time);
+
+	if (error)
+		return error;
+
+	error = mxt_read_object(data, MXT_GEN_POWER_T7,
+		MXT_POWER_ACTV2IDLETO,
+		&actv2idle_timeout);
+
+	if (error)
+		return error;
+
+	count += sprintf(buf + count, "SLOW SCAN (enable/disable) = %s.\n", data->slowscan_enabled ? "enabled" : "disabled");
+	count += sprintf(buf + count, "SLOW SCAN (actv_cycle_time) = %umS.\n", data->slowscan_actv_cycle_time);
+	count += sprintf(buf + count, "SLOW SCAN (idle_cycle_time) = %umS.\n", data->slowscan_idle_cycle_time);
+	count += sprintf(buf + count, "SLOW SCAN (actv2idle_timeout) = %u.%0uS.\n", data->slowscan_actv2idle_timeout / 10, \
+											data->slowscan_actv2idle_timeout % 10);
+	count += sprintf(buf + count, "CURRENT   (actv_cycle_time) = %umS.\n", actv_cycle_time);
+	count += sprintf(buf + count, "CURRENT   (idle_cycle_time) = %umS.\n", idle_cycle_time);
+	count += sprintf(buf + count, "CURRENT   (actv2idle_timeout) = %u.%0uS.\n", actv2idle_timeout / 10, \
+											actv2idle_timeout % 10);
+
+	return count;
+}
+
+static ssize_t mxt_slowscan_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct mxt_data *data = dev_get_drvdata(dev);
+	int fn;
+	int val;
+	int ret;
+
+	dev_info(dev, "Calling mxt_slowscan_store()\n");
+	ret = sscanf(buf, "%u %u", &fn, &val);
+	if ((ret == 1) || (ret == 2)) {
+		switch (fn) {
+		case SLOSCAN_DISABLE:
+			data->actv_cycle_time = data->slowscan_shad_actv_cycle_time;
+			data->idle_cycle_time = data->slowscan_shad_idle_cycle_time;
+			data->actv2idle_timeout = data->slowscan_shad_actv2idle_timeout;
+			data->slowscan_enabled = 0;
+			mxt_set_power_cfg(data, 0);
+			break;
+
+		case SLOSCAN_ENABLE:
+			data->slowscan_shad_actv_cycle_time = data->actv_cycle_time;
+			data->slowscan_shad_idle_cycle_time = data->idle_cycle_time;
+			data->slowscan_shad_actv2idle_timeout = data->actv2idle_timeout;
+			data->actv_cycle_time = data->slowscan_actv_cycle_time;
+			data->idle_cycle_time = data->slowscan_idle_cycle_time;
+			data->actv2idle_timeout = data->slowscan_actv2idle_timeout;
+			data->slowscan_enabled = 1;
+			mxt_set_power_cfg(data, 0);
+			break;
+
+		case SLOSCAN_SET_ACTVACQINT:
+			data->slowscan_actv_cycle_time = val;
+			break;
+
+		case SLOSCAN_SET_IDLEACQINT:
+			data->slowscan_idle_cycle_time = val;
+			break;
+
+		case SLOSCAN_SET_ACTV2IDLETO:
+			data->slowscan_actv2idle_timeout = val;
+			break;
+		}
+	}
+	return count;
+}
+
 static ssize_t mxt_mem_access_read(struct file *filp, struct kobject *kobj,
 	struct bin_attribute *bin_attr, char *buf, loff_t off, size_t count)
 {
@@ -1374,12 +1497,14 @@ static DEVICE_ATTR(object, 0444, mxt_object_show, NULL);
 static DEVICE_ATTR(update_fw, 0664, NULL, mxt_update_fw_store);
 static DEVICE_ATTR(pause_driver, 0664, mxt_pause_show, mxt_pause_store);
 static DEVICE_ATTR(debug_enable, 0664, mxt_debug_enable_show, mxt_debug_enable_store);
+static DEVICE_ATTR(slowscan_enable, 0664, mxt_slowscan_show, mxt_slowscan_store);
 
 static struct attribute *mxt_attrs[] = {
 	&dev_attr_object.attr,
 	&dev_attr_update_fw.attr,
 	&dev_attr_pause_driver.attr,
 	&dev_attr_debug_enable.attr,
+	&dev_attr_slowscan_enable.attr,
 	NULL
 };
 
