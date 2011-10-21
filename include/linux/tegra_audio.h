@@ -70,4 +70,9 @@ struct dam_srate {
 #define DAM_MIXING_STOP	_IO(TEGRA_AUDIO_MAGIC, 16)
 #define DAM_SET_MIXING_FLAG	_IO(TEGRA_AUDIO_MAGIC, 17)
 
+#define I2S_START	_IOW(TEGRA_AUDIO_MAGIC, 15, struct i2s_pcm_format *)
+#define I2S_STOP	_IOW(TEGRA_AUDIO_MAGIC, 16, struct i2s_pcm_format *)
+#define I2S_LOOPBACK	_IOW(TEGRA_AUDIO_MAGIC, 17, unsigned int *)
+#define I2S_MODE_I2S	_IOW(TEGRA_AUDIO_MAGIC, 18, unsigned int *)
+
 #endif/*_CPCAP_AUDIO_H*/
