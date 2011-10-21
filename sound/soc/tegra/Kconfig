@@ -71,6 +71,7 @@ config SND_SOC_TEGRA_WM8903
 	select SND_SOC_TEGRA30_SPDIF if ARCH_TEGRA_3x_SOC
 	select SND_SOC_WM8903
 	select SND_SOC_SPDIF
+	select SND_SOC_TEGRA30_DAM if ARCH_TEGRA_3x_SOC
 	help
 	  Say Y or M here if you want to add support for SoC audio on Tegra
 	  boards using the WM8093 codec. Currently, the supported boards are
@@ -114,6 +115,7 @@ config SND_SOC_TEGRA_MAX98088
 	select SND_SOC_TEGRA30_SPDIF if ARCH_TEGRA_3x_SOC
 	select SND_SOC_MAX98088
 	select SND_SOC_SPDIF
+	select SND_SOC_TEGRA30_DAM if ARCH_TEGRA_3x_SOC
 	help
 	  Say Y or M here if you want to add support for SoC audio on Tegra
 	  boards using the MAX98088 codec. Currently, only supported board is
