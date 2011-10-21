@@ -74,7 +74,7 @@ static struct tegra_ulpi_config ehci2_null_ulpi_phy_config = {
 
 static struct tegra_ehci_platform_data ehci2_null_ulpi_platform_data = {
 	.operating_mode = TEGRA_USB_HOST,
-	.power_down_on_bus_suspend = 1,
+	.power_down_on_bus_suspend = 0,
 	.phy_config = &ehci2_null_ulpi_phy_config,
 	.phy_type = TEGRA_USB_PHY_TYPE_NULL_ULPI,
 };
