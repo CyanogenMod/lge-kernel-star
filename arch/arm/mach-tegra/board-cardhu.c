@@ -684,9 +684,6 @@ static struct platform_device *cardhu_devices[] __initdata = {
 	&tegra_udc_device,
 	&androidusb_device,
 	&tegra_usb_fsg_device,
-#if defined(CONFIG_SND_HDA_TEGRA)
-	&tegra_hda_device,
-#endif
 #if defined(CONFIG_TEGRA_IOVMM_SMMU)
 	&tegra_smmu_device,
 #endif
@@ -709,6 +706,7 @@ static struct platform_device *cardhu_devices[] __initdata = {
 	&bluetooth_dit_device,
 	&tegra_pcm_device,
 	&cardhu_audio_device,
+	&tegra_hda_device,
 #if defined(CONFIG_CRYPTO_DEV_TEGRA_AES)
 	&tegra_aes_device,
 #endif
