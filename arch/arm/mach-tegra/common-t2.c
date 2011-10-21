@@ -110,7 +110,7 @@ static irqreturn_t tegra_mc_error_isr(int irq, void *data)
 		 MC_INT_INVALID_GART_PAGE |
 		 MC_INT_DECERR_EMEM_OTHERS);
 
-	cancel_delayed_work(&unthrottle_prints_work);
+	__cancel_delayed_work(&unthrottle_prints_work);
 
 	spin_lock(&mc_lock);
 	count = ++error_count;

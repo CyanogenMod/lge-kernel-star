@@ -133,7 +133,7 @@ static irqreturn_t tegra_mc_error_isr(int irq, void *data)
 		 MC_INT_SECURITY_VIOLATION |
 		 MC_INT_INVALID_SMMU_PAGE);
 
-	cancel_delayed_work(&unthrottle_prints_work);
+	__cancel_delayed_work(&unthrottle_prints_work);
 
 	spin_lock(&mc_lock);
 	count = ++error_count;
