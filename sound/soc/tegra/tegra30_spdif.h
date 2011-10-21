@@ -765,7 +765,6 @@
 
 struct tegra30_spdif {
 	struct clk *clk_spdif_out;
-	struct clk *clk_hda2codec;
 	enum tegra30_ahub_txcif txcif;
 	struct tegra_pcm_dma_params playback_dma_data;
 	void __iomem *regs;

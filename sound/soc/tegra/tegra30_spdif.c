@@ -61,14 +61,12 @@ static inline u32 tegra30_spdif_read(struct tegra30_spdif *spdif, u32 reg)
 static void tegra30_spdif_enable_clocks(struct tegra30_spdif *spdif)
 {
 	clk_enable(spdif->clk_spdif_out);
-	clk_enable(spdif->clk_hda2codec);
 	tegra30_ahub_enable_clocks();
 }
 
 static void tegra30_spdif_disable_clocks(struct tegra30_spdif *spdif)
 {
 	tegra30_ahub_disable_clocks();
-	clk_disable(spdif->clk_hda2codec);
 	clk_disable(spdif->clk_spdif_out);
 }
 
@@ -284,10 +282,6 @@ static int tegra30_spdif_hw_params(struct snd_pcm_substream *substream,
 		return -EINVAL;
 	}
 
-	// WAR: Apply 2x spdifclock to have proper audio (bug 838569)
-	//	Should be removed once HDA is up.
-	spdifclock *= 2;
-
 	ret = clk_set_rate(spdif->clk_spdif_out, spdifclock);
 	if (ret) {
 		dev_err(dev, "Can't set SPDIF clock rate: %d\n", ret);
@@ -405,18 +399,11 @@ static __devinit int tegra30_spdif_platform_probe(struct platform_device *pdev)
 		goto err_free;
 	}
 
-	spdif->clk_hda2codec = clk_get_sys("hda2codec_2x", NULL);
-	if (IS_ERR(spdif->clk_hda2codec)) {
-		dev_err(&pdev->dev, "Can't retrieve hda2codec clock\n");
-		ret = PTR_ERR(spdif->clk_hda2codec);
-		goto err_clk_put_spdif;
-	}
-
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!mem) {
 		dev_err(&pdev->dev, "No memory resource\n");
 		ret = -ENODEV;
-		goto err_clk_put_hda;
+		goto err_clk_put_spdif;
 	}
 
 	memregion = request_mem_region(mem->start, resource_size(mem),
@@ -424,7 +411,7 @@ static __devinit int tegra30_spdif_platform_probe(struct platform_device *pdev)
 	if (!memregion) {
 		dev_err(&pdev->dev, "Memory region already claimed\n");
 		ret = -EBUSY;
-		goto err_clk_put_hda;
+		goto err_clk_put_spdif;
 	}
 
 	spdif->regs = ioremap(mem->start, resource_size(mem));
@@ -462,8 +449,6 @@ err_unmap:
 	iounmap(spdif->regs);
 err_release:
 	release_mem_region(mem->start, resource_size(mem));
-err_clk_put_hda:
-	clk_put(spdif->clk_hda2codec);
 err_clk_put_spdif:
 	clk_put(spdif->clk_spdif_out);
 err_free:
@@ -487,7 +472,6 @@ static int __devexit tegra30_spdif_platform_remove(struct platform_device *pdev)
 	release_mem_region(res->start, resource_size(res));
 
 	clk_put(spdif->clk_spdif_out);
-	clk_put(spdif->clk_hda2codec);
 
 	kfree(spdif);
 
