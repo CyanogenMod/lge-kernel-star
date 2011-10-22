@@ -97,6 +97,7 @@ void tegra_dvfs_add_relationships(struct dvfs_relationship *rels, int n);
 void tegra_dvfs_rail_enable(struct dvfs_rail *rail);
 void tegra_dvfs_rail_disable(struct dvfs_rail *rail);
 bool tegra_dvfs_rail_updating(struct clk *clk);
+struct dvfs_rail *tegra_dvfs_get_rail_by_name(const char *reg_id);
 int tegra_dvfs_predict_millivolts(struct clk *c, unsigned long rate);
 void tegra_dvfs_core_cap_enable(bool enable);
 void tegra_dvfs_core_cap_level_set(int level);
@@ -119,12 +120,24 @@ static inline void tegra_dvfs_rail_disable(struct dvfs_rail *rail)
 {}
 static inline bool tegra_dvfs_rail_updating(struct clk *clk)
 { return false; }
+static inline struct dvfs_rail *tegra_dvfs_get_rail_by_name(const char *reg_id)
+{ return NULL; }
 static inline int tegra_dvfs_predict_millivolts(struct clk *c, unsigned long rate)
 { return 0; }
 static inline void tegra_dvfs_core_cap_enable(bool enable)
 {}
 static inline void tegra_dvfs_core_cap_level_set(int level)
 {}
+#endif
+
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+int tegra_dvfs_rail_disable_prepare(struct dvfs_rail *rail);
+int tegra_dvfs_rail_post_enable(struct dvfs_rail *rail);
+#else
+static inline int tegra_dvfs_rail_disable_prepare(struct dvfs_rail *rail)
+{ return 0; }
+static inline int tegra_dvfs_rail_post_enable(struct dvfs_rail *rail)
+{ return 0; }
 #endif
 
 #endif

@@ -26,6 +26,7 @@
 #include "dvfs.h"
 #include "fuse.h"
 #include "board.h"
+#include "tegra3_emc.h"
 
 static bool tegra_dvfs_cpu_disabled;
 static bool tegra_dvfs_core_disabled;
@@ -516,6 +517,48 @@ void __init tegra_soc_init_dvfs(void)
 	pr_info("tegra dvfs: VDD_CORE nominal %dmV, scaling %s\n",
 		tegra3_dvfs_rail_vdd_core.nominal_millivolts,
 		tegra_dvfs_core_disabled ? "disabled" : "enabled");
+}
+
+int tegra_dvfs_rail_disable_prepare(struct dvfs_rail *rail)
+{
+	int ret = 0;
+
+	if (tegra_emc_get_dram_type() != DRAM_TYPE_DDR3)
+		return ret;
+
+	if (((&tegra3_dvfs_rail_vdd_core == rail) &&
+	     (rail->nominal_millivolts > TEGRA_EMC_BRIDGE_MVOLTS_MIN)) ||
+	    ((&tegra3_dvfs_rail_vdd_cpu == rail) &&
+	     (tegra3_get_core_floor_mv(rail->nominal_millivolts) >
+	      TEGRA_EMC_BRIDGE_MVOLTS_MIN))) {
+		struct clk *bridge = tegra_get_clock_by_name("bridge.emc");
+		BUG_ON(!bridge);
+
+		ret = clk_enable(bridge);
+		pr_info("%s: %s: %s bridge.emc\n", __func__,
+			rail->reg_id, ret ? "failed to enable" : "enabled");
+	}
+	return ret;
+}
+
+int tegra_dvfs_rail_post_enable(struct dvfs_rail *rail)
+{
+	if (tegra_emc_get_dram_type() != DRAM_TYPE_DDR3)
+		return 0;
+
+	if (((&tegra3_dvfs_rail_vdd_core == rail) &&
+	     (rail->nominal_millivolts > TEGRA_EMC_BRIDGE_MVOLTS_MIN)) ||
+	    ((&tegra3_dvfs_rail_vdd_cpu == rail) &&
+	     (tegra3_get_core_floor_mv(rail->nominal_millivolts) >
+	      TEGRA_EMC_BRIDGE_MVOLTS_MIN))) {
+		struct clk *bridge = tegra_get_clock_by_name("bridge.emc");
+		BUG_ON(!bridge);
+
+		clk_disable(bridge);
+		pr_info("%s: %s: disabled bridge.emc\n",
+			__func__, rail->reg_id);
+	}
+	return 0;
 }
 
 /*

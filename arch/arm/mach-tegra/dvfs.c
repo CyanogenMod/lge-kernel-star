@@ -41,6 +41,7 @@
 
 static LIST_HEAD(dvfs_rail_list);
 static DEFINE_MUTEX(dvfs_lock);
+static DEFINE_MUTEX(rail_disable_lock);
 
 static int dvfs_rail_update(struct dvfs_rail *rail);
 
@@ -476,57 +477,82 @@ static void __tegra_dvfs_rail_disable(struct dvfs_rail *rail)
 {
 	int ret;
 
-	if (!rail->disabled) {
-		ret = dvfs_rail_set_voltage(rail, rail->nominal_millivolts);
-		if (ret)
-			pr_info("dvfs: failed to set regulator %s to disable "
-				"voltage %d\n", rail->reg_id,
-				rail->nominal_millivolts);
-		rail->disabled = true;
-	}
+	ret = dvfs_rail_set_voltage(rail, rail->nominal_millivolts);
+	if (ret)
+		pr_info("dvfs: failed to set regulator %s to disable "
+			"voltage %d\n", rail->reg_id,
+			rail->nominal_millivolts);
+	rail->disabled = true;
 }
 
 /* must be called with dvfs lock held */
 static void __tegra_dvfs_rail_enable(struct dvfs_rail *rail)
 {
-	if (rail->disabled) {
-		rail->disabled = false;
-		dvfs_rail_update(rail);
-	}
+	rail->disabled = false;
+	dvfs_rail_update(rail);
 }
 
 void tegra_dvfs_rail_enable(struct dvfs_rail *rail)
 {
-	mutex_lock(&dvfs_lock);
-	__tegra_dvfs_rail_enable(rail);
-	mutex_unlock(&dvfs_lock);
+	mutex_lock(&rail_disable_lock);
+
+	if (rail->disabled) {
+		mutex_lock(&dvfs_lock);
+		__tegra_dvfs_rail_enable(rail);
+		mutex_unlock(&dvfs_lock);
+
+		tegra_dvfs_rail_post_enable(rail);
+	}
+	mutex_unlock(&rail_disable_lock);
+
 }
 
 void tegra_dvfs_rail_disable(struct dvfs_rail *rail)
 {
+	mutex_lock(&rail_disable_lock);
+	if (rail->disabled)
+		goto out;
+
+	/* rail disable will set it to nominal voltage underneath clock
+	   framework - need to re-configure clock rates that are not safe
+	   at nominal (yes, unsafe at nominal is ugly, but possible). Rate
+	   change must be done outside of dvfs lock. */
+	if (tegra_dvfs_rail_disable_prepare(rail)) {
+		pr_info("dvfs: failed to prepare regulator %s to disable\n",
+			rail->reg_id);
+		goto out;
+	}
+
 	mutex_lock(&dvfs_lock);
 	__tegra_dvfs_rail_disable(rail);
 	mutex_unlock(&dvfs_lock);
+out:
+	mutex_unlock(&rail_disable_lock);
 }
 
 int tegra_dvfs_rail_disable_by_name(const char *reg_id)
 {
+	struct dvfs_rail *rail = tegra_dvfs_get_rail_by_name(reg_id);
+	if (!rail)
+		return -EINVAL;
+
+	tegra_dvfs_rail_disable(rail);
+	return 0;
+}
+
+struct dvfs_rail *tegra_dvfs_get_rail_by_name(const char *reg_id)
+{
 	struct dvfs_rail *rail;
-	int ret = 0;
 
 	mutex_lock(&dvfs_lock);
 	list_for_each_entry(rail, &dvfs_rail_list, node) {
 		if (!strcmp(reg_id, rail->reg_id)) {
-			__tegra_dvfs_rail_disable(rail);
-			goto out;
+			mutex_unlock(&dvfs_lock);
+			return rail;
 		}
 	}
-
-	ret = -EINVAL;
-
-out:
 	mutex_unlock(&dvfs_lock);
-	return ret;
+	return NULL;
 }
 
 bool tegra_dvfs_rail_updating(struct clk *clk)
