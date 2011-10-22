@@ -333,9 +333,8 @@ static int tegra_max98088_init(struct snd_soc_pcm_runtime *rtd)
 
 	snd_soc_dapm_nc_pin(dapm, "INA1");
 	snd_soc_dapm_nc_pin(dapm, "INA2");
-	snd_soc_dapm_nc_pin(dapm, "INAB1");
-	snd_soc_dapm_nc_pin(dapm, "INAB2");
-
+	snd_soc_dapm_nc_pin(dapm, "INB1");
+	snd_soc_dapm_nc_pin(dapm, "INB2");
 	snd_soc_dapm_sync(dapm);
 
 	return 0;
