@@ -2329,6 +2329,7 @@ static struct clk_ops tegra_clk_out_ops = {
 static void tegra3_emc_clk_init(struct clk *c)
 {
 	tegra3_periph_clk_init(c);
+	tegra_emc_dram_type_init(c);
 
 	/* On A01 limit EMC maximum rate to boot frequency;
 	   starting with A02 full PLLM range should be supported */
@@ -2340,7 +2341,7 @@ static void tegra3_emc_clk_init(struct clk *c)
 
 static long tegra3_emc_clk_round_rate(struct clk *c, unsigned long rate)
 {
-	long new_rate = rate;
+	long new_rate = max(rate, c->min_rate);
 
 	new_rate = tegra_emc_round_rate(new_rate);
 	if (new_rate < 0)

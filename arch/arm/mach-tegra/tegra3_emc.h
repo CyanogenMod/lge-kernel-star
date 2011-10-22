@@ -43,8 +43,11 @@ struct tegra_emc_table {
 	u32 emc_mode_2;
 };
 
+struct clk;
+
 void tegra_init_emc(const struct tegra_emc_table *table, int table_size);
 
+void tegra_emc_dram_type_init(struct clk *c);
 int tegra_emc_get_dram_type(void);
 
 #ifdef CONFIG_PM_SLEEP

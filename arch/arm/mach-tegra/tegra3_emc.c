@@ -780,20 +780,21 @@ void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
 	unsigned long boot_rate, max_rate;
 	const struct clk_mux_sel *sel;
 
-	emc_cfg_saved = emc_readl(EMC_CFG);
-
 	emc_stats.clkchange_count = 0;
 	spin_lock_init(&emc_stats.spinlock);
 	emc_stats.last_update = get_jiffies_64();
 
-	emc = tegra_get_clock_by_name("emc");
-	BUG_ON(!emc);
 	boot_rate = clk_get_rate(emc) / 1000;
 	max_rate = clk_get_max_rate(emc) / 1000;
 
 	if (emc->parent != tegra_get_clock_by_name("pll_m")) {
 		pr_warn("tegra: boot parent %s is not supported by EMC DFS\n",
 			emc->parent->name);
+		return;
+	}
+
+	if (!table || !table_size) {
+		pr_warn("tegra: EMC DFS table is empty\n");
 		return;
 	}
 
@@ -842,21 +843,15 @@ void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
 			tegra_emc_clk_sel[i].value |= EMC_CLK_MC_SAME_FREQ;
 	}
 
-	dram_type = (emc_readl(EMC_FBIO_CFG5) &
-		     EMC_CFG5_TYPE_MASK) >> EMC_CFG5_TYPE_SHIFT;
+	/* Configure clock change mode according to dram type */
 	if ((dram_type != DRAM_TYPE_DDR3) && (dram_type != DRAM_TYPE_LPDDR2)) {
-		pr_err("Not supported DRAM type %u\n", dram_type);
+		pr_err("tegra: not supported DRAM type %u\n", dram_type);
 		return;
 	}
-	if (dram_type == DRAM_TYPE_DDR3)
-		emc->min_rate = EMC_MIN_RATE_DDR3;
-
 	reg = emc_readl(EMC_CFG_2) & (~EMC_CFG_2_MODE_MASK);
 	reg |= ((dram_type == DRAM_TYPE_LPDDR2) ? EMC_CFG_2_PD_MODE :
 		EMC_CFG_2_SREF_MODE) << EMC_CFG_2_MODE_SHIFT;
 	emc_writel(reg, EMC_CFG_2);
-
-	dram_dev_num = (mc_readl(MC_EMEM_ADR_CFG) & 0x1) + 1; /* 2 dev max */
 
 	if (!max_entry) {
 		pr_err("tegra: invalid EMC DFS table: entry for max rate"
@@ -876,6 +871,19 @@ void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
 void tegra_emc_timing_invalidate(void)
 {
 	emc_timing_in_sync = false;
+}
+
+void tegra_emc_dram_type_init(struct clk *c)
+{
+	emc = c;
+
+	dram_type = (emc_readl(EMC_FBIO_CFG5) &
+		     EMC_CFG5_TYPE_MASK) >> EMC_CFG5_TYPE_SHIFT;
+	if (dram_type == DRAM_TYPE_DDR3)
+		emc->min_rate = EMC_MIN_RATE_DDR3;
+
+	dram_dev_num = (mc_readl(MC_EMEM_ADR_CFG) & 0x1) + 1; /* 2 dev max */
+	emc_cfg_saved = emc_readl(EMC_CFG);
 }
 
 int tegra_emc_get_dram_type(void)
