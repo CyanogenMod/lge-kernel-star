@@ -21,6 +21,7 @@
 #include <linux/debugfs.h>
 #include <linux/uaccess.h>
 #include <linux/i2c.h>
+#include <linux/mfd/core.h>
 #include <linux/mfd/max77663-core.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
@@ -142,6 +143,7 @@ struct max77663_register {
 struct max77663_regulator {
 	struct regulator_dev *rdev;
 	struct device *dev;
+	struct max77663_regulator_platform_data *pdata;
 
 	u8 id;
 	u8 type;
@@ -181,7 +183,7 @@ static struct max77663_register fps_cfg_regs[] = {
 static inline struct max77663_regulator_platform_data
 *_to_pdata(struct max77663_regulator *reg)
 {
-	return reg->dev->platform_data;
+	return reg->pdata;
 }
 
 static inline struct device *_to_parent(struct max77663_regulator *reg)
@@ -759,7 +761,6 @@ static int max77663_regulator_probe(struct platform_device *pdev)
 {
 	struct regulator_desc *rdesc;
 	struct max77663_regulator *reg;
-	struct max77663_regulator_platform_data *pdata;
 	int ret = 0;
 
 	if ((pdev->id < 0) || (pdev->id >= MAX77663_REGULATOR_ID_NR)) {
@@ -770,7 +771,7 @@ static int max77663_regulator_probe(struct platform_device *pdev)
 	rdesc = &max77663_rdesc[pdev->id];
 	reg = &max77663_regs[pdev->id];
 	reg->dev = &pdev->dev;
-	pdata = reg->dev->platform_data;
+	reg->pdata = mfd_get_data(pdev);
 
 	dev_dbg(&pdev->dev, "probe: name=%s\n", rdesc->name);
 
@@ -781,8 +782,8 @@ static int max77663_regulator_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	reg->rdev = regulator_register(rdesc, &pdev->dev, &pdata->init_data,
-				       reg);
+	reg->rdev = regulator_register(rdesc, &pdev->dev,
+				       &reg->pdata->init_data, reg);
 	if (IS_ERR(reg->rdev)) {
 		dev_err(&pdev->dev, "probe: Failed to register regulator %s\n",
 			rdesc->name);
