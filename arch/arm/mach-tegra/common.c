@@ -89,6 +89,7 @@ bool tegra_lp0_vec_relocate;
 unsigned long tegra_grhost_aperture = ~0ul;
 static   bool is_tegra_debug_uart_hsport;
 static struct board_info pmu_board_info;
+static struct board_info display_board_info;
 
 static int pmu_core_edp = 1200;	/* default 1.2V EDP limit */
 static int board_panel_type;
@@ -494,6 +495,24 @@ void tegra_get_pmu_board_info(struct board_info *bi)
 }
 
 __setup("pmuboard=", tegra_pmu_board_info);
+
+static int __init tegra_display_board_info(char *info)
+{
+	char *p = info;
+	display_board_info.board_id = memparse(p, &p);
+	display_board_info.sku = memparse(p+1, &p);
+	display_board_info.fab = memparse(p+1, &p);
+	display_board_info.major_revision = memparse(p+1, &p);
+	display_board_info.minor_revision = memparse(p+1, &p);
+	return 1;
+}
+
+void tegra_get_display_board_info(struct board_info *bi)
+{
+	memcpy(bi, &display_board_info, sizeof(struct board_info));
+}
+
+__setup("displayboard=", tegra_display_board_info);
 
 static int __init tegra_modem_id(char *id)
 {

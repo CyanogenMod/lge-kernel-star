@@ -38,7 +38,7 @@
 #define CARDHU_WLAN_WOW	TEGRA_GPIO_PO4
 #define CARDHU_SD_CD TEGRA_GPIO_PI5
 #define CARDHU_SD_WP TEGRA_GPIO_PT3
-#define PM269_SD_WP TEGRA_GPIO_PZ4
+#define PM269_SD_WP -1
 
 static void (*wifi_status_cb)(int card_present, void *dev_id);
 static void *wifi_status_cb_devid;

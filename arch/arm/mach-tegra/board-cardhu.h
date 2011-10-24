@@ -67,6 +67,9 @@
 #define BOARD_FAB_A04			0x4
 #define BOARD_FAB_A05			0x5
 
+/* Display Board ID */
+#define BOARD_DISPLAY_PM313		0x030D
+#define BOARD_DISPLAY_E1247		0x0C2F
 
 /* External peripheral act as gpio */
 /* TPS6591x GPIOs */
