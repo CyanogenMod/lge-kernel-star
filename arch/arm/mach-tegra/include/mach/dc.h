@@ -265,15 +265,14 @@ struct tegra_dc_sd_settings {
 	u8 hw_update_delay;
 	u8 aggressiveness;
 	short bin_width;
-	u8 phase_in;
-	u8 phase_in_video;
+	u8 phase_in_settings;
+	u8 phase_in_adjustments;
 	u8 cmd;
 	u8 final_agg;
 	u16 cur_agg_step;
-	u16 cur_phase_step;
-	u16 phase_in_steps;
-	short prev_k;
-	short phase_vid_step;
+	u16 phase_settings_step;
+	u16 phase_adj_step;
+	u16 num_phase_in_steps;
 
 	struct tegra_dc_sd_agg_priorities agg_priorities;
 
