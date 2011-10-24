@@ -45,6 +45,7 @@ struct ricoh583_regulator {
 	u8		disc_bit;
 	u8		vout_reg;
 	u8		vout_mask;
+	u8		vout_reg_cache;
 	u8		deepsleep_reg;
 
 	/* chip constraints on regulator behavior */
@@ -149,6 +150,7 @@ static int __ricoh583_set_voltage(struct device *parent,
 {
 	int vsel;
 	int ret;
+	uint8_t vout_val;
 
 	if ((min_uV < ri->min_uV) || (max_uV > ri->max_uV))
 		return -EDOM;
@@ -157,9 +159,13 @@ static int __ricoh583_set_voltage(struct device *parent,
 	if (vsel > ri->nsteps)
 		return -EDOM;
 
-	ret = ricoh583_update(parent, ri->vout_reg, vsel, ri->vout_mask);
+	vout_val = (ri->vout_reg_cache & ~ri->vout_mask) | (vsel & ri->vout_mask);
+	ret = ricoh583_write(parent, ri->vout_reg, vout_val);
 	if (ret < 0)
 		dev_err(ri->dev, "Error in writing the Voltage register\n");
+	else
+		ri->vout_reg_cache = vout_val;
+
 	return ret;
 }
 
@@ -172,20 +178,12 @@ static int ricoh583_set_voltage(struct regulator_dev *rdev,
 	return __ricoh583_set_voltage(parent, ri, min_uV, max_uV);
 }
 
-
 static int ricoh583_get_voltage(struct regulator_dev *rdev)
 {
 	struct ricoh583_regulator *ri = rdev_get_drvdata(rdev);
-	struct device *parent = to_ricoh583_dev(rdev);
 	uint8_t vsel;
-	int ret;
 
-	ret = ricoh583_read(parent, ri->vout_reg, &vsel);
-	if (ret < 0) {
-		dev_err(&rdev->dev, "Error in reading the Voltage register\n");
-		return ret;
-	}
-	vsel &= vsel & ri->vout_mask;
+	vsel = ri->vout_reg_cache & ri->vout_mask;
 	return ri->min_uV + vsel * ri->step_uV;
 }
 
@@ -318,6 +316,13 @@ static int ricoh583_regulator_preinit(struct device *parent,
 	return ret;
 }
 
+static inline int ricoh583_cache_regulator_register(struct device *parent,
+	struct ricoh583_regulator *ri)
+{
+	ri->vout_reg_cache = 0;
+	return ricoh583_read(parent, ri->vout_reg, &ri->vout_reg_cache);
+}
+
 static int __devinit ricoh583_regulator_probe(struct platform_device *pdev)
 {
 	struct ricoh583_regulator *ri = NULL;
@@ -336,10 +341,17 @@ static int __devinit ricoh583_regulator_probe(struct platform_device *pdev)
 	tps_pdata = pdev->dev.platform_data;
 	ri->dev = &pdev->dev;
 
-	err = ricoh583_regulator_preinit(pdev->dev.parent, ri, tps_pdata);
-	if (err)
+	err = ricoh583_cache_regulator_register(pdev->dev.parent, ri);
+	if (err) {
+		dev_err(&pdev->dev, "Fail in caching register\n");
 		return err;
+	}
 
+	err = ricoh583_regulator_preinit(pdev->dev.parent, ri, tps_pdata);
+	if (err) {
+		dev_err(&pdev->dev, "Fail in pre-initialisation\n");
+		return err;
+	}
 	rdev = regulator_register(&ri->desc, &pdev->dev,
 				&tps_pdata->regulator, ri);
 	if (IS_ERR_OR_NULL(rdev)) {
