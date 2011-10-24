@@ -33,7 +33,7 @@
 #include <asm/unaligned.h>
 #include <mach/clk.h>
 #include <mach/pinmux.h>
-
+#include <linux/pm_runtime.h>
 #define BYTES_PER_FIFO_WORD 4
 #define to_jiffies(msecs) msecs_to_jiffies(msecs)
 
@@ -650,7 +650,7 @@ static int tegra_i2c_slave_start(struct i2c_slave_adapter *slv_adap, int addr,
 	get_packet_headers(i2c_dev, 4096, 0, &i2c_dev->rx_pack_hdr1,
 		&i2c_dev->rx_pack_hdr2, &i2c_dev->rx_pack_hdr3);
 
-	clk_enable(i2c_dev->clk);
+	pm_runtime_get_sync(i2c_dev->dev);
 	configure_i2c_slave_packet_mode(i2c_dev);
 	configure_i2c_slave_address(i2c_dev);
 	do_tx_fifo_empty(i2c_dev, NULL);
@@ -690,7 +690,7 @@ static void tegra_i2c_slave_stop(struct i2c_slave_adapter *slv_adap,
 	writel(0, i2c_dev->base + I2C_INT_MASK);
 	i2c_dev->curr_transfer = 0;
 	i2c_dev->is_slave_started = false;
-	clk_disable(i2c_dev->clk);
+	pm_runtime_put_sync(i2c_dev->dev);
 	if (is_buffer_clear) {
 		i2c_dev->rx_msg_head = 0;
 		i2c_dev->rx_msg_tail = 0;
@@ -1018,6 +1018,7 @@ static int tegra_i2c_slave_probe(struct platform_device *pdev)
 	}
 	i2c_set_slave_adapdata(&i2c_bus->slv_adap, i2c_bus);
 	dev_dbg(&pdev->dev, "%s() suucess\n", __func__);
+	pm_runtime_enable(i2c_dev->dev);
 	return 0;
 
 err_free_irq:
@@ -1039,6 +1040,7 @@ static int tegra_i2c_slave_remove(struct platform_device *pdev)
 	struct tegra_i2c_slave_dev *i2c_dev = platform_get_drvdata(pdev);
 
 	i2c_del_slave_adapter(&i2c_dev->bus.slv_adap);
+	pm_runtime_disable(i2c_dev->dev);
 	free_irq(i2c_dev->irq, i2c_dev);
 	clk_put(i2c_dev->clk);
 	release_mem_region(i2c_dev->iomem->start,
@@ -1060,6 +1062,26 @@ static int tegra_i2c_slave_resume(struct platform_device *pdev)
 	return 0;
 }
 #endif
+#if defined(CONFIG_PM_RUNTIME)
+static int tegra_i2c_slave_runtime_idle(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct tegra_i2c_slave_dev *i2c_dev = platform_get_drvdata(pdev);
+	clk_disable(i2c_dev->clk);
+	return 0;
+}
+static int tegra_i2c_slave_runtime_resume(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct tegra_i2c_slave_dev *i2c_dev = platform_get_drvdata(pdev);
+	clk_enable(i2c_dev->clk);
+	return 0;
+}
+static const struct dev_pm_ops tegra_i2c_slave_dev_pm_ops = {
+	.runtime_idle = tegra_i2c_slave_runtime_idle,
+	.runtime_resume = tegra_i2c_slave_runtime_resume,
+};
+#endif
 
 static struct platform_driver tegra_i2c_slave_driver = {
 	.probe   = tegra_i2c_slave_probe,
@@ -1071,6 +1093,9 @@ static struct platform_driver tegra_i2c_slave_driver = {
 	.driver  = {
 		.name  = "tegra-i2c-slave",
 		.owner = THIS_MODULE,
+#if defined(CONFIG_PM_RUNTIME)
+		.pm = &tegra_i2c_slave_dev_pm_ops,
+#endif
 	},
 };
 
