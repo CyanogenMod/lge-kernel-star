@@ -833,6 +833,9 @@ static void __init tegra_ventana_init(void)
 
 int __init tegra_ventana_protected_aperture_init(void)
 {
+	if (!machine_is_ventana())
+		return 0;
+
 	tegra_protected_aperture_init(tegra_grhost_aperture);
 	return 0;
 }

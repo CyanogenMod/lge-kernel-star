@@ -30,6 +30,8 @@
 #include <linux/regulator/tps6236x-regulator.h>
 #include <linux/power/gpio-charger.h>
 
+#include <asm/mach-types.h>
+
 #include <mach/iomap.h>
 #include <mach/irqs.h>
 #include <mach/pinmux.h>
@@ -1092,6 +1094,9 @@ static struct platform_device cardhu_charger_device = {
 
 static int __init cardhu_charger_late_init(void)
 {
+	if (!machine_is_cardhu())
+		return 0;
+
 	platform_device_register(&cardhu_charger_device);
 	return 0;
 }
