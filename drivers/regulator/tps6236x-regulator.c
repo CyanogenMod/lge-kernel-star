@@ -88,6 +88,7 @@ struct tps6236x_chip {
 	int internal_pulldn_en;
 	const u16 *voltages;
 	u8 voltage_reg_mask;
+	bool is_force_pwm;
 };
 static inline int tps6236x_read(struct tps6236x_chip *tps, u8 reg)
 {
@@ -149,6 +150,8 @@ static int __tps6236x_dcdc_set_voltage(struct tps6236x_chip *tps,
 		if (min_uV <= uV && uV <= max_uV) {
 			if (selector)
 				*selector = vsel;
+			if (tps->is_force_pwm)
+				vsel |= (1 << 7);
 			return tps6236x_reg_write(tps, REG_VSET0 + tps->vsel_id,
 					vsel);
 		}
@@ -280,13 +283,34 @@ static int tps6236x_init_dcdc(struct i2c_client *client,
 {
 	int st;
 	int init_mV;
+	int data;
 
 	if (pdata->internal_pd_enable)
 		st = tps6236x_write(tps, REG_CONTROL, 0xE0);
 	else
 		st = tps6236x_write(tps, REG_CONTROL, 0x0);
-	if (st < 0)
+	if (st < 0) {
+		dev_err(tps->dev, "%s() fails in writing reg %d\n",
+			__func__, REG_CONTROL);
 		return st;
+	}
+
+	data = tps6236x_reg_read(tps, REG_VSET0 + tps->vsel_id);
+	if (data < 0) {
+		dev_err(tps->dev, "%s() fails in reading reg %d\n",
+			__func__, REG_VSET0 + tps->vsel_id);
+		return data;
+	}
+	if (pdata->is_force_pwm)
+		data |= (1 << 7);
+	else
+		data &= ~(1 << 7);
+	st = tps6236x_reg_write(tps, REG_VSET0 + tps->vsel_id, data);
+	if (data < 0) {
+		dev_err(tps->dev, "%s() fails in writing reg %d\n",
+			__func__, REG_VSET0 + tps->vsel_id);
+		return st;
+	}
 
 	if (!pdata->init_apply)
 		return 0;
@@ -333,6 +357,7 @@ static int __devinit tps6236x_probe(struct i2c_client *client,
 
 	mutex_init(&tps->io_lock);
 
+	tps->is_force_pwm = pdata->is_force_pwm;
 	tps->chip_id = id->driver_data;
 	tps->client = client;
 	tps->dev = &client->dev;
