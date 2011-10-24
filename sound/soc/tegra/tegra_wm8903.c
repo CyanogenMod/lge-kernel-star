@@ -52,6 +52,10 @@
 #include "tegra_pcm.h"
 #include "tegra_asoc_utils.h"
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+#include "tegra20_das.h"
+#endif
+
 #define DRV_NAME "tegra-snd-wm8903"
 
 #define GPIO_SPKR_EN    BIT(0)
@@ -140,6 +144,91 @@ static int tegra_wm8903_hw_params(struct snd_pcm_substream *substream,
 		return err;
 	}
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	err = tegra20_das_connect_dac_to_dap(TEGRA20_DAS_DAP_SEL_DAC1,
+					TEGRA20_DAS_DAP_ID_1);
+	if (err < 0) {
+		dev_err(card->dev, "failed to set dap-dac path\n");
+		return err;
+	}
+
+	err = tegra20_das_connect_dap_to_dac(TEGRA20_DAS_DAP_ID_1,
+					TEGRA20_DAS_DAP_SEL_DAC1);
+	if (err < 0) {
+		dev_err(card->dev, "failed to set dac-dap path\n");
+		return err;
+	}
+#endif
+	return 0;
+}
+
+static int tegra_bt_sco_hw_params(struct snd_pcm_substream *substream,
+					struct snd_pcm_hw_params *params)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	struct snd_soc_card *card = rtd->card;
+	struct tegra_wm8903 *machine = snd_soc_card_get_drvdata(card);
+	int srate, mclk, min_mclk;
+	int err;
+
+	srate = params_rate(params);
+	switch (srate) {
+	case 11025:
+	case 22050:
+	case 44100:
+	case 88200:
+		mclk = 11289600;
+		break;
+	case 8000:
+	case 16000:
+	case 32000:
+	case 48000:
+	case 64000:
+	case 96000:
+		mclk = 12288000;
+		break;
+	default:
+		return -EINVAL;
+	}
+	min_mclk = 64 * srate;
+
+	err = tegra_asoc_utils_set_rate(&machine->util_data, srate, mclk);
+	if (err < 0) {
+		if (!(machine->util_data.set_mclk % min_mclk))
+			mclk = machine->util_data.set_mclk;
+		else {
+			dev_err(card->dev, "Can't configure clocks\n");
+			return err;
+		}
+	}
+
+	tegra_asoc_utils_lock_clk_rate(&machine->util_data, 1);
+
+	err = snd_soc_dai_set_fmt(cpu_dai,
+					SND_SOC_DAIFMT_DSP_A |
+					SND_SOC_DAIFMT_NB_NF |
+					SND_SOC_DAIFMT_CBS_CFS);
+	if (err < 0) {
+		dev_err(card->dev, "cpu_dai fmt not set\n");
+		return err;
+	}
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	err = tegra20_das_connect_dac_to_dap(TEGRA20_DAS_DAP_SEL_DAC2,
+					TEGRA20_DAS_DAP_ID_4);
+	if (err < 0) {
+		dev_err(card->dev, "failed to set dac-dap path\n");
+		return err;
+	}
+
+	err = tegra20_das_connect_dap_to_dac(TEGRA20_DAS_DAP_ID_4,
+					TEGRA20_DAS_DAP_SEL_DAC2);
+	if (err < 0) {
+		dev_err(card->dev, "failed to set dac-dap path\n");
+		return err;
+	}
+#endif
 	return 0;
 }
 
@@ -200,6 +289,11 @@ static int tegra_hw_free(struct snd_pcm_substream *substream)
 
 static struct snd_soc_ops tegra_wm8903_ops = {
 	.hw_params = tegra_wm8903_hw_params,
+	.hw_free = tegra_hw_free,
+};
+
+static struct snd_soc_ops tegra_wm8903_bt_sco_ops = {
+	.hw_params = tegra_bt_sco_hw_params,
 	.hw_free = tegra_hw_free,
 };
 
@@ -627,7 +721,18 @@ static struct snd_soc_dai_link tegra_wm8903_dai[] = {
 		.cpu_dai_name = "tegra20-spdif",
 		.codec_dai_name = "dit-hifi",
 		.ops = &tegra_spdif_ops,
-	}
+	},
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	{
+		.name = "BT-SCO",
+		.stream_name = "BT SCO PCM",
+		.codec_name = "spdif-dit.1",
+		.platform_name = "tegra-pcm-audio",
+		.cpu_dai_name = "tegra20-i2s.1",
+		.codec_dai_name = "dit-hifi",
+		.ops = &tegra_wm8903_bt_sco_ops,
+	},
+#endif
 };
 
 static struct snd_soc_card snd_soc_tegra_wm8903 = {
