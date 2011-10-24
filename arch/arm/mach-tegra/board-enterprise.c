@@ -629,6 +629,9 @@ static struct platform_device *enterprise_devices[] __initdata = {
 #endif
 	&tegra_camera,
 	&tegra_ahub_device,
+	&tegra_dam_device0,
+	&tegra_dam_device1,
+	&tegra_dam_device2,
 	&tegra_i2s_device0,
 	&tegra_spdif_device,
 	&spdif_dit_device,

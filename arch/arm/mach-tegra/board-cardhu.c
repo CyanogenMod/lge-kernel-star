@@ -632,6 +632,9 @@ static struct platform_device *cardhu_devices[] __initdata = {
 	&tegra_se_device,
 #endif
 	&tegra_ahub_device,
+	&tegra_dam_device0,
+	&tegra_dam_device1,
+	&tegra_dam_device2,
 	&tegra_i2s_device1,
 	&tegra_spdif_device,
 	&spdif_dit_device,
