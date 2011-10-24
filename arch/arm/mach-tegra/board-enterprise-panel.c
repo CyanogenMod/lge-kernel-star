@@ -296,6 +296,7 @@ static struct tegra_dc_sd_settings enterprise_sd_settings = {
 	.hw_update_delay = 0,
 	.bin_width = -1,
 	.aggressiveness = 1,
+	.phase_in_adjustments = true,
 	.use_vid_luma = false,
 	/* Default video coefficients */
 	.coeff = {5, 9, 2},
