@@ -279,7 +279,7 @@ int tegra_sku_id(void)
 
 int tegra_gpu_register_sets(void)
 {
-#ifdef CONFIG_ARCH_TEGRA_DUAL_3D
+#ifdef CONFIG_ARCH_TEGRA_HAS_DUAL_3D
 	u32 reg = readl(IO_TO_VIRT(TEGRA_CLK_RESET_BASE + FUSE_GPU_INFO));
 	if (reg & FUSE_GPU_INFO_MASK)
 		return 1;
