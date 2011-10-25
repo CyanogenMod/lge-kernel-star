@@ -386,4 +386,11 @@ config TEGRA_EDP_EXACT_FREQ
 	  When enabled the cpu will run at the exact frequency
 	  specified in the EDP table when EDP capping is applied; when
 	  disabled the next lower cpufreq frequency will be used.
+
+config TEGRA_USB_MODEM_POWER
+	bool "Enable tegra usb modem power management"
+	default n
+	help
+	  This option enables support for out-of_band remote wakeup, selective
+	  suspend and system suspend/resume.
 endif

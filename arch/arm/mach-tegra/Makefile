@@ -94,6 +94,7 @@ obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += tegra3_mc.o
 endif
 obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += tegra3_tsensor.o
 obj-$(CONFIG_TEGRA_DYNAMIC_PWRDET)      += powerdetect.o
+obj-$(CONFIG_TEGRA_USB_MODEM_POWER)     += tegra_usb_modem_power.o
 
 obj-${CONFIG_TEGRA_SPI_SLAVE}           += spi_tegra_slave.o
 
