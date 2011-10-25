@@ -5282,7 +5282,7 @@ dhdsdio_probe(uint16 venid, uint16 devid, uint16 bus_no, uint16 slot,
 	bus->usebufpool = FALSE; /* Use bufpool if allocated, else use locally malloced rxbuf */
 
 	/* attach the common module */
-	if (!(cmn = dhd_common_init(osh))) {
+	if (!(cmn = dhd_common_init(bus->cl_devid, osh))) {
 		DHD_ERROR(("%s: dhd_common_init failed\n", __FUNCTION__));
 		goto fail;
 	}
