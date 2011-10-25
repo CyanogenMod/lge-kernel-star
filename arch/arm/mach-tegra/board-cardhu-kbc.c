@@ -269,6 +269,7 @@ int __init cardhu_keys_init(void)
 
 	/* Register on-key through pmu interrupt */
 	if ((board_info.board_id == BOARD_E1291) ||
+		(board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1257) ||
 		(board_info.board_id == BOARD_PM305) ||
 		(board_info.board_id == BOARD_PM311) ||
