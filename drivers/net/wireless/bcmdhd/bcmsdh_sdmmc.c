@@ -243,28 +243,33 @@ sdioh_enable_func_intr(void)
 	return SDIOH_API_RC_SUCCESS;
 }
 
+#endif /* defined(OOB_INTR_ONLY) && defined(HW_OOB) */
+
 extern SDIOH_API_RC
-sdioh_disable_func_intr(void)
+sdioh_disable_func_intr(int func)
 {
 	uint8 reg;
 	int err;
 
-	if (gInstance->func[0]) {
-		sdio_claim_host(gInstance->func[0]);
-		reg = sdio_readb(gInstance->func[0], SDIOD_CCCR_INTEN, &err);
+	if (gInstance->func[func]) {
+		sdio_claim_host(gInstance->func[func]);
+		reg = sdio_readb(gInstance->func[func], SDIOD_CCCR_INTEN, &err);
 		if (err) {
 			sd_err(("%s: error for read SDIO_CCCR_IENx : 0x%x\n", __FUNCTION__, err));
-			sdio_release_host(gInstance->func[0]);
+			sdio_release_host(gInstance->func[func]);
 			return SDIOH_API_RC_FAIL;
 		}
-
+#if defined(HW_OOB)
 		reg &= ~(INTR_CTL_FUNC1_EN | INTR_CTL_FUNC2_EN);
+#else
+		reg &= ~(1 << func);
+#endif
 		/* Disable master interrupt with the last function interrupt */
 		if (!(reg & 0xFE))
 			reg = 0;
-		sdio_writeb(gInstance->func[0], reg, SDIOD_CCCR_INTEN, &err);
+		sdio_writeb(gInstance->func[func], reg, SDIOD_CCCR_INTEN, &err);
 
-		sdio_release_host(gInstance->func[0]);
+		sdio_release_host(gInstance->func[func]);
 		if (err) {
 			sd_err(("%s: error for write SDIO_CCCR_IENx : 0x%x\n", __FUNCTION__, err));
 			return SDIOH_API_RC_FAIL;
@@ -272,7 +277,7 @@ sdioh_disable_func_intr(void)
 	}
 	return SDIOH_API_RC_SUCCESS;
 }
-#endif /* defined(OOB_INTR_ONLY) && defined(HW_OOB) */
+
 
 /* Configure callback to client when we recieve client interrupt */
 extern SDIOH_API_RC
@@ -314,6 +319,9 @@ sdioh_interrupt_deregister(sdioh_info_t *sd)
 
 #if !defined(OOB_INTR_ONLY)
 	if (gInstance->func[1]) {
+		sdioh_disable_func_intr(1);
+		/*Wait for the pending interrupts to be cleared*/
+		msleep(300);
 		/* register and unmask irq */
 		sdio_claim_host(gInstance->func[1]);
 		sdio_release_irq(gInstance->func[1]);
@@ -321,6 +329,9 @@ sdioh_interrupt_deregister(sdioh_info_t *sd)
 	}
 
 	if (gInstance->func[2]) {
+		sdioh_disable_func_intr(2);
+		/*Wait for the pending interrupts to be cleared*/
+		msleep(300);
 		/* Claim host controller F2 */
 		sdio_claim_host(gInstance->func[2]);
 		sdio_release_irq(gInstance->func[2]);
@@ -332,7 +343,7 @@ sdioh_interrupt_deregister(sdioh_info_t *sd)
 	sd->intr_handler = NULL;
 	sd->intr_handler_arg = NULL;
 #elif defined(HW_OOB)
-	sdioh_disable_func_intr();
+	sdioh_disable_func_intr(0);
 #endif /* !defined(OOB_INTR_ONLY) */
 	return SDIOH_API_RC_SUCCESS;
 }
@@ -1298,7 +1309,7 @@ sdioh_stop(sdioh_info_t *si)
 		sdio_release_host(gInstance->func[0]);
 #else /* defined(OOB_INTR_ONLY) */
 #if defined(HW_OOB)
-		sdioh_disable_func_intr();
+		sdioh_disable_func_intr(0);
 #endif
 		bcmsdh_oob_intr_set(FALSE);
 #endif /* !defined(OOB_INTR_ONLY) */
