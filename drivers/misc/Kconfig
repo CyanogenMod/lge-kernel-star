@@ -554,6 +554,6 @@ source "drivers/misc/cb710/Kconfig"
 source "drivers/misc/iwmc3200top/Kconfig"
 source "drivers/misc/ti-st/Kconfig"
 source "drivers/misc/lis3lv02d/Kconfig"
-source "drivers/misc/mpu3050/Kconfig"
+source "drivers/misc/inv_mpu/Kconfig"
 
 endif # MISC_DEVICES
