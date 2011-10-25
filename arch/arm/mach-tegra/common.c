@@ -142,7 +142,7 @@ static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 	{ "pll_p_out1",	"pll_p",	9600000,	true },
 	{ "pll_p_out2",	"pll_p",	48000000,	true },
 	{ "pll_p_out3",	"pll_p",	102000000,	true },
-	{ "pll_m_out1",	"pll_m",	275000000,	true },
+	{ "pll_m_out1",	"pll_m",	275000000,	false },
 	{ "pll_p_out4",	"pll_p",	102000000,	true },
 	{ "sclk",	"pll_p_out4",	102000000,	true },
 	{ "hclk",	"sclk",		102000000,	true },

@@ -199,7 +199,7 @@ err_free_dev:
 
 static __initdata struct tegra_clk_init_table enterprise_clk_init_table[] = {
 	/* name		parent		rate		enabled */
-	{ "pll_m",	NULL,		0,		true},
+	{ "pll_m",	NULL,		0,		false},
 	{ "hda",	"pll_p",	108000000,	false},
 	{ "hda2codec_2x","pll_p",	48000000,	false},
 	{ "pwm",	"clk_32k",	32768,		false},

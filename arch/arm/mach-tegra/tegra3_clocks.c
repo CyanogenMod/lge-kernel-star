@@ -225,6 +225,9 @@
 #define PMC_BLINK_TIMER_DATA_OFF_SHIFT	16
 #define PMC_BLINK_TIMER_DATA_OFF_MASK	0xffff
 
+#define PMC_PLLP_WB0_OVERRIDE				0xf8
+#define PMC_PLLP_WB0_OVERRIDE_PLLM_ENABLE		(1 << 12)
+
 #define UTMIP_PLL_CFG2					0x488
 #define UTMIP_PLL_CFG2_STABLE_COUNT(x)			(((x) & 0xfff) << 6)
 #define UTMIP_PLL_CFG2_ACTIVE_DLY_COUNT(x)		(((x) & 0x3f) << 18)
@@ -1393,6 +1396,12 @@ static int tegra3_pll_clk_enable(struct clk *c)
 	val |= PLL_BASE_ENABLE;
 	clk_writel(val, c->reg + PLL_BASE);
 
+	if (c->flags & PLLM) {
+		val = pmc_readl(PMC_PLLP_WB0_OVERRIDE);
+		val |= PMC_PLLP_WB0_OVERRIDE_PLLM_ENABLE;
+		pmc_writel(val, PMC_PLLP_WB0_OVERRIDE);
+	}
+
 	tegra3_pll_clk_wait_for_lock(c, c->reg + PLL_BASE, PLL_BASE_LOCK);
 
 	return 0;
@@ -1406,6 +1415,12 @@ static void tegra3_pll_clk_disable(struct clk *c)
 	val = clk_readl(c->reg);
 	val &= ~(PLL_BASE_BYPASS | PLL_BASE_ENABLE);
 	clk_writel(val, c->reg);
+
+	if (c->flags & PLLM) {
+		val = pmc_readl(PMC_PLLP_WB0_OVERRIDE);
+		val &= ~PMC_PLLP_WB0_OVERRIDE_PLLM_ENABLE;
+		pmc_writel(val, PMC_PLLP_WB0_OVERRIDE);
+	}
 }
 
 static int tegra3_pll_clk_set_rate(struct clk *c, unsigned long rate)
@@ -1425,6 +1440,15 @@ static int tegra3_pll_clk_set_rate(struct clk *c, unsigned long rate)
 			ret = -EINVAL;
 		}
 		return ret;
+	}
+
+	if (c->flags & PLLM) {
+		if (rate != clk_get_rate_locked(c)) {
+			pr_err("%s: Can not change memory %s rate in flight\n",
+			       __func__, c->name);
+			return -EINVAL;
+		}
+		return 0;
 	}
 
 	p_div = 0;
