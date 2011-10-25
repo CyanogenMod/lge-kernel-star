@@ -761,7 +761,7 @@ static int __devinit ricoh583_irq_init(struct ricoh583 *ricoh583, int irq,
 				ricoh583->irq_en_add[i],
 				ricoh583->irq_en_reg[i]);
 		if (ret < 0)
-			dev_err(ricoh583->dev, "Error in writin reg 0x%02x "
+			dev_err(ricoh583->dev, "Error in writing reg 0x%02x "
 				"error: %d\n", ricoh583->irq_en_add[i], ret);
 	}
 
@@ -770,13 +770,13 @@ static int __devinit ricoh583_irq_init(struct ricoh583 *ricoh583, int irq,
 				ricoh583->gpedge_add[i],
 				ricoh583->gpedge_reg[i]);
 		if (ret < 0)
-			dev_err(ricoh583->dev, "Error in writin reg 0x%02x "
+			dev_err(ricoh583->dev, "Error in writing reg 0x%02x "
 				"error: %d\n", ricoh583->gpedge_add[i], ret);
 	}
 
 	ret = __ricoh583_write(ricoh583->client, RICOH583_INTC_INTEN, 0x0);
 	if (ret < 0)
-		dev_err(ricoh583->dev, "Error in writin reg 0x%02x "
+		dev_err(ricoh583->dev, "Error in writing reg 0x%02x "
 				"error: %d\n", RICOH583_INTC_INTEN, ret);
 
 	/* Clear all interrupts in case they woke up active. */
@@ -784,7 +784,7 @@ static int __devinit ricoh583_irq_init(struct ricoh583 *ricoh583, int irq,
 		ret = __ricoh583_write(ricoh583->client,
 					ricoh583->irq_clr_add[i], 0);
 		if (ret < 0)
-			dev_err(ricoh583->dev, "Error in writin reg 0x%02x "
+			dev_err(ricoh583->dev, "Error in writing reg 0x%02x "
 				"error: %d\n", ricoh583->irq_clr_add[i], ret);
 	}
 
