@@ -86,9 +86,11 @@ void __init tegra3_tsensor_init(struct tegra_tsensor_pmu_data *data)
 			__func__, __LINE__);
 
 	pMem = ioremap(TEGRA_PMC_BASE + SCRATCH54_OFFSET, 8);
-	if (!pMem)
+	if (!pMem) {
 		pr_err(" [%s, line=%d]: can't ioremap "
 			"pmc iomem\n", __FILE__, __LINE__);
+		goto labelEnd;
+	}
 
 	/*
 	 * Fill scratch registers to power off the device
