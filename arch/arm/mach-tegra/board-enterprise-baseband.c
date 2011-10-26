@@ -40,7 +40,7 @@
 #define MODEM_RESET     TEGRA_GPIO_PE1
 #define BB_RST_OUT      TEGRA_GPIO_PV1
 
-/* Icera 450 GPIO */
+/* Icera BB GPIO */
 #define AP2MDM_ACK      TEGRA_GPIO_PE3
 #define MDM2AP_ACK      TEGRA_GPIO_PU5
 #define AP2MDM_ACK2     TEGRA_GPIO_PE2
@@ -55,15 +55,15 @@ static struct gpio modem_gpios[] = {
 	{AP2MDM_ACK2, GPIOF_OUT_INIT_HIGH, "AP2MDM ACK2"},
 };
 
-static int ph450_phy_on(void);
-static int ph450_phy_off(void);
+static int baseband_phy_on(void);
+static int baseband_phy_off(void);
 
 static struct tegra_ulpi_trimmer e1219_trimmer = { 10, 1, 1, 1 };
 
 static struct tegra_ulpi_config ehci2_null_ulpi_phy_config = {
 	.trimmer = &e1219_trimmer,
-	.post_phy_on = ph450_phy_on,
-	.pre_phy_off = ph450_phy_off,
+	.post_phy_on = baseband_phy_on,
+	.pre_phy_off = baseband_phy_off,
 };
 
 static struct tegra_ehci_platform_data ehci2_null_ulpi_platform_data = {
@@ -93,7 +93,7 @@ static irqreturn_t mdm_start_thread(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-static int ph450_phy_on(void)
+static int baseband_phy_on(void)
 {
 	/* set AP2MDM_ACK2 low */
 	gpio_set_value(AP2MDM_ACK2, 0);
@@ -101,7 +101,7 @@ static int ph450_phy_on(void)
 	return 0;
 }
 
-static int ph450_phy_off(void)
+static int baseband_phy_off(void)
 {
 	/* set AP2MDM_ACK2 high */
 	gpio_set_value(AP2MDM_ACK2, 1);
@@ -109,15 +109,26 @@ static int ph450_phy_off(void)
 	return 0;
 }
 
-static void ph450_reset(void)
+static void baseband_start(void)
 {
+	/*
+	 *  Leave baseband powered OFF.
+	 *  User-space daemons will take care of powering it up.
+	 */
+	pr_info("%s\n", __func__);
+	gpio_set_value(MODEM_PWR_ON, 0);
+}
+
+static void baseband_reset(void)
+{
+	/* Initiate power cycle on baseband sub system */
 	pr_info("%s\n", __func__);
 	gpio_set_value(MODEM_PWR_ON, 0);
 	mdelay(200);
 	gpio_set_value(MODEM_PWR_ON, 1);
 }
 
-static int ph450_init(void)
+static int baseband_init(void)
 {
 	int irq;
 	int ret;
@@ -168,28 +179,28 @@ static int ph450_init(void)
 	return 0;
 }
 
-static const struct tegra_modem_operations ph450_operations = {
-	.init = ph450_init,
-	.start = ph450_reset,
-	.reset = ph450_reset,
+static const struct tegra_modem_operations baseband_operations = {
+	.init = baseband_init,
+	.start = baseband_start,
+	.reset = baseband_reset,
 };
 
-static struct tegra_usb_modem_power_platform_data ph450_pdata = {
-	.ops = &ph450_operations,
+static struct tegra_usb_modem_power_platform_data baseband_pdata = {
+	.ops = &baseband_operations,
 	.wake_gpio = MDM2AP_ACK2,
 	.flags = IRQF_TRIGGER_FALLING,
 };
 
-static struct platform_device icera_450_device = {
+static struct platform_device icera_baseband_device = {
 	.name = "tegra_usb_modem_power",
 	.id = -1,
 	.dev = {
-		.platform_data = &ph450_pdata,
+		.platform_data = &baseband_pdata,
 	},
 };
 
 int __init enterprise_modem_init(void)
 {
-	platform_device_register(&icera_450_device);
+	platform_device_register(&icera_baseband_device);
 	return 0;
 }
