@@ -569,7 +569,7 @@ static int enterprise_cam_init(void)
 
 	tegra_get_board_info(&bi);
 
-	if (bi.fab == BOARD_FAB_A01)
+	if (bi.fab == BOARD_FAB_A00 || bi.fab == BOARD_FAB_A01)
 		i2c_register_board_info(2, ar0832_i2c2_boardinfo,
 			ARRAY_SIZE(ar0832_i2c2_boardinfo));
 	else if (bi.fab == BOARD_FAB_A02) {
