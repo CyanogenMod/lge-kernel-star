@@ -2695,6 +2695,7 @@ static void __init tegra_setup_suspend(void)
 		gpio_to_irq(TEGRA_GPIO_PS4), gpio_to_irq(TEGRA_GPIO_PS5),
 		INT_SDMMC2, gpio_to_irq(TEGRA_GPIO_PQ6),
 		gpio_to_irq(TEGRA_GPIO_PQ7), gpio_to_irq(TEGRA_GPIO_PN2),
+		gpio_to_irq(TEGRA_GPIO_PG0), gpio_to_irq(TEGRA_GPIO_PG1),
 	};
 #endif
 	const NvOdmWakeupPadInfo *w;
@@ -2781,6 +2782,8 @@ static void __init tegra_setup_suspend(void)
 #endif
         enable_irq_wake(gpio_to_irq(TEGRA_GPIO_PG3));   //earjack sensor
         enable_irq_wake(gpio_to_irq(TEGRA_GPIO_PD3));   //hook detect
+        enable_irq_wake(gpio_to_irq(TEGRA_GPIO_PG0));   //vol-up
+        enable_irq_wake(gpio_to_irq(TEGRA_GPIO_PG1));   //vol-down
 #endif
 //20101117, cs77, gpio wakeup from LP1 [END]
 

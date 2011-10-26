@@ -471,8 +471,8 @@ const struct tegra_init_gpio_info tegra_sleep_gpio_info_array[] = {
     { 'x'-'a',      6, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   SPIE},  // TOUCH_INT
 #ifdef CONFIG_MACH_STAR_REV_F
     { 'r'-'a',      1, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCA},  // IFX2_AP20 (LGP990)
-    { 'r'-'a',      2, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCA},  // PROXI_OUT
 #endif
+    { 'w'-'a',      2, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCA},  // PROXI_OUT
     /* group tristate or input */
     #if 1
     { 'j'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   IRTX},  // LCD_MAKER_ID
