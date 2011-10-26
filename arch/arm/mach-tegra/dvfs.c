@@ -98,6 +98,7 @@ static int dvfs_rail_set_voltage(struct dvfs_rail *rail, int millivolts)
 	int step = (millivolts > rail->millivolts) ? rail->step : -rail->step;
 	int i;
 	int steps;
+	bool jmp_to_zero;
 
 	if (!rail->reg) {
 		if (millivolts == rail->millivolts)
@@ -110,10 +111,14 @@ static int dvfs_rail_set_voltage(struct dvfs_rail *rail, int millivolts)
 		return 0;
 
 	rail->resolving_to = true;
-	steps = DIV_ROUND_UP(abs(millivolts - rail->millivolts), rail->step);
+	jmp_to_zero = rail->jmp_to_zero &&
+			((millivolts == 0) || (rail->millivolts == 0));
+	steps = jmp_to_zero ? 1 :
+		DIV_ROUND_UP(abs(millivolts - rail->millivolts), rail->step);
 
 	for (i = 0; i < steps; i++) {
-		if (abs(millivolts - rail->millivolts) > rail->step)
+		if (!jmp_to_zero &&
+		    (abs(millivolts - rail->millivolts) > rail->step))
 			rail->new_millivolts = rail->millivolts + step;
 		else
 			rail->new_millivolts = millivolts;

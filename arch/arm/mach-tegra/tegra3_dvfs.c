@@ -60,6 +60,7 @@ static struct dvfs_rail tegra3_dvfs_rail_vdd_cpu = {
 	.max_millivolts = 1250,
 	.min_millivolts = 850,
 	.step = VDD_SAFE_STEP,
+	.jmp_to_zero = true,
 };
 
 static struct dvfs_rail tegra3_dvfs_rail_vdd_core = {
@@ -102,7 +103,12 @@ static int tegra3_dvfs_rel_vdd_cpu_vdd_core(struct dvfs_rail *vdd_cpu,
 static int tegra3_dvfs_rel_vdd_core_vdd_cpu(struct dvfs_rail *vdd_core,
 	struct dvfs_rail *vdd_cpu)
 {
-	int cpu_floor = max(vdd_core->new_millivolts, vdd_core->millivolts) -
+	int cpu_floor;
+
+	if (vdd_cpu->new_millivolts == 0)
+		return 0; /* If G CPU is off, core relations can be ignored */
+
+	cpu_floor = max(vdd_core->new_millivolts, vdd_core->millivolts) -
 		cpu_below_core;
 	return max(vdd_cpu->new_millivolts, cpu_floor);
 }

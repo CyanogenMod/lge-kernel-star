@@ -49,6 +49,7 @@ struct dvfs_rail {
 	int max_millivolts;
 	int nominal_millivolts;
 	int step;
+	bool jmp_to_zero;
 	bool disabled;
 	bool updating;
 	bool resolving_to;
