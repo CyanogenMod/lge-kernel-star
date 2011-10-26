@@ -359,6 +359,7 @@ static int tps6591x_gpio_output(struct gpio_chip *gc, unsigned offset,
 	if (ret)
 		return ret;
 
+	reg_val &= ~0x1;
 	val = (value & 0x1) | 0x4;
 	reg_val = reg_val | val;
 	return __tps6591x_write(tps6591x->client, TPS6591X_GPIO_BASE_ADDR +
