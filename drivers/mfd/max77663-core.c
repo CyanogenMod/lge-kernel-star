@@ -363,6 +363,22 @@ int max77663_power_off(void)
 }
 EXPORT_SYMBOL(max77663_power_off);
 
+static int max77663_sleep_enable(struct max77663_chip *chip)
+{
+	int ret;
+
+	/* Enable sleep that AP can be placed into sleep mode
+	 * by pulling EN1 low */
+	ret = max77663_set_bits(chip->dev, MAX77663_REG_ONOFF_CFG1,
+				ONOFF_SLPEN_MASK, ONOFF_SLPEN_MASK, 0);
+	if (ret < 0)
+		dev_err(chip->dev,
+			"sleep_enable: Failed to set on/off config1\n",
+			MAX77663_REG_ONOFF_CFG1);
+
+	return ret;
+}
+
 static inline int max77663_cache_write(struct device *dev, u8 addr, u8 mask,
 				       u8 val, u8 *cache)
 {
@@ -1277,6 +1293,7 @@ static int max77663_probe(struct i2c_client *client,
 	max77663_gpio_init(chip);
 	max77663_irq_init(chip);
 	max77663_debugfs_init(chip);
+	max77663_sleep_enable(chip);
 
 	ret = mfd_add_devices(&client->dev, 0, pdata->sub_devices,
 			      pdata->num_subdevs, NULL, 0);
@@ -1317,20 +1334,9 @@ static int __devexit max77663_remove(struct i2c_client *client)
 static int max77663_suspend(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
-	struct max77663_chip *chip = i2c_get_clientdata(client);
-	int ret;
 
 	if (client->irq)
 		disable_irq(client->irq);
-
-	/* Enable sleep that AP can be placed into sleep mode
-	 * by pulling EN1 low */
-	ret = max77663_set_bits(chip->dev, MAX77663_REG_ONOFF_CFG1,
-				 ONOFF_SLPEN_MASK, ONOFF_SLPEN_MASK, 0);
-	if (ret < 0)
-		dev_err(&client->dev,
-			"suspend: Failed to set ONOFF_CFG1(0x%02x)\n",
-			MAX77663_REG_ONOFF_CFG1);
 
 	return 0;
 }
@@ -1338,9 +1344,12 @@ static int max77663_suspend(struct device *dev)
 static int max77663_resume(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
+	struct max77663_chip *chip = i2c_get_clientdata(client);
 
 	if (client->irq)
 		enable_irq(client->irq);
+
+	max77663_sleep_enable(chip);
 
 	return 0;
 }
