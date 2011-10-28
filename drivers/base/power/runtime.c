@@ -29,12 +29,8 @@ void update_pm_runtime_accounting(struct device *dev)
 {
 	unsigned long now = jiffies;
 	unsigned long delta;
-	unsigned long max_num = ~0;
 
 	delta = now - dev->power.accounting_timestamp;
-
-	if (now < dev->power.accounting_timestamp)
-		delta = max_num - dev->power.accounting_timestamp + now;
 
 	dev->power.accounting_timestamp = now;
 
