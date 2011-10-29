@@ -46,13 +46,15 @@
 #define DSI_PANEL_RESET 0
 
 /* Select LVDS panel resolution. 13X7 is default */
-#define PM313_LVDS_PANEL_19X12_18BPP		1
+#define PM313_LVDS_PANEL_19X12			1
+#define PM313_LVDS_PANEL_BPP			1 /* 0:24bpp, 1:18bpp */
 
 /* PM313 display board specific pins */
 #define pm313_R_FDE			TEGRA_GPIO_PW0
 #define pm313_R_FB			TEGRA_GPIO_PN4
 #define pm313_MODE0			TEGRA_GPIO_PZ4
 #define pm313_MODE1			TEGRA_GPIO_PW1
+#define pm313_BPP			TEGRA_GPIO_PN6 /* 0:24bpp, 1:18bpp */
 #define pm313_lvds_shutdown		TEGRA_GPIO_PH1
 
 /* E1247 reworked for pm269 pins */
@@ -297,6 +299,7 @@ static int cardhu_panel_enable(void)
 		gpio_set_value(pm313_R_FB, 1);
 		gpio_set_value(pm313_MODE0, 1);
 		gpio_set_value(pm313_MODE1, 0);
+		gpio_set_value(pm313_BPP, PM313_LVDS_PANEL_BPP);
 
 		/* FIXME : it may require more or less delay for latching
 		  values correctly before enabling RGB2LVDS */
@@ -1092,6 +1095,24 @@ int __init cardhu_panel_init(void)
 	}
 
 	if (display_board_info.board_id == BOARD_DISPLAY_PM313) {
+		/* initialize the values */
+#if defined(PM313_LVDS_PANEL_19X12)
+		cardhu_disp1_out.modes = panel_19X12_modes;
+		cardhu_disp1_out.n_modes = ARRAY_SIZE(panel_19X12_modes);
+		cardhu_disp1_out.parent_clk = "pll_d_out0";
+#if (PM313_LVDS_PANEL_BPP == 1)
+		cardhu_disp1_out.depth = 18;
+#else
+		cardhu_disp1_out.depth = 24;
+#endif
+		cardhu_fb_data.xres = 1920;
+		cardhu_fb_data.yres = 1200;
+
+		cardhu_disp2_out.parent_clk = "pll_d2_out0";
+		cardhu_hdmi_fb_data.xres = 1920;
+		cardhu_hdmi_fb_data.yres = 1200;
+#endif
+
 		/* lvds configuration */
 		err = gpio_request(pm313_R_FDE, "R_FDE");
 		err |= gpio_direction_output(pm313_R_FDE, 1);
@@ -1109,6 +1130,10 @@ int __init cardhu_panel_init(void)
 		err |= gpio_direction_output(pm313_MODE1, 0);
 		tegra_gpio_enable(pm313_MODE1);
 
+		err |= gpio_request(pm313_BPP, "BPP");
+		err |= gpio_direction_output(pm313_BPP, PM313_LVDS_PANEL_BPP);
+		tegra_gpio_enable(pm313_BPP);
+
 		err = gpio_request(pm313_lvds_shutdown, "lvds_shutdown");
 		/* free ride provided by bootloader */
 		err |= gpio_direction_output(pm313_lvds_shutdown, 1);
@@ -1116,19 +1141,6 @@ int __init cardhu_panel_init(void)
 
 		if (err)
 			printk(KERN_ERR "ERROR(s) in LVDS configuration\n");
-#if defined(PM313_LVDS_PANEL_19X12_18BPP)
-		cardhu_disp1_out.modes = panel_19X12_modes;
-		cardhu_disp1_out.n_modes = ARRAY_SIZE(panel_19X12_modes);
-		cardhu_disp1_out.parent_clk = "pll_d_out0";
-		cardhu_disp1_out.depth = 18;
-
-		cardhu_fb_data.xres = 1920;
-		cardhu_fb_data.yres = 1200;
-
-		cardhu_disp2_out.parent_clk = "pll_d2_out0";
-		cardhu_hdmi_fb_data.xres = 1920;
-		cardhu_hdmi_fb_data.yres = 1200;
-#endif
 	} else if ((display_board_info.board_id == BOARD_DISPLAY_E1247 &&
 				board_info.board_id == BOARD_PM269) ||
 				(board_info.board_id == BOARD_E1257) ||
