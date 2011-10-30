@@ -45,6 +45,7 @@ struct tegra_kbc_wake_key {
 struct tegra_kbc_platform_data {
 	unsigned int debounce_cnt;
 	unsigned int repeat_cnt;
+	unsigned int scan_count;
 
 	unsigned int wake_cnt; /* 0:wake on any key >1:wake on wake_cfg */
 	const struct tegra_kbc_wake_key *wake_cfg;
