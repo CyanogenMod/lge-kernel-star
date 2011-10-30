@@ -49,12 +49,19 @@ enum regulator_id {
 	RICOH583_ID_LDO9,
 };
 
+enum ext_control {
+	EXT_PWRREQ1_CONTROL = 0x1,
+	EXT_PWRREQ2_CONTROL = 0x2,
+};
+
 struct ricoh583_regulator_platform_data {
 		struct regulator_init_data regulator;
 		int init_uV;
 		unsigned init_enable:1;
 		unsigned init_apply:1;
 		int deepsleep_uV;
+		int deepsleep_slots;
+		unsigned long flags;
 };
 
 #endif

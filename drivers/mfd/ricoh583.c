@@ -499,10 +499,12 @@ static void __devinit ricoh583_gpio_init(struct ricoh583 *ricoh583,
 			dev_err(ricoh583->dev, "Gpio %d init "
 				"dir configuration failed: %d\n", i, ret);
 
-		ret = ricoh583_clr_bits(ricoh583->dev, RICOH583_GPIO_PGSEL, 1 << i);
+		ret = ricoh583_clr_bits(ricoh583->dev, RICOH583_GPIO_PGSEL,
+					1 << i);
 		if (ret < 0)
-			dev_err(ricoh583->dev, "%s(): The error in writing register "
-			"0x%02x\n", __func__, RICOH583_GPIO_PGSEL);
+			dev_err(ricoh583->dev, "%s(): The error in writing "
+				"register 0x%02x\n", __func__,
+				RICOH583_GPIO_PGSEL);
 	}
 
 	ricoh583->gpio.owner		= THIS_MODULE;
@@ -940,6 +942,14 @@ static int ricoh583_i2c_probe(struct i2c_client *i2c,
 	i2c_set_clientdata(i2c, ricoh583);
 
 	mutex_init(&ricoh583->io_lock);
+
+	/*  Clear ONOFFSEL register */
+	ret = __ricoh583_write(ricoh583->client, 0x10, 0x0);
+	if (ret < 0) {
+		dev_err(ricoh583->dev, "Error in writing reg 0x10 error: "
+				"%d\n", ret);
+		goto err_irq_init;
+	}
 
 	if (i2c->irq) {
 		ret = ricoh583_irq_init(ricoh583, i2c->irq, pdata->irq_base);
