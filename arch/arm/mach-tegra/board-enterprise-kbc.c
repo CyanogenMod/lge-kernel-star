@@ -70,8 +70,9 @@ static struct tegra_kbc_wake_key enterprise_wake_cfg[] = {
 };
 
 static struct tegra_kbc_platform_data enterprise_kbc_platform_data = {
-	.debounce_cnt = 2,
-	.repeat_cnt = 5 * 32,
+	.debounce_cnt = 20,
+	.repeat_cnt = 1,
+	.scan_count = 30,
 	.wakeup = true,
 	.keymap_data = &keymap_data,
 	.wake_cnt = 4,
