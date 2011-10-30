@@ -229,6 +229,8 @@ static void tegra_auto_hotplug_work_func(struct work_struct *work)
 			if(!clk_set_parent(cpu_clk, cpu_lp_clk)) {
 				hp_stats_update(CONFIG_NR_CPUS, true);
 				hp_stats_update(0, false);
+				/* catch-up with governor target speed */
+				tegra_cpu_set_speed_cap(NULL);
 			} else
 				queue_delayed_work(
 					hotplug_wq, &hotplug_work, down_delay);
