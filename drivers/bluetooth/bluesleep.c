@@ -67,6 +67,9 @@
 #define POLARITY_LOW 0
 #define POLARITY_HIGH 1
 
+/* enable/disable wake-on-bluetooth */
+#define BT_ENABLE_IRQ_WAKE 0
+
 struct bluesleep_info {
 	unsigned host_wake;
 	unsigned ext_wake;
@@ -384,12 +387,14 @@ static int bluesleep_start(void)
 		goto fail;
 	}
 
+#if BT_ENABLE_IRQ_WAKE
 	retval = enable_irq_wake(bsi->host_wake_irq);
 	if (retval < 0) {
 		BT_ERR("Couldn't enable BT_HOST_WAKE as wakeup interrupt");
 		free_irq(bsi->host_wake_irq, NULL);
 		goto fail;
 	}
+#endif
 	set_bit(BT_PROTO, &flags);
 	wake_lock(&bsi->wake_lock);
 	return 0;
@@ -427,8 +432,10 @@ static void bluesleep_stop(void)
 	atomic_inc(&open_count);
 	spin_unlock_irqrestore(&rw_lock, irq_flags);
 
+#if BT_ENABLE_IRQ_WAKE
 	if (disable_irq_wake(bsi->host_wake_irq))
 		BT_ERR("Couldn't disable hostwake IRQ wakeup mode\n");
+#endif
 	free_irq(bsi->host_wake_irq, NULL);
 	wake_lock_timeout(&bsi->wake_lock, HZ / 2);
 }
