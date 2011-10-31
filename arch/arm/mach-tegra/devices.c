@@ -1185,8 +1185,8 @@ struct platform_device tegra_sata_device = {
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 static struct resource das_resource[] = {
 	[0] = {
-		.start	= TEGRA_APB_MISC_BASE,
-		.end	= TEGRA_APB_MISC_BASE + TEGRA_APB_MISC_SIZE - 1,
+		.start	= TEGRA_APB_MISC_DAS_BASE,
+		.end	= TEGRA_APB_MISC_DAS_BASE + TEGRA_APB_MISC_DAS_SIZE - 1,
 		.flags	= IORESOURCE_MEM
 	}
 };
