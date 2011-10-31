@@ -112,6 +112,41 @@ int tegra_asoc_utils_set_rate(struct tegra_asoc_utils_data *data, int srate,
 }
 EXPORT_SYMBOL_GPL(tegra_asoc_utils_set_rate);
 
+int tegra_asoc_utils_clk_enable(struct tegra_asoc_utils_data *data)
+{
+	int err;
+
+	err = clk_enable(data->clk_pll_a);
+	if (err) {
+		dev_err(data->dev, "Can't enable pll_a: %d\n", err);
+		return err;
+	}
+
+	err = clk_enable(data->clk_pll_a_out0);
+	if (err) {
+		dev_err(data->dev, "Can't enable pll_a_out0: %d\n", err);
+		return err;
+	}
+
+	err = clk_enable(data->clk_cdev1);
+	if (err) {
+		dev_err(data->dev, "Can't enable cdev1: %d\n", err);
+		return err;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(tegra_asoc_utils_clk_enable);
+
+int tegra_asoc_utils_clk_disable(struct tegra_asoc_utils_data *data)
+{
+	clk_disable(data->clk_cdev1);
+	clk_disable(data->clk_pll_a_out0);
+	clk_disable(data->clk_pll_a);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(tegra_asoc_utils_clk_disable);
+
 int tegra_asoc_utils_init(struct tegra_asoc_utils_data *data,
 			  struct device *dev)
 {
