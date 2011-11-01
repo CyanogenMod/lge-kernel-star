@@ -233,6 +233,7 @@ static __initdata struct tegra_clk_init_table whistler_clk_init_table[] = {
 	{ "kbc",	"clk_32k",	32768,		true},
 	{ "sdmmc2",	"pll_p",	25000000,	false},
 	{ "i2s1",	"pll_a_out0",	0,		false},
+	{ "i2s2",	"pll_a_out0",	0,		false},
 	{ "spdif_out",	"pll_a_out0",	0,		false},
 	{ NULL,		NULL,		0,		0},
 };
@@ -458,9 +459,11 @@ static struct platform_device *whistler_devices[] __initdata = {
 	&whistler_scroll_device,
 	&tegra_camera,
 	&tegra_i2s_device1,
+	&tegra_i2s_device2,
 	&tegra_spdif_device,
 	&tegra_das_device,
 	&spdif_dit_device,
+	&bluetooth_dit_device,
 	&tegra_pcm_device,
 	&whistler_audio_device,
 };
