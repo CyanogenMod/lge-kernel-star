@@ -28,20 +28,20 @@ MODULE_PARM_DESC(baseband_type, "baseband type");
 
 static struct tegra_clk_init_table u3xx_clk[] = {
 	/* spi slave controller clock @ 4 x 13 Mhz interface clock */
-	{ "sbc1",	"pll_m",	52000000,	true},
+	{ "sbc1",	"pll_c",	52000000,	true},
 	{ NULL,		NULL,		0,		0},
 };
 
 static struct tegra_clk_init_table n731_clk[] = {
 	/* spi master controller clock @ 4 x 12 Mhz interface clock */
-	{ "sbc1",	"pll_m",	48000000,	true},
+	{ "sbc1",	"pll_c",	48000000,	true},
 	{ NULL,		NULL,		0,		0},
 };
 
 static struct tegra_clk_init_table spi_loopback_clk[] = {
 	/* spi slave / master controller clocks @ 4 x max interface clock */
-	{ "sbc1",	"pll_m",	60000000,	true},
-	{ "sbc2",	"pll_m",	60000000,	true},
+	{ "sbc1",	"pll_c",	60000000,	true},
+	{ "sbc2",	"pll_c",	60000000,	true},
 	{ NULL,		NULL,		0,		0},
 };
 
