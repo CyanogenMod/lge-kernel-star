@@ -376,7 +376,7 @@ static struct snd_soc_dai_link tegra_wm8753_dai[] = {
 	{
 		.name = "SPDIF",
 		.stream_name = "SPDIF PCM",
-		.codec_name = "spdif-dit",
+		.codec_name = "spdif-dit.0",
 		.platform_name = "tegra-pcm-audio",
 		.cpu_dai_name = "tegra20-spdif",
 		.codec_dai_name = "dit-hifi",
