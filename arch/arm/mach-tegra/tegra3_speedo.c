@@ -68,7 +68,7 @@ static const u32 cpu_process_speedos[][CPU_PROCESS_CORNERS_NUM] = {
 	{324, 324, 348, 364}, /* threshold_index 6: cpu_speedo_id 3: T30Schar */
 
 /* T33 family */
-	{376, 376, 376, 376}, /* threshold_FIXME 7: cpu_speedo_id = 4 - AP33 */
+	{304, 336, 359, 375}, /* threshold_index 7: cpu_speedo_id = 4 - AP33 */
 	{368, 368, 368, 368}, /* threshold_index 8: cpu_speedo_id = 5 - T33  */
 	{372, 372, 372, 372}, /* threshold_index 9: cpu_speedo_id = 6 - T33S */
 };
