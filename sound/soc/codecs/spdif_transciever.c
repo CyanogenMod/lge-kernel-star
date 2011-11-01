@@ -38,6 +38,13 @@ static struct snd_soc_dai_driver dit_stub_dai = {
 		.rates		= STUB_RATES,
 		.formats	= STUB_FORMATS,
 	},
+	.capture	= {
+		.stream_name	= "Capture",
+		.channels_min	= 1,
+		.channels_max	= 384,
+		.rates		= STUB_RATES,
+		.formats	= STUB_FORMATS,
+	},
 };
 
 static int spdif_dit_probe(struct platform_device *pdev)
