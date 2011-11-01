@@ -1,7 +1,7 @@
 /*
  * Gas Gauge driver for TI's BQ20Z75
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010-2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,6 +27,7 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/gpio.h>
+#include <linux/workqueue.h>
 
 #include <linux/power/bq20z75.h>
 
@@ -49,6 +50,9 @@ enum {
 	REG_DESIGN_CAPACITY_CHARGE,
 	REG_DESIGN_VOLTAGE,
 };
+
+#define POLL_INTERVAL			30
+#define CHARGE_FLAG_CHANGE_INTERVAL	3
 
 /* Battery Mode defines */
 #define BATTERY_MODE_OFFSET		0x03
@@ -148,6 +152,7 @@ struct bq20z75_info {
 	struct i2c_client		*client;
 	struct power_supply		power_supply;
 	struct bq20z75_platform_data	*pdata;
+	struct delayed_work		work;
 	bool				is_present;
 	bool				gpio_detect;
 	bool				enable_detection;
@@ -545,6 +550,40 @@ static irqreturn_t bq20z75_irq(int irq, void *devid)
 	return IRQ_HANDLED;
 }
 
+static unsigned int poll_interval = POLL_INTERVAL;
+module_param(poll_interval, uint, 0644);
+MODULE_PARM_DESC(poll_interval, "battery poll interval in seconds - " \
+			"0 disables polling");
+
+static void bq20z75_battery_poll(struct work_struct *work)
+{
+	struct bq20z75_info *bq20z75_device =
+		container_of(work, struct bq20z75_info, work.work);
+
+	power_supply_changed(&bq20z75_device->power_supply);
+
+	if (poll_interval > 0) {
+		schedule_delayed_work(&bq20z75_device->work,
+					poll_interval * HZ);
+	}
+}
+
+static unsigned int charge_flag_change_interval =
+				CHARGE_FLAG_CHANGE_INTERVAL;
+module_param(charge_flag_change_interval, uint, 0644);
+MODULE_PARM_DESC(charge_flag_change_interval, "battery charge flag " \
+			"change interval in seconds");
+
+static void bq20z75_external_power_changed(struct power_supply *psy)
+{
+	struct bq20z75_info *bq20z75_device =
+		container_of(psy, struct bq20z75_info, power_supply);
+
+	cancel_delayed_work_sync(&bq20z75_device->work);
+	schedule_delayed_work(&bq20z75_device->work,
+				charge_flag_change_interval * HZ);
+}
+
 static int __devinit bq20z75_probe(struct i2c_client *client,
 	const struct i2c_device_id *id)
 {
@@ -566,6 +605,8 @@ static int __devinit bq20z75_probe(struct i2c_client *client,
 	bq20z75_device->power_supply.num_properties =
 		ARRAY_SIZE(bq20z75_properties);
 	bq20z75_device->power_supply.get_property = bq20z75_get_property;
+	bq20z75_device->power_supply.external_power_changed =
+		bq20z75_external_power_changed;
 
 	if (pdata) {
 		bq20z75_device->gpio_detect =
@@ -622,6 +663,9 @@ skip_gpio:
 		goto exit_psupply;
 	}
 
+	INIT_DELAYED_WORK(&bq20z75_device->work, bq20z75_battery_poll);
+	bq20z75_battery_poll(&bq20z75_device->work.work);
+
 	dev_info(&client->dev,
 		"%s: battery gas gauge device registered\n", client->name);
 
@@ -646,6 +690,8 @@ static int __devexit bq20z75_remove(struct i2c_client *client)
 		free_irq(bq20z75_device->irq, &bq20z75_device->power_supply);
 	if (bq20z75_device->gpio_detect)
 		gpio_free(bq20z75_device->pdata->battery_detect);
+
+	cancel_delayed_work_sync(&bq20z75_device->work);
 
 	power_supply_unregister(&bq20z75_device->power_supply);
 	kfree(bq20z75_device);
