@@ -534,51 +534,6 @@ static void aruba_usb_init(void)
 	platform_device_register(&tegra_ehci2_device);
 }
 
-struct platform_device *tegra_usb_otg_host_register(void)
-{
-	struct platform_device *pdev;
-	void *platform_data;
-	int val;
-
-	pdev = platform_device_alloc(tegra_ehci1_device.name, tegra_ehci1_device.id);
-	if (!pdev)
-		return NULL;
-
-	val = platform_device_add_resources(pdev, tegra_ehci1_device.resource,
-		tegra_ehci1_device.num_resources);
-	if (val)
-		goto error;
-
-	pdev->dev.dma_mask =  tegra_ehci1_device.dev.dma_mask;
-	pdev->dev.coherent_dma_mask = tegra_ehci1_device.dev.coherent_dma_mask;
-
-	platform_data = kmalloc(sizeof(struct tegra_ehci_platform_data), GFP_KERNEL);
-	if (!platform_data)
-		goto error;
-
-	memcpy(platform_data, &tegra_ehci_pdata[0],
-				sizeof(struct tegra_ehci_platform_data));
-	pdev->dev.platform_data = platform_data;
-
-	val = platform_device_add(pdev);
-	if (val)
-		goto error_add;
-
-	return pdev;
-
-error_add:
-	kfree(platform_data);
-error:
-	pr_err("%s: failed to add the host contoller device\n", __func__);
-	platform_device_put(pdev);
-	return NULL;
-}
-
-void tegra_usb_otg_host_unregister(struct platform_device *pdev)
-{
-	platform_device_unregister(pdev);
-}
-
 #ifdef CONFIG_SATA_AHCI_TEGRA
 static void aruba_sata_init(void)
 {
