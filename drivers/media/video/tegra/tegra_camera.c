@@ -374,9 +374,11 @@ static int tegra_camera_release(struct inode *inode, struct file *file)
 	/* If camera blocks are not powergated yet, do it now */
 	if (dev->power_refcnt > 0) {
 		mutex_lock(&dev->tegra_camera_lock);
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 		err = tegra_powergate_partition(TEGRA_POWERGATE_VENC);
 		if (err)
 			dev_err(dev->dev, "%s: powergate failed.\n", __func__);
+#endif
 		dev->power_refcnt = 0;
 		mutex_unlock(&dev->tegra_camera_lock);
 	}
@@ -422,11 +424,13 @@ static int tegra_camera_probe(struct platform_device *pdev)
 	mutex_init(&dev->tegra_camera_lock);
 
 	/* Powergate VE when boot */
-	dev->power_refcnt = 0;
 	mutex_lock(&dev->tegra_camera_lock);
+	dev->power_refcnt = 0;
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	err = tegra_powergate_partition(TEGRA_POWERGATE_VENC);
 	if (err)
 		dev_err(&pdev->dev, "%s: powergate failed.\n", __func__);
+#endif
 	mutex_unlock(&dev->tegra_camera_lock);
 
 	dev->dev = &pdev->dev;
