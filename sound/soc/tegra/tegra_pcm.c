@@ -170,6 +170,12 @@ static int tegra_pcm_open(struct snd_pcm_substream *substream)
 	/* Set HW params now that initialization is complete */
 	snd_soc_set_runtime_hwparams(substream, &tegra_pcm_hardware);
 
+	/* Ensure period size is multiple of 8 */
+	ret = snd_pcm_hw_constraint_step(runtime, 0,
+		SNDRV_PCM_HW_PARAM_PERIOD_BYTES, 0x8);
+	if (ret < 0)
+		goto err;
+
 	/* Ensure that buffer size is a multiple of period size */
 	ret = snd_pcm_hw_constraint_integer(runtime,
 						SNDRV_PCM_HW_PARAM_PERIODS);
