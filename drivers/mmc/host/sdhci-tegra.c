@@ -376,7 +376,7 @@ static int tegra_sdhci_pltfm_init(struct sdhci_host *host,
 
 	if (!plat->mmc_data.built_in) {
 		tegra_host->vdd_io_reg = regulator_get(mmc_dev(host->mmc), "vddio_sdmmc");
-		if (WARN_ON(IS_ERR_OR_NULL(tegra_host->vdd_io_reg))) {
+		if (IS_ERR_OR_NULL(tegra_host->vdd_io_reg)) {
 			dev_err(mmc_dev(host->mmc), "%s regulator not found: %ld\n",
 				"vddio_sdmmc", PTR_ERR(tegra_host->vdd_io_reg));
 			tegra_host->vdd_io_reg = NULL;
@@ -392,7 +392,7 @@ static int tegra_sdhci_pltfm_init(struct sdhci_host *host,
 		}
 
 		tegra_host->vdd_slot_reg = regulator_get(mmc_dev(host->mmc), "vddio_sd_slot");
-		if (WARN_ON(IS_ERR_OR_NULL(tegra_host->vdd_slot_reg))) {
+		if (IS_ERR_OR_NULL(tegra_host->vdd_slot_reg)) {
 			dev_err(mmc_dev(host->mmc), "%s regulator not found: %ld\n",
 				"vddio_sd_slot", PTR_ERR(tegra_host->vdd_slot_reg));
 			tegra_host->vdd_slot_reg = NULL;
