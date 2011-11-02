@@ -567,6 +567,8 @@ static noinline void emc_set_clock(const struct tegra_emc_table *next_timing,
 			   EMC_AUTO_CAL_INTERVAL);
 
 	/* 16. restore dynamic self-refresh */
+	if (next_timing->rev >= 0x32)
+		dyn_sref_enabled = next_timing->emc_dsr;
 	if (dyn_sref_enabled) {
 		emc_cfg_reg |= EMC_CFG_DYN_SREF_ENABLE;
 		emc_writel(emc_cfg_reg, EMC_CFG);
@@ -606,9 +608,13 @@ static inline void emc_get_timing(struct tegra_emc_table *timing)
 static inline void emc_cfg_power_restore(void)
 {
 	u32 reg = emc_readl(EMC_CFG);
-	if ((reg ^ emc_cfg_saved) & EMC_CFG_PWR_MASK) {
-		reg = (reg & (~EMC_CFG_PWR_MASK)) |
-			(emc_cfg_saved & EMC_CFG_PWR_MASK);
+	u32 pwr_mask = EMC_CFG_PWR_MASK;
+
+	if (tegra_emc_table[0].rev >= 0x32)
+		pwr_mask &= ~EMC_CFG_DYN_SREF_ENABLE;
+
+	if ((reg ^ emc_cfg_saved) & pwr_mask) {
+		reg = (reg & (~pwr_mask)) | (emc_cfg_saved & pwr_mask);
 		emc_writel(reg, EMC_CFG);
 		emc_timing_update();
 	}
@@ -845,6 +851,7 @@ void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
 		emc_num_burst_regs = 105;
 		break;
 	case 0x31:
+	case 0x32:
 		emc_num_burst_regs = 107;
 		break;
 	default:
