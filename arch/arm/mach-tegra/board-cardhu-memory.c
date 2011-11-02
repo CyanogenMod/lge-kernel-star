@@ -1621,7 +1621,7 @@ static const struct tegra_emc_table cardhu_emc_tables_k4p8g304eb[] = {
 			0x00000000, /* EMC_ODT_WRITE */
 			0x00000000, /* EMC_ODT_READ */
 			0x00004282, /* EMC_FBIO_CFG5 */
-			0x00780084, /* EMC_CFG_DIG_DLL */
+			0x007800a4, /* EMC_CFG_DIG_DLL */
 			0x00008000, /* EMC_CFG_DIG_DLL_PERIOD */
 			0x00098000, /* EMC_DLL_XFORM_DQS0 */
 			0x00098000, /* EMC_DLL_XFORM_DQS1 */
@@ -1741,7 +1741,7 @@ static const struct tegra_emc_table cardhu_emc_tables_k4p8g304eb[] = {
 			0x00000000, /* EMC_ODT_WRITE */
 			0x00000000, /* EMC_ODT_READ */
 			0x00004282, /* EMC_FBIO_CFG5 */
-			0x00780084, /* EMC_CFG_DIG_DLL */
+			0x007800a4, /* EMC_CFG_DIG_DLL */
 			0x00008000, /* EMC_CFG_DIG_DLL_PERIOD */
 			0x000a0000, /* EMC_DLL_XFORM_DQS0 */
 			0x000a0000, /* EMC_DLL_XFORM_DQS1 */
@@ -1861,7 +1861,7 @@ static const struct tegra_emc_table cardhu_emc_tables_k4p8g304eb[] = {
 			0x00000000, /* EMC_ODT_WRITE */
 			0x00000000, /* EMC_ODT_READ */
 			0x00004282, /* EMC_FBIO_CFG5 */
-			0x00780084, /* EMC_CFG_DIG_DLL */
+			0x007800a4, /* EMC_CFG_DIG_DLL */
 			0x00008000, /* EMC_CFG_DIG_DLL_PERIOD */
 			0x000a0000, /* EMC_DLL_XFORM_DQS0 */
 			0x000a0000, /* EMC_DLL_XFORM_DQS1 */
@@ -1981,7 +1981,7 @@ static const struct tegra_emc_table cardhu_emc_tables_k4p8g304eb[] = {
 			0x00000000, /* EMC_ODT_WRITE */
 			0x00000000, /* EMC_ODT_READ */
 			0x00004282, /* EMC_FBIO_CFG5 */
-			0x00440084, /* EMC_CFG_DIG_DLL */
+			0x004400a4, /* EMC_CFG_DIG_DLL */
 			0x00008000, /* EMC_CFG_DIG_DLL_PERIOD */
 			0x00074000, /* EMC_DLL_XFORM_DQS0 */
 			0x00074000, /* EMC_DLL_XFORM_DQS1 */
@@ -2224,7 +2224,7 @@ static const struct tegra_emc_table cardhu_emc_tables_edb8132b2ma[] = {
 			0x00000000, /* EMC_ODT_WRITE */
 			0x00000000, /* EMC_ODT_READ */
 			0x00004282, /* EMC_FBIO_CFG5 */
-			0x00780084, /* EMC_CFG_DIG_DLL */
+			0x007800a4, /* EMC_CFG_DIG_DLL */
 			0x00008000, /* EMC_CFG_DIG_DLL_PERIOD */
 			0x000a0000, /* EMC_DLL_XFORM_DQS0 */
 			0x000a0000, /* EMC_DLL_XFORM_DQS1 */
@@ -2344,7 +2344,7 @@ static const struct tegra_emc_table cardhu_emc_tables_edb8132b2ma[] = {
 			0x00000000, /* EMC_ODT_WRITE */
 			0x00000000, /* EMC_ODT_READ */
 			0x00004282, /* EMC_FBIO_CFG5 */
-			0x00780084, /* EMC_CFG_DIG_DLL */
+			0x007800a4, /* EMC_CFG_DIG_DLL */
 			0x00008000, /* EMC_CFG_DIG_DLL_PERIOD */
 			0x000a0000, /* EMC_DLL_XFORM_DQS0 */
 			0x000a0000, /* EMC_DLL_XFORM_DQS1 */
@@ -2464,7 +2464,7 @@ static const struct tegra_emc_table cardhu_emc_tables_edb8132b2ma[] = {
 			0x00000000, /* EMC_ODT_WRITE */
 			0x00000000, /* EMC_ODT_READ */
 			0x00004282, /* EMC_FBIO_CFG5 */
-			0x00780084, /* EMC_CFG_DIG_DLL */
+			0x007800a4, /* EMC_CFG_DIG_DLL */
 			0x00008000, /* EMC_CFG_DIG_DLL_PERIOD */
 			0x000a0000, /* EMC_DLL_XFORM_DQS0 */
 			0x000a0000, /* EMC_DLL_XFORM_DQS1 */
@@ -2584,7 +2584,7 @@ static const struct tegra_emc_table cardhu_emc_tables_edb8132b2ma[] = {
 			0x00000000, /* EMC_ODT_WRITE */
 			0x00000000, /* EMC_ODT_READ */
 			0x00004282, /* EMC_FBIO_CFG5 */
-			0x00440084, /* EMC_CFG_DIG_DLL */
+			0x004400a4, /* EMC_CFG_DIG_DLL */
 			0x00008000, /* EMC_CFG_DIG_DLL_PERIOD */
 			0x00070000, /* EMC_DLL_XFORM_DQS0 */
 			0x00070000, /* EMC_DLL_XFORM_DQS1 */
