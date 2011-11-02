@@ -189,6 +189,12 @@ static int tegra20_i2s_hw_params(struct snd_pcm_substream *substream,
 	u32 reg;
 	int ret, sample_size, srate, i2sclock, bitcnt, i2sclk_div;
 
+	if ((i2s->reg_ctrl & TEGRA20_I2S_CTRL_BIT_FORMAT_I2S) &&
+	    (params_channels(params) != 2)) {
+		dev_err(dev, "Only Stereo is supported in I2s mode\n");
+		return -EINVAL;
+	}
+
 	i2s->reg_ctrl &= ~TEGRA20_I2S_CTRL_BIT_SIZE_MASK;
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
@@ -348,13 +354,13 @@ struct snd_soc_dai_driver tegra20_i2s_dai[] = {
 		.name = DRV_NAME ".0",
 		.probe = tegra20_i2s_probe,
 		.playback = {
-			.channels_min = 2,
+			.channels_min = 1,
 			.channels_max = 2,
 			.rates = SNDRV_PCM_RATE_8000_96000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE,
 		},
 		.capture = {
-			.channels_min = 2,
+			.channels_min = 1,
 			.channels_max = 2,
 			.rates = SNDRV_PCM_RATE_8000_96000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE,
@@ -366,13 +372,13 @@ struct snd_soc_dai_driver tegra20_i2s_dai[] = {
 		.name = DRV_NAME ".1",
 		.probe = tegra20_i2s_probe,
 		.playback = {
-			.channels_min = 2,
+			.channels_min = 1,
 			.channels_max = 2,
 			.rates = SNDRV_PCM_RATE_8000_96000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE,
 		},
 		.capture = {
-			.channels_min = 2,
+			.channels_min = 1,
 			.channels_max = 2,
 			.rates = SNDRV_PCM_RATE_8000_96000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE,

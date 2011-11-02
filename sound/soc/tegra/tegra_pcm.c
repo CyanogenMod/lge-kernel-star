@@ -48,9 +48,9 @@ static const struct snd_pcm_hardware tegra_pcm_hardware = {
 				  SNDRV_PCM_INFO_RESUME |
 				  SNDRV_PCM_INFO_INTERLEAVED,
 	.formats		= SNDRV_PCM_FMTBIT_S16_LE,
-	.channels_min		= 2,
+	.channels_min		= 1,
 	.channels_max		= 2,
-	.period_bytes_min	= 1024,
+	.period_bytes_min	= 128,
 	.period_bytes_max	= PAGE_SIZE,
 	.periods_min		= 2,
 	.periods_max		= 8,
