@@ -1724,6 +1724,7 @@ static int __devinit tegra_tsensor_probe(struct platform_device *pdev)
 	int err;
 	unsigned int reg;
 	u8 i;
+	struct tegra_tsensor_platform_data *tsensor_data;
 
 	data = kzalloc(sizeof(struct tegra_tsensor_data), GFP_KERNEL);
 	if (!data) {
@@ -1835,10 +1836,9 @@ static int __devinit tegra_tsensor_probe(struct platform_device *pdev)
 	dump_tsensor_regs(data);
 	dev_dbg(&pdev->dev, "end tegra_tsensor_probe\n");
 
-#ifdef notyet
-	if (pdev->dev.platform_data->probe_callback)
-		pdev->dev.platform_data->probe_callback(data);
-#endif
+	tsensor_data = pdev->dev.platform_data;
+	if (tsensor_data->probe_callback)
+		tsensor_data->probe_callback(data);
 
 	return 0;
 err6:
