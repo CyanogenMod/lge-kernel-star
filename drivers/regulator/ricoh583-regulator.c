@@ -148,7 +148,8 @@ static int __ricoh583_set_ds_voltage(struct device *parent,
 }
 
 static int __ricoh583_set_voltage(struct device *parent,
-		struct ricoh583_regulator *ri, int min_uV, int max_uV)
+		struct ricoh583_regulator *ri, int min_uV, int max_uV,
+		unsigned *selector)
 {
 	int vsel;
 	int ret;
@@ -160,6 +161,9 @@ static int __ricoh583_set_voltage(struct device *parent,
 	vsel = (min_uV - ri->min_uV + ri->step_uV - 1)/ri->step_uV;
 	if (vsel > ri->nsteps)
 		return -EDOM;
+
+	if (selector)
+		*selector = vsel;
 
 	vout_val = (ri->vout_reg_cache & ~ri->vout_mask) |
 				(vsel & ri->vout_mask);
@@ -173,12 +177,12 @@ static int __ricoh583_set_voltage(struct device *parent,
 }
 
 static int ricoh583_set_voltage(struct regulator_dev *rdev,
-		int min_uV, int max_uV)
+		int min_uV, int max_uV, unsigned *selector)
 {
 	struct ricoh583_regulator *ri = rdev_get_drvdata(rdev);
 	struct device *parent = to_ricoh583_dev(rdev);
 
-	return __ricoh583_set_voltage(parent, ri, min_uV, max_uV);
+	return __ricoh583_set_voltage(parent, ri, min_uV, max_uV, selector);
 }
 
 static int ricoh583_get_voltage(struct regulator_dev *rdev)
@@ -303,7 +307,7 @@ static int ricoh583_regulator_preinit(struct device *parent,
 	if (ricoh583_pdata->init_uV >= 0) {
 		ret = __ricoh583_set_voltage(parent, ri,
 				ricoh583_pdata->init_uV,
-				ricoh583_pdata->init_uV);
+				ricoh583_pdata->init_uV, 0);
 		if (ret < 0) {
 			dev_err(ri->dev, "Not able to initialize voltage %d "
 				"for rail %d err %d\n", ricoh583_pdata->init_uV,
