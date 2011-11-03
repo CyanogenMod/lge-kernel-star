@@ -207,6 +207,7 @@ static __initdata struct tegra_clk_init_table cardhu_clk_init_table[] = {
 	{ "pwm",	"pll_p",	3187500,	false},
 	{ "blink",	"clk_32k",	32768,		true},
 	{ "i2s1",	"pll_a_out0",	0,		false},
+	{ "i2s3",	"pll_a_out0",	0,		false},
 	{ "spdif_out",	"pll_a_out0",	0,		false},
 	{ "d_audio",	"pll_a_out0",	0,		false},
 	{ "dam0",	"pll_a_out0",	0,		false},
@@ -688,8 +689,10 @@ static struct platform_device *cardhu_devices[] __initdata = {
 	&tegra_dam_device1,
 	&tegra_dam_device2,
 	&tegra_i2s_device1,
+	&tegra_i2s_device3,
 	&tegra_spdif_device,
 	&spdif_dit_device,
+	&bluetooth_dit_device,
 	&tegra_pcm_device,
 	&cardhu_audio_device,
 #if defined(CONFIG_CRYPTO_DEV_TEGRA_AES)
