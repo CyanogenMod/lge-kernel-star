@@ -30,6 +30,9 @@
 #else
 #define USE_TEGRA_CPU_SUSPEND	0
 #endif
+
+#define TEGRA_PL310_VIRT	(TEGRA_ARM_PL310_BASE - IO_CPU_PHYS + IO_CPU_VIRT)
+
 /* FIXME: The core associated with this should be removed if our change to
    save the diagnostic regsiter in the CPU context is accepted. */
 #define USE_TEGRA_DIAG_REG_SAVE	1

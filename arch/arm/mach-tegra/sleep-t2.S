@@ -70,7 +70,6 @@
 #define TEGRA_PMC_VIRT		(TEGRA_PMC_BASE - IO_APB_PHYS + IO_APB_VIRT)
 #define TEGRA_ARM_PERIF_VIRT	(TEGRA_ARM_PERIF_BASE - IO_CPU_PHYS + IO_CPU_VIRT)
 #define TEGRA_CLK_RESET_VIRT	(TEGRA_CLK_RESET_BASE - IO_PPSB_PHYS + IO_PPSB_VIRT)
-#define TEGRA_PL310_VIRT	(TEGRA_ARM_PL310_BASE - IO_PPSB_PHYS + IO_PPSB_VIRT)
 
 #ifdef CONFIG_HOTPLUG_CPU
 /*
@@ -262,7 +261,8 @@ ENTRY(tegra2_sleep_wfi)
 #ifdef CONFIG_CACHE_L2X0
 	/* Issue a PL310 cache sync operation */
 	dsb
-	mov32	r2, TEGRA_PL310_VIRT + 0x730	@ cache sync
+	mov32	r2, TEGRA_PL310_VIRT
+	movw	r1, 0x730	@ cache sync
 	add	r2, r2, r1
 	mov	r1, #0
 	str	r1, [r2]
