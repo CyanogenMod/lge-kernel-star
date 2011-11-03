@@ -184,7 +184,60 @@ static int tegra_spdif_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int tegra_hw_free(struct snd_pcm_substream *substream)
+static int tegra_bt_hw_params(struct snd_pcm_substream *substream,
+		struct snd_pcm_hw_params *params)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_card *card = rtd->card;
+	struct tegra_max98088 *machine = snd_soc_card_get_drvdata(card);
+	int err, srate, mclk, min_mclk;
+
+	srate = params_rate(params);
+	switch (srate) {
+	case 11025:
+	case 22050:
+	case 44100:
+	case 88200:
+		mclk = 11289600;
+		break;
+	case 8000:
+	case 16000:
+	case 32000:
+	case 48000:
+	case 64000:
+	case 96000:
+		mclk = 12288000;
+		break;
+	default:
+		return -EINVAL;
+	}
+	min_mclk = 64 * srate;
+
+	err = tegra_asoc_utils_set_rate(&machine->util_data, srate, mclk);
+	if (err < 0) {
+		if (!(machine->util_data.set_mclk % min_mclk))
+			mclk = machine->util_data.set_mclk;
+		else {
+			dev_err(card->dev, "Can't configure clocks\n");
+			return err;
+		}
+	}
+
+	tegra_asoc_utils_lock_clk_rate(&machine->util_data, 1);
+
+	err = snd_soc_dai_set_fmt(rtd->cpu_dai,
+			SND_SOC_DAIFMT_DSP_A |
+			SND_SOC_DAIFMT_NB_NF |
+			SND_SOC_DAIFMT_CBS_CFS);
+	if (err < 0) {
+		dev_err(rtd->codec->card->dev, "cpu_dai fmt not set\n");
+		return err;
+	}
+
+	return 0;
+}
+
+static void tegra_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct tegra_max98088 *machine = snd_soc_card_get_drvdata(rtd->card);
@@ -201,6 +254,11 @@ static struct snd_soc_ops tegra_max98088_ops = {
 
 static struct snd_soc_ops tegra_spdif_ops = {
 	.hw_params = tegra_spdif_hw_params,
+	.hw_free = tegra_hw_free,
+};
+
+static struct snd_soc_ops tegra_bt_ops = {
+	.hw_params = tegra_bt_hw_params,
 	.hw_free = tegra_hw_free,
 };
 
@@ -425,7 +483,16 @@ static struct snd_soc_dai_link tegra_max98088_dai[] = {
 		.cpu_dai_name = "tegra30-spdif",
 		.codec_dai_name = "dit-hifi",
 		.ops = &tegra_spdif_ops,
-	}
+	},
+	{
+		.name = "BT SCO",
+		.stream_name = "BT SCO PCM",
+		.codec_name = "spdif-dit.1",
+		.platform_name = "tegra-pcm-audio",
+		.cpu_dai_name = "tegra30-i2s.3",
+		.codec_dai_name = "dit-hifi",
+		.ops = &tegra_bt_ops,
+	},
 };
 
 static struct snd_soc_card snd_soc_tegra_max98088 = {
