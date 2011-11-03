@@ -1328,6 +1328,11 @@ static const struct usb_device_id products[] = {
 		USB_DEVICE(0x0424, 0x9E08),
 		.driver_info = (unsigned long) &smsc95xx_info,
 	},
+	{
+		/* SMSC89530 USB Ethernet Device on Automotive VCM */
+		USB_DEVICE(0x0424, 0x9E08),
+		.driver_info = (unsigned long) &smsc95xx_info,
+	},
 	{ },		/* END */
 };
 MODULE_DEVICE_TABLE(usb, products);
