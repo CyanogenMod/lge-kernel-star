@@ -33,8 +33,12 @@
 #include <mach/usb_phy.h>
 #include <mach/iomap.h>
 #include <mach/pinmux.h>
-
+#include "gpio-names.h"
 #include "fuse.h"
+
+/* Modem hibernate test parameters */
+#define TRIGGER_BY_MDM2AP_ACK	1
+/* ------------------------------- */
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 #define USB_USBCMD		0x140
@@ -1663,6 +1667,21 @@ static void ulpi_set_trimmer(void __iomem *base, u8 data, u8 sdn, u8 dir)
 	writel(val, base + ULPI_TIMING_CTRL_1);
 }
 
+static inline void ulpi_pinmux_bypass(struct tegra_usb_phy *phy, bool enable)
+{
+	unsigned long val;
+	void __iomem *base = phy->regs;
+
+	val = readl(base + ULPI_TIMING_CTRL_0);
+
+	if (enable)
+		val |= ULPI_OUTPUT_PINMUX_BYP;
+	else
+		val &= ~ULPI_OUTPUT_PINMUX_BYP;
+
+	writel(val, base + ULPI_TIMING_CTRL_0);
+}
+
 static void ulpi_phy_restore_start(struct tegra_usb_phy *phy,
 				   enum tegra_usb_phy_port_speed port_speed)
 {
@@ -1822,7 +1841,7 @@ static int ulpi_phy_power_off(struct tegra_usb_phy *phy, bool is_dpd)
 	return 0;
 }
 
-static void null_phy_set_tristate(bool enable)
+static inline void null_phy_set_tristate(bool enable)
 {
 	int tristate = (enable) ? TEGRA_TRI_TRISTATE : TEGRA_TRI_NORMAL;
 
@@ -1831,6 +1850,7 @@ static void null_phy_set_tristate(bool enable)
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UAB, tristate);
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UDA, tristate);
 #else
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA0, tristate);
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA1, tristate);
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA2, tristate);
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA3, tristate);
@@ -1839,7 +1859,6 @@ static void null_phy_set_tristate(bool enable)
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA6, tristate);
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA7, tristate);
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_NXT, tristate);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA0, tristate);
 
 	if (enable)
 		tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DIR, tristate);
@@ -1863,21 +1882,43 @@ static void null_phy_restore_end(struct tegra_usb_phy *phy)
 	unsigned long val;
 	void __iomem *base = phy->regs;
 	struct tegra_ulpi_config *config = phy->config;
+	int retry = 20000;
+
+	/* disable ULPI pinmux bypass */
+	ulpi_pinmux_bypass(phy, false);
+
+	/* driving linestate using GPIO */
+	gpio_set_value(TEGRA_GPIO_PO1, 0);
+	gpio_set_value(TEGRA_GPIO_PO2, 0);
+
+	/* remove ULPI tristate except DIR */
+	null_phy_set_tristate(false);
 
 	if (config->phy_restore_end)
 		config->phy_restore_end();
 
-	val = readl(base + ULPI_TIMING_CTRL_0);
-	val |= ULPI_CLK_PADOUT_ENA;
+	while (retry) {
+#if TRIGGER_BY_MDM2AP_ACK
+		if (gpio_get_value(TEGRA_GPIO_PU5)) /* poll MDM2AP_ACK high */
+			break;
+#else
+		if (gpio_get_value(TEGRA_GPIO_PY3)) /* poll STP high */
+			break;
+#endif
+		retry--;
+	}
 
-	udelay(500);
-
-	/* remove ULPI tristate except DIR */
-	null_phy_set_tristate(false);
-	udelay(20);
+	if (retry == 0)
+		pr_info("MDM2AP_ACK timeout\n");
 
 	/* enable ULPI CLK output pad */
+	val = readl(base + ULPI_TIMING_CTRL_0);
+	val |= ULPI_CLK_PADOUT_ENA;
 	writel(val, base + ULPI_TIMING_CTRL_0);
+
+	/* enable ULPI pinmux bypass */
+	ulpi_pinmux_bypass(phy, true);
+	udelay(5);
 
 	/* remove DIR tristate */
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DIR, TEGRA_TRI_NORMAL);

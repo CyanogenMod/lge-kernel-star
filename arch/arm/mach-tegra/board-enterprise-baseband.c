@@ -55,6 +55,9 @@ static struct gpio modem_gpios[] = {
 	{MDM2AP_ACK, GPIOF_IN, "MDM2AP_ACK"},
 	{AP2MDM_ACK2, GPIOF_OUT_INIT_HIGH, "AP2MDM ACK2"},
 	{AP2MDM_ACK, GPIOF_OUT_INIT_LOW, "AP2MDM ACK"},
+	{TEGRA_GPIO_PY3, GPIOF_IN, "ULPI_STP"},
+	{TEGRA_GPIO_PO1, GPIOF_OUT_INIT_LOW, "ULPI_D0"},
+	{TEGRA_GPIO_PO2, GPIOF_OUT_INIT_LOW, "ULPI_D1"},
 };
 
 static int baseband_phy_on(void);
@@ -171,6 +174,10 @@ static int baseband_init(void)
 	tegra_gpio_enable(AP2MDM_ACK2);
 	tegra_gpio_enable(BB_RST_OUT);
 	tegra_gpio_enable(AP2MDM_ACK);
+	tegra_gpio_enable(MDM2AP_ACK);
+	tegra_gpio_enable(TEGRA_GPIO_PY3);
+	tegra_gpio_enable(TEGRA_GPIO_PO1);
+	tegra_gpio_enable(TEGRA_GPIO_PO2);
 
 	/* export GPIO for user space access through sysfs */
 	gpio_export(MODEM_PWR_ON, false);
