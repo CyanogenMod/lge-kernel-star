@@ -36,18 +36,24 @@ struct tegra_tsensor_pmu_data {
 	u8 pmu_i2c_addr;
 };
 
+struct tegra_tsensor_data;
+
 struct tegra_tsensor_platform_data {
-	int sw_intr_temperature;
-	int hw_clk_div_temperature;
-	int hw_reset_temperature;
-	int hysteresis;
-	u8 throttling_ext_limit;
-	u8 thermal_zones[MAX_ZONES];
-	u8 thermal_zones_sz;
-	void (*alarm_fn)(bool raised);
+	void (*probe_callback)(struct tegra_tsensor_data *);
 };
 
 void __init tegra3_tsensor_init(struct tegra_tsensor_pmu_data *);
+
+int tsensor_thermal_get_temp(struct tegra_tsensor_data *data,
+				long *milli_temp);
+int tsensor_thermal_set_limits(struct tegra_tsensor_data *data,
+				long lo_limit_milli,
+				long hi_limit_milli);
+int tsensor_thermal_set_alert(struct tegra_tsensor_data *data,
+				void (*alert_func)(void *),
+				void *alert_data);
+int tsensor_thermal_set_shutdown_temp(struct tegra_tsensor_data *data,
+				long shutdown_temp_milli);
 
 #endif /* __MACH_TEGRA_TSENSOR_H */
 
