@@ -1,7 +1,8 @@
 /*
- * arch/arm/mach-tegra/board-harmony-sdhci.c
+ * arch/arm/mach-tegra/board-whistler-sdhci.c
  *
  * Copyright (C) 2010 Google, Inc.
+ * Copyright (C) 2011 NVIDIA Corporation.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -91,18 +92,6 @@ static struct platform_device whistler_wifi_device = {
 	},
 };
 
-static struct resource sdhci_resource0[] = {
-	[0] = {
-		.start  = INT_SDMMC1,
-		.end    = INT_SDMMC1,
-		.flags  = IORESOURCE_IRQ,
-	},
-	[1] = {
-		.start	= TEGRA_SDMMC1_BASE,
-		.end	= TEGRA_SDMMC1_BASE + TEGRA_SDMMC1_SIZE-1,
-		.flags	= IORESOURCE_MEM,
-	},
-};
 static struct resource sdhci_resource1[] = {
 	[0] = {
 		.start  = INT_SDMMC2,
@@ -141,12 +130,6 @@ static struct resource sdhci_resource3[] = {
 		.end	= TEGRA_SDMMC4_BASE + TEGRA_SDMMC4_SIZE-1,
 		.flags	= IORESOURCE_MEM,
 	},
-};
-
-static struct tegra_sdhci_platform_data tegra_sdhci_platform_data0 = {
-	.cd_gpio = -1,
-	.wp_gpio = -1,
-	.power_gpio = -1,
 };
 
 static struct embedded_sdio_data embedded_sdio_data1 = {
@@ -188,16 +171,6 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data3 = {
 	.mmc_data = {
 		.built_in = 1,
 	}
-};
-
-static struct platform_device tegra_sdhci_device0 = {
-	.name		= "sdhci-tegra",
-	.id		= 0,
-	.resource	= sdhci_resource0,
-	.num_resources	= ARRAY_SIZE(sdhci_resource0),
-	.dev = {
-		.platform_data = &tegra_sdhci_platform_data0,
-	},
 };
 
 static struct platform_device tegra_sdhci_device1 = {
@@ -253,7 +226,6 @@ int __init whistler_sdhci_init(void)
 	platform_device_register(&tegra_sdhci_device3);
 	platform_device_register(&tegra_sdhci_device2);
 	platform_device_register(&tegra_sdhci_device1);
-	platform_device_register(&tegra_sdhci_device0);
 
 	whistler_wifi_init();
 	return 0;
