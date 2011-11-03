@@ -14,11 +14,6 @@
  *
  */
 
-#if 0
-#define VERBOSE_DEBUG
-#define DEBUG
-#endif
-
 #include <linux/slab.h>
 #include <linux/platform_device.h>
 #include <linux/hwmon.h>
@@ -222,10 +217,6 @@ static struct tegra_tsensor_coeff coeff_table[] = {
 	}
 	/* FIXME: add tsensor coefficients after chip characterization */
 };
-
-static char my_fixed_str[LOCAL_STR_SIZE1] = "YYYYYY";
-static char error_str[LOCAL_STR_SIZE1] = "ERROR:";
-static unsigned int init_flag;
 
 static int tsensor_count_2_temp(struct tegra_tsensor_data *data,
 	unsigned int count, int *p_temperature);
@@ -450,17 +441,13 @@ static ssize_t tsensor_show_counters(struct device *dev,
 			curr_avg[1], min_max[1], temp1);
 		if (err < 0)
 			goto error;
-		snprintf(buf, (((LOCAL_STR_SIZE1 << 1) + 3) +
-			strlen(fixed_str)),
-			"%s "
+		snprintf(buf, PAGE_SIZE, "%s "
 			"[%d]: current counter=0x%x, %d.%d"
-			" deg Celsius ", fixed_str,
-			data->tsensor_index,
+			" deg Celsius\n", fixed_str, data->tsensor_index,
 			((curr_avg[data->tsensor_index] & 0xFFFF0000) >> 16),
 			get_temperature_int(temp1),
 			get_temperature_fraction(temp1));
 	}
-	strcat(buf, "\n");
 	return strlen(buf);
 error:
 	return snprintf(buf, strlen(err_str),
@@ -488,28 +475,29 @@ static bool cclkg_check_hwdiv2_sensor(struct tegra_tsensor_data *data)
  */
 static int get_param_values(
 	struct tegra_tsensor_data *data, unsigned int indx,
-	unsigned int *p_reg, unsigned int *p_sft, unsigned int *p_msk)
+	unsigned int *p_reg, unsigned int *p_sft, unsigned int *p_msk,
+	char *info, size_t info_len)
 {
 	switch (indx) {
 	case TSENSOR_PARAM_TH1:
 		*p_reg = ((data->tsensor_index << 16) | SENSOR_CFG1);
 		*p_sft = SENSOR_CFG1_TH1_SHIFT;
 		*p_msk = SENSOR_CFG_X_TH_X_MASK;
-		snprintf(my_fixed_str, LOCAL_STR_SIZE1, "TH1[%d]: ",
+		snprintf(info, info_len, "TH1[%d]: ",
 			data->tsensor_index);
 		break;
 	case TSENSOR_PARAM_TH2:
 		*p_reg = ((data->tsensor_index << 16) | SENSOR_CFG1);
 		*p_sft = SENSOR_CFG1_TH2_SHIFT;
 		*p_msk = SENSOR_CFG_X_TH_X_MASK;
-		snprintf(my_fixed_str, LOCAL_STR_SIZE1, "TH2[%d]: ",
+		snprintf(info, info_len, "TH2[%d]: ",
 			data->tsensor_index);
 		break;
 	case TSENSOR_PARAM_TH3:
 		*p_reg = ((data->tsensor_index << 16) | SENSOR_CFG2);
 		*p_sft = SENSOR_CFG2_TH3_SHIFT;
 		*p_msk = SENSOR_CFG_X_TH_X_MASK;
-		snprintf(my_fixed_str, LOCAL_STR_SIZE1, "TH3[%d]: ",
+		snprintf(info, info_len, "TH3[%d]: ",
 			data->tsensor_index);
 		break;
 	default:
@@ -531,28 +519,27 @@ static ssize_t show_tsensor_param(struct device *dev,
 	unsigned int msk;
 	int err;
 	int temp;
+	char info[LOCAL_STR_SIZE1];
 
-	err = get_param_values(data, attr->index, &reg, &sft, &msk);
+	err = get_param_values(data, attr->index, &reg, &sft, &msk,
+			       info, sizeof(info));
 	if (err < 0)
 		goto labelErr;
 	val = tsensor_get_reg_field(data, reg, sft, msk);
 	if (val == MAX_THRESHOLD)
-		snprintf(buf, LOCAL_STR_SIZE1 + strlen(my_fixed_str),
-			"%s un-initialized threshold ",
-			my_fixed_str);
+		snprintf(buf, PAGE_SIZE, "%s un-initialized threshold\n", info);
 	else {
 		err = tsensor_count_2_temp(data, val, &temp);
 		if (err != 0)
 			goto labelErr;
-		snprintf(buf, LOCAL_STR_SIZE1 + strlen(my_fixed_str),
-			"%s threshold: %d.%d Celsius ",
-			my_fixed_str, get_temperature_int(temp),
+		snprintf(buf, PAGE_SIZE, "%s threshold: %d.%d Celsius\n", info,
+			get_temperature_int(temp),
 			get_temperature_fraction(temp));
 	}
-	strcat(buf, "\n");
 	return strlen(buf);
+
 labelErr:
-	snprintf(buf, strlen(error_str), "%s", error_str);
+	snprintf(buf, PAGE_SIZE, "ERROR:");
 	return strlen(buf);
 }
 
@@ -570,6 +557,7 @@ static ssize_t set_tsensor_param(struct device *dev,
 	int err;
 	unsigned int counter;
 	unsigned int val;
+	char info[LOCAL_STR_SIZE1];
 
 	if (strict_strtoul(buf, 0, (long int *)&num)) {
 		dev_err(dev, "file: %s, line=%d return %s()\n",
@@ -579,7 +567,8 @@ static ssize_t set_tsensor_param(struct device *dev,
 
 	counter = tsensor_get_threshold_counter(data, num);
 
-	err = get_param_values(data, attr->index, &reg, &sft, &msk);
+	err = get_param_values(data, attr->index, &reg, &sft, &msk,
+			       info, sizeof(info));
 	if (err < 0)
 		goto labelErr;
 
@@ -593,7 +582,7 @@ static ssize_t set_tsensor_param(struct device *dev,
 		(void)cclkg_check_hwdiv2_sensor(data);
 	}
 	val = tsensor_get_reg_field(data, reg, sft, msk);
-	dev_dbg(dev, "%s 0x%x\n", my_fixed_str, val);
+	dev_dbg(dev, "%s 0x%x\n", info, val);
 	return count;
 labelErr:
 	dev_err(dev, "file: %s, line=%d, %s(), error=0x%x\n", __FILE__,
@@ -1798,28 +1787,16 @@ static struct platform_driver tegra_tsensor_driver = {
 
 static int __init tegra_tsensor_init(void)
 {
-	init_flag = 0;
-	if (platform_driver_register(&tegra_tsensor_driver))
-		goto exit;
-	init_flag = 1;
-	return 0;
-
-exit:
-	return -ENODEV;
+	return platform_driver_register(&tegra_tsensor_driver);
 }
+module_init(tegra_tsensor_init);
 
 static void __exit tegra_tsensor_exit(void)
 {
-	if (init_flag) {
-		platform_driver_unregister(&tegra_tsensor_driver);
-		init_flag = 0;
-	}
+	platform_driver_unregister(&tegra_tsensor_driver);
 }
+module_exit(tegra_tsensor_exit);
 
 MODULE_AUTHOR("nvidia");
 MODULE_DESCRIPTION("Nvidia Tegra Temperature Sensor driver");
 MODULE_LICENSE("GPL");
-
-module_init(tegra_tsensor_init);
-module_exit(tegra_tsensor_exit);
-
