@@ -238,6 +238,7 @@ struct tegra30_i2s {
 	void __iomem *regs;
 	struct dentry *debug;
 	u32 reg_ctrl;
+	u32 reg_ch_ctrl;
 };
 
 #endif
