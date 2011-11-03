@@ -34,6 +34,7 @@
 
 #define ENTERPRISE_WLAN_PWR	TEGRA_GPIO_PV2
 #define ENTERPRISE_WLAN_RST	TEGRA_GPIO_PV3
+#define ENTERPRISE_WLAN_WOW	TEGRA_GPIO_PU6
 #define ENTERPRISE_SD_CD TEGRA_GPIO_PI5
 
 static void (*wifi_status_cb)(int card_present, void *dev_id);
@@ -50,9 +51,20 @@ static struct wifi_platform_data enterprise_wifi_control = {
 	.set_carddetect = enterprise_wifi_set_carddetect,
 };
 
+static struct resource wifi_resource[] = {
+	[0] = {
+		.name	= "bcm4329_wlan_irq",
+		.start	= TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PU6),
+		.end	= TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PU6),
+		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL | IORESOURCE_IRQ_SHAREABLE,
+	},
+};
+
 static struct platform_device enterprise_wifi_device = {
 	.name           = "bcm4329_wlan",
 	.id             = 1,
+	.num_resources	= 1,
+	.resource	= wifi_resource,
 	.dev            = {
 		.platform_data = &enterprise_wifi_control,
 	},
@@ -216,9 +228,13 @@ static int __init enterprise_wifi_init(void)
 	rc = gpio_request(ENTERPRISE_WLAN_RST, "wlan_rst");
 	if (rc)
 		pr_err("WLAN_RST gpio request failed:%d\n", rc);
+	rc = gpio_request(ENTERPRISE_WLAN_WOW, "bcmsdh_sdmmc");
+	if (rc)
+		pr_err("WLAN_WOW gpio request failed:%d\n", rc);
 
 	tegra_gpio_enable(ENTERPRISE_WLAN_PWR);
 	tegra_gpio_enable(ENTERPRISE_WLAN_RST);
+	tegra_gpio_enable(ENTERPRISE_WLAN_WOW);
 
 	rc = gpio_direction_output(ENTERPRISE_WLAN_PWR, 0);
 	if (rc)
@@ -226,6 +242,9 @@ static int __init enterprise_wifi_init(void)
 	gpio_direction_output(ENTERPRISE_WLAN_RST, 0);
 	if (rc)
 		pr_err("WLAN_RST gpio direction configuration failed:%d\n", rc);
+	rc = gpio_direction_input(ENTERPRISE_WLAN_WOW);
+	if (rc)
+		pr_err("WLAN_WOW gpio direction configuration failed:%d\n", rc);
 
 	platform_device_register(&enterprise_wifi_device);
 	return 0;
