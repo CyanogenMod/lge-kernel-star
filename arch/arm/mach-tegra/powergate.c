@@ -151,7 +151,9 @@ static struct powergate_partition powergate_partition_info[TEGRA_NUM_POWERGATE] 
 						{MC_CLIENT_NV2, MC_CLIENT_LAST},
 						{{"3d2", CLK_AND_RST} }, },
 	[TEGRA_POWERGATE_HEG]	= { "heg",
-						{MC_CLIENT_G2, MC_CLIENT_EPP, MC_CLIENT_HC},
+						{MC_CLIENT_G2, MC_CLIENT_EPP,
+							MC_CLIENT_HC,
+							MC_CLIENT_LAST},
 						{{"2d", CLK_AND_RST},
 						{"epp", CLK_AND_RST},
 						{"host1x", CLK_AND_RST},
@@ -202,7 +204,6 @@ static void mc_flush(int id)
 			break;
 
 		spin_lock_irqsave(&tegra_powergate_lock, flags);
-
 		rst_ctrl = mc_read(MC_CLIENT_HOTRESET_CTRL);
 		rst_ctrl |= (1 << mcClientBit);
 		mc_write(rst_ctrl, MC_CLIENT_HOTRESET_CTRL);
