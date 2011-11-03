@@ -1310,6 +1310,14 @@ config SENSORS_INA219
 	help
 		Support for the TI INA219 power monitor sensor.
 
+config SENSORS_INA230
+	tristate "Texas Instruments INA230 POWER MONITOR SENSOR DRIVER"
+	depends on I2C
+	help
+	  Support for the TI INA230 power monitor sensor.
+	  (also works for TI INA226)
+
+
 if ACPI
 
 comment "ACPI drivers"
