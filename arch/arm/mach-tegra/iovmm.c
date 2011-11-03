@@ -791,7 +791,6 @@ struct tegra_iovmm_client *tegra_iovmm_alloc_client(const char *name,
 	struct tegra_iovmm_client *c = kzalloc(sizeof(*c), GFP_KERNEL);
 	struct iovmm_share_group *grp = NULL;
 	struct tegra_iovmm_device *dev;
-	unsigned long flags;
 
 	if (!c) return NULL;
 	c->name = kstrdup(name, GFP_KERNEL);
@@ -882,7 +881,6 @@ static int tegra_iovmm_suspend(void)
 {
 	int rc = 0;
 	struct tegra_iovmm_device *dev;
-	unsigned long flags;
 
 	list_for_each_entry(dev, &iovmm_devices, list) {
 
@@ -902,7 +900,6 @@ static int tegra_iovmm_suspend(void)
 static void tegra_iovmm_resume(void)
 {
 	struct tegra_iovmm_device *dev;
-	unsigned long flags;
 
 	list_for_each_entry(dev, &iovmm_devices, list) {
 		if (dev->ops->resume)
