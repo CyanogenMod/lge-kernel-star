@@ -418,11 +418,14 @@ static void tegra_kbc_config_pins(struct tegra_kbc *kbc)
 		row_cfg &= ~r_mask;
 		col_cfg &= ~c_mask;
 
-		if (pdata->pin_cfg[i].is_row)
-			row_cfg |= ((pdata->pin_cfg[i].num << 1) | 1) << r_shft;
-		else
-			col_cfg |= ((pdata->pin_cfg[i].num << 1) | 1) << c_shft;
-
+		if (pdata->pin_cfg[i].en) {
+			if (pdata->pin_cfg[i].is_row)
+				row_cfg |= ((pdata->pin_cfg[i].num << 1) | 1)
+						<< r_shft;
+			else
+				col_cfg |= ((pdata->pin_cfg[i].num << 1) | 1)
+						<< c_shft;
+		}
 		writel(row_cfg, kbc->mmio + r_offs);
 		writel(col_cfg, kbc->mmio + c_offs);
 	}

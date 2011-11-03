@@ -33,6 +33,7 @@
 
 struct tegra_kbc_pin_cfg {
 	bool is_row;
+	bool en;
 	unsigned char num;
 };
 
