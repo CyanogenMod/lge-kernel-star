@@ -565,6 +565,8 @@ static int __tps80031_ldo_set_voltage(struct device *parent,
 	 * mV = 1000mv + 100mv * (vsel - 1)
 	 */
 	vsel = (min_uV/1000 - 1000)/100 + 1;
+	if (selector)
+		*selector = vsel;
 	ret = tps80031_write(parent, ri->volt_id, ri->volt_reg, vsel);
 	if (ret < 0)
 		dev_err(ri->dev, "Error in writing the Voltage register\n");
