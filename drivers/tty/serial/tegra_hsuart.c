@@ -51,7 +51,7 @@
 #define BYTES_TO_ALIGN(x) ((unsigned long)(ALIGN((x), sizeof(u32))) - \
 	(unsigned long)(x))
 
-#define UART_RX_DMA_BUFFER_SIZE    (2048*4)
+#define UART_RX_DMA_BUFFER_SIZE    (2048*8)
 
 #define UART_LSR_FIFOE		0x80
 #define UART_LSR_TXFIFO_FULL	0x100
