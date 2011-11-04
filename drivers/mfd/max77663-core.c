@@ -112,6 +112,7 @@
 #define GPIO_DBNC_32MS			3
 
 #define ONOFF_SFT_RST_MASK		(1 << 7)
+#define ONOFF_SLPEN_MASK		(1 << 2)
 
 enum {
 	CACHE_IRQ_LBT,
@@ -1316,9 +1317,20 @@ static int __devexit max77663_remove(struct i2c_client *client)
 static int max77663_suspend(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
+	struct max77663_chip *chip = i2c_get_clientdata(client);
+	int ret;
 
 	if (client->irq)
 		disable_irq(client->irq);
+
+	/* Enable sleep that AP can be placed into sleep mode
+	 * by pulling EN1 low */
+	ret = max77663_set_bits(chip->dev, MAX77663_REG_ONOFF_CFG1,
+				 ONOFF_SLPEN_MASK, ONOFF_SLPEN_MASK, 0);
+	if (ret < 0)
+		dev_err(&client->dev,
+			"suspend: Failed to set ONOFF_CFG1(0x%02x)\n",
+			MAX77663_REG_ONOFF_CFG1);
 
 	return 0;
 }
