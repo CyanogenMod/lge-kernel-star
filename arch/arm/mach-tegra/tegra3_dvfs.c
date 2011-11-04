@@ -340,8 +340,15 @@ static void __init init_dvfs_one(struct dvfs *d, int nominal_mv_index)
 		return;
 	}
 
-	if (d->auto_dvfs) {
-		/* Update max rate for auto-dvfs clocks */
+	if (!(c->flags & PERIPH_EMC_ENB) && d->auto_dvfs) {
+		/* Update max rate for auto-dvfs clocks, except EMC.
+		 * EMC is a special case, since EMC dvfs is board dependent:
+		 * max rate and EMC scaling frequencies are determined by tegra
+		 * BCT (flashed together with the image) and board specific EMC
+		 * DFS table; we will check the scaling ladder against nominal
+		 * core voltage when the table is loaded (and if on particular
+		 * board the table is not loaded, EMC scaling is disabled).
+		 */
 		BUG_ON(!d->freqs[nominal_mv_index]);
 		tegra_init_max_rate(
 			c, d->freqs[nominal_mv_index] * d->freqs_mult);
