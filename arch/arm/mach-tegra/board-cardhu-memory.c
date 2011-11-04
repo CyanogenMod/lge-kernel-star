@@ -615,7 +615,7 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g[] = {
 
 static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 	{
-		0x31,       /* Rev 3.1 */
+		0x32,       /* Rev 3.2 */
 		25500,      /* SDRAM frequency */
 		{
 			0x00000001, /* EMC_RC */
@@ -706,7 +706,7 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 			0x00000000, /* EMC_CTT_DURATION */
 			0x80000280, /* EMC_DYN_SELF_REF_CONTROL */
 			0x00020001, /* MC_EMEM_ARB_CFG */
-			0x80000008, /* MC_EMEM_ARB_OUTSTANDING_REQ */
+			0xc0000008, /* MC_EMEM_ARB_OUTSTANDING_REQ */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RCD */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RP */
 			0x00000002, /* MC_EMEM_ARB_TIMING_RC */
@@ -732,9 +732,10 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 		0x80001221, /* Mode Register 0 */
 		0x80100003, /* Mode Register 1 */
 		0x80200008, /* Mode Register 2 */
+		0x00000001, /* EMC_CFG.DYN_SELF_REF */
 	},
 	{
-		0x31,       /* Rev 3.1 */
+		0x32,       /* Rev 3.2 */
 		51000,      /* SDRAM frequency */
 		{
 			0x00000002, /* EMC_RC */
@@ -825,7 +826,7 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 			0x00000000, /* EMC_CTT_DURATION */
 			0x8000040b, /* EMC_DYN_SELF_REF_CONTROL */
 			0x00000001, /* MC_EMEM_ARB_CFG */
-			0x8000000a, /* MC_EMEM_ARB_OUTSTANDING_REQ */
+			0xc000000a, /* MC_EMEM_ARB_OUTSTANDING_REQ */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RCD */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RP */
 			0x00000002, /* MC_EMEM_ARB_TIMING_RC */
@@ -851,9 +852,10 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 		0x80001221, /* Mode Register 0 */
 		0x80100003, /* Mode Register 1 */
 		0x80200008, /* Mode Register 2 */
+		0x00000001, /* EMC_CFG.DYN_SELF_REF */
 	},
 	{
-		0x31,       /* Rev 3.1 */
+		0x32,       /* Rev 3.2 */
 		102000,     /* SDRAM frequency */
 		{
 			0x00000004, /* EMC_RC */
@@ -944,7 +946,7 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 			0x00000000, /* EMC_CTT_DURATION */
 			0x80000713, /* EMC_DYN_SELF_REF_CONTROL */
 			0x00000001, /* MC_EMEM_ARB_CFG */
-			0x80000013, /* MC_EMEM_ARB_OUTSTANDING_REQ */
+			0xc0000013, /* MC_EMEM_ARB_OUTSTANDING_REQ */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RCD */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RP */
 			0x00000003, /* MC_EMEM_ARB_TIMING_RC */
@@ -970,9 +972,10 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 		0x80001221, /* Mode Register 0 */
 		0x80100003, /* Mode Register 1 */
 		0x80200008, /* Mode Register 2 */
+		0x00000001, /* EMC_CFG.DYN_SELF_REF */
 	},
 	{
-		0x31,       /* Rev 3.1 */
+		0x32,       /* Rev 3.2 */
 		408000,     /* SDRAM frequency */
 		{
 			0x00000012, /* EMC_RC */
@@ -1089,9 +1092,10 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 		0x80000731, /* Mode Register 0 */
 		0x80100002, /* Mode Register 1 */
 		0x80200008, /* Mode Register 2 */
+		0x00000000, /* EMC_CFG.DYN_SELF_REF */
 	},
 	{
-		0x31,       /* Rev 3.1 */
+		0x32,       /* Rev 3.2 */
 		533000,     /* SDRAM frequency */
 		{
 			0x00000018, /* EMC_RC */
@@ -1208,9 +1212,10 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 		0x80000941, /* Mode Register 0 */
 		0x80100002, /* Mode Register 1 */
 		0x80200008, /* Mode Register 2 */
+		0x00000000, /* EMC_CFG.DYN_SELF_REF */
 	},
 	{
-		0x31,       /* Rev 3.1 */
+		0x32,       /* Rev 3.2 */
 		750000,     /* SDRAM frequency */
 		{
 			0x00000025, /* EMC_RC */
@@ -1327,6 +1332,7 @@ static const struct tegra_emc_table cardhu_emc_tables_h5tc2g_a2[] = {
 		0x80000d71, /* Mode Register 0 */
 		0x80100002, /* Mode Register 1 */
 		0x80200018, /* Mode Register 2 */
+		0x00000000, /* EMC_CFG.DYN_SELF_REF */
 	},
 };
 
