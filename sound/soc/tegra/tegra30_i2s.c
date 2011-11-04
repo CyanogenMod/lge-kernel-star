@@ -271,9 +271,7 @@ static int tegra30_i2s_hw_params(struct snd_pcm_substream *substream,
 	struct tegra30_i2s *i2s = snd_soc_dai_get_drvdata(dai);
 	u32 val;
 	int ret, sample_size, srate, i2sclock, bitcnt, sym_bitclk;
-
-	if (params_channels(params) != 2)
-		return -EINVAL;
+	int i2s_client_ch;
 
 	i2s->reg_ctrl &= ~TEGRA30_I2S_CTRL_BIT_SIZE_MASK;
 	switch (params_format(params)) {
@@ -303,9 +301,11 @@ static int tegra30_i2s_hw_params(struct snd_pcm_substream *substream,
 	if (i2s->reg_ctrl & TEGRA30_I2S_CTRL_FRAME_FORMAT_FSYNC) {
 		bitcnt = (i2sclock / srate) - 1;
 		sym_bitclk = !(i2sclock % srate);
+		i2s_client_ch = params_channels(params);
 	} else {
 		bitcnt = (i2sclock / (2 * srate)) - 1;
 		sym_bitclk = !(i2sclock % (2 * srate));
+		i2s_client_ch = 2;
 	}
 
 	tegra30_i2s_enable_clocks(i2s);
@@ -318,17 +318,27 @@ static int tegra30_i2s_hw_params(struct snd_pcm_substream *substream,
 	tegra30_i2s_write(i2s, TEGRA30_I2S_TIMING, val);
 
 	val = (0 << TEGRA30_AUDIOCIF_CTRL_FIFO_THRESHOLD_SHIFT) |
-	      (1 << TEGRA30_AUDIOCIF_CTRL_AUDIO_CHANNELS_SHIFT) |
-	      (1 << TEGRA30_AUDIOCIF_CTRL_CLIENT_CHANNELS_SHIFT) |
+	      ((params_channels(params) - 1) <<
+			TEGRA30_AUDIOCIF_CTRL_AUDIO_CHANNELS_SHIFT) |
+	      ((i2s_client_ch - 1) <<
+			TEGRA30_AUDIOCIF_CTRL_CLIENT_CHANNELS_SHIFT) |
 	      TEGRA30_AUDIOCIF_CTRL_AUDIO_BITS_16 |
 	      TEGRA30_AUDIOCIF_CTRL_CLIENT_BITS_16;
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		val |= TEGRA30_AUDIOCIF_CTRL_DIRECTION_RX;
 		tegra30_i2s_write(i2s, TEGRA30_I2S_CIF_RX_CTRL, val);
+
+		tegra30_ahub_set_tx_cif_channels(i2s->txcif,
+						 params_channels(params),
+						 params_channels(params));
 	} else {
 		val |= TEGRA30_AUDIOCIF_CTRL_DIRECTION_TX;
 		tegra30_i2s_write(i2s, TEGRA30_I2S_CIF_TX_CTRL, val);
+
+		tegra30_ahub_set_rx_cif_channels(i2s->rxcif,
+						 params_channels(params),
+						 params_channels(params));
 	}
 
 	val = (1 << TEGRA30_I2S_OFFSET_RX_DATA_OFFSET_SHIFT) |
@@ -434,13 +444,13 @@ static struct snd_soc_dai_ops tegra30_i2s_dai_ops = {
 		.name = DRV_NAME "." #id, \
 		.probe = tegra30_i2s_probe, \
 		.playback = { \
-			.channels_min = 2, \
+			.channels_min = 1, \
 			.channels_max = 2, \
 			.rates = SNDRV_PCM_RATE_8000_96000, \
 			.formats = SNDRV_PCM_FMTBIT_S16_LE, \
 		}, \
 		.capture = { \
-			.channels_min = 2, \
+			.channels_min = 1, \
 			.channels_max = 2, \
 			.rates = SNDRV_PCM_RATE_8000_96000, \
 			.formats = SNDRV_PCM_FMTBIT_S16_LE, \
