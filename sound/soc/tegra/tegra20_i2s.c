@@ -394,23 +394,6 @@ static __devinit int tegra20_i2s_platform_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	/*
-	 * FIXME: Until a codec driver exists for the tegra DAS, hard-code a
-	 * 1:1 mapping between audio controllers and audio ports.
-	 */
-	ret = tegra20_das_connect_dap_to_dac(TEGRA20_DAS_DAP_ID_1 + pdev->id,
-					TEGRA20_DAS_DAP_SEL_DAC1 + pdev->id);
-	if (ret) {
-		dev_err(&pdev->dev, "Can't set up DAP connection\n");
-		return ret;
-	}
-	ret = tegra20_das_connect_dac_to_dap(TEGRA20_DAS_DAC_ID_1 + pdev->id,
-					TEGRA20_DAS_DAC_SEL_DAP1 + pdev->id);
-	if (ret) {
-		dev_err(&pdev->dev, "Can't set up DAC connection\n");
-		return ret;
-	}
-
 	i2s = kzalloc(sizeof(struct tegra20_i2s), GFP_KERNEL);
 	if (!i2s) {
 		dev_err(&pdev->dev, "Can't allocate tegra20_i2s\n");
