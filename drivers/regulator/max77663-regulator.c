@@ -129,6 +129,14 @@
 #define FPS_PD_PERIOD_MASK		0x07
 #define FPS_PD_PERIOD_SHIFT		0
 
+/* Chip Identification Register */
+#define MAX77663_REG_CID5		0x5D
+
+#define CID_DIDM_MASK			0xF0
+#define CID_DIDM_SHIFT			4
+
+#define SD_SAFE_DOWN_UV			50000 /* 50mV */
+
 enum {
 	VOLT_REG = 0,
 	CFG_REG,
@@ -150,6 +158,7 @@ struct max77663_regulator {
 	u32 min_uV;
 	u32 max_uV;
 	u32 step_uV;
+	int safe_down_uV; /* for stable down scaling */
 	u32 regulator_mode;
 
 	struct max77663_register regs[3]; /* volt, cfg, fps */
@@ -355,14 +364,51 @@ static u8 max77663_regulator_get_power_mode(struct max77663_regulator *reg)
 static int max77663_regulator_do_set_voltage(struct max77663_regulator *reg,
 					     int min_uV, int max_uV)
 {
+	u8 addr = reg->regs[VOLT_REG].addr;
+	u8 mask = reg->volt_mask;
+	u8 *cache = &reg->regs[VOLT_REG].val;
 	u8 val;
+	int old_uV, new_uV, safe_uV;
+	int i, steps = 1;
+	int ret = 0;
 
 	if (min_uV < reg->min_uV || max_uV > reg->max_uV)
 		return -EDOM;
 
-	val = (min_uV - reg->min_uV) / reg->step_uV;
-	return max77663_regulator_cache_write(reg, reg->regs[VOLT_REG].addr,
-				reg->volt_mask, val, &reg->regs[VOLT_REG].val);
+	old_uV = (*cache & mask) * reg->step_uV + reg->min_uV;
+
+	if ((old_uV > min_uV) && (reg->safe_down_uV >= reg->step_uV)) {
+		steps = DIV_ROUND_UP(old_uV - min_uV, reg->safe_down_uV);
+		safe_uV = -reg->safe_down_uV;
+	}
+
+	if (steps == 1) {
+		val = (min_uV - reg->min_uV) / reg->step_uV;
+		ret = max77663_regulator_cache_write(reg, addr, mask, val,
+						     cache);
+	} else {
+		for (i = 0; i < steps; i++) {
+			if (abs(min_uV - old_uV) > abs(safe_uV))
+				new_uV = old_uV + safe_uV;
+			else
+				new_uV = min_uV;
+
+			dev_dbg(&reg->rdev->dev, "do_set_voltage: name=%s, "
+				"%d/%d, old_uV=%d, new_uV=%d\n",
+				reg->rdev->desc->name, i + 1, steps, old_uV,
+				new_uV);
+
+			val = (new_uV - reg->min_uV) / reg->step_uV;
+			ret = max77663_regulator_cache_write(reg, addr, mask,
+							     val, cache);
+			if (ret < 0)
+				return ret;
+
+			old_uV = new_uV;
+		}
+	}
+
+	return ret;
 }
 
 static int max77663_regulator_set_voltage(struct regulator_dev *rdev,
@@ -539,6 +585,22 @@ static int max77663_regulator_preinit(struct max77663_regulator *reg)
 	else
 		reg->fps_src = (reg->regs[FPS_REG].val & FPS_SRC_MASK)
 				>> FPS_SRC_SHIFT;
+
+	/* Check Chip Identification */
+	ret = max77663_read(parent, MAX77663_REG_CID5, &val, 1, 0);
+	if (ret < 0) {
+		dev_err(reg->dev, "preinit: Failed to get register 0x%x\n",
+			MAX77663_REG_CID5);
+		return ret;
+	}
+
+	/* If metal revision is less than rev.3,
+	 * set safe_down_uV for stable down scaling. */
+	if ((reg->type == REGULATOR_TYPE_SD) &&
+			((val & CID_DIDM_MASK) >> CID_DIDM_SHIFT) <= 2)
+		reg->safe_down_uV = SD_SAFE_DOWN_UV;
+	else
+		reg->safe_down_uV = 0;
 
 	/* Set initial state */
 	if (!pdata->init_apply)
