@@ -26,6 +26,7 @@
 #include <linux/delay.h>
 #include <linux/fs.h>
 #include <linux/uaccess.h>
+#include <linux/wakelock.h>
 #include <mach/usb_phy.h>
 #include "baseband-xmm-power.h"
 #include "board.h"
@@ -33,7 +34,7 @@
 
 MODULE_LICENSE("GPL");
 
-static unsigned long XYZ = 500 * 1000000 + 30 * 1000 + 50;
+static unsigned long XYZ = 1000 * 1000000 + 800 * 1000 + 500;
 
 module_param(modem_ver, ulong, 0644);
 MODULE_PARM_DESC(modem_ver,
@@ -382,11 +383,10 @@ static void baseband_xmm_power2_flashless_pm_ver_ge_1130_step3
 		struct file *filp;
 		oldfs = get_fs();
 		set_fs(KERNEL_DS);
-		filp = filp_open("/sys/bus/usb/devices/usb2/2-1/manufacturer",
+		filp = filp_open("/dev/ttyACM0",
 			O_RDONLY, 0);
 		if (IS_ERR(filp) || (filp == NULL)) {
-			pr_err("open /sys/bus/usb/devices"
-				"/usb2/2-1/manufacturer failed %ld\n",
+			pr_err("/dev/ttyACM0 %ld\n",
 				PTR_ERR(filp));
 		} else {
 			filp_close(filp, NULL);
@@ -443,11 +443,10 @@ static void baseband_xmm_power2_flashless_pm_ver_ge_1130_step4
 		struct file *filp;
 		oldfs = get_fs();
 		set_fs(KERNEL_DS);
-		filp = filp_open("/sys/bus/usb/devices/usb2/2-1/manufacturer",
+		filp = filp_open("/dev/ttyACM0",
 			O_RDONLY, 0);
 		if (IS_ERR(filp) || (filp == NULL)) {
-			pr_err("open /sys/bus/usb/devices"
-				"/usb2/2-1/manufacturer failed %ld\n",
+			pr_err("open /dev/ttyACM0 failed %ld\n",
 				PTR_ERR(filp));
 		} else {
 			filp_close(filp, NULL);
@@ -488,7 +487,7 @@ static void baseband_xmm_power2_work_func(struct work_struct *work)
 		= (struct baseband_xmm_power_work_t *) work;
 	int err;
 
-	pr_debug("%s\n", __func__);
+	pr_debug("%s bbxmm_work->state=%d\n", __func__, bbxmm_work->state);
 
 	switch (bbxmm_work->state) {
 	case BBXMM_WORK_UNINIT:
@@ -598,6 +597,7 @@ static int baseband_xmm_power2_driver_probe(struct platform_device *device)
 	baseband_power2_driver_data = data;
 
 	/* init work queue */
+	pr_debug("%s: init work queue\n", __func__);
 	workqueue = create_singlethread_workqueue
 		("baseband_xmm_power2_workqueue");
 	if (!workqueue) {
@@ -610,12 +610,12 @@ static int baseband_xmm_power2_driver_probe(struct platform_device *device)
 		pr_err("cannot allocate baseband_xmm_power2_work\n");
 		return -1;
 	}
+	pr_debug("%s: BBXMM_WORK_INIT\n", __func__);
 	INIT_WORK((struct work_struct *) baseband_xmm_power2_work,
 		baseband_xmm_power2_work_func);
 	baseband_xmm_power2_work->state = BBXMM_WORK_INIT;
 	queue_work(workqueue,
 		(struct work_struct *) baseband_xmm_power2_work);
-
 	return 0;
 }
 
@@ -693,6 +693,7 @@ static struct platform_driver baseband_power2_driver = {
 static int __init baseband_xmm_power2_init(void)
 {
 	pr_debug("%s\n", __func__);
+
 	return platform_driver_register(&baseband_power2_driver);
 }
 

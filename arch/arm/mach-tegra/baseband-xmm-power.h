@@ -20,6 +20,8 @@
 #include <linux/pm.h>
 #include <linux/suspend.h>
 
+#define VENDOR_ID         0x1519
+#define PRODUCT_ID        0x0020
 #define TEGRA_EHCI_DEVICE "/sys/devices/platform/tegra-ehci.1/ehci_power"
 
 #define XMM_MODEM_VER_1121	0x1121
