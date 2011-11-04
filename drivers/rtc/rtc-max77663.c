@@ -19,7 +19,7 @@
 #include <linux/rtc.h>
 #include <linux/mfd/max77663-core.h>
 
-/* Registers */
+/* RTC Registers */
 #define MAX77663_RTC_IRQ		0x00
 #define MAX77663_RTC_IRQ_MASK		0x01
 #define MAX77663_RTC_CTRL_MODE		0x02
@@ -74,6 +74,11 @@
 #define RTC_YEAR_BASE			100
 #define RTC_YEAR_MAX			99
 
+/* ON/OFF Registers */
+#define MAX77663_REG_ONOFF_CFG2		0x42
+
+#define ONOFF_WK_ALARM1_MASK		(1 << 2)
+
 enum {
 	RTC_SEC,
 	RTC_MIN,
@@ -103,11 +108,13 @@ static inline int max77663_rtc_update_buffer(struct max77663_rtc *rtc,
 					     int write)
 {
 	struct device *parent = _to_parent(rtc);
-	u8 val = FLAG_AUTO_CLEAR_MASK | RTC_WAKE_MASK | RB_UPDATE_MASK;
+	u8 val =  FLAG_AUTO_CLEAR_MASK | RTC_WAKE_MASK;
 	int ret;
 
 	if (write)
-		val = FLAG_AUTO_CLEAR_MASK | RTC_WAKE_MASK | WB_UPDATE_MASK;
+		val |= WB_UPDATE_MASK;
+	else
+		val |= RB_UPDATE_MASK;
 
 	dev_dbg(rtc->dev, "rtc_update_buffer: write=%d, addr=0x%x, val=0x%x\n",
 		write, MAX77663_RTC_UPDATE0, val);
@@ -192,18 +199,7 @@ static inline int max77663_rtc_reg_to_tm(struct max77663_rtc *rtc, u8 *buf,
 	tm->tm_mday = (int)(buf[RTC_MONTHDAY] & MONTHDAY_MASK);
 	tm->tm_mon = (int)(buf[RTC_MONTH] & MONTH_MASK) - 1;
 	tm->tm_year = (int)(buf[RTC_YEAR] & YEAR_MASK) + RTC_YEAR_BASE;
-	tm->tm_wday = ffs(wday);
-
-	dev_dbg(rtc->dev, "rtc_reg_to_tm: buf sec=%u, min=%u, hour=%u, "
-		"mday=%u, month=%u, year=%u, wday=%u\n",
-		buf[RTC_SEC] & SEC_MASK, buf[RTC_MIN] & MIN_MASK,
-		buf[RTC_HOUR] & HOUR_MASK, buf[RTC_MONTHDAY] & MONTHDAY_MASK,
-		buf[RTC_MONTH] & MONTH_MASK, buf[RTC_YEAR] & YEAR_MASK,
-		buf[RTC_WEEKDAY] & WEEKDAY_MASK);
-	dev_dbg(rtc->dev, "rtc_reg_to_tm: tm_sec=%d, tm_min=%d, tm_hour=%d, "
-		"tm_mday=%d, tm_mon=%d, tm_year=%d, tm_wday=%d\n",
-		tm->tm_sec, tm->tm_min, tm->tm_hour, tm->tm_mday, tm->tm_mon,
-		tm->tm_year, tm->tm_wday);
+	tm->tm_wday = ffs(wday) - 1;
 
 	return 0;
 }
@@ -226,37 +222,82 @@ static inline int max77663_rtc_tm_to_reg(struct max77663_rtc *rtc, u8 *buf,
 	buf[RTC_MONTHDAY] = tm->tm_mday | alarm_mask;
 	buf[RTC_MONTH] = (tm->tm_mon + 1) | alarm_mask;
 	buf[RTC_YEAR] = (tm->tm_year - RTC_YEAR_BASE) | alarm_mask;
-	buf[RTC_WEEKDAY] = (1 << tm->tm_wday) | alarm_mask;
 
-	dev_dbg(rtc->dev, "rtc_tm_to_reg: tm_sec=%d, tm_min=%d, tm_hour=%d, "
-		"tm_mday=%d, tm_mon=%d, tm_year=%d, tm_wday=%d, alarm=%d\n",
-		tm->tm_sec, tm->tm_min, tm->tm_hour, tm->tm_mday, tm->tm_mon,
-		tm->tm_year, tm->tm_wday, alarm);
-	dev_dbg(rtc->dev, "rtc_tm_to_reg: buf sec=%u, min=%u, hour=%u, "
-		"mday=%u, month=%u, year=%u, wday=%u\n",
-		buf[RTC_SEC] & SEC_MASK, buf[RTC_MIN] & MIN_MASK,
-		buf[RTC_HOUR] & HOUR_MASK, buf[RTC_MONTHDAY] & MONTHDAY_MASK,
-		buf[RTC_MONTH] & MONTH_MASK, buf[RTC_YEAR] & YEAR_MASK,
-		buf[RTC_WEEKDAY] & WEEKDAY_MASK);
+	/* The wday is configured only when disabled alarm. */
+	if (!alarm)
+		buf[RTC_WEEKDAY] = (1 << tm->tm_wday);
+	else
+		buf[RTC_WEEKDAY] = 0;
 
 	return 0;
+}
+
+static inline int max77663_rtc_irq_mask(struct max77663_rtc *rtc, u8 irq)
+{
+	struct device *parent = _to_parent(rtc);
+	u8 irq_mask = rtc->irq_mask | irq;
+	int ret = 0;
+
+	ret = max77663_write(parent, MAX77663_RTC_IRQ_MASK, &irq_mask, 1, 1);
+	if (ret < 0) {
+		dev_err(rtc->dev, "rtc_irq_mask: Failed to set rtc irq mask\n");
+		goto out;
+	}
+	rtc->irq_mask = irq_mask;
+
+out:
+	return ret;
+}
+
+static inline int max77663_rtc_irq_unmask(struct max77663_rtc *rtc, u8 irq)
+{
+	struct device *parent = _to_parent(rtc);
+	u8 irq_mask = rtc->irq_mask & ~irq;
+	int ret = 0;
+
+	ret = max77663_write(parent, MAX77663_RTC_IRQ_MASK, &irq_mask, 1, 1);
+	if (ret < 0) {
+		dev_err(rtc->dev,
+			"rtc_irq_unmask: Failed to set rtc irq mask\n");
+		goto out;
+	}
+	rtc->irq_mask = irq_mask;
+
+out:
+	return ret;
+}
+
+static inline int max77663_rtc_do_irq(struct max77663_rtc *rtc)
+{
+	struct device *parent = _to_parent(rtc);
+	u8 irq_status;
+	int ret;
+
+	ret = max77663_read(parent, MAX77663_RTC_IRQ, &irq_status, 1, 1);
+	if (ret < 0) {
+		dev_err(rtc->dev, "rtc_irq: Failed to get rtc irq status\n");
+		return ret;
+	}
+
+	dev_dbg(rtc->dev, "rtc_do_irq: irq_mask=0x%02x, irq_status=0x%02x\n",
+		rtc->irq_mask, irq_status);
+
+	if (!(rtc->irq_mask & RTC_IRQ_ALARM1_MASK) &&
+			(irq_status & RTC_IRQ_ALARM1_MASK))
+		rtc_update_irq(rtc->rtc, 1, RTC_IRQF | RTC_AF);
+
+	if (!(rtc->irq_mask & RTC_IRQ_1SEC_MASK) &&
+			(irq_status & RTC_IRQ_1SEC_MASK))
+		rtc_update_irq(rtc->rtc, 1, RTC_IRQF | RTC_UF);
+
+	return ret;
 }
 
 static irqreturn_t max77663_rtc_irq(int irq, void *data)
 {
 	struct max77663_rtc *rtc = (struct max77663_rtc *)data;
-	u8 val = 0;
-	int ret;
 
-	ret = max77663_rtc_read(rtc, MAX77663_RTC_IRQ, &val, 1, 0);
-	if (ret < 0)
-		dev_err(rtc->dev, "rtc_irq: Failed to get rtc irq status\n");
-
-	if (val & RTC_IRQ_ALARM1_MASK)
-		rtc_update_irq(rtc->rtc, 1, RTC_IRQF | RTC_AF);
-
-	if (val & RTC_IRQ_1SEC_MASK)
-		rtc_update_irq(rtc->rtc, 1, RTC_IRQF | RTC_UF);
+	max77663_rtc_do_irq(rtc);
 
 	return IRQ_HANDLED;
 }
@@ -265,33 +306,54 @@ static int max77663_rtc_alarm_irq_enable(struct device *dev,
 					 unsigned int enabled)
 {
 	struct max77663_rtc *rtc = dev_get_drvdata(dev);
-	struct device *parent = _to_parent(rtc);
-	u8 val = 0;
 	int ret = 0;
 
 	if (rtc->irq < 0)
 		return -ENXIO;
 
 	mutex_lock(&rtc->io_lock);
+
+	/* Handle pending interrupt */
+	ret = max77663_rtc_do_irq(rtc);
+	if (ret < 0)
+		goto out;
+
+	/* Config alarm interrupt */
 	if (enabled)
-		val = rtc->irq_mask & ~RTC_IRQ_ALARM1_MASK;
+		max77663_rtc_irq_unmask(rtc, RTC_IRQ_ALARM1_MASK);
 	else
-		val = rtc->irq_mask | RTC_IRQ_ALARM1_MASK;
+		max77663_rtc_irq_mask(rtc, RTC_IRQ_ALARM1_MASK);
 
-	if (val != rtc->irq_mask) {
-		ret = max77663_write(parent, MAX77663_RTC_IRQ_MASK, &val, 1, 1);
-		if (ret < 0) {
-			dev_err(rtc->dev, "rtc_alarm_irq_enable: "
-				"Failed to set rtc irq mask\n");
-			mutex_unlock(&rtc->io_lock);
-			return ret;
-		}
-
-		rtc->irq_mask = val;
-	}
+out:
 	mutex_unlock(&rtc->io_lock);
+	return ret;
+}
 
-	return 0;
+static int max77663_rtc_update_irq_enable(struct device *dev,
+					  unsigned int enabled)
+{
+	struct max77663_rtc *rtc = dev_get_drvdata(dev);
+	int ret = 0;
+
+	if (rtc->irq < 0)
+		return -ENXIO;
+
+	mutex_lock(&rtc->io_lock);
+
+	/* Handle pending interrupt */
+	ret = max77663_rtc_do_irq(rtc);
+	if (ret < 0)
+		goto out;
+
+	/* Config update interrupt */
+	if (enabled)
+		max77663_rtc_irq_unmask(rtc, RTC_IRQ_1SEC_MASK);
+	else
+		max77663_rtc_irq_mask(rtc, RTC_IRQ_1SEC_MASK);
+
+out:
+	mutex_unlock(&rtc->io_lock);
+	return ret;
 }
 
 static int max77663_rtc_read_time(struct device *dev, struct rtc_time *tm)
@@ -306,7 +368,24 @@ static int max77663_rtc_read_time(struct device *dev, struct rtc_time *tm)
 		return ret;
 	}
 
-	return max77663_rtc_reg_to_tm(rtc, buf, tm);
+	dev_dbg(rtc->dev, "rtc_read_time: "
+		"buf: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n",
+		buf[RTC_SEC], buf[RTC_MIN], buf[RTC_HOUR], buf[RTC_WEEKDAY],
+		buf[RTC_MONTH], buf[RTC_YEAR], buf[RTC_MONTHDAY]);
+
+	ret = max77663_rtc_reg_to_tm(rtc, buf, tm);
+	if (ret < 0) {
+		dev_err(rtc->dev, "rtc_read_time: "
+			"Failed to convert register format into time format\n");
+		return ret;
+	}
+
+	dev_dbg(rtc->dev, "rtc_read_time: "
+		"tm: %d-%02d-%02d %02d:%02d:%02d, wday=%d\n",
+		tm->tm_year, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min,
+		tm->tm_sec, tm->tm_wday);
+
+	return ret;
 }
 
 static int max77663_rtc_set_time(struct device *dev, struct rtc_time *tm)
@@ -315,12 +394,22 @@ static int max77663_rtc_set_time(struct device *dev, struct rtc_time *tm)
 	u8 buf[RTC_NR];
 	int ret;
 
+	dev_dbg(rtc->dev, "rtc_set_time: "
+		"tm: %d-%02d-%02d %02d:%02d:%02d, wday=%d\n",
+		tm->tm_year, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min,
+		tm->tm_sec, tm->tm_wday);
+
 	ret = max77663_rtc_tm_to_reg(rtc, buf, tm, 0);
 	if (ret < 0) {
 		dev_err(rtc->dev, "rtc_set_time: "
 			"Failed to convert time format into register format\n");
 		return ret;
 	}
+
+	dev_dbg(rtc->dev, "rtc_set_time: "
+		"buf: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n",
+		buf[RTC_SEC], buf[RTC_MIN], buf[RTC_HOUR], buf[RTC_WEEKDAY],
+		buf[RTC_MONTH], buf[RTC_YEAR], buf[RTC_MONTHDAY]);
 
 	return max77663_rtc_write(rtc, MAX77663_RTC_SEC, buf, sizeof(buf), 1);
 }
@@ -339,12 +428,23 @@ static int max77663_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 		return ret;
 	}
 
+	dev_dbg(rtc->dev, "rtc_read_alarm: "
+		"buf: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n",
+		buf[RTC_SEC], buf[RTC_MIN], buf[RTC_HOUR], buf[RTC_WEEKDAY],
+		buf[RTC_MONTH], buf[RTC_YEAR], buf[RTC_MONTHDAY]);
+
 	ret = max77663_rtc_reg_to_tm(rtc, buf, &alrm->time);
 	if (ret < 0) {
 		dev_err(rtc->dev, "rtc_read_alarm: "
 			"Failed to convert register format into time format\n");
 		return ret;
 	}
+
+	dev_dbg(rtc->dev, "rtc_read_alarm: "
+		"tm: %d-%02d-%02d %02d:%02d:%02d, wday=%d\n",
+		alrm->time.tm_year, alrm->time.tm_mon, alrm->time.tm_mday,
+		alrm->time.tm_hour, alrm->time.tm_min, alrm->time.tm_sec,
+		alrm->time.tm_wday);
 
 	if (rtc->irq_mask & RTC_IRQ_ALARM1_MASK)
 		alrm->enabled = 1;
@@ -360,12 +460,30 @@ static int max77663_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	u8 buf[RTC_NR];
 	int ret;
 
+	ret = max77663_rtc_alarm_irq_enable(dev, 0);
+	if (ret < 0) {
+		dev_err(rtc->dev,
+			"rtc_set_alarm: Failed to disable rtc alarm\n");
+		return ret;
+	}
+
+	dev_dbg(rtc->dev, "rtc_set_alarm: "
+		"tm: %d-%02d-%02d %02d:%02d:%02d, wday=%d\n",
+		alrm->time.tm_year, alrm->time.tm_mon, alrm->time.tm_mday,
+		alrm->time.tm_hour, alrm->time.tm_min, alrm->time.tm_sec,
+		alrm->time.tm_wday);
+
 	ret = max77663_rtc_tm_to_reg(rtc, buf, &alrm->time, 1);
 	if (ret < 0) {
 		dev_err(rtc->dev, "rtc_set_alarm: "
 			"Failed to convert time format into register format\n");
 		return ret;
 	}
+
+	dev_dbg(rtc->dev, "rtc_set_alarm: "
+		"buf: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n",
+		buf[RTC_SEC], buf[RTC_MIN], buf[RTC_HOUR], buf[RTC_WEEKDAY],
+		buf[RTC_MONTH], buf[RTC_YEAR], buf[RTC_MONTHDAY]);
 
 	ret = max77663_rtc_write(rtc, MAX77663_RTC_ALARM_SEC1, buf, sizeof(buf),
 				 1);
@@ -375,14 +493,14 @@ static int max77663_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 		return ret;
 	}
 
-	ret = max77663_rtc_alarm_irq_enable(dev, alrm->enabled);
+	ret = max77663_rtc_alarm_irq_enable(dev, 1);
 	if (ret < 0) {
 		dev_err(rtc->dev,
-			"rtc_set_alarm: Failed to set rtc alarm irq\n");
+			"rtc_set_alarm: Failed to enable rtc alarm\n");
 		return ret;
 	}
 
-	return 0;
+	return ret;
 }
 
 static const struct rtc_class_ops max77663_rtc_ops = {
@@ -395,11 +513,12 @@ static const struct rtc_class_ops max77663_rtc_ops = {
 
 static int max77663_rtc_preinit(struct max77663_rtc *rtc)
 {
+	struct device *parent = _to_parent(rtc);
 	u8 val;
 	int ret;
 
 	/* Mask all interrupts */
-	rtc->irq_mask = RTC_IRQ_MASK;
+	rtc->irq_mask = 0xFF;
 	ret = max77663_rtc_write(rtc, MAX77663_RTC_IRQ_MASK, &rtc->irq_mask, 1,
 				 0);
 	if (ret < 0) {
@@ -412,6 +531,14 @@ static int max77663_rtc_preinit(struct max77663_rtc *rtc)
 	ret = max77663_rtc_write(rtc, MAX77663_RTC_CTRL, &val, 1, 0);
 	if (ret < 0) {
 		dev_err(rtc->dev, "preinit: Failed to set rtc control\n");
+		return ret;
+	}
+
+	/* Set alarm to wake-up event from sleep */
+	ret = max77663_set_bits(parent, MAX77663_REG_ONOFF_CFG2,
+				ONOFF_WK_ALARM1_MASK, ONOFF_WK_ALARM1_MASK, 0);
+	if (ret < 0) {
+		dev_err(rtc->dev, "preinit: Failed to set onoff cfg2\n");
 		return ret;
 	}
 
