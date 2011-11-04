@@ -1128,6 +1128,9 @@ static void tegra_debug_uart_resume(void)
 	/* DLAB = 0 */
 	writeb(lcr & ~UART_LCR_DLAB, uart + UART_LCR * 4);
 
+	writeb(UART_FCR_ENABLE_FIFO | UART_FCR_T_TRIG_01 | UART_FCR_R_TRIG_01,
+			uart + UART_FCR * 4);
+
 	writeb(tegra_sctx.uart[2], uart + UART_IER * 4);
 
 	/* DLAB = 1 */
