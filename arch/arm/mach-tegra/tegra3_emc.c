@@ -769,6 +769,35 @@ static const struct clk_mux_sel *find_matching_input(
 	return NULL;
 }
 
+static void adjust_emc_dvfs_table(const struct tegra_emc_table *table,
+				  int table_size)
+{
+	int i, j;
+	unsigned long rate;
+
+	if (table[0].rev < 0x33)
+		return;
+
+	for (i = 0; i < MAX_DVFS_FREQS; i++) {
+		int mv = emc->dvfs->millivolts[i];
+		if (!mv)
+			break;
+
+		/* For each dvfs voltage find maximum supported rate;
+		   use 1MHz placeholder if not found */
+		for (rate = 1000, j = 0; j < table_size; j++) {
+			if (tegra_emc_clk_sel[j].input == NULL)
+				continue;	/* invalid entry */
+
+			if ((mv >= table[j].emc_min_mv) &&
+			    (rate < table[j].rate))
+				rate = table[j].rate;
+		}
+		/* Table entries specify rate in kHz */
+		emc->dvfs->freqs[i] = rate * 1000;
+	}
+}
+
 static bool is_emc_bridge(void)
 {
 	int mv;
@@ -876,6 +905,7 @@ void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
 		break;
 	case 0x31:
 	case 0x32:
+	case 0x33:
 		emc_num_burst_regs = 107;
 		break;
 	default:
@@ -927,6 +957,7 @@ void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
 
 	tegra_emc_table = table;
 
+	adjust_emc_dvfs_table(tegra_emc_table, tegra_emc_table_size);
 	mv = tegra_dvfs_predict_millivolts(emc, max_rate * 1000);
 	if ((mv <= 0) || (mv > emc->dvfs->max_millivolts)) {
 		tegra_emc_table = NULL;

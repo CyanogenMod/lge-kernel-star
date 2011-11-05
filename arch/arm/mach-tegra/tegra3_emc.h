@@ -42,6 +42,7 @@ struct tegra_emc_table {
 	u32 emc_mode_1;
 	u32 emc_mode_2;
 	u32 emc_dsr;
+	int emc_min_mv;
 };
 
 struct clk;
