@@ -64,11 +64,94 @@
 #define GPIO_INT_MIC_EN BIT(2)
 #define GPIO_EXT_MIC_EN BIT(3)
 
+#define DAI_LINK_HIFI		0
+#define DAI_LINK_SPDIF		1
+#define DAI_LINK_BTSCO		2
+#define DAI_LINK_VOICE_CALL	3
+#define DAI_LINK_BT_VOICE_CALL	4
+#define NUM_DAI_LINKS	5
+
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+const char *tegra_max98088_i2s_dai_name[TEGRA30_NR_I2S_IFC] = {
+	"tegra30-i2s.0",
+	"tegra30-i2s.1",
+	"tegra30-i2s.2",
+	"tegra30-i2s.3",
+	"tegra30-i2s.4",
+};
+#endif
+
 struct tegra_max98088 {
 	struct tegra_asoc_utils_data util_data;
 	struct tegra_max98088_platform_data *pdata;
 	int gpio_requested;
 	bool init_done;
+	int is_call_mode;
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	struct codec_config codec_info[NUM_I2S_DEVICES];
+#endif
+};
+
+static int tegra_call_mode_info(struct snd_kcontrol *kcontrol,
+			struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 1;
+	return 0;
+}
+
+static int tegra_call_mode_get(struct snd_kcontrol *kcontrol,
+		struct snd_ctl_elem_value *ucontrol)
+{
+	struct tegra_max98088 *machine = snd_kcontrol_chip(kcontrol);
+
+	ucontrol->value.integer.value[0] = machine->is_call_mode;
+
+	return 0;
+}
+
+static int tegra_call_mode_put(struct snd_kcontrol *kcontrol,
+		struct snd_ctl_elem_value *ucontrol)
+{
+	struct tegra_max98088 *machine = snd_kcontrol_chip(kcontrol);
+	int is_call_mode_new = ucontrol->value.integer.value[0];
+
+	if (machine->is_call_mode == is_call_mode_new)
+		return 0;
+
+	if (is_call_mode_new) {
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+		if (machine->codec_info[HIFI_CODEC].rate == 0 ||
+			machine->codec_info[HIFI_CODEC].channels == 0)
+				return -EINVAL;
+
+		tegra30_make_voice_call_connections(
+			&machine->codec_info[HIFI_CODEC],
+			&machine->codec_info[BASEBAND]);
+#endif
+	} else {
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+		tegra30_break_voice_call_connections(
+			&machine->codec_info[HIFI_CODEC],
+			&machine->codec_info[BASEBAND]);
+#endif
+	}
+
+	machine->is_call_mode = is_call_mode_new;
+
+	return 1;
+}
+
+struct snd_kcontrol_new tegra_call_mode_control = {
+	.access = SNDRV_CTL_ELEM_ACCESS_READWRITE,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Call Mode Switch",
+	.private_value = 0xffff,
+	.info = tegra_call_mode_info,
+	.get = tegra_call_mode_get,
+	.put = tegra_call_mode_put
 };
 
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
@@ -374,6 +457,98 @@ static int tegra_max98088_shutdown(struct snd_pcm_substream *substream)
 }
 #endif
 
+static int tegra_voice_call_hw_params(struct snd_pcm_substream *substream,
+			struct snd_pcm_hw_params *params)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	struct snd_soc_codec *codec = rtd->codec;
+	struct snd_soc_card *card = codec->card;
+	struct tegra_max98088 *machine = snd_soc_card_get_drvdata(card);
+	int srate, mclk;
+	int err;
+
+	srate = params_rate(params);
+	switch (srate) {
+	case 8000:
+	case 16000:
+	case 24000:
+	case 32000:
+	case 48000:
+	case 64000:
+	case 96000:
+		mclk = 12288000;
+		break;
+	case 11025:
+	case 22050:
+	case 44100:
+	case 88200:
+		mclk = 11289600;
+		break;
+	default:
+		return -EINVAL;
+		break;
+	}
+
+	err = tegra_asoc_utils_set_rate(&machine->util_data, srate, mclk);
+	if (err < 0) {
+		if (!(machine->util_data.set_mclk % mclk))
+			mclk = machine->util_data.set_mclk;
+		else {
+			dev_err(card->dev, "Can't configure clocks\n");
+			return err;
+		}
+	}
+
+	tegra_asoc_utils_lock_clk_rate(&machine->util_data, 1);
+
+	err = snd_soc_dai_set_fmt(codec_dai,
+					SND_SOC_DAIFMT_I2S |
+					SND_SOC_DAIFMT_NB_NF |
+					SND_SOC_DAIFMT_CBS_CFS);
+	if (err < 0) {
+		dev_err(card->dev, "codec_dai fmt not set\n");
+		return err;
+	}
+
+	err = snd_soc_dai_set_sysclk(codec_dai, 0, mclk,
+					SND_SOC_CLOCK_IN);
+	if (err < 0) {
+		dev_err(card->dev, "codec_dai clock not set\n");
+		return err;
+	}
+
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	/* codec configuration */
+	machine->codec_info[HIFI_CODEC].rate = params_rate(params);
+	machine->codec_info[HIFI_CODEC].channels = params_channels(params);
+	machine->codec_info[HIFI_CODEC].bitsize = 16;
+	machine->codec_info[HIFI_CODEC].is_i2smaster = 1;
+	machine->codec_info[HIFI_CODEC].is_format_dsp = 0;
+
+	/* baseband configuration */
+	machine->codec_info[BASEBAND].bitsize = 16;
+	machine->codec_info[BASEBAND].is_i2smaster = 1;
+	machine->codec_info[BASEBAND].is_format_dsp = 1;
+#endif
+
+	return 0;
+}
+
+static int tegra_voice_call_shutdown(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct tegra_max98088 *machine  =
+			snd_soc_card_get_drvdata(rtd->codec->card);
+
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	machine->codec_info[HIFI_CODEC].rate = 0;
+	machine->codec_info[HIFI_CODEC].channels = 0;
+#endif
+
+	return 0;
+}
+
 static struct snd_soc_ops tegra_max98088_ops = {
 	.hw_params = tegra_max98088_hw_params,
 	.hw_free = tegra_hw_free,
@@ -385,6 +560,12 @@ static struct snd_soc_ops tegra_max98088_ops = {
 
 static struct snd_soc_ops tegra_spdif_ops = {
 	.hw_params = tegra_spdif_hw_params,
+	.hw_free = tegra_hw_free,
+};
+
+static struct snd_soc_ops tegra_voice_call_ops = {
+	.hw_params = tegra_voice_call_hw_params,
+	.shutdown = tegra_voice_call_shutdown,
 	.hw_free = tegra_hw_free,
 };
 
@@ -514,7 +695,15 @@ static int tegra_max98088_init(struct snd_soc_pcm_runtime *rtd)
 	struct snd_soc_card *card = codec->card;
 	struct tegra_max98088 *machine = snd_soc_card_get_drvdata(card);
 	struct tegra_max98088_platform_data *pdata = machine->pdata;
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	struct tegra30_i2s *i2s = snd_soc_dai_get_drvdata(rtd->cpu_dai);
+#endif
 	int ret;
+
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	if (machine->codec_info[BASEBAND].i2s_id != -1)
+		i2s->is_dam_used = true;
+#endif
 
 	if (machine->init_done)
 		return 0;
@@ -595,6 +784,12 @@ static int tegra_max98088_init(struct snd_soc_pcm_runtime *rtd)
 	max98088_headset_detect(codec, &tegra_max98088_hp_jack,
 		SND_JACK_HEADSET);
 
+       /* Add call mode switch control */
+	ret = snd_ctl_add(codec->card->snd_card,
+			snd_ctl_new1(&tegra_call_mode_control, machine));
+	if (ret < 0)
+		return ret;
+
 	snd_soc_dapm_nc_pin(dapm, "INA1");
 	snd_soc_dapm_nc_pin(dapm, "INA2");
 	snd_soc_dapm_nc_pin(dapm, "INB1");
@@ -604,36 +799,44 @@ static int tegra_max98088_init(struct snd_soc_pcm_runtime *rtd)
 	return 0;
 }
 
-static struct snd_soc_dai_link tegra_max98088_dai[] = {
-	{
-		.name = "MAX98088",
-		.stream_name = "MAX98088 HIFI",
-		.codec_name = "max98088.0-0010",
-		.platform_name = "tegra-pcm-audio",
-		.cpu_dai_name = "tegra30-i2s.0",
-		.codec_dai_name = "HiFi",
-		.init = tegra_max98088_init,
-		.ops = &tegra_max98088_ops,
-	},
-	{
-		.name = "SPDIF",
-		.stream_name = "SPDIF PCM",
-		.codec_name = "spdif-dit.0",
-		.platform_name = "tegra-pcm-audio",
-		.cpu_dai_name = "tegra30-spdif",
-		.codec_dai_name = "dit-hifi",
-		.ops = &tegra_spdif_ops,
-	},
-	{
-		.name = "BT SCO",
-		.stream_name = "BT SCO PCM",
-		.codec_name = "spdif-dit.1",
-		.platform_name = "tegra-pcm-audio",
-		.cpu_dai_name = "tegra30-i2s.3",
-		.codec_dai_name = "dit-hifi",
-		.init = tegra_max98088_init,
-		.ops = &tegra_bt_ops,
-	},
+static struct snd_soc_dai_link tegra_max98088_dai[NUM_DAI_LINKS] = {
+	[DAI_LINK_HIFI] = {
+			.name = "MAX98088",
+			.stream_name = "MAX98088 HIFI",
+			.codec_name = "max98088.0-0010",
+			.platform_name = "tegra-pcm-audio",
+			.codec_dai_name = "HiFi",
+			.init = tegra_max98088_init,
+			.ops = &tegra_max98088_ops,
+		},
+	[DAI_LINK_SPDIF] = {
+			.name = "SPDIF",
+			.stream_name = "SPDIF PCM",
+			.codec_name = "spdif-dit.0",
+			.platform_name = "tegra-pcm-audio",
+			.cpu_dai_name = "tegra30-spdif",
+			.codec_dai_name = "dit-hifi",
+			.ops = &tegra_spdif_ops,
+		},
+	[DAI_LINK_BTSCO] = {
+			.name = "BT SCO",
+			.stream_name = "BT SCO PCM",
+			.codec_name = "spdif-dit.1",
+			.platform_name = "tegra-pcm-audio",
+			.cpu_dai_name = "tegra30-i2s.3",
+			.codec_dai_name = "dit-hifi",
+			.init = tegra_max98088_init,
+			.ops = &tegra_bt_ops,
+		},
+	[DAI_LINK_VOICE_CALL] = {
+			.name = "VOICE CALL",
+			.stream_name = "VOICE CALL PCM",
+			.codec_name = "max98088.0-0010",
+			.platform_name = "tegra-pcm-audio",
+			.cpu_dai_name = "dit-hifi",
+			.codec_dai_name = "HiFi",
+			.ops = &tegra_voice_call_ops,
+		},
 };
 
 static struct snd_soc_card snd_soc_tegra_max98088 = {
@@ -647,7 +850,7 @@ static __devinit int tegra_max98088_driver_probe(struct platform_device *pdev)
 	struct snd_soc_card *card = &snd_soc_tegra_max98088;
 	struct tegra_max98088 *machine;
 	struct tegra_max98088_platform_data *pdata;
-	int ret;
+	int ret, i;
 
 	pdata = pdev->dev.platform_data;
 	if (!pdata) {
@@ -679,6 +882,17 @@ static __devinit int tegra_max98088_driver_probe(struct platform_device *pdev)
 			ret);
 		goto err_fini_utils;
 	}
+#endif
+
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	for (i = 0; i < NUM_I2S_DEVICES ; i++)
+		machine->codec_info[i].i2s_id = pdata->audio_port_id[i];
+
+	machine->codec_info[BASEBAND].rate = pdata->baseband_param.rate;
+	machine->codec_info[BASEBAND].channels = pdata->baseband_param.channels;
+
+	tegra_max98088_dai[DAI_LINK_HIFI].cpu_dai_name =
+	tegra_max98088_i2s_dai_name[machine->codec_info[HIFI_CODEC].i2s_id];
 #endif
 
 	ret = snd_soc_register_card(card);
