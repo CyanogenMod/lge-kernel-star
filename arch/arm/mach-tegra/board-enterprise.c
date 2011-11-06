@@ -209,6 +209,7 @@ static __initdata struct tegra_clk_init_table enterprise_clk_init_table[] = {
 	{ "pll_a",	NULL,		564480000,	false},
 	{ "pll_a_out0",	NULL,		11289600,	false},
 	{ "i2s0",	"pll_a_out0",	0,		false},
+	{ "i2s2",	"pll_a_out0",	0,		false},
 	{ "i2s3",	"pll_a_out0",	0,		false},
 	{ "spdif_out",	"pll_a_out0",	0,		false},
 	{ "d_audio",	"pll_a_out0",	0,		false},
@@ -608,6 +609,14 @@ static struct tegra_max98088_platform_data enterprise_audio_pdata = {
 	.gpio_hp_mute		= -1,
 	.gpio_int_mic_en	= -1,
 	.gpio_ext_mic_en	= -1,
+	.audio_port_id		= {
+		[HIFI_CODEC] = 0,
+		[BASEBAND] = 2,
+	},
+	.baseband_param		= {
+		.rate = 8000,
+		.channels = 1,
+	},
 };
 
 static struct platform_device enterprise_audio_device = {
@@ -650,10 +659,12 @@ static struct platform_device *enterprise_devices[] __initdata = {
 	&tegra_dam_device1,
 	&tegra_dam_device2,
 	&tegra_i2s_device0,
+	&tegra_i2s_device2,
 	&tegra_i2s_device3,
 	&tegra_spdif_device,
 	&spdif_dit_device,
 	&bluetooth_dit_device,
+	&baseband_dit_device,
 	&tegra_pcm_device,
 	&enterprise_audio_device,
 	&tegra_spi_device4,
