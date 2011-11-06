@@ -14,10 +14,21 @@
  *
  */
 
+#define	HIFI_CODEC		0
+#define	BASEBAND		1
+#define	NUM_I2S_DEVICES	2
+
+struct baseband_config {
+	int rate;
+	int channels;
+};
+
 struct tegra_max98088_platform_data {
 	int gpio_spkr_en;
 	int gpio_hp_det;
 	int gpio_hp_mute;
 	int gpio_int_mic_en;
 	int gpio_ext_mic_en;
+	int audio_port_id[NUM_I2S_DEVICES];
+	struct baseband_config baseband_param;
 };
