@@ -462,6 +462,10 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_cardhu_a03[] = {
 
 static __initdata struct tegra_pingroup_config cardhu_pinmux_e1291_a04[] = {
 	DEFAULT_PINMUX(GMI_AD15,        NAND,            PULL_DOWN,   NORMAL,   OUTPUT),
+	DEFAULT_PINMUX(ULPI_DATA5,      UARTA,           PULL_UP,   NORMAL,     INPUT),
+	DEFAULT_PINMUX(ULPI_DATA6,      UARTA,           NORMAL,    NORMAL,     OUTPUT),
+	DEFAULT_PINMUX(SPI2_MOSI,       SPI6,            NORMAL,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(DAP3_SCLK,       RSVD1,           NORMAL,    NORMAL,     OUTPUT),
 };
 
 static __initdata struct tegra_pingroup_config cardhu_pinmux_e1198[] = {

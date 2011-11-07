@@ -54,6 +54,7 @@
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <mach/usb_phy.h>
+#include <linux/nfc/pn544.h>
 
 #include "board.h"
 #include "clock.h"
@@ -327,6 +328,19 @@ static struct platform_device rndis_device = {
 };
 #endif
 
+static struct pn544_i2c_platform_data nfc_pdata = {
+	.irq_gpio = TEGRA_GPIO_PX0,
+	.ven_gpio = TEGRA_GPIO_PP3,
+	.firm_gpio = TEGRA_GPIO_PO7,
+	};
+
+static struct i2c_board_info __initdata cardhu_i2c_bus3_board_info[] = {
+	{
+		I2C_BOARD_INFO("pn544", 0x28),
+		.platform_data = &nfc_pdata,
+		.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PX0),
+	},
+};
 static struct tegra_i2c_platform_data cardhu_i2c1_platform_data = {
 	.adapter_nr	= 0,
 	.bus_count	= 1,
@@ -418,6 +432,7 @@ static void cardhu_i2c_init(void)
 	platform_device_register(&tegra_i2c_device1);
 
 	i2c_register_board_info(4, &wm8903_board_info, 1);
+	i2c_register_board_info(2, cardhu_i2c_bus3_board_info, 1);
 }
 
 static struct platform_device *cardhu_uart_devices[] __initdata = {
@@ -952,6 +967,13 @@ static void cardhu_gps_init(void)
 	tegra_gpio_enable(TEGRA_GPIO_PU3);
 }
 
+static void cardhu_nfc_init(void)
+{
+	tegra_gpio_enable(TEGRA_GPIO_PX0);
+	tegra_gpio_enable(TEGRA_GPIO_PP3);
+	tegra_gpio_enable(TEGRA_GPIO_PO7);
+}
+
 static struct baseband_power_platform_data tegra_baseband_power_data = {
 	.baseband_type = BASEBAND_XMM,
 	.modem = {
@@ -1090,6 +1112,7 @@ static void __init tegra_cardhu_init(void)
 	cardhu_pins_state_init();
 	cardhu_emc_init();
 	tegra_release_bootloader_fb();
+	cardhu_nfc_init();
 }
 
 static void __init cardhu_ramconsole_reserve(unsigned long size)
