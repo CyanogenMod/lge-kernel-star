@@ -36,10 +36,9 @@
 #include <linux/mfd/ricoh583.h>
 #include <linux/regulator/ricoh583-regulator.h>
 
-
-#define RICOH_ONOFFSEL_REG	0x10
 struct ricoh583_regulator {
 	int		id;
+	int		deepsleep_id;
 	/* Regulator register address.*/
 	u8		reg_en_reg;
 	u8		en_bit;
@@ -49,8 +48,6 @@ struct ricoh583_regulator {
 	u8		vout_mask;
 	u8		vout_reg_cache;
 	u8		deepsleep_reg;
-	u8		sleepseq_reg;
-	u8		sleepseq_shift;
 
 	/* chip constraints on regulator behavior */
 	int			min_uV;
@@ -150,73 +147,6 @@ static int __ricoh583_set_ds_voltage(struct device *parent,
 	return ret;
 }
 
-static int __ricoh583_set_ext_pwrreq1_control(struct device *parent,
-		struct ricoh583_regulator *ri, unsigned long flags, int slots)
-{
-	int ret;
-	uint8_t sleepseq_val;
-	u8 en_bit;
-	u8 slot_bit;
-
-	if (ri->id == RICOH583_ID_DC0) {
-		if (flags & EXT_PWRREQ1_CONTROL) {
-			dev_err(ri->dev, "PWRREQ1 is invalid control for "
-				"rail %d\n", ri->id);
-			return -EINVAL;
-		}
-		return 0;
-	}
-
-	en_bit = ri->sleepseq_shift;
-	slot_bit = en_bit + 1;
-	ret = ricoh583_read(parent, ri->sleepseq_reg, &sleepseq_val);
-	if (ret < 0) {
-		dev_err(ri->dev, "Error in reading reg 0x%x\n",
-				ri->sleepseq_reg);
-		return ret;
-	}
-
-	if (flags & EXT_PWRREQ1_CONTROL) {
-		sleepseq_val |= (1 << en_bit);
-		sleepseq_val &= ~(0x7 << slot_bit);
-		sleepseq_val |= ((slots & 0x7) << slot_bit);
-		ret = ricoh583_set_bits(parent, RICOH_ONOFFSEL_REG, (1 << 1));
-		if (ret < 0) {
-			dev_err(ri->dev, "Error in updating the ONOFFSEL 0x10 register\n");
-			return ret;
-		}
-	} else {
-		sleepseq_val &= ~(0xF << en_bit);
-	}
-	ret = ricoh583_write(parent, ri->sleepseq_reg, sleepseq_val);
-	if (ret < 0)
-		dev_err(ri->dev, "Error in writing reg 0x%x\n",
-				ri->sleepseq_reg);
-	return ret;
-}
-
-static int __ricoh583_set_ext_pwrreq2_control(struct device *parent,
-		struct ricoh583_regulator *ri, unsigned long flags)
-{
-	int ret;
-
-	if (ri->id != RICOH583_ID_DC0) {
-		if (flags & EXT_PWRREQ2_CONTROL) {
-			dev_err(ri->dev, "PWRREQ2 is invalid control for "
-				"rail %d\n", ri->id);
-			return -EINVAL;
-		}
-		return 0;
-	}
-	if (flags & EXT_PWRREQ2_CONTROL)
-		ret = ricoh583_set_bits(parent, RICOH_ONOFFSEL_REG, (1 << 2));
-	else
-		ret = ricoh583_clr_bits(parent, RICOH_ONOFFSEL_REG, (1 << 2));
-	if (ret < 0)
-		dev_err(ri->dev, "Error in updating the ONOFFSEL 0x10 register\n");
-	return ret;
-}
-
 static int __ricoh583_set_voltage(struct device *parent,
 		struct ricoh583_regulator *ri, int min_uV, int max_uV)
 {
@@ -271,8 +201,8 @@ static struct regulator_ops ricoh583_ops = {
 };
 
 #define RICOH583_REG(_id, _en_reg, _en_bit, _disc_reg, _disc_bit, _vout_reg, \
-		_vout_mask, _ds_reg, _slpseq_reg, _slpseq_shift, _min_mv, \
-		_max_mv, _step_uV, _nsteps, _ops, _delay)		\
+		_vout_mask, _ds_reg, _min_mv, _max_mv, _step_uV, _nsteps,    \
+		_ops, _delay)		\
 {								\
 	.reg_en_reg	= _en_reg,				\
 	.en_bit		= _en_bit,				\
@@ -281,14 +211,13 @@ static struct regulator_ops ricoh583_ops = {
 	.vout_reg	= _vout_reg,				\
 	.vout_mask	= _vout_mask,				\
 	.deepsleep_reg	= _ds_reg,				\
-	.sleepseq_reg	= _slpseq_reg,				\
-	.sleepseq_shift = _slpseq_shift,			\
 	.min_uV		= _min_mv * 1000,			\
 	.max_uV		= _max_mv * 1000,			\
 	.step_uV	= _step_uV,				\
 	.nsteps		= _nsteps,				\
 	.delay		= _delay,				\
 	.id		= RICOH583_ID_##_id,			\
+	.deepsleep_id	= RICOH583_DS_##_id,			\
 	.desc = {						\
 		.name = ricoh583_rails(_id),			\
 		.id = RICOH583_ID_##_id,			\
@@ -300,33 +229,33 @@ static struct regulator_ops ricoh583_ops = {
 }
 
 static struct ricoh583_regulator ricoh583_regulator[] = {
-	RICOH583_REG(DC0, 0x30, 0, 0x30, 1, 0x31, 0x7F, 0x60, 0x21, 0,
+	RICOH583_REG(DC0, 0x30, 0, 0x30, 1, 0x31, 0x7F, 0x60,
 			700, 1500, 12500, 0x41, ricoh583_ops, 500),
-	RICOH583_REG(DC1, 0x34, 0, 0x34, 1, 0x35, 0x7F, 0x61, 0x21, 4,
+	RICOH583_REG(DC1, 0x34, 0, 0x34, 1, 0x35, 0x7F, 0x61,
 			700, 1500, 12500, 0x41, ricoh583_ops, 500),
-	RICOH583_REG(DC2, 0x38, 0, 0x38, 1, 0x39, 0x7F, 0x62, 0x22, 0,
+	RICOH583_REG(DC2, 0x38, 0, 0x38, 1, 0x39, 0x7F, 0x62,
 			900, 2400, 12500, 0x79, ricoh583_ops, 500),
-	RICOH583_REG(DC3, 0x3C, 0, 0x3C, 1, 0x3D, 0x7F, 0x63, 0x22, 4,
+	RICOH583_REG(DC3, 0x3C, 0, 0x3C, 1, 0x3D, 0x7F, 0x63,
 			900, 2400, 12500, 0x79, ricoh583_ops, 500),
-	RICOH583_REG(LDO0, 0x51, 0, 0x53, 0, 0x54, 0x7F, 0x64, 0x23, 0,
+	RICOH583_REG(LDO0, 0x51, 0, 0x53, 0, 0x54, 0x7F, 0x64,
 			900, 3400, 25000, 0x65, ricoh583_ops, 500),
-	RICOH583_REG(LDO1, 0x51, 1, 0x53, 1, 0x55, 0x7F, 0x65, 0x23, 4,
+	RICOH583_REG(LDO1, 0x51, 1, 0x53, 1, 0x55, 0x7F, 0x65,
 			900, 3400, 25000, 0x65, ricoh583_ops, 500),
-	RICOH583_REG(LDO2, 0x51, 2, 0x53, 2, 0x56, 0x7F, 0x66, 0x24, 0,
+	RICOH583_REG(LDO2, 0x51, 2, 0x53, 2, 0x56, 0x7F, 0x66,
 			900, 3400, 25000, 0x65, ricoh583_ops, 500),
-	RICOH583_REG(LDO3, 0x51, 3, 0x53, 3, 0x57, 0x7F, 0x67, 0x24, 4,
+	RICOH583_REG(LDO3, 0x51, 3, 0x53, 3, 0x57, 0x7F, 0x67,
 			900, 3400, 25000, 0x65, ricoh583_ops, 500),
-	RICOH583_REG(LDO4, 0x51, 4, 0x53, 4, 0x58, 0x3F, 0x68, 0x25, 0,
+	RICOH583_REG(LDO4, 0x51, 4, 0x53, 4, 0x58, 0x3F, 0x68,
 			750, 1500, 12500, 0x3D, ricoh583_ops, 500),
-	RICOH583_REG(LDO5, 0x51, 5, 0x53, 5, 0x59, 0x7F, 0x69, 0x25, 4,
+	RICOH583_REG(LDO5, 0x51, 5, 0x53, 5, 0x59, 0x7F, 0x69,
 			900, 3400, 25000, 0x65, ricoh583_ops, 500),
-	RICOH583_REG(LDO6, 0x51, 6, 0x53, 6, 0x5A, 0x7F, 0x6A, 0x26, 0,
+	RICOH583_REG(LDO6, 0x51, 6, 0x53, 6, 0x5A, 0x7F, 0x6A,
 			900, 3400, 25000, 0x65, ricoh583_ops, 500),
-	RICOH583_REG(LDO7, 0x51, 7, 0x53, 7, 0x5B, 0x7F, 0x6B, 0x26, 4,
+	RICOH583_REG(LDO7, 0x51, 7, 0x53, 7, 0x5B, 0x7F, 0x6B,
 			900, 3400, 25000, 0x65, ricoh583_ops, 500),
-	RICOH583_REG(LDO8, 0x50, 0, 0x52, 0, 0x5C, 0x7F, 0x6C, 0x27, 0,
+	RICOH583_REG(LDO8, 0x50, 0, 0x52, 0, 0x5C, 0x7F, 0x6C,
 			900, 3400, 25000, 0x65, ricoh583_ops, 500),
-	RICOH583_REG(LDO9, 0x50, 1, 0x52, 1, 0x5D, 0x7F, 0x6D, 0x27, 4,
+	RICOH583_REG(LDO9, 0x50, 1, 0x52, 1, 0x5D, 0x7F, 0x6D,
 			900, 3400, 25000, 0x65, ricoh583_ops, 500),
 };
 static inline struct ricoh583_regulator *find_regulator_info(int id)
@@ -348,15 +277,13 @@ static int ricoh583_regulator_preinit(struct device *parent,
 {
 	int ret = 0;
 
-	ret = __ricoh583_set_ext_pwrreq1_control(parent, ri,
-			ricoh583_pdata->flags, ricoh583_pdata->deepsleep_slots);
-	if (ret < 0)
-		return ret;
-
-	ret = __ricoh583_set_ext_pwrreq2_control(parent, ri,
-			ricoh583_pdata->flags);
-	if (ret < 0)
-		return ret;
+	if (ri->deepsleep_id != RICOH583_DS_NONE) {
+		ret = ricoh583_ext_power_req_config(parent, ri->deepsleep_id,
+			ricoh583_pdata->ext_pwr_req,
+			ricoh583_pdata->deepsleep_slots);
+		if (ret < 0)
+			return ret;
+	}
 
 	if (!ricoh583_pdata->init_apply)
 		return 0;
