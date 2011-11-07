@@ -956,6 +956,10 @@ static int acm_probe(struct usb_interface *intf,
 	quirks = (unsigned long)id->driver_info;
 	num_rx_buf = (quirks == SINGLE_RX_URB) ? 1 : ACM_NR;
 
+	/* not a real CDC ACM device */
+	if (quirks == NOT_REAL_ACM)
+		return -ENODEV;
+
 	/* handle quirks deadly to normal probing*/
 	if (quirks == NO_UNION_NORMAL) {
 		data_interface = usb_ifnum_to_if(usb_dev, 1);
@@ -1638,7 +1642,7 @@ static const struct usb_device_id acm_ids[] = {
 
 	/* Exclude XMM6260 boot rom (not running modem software yet) */
 	{ USB_DEVICE(0x058b, 0x0041),
-	.driver_info = NOT_A_MODEM,
+	.driver_info = NOT_REAL_ACM,
 	},
 
 	/* control interfaces without any protocol set */
