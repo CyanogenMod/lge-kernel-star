@@ -172,11 +172,10 @@ static int pn544_dev_open(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static int pn544_dev_ioctl(struct file *filp, unsigned cmd,
+static long  pn544_dev_ioctl(struct file *filp, unsigned int cmd,
 				unsigned long arg)
 {
 	struct pn544_dev *pn544_dev = filp->private_data;
-	int ret=0;
 
 	switch (cmd) {
 	case PN544_SET_PWR:
@@ -184,38 +183,28 @@ static int pn544_dev_ioctl(struct file *filp, unsigned cmd,
 			/* power on with firmware download (requires hw reset)
 			 */
 			pr_info("%s power on with firmware\n", __func__);
+			gpio_set_value(pn544_dev->ven_gpio, 1);
+			msleep(20);
 			if (pn544_dev->firm_gpio)
 				gpio_set_value(pn544_dev->firm_gpio, 1);
-			msleep(10);
-			ret = gpio_direction_output(pn544_dev->ven_gpio, 0);
-			if (ret < 0) {
-				pr_err("%s : could not set it to 0\n", __func__);
-			}
+			msleep(20);
+			gpio_set_value(pn544_dev->ven_gpio, 0);
 			msleep(100);
-			ret = gpio_direction_input(pn544_dev->ven_gpio);
-			if (ret < 0) {
-				pr_err("%s : could not set in input direction\n", __func__);
-			}
-			msleep(10);
+			gpio_set_value(pn544_dev->ven_gpio, 1);
+			msleep(20);
 		} else if (arg == 1) {
 			/* power on */
 			pr_info("%s power on\n", __func__);
 			if (pn544_dev->firm_gpio)
 				gpio_set_value(pn544_dev->firm_gpio, 0);
-			ret = gpio_direction_input(pn544_dev->ven_gpio);
-			if (ret < 0) {
-				pr_err("%s : could not set in input direction\n", __func__);
-			}
-			msleep(20);
+			gpio_set_value(pn544_dev->ven_gpio, 1);
+			msleep(100);
 		} else  if (arg == 0) {
 			/* power off */
 			pr_info("%s power off\n", __func__);
 			if (pn544_dev->firm_gpio)
 				gpio_set_value(pn544_dev->firm_gpio, 0);
-			ret = gpio_direction_output(pn544_dev->ven_gpio, 0);
-			if (ret < 0) {
-				pr_err("%s : could not set it to 0\n", __func__);
-			}
+			gpio_set_value(pn544_dev->ven_gpio, 0);
 			msleep(100);
 		} else {
 			pr_err("%s bad arg %lu\n", __func__, arg);
@@ -283,14 +272,23 @@ static int pn544_probe(struct i2c_client *client,
 	pn544_dev->firm_gpio  = platform_data->firm_gpio;
 	pn544_dev->client   = client;
 
-	ret = gpio_direction_output(platform_data->ven_gpio, 0);
+	ret = gpio_direction_input(pn544_dev->irq_gpio);
 	if (ret < 0) {
-		pr_err("%s : could not set it to 0\n", __func__);
+		pr_err("%s :not able to set irq_gpio as input\n", __func__);
+		goto err_ven;
 	}
-	msleep(100);
-	ret = gpio_direction_input(platform_data->ven_gpio);
+	ret = gpio_direction_output(pn544_dev->ven_gpio, 0);
 	if (ret < 0) {
-		pr_err("%s : could not set in input direction\n", __func__);
+		pr_err("%s : not able to set ven_gpio as output\n", __func__);
+		goto err_firm;
+	}
+	if (platform_data->firm_gpio) {
+		ret = gpio_direction_output(pn544_dev->firm_gpio, 0);
+		if (ret < 0) {
+			pr_err("%s : not able to set firm_gpio as output\n",
+				 __func__);
+			goto err_exit;
+		}
 	}
 
 	/* init mutex and queues */
