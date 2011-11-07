@@ -156,7 +156,7 @@ static struct regulator_consumer_supply tps80031_battery_charge_supply[] = {
 
 #define TPS_PDATA_INIT(_id, _minmv, _maxmv, _supply_reg, _always_on,	\
 	_boot_on, _apply_uv, _init_uV, _init_enable, _init_apply, 	\
-	_flags, _delay)							\
+	_flags, _ectrl, _delay)						\
 	static struct tps80031_regulator_platform_data pdata_##_id = {	\
 		.regulator = {						\
 			.constraints = {				\
@@ -180,25 +180,26 @@ static struct regulator_consumer_supply tps80031_battery_charge_supply[] = {
 		.init_enable = _init_enable,				\
 		.init_apply = _init_apply,				\
 		.flags = _flags,					\
+		.ext_pwr_ctrl = _ectrl,					\
 		.delay_us = _delay,					\
 	}
 
-TPS_PDATA_INIT(vio,   600, 2100, 0, 1, 0, 0, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(smps1, 600, 2100, 0, 0, 0, 0, -1, 0, 0, PWR_REQ_INPUT_PREQ2, 0);
-TPS_PDATA_INIT(smps2, 600, 2100, 0, 0, 0, 0, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(smps3, 600, 2100, 0, 1, 0, 0, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(smps4, 600, 2100, 0, 0, 0, 0, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldo1, 1000, 3300, tps80031_rails(VIO), 0, 0, 0, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldo2, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldo3, 1000, 3300, tps80031_rails(VIO), 0, 0, 0, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldo4, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldo5, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldo6, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldo7, 1000, 3300, tps80031_rails(VIO), 0, 0, 0, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldoln, 1000, 3300, tps80031_rails(SMPS3), 0, 0, 0, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldousb, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, USBLDO_INPUT_VSYS, 0);
-TPS_PDATA_INIT(vana,  1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(vbus,  0, 5000, 0, 0, 0, 0, -1, 0, 0, (VBUS_SW_ONLY | VBUS_DISCHRG_EN_PDN), 100000);
+TPS_PDATA_INIT(vio,   600, 2100, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0);
+TPS_PDATA_INIT(smps1, 600, 2100, 0, 0, 0, 0, -1, 0, 0, 0, PWR_REQ_INPUT_PREQ2, 0);
+TPS_PDATA_INIT(smps2, 600, 2100, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0);
+TPS_PDATA_INIT(smps3, 600, 2100, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0);
+TPS_PDATA_INIT(smps4, 600, 2100, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0);
+TPS_PDATA_INIT(ldo1, 1000, 3300, tps80031_rails(VIO), 0, 0, 0, -1, 0, 0, 0, 0, 0);
+TPS_PDATA_INIT(ldo2, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0);
+TPS_PDATA_INIT(ldo3, 1000, 3300, tps80031_rails(VIO), 0, 0, 0, -1, 0, 0, 0, 0, 0);
+TPS_PDATA_INIT(ldo4, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0);
+TPS_PDATA_INIT(ldo5, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0);
+TPS_PDATA_INIT(ldo6, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0);
+TPS_PDATA_INIT(ldo7, 1000, 3300, tps80031_rails(VIO), 0, 0, 0, -1, 0, 0, 0, 0, 0);
+TPS_PDATA_INIT(ldoln, 1000, 3300, tps80031_rails(SMPS3), 0, 0, 0, -1, 0, 0, 0, 0, 0);
+TPS_PDATA_INIT(ldousb, 1000, 3300, 0, 0, 0, 0, -1, 0, 0, USBLDO_INPUT_VSYS, 0, 0);
+TPS_PDATA_INIT(vana,  1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0);
+TPS_PDATA_INIT(vbus,  0, 5000, 0, 0, 0, 0, -1, 0, 0, (VBUS_SW_ONLY | VBUS_DISCHRG_EN_PDN), 0, 100000);
 
 static struct tps80031_rtc_platform_data rtc_data = {
 	.irq = ENT_TPS80031_IRQ_BASE + TPS80031_INT_RTC_ALARM,
