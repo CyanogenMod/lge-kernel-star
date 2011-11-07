@@ -150,7 +150,8 @@ static struct regulator_consumer_supply ricoh583_ldo8_supply_0[] = {
 };
 
 #define TPS_PDATA_INIT(_name, _sname, _minmv, _maxmv, _supply_reg, _always_on, \
-	_boot_on, _apply_uv, _init_uV, _init_enable, _init_apply, _flags, _ds_slots) \
+	_boot_on, _apply_uv, _init_uV, _init_enable, _init_apply, _flags,      \
+	_ext_contol, _ds_slots) \
 	static struct ricoh583_regulator_platform_data pdata_##_name##_##_sname = \
 	{								\
 		.regulator = {						\
@@ -176,24 +177,26 @@ static struct regulator_consumer_supply ricoh583_ldo8_supply_0[] = {
 		.init_apply = _init_apply,				\
 		.deepsleep_slots = _ds_slots,				\
 		.flags = _flags,					\
+		.ext_pwr_req = _ext_contol,				\
 	}
 
-TPS_PDATA_INIT(dc0, 0,         700,  1500, 0, 1, 1, 0, -1, 0, 0, EXT_PWRREQ2_CONTROL, 0);
-TPS_PDATA_INIT(dc1, skubit0_0, 700,  1500, 0, 1, 1, 0, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(dc2, 0,         900,  2400, 0, 1, 1, 0, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(dc3, 0,         900,  2400, 0, 1, 1, 0, -1, 0, 0, 0, 0);
+TPS_PDATA_INIT(dc0, 0,         700,  1500, 0, 1, 1, 0, -1, 0, 0, 0,
+				RICOH583_EXT_PWRREQ2_CONTROL, 0);
+TPS_PDATA_INIT(dc1, skubit0_0, 700,  1500, 0, 1, 1, 0, -1, 0, 0, 0, 0, 0);
+TPS_PDATA_INIT(dc2, 0,         900,  2400, 0, 1, 1, 0, -1, 0, 0, 0, 0, 0);
+TPS_PDATA_INIT(dc3, 0,         900,  2400, 0, 1, 1, 0, -1, 0, 0, 0, 0, 0);
 
-TPS_PDATA_INIT(ldo0, 0,         1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldo1, 0,         1000, 3300, ricoh583_rails(DC1), 0, 0, 0, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldo2, 0,         1050, 1050, ricoh583_rails(DC1), 0, 0, 1, -1, 0, 0, 0, 0);
+TPS_PDATA_INIT(ldo0, 0,         1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0);
+TPS_PDATA_INIT(ldo1, 0,         1000, 3300, ricoh583_rails(DC1), 0, 0, 0, -1, 0, 0, 0, 0, 0);
+TPS_PDATA_INIT(ldo2, 0,         1050, 1050, ricoh583_rails(DC1), 0, 0, 1, -1, 0, 0, 0, 0, 0);
 
-TPS_PDATA_INIT(ldo3, 0,         1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldo4, 0,         750,  1500, 0, 1, 0, 0, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldo5, 0,         1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0);
+TPS_PDATA_INIT(ldo3, 0,         1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0);
+TPS_PDATA_INIT(ldo4, 0,         750,  1500, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0);
+TPS_PDATA_INIT(ldo5, 0,         1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0);
 
-TPS_PDATA_INIT(ldo6, 0,         1200, 1200, ricoh583_rails(DC2), 0, 0, 1, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldo7, 0,         1200, 1200, ricoh583_rails(DC2), 1, 1, 1, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldo8, 0,         900, 3400, ricoh583_rails(DC2), 1, 0, 0, -1, 0, 0, 0, 0);
+TPS_PDATA_INIT(ldo6, 0,         1200, 1200, ricoh583_rails(DC2), 0, 0, 1, -1, 0, 0, 0, 0, 0);
+TPS_PDATA_INIT(ldo7, 0,         1200, 1200, ricoh583_rails(DC2), 1, 1, 1, -1, 0, 0, 0, 0, 0);
+TPS_PDATA_INIT(ldo8, 0,         900, 3400, ricoh583_rails(DC2), 1, 0, 0, -1, 0, 0, 0, 0, 0);
 
 #define TPS_REG(_id, _name, _sname)				\
 	{							\
