@@ -127,8 +127,9 @@ do {									\
 #define WL_AP_MAX	256	/* virtually unlimitted as long
 				 * as kernel memory allows
 				 */
-#define WL_FILE_NAME_MAX		256
-#define WL_DWELL_TIME 	200
+#define WL_FILE_NAME_MAX	256
+#define WL_DWELL_TIME		200
+#define WL_LONG_DWELL_TIME	1000
 #define VWDEV_CNT 3
 
 #define WL_SCAN_TIMER_INTERVAL_MS	8000 /* Scan timeout */
@@ -182,6 +183,11 @@ enum wl_fw_status {
 	WL_NVRAM_LOADING_DONE
 };
 
+enum wl_management_type {
+	WL_BEACON = 0x1,
+	WL_PROBE_RESP = 0x2,
+	WL_ASSOC_RESP = 0x4
+};
 /* beacon / probe_response */
 struct beacon_proberesp {
 	__le64 timestamp;
@@ -374,7 +380,6 @@ struct wl_priv {
 	struct wl_cfg80211_bss_info *bss_info;
 	/* information element object for internal purpose */
 	struct wl_ie ie;
-	struct ether_addr bssid;	/* bssid of currently engaged network */
 
 	/* for synchronization of main event thread */
 	struct wl_profile *profile;	/* holding dongle profile */
@@ -525,8 +530,7 @@ extern s32 wl_cfg80211_up(void);	/* dongle up */
 extern s32 wl_cfg80211_down(void);	/* dongle down */
 extern s32 wl_cfg80211_notify_ifadd(struct net_device *net, s32 idx, s32 bssidx,
 int (*_net_attach)(dhd_pub_t *dhdp, int ifidx));
-extern s32 wl_cfg80211_ifdel_ops(struct net_device *net);
-extern s32 wl_cfg80211_notify_ifdel(struct net_device *net);
+extern s32 wl_cfg80211_notify_ifdel(struct net_device *ndev);
 extern s32 wl_cfg80211_is_progress_ifadd(void);
 extern s32 wl_cfg80211_is_progress_ifchange(void);
 extern s32 wl_cfg80211_is_progress_ifadd(void);
@@ -538,10 +542,12 @@ extern void wl_cfg80211_release_fw(void);
 extern s8 *wl_cfg80211_get_fwname(void);
 extern s8 *wl_cfg80211_get_nvramname(void);
 extern s32 wl_cfg80211_get_p2p_dev_addr(struct net_device *net, struct ether_addr *p2pdev_addr);
+extern s32 wl_cfg80211_set_p2p_noa(struct net_device *net, char* buf, int len);
+extern s32 wl_cfg80211_get_p2p_noa(struct net_device *net, char* buf, int len);
+extern s32 wl_cfg80211_set_wps_p2p_ie(struct net_device *net, char *buf, int len,
+	enum wl_management_type type);
+extern s32 wl_cfg80211_set_p2p_ps(struct net_device *net, char* buf, int len);
 extern int wl_cfg80211_hang(struct net_device *dev, u16 reason);
-#ifdef CONFIG_SYSCTL
-extern s32 wl_cfg80211_sysctl_export_devaddr(void *data);
-#endif
 
 /* do scan abort */
 extern s32

@@ -36,7 +36,9 @@
 #include <dngl_stats.h>
 #include <dhd.h>
 #include <bcmsdbus.h>
-
+#ifdef WL_CFG80211
+#include <wl_cfg80211.h>
+#endif
 #if defined(CONFIG_WIFI_CONTROL_FUNC)
 #include <linux/platform_device.h>
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35))
@@ -51,25 +53,30 @@
  * so they can be updated easily in the future (if needed)
  */
 
-#define CMD_START		"START"
-#define CMD_STOP		"STOP"
-#define	CMD_SCAN_ACTIVE		"SCAN-ACTIVE"
-#define	CMD_SCAN_PASSIVE	"SCAN-PASSIVE"
-#define CMD_RSSI		"RSSI"
-#define CMD_LINKSPEED		"LINKSPEED"
-#define CMD_RXFILTER_START	"RXFILTER-START"
-#define CMD_RXFILTER_STOP	"RXFILTER-STOP"
-#define CMD_RXFILTER_ADD	"RXFILTER-ADD"
-#define CMD_RXFILTER_REMOVE	"RXFILTER-REMOVE"
+#define CMD_START				"START"
+#define CMD_STOP				"STOP"
+#define CMD_SCAN_ACTIVE			"SCAN-ACTIVE"
+#define CMD_SCAN_PASSIVE		"SCAN-PASSIVE"
+#define CMD_RSSI				"RSSI"
+#define CMD_LINKSPEED			"LINKSPEED"
+#define CMD_RXFILTER_START		"RXFILTER-START"
+#define CMD_RXFILTER_STOP		"RXFILTER-STOP"
+#define CMD_RXFILTER_ADD		"RXFILTER-ADD"
+#define CMD_RXFILTER_REMOVE		"RXFILTER-REMOVE"
 #define CMD_BTCOEXSCAN_START	"BTCOEXSCAN-START"
-#define CMD_BTCOEXSCAN_STOP	"BTCOEXSCAN-STOP"
-#define CMD_BTCOEXMODE		"BTCOEXMODE"
-#define CMD_SETSUSPENDOPT	"SETSUSPENDOPT"
-#define CMD_P2P_DEV_ADDR	"P2P_DEV_ADDR"
-#define CMD_SETFWPATH		"SETFWPATH"
-#define CMD_SETBAND		"SETBAND"
-#define CMD_GETBAND		"GETBAND"
-#define CMD_COUNTRY		"COUNTRY"
+#define CMD_BTCOEXSCAN_STOP		"BTCOEXSCAN-STOP"
+#define CMD_BTCOEXMODE			"BTCOEXMODE"
+#define CMD_SETSUSPENDOPT		"SETSUSPENDOPT"
+#define CMD_P2P_DEV_ADDR		"P2P_DEV_ADDR"
+#define CMD_SETFWPATH			"SETFWPATH"
+#define CMD_SETBAND				"SETBAND"
+#define CMD_GETBAND				"GETBAND"
+#define CMD_COUNTRY				"COUNTRY"
+#define CMD_P2P_SET_NOA			"P2P_SET_NOA"
+#define CMD_P2P_GET_NOA			"P2P_GET_NOA"
+#define CMD_P2P_SET_PS			"P2P_SET_PS"
+#define CMD_SET_AP_WPS_P2P_IE	"SET_AP_WPS_P2P_IE"
+
 
 #ifdef PNO_SUPPORT
 #define CMD_PNOSSIDCLR_SET	"PNOSSIDCLR"
@@ -111,6 +118,12 @@ int wl_cfg80211_get_p2p_dev_addr(struct net_device *net, struct ether_addr *p2pd
 int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, char *command);
 #else
 int wl_cfg80211_get_p2p_dev_addr(struct net_device *net, struct ether_addr *p2pdev_addr)
+{ return 0; }
+int wl_cfg80211_set_p2p_noa(struct net_device *net, char* buf, int len)
+{ return 0; }
+int wl_cfg80211_get_p2p_noa(struct net_device *net, char* buf, int len)
+{ return 0; }
+int wl_cfg80211_set_p2p_ps(struct net_device *net, char* buf, int len)
 { return 0; }
 #endif
 
@@ -371,8 +384,6 @@ int wl_android_wifi_off(struct net_device *dev)
 	if (g_wifi_on) {
 		dhd_dev_reset(dev, 1);
 		sdioh_stop(NULL);
-		/* clean up dtim_skip setting */
-		net_os_set_dtim_skip(dev, TRUE);
 		dhd_customer_gpio_wlan_ctrl(WLAN_RESET_OFF);
 		g_wifi_on = 0;
 	}
@@ -517,7 +528,29 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 #endif
 	else if (strnicmp(command, CMD_P2P_DEV_ADDR, strlen(CMD_P2P_DEV_ADDR)) == 0) {
 		bytes_written = wl_android_get_p2p_dev_addr(net, command, priv_cmd.total_len);
-	} else {
+	}
+	else if (strnicmp(command, CMD_P2P_SET_NOA, strlen(CMD_P2P_SET_NOA)) == 0) {
+		int skip = strlen(CMD_P2P_SET_NOA) + 1;
+		bytes_written = wl_cfg80211_set_p2p_noa(net, command + skip,
+			priv_cmd.total_len - skip);
+	}
+	else if (strnicmp(command, CMD_P2P_GET_NOA, strlen(CMD_P2P_GET_NOA)) == 0) {
+		bytes_written = wl_cfg80211_get_p2p_noa(net, command, priv_cmd.total_len);
+	}
+	else if (strnicmp(command, CMD_P2P_SET_PS, strlen(CMD_P2P_SET_PS)) == 0) {
+		int skip = strlen(CMD_P2P_SET_PS) + 1;
+		bytes_written = wl_cfg80211_set_p2p_ps(net, command + skip,
+			priv_cmd.total_len - skip);
+	}
+#ifdef WL_CFG80211
+	else if (strnicmp(command, CMD_SET_AP_WPS_P2P_IE,
+		strlen(CMD_SET_AP_WPS_P2P_IE)) == 0) {
+		int skip = strlen(CMD_SET_AP_WPS_P2P_IE) + 3;
+		bytes_written = wl_cfg80211_set_wps_p2p_ie(net, command + skip,
+			priv_cmd.total_len - skip, *(command + skip - 2) - '0');
+	}
+#endif /* WL_CFG80211 */
+	else {
 		DHD_ERROR(("Unknown PRIVATE command %s - ignored\n", command));
 		snprintf(command, 3, "OK");
 		bytes_written = strlen("OK");

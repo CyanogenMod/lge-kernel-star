@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_cfgp2p.c,v 1.1.4.1.2.14 2011-02-09 01:40:07 Exp $
+ * $Id: wl_cfgp2p.c,v 1.1.4.1.2.14 2011-02-09 01:40:07 $
  *
  */
 #include <typedefs.h>
@@ -112,6 +112,7 @@ wl_cfgp2p_deinit_priv(struct wl_priv *wl)
 {
 	if (wl->p2p) {
 		kfree(wl->p2p);
+		wl->p2p = NULL;
 	}
 	wl->p2p_supported = 0;
 }
@@ -1021,15 +1022,12 @@ wl_cfgp2p_discover_listen(struct wl_priv *wl, s32 channel, u32 duration_ms)
 		ret = BCME_NOTREADY;
 		goto exit;
 	}
-	if (!wl_get_p2p_status(wl, LISTEN_EXPIRED)) {
-		wl_set_p2p_status(wl, LISTEN_EXPIRED);
-		if (timer_pending(&wl->p2p->listen_timer)) {
-			spin_lock_bh(&wl->p2p->timer_lock);
-			del_timer_sync(&wl->p2p->listen_timer);
-			spin_unlock_bh(&wl->p2p->timer_lock);
-		}
+	if (timer_pending(&wl->p2p->listen_timer)) {
+		CFGP2P_DBG(("previous LISTEN is not completed yet\n"));
+		goto exit;
+
 	} else
-	wl_clr_p2p_status(wl, LISTEN_EXPIRED);
+		wl_clr_p2p_status(wl, LISTEN_EXPIRED);
 
 	wl_cfgp2p_set_p2p_mode(wl, WL_P2P_DISC_ST_LISTEN, channel, (u16) duration_ms,
 	            wl_to_p2p_bss_bssidx(wl, P2PAPI_BSSCFG_DEVICE));
@@ -1305,11 +1303,167 @@ wl_cfgp2p_supported(struct wl_priv *wl, struct net_device *ndev)
 	}
 	return p2p_supported;
 }
+
 /* Cleanup P2P resources */
 s32
 wl_cfgp2p_down(struct wl_priv *wl)
 {
 	if (timer_pending(&wl->p2p->listen_timer))
 		del_timer_sync(&wl->p2p->listen_timer);
+	wl_cfgp2p_deinit_priv(wl);
 	return 0;
+}
+
+s32 wl_cfgp2p_set_p2p_noa(struct wl_priv *wl, struct net_device *ndev, char* buf, int len)
+{
+	s32 ret = -1;
+	int count, start, duration;
+	wl_p2p_sched_t dongle_noa;
+
+	CFGP2P_DBG((" Enter\n"));
+
+	memset(&dongle_noa, 0, sizeof(dongle_noa));
+
+	if (wl->p2p && wl->p2p->vif_created) {
+
+		wl->p2p->noa.desc[0].start = 0;
+
+		sscanf(buf, "%d %d %d", &count, &start, &duration);
+		CFGP2P_DBG(("set_p2p_noa count %d start %d duration %d\n",
+				count, start, duration));
+		if (count != -1)
+			wl->p2p->noa.desc[0].count = count;
+
+		/* supplicant gives interval as start */
+		if (start != -1)
+			wl->p2p->noa.desc[0].interval = start;
+
+		if (duration != -1)
+			wl->p2p->noa.desc[0].duration = duration;
+
+		if (wl->p2p->noa.desc[0].count != 255) {
+			wl->p2p->noa.desc[0].start = 200;
+			dongle_noa.type = WL_P2P_SCHED_TYPE_REQ_ABS;
+			dongle_noa.action = WL_P2P_SCHED_ACTION_GOOFF;
+			dongle_noa.option = WL_P2P_SCHED_OPTION_TSFOFS;
+		}
+		else {
+			/* Continuous NoA interval. */
+			dongle_noa.action = WL_P2P_SCHED_ACTION_NONE;
+			dongle_noa.type = WL_P2P_SCHED_TYPE_ABS;
+			if ((wl->p2p->noa.desc[0].interval == 102) ||
+				(wl->p2p->noa.desc[0].interval == 100)) {
+				wl->p2p->noa.desc[0].start = 100 -
+					wl->p2p->noa.desc[0].duration;
+				dongle_noa.option = WL_P2P_SCHED_OPTION_BCNPCT;
+			}
+			else {
+				dongle_noa.option = WL_P2P_SCHED_OPTION_NORMAL;
+			}
+		}
+		/* Put the noa descriptor in dongle format for dongle */
+		dongle_noa.desc[0].count = htod32(wl->p2p->noa.desc[0].count);
+		if (dongle_noa.option == WL_P2P_SCHED_OPTION_BCNPCT) {
+			dongle_noa.desc[0].start = htod32(wl->p2p->noa.desc[0].start);
+			dongle_noa.desc[0].duration = htod32(wl->p2p->noa.desc[0].duration);
+		}
+		else {
+			dongle_noa.desc[0].start = htod32(wl->p2p->noa.desc[0].start*1000);
+			dongle_noa.desc[0].duration = htod32(wl->p2p->noa.desc[0].duration*1000);
+		}
+		dongle_noa.desc[0].interval = htod32(wl->p2p->noa.desc[0].interval*1000);
+
+		ret = wldev_iovar_setbuf(wl_to_p2p_bss_ndev(wl, P2PAPI_BSSCFG_CONNECTION),
+			"p2p_noa", &dongle_noa, sizeof(dongle_noa), ioctlbuf, sizeof(ioctlbuf));
+
+		if (ret < 0) {
+			CFGP2P_ERR(("fw set p2p_noa failed %d\n", ret));
+		}
+	}
+	else {
+		CFGP2P_ERR(("ERROR: set_noa in non-p2p mode\n"));
+	}
+	return ret;
+}
+
+s32 wl_cfgp2p_get_p2p_noa(struct wl_priv *wl, struct net_device *ndev, char* buf, int buf_len)
+{
+	wifi_p2p_noa_desc_t *noa_desc;
+	int len = 0, i;
+	char _buf[200];
+
+	CFGP2P_DBG((" Enter\n"));
+	buf[0] = '\0';
+	if (wl->p2p && wl->p2p->vif_created) {
+		if (wl->p2p->noa.desc[0].count || wl->p2p->ops.ops) {
+			_buf[0] = 1; /* noa index */
+			_buf[1] = (wl->p2p->ops.ops ? 0x80: 0) |
+				(wl->p2p->ops.ctw & 0x7f); /* ops + ctw */
+			len += 2;
+			if (wl->p2p->noa.desc[0].count) {
+				noa_desc = (wifi_p2p_noa_desc_t*)&_buf[len];
+				noa_desc->cnt_type = wl->p2p->noa.desc[0].count;
+				noa_desc->duration = wl->p2p->noa.desc[0].duration;
+				noa_desc->interval = wl->p2p->noa.desc[0].interval;
+				noa_desc->start = wl->p2p->noa.desc[0].start;
+				len += sizeof(wifi_p2p_noa_desc_t);
+			}
+			if (buf_len <= len * 2) {
+				CFGP2P_ERR(("ERROR: buf_len %d in not enough for"
+					"returning noa in string format\n", buf_len));
+				return -1;
+			}
+			/* We have to convert the buffer data into ASCII strings */
+			for (i = 0; i < len; i++) {
+				sprintf(buf, "%02x", _buf[i]);
+				buf += 2;
+			}
+			buf[i*2] = '\0';
+		}
+	}
+	else {
+		CFGP2P_ERR(("ERROR: get_noa in non-p2p mode\n"));
+		return -1;
+	}
+	return len * 2;
+}
+
+s32 wl_cfgp2p_set_p2p_ps(struct wl_priv *wl, struct net_device *ndev, char* buf, int len)
+{
+	int ps, ctw;
+	int ret = -1;
+	s32 legacy_ps;
+
+	CFGP2P_DBG((" Enter\n"));
+	if (wl->p2p && wl->p2p->vif_created) {
+		sscanf(buf, "%d %d %d", &legacy_ps, &ps, &ctw);
+		CFGP2P_DBG((" Enter legacy_ps %d ps %d ctw %d\n", legacy_ps, ps, ctw));
+		if (ctw != -1) {
+			wl->p2p->ops.ctw = ctw;
+			ret = 0;
+		}
+		if (ps != -1) {
+			wl->p2p->ops.ops = ps;
+			ret = wldev_iovar_setbuf(wl_to_p2p_bss_ndev(wl, P2PAPI_BSSCFG_CONNECTION),
+				"p2p_ops", &wl->p2p->ops, sizeof(wl->p2p->ops),
+				ioctlbuf, sizeof(ioctlbuf));
+			if (ret < 0) {
+				CFGP2P_ERR(("fw set p2p_ops failed %d\n", ret));
+			}
+		}
+
+		if (legacy_ps != -1) {
+			s32 pm = legacy_ps ? PM_MAX : PM_OFF;
+			ret = wldev_ioctl(wl_to_p2p_bss_ndev(wl, P2PAPI_BSSCFG_CONNECTION),
+				WLC_SET_PM, &pm, sizeof(pm), true);
+			if (unlikely(ret)) {
+				CFGP2P_ERR(("error (%d)\n", ret));
+			}
+		}
+	}
+	else {
+		CFGP2P_ERR(("ERROR: set_p2p_ps in non-p2p mode\n"));
+		ret = -1;
+	}
+	return ret;
 }

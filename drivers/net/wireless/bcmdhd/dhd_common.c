@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_common.c,v 1.57.2.22 2011-02-01 18:38:37 Exp $
+ * $Id: dhd_common.c 290546 2011-10-19 01:55:21Z $
  */
 #include <typedefs.h>
 #include <osl.h>
@@ -100,8 +100,6 @@ const char dhd_version[] = "Dongle Host Driver, version " EPI_VERSION_STR;
 #endif
 
 void dhd_set_timer(void *bus, uint wdtick);
-
-
 
 /* IOVar table */
 enum {
@@ -484,7 +482,7 @@ dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, uint32 actionid, const ch
 #endif /* PROP_TXSTATUS */
 
 	case IOV_GVAL(IOV_BUS_TYPE):
-	/* The dhd application query the driver to check if its usb or sdio.  */
+		/* The dhd application queries the driver to check if its usb or sdio.  */
 #ifdef BCMDHDUSB
 		int_val = BUS_TYPE_USB;
 #endif
@@ -961,7 +959,7 @@ wl_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata,
 {
 	/* check whether packet is a BRCM event pkt */
 	bcm_event_t *pvt_data = (bcm_event_t *)pktdata;
-	char *event_data;
+	uint8 *event_data;
 	uint32 type, status, reason, datalen;
 	uint16 flags;
 	int evlen;
@@ -1004,27 +1002,27 @@ wl_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata,
 
 	case WLC_E_IF:
 		{
-		dhd_if_event_t *ifevent = (dhd_if_event_t *)event_data;
+			dhd_if_event_t *ifevent = (dhd_if_event_t *)event_data;
 #ifdef PROP_TXSTATUS
-{
-		uint8* ea = pvt_data->eth.ether_dhost;
-		WLFC_DBGMESG(("WLC_E_IF: idx:%d, action:%s, iftype:%s, "
-		              "[%02x:%02x:%02x:%02x:%02x:%02x]\n",
-		              ifevent->ifidx,
-		              ((ifevent->action == WLC_E_IF_ADD) ? "ADD":"DEL"),
-		              ((ifevent->is_AP == 0) ? "STA":"AP "),
-		              ea[0], ea[1], ea[2], ea[3], ea[4], ea[5]));
-		(void)ea;
+			{
+				uint8* ea = pvt_data->eth.ether_dhost;
+				WLFC_DBGMESG(("WLC_E_IF: idx:%d, action:%s, iftype:%s, "
+						"[%02x:%02x:%02x:%02x:%02x:%02x]\n",
+						ifevent->ifidx,
+						((ifevent->action == WLC_E_IF_ADD) ? "ADD":"DEL"),
+						((ifevent->is_AP == 0) ? "STA":"AP "),
+						ea[0], ea[1], ea[2], ea[3], ea[4], ea[5]));
+				(void)ea;
 
-		dhd_wlfc_interface_event(dhd_pub->info,
-		                         ((ifevent->action == WLC_E_IF_ADD) ?
-		                          eWLFC_MAC_ENTRY_ACTION_ADD : eWLFC_MAC_ENTRY_ACTION_DEL),
-		                         ifevent->ifidx, ifevent->is_AP, ea);
+				dhd_wlfc_interface_event(dhd_pub->info,
+					((ifevent->action == WLC_E_IF_ADD) ?
+					eWLFC_MAC_ENTRY_ACTION_ADD : eWLFC_MAC_ENTRY_ACTION_DEL),
+					ifevent->ifidx, ifevent->is_AP, ea);
 
-		/* dhd already has created an interface by default, for 0 */
-		if (ifevent->ifidx == 0)
-			break;
-}
+				/* dhd already has created an interface by default, for 0 */
+				if (ifevent->ifidx == 0)
+					break;
+			}
 #endif /* PROP_TXSTATUS */
 
 #ifdef WL_CFG80211
@@ -1032,7 +1030,7 @@ wl_host_event(dhd_pub_t *dhd_pub, int *ifidx, void *pktdata,
 				DHD_ERROR(("%s:  ifidx %d for %s action %d\n",
 					__FUNCTION__, ifevent->ifidx,
 					event->ifname, ifevent->action));
-			if (ifevent->action == WLC_E_IF_ADD)
+				if (ifevent->action == WLC_E_IF_ADD)
 					wl_cfg80211_notify_ifchange();
 				return (BCME_OK);
 			}
@@ -1529,8 +1527,6 @@ dhd_sendup_event_common(dhd_pub_t *dhdp, wl_event_msg_t *event, void *data)
 	dhd_sendup_event(dhdp, event, data);
 }
 
-
-
 #ifdef SIMPLE_ISCAN
 
 uint iscan_thread_id = 0;
@@ -1720,7 +1716,7 @@ fail:
 /*
  * returns = TRUE if associated, FALSE if not associated
  */
-bool is_associated(dhd_pub_t *dhd, void *bss_buf)
+bool dhd_is_associated(dhd_pub_t *dhd, void *bss_buf)
 {
 	char bssid[6], zbuf[6];
 	int ret = -1;
@@ -1767,7 +1763,7 @@ dhd_get_dtim_skip(dhd_pub_t *dhd)
 		bcn_li_dtim = dhd->dtim_skip;
 
 	/* Check if associated */
-	if (is_associated(dhd, NULL) == FALSE) {
+	if (dhd_is_associated(dhd, NULL) == FALSE) {
 		DHD_TRACE(("%s NOT assoc ret %d\n", __FUNCTION__, ret));
 		goto exit;
 	}
@@ -1865,10 +1861,10 @@ dhd_pno_enable(dhd_pub_t *dhd, int pfn_enabled)
 
 	memset(iovbuf, 0, sizeof(iovbuf));
 
-	if ((pfn_enabled) && (is_associated(dhd, NULL) == TRUE)) {
+	if ((pfn_enabled) && (dhd_is_associated(dhd, NULL) == TRUE)) {
 		DHD_ERROR(("%s pno is NOT enable : called in assoc mode , ignore\n", __FUNCTION__));
 		return ret;
-}
+	}
 
 	/* Enable/disable PNO */
 	if ((ret = bcm_mkiovar("pfn", (char *)&pfn_enabled, 4, iovbuf, sizeof(iovbuf))) > 0) {
@@ -1906,6 +1902,7 @@ dhd_pno_set(dhd_pub_t *dhd, wlc_ssid_t* ssids_local, int nssid, ushort scan_fr,
 		DHD_ERROR(("%s error exit\n", __FUNCTION__));
 		err = -1;
 	}
+
 	if (dhd_check_ap_wfd_mode_set(dhd) == TRUE)
 		return (err);
 
@@ -1988,7 +1985,7 @@ dhd_pno_set(dhd_pub_t *dhd, wlc_ssid_t* ssids_local, int nssid, ushort scan_fr,
 				return err;
 			}
 			else
-				DHD_ERROR(("%s set OK with PNO time=%d repeat=%d max_adjust=%d\n",
+				DHD_TRACE(("%s set OK with PNO time=%d repeat=%d max_adjust=%d\n",
 					__FUNCTION__, pfn_param.scan_freq,
 					pfn_param.repeat, pfn_param.exp));
 		}
@@ -2016,13 +2013,13 @@ dhd_pno_get_status(dhd_pub_t *dhd)
 #if defined(KEEP_ALIVE)
 int dhd_keep_alive_onoff(dhd_pub_t *dhd)
 {
-	char			buf[256];
-	const char		*str;
+	char 				buf[256];
+	const char 			*str;
 	wl_mkeep_alive_pkt_t	mkeep_alive_pkt;
 	wl_mkeep_alive_pkt_t	*mkeep_alive_pktp;
-	int			buf_len;
-	int			str_len;
-	int res			= -1;
+	int					buf_len;
+	int					str_len;
+	int res 				= -1;
 
 	if (dhd_check_ap_wfd_mode_set(dhd) == TRUE)
 		return (res);
