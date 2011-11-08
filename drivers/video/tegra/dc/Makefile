@@ -1,3 +1,4 @@
+GCOV_PROFILE := y
 obj-y += dc.o
 obj-y += rgb.o
 obj-y += hdmi.o

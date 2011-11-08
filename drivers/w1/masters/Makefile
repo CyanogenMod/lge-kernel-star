@@ -1,6 +1,7 @@
 #
 # Makefile for 1-wire bus master drivers.
 #
+GCOV_PROFILE_tegra_w1.o := y
 
 obj-$(CONFIG_W1_MASTER_MATROX)		+= matrox_w1.o
 obj-$(CONFIG_W1_MASTER_DS2490)		+= ds2490.o

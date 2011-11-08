@@ -1,6 +1,7 @@
 #
 # Makefile for kernel SPI drivers.
 #
+GCOV_PROFILE := y
 
 ccflags-$(CONFIG_SPI_DEBUG) := -DDEBUG
 

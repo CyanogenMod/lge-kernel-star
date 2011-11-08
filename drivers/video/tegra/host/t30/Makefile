@@ -1,3 +1,5 @@
+GCOV_PROFILE := y
+
 nvhost-t30-objs  = \
 	t30.o \
 	channel_t30.o \

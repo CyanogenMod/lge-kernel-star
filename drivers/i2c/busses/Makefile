@@ -1,6 +1,7 @@
 #
 # Makefile for the i2c bus drivers.
 #
+GCOV_PROFILE := y
 
 # ACPI drivers
 obj-$(CONFIG_I2C_SCMI)		+= i2c-scmi.o

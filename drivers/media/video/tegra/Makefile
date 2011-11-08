@@ -1,3 +1,4 @@
+GCOV_PROFILE := y
 #
 # Makefile for the video capture/playback device drivers.
 #

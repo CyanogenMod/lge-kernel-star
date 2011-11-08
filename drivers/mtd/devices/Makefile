@@ -1,6 +1,7 @@
 #
 # linux/drivers/mtd/devices/Makefile
 #
+GCOV_PROFILE := y
 
 obj-$(CONFIG_MTD_DOC2000)	+= doc2000.o
 obj-$(CONFIG_MTD_DOC2001)	+= doc2001.o

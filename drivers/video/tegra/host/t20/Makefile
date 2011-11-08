@@ -1,3 +1,5 @@
+GCOV_PROFILE := y
+
 nvhost-t20-objs  = \
 	t20.o \
 	syncpt_t20.o \

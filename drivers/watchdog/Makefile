@@ -1,7 +1,7 @@
 #
 # Makefile for the WatchDog device drivers.
 #
-
+GCOV_PROFILE_tegra_wdt.o := y
 # Only one watchdog can succeed. We probe the ISA/PCI/USB based
 # watchdog-cards first, then the architecture specific watchdog
 # drivers and then the architecture independent "softdog" driver.
