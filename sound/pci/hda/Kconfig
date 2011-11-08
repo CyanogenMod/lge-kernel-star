@@ -71,6 +71,13 @@ config SND_HDA_PATCH_LOADER
 
 	  This option turns on hwdep and reconfig features automatically.
 
+config SND_HDA_PLATFORM_DRIVER
+	bool "Build platform driver interface for HD-audio driver"
+	help
+	  Say Y here to build a platform driver interface for HD-audio driver.
+	  This interface can be used by platforms which have an Azalia
+	  controller not installed on a PCI bus.
+
 config SND_HDA_CODEC_REALTEK
 	bool "Build Realtek HD-audio codec support"
 	default y
