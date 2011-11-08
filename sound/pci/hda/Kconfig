@@ -78,6 +78,13 @@ config SND_HDA_PLATFORM_DRIVER
 	  This interface can be used by platforms which have an Azalia
 	  controller not installed on a PCI bus.
 
+config SND_HDA_PLATFORM_NVIDIA_TEGRA
+	bool "Build NVIDIA Tegra platform driver interface for HD-audio driver"
+	depends on SND_HDA_PLATFORM_DRIVER
+	help
+	  Say Y here to build NVIDIA Tegra platform driver interface for
+	  HD-audio driver.
+
 config SND_HDA_CODEC_REALTEK
 	bool "Build Realtek HD-audio codec support"
 	default y
