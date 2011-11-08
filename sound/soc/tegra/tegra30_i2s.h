@@ -248,4 +248,19 @@ struct tegra30_i2s {
 	bool is_dam_used;
 };
 
+struct codec_config {
+	int i2s_id;
+	int rate;
+	int channels;
+	int bitsize;
+	int is_i2smaster;
+	int is_format_dsp;
+};
+
+int tegra30_make_voice_call_connections(struct codec_config *codec_info,
+			struct codec_config *bb_info);
+
+int tegra30_break_voice_call_connections(struct codec_config *codec_info,
+			struct codec_config *bb_info);
+
 #endif
