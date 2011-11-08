@@ -24,6 +24,7 @@
 #include <mach/gpio.h>
 #include <mach/irqs.h>
 #include <linux/mfd/tps6591x.h>
+#include <linux/mfd/ricoh583.h>
 
 /* Processor Board  ID */
 #define BOARD_E1187   0x0B57
@@ -37,6 +38,8 @@
 #define BOARD_E1208   0x0C08
 #define BOARD_PM305   0x0305
 #define BOARD_PM311   0x030B
+#define BOARD_PMU_PM298   0x0262
+#define BOARD_PMU_PM299   0x0263
 
 /* SKU Information */
 #define SKU_DCDC_TPS62361_SUPPORT	0x1
@@ -84,6 +87,10 @@
 #define TPS6591X_GPIO_7		(TPS6591X_GPIO_BASE + TPS6591X_GPIO_GP7)
 #define TPS6591X_GPIO_8		(TPS6591X_GPIO_BASE + TPS6591X_GPIO_GP8)
 #define TPS6591X_GPIO_END	(TPS6591X_GPIO_BASE + TPS6591X_GPIO_NR)
+
+/* RICOH583 GPIO */
+#define RICOH583_GPIO_BASE	TEGRA_NR_GPIOS
+#define RICOH583_GPIO_END	(RICOH583_GPIO_BASE + 8)
 
 /* PMU_TCA6416 GPIOs */
 #define PMU_TCA6416_GPIO_BASE	(TPS6591X_GPIO_END)
@@ -170,6 +177,10 @@
 #define TPS6591X_IRQ_BASE	TEGRA_NR_IRQS
 #define TPS6591X_IRQ_END	(TPS6591X_IRQ_BASE + 18)
 
+/* RICOH583 IRQs */
+#define RICOH583_IRQ_BASE	TEGRA_NR_IRQS
+#define RICOH583_IRQ_END	(RICOH583_IRQ_BASE + RICOH583_NR_IRQS)
+
 int cardhu_charge_init(void);
 int cardhu_regulator_init(void);
 int cardhu_suspend_init(void);
@@ -186,6 +197,8 @@ int cardhu_emc_init(void);
 int cardhu_power_off_init(void);
 int cardhu_edp_init(void);
 int cardhu_pmon_init(void);
+int cardhu_pm299_gpio_switch_regulator_init(void);
+int cardhu_pm299_regulator_init(void);
 void __init cardhu_tsensor_init(void);
 
 /* Baseband GPIO addresses */
