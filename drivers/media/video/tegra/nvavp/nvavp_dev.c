@@ -189,9 +189,6 @@ static void nvavp_halt_avp(struct nvavp_info *nvavp)
 	writel(FLOW_MODE_STOP, FLOW_CTRL_HALT_COP_EVENTS);
 	tegra_periph_reset_assert(nvavp->cop_clk);
 
-	clk_disable(nvavp->sclk);
-	clk_disable(nvavp->emc_clk);
-
 	writel(0, NVAVP_OS_OUTBOX);
 	writel(0, NVAVP_OS_INBOX);
 }
@@ -694,6 +691,9 @@ static void nvavp_uninit(struct nvavp_info *nvavp)
 
 	nvavp_halt_vde(nvavp);
 	nvavp_halt_avp(nvavp);
+
+	clk_disable(nvavp->sclk);
+	clk_disable(nvavp->emc_clk);
 }
 
 static int nvavp_set_clock_ioctl(struct file *filp, unsigned int cmd,
