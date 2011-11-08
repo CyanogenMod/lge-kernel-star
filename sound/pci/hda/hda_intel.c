@@ -320,6 +320,32 @@ enum {
 #define NVIDIA_HDA_OSTRM_COH          0x4c
 #define NVIDIA_HDA_ENABLE_COHBIT      0x01
 
+#ifdef CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA
+/* Defines for Nvidia Tegra HDA support */
+#define NVIDIA_TEGRA_HDA_BAR0_OFFSET           0x8000
+
+#define NVIDIA_TEGRA_HDA_CFG_CMD_OFFSET        0x1004
+#define NVIDIA_TEGRA_HDA_CFG_BAR0_OFFSET       0x1010
+
+#define NVIDIA_TEGRA_HDA_ENABLE_IO_SPACE       (1 << 0)
+#define NVIDIA_TEGRA_HDA_ENABLE_MEM_SPACE      (1 << 1)
+#define NVIDIA_TEGRA_HDA_ENABLE_BUS_MASTER     (1 << 2)
+#define NVIDIA_TEGRA_HDA_ENABLE_SERR           (1 << 8)
+#define NVIDIA_TEGRA_HDA_DISABLE_INTR          (1 << 10)
+#define NVIDIA_TEGRA_HDA_BAR0_INIT_PROGRAM     0xFFFFFFFF
+#define NVIDIA_TEGRA_HDA_BAR0_FINAL_PROGRAM    (1 << 14)
+
+/* IPFS */
+#define NVIDIA_TEGRA_HDA_IPFS_CONFIG           0x180
+#define NVIDIA_TEGRA_HDA_IPFS_EN_FPCI          0x1
+
+#define NVIDIA_TEGRA_HDA_IPFS_FPCI_BAR0        0x80
+#define NVIDIA_TEGRA_HDA_FPCI_BAR0_START       0x40
+
+#define NVIDIA_TEGRA_HDA_IPFS_INTR_MASK        0x188
+#define NVIDIA_TEGRA_HDA_IPFS_EN_INTR          (1 << 16)
+#endif /* CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA */
+
 /* Defines for Intel SCH HDA snoop control */
 #define INTEL_SCH_HDA_DEVC      0x78
 #define INTEL_SCH_HDA_DEVC_NOSNOOP       (0x1<<11)
@@ -403,6 +429,9 @@ struct azx {
 	/* pci resources */
 	unsigned long addr;
 	void __iomem *remap_addr;
+#ifdef CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA
+	void __iomem *remap_config_addr;
+#endif
 	int irq;
 
 #ifdef CONFIG_SND_HDA_PLATFORM_DRIVER
@@ -467,6 +496,7 @@ enum {
 	AZX_DRIVER_SIS,
 	AZX_DRIVER_ULI,
 	AZX_DRIVER_NVIDIA,
+	AZX_DRIVER_NVIDIA_TEGRA,
 	AZX_DRIVER_TERA,
 	AZX_DRIVER_CTX,
 	AZX_DRIVER_GENERIC,
@@ -483,6 +513,7 @@ static char *driver_short_names[] __devinitdata = {
 	[AZX_DRIVER_SIS] = "HDA SIS966",
 	[AZX_DRIVER_ULI] = "HDA ULI M5461",
 	[AZX_DRIVER_NVIDIA] = "HDA NVidia",
+	[AZX_DRIVER_NVIDIA_TEGRA] = "HDA NVIDIA Tegra",
 	[AZX_DRIVER_TERA] = "HDA Teradici", 
 	[AZX_DRIVER_CTX] = "HDA Creative", 
 	[AZX_DRIVER_GENERIC] = "HD-Audio Generic",
@@ -491,6 +522,48 @@ static char *driver_short_names[] __devinitdata = {
 /*
  * macros for easy use
  */
+#ifdef CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA
+#define MASK_LONG_ALIGN		0x3UL
+#define SHIFT_BYTE		3
+#define SHIFT_BITS(reg)		((reg & MASK_LONG_ALIGN) << SHIFT_BYTE)
+#define ADDR_ALIGN_L(base, reg)	(base + (reg & ~MASK_LONG_ALIGN))
+#define MASK(bits)		(BIT(bits) - 1)
+#define MASK_REG(reg, bits)	(MASK(bits) << SHIFT_BITS(reg))
+
+#define tegra_write(base, reg, val, bits) \
+	writel((readl(ADDR_ALIGN_L(base, reg)) & ~MASK_REG(reg, bits)) | \
+	       ((val) << SHIFT_BITS(reg)), ADDR_ALIGN_L(base, reg))
+
+#define tegra_read(base, reg, bits) \
+	((readl(ADDR_ALIGN_L(base, reg)) >> SHIFT_BITS(reg)) & MASK(bits))
+
+#define azx_writel(chip, reg, value) \
+	writel(value, (chip)->remap_addr + ICH6_REG_##reg)
+#define azx_readl(chip, reg) \
+	readl((chip)->remap_addr + ICH6_REG_##reg)
+#define azx_writew(chip, reg, value) \
+	tegra_write((chip)->remap_addr, ICH6_REG_##reg, value, 16)
+#define azx_readw(chip, reg) \
+	tegra_read((chip)->remap_addr, ICH6_REG_##reg, 16)
+#define azx_writeb(chip, reg, value) \
+	tegra_write((chip)->remap_addr, ICH6_REG_##reg, value, 8)
+#define azx_readb(chip, reg) \
+	tegra_read((chip)->remap_addr, ICH6_REG_##reg, 8)
+
+#define azx_sd_writel(dev, reg, value) \
+	writel(value, (dev)->sd_addr + ICH6_REG_##reg)
+#define azx_sd_readl(dev, reg) \
+	readl((dev)->sd_addr + ICH6_REG_##reg)
+#define azx_sd_writew(dev, reg, value) \
+	tegra_write((dev)->sd_addr, ICH6_REG_##reg, value, 16)
+#define azx_sd_readw(dev, reg) \
+	tegra_read((dev)->sd_addr, ICH6_REG_##reg, 16)
+#define azx_sd_writeb(dev, reg, value) \
+	tegra_write((dev)->sd_addr, ICH6_REG_##reg, value, 8)
+#define azx_sd_readb(dev, reg) \
+	tegra_read((dev)->sd_addr, ICH6_REG_##reg, 8)
+
+#else /* CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA */
 #define azx_writel(chip,reg,value) \
 	writel(value, (chip)->remap_addr + ICH6_REG_##reg)
 #define azx_readl(chip,reg) \
@@ -516,6 +589,8 @@ static char *driver_short_names[] __devinitdata = {
 	writeb(value, (dev)->sd_addr + ICH6_REG_##reg)
 #define azx_sd_readb(dev,reg) \
 	readb((dev)->sd_addr + ICH6_REG_##reg)
+
+#endif /* CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA */
 
 /* for pcm support */
 #define get_azx_dev(substream) (substream->runtime->private_data)
@@ -1106,9 +1181,57 @@ static void azx_init_pci(struct azx *chip)
 }
 
 #ifdef CONFIG_SND_HDA_PLATFORM_DRIVER
-/* Platform driver specific initiallization */
+/*
+ * initialize the platform specific registers
+ */
+static void reg_update_bits(void __iomem *base, unsigned int reg,
+			    unsigned int mask, unsigned int val)
+{
+	unsigned int data;
+
+	data = readl(base + reg);
+	data &= ~mask;
+	data |= (val & mask);
+	writel(data, base + reg);
+}
+
 static void azx_init_platform(struct azx *chip)
 {
+	switch (chip->driver_type) {
+#ifdef CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA
+	case AZX_DRIVER_NVIDIA_TEGRA:
+		/*Enable the PCI access */
+		reg_update_bits(chip->remap_config_addr,
+				NVIDIA_TEGRA_HDA_IPFS_CONFIG,
+				NVIDIA_TEGRA_HDA_IPFS_EN_FPCI,
+				NVIDIA_TEGRA_HDA_IPFS_EN_FPCI);
+		/* Enable MEM/IO space and bus master */
+		reg_update_bits(chip->remap_config_addr,
+				NVIDIA_TEGRA_HDA_CFG_CMD_OFFSET, 0x507,
+				NVIDIA_TEGRA_HDA_ENABLE_MEM_SPACE |
+				NVIDIA_TEGRA_HDA_ENABLE_IO_SPACE |
+				NVIDIA_TEGRA_HDA_ENABLE_BUS_MASTER |
+				NVIDIA_TEGRA_HDA_ENABLE_SERR);
+		reg_update_bits(chip->remap_config_addr,
+				NVIDIA_TEGRA_HDA_CFG_BAR0_OFFSET, 0xFFFFFFFF,
+				NVIDIA_TEGRA_HDA_BAR0_INIT_PROGRAM);
+		reg_update_bits(chip->remap_config_addr,
+				NVIDIA_TEGRA_HDA_CFG_BAR0_OFFSET, 0xFFFFFFFF,
+				NVIDIA_TEGRA_HDA_BAR0_FINAL_PROGRAM);
+		reg_update_bits(chip->remap_config_addr,
+				NVIDIA_TEGRA_HDA_IPFS_FPCI_BAR0, 0xFFFFFFFF,
+				NVIDIA_TEGRA_HDA_FPCI_BAR0_START);
+		reg_update_bits(chip->remap_config_addr,
+				NVIDIA_TEGRA_HDA_IPFS_INTR_MASK,
+				NVIDIA_TEGRA_HDA_IPFS_EN_INTR,
+				NVIDIA_TEGRA_HDA_IPFS_EN_INTR);
+		break;
+#endif
+	default:
+		break;
+	}
+
+	return;
 }
 
 static void azx_platform_enable_clocks(struct azx *chip)
@@ -1447,7 +1570,8 @@ static int __devinit azx_codec_create(struct azx *chip, const char *model)
 	if (err < 0)
 		return err;
 
-	if (chip->driver_type == AZX_DRIVER_NVIDIA)
+	if (chip->driver_type == AZX_DRIVER_NVIDIA ||
+	    chip->driver_type == AZX_DRIVER_NVIDIA_TEGRA)
 		chip->bus->needs_damn_long_delay = 1;
 
 	codecs = 0;
@@ -2557,6 +2681,14 @@ static void __devinit check_msi(struct azx *chip)
 	}
 }
 
+#ifdef CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA
+static const char *tegra_clk_names[] __initdata = {
+	"hda",
+	"hda2codec",
+	"hda2hdmi",
+};
+static struct clk *tegra_clks[ARRAY_SIZE(tegra_clk_names)];
+#endif
 
 /*
  * constructor
@@ -2655,6 +2787,26 @@ static int __devinit azx_create(struct snd_card *card, struct pci_dev *pci,
 	if (chip->pdev) {
 		struct resource *res, *region;
 
+		/* Do platform specific initialization */
+		switch (chip->driver_type) {
+#ifdef CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA
+		case AZX_DRIVER_NVIDIA_TEGRA:
+			chip->platform_clk_count = ARRAY_SIZE(tegra_clk_names);
+			for (i = 0; i < chip->platform_clk_count; i++) {
+				tegra_clks[i] = clk_get(&pdev->dev,
+							tegra_clk_names[i]);
+				if (IS_ERR_OR_NULL(tegra_clks[i])) {
+					err = PTR_ERR(tegra_clks[i]);
+					goto errout;
+				}
+			}
+			chip->platform_clks = tegra_clks;
+			break;
+#endif
+		default:
+			break;
+		}
+
 		azx_platform_enable_clocks(chip);
 
 		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -2673,7 +2825,8 @@ static int __devinit azx_create(struct snd_card *card, struct pci_dev *pci,
 		}
 
 		chip->addr = res->start;
-		chip->remap_addr = devm_ioremap(chip->dev, res->start,
+		chip->remap_addr = devm_ioremap(chip->dev,
+						res->start,
 						resource_size(res));
 		if (chip->remap_addr == NULL) {
 			snd_printk(KERN_ERR SFX "ioremap error\n");
@@ -2681,9 +2834,17 @@ static int __devinit azx_create(struct snd_card *card, struct pci_dev *pci,
 			goto errout;
 		}
 
+#ifdef CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA
+		if (chip->driver_type == AZX_DRIVER_NVIDIA_TEGRA) {
+			chip->remap_config_addr = chip->remap_addr;
+			chip->remap_addr += NVIDIA_TEGRA_HDA_BAR0_OFFSET;
+			chip->addr += NVIDIA_TEGRA_HDA_BAR0_OFFSET;
+		}
+#endif
+
 		azx_init_platform(chip);
 	}
-#endif
+#endif /* CONFIG_SND_HDA_PLATFORM_DRIVER */
 
 	if (azx_acquire_irq(chip, 0) < 0) {
 		err = -EBUSY;
@@ -3031,6 +3192,9 @@ static int __devexit azx_remove_platform(struct platform_device *pdev)
 }
 
 static const struct platform_device_id azx_platform_ids[] = {
+#ifdef CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA
+	{ "tegra30-hda", AZX_DRIVER_NVIDIA_TEGRA },
+#endif
 	{ },
 };
 MODULE_DEVICE_TABLE(platform, azx_platform_ids);
