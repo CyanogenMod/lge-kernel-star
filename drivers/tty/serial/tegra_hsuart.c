@@ -1078,13 +1078,19 @@ static unsigned long find_best_clock_source(struct tegra_uart_port *t,
 	unsigned long fin_rate = rate;
 	int final_index = -1;
 	int count;
+	unsigned long error_2perc;
 
 	pdata = u->dev->platform_data;
 	if (!pdata || !pdata->parent_clk_count)
 		return fin_rate;
 
+	error_2perc = (rate / 50);
+
 	for (count = 0; count < pdata->parent_clk_count; ++count) {
 		parent_rate = pdata->parent_clk_list[count].fixed_clk_rate;
+
+		if (parent_rate < rate)
+			continue;
 
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
 		divider = clk_div71_get_divider(parent_rate, rate);
@@ -1099,8 +1105,12 @@ static unsigned long find_best_clock_source(struct tegra_uart_port *t,
 					final_index = count;
 					fin_err = err_rate;
 					fin_rate = new_rate;
+					if (fin_err < error_2perc)
+						break;
 				}
 			}
+			if (fin_err < error_2perc)
+				break;
 		}
 #endif
 		/* Get the divisor by uart controller dll/dlm */
@@ -1115,8 +1125,12 @@ static unsigned long find_best_clock_source(struct tegra_uart_port *t,
 					final_index = count;
 					fin_err = err_rate;
 					fin_rate = parent_rate;
+					if (fin_err < error_2perc)
+						break;
 				}
 			}
+			if (fin_err < error_2perc)
+				break;
 		}
 	}
 
