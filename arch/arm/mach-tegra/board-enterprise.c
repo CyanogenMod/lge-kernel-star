@@ -612,6 +612,7 @@ static struct tegra_max98088_platform_data enterprise_audio_pdata = {
 	.audio_port_id		= {
 		[HIFI_CODEC] = 0,
 		[BASEBAND] = 2,
+		[BT_SCO] = 3,
 	},
 	.baseband_param		= {
 		.rate = 8000,
