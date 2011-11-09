@@ -2729,22 +2729,22 @@ static struct clk_ops tegra_clk_cbus_ops = {
  * shared bus.
  */
 
-static int shared_bus_set_rate(struct clk *bus,
-				unsigned long rate, unsigned long old_rate)
+static noinline int shared_bus_set_rate(struct clk *bus, unsigned long rate,
+					unsigned long old_rate)
 {
 	int ret, mv, old_mv;
 	unsigned long bridge_rate = emc_bridge->u.shared_bus_user.rate;
 
 	/* If bridge is not needed (LPDDR2) just set bus rate */
-	if (bridge_rate < TEGRA_EMC_BRIDGE_RATE_MIN) {
+	if (tegra_emc_get_dram_type() == DRAM_TYPE_LPDDR2)
 		return clk_set_rate_locked(bus, rate);
-	}
 
 	mv = tegra_dvfs_predict_millivolts(bus, rate);
 	old_mv = tegra_dvfs_predict_millivolts(bus, old_rate);
 	if (IS_ERR_VALUE(mv) || IS_ERR_VALUE(old_mv)) {
 		pr_err("%s: Failed to predict %s voltage for %lu => %lu\n",
 		       __func__, bus->name, old_rate, rate);
+		return -EINVAL;
 	}
 
 	/* emc bus: set bridge rate as intermediate step when crossing
@@ -2779,12 +2779,14 @@ static int shared_bus_set_rate(struct clk *bus,
 	}
 
 	ret = clk_set_rate_locked(bus, rate);
+	if (ret)
+		return ret;
 
 	if ((mv <= TEGRA_EMC_BRIDGE_MVOLTS_MIN) &&
 	    (old_mv > TEGRA_EMC_BRIDGE_MVOLTS_MIN))
 		clk_disable(emc_bridge);
 
-	return ret;
+	return 0;
 }
 
 static int tegra3_clk_shared_bus_update(struct clk *bus)
