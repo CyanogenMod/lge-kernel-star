@@ -219,6 +219,7 @@ int __init cardhu_keys_init(void)
 	tegra_get_board_info(&board_info);
 	if (!((board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1291) ||
+		(board_info.board_id == BOARD_E1186) ||
 		(board_info.board_id == BOARD_E1257) ||
 		(board_info.board_id == BOARD_PM305) ||
 		(board_info.board_id == BOARD_PM311) ||
@@ -267,6 +268,7 @@ int __init cardhu_keys_init(void)
 	if ((board_info.board_id == BOARD_E1291) ||
 		(board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1257) ||
+		(board_info.board_id == BOARD_E1186) ||
 		(board_info.board_id == BOARD_PM305) ||
 		(board_info.board_id == BOARD_PM311) ||
 		(board_info.board_id == BOARD_PM269))
