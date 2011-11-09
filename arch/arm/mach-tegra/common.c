@@ -374,6 +374,7 @@ static int __init tegra_vpr_arg(char *options)
 		tegra_vpr_start = memparse(p+1, &p);
 	pr_info("Found vpr, start=0x%lx size=%lx",
 		tegra_vpr_start, tegra_vpr_size);
+	return 0;
 }
 early_param("vpr", tegra_vpr_arg);
 
