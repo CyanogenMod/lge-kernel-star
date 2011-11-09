@@ -134,8 +134,8 @@ int __init cardhu_kbc_init(void)
 		data->pin_cfg[i].pin_type = kbc_pin_row;
 	}
 	for (i = 0; i < col_count; i++) {
-		data->pin_cfg[i + row_count].num = i;
-		data->pin_cfg[i + row_count].pin_type = kbc_pin_col;
+		data->pin_cfg[i + KBC_PIN_GPIO_16].num = i;
+		data->pin_cfg[i + KBC_PIN_GPIO_16].pin_type = kbc_pin_col;
 	}
 
 	platform_device_register(&cardhu_kbc_device);

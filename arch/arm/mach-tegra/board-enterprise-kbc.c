@@ -93,8 +93,8 @@ int __init enterprise_kbc_init(void)
 		data->pin_cfg[i].en = true;
 	}
 	for (i = 0; i < ENTERPRISE_COL_COUNT; i++) {
-		data->pin_cfg[i + KBC_MAX_ROW].num = i;
-		data->pin_cfg[i + KBC_MAX_ROW].en = true;
+		data->pin_cfg[i + KBC_PIN_GPIO_16].num = i;
+		data->pin_cfg[i + KBC_PIN_GPIO_16].en = true;
 	}
 
 	platform_device_register(&tegra_kbc_device);
