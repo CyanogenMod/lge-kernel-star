@@ -334,51 +334,96 @@ static struct i2c_board_info ventana_i2c8_board_info[] = {
 };
 
 #ifdef CONFIG_MPU_SENSORS_MPU3050
-#define SENSOR_MPU_NAME "mpu3050"
-static struct mpu3050_platform_data mpu3050_data = {
-	.int_config  = 0x10,
-	.orientation = { 0, -1, 0, -1, 0, 0, 0, 0, -1 },  /* Orientation matrix for MPU on ventana */
-	.level_shifter = 0,
-	.accel = {
-#ifdef CONFIG_MPU_SENSORS_KXTF9
-	.get_slave_descr = get_accel_slave_descr,
-#else
-	.get_slave_descr = NULL,
-#endif
-	.adapt_num   = 0,
-	.bus         = EXT_SLAVE_BUS_SECONDARY,
-	.address     = 0x0F,
-	.orientation = { 0, -1, 0, -1, 0, 0, 0, 0, -1 },  /* Orientation matrix for Kionix on ventana */
-	},
-
-	.compass = {
-#ifdef CONFIG_MPU_SENSORS_AK8975
-	.get_slave_descr = get_compass_slave_descr,
-#else
-	.get_slave_descr = NULL,
-#endif
-	.adapt_num   = 4,            /* bus number 4 on ventana */
-	.bus         = EXT_SLAVE_BUS_PRIMARY,
-	.address     = 0x0C,
-	.orientation = { 1, 0, 0, 0, -1, 0, 0, 0, -1 },  /* Orientation matrix for AKM on ventana */
-	},
+static struct mpu_platform_data mpu3050_data = {
+	.int_config	= 0x10,
+	.level_shifter	= 0,
+	.orientation	= MPU_GYRO_ORIENTATION,	/* Located in board_[platformname].h	*/
 };
 
-static struct i2c_board_info __initdata mpu3050_i2c0_boardinfo[] = {
+static struct ext_slave_platform_data mpu3050_accel_data = {
+	.address	= MPU_ACCEL_ADDR,
+	.irq		= 0,
+	.adapt_num	= MPU_ACCEL_BUS_NUM,
+	.bus		= EXT_SLAVE_BUS_SECONDARY,
+	.orientation	= MPU_ACCEL_ORIENTATION,	/* Located in board_[platformname].h	*/
+};
+
+static struct ext_slave_platform_data mpu_compass_data = {
+	.address	= MPU_COMPASS_ADDR,
+	.irq		= 0,
+	.adapt_num	= MPU_COMPASS_BUS_NUM,
+	.bus		= EXT_SLAVE_BUS_PRIMARY,
+	.orientation	= MPU_COMPASS_ORIENTATION,	/* Located in board_[platformname].h	*/
+};
+
+static struct i2c_board_info __initdata inv_mpu_i2c2_board_info[] = {
 	{
-		I2C_BOARD_INFO(SENSOR_MPU_NAME, 0x68),
-		.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PZ4),
+		I2C_BOARD_INFO(MPU_GYRO_NAME, MPU_GYRO_ADDR),
+		.irq = TEGRA_GPIO_TO_IRQ(MPU_GYRO_IRQ_GPIO),
 		.platform_data = &mpu3050_data,
 	},
+	{
+		I2C_BOARD_INFO(MPU_ACCEL_NAME, MPU_ACCEL_ADDR),
+#if	MPU_ACCEL_IRQ_GPIO
+		.irq = TEGRA_GPIO_TO_IRQ(MPU_ACCEL_IRQ_GPIO),
+#endif
+		.platform_data = &mpu3050_accel_data,
+	},
 };
 
-static void ventana_mpuirq_init(void)
+static struct i2c_board_info __initdata inv_mpu_i2c4_board_info[] = {
+	{
+		I2C_BOARD_INFO(MPU_COMPASS_NAME, MPU_COMPASS_ADDR),
+#if	MPU_COMPASS_IRQ_GPIO
+		.irq = TEGRA_GPIO_TO_IRQ(MPU_COMPASS_IRQ_GPIO),
+#endif
+		.platform_data = &mpu_compass_data,
+	},
+};
+
+static void mpuirq_init(void)
 {
-	pr_info("*** MPU START *** ventana_mpuirq_init...\n");
-	tegra_gpio_enable(TEGRA_GPIO_PZ4);
-	gpio_request(TEGRA_GPIO_PZ4, SENSOR_MPU_NAME);
-	gpio_direction_input(TEGRA_GPIO_PZ4);
-	pr_info("*** MPU END *** ventana_mpuirq_init...\n");
+	int ret = 0;
+
+	pr_info("*** MPU START *** mpuirq_init...\n");
+
+#if	MPU_ACCEL_IRQ_GPIO
+	/* ACCEL-IRQ assignment */
+	tegra_gpio_enable(MPU_ACCEL_IRQ_GPIO);
+	ret = gpio_request(MPU_ACCEL_IRQ_GPIO, MPU_ACCEL_NAME);
+	if (ret < 0) {
+		pr_err("%s: gpio_request failed %d\n", __func__, ret);
+		return;
+	}
+
+	ret = gpio_direction_input(MPU_ACCEL_IRQ_GPIO);
+	if (ret < 0) {
+		pr_err("%s: gpio_direction_input failed %d\n", __func__, ret);
+		gpio_free(MPU_ACCEL_IRQ_GPIO);
+		return;
+	}
+#endif
+
+	/* MPU-IRQ assignment */
+	tegra_gpio_enable(MPU_GYRO_IRQ_GPIO);
+	ret = gpio_request(MPU_GYRO_IRQ_GPIO, MPU_GYRO_NAME);
+	if (ret < 0) {
+		pr_err("%s: gpio_request failed %d\n", __func__, ret);
+		return;
+	}
+
+	ret = gpio_direction_input(MPU_GYRO_IRQ_GPIO);
+	if (ret < 0) {
+		pr_err("%s: gpio_direction_input failed %d\n", __func__, ret);
+		gpio_free(MPU_GYRO_IRQ_GPIO);
+		return;
+	}
+	pr_info("*** MPU END *** mpuirq_init...\n");
+
+	i2c_register_board_info(MPU_GYRO_BUS_NUM, inv_mpu_i2c2_board_info,
+		ARRAY_SIZE(inv_mpu_i2c2_board_info));
+	i2c_register_board_info(MPU_COMPASS_BUS_NUM, inv_mpu_i2c4_board_info,
+		ARRAY_SIZE(inv_mpu_i2c4_board_info));
 }
 #endif
 
@@ -391,7 +436,7 @@ int __init ventana_sensors_init(void)
 	ventana_akm8975_init();
 #endif
 #ifdef CONFIG_MPU_SENSORS_MPU3050
-	ventana_mpuirq_init();
+	mpuirq_init();
 #endif
 	ventana_camera_init();
 	ventana_nct1008_init();
@@ -424,12 +469,6 @@ int __init ventana_sensors_init(void)
 
 	i2c_register_board_info(8, ventana_i2c8_board_info,
 		ARRAY_SIZE(ventana_i2c8_board_info));
-
-
-#ifdef CONFIG_MPU_SENSORS_MPU3050
-	i2c_register_board_info(0, mpu3050_i2c0_boardinfo,
-		ARRAY_SIZE(mpu3050_i2c0_boardinfo));
-#endif
 
 	return 0;
 }

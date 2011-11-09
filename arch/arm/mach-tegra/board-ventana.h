@@ -69,4 +69,21 @@ int ventana_charger_init(void);
 #define TPS6586X_INT_BASE	TEGRA_NR_IRQS
 #define TPS6586X_INT_END	(TPS6586X_INT_BASE + 32)
 
+/* Invensense MPU Definitions */
+#define MPU_GYRO_NAME		"mpu3050"
+#define MPU_GYRO_IRQ_GPIO	TEGRA_GPIO_PZ4
+#define MPU_GYRO_ADDR		0x68
+#define MPU_GYRO_BUS_NUM	0
+#define MPU_GYRO_ORIENTATION	{ 0, -1, 0, -1, 0, 0, 0, 0, -1 }
+#define MPU_ACCEL_NAME		"kxtf9"
+#define MPU_ACCEL_IRQ_GPIO	0 /* Disable ACCELIRQ: TEGRA_GPIO_PN4 */
+#define MPU_ACCEL_ADDR		0x0F
+#define MPU_ACCEL_BUS_NUM	0
+#define MPU_ACCEL_ORIENTATION	{ 0, -1, 0, -1, 0, 0, 0, 0, -1 }
+#define MPU_COMPASS_NAME	"ak8975"
+#define MPU_COMPASS_IRQ_GPIO	TEGRA_GPIO_PN5
+#define MPU_COMPASS_ADDR	0x0C
+#define MPU_COMPASS_BUS_NUM	4
+#define MPU_COMPASS_ORIENTATION	{ 1, 0, 0, 0, 1, 0, 0, 0, 1 }
+
 #endif

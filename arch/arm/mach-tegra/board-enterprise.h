@@ -52,6 +52,23 @@ int enterprise_suspend_init(void);
 int enterprise_edp_init(void);
 void __init enterprise_tsensor_init(void);
 
+/* Invensense MPU Definitions */
+#define MPU_GYRO_NAME		"mpu3050"
+#define MPU_GYRO_IRQ_GPIO	TEGRA_GPIO_PH4
+#define MPU_GYRO_ADDR		0x68
+#define MPU_GYRO_BUS_NUM	0
+#define MPU_GYRO_ORIENTATION	{ -1, 0, 0, 0, -1, 0, 0, 0, 1 }
+#define MPU_ACCEL_NAME		"kxtf9"
+#define MPU_ACCEL_IRQ_GPIO	0 /* DISABLE ACCELIRQ:  TEGRA_GPIO_PJ2 */
+#define MPU_ACCEL_ADDR		0x0F
+#define MPU_ACCEL_BUS_NUM	0
+#define MPU_ACCEL_ORIENTATION	{ 0, 1, 0, -1, 0, 0, 0, 0, 1 }
+#define MPU_COMPASS_NAME	"ak8975"
+#define MPU_COMPASS_IRQ_GPIO	0
+#define MPU_COMPASS_ADDR	0x0C
+#define MPU_COMPASS_BUS_NUM	0
+#define MPU_COMPASS_ORIENTATION	{ 0, 1, 0, -1, 0, 0, 0, 0, 1 }
+
 /* PCA954x I2C bus expander bus addresses */
 #define PCA954x_I2C_BUS_BASE	6
 #define PCA954x_I2C_BUS0	(PCA954x_I2C_BUS_BASE + 0)

@@ -211,6 +211,23 @@ int cardhu_pm299_gpio_switch_regulator_init(void);
 int cardhu_pm299_regulator_init(void);
 void __init cardhu_tsensor_init(void);
 
+/* Invensense MPU Definitions */
+#define MPU_GYRO_NAME		"mpu3050"
+#define MPU_GYRO_IRQ_GPIO	TEGRA_GPIO_PX1
+#define MPU_GYRO_ADDR		0x68
+#define MPU_GYRO_BUS_NUM	2
+#define MPU_GYRO_ORIENTATION	{ 0, -1, 0, -1, 0, 0, 0, 0, -1 }
+#define MPU_ACCEL_NAME		"kxtf9"
+#define MPU_ACCEL_IRQ_GPIO	TEGRA_GPIO_PL1
+#define MPU_ACCEL_ADDR		0x0F
+#define MPU_ACCEL_BUS_NUM	2
+#define MPU_ACCEL_ORIENTATION	{ 0, -1, 0, -1, 0, 0, 0, 0, -1 }
+#define MPU_COMPASS_NAME	"ak8975"
+#define MPU_COMPASS_IRQ_GPIO	0
+#define MPU_COMPASS_ADDR	0x0C
+#define MPU_COMPASS_BUS_NUM	2
+#define MPU_COMPASS_ORIENTATION	{ 1, 0, 0, 0, 1, 0, 0, 0, 1 }
+
 /* Baseband GPIO addresses */
 #define BB_GPIO_BB_EN			TEGRA_GPIO_PR5
 #define BB_GPIO_BB_RST			TEGRA_GPIO_PS4

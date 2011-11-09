@@ -144,40 +144,92 @@ static void enterprise_nct1008_init(void)
 				ARRAY_SIZE(enterprise_i2c4_nct1008_board_info));
 }
 
-#define SENSOR_MPU_NAME "mpu3050"
-static struct mpu3050_platform_data mpu3050_data = {
-	.int_config  = 0x10,
-	/* Orientation matrix for MPU on enterprise */
-	.orientation = { -1, 0, 0, 0, -1, 0, 0, 0, 1 },
-	.level_shifter = 0,
-
-	.accel = {
-		.get_slave_descr = get_accel_slave_descr,
-		.adapt_num   = 0,
-		.bus         = EXT_SLAVE_BUS_SECONDARY,
-		.address     = 0x0F,
-		/* Orientation matrix for Kionix on enterprise */
-		.orientation = { 0, 1, 0, -1, 0, 0, 0, 0, 1 },
-
-	},
-
-	.compass = {
-		.get_slave_descr = get_compass_slave_descr,
-		.adapt_num   = 0,
-		.bus         = EXT_SLAVE_BUS_PRIMARY,
-		.address     = 0x0C,
-		/* Orientation matrix for AKM on enterprise */
-		.orientation = { 0, 1, 0, -1, 0, 0, 0, 0, 1 },
-	},
+static struct mpu_platform_data mpu3050_data = {
+	.int_config	= 0x10,
+	.level_shifter	= 0,
+	.orientation	= MPU_GYRO_ORIENTATION,	/* Located in board_[platformname].h	*/
 };
 
-static struct i2c_board_info __initdata mpu3050_i2c0_boardinfo[] = {
+static struct ext_slave_platform_data mpu3050_accel_data = {
+	.address	= MPU_ACCEL_ADDR,
+	.irq		= 0,
+	.adapt_num	= MPU_ACCEL_BUS_NUM,
+	.bus		= EXT_SLAVE_BUS_SECONDARY,
+	.orientation	= MPU_ACCEL_ORIENTATION,	/* Located in board_[platformname].h	*/
+};
+
+static struct ext_slave_platform_data mpu_compass_data = {
+	.address	= MPU_COMPASS_ADDR,
+	.irq		= 0,
+	.adapt_num	= MPU_COMPASS_BUS_NUM,
+	.bus		= EXT_SLAVE_BUS_PRIMARY,
+	.orientation	= MPU_COMPASS_ORIENTATION,	/* Located in board_[platformname].h	*/
+};
+
+static struct i2c_board_info __initdata inv_mpu_i2c2_board_info[] = {
 	{
-		I2C_BOARD_INFO(SENSOR_MPU_NAME, 0x68),
-		.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PH4),
+		I2C_BOARD_INFO(MPU_GYRO_NAME, MPU_GYRO_ADDR),
+		.irq = TEGRA_GPIO_TO_IRQ(MPU_GYRO_IRQ_GPIO),
 		.platform_data = &mpu3050_data,
 	},
+	{
+		I2C_BOARD_INFO(MPU_ACCEL_NAME, MPU_ACCEL_ADDR),
+#if	MPU_ACCEL_IRQ_GPIO
+		.irq = TEGRA_GPIO_TO_IRQ(MPU_ACCEL_IRQ_GPIO),
+#endif
+		.platform_data = &mpu3050_accel_data,
+	},
+	{
+		I2C_BOARD_INFO(MPU_COMPASS_NAME, MPU_COMPASS_ADDR),
+#if	MPU_COMPASS_IRQ_GPIO
+		.irq = TEGRA_GPIO_TO_IRQ(MPU_COMPASS_IRQ_GPIO),
+#endif
+		.platform_data = &mpu_compass_data,
+	},
 };
+
+static void mpuirq_init(void)
+{
+	int ret = 0;
+
+	pr_info("*** MPU START *** mpuirq_init...\n");
+
+#if	MPU_ACCEL_IRQ_GPIO
+	/* ACCEL-IRQ assignment */
+	tegra_gpio_enable(MPU_ACCEL_IRQ_GPIO);
+	ret = gpio_request(MPU_ACCEL_IRQ_GPIO, MPU_ACCEL_NAME);
+	if (ret < 0) {
+		pr_err("%s: gpio_request failed %d\n", __func__, ret);
+		return;
+	}
+
+	ret = gpio_direction_input(MPU_ACCEL_IRQ_GPIO);
+	if (ret < 0) {
+		pr_err("%s: gpio_direction_input failed %d\n", __func__, ret);
+		gpio_free(MPU_ACCEL_IRQ_GPIO);
+		return;
+	}
+#endif
+
+	/* MPU-IRQ assignment */
+	tegra_gpio_enable(MPU_GYRO_IRQ_GPIO);
+	ret = gpio_request(MPU_GYRO_IRQ_GPIO, MPU_GYRO_NAME);
+	if (ret < 0) {
+		pr_err("%s: gpio_request failed %d\n", __func__, ret);
+		return;
+	}
+
+	ret = gpio_direction_input(MPU_GYRO_IRQ_GPIO);
+	if (ret < 0) {
+		pr_err("%s: gpio_direction_input failed %d\n", __func__, ret);
+		gpio_free(MPU_GYRO_IRQ_GPIO);
+		return;
+	}
+	pr_info("*** MPU END *** mpuirq_init...\n");
+
+	i2c_register_board_info(MPU_GYRO_BUS_NUM, inv_mpu_i2c2_board_info,
+		ARRAY_SIZE(inv_mpu_i2c2_board_info));
+}
 
 static inline void enterprise_msleep(u32 t)
 {
@@ -187,28 +239,6 @@ static inline void enterprise_msleep(u32 t)
 	Please read Documentation/timers/timers-howto.txt.
 	*/
 	usleep_range(t*1000, t*1000 + 500);
-}
-
-static void enterprise_mpuirq_init(void)
-{
-	int ret = 0;
-
-	tegra_gpio_enable(TEGRA_GPIO_PH4);
-	ret = gpio_request(TEGRA_GPIO_PH4, SENSOR_MPU_NAME);
-	if (ret < 0) {
-		pr_err("%s: gpio_request failed %d\n", __func__, ret);
-		return;
-	}
-
-	ret = gpio_direction_input(TEGRA_GPIO_PH4);
-	if (ret < 0) {
-		pr_err("%s: gpio_direction_input failed %d\n", __func__, ret);
-		gpio_free(TEGRA_GPIO_PH4);
-		return;
-	}
-
-	i2c_register_board_info(0, mpu3050_i2c0_boardinfo,
-				ARRAY_SIZE(mpu3050_i2c0_boardinfo));
 }
 
 static struct i2c_board_info enterprise_i2c0_isl_board_info[] = {
@@ -623,7 +653,7 @@ int __init enterprise_sensors_init(void)
 
 	enterprise_isl_init();
 	enterprise_nct1008_init();
-	enterprise_mpuirq_init();
+	mpuirq_init();
 	ret = enterprise_cam_init();
 
 	return ret;
