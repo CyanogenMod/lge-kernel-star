@@ -44,6 +44,9 @@
 #define PMC_CTRL		0x0
 #define PMC_CTRL_INTR_LOW	(1 << 17)
 
+#define PMC_DPD_PADS_ORIDE		0x01c
+#define PMC_DPD_PADS_ORIDE_BLINK	(1 << 20)
+
 /************************ TPS80031 based regulator ****************/
 static struct regulator_consumer_supply tps80031_vio_supply[] = {
 	REGULATOR_SUPPLY("vio_1v8", NULL),
@@ -492,12 +495,16 @@ int __init enterprise_regulator_init(void)
 {
 	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
 	u32 pmc_ctrl;
+	u32 pmc_dpd_pads;
 
 	/* configure the power management controller to trigger PMU
 	 * interrupts when low */
 
 	pmc_ctrl = readl(pmc + PMC_CTRL);
 	writel(pmc_ctrl | PMC_CTRL_INTR_LOW, pmc + PMC_CTRL);
+
+	pmc_dpd_pads = readl(pmc + PMC_DPD_PADS_ORIDE);
+	writel(pmc_dpd_pads & ~PMC_DPD_PADS_ORIDE_BLINK , pmc + PMC_DPD_PADS_ORIDE);
 
 	/* Disable battery charging if power adapter is connected. */
 	if (get_power_supply_type() == POWER_SUPPLY_TYPE_MAINS) {
