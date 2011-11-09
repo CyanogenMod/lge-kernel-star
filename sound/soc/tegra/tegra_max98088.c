@@ -87,6 +87,7 @@ struct tegra_max98088 {
 	int gpio_requested;
 	bool init_done;
 	int is_call_mode;
+	int is_device_bt;
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	struct codec_config codec_info[NUM_I2S_DEVICES];
 #endif
@@ -117,24 +118,30 @@ static int tegra_call_mode_put(struct snd_kcontrol *kcontrol,
 {
 	struct tegra_max98088 *machine = snd_kcontrol_chip(kcontrol);
 	int is_call_mode_new = ucontrol->value.integer.value[0];
+	int codec_index;
 
 	if (machine->is_call_mode == is_call_mode_new)
 		return 0;
 
+	if (machine->is_device_bt)
+		codec_index = BT_SCO;
+	else
+		codec_index = HIFI_CODEC;
+
 	if (is_call_mode_new) {
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
-		if (machine->codec_info[HIFI_CODEC].rate == 0 ||
-			machine->codec_info[HIFI_CODEC].channels == 0)
+		if (machine->codec_info[codec_index].rate == 0 ||
+			machine->codec_info[codec_index].channels == 0)
 				return -EINVAL;
 
 		tegra30_make_voice_call_connections(
-			&machine->codec_info[HIFI_CODEC],
+			&machine->codec_info[codec_index],
 			&machine->codec_info[BASEBAND]);
 #endif
 	} else {
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
 		tegra30_break_voice_call_connections(
-			&machine->codec_info[HIFI_CODEC],
+			&machine->codec_info[codec_index],
 			&machine->codec_info[BASEBAND]);
 #endif
 	}
@@ -532,6 +539,8 @@ static int tegra_voice_call_hw_params(struct snd_pcm_substream *substream,
 	machine->codec_info[BASEBAND].is_format_dsp = 1;
 #endif
 
+	machine->is_device_bt = 0;
+
 	return 0;
 }
 
@@ -544,6 +553,80 @@ static int tegra_voice_call_shutdown(struct snd_pcm_substream *substream)
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	machine->codec_info[HIFI_CODEC].rate = 0;
 	machine->codec_info[HIFI_CODEC].channels = 0;
+#endif
+
+	return 0;
+}
+
+static int tegra_bt_voice_call_hw_params(struct snd_pcm_substream *substream,
+			struct snd_pcm_hw_params *params)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_card *card = rtd->card;
+	struct tegra_max98088 *machine = snd_soc_card_get_drvdata(card);
+	int err, srate, mclk, min_mclk;
+
+	srate = params_rate(params);
+	switch (srate) {
+	case 11025:
+	case 22050:
+	case 44100:
+	case 88200:
+		mclk = 11289600;
+		break;
+	case 8000:
+	case 16000:
+	case 32000:
+	case 48000:
+	case 64000:
+	case 96000:
+		mclk = 12288000;
+		break;
+	default:
+		return -EINVAL;
+	}
+	min_mclk = 64 * srate;
+
+	err = tegra_asoc_utils_set_rate(&machine->util_data, srate, mclk);
+	if (err < 0) {
+		if (!(machine->util_data.set_mclk % min_mclk))
+			mclk = machine->util_data.set_mclk;
+		else {
+			dev_err(card->dev, "Can't configure clocks\n");
+			return err;
+		}
+	}
+
+	tegra_asoc_utils_lock_clk_rate(&machine->util_data, 1);
+
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	/* codec configuration */
+	machine->codec_info[BT_SCO].rate = params_rate(params);
+	machine->codec_info[BT_SCO].channels = params_channels(params);
+	machine->codec_info[BT_SCO].bitsize = 16;
+	machine->codec_info[BT_SCO].is_i2smaster = 1;
+	machine->codec_info[BT_SCO].is_format_dsp = 1;
+
+	/* baseband configuration */
+	machine->codec_info[BASEBAND].bitsize = 16;
+	machine->codec_info[BASEBAND].is_i2smaster = 1;
+	machine->codec_info[BASEBAND].is_format_dsp = 1;
+#endif
+
+	machine->is_device_bt = 1;
+
+	return 0;
+}
+
+static int tegra_bt_voice_call_shutdown(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct tegra_max98088 *machine  =
+			snd_soc_card_get_drvdata(rtd->codec->card);
+
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	machine->codec_info[BT_SCO].rate = 0;
+	machine->codec_info[BT_SCO].channels = 0;
 #endif
 
 	return 0;
@@ -566,6 +649,12 @@ static struct snd_soc_ops tegra_spdif_ops = {
 static struct snd_soc_ops tegra_voice_call_ops = {
 	.hw_params = tegra_voice_call_hw_params,
 	.shutdown = tegra_voice_call_shutdown,
+	.hw_free = tegra_hw_free,
+};
+
+static struct snd_soc_ops tegra_bt_voice_call_ops = {
+	.hw_params = tegra_bt_voice_call_hw_params,
+	.shutdown = tegra_bt_voice_call_shutdown,
 	.hw_free = tegra_hw_free,
 };
 
@@ -823,7 +912,6 @@ static struct snd_soc_dai_link tegra_max98088_dai[NUM_DAI_LINKS] = {
 			.stream_name = "BT SCO PCM",
 			.codec_name = "spdif-dit.1",
 			.platform_name = "tegra-pcm-audio",
-			.cpu_dai_name = "tegra30-i2s.3",
 			.codec_dai_name = "dit-hifi",
 			.init = tegra_max98088_init,
 			.ops = &tegra_bt_ops,
@@ -836,6 +924,15 @@ static struct snd_soc_dai_link tegra_max98088_dai[NUM_DAI_LINKS] = {
 			.cpu_dai_name = "dit-hifi",
 			.codec_dai_name = "HiFi",
 			.ops = &tegra_voice_call_ops,
+		},
+	[DAI_LINK_BT_VOICE_CALL] = {
+			.name = "BT VOICE CALL",
+			.stream_name = "BT VOICE CALL PCM",
+			.codec_name = "spdif-dit.2",
+			.platform_name = "tegra-pcm-audio",
+			.cpu_dai_name = "dit-hifi",
+			.codec_dai_name = "dit-hifi",
+			.ops = &tegra_bt_voice_call_ops,
 		},
 };
 
@@ -893,6 +990,9 @@ static __devinit int tegra_max98088_driver_probe(struct platform_device *pdev)
 
 	tegra_max98088_dai[DAI_LINK_HIFI].cpu_dai_name =
 	tegra_max98088_i2s_dai_name[machine->codec_info[HIFI_CODEC].i2s_id];
+
+	tegra_max98088_dai[DAI_LINK_BTSCO].cpu_dai_name =
+	tegra_max98088_i2s_dai_name[machine->codec_info[BT_SCO].i2s_id];
 #endif
 
 	ret = snd_soc_register_card(card);
