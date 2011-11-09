@@ -111,6 +111,18 @@ struct tegra_camera_block tegra_camera_block[] = {
 #define TEGRA_CAMERA_PD2VI_CLK_SEL_VI_SENSOR_CLK (1<<25)
 #define TEGRA_CAMERA_PD2VI_CLK_SEL_PD2VI_CLK 0
 
+static bool tegra_camera_enabled()
+{
+	bool ret = false;
+
+	mutex_lock(&tegra_camera_lock);
+	ret = tegra_camera_block[TEGRA_CAMERA_MODULE_ISP].is_enabled == true ||
+			tegra_camera_block[TEGRA_CAMERA_MODULE_VI].is_enabled == true ||
+			tegra_camera_block[TEGRA_CAMERA_MODULE_CSI].is_enabled == true;
+	mutex_unlock(&tegra_camera_lock);
+	return ret;
+}
+
 static int tegra_camera_clk_set_rate(struct tegra_camera_clk_info *info)
 {
 	u32 offset;
@@ -355,9 +367,28 @@ static int tegra_camera_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int tegra_camera_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	int ret = 0;
+
+	if (tegra_camera_enabled()) {
+		ret = -EBUSY;
+		pr_info("tegra_camera cannot suspend, application is holding on to camera. \n");
+	}
+
+	return ret;
+}
+
+static int tegra_camera_resume(struct platform_device *pdev)
+{
+	return 0;
+}
+
 static struct platform_driver tegra_camera_driver = {
 	.probe = tegra_camera_probe,
 	.remove = tegra_camera_remove,
+	.suspend = tegra_camera_suspend,
+	.resume = tegra_camera_resume,
 	.driver = { .name = TEGRA_CAMERA_NAME }
 };
 
