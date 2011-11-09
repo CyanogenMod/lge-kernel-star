@@ -58,6 +58,7 @@
 #include "board.h"
 #include "clock.h"
 #include "board-enterprise.h"
+#include "baseband-xmm-power.h"
 #include "devices.h"
 #include "gpio-names.h"
 #include "fuse.h"
@@ -770,6 +771,22 @@ static struct usb_phy_plat_data tegra_usb_phy_pdata[] = {
 	},
 };
 
+static struct tegra_uhsic_config uhsic_phy_config = {
+	.enable_gpio = -1,
+	.reset_gpio = -1,
+	.sync_start_delay = 9,
+	.idle_wait_delay = 17,
+	.term_range_adj = 0,
+	.elastic_underrun_limit = 16,
+	.elastic_overrun_limit = 16,
+};
+
+static struct tegra_ehci_platform_data tegra_ehci_uhsic_pdata = {
+	.phy_type = TEGRA_USB_PHY_TYPE_HSIC,
+	.phy_config = &uhsic_phy_config,
+	.operating_mode = TEGRA_USB_HOST,
+	.power_down_on_bus_suspend = 1,
+};
 
 static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
 	[0] = {
@@ -798,6 +815,42 @@ static struct tegra_otg_platform_data tegra_otg_pdata = {
 #define SERIAL_NUMBER_LENGTH 20
 static char usb_serial_num[SERIAL_NUMBER_LENGTH];
 #endif
+
+static int enterprise_usb_hsic_postsupend(void)
+{
+	pr_debug("%s\n", __func__);
+#ifdef CONFIG_TEGRA_BB_XMM_POWER
+	baseband_xmm_set_power_status(BBXMM_PS_L2);
+#endif
+	return 0;
+}
+
+static int enterprise_usb_hsic_preresume(void)
+{
+	pr_debug("%s\n", __func__);
+#ifdef CONFIG_TEGRA_BB_XMM_POWER
+	baseband_xmm_set_power_status(BBXMM_PS_L2TOL0);
+#endif
+	return 0;
+}
+
+static int enterprise_usb_hsic_phy_ready(void)
+{
+	pr_debug("%s\n", __func__);
+#ifdef CONFIG_TEGRA_BB_XMM_POWER
+	baseband_xmm_set_power_status(BBXMM_PS_L0);
+#endif
+	return 0;
+}
+
+static int enterprise_usb_hsic_phy_off(void)
+{
+	pr_debug("%s\n", __func__);
+#ifdef CONFIG_TEGRA_BB_XMM_POWER
+	baseband_xmm_set_power_status(BBXMM_PS_L3);
+#endif
+	return 0;
+}
 
 static void enterprise_usb_init(void)
 {
@@ -835,6 +888,37 @@ static void enterprise_gps_init(void)
 	tegra_gpio_enable(TEGRA_GPIO_PE5);
 }
 
+static struct baseband_power_platform_data tegra_baseband_power_data = {
+	.baseband_type = BASEBAND_XMM,
+	.modem = {
+		.xmm = {
+			.bb_rst = XMM_GPIO_BB_RST,
+			.bb_on = XMM_GPIO_BB_ON,
+			.ipc_bb_wake = XMM_GPIO_IPC_BB_WAKE,
+			.ipc_ap_wake = XMM_GPIO_IPC_AP_WAKE,
+			.ipc_hsic_active = XMM_GPIO_IPC_HSIC_ACTIVE,
+			.ipc_hsic_sus_req = XMM_GPIO_IPC_HSIC_SUS_REQ,
+			.hsic_device = &tegra_ehci2_device,
+		},
+	},
+};
+
+static struct platform_device tegra_baseband_power_device = {
+	.name = "baseband_xmm_power",
+	.id = -1,
+	.dev = {
+		.platform_data = &tegra_baseband_power_data,
+	},
+};
+
+static struct platform_device tegra_baseband_power2_device = {
+	.name = "baseband_xmm_power2",
+	.id = -1,
+	.dev = {
+		.platform_data = &tegra_baseband_power_data,
+	},
+};
+
 static void enterprise_baseband_init(void)
 {
 	int modem_id = tegra_get_modem_id();
@@ -843,7 +927,31 @@ static void enterprise_baseband_init(void)
 	case 1: /* PH450 ULPI */
 		enterprise_modem_init();
 		break;
-	case 2: /* 6260 HSIC */
+	case 2: /* XMM6260 HSIC */
+		/* xmm baseband - do not switch off phy during suspend */
+		tegra_ehci_uhsic_pdata.power_down_on_bus_suspend = 0;
+		uhsic_phy_config.postsuspend = enterprise_usb_hsic_postsupend;
+		uhsic_phy_config.preresume = enterprise_usb_hsic_preresume;
+		uhsic_phy_config.usb_phy_ready = enterprise_usb_hsic_phy_ready;
+		uhsic_phy_config.post_phy_off = enterprise_usb_hsic_phy_off;
+		/* baseband-power.ko will register ehci2 device */
+		tegra_ehci2_device.dev.platform_data
+			= &tegra_ehci_uhsic_pdata;
+		/* enable XMM6260 baseband gpio(s) */
+		tegra_gpio_enable(tegra_baseband_power_data.modem.generic
+			.mdm_reset);
+		tegra_gpio_enable(tegra_baseband_power_data.modem.generic
+			.mdm_on);
+		tegra_gpio_enable(tegra_baseband_power_data.modem.generic
+			.ap2mdm_ack);
+		tegra_gpio_enable(tegra_baseband_power_data.modem.generic
+			.mdm2ap_ack);
+		tegra_gpio_enable(tegra_baseband_power_data.modem.generic
+			.ap2mdm_ack2);
+		tegra_gpio_enable(tegra_baseband_power_data.modem.generic
+			.mdm2ap_ack2);
+		platform_device_register(&tegra_baseband_power_device);
+		platform_device_register(&tegra_baseband_power2_device);
 		break;
 	}
 }
