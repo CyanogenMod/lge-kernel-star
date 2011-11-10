@@ -23,7 +23,7 @@
 #include <linux/regulator/consumer.h>
 #include <media/ar0832_main.h>
 
-#define POS_LOW 50
+#define POS_LOW  0
 #define POS_HIGH 1000
 #define SETTLETIME_MS 100
 
@@ -35,6 +35,7 @@ struct ar0832_sensor_info {
 struct ar0832_focuser_info {
 	struct ar0832_focuser_config config;
 	int focuser_init_flag;
+	u16 last_position;
 };
 
 struct ar0832_power_rail {
@@ -1974,6 +1975,7 @@ ar0832_pwdn_exit:
 
 static int ar0832_focuser_set_config(struct ar0832_dev *dev)
 {
+	struct i2c_client *i2c_client = dev->i2c_client;
 	struct ar0832_reg reg_vcm_ctrl, reg_vcm_step_time;
 	int ret = 0;
 	u8 vcm_slew = 1;
@@ -1982,18 +1984,30 @@ static int ar0832_focuser_set_config(struct ar0832_dev *dev)
 	/* bit3(0x08) means that keep VCM(AF position) */
 	/* while sensor is in soft standby mode during mode transitions. */
 	u16 vcm_control_data = (0x80 << 8 | (0x08 | (vcm_slew & 0x07)));
-	u16 vcm_step_time = 2048;
+	u16 vcm_step_time = 1024;
 
 	ar0832_get_focuser_vcm_control_regs(&reg_vcm_ctrl, vcm_control_data);
 	ret = ar0832_write_reg16(dev->i2c_client, reg_vcm_ctrl.addr,
 					reg_vcm_ctrl.val);
-	if (ret)
+
+	dev_dbg(&i2c_client->dev, "%s Reg 0x%X Value 0x%X\n", __func__,
+			reg_vcm_ctrl.addr, reg_vcm_ctrl.val);
+
+	if (ret) {
+		dev_dbg(&i2c_client->dev, "%s Error writing to register 0x%X\n",
+				__func__, reg_vcm_ctrl.addr);
 		return ret;
+	}
 
 	ar0832_get_focuser_vcm_step_time_regs(&reg_vcm_step_time,
 						vcm_step_time);
 	ret = ar0832_write_reg16(dev->i2c_client, reg_vcm_step_time.addr,
 					reg_vcm_step_time.val);
+
+	dev_dbg(&i2c_client->dev, "%s Reg step_time 0x%X Value 0x%X\n",
+			__func__, reg_vcm_step_time.addr,
+			reg_vcm_step_time.val);
+
 	return ret;
 }
 
@@ -2003,15 +2017,72 @@ static int ar0832_focuser_set_position(struct ar0832_dev *dev,
 	int ret = 0;
 	struct ar0832_reg reg_data;
 
-	if (position < dev->focuser_info->config.pos_low ||
-		position > dev->focuser_info->config.pos_high)
-		return -EINVAL;
-
 	ar0832_get_focuser_data_regs(&reg_data, position);
 	ret = ar0832_write_reg16(dev->i2c_client, reg_data.addr,
 				     reg_data.val);
+	dev->focuser_info->last_position = position;
+
 	return ret;
 }
+
+
+/*
+ * This function is not currently called as we have the hardcoded
+ * step time in ar0832_focuser_set_config function. If we need to
+ * compute the actual step time based on a number of clocks, we need
+ * to use this function. The formula for computing the clock-based
+ * step time is obtained from Aptina and is not part of external
+ * documentation and hence this code needs to be saved.
+ */
+static u16 ar0832_get_focuser_vcm_step_time(struct ar0832_dev *dev)
+{
+	struct i2c_client *i2c_client = dev->i2c_client;
+	int ret;
+	u16 pll_multiplier = 0;
+	u16 pre_pll_clk_div = 0;
+	u16 vt_sys_clk_div = 0;
+	u16 vt_pix_clk_div = 0;
+	u16 vt_pix_clk_freq_mhz = 0;
+
+	ret = ar0832_read_reg16(dev->i2c_client, 0x306, &pll_multiplier);
+	if (ret) {
+		dev_err(&i2c_client->dev, "%s pll_multiplier read failed\n",
+				__func__);
+	}
+
+	ret = ar0832_read_reg16(dev->i2c_client, 0x304, &pre_pll_clk_div);
+	if (ret) {
+		dev_err(&i2c_client->dev, "%s pre_pll_clk_div read failed\n",
+				__func__);
+	}
+
+	ret = ar0832_read_reg16(dev->i2c_client, 0x302, &vt_sys_clk_div);
+	if (ret) {
+		dev_err(&i2c_client->dev, "%s vt_sys_clk_div read failed\n",
+				__func__);
+	}
+
+	ret = ar0832_read_reg16(dev->i2c_client, 0x300, &vt_pix_clk_div);
+	if (ret) {
+		dev_err(&i2c_client->dev, "%s vt_pix_clk_div read failed\n",
+				__func__);
+	}
+
+	vt_pix_clk_freq_mhz =
+		(24 * pll_multiplier) / (pre_pll_clk_div * vt_sys_clk_div *
+		 vt_pix_clk_div);
+
+	dev_dbg(&i2c_client->dev, "%s pll_multiplier 0x%X pre_pll_clk_div 0x%X "
+			"vt_sys_clk_div 0x%X vt_pix_clk_div 0x%X vt_pix_clk_freq_mhz 0x%X\n",
+			__func__, pll_multiplier,
+			pre_pll_clk_div, vt_sys_clk_div,
+			vt_pix_clk_div, vt_pix_clk_freq_mhz);
+
+	return vt_pix_clk_freq_mhz;
+
+}
+
+
 
 static inline
 int ar0832_get_sensorid(struct ar0832_dev *dev, u16 *sensor_id)
@@ -2039,6 +2110,7 @@ static long ar0832_ioctl(struct file *file,
 	struct ar0832_dev *dev = file->private_data;
 	struct i2c_client *i2c_client = dev->i2c_client;
 	struct ar0832_mode mode;
+	u16 pos;
 
 	switch (cmd) {
 	case AR0832_IOCTL_SET_POWER_ON:
@@ -2066,9 +2138,29 @@ static long ar0832_ioctl(struct file *file,
 		}
 		mutex_lock(&dev->ar0832_camera_lock);
 		err = ar0832_set_mode(dev, &mode);
-		if (dev->focuser_info->focuser_init_flag == false) {
-			ar0832_focuser_set_config(dev);
-			dev->focuser_info->focuser_init_flag = true;
+
+		/*
+		 * We need to re-initialize the Focuser registers during mode
+		 * switch due to the known issue of focuser retracting
+		 */
+		ar0832_focuser_set_config(dev);
+		dev->focuser_info->focuser_init_flag = true;
+
+		/*
+		 * If the last focuser position is not at infinity when we
+		 * did the mode switch, we need to go there. Before that,
+		 * we need to come back to 0.
+		 */
+		if (dev->focuser_info->last_position > 0) {
+			pos = dev->focuser_info->last_position;
+			dev_err(&i2c_client->dev, "%s: AR0832_IOCTL_SET_MODE: "
+					" Move to 0, restore the backedup focuser position of %d\n",
+					__func__, pos);
+			ar0832_focuser_set_position(dev, 0);
+			ar0832_msleep(10);
+
+			ar0832_focuser_set_position(dev, pos);
+			ar0832_msleep(10);
 		}
 		mutex_unlock(&dev->ar0832_camera_lock);
 		return err;
@@ -2137,6 +2229,10 @@ static long ar0832_ioctl(struct file *file,
 		dev_dbg(&i2c_client->dev,
 			"%s AR0832_FOCUSER_IOCTL_SET_POSITION\n", __func__);
 		mutex_lock(&dev->ar0832_camera_lock);
+		if (dev->focuser_info->focuser_init_flag == false) {
+			ar0832_focuser_set_config(dev);
+			dev->focuser_info->focuser_init_flag = true;
+		}
 		err = ar0832_focuser_set_position(dev, (u32)arg);
 		mutex_unlock(&dev->ar0832_camera_lock);
 		return err;
@@ -2199,6 +2295,8 @@ static int ar0832_release(struct inode *inode, struct file *file)
 	ar0832_power_off(dev);
 
 	file->private_data = NULL;
+
+	dev->focuser_info->focuser_init_flag = false;
 
 	WARN_ON(!atomic_xchg(&dev->in_use, 0));
 	return 0;
