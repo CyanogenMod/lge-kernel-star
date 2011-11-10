@@ -25,6 +25,8 @@
 #include <linux/slab.h>
 #include <linux/synaptics_i2c_rmi.h>
 
+#define ABS_DIFF(a, b)   (((a) > (b)) ? ((a) - (b)) : ((b) - (a)))
+
 static struct workqueue_struct *synaptics_wq;
 
 struct synaptics_ts_data {
@@ -45,6 +47,7 @@ struct synaptics_ts_data {
 	int snap_up[2];
 	uint32_t flags;
 	int reported_finger_count;
+	int last_pos[2][2];
 	int8_t sensitivity_adjust;
 	int (*power)(int on);
 	struct early_suspend early_suspend;
@@ -136,6 +139,7 @@ static void synaptics_ts_work_func(struct work_struct *work)
 				break;
 			} else {
 				int pos[2][2];
+				int rmpos_x, rmpos_y;
 				int f, a;
 				int base;
 				/* int x = buf[3] | (uint16_t)(buf[2] & 0x1f) << 8; */
@@ -193,22 +197,19 @@ static void synaptics_ts_work_func(struct work_struct *work)
 					if (ts->flags & SYNAPTICS_SWAP_XY)
 						swap(pos[f][0], pos[f][1]);
 				}
-				if (z) {
-					input_report_abs(ts->input_dev, ABS_X, pos[0][0]);
-					input_report_abs(ts->input_dev, ABS_Y, pos[0][1]);
-				}
-				input_report_abs(ts->input_dev, ABS_PRESSURE, z);
-				input_report_abs(ts->input_dev, ABS_TOOL_WIDTH, w);
-				input_report_key(ts->input_dev, BTN_TOUCH, finger);
-				finger2_pressed = finger > 1 && finger != 7;
-				input_report_key(ts->input_dev, BTN_2, finger2_pressed);
-				if (finger2_pressed) {
-					input_report_abs(ts->input_dev, ABS_HAT0X, pos[1][0]);
-					input_report_abs(ts->input_dev, ABS_HAT0Y, pos[1][1]);
-				}
 
-				if (!finger)
+				if (!finger) {
 					z = 0;
+					if (ts->reported_finger_count > 0) {
+						pos[0][0] = ts->last_pos[0][0];
+						pos[0][1] = ts->last_pos[0][1];
+					}
+					else
+						continue; /* skip touch noise */
+				}
+				finger = (finger == 7) ? 1 : finger; /* correct wrong finger count */
+				finger2_pressed = finger > 1;
+
 				input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, z);
 				input_report_abs(ts->input_dev, ABS_MT_WIDTH_MAJOR, w);
 				input_report_abs(ts->input_dev, ABS_MT_POSITION_X, pos[0][0]);
@@ -220,11 +221,37 @@ static void synaptics_ts_work_func(struct work_struct *work)
 					input_report_abs(ts->input_dev, ABS_MT_POSITION_X, pos[1][0]);
 					input_report_abs(ts->input_dev, ABS_MT_POSITION_Y, pos[1][1]);
 					input_mt_sync(ts->input_dev);
+					ts->last_pos[1][0] = pos[1][0];
+					ts->last_pos[1][1] = pos[1][1];
 				} else if (ts->reported_finger_count > 1) {
+					/* check which point was removed */
+					if ((ABS_DIFF(pos[0][0],ts->last_pos[0][0]) +
+					ABS_DIFF(pos[0][1],ts->last_pos[0][1])) <
+					(ABS_DIFF(pos[0][0],ts->last_pos[1][0]) +
+					ABS_DIFF(pos[0][1],ts->last_pos[1][1]))) {
+						rmpos_x = ts->last_pos[1][0];
+						rmpos_y = ts->last_pos[1][1];
+					}
+					else {
+						rmpos_x = ts->last_pos[0][0];
+						rmpos_y = ts->last_pos[0][1];
+					}
 					input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0);
 					input_report_abs(ts->input_dev, ABS_MT_WIDTH_MAJOR, 0);
+					input_report_abs(ts->input_dev, ABS_MT_POSITION_X, rmpos_x);
+					input_report_abs(ts->input_dev, ABS_MT_POSITION_Y, rmpos_y);
 					input_mt_sync(ts->input_dev);
 				}
+
+				if (z) {
+					input_report_abs(ts->input_dev, ABS_X, pos[0][0]);
+					input_report_abs(ts->input_dev, ABS_Y, pos[0][1]);
+					ts->last_pos[0][0] = pos[0][0];
+					ts->last_pos[0][1] = pos[0][1];
+				}
+				input_report_abs(ts->input_dev, ABS_PRESSURE, z);
+				input_report_abs(ts->input_dev, ABS_TOOL_WIDTH, w);
+				input_report_key(ts->input_dev, BTN_TOUCH, finger);
 				ts->reported_finger_count = finger;
 				input_sync(ts->input_dev);
 			}
@@ -464,7 +491,6 @@ static int synaptics_ts_probe(
 	set_bit(EV_SYN, ts->input_dev->evbit);
 	set_bit(EV_KEY, ts->input_dev->evbit);
 	set_bit(BTN_TOUCH, ts->input_dev->keybit);
-	set_bit(BTN_2, ts->input_dev->keybit);
 	set_bit(EV_ABS, ts->input_dev->evbit);
 	inactive_area_left = inactive_area_left * max_x / 0x10000;
 	inactive_area_right = inactive_area_right * max_x / 0x10000;
@@ -503,8 +529,6 @@ static int synaptics_ts_probe(
 	input_set_abs_params(ts->input_dev, ABS_Y, -inactive_area_top, max_y + inactive_area_bottom, fuzz_y, 0);
 	input_set_abs_params(ts->input_dev, ABS_PRESSURE, 0, 255, fuzz_p, 0);
 	input_set_abs_params(ts->input_dev, ABS_TOOL_WIDTH, 0, 15, fuzz_w, 0);
-	input_set_abs_params(ts->input_dev, ABS_HAT0X, -inactive_area_left, max_x + inactive_area_right, fuzz_x, 0);
-	input_set_abs_params(ts->input_dev, ABS_HAT0Y, -inactive_area_top, max_y + inactive_area_bottom, fuzz_y, 0);
 	input_set_abs_params(ts->input_dev, ABS_MT_POSITION_X, -inactive_area_left, max_x + inactive_area_right, fuzz_x, 0);
 	input_set_abs_params(ts->input_dev, ABS_MT_POSITION_Y, -inactive_area_top, max_y + inactive_area_bottom, fuzz_y, 0);
 	input_set_abs_params(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0, 255, fuzz_p, 0);
