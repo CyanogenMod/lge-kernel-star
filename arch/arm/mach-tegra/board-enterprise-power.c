@@ -529,8 +529,11 @@ static void enterprise_init_deep_sleep_mode(void)
 {
 	struct board_info bi;
 	tegra_get_board_info(&bi);
-	if (bi.board_id == BOARD_1205 && bi.fab == ENTERPRISE_FAB_A01)
+	if (bi.board_id == BOARD_E1205 && bi.fab == BOARD_FAB_A01)
 		enterprise_suspend_data.suspend_mode = TEGRA_SUSPEND_LP1;
+
+	if (bi.board_id == BOARD_E1205 && (bi.sku & BOARD_SKU_VF_DISABLED) == 0)
+		enterprise_suspend_data.cpu_timer = 8000;
 }
 
 int __init enterprise_suspend_init(void)

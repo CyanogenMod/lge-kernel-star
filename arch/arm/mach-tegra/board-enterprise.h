@@ -27,11 +27,16 @@
 
 /* Processor Board  ID */
 #define BOARD_E1205		0x0C05
+#define BOARD_E1197		0x0B61
+#define SKU_BATTERY_SUPPORT	0x1
 
 /* Board Fab version */
 #define BOARD_FAB_A00		0x0
 #define BOARD_FAB_A01		0x1
 #define BOARD_FAB_A02		0x2
+
+/* vdd_cpu voltage follower */
+#define BOARD_SKU_VF_DISABLED	0x0400
 
 int enterprise_charge_init(void);
 int enterprise_sdhci_init(void);
@@ -104,9 +109,4 @@ void __init enterprise_tsensor_init(void);
 #define XMM_GPIO_IPC_BB_WAKE		BB_GPIO_HS1_AP2BB
 #define XMM_GPIO_IPC_AP_WAKE		BB_GPIO_HS1_BB2AP
 
-/* Board IDs */
-
-#define BOARD_1205		(0x0C05)
-#define BOARD_E1197		(0x0B61)
-#define ENTERPRISE_FAB_A01	(0x01)
 #endif
