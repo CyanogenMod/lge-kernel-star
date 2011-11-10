@@ -17,6 +17,8 @@
 #include <linux/uaccess.h>
 #include <mach/hardware.h>
 #include <linux/gpio.h>
+#include <linux/debugfs.h>
+#include <linux/seq_file.h>
 #include <asm/atomic.h>
 #include <linux/regulator/consumer.h>
 #include <media/ar0832_main.h>
@@ -55,6 +57,7 @@ struct ar0832_dev {
 	int is_stereo;
 	int sensor_id_valid;
 	u16 sensor_id_data;
+	struct dentry *debugdir;
 };
 
 #define UpperByte16to8(x) ((u8)((x & 0xFF00) >> 8))
@@ -64,10 +67,19 @@ struct ar0832_dev {
 #define ar0832_TABLE_END 1
 #define ar0832_MAX_RETRIES 3
 
+/* AR0832 Register */
 #define AR0832_SENSORID_REG	0x0002
 #define AR0832_RESET_REG	0x301A
 #define AR0832_ID_REG		0x31FC
-#define AR0832_GLOBAL_GAIN	0x305E
+#define AR0832_GLOBAL_GAIN_REG	0x305E
+#define AR0832_TEST_PATTERN_REG	0x0600
+#define AR0832_GROUP_HOLD_REG	0x0104
+#define AR0832_TEST_RED_REG	0x0602
+#define AR0832_TEST_GREENR_REG	0x0604
+#define AR0832_TEST_BLUE_REG	0x0606
+#define AR0832_TEST_GREENB_REG	0x0608
+
+
 
 /* AR0832_RESET_REG */
 #define AR0832_RESET_REG_GROUPED_PARAMETER_HOLD		(1 << 15)
@@ -1546,7 +1558,7 @@ static inline void ar0832_get_focuser_data_regs(struct ar0832_reg *regs,
 static inline void ar0832_set_gain_reg(struct ar0832_reg *regs, u16 gain)
 {
 	/* global_gain register*/
-	regs->addr = AR0832_GLOBAL_GAIN;
+	regs->addr = AR0832_GLOBAL_GAIN_REG;
 	regs->val = gain;
 }
 
@@ -1694,7 +1706,7 @@ static int ar0832_set_frame_length(struct ar0832_dev *dev,
 	dev_dbg(&i2c_client->dev, "[%s] (0x%08x)\n", __func__,  frame_length);
 
 	ar0832_get_frame_length_regs(&reg_list, frame_length);
-	ret = ar0832_write_reg8(i2c_client, 0x0104, 0x1);
+	ret = ar0832_write_reg8(i2c_client, AR0832_GROUP_HOLD_REG, 0x1);
 	if (ret)
 		return ret;
 
@@ -1703,7 +1715,7 @@ static int ar0832_set_frame_length(struct ar0832_dev *dev,
 	if (ret)
 		return ret;
 
-	ret = ar0832_write_reg8(i2c_client, 0x0104, 0x0);
+	ret = ar0832_write_reg8(i2c_client, AR0832_GROUP_HOLD_REG, 0x0);
 	if (ret)
 		return ret;
 
@@ -1720,7 +1732,7 @@ static int ar0832_set_coarse_time(struct ar0832_dev *dev,
 	dev_dbg(&i2c_client->dev, "[%s] (0x%08x)\n", __func__,  coarse_time);
 	ar0832_get_coarse_time_regs(&reg_list, coarse_time);
 
-	ret = ar0832_write_reg8(i2c_client, 0x0104, 0x1);
+	ret = ar0832_write_reg8(i2c_client, AR0832_GROUP_HOLD_REG, 0x1);
 	if (ret)
 		return ret;
 
@@ -1729,7 +1741,7 @@ static int ar0832_set_coarse_time(struct ar0832_dev *dev,
 	if (ret)
 		return ret;
 
-	ret = ar0832_write_reg8(i2c_client, 0x0104, 0x0);
+	ret = ar0832_write_reg8(i2c_client, AR0832_GROUP_HOLD_REG, 0x0);
 	if (ret)
 		return ret;
 
@@ -1738,11 +1750,10 @@ static int ar0832_set_coarse_time(struct ar0832_dev *dev,
 
 static int ar0832_set_gain(struct ar0832_dev *dev, u16 gain)
 {
-	int i;
 	int ret = 0;
 	struct ar0832_reg reg_list_gain;
 
-	ret = ar0832_write_reg8(dev->i2c_client, 0x0104, 0x1);
+	ret = ar0832_write_reg8(dev->i2c_client, AR0832_GROUP_HOLD_REG, 0x1);
 	/* Gain Registers Start */
 	ar0832_set_gain_reg(&reg_list_gain, gain);
 	ret |= ar0832_write_reg16(dev->i2c_client,
@@ -1752,7 +1763,7 @@ static int ar0832_set_gain(struct ar0832_dev *dev, u16 gain)
 		return ret;
 
 	/* Gain register End */
-	ret |= ar0832_write_reg8(dev->i2c_client, 0x0104, 0x0);
+	ret |= ar0832_write_reg8(dev->i2c_client, AR0832_GROUP_HOLD_REG, 0x0);
 
 	return ret;
 }
@@ -1767,7 +1778,7 @@ static int ar0832_set_mode(struct ar0832_dev *dev,
 	struct ar0832_reg reg_frame_length, reg_coarse_time;
 	struct ar0832_reg *mode_seq;
 
-	dev_info(&i2c_client->dev, "%s: ++\n", __func__);
+	dev_dbg(&i2c_client->dev, "%s: ++\n", __func__);
 
 	if (mode->xres == 3264 && mode->yres == 2448)
 		sensor_mode = ar0832_MODE_3264X2448;
@@ -1894,7 +1905,7 @@ static int ar0832_power_on(struct ar0832_dev *dev)
 	struct i2c_client *i2c_client = dev->i2c_client;
 	int ret = 0;
 
-	dev_info(&i2c_client->dev, "%s: ++ %d\n", __func__, dev->is_stereo);
+	dev_dbg(&i2c_client->dev, "%s: ++ %d\n", __func__, dev->is_stereo);
 
 	/* Plug 1.8V and 2.8V power to sensor */
 	if (dev->power_rail.sen_1v8_reg) {
@@ -2168,7 +2179,7 @@ static int ar0832_open(struct inode *inode, struct file *file)
 	struct ar0832_dev *dev = dev_get_drvdata(miscdev->parent);
 	struct i2c_client *i2c_client = dev->i2c_client;
 
-	dev_info(&i2c_client->dev, "%s: ++\n", __func__);
+	dev_dbg(&i2c_client->dev, "%s: ++\n", __func__);
 	if (atomic_xchg(&dev->in_use, 1))
 		return -EBUSY;
 
@@ -2183,7 +2194,7 @@ static int ar0832_release(struct inode *inode, struct file *file)
 	struct ar0832_dev *dev = file->private_data;
 	struct i2c_client *i2c_client = dev->i2c_client;
 
-	dev_info(&i2c_client->dev, "%s: ++\n", __func__);
+	dev_dbg(&i2c_client->dev, "%s: ++\n", __func__);
 
 	ar0832_power_off(dev);
 
@@ -2199,6 +2210,168 @@ static const struct file_operations ar0832_fileops = {
 	.unlocked_ioctl = ar0832_ioctl,
 	.release = ar0832_release,
 };
+
+static int ar0832_debugfs_show(struct seq_file *s, void *unused)
+{
+	struct ar0832_dev *dev = s->private;
+	struct i2c_client *i2c_client = dev->i2c_client;
+	int ret;
+	u16 test_pattern_reg;
+
+	dev_dbg(&dev->i2c_client->dev, "%s: ++\n", __func__);
+	if (!dev->brd_power_cnt) {
+		dev_info(&i2c_client->dev,
+			"%s: camera is off\n", __func__);
+		return 0;
+	}
+
+	mutex_lock(&dev->ar0832_camera_lock);
+	ret = ar0832_read_reg16(i2c_client,
+			AR0832_TEST_PATTERN_REG, &test_pattern_reg);
+	mutex_unlock(&dev->ar0832_camera_lock);
+
+	if (ret) {
+		dev_err(&i2c_client->dev,
+			"%s: test pattern write failed\n", __func__);
+		return -EFAULT;
+	}
+
+	seq_printf(s, "%d\n", test_pattern_reg);
+	return 0;
+}
+
+static ssize_t ar0832_debugfs_write(
+	struct file *file,
+	char const __user *buf,
+	size_t count,
+	loff_t *offset)
+{
+	struct ar0832_dev *dev = ((struct seq_file *)file->private_data)->private;
+	struct i2c_client *i2c_client = dev->i2c_client;
+	int ret = 0;
+	char buffer[10];
+	u16 input, val, red = 0, green = 0, blue = 0;
+
+	dev_dbg(&i2c_client->dev, "%s: ++\n", __func__);
+	if (!dev->brd_power_cnt) {
+		dev_info(&i2c_client->dev,
+			"%s: camera is off\n", __func__);
+		return count;
+	}
+
+	if (copy_from_user(&buffer, buf, sizeof(buffer)))
+		goto debugfs_write_fail;
+
+	input = (u16)simple_strtoul(buffer, NULL, 10);
+
+	mutex_lock(&dev->ar0832_camera_lock);
+	ret = ar0832_write_reg8(i2c_client, AR0832_GROUP_HOLD_REG, 0x1);
+
+	switch (input) {
+	case 1: /* color bar */
+		val = 2;
+		break;
+	case 2:	/* Red */
+		val = 1;
+		red = 0x300; /* 10 bit value */
+		green = 0;
+		blue = 0;
+		break;
+	case 3: /* Green */
+		val = 1;
+		red = 0;
+		green = 0x300; /* 10 bit value */
+		blue = 0;
+		break;
+	case 4:	/* Blue */
+		val = 1;
+		red = 0;
+		green = 0;
+		blue = 0x300; /* 10 bit value */
+		break;
+	default:
+		val = 0;
+		break;
+	}
+
+	if (input == 2 || input == 3 || input == 4) {
+		ret |= ar0832_write_reg_helper(dev,
+				AR0832_TEST_RED_REG, red);
+		ret |= ar0832_write_reg_helper(dev,
+				AR0832_TEST_GREENR_REG, green);
+		ret |= ar0832_write_reg_helper(dev,
+				AR0832_TEST_GREENR_REG, green);
+		ret |= ar0832_write_reg_helper(dev,
+				AR0832_TEST_BLUE_REG, blue);
+	}
+
+	ret |= ar0832_write_reg_helper(dev, AR0832_TEST_PATTERN_REG, val);
+	ret |= ar0832_write_reg8(i2c_client, AR0832_GROUP_HOLD_REG, 0x0);
+	mutex_unlock(&dev->ar0832_camera_lock);
+
+	if (ret)
+		goto debugfs_write_fail;
+
+	return count;
+
+debugfs_write_fail:
+	dev_err(&i2c_client->dev,
+			"%s: test pattern write failed\n", __func__);
+	return -EFAULT;
+}
+
+static int ar0832_debugfs_open(struct inode *inode, struct file *file)
+{
+	struct ar0832_dev *dev = inode->i_private;
+	struct i2c_client *i2c_client = dev->i2c_client;
+
+	dev_dbg(&i2c_client->dev, "%s: ++\n", __func__);
+
+	return single_open(file, ar0832_debugfs_show, inode->i_private);
+}
+
+static const struct file_operations ar0832_debugfs_fops = {
+	.open		= ar0832_debugfs_open,
+	.read		= seq_read,
+	.write		= ar0832_debugfs_write,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static void __devexit ar0832_remove_debugfs(struct ar0832_dev *dev)
+{
+	struct i2c_client *i2c_client = dev->i2c_client;
+
+	dev_dbg(&i2c_client->dev, "%s: ++\n", __func__);
+
+	if (dev->debugdir)
+		debugfs_remove_recursive(dev->debugdir);
+	dev->debugdir = NULL;
+}
+
+static void ar0832_create_debugfs(struct ar0832_dev *dev)
+{
+	struct dentry *ret;
+	struct i2c_client *i2c_client = dev->i2c_client;
+
+	dev_dbg(&i2c_client->dev, "%s\n", __func__);
+
+	dev->debugdir = debugfs_create_dir(dev->dname, NULL);
+	if (!dev->debugdir)
+		goto remove_debugfs;
+
+	ret = debugfs_create_file("test_pattern",
+				S_IWUGO | S_IRUGO,
+				dev->debugdir, dev,
+				&ar0832_debugfs_fops);
+	if (!ret)
+		goto remove_debugfs;
+
+	return;
+remove_debugfs:
+	dev_err(&i2c_client->dev, "couldn't create debugfs\n");
+	ar0832_remove_debugfs(dev);
+}
 
 static int ar0832_probe(struct i2c_client *client,
 		const struct i2c_device_id *id)
@@ -2268,6 +2441,8 @@ static int ar0832_probe(struct i2c_client *client,
 		dev->power_rail.sen_1v8_reg = NULL;
 		goto probe_fail_free;
 	}
+	/* create debugfs interface */
+	ar0832_create_debugfs(dev);
 
 	return 0;
 
@@ -2297,6 +2472,9 @@ static int ar0832_remove(struct i2c_client *client)
 		kfree(dev->sensor_info);
 		kfree(dev->focuser_info);
 	}
+
+	ar0832_remove_debugfs(dev);
+
 	kfree(dev);
 	return 0;
 }
