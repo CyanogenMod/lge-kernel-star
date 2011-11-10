@@ -43,6 +43,7 @@ static struct regulator_consumer_supply max8907c_SD1_supply[] = {
 
 static struct regulator_consumer_supply max8907c_SD2_supply[] = {
 	REGULATOR_SUPPLY("vdd_core", NULL),
+	REGULATOR_SUPPLY("vdd_aon", NULL),
 };
 
 static struct regulator_consumer_supply max8907c_SD3_supply[] = {
