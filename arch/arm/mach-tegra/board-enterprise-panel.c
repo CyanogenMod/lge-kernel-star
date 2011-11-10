@@ -499,18 +499,8 @@ static void enterprise_stereo_set_orientation(int mode)
 #ifdef CONFIG_TEGRA_DC
 static int enterprise_dsi_panel_postsuspend(void)
 {
-	int err = 0;
-
-	if (enterprise_dsi_reg) {
-		err = regulator_disable(enterprise_dsi_reg);
-		if (err < 0)
-			printk(KERN_ERR
-			"DSI regulator avdd_dsi_csi disable failed\n");
-		regulator_put(enterprise_dsi_reg);
-		enterprise_dsi_reg = NULL;
-	}
-
-	return err;
+	/* Do nothing for enterprise dsi panel */
+	return 0;
 }
 #endif
 
