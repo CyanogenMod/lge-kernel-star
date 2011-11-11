@@ -340,7 +340,6 @@ struct smmu_device {
 		unsigned long _pa_ = VA_PAGE_TO_PA(va, page);		\
 		__cpuc_flush_dcache_area((void *)(va), (size_t)(size));	\
 		outer_flush_range(_pa_, _pa_+(size_t)(size));		\
-		wmb();	\
 	} while (0)
 
 #define FLUSH_SMMU_REGS(smmu)	\
