@@ -242,6 +242,8 @@ struct tegra30_i2s {
 	struct dentry *debug;
 	u32 reg_ctrl;
 	u32 reg_ch_ctrl;
+	int dam_ifc;
+	int dam_ch_refcount;
 	int  playback_ref_count;
 	bool is_dam_used;
 };

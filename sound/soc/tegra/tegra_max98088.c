@@ -51,6 +51,11 @@
 
 #include "tegra_pcm.h"
 #include "tegra_asoc_utils.h"
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+#include "tegra30_ahub.h"
+#include "tegra30_i2s.h"
+#include "tegra30_dam.h"
+#endif
 
 #define DRV_NAME "tegra-snd-max98088"
 
@@ -63,7 +68,27 @@ struct tegra_max98088 {
 	struct tegra_asoc_utils_data util_data;
 	struct tegra_max98088_platform_data *pdata;
 	int gpio_requested;
+	bool init_done;
 };
+
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+static int tegra_max98088_set_dam_cif(int dam_ifc, int srate,
+			int channels, int bit_size)
+{
+	tegra30_dam_set_samplerate(dam_ifc, TEGRA30_DAM_CHOUT,
+				srate);
+	tegra30_dam_set_samplerate(dam_ifc, TEGRA30_DAM_CHIN1,
+				srate);
+	tegra30_dam_set_acif(dam_ifc, TEGRA30_DAM_CHIN1,
+		channels, bit_size, channels,
+				bit_size);
+	tegra30_dam_set_acif(dam_ifc, TEGRA30_DAM_CHOUT,
+		channels, bit_size, channels,
+				bit_size);
+
+	return 0;
+}
+#endif
 
 static int tegra_max98088_hw_params(struct snd_pcm_substream *substream,
 					struct snd_pcm_hw_params *params)
@@ -74,8 +99,19 @@ static int tegra_max98088_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_codec *codec = rtd->codec;
 	struct snd_soc_card *card = codec->card;
 	struct tegra_max98088 *machine = snd_soc_card_get_drvdata(card);
-	int srate, mclk;
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	struct tegra30_i2s *i2s = snd_soc_dai_get_drvdata(cpu_dai);
+#endif
+	int srate, mclk, sample_size;
 	int err;
+
+	switch (params_format(params)) {
+	case SNDRV_PCM_FORMAT_S16_LE:
+		sample_size = 16;
+		break;
+	default:
+		return -EINVAL;
+	}
 
 	srate = params_rate(params);
 	switch (srate) {
@@ -136,6 +172,12 @@ static int tegra_max98088_hw_params(struct snd_pcm_substream *substream,
 		return err;
 	}
 
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		tegra_max98088_set_dam_cif(i2s->dam_ifc, srate,
+				params_channels(params), sample_size);
+#endif
+
 	return 0;
 }
 
@@ -188,9 +230,20 @@ static int tegra_bt_hw_params(struct snd_pcm_substream *substream,
 		struct snd_pcm_hw_params *params)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	struct tegra30_i2s *i2s = snd_soc_dai_get_drvdata(rtd->cpu_dai);
+#endif
 	struct snd_soc_card *card = rtd->card;
 	struct tegra_max98088 *machine = snd_soc_card_get_drvdata(card);
-	int err, srate, mclk, min_mclk;
+	int err, srate, mclk, min_mclk, sample_size;
+
+	switch (params_format(params)) {
+	case SNDRV_PCM_FORMAT_S16_LE:
+		sample_size = 16;
+		break;
+	default:
+		return -EINVAL;
+	}
 
 	srate = params_rate(params);
 	switch (srate) {
@@ -234,6 +287,12 @@ static int tegra_bt_hw_params(struct snd_pcm_substream *substream,
 		return err;
 	}
 
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		tegra_max98088_set_dam_cif(i2s->dam_ifc, params_rate(params),
+				params_channels(params), sample_size);
+#endif
+
 	return 0;
 }
 
@@ -247,9 +306,81 @@ static void tegra_hw_free(struct snd_pcm_substream *substream)
 	return 0;
 }
 
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+static int tegra_max98088_startup(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	struct tegra30_i2s *i2s = snd_soc_dai_get_drvdata(cpu_dai);
+
+	if ((substream->stream != SNDRV_PCM_STREAM_PLAYBACK) ||
+		!(i2s->is_dam_used))
+		return 0;
+
+	/*dam configuration*/
+	if (!i2s->dam_ch_refcount)
+		i2s->dam_ifc = tegra30_dam_allocate_controller();
+
+	tegra30_dam_allocate_channel(i2s->dam_ifc, TEGRA30_DAM_CHIN1);
+	i2s->dam_ch_refcount++;
+	tegra30_dam_enable_clock(i2s->dam_ifc);
+	tegra30_dam_set_gain(i2s->dam_ifc, TEGRA30_DAM_CHIN1, 0x1000);
+
+	tegra30_ahub_set_rx_cif_source(TEGRA30_AHUB_RXCIF_DAM0_RX1 +
+			(i2s->dam_ifc*2), i2s->txcif);
+
+	/*
+	*make the dam tx to i2s rx connection if this is the only client
+	*using i2s for playback
+	*/
+	if (i2s->playback_ref_count == 1)
+		tegra30_ahub_set_rx_cif_source(
+			TEGRA30_AHUB_RXCIF_I2S0_RX0 + i2s->id,
+			TEGRA30_AHUB_TXCIF_DAM0_TX0 + i2s->dam_ifc);
+
+	/* enable the dam*/
+	tegra30_dam_enable(i2s->dam_ifc, TEGRA30_DAM_ENABLE,
+			TEGRA30_DAM_CHIN1);
+
+	return 0;
+}
+
+static int tegra_max98088_shutdown(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	struct tegra30_i2s *i2s = snd_soc_dai_get_drvdata(cpu_dai);
+
+	if ((substream->stream != SNDRV_PCM_STREAM_PLAYBACK) ||
+		!(i2s->is_dam_used))
+		return 0;
+
+	/* disable the dam*/
+	tegra30_dam_enable(i2s->dam_ifc, TEGRA30_DAM_DISABLE,
+			TEGRA30_DAM_CHIN1);
+
+	/* disconnect the ahub connections*/
+	tegra30_ahub_unset_rx_cif_source(TEGRA30_AHUB_RXCIF_DAM0_RX1 +
+				(i2s->dam_ifc*2));
+
+	/* disable the dam and free the controller */
+	tegra30_dam_disable_clock(i2s->dam_ifc);
+	tegra30_dam_free_channel(i2s->dam_ifc, TEGRA30_DAM_CHIN1);
+	i2s->dam_ch_refcount--;
+	if (!i2s->dam_ch_refcount)
+		tegra30_dam_free_controller(i2s->dam_ifc);
+
+	return 0;
+}
+#endif
+
 static struct snd_soc_ops tegra_max98088_ops = {
 	.hw_params = tegra_max98088_hw_params,
 	.hw_free = tegra_hw_free,
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	.startup = tegra_max98088_startup,
+	.shutdown = tegra_max98088_shutdown,
+#endif
 };
 
 static struct snd_soc_ops tegra_spdif_ops = {
@@ -260,6 +391,10 @@ static struct snd_soc_ops tegra_spdif_ops = {
 static struct snd_soc_ops tegra_bt_ops = {
 	.hw_params = tegra_bt_hw_params,
 	.hw_free = tegra_hw_free,
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	.startup = tegra_max98088_startup,
+	.shutdown = tegra_max98088_shutdown,
+#endif
 };
 
 static struct snd_soc_jack tegra_max98088_hp_jack;
@@ -381,6 +516,11 @@ static int tegra_max98088_init(struct snd_soc_pcm_runtime *rtd)
 	struct tegra_max98088_platform_data *pdata = machine->pdata;
 	int ret;
 
+	if (machine->init_done)
+		return 0;
+
+	machine->init_done = true;
+
 	if (gpio_is_valid(pdata->gpio_spkr_en)) {
 		ret = gpio_request(pdata->gpio_spkr_en, "spkr_en");
 		if (ret) {
@@ -491,6 +631,7 @@ static struct snd_soc_dai_link tegra_max98088_dai[] = {
 		.platform_name = "tegra-pcm-audio",
 		.cpu_dai_name = "tegra30-i2s.3",
 		.codec_dai_name = "dit-hifi",
+		.init = tegra_max98088_init,
 		.ops = &tegra_bt_ops,
 	},
 };
