@@ -102,9 +102,15 @@ static int tegra_wm8753_hw_params(struct snd_pcm_substream *substream,
 
 	err = tegra_asoc_utils_set_rate(&machine->util_data, srate, mclk);
 	if (err < 0) {
-		dev_err(card->dev, "Can't configure clocks\n");
-		return err;
+		if (!(machine->util_data.set_mclk % mclk))
+			mclk = machine->util_data.set_mclk;
+		else {
+			dev_err(card->dev, "Can't configure clocks\n");
+			return err;
+		}
 	}
+
+	tegra_asoc_utils_lock_clk_rate(&machine->util_data, 1);
 
 	i2s_daifmt = SND_SOC_DAIFMT_NB_NF |
 		     SND_SOC_DAIFMT_CBS_CFS;
@@ -137,11 +143,70 @@ static int tegra_wm8753_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+static int tegra_spdif_hw_params(struct snd_pcm_substream *substream,
+					struct snd_pcm_hw_params *params)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_card *card = rtd->card;
+	struct tegra_wm8753 *machine = snd_soc_card_get_drvdata(card);
+	int srate, mclk, min_mclk;
+	int err;
+
+	srate = params_rate(params);
+	switch (srate) {
+	case 11025:
+	case 22050:
+	case 44100:
+	case 88200:
+		mclk = 11289600;
+		break;
+	case 8000:
+	case 16000:
+	case 32000:
+	case 48000:
+	case 64000:
+	case 96000:
+		mclk = 12288000;
+		break;
+	default:
+		return -EINVAL;
+	}
+	min_mclk = 128 * srate;
+
+	err = tegra_asoc_utils_set_rate(&machine->util_data, srate, mclk);
+	if (err < 0) {
+		if (!(machine->util_data.set_mclk % min_mclk))
+			mclk = machine->util_data.set_mclk;
+		else {
+			dev_err(card->dev, "Can't configure clocks\n");
+			return err;
+		}
+	}
+
+	tegra_asoc_utils_lock_clk_rate(&machine->util_data, 1);
+
+	return 0;
+}
+
+static int tegra_hw_free(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct tegra_wm8753 *machine = snd_soc_card_get_drvdata(rtd->card);
+
+	tegra_asoc_utils_lock_clk_rate(&machine->util_data, 0);
+
+	return 0;
+}
+
 static struct snd_soc_ops tegra_wm8753_ops = {
 	.hw_params = tegra_wm8753_hw_params,
+	.hw_free = tegra_hw_free,
 };
 
-static struct snd_soc_ops tegra_spdif_ops;
+static struct snd_soc_ops tegra_spdif_ops = {
+	.hw_params = tegra_spdif_hw_params,
+	.hw_free = tegra_hw_free,
+};
 
 static struct snd_soc_jack tegra_wm8753_hp_jack;
 
