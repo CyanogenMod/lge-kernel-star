@@ -1386,8 +1386,11 @@ int sdhci_enable(struct mmc_host *mmc)
 	if (!mmc->card || mmc->card->type == MMC_TYPE_SDIO)
 		return 0;
 
-	if (mmc->ios.clock)
+	if (mmc->ios.clock) {
+		if (host->ops->set_clock)
+			host->ops->set_clock(host, mmc->ios.clock);
 		sdhci_set_clock(host, mmc->ios.clock);
+	}
 
 	return 0;
 }
@@ -1400,6 +1403,8 @@ int sdhci_disable(struct mmc_host *mmc, int lazy)
 		return 0;
 
 	sdhci_set_clock(host, 0);
+	if (host->ops->set_clock)
+		host->ops->set_clock(host, 0);
 
 	return 0;
 }
