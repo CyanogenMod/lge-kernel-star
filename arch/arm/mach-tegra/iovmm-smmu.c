@@ -331,8 +331,12 @@ struct smmu_device {
 		outer_flush_range(_pa_, _pa_+(size_t)(size));		\
 	} while (0)
 
-#define FLUSH_SMMU_REGS(smmu)	\
-	do { wmb(); (void)readl((smmu)->regs + MC_SMMU_CONFIG_0); } while (0)
+/*
+ * Any interaction between any block on PPSB and a block on APB or AHB
+ * must have these read-back to ensure the APB/AHB bus transaction is
+ * complete before initiating activity on the PPSB block.
+ */
+#define FLUSH_SMMU_REGS(smmu) (void)readl((smmu)->regs + MC_SMMU_CONFIG_0)
 
 /*
  * Flush all TLB entries and all PTC entries
