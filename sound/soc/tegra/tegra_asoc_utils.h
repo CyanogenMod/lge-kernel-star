@@ -34,10 +34,13 @@ struct tegra_asoc_utils_data {
 	struct clk *clk_out1;
 	int set_baseclock;
 	int set_mclk;
+	int lock_count;
 };
 
 int tegra_asoc_utils_set_rate(struct tegra_asoc_utils_data *data, int srate,
 			      int mclk);
+void tegra_asoc_utils_lock_clk_rate(struct tegra_asoc_utils_data *data,
+				    int lock);
 int tegra_asoc_utils_init(struct tegra_asoc_utils_data *data,
 			  struct device *dev);
 void tegra_asoc_utils_fini(struct tegra_asoc_utils_data *data);

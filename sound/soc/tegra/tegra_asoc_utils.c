@@ -66,6 +66,10 @@ int tegra_asoc_utils_set_rate(struct tegra_asoc_utils_data *data, int srate,
 	if (!clk_change)
 		return 0;
 
+	/* Don't change rate if already one dai-link is using it */
+	if (data->lock_count)
+		return -EINVAL;
+
 	data->set_baseclock = 0;
 	data->set_mclk = 0;
 
@@ -111,6 +115,16 @@ int tegra_asoc_utils_set_rate(struct tegra_asoc_utils_data *data, int srate,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(tegra_asoc_utils_set_rate);
+
+void tegra_asoc_utils_lock_clk_rate(struct tegra_asoc_utils_data *data,
+				    int lock)
+{
+	if (lock)
+		data->lock_count++;
+	else if (data->lock_count)
+		data->lock_count--;
+}
+EXPORT_SYMBOL_GPL(tegra_asoc_utils_lock_clk_rate);
 
 int tegra_asoc_utils_clk_enable(struct tegra_asoc_utils_data *data)
 {
