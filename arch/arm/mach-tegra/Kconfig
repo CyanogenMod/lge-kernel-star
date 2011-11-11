@@ -241,7 +241,8 @@ config TEGRA_IOVMM_GART
 	help
 	  Enables support for remapping discontiguous physical memory
 	  shared with the operating system into contiguous I/O virtual
-	  space through the GART hardware included on Tegra SoCs
+	  space through the GART (Graphics Address Relocation Table)
+	  hardware included on Tegra SoCs.
 
 config TEGRA_IOVMM_SMMU
 	bool "Enable I/O virtual memory manager for SMMU"
@@ -251,7 +252,8 @@ config TEGRA_IOVMM_SMMU
 	help
 	  Enables support for remapping discontiguous physical memory
 	  shared with the operating system into contiguous I/O virtual
-	  space through the SMMU hardware included on Tegra SoCs
+	  space through the SMMU (System Memory Management Unit)
+	  hardware included on Tegra SoCs.
 
 config TEGRA_IOVMM_SMMU_SYSFS
 	bool "Enable SMMU register access for debugging"

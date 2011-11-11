@@ -30,18 +30,19 @@
 
 #include <mach/iovmm.h>
 
-/* after the best-fit block is located, the remaining pages not needed for
- * the allocation will be split into a new free block if the number of
- * remaining pages is >= MIN_SPLIT_PAGE.
+/*
+ * after the best-fit block is located, the remaining pages not needed
+ * for the allocation will be split into a new free block if the
+ * number of remaining pages is >= MIN_SPLIT_PAGE.
  */
-#define MIN_SPLIT_PAGE (4)
-#define MIN_SPLIT_BYTES(_d) (MIN_SPLIT_PAGE<<(_d)->dev->pgsize_bits)
-#define NO_SPLIT(m) ((m) < MIN_SPLIT_BYTES(domain))
-#define DO_SPLIT(m) ((m) >= MIN_SPLIT_BYTES(domain))
+#define MIN_SPLIT_PAGE		4
+#define MIN_SPLIT_BYTES(_d)	(MIN_SPLIT_PAGE << (_d)->dev->pgsize_bits)
+#define NO_SPLIT(m)		((m) < MIN_SPLIT_BYTES(domain))
+#define DO_SPLIT(m)		((m) >= MIN_SPLIT_BYTES(domain))
 
-#define iovmm_start(_b) ((_b)->vm_area.iovm_start)
-#define iovmm_length(_b) ((_b)->vm_area.iovm_length)
-#define iovmm_end(_b) (iovmm_start(_b) + iovmm_length(_b))
+#define iovmm_start(_b)		((_b)->vm_area.iovm_start)
+#define iovmm_length(_b)	((_b)->vm_area.iovm_length)
+#define iovmm_end(_b)		(iovmm_start(_b) + iovmm_length(_b))
 
 /* flags for the block */
 #define BK_free		0 /* indicates free mappings */
@@ -69,7 +70,7 @@ struct iovmm_share_group {
 	struct tegra_iovmm_domain	*domain;
 	struct list_head		client_list;
 	struct list_head		group_list;
-	spinlock_t			lock;
+	spinlock_t			lock; /* for client_list */
 };
 
 static LIST_HEAD(iovmm_devices);
@@ -92,6 +93,8 @@ static tegra_iovmm_addr_t iovmm_align_down(struct tegra_iovmm_device *dev,
 	addr &= ~((1<<dev->pgsize_bits)-1);
 	return addr;
 }
+
+#define SIMALIGN(b, a)	(((b)->start % (a)) ? ((a) - ((b)->start % (a))) : 0)
 
 #define iovmprint(fmt, arg...) snprintf(page+len, count-len, fmt, ## arg)
 
@@ -183,7 +186,7 @@ static int tegra_iovmm_read_proc(char *page, char **start, off_t off,
 static void iovmm_block_put(struct tegra_iovmm_block *b)
 {
 	BUG_ON(b->poison);
-	BUG_ON(atomic_read(&b->ref)==0);
+	BUG_ON(atomic_read(&b->ref) == 0);
 	if (!atomic_dec_return(&b->ref)) {
 		b->poison = 0xa5a5a5a5;
 		kmem_cache_free(iovmm_cache, b);
@@ -209,8 +212,10 @@ static void iovmm_free_block(struct tegra_iovmm_domain *domain,
 	if (temp)
 		succ = rb_entry(temp, struct tegra_iovmm_block, all_node);
 
-	if (pred) pred_free = test_bit(BK_free, &pred->flags);
-	if (succ) succ_free = test_bit(BK_free, &succ->flags);
+	if (pred)
+		pred_free = test_bit(BK_free, &pred->flags);
+	if (succ)
+		succ_free = test_bit(BK_free, &succ->flags);
 
 	if (pred_free && succ_free) {
 		pred->length += block->length;
@@ -251,10 +256,12 @@ static void iovmm_free_block(struct tegra_iovmm_domain *domain,
 	spin_unlock(&domain->block_lock);
 }
 
-/* if the best-fit block is larger than the requested size, a remainder
+/*
+ * if the best-fit block is larger than the requested size, a remainder
  * block will be created and inserted into the free list in its place.
  * since all free blocks are stored in two trees the new block needs to be
- * linked into both. */
+ * linked into both.
+ */
 static struct tegra_iovmm_block *iovmm_split_free_block(
 	struct tegra_iovmm_domain *domain,
 	struct tegra_iovmm_block *block, unsigned long size)
@@ -308,8 +315,6 @@ static int iovmm_block_splitting;
 static struct tegra_iovmm_block *iovmm_alloc_block(
 	struct tegra_iovmm_domain *domain, size_t size, size_t align)
 {
-#define SIMALIGN(b, a)	(((b)->start%(a)) ? ((a)-((b)->start%(a))) : 0)
-
 	struct rb_node *n;
 	struct tegra_iovmm_block *b, *best;
 	size_t simalign;
@@ -460,7 +465,8 @@ int tegra_iovmm_domain_init(struct tegra_iovmm_domain *domain,
 	struct tegra_iovmm_block *b;
 
 	b = kmem_cache_zalloc(iovmm_cache, GFP_KERNEL);
-	if (!b) return -ENOMEM;
+	if (!b)
+		return -ENOMEM;
 
 	domain->dev = dev;
 	atomic_set(&domain->clients, 0);
@@ -479,8 +485,9 @@ int tegra_iovmm_domain_init(struct tegra_iovmm_domain *domain,
 	return 0;
 }
 
-/* If iovm_start != 0, tries to allocate specified iova block if it is free.
- * if it is not free, it fails.
+/*
+ * If iovm_start != 0, tries to allocate specified iova block if it is
+ * free. if it is not free, it fails.
  */
 struct tegra_iovmm_area *tegra_iovmm_create_vm(
 	struct tegra_iovmm_client *client, struct tegra_iovmm_area_ops *ops,
@@ -489,7 +496,8 @@ struct tegra_iovmm_area *tegra_iovmm_create_vm(
 	struct tegra_iovmm_block *b;
 	struct tegra_iovmm_domain *domain;
 
-	if (!client) return NULL;
+	if (!client)
+		return NULL;
 
 	domain = client->domain;
 
@@ -497,7 +505,8 @@ struct tegra_iovmm_area *tegra_iovmm_create_vm(
 		b = iovmm_allocate_vm(domain, size, align, iovm_start);
 	else
 		b = iovmm_alloc_block(domain, size, align);
-	if (!b) return NULL;
+	if (!b)
+		return NULL;
 
 	b->vm_area.domain = domain;
 	b->vm_area.pgprot = pgprot;
@@ -535,8 +544,10 @@ void tegra_iovmm_zap_vm(struct tegra_iovmm_area *vm)
 
 	b = container_of(vm, struct tegra_iovmm_block, vm_area);
 	domain = vm->domain;
-	/* if the vm area mapping was deferred, don't unmap it since
-	 * the memory for the page tables it uses may not be allocated */
+	/*
+	 * if the vm area mapping was deferred, don't unmap it since
+	 * the memory for the page tables it uses may not be allocated
+	 */
 	down_read(&domain->map_lock);
 	if (!test_and_clear_bit(BK_map_dirty, &b->flags))
 		domain->dev->ops->unmap(domain, vm, false);
@@ -550,7 +561,8 @@ void tegra_iovmm_unzap_vm(struct tegra_iovmm_area *vm)
 
 	b = container_of(vm, struct tegra_iovmm_block, vm_area);
 	domain = vm->domain;
-	if (!vm->ops) return;
+	if (!vm->ops)
+		return;
 
 	down_read(&domain->map_lock);
 	if (vm->ops) {
@@ -569,7 +581,8 @@ void tegra_iovmm_free_vm(struct tegra_iovmm_area *vm)
 	struct tegra_iovmm_block *b;
 	struct tegra_iovmm_domain *domain;
 
-	if (!vm) return;
+	if (!vm)
+		return;
 
 	b = container_of(vm, struct tegra_iovmm_block, vm_area);
 	domain = vm->domain;
@@ -605,7 +618,8 @@ struct tegra_iovmm_area *tegra_iovmm_find_area_get(
 	struct rb_node *n;
 	struct tegra_iovmm_block *b = NULL;
 
-	if (!client) return NULL;
+	if (!client)
+		return NULL;
 
 	spin_lock(&client->domain->block_lock);
 	n = client->domain->all_blocks.rb_node;
@@ -637,7 +651,9 @@ static int _iovmm_client_lock(struct tegra_iovmm_client *client)
 	struct tegra_iovmm_domain *domain;
 	int v;
 
-	if (unlikely(!client)) return -ENODEV;
+	if (unlikely(!client))
+		return -ENODEV;
+
 	if (unlikely(test_bit(CL_locked, &client->flags))) {
 		pr_err("attempting to relock client %s\n", client->name);
 		return 0;
@@ -647,9 +663,11 @@ static int _iovmm_client_lock(struct tegra_iovmm_client *client)
 	dev = domain->dev;
 	down_write(&domain->map_lock);
 	v = atomic_inc_return(&domain->locks);
-	/* if the device doesn't export the lock_domain function, the device
-	 * must guarantee that any valid domain will be locked. */
-	if (v==1 && dev->ops->lock_domain) {
+	/*
+	 * if the device doesn't export the lock_domain function, the
+	 * device must guarantee that any valid domain will be locked.
+	 */
+	if (v == 1 && dev->ops->lock_domain) {
 		if (dev->ops->lock_domain(domain, client)) {
 			atomic_dec(&domain->locks);
 			up_write(&domain->map_lock);
@@ -670,7 +688,9 @@ static int _iovmm_client_lock(struct tegra_iovmm_client *client)
 
 			if (test_and_clear_bit(BK_map_dirty, &b->flags)) {
 				if (!b->vm_area.ops) {
-					pr_err("%s: vm_area ops must exist for lazy maps\n", __func__);
+					pr_err("%s: "
+					       "vm_area ops must exist for lazy maps\n",
+					       __func__);
 					continue;
 				}
 				dev->ops->map(domain, &b->vm_area);
@@ -691,12 +711,14 @@ int tegra_iovmm_client_lock(struct tegra_iovmm_client *client)
 {
 	int ret;
 
-	if (!client) return -ENODEV;
+	if (!client)
+		return -ENODEV;
 
 	ret = wait_event_interruptible(client->domain->delay_lock,
-		_iovmm_client_lock(client)!=-EAGAIN);
+		_iovmm_client_lock(client) != -EAGAIN);
 
-	if (ret==-ERESTARTSYS) return -EINTR;
+	if (ret == -ERESTARTSYS)
+		return -EINTR;
 
 	return ret;
 }
@@ -707,7 +729,8 @@ void tegra_iovmm_client_unlock(struct tegra_iovmm_client *client)
 	struct tegra_iovmm_domain *domain;
 	int do_wake = 0;
 
-	if (!client) return;
+	if (!client)
+		return;
 
 	if (!test_and_clear_bit(CL_locked, &client->flags)) {
 		pr_err("unlocking unlocked client %s\n", client->name);
@@ -716,14 +739,15 @@ void tegra_iovmm_client_unlock(struct tegra_iovmm_client *client)
 
 	domain = client->domain;
 	dev = domain->dev;
-        down_write(&domain->map_lock);
+	down_write(&domain->map_lock);
 	if (!atomic_dec_return(&domain->locks)) {
 		if (dev->ops->unlock_domain)
 			dev->ops->unlock_domain(domain, client);
 		do_wake = 1;
 	}
 	up_write(&domain->map_lock);
-	if (do_wake) wake_up(&domain->delay_lock);
+	if (do_wake)
+		wake_up(&domain->delay_lock);
 }
 
 size_t tegra_iovmm_get_vm_size(struct tegra_iovmm_client *client)
@@ -733,7 +757,8 @@ size_t tegra_iovmm_get_vm_size(struct tegra_iovmm_client *client)
 	struct tegra_iovmm_block *b;
 	size_t size = 0;
 
-	if (!client) return 0;
+	if (!client)
+		return 0;
 
 	domain = client->domain;
 
@@ -753,7 +778,9 @@ void tegra_iovmm_free_client(struct tegra_iovmm_client *client)
 {
 	struct tegra_iovmm_device *dev;
 	struct tegra_iovmm_domain *domain;
-	if (!client) return;
+
+	if (!client)
+		return;
 
 	BUG_ON(!client->domain || !client->domain->dev);
 
@@ -777,7 +804,7 @@ void tegra_iovmm_free_client(struct tegra_iovmm_client *client)
 	list_del(&client->list);
 	if (list_empty(&client->group->client_list)) {
 		list_del(&client->group->group_list);
-		if (client->group->name) kfree(client->group->name);
+		kfree(client->group->name);
 		kfree(client->group);
 	}
 	kfree(client->name);
@@ -792,9 +819,11 @@ struct tegra_iovmm_client *tegra_iovmm_alloc_client(const char *name,
 	struct iovmm_share_group *grp = NULL;
 	struct tegra_iovmm_device *dev;
 
-	if (!c) return NULL;
+	if (!c)
+		return NULL;
 	c->name = kstrdup(name, GFP_KERNEL);
-	if (!c->name) goto fail;
+	if (!c->name)
+		goto fail;
 	c->misc_dev = misc_dev;
 
 	mutex_lock(&iovmm_group_list_lock);
@@ -806,21 +835,24 @@ struct tegra_iovmm_client *tegra_iovmm_alloc_client(const char *name,
 	}
 	if (!grp || strcmp(grp->name, share_group)) {
 		grp = kzalloc(sizeof(*grp), GFP_KERNEL);
-		if (!grp) goto fail_lock;
-		grp->name = (share_group) ? kstrdup(share_group, GFP_KERNEL) : NULL;
+		if (!grp)
+			goto fail_lock;
+		grp->name =
+			share_group ? kstrdup(share_group, GFP_KERNEL) : NULL;
 		if (share_group && !grp->name) {
 			kfree(grp);
 			goto fail_lock;
 		}
 		list_for_each_entry(dev, &iovmm_devices, list) {
 			grp->domain = dev->ops->alloc_domain(dev, c);
-			if (grp->domain) break;
+			if (grp->domain)
+				break;
 		}
 		if (!grp->domain) {
 			pr_err("%s: alloc_domain failed for %s\n",
 				__func__, c->name);
 			dump_stack();
-			if (grp->name) kfree(grp->name);
+			kfree(grp->name);
 			kfree(grp);
 			grp = NULL;
 			goto fail_lock;
@@ -842,10 +874,9 @@ struct tegra_iovmm_client *tegra_iovmm_alloc_client(const char *name,
 fail_lock:
 	mutex_unlock(&iovmm_group_list_lock);
 fail:
-	if (c) {
-		if (c->name) kfree(c->name);
-		kfree(c);
-	}
+	if (c)
+		kfree(c->name);
+	kfree(c);
 	return NULL;
 }
 
@@ -883,7 +914,6 @@ static int tegra_iovmm_suspend(void)
 	struct tegra_iovmm_device *dev;
 
 	list_for_each_entry(dev, &iovmm_devices, list) {
-
 		if (!dev->ops->suspend)
 			continue;
 

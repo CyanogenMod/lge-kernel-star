@@ -4,7 +4,7 @@
  * Tegra I/O VMM implementation for GART devices in Tegra and Tegra 2 series
  * systems-on-a-chip.
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010-2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,16 +27,15 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/mm.h>
-#include <asm/io.h>
+#include <linux/io.h>
+
 #include <asm/cacheflush.h>
 
 #include <mach/iovmm.h>
 
-#if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 #define GART_CONFIG		0x24
 #define GART_ENTRY_ADDR		0x28
 #define GART_ENTRY_DATA		0x2c
-#endif
 
 #define VMM_NAME "iovmm-gart"
 #define DRIVER_NAME "tegra_gart"
@@ -101,7 +100,7 @@ static int gart_suspend(struct tegra_iovmm_device *dev)
 
 	spin_lock(&gart->pte_lock);
 	reg = gart->iovmm_base;
-	for (i=0; i<gart->page_count; i++) {
+	for (i = 0; i < gart->page_count; i++) {
 		writel(reg, gart->regs + GART_ENTRY_ADDR);
 		gart->savedata[i] = readl(gart->regs + GART_ENTRY_DATA);
 		dmb();
@@ -119,7 +118,7 @@ static void do_gart_setup(struct gart_device *gart, const u32 *data)
 	writel(1, gart->regs + GART_CONFIG);
 
 	reg = gart->iovmm_base;
-	for (i=0; i<gart->page_count; i++) {
+	for (i = 0; i < gart->page_count; i++) {
 		writel(reg, gart->regs + GART_ENTRY_ADDR);
 		writel((data) ? data[i] : 0, gart->regs + GART_ENTRY_DATA);
 		wmb();
@@ -163,9 +162,9 @@ static int gart_remove(struct platform_device *pdev)
 
 static int gart_probe(struct platform_device *pdev)
 {
-	struct gart_device *gart = NULL;
+	struct gart_device *gart;
 	struct resource *res, *res_remap;
-	void __iomem *gart_regs = NULL;
+	void __iomem *gart_regs;
 	int e;
 
 	if (!pdev) {
@@ -189,8 +188,7 @@ static int gart_probe(struct platform_device *pdev)
 	gart = kzalloc(sizeof(*gart), GFP_KERNEL);
 	if (!gart) {
 		pr_err(DRIVER_NAME ": failed to allocate tegra_iovmm_device\n");
-		e = -ENOMEM;
-		goto fail;
+		return -ENOMEM;
 	}
 
 	gart_regs = ioremap_wc(res->start, res->end - res->start + 1);
@@ -208,19 +206,21 @@ static int gart_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, gart);
 
 	e = tegra_iovmm_register(&gart->iovmm);
-	if (e) goto fail;
+	if (e)
+		goto fail;
 
 	e = tegra_iovmm_domain_init(&gart->domain, &gart->iovmm,
 		(tegra_iovmm_addr_t)res_remap->start,
 		(tegra_iovmm_addr_t)res_remap->end+1);
-	if (e) goto fail;
+	if (e)
+		goto fail;
 
 	gart->regs = gart_regs;
 	gart->iovmm_base = (tegra_iovmm_addr_t)res_remap->start;
 	gart->page_count = res_remap->end - res_remap->start + 1;
 	gart->page_count >>= GART_PAGE_SHIFT;
 
-	gart->savedata = vmalloc(sizeof(u32)*gart->page_count);
+	gart->savedata = vmalloc(sizeof(u32) * gart->page_count);
 	if (!gart->savedata) {
 		pr_err(DRIVER_NAME ": failed to allocate context save area\n");
 		e = -ENOMEM;
@@ -240,8 +240,7 @@ fail:
 		iounmap(gart_regs);
 	if (gart && gart->savedata)
 		vfree(gart->savedata);
-	if (gart)
-		kfree(gart);
+	kfree(gart);
 	return e;
 }
 
@@ -261,14 +260,15 @@ static void __exit gart_exit(void)
 static int gart_map(struct tegra_iovmm_domain *domain,
 	struct tegra_iovmm_area *iovma)
 {
-	struct gart_device *gart = container_of(domain, struct gart_device, domain);
+	struct gart_device *gart =
+		container_of(domain, struct gart_device, domain);
 	unsigned long gart_page, count;
 	unsigned int i;
 
 	gart_page = iovma->iovm_start;
 	count = iovma->iovm_length >> GART_PAGE_SHIFT;
 
-	for (i=0; i<count; i++) {
+	for (i = 0; i < count; i++) {
 		unsigned long pfn;
 
 		pfn = iovma->ops->lock_makeresident(iovma, i<<PAGE_SHIFT);
@@ -290,7 +290,7 @@ static int gart_map(struct tegra_iovmm_domain *domain,
 fail:
 	spin_lock(&gart->pte_lock);
 	while (i--) {
-		iovma->ops->release(iovma, i<<PAGE_SHIFT);
+		iovma->ops->release(iovma, i << PAGE_SHIFT);
 		gart_page -= 1 << GART_PAGE_SHIFT;
 		writel(gart_page, gart->regs + GART_ENTRY_ADDR);
 		writel(0, gart->regs + GART_ENTRY_DATA);
@@ -304,7 +304,8 @@ fail:
 static void gart_unmap(struct tegra_iovmm_domain *domain,
 	struct tegra_iovmm_area *iovma, bool decommit)
 {
-	struct gart_device *gart = container_of(domain, struct gart_device, domain);
+	struct gart_device *gart =
+		container_of(domain, struct gart_device, domain);
 	unsigned long gart_page, count;
 	unsigned int i;
 
@@ -312,9 +313,9 @@ static void gart_unmap(struct tegra_iovmm_domain *domain,
 	gart_page = iovma->iovm_start;
 
 	spin_lock(&gart->pte_lock);
-	for (i=0; i<count; i++) {
+	for (i = 0; i < count; i++) {
 		if (iovma->ops && iovma->ops->release)
-			iovma->ops->release(iovma, i<<PAGE_SHIFT);
+			iovma->ops->release(iovma, i << PAGE_SHIFT);
 
 		writel(gart_page, gart->regs + GART_ENTRY_ADDR);
 		writel(0, gart->regs + GART_ENTRY_DATA);
@@ -329,7 +330,8 @@ static void gart_map_pfn(struct tegra_iovmm_domain *domain,
 	struct tegra_iovmm_area *iovma, tegra_iovmm_addr_t offs,
 	unsigned long pfn)
 {
-	struct gart_device *gart = container_of(domain, struct gart_device, domain);
+	struct gart_device *gart =
+		container_of(domain, struct gart_device, domain);
 
 	BUG_ON(!pfn_valid(pfn));
 	spin_lock(&gart->pte_lock);
