@@ -26,7 +26,7 @@
 #include "fuse.h"
 
 #define CORE_PROCESS_CORNERS_NUM	1
-#define CPU_PROCESS_CORNERS_NUM		4
+#define CPU_PROCESS_CORNERS_NUM		5
 
 #define FUSE_SPEEDO_CALIB_0	0x114
 #define FUSE_PACKAGE_INFO	0X1FC
@@ -34,43 +34,43 @@
 /* Maximum speedo levels for each core process corner */
 static const u32 core_process_speedos[][CORE_PROCESS_CORNERS_NUM] = {
 /* proc_id 0 */
-	{180}, /* threshold_index 0: soc_speedo_id 0: any A01 */
+	{180}, /* [0]: soc_speedo_id 0: any A01 */
 
 /* T30 family */
-	{180}, /* threshold_index 1: soc_speedo_id 1: AP30 */
-	{204}, /* threshold_index 2: soc_speedo_id 2: T30  */
-	{192}, /* threshold_index 3: soc_speedo_id 2: T30S */
+	{180}, /* [1]: soc_speedo_id 1: AP30 */
+	{204}, /* [2]: soc_speedo_id 2: T30  */
+	{192}, /* [3]: soc_speedo_id 2: T30S */
 
 /* Characterization SKUs */
-	{168}, /* threshold_index 4: soc_speedo_id 1: AP30 char */
-	{192}, /* threshold_index 5: soc_speedo_id 2: T30  char */
-	{184}, /* threshold_index 6: soc_speedo_id 2: T30S char */
+	{168}, /* [4]: soc_speedo_id 1: AP30 char */
+	{192}, /* [5]: soc_speedo_id 2: T30  char */
+	{184}, /* [6]: soc_speedo_id 2: T30S char */
 
-/* T33 family: Numbers cloned from T30 family; FIXME: adjust these later */
-	{180}, /* threshold_index 7: soc_speedo_id = 1 - AP33 */
-	{204}, /* threshold_index 8: soc_speedo_id = 2 - T33  */
-	{192}, /* threshold_index 9: soc_speedo_id = 2 - T33S */
+/* T33 family */
+	{180}, /* [7]: soc_speedo_id = 1 - AP33 */
+	{208}, /* [8]: soc_speedo_id = 2 - T33  */
+	{192}, /* [9]: soc_speedo_id = 2 - T33S */
 };
 
 /* Maximum speedo levels for each CPU process corner */
 static const u32 cpu_process_speedos[][CPU_PROCESS_CORNERS_NUM] = {
-/* proc_id 0    1    2    3 */
-	{306, 338, 360, 376}, /* threshold_index 0: cpu_speedo_id 0: any A01 */
+/* proc_id 0    1    2    3    4*/
+	{306, 338, 360, 376, UINT_MAX}, /* [0]: cpu_speedo_id 0: any A01 */
 
 /* T30 family */
-	{304, 336, 359, 375}, /* threshold_index 1: cpu_speedo_id 1: AP30 */
-	{336, 336, 359, 375}, /* threshold_index 2: cpu_speedo_id 2: T30  */
-	{336, 336, 359, 375}, /* threshold_index 3: cpu_speedo_id 3: T30S */
+	{304, 336, 359, 375, UINT_MAX}, /* [1]: cpu_speedo_id 1: AP30 */
+	{336, 336, 359, 375, UINT_MAX}, /* [2]: cpu_speedo_id 2: T30  */
+	{336, 336, 359, 375, UINT_MAX}, /* [3]: cpu_speedo_id 3: T30S */
 
 /* Characterization SKUs */
-	{292, 324, 348, 364}, /* threshold_index 4: cpu_speedo_id 1: AP30char */
-	{324, 324, 348, 364}, /* threshold_index 5: cpu_speedo_id 2: T30char  */
-	{324, 324, 348, 364}, /* threshold_index 6: cpu_speedo_id 3: T30Schar */
+	{292, 324, 348, 364, UINT_MAX}, /* [4]: cpu_speedo_id 1: AP30char */
+	{324, 324, 348, 364, UINT_MAX}, /* [5]: cpu_speedo_id 2: T30char  */
+	{324, 324, 348, 364, UINT_MAX}, /* [6]: cpu_speedo_id 3: T30Schar */
 
 /* T33 family */
-	{304, 336, 359, 375}, /* threshold_index 7: cpu_speedo_id = 4 - AP33 */
-	{368, 368, 368, 368}, /* threshold_index 8: cpu_speedo_id = 5 - T33  */
-	{372, 372, 372, 372}, /* threshold_index 9: cpu_speedo_id = 6 - T33S */
+	{305, 337, 359, 376, UINT_MAX}, /* [7]: cpu_speedo_id = 4 - AP33 */
+	{368, 368, 368, 368, 392}, 	/* [8]: cpu_speedo_id = 5 - T33  */
+	{376, 376, 376, 376, 392}, 	/* [9]: cpu_speedo_id = 6 - T33S */
 };
 
 /*
