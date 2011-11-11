@@ -288,7 +288,7 @@ struct smmu_as {
 	struct smmu_device	*smmu;	/* back pointer to container */
 	unsigned int		asid;
 	const struct domain_hwc_map	*hwclients;
-	struct semaphore	sem;
+	struct mutex	lock;	/* for pagetable */
 	struct tegra_iovmm_domain domain;
 	bool		needs_barrier;	/* emulator WAR */
 	struct page	*pdir_page;
@@ -621,7 +621,7 @@ static int smmu_map(struct tegra_iovmm_domain *domain,
 		if (!pfn_valid(pfn))
 			goto fail;
 
-		down(&as->sem);
+		mutex_lock(&as->lock);
 
 		pte = locate_pte(as, addr, true, &ptpage, &pte_counter);
 		if (!pte)
@@ -640,14 +640,14 @@ static int smmu_map(struct tegra_iovmm_domain *domain,
 		FLUSH_CPU_DCACHE(pte, ptpage, sizeof *pte);
 		flush_ptc_and_tlb(as->smmu, as, addr, pte, ptpage, 0);
 		kunmap(ptpage);
-		up(&as->sem);
+		mutex_unlock(&as->lock);
 		put_signature(as, addr, pfn);
 		addr += SMMU_PAGE_SIZE;
 	}
 	return 0;
 
 fail:
-	down(&as->sem);
+	mutex_lock(&as->lock);
 fail2:
 
 	while (i-- > 0) {
@@ -672,7 +672,7 @@ fail2:
 			}
 		}
 	}
-	up(&as->sem);
+	mutex_unlock(&as->lock);
 	return -ENOMEM;
 }
 
@@ -687,7 +687,7 @@ static void smmu_unmap(struct tegra_iovmm_domain *domain,
 	if (as->smmu->verbose)
 		pr_info("%s:%d iova=%lx asid=%d\n", __func__, __LINE__,
 			addr, as - as->smmu->as);
-	down(&as->sem);
+	mutex_lock(&as->lock);
 	for (i = 0; i < pcount; i++) {
 		unsigned long *pte;
 		struct page *page;
@@ -711,7 +711,7 @@ static void smmu_unmap(struct tegra_iovmm_domain *domain,
 		}
 		addr += SMMU_PAGE_SIZE;
 	}
-	up(&as->sem);
+	mutex_unlock(&as->lock);
 }
 
 static void smmu_map_pfn(struct tegra_iovmm_domain *domain,
@@ -729,7 +729,7 @@ static void smmu_map_pfn(struct tegra_iovmm_domain *domain,
 			(unsigned long)addr, pfn, as - as->smmu->as);
 
 	BUG_ON(!pfn_valid(pfn));
-	down(&as->sem);
+	mutex_lock(&as->lock);
 	pte = locate_pte(as, addr, true, &ptpage, &pte_counter);
 	if (pte) {
 		if (*pte == _PTE_VACANT(addr))
@@ -742,7 +742,7 @@ static void smmu_map_pfn(struct tegra_iovmm_domain *domain,
 		kunmap(ptpage);
 		put_signature(as, addr, pfn);
 	}
-	up(&as->sem);
+	mutex_unlock(&as->lock);
 }
 
 /*
@@ -808,12 +808,12 @@ static struct tegra_iovmm_domain *smmu_alloc_domain(
 
 	/* Look for a free AS */
 	for  (asid = smmu->lowest_asid; asid < smmu->num_ases; asid++) {
-		down(&smmu->as[asid].sem);
+		mutex_lock(&smmu->as[asid].lock);
 		if (!smmu->as[asid].hwclients) {
 			as = &smmu->as[asid];
 			break;
 		}
-		up(&smmu->as[asid].sem);
+		mutex_unlock(&smmu->as[asid].lock);
 	}
 
 	if (!as) {
@@ -867,7 +867,7 @@ static struct tegra_iovmm_domain *smmu_alloc_domain(
 	spin_unlock(&smmu->lock);
 	as->hwclients = map;
 	_sysfs_create(as, client->misc_dev->this_device);
-	up(&as->sem);
+	mutex_unlock(&as->lock);
 
 	/* Reserve "page zero" for AVP vectors using a common dummy page */
 	smmu_map_pfn(&as->domain, NULL, 0,
@@ -887,7 +887,7 @@ bad:
 bad2:
 	free_pdir(as);
 bad3:
-	up(&as->sem);
+	mutex_unlock(&as->lock);
 	return NULL;
 
 }
@@ -904,7 +904,7 @@ static void smmu_free_domain(
 	const struct domain_hwc_map *map = NULL;
 	int i;
 
-	down(&as->sem);
+	mutex_lock(&as->lock);
 	map = as->hwclients;
 
 	spin_lock(&smmu->lock);
@@ -929,7 +929,7 @@ static void smmu_free_domain(
 
 		free_pdir(as);
 	}
-	up(&as->sem);
+	mutex_unlock(&as->lock);
 }
 
 static struct tegra_iovmm_device_ops tegra_iovmm_smmu_ops = {
@@ -1024,7 +1024,7 @@ static int smmu_probe(struct platform_device *pdev)
 		as->pde_attr  = _PDE_ATTR;
 		as->pte_attr  = _PTE_ATTR;
 
-		sema_init(&as->sem, 1);
+		mutex_init(&as->lock);
 
 		e = tegra_iovmm_domain_init(&as->domain, &smmu->iovmm_dev,
 			smmu->iovmm_base,
