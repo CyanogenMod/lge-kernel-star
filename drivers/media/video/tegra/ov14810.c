@@ -576,22 +576,14 @@ static struct ov14810_info *info;
 #define OV14810_TABLE_END 1
 
 static struct ov14810_reg mode_4416x3312[] = {
-/* I2C
-4416x3312 10-bit 7.5fps
-MIPI 2 or 4-lane 600Mbps/lane
-24MHz input clock
-4416x3312 */
-
 	{0x0103, 0x01},
 
-/* start, set these registers in initial */
 	{0x3003, 0x09},
 	{0x3004, 0x00},
 	{0x3005, 0xa7},
 	{0x3006, 0x80},
 	{0x3007, 0x08},
 	{0x3013, 0x1f},
-/* end */
 
 	{0x3018, 0x04},
 	{0x301b, 0xe0},
@@ -647,19 +639,10 @@ MIPI 2 or 4-lane 600Mbps/lane
 	{0x5b01, 0x03},
 	{0x5b03, 0x00},
 
-/* sensor wake up */
-/*	{0x0100, 0x01}, */
-
-/* MIPI 2-Lane 4416x3312 10-bit 7.5fps */
-
-/* Group 0 hold */
-/*	{0x3212, 0x00}, */
-
-/*	{0x3003, 0x09}, */ /*2-lane */
-	{0x3003, 0x0a}, /* 4-lane */
+	{0x3003, 0x0a},
 	{0x3005, 0xa7},
-/*	{0x3006, 0xa0}, */ /* 2-lane */
-	{0x3006, 0x80}, /* 4-lane */
+
+	{0x3006, 0x80},
 	{0x3007, 0x08},
 	{0x3013, 0x1f},
 
@@ -691,14 +674,14 @@ MIPI 2 or 4-lane 600Mbps/lane
 	{0x3728, 0x0c},
 
 	{0x3803, 0x0b},
-	{0x3804, 0x11}, /* HREF width  higher 4 bits [3:0] pg 108 */
-	{0x3805, 0x40}, /* HREF width  lower  8 bits [7:0] pg 108 */
-	{0x3806, 0x0c}, /* VREF height higher 4 bits [3:0] pg 109 */
-	{0x3807, 0xf9}, /* VREF height lower  8 bits [7:0] pg 109 */
-	{0x380c, 0x09}, /* total horizontal size higher 5 bits [4:0] pg 109,line length */
-	{0x380d, 0x5c}, /* total horizontal size lower 8 bits [7:0] pg 109,line length */
-	{0x380e, 0x0d}, /* total vertical size higher 5 bits [4:0] pg 109,frame length */
-	{0x380f, 0x08}, /* total vertical size lower 8 bits [7:0] pg 109,frame length */
+	{0x3804, 0x11},
+	{0x3805, 0x40},
+	{0x3806, 0x0c},
+	{0x3807, 0xf9},
+	{0x380c, 0x09},
+	{0x380d, 0x5c},
+	{0x380e, 0x0d},
+	{0x380f, 0x08},
 	{0x3810, 0x44},
 	{0x3811, 0x96},
 	{0x3818, 0x40},
@@ -708,7 +691,7 @@ MIPI 2 or 4-lane 600Mbps/lane
 	{0x381f, 0xf8},
 	{0x3820, 0x00},
 	{0x3821, 0x0c},
-	{0x3503, 0x13}, /* enable manual gain and manual exposure */
+	{0x3503, 0x13},
 
 	{0x4050, 0xc0},
 	{0x4051, 0x00},
@@ -718,7 +701,6 @@ MIPI 2 or 4-lane 600Mbps/lane
 	{0x5042, 0x21},
 	{0x5047, 0x00},
 
-/* start, if use manual exposure mode, registers can be removed */
 	{0x3a08, 0x1f},
 	{0x3a09, 0x40},
 	{0x3a0a, 0x1a},
@@ -726,12 +708,8 @@ MIPI 2 or 4-lane 600Mbps/lane
 	{0x3a0d, 0x08},
 	{0x3a0e, 0x06},
 
-/*	{0x503d, 0x80}, test pattern */
-	{0x503d, 0x00}, /* test_pattern disabled */
+	{0x503d, 0x00},
 
-/* Finish group 0 and launch
-	{0x3212 0x10},
-	{0x3212 0xa0}, */
 	{0x0100, 0x01},
 	{OV14810_TABLE_END, 0x0000}
 };
@@ -744,7 +722,6 @@ static struct ov14810_reg *mode_table[] = {
 	[OV14810_MODE_4416x3312] = mode_4416x3312,
 };
 
-/* 2 regs to program frame length */
 static inline void ov14810_get_frame_length_regs(struct ov14810_reg *regs,
 						u32 frame_length)
 {
@@ -754,7 +731,6 @@ static inline void ov14810_get_frame_length_regs(struct ov14810_reg *regs,
 	(regs + 1)->val = (frame_length) & 0xff;
 }
 
-/* 3 regs to program coarse time */
 static inline void ov14810_get_coarse_time_regs(struct ov14810_reg *regs,
 						u32 coarse_time)
 {
@@ -766,7 +742,6 @@ static inline void ov14810_get_coarse_time_regs(struct ov14810_reg *regs,
 	(regs + 2)->val = (coarse_time & 0xf) << 4;
 }
 
-/* 1 reg to program gain */
 static inline void ov14810_get_gain_reg(struct ov14810_reg *regs, u16 gain)
 {
 	regs->addr = OV14810_GAIN_REG_ADDR0;
@@ -1051,7 +1026,6 @@ static int ov14810uC_open(void)
 	pr_info("ov14810uC programmming started \n");
 
 	for (i=0; i < 8192; i++) {
-		/* swap the uC register address as it expects in the opposite way */
 		ov14810_write16(info->uC.i2c_client, ( ( (i & 0xff) << 8) | ( (i & 0xff00) >> 8) ), uCProgram[i]);
 	}
 	pr_info("ov14810uC programmming finished \n");

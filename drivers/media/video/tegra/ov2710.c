@@ -83,7 +83,6 @@ static struct ov2710_reg mode_1920x1080[] = {
 	{0x381a, 0x1a},
 	{0x401d, 0x02},
 
-	/* resolution */
 	{0x381c, 0x00},
 	{0x381d, 0x02},
 	{0x381e, 0x04},
@@ -117,17 +116,15 @@ static struct ov2710_reg mode_1920x1080[] = {
 	{0x300f, 0x8a},
 	{0x3017, 0x00},
 	{0x3018, 0x00},
-	{0x4800, 0x24}, /* non-continuous mode */
+	{0x4800, 0x24},
 	{0x300e, 0x04},
 	{0x4801, 0x0f},
 
-	/* MIPI fullspeed PLL */
 	{0x300f, 0xc3},
 	{0x3010, 0x00},
 	{0x3011, 0x0a},
 	{0x3012, 0x01},
 
-	/* AE target */
 	{0x3a0f, 0x40},
 	{0x3a10, 0x38},
 	{0x3a1b, 0x48},
@@ -135,7 +132,6 @@ static struct ov2710_reg mode_1920x1080[] = {
 	{0x3a11, 0x90},
 	{0x3a1f, 0x10},
 
-	/*  Anti-flicker */
 	{0x3a0e, 0x03},
 	{0x3a0d, 0x04},
 	{0x3a08, 0x14},
@@ -143,21 +139,19 @@ static struct ov2710_reg mode_1920x1080[] = {
 	{0x3a0a, 0x11},
 	{0x3a0b, 0x40},
 
-	/* Eliminate stripe */
-	{0x300f, 0xc3}, /* PLL */
+	{0x300f, 0xc3},
 	{0x3010, 0x00},
 	{0x3011, 0x0e},
 	{0x3012, 0x02},
-	{0x380c, 0x09}, /* extend HTS */
+	{0x380c, 0x09},
 	{0x380d, 0xec},
-	{0x3703, 0x61}, /* tx time */
+	{0x3703, 0x61},
 	{0x3704, 0x44},
 	{0x3801, 0xd2},
 
-	/* Disable sensor ISP */
-	{0x3503, 0x17}, /* manual AEC/AGC */
-	{0x5001, 0x4e}, /* [0]disable AWB */
-	{0x5000, 0x5f}, /* disable LenC[7], keep defect pixel correction */
+	{0x3503, 0x17},
+	{0x5001, 0x4e},
+	{0x5000, 0x5f},
 
 	{OV2710_TABLE_END, 0x0000}
 };
@@ -209,7 +203,6 @@ static struct ov2710_reg mode_1280x720[] = {
 	{0x381a, 0x1a},
 	{0x401d, 0x02},
 
-	/* resolution */
 	{0x381c, 0x10},
 	{0x381d, 0xb0},
 	{0x381e, 0x02},
@@ -250,7 +243,7 @@ static struct ov2710_reg mode_1280x720[] = {
 	{0x300f, 0x8a},
 	{0x3017, 0x00},
 	{0x3018, 0x00},
-	{0x4800, 0x24}, /* non-continuous mode */
+	{0x4800, 0x24},
 	{0x300e, 0x04},
 	{0x4801, 0x0f},
 	{0x300f, 0xc3},
@@ -269,8 +262,7 @@ static struct ov2710_reg mode_1280x720[] = {
 	{0x3a0a, 0x0b},
 	{0x3a0b, 0xa0},
 
-	/* Eliminate stripe */
-	{0x300f, 0xc3}, /* PLL */
+	{0x300f, 0xc3},
 	{0x3011, 0x0e},
 	{0x3012, 0x02},
 	{0x380c, 0x07},
@@ -279,10 +271,9 @@ static struct ov2710_reg mode_1280x720[] = {
 	{0x3704, 0x40},
 	{0x3801, 0xbc},
 
-	/* Disable sensor ISP */
-	{0x3503, 0x17}, /* manual AEC/AGC */
-	{0x5001, 0x4e}, /* [0]disable AWB */
-	{0x5000, 0x5f}, /* disable LenC[7], keep defect pixel correction */
+	{0x3503, 0x17},
+	{0x5001, 0x4e},
+	{0x5000, 0x5f},
 
 	{OV2710_TABLE_END, 0x0000}
 };
@@ -298,7 +289,6 @@ static struct ov2710_reg *mode_table[] = {
 	[OV2710_MODE_1280x720] = mode_1280x720,
 };
 
-/* 2 regs to program frame length */
 static inline void ov2710_get_frame_length_regs(struct ov2710_reg *regs,
 						u32 frame_length)
 {
@@ -308,7 +298,6 @@ static inline void ov2710_get_frame_length_regs(struct ov2710_reg *regs,
 	(regs + 1)->val = (frame_length) & 0xff;
 }
 
-/* 3 regs to program coarse time */
 static inline void ov2710_get_coarse_time_regs(struct ov2710_reg *regs,
 					       u32 coarse_time)
 {
@@ -320,7 +309,6 @@ static inline void ov2710_get_coarse_time_regs(struct ov2710_reg *regs,
 	(regs + 2)->val = (coarse_time & 0xf) << 4;
 }
 
-/* 1 reg to program gain */
 static inline void ov2710_get_gain_reg(struct ov2710_reg *regs, u16 gain)
 {
 	regs->addr = 0x350b;

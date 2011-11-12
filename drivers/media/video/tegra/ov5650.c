@@ -48,21 +48,21 @@ static struct ov5650_info *stereo_ov5650_info;
 #define OV5650_MAX_RETRIES 3
 
 static struct ov5650_reg tp_none_seq[] = {
-	{0x5046, 0x00}, /* isp_off */
+	{0x5046, 0x00},
 	{OV5650_TABLE_END, 0x0000}
 };
 
 static struct ov5650_reg tp_cbars_seq[] = {
 	{0x503D, 0xC0},
 	{0x503E, 0x00},
-	{0x5046, 0x01}, /* isp_on */
+	{0x5046, 0x01},
 	{OV5650_TABLE_END, 0x0000}
 };
 
 static struct ov5650_reg tp_checker_seq[] = {
 	{0x503D, 0xC0},
 	{0x503E, 0x0A},
-	{0x5046, 0x01}, /* isp_on */
+	{0x5046, 0x01},
 	{OV5650_TABLE_END, 0x0000}
 };
 
@@ -73,274 +73,271 @@ static struct ov5650_reg *test_pattern_modes[] = {
 };
 
 static struct ov5650_reg reset_seq[] = {
-	{0x3008, 0x82}, /* reset registers pg 72 */
+	{0x3008, 0x82},
 	{OV5650_TABLE_WAIT_MS, 5},
-	{0x3008, 0x42}, /* register power down pg 72 */
+	{0x3008, 0x42},
 	{OV5650_TABLE_WAIT_MS, 5},
 	{OV5650_TABLE_END, 0x0000},
 };
 
 static struct ov5650_reg mode_start[] = {
-	{0x3103, 0x93}, /* power up system clock from PLL page 77 */
-	{0x3017, 0xff}, /* PAD output enable page 100 */
-	{0x3018, 0xfc}, /* PAD output enable page 100 */
+	{0x3103, 0x93},
+	{0x3017, 0xff},
+	{0x3018, 0xfc},
 
-	{0x3600, 0x50}, /* analog pg 108 */
-	{0x3601, 0x0d}, /* analog pg 108 */
-	{0x3604, 0x50}, /* analog pg 108 */
-	{0x3605, 0x04}, /* analog pg 108 */
-	{0x3606, 0x3f}, /* analog pg 108 */
-	{0x3612, 0x1a}, /* analog pg 108 */
-	{0x3630, 0x22}, /* analog pg 108 */
-	{0x3631, 0x22}, /* analog pg 108 */
-	{0x3702, 0x3a}, /* analog pg 108 */
-	{0x3704, 0x18}, /* analog pg 108 */
-	{0x3705, 0xda}, /* analog pg 108 */
-	{0x3706, 0x41}, /* analog pg 108 */
-	{0x370a, 0x80}, /* analog pg 108 */
-	{0x370b, 0x40}, /* analog pg 108 */
-	{0x370e, 0x00}, /* analog pg 108 */
-	{0x3710, 0x28}, /* analog pg 108 */
-	{0x3712, 0x13}, /* analog pg 108 */
-	{0x3830, 0x50}, /* manual exposure gain bit [0] */
-	{0x3a18, 0x00}, /* AEC gain ceiling bit 8 pg 114 */
-	{0x3a19, 0xf8}, /* AEC gain ceiling pg 114 */
-	{0x3a00, 0x38}, /* AEC control 0 debug mode band low
-			   limit mode band func pg 112 */
+	{0x3600, 0x50},
+	{0x3601, 0x0d},
+	{0x3604, 0x50},
+	{0x3605, 0x04},
+	{0x3606, 0x3f},
+	{0x3612, 0x1a},
+	{0x3630, 0x22},
+	{0x3631, 0x22},
+	{0x3702, 0x3a},
+	{0x3704, 0x18},
+	{0x3705, 0xda},
+	{0x3706, 0x41},
+	{0x370a, 0x80},
+	{0x370b, 0x40},
+	{0x370e, 0x00},
+	{0x3710, 0x28},
+	{0x3712, 0x13},
+	{0x3830, 0x50},
+	{0x3a18, 0x00},
+	{0x3a19, 0xf8},
+	{0x3a00, 0x38},
 
-	{0x3603, 0xa7}, /* analog pg 108 */
-	{0x3615, 0x50}, /* analog pg 108 */
-	{0x3620, 0x56}, /* analog pg 108 */
-	{0x3810, 0x00}, /* TIMING HVOFFS both are zero pg 80 */
-	{0x3836, 0x00}, /* TIMING HVPAD both are zero pg 82 */
-	{0x3a1a, 0x06}, /* DIFF MAX an AEC register??? pg 114 */
-	{0x4000, 0x01}, /* BLC enabled pg 120 */
-	{0x401c, 0x48}, /* reserved pg 120 */
-	{0x401d, 0x28}, /* BLC control pg 120 */
-	{0x5000, 0x00}, /* ISP control00 features are disabled. pg 132 */
-	{0x5001, 0x00}, /* ISP control01 awb disabled. pg 132 */
-	{0x5002, 0x00}, /* ISP control02 debug mode disabled pg 132 */
-	{0x503d, 0x00}, /* ISP control3D features disabled pg 133 */
-	{0x5046, 0x00}, /* ISP control isp disable awbg disable pg 133 */
 
-	{0x300f, 0x8f}, /* PLL control00 R_SELD5 [7:6] div by 4 R_DIVL [2]
-			   two lane div 1 SELD2P5 [1:0] div 2.5 pg 99 */
-	{0x3010, 0x10}, /* PLL control01 DIVM [3:0] DIVS [7:4] div 1 pg 99 */
-	{0x3011, 0x14}, /* PLL control02 R_DIVP [5:0] div 20 pg 99 */
-	{0x3012, 0x02}, /* PLL CTR 03, default */
-	{0x3815, 0x82}, /* PCLK to SCLK ratio bit[4:0] is set to 2 pg 81 */
-	{0x3503, 0x33}, /* AEC auto AGC auto gain has no latch delay. pg 38 */
-	/*	{FAST_SETMODE_START, 0}, */
-	{0x3613, 0x44}, /* analog pg 108 */
+	{0x3603, 0xa7},
+	{0x3615, 0x50},
+	{0x3620, 0x56},
+	{0x3810, 0x00},
+	{0x3836, 0x00},
+	{0x3a1a, 0x06},
+	{0x4000, 0x01},
+	{0x401c, 0x48},
+	{0x401d, 0x28},
+	{0x5000, 0x00},
+	{0x5001, 0x00},
+	{0x5002, 0x00},
+	{0x503d, 0x00},
+	{0x5046, 0x00},
+
+	{0x300f, 0x8f},
+
+	{0x3010, 0x10},
+	{0x3011, 0x14},
+	{0x3012, 0x02},
+	{0x3815, 0x82},
+	{0x3503, 0x33},
+	{0x3613, 0x44},
 	{OV5650_TABLE_END, 0x0},
 };
 
 static struct ov5650_reg mode_2592x1944[] = {
-	{0x3621, 0x2f}, /* analog horizontal binning/sampling not enabled.
-			   pg 108 */
-	{0x3632, 0x55}, /* analog pg 108 */
-	{0x3703, 0xe6}, /* analog pg 108 */
-	{0x370c, 0xa0}, /* analog pg 108 */
-	{0x370d, 0x04}, /* analog pg 108 */
-	{0x3713, 0x2f}, /* analog pg 108 */
-	{0x3800, 0x02}, /* HREF start point higher 4 bits [3:0] pg 108 */
-	{0x3801, 0x58}, /* HREF start point lower  8 bits [7:0] pg 108 */
-	{0x3802, 0x00}, /* VREF start point higher 4 bits [3:0] pg 108 */
-	{0x3803, 0x0c}, /* VREF start point [7:0] pg 108 */
-	{0x3804, 0x0a}, /* HREF width  higher 4 bits [3:0] pg 108 */
-	{0x3805, 0x20}, /* HREF width  lower  8 bits [7:0] pg 108 */
-	{0x3806, 0x07}, /* VREF height higher 4 bits [3:0] pg 109 */
-	{0x3807, 0xa0}, /* VREF height lower  8 bits [7:0] pg 109 */
-	{0x3808, 0x0a}, /* DVP horizontal output size higher 4 bits [3:0]
-			   pg 109 */
-	{0x3809, 0x20}, /* DVP horizontal output size lower  8 bits [7:0]
-			   pg 109 */
-	{0x380a, 0x07}, /* DVP vertical   output size higher 4 bits [3:0]
-			   pg 109 */
-	{0x380b, 0xa0}, /* DVP vertical   output size lower  8 bits [7:0]
-			   pg 109 */
-	{0x380c, 0x0c}, /* total horizontal size higher 5 bits [4:0] pg 109,
-			   line length */
-	{0x380d, 0xb4}, /* total horizontal size lower  8 bits [7:0] pg 109,
-			   line length */
-	{0x380e, 0x07}, /* total vertical   size higher 5 bits [4:0] pg 109,
-			   frame length */
-	{0x380f, 0xb0}, /* total vertical   size lower  8 bits [7:0] pg 109,
-			   frame length */
-	{0x3818, 0xc0}, /* timing control reg18 mirror & dkhf pg 110 */
-	{0x381a, 0x3c}, /* HS mirror adjustment pg 110 */
-	{0x3a0d, 0x06}, /* b60 max pg 113 */
-	{0x3c01, 0x00}, /* 5060HZ_CTRL01 pg 116 */
-	{0x3007, 0x3f}, /* clock enable03 pg 98 */
-	{0x5059, 0x80}, /* => NOT found */
-	{0x3003, 0x03}, /* reset MIPI and DVP pg 97 */
-	{0x3500, 0x00}, /* long exp 1/3 in unit of 1/16 line, pg 38 */
-	{0x3501, 0x7a}, /* long exp 2/3 in unit of 1/16 line, pg 38,
-			   note frame length start with 0x7b0,
-			   and SENSOR_BAYER_DEFAULT_MAX_COARSE_DIFF=3 */
-	{0x3502, 0xd0}, /* long exp 3/3 in unit of 1/16 line, pg 38.
-			   Two lines of integration time. */
-	{0x350a, 0x00}, /* gain output to sensor, pg 38 */
-	{0x350b, 0x00}, /* gain output to sensor, pg 38 */
-	{0x4801, 0x0f}, /* MIPI control01 pg 125 */
-	{0x300e, 0x0c}, /* SC_MIPI_SC_CTRL0 pg 73 */
-	{0x4803, 0x50}, /* MIPI CTRL3 pg 91 */
-	{0x4800, 0x34}, /* MIPI CTRl0 idle and short line pg 89 */
+	{0x3621, 0x2f},
+
+	{0x3632, 0x55},
+	{0x3703, 0xe6},
+	{0x370c, 0xa0},
+	{0x370d, 0x04},
+	{0x3713, 0x2f},
+	{0x3800, 0x02},
+	{0x3801, 0x58},
+	{0x3802, 0x00},
+	{0x3803, 0x0c},
+	{0x3804, 0x0a},
+	{0x3805, 0x20},
+	{0x3806, 0x07},
+	{0x3807, 0xa0},
+	{0x3808, 0x0a},
+
+	{0x3809, 0x20},
+
+	{0x380a, 0x07},
+
+	{0x380b, 0xa0},
+
+	{0x380c, 0x0c},
+
+	{0x380d, 0xb4},
+
+	{0x380e, 0x07},
+
+	{0x380f, 0xb0},
+
+	{0x3818, 0xc0},
+	{0x381a, 0x3c},
+	{0x3a0d, 0x06},
+	{0x3c01, 0x00},
+	{0x3007, 0x3f},
+	{0x5059, 0x80},
+	{0x3003, 0x03},
+	{0x3500, 0x00},
+	{0x3501, 0x7a},
+
+	{0x3502, 0xd0},
+
+	{0x350a, 0x00},
+	{0x350b, 0x00},
+	{0x4801, 0x0f},
+	{0x300e, 0x0c},
+	{0x4803, 0x50},
+	{0x4800, 0x34},
 	{OV5650_TABLE_END, 0x0000}
 };
 
 static struct ov5650_reg mode_1296x972[] = {
-	{0x3621, 0xaf}, /* analog horizontal binning/sampling enabled.
-			   pg 108 */
-	{0x3632, 0x5a}, /* analog pg 108 */
-	{0x3703, 0xb0}, /* analog pg 108 */
-	{0x370c, 0xc5}, /* analog pg 108 */
-	{0x370d, 0x42}, /* analog pg 108 */
-	{0x3713, 0x2f}, /* analog pg 108 */
-	{0x3800, 0x03}, /* HREF start point higher 4 bits [3:0] pg 108 */
-	{0x3801, 0x3c}, /* HREF start point lower  8 bits [7:0] pg 108 */
-	{0x3802, 0x00}, /* VREF start point higher 4 bits [3:0] pg 108 */
-	{0x3803, 0x06}, /* VREF start point [7:0] pg 108 */
-	{0x3804, 0x05}, /* HREF width  higher 4 bits [3:0] pg 108 */
-	{0x3805, 0x10}, /* HREF width  lower  8 bits [7:0] pg 108 */
-	{0x3806, 0x03}, /* VREF height higher 4 bits [3:0] pg 109 */
-	{0x3807, 0xd0}, /* VREF height lower  8 bits [7:0] pg 109 */
-	{0x3808, 0x05}, /* DVP horizontal output size higher 4 bits [3:0]
-			   pg 109 */
-	{0x3809, 0x10}, /* DVP horizontal output size lower  8 bits [7:0]
-			   pg 109 */
-	{0x380a, 0x03}, /* DVP vertical   output size higher 4 bits [3:0]
-			   pg 109 */
-	{0x380b, 0xd0}, /* DVP vertical   output size lower  8 bits [7:0]
-			   pg 109 */
-	{0x380c, 0x08}, /* total horizontal size higher 5 bits [4:0]
-			   pg 109, line length */
-	{0x380d, 0xa8}, /* total horizontal size lower  8 bits [7:0] pg 109,
-			   line length */
-	{0x380e, 0x05}, /* total vertical   size higher 5 bits [4:0] pg 109,
-			   frame length */
-	{0x380f, 0xa4}, /* total horizontal size lower  8 bits [7:0] pg 109,
-			   frame length */
-	{0x3818, 0xc1}, /* timing control reg18 mirror & dkhf pg 110 */
-	{0x381a, 0x00}, /* HS mirror adjustment pg 110 */
-	{0x3a0d, 0x08}, /* b60 max pg 113 */
-	{0x3c01, 0x00}, /* 5060HZ_CTRL01 pg 116 */
-	{0x3007, 0x3b}, /* clock enable03 pg 98 */
-	{0x5059, 0x80}, /* => NOT found. added */
-	{0x3003, 0x03}, /* reset MIPI and DVP pg 97 */
-	{0x3500, 0x00}, /* long exp 1/3 in unit of 1/16 line, pg 38,
-			   note frame length is from 0x5a4,
-			   and SENSOR_BAYER_DEFAULT_MAX_COARSE_DIFF=3 */
-	{0x3501, 0x5a}, /* long exp 2/3 in unit of 1/16 line, pg 38 */
-	{0x3502, 0x10}, /* long exp 3/3 in unit of 1/16 line, pg 38 */
-	{0x350a, 0x00}, /* gain output to sensor, pg 38 */
-	{0x350b, 0x10}, /* gain output to sensor, pg 38 */
-	{0x4801, 0x0f}, /* MIPI control01 pg 125 */
-	{0x300e, 0x0c}, /* SC_MIPI_SC_CTRL0 pg 73 */
-	{0x4803, 0x50}, /* MIPI CTRL3 pg 91 */
-	{0x4800, 0x34}, /* MIPI CTRl0 idle and short line pg 89 */
+	{0x3621, 0xaf},
+
+	{0x3632, 0x5a},
+	{0x3703, 0xb0},
+	{0x370c, 0xc5},
+	{0x370d, 0x42},
+	{0x3713, 0x2f},
+	{0x3800, 0x03},
+	{0x3801, 0x3c},
+	{0x3802, 0x00},
+	{0x3803, 0x06},
+	{0x3804, 0x05},
+	{0x3805, 0x10},
+	{0x3806, 0x03},
+	{0x3807, 0xd0},
+	{0x3808, 0x05},
+
+	{0x3809, 0x10},
+
+	{0x380a, 0x03},
+
+	{0x380b, 0xd0},
+
+	{0x380c, 0x08},
+
+	{0x380d, 0xa8},
+
+	{0x380e, 0x05},
+
+	{0x380f, 0xa4},
+
+	{0x3818, 0xc1},
+	{0x381a, 0x00},
+	{0x3a0d, 0x08},
+	{0x3c01, 0x00},
+	{0x3007, 0x3b},
+	{0x5059, 0x80},
+	{0x3003, 0x03},
+	{0x3500, 0x00},
+
+	{0x3501, 0x5a},
+	{0x3502, 0x10},
+	{0x350a, 0x00},
+	{0x350b, 0x10},
+	{0x4801, 0x0f},
+	{0x300e, 0x0c},
+	{0x4803, 0x50},
+	{0x4800, 0x34},
 	{OV5650_TABLE_END, 0x0000}
 };
 
 static struct ov5650_reg mode_2080x1164[] = {
-	{0x3103, 0x93}, /* power up system clock from PLL page 77 */
-	{0x3007, 0x3b}, /* clock enable03 pg 98 */
-	{0x3017, 0xff}, /* PAD output enable page 100 */
-	{0x3018, 0xfc}, /* PAD output enable page 100 */
+	{0x3103, 0x93},
+	{0x3007, 0x3b},
+	{0x3017, 0xff},
+	{0x3018, 0xfc},
 
-	{0x3600, 0x54}, /* analog pg 108 */
-	{0x3601, 0x05}, /* analog pg 108 */
-	{0x3603, 0xa7}, /* analog pg 108 */
-	{0x3604, 0x40}, /* analog pg 108 */
-	{0x3605, 0x04}, /* analog pg 108 */
-	{0x3606, 0x3f}, /* analog pg 108 */
-	{0x3612, 0x1a}, /* analog pg 108 */
-	{0x3613, 0x44}, /* analog pg 108 */
-	{0x3615, 0x52}, /* analog pg 108 */
-	{0x3620, 0x56}, /* analog pg 108 */
-	{0x3623, 0x01}, /* analog pg 108 */
-	{0x3630, 0x22}, /* analog pg 108 */
-	{0x3631, 0x36}, /* analog pg 108 */
-	{0x3632, 0x5f}, /* analog pg 108 */
-	{0x3633, 0x24}, /* analog pg 108 */
+	{0x3600, 0x54},
+	{0x3601, 0x05},
+	{0x3603, 0xa7},
+	{0x3604, 0x40},
+	{0x3605, 0x04},
+	{0x3606, 0x3f},
+	{0x3612, 0x1a},
+	{0x3613, 0x44},
+	{0x3615, 0x52},
+	{0x3620, 0x56},
+	{0x3623, 0x01},
+	{0x3630, 0x22},
+	{0x3631, 0x36},
+	{0x3632, 0x5f},
+	{0x3633, 0x24},
 
-	{0x3702, 0x3a}, /* analog pg 108 */
-	{0x3704, 0x18}, /* analog pg 108 */
-	{0x3706, 0x41}, /* analog pg 108 */
-	{0x370b, 0x40}, /* analog pg 108 */
-	{0x370e, 0x00}, /* analog pg 108 */
-	{0x3710, 0x28}, /* analog pg 108 */
+	{0x3702, 0x3a},
+	{0x3704, 0x18},
+	{0x3706, 0x41},
+	{0x370b, 0x40},
+	{0x370e, 0x00},
+	{0x3710, 0x28},
 	{0x3711, 0x24},
-	{0x3712, 0x13}, /* analog pg 108 */
+	{0x3712, 0x13},
 
-	{0x3810, 0x00}, /* TIMING HVOFFS both are zero pg 80 */
-	{0x3815, 0x82}, /* PCLK to SCLK ratio bit[4:0] is set to 2 pg 81 */
-	{0x3830, 0x50}, /* manual exposure gain bit [0] */
-	{0x3836, 0x00}, /* TIMING HVPAD both are zero pg 82 */
+	{0x3810, 0x00},
+	{0x3815, 0x82},
+	{0x3830, 0x50},
+	{0x3836, 0x00},
 
-	{0x3a1a, 0x06}, /* DIFF MAX an AEC register??? pg 114 */
-	{0x3a18, 0x00}, /* AEC gain ceiling bit 8 pg 114 */
-	{0x3a19, 0xf8}, /* AEC gain ceiling pg 114 */
-	{0x3a00, 0x38}, /* AEC control 0 debug mode band
-			low limit mode band func pg 112 */
-	{0x3a0d, 0x06}, /* b60 max pg 113 */
-	{0x3c01, 0x34}, /* 5060HZ_CTRL01 pg 116 */
+	{0x3a1a, 0x06},
+	{0x3a18, 0x00},
+	{0x3a19, 0xf8},
+	{0x3a00, 0x38},
 
-	{0x401f, 0x03}, /* BLC enabled pg 120 */
-	{0x4000, 0x05}, /* BLC enabled pg 120 */
-	{0x401d, 0x08}, /* reserved pg 120 */
-	{0x4001, 0x02}, /* BLC control pg 120 */
+	{0x3a0d, 0x06},
+	{0x3c01, 0x34},
 
-	{0x5000, 0x00}, /* ISP control00 features are disabled. pg 132 */
-	{0x5001, 0x00}, /* ISP control01 awb disabled. pg 132 */
-	{0x5002, 0x00}, /* ISP control02 debug mode disabled pg 132 */
-	{0x503d, 0x00}, /* ISP control3D features disabled pg 133 */
-	{0x5046, 0x00}, /* ISP control isp disable awbg disable pg 133 */
+	{0x401f, 0x03},
+	{0x4000, 0x05},
+	{0x401d, 0x08},
+	{0x4001, 0x02},
 
-	{0x300f, 0x8f}, /* PLL control00 R_SELD5 [7:6] div by 4 R_DIVL [2]
-				two lane div 1 SELD2P5 [1:0] div 2.5 pg 99 */
-	{0x3010, 0x10}, /* PLL control01 DIVM [3:0] DIVS [7:4] div 1 pg 99 */
-	{0x3011, 0x14}, /* PLL control02 R_DIVP [5:0] div 20 pg 99 */
-	{0x3012, 0x02}, /* PLL CTR 03, default */
-	{0x3503, 0x33}, /* AEC auto AGC auto gain has delay of 2 frames.
-						pg 38 */
+	{0x5000, 0x00},
+	{0x5001, 0x00},
+	{0x5002, 0x00},
+	{0x503d, 0x00},
+	{0x5046, 0x00},
 
-	{0x3621, 0x2f}, /* analog horizontal binning/sampling not enabled.
-						pg 108 */
-	{0x3703, 0xe6}, /* analog pg 108 */
-	{0x370c, 0x00}, /* analog pg 108 */
-	{0x370d, 0x04}, /* analog pg 108 */
-	{0x3713, 0x22}, /* analog pg 108 */
+	{0x300f, 0x8f},
+
+	{0x3010, 0x10},
+	{0x3011, 0x14},
+	{0x3012, 0x02},
+	{0x3503, 0x33},
+
+
+	{0x3621, 0x2f},
+
+	{0x3703, 0xe6},
+	{0x370c, 0x00},
+	{0x370d, 0x04},
+	{0x3713, 0x22},
 	{0x3714, 0x27},
 	{0x3705, 0xda},
 	{0x370a, 0x80},
 
-	{0x3800, 0x02}, /* HREF start point higher 4 bits [3:0] pg 108 */
-	{0x3801, 0x12}, /* HREF start point lower  8 bits [7:0] pg 108 */
-	{0x3802, 0x00}, /* VREF start point higher 4 bits [3:0] pg 108 */
-	{0x3803, 0x0a}, /* VREF start point [7:0] pg 108 */
-	{0x3804, 0x08}, /* HREF width  higher 4 bits [3:0] pg 108 */
-	{0x3805, 0x20}, /* HREF width  lower  8 bits [7:0] pg 108 */
-	{0x3806, 0x04}, /* VREF height higher 4 bits [3:0] pg 109 */
-	{0x3807, 0x92}, /* VREF height lower  8 bits [7:0] pg 109 */
-	{0x3808, 0x08}, /* DVP horizontal output size higher 4 bits [3:0]
-							pg 109 */
-	{0x3809, 0x20}, /* DVP horizontal output size lower  8 bits [7:0]
-							pg 109 */
-	{0x380a, 0x04}, /* DVP vertical   output size higher 4 bits [3:0]
-							pg 109 */
-	{0x380b, 0x92}, /* DVP vertical   output size lower  8 bits [7:0]
-							pg 109 */
-	{0x380c, 0x0a}, /* total horizontal size higher 5 bits [4:0] pg 109,
-							line length */
-	{0x380d, 0x96}, /* total horizontal size lower  8 bits [7:0] pg 109,
-							line length */
-	{0x380e, 0x04}, /* total vertical size higher 5 bits [4:0] pg 109,
-							frame length */
-	{0x380f, 0x9e}, /* total vertical   size lower  8 bits [7:0] pg 109,
-							frame length */
-	{0x3818, 0xc0}, /* timing control reg18 mirror & dkhf pg 110 */
-	{0x381a, 0x3c}, /* HS mirror adjustment pg 110 */
+	{0x3800, 0x02},
+	{0x3801, 0x12},
+	{0x3802, 0x00},
+	{0x3803, 0x0a},
+	{0x3804, 0x08},
+	{0x3805, 0x20},
+	{0x3806, 0x04},
+	{0x3807, 0x92},
+	{0x3808, 0x08},
+
+	{0x3809, 0x20},
+
+	{0x380a, 0x04},
+
+	{0x380b, 0x92},
+
+	{0x380c, 0x0a},
+
+	{0x380d, 0x96},
+
+	{0x380e, 0x04},
+
+	{0x380f, 0x9e},
+
+	{0x3818, 0xc0},
+	{0x381a, 0x3c},
 	{0x381c, 0x31},
 	{0x381d, 0x8e},
 	{0x381e, 0x04},
@@ -351,108 +348,108 @@ static struct ov5650_reg mode_2080x1164[] = {
 	{0x3827, 0x0a},
 	{0x401c, 0x46},
 
-	{0x3003, 0x03}, /* reset MIPI and DVP pg 97 */
-	{0x3500, 0x00}, /* long exp 1/3 in unit of 1/16 line, pg 38 */
-	{0x3501, 0x49}, /* long exp 2/3 in unit of 1/16 line, pg 38 */
-	{0x3502, 0xa0}, /* long exp 3/3 in unit of 1/16 line, pg 38 */
-	{0x350a, 0x00}, /* gain output to sensor, pg 38 */
-	{0x350b, 0x00}, /* gain output to sensor, pg 38 */
-	{0x4801, 0x0f}, /* MIPI control01 pg 125 */
-	{0x300e, 0x0c}, /* SC_MIPI_SC_CTRL0 pg 73 */
-	{0x4803, 0x50}, /* MIPI CTRL3 pg 91 */
-	{0x4800, 0x34}, /* MIPI CTRl0 idle and short line pg 89 */
+	{0x3003, 0x03},
+	{0x3500, 0x00},
+	{0x3501, 0x49},
+	{0x3502, 0xa0},
+	{0x350a, 0x00},
+	{0x350b, 0x00},
+	{0x4801, 0x0f},
+	{0x300e, 0x0c},
+	{0x4803, 0x50},
+	{0x4800, 0x34},
 
 	{OV5650_TABLE_END, 0x0000}
 };
 
 static struct ov5650_reg mode_1920x1080[] = {
-	{0x3103, 0x93}, // power up system clock from PLL page 77
-	{0x3007, 0x3b}, // clock enable03 pg 98
-	{0x3017, 0xff}, // PAD output enable page 100
-	{0x3018, 0xfc}, // PAD output enable page 100
+	{0x3103, 0x93},
+	{0x3007, 0x3b},
+	{0x3017, 0xff},
+	{0x3018, 0xfc},
 
-	{0x3600, 0x54}, // analog pg 108
-	{0x3601, 0x05}, // analog pg 108
-	{0x3603, 0xa7}, // analog pg 108
-	{0x3604, 0x40}, // analog pg 108
-	{0x3605, 0x04}, // analog pg 108
-	{0x3606, 0x3f}, // analog pg 108
-	{0x3612, 0x1a}, // analog pg 108
-	{0x3613, 0x44}, // analog pg 108
-	{0x3615, 0x52}, // analog pg 108
-	{0x3620, 0x56}, // analog pg 108
-	{0x3623, 0x01}, // analog pg 108
-	{0x3630, 0x22}, // analog pg 108
-	{0x3631, 0x36}, // analog pg 108
-	{0x3632, 0x5f}, // analog pg 108
-	{0x3633, 0x24}, // analog pg 108
+	{0x3600, 0x54},
+	{0x3601, 0x05},
+	{0x3603, 0xa7},
+	{0x3604, 0x40},
+	{0x3605, 0x04},
+	{0x3606, 0x3f},
+	{0x3612, 0x1a},
+	{0x3613, 0x44},
+	{0x3615, 0x52},
+	{0x3620, 0x56},
+	{0x3623, 0x01},
+	{0x3630, 0x22},
+	{0x3631, 0x36},
+	{0x3632, 0x5f},
+	{0x3633, 0x24},
 
-	{0x3702, 0x3a}, // analog pg 108
-	{0x3704, 0x18}, // analog pg 108
-	{0x3706, 0x41}, // analog pg 108
-	{0x370b, 0x40}, // analog pg 108
-	{0x370e, 0x00}, // analog pg 108
-	{0x3710, 0x28}, // analog pg 108
+	{0x3702, 0x3a},
+	{0x3704, 0x18},
+	{0x3706, 0x41},
+	{0x370b, 0x40},
+	{0x370e, 0x00},
+	{0x3710, 0x28},
 	{0x3711, 0x24},
-	{0x3712, 0x13}, // analog pg 10
+	{0x3712, 0x13},
 
-	{0x3810, 0x00}, // TIMING HVOFFS both are zero pg 80
-	{0x3815, 0x82}, // PCLK to SCLK ratio bit[4:0] is set to 2 pg 81
+	{0x3810, 0x00},
+	{0x3815, 0x82},
 
-	{0x3830, 0x50}, // manual exposure gain bit [0]
-	{0x3836, 0x00}, // TIMING HVPAD both are zero pg 82
+	{0x3830, 0x50},
+	{0x3836, 0x00},
 
-	{0x3a1a, 0x06}, // DIFF MAX an AEC register??? pg 114
-	{0x3a18, 0x00}, // AEC gain ceiling bit 8 pg 114
-	{0x3a19, 0xf8}, // AEC gain ceiling pg 114
-	{0x3a00, 0x38}, // AEC control 0 debug mode band low limit mode band func pg 112
-	{0x3a0d, 0x06}, // b60 max pg 113
-	{0x3c01, 0x34}, // 5060HZ_CTRL01 pg 116
+	{0x3a1a, 0x06},
+	{0x3a18, 0x00},
+	{0x3a19, 0xf8},
+	{0x3a00, 0x38},
+	{0x3a0d, 0x06},
+	{0x3c01, 0x34},
 
-	{0x401f, 0x03}, // BLC enabled pg 120
-	{0x4000, 0x05}, // BLC enabled pg 120
-	{0x401d, 0x08}, // reserved pg 120
-	{0x4001, 0x02}, // BLC control pg 120
+	{0x401f, 0x03},
+	{0x4000, 0x05},
+	{0x401d, 0x08},
+	{0x4001, 0x02},
 
-	{0x5000, 0x00}, // ISP control00 features are disabled. pg 132
-	{0x5001, 0x00}, // ISP control01 awb disabled. pg 132
-	{0x5002, 0x00}, // ISP control02 debug mode disabled pg 132
-	{0x503d, 0x00}, // ISP control3D features disabled pg 133
-	{0x5046, 0x00}, // ISP control isp disable awbg disable pg 133
+	{0x5000, 0x00},
+	{0x5001, 0x00},
+	{0x5002, 0x00},
+	{0x503d, 0x00},
+	{0x5046, 0x00},
 
-	{0x300f, 0x8f}, // PLL control00 R_SELD5 [7:6] div by 4 R_DIVL [2] two lane div 1 SELD2P5 [1:0] div 2.5 pg 99
-	{0x3010, 0x10}, // PLL control01 DIVM [3:0] DIVS [7:4] div 1 pg 99
-	{0x3011, 0x14}, // PLL control02 R_DIVP [5:0] div 20 pg 99
-	{0x3012, 0x02}, // PLL CTR 03, default
-	{0x3503, 0x33}, // AEC auto AGC auto gain has delay of 2 frames. pg 38
+	{0x300f, 0x8f},
+	{0x3010, 0x10},
+	{0x3011, 0x14},
+	{0x3012, 0x02},
+	{0x3503, 0x33},
 
-	{0x3621, 0x2f}, // analog horizontal binning/sampling not enabled. pg 108
-	{0x3703, 0xe6}, // analog pg 108
-	{0x370c, 0x00}, // analog pg 108
-	{0x370d, 0x04}, // analog pg 108
-	{0x3713, 0x22}, // analog pg 108
+	{0x3621, 0x2f},
+	{0x3703, 0xe6},
+	{0x370c, 0x00},
+	{0x370d, 0x04},
+	{0x3713, 0x22},
 	{0x3714, 0x27},
 	{0x3705, 0xda},
 	{0x370a, 0x80},
 
-	{0x3800, 0x02}, // HREF start point higher 4 bits [3:0] pg 108
-	{0x3801, 0x94}, // HREF start point lower  8 bits [7:0] pg 108
-	{0x3802, 0x00}, // VREF start point higher 4 bits [3:0] pg 108
-	{0x3803, 0x0c}, // VREF start point [7:0] pg 108
-	{0x3804, 0x07}, // HREF width  higher 4 bits [3:0] pg 108
-	{0x3805, 0x80}, // HREF width  lower  8 bits [7:0] pg 108
-	{0x3806, 0x04}, // VREF height higher 4 bits [3:0] pg 109
-	{0x3807, 0x40}, // VREF height lower  8 bits [7:0] pg 109
-	{0x3808, 0x07}, // DVP horizontal output size higher 4 bits [3:0] pg 109
-	{0x3809, 0x80}, // DVP horizontal output size lower  8 bits [7:0] pg 109
-	{0x380a, 0x04}, // DVP vertical   output size higher 4 bits [3:0] pg 109
-	{0x380b, 0x40}, // DVP vertical   output size lower  8 bits [7:0] pg 109
-	{0x380c, 0x0a}, // total horizontal size higher 5 bits [4:0] pg 109, line length
-	{0x380d, 0x84}, // total horizontal size lower  8 bits [7:0] pg 109, line length
-	{0x380e, 0x04}, // total vertical   size higher 5 bits [4:0] pg 109, frame length
-	{0x380f, 0xa4}, // total vertical   size lower  8 bits [7:0] pg 109, frame length
-	{0x3818, 0xc0}, // timing control reg18 mirror & dkhf pg 110
-	{0x381a, 0x3c}, // HS mirror adjustment pg 110
+	{0x3800, 0x02},
+	{0x3801, 0x94},
+	{0x3802, 0x00},
+	{0x3803, 0x0c},
+	{0x3804, 0x07},
+	{0x3805, 0x80},
+	{0x3806, 0x04},
+	{0x3807, 0x40},
+	{0x3808, 0x07},
+	{0x3809, 0x80},
+	{0x380a, 0x04},
+	{0x380b, 0x40},
+	{0x380c, 0x0a},
+	{0x380d, 0x84},
+	{0x380e, 0x04},
+	{0x380f, 0xa4},
+	{0x3818, 0xc0},
+	{0x381a, 0x3c},
 	{0x381c, 0x31},
 	{0x381d, 0xa4},
 	{0x381e, 0x04},
@@ -463,89 +460,87 @@ static struct ov5650_reg mode_1920x1080[] = {
 	{0x3827, 0x0a},
 	{0x401c, 0x46},
 
-	{0x3003, 0x03}, // reset MIPI and DVP pg 97
-	{0x3500, 0x00}, // long exp 1/3 in unit of 1/16 line, pg 38
-	{0x3501, 0x49}, // long exp 2/3 in unit of 1/16 line, pg 38
-	{0x3502, 0xa0}, // long exp 3/3 in unit of 1/16 line, pg 38
-	{0x350a, 0x00}, // gain output to sensor, pg 38
-	{0x350b, 0x00}, // gain output to sensor, pg 38
-	{0x4801, 0x0f}, // MIPI control01 pg 125
-	{0x300e, 0x0c}, // SC_MIPI_SC_CTRL0 pg 73
-	{0x4803, 0x50}, // MIPI CTRL3 pg 91
-	{0x4800, 0x34}, // MIPI CTRl0 idle and short line pg 89
+	{0x3003, 0x03},
+	{0x3500, 0x00},
+	{0x3501, 0x49},
+	{0x3502, 0xa0},
+	{0x350a, 0x00},
+	{0x350b, 0x00},
+	{0x4801, 0x0f},
+	{0x300e, 0x0c},
+	{0x4803, 0x50},
+	{0x4800, 0x34},
 
 	{OV5650_TABLE_END, 0x0000}
 };
 
 
 static struct ov5650_reg mode_1264x704[] = {
-	{0x3600, 0x54}, /* analog pg 108 */
-	{0x3601, 0x05}, /* analog pg 108 */
-	{0x3604, 0x40}, /* analog pg 108 */
-	{0x3705, 0xdb}, /* analog pg 108 */
-	{0x370a, 0x81}, /* analog pg 108 */
-	{0x3615, 0x52}, /* analog pg 108 */
-	{0x3810, 0x40}, /* TIMING HVOFFS both are zero pg 80 */
-	{0x3836, 0x41}, /* TIMING HVPAD both are zero pg 82 */
-	{0x4000, 0x05}, /* BLC enabled pg 120 */
-	{0x401c, 0x42}, /* reserved pg 120 */
-	{0x5046, 0x09}, /* ISP control isp disable awbg disable pg 133 */
-	{0x3010, 0x00}, /* PLL control01 DIVM [3:0] DIVS [7:4] div 1 pg 99 */
-	{0x3503, 0x00}, /* AEC auto AGC auto gain has no latch delay. pg 38 */
-	{0x3613, 0xc4}, /* analog pg 108 */
+	{0x3600, 0x54},
+	{0x3601, 0x05},
+	{0x3604, 0x40},
+	{0x3705, 0xdb},
+	{0x370a, 0x81},
+	{0x3615, 0x52},
+	{0x3810, 0x40},
+	{0x3836, 0x41},
+	{0x4000, 0x05},
+	{0x401c, 0x42},
+	{0x5046, 0x09},
+	{0x3010, 0x00},
+	{0x3503, 0x00},
+	{0x3613, 0xc4},
 
-	{0x3621, 0xaf}, /* analog horizontal binning/sampling enabled.
-			   pg 108 */
-	{0x3632, 0x55}, /* analog pg 108 */
-	{0x3703, 0x9a}, /* analog pg 108 */
-	{0x370c, 0x00}, /* analog pg 108 */
-	{0x370d, 0x42}, /* analog pg 108 */
-	{0x3713, 0x22}, /* analog pg 108 */
-	{0x3800, 0x02}, /* HREF start point higher 4 bits [3:0] pg 108 */
-	{0x3801, 0x54}, /* HREF start point lower  8 bits [7:0] pg 108 */
-	{0x3802, 0x00}, /* VREF start point higher 4 bits [3:0] pg 108 */
-	{0x3803, 0x0c}, /* VREF start point [7:0] pg 108 */
-	{0x3804, 0x05}, /* HREF width  higher 4 bits [3:0] pg 108 */
-	{0x3805, 0x00}, /* HREF width  lower  8 bits [7:0] pg 108 */
-	{0x3806, 0x02}, /* VREF height higher 4 bits [3:0] pg 109 */
-	{0x3807, 0xd0}, /* VREF height lower  8 bits [7:0] pg 109 */
-	{0x3808, 0x05}, /* DVP horizontal output size higher 4 bits [3:0]
-			   pg 109 */
-	{0x3809, 0x00}, /* DVP horizontal output size lower  8 bits [7:0]
-			   pg 109 */
-	{0x380a, 0x02}, /* DVP vertical   output size higher 4 bits [3:0]
-			   pg 109 */
-	{0x380b, 0xd0}, /* DVP vertical   output size lower  8 bits [7:0]
-			   pg 109 */
-	{0x380c, 0x08}, /* total horizontal size higher 5 bits [4:0] pg 109,
-			   line length */
-	{0x380d, 0x72}, /* total horizontal size lower  8 bits [7:0] pg 109,
-			   line length */
-	{0x380e, 0x02}, /* total vertical size higher 5 bits [4:0] pg 109,
-			   frame length */
-	{0x380f, 0xe4}, /* total vertical size lower  8 bits [7:0] pg 109,
-			   frame length */
-	{0x3818, 0xc1}, /* timing control reg18 mirror & dkhf pg 110 */
-	{0x381a, 0x3c}, /* HS mirror adjustment pg 110 */
-	{0x3a0d, 0x06}, /* b60 max pg 113 */
-	{0x3c01, 0x34}, /* 5060HZ_CTRL01 pg 116 */
-	{0x3007, 0x3b}, /* clock enable03 pg 98 */
-	{0x5059, 0x80}, /* => NOT found */
-	{0x3003, 0x03}, /* reset MIPI and DVP pg 97 */
-	{0x3500, 0x04}, /* long exp 1/3 in unit of 1/16 line, pg 38 */
-	{0x3501, 0xa5}, /* long exp 2/3 in unit of 1/16 line, pg 38,
-			   note frame length start with 0x7b0,
-			   and SENSOR_BAYER_DEFAULT_MAX_COARSE_DIFF=3 */
-	{0x3502, 0x10}, /* long exp 3/3 in unit of 1/16 line, pg 38.
-			   Two lines of integration time. */
-	{0x350a, 0x00}, /* gain output to sensor, pg 38 */
-	{0x350b, 0x00}, /* gain output to sensor, pg 38 */
-	{0x4801, 0x0f}, /* MIPI control01 pg 125 */
-	{0x300e, 0x0c}, /* SC_MIPI_SC_CTRL0 pg 73 */
-	{0x4803, 0x50}, /* MIPI CTRL3 pg 91 */
-	{0x4800, 0x24}, /* MIPI CTRl0 idle and short line pg 89 */
-	{0x300f, 0x8b}, /* PLL control00 R_SELD5 [7:6] div by 4 R_DIVL [2]
-			   two lane div 1 SELD2P5 [1:0] div 2.5 pg 99 */
+	{0x3621, 0xaf},
+
+	{0x3632, 0x55},
+	{0x3703, 0x9a},
+	{0x370c, 0x00},
+	{0x370d, 0x42},
+	{0x3713, 0x22},
+	{0x3800, 0x02},
+	{0x3801, 0x54},
+	{0x3802, 0x00},
+	{0x3803, 0x0c},
+	{0x3804, 0x05},
+	{0x3805, 0x00},
+	{0x3806, 0x02},
+	{0x3807, 0xd0},
+	{0x3808, 0x05},
+
+	{0x3809, 0x00},
+
+	{0x380a, 0x02},
+
+	{0x380b, 0xd0},
+
+	{0x380c, 0x08},
+
+	{0x380d, 0x72},
+
+	{0x380e, 0x02},
+
+	{0x380f, 0xe4},
+
+	{0x3818, 0xc1},
+	{0x381a, 0x3c},
+	{0x3a0d, 0x06},
+	{0x3c01, 0x34},
+	{0x3007, 0x3b},
+	{0x5059, 0x80},
+	{0x3003, 0x03},
+	{0x3500, 0x04},
+	{0x3501, 0xa5},
+
+	{0x3502, 0x10},
+
+	{0x350a, 0x00},
+	{0x350b, 0x00},
+	{0x4801, 0x0f},
+	{0x300e, 0x0c},
+	{0x4803, 0x50},
+	{0x4800, 0x24},
+	{0x300f, 0x8b},
 
 	{0x3711, 0x24},
 	{0x3713, 0x92},
@@ -629,14 +624,14 @@ static struct ov5650_reg mode_320x240[] = {
 	{0x3809, 0x40},
 	{0x380a, 0x01},
 	{0x380b, 0x00},
-	{0x380c, 0x0a}, /* total horizontal size higher 5 bits [4:0] pg 109,
-			   line length */
-	{0x380d, 0x04}, /* total horizontal size lower  8 bits [7:0] pg 109,
-			   line length */
-	{0x380e, 0x01}, /* total vertical size higher 5 bits [4:0] pg 109,
-			   frame length */
-	{0x380f, 0x38}, /* total vertical size lower  8 bits [7:0] pg 109,
-			   frame length */
+	{0x380c, 0x0a},
+
+	{0x380d, 0x04},
+
+	{0x380e, 0x01},
+
+	{0x380f, 0x38},
+
 	{0x3815, 0x81},
 	{0x3824, 0x23},
 	{0x3825, 0x20},
@@ -696,27 +691,26 @@ static struct ov5650_reg mode_320x240[] = {
 
 	{0x3011, 0x14},
 	{0x3007, 0x3B},
-	{0x300f, 0x8f},  //0x8f:2-lane, 0x8b:1-lane
+	{0x300f, 0x8f},
 	{0x4801, 0x0f},
 	{0x3003, 0x03},
 	{0x300e, 0x0c},
-	{0x3010, 0x15},  //120/60/30fps:0x15/0x35/0x75
+	{0x3010, 0x15},
 	{0x4803, 0x50},
-	{0x4800, 0x24},  //bit[5]=0 as CSI continuous clock
-	{0x4837, 0x40},  //120/60/30fps:0x10/0x20/0x40
+	{0x4800, 0x24},
+	{0x4837, 0x40},
 	{0x3815, 0x82},
 
 	{OV5650_TABLE_END, 0x0000}
 };
 
 static struct ov5650_reg mode_end[] = {
-	{0x3212, 0x00}, /* SRM_GROUP_ACCESS (group hold begin) */
-	{0x3003, 0x01}, /* reset DVP pg 97 */
-	{0x3212, 0x10}, /* SRM_GROUP_ACCESS (group hold end) */
-	{0x3212, 0xa0}, /* SRM_GROUP_ACCESS (group hold launch) */
-	{0x3008, 0x02}, /* SYSTEM_CTRL0 mipi suspend mask pg 98 */
+	{0x3212, 0x00},
+	{0x3003, 0x01},
+	{0x3212, 0x10},
+	{0x3212, 0xa0},
+	{0x3008, 0x02},
 
-	/*	{FAST_SETMODE_END, 0}, */
 	{OV5650_TABLE_END, 0x0000}
 };
 
@@ -739,7 +733,6 @@ static struct ov5650_reg *mode_table[] = {
 	[OV5650_MODE_320x240]   = mode_320x240
 };
 
-/* 2 regs to program frame length */
 static inline void ov5650_get_frame_length_regs(struct ov5650_reg *regs,
 						u32 frame_length)
 {
@@ -749,7 +742,6 @@ static inline void ov5650_get_frame_length_regs(struct ov5650_reg *regs,
 	(regs + 1)->val = (frame_length) & 0xff;
 }
 
-/* 3 regs to program coarse time */
 static inline void ov5650_get_coarse_time_regs(struct ov5650_reg *regs,
 						u32 coarse_time)
 {
@@ -761,7 +753,6 @@ static inline void ov5650_get_coarse_time_regs(struct ov5650_reg *regs,
 	(regs + 2)->val = (coarse_time & 0xf) << 4;
 }
 
-/* 1 reg to program gain */
 static inline void ov5650_get_gain_reg(struct ov5650_reg *regs, u16 gain)
 {
 	regs->addr = 0x350b;
@@ -1059,7 +1050,6 @@ static int ov5650_set_binning(struct ov5650_info *info, u8 enable)
 	ov5650_read_reg_helper(info, OV5650_ANALOG_CONTROL_D, &analog_ctrl_reg);
 	ov5650_read_reg_helper(info, OV5650_TIMING_TC_REG_18, &timing_reg);
 
-	/* Group 3 begin (pg.78) */
 	ret = ov5650_write_reg_helper(info,
 			OV5650_SRM_GRUP_ACCESS,
 			OV5650_GROUP_ID(3));
@@ -1067,15 +1057,6 @@ static int ov5650_set_binning(struct ov5650_info *info, u8 enable)
 		return -EIO;
 
 	if (!enable) {
-		/* 2x2 subsampling
-		 * ----------------
-		 * address | value
-		 * --------+-------
-		 *  0x3621 | 0xEF
-		 *  0x370D | 0x02
-		 *  0x3818 | 0xC1
-		 * ----------------
-		 */
 	ret = ov5650_write_reg_helper(info,
 		OV5650_ARRAY_CONTROL_01,
 		array_ctrl_reg |
@@ -1115,15 +1096,6 @@ static int ov5650_set_binning(struct ov5650_info *info, u8 enable)
 		OV5650_TIMING_CONTROL_HS_LOW,
 		(val & 0xFF));
 	} else {
-		/* 2x2 binning
-		 * ----------------
-		 * address | value
-		 * --------+-------
-		 *  0x3621 | 0xAF
-		 *  0x370D | 0x42
-		 *  0x3818 | 0xC1
-		 * ----------------
-		 */
 		ret = ov5650_write_reg_helper(info,
 			OV5650_ARRAY_CONTROL_01,
 			(array_ctrl_reg | OV5650_H_BINNING_BIT)
@@ -1164,12 +1136,10 @@ static int ov5650_set_binning(struct ov5650_info *info, u8 enable)
 	}
 
 exit:
-	/* Group 3 end (pg.78) */
 	ret = ov5650_write_reg_helper(info,
 		OV5650_SRM_GRUP_ACCESS,
 		(OV5650_GROUP_HOLD_END_BIT | OV5650_GROUP_ID(3)));
 
-	/* Group3 launch (pg.78) */
 	ret |= ov5650_write_reg_helper(info,
 		OV5650_SRM_GRUP_ACCESS,
 		(OV5650_GROUP_HOLD_BIT | OV5650_GROUP_LAUNCH_BIT | OV5650_GROUP_ID(3)));

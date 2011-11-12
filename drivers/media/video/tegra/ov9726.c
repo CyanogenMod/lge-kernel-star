@@ -264,7 +264,6 @@ fail_regulator_1v8_reg:
 	return ret;
 }
 
-/* 2 regs to program frame length */
 static inline void
 ov9726_get_frame_length_regs(struct ov9726_reg *regs, u32 frame_length)
 {
@@ -275,7 +274,6 @@ ov9726_get_frame_length_regs(struct ov9726_reg *regs, u32 frame_length)
 	regs->val = frame_length & 0xff;
 }
 
-/* 3 regs to program coarse time */
 static inline void
 ov9726_get_coarse_time_regs(struct ov9726_reg *regs, u32 coarse_time)
 {
@@ -286,7 +284,6 @@ ov9726_get_coarse_time_regs(struct ov9726_reg *regs, u32 coarse_time)
 	regs->val = coarse_time & 0xff;
 }
 
-/* 1 reg to program gain */
 static inline void
 ov9726_get_gain_reg(struct ov9726_reg *regs, u16 gain)
 {
