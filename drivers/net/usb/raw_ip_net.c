@@ -417,12 +417,14 @@ static netdev_tx_t baseband_usb_netdev_start_xmit(
 	urb = usb_alloc_urb(0, GFP_ATOMIC);
 	if (!urb) {
 		pr_err("usb_alloc_urb() failed\n");
+		kfree_skb(skb);
 		return -ENOMEM;
 	}
 	buf = kzalloc(skb->len - 14, GFP_ATOMIC);
 	if (!buf) {
 		pr_err("usb buffer kzalloc() failed\n");
 		usb_free_urb(urb);
+		kfree_skb(skb);
 		return -ENOMEM;
 	}
 	err = skb_copy_bits(skb, 14, buf, skb->len - 14);
@@ -430,6 +432,7 @@ static netdev_tx_t baseband_usb_netdev_start_xmit(
 		pr_err("skb_copy_bits() failed - %d\n", err);
 		kfree(buf);
 		usb_free_urb(urb);
+		kfree_skb(skb);
 		return err;
 	}
 	usb_fill_bulk_urb(urb, usb->usb.device, usb->usb.pipe.bulk.out,
@@ -438,11 +441,24 @@ static netdev_tx_t baseband_usb_netdev_start_xmit(
 		usb);
 	urb->transfer_flags = URB_ZERO_PACKET;
 
+	/* autoresume before tx */
+	err = usb_autopm_get_interface(usb->usb.interface);
+	if (err < 0) {
+		pr_err("%s: usb_autopm_get_interface(%p) failed %d\n",
+			__func__, usb->usb.interface, err);
+		kfree(urb->transfer_buffer);
+		usb_free_urb(urb);
+		kfree_skb(skb);
+		return err;
+	}
+
 	/* submit tx urb */
+	usb_mark_last_busy(usb->usb.device);
 	usb->usb.tx_urb = urb;
 	err = usb_submit_urb(urb, GFP_ATOMIC);
 	if (err < 0) {
 		pr_err("usb_submit_urb() failed - err %d\n", err);
+		usb_autopm_put_interface(usb->usb.interface);
 		usb->usb.tx_urb = (struct urb *) 0;
 		kfree(urb->transfer_buffer);
 		usb_free_urb(urb);
@@ -615,6 +631,9 @@ static void usb_net_raw_ip_tx_urb_comp(struct urb *urb)
 	}
 	usb_free_urb(urb);
 	usb->usb.tx_urb = (struct urb *) 0;
+
+	/* autosuspend after tx completed */
+	usb_autopm_put_interface_async(usb->usb.interface);
 
 	pr_debug("usb_net_raw_ip_tx_urb_comp }\n");
 }
