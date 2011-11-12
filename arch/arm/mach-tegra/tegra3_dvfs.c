@@ -329,6 +329,23 @@ module_param_cb(disable_core, &tegra_dvfs_disable_core_ops,
 module_param_cb(disable_cpu, &tegra_dvfs_disable_cpu_ops,
 	&tegra_dvfs_cpu_disabled, 0644);
 
+static bool __init is_pllm_dvfs(struct clk *c, struct dvfs *d)
+{
+#ifdef CONFIG_TEGRA_PLLM_RESTRICTED
+	/* Restricting PLLM usage on T30 and T33, rev A02+, allows to apply
+	   maximum PLLM frequency to clock tree at minimum core voltage;
+	   no need to enable dvfs on PLLM in this case */
+	if ((tegra_cpu_speedo_id() == 2) || (tegra_cpu_speedo_id() == 5))
+	   return false;
+#endif
+	/* Check if PLLM boot frequency can be applied to clock tree at
+	   minimum voltage. If yes, no need to enable dvfs on PLLM */
+	if (clk_get_rate_all_locked(c) <= d->freqs[0] * d->freqs_mult)
+		return false;
+
+	return true;
+}
+
 static void __init init_dvfs_one(struct dvfs *d, int nominal_mv_index)
 {
 	int ret;
@@ -340,25 +357,33 @@ static void __init init_dvfs_one(struct dvfs *d, int nominal_mv_index)
 		return;
 	}
 
+	/*
+	 * Update max rate for auto-dvfs clocks, except EMC.
+	 * EMC is a special case, since EMC dvfs is board dependent: max rate
+	 * and EMC scaling frequencies are determined by tegra BCT (flashed
+	 * together with the image) and board specific EMC DFS table; we will
+	 * check the scaling ladder against nominal core voltage when the table
+	 * is loaded (and if on particular board the table is not loaded, EMC
+	 * scaling is disabled).
+	 */
 	if (!(c->flags & PERIPH_EMC_ENB) && d->auto_dvfs) {
-		/* Update max rate for auto-dvfs clocks, except EMC.
-		 * EMC is a special case, since EMC dvfs is board dependent:
-		 * max rate and EMC scaling frequencies are determined by tegra
-		 * BCT (flashed together with the image) and board specific EMC
-		 * DFS table; we will check the scaling ladder against nominal
-		 * core voltage when the table is loaded (and if on particular
-		 * board the table is not loaded, EMC scaling is disabled).
-		 */
 		BUG_ON(!d->freqs[nominal_mv_index]);
 		tegra_init_max_rate(
 			c, d->freqs[nominal_mv_index] * d->freqs_mult);
 	}
 	d->max_millivolts = d->dvfs_rail->nominal_millivolts;
 
-	ret = tegra_enable_dvfs_on_clk(c, d);
-	if (ret)
-		pr_err("tegra3_dvfs: failed to enable dvfs on %s\n",
-			c->name);
+	/*
+	 * Check if we may skip enabling dvfs on PLLM. PLLM is a special case,
+	 * since its frequency never exceeds boot rate, and configuration with
+	 * restricted PLLM usage is possible.
+	 */
+	if (!(c->flags & PLLM) || is_pllm_dvfs(c, d)) {
+		ret = tegra_enable_dvfs_on_clk(c, d);
+		if (ret)
+			pr_err("tegra3_dvfs: failed to enable dvfs on %s\n",
+				c->name);
+	}
 }
 
 static bool __init match_dvfs_one(struct dvfs *d, int speedo_id, int process_id)

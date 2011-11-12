@@ -3783,7 +3783,9 @@ static struct clk_mux_sel mux_pllm_pllc_pllp_clkm[] = {
 static struct clk_mux_sel mux_pllp_pllc_pllm_clkm[] = {
 	{ .input = &tegra_pll_p, .value = 0},
 	{ .input = &tegra_pll_c, .value = 1},
+#ifndef CONFIG_TEGRA_PLLM_RESTRICTED
 	{ .input = &tegra_pll_m, .value = 2},
+#endif
 	{ .input = &tegra_clk_m, .value = 3},
 	{ 0, 0},
 };
@@ -3804,7 +3806,9 @@ static struct clk_mux_sel mux_pllp_plld_pllc_clkm[] = {
 
 static struct clk_mux_sel mux_pllp_pllm_plld_plla_pllc_plld2_clkm[] = {
 	{.input = &tegra_pll_p, .value = 0},
+#ifndef CONFIG_TEGRA_PLLM_RESTRICTED
 	{.input = &tegra_pll_m, .value = 1},
+#endif
 	{.input = &tegra_pll_d_out0, .value = 2},
 	{.input = &tegra_pll_a_out0, .value = 3},
 	{.input = &tegra_pll_c, .value = 4},
@@ -3840,7 +3844,9 @@ static struct clk_mux_sel mux_pllp_pllc_clkm_clk32[] = {
 static struct clk_mux_sel mux_pllp_pllc_pllm[] = {
 	{.input = &tegra_pll_p,     .value = 0},
 	{.input = &tegra_pll_c,     .value = 1},
+#ifndef CONFIG_TEGRA_PLLM_RESTRICTED
 	{.input = &tegra_pll_m,     .value = 2},
+#endif
 	{ 0, 0},
 };
 

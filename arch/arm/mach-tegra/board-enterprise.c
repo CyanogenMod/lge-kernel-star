@@ -387,7 +387,9 @@ static struct platform_device *enterprise_uart_devices[] __initdata = {
 static struct uart_clk_parent uart_parent_clk[] = {
 	[0] = {.name = "clk_m"},
 	[1] = {.name = "pll_p"},
+#ifndef CONFIG_TEGRA_PLLM_RESTRICTED
 	[2] = {.name = "pll_m"},
+#endif
 };
 static struct tegra_uart_platform_data enterprise_uart_pdata;
 

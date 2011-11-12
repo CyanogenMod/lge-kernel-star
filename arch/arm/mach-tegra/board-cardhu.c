@@ -324,7 +324,9 @@ static struct platform_device *cardhu_uart_devices[] __initdata = {
 static struct uart_clk_parent uart_parent_clk[] = {
 	[0] = {.name = "clk_m"},
 	[1] = {.name = "pll_p"},
+#ifndef CONFIG_TEGRA_PLLM_RESTRICTED
 	[2] = {.name = "pll_m"},
+#endif
 };
 
 static struct tegra_uart_platform_data cardhu_uart_pdata;
@@ -467,8 +469,12 @@ static struct platform_device *cardhu_spi_devices[] __initdata = {
 
 struct spi_clk_parent spi_parent_clk[] = {
 	[0] = {.name = "pll_p"},
+#ifndef CONFIG_TEGRA_PLLM_RESTRICTED
 	[1] = {.name = "pll_m"},
 	[2] = {.name = "clk_m"},
+#else
+	[1] = {.name = "clk_m"},
+#endif
 };
 
 static struct tegra_spi_platform_data cardhu_spi_pdata = {

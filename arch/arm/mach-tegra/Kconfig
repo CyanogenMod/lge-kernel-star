@@ -413,5 +413,15 @@ config TEGRA_THERMAL_SYSFS
 	bool "Enable Thermal driver to use Thermal Sysfs infrastructure"
 	depends on THERMAL
 	default n
+
+config TEGRA_PLLM_RESTRICTED
+	bool "Restrict PLLM usage as module clock source"
+	depends on !ARCH_TEGRA_2x_SOC
+	default n
+	help
+	  When enabled, PLLM usage may be restricted to modules with dividers
+	  capable of dividing maximum PLLM frequency at minimum voltage. When
+	  disabled, PLLM is used as a clock source with no restrictions (which
+	  may effectively increase lower limit for core voltage).
 endif
 
