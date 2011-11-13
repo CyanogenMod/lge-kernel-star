@@ -109,6 +109,7 @@ enum shared_bus_users_mode {
 	SHARED_FLOOR = 0,
 	SHARED_BW,
 	SHARED_CEILING,
+	SHARED_AUTO,
 };
 
 enum clk_state {
