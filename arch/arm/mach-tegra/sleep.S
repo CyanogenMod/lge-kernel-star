@@ -246,6 +246,11 @@ ENTRY(tegra_cpu_suspend)
 	bl	__cpuc_flush_kern_all
 #endif
 #ifdef CONFIG_CACHE_L2X0
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	cpu_id  r2
+	cmp r2, #0
+	bne no_l2_sync
+#endif
 	/* Issue a PL310 cache sync operation */
 	dsb
 	mov32	r2, TEGRA_PL310_VIRT
@@ -255,6 +260,7 @@ ENTRY(tegra_cpu_suspend)
 	str	r1, [r2]
 #endif
 
+no_l2_sync:
 	/* Invalidate the TLBs & BTAC */
 	mov	r1, #0
 	mcr	p15, 0, r1, c8, c3, 0	@ invalidate shared TLBs
