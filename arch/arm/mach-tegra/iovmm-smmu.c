@@ -1170,7 +1170,7 @@ static ssize_t _sysfs_store_reg(struct device *d,
 	if (offset < 0)
 		return offset;
 	value = simple_strtoul(buf, NULL, 16);
-#ifdef CONFIG_TEGRA_SMMU_SYSFS
+#ifdef CONFIG_TEGRA_IOVMM_SMMU_SYSFS
 	writel(value, smmu->regs + offset);
 #else
 	/* Allow writing to reg only for TLB/PTC stats enabling/disabling */
@@ -1248,7 +1248,7 @@ static ssize_t _sysfs_set_##name(struct device *d,		\
 	}							\
 	return count;						\
 }
-#ifdef CONFIG_TEGRA_SMMU_SYSFS
+#ifdef CONFIG_TEGRA_IOVMM_SMMU_SYSFS
 #define _SYSFS_SET_VALUE	_SYSFS_SET_VALUE_DO
 #else
 #define _SYSFS_SET_VALUE(name, field, base, ceil, callback)	\
@@ -1271,7 +1271,7 @@ _SYSFS_SHOW_VALUE(signature_pid, signature_pid, "%lu")
 _SYSFS_SET_VALUE_DO(signature_pid, signature_pid, 10, PID_MAX_LIMIT+1,
 		_sysfs_null_callback)
 
-#ifdef CONFIG_TEGRA_SMMU_SYSFS
+#ifdef CONFIG_TEGRA_IOVMM_SMMU_SYSFS
 static void _sysfs_mask_attr(struct smmu_device *smmu, unsigned long *field)
 {
 	*field &= _MASK_ATTR;
