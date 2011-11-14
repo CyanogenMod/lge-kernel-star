@@ -41,15 +41,6 @@
 
 #include "tegra_smmu.h"
 
-/* For debugging */
-/*#define SMMU_DEBUG*/
-
-#ifdef SMMU_DEBUG
-#define SMMU_VERBOSE 1
-#else
-#define SMMU_VERBOSE 0
-#endif
-
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
 /*
  * ALL-CAP macros copied from armc.h
@@ -328,7 +319,6 @@ struct smmu_device {
 
 	unsigned long lowest_asid;	/* Variables for hardware testing */
 	unsigned long debug_asid;
-	unsigned long verbose;
 	unsigned long signature_pid;	/* For debugging aid */
 };
 
@@ -465,8 +455,8 @@ static void free_ptbl(struct smmu_as *as, unsigned long iova)
 	unsigned long *pdir = (unsigned long *)kmap(as->pdir_page);
 
 	if (pdir[pdn] != _PDE_VACANT(pdn)) {
-		if (as->smmu->verbose)
-			pr_info("%s:%d pdn=%lx\n", __func__, __LINE__, pdn);
+		pr_debug("%s:%d pdn=%lx\n", __func__, __LINE__, pdn);
+
 		ClearPageReserved(SMMU_EX_PTBL_PAGE(pdir[pdn]));
 		__free_page(SMMU_EX_PTBL_PAGE(pdir[pdn]));
 		pdir[pdn] = _PDE_VACANT(pdn);
@@ -551,9 +541,8 @@ static unsigned long *locate_pte(struct smmu_as *as,
 		return NULL;
 	} else {
 		/* Vacant - allocate a new page table */
-		if (as->smmu->verbose)
-			pr_info("%s:%d new PTBL pdn=%lx\n",
-				__func__, __LINE__, pdn);
+		pr_debug("%s:%d new PTBL pdn=%lx\n", __func__, __LINE__, pdn);
+
 		*ptbl_page_p = alloc_page(GFP_KERNEL | __GFP_DMA);
 		if (!*ptbl_page_p) {
 			kunmap(as->pdir_page);
@@ -607,9 +596,8 @@ static int smmu_map(struct tegra_iovmm_domain *domain,
 	unsigned long pcount = iovma->iovm_length >> SMMU_PAGE_SHIFT;
 	int i;
 
-	if (as->smmu->verbose)
-		pr_info("%s:%d iova=%lx asid=%d\n", __func__, __LINE__,
-			addr, as - as->smmu->as);
+	pr_debug("%s:%d iova=%lx asid=%d\n", __func__, __LINE__,
+		 addr, as - as->smmu->as);
 
 	for (i = 0; i < pcount; i++) {
 		unsigned long pfn;
@@ -627,10 +615,8 @@ static int smmu_map(struct tegra_iovmm_domain *domain,
 		if (!pte)
 			goto fail2;
 
-		if (as->smmu->verbose)
-			pr_info("%s:%d iova=%lx pfn=%lx asid=%d\n",
-				__func__, __LINE__,
-				addr, pfn, as - as->smmu->as);
+		pr_debug("%s:%d iova=%lx pfn=%lx asid=%d\n",
+			 __func__, __LINE__, addr, pfn, as - as->smmu->as);
 
 		if (*pte == _PTE_VACANT(addr))
 			(*pte_counter)++;
@@ -684,9 +670,9 @@ static void smmu_unmap(struct tegra_iovmm_domain *domain,
 	unsigned int pcount = iovma->iovm_length >> SMMU_PAGE_SHIFT;
 	unsigned int i, *pte_counter;
 
-	if (as->smmu->verbose)
-		pr_info("%s:%d iova=%lx asid=%d\n", __func__, __LINE__,
-			addr, as - as->smmu->as);
+	pr_debug("%s:%d iova=%lx asid=%d\n", __func__, __LINE__,
+		 addr, as - as->smmu->as);
+
 	mutex_lock(&as->lock);
 	for (i = 0; i < pcount; i++) {
 		unsigned long *pte;
@@ -724,9 +710,8 @@ static void smmu_map_pfn(struct tegra_iovmm_domain *domain,
 	unsigned int *pte_counter;
 	struct page *ptpage;
 
-	if (smmu->verbose)
-		pr_info("%s:%d iova=%lx pfn=%lx asid=%d\n", __func__, __LINE__,
-			(unsigned long)addr, pfn, as - as->smmu->as);
+	pr_debug("%s:%d iova=%lx pfn=%lx asid=%d\n", __func__, __LINE__,
+		 (unsigned long)addr, pfn, as - as->smmu->as);
 
 	BUG_ON(!pfn_valid(pfn));
 	mutex_lock(&as->lock);
@@ -995,7 +980,6 @@ static int smmu_probe(struct platform_device *pdev)
 	smmu->translation_enable_1_0 = ~0;
 	smmu->translation_enable_2_0 = ~0;
 	smmu->asid_security_0        = 0;
-	smmu->verbose = SMMU_VERBOSE;
 
 	memcpy(smmu->hwc_state, smmu_hwc_state_init, sizeof(smmu->hwc_state));
 
@@ -1277,8 +1261,6 @@ _SYSFS_SET_VALUE(lowest_asid, lowest_asid, 10,
 _SYSFS_SHOW_VALUE(debug_asid, debug_asid, "%lu")
 _SYSFS_SET_VALUE(debug_asid, debug_asid, 10,
 		MC_SMMU_NUM_ASIDS, _sysfs_null_callback)
-_SYSFS_SHOW_VALUE(verbose, verbose, "%lu")
-_SYSFS_SET_VALUE(verbose, verbose, 10, 3, _sysfs_null_callback)
 _SYSFS_SHOW_VALUE(signature_pid, signature_pid, "%lu")
 _SYSFS_SET_VALUE_DO(signature_pid, signature_pid, 10, PID_MAX_LIMIT + 1,
 		_sysfs_null_callback)
@@ -1325,8 +1307,6 @@ static struct device_attribute _attr_values[] = {
 		_sysfs_show_lowest_asid, _sysfs_set_lowest_asid),
 	__ATTR(debug_asid, S_IRUGO | S_IWUSR,
 		_sysfs_show_debug_asid, _sysfs_set_debug_asid),
-	__ATTR(verbose, S_IRUGO | S_IWUSR,
-		_sysfs_show_verbose, _sysfs_set_verbose),
 	__ATTR(signature_pid, S_IRUGO | S_IWUSR,
 		_sysfs_show_signature_pid, _sysfs_set_signature_pid),
 
