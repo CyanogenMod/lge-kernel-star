@@ -50,6 +50,10 @@ static const u32 core_process_speedos[][CORE_PROCESS_CORNERS_NUM] = {
 	{180}, /* [7]: soc_speedo_id = 1 - AP33 */
 	{208}, /* [8]: soc_speedo_id = 2 - T33  */
 	{192}, /* [9]: soc_speedo_id = 2 - T33S */
+
+/* T30 'L' family */
+	{192}, /* [10]: soc_speedo_id 2: T30L */
+	{192}, /* [11]: soc_speedo_id 2: T30SL */
 };
 
 /* Maximum speedo levels for each CPU process corner */
@@ -69,8 +73,12 @@ static const u32 cpu_process_speedos[][CPU_PROCESS_CORNERS_NUM] = {
 
 /* T33 family */
 	{305, 337, 359, 376, UINT_MAX}, /* [7]: cpu_speedo_id = 4 - AP33 */
-	{368, 368, 368, 368, 392}, 	/* [8]: cpu_speedo_id = 5 - T33  */
-	{376, 376, 376, 376, 392}, 	/* [9]: cpu_speedo_id = 6 - T33S */
+	{368, 368, 368, 368, 392},	/* [8]: cpu_speedo_id = 5 - T33  */
+	{376, 376, 376, 376, 392},	/* [9]: cpu_speedo_id = 6 - T33S */
+
+/* T30 'L' family */
+	{305, 337, 359, 376, 392},	/* [10]: cpu_speedo_id 7: T30L  */
+	{305, 337, 359, 376, 392},	/* [11]: cpu_speedo_id 8: T30SL */
 };
 
 /*
@@ -158,10 +166,30 @@ static void rev_sku_to_speedo_ids(int rev, int sku)
 			}
 			break;
 
-		case 0x83: /* T30S */
-			cpu_speedo_id = 3;
+		case 0x83: /* T30L or T30S */
+			switch (package_id) {
+			case 1: /* MID => T30L */
+				cpu_speedo_id = 7;
+				soc_speedo_id = 2;
+				threshold_index = 10;
+				break;
+			case 2: /* DSC => T30S */
+				cpu_speedo_id = 3;
+				soc_speedo_id = 2;
+				threshold_index = 3;
+				break;
+			default:
+				pr_err("Tegra3 Rev-A02: Reserved pkg: %d\n",
+				       package_id);
+				BUG();
+				break;
+			}
+			break;
+
+		case 0x8F: /* T30SL */
+			cpu_speedo_id = 8;
 			soc_speedo_id = 2;
-			threshold_index = 3;
+			threshold_index = 11;
 			break;
 
 /* Characterization SKUs */
