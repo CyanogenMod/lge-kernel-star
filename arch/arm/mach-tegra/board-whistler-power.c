@@ -245,6 +245,7 @@ static struct tegra_suspend_platform_data whistler_suspend_data = {
 	.core_off_timer = 0xc00,
 	.corereq_high	= true,
 	.sysclkreq_high	= true,
+	.combined_req   = true,
 };
 
 int __init whistler_regulator_init(void)
