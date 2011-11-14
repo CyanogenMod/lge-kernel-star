@@ -1137,7 +1137,7 @@ int __init cardhu_edp_init(void)
 #endif
 
 static char *cardhu_battery[] = {
-	"battery",
+	"bq27510-0",
 };
 
 static struct gpio_charger_platform_data cardhu_charger_pdata = {
