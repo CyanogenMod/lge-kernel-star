@@ -519,6 +519,7 @@ static irqreturn_t tps6591x_irq(int irq, void *data)
 	struct tps6591x *tps6591x = data;
 	int ret = 0;
 	u8 tmp[3];
+	u8 int_ack;
 	u32 acks, mask = 0;
 	int i;
 
@@ -531,8 +532,10 @@ static irqreturn_t tps6591x_irq(int irq, void *data)
 			return IRQ_NONE;
 		}
 		if (tmp[i]) {
+			/* Ack only those interrupts which are enabled */
+			int_ack = tmp[i] & (~(tps6591x->mask_cache[i]));
 			ret = tps6591x_write(tps6591x->dev,
-					TPS6591X_INT_STS + 2*i,	tmp[i]);
+					TPS6591X_INT_STS + 2*i,	int_ack);
 			if (ret < 0) {
 				dev_err(tps6591x->dev,
 					"failed to write interrupt status\n");
