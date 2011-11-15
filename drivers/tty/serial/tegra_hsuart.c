@@ -90,6 +90,8 @@ const int dma_req_sel[] = {
 #define TEGRA_UART_TX_TRIG_4B  0x20
 #define TEGRA_UART_TX_TRIG_1B  0x30
 
+#define TX_EMPTY_TIMEOUT_CNT	5000
+
 struct tegra_uart_port {
 	struct uart_port	uport;
 	char			port_name[32];
@@ -621,12 +623,19 @@ static void tegra_stop_rx(struct uart_port *u)
 static void tegra_uart_hw_deinit(struct tegra_uart_port *t)
 {
 	unsigned long flags;
+	int retry = 0;
 
 	/* Disable interrupts */
 	uart_writeb(t, 0, UART_IER);
 
-	while ((uart_readb(t, UART_LSR) & UART_LSR_TEMT) != UART_LSR_TEMT);
+	while ((uart_readb(t, UART_LSR) & UART_LSR_TEMT) != UART_LSR_TEMT) {
 		udelay(200);
+		if (retry++ > TX_EMPTY_TIMEOUT_CNT) {
+			dev_err(t->uport.dev, "%s: Tx Empty timeout! (%d)\n",
+					__func__, TX_EMPTY_TIMEOUT_CNT);
+			break;
+		}
+	}
 
 	spin_lock_irqsave(&t->uport.lock, flags);
 
