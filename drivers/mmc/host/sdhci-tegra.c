@@ -155,6 +155,43 @@ static void tegra3_sdhci_post_reset_init(struct sdhci_host *sdhci)
 	sdhci_writew(sdhci, ctrl, SDHCI_VENDOR_MISC_CNTRL);
 }
 
+static int tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
+		unsigned int uhs)
+{
+	u16 clk, ctrl_2;
+	ctrl_2 = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+
+	/* Select Bus Speed Mode for host */
+	ctrl_2 &= ~SDHCI_CTRL_UHS_MASK;
+	switch (uhs) {
+	case MMC_TIMING_UHS_SDR12:
+		ctrl_2 |= SDHCI_CTRL_UHS_SDR12;
+		break;
+	case MMC_TIMING_UHS_SDR25:
+		ctrl_2 |= SDHCI_CTRL_UHS_SDR25;
+		break;
+	case MMC_TIMING_UHS_SDR50:
+		ctrl_2 |= SDHCI_CTRL_UHS_SDR50;
+		break;
+	case MMC_TIMING_UHS_SDR104:
+		ctrl_2 |= SDHCI_CTRL_UHS_SDR104;
+		break;
+	case MMC_TIMING_UHS_DDR50:
+		ctrl_2 |= SDHCI_CTRL_UHS_DDR50;
+		break;
+	}
+
+	sdhci_writew(host, ctrl_2, SDHCI_HOST_CONTROL2);
+
+	if (uhs == MMC_TIMING_UHS_DDR50) {
+		clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
+		clk &= ~(0xFF << SDHCI_DIVIDER_SHIFT);
+		clk |= 1 << SDHCI_DIVIDER_SHIFT;
+		sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
+	}
+	return 0;
+}
+
 static void tegra_sdhci_reset_exit(struct sdhci_host *sdhci, u8 mask)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
@@ -241,6 +278,10 @@ static void tegra_3x_sdhci_set_card_clock(struct sdhci_host *sdhci, unsigned int
 
 	if (clock == 0)
 		goto out;
+	if (sdhci->mmc->ios.timing == MMC_TIMING_UHS_DDR50) {
+		div = 1;
+		goto set_clk;
+	}
 
 	if (sdhci->version >= SDHCI_SPEC_300) {
 		/* Version 3.00 divisors must be a multiple of 2. */
@@ -269,7 +310,7 @@ static void tegra_3x_sdhci_set_card_clock(struct sdhci_host *sdhci, unsigned int
 	 * - Wait for 5 usec and do a dummy write.
 	 * - Poll for clk stable and disable PADPIPE_CLK_OVERRIDE.
 	 */
-
+set_clk:
 	/* Enable PADPIPE clk override */
 	ctrl = sdhci_readb(sdhci, SDHCI_VENDOR_CLOCK_CNTRL);
 	ctrl |= SDHCI_VENDOR_CLOCK_CNTRL_PADPIPE_CLKEN_OVERRIDE;
@@ -479,6 +520,8 @@ static int tegra_sdhci_pltfm_init(struct sdhci_host *host,
 
 	host->mmc->caps |= MMC_CAP_ERASE;
 	host->mmc->caps |= MMC_CAP_DISABLE;
+	/* enable 1/8V DDR capable */
+	host->mmc->caps |= MMC_CAP_1_8V_DDR;
 	if (plat->is_8bit)
 		host->mmc->caps |= MMC_CAP_8_BIT_DATA;
 	host->mmc->caps |= MMC_CAP_SDIO_IRQ;
@@ -636,6 +679,7 @@ static struct sdhci_ops tegra_sdhci_ops = {
 	.suspend    = tegra_sdhci_suspend,
 	.resume     = tegra_sdhci_resume,
 	.platform_reset_exit = tegra_sdhci_reset_exit,
+	.set_uhs_signaling = tegra_sdhci_set_uhs_signaling,
 };
 
 struct sdhci_pltfm_data sdhci_tegra_pdata = {
