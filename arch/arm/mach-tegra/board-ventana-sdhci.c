@@ -33,6 +33,7 @@
 
 #define VENTANA_WLAN_PWR	TEGRA_GPIO_PK5
 #define VENTANA_WLAN_RST	TEGRA_GPIO_PK6
+#define VENTANA_WLAN_WOW	TEGRA_GPIO_PS0
 
 static void (*wifi_status_cb)(int card_present, void *dev_id);
 static void *wifi_status_cb_devid;
@@ -49,9 +50,20 @@ static struct wifi_platform_data ventana_wifi_control = {
 	.set_carddetect = ventana_wifi_set_carddetect,
 };
 
+static struct resource wifi_resource[] = {
+	[0] = {
+		.name  = "bcm4329_wlan_irq",
+		.start = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PS0),
+		.end   = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PS0),
+		.flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL | IORESOURCE_IRQ_SHAREABLE,
+	},
+};
+
 static struct platform_device ventana_wifi_device = {
 	.name		= "bcm4329_wlan",
 	.id		= 1,
+	.num_resources  = 1,
+	.resource	= wifi_resource,
 	.dev		= {
 		.platform_data = &ventana_wifi_control,
 	},
@@ -221,12 +233,15 @@ static int __init ventana_wifi_init(void)
 
 	gpio_request(VENTANA_WLAN_PWR, "wlan_power");
 	gpio_request(VENTANA_WLAN_RST, "wlan_rst");
+	gpio_request(VENTANA_WLAN_WOW, "bcmsdh_sdmmc");
 
 	tegra_gpio_enable(VENTANA_WLAN_PWR);
 	tegra_gpio_enable(VENTANA_WLAN_RST);
+	tegra_gpio_enable(VENTANA_WLAN_WOW);
 
 	gpio_direction_output(VENTANA_WLAN_PWR, 0);
 	gpio_direction_output(VENTANA_WLAN_RST, 0);
+	gpio_direction_input(VENTANA_WLAN_WOW);
 
 	platform_device_register(&ventana_wifi_device);
 
