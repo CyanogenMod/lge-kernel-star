@@ -125,6 +125,19 @@ static void tegra_gpio_mask_write(u32 reg, int gpio, int value)
 	__raw_writel(val, reg);
 }
 
+int tegra_gpio_get_bank_int_nr(int gpio)
+{
+	int bank;
+	int irq;
+	if (gpio >= TEGRA_NR_GPIOS) {
+		pr_warn("%s : Invalid gpio ID - %d\n", __func__, gpio);
+		return -EINVAL;
+	}
+	bank = gpio >> 5;
+	irq = tegra_gpio_banks[bank].irq;
+	return irq;
+}
+
 void tegra_gpio_enable(int gpio)
 {
 	if (gpio >= TEGRA_NR_GPIOS) {
@@ -166,7 +179,8 @@ static void tegra_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
 static int tegra_gpio_get(struct gpio_chip *chip, unsigned offset)
 {
 	if ((__raw_readl(GPIO_OE(offset)) >> GPIO_BIT(offset)) & 0x1)
-		return (__raw_readl(GPIO_OUT(offset)) >> GPIO_BIT(offset)) & 0x1;
+		return (__raw_readl(GPIO_OUT(offset)) >>
+			GPIO_BIT(offset)) & 0x1;
 	return (__raw_readl(GPIO_IN(offset)) >> GPIO_BIT(offset)) & 0x1;
 }
 
