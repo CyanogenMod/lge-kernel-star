@@ -288,6 +288,20 @@ static inline void auto_cal_disable(void)
 	}
 }
 
+static inline void set_mc_arbiter_limits(void)
+{
+	u32 reg = mc_readl(MC_EMEM_ARB_OUTSTANDING_REQ);
+	u32 max_val = 0x50 << EMC_MRS_WAIT_CNT_SHORT_WAIT_SHIFT;
+
+	if (!(reg & MC_EMEM_ARB_OUTSTANDING_REQ_HOLDOFF_OVERRIDE) ||
+	    ((reg & MC_EMEM_ARB_OUTSTANDING_REQ_MAX_MASK) > max_val)) {
+		reg = MC_EMEM_ARB_OUTSTANDING_REQ_LIMIT_ENABLE |
+			MC_EMEM_ARB_OUTSTANDING_REQ_HOLDOFF_OVERRIDE | max_val;
+		mc_writel(reg, MC_EMEM_ARB_OUTSTANDING_REQ);
+		mc_writel(0x1, MC_TIMING_CONTROL);
+	}
+}
+
 static inline bool dqs_preset(const struct tegra_emc_table *next_timing,
 			      const struct tegra_emc_table *last_timing)
 {
@@ -465,6 +479,11 @@ static noinline void emc_set_clock(const struct tegra_emc_table *next_timing,
 		emc_writel(emc_cfg_reg, EMC_CFG);
 		pre_wait = 5;		/* 5us+ for self-refresh entry/exit */
 	}
+
+	/* 2.25 update MC arbiter settings */
+	set_mc_arbiter_limits();
+
+	/* 2.5 check dq/dqs vref delay */
 	if (dqs_preset(next_timing, last_timing)) {
 		if (pre_wait < 3)
 			pre_wait = 3;	/* 3us+ for dqs vref settled */
