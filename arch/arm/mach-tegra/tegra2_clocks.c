@@ -154,6 +154,10 @@
 #define PMC_BLINK_TIMER_DATA_OFF_SHIFT	16
 #define PMC_BLINK_TIMER_DATA_OFF_MASK	0xffff
 
+#define AP25_EMC_BRIDGE_RATE		380000000
+#define AP25_EMC_INTERMEDIATE_RATE	760000000
+#define AP25_EMC_SCALING_STEP		600000000
+
 static void __iomem *reg_clk_base = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
 static void __iomem *reg_pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
 static void __iomem *misc_gp_hidrev_base = IO_ADDRESS(TEGRA_APB_MISC_BASE);
@@ -1264,14 +1268,35 @@ static long tegra2_emc_clk_round_rate(struct clk *c, unsigned long rate)
 	if (new_rate < 0)
 		return c->max_rate;
 
-	BUG_ON(new_rate != tegra2_periph_clk_round_rate(c, new_rate));
-
 	return new_rate;
 }
 
 static int tegra2_emc_clk_set_rate(struct clk *c, unsigned long rate)
 {
 	int ret;
+	int divider;
+	struct clk *p = NULL;
+	unsigned long inp_rate;
+	unsigned long new_rate;
+	const struct clk_mux_sel *sel;
+
+	for (sel = c->inputs; sel->input != NULL; sel++) {
+		inp_rate = clk_get_rate(sel->input);
+
+		divider = clk_div71_get_divider(inp_rate, rate);
+		if (divider < 0)
+			return divider;
+
+		new_rate = DIV_ROUND_UP(inp_rate * 2, divider + 2);
+		if ((abs(rate - new_rate)) < 2000) {
+			p = sel->input;
+			break;
+		}
+	}
+
+	BUG_ON(!p);
+	BUG_ON(divider & 0x1);
+
 	/*
 	 * The Tegra2 memory controller has an interlock with the clock
 	 * block that allows memory shadowed registers to be updated,
@@ -1281,6 +1306,13 @@ static int tegra2_emc_clk_set_rate(struct clk *c, unsigned long rate)
 	ret = tegra_emc_set_rate(rate);
 	if (ret < 0)
 		return ret;
+
+	if (c->parent != p) {
+		BUG_ON(divider != 0);
+		ret = clk_set_parent_locked(c, p);
+		udelay(1);
+		return ret;
+	}
 
 	ret = tegra2_periph_clk_set_rate(c, rate);
 	udelay(1);
@@ -1472,14 +1504,37 @@ static struct clk_ops tegra_cdev_clk_ops = {
 static int tegra2_clk_shared_bus_update(struct clk *bus)
 {
 	struct clk *c;
+	unsigned long old_rate;
 	unsigned long rate = bus->min_rate;
+	int sku_id = tegra_sku_id();
 
-	list_for_each_entry(c, &bus->shared_bus_list, u.shared_bus_user.node)
+	list_for_each_entry(c, &bus->shared_bus_list,
+			u.shared_bus_user.node) {
 		if (c->u.shared_bus_user.enabled)
 			rate = max(c->u.shared_bus_user.rate, rate);
+	}
 
-	if (rate == clk_get_rate_locked(bus))
+	old_rate = clk_get_rate_locked(bus);
+
+	if (rate == old_rate)
 		return 0;
+
+	/* WAR: For AP25 EMC scaling */
+	if ((sku_id == 0x17) && (bus->flags & PERIPH_EMC_ENB)) {
+		if (old_rate == AP25_EMC_SCALING_STEP &&
+			rate != AP25_EMC_INTERMEDIATE_RATE)
+			clk_set_rate_locked(bus, AP25_EMC_INTERMEDIATE_RATE);
+
+		if (((old_rate > AP25_EMC_BRIDGE_RATE) &&
+		    (rate < AP25_EMC_BRIDGE_RATE)) ||
+		    ((old_rate < AP25_EMC_BRIDGE_RATE) &&
+		    (rate > AP25_EMC_BRIDGE_RATE)))
+			clk_set_rate_locked(bus, AP25_EMC_BRIDGE_RATE);
+
+		if (rate == AP25_EMC_SCALING_STEP &&
+			old_rate != AP25_EMC_INTERMEDIATE_RATE)
+			clk_set_rate_locked(bus, AP25_EMC_INTERMEDIATE_RATE);
+	}
 
 	return clk_set_rate_locked(bus, rate);
 };

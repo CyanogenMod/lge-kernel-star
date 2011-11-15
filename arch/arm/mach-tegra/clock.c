@@ -332,15 +332,12 @@ static int clk_rate_change_notify(struct clk *c, unsigned long rate)
 	return raw_notifier_call_chain(c->rate_change_nh, rate, NULL);
 }
 
-int clk_set_parent(struct clk *c, struct clk *parent)
+int clk_set_parent_locked(struct clk *c, struct clk *parent)
 {
 	int ret = 0;
-	unsigned long flags;
 	unsigned long new_rate;
 	unsigned long old_rate;
 	bool disable = false;
-
-	clk_lock_save(c, &flags);
 
 	if (!c->ops || !c->ops->set_parent) {
 		ret = -ENOSYS;
@@ -395,7 +392,19 @@ int clk_set_parent(struct clk *c, struct clk *parent)
 out:
 	if (disable)
 		clk_disable_locked(c);
+	return ret;
+}
+
+
+int clk_set_parent(struct clk *c, struct clk *parent)
+{
+	int ret = 0;
+	unsigned long flags;
+
+	clk_lock_save(c, &flags);
+	ret = clk_set_parent_locked(c, parent);
 	clk_unlock_restore(c, &flags);
+
 	return ret;
 }
 EXPORT_SYMBOL(clk_set_parent);
