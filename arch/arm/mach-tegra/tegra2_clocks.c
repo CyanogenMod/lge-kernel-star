@@ -1503,7 +1503,6 @@ static void tegra_clk_shared_bus_init(struct clk *c)
 
 static int tegra_clk_shared_bus_set_rate(struct clk *c, unsigned long rate)
 {
-	unsigned long flags;
 	int ret;
 	long new_rate = rate;
 
@@ -1524,7 +1523,6 @@ static long tegra_clk_shared_bus_round_rate(struct clk *c, unsigned long rate)
 
 static int tegra_clk_shared_bus_enable(struct clk *c)
 {
-	unsigned long flags;
 	int ret;
 
 	c->u.shared_bus_user.enabled = true;
@@ -1537,7 +1535,6 @@ static int tegra_clk_shared_bus_enable(struct clk *c)
 
 static void tegra_clk_shared_bus_disable(struct clk *c)
 {
-	unsigned long flags;
 	int ret;
 
 	if (strcmp(c->name, "avp.sclk") == 0)
