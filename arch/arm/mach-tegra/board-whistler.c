@@ -35,8 +35,6 @@
 #include <linux/input.h>
 #include <linux/platform_data/tegra_usb.h>
 #include <linux/mfd/max8907c.h>
-#include <linux/usb/android_composite.h>
-#include <linux/usb/f_accessory.h>
 #include <linux/memblock.h>
 #include <linux/tegra_uart.h>
 
@@ -61,20 +59,6 @@
 #include "fuse.h"
 #include "pm.h"
 #include "board-whistler-baseband.h"
-
-static struct usb_mass_storage_platform_data tegra_usb_fsg_platform = {
-	.vendor = "NVIDIA",
-	.product = "Tegra 2",
-	.nluns = 1,
-};
-
-static struct platform_device tegra_usb_fsg_device = {
-	.name = "usb_mass_storage",
-	.id = -1,
-	.dev = {
-		.platform_data = &tegra_usb_fsg_platform,
-	},
-};
 
 static struct plat_serial8250_port debug_uart_platform_data[] = {
 	{
@@ -296,108 +280,6 @@ static __initdata struct tegra_clk_init_table whistler_clk_init_table[] = {
 	{ NULL,		NULL,		0,		0},
 };
 
-#define USB_MANUFACTURER_NAME		"NVIDIA"
-#define USB_PRODUCT_NAME		"Whistler"
-#define USB_PRODUCT_ID_MTP_ADB		0x7100
-#define USB_PRODUCT_ID_MTP		0x7102
-#define USB_PRODUCT_ID_RNDIS		0x7103
-#define USB_VENDOR_ID			0x0955
-
-static char *usb_functions_mtp_ums[] = { "mtp", "usb_mass_storage" };
-static char *usb_functions_mtp_adb_ums[] = { "mtp", "adb", "usb_mass_storage" };
-#ifdef CONFIG_USB_ANDROID_ACCESSORY
-static char *usb_functions_accessory[] = { "accessory" };
-static char *usb_functions_accessory_adb[] = { "accessory", "adb" };
-#endif
-#ifdef CONFIG_USB_ANDROID_RNDIS
-static char *usb_functions_rndis[] = { "rndis" };
-static char *usb_functions_rndis_adb[] = { "rndis", "adb" };
-#endif
-static char *usb_functions_all[] = {
-#ifdef CONFIG_USB_ANDROID_RNDIS
-	"rndis",
-#endif
-	"mtp",
-	"adb",
-	"usb_mass_storage"
-};
-
-static struct android_usb_product usb_products[] = {
-	{
-		.product_id     = USB_PRODUCT_ID_MTP,
-		.num_functions  = ARRAY_SIZE(usb_functions_mtp_ums),
-		.functions      = usb_functions_mtp_ums,
-	},
-	{
-		.product_id     = USB_PRODUCT_ID_MTP_ADB,
-		.num_functions  = ARRAY_SIZE(usb_functions_mtp_adb_ums),
-		.functions      = usb_functions_mtp_adb_ums,
-	},
-#ifdef CONFIG_USB_ANDROID_ACCESSORY
-	{
-		.vendor_id	= USB_ACCESSORY_VENDOR_ID,
-		.product_id	= USB_ACCESSORY_PRODUCT_ID,
-		.num_functions	= ARRAY_SIZE(usb_functions_accessory),
-		.functions	= usb_functions_accessory,
-	},
-	{
-		.vendor_id	= USB_ACCESSORY_VENDOR_ID,
-		.product_id	= USB_ACCESSORY_ADB_PRODUCT_ID,
-		.num_functions	= ARRAY_SIZE(usb_functions_accessory_adb),
-		.functions	= usb_functions_accessory_adb,
-	},
-#endif
-#ifdef CONFIG_USB_ANDROID_RNDIS
-	{
-		.product_id     = USB_PRODUCT_ID_RNDIS,
-		.num_functions  = ARRAY_SIZE(usb_functions_rndis),
-		.functions      = usb_functions_rndis,
-	},
-	{
-		.product_id     = USB_PRODUCT_ID_RNDIS,
-		.num_functions  = ARRAY_SIZE(usb_functions_rndis_adb),
-		.functions      = usb_functions_rndis_adb,
-	},
-#endif
-};
-
-/* standard android USB platform data */
-static struct android_usb_platform_data andusb_plat = {
-	.vendor_id              = USB_VENDOR_ID,
-	.product_id             = USB_PRODUCT_ID_MTP_ADB,
-	.manufacturer_name      = USB_MANUFACTURER_NAME,
-	.product_name           = USB_PRODUCT_NAME,
-	.serial_number          = NULL,
-	.num_products = ARRAY_SIZE(usb_products),
-	.products = usb_products,
-	.num_functions = ARRAY_SIZE(usb_functions_all),
-	.functions = usb_functions_all,
-};
-
-#ifdef CONFIG_USB_ANDROID_RNDIS
-static struct usb_ether_platform_data rndis_pdata = {
-	.ethaddr = {0, 0, 0, 0, 0, 0},
-	.vendorID = USB_VENDOR_ID,
-	.vendorDescr = USB_MANUFACTURER_NAME,
-};
-
-static struct platform_device rndis_device = {
-	.name   = "rndis",
-	.id     = -1,
-	.dev    = {
-		.platform_data  = &rndis_pdata,
-	},
-};
-#endif
-
-static struct platform_device androidusb_device = {
-	.name   = "android_usb",
-	.id     = -1,
-	.dev    = {
-		.platform_data  = &andusb_plat,
-	},
-};
-
 static struct tegra_i2c_platform_data whistler_i2c1_platform_data = {
 	.adapter_nr	= 0,
 	.bus_count	= 1,
@@ -507,8 +389,6 @@ static struct platform_device whistler_audio_device = {
 };
 
 static struct platform_device *whistler_devices[] __initdata = {
-	&tegra_usb_fsg_device,
-	&androidusb_device,
 	&tegra_pmu_device,
 	&tegra_udc_device,
 	&tegra_gart_device,
@@ -617,13 +497,8 @@ static void __init whistler_power_off_init(void)
 	pm_power_off = whistler_power_off;
 }
 
-#define SERIAL_NUMBER_LENGTH 20
-static char usb_serial_num[SERIAL_NUMBER_LENGTH];
 static void whistler_usb_init(void)
 {
-	char *src = NULL;
-	int i;
-
 	tegra_usb_phy_init(tegra_usb_phy_pdata, ARRAY_SIZE(tegra_usb_phy_pdata));
 
 	tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
@@ -631,20 +506,6 @@ static void whistler_usb_init(void)
 
 	tegra_ehci3_device.dev.platform_data = &tegra_ehci_pdata[2];
 	platform_device_register(&tegra_ehci3_device);
-
-#ifdef CONFIG_USB_ANDROID_RNDIS
-	src = usb_serial_num;
-
-	/* create a fake MAC address from our serial number.
-	 * first byte is 0x02 to signify locally administered.
-	 */
-	rndis_pdata.ethaddr[0] = 0x02;
-	for (i = 0; *src; i++) {
-		/* XOR the USB serial across the remaining bytes */
-		rndis_pdata.ethaddr[i % (ETH_ALEN - 1) + 1] ^= *src++;
-	}
-	platform_device_register(&rndis_device);
-#endif
 }
 
 static void __init tegra_whistler_init(void)
@@ -653,8 +514,6 @@ static void __init tegra_whistler_init(void)
 	whistler_pinmux_init();
 	whistler_i2c_init();
 	whistler_uart_init();
-	snprintf(usb_serial_num, sizeof(usb_serial_num), "%016llx", tegra_chip_uid());
-	andusb_plat.serial_number = kstrdup(usb_serial_num, GFP_KERNEL);
 	platform_add_devices(whistler_devices, ARRAY_SIZE(whistler_devices));
 
 	whistler_sdhci_init();
