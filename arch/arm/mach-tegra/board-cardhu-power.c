@@ -23,6 +23,7 @@
 #include <linux/resource.h>
 #include <linux/regulator/machine.h>
 #include <linux/mfd/tps6591x.h>
+#include <linux/mfd/max77663-core.h>
 #include <linux/gpio.h>
 #include <linux/io.h>
 #include <linux/regulator/gpio-switch-regulator.h>
@@ -384,6 +385,9 @@ int __init cardhu_regulator_init(void)
 
 	tegra_get_board_info(&board_info);
 	tegra_get_pmu_board_info(&pmu_board_info);
+
+	if (pmu_board_info.board_id == BOARD_PMU_PM298)
+		return cardhu_pm298_regulator_init();
 
 	if (pmu_board_info.board_id == BOARD_PMU_PM299)
 		return cardhu_pm299_regulator_init();
@@ -957,6 +961,9 @@ int __init cardhu_gpio_switch_regulator_init(void)
 	tegra_get_pmu_board_info(&pmu_board_info);
 	tegra_get_display_board_info(&display_board_info);
 
+	if (pmu_board_info.board_id == BOARD_PMU_PM298)
+		return cardhu_pm298_gpio_switch_regulator_init();
+
 	if (pmu_board_info.board_id == BOARD_PMU_PM299)
 		return cardhu_pm299_gpio_switch_regulator_init();
 
@@ -1103,9 +1110,28 @@ static void cardhu_power_off(void)
 	while (1);
 }
 
+static void cardhu_pm298_power_off(void)
+{
+	int ret;
+	pr_err("cardhu-pm298: Powering off the device\n");
+	ret = max77663_power_off();
+	if (ret)
+		pr_err("cardhu-pm298: failed to power off\n");
+
+	while (1);
+}
+
 int __init cardhu_power_off_init(void)
 {
-	pm_power_off = cardhu_power_off;
+	struct board_info pmu_board_info;
+
+	tegra_get_pmu_board_info(&pmu_board_info);
+
+	if (pmu_board_info.board_id == BOARD_PMU_PM298)
+		pm_power_off = cardhu_pm298_power_off;
+	else
+		pm_power_off = cardhu_power_off;
+
 	return 0;
 }
 
