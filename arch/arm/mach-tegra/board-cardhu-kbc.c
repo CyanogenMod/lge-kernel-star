@@ -222,7 +222,6 @@ static struct platform_device cardhu_keys_e1291_device = {
 	}
 static struct interrupt_keys_button cardhu_int_keys[] = {
 	[0] = INT_KEY(KEY_POWER, TPS6591X_IRQ_BASE + TPS6591X_INT_PWRON, 0, 100),
-	[1] = INT_KEY(KEY_POWER, TPS6591X_IRQ_BASE + TPS6591X_INT_PWRON_LP, 0, 8000),
 };
 
 static struct interrupt_keys_button cardhu_pm298_int_keys[] = {
