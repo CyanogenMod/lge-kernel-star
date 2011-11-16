@@ -358,6 +358,7 @@ static struct tps6236x_regulator_platform_data tps6236x_pdata = {
 		.consumer_supplies = tps6236x_dcdc_supply,		\
 		},							\
 	.internal_pd_enable = 0,					\
+	.enable_discharge = true,					\
 	.vsel = 3,							\
 	.init_uV = -1,							\
 	.init_apply = 0,						\
