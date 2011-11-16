@@ -158,8 +158,6 @@ static void __init whistler_uart_init(void)
 				ARRAY_SIZE(whistler_uart_devices));
 }
 
-#ifdef CONFIG_BCM4329_RFKILL
-
 static struct resource whistler_bcm4329_rfkill_resources[] = {
 	{
 		.name	= "bcm4329_nshutdown_gpio",
@@ -176,72 +174,41 @@ static struct platform_device whistler_bcm4329_rfkill_device = {
 	.resource	= whistler_bcm4329_rfkill_resources,
 };
 
-static noinline void __init whistler_bt_rfkill(void)
+static struct resource whistler_bluesleep_resources[] = {
+	[0] = {
+		.name = "gpio_host_wake",
+			.start  = TEGRA_GPIO_PU6,
+			.end    = TEGRA_GPIO_PU6,
+			.flags  = IORESOURCE_IO,
+	},
+	[1] = {
+		.name = "gpio_ext_wake",
+			.start  = TEGRA_GPIO_PU1,
+			.end    = TEGRA_GPIO_PU1,
+			.flags  = IORESOURCE_IO,
+	},
+	[2] = {
+		.name = "host_wake",
+			.start  = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PU6),
+			.end    = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PU6),
+			.flags  = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE,
+	},
+};
+
+static struct platform_device whistler_bluesleep_device = {
+	.name           = "bluesleep",
+	.id             = -1,
+	.num_resources  = ARRAY_SIZE(whistler_bluesleep_resources),
+	.resource       = whistler_bluesleep_resources,
+};
+
+static void __init whistler_setup_bluesleep(void)
 {
-	platform_device_register(&whistler_bcm4329_rfkill_device);
-	return;
-}
-#else
-static inline void whistler_bt_rfkill(void) { }
-#endif
-
-#ifdef CONFIG_BT_BLUESLEEP
-static noinline void __init tegra_setup_bluesleep(void)
-{
-	struct platform_device *pdev = NULL;
-	struct resource *res;
-
-	pdev = platform_device_alloc("bluesleep", 0);
-	if (!pdev) {
-		pr_err("unable to allocate platform device for bluesleep");
-		return;
-	}
-
-	res = kzalloc(sizeof(struct resource) * 3, GFP_KERNEL);
-	if (!res) {
-		pr_err("unable to allocate resource for bluesleep\n");
-		goto err_free_dev;
-	}
-
-	res[0].name   = "gpio_host_wake";
-	res[0].start  = TEGRA_GPIO_PU6;
-	res[0].end    = TEGRA_GPIO_PU6;
-	res[0].flags  = IORESOURCE_IO;
-
-	res[1].name   = "gpio_ext_wake";
-	res[1].start  = TEGRA_GPIO_PU1;
-	res[1].end    = TEGRA_GPIO_PU1;
-	res[1].flags  = IORESOURCE_IO;
-
-	res[2].name   = "host_wake";
-	res[2].start  = gpio_to_irq(TEGRA_GPIO_PU6);
-	res[2].end    = gpio_to_irq(TEGRA_GPIO_PU6);
-	res[2].flags  = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE;
-
-	if (platform_device_add_resources(pdev, res, 3)) {
-		pr_err("unable to add resources to bluesleep device\n");
-		goto err_free_res;
-	}
-
-	if (platform_device_add(pdev)) {
-		pr_err("unable to add bluesleep device\n");
-		goto err_free_res;
-	}
-
+	platform_device_register(&whistler_bluesleep_device);
 	tegra_gpio_enable(TEGRA_GPIO_PU6);
 	tegra_gpio_enable(TEGRA_GPIO_PU1);
-
-	return;
-
-err_free_res:
-	kfree(res);
-err_free_dev:
-	platform_device_put(pdev);
 	return;
 }
-#else
-static inline void tegra_setup_bluesleep(void) { }
-#endif
 
 static struct tegra_utmip_config utmi_phy_config[] = {
 	[0] = {
@@ -402,6 +369,7 @@ static struct platform_device *whistler_devices[] __initdata = {
 	&tegra_das_device,
 	&spdif_dit_device,
 	&bluetooth_dit_device,
+	&whistler_bcm4329_rfkill_device,
 	&tegra_pcm_device,
 	&whistler_audio_device,
 };
@@ -522,16 +490,13 @@ static void __init tegra_whistler_init(void)
 	whistler_sensors_init();
 	whistler_touch_init();
 	whistler_kbc_init();
-	whistler_bt_rfkill();
 	whistler_gps_init();
 	whistler_usb_init();
 	whistler_scroll_init();
 	whistler_power_off_init();
 	whistler_emc_init();
 	whistler_baseband_init();
-#ifdef CONFIG_BT_BLUESLEEP
-	tegra_setup_bluesleep();
-#endif
+	whistler_setup_bluesleep();
 	tegra_release_bootloader_fb();
 }
 
