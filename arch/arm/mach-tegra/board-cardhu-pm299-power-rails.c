@@ -247,6 +247,7 @@ static struct ricoh583_platform_data ricoh_platform = {
 	.gpio_base	= RICOH583_GPIO_BASE,
 	.gpio_init_data = ricoh_gpio_data,
 	.num_gpioinit_data = ARRAY_SIZE(ricoh_gpio_data),
+	.enable_shutdown_pin = true,
 };
 
 static struct i2c_board_info __initdata ricoh583_regulators[] = {
