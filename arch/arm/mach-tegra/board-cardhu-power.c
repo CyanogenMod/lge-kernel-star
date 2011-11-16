@@ -1022,7 +1022,7 @@ int __init cardhu_gpio_switch_regulator_init(void)
 
 	for (i = 0; i < gswitch_pdata.num_subdevs; ++i) {
 		struct gpio_switch_regulator_subdev_data *gswitch_data = gswitch_pdata.subdevs[i];
-		if (gswitch_data->gpio_nr <= TEGRA_NR_GPIOS)
+		if (gswitch_data->gpio_nr < TEGRA_NR_GPIOS)
 			tegra_gpio_enable(gswitch_data->gpio_nr);
 	}
 
