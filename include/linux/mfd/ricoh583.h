@@ -140,6 +140,7 @@ struct ricoh583_platform_data {
 
 	struct ricoh583_gpio_init_data *gpio_init_data;
 	int num_gpioinit_data;
+	bool enable_shutdown_pin;
 };
 
 extern int ricoh583_read(struct device *dev, uint8_t reg, uint8_t *val);

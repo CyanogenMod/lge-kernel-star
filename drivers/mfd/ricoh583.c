@@ -486,10 +486,15 @@ static int __devinit ricoh583_ext_power_init(struct ricoh583 *ricoh583,
 {
 	int ret;
 	int i;
+	uint8_t on_off_val = 0;
 
 	/*  Clear ONOFFSEL register */
 	mutex_lock(&ricoh583->io_lock);
-	ret = __ricoh583_write(ricoh583->client, RICOH_ONOFFSEL_REG, 0x0);
+	if (pdata->enable_shutdown_pin)
+		on_off_val |= 0x1;
+
+	ret = __ricoh583_write(ricoh583->client, RICOH_ONOFFSEL_REG,
+					on_off_val);
 	if (ret < 0)
 		dev_err(ricoh583->dev, "Error in writing reg %d error: "
 				"%d\n", RICOH_ONOFFSEL_REG, ret);
