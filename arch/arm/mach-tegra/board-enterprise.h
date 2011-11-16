@@ -36,7 +36,7 @@
 #define BOARD_FAB_A02		0x2
 
 /* vdd_cpu voltage follower */
-#define BOARD_SKU_VF_DISABLED	0x0400
+#define BOARD_SKU_VF_BIT	0x0400
 
 int enterprise_charge_init(void);
 int enterprise_sdhci_init(void);
