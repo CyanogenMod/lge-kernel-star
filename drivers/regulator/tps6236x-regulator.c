@@ -306,9 +306,27 @@ static int tps6236x_init_dcdc(struct i2c_client *client,
 	else
 		data &= ~(1 << 7);
 	st = tps6236x_reg_write(tps, REG_VSET0 + tps->vsel_id, data);
-	if (data < 0) {
+	if (st < 0) {
 		dev_err(tps->dev, "%s() fails in writing reg %d\n",
 			__func__, REG_VSET0 + tps->vsel_id);
+		return st;
+	}
+
+	/* Configure the output discharge path */
+	data = tps6236x_reg_read(tps, REG_RAMPCTRL);
+	if (data < 0) {
+		dev_err(tps->dev, "%s() fails in reading reg %d\n",
+			__func__, REG_RAMPCTRL);
+		return data;
+	}
+	if (pdata->enable_discharge)
+		data |= (1 << 2);
+	else
+		data &= ~(1 << 2);
+	st = tps6236x_write(tps, REG_RAMPCTRL, data);
+	if (st < 0) {
+		dev_err(tps->dev, "%s() fails in writing reg %d\n",
+			__func__, REG_RAMPCTRL);
 		return st;
 	}
 
