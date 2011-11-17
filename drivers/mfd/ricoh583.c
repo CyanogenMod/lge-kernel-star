@@ -669,17 +669,17 @@ static void __devinit ricoh583_gpio_init(struct ricoh583 *ricoh583,
 		dev_warn(ricoh583->dev, "GPIO registration failed: %d\n", ret);
 }
 
-static void ricoh583_irq_lock(unsigned int irq)
+static void ricoh583_irq_lock(struct irq_data *irq_data)
 {
-	struct ricoh583 *ricoh583 = get_irq_chip_data(irq);
+	struct ricoh583 *ricoh583 = irq_data_get_irq_chip_data(irq_data);
 
 	mutex_lock(&ricoh583->irq_lock);
 }
 
-static void ricoh583_irq_unmask(unsigned int irq)
+static void ricoh583_irq_unmask(struct irq_data *irq_data)
 {
-	struct ricoh583 *ricoh583 = get_irq_chip_data(irq);
-	unsigned int __irq = irq - ricoh583->irq_base;
+	struct ricoh583 *ricoh583 = irq_data_get_irq_chip_data(irq_data);
+	unsigned int __irq = irq_data->irq - ricoh583->irq_base;
 	const struct ricoh583_irq_data *data = &ricoh583_irqs[__irq];
 
 	ricoh583->group_irq_en[data->grp_index] |= (1 << data->grp_index);
@@ -689,10 +689,10 @@ static void ricoh583_irq_unmask(unsigned int irq)
 	ricoh583->irq_en_reg[data->mask_reg_index] |= 1 << data->int_en_bit;
 }
 
-static void ricoh583_irq_mask(unsigned int irq)
+static void ricoh583_irq_mask(struct irq_data *irq_data)
 {
-	struct ricoh583 *ricoh583 = get_irq_chip_data(irq);
-	unsigned int __irq = irq - ricoh583->irq_base;
+	struct ricoh583 *ricoh583 = irq_data_get_irq_chip_data(irq_data);
+	unsigned int __irq = irq_data->irq - ricoh583->irq_base;
 	const struct ricoh583_irq_data *data = &ricoh583_irqs[__irq];
 
 	ricoh583->group_irq_en[data->grp_index] &= ~(1 << data->grp_index);
@@ -702,9 +702,9 @@ static void ricoh583_irq_mask(unsigned int irq)
 	ricoh583->irq_en_reg[data->mask_reg_index] &= ~(1 << data->int_en_bit);
 }
 
-static void ricoh583_irq_sync_unlock(unsigned int irq)
+static void ricoh583_irq_sync_unlock(struct irq_data *irq_data)
 {
-	struct ricoh583 *ricoh583 = get_irq_chip_data(irq);
+	struct ricoh583 *ricoh583 = irq_data_get_irq_chip_data(irq_data);
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(ricoh583->gpedge_reg); i++) {
@@ -736,10 +736,10 @@ static void ricoh583_irq_sync_unlock(unsigned int irq)
 	mutex_unlock(&ricoh583->irq_lock);
 }
 
-static int ricoh583_irq_set_type(unsigned int irq, unsigned int type)
+static int ricoh583_irq_set_type(struct irq_data *irq_data, unsigned int type)
 {
-	struct ricoh583 *ricoh583 = get_irq_chip_data(irq);
-	unsigned int __irq = irq - ricoh583->irq_base;
+	struct ricoh583 *ricoh583 = irq_data_get_irq_chip_data(irq_data);
+	unsigned int __irq = irq_data->irq - ricoh583->irq_base;
 	const struct ricoh583_irq_data *data = &ricoh583_irqs[__irq];
 	int val = 0;
 	int gpedge_index;
@@ -757,7 +757,7 @@ static int ricoh583_irq_set_type(unsigned int irq, unsigned int type)
 
 		ricoh583->gpedge_reg[gpedge_index] &= ~(3 << gpedge_bit_pos);
 		ricoh583->gpedge_reg[gpedge_index] |= (val << gpedge_bit_pos);
-		ricoh583_irq_unmask(irq);
+		ricoh583_irq_unmask(irq_data);
 	}
 	return 0;
 }
@@ -934,18 +934,18 @@ static int __devinit ricoh583_irq_init(struct ricoh583 *ricoh583, int irq,
 
 	ricoh583->irq_base = irq_base;
 	ricoh583->irq_chip.name = "ricoh583";
-	ricoh583->irq_chip.mask = ricoh583_irq_mask;
-	ricoh583->irq_chip.unmask = ricoh583_irq_unmask;
-	ricoh583->irq_chip.bus_lock = ricoh583_irq_lock;
-	ricoh583->irq_chip.bus_sync_unlock = ricoh583_irq_sync_unlock;
-	ricoh583->irq_chip.set_type = ricoh583_irq_set_type;
+	ricoh583->irq_chip.irq_mask = ricoh583_irq_mask;
+	ricoh583->irq_chip.irq_unmask = ricoh583_irq_unmask;
+	ricoh583->irq_chip.irq_bus_lock = ricoh583_irq_lock;
+	ricoh583->irq_chip.irq_bus_sync_unlock = ricoh583_irq_sync_unlock;
+	ricoh583->irq_chip.irq_set_type = ricoh583_irq_set_type;
 
 	for (i = 0; i < RICOH583_NR_IRQS; i++) {
 		int __irq = i + ricoh583->irq_base;
-		set_irq_chip_data(__irq, ricoh583);
-		set_irq_chip_and_handler(__irq, &ricoh583->irq_chip,
+		irq_set_chip_data(__irq, ricoh583);
+		irq_set_chip_and_handler(__irq, &ricoh583->irq_chip,
 					 handle_simple_irq);
-		set_irq_nested_thread(__irq, 1);
+		irq_set_nested_thread(__irq, 1);
 #ifdef CONFIG_ARM
 		set_irq_flags(__irq, IRQF_VALID);
 #endif

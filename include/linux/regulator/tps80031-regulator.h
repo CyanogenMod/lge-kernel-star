@@ -61,11 +61,6 @@ enum {
 	VBUS_DISCHRG_EN_PDN	= 0x00000004,
 	VBUS_SW_ONLY		= 0x00000008,
 	VBUS_SW_N_ID		= 0x00000010,
-
-	/* Power requests */
-	PWR_REQ_INPUT_PREQ1	= 0x00000020,
-	PWR_REQ_INPUT_PREQ2	= 0x00000040,
-	PWR_REQ_INPUT_PREQ3	= 0x00000080,
 };
 
 /*
@@ -75,6 +70,7 @@ enum {
  * @init_uV: initial micro volts which need to be set.
  * @init_enable: Enable or do not enable the rails during initialization.
  * @init_apply: Init parameter applied or not.
+ * @ext_pwr_ctrl: External power request control.
  * @flags: Configuration flag to configure the rails. It should be ORed of
  *	 above enums.
  * @delay_us: Delay in microsecond after setting the desired voltage.
@@ -85,6 +81,7 @@ struct tps80031_regulator_platform_data {
 	int init_uV;
 	unsigned init_enable:1;
 	unsigned init_apply:1;
+	unsigned int ext_pwr_ctrl;
 	unsigned int flags;
 	int delay_us;
 };

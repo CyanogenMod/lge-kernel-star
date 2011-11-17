@@ -23,6 +23,7 @@
 #include <linux/resource.h>
 #include <linux/regulator/machine.h>
 #include <linux/mfd/tps6591x.h>
+#include <linux/mfd/max77663-core.h>
 #include <linux/gpio.h>
 #include <linux/io.h>
 #include <linux/regulator/gpio-switch-regulator.h>
@@ -204,8 +205,8 @@ TPS_PDATA_INIT(ldo5, e118x,     1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0);
 TPS_PDATA_INIT(ldo5, e1198,     1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0);
 
 TPS_PDATA_INIT(ldo6, 0,         1200, 1200, tps6591x_rails(VIO), 0, 0, 1, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldo7, 0,         1200, 1200, tps6591x_rails(VIO), 1, 1, 1, -1, 0, 0, 0, LDO_LOW_POWER_ON_SUSPEND);
-TPS_PDATA_INIT(ldo8, 0,         1000, 3300, tps6591x_rails(VIO), 1, 0, 0, -1, 0, 0, 0, LDO_LOW_POWER_ON_SUSPEND);
+TPS_PDATA_INIT(ldo7, 0,         1200, 1200, tps6591x_rails(VIO), 1, 1, 1, -1, 0, 0, EXT_CTRL_SLEEP_OFF, LDO_LOW_POWER_ON_SUSPEND);
+TPS_PDATA_INIT(ldo8, 0,         1000, 3300, tps6591x_rails(VIO), 1, 0, 0, -1, 0, 0, EXT_CTRL_SLEEP_OFF, LDO_LOW_POWER_ON_SUSPEND);
 
 #if defined(CONFIG_RTC_DRV_TPS6591x)
 static struct tps6591x_rtc_platform_data rtc_data = {
@@ -384,6 +385,9 @@ int __init cardhu_regulator_init(void)
 
 	tegra_get_board_info(&board_info);
 	tegra_get_pmu_board_info(&pmu_board_info);
+
+	if (pmu_board_info.board_id == BOARD_PMU_PM298)
+		return cardhu_pm298_regulator_init();
 
 	if (pmu_board_info.board_id == BOARD_PMU_PM299)
 		return cardhu_pm299_regulator_init();
@@ -957,6 +961,9 @@ int __init cardhu_gpio_switch_regulator_init(void)
 	tegra_get_pmu_board_info(&pmu_board_info);
 	tegra_get_display_board_info(&display_board_info);
 
+	if (pmu_board_info.board_id == BOARD_PMU_PM298)
+		return cardhu_pm298_gpio_switch_regulator_init();
+
 	if (pmu_board_info.board_id == BOARD_PMU_PM299)
 		return cardhu_pm299_gpio_switch_regulator_init();
 
@@ -1103,9 +1110,28 @@ static void cardhu_power_off(void)
 	while (1);
 }
 
+static void cardhu_pm298_power_off(void)
+{
+	int ret;
+	pr_err("cardhu-pm298: Powering off the device\n");
+	ret = max77663_power_off();
+	if (ret)
+		pr_err("cardhu-pm298: failed to power off\n");
+
+	while (1);
+}
+
 int __init cardhu_power_off_init(void)
 {
-	pm_power_off = cardhu_power_off;
+	struct board_info pmu_board_info;
+
+	tegra_get_pmu_board_info(&pmu_board_info);
+
+	if (pmu_board_info.board_id == BOARD_PMU_PM298)
+		pm_power_off = cardhu_pm298_power_off;
+	else
+		pm_power_off = cardhu_power_off;
+
 	return 0;
 }
 
@@ -1129,9 +1155,15 @@ void __init cardhu_tsensor_init(void)
 
 int __init cardhu_edp_init(void)
 {
-	/* Temporary initalization, needs to be set to the actual
-	   regulator current */
-	tegra_init_cpu_edp_limits(5000);
+	unsigned int regulator_mA;
+
+	regulator_mA = get_maximum_cpu_current_supported();
+	if (!regulator_mA) {
+		regulator_mA = 5000; /* regular T30/s */
+	}
+	pr_info("%s: CPU regulator %d mA\n", __func__, regulator_mA);
+
+	tegra_init_cpu_edp_limits(regulator_mA);
 	return 0;
 }
 #endif

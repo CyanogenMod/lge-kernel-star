@@ -113,6 +113,14 @@ enum {
 	I2C_ID3_ADDR = 0x4A,
 };
 
+/* External power requests */
+enum tps80031_ext_control {
+	PWR_REQ_INPUT_NONE	= 0x00000000,
+	PWR_REQ_INPUT_PREQ1	= 0x00000001,
+	PWR_REQ_INPUT_PREQ2	= 0x00000002,
+	PWR_REQ_INPUT_PREQ3	= 0x00000004,
+};
+
 struct tps80031_subdev_info {
 	int		id;
 	const char	*name;
@@ -130,12 +138,19 @@ struct tps80031_32kclock_plat_data {
 	unsigned en_clk32kaudio:1;
 };
 
+struct tps80031_gpio_init_data {
+	int gpio_nr;
+	enum tps80031_ext_control ext_control;
+};
+
 struct tps80031_platform_data {
 	int num_subdevs;
 	struct tps80031_subdev_info *subdevs;
 	int gpio_base;
 	int irq_base;
 	struct tps80031_32kclock_plat_data *clk32k_pdata;
+	struct tps80031_gpio_init_data *gpio_init_data;
+	int gpio_init_data_size;
 };
 
 struct tps80031_bg_platform_data {
@@ -160,6 +175,10 @@ extern int tps80031_update(struct device *dev, int sid, int reg, uint8_t val,
 			   uint8_t mask);
 extern int tps80031_force_update(struct device *dev, int sid, int reg,
 				 uint8_t val, uint8_t mask);
+extern int tps80031_ext_power_req_config(struct device *dev,
+		enum tps80031_ext_control ext_pwr_ctrl, int preq_bit,
+		int state_reg_add, int trans_reg_add);
+
 extern int tps80031_power_off(void);
 
 extern unsigned long tps80031_get_chip_info(struct device *dev);

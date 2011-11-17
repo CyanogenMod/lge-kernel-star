@@ -597,12 +597,13 @@ static int __devinit tegra_kbc_probe(struct platform_device *pdev)
 	}
 
 	kbc = kzalloc(sizeof(*kbc), GFP_KERNEL);
+	if (!kbc)
+		return -ENOMEM;
 	input_dev = input_allocate_device();
-	if (!kbc || !input_dev) {
+	if (!input_dev) {
 		err = -ENOMEM;
-		goto err_free_mem;
+		goto err_free_kbc;
 	}
-
 	kbc->pdata = pdata;
 	kbc->idev = input_dev;
 	kbc->irq = irq;
@@ -613,7 +614,7 @@ static int __devinit tegra_kbc_probe(struct platform_device *pdev)
 	if (!res) {
 		dev_err(&pdev->dev, "failed to request I/O memory\n");
 		err = -EBUSY;
-		goto err_free_mem;
+		goto err_free_input_dev;
 	}
 
 	kbc->mmio = ioremap(res->start, resource_size(res));
@@ -709,10 +710,10 @@ err_iounmap:
 	iounmap(kbc->mmio);
 err_free_mem_region:
 	release_mem_region(res->start, resource_size(res));
-err_free_mem:
+err_free_input_dev:
 	input_free_device(kbc->idev);
+err_free_kbc:
 	kfree(kbc);
-
 	return err;
 }
 
