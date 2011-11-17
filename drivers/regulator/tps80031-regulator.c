@@ -504,11 +504,12 @@ static int tps80031ldo_list_voltage(struct regulator_dev *rdev, unsigned index)
 	return (ri->min_mV + ((index - 1) * 100)) * 1000;
 }
 
-static int __tps80031_ldo2_set_voltage(struct device *parent,
+static int __tps80031_ldo2_set_voltage_track_mode(struct device *parent,
 		struct tps80031_regulator *ri, int min_uV, int max_uV)
 {
 	int vsel = 0;
 	int ret;
+	int nvsel;
 
 	if (min_uV < 600000) {
 		vsel = 0;
@@ -520,6 +521,18 @@ static int __tps80031_ldo2_set_voltage(struct device *parent,
 		vsel++;
 	} else {
 		return -EINVAL;
+	}
+
+	/* Check for valid setting for TPS80031 or TPS80032-ES1.0 */
+	if ((tps80031_get_chip_info(parent) == TPS80031) ||
+		((tps80031_get_chip_info(parent) == TPS80032) &&
+		(tps80031_get_pmu_version(parent) == 0x0))) {
+		nvsel = vsel & 0x1F;
+		if ((nvsel == 0x0) || (nvsel >= 0x19 && nvsel <= 0x1F)) {
+			dev_err(ri->dev, "Invalid value for track mode LDO2 "
+				"configuration for TPS8003x PMU\n");
+			return -EINVAL;
+		}
 	}
 
 	ret = tps80031_write(parent, ri->volt_id, ri->volt_reg, vsel);
@@ -544,7 +557,8 @@ static int __tps80031_ldo_set_voltage(struct device *parent,
 
 	if ((ri->desc.id == TPS80031_ID_LDO2) &&
 			(ri->flags &  TRACK_MODE_ENABLE))
-		return __tps80031_ldo2_set_voltage(parent, ri, min_uV, max_uV);
+		return __tps80031_ldo2_set_voltage_track_mode(parent, ri,
+				min_uV, max_uV);
 
 	/*
 	 * Use the below formula to calculate vsel

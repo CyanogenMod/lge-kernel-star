@@ -186,4 +186,6 @@ extern unsigned long tps80031_get_chip_info(struct device *dev);
 
 extern int tps80031_gpadc_conversion(int channle_no);
 
+extern int tps80031_get_pmu_version(struct device *dev);
+
 #endif /*__LINUX_MFD_TPS80031_H */

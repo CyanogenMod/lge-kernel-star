@@ -198,6 +198,7 @@ struct tps80031_client {
 struct tps80031 {
 	struct device		*dev;
 	unsigned long		chip_info;
+	int			es_version;
 
 	struct gpio_chip	gpio;
 	struct irq_chip		irq_chip;
@@ -483,6 +484,13 @@ unsigned long tps80031_get_chip_info(struct device *dev)
 	return tps80031->chip_info;
 }
 EXPORT_SYMBOL_GPL(tps80031_get_chip_info);
+
+int tps80031_get_pmu_version(struct device *dev)
+{
+	struct tps80031 *tps80031 = dev_get_drvdata(dev);
+	return tps80031->es_version;
+}
+EXPORT_SYMBOL_GPL(tps80031_get_pmu_version);
 
 static struct tps80031 *tps80031_dev;
 int tps80031_power_off(void)
@@ -1009,7 +1017,8 @@ static int dbg_tps_show(struct seq_file *s, void *unused)
 	print_regs("MASK_PH Regs",   s, SLAVE_ID1, 0x20, 0x21);
 	print_regs("PMC MISC Regs",  s, SLAVE_ID1, 0xE0, 0xEF);
 	print_regs("CONT_STATE",     s, SLAVE_ID2, 0xE0, 0xE4);
-	print_regs("VERNUM Regs",    s, SLAVE_ID1, 0x87, 0x87);
+	print_regs("VERNUM Regs",    s, SLAVE_ID3, 0x87, 0x87);
+	print_regs("EEPROM Regs",    s, SLAVE_ID3, 0xDF, 0xDF);
 	print_regs("CHARGE Regs",    s, SLAVE_ID2, 0xDA, 0xF5);
 	return 0;
 }
@@ -1099,6 +1108,7 @@ static int __devinit tps80031_i2c_probe(struct i2c_client *client,
 	if (tps80031 == NULL)
 		return -ENOMEM;
 
+	tps80031->es_version = jtag_ver;
 	tps80031->dev = &client->dev;
 	i2c_set_clientdata(client, tps80031);
 	tps80031->chip_info = id->driver_data;
