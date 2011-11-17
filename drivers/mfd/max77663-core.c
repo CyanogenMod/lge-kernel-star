@@ -1033,7 +1033,6 @@ static struct irq_chip max77663_irq_chip = {
 
 static int max77663_irq_init(struct max77663_chip *chip)
 {
-	unsigned long flags = IRQF_TRIGGER_LOW | IRQF_ONESHOT | IRQF_DISABLED;
 	u32 temp;
 	int i, ret = 0;
 
@@ -1089,7 +1088,7 @@ static int max77663_irq_init(struct max77663_chip *chip)
 	}
 
 	ret = request_threaded_irq(chip->i2c_power->irq, NULL, max77663_irq,
-				   flags, "max77663", chip);
+				   IRQF_ONESHOT, "max77663", chip);
 	if (ret) {
 		dev_err(chip->dev, "irq_init: Failed to request irq %d\n",
 			chip->i2c_power->irq);
