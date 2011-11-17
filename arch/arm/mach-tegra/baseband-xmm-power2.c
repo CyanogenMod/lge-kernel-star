@@ -230,21 +230,12 @@ static void baseband_xmm_power2_flashless_pm_ver_lt_1130_step2
 	/* wait 1 ms */
 	mdelay(1);
 
-	/* turn on usb host controller */
-	{
-		mm_segment_t oldfs;
-		struct file *filp;
-		oldfs = get_fs();
-		set_fs(KERNEL_DS);
-		filp = filp_open(TEGRA_EHCI_DEVICE, O_RDWR, 0);
-		if (IS_ERR(filp) || (filp == NULL)) {
-			pr_err("open ehci_power failed\n");
-		} else {
-			filp->f_op->write(filp, "1", 1, &filp->f_pos);
-			filp_close(filp, NULL);
-		}
-		set_fs(oldfs);
-	}
+	/* unregister usb host controller */
+	if (baseband_power2_driver_data->hsic_unregister)
+		baseband_power2_driver_data->hsic_unregister(
+			baseband_power2_driver_data->modem.xmm.hsic_device);
+	else
+		pr_err("%s: hsic_unregister is missing\n", __func__);
 
 	/* set IPC_HSIC_ACTIVE high */
 	gpio_set_value(baseband_power2_driver_data->
@@ -282,21 +273,12 @@ static void baseband_xmm_power2_flashless_pm_ver_ge_1130_step1
 	if (!baseband_power2_driver_data)
 		return;
 
-	/* turn off usb host controller */
-	{
-		mm_segment_t oldfs;
-		struct file *filp;
-		oldfs = get_fs();
-		set_fs(KERNEL_DS);
-		filp = filp_open(TEGRA_EHCI_DEVICE, O_RDWR, 0);
-		if (IS_ERR(filp) || (filp == NULL)) {
-			pr_err("open ehci_power failed\n");
-		} else {
-			filp->f_op->write(filp, "0", 1, &filp->f_pos);
-			filp_close(filp, NULL);
-		}
-		set_fs(oldfs);
-	}
+	/* unregister usb host controller */
+	if (baseband_power2_driver_data->hsic_unregister)
+		baseband_power2_driver_data->hsic_unregister(
+			baseband_power2_driver_data->modem.xmm.hsic_device);
+	else
+		pr_err("%s: hsic_unregister is missing\n", __func__);
 
 	/* wait X ms */
 	mdelay(X);
@@ -326,21 +308,12 @@ static void baseband_xmm_power2_flashless_pm_ver_ge_1130_step2
 	/* wait Y ms */
 	mdelay(Y);
 
-	/* turn on usb host controller */
-	{
-		mm_segment_t oldfs;
-		struct file *filp;
-		oldfs = get_fs();
-		set_fs(KERNEL_DS);
-		filp = filp_open(TEGRA_EHCI_DEVICE, O_RDWR, 0);
-		if (IS_ERR(filp) || (filp == NULL)) {
-			pr_err("open ehci_power failed\n");
-		} else {
-			filp->f_op->write(filp, "1", 1, &filp->f_pos);
-			filp_close(filp, NULL);
-		}
-		set_fs(oldfs);
-	}
+	/* register usb host controller */
+	if (baseband_power2_driver_data->hsic_register)
+		baseband_power2_driver_data->modem.xmm.hsic_device =
+			baseband_power2_driver_data->hsic_register();
+	else
+		pr_err("%s: hsic_register is missing\n", __func__);
 
 	/* wait Z ms */
 	mdelay(Z);

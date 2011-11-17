@@ -140,7 +140,7 @@ static int baseband_xmm_power_on(struct platform_device *device)
 
 	pr_debug("%s - %d\n", __func__, __LINE__);
 
-	/* register / turn on usb host controller */
+	/* register usb host controller */
 	if (!modem_flash) {
 		pr_debug("%s - %d\n", __func__, __LINE__);
 		/* register usb host controller only once */
@@ -148,24 +148,18 @@ static int baseband_xmm_power_on(struct platform_device *device)
 			pr_debug("%s: register usb host controller\n",
 				__func__);
 			modem_power_on = true;
-			platform_device_register(data->modem.xmm.hsic_device);
+			if (data->hsic_register)
+				data->modem.xmm.hsic_device =
+						data->hsic_register();
+			else
+				pr_err("%s: hsic_register is missing\n",
+					__func__);
 			register_hsic_device = false;
 		} else {
-			/* turn on ehci controller */
-			mm_segment_t oldfs;
-			struct file *filp;
-			pr_debug("%s: register usb host controller echo on\n",
-				__func__);
-			oldfs = get_fs();
-			set_fs(KERNEL_DS);
-			filp = filp_open(TEGRA_EHCI_DEVICE, O_RDWR, 0);
-			if (IS_ERR(filp) || (filp == NULL)) {
-				pr_err("open ehci_power failed\n");
-			} else {
-				filp->f_op->write(filp, "1", 1, &filp->f_pos);
-				filp_close(filp, NULL);
-			}
-			set_fs(oldfs);
+			/* register usb host controller */
+			if (data->hsic_register)
+				data->modem.xmm.hsic_device =
+							data->hsic_register();
 			/* turn on modem */
 			pr_debug("%s call baseband_modem_power_on\n", __func__);
 			baseband_modem_power_on(data);
@@ -195,21 +189,12 @@ static int baseband_xmm_power_off(struct platform_device *device)
 		return -EINVAL;
 	}
 
-	/* turn off usb host controller */
-	{
-		mm_segment_t oldfs;
-		struct file *filp;
-		oldfs = get_fs();
-		set_fs(KERNEL_DS);
-		filp = filp_open(TEGRA_EHCI_DEVICE, O_RDWR, 0);
-		if (IS_ERR(filp) || (filp == NULL)) {
-			pr_err("open ehci_power failed\n");
-		} else {
-			filp->f_op->write(filp, "0", 1, &filp->f_pos);
-			filp_close(filp, NULL);
-		}
-		set_fs(oldfs);
-	}
+	/* unregister usb host controller */
+	pr_info("%s: hsic device: %x\n", __func__, data->modem.xmm.hsic_device);
+	if (data->hsic_unregister)
+		data->hsic_unregister(data->modem.xmm.hsic_device);
+	else
+		pr_err("%s: hsic_unregister is missing\n", __func__);
 
 	/* set IPC_HSIC_ACTIVE low */
 	gpio_set_value(baseband_power_driver_data->
@@ -315,7 +300,6 @@ void baseband_xmm_set_power_status(unsigned int status)
 	pr_debug("BB XMM POWER STATE = %d\n", status);
 }
 EXPORT_SYMBOL_GPL(baseband_xmm_set_power_status);
-
 
 irqreturn_t baseband_xmm_power_ipc_ap_wake_irq(int irq, void *dev_id)
 {
@@ -458,7 +442,10 @@ static void baseband_xmm_power_init2_work(struct work_struct *work)
 
 	/* register usb host controller only once */
 	if (register_hsic_device) {
-		platform_device_register(data->modem.xmm.hsic_device);
+		if (data->hsic_register)
+			data->modem.xmm.hsic_device = data->hsic_register();
+		else
+			pr_err("%s: hsic_register is missing\n", __func__);
 		register_hsic_device = false;
 	}
 
@@ -555,8 +542,11 @@ static void baseband_xmm_power_work_func(struct work_struct *work)
 		pr_debug("BBXMM_WORK_INIT_FLASH_STEP1\n");
 		/* register usb host controller */
 		pr_debug("%s: register usb host controller\n", __func__);
-		platform_device_register(baseband_power_driver_data->modem
-			.xmm.hsic_device);
+		if (baseband_power_driver_data->hsic_register)
+			baseband_power_driver_data->modem.xmm.hsic_device =
+				baseband_power_driver_data->hsic_register();
+		else
+			pr_err("%s: hsic_register is missing\n", __func__);
 		break;
 	case BBXMM_WORK_INIT_FLASH_PM_STEP1:
 		pr_debug("BBXMM_WORK_INIT_FLASH_PM_STEP1\n");
@@ -583,8 +573,11 @@ static void baseband_xmm_power_work_func(struct work_struct *work)
 			mdelay(enum_delay_ms);
 		/* register usb host controller */
 		pr_debug("%s: register usb host controller\n", __func__);
-		platform_device_register(baseband_power_driver_data->modem
-			.xmm.hsic_device);
+		if (baseband_power_driver_data->hsic_register)
+			baseband_power_driver_data->modem.xmm.hsic_device =
+				baseband_power_driver_data->hsic_register();
+		else
+			pr_err("%s: hsic_register is missing\n", __func__);
 		/* go to next state */
 		bbxmm_work->state = (modem_ver < XMM_MODEM_VER_1130)
 			? BBXMM_WORK_INIT_FLASH_PM_VER_LT_1130_STEP1
@@ -810,7 +803,10 @@ static int baseband_xmm_power_driver_remove(struct platform_device *device)
 	device_remove_file(dev, &dev_attr_xmm_onoff);
 
 	/* unregister usb host controller */
-	platform_device_unregister(data->modem.xmm.hsic_device);
+	if (data->hsic_unregister)
+		data->hsic_unregister(data->modem.xmm.hsic_device);
+	else
+		pr_err("%s: hsic_unregister is missing\n", __func__);
 
 	return 0;
 }
