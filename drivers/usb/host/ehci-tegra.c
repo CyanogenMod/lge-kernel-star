@@ -803,65 +803,6 @@ static void tegra_hsic_connection_work(struct work_struct *work)
 	return;
 }
 
-#ifdef CONFIG_USB_EHCI_ONOFF_FEATURE
-/* Stored ehci handle for hsic insatnce */
-struct usb_hcd *ehci_handle;
-int ehci_tegra_irq;
-
-static ssize_t show_ehci_power(struct device *dev,
-			struct device_attribute *attr,
-			char *buf)
-{
-	return sprintf(buf, "EHCI Power %s\n", (ehci_handle) ? "on" : "off");
-}
-
-static ssize_t store_ehci_power(struct device *dev,
-		struct device_attribute *attr,
-		const char *buf, size_t count)
-{
-	int power_on;
-	int retval;
-	struct tegra_ehci_hcd *tegra = dev_get_drvdata(dev);
-	struct usb_hcd *hcd = ehci_to_hcd(tegra->ehci);
-
-	if (sscanf(buf, "%d", &power_on) != 1)
-		return -EINVAL;
-
-	if (power_on == 0 && ehci_handle != NULL) {
-		usb_remove_hcd(hcd);
-		tegra_ehci_power_down(hcd, false);
-		ehci_handle = NULL;
-	} else if (power_on == 1) {
-		if (ehci_handle)
-			usb_remove_hcd(hcd);
-		tegra_ehci_power_up(hcd, false);
-		retval = usb_add_hcd(hcd, ehci_tegra_irq,
-					IRQF_DISABLED | IRQF_SHARED);
-		if (retval < 0)
-			printk(KERN_ERR "power_on error\n");
-		ehci_handle = hcd;
-	}
-
-	return count;
-}
-
-static DEVICE_ATTR(ehci_power, S_IRUSR | S_IRGRP | S_IWUSR | S_IWGRP,
-		show_ehci_power, store_ehci_power);
-
-static inline int create_ehci_sys_file(struct ehci_hcd *ehci)
-{
-	return device_create_file(ehci_to_hcd(ehci)->self.controller,
-							&dev_attr_ehci_power);
-}
-
-static inline void remove_ehci_sys_file(struct ehci_hcd *ehci)
-{
-	device_remove_file(ehci_to_hcd(ehci)->self.controller,
-						&dev_attr_ehci_power);
-}
-
-#endif
-
 void clk_timer_callback(unsigned long data)
 {
 	struct tegra_ehci_hcd *tegra = (struct tegra_ehci_hcd*) data;
@@ -913,6 +854,83 @@ static void clk_timer_work_handler(struct work_struct* clk_timer_work) {
 		}
 	}
 }
+
+#ifdef CONFIG_USB_EHCI_ONOFF_FEATURE
+/* Stored ehci handle for hsic insatnce */
+struct usb_hcd *ehci_handle;
+int ehci_tegra_irq;
+
+static ssize_t show_ehci_power(struct device *dev,
+			struct device_attribute *attr,
+			char *buf)
+{
+	return sprintf(buf, "EHCI Power %s\n", (ehci_handle) ? "on" : "off");
+}
+
+static ssize_t store_ehci_power(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+	int power_on;
+	int retval;
+	struct tegra_ehci_hcd *tegra = dev_get_drvdata(dev);
+	struct usb_hcd *hcd = ehci_to_hcd(tegra->ehci);
+	bool clock_enabled;
+	unsigned long flags;
+
+	if (sscanf(buf, "%d", &power_on) != 1)
+		return -EINVAL;
+
+	if (power_on == 0 && ehci_handle != NULL) {
+		del_timer_sync(&tegra->clk_timer);
+		spin_lock_irqsave(&tegra->ehci->lock, flags);
+		clock_enabled = tegra->clock_enabled;
+		spin_unlock_irqrestore(&tegra->ehci->lock, flags);
+		if (clock_enabled) {
+			spin_lock_irqsave(&tegra->ehci->lock, flags);
+			tegra->clock_enabled = 0;
+			spin_unlock_irqrestore(&tegra->ehci->lock, flags);
+			clk_disable(tegra->emc_clk);
+			clk_disable(tegra->sclk_clk);
+		}
+		usb_remove_hcd(hcd);
+		tegra_ehci_power_down(hcd, false);
+		ehci_handle = NULL;
+	} else if (power_on == 1) {
+		if (ehci_handle) {
+			del_timer_sync(&tegra->clk_timer);
+			usb_remove_hcd(hcd);
+		}
+		tegra_ehci_power_up(hcd, false);
+		retval = usb_add_hcd(hcd, ehci_tegra_irq,
+					IRQF_DISABLED | IRQF_SHARED);
+		if (retval < 0)
+			printk(KERN_ERR "power_on error\n");
+		ehci_handle = hcd;
+		init_timer(&tegra->clk_timer);
+		tegra->clk_timer.function = clk_timer_callback;
+		tegra->clk_timer.data = (unsigned long) tegra;
+	}
+
+	return count;
+}
+
+static DEVICE_ATTR(ehci_power, S_IRUSR | S_IRGRP | S_IWUSR | S_IWGRP,
+		show_ehci_power, store_ehci_power);
+
+static inline int create_ehci_sys_file(struct ehci_hcd *ehci)
+{
+	return device_create_file(ehci_to_hcd(ehci)->self.controller,
+							&dev_attr_ehci_power);
+}
+
+static inline void remove_ehci_sys_file(struct ehci_hcd *ehci)
+{
+	device_remove_file(ehci_to_hcd(ehci)->self.controller,
+						&dev_attr_ehci_power);
+}
+
+#endif
 
 static int tegra_ehci_urb_enqueue (
 	struct usb_hcd	*hcd,
@@ -1238,7 +1256,7 @@ static int tegra_ehci_remove(struct platform_device *pdev)
 	clk_disable(tegra->clk);
 	clk_put(tegra->clk);
 
-	if (tegra->clock_enabled){
+	if (tegra->clock_enabled) {
 		clk_disable(tegra->sclk_clk);
 		clk_disable(tegra->emc_clk);
 	}
