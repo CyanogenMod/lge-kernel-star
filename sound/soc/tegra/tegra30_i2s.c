@@ -52,6 +52,9 @@ static struct tegra30_i2s  i2scont[TEGRA30_NR_I2S_IFC];
 
 static inline void tegra30_i2s_write(struct tegra30_i2s *i2s, u32 reg, u32 val)
 {
+#ifdef CONFIG_PM
+	i2s->reg_cache[reg >> 2] = val;
+#endif
 	__raw_writel(val, i2s->regs + reg);
 }
 
@@ -451,6 +454,29 @@ static int tegra30_i2s_probe(struct snd_soc_dai *dai)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+int tegra30_i2s_resume(struct snd_soc_dai *cpu_dai)
+{
+	struct tegra30_i2s *i2s = snd_soc_dai_get_drvdata(cpu_dai);
+	int i, ret = 0;
+
+	tegra30_i2s_enable_clocks(i2s);
+
+	/*restore the i2s regs*/
+	for (i = 0; i < ((TEGRA30_I2S_CIF_TX_CTRL>>2) + 1); i++)
+		tegra30_i2s_write(i2s, i<<2, i2s->reg_cache[i]);
+
+	tegra30_i2s_disable_clocks(i2s);
+
+	if (i2s->dam_ch_refcount)
+		ret = tegra30_dam_resume(i2s->dam_ifc);
+
+	return ret;
+}
+#else
+#define tegra30_i2s_resume NULL
+#endif
+
 static struct snd_soc_dai_ops tegra30_i2s_dai_ops = {
 	.startup	= tegra30_i2s_startup,
 	.shutdown	= tegra30_i2s_shutdown,
@@ -463,6 +489,7 @@ static struct snd_soc_dai_ops tegra30_i2s_dai_ops = {
 	{ \
 		.name = DRV_NAME "." #id, \
 		.probe = tegra30_i2s_probe, \
+		.resume = tegra30_i2s_resume, \
 		.playback = { \
 			.channels_min = 1, \
 			.channels_max = 2, \

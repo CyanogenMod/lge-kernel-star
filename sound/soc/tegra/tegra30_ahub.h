@@ -399,6 +399,14 @@
 /* This register repeats once for each entry in enum tegra30_ahub_rxcif */
 /* The fields in this register are 1 bit per entry in tegra30_ahub_txcif */
 
+/* apbif register count */
+#define TEGRA30_APBIF_CACHE_REG_COUNT_PER_CHANNEL		((TEGRA30_AHUB_CIF_RX_CTRL>>2) + 1)
+#define TEGRA30_APBIF_CACHE_REG_COUNT				((TEGRA30_APBIF_CACHE_REG_COUNT_PER_CHANNEL + 1) * TEGRA30_AHUB_CHANNEL_CTRL_COUNT)
+
+/* cache index to be skipped */
+#define TEGRA30_APBIF_CACHE_REG_INDEX_RSVD			TEGRA30_APBIF_CACHE_REG_COUNT_PER_CHANNEL
+#define TEGRA30_APBIF_CACHE_REG_INDEX_RSVD_STRIDE		(TEGRA30_APBIF_CACHE_REG_COUNT_PER_CHANNEL + 1)
+
 /*
  * Terminology:
  * AHUB: Audio Hub; a cross-bar switch between the audio devices: DMA FIFOs,
@@ -481,6 +489,10 @@ extern int tegra30_ahub_set_rx_cif_source(enum tegra30_ahub_rxcif rxcif,
 					  enum tegra30_ahub_txcif txcif);
 extern int tegra30_ahub_unset_rx_cif_source(enum tegra30_ahub_rxcif rxcif);
 
+#ifdef CONFIG_PM
+extern int tegra30_ahub_apbif_resume();
+#endif
+
 struct tegra30_ahub {
 	struct device *dev;
 	struct clk *clk_d_audio;
@@ -491,6 +503,10 @@ struct tegra30_ahub {
 	DECLARE_BITMAP(rx_usage, TEGRA30_AHUB_CHANNEL_CTRL_COUNT);
 	DECLARE_BITMAP(tx_usage, TEGRA30_AHUB_CHANNEL_CTRL_COUNT);
 	struct dentry *debug;
+#ifdef CONFIG_PM
+	u32 ahub_reg_cache[TEGRA30_AHUB_AUDIO_RX_COUNT];
+	u32 apbif_reg_cache[TEGRA30_APBIF_CACHE_REG_COUNT];
+#endif
 };
 
 #endif

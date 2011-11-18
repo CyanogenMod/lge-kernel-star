@@ -65,7 +65,9 @@ static void tegra30_dam_ch0_set_step(struct tegra30_dam_context *dam, int step);
 static inline void tegra30_dam_writel(struct tegra30_dam_context *dam,
 			u32 val, u32 reg)
 {
-	dam->ctrlreg_cache[(reg >> 2)] = val;
+#ifdef CONFIG_PM
+	dam->reg_cache[reg >> 2] = val;
+#endif
 	__raw_writel(val, dam->damregs + reg);
 }
 
@@ -77,17 +79,6 @@ static inline u32 tegra30_dam_readl(struct tegra30_dam_context *dam, u32 reg)
 }
 
 #ifdef CONFIG_PM
-int tegra30_dam_suspend(int ifc)
-{
-	int i = 0;
-	struct tegra30_dam_context *dam;
-
-	if (ifc >= TEGRA30_NR_DAM_IFC)
-		return -EINVAL;
-
-	return 0;
-}
-
 int tegra30_dam_resume(int ifc)
 {
 	int i = 0;
@@ -106,7 +97,7 @@ int tegra30_dam_resume(int ifc)
 				(i == TEGRA30_DAM_CTRL_RSVD_10))
 				continue;
 
-			tegra30_dam_writel(dam, dam->ctrlreg_cache[i],
+			tegra30_dam_writel(dam, dam->reg_cache[i],
 						(i << 2));
 		}
 

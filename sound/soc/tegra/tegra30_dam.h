@@ -129,7 +129,9 @@ struct tegra30_dam_context {
 	bool			ch_alloc[TEGRA30_DAM_NUM_INPUT_CHANNELS];
 	int			ch_enable_refcnt[TEGRA30_DAM_NUM_INPUT_CHANNELS];
 	int			ch_insamplerate[TEGRA30_DAM_NUM_INPUT_CHANNELS];
-	int			ctrlreg_cache[TEGRA30_DAM_CTRL_REGINDEX + 1];
+#ifdef CONFIG_PM
+	int			reg_cache[TEGRA30_DAM_CTRL_REGINDEX + 1];
+#endif
 	struct clk		*dam_clk;
 	bool			in_use;
 	void __iomem		*damregs;
@@ -143,7 +145,6 @@ struct tegra30_dam_src_step_table {
 };
 
 #ifdef CONFIG_PM
-int tegra30_dam_suspend(int ifc);
 int tegra30_dam_resume(int ifc);
 #endif
 void tegra30_dam_disable_clock(int ifc);

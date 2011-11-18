@@ -39,6 +39,9 @@ static struct tegra30_ahub *ahub;
 
 static inline void tegra30_apbif_write(u32 reg, u32 val)
 {
+#ifdef CONFIG_PM
+	ahub->apbif_reg_cache[reg >> 2] = val;
+#endif
 	__raw_writel(val, ahub->apbif_regs + reg);
 }
 
@@ -49,6 +52,9 @@ static inline u32 tegra30_apbif_read(u32 reg)
 
 static inline void tegra30_audio_write(u32 reg, u32 val)
 {
+#ifdef CONFIG_PM
+	ahub->ahub_reg_cache[reg >> 2] = val;
+#endif
 	__raw_writel(val, ahub->audio_regs + reg);
 }
 
@@ -56,6 +62,36 @@ static inline u32 tegra30_audio_read(u32 reg)
 {
 	return __raw_readl(ahub->audio_regs + reg);
 }
+
+#ifdef CONFIG_PM
+int tegra30_ahub_apbif_resume()
+{
+	int i = 0;
+	int cache_idx_rsvd;
+
+	tegra30_ahub_enable_clocks();
+
+	/*restore ahub regs*/
+	for (i = 0; i < TEGRA30_AHUB_AUDIO_RX_COUNT; i++)
+		tegra30_audio_write(i<<2, ahub->ahub_reg_cache[i]);
+
+	/*restore apbif regs*/
+	cache_idx_rsvd = TEGRA30_APBIF_CACHE_REG_INDEX_RSVD;
+	for (i = 0; i < TEGRA30_APBIF_CACHE_REG_COUNT; i++) {
+		if (i == cache_idx_rsvd) {
+			cache_idx_rsvd +=
+				TEGRA30_APBIF_CACHE_REG_INDEX_RSVD_STRIDE;
+			continue;
+		}
+
+		tegra30_apbif_write(i<<2, ahub->apbif_reg_cache[i]);
+	}
+
+	tegra30_ahub_disable_clocks();
+
+	return 0;
+}
+#endif
 
 /*
  * clk_apbif isn't required for a theoretical I2S<->I2S configuration where

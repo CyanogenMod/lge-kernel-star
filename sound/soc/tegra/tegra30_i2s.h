@@ -246,6 +246,9 @@ struct tegra30_i2s {
 	int dam_ch_refcount;
 	int  playback_ref_count;
 	bool is_dam_used;
+#ifdef CONFIG_PM
+	u32  reg_cache[(TEGRA30_I2S_CIF_TX_CTRL >> 2) + 1];
+#endif
 };
 
 struct codec_config {
