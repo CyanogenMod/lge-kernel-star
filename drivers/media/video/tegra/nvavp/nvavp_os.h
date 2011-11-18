@@ -26,7 +26,10 @@ struct nv_e276_control {
 	u32 put;
 	u32 reserved03[15];
 	u32 get;
-	u32 reserved04[13];
+	u32 reserved04[10];
+	u32 watchdog_timeout;
+	u32 idle_notify_enable;
+	u32 idle_notify_delay;
 	u32 idle_clk_enable;
 	u32 iram_clk_gating;
 	u32 idle;
@@ -69,7 +72,10 @@ struct nv_e276_control {
 #define NVE276_OS_INTERRUPT_SEMAPHORE_AWAKEN	(0x00000002)
 #define NVE276_OS_INTERRUPT_EXECUTE_AWAKEN	(0x00000004)
 #define NVE276_OS_INTERRUPT_DEBUG_STRING	(0x00000008)
-#define NVE276_OS_INTERRUPT_VDE_SHUTDOWN	(0x00000010)
+#define NVE276_OS_INTERRUPT_DH_KEYEXCHANGE	(0x00000010)
+#define NVE276_OS_INTERRUPT_APP_NOTIFY		(0x00000020)
+#define NVE276_OS_INTERRUPT_VIDEO_IDLE		(0x00000040)
+#define NVE276_OS_INTERRUPT_AUDIO_IDLE		(0x00000080)
 #define NVE276_OS_INTERRUPT_AVP_BREAKPOINT	(0x00800000)
 #define NVE276_OS_INTERRUPT_AVP_FATAL_ERROR	(0x01000000)
 
