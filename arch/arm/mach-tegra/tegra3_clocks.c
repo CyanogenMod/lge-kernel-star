@@ -306,6 +306,8 @@
 /* FIXME: recommended safety delay after lock is detected */
 #define PLL_POST_LOCK_DELAY		100
 
+static bool tegra3_clk_is_parent_allowed(struct clk *c, struct clk *p);
+
 static int tegra3_clk_shared_bus_update(struct clk *bus);
 
 static struct clk *emc_bridge;
@@ -2048,6 +2050,9 @@ static int tegra3_periph_clk_set_parent(struct clk *c, struct clk *p)
 	if (!(c->flags & MUX))
 		return (p == c->parent) ? 0 : (-EINVAL);
 
+	if (!tegra3_clk_is_parent_allowed(c, p))
+		return -EINVAL;
+
 	for (sel = c->inputs; sel->input != NULL; sel++) {
 		if (sel->input == p) {
 			val = clk_readl(c->reg);
@@ -2844,6 +2849,9 @@ static void tegra_clk_shared_bus_init(struct clk *c)
 			       c->u.shared_bus_user.client_id);
 			return;
 		}
+		c->u.shared_bus_user.client->flags |=
+			c->parent->flags & PERIPH_ON_CBUS;
+		c->flags |= c->parent->flags & PERIPH_ON_CBUS;
 		c->div = c->u.shared_bus_user.client_div ? : 1;
 		c->mul = 1;
 	}
@@ -3918,6 +3926,7 @@ static struct clk tegra_clk_cbus = {
 	.max_rate  = 700000000,
 	.mul	   = 1,
 	.div	   = 2,
+	.flags     = PERIPH_ON_CBUS,
 	.shared_bus_backup = {
 		.input = &tegra_pll_p,
 		.value = 2,
@@ -4208,6 +4217,12 @@ struct clk *tegra_ptr_clks[] = {
 	&tegra_clk_cbus,
 };
 
+static bool tegra3_clk_is_parent_allowed(struct clk *c, struct clk *p)
+{
+	if (c->flags & PERIPH_ON_CBUS)
+		return p != &tegra_pll_m;
+	return true;
+}
 
 static void tegra3_init_one_clock(struct clk *c)
 {
