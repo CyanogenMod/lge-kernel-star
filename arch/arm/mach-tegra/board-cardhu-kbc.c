@@ -26,6 +26,7 @@
 #include <linux/gpio.h>
 #include <linux/gpio_keys.h>
 #include <linux/mfd/tps6591x.h>
+#include <linux/mfd/max77663-core.h>
 #include <linux/interrupt_keys.h>
 #include <linux/gpio_scrollwheel.h>
 
@@ -133,8 +134,8 @@ int __init cardhu_kbc_init(void)
 		data->pin_cfg[i].pin_type = kbc_pin_row;
 	}
 	for (i = 0; i < col_count; i++) {
-		data->pin_cfg[i + row_count].num = i;
-		data->pin_cfg[i + row_count].pin_type = kbc_pin_col;
+		data->pin_cfg[i + KBC_PIN_GPIO_16].num = i;
+		data->pin_cfg[i + KBC_PIN_GPIO_16].pin_type = kbc_pin_col;
 	}
 
 	platform_device_register(&cardhu_kbc_device);
@@ -224,6 +225,11 @@ static struct interrupt_keys_button cardhu_int_keys[] = {
 	[1] = INT_KEY(KEY_POWER, TPS6591X_IRQ_BASE + TPS6591X_INT_PWRON_LP, 0, 8000),
 };
 
+static struct interrupt_keys_button cardhu_pm298_int_keys[] = {
+	[0] = INT_KEY(KEY_POWER, MAX77663_IRQ_BASE + MAX77663_IRQ_ONOFF_EN0_FALLING, 0, 100),
+	[1] = INT_KEY(KEY_POWER, MAX77663_IRQ_BASE + MAX77663_IRQ_ONOFF_EN0_1SEC, 0, 3000),
+};
+
 static struct interrupt_keys_button cardhu_pm299_int_keys[] = {
 	[0] = INT_KEY(KEY_POWER, RICOH583_IRQ_BASE + RICOH583_IRQ_ONKEY, 0, 100),
 };
@@ -274,6 +280,12 @@ int __init cardhu_keys_init(void)
 
 	/* Register on-key through pmu interrupt */
 	tegra_get_pmu_board_info(&pmu_board_info);
+
+	if (pmu_board_info.board_id == BOARD_PMU_PM298) {
+		cardhu_int_keys_pdata.int_buttons = cardhu_pm298_int_keys;
+		cardhu_int_keys_pdata.nbuttons =
+					ARRAY_SIZE(cardhu_pm298_int_keys);
+	}
 
 	if (pmu_board_info.board_id == BOARD_PMU_PM299) {
 		cardhu_int_keys_pdata.int_buttons = cardhu_pm299_int_keys;

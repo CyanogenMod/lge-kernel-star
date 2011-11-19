@@ -201,7 +201,8 @@ static int tegra_pcm_close(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct tegra_runtime_data *prtd = runtime->private_data;
 
-	tegra_dma_free_channel(prtd->dma_chan);
+	if (prtd->dma_chan)
+		tegra_dma_free_channel(prtd->dma_chan);
 
 	kfree(prtd);
 

@@ -76,7 +76,7 @@ static struct regulator_consumer_supply max77663_sd2_supply[] = {
 	REGULATOR_SUPPLY("ldo8", NULL),
 	REGULATOR_SUPPLY("vcore_audio", NULL),
 	REGULATOR_SUPPLY("avcore_audio", NULL),
-	REGULATOR_SUPPLY("vddio_sdmmc3", NULL),
+	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.2"),
 	REGULATOR_SUPPLY("pwrdet_sdmmc3", NULL),
 	REGULATOR_SUPPLY("vcore1_lpddr2", NULL),
 	REGULATOR_SUPPLY("vcom_1v8", NULL),
@@ -119,7 +119,7 @@ static struct regulator_consumer_supply max77663_ldo2_supply[] = {
 };
 
 static struct regulator_consumer_supply max77663_ldo3_supply[] = {
-	REGULATOR_SUPPLY("vddio_sdmmc4", NULL),
+	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.3"),
 	REGULATOR_SUPPLY("pwrdet_sdmmc4", NULL),
 };
 
@@ -128,7 +128,7 @@ static struct regulator_consumer_supply max77663_ldo4_supply[] = {
 };
 
 static struct regulator_consumer_supply max77663_ldo5_supply[] = {
-	REGULATOR_SUPPLY("vddio_sdmmc1", NULL),
+	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.0"),
 	REGULATOR_SUPPLY("pwrdet_sdmmc1", NULL),
 };
 
@@ -199,9 +199,7 @@ static struct max77663_regulator_fps_cfg max77663_fps_cfgs[] = {
 MAX77663_PDATA_INIT(sd0,  600000, 3387500, NULL, 1, 0, 0,
 		    0, 0, -1, FPS_SRC_NONE, -1, -1, EN2_CTRL_SD0 | SD_FSRADE_DISABLE);
 
-/* FIXME: MAX77663 Rev.3 has voltage undershooting issue when voltage scaling.
- *        To prevent system hang, SD1 min_uV was configured to 1050000. */
-MAX77663_PDATA_INIT(sd1,  1050000, 1587500, NULL, 1, 0, 0,
+MAX77663_PDATA_INIT(sd1,  800000, 1587500, NULL, 1, 0, 0,
 		    1, 1, -1, FPS_SRC_1, -1, -1, SD_FSRADE_DISABLE);
 
 MAX77663_PDATA_INIT(sd2,  600000, 3387500, NULL, 1, 0, 0,
@@ -437,6 +435,7 @@ static struct regulator_consumer_supply gpio_switch_en_3v3_sys_supply[] = {
 	REGULATOR_SUPPLY("vdd_3v3_cam", NULL),
 	REGULATOR_SUPPLY("vdd_3v3_als", NULL),
 	REGULATOR_SUPPLY("debug_cons", NULL),
+	REGULATOR_SUPPLY("vdd", "4-004c"),
 };
 static int gpio_switch_en_3v3_sys_voltages[] = { 3300};
 
@@ -512,7 +511,7 @@ static int gpio_switch_en_vdd_com_voltages[] = { 3300};
 
 /* EN_VDD_SDMMC1 from AP GPIO VI_HSYNC D07*/
 static struct regulator_consumer_supply gpio_switch_en_vdd_sdmmc1_supply[] = {
-	REGULATOR_SUPPLY("vddio_sd_slot", NULL),
+	REGULATOR_SUPPLY("vddio_sd_slot", "sdhci-tegra.0"),
 };
 static int gpio_switch_en_vdd_sdmmc1_voltages[] = { 3300};
 
@@ -633,8 +632,6 @@ GREG_INIT(6, en_vdd_pnl1_pm269,		en_vdd_pnl1,		"vdd_3v3_devices",
 	0,      0,      TEGRA_GPIO_PW1,	false,	1,	0,	0,	0);
 GREG_INIT(9, en_3v3_fuse_pm269,		en_3v3_fuse,		"vdd_3v3_devices",
 	0,      0,      TEGRA_GPIO_PC1,	false,	0,	0,	0,	0);
-GREG_INIT(11, en_vdd_sdmmc1_pm269,	en_vdd_sdmmc1,		"vdd_3v3_devices",
-	0,      0,      TEGRA_GPIO_PP1,	false,	1,	0,	0,	0);
 GREG_INIT(12, en_3v3_pex_hvdd_pm269,	en_3v3_pex_hvdd,	"hvdd_pex_pmu",
 	0,      0,      TEGRA_GPIO_PC6,	false,	0,	0,	0,	0);
 GREG_INIT(17, en_vddio_vid_oc_pm269,	en_vddio_vid_oc,	"master_5v_switch",
@@ -693,7 +690,6 @@ GREG_INIT(22, en_vbrtr,		en_vbrtr,	"vdd_3v3_devices",	0,      0,      PMU_TCA641
 	ADD_GPIO_REG(en_vdd_com),		\
 	ADD_GPIO_REG(en_3v3_fuse_pm269),	\
 	ADD_GPIO_REG(en_3v3_emmc),		\
-	ADD_GPIO_REG(en_vdd_sdmmc1_pm269),	\
 	ADD_GPIO_REG(en_3v3_pex_hvdd_pm269),	\
 	ADD_GPIO_REG(en_1v8_cam),		\
 	ADD_GPIO_REG(dis_5v_switch_e118x),	\
@@ -737,6 +733,9 @@ int __init cardhu_pm298_gpio_switch_regulator_init(void)
 
 	switch (board_info.board_id) {
 	case BOARD_PM269:
+	case BOARD_PM305:
+	case BOARD_PM311:
+	case BOARD_E1257:
 		gswitch_pdata.num_subdevs = ARRAY_SIZE(gswitch_subdevs_pm269);
 		gswitch_pdata.subdevs = gswitch_subdevs_pm269;
 		break;

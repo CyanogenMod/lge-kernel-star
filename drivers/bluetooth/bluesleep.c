@@ -372,21 +372,6 @@ static int bluesleep_start(void)
 	if (bsi->has_ext_wake == 1)
 		gpio_set_value(bsi->ext_wake, 1);
 	set_bit(BT_EXT_WAKE, &flags);
-
-	if (bsi->irq_polarity == POLARITY_LOW) {
-		retval = request_irq(bsi->host_wake_irq, bluesleep_hostwake_isr,
-				IRQF_DISABLED | IRQF_TRIGGER_FALLING,
-				"bluetooth hostwake", NULL);
-	} else 	{
-		retval = request_irq(bsi->host_wake_irq, bluesleep_hostwake_isr,
-				IRQF_DISABLED | IRQF_TRIGGER_RISING,
-				"bluetooth hostwake", NULL);
-	}
-	if (retval  < 0) {
-		BT_ERR("Couldn't acquire BT_HOST_WAKE IRQ");
-		goto fail;
-	}
-
 #if BT_ENABLE_IRQ_WAKE
 	retval = enable_irq_wake(bsi->host_wake_irq);
 	if (retval < 0) {
@@ -672,6 +657,20 @@ static int bluesleep_probe(struct platform_device *pdev)
 
 	wake_lock_init(&bsi->wake_lock, WAKE_LOCK_SUSPEND, "bluesleep");
 	clear_bit(BT_SUSPEND, &flags);
+
+	if (bsi->irq_polarity == POLARITY_LOW) {
+		ret = request_irq(bsi->host_wake_irq, bluesleep_hostwake_isr,
+				IRQF_DISABLED | IRQF_TRIGGER_FALLING,
+				"bluetooth hostwake", NULL);
+	} else {
+		ret = request_irq(bsi->host_wake_irq, bluesleep_hostwake_isr,
+				IRQF_DISABLED | IRQF_TRIGGER_RISING,
+				"bluetooth hostwake", NULL);
+	}
+	if (ret  < 0) {
+		BT_ERR("Couldn't acquire BT_HOST_WAKE IRQ");
+		goto free_bt_ext_wake;
+	}
 
 	return 0;
 
