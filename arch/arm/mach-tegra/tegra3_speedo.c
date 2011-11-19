@@ -52,8 +52,8 @@ static const u32 core_process_speedos[][CORE_PROCESS_CORNERS_NUM] = {
 	{192}, /* [9]: soc_speedo_id = 2 - T33S */
 
 /* T30 'L' family */
-	{192}, /* [10]: soc_speedo_id 2: T30L */
-	{192}, /* [11]: soc_speedo_id 2: T30SL */
+	{192}, /* [10]: soc_speedo_id 1: T30L */
+	{192}, /* [11]: soc_speedo_id 1: T30SL */
 };
 
 /* Maximum speedo levels for each CPU process corner */
@@ -170,7 +170,7 @@ static void rev_sku_to_speedo_ids(int rev, int sku)
 			switch (package_id) {
 			case 1: /* MID => T30L */
 				cpu_speedo_id = 7;
-				soc_speedo_id = 2;
+				soc_speedo_id = 1;
 				threshold_index = 10;
 				break;
 			case 2: /* DSC => T30S */
@@ -188,7 +188,7 @@ static void rev_sku_to_speedo_ids(int rev, int sku)
 
 		case 0x8F: /* T30SL */
 			cpu_speedo_id = 8;
-			soc_speedo_id = 2;
+			soc_speedo_id = 1;
 			threshold_index = 11;
 			break;
 
@@ -339,4 +339,35 @@ int tegra_soc_speedo_id(void)
 int tegra_package_id(void)
 {
 	return package_id;
+}
+
+/*
+ * CPU and core nominal voltage levels as determined by chip SKU and speedo
+ * (not final - can be lowered by dvfs tables and rail dependencies; the
+ * latter is resolved by the dvfs code)
+ */
+static const int cpu_speedo_nominal_millivolts[] =
+/* speedo_id 0,    1,    2,    3,    4,    5,    6,    7,    8 */
+	{ 1125, 1150, 1150, 1150, 1237, 1237, 1237, 1150, 1150 };
+
+int tegra_cpu_speedo_mv(void)
+{
+	BUG_ON(cpu_speedo_id >= ARRAY_SIZE(cpu_speedo_nominal_millivolts));
+	return cpu_speedo_nominal_millivolts[cpu_speedo_id];
+}
+
+int tegra_core_speedo_mv(void)
+{
+	switch (soc_speedo_id) {
+	case 0:
+		return 1200;
+	case 1:
+		if ((cpu_speedo_id != 7) && (cpu_speedo_id != 8))
+			return 1200;
+		/* fall thru for T30L or T30SL */
+	case 2:
+		return 1300;
+	default:
+		BUG();
+	}
 }

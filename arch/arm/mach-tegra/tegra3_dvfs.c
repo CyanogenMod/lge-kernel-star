@@ -37,14 +37,6 @@ static const int cpu_millivolts[MAX_DVFS_FREQS] =
 static const int core_millivolts[MAX_DVFS_FREQS] =
 	{1000, 1050, 1100, 1150, 1200, 1250, 1300};
 
-static const int core_speedo_nominal_millivolts[] =
-/* speedo_id 0,    1,    2 */
-	{ 1200, 1200, 1300 };
-
-static const int cpu_speedo_nominal_millivolts[] =
-/* speedo_id 0,    1,    2,    3,    4,    5,    6,    7,    8 */
-	{ 1125, 1150, 1150, 1150, 1237, 1237, 1237, 1150, 1150 };
-
 #define KHZ 1000
 #define MHZ 1000000
 
@@ -425,7 +417,6 @@ static int __init get_cpu_nominal_mv_index(
 	 * nominal core voltage ("solve from cpu to core at nominal"). Clip
 	 * result to the nominal cpu level for the chips with this speedo_id.
 	 */
-	BUG_ON(speedo_id >= ARRAY_SIZE(cpu_speedo_nominal_millivolts));
 	mv = tegra3_dvfs_rail_vdd_core.nominal_millivolts;
 	for (i = 0; i < MAX_DVFS_FREQS; i++) {
 		if ((cpu_millivolts[i] == 0) ||
@@ -435,7 +426,7 @@ static int __init get_cpu_nominal_mv_index(
 	BUG_ON(i == 0);
 	mv = cpu_millivolts[i - 1];
 	BUG_ON(mv < tegra3_dvfs_rail_vdd_cpu.min_millivolts);
-	mv = min(mv, cpu_speedo_nominal_millivolts[speedo_id]);
+	mv = min(mv, tegra_cpu_speedo_mv());
 
 	/*
 	 * Find matching cpu dvfs entry, and use it to determine index to the
@@ -479,7 +470,8 @@ static int __init get_cpu_nominal_mv_index(
 
 static int __init get_core_nominal_mv_index(int speedo_id)
 {
-	int i, mv;
+	int i;
+	int mv = tegra_core_speedo_mv();
 	int core_edp_limit = get_core_edp();
 
 	/*
@@ -487,9 +479,6 @@ static int __init get_core_nominal_mv_index(int speedo_id)
 	 * make sure core nominal voltage is below edp limit for the board
 	 * (if edp limit is set).
 	 */
-	BUG_ON(speedo_id >= ARRAY_SIZE(core_speedo_nominal_millivolts));
-	mv = core_speedo_nominal_millivolts[speedo_id];
-
 	if (core_edp_limit)
 		mv = min(mv, core_edp_limit);
 

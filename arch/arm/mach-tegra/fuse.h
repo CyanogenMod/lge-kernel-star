@@ -36,6 +36,8 @@ int tegra_cpu_process_id(void);
 int tegra_core_process_id(void);
 int tegra_cpu_speedo_id(void);
 int tegra_soc_speedo_id(void);
+int tegra_cpu_speedo_mv(void);
+int tegra_core_speedo_mv(void);
 void tegra_init_speedo_data(void);
 
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
@@ -50,6 +52,8 @@ static inline int tegra_cpu_process_id(void) { return 0; }
 static inline int tegra_core_process_id(void) { return 0; }
 static inline int tegra_cpu_speedo_id(void) { return 0; }
 static inline int tegra_soc_speedo_id(void) { return 0; }
+static inline int tegra_cpu_speedo_mv(void) { return 1000; }
+static inline int tegra_core_speedo_mv(void) { return 1200; }
 static inline void tegra_init_speedo_data(void) { }
 
 #endif
