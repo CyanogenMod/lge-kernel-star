@@ -92,6 +92,10 @@
 #define RICOH583_GPIO_BASE	TEGRA_NR_GPIOS
 #define RICOH583_GPIO_END	(RICOH583_GPIO_BASE + 8)
 
+/* MAX77663 GPIO */
+#define MAX77663_GPIO_BASE	TEGRA_NR_GPIOS
+#define MAX77663_GPIO_END	(MAX77663_GPIO_BASE + MAX77663_GPIO_NR)
+
 /* PMU_TCA6416 GPIOs */
 #define PMU_TCA6416_GPIO_BASE	(TPS6591X_GPIO_END)
 #define PMU_TCA6416_GPIO_PORT00	(PMU_TCA6416_GPIO_BASE + 0)
@@ -181,6 +185,10 @@
 #define RICOH583_IRQ_BASE	TEGRA_NR_IRQS
 #define RICOH583_IRQ_END	(RICOH583_IRQ_BASE + RICOH583_NR_IRQS)
 
+/* MAX77663 IRQs */
+#define MAX77663_IRQ_BASE	TEGRA_NR_IRQS
+#define MAX77663_IRQ_END	(MAX77663_IRQ_BASE + MAX77663_IRQ_NR)
+
 int cardhu_charge_init(void);
 int cardhu_regulator_init(void);
 int cardhu_suspend_init(void);
@@ -197,6 +205,8 @@ int cardhu_emc_init(void);
 int cardhu_power_off_init(void);
 int cardhu_edp_init(void);
 int cardhu_pmon_init(void);
+int cardhu_pm298_gpio_switch_regulator_init(void);
+int cardhu_pm298_regulator_init(void);
 int cardhu_pm299_gpio_switch_regulator_init(void);
 int cardhu_pm299_regulator_init(void);
 void __init cardhu_tsensor_init(void);
