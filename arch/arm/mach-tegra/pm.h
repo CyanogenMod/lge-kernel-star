@@ -194,6 +194,10 @@ extern bool tegra_all_cpus_booted __read_mostly;
 #define tegra_all_cpus_booted (true)
 #endif
 
+#ifdef CONFIG_TRUSTED_FOUNDATIONS
+void tegra_generic_smc(u32 type, u32 subtype, u32 arg);
+#endif
+
 /* The debug channel uart base physical address */
 extern unsigned long  debug_uart_port_base;
 

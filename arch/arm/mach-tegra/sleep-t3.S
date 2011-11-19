@@ -289,14 +289,15 @@ ENTRY(tegra3_lp1_reset)
 	 * IRAM when this code is executed; immediately switch to CLKM and
 	 * enable PLLP, PLLM, PLLC, PLLA and PLLX. */
 	mov32	r0, TEGRA_CLK_RESET_BASE
-
+#ifndef CONFIG_TRUSTED_FOUNDATIONS
+	/* secure code handles 32KHz to CLKM/OSC clock switch */
 	mov	r1, #(1<<28)
 	str	r1, [r0, #CLK_RESET_SCLK_BURST]
 	str	r1, [r0, #CLK_RESET_CCLK_BURST]
 	mov	r1, #0
 	str	r1, [r0, #CLK_RESET_SCLK_DIVIDER]
 	str	r1, [r0, #CLK_RESET_CCLK_DIVIDER]
-
+#endif
 	/* enable PLLM via PMC */
 	mov32	r2, TEGRA_PMC_BASE
 	ldr	r1, [r2, #PMC_PLLP_WB0_OVERRIDE]

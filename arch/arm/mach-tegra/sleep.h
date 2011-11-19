@@ -30,12 +30,13 @@
 #else
 #define USE_TEGRA_CPU_SUSPEND	0
 #endif
-
-#define TEGRA_PL310_VIRT	(TEGRA_ARM_PL310_BASE - IO_CPU_PHYS + IO_CPU_VIRT)
-
-/* FIXME: The core associated with this should be removed if our change to
+#ifndef CONFIG_TRUSTED_FOUNDATIONS
+/* FIXME: The code associated with this should be removed if our change to
    save the diagnostic regsiter in the CPU context is accepted. */
 #define USE_TEGRA_DIAG_REG_SAVE	1
+#else
+#define USE_TEGRA_DIAG_REG_SAVE	0
+#endif
 
 #define TEGRA_POWER_SDRAM_SELFREFRESH	(1 << 26) /* SDRAM is in self-refresh */
 #define TEGRA_POWER_HOTPLUG_SHUTDOWN	(1 << 27) /* Hotplug shutdown */
@@ -85,6 +86,7 @@
 #define FLOW_CTRL_CSR_WFI_BITMAP	(0xF << 8)
 #endif
 
+#define TEGRA_PL310_VIRT (TEGRA_ARM_PL310_BASE - IO_CPU_PHYS + IO_CPU_VIRT)
 #define TEGRA_FLOW_CTRL_VIRT (TEGRA_FLOW_CTRL_BASE - IO_PPSB_PHYS + IO_PPSB_VIRT)
 #define TEGRA_ARM_PERIF_VIRT (TEGRA_ARM_PERIF_BASE - IO_CPU_PHYS + IO_CPU_VIRT)
 
@@ -180,7 +182,7 @@
 	pop_stack_token \tmp1, \tmp2	@ debug stack debug token
 .endm
 
-#else
+#else	/* !defined(__ASSEMBLY__) */
 
 #define FLOW_CTRL_HALT_CPU(cpu)	(IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) +	\
 	((cpu) ? (FLOW_CTRL_HALT_CPU1_EVENTS + 8 * ((cpu) - 1)) :	\
@@ -202,6 +204,8 @@ static inline void flowctrl_writel(unsigned long val, void __iomem *addr)
 void tegra_pen_lock(void);
 void tegra_pen_unlock(void);
 void tegra_cpu_wfi(void);
+void tegra_sleep_cpu_save(unsigned long v2p);
+void tegra_resume(void);
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 extern void tegra2_iram_start;
@@ -238,19 +242,5 @@ static inline void *tegra_iram_end(void)
 	return &tegra3_iram_end;
 #endif
 }
-
-static inline void tegra_sleep_core(unsigned long v2p)
-{
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-	tegra2_sleep_core(v2p);
-#else
-	tegra3_sleep_core(v2p);
 #endif
-}
-
-void tegra_sleep_cpu(unsigned long v2p);
-void tegra_resume(void);
-
-#endif
-
 #endif

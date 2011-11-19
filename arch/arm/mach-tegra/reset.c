@@ -26,33 +26,32 @@
 
 #include "reset.h"
 #include "sleep.h"
+#include "pm.h"
 
 static bool is_enabled;
 
-void tegra_cpu_reset_handler_enable(void)
+static void tegra_cpu_reset_handler_enable(void)
 {
-	void __tegra_cpu_reset_handler(void);
-	void __tegra_cpu_reset_handler_start(void);
-	void __tegra_cpu_reset_handler_end(void);
+	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_BASE);
+#ifndef CONFIG_TRUSTED_FOUNDATIONS
 	void __iomem *evp_cpu_reset =
 		IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE + 0x100);
-	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_BASE);
 	void __iomem *sb_ctrl = IO_ADDRESS(TEGRA_SB_BASE);
-	unsigned long cpu_reset_handler_size =
-		__tegra_cpu_reset_handler_end - __tegra_cpu_reset_handler_start;
-	unsigned long cpu_reset_handler_offset =
-		__tegra_cpu_reset_handler - __tegra_cpu_reset_handler_start;
 	unsigned long reg;
-
+#endif
 	BUG_ON(is_enabled);
-	BUG_ON(cpu_reset_handler_size > TEGRA_RESET_HANDLER_SIZE);
+	BUG_ON(tegra_cpu_reset_handler_size > TEGRA_RESET_HANDLER_SIZE);
 
 	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
-	       cpu_reset_handler_size);
+		tegra_cpu_reset_handler_size);
 
+#ifdef CONFIG_TRUSTED_FOUNDATIONS
+	tegra_generic_smc(0xFFFFF200,
+		TEGRA_RESET_HANDLER_BASE + tegra_cpu_reset_handler_offset, 0);
+#else
 	/* NOTE: This must be the one and only write to the EVP CPU reset
 		 vector in the entire system. */
-	writel(TEGRA_RESET_HANDLER_BASE + cpu_reset_handler_offset,
+	writel(TEGRA_RESET_HANDLER_BASE + tegra_cpu_reset_handler_offset,
 		evp_cpu_reset);
 	wmb();
 	reg = readl(evp_cpu_reset);
@@ -62,8 +61,9 @@ void tegra_cpu_reset_handler_enable(void)
 	reg = readl(sb_ctrl);
 	reg |= 2;
 	writel(reg, sb_ctrl);
-	is_enabled = true;
 	wmb();
+#endif
+	is_enabled = true;
 }
 
 #ifdef CONFIG_PM_SLEEP

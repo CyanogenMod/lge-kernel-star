@@ -66,7 +66,6 @@
 #include "reset.h"
 #include "sleep.h"
 #include "timer.h"
-#include "reset.h"
 
 struct suspend_context {
 	/*
@@ -525,6 +524,36 @@ bool tegra_set_cpu_in_lp2(int cpu)
 	return last_cpu;
 }
 
+static void tegra_sleep_core(enum tegra_suspend_mode mode,
+			     unsigned long v2p)
+{
+#ifdef CONFIG_TRUSTED_FOUNDATIONS
+	if (mode == TEGRA_SUSPEND_LP0) {
+		tegra_generic_smc(0xFFFFFFFC, 0xFFFFFFE3,
+				  virt_to_phys(tegra_resume));
+	} else {
+		tegra_generic_smc(0xFFFFFFFC, 0xFFFFFFE6,
+				  (TEGRA_RESET_HANDLER_BASE +
+				   tegra_cpu_reset_handler_offset));
+	}
+#endif
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	tegra2_sleep_core(v2p);
+#else
+	tegra3_sleep_core(v2p);
+#endif
+}
+
+static inline void tegra_sleep_cpu(unsigned long v2p)
+{
+#ifdef CONFIG_TRUSTED_FOUNDATIONS
+	tegra_generic_smc(0xFFFFFFFC, 0xFFFFFFE4,
+			  (TEGRA_RESET_HANDLER_BASE +
+			   tegra_cpu_reset_handler_offset));
+#endif
+	tegra_sleep_cpu_save(v2p);
+}
+
 unsigned int tegra_idle_lp2_last(unsigned int sleep_time, unsigned int flags)
 {
 	u32 mode;	/* hardware + software power mode flags */
@@ -569,7 +598,6 @@ unsigned int tegra_idle_lp2_last(unsigned int sleep_time, unsigned int flags)
 
 #ifdef CONFIG_CACHE_L2X0
 	tegra_init_cache(false);
-	l2x0_enable();
 #endif
 	tegra_cluster_switch_time(flags, tegra_cluster_switch_time_id_switch);
 	restore_cpu_complex(mode);
@@ -810,7 +838,7 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode, unsigned int flags)
 	if (mode == TEGRA_SUSPEND_LP2)
 		tegra_sleep_cpu(PLAT_PHYS_OFFSET - PAGE_OFFSET);
 	else
-		tegra_sleep_core(PLAT_PHYS_OFFSET - PAGE_OFFSET);
+		tegra_sleep_core(mode, PLAT_PHYS_OFFSET - PAGE_OFFSET);
 
 	tegra_init_cache(true);
 

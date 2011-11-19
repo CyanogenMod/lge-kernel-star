@@ -27,6 +27,7 @@
 #include <linux/highmem.h>
 #include <linux/memblock.h>
 #include <linux/bitops.h>
+#include <linux/sched.h>
 
 #include <asm/hardware/cache-l2x0.h>
 #include <asm/system.h>
@@ -185,12 +186,95 @@ static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 	{ NULL,		NULL,		0,		0},
 };
 
+#if defined(CONFIG_TRUSTED_FOUNDATIONS) && defined(CONFIG_CACHE_L2X0)
+static void tegra_cache_smc(bool enable, u32 arg)
+{
+	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
+	bool need_affinity_switch;
+	bool can_switch_affinity;
+	bool l2x0_enabled;
+	cpumask_t local_cpu_mask;
+	cpumask_t saved_cpu_mask;
+	unsigned long flags;
+	long ret;
+
+	/*
+	 * ISSUE : Some registers of PL310 controler must be written
+	 *              from Secure context (and from CPU0)!
+	 *
+	 * When called form Normal we obtain an abort or do nothing.
+	 * Instructions that must be called in Secure:
+	 *      - Write to Control register (L2X0_CTRL==0x100)
+	 *      - Write in Auxiliary controler (L2X0_AUX_CTRL==0x104)
+	 *      - Invalidate all entries (L2X0_INV_WAY==0x77C),
+	 *              mandatory at boot time.
+	 *      - Tag and Data RAM Latency Control Registers
+	 *              (0x108 & 0x10C) must be written in Secure.
+	 */
+	need_affinity_switch = (smp_processor_id() != 0);
+	can_switch_affinity = !irqs_disabled();
+
+	WARN_ON(need_affinity_switch && !can_switch_affinity);
+	if (need_affinity_switch && can_switch_affinity) {
+		cpu_set(0, local_cpu_mask);
+		sched_getaffinity(0, &saved_cpu_mask);
+		ret = sched_setaffinity(0, &local_cpu_mask);
+		WARN_ON(ret != 0);
+	}
+
+	local_irq_save(flags);
+	l2x0_enabled = readl_relaxed(p + L2X0_CTRL) & 1;
+	if (enable && !l2x0_enabled)
+		tegra_generic_smc(0xFFFFF100, 0x00000001, arg);
+	else if (!enable && l2x0_enabled)
+		tegra_generic_smc(0xFFFFF100, 0x00000002, arg);
+	local_irq_restore(flags);
+
+	if (need_affinity_switch && can_switch_affinity) {
+		ret = sched_setaffinity(0, &saved_cpu_mask);
+		WARN_ON(ret != 0);
+	}
+}
+
+static void tegra_l2x0_disable(void)
+{
+	unsigned long flags;
+	static u32 l2x0_way_mask;
+
+	if (!l2x0_way_mask) {
+		void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
+		u32 aux_ctrl;
+		u32 ways;
+
+		aux_ctrl = readl_relaxed(p + L2X0_AUX_CTRL);
+		ways = (aux_ctrl & (1 << 16)) ? 16 : 8;
+		l2x0_way_mask = (1 << ways) - 1;
+	}
+
+	local_irq_save(flags);
+	tegra_cache_smc(false, l2x0_way_mask);
+	local_irq_restore(flags);
+}
+#endif	/* CONFIG_TRUSTED_FOUNDATIONS && defined(CONFIG_CACHE_L2X0) */
+
 void tegra_init_cache(bool init)
 {
 #ifdef CONFIG_CACHE_L2X0
 	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
 	u32 aux_ctrl;
 
+#ifdef CONFIG_TRUSTED_FOUNDATIONS
+	/* issue the SMC to enable the L2 */
+	aux_ctrl = readl_relaxed(p + L2X0_AUX_CTRL);
+	tegra_cache_smc(true, aux_ctrl);
+
+	/* after init, reread aux_ctrl and register handlers */
+	aux_ctrl = readl_relaxed(p + L2X0_AUX_CTRL);
+	l2x0_init(p, aux_ctrl, 0xFFFFFFFF);
+
+	/* override outer_disable() with our disable */
+	outer_cache.disable = tegra_l2x0_disable;
+#else
 #if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 	writel_relaxed(0x331, p + L2X0_TAG_LATENCY_CTRL);
 	writel_relaxed(0x441, p + L2X0_DATA_LATENCY_CTRL);
@@ -219,6 +303,8 @@ void tegra_init_cache(bool init)
 		aux_ctrl |= 0x7C000001;
 		l2x0_init(p, aux_ctrl, 0x8200c3fe);
 	}
+	l2x0_enable();
+#endif
 #endif
 }
 
