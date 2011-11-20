@@ -523,8 +523,10 @@ static char *driver_short_names[] __devinitdata = {
  * macros for easy use
  */
 #ifdef CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA
-#define SHIFT_BITS(reg)		((reg & 0x3) << 3)
-#define ADDR_ALIGN_L(base, reg)	(base + (reg & ~0x3UL))
+#define MASK_LONG_ALIGN		0x3UL
+#define SHIFT_BYTE		3
+#define SHIFT_BITS(reg)		((reg & MASK_LONG_ALIGN) << SHIFT_BYTE)
+#define ADDR_ALIGN_L(base, reg)	(base + (reg & ~MASK_LONG_ALIGN))
 #define MASK(bits)		(BIT(bits) - 1)
 #define MASK_REG(reg, bits)	(MASK(bits) << SHIFT_BITS(reg))
 
@@ -2793,7 +2795,7 @@ static int __devinit azx_create(struct snd_card *card, struct pci_dev *pci,
 			for (i = 0; i < chip->platform_clk_count; i++) {
 				tegra_clks[i] = clk_get(&pdev->dev,
 							tegra_clk_names[i]);
-				if (IS_ERR(tegra_clks[i])) {
+				if (IS_ERR_OR_NULL(tegra_clks[i])) {
 					err = PTR_ERR(tegra_clks[i]);
 					goto errout;
 				}
@@ -3210,7 +3212,7 @@ static struct platform_driver driver_platform = {
 	.resume = azx_resume_platform,
 #endif
 };
-#endif	/* CONFIG_SND_HDA_PLATFORM_DRIVER */
+#endif /* CONFIG_SND_HDA_PLATFORM_DRIVER */
 
 static int __init alsa_card_azx_init(void)
 {

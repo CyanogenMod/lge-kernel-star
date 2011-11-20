@@ -107,6 +107,7 @@ struct tegra_usb_phy {
 	int initialized;
 	bool power_on;
 	bool remote_wakeup;
+	int hotplug;
 	unsigned int xcvr_setup_value;
 };
 

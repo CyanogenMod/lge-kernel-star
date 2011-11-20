@@ -53,6 +53,8 @@ struct mxt_platform_data {
 	unsigned long irqflags;
 	u8(*read_chg) (void);
 	unsigned long config_crc;
+	unsigned int actv_cycle_time;
+	unsigned int idle_cycle_time;
 };
 
 #endif /* __LINUX_ATMEL_MXT_TS_H */

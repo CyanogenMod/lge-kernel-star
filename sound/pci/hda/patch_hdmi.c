@@ -1047,9 +1047,10 @@ static int generic_hdmi_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
 		/* Set hdmi:audio freq and source selection*/
 		err = tegra_hdmi_setup_audio_freq_source(
 					substream->runtime->rate, HDA);
-		if (err < 0) {
-			snd_printk(KERN_ERR "Can't set hdmi audio freq to %d\n",
-				   substream->runtime->rate);
+		if ( err < 0 ) {
+			snd_printk(KERN_ERR
+				"Unable to set hdmi audio freq to %d \n",
+						substream->runtime->rate);
 			return err;
 		}
 	}
@@ -1690,7 +1691,7 @@ static struct hda_codec_preset snd_hda_preset_hdmi[] = {
 { .id = 0x10de001a, .name = "GPU 1a HDMI/DP",	.patch = patch_nvhdmi_8ch_89 },
 { .id = 0x10de001b, .name = "GPU 1b HDMI/DP",	.patch = patch_nvhdmi_8ch_89 },
 { .id = 0x10de001c, .name = "GPU 1c HDMI/DP",	.patch = patch_nvhdmi_8ch_89 },
-{ .id = 0x10de0020, .name = "Tegra30 HDMI",     .patch = patch_nvhdmi_8ch_89 },
+{ .id = 0x10de0020, .name = "Tegra30 HDMI",	.patch = patch_nvhdmi_8ch_89 },
 { .id = 0x10de0040, .name = "GPU 40 HDMI/DP",	.patch = patch_nvhdmi_8ch_89 },
 { .id = 0x10de0041, .name = "GPU 41 HDMI/DP",	.patch = patch_nvhdmi_8ch_89 },
 { .id = 0x10de0042, .name = "GPU 42 HDMI/DP",	.patch = patch_nvhdmi_8ch_89 },
