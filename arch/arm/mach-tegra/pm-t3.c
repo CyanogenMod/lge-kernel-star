@@ -38,6 +38,7 @@
 #include "pm.h"
 #include "sleep.h"
 #include "tegra3_emc.h"
+#include "dvfs.h"
 
 #ifdef CONFIG_TEGRA_CLUSTER_CONTROL
 #define CAR_CCLK_BURST_POLICY \
@@ -322,26 +323,32 @@ int tegra_cluster_control(unsigned int us, unsigned int flags)
 	if (flags & TEGRA_POWER_CLUSTER_IMMEDIATE)
 		us = 0;
 
-	if (current_cluster != target_cluster && !timekeeping_suspended) {
-		if (target_cluster == TEGRA_POWER_CLUSTER_G) {
-			s64 t = ktime_to_us(ktime_sub(ktime_get(), last_g2lp));
-			s64 t_off = tegra_cpu_power_off_time();
-			if (t_off > t)
-				udelay((unsigned int)(t_off - t));
-		}
-		else
-			last_g2lp = ktime_get();
-	}
-
 	DEBUG_CLUSTER(("%s(LP%d): %s->%s %s %s %d\r\n", __func__,
 		(flags & TEGRA_POWER_SDRAM_SELFREFRESH) ? 1 : 2,
 		is_lp_cluster() ? "LP" : "G",
 		(target_cluster == TEGRA_POWER_CLUSTER_G) ? "G" : "LP",
 		(flags & TEGRA_POWER_CLUSTER_IMMEDIATE) ? "immediate" : "",
 		(flags & TEGRA_POWER_CLUSTER_FORCE) ? "force" : "",
-	        us));
+		us));
 
 	local_irq_save(irq_flags);
+
+	if (current_cluster != target_cluster && !timekeeping_suspended) {
+		ktime_t now = ktime_get();
+		if (target_cluster == TEGRA_POWER_CLUSTER_G) {
+			s64 t = ktime_to_us(ktime_sub(now, last_g2lp));
+			s64 t_off = tegra_cpu_power_off_time();
+			if (t_off > t)
+				udelay((unsigned int)(t_off - t));
+
+			tegra_dvfs_rail_on(tegra_cpu_rail, now);
+
+		} else {
+			last_g2lp = now;
+			tegra_dvfs_rail_off(tegra_cpu_rail, now);
+		}
+	}
+
 	if (flags & TEGRA_POWER_SDRAM_SELFREFRESH) {
 		if (us)
 			tegra_lp2_set_trigger(us);

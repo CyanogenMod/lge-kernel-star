@@ -233,6 +233,8 @@ static void tegra3_idle_enter_lp2_cpu_0(struct cpuidle_device *dev,
 
 		trace_power_start(POWER_CSTATE, 2, dev->cpu);
 		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
+		if (!is_lp_cluster())
+			tegra_dvfs_rail_off(tegra_cpu_rail, entry_time);
 
 		if (tegra_idle_lp2_last(sleep_time, 0) == 0)
 			sleep_completed = true;
@@ -242,7 +244,12 @@ static void tegra3_idle_enter_lp2_cpu_0(struct cpuidle_device *dev,
 		}
 
 		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
-	}
+		exit_time = ktime_get();
+		if (!is_lp_cluster())
+			tegra_dvfs_rail_on(tegra_cpu_rail, exit_time);
+	} else
+		exit_time = ktime_get();
+
 
 #ifdef CONFIG_SMP
 	if (!is_lp_cluster() && (num_online_cpus() > 1)) {
@@ -258,7 +265,6 @@ static void tegra3_idle_enter_lp2_cpu_0(struct cpuidle_device *dev,
 	}
 #endif
 
-	exit_time = ktime_get();
 	if (sleep_completed) {
 		/*
 		 * Stayed in LP2 for the full time until the next tick,
