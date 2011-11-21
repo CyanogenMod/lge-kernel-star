@@ -52,7 +52,6 @@ struct gart_device {
 	struct tegra_iovmm_device iovmm;
 	struct tegra_iovmm_domain domain;
 	bool			enable;
-	bool			needs_barrier; /* emulator WAR */
 };
 
 static int gart_map(struct tegra_iovmm_domain *, struct tegra_iovmm_area *);
