@@ -101,7 +101,7 @@
 
 .macro emc_device_mask, rd, base
 	ldr	\rd, [\base, #EMC_ADR_CFG]
-	tst	\rd, #(0x3<<24)
+	tst     \rd, #0x1
 	moveq	\rd, #(0x1<<8)		@ just 1 device
 	movne	\rd, #(0x3<<8)		@ 2 devices
 .endm
