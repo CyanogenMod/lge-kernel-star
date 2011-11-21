@@ -490,7 +490,7 @@ static struct platform_device tegra_camera = {
 };
 
 static struct tegra_wm8753_platform_data whistler_audio_pdata = {
-	.gpio_spkr_en = TEGRA_GPIO_SPKR_EN,
+	.gpio_spkr_en = -1,
 	.gpio_hp_det = TEGRA_GPIO_HP_DET,
 	.gpio_hp_mute = -1,
 	.gpio_int_mic_en = -1,

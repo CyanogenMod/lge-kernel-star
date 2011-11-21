@@ -164,7 +164,6 @@ static __initdata struct tegra_pingroup_config whistler_pinmux[] = {
 
 static struct tegra_gpio_table gpio_table[] = {
 	{ .gpio = TEGRA_GPIO_HP_DET,		.enable = true	},
-	{ .gpio = TEGRA_GPIO_SPKR_EN,		.enable = true	},
 };
 
 int __init whistler_pinmux_init(void)
