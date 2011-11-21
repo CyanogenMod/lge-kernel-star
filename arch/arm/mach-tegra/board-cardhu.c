@@ -501,6 +501,8 @@ static void __init cardhu_spi_init(void)
 	if (board_info.board_id == BOARD_E1198) {
 		tegra_spi_device2.dev.platform_data = &cardhu_spi_pdata;
 		platform_device_register(&tegra_spi_device2);
+		tegra_spi_slave_device1.dev.platform_data = &cardhu_spi_pdata;
+		platform_device_register(&tegra_spi_slave_device1);
 	}
 }
 

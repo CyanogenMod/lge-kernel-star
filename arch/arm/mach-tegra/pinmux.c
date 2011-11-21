@@ -609,6 +609,7 @@ void tegra_pinmux_config_table(const struct tegra_pingroup_config *config, int l
 	for (i = 0; i < len; i++)
 		tegra_pinmux_config_pingroup(&config[i]);
 }
+EXPORT_SYMBOL(tegra_pinmux_config_table);
 
 static const char *drive_pinmux_name(enum tegra_drive_pingroup pg)
 {
