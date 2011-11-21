@@ -96,8 +96,6 @@ static tegra_iovmm_addr_t iovmm_align_down(struct tegra_iovmm_device *dev,
 
 #define SIMALIGN(b, a)	(((b)->start % (a)) ? ((a) - ((b)->start % (a))) : 0)
 
-#define iovmprint(fmt, arg...) snprintf(page+len, count-len, fmt, ## arg)
-
 size_t tegra_iovmm_get_max_free(struct tegra_iovmm_client *client)
 {
 	struct rb_node *n;
@@ -159,20 +157,22 @@ static int tegra_iovmm_read_proc(char *page, char **start, off_t off,
 	int len = 0;
 
 	mutex_lock(&iovmm_group_list_lock);
-	len += iovmprint("\ngroups\n");
+	len += snprintf(page + len, count - len, "\ngroups\n");
 	if (list_empty(&iovmm_groups))
-		len += iovmprint("\t<empty>\n");
+		len += snprintf(page + len, count - len, "\t<empty>\n");
 	else {
 		list_for_each_entry(grp, &iovmm_groups, group_list) {
-			len += iovmprint("\t%s (device: %s)\n",
-				(grp->name) ? grp->name : "<unnamed>",
+			len += snprintf(page + len, count - len,
+				"\t%s (device: %s)\n",
+				grp->name ? grp->name : "<unnamed>",
 				grp->domain->dev->name);
 			tegra_iovmm_block_stats(grp->domain, &num,
 				&num_free, &total, &total_free, &max_free);
 			total >>= 10;
 			total_free >>= 10;
 			max_free >>= 10;
-			len += iovmprint("\t\tsize: %uKiB free: %uKiB "
+			len += snprintf(page + len, count - len,
+				"\t\tsize: %uKiB free: %uKiB "
 				"largest: %uKiB (%u free / %u total blocks)\n",
 				total, total_free, max_free, num_free, num);
 		}
