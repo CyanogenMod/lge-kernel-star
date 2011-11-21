@@ -38,25 +38,25 @@
 #include "board-cardhu.h"
 
 #include "gpio-names.h"
+#include "devices.h"
 
-#define CARDHU_ROW_COUNT	4
-#define CARDHU_COL_COUNT	2
 #define CARDHU_PM269_ROW_COUNT	2
 #define CARDHU_PM269_COL_COUNT	4
 
-#if 0
-static int plain_kbd_keycode[] = {
-	KEY_POWER,	KEY_RESERVED,
-	KEY_HOME,	KEY_BACK,
-	KEY_CAMERA,	KEY_CAMERA,
-	KEY_VOLUMEDOWN,	KEY_VOLUMEUP
-};
+static const u32 kbd_keymap[] = {
+	KEY(0, 0, KEY_POWER),
+	KEY(0, 1, KEY_RESERVED),
+	KEY(0, 2, KEY_VOLUMEUP),
+	KEY(0, 3, KEY_VOLUMEDOWN),
 
-static int plain_kbd_keycode_pm269[] = {
-	KEY_POWER,	KEY_RESERVED,
-	KEY_VOLUMEUP,	KEY_VOLUMEDOWN,
-	KEY_HOME,	KEY_MENU,
-	KEY_BACK,	KEY_SEARCH
+	KEY(1, 0, KEY_HOME),
+	KEY(1, 1, KEY_MENU),
+	KEY(1, 2, KEY_BACK),
+	KEY(1, 3, KEY_SEARCH),
+};
+static const struct matrix_keymap_data keymap_data = {
+	.keymap	 = kbd_keymap,
+	.keymap_size    = ARRAY_SIZE(kbd_keymap),
 };
 
 static struct tegra_kbc_wake_key cardhu_wake_cfg[] = {
@@ -70,35 +70,10 @@ static struct tegra_kbc_platform_data cardhu_kbc_platform_data = {
 	.debounce_cnt = 20,
 	.repeat_cnt = 1,
 	.scan_count = 30,
-	.plain_keycode = plain_kbd_keycode,
-	.fn_keycode = NULL,
-	.is_filter_keys = false,
-	.is_wake_on_any_key = false,
-	.wake_key_cnt = 1,
+	.wakeup = true,
+	.keymap_data = &keymap_data,
+	.wake_cnt = 1,
 	.wake_cfg = &cardhu_wake_cfg[0],
-};
-
-static struct resource cardhu_kbc_resources[] = {
-	[0] = {
-		.start = TEGRA_KBC_BASE,
-		.end   = TEGRA_KBC_BASE + TEGRA_KBC_SIZE - 1,
-		.flags = IORESOURCE_MEM,
-	},
-	[1] = {
-		.start = INT_KBC,
-		.end   = INT_KBC,
-		.flags = IORESOURCE_IRQ,
-	},
-};
-
-struct platform_device cardhu_kbc_device = {
-	.name = "tegra-kbc",
-	.id = -1,
-	.dev = {
-		.platform_data = &cardhu_kbc_platform_data,
-	},
-	.resource = cardhu_kbc_resources,
-	.num_resources = ARRAY_SIZE(cardhu_kbc_resources),
 };
 
 int __init cardhu_kbc_init(void)
@@ -106,48 +81,28 @@ int __init cardhu_kbc_init(void)
 	struct tegra_kbc_platform_data *data = &cardhu_kbc_platform_data;
 	int i;
 	struct board_info board_info;
-	int row_count = CARDHU_ROW_COUNT, col_count = CARDHU_COL_COUNT;
 
 	tegra_get_board_info(&board_info);
-
 	if ((board_info.board_id == BOARD_E1198) ||
 			(board_info.board_id == BOARD_E1291))
 		return 0;
 
-	if ((board_info.board_id == BOARD_PM269) ||
-		(board_info.board_id == BOARD_E1257) ||
-		(board_info.board_id == BOARD_PM305) ||
-		(board_info.board_id == BOARD_PM311)) {
-		cardhu_kbc_platform_data.plain_keycode = plain_kbd_keycode_pm269;
-		row_count = CARDHU_PM269_ROW_COUNT;
-		col_count = CARDHU_PM269_COL_COUNT;
-	}
-
 	pr_info("Registering tegra-kbc\n");
-	 /* Setup the pin configuration information. */
-	for (i = 0; i < KBC_MAX_GPIO; i++) {
-		data->pin_cfg[i].num = 0;
-		data->pin_cfg[i].pin_type = kbc_pin_unused;
-	}
-	for (i = 0; i < row_count; i++) {
+	tegra_kbc_device.dev.platform_data = &cardhu_kbc_platform_data;
+
+	for (i = 0; i < CARDHU_PM269_ROW_COUNT; i++) {
 		data->pin_cfg[i].num = i;
-		data->pin_cfg[i].pin_type = kbc_pin_row;
+		data->pin_cfg[i].is_row = true;
+		data->pin_cfg[i].en = true;
 	}
-	for (i = 0; i < col_count; i++) {
+	for (i = 0; i < CARDHU_PM269_COL_COUNT; i++) {
 		data->pin_cfg[i + KBC_PIN_GPIO_16].num = i;
-		data->pin_cfg[i + KBC_PIN_GPIO_16].pin_type = kbc_pin_col;
+		data->pin_cfg[i + KBC_PIN_GPIO_16].en = true;
 	}
 
-	platform_device_register(&cardhu_kbc_device);
-
+	platform_device_register(&tegra_kbc_device);
 	return 0;
 }
-#else
-int __init cardhu_kbc_init(void)
-{
-	return 0;
-}
-#endif
 
 int __init cardhu_scroll_init(void)
 {
