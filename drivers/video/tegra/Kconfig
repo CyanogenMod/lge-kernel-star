@@ -115,5 +115,12 @@ config NVMAP_CONVERT_CARVEOUT_TO_IOVMM
 	  Say Y here to force to convert carveout memory requests to
 	  I/O virtual memory requests.
 
+config TEGRA_NVHDCP
+	bool "Support NVHDCP content protection on HDMI"
+	default n
+	help
+	  Say Y here to support NVHDCP upstream and downstream protocols, this
+	  requires a correctly fused chip to negotiate keys.
+
 endif
 
