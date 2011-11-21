@@ -933,21 +933,8 @@ static int smmu_probe(struct platform_device *pdev)
 	struct tegra_smmu_window *window;
 	int e, asid;
 
-	if (!pdev) {
-		pr_err(DRIVER_NAME ": platform_device required\n");
-		return -ENODEV;
-	}
-
-	if (PAGE_SHIFT != SMMU_PAGE_SHIFT) {
-		pr_err(DRIVER_NAME ": SMMU and CPU page sizes must match\n");
-		return -ENXIO;
-	}
-
-	if (ARRAY_SIZE(smmu_hwc_state_init) != HWC_COUNT) {
-		pr_err(DRIVER_NAME
-			": sizeof smmu_hwc_state_init != enum smmu_hwclient\n");
-		return -ENXIO;
-	}
+	BUILD_BUG_ON(PAGE_SHIFT != SMMU_PAGE_SHIFT);
+	BUILD_BUG_ON(ARRAY_SIZE(smmu_hwc_state_init) != HWC_COUNT);
 
 	regs = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mc");
 	regs2 = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ahbarb");
@@ -957,6 +944,7 @@ static int smmu_probe(struct platform_device *pdev)
 		pr_err(DRIVER_NAME ": No SMMU resources\n");
 		return -ENODEV;
 	}
+
 	smmu = kzalloc(sizeof(*smmu), GFP_KERNEL);
 	if (!smmu) {
 		pr_err(DRIVER_NAME ": failed to allocate smmu_device\n");
