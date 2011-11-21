@@ -281,7 +281,6 @@ struct smmu_as {
 	const struct domain_hwc_map	*hwclients;
 	struct mutex	lock;	/* for pagetable */
 	struct tegra_iovmm_domain domain;
-	bool		needs_barrier;	/* emulator WAR */
 	struct page	*pdir_page;
 	unsigned long	pdir_attr;
 	unsigned long	pde_attr;
