@@ -49,6 +49,7 @@ extern struct platform_device tegra_spi_device5;
 extern struct platform_device tegra_spi_device6;
 extern struct platform_device tegra_spi_slave_device5;
 extern struct platform_device tegra_spi_slave_device6;
+extern struct platform_device tegra_dtv_device;
 #endif
 extern struct platform_device tegra_ehci1_device;
 extern struct platform_device tegra_ehci2_device;

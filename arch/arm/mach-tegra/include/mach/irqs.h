@@ -229,6 +229,7 @@
 #define INT_UARTB			(INT_SEC_BASE + 5)
 #define INT_I2C				(INT_SEC_BASE + 6)
 #define INT_SPI				(INT_SEC_BASE + 7)
+#define INT_DTV				INT_SPI
 #define INT_TWC				(INT_SEC_BASE + 8)
 #define INT_TMR3			(INT_SEC_BASE + 9)
 #define INT_TMR4			(INT_SEC_BASE + 10)
