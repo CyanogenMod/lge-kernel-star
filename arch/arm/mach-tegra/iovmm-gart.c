@@ -226,12 +226,9 @@ static int gart_probe(struct platform_device *pdev)
 		goto fail;
 	}
 
-	spin_lock(&gart->pte_lock);
-
 	do_gart_setup(gart, NULL);
 	gart->enable = 1;
 
-	spin_unlock(&gart->pte_lock);
 	return 0;
 
 fail:
