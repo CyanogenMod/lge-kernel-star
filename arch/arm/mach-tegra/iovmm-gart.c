@@ -251,7 +251,7 @@ static int __devinit gart_init(void)
 
 static void __exit gart_exit(void)
 {
-	return platform_driver_unregister(&tegra_iovmm_gart_drv);
+	platform_driver_unregister(&tegra_iovmm_gart_drv);
 }
 
 #define GART_PTE(_pfn) (0x80000000ul | ((_pfn)<<PAGE_SHIFT))
