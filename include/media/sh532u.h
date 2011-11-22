@@ -19,36 +19,38 @@
 #ifndef __SH532U_H__
 #define __SH532U_H__
 
-#include <linux/ioctl.h> /* For IOCTL macros */
+#include <media/nvc_focus.h>
 
-#define SH532U_IOCTL_GET_CONFIG		_IOR('o', 1, struct sh532u_config)
-#define SH532U_IOCTL_SET_POSITION	_IOW('o', 2, u32)
-#define SH532U_IOCTL_GET_MOVE_STATUS	_IOW('o', 3, unsigned char)
-#define SH532U_IOCTL_SET_CAMERA_MODE	_IOW('o', 4, unsigned char)
-
-enum sh532u_move_status {
-	SH532U_STATE_UNKNOWN = 1,
-	SH532U_WAIT_FOR_MOVE_END,
-	SH532U_WAIT_FOR_SETTLE,
-	SH532U_LENS_SETTLED,
-	SH532U_Forced32 = 0x7FFFFFFF
-};
-
-struct sh532u_config {
-	__u32 settle_time;
-	__u32 focal_length;
-	__u32 fnumber;
-	s16 pos_low;
-	s16 pos_high;
-	s16 limit_low;
-	s16 limit_high;
-};
 
 struct sh532u_platform_data {
-	void *context_data;
-	int (*board_init)(void *context_data);
-	int (*board_deinit)(void *context_data);
+	int cfg;
+	int num;
+	int sync;
+	const char *dev_name;
+	struct nvc_focus_nvc (*nvc);
+	struct nvc_focus_cap (*cap);
+	struct sh532u_pdata_info (*info);
+	__u8 i2c_addr_rom;
+	unsigned gpio_reset;
+/* Due to a Linux limitation, a GPIO is defined to "enable" the device.  This
+ * workaround is for when the device's power GPIO's are behind an I2C expander.
+ * The Linux limitation doesn't allow the I2C GPIO expander to be ready for
+ * use when this device is probed.
+ */
+	unsigned gpio_en;
 };
+
+struct sh532u_pdata_info {
+	__s16 pos_low;
+	__s16 pos_high;
+	__s16 limit_low;
+	__s16 limit_high;
+	int move_timeoutms;
+	__u32 focus_hyper_ratio;
+	__u32 focus_hyper_div;
+};
+
+
 /* Register Definition  : Sany Driver IC */
 /* EEPROM addresses */
 #define addrHallOffset		0x10
@@ -104,8 +106,8 @@ struct sh532u_platform_data {
 #define ADHXI_211L		0x01
 #define PIDZO_211H		0x02
 #define PIDZO_211L		0x03
-#define RZ_211H		0x04
-#define RZ_211L		0x05
+#define RZ_211H			0x04
+#define RZ_211L			0x05
 #define DZ1_211H		0x06
 #define DZ1_211L		0x07
 #define DZ2_211H		0x08
@@ -148,8 +150,8 @@ struct sh532u_platform_data {
 #define OZ4_211L		0x2D
 #define OZ5_211H		0x2E
 #define OZ5_211L		0x2F
-#define oe_211H		0x30
-#define oe_211L		0x31
+#define oe_211H			0x30
+#define oe_211L			0x31
 #define MSR1CMAX_211H		0x32
 #define MSR1CMAX_211L		0x33
 #define MSR1CMIN_211H		0x34
@@ -162,34 +164,34 @@ struct sh532u_platform_data {
 #define OFFSET_211L		0x3B
 #define ADOFFSET_211H		0x3C
 #define ADOFFSET_211L		0x3D
-#define EZ_211H		0x3E
-#define EZ_211L		0x3F
+#define EZ_211H			0x3E
+#define EZ_211L			0x3F
 
 /* Coefficient RAM 40h ~ 7Fh */
-#define ag_211H		0x40
-#define ag_211L		0x41
-#define da_211H		0x42
-#define da_211L		0x43
-#define db_211H		0x44
-#define db_211L		0x45
-#define dc_211H		0x46
-#define dc_211L		0x47
-#define dg_211H		0x48
-#define dg_211L		0x49
-#define pg_211H		0x4A
-#define pg_211L		0x4B
+#define ag_211H			0x40
+#define ag_211L			0x41
+#define da_211H			0x42
+#define da_211L			0x43
+#define db_211H			0x44
+#define db_211L			0x45
+#define dc_211H			0x46
+#define dc_211L			0x47
+#define dg_211H			0x48
+#define dg_211L			0x49
+#define pg_211H			0x4A
+#define pg_211L			0x4B
 #define gain1_211H		0x4C
 #define gain1_211L		0x4D
 #define gain2_211H		0x4E
 #define gain2_211L		0x4F
-#define ua_211H		0x50
-#define ua_211L		0x51
-#define uc_211H		0x52
-#define uc_211L		0x53
-#define ia_211H		0x54
-#define ia_211L		0x55
-#define ib_211H		0x56
-#define ib_211L		0x57
+#define ua_211H			0x50
+#define ua_211L			0x51
+#define uc_211H			0x52
+#define uc_211L			0x53
+#define ia_211H			0x54
+#define ia_211L			0x55
+#define ib_211H			0x56
+#define ib_211L			0x57
 #define i_c_211H		0x58
 #define i_c_211L		0x59
 #define ms11a_211H		0x5A
@@ -216,10 +218,10 @@ struct sh532u_platform_data {
 #define ms22e_211L		0x6F
 #define ms23p_211H		0x70
 #define ms23p_211L		0x71
-#define oa_211H		0x72
-#define oa_211L		0x73
-#define oc_211H		0x74
-#define oc_211L		0x75
+#define oa_211H			0x72
+#define oa_211L			0x73
+#define oc_211H			0x74
+#define oc_211L			0x75
 #define PX12_211H		0x76
 #define PX12_211L		0x77
 #define PX3_211H		0x78
@@ -237,7 +239,7 @@ struct sh532u_platform_data {
 #define PWMSEL_211		0x82
 #define SWTCH_211		0x83
 #define STBY_211		0x84
-#define CLR_211		0x85
+#define CLR_211			0x85
 #define DSSEL_211		0x86
 #define ENBL_211		0x87
 #define ANA1_211		0x88
@@ -296,10 +298,10 @@ P0  P1
 
 /* E2P data type define of HVCA Initial Value Section */
 #define DIRECT_MODE		0x00
-#define INDIRECT_EEPROM	0x10
+#define INDIRECT_EEPROM		0x10
 #define INDIRECT_HVCA		0x20
 #define MASK_AND		0x70
-#define MASK_OR		0x80
+#define MASK_OR			0x80
 
 #define DATA_1BYTE		0x01
 #define DATA_2BYTE		0x02
