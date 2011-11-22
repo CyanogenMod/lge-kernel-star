@@ -191,6 +191,9 @@ static struct tegra_dc_out whistler_disp1_out = {
 	.align		= TEGRA_DC_ALIGN_MSB,
 	.order		= TEGRA_DC_ORDER_RED_BLUE,
 
+	.height		= 54, /* mm */
+	.width		= 90, /* mm */
+
 	.modes	 	= whistler_panel_modes,
 	.n_modes 	= ARRAY_SIZE(whistler_panel_modes),
 
