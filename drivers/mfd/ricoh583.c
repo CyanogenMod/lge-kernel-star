@@ -35,7 +35,8 @@
 #include <linux/mfd/core.h>
 #include <linux/mfd/ricoh583.h>
 
-#define RICOH_ONOFFSEL_REG      0x10
+#define RICOH_ONOFFSEL_REG	0x10
+#define RICOH_SWCTL_REG		0x5E
 
 /* Interrupt enable register */
 #define RICOH583_INT_EN_SYS1	0x19
@@ -436,9 +437,18 @@ static int __ricoh583_set_ext_pwrreq1_control(struct device *dev,
 	}
 
 	ret = ricoh583_write(dev, deepsleep_data[id].reg_add, sleepseq_val);
-	if (ret < 0)
+	if (ret < 0) {
 		dev_err(dev, "Error in writing reg 0x%x\n",
 				deepsleep_data[id].reg_add);
+		return ret;
+	}
+
+	if (id == RICOH583_DS_LDO4) {
+		ret = ricoh583_write(dev, RICOH_SWCTL_REG, 0x1);
+		if (ret < 0)
+			dev_err(dev, "Error in writing reg 0x%x\n",
+				RICOH_SWCTL_REG);
+	}
 	return ret;
 }
 
@@ -498,6 +508,11 @@ static int __devinit ricoh583_ext_power_init(struct ricoh583 *ricoh583,
 	if (ret < 0)
 		dev_err(ricoh583->dev, "Error in writing reg %d error: "
 				"%d\n", RICOH_ONOFFSEL_REG, ret);
+
+	ret = __ricoh583_write(ricoh583->client, RICOH_SWCTL_REG, 0x0);
+	if (ret < 0)
+		dev_err(ricoh583->dev, "Error in writing reg %d error: "
+				"%d\n", RICOH_SWCTL_REG, ret);
 
 	/* Clear sleepseq register */
 	for (i = 0x21; i < 0x2B; ++i) {
