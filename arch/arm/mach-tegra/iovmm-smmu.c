@@ -1061,7 +1061,7 @@ static int __devinit smmu_init(void)
 
 static void __exit smmu_exit(void)
 {
-	return platform_driver_unregister(&tegra_iovmm_smmu_drv);
+	platform_driver_unregister(&tegra_iovmm_smmu_drv);
 }
 
 subsys_initcall(smmu_init);
