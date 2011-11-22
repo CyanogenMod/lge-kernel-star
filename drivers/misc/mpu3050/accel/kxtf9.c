@@ -263,9 +263,6 @@ static int kxtf9_set_odr(void *mlsl_handle,
 		bits = 0;
 	}
 
-	if (odr != 0)
-		config->ctrl_reg1 |= 0x80;
-
 	config->reg_odr = bits;
 	kxtf9_set_dur(mlsl_handle, pdata,
 		config, apply, config->dur);
@@ -498,6 +495,8 @@ static int kxtf9_config(void *mlsl_handle,
 			struct ext_slave_platform_data *pdata,
 			struct ext_slave_config *data)
 {
+	int retval;
+	long odr;
 	struct kxtf9_private_data *private_data = pdata->private_data;
 	if (!data->data)
 		return ML_ERROR_INVALID_PARAMETER;
@@ -509,10 +508,15 @@ static int kxtf9_config(void *mlsl_handle,
 					data->apply,
 					*((long *)data->data));
 	case MPU_SLAVE_CONFIG_ODR_RESUME:
-		return kxtf9_set_odr(mlsl_handle, pdata,
-					&private_data->resume,
-					data->apply,
-					*((long *)data->data));
+		odr = *((long *)data->data);
+		if (odr != 0)
+			private_data->resume.ctrl_reg1 |= 0x80;
+
+		retval = kxtf9_set_odr(mlsl_handle, pdata,
+				&private_data->resume,
+				data->apply,
+				odr);
+		return retval;
 	case MPU_SLAVE_CONFIG_FSR_SUSPEND:
 		return kxtf9_set_fsr(mlsl_handle, pdata,
 					&private_data->suspend,
