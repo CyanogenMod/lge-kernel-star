@@ -57,15 +57,12 @@
 #define CAMERA_POWER_GPIO	TEGRA_GPIO_PV4
 #define CAMERA_CSI_MUX_SEL_GPIO	TEGRA_GPIO_PBB4
 #define CAMERA_FLASH_ACT_GPIO	TEGRA_GPIO_PD2
-#define CAMERA_FLASH_STRB_GPIO	TEGRA_GPIO_PA0
 #define NCT1008_THERM2_GPIO	TEGRA_GPIO_PN6
-#define CAMERA_FLASH_OP_MODE		0 /*0=I2C mode, 1=GPIO mode*/
-#define CAMERA_FLASH_MAX_LED_AMP	7
-#define CAMERA_FLASH_MAX_TORCH_AMP	11
-#define CAMERA_FLASH_MAX_FLASH_AMP	31
 
 static int ventana_camera_init(void)
 {
+	int err;
+
 	tegra_gpio_enable(CAMERA_POWER_GPIO);
 	gpio_request(CAMERA_POWER_GPIO, "camera_power_en");
 	gpio_direction_output(CAMERA_POWER_GPIO, 1);
@@ -76,6 +73,15 @@ static int ventana_camera_init(void)
 	gpio_direction_output(CAMERA_CSI_MUX_SEL_GPIO, 0);
 	gpio_export(CAMERA_CSI_MUX_SEL_GPIO, false);
 
+	err = gpio_request(CAMERA_FLASH_ACT_GPIO, "torch_gpio_act");
+	if (err < 0) {
+		pr_err("gpio_request failed for gpio %d\n",
+					CAMERA_FLASH_ACT_GPIO);
+	} else {
+		tegra_gpio_enable(CAMERA_FLASH_ACT_GPIO);
+		gpio_direction_output(CAMERA_FLASH_ACT_GPIO, 0);
+		gpio_export(CAMERA_FLASH_ACT_GPIO, false);
+	}
 	return 0;
 }
 
@@ -168,56 +174,18 @@ struct ov2710_platform_data ventana_ov2710_data = {
 	.power_off = ventana_ov2710_power_off,
 };
 
-static int ventana_ssl3250a_init(void)
-{
-	gpio_request(CAMERA_FLASH_ACT_GPIO, "torch_gpio_act");
-	gpio_direction_output(CAMERA_FLASH_ACT_GPIO, 0);
-	tegra_gpio_enable(CAMERA_FLASH_ACT_GPIO);
-	gpio_request(CAMERA_FLASH_STRB_GPIO, "torch_gpio_strb");
-	gpio_direction_output(CAMERA_FLASH_STRB_GPIO, 0);
-	tegra_gpio_enable(CAMERA_FLASH_STRB_GPIO);
-	gpio_export(CAMERA_FLASH_STRB_GPIO, false);
-	return 0;
-}
 
-static void ventana_ssl3250a_exit(void)
-{
-	gpio_set_value(CAMERA_FLASH_STRB_GPIO, 0);
-	gpio_free(CAMERA_FLASH_STRB_GPIO);
-	tegra_gpio_disable(CAMERA_FLASH_STRB_GPIO);
-	gpio_set_value(CAMERA_FLASH_ACT_GPIO, 0);
-	gpio_free(CAMERA_FLASH_ACT_GPIO);
-	tegra_gpio_disable(CAMERA_FLASH_ACT_GPIO);
-}
-
-static int ventana_ssl3250a_gpio_strb(int val)
-{
-	int prev_val;
-	prev_val = gpio_get_value(CAMERA_FLASH_STRB_GPIO);
-	gpio_set_value(CAMERA_FLASH_STRB_GPIO, val);
-	return prev_val;
+static struct nvc_torch_pin_state ventana_ssl3250a_pinstate = {
+	.mask		= 0x0040, /* VGP6 */
+	.values		= 0x0040,
 };
 
-static int ventana_ssl3250a_gpio_act(int val)
-{
-	int prev_val;
-	prev_val = gpio_get_value(CAMERA_FLASH_ACT_GPIO);
-	gpio_set_value(CAMERA_FLASH_ACT_GPIO, val);
-	return prev_val;
+static struct ssl3250a_platform_data ventana_ssl3250a_pdata = {
+	.dev_name	= "torch",
+	.pinstate	= &ventana_ssl3250a_pinstate,
+	.gpio_act	= CAMERA_FLASH_ACT_GPIO,
 };
 
-static struct ssl3250a_platform_data ventana_ssl3250a_data = {
-	.config		= CAMERA_FLASH_OP_MODE,
-	.max_amp_indic	= CAMERA_FLASH_MAX_LED_AMP,
-	.max_amp_torch	= CAMERA_FLASH_MAX_TORCH_AMP,
-	.max_amp_flash	= CAMERA_FLASH_MAX_FLASH_AMP,
-	.init		= ventana_ssl3250a_init,
-	.exit		= ventana_ssl3250a_exit,
-	.gpio_act	= ventana_ssl3250a_gpio_act,
-	.gpio_en1	= NULL,
-	.gpio_en2	= NULL,
-	.gpio_strb	= ventana_ssl3250a_gpio_strb,
-};
 
 static void ventana_isl29018_init(void)
 {
@@ -299,7 +267,7 @@ static const struct i2c_board_info ventana_i2c3_board_info_pca9546[] = {
 static const struct i2c_board_info ventana_i2c3_board_info_ssl3250a[] = {
 	{
 		I2C_BOARD_INFO("ssl3250a", 0x30),
-		.platform_data = &ventana_ssl3250a_data,
+		.platform_data = &ventana_ssl3250a_pdata,
 	},
 };
 
