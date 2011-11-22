@@ -25,7 +25,7 @@
 
 static const struct tegra_emc_table enterprise_emc_tables_h5tc2g[] = {
 	{
-		0x31,       /* Rev 3.1 */
+		0x32,       /* Rev 3.2 */
 		25500,      /* SDRAM frequency */
 		{
 			0x00000001, /* EMC_RC */
@@ -68,7 +68,7 @@ static const struct tegra_emc_table enterprise_emc_tables_h5tc2g[] = {
 			0x00000000, /* EMC_ODT_WRITE */
 			0x00000000, /* EMC_ODT_READ */
 			0x00004282, /* EMC_FBIO_CFG5 */
-			0x00780084, /* EMC_CFG_DIG_DLL */
+			0x007800a4, /* EMC_CFG_DIG_DLL */
 			0x00008000, /* EMC_CFG_DIG_DLL_PERIOD */
 			0x00090000, /* EMC_DLL_XFORM_DQS0 */
 			0x00090000, /* EMC_DLL_XFORM_DQS1 */
@@ -116,7 +116,7 @@ static const struct tegra_emc_table enterprise_emc_tables_h5tc2g[] = {
 			0x00000000, /* EMC_CTT_DURATION */
 			0x800001c2, /* EMC_DYN_SELF_REF_CONTROL */
 			0x00020001, /* MC_EMEM_ARB_CFG */
-			0x80000008, /* MC_EMEM_ARB_OUTSTANDING_REQ */
+			0xc0000008, /* MC_EMEM_ARB_OUTSTANDING_REQ */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RCD */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RP */
 			0x00000002, /* MC_EMEM_ARB_TIMING_RC */
@@ -142,9 +142,10 @@ static const struct tegra_emc_table enterprise_emc_tables_h5tc2g[] = {
 		0x00000000, /* Mode Register 0 */
 		0x00010022, /* Mode Register 1 */
 		0x00020001, /* Mode Register 2 */
+		0x00000001, /* EMC_CFG.DYN_SELF_REF */
 	},
 	{
-		0x31,       /* Rev 3.1 */
+		0x32,       /* Rev 3.2 */
 		51000,      /* SDRAM frequency */
 		{
 			0x00000003, /* EMC_RC */
@@ -187,7 +188,7 @@ static const struct tegra_emc_table enterprise_emc_tables_h5tc2g[] = {
 			0x00000000, /* EMC_ODT_WRITE */
 			0x00000000, /* EMC_ODT_READ */
 			0x00004282, /* EMC_FBIO_CFG5 */
-			0x00780084, /* EMC_CFG_DIG_DLL */
+			0x007800a4, /* EMC_CFG_DIG_DLL */
 			0x00008000, /* EMC_CFG_DIG_DLL_PERIOD */
 			0x00090000, /* EMC_DLL_XFORM_DQS0 */
 			0x00090000, /* EMC_DLL_XFORM_DQS1 */
@@ -235,7 +236,7 @@ static const struct tegra_emc_table enterprise_emc_tables_h5tc2g[] = {
 			0x00000000, /* EMC_CTT_DURATION */
 			0x80000287, /* EMC_DYN_SELF_REF_CONTROL */
 			0x00010001, /* MC_EMEM_ARB_CFG */
-			0x8000000a, /* MC_EMEM_ARB_OUTSTANDING_REQ */
+			0xc000000a, /* MC_EMEM_ARB_OUTSTANDING_REQ */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RCD */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RP */
 			0x00000002, /* MC_EMEM_ARB_TIMING_RC */
@@ -261,9 +262,10 @@ static const struct tegra_emc_table enterprise_emc_tables_h5tc2g[] = {
 		0x00000000, /* Mode Register 0 */
 		0x00010022, /* Mode Register 1 */
 		0x00020001, /* Mode Register 2 */
+		0x00000001, /* EMC_CFG.DYN_SELF_REF */
 	},
 	{
-		0x31,       /* Rev 3.1 */
+		0x32,       /* Rev 3.2 */
 		102000,     /* SDRAM frequency */
 		{
 			0x00000006, /* EMC_RC */
@@ -306,7 +308,7 @@ static const struct tegra_emc_table enterprise_emc_tables_h5tc2g[] = {
 			0x00000000, /* EMC_ODT_WRITE */
 			0x00000000, /* EMC_ODT_READ */
 			0x00004282, /* EMC_FBIO_CFG5 */
-			0x00780084, /* EMC_CFG_DIG_DLL */
+			0x007800a4, /* EMC_CFG_DIG_DLL */
 			0x00008000, /* EMC_CFG_DIG_DLL_PERIOD */
 			0x00090000, /* EMC_DLL_XFORM_DQS0 */
 			0x00090000, /* EMC_DLL_XFORM_DQS1 */
@@ -354,7 +356,7 @@ static const struct tegra_emc_table enterprise_emc_tables_h5tc2g[] = {
 			0x00000000, /* EMC_CTT_DURATION */
 			0x8000040b, /* EMC_DYN_SELF_REF_CONTROL */
 			0x00000001, /* MC_EMEM_ARB_CFG */
-			0x80000013, /* MC_EMEM_ARB_OUTSTANDING_REQ */
+			0xc0000013, /* MC_EMEM_ARB_OUTSTANDING_REQ */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RCD */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RP */
 			0x00000003, /* MC_EMEM_ARB_TIMING_RC */
@@ -380,9 +382,10 @@ static const struct tegra_emc_table enterprise_emc_tables_h5tc2g[] = {
 		0x00000000, /* Mode Register 0 */
 		0x00010022, /* Mode Register 1 */
 		0x00020001, /* Mode Register 2 */
+		0x00000001, /* EMC_CFG.DYN_SELF_REF */
 	},
 	{
-		0x31,       /* Rev 3.1 */
+		0x32,       /* Rev 3.2 */
 		204000,     /* SDRAM frequency */
 		{
 			0x0000000c, /* EMC_RC */
@@ -425,7 +428,7 @@ static const struct tegra_emc_table enterprise_emc_tables_h5tc2g[] = {
 			0x00000000, /* EMC_ODT_WRITE */
 			0x00000000, /* EMC_ODT_READ */
 			0x00004282, /* EMC_FBIO_CFG5 */
-			0x00440084, /* EMC_CFG_DIG_DLL */
+			0x004400a4, /* EMC_CFG_DIG_DLL */
 			0x00008000, /* EMC_CFG_DIG_DLL_PERIOD */
 			0x0007c000, /* EMC_DLL_XFORM_DQS0 */
 			0x0007c000, /* EMC_DLL_XFORM_DQS1 */
@@ -473,7 +476,7 @@ static const struct tegra_emc_table enterprise_emc_tables_h5tc2g[] = {
 			0x00000000, /* EMC_CTT_DURATION */
 			0x80000713, /* EMC_DYN_SELF_REF_CONTROL */
 			0x00000003, /* MC_EMEM_ARB_CFG */
-			0x80000025, /* MC_EMEM_ARB_OUTSTANDING_REQ */
+			0xc0000025, /* MC_EMEM_ARB_OUTSTANDING_REQ */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RCD */
 			0x00000001, /* MC_EMEM_ARB_TIMING_RP */
 			0x00000006, /* MC_EMEM_ARB_TIMING_RC */
@@ -499,9 +502,10 @@ static const struct tegra_emc_table enterprise_emc_tables_h5tc2g[] = {
 		0x00000000, /* Mode Register 0 */
 		0x00010042, /* Mode Register 1 */
 		0x00020001, /* Mode Register 2 */
+		0x00000001, /* EMC_CFG.DYN_SELF_REF */
 	},
 	{
-		0x31,       /* Rev 3.1 */
+		0x32,       /* Rev 3.2 */
 		400000,     /* SDRAM frequency */
 		{
 			0x00000017, /* EMC_RC */
@@ -618,6 +622,7 @@ static const struct tegra_emc_table enterprise_emc_tables_h5tc2g[] = {
 		0x00000000, /* Mode Register 0 */
 		0x00010082, /* Mode Register 1 */
 		0x00020004, /* Mode Register 2 */
+		0x00000000, /* EMC_CFG.DYN_SELF_REF */
 	},
 };
 
