@@ -15,24 +15,29 @@
  * 02111-1307, USA
  */
 
-#ifndef __SSL3250A_H__
-#define __SSL3250A_H__
+#ifndef __NVC_TORCH_H__
+#define __NVC_TORCH_H__
 
-#include <media/nvc_torch.h>
+struct nvc_torch_level_info {
+	__s32 guidenum;
+	__u32 sustaintime;
+	__s32 rechargefactor;
+} __packed;
 
-#define SSL3250A_MAX_TORCH_LEVEL	11
-#define SSL3250A_MAX_FLASH_LEVEL	20
+struct nvc_torch_pin_state {
+	__u16 mask;
+	__u16 values;
+} __packed;
 
-struct ssl3250a_platform_data {
-	unsigned cfg; /* use the NVC_CFG_ defines */
-	unsigned num; /* see implementation notes in driver */
-	unsigned sync; /* see implementation notes in driver */
-	const char *dev_name; /* see implementation notes in driver */
-	struct nvc_torch_pin_state (*pinstate); /* see notes in driver */
-	unsigned max_amp_torch; /* maximum torch value allowed */
-	unsigned max_amp_flash; /* maximum flash value allowed */
-	unsigned gpio_act; /* GPIO connected to the ACT signal */
-};
+struct nvc_torch_flash_capabilities {
+	__u32 numberoflevels;
+	struct nvc_torch_level_info levels[];
+} __packed;
 
-#endif /* __SSL3250A_H__ */
+struct nvc_torch_torch_capabilities {
+	__u32 numberoflevels;
+	__s32 guidenum[];
+} __packed;
+
+#endif /* __NVC_TORCH_H__ */
 
