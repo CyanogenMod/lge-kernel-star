@@ -22,6 +22,7 @@
 
 #include <linux/ioctl.h>
 #include <linux/file.h>
+#include <linux/rbtree.h>
 
 #if !defined(__KERNEL__)
 #define __user
@@ -52,7 +53,6 @@
 
 #if defined(__KERNEL__)
 
-struct nvmap_handle_ref;
 struct nvmap_handle;
 struct nvmap_client;
 struct nvmap_device;
@@ -65,6 +65,17 @@ struct nvmap_pinarray_elem {
 	__u32 patch_offset;
 	__u32 pin_mem;
 	__u32 pin_offset;
+};
+
+/* handle_ref objects are client-local references to an nvmap_handle;
+ * they are distinct objects so that handles can be unpinned and
+ * unreferenced the correct number of times when a client abnormally
+ * terminates */
+struct nvmap_handle_ref {
+	struct nvmap_handle *handle;
+	struct rb_node	node;
+	atomic_t	dupes;	/* number of times to free on file close */
+	atomic_t	pin;	/* number of times to unpin on free */
 };
 
 struct nvmap_client *nvmap_create_client(struct nvmap_device *dev,
