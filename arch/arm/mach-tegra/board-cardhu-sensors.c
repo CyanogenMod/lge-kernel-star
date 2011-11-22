@@ -463,53 +463,18 @@ static const struct i2c_board_info cardhu_i2c3_board_info[] = {
 	},
 };
 
-static int sh532u_power_control(void *cdata, int is_enable, int which) {
-	static struct regulator *vdd_2v8_cam1_af = NULL;
-	static struct regulator *vdd_2v8_cam2_af = NULL;
-
-	struct regulator *vdd_2v8_camx_af = (1 == which) ? vdd_2v8_cam1_af : vdd_2v8_cam2_af;
-	char *vdd_2v8_camx_tag = (1 == which) ? "vdd_2v8_cam1_af" : "vdd_2v8_cam2_af";
-
-	if (vdd_2v8_camx_af == NULL) {
-		vdd_2v8_camx_af = regulator_get(NULL, vdd_2v8_camx_tag);
-		if (WARN_ON(IS_ERR_OR_NULL(vdd_2v8_camx_af))) {
-			pr_err("%s: couldn't get regulator %s:"
-				" %ld\n", __func__, vdd_2v8_camx_tag, PTR_ERR(vdd_2v8_camx_af));
-			vdd_2v8_camx_af = NULL;
-			return -ENODEV;
-		}
-	}
-	if (is_enable) {
-		regulator_enable(vdd_2v8_camx_af);
-		mdelay(20);
-	} else
-		regulator_disable(vdd_2v8_camx_af);
-
-	return 0;
-}
-
-static int sh532u_left_init(void *cdata) {
-	return sh532u_power_control(cdata, true, 1);
-}
-static int sh532u_left_deinit(void *cdata) {
-	return sh532u_power_control(cdata, false, 1);
-}
-
-static int sh532u_right_init(void *cdata) {
-	return sh532u_power_control(cdata, true, 2);
-}
-static int sh532u_right_deinit(void *cdata) {
-	return sh532u_power_control(cdata, false, 2);
-}
-
-struct sh532u_platform_data sh532u_left_pdata = {
-	.board_init = sh532u_left_init,
-	.board_deinit = sh532u_left_deinit,
+static struct sh532u_platform_data sh532u_left_pdata = {
+	.num		= 1,
+	.sync		= 2,
+	.dev_name	= "focuser",
+	.gpio_reset	= TEGRA_GPIO_PBB0,
 };
 
-struct sh532u_platform_data sh532u_right_pdata = {
-	.board_init = sh532u_right_init,
-	.board_deinit = sh532u_right_deinit,
+static struct sh532u_platform_data sh532u_right_pdata = {
+	.num		= 2,
+	.sync		= 1,
+	.dev_name	= "focuser",
+	.gpio_reset	= TEGRA_GPIO_PBB0,
 };
 
 static bool cardhu_tps61050_pm_flag = 0;
@@ -581,7 +546,7 @@ static struct i2c_board_info cardhu_i2c6_board_info[] = {
 		.platform_data = &cardhu_left_ov5650_data,
 	},
 	{
-		I2C_BOARD_INFO("sh532uL", 0x72),
+		I2C_BOARD_INFO("sh532u", 0x72),
 		.platform_data = &sh532u_left_pdata,
 	},
 };
@@ -592,7 +557,7 @@ static struct i2c_board_info cardhu_i2c7_board_info[] = {
 		.platform_data = &cardhu_right_ov5650_data,
 	},
 	{
-		I2C_BOARD_INFO("sh532uR", 0x72),
+		I2C_BOARD_INFO("sh532u", 0x72),
 		.platform_data = &sh532u_right_pdata,
 	},
 };
