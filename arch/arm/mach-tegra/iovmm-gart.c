@@ -216,7 +216,7 @@ static int gart_probe(struct platform_device *pdev)
 
 	gart->regs = gart_regs;
 	gart->iovmm_base = (tegra_iovmm_addr_t)res_remap->start;
-	gart->page_count = res_remap->end - res_remap->start + 1;
+	gart->page_count = resource_size(res_remap);
 	gart->page_count >>= GART_PAGE_SHIFT;
 
 	gart->savedata = vmalloc(sizeof(u32) * gart->page_count);
