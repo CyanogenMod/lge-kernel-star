@@ -53,15 +53,18 @@ DEFINE_EVENT(nvhost, nvhost_ioctl_channel_flush,
 );
 
 TRACE_EVENT(nvhost_channel_write_submit,
-	TP_PROTO(const char *name, ssize_t count, u32 cmdbufs, u32 relocs),
+	TP_PROTO(const char *name, ssize_t count, u32 cmdbufs, u32 relocs,
+			u32 syncpt_id, u32 syncpt_incrs),
 
-	TP_ARGS(name, count, cmdbufs, relocs),
+	TP_ARGS(name, count, cmdbufs, relocs, syncpt_id, syncpt_incrs),
 
 	TP_STRUCT__entry(
 		__field(const char *, name)
 		__field(ssize_t, count)
 		__field(u32, cmdbufs)
 		__field(u32, relocs)
+		__field(u32, syncpt_id)
+		__field(u32, syncpt_incrs)
 	),
 
 	TP_fast_assign(
@@ -69,18 +72,21 @@ TRACE_EVENT(nvhost_channel_write_submit,
 		__entry->count = count;
 		__entry->cmdbufs = cmdbufs;
 		__entry->relocs = relocs;
+		__entry->syncpt_id = syncpt_id;
+		__entry->syncpt_incrs = syncpt_incrs;
 	),
 
-	TP_printk("name=%s, count=%lu, cmdbufs=%lu, relocs=%ld",
-	  __entry->name, (unsigned long)__entry->count,
-	  (unsigned long)__entry->cmdbufs, (unsigned long)__entry->relocs)
+	TP_printk("name=%s, count=%d, cmdbufs=%u, relocs=%u, syncpt_id=%u, syncpt_incrs=%u",
+	  __entry->name, __entry->count, __entry->cmdbufs, __entry->relocs,
+	  __entry->syncpt_id, __entry->syncpt_incrs)
 );
 
 TRACE_EVENT(nvhost_ioctl_channel_submit,
 	TP_PROTO(const char *name, u32 version, u32 cmdbufs, u32 relocs,
-		 u32 waitchks),
+		 u32 waitchks, u32 syncpt_id, u32 syncpt_incrs),
 
-	TP_ARGS(name, version, cmdbufs, relocs, waitchks),
+	TP_ARGS(name, version, cmdbufs, relocs, waitchks,
+			syncpt_id, syncpt_incrs),
 
 	TP_STRUCT__entry(
 		__field(const char *, name)
@@ -88,6 +94,8 @@ TRACE_EVENT(nvhost_ioctl_channel_submit,
 		__field(u32, cmdbufs)
 		__field(u32, relocs)
 		__field(u32, waitchks)
+		__field(u32, syncpt_id)
+		__field(u32, syncpt_incrs)
 	),
 
 	TP_fast_assign(
@@ -96,16 +104,18 @@ TRACE_EVENT(nvhost_ioctl_channel_submit,
 		__entry->cmdbufs = cmdbufs;
 		__entry->relocs = relocs;
 		__entry->waitchks = waitchks;
+		__entry->syncpt_id = syncpt_id;
+		__entry->syncpt_incrs = syncpt_incrs;
 	),
 
-	TP_printk("name=%s, version=%lu, cmdbufs=%lu, relocs=%ld, waitchks=%ld",
-	  __entry->name, (unsigned long)__entry->version,
-	  (unsigned long)__entry->cmdbufs, (unsigned long)__entry->relocs,
-	  (unsigned long)__entry->waitchks)
+	TP_printk("name=%s, version=%u, cmdbufs=%u, relocs=%u, waitchks=%u, syncpt_id=%u, syncpt_incrs=%u",
+	  __entry->name, __entry->version, __entry->cmdbufs, __entry->relocs,
+	  __entry->waitchks, __entry->syncpt_id, __entry->syncpt_incrs)
 );
 
 TRACE_EVENT(nvhost_channel_write_cmdbuf,
-	TP_PROTO(const char *name, u32 mem_id, u32 words, u32 offset),
+	TP_PROTO(const char *name, u32 mem_id,
+			u32 words, u32 offset),
 
 	TP_ARGS(name, mem_id, words, offset),
 
@@ -123,9 +133,43 @@ TRACE_EVENT(nvhost_channel_write_cmdbuf,
 		__entry->offset = offset;
 	),
 
-	TP_printk("name=%s, mem_id=%08lx, words=%lu, offset=%ld",
-	  __entry->name, (unsigned long)__entry->mem_id,
-	  (unsigned long)__entry->words, (unsigned long)__entry->offset)
+	TP_printk("name=%s, mem_id=%08x, words=%u, offset=%d",
+	  __entry->name, __entry->mem_id,
+	  __entry->words, __entry->offset)
+);
+
+TRACE_EVENT(nvhost_channel_write_cmdbuf_data,
+	TP_PROTO(const char *name, u32 mem_id,
+			u32 words, u32 offset, void *cmdbuf),
+
+	TP_ARGS(name, mem_id, words, offset, cmdbuf),
+
+	TP_STRUCT__entry(
+		__field(const char *, name)
+		__field(u32, mem_id)
+		__field(u32, words)
+		__field(u32, offset)
+		__field(bool, cmdbuf)
+		__dynamic_array(u32, cmdbuf, words)
+	),
+
+	TP_fast_assign(
+		if (cmdbuf) {
+			memcpy(__get_dynamic_array(cmdbuf), cmdbuf+offset,
+					words * sizeof(u32));
+		}
+		__entry->cmdbuf = cmdbuf;
+		__entry->name = name;
+		__entry->mem_id = mem_id;
+		__entry->words = words;
+		__entry->offset = offset;
+	),
+
+	TP_printk("name=%s, mem_id=%08x, words=%u, offset=%d, contents=[%s]",
+	  __entry->name, __entry->mem_id,
+	  __entry->words, __entry->offset,
+	  __print_hex(__get_dynamic_array(cmdbuf),
+		  __entry->cmdbuf ? __entry->words * 4 : 0))
 );
 
 TRACE_EVENT(nvhost_channel_write_relocs,
@@ -143,8 +187,8 @@ TRACE_EVENT(nvhost_channel_write_relocs,
 		__entry->relocs = relocs;
 	),
 
-	TP_printk("name=%s, relocs=%lu",
-	  __entry->name, (unsigned long)__entry->relocs)
+	TP_printk("name=%s, relocs=%u",
+	  __entry->name, __entry->relocs)
 );
 
 TRACE_EVENT(nvhost_channel_write_waitchks,
@@ -164,9 +208,8 @@ TRACE_EVENT(nvhost_channel_write_waitchks,
 		__entry->waitmask = waitmask;
 	),
 
-	TP_printk("name=%s, waitchks=%lu, waitmask=%08lx",
-	  __entry->name, (unsigned long)__entry->waitchks,
-	  (unsigned long)__entry->waitmask)
+	TP_printk("name=%s, waitchks=%u, waitmask=%08x",
+	  __entry->name, __entry->waitchks, __entry->waitmask)
 );
 
 TRACE_EVENT(nvhost_channel_context_switch,
@@ -186,9 +229,8 @@ TRACE_EVENT(nvhost_channel_context_switch,
 	    __entry->new_ctx = new_ctx;
 	),
 
-	TP_printk("name=%s, old=%08lx, new=%08lx",
-	  __entry->name, (long unsigned int)__entry->old_ctx,
-	  (long unsigned int)__entry->new_ctx)
+	TP_printk("name=%s, old=%p, new=%p",
+	  __entry->name, __entry->old_ctx, __entry->new_ctx)
 );
 
 TRACE_EVENT(nvhost_ctrlopen,
@@ -285,6 +327,27 @@ TRACE_EVENT(nvhost_ioctl_ctrl_syncpt_wait,
 
 	TP_printk("id=%u, threshold=%u, timeout=%d",
 	  __entry->id, __entry->threshold, __entry->timeout)
+);
+
+TRACE_EVENT(nvhost_ioctl_ctrl_module_regrdwr,
+	TP_PROTO(u32 id, u32 num_offsets, bool write),
+
+	TP_ARGS(id, num_offsets, write),
+
+	TP_STRUCT__entry(
+		__field(u32, id)
+		__field(u32, num_offsets)
+		__field(bool, write)
+	),
+
+	TP_fast_assign(
+		__entry->id = id;
+		__entry->num_offsets = num_offsets;
+		__entry->write = write;
+	),
+
+	TP_printk("id=%u, num_offsets=%u, write=%d",
+	  __entry->id, __entry->num_offsets, __entry->write)
 );
 
 TRACE_EVENT(nvhost_channel_submitted,
