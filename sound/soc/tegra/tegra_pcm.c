@@ -157,16 +157,17 @@ static int tegra_pcm_open(struct snd_pcm_substream *substream)
 			setup_dma_rx_request(&prtd->dma_req[0], dmap);
 			setup_dma_rx_request(&prtd->dma_req[1], dmap);
 		}
-	}
 
-	prtd->dma_req[0].dev = prtd;
-	prtd->dma_req[1].dev = prtd;
+		prtd->dma_req[0].dev = prtd;
+		prtd->dma_req[1].dev = prtd;
 
-	prtd->dma_chan = tegra_dma_allocate_channel(
-				TEGRA_DMA_MODE_CONTINUOUS_SINGLE, "pcm");
-	if (prtd->dma_chan == NULL) {
-		ret = -ENOMEM;
-		goto err;
+		prtd->dma_chan = tegra_dma_allocate_channel(
+					TEGRA_DMA_MODE_CONTINUOUS_SINGLE,
+					"pcm");
+		if (prtd->dma_chan == NULL) {
+			ret = -ENOMEM;
+			goto err;
+		}
 	}
 
 	/* Set HW params now that initialization is complete */
