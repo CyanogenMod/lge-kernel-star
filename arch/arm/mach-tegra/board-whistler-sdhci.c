@@ -34,6 +34,7 @@
 
 #define WHISTLER_WLAN_PWR	TEGRA_GPIO_PK5
 #define WHISTLER_WLAN_RST	TEGRA_GPIO_PK6
+#define WHISTLER_WLAN_WOW	TEGRA_GPIO_PU5
 
 #define WHISTLER_EXT_SDCARD_DETECT	TEGRA_GPIO_PI5
 
@@ -84,9 +85,20 @@ static struct wifi_platform_data whistler_wifi_control = {
 	.set_carddetect = whistler_wifi_set_carddetect,
 };
 
+static struct resource wifi_resource[] = {
+	[0] = {
+		.name	= "bcm4329_wlan_irq",
+		.start	= TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PU5),
+		.end	= TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PU5),
+		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL | IORESOURCE_IRQ_SHAREABLE,
+	},
+};
+
 static struct platform_device whistler_wifi_device = {
 	.name           = "bcm4329_wlan",
 	.id             = 1,
+	.num_resources	= 1,
+	.resource	= wifi_resource,
 	.dev            = {
 		.platform_data = &whistler_wifi_control,
 	},
@@ -207,12 +219,15 @@ static int __init whistler_wifi_init(void)
 {
 	gpio_request(WHISTLER_WLAN_PWR, "wlan_power");
 	gpio_request(WHISTLER_WLAN_RST, "wlan_rst");
+	gpio_request(WHISTLER_WLAN_WOW, "bcmsdh_sdmmc");
 
 	tegra_gpio_enable(WHISTLER_WLAN_PWR);
 	tegra_gpio_enable(WHISTLER_WLAN_RST);
+	tegra_gpio_enable(WHISTLER_WLAN_WOW);
 
 	gpio_direction_output(WHISTLER_WLAN_PWR, 0);
 	gpio_direction_output(WHISTLER_WLAN_RST, 0);
+	gpio_direction_input(WHISTLER_WLAN_WOW);
 
 	platform_device_register(&whistler_wifi_device);
 	return 0;
