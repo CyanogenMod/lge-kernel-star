@@ -64,6 +64,7 @@ struct tegra_ehci_hcd {
 	int bus_suspended;
 	int port_resuming;
 	int power_down_on_bus_suspend;
+	int ehci_power_off;
 	struct delayed_work work;
 	enum tegra_usb_phy_port_speed port_speed;
 	struct work_struct clk_timer_work;
@@ -893,6 +894,7 @@ static ssize_t store_ehci_power(struct device *dev,
 			clk_disable(tegra->emc_clk);
 			clk_disable(tegra->sclk_clk);
 		}
+		tegra->ehci_power_off = 1;
 		usb_remove_hcd(hcd);
 		tegra_ehci_power_down(hcd, false);
 		ehci_handle = NULL;
@@ -901,6 +903,7 @@ static ssize_t store_ehci_power(struct device *dev,
 			del_timer_sync(&tegra->clk_timer);
 			usb_remove_hcd(hcd);
 		}
+		tegra->ehci_power_off = 0;
 		tegra_ehci_power_up(hcd, false);
 		retval = usb_add_hcd(hcd, ehci_tegra_irq,
 					IRQF_DISABLED | IRQF_SHARED);
@@ -1179,6 +1182,13 @@ static int tegra_ehci_resume(struct platform_device *pdev)
 	struct tegra_ehci_hcd *tegra = platform_get_drvdata(pdev);
 	struct usb_hcd *hcd = ehci_to_hcd(tegra->ehci);
 
+#ifdef CONFIG_USB_EHCI_ONOFF_FEATURE
+	if (tegra->ehci_power_off) {
+		pr_info("%s: ehci_power off - nop\n", __func__);
+		return 0;
+	}
+#endif
+
 	if ((tegra->bus_suspended) && (tegra->power_down_on_bus_suspend)) {
 #ifdef CONFIG_USB_HOTPLUG
 		clk_enable(tegra->clk);
@@ -1197,6 +1207,13 @@ static int tegra_ehci_suspend(struct platform_device *pdev, pm_message_t state)
 	struct tegra_ehci_hcd *tegra = platform_get_drvdata(pdev);
 	struct usb_hcd *hcd = ehci_to_hcd(tegra->ehci);
 	int ret;
+
+#ifdef CONFIG_USB_EHCI_ONOFF_FEATURE
+	if (tegra->ehci_power_off) {
+		pr_info("%s: ehci_power off - nop\n", __func__);
+		return 0;
+	}
+#endif
 
 	if ((tegra->bus_suspended) && (tegra->power_down_on_bus_suspend)) {
 #ifdef CONFIG_USB_HOTPLUG
