@@ -1012,7 +1012,7 @@ static int avp_init(struct tegra_avp_info *avp)
 	}
 	pr_info("%s: Using nvmem= carveout at %lx to load AVP kernel\n",
 		__func__, (unsigned long)avp->kernel_phys);
-	sprintf(fw_file, "nvrm_avp_%08lx.bin", avp->kernel_phys);
+	sprintf(fw_file, "nvrm_avp_%08lx.bin", (unsigned long)avp->kernel_phys);
 	avp->reset_addr = avp->kernel_phys;
 	avp->kernel_data = ioremap(avp->kernel_phys, SZ_1M);
 #endif
