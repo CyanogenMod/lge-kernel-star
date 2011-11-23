@@ -426,7 +426,7 @@ static int tegra_powergate_set(int id, bool new_state)
 
 	if (status == new_state) {
 		spin_unlock_irqrestore(&tegra_powergate_lock, flags);
-		return -EINVAL;
+		return 0;
 	}
 
 	if (TEGRA_IS_CPU_POWERGATE_ID(id)) {
