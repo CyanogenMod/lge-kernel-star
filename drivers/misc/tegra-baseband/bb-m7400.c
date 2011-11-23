@@ -36,7 +36,7 @@
 static struct tegra_bb_gpio_data m7400_gpios[] = {
 	{ { GPIO_INVALID, GPIOF_OUT_INIT_LOW, "MDM_PWR_ON" }, true },
 	{ { GPIO_INVALID, GPIOF_IN, "MDM_PWRSTATUS" }, true },
-	{ { GPIO_INVALID, GPIOF_IN, "MDM_SERVICE" }, true },
+	{ { GPIO_INVALID, GPIOF_OUT_INIT_HIGH, "MDM_SERVICE" }, true },
 	{ { GPIO_INVALID, GPIOF_OUT_INIT_HIGH, "MDM_USB_AWR" }, false },
 	{ { GPIO_INVALID, GPIOF_IN, "MDM_USB_CWR" }, false },
 	{ { GPIO_INVALID, GPIOF_IN, "MDM_RESOUT2" }, true },
