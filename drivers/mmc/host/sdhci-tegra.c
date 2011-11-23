@@ -40,6 +40,12 @@
 
 #define SDHOST_1V8_OCR_MASK		0x8
 
+#define TEGRA_SDHOST_MIN_FREQ	50000000
+#define TEGRA2_SDHOST_STD_FREQ	50000000
+#define TEGRA3_SDHOST_STD_FREQ	104000000
+
+static unsigned int tegra_sdhost_min_freq;
+static unsigned int tegra_sdhost_std_freq;
 static void tegra_3x_sdhci_set_card_clock(struct sdhci_host *sdhci, unsigned int clock);
 static void tegra3_sdhci_post_reset_init(struct sdhci_host *sdhci);
 
@@ -349,7 +355,6 @@ set_clk:
 
 	clk |= SDHCI_CLOCK_CARD_EN;
 	sdhci_writew(sdhci, clk, SDHCI_CLOCK_CONTROL);
-
 out:
 	sdhci->clock = clock;
 }
@@ -371,6 +376,13 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 			sdhci_writeb(sdhci, ctrl, SDHCI_VENDOR_CLOCK_CNTRL);
 			tegra_host->clk_enabled = true;
 		}
+		if (clock <= tegra_sdhost_min_freq)
+			clk_set_rate(pltfm_host->clk, tegra_sdhost_min_freq);
+		else if (clock <= tegra_sdhost_std_freq)
+			clk_set_rate(pltfm_host->clk, tegra_sdhost_std_freq);
+		else
+			clk_set_rate(pltfm_host->clk, clock);
+		sdhci->max_clk = clk_get_rate(pltfm_host->clk);
 		if (tegra_host->hw_ops->set_card_clock)
 			tegra_host->hw_ops->set_card_clock(sdhci, clock);
 	} else if (!clock && tegra_host->clk_enabled) {
@@ -540,10 +552,13 @@ static int tegra_sdhci_pltfm_init(struct sdhci_host *host,
 	if (plat->mmc_data.embedded_sdio)
 		host->mmc->pm_flags = MMC_PM_KEEP_POWER;
 
+	tegra_sdhost_min_freq = TEGRA_SDHOST_MIN_FREQ;
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	tegra_host->hw_ops = &tegra_2x_sdhci_ops;
+	tegra_sdhost_std_freq = TEGRA2_SDHOST_STD_FREQ;
 #else
 	tegra_host->hw_ops = &tegra_3x_sdhci_ops;
+	tegra_sdhost_std_freq = TEGRA3_SDHOST_STD_FREQ;
 #endif
 
 	return 0;
