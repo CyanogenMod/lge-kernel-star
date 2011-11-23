@@ -319,38 +319,15 @@ static int max77663_rtc_alarm_irq_enable(struct device *dev,
 		goto out;
 
 	/* Config alarm interrupt */
-	if (enabled)
-		max77663_rtc_irq_unmask(rtc, RTC_IRQ_ALARM1_MASK);
-	else
-		max77663_rtc_irq_mask(rtc, RTC_IRQ_ALARM1_MASK);
-
-out:
-	mutex_unlock(&rtc->io_lock);
-	return ret;
-}
-
-static int max77663_rtc_update_irq_enable(struct device *dev,
-					  unsigned int enabled)
-{
-	struct max77663_rtc *rtc = dev_get_drvdata(dev);
-	int ret = 0;
-
-	if (rtc->irq < 0)
-		return -ENXIO;
-
-	mutex_lock(&rtc->io_lock);
-
-	/* Handle pending interrupt */
-	ret = max77663_rtc_do_irq(rtc);
-	if (ret < 0)
-		goto out;
-
-	/* Config update interrupt */
-	if (enabled)
-		max77663_rtc_irq_unmask(rtc, RTC_IRQ_1SEC_MASK);
-	else
-		max77663_rtc_irq_mask(rtc, RTC_IRQ_1SEC_MASK);
-
+	if (enabled) {
+		ret = max77663_rtc_irq_unmask(rtc, RTC_IRQ_ALARM1_MASK);
+		if (ret < 0)
+			goto out;
+	} else {
+		ret = max77663_rtc_irq_mask(rtc, RTC_IRQ_ALARM1_MASK);
+		if (ret < 0)
+			goto out;
+	}
 out:
 	mutex_unlock(&rtc->io_lock);
 	return ret;
@@ -460,13 +437,6 @@ static int max77663_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	u8 buf[RTC_NR];
 	int ret;
 
-	ret = max77663_rtc_alarm_irq_enable(dev, 0);
-	if (ret < 0) {
-		dev_err(rtc->dev,
-			"rtc_set_alarm: Failed to disable rtc alarm\n");
-		return ret;
-	}
-
 	dev_dbg(rtc->dev, "rtc_set_alarm: "
 		"tm: %d-%02d-%02d %02d:%02d:%02d, wday=%d\n",
 		alrm->time.tm_year, alrm->time.tm_mon, alrm->time.tm_mday,
@@ -534,9 +504,10 @@ static int max77663_rtc_preinit(struct max77663_rtc *rtc)
 		return ret;
 	}
 
-	/* Set alarm to wake-up event from sleep */
+	/* It should be disabled alarm wakeup to wakeup from sleep
+	 * by EN1 input signal */
 	ret = max77663_set_bits(parent, MAX77663_REG_ONOFF_CFG2,
-				ONOFF_WK_ALARM1_MASK, ONOFF_WK_ALARM1_MASK, 0);
+				ONOFF_WK_ALARM1_MASK, 0, 0);
 	if (ret < 0) {
 		dev_err(rtc->dev, "preinit: Failed to set onoff cfg2\n");
 		return ret;
