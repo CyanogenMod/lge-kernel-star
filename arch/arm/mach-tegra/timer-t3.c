@@ -184,6 +184,7 @@ fail:
 	tegra_lp2_in_idle(false);
 }
 
+#if defined(CONFIG_PM_SLEEP) && defined(CONFIG_HOTPLUG_CPU)
 static void tegra3_unregister_wake_timer(unsigned int cpu)
 {
 #ifdef CONFIG_SMP
@@ -194,6 +195,7 @@ static void tegra3_unregister_wake_timer(unsigned int cpu)
 	/* Dispose of this IRQ. */
 	remove_irq(tegra_lp2wake_irq[cpu].irq, &tegra_lp2wake_irq[cpu]);
 }
+#endif
 
 void tegra3_lp2_set_trigger(unsigned long cycles)
 {
