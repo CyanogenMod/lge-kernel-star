@@ -555,6 +555,7 @@ typedef enum sup_auth_status {
 #define CRYPTO_ALGO_AES_OCB_MSDU    5
 #define CRYPTO_ALGO_AES_OCB_MPDU    6
 #define CRYPTO_ALGO_NALG        7
+#define CRYPTO_ALGO_PMK			12
 
 #define WSEC_GEN_MIC_ERROR  0x0001
 #define WSEC_GEN_REPLAY     0x0002
@@ -616,6 +617,9 @@ typedef struct {
 #define WPA2_AUTH_PSK       0x0080  
 #define BRCM_AUTH_PSK           0x0100  
 #define BRCM_AUTH_DPT       0x0200  
+#define WPA2_AUTH_MFP           0x1000
+#define WPA2_AUTH_TPK		0x2000
+#define WPA2_AUTH_FT		0x4000
 
 
 #define MAXPMKID        16
@@ -652,6 +656,49 @@ typedef struct wl_assoc_info {
 
 #define WLC_ASSOC_REQ_IS_REASSOC 0x01
 
+
+typedef struct {
+	uint16          ver;        
+	uint16          len;        
+	uint16          cap;        
+	uint32          flags;      
+	uint32          idle;       
+	struct ether_addr   ea;     
+	wl_rateset_t        rateset;    
+	uint32          in;     
+	uint32          listen_interval_inms; 
+	uint32          tx_pkts;    
+	uint32          tx_failures;    
+	uint32          rx_ucast_pkts;  
+	uint32          rx_mcast_pkts;  
+	uint32          tx_rate;    
+	uint32          rx_rate;    
+	uint32          rx_decrypt_succeeds;    
+	uint32          rx_decrypt_failures;    
+} sta_info_t;
+
+#define WL_OLD_STAINFO_SIZE OFFSETOF(sta_info_t, tx_pkts)
+
+#define WL_STA_VER      3
+
+
+#define WL_STA_BRCM     0x1     
+#define WL_STA_WME      0x2     
+#define WL_STA_ABCAP        0x4
+#define WL_STA_AUTHE        0x8     
+#define WL_STA_ASSOC        0x10        
+#define WL_STA_AUTHO        0x20        
+#define WL_STA_WDS      0x40        
+#define WL_STA_WDS_LINKUP   0x80        
+#define WL_STA_PS       0x100       
+#define WL_STA_APSD_BE      0x200       
+#define WL_STA_APSD_BK      0x400       
+#define WL_STA_APSD_VI      0x800       
+#define WL_STA_APSD_VO      0x1000      
+#define WL_STA_N_CAP        0x2000      
+#define WL_STA_SCBSTATS     0x4000      
+
+#define WL_WDS_LINKUP       WL_STA_WDS_LINKUP   
 
 
 #define WLC_TXFILTER_OVERRIDE_DISABLED  0
@@ -1499,6 +1546,7 @@ typedef struct wl_sampledata {
 #define WL_JOIN_PREF_WPA    2   
 #define WL_JOIN_PREF_BAND   3   
 #define WL_JOIN_PREF_RSSI_DELTA 4   
+#define WL_JOIN_PREF_TRANS_PREF	5
 
 
 #define WLJP_BAND_ASSOC_PREF    255 
