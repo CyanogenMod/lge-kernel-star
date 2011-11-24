@@ -180,7 +180,7 @@ static struct regulator_consumer_supply tps80031_battery_charge_supply[] = {
 		.init_enable = _init_enable,				\
 		.init_apply = _init_apply,				\
 		.flags = _flags,					\
-		.ext_pwr_ctrl = _ectrl,					\
+		.ext_ctrl_flag = _ectrl,				\
 		.delay_us = _delay,					\
 	}
 
@@ -294,16 +294,24 @@ static struct tps80031_subdev_info tps80031_devs[] = {
 	TPS_GPADC(),
 };
 
-struct tps80031_32kclock_plat_data clk32k_pdata = {
-	.en_clk32kg = 1,
-	.en_clk32kaudio = 1,
+struct tps80031_clk32k_init_data clk32k_idata[] = {
+	{
+		.clk32k_nr = TPS80031_CLOCK32K_G,
+		.enable = true,
+	},
+	{
+		.clk32k_nr = TPS80031_CLOCK32K_AUDIO,
+		.enable = true,
+	},
 };
+
 static struct tps80031_platform_data tps_platform = {
 	.num_subdevs	= ARRAY_SIZE(tps80031_devs),
 	.subdevs	= tps80031_devs,
 	.irq_base	= ENT_TPS80031_IRQ_BASE,
 	.gpio_base	= ENT_TPS80031_GPIO_BASE,
-	.clk32k_pdata	= &clk32k_pdata,
+	.clk32k_init_data	= clk32k_idata,
+	.clk32k_init_data_size	= ARRAY_SIZE(clk32k_idata),
 };
 
 static struct i2c_board_info __initdata enterprise_regulators[] = {
