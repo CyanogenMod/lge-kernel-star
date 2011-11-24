@@ -70,7 +70,7 @@ enum {
  * @init_uV: initial micro volts which need to be set.
  * @init_enable: Enable or do not enable the rails during initialization.
  * @init_apply: Init parameter applied or not.
- * @ext_pwr_ctrl: External power request control.
+ * @ext_ctrl_flag: External control flag for sleep/power request control.
  * @flags: Configuration flag to configure the rails. It should be ORed of
  *	 above enums.
  * @delay_us: Delay in microsecond after setting the desired voltage.
@@ -81,7 +81,7 @@ struct tps80031_regulator_platform_data {
 	int init_uV;
 	unsigned init_enable:1;
 	unsigned init_apply:1;
-	unsigned int ext_pwr_ctrl;
+	unsigned int ext_ctrl_flag;
 	unsigned int flags;
 	int delay_us;
 };

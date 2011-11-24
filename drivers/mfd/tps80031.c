@@ -106,6 +106,11 @@ static u8 pmc_ext_control_base[] = {
 	SYSEN_BASE_ADD,
 };
 
+static u8 pmc_clk32k_control_base[] = {
+	CLK32KAO_BASE_ADD,
+	CLK32KG_BASE_ADD,
+	CLK32KAUDIO_BASE_ADD,
+};
 struct tps80031_irq_data {
 	u8	mask_reg;
 	u8	mask_mask;
@@ -416,23 +421,23 @@ out:
 EXPORT_SYMBOL_GPL(tps80031_force_update);
 
 int tps80031_ext_power_req_config(struct device *dev,
-		enum tps80031_ext_control ext_pwr_ctrl, int preq_bit,
+		unsigned long ext_ctrl_flag, int preq_bit,
 		int state_reg_add, int trans_reg_add)
 {
 	u8 res_ass_reg = 0;
 	int preq_mask_bit = 0;
 	int ret;
 
-	if (!(ext_pwr_ctrl & EXT_PWR_REQ))
+	if (!(ext_ctrl_flag & EXT_PWR_REQ))
 		return 0;
 
-	if (ext_pwr_ctrl & PWR_REQ_INPUT_PREQ1) {
+	if (ext_ctrl_flag & PWR_REQ_INPUT_PREQ1) {
 		res_ass_reg = TPS80031_PREQ1_RES_ASS_A + (preq_bit >> 3);
 		preq_mask_bit = 5;
-	} else if (ext_pwr_ctrl & PWR_REQ_INPUT_PREQ2) {
+	} else if (ext_ctrl_flag & PWR_REQ_INPUT_PREQ2) {
 		res_ass_reg = TPS80031_PREQ2_RES_ASS_A + (preq_bit >> 3);
 		preq_mask_bit = 6;
-	} else if (ext_pwr_ctrl & PWR_REQ_INPUT_PREQ3) {
+	} else if (ext_ctrl_flag & PWR_REQ_INPUT_PREQ3) {
 		res_ass_reg = TPS80031_PREQ3_RES_ASS_A + (preq_bit >> 3);
 		preq_mask_bit = 7;
 	}
@@ -459,7 +464,7 @@ int tps80031_ext_power_req_config(struct device *dev,
 	}
 
 	/* Switch regulator control to resource now */
-	if (ext_pwr_ctrl &  (PWR_REQ_INPUT_PREQ2 | PWR_REQ_INPUT_PREQ3)) {
+	if (ext_ctrl_flag & (PWR_REQ_INPUT_PREQ2 | PWR_REQ_INPUT_PREQ3)) {
 		ret = tps80031_update(dev, SLAVE_ID1, state_reg_add, 0x0,
 						STATE_MASK);
 		if (ret < 0)
@@ -596,7 +601,6 @@ static void tps80031_gpio_disable(struct gpio_chip *gc, unsigned offset)
 						STATE_OFF, STATE_MASK);
 }
 
-
 static void tps80031_gpio_init(struct tps80031 *tps80031,
 			struct tps80031_platform_data *pdata)
 {
@@ -614,16 +618,35 @@ static void tps80031_gpio_init(struct tps80031 *tps80031,
 
 	/* Configure the external request mode */
 	for (i = 0; i < data_size; ++i) {
-		if (!(gpio_init_data[i].ext_control & EXT_PWR_REQ))
-			continue;
-		base_add = pmc_ext_control_base[gpio_init_data[i].gpio_nr];
-		ret = tps80031_ext_power_req_config(tps80031->dev,
-			gpio_init_data[i].ext_control,
-			preq_bit_pos[gpio_init_data[i].gpio_nr],
-			base_add + EXT_CONTROL_CFG_STATE,
-			base_add + EXT_CONTROL_CFG_TRANS);
-		if (!ret)
-			dev_warn(tps80031->dev, "GPIO sleep control fails\n");
+		struct tps80031_gpio_init_data *gpio_pd = &gpio_init_data[i];
+		base_add = pmc_ext_control_base[gpio_pd->gpio_nr];
+
+		if (gpio_pd->ext_ctrl_flag & EXT_PWR_REQ) {
+			ret = tps80031_ext_power_req_config(tps80031->dev,
+				gpio_pd->ext_ctrl_flag,
+				preq_bit_pos[gpio_pd->gpio_nr],
+				base_add + EXT_CONTROL_CFG_STATE,
+				base_add + EXT_CONTROL_CFG_TRANS);
+			if (ret < 0)
+				dev_warn(tps80031->dev, "Ext pwrreq GPIO "
+					"sleep control fails\n");
+		}
+
+		if (gpio_pd->ext_ctrl_flag & PWR_OFF_ON_SLEEP) {
+			ret = tps80031_update(tps80031->dev, SLAVE_ID1,
+				base_add + EXT_CONTROL_CFG_TRANS, 0x0, 0xC);
+			if (ret < 0)
+				dev_warn(tps80031->dev, "GPIO OFF on sleep "
+					"control fails\n");
+		}
+
+		if (gpio_pd->ext_ctrl_flag & PWR_ON_ON_SLEEP) {
+			ret = tps80031_update(tps80031->dev, SLAVE_ID1,
+				base_add + EXT_CONTROL_CFG_TRANS, 0x4, 0xC);
+			if (ret < 0)
+				dev_warn(tps80031->dev, "GPIO ON on sleep "
+					"control fails\n");
+		}
 	}
 
 	tps80031->gpio.owner		= THIS_MODULE;
@@ -917,20 +940,51 @@ static void tps80031_clk32k_enable(struct tps80031 *tps80031, int base_add)
 static void tps80031_clk32k_init(struct tps80031 *tps80031,
 			struct tps80031_platform_data *pdata)
 {
-	struct tps80031_32kclock_plat_data *clk32k_pdata;
+	int ret;
+	struct tps80031_clk32k_init_data *clk32_idata = pdata->clk32k_init_data;
+	int data_size = pdata->clk32k_init_data_size;
+	static int clk32k_preq_bit_pos[TPS80031_CLOCK32K_NR] = {-1, 20, 19};
+	int base_add;
+	int i;
 
-	if (!(pdata && pdata->clk32k_pdata))
+	if (!clk32_idata || !data_size)
 		return;
 
-	clk32k_pdata = pdata->clk32k_pdata;
-	if (clk32k_pdata->en_clk32kao)
-		tps80031_clk32k_enable(tps80031, CLK32KAO_BASE_ADD);
+	/* Configure the external request mode */
+	for (i = 0; i < data_size; ++i) {
+		struct tps80031_clk32k_init_data *clk32_pd =  &clk32_idata[i];
+		base_add = pmc_clk32k_control_base[clk32_pd->clk32k_nr];
+		if (clk32_pd->enable)
+			tps80031_clk32k_enable(tps80031, base_add);
 
-	if (clk32k_pdata->en_clk32kg)
-		tps80031_clk32k_enable(tps80031, CLK32KG_BASE_ADD);
+		if ((clk32_pd->ext_ctrl_flag & EXT_PWR_REQ) &&
+			 (clk32k_preq_bit_pos[clk32_pd->clk32k_nr] != -1)) {
+			ret = tps80031_ext_power_req_config(tps80031->dev,
+				clk32_pd->ext_ctrl_flag,
+				clk32k_preq_bit_pos[clk32_pd->clk32k_nr],
+				base_add + EXT_CONTROL_CFG_STATE,
+				base_add + EXT_CONTROL_CFG_TRANS);
+			if (ret < 0)
+				dev_warn(tps80031->dev, "Clk32 ext control "
+					"fails\n");
+		}
 
-	if (clk32k_pdata->en_clk32kaudio)
-		tps80031_clk32k_enable(tps80031, CLK32KAUDIO_BASE_ADD);
+		if (clk32_pd->ext_ctrl_flag & PWR_OFF_ON_SLEEP) {
+			ret = tps80031_update(tps80031->dev, SLAVE_ID1,
+				base_add + EXT_CONTROL_CFG_TRANS, 0x0, 0xC);
+			if (ret < 0)
+				dev_warn(tps80031->dev, "clk OFF on sleep "
+					"control fails\n");
+		}
+
+		if (clk32_pd->ext_ctrl_flag & PWR_ON_ON_SLEEP) {
+			ret = tps80031_update(tps80031->dev, SLAVE_ID1,
+				base_add + EXT_CONTROL_CFG_TRANS, 0x4, 0xC);
+			if (ret < 0)
+				dev_warn(tps80031->dev, "clk ON sleep "
+					"control fails\n");
+		}
+	}
 }
 
 static int __devinit tps80031_add_subdevs(struct tps80031 *tps80031,

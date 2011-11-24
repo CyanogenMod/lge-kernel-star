@@ -106,7 +106,7 @@ struct tps80031_regulator {
 
 	u8			flags;
 	unsigned int		platform_flags;
-	enum tps80031_ext_control ext_pwr_ctrl;
+	unsigned int		ext_ctrl_flag;
 
 	/* used by regulator core */
 	struct regulator_desc	desc;
@@ -160,7 +160,7 @@ static int tps80031_reg_is_enabled(struct regulator_dev *rdev)
 {
 	struct tps80031_regulator *ri = rdev_get_drvdata(rdev);
 
-	if (ri->ext_pwr_ctrl & EXT_PWR_REQ)
+	if (ri->ext_ctrl_flag & EXT_PWR_REQ)
 		return true;
 	return ((ri->state_reg_cache & STATE_MASK) == STATE_ON);
 }
@@ -172,7 +172,7 @@ static int tps80031_reg_enable(struct regulator_dev *rdev)
 	int ret;
 	uint8_t reg_val;
 
-	if (ri->ext_pwr_ctrl & EXT_PWR_REQ)
+	if (ri->ext_ctrl_flag & EXT_PWR_REQ)
 		return 0;
 
 	reg_val = (ri->state_reg_cache & ~STATE_MASK) |
@@ -194,7 +194,7 @@ static int tps80031_reg_disable(struct regulator_dev *rdev)
 	int ret;
 	uint8_t reg_val;
 
-	if (ri->ext_pwr_ctrl & EXT_PWR_REQ)
+	if (ri->ext_ctrl_flag & EXT_PWR_REQ)
 		return 0;
 
 	reg_val = (ri->state_reg_cache & ~STATE_MASK) |
@@ -793,10 +793,12 @@ static int tps80031_power_req_config(struct device *parent,
 		struct tps80031_regulator_platform_data *tps80031_pdata)
 {
 	int ret;
+	uint8_t reg_val;
+
 	if (ri->preq_bit < 0)
 		return 0;
 
-	ret = tps80031_ext_power_req_config(parent, ri->ext_pwr_ctrl,
+	ret = tps80031_ext_power_req_config(parent, ri->ext_ctrl_flag,
 			ri->preq_bit, ri->state_reg, ri->trans_reg);
 	if (!ret)
 		ret = tps80031_read(parent, SLAVE_ID1, ri->trans_reg,
@@ -805,6 +807,25 @@ static int tps80031_power_req_config(struct device *parent,
 	if (!ret && ri->state_reg)
 		ret = tps80031_read(parent, SLAVE_ID1, ri->state_reg,
 			&ri->state_reg_cache);
+	if (ret < 0) {
+		dev_err(ri->dev, "%s() fails\n", __func__);
+		return ret;
+	}
+
+	if (tps80031_pdata->ext_ctrl_flag &
+			(PWR_OFF_ON_SLEEP | PWR_ON_ON_SLEEP)) {
+		reg_val = (ri->trans_reg_cache & ~0xC);
+		if (tps80031_pdata->ext_ctrl_flag & PWR_ON_ON_SLEEP)
+			reg_val |= 0x4;
+
+		ret = tps80031_write(parent, SLAVE_ID1, ri->trans_reg,
+			reg_val);
+		if (ret < 0)
+			dev_err(ri->dev, "Not able to write reg 0x%02x\n",
+				ri->trans_reg);
+		else
+			ri->trans_reg_cache = reg_val;
+	}
 	return ret;
 }
 
@@ -997,7 +1018,7 @@ static int __devinit tps80031_regulator_probe(struct platform_device *pdev)
 
 	check_smps_mode_mult(pdev->dev.parent, ri);
 	ri->platform_flags = tps_pdata->flags;
-	ri->ext_pwr_ctrl = tps_pdata->ext_pwr_ctrl;
+	ri->ext_ctrl_flag = tps_pdata->ext_ctrl_flag;
 
 	err = tps80031_cache_regulator_register(pdev->dev.parent, ri);
 	if (err) {
