@@ -363,7 +363,7 @@ static struct xt_match socket_mt_reg[] __read_mostly = {
 		.hooks		= 1 << NF_INET_PRE_ROUTING,
 		.me		= THIS_MODULE,
 	},
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+#ifdef XT_SOCKET_HAVE_IPV6
        {
 		.name           = "socket",
 		.revision       = 1,

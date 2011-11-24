@@ -106,7 +106,7 @@ nf_tproxy_get_sock_v4(struct net *net, const u8 protocol,
 				     in->ifindex);
 		if (sk && lookup_type != NFT_LOOKUP_ANY) {
 			int connected = (sk->sk_state == TCP_ESTABLISHED);
-			int wildcard = (inet_sk(sk)->inet_rcv_saddr == 0);
+			int wildcard = (inet_sk(sk)->rcv_saddr == 0);
 
 			/* NOTE: we return listeners even if bound to
 			 * 0.0.0.0, those are filtered out in
