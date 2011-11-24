@@ -106,9 +106,6 @@ static char *tegra_android_functions_all[] = {
 #ifdef CONFIG_USB_ANDROID_ADB
 	"adb",
 #endif
-#ifdef CONFIG_USB_ANDROID_ACCESSORY
-	"accessory",
-#endif
 };
 
 static struct android_usb_product tegra_android_products[] = {
@@ -147,14 +144,12 @@ static struct android_usb_product tegra_android_products[] = {
 	},
 #ifdef CONFIG_USB_ANDROID_ACCESSORY
 	[4] = {
-		.vendor_id  = USB_ACCESSORY_VENDOR_ID,
-		.product_id  = USB_ACCESSORY_PRODUCT_ID,
+		.product_id = 0x7104,
 		.num_functions = ARRAY_SIZE(tegra_android_functions_accessory),
 		.functions = tegra_android_functions_accessory,
 	},
 	[5] = {
-		.vendor_id  = USB_ACCESSORY_VENDOR_ID,
-		.product_id  = USB_ACCESSORY_ADB_PRODUCT_ID,
+		.product_id = 0x7105,
 		.num_functions = ARRAY_SIZE(tegra_android_functions_accessory_adb),
 		.functions = tegra_android_functions_accessory_adb,
 	},
