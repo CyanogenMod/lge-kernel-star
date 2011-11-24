@@ -172,23 +172,21 @@ TRACE_EVENT(nvhost_channel_write_cmdbuf_data,
 		  __entry->cmdbuf ? __entry->words * 4 : 0))
 );
 
-TRACE_EVENT(nvhost_channel_write_relocs,
-	TP_PROTO(const char *name, u32 relocs),
+TRACE_EVENT(nvhost_channel_write_reloc,
+	TP_PROTO(const char *name),
 
-	TP_ARGS(name, relocs),
+	TP_ARGS(name),
 
 	TP_STRUCT__entry(
 		__field(const char *, name)
-		__field(u32, relocs)
 	),
 
 	TP_fast_assign(
 		__entry->name = name;
-		__entry->relocs = relocs;
 	),
 
-	TP_printk("name=%s, relocs=%u",
-	  __entry->name, __entry->relocs)
+	TP_printk("name=%s",
+	  __entry->name)
 );
 
 TRACE_EVENT(nvhost_channel_write_waitchks,

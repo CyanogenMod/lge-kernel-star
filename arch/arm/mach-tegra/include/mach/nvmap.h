@@ -65,6 +65,7 @@ struct nvmap_pinarray_elem {
 	__u32 patch_offset;
 	__u32 pin_mem;
 	__u32 pin_offset;
+	__u32 reloc_shift;
 };
 
 /* handle_ref objects are client-local references to an nvmap_handle;
