@@ -94,9 +94,13 @@ void __iomem *tegra_ioremap(unsigned long p, size_t size, unsigned int type)
 	 * __arm_ioremap fails to set the domain of ioremapped memory
 	 * correctly, only use it on physical memory.
 	 */
-	if (v == NULL && p >= TEGRA_DRAM_BASE &&
-		p <= (TEGRA_DRAM_BASE + TEGRA_DRAM_SIZE))
+	if (v == NULL) {
+		if ((p >= TEGRA_DRAM_BASE &&
+		     (p + size) <= (TEGRA_DRAM_BASE + TEGRA_DRAM_SIZE)) ||
+		    (p >= TEGRA_NOR_FLASH_BASE &&
+		     (p + size) <= (TEGRA_NOR_FLASH_BASE + TEGRA_NOR_FLASH_SIZE)))
 			v = __arm_ioremap(p, size, type);
+	}
 
 	/*
 	 * If the physical address was not physical memory or statically
