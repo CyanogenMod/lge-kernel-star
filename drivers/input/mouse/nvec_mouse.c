@@ -172,7 +172,7 @@ static int nvec_mouse_receive_thread(void *arg)
 
 	/* mouse event thread should be frozen before suspending the
 	 * mouse and NVEC drivers */
-	set_freezable_with_signal();
+	set_freezable();
 
 	if (!NvOdmMouseEnableInterrupt(mouse->hDevice, mouse->semaphore)) {
 		pr_err("**nvec_mouse_receive_thread: EnableInterrupt: fail\n");
