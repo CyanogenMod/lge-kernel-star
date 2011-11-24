@@ -794,7 +794,7 @@ functions_store(struct device *pdev, struct device_attribute *attr,
 	INIT_LIST_HEAD(&dev->enabled_functions);
 
 	strncpy(buf, buff, sizeof(buf));
-	b = strim(buf);
+	b = strstrip(buf);
 
 	while (b) {
 		name = strsep(&b, ",");

@@ -147,14 +147,12 @@ static void adb_request_free(struct usb_request *req, struct usb_ep *ep)
 
 static inline int adb_lock(atomic_t *excl)
 {
-	int ret = -1;
-	preempt_disable();
 	if (atomic_inc_return(excl) == 1) {
-		ret= 0;
-	} else
+		return 0;
+	} else {
 		atomic_dec(excl);
-	preempt_enable();
-	return ret;
+		return -1;
+	}
 }
 
 static inline void adb_unlock(atomic_t *excl)
@@ -414,14 +412,12 @@ static int adb_open(struct inode *ip, struct file *fp)
 
 	if (adb_lock(&_adb_dev->open_excl))
 		return -EBUSY;
-	}
 
-	if (count < 5)
-		printk(KERN_INFO "adb_open(%s)\n", current->comm);
 	fp->private_data = _adb_dev;
 
 	/* clear the error latch */
 	_adb_dev->error = 0;
+
 	return 0;
 }
 

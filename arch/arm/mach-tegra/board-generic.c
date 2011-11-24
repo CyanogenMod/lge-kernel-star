@@ -46,64 +46,64 @@
 #include "nvodm_query_discovery.h"
 #include "board.h"
 
-#ifdef CONFIG_USB_ANDROID
+#ifdef CONFIG_USB_G_ANDROID
 
 static char *tegra_android_functions_ums[] = {
-#ifdef CONFIG_USB_ANDROID_MASS_STORAGE
+#ifdef CONFIG_USB_G_ANDROID_MASS_STORAGE
 	"usb_mass_storage",
 #endif
 };
 
 static char *tegra_android_functions_ums_adb[] = {
-#ifdef CONFIG_USB_ANDROID_ACM
+#ifdef CONFIG_USB_G_ANDROID_ACM
 	"acm",
 #endif
-#ifdef CONFIG_USB_ANDROID_MASS_STORAGE
+#ifdef CONFIG_USB_G_ANDROID_MASS_STORAGE
 	"usb_mass_storage",
 #endif
-#ifdef CONFIG_USB_ANDROID_ADB
+#ifdef CONFIG_USB_G_ANDROID_ADB
 	"adb",
 #endif
 };
 
 static char *tegra_android_functions_rndis[] = {
-#ifdef CONFIG_USB_ANDROID_RNDIS
+#ifdef CONFIG_USB_G_ANDROID_RNDIS
 	"rndis",
 #endif
 };
 
 static char *tegra_android_functions_rndis_adb[] = {
-#ifdef CONFIG_USB_ANDROID_RNDIS
+#ifdef CONFIG_USB_G_ANDROID_RNDIS
 	"rndis",
 #endif
-#ifdef CONFIG_USB_ANDROID_ADB
+#ifdef CONFIG_USB_G_ANDROID_ADB
 	"adb",
 #endif
 };
 
-#ifdef CONFIG_USB_ANDROID_ACCESSORY
+#ifdef CONFIG_USB_G_ANDROID_ACCESSORY
 static char *tegra_android_functions_accessory[] = { 
 	"accessory",
 };
 static char *tegra_android_functions_accessory_adb[] = { 
 	"accessory", 
-#ifdef CONFIG_USB_ANDROID_ADB
+#ifdef CONFIG_USB_G_ANDROID_ADB
 	"adb",
 #endif
 };
 #endif
 
 static char *tegra_android_functions_all[] = {
-#ifdef CONFIG_USB_ANDROID_RNDIS
+#ifdef CONFIG_USB_G_ANDROID_RNDIS
 	"rndis",
 #endif
-#ifdef CONFIG_USB_ANDROID_ACM
+#ifdef CONFIG_USB_G_ANDROID_ACM
 	"acm",
 #endif
-#ifdef CONFIG_USB_ANDROID_MASS_STORAGE
+#ifdef CONFIG_USB_G_ANDROID_MASS_STORAGE
 	"usb_mass_storage",
 #endif
-#ifdef CONFIG_USB_ANDROID_ADB
+#ifdef CONFIG_USB_G_ANDROID_ADB
 	"adb",
 #endif
 };
@@ -142,7 +142,7 @@ static struct android_usb_product tegra_android_products[] = {
 		.num_functions = ARRAY_SIZE(tegra_android_functions_rndis_adb),
 		.functions = tegra_android_functions_rndis_adb,
 	},
-#ifdef CONFIG_USB_ANDROID_ACCESSORY
+#ifdef CONFIG_USB_G_ANDROID_ACCESSORY
 	[4] = {
 		.product_id = 0x7104,
 		.num_functions = ARRAY_SIZE(tegra_android_functions_accessory),
@@ -194,7 +194,7 @@ static struct platform_device tegra_android_device = {
 		.platform_data = &tegra_android_platform,
 	},
 };
-#ifdef CONFIG_USB_ANDROID_MASS_STORAGE
+#ifdef CONFIG_USB_G_ANDROID_MASS_STORAGE
 static struct usb_mass_storage_platform_data tegra_usb_fsg_platform = {
 //20100710, change mass storage device information [START]
 #if defined (CONFIG_MACH_STAR)
@@ -216,7 +216,7 @@ static struct platform_device tegra_usb_fsg_device = {
 	},
 };
 #endif
-#ifdef CONFIG_USB_ANDROID_RNDIS
+#ifdef CONFIG_USB_G_ANDROID_RNDIS
 static struct usb_ether_platform_data tegra_usb_rndis_platform = {
 	.ethaddr = {
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00
@@ -235,11 +235,11 @@ static struct platform_device tegra_usb_rndis_device = {
 #endif
 
 static struct platform_device *platform_devices[] = {
-#if defined(CONFIG_USB_ANDROID) || defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
-#ifdef CONFIG_USB_ANDROID_RNDIS
+#if defined(CONFIG_USB_G_ANDROID) || defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
+#ifdef CONFIG_USB_G_ANDROID_RNDIS
 	&tegra_usb_rndis_device,
 #endif
-#ifdef CONFIG_USB_ANDROID_MASS_STORAGE
+#ifdef CONFIG_USB_G_ANDROID_MASS_STORAGE
 	&tegra_usb_fsg_device,
 #endif
 	&tegra_android_device,
@@ -473,7 +473,7 @@ static inline void tegra_setup_bluesleep_csr(void) { }
 
 static void __init tegra_harmony_init(void)
 {
-#ifdef CONFIG_USB_ANDROID
+#ifdef CONFIG_USB_G_ANDROID
 	tegra_android_platform.product_name = harmony_dev;
 #endif
 	do_system_init(true, true);
@@ -483,7 +483,7 @@ static void __init tegra_harmony_init(void)
 
 static void __init tegra_ventana_init(void)
 {
-#ifdef CONFIG_USB_ANDROID
+#ifdef CONFIG_USB_G_ANDROID
 	tegra_android_platform.product_name = ventana_dev;
 #endif
 	do_system_init(false, true);
@@ -495,7 +495,7 @@ static void __init tegra_ventana_init(void)
 
 static void __init tegra_generic_init(void)
 {
-#if defined(CONFIG_USB_ANDROID) || defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
+#if defined(CONFIG_USB_G_ANDROID) || defined(CONFIG_USB_SUPPORT_LGE_ANDROID_GADGET)
 	tegra_android_platform.product_name = generic_dev;
 #endif
 	do_system_init(true, true);
