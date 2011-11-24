@@ -241,7 +241,7 @@ NvEcPrivPingThread(void *args)
 	NvEcResponse resp;
 	NvEcPrivState *ec = (NvEcPrivState *)args;
 
-	set_freezable_with_signal();
+	set_freezable();
 
 	for (;;) {
 	NvOsSemaphoreWait(ec->hPingSema);

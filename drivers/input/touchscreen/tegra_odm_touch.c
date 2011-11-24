@@ -43,6 +43,7 @@ struct tegra_touch_driver_data
 	struct input_dev	*input_dev;
 	struct task_struct	*task;
 	NvOdmOsSemaphoreHandle	semaphore;
+	NvOdmOsMutexHandle hMutex;
 	NvOdmTouchDeviceHandle	hTouchDevice;
 	NvBool			bPollingMode;
 	NvU32			pollingIntervalMS;
@@ -53,8 +54,12 @@ struct tegra_touch_driver_data
 	NvU32			MinY;
 	int			shutdown;
 	struct early_suspend	early_suspend;
+	/* wait_queue needed for kernel thread freeze support */
+	wait_queue_head_t	ts_wait;
+	NvBool bIsSuspended;
 };
 
+	NvOdmOsMutexHandle htouchMutex;
 
 // 20100825  Debug Message Control (Temporary) [START]
 #define touch_fingerprint(enable, fmt, args...) do { \
@@ -152,10 +157,20 @@ static void tegra_touch_early_suspend(struct early_suspend *es)
 	printk("[TOUCH] tegra_touch_early_suspend\n");
 	
 	if (touch && touch->hTouchDevice) {
+        if (!touch->bIsSuspended) {
+            NvOdmOsMutexLock(touch->hMutex);
 		NvOdmTouchInterruptMask(touch->hTouchDevice, NV_TRUE);
-		NvOdmOsSleepMS(50);
 			
 		NvOdmTouchPowerControl(touch->hTouchDevice, NvOdmTouch_PowerMode_3);
+
+            touch->bIsSuspended = NV_TRUE;
+            if (!touch->bPollingMode) {
+                /* allow touch thread to call wake_event_freezer */
+                NvOdmOsSemaphoreSignal(touch->semaphore);
+            }
+            NvOdmOsMutexUnlock(touch->hMutex);
+        } 
+        else printk("[TOUCH]!: bIsSuspended = TURE!@tegra_touch_early_suspend\n");
 	}
 	else {
 		pr_err("tegra_touch_early_suspend: NULL handles passed\n");
@@ -175,13 +190,20 @@ static void tegra_touch_late_resume(struct early_suspend *es)
 			NvOdmTouchDeviceClose(touch->hTouchDevice);
 			NvOdmTouchDeviceOpen(&touch->hTouchDevice, &touch->semaphore);
 
-// 20101130  for ESD [START]
+             // 20101130  for ESD [START]
 			NvOdmTouchPowerControl(touch->hTouchDevice, NvOdmTouch_PowerMode_3);
 			NvOdmTouchPowerControl(touch->hTouchDevice, NvOdmTouch_PowerMode_1);
-// 20101130  for ESD [END]
+             // 20101130  for ESD [END]
 		}
 		else
 			NvOdmTouchInterruptMask(touch->hTouchDevice, NV_FALSE);
+
+         if (touch->bIsSuspended) {
+             touch->bIsSuspended = NV_FALSE;
+             wake_up(&touch->ts_wait);
+         }
+         else printk("[TOUCH]!:bIsSuspended = FALSE!@tegra_touch_late_resume\n");
+
 	}
 	else {
 		pr_err("tegra_touch_late_resume: NULL handles passed\n");
@@ -195,13 +217,20 @@ static int tegra_touch_suspend(struct platform_device *pdev, pm_message_t state)
 	printk("[TOUCH] tegra_touch_suspend\n");
 
 	if (touch && touch->hTouchDevice) {
+        if (!touch->bIsSuspended) {
 		NvOdmTouchInterruptMask(touch->hTouchDevice, NV_TRUE);
 		NvOdmOsSleepMS(50);
 			
 		NvOdmTouchPowerControl(touch->hTouchDevice, NvOdmTouch_PowerMode_3);
+            touch->bIsSuspended = NV_TRUE;
+            if (!touch->bPollingMode) {
+                /* allow touch thread to call wake_event_freezer */
+                NvOdmOsSemaphoreSignal(touch->semaphore);
+            }
 
 		return 0;
 	}
+    }
 	pr_err("tegra_touch_suspend: NULL handles passed\n");
 	return -1;
 }
@@ -213,11 +242,15 @@ static int tegra_touch_resume(struct platform_device *pdev)
 	printk("[TOUCH] tegra_touch_resume\n");
 
 	if (touch && touch->hTouchDevice) {
+        if (touch->bIsSuspended) {
 		if(!NvOdmTouchPowerControl(touch->hTouchDevice, NvOdmTouch_PowerMode_0))
 		{
+                touch->bIsSuspended = NV_FALSE;
+                wake_up(&touch->ts_wait);
 			NvOdmTouchDeviceClose(touch->hTouchDevice);
 			NvOdmTouchDeviceOpen(&touch->hTouchDevice, &touch->semaphore);
 		}
+        }
 		else
 			NvOdmTouchInterruptMask(touch->hTouchDevice, NV_FALSE);
 
@@ -228,7 +261,7 @@ static int tegra_touch_resume(struct platform_device *pdev)
 }
 #endif
 
-
+// 20101022  touch smooth moving improve [START]
 #ifdef FEATURE_LGE_TOUCH_MOVING_IMPROVE
 #define ADJUST_FACTOR_LEVEL_5			8
 #define ADJUST_FACTOR_LEVEL_4			6
@@ -294,6 +327,7 @@ static void tegra_touch_adjust_position(NvU32 finger_num, NvU32 x_value, NvU32 y
 	}
 }
 #endif /* FEATURE_LGE_TOUCH_MOVING_IMPROVE */
+// 20101022  [STAR] apply touch smooth moving improve [END]
 
 
 #ifndef CONFIG_TOUCHSCREEN_ANDROID_VIRTUALKEYS
@@ -355,9 +389,14 @@ static int tegra_touch_thread(void *pdata)
 	NvU8 lcd_finger_num = 0;
 
 	/* touch event thread should be frozen before suspend */
+    /* 20110730 
+       BUG 853092
+       use set_freezeable() instead of set_freezable_with_signal()
 	set_freezable_with_signal();
+     */	
+    set_freezable();
 	
-	for (;;)
+	while(!kthread_should_stop())
 	{
 		if (touch->bPollingMode)
 			msleep(touch->pollingIntervalMS); 
@@ -365,18 +404,32 @@ static int tegra_touch_thread(void *pdata)
 			/* FIXME should have a timeout so, that we can exit thread */
 			if (!NvOdmOsSemaphoreWaitTimeout(touch->semaphore, NV_WAIT_INFINITE))
 				BUG();
+        if (touch->bIsSuspended) {
+            /*
+             * kernel threads need to wait on event freezable in order
+             * to be freezable.
+             * Refer kernel Documentation power->freezing-of-tasks
+             */
+            wait_event_freezable(touch->ts_wait,
+                    !touch->bIsSuspended ||
+                    kthread_should_stop());
+	        printk("[TOUCH] ktrhead_wakeup@tegra_touch_thread\n");
+            continue;
+        }
 
         bKeepReadingSamples = NV_TRUE;
         while (bKeepReadingSamples)
         {
+        	NvOdmOsMutexLock(touch->hMutex);
 			if (!NvOdmTouchReadCoordinate(touch->hTouchDevice, &c))
 			{
 				pr_err("What the... Nvidia!! Why does it happen i2c error and why can't I recover it??\n");
-				
-				bKeepReadingSamples = NV_FALSE;
-
-				goto DoneWithSample;
+				NvOdmTouchDeviceClose(touch->hTouchDevice);
+				NvOdmTouchDeviceOpen(&touch->hTouchDevice, &touch->semaphore);
+        		NvOdmOsMutexUnlock(touch->hMutex);
+				break;
 			}
+	   		NvOdmOsMutexUnlock(touch->hMutex);
 
 			if (c.fingerstate & NvOdmTouchSampleIgnore)
 			{
@@ -788,7 +841,12 @@ static int tegra_touch_thread(void *pdata)
 	NvU32 max_fingers = caps->MaxNumberOfFingerCoordReported;
 
 	/* touch event thread should be frozen before suspend */
+    /* 20110730 
+       BUG 853092
+       use set_freezeable() instead of set_freezable_with_signal()
 	set_freezable_with_signal();
+     */
+	set_freezable();
 
 	for (;;) {
 		if (touch->bPollingMode)
@@ -969,6 +1027,14 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 		return err;
 	}
 	
+    touch->hMutex = NvOdmOsMutexCreate();
+		if (!touch->hMutex) {
+			err = -1;
+			pr_err("tegra_touch_probe: Mutex creation failed\n");
+			goto err_mutex_create_failed;
+		}
+		
+		htouchMutex = touch->hMutex;
 	touch->semaphore = NvOdmOsSemaphoreCreate(0);
 	if (!touch->semaphore) {
 		err = -1;
@@ -1007,6 +1073,7 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 		err = -1;
 		goto err_kthread_create_failed;
 	}
+	init_waitqueue_head(&touch->ts_wait);
 	wake_up_process( touch->task );
 
 	touch->input_dev = input_dev;
@@ -1021,6 +1088,7 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 	set_bit(BTN_TOUCH, touch->input_dev->keybit);
 	/* Input values are in absoulte values */
 	set_bit(EV_ABS, touch->input_dev->evbit);
+	touch->bIsSuspended = NV_FALSE;
 
 	NvOdmTouchDeviceGetCapabilities(touch->hTouchDevice, &touch->caps);
 
@@ -1145,9 +1213,13 @@ err_input_register_device_failed:
 	NvOdmTouchDeviceClose(touch->hTouchDevice);
 err_kthread_create_failed:
 	/* FIXME How to destroy the thread? Maybe we should use workqueues? */
+	kthread_stop(touch->task);
 err_open_failed:
 	NvOdmOsSemaphoreDestroy(touch->semaphore);
 err_semaphore_create_failed:
+	NvOdmOsMutexDestroy(touch->hMutex);
+	htouchMutex = NULL;
+err_mutex_create_failed:
 	kfree(touch);
 	input_free_device(input_dev);
 	return err;
@@ -1180,11 +1252,14 @@ static int tegra_touch_remove(struct platform_device *pdev)
 // 20100906  Touch F/W version [END]
 
 	NvOdmOsSemaphoreDestroy(touch->semaphore);
+	htouchMutex = NULL;
+	NvOdmOsMutexDestroy(touch->hMutex);
 	NvOdmTouchDeviceClose(touch->hTouchDevice);
 
 	/* FIXME How to destroy the thread? Maybe we should use workqueues? */
+	kthread_stop(touch->task);
 	input_unregister_device(touch->input_dev);
-
+	NvOdmOsSemaphoreDestroy(touch->semaphore);
 	kfree(touch);
 	return 0;
 }
@@ -1219,6 +1294,8 @@ static void tegra_touch_shutdown(struct  platform_device *pdev)
 // 20100906  Touch F/W version [END]
 
 	NvOdmOsSemaphoreDestroy(touch->semaphore);
+	htouchMutex = NULL;
+	NvOdmOsMutexDestroy(touch->hMutex);
 	NvOdmTouchDeviceClose(touch->hTouchDevice);
 
 	input_unregister_device(touch->input_dev);
@@ -1230,7 +1307,10 @@ static struct platform_driver tegra_touch_driver = {
 	.probe   = tegra_touch_probe,
 	.remove	 = tegra_touch_remove,
 	.shutdown = tegra_touch_shutdown,
-#ifndef CONFIG_HAS_EARLYSUSPEND
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	.suspend = NULL,
+	.resume	 = NULL,
+#else
 	.suspend = tegra_touch_suspend,
 	.resume	 = tegra_touch_resume,
 #endif

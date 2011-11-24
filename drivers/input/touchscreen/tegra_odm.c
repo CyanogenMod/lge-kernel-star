@@ -66,6 +66,8 @@ struct tegra_touch_driver_data
 	NvU32			MinY;
 	int			shutdown;
 	struct early_suspend	early_suspend;
+	/* wait_queue needed for kernel thread freeze support */
+	wait_queue_head_t	ts_wait;
 	NvBool bIsSuspended;
 };
 
@@ -82,6 +84,10 @@ static void tegra_touch_early_suspend(struct early_suspend *es)
 		if (!touch->bIsSuspended) {
 			NvOdmTouchPowerOnOff(touch->hTouchDevice, NV_FALSE);
 			touch->bIsSuspended = NV_TRUE;
+			if (!touch->bPollingMode) {
+				/* allow touch thread to call wake_event_freezer */
+				NvOdmOsSemaphoreSignal(touch->semaphore);
+			}
 		}
 	}
 	else {
@@ -97,15 +103,18 @@ static void tegra_touch_late_resume(struct early_suspend *es)
 		if (touch->bIsSuspended) {
 			NvOdmTouchPowerOnOff(touch->hTouchDevice, NV_TRUE);
 			touch->bIsSuspended = NV_FALSE;
+			wake_up(&touch->ts_wait);
 		}
 	}
 	else {
 		pr_err("tegra_touch_late_resume: NULL handles passed\n");
 	}
 }
-
-#endif
-
+#else
+/*
+ * If early suspend touch handlers are disabled only then platform
+ * driver suspend implementations are to be used
+ */
 static int tegra_touch_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct tegra_touch_driver_data *touch = platform_get_drvdata(pdev);
@@ -113,10 +122,14 @@ static int tegra_touch_suspend(struct platform_device *pdev, pm_message_t state)
 		if (!touch->bIsSuspended) {
 			NvOdmTouchPowerOnOff(touch->hTouchDevice, NV_FALSE);
 			touch->bIsSuspended = NV_TRUE;
+			if (!touch->bPollingMode) {
+				/* allow touch thread to call wake_event_freezer */
+				NvOdmOsSemaphoreSignal(touch->semaphore);
+			}
 			return 0;
 		}
 		else {
-			// device is already suspended
+			/* device is already suspended */
 			return 0;
 		}
 	}
@@ -131,6 +144,7 @@ static int tegra_touch_resume(struct platform_device *pdev)
 		if (touch->bIsSuspended) {
 			NvOdmTouchPowerOnOff(touch->hTouchDevice, NV_TRUE);
 			touch->bIsSuspended = NV_FALSE;
+			wake_up(&touch->ts_wait);
 			return 0;
 		}
 		else {
@@ -140,6 +154,7 @@ static int tegra_touch_resume(struct platform_device *pdev)
 	pr_err("tegra_touch_resume: NULL handles passed\n");
 	return -1;
 }
+#endif
 
 static int tegra_touch_thread(void *pdata)
 {
@@ -155,13 +170,24 @@ static int tegra_touch_thread(void *pdata)
 	NvOdmTouchCapabilities *caps = &touch->caps;
 
 	/* touch event thread should be frozen before suspend */
-	set_freezable_with_signal();
+	set_freezable();
 
-	for (;;) {
+	while (!kthread_should_stop()) {
 		if (touch->bPollingMode)
 			msleep(touch->pollingIntervalMS);
 		else
 			NvOdmOsSemaphoreWait(touch->semaphore);
+		if (touch->bIsSuspended) {
+			/*
+			 * kernel threads need to wait on event freezable in order
+			 * to be freezable.
+			 * Refer kernel Documentation power->freezing-of-tasks
+			 */
+			wait_event_freezable(touch->ts_wait,
+				!touch->bIsSuspended ||
+				kthread_should_stop());
+			continue;
+		}
 
 		bKeepReadingSamples = NV_TRUE;
 		while (bKeepReadingSamples) {
@@ -328,6 +354,7 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 		err = -1;
 		goto err_kthread_create_failed;
 	}
+	init_waitqueue_head(&touch->ts_wait);
 	wake_up_process( touch->task );
 
 	touch->input_dev = input_dev;
@@ -432,7 +459,7 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 err_input_register_device_failed:
 	NvOdmTouchDeviceClose(touch->hTouchDevice);
 err_kthread_create_failed:
-	/* FIXME How to destroy the thread? Maybe we should use workqueues? */
+	kthread_stop(touch->task);
 err_open_failed:
 	NvOdmOsSemaphoreDestroy(touch->semaphore);
 err_semaphore_create_failed:
@@ -449,10 +476,9 @@ static int tegra_touch_remove(struct platform_device *pdev)
         unregister_early_suspend(&touch->early_suspend);
 #endif
         touch->shutdown = 1;
-	/* FIXME How to destroy the thread? Maybe we should use workqueues? */
+	kthread_stop(touch->task);
 	input_unregister_device(touch->input_dev);
-	/* NvOsSemaphoreDestroy(touch->semaphore); */
-	input_unregister_device(touch->input_dev);
+	NvOdmOsSemaphoreDestroy(touch->semaphore);
 	kfree(touch);
 	return 0;
 }
@@ -460,8 +486,13 @@ static int tegra_touch_remove(struct platform_device *pdev)
 static struct platform_driver tegra_touch_driver = {
 	.probe	  = tegra_touch_probe,
 	.remove	 = tegra_touch_remove,
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	.suspend = NULL,
+	.resume	 = NULL,
+#else
 	.suspend = tegra_touch_suspend,
 	.resume	 = tegra_touch_resume,
+#endif
 	.driver	 = {
 		.name   = "tegra_touch",
 	},

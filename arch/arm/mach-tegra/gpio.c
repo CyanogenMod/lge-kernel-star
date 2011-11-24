@@ -760,7 +760,11 @@ static const unsigned int disable_interrupt_list[] =
 #endif
     TEGRA_GPIO_PW3,  // BATT_LOW_INT
     TEGRA_GPIO_PV3,	// MDM_RESET_FLAG +
+#ifdef CONFIG_MACH_STAR_TMUS
     TEGRA_GPIO_PU6,	// SDRY1
+#else
+    TEGRA_GPIO_PR1,    // IFX2_AP20 (LGP990)
+#endif
     0xFFFF,		      // LAST MARK
 };
 

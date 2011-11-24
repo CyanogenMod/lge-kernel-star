@@ -267,7 +267,7 @@ static int nvec_keyboard_recv(void *arg)
 
 	/* keyboard event thread should be frozen before suspending the
 	 * keyboard and NVEC drivers */
-	set_freezable_with_signal();
+	set_freezable();
 
 	while (!keyboard->shutdown) {
 		unsigned int pressed;
