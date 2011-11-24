@@ -251,7 +251,7 @@ int tegra30_ahub_allocate_rx_fifo(enum tegra30_ahub_rxcif *rxcif,
 	      (channel * TEGRA30_AHUB_CHANNEL_CTRL_STRIDE);
 	val = tegra30_apbif_read(reg);
 	val &= ~(TEGRA30_AHUB_CHANNEL_CTRL_RX_THRESHOLD_MASK |
-	       TEGRA30_AHUB_CHANNEL_CTRL_TX_PACK_MASK);
+	       TEGRA30_AHUB_CHANNEL_CTRL_RX_PACK_MASK);
 	val |= (7 << TEGRA30_AHUB_CHANNEL_CTRL_RX_THRESHOLD_SHIFT) |
 	       TEGRA30_AHUB_CHANNEL_CTRL_RX_PACK_EN |
 	       TEGRA30_AHUB_CHANNEL_CTRL_RX_PACK_16;
