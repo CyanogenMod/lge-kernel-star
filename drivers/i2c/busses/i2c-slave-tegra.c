@@ -316,6 +316,7 @@ static void configure_i2c_slave_address(struct tegra_i2c_slave_dev *i2c_dev)
 	if (i2c_dev->is_ten_bit_addr) {
 		slave_add = i2c_dev->slave_add & 0xFF;
 		slave_add_reg = readl(i2c_dev->base + I2C_SLV_ADDR1);
+		slave_add_reg &= ~(0xFF);
 		slave_add_reg |= slave_add << I2C_SLV_ADDR1_ADDR_SHIFT;
 		writel(slave_add_reg, i2c_dev->base + I2C_SLV_ADDR1);
 
@@ -328,6 +329,7 @@ static void configure_i2c_slave_address(struct tegra_i2c_slave_dev *i2c_dev)
 	} else {
 		slave_add = (i2c_dev->slave_add & 0x3FF);
 		slave_add_reg = readl(i2c_dev->base + I2C_SLV_ADDR1);
+		slave_add_reg &= ~(0x3FF);
 		slave_add_reg |= slave_add << I2C_SLV_ADDR1_ADDR_SHIFT;
 		writel(slave_add_reg, i2c_dev->base + I2C_SLV_ADDR1);
 
