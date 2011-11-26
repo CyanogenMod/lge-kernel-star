@@ -5590,7 +5590,7 @@ wl_iw_set_pmksa(
 
 		if ((pmkid_list.pmkids.npmkid > 0) && (i < pmkid_list.pmkids.npmkid)) {
 			bzero(&pmkid_list.pmkids.pmkid[i], sizeof(pmkid_t));
-			for (; i < (pmkid_list.pmkids.npmkid - 1); i++) {
+			for (; i>-1 && i < (pmkid_list.pmkids.npmkid - 1); i++) {
 				bcopy(&pmkid_list.pmkids.pmkid[i+1].BSSID,
 					&pmkid_list.pmkids.pmkid[i].BSSID,
 					ETHER_ADDR_LEN);
