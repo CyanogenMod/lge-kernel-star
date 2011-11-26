@@ -793,8 +793,6 @@ static NvOdmWakeupPadInfo s_NvOdmWakeupPadInfo[] =
     {NV_FALSE, 28, NvOdmWakeupPadPolarity_Low},     // Wake Event 28 - gp3_pq[6] (KB_ROW6)
     {NV_FALSE, 29, NvOdmWakeupPadPolarity_Low},     // Wake Event 29 - gp3_pq[7] (KB_ROW6)
     {NV_FALSE, 30, NvOdmWakeupPadPolarity_High},    // Wake Event 30 - dap1_dout (DAP1_DOUT)
-    {NV_TRUE, 31, NvOdmWakeupPadPolarity_High},    // Wake Event 31 - vol+
-    {NV_TRUE, 32, NvOdmWakeupPadPolarity_High},    // Wake Event 32 - vol-
 };
 #else
 #error STAR_HW not assigned
