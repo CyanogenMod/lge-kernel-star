@@ -101,7 +101,7 @@ static int hdmi_reg_remove(struct platform_device *pdev)
     return 0;
 }
 
-static struct platform_driver hdmi_reg = {
+static struct platform_driver hdmi_reg_driver = {
     .probe      = hdmi_reg_probe,
     .remove     = hdmi_reg_remove,
     .suspend    = hdmi_reg_suspend,
@@ -114,12 +114,12 @@ static struct platform_driver hdmi_reg = {
 
 static int __init hdmi_reg_init(void)
 {
-    return platform_driver_register(&hdmi_reg);
+    return platform_driver_register(&hdmi_reg_driver);
 }
 
 static void __exit hdmi_reg_exit(void)
 {
-    platform_driver_unregister(&hdmi_reg);
+    platform_driver_unregister(&hdmi_reg_driver);
 }
 
 module_init(hdmi_reg_init);
