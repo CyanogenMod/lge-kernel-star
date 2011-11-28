@@ -863,14 +863,14 @@ static void vbus_enable(struct tegra_usb_phy *phy)
 		WARN_ON(1);
 		return;
 	}
-	tegra_gpio_enable(gpio);
+	if (gpio < TEGRA_NR_GPIOS) tegra_gpio_enable(gpio);
 	gpio_status = gpio_direction_output(gpio, 1);
 	if (gpio_status < 0) {
 		printk("VBUS_USB request GPIO DIRECTION FAILED \n");
 		WARN_ON(1);
 		return;
 	}
-	gpio_set_value(gpio, 1);
+	gpio_set_value_cansleep(gpio, 1);
 #else
 	if (phy->reg_vbus)
 		regulator_enable(phy->reg_vbus);
@@ -885,7 +885,7 @@ static void vbus_disable(struct tegra_usb_phy *phy)
 	if (gpio == -1)
 		return;
 
-	gpio_set_value(gpio, 0);
+	gpio_set_value_cansleep(gpio, 0);
 	gpio_free(gpio);
 #else
 	if (phy->reg_vbus)
