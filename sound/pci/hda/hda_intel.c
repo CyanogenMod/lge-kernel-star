@@ -438,6 +438,7 @@ struct azx {
 	/* platform driver clocks */
 	struct clk **platform_clks;
 	int platform_clk_count;
+	int platform_clk_enable;
 #endif
 
 	/* locks */
@@ -1240,14 +1241,21 @@ static void azx_platform_enable_clocks(struct azx *chip)
 
 	for (i = 0; i < chip->platform_clk_count; i++)
 		clk_enable(chip->platform_clks[i]);
+
+	chip->platform_clk_enable++;
 }
 
 static void azx_platform_disable_clocks(struct azx *chip)
 {
 	int i;
 
+	if (!chip->platform_clk_enable)
+		return;
+
 	for (i = 0; i < chip->platform_clk_count; i++)
 		clk_disable(chip->platform_clks[i]);
+
+	chip->platform_clk_enable--;
 }
 #endif /* CONFIG_SND_HDA_PLATFORM_DRIVER */
 
@@ -2308,11 +2316,19 @@ static void azx_power_notify(struct hda_bus *bus)
 			break;
 		}
 	}
-	if (power_on)
+	if (power_on) {
+#ifdef CONFIG_SND_HDA_PLATFORM_DRIVER
+		azx_platform_enable_clocks(chip);
+#endif
 		azx_init_chip(chip, 1);
+	}
 	else if (chip->running && power_save_controller &&
-		 !bus->power_keep_link_on)
+		 !bus->power_keep_link_on) {
 		azx_stop_chip(chip);
+#ifdef CONFIG_SND_HDA_PLATFORM_DRIVER
+		azx_platform_disable_clocks(chip);
+#endif
+	}
 }
 #endif /* CONFIG_SND_HDA_POWER_SAVE */
 
@@ -2336,6 +2352,12 @@ static int azx_suspend(struct azx *chip, pm_message_t state)
 {
 	struct snd_card *card = chip->card;
 	int i;
+
+#if defined(CONFIG_SND_HDA_PLATFORM_DRIVER) && \
+	defined(CONFIG_SND_HDA_POWER_SAVE)
+	if (!chip->platform_clk_enable)
+		azx_platform_enable_clocks(chip);
+#endif
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	azx_clear_irq_pending(chip);
@@ -2406,6 +2428,13 @@ static int azx_resume(struct azx *chip)
 
 	snd_hda_resume(chip->bus);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
+
+#if defined(CONFIG_SND_HDA_PLATFORM_DRIVER) && \
+	defined(CONFIG_SND_HDA_POWER_SAVE)
+	if (chip->pdev)
+		azx_platform_disable_clocks(chip);
+#endif
+
 	return 0;
 }
 
@@ -2452,8 +2481,22 @@ static int azx_resume_platform(struct platform_device *pdev)
 static int azx_halt(struct notifier_block *nb, unsigned long event, void *buf)
 {
 	struct azx *chip = container_of(nb, struct azx, reboot_notifier);
+
+#if defined(CONFIG_SND_HDA_PLATFORM_DRIVER) && \
+	defined(CONFIG_SND_HDA_POWER_SAVE)
+	if (chip->pdev)
+		azx_platform_enable_clocks(chip);
+#endif
+
 	snd_hda_bus_reboot_notify(chip->bus);
 	azx_stop_chip(chip);
+
+#if defined(CONFIG_SND_HDA_PLATFORM_DRIVER) && \
+	defined(CONFIG_SND_HDA_POWER_SAVE)
+	if (chip->pdev)
+		azx_platform_disable_clocks(chip);
+#endif
+
 	return NOTIFY_OK;
 }
 
