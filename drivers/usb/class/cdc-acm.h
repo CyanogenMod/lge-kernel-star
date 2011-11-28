@@ -126,6 +126,7 @@ struct acm {
 	unsigned int susp_count;			/* number of suspended interfaces */
 	unsigned int combined_interfaces:1;		/* control and data collapsed */
 	unsigned int is_int_ep:1;			/* interrupt endpoints contrary to spec used */
+	unsigned int no_hangup_in_reset_resume:1;	/* do not call tty_hangup in acm_reset_resume */
 	u8 bInterval;
 	struct acm_wb *delayed_wb;			/* write queued for a device about to be woken */
 };
@@ -139,3 +140,4 @@ struct acm {
 #define NOT_A_MODEM			8
 #define NO_DATA_INTERFACE		16
 #define NOT_REAL_ACM			32
+#define NO_HANGUP_IN_RESET_RESUME	64
