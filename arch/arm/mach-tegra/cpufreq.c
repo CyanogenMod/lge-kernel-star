@@ -60,6 +60,7 @@ static DEFINE_MUTEX(init_mutex);
 
 #ifdef CONFIG_HOTPLUG_CPU
 static int disable_hotplug = 0;
+extern atomic_t hotplug_policy;
 #endif
 
 static void tegra_cpufreq_hotplug(NvRmPmRequest req)
@@ -67,12 +68,14 @@ static void tegra_cpufreq_hotplug(NvRmPmRequest req)
 	int rc = 0;
 #ifdef CONFIG_HOTPLUG_CPU
 	unsigned int cpu;
+	int policy = atomic_read(&hotplug_policy);
 
 	smp_rmb();
 	if (disable_hotplug)
 		return;
 	
-	if (req & NvRmPmRequest_CpuOnFlag) {
+
+	if (req & NvRmPmRequest_CpuOnFlag && (policy > 1 || !policy)) {
 		struct cpumask m;
 
 		cpumask_andnot(&m, cpu_present_mask, cpu_online_mask);
@@ -80,8 +83,8 @@ static void tegra_cpufreq_hotplug(NvRmPmRequest req)
 
 		if (cpu_present(cpu) && !cpu_online(cpu))
 			rc = cpu_up(cpu);
-
-	} else if (req & NvRmPmRequest_CpuOffFlag) {
+	} else
+	  if (req & NvRmPmRequest_CpuOffFlag && (policy < NR_CPUS || !policy)) {
 		cpu = cpumask_any_but(cpu_online_mask, 0);
 
 		if (cpu_present(cpu) && cpu_online(cpu))
@@ -301,6 +304,11 @@ static int tegra_cpufreq_driver_init(struct cpufreq_policy *pol)
 	return 0;
 }
 
+static struct freq_attr *tegra_cpufreq_attr[] = {
+	&cpufreq_freq_attr_scaling_available_freqs,
+	NULL,
+};
+
 static struct cpufreq_driver s_tegra_cpufreq_driver = {
 	.flags		= CPUFREQ_CONST_LOOPS,
 	.verify		= tegra_verify_speed,
@@ -309,6 +317,7 @@ static struct cpufreq_driver s_tegra_cpufreq_driver = {
 	.init		= tegra_cpufreq_driver_init,
 	.name		= "tegra_cpufreq",
 	.owner		= THIS_MODULE,
+	.attr		= tegra_cpufreq_attr,
 
 };
 
