@@ -1098,7 +1098,7 @@ composite_switch_work(struct work_struct *data)
 		switch_set_state(&cdev->sw_config, 0);
 }
 
-static int composite_bind(struct usb_gadget *gadget)
+static __init int composite_bind(struct usb_gadget *gadget)
 {
 	struct usb_composite_dev	*cdev;
 	int				status = -ENOMEM;
