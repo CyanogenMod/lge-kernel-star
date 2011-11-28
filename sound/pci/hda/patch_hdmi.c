@@ -844,6 +844,35 @@ static int hdmi_pcm_open(struct hda_pcm_stream *hinfo,
 		*codec_pars = *hinfo;
 
 	eld = &spec->sink_eld[idx];
+
+#ifdef CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA
+	if ((codec->preset->id == 0x10de0020) &&
+	    (!eld->eld_valid || !eld->sad_count)) {
+		int err = 0;
+		unsigned long timeout;
+
+		if (!eld->eld_valid) {
+			err = tegra_hdmi_setup_hda_presence();
+			if (err < 0) {
+				snd_printk(KERN_WARNING
+					   "HDMI: No HDMI device connected\n");
+				return -ENODEV;
+			}
+		}
+
+		timeout = jiffies + msecs_to_jiffies(5000);
+		for (;;) {
+			if (eld->eld_valid && eld->sad_count)
+				break;
+
+			if (time_after(jiffies, timeout))
+				break;
+
+			mdelay(10);
+		}
+	}
+#endif
+
 	if (!static_hdmi_pcm && eld->eld_valid && eld->sad_count > 0) {
 		hdmi_eld_update_pcm_info(eld, hinfo, codec_pars);
 		if (hinfo->channels_min > hinfo->channels_max ||
@@ -1015,8 +1044,8 @@ static int hdmi_parse_codec(struct hda_codec *codec)
 	 * HDA link is powered off at hot plug or hw initialization time.
 	 */
 #ifdef CONFIG_SND_HDA_POWER_SAVE
-	if (!(snd_hda_param_read(codec, codec->afg, AC_PAR_POWER_STATE) &
-	      AC_PWRST_EPSS))
+	if ((!(snd_hda_param_read(codec, codec->afg, AC_PAR_POWER_STATE) &
+	      AC_PWRST_EPSS)) && (codec->preset->id != 0x10de0020))
 		codec->bus->power_keep_link_on = 1;
 #endif
 

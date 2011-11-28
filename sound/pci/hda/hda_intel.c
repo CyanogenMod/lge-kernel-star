@@ -2425,6 +2425,18 @@ static int azx_resume(struct azx *chip)
 
 	if (snd_hda_codecs_inuse(chip->bus))
 		azx_init_chip(chip, 1);
+#if defined(CONFIG_SND_HDA_PLATFORM_DRIVER) && \
+	defined(CONFIG_SND_HDA_POWER_SAVE)
+	else if (chip->driver_type == AZX_DRIVER_NVIDIA_TEGRA) {
+		struct hda_bus *bus = chip->bus;
+		struct hda_codec *c;
+
+		list_for_each_entry(c, &bus->codec_list, list) {
+			snd_hda_power_up(c);
+			snd_hda_power_down(c);
+		}
+	}
+#endif
 
 	snd_hda_resume(chip->bus);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
