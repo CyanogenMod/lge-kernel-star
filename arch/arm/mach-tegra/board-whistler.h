@@ -33,4 +33,7 @@ int whistler_emc_init(void);
 /* Audio-related GPIOs */
 #define TEGRA_GPIO_HP_DET		TEGRA_GPIO_PW3
 
+/* TCA6416 GPIO expander */
+#define TCA6416_GPIO_BASE		(TEGRA_NR_GPIOS)
+
 #endif

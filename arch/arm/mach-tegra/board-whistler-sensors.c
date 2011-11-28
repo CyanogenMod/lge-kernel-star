@@ -47,6 +47,7 @@
 
 #include "gpio-names.h"
 #include "cpu-tegra.h"
+#include "board-whistler.h"
 
 #define CAMERA1_PWDN_GPIO		TEGRA_GPIO_PT2
 #define CAMERA1_RESET_GPIO		TEGRA_GPIO_PD2
@@ -56,7 +57,6 @@
 #define CAMERA_FLASH_EN1_GPIO		TEGRA_GPIO_PBB4
 #define CAMERA_FLASH_EN2_GPIO		TEGRA_GPIO_PA0
 
-#define TCA6416_GPIO_BASE		(TEGRA_NR_GPIOS)
 #define FUSE_POWER_EN_GPIO		(TCA6416_GPIO_BASE + 2)
 
 #define ADXL34X_IRQ_GPIO		TEGRA_GPIO_PAA1

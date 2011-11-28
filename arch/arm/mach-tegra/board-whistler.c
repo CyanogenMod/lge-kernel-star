@@ -60,6 +60,8 @@
 #include "pm.h"
 #include "board-whistler-baseband.h"
 
+#define USB1_VBUS_GPIO TCA6416_GPIO_BASE
+
 static struct plat_serial8250_port debug_uart_platform_data[] = {
 	{
 		.membase	= IO_ADDRESS(TEGRA_UARTA_BASE),
@@ -408,7 +410,7 @@ static struct usb_phy_plat_data tegra_usb_phy_pdata[] = {
 	[0] = {
 			.instance = 0,
 			.vbus_irq = MAX8907C_INT_BASE + MAX8907C_IRQ_VCHG_DC_R,
-			.vbus_gpio = TEGRA_GPIO_PN6,
+			.vbus_gpio = USB1_VBUS_GPIO,
 	},
 	[1] = {
 			.instance = 1,
