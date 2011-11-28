@@ -482,14 +482,17 @@ i915_gem_pread_ioctl(struct drm_device *dev, void *data,
 		return -EBADF;
 	obj_priv = obj->driver_private;
 
-	/* Bounds check source.
-	 *
-	 * XXX: This could use review for overflow issues...
-	 */
-	if (args->offset > obj->size || args->size > obj->size ||
-	    args->offset + args->size > obj->size) {
-		drm_gem_object_unreference(obj);
-		return -EINVAL;
+	/* Bounds check source.  */
+	if (args->offset > obj->size || args->size > obj->size - args->offset) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	if (!access_ok(VERIFY_WRITE,
+		       (char __user *)(uintptr_t)args->data_ptr,
+		       args->size)) {
+		ret = -EFAULT;
+		goto err;
 	}
 
 	if (i915_gem_object_needs_bit17_swizzle(obj)) {
@@ -501,8 +504,8 @@ i915_gem_pread_ioctl(struct drm_device *dev, void *data,
 							file_priv);
 	}
 
+err:
 	drm_gem_object_unreference(obj);
-
 	return ret;
 }
 
@@ -592,8 +595,6 @@ i915_gem_gtt_pwrite_fast(struct drm_device *dev, struct drm_gem_object *obj,
 
 	user_data = (char __user *) (uintptr_t) args->data_ptr;
 	remain = args->size;
-	if (!access_ok(VERIFY_READ, user_data, remain))
-		return -EFAULT;
 
 
 	mutex_lock(&dev->struct_mutex);
@@ -955,14 +956,17 @@ i915_gem_pwrite_ioctl(struct drm_device *dev, void *data,
 		return -EBADF;
 	obj_priv = obj->driver_private;
 
-	/* Bounds check destination.
-	 *
-	 * XXX: This could use review for overflow issues...
-	 */
-	if (args->offset > obj->size || args->size > obj->size ||
-	    args->offset + args->size > obj->size) {
-		drm_gem_object_unreference(obj);
-		return -EINVAL;
+	/* Bounds check destination. */
+	if (args->offset > obj->size || args->size > obj->size - args->offset) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	if (!access_ok(VERIFY_READ,
+		       (char __user *)(uintptr_t)args->data_ptr,
+		       args->size)) {
+		ret = -EFAULT;
+		goto err;
 	}
 
 	/* We can only do the GTT pwrite on untiled buffers, as otherwise
@@ -995,8 +999,8 @@ i915_gem_pwrite_ioctl(struct drm_device *dev, void *data,
 		DRM_INFO("pwrite failed %d\n", ret);
 #endif
 
+err:
 	drm_gem_object_unreference(obj);
-
 	return ret;
 }
 
