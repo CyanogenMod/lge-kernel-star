@@ -49,11 +49,11 @@ static struct tegra_usb_modem tegra_mdm;
 
 /* supported modems */
 static const struct usb_device_id modem_list[] = {
-	{USB_DEVICE(0x1983, 0x0310),	/* Icera 450 Modem */
-	 .driver_info = 0, /* enable autosuspend with TEGRA_MODEM_AUTOSUSPEND */
+	{USB_DEVICE(0x1983, 0x0310),	/* Icera 450 rev1 */
+	 .driver_info = TEGRA_MODEM_AUTOSUSPEND,
 	 },
-	{USB_DEVICE(0x1983, 0x0321),	/* Icera 450 Modem */
-	 .driver_info = 0, /* enable autosuspend with TEGRA_MODEM_AUTOSUSPEND */
+	{USB_DEVICE(0x1983, 0x0321),	/* Icera 450 rev2 */
+	 .driver_info = TEGRA_MODEM_AUTOSUSPEND,
 	 },
 	{}
 };
