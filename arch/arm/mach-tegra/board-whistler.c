@@ -63,7 +63,30 @@
 
 #define USB1_VBUS_GPIO TCA6416_GPIO_BASE
 
-static struct plat_serial8250_port debug_uart_platform_data[] = {
+static struct plat_serial8250_port debug_uartb_platform_data[] = {
+	{
+		.membase	= IO_ADDRESS(TEGRA_UARTB_BASE),
+		.mapbase	= TEGRA_UARTB_BASE,
+		.irq		= INT_UARTB,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_FIXED_TYPE,
+		.type           = PORT_TEGRA,
+		.iotype		= UPIO_MEM,
+		.regshift	= 2,
+		.uartclk	= 216000000,
+	}, {
+		.flags		= 0,
+	}
+};
+
+static struct platform_device debug_uartb = {
+	.name = "serial8250",
+	.id = PLAT8250_DEV_PLATFORM,
+	.dev = {
+		.platform_data = debug_uartb_platform_data,
+	},
+};
+
+static struct plat_serial8250_port debug_uarta_platform_data[] = {
 	{
 		.membase	= IO_ADDRESS(TEGRA_UARTA_BASE),
 		.mapbase	= TEGRA_UARTA_BASE,
@@ -78,13 +101,14 @@ static struct plat_serial8250_port debug_uart_platform_data[] = {
 	}
 };
 
-static struct platform_device debug_uart = {
+static struct platform_device debug_uarta = {
 	.name = "serial8250",
 	.id = PLAT8250_DEV_PLATFORM,
 	.dev = {
-		.platform_data = debug_uart_platform_data,
+		.platform_data = debug_uarta_platform_data,
 	},
 };
+
 static struct platform_device *whistler_uart_devices[] __initdata = {
 	&tegra_uarta_device,
 	&tegra_uartb_device,
@@ -104,30 +128,54 @@ static void __init uart_debug_init(void)
 	unsigned long rate;
 	struct clk *debug_uart_clk;
 	struct clk *c;
+	int modem_id = tegra_get_modem_id();
 
-	/* UARTA is the debug port. */
-	pr_info("Selecting UARTA as the debug console\n");
-	whistler_uart_devices[0] = &debug_uart;
-	debug_uart_port_base = ((struct plat_serial8250_port *)(
-				debug_uarta_device.dev.platform_data))->mapbase;
-	debug_uart_clk = clk_get_sys("serial8250.0", "uarta");
+	if (modem_id == 0x1) {
+		/* UARTB is the debug port. */
+		pr_info("Selecting UARTB as the debug console\n");
+		whistler_uart_devices[1] = &debug_uartb;
+		debug_uart_clk = clk_get_sys("serial8250.0", "uartb");
 
-	/* Clock enable for the debug channel */
-	if (!IS_ERR_OR_NULL(debug_uart_clk)) {
-		rate = debug_uart_platform_data[0].uartclk;
-		pr_info("The debug console clock name is %s\n",
+		/* Clock enable for the debug channel */
+		if (!IS_ERR_OR_NULL(debug_uart_clk)) {
+			rate = debug_uartb_platform_data[0].uartclk;
+			pr_info("The debug console clock name is %s\n",
 						debug_uart_clk->name);
-		c = tegra_get_clock_by_name("pll_p");
-		if (IS_ERR_OR_NULL(c))
-			pr_err("Not getting the parent clock pll_p\n");
-		else
-			clk_set_parent(debug_uart_clk, c);
+			c = tegra_get_clock_by_name("pll_p");
+			if (IS_ERR_OR_NULL(c))
+				pr_err("Not getting the parent clock pll_p\n");
+			else
+				clk_set_parent(debug_uart_clk, c);
 
-		clk_enable(debug_uart_clk);
-		clk_set_rate(debug_uart_clk, rate);
+			clk_enable(debug_uart_clk);
+			clk_set_rate(debug_uart_clk, rate);
+		} else {
+			pr_err("Not getting the clock %s for debug console\n",
+						debug_uart_clk->name);
+		}
 	} else {
-		pr_err("Not getting the clock %s for debug console\n",
-					debug_uart_clk->name);
+		/* UARTA is the debug port. */
+		pr_info("Selecting UARTA as the debug console\n");
+		whistler_uart_devices[0] = &debug_uarta;
+		debug_uart_clk = clk_get_sys("serial8250.0", "uarta");
+
+		/* Clock enable for the debug channel */
+		if (!IS_ERR_OR_NULL(debug_uart_clk)) {
+			rate = debug_uarta_platform_data[0].uartclk;
+			pr_info("The debug console clock name is %s\n",
+						debug_uart_clk->name);
+			c = tegra_get_clock_by_name("pll_p");
+			if (IS_ERR_OR_NULL(c))
+				pr_err("Not getting the parent clock pll_p\n");
+			else
+				clk_set_parent(debug_uart_clk, c);
+
+			clk_enable(debug_uart_clk);
+			clk_set_rate(debug_uart_clk, rate);
+		} else {
+			pr_err("Not getting the clock %s for debug console\n",
+						debug_uart_clk->name);
+		}
 	}
 }
 
@@ -153,7 +201,6 @@ static void __init whistler_uart_init(void)
 	tegra_uartb_device.dev.platform_data = &whistler_uart_pdata;
 	tegra_uartc_device.dev.platform_data = &whistler_uart_pdata;
 
-	/* Register low speed only if it is selected */
 	if (!is_tegra_debug_uartport_hs())
 		uart_debug_init();
 

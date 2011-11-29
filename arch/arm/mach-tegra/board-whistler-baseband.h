@@ -25,10 +25,12 @@
 #include <linux/resource.h>
 #include <linux/platform_device.h>
 #include <linux/err.h>
+#include <linux/interrupt.h>
+#include <linux/irq.h>
+#include <linux/wakelock.h>
 #include <asm/mach-types.h>
 #include <mach/pinmux.h>
 #include <mach/spi.h>
-
 #include "clock.h"
 #include "devices.h"
 #include "gpio-names.h"
@@ -54,9 +56,12 @@
 #define SPI_INT		TEGRA_GPIO_PO6
 #define SPI_SLAVE_SEL	TEGRA_GPIO_PV2
 
-/* PH450 */
+/* Icera 450 GPIO */
+#define AP2MDM_ACK	TEGRA_GPIO_PZ0
+#define MDM2AP_ACK	TEGRA_GPIO_PY6
 #define AP2MDM_ACK2	TEGRA_GPIO_PU2
 #define MDM2AP_ACK2	TEGRA_GPIO_PV2
+#define BB_RST_OUT      TEGRA_GPIO_PV3
 
 
 struct whistler_baseband {
@@ -68,6 +73,4 @@ struct whistler_baseband {
 };
 
 int whistler_baseband_init(void);
-
 #endif	/* BOARD_WHISTLER_BASEBAND_H */
-
