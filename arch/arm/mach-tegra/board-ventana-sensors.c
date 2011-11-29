@@ -44,6 +44,7 @@
 
 #include <media/ov5650.h>
 #include <media/ov2710.h>
+#include <media/sh532u.h>
 #include <media/ssl3250a.h>
 #include <generated/mach-types.h>
 
@@ -175,6 +176,23 @@ struct ov2710_platform_data ventana_ov2710_data = {
 };
 
 
+static struct sh532u_platform_data sh532u_left_pdata = {
+	.num		= 1,
+	.sync		= 2,
+	.dev_name	= "focuser",
+	.gpio_reset	= CAM2_RST_L_GPIO,
+	.gpio_en	= CAM2_LDO_SHUTDN_L_GPIO,
+};
+
+static struct sh532u_platform_data sh532u_right_pdata = {
+	.num		= 2,
+	.sync		= 1,
+	.dev_name	= "focuser",
+	.gpio_reset	= CAM1_RST_L_GPIO,
+	.gpio_en	= CAM1_LDO_SHUTDN_L_GPIO,
+};
+
+
 static struct nvc_torch_pin_state ventana_ssl3250a_pinstate = {
 	.mask		= 0x0040, /* VGP6 */
 	.values		= 0x0040,
@@ -291,6 +309,10 @@ static struct i2c_board_info ventana_i2c6_board_info[] = {
 		I2C_BOARD_INFO("ov5650R", 0x36),
 		.platform_data = &ventana_right_ov5650_data,
 	},
+	{
+		I2C_BOARD_INFO("sh532u", 0x72),
+		.platform_data = &sh532u_right_pdata,
+	},
 };
 
 static struct i2c_board_info ventana_i2c7_board_info[] = {
@@ -300,6 +322,7 @@ static struct i2c_board_info ventana_i2c7_board_info[] = {
 	},
 	{
 		I2C_BOARD_INFO("sh532u", 0x72),
+		.platform_data = &sh532u_left_pdata,
 	},
 };
 

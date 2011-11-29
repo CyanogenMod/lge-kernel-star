@@ -91,6 +91,8 @@ static struct regulator_consumer_supply tps658621_ldo6_supply[] = {
 	REGULATOR_SUPPLY("vcsi", "tegra_camera"),
 	REGULATOR_SUPPLY("vdd_dmic", "tegra-snd-wm8903"),
 	REGULATOR_SUPPLY("vdd_i2c", "3-0030"),
+	REGULATOR_SUPPLY("vdd_i2c", "6-0072"),
+	REGULATOR_SUPPLY("vdd_i2c", "7-0072"),
 };
 static struct regulator_consumer_supply tps658621_ldo7_supply[] = {
 	REGULATOR_SUPPLY("vdd_ldo7", NULL),
