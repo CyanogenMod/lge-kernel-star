@@ -160,10 +160,6 @@ void __init tegra_init_cpu_edp_limits(unsigned int regulator_mA)
 	struct tegra_edp_entry *t = (struct tegra_edp_entry *)tegra_edp_map;
 	int tsize = sizeof(tegra_edp_map)/sizeof(struct tegra_edp_entry);
 
-	/* FIXME: Now for T33 we use 6A limit - fix this later */
-	if (cpu_speedo_id > 3)
-		regulator_mA = 6000;
-
 	if (!regulator_mA) {
 		edp_limits = edp_default_limits;
 		edp_limits_size = ARRAY_SIZE(edp_default_limits);
