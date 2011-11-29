@@ -63,6 +63,11 @@
 #define MDM2AP_ACK2	TEGRA_GPIO_PV2
 #define BB_RST_OUT      TEGRA_GPIO_PV3
 
+/* ULPI GPIO */
+#define ULPI_STP        TEGRA_GPIO_PY3
+#define ULPI_DIR        TEGRA_GPIO_PY1
+#define ULPI_D0         TEGRA_GPIO_PO1
+#define ULPI_D1         TEGRA_GPIO_PO2
 
 struct whistler_baseband {
 	struct tegra_clk_init_table *clk_init;

@@ -53,6 +53,10 @@ struct tegra_ulpi_config {
 	int (*post_phy_off)(void);
 	void (*phy_restore_start)(void);
 	void (*phy_restore_end)(void);
+	int phy_restore_gpio; /* null phy restore ack from device */
+	int ulpi_dir_gpio; /* ulpi dir */
+	int ulpi_d0_gpio; /* usb linestate[0] */
+	int ulpi_d1_gpio; /* usb linestate[1] */
 };
 
 struct tegra_uhsic_config {

@@ -33,12 +33,8 @@
 #include <mach/usb_phy.h>
 #include <mach/iomap.h>
 #include <mach/pinmux.h>
-#include "gpio-names.h"
 #include "fuse.h"
 
-/* Modem hibernate test parameters */
-#define TRIGGER_BY_MDM2AP_ACK	1
-/* ------------------------------- */
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 #define USB_USBCMD		0x140
@@ -1846,9 +1842,9 @@ static inline void null_phy_set_tristate(bool enable)
 	int tristate = (enable) ? TEGRA_TRI_TRISTATE : TEGRA_TRI_NORMAL;
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UDA, tristate);
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UAA, tristate);
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UAB, tristate);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_UDA, tristate);
 #else
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA0, tristate);
 	tegra_pinmux_set_tristate(TEGRA_PINGROUP_ULPI_DATA1, tristate);
@@ -1868,54 +1864,62 @@ static inline void null_phy_set_tristate(bool enable)
 static void null_phy_restore_start(struct tegra_usb_phy *phy,
 				   enum tegra_usb_phy_port_speed port_speed)
 {
-#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	struct tegra_ulpi_config *config = phy->config;
 
 	if (config->phy_restore_start)
 		config->phy_restore_start();
-#endif
 }
 
 static void null_phy_restore_end(struct tegra_usb_phy *phy)
 {
-#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	unsigned long val;
 	void __iomem *base = phy->regs;
 	struct tegra_ulpi_config *config = phy->config;
-	int retry = 20000;
 
 	/* disable ULPI pinmux bypass */
 	ulpi_pinmux_bypass(phy, false);
 
 	/* driving linestate using GPIO */
-	gpio_set_value(TEGRA_GPIO_PO1, 0);
-	gpio_set_value(TEGRA_GPIO_PO2, 0);
+	gpio_set_value(config->ulpi_d0_gpio, 0);
+	gpio_set_value(config->ulpi_d1_gpio, 0);
 
-	/* remove ULPI tristate except DIR */
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	/* driving DIR high */
+	gpio_set_value(config->ulpi_dir_gpio, 1);
+#endif
+
+	/* remove ULPI tristate */
 	null_phy_set_tristate(false);
 
 	if (config->phy_restore_end)
 		config->phy_restore_end();
 
-	while (retry) {
-#if TRIGGER_BY_MDM2AP_ACK
-		if (gpio_get_value(TEGRA_GPIO_PU5)) /* poll MDM2AP_ACK high */
-			break;
-#else
-		if (gpio_get_value(TEGRA_GPIO_PY3)) /* poll STP high */
-			break;
-#endif
-		retry--;
-	}
+	if (gpio_is_valid(config->phy_restore_gpio)) {
+		int phy_restore_gpio = config->phy_restore_gpio;
+		int retry = 20000;
 
-	if (retry == 0)
-		pr_info("MDM2AP_ACK timeout\n");
+		while (retry) {
+			/* poll phy_restore_gpio high */
+			if (gpio_get_value(phy_restore_gpio))
+				break;
+			retry--;
+		}
+
+		if (retry == 0)
+			pr_info("phy_restore_gpio timeout\n");
+	}
 
 	/* enable ULPI CLK output pad */
 	val = readl(base + ULPI_TIMING_CTRL_0);
 	val |= ULPI_CLK_PADOUT_ENA;
 	writel(val, base + ULPI_TIMING_CTRL_0);
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	udelay(5); /* wait for CLK stabilize */
+
+	/* enable ULPI pinmux bypass */
+	ulpi_pinmux_bypass(phy, true);
+#else
 	/* enable ULPI pinmux bypass */
 	ulpi_pinmux_bypass(phy, true);
 	udelay(5);
@@ -1960,8 +1964,13 @@ static int null_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 	/* set timming parameters */
 	val = readl(base + ULPI_TIMING_CTRL_0);
 	val |= ULPI_SHADOW_CLK_LOOPBACK_EN;
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	val &= ~ULPI_SHADOW_CLK_SEL;
 	val &= ~ULPI_LBK_PAD_EN;
+#else
+	val |= ULPI_SHADOW_CLK_SEL;
+	val |= ULPI_LBK_PAD_EN;
+#endif
 	val |= ULPI_SHADOW_CLK_DELAY(config->trimmer->shadow_clk_delay);
 	val |= ULPI_CLOCK_OUT_DELAY(config->trimmer->clock_out_delay);
 	val |= ULPI_LBK_PAD_E_INPUT_OR;

@@ -38,10 +38,10 @@ static struct gpio modem_gpios[] = {
 	{MDM2AP_ACK, GPIOF_IN, "MDM2AP_ACK"},
 	{AP2MDM_ACK2, GPIOF_OUT_INIT_HIGH, "AP2MDM ACK2"},
 	{AP2MDM_ACK, GPIOF_OUT_INIT_LOW, "AP2MDM ACK"},
-	{TEGRA_GPIO_PY3, GPIOF_IN, "ULPI_STP"},
-	{TEGRA_GPIO_PY1, GPIOF_OUT_INIT_LOW, "ULPI_DIR"},
-	{TEGRA_GPIO_PO1, GPIOF_OUT_INIT_LOW, "ULPI_D0"},
-	{TEGRA_GPIO_PO2, GPIOF_OUT_INIT_LOW, "ULPI_D1"},
+	{ULPI_STP, GPIOF_IN, "ULPI_STP"},
+	{ULPI_DIR, GPIOF_OUT_INIT_LOW, "ULPI_DIR"},
+	{ULPI_D0, GPIOF_OUT_INIT_LOW, "ULPI_D0"},
+	{ULPI_D1, GPIOF_OUT_INIT_LOW, "ULPI_D1"},
 };
 
 static __initdata struct tegra_pingroup_config whistler_null_ulpi_pinmux[] = {
@@ -65,6 +65,10 @@ static struct tegra_ulpi_config ehci2_null_ulpi_phy_config = {
 	.pre_phy_off = baseband_phy_off,
 	.phy_restore_start = baseband_phy_restore_start,
 	.phy_restore_end = baseband_phy_restore_end,
+	.phy_restore_gpio = MDM2AP_ACK,
+	.ulpi_dir_gpio = ULPI_DIR,
+	.ulpi_d0_gpio = ULPI_D0,
+	.ulpi_d1_gpio = ULPI_D1,
 };
 
 static struct tegra_ehci_platform_data ehci2_null_ulpi_platform_data = {
