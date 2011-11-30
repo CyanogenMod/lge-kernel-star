@@ -30,7 +30,7 @@
 #include "sdhci.h"
 #include "sdhci-pltfm.h"
 
-#define SDHCI_VENDOR_CLOCK_CNTRL       0x100
+#define SDHCI_VENDOR_CLOCK_CNTRL	0x100
 #define SDHCI_VENDOR_CLOCK_CNTRL_SDMMC_CLK	0x1
 #define SDHCI_VENDOR_CLOCK_CNTRL_PADPIPE_CLKEN_OVERRIDE	0x8
 #define SDHCI_VENDOR_CLOCK_CNTRL_BASE_CLK_FREQ_SHIFT	8
@@ -38,7 +38,17 @@
 #define SDHCI_VENDOR_MISC_CNTRL		0x120
 #define SDHCI_VENDOR_MISC_CNTRL_SDMMC_SPARE0_ENABLE_SD_3_0	0x20
 
-#define SDHOST_1V8_OCR_MASK		0x8
+#define SDMMC_AUTO_CAL_CONFIG	0x1E4
+#define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_ENABLE	0x20000000
+#define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_PD_OFFSET_SHIFT	0x8
+#define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_PD_OFFSET	0x70
+#define SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_PU_OFFSET	0x62
+
+#define SDHOST_1V8_OCR_MASK	0x8
+#define SDHOST_HIGH_VOLT_MIN	2700000
+#define SDHOST_HIGH_VOLT_MAX	3600000
+#define SDHOST_LOW_VOLT_MIN	1800000
+#define SDHOST_LOW_VOLT_MAX	1800000
 
 #define TEGRA_SDHOST_MIN_FREQ	50000000
 #define TEGRA2_SDHOST_STD_FREQ	50000000
@@ -423,6 +433,72 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 	}
 }
 
+static int tegra_sdhci_signal_voltage_switch(struct sdhci_host *sdhci,
+	unsigned int signal_voltage)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct tegra_sdhci_host *tegra_host = pltfm_host->priv;
+	unsigned int min_uV = SDHOST_HIGH_VOLT_MIN;
+	unsigned int max_uV = SDHOST_HIGH_VOLT_MAX;
+	unsigned int rc;
+	u16 clk, ctrl;
+	unsigned int val;
+
+	/* Switch OFF the card clock to prevent glitches on the clock line */
+	clk = sdhci_readw(sdhci, SDHCI_CLOCK_CONTROL);
+	clk &= ~SDHCI_CLOCK_CARD_EN;
+	sdhci_writew(sdhci, clk, SDHCI_CLOCK_CONTROL);
+
+	ctrl = sdhci_readw(sdhci, SDHCI_HOST_CONTROL2);
+	if (signal_voltage == MMC_SIGNAL_VOLTAGE_180) {
+		ctrl |= SDHCI_CTRL_VDD_180;
+		min_uV = SDHOST_LOW_VOLT_MIN;
+		max_uV = SDHOST_LOW_VOLT_MAX;
+	} else if (signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
+		if (ctrl & SDHCI_CTRL_VDD_180)
+			ctrl &= ~SDHCI_CTRL_VDD_180;
+	}
+	sdhci_writew(sdhci, ctrl, SDHCI_HOST_CONTROL2);
+
+	/* Switch the I/O rail voltage */
+	if (tegra_host->vdd_io_reg) {
+		rc = regulator_set_voltage(tegra_host->vdd_io_reg,
+			min_uV, max_uV);
+		if (rc) {
+			dev_err(mmc_dev(sdhci->mmc), "switching to 1.8V"
+			"failed . Switching back to 3.3V\n");
+			regulator_set_voltage(tegra_host->vdd_io_reg,
+				SDHOST_HIGH_VOLT_MIN,
+				SDHOST_HIGH_VOLT_MAX);
+			return rc;
+		}
+	}
+
+	/* Wait for 10 msec for the voltage to be switched */
+	mdelay(10);
+
+	/* Enable the card clock */
+	clk |= SDHCI_CLOCK_CARD_EN;
+	sdhci_writew(sdhci, clk, SDHCI_CLOCK_CONTROL);
+
+	if (signal_voltage == MMC_SIGNAL_VOLTAGE_180) {
+		/* Do Auto Calibration for 1.8V signal voltage */
+		val = sdhci_readl(sdhci, SDMMC_AUTO_CAL_CONFIG);
+		val |= SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_ENABLE;
+		/* Program Auto cal PD offset(bits 8:14) */
+		val &= ~(0x7F <<
+			SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_PD_OFFSET_SHIFT);
+		val |= (SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_PD_OFFSET <<
+			SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_PD_OFFSET_SHIFT);
+		/* Program Auto cal PU offset(bits 0:6) */
+		val &= ~0x7F;
+		val |= SDMMC_AUTO_CAL_CONFIG_AUTO_CAL_PU_OFFSET;
+		sdhci_writel(sdhci, val, SDMMC_AUTO_CAL_CONFIG);
+	}
+
+	return 0;
+}
+
 static int tegra_sdhci_pltfm_init(struct sdhci_host *host,
 				  struct sdhci_pltfm_data *pdata)
 {
@@ -511,15 +587,15 @@ static int tegra_sdhci_pltfm_init(struct sdhci_host *host,
 
 	if (!plat->mmc_data.built_in) {
 		if (plat->mmc_data.ocr_mask & SDHOST_1V8_OCR_MASK) {
-			tegra_host->vddio_min_uv = 1800000;
-			tegra_host->vddio_max_uv = 1800000;
+			tegra_host->vddio_min_uv = SDHOST_LOW_VOLT_MIN;
+			tegra_host->vddio_max_uv = SDHOST_LOW_VOLT_MAX;
 		} else {
 			/*
 			 * Set the minV and maxV to default
 			 * voltage range of 2.7V - 3.6V
 			 */
-			tegra_host->vddio_min_uv = 2700000;
-			tegra_host->vddio_max_uv = 3600000;
+			tegra_host->vddio_min_uv = SDHOST_HIGH_VOLT_MIN;
+			tegra_host->vddio_max_uv = SDHOST_HIGH_VOLT_MAX;
 		}
 		tegra_host->vdd_io_reg = regulator_get(mmc_dev(host->mmc), "vddio_sdmmc");
 		if (IS_ERR_OR_NULL(tegra_host->vdd_io_reg)) {
@@ -730,6 +806,7 @@ static struct sdhci_ops tegra_sdhci_ops = {
 	.resume     = tegra_sdhci_resume,
 	.platform_reset_exit = tegra_sdhci_reset_exit,
 	.set_uhs_signaling = tegra_sdhci_set_uhs_signaling,
+	.switch_signal_voltage = tegra_sdhci_signal_voltage_switch,
 };
 
 struct sdhci_pltfm_data sdhci_tegra_pdata = {
@@ -739,6 +816,7 @@ struct sdhci_pltfm_data sdhci_tegra_pdata = {
 #endif
 #ifdef CONFIG_ARCH_TEGRA_3x_SOC
 		  SDHCI_QUIRK_NONSTANDARD_CLOCK |
+		  SDHCI_QUIRK_NON_STD_VOLTAGE_SWITCHING |
 #endif
 		  SDHCI_QUIRK_SINGLE_POWER_WRITE |
 		  SDHCI_QUIRK_NO_HISPD_BIT |
