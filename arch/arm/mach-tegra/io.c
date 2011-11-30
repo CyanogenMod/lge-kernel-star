@@ -98,7 +98,9 @@ void __iomem *tegra_ioremap(unsigned long p, size_t size, unsigned int type)
 		if ((p >= TEGRA_DRAM_BASE &&
 		     (p + size) <= (TEGRA_DRAM_BASE + TEGRA_DRAM_SIZE)) ||
 		    (p >= TEGRA_NOR_FLASH_BASE &&
-		     (p + size) <= (TEGRA_NOR_FLASH_BASE + TEGRA_NOR_FLASH_SIZE)))
+		     (p + size) <= (TEGRA_NOR_FLASH_BASE + TEGRA_NOR_FLASH_SIZE)) ||
+		    (p >= TEGRA_PCIE_BASE &&
+		     (p + size) <= (TEGRA_PCIE_BASE + TEGRA_PCIE_SIZE)))
 			v = __arm_ioremap(p, size, type);
 	}
 
