@@ -1387,22 +1387,26 @@ static ssize_t mxt_slowscan_store(struct device *dev,
 	if ((ret == 1) || (ret == 2)) {
 		switch (fn) {
 		case SLOSCAN_DISABLE:
-			data->actv_cycle_time = data->slowscan_shad_actv_cycle_time;
-			data->idle_cycle_time = data->slowscan_shad_idle_cycle_time;
-			data->actv2idle_timeout = data->slowscan_shad_actv2idle_timeout;
-			data->slowscan_enabled = 0;
-			mxt_set_power_cfg(data, 0);
+			if (data->slowscan_enabled) {
+				data->actv_cycle_time = data->slowscan_shad_actv_cycle_time;
+				data->idle_cycle_time = data->slowscan_shad_idle_cycle_time;
+				data->actv2idle_timeout = data->slowscan_shad_actv2idle_timeout;
+				data->slowscan_enabled = 0;
+				mxt_set_power_cfg(data, 0);
+			}
 			break;
 
 		case SLOSCAN_ENABLE:
-			data->slowscan_shad_actv_cycle_time = data->actv_cycle_time;
-			data->slowscan_shad_idle_cycle_time = data->idle_cycle_time;
-			data->slowscan_shad_actv2idle_timeout = data->actv2idle_timeout;
-			data->actv_cycle_time = data->slowscan_actv_cycle_time;
-			data->idle_cycle_time = data->slowscan_idle_cycle_time;
-			data->actv2idle_timeout = data->slowscan_actv2idle_timeout;
-			data->slowscan_enabled = 1;
-			mxt_set_power_cfg(data, 0);
+			if (!data->slowscan_enabled) {
+				data->slowscan_shad_actv_cycle_time = data->actv_cycle_time;
+				data->slowscan_shad_idle_cycle_time = data->idle_cycle_time;
+				data->slowscan_shad_actv2idle_timeout = data->actv2idle_timeout;
+				data->actv_cycle_time = data->slowscan_actv_cycle_time;
+				data->idle_cycle_time = data->slowscan_idle_cycle_time;
+				data->actv2idle_timeout = data->slowscan_actv2idle_timeout;
+				data->slowscan_enabled = 1;
+				mxt_set_power_cfg(data, 0);
+			}
 			break;
 
 		case SLOSCAN_SET_ACTVACQINT:
