@@ -79,6 +79,8 @@ struct tegra_sdhci_host {
 	unsigned int vddio_min_uv;
 	/* vddio_max */
 	unsigned int vddio_max_uv;
+	/* max clk supported by the platform */
+	unsigned int max_clk_limit;
 };
 
 static u32 tegra_sdhci_readl(struct sdhci_host *host, int reg)
@@ -270,6 +272,37 @@ static int tegra_sdhci_8bit(struct sdhci_host *host, int bus_width)
 	return 0;
 }
 
+static void tegra_sdhci_set_clk_rate(struct sdhci_host *sdhci,
+	unsigned int clock)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+	struct tegra_sdhci_host *tegra_host = pltfm_host->priv;
+	unsigned int clk_rate;
+
+	if (sdhci->mmc->card &&
+		mmc_card_ddr_mode(sdhci->mmc->card)) {
+		/*
+		 * In ddr mode, tegra sdmmc controller clock frequency
+		 * should be double the card clock frequency.
+		 */
+		 clk_rate = clock * 2;
+	} else {
+		if (clock <= tegra_sdhost_min_freq)
+			clk_rate = tegra_sdhost_min_freq;
+		else if (clock <= tegra_sdhost_std_freq)
+			clk_rate = tegra_sdhost_std_freq;
+		else
+			clk_rate = clock;
+	}
+
+	if (tegra_host->max_clk_limit &&
+		(clk_rate > tegra_host->max_clk_limit))
+		clk_rate = tegra_host->max_clk_limit;
+
+	clk_set_rate(pltfm_host->clk, clk_rate);
+	sdhci->max_clk = clk_get_rate(pltfm_host->clk);
+}
+
 static void tegra_3x_sdhci_set_card_clock(struct sdhci_host *sdhci, unsigned int clock)
 {
 	int div;
@@ -376,13 +409,7 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 			sdhci_writeb(sdhci, ctrl, SDHCI_VENDOR_CLOCK_CNTRL);
 			tegra_host->clk_enabled = true;
 		}
-		if (clock <= tegra_sdhost_min_freq)
-			clk_set_rate(pltfm_host->clk, tegra_sdhost_min_freq);
-		else if (clock <= tegra_sdhost_std_freq)
-			clk_set_rate(pltfm_host->clk, tegra_sdhost_std_freq);
-		else
-			clk_set_rate(pltfm_host->clk, clock);
-		sdhci->max_clk = clk_get_rate(pltfm_host->clk);
+		tegra_sdhci_set_clk_rate(sdhci, clock);
 		if (tegra_host->hw_ops->set_card_clock)
 			tegra_host->hw_ops->set_card_clock(sdhci, clock);
 	} else if (!clock && tegra_host->clk_enabled) {
@@ -533,6 +560,7 @@ static int tegra_sdhci_pltfm_init(struct sdhci_host *host,
 	pltfm_host->clk = clk;
 	pltfm_host->priv = tegra_host;
 	tegra_host->clk_enabled = true;
+	tegra_host->max_clk_limit = plat->max_clk_limit;
 	tegra_host->instance = pdev->id;
 
 	host->mmc->caps |= MMC_CAP_ERASE;
