@@ -555,10 +555,17 @@ static struct gpio_init_pin_info init_gpio_mode_e1291_a02[] = {
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PI4, false, 0),
 };
 
-/* E1198-A02/E1291 specific  fab >= A03 */
+/* E1198-A02/E1291 specific  fab = A03 */
 static struct gpio_init_pin_info init_gpio_mode_e1291_a03[] = {
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PDD6, false, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PDD4, false, 0),
+};
+
+/* E1198-A02/E1291 specific  fab >= A04 */
+static struct gpio_init_pin_info init_gpio_mode_e1291_a04[] = {
+	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PDD6, false, 0),
+	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PDD4, false, 0),
+	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PR2, false, 0),
 };
 
 static void __init cardhu_gpio_init_configure(void)
@@ -584,9 +591,12 @@ static void __init cardhu_gpio_init_configure(void)
 		if (board_info.fab < BOARD_FAB_A03) {
 			len = ARRAY_SIZE(init_gpio_mode_e1291_a02);
 			pins_info = init_gpio_mode_e1291_a02;
-		} else {
+		} else if (board_info.fab == BOARD_FAB_A03) {
 			len = ARRAY_SIZE(init_gpio_mode_e1291_a03);
 			pins_info = init_gpio_mode_e1291_a03;
+		} else {
+			len = ARRAY_SIZE(init_gpio_mode_e1291_a04);
+			pins_info = init_gpio_mode_e1291_a04;
 		}
 		break;
 	default:

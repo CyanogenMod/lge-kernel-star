@@ -152,6 +152,15 @@ static struct gpio_keys_button cardhu_keys_e1291[] = {
 	[5] = GPIO_KEY(KEY_VOLUMEDOWN, PQ1, 0),
 };
 
+static struct gpio_keys_button cardhu_keys_e1291_a04[] = {
+	[0] = GPIO_KEY(KEY_MENU, PR0, 0),
+	[1] = GPIO_KEY(KEY_BACK, PR1, 0),
+	[2] = GPIO_KEY(KEY_HOME, PQ2, 0),
+	[3] = GPIO_KEY(KEY_SEARCH, PQ3, 0),
+	[4] = GPIO_KEY(KEY_VOLUMEUP, PQ0, 0),
+	[5] = GPIO_KEY(KEY_VOLUMEDOWN, PQ1, 0),
+};
+
 static struct gpio_keys_platform_data cardhu_keys_e1291_platform_data = {
 	.buttons	= cardhu_keys_e1291,
 	.nbuttons	= ARRAY_SIZE(cardhu_keys_e1291),
@@ -219,9 +228,17 @@ int __init cardhu_keys_init(void)
 	pr_info("Registering gpio keys\n");
 
 	if (board_info.board_id == BOARD_E1291) {
+		if (board_info.fab >= BOARD_FAB_A04) {
+			cardhu_keys_e1291_platform_data.buttons =
+					cardhu_keys_e1291_a04;
+			cardhu_keys_e1291_platform_data.nbuttons =
+					ARRAY_SIZE(cardhu_keys_e1291_a04);
+		}
+
 		/* Enable gpio mode for other pins */
-		for (i = 0; i < ARRAY_SIZE(cardhu_keys_e1291); i++)
-			tegra_gpio_enable(cardhu_keys_e1291[i].gpio);
+		for (i = 0; i < cardhu_keys_e1291_platform_data.nbuttons; i++)
+			tegra_gpio_enable(cardhu_keys_e1291_platform_data.
+						buttons[i].gpio);
 
 		platform_device_register(&cardhu_keys_e1291_device);
 	} else if (board_info.board_id == BOARD_E1198) {
