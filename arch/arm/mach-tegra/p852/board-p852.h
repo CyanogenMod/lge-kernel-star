@@ -31,6 +31,7 @@
 #include <linux/spi/spi.h>
 #include <linux/i2c-tegra.h>
 #include <linux/platform_data/tegra_usb.h>
+#include <linux/platform_data/tegra_nor.h>
 #include <linux/gpio.h>
 
 #include <asm/mach-types.h>

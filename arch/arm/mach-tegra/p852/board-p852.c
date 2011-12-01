@@ -434,70 +434,23 @@ static struct platform_device *p852_devices[] __initdata = {
 	&tegra_itu656,
 };
 
-#ifdef CONFIG_MTD_NOR_TEGRA
-static struct tegra_nor_chip_parms nor_chip_parms[] = {
-	[0] = {
-	       .timing_default = {
-				  .pg_rdy = 120,
-				  .pg_seq = 35,
-				  .mux = 5,
-				  .hold = 25,
-				  .adv = 50,
-				  .ce = 35,
-				  .we = 50,
-				  .oe = 50,
-				  .wait = 70,
-				  },
-	       .timing_read = {
-			       .pg_rdy = 120,
-			       .pg_seq = 25,
-			       .mux = 5,
-			       .hold = 25,
-			       .adv = 50,
-			       .ce = 35,
-			       .we = 5,
-			       .oe = 120,
-			       .wait = 5,
-			       },
-	       },
-};
-
-static struct flash_platform_data p852_flash = {
-	.map_name = "cfi_probe",
-	.width = 2,
-};
-
-static struct tegra_nor_platform p852_nor_data = {
-	.flash = &p852_flash,
-	.chip_parms = nor_chip_parms,
-	.nr_chip_parms = ARRAY_SIZE(nor_chip_parms),
-};
-
-static struct resource resources_nor[] = {
-	[0] = {
-	       .start = INT_SNOR,
-	       .end = INT_SNOR,
-	       .flags = IORESOURCE_IRQ,
-	       },
-	[1] = {
-	       /* Map the size of flash */
-	       .start = 0xd0000000,
-	       .end = 0xd0000000 + SZ_64M - 1,
-	       .flags = IORESOURCE_MEM,
-	       }
-};
-
-struct platform_device p852_nor_device = {
-	.name = "tegra_nor",
-	.id = -1,
-	.num_resources = ARRAY_SIZE(resources_nor),
-	.resource = resources_nor,
-	.dev = {
-		.platform_data = &p852_nor_data,
-		.coherent_dma_mask = 0xffffffff,
+static struct tegra_nor_platform_data p852_nor_data = {
+	.flash = {
+		.map_name = "cfi_probe",
+		.width = 2,
+	},
+	.chip_parms = {
+		/* FIXME: use characterized clock freq */
+		.timing_default = {
+			.timing0 = 0xA0300243,
+			.timing1 = 0x00040406,
 		},
+		.timing_read = {
+			.timing0 = 0xA0300243,
+			.timing1 = 0x00000A00,
+		},
+	},
 };
-#endif
 
 #ifdef CONFIG_TEGRA_SPI_I2S
 struct spi_board_info tegra_spi_i2s_device __initdata = {
@@ -690,10 +643,12 @@ static void __init p852_flash_init(void)
 {
 	if (p852_sku_peripherals & P852_SKU_NAND_ENABLE)
 		platform_device_register(&p852_nand_device);
-#ifdef CONFIG_MTD_NOR_TEGRA
-	if (p852_sku_peripherals & P852_SKU_NOR_ENABLE)
-		platform_device_register(&p852_nor_device);
-#endif
+
+	if (p852_sku_peripherals & P852_SKU_NOR_ENABLE) {
+		tegra_nor_device.resource[2].end = TEGRA_NOR_FLASH_BASE + SZ_64M - 1;
+		tegra_nor_device.dev.platform_data = &p852_nor_data;
+		platform_device_register(&tegra_nor_device);
+	}
 }
 
 void __init p852_common_init(void)
