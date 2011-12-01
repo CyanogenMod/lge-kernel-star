@@ -869,7 +869,7 @@ static irqreturn_t tegra_dc_hdmi_irq(int irq, void *ptr)
 
 	spin_lock_irqsave(&hdmi->suspend_lock, flags);
 	if (!hdmi->suspended) {
-		cancel_delayed_work(&hdmi->work);
+		__cancel_delayed_work(&hdmi->work);
 		if (tegra_dc_hdmi_hpd(dc))
 			queue_delayed_work(system_nrt_wq, &hdmi->work,
 					   msecs_to_jiffies(100));
