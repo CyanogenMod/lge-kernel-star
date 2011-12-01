@@ -240,7 +240,7 @@ ENTRY(tegra2_sleep_wfi)
 
 #else
 	mcr	p15, 0, r11, c1, c0, 1	@ reenable coherency
-
+#endif
 	/* Invalidate the TLBs & BTAC */
 	mov	r1, #0
 	mcr	p15, 0, r1, c8, c3, 0	@ invalidate shared TLBs
@@ -255,7 +255,6 @@ ENTRY(tegra2_sleep_wfi)
 	ldr	pc, [r10, #CACHE_FLUSH_KERN_ALL]
 #else
 	bl	__cpuc_flush_kern_all
-#endif
 #endif
 
 #ifdef CONFIG_CACHE_L2X0
