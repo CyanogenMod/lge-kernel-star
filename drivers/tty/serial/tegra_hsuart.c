@@ -90,7 +90,7 @@ const int dma_req_sel[] = {
 #define TEGRA_UART_TX_TRIG_4B  0x20
 #define TEGRA_UART_TX_TRIG_1B  0x30
 
-#define TX_EMPTY_TIMEOUT_CNT	5000
+#define TX_EMPTY_TIMEOUT_CNT	10000
 
 struct tegra_uart_port {
 	struct uart_port	uport;
