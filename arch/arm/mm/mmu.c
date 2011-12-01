@@ -578,6 +578,7 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
 {
 	pmd_t *pmd = pmd_offset(pud, addr);
 	unsigned long pages_2m = 0, pages_4k = 0;
+	unsigned long stash_phys = phys;
 
 	/*
 	 * Try a section mapping - end, addr and phys must all be aligned
@@ -588,6 +589,8 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
 	if (((addr | end | phys) & ~SECTION_MASK) == 0 && !force_pages) {
 		pmd_t *p = pmd;
 
+		pages_2m = (end - addr) >> (PGDIR_SHIFT);
+
 		if (addr & SECTION_SIZE)
 			pmd++;
 
@@ -596,19 +599,17 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
 			phys += SECTION_SIZE;
 		} while (pmd++, addr += SECTION_SIZE, addr != end);
 
-		pages_2m += (end-addr) >> SECTION_SHIFT;
-
 		flush_pmd_entry(p);
 	} else {
+		pages_4k = (end - addr) >> PAGE_SHIFT;
 		/*
 		 * No need to loop; pte's aren't interested in the
 		 * individual L1 entries.
 		 */
 		alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
-		pages_4k += (end-addr) >> PAGE_SHIFT;
 	}
 
-	if ((addr < lowmem_limit) && (end < lowmem_limit)) {
+	if ((stash_phys >= PHYS_OFFSET) && (stash_phys < lowmem_limit)) {
 		update_page_count(PG_LEVEL_2M, pages_2m);
 		update_page_count(PG_LEVEL_4K, pages_4k);
 	}
