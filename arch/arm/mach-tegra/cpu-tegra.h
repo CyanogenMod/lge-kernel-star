@@ -48,7 +48,8 @@ static inline unsigned int tegra_throttle_governor_speed(
 static inline int tegra_throttle_debug_init(
 	struct dentry *cpu_tegra_debugfs_root)
 { return 0; }
-#define tegra_throttling_enable NULL
+static inline void tegra_throttling_enable(bool enable)
+{}
 #endif /* CONFIG_TEGRA_THERMAL_THROTTLE */
 
 #if defined(CONFIG_TEGRA_AUTO_HOTPLUG) && !defined(CONFIG_ARCH_TEGRA_2x_SOC)
