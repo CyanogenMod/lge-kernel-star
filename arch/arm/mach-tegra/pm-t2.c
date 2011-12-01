@@ -28,8 +28,6 @@
 #include <mach/iomap.h>
 #include <mach/irqs.h>
 
-#include "gpio-names.h"
-
 #define PMC_SCRATCH3	0x5c
 #define PMC_SCRATCH5	0x64
 #define PMC_SCRATCH6	0x68
