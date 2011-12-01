@@ -478,66 +478,20 @@ static struct sh532u_platform_data sh532u_right_pdata = {
 	.gpio_reset	= TEGRA_GPIO_PBB0,
 };
 
-static bool cardhu_tps61050_pm_flag = 0;
-
-static struct tps61050_pin_state cardhu_tps61050_pinstate = {
+static struct nvc_torch_pin_state cardhu_tps61050_pinstate = {
 	.mask		= 0x0008, /*VGP3*/
 	.values		= 0x0008,
 };
 
-static int cardhu_tps61050_pm(int pwr)
-{
-	switch (pwr) {
-	case TPS61050_PWR_OFF:
-		if (cardhu_tps61050_pm_flag && cardhu_1v8_cam1) {
-			regulator_disable(cardhu_1v8_cam1);
-			cardhu_tps61050_pm_flag = 0;
-		}
-		return 0;
-
-	case TPS61050_PWR_STDBY:
-	case TPS61050_PWR_COMM:
-	case TPS61050_PWR_ON:
-		if (!cardhu_tps61050_pm_flag) {
-			if (cardhu_1v8_cam1 == NULL) {
-				cardhu_1v8_cam1 =
-					regulator_get(NULL, "vdd_1v8_cam1");
-				if (WARN_ON(IS_ERR(cardhu_1v8_cam1))) {
-					pr_err("%s: err: %ld\n",
-						__func__,
-						PTR_ERR(cardhu_1v8_cam1));
-					regulator_put(cardhu_1v8_cam1);
-					cardhu_1v8_cam1 = NULL;
-				}
-			}
-			regulator_enable(cardhu_1v8_cam1);
-			cardhu_tps61050_pm_flag = 1;
-			mdelay(5);
-		}
-		return 0;
-
-	default:
-		return -1;
-	}
-}
-
-static struct tps61050_platform_data cardhu_tps61050_data = {
-	.cfg		= 0,
-	.num		= 1,
-	.max_amp_torch	= CAMERA_FLASH_MAX_TORCH_AMP,
-	.max_amp_flash	= CAMERA_FLASH_MAX_FLASH_AMP,
+static struct tps61050_platform_data cardhu_tps61050_pdata = {
+	.dev_name	= "torch",
 	.pinstate	= &cardhu_tps61050_pinstate,
-	.init		= NULL,
-	.exit		= NULL,
-	.pm		= cardhu_tps61050_pm,
-	.gpio_envm	= NULL,
-	.gpio_sync	= NULL,
 };
 
 static const struct i2c_board_info cardhu_i2c_board_info_tps61050[] = {
 	{
 		I2C_BOARD_INFO("tps61050", 0x33),
-		.platform_data = &cardhu_tps61050_data,
+		.platform_data = &cardhu_tps61050_pdata,
 	},
 };
 

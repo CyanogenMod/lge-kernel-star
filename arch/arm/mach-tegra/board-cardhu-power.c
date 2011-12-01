@@ -625,6 +625,7 @@ static struct regulator_consumer_supply gpio_switch_en_1v8_cam_supply[] = {
 	REGULATOR_SUPPLY("vdd_1v8_cam3", NULL),
 	REGULATOR_SUPPLY("vdd_i2c", "6-0072"),
 	REGULATOR_SUPPLY("vdd_i2c", "7-0072"),
+	REGULATOR_SUPPLY("vdd_i2c", "2-0033"),
 };
 static int gpio_switch_en_1v8_cam_voltages[] = { 1800};
 
