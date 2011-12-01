@@ -298,16 +298,16 @@ static int sh532u_i2c_rd32(struct sh532u_info *info, u8 addr, u8 reg, u32 *val)
 static void sh532u_gpio_en(struct sh532u_info *info, int val)
 {
 	if (info->pdata->gpio_en)
-		gpio_set_value(info->pdata->gpio_en, val);
+		gpio_set_value_cansleep(info->pdata->gpio_en, val);
 }
 
 static void sh532u_gpio_reset(struct sh532u_info *info, int val)
 {
 	if (val) {
 		if (!info->gpio_flag_reset && info->pdata->gpio_reset) {
-			gpio_set_value(info->pdata->gpio_reset, 0);
+			gpio_set_value_cansleep(info->pdata->gpio_reset, 0);
 			mdelay(1);
-			gpio_set_value(info->pdata->gpio_reset, 1);
+			gpio_set_value_cansleep(info->pdata->gpio_reset, 1);
 			mdelay(10); /* delay for device startup */
 			info->gpio_flag_reset = 1;
 		}
