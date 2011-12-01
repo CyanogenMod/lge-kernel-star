@@ -384,6 +384,7 @@ static int gpio_switch_cam_ldo_2v8_en_voltages[] = {2800};
 /* 2-0036 is dev_name of ar0832 in Enterprise A01*/
 /* 2-0032 is alternative dev_name of ar0832 Enterprise A01*/
 /* 2-0010 is dev_name of ov9726 */
+/* 2-0033 is dev_name of tps61050 */
 /* 2-0070 is dev_name of PCA9546 in Enterprise A02*/
 /* 6-0036 is dev_name of ar0832 in Enterprise A02 */
 /* 7-0036 is dev_name of ar0832 in Enterprise A02 */
@@ -392,6 +393,7 @@ static struct regulator_consumer_supply gpio_switch_cam_ldo_1v8_en_supply[] = {
 	REGULATOR_SUPPLY("vdd", "2-0032"),
 	REGULATOR_SUPPLY("dovdd", "2-0010"),
 	REGULATOR_SUPPLY("vdd_1v8_cam", NULL),
+	REGULATOR_SUPPLY("vdd_i2c", "2-0033"),
 	REGULATOR_SUPPLY("vcc_i2c", "2-0070"),
 	REGULATOR_SUPPLY("vdd", "6-0036"),
 	REGULATOR_SUPPLY("vdd", "7-0036"),

@@ -436,50 +436,15 @@ struct ov9726_platform_data enterprise_ov9726_data = {
 	.pwdn_low_active = false,
 };
 
-static struct tps61050_pin_state enterprise_tps61050_pinstate = {
+static struct nvc_torch_pin_state enterprise_tps61050_pinstate = {
 	.mask		= 0x0008, /*VGP3*/
 	.values		= 0x0008,
 };
 
-/* I2C bus becomes active when vdd_1v8_cam is enabled */
-static int enterprise_tps61050_pm(int pwr)
-{
-	static struct regulator *enterprise_flash_reg = NULL;
-	int ret = 0;
-
-	pr_info("%s: ++%d\n", __func__, pwr);
-	switch (pwr) {
-	case TPS61050_PWR_OFF:
-		if (enterprise_flash_reg)
-			regulator_disable(enterprise_flash_reg);
-		break;
-	case TPS61050_PWR_STDBY:
-	case TPS61050_PWR_COMM:
-	case TPS61050_PWR_ON:
-		if (!enterprise_flash_reg) {
-			enterprise_flash_reg = regulator_get(NULL, "vdd_1v8_cam");
-			if (IS_ERR_OR_NULL(enterprise_flash_reg)) {
-				pr_err("%s: failed to get flash pwr\n", __func__);
-				return PTR_ERR(enterprise_flash_reg);
-			}
-		}
-		ret = regulator_enable(enterprise_flash_reg);
-		if (ret) {
-			pr_err("%s: failed to enable flash pwr\n", __func__);
-			goto fail_regulator_flash_reg;
-		}
-		enterprise_msleep(1);
-		break;
-	default:
-		ret = -1;
-	}
-	return ret;
-
-fail_regulator_flash_reg:
-	regulator_put(enterprise_flash_reg);
-	enterprise_flash_reg = NULL;
-	return ret;
-}
+static struct tps61050_platform_data enterprise_tps61050_pdata = {
+	.dev_name	= "torch",
+	.pinstate	= &enterprise_tps61050_pinstate,
+};
 
 
 struct enterprise_cam_gpio {
@@ -529,19 +494,6 @@ static struct ar0832_platform_data enterprise_ar0832_le_data = {
 	.id = "left",
 };
 
-static struct tps61050_platform_data enterprise_tps61050_data = {
-	.cfg		= 0,
-	.num		= 1,
-	.max_amp_torch	= CAM_FLASH_MAX_TORCH_AMP,
-	.max_amp_flash	= CAM_FLASH_MAX_FLASH_AMP,
-	.pinstate	= &enterprise_tps61050_pinstate,
-	.init		= NULL,
-	.exit		= NULL,
-	.pm		= &enterprise_tps61050_pm,
-	.gpio_envm	= NULL,
-	.gpio_sync	= NULL,
-};
-
 static const struct i2c_board_info enterprise_i2c2_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("pca9546", 0x70),
@@ -549,7 +501,7 @@ static const struct i2c_board_info enterprise_i2c2_boardinfo[] = {
 	},
 	{
 		I2C_BOARD_INFO("tps61050", 0x33),
-		.platform_data = &enterprise_tps61050_data,
+		.platform_data = &enterprise_tps61050_pdata,
 	},
 	{
 		I2C_BOARD_INFO("ov9726", OV9726_I2C_ADDR >> 1),
@@ -576,7 +528,7 @@ static struct i2c_board_info ar0832_i2c2_boardinfo[] = {
 	},
 	{
 		I2C_BOARD_INFO("tps61050", 0x33),
-		.platform_data = &enterprise_tps61050_data,
+		.platform_data = &enterprise_tps61050_pdata,
 	},
 	{
 		I2C_BOARD_INFO("ov9726", OV9726_I2C_ADDR >> 1),
