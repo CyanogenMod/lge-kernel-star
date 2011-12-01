@@ -374,7 +374,6 @@ static int bluesleep_start(void)
 	retval = enable_irq_wake(bsi->host_wake_irq);
 	if (retval < 0) {
 		BT_ERR("Couldn't enable BT_HOST_WAKE as wakeup interrupt");
-		free_irq(bsi->host_wake_irq, NULL);
 		goto fail;
 	}
 #endif
@@ -419,7 +418,6 @@ static void bluesleep_stop(void)
 	if (disable_irq_wake(bsi->host_wake_irq))
 		BT_ERR("Couldn't disable hostwake IRQ wakeup mode\n");
 #endif
-	free_irq(bsi->host_wake_irq, NULL);
 	wake_lock_timeout(&bsi->wake_lock, HZ / 2);
 }
 /**
@@ -683,6 +681,7 @@ free_bsi:
 
 static int bluesleep_remove(struct platform_device *pdev)
 {
+	free_irq(bsi->host_wake_irq, NULL);
 	gpio_free(bsi->host_wake);
 	gpio_free(bsi->ext_wake);
 	wake_lock_destroy(&bsi->wake_lock);
