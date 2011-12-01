@@ -185,7 +185,7 @@ static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 	{ NULL,		NULL,		0,		0},
 };
 
-void tegra_init_cache(void)
+void tegra_init_cache(bool init)
 {
 #ifdef CONFIG_CACHE_L2X0
 	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
@@ -204,18 +204,21 @@ void tegra_init_cache(void)
 		writel(0x221, p + L2X0_TAG_LATENCY_CTRL);
 		writel(0x221, p + L2X0_DATA_LATENCY_CTRL);
 	} else {
-		writel(0x441, p + L2X0_TAG_LATENCY_CTRL);
-		writel(0x551, p + L2X0_DATA_LATENCY_CTRL);
+		/* FIXME: This should be based on speedo id. */
+		writel(0x442, p + L2X0_TAG_LATENCY_CTRL);
+		writel(0x552, p + L2X0_DATA_LATENCY_CTRL);
 	}
 #else
 	writel(0x770, p + L2X0_TAG_LATENCY_CTRL);
 	writel(0x770, p + L2X0_DATA_LATENCY_CTRL);
 #endif
 #endif
-	aux_ctrl = readl(p + L2X0_CACHE_TYPE);
-	aux_ctrl = (aux_ctrl & 0x700) << (17-8);
-	aux_ctrl |= 0x7C000001;
-	l2x0_init(p, aux_ctrl, 0x8200c3fe);
+	if (init) {
+		aux_ctrl = readl(p + L2X0_CACHE_TYPE);
+		aux_ctrl = (aux_ctrl & 0x700) << (17-8);
+		aux_ctrl |= 0x7C000001;
+		l2x0_init(p, aux_ctrl, 0x8200c3fe);
+	}
 #endif
 }
 
@@ -330,7 +333,7 @@ void __init tegra_init_early(void)
 	tegra_init_pinmux();
 	tegra_clk_init_from_table(common_clk_init_table);
 	tegra_init_power();
-	tegra_init_cache();
+	tegra_init_cache(true);
 	tegra_init_ahb_gizmo_settings();
 }
 

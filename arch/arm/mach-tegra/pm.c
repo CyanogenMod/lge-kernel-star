@@ -568,6 +568,7 @@ unsigned int tegra_idle_lp2_last(unsigned int sleep_time, unsigned int flags)
 	tegra_sleep_cpu(PLAT_PHYS_OFFSET - PAGE_OFFSET);
 
 #ifdef CONFIG_CACHE_L2X0
+	tegra_init_cache(false);
 	l2x0_enable();
 #endif
 	tegra_cluster_switch_time(flags, tegra_cluster_switch_time_id_switch);
@@ -811,7 +812,7 @@ int tegra_suspend_dram(enum tegra_suspend_mode mode, unsigned int flags)
 	else
 		tegra_sleep_core(PLAT_PHYS_OFFSET - PAGE_OFFSET);
 
-	tegra_init_cache();
+	tegra_init_cache(true);
 
 	if (mode == TEGRA_SUSPEND_LP0) {
 		tegra_cpu_reset_handler_restore();
