@@ -120,3 +120,24 @@ config SND_SOC_TEGRA_MAX98088
 	  Say Y or M here if you want to add support for SoC audio on Tegra
 	  boards using the MAX98088 codec. Currently, only supported board is
 	  Enterprise.
+
+config MACH_HAS_SND_SOC_TEGRA_TLV320AIC326X
+	bool
+	help
+	  Machines that use the SND_SOC_TEGRA_TLV320AIC326X driver should select
+	  this config option, in order to allow the user to enable
+	  SND_SOC_TEGRA_TLV320AIC326X.
+
+config SND_SOC_TEGRA_TLV320AIC326X
+	tristate "SoC Audio support for Tegra boards using a TI AIC326x codec"
+	depends on SND_SOC_TEGRA && I2C && TEGRA_DC
+	depends on MACH_HAS_SND_SOC_TEGRA_TLV320AIC326X
+	select SND_SOC_TEGRA20_I2S if ARCH_TEGRA_2x_SOC
+	select SND_SOC_TEGRA30_I2S if ARCH_TEGRA_3x_SOC
+	select SND_SOC_TEGRA30_SPDIF if ARCH_TEGRA_3x_SOC
+	select SND_SOC_TLV320AIC326X
+	select SND_SOC_SPDIF
+	select SND_SOC_TEGRA30_DAM if ARCH_TEGRA_3x_SOC
+	help
+	  Say Y or M here if you want to add support for SoC audio on Tegra
+	  boards using the TI AIC326X codec.
