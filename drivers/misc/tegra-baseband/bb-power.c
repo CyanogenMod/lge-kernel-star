@@ -30,21 +30,13 @@
 #include <mach/tegra-bb-power.h>
 #include "bb-power.h"
 
-static int bb_id;
-static bool bb_registered;
-
-static bb_init_cb init_cb_list[] = {
+static struct tegra_bb_callback *callback;
+static int attr_load_val;
+static bb_get_cblist get_cblist[] = {
 	NULL,
 	NULL,
 	NULL,
-	M7400_INIT_CB,
-};
-
-static bb_power_cb power_cb_list[] = {
-	NULL,
-	NULL,
-	NULL,
-	M7400_PWR_CB,
+	M7400_CB,
 };
 
 static int tegra_bb_power_gpio_init(struct tegra_bb_power_gdata *gdata)
@@ -66,7 +58,7 @@ static int tegra_bb_power_gpio_init(struct tegra_bb_power_gdata *gdata)
 		/* Request the gpio */
 		ret = gpio_request(gpio_id, gpio_label);
 		if (ret) {
-			pr_err("%s: gpio_request for gpio %d failed.\n",
+			pr_err("%s: Error: gpio_request for gpio %d failed.\n",
 							 __func__, gpio_id);
 			return ret;
 		}
@@ -94,13 +86,14 @@ static int tegra_bb_power_gpio_init(struct tegra_bb_power_gdata *gdata)
 			ret = request_threaded_irq(irq, NULL, gpioirq->handler,
 				gpioirq->flags, gpioirq->name, gpioirq->cookie);
 			if (ret < 0) {
-				pr_err("%s: request_threaded_irq error\n",
-								 __func__);
+				pr_err("%s: Error: threaded_irq req fail.\n"
+								, __func__);
 				return ret;
 			}
 			ret = enable_irq_wake(irq);
 			if (ret) {
-				pr_err("%s: enable_irq_wake error\n", __func__);
+				pr_err("%s: Error: enable_irq_wake failed.\n",
+								__func__);
 				return ret;
 			}
 		}
@@ -129,61 +122,26 @@ static int tegra_bb_power_gpio_deinit(struct tegra_bb_power_gdata *gdata)
 	return 0;
 }
 
-static int baseband_l2_suspend(void)
-{
-	/* BB specific callback */
-	if (power_cb_list[bb_id] != NULL)
-		power_cb_list[bb_id](CB_CODE_L0L2);
-	return 0;
-}
-
-static int baseband_l2_resume(void)
-{
-	/* BB specific callback */
-	if (power_cb_list[bb_id] != NULL)
-		power_cb_list[bb_id](CB_CODE_L2L0);
-	return 0;
-}
-
 static ssize_t tegra_bb_attr_write(struct device *dev,
 			struct device_attribute *attr,
 			const char *buf, size_t count)
 {
-	struct tegra_bb_pdata *pdata;
-	struct tegra_ehci_platform_data *ehci_data;
-	struct tegra_uhsic_config *hsic_config;
-	int load;
+	int val;
 
-	if (sscanf(buf, "%d", &load) != 1)
+	if (sscanf(buf, "%d", &val) != 1)
 		return -EINVAL;
 
-	if (load == 1 && !bb_registered) {
-		pdata = (struct tegra_bb_pdata *) dev->platform_data;
-		ehci_data = (struct tegra_ehci_platform_data *)
-					pdata->device->dev.platform_data;
-		hsic_config = (struct tegra_uhsic_config *)
-					ehci_data->phy_config;
-
-		/* Register PHY callbacks */
-		hsic_config->postsuspend = baseband_l2_suspend;
-		hsic_config->preresume = baseband_l2_resume;
-
-		/* Override required settings */
-		ehci_data->power_down_on_bus_suspend = 0;
-
-		/* Register the ehci device. */
-		platform_device_register(pdata->device);
-		bb_registered = true;
+	if (callback && callback->attrib) {
+		if (!callback->attrib(dev, val))
+			attr_load_val = val;
 	}
-
 	return count;
 }
 
 static ssize_t tegra_bb_attr_read(struct device *dev,
 			struct device_attribute *attr, char *buf)
 {
-	int ret = 0;
-	return sprintf(buf, "%d", ret);
+	return sprintf(buf, "%d", attr_load_val);
 }
 
 static DEVICE_ATTR(load, S_IRUSR | S_IWUSR | S_IRGRP,
@@ -195,6 +153,7 @@ static int tegra_bb_power_probe(struct platform_device *device)
 	struct tegra_bb_pdata *pdata;
 	struct tegra_bb_power_gdata *gdata;
 	int err;
+	unsigned int bb_id;
 
 	pdata = (struct tegra_bb_pdata *) dev->platform_data;
 	if (!pdata) {
@@ -202,29 +161,39 @@ static int tegra_bb_power_probe(struct platform_device *device)
 		return -ENODEV;
 	}
 
-	/* BB specific callback */
+	/* Obtain BB specific callback list */
 	bb_id = pdata->bb_id;
-	if (init_cb_list[bb_id] != NULL) {
-		gdata = (struct tegra_bb_power_gdata *)
-		init_cb_list[pdata->bb_id]((void *)pdata, CB_CODE_INIT);
+	if (get_cblist[bb_id] != NULL) {
+		callback = (struct tegra_bb_callback *) get_cblist[bb_id]();
+		if (callback && callback->init) {
+			gdata = (struct tegra_bb_power_gdata *)
+			callback->init((void *)pdata);
 
-		if (!gdata) {
-			pr_err("%s - Error: Gpio data is empty.\n", __func__);
+			if (!gdata) {
+				pr_err("%s - Error: Gpio data is empty.\n",
+								__func__);
+				return -ENODEV;
+			}
+
+			/* Initialize gpio as required */
+			tegra_bb_power_gpio_init(gdata);
+		} else {
+			pr_err("%s - Error: init callback is empty.\n",
+								__func__);
 			return -ENODEV;
 		}
-
-		/* Initialize gpio as required */
-		tegra_bb_power_gpio_init(gdata);
+	} else {
+		pr_err("%s - Error: callback data is empty.\n", __func__);
+		return -ENODEV;
 	}
-
-	bb_registered = false;
 
 	/* Create the control sysfs node */
 	err = device_create_file(dev, &dev_attr_load);
 	if (err < 0) {
-		pr_err("%s - device_create_file failed\n", __func__);
+		pr_err("%s - Error: device_create_file failed.\n", __func__);
 		return -ENODEV;
 	}
+	attr_load_val = 0;
 
 	return 0;
 }
@@ -232,18 +201,20 @@ static int tegra_bb_power_probe(struct platform_device *device)
 static int tegra_bb_power_remove(struct platform_device *device)
 {
 	struct device *dev = &device->dev;
-	struct tegra_bb_pdata *pdata;
 	struct tegra_bb_power_gdata *gdata;
 
 	/* BB specific callback */
-	if (init_cb_list[bb_id] != NULL) {
-		pdata = (struct tegra_bb_pdata *) dev->platform_data;
+	if (callback && callback->deinit) {
 		gdata = (struct tegra_bb_power_gdata *)
-			init_cb_list[bb_id]((void *)pdata, CB_CODE_DEINIT);
+		callback->deinit();
 
 		/* Deinitialize gpios */
 		if (gdata)
 			tegra_bb_power_gpio_deinit(gdata);
+		else {
+			pr_err("%s - Error: Gpio data is empty.\n", __func__);
+			return -ENODEV;
+		}
 	}
 
 	/* Remove the control sysfs node */
@@ -257,18 +228,16 @@ static int tegra_bb_power_suspend(struct platform_device *device,
 	pm_message_t state)
 {
 	/* BB specific callback */
-	if (power_cb_list[bb_id] != NULL)
-		power_cb_list[bb_id](CB_CODE_L2L3);
-
+	if (callback && callback->power)
+		callback->power(PWRSTATE_L2L3);
 	return 0;
 }
 
 static int tegra_bb_power_resume(struct platform_device *device)
 {
 	/* BB specific callback */
-	if (power_cb_list[bb_id] != NULL)
-		power_cb_list[bb_id](CB_CODE_L3L0);
-
+	if (callback && callback->power)
+		callback->power(PWRSTATE_L3L0);
 	return 0;
 }
 #endif

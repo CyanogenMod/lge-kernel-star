@@ -49,8 +49,13 @@ union tegra_bb_gpio_id {
 	} m7400;
 };
 
+typedef struct platform_device* (*ehci_register_cb)(void);
+typedef void (*ehci_unregister_cb)(struct platform_device *);
+
 struct tegra_bb_pdata {
 	union tegra_bb_gpio_id *id;
 	struct platform_device *device;
+	ehci_register_cb ehci_register;
+	ehci_unregister_cb ehci_unregister;
 	int bb_id;
 };

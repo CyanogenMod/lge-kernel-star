@@ -31,17 +31,21 @@
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <mach/tegra-bb-power.h>
+#include <mach/usb_phy.h>
 #include "bb-power.h"
 
 static struct tegra_bb_gpio_data m7400_gpios[] = {
 	{ { GPIO_INVALID, GPIOF_OUT_INIT_LOW, "MDM_PWR_ON" }, true },
 	{ { GPIO_INVALID, GPIOF_IN, "MDM_PWRSTATUS" }, true },
 	{ { GPIO_INVALID, GPIOF_OUT_INIT_HIGH, "MDM_SERVICE" }, true },
-	{ { GPIO_INVALID, GPIOF_OUT_INIT_HIGH, "MDM_USB_AWR" }, false },
+	{ { GPIO_INVALID, GPIOF_OUT_INIT_LOW, "MDM_USB_AWR" }, false },
 	{ { GPIO_INVALID, GPIOF_IN, "MDM_USB_CWR" }, false },
 	{ { GPIO_INVALID, GPIOF_IN, "MDM_RESOUT2" }, true },
 	{ { GPIO_INVALID, 0, NULL }, false },	/* End of table */
 };
+static bool ehci_registered;
+static int gpio_awr;
+static int gpio_cwr;
 
 static int gpio_wait_timeout(int gpio, int value, int timeout_msec)
 {
@@ -54,39 +58,71 @@ static int gpio_wait_timeout(int gpio, int value, int timeout_msec)
 	return -1;
 }
 
-static int baseband_l3_suspend(void)
+static int m7400_enum_handshake(void)
 {
-	int gpio_awr = m7400_gpios[3].data.gpio;
+	int retval = 0;
 
-	/* Signal L3 to modem - Drive USB_AWR low. */
-	gpio_set_value(gpio_awr, 0);
+	/* Wait for CP to indicate ready - by driving USB_CWR high. */
+	if (gpio_wait_timeout(gpio_cwr, 1, 10) != 0) {
+			pr_info("%s: Error: timeout waiting for modem resume.\n",
+							__func__);
+			retval = -1;
+	}
 
-	return 0;
-}
-
-static int baseband_l3_resume(void)
-{
-	int gpio_awr = m7400_gpios[3].data.gpio;
-	int gpio_cwr = m7400_gpios[4].data.gpio;
-
-	/* Signal L0 to modem - Drive USB_AWR high. */
+	/* Signal AP ready - Drive USB_AWR high. */
 	gpio_set_value(gpio_awr, 1);
 
-	/* If this is a AP driven wakeup, wait for CP
-	   to ack by driving USB_CWR high.
-	   If this is a CP driven wakeup, USB_CWR will
-	   be high already. AP has already driven it's
-	   response as above.
-	*/
-	if (gpio_wait_timeout(gpio_cwr, 1, 10) != 0)
-		pr_info("%s: timeout waiting for modem ack.\n", __func__);
+	return retval;
+}
 
+static int m7400_apup_handshake(bool checkresponse)
+{
+	int retval = 0;
+
+	/* Signal AP ready - Drive USB_AWR high. */
+	gpio_set_value(gpio_awr, 1);
+
+	if (checkresponse) {
+		/* Wait for CP ack - by driving USB_CWR high. */
+		if (gpio_wait_timeout(gpio_cwr, 1, 10) != 0) {
+			pr_info("%s: Error: timeout waiting for modem ack.\n",
+							__func__);
+			retval = -1;
+		}
+	}
+	return retval;
+}
+
+static void m7400_apdown_handshake(void)
+{
+	/* Signal AP going down to modem - Drive USB_AWR low. */
+	/* No need to wait for a CP response */
+	gpio_set_value(gpio_awr, 0);
+}
+
+static int m7400_l2_suspend(void)
+{
 	return 0;
 }
 
-static irqreturn_t baseband_wake_irq(int irq, void *dev_id)
+static int m7400_l2_resume(void)
 {
-	pr_info("%s {\n", __func__);
+	return 0;
+}
+
+static void m7400_l3_suspend(void)
+{
+	m7400_apdown_handshake();
+}
+
+static void m7400_l3_resume(void)
+{
+	m7400_apup_handshake(true);
+}
+
+static irqreturn_t m7400_wake_irq(int irq, void *dev_id)
+{
+	pr_info("%s called.\n", __func__);
 
 	/* Resume usb host activity. */
 	/* TBD */
@@ -94,18 +130,14 @@ static irqreturn_t baseband_wake_irq(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-int m7400_power_callback(int code)
+static int m7400_power(int code)
 {
 	switch (code) {
-	case CB_CODE_L0L2:
+	case PWRSTATE_L2L3:
+	m7400_l3_suspend();
 	break;
-	case CB_CODE_L2L0:
-	break;
-	case CB_CODE_L2L3:
-	baseband_l3_suspend();
-	break;
-	case CB_CODE_L3L0:
-	baseband_l3_resume();
+	case PWRSTATE_L3L0:
+	m7400_l3_resume();
 	break;
 	default:
 	break;
@@ -113,10 +145,72 @@ int m7400_power_callback(int code)
 	return 0;
 }
 
+static void m7400_ehci_customize(struct platform_device *pdev)
+{
+	struct tegra_ehci_platform_data *ehci_pdata;
+	struct tegra_uhsic_config *hsic_config;
+
+	ehci_pdata = (struct tegra_ehci_platform_data *)
+			pdev->dev.platform_data;
+	hsic_config = (struct tegra_uhsic_config *)
+			ehci_pdata->phy_config;
+
+	/* Register PHY callbacks */
+	hsic_config->postsuspend = m7400_l2_suspend;
+	hsic_config->preresume = m7400_l2_resume;
+
+	/* Override required settings */
+	ehci_pdata->power_down_on_bus_suspend = 0;
+}
+
+static int m7400_attrib_write(struct device *dev, int value)
+{
+	struct tegra_bb_pdata *pdata;
+	static struct platform_device *ehci_device;
+	static bool first_enum = true;
+
+	if (value > 1 || (!ehci_registered && !value)) {
+		/* Supported values are 0/1. */
+		return -1;
+	}
+
+	pdata = (struct tegra_bb_pdata *) dev->platform_data;
+	if (value) {
+
+		/* Check readiness for enumeration */
+		if (first_enum)
+			first_enum = false;
+		else
+			m7400_enum_handshake();
+
+		/* Register ehci controller */
+		ehci_device = pdata->ehci_register();
+		if (ehci_device == NULL) {
+			pr_info("%s - Error: ehci register failed.\n",
+							 __func__);
+			return -1;
+		}
+
+		/* Customize PHY setup/callbacks */
+		m7400_ehci_customize(ehci_device);
+
+		ehci_registered = true;
+	} else {
+		/* Unregister ehci controller */
+		if (ehci_device != NULL)
+			pdata->ehci_unregister(ehci_device);
+
+		/* Signal AP going down */
+		m7400_apdown_handshake();
+		ehci_registered = false;
+	}
+
+	return 0;
+}
 
 static struct tegra_bb_gpio_irqdata m7400_gpioirqs[] = {
-	{ GPIO_INVALID, "tegra_bb_wake", baseband_wake_irq,
-					IRQF_TRIGGER_RISING, NULL },
+	{ GPIO_INVALID, "tegra_bb_wake", m7400_wake_irq,
+					IRQF_TRIGGER_FALLING, NULL },
 	{ GPIO_INVALID, NULL, NULL, 0, NULL },	/* End of table */
 };
 
@@ -125,21 +219,52 @@ static struct tegra_bb_power_gdata m7400_gdata = {
 	.gpioirq = m7400_gpioirqs,
 };
 
-void *m7400_init(void *pdata, int code)
+static void *m7400_init(void *pdata)
 {
 	struct tegra_bb_pdata *platdata = (struct tegra_bb_pdata *) pdata;
 	union tegra_bb_gpio_id *id = platdata->id;
 
-	if (code == CB_CODE_INIT) {
-		/* Fill the gpio ids allocated by hardware */
-		m7400_gpios[0].data.gpio = id->m7400.pwr_on;
-		m7400_gpios[1].data.gpio = id->m7400.pwr_status;
-		m7400_gpios[2].data.gpio = id->m7400.service;
-		m7400_gpios[3].data.gpio = id->m7400.usb_awr;
-		m7400_gpios[4].data.gpio = id->m7400.usb_cwr;
-		m7400_gpios[5].data.gpio = id->m7400.resout2;
-		m7400_gpioirqs[0].id = id->m7400.usb_cwr;
+	/* Fill the gpio ids allocated by hardware */
+	m7400_gpios[0].data.gpio = id->m7400.pwr_on;
+	m7400_gpios[1].data.gpio = id->m7400.pwr_status;
+	m7400_gpios[2].data.gpio = id->m7400.service;
+	m7400_gpios[3].data.gpio = id->m7400.usb_awr;
+	m7400_gpios[4].data.gpio = id->m7400.usb_cwr;
+	m7400_gpios[5].data.gpio = id->m7400.resout2;
+	m7400_gpioirqs[0].id = id->m7400.usb_cwr;
+
+	if (!platdata->ehci_register || !platdata->ehci_unregister) {
+		pr_info("%s - Error: ehci reg/unreg functions missing.\n"
+							, __func__);
+		return 0;
 	}
 
+	gpio_awr = m7400_gpios[3].data.gpio;
+	gpio_cwr = m7400_gpios[4].data.gpio;
+	if (gpio_awr == GPIO_INVALID || gpio_cwr == GPIO_INVALID) {
+		pr_info("%s - Error: Invalid gpio data.\n", __func__);
+		return 0;
+	}
+
+	ehci_registered = false;
 	return (void *) &m7400_gdata;
+}
+
+static void *m7400_deinit(void)
+{
+	return (void *) &m7400_gdata;
+}
+
+static struct tegra_bb_callback m7400_callbacks = {
+	.init = m7400_init,
+	.deinit = m7400_deinit,
+	.attrib = m7400_attrib_write,
+#ifdef CONFIG_PM
+	.power = m7400_power,
+#endif
+};
+
+void *m7400_get_cblist(void)
+{
+	return (void *) &m7400_callbacks;
 }
