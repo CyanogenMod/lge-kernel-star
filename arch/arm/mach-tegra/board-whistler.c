@@ -46,6 +46,7 @@
 #include <mach/io.h>
 #include <mach/i2s.h>
 #include <mach/tegra_wm8753_pdata.h>
+#include <sound/tlv320aic326x.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -286,9 +287,21 @@ static struct tegra_i2c_platform_data whistler_dvc_platform_data = {
 	.is_dvc		= true,
 };
 
-static struct i2c_board_info __initdata wm8753_board_info = {
-	I2C_BOARD_INFO("wm8753", 0x1a),
-	.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_HP_DET),
+static struct aic326x_pdata whistler_aic3262_pdata = {
+	/* debounce time */
+	.debounce_time_ms = 512,
+};
+
+static struct i2c_board_info __initdata wm8753_board_info[] = {
+	{
+		I2C_BOARD_INFO("wm8753", 0x1a),
+		.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_HP_DET),
+	},
+	{
+		I2C_BOARD_INFO("tlv320aic3262", 0x18),
+		.platform_data = &whistler_aic3262_pdata,
+		.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_HP_DET),
+	},
 };
 
 static void whistler_i2c_init(void)
@@ -303,7 +316,8 @@ static void whistler_i2c_init(void)
 	platform_device_register(&tegra_i2c_device2);
 	platform_device_register(&tegra_i2c_device1);
 
-	i2c_register_board_info(4, &wm8753_board_info, 1);
+	i2c_register_board_info(4, wm8753_board_info,
+		ARRAY_SIZE(wm8753_board_info));
 }
 
 #define GPIO_SCROLL(_pinaction, _gpio, _desc)	\
@@ -349,7 +363,15 @@ static struct tegra_wm8753_platform_data whistler_audio_pdata = {
 	.debounce_time_hp = 200,
 };
 
-static struct platform_device whistler_audio_device = {
+static struct platform_device whistler_audio_device1 = {
+	.name	= "tegra-snd-aic326x",
+	.id	= 0,
+	.dev	= {
+		.platform_data  = &whistler_audio_pdata,
+	},
+};
+
+static struct platform_device whistler_audio_device2 = {
 	.name	= "tegra-snd-wm8753",
 	.id	= 0,
 	.dev	= {
@@ -373,7 +395,8 @@ static struct platform_device *whistler_devices[] __initdata = {
 	&bluetooth_dit_device,
 	&whistler_bcm4329_rfkill_device,
 	&tegra_pcm_device,
-	&whistler_audio_device,
+	&whistler_audio_device1,
+	&whistler_audio_device2,
 };
 
 static struct synaptics_i2c_rmi_platform_data synaptics_pdata = {
