@@ -81,7 +81,6 @@ static int tegra_wm8753_hw_params(struct snd_pcm_substream *substream,
 	struct tegra_wm8753 *machine = snd_soc_card_get_drvdata(card);
 	int srate, mclk, i2s_daifmt;
 	int err;
-
 	srate = params_rate(params);
 	switch (srate) {
 	case 8000:
@@ -571,6 +570,7 @@ static __devinit int tegra_wm8753_driver_probe(struct platform_device *pdev)
 	struct tegra_wm8753_platform_data *pdata;
 	int ret;
 
+
 	pdata = pdev->dev.platform_data;
 	if (!pdata) {
 		dev_err(&pdev->dev, "No platform data supplied\n");
@@ -600,11 +600,16 @@ static __devinit int tegra_wm8753_driver_probe(struct platform_device *pdev)
 		goto err_fini_utils;
 	}
 
+	if (!card->instantiated) {
+		dev_err(&pdev->dev, "No WM8753 codec\n");
+		goto err_unregister_card;
+	}
+
 #ifdef CONFIG_SWITCH
 	/* Add h2w swith class support */
 	ret = switch_dev_register(&wired_switch_dev);
 	if (ret < 0) {
-		dev_err(&pdev->dev, "not able to register switch device\n",
+		dev_err(&pdev->dev, "not able to register switch device %d\n",
 			ret);
 		goto err_unregister_card;
 	}

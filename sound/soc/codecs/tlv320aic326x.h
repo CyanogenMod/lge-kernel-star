@@ -28,11 +28,17 @@
 /* Enable this macro allow for different ASI formats */
 /*#define ASI_MULTI_FMT*/
 #undef ASI_MULTI_FMT
+
 /* Enable register caching on write */
-#define EN_REG_CACHE
+#define EN_REG_CACHE 1
 
 #define MULTIBYTE_CONFIG_SUPPORT
 
+/*Setting all codec reg/write locally*/
+/* This definition is added as the snd_ direct call are
+result some issue with cache. Common code doesnot support
+page, so fix that before commenting this line*/
+#define LOCAL_REG_ACCESS 1
 
 /* Macro enables or disables support for miniDSP in the driver */
 /* Enable the AIC3262_TiLoad macro first before enabling these macros */
@@ -57,7 +63,7 @@
 #define AIC3262_MULTI_I2S	1
 
 /* Driver Debug Messages Enabled */
-#define DEBUG
+/*#define DEBUG*/
 
 #ifdef DEBUG
 	#define DBG(x...)	printk(x)
@@ -519,6 +525,9 @@ struct aic3262_priv {
 	u8 adc_clkin_option;
 	int irq;
 	struct snd_soc_jack *headset_jack;
+#if defined(LOCAL_REG_ACCESS)
+	void *control_data;
+#endif
 };
 
 /*

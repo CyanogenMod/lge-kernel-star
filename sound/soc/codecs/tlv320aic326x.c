@@ -49,7 +49,6 @@
 #include <linux/pm.h>
 #include <linux/i2c.h>
 #include <linux/platform_device.h>
-#include <linux/spi/spi.h>
 #include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -120,17 +119,6 @@ static int soc_static_freq_config = 1;
  * Function Prototype
  *****************************************************************************
  */
-static int aic3262_hw_params(struct snd_pcm_substream *substream,
-			     struct snd_pcm_hw_params *params,
-			     struct snd_soc_dai *dai);
-
-static int aic3262_mute(struct snd_soc_dai *dai, int mute);
-
-static int aic3262_set_dai_sysclk(struct snd_soc_dai *codec_dai,
-				  int clk_id, unsigned int freq, int dir);
-
-static int aic3262_set_dai_fmt(struct snd_soc_dai *codec_dai, unsigned int fmt);
-
 static int aic3262_set_bias_level(struct snd_soc_codec *codec,
 						enum snd_soc_bias_level level);
 
@@ -416,8 +404,8 @@ int snd_soc_get_volsw_2r_n(struct snd_kcontrol *kcontrol,
 	}
 
 	/* Read, update the corresponding Registers */
-	val = (snd_soc_read(codec, reg) >> shift) & mask;
-	val2 = (snd_soc_read(codec, reg2) >> shift) & mask;
+	val = (aic3262_read(codec, reg) >> shift) & mask;
+	val2 = (aic3262_read(codec, reg2) >> shift) & mask;
 
 	if (!strcmp(kcontrol->id.name, "PCM Playback Volume")) {
 		ucontrol->value.integer.value[0] =
@@ -612,8 +600,12 @@ static int __new_control_put(struct snd_kcontrol *kcontrol,
 		aic3262->page_no = data[1];
 
 	DBG("reg = %d val = %x\n", data[0], data[1]);
-
+#if defined(LOCAL_REG_ACCESS)
+	if (codec->hw_write(codec->control_data, data, 2) != 2)
+		ret = -EIO;
+#else
 	ret = snd_soc_write(codec, data[0], data[1]);
+#endif
 	if (ret)
 		printk(KERN_ERR "Error in i2c write\n");
 
@@ -894,11 +886,11 @@ static void aic3262_multi_i2s_dump_regs(struct snd_soc_dai *dai)
 			aic3262_read(codec, counter));
 	}
 
-	/*DBG(KERN_INFO "#Page1 REGS..\n");
+	DBG(KERN_INFO "#Page1 REGS..\n");
 	for (counter = 128; counter < 176; counter++) {
 		DBG(KERN_INFO "#%2d -> 0x%x\n", (counter % 128),
 			aic3262_read(codec, counter));
-	}*/
+	}
 
 	DBG(KERN_INFO "#Page4 REGS..\n");
 	for (counter = 512; counter < 631; counter++) {
@@ -1376,9 +1368,6 @@ static int aic3262_multi_i2s_asi2_set_dai_fmt(struct snd_soc_dai *codec_dai,
 	*/
 	iface_reg = aic3262_read(codec, ASI2_BUS_FMT);
 	clk_reg   = aic3262_read(codec, ASI2_BWCLK_CNTL_REG);
-	/*
-	iface_reg = ifce_reg & ~(3 << 6 | 3 << 2);
-	*/
 
 	/* set master/slave audio interface */
 	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
@@ -1592,8 +1581,6 @@ static int aic3262_multi_i2s_set_dai_sysclk(struct snd_soc_dai *codec_dai,
 	switch (freq) {
 	case AIC3262_FREQ_12000000:
 	case AIC3262_FREQ_12288000:
-		aic3262->sysclk = freq;
-		return 0;
 	case AIC3262_FREQ_24000000:
 		aic3262->sysclk = freq;
 		return 0;
@@ -2172,7 +2159,7 @@ static int aic3262_multi_i2s_hw_free(struct snd_pcm_substream *substream,
 	*/
 	if ((substream->stream == SNDRV_PCM_STREAM_PLAYBACK) &&
 		(dacregoffset != 0)) {
-		printk(KERN_INFO "#%s: Disabling Pg %d Reg %d DAC Inputs ..\n",
+		DBG(KERN_INFO "#%s: Disabling Pg %d Reg %d DAC Inputs ..\n",
 			__func__, (dacregoffset/128), (dacregoffset % 128));
 
 		dacpath = aic3262_read(codec, dacregoffset);
@@ -2237,13 +2224,6 @@ err:
  *          The PCM bit format supported are 16, 20, 24 and 32 bits
  *----------------------------------------------------------------------------
  */
-struct snd_soc_dai_ops aic3262_dai_ops = {
-	.hw_params = aic3262_hw_params,
-	.digital_mute = aic3262_mute,
-	.set_sysclk = aic3262_set_dai_sysclk,
-	.set_fmt = aic3262_set_dai_fmt,
-};
-
 struct snd_soc_dai_ops aic3262_multi_i2s_dai_ops = {
 	.hw_params      = aic3262_multi_i2s_hw_params,
 	.digital_mute   = aic3262_multi_i2s_mute,
@@ -2730,11 +2710,16 @@ int aic3262_change_page(struct snd_soc_codec *codec, u8 new_page)
 	data[1] = new_page;
 	aic3262->page_no = new_page;
 
+#if defined(LOCAL_REG_ACCESS)
+	if (codec->hw_write(codec->control_data, data, 2) != 2)
+		ret = -EIO;
+#else
 	ret = snd_soc_write(codec, data[0], data[1]);
+#endif
 	if (ret)
 		printk(KERN_ERR "Error in changing page to %d\n", new_page);
 
-	DBG("# Changing page to %d\r\n", new_page);
+	/*DBG("# Changing page to %d\r\n", new_page);*/
 
 	return ret;
 }
@@ -2759,11 +2744,16 @@ int aic3262_change_book(struct snd_soc_codec *codec, u8 new_book)
 	if (ret)
 		return ret;
 
+#if defined(LOCAL_REG_ACCESS)
+	if (codec->hw_write(codec->control_data, data, 2) != 2)
+		ret = -EIO;
+#else
 	ret = snd_soc_write(codec, data[0], data[1]);
+#endif
 	if (ret)
 		printk(KERN_ERR "Error in changing Book\n");
 
-	DBG("# Changing book to %d\r\n", new_book);
+	/*DBG("# Changing book to %d\r\n", new_book);*/
 
 	return ret;
 }
@@ -2777,6 +2767,7 @@ int aic3262_change_book(struct snd_soc_codec *codec, u8 new_book)
 void aic3262_write_reg_cache(struct snd_soc_codec *codec,
 					   u16 reg, u8 value)
 {
+#if defined(EN_REG_CACHE)
 	u8 *cache = codec->reg_cache;
 
 	if (reg >= AIC3262_CACHEREGNUM)
@@ -2784,6 +2775,7 @@ void aic3262_write_reg_cache(struct snd_soc_codec *codec,
 
 	if (cache)
 		cache[reg] = value;
+#endif
 }
 
 /*
@@ -2804,7 +2796,12 @@ u8 aic3262_read(struct snd_soc_codec *codec, u16 reg)
 	if (aic3262->page_no != page)
 		aic3262_change_page(codec, page);
 
+#if defined(LOCAL_REG_ACCESS)
+	i2c_master_send(codec->control_data, (char *)&reg, 1);
+	i2c_master_recv(codec->control_data, &value, 1);
+#else
 	value = snd_soc_read(codec, reg);
+#endif
 	/*DBG("r %2x %02x\r\n", reg, value);*/
 	return value;
 }
@@ -2845,8 +2842,14 @@ int aic3262_write(struct snd_soc_codec *codec, u16 reg, u8 value)
 
 	/*DBG("w %2x %02x\r\n",
 		data[AIC3262_REG_OFFSET_INDEX], data[AIC3262_REG_DATA_INDEX]);*/
+
+#if defined(LOCAL_REG_ACCESS)
+	if (codec->hw_write(codec->control_data, data, 2) != 2)
+		ret = -EIO;
+#else
 	ret = snd_soc_write(codec, data[AIC3262_REG_OFFSET_INDEX],
 			data[AIC3262_REG_DATA_INDEX]);
+#endif
 	if (ret)
 		printk(KERN_ERR "Error in i2c write\n");
 
@@ -2873,7 +2876,7 @@ int aic3262_write__(struct i2c_client *client, const char *buf, int count)
 	ret = i2c_master_send(client, data, 2);
 	if (ret < 2) {
 		printk(
-		KERN_ERR"I2C write Error : bytes written = %d\n\n", ret);
+		KERN_ERR "I2C write Error : bytes written = %d\n\n", ret);
 		return -EIO;
 	}
 
@@ -2891,6 +2894,13 @@ int aic3262_reset_cache(struct snd_soc_codec *codec)
 	if (codec->reg_cache) {
 		memcpy(codec->reg_cache, aic3262_reg, sizeof(aic3262_reg));
 		return 0;
+	}
+
+	codec->reg_cache = kmemdup(aic3262_reg,
+			sizeof(aic3262_reg), GFP_KERNEL);
+	if (!codec->reg_cache) {
+		printk(KERN_ERR "aic32x4: kmemdup failed\n");
+		return -ENOMEM;
 	}
 #endif
 	return 0;
@@ -2939,15 +2949,17 @@ static int aic3262_add_controls(struct snd_soc_codec *codec)
 {
 	int err;
 
+	DBG("%s++\n", __func__);
+
 	err = snd_soc_add_controls(codec, aic3262_snd_controls,
-		ARRAY_SIZE(aic3262_snd_controls));
+			     ARRAY_SIZE(aic3262_snd_controls));
 	if (err < 0) {
 		printk(KERN_ERR "Invalid control\n");
 		return err;
 	}
 
 	err = snd_soc_add_controls(codec, aic3262_snd_controls2,
-		ARRAY_SIZE(aic3262_snd_controls2));
+			     ARRAY_SIZE(aic3262_snd_controls2));
 	if (err < 0) {
 		printk(KERN_ERR "Invalid control\n");
 		return err;
@@ -3004,9 +3016,15 @@ static int aic3262_add_widgets(struct snd_soc_codec *codec)
 int reg_def_conf(struct snd_soc_codec *codec)
 {
 	int i = 0, ret;
+	DBG(KERN_INFO "#%s: Invoked..\n", __func__);
 
-	aic3262_change_page(codec, 0);
-	aic3262_change_book(codec, 0);
+	ret = aic3262_change_page(codec, 0);
+	if (ret != 0)
+		return ret;
+
+	ret = aic3262_change_book(codec, 0);
+	if (ret != 0)
+		return ret;
 
 	/* Configure the Codec with the default Initialization Values */
 	for (i = 0; i < reg_init_size; i++) {
@@ -3015,6 +3033,7 @@ int reg_def_conf(struct snd_soc_codec *codec)
 		if (ret)
 			break;
 	}
+	DBG(KERN_INFO "#%s: Done..\n", __func__);
 	return ret;
 }
 
@@ -3046,292 +3065,14 @@ int i2c_verify_book0(struct snd_soc_codec *codec)
 			k = 4;
 		}*/
 		for (i = 0; i <= 127; i++) {
+#if defined(LOCAL_REG_ACCESS)
+			val1 = i2c_smbus_read_byte_data(codec->control_data, i);
+#else
 			val1 = snd_soc_read(codec, i);
+#endif
 			/* printk("[%d][%d]=[0x%2x]\n",k,i,val1); */
 		}
 	}
-	return 0;
-}
-
-
-
-/*
- *----------------------------------------------------------------------------
- * Function : aic3262_hw_params
- * Purpose  : This function is to set the hardware parameters for AIC3262.
- *            The functions set the sample rate and audio serial data word
- *            length.
- *
- *----------------------------------------------------------------------------
- */
-static int aic3262_hw_params(struct snd_pcm_substream *substream,
-			     struct snd_pcm_hw_params *params,
-			     struct snd_soc_dai *dai)
-{
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_codec *codec = rtd->codec;
-	struct aic3262_priv *aic3262 = snd_soc_codec_get_drvdata(codec);
-	int i, j;
-	u8 data;
-
-	aic3262_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
-
-	i = aic3262_get_divs(aic3262->sysclk, params_rate(params));
-
-	i2c_verify_book0(codec);
-
-	if (i < 0) {
-		printk(KERN_ERR "sampling rate not supported\n");
-		return i;
-	}
-
-	if (soc_static_freq_config) {
-		/*We will fix R value to 1 and make P & J=K.D as varialble */
-
-		/* Setting P & R values are set to 1 and 1 at init*/
-
-		/* J value */
-		aic3262_write(codec, PLL_J_REG, aic3262_divs[i].pll_j);
-
-		/* MSB & LSB for D value */
-
-		aic3262_write(codec, PLL_D_MSB, (aic3262_divs[i].pll_d >> 8));
-		aic3262_write(codec, PLL_D_LSB,
-			      (aic3262_divs[i].pll_d & AIC3262_8BITS_MASK));
-
-		/* NDAC divider value */
-		data = aic3262_read(codec, NDAC_DIV_POW_REG);
-		DBG(KERN_INFO "# reading NDAC = %d , NDAC_DIV_POW_REG = %x\n",
-			aic3262_divs[i].ndac, data);
-		aic3262_write(codec, NDAC_DIV_POW_REG,
-			 ((data & 0x80)|(aic3262_divs[i].ndac)));
-		DBG(KERN_INFO "# writing NDAC = %d , NDAC_DIV_POW_REG = %x\n",
-			aic3262_divs[i].ndac,
-			((data & 0x80)|(aic3262_divs[i].ndac)));
-
-		/* MDAC divider value */
-		data = aic3262_read(codec, MDAC_DIV_POW_REG);
-		DBG(KERN_INFO "# reading MDAC = %d , MDAC_DIV_POW_REG = %x\n",
-			aic3262_divs[i].mdac, data);
-		aic3262_write(codec, MDAC_DIV_POW_REG,
-			 ((data & 0x80)|(aic3262_divs[i].mdac)));
-		DBG(KERN_INFO "# writing MDAC = %d , MDAC_DIV_POW_REG = %x\n",
-		aic3262_divs[i].mdac, ((data & 0x80)|(aic3262_divs[i].mdac)));
-
-		/* DOSR MSB & LSB values */
-		aic3262_write(codec, DOSR_MSB_REG, aic3262_divs[i].dosr >> 8);
-		DBG(KERN_INFO "# writing DOSR_MSB_REG = %d\n",
-			(aic3262_divs[i].dosr >> 8));
-		aic3262_write(codec, DOSR_LSB_REG,
-			      aic3262_divs[i].dosr & AIC3262_8BITS_MASK);
-		DBG(KERN_INFO "# writing DOSR_LSB_REG = %d\n",
-			(aic3262_divs[i].dosr & AIC3262_8BITS_MASK));
-
-		/* NADC divider value */
-		data = aic3262_read(codec, NADC_DIV_POW_REG);
-		aic3262_write(codec, NADC_DIV_POW_REG,
-			 ((data & 0x80)|(aic3262_divs[i].nadc)));
-		DBG(KERN_INFO "# writing NADC_DIV_POW_REG = %d\n",
-			aic3262_divs[i].nadc);
-
-		/* MADC divider value */
-		data = aic3262_read(codec, MADC_DIV_POW_REG);
-		aic3262_write(codec, MADC_DIV_POW_REG,
-			((data & 0x80)|(aic3262_divs[i].madc)));
-		DBG(KERN_INFO "# writing MADC_DIV_POW_REG = %d\n",
-			aic3262_divs[i].madc);
-
-		/* AOSR value */
-		aic3262_write(codec, AOSR_REG, aic3262_divs[i].aosr);
-		DBG(KERN_INFO "# writing AOSR = %d\n", aic3262_divs[i].aosr);
-	}
-
-
-	data = aic3262_read(codec, ASI1_BUS_FMT);
-
-	data = data & 0xe7;
-
-	switch (params_format(params)) {
-	case SNDRV_PCM_FORMAT_S16_LE:
-		data = data | 0x00;
-		break;
-	case SNDRV_PCM_FORMAT_S20_3LE:
-		data |= (0x08);
-		break;
-	case SNDRV_PCM_FORMAT_S24_LE:
-		data |= (0x10);
-		break;
-	case SNDRV_PCM_FORMAT_S32_LE:
-		data |= (0x18);
-		break;
-	}
-
-	/* configure the respective Registers for the above configuration */
-	aic3262_write(codec, ASI1_BUS_FMT, data);
-
-	for (j = 0; j < NO_FEATURE_REGS; j++) {
-		aic3262_write(codec,
-			      aic3262_divs[i].codec_specific_regs[j].reg_offset,
-			      aic3262_divs[i].codec_specific_regs[j].reg_val);
-	}
-
-	aic3262_set_bias_level(codec, SND_SOC_BIAS_ON);
-	return 0;
-}
-
-/*
- *----------------------------------------------------------------------------
- * Function : aic3262_mute
- * Purpose  : This function is to mute or unmute the left and right DAC
- *
- *----------------------------------------------------------------------------
- */
-static int aic3262_mute(struct snd_soc_dai *dai, int mute)
-{
-	struct snd_soc_codec *codec = dai->codec;
-	struct aic3262_priv *aic3262 = snd_soc_codec_get_drvdata(codec);
-
-	DBG(KERN_INFO "#aic3262 codec : mute started\n");
-	if (mute) {
-		DBG("Mute if part\n");
-
-		if (!aic3262->mute_codec) {
-			dac_reg = aic3262_read(codec, DAC_MVOL_CONF);
-			adc_gain = aic3262_read(codec, ADC_FINE_GAIN);
-			hpl = aic3262_read(codec, HPL_VOL);
-			hpr = aic3262_read(codec, HPR_VOL);
-			rec_amp = aic3262_read(codec, REC_AMP_CNTL_R5);
-			rampr = aic3262_read(codec, RAMPR_VOL);
-			spk_amp = aic3262_read(codec, SPK_AMP_CNTL_R4);
-		}
-		DBG("spk_reg = %2x\n\n", spk_amp);
-
-		aic3262_write(codec, DAC_MVOL_CONF, ((dac_reg & 0xF3) | 0x0C));
-		aic3262_write(codec, ADC_FINE_GAIN, ((adc_gain & 0x77) | 0x88));
-		aic3262_write(codec, HPL_VOL, 0xB9);
-		aic3262_write(codec, HPR_VOL, 0xB9);
-		aic3262_write(codec, REC_AMP_CNTL_R5, 0x39);
-		aic3262_write(codec, RAMPR_VOL, 0x39);
-		aic3262_write(codec, SPK_AMP_CNTL_R4, 0x00);
-		aic3262->mute_codec = 1;
-	} else {
-		DBG("Mute else part\n");
-		aic3262_write(codec, DAC_MVOL_CONF, (dac_reg & 0xF3));
-		mdelay(5);
-		aic3262_write(codec, ADC_FINE_GAIN, (adc_gain & 0x77));
-		mdelay(5);
-		aic3262_write(codec, HPL_VOL, hpl);
-		mdelay(5);
-		aic3262_write(codec, HPR_VOL, hpr);
-		mdelay(5);
-		aic3262_write(codec, REC_AMP_CNTL_R5, rec_amp);
-		mdelay(5);
-		aic3262_write(codec, RAMPR_VOL, rampr);
-		mdelay(5);
-		aic3262_write(codec, SPK_AMP_CNTL_R4, spk_amp);
-		mdelay(5);
-		aic3262->mute_codec = 0;
-	}
-	DBG(KERN_INFO "#aic3262 codec : mute ended\n");
-	return 0;
-}
-
-/*
- *----------------------------------------------------------------------------
- * Function : aic3262_set_dai_sysclk
- * Purpose  : This function is to set the DAI system clock
- *
- *----------------------------------------------------------------------------
- */
-static int aic3262_set_dai_sysclk(struct snd_soc_dai *codec_dai,
-				  int clk_id, unsigned int freq, int dir)
-{
-	struct snd_soc_codec *codec = codec_dai->codec;
-	struct aic3262_priv *aic3262 = snd_soc_codec_get_drvdata(codec);
-
-	switch (freq) {
-	case AIC3262_FREQ_12000000:
-	case AIC3262_FREQ_12288000:
-		aic3262->sysclk = freq;
-		return 0;
-	case AIC3262_FREQ_24000000:
-		aic3262->sysclk = freq;
-		return 0;
-		break;
-	}
-	printk(KERN_ERR "Invalid frequency to set DAI system clock\n");
-	return -EINVAL;
-}
-
-/*
- *----------------------------------------------------------------------------
- * Function : aic3262_set_dai_fmt
- * Purpose  : This function is to set the DAI format
- *
- *----------------------------------------------------------------------------
- */
-static int aic3262_set_dai_fmt(struct snd_soc_dai *codec_dai, unsigned int fmt)
-{
-	struct snd_soc_codec *codec = codec_dai->codec;
-	struct aic3262_priv *aic3262 = snd_soc_codec_get_drvdata(codec);
-	u8 iface_reg, clk_reg;
-
-	iface_reg = aic3262_read(codec, ASI1_BUS_FMT);
-
-	/* set master/slave audio interface */
-	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
-	case SND_SOC_DAIFMT_CBM_CFM:
-		DBG("setdai_fmt : SND_SOC_DAIFMT_CBM_CFM : master=1\n");
-		aic3262->master = 1;
-		/*Test added */
-		clk_reg = aic3262_read(codec, ASI1_BWCLK_CNTL_REG);
-		clk_reg = (clk_reg & 0x03);
-		aic3262_write(codec, ASI1_BWCLK_CNTL_REG,
-				      (clk_reg | 0x24));
-		break;
-	case SND_SOC_DAIFMT_CBS_CFS:
-		DBG("setdai_fmt : SND_SOC_DAIFMT_CBS_CFS : master=0\n");
-		aic3262->master = 0;
-		/*Test added */
-		clk_reg = aic3262_read(codec, ASI1_BWCLK_CNTL_REG);
-		aic3262_write(codec, ASI1_BWCLK_CNTL_REG,
-				      (clk_reg & 0x03));
-		break;
-	case SND_SOC_DAIFMT_CBS_CFM: /*new case..just for debugging*/
-		DBG("SND_SOC_DAIFMT_CBS_CFM\n");
-		aic3262->master = 0;
-		break;
-	default:
-		printk(KERN_ERR "Invalid DAI master/slave interface\n");
-		return -EINVAL;
-	}
-
-	/* interface format */
-	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
-	case SND_SOC_DAIFMT_I2S:
-		iface_reg = (iface_reg & 0x1f);
-		break;
-	case SND_SOC_DAIFMT_DSP_A:
-		iface_reg = (iface_reg & 0x1f) | 0x20;
-		break;
-	case SND_SOC_DAIFMT_RIGHT_J:
-		iface_reg = (iface_reg & 0x1f) | 0x40;
-		break;
-	case SND_SOC_DAIFMT_LEFT_J:
-		iface_reg = (iface_reg & 0x1f) | 0x60;
-		break;
-	case SND_SOC_DAIFMT_DSP_B:
-		iface_reg = (iface_reg & 0x1f) | 0x80;
-		/* voice call need data offset in 1 bitclock */
-		aic3262_write(codec, ASI1_LCH_OFFSET, 1);
-		break;
-	default:
-		printk(KERN_ERR "Invalid DAI interface format\n");
-		return -EINVAL;
-	}
-
-	aic3262_write(codec, ASI1_BUS_FMT, iface_reg);
-
 	return 0;
 }
 
@@ -3478,7 +3219,7 @@ static int aic3262_set_bias_level(struct snd_soc_codec *codec,
 static int aic3262_suspend(struct snd_soc_codec *codec, pm_message_t state)
 {
 	struct aic3262_priv *aic3262 = snd_soc_codec_get_drvdata(codec);
-
+	DBG(KERN_INFO "#%s: Invoked..\n", __func__);
 	if (aic3262)
 		disable_irq(aic3262->irq);
 
@@ -3501,21 +3242,25 @@ static int aic3262_resume(struct snd_soc_codec *codec)
 	int ret = 0;
 	struct aic3262_priv *aic3262 = snd_soc_codec_get_drvdata(codec);
 	u8 *cache = codec->reg_cache;
+	DBG(KERN_INFO "#%s: Invoked..\n", __func__);
 
 	ret = aic3262_change_page(codec, 0);
 	if (ret)
 		return ret;
-
+#if defined(EN_REG_CACHE)
 	/* Sync reg_cache with the hardware */
 	for (i = 0; i < ARRAY_SIZE(aic3262_reg); i++) {
 		data[0] = i % 128;
 		data[1] = cache[i];
-
+#if defined(LOCAL_REG_ACCESS)
+		codec->hw_write(codec->control_data, data, 2);
+#else
 		ret = snd_soc_write(codec, data[0], data[1]);
 		if (ret)
 			break;
+#endif
 	}
-
+#endif
 	if (!ret) {
 		aic3262_change_page(codec, 0);
 		aic3262_set_bias_level(codec, SND_SOC_BIAS_ON);
@@ -3524,6 +3269,24 @@ static int aic3262_resume(struct snd_soc_codec *codec)
 			enable_irq(aic3262->irq);
 	}
 	return ret;
+}
+/*
+ *----------------------------------------------------------------------------
+ * Function : aic3262_hw_read
+ * Purpose  : This is a low level harware read function.
+ *
+ *----------------------------------------------------------------------------
+ */
+unsigned int aic3262_hw_read(struct snd_soc_codec *codec, unsigned int count)
+{
+	struct i2c_client *client = codec->control_data;
+	unsigned int buf;
+
+	if (count > (sizeof(unsigned int)))
+		return 0;
+
+	i2c_master_recv(client, (char *)&buf, count);
+	return buf;
 }
 
 /*
@@ -3541,14 +3304,16 @@ static irqreturn_t aic3262_jack_handler(int irq, void *data)
 
 	DBG("%s++\n", __func__);
 
+	aic3262_change_page(codec, 0);
+
 	/* Read the Jack Status Register*/
-	value = snd_soc_read(codec, STICKY_FLAG2);
+	value = aic3262_read(codec, STICKY_FLAG2);
 	DBG(KERN_INFO "reg44 0x%x\n", value);
 
-	value = snd_soc_read(codec, INT_FLAG2);
+	value = aic3262_read(codec, INT_FLAG2);
 	DBG("reg46 0x%x\n", value);
 
-	value = snd_soc_read(codec, DAC_FLAG_R1);
+	value = aic3262_read(codec, DAC_FLAG_R1);
 	DBG("reg37 0x%x\n", value);
 
 	micbits = value & DAC_FLAG_MIC_MASKBITS;
@@ -3558,26 +3323,30 @@ static irqreturn_t aic3262_jack_handler(int irq, void *data)
 	DBG("hsbits 0x%x\n", hsbits);
 
 	/* sleep for debounce time */
-	msleep(aic3262->pdata->debounce_time_ms);
+	/*msleep(aic3262->pdata->debounce_time_ms);*/
 
 	/* No Headphone or Headset*/
 	if (!micbits && !hsbits) {
+		DBG("no headset/headphone\n");
 		snd_soc_jack_report(aic3262->headset_jack,
 				0, SND_JACK_HEADSET);
 	}
 
 	/* Headphone Detected */
 	if ((micbits == DAC_FLAG_R1_NOMIC) || (hsbits)) {
+		DBG("headphone\n");
 		snd_soc_jack_report(aic3262->headset_jack,
 				SND_JACK_HEADPHONE, SND_JACK_HEADSET);
 	}
 
 	/* Headset Detected - only with capless */
 	if (micbits == DAC_FLAG_R1_MIC) {
+		DBG("headset\n");
 		snd_soc_jack_report(aic3262->headset_jack,
 				SND_JACK_HEADSET, SND_JACK_HEADSET);
 	}
 
+	DBG("%s--\n", __func__);
 	return IRQ_HANDLED;
 }
 
@@ -3670,18 +3439,33 @@ static int aic3262_probe(struct snd_soc_codec *codec)
 
 	DBG(KERN_INFO "#%s: Invoked..\n", __func__);
 
+#if defined(EN_REG_CACHE)
+	codec->reg_cache =
+		kmemdup(aic3262_reg, sizeof(aic3262_reg), GFP_KERNEL);
+
+	if (!codec->reg_cache) {
+		printk(KERN_ERR "aic3262: kmemdup failed\n");
+		return -ENOMEM;
+	}
+#else
 	/* Setting cache bypass - not to overwrite the cache registers,
 	Codec registers have 4 pages which is not handled in the common
 	cache code properly - bypass it in write value and save it
 	using separate call*/
 	codec->cache_bypass = 1;
+#endif
 
+#if defined(LOCAL_REG_ACCESS)
+	codec->control_data = aic3262->control_data;
+	codec->hw_write = (hw_write_t) aic3262_write__;
+	codec->hw_read = aic3262_hw_read;
+#else
 	ret = snd_soc_codec_set_cache_io(codec, 8, 8, SND_SOC_I2C);
 	if (ret != 0) {
 		dev_err(codec->dev, "Failed to set cache I/O: %d\n", ret);
 		return ret;
 	}
-
+#endif
 	ret = reg_def_conf(codec);
 	if (ret != 0) {
 		printk(KERN_ERR "Failed to init TI codec: %d\n", ret);
@@ -3700,11 +3484,11 @@ static int aic3262_probe(struct snd_soc_codec *codec)
 			dev_err(codec->dev, "Failed to request IRQ: %d\n", ret);
 			return ret;
 		} else
-			printk(KERN_INFO
+			DBG(KERN_INFO
 				"#%s: irq Registration for IRQ %d done..\n",
 					__func__, aic3262->irq);
 	} else {
-		printk(KERN_INFO "#%s: I2C IRQ Configuration is Wrong. \
+		DBG(KERN_INFO "#%s: I2C IRQ Configuration is Wrong. \
 			Please check it..\n", __func__);
 	}
 
@@ -3729,6 +3513,7 @@ static int aic3262_probe(struct snd_soc_codec *codec)
 	aic3262_add_multiconfig_controls(codec);
 #endif
 
+	DBG(KERN_INFO "#%s: done..\n", __func__);
 	return ret;
 }
 
@@ -3763,10 +3548,15 @@ static struct snd_soc_codec_driver soc_codec_dev_aic3262 = {
 	.suspend = aic3262_suspend,
 	.resume = aic3262_resume,
 	.set_bias_level = aic3262_set_bias_level,
+#if defined(LOCAL_REG_ACCESS)
+	.read = aic3262_read,
+	.write = aic3262_write,
+#endif
+#if !defined(EN_REG_CACHE)
 	.reg_cache_size = ARRAY_SIZE(aic3262_reg),
-	.reg_word_size = sizeof(u16),
+	.reg_word_size = sizeof(u8),
 	.reg_cache_default = aic3262_reg,
-	.compress_type = SND_SOC_FLAT_COMPRESSION,
+#endif
 };
 
 
@@ -3802,6 +3592,9 @@ static __devinit int aic3262_codec_probe(struct i2c_client *i2c,
 	}
 
 	i2c_set_clientdata(i2c, aic3262);
+#if defined(LOCAL_REG_ACCESS)
+	aic3262->control_data = i2c;
+#endif
 	aic3262->control_type = SND_SOC_I2C;
 	aic3262->irq = i2c->irq;
 	aic3262->pdata = i2c->dev.platform_data;
@@ -3828,7 +3621,7 @@ static __devinit int aic3262_codec_probe(struct i2c_client *i2c,
 
 	if (ret < 0)
 		kfree(aic3262);
-
+	DBG(KERN_INFO "#%s: Done ret %d\n", __func__, ret);
 	return ret;
 }
 
@@ -3859,7 +3652,7 @@ MODULE_DEVICE_TABLE(i2c, tlv320aic3262_id);
 
 static struct i2c_driver tlv320aic3262_i2c_driver = {
 	.driver = {
-		.name = "tlv320aic3262",
+		.name = "aic3262-codec",
 		.owner = THIS_MODULE,
 	},
 	.probe = aic3262_codec_probe,

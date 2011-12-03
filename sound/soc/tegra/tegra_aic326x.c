@@ -588,11 +588,11 @@ static int tegra_aic326x_bt_voice_call_hw_params(
 static void tegra_aic326x_bt_voice_call_shutdown(
 				struct snd_pcm_substream *substream)
 {
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct tegra_aic326x *machine  =
 			snd_soc_card_get_drvdata(rtd->codec->card);
 
-#ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	machine->codec_info[BT_SCO].rate = 0;
 	machine->codec_info[BT_SCO].channels = 0;
 #endif
@@ -915,7 +915,7 @@ static struct snd_soc_dai_link tegra_aic326x_dai[] = {
 		.codec_dai_name = "dit-hifi",
 		.ops = &tegra_aic326x_bt_ops,
 		},
-	/*[DAI_LINK_VOICE_CALL] = {
+	[DAI_LINK_VOICE_CALL] = {
 			.name = "VOICE CALL",
 			.stream_name = "VOICE CALL PCM",
 			.codec_name = "aic3262-codec.4-0018",
@@ -923,7 +923,7 @@ static struct snd_soc_dai_link tegra_aic326x_dai[] = {
 			.cpu_dai_name = "dit-hifi",
 			.codec_dai_name = "aic3262-asi2",
 			.ops = &tegra_aic326x_voice_call_ops,
-		},*/
+		},
 	/* TODO - enabling this cause binding issue- figure out */
 	/*[DAI_LINK_BT_VOICE_CALL] = {
 			.name = "BT VOICE CALL",
@@ -971,16 +971,6 @@ static __devinit int tegra_aic326x_driver_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, card);
 	snd_soc_card_set_drvdata(card, machine);
 
-#ifdef CONFIG_SWITCH
-	/* Add h2w switch class support */
-	ret = switch_dev_register(&aic326x_wired_switch_dev);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "not able to register switch device %d\n",
-			ret);
-		goto err_fini_utils;
-	}
-#endif
-
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	for (i = 0; i < NUM_I2S_DEVICES ; i++)
 		machine->codec_info[i].i2s_id = pdata->audio_port_id[i];
@@ -999,15 +989,28 @@ static __devinit int tegra_aic326x_driver_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n",
 			ret);
-		goto err_switch_unregister;
+		goto err_fini_utils;
 	}
+
+	if (!card->instantiated) {
+		dev_err(&pdev->dev, "No TI AIC3262 codec\n");
+		goto err_unregister_card;
+	}
+
+#ifdef CONFIG_SWITCH
+	/* Add h2w switch class support */
+	ret = switch_dev_register(&aic326x_wired_switch_dev);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "not able to register switch device %d\n",
+			ret);
+		goto err_unregister_card;
+	}
+#endif
 
 	return 0;
 
-err_switch_unregister:
-#ifdef CONFIG_SWITCH
-	switch_dev_unregister(&aic326x_wired_switch_dev);
-#endif
+err_unregister_card:
+	snd_soc_unregister_card(card);
 err_fini_utils:
 	tegra_asoc_utils_fini(&machine->util_data);
 err_free_machine:
