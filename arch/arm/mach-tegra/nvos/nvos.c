@@ -63,6 +63,7 @@
 #include <linux/freezer.h>
 #include <linux/rbtree.h>
 #include <linux/rwsem.h>
+#include <linux/kmemleak.h>
 
 #define ATAG_NVIDIA_TEGRA 0x41000801
 struct tag_nvidia_tegra {
