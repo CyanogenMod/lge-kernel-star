@@ -263,6 +263,7 @@ void tegra_init_cache(bool init)
 	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
 	u32 aux_ctrl;
 	u32 speedo;
+	u32 tmp;
 
 #ifdef CONFIG_TRUSTED_FOUNDATIONS
 	/* issue the SMC to enable the L2 */
@@ -304,11 +305,17 @@ void tegra_init_cache(bool init)
 	writel(0x770, p + L2X0_DATA_LATENCY_CTRL);
 #endif
 #endif
+	aux_ctrl = readl(p + L2X0_CACHE_TYPE);
+	aux_ctrl = (aux_ctrl & 0x700) << (17-8);
+	aux_ctrl |= 0x7C000001;
 	if (init) {
-		aux_ctrl = readl(p + L2X0_CACHE_TYPE);
-		aux_ctrl = (aux_ctrl & 0x700) << (17-8);
-		aux_ctrl |= 0x7C000001;
 		l2x0_init(p, aux_ctrl, 0x8200c3fe);
+	} else {
+		tmp = aux_ctrl;
+		aux_ctrl = readl(p + L2X0_AUX_CTRL);
+		aux_ctrl &= 0x8200c3fe;
+		aux_ctrl |= tmp;
+		writel(aux_ctrl, p + L2X0_AUX_CTRL);
 	}
 	l2x0_enable();
 #endif
