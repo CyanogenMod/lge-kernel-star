@@ -441,6 +441,8 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_cardhu[] = {
 	DEFAULT_PINMUX(GMI_CS1_N,       GMI,             PULL_UP,   TRISTATE,   INPUT),
 	/*TP_IRQ*/
 	DEFAULT_PINMUX(GMI_CS4_N,       GMI,             PULL_UP,   NORMAL,     INPUT),
+	/*PCIE dock detect*/
+	DEFAULT_PINMUX(GPIO_PU4,        PWM1,            PULL_UP,   NORMAL,     INPUT),
 };
 
 static __initdata struct tegra_pingroup_config cardhu_pinmux_cardhu_a03[] = {

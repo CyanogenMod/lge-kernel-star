@@ -432,6 +432,7 @@ static void __init tegra_harmony_init(void)
 #ifdef CONFIG_KEYBOARD_TEGRA
 	harmony_kbc_init();
 #endif
+	harmony_pcie_init();
 }
 
 void __init tegra_harmony_reserve(void)

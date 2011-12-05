@@ -454,6 +454,16 @@ static struct resource sdhci_resource4[] = {
 	},
 };
 
+struct platform_device tegra_pci_device = {
+	.name		= "tegra-pcie",
+	.id		= 0,
+	.resource	= 0,
+	.num_resources	= 0,
+	.dev = {
+		.platform_data = 0,
+	},
+};
+
 /* board files should fill in platform_data register the devices themselvs.
  * See board-harmony.c for an example
  */

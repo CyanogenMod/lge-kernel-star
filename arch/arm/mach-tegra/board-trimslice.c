@@ -30,6 +30,7 @@
 
 #include <mach/iomap.h>
 #include <mach/sdhci.h>
+#include <mach/pci.h>
 
 #include "board.h"
 #include "clock.h"
@@ -70,11 +71,17 @@ static struct tegra_sdhci_platform_data sdhci_pdata4 = {
 	.wp_gpio	= TRIMSLICE_GPIO_SD4_WP,
 	.power_gpio	= -1,
 };
-
+static struct tegra_pci_platform_data trimslice_pci_platform_data = {
+	.port_status[0]	= 1,
+	.port_status[1]	= 1,
+	.use_dock_detect	= 0,
+	.gpio		= 0,
+};
 static struct platform_device *trimslice_devices[] __initdata = {
 	&debug_uart,
 	&tegra_sdhci_device1,
 	&tegra_sdhci_device4,
+	&trimslice_pci_platform_data,
 };
 
 static void __init tegra_trimslice_fixup(struct machine_desc *desc,
@@ -93,15 +100,6 @@ static __initdata struct tegra_clk_init_table trimslice_clk_init_table[] = {
 	{ NULL,		NULL,		0,		0},
 };
 
-static int __init tegra_trimslice_pci_init(void)
-{
-	if (!machine_is_trimslice())
-		return 0;
-
-	return tegra_pcie_init(true, true);
-}
-subsys_initcall(tegra_trimslice_pci_init);
-
 static void __init tegra_trimslice_init(void)
 {
 	tegra_clk_init_from_table(trimslice_clk_init_table);
@@ -110,6 +108,7 @@ static void __init tegra_trimslice_init(void)
 
 	tegra_sdhci_device1.dev.platform_data = &sdhci_pdata1;
 	tegra_sdhci_device4.dev.platform_data = &sdhci_pdata4;
+	tegra_pci_device.dev.platform_data = &trimslice_pci_platform_data;
 
 	platform_add_devices(trimslice_devices, ARRAY_SIZE(trimslice_devices));
 }
