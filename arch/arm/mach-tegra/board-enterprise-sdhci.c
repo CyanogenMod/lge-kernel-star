@@ -128,7 +128,10 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data0 = {
 	.mmc_data = {
 		.register_status_notify	= enterprise_wifi_status_register,
 		.embedded_sdio = &embedded_sdio_data0,
-		.built_in = 1,
+		/* FIXME need to revert the built_in change
+		once we use get the signal strength fix of
+		bcmdhd driver from broadcom for bcm4329 chipset*/
+		.built_in = 0,
 	},
 	.cd_gpio = -1,
 	.wp_gpio = -1,
