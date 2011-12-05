@@ -287,6 +287,7 @@ int __init cardhu_sdhci_init(void)
 		(board_info.board_id == BOARD_PM305) ||
 		(board_info.board_id == BOARD_PM311)) {
 			tegra_sdhci_platform_data0.wp_gpio = PM269_SD_WP;
+			tegra_sdhci_platform_data2.max_clk_limit = 12000000;
 	}
 
 	platform_device_register(&tegra_sdhci_device3);
