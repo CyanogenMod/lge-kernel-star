@@ -22,6 +22,8 @@
 #include <media/ov5650.h>
 #include <media/tegra_camera.h>
 
+#define SIZEOF_I2C_TRANSBUF 32
+
 struct ov5650_reg {
 	u16 addr;
 	u16 val;
@@ -39,6 +41,7 @@ struct ov5650_info {
 	enum StereoCameraMode camera_mode;
 	struct ov5650_sensor left;
 	struct ov5650_sensor right;
+	u8 i2c_trans_buf[SIZEOF_I2C_TRANSBUF];
 };
 
 static struct ov5650_info *stereo_ov5650_info;
@@ -777,7 +780,7 @@ static int ov5650_read_reg(struct i2c_client *client, u16 addr, u8 *val)
 	msg[0].buf = data;
 
 	/* high byte goes out first */
-	data[0] = (u8) (addr >> 8);;
+	data[0] = (u8) (addr >> 8);
 	data[1] = (u8) (addr & 0xff);
 
 	msg[1].addr = client->addr;
@@ -824,12 +827,11 @@ static int ov5650_write_reg(struct i2c_client *client, u16 addr, u8 val)
 	int err;
 	struct i2c_msg msg;
 	unsigned char data[3];
-	int retry = 0;
 
 	if (!client->adapter)
 		return -ENODEV;
 
-	data[0] = (u8) (addr >> 8);;
+	data[0] = (u8) (addr >> 8);
 	data[1] = (u8) (addr & 0xff);
 	data[2] = (u8) (val & 0xff);
 
@@ -838,15 +840,11 @@ static int ov5650_write_reg(struct i2c_client *client, u16 addr, u8 val)
 	msg.len = 3;
 	msg.buf = data;
 
-	do {
-		err = i2c_transfer(client->adapter, &msg, 1);
-		if (err == 1)
-			return 0;
-		retry++;
-		pr_err("ov5650: i2c transfer failed, retrying %x %x\n",
-			addr, val);
-		usleep_range(3000, 3250);
-	} while (retry <= OV5650_MAX_RETRIES);
+	err = i2c_transfer(client->adapter, &msg, 1);
+	if (err == 1)
+		return 0;
+
+	pr_err("ov5650: i2c transfer failed, retrying %x %x\n",	addr, val);
 
 	return err;
 }
@@ -875,14 +873,66 @@ static int ov5650_write_reg_helper(struct ov5650_info *info,
 	return ret;
 }
 
+static int ov5650_write_bulk_reg(struct i2c_client *client, u8 *data, int len)
+{
+	int err;
+	struct i2c_msg msg;
+
+	if (!client->adapter)
+		return -ENODEV;
+
+	msg.addr = client->addr;
+	msg.flags = 0;
+	msg.len = len;
+	msg.buf = data;
+
+	err = i2c_transfer(client->adapter, &msg, 1);
+	if (err == 1)
+		return 0;
+
+	pr_err("ov5650: i2c bulk transfer failed at %x\n",
+		(int)data[0] << 8 | data[1]);
+
+	return err;
+}
+
+static int ov5650_write_bulk_reg_helper(struct ov5650_info *info, int len)
+{
+	int ret;
+	switch (info->camera_mode) {
+	case Main:
+	case StereoCameraMode_Left:
+		ret = ov5650_write_bulk_reg(info->left.i2c_client,
+					info->i2c_trans_buf, len);
+		break;
+	case StereoCameraMode_Stereo:
+		ret = ov5650_write_bulk_reg(info->left.i2c_client,
+					info->i2c_trans_buf, len);
+		if (ret)
+			break;
+		ret = ov5650_write_bulk_reg(info->right.i2c_client,
+					info->i2c_trans_buf, len);
+		break;
+	case StereoCameraMode_Right:
+		ret = ov5650_write_bulk_reg(info->right.i2c_client,
+					info->i2c_trans_buf, len);
+		break;
+	default:
+		return -1;
+	}
+	return ret;
+}
+
 static int ov5650_write_table(struct ov5650_info *info,
 				const struct ov5650_reg table[],
 				const struct ov5650_reg override_list[],
 				int num_override_regs)
 {
 	int err;
-	const struct ov5650_reg *next;
-	int i;
+	const struct ov5650_reg *next, *n_next;
+	u8 *b_ptr = info->i2c_trans_buf;
+	unsigned int buf_filled = 0;
+	unsigned int i;
 	u16 val;
 
 	for (next = table; next->addr != OV5650_TABLE_END; next++) {
@@ -892,7 +942,6 @@ static int ov5650_write_table(struct ov5650_info *info,
 		}
 
 		val = next->val;
-
 		/* When an override list is passed in, replace the reg */
 		/* value to write if the reg is in the list            */
 		if (override_list) {
@@ -904,9 +953,28 @@ static int ov5650_write_table(struct ov5650_info *info,
 			}
 		}
 
-		err = ov5650_write_reg_helper(info, next->addr, val);
+		if (!buf_filled) {
+			b_ptr = info->i2c_trans_buf;
+			*b_ptr++ = next->addr >> 8;
+			*b_ptr++ = next->addr & 0xff;
+			buf_filled = 2;
+		}
+		*b_ptr++ = val;
+		buf_filled++;
+
+		n_next = next + 1;
+		if (n_next->addr != OV5650_TABLE_END &&
+			n_next->addr != OV5650_TABLE_WAIT_MS &&
+			buf_filled < SIZEOF_I2C_TRANSBUF &&
+			n_next->addr == next->addr + 1) {
+			continue;
+		}
+
+		err = ov5650_write_bulk_reg_helper(info, buf_filled);
 		if (err)
 			return err;
+
+		buf_filled = 0;
 	}
 	return 0;
 }
@@ -960,7 +1028,6 @@ static int ov5650_set_mode(struct ov5650_info *info, struct ov5650_mode *mode)
 		if (err)
 			return err;
 	}
-
 	last_mode = mode_table[sensor_mode];
 
 	err = ov5650_write_table(info, mode_table[sensor_mode],
@@ -1060,44 +1127,44 @@ static int ov5650_set_binning(struct ov5650_info *info, u8 enable)
 		return -EIO;
 
 	if (!enable) {
-	ret = ov5650_write_reg_helper(info,
-		OV5650_ARRAY_CONTROL_01,
-		array_ctrl_reg |
-		(OV5650_H_BINNING_BIT | OV5650_H_SUBSAMPLING_BIT));
+		ret = ov5650_write_reg_helper(info,
+			OV5650_ARRAY_CONTROL_01,
+			array_ctrl_reg |
+			(OV5650_H_BINNING_BIT | OV5650_H_SUBSAMPLING_BIT));
 
-	if (ret < 0)
-		goto exit;
+		if (ret < 0)
+			goto exit;
 
-	ret = ov5650_write_reg_helper(info,
-		OV5650_ANALOG_CONTROL_D,
-		analog_ctrl_reg & ~OV5650_V_BINNING_BIT);
+		ret = ov5650_write_reg_helper(info,
+			OV5650_ANALOG_CONTROL_D,
+			analog_ctrl_reg & ~OV5650_V_BINNING_BIT);
 
-	if (ret < 0)
-		goto exit;
+		if (ret < 0)
+			goto exit;
 
-	ret = ov5650_write_reg_helper(info,
-		OV5650_TIMING_TC_REG_18,
-		timing_reg | OV5650_V_SUBSAMPLING_BIT);
+		ret = ov5650_write_reg_helper(info,
+			OV5650_TIMING_TC_REG_18,
+			timing_reg | OV5650_V_SUBSAMPLING_BIT);
 
-	if (ret < 0)
-		goto exit;
+		if (ret < 0)
+			goto exit;
 
-	if (info->mode == OV5650_MODE_1296x972)
-		val = 0x1A2;
-	else
-		/* FIXME: this value is not verified yet. */
-		val = 0x1A8;
+		if (info->mode == OV5650_MODE_1296x972)
+			val = 0x1A2;
+		else
+			/* FIXME: this value is not verified yet. */
+			val = 0x1A8;
 
-	ret = ov5650_write_reg_helper(info,
-		OV5650_TIMING_CONTROL_HS_HIGH,
-		(val >> 8));
+		ret = ov5650_write_reg_helper(info,
+			OV5650_TIMING_CONTROL_HS_HIGH,
+			(val >> 8));
 
-	if (ret < 0)
-		goto exit;
+		if (ret < 0)
+			goto exit;
 
-	ret = ov5650_write_reg_helper(info,
-		OV5650_TIMING_CONTROL_HS_LOW,
-		(val & 0xFF));
+		ret = ov5650_write_reg_helper(info,
+			OV5650_TIMING_CONTROL_HS_LOW,
+			(val & 0xFF));
 	} else {
 		ret = ov5650_write_reg_helper(info,
 			OV5650_ARRAY_CONTROL_01,
@@ -1145,7 +1212,8 @@ exit:
 
 	ret |= ov5650_write_reg_helper(info,
 		OV5650_SRM_GRUP_ACCESS,
-		(OV5650_GROUP_HOLD_BIT | OV5650_GROUP_LAUNCH_BIT | OV5650_GROUP_ID(3)));
+		(OV5650_GROUP_HOLD_BIT | OV5650_GROUP_LAUNCH_BIT |
+		OV5650_GROUP_ID(3)));
 
 	return ret;
 }
