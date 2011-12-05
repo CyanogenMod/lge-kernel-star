@@ -180,6 +180,7 @@ static __initdata struct tegra_clk_init_table enterprise_clk_init_table[] = {
 	{ "pll_a",	NULL,		564480000,	false},
 	{ "pll_a_out0",	NULL,		11289600,	false},
 	{ "i2s0",	"pll_a_out0",	0,		false},
+	{ "i2s1",	"pll_a_out0",	0,		false},
 	{ "i2s2",	"pll_a_out0",	0,		false},
 	{ "i2s3",	"pll_a_out0",	0,		false},
 	{ "spdif_out",	"pll_a_out0",	0,		false},
@@ -524,20 +525,7 @@ static struct platform_device *enterprise_devices[] __initdata = {
 	&tegra_avp_device,
 #endif
 	&tegra_camera,
-	&tegra_ahub_device,
-	&tegra_dam_device0,
-	&tegra_dam_device1,
-	&tegra_dam_device2,
-	&tegra_i2s_device0,
-	&tegra_i2s_device2,
-	&tegra_i2s_device3,
-	&tegra_spdif_device,
-	&spdif_dit_device,
-	&bluetooth_dit_device,
 	&enterprise_bcm4329_rfkill_device,
-	&baseband_dit_device,
-	&tegra_pcm_device,
-	&enterprise_audio_device,
 	&tegra_spi_device4,
 	&tegra_hda_device,
 #if defined(CONFIG_CRYPTO_DEV_TEGRA_SE)
@@ -789,6 +777,36 @@ static void enterprise_usb_init(void)
 	udc_pdata = tegra_udc_device.dev.platform_data;
 }
 
+static struct platform_device *enterprise_audio_devices[] __initdata = {
+	&tegra_ahub_device,
+	&tegra_dam_device0,
+	&tegra_dam_device1,
+	&tegra_dam_device2,
+	&tegra_i2s_device2,
+	&tegra_i2s_device3,
+	&tegra_spdif_device,
+	&spdif_dit_device,
+	&bluetooth_dit_device,
+	&baseband_dit_device,
+	&tegra_pcm_device,
+	&enterprise_audio_device,
+};
+
+static void enterprise_audio_init(void)
+{
+	struct board_info board_info;
+
+	tegra_get_board_info(&board_info);
+	if (board_info.board_id == BOARD_E1197) {
+		platform_device_register(&tegra_i2s_device1);
+		enterprise_audio_pdata.audio_port_id[HIFI_CODEC] = 1;
+	} else
+		platform_device_register(&tegra_i2s_device0);
+
+	platform_add_devices(enterprise_audio_devices,
+			ARRAY_SIZE(enterprise_audio_devices));
+}
+
 static void enterprise_gps_init(void)
 {
 	tegra_gpio_enable(TEGRA_GPIO_PE4);
@@ -922,6 +940,7 @@ static void __init tegra_enterprise_init(void)
 #endif
 	enterprise_kbc_init();
 	enterprise_touch_init();
+	enterprise_audio_init();
 	enterprise_gps_init();
 	enterprise_baseband_init();
 	enterprise_panel_init();
