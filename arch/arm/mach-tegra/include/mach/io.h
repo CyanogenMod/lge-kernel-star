@@ -22,7 +22,11 @@
 #ifndef __MACH_TEGRA_IO_H
 #define __MACH_TEGRA_IO_H
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 #define IO_SPACE_LIMIT 0xffff
+#else
+#define IO_SPACE_LIMIT 0xffffffff
+#endif
 
 /* On TEGRA, many peripherals are very closely packed in
  * two 256MB io windows (that actually only use about 64KB
@@ -100,7 +104,7 @@ void tegra_iounmap(volatile void __iomem *addr);
 
 #define IO_ADDRESS(n) ((void __iomem *) IO_TO_VIRT(n))
 
-#ifdef CONFIG_TEGRA_PCI
+#if (defined(CONFIG_TEGRA_PCI) && defined(CONFIG_ARCH_TEGRA_2x_SOC))
 extern void __iomem *tegra_pcie_io_base;
 
 static inline void __iomem *__io(unsigned long addr)
