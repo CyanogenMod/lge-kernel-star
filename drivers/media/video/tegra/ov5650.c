@@ -29,8 +29,6 @@ struct ov5650_reg {
 	u16 val;
 };
 
-static struct ov5650_reg *last_mode;
-
 struct ov5650_sensor {
 	struct i2c_client *i2c_client;
 	struct ov5650_platform_data *pdata;
@@ -1012,23 +1010,13 @@ static int ov5650_set_mode(struct ov5650_info *info, struct ov5650_mode *mode)
 	ov5650_get_coarse_time_regs(reg_list + 2, mode->coarse_time);
 	ov5650_get_gain_reg(reg_list + 5, mode->gain);
 
-	/* Check what condition reset and mode start sequences are */
-	/* needed. For switching between certain modes, these are  */
-	/* not required. Skipping them saves time for I2C access   */
-	if ((info->mode == OV5650_MODE_INVALID) ||
-		((last_mode != mode_2592x1944) &&
-		(last_mode != mode_1296x972)) ||
-		((mode_table[sensor_mode] != mode_2592x1944) &&
-		(mode_table[sensor_mode] != mode_1296x972))) {
-		err = ov5650_write_table(info, reset_seq, NULL, 0);
-		if (err)
-			return err;
+	err = ov5650_write_table(info, reset_seq, NULL, 0);
+	if (err)
+		return err;
 
-		err = ov5650_write_table(info, mode_start, NULL, 0);
-		if (err)
-			return err;
-	}
-	last_mode = mode_table[sensor_mode];
+	err = ov5650_write_table(info, mode_start, NULL, 0);
+	if (err)
+		return err;
 
 	err = ov5650_write_table(info, mode_table[sensor_mode],
 		reg_list, 6);
@@ -1233,12 +1221,10 @@ static int set_power_helper(struct ov5650_platform_data *pdata,
 				int powerLevel)
 {
 	if (pdata) {
-		if (powerLevel && pdata->power_on) {
+		if (powerLevel && pdata->power_on)
 			pdata->power_on();
-		} else if (pdata->power_off) {
+		else if (pdata->power_off)
 			pdata->power_off();
-			stereo_ov5650_info->mode = OV5650_MODE_INVALID;
-		}
 	}
 	return 0;
 }
