@@ -1061,7 +1061,9 @@ static int tegra_dc_hdmi_init(struct tegra_dc *dc)
 	ret = switch_dev_register(&hdmi->hpd_switch);
 
 	if (!ret)
-		device_create_file(hdmi->hpd_switch.dev, &dev_attr_underscan);
+		ret = device_create_file(hdmi->hpd_switch.dev,
+			&dev_attr_underscan);
+	WARN(ret, "could not create dev_attr_underscan\n");
 #endif
 
 	dc->out->depth = 24;
@@ -1082,7 +1084,9 @@ static int tegra_dc_hdmi_init(struct tegra_dc *dc)
 
 	return 0;
 
+#ifdef CONFIG_TEGRA_NVHDCP
 err_edid_destroy:
+#endif
 	tegra_edid_destroy(hdmi->edid);
 err_free_irq:
 	free_irq(gpio_to_irq(dc->out->hotplug_gpio), dc);

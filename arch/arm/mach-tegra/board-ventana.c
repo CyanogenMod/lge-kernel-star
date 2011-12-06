@@ -568,9 +568,6 @@ static void __init ventana_power_off_init(void)
 
 static void ventana_usb_init(void)
 {
-	char *src = NULL;
-	int i;
-
 	tegra_usb_phy_init(tegra_usb_phy_pdata, ARRAY_SIZE(tegra_usb_phy_pdata));
 	/* OTG should be the first to be registered */
 	tegra_otg_device.dev.platform_data = &tegra_otg_pdata;

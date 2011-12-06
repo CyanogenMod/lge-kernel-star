@@ -1048,8 +1048,6 @@ struct early_suspend cardhu_panel_early_suspender;
 
 static void cardhu_panel_early_suspend(struct early_suspend *h)
 {
-	unsigned i;
-
 	/* power down LCD, add use a black screen for HDMI */
 	if (num_registered_fb > 0)
 		fb_blank(registered_fb[0], FB_BLANK_POWERDOWN);

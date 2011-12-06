@@ -235,8 +235,6 @@ static int __init whistler_wifi_init(void)
 }
 int __init whistler_sdhci_init(void)
 {
-	int ret;
-
 	tegra_gpio_enable(WHISTLER_EXT_SDCARD_DETECT);
 
 	platform_device_register(&tegra_sdhci_device3);

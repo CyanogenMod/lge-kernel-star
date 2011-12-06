@@ -393,7 +393,6 @@ static int tegra_hw_free(struct snd_pcm_substream *substream)
 	struct tegra_max98088 *machine = snd_soc_card_get_drvdata(rtd->card);
 
 	tegra_asoc_utils_lock_clk_rate(&machine->util_data, 0);
-
 	return 0;
 }
 

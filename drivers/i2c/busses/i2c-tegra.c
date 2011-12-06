@@ -443,7 +443,6 @@ static irqreturn_t tegra_i2c_isr(int irq, void *dev_id)
 	u32 status;
 	const u32 status_err = I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST | I2C_INT_TX_FIFO_OVERFLOW;
 	struct tegra_i2c_dev *i2c_dev = dev_id;
-	unsigned long flags;
 
 	status = i2c_readl(i2c_dev, I2C_INT_STATUS);
 
@@ -573,7 +572,6 @@ static int tegra_i2c_xfer_msg(struct tegra_i2c_bus *i2c_bus,
 	struct tegra_i2c_dev *i2c_dev = i2c_bus->dev;
 	u32 int_mask;
 	int ret;
-	unsigned long flags;
 	int arb_stat;
 
 	tegra_i2c_flush_fifos(i2c_dev);
@@ -682,7 +680,6 @@ static int tegra_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
 	struct tegra_i2c_dev *i2c_dev = i2c_bus->dev;
 	int i;
 	int ret = 0;
-	unsigned long flags;
 
 	if (i2c_dev->is_suspended)
 		return -EBUSY;

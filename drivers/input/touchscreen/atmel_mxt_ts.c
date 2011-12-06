@@ -1451,8 +1451,6 @@ int mxt_write_block(struct i2c_client *client, u16 addr, u16 length, u8 *value)
 		u8  data[256];
 	} i2c_block_transfer;
 
-	struct mxt_data *mxt;
-
 	if (length > 256)
 		return -EINVAL;
 

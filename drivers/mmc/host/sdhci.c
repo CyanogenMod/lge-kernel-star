@@ -1244,7 +1244,6 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 
 	if (host->version >= SDHCI_SPEC_300) {
 		u16 clk, ctrl_2;
-		unsigned int clock;
 
 		/* In case of UHS-I modes, set High Speed Enable */
 		if ((ios->timing == MMC_TIMING_UHS_SDR50) ||

@@ -2721,7 +2721,6 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
 	u32 dccparams;
 #if defined(CONFIG_ARCH_TEGRA)
 	struct resource *res_sys = NULL;
-	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
 #endif
 
 	if (strcmp(pdev->name, driver_name)) {

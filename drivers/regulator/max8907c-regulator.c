@@ -115,7 +115,8 @@ struct max8907c_regulator_info {
 static int max8907c_regulator_list_voltage(struct regulator_dev *dev,
 					   unsigned index);
 static int max8907c_regulator_ldo_set_voltage(struct regulator_dev *dev,
-					      int min_uV, int max_uV);
+					      int min_uV, int max_uV,
+					      unsigned *selector);
 static int max8907c_regulator_bbat_set_voltage(struct regulator_dev *dev,
 					       int min_uV, int max_uV);
 static int max8907c_regulator_ldo_get_voltage(struct regulator_dev *dev);
@@ -207,7 +208,8 @@ static int max8907c_regulator_list_voltage(struct regulator_dev *rdev,
 }
 
 static int max8907c_regulator_ldo_set_voltage(struct regulator_dev *rdev,
-					      int min_uV, int max_uV)
+					      int min_uV, int max_uV,
+					      unsigned *selector)
 {
 	const struct max8907c_regulator_info *info = rdev_get_drvdata(rdev);
 	int val;
@@ -215,6 +217,7 @@ static int max8907c_regulator_ldo_set_voltage(struct regulator_dev *rdev,
 	if (min_uV < info->min_uV || max_uV > info->max_uV)
 		return -EDOM;
 
+	*selector = -1;
 	val = (min_uV - info->min_uV) / info->step_uV;
 
 	return max8907c_reg_write(info->i2c, info->reg_base + MAX8907C_VOUT, val);

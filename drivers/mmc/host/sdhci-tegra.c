@@ -69,13 +69,15 @@ struct tegra_sdhci_hw_ops{
 	void	(*sdhost_init)(struct sdhci_host *sdhci);
 };
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
 static struct tegra_sdhci_hw_ops tegra_2x_sdhci_ops = {
 };
-
+#else
 static struct tegra_sdhci_hw_ops tegra_3x_sdhci_ops = {
 	.set_card_clock = tegra_3x_sdhci_set_card_clock,
 	.sdhost_init = tegra3_sdhci_post_reset_init,
 };
+#endif
 
 struct tegra_sdhci_host {
 	bool	clk_enabled;

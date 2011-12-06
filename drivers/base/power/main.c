@@ -928,7 +928,6 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
 		pm_op(dev, &dev->pwr_domain->ops, state);
 	}
 
- End:
 	dev->power.is_suspended = !error;
 
  Unlock:

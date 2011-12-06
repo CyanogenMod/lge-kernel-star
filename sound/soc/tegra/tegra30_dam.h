@@ -147,17 +147,17 @@ struct tegra30_dam_src_step_table {
 #ifdef CONFIG_PM
 int tegra30_dam_resume(int ifc);
 #endif
-void tegra30_dam_disable_clock(int ifc);
+int tegra30_dam_disable_clock(int ifc);
 int tegra30_dam_enable_clock(int ifc);
 int tegra30_dam_allocate_controller(void);
 int tegra30_dam_allocate_channel(int ifc, int chid);
 int tegra30_dam_free_channel(int ifc, int chid);
 int tegra30_dam_free_controller(int ifc);
-void tegra30_dam_set_samplerate(int ifc, int chtype, int samplerate);
+int tegra30_dam_set_samplerate(int ifc, int chtype, int samplerate);
 int tegra30_dam_set_gain(int ifc, int chtype, int gain);
 int tegra30_dam_set_acif(int ifc, int chtype, unsigned int audio_channels,
 	unsigned int audio_bits, unsigned int client_channels,
 	unsigned int client_bits);
-void tegra30_dam_enable(int ifc, int on, int chtype);
+int tegra30_dam_enable(int ifc, int on, int chtype);
 
 #endif

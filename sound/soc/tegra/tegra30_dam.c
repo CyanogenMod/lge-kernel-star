@@ -108,16 +108,17 @@ int tegra30_dam_resume(int ifc)
 }
 #endif
 
-void tegra30_dam_disable_clock(int ifc)
+int tegra30_dam_disable_clock(int ifc)
 {
 	struct tegra30_dam_context *dam;
 
 	if (ifc >= TEGRA30_NR_DAM_IFC)
-		return;
+		return -EINVAL;
 
 	dam =  dams_cont_info[ifc];
 	clk_disable(dam->dam_clk);
 	tegra30_ahub_disable_clocks();
+	return 0;
 }
 
 int tegra30_dam_enable_clock(int ifc)
@@ -277,12 +278,12 @@ int tegra30_dam_free_controller(int ifc)
 	return -EINVAL;
 }
 
-void tegra30_dam_set_samplerate(int ifc, int chid, int samplerate)
+int tegra30_dam_set_samplerate(int ifc, int chid, int samplerate)
 {
 	struct tegra30_dam_context *dam = dams_cont_info[ifc];
 
 	if (ifc >= TEGRA30_NR_DAM_IFC)
-		return;
+		return -EINVAL;
 
 	switch (chid) {
 	case dam_ch_in0:
@@ -292,7 +293,7 @@ void tegra30_dam_set_samplerate(int ifc, int chid, int samplerate)
 		break;
 	case dam_ch_in1:
 		if (samplerate != dam->outsamplerate)
-			return;
+			return -EINVAL;
 		dam->ch_insamplerate[dam_ch_in1] = samplerate;
 		break;
 	case dam_ch_out:
@@ -302,6 +303,7 @@ void tegra30_dam_set_samplerate(int ifc, int chid, int samplerate)
 	default:
 		break;
 	}
+	return 0;
 }
 
 void tegra30_dam_set_output_samplerate(struct tegra30_dam_context *dam,
@@ -452,13 +454,13 @@ int tegra30_dam_set_acif(int ifc, int chid, unsigned int audio_channels,
 	return 0;
 }
 
-void tegra30_dam_enable(int ifc, int on, int chid)
+int tegra30_dam_enable(int ifc, int on, int chid)
 {
 	u32 old_val, val, enreg;
 	struct tegra30_dam_context *dam = dams_cont_info[ifc];
 
 	if (ifc >= TEGRA30_NR_DAM_IFC)
-		return;
+		return -EINVAL;
 
 	if (chid == dam_ch_in0)
 		enreg = TEGRA30_DAM_CH0_CTRL;
@@ -489,6 +491,7 @@ void tegra30_dam_enable(int ifc, int on, int chid)
 
 	if (old_val != val)
 		tegra30_dam_writel(dam, val, TEGRA30_DAM_CTRL);
+	return 0;
 }
 
 void tegra30_dam_ch0_set_datasync(struct tegra30_dam_context *dam, int datasync)

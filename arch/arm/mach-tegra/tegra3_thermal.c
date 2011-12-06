@@ -107,7 +107,7 @@ static int tegra_thermal_zone_unbind(struct thermal_zone_device *thermal,
 }
 
 static int tegra_thermal_zone_get_temp(struct thermal_zone_device *thz,
-						long *temp)
+						unsigned long *temp)
 {
 	struct tegra_thermal *thermal = thz->devdata;
 	thermal->device->get_temp(thermal->device->data, temp);
@@ -131,7 +131,7 @@ static int tegra_thermal_zone_get_trip_type(
 
 static int tegra_thermal_zone_get_trip_temp(struct thermal_zone_device *thz,
 						int trip,
-						long *temp) {
+						unsigned long *temp) {
 	struct tegra_thermal *thermal = thz->devdata;
 
 	/* Support only Thermal Throttling (1 trip) for now */

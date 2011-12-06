@@ -100,7 +100,7 @@ struct tegra_iovmm_device_ops {
 		struct tegra_iovmm_area *io_vma, bool decommit);
 	void (*map_pfn)(struct tegra_iovmm_domain *domain,
 		struct tegra_iovmm_area *io_vma,
-		unsigned long offs, unsigned long pfn);
+		tegra_iovmm_addr_t offs, unsigned long pfn);
 	/*
 	 * ensures that a domain is resident in the hardware's mapping region
 	 * so that it may be used by a client

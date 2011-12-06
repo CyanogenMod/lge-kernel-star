@@ -67,19 +67,19 @@ static __initdata struct tegra_clk_init_table seaboard_clk_init_table[] = {
 };
 
 static struct tegra_i2c_platform_data seaboard_i2c1_platform_data = {
-	.bus_clk_rate	= 400000.
+	.bus_clk_rate	= { 400000, 0 },
 };
 
 static struct tegra_i2c_platform_data seaboard_i2c2_platform_data = {
-	.bus_clk_rate	= 400000,
+	.bus_clk_rate	= { 400000, 0 },
 };
 
 static struct tegra_i2c_platform_data seaboard_i2c3_platform_data = {
-	.bus_clk_rate	= 400000,
+	.bus_clk_rate	= { 400000, 0 },
 };
 
 static struct tegra_i2c_platform_data seaboard_dvc_platform_data = {
-	.bus_clk_rate	= 400000,
+	.bus_clk_rate	= { 400000, 0 },
 };
 
 static struct gpio_keys_button seaboard_gpio_keys_buttons[] = {

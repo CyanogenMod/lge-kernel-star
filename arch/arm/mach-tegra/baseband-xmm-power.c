@@ -190,7 +190,7 @@ static int baseband_xmm_power_off(struct platform_device *device)
 	}
 
 	/* unregister usb host controller */
-	pr_info("%s: hsic device: %x\n", __func__, data->modem.xmm.hsic_device);
+	pr_info("%s: hsic device: %p\n", __func__, data->modem.xmm.hsic_device);
 	if (data->hsic_unregister)
 		data->hsic_unregister(data->modem.xmm.hsic_device);
 	else
@@ -665,7 +665,7 @@ static int baseband_xmm_power_driver_probe(struct platform_device *device)
 	int err;
 
 	pr_debug("%s\n", __func__);
-	pr_debug("[XMM] enum_delay_ms=%d\n", enum_delay_ms);
+	pr_debug("[XMM] enum_delay_ms=%ld\n", enum_delay_ms);
 
 	/* check for platform data */
 	if (!data)
