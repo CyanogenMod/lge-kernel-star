@@ -478,6 +478,8 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
 			       "command, response %#x, card status %#x\n",
 			       req->rq_disk->disk_name, brq.cmd.error,
 			       brq.cmd.resp[0], status);
+			if (brq.cmd.error == -ENOMEDIUM)
+				goto cmd_err;
 		}
 
 		if (brq.data.error) {
