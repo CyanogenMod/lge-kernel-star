@@ -864,6 +864,8 @@ static union tegra_bb_gpio_id m7400_gpio_id = {
 static struct tegra_bb_pdata m7400_pdata = {
 	.id = &m7400_gpio_id,
 	.device = &tegra_ehci2_device,
+	.ehci_register = tegra_usb_hsic_host_register,
+	.ehci_unregister = tegra_usb_hsic_host_unregister,
 	.bb_id = TEGRA_BB_M7400,
 };
 
