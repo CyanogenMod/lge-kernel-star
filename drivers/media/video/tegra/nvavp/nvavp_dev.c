@@ -797,10 +797,11 @@ static int nvavp_set_clock_ioctl(struct file *filp, unsigned int cmd,
 	if (IS_ERR_OR_NULL(c))
 		return -EINVAL;
 
+	clk_enable(c);
 	clk_set_rate(c, config.rate);
 
 	config.rate = clk_get_rate(c);
-
+	clk_disable(c);
 	if (copy_to_user((void __user *)arg, &config, sizeof(struct nvavp_clock_args)))
 		return -EFAULT;
 
@@ -822,7 +823,9 @@ static int nvavp_get_clock_ioctl(struct file *filp, unsigned int cmd,
 	if (IS_ERR_OR_NULL(c))
 		return -EINVAL;
 
+	clk_enable(c);
 	config.rate = clk_get_rate(c);
+	clk_disable(c);
 
 	if (copy_to_user((void __user *)arg, &config, sizeof(struct nvavp_clock_args)))
 		return -EFAULT;
