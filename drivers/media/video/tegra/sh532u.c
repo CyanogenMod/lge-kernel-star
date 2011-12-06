@@ -106,6 +106,8 @@
 #define SH532U_FOCUS_HYPER	250
 #define SH532U_FOCUS_INFINITY	100
 #define SH532U_TIMEOUT_MS	200
+#define SH532U_POS_LOW_DEFAULT	0xA000
+#define SH532U_POS_HIGH_DEFAULT	0x6000
 
 
 struct sh532u_info {
@@ -627,7 +629,7 @@ static int sh532u_rel_pos_rd(struct sh532u_info *info, u32 *position)
 	return 0;
 }
 
-static int sh532u_calibration(struct sh532u_info *info)
+static int sh532u_calibration(struct sh532u_info *info, bool use_defaults)
 {
 	u8 reg;
 	s16 abs_focus_macro;
@@ -719,10 +721,48 @@ static int sh532u_calibration(struct sh532u_info *info)
 			info->cfg.focus_hyper_div =
 					info->pdata->info->focus_hyper_div;
 	}
-	if (ret || !info->cfg.pos_low || !info->cfg.pos_high ||
-			!info->cfg.limit_low || !info->cfg.limit_high) {
+	/*
+	 * There is known to be many sh532u devices with no EPROM data.
+	 * Using default data is known to reduce the sh532u performance since
+	 * the defaults may no where be close to the correct values that
+	 * should be used.  However, we don't want to prevent the camera from
+	 * starting due to the lack of the EPROM data.
+	 * The following truth table shows the action to take at this point:
+	 * DFLT = the use_defaults flag (used after multiple attempts)
+	 * I2C = the I2C transactions to get the data.
+	 * DATA = the needed data either from the EPROM or board file.
+	 * DFLT   I2C   DATA   Action
+	 * --------------------------
+	 *  0     FAIL  FAIL   Exit with -EIO
+	 *  0     FAIL  PASS   Continue to calculations
+	 *  0     PASS  FAIL   Use defaults
+	 *  0     PASS  PASS   Continue to calculations
+	 *  1     FAIL  FAIL   Use defaults
+	 *  1     FAIL  PASS   Continue to calculations
+	 *  1     PASS  FAIL   Use defaults
+	 *  1     PASS  PASS   Continue to calculations
+	 */
+	/* err = DATA where FAIL = 1 */
+	if (!info->cfg.pos_low || !info->cfg.pos_high ||
+			!info->cfg.limit_low || !info->cfg.limit_high)
+		err = 1;
+	else
+		err = 0;
+	/* Exit with -EIO */
+	if (!use_defaults && ret && err) {
 		dev_err(&info->i2c_client->dev, "%s ERR\n", __func__);
 		return -EIO;
+	}
+
+	/* Use defaults */
+	if (err) {
+		info->cfg.pos_low = SH532U_POS_LOW_DEFAULT;
+		info->cfg.pos_high = SH532U_POS_HIGH_DEFAULT;
+		info->cfg.limit_low = SH532U_POS_LOW_DEFAULT;
+		info->cfg.limit_high = SH532U_POS_HIGH_DEFAULT;
+		dev_err(&info->i2c_client->dev, "%s ERR: ERPOM data is void!  "
+			    "Focuser will use defaults that will cause "
+			    "reduced functionality!\n", __func__);
 	}
 	/* calculate relative and absolute positions */
 	abs_focus_macro = info->cfg.pos_low;
@@ -918,7 +958,7 @@ static int sh532u_dev_init(struct sh532u_info *info)
 	if (err)
 		dev_err(&info->i2c_client->dev, "%s programming err=%d\n",
 				__func__, err);
-	err |= sh532u_calibration(info);
+	err |= sh532u_calibration(info, false);
 	info->sts = NVC_FOCUS_STS_LENS_SETTLED;
 	return err;
 }
@@ -1112,7 +1152,7 @@ static int sh532u_param_rd(struct sh532u_info *info, unsigned long arg)
 
 	case NVC_PARAM_CAPS:
 		sh532u_pm_dev_wr(info, NVC_PWR_COMM);
-		err = sh532u_calibration(info);
+		err = sh532u_calibration(info, true);
 		sh532u_pm_dev_wr(info, NVC_PWR_STDBY);
 		if (err)
 			return -EIO;
@@ -1537,7 +1577,7 @@ static int sh532u_probe(
 		}
 	} else {
 		dev_dbg(&client->dev, "%s device found\n", __func__);
-		sh532u_calibration(info);
+		sh532u_calibration(info, false);
 		if (info->pdata->cfg & NVC_CFG_BOOT_INIT) {
 			/* initial move causes full initialization */
 			sh532u_pos_rel_wr(info, info->cap.focus_infinity);
