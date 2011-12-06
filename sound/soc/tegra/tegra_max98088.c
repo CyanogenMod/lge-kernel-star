@@ -937,14 +937,6 @@ static struct snd_soc_dai_link tegra_max98088_dai[NUM_DAI_LINKS] = {
 		},
 };
 
-#ifdef CONFIG_PM
-int tegra30_soc_resume_pre(struct snd_soc_card *card)
-{
-	return tegra30_ahub_apbif_resume();
-}
-#endif
-
-
 static int tegra30_soc_set_bias_level(struct snd_soc_card *card,
 					enum snd_soc_bias_level level)
 {
@@ -974,9 +966,6 @@ static struct snd_soc_card snd_soc_tegra_max98088 = {
 	.name = "tegra-max98088",
 	.dai_link = tegra_max98088_dai,
 	.num_links = ARRAY_SIZE(tegra_max98088_dai),
-#ifdef CONFIG_PM
-	.resume_pre = tegra30_soc_resume_pre,
-#endif
 	.set_bias_level = tegra30_soc_set_bias_level,
 	.set_bias_level_post = tegra30_soc_set_bias_level_post,
 };

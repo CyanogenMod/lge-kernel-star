@@ -466,6 +466,8 @@ int tegra30_i2s_resume(struct snd_soc_dai *cpu_dai)
 	for (i = 0; i < ((TEGRA30_I2S_CIF_TX_CTRL>>2) + 1); i++)
 		tegra30_i2s_write(i2s, i<<2, i2s->reg_cache[i]);
 
+	tegra30_ahub_apbif_resume();
+
 	tegra30_i2s_disable_clocks(i2s);
 
 	if (i2s->dam_ch_refcount)
