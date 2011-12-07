@@ -252,7 +252,6 @@ static int tegra_pm_irq_syscore_suspend(void)
 	u64 lvl;
 	u64 wake_level;
 	u64 wake_enb;
-	static bool is_first = true;
 
 	clear_pmc_sw_wake_status();
 
@@ -269,10 +268,7 @@ static int tegra_pm_irq_syscore_suspend(void)
 
 	/* flip the wakeup trigger for any-edge triggered pads
 	 * which are currently asserting as wakeups */
-	if (is_first)
-		is_first = false;
-	else
-		lvl ^= status;
+	lvl ^= status;
 
 	lvl &= tegra_lp0_wake_level_any;
 
