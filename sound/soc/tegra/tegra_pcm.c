@@ -292,10 +292,15 @@ static snd_pcm_uframes_t tegra_pcm_pointer(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct tegra_runtime_data *prtd = runtime->private_data;
+	int dma_transfer_count;
 
-	return prtd->period_index * runtime->period_size;
+	dma_transfer_count = tegra_dma_get_transfer_count(prtd->dma_chan,
+					&prtd->dma_req[prtd->dma_req_idx],
+					false);
+
+	return prtd->period_index * runtime->period_size +
+		bytes_to_frames(runtime, dma_transfer_count);
 }
-
 
 static int tegra_pcm_mmap(struct snd_pcm_substream *substream,
 				struct vm_area_struct *vma)
