@@ -47,6 +47,11 @@ void tegra_secondary_startup(void);
 		((u32)__tegra_cpu_reset_handler_data - \
 		 (u32)__tegra_cpu_reset_handler_start))))
 
+#define tegra_cpu_lp2_mask ((cpumask_t *)(IO_ADDRESS(TEGRA_RESET_HANDLER_BASE + \
+		((u32)&__tegra_cpu_reset_handler_data[TEGRA_RESET_MASK_LP2] - \
+		 (u32)__tegra_cpu_reset_handler_start))))
+#endif
+
 #define tegra_cpu_reset_handler_offset \
 		((u32)__tegra_cpu_reset_handler - \
 		 (u32)__tegra_cpu_reset_handler_start)
@@ -54,11 +59,6 @@ void tegra_secondary_startup(void);
 #define tegra_cpu_reset_handler_size \
 		(__tegra_cpu_reset_handler_end - \
 		 __tegra_cpu_reset_handler_start)
-
-#define tegra_cpu_lp2_mask ((cpumask_t *)(IO_ADDRESS(TEGRA_RESET_HANDLER_BASE + \
-		((u32)&__tegra_cpu_reset_handler_data[TEGRA_RESET_MASK_LP2] - \
-		 (u32)__tegra_cpu_reset_handler_start))))
-#endif
 
 void __init tegra_cpu_reset_handler_init(void);
 
