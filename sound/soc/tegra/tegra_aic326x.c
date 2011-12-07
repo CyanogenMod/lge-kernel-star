@@ -924,8 +924,7 @@ static struct snd_soc_dai_link tegra_aic326x_dai[] = {
 			.codec_dai_name = "aic3262-asi2",
 			.ops = &tegra_aic326x_voice_call_ops,
 		},
-	/* TODO - enabling this cause binding issue- figure out */
-	/*[DAI_LINK_BT_VOICE_CALL] = {
+	[DAI_LINK_BT_VOICE_CALL] = {
 			.name = "BT VOICE CALL",
 			.stream_name = "BT VOICE CALL PCM",
 			.codec_name = "spdif-dit.2",
@@ -933,7 +932,7 @@ static struct snd_soc_dai_link tegra_aic326x_dai[] = {
 			.cpu_dai_name = "dit-hifi",
 			.codec_dai_name = "dit-hifi",
 			.ops = &tegra_aic326x_bt_voice_call_ops,
-		},*/
+		},
 };
 
 static struct snd_soc_card snd_soc_tegra_aic326x = {
