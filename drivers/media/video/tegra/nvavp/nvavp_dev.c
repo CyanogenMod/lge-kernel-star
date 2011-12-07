@@ -521,11 +521,21 @@ static int nvavp_load_ucode(struct nvavp_info *nvavp)
 		ret = request_firmware(&nvavp_ucode_fw, fw_ucode_file,
 					nvavp->misc_dev.this_device);
 		if (ret) {
-			dev_err(&nvavp->nvhost_dev->dev,
-				"cannot read ucode firmware '%s'\n",
-				fw_ucode_file);
-			goto err_req_ucode;
+			/* Try alternative version */
+			sprintf(fw_ucode_file, "nvavp_vid_ucode_alt.bin");
+
+			ret = request_firmware(&nvavp_ucode_fw,
+						fw_ucode_file,
+						nvavp->misc_dev.this_device);
+
+			if (ret) {
+				dev_err(&nvavp->nvhost_dev->dev,
+					"cannot read ucode firmware '%s'\n",
+					fw_ucode_file);
+				goto err_req_ucode;
+			}
 		}
+
 		dev_info(&nvavp->nvhost_dev->dev,
 			"read ucode firmware from '%s' (%d bytes)\n",
 			fw_ucode_file, nvavp_ucode_fw->size);
