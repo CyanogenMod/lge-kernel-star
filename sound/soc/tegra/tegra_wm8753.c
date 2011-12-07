@@ -287,9 +287,27 @@ static int tegra_hw_free(struct snd_pcm_substream *substream)
 	return 0;
 }
 
+static int tegra_wm8753_startup(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct tegra_wm8753 *machine = snd_soc_card_get_drvdata(rtd->card);
+
+	return regulator_enable(machine->audio_reg);
+}
+
+static void tegra_wm8753_shutdown(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct tegra_wm8753 *machine = snd_soc_card_get_drvdata(rtd->card);
+
+	regulator_disable(machine->audio_reg);
+}
+
 static struct snd_soc_ops tegra_wm8753_ops = {
 	.hw_params = tegra_wm8753_hw_params,
 	.hw_free = tegra_hw_free,
+	.startup = tegra_wm8753_startup,
+	.shutdown = tegra_wm8753_shutdown,
 };
 
 static struct snd_soc_ops tegra_bt_sco_ops = {
@@ -432,14 +450,6 @@ static int tegra_wm8753_init(struct snd_soc_pcm_runtime *rtd)
 		if (IS_ERR(machine->audio_reg)) {
 			dev_err(card->dev, "cannot get avddio_audio reg\n");
 			ret = PTR_ERR(machine->audio_reg);
-			return ret;
-		}
-
-		ret = regulator_enable(machine->audio_reg);
-		if (ret) {
-			dev_err(card->dev, "cannot enable avddio_audio reg\n");
-			regulator_put(machine->audio_reg);
-			machine->audio_reg = NULL;
 			return ret;
 		}
 	}
