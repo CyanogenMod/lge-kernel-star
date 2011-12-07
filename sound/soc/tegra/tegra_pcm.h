@@ -33,6 +33,10 @@
 
 #include <mach/dma.h>
 
+#ifdef CONFIG_HAS_WAKELOCK
+#include <linux/wakelock.h>
+#endif
+
 struct tegra_pcm_dma_params {
 	unsigned long addr;
 	unsigned long wrap;
@@ -50,6 +54,10 @@ struct tegra_runtime_data {
 	int dma_req_idx;
 	struct tegra_dma_req dma_req[2];
 	struct tegra_dma_channel *dma_chan;
+#ifdef CONFIG_HAS_WAKELOCK
+	struct wake_lock tegra_wake_lock;
+	char tegra_wake_lock_name[32];
+#endif
 };
 
 #endif
