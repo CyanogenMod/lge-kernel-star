@@ -440,6 +440,7 @@ static struct platform_device *whistler_devices[] __initdata = {
 	&tegra_das_device,
 	&spdif_dit_device,
 	&bluetooth_dit_device,
+	&baseband_dit_device,
 	&whistler_bcm4329_rfkill_device,
 	&tegra_pcm_device,
 	&whistler_audio_device1,
