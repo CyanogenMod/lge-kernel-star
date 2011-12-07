@@ -576,7 +576,9 @@ static ssize_t show_go_maxspeed_load(struct kobject *kobj,
 static ssize_t store_go_maxspeed_load(struct kobject *kobj,
 			struct attribute *attr, const char *buf, size_t count)
 {
-	return strict_strtoul(buf, 0, &go_maxspeed_load);
+	if (!strict_strtoul(buf, 0, &go_maxspeed_load))
+		return count;
+	return -EINVAL;
 }
 
 static struct global_attr go_maxspeed_load_attr = __ATTR(go_maxspeed_load, 0644,
@@ -591,7 +593,9 @@ static ssize_t show_boost_factor(struct kobject *kobj,
 static ssize_t store_boost_factor(struct kobject *kobj,
 			struct attribute *attr, const char *buf, size_t count)
 {
-	return strict_strtoul(buf, 0, &boost_factor);
+	if (!strict_strtoul(buf, 0, &boost_factor))
+		return count;
+	return -EINVAL;
 }
 
 static struct global_attr boost_factor_attr = __ATTR(boost_factor, 0644,
@@ -606,7 +610,9 @@ static ssize_t show_max_boost(struct kobject *kobj,
 static ssize_t store_max_boost(struct kobject *kobj,
 			struct attribute *attr, const char *buf, size_t count)
 {
-	return strict_strtoul(buf, 0, &max_boost);
+	if (!strict_strtoul(buf, 0, &max_boost))
+		return count;
+	return -EINVAL;
 }
 
 static struct global_attr max_boost_attr = __ATTR(max_boost, 0644,
@@ -622,7 +628,9 @@ static ssize_t show_sustain_load(struct kobject *kobj,
 static ssize_t store_sustain_load(struct kobject *kobj,
 			struct attribute *attr, const char *buf, size_t count)
 {
-	return strict_strtoul(buf, 0, &sustain_load);
+	if (!strict_strtoul(buf, 0, &sustain_load))
+		return count;
+	return -EINVAL;
 }
 
 static struct global_attr sustain_load_attr = __ATTR(sustain_load, 0644,
@@ -637,7 +645,9 @@ static ssize_t show_min_sample_time(struct kobject *kobj,
 static ssize_t store_min_sample_time(struct kobject *kobj,
 			struct attribute *attr, const char *buf, size_t count)
 {
-	return strict_strtoul(buf, 0, &min_sample_time);
+	if (!strict_strtoul(buf, 0, &min_sample_time))
+		return count;
+	return -EINVAL;
 }
 
 static struct global_attr min_sample_time_attr = __ATTR(min_sample_time, 0644,
