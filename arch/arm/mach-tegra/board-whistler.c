@@ -551,6 +551,7 @@ static void whistler_usb_init(void)
 
 static void __init tegra_whistler_init(void)
 {
+	int modem_id = tegra_get_modem_id();
 	tegra_clk_init_from_table(whistler_clk_init_table);
 	whistler_pinmux_init();
 	whistler_i2c_init();
@@ -568,7 +569,8 @@ static void __init tegra_whistler_init(void)
 	whistler_scroll_init();
 	whistler_power_off_init();
 	whistler_emc_init();
-	whistler_baseband_init();
+	if (modem_id == 0x1)
+		whistler_baseband_init();
 	whistler_setup_bluesleep();
 	tegra_release_bootloader_fb();
 }
