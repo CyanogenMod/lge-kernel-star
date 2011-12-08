@@ -829,7 +829,7 @@ err_clk_put:
 	clk_put(i2s->clk_i2s);
 err_free:
 	kfree(i2s);
-exit:
+
 	return ret;
 }
 

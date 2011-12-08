@@ -149,7 +149,7 @@ int tegra30_dam_resume(int ifc);
 #endif
 void tegra30_dam_disable_clock(int ifc);
 int tegra30_dam_enable_clock(int ifc);
-int tegra30_dam_allocate_controller();
+int tegra30_dam_allocate_controller(void);
 int tegra30_dam_allocate_channel(int ifc, int chid);
 int tegra30_dam_free_channel(int ifc, int chid);
 int tegra30_dam_free_controller(int ifc);

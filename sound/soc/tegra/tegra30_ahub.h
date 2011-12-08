@@ -490,7 +490,7 @@ extern int tegra30_ahub_set_rx_cif_source(enum tegra30_ahub_rxcif rxcif,
 extern int tegra30_ahub_unset_rx_cif_source(enum tegra30_ahub_rxcif rxcif);
 
 #ifdef CONFIG_PM
-extern int tegra30_ahub_apbif_resume();
+extern int tegra30_ahub_apbif_resume(void);
 #endif
 
 struct tegra30_ahub {

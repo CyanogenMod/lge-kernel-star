@@ -387,7 +387,7 @@ static int tegra_bt_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static void tegra_hw_free(struct snd_pcm_substream *substream)
+static int tegra_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct tegra_max98088 *machine = snd_soc_card_get_drvdata(rtd->card);
@@ -436,7 +436,7 @@ static int tegra_max98088_startup(struct snd_pcm_substream *substream)
 	return 0;
 }
 
-static int tegra_max98088_shutdown(struct snd_pcm_substream *substream)
+static void tegra_max98088_shutdown(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
@@ -444,7 +444,7 @@ static int tegra_max98088_shutdown(struct snd_pcm_substream *substream)
 
 	if ((substream->stream != SNDRV_PCM_STREAM_PLAYBACK) ||
 		!(i2s->is_dam_used))
-		return 0;
+		return;
 
 	/* disable the dam*/
 	tegra30_dam_enable(i2s->dam_ifc, TEGRA30_DAM_DISABLE,
@@ -461,7 +461,7 @@ static int tegra_max98088_shutdown(struct snd_pcm_substream *substream)
 	if (!i2s->dam_ch_refcount)
 		tegra30_dam_free_controller(i2s->dam_ifc);
 
-	return 0;
+	return;
 }
 #endif
 
@@ -545,7 +545,7 @@ static int tegra_voice_call_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int tegra_voice_call_shutdown(struct snd_pcm_substream *substream)
+static void tegra_voice_call_shutdown(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct tegra_max98088 *machine  =
@@ -556,7 +556,7 @@ static int tegra_voice_call_shutdown(struct snd_pcm_substream *substream)
 	machine->codec_info[HIFI_CODEC].channels = 0;
 #endif
 
-	return 0;
+	return;
 }
 
 static int tegra_bt_voice_call_hw_params(struct snd_pcm_substream *substream,
@@ -619,7 +619,7 @@ static int tegra_bt_voice_call_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int tegra_bt_voice_call_shutdown(struct snd_pcm_substream *substream)
+static void tegra_bt_voice_call_shutdown(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct tegra_max98088 *machine  =
@@ -630,7 +630,7 @@ static int tegra_bt_voice_call_shutdown(struct snd_pcm_substream *substream)
 	machine->codec_info[BT_SCO].channels = 0;
 #endif
 
-	return 0;
+	return;
 }
 
 static struct snd_soc_ops tegra_max98088_ops = {
@@ -1003,8 +1003,7 @@ static __devinit int tegra_max98088_driver_probe(struct platform_device *pdev)
 	/* Add h2w switch class support */
 	ret = switch_dev_register(&wired_switch_dev);
 	if (ret < 0) {
-		dev_err(&pdev->dev, "not able to register switch device\n",
-			ret);
+		dev_err(&pdev->dev, "not able to register switch device\n");
 		goto err_fini_utils;
 	}
 #endif
