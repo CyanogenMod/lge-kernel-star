@@ -99,8 +99,11 @@ static inline u64 read_pmc_wake_level(void)
 
 static inline void write_pmc_wake_level(u64 value)
 {
+	pr_info("Wake[31-0] level=0x%x\n", (u32)(value & 0xFFFFFFFF));
 	writel((u32)value, pmc + PMC_WAKE_LEVEL);
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	pr_info("Tegra3 wake[63-32] level=0x%x\n", (u32)((value >> 32) &
+		0xFFFFFFFF));
 	__raw_writel((u32)(value >> 32), pmc + PMC_WAKE2_LEVEL);
 #endif
 }
@@ -179,17 +182,17 @@ int tegra_pm_irq_set_wake_type(int irq, int flow_type)
 	switch (flow_type) {
 	case IRQF_TRIGGER_FALLING:
 	case IRQF_TRIGGER_LOW:
-		tegra_lp0_wake_level &= ~(1 << wake);
-		tegra_lp0_wake_level_any &= ~(1 << wake);
+		tegra_lp0_wake_level &= ~(1ull << wake);
+		tegra_lp0_wake_level_any &= ~(1ull << wake);
 		break;
 	case IRQF_TRIGGER_HIGH:
 	case IRQF_TRIGGER_RISING:
-		tegra_lp0_wake_level |= 1 << wake;
-		tegra_lp0_wake_level_any &= ~(1 << wake);
+		tegra_lp0_wake_level |= (1ull << wake);
+		tegra_lp0_wake_level_any &= ~(1ull << wake);
 		break;
 
 	case IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING:
-		tegra_lp0_wake_level_any |= 1 << wake;
+		tegra_lp0_wake_level_any |= (1ull << wake);
 		break;
 	default:
 		return -EINVAL;
