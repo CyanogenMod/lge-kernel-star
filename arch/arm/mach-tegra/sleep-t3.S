@@ -38,6 +38,7 @@
 
 #include "asm_macros.h"
 #include "sleep.h"
+#include "clock.h"
 
 #define EMC_CFG				0xc
 #define EMC_ADR_CFG			0x10
@@ -96,7 +97,12 @@
 
 #define MSELECT_CLKM			(0x3 << 30)
 
-#define USE_PLL_LOCK_BITS 0
+#if USE_PLL_LOCK_BITS
+#define LOCK_DELAY 		PLL_POST_LOCK_DELAY
+#else
+#define LOCK_DELAY 		0xff /* 255uS delay for PLL stabilization */
+#endif
+
 #define USE_PLLP_ON_SLEEP_ENTRY 0
 
 .macro emc_device_mask, rd, base
@@ -284,6 +290,15 @@ tegra3_iram_start:
 #endif
 .endm
 
+.macro pll_locked, rd, car, base
+#if USE_PLL_LOCK_BITS
+1:
+	ldr	\rd, [\car, #\base]
+	tst	\rd, #(1<<27)
+	beq	1b
+#endif
+.endm
+
 ENTRY(tegra3_lp1_reset)
 	/* the CPU and system bus are running at 32KHz and executing from
 	 * IRAM when this code is executed; immediately switch to CLKM and
@@ -304,23 +319,23 @@ ENTRY(tegra3_lp1_reset)
 	orr	r1, r1, #(1<<12)
 	str	r1, [r2, #PMC_PLLP_WB0_OVERRIDE]
 
+	pll_enable r1, r0, CLK_RESET_PLLM_BASE, CLK_RESET_PLLM_MISC
 	pll_enable r1, r0, CLK_RESET_PLLP_BASE, CLK_RESET_PLLP_MISC
 	pll_enable r1, r0, CLK_RESET_PLLA_BASE, CLK_RESET_PLLA_MISC
 	pll_enable r1, r0, CLK_RESET_PLLC_BASE, CLK_RESET_PLLC_MISC
 	pll_enable r1, r0, CLK_RESET_PLLX_BASE, CLK_RESET_PLLX_MISC
-	mov32	r7, TEGRA_TMRUS_BASE
-	ldr	r1, [r7]
 
-#if USE_PLL_LOCK_BITS
 	pll_locked r1, r0, CLK_RESET_PLLM_BASE
 	pll_locked r1, r0, CLK_RESET_PLLP_BASE
 	pll_locked r1, r0, CLK_RESET_PLLA_BASE
 	pll_locked r1, r0, CLK_RESET_PLLC_BASE
 	pll_locked r1, r0, CLK_RESET_PLLX_BASE
-#else
-	add	r1, r1, #0xff	@ 255uS delay for PLL stabilization
+
+	mov32	r7, TEGRA_TMRUS_BASE
+	ldr	r1, [r7]
+	add	r1, r1, #LOCK_DELAY
 	wait_until r1, r7, r3
-#endif
+
 	add	r5, pc, #tegra3_sdram_pad_save-(.+8)	@ r5 reserved for pad base
 
 	ldr	r4, [r5, #0x18]

@@ -25,9 +25,9 @@
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 #define USE_PLL_LOCK_BITS 0	/* Never use lock bits on Tegra2 */
 #else
-/* !!!FIXME!!! PLL lock bits should work on Tegra3 */
-#define USE_PLL_LOCK_BITS 0	/* Use lock bits for PLL stabiliation */
+#define USE_PLL_LOCK_BITS 1	/* Use lock bits for PLL stabiliation */
 #define USE_PLLE_SS 1		/* Use spread spectrum coefficients for PLLE */
+#define PLL_POST_LOCK_DELAY 50	/* Safety delay after lock is detected */
 #endif
 
 #define DIV_BUS			(1 << 0)

@@ -303,9 +303,6 @@
 #define ROUND_DIVIDER_UP	0
 #define ROUND_DIVIDER_DOWN	1
 
-/* FIXME: recommended safety delay after lock is detected */
-#define PLL_POST_LOCK_DELAY		100
-
 static bool tegra3_clk_is_parent_allowed(struct clk *c, struct clk *p);
 
 static int tegra3_clk_shared_bus_update(struct clk *bus);
