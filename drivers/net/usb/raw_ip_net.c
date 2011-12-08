@@ -442,7 +442,7 @@ static netdev_tx_t baseband_usb_netdev_start_xmit(
 	urb->transfer_flags = URB_ZERO_PACKET;
 
 	/* autoresume before tx */
-	err = usb_autopm_get_interface(usb->usb.interface);
+	err = usb_autopm_get_interface_async(usb->usb.interface);
 	if (err < 0) {
 		pr_err("%s: usb_autopm_get_interface(%p) failed %d\n",
 			__func__, usb->usb.interface, err);
@@ -458,7 +458,7 @@ static netdev_tx_t baseband_usb_netdev_start_xmit(
 	err = usb_submit_urb(urb, GFP_ATOMIC);
 	if (err < 0) {
 		pr_err("usb_submit_urb() failed - err %d\n", err);
-		usb_autopm_put_interface(usb->usb.interface);
+		usb_autopm_put_interface_async(usb->usb.interface);
 		usb->usb.tx_urb = (struct urb *) 0;
 		kfree(urb->transfer_buffer);
 		usb_free_urb(urb);
