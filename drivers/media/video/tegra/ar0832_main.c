@@ -51,12 +51,10 @@ struct ar0832_dev {
 	struct mutex ar0832_camera_lock;
 	struct miscdevice misc_dev;
 	struct ar0832_power_rail power_rail;
-	struct mutex brd_power_lock;
 	int brd_power_cnt;
 	atomic_t in_use;
 	char dname[20];
 	int is_stereo;
-	int sensor_id_valid;
 	u16 sensor_id_data;
 	struct dentry *debugdir;
 };
@@ -1853,28 +1851,6 @@ static int ar0832_get_status(struct ar0832_dev *dev, u8 *status)
 	return err;
 }
 
-static int ar0832_set_region(struct ar0832_dev *dev,
-				struct ar0832_stereo_region *region)
-{
-	u16 image_width = region->image_end.x - region->image_start.x+1;
-	u16 image_height = region->image_end.y - region->image_start.y+1;
-	struct i2c_client *i2c_client = dev->i2c_client;
-
-	dev_dbg(&i2c_client->dev, "%s: %d\n", __func__, region->camera_index);
-	if (region->camera_index == 0)
-		i2c_client = dev->i2c_client;
-#if 0
-	else if (region->camera_index == 1)
-		i2c_client = dev->i2c_client_right;
-#endif
-	else
-		return -1;
-	dev_dbg(&i2c_client->dev, "%s: width = %d  height = %d\n",
-		 __func__, image_width, image_height);
-
-	return 0;
-}
-
 static int ar0832_set_alternate_addr(struct i2c_client *client)
 {
 	int ret = 0;
@@ -1890,7 +1866,7 @@ static int ar0832_set_alternate_addr(struct i2c_client *client)
 
 	if (!ret) {
 		client->addr = new_addr;
-		dev_info(&client->dev,
+		dev_dbg(&client->dev,
 			"new slave address is set to 0x%x\n", new_addr);
 	}
 
@@ -1906,35 +1882,37 @@ static int ar0832_power_on(struct ar0832_dev *dev)
 	struct i2c_client *i2c_client = dev->i2c_client;
 	int ret = 0;
 
-	dev_dbg(&i2c_client->dev, "%s: ++ %d\n", __func__, dev->is_stereo);
-
-	/* Plug 1.8V and 2.8V power to sensor */
-	if (dev->power_rail.sen_1v8_reg) {
-		ret = regulator_enable(dev->power_rail.sen_1v8_reg);
-		if (ret) {
-			dev_err(&i2c_client->dev, "%s: failed to enable vdd\n",
-				__func__);
-			goto fail_regulator_1v8_reg;
-		}
-	}
-
-	ar0832_msleep(20);
-
-	if (dev->power_rail.sen_2v8_reg) {
-		ret = regulator_enable(dev->power_rail.sen_2v8_reg);
-		if (ret) {
-			dev_err(&i2c_client->dev, "%s: failed to enable vaa\n",
-				__func__);
-			goto fail_regulator_2v8_reg;
-		}
-	}
+	dev_dbg(&i2c_client->dev, "%s: ++ %d %d\n",
+		__func__, dev->is_stereo,
+		dev->brd_power_cnt);
 
 	/* Board specific power-on sequence */
-	mutex_lock(&dev->brd_power_lock);
-	if (dev->brd_power_cnt == 0)
+	mutex_lock(&dev->ar0832_camera_lock);
+	if (dev->brd_power_cnt == 0) {
+		/* Plug 1.8V and 2.8V power to sensor */
+		if (dev->power_rail.sen_1v8_reg) {
+			ret = regulator_enable(dev->power_rail.sen_1v8_reg);
+			if (ret) {
+				dev_err(&i2c_client->dev,
+					"%s: failed to enable vdd\n",
+					__func__);
+				goto fail_regulator_1v8_reg;
+			}
+		}
+
+		if (dev->power_rail.sen_2v8_reg) {
+			ret = regulator_enable(dev->power_rail.sen_2v8_reg);
+			if (ret) {
+				dev_err(&i2c_client->dev,
+					"%s: failed to enable vaa\n",
+					__func__);
+				goto fail_regulator_2v8_reg;
+			}
+		}
 		dev->pdata->power_on(dev->is_stereo);
+	}
 	dev->brd_power_cnt++;
-	mutex_unlock(&dev->brd_power_lock);
+	mutex_unlock(&dev->ar0832_camera_lock);
 
 	/* Change slave address */
 	if (i2c_client->addr)
@@ -1954,23 +1932,26 @@ fail_regulator_1v8_reg:
 
 static void ar0832_power_off(struct ar0832_dev *dev)
 {
-	/* Unplug 1.8V and 2.8V power from sensor */
-	if (dev->power_rail.sen_2v8_reg)
-		regulator_disable(dev->power_rail.sen_2v8_reg);
-	if (dev->power_rail.sen_1v8_reg)
-		regulator_disable(dev->power_rail.sen_1v8_reg);
+	struct i2c_client *i2c_client = dev->i2c_client;
+	dev_dbg(&i2c_client->dev, "%s: ++ %d\n", __func__, dev->brd_power_cnt);
 
 	/* Board specific power-down sequence */
-	mutex_lock(&dev->brd_power_lock);
-	if (WARN(dev->brd_power_cnt <= 0, "unbalanced %s\n", __func__))
+	mutex_lock(&dev->ar0832_camera_lock);
+
+	if (dev->brd_power_cnt <= 0)
 		goto ar0832_pwdn_exit;
 
-	if (dev->brd_power_cnt == 1)
+	if (dev->brd_power_cnt-- == 1) {
+		/* Unplug 1.8V and 2.8V power from sensor */
+		if (dev->power_rail.sen_2v8_reg)
+			regulator_disable(dev->power_rail.sen_2v8_reg);
+		if (dev->power_rail.sen_1v8_reg)
+			regulator_disable(dev->power_rail.sen_1v8_reg);
 		dev->pdata->power_off(dev->is_stereo);
-	dev->brd_power_cnt--;
+	}
 
 ar0832_pwdn_exit:
-	mutex_unlock(&dev->brd_power_lock);
+	mutex_unlock(&dev->ar0832_camera_lock);
 }
 
 static int ar0832_focuser_set_config(struct ar0832_dev *dev)
@@ -2082,8 +2063,6 @@ static u16 ar0832_get_focuser_vcm_step_time(struct ar0832_dev *dev)
 
 }
 
-
-
 static inline
 int ar0832_get_sensorid(struct ar0832_dev *dev, u16 *sensor_id)
 {
@@ -2153,7 +2132,7 @@ static long ar0832_ioctl(struct file *file,
 		 */
 		if (dev->focuser_info->last_position > 0) {
 			pos = dev->focuser_info->last_position;
-			dev_err(&i2c_client->dev, "%s: AR0832_IOCTL_SET_MODE: "
+			dev_dbg(&i2c_client->dev, "%s: AR0832_IOCTL_SET_MODE: "
 					" Move to 0, restore the backedup focuser position of %d\n",
 					__func__, pos);
 			ar0832_focuser_set_position(dev, 0);
@@ -2200,16 +2179,9 @@ static long ar0832_ioctl(struct file *file,
 	{
 		struct ar0832_stereo_region region;
 		dev_dbg(&i2c_client->dev, "AR0832_IOCTL_SET_SENSOR_REGION\n");
-		if (copy_from_user(&region,
-			(const void __user *)arg,
-			sizeof(struct ar0832_stereo_region))) {
-			dev_err(&i2c_client->dev,
-				"%s: AR0832_IOCTL_SET_SENSOR_REGION failed\n",
-				__func__);
-			return -EFAULT;
-		}
-		err = ar0832_set_region(dev, &region);
-		return err;
+		/* Right now, it doesn't do anything */
+
+		return 0;
 	}
 
 	case AR0832_FOCUSER_IOCTL_GET_CONFIG:
@@ -2241,14 +2213,14 @@ static long ar0832_ioctl(struct file *file,
 		dev_dbg(&i2c_client->dev,
 			"%s AR0832_IOCTL_GET_SENSOR_ID\n", __func__);
 
-		if (!dev->sensor_id_valid) {
+		if (!dev->sensor_id_data) {
 			err = ar0832_get_sensorid(dev, &dev->sensor_id_data);
 			if (err) {
 				dev_err(&i2c_client->dev,
 					"%s: failed to get sensor id\n",
 					__func__);
+				return -EFAULT;
 			}
-			dev->sensor_id_valid = 1;
 		}
 
 		if (copy_to_user((void __user *) arg,
@@ -2520,7 +2492,6 @@ static int ar0832_probe(struct i2c_client *client,
 
 	i2c_set_clientdata(client, dev);
 	mutex_init(&dev->ar0832_camera_lock);
-	mutex_init(&dev->brd_power_lock);
 
 	dev->power_rail.sen_1v8_reg = regulator_get(&client->dev, "vdd");
 	if (IS_ERR_OR_NULL(dev->power_rail.sen_1v8_reg)) {
