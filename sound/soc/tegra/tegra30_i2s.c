@@ -447,9 +447,18 @@ static int tegra30_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
 static int tegra30_i2s_probe(struct snd_soc_dai *dai)
 {
 	struct tegra30_i2s *i2s = snd_soc_dai_get_drvdata(dai);
+	int i;
 
 	dai->capture_dma_data = &i2s->capture_dma_data;
 	dai->playback_dma_data = &i2s->playback_dma_data;
+
+	tegra30_i2s_enable_clocks(i2s);
+
+	/*cache the POR values of i2s regs*/
+	for (i = 0; i < ((TEGRA30_I2S_CIF_TX_CTRL>>2) + 1); i++)
+		i2s->reg_cache[i] = tegra30_i2s_read(i2s, i<<2);
+
+	tegra30_i2s_disable_clocks(i2s);
 
 	return 0;
 }
