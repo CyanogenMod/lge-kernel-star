@@ -961,7 +961,7 @@ static int acm_probe(struct usb_interface *intf,
 		return -ENODEV;
 
 	/* handle quirks deadly to normal probing*/
-	if (quirks == NO_UNION_NORMAL) {
+	if (quirks & NO_UNION_NORMAL) {
 		data_interface = usb_ifnum_to_if(usb_dev, 1);
 		control_interface = usb_ifnum_to_if(usb_dev, 0);
 		goto skip_normal_probe;
