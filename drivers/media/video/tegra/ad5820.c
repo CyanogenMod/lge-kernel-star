@@ -22,14 +22,36 @@
 #include <linux/uaccess.h>
 #include <media/ad5820.h>
 
-#define POS_LOW (144)
-#define POS_HIGH (520)
-#define SETTLETIME_MS 100
+/* Focuser single step & full scale transition time truth table
+ * in the format of:
+ *   index	mode		single step transition	full scale transition
+ *	0	0			0			0
+ *	1	1			50uS			51.2mS
+ *	2	1			100uS			102.3mS
+ *	3	1			200uS			204.6mS
+ *	4	1			400uS			409.2mS
+ *	5	1			800uS			818.4mS
+ *	6	1			1600uS			1636.8mS
+ *	7	1			3200uS			3273.6mS
+ *	8	0			0			0
+ *	9	2			50uS			1.1mS
+ *	A	2			100uS			2.2mS
+ *	B	2			200uS			4.4mS
+ *	C	2			400uS			8.8mS
+ *	D	2			800uS			17.6mS
+ *	E	2			1600uS			35.2mS
+ *	F	2			3200uS			70.4mS
+ */
+
+/* pick up the mode index setting and its settle time from the above table */
+#define AD5820_TRANSITION_MODE 0x0B
+#define SETTLETIME_MS 5
+
+#define POS_LOW (0)
+#define POS_HIGH (1023)
 #define FOCAL_LENGTH (4.507f)
 #define FNUMBER (2.8f)
 #define FPOS_COUNT 1024
-
-#define AD5820_MAX_RETRIES (3)
 
 struct ad5820_info {
 	struct i2c_client *i2c_client;
@@ -37,33 +59,27 @@ struct ad5820_info {
 	struct ad5820_config config;
 };
 
-static int ad5820_write(struct i2c_client *client, u16 value)
+static int ad5820_write(struct i2c_client *client, u32 value)
 {
 	int count;
 	struct i2c_msg msg[1];
 	unsigned char data[2];
-	int retry = 0;
 
 	if (!client->adapter)
 		return -ENODEV;
 
-	data[1] = (u8) ((value >> 4) & 0x3F);
-	data[0] = (u8) ((value & 0xF) << 4);
+	data[0] = (u8) ((value >> 4) & 0x3F);
+	data[1] = (u8) ((value & 0xF) << 4) | AD5820_TRANSITION_MODE;
 
 	msg[0].addr = client->addr;
 	msg[0].flags = 0;
 	msg[0].len = ARRAY_SIZE(data);
 	msg[0].buf = data;
 
-	do {
-		count = i2c_transfer(client->adapter, msg, ARRAY_SIZE(msg));
-		if (count == ARRAY_SIZE(msg))
-			return 0;
-		retry++;
-		pr_err("ad5820: i2c transfer failed, retrying %x\n",
-		       value);
-		msleep(3);
-	} while (retry <= AD5820_MAX_RETRIES);
+	count = i2c_transfer(client->adapter, msg, ARRAY_SIZE(msg));
+	if (count == ARRAY_SIZE(msg))
+		return 0;
+
 	return -EIO;
 }
 
