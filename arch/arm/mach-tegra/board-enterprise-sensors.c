@@ -37,6 +37,7 @@
 #include <linux/nct1008.h>
 #include <linux/err.h>
 #include <linux/mpu.h>
+#include <linux/platform_data/ina230.h>
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 #include <mach/gpio.h>
@@ -613,6 +614,31 @@ fail_free_gpio:
 	return ret;
 }
 
+#define ENTERPRISE_INA230_ENABLED 0
+
+#if ENTERPRISE_INA230_ENABLED
+static struct ina230_platform_data ina230_platform = {
+	.rail_name = "VDD_AC_BAT",
+	.current_threshold = TEGRA_CUR_MON_THRESHOLD,
+	.resistor = TEGRA_CUR_MON_RESISTOR,
+	.min_cores_online = TEGRA_CUR_MON_MIN_CORES,
+};
+
+static struct i2c_board_info enterprise_i2c0_ina230_info[] = {
+	{
+		I2C_BOARD_INFO("ina230", 0x42),
+		.platform_data = &ina230_platform,
+		.irq = -1,
+	},
+};
+
+static int __init enterprise_ina230_init(void)
+{
+	return i2c_register_board_info(0, enterprise_i2c0_ina230_info,
+				       ARRAY_SIZE(enterprise_i2c0_ina230_info));
+}
+#endif
+
 int __init enterprise_sensors_init(void)
 {
 	int ret;
@@ -620,6 +646,9 @@ int __init enterprise_sensors_init(void)
 	enterprise_isl_init();
 	enterprise_nct1008_init();
 	mpuirq_init();
+#if ENTERPRISE_INA230_ENABLED
+	enterprise_ina230_init();
+#endif
 	ret = enterprise_cam_init();
 
 	return ret;
