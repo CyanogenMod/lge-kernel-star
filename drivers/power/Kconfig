@@ -242,3 +242,10 @@ config CHARGER_GPIO
 	  called gpio-charger.
 
 endif # POWER_SUPPLY
+
+config TEGRA_BPC_MGMT
+	tristate "battery peak current management"
+	depends on ARCH_TEGRA
+	help
+	  This driver reduces cpu frequency/voltage on gpio event from the
+	  battery current monitor device.
