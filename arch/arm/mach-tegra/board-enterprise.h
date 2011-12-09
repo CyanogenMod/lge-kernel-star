@@ -51,6 +51,7 @@ int enterprise_modem_init(void);
 int enterprise_suspend_init(void);
 int enterprise_edp_init(void);
 void __init enterprise_tsensor_init(void);
+void enterprise_bpc_mgmt_init(void);
 
 /* Invensense MPU Definitions */
 #define MPU_GYRO_NAME		"mpu3050"
@@ -137,6 +138,10 @@ void __init enterprise_tsensor_init(void);
 
 #define TDIODE_OFFSET	(9000)	/* in millicelsius */
 
+/* Battery Peak Current Management */
+#define TEGRA_BPC_TRIGGER		TEGRA_GPIO_PR3
+#define TEGRA_BPC_TIMEOUT		100 /* ms */
+
 /* Baseband IDs */
 
 enum tegra_bb_type {
@@ -145,4 +150,4 @@ enum tegra_bb_type {
 	TEGRA_BB_M7400,
 };
 
-#endif
+#endif /*_MACH_TEGRA_BOARD_ENTERPRISE_H */

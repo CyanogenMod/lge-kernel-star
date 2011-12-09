@@ -198,6 +198,13 @@ static int tegra_gpio_direction_output(struct gpio_chip *chip, unsigned offset,
 	return 0;
 }
 
+int tegra_gpio_to_int_pin(int gpio)
+{
+	if (gpio < TEGRA_NR_GPIOS)
+		return tegra_gpio_banks[gpio >> 5].irq;
+
+	return -EIO;
+}
 
 
 static struct gpio_chip tegra_gpio_chip = {

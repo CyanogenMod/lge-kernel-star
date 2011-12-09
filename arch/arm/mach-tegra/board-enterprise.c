@@ -952,6 +952,7 @@ static void __init tegra_enterprise_init(void)
 	enterprise_emc_init();
 	enterprise_sensors_init();
 	enterprise_suspend_init();
+	enterprise_bpc_mgmt_init();
 	tegra_release_bootloader_fb();
 	enterprise_nfc_init();
 }

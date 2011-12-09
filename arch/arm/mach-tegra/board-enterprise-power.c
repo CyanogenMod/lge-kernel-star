@@ -28,6 +28,8 @@
 #include <linux/tps80031-charger.h>
 #include <linux/gpio.h>
 #include <linux/io.h>
+#include <linux/cpumask.h>
+#include <linux/platform_data/tegra_bpc_mgmt.h>
 
 #include <mach/edp.h>
 #include <mach/iomap.h>
@@ -580,3 +582,35 @@ int __init enterprise_edp_init(void)
 	return 0;
 }
 #endif
+
+static struct tegra_bpc_mgmt_platform_data bpc_mgmt_platform_data = {
+	.gpio_trigger = TEGRA_BPC_TRIGGER,
+	.bpc_mgmt_timeout = TEGRA_BPC_TIMEOUT,
+};
+
+static struct platform_device enterprise_bpc_mgmt_device = {
+	.name		= "tegra-bpc-mgmt",
+	.id		= -1,
+	.dev		= {
+		.platform_data = &bpc_mgmt_platform_data,
+	},
+};
+
+void __init enterprise_bpc_mgmt_init(void)
+{
+	int int_gpio;
+
+	tegra_gpio_enable(TEGRA_BPC_TRIGGER);
+
+	int_gpio = tegra_gpio_to_int_pin(TEGRA_BPC_TRIGGER);
+
+#ifdef CONFIG_SMP
+	cpumask_setall(&(bpc_mgmt_platform_data.affinity_mask));
+	irq_set_affinity_hint(int_gpio,
+				&(bpc_mgmt_platform_data.affinity_mask));
+	irq_set_affinity(int_gpio, &(bpc_mgmt_platform_data.affinity_mask));
+#endif
+	platform_device_register(&enterprise_bpc_mgmt_device);
+
+	return;
+}
