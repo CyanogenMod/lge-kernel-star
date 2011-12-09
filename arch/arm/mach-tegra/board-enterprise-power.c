@@ -579,6 +579,7 @@ int __init enterprise_edp_init(void)
 	pr_info("%s: CPU regulator %d mA\n", __func__, regulator_mA);
 
 	tegra_init_cpu_edp_limits(regulator_mA);
+	tegra_init_system_edp_limits(TEGRA_BPC_CPU_PWR_LIMIT);
 	return 0;
 }
 #endif

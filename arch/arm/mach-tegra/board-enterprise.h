@@ -141,6 +141,7 @@ void enterprise_bpc_mgmt_init(void);
 /* Battery Peak Current Management */
 #define TEGRA_BPC_TRIGGER		TEGRA_GPIO_PR3
 #define TEGRA_BPC_TIMEOUT		100 /* ms */
+#define TEGRA_BPC_CPU_PWR_LIMIT	0 /* in mW, (0 disables) */
 
 /* Baseband IDs */
 
