@@ -54,8 +54,6 @@
 #define TEGRA2_SDHOST_STD_FREQ	50000000
 #define TEGRA3_SDHOST_STD_FREQ	104000000
 
-#define MMC_DISABLE_DELAY	50
-
 static unsigned int tegra_sdhost_min_freq;
 static unsigned int tegra_sdhost_std_freq;
 static void tegra_3x_sdhci_set_card_clock(struct sdhci_host *sdhci, unsigned int clock);
@@ -141,23 +139,6 @@ static void tegra_sdhci_writel(struct sdhci_host *host, u32 val, int reg)
 		writeb(gap_ctrl, host->ioaddr + SDHCI_BLOCK_GAP_CONTROL);
 	}
 #endif
-}
-
-static unsigned int tegra_sdhci_get_cd(struct sdhci_host *sdhci)
-{
-	struct platform_device *pdev = to_platform_device(mmc_dev(sdhci->mmc));
-	struct tegra_sdhci_platform_data *plat;
-
-	plat = pdev->dev.platform_data;
-
-	/* Always return card present as true for non-removable cards */
-	if (sdhci->mmc->caps & MMC_CAP_NONREMOVABLE)
-		return 1;
-
-	if (!gpio_is_valid(plat->cd_gpio))
-		return 1;
-
-	return (gpio_get_value(plat->cd_gpio) == 0);
 }
 
 static unsigned int tegra_sdhci_get_ro(struct sdhci_host *sdhci)
@@ -658,7 +639,6 @@ static int tegra_sdhci_pltfm_init(struct sdhci_host *host,
 	tegra_host->max_clk_limit = plat->max_clk_limit;
 	tegra_host->instance = pdev->id;
 
-	mmc_set_disable_delay(host->mmc, MMC_DISABLE_DELAY);
 	host->mmc->caps |= MMC_CAP_ERASE;
 	host->mmc->caps |= MMC_CAP_DISABLE;
 	/* enable 1/8V DDR capable */
@@ -817,7 +797,6 @@ static int tegra_sdhci_resume(struct sdhci_host *sdhci)
 
 static struct sdhci_ops tegra_sdhci_ops = {
 	.get_ro     = tegra_sdhci_get_ro,
-	.get_cd     = tegra_sdhci_get_cd,
 	.read_l     = tegra_sdhci_readl,
 	.read_w     = tegra_sdhci_readw,
 	.write_l    = tegra_sdhci_writel,
@@ -841,7 +820,6 @@ struct sdhci_pltfm_data sdhci_tegra_pdata = {
 #endif
 		  SDHCI_QUIRK_SINGLE_POWER_WRITE |
 		  SDHCI_QUIRK_NO_HISPD_BIT |
-		  SDHCI_QUIRK_BROKEN_CARD_DETECTION |
 		  SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC,
 	.ops  = &tegra_sdhci_ops,
 	.init = tegra_sdhci_pltfm_init,

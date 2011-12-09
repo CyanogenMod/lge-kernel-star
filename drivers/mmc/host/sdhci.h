@@ -252,7 +252,6 @@ struct sdhci_ops {
 	void (*platform_send_init_74_clocks)(struct sdhci_host *host,
 					     u8 power_mode);
 	unsigned int    (*get_ro)(struct sdhci_host *host);
-	unsigned int    (*get_cd)(struct sdhci_host *host);
 
 	int		(*suspend)(struct sdhci_host *host, pm_message_t state);
 	int		(*resume)(struct sdhci_host *host);
