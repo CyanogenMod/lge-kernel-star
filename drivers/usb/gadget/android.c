@@ -164,6 +164,7 @@ struct android_dev {
 	struct device *dev;
 
 	bool enabled;
+	struct mutex mutex;
 	int disable_depth;
 	bool connected;
 	bool sw_connected;
@@ -1287,8 +1288,11 @@ functions_show(struct device *pdev, struct device_attribute *attr, char *buf)
 	struct android_usb_function *f;
 	char *buff = buf;
 
+	mutex_lock(&dev->mutex);
+
 	list_for_each_entry(f, &dev->enabled_functions, enabled_list)
 		buff += sprintf(buff, "%s,", f->name);
+	mutex_unlock(&dev->mutex);
 	if (buff != buf)
 		*(buff-1) = '\n';
 	return buff - buf;
@@ -1302,6 +1306,13 @@ functions_store(struct device *pdev, struct device_attribute *attr,
 	char *name;
 	char buf[256], *b;
 	int err;
+
+	mutex_lock(&dev->mutex);
+
+	if (dev->enabled) {
+		mutex_unlock(&dev->mutex);
+		return -EBUSY;
+	}
 
 	INIT_LIST_HEAD(&dev->enabled_functions);
 
@@ -1317,6 +1328,7 @@ functions_store(struct device *pdev, struct device_attribute *attr,
 				pr_err("android_usb: Cannot enable '%s'", name);
 		}
 	}
+	mutex_unlock(&dev->mutex);
 
 	return size;
 }
@@ -1336,6 +1348,7 @@ static ssize_t enable_store(struct device *pdev, struct device_attribute *attr,
 	struct android_usb_function *f;
 	int enabled = 0;
 
+	mutex_lock(&dev->mutex);
 	sscanf(buff, "%d", &enabled);
 	if (enabled && !dev->enabled) {
 		/* update values in composite driver's copy of device descriptor */
@@ -1362,6 +1375,7 @@ static ssize_t enable_store(struct device *pdev, struct device_attribute *attr,
 		pr_err("android_usb: already %s\n",
 				dev->enabled ? "enabled" : "disabled");
 	}
+	mutex_unlock(&dev->mutex);
 	return size;
 }
 
@@ -1682,6 +1696,7 @@ static int __init init(void)
 	dev->functions = supported_functions;
 	INIT_LIST_HEAD(&dev->enabled_functions);
 	INIT_WORK(&dev->work, android_work);
+	mutex_init(&dev->mutex);
 
 	err = android_create_device(dev);
 	if (err) {
