@@ -401,6 +401,7 @@ static void acm_rx_tasklet(unsigned long _acm)
 	struct acm_ru *rcv;
 	unsigned long flags;
 	unsigned char throttled;
+	int copied;
 
 	dbg("Entering acm_rx_tasklet");
 
@@ -432,13 +433,21 @@ next_buffer:
 
 	dbg("acm_rx_tasklet: procesing buf 0x%p, size = %d", buf, buf->size);
 
+	copied = 0;
 	if (tty) {
 		spin_lock_irqsave(&acm->throttle_lock, flags);
 		throttled = acm->throttle;
 		spin_unlock_irqrestore(&acm->throttle_lock, flags);
 		if (!throttled) {
-			tty_insert_flip_string(tty, buf->base, buf->size);
+			copied = tty_insert_flip_string(tty, buf->base,
+				buf->size);
 			tty_flip_buffer_push(tty);
+			if (copied != buf->size)
+				dbg("%s: copied %d != buf->size %d!!!!!!\n",
+					__func__, copied, buf->size);
+			else
+				dbg("%s: copied %d == buf->size %d\n",
+					__func__, copied, buf->size);
 		} else {
 			tty_kref_put(tty);
 			dbg("Throttling noticed");
@@ -449,9 +458,24 @@ next_buffer:
 		}
 	}
 
-	spin_lock_irqsave(&acm->read_lock, flags);
-	list_add(&buf->list, &acm->spare_read_bufs);
-	spin_unlock_irqrestore(&acm->read_lock, flags);
+	if (copied == buf->size || !tty) {
+		spin_lock_irqsave(&acm->read_lock, flags);
+		list_add(&buf->list, &acm->spare_read_bufs);
+		spin_unlock_irqrestore(&acm->read_lock, flags);
+	} else {
+		tty_kref_put(tty);
+		dbg("Partial buffer fill %d", copied);
+		if (copied > 0) {
+			memmove(buf->base,
+				buf->base + copied,
+				buf->size - copied);
+			buf->size -= copied;
+		}
+		spin_lock_irqsave(&acm->read_lock, flags);
+		list_add(&buf->list, &acm->filled_read_bufs);
+		spin_unlock_irqrestore(&acm->read_lock, flags);
+		return;
+	}
 	goto next_buffer;
 
 urbs:
