@@ -23,6 +23,7 @@
 #include <linux/interrupt.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
+#include <linux/irq.h>
 
 #include <mach/gpio.h>
 #include <mach/iomap.h>
@@ -261,8 +262,25 @@ static void cluster_switch_epilog_gic(void)
 	max_irq = readl(gic_base + GIC_DIST_CTR) & 0x1f;
 	max_irq = (max_irq + 1) * 32;
 
-	for (i = 32; i < max_irq; i += 4)
-		writel(0x01010101, gic_base + GIC_DIST_TARGET + i * 4 / 4);
+	for (i = 32; i < max_irq; i += 4) {
+		u32 val = 0x01010101;
+#ifdef CONFIG_GIC_SET_MULTIPLE_CPUS
+		unsigned int irq;
+		for (irq = i; irq < (i + 4); irq++) {
+			struct cpumask mask;
+			struct irq_desc *desc = irq_to_desc(irq);
+
+			if (desc && desc->affinity_hint &&
+			    desc->irq_data.affinity) {
+				if (cpumask_and(&mask, desc->affinity_hint,
+						desc->irq_data.affinity))
+					val |= (*cpumask_bits(&mask) & 0xff) <<
+						((irq & 3) * 8);
+			}
+		}
+#endif
+		writel(val, gic_base + GIC_DIST_TARGET + i * 4 / 4);
+	}
 }
 
 void tegra_cluster_switch_epilog(unsigned int flags)
