@@ -598,7 +598,7 @@ void __init tegra_whistler_reserve(void)
 	if (memblock_reserve(0x0, 4096) < 0)
 		pr_warn("Cannot reserve first 4K of memory for safety\n");
 
-	tegra_reserve(SZ_128M, SZ_8M, SZ_16M);
+	tegra_reserve(SZ_160M, SZ_8M, SZ_16M);
 }
 
 MACHINE_START(WHISTLER, "whistler")
