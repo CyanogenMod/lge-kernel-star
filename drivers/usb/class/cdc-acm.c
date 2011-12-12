@@ -189,7 +189,6 @@ static int acm_start_wb(struct acm *acm, struct acm_wb *wb)
 	wb->urb->transfer_dma = wb->dmah;
 	wb->urb->transfer_buffer_length = wb->len;
 	wb->urb->dev = acm->dev;
-
 	rc = usb_submit_urb(wb->urb, GFP_ATOMIC);
 	if (rc < 0) {
 		dbg("usb_submit_urb(write bulk) failed: %d", rc);
@@ -214,6 +213,15 @@ static int acm_write_start(struct acm *acm, int wbn)
 	dbg("%s susp_count: %d", __func__, acm->susp_count);
 	usb_autopm_get_interface_async(acm->control);
 	if (acm->susp_count) {
+#ifdef CONFIG_PM
+		printk("%s buffer urb\n", __func__);
+		acm->transmitting++;
+		wb->urb->transfer_buffer = wb->buf;
+		wb->urb->transfer_dma = wb->dmah;
+		wb->urb->transfer_buffer_length = wb->len;
+		wb->urb->dev = acm->dev;
+		usb_anchor_urb(wb->urb, &acm->deferred);
+#endif
 		if (!acm->delayed_wb)
 			acm->delayed_wb = wb;
 		else
@@ -567,7 +575,7 @@ static int acm_tty_open(struct tty_struct *tty, struct file *filp)
 	if (usb_autopm_get_interface(acm->control) < 0)
 		goto early_bail;
 	else
-		acm->control->needs_remote_wakeup = 1;
+		acm->control->needs_remote_wakeup = 0;
 
 	mutex_lock(&acm->mutex);
 	if (acm->port.count++) {
@@ -1173,6 +1181,7 @@ made_compressed_probe:
 	acm->urb_task.func = acm_rx_tasklet;
 	acm->urb_task.data = (unsigned long) acm;
 	INIT_WORK(&acm->work, acm_softint);
+	init_usb_anchor(&acm->deferred);
 	init_waitqueue_head(&acm->drain_wait);
 	spin_lock_init(&acm->throttle_lock);
 	spin_lock_init(&acm->write_lock);
@@ -1434,6 +1443,7 @@ static int acm_resume(struct usb_interface *intf)
 	struct acm *acm = usb_get_intfdata(intf);
 	struct acm_wb *wb;
 	int rv = 0;
+	struct urb *res;
 	int cnt;
 
 	spin_lock_irq(&acm->read_lock);
@@ -1444,10 +1454,21 @@ static int acm_resume(struct usb_interface *intf)
 	if (cnt)
 		return 0;
 
+
 	mutex_lock(&acm->mutex);
+
+#ifdef CONFIG_PM
+	while ((res = usb_get_from_anchor(&acm->deferred))) {
+		printk("%s process buffered request \n", __func__);
+		rv = usb_submit_urb(res, GFP_ATOMIC);
+		if (rv < 0) {
+			dbg("usb_submit_urb(pending request) failed: %d", rv);
+		}
+	}
+#endif
+
 	if (acm->port.count) {
 		rv = usb_submit_urb(acm->ctrlurb, GFP_NOIO);
-
 		spin_lock_irq(&acm->write_lock);
 		if (acm->delayed_wb) {
 			wb = acm->delayed_wb;
@@ -1457,6 +1478,7 @@ static int acm_resume(struct usb_interface *intf)
 		} else {
 			spin_unlock_irq(&acm->write_lock);
 		}
+
 
 		/*
 		 * delayed error checking because we must
