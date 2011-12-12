@@ -14,6 +14,7 @@
 #include <linux/percpu.h>
 #include <linux/gfp.h>
 #include <linux/vmalloc.h>
+#include <linux/mutex.h>
 
 #include <asm/processor.h>
 #include <asm/tlbflush.h>
@@ -49,7 +50,7 @@ struct cpa_data {
  * entries change the page attribute in parallel to some other cpu
  * splitting a large page entry along with changing the attribute.
  */
-static DEFINE_SPINLOCK(cpa_lock);
+static DEFINE_MUTEX(cpa_lock);
 
 #define CPA_FLUSHTLB 1
 #define CPA_ARRAY 2
@@ -694,10 +695,10 @@ static int __change_page_attr_set_clr(struct cpa_data *cpa, int checkalias)
 			cpa->numpages = 1;
 
 		if (!debug_pagealloc)
-			spin_lock(&cpa_lock);
+			mutex_lock(&cpa_lock);
 		ret = __change_page_attr(cpa, checkalias);
 		if (!debug_pagealloc)
-			spin_unlock(&cpa_lock);
+			mutex_unlock(&cpa_lock);
 		if (ret)
 			return ret;
 
