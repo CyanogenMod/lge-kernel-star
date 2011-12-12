@@ -212,6 +212,11 @@ void tegra_thermal_alert(void *data)
 		lo_limit_throttle_tj = thermal->temp_throttle_low_tj;
 		hi_limit_throttle_tj = thermal->temp_shutdown_tj;
 	}
+#else
+	if (temp_tj > thermal->temp_throttle_tj) {
+		lo_limit_throttle_tj = thermal->temp_throttle_tj;
+		hi_limit_throttle_tj = thermal->temp_shutdown_tj;
+	}
 #endif
 
 #ifdef CONFIG_TEGRA_EDP_LIMITS
