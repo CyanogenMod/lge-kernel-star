@@ -496,6 +496,30 @@ config TRACELEVEL
 	  will automatically be enabled on kernel boot, and users can change
 	  the the trace level in a kernel parameter.
 
+config TRACEDUMP
+	bool "Dumping functionality for ftrace"
+	depends on FUNCTION_TRACER
+	help
+	  This option adds functionality to dump tracing data in several forms
+	  Data can be dumped in ascii form or as raw pages from the tracing
+	  ring buffers, along with the saved cmdlines. This is specified by
+	  the module parameter tracedump_ascii. Data will be compressed
+	  using zlib.
+
+config TRACEDUMP_PANIC
+	bool "Tracedump to console on panic"
+	depends on TRACEDUMP
+	help
+	  With this option, tracedump will automatically dump to the console
+	  on a kernel panic.
+
+config TRACEDUMP_PROCFS
+	bool "Tracedump via proc file"
+	depends on TRACEDUMP
+	help
+	  With this option, tracedump can be dumped from user space by reading
+	  from /proc/tracedump.
+
 endif # FTRACE
 
 endif # TRACING_SUPPORT
