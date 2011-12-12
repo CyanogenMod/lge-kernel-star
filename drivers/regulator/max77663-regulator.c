@@ -224,7 +224,8 @@ max77663_regulator_set_fps_src(struct max77663_regulator *reg,
 {
 	int ret;
 
-	if (reg->regs[FPS_REG].addr == MAX77663_REG_FPS_NONE)
+	if ((reg->regs[FPS_REG].addr == MAX77663_REG_FPS_NONE) ||
+			(reg->fps_src == fps_src))
 		return 0;
 
 	switch (fps_src) {
@@ -308,10 +309,18 @@ max77663_regulator_set_fps_cfgs(struct max77663_regulator *reg,
 				struct max77663_regulator_fps_cfg *fps_cfgs,
 				int num_fps_cfgs)
 {
+	struct device *parent = _to_parent(reg);
 	int i, ret;
 
 	if (fps_cfg_init)
 		return 0;
+
+	for (i = 0; i <= FPS_SRC_2; i++) {
+		ret = max77663_read(parent, fps_cfg_regs[i].addr,
+				    &fps_cfg_regs[i].val, 1, 0);
+		if (ret < 0)
+			return ret;
+	}
 
 	for (i = 0; i < num_fps_cfgs; i++) {
 		ret = max77663_regulator_set_fps_cfg(reg, &fps_cfgs[i]);
@@ -481,7 +490,7 @@ static int max77663_regulator_disable(struct regulator_dev *rdev)
 		return 0;
 	}
 
-	return max77663_regulator_set_power_mode(reg, power_mode);;
+	return max77663_regulator_set_power_mode(reg, power_mode);
 }
 
 static int max77663_regulator_is_enabled(struct regulator_dev *rdev)
@@ -553,7 +562,7 @@ static int max77663_regulator_preinit(struct max77663_regulator *reg)
 	struct max77663_regulator_platform_data *pdata = _to_pdata(reg);
 	struct device *parent = _to_parent(reg);
 	int i;
-	u8 val;
+	u8 val, mask;
 	int ret;
 
 	/* Update registers */
@@ -568,23 +577,18 @@ static int max77663_regulator_preinit(struct max77663_regulator *reg)
 		}
 	}
 
-	for (i = 0; i <= FPS_SRC_2; i++) {
-		ret = max77663_read(parent, fps_cfg_regs[i].addr,
-				    &fps_cfg_regs[i].val, 1, 0);
-		if (ret < 0) {
-			dev_err(reg->dev,
-				"preinit: Failed to get register 0x%x\n",
-				fps_cfg_regs[i].addr);
-			return ret;
-		}
-	}
-
 	/* Update FPS source */
 	if (reg->regs[FPS_REG].addr == MAX77663_REG_FPS_NONE)
 		reg->fps_src = FPS_SRC_NONE;
 	else
 		reg->fps_src = (reg->regs[FPS_REG].val & FPS_SRC_MASK)
 				>> FPS_SRC_SHIFT;
+
+	dev_dbg(reg->dev, "preinit: initial fps_src=%s\n",
+		fps_src_name(reg->fps_src));
+
+	/* Update power mode */
+	max77663_regulator_get_power_mode(reg);
 
 	/* Check Chip Identification */
 	ret = max77663_read(parent, MAX77663_REG_CID5, &val, 1, 0);
@@ -601,6 +605,40 @@ static int max77663_regulator_preinit(struct max77663_regulator *reg)
 		reg->safe_down_uV = SD_SAFE_DOWN_UV;
 	else
 		reg->safe_down_uV = 0;
+
+	/* Set FPS */
+	ret = max77663_regulator_set_fps_cfgs(reg, pdata->fps_cfgs,
+					      pdata->num_fps_cfgs);
+	if (ret < 0) {
+		dev_err(reg->dev, "preinit: Failed to set FPSCFG\n");
+		return ret;
+	}
+
+	/* To prevent power rail turn-off when change FPS source,
+	 * it must set power mode to NORMAL before change FPS source to NONE
+	 * from SRC_0, SRC_1 and SRC_2. */
+	if ((reg->fps_src != FPS_SRC_NONE) && (pdata->fps_src == FPS_SRC_NONE)
+			&& (reg->power_mode != POWER_MODE_NORMAL)) {
+		ret = max77663_regulator_set_power_mode(reg, POWER_MODE_NORMAL);
+		if (ret < 0) {
+			dev_err(reg->dev, "preinit: Failed to "
+				"set power mode to POWER_MODE_NORMAL\n");
+			return ret;
+		}
+	}
+
+	ret = max77663_regulator_set_fps_src(reg, pdata->fps_src);
+	if (ret < 0) {
+		dev_err(reg->dev, "preinit: Failed to set FPSSRC to %d\n",
+			pdata->fps_src);
+		return ret;
+	}
+
+	ret = max77663_regulator_set_fps(reg);
+	if (ret < 0) {
+		dev_err(reg->dev, "preinit: Failed to set FPS\n");
+		return ret;
+	}
 
 	/* Set initial state */
 	if (!pdata->init_apply)
@@ -628,50 +666,41 @@ static int max77663_regulator_preinit(struct max77663_regulator *reg)
 		return ret;
 	}
 
-
 skip_init_apply:
 	if (reg->type == REGULATOR_TYPE_SD) {
-		if (pdata->flags & SD_SLEW_RATE_MASK) {
-			if (pdata->flags & SD_SLEW_RATE_SLOWEST)
-				val = SD_SR_13_75 << SD_SR_SHIFT;
-			else if (pdata->flags & SD_SLEW_RATE_SLOW)
-				val = SD_SR_27_5 << SD_SR_SHIFT;
-			else if (pdata->flags & SD_SLEW_RATE_FAST)
-				val = SD_SR_55 << SD_SR_SHIFT;
-			else
-				val = SD_SR_100 << SD_SR_SHIFT;
+		val = 0;
+		mask = 0;
 
-			ret = max77663_regulator_cache_write(reg,
-					reg->regs[CFG_REG].addr, SD_SR_MASK,
-					val, &reg->regs[CFG_REG].val);
-			if (ret < 0) {
-				dev_err(reg->dev,
-					"preinit: Failed to set slew rate\n");
-				return ret;
-			}
+		if (pdata->flags & SD_SLEW_RATE_MASK) {
+			mask |= SD_SR_MASK;
+			if (pdata->flags & SD_SLEW_RATE_SLOWEST)
+				val |= (SD_SR_13_75 << SD_SR_SHIFT);
+			else if (pdata->flags & SD_SLEW_RATE_SLOW)
+				val |= (SD_SR_27_5 << SD_SR_SHIFT);
+			else if (pdata->flags & SD_SLEW_RATE_FAST)
+				val |= (SD_SR_55 << SD_SR_SHIFT);
+			else
+				val |= (SD_SR_100 << SD_SR_SHIFT);
 		}
 
 		if (pdata->flags & SD_FORCED_PWM_MODE) {
-			ret = max77663_regulator_cache_write(reg,
-					reg->regs[CFG_REG].addr, SD_FPWM_MASK,
-					SD_FPWM_MASK, &reg->regs[CFG_REG].val);
-			if (ret < 0) {
-				dev_err(reg->dev, "preinit: "
-					"Failed to set forced pwm mode\n");
-				return ret;
-			}
+			mask |= SD_FPWM_MASK;
+			val |= SD_FPWM_MASK;
 		}
 
 		if (pdata->flags & SD_FSRADE_DISABLE) {
-			ret = max77663_regulator_cache_write(reg,
-					reg->regs[CFG_REG].addr,
-					SD_FSRADE_MASK,	SD_FSRADE_MASK,
-					&reg->regs[CFG_REG].val);
-			if (ret < 0) {
-				dev_err(reg->dev, "preinit: Failed to set "
-					"falling slew-rate discharge mode\n");
-				return ret;
-			}
+			mask |= SD_FSRADE_MASK;
+			val |= SD_FSRADE_MASK;
+		}
+
+		ret = max77663_regulator_cache_write(reg,
+				reg->regs[CFG_REG].addr, mask, val,
+				&reg->regs[CFG_REG].val);
+		if (ret < 0) {
+			dev_err(reg->dev, "preinit: "
+				"Failed to set register 0x%x\n",
+				reg->regs[CFG_REG].addr);
+			return ret;
 		}
 
 		if ((reg->id == MAX77663_REGULATOR_ID_SD0)
@@ -685,9 +714,6 @@ skip_init_apply:
 				return ret;
 			}
 
-			if (reg->fps_src == FPS_SRC_NONE)
-				return 0;
-
 			ret = max77663_regulator_set_fps_src(reg, FPS_SRC_NONE);
 			if (ret < 0) {
 				dev_err(reg->dev, "preinit: "
@@ -696,26 +722,6 @@ skip_init_apply:
 				return ret;
 			}
 		}
-	}
-
-	ret = max77663_regulator_set_fps_cfgs(reg, pdata->fps_cfgs,
-					      pdata->num_fps_cfgs);
-	if (ret < 0) {
-		dev_err(reg->dev, "preinit: Failed to set FPSCFG\n");
-		return ret;
-	}
-
-	ret = max77663_regulator_set_fps_src(reg, pdata->fps_src);
-	if (ret < 0) {
-		dev_err(reg->dev, "preinit: Failed to set FPSSRC to %d\n",
-			pdata->fps_src);
-		return ret;
-	}
-
-	ret = max77663_regulator_set_fps(reg);
-	if (ret < 0) {
-		dev_err(reg->dev, "preinit: Failed to set FPS\n");
-		return ret;
 	}
 
 	return 0;
