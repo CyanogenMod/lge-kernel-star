@@ -96,6 +96,7 @@ enum audio_codec_type {
 void tegra_get_board_info(struct board_info *);
 void tegra_get_pmu_board_info(struct board_info *bi);
 void tegra_get_display_board_info(struct board_info *bi);
+void tegra_get_camera_board_info(struct board_info *bi);
 #ifdef CONFIG_TEGRA_CONVSERVATIVE_GOV_ON_EARLYSUPSEND
 #define SET_CONSERVATIVE_GOVERNOR_UP_THRESHOLD 95
 #define SET_CONSERVATIVE_GOVERNOR_DOWN_THRESHOLD 50

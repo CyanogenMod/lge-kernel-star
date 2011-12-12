@@ -93,6 +93,7 @@ unsigned long tegra_grhost_aperture = ~0ul;
 static   bool is_tegra_debug_uart_hsport;
 static struct board_info pmu_board_info;
 static struct board_info display_board_info;
+static struct board_info camera_board_info;
 
 static int pmu_core_edp = 1200;	/* default 1.2V EDP limit */
 static int board_panel_type;
@@ -638,6 +639,24 @@ void tegra_get_display_board_info(struct board_info *bi)
 
 __setup("displayboard=", tegra_display_board_info);
 
+static int __init tegra_camera_board_info(char *info)
+{
+	char *p = info;
+	camera_board_info.board_id = memparse(p, &p);
+	camera_board_info.sku = memparse(p+1, &p);
+	camera_board_info.fab = memparse(p+1, &p);
+	camera_board_info.major_revision = memparse(p+1, &p);
+	camera_board_info.minor_revision = memparse(p+1, &p);
+	return 1;
+}
+
+void tegra_get_camera_board_info(struct board_info *bi)
+{
+	memcpy(bi, &camera_board_info, sizeof(struct board_info));
+}
+
+__setup("cameraboard=", tegra_camera_board_info);
+
 static int __init tegra_modem_id(char *id)
 {
 	char *p = id;
@@ -652,6 +671,8 @@ int tegra_get_modem_id(void)
 }
 
 __setup("modem_id=", tegra_modem_id);
+
+
 
 /*
  * Tegra has a protected aperture that prevents access by most non-CPU

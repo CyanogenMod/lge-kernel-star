@@ -555,6 +555,8 @@ static int enterprise_cam_init(void)
 	int ret;
 	int i;
 	struct board_info bi;
+	struct board_info cam_bi;
+	bool i2c_mux = false;
 
 	pr_info("%s:++\n", __func__);
 	memset(ent_vicsi_pwr, 0, sizeof(ent_vicsi_pwr));
@@ -573,11 +575,24 @@ static int enterprise_cam_init(void)
 	}
 
 	tegra_get_board_info(&bi);
+	tegra_get_camera_board_info(&cam_bi);
 
-	if (bi.fab == BOARD_FAB_A00 || bi.fab == BOARD_FAB_A01)
+	if (bi.board_id == BOARD_E1205) {
+		if (bi.fab == BOARD_FAB_A00 || bi.fab == BOARD_FAB_A01)
+			i2c_mux = false;
+		else if (bi.fab == BOARD_FAB_A02)
+			i2c_mux = true;
+	} else if (bi.board_id == BOARD_E1197) {
+		if (cam_bi.fab == BOARD_FAB_A00)
+			i2c_mux = false;
+		else if (cam_bi.fab == BOARD_FAB_A01)
+			i2c_mux = true;
+	}
+
+	if (!i2c_mux)
 		i2c_register_board_info(2, ar0832_i2c2_boardinfo,
 			ARRAY_SIZE(ar0832_i2c2_boardinfo));
-	else if (bi.fab == BOARD_FAB_A02) {
+	else {
 		i2c_register_board_info(2, enterprise_i2c2_boardinfo,
 			ARRAY_SIZE(enterprise_i2c2_boardinfo));
 		/*
@@ -589,7 +604,6 @@ static int enterprise_cam_init(void)
 		i2c_register_board_info(PCA954x_I2C_BUS1, enterprise_i2c7_boardinfo,
 			ARRAY_SIZE(enterprise_i2c7_boardinfo));
 	}
-
 	return 0;
 
 fail_free_gpio:
