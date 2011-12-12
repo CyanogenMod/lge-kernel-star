@@ -69,7 +69,11 @@
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/mach-types.h>
-
+//P990_IFX_GB_LGSI_START
+//Domain:- RIL: 
+/*  :: 08-July-11 :: RIL Recovery for second time not working due to local variable NvOdmGpioPinHandle declaration, now made global as per Froyo  [START] */
+//BEGIN :  2011-7-8 
+//MOD : 0019311: [Star-GB] since 2nd RIL recovery, recovery is not working.
 /*
 	RECOVERY_MODE
 		description : This mode is used to recover the at command pending state
@@ -87,8 +91,9 @@
 static NvOdmServicesGpioHandle hGpio = NULL;
 static NvOdmGpioPinHandle hPin = NULL; 
 #endif
-
-
+//END :  2011-7-8 
+/*  :: 08-July-11 :: RIL Recovery for second time not working due to local variable NvOdmGpioPinHandle declaration, now made global as per Froyo [END] */
+//P990_IFX_GB_TD_ISSUE_FIX_LGSI_END
 #ifdef LGE_KERNEL_MUX
 #include <linux/spinlock.h>
 #include <linux/semaphore.h>
@@ -116,6 +121,14 @@ static NvOdmGpioPinHandle hPin = NULL;
 struct wake_lock	 	s_wake_lock;
 static unsigned int	s_wake_lock_flag;
 #endif
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]
+//LGE_TELECA_CR:1056_SPI/MUX_IMPROVEMENT START
+//#define MAX_SIZE_OF_RX_QUEUE 10
+//LGE_TELECA_CR:1056_SPI/MUX_IMPROVEMENT END
+//LGE_TELECA_CR1317_DATA_THROUGHPUT START
+//#define SPI_MORE_ATTR 0x8000
+//LGE_TELECA_CR1317_DATA_THROUGHPUT END
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]
 
 #define LOCK_T          spinlock_t
 #define CREATELOCK(_l)  spin_lock_init(&(_l))
@@ -198,7 +211,9 @@ static struct tty_struct *mux_table[TS0710MAX_CHANNELS];
 static struct ktermios *mux_termios[TS0710MAX_CHANNELS];
 static struct ktermios *mux_termios_locked[TS0710MAX_CHANNELS];
 static volatile short int mux_tty[TS0710MAX_CHANNELS];
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]
 static volatile struct file * mux_filp[TS0710MAX_CHANNELS];
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]
 
 #ifdef min
 #undef min
@@ -209,7 +224,9 @@ static ts0710_con ts0710_connection;
 
 #ifdef LGE_KERNEL_MUX
 static DECLARE_MUTEX(spi_write_sema); /* use semaphore to synchronize different threads*/
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]
 static struct semaphore spi_write_data_sema[33];
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]
 
 struct spi_data_recived_struct {
     struct tty_struct *tty; 
@@ -218,16 +235,27 @@ struct spi_data_recived_struct {
     int size;
     int updated;
 };
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]
+//LGE_TELECA_CR1317_DATA_THROUGHPUT START
+//#define MAX_WAITING_FRAMES_PER_CHANNEL 4
 #define MAX_WAITING_FRAMES 50
+//static DECLARE_WAIT_QUEUE_HEAD(wq);
+//static volatile short int frames_to_send_count[TS0710MAX_CHANNELS];
+//LGE_TELECA_CR1317_DATA_THROUGHPUT END
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]
 struct spi_data_send_struct;
 struct spi_data_send_struct {
     struct spi_data_send_struct *next;
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]	
+//    u8  dlci;
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]	
     u8 *data;
     int size;
 };
-
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]
 static LOCK_T frame_nodes_lock = SPIN_LOCK_UNLOCKED;
 static unsigned long lock_flag ;
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]
 static struct spi_data_send_struct frame_node[MAX_WAITING_FRAMES];
 static struct spi_data_send_struct *frame_to_send[TS0710MAX_PRIORITY_NUMBER];          
 static struct spi_data_recived_struct spi_data_recieved;
@@ -245,32 +273,54 @@ static u8 default_priority_table[] = {
 61,61,61,61,61,61,       /* 56-61 DLC */
 63,63                    /* 62-63 DLC */
 };
-
-
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]
+//LGE_TELECA_CR1317_DATA_THROUGHPUT START
+//static int frames_to_send_counter = 0;
+//LGE_TELECA_CR1317_DATA_THROUGHPUT END
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]
 static int max_frame_usage = 0;
 static void nodes_init(void)
 {
     int i;
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]	
     spin_lock_irqsave(&frame_nodes_lock, lock_flag);
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]	
     for (i=0; i<MAX_WAITING_FRAMES;i++){
         frame_node[i].next = NULL;
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]		
+//        frame_node[i].dlci = 0;
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]		
         frame_node[i].data = NULL;
         frame_node[i].size = 0;
     }
-    for (i=0; i<TS0710MAX_PRIORITY_NUMBER;i++){
-        frame_to_send[i]=NULL;
+    for (i = 0; i < TS0710MAX_PRIORITY_NUMBER; i++) {
+        frame_to_send[i] = NULL;
     }
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]	
+//LGE_TELECA_CR1317_DATA_THROUGHPUT START
     spin_unlock_irqrestore(&frame_nodes_lock, lock_flag);
+//    for (i = 0; i < TS0710MAX_CHANNELS; i++) {
+//        frames_to_send_count[i] = 0;
+//    }
+//    frames_to_send_counter = 0;
+//LGE_TELECA_CR1317_DATA_THROUGHPUT END
+//    UNLOCK(frame_nodes_lock);
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]	
 }
 
 static int node_put_to_send(u8 dlci, u8 *data, int size)
 {
+//LGE_TELECA_CR1317_DATA_THROUGHPUT START
     int i;
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]	
     int retval = 0; 
-    int free_node = MAX_WAITING_FRAMES+1;
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]	
+							   
+    int free_node = MAX_WAITING_FRAMES + 1;
     struct spi_data_send_struct *new_frame;
 //    u8 * buf;
     u8 priority;
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]	
     int frame_count = 0;
 
     priority = ts0710_connection.dlci[dlci].priority;    
@@ -307,7 +357,7 @@ static int node_put_to_send(u8 dlci, u8 *data, int size)
                 new_frame = new_frame->next;
                 frame_count++;
                 if(frame_count>MAX_WAITING_FRAMES) {
-                  printk("\n Never hit this case : frame_count(%d) > MAX_WAITING_FRAMES[%d]\r\n", frame_count, MAX_WAITING_FRAMES);
+                  TS0710_PRINTK("\n Never hit this case : frame_count(%d) > MAX_WAITING_FRAMES[%d]\r\n", frame_count, MAX_WAITING_FRAMES);
                   break;
                 }
             }
@@ -325,9 +375,12 @@ static int node_put_to_send(u8 dlci, u8 *data, int size)
     if(retval > 0 ){
         up(&spi_write_sema);
     }
-
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]
+    TS0710_LOG("return retval=%d", retval);
+				TS0710_PRINTK ("return val %d \n",retval);
     return retval;
-} 
+//LGE_TELECA_CR1317_DATA_THROUGHPUT END
+}
 
 #endif
 
@@ -446,6 +499,7 @@ static int mux_send_frame(u8 dlci, int initiator,
 
   if (!framebuf) {
     printk(KERN_ERR "mux_send_frame:: Alloc Failed \n");
+				TS0710_PRINTK ("mux_send_frame:: Alloc Failed \n");
     return -1;
   }
 
@@ -461,6 +515,7 @@ static int mux_send_frame(u8 dlci, int initiator,
 			crc_len = 0;
 			break;
 		default:
+				TS0710_PRINTK ("mux_send_frame:: default \n");
 			pf = 1;
 			crc_len = 0;
 	}
@@ -502,17 +557,26 @@ static int mux_send_frame(u8 dlci, int initiator,
 		framebuf[pos ++] = MUX_ADVANCED_FLAG_SEQ; */
 #ifdef LGE_KERNEL_MUX
     res = node_put_to_send( dlci, framebuf, pos);
+				TS0710_PRINTK ("mux_send_frame:: node_put_to_send %d\n",res);
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]	
     if(res == -ENOMEM){
       return res;
     }
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]	
 #else    
 	res = ipc_tty->ops->write(ipc_tty, framebuf, pos);
      kfree(framebuf);
 #endif
 
 	if (res != pos) {
-		TS0710_PRINTK("mux_send_frame error %d\n", res);
-		return -1;
+		TS0710_LOG("mux_send_frame error %d", res);
+				TS0710_PRINTK ("mux_send_frame:: %d %d\n",res,pos);
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]		
+//		if (res < 0)
+//			return res;
+//		else
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]		
+			return -1;
 	}
 
 #ifdef LGE_KERNEL_MUX
@@ -605,7 +669,9 @@ static void send_nsc_msg(ts0710_con * ts0710, mcc_type cmd, u8 cr)
 
 static void mux_send_uih(ts0710_con * ts0710, u8 cr, u8 type, u8 *data, int len)
 {
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]
      u8 *send = kmalloc(len + 2, GFP_ATOMIC);
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]	
 
 	mcc_short_frame_head *head = (mcc_short_frame_head *)send;
 	head->type.ea = 1;
@@ -682,19 +748,21 @@ void process_mcc(u8 * data, u32 len, ts0710_con * ts0710, int longpkt)
 	switch (mcc_short_pkt->h.type.type) {
 
 	case FCON:		/*Flow control on command */
-		TS0710_PRINTK("MUX Received Flow control(all channels) on command\n");
+		TS0710_PRINTK("MUX Received Flow control(all channels) on command");
 		if (mcc_short_pkt->h.type.cr == MCC_CMD) {
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]		
 			for (j = 0; j < TS0710_MAX_CHN; j++) {
 				ts0710->dlci[j].state = CONNECTED;
 				up(&spi_write_data_sema[j]);
 				down_trylock(&spi_write_data_sema[j]);
 			}
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]			
 			ts0710_fcon_msg(ts0710, MCC_RSP);
 		}
 		break;
 
 	case FCOFF:		/*Flow control off command */
-		TS0710_PRINTK("MUX Received Flow control(all channels) off command\n");
+		TS0710_PRINTK("MUX Received Flow control(all channels) off command");
 		if (mcc_short_pkt->h.type.cr == MCC_CMD) {
 			for (j = 0; j < TS0710_MAX_CHN; j++) {
 				ts0710->dlci[j].state = FLOW_STOPPED;
@@ -718,23 +786,25 @@ void process_mcc(u8 * data, u32 len, ts0710_con * ts0710, int longpkt)
 			}
 
 			if (mcc_short_pkt->h.type.cr == MCC_CMD) {
-				TS0710_DEBUG("Received Modem status command\n");
+				TS0710_DEBUG("Received Modem status command");
 				if ((v24_sigs & 2) && (ts0710->dlci[dlci].state == CONNECTED)) {
-					TS0710_LOG ("MUX Received Flow off on dlci %d\n", dlci);
+					TS0710_LOG ("MUX Received Flow off on dlci [%d]", dlci);
 					ts0710->dlci[dlci].state = FLOW_STOPPED;
 				} else if (MUX_STOPPED(ts0710,dlci)) {
 					ts0710->dlci[dlci].state = CONNECTED;
-					TS0710_LOG ("MUX Received Flow on on dlci %d\n", dlci);
+					TS0710_LOG ("MUX Received Flow on on dlci [%d]", dlci);
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]					
 					up(&spi_write_data_sema[dlci]);
 					down_trylock(&spi_write_data_sema[dlci]);
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]					
 				}
 
 				ts0710_msc_msg(ts0710, v24_sigs, MCC_RSP, dlci);
 			} else {
-				TS0710_DEBUG("Received Modem status response\n");
+				TS0710_DEBUG("Received Modem status response");
 
 				if (v24_sigs & 2) {
-					TS0710_DEBUG("Flow stop accepted\n");
+					TS0710_DEBUG("Flow stop accepted");
 				}
 			}
 			break;
@@ -749,19 +819,19 @@ void process_mcc(u8 * data, u32 len, ts0710_con * ts0710, int longpkt)
 			pn_pkt = (pn_msg *) data;
 			dlci = pn_pkt->dlci;
 			frame_size = GET_PN_MSG_FRAME_SIZE(pn_pkt);
-			TS0710_DEBUG("Received DLC parameter negotiation, PN\n");
+			TS0710_DEBUG("Received DLC parameter negotiation, PN");
 
 			if (pn_pkt->mcc_s_head.type.cr == MCC_CMD) {
-				TS0710_DEBUG("received PN command with:\n");
-				TS0710_DEBUG("Frame size:%d\n", frame_size);
+				TS0710_DEBUG("received PN command with:");
+				TS0710_DEBUG("Frame size:%d", frame_size);
 
 				frame_size = min(frame_size, ts0710->dlci[dlci].mtu);
 				send_pn_msg(ts0710, pn_pkt->prior, frame_size, 0, 0, dlci, MCC_RSP);
 				ts0710->dlci[dlci].mtu = frame_size;
-				TS0710_DEBUG("process_mcc : mtu set to %d\n", ts0710->dlci[dlci].mtu);
+				TS0710_DEBUG("mtu set to %d", ts0710->dlci[dlci].mtu);
 			} else {
-				TS0710_DEBUG("received PN response with:\n");
-				TS0710_DEBUG("Frame size:%d\n", frame_size);
+				TS0710_DEBUG("received PN response with:");
+				TS0710_DEBUG("Frame size:%d", frame_size);
 
 				frame_size = min(frame_size, ts0710->dlci[dlci].mtu);
 				ts0710->dlci[dlci].mtu = frame_size;
@@ -776,11 +846,11 @@ void process_mcc(u8 * data, u32 len, ts0710_con * ts0710, int longpkt)
 		}
 
 	case NSC:		/*Non supported command resonse */
-		TS0710_LOG("MUX Received Non supported command response\n");
+		TS0710_LOG("MUX Received Non supported command response");
 		break;
 
 	default:		/*Non supported command received */
-		TS0710_LOG("MUX Received a non supported command\n");
+		TS0710_LOG("MUX Received a non supported command");
 		send_nsc_msg(ts0710, mcc_short_pkt->h.type, MCC_RSP);
 		break;
 	}
@@ -800,22 +870,26 @@ static inline void add_post_recv_queue(mux_recv_struct ** head,
 	new_item->next = *head;
 	*head = new_item;
 }
-
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]
 #define MUX_CONTROL_BUG_FIX //by eunae.kim 2011-01-07
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]
 static void ts0710_flow_on(u8 dlci, ts0710_con * ts0710)
 {
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]
+//LGE_TELECA_CR1317_DATA_THROUGHPUT START
 #if defined(MUX_CONTROL_BUG_FIX) /*  2011-01-07 */
-           if (!((ts0710->dlci[0].state) & (CONNECTED | FLOW_STOPPED)))
-                     return;
+	if (!((ts0710->dlci[0].state) & (CONNECTED | FLOW_STOPPED)))
+		return;
 
-           if (!((ts0710->dlci[dlci].state) & (CONNECTED | FLOW_STOPPED)))
-                     return;
+	if (!((ts0710->dlci[dlci].state) & (CONNECTED | FLOW_STOPPED)))
+		return;
+//LGE_TELECA_CR1317_DATA_THROUGHPUT END
 #else
-	if (!(ts0710->dlci[0].state) & (CONNECTED | FLOW_STOPPED))
-		return;
+           if (!(ts0710->dlci[0].state) & (CONNECTED | FLOW_STOPPED))
+                     return;
 
-	if (!(ts0710->dlci[dlci].state) & (CONNECTED | FLOW_STOPPED))
-		return;
+           if (!(ts0710->dlci[dlci].state) & (CONNECTED | FLOW_STOPPED))
+                     return;
 #endif
 
 	if (!(ts0710->dlci[dlci].flow_control))
@@ -831,7 +905,7 @@ static void ts0710_flow_off(struct tty_struct *tty, u8 dlci,
 {
 	int i;
 
-	TS0710_PRINTK("flow off\n");
+	TS0710_PRINTK("flow off");
 
 	if (test_and_set_bit(TTY_THROTTLED, &tty->flags))
 		return;
@@ -851,7 +925,7 @@ static void ts0710_flow_off(struct tty_struct *tty, u8 dlci,
 		if (ts0710_msc_msg(ts0710, EA | FC | RTC | RTR | DV, MCC_CMD, dlci) < 0) 
 			continue;
 
-		TS0710_LOG("\nMUX send Flow off on dlci %d\n", dlci);
+		TS0710_LOG("MUX send Flow off on dlci [%d]", dlci);
 		ts0710->dlci[dlci].flow_control = 1;
 		break;
 	}
@@ -866,19 +940,19 @@ void ts0710_recv_data_server(ts0710_con * ts0710, short_frame *short_pkt, int le
 
 	switch (CLR_PF(short_pkt->h.control)) {
 	case SABM:
-		TS0710_DEBUG("SABM-packet received\n");
-		TS0710_DEBUG("server channel == 0\n");
+		TS0710_DEBUG("SABM-packet received");
+		TS0710_DEBUG("server channel == 0");
 		ts0710->dlci[0].state = CONNECTED;
 
-		TS0710_DEBUG("sending back UA - control channel\n");
+		TS0710_DEBUG("sending back UA - control channel");
 		send_ua(ts0710, 0);
 		wake_up_interruptible(&ts0710->dlci[0].open_wait);
 
 		break;
 	case UA:
-		TS0710_DEBUG("UA packet received\n");
+		TS0710_DEBUG("UA packet received");
 
-		TS0710_DEBUG("server channel == 0\n");
+		TS0710_DEBUG("server channel == 0");
 
 		if (ts0710->dlci[0].state == CONNECTING) {
 			ts0710->dlci[0].state = CONNECTED;
@@ -887,13 +961,13 @@ void ts0710_recv_data_server(ts0710_con * ts0710, short_frame *short_pkt, int le
 		} else if (ts0710->dlci[0].state == DISCONNECTING) {
 			ts0710_upon_disconnect();
 		} else {
-			TS0710_DEBUG(" Something wrong receiving UA packet\n");
+			TS0710_DEBUG("Something wrong receiving UA packet");
 		}
 
 		break;
 	case DM:
-		TS0710_DEBUG("DM packet received\n");
-		TS0710_DEBUG("server channel == 0\n");
+		TS0710_DEBUG("DM packet received");
+		TS0710_DEBUG("server channel == 0");
 
 		if (ts0710->dlci[0].state == CONNECTING) {
 			be_connecting = 1;
@@ -907,49 +981,48 @@ void ts0710_recv_data_server(ts0710_con * ts0710, short_frame *short_pkt, int le
 
 		break;
 	case DISC:
-		TS0710_DEBUG("DISC packet received\n");
+		TS0710_DEBUG("DISC packet received");
 
-		TS0710_DEBUG("server channel == 0\n");
+		TS0710_DEBUG("server channel == 0");
 
 		send_ua(ts0710, 0);
-		TS0710_DEBUG("DISC, sending back UA\n");
+		TS0710_DEBUG("DISC, sending back UA");
 
 		ts0710_upon_disconnect();
 
 		break;
 
 	case UIH:
-		TS0710_DEBUG("UIH packet received\n");
+		TS0710_DEBUG("UIH packet received");
 
 		if (GET_PF(short_pkt->h.control)) {
-			TS0710_LOG("MUX Error %s: UIH packet with P/F set, discard it!\n",
-				__FUNCTION__);
+			TS0710_LOG("MUX Error: UIH packet with P/F set, discard it!");
 			break;
 		}
 
 		/* FIXME: connected and flow */
 
 		if ((short_pkt->h.length.ea) == 0) {
-			TS0710_DEBUG("Long UIH packet received\n");
+			TS0710_DEBUG("Long UIH packet received");
 			long_pkt = (long_frame *) short_pkt;
 			uih_len = GET_LONG_LENGTH(long_pkt->h.length);
 			uih_data_start = long_pkt->h.data;
-			TS0710_DEBUG("long packet length %d\n", uih_len);
+			TS0710_DEBUG("long packet length=%d", uih_len);
 
 		} else {
-			TS0710_DEBUG("Short UIH pkt received\n");
+			TS0710_DEBUG("Short UIH pkt received");
 			uih_len = short_pkt->h.length.len;
 			uih_data_start = short_pkt->data;
 
 		}
-		TS0710_DEBUG("UIH on serv_channel 0\n");
+		TS0710_DEBUG("UIH on serv_channel [0]");
 		process_mcc((u8 *)short_pkt, len, ts0710,
 				!(short_pkt->h.length.ea));
 
 		break;
 
 	default:
-		TS0710_DEBUG("illegal packet\n");
+		TS0710_DEBUG("illegal packet");
 		break;
 	}
 
@@ -973,32 +1046,30 @@ void process_uih(ts0710_con * ts0710, char *data, int len, u8 dlci) {
 
 	if ((ts0710->dlci[dlci].state != CONNECTED)
 			&& (ts0710->dlci[dlci].state != FLOW_STOPPED)) {
-		TS0710_LOG("MUX Error %s: DLCI %d not connected, discard it!\n",
-				__FUNCTION__, dlci);
+		TS0710_LOG("MUX Error: DLCI [%d] not connected, discard it!", dlci);
 		send_dm(ts0710, dlci);
 		return;
 	}
 
 	if ((short_pkt->h.length.ea) == 0) {
-		TS0710_DEBUG("Long UIH packet received\n");
+		TS0710_DEBUG("Long UIH packet received");
 		long_pkt = (long_frame *) data;
 		uih_len = GET_LONG_LENGTH(long_pkt->h.length);
 		uih_data_start = long_pkt->h.data;
-		TS0710_DEBUG("long packet length %d\n", uih_len);
+		TS0710_DEBUG("long packet length=%d", uih_len);
 
 	} else {
-		TS0710_DEBUG("Short UIH pkt received\n");
+		TS0710_DEBUG("Short UIH pkt received");
 		uih_len = short_pkt->h.length.len;
 		uih_data_start = short_pkt->data;
 
 	}
 
-	TS0710_DEBUG("UIH on channel %d\n", dlci);
+	TS0710_DEBUG("UIH on channel [%d]", dlci);
 
 	if (uih_len > ts0710->dlci[dlci].mtu) {
-		TS0710_PRINTK
-			("MUX Error:  DLCI:%d, uih_len:%d is bigger than mtu:%d, discard data!\n",
-			 dlci, uih_len, ts0710->dlci[dlci].mtu);
+		TS0710_PRINTK("MUX Error:  DLCI [%d], uih_len:%d is bigger than mtu:%d, discard data!",
+			dlci, uih_len, ts0710->dlci[dlci].mtu);
 		return;
 	}
 #ifndef LGE_KERNEL_MUX
@@ -1009,32 +1080,26 @@ void process_uih(ts0710_con * ts0710, char *data, int len, u8 dlci) {
 	if (!uih_len)
 		return;
 
-	printk("TS07.10:uih tag %x on dlci %d\n",tag,dlci);
+	TS0710_LOG("TS07.10:uih tag %x on dlci %d",tag,dlci);
 #endif
 
 	tty_idx = dlci;
 	tty = mux_table[tty_idx];
 	if ((!mux_tty[tty_idx]) || (!tty)) {
-		TS0710_PRINTK
-			("MUX: No application waiting for, discard it! /dev/mux%d\n",
-			 tty_idx);
+		TS0710_PRINTK("MUX: No application waiting for, discard it! /dev/mux%d", tty_idx);
 		return;
 
 	}
 
 	if ((!mux_recv_info_flags[tty_idx])
 			|| (!mux_recv_info[tty_idx])) {
-		TS0710_PRINTK
-			("MUX Error: No mux_recv_info, discard it! /dev/mux%d\n",
-			 tty_idx);
+		TS0710_PRINTK("MUX Error: No mux_recv_info, discard it! /dev/mux%d", tty_idx);
 		return;
 	}
 
 	recv_info = mux_recv_info[tty_idx];
 	if (recv_info->total > 8192) {
-		TS0710_PRINTK
-			("MUX : discard data for tty_idx:%d, recv_info->total > 8192 \n",
-			 tty_idx);
+		TS0710_PRINTK("discard data for tty_idx:%d, recv_info->total > 8192", tty_idx);
 		return;
 	}
 
@@ -1045,7 +1110,9 @@ void process_uih(ts0710_con * ts0710, char *data, int len, u8 dlci) {
 		recv_room = tty->receive_room;
 
 	if ((recv_room - (uih_len + recv_info->total)) <
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]	
 			ts0710->dlci[dlci].mtu) {
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]			
 		flow_control = 1;
 	}
 #ifdef LGE_FROYO_BSP
@@ -1054,8 +1121,10 @@ void process_uih(ts0710_con * ts0710, char *data, int len, u8 dlci) {
 	tty->ldisc.ops->receive_buf(tty, uih_data_start, NULL, uih_len);
 #endif
 	if (flow_control)
-		tty_throttle(tty);	//20101127-3, , Teleca's patch for mux flow control
+//LGE_TELECA_CR:707_DATA_THROUGHPUT START
+		tty_throttle(tty);
 //		ts0710_flow_off(tty, dlci, ts0710);
+//LGE_TELECA_CR:707_DATA_THROUGHPUT END
 }
 
 void ts0710_recv_data(ts0710_con * ts0710, char *data, int len)
@@ -1071,7 +1140,7 @@ void ts0710_recv_data(ts0710_con * ts0710, char *data, int len)
 
 	switch (CLR_PF(short_pkt->h.control)) {
 	case SABM:
-		TS0710_PRINTK("Incomming connect on channel %d\n", dlci);
+		TS0710_PRINTK("Incomming connect on channel [%d]", dlci);
 
 		send_ua(ts0710, dlci);
 
@@ -1080,7 +1149,7 @@ void ts0710_recv_data(ts0710_con * ts0710, char *data, int len)
 
 		break;
 	case UA:
-		TS0710_DEBUG("Incomming UA on channel %d\n", dlci);
+		TS0710_DEBUG("Incomming UA on channel [%d]", dlci);
 
 		if (ts0710->dlci[dlci].state == CONNECTING) {
 			ts0710->dlci[dlci].state = CONNECTED;
@@ -1097,7 +1166,7 @@ void ts0710_recv_data(ts0710_con * ts0710, char *data, int len)
 
 		break;
 	case DM:
-		TS0710_DEBUG("Incomming DM on channel %d\n", dlci);
+		TS0710_DEBUG("Incomming DM on channel [%d]", dlci);
 
 		if (ts0710->dlci[dlci].state == CONNECTING)
 			ts0710->dlci[dlci].state = REJECTED;
@@ -1124,8 +1193,7 @@ void ts0710_recv_data(ts0710_con * ts0710, char *data, int len)
 
 		break;
 	default:
-		TS0710_PRINTK("illegal packet\n");
-        printk("\n TS0710:ts0710_recv_data:illegal packet for DLCi %d, hdr=%x \n",dlci,CLR_PF(short_pkt->h.control));
+		TS0710_PRINTK("illegal packet for DLCI [%d], hdr=%x", dlci, CLR_PF(short_pkt->h.control));
 		break;
 	}
 }
@@ -1137,7 +1205,7 @@ static void ts0710_close_channel(u8 dlci)
 	int try;
 	unsigned long t;
 
-	TS0710_DEBUG("ts0710_disc_command on channel %d\n", dlci);
+	TS0710_DEBUG("ts0710_disc_command on channel [%d]", dlci);
 
 	if ((ts0710->dlci[dlci].state == DISCONNECTED)
 	    || (ts0710->dlci[dlci].state == REJECTED)) {
@@ -1158,10 +1226,10 @@ static void ts0710_close_channel(u8 dlci)
 		if (ts0710->dlci[dlci].state == DISCONNECTED) {
 			break;
 		} else if (signal_pending(current)) {
-			TS0710_PRINTK ("MUX DLCI %d Send DISC got signal!\n", dlci);
+			TS0710_PRINTK ("MUX DLCI [%d] Send DISC got signal!", dlci);
 			break;
 		} else if ((jiffies - t) >= TS0710MUX_TIME_OUT) {
-			TS0710_PRINTK ("MUX DLCI %d Send DISC timeout!\n", dlci);
+			TS0710_PRINTK ("MUX DLCI [%d] Send DISC timeout!", dlci);
 			continue;
 		}
 	}
@@ -1191,8 +1259,7 @@ int ts0710_open_channel(u8 dlci)
 			return 0;
 		} else if (ts0710->dlci[0].state == CONNECTING) {
 			/* Reentry */
-			TS0710_PRINTK("MUX DLCI: 0, reentry to open DLCI 0, pid: %d, %s !\n",
-				current->pid, current->comm);
+			TS0710_PRINTK("MUX DLCI:0 Reentry to open DLCI 0, pid: %d, %s !", current->pid, current->comm);
 			try = 11;
 			while (try--) {
 				t = jiffies;
@@ -1211,13 +1278,11 @@ int ts0710_open_channel(u8 dlci)
 					   DISCONNECTED) {
 					break;
 				} else if (signal_pending(current)) {
-					TS0710_PRINTK ("MUX DLCI:%d Wait for connecting got signal!\n", dlci);
+					TS0710_PRINTK ("MUX DLCI:%d Wait for connecting got signal!", dlci);
 					retval = -EAGAIN;
 					break;
 				} else if ((jiffies - t) >= TS0710MUX_TIME_OUT) {
-					TS0710_PRINTK
-					    ("MUX DLCI:%d Wait for connecting timeout!\n",
-					     dlci);
+					TS0710_PRINTK("MUX DLCI:%d Wait for connecting timeout!", dlci);
 					continue;
 				} else if (ts0710->dlci[0].state == CONNECTING) {
 					continue;
@@ -1229,7 +1294,7 @@ int ts0710_open_channel(u8 dlci)
 			}
 		} else if ((ts0710->dlci[0].state != DISCONNECTED)
 			   && (ts0710->dlci[0].state != REJECTED)) {
-			TS0710_PRINTK("MUX DLCI:%d state is invalid!\n", dlci);
+			TS0710_PRINTK("MUX DLCI:%d state is invalid!", dlci);
 			return retval;
 		} else {
 			ts0710->initiator = 1;
@@ -1246,17 +1311,13 @@ int ts0710_open_channel(u8 dlci)
 						FLOW_STOPPED)) {
 				retval = 0;
 			} else if (ts0710->dlci[0].state == REJECTED) {
-				TS0710_PRINTK
-					("MUX DLCI:%d Send SABM got rejected!\n",
-					 dlci);
+				TS0710_PRINTK("MUX DLCI:%d Send SABM got rejected!", dlci);
 				retval = -EREJECTED;
 			} else if (signal_pending(current)) {
-				TS0710_PRINTK ("MUX DLCI:%d Send SABM got signal!\n", dlci);
+				TS0710_PRINTK ("MUX DLCI:%d Send SABM got signal!", dlci);
 				retval = -EAGAIN;
 			} else if ((jiffies - t) >= TS0710MUX_TIME_OUT) {
-				TS0710_PRINTK
-					("MUX DLCI:%d Send SABM timeout!\n",
-					 dlci);
+				TS0710_PRINTK("MUX DLCI:%d Send SABM timeout!", dlci);
 				retval = -ENODEV;
 			}
 
@@ -1297,7 +1358,7 @@ int ts0710_open_channel(u8 dlci)
 			}
 		} else if ((ts0710->dlci[dlci].state != DISCONNECTED)
 			   && (ts0710->dlci[dlci].state != REJECTED)) {
-			TS0710_PRINTK("MUX DLCI:%d state is invalid!\n", dlci);
+			TS0710_PRINTK("MUX DLCI:%d state is invalid!", dlci);
 			return retval;
 		} else {
 #ifdef LGE_KERNEL_MUX
@@ -1314,9 +1375,7 @@ int ts0710_open_channel(u8 dlci)
 						       open_wait,
 						       TS0710MUX_TIME_OUT);
 			if (signal_pending(current)) {
-				TS0710_PRINTK
-				    ("MUX DLCI:%d Send pn_msg got signal!\n",
-				     dlci);
+				TS0710_PRINTK("MUX DLCI:%d Send pn_msg got signal!", dlci);
 				retval = -EAGAIN;
 			}
 #endif
@@ -1336,14 +1395,10 @@ int ts0710_open_channel(u8 dlci)
 					retval = 0;
 				} else if (ts0710->dlci[dlci].state ==
 					   REJECTED) {
-					TS0710_PRINTK
-					    ("MUX DLCI:%d Send SABM got rejected!\n",
-					     dlci);
+					TS0710_PRINTK("MUX DLCI:%d Send SABM got rejected!", dlci);
 					retval = -EREJECTED;
 				} else if (signal_pending(current)) {
-					TS0710_PRINTK
-					    ("MUX DLCI:%d Send SABM got signal!\n",
-					     dlci);
+					TS0710_PRINTK("MUX DLCI:%d Send SABM got signal!", dlci);
 					retval = -EAGAIN;
 				} 
 			}
@@ -1380,6 +1435,7 @@ static void mux_close(struct tty_struct *tty, struct file *filp)
 	if (mux_tty[line] == 0)
 #ifdef LGE_KERNEL_MUX
 /*Workaround Infineon modem - DLS opened once will never be closed*/
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]
 //20100915-1, , Fix VT can't recevie data from CP [START]
 		if(dlci==12)
 		{	//When VT close DLC 12 with flow off status, must send flow on status to CP
@@ -1388,13 +1444,14 @@ static void mux_close(struct tty_struct *tty, struct file *filp)
 		}
 	TS0710_PRINTK("%s - close channel[%d]\n", __FUNCTION__, dlci);	
 //20100915, , Fix VT can't recevie data from CP [END]
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]
         return;
 #else        
 		ts0710_close_channel(dlci);
 #endif    
-
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]
      mux_filp[line] = NULL;
-
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]
 	if (mux_tty[line] != 0)
 		return;
 
@@ -1403,7 +1460,7 @@ static void mux_close(struct tty_struct *tty, struct file *filp)
 		mux_send_info_flags[line] = 0;
 		kfree(mux_send_info[line]);
 		mux_send_info[line] = 0;
-		TS0710_DEBUG("Free mux_send_info for /dev/mux%d\n", line);
+		TS0710_DEBUG("Free mux_send_info for /dev/mux%d", line);
 	}
 
 	if ((mux_recv_info_flags[line])
@@ -1412,10 +1469,13 @@ static void mux_close(struct tty_struct *tty, struct file *filp)
 		mux_recv_info_flags[line] = 0;
 		free_mux_recv_struct(mux_recv_info[line]);
 		mux_recv_info[line] = 0;
-		TS0710_DEBUG("Free mux_recv_info for /dev/mux%d\n", line);
+		TS0710_DEBUG("Free mux_recv_info for /dev/mux%d", line);
 	}
-        tty_unthrottle(tty);	//20101127-3, , Teleca's patch for mux flow control
+
+//LGE_TELECA_CR:1056_SPI/MUX_IMPROVEMENT START
+	tty_unthrottle(tty);
 //	ts0710_flow_on(dlci, ts0710);
+//LGE_TELECA_CR:1056_SPI/MUX_IMPROVEMENT END
 
 	wake_up_interruptible(&tty->read_wait);
 	wake_up_interruptible(&tty->write_wait);
@@ -1434,8 +1494,7 @@ static void mux_throttle(struct tty_struct *tty)
 		return;
 
 
-	TS0710_DEBUG("Enter into %s, minor number is: %d\n", __FUNCTION__,
-		     line);
+	TS0710_DEBUG("minor number is %d", line);
 
 	dlci = line;
 	if ((ts0710->dlci[0].state != CONNECTED)
@@ -1455,7 +1514,7 @@ static void mux_throttle(struct tty_struct *tty)
 		    (ts0710, EA | FC | RTC | RTR | DV, MCC_CMD, dlci) < 0) {
 			continue;
 		} else {
-			TS0710_LOG("MUX Send Flow off on dlci %d\n", dlci);
+			TS0710_LOG("MUX Send Flow off on dlci [%d]", dlci);
 			ts0710->dlci[dlci].flow_control = 1;
 			break;
 		}
@@ -1477,8 +1536,7 @@ static void mux_unthrottle(struct tty_struct *tty)
 		return;
 	}
 
-	TS0710_DEBUG("Enter into %s, minor number is: %d\n", __FUNCTION__,
-		     line);
+	TS0710_DEBUG("minor number is %d", line);
 
 	recv_info = mux_recv_info[line];
 	dlci = line;
@@ -1528,42 +1586,68 @@ out:
 	return retval;
 }
 
-//#define LGE_DUMP_MUX_BIFFUER
-#ifdef LGE_DUMP_MUX_BIFFUER
-#define COL_SIZE 50
-static void dump_mux_buffer(const unsigned char *txt, const unsigned char *buf, int count)
+//LGE_TELECA_CR1317_DATA_THROUGHPUT START
+//#define LGE_DUMP_MUX_BUFFER
+#ifdef LGE_DUMP_MUX_BUFFER
+#define DUMP_MUX_BUFFER_SIZE 64
+static void DUMP_MUX_BUFFER(const unsigned char *txt, const unsigned char *buf, int count)
 {
-    char dump_buf_str[COL_SIZE+1];
+    char dump_buf_str[DUMP_MUX_BUFFER_SIZE];
 
-    if (buf != NULL) 
+    if (buf != NULL)
     {
-        int j = 0;
+        int i = 0;
+        int str_len = 0;
+        int written_len = 0;
+        unsigned char cur_byte = 0;
         char *cur_str = dump_buf_str;
-        unsigned char ch;
-        while((j < COL_SIZE) && (j < count))
+        
+        while (i  < count)
         {
-            ch = buf[j];
-            if ((ch < 32) || (ch > 126))
+            cur_byte = buf[i];
+
+            if ((cur_byte < 32) || (cur_byte > 126))
             {
-                *cur_str = '.';
-            } else
-            {
-                *cur_str = ch;
+                // not a character
+                written_len = snprintf(cur_str, DUMP_MUX_BUFFER_SIZE - str_len, "%02X ", cur_byte);
+                if (written_len > 0 && written_len < (DUMP_MUX_BUFFER_SIZE - str_len))
+                {
+                    // written_len characters are successfully written
+                    str_len += written_len;
+                    cur_str += written_len;
+                }
+                else
+                {
+                    break;
+                }
             }
-            cur_str++;
-            j++;
+            else
+            {
+                // a character
+                *cur_str = cur_byte;
+                ++str_len;
+                ++cur_str;
+            }
+            
+            if ((str_len+1) >= DUMP_MUX_BUFFER_SIZE)
+            {
+                break;
+            }
+            
+            ++i;
         }
         *cur_str = 0;
-        printk("%s:count:%d [%s]\n", txt, count, dump_buf_str);                        
+        TS0710_LOG("%s:count:%d [ %s]", txt, count, dump_buf_str);
     }
     else
     {
-        printk("%s: buffer is NULL\n", txt);                 
+        TS0710_LOG("%s: buffer is NULL", txt);
     }
 }
 #else
-#define dump_mux_buffer(...)
-#endif
+#define DUMP_MUX_BUFFER(...)
+#endif //LGE_DUMP_MUX_BUFFER
+//LGE_TELECA_CR1317_DATA_THROUGHPUT END
 
 static int mux_write(struct tty_struct *tty,
 		     const unsigned char *buf, int count)
@@ -1575,7 +1659,11 @@ static int mux_write(struct tty_struct *tty,
 	int frame_size = 0;
 	int frame_written = 0;
 #endif
-
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]
+//LGE_TELECA_CR1317_DATA_THROUGHPUT START
+//	DUMP_MUX_BUFFER(__FUNCTION__, buf, count);
+//LGE_TELECA_CR1317_DATA_THROUGHPUT END
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]
 	if (!count)
 		return 0;
 
@@ -1586,6 +1674,7 @@ static int mux_write(struct tty_struct *tty,
 	 * FIXME: support DATATAG
 	 * */
 #ifdef LGE_KERNEL_MUX
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]
 /* To remove Motorola's modem specific*/
   if(ts0710->dlci[dlci].state == FLOW_STOPPED){
     TS0710_DEBUG("TS0710 Write:Flow OFF state = %d \n",ts0710->dlci[dlci].state);
@@ -1597,14 +1686,15 @@ static int mux_write(struct tty_struct *tty,
       while (down_interruptible(&spi_write_data_sema[dlci])!=0){};
     }
   }
-
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]
 /* spliting big packets into small one */
 	while(count)
 	{
 		frame_size = min(count, ts0710->dlci[dlci].mtu);
 
+//LGE_TELECA_CR1317_DATA_THROUGHPUT START
 		frame_written = mux_send_uih_data(ts0710, dlci, (u8 *)(buf + written), frame_size);
-
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]
           if(frame_written == -ENOMEM){
             if(mux_filp[dlci]->f_flags & O_NONBLOCK){
               return -EWOULDBLOCK;
@@ -1615,12 +1705,15 @@ static int mux_write(struct tty_struct *tty,
             else
               TS0710_DEBUG("\nTS0710:mux_write(), NOMEM, returning 0, should be stopped by mtx \n");
             }
-
-            if(frame_written < 0){
-              TS0710_DEBUG("\nTS0710:mux_write(): returning -1 \n");
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]
+		if (frame_written < 0) {
+			TS0710_DEBUG("send frame error");
+//LGE_TELECA_CR1317_DATA_THROUGHPUT END
 			/* send frame error */
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]			
 			return -1;
-		}else{
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]			
+		} else {
 			written += frame_written;
 			count -= frame_written;
 		}
@@ -1647,13 +1740,13 @@ static int mux_write_room(struct tty_struct *tty)
 
 	dlci = line;
 	if (ts0710->dlci[0].state == FLOW_STOPPED) {
-		TS0710_DEBUG("Flow stopped on all channels, returning ZERO\n");
+		TS0710_DEBUG("Flow stopped on all channels, returning ZERO");
 		goto out;
 	} else if (ts0710->dlci[dlci].state == FLOW_STOPPED) {
-		TS0710_DEBUG("Flow stopped, returning ZERO\n");
+		TS0710_DEBUG("Flow stopped, returning ZERO");
 		goto out;
 	} else if (ts0710->dlci[dlci].state != CONNECTED) {
-		TS0710_DEBUG("DLCI %d not connected\n", dlci);
+		TS0710_DEBUG("DLCI %d not connected", dlci);
 		goto out;
 	}
 
@@ -1670,7 +1763,7 @@ static int mux_write_room(struct tty_struct *tty)
 	retval = ts0710->dlci[dlci].mtu - 1;
 
 out:
- //printk("\nTS0710:write_room retval %d \n",retval);
+//	TS0710_DEBUG("return retval=%d", retval);
 	return retval;
 }
 
@@ -1682,8 +1775,9 @@ static void mux_flush_buffer(struct tty_struct *tty)
 	if (MUX_INVALID(line))
 		return;
 
-
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]
 	TS0710_PRINTK("MUX %s: line is:%d\n", __FUNCTION__, line);
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]	
 
 	if ((mux_send_info_flags[line])
 	    && (mux_send_info[line])
@@ -1712,22 +1806,26 @@ static int mux_open(struct tty_struct *tty, struct file *filp)
 	u8 dlci;
 	mux_send_struct *send_info;
 	mux_recv_struct *recv_info;
-
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]
+//	UNUSED_PARAM(filp);
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]
 	retval = -ENODEV;
 
 	line = tty->index;
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]	
      mux_filp[line] = filp;
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]		
 
 	if (!(ipc_tty && line))
 		return -ENODEV;
 
-    mux_tty[line]++;
+	mux_tty[line]++;
 	dlci = line;
 	mux_table[line] = tty;
 
 	/* Open server channel 0 first */
 	if ((retval = ts0710_open_channel(0)) != 0) {
-		TS0710_PRINTK("MUX: Can't connect server channel 0!\n");
+		TS0710_PRINTK("MUX: Can't connect server channel 0!");
 		ts0710_init();
 
 		mux_tty[line]--;
@@ -1780,8 +1878,7 @@ static int mux_open(struct tty_struct *tty, struct file *filp)
 	/* Now establish DLCI connection */
 	if (mux_tty[dlci] > 0) {
 		if ((retval = ts0710_open_channel(dlci)) != 0) {
-			TS0710_PRINTK("MUX: Can't connected channel %d!\n",
-				      dlci);
+			TS0710_PRINTK("MUX: Can't connected channel %d!", dlci);
 			ts0710_reset_dlci(dlci);
 
 			mux_send_info_flags[line] = 0;
@@ -1840,8 +1937,8 @@ static void ts_ldisc_rx_post(struct tty_struct *tty, const u8 *data, char *flags
 				(char*)(data + 1),
 				framelen - 2);
 #else
-    TS0710_PRINTK("MUX: ts_ldisc_rx_post: expect_seq = %x \n", expect_seq );
-    TS0710_PRINTK("MUX: ts_ldisc_rx_post: *(data + SLIDE_BP_SEQ_OFFSET) = %x \n", *(data + SLIDE_BP_SEQ_OFFSET) );
+    TS0710_PRINTK("MUX: ts_ldisc_rx_post: expect_seq = %x", expect_seq );
+    TS0710_PRINTK("MUX: ts_ldisc_rx_post: *(data + SLIDE_BP_SEQ_OFFSET) = %x", *(data + SLIDE_BP_SEQ_OFFSET) );
 	if (expect_seq == *(data + SLIDE_BP_SEQ_OFFSET)) {
 		expect_seq++;
 		if (expect_seq >= 4)
@@ -1853,7 +1950,7 @@ static void ts_ldisc_rx_post(struct tty_struct *tty, const u8 *data, char *flags
 				(char*)(data + ADDRESS_FIELD_OFFSET),
 				framelen - 2 - SEQ_FIELD_SIZE);
 	} else {
-		TS0710_PRINTK("miss seq. possibly lost sync!\n");
+		TS0710_PRINTK("miss seq. possibly lost sync!");
 	}
 #endif
 
@@ -1874,7 +1971,7 @@ void ts_ldisc_rx(struct tty_struct *tty, const u8 *data, char *flags, int size)
                 st->copy_index = 0;
             }
             else{
-                printk("\nTS0710:ts_ldisc_rx:bad_data,%x\n",data[i]);
+                TS0710_PRINTK("bad_data %x", data[i]);
                 break;
             }
         case INSIDE_FRAME_HEADER:
@@ -1893,7 +1990,7 @@ void ts_ldisc_rx(struct tty_struct *tty, const u8 *data, char *flags, int size)
                     st->framelen = TS0710_MAX_HDR_SIZE + GET_LONG_LENGTH(long_pkt->h.length) + 2 + SEQ_FIELD_SIZE;
                 }
                 if(st->framelen > MAX_FRAME_SIZE){
-                    printk("\nTS0710:ts_ldisc_rx:Too big frame to copy %d!\n",st->framelen);
+                    TS0710_PRINTK("Too big frame to copy [framelen=%d]!", st->framelen);
                     st->state = OUT_OF_FRAME ;
                     break;
                 }
@@ -1909,7 +2006,7 @@ void ts_ldisc_rx(struct tty_struct *tty, const u8 *data, char *flags, int size)
             }
             break;
         default:
-            printk("\nTS0710:ts_ldisc_rx:unknown state!!!!!!!\n");
+            TS0710_PRINTK("Unknown state!");
             return;
         }
     }
@@ -1963,30 +2060,60 @@ void ts_ldisc_rx(struct tty_struct *tty, const u8 *data, char *flags, int size)
 static int ts_ldisc_tx_looper(void *param)
 {
     int i,res;
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]	
+//    u8 dlci;
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]	
     u8 *data_ptr;
     int data_size;
-    void * next_ptr;     
-    while(!kthread_should_stop()){
-		//printk("%s:CPU%d-%d\n",__FUNCTION__, smp_processor_id(), __LINE__);	
-		WAIT_UNLOCK(frame_nodes_lock);
-		LOCK(frame_nodes_lock);
-		//printk("%s-%d\n",__FUNCTION__, __LINE__);	
+    void *next_ptr;
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]	
+//LGE_TELECA_CR1317_DATA_THROUGHPUT START
+//    int count = -1; // -1 means not valid value
+//#ifdef TS0710LOG
+//    unsigned int smp_id = smp_processor_id();
+//#endif
+//LGE_TELECA_CR1317_DATA_THROUGHPUT END
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]
+
+    while(!kthread_should_stop()) {
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]	
+//LGE_TELECA_CR1317_DATA_THROUGHPUT START
+//        TS0710_LOG("CPU%d: frame_nodes_lock [waiting...]", smp_id);
+        WAIT_UNLOCK(frame_nodes_lock);
+        LOCK(frame_nodes_lock);
+//        TS0710_LOG("CPU%d: frame_nodes_lock [locked]", smp_id);
+//LGE_TELECA_CR1317_DATA_THROUGHPUT END
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]
         data_size = 0;
         data_ptr  = NULL;
-        for(i = 0; i < TS0710MAX_PRIORITY_NUMBER ; i++){
-            if(frame_to_send[i] != NULL){
+        for(i = 0; i < TS0710MAX_PRIORITY_NUMBER ; i++) {
+            if(frame_to_send[i] != NULL) {
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]			
+//                dlci = frame_to_send[i]->dlci;
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]				
                 data_ptr = frame_to_send[i]->data;
                 data_size = frame_to_send[i]->size;
                 next_ptr = frame_to_send[i]->next;
                 frame_to_send[i]->size = 0;
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]				
+                //frame_to_send[i]->dlci = 0;
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]				
                 frame_to_send[i]->data = NULL;
                 frame_to_send[i]->next = NULL;
                 frame_to_send[i]= next_ptr;
-              /*  printk("\nTS0710:ts_ldisc_tx_looper:send to dlci=%d",i);*/
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]				
+//LGE_TELECA_CR1317_DATA_THROUGHPUT START
+//               --frames_to_send_count[dlci];
+//                --frames_to_send_counter;
+//LGE_TELECA_CR1317_DATA_THROUGHPUT END
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]
                 break;
             }
         }
-		UNLOCK(frame_nodes_lock);
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]		
+//LGE_TELECA_CR1317_DATA_THROUGHPUT START
+        UNLOCK(frame_nodes_lock);
+
         if((data_size > 0) && (data_ptr != NULL)){
 			//printk("%s-%d\n",__FUNCTION__, __LINE__);	
             res = ipc_tty->ops->write(ipc_tty, data_ptr, data_size);
@@ -1995,8 +2122,11 @@ static int ts_ldisc_tx_looper(void *param)
                 printk("\nTS0710:ts_ldisc_tx_looper:data_size=%d,res=%d\n",data_size,res);
             kfree(data_ptr);    
         }
+
+        TS0710_LOG("spi_write_sema: down");
         down(&spi_write_sema);
-		//printk("%s-%d\n",__FUNCTION__, __LINE__);	
+//LGE_TELECA_CR1317_DATA_THROUGHPUT END
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]
     }
     return 0;
 }
@@ -2006,7 +2136,9 @@ static int ts_ldisc_tx_looper(void *param)
 static int ts_ldisc_open(struct tty_struct *tty)
 {
 	struct mux_data *disc_data;
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]	
      int i;
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]	 
 
 	tty->receive_room = 65536;
 
@@ -2017,17 +2149,19 @@ static int ts_ldisc_open(struct tty_struct *tty)
 
 	tty->disc_data = disc_data;
 
-
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]
     for (i=0; i<32; i++){
         spi_write_data_sema[i].lock = __SPIN_LOCK_UNLOCKED(spi_write_data_sema[i].lock);
         spi_write_data_sema[i].count = 0;
         spi_write_data_sema[i].wait_list.next = &(spi_write_data_sema[i].wait_list);
         spi_write_data_sema[i].wait_list.prev = &(spi_write_data_sema[i].wait_list);
     }
-
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]
 	ipc_tty = tty;
 #ifdef LGE_KERNEL_MUX
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]
     spin_lock_init(&frame_nodes_lock) ;
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]	
     nodes_init();
     ts0710_reset_dlci_priority();
     spi_data_recieved.tty = NULL;
@@ -2035,48 +2169,76 @@ static int ts_ldisc_open(struct tty_struct *tty)
     spi_data_recieved.flags = NULL;
     spi_data_recieved.size = 0;
     spi_data_recieved.updated = 0;
-    // LGE_UPDATE_S // 20100826 , initialize task handle [START]
+    // LGE_UPDATE_S // 20100826 
     task = NULL;
-    // LGE_UPDATE_E // 20100826 , initialize task handle [START]
+    // LGE_UPDATE_E
     write_task = NULL;
     write_task = kthread_run(ts_ldisc_tx_looper,NULL,"%s","ts_ldisc_tx_looper");
     if(write_task == NULL)
-        TS0710_DEBUG("ts_ldisc_open WRITE_THREAD is not started!!!\n");
-
-// LGE_UPDATE_S // 20100722  
-//	set_user_nice(write_task, 19); // 19:O 5:O 2:O 0:O
-//	set_user_nice(write_task, 0);
-// LGE_UPDATE_E
+        TS0710_DEBUG("WRITE_THREAD is not started!!!");
 #endif    
-	TS0710_PRINTK("ts_ldisc_open executed\n");
+	TS0710_PRINTK("ts_ldisc_open executed");
 
 	return 0;
 }
+//P990_IFX_GB_LGSI_START
+//Domain:- RIL: 
+/*  :: 08-July-11 :: RIL Recovery for second time not working due to local variable NvOdmGpioPinHandle declaration, now made global as per Froyo  [START] */
+/*
+	RECOVERY_MODE
+		description : This mode is used to recover the at command pending state
+				     Step.1 : CP reset
+				     Step.2 : Close all mux channels
+				     Step.3 : Wait until CP is rebooting for 5 seconds
+#define RECOVERY_MODE
+#ifdef RECOVERY_MODE
+#include "nvos.h"
+#include "nvcommon.h"
+#include "nvodm_services.h"
+#include "nvodm_query_discovery.h"
+#endif
+*/
+/*  :: 08-July-11 :: RIL Recovery for second time not working due to local variable NvOdmGpioPinHandle declaration, now made global as per Froyo [END] */
+//P990_IFX_GB_TD_ISSUE_FIX_LGSI_END
 
 static void ts_ldisc_close(struct tty_struct *tty)
 {
+	u8 i;
+
 	ipc_tty = 0;
 #ifdef LGE_KERNEL_MUX
     if(task != NULL){
         kthread_stop(task);
-        TS0710_DEBUG("ts_ldisc_close READ_THREAD is stopped\n");    
+        TS0710_DEBUG("READ_THREAD is stopped");    
     }
     if(write_task != NULL){
-        // LGE_UPDATE_S // 20100826 , if write semaphore holds on the thread, release it [START]
+        // LGE_UPDATE_S // 20100826 
+        TS0710_LOG("spi_write_sema: up");
         up(&spi_write_sema);
-        // LGE_UPDATE_E // 20100826 , if write semaphore holds on the thread, release it [START]
+        // LGE_UPDATE_E
         kthread_stop(write_task);
-        TS0710_DEBUG("ts_ldisc_close WRITE_THREAD is stopped\n");    
+        TS0710_DEBUG("WRITE_THREAD is stopped");    
     }
 	
 #ifdef RECOVERY_MODE
 	{
 		ts0710_con *ts0710 = &ts0710_connection;
-		u8 i;
+
+		u8 j;
+//P990_IFX_GB_LGSI_START
+//Domain:- RIL: 
+/*  :: 08-July-11 :: RIL Recovery for second time not working due to local variable NvOdmGpioPinHandle declaration, now made global as per Froyo  [START] */
+/*
+		NvOdmServicesGpioHandle hGpio = NULL;
+		NvOdmGpioPinHandle hPin = NULL; 
+*/
+/*  :: 08-July-11 :: RIL Recovery for second time not working due to local variable NvOdmGpioPinHandle declaration, now made global as per Froyo [END] */
+//P990_IFX_GB_TD_ISSUE_FIX_LGSI_END
 
 #ifdef ENABLE_MUX_WAKE_LOCK
 		wake_lock_timeout(&s_wake_lock, MUX_WAKELOCK_TIME);
 #endif
+
 		LOCK(frame_nodes_lock);
 		for(i = 0; i < TS0710MAX_PRIORITY_NUMBER ; i++)
 		{
@@ -2090,7 +2252,7 @@ static void ts_ldisc_close(struct tty_struct *tty)
 			}
 		}
 		UNLOCK(frame_nodes_lock);
-
+		
 		ts0710_upon_disconnect();
 		tty_ldisc_flush(tty);
 		if(tty->disc_data)
@@ -2111,7 +2273,10 @@ static void ts_ldisc_close(struct tty_struct *tty)
 		NvOdmGpioSetState(hGpio,hPin, 0);	//20100607, , remain only this code
 		NvOsSleepMS(200);
 		NvOdmGpioSetState(hGpio,hPin, 1);	//20100607, , remain only this code
-		//NvOdmGpioReleasePinHandle(hGpio, hPin);
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [Start]		
+//		NvOdmGpioReleasePinHandle(hGpio, hPin);
+//		NvOdmGpioClose(hGpio);
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]		
 		//NvOsSleepMS(1000);
 		TS0710_PRINTK("%s - end recovery mode!!\n", __FUNCTION__);
 	}
@@ -2122,7 +2287,7 @@ static void ts_ldisc_close(struct tty_struct *tty)
 
 static void ts_ldisc_wake(struct tty_struct *tty)
 {
-	printk("ts wake\n");
+	TS0710_LOG("ts wake");
 }
 
 static ssize_t ts_ldisc_read(struct tty_struct *tty, struct file *file,
@@ -2202,7 +2367,7 @@ static int __init mux_init(void)
 		mux_send_info_idx = 16;
 	}
 #endif
-	TS0710_PRINTK("initializing mux with %d channels\n", NR_MUXS);
+	TS0710_PRINTK("initializing mux with %d channels", NR_MUXS);
 
 	ts0710_init();
 
@@ -2250,9 +2415,9 @@ static int __init mux_init(void)
 
 	/* FIXME: No panic() here */
 	if (result=tty_register_driver(mux_driver)){
-        printk("TS0710:tty_register_driver returns %d",result);
-		panic("TS0710 :Couldn't register mux driver");
-        }
+		printk("TS0710: tty_register_driver returns %d\n", result);
+		panic("TS0710: Couldn't register mux driver");
+	}
 
 	for (j = 0; j < NR_MUXS; j++)
 		tty_register_device(mux_driver, j, NULL);
@@ -2261,8 +2426,8 @@ static int __init mux_init(void)
 #else
 	if (result=tty_register_ldisc(N_TS0710, &ts_ldisc)){
 #endif
-		printk("TS0710 :oops. cant register ldisc\n");
-        }
+		printk("TS0710: cant register ldisc\n");
+	}
 
 #ifdef ENABLE_MUX_WAKE_LOCK
 	wake_lock_init(&s_wake_lock, WAKE_LOCK_SUSPEND, "mux_wake");

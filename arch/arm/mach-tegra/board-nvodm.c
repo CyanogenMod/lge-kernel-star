@@ -145,6 +145,30 @@ static struct platform_device debug_uart = {
 	},
 };
 
+#define TEGRA_EMC_MRW          0x00e8
+static void __iomem *emc = IO_ADDRESS(TEGRA_EMC_BASE);
+static inline void emc_writel(u32 val, unsigned long addr)
+{
+	writel(val, emc + addr);
+}
+
+/* read LPDDR2 memory modes */
+void tegra_emc_write_mrw(unsigned long addr)
+{
+	emc_writel(0x90000, TEGRA_EMC_MRW);    
+	printk("Sending 0xB0 to TEGRA_EMC_MRW\n");
+	emc_writel(0x900B0, TEGRA_EMC_MRW);
+	printk("Sending 0xE0 to TEGRA_EMC_MRW\n");
+	emc_writel(0x900E0, TEGRA_EMC_MRW);
+	printk("Sending 0x90 to TEGRA_EMC_MRW\n");
+	emc_writel(0x90090, TEGRA_EMC_MRW);
+	/* Sending the test op code per Hynix FAE requested. 
+	   0xBD - reducing self-refresh rate from 30 us to 20 us.
+	   */
+	printk("Sending 0xBD to TEGRA_EMC_MRW\n");
+	emc_writel(0x900BD, TEGRA_EMC_MRW);
+}
+
 #if defined (CONFIG_MACH_STAR)
 extern void write_cmd_reserved_buffer(unsigned char *buf, size_t len);
 #endif
@@ -2997,6 +3021,7 @@ void __init tegra_setup_nvodm(bool standard_i2c, bool standard_spi)
 #ifdef CONFIG_TOUCHSCREEN_ANDROID_VIRTUALKEYS
 	star_init_android_virtualkeys();
 #endif
+	tegra_emc_write_mrw(9);
 	tegra_setup_w1();
 #if defined (CONFIG_MACH_STAR)
 	pm_power_off_prepare = star_power_off_prepare;

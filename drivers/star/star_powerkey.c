@@ -24,14 +24,14 @@
 /**
 	@brief		 star(lgp990) power key
  
-	@author		
+	@author		 
 	@date		 2010-04-13
  
 	@version	 V1.00		 2010.04.13		 Changsu Ha	 Create
 */
 
 //20100610, , sleep status gpio for modem [START]
-#define AP_SUSPEND_STATUS
+//#define AP_SUSPEND_STATUS
 //20100610, , sleep status gpio for modem [START]
 
 #define AP20_A03_POWERKEY_WAR
@@ -97,11 +97,6 @@ static int key_wakeup_ISR = 0;
 static void __iomem *pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
 #endif
 
-//20110324, , LP1 powerkey skip issue [START]
-extern bool core_lock_on;
-static int LP1_key_wake = 0;
-//20110324, , LP1 powerkey skip issue [END]
-
 //20101129, , idle current issue [START]
 typedef struct TouchMakerRec
 {
@@ -152,7 +147,7 @@ static void powerkey_handle(struct work_struct *wq)
     // Clear power key wakeup pad bit.
     // Because powerkey interrupt might be called before powerkey_resume() is called.
     // In this case, clear bit not to call power key press at powerkey_resume() function.
-    if (key_wakeup_ISR == 0 || LP1_key_wake == 1)
+    if (key_wakeup_ISR == 0 )
     {
         if( reg & WAKEUP_POWERKEY_MASK){
             printk("[PWR_KEY] wakeup pad clear\n");
@@ -170,9 +165,6 @@ static void powerkey_handle(struct work_struct *wq)
             input_sync(s_powerkey.inputDev);
         }
         key_wakeup_ISR = 1;
-//20110324, , LP1 powerkey skip issue [START]
-        LP1_key_wake = 0;
-//20110324, , LP1 powerkey skip issue [END]
         return;
     }
 #endif
@@ -202,11 +194,6 @@ static void powerkey_interrupt_handler(void* arg)
         return;
     }
     printk("powerkey_interrupt_handler\n");
-//20110324, , LP1 powerkey skip issue [START]
-    if(core_lock_on && key_wakeup_ISR==0){
-        LP1_key_wake = 1;
-    }
-//20110324, , LP1 powerkey skip issue [END]
 #ifdef POWERKEY_DELAYED_WORKQUEUE
     schedule_delayed_work(&powerKeyDevice->work, msecs_to_jiffies(20));
     wake_lock_timeout(&s_powerkey.wlock, msecs_to_jiffies(50));
@@ -302,34 +289,75 @@ static const struct attribute_group star_pmic_group = {
     .attrs = star_pmic_attributes,
 };
 
-#if 1
+//20101110, , Function for Warm-boot [START]
 static ssize_t star_reset_show(struct device *dev, 
             struct device_attribute *attr, char *buf)
 {
 
-    unsigned char tmpbuf[2];
+    unsigned char tmpbuf[3];
     int ret;
     int tag;
 
-    read_cmd_reserved_buffer(tmpbuf,1);
-    printk(" power key reserved_buffer = %x\n",tmpbuf[0]);
+    read_cmd_reserved_buffer(tmpbuf, 3);
+    printk(" power key reserved_buffer = %c%c%c\n",tmpbuf[0],tmpbuf[1],tmpbuf[2]);
 
-    if ('w' == tmpbuf[0]||'p'== tmpbuf[0])
-        tag = 1;
+    #define _COLDBOOT          0   
+    #define _NORMAL_WARMBOOT   1
+    #define _HIDDEN_RESET      2
+
+    if ('p' == tmpbuf[0])
+    {
+      printk("star_powekey : hidden reset detected\n");
+      tag = _HIDDEN_RESET;
+      ret = sprintf(buf,"%d\n",tag);
+      tmpbuf[1] = NULL; tmpbuf[2] = NULL;
+      write_cmd_reserved_buffer(tmpbuf,3);
+      return ret;
+    }
+  
+    if ('w' == tmpbuf[0])
+    {
+	    switch (tmpbuf[1])
+	    {
+		    case 'm': // reboot immediately
+		    case 'a': // panic
+                    printk("star_powekey : hidden reset detected\n");
+	            tag = _HIDDEN_RESET;
+		    tmpbuf[2] = NULL;
+		    break;
+		    case 'e': //recovery
+                    printk("star_powekey : factory reset detected\n");
+		    tag = _NORMAL_WARMBOOT;
+		    tmpbuf[2] = NULL;
+		    break;
+		    default : // reboot other case (ex adb)
+                    printk("star_powekey : warm boot detected\n");
+		    tag = _NORMAL_WARMBOOT;
+		    tmpbuf[1] = NULL; tmpbuf[2] = NULL;
+		    break;
+	    }
+    }
     else
-        tag = 0;
-
+    {
+       printk("star_powekey : cold boot detected\n");
+       tag = _COLDBOOT; 
+       memset(tmpbuf,NULL,3);
+    }    
     ret = sprintf(buf,"%d\n",tag);
+    write_cmd_reserved_buffer(tmpbuf,3);
     return ret;
 }
+
+
+extern int wdt_test;
 
 static ssize_t star_reset_store(struct device *dev, 
             struct device_attribute *attr, char *buf, size_t count)
 {
 
-    unsigned char tmpbuf[2];
+    unsigned char tmpbuf[3] = { NULL, };
     tmpbuf[0] = 'w'; // index for warm-boot
-    write_cmd_reserved_buffer(tmpbuf,1);
+    write_cmd_reserved_buffer(tmpbuf,3);
     emergency_restart();
     return count;
 }
@@ -344,7 +372,8 @@ static struct attribute *star_reset_attributes[] = {
 static const struct attribute_group star_reset_group = {
     .attrs = star_reset_attributes,
 };
-#endif
+//20101110, , Function for Warm-boot [END]
+
 // 20110209  disable gpio interrupt during power-off  [START] 
 //extern void muic_gpio_interrupt_mask();
 extern void keep_touch_led_on();
@@ -352,6 +381,7 @@ extern void keep_touch_led_on();
 static ssize_t star_poweroff_store(struct device *dev, struct device_attribute *attr, char *buf, size_t count)
 {
     u32 val = 0;
+    unsigned char tmpbuf[3] = { NULL, };
     val = simple_strtoul(buf, NULL, 10);
 
     pwky_shutdown = 1;
@@ -363,6 +393,7 @@ static ssize_t star_poweroff_store(struct device *dev, struct device_attribute *
         wake_lock(&s_powerkey.wlock);
         tegra_gpio_disable_all_irq();
         keep_touch_led_on();
+        write_cmd_reserved_buffer(tmpbuf,3);
     }
     return count;
 }
@@ -425,13 +456,8 @@ static int __init powerkey_probe(struct platform_device *pdev)
         printk(KERN_ERR "[star modem_chk] NvOdmGpioOpen Error \n");
         goto err_open_modem_chk_gpio_fail;
     }
-#ifdef CONFIG_MACH_STAR_TMUS
-    port = 'h'-'a';
-    pin = 2;
-#else
     port = 'r'-'a';
     pin = 0;
-#endif
     s_modemCheck.pinHandle = NvOdmGpioAcquirePinHandle(s_modemCheck.gpioHandle, 
                                                     port, pin);
     if (!s_modemCheck.pinHandle)
@@ -600,7 +626,7 @@ static int powerkey_remove(struct platform_device *pdev)
     
     NvOdmGpioReleasePinHandle(s_powerkey.gpioHandle, s_powerkey.pinHandle);
     NvOdmGpioClose(s_powerkey.gpioHandle);
-
+    
 #ifdef POWERKEY_DELAYED_WORKQUEUE
     wake_lock_destroy(&s_powerkey.wlock);
 #endif

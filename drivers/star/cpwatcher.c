@@ -49,7 +49,6 @@
 #endif /* CONFIG_MACH_STAR */
 
 
-
 #if defined(CONFIG_DEBUG_FS)
 
 #include <linux/debugfs.h>
@@ -109,14 +108,16 @@ static int debug_enable_flag = 0;//Release
 #define EVENT_KEY KEY_SEARCH //debug
 #else
 #define EVENT_KEY KEY_F24 //194, Need to be changed
+#if defined (CONFIG_MACH_STAR_REV_F)
 #define EVENT_HARD_RESET_KEY	195	//this key number is not used in input.h
+#endif
 #endif
 
 #define	HEADSET_PORT 6
 #define	HEADSET_PIN 3
-
+#if defined (CONFIG_MACH_STAR_REV_F)
 #define ENABLE_CP_HARD_RESET
-
+#endif
 struct cpwatcher_dev {
 
 	struct input_dev *input;
@@ -128,6 +129,7 @@ struct cpwatcher_dev {
 	NvU32 status;
 	NvU8 onoff;
 	NvU32 delay;
+#if defined (CONFIG_MACH_STAR_REV_F)
 #ifdef ENABLE_CP_HARD_RESET				
 	NvOdmGpioPinHandle hCP_status_HardReset;
 	NvOdmServicesGpioIntrHandle hGpioInterrupt_HardReset;
@@ -136,6 +138,7 @@ struct cpwatcher_dev {
 	NvU32 status_HardReset;
 	NvU8 onoff_HardReset;
 	NvU32 delay_HardReset;
+#endif
 #endif
 	struct delayed_work delayed_work_cpwatcher;
 	struct mutex lock;
@@ -154,9 +157,11 @@ static int debug_control_set(void *data, u64 val)
 		
 		debug_enable_flag |= ENABLE_DEBUG_MESSAGE;
 	}
-
+#if defined (CONFIG_MACH_STAR_TMUS)
+	if (val /*& ENABLE_TEST_MODE*/) {
+#elif defined (CONFIG_MACH_STAR_REV_F)
 	if (val & ENABLE_TEST_MODE) {
-
+#endif
 		debug_enable_flag |= ENABLE_TEST_MODE;
 		input_report_key(cpwatcher->input, EVENT_KEY, 1);
 		input_report_key(cpwatcher->input, EVENT_KEY, 0);
@@ -211,14 +216,14 @@ static void cpwatcher_get_status(NvU32 *pin)
 {
 	NvOdmGpioGetState(cpwatcher->hGpio, cpwatcher->hCP_status, pin);
 }
-
+#if defined (CONFIG_MACH_STAR_REV_F)
 #ifdef ENABLE_CP_HARD_RESET
 static void cpwatcher_HardReset_get_status(NvU32 *pin)
 {
 	NvOdmGpioGetState(cpwatcher->hGpio, cpwatcher->hCP_status_HardReset, pin);	
 }
 #endif
-
+#endif
 static void cpwatcher_irq_handler(void *dev_id)
 {
 	struct cpwatcher_dev *dev = cpwatcher;
@@ -246,7 +251,6 @@ static int cpwatcher_thread(void *pd)
 		DBG("[CPW] CP status: %s\n", status? "error" : "available");
 
 		if (status) {//If High, CP error
-
 			input_report_key(cpwatcher->input, EVENT_KEY, 1);
 			input_report_key(cpwatcher->input, EVENT_KEY, 0);
 			DBG("[CPW] Report Key: %d\n", EVENT_KEY);
@@ -270,13 +274,15 @@ static void cpwatcher_work_func(struct work_struct *wq)
 	if (dev->onoff) {
 
 		cpwatcher_get_status(&status);
-		printk("[CPW] %s(), status: %d\n", __FUNCTION__, status);
+		DBG("[CPW] %s(), status: %d\n", __FUNCTION__, status);
+
 		if (status) {//If High, CP error
 			input_report_key(dev->input, EVENT_KEY, 1);
 			input_report_key(dev->input, EVENT_KEY, 0);
 			input_sync(dev->input);
-			printk("[CPW] input_report_key(): %d\n", EVENT_KEY);
+			DBG("[CPW] input_report_key(): %d\n", EVENT_KEY);
 		}
+#if defined (CONFIG_MACH_STAR_REV_F)
 #ifdef ENABLE_CP_HARD_RESET
 		cpwatcher_HardReset_get_status(&status);
 		printk("[CPW] %s(), Hard reset status: %d\n", __FUNCTION__, status);
@@ -286,6 +292,7 @@ static void cpwatcher_work_func(struct work_struct *wq)
 			input_sync(dev->input);
 			printk("[CPW] input_report_key(): %d\n", EVENT_HARD_RESET_KEY);
 		}
+#endif
 #endif
 	}
 }
@@ -345,7 +352,9 @@ static const struct attribute_group cpwatcher_group = {
 	.attrs = cpwatcher_attributes,
 };
 
-#ifdef ENABLE_CP_HARD_RESET
+
+	
+#ifdef CONFIG_MACH_STAR_REV_F
 static void cpwatcher_HardReset_irq_handler(void *dev_id)
 {
 	struct cpwatcher_dev *dev = cpwatcher;
@@ -574,6 +583,7 @@ static int cpwatcher_probe(struct platform_device *pdev)
 	int ret = 0;
     const NvOdmPeripheralConnectivity *pConnectivity = NULL;
 
+
 	dev = kzalloc(sizeof(struct cpwatcher_dev), GFP_KERNEL);
 	if (!dev) {
 
@@ -745,7 +755,7 @@ static int cpwatcher_remove(struct platform_device *pdev)
 }
 
 #endif	//ENABLE_CP_HARD_RESET
-
+//LGSI_BSP_CHANGE Merge from Froyo [][lgp990_gb]18042011 [End]
 
 static struct platform_driver cpwatcher_driver = {
 	.probe		= cpwatcher_probe,

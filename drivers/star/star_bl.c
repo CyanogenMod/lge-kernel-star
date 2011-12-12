@@ -56,7 +56,18 @@
 #include "aat2870.h"
 #include "star_bl.h"
 #include "star_gpioi2c.h"
+// 20110808  GPIO Sleep status GPIO patch from P999
+#define AP_SUSPEND_STATUS
 
+#ifdef AP_SUSPEND_STATUS
+typedef struct ModemCheckRec
+{
+    NvOdmServicesGpioHandle gpioHandle;
+    NvOdmGpioPinHandle  pinHandle;
+} ModemCheck;
+
+static ModemCheck s_modemCheck;
+#endif
 
 /*
  * Debug
@@ -984,6 +995,50 @@ star_bl_store_foff(struct device *dev, struct device_attribute *attr, const char
 
 	return count;
 }
+
+//20110419  LGD panel ver. info [START]
+static ssize_t
+star_show_panel_info(struct device *dev, struct device_attribute *attr, char *buf )
+{
+	NvOdmServicesGpioHandle h_gpio;
+	NvOdmGpioPinHandle  pin;
+	NvU32 val;
+	ssize_t rval;
+
+	h_gpio = NvOdmGpioOpen();
+	if( h_gpio != NULL ){
+		pin = NvOdmGpioAcquirePinHandle(h_gpio, 'j' - 'a', 5 );
+		if( pin ){
+            NvOdmGpioConfig( h_gpio, pin, NvOdmGpioPinMode_InputData );
+            NvOdmGpioGetState( h_gpio, pin, &val );
+            if( val == 0 ){
+                NvOdmGpioReleasePinHandle( h_gpio, pin );
+                NvOdmGpioClose( h_gpio );
+				sprintf(buf, "%d\n", val);
+				rval = (ssize_t)(strlen(buf) + 1);
+            }
+            else if( val == 1 ){
+                NvOdmGpioReleasePinHandle( h_gpio, pin );
+                NvOdmGpioClose( h_gpio );
+				sprintf(buf, "%d\n", val);
+				rval = (ssize_t)(strlen(buf) + 1);
+            }
+        }
+        else{
+			rval = -1;
+            NvOdmGpioClose(h_gpio);
+		}
+	}
+
+	return rval;
+}
+
+static ssize_t
+star_store_panel_info(struct device *dev, struct device_attribute *attr, char *buf, size_t count )
+{
+	return 0;
+}
+//20110419  LGD panel ver. info [END]
 //20110202, , force off [END]
 
 static DEVICE_ATTR(intensity, 0666, star_bl_show_intensity, star_bl_store_intensity);
@@ -992,6 +1047,8 @@ static DEVICE_ATTR(alc, 0664, star_bl_show_alc, star_bl_store_alc);
 static DEVICE_ATTR(onoff, 0666, star_bl_show_onoff, star_bl_store_onoff);
 static DEVICE_ATTR(hwdim, 0666, star_bl_show_hwdim, star_bl_store_hwdim);
 static DEVICE_ATTR(lsensor_onoff, 0666, star_bl_show_lsensor_onoff, star_bl_store_lsensor_onoff);
+//20110419  LGD panel ver. info
+static DEVICE_ATTR(panel_info, 0666, star_show_panel_info, star_store_panel_info);
 //static DEVICE_ATTR(alc_reg, 0666, alc_reg_show, alc_reg_store);
 //20110202, , force off [START]
 static DEVICE_ATTR(foff, 0666, star_bl_show_onoff, star_bl_store_foff);
@@ -1005,6 +1062,8 @@ static struct attribute *star_bl_attributes[] = {
 	&dev_attr_onoff.attr,
 	&dev_attr_hwdim.attr,
 	&dev_attr_lsensor_onoff.attr,
+//20110419  LGD panel ver. info
+	&dev_attr_panel_info,
     //20110202, , force off [START]
 	&dev_attr_foff.attr,
     //20110202, , force off [END]
@@ -1058,6 +1117,9 @@ static void star_aat2870_early_suspend(struct early_suspend *es)
 {
 	static struct aat2870_drvdata_t *drv;
 	
+#ifdef AP_SUSPEND_STATUS
+    NvOdmGpioSetState(s_modemCheck.gpioHandle, s_modemCheck.pinHandle, 0);
+#endif
 	drv = drvdata;
 
 	if (drv->status == BL_POWER_STATE_ON) {
@@ -1079,6 +1141,9 @@ static void star_aat2870_late_resume(struct early_suspend *es)
 {
 	static struct aat2870_drvdata_t *drv;
 	
+#ifdef AP_SUSPEND_STATUS
+    NvOdmGpioSetState(s_modemCheck.gpioHandle, s_modemCheck.pinHandle, 1);
+#endif
 	drv = drvdata;
 
 	if (drv->status == BL_POWER_STATE_OFF) {
@@ -1108,7 +1173,9 @@ static int star_aat2870_probe(struct platform_device *pdev)
 	int retval = 0;
 	struct device *dev = &pdev->dev;
 	struct aat2870_drvdata_t *drv;
-
+#ifdef AP_SUSPEND_STATUS
+    NvU32 pin, port;
+#endif
 
 	drv = kzalloc(sizeof(struct aat2870_drvdata_t), GFP_KERNEL);
 	if (drv == NULL) {
@@ -1190,8 +1257,40 @@ static int star_aat2870_probe(struct platform_device *pdev)
 	INIT_DELAYED_WORK(&drv->delayed_work_bl, star_bl_work_func);
 	//schedule_delayed_work(&drvdata->delayed_work_bl, 100);
    
+#ifdef AP_SUSPEND_STATUS
+    //GPIO configuration
+    s_modemCheck.gpioHandle = NvOdmGpioOpen();
+    if (!s_modemCheck.gpioHandle)
+    {
+        printk(KERN_ERR "[star modem_chk] NvOdmGpioOpen Error \n");
+        goto err_open_modem_chk_gpio_fail;
+    }
+#if defined(CONFIG_MACH_STAR_REV_F)
+    port = 'r'-'a';
+    pin = 0;
+#elif defined(CONFIG_MACH_STAR_TMUS)
+    port = 'h'-'a';
+    pin = 2;
+#endif 
+    s_modemCheck.pinHandle = NvOdmGpioAcquirePinHandle(s_modemCheck.gpioHandle, 
+                                                    port, pin);
+    if (!s_modemCheck.pinHandle)
+    {
+        printk(KERN_ERR "[star modem_chk] NvOdmGpioAcquirePinHandle Error\n");
+        goto err_modem_chk_gpio_pin_acquire_fail;
+    }
+    NvOdmGpioSetState(s_modemCheck.gpioHandle, s_modemCheck.pinHandle, 1);
+    NvOdmGpioConfig(s_modemCheck.gpioHandle, s_modemCheck.pinHandle, 
+                    NvOdmGpioPinMode_Output);
+#endif
+   
     return 0;
 
+#ifdef AP_SUSPEND_STATUS
+err_modem_chk_gpio_pin_acquire_fail:
+    NvOdmGpioClose(s_modemCheck.gpioHandle); 
+err_open_modem_chk_gpio_fail:
+#endif
 
 err_input_device:
 

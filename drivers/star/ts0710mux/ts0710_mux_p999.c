@@ -43,13 +43,6 @@
  * General Public License.
  *
  */
-
-// -------------------- Start of Changes History -------------------------------------
-// when       who     what, where, why
-// --------   ---     ----------------------------------------------------------------
-// 05/26/11  Teleca   LGE_TELECA_CR767_MUX - flow control issue
-// -------------------- End of Changes History ---------------------------------------
-
 #define LGE_FROYO_BSP
 #include <linux/module.h>
 #include <linux/types.h>
@@ -193,9 +186,7 @@ static struct tty_struct *mux_table[TS0710MAX_CHANNELS];
 static struct ktermios *mux_termios[TS0710MAX_CHANNELS];
 static struct ktermios *mux_termios_locked[TS0710MAX_CHANNELS];
 static volatile short int mux_tty[TS0710MAX_CHANNELS];
-// LGE_TELECA_CR767_MUX_START  -- for UDP Flow control 
-static volatile struct file * mux_filp[TS0710MAX_CHANNELS];
-// LGE_TELECA_CR767_MUX_END  -- for UDP Flow control 20110603 
+static volatile int mux_file_flags[TS0710MAX_CHANNELS];
 
 #ifdef min
 #undef min
@@ -206,10 +197,6 @@ static ts0710_con ts0710_connection;
 
 #ifdef LGE_KERNEL_MUX
 static DECLARE_MUTEX(spi_write_sema); /* use semaphore to synchronize different threads*/
-// LGE_TELECA_CR767_MUX_START  -- for UDP Flow control 20110603
-static struct semaphore spi_write_data_sema[TS0710_MAX_CHN];
-// LGE_TELECA_CR767_MUX_END  -- for UDP Flow control 20110603
-
 struct spi_data_recived_struct {
     struct tty_struct *tty; 
     const u8 *data; 
@@ -281,9 +268,8 @@ static int node_put_to_send(u8 dlci, u8 *data, int size)
 {
 //LGE_TELECA_CR1317_DATA_THROUGHPUT START
     int i;
-// LGE_TELECA_CR767_MUX_START  -- for UDP Flow control 20110603
-    int retval = -ENOMEM;
-// LGE_TELECA_CR767_MUX_END  -- for UDP Flow control 20110603
+    int retval = (mux_file_flags[dlci] & O_NONBLOCK) ? -EWOULDBLOCK :
+                                                       in_interrupt() ? -EIO : -ENOMEM;
     int free_node = MAX_WAITING_FRAMES + 1;
     struct spi_data_send_struct *new_frame;
 //    u8 * buf;
@@ -293,14 +279,10 @@ static int node_put_to_send(u8 dlci, u8 *data, int size)
     unsigned int smp_id = smp_processor_id();
 #endif
 
-// LGE_TELECA_CR767_MUX_START  -- for UDP Flow control 20110603
-    int dont_wait = (in_interrupt() || (mux_filp[dlci] != NULL) && (mux_filp[dlci]->f_flags & O_NONBLOCK));
-
     if (!dlci ||
-        (dont_wait ? (frames_to_send_count[dlci] < MAX_WAITING_FRAMES_PER_CHANNEL) :
-                     (wait_event_interruptible_timeout(wq, (frames_to_send_count[dlci] < MAX_WAITING_FRAMES_PER_CHANNEL),
+        ((retval != -ENOMEM) && (frames_to_send_count[dlci] < MAX_WAITING_FRAMES_PER_CHANNEL)) ||
+        ((retval == -ENOMEM) && (wait_event_interruptible_timeout(wq, (frames_to_send_count[dlci] < MAX_WAITING_FRAMES_PER_CHANNEL),
                                                                   TS0710MUX_TIME_OUT) > 0))) {
-// LGE_TELECA_CR767_MUX_END  -- for UDP Flow control 20110603
 	    priority = ts0710_connection.dlci[dlci].priority;
 	//    buf = kmalloc(size, GFP_ATOMIC);
 	//    if (buf)
@@ -667,11 +649,15 @@ static int mux_send_uih_data(ts0710_con * ts0710, u8 dlci, u8 *data, int len)
 {
 	int ret =0;
 #ifdef LGE_KERNEL_MUX
-// LGE_TELECA_CR767_MUX_START  -- for UDP Flow control 20110603
+    u8 *send = NULL;
 	if (len){
-            ret = mux_send_frame(dlci, ts0710->initiator, MUX_UIH, data, len);
+        send = kmalloc(len + 1, GFP_ATOMIC);
+        if(send != NULL){
+            memcpy(send, data, len);
+            ret = mux_send_frame(dlci, ts0710->initiator, MUX_UIH, send, len);
+            kfree(send);
+        }
     }
-// LGE_TELECA_CR767_MUX_END  -- for UDP Flow control 20110603
 #else
 	u8 *send = kmalloc(len + 2, GFP_ATOMIC);
 	*send = CMDTAG;
@@ -721,13 +707,7 @@ void process_mcc(u8 * data, u32 len, ts0710_con * ts0710, int longpkt)
 	case FCON:		/*Flow control on command */
 		TS0710_PRINTK("MUX Received Flow control(all channels) on command");
 		if (mcc_short_pkt->h.type.cr == MCC_CMD) {
-// LGE_TELECA_CR767_MUX_START  -- for UDP Flow control 20110603
-			for (j = 0; j < TS0710_MAX_CHN; j++) {
-				ts0710->dlci[j].state = CONNECTED;
-				up(&spi_write_data_sema[j]);
-				(void)down_trylock(&spi_write_data_sema[j]);
-			}
-// LGE_TELECA_CR767_MUX_END  -- for UDP Flow control 20110603
+			ts0710->dlci[0].state = CONNECTED;
 			ts0710_fcon_msg(ts0710, MCC_RSP);
 		}
 		break;
@@ -764,10 +744,6 @@ void process_mcc(u8 * data, u32 len, ts0710_con * ts0710, int longpkt)
 				} else if (MUX_STOPPED(ts0710,dlci)) {
 					ts0710->dlci[dlci].state = CONNECTED;
 					TS0710_LOG ("MUX Received Flow on on dlci [%d]", dlci);
-// LGE_TELECA_CR767_MUX_START  -- for UDP Flow control 20110603
-					up(&spi_write_data_sema[dlci]);
-					(void)down_trylock(&spi_write_data_sema[dlci]);
-// LGE_TELECA_CR676_MUX_END  -- for UDP Flow control 20110603
 				}
 
 				ts0710_msc_msg(ts0710, v24_sigs, MCC_RSP, dlci);
@@ -1095,15 +1071,6 @@ void ts0710_recv_data(ts0710_con * ts0710, char *data, int len)
 	short_pkt = (short_frame *) data;
 
 	dlci = short_pkt->h.addr.server_chn << 1 | short_pkt->h.addr.d;
-//LGE_UPDATE_S  -- Added exceptional code for AUSTRILIA TELSTRA 
-//	if(dlci > 32)
-// 20110530  Froyo Merge 
-	if(dlci < 0 || dlci >= TS0710MAX_CHANNELS)
-	{//If dlci is out of max channels, wake_up_interruptible(&ts0710->dlci[dlci].open_wait) makes kernel page fault
-		TS0710_PRINTK("%s : Invalid DLCI[%d]!! This rx data may be broken!", __FUNCTION__, dlci);
-		return;
-	}
-//LGE_UPDATE_E  -- Added exceptional code 
 	if (!dlci)
 		return ts0710_recv_data_server(ts0710, short_pkt, len);
 
@@ -1162,9 +1129,7 @@ void ts0710_recv_data(ts0710_con * ts0710, char *data, int len)
 
 		break;
 	default:
-				TS0710_PRINTK("ts0710_recv_data() - illegal packet\n");
-		        TS0710_PRINTK("ts0710_recv_data() - illegal packet for DLCi %d, hdr=%x \n",dlci,CLR_PF(short_pkt->h.control));
-				TS0710_PRINTK("ts0710_recv_data() - Discard this Packet!!\n\n");
+		TS0710_PRINTK("illegal packet for DLCI [%d], hdr=%x", dlci, CLR_PF(short_pkt->h.control));
 		break;
 	}
 }
@@ -1411,9 +1376,6 @@ static void mux_close(struct tty_struct *tty, struct file *filp)
 		ts0710_close_channel(dlci);
 #endif    
 
-// LGE_TELECA_CR767_MUX_START  -- for UDP Flow control 20110603
-	mux_filp[line] = NULL;
-// LGE_TELECA_CR767_MUX_END  -- for UDP Flow control 20110603
 
 	if (mux_tty[line] != 0)
 		return;
@@ -1504,9 +1466,12 @@ static void mux_unthrottle(struct tty_struct *tty)
 	recv_info = mux_recv_info[line];
 	dlci = line;
 
-// LGE_TELECA_CR767_MUX_START  -- for UDP Flow control 20110603
+	if (recv_info->total) {
+		recv_info->post_unthrottle = 1;
+		/* schedule_work(&post_recv_tqueue); */
+	} else {
 		ts0710_flow_on(dlci, ts0710);
-// LGE_TELECA_CR767_MUX_END  -- for UDP Flow control 20110603
+	}
 }
 
 static int mux_chars_in_buffer(struct tty_struct *tty)
@@ -1634,28 +1599,11 @@ static int mux_write(struct tty_struct *tty,
 	 * FIXME: support DATATAG
 	 * */
 #ifdef LGE_KERNEL_MUX
-	/* spliting big packets into small one */
-	while (count) {
-// LGE_TELECA_CR767_MUX_START  -- for UDP Flow control 20110603
-		if (ts0710->dlci[dlci].state == FLOW_STOPPED) {
-			TS0710_DEBUG("TS0710 Write: Flow OFF state = %d \n", ts0710->dlci[dlci].state);
+/* To remove Motorola's modem specific*/
 
-			if (in_interrupt()) {
-				TS0710_DEBUG("TS0710 Write: returning EIO for flow stopped channel in interrupt\n");
-				return -EIO;
-			}
-
-			if ((mux_filp[dlci] != NULL) && (mux_filp[dlci]->f_flags & O_NONBLOCK)) {
-				TS0710_DEBUG("TS0710 Write: returning EWOULDBLOCK for flow stopped channel\n");
-				return -EWOULDBLOCK;
-			}
-
-			if (down_interruptible(&spi_write_data_sema[dlci])) {
-				TS0710_DEBUG("TS0710 Write: returning ERESTARTSYS for flow stopped channel because of signal\n");
-				return -ERESTARTSYS;
-			}
-		}
-// LGE_TELECA_CR767_MUX_END  -- for UDP Flow control 20110603
+/* spliting big packets into small one */
+	while(count)
+	{
 		frame_size = min(count, ts0710->dlci[dlci].mtu);
 
 //LGE_TELECA_CR1317_DATA_THROUGHPUT START
@@ -1663,28 +1611,15 @@ static int mux_write(struct tty_struct *tty,
 
 
 		if (frame_written < 0) {
-			TS0710_DEBUG("\nTS0710 Write: returning error = %d \n", frame_written);
+			TS0710_DEBUG("send frame error");
 //LGE_TELECA_CR1317_DATA_THROUGHPUT END
-
-// LGE_TELECA_CR767_MUX_START  -- for UDP Flow control 20110603
-			if (in_interrupt()) {
-				TS0710_DEBUG("TS0710 Write: returning EIO for error send in interrupt\n");
-				return -EIO;
-			}
-
-			if ((mux_filp[dlci] != NULL) && (mux_filp[dlci]->f_flags & O_NONBLOCK)) {
-				TS0710_DEBUG("TS0710 Write: returning EWOULDBLOCK for error send\n");
-				return -EWOULDBLOCK;
-			}
-
 			/* send frame error */
 			return frame_written;
-// LGE_TELECA_CR767_MUX_START  -- for UDP Flow control 20110603
-		}
-
+		} else {
 			written += frame_written;
 			count -= frame_written;
 		}
+	}
 #else
 	written = mux_send_uih_data(ts0710, dlci, (u8 *)buf, count) - 7;
 #endif    
@@ -1777,9 +1712,7 @@ static int mux_open(struct tty_struct *tty, struct file *filp)
 	retval = -ENODEV;
 
 	line = tty->index;
-// LGE_TELECA_CR767_MUX_START  -- for UDP Flow control 20110603
-	mux_filp[line] = filp;
-// LGE_TELECA_CR767_MUX_END  -- for UDP Flow control 20110603
+        mux_file_flags[line] = filp->f_flags;
 
 	if (!(ipc_tty && line))
 		return -ENODEV;
@@ -1936,10 +1869,7 @@ void ts_ldisc_rx(struct tty_struct *tty, const u8 *data, char *flags, int size)
                 st->copy_index = 0;
             }
             else{
-               	// LGE_UPDATE_S  -- Kernel mux received bad data.
-						if(i == 0 || i == 1|| i == 2|| i == 3)
-		              		printk("\n[LGE-MUX] :ts_ldisc_rx: data_decoding[%d] = %x  Size = %d\n",i, data[i], size);
-					// LGE_UPDATE_E  -- Kernel mux received bad data.
+                TS0710_PRINTK("bad_data %x", data[i]);
                 break;
             }
         case INSIDE_FRAME_HEADER:
@@ -1974,7 +1904,7 @@ void ts_ldisc_rx(struct tty_struct *tty, const u8 *data, char *flags, int size)
             }
             break;
         default:
-            printk("\nTS0710:ts_ldisc_rx:unknown state!!!!!!!\n");
+            TS0710_PRINTK("Unknown state!");
             return;
         }
     }
@@ -2084,8 +2014,6 @@ static int ts_ldisc_tx_looper(void *param)
         }
 
         TS0710_LOG("spi_write_sema: down");
-// 20110530 	P999 Froyo Merge
-		if(ipc_tty)
         down(&spi_write_sema);
 //LGE_TELECA_CR1317_DATA_THROUGHPUT END
     }
@@ -2097,9 +2025,6 @@ static int ts_ldisc_tx_looper(void *param)
 static int ts_ldisc_open(struct tty_struct *tty)
 {
 	struct mux_data *disc_data;
-// LGE_TELECA_CR767_MUX_START  -- for UDP Flow control 20110603
-	int i;
-// LGE_TELECA_CR767_MUX_END  -- for UDP Flow control 20110603
 
 	tty->receive_room = 65536;
 
@@ -2112,16 +2037,6 @@ static int ts_ldisc_open(struct tty_struct *tty)
 
 
 	ipc_tty = tty;
-
-// LGE_TELECA_CR767_MUX_START  -- for UDP Flow control 20110603
-	for (i=0; i<TS0710_MAX_CHN; i++){
-		spi_write_data_sema[i].lock = __SPIN_LOCK_UNLOCKED(spi_write_data_sema[i].lock);
-		spi_write_data_sema[i].count = 0;
-		spi_write_data_sema[i].wait_list.next = &(spi_write_data_sema[i].wait_list);
-		spi_write_data_sema[i].wait_list.prev = &(spi_write_data_sema[i].wait_list);
-	}
-// LGE_TELECA_CR767_MUX_END  -- for UDP Flow control 20110603
-
 #ifdef LGE_KERNEL_MUX
     nodes_init();
     ts0710_reset_dlci_priority();
@@ -2166,23 +2081,15 @@ static void ts_ldisc_close(struct tty_struct *tty)
 #ifdef LGE_KERNEL_MUX
     if(task != NULL){
         kthread_stop(task);
-// LGE_UPDATE_S  20110609 -- For RIL Recovery !! [EBS]		
-        TS0710_PRINTK("[1] READ_THREAD is stopped\n");    
-// LGE_UPDATE_E  20110609 -- For RIL Recovery !! [EBS]
-
+        TS0710_DEBUG("READ_THREAD is stopped");    
     }
     if(write_task != NULL){
-// LGE_UPDATE_S  20110609 -- For RIL Recovery !! [EBS]
-        TS0710_PRINTK("[2] spi_write_sema: up\n");
-// LGE_UPDATE_E  20110609 -- For RIL Recovery !! [EBS]
-
+        // LGE_UPDATE_S // 20100826 
+        TS0710_LOG("spi_write_sema: up");
         up(&spi_write_sema);
         // LGE_UPDATE_E
         kthread_stop(write_task);
-// LGE_UPDATE_S  20110609 -- For RIL Recovery !! [EBS]
-        TS0710_PRINTK("[3] WRITE_THREAD is stopped\n");    
-// LGE_UPDATE_E  20110609 -- For RIL Recovery !! [EBS]
-
+        TS0710_DEBUG("WRITE_THREAD is stopped");    
     }
 	
 #ifdef RECOVERY_MODE
@@ -2219,38 +2126,21 @@ static void ts_ldisc_close(struct tty_struct *tty)
 			tty->disc_data = NULL;
 		}
 
-// LGE_UPDATE_S  20110609 -- For RIL Recovery !! [EBS] change to CP RESET scheme
-
-		printk(KERN_ERR "###############################\n");
-		printk(KERN_ERR " Start RIL Recorvery Mode     \n");
-		printk(KERN_ERR " [E-MAIL]      \n");
-		printk(KERN_ERR " Restart QCT Modem            \n");
-		printk(KERN_ERR "###############################\n");
-
-		TS0710_PRINTK("%s - start modem reset!!\n", __FUNCTION__);
-
+		TS0710_PRINTK("%s - start recovery mode!!\n", __FUNCTION__);
 		if(hGpio==NULL)
 			hGpio =  (NvOdmServicesGpioHandle)NvOdmGpioOpen();
 		if(hPin==NULL)
 			hPin = NvOdmGpioAcquirePinHandle(hGpio, 'v'-'a', 0);
-
+		NvOdmGpioSetState(hGpio,hPin, 1);	//20100607, , remain only this code
 		NvOdmGpioConfig(hGpio, hPin, NvOdmGpioPinMode_Output);
-
-		NvOdmGpioSetState(hGpio,hPin, 0); // LOW
-		NvOdmGpioSetState(hGpio,hPin, 1);	// HIGH
-		//EBS 
-		//NvOsSleepMS(200);
-		NvOsSleepMS(2000);					// DELAY 2S
-
-		NvOdmGpioSetState(hGpio,hPin, 0);	// LOW
 		NvOsSleepMS(200);
-		NvOdmGpioSetState(hGpio,hPin, 1);	// HIGH
-		
+		NvOdmGpioSetState(hGpio,hPin, 0);	//20100607, , remain only this code
+		NvOsSleepMS(200);
+		NvOdmGpioSetState(hGpio,hPin, 1);	//20100607, , remain only this code
 		NvOdmGpioReleasePinHandle(hGpio, hPin);
 		NvOdmGpioClose(hGpio);
-	
-		TS0710_PRINTK("%s - end modem reset!!\n", __FUNCTION__);
-// LGE_UPDATE_E  20110609 -- For RIL Recovery !! [EBS]
+		//NvOsSleepMS(1000);
+		TS0710_PRINTK("%s - end recovery mode!!\n", __FUNCTION__);
 	}
 #else
 	TS0710_PRINTK("%s - start\n", __FUNCTION__);
