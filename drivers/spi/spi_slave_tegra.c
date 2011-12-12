@@ -664,13 +664,6 @@ static void spi_tegra_start_transfer(struct spi_device *spi,
 	unsigned long command;
 	unsigned long command2;
 
-	unsigned int cs_pol_bit[] = {
-			SLINK_CS_POLARITY,
-			SLINK_CS_POLARITY1,
-			SLINK_CS_POLARITY2,
-			SLINK_CS_POLARITY3,
-	};
-
 	bits_per_word = t->bits_per_word ? t->bits_per_word :
 					spi->bits_per_word;
 
