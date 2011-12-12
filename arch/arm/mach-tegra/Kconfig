@@ -442,5 +442,12 @@ config TEGRA_PLLM_RESTRICTED
 	  capable of dividing maximum PLLM frequency at minimum voltage. When
 	  disabled, PLLM is used as a clock source with no restrictions (which
 	  may effectively increase lower limit for core voltage).
+
+config TEGRA_WDT_RECOVERY
+	bool "Enable suspend/resume watchdog recovery mechanism"
+	default n
+	help
+	  Enables watchdog recovery mechanism to protect against
+	  suspend/resume hangs.
 endif
 

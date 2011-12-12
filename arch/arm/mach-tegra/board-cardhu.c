@@ -64,6 +64,7 @@
 #include "fuse.h"
 #include "pm.h"
 #include "baseband-xmm-power.h"
+#include "wdt-recovery.h"
 
 /* All units are in millicelsius */
 static struct tegra_thermal_data thermal_data = {
@@ -996,6 +997,9 @@ static void __init tegra_cardhu_init(void)
 	tegra_release_bootloader_fb();
 	cardhu_nfc_init();
 	cardhu_pci_init();
+#ifdef CONFIG_TEGRA_WDT_RECOVERY
+	tegra_wdt_recovery_init();
+#endif
 }
 
 static void __init cardhu_ramconsole_reserve(unsigned long size)
