@@ -1610,18 +1610,18 @@ static int tegra_avp_probe(struct platform_device *pdev)
 #endif
 
 	if (heap_mask == NVMAP_HEAP_IOVMM) {
-		u32 iovmm_addr = 0x0ff00000;
+		int i;
+		/* Tegra3 A01 has different SMMU address in 0xe00000000- */
+		u32 iovmm_addr[] = {0x0ff00000, 0xeff00000};
 
-		/* Tegra3 A01 has different SMMU address */
-		if (tegra_get_chipid() == TEGRA_CHIPID_TEGRA3
-			&& tegra_get_revision() == TEGRA_REVISION_A01) {
-			iovmm_addr = 0xeff00000;
-		}
-
-		avp->kernel_handle = nvmap_alloc_iovm(avp->nvmap_drv, SZ_1M,
-						L1_CACHE_BYTES,
+		for (i = 0; i < ARRAY_SIZE(iovmm_addr); i++) {
+			avp->kernel_handle = nvmap_alloc_iovm(avp->nvmap_drv,
+						SZ_1M, L1_CACHE_BYTES,
 						NVMAP_HANDLE_WRITE_COMBINE,
-						iovmm_addr);
+						iovmm_addr[i]);
+			if (!IS_ERR_OR_NULL(avp->kernel_handle))
+				break;
+		}
 		if (IS_ERR_OR_NULL(avp->kernel_handle)) {
 			pr_err("%s: cannot create handle\n", __func__);
 			ret = PTR_ERR(avp->kernel_handle);

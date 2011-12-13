@@ -264,6 +264,14 @@ config TEGRA_IOVMM_SMMU
 	  space through the SMMU (System Memory Management Unit)
 	  hardware included on Tegra SoCs.
 
+config TEGRA_SMMU_BASE_AT_E0000000
+	bool "Force SMMU IOVA base to 0xe0000000"
+	depends on TEGRA_IOVMM_SMMU
+	default n
+	help
+	  Forces SMMU IOVA base address to 0xe0000000 for debug purposes
+	  only. Select n for production systems.
+
 config TEGRA_IOVMM_SMMU_SYSFS
 	bool "Enable SMMU register access for debugging"
 	depends on TEGRA_IOVMM_SMMU
