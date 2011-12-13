@@ -237,31 +237,28 @@ static int pwrdet_notify_cb(
 
 	spin_lock_irqsave(&pwr_lock, flags);
 
-	switch (event) {
-	case REGULATOR_EVENT_PRE_ENABLE:
+	if (event & REGULATOR_EVENT_PRE_ENABLE) {
 		pwrio_disabled_mask &= ~cell->pwrio_mask;
 		if (!pwrio_always_on)
 			pwr_io_enable(cell->pwrio_mask);
-		/* fall thru */
-	case REGULATOR_EVENT_OUT_PRECHANGE:
+	}
+	if (event & (REGULATOR_EVENT_PRE_ENABLE |
+		     REGULATOR_EVENT_OUT_PRECHANGE)) {
 		if (!pwrdet_always_on && cell->pwrdet_mask)
 			pwr_detect_reset(cell->pwrdet_mask);
-		break;
-
-	case REGULATOR_EVENT_POST_ENABLE:
-	case REGULATOR_EVENT_OUT_POSTCHANGE:
+	}
+	if (event & (REGULATOR_EVENT_POST_ENABLE |
+		     REGULATOR_EVENT_OUT_POSTCHANGE)) {
 		if (!pwrdet_always_on && cell->pwrdet_mask) {
 			pwr_detect_start(cell->pwrdet_mask);
 			pwr_detect_latch();
 		}
-		break;
-
-	case REGULATOR_EVENT_DISABLE:
-	case REGULATOR_EVENT_FORCE_DISABLE:
+	}
+	if (event & (REGULATOR_EVENT_DISABLE |
+		     REGULATOR_EVENT_FORCE_DISABLE)) {
 		pwrio_disabled_mask |= cell->pwrio_mask;
 		if (!pwrio_always_on)
 			pwr_io_disable(cell->pwrio_mask);
-		break;
 	}
 
 	pr_debug("tegra: %s: event %lu, pwrdet 0x%x, pwrio 0x%x\n",
