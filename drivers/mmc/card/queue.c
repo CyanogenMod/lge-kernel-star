@@ -60,6 +60,12 @@ static int mmc_queue_thread(void *d)
 		spin_unlock_irq(q->queue_lock);
 
 		if (!req) {
+			/*
+			 * Since the queue is empty, start synchronous
+			 * background ops if there is a request for it.
+			 */
+			if (mmc_card_need_bkops(mq->card))
+				mmc_bkops_start(mq->card, true);
 			if (kthread_should_stop()) {
 				set_current_state(TASK_RUNNING);
 				break;
@@ -70,7 +76,6 @@ static int mmc_queue_thread(void *d)
 			continue;
 		}
 		set_current_state(TASK_RUNNING);
-
 		mq->issue_fn(mq, req);
 	} while (1);
 	up(&mq->thread_sem);
