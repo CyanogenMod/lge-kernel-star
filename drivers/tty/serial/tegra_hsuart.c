@@ -1462,23 +1462,30 @@ static int tegra_uart_probe(struct platform_device *pdev)
 	u->fifosize = 32;
 
 	resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (unlikely(!resource))
-		return -ENXIO;
+	if (unlikely(!resource)) {
+		ret = -ENXIO;
+		goto fail;
+	}
 
 	u->mapbase = resource->start;
 	u->membase = IO_ADDRESS(u->mapbase);
-	if (unlikely(!u->membase))
-		return -ENOMEM;
+	if (unlikely(!u->membase)) {
+		ret = -ENOMEM;
+		goto fail;
+	}
 
 	u->irq = platform_get_irq(pdev, 0);
-	if (unlikely(u->irq < 0))
-		return -ENXIO;
+	if (unlikely(u->irq < 0)) {
+		ret = -ENXIO;
+		goto fail;
+	}
 
 	u->regshift = 2;
 
 	t->clk = clk_get(&pdev->dev, NULL);
 	if (IS_ERR_OR_NULL(t->clk)) {
 		dev_err(&pdev->dev, "Couldn't get the clock\n");
+		ret = -ENODEV;
 		goto fail;
 	}
 
@@ -1486,19 +1493,20 @@ static int tegra_uart_probe(struct platform_device *pdev)
 	if (ret) {
 		pr_err("%s: Failed(%d) to add uart port %s%d\n",
 			__func__, ret, tegra_uart_driver.dev_name, u->line);
-		kfree(t);
-		platform_set_drvdata(pdev, NULL);
-		return ret;
+		goto fail;
 	}
 
 	snprintf(name, sizeof(name), "tegra_hsuart_%d", u->line);
 	pr_info("Registered UART port %s%d\n",
 		tegra_uart_driver.dev_name, u->line);
 	t->uart_state = TEGRA_UART_CLOSED;
-	return ret;
+	return 0;
 fail:
+	if (t->clk)
+		clk_put(t->clk);
+	platform_set_drvdata(pdev, NULL);
 	kfree(t);
-	return -ENODEV;
+	return ret;
 }
 
 /* Switch off the clock of the uart controller. */
