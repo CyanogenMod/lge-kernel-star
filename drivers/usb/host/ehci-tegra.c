@@ -1066,6 +1066,7 @@ static int tegra_ehci_probe(struct platform_device *pdev)
 			"Couldn't enable USB host mode wakeup, irq=%d, "
 			"error=%d\n", tegra->irq, err);
 		err = 0;
+		tegra->irq = 0;
 	}
 
 	return err;
@@ -1161,7 +1162,8 @@ static int tegra_ehci_remove(struct platform_device *pdev)
 	/* Turn Off Interrupts */
 	ehci_writel(tegra->ehci, 0, &tegra->ehci->regs->intr_enable);
 	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
-	disable_irq_wake(tegra->irq);
+	if (tegra->irq)
+		disable_irq_wake(tegra->irq);
 	usb_remove_hcd(hcd);
 	usb_put_hcd(hcd);
 	cancel_delayed_work(&tegra->work);
