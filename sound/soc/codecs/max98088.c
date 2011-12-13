@@ -1978,7 +1978,6 @@ int max98088_report_jack(struct snd_soc_codec *codec)
 static irqreturn_t max98088_jack_handler(int irq, void *data)
 {
        struct snd_soc_codec *codec = data;
-       struct max98088_priv *max98088 = snd_soc_codec_get_drvdata(codec);
 
        /*clear the interrupt by reading the status register */
        snd_soc_read(codec, M98088_REG_00_IRQ_STATUS);
