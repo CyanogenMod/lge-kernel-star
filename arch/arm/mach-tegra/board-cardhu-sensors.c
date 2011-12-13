@@ -277,6 +277,9 @@ static struct i2c_board_info cardhu_i2c_board_info_e1214[] = {
 
 static int cardhu_right_ov5650_power_on(void)
 {
+	/* CSI-B and front sensor are muxed on cardhu */
+	gpio_direction_output(CAMERA_CSI_MUX_SEL_GPIO, 0);
+
 	/* Boards E1198 and E1291 are of Cardhu personality
 	 * and donot have TCA6416 exp for camera */
 	if ((board_info.board_id == BOARD_E1198) ||
@@ -335,6 +338,9 @@ reg_alloc_fail:
 
 static int cardhu_right_ov5650_power_off(void)
 {
+	/* CSI-B and front sensor are muxed on cardhu */
+	gpio_direction_output(CAMERA_CSI_MUX_SEL_GPIO, 0);
+
 	/* Boards E1198 and E1291 are of Cardhu personality
 	 * and donot have TCA6416 exp for camera */
 	if ((board_info.board_id == BOARD_E1198) ||
@@ -380,7 +386,7 @@ struct ov5650_platform_data cardhu_right_ov5650_data = {
 
 static int cardhu_ov2710_power_on(void)
 {
-	/* CSI-B and front sensor are muxed on verbier */
+	/* CSI-B and front sensor are muxed on cardhu */
 	gpio_direction_output(CAMERA_CSI_MUX_SEL_GPIO, 1);
 
 	/* Boards E1198 and E1291 are of Cardhu personality
@@ -433,6 +439,7 @@ reg_alloc_fail:
 
 static int cardhu_ov2710_power_off(void)
 {
+	/* CSI-B and front sensor are muxed on cardhu */
 	gpio_direction_output(CAMERA_CSI_MUX_SEL_GPIO, 1);
 
 	/* Boards E1198 and E1291 are of Cardhu personality
