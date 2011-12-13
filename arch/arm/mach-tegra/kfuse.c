@@ -69,6 +69,7 @@ static int wait_for_done(void)
  */
 int tegra_kfuse_read(void *dest, size_t len)
 {
+	int err;
 	u32 v;
 	unsigned cnt;
 
@@ -83,10 +84,18 @@ int tegra_kfuse_read(void *dest, size_t len)
 		}
 	}
 
-	clk_enable(kfuse_clk);
+	err = clk_enable(kfuse_clk);
+	if (err)
+		return err;
 
 	tegra_kfuse_writel(KFUSE_KEYADDR_AUTOINC, KFUSE_KEYADDR);
-	wait_for_done();
+
+	err = wait_for_done();
+	if (err) {
+		pr_err("kfuse: read timeout\n");
+		clk_disable(kfuse_clk);
+		return err;
+	}
 
 	if ((tegra_kfuse_readl(KFUSE_STATE) & KFUSE_STATE_CRCPASS) == 0) {
 		pr_err("kfuse: crc failed\n");
