@@ -37,6 +37,9 @@ static struct tegra20_das *das;
 
 static inline void tegra20_das_write(u32 reg, u32 val)
 {
+#ifdef CONFIG_PM
+	das->reg_cache[reg >> 2] = val;
+#endif
 	__raw_writel(val, das->regs + reg);
 }
 
@@ -44,6 +47,24 @@ static inline u32 tegra20_das_read(u32 reg)
 {
 	return __raw_readl(das->regs + reg);
 }
+
+#ifdef CONFIG_PM
+int tegra20_das_resume()
+{
+	int i, reg;
+
+	for (i = 0; i <= TEGRA20_DAS_DAP_ID_5; i++)
+		tegra20_das_write(i << 2, das->reg_cache[i]);
+
+	for (i = 0; i <= TEGRA20_DAS_DAC_ID_3; i++) {
+		reg = TEGRA20_DAS_DAC_INPUT_DATA_CLK_SEL +
+			(i * TEGRA20_DAS_DAC_INPUT_DATA_CLK_SEL_STRIDE);
+		tegra20_das_write(reg, das->reg_cache[reg >> 2]);
+	}
+
+	return 0;
+}
+#endif
 
 int tegra20_das_connect_dap_to_dac(int dap, int dac)
 {
@@ -168,6 +189,9 @@ static int __devinit tegra20_das_probe(struct platform_device *pdev)
 {
 	struct resource *res, *region;
 	int ret = 0;
+#ifdef CONFIG_PM
+	int i, reg;
+#endif
 
 	if (das)
 		return -ENODEV;
@@ -201,6 +225,18 @@ static int __devinit tegra20_das_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto err_release;
 	}
+
+#ifdef CONFIG_PM
+	/* populate the das reg cache with POR values*/
+	for (i = 0; i <= TEGRA20_DAS_DAP_ID_5; i++)
+		das->reg_cache[i] = tegra20_das_read(i << 2);
+
+	for (i = 0; i <= TEGRA20_DAS_DAC_ID_3; i++) {
+		reg = TEGRA20_DAS_DAC_INPUT_DATA_CLK_SEL +
+			(i * TEGRA20_DAS_DAC_INPUT_DATA_CLK_SEL_STRIDE);
+		das->reg_cache[reg >> 2] = tegra20_das_read(reg);
+	}
+#endif
 
 	tegra20_das_debug_add(das);
 

@@ -535,6 +535,10 @@
  * This 4-word deep FIFO transmits user FIFO field information. The order of
  * transmission is from LSB to MSB bit.
  */
+#ifdef CONFIG_PM
+#define TEGRA20_SPDIF_CTRL_CACHE_SIZE		((TEGRA20_SPDIF_DATA_FIFO_CSR >> 2) + 1)
+#define TEGRA20_SPDIF_TX_CACHE_SIZE		(((TEGRA20_SPDIF_CH_STA_TX_F - TEGRA20_SPDIF_CH_STA_TX_A) >> 2) + 1)
+#endif
 
 struct tegra20_spdif {
 	struct clk *clk_spdif_out;
@@ -543,6 +547,10 @@ struct tegra20_spdif {
 	void __iomem *regs;
 	struct dentry *debug;
 	u32 reg_ctrl;
+#ifdef CONFIG_PM
+	u32  reg_ctrl_cache[TEGRA20_SPDIF_CTRL_CACHE_SIZE];
+	u32  reg_tx_cache[TEGRA20_SPDIF_TX_CACHE_SIZE];
+#endif
 };
 
 #endif

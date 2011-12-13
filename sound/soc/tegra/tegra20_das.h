@@ -83,12 +83,23 @@
 #define TEGRA20_DAS_DAC_ID_2 1
 #define TEGRA20_DAS_DAC_ID_3 2
 
+#ifdef CONFIG_PM
+#define TEGRA20_DAS_CACHE_SIZE	((((TEGRA20_DAS_DAC_INPUT_DATA_CLK_SEL) + (TEGRA20_DAS_DAC_INPUT_DATA_CLK_SEL_STRIDE*TEGRA20_DAS_DAC_ID_3))>>2) + 1)
+#endif
+
 struct tegra20_das {
 	struct device *dev;
 	void __iomem *regs;
 	struct dentry *debug;
+#ifdef CONFIG_PM
+	u32  reg_cache[TEGRA20_DAS_CACHE_SIZE];
+#endif
 };
 
+#ifdef CONFIG_PM
+/* Restores the das registers from cache */
+extern int tegra20_das_resume();
+#endif
 /*
  * Terminology:
  * DAS: Digital audio switch (HW module controlled by this driver)

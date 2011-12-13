@@ -42,6 +42,13 @@
 static inline void tegra20_spdif_write(struct tegra20_spdif *spdif, u32 reg,
 					u32 val)
 {
+#ifdef CONFIG_PM
+	if (reg < TEGRA20_SPDIF_CH_STA_TX_A)
+		spdif->reg_ctrl_cache[reg >> 2] = val;
+	else
+		spdif->reg_tx_cache[((reg - TEGRA20_SPDIF_CH_STA_TX_A) >> 2)]
+			= val;
+#endif
 	__raw_writel(val, spdif->regs + reg);
 }
 
@@ -250,12 +257,56 @@ static int tegra20_spdif_trigger(struct snd_pcm_substream *substream, int cmd,
 static int tegra20_spdif_probe(struct snd_soc_dai *dai)
 {
 	struct tegra20_spdif *spdif = snd_soc_dai_get_drvdata(dai);
+#ifdef CONFIG_PM
+	int i, reg;
+#endif
 
 	dai->capture_dma_data = NULL;
 	dai->playback_dma_data = &spdif->playback_dma_data;
 
+#ifdef CONFIG_PM
+	clk_enable(spdif->clk_spdif_out);
+
+	/* populate the spdif reg cache with POR values*/
+	for (i = 0; i < TEGRA20_SPDIF_CTRL_CACHE_SIZE; i++)
+		spdif->reg_ctrl_cache[i] = tegra20_spdif_read(spdif, i << 2);
+
+	for (i = 0; i < TEGRA20_SPDIF_TX_CACHE_SIZE; i++) {
+		reg = (TEGRA20_SPDIF_CH_STA_TX_A) + (i << 2);
+		spdif->reg_tx_cache[i] = tegra20_spdif_read(spdif, reg);
+	}
+
+	clk_disable(spdif->clk_spdif_out);
+
+#endif
+
 	return 0;
 }
+
+#ifdef CONFIG_PM
+int tegra20_spdif_resume(struct snd_soc_dai *cpu_dai)
+{
+	struct tegra20_spdif *spdif = snd_soc_dai_get_drvdata(cpu_dai);
+	int i, reg;
+
+	clk_enable(spdif->clk_spdif_out);
+
+	/*restore the spdif regs*/
+	for (i = 0; i < TEGRA20_SPDIF_CTRL_CACHE_SIZE; i++)
+		tegra20_spdif_write(spdif, i << 2, spdif->reg_ctrl_cache[i]);
+
+	for (i = 0; i < TEGRA20_SPDIF_TX_CACHE_SIZE; i++) {
+		reg = (TEGRA20_SPDIF_CH_STA_TX_A) + (i << 2);
+		tegra20_spdif_write(spdif, reg, spdif->reg_tx_cache[i]);
+	}
+
+	clk_disable(spdif->clk_spdif_out);
+
+	return 0;
+}
+#else
+#define tegra20_spdif_resume NULL
+#endif
 
 static struct snd_soc_dai_ops tegra20_spdif_dai_ops = {
 	.hw_params	= tegra20_spdif_hw_params,
@@ -265,6 +316,7 @@ static struct snd_soc_dai_ops tegra20_spdif_dai_ops = {
 struct snd_soc_dai_driver tegra20_spdif_dai = {
 	.name = DRV_NAME,
 	.probe = tegra20_spdif_probe,
+	.resume = tegra20_spdif_resume,
 	.playback = {
 		.channels_min = 2,
 		.channels_max = 2,

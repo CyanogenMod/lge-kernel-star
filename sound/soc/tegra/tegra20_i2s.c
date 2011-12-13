@@ -49,6 +49,9 @@
 
 static inline void tegra20_i2s_write(struct tegra20_i2s *i2s, u32 reg, u32 val)
 {
+#ifdef CONFIG_PM
+	i2s->reg_cache[reg >> 2] = val;
+#endif
 	__raw_writel(val, i2s->regs + reg);
 }
 
@@ -336,12 +339,58 @@ static int tegra20_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
 static int tegra20_i2s_probe(struct snd_soc_dai *dai)
 {
 	struct tegra20_i2s * i2s = snd_soc_dai_get_drvdata(dai);
+#ifdef CONFIG_PM
+	int i;
+#endif
 
 	dai->capture_dma_data = &i2s->capture_dma_data;
 	dai->playback_dma_data = &i2s->playback_dma_data;
 
+#ifdef CONFIG_PM
+	/* populate the i2s reg cache with POR values*/
+	clk_enable(i2s->clk_i2s);
+
+	for (i = 0; i < ((TEGRA20_I2S_TDM_TX_RX_CTRL >> 2) + 1); i++) {
+		if ((i == TEGRA20_I2S_CACHE_RSVD_6) ||
+			(i == TEGRA20_I2S_CACHE_RSVD_7))
+			continue;
+
+		i2s->reg_cache[i] = tegra20_i2s_read(i2s, i << 2);
+	}
+
+	clk_disable(i2s->clk_i2s);
+#endif
+
 	return 0;
 }
+
+#ifdef CONFIG_PM
+int tegra20_i2s_resume(struct snd_soc_dai *cpu_dai)
+{
+	struct tegra20_i2s *i2s = snd_soc_dai_get_drvdata(cpu_dai);
+	int i;
+
+	clk_enable(i2s->clk_i2s);
+
+	/*restore the i2s regs*/
+	for (i = 0; i < ((TEGRA20_I2S_TDM_TX_RX_CTRL >> 2) + 1); i++) {
+		if ((i == TEGRA20_I2S_CACHE_RSVD_6) ||
+			(i == TEGRA20_I2S_CACHE_RSVD_7))
+			continue;
+
+		tegra20_i2s_write(i2s, i << 2, i2s->reg_cache[i]);
+	}
+
+	/*restore the das regs*/
+	tegra20_das_resume();
+
+	clk_disable(i2s->clk_i2s);
+
+	return 0;
+}
+#else
+#define tegra20_i2s_resume NULL
+#endif
 
 static struct snd_soc_dai_ops tegra20_i2s_dai_ops = {
 	.set_fmt	= tegra20_i2s_set_fmt,
@@ -353,6 +402,7 @@ struct snd_soc_dai_driver tegra20_i2s_dai[] = {
 	{
 		.name = DRV_NAME ".0",
 		.probe = tegra20_i2s_probe,
+		.resume = tegra20_i2s_resume,
 		.playback = {
 			.channels_min = 1,
 			.channels_max = 2,
@@ -371,6 +421,7 @@ struct snd_soc_dai_driver tegra20_i2s_dai[] = {
 	{
 		.name = DRV_NAME ".1",
 		.probe = tegra20_i2s_probe,
+		.resume = tegra20_i2s_resume,
 		.playback = {
 			.channels_min = 1,
 			.channels_max = 2,
