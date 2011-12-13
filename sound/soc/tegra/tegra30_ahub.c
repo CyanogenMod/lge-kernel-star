@@ -483,7 +483,7 @@ int tegra30_ahub_set_tx_cif_channels(enum tegra30_ahub_txcif txcif,
 static int __devinit tegra30_ahub_probe(struct platform_device *pdev)
 {
 	struct resource *res0, *res1, *region;
-	int ret = 0;
+	int ret = 0, i = 0, cache_idx_rsvd;
 
 	if (ahub)
 		return -ENODEV;
@@ -555,6 +555,25 @@ static int __devinit tegra30_ahub_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto err_release1;
 	}
+
+	/* cache the POR values of ahub/apbif regs*/
+	tegra30_ahub_enable_clocks();
+
+	for (i = 0; i < TEGRA30_AHUB_AUDIO_RX_COUNT; i++)
+		ahub->ahub_reg_cache[i] = tegra30_audio_read(i<<2);
+
+	cache_idx_rsvd = TEGRA30_APBIF_CACHE_REG_INDEX_RSVD;
+	for (i = 0; i < TEGRA30_APBIF_CACHE_REG_COUNT; i++) {
+		if (i == cache_idx_rsvd) {
+			cache_idx_rsvd +=
+				TEGRA30_APBIF_CACHE_REG_INDEX_RSVD_STRIDE;
+			continue;
+		}
+
+		ahub->apbif_reg_cache[i] = tegra30_apbif_read(i<<2);
+	}
+
+	tegra30_ahub_disable_clocks();
 
 	tegra30_ahub_debug_add(ahub);
 
