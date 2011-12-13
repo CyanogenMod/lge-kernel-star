@@ -785,7 +785,7 @@ static __devinit int tegra30_i2s_platform_probe(struct platform_device *pdev)
 	if (IS_ERR(i2s->clk_i2s)) {
 		dev_err(&pdev->dev, "Can't retrieve i2s clock\n");
 		ret = PTR_ERR(i2s->clk_i2s);
-		goto err_free;
+		goto exit;
 	}
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -827,9 +827,7 @@ err_release:
 	release_mem_region(mem->start, resource_size(mem));
 err_clk_put:
 	clk_put(i2s->clk_i2s);
-err_free:
-	kfree(i2s);
-
+exit:
 	return ret;
 }
 
