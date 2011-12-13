@@ -268,17 +268,19 @@ static int tps80031_rtc_alarm_irq_enable(struct device *dev,
 			return 0;
 
 		err = tps80031_set_bits(p, 1, RTC_INT, ENABLE_ALARM_INT);
-		if (err < 0)
+		if (err < 0) {
 			dev_err(p, "failed to set ALRM int. err: %d\n", err);
-		return err;
+			return err;
+		}
 		rtc->irq_en = true;
 	} else {
 		if (rtc->irq_en == false)
 			return 0;
 		err = tps80031_clr_bits(p, 1, RTC_INT, ENABLE_ALARM_INT);
-		if (err < 0)
+		if (err < 0) {
 			dev_err(p, "failed to clear ALRM int. err: %d\n", err);
-		return err;
+			return err;
+		}
 		rtc->irq_en = false;
 	}
 	return 0;
