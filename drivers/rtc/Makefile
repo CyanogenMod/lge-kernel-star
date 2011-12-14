@@ -100,6 +100,7 @@ obj-$(CONFIG_RTC_DRV_TEST)	+= rtc-test.o
 obj-$(CONFIG_RTC_DRV_TPS6586X)	+= rtc-tps6586x.o
 obj-$(CONFIG_RTC_DRV_TPS6591x)	+= rtc-tps6591x.o
 obj-$(CONFIG_RTC_DRV_TPS80031)	+= rtc-tps80031.o
+obj-$(CONFIG_RTC_DRV_RC5T583)	+= rtc-ricoh583.o
 obj-$(CONFIG_RTC_DRV_TWL4030)	+= rtc-twl.o
 obj-$(CONFIG_RTC_DRV_TX4939)	+= rtc-tx4939.o
 obj-$(CONFIG_RTC_DRV_V3020)	+= rtc-v3020.o
