@@ -1667,7 +1667,7 @@ static int __devinit tegra_nand_probe(struct platform_device *pdev)
 
 	err = device_create_file(&pdev->dev, &dev_attr_device_id);
 	if (err != 0)
-		goto out_free_bbbmap;
+		goto out_free_rw_buffer;
 
 	err = device_create_file(&pdev->dev, &dev_attr_vendor_id);
 	if (err != 0)
@@ -1699,6 +1699,9 @@ err_nand_sysfs_flash_size_failed:
 
 err_nand_sysfs_vendorid_failed:
 	device_remove_file(&pdev->dev, &dev_attr_device_id);
+
+out_free_rw_buffer:
+	kfree(info->partial_unaligned_rw_buffer);
 
 out_free_bbbmap:
 	kfree(info->bb_bitmap);
