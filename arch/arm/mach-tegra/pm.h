@@ -102,7 +102,7 @@ static inline void tegra_lp0_cpu_mode(bool enter) {}
 #endif
 
 #ifdef CONFIG_TEGRA_CLUSTER_CONTROL
-#define INSTRUMENT_CLUSTER_SWITCH 1	/* Should be zero for shipping code */
+#define INSTRUMENT_CLUSTER_SWITCH 0	/* Should be zero for shipping code */
 #define DEBUG_CLUSTER_SWITCH 0		/* Should be zero for shipping code */
 #define PARAMETERIZE_CLUSTER_SWITCH 1	/* Should be zero for shipping code */
 
