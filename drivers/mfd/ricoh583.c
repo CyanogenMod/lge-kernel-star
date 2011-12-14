@@ -309,7 +309,7 @@ int ricoh583_write(struct device *dev, u8 reg, uint8_t val)
 }
 EXPORT_SYMBOL_GPL(ricoh583_write);
 
-int ricoh583_bulk_writes(struct device *dev, u8 reg, int len, uint8_t *val)
+int ricoh583_bulk_writes(struct device *dev, u8 reg, u8 len, uint8_t *val)
 {
 	struct ricoh583 *ricoh583 = dev_get_drvdata(dev);
 	int ret = 0;
@@ -328,7 +328,7 @@ int ricoh583_read(struct device *dev, u8 reg, uint8_t *val)
 }
 EXPORT_SYMBOL_GPL(ricoh583_read);
 
-int ricoh583_bulk_reads(struct device *dev, u8 reg, int len, uint8_t *val)
+int ricoh583_bulk_reads(struct device *dev, u8 reg, u8 len, uint8_t *val)
 {
 	return __ricoh583_bulk_reads(to_i2c_client(dev), reg, len, val);
 }
@@ -750,7 +750,7 @@ static void ricoh583_irq_sync_unlock(struct irq_data *irq_data)
 	if (ricoh583->intc_inten_reg != ricoh583->intc_inten_cache) {
 		if (!WARN_ON(__ricoh583_write(ricoh583->client,
 				RICOH583_INTC_INTEN, ricoh583->intc_inten_reg)))
-			ricoh583->intc_inten_reg = ricoh583->intc_inten_cache;
+			ricoh583->intc_inten_cache = ricoh583->intc_inten_reg;
 	}
 
 	mutex_unlock(&ricoh583->irq_lock);

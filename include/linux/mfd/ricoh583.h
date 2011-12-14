@@ -23,6 +23,7 @@
 #ifndef __LINUX_MFD_RICOH583_H
 #define __LINUX_MFD_RICOH583_H
 
+#include <linux/rtc.h>
 /* RICOH583 IRQ definitions */
 enum {
 	RICOH583_IRQ_ONKEY,
@@ -123,6 +124,7 @@ struct ricoh583_subdev_info {
 
 struct ricoh583_rtc_platform_data {
 	int irq;
+	struct rtc_time time;
 };
 
 struct ricoh583_gpio_init_data {
@@ -144,10 +146,10 @@ struct ricoh583_platform_data {
 };
 
 extern int ricoh583_read(struct device *dev, uint8_t reg, uint8_t *val);
-extern int ricoh583_bulk_read(struct device *dev, u8 reg, u8 count,
+extern int ricoh583_bulk_reads(struct device *dev, u8 reg, u8 count,
 				uint8_t *val);
 extern int ricoh583_write(struct device *dev, u8 reg, uint8_t val);
-extern int ricoh583_bulk_write(struct device *dev, u8 reg, u8 count,
+extern int ricoh583_bulk_writes(struct device *dev, u8 reg, u8 count,
 				uint8_t *val);
 extern int ricoh583_set_bits(struct device *dev, u8 reg, uint8_t bit_mask);
 extern int ricoh583_clr_bits(struct device *dev, u8 reg, uint8_t bit_mask);
