@@ -801,35 +801,35 @@ static irqreturn_t tps80031_irq(int irq, void *data)
 {
 	struct tps80031 *tps80031 = data;
 	int ret = 0;
-	u8 tmp[3];
 	u32 acks;
 	int i;
+	uint8_t tmp[3];
 
-	for (i = 0; i < 3; i++) {
-		ret = tps80031_read(tps80031->dev, SLAVE_ID2,
-			TPS80031_INT_STS_A + i,	&tmp[i]);
-		if (ret < 0) {
-			dev_err(tps80031->dev, "failed to read interrupt "
-							"status\n");
-			return IRQ_NONE;
-		}
-		if (tmp[i]) {
-			ret = tps80031_write(tps80031->dev, SLAVE_ID2,
-					TPS80031_INT_STS_A + i, tmp[i]);
-			if (ret < 0) {
-				dev_err(tps80031->dev, "failed to write "
-							"interrupt status\n");
-				return IRQ_NONE;
-			}
-		}
+	ret = tps80031_reads(tps80031->dev, SLAVE_ID2,
+			     TPS80031_INT_STS_A, 3, tmp);
+	if (ret < 0) {
+		dev_err(tps80031->dev, "failed to read interrupt status\n");
+		return IRQ_NONE;
 	}
 	acks = (tmp[2] << 16) | (tmp[1] << 8) | tmp[0];
-	while (acks) {
-		i = __ffs(acks);
-		if (tps80031->irq_en & (1 << i))
-			handle_nested_irq(tps80031->irq_base + i);
-		acks &= ~(1 << i);
+
+	if (acks) {
+		ret = tps80031_writes(tps80031->dev, SLAVE_ID2,
+				      TPS80031_INT_STS_A, 3, tmp);
+		if (ret < 0) {
+			dev_err(tps80031->dev, "failed to write "
+						"interrupt status\n");
+			return IRQ_NONE;
+		}
+
+		while (acks) {
+			i = __ffs(acks);
+			if (tps80031->irq_en & (1 << i))
+				handle_nested_irq(tps80031->irq_base + i);
+			acks &= ~(1 << i);
+		}
 	}
+
 	return IRQ_HANDLED;
 }
 
