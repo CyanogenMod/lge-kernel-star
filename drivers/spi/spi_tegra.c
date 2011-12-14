@@ -407,8 +407,14 @@ static unsigned int spi_tegra_read_rx_fifo_to_client_rxbuf(
 		tspi->cur_rx_pos += tspi->curr_dma_words * tspi->bytes_per_word;
 		read_words += tspi->curr_dma_words;
 	} else {
+		unsigned int rx_mask, bits_per_word;
+
+		bits_per_word = t->bits_per_word ? t->bits_per_word :
+						tspi->cur_spi->bits_per_word;
+		rx_mask = (1 << bits_per_word) -1;
 		for (count = 0; count < rx_full_count; ++count) {
 			x = spi_tegra_readl(tspi, SLINK_RX_FIFO);
+			x &= rx_mask;
 			for (i = 0; (i < tspi->bytes_per_word); ++i)
 				*rx_buf++ = (x >> (i*8)) & 0xFF;
 		}
@@ -447,6 +453,7 @@ static void spi_tegra_copy_spi_rxbuf_to_client_rxbuf(
 		struct spi_tegra_data *tspi, struct spi_transfer *t)
 {
 	unsigned len;
+
 	if (tspi->is_packed) {
 		len = tspi->curr_dma_words * tspi->bytes_per_word;
 		memcpy(t->rx_buf + tspi->cur_rx_pos, tspi->rx_buf, len);
@@ -455,8 +462,15 @@ static void spi_tegra_copy_spi_rxbuf_to_client_rxbuf(
 		unsigned int count;
 		unsigned char *rx_buf = t->rx_buf + tspi->cur_rx_pos;
 		unsigned int x;
+		unsigned int rx_mask, bits_per_word;
+
+		bits_per_word = t->bits_per_word ? t->bits_per_word :
+						tspi->cur_spi->bits_per_word;
+		rx_mask = (1 << bits_per_word) -1;
+
 		for (count = 0; count < tspi->curr_dma_words; ++count) {
 			x = tspi->rx_buf[count];
+			x &= rx_mask;
 			for (i = 0; (i < tspi->bytes_per_word); ++i)
 				*rx_buf++ = (x >> (i*8)) & 0xFF;
 		}
