@@ -748,7 +748,7 @@ static struct usb_phy_plat_data tegra_usb_phy_pdata[] = {
 	},
 };
 
-static int cardu_usb_hsic_postsupend(void)
+static int cardhu_usb_hsic_postsupend(void)
 {
 #ifdef CONFIG_TEGRA_BB_XMM_POWER
 	baseband_xmm_set_power_status(BBXMM_PS_L2);
@@ -756,7 +756,7 @@ static int cardu_usb_hsic_postsupend(void)
 	return 0;
 }
 
-static int cardu_usb_hsic_preresume(void)
+static int cardhu_usb_hsic_preresume(void)
 {
 #ifdef CONFIG_TEGRA_BB_XMM_POWER
 	baseband_xmm_set_power_status(BBXMM_PS_L2TOL0);
@@ -764,7 +764,7 @@ static int cardu_usb_hsic_preresume(void)
 	return 0;
 }
 
-static int cardu_usb_hsic_phy_ready(void)
+static int cardhu_usb_hsic_phy_ready(void)
 {
 #ifdef CONFIG_TEGRA_BB_XMM_POWER
 	baseband_xmm_set_power_status(BBXMM_PS_L0);
@@ -772,7 +772,7 @@ static int cardu_usb_hsic_phy_ready(void)
 	return 0;
 }
 
-static int cardu_usb_hsic_phy_off(void)
+static int cardhu_usb_hsic_phy_off(void)
 {
 #ifdef CONFIG_TEGRA_BB_XMM_POWER
 	baseband_xmm_set_power_status(BBXMM_PS_L3);
@@ -802,10 +802,10 @@ static void cardhu_usb_init(void)
 	} else if (bi.board_id == BOARD_E1186) {
 		/* for baseband devices do not switch off phy during suspend */
 		tegra_ehci_uhsic_pdata.power_down_on_bus_suspend = 0;
-		uhsic_phy_config.postsuspend = cardu_usb_hsic_postsupend;
-		uhsic_phy_config.preresume = cardu_usb_hsic_preresume;
-		uhsic_phy_config.usb_phy_ready = cardu_usb_hsic_phy_ready;
-		uhsic_phy_config.post_phy_off = cardu_usb_hsic_phy_off;
+		uhsic_phy_config.postsuspend = cardhu_usb_hsic_postsupend;
+		uhsic_phy_config.preresume = cardhu_usb_hsic_preresume;
+		uhsic_phy_config.usb_phy_ready = cardhu_usb_hsic_phy_ready;
+		uhsic_phy_config.post_phy_off = cardhu_usb_hsic_phy_off;
 		tegra_ehci2_device.dev.platform_data = &tegra_ehci_uhsic_pdata;
 		/* baseband registration happens in baseband-xmm-power  */
 	} else {
