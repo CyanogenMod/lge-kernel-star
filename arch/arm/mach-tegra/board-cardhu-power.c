@@ -1163,7 +1163,7 @@ int __init cardhu_edp_init(void)
 
 	regulator_mA = get_maximum_cpu_current_supported();
 	if (!regulator_mA) {
-		regulator_mA = 5000; /* regular T30/s */
+		regulator_mA = 6000; /* regular T30/s */
 	}
 	pr_info("%s: CPU regulator %d mA\n", __func__, regulator_mA);
 
