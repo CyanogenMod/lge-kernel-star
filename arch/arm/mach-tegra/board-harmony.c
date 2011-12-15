@@ -24,8 +24,10 @@
 #include <linux/mtd/partitions.h>
 #include <linux/dma-mapping.h>
 #include <linux/pda_power.h>
+#include <linux/input.h>
 #include <linux/io.h>
 #include <linux/gpio.h>
+#include <linux/gpio_keys.h>
 #include <linux/i2c.h>
 #include <linux/i2c-tegra.h>
 #include <linux/memblock.h>
@@ -174,6 +176,30 @@ static struct plat_serial8250_port debug_uart_platform_data[] = {
 	}
 };
 
+static struct gpio_keys_button harmony_gpio_keys_buttons[] = {
+	{
+		.code		= KEY_POWER,
+		.gpio		= TEGRA_GPIO_POWERKEY,
+		.active_low	= 1,
+		.desc		= "Power",
+		.type		= EV_KEY,
+		.wakeup		= 1,
+	},
+};
+
+static struct gpio_keys_platform_data harmony_gpio_keys = {
+	.buttons	= harmony_gpio_keys_buttons,
+	.nbuttons	= ARRAY_SIZE(harmony_gpio_keys_buttons),
+};
+
+static struct platform_device harmony_gpio_keys_device = {
+	.name		= "gpio-keys",
+	.id		= -1,
+	.dev		= {
+		.platform_data = &harmony_gpio_keys,
+	}
+};
+
 static struct platform_device debug_uart = {
 	.name = "serial8250",
 	.id = PLAT8250_DEV_PLATFORM,
@@ -181,6 +207,14 @@ static struct platform_device debug_uart = {
 		.platform_data = debug_uart_platform_data,
 	},
 };
+
+static void harmony_keys_init(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(harmony_gpio_keys_buttons); i++)
+		tegra_gpio_enable(harmony_gpio_keys_buttons[i].gpio);
+}
 
 static struct tegra_wm8903_platform_data harmony_audio_pdata = {
 	.gpio_spkr_en		= TEGRA_GPIO_SPKR_EN,
@@ -328,6 +362,7 @@ static struct platform_device *harmony_devices[] __initdata = {
 	&tegra_pmu_device,
 	&tegra_nand_device,
 	&tegra_udc_device,
+	&harmony_gpio_keys_device,
 	&pda_power_device,
 	&tegra_ehci3_device,
 	&tegra_spi_device1,
@@ -419,6 +454,8 @@ static void __init tegra_harmony_init(void)
 	tegra_clk_init_from_table(harmony_clk_init_table);
 
 	harmony_pinmux_init();
+
+	harmony_keys_init();
 
 	tegra_sdhci_device1.dev.platform_data = &sdhci_pdata1;
 	tegra_sdhci_device2.dev.platform_data = &sdhci_pdata2;
