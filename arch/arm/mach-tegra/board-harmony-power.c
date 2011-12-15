@@ -28,6 +28,7 @@
 #include <mach/irqs.h>
 
 #include "board-harmony.h"
+#include "pm.h"
 
 #define PMC_CTRL		0x0
 #define PMC_CTRL_INTR_LOW	(1 << 17)
@@ -273,6 +274,39 @@ static struct i2c_board_info __initdata harmony_regulators[] = {
 		.platform_data	= &tps_platform,
 	},
 };
+
+static void harmony_board_suspend(int lp_state, enum suspend_stage stg)
+{
+	if ((lp_state == TEGRA_SUSPEND_LP1) && (stg == TEGRA_SUSPEND_BEFORE_CPU))
+		tegra_console_uart_suspend();
+}
+
+static void harmony_board_resume(int lp_state, enum resume_stage stg)
+{
+	if ((lp_state == TEGRA_SUSPEND_LP1) && (stg == TEGRA_RESUME_AFTER_CPU))
+		tegra_console_uart_resume();
+}
+
+static struct tegra_suspend_platform_data harmony_suspend_data = {
+	/*
+	 * Check power on time and crystal oscillator start time
+	 * for appropriate settings.
+	 */
+	.cpu_timer	= 5000,
+	.cpu_off_timer	= 5000,
+	.suspend_mode	= TEGRA_SUSPEND_LP0,
+	.core_timer	= 0x7e7e,
+	.core_off_timer = 0x7f,
+	.corereq_high	= false,
+	.sysclkreq_high	= true,
+	.board_suspend = harmony_board_suspend,
+	.board_resume = harmony_board_resume,
+};
+
+int __init harmony_suspend_init(void)
+{
+	tegra_init_suspend(&harmony_suspend_data);
+}
 
 int __init harmony_regulator_init(void)
 {

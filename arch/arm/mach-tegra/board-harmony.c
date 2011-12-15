@@ -469,6 +469,7 @@ static void __init tegra_harmony_init(void)
 	platform_add_devices(harmony_devices, ARRAY_SIZE(harmony_devices));
 	harmony_i2c_init();
 	harmony_regulator_init();
+	harmony_suspend_init();
 	harmony_panel_init();
 #ifdef CONFIG_KEYBOARD_TEGRA
 	harmony_kbc_init();
