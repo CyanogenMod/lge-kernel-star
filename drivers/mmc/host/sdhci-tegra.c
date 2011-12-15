@@ -656,7 +656,7 @@ static int tegra_sdhci_pltfm_init(struct sdhci_host *host,
 	}
 	/* Do not turn OFF embedded sdio cards as it support Wake on Wireless */
 	if (plat->mmc_data.embedded_sdio)
-		host->mmc->pm_flags = MMC_PM_KEEP_POWER;
+		host->mmc->pm_flags |= MMC_PM_KEEP_POWER;
 
 	tegra_sdhost_min_freq = TEGRA_SDHOST_MIN_FREQ;
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
