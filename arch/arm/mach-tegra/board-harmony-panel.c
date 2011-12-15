@@ -20,12 +20,14 @@
 #include <asm/mach-types.h>
 #include <linux/nvhost.h>
 #include <linux/gpio.h>
+#include <linux/pwm_backlight.h>
 
 #include <mach/dc.h>
 #include <mach/irqs.h>
 #include <mach/iomap.h>
 #include <mach/nvmap.h>
 #include <mach/tegra_fb.h>
+#include <mach/fb.h>
 
 #include "devices.h"
 #include "gpio-names.h"
@@ -41,6 +43,59 @@
 #define harmony_pnl_to_lvds_ms	0
 #define harmony_lvds_to_bl_ms	200
 
+static int harmony_backlight_init(struct device *dev)
+{
+	int ret;
+
+	ret = gpio_request(harmony_bl_enb, "backlight_enb");
+	if (ret < 0)
+		return ret;
+
+	ret = gpio_direction_output(harmony_bl_enb, 1);
+	if (ret < 0)
+		gpio_free(harmony_bl_enb);
+	else
+		tegra_gpio_enable(harmony_bl_enb);
+
+	return ret;
+}
+
+static void harmony_backlight_exit(struct device *dev)
+{
+	gpio_set_value(harmony_bl_enb, 0);
+	gpio_free(harmony_bl_enb);
+	tegra_gpio_disable(harmony_bl_enb);
+}
+
+static int harmony_backlight_notify(struct device *unused, int brightness)
+{
+	gpio_set_value(harmony_en_vdd_pnl, !!brightness);
+	gpio_set_value(harmony_lvds_shutdown, !!brightness);
+	gpio_set_value(harmony_bl_enb, !!brightness);
+	return brightness;
+}
+
+static int harmony_disp1_check_fb(struct device *dev, struct fb_info *info);
+
+static struct platform_pwm_backlight_data harmony_backlight_data = {
+	.pwm_id		= 0,
+	.max_brightness	= 255,
+	.dft_brightness	= 224,
+	.pwm_period_ns	= 5000000,
+	.init		= harmony_backlight_init,
+	.exit		= harmony_backlight_exit,
+	.notify		= harmony_backlight_notify,
+	/* Only toggle backlight on fb blank notifications for disp1 */
+	.check_fb	= harmony_disp1_check_fb,
+};
+
+static struct platform_device harmony_backlight_device = {
+	.name	= "pwm-backlight",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &harmony_backlight_data,
+	},
+};
 
 static int harmony_panel_enable(void)
 {
@@ -132,6 +187,11 @@ static struct nvhost_device harmony_disp1_device = {
 	},
 };
 
+static int harmony_disp1_check_fb(struct device *dev, struct fb_info *info)
+{
+	return info->device == &harmony_disp1_device.dev;
+}
+
 static struct nvmap_platform_carveout harmony_carveouts[] = {
 	[0] = NVMAP_HEAP_CARVEOUT_IRAM_INIT,
 	[1] = {
@@ -157,6 +217,8 @@ static struct platform_device harmony_nvmap_device = {
 static struct platform_device *harmony_gfx_devices[] __initdata = {
 	&harmony_nvmap_device,
 	&tegra_grhost_device,
+	&tegra_pwfm0_device,
+	&harmony_backlight_device,
 };
 
 int __init harmony_panel_init(void) {
