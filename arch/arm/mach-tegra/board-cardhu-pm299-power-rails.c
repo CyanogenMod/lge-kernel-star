@@ -149,7 +149,7 @@ static struct regulator_consumer_supply ricoh583_ldo8_supply_0[] = {
 	REGULATOR_SUPPLY("vdd_ddr_hs", NULL),
 };
 
-#define TPS_PDATA_INIT(_name, _sname, _minmv, _maxmv, _supply_reg, _always_on, \
+#define RICOH_PDATA_INIT(_name, _sname, _minmv, _maxmv, _supply_reg, _always_on, \
 	_boot_on, _apply_uv, _init_uV, _init_enable, _init_apply, _flags,      \
 	_ext_contol, _ds_slots) \
 	static struct ricoh583_regulator_platform_data pdata_##_name##_##_sname = \
@@ -180,48 +180,48 @@ static struct regulator_consumer_supply ricoh583_ldo8_supply_0[] = {
 		.ext_pwr_req = _ext_contol,				\
 	}
 
-TPS_PDATA_INIT(dc0, 0,         700,  1500, 0, 1, 1, 0, -1, 0, 0, 0,
+RICOH_PDATA_INIT(dc0, 0,         700,  1500, 0, 1, 1, 0, -1, 0, 0, 0,
 				RICOH583_EXT_PWRREQ2_CONTROL, 0);
-TPS_PDATA_INIT(dc1, skubit0_0, 700,  1500, 0, 1, 1, 0, -1, 0, 0, 0, 0, 0);
-TPS_PDATA_INIT(dc2, 0,         900,  2400, 0, 1, 1, 0, -1, 0, 0, 0, 0, 0);
-TPS_PDATA_INIT(dc3, 0,         900,  2400, 0, 1, 1, 0, -1, 0, 0, 0, 0, 0);
+RICOH_PDATA_INIT(dc1, skubit0_0, 700,  1500, 0, 1, 1, 0, -1, 0, 0, 0, 0, 0);
+RICOH_PDATA_INIT(dc2, 0,         900,  2400, 0, 1, 1, 0, -1, 0, 0, 0, 0, 0);
+RICOH_PDATA_INIT(dc3, 0,         900,  2400, 0, 1, 1, 0, -1, 0, 0, 0, 0, 0);
 
-TPS_PDATA_INIT(ldo0, 0,         1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldo1, 0,         1000, 3300, ricoh583_rails(DC1), 0, 0, 0, -1, 0, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldo2, 0,         1050, 1050, ricoh583_rails(DC1), 0, 0, 1, -1, 0, 0, 0, 0, 0);
+RICOH_PDATA_INIT(ldo0, 0,         1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0);
+RICOH_PDATA_INIT(ldo1, 0,         1000, 3300, ricoh583_rails(DC1), 0, 0, 0, -1, 0, 0, 0, 0, 0);
+RICOH_PDATA_INIT(ldo2, 0,         1050, 1050, ricoh583_rails(DC1), 0, 0, 1, -1, 0, 0, 0, 0, 0);
 
-TPS_PDATA_INIT(ldo3, 0,         1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldo4, 0,         750,  1500, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldo5, 0,         1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0);
+RICOH_PDATA_INIT(ldo3, 0,         1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0);
+RICOH_PDATA_INIT(ldo4, 0,         750,  1500, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0);
+RICOH_PDATA_INIT(ldo5, 0,         1000, 3300, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0);
 
-TPS_PDATA_INIT(ldo6, 0,         1200, 1200, ricoh583_rails(DC2), 0, 0, 1, -1, 0, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldo7, 0,         1200, 1200, ricoh583_rails(DC2), 1, 1, 1, -1, 0, 0, 0, 0, 0);
-TPS_PDATA_INIT(ldo8, 0,         900, 3400, ricoh583_rails(DC2), 1, 0, 0, -1, 0, 0, 0, 0, 0);
+RICOH_PDATA_INIT(ldo6, 0,         1200, 1200, ricoh583_rails(DC2), 0, 0, 1, -1, 0, 0, 0, 0, 0);
+RICOH_PDATA_INIT(ldo7, 0,         1200, 1200, ricoh583_rails(DC2), 1, 1, 1, -1, 0, 0, 0, 0, 0);
+RICOH_PDATA_INIT(ldo8, 0,         900, 3400, ricoh583_rails(DC2), 1, 0, 0, -1, 0, 0, 0, 0, 0);
 
-#define TPS_REG(_id, _name, _sname)				\
+#define RICOH_REG(_id, _name, _sname)				\
 	{							\
 		.id	= RICOH583_ID_##_id,			\
 		.name	= "ricoh583-regulator",			\
 		.platform_data	= &pdata_##_name##_##_sname,	\
 	}
 
-#define TPS6591X_DEV_COMMON_E118X 		\
-	TPS_REG(DC0, dc0, 0),			\
-	TPS_REG(DC1, dc1, skubit0_0),		\
-	TPS_REG(DC2, dc2, 0),		\
-	TPS_REG(DC3, dc3, 0),		\
-	TPS_REG(LDO0, ldo8, 0),		\
-	TPS_REG(LDO1, ldo7, 0),		\
-	TPS_REG(LDO2, ldo6, 0),		\
-	TPS_REG(LDO3, ldo5, 0),		\
-	TPS_REG(LDO4, ldo4, 0),		\
-	TPS_REG(LDO5, ldo3, 0),		\
-	TPS_REG(LDO6, ldo0, 0),		\
-	TPS_REG(LDO7, ldo1, 0),		\
-	TPS_REG(LDO8, ldo2, 0)
+#define RICOH583_DEV_COMMON_E118X 		\
+	RICOH_REG(DC0, dc0, 0),			\
+	RICOH_REG(DC1, dc1, skubit0_0),		\
+	RICOH_REG(DC2, dc2, 0),		\
+	RICOH_REG(DC3, dc3, 0),		\
+	RICOH_REG(LDO0, ldo8, 0),		\
+	RICOH_REG(LDO1, ldo7, 0),		\
+	RICOH_REG(LDO2, ldo6, 0),		\
+	RICOH_REG(LDO3, ldo5, 0),		\
+	RICOH_REG(LDO4, ldo4, 0),		\
+	RICOH_REG(LDO5, ldo3, 0),		\
+	RICOH_REG(LDO6, ldo0, 0),		\
+	RICOH_REG(LDO7, ldo1, 0),		\
+	RICOH_REG(LDO8, ldo2, 0)
 
-static struct ricoh583_subdev_info tps_devs_e118x_dcdc[] = {
-	TPS6591X_DEV_COMMON_E118X,
+static struct ricoh583_subdev_info ricoh_devs_e118x_dcdc[] = {
+	RICOH583_DEV_COMMON_E118X,
 };
 
 #define RICOH_GPIO_INIT(_init_apply, _pulldn, _output_mode, _output_val) \
@@ -323,8 +323,8 @@ int __init cardhu_pm299_regulator_init(void)
 				ARRAY_SIZE(ricoh583_dc1_supply_skubit0_1);
 	}
 
-	ricoh_platform.num_subdevs = ARRAY_SIZE(tps_devs_e118x_dcdc);
-	ricoh_platform.subdevs = tps_devs_e118x_dcdc;
+	ricoh_platform.num_subdevs = ARRAY_SIZE(ricoh_devs_e118x_dcdc);
+	ricoh_platform.subdevs = ricoh_devs_e118x_dcdc;
 
 	i2c_register_board_info(4, ricoh583_regulators, 1);
 
