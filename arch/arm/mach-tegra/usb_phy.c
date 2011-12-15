@@ -2221,7 +2221,7 @@ static irqreturn_t usb_phy_vbus_irq_thr(int irq, void *pdata)
 {
 	struct tegra_usb_phy *phy = pdata;
 
-	if (!phy->regulator_on) {
+	if (phy->reg_vdd && !phy->regulator_on) {
 		regulator_enable(phy->reg_vdd);
 		phy->regulator_on = 1;
 		/*
@@ -2365,11 +2365,10 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 #endif
 
 	phy->reg_vdd = regulator_get(NULL, "avdd_usb");
-	if (WARN_ON(IS_ERR_OR_NULL(phy->reg_vdd))) {
+	if (IS_ERR_OR_NULL(phy->reg_vdd)) {
 		pr_err("couldn't get regulator avdd_usb: %ld \n",
 			 PTR_ERR(phy->reg_vdd));
-		err = PTR_ERR(phy->reg_vdd);
-		goto err1;
+		phy->reg_vdd = NULL;
 	}
 
 	if (instance == 0 && usb_phy_data[0].vbus_irq) {
