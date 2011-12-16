@@ -198,12 +198,31 @@ RICOH_PDATA_INIT(ldo6, 0,         1200, 1200, ricoh583_rails(DC2), 0, 0, 1, -1, 
 RICOH_PDATA_INIT(ldo7, 0,         1200, 1200, ricoh583_rails(DC2), 1, 1, 1, -1, 0, 0, 0, 0, 0);
 RICOH_PDATA_INIT(ldo8, 0,         900, 3400, ricoh583_rails(DC2), 1, 0, 0, -1, 0, 0, 0, 0, 0);
 
-#define RICOH_REG(_id, _name, _sname)				\
-	{							\
-		.id	= RICOH583_ID_##_id,			\
-		.name	= "ricoh583-regulator",			\
-		.platform_data	= &pdata_##_name##_##_sname,	\
-	}
+static struct ricoh583_rtc_platform_data rtc_data = {
+	.irq = TEGRA_NR_IRQS + RICOH583_IRQ_YALE,
+	.time = {
+		.tm_year = 2011,
+		.tm_mon = 0,
+		.tm_mday = 1,
+		.tm_hour = 0,
+		.tm_min = 0,
+		.tm_sec = 0,
+	},
+};
+
+#define RICOH_RTC_REG()				\
+{						\
+	.id	= 0,				\
+	.name	= "rtc_ricoh583",		\
+	.platform_data = &rtc_data,		\
+}
+
+#define RICOH_REG(_id, _name, _sname)			\
+{							\
+	.id	= RICOH583_ID_##_id,			\
+	.name	= "ricoh583-regulator",			\
+	.platform_data	= &pdata_##_name##_##_sname,	\
+}
 
 #define RICOH583_DEV_COMMON_E118X 		\
 	RICOH_REG(DC0, dc0, 0),			\
@@ -218,7 +237,8 @@ RICOH_PDATA_INIT(ldo8, 0,         900, 3400, ricoh583_rails(DC2), 1, 0, 0, -1, 0
 	RICOH_REG(LDO5, ldo3, 0),		\
 	RICOH_REG(LDO6, ldo0, 0),		\
 	RICOH_REG(LDO7, ldo1, 0),		\
-	RICOH_REG(LDO8, ldo2, 0)
+	RICOH_REG(LDO8, ldo2, 0),		\
+	RICOH_RTC_REG()
 
 static struct ricoh583_subdev_info ricoh_devs_e118x_dcdc[] = {
 	RICOH583_DEV_COMMON_E118X,
