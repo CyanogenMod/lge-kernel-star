@@ -94,6 +94,7 @@ static void nct1008_probe_callback(struct nct1008_data *data)
 		return;
 	}
 
+	thermal_device->name = "nct1008";
 	thermal_device->data = data;
 	thermal_device->offset = TDIODE_OFFSET;
 	thermal_device->get_temp = nct_get_temp;

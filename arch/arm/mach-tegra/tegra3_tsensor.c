@@ -98,6 +98,7 @@ static void tegra3_tsensor_probe_callback(struct tegra_tsensor_data *data)
 		return;
 	}
 
+	thermal_device->name = "tsensor";
 	thermal_device->data = data;
 	thermal_device->offset = TSENSOR_OFFSET;
 	thermal_device->get_temp = tsensor_get_temp;

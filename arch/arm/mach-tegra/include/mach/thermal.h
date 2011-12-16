@@ -36,6 +36,7 @@ struct tegra_thermal_data {
 };
 
 struct tegra_thermal_device {
+	char *name;
 	void *data;
 	long offset;
 	int (*get_temp) (void *, long *);

@@ -291,7 +291,7 @@ int tegra_thermal_set_device(struct tegra_thermal_device *device)
 	thermal_state.device = device;
 
 #ifdef CONFIG_TEGRA_THERMAL_SYSFS
-	thz = thermal_zone_device_register("thermal",
+	thz = thermal_zone_device_register(thermal_state.device->name,
 					1, /* trips */
 					&thermal_state,
 					&tegra_thermal_zone_ops,
