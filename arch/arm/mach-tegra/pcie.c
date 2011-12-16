@@ -1366,7 +1366,7 @@ static bool pci_tegra_enable_msi(void)
 	/* FIXME do this better! should be based on PAGE_SIZE */
 	msi_base = __get_free_pages(GFP_KERNEL, 3);
 	msi_aligned = ((msi_base + ((1<<12) - 1)) & ~((1<<12) - 1));
-	msi_aligned = virt_to_bus((void *)msi_aligned);
+	msi_aligned = virt_to_phys((void *)msi_aligned);
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	afi_writel(msi_aligned, AFI_MSI_FPCI_BAR_ST_0);
