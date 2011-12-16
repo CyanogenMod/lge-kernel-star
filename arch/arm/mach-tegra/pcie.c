@@ -311,7 +311,7 @@ struct tegra_pcie_port {
 };
 
 struct tegra_pcie_info {
-	struct tegra_pcie_port	port[2];
+	struct tegra_pcie_port	port[MAX_PCIE_SUPPORTED_PORTS];
 	int			num_ports;
 
 	void __iomem		*reg_clk_base;
@@ -1421,13 +1421,13 @@ int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
 	if (map_entry == NULL)
 		goto exit;
 
-
-	dynamic_irq_init(map_entry->irq);
-	irq_set_chip_and_handler_name(map_entry->irq,
+	irq_alloc_desc(map_entry->irq);
+	irq_set_chip_and_handler(map_entry->irq,
 				&tegra_irq_chip_msi_pcie,
-				handle_simple_irq, "PCIe-MSI");
+				handle_simple_irq);
 
 	irq_set_msi_desc(map_entry->irq, desc);
+	set_irq_flags(map_entry->irq, IRQF_VALID);
 
 	msg.address_lo = afi_readl(AFI_MSI_AXI_BAR_ST_0);
 	/* 32 bit address only */
@@ -1451,7 +1451,7 @@ void arch_teardown_msi_irq(unsigned int irq)
 	int i;
 	for (i = 0; i < MSI_MAP_SIZE; i++) {
 		if ((msi_map[i].used) && (msi_map[i].irq == irq)) {
-			dynamic_irq_cleanup(msi_map[i].irq);
+			irq_free_desc(msi_map[i].irq);
 			msi_map_release(msi_map + i);
 			break;
 		}
