@@ -102,9 +102,9 @@
 #define SH532U_CAPS_VER		2
 #define SH532U_ACTUATOR_RANGE	1000
 #define SH532U_SETTLETIME	30
-#define SH532U_FOCUS_MACRO	900
+#define SH532U_FOCUS_MACRO	950
 #define SH532U_FOCUS_HYPER	250
-#define SH532U_FOCUS_INFINITY	100
+#define SH532U_FOCUS_INFINITY	50
 #define SH532U_TIMEOUT_MS	200
 #define SH532U_POS_LOW_DEFAULT	0xA000
 #define SH532U_POS_HIGH_DEFAULT	0x6000
@@ -129,6 +129,8 @@ struct sh532u_info {
 	struct sh532u_pdata_info cfg;
 	bool gpio_flag_reset;
 	bool init_cal_flag;
+	s16 abs_base;
+	u32 abs_range;
 	u32 pos_rel;
 	s16 pos_abs;
 	long pos_time_wr;
@@ -389,33 +391,24 @@ static int sh532u_pm_wr(struct sh532u_info *info, int pwr)
 {
 	int err = 0;
 
+	if ((info->pdata->cfg & (NVC_CFG_OFF2STDBY | NVC_CFG_BOOT_INIT)) &&
+			(pwr == NVC_PWR_OFF ||
+			 pwr == NVC_PWR_STDBY_OFF))
+		pwr = NVC_PWR_STDBY;
+
 	if (pwr == info->pwr_dev)
 		return 0;
 
 	switch (pwr) {
-	case NVC_PWR_OFF_DELAYED:
+	case NVC_PWR_OFF_FORCE:
 	case NVC_PWR_OFF:
-		if ((info->pdata->cfg & NVC_CFG_OFF2STDBY) ||
-			     (info->pdata->cfg & NVC_CFG_BOOT_INIT)) {
-			pwr = NVC_PWR_STDBY;
-		} else {
-			sh532u_gpio_en(info, 0);
-			err = sh532u_pm_regulator_dis(info, &info->vreg_vdd);
-			err |= sh532u_pm_regulator_dis(info, &info->vreg_i2c);
-			sh532u_gpio_reset(info, 0);
-			break;
-		}
+		sh532u_gpio_en(info, 0);
+		err = sh532u_pm_regulator_dis(info, &info->vreg_vdd);
+		err |= sh532u_pm_regulator_dis(info, &info->vreg_i2c);
+		sh532u_gpio_reset(info, 0);
+		break;
+
 	case NVC_PWR_STDBY_OFF:
-		if ((info->pdata->cfg & NVC_CFG_OFF2STDBY) ||
-			     (info->pdata->cfg & NVC_CFG_BOOT_INIT)) {
-			pwr = NVC_PWR_STDBY;
-		} else {
-			err = sh532u_pm_regulator_en(info, &info->vreg_vdd);
-			err |= sh532u_pm_regulator_en(info, &info->vreg_i2c);
-			sh532u_gpio_en(info, 1);
-			sh532u_gpio_reset(info, 0);
-			break;
-		}
 	case NVC_PWR_STDBY:
 		err = sh532u_pm_regulator_en(info, &info->vreg_vdd);
 		err |= sh532u_pm_regulator_en(info, &info->vreg_i2c);
@@ -499,9 +492,14 @@ static int sh532u_pm_dev_wr(struct sh532u_info *info, int pwr)
 
 static void sh532u_pm_exit(struct sh532u_info *info)
 {
-	sh532u_pm_wr_s(info, NVC_PWR_OFF);
+	sh532u_pm_wr(info, NVC_PWR_OFF_FORCE);
 	sh532u_pm_regulator_put(&info->vreg_vdd);
 	sh532u_pm_regulator_put(&info->vreg_i2c);
+	if (info->s_info != NULL) {
+		sh532u_pm_wr(info->s_info, NVC_PWR_OFF_FORCE);
+		sh532u_pm_regulator_put(&info->s_info->vreg_vdd);
+		sh532u_pm_regulator_put(&info->s_info->vreg_i2c);
+	}
 }
 
 static void sh532u_pm_init(struct sh532u_info *info)
@@ -558,30 +556,36 @@ static s16 sh532u_rel2abs(struct sh532u_info *info, u32 rel_position)
 {
 	s16 abs_pos;
 
-	if (info->cap.actuator_range > 0) {
-		abs_pos = info->cfg.pos_high -
-				(((info->cfg.pos_high - info->cfg.pos_low) *
-				rel_position) / info->cap.actuator_range);
-		return abs_pos;
-	} else {
-		return 0;
+	if (rel_position > info->cap.actuator_range)
+		rel_position = info->cap.actuator_range;
+	rel_position = info->cap.actuator_range - rel_position;
+	if (rel_position) {
+		rel_position *= info->abs_range;
+		rel_position /= info->cap.actuator_range;
 	}
+	abs_pos = (s16)(info->abs_base + rel_position);
+	if (abs_pos < info->cfg.limit_low)
+		abs_pos = info->cfg.limit_low;
+	if (abs_pos > info->cfg.limit_high)
+		abs_pos = info->cfg.limit_high;
+	return abs_pos;
 }
 
 static u32 sh532u_abs2rel(struct sh532u_info *info, s16 abs_position)
 {
 	u32 rel_pos;
 
-	if (abs_position > info->cfg.pos_high)
-		abs_position = info->cfg.pos_high;
-	if ((info->cfg.pos_high - info->cfg.pos_low) > 0) {
-		rel_pos = (((info->cfg.pos_high - abs_position) *
-				info->cap.actuator_range) /
-				(info->cfg.pos_high - info->cfg.pos_low));
-		return rel_pos;
-	} else {
-		return 0;
-	}
+	if (abs_position > info->cfg.limit_high)
+		abs_position = info->cfg.limit_high;
+	if (abs_position < info->abs_base)
+		abs_position = info->abs_base;
+	rel_pos = (u32)(abs_position - info->abs_base);
+	rel_pos *= info->cap.actuator_range;
+	rel_pos /= info->abs_range;
+	if (rel_pos > info->cap.actuator_range)
+		rel_pos = info->cap.actuator_range;
+	rel_pos = info->cap.actuator_range - rel_pos;
+	return rel_pos;
 }
 
 static int sh532u_abs_pos_rd(struct sh532u_info *info, s16 *position)
@@ -632,12 +636,13 @@ static int sh532u_rel_pos_rd(struct sh532u_info *info, u32 *position)
 static int sh532u_calibration(struct sh532u_info *info, bool use_defaults)
 {
 	u8 reg;
-	s16 abs_focus_macro;
-	s16 abs_focus_infinity;
-	u32 abs_focus_hyper;
-	u32 abs_range;
+	s16 abs_top;
 	u32 rel_range;
+	u32 rel_lo;
+	u32 rel_hi;
 	u32 step;
+	u32 loop_limit;
+	u32 i;
 	int err;
 	int ret = 0;
 
@@ -677,10 +682,12 @@ static int sh532u_calibration(struct sh532u_info *info, bool use_defaults)
 			info->cap.focus_infinity =
 					info->pdata->cap->focus_infinity;
 	}
-	/* Get Inf1, Mac1
-	Inf1 and Mac1 are the mechanical limit position.
-	Inf1     : Bottom limit.
-	Mac1 : Top limit. */
+	/*
+	 * Get Inf1, Mac1
+	 * Inf1 and Mac1 are the mechanical limit position.
+	 * Inf1: top limit.
+	 * Mac1: bottom limit.
+	 */
 	err = sh532u_i2c_rd8(info, info->i2c_addr_rom, addrMac1, &reg);
 	if (!err && (reg != 0) && (reg != 0xFF))
 		info->cfg.limit_low = (reg<<8) & 0xff00;
@@ -689,10 +696,12 @@ static int sh532u_calibration(struct sh532u_info *info, bool use_defaults)
 	if (!err && (reg != 0) && (reg != 0xFF))
 		info->cfg.limit_high = (reg<<8) & 0xff00;
 	ret |= err;
-	/* Get Inf2, Mac2
-	Inf2 and Mac2 are the calibration data for SEMCO AF lens.
-	Inf2: Best focus (lens position) when object distance is 1.2M.
-	Mac2: Best focus (lens position) when object distance is 10cm. */
+	/*
+	 * Get Inf2, Mac2
+	 * Inf2 and Mac2 are the calibration data for SEMCO AF lens.
+	 * Inf2: Best focus (lens position) when object distance is 1.2M.
+	 * Mac2: Best focus (lens position) when object distance is 10cm.
+	 */
 	err = sh532u_i2c_rd8(info, info->i2c_addr_rom, addrMac2, &reg);
 	if (!err && (reg != 0) && (reg != 0xFF))
 		info->cfg.pos_low = (reg << 8) & 0xff00;
@@ -764,34 +773,75 @@ static int sh532u_calibration(struct sh532u_info *info, bool use_defaults)
 			    "Focuser will use defaults that will cause "
 			    "reduced functionality!\n", __func__);
 	}
-	/* calculate relative and absolute positions */
-	abs_focus_macro = info->cfg.pos_low;
-	abs_focus_infinity = info->cfg.pos_high;
-	abs_range = (u32)(abs_focus_infinity - abs_focus_macro);
-	rel_range = (info->cap.focus_macro - info->cap.focus_infinity);
-		/* calculate absolute hyperfocus position */
-	abs_focus_hyper = ((abs_range * info->cfg.focus_hyper_ratio) /
-			   info->cfg.focus_hyper_div);
-	abs_focus_hyper = abs_focus_infinity - abs_focus_hyper;
-		/* calculate absolute high end */
-	step = (abs_range * info->cap.focus_infinity) / rel_range;
-	info->cfg.pos_high += step;
-	if (abs_focus_infinity < info->cfg.limit_high) {
-		if (info->cfg.pos_high > info->cfg.limit_high)
-			info->cfg.pos_high = info->cfg.limit_high;
+	if (info->cfg.pos_low < info->cfg.limit_low)
+		info->cfg.pos_low = info->cfg.limit_low;
+	if (info->cfg.pos_high > info->cfg.limit_high)
+		info->cfg.pos_high = info->cfg.limit_high;
+	dev_dbg(&info->i2c_client->dev, "%s pos_low=%d\n", __func__,
+				(int)info->cfg.pos_low);
+	dev_dbg(&info->i2c_client->dev, "%s pos_high=%d\n", __func__,
+				(int)info->cfg.pos_high);
+	dev_dbg(&info->i2c_client->dev, "%s limit_low=%d\n", __func__,
+				(int)info->cfg.limit_low);
+	dev_dbg(&info->i2c_client->dev, "%s limit_high=%d\n", __func__,
+				(int)info->cfg.limit_high);
+	/*
+	 * calculate relative and absolute positions
+	 * Note that relative values, what upper SW uses, are the
+	 * abstraction of HW (absolute) values.
+	 * |<--limit_low                                  limit_high-->|
+	 * | |<-------------------_ACTUATOR_RANGE------------------->| |
+	 *              -focus_inf                        -focus_mac
+	 *   |<---RI--->|                                 |<---RM--->|
+	 *   -abs_base  -pos_low                          -pos_high  -abs_top
+	 *
+	 * The pos_low and pos_high are fixed absolute positions and correspond
+	 * to the relative focus_infinity and focus_macro, respectively.  We'd
+	 * like to have "wiggle" room (RI and RM) around these relative
+	 * positions so the loop below finds the best fit for RI and RM without
+	 * passing the absolute limits.
+	 * We want our _ACTUATOR_RANGE to be infinity on the 0 end and macro
+	 * on the max end.  However, the focuser HW is opposite this.
+	 * Therefore we use the rel(ative)_lo/hi variables in the calculation
+	 * loop and assign them the focus_infinity and focus_macro values.
+	 */
+	rel_lo = (info->cap.actuator_range - info->cap.focus_macro);
+	rel_hi = info->cap.focus_infinity;
+	info->abs_range = (u32)(info->cfg.pos_high - info->cfg.pos_low);
+	loop_limit = (rel_lo > rel_hi) ? rel_lo : rel_hi;
+	for (i = 0; i <= loop_limit; i++) {
+		rel_range = info->cap.actuator_range - (rel_lo + rel_hi);
+		step = info->abs_range / rel_range;
+		info->abs_base = info->cfg.pos_low - (step * rel_lo);
+		abs_top = info->cfg.pos_high + (step * rel_hi);
+		if (info->abs_base < info->cfg.limit_low) {
+			if (rel_lo > 0)
+				rel_lo--;
+		}
+		if (abs_top > info->cfg.limit_high) {
+			if (rel_hi > 0)
+				rel_hi--;
+		}
+		if (info->abs_base >= info->cfg.limit_low &&
+					abs_top <= info->cfg.limit_high)
+			break;
 	}
-		/* calculate absolute low end */
-	step = (abs_range * (info->cap.actuator_range -
-			     info->cap.focus_macro)) / rel_range;
-	info->cfg.pos_low -= step;
-	if (abs_focus_macro > info->cfg.limit_low) {
-		if (info->cfg.pos_low < info->cfg.limit_low)
-			info->cfg.pos_low = info->cfg.limit_low;
-	}
-		/* update actual relative positions */
-	info->cap.focus_macro = sh532u_abs2rel(info, abs_focus_macro);
-	info->cap.focus_infinity = sh532u_abs2rel(info, abs_focus_infinity);
-	info->cap.focus_hyper = sh532u_abs2rel(info, (s16)abs_focus_hyper);
+	info->cap.focus_hyper = info->abs_range;
+	info->abs_range = (u32)(abs_top - info->abs_base);
+	/* calculate absolute hyperfocus position */
+	info->cap.focus_hyper *= info->cfg.focus_hyper_ratio;
+	info->cap.focus_hyper /= info->cfg.focus_hyper_div;
+	abs_top = (s16)(info->cfg.pos_high - info->cap.focus_hyper);
+	/* update actual relative positions */
+	info->cap.focus_hyper = sh532u_abs2rel(info, abs_top);
+	info->cap.focus_infinity = sh532u_abs2rel(info, info->cfg.pos_high);
+	info->cap.focus_macro = sh532u_abs2rel(info, info->cfg.pos_low);
+	dev_dbg(&info->i2c_client->dev, "%s focus_macro=%u\n", __func__,
+					info->cap.focus_macro);
+	dev_dbg(&info->i2c_client->dev, "%s focus_infinity=%u\n", __func__,
+					info->cap.focus_infinity);
+	dev_dbg(&info->i2c_client->dev, "%s focus_hyper=%u\n", __func__,
+					info->cap.focus_hyper);
 	info->init_cal_flag = 1;
 	dev_dbg(&info->i2c_client->dev, "%s complete\n", __func__);
 	return 0;
@@ -963,7 +1013,7 @@ static int sh532u_dev_init(struct sh532u_info *info)
 	return err;
 }
 
-static int sh532u_move_lens(struct sh532u_info *info, s16 tar_pos)
+static int sh532u_pos_abs_wr(struct sh532u_info *info, s16 tar_pos)
 {
 	s16 cur_pos;
 	s16 move_step;
@@ -980,6 +1030,8 @@ static int sh532u_move_lens(struct sh532u_info *info, s16 tar_pos)
 	if (err)
 		return err;
 
+	dev_dbg(&info->i2c_client->dev, "%s cur_pos=%d tar_pos=%d\n",
+			__func__, (int)cur_pos, (int)tar_pos);
 	info->sts = NVC_FOCUS_STS_WAIT_FOR_MOVE_END;
 	/* Check move distance to Target Position */
 	move_distance = abs((int)cur_pos - (int)tar_pos);
@@ -1054,7 +1106,7 @@ static int sh532u_move_pulse(struct sh532u_info *info, s16 position)
 {
 	int err;
 
-	err = sh532u_move_lens(info, position);
+	err = sh532u_pos_abs_wr(info, position);
 	err |= sh532u_move_wait(info);
 	return err;
 }
@@ -1077,17 +1129,15 @@ static int sh532u_hvca_pos_init(struct sh532u_info *info)
 	return err;
 }
 
-static int sh532u_pos_abs_wr(struct sh532u_info *info, s16 position)
-{
-	if (position > info->cfg.limit_high || position < info->cfg.limit_low)
-		return -EINVAL;
-
-	return sh532u_move_lens(info, position);
-}
-
 static int sh532u_pos_rel_wr(struct sh532u_info *info, u32 position)
 {
 	s16 abs_pos;
+
+	if (position > info->cap.actuator_range) {
+		dev_err(&info->i2c_client->dev, "%s invalid position %u\n",
+				__func__, position);
+		return -EINVAL;
+	}
 
 	abs_pos = sh532u_rel2abs(info, position);
 	info->pos_rel = position;
