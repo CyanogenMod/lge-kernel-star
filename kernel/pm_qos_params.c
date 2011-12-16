@@ -102,12 +102,23 @@ static struct pm_qos_object network_throughput_pm_qos = {
 	.type = PM_QOS_MAX,
 };
 
+static BLOCKING_NOTIFIER_HEAD(max_online_cpus_notifier);
+static struct pm_qos_object max_online_cpus_pm_qos = {
+	.requests = PLIST_HEAD_INIT(max_online_cpus_pm_qos.requests, pm_qos_lock),
+	.notifiers = &max_online_cpus_notifier,
+	.name = "max_online_cpus",
+	.target_value = PM_QOS_MAX_ONLINE_CPUS_DEFAULT_VALUE,
+	.default_value = PM_QOS_MAX_ONLINE_CPUS_DEFAULT_VALUE,
+	.type = PM_QOS_MIN,
+};
+
 
 static struct pm_qos_object *pm_qos_array[] = {
 	&null_pm_qos,
 	&cpu_dma_pm_qos,
 	&network_lat_pm_qos,
-	&network_throughput_pm_qos
+	&network_throughput_pm_qos,
+	&max_online_cpus_pm_qos
 };
 
 static ssize_t pm_qos_power_write(struct file *filp, const char __user *buf,
