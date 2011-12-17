@@ -32,6 +32,7 @@
 #include <linux/clk.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
+#include <linux/pm_qos_params.h>
 
 #include "pm.h"
 #include "cpu-tegra.h"
@@ -194,16 +195,21 @@ static noinline int tegra_cpu_speed_balance(void)
 	unsigned long balanced_speed = highest_speed * balance_level / 100;
 	unsigned long skewed_speed = balanced_speed / 2;
 	unsigned int nr_cpus = num_online_cpus();
+	unsigned int max_cpus = pm_qos_request(PM_QOS_MAX_ONLINE_CPUS) ? : 4;
 
 	/* balanced: freq targets for all CPUs are above 50% of highest speed
 	   biased: freq target for at least one CPU is below 50% threshold
 	   skewed: freq targets for at least 2 CPUs are below 25% threshold */
 	if ((tegra_count_slow_cpus(skewed_speed) >= 2) ||
-	    tegra_cpu_edp_favor_down(nr_cpus, mp_overhead))
+	    tegra_cpu_edp_favor_down(nr_cpus, mp_overhead) ||
+	    (nr_cpus > max_cpus))
 		return TEGRA_CPU_SPEED_SKEWED;
-	else if ((tegra_count_slow_cpus(balanced_speed) >= 1) ||
-		 (!tegra_cpu_edp_favor_up(nr_cpus, mp_overhead)))
+
+	if ((tegra_count_slow_cpus(balanced_speed) >= 1) ||
+	    (!tegra_cpu_edp_favor_up(nr_cpus, mp_overhead)) ||
+	    (nr_cpus == max_cpus))
 		return TEGRA_CPU_SPEED_BIASED;
+
 	return TEGRA_CPU_SPEED_BALANCED;
 }
 
@@ -376,6 +382,8 @@ int tegra_auto_hotplug_init(struct mutex *cpu_lock)
 
 static struct dentry *hp_debugfs_root;
 
+struct pm_qos_request_list max_cpu_req;
+
 static int hp_stats_show(struct seq_file *s, void *data)
 {
 	int i;
@@ -427,6 +435,18 @@ static const struct file_operations hp_stats_fops = {
 	.release	= single_release,
 };
 
+static int max_cpus_get(void *data, u64 *val)
+{
+	*val = pm_qos_request(PM_QOS_MAX_ONLINE_CPUS);
+	return 0;
+}
+static int max_cpus_set(void *data, u64 val)
+{
+	pm_qos_update_request(&max_cpu_req, (s32)val);
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(max_cpus_fops, max_cpus_get, max_cpus_set, "%llu\n");
+
 static int __init tegra_auto_hotplug_debug_init(void)
 {
 	if (!tegra3_cpu_lock)
@@ -436,6 +456,13 @@ static int __init tegra_auto_hotplug_debug_init(void)
 	if (!hp_debugfs_root)
 		return -ENOMEM;
 
+	pm_qos_add_request(&max_cpu_req, PM_QOS_MAX_ONLINE_CPUS,
+			   PM_QOS_DEFAULT_VALUE);
+
+	if (!debugfs_create_file(
+		"max_cpus", S_IRUGO, hp_debugfs_root, NULL, &max_cpus_fops))
+		goto err_out;
+
 	if (!debugfs_create_file(
 		"stats", S_IRUGO, hp_debugfs_root, NULL, &hp_stats_fops))
 		goto err_out;
@@ -444,6 +471,7 @@ static int __init tegra_auto_hotplug_debug_init(void)
 
 err_out:
 	debugfs_remove_recursive(hp_debugfs_root);
+	pm_qos_remove_request(&max_cpu_req);
 	return -ENOMEM;
 }
 
@@ -455,5 +483,6 @@ void tegra_auto_hotplug_exit(void)
 	destroy_workqueue(hotplug_wq);
 #ifdef CONFIG_DEBUG_FS
 	debugfs_remove_recursive(hp_debugfs_root);
+	pm_qos_remove_request(&max_cpu_req);
 #endif
 }
