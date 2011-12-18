@@ -46,6 +46,8 @@ void __init tegra3_tsensor_init(struct tegra_tsensor_pmu_data *);
 
 int tsensor_thermal_get_temp(struct tegra_tsensor_data *data,
 				long *milli_temp);
+int tsensor_thermal_get_temp_low(struct tegra_tsensor_data *data,
+					long *milli_temp);
 int tsensor_thermal_set_limits(struct tegra_tsensor_data *data,
 				long lo_limit_milli,
 				long hi_limit_milli);
