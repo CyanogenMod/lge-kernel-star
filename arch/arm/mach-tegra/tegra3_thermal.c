@@ -174,6 +174,7 @@ void tegra_thermal_alert(void *data)
 	long temp_dev, temp_tj;
 	long lo_limit_throttle_tj, hi_limit_throttle_tj;
 	long lo_limit_edp_tj = 0, hi_limit_edp_tj = 0;
+	long temp_low_dev, temp_low_tj;
 	int lo_limit_tj = 0, hi_limit_tj = 0;
 #ifdef CONFIG_TEGRA_EDP_LIMITS
 	const struct tegra_edp_limits *z;
@@ -202,8 +203,10 @@ void tegra_thermal_alert(void *data)
 	/* Convert all temps to tj and then do all work/logic in terms of
 	   tj in order to avoid confusion */
 	temp_tj = dev2tj(thermal->device, temp_dev);
+	thermal->device->get_temp_low(thermal->device, &temp_low_dev);
+	temp_low_tj = dev2tj(thermal->device, temp_low_dev);
 
-	lo_limit_throttle_tj = dev2tj(thermal->device, 0);
+	lo_limit_throttle_tj = temp_low_tj;
 	hi_limit_throttle_tj = thermal->temp_throttle_tj;
 
 #ifndef CONFIG_TEGRA_THERMAL_SYSFS
@@ -228,7 +231,7 @@ void tegra_thermal_alert(void *data)
 #define EDP_TEMP_TJ(_index)	edp2tj(thermal, z[_index].temperature * 1000)
 
 	if (temp_tj < EDP_TEMP_TJ(0)) {
-		lo_limit_edp_tj = dev2tj(thermal->device, 0);
+		lo_limit_edp_tj = temp_low_tj;
 		hi_limit_edp_tj = EDP_TEMP_TJ(0);
 	} else if (temp_tj >= EDP_TEMP_TJ(zones_sz-1)) {
 		lo_limit_edp_tj = EDP_TEMP_TJ(zones_sz-1) -
@@ -247,7 +250,7 @@ void tegra_thermal_alert(void *data)
 	}
 #undef EDP_TEMP_TJ
 #else
-	lo_limit_edp_tj = 0;
+	lo_limit_edp_tj = temp_low_tj;
 	hi_limit_edp_tj = thermal->temp_shutdown_tj;
 #endif
 

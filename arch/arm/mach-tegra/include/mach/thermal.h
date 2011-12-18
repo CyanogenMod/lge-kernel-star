@@ -40,6 +40,7 @@ struct tegra_thermal_device {
 	void *data;
 	long offset;
 	int (*get_temp) (void *, long *);
+	int (*get_temp_low)(void *, long *);
 	int (*set_limits) (void *, long, long);
 	int (*set_alert)(void *, void (*)(void *), void *);
 	int (*set_shutdown_temp)(void *, long);
