@@ -103,7 +103,7 @@ static struct tegra_utmip_config utmi_phy_config[] = {
 
 /* !!!FIXME!!! THESE ARE VENTANA SETTINGS */
 static struct tegra_ulpi_config ulpi_phy_config = {
-	.clk = "clk_dev2",
+	.clk = "cdev2",
 };
 
 #ifdef CONFIG_BCM4329_RFKILL

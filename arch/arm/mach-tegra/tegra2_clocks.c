@@ -1430,7 +1430,7 @@ static void tegra2_cdev_clk_set_parent(struct clk *c)
 	int val;
 
 	/* Get pinmux setting for cdev1 and cdev2 from APB_MISC register */
-	if (!strcmp(c->name, "clk_dev2"))
+	if (!strcmp(c->name, "cdev2"))
 		pg = TEGRA_PINGROUP_CDEV2;
 
 	val = tegra_pinmux_get_func(pg);
