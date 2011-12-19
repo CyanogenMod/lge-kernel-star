@@ -243,7 +243,6 @@ int i2c_add_slave_adapter(struct i2c_slave_adapter *slv_adap, bool force_nr)
 		"i2c-%d-slave", slv_adap->nr);
 	priv->master_adap.owner = THIS_MODULE;
 	priv->master_adap.class = slv_adap->class;
-	priv->master_adap.id = slv_adap->id;
 	priv->master_adap.algo = &priv->master_algo;
 	priv->master_adap.algo_data = priv;
 	priv->master_adap.dev.parent = slv_adap->parent_dev;
