@@ -356,7 +356,9 @@ static struct platform_device *harmony_devices[] __initdata = {
 	&tegra_sdhci_device2,
 	&tegra_sdhci_device4,
 	&tegra_i2s_device1,
+	&tegra_spdif_device,
 	&tegra_das_device,
+	&spdif_dit_device,
 	&tegra_pcm_device,
 	&harmony_audio_device,
 	&tegra_pmu_device,
@@ -386,6 +388,7 @@ static __initdata struct tegra_clk_init_table harmony_clk_init_table[] = {
 	/* name		parent		rate		enabled */
 	{ "uartd",	"pll_p",	216000000,	true },
 	{ "i2s1",	"pll_a_out0",	0,		false},
+	{ "spdif_out",	"pll_a_out0",	0,		false},
 	{ "sdmmc1",	"clk_m",	48000000,	true },
 	{ "sdmmc2",	"clk_m",	48000000,	true },
 	{ "sdmmc4",	"clk_m",	48000000,	true },
