@@ -483,7 +483,10 @@ int tegra30_ahub_set_tx_cif_channels(enum tegra30_ahub_txcif txcif,
 static int __devinit tegra30_ahub_probe(struct platform_device *pdev)
 {
 	struct resource *res0, *res1, *region;
-	int ret = 0, i = 0, cache_idx_rsvd;
+	int ret = 0;
+#ifdef CONFIG_PM
+	int i = 0, cache_idx_rsvd;
+#endif
 
 	if (ahub)
 		return -ENODEV;
@@ -556,6 +559,7 @@ static int __devinit tegra30_ahub_probe(struct platform_device *pdev)
 		goto err_release1;
 	}
 
+#ifdef CONFIG_PM
 	/* cache the POR values of ahub/apbif regs*/
 	tegra30_ahub_enable_clocks();
 
@@ -574,6 +578,7 @@ static int __devinit tegra30_ahub_probe(struct platform_device *pdev)
 	}
 
 	tegra30_ahub_disable_clocks();
+#endif
 
 	tegra30_ahub_debug_add(ahub);
 

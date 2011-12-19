@@ -528,7 +528,10 @@ static int __devinit tegra30_dam_probe(struct platform_device *pdev)
 {
 	struct resource *res,  *region;
 	struct tegra30_dam_context *dam;
-	int ret = 0, i;
+	int ret = 0;
+#ifdef CONFIG_PM
+	int i;
+#endif
 
 	if ((pdev->id < 0) ||
 		(pdev->id >= TEGRA30_NR_DAM_IFC)) {
@@ -575,6 +578,7 @@ static int __devinit tegra30_dam_probe(struct platform_device *pdev)
 		goto err_clk_put_dam;
 	}
 
+#ifdef CONFIG_PM
 	/* cache the POR values of DAM regs*/
 	tegra30_dam_enable_clock(pdev->id);
 
@@ -588,6 +592,7 @@ static int __devinit tegra30_dam_probe(struct platform_device *pdev)
 	}
 
 	tegra30_dam_disable_clock(pdev->id);
+#endif
 
 	platform_set_drvdata(pdev, dam);
 
