@@ -574,3 +574,73 @@ int mmc_bus_test(struct mmc_card *card, u8 bus_width)
 	err = mmc_send_bus_test(card, card->host, MMC_BUS_TEST_R, width);
 	return err;
 }
+
+int mmc_send_hpi_cmd(struct mmc_card *card, u32 *status)
+{
+	struct mmc_command cmd = {0};
+	unsigned int opcode;
+	unsigned int flags;
+	int err;
+
+	opcode = card->ext_csd.hpi_cmd;
+	flags = MMC_RSP_R1 | MMC_CMD_AC;
+
+	cmd.opcode = opcode;
+	cmd.arg = card->rca << 16 | 1;
+	cmd.flags = flags;
+
+	err = mmc_wait_for_cmd(card->host, &cmd, 0);
+	if (err) {
+		pr_warn("%s: error %d interrupting operation. "
+			"HPI command response %#x\n", mmc_hostname(card->host),
+			err, cmd.resp[0]);
+		return err;
+	}
+	if (status)
+		*status = cmd.resp[0];
+
+	return 0;
+}
+
+int mmc_send_bk_ops_cmd(struct mmc_card *card, bool is_synchronous)
+{
+	int err;
+	struct mmc_command cmd;
+	u32 status;
+
+	BUG_ON(!card);
+	BUG_ON(!card->host);
+
+	memset(&cmd, 0, sizeof(struct mmc_command));
+
+	cmd.opcode = MMC_SWITCH;
+	cmd.arg = (MMC_SWITCH_MODE_WRITE_BYTE << 24) |
+		(EXT_CSD_BKOPS_EN << 16) |
+		(1 << 8) |
+		EXT_CSD_CMD_SET_NORMAL;
+	if (is_synchronous)
+		cmd.flags = MMC_RSP_R1B | MMC_CMD_AC;
+	else
+		cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
+
+	err = mmc_wait_for_cmd(card->host, &cmd, MMC_CMD_RETRIES);
+	if (err)
+		return err;
+
+	/* Must check status to be sure of no errors */
+	do {
+		err = mmc_send_status(card, &status);
+		if (err)
+			return err;
+		if (card->host->caps & MMC_CAP_WAIT_WHILE_BUSY)
+			break;
+	} while (R1_CURRENT_STATE(status) == 7);
+
+	if (status & 0xFDFFA000)
+		printk(KERN_ERR "%s: unexpected status %#x after "
+			   "switch", mmc_hostname(card->host), status);
+	if (status & R1_SWITCH_ERROR)
+		return -EBADMSG;
+
+	return 0;
+}

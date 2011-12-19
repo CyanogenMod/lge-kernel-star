@@ -204,6 +204,7 @@ struct mmc_host {
 #define MMC_CAP_DRIVER_TYPE_A	(1 << 23)	/* Host supports Driver Type A */
 #define MMC_CAP_DRIVER_TYPE_C	(1 << 24)	/* Host supports Driver Type C */
 #define MMC_CAP_DRIVER_TYPE_D	(1 << 25)	/* Host supports Driver Type D */
+#define MMC_CAP_BKOPS		(1 << 26)	/* Host supports BKOPS */
 
 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
 
