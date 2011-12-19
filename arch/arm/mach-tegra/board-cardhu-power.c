@@ -732,6 +732,14 @@ GREG_INIT(17, en_vddio_vid_oc_pm269,	en_vddio_vid_oc,	"master_5v_switch",
 	0,      0,      TEGRA_GPIO_PP2,	false,	0,	TEGRA_PINGROUP_DAP3_DOUT,
 	enable_load_switch_rail, disable_load_switch_rail);
 
+/* Specific to pm311 */
+GREG_INIT(15, en_usb1_vbus_oc_pm311,	en_usb1_vbus_oc,	"master_5v_switch",
+		0,      0,      TEGRA_GPIO_PCC7,		false,	0,	TEGRA_PINGROUP_GMI_RST_N,
+		enable_load_switch_rail, disable_load_switch_rail);
+GREG_INIT(16, en_usb3_vbus_oc_pm311,	en_usb3_vbus_oc,	"master_5v_switch",
+		0,      0,      TEGRA_GPIO_PCC6,		false,	0,	TEGRA_PINGROUP_GMI_AD15,
+		enable_load_switch_rail, disable_load_switch_rail);
+
 /* Specific to E1187/E1186/E1256 */
 GREG_INIT(14, dis_5v_switch_e118x,	dis_5v_switch,		"vdd_5v0_sys",
 		0,      0,      TEGRA_GPIO_PX2,		true,	0,	0,	0,	0);
@@ -833,6 +841,25 @@ GREG_INIT(6, en_vdd_pnl1_pm313,     en_vdd_pnl1,        "vdd_3v3_devices",
 	ADD_GPIO_REG(en_usb3_vbus_oc_e118x),	\
 	ADD_GPIO_REG(en_vddio_vid_oc_pm269),
 
+#define PM311_GPIO_REG \
+	ADD_GPIO_REG(en_5v_cp),			\
+	ADD_GPIO_REG(en_5v0),			\
+	ADD_GPIO_REG(en_ddr),			\
+	ADD_GPIO_REG(en_3v3_sys),		\
+	ADD_GPIO_REG(en_3v3_modem),		\
+	ADD_GPIO_REG(cam1_ldo_en),		\
+	ADD_GPIO_REG(cam2_ldo_en),		\
+	ADD_GPIO_REG(cam3_ldo_en),		\
+	ADD_GPIO_REG(en_vdd_com),		\
+	ADD_GPIO_REG(en_3v3_fuse_pm269),	\
+	ADD_GPIO_REG(en_3v3_emmc),		\
+	ADD_GPIO_REG(en_3v3_pex_hvdd_pm269),	\
+	ADD_GPIO_REG(en_1v8_cam),		\
+	ADD_GPIO_REG(dis_5v_switch_e118x),	\
+	ADD_GPIO_REG(en_usb1_vbus_oc_pm311),	\
+	ADD_GPIO_REG(en_usb3_vbus_oc_pm311),	\
+	ADD_GPIO_REG(en_vddio_vid_oc_pm269),
+
 #define E1247_DISPLAY_GPIO_REG		\
 	ADD_GPIO_REG(en_vdd_bl_pm269),	\
 	ADD_GPIO_REG(en_vdd_pnl1_pm269),
@@ -930,6 +957,18 @@ static struct gpio_switch_regulator_subdev_data *gswitch_subdevs_pm269_pm313[] =
 	PM313_DISPLAY_GPIO_REG
 };
 
+/* Gpio switch regulator platform data for PM311*/
+static struct gpio_switch_regulator_subdev_data *gswitch_subdevs_pm311[] = {
+	PM311_GPIO_REG
+	E1247_DISPLAY_GPIO_REG
+};
+
+/* Gpio switch regulator platform data for PM11*/
+static struct gpio_switch_regulator_subdev_data *gswitch_subdevs_pm311_pm313[] = {
+	PM311_GPIO_REG
+	PM313_DISPLAY_GPIO_REG
+};
+
 /* Gpio switch regulator platform data for E1291 A03*/
 static struct gpio_switch_regulator_subdev_data *gswitch_subdevs_e1291_a03[] = {
 	COMMON_GPIO_REG
@@ -999,9 +1038,17 @@ int __init cardhu_gpio_switch_regulator_init(void)
 		}
 		break;
 
-	case BOARD_PM269:
-	case BOARD_PM305:
 	case BOARD_PM311:
+	case BOARD_PM305:
+		gswitch_pdata.num_subdevs = ARRAY_SIZE(gswitch_subdevs_pm311);
+		gswitch_pdata.subdevs = gswitch_subdevs_pm311;
+		if (display_board_info.board_id == BOARD_DISPLAY_PM313) {
+			gswitch_pdata.num_subdevs = ARRAY_SIZE(gswitch_subdevs_pm311_pm313);
+			gswitch_pdata.subdevs = gswitch_subdevs_pm311_pm313;
+		}
+		break;
+
+	case BOARD_PM269:
 	case BOARD_E1257:
 		gswitch_pdata.num_subdevs = ARRAY_SIZE(gswitch_subdevs_pm269);
 		gswitch_pdata.subdevs = gswitch_subdevs_pm269;

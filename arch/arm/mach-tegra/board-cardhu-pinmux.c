@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/board-cardhu-pinmux.c
  *
- * Copyright (C) 2010-2011 NVIDIA Corporation
+ * Copyright (C) 2011 NVIDIA Corporation
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -422,6 +422,13 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_e118x[] = {
 	DEFAULT_PINMUX(GMI_AD15,        NAND,            PULL_UP,   TRISTATE,   INPUT),
 };
 
+static __initdata struct tegra_pingroup_config cardhu_pinmux_pm311[] = {
+	/* Power rails GPIO */
+	DEFAULT_PINMUX(SPI2_SCK,        SPI2,            NORMAL,    NORMAL,     INPUT),
+	DEFAULT_PINMUX(PEX_L2_RST_N,    PCIE,            PULL_UP,   TRISTATE,   INPUT),
+	DEFAULT_PINMUX(PEX_L2_CLKREQ_N, PCIE,            PULL_UP,   TRISTATE,   INPUT),
+};
+
 static __initdata struct tegra_pingroup_config cardhu_pinmux_cardhu[] = {
 	DEFAULT_PINMUX(LCD_CS0_N,       DISPLAYA,        NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(LCD_SCK,         DISPLAYA,        NORMAL,    NORMAL,     INPUT),
@@ -652,8 +659,13 @@ int __init cardhu_pinmux_init(void)
 	case BOARD_PM305:
 	case BOARD_PM311:
 	case BOARD_E1257:
-		tegra_pinmux_config_table(cardhu_pinmux_e118x,
+		if (board_info.board_id == BOARD_PM311 || board_info.board_id == BOARD_PM305) {
+			tegra_pinmux_config_table(cardhu_pinmux_pm311,
+					ARRAY_SIZE(cardhu_pinmux_pm311));
+		} else {
+			tegra_pinmux_config_table(cardhu_pinmux_e118x,
 					ARRAY_SIZE(cardhu_pinmux_e118x));
+		}
 		tegra_pinmux_config_table(unused_pins_lowpower,
 					ARRAY_SIZE(unused_pins_lowpower));
 		tegra_pinmux_config_table(gmi_pins_269,
