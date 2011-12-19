@@ -109,6 +109,11 @@ void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
 
 		cmd->retries--;
 		cmd->error = 0;
+		if (mrq->data) {
+			mrq->data->error = 0;
+			if (mrq->stop)
+				mrq->stop->error = 0;
+		}
 		host->ops->request(host, mrq);
 	} else {
 		led_trigger_event(host->led, LED_OFF);
