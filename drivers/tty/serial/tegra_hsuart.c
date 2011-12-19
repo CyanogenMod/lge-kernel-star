@@ -306,6 +306,7 @@ static void tegra_rx_dma_complete_callback(struct tegra_dma_req *req)
 	struct tegra_uart_port *t = req->dev;
 	struct uart_port *u = &t->uport;
 	struct tty_struct *tty = u->state->port.tty;
+	int copied;
 
 	/* If we are here, DMA is stopped */
 
@@ -313,9 +314,15 @@ static void tegra_rx_dma_complete_callback(struct tegra_dma_req *req)
 		req->status);
 	if (req->bytes_transferred) {
 		t->uport.icount.rx += req->bytes_transferred;
-		tty_insert_flip_string(tty,
+		copied = tty_insert_flip_string(tty,
 			((unsigned char *)(req->virt_addr)),
 			req->bytes_transferred);
+		if (copied != req->bytes_transferred) {
+			WARN_ON(1);
+			dev_err(t->uport.dev, "Not able to copy uart data "
+				"to tty layer Req %d and coped %d\n",
+				req->bytes_transferred, copied);
+		}
 	}
 
 	do_handle_rx_pio(t);
@@ -650,20 +657,22 @@ static void tegra_uart_hw_deinit(struct tegra_uart_port *t)
 	clk_disable(t->clk);
 }
 
-static void tegra_uart_free_rx_dma(struct tegra_uart_port *t)
+static void tegra_uart_free_rx_dma_buffer(struct tegra_uart_port *t)
 {
-	if (!t->use_rx_dma)
-               return;
-
-	tegra_dma_free_channel(t->rx_dma);
-	t->rx_dma = NULL;
-
 	if (likely(t->rx_dma_req.dest_addr))
 		dma_free_coherent(t->uport.dev, t->rx_dma_req.size,
 			t->rx_dma_req.virt_addr, t->rx_dma_req.dest_addr);
 	t->rx_dma_req.dest_addr = 0;
 	t->rx_dma_req.virt_addr = NULL;
+}
 
+static void tegra_uart_free_rx_dma(struct tegra_uart_port *t)
+{
+	if (!t->use_rx_dma)
+		return;
+
+	tegra_dma_free_channel(t->rx_dma);
+	t->rx_dma = NULL;
 	t->use_rx_dma = false;
 }
 
@@ -768,24 +777,17 @@ static int tegra_uart_hw_init(struct tegra_uart_port *t)
 	return 0;
 }
 
-static int tegra_uart_init_rx_dma(struct tegra_uart_port *t)
+static int tegra_uart_init_rx_dma_buffer(struct tegra_uart_port *t)
 {
 	dma_addr_t rx_dma_phys;
 	void *rx_dma_virt;
-
-	t->rx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_CONTINUOUS,
-					"uart_rx_%d", t->uport.line);
-	if (!t->rx_dma) {
-		dev_err(t->uport.dev, "%s: failed to allocate RX DMA.\n", __func__);
-		return -ENODEV;
-	}
 
 	t->rx_dma_req.size = UART_RX_DMA_BUFFER_SIZE;
 	rx_dma_virt = dma_alloc_coherent(t->uport.dev,
 		t->rx_dma_req.size, &rx_dma_phys, GFP_KERNEL);
 	if (!rx_dma_virt) {
 		dev_err(t->uport.dev, "DMA buffers allocate failed\n");
-		goto fail;
+		return -ENOMEM;
 	}
 	t->rx_dma_req.dest_addr = rx_dma_phys;
 	t->rx_dma_req.virt_addr = rx_dma_virt;
@@ -802,9 +804,20 @@ static int tegra_uart_init_rx_dma(struct tegra_uart_port *t)
 	t->rx_dma_req.dev = t;
 
 	return 0;
-fail:
-	tegra_uart_free_rx_dma(t);
-	return -ENODEV;
+}
+
+static int tegra_uart_init_rx_dma(struct tegra_uart_port *t)
+{
+	dma_addr_t rx_dma_phys;
+
+	t->rx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_CONTINUOUS,
+					"uart_rx_%d", t->uport.line);
+	if (!t->rx_dma) {
+		dev_err(t->uport.dev, "%s: failed to allocate RX DMA.\n",
+				__func__);
+		return -ENODEV;
+	}
+	return 0;
 }
 
 static int tegra_startup(struct uart_port *u)
@@ -845,7 +858,7 @@ static int tegra_startup(struct uart_port *u)
 	t->tx_in_progress = 0;
 
 	t->use_rx_dma = false;
-	if (!RX_FORCE_PIO) {
+	if (!RX_FORCE_PIO && t->rx_dma_req.virt_addr) {
 		if (!tegra_uart_init_rx_dma(t))
 			t->use_rx_dma = true;
 	}
@@ -1428,6 +1441,8 @@ static int __devexit tegra_uart_remove(struct platform_device *pdev)
 	u = &t->uport;
 	uart_remove_one_port(&tegra_uart_driver, u);
 
+	tegra_uart_free_rx_dma_buffer(t);
+
 	platform_set_drvdata(pdev, NULL);
 
 	pr_info("Unregistered UART port %s%d\n",
@@ -1500,7 +1515,20 @@ static int tegra_uart_probe(struct platform_device *pdev)
 	pr_info("Registered UART port %s%d\n",
 		tegra_uart_driver.dev_name, u->line);
 	t->uart_state = TEGRA_UART_CLOSED;
-	return 0;
+
+	if (!RX_FORCE_PIO) {
+		ret = tegra_uart_init_rx_dma_buffer(t);
+		if (ret < 0) {
+			pr_err("%s: Failed(%d) to allocate rx dma buffer "
+				"%s%d\n", __func__, ret,
+				tegra_uart_driver.dev_name, u->line);
+			goto rx_dma_buff_fail;
+		}
+	}
+	return ret;
+
+rx_dma_buff_fail:
+	uart_remove_one_port(&tegra_uart_driver, u);
 fail:
 	if (t->clk)
 		clk_put(t->clk);
