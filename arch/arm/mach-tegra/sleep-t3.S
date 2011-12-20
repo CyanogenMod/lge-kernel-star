@@ -555,12 +555,16 @@ enable_pllm_lp0:
 
 powerdown_pll_pcx:
 	/* disable PLLP, PLLA, PLLC, and PLLX in LP0 and LP1 states */
+	ldr	r0, [r4, #PMC_CTRL]
+	tst	r0, #PMC_CTRL_SIDE_EFFECT_LP0
+	beq	powerdown_pll_cx
 	ldr	r0, [r5, #CLK_RESET_PLLP_BASE]
 	bic	r0, r0, #(1<<30)
 	str	r0, [r5, #CLK_RESET_PLLP_BASE]
 	ldr	r0, [r5, #CLK_RESET_PLLA_BASE]
 	bic	r0, r0, #(1<<30)
 	str	r0, [r5, #CLK_RESET_PLLA_BASE]
+powerdown_pll_cx:
 	ldr	r0, [r5, #CLK_RESET_PLLC_BASE]
 	bic	r0, r0, #(1<<30)
 	str	r0, [r5, #CLK_RESET_PLLC_BASE]
