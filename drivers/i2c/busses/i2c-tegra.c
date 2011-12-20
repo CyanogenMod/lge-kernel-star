@@ -428,7 +428,7 @@ static int tegra_i2c_init(struct tegra_i2c_dev *i2c_dev)
 	if (tegra_i2c_flush_fifos(i2c_dev))
 		err = -ETIMEDOUT;
 
-	pm_runtime_put_sync(i2c_dev->dev);
+	pm_runtime_put(i2c_dev->dev);
 
 	if (i2c_dev->irq_disabled) {
 		i2c_dev->irq_disabled = 0;
@@ -713,7 +713,7 @@ static int tegra_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
 	}
 
 
-	pm_runtime_put_sync(i2c_dev->dev);
+	pm_runtime_put(i2c_dev->dev);
 
 	rt_mutex_unlock(&i2c_dev->dev_lock);
 
@@ -954,7 +954,7 @@ static int tegra_i2c_resume_noirq(struct device *dev)
 	return 0;
 }
 
-static int tegra_i2c_runtime_idle(struct device *dev)
+static int tegra_i2c_runtime_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct tegra_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
@@ -977,7 +977,7 @@ static int tegra_i2c_runtime_resume(struct device *dev)
 static const struct dev_pm_ops tegra_i2c_dev_pm_ops = {
 	.suspend_noirq = tegra_i2c_suspend_noirq,
 	.resume_noirq = tegra_i2c_resume_noirq,
-	.runtime_idle = tegra_i2c_runtime_idle,
+	.runtime_suspend = tegra_i2c_runtime_suspend,
 	.runtime_resume = tegra_i2c_runtime_resume,
 };
 

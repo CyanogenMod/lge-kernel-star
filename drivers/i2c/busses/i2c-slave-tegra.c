@@ -1065,7 +1065,7 @@ static int tegra_i2c_slave_resume(struct platform_device *pdev)
 }
 #endif
 #if defined(CONFIG_PM_RUNTIME)
-static int tegra_i2c_slave_runtime_idle(struct device *dev)
+static int tegra_i2c_slave_runtime_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct tegra_i2c_slave_dev *i2c_dev = platform_get_drvdata(pdev);
@@ -1080,7 +1080,7 @@ static int tegra_i2c_slave_runtime_resume(struct device *dev)
 	return 0;
 }
 static const struct dev_pm_ops tegra_i2c_slave_dev_pm_ops = {
-	.runtime_idle = tegra_i2c_slave_runtime_idle,
+	.runtime_suspend = tegra_i2c_slave_runtime_suspend,
 	.runtime_resume = tegra_i2c_slave_runtime_resume,
 };
 #endif
