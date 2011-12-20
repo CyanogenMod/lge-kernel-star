@@ -92,6 +92,7 @@ struct tegra_max98088 {
 	struct codec_config codec_info[NUM_I2S_DEVICES];
 #endif
 	enum snd_soc_bias_level bias_level;
+	struct snd_soc_card *pcard;
 };
 
 static int tegra_call_mode_info(struct snd_kcontrol *kcontrol,
@@ -120,6 +121,7 @@ static int tegra_call_mode_put(struct snd_kcontrol *kcontrol,
 	struct tegra_max98088 *machine = snd_kcontrol_chip(kcontrol);
 	int is_call_mode_new = ucontrol->value.integer.value[0];
 	int codec_index;
+	unsigned int i;
 
 	if (machine->is_call_mode == is_call_mode_new)
 		return 0;
@@ -135,6 +137,9 @@ static int tegra_call_mode_put(struct snd_kcontrol *kcontrol,
 			machine->codec_info[codec_index].channels == 0)
 				return -EINVAL;
 
+		for (i = 0; i < machine->pcard->num_links; i++)
+			machine->pcard->dai_link[i].ignore_suspend = 1;
+
 		tegra30_make_voice_call_connections(
 			&machine->codec_info[codec_index],
 			&machine->codec_info[BASEBAND]);
@@ -144,6 +149,9 @@ static int tegra_call_mode_put(struct snd_kcontrol *kcontrol,
 		tegra30_break_voice_call_connections(
 			&machine->codec_info[codec_index],
 			&machine->codec_info[BASEBAND]);
+
+		for (i = 0; i < machine->pcard->num_links; i++)
+			machine->pcard->dai_link[i].ignore_suspend = 0;
 #endif
 	}
 
@@ -798,6 +806,8 @@ static int tegra_max98088_init(struct snd_soc_pcm_runtime *rtd)
 		return 0;
 
 	machine->init_done = true;
+
+	machine->pcard = card;
 
 	if (gpio_is_valid(pdata->gpio_spkr_en)) {
 		ret = gpio_request(pdata->gpio_spkr_en, "spkr_en");
