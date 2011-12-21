@@ -333,7 +333,7 @@ config TEGRA_AUTO_HOTPLUG
 
 config TEGRA_MC_PROFILE
 	tristate "Enable profiling memory controller utilization"
-	default n
+	default y
 	help
 	  When enabled, provides a mechanism to perform statistical
 	  sampling of the memory controller usage on a client-by-client
