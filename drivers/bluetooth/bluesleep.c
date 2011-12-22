@@ -180,7 +180,6 @@ void bluesleep_sleep_wakeup(void)
 		set_bit(BT_EXT_WAKE, &flags);
 		clear_bit(BT_ASLEEP, &flags);
 		/*Activating UART */
-		hsuart_power(1);
 	}
 }
 
@@ -201,7 +200,6 @@ static void bluesleep_sleep_work(struct work_struct *work)
 			BT_DBG("going to sleep...");
 			set_bit(BT_ASLEEP, &flags);
 			/*Deactivating UART */
-			hsuart_power(0);
 			/* UART clk is not turned off immediately. Release
 			 * wakelock after 500 ms.
 			 */
@@ -287,10 +285,10 @@ static int bluesleep_hci_event(struct notifier_block *this,
 		}
 		break;
 	case HCI_DEV_UNREG:
+		bluesleep_stop();
 		bluesleep_hdev = NULL;
 		bsi->uport = NULL;
 		/* if bluetooth stopped, stop bluesleep also */
-		bluesleep_stop();
 		break;
 	case HCI_DEV_WRITE:
 		bluesleep_outgoing_data();
