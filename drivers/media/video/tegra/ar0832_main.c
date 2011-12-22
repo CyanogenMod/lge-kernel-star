@@ -228,10 +228,7 @@ static struct ar0832_reg mode_3264X2448_8140[] = {
 	{0x301A, 0x8650},	/* RESET_REGISTER */
 	{0x301A, 0x8658},	/* RESET_REGISTER */
 	/* gain */
-	{0x3056, 0x10AA},	/* gain */
-	{0x3058, 0x10AA},	/* gain */
-	{0x305a, 0x10AA},	/* gain */
-	{0x305c, 0x10AA},	/* gain */
+	{0x305e, 0x10AA},	/* gain */
 	{0x0104, 0x0000},	/* GROUPED_PARAMETER_HOLD */
 	{0x301A, 0x065C},	/* RESET_REGISTER */
 	{ar0832_TABLE_END, 0x0000}
@@ -357,10 +354,7 @@ static struct ar0832_reg mode_3264X2448_8141[] = {
 	{0x301A, 0x8650},	/* RESET_REGISTER */
 	{0x301A, 0x8658},	/* RESET_REGISTER */
 	/* gain */
-	{0x3056, 0x10AA},	/* gain */
-	{0x3058, 0x10AA},	/* gain */
-	{0x305a, 0x10AA},	/* gain */
-	{0x305c, 0x10AA},	/* gain */
+	{0x305e, 0x10AA},	/* gain */
 	{0x0104, 0x0000},	/* GROUPED_PARAMETER_HOLD */
 	{0x301A, 0x065C},	/* RESET_REGISTER */
 	{ar0832_TABLE_END, 0x0000}
@@ -494,10 +488,7 @@ static struct ar0832_reg mode_2880X1620_8140[] = {
 	{0x301A, 0x8650},	/* RESET_REGISTER */
 	{0x301A, 0x8658},	/* RESET_REGISTER */
 	/* gain */
-	{0x3056, 0x10AA},	/* gain */
-	{0x3058, 0x10AA},	/* gain */
-	{0x305a, 0x10AA},	/* gain */
-	{0x305c, 0x10AA},	/* gain */
+	{0x305e, 0x10AA},	/* gain */
 	{0x0104, 0x0000},	/* GROUPED_PARAMETER_HOLD */
 	{0x301A, 0x065C},	/* RESET_REGISTER */
 	{ar0832_TABLE_END, 0x0000}
@@ -622,10 +613,7 @@ static struct ar0832_reg mode_2880X1620_8141[] = {
 	{0x301A, 0x8650},	/* RESET_REGISTER */
 	{0x301A, 0x8658},	/* RESET_REGISTER */
 	/* gain */
-	{0x3056, 0x10AA},	/* gain */
-	{0x3058, 0x10AA},	/* gain */
-	{0x305a, 0x10AA},	/* gain */
-	{0x305c, 0x10AA},	/* gain */
+	{0x305e, 0x10AA},	/* gain */
 	{0x0104, 0x0000},	/* GROUPED_PARAMETER_HOLD */
 	{0x301A, 0x065C},	/* RESET_REGISTER */
 	{ar0832_TABLE_END, 0x0000}
@@ -759,10 +747,7 @@ static struct ar0832_reg mode_1920X1080_8140[] = {
 	{0x301A, 0x8650},	/* RESET_REGISTER */
 	{0x301A, 0x8658},	/* RESET_REGISTER */
 	/* gain */
-	{0x3056, 0x10AA},	/* gain */
-	{0x3058, 0x10AA},	/* gain */
-	{0x305a, 0x10AA},	/* gain */
-	{0x305c, 0x10AA},	/* gain */
+	{0x305e, 0x10AA},	/* gain */
 	{0x0104, 0x0000},	/* GROUPED_PARAMETER_HOLD */
 	{0x301A, 0x065C},	/* RESET_REGISTER */
 	{ar0832_TABLE_END, 0x0000}
@@ -887,10 +872,7 @@ static struct ar0832_reg mode_1920X1080_8141[] = {
 	{0x301A, 0x8650},	/* RESET_REGISTER */
 	{0x301A, 0x8658},	/* RESET_REGISTER */
 	/* gain */
-	{0x3056, 0x10AA},	/* gain */
-	{0x3058, 0x10AA},	/* gain */
-	{0x305a, 0x10AA},	/* gain */
-	{0x305c, 0x10AA},	/* gain */
+	{0x305e, 0x10AA},	/* gain */
 	{0x0104, 0x0000},	/* GROUPED_PARAMETER_HOLD */
 	{0x301A, 0x065C},	/* RESET_REGISTER */
 	{ar0832_TABLE_END, 0x0000}
@@ -1032,14 +1014,10 @@ static struct ar0832_reg mode_1632X1224_8140[] = {
 	{0x301A, 0x8658},	/* RESET_REGISTER */
 
 	/* gain */
-	{0x3056, 0x10AA},	/* gain */
-	{0x3058, 0x10AA},	/* gain */
-	{0x305a, 0x10AA},	/* gain */
-	{0x305c, 0x10AA},	/* gain */
+	{0x305e, 0x10AA},	/* gain */
 
 	/* todo 8-bit write */
 	{0x0104, 0x0000},	/* GROUPED_PARAMETER_HOLD */
-
 	{0x301A, 0x065C},	/* RESET_REGISTER */
 	{ar0832_TABLE_END, 0x0000}
 };
@@ -1180,14 +1158,10 @@ static struct ar0832_reg mode_1632X1224_8141[] = {
 	{0x301A, 0x8658},	/* RESET_REGISTER */
 
 	/* gain */
-	{0x3056, 0x10AA},	/* gain */
-	{0x3058, 0x10AA},	/* gain */
-	{0x305a, 0x10AA},	/* gain */
-	{0x305c, 0x10AA},	/* gain */
+	{0x305e, 0x10AA},	/* gain */
 
 	/* todo 8-bit write */
 	{0x0104, 0x0000},	/* GROUPED_PARAMETER_HOLD */
-
 	{0x301A, 0x065C},	/* RESET_REGISTER */
 	{ar0832_TABLE_END, 0x0000}
 };
@@ -1285,8 +1259,6 @@ static struct ar0832_reg mode_800X600_8140[] = {
 
 	/* mode end */
 	{0x3174, 0x8000},
-	/* STATE= Minimum Gain, 1500 */
-	{0x305E, 0x13AF},
 
 	/* [RAW10] */
 	{0x0112, 0x0A0A},
@@ -1327,8 +1299,10 @@ static struct ar0832_reg mode_800X600_8140[] = {
 	{0x301A, 0x8250},
 	{0x301A, 0x8650},
 	{0x301A, 0x8658},
-	{0x0104, 0x0000},
+	/* STATE= Minimum Gain, 1500 */
+	{0x305E, 0x13AF},
 
+	{0x0104, 0x0000},
 	{0x301A, 0x065C},
 	{ar0832_TABLE_END, 0x0000}
 };
@@ -1469,14 +1443,10 @@ static struct ar0832_reg mode_800X600_8141[] = {
 	{0x301A, 0x8658},	/* RESET_REGISTER */
 
 	/* gain */
-	{0x3056, 0x10AA},	/* gain */
-	{0x3058, 0x10AA},	/* gain */
-	{0x305a, 0x10AA},	/* gain */
-	{0x305c, 0x10AA},	/* gain */
+	{0x305e, 0x10AA},	/* gain */
 
 	/* todo 8-bit write */
 	{0x0104, 0x0000},	/* GROUPED_PARAMETER_HOLD */
-
 	{0x301A, 0x065C},	/* RESET_REGISTER */
 	{ar0832_TABLE_END, 0x0000}
 };
@@ -1554,7 +1524,7 @@ static inline void ar0832_get_focuser_data_regs(struct ar0832_reg *regs,
 	regs->val = (value) & 0xFFFF;
 }
 
-static inline void ar0832_set_gain_reg(struct ar0832_reg *regs, u16 gain)
+static inline void ar0832_get_gain_regs(struct ar0832_reg *regs, u16 gain)
 {
 	/* global_gain register*/
 	regs->addr = AR0832_GLOBAL_GAIN_REG;
@@ -1682,13 +1652,28 @@ static int ar0832_write_table(struct ar0832_dev *dev,
 {
 	int err;
 	const struct ar0832_reg *next;
+	u16 val;
+	int i;
 
 	for (next = table; next->addr != ar0832_TABLE_END; next++) {
 		if (next->addr ==  ar0832_TABLE_WAIT_MS) {
 			ar0832_msleep(next->val);
 			continue;
 		}
-		err = ar0832_write_reg_helper(dev, next->addr, next->val);
+
+		val = next->val;
+		/* When an override list is passed in, replace the reg */
+		/* value to write if the reg is in the list            */
+		if (override_list) {
+			for (i = 0; i < num_override_regs; i++) {
+				if (next->addr == override_list[i].addr) {
+					val = override_list[i].val;
+					break;
+				}
+			}
+		}
+
+		err = ar0832_write_reg_helper(dev, next->addr, val);
 		if (err)
 			return err;
 	}
@@ -1754,7 +1739,7 @@ static int ar0832_set_gain(struct ar0832_dev *dev, u16 gain)
 
 	ret = ar0832_write_reg8(dev->i2c_client, AR0832_GROUP_HOLD_REG, 0x1);
 	/* Gain Registers Start */
-	ar0832_set_gain_reg(&reg_list_gain, gain);
+	ar0832_get_gain_regs(&reg_list_gain, gain);
 	ret |= ar0832_write_reg16(dev->i2c_client,
 				reg_list_gain.addr,
 				reg_list_gain.val);
@@ -1772,9 +1757,8 @@ static int ar0832_set_mode(struct ar0832_dev *dev,
 {
 	int sensor_mode;
 	int err;
-	int ret;
 	struct i2c_client *i2c_client = dev->i2c_client;
-	struct ar0832_reg reg_frame_length, reg_coarse_time;
+	struct ar0832_reg reg_ovr[3];
 	struct ar0832_reg *mode_seq;
 
 	dev_dbg(&i2c_client->dev, "%s: ++\n", __func__);
@@ -1806,26 +1790,13 @@ static int ar0832_set_mode(struct ar0832_dev *dev,
 	if (err)
 		return err;
 
-	err = ar0832_write_table(dev, mode_seq, NULL, 0);
+	/* When we change the resolution */
+	ar0832_get_frame_length_regs(&reg_ovr[0], mode->frame_length);
+	ar0832_get_coarse_time_regs(&reg_ovr[1], mode->coarse_time);
+	ar0832_get_gain_regs(&reg_ovr[2], mode->gain);
+	err = ar0832_write_table(dev, mode_seq, reg_ovr, ARRAY_SIZE(reg_ovr));
 	if (err)
 		return err;
-
-	/* When we change the resolution */
-	ar0832_get_frame_length_regs(&reg_frame_length, mode->frame_length);
-	ret = ar0832_write_reg16(i2c_client, reg_frame_length.addr,
-		reg_frame_length.val);
-	if (ret)
-		return ret;
-
-	ar0832_get_coarse_time_regs(&reg_coarse_time, mode->coarse_time);
-	ret = ar0832_write_reg16(i2c_client, reg_coarse_time.addr,
-			reg_coarse_time.val);
-	if (ret)
-		return ret;
-
-	ret = ar0832_set_gain(dev, mode->gain);
-	if (ret)
-		return ret;
 
 	err = ar0832_write_table(dev, mode_end, NULL, 0);
 	if (err)
