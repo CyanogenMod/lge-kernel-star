@@ -916,7 +916,7 @@ static void cpufreq_set_governor(char *governor)
 	struct file *scaling_gov = NULL;
 	mm_segment_t old_fs;
 	char    buf[128];
-	int i;
+	int i = 0;
 	loff_t offset = 0;
 
 	if (governor == NULL)
@@ -925,8 +925,10 @@ static void cpufreq_set_governor(char *governor)
 	/* change to KERNEL_DS address limit */
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-
-	for_each_online_cpu(i) {
+#ifndef CONFIG_HOTPLUG_CPU
+	for_each_online_cpu(i)
+#endif
+	{
 		sprintf(buf, cpufreq_sysfs_place_holder, i);
 		scaling_gov = filp_open(buf, O_RDWR, 0);
 		if (IS_ERR_OR_NULL(scaling_gov)) {
