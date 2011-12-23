@@ -220,7 +220,7 @@ static int tps80031dcdc_list_voltage(struct regulator_dev *rdev, unsigned index)
 		if (index == 0)
 			voltage = 0;
 		else if (index < 58)
-			voltage = (600000 + (12500 * (index - 1)));
+			voltage = (607700 + (12660 * (index - 1)));
 		else if (index == 58)
 			voltage = 1350 * 1000;
 		else if (index == 59)
@@ -300,8 +300,8 @@ static int __tps80031_dcdc_set_voltage(struct device *parent,
 	case 0:
 		if (min_uV == 0)
 			vsel = 0;
-		else if ((min_uV >= 600000) && (max_uV <= 1300000)) {
-			vsel = (min_uV - 600000) / 125;
+		else if ((min_uV >= 607700) && (max_uV <= 1300000)) {
+			vsel = (10 * (min_uV - 607700)) / 1266;
 			if (vsel % 100)
 				vsel += 100;
 			vsel /= 100;
@@ -422,7 +422,7 @@ decode:
 		if (vsel == 0)
 			voltage = 0;
 		else if (vsel < 58)
-			voltage = (600000 + (12500 * (vsel - 1)));
+			voltage = (607700 + (12660 * (vsel - 1)));
 		else if (vsel == 58)
 			voltage = 1350 * 1000;
 		else if (vsel == 59)
