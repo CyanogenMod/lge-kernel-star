@@ -925,7 +925,7 @@ static void cpufreq_set_governor(char *governor)
 	/* change to KERNEL_DS address limit */
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-#ifndef CONFIG_HOTPLUG_CPU
+#ifndef CONFIG_TEGRA_AUTO_HOTPLUG
 	for_each_online_cpu(i)
 #endif
 	{
