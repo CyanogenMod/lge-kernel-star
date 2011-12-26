@@ -63,7 +63,7 @@
 	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x470)
 
 #ifdef CONFIG_SMP
-static s64 tegra_cpu_wake_by_time[4] = {
+static u64 tegra_cpu_wake_by_time[4] = {
 	LLONG_MAX, LLONG_MAX, LLONG_MAX, LLONG_MAX };
 #endif
 
@@ -118,7 +118,7 @@ void tegra3_cpu_idle_stats_lp2_time(unsigned int cpu, s64 us)
 bool tegra3_lp2_is_allowed(struct cpuidle_device *dev,
 	struct cpuidle_state *state)
 {
-	s64 request;
+	unsigned int request;
 
 	if (!tegra_all_cpus_booted)
 		return false;
@@ -165,7 +165,7 @@ static inline void tegra3_lp3_fall_back(struct cpuidle_device *dev)
 }
 
 static void tegra3_idle_enter_lp2_cpu_0(struct cpuidle_device *dev,
-			   struct cpuidle_state *state, s64 request)
+			   struct cpuidle_state *state, unsigned int request)
 {
 	ktime_t entry_time;
 	ktime_t exit_time;
@@ -183,7 +183,7 @@ static void tegra3_idle_enter_lp2_cpu_0(struct cpuidle_device *dev,
 
 #ifdef CONFIG_SMP
 	if (!is_lp_cluster() && (num_online_cpus() > 1)) {
-		s64 wake_time;
+		u64 wake_time;
 		unsigned int i;
 
 		/* Disable the distributor -- this is the only way to
@@ -214,7 +214,7 @@ static void tegra3_idle_enter_lp2_cpu_0(struct cpuidle_device *dev,
 		/* CPU0 must wake up before any of the other CPUs. */
 		smp_rmb();
 		for (i = 1; i < CONFIG_NR_CPUS; i++)
-			wake_time = min_t(s64, wake_time,
+			wake_time = min_t(u64, wake_time,
 				tegra_cpu_wake_by_time[i]);
 
 		/* LP2 actual targeted wake time */
@@ -224,9 +224,9 @@ static void tegra3_idle_enter_lp2_cpu_0(struct cpuidle_device *dev,
 #endif
 
 	if (request > state->target_residency) {
-		s64 sleep_time = request - tegra_lp2_exit_latency;
+		u64 sleep_time = request - tegra_lp2_exit_latency;
 
-		bin = time_to_bin((u32)request / 1000);
+		bin = time_to_bin(request / 1000);
 		idle_stats.tear_down_count[cpu_number(dev->cpu)]++;
 		idle_stats.lp2_count++;
 		idle_stats.lp2_count_bin[bin]++;
@@ -270,9 +270,10 @@ static void tegra3_idle_enter_lp2_cpu_0(struct cpuidle_device *dev,
 		 * Stayed in LP2 for the full time until the next tick,
 		 * adjust the exit latency based on measurement
 		 */
-		int offset = ktime_to_us(ktime_sub(exit_time, entry_time))
+		unsigned int offset = ktime_to_us(
+			ktime_sub(exit_time, entry_time))
 			- request;
-		int latency = tegra_lp2_exit_latency + offset / 16;
+		unsigned int latency = tegra_lp2_exit_latency + offset / 16;
 		latency = clamp(latency, 0, 10000);
 		tegra_lp2_exit_latency = latency;
 		smp_wmb();
@@ -282,14 +283,14 @@ static void tegra3_idle_enter_lp2_cpu_0(struct cpuidle_device *dev,
 		idle_stats.in_lp2_time[cpu_number(dev->cpu)] +=
 			ktime_to_us(ktime_sub(exit_time, entry_time));
 
-		pr_debug("%lld %lld %d %d\n", request,
+		pr_debug("%d %lld %d %d\n", request,
 			ktime_to_us(ktime_sub(exit_time, entry_time)),
 			offset, bin);
 	}
 }
 
 static void tegra3_idle_enter_lp2_cpu_n(struct cpuidle_device *dev,
-			   struct cpuidle_state *state, s64 request)
+			   struct cpuidle_state *state, unsigned int request)
 {
 #ifdef CONFIG_SMP
 	ktime_t entery_time;
@@ -333,7 +334,7 @@ static void tegra3_idle_enter_lp2_cpu_n(struct cpuidle_device *dev,
 void tegra3_idle_lp2(struct cpuidle_device *dev,
 			   struct cpuidle_state *state)
 {
-	s64 request = ktime_to_us(tick_nohz_get_sleep_length());
+	unsigned int request = ktime_to_us(tick_nohz_get_sleep_length());
 	bool last_cpu = tegra_set_cpu_in_lp2(dev->cpu);
 
 	cpu_pm_enter();

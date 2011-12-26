@@ -23,7 +23,7 @@
 
 #ifdef CONFIG_PM_SLEEP
 
-extern int tegra_lp2_exit_latency;
+extern unsigned int tegra_lp2_exit_latency;
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 void tegra2_idle_lp2(struct cpuidle_device *dev, struct cpuidle_state *state);
