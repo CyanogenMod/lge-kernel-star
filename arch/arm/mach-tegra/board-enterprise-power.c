@@ -303,7 +303,7 @@ struct tps80031_clk32k_init_data clk32k_idata[] = {
 	{
 		.clk32k_nr = TPS80031_CLOCK32K_G,
 		.enable = true,
-		.ext_ctrl_flag = PWR_REQ_INPUT_PREQ1,
+		.ext_ctrl_flag = 0,
 	},
 	{
 		.clk32k_nr = TPS80031_CLOCK32K_AUDIO,
