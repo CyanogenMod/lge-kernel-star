@@ -45,6 +45,8 @@
 #include "../../../../video/tegra/nvmap/nvmap.h"
 #include "../../../../video/tegra/host/t20/syncpt_t20.h"
 #include "../../../../video/tegra/host/dev.h"
+#include "../../../../video/tegra/host/nvhost_acm.h"
+
 #if defined(CONFIG_TEGRA_AVP_KERNEL_ON_MMU)
 #include "../avp/headavp.h"
 #endif
@@ -991,7 +993,6 @@ err_reloc_info:
 err_cmdbuf_mmap:
 	nvmap_unpin(nvavp->nvmap, cmdbuf_dupe);
 	nvmap_free(nvavp->nvmap, cmdbuf_dupe);
-
 	return ret;
 }
 
@@ -1023,6 +1024,7 @@ static int tegra_nvavp_open(struct inode *inode, struct file *filp)
 
 	filp->private_data = clientctx;
 
+	nvhost_module_busy(&nvavp->nvhost_dev->host->mod);
 	mutex_unlock(&nvavp->open_lock);
 
 	return ret;
@@ -1037,6 +1039,7 @@ static int tegra_nvavp_release(struct inode *inode, struct file *filp)
 	dev_dbg(&nvavp->nvhost_dev->dev, "%s: ++\n", __func__);
 
 	filp->private_data = NULL;
+	nvhost_module_idle(&nvavp->nvhost_dev->host->mod);
 
 	mutex_lock(&nvavp->open_lock);
 
@@ -1353,11 +1356,19 @@ static int tegra_nvavp_remove(struct nvhost_device *ndev)
 #ifdef CONFIG_PM
 static int tegra_nvavp_suspend(struct nvhost_device *ndev, pm_message_t state)
 {
+	struct nvavp_info *nvavp = nvhost_get_drvdata(ndev);
+
+	if (nvavp->refcount)
+		nvhost_module_idle(&ndev->host->mod);
 	return 0;
 }
 
 static int tegra_nvavp_resume(struct nvhost_device *ndev)
 {
+	struct nvavp_info *nvavp = nvhost_get_drvdata(ndev);
+
+	if (nvavp->refcount)
+		nvhost_module_busy(&ndev->host->mod);
 	return 0;
 }
 #endif
