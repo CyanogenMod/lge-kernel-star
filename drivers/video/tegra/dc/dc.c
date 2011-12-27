@@ -11,7 +11,7 @@
  * may be copied, distributed, and modified under those terms.
  *
  * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * but WITHOUT ANY WARRANTY; without eve<<n the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
@@ -45,7 +45,7 @@
 #include <linux/gpio.h>
 #include <../../../../arch/arm/mach-tegra/gpio-names.h>
 #include <../../../../arch/arm/mach-tegra/lge/star/include/lge/board-star.h>
-#endif // MOBII_CHANGE [jg.noh@mobii.co.kr] 2012-03-01 Added to enable hdmi controler 
+#endif // MOBII_CHANGE [jg.noh@mobii.co.kr] 2012-03-01 Added to enable hdmi controler
 
 #include <mach/clk.h>
 #include <mach/dc.h>
@@ -73,19 +73,19 @@
 	#define DC_LGD_PANEL	0
 	/****************************/
 	#endif
-	
+
 	#if (DC_HITACH_PANEL)
 		#define TEGRA_DC_PANEL_CLEAR 0	// HITACH LCD do not need this.
 	#else
 		#define TEGRA_DC_PANEL_CLEAR 1	// This is for BTA implement LGD panel.
-	
+
 		#if (TEGRA_DC_PANEL_CLEAR)
 		static unsigned int n_frame_end_cnt = 0;
 		static unsigned int n_v_blank_cnt = 0;
-	
+
 		static ktime_t starttime;
 		static ktime_t stoptime;
-	
+
 		//#define DEBUG_DC_IRQ // This is only for debug
 		#endif
 	#endif
@@ -111,7 +111,7 @@
 #define ALL_UF_INT (0)
 #endif
 
-#if defined (CONFIG_PANICRPT)   
+#if defined (CONFIG_PANICRPT)
 extern int panicrpt_status_check(void);
 extern int panicrpt_ispanic(void);
 static bool start_panicrpt = false;
@@ -149,7 +149,7 @@ static const struct {
 };
 
 
-#if defined(CONFIG_PANICRPT) 
+#if defined(CONFIG_PANICRPT)
 void panicrpt_ready( bool flag )
 {
 	start_panicrpt = flag;
@@ -1067,6 +1067,24 @@ static void tegra_dc_clear_bandwidth(struct tegra_dc *dc)
 	dc->emc_clk_rate = 0;
 }
 
+/* program bandwidth needs if higher than old bandwidth */
+static void tegra_dc_increase_bandwidth(struct tegra_dc *dc)
+{
+	unsigned i;
+
+	if (dc->emc_clk_rate < dc->new_emc_clk_rate) {
+		dc->emc_clk_rate = dc->new_emc_clk_rate;
+		clk_set_rate(dc->emc_clk, dc->emc_clk_rate);
+	}
+
+	for (i = 0; i < DC_N_WINDOWS; i++) {
+		struct tegra_dc_win *w = &dc->windows[i];
+		if (w->bandwidth < w->new_bandwidth && w->new_bandwidth != 0)
+			tegra_dc_set_latency_allowance(dc, w);
+	}
+}
+
+/* program the current bandwidth */
 static void tegra_dc_program_bandwidth(struct tegra_dc *dc)
 {
 	unsigned i;
@@ -1330,18 +1348,19 @@ int tegra_dc_update_windows(struct tegra_dc_win *windows[], int n)
 
 // LGE_CHANGE_S [chan.jeong@lge.com] 2011-01-14, [LGE_AP20] CPU-interface LCD
 #ifdef CONFIG_MACH_LGE
-#if defined (CONFIG_PANICRPT)   
+#if defined (CONFIG_PANICRPT)
 	if ( start_panicrpt ) {
 		if ( panicrpt_ispanic() && panicrpt_status_check()>0 ){
 			//printk ( KERN_INFO " NOT UPDATE DC !!!!!!!!!! \n ");
 			return 0;
 		}
 	}
-#endif		 	
+#endif
 #endif
 // LGE_CHANGE_E [chan.jeong@lge.com] 2011-01-14
 
 	tegra_dc_set_dynamic_emc(windows, n);
+	tegra_dc_increase_bandwidth(dc);
 
 	tegra_dc_writel(dc, update_mask << 8, DC_CMD_STATE_CONTROL);
 
@@ -2792,7 +2811,7 @@ static bool _tegra_dc_enable(struct tegra_dc *dc)
 {
 #if 0//MOBII_CHNANGE_S 20120716 hskim@mobii.co.kr : Moved HDMI Setting  //def CONFIG_MACH_STAR
 	gpio_set_value(TEGRA_GPIO_HDMI_EN, 1);
-#endif // MOBII_CHANGE HDMI Can control the mode when HDMI is enabled. 
+#endif // MOBII_CHANGE HDMI Can control the mode when HDMI is enabled.
 
 	if (dc->mode.pclk == 0)
 		return false;
@@ -2943,7 +2962,7 @@ void tegra_dc_disable(struct tegra_dc *dc)
 		dc->out_ops->suspend(dc);
 
 	// dsi power off when early suspend
-	if ((dc->out->type == TEGRA_DC_OUT_DSI || 
+	if ((dc->out->type == TEGRA_DC_OUT_DSI ||
 		dc->out->type == TEGRA_DC_OUT_CPU) &&
 		dc->out && dc->out->postsuspend) {
 		dc->out->postsuspend();
