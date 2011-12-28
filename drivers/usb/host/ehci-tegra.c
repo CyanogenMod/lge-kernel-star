@@ -576,10 +576,9 @@ restart:
 		tegra_ehci_phy_restore_end(tegra->phy);
 	if (hsic) {
 		val = readl(&hw->port_status[0]);
-		if (!((val & PORT_POWER) && (val & PORT_PE))) {
+		if (!((val & PORT_POWER) && (val & PORT_PE)))
 			tegra_ehci_restart(hcd, false);
-			usb_set_device_state(udev, USB_STATE_CONFIGURED);
-		}
+
 		tegra_usb_phy_bus_idle(tegra->phy);
 		tegra->hsic_connect_retries = 0;
 		if (!tegra_usb_phy_is_device_connected(tegra->phy))
