@@ -45,8 +45,8 @@ linux rtc driver refers 1900 as base year in many calculations.
 #define os_ref_year 1900
 
 /*
-	pmu rtc have only 2 nibbles to store year information, so using an offset
-	of 100 to set the base year as 2000 for our driver.
+	pmu rtc have only 2 nibbles to store year information, so using an
+	offset of 100 to set the base year as 2000 for our driver.
 */
 #define rtc_year_offset 100
 
@@ -84,16 +84,21 @@ static int ricoh583_write_regs(struct device *dev, int reg, int len,
 	return ret;
 }
 
-static int ricoh583_rtc_valid_tm(struct rtc_time *tm)
+static int ricoh583_rtc_valid_tm(struct device *dev, struct rtc_time *tm)
 {
 	if (tm->tm_year >= (rtc_year_offset + 99)
-		|| tm->tm_mon >= 12
+		|| tm->tm_mon > 12
 		|| tm->tm_mday < 1
-		|| tm->tm_mday > rtc_month_days(tm->tm_mon, tm->tm_year + os_ref_year)
+		|| tm->tm_mday > rtc_month_days(tm->tm_mon,
+			tm->tm_year + os_ref_year)
 		|| tm->tm_hour >= 24
 		|| tm->tm_min >= 60
-		|| tm->tm_sec >= 60)
+		|| tm->tm_sec >= 60) {
+		dev_err(dev->parent, "\n returning error due to time"
+		"%d/%d/%d %d:%d:%d", tm->tm_mon, tm->tm_mday,
+		tm->tm_year, tm->tm_hour, tm->tm_min, tm->tm_sec);
 		return -EINVAL;
+	}
 	return 0;
 }
 
@@ -143,10 +148,10 @@ static int ricoh583_rtc_read_time(struct device *dev, struct rtc_time *tm)
 	tm->tm_hour = buff[2];
 	tm->tm_wday = buff[3];
 	tm->tm_mday = buff[4];
-	tm->tm_mon  = buff[5];
-	tm->tm_year = buff[6];
+	tm->tm_mon  = buff[5] - 1;
+	tm->tm_year = buff[6] + rtc_year_offset;
 	print_time(dev, tm);
-	return ricoh583_rtc_valid_tm(tm);
+	return ricoh583_rtc_valid_tm(dev, tm);
 }
 
 static int ricoh583_rtc_set_time(struct device *dev, struct rtc_time *tm)
@@ -154,15 +159,14 @@ static int ricoh583_rtc_set_time(struct device *dev, struct rtc_time *tm)
 	u8 buff[7];
 	int err;
 
+	print_time(dev, tm);
 	buff[0] = tm->tm_sec;
 	buff[1] = tm->tm_min;
 	buff[2] = tm->tm_hour;
 	buff[3] = tm->tm_wday;
 	buff[4] = tm->tm_mday;
-	buff[5] = tm->tm_mon;
-	buff[6] = tm->tm_year;
-
-	print_time(dev, tm);
+	buff[5] = tm->tm_mon + 1;
+	buff[6] = tm->tm_year - rtc_year_offset;
 
 	convert_decimal_to_bcd(buff, sizeof(buff));
 	err = ricoh583_write_regs(dev, rtc_seconds_reg, sizeof(buff), buff);
@@ -186,35 +190,41 @@ static int ricoh583_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	if (rtc->irq == -1)
 		return -EIO;
 
-	dev_info(dev->parent, "\n setting alarm to requested time::\n");
-	print_time(dev->parent, &alrm->time);
 	rtc_tm_to_time(&alrm->time, &seconds);
 	ricoh583_rtc_read_time(dev, &tm);
 	rtc_tm_to_time(&tm, &rtc->epoch_start);
+	/*
+		work around: As YAL does not provide the seconds register,
+		program minute register to next minute, in cases when alarm
+		is requested within a minute from the current time.
+	*/
+	if (seconds - rtc->epoch_start < 60)
+		alrm->time.tm_min += 1;
+	dev_info(dev->parent, "\n setting alarm to requested time::\n");
+	print_time(dev->parent, &alrm->time);
 
 	if (WARN_ON(alrm->enabled && (seconds < rtc->epoch_start))) {
 		dev_err(dev->parent, "\n can't set alarm to requested time\n");
 		return -EINVAL;
 	}
 
-	if (alrm->enabled && !rtc->irq_en) {
+	if (alrm->enabled && !rtc->irq_en)
 		rtc->irq_en = true;
-	} else if (!alrm->enabled && rtc->irq_en) {
+	else if (!alrm->enabled && rtc->irq_en)
 		rtc->irq_en = false;
-	}
 
 	buff[0] = alrm->time.tm_min;
 	buff[1] = alrm->time.tm_hour;
 	buff[2] = alrm->time.tm_mday;
-	buff[3] = alrm->time.tm_mon;
-	buff[4] = alrm->time.tm_year;
+	buff[3] = alrm->time.tm_mon + 1;
+	buff[4] = alrm->time.tm_year - rtc_year_offset;
 	convert_decimal_to_bcd(buff, sizeof(buff));
 	err = ricoh583_write_regs(dev, rtc_alarm_y, sizeof(buff), buff);
-	if (err){
+	if (err) {
 		dev_err(dev->parent, "\n unable to set alarm\n");
 		return -EBUSY;
 	}
-	buff[0] = 0x25; /* to enable alarm_y */
+	buff[0] = 0x20; /* to enable alarm_y */
 	buff[1] = 0x20; /* to enable 24-hour format */
 	err = ricoh583_write_regs(dev, rtc_ctrl1, 2, buff);
 	if (err) {
@@ -237,8 +247,8 @@ static int ricoh583_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	alrm->time.tm_min  = buff[0];
 	alrm->time.tm_hour = buff[1];
 	alrm->time.tm_mday = buff[2];
-	alrm->time.tm_mon  = buff[3];
-	alrm->time.tm_year = buff[4];
+	alrm->time.tm_mon  = buff[3] - 1;
+	alrm->time.tm_year = buff[4] + rtc_year_offset;
 
 	dev_info(dev->parent, "\n getting alarm time::\n");
 	print_time(dev, &alrm->time);
@@ -315,7 +325,7 @@ static int __devinit ricoh583_rtc_probe(struct platform_device *pdev)
 		return -EBUSY;
 	}
 
-	reg[0] = 0x25; /* to enable alarm_y */
+	reg[0] = 0x20; /* to enable alarm_y */
 	reg[1] = 0x20; /* to enable 24-hour format */
 	err = ricoh583_write_regs(&pdev->dev, rtc_ctrl1, 2, reg);
 	if (err) {
@@ -324,8 +334,8 @@ static int __devinit ricoh583_rtc_probe(struct platform_device *pdev)
 	}
 
 	ricoh583_rtc_read_time(&pdev->dev, &tm);
-	if ((tm.tm_year < rtc_year_offset || tm.tm_year > (rtc_year_offset + 99))){
-		if (pdata->time.tm_year < 2000 || pdata->time.tm_year > 2100)	{
+	if (ricoh583_rtc_valid_tm(&pdev->dev, &tm)) {
+		if (pdata->time.tm_year < 2000 || pdata->time.tm_year > 2100) {
 			memset(&pdata->time, 0, sizeof(pdata->time));
 			pdata->time.tm_year = rtc_year_offset;
 			pdata->time.tm_mday = 1;
