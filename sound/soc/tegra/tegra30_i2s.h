@@ -252,6 +252,8 @@ struct tegra30_i2s {
 #ifdef CONFIG_PM
 	u32  reg_cache[(TEGRA30_I2S_CIF_TX_CTRL >> 2) + 1];
 #endif
+	int call_record_dam_ifc;
+	int is_call_mode_rec;
 };
 
 struct codec_config {
