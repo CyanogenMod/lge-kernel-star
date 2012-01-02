@@ -46,7 +46,7 @@
 #include "pm.h"
 #include "sleep.h"
 
-unsigned int tegra_lp2_exit_latency;
+int tegra_lp2_exit_latency;
 static int tegra_lp2_power_off_time;
 static unsigned int tegra_lp2_min_residency;
 
