@@ -225,7 +225,7 @@ static int tegra2_idle_lp2_cpu_0(struct cpuidle_device *dev,
 	if (request > state->target_residency) {
 		s64 sleep_time = request - tegra_lp2_exit_latency;
 
-		bin = time_to_bin(u32)request / 1000);
+		bin = time_to_bin((u32)request / 1000);
 		idle_stats.lp2_count++;
 		idle_stats.lp2_count_bin[bin]++;
 
