@@ -326,11 +326,12 @@ typedef struct {
 /* #define TS0710LOG */ 
 #ifdef TS0710LOG
 #define TS0710_LOG(fmt, arg...) printk("\nTS07.10: "fmt, ## arg)
+#define TS0710_PRINTK(fmt, arg...) printk(KERN_INFO "TS07.10: " fmt, ## arg) 
 #else
 #define TS0710_LOG(fmt...)
+#define TS0710_PRINTK(fmt...)
 #endif
 
-#define TS0710_PRINTK(fmt, arg...) printk(KERN_INFO "TS07.10: " fmt, ## arg) 
 #define MUX_EA			1
 #define MUX_BASIC_FLAG_SEQ	0xf9
 #define MUX_ADVANCED_FLAG_SEQ	0x7e
