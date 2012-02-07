@@ -566,10 +566,16 @@ static void rin_receive_buf(struct tty_struct *tty, const unsigned char *cp,
 	if (!sl || sl->magic != RIN_MAGIC || !netif_running(sl->dev))
 		return;
 
+// 2011.2.2 [ril] improve the performance of TCP Throughput [start]
+#if defined (CONFIG_MACH_STAR_REV_F)
 	sl->rx_bytes += count;
+#endif
 	skb = dev_alloc_skb(count);
 	if (skb == NULL) {
 		printk(KERN_WARNING "%s: memory squeeze, dropping packet.\n", sl->dev->name);
+#if defined (CONFIG_MACH_STAR_TMUS)
+        sl->rx_bytes += count;
+#endif
 		sl->rx_dropped++;
 		return;
 	}
@@ -577,10 +583,17 @@ static void rin_receive_buf(struct tty_struct *tty, const unsigned char *cp,
 	memcpy(skb_put(skb, count), cp, count);
 	skb_reset_mac_header(skb);
 	skb->protocol = htons(ETH_P_IP);
-
+#if defined (CONFIG_MACH_STAR_TMUS)
+    spin_lock_bh(&sl->lock);
+	sl->rx_bytes += count;
+#endif
 	netif_rx(skb);
 	sl->rx_packets++;
+#if defined (CONFIG_MACH_STAR_TMUS)
+    spin_unlock_bh(&sl->lock);
+#endif
 
+// 2011.2.2 [ril] improve the performance of TCP Throughput [end]
 #ifdef RIN_DEINSALA_DEBUG
     printk(KERN_INFO "%s: rin_receive_buf: netif_rx(skb) received packet of %d bytes from TTY\n", sl->dev->name, count);
     printk(KERN_INFO "%s: rin_receive_buf: tty_chars_in_buffer(sl->tty): %d\n", sl->dev->name, tty_chars_in_buffer(sl->tty));
@@ -767,6 +780,10 @@ static int rin_open(struct tty_struct *tty)
 			sl = netdev_priv(rin_devs[realloc_count]);
 			printk("%s - line : %d, realloc sl->dev = %x\n", __FUNCTION__, __LINE__, sl->dev);
 			realloc_count ++;
+			// START:: RIP-11174 [Data] Upon RIL recovery completion, multiple RIN channel should be opened.
+			err = 0;
+			// END:: RIP-11174 [Data] Upon RIL recovery completion, multiple RIN channel should be opened.
+
 		}
 	}
 	else
@@ -807,7 +824,11 @@ static int rin_open(struct tty_struct *tty)
 	/* Done.  We have linked the TTY line to a channel. */
 	rtnl_unlock();
 	tty->receive_room = 65536;	/* We don't flow control */
-	return sl->dev->base_addr;
+	// START:: RIP-11174 [Data] Upon RIL recovery completion, multiple RIN channel should be opened.
+	//ril_open must return 0, if succeed
+	//return sl->dev->base_addr;
+	return err;
+	// END:: RIP-11174 [Data] Upon RIL recovery completion, multiple RIN channel should be opened.
 
 err_free_bufs:
 	rin_free_bufs(sl);
@@ -857,7 +878,11 @@ static void rin_close(struct tty_struct *tty)
 	/* First make sure we're connected. */
 	if (!sl || sl->magic != RIN_MAGIC || sl->tty != tty)
 		return;
-
+	// START:: RIP-11174 [Data] Upon RIL recovery completion, multiple RIN channel should be opened.
+	spin_lock(&sl->lock);		
+    if(rin_tx_wq)
+        flush_workqueue(rin_tx_wq);
+	// END:: RIP-11174 [Data] Upon RIL recovery completion, multiple RIN channel should be opened.
 	tty_ldisc_flush(tty);
 	tty->disc_data = NULL;
 	sl->tty = NULL;
@@ -866,6 +891,9 @@ static void rin_close(struct tty_struct *tty)
 	
 	rindrv_count++;
 	printk("%s - line : %d - rindrv_count = %d\n", __FUNCTION__, __LINE__, rindrv_count);
+	// START:: RIP-11174 [Data] Upon RIL recovery completion, multiple RIN channel should be opened.
+	spin_unlock(&sl->lock);
+	// END:: RIP-11174 [Data] Upon RIL recovery completion, multiple RIN channel should be opened.
 }
 
 /* Perform I/O control on an active RIN channel. */

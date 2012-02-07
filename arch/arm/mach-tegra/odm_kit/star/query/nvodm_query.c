@@ -1254,7 +1254,7 @@ NvBool NvOdmQueryGetPmuProperty(NvOdmPmuProperty* pPmuProperty)
 
     pPmuProperty->IrqConnected = NV_TRUE; // 20100928, , RTC alarm enable 
 
-    pPmuProperty->PowerGoodCount = 0x7E;
+    pPmuProperty->PowerGoodCount = 0x7E7E;
     pPmuProperty->IrqPolarity = NvOdmInterruptPolarity_Low;
     
     // Not there yet, add it later ...

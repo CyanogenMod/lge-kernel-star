@@ -56,11 +56,7 @@ obj-$(CONFIG_STAR_COMPASS2)		+= sensor.module/
 
 obj-$(CONFIG_STAR_ERS_TEST)	+= star_ers.o
 #20100730, , CP Watcher
-ifeq ($(CONFIG_MACH_STAR_TMUS),y)
-obj-$(CONFIG_STAR_CPWATCHER) += cpwatcher_p999.o
-else
 obj-$(CONFIG_STAR_CPWATCHER) += cpwatcher.o
-endif
 
 obj-$(CONFIG_STAR_HALL)	+= star_hall.o
 obj-$(CONFIG_STAR_BL) += star_bl.o
