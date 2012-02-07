@@ -1657,7 +1657,7 @@ static struct platform_device star_wm8994_pdevice =
 #else
 #define RAM_CONSOLE_RESERVED_SIZE 1
 #endif
-#define CARVEOUT_SIZE 128
+#define CARVEOUT_SIZE 64
 #define STAR_RAM_CONSOLE_BASE 	((512-CARVEOUT_SIZE-RAM_CONSOLE_RESERVED_SIZE)*SZ_1M)
 #ifdef CONFIG_MACH_STAR_TMUS
 #define STAR_RAM_CONSOLE_SIZE	(128*SZ_1K) 	
