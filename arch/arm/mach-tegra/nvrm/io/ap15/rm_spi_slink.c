@@ -2366,7 +2366,7 @@ static NvError MasterModeReadWriteDma(
 
         if (!Error)
 
-#ifdef CONFIG_MACH_STAR_REV_F
+#ifndef CONFIG_MACH_STAR_REV_F
             WaitForTransferCompletion(hRmSpiSlink, 1000, NV_FALSE);	////20101218-3, , NVIDIA patch to protect infinite loop : WaitForTransferCompletion(hRmSpiSlink, NV_WAIT_INFINITE, NV_FALSE);
 #else
             nvError = WaitForTransferCompletion(hRmSpiSlink, 500, NV_FALSE);        ////20101218-3, , NVIDIA patch to protect infinite loop : WaitForTransferCompletion(hRmSpiSlink, NV_WAIT_INFINITE, NV_FALSE);	
