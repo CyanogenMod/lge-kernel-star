@@ -276,15 +276,15 @@ long nvrm_unlocked_ioctl(struct file *file,
             goto fail;
         }
 
-        if (priv->su) {
+//        if (priv->su) {
             err = NvRm_Dispatch( ptr, p.InBufferSize + p.InOutBufferSize,
                 ((NvU8 *)ptr) + p.InBufferSize, p.InOutBufferSize +
                 p.OutBufferSize, &dctx );
-        } else {
+ /*       } else {
             err = NvRm_Dispatch_Others( ptr, p.InBufferSize + p.InOutBufferSize,
                 ((NvU8 *)ptr) + p.InBufferSize, p.InOutBufferSize +
                 p.OutBufferSize, &dctx );
-        }
+        }*/
         if( err != NvSuccess )
         {
             printk( "NvRmIoctls_Generic: dispatch failure\n" );
