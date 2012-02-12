@@ -55,6 +55,8 @@ struct nvmem_create_handle {
 
 #define NVMEM_HANDLE_SECURE          (0x1ul << 2)
 
+#define NVMEM_HANDLE_NO_COKILLER   (0x1ul << 4)
+
 struct nvmem_alloc_handle {
 	__u32 handle;
 	__u32 heap_mask;
