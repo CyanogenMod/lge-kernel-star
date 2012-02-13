@@ -356,10 +356,10 @@ static int ram_console_driver_probe(struct platform_device *pdev)
 #else
        #define RAM_RESERVED_SIZE 100*1024
 #endif
-       // Shift by 64M, since we're using less carveout on ICS
+       // Shift by 32M, since we're using less carveout on ICS
        // This WILL match a chunk in the middle of active RAM, so it may crash
        // stuffs
-       reserved_start = start+ buffer_size - (64*SZ_1M);
+       reserved_start = start+ buffer_size - (32*SZ_1M);
        reserved_buffer = ioremap(reserved_start, RAM_RESERVED_SIZE);
        //memset(reserved_buffer, 0x00, 100*1024);
        printk ("ram console : ram_console virtual addr = 0x%x \n", buffer);
