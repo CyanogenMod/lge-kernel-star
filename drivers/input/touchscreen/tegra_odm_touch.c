@@ -375,7 +375,7 @@ static int tegra_touch_thread(void *pdata)
 	NvU32 i = 0;
 	NvU32 x[LGE_SUPPORT_FINGERS_NUM] = {0}, y[LGE_SUPPORT_FINGERS_NUM] = {0};
     NvU32 pressure[LGE_SUPPORT_FINGERS_NUM] = {0}, width[LGE_SUPPORT_FINGERS_NUM] = {0};
-    NvU32 prev_pressure[LGE_SUPPORT_FINGERS_NUM];
+    NvU32 prev_pressure;
     NvBool bKeepReadingSamples;
 
     NvBool ToolDown[LGE_SUPPORT_FINGERS_NUM] = {NV_FALSE, NV_FALSE};
@@ -489,11 +489,12 @@ static int tegra_touch_thread(void *pdata)
 					if (!width[i]) {
 						width[i] = 1;
 					}
-					/* WTF... can't send the same pressure twice in a row? */
-					if (pressure[i] == prev_pressure[i]) {
+					/* WTF... can't send the same pressure twice in a row? 
+                                           regardless of slot ?? */
+					if (pressure[i] == prev_pressure) {
 						pressure[i]++;
                                         }
-                                        prev_pressure[i] = pressure[i];
+                                        prev_pressure = pressure[i];
 					ToolDown[i] = NV_TRUE;
 					valid_fingers++;
 				}
@@ -532,6 +533,7 @@ static int tegra_touch_thread(void *pdata)
 									input_report_abs(touch->input_dev, ABS_MT_POSITION_Y, y[i]);
 									input_report_abs(touch->input_dev, ABS_MT_PRESSURE, pressure[i]);
 									input_report_abs(touch->input_dev, ABS_MT_TOUCH_MAJOR, width[i]);
+									input_report_abs(touch->input_dev, ABS_MT_TRACKING_ID, i);
 									input_report_key(touch->input_dev, BTN_TOUCH, width[i] ? 1 : 0);
 									input_mt_sync(touch->input_dev);
 									touch_fingerprint(DebugMsgPrint, "[TOUCH] Finger1 Press x = %d, y = %d, width = %d\n", x[i], y[i], width[i]);
@@ -674,6 +676,7 @@ static int tegra_touch_thread(void *pdata)
 										input_report_abs(touch->input_dev, ABS_MT_POSITION_Y, y[i]);
 										input_report_abs(touch->input_dev, ABS_MT_PRESSURE, pressure[i]);
 										input_report_abs(touch->input_dev, ABS_MT_TOUCH_MAJOR, width[i]);
+										input_report_abs(touch->input_dev, ABS_MT_TRACKING_ID, i);
 										input_report_key(touch->input_dev, BTN_TOUCH, width[i] ? 1 : 0);
 										
 										input_mt_sync(touch->input_dev);
@@ -771,10 +774,11 @@ static int tegra_touch_thread(void *pdata)
 								input_report_abs(touch->input_dev, ABS_MT_POSITION_Y, y[i]);
 								input_report_abs(touch->input_dev, ABS_MT_PRESSURE, pressure[i]);
 								input_report_abs(touch->input_dev, ABS_MT_TOUCH_MAJOR, width[i]);
+								input_report_abs(touch->input_dev, ABS_MT_TRACKING_ID, i);
 								input_report_key(touch->input_dev, BTN_TOUCH, width[i] ? 1 : 0);
 
 								input_mt_sync(touch->input_dev);
-								touch_fingerprint(DebugMsgPrint, "[TOUCH] Finger%d Press x = %d, y = %d, press = %d\n", i+1, x[i], y[i], width[i]);
+								touch_fingerprint(DebugMsgPrint, "[TOUCH] Finger%d Press x = %d, y = %d, press = %d\n", i+1, x[i], y[i], pressure[i]);
 
 								lcd_finger_num++;
 							}
@@ -1142,6 +1146,7 @@ static int __init tegra_touch_probe(struct platform_device *pdev)
 		input_set_abs_params(touch->input_dev, ABS_MT_POSITION_Y, touch->MinY, touch->MaxY, 0, 0);
 		input_set_abs_params(touch->input_dev, ABS_MT_PRESSURE, 0, caps->MaxNumberOfPressureReported, 0, 0);
 		input_set_abs_params(touch->input_dev, ABS_MT_TOUCH_MAJOR, 0, caps->MaxNumberOfWidthReported, 0, 0);
+                input_set_abs_params(touch->input_dev, ABS_MT_TRACKING_ID, 0, 9, 0, 0);
 	}
 #else
 	input_set_abs_params(touch->input_dev, ABS_X, touch->MinX,
