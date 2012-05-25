@@ -2738,7 +2738,7 @@ unsigned long tegra_emc_to_cpu_ratio(unsigned long cpu_rate)
 
 #ifdef CONFIG_PM_SLEEP
 static u32 clk_rst_suspend[RST_DEVICES_NUM + CLK_OUT_ENB_NUM +
-			   PERIPH_CLK_SOURCE_NUM + 22];
+			   PERIPH_CLK_SOURCE_NUM + 24];
 
 static int tegra_clk_suspend(void)
 {
@@ -2749,6 +2749,8 @@ static int tegra_clk_suspend(void)
 		return 0;
 
 	*ctx++ = clk_readl(OSC_CTRL) & OSC_CTRL_MASK;
+	*ctx++ = clk_readl(tegra_pll_p_out1.reg);
+	*ctx++ = clk_readl(tegra_pll_p_out3.reg);
 	*ctx++ = clk_readl(tegra_pll_c.reg + PLL_BASE);
 	*ctx++ = clk_readl(tegra_pll_c.reg + PLL_MISC(&tegra_pll_c));
 	*ctx++ = clk_readl(tegra_pll_a.reg + PLL_BASE);
@@ -2801,6 +2803,8 @@ static void tegra_clk_resume(void)
 	unsigned long off, i;
 	const u32 *ctx = clk_rst_suspend;
 	u32 val;
+	u32 pll_p_out12, pll_p_out34;
+	u32 pll_m_out1, pll_a_out0, pll_c_out1;
 
 	if (tegra_get_current_suspend_mode() != TEGRA_SUSPEND_LP0)
 		return;
@@ -2808,6 +2812,19 @@ static void tegra_clk_resume(void)
 	val = clk_readl(OSC_CTRL) & ~OSC_CTRL_MASK;
 	val |= *ctx++;
 	clk_writel(val, OSC_CTRL);
+
+	/* Since we are going to reset devices and switch clock sources in this
+	 * function, plls and secondary dividers is required to be enabled. The
+	 * actual value will be restored back later. Note that boot plls: pllm,
+	 * pllp, and pllu are already configured and enabled.
+	 */
+
+	val = PLL_OUT_CLKEN | PLL_OUT_RESET_DISABLE;
+	val |= val << 16;
+	pll_p_out12 = *ctx++;
+	clk_writel(pll_p_out12 | val, tegra_pll_p_out1.reg);
+	pll_p_out34 = *ctx++;
+	clk_writel(pll_p_out34 | val, tegra_pll_p_out3.reg);
 
 	clk_writel(*ctx++, tegra_pll_c.reg + PLL_BASE);
 	clk_writel(*ctx++, tegra_pll_c.reg + PLL_MISC(&tegra_pll_c));
@@ -2821,9 +2838,13 @@ static void tegra_clk_resume(void)
 	clk_writel(*ctx++, tegra_pll_u.reg + PLL_MISC(&tegra_pll_u));
 	udelay(1000);
 
-	clk_writel(*ctx++, tegra_pll_m_out1.reg);
-	clk_writel(*ctx++, tegra_pll_a_out0.reg);
-	clk_writel(*ctx++, tegra_pll_c_out1.reg);
+	val = PLL_OUT_CLKEN | PLL_OUT_RESET_DISABLE;
+	pll_m_out1 = *ctx++;
+	clk_writel(pll_m_out1 | val, tegra_pll_m_out1.reg);
+	pll_a_out0 = *ctx++;
+	clk_writel(pll_a_out0 | val, tegra_pll_a_out0.reg);
+	pll_c_out1 = *ctx++;
+	clk_writel(pll_c_out1 | val, tegra_pll_c_out1.reg);
 
 	clk_writel(*ctx++, tegra_clk_cclk.reg);
 	clk_writel(*ctx++, tegra_clk_cclk.reg + SUPER_CLK_DIVIDER);
@@ -2860,6 +2881,13 @@ static void tegra_clk_resume(void)
 
 	clk_writel(*ctx++, MISC_CLK_ENB);
 	clk_writel(*ctx++, CLK_MASK_ARM);
+
+	/* Restore back the actual pll and secondary divider values */
+	clk_writel(pll_p_out12, tegra_pll_p_out1.reg);
+	clk_writel(pll_p_out34, tegra_pll_p_out3.reg);
+	clk_writel(pll_m_out1, tegra_pll_m_out1.reg);
+	clk_writel(pll_a_out0, tegra_pll_a_out0.reg);
+	clk_writel(pll_c_out1, tegra_pll_c_out1.reg);
 }
 
 #else
