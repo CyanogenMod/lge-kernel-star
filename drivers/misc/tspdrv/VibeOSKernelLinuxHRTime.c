@@ -54,6 +54,8 @@ static bool g_bTimerStarted = false;
 static struct hrtimer g_tspTimer;
 static ktime_t g_ktFiveMs;
 static int g_nWatchdogCounter = 0;
+static struct hrtimer g_autoTimer;
+static struct work_struct  vibrator_timeout;
 
 DEFINE_SEMAPHORE(g_hMutex);
 
@@ -83,6 +85,19 @@ static enum hrtimer_restart tsp_timer_interrupt(struct hrtimer *timer)
     }
 
     return HRTIMER_RESTART;
+}
+
+static enum hrtimer_restart autotimer_stop(struct hrtimer *timer)
+{
+    g_bStopRequested = true;
+    schedule_work(&vibrator_timeout);
+
+    return HRTIMER_NORESTART;
+}
+
+static void vibrator_timeout_work(struct work_struct *wq)
+{
+    ImmVibeSPI_ForceOut_AmpDisable(0);
 }
 
 static int VibeOSKernelProcessData(void* data)
@@ -169,6 +184,12 @@ static void VibeOSKernelLinuxInitTimer(void)
 
     /* Initialize a 5ms-timer with tsp_timer_interrupt as timer callback (interrupt driven)*/
     g_tspTimer.function = tsp_timer_interrupt;
+
+    /* Extend timers to enable a timed vibration */
+    hrtimer_init(&g_autoTimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+    g_autoTimer.function = autotimer_stop;
+
+    INIT_WORK(&vibrator_timeout, vibrator_timeout_work);
 }
 
 static void VibeOSKernelLinuxStartTimer(void)
@@ -210,6 +231,12 @@ static void VibeOSKernelLinuxStartTimer(void)
     {
         DbgOut((KERN_INFO "VibeOSKernelLinuxStartTimer: down_interruptible interrupted by a signal.\n"));
     }
+}
+
+static void VibeOSKernelLinuxAutoTimer(int timeout)
+{
+        hrtimer_cancel(&g_autoTimer);
+        hrtimer_start(&g_autoTimer, ktime_set(0, timeout*1000*1000), HRTIMER_MODE_REL);
 }
 
 static void VibeOSKernelLinuxStopTimer(void)
