@@ -80,13 +80,12 @@
 #endif
 
 #ifdef CONFIG_LGE_USB_GADGET_DRIVER
-#include "f_ecm.c"
-#include "u_ether.c"
-#else
 #define USB_ETH_RNDIS y
+#include "f_ecm.c"
 #include "f_rndis.c"
 #include "rndis.c"
 #include "u_ether.c"
+//#include "u_ether.c"
 #endif
 
 MODULE_AUTHOR("Mike Lockwood");
@@ -632,7 +631,188 @@ static struct android_usb_function ptp_function = {
 	.bind_config	= ptp_function_bind_config,
 };
 
+struct rndis_function_config {
+	u8      ethaddr[ETH_ALEN];
+	u32     vendorID;
+	char    manufacturer[256];
+	bool    wceis;
+};
+
+static int rndis_function_init(struct android_usb_function *f, struct usb_composite_dev *cdev)
+{
+	f->config = kzalloc(sizeof(struct rndis_function_config), GFP_KERNEL);
+	if (!f->config)
+		return -ENOMEM;
+	return 0;
+}
+
+static void rndis_function_cleanup(struct android_usb_function *f)
+{
+	kfree(f->config);
+	f->config = NULL;
+}
+
+static int rndis_function_bind_config(struct android_usb_function *f,
+		struct usb_configuration *c)
+{
+	int ret;
+	struct rndis_function_config *rndis = f->config;
+
+	if (!rndis) {
+		pr_err("%s: rndis_pdata\n", __func__);
+		return -1;
+	}
+
+	pr_info("%s MAC: %02X:%02X:%02X:%02X:%02X:%02X\n", __func__,
+			rndis->ethaddr[0], rndis->ethaddr[1], rndis->ethaddr[2],
+			rndis->ethaddr[3], rndis->ethaddr[4], rndis->ethaddr[5]);
+
+	ret = gether_setup_name(c->cdev->gadget, rndis->ethaddr, "rndis");
+	if (ret) {
+		pr_err("%s: gether_setup failed\n", __func__);
+		return ret;
+	}
+
+	if (rndis->wceis) {
+		/* "Wireless" RNDIS; auto-detected by Windows */
+		rndis_iad_descriptor.bFunctionClass =
+			USB_CLASS_WIRELESS_CONTROLLER;
+		rndis_iad_descriptor.bFunctionSubClass = 0x01;
+		rndis_iad_descriptor.bFunctionProtocol = 0x03;
+		rndis_control_intf.bInterfaceClass =
+			USB_CLASS_WIRELESS_CONTROLLER;
+		rndis_control_intf.bInterfaceSubClass =  0x01;
+		rndis_control_intf.bInterfaceProtocol =  0x03;
+	}
+
+	return rndis_bind_config(c, rndis->ethaddr, rndis->vendorID,
+			rndis->manufacturer);
+}
+
+static void rndis_function_unbind_config(struct android_usb_function *f,
+		struct usb_configuration *c)
+{
+	gether_cleanup();
+}
+static ssize_t rndis_manufacturer_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct rndis_function_config *config = f->config;
+	return sprintf(buf, "%s\n", config->manufacturer);
+}
+
+static ssize_t rndis_manufacturer_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct rndis_function_config *config = f->config;
+
+	if (size >= sizeof(config->manufacturer))
+		return -EINVAL;
+	if (sscanf(buf, "%s", config->manufacturer) == 1)
+		return size;
+	return -1;
+}
+static DEVICE_ATTR(manufacturer, S_IRUGO | S_IWUSR, rndis_manufacturer_show,
+		rndis_manufacturer_store);
+
+static ssize_t rndis_wceis_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct rndis_function_config *config = f->config;
+	return sprintf(buf, "%d\n", config->wceis);
+}
+
+static ssize_t rndis_wceis_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct rndis_function_config *config = f->config;
+	int value;
+
+	if (sscanf(buf, "%d", &value) == 1) {
+		config->wceis = value;
+		return size;
+	}
+	return -EINVAL;
+}
+
+static DEVICE_ATTR(wceis, S_IRUGO | S_IWUSR, rndis_wceis_show,
+		rndis_wceis_store);
+
+static ssize_t rndis_ethaddr_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct rndis_function_config *rndis = f->config;
+	return sprintf(buf, "%02x:%02x:%02x:%02x:%02x:%02x\n",
+			rndis->ethaddr[0], rndis->ethaddr[1], rndis->ethaddr[2],
+			rndis->ethaddr[3], rndis->ethaddr[4], rndis->ethaddr[5]);
+}
+
+static ssize_t rndis_ethaddr_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct rndis_function_config *rndis = f->config;
+
+	if (sscanf(buf, "%02x:%02x:%02x:%02x:%02x:%02x\n",
+				(int *)&rndis->ethaddr[0], (int *)&rndis->ethaddr[1],
+				(int *)&rndis->ethaddr[2], (int *)&rndis->ethaddr[3],
+				(int *)&rndis->ethaddr[4], (int *)&rndis->ethaddr[5]) == 6)
+		return size;
+	return -EINVAL;
+}
+
+static DEVICE_ATTR(ethaddr, S_IRUGO | S_IWUSR, rndis_ethaddr_show,
+		rndis_ethaddr_store);
+
+static ssize_t rndis_vendorID_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct rndis_function_config *config = f->config;
+	return sprintf(buf, "%04x\n", config->vendorID);
+}
+
+static ssize_t rndis_vendorID_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct rndis_function_config *config = f->config;
+	int value;
+
+	if (sscanf(buf, "%04x", &value) == 1) {
+		config->vendorID = value;
+		return size;
+	}
+	return -EINVAL;
+}
+
+static DEVICE_ATTR(vendorID, S_IRUGO | S_IWUSR, rndis_vendorID_show,
+		rndis_vendorID_store);
+
+static struct device_attribute *rndis_function_attributes[] = {
+	&dev_attr_manufacturer,
+	&dev_attr_wceis,
+	&dev_attr_ethaddr,
+	&dev_attr_vendorID,
+	NULL
+};
+
+static struct android_usb_function rndis_function = {
+	.name           = "rndis",
+	.init           = rndis_function_init,
+	.cleanup        = rndis_function_cleanup,
+	.bind_config    = rndis_function_bind_config,
+	.unbind_config  = rndis_function_unbind_config,
+	.attributes     = rndis_function_attributes,
+};
+
 #ifdef CONFIG_LGE_USB_GADGET_DRIVER
+#if 0
 static struct ecm_function_config {
 	u8      ethaddr[ETH_ALEN];
 	u32     vendorID;
@@ -780,6 +960,7 @@ static struct android_usb_function ecm_function = {
 	.attributes	= ecm_function_attributes,
 };
 
+#endif
 #endif
 
 struct mass_storage_function_config {
@@ -1148,7 +1329,9 @@ static struct android_usb_function *supported_functions[] = {
 	&serial_gps_function,
 //LGE_CHANGE_S seokjae.yoon@lge.com 2012/02/13: ==> for NMEA
 #endif
+#if 0
 	&ecm_function,
+#endif
 	&mass_storage_function,
 /*
 #ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_AUTORUN //LGE_CHANGE_S  youngjae.ko@lge.com 2012/01/12:  ==> Autorun mode test
@@ -1161,6 +1344,7 @@ static struct android_usb_function *supported_functions[] = {
 	&accessory_function,
 	&mtp_function,
 	&ptp_function,
+	&rndis_function,
 	&adb_function,
 #ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_CHARGEMODE //LGE_CHANGE_S  youngjae.ko@lge.com 2012/01/12:  ==> Charge only mode test
 	&charge_only_function,
