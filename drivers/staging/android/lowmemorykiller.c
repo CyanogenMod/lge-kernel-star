@@ -185,7 +185,7 @@ static int lowmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
 		     nr_to_scan, gfp_mask, rem);
 	read_unlock(&tasklist_lock);
     if (selected)
-        compact_nodes();
+        compact_nodes(false);
 	return rem;
 }
 
