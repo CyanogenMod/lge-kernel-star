@@ -168,6 +168,14 @@ config MACH_STAR_DUMP_GPIO
 	help
 	  Support for the LGE STAR GPIO DUMP	  
 
+config CM_BOOTLOADER_COMPAT
+    bool "CyanogenMod boot with the older (pre-ICS) bootloaders"
+	default y
+	depends on MACH_STAR
+	help
+	  Allow CM (and other custom builds) to run on the older (and 
+          unlocked) bootloaders
+
 
 comment " Kernel Debug Selection  "    	  	  
 
