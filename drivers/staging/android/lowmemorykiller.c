@@ -58,7 +58,7 @@ static int lowmem_minfree_size = 4;
 static struct task_struct *lowmem_deathpending;
 static unsigned long lowmem_deathpending_timeout;
 
-extern int compact_nodes();
+extern int compact_nodes(bool sync);
 
 #define lowmem_print(level, x...)			\
 	do {						\
