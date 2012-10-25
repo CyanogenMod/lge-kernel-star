@@ -98,7 +98,17 @@ static inline struct f_acm *port_to_acm(struct gserial *p)
 /* notification endpoint uses smallish and infrequent fixed-size messages */
 
 #define GS_LOG2_NOTIFY_INTERVAL		5	/* 1 << 5 == 32 msec */
+
+
+#ifdef CONFIG_LGE_USB_GADGET_DRIVER
+/* LGE_CHANGE
+ * Apply CDC ACM function fixup for LG Android USB
+ * 2011-01-12, hyunhui.park@lge.com
+ */
+#define GS_NOTIFY_MAXPACKET		16	/* For LG host driver */
+#else
 #define GS_NOTIFY_MAXPACKET		10	/* notification + 2 bytes */
+#endif
 
 /* interface and class descriptors: */
 
@@ -120,6 +130,7 @@ static struct usb_interface_descriptor acm_control_interface_desc = {
 	.bLength =		USB_DT_INTERFACE_SIZE,
 	.bDescriptorType =	USB_DT_INTERFACE,
 	/* .bInterfaceNumber = DYNAMIC */
+	.bAlternateSetting = 0,	
 	.bNumEndpoints =	1,
 	.bInterfaceClass =	USB_CLASS_COMM,
 	.bInterfaceSubClass =	USB_CDC_SUBCLASS_ACM,
@@ -224,6 +235,7 @@ static struct usb_endpoint_descriptor acm_hs_in_desc = {
 	.bDescriptorType =	USB_DT_ENDPOINT,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 	.wMaxPacketSize =	cpu_to_le16(512),
+	.bInterval =		0,
 };
 
 static struct usb_endpoint_descriptor acm_hs_out_desc = {
@@ -231,6 +243,7 @@ static struct usb_endpoint_descriptor acm_hs_out_desc = {
 	.bDescriptorType =	USB_DT_ENDPOINT,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 	.wMaxPacketSize =	cpu_to_le16(512),
+	.bInterval =		0,
 };
 
 static struct usb_descriptor_header *acm_hs_function[] = {
@@ -464,15 +477,38 @@ static int acm_cdc_notify(struct f_acm *acm, u8 type, u16 value,
 	struct usb_ep			*ep = acm->notify;
 	struct usb_request		*req;
 	struct usb_cdc_notification	*notify;
+#ifndef CONFIG_LGE_USB_GADGET_DRIVER
+	/* LGE_CHANGE
+	 * Apply CDC ACM function fixup for LG Android USB
+	 * 2011-01-12, hyunhui.park@lge.com
+	 */
 	const unsigned			len = sizeof(*notify) + length;
+#endif
 	void				*buf;
 	int				status;
+#ifdef CONFIG_LGE_USB_GADGET_DRIVER
+	/* LGE_CHANGE
+	 * Apply CDC ACM function fixup for LG Android USB
+	 * 2011-01-12, hyunhui.park@lge.com
+	 */
+	unsigned char noti_buf[GS_NOTIFY_MAXPACKET];
+
+	memset(noti_buf, 0, GS_NOTIFY_MAXPACKET);
+#endif
 
 	req = acm->notify_req;
 	acm->notify_req = NULL;
 	acm->pending = false;
 
+#ifdef CONFIG_LGE_USB_GADGET_DRIVER
+	/* LGE_CHANGE
+	 * Apply CDC ACM function fixup for LG Android USB
+	 * 2011-01-12, hyunhui.park@lge.com
+	 */
+	req->length = GS_NOTIFY_MAXPACKET;
+#else
 	req->length = len;
+#endif
 	notify = req->buf;
 	buf = notify + 1;
 
@@ -482,7 +518,16 @@ static int acm_cdc_notify(struct f_acm *acm, u8 type, u16 value,
 	notify->wValue = cpu_to_le16(value);
 	notify->wIndex = cpu_to_le16(acm->ctrl_id);
 	notify->wLength = cpu_to_le16(length);
+#ifdef CONFIG_LGE_USB_GADGET_DRIVER
+	/* LGE_CHANGE
+	 * Apply CDC ACM function fixup for LG Android USB
+	 * 2011-01-12, hyunhui.park@lge.com
+	 */
+	memcpy(noti_buf, data, length);
+	memcpy(buf, noti_buf, GS_NOTIFY_MAXPACKET);
+#else
 	memcpy(buf, data, length);
+#endif
 
 	/* ep_queue() can complete immediately if it fills the fifo... */
 	spin_unlock(&acm->lock);
@@ -769,7 +814,7 @@ int acm_bind_config(struct usb_configuration *c, u8 port_num)
 	acm->port.disconnect = acm_disconnect;
 	acm->port.send_break = acm_send_break;
 
-	acm->port.func.name = kasprintf(GFP_KERNEL, "acm%u", port_num);
+	acm->port.func.name = kasprintf(GFP_KERNEL, "acm", port_num);
 	if (!acm->port.func.name) {
 		kfree(acm);
 		return -ENOMEM;

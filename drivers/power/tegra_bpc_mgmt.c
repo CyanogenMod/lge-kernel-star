@@ -27,15 +27,18 @@
 
 static irqreturn_t tegra_bpc_mgmt_bh(int irq, void *data)
 {
+	int ret = -1;
 	int gpio_val = 0;
 	struct tegra_bpc_mgmt_platform_data *bpc_platform_data;
 	bpc_platform_data = (struct tegra_bpc_mgmt_platform_data *)data;
 
-	tegra_system_edp_alarm(true);
 	/**
 	 * Keep on checking whether event has passed or not.
 	 */
 	while (!gpio_val) {
+		if (ret)
+			ret = tegra_system_edp_alarm(true);
+
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(msecs_to_jiffies(
 			bpc_platform_data->bpc_mgmt_timeout));

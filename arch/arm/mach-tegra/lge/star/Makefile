@@ -1,0 +1,18 @@
+obj-${CONFIG_MACH_STAR}             		+= board-star.o
+obj-${CONFIG_MACH_STAR}       		      	+= board-star-pinmux.o
+obj-${CONFIG_MACH_STAR}        		    	+= board-star-sdhci.o
+obj-${CONFIG_MACH_STAR}        	 	    	+= board-star-power.o
+obj-${CONFIG_MACH_STAR}          	   	+= board-star-panel.o
+obj-${CONFIG_MACH_STAR}          	   	+= board-star-sensors.o
+obj-${CONFIG_MACH_STAR}          	   	+= board-star-kbc.o
+obj-${CONFIG_MACH_STAR}          	   	+= board-star-memory.o
+obj-${CONFIG_MACH_STAR}          	   	+= board-star-bt.o
+obj-${CONFIG_MACH_STAR}          	   	+= board-star-audio.o
+obj-${CONFIG_MACH_STAR}          	   	+= board-star-misc.o
+obj-${CONFIG_MACH_STAR}          	   	+= board-star-usb.o
+obj-${CONFIG_MACH_STAR}          	   	+= board-star-touch.o
+obj-${CONFIG_MACH_STAR}             		+= board-star-baseband.o
+obj-${CONFIG_MACH_STAR}             		+= board-star-nv.o
+obj-$(CONFIG_STAR_REBOOT_MONITOR)		+= board-star-reboot.o
+obj-${CONFIG_MACH_STAR}		             	+= board-star-gps.o
+

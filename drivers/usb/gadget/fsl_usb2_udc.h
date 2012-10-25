@@ -616,6 +616,7 @@ struct fsl_udc {
 	unsigned vbus_active:1;
 	unsigned stopped:1;
 	unsigned remote_wakeup:1;
+	unsigned selfpowered:1;
 
 	struct ep_queue_head *ep_qh;	/* Endpoints Queue-Head */
 	struct fsl_req *status_req;	/* ep0 status request */
@@ -636,6 +637,7 @@ struct fsl_udc {
 	struct regulator *vbus_regulator;	/* regulator for drawing VBUS */
 	u32 current_limit;
 	struct work_struct charger_work; /* work for settting regulator current limit */
+	struct work_struct boost_cpufreq_work; /* work for boosting cpu frequency */
 };
 
 /*-------------------------------------------------------------------------*/
@@ -720,6 +722,8 @@ void fsl_udc_clk_resume(bool is_dpd);
 void fsl_udc_clk_enable(void);
 void fsl_udc_clk_disable(void);
 bool fsl_udc_charger_detect(void);
+void fsl_udc_dtd_prepare(void);
+void fsl_udc_ep_barrier(void);
 #else
 static inline int fsl_udc_clk_init(struct platform_device *pdev)
 {
@@ -746,6 +750,12 @@ void fsl_udc_clk_disable(void)
 static inline bool fsl_udc_charger_detect(void)
 {
 	return false;
+}
+void fsl_udc_dtd_prepare(void)
+{
+}
+void fsl_udc_ep_barrier(void)
+{
 }
 #endif
 

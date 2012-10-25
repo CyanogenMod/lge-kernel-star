@@ -3,7 +3,7 @@
  *
  * Tegra3 SOC-specific power and cluster management
  *
- * Copyright (c) 2009-2011, NVIDIA Corporation.
+ * Copyright (c) 2009-2012, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,6 +24,9 @@
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/irq.h>
+#include <linux/device.h>
+#include <linux/module.h>
+#include <linux/clockchips.h>
 
 #include <mach/gpio.h>
 #include <mach/iomap.h>
@@ -378,9 +381,17 @@ int tegra_cluster_control(unsigned int us, unsigned int flags)
 		if (us)
 			tegra_lp2_set_trigger(0);
 	} else {
+		int cpu = 0;
+
 		tegra_set_cpu_in_lp2(0);
 		cpu_pm_enter();
+		if (!timekeeping_suspended)
+			clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER,
+					   &cpu);
 		tegra_idle_lp2_last(0, flags);
+		if (!timekeeping_suspended)
+			clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT,
+					   &cpu);
 		cpu_pm_exit();
 		tegra_clear_cpu_in_lp2(0);
 	}
@@ -418,6 +429,101 @@ void tegra_lp0_cpu_mode(bool enter)
 		flags = enter ? TEGRA_POWER_CLUSTER_LP : TEGRA_POWER_CLUSTER_G;
 		flags |= TEGRA_POWER_CLUSTER_IMMEDIATE;
 		tegra_cluster_control(0, flags);
+		pr_info("Tegra: switched to %s cluster\n", enter ? "LP" : "G");
 	}
 }
 #endif
+
+#define IO_DPD_INFO(_name, _index, _bit) \
+	{ \
+		.name = _name, \
+		.io_dpd_reg_index = _index, \
+		.io_dpd_bit = _bit, \
+	}
+
+/* PMC IO DPD register offsets */
+#define APBDEV_PMC_IO_DPD_REQ_0		0x1b8
+#define APBDEV_PMC_IO_DPD_STATUS_0	0x1bc
+#define APBDEV_PMC_SEL_DPD_TIM_0	0x1c8
+#define APBDEV_DPD_ENABLE_LSB		30
+#define APBDEV_DPD2_ENABLE_LSB		5
+#define PMC_DPD_SAMPLE			0x20
+
+struct tegra_io_dpd tegra_list_io_dpd[] = {
+/* Empty DPD list - sd dpd entries removed */
+};
+
+struct tegra_io_dpd *tegra_io_dpd_get(struct device *dev)
+{
+	int i;
+	const char *name = dev ? dev_name(dev) : NULL;
+	if (name) {
+		for (i = 0; i < (sizeof(tegra_list_io_dpd) /
+			sizeof(struct tegra_io_dpd)); i++) {
+			if (!(strncmp(tegra_list_io_dpd[i].name, name,
+				strlen(name)))) {
+				return &tegra_list_io_dpd[i];
+			}
+		}
+	}
+	dev_info(dev, "Error: tegra3 io dpd not supported for %s\n",
+		((name) ? name : "NULL"));
+	return NULL;
+}
+EXPORT_SYMBOL(tegra_io_dpd_get);
+
+static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
+static DEFINE_SPINLOCK(tegra_io_dpd_lock);
+
+void tegra_io_dpd_enable(struct tegra_io_dpd *hnd)
+{
+	unsigned int enable_mask;
+	unsigned int dpd_status;
+	unsigned int dpd_enable_lsb;
+
+	if ((!hnd))
+		return;
+	spin_lock(&tegra_io_dpd_lock);
+	dpd_enable_lsb = (hnd->io_dpd_reg_index) ? APBDEV_DPD2_ENABLE_LSB :
+						APBDEV_DPD_ENABLE_LSB;
+	writel(0x1, pmc + PMC_DPD_SAMPLE);
+	writel(0x10, pmc + APBDEV_PMC_SEL_DPD_TIM_0);
+	enable_mask = ((1 << hnd->io_dpd_bit) | (2 << dpd_enable_lsb));
+	writel(enable_mask, pmc + (APBDEV_PMC_IO_DPD_REQ_0 +
+					hnd->io_dpd_reg_index * 8));
+	udelay(1);
+	dpd_status = readl(pmc + (APBDEV_PMC_IO_DPD_STATUS_0 +
+					hnd->io_dpd_reg_index * 8));
+	if (!(dpd_status & (1 << hnd->io_dpd_bit)))
+		pr_info("Error: dpd%d enable failed, status=%#x\n",
+		(hnd->io_dpd_reg_index + 1), dpd_status);
+	/* Sample register must be reset before next sample operation */
+	writel(0x0, pmc + PMC_DPD_SAMPLE);
+	spin_unlock(&tegra_io_dpd_lock);
+	return;
+}
+EXPORT_SYMBOL(tegra_io_dpd_enable);
+
+void tegra_io_dpd_disable(struct tegra_io_dpd *hnd)
+{
+	unsigned int enable_mask;
+	unsigned int dpd_status;
+	unsigned int dpd_enable_lsb;
+
+	if ((!hnd))
+		return;
+	spin_lock(&tegra_io_dpd_lock);
+	dpd_enable_lsb = (hnd->io_dpd_reg_index) ? APBDEV_DPD2_ENABLE_LSB :
+						APBDEV_DPD_ENABLE_LSB;
+	enable_mask = ((1 << hnd->io_dpd_bit) | (1 << dpd_enable_lsb));
+	writel(enable_mask, pmc + (APBDEV_PMC_IO_DPD_REQ_0 +
+					hnd->io_dpd_reg_index * 8));
+	dpd_status = readl(pmc + (APBDEV_PMC_IO_DPD_STATUS_0 +
+					hnd->io_dpd_reg_index * 8));
+	if (dpd_status & (1 << hnd->io_dpd_bit))
+		pr_info("Error: dpd%d disable failed, status=%#x\n",
+		(hnd->io_dpd_reg_index + 1), dpd_status);
+	spin_unlock(&tegra_io_dpd_lock);
+	return;
+}
+EXPORT_SYMBOL(tegra_io_dpd_disable);

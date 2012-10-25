@@ -22,6 +22,9 @@ obj-$(CONFIG_INPUT_JOYSTICK)	+= joystick/
 obj-$(CONFIG_INPUT_TABLET)	+= tablet/
 obj-$(CONFIG_INPUT_TOUCHSCREEN)	+= touchscreen/
 obj-$(CONFIG_INPUT_MISC)	+= misc/
+#MOBII_CHNANGE_S 20120213 mg.chang@mobii.co.kr : Appy Sensor Porting
+obj-$(CONFIG_SENSOR_GP2A)      += sensor/
+#MOBII_CHNANGE_E 20120213 mg.chang@mobii.co.kr : Appy Sensor Porting
 
 obj-$(CONFIG_INPUT_APMPOWER)	+= apm-power.o
 obj-$(CONFIG_INPUT_KEYRESET)	+= keyreset.o

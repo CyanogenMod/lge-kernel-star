@@ -136,6 +136,12 @@
 #define gadget_is_s3c_hsotg(g)    0
 #endif
 
+// LGE_CHANGE [dojip.kim@lge.com] 2011-01-18, [LGE_AP20] add the tegra usb gadget controller
+#ifdef CONFIG_ARCH_TEGRA
+#define gadget_is_tegra(g)    (!strcmp("fsl-tegra-udc", (g)->name))
+#else
+#define gadget_is_tegra(g)    0
+#endif
 #ifdef CONFIG_USB_GADGET_EG20T
 #define	gadget_is_pch(g)	(!strcmp("pch_udc", (g)->name))
 #else
@@ -203,6 +209,10 @@ static inline int usb_gadget_controller_number(struct usb_gadget *gadget)
 		return 0x25;
 	else if (gadget_is_s3c_hsotg(gadget))
 		return 0x26;
+	// LGE_CHANGE [dojip.kim@lge.com] 2011-01-18, [LGE_AP20] 
+	// add the tegra usb gadget controller
+	else if (gadget_is_tegra(gadget))
+		return 0x27;
 	else if (gadget_is_pch(gadget))
 		return 0x27;
 	else if (gadget_is_ci13xxx_msm(gadget))

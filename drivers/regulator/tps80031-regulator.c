@@ -300,12 +300,16 @@ static int __tps80031_dcdc_set_voltage(struct device *parent,
 	case 0:
 		if (min_uV == 0)
 			vsel = 0;
-		else if ((min_uV >= 607700) && (max_uV <= 1300000)) {
+		else if ((min_uV >= 607700) && (min_uV <= 1300000)) {
+			int cal_volt;
 			vsel = (10 * (min_uV - 607700)) / 1266;
 			if (vsel % 100)
 				vsel += 100;
 			vsel /= 100;
 			vsel++;
+			cal_volt = (607700 + (12660 * (vsel - 1)));
+			if (cal_volt > max_uV)
+				return -EINVAL;
 		} else if ((min_uV > 1900000) && (max_uV >= 2100000))
 			vsel = 62;
 		else if ((min_uV > 1800000) && (max_uV >= 1900000))
@@ -323,17 +327,21 @@ static int __tps80031_dcdc_set_voltage(struct device *parent,
 	case DCDC_OFFSET_EN:
 		if (min_uV == 0)
 			vsel = 0;
-		else if ((min_uV >= 700000) && (max_uV <= 1420000)) {
-			vsel = (min_uV - 600000) / 125;
+		else if ((min_uV >= 700000) && (min_uV <= 1420000)) {
+			int cal_volt;
+			vsel = (min_uV - 700000) / 125;
 			if (vsel % 100)
 				vsel += 100;
 			vsel /= 100;
 			vsel++;
+			cal_volt = (700000 + (12500 * (vsel - 1)));
+			if (cal_volt > max_uV)
+				return -EINVAL;
 		} else if ((min_uV > 1900000) && (max_uV >= 2100000))
 			vsel = 62;
 		else if ((min_uV > 1800000) && (max_uV >= 1900000))
 			vsel = 61;
-		else if ((min_uV > 1350000) && (max_uV >= 1800000))
+		else if ((min_uV > 1500000) && (max_uV >= 1800000))
 			vsel = 60;
 		else if ((min_uV > 1350000) && (max_uV >= 1500000))
 			vsel = 59;
@@ -350,7 +358,6 @@ static int __tps80031_dcdc_set_voltage(struct device *parent,
 			vsel = (min_uV - 1852000) / 386;
 			if (vsel % 100)
 				vsel += 100;
-			vsel /= 100;
 			vsel++;
 		}
 		break;
@@ -359,7 +366,7 @@ static int __tps80031_dcdc_set_voltage(struct device *parent,
 		if (min_uV == 0)
 			vsel = 0;
 		else if ((min_uV >= 2161000) && (max_uV <= 4321000)) {
-			vsel = (min_uV - 1852000) / 386;
+			vsel = (min_uV - 2161000) / 386;
 			if (vsel % 100)
 				vsel += 100;
 			vsel /= 100;

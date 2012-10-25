@@ -44,7 +44,7 @@
 #define MC_LA_EPP_0		0x300
 #define MC_LA_EPP_1		0x304
 #define MC_LA_G2_0		0x308
-#define MC_LA_G2_1		0x304
+#define MC_LA_G2_1		0x30c
 #define MC_LA_HC_0		0x310
 #define MC_LA_HC_1		0x314
 #define MC_LA_HDA_0		0x318
@@ -543,6 +543,11 @@ late_initcall(tegra_latency_allowance_debugfs_init);
 static int __init tegra_latency_allowance_init(void)
 {
 	la_scaling_enable_count = 0;
+
+	tegra_set_latency_allowance(TEGRA_LA_G2PR, 20);
+	tegra_set_latency_allowance(TEGRA_LA_G2SR, 20);
+	tegra_set_latency_allowance(TEGRA_LA_G2DR, 20);
+	tegra_set_latency_allowance(TEGRA_LA_G2DW, 20);
 	return 0;
 }
 

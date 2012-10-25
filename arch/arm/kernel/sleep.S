@@ -75,12 +75,14 @@ ENDPROC(cpu_suspend)
  * r3 = L1 section flags
  */
 ENTRY(cpu_resume_mmu)
+#ifndef CONFIG_ARCH_HAS_SUSPEND_PAGETABLE
 	adr	r4, cpu_resume_turn_mmu_on
 	mov	r4, r4, lsr #20
 	orr	r3, r3, r4, lsl #20
 	ldr	r5, [r2, r4, lsl #2]	@ save old mapping
 	str	r3, [r2, r4, lsl #2]	@ setup 1:1 mapping for mmu code
 	sub	r2, r2, r1
+#endif
 	ldr	r3, =cpu_resume_after_mmu
 	bic	r1, r0, #CR_C		@ ensure D-cache is disabled
 	b	cpu_resume_turn_mmu_on
@@ -95,7 +97,9 @@ cpu_resume_turn_mmu_on:
 	mov	pc, r3			@ jump to virtual address
 ENDPROC(cpu_resume_turn_mmu_on)
 cpu_resume_after_mmu:
+#ifndef CONFIG_ARCH_HAS_SUSPEND_PAGETABLE
 	str	r5, [r2, r4, lsl #2]	@ restore old mapping
+#endif
 	mcr	p15, 0, r0, c1, c0, 0	@ turn on D-cache
 	mov	pc, lr
 ENDPROC(cpu_resume_after_mmu)

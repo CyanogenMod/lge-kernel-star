@@ -53,7 +53,6 @@ struct tegra_otg_data {
 	struct platform_device *pdev;
 	struct work_struct work;
 	unsigned int intr_reg_data;
-	bool detect_vbus;
 	bool clk_enabled;
 };
 static struct tegra_otg_data *tegra_clone;
@@ -171,12 +170,6 @@ static void irq_work(struct work_struct *work)
 	unsigned long flags;
 	unsigned long status;
 
-	if (tegra->detect_vbus) {
-		tegra->detect_vbus = false;
-		tegra_otg_enable_clk();
-		return;
-	}
-
 	clk_enable(tegra->clk);
 
 	spin_lock_irqsave(&tegra->lock, flags);
@@ -239,7 +232,6 @@ static irqreturn_t tegra_otg_irq(int irq, void *data)
 		otg_writel(tegra, val, USB_PHY_WAKEUP);
 		if ((val & USB_ID_INT_STATUS) || (val & USB_VBUS_INT_STATUS)) {
 			tegra->int_status = val;
-			tegra->detect_vbus = false;
 			schedule_work(&tegra->work);
 		}
 	}
@@ -251,8 +243,7 @@ static irqreturn_t tegra_otg_irq(int irq, void *data)
 
 void tegra_otg_check_vbus_detection(void)
 {
-	tegra_clone->detect_vbus = true;
-	schedule_work(&tegra_clone->work);
+	tegra_otg_enable_clk();
 }
 EXPORT_SYMBOL(tegra_otg_check_vbus_detection);
 
@@ -268,7 +259,12 @@ static int tegra_otg_set_peripheral(struct otg_transceiver *otg,
 	clk_enable(tegra->clk);
 	val = otg_readl(tegra, USB_PHY_WAKEUP);
 	val |= (USB_VBUS_INT_EN | USB_VBUS_WAKEUP_EN);
-	val |= (USB_ID_INT_EN | USB_ID_PIN_WAKEUP_EN);
+#if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ) 
+    // disable USB_ID_INT_EN 
+    val |= USB_ID_PIN_WAKEUP_EN;
+#else 
+    val |= (USB_ID_INT_EN | USB_ID_PIN_WAKEUP_EN); 
+#endif 
 	otg_writel(tegra, val, USB_PHY_WAKEUP);
 	/* Add delay to make sure register is updated */
 	udelay(1);
@@ -284,7 +280,6 @@ static int tegra_otg_set_peripheral(struct otg_transceiver *otg,
 
 	if ((val & USB_ID_INT_STATUS) || (val & USB_VBUS_INT_STATUS)) {
 		tegra->int_status = val;
-		tegra->detect_vbus = false;
 		schedule_work (&tegra->work);
 	}
 
@@ -324,6 +319,8 @@ static int tegra_otg_set_suspend(struct otg_transceiver *otg, int suspend)
 static int tegra_otg_probe(struct platform_device *pdev)
 {
 	struct tegra_otg_data *tegra;
+	struct tegra_otg_platform_data *otg_pdata;
+	struct tegra_ehci_platform_data *ehci_pdata;
 	struct resource *res;
 	int err;
 
@@ -332,6 +329,8 @@ static int tegra_otg_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	tegra->otg.dev = &pdev->dev;
+	otg_pdata = tegra->otg.dev->platform_data;
+	ehci_pdata = otg_pdata->ehci_pdata;
 	tegra->otg.label = "tegra-otg";
 	tegra->otg.state = OTG_STATE_UNDEFINED;
 	tegra->otg.set_host = tegra_otg_set_host;
@@ -391,9 +390,18 @@ static int tegra_otg_probe(struct platform_device *pdev)
 	}
 	INIT_WORK (&tegra->work, irq_work);
 
-#ifndef CONFIG_USB_HOTPLUG
-	clk_disable(tegra->clk);
+#if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
+	/* Added For USB Wakeup */
+	err = enable_irq_wake(tegra->irq);
+	if (err < 0) {
+		dev_warn(&pdev->dev,
+			"Couldn't enable USB OTG mode wakeup, irq=%d, "
+			"error=%d\n", tegra->irq, err);
+		err = 0;
+	}
 #endif
+	if (!ehci_pdata->default_enable)
+		clk_disable(tegra->clk);
 	dev_info(&pdev->dev, "otg transceiver registered\n");
 	return 0;
 
@@ -436,6 +444,7 @@ static int tegra_otg_suspend(struct device *dev)
 	/* store the interupt enable for cable ID and VBUS */
 	clk_enable(tegra_otg->clk);
 	tegra_otg->intr_reg_data = readl(tegra_otg->regs + USB_PHY_WAKEUP);
+	writel(0, (tegra_otg->regs + USB_PHY_WAKEUP));
 	clk_disable(tegra_otg->clk);
 
 	if (from == OTG_STATE_B_PERIPHERAL && otg->gadget) {
@@ -462,7 +471,6 @@ static void tegra_otg_resume(struct device *dev)
 	msleep(1);
 	/* restore the interupt enable for cable ID and VBUS */
 	clk_enable(tegra_otg->clk);
-	writel(tegra_otg->intr_reg_data, (tegra_otg->regs + USB_PHY_WAKEUP));
 	val = readl(tegra_otg->regs + USB_PHY_WAKEUP);
 	clk_disable(tegra_otg->clk);
 
@@ -480,9 +488,31 @@ static void tegra_otg_resume(struct device *dev)
 	return;
 }
 
+static int tegra_otg_resume_noirq(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct tegra_otg_data *tegra_otg = platform_get_drvdata(pdev);
+	int val;
+
+	tegra_otg_enable_clk();
+
+	/* Following delay is intentional.
+	 * It is placed here after observing system hang.
+	 * Root cause is not confirmed.
+	 */
+	msleep(1);
+	/* restore the interupt enable for cable ID and VBUS */
+	clk_enable(tegra_otg->clk);
+	writel(tegra_otg->intr_reg_data, (tegra_otg->regs + USB_PHY_WAKEUP));
+	clk_disable(tegra_otg->clk);
+
+	return 0;
+}
+
 static const struct dev_pm_ops tegra_otg_pm_ops = {
 	.complete = tegra_otg_resume,
 	.suspend = tegra_otg_suspend,
+	.resume_noirq = tegra_otg_resume_noirq,
 };
 #endif
 

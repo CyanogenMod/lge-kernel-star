@@ -306,6 +306,7 @@ static struct tegra_suspend_platform_data harmony_suspend_data = {
 int __init harmony_suspend_init(void)
 {
 	tegra_init_suspend(&harmony_suspend_data);
+	return 0;
 }
 
 int __init harmony_regulator_init(void)

@@ -161,6 +161,8 @@
 #define   SDHCI_CTRL_DRV_TYPE_A		0x0010
 #define   SDHCI_CTRL_DRV_TYPE_C		0x0020
 #define   SDHCI_CTRL_DRV_TYPE_D		0x0030
+#define  SDHCI_CTRL_EXEC_TUNING		0x0040
+#define  SDHCI_CTRL_TUNED_CLK		0x0080
 #define  SDHCI_CTRL_PRESET_VAL_ENABLE	0x8000
 
 #define SDHCI_CAPABILITIES	0x40
@@ -190,6 +192,7 @@
 #define  SDHCI_DRIVER_TYPE_A	0x00000010
 #define  SDHCI_DRIVER_TYPE_C	0x00000020
 #define  SDHCI_DRIVER_TYPE_D	0x00000040
+#define  SDHCI_USE_SDR50_TUNING	0x00002000
 
 #define SDHCI_MAX_CURRENT		0x48
 #define  SDHCI_MAX_CURRENT_330_MASK	0x0000FF
@@ -252,6 +255,7 @@ struct sdhci_ops {
 	void (*platform_send_init_74_clocks)(struct sdhci_host *host,
 					     u8 power_mode);
 	unsigned int    (*get_ro)(struct sdhci_host *host);
+	unsigned int    (*get_cd)(struct sdhci_host *host);
 
 	int		(*suspend)(struct sdhci_host *host, pm_message_t state);
 	int		(*resume)(struct sdhci_host *host);
@@ -261,6 +265,12 @@ struct sdhci_ops {
 	int	(*set_uhs_signaling)(struct sdhci_host *host, unsigned int uhs);
 	int	(*switch_signal_voltage)(struct sdhci_host *host,
 				unsigned int signal_voltage);
+	// LGE_CHANGE [dojip.kim@lge.com] 2010-12-31, [LGE_AP20] from Star
+#ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
+	unsigned int	(*get_startoffset)(struct sdhci_host *host);
+#endif
+
+	int	(*execute_freq_tuning)(struct sdhci_host *sdhci);
 };
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS

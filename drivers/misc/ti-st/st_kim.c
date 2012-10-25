@@ -30,6 +30,7 @@
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 #include <linux/sched.h>
+#include <linux/sysfs.h>
 #include <linux/tty.h>
 
 #include <linux/skbuff.h>
@@ -67,6 +68,7 @@ void validate_firmware_response(struct kim_data_s *kim_gdata)
 	if (unlikely(skb->data[5] != 0)) {
 		pr_err("no proper response during fw download");
 		pr_err("data6 %x", skb->data[5]);
+		kfree_skb(skb);
 		return;		/* keep waiting for the proper response */
 	}
 	/* becos of all the script being downloaded */
@@ -209,6 +211,7 @@ static long read_local_version(struct kim_data_s *kim_gdata, char *bts_scr_name)
 		pr_err(" waiting for ver info- timed out ");
 		return -ETIMEDOUT;
 	}
+	INIT_COMPLETION(kim_gdata->kim_rcvd);
 
 	version =
 		MAKEWORD(kim_gdata->resp_buffer[13],
@@ -244,9 +247,9 @@ void skip_change_remote_baud(unsigned char **ptr, long *len)
 		pr_err("invalid action after change remote baud command");
 	} else {
 		*ptr = *ptr + sizeof(struct bts_action) +
-			((struct bts_action *)nxt_action)->size;
+			((struct bts_action *)cur_action)->size;
 		*len = *len - (sizeof(struct bts_action) +
-				((struct bts_action *)nxt_action)->size);
+				((struct bts_action *)cur_action)->size);
 		/* warn user on not commenting these in firmware */
 		pr_warn("skipping the wait event of change remote baud");
 	}
@@ -297,6 +300,7 @@ static long download_firmware(struct kim_data_s *kim_gdata)
 
 		switch (((struct bts_action *)ptr)->type) {
 		case ACTION_SEND_COMMAND:	/* action send */
+			pr_debug("S");
 			action_ptr = &(((struct bts_action *)ptr)->data[0]);
 			if (unlikely
 			    (((struct hci_command *)action_ptr)->opcode ==
@@ -334,6 +338,10 @@ static long download_firmware(struct kim_data_s *kim_gdata)
 				release_firmware(kim_gdata->fw_entry);
 				return -ETIMEDOUT;
 			}
+			/* reinit completion before sending for the
+			 * relevant wait
+			 */
+			INIT_COMPLETION(kim_gdata->kim_rcvd);
 
 			/*
 			 * Free space found in uart buffer, call st_int_write
@@ -360,6 +368,7 @@ static long download_firmware(struct kim_data_s *kim_gdata)
 			}
 			break;
 		case ACTION_WAIT_EVENT:  /* wait */
+			pr_debug("W");
 			if (!wait_for_completion_timeout
 					(&kim_gdata->kim_rcvd,
 					 msecs_to_jiffies(CMD_RESP_TIME))) {
@@ -433,11 +442,17 @@ long st_kim_start(void *kim_data)
 {
 	long err = 0;
 	long retry = POR_RETRY_COUNT;
+	struct ti_st_plat_data	*pdata;
 	struct kim_data_s	*kim_gdata = (struct kim_data_s *)kim_data;
 
 	pr_info(" %s", __func__);
+	pdata = kim_gdata->kim_pdev->dev.platform_data;
 
 	do {
+		/* platform specific enabling code here */
+		/*if (pdata->chip_enable)
+			pdata->chip_enable();*/
+
 		/* Configure BT nShutdown to HIGH state */
 		gpio_set_value(kim_gdata->nshutdown, GPIO_LOW);
 		mdelay(5);	/* FIXME: a proper toggle */
@@ -459,6 +474,12 @@ long st_kim_start(void *kim_data)
 			pr_info("ldisc_install = 0");
 			sysfs_notify(&kim_gdata->kim_pdev->dev.kobj,
 					NULL, "install");
+			/* the following wait is never going to be completed,
+			 * since the ldisc was never installed, hence serving
+			 * as a mdelay of LDISC_TIME msecs */
+			err = wait_for_completion_timeout
+				(&kim_gdata->ldisc_installed,
+				 msecs_to_jiffies(LDISC_TIME));
 			err = -ETIMEDOUT;
 			continue;
 		} else {
@@ -471,6 +492,13 @@ long st_kim_start(void *kim_data)
 				pr_info("ldisc_install = 0");
 				sysfs_notify(&kim_gdata->kim_pdev->dev.kobj,
 						NULL, "install");
+				/* this wait might be completed, though in the
+				 * tty_close() since the ldisc is already
+				 * installed */
+				err = wait_for_completion_timeout
+					(&kim_gdata->ldisc_installed,
+					 msecs_to_jiffies(LDISC_TIME));
+				err = -EINVAL;
 				continue;
 			} else {	/* on success don't retry */
 				break;
@@ -514,6 +542,7 @@ long st_kim_stop(void *kim_data)
 	gpio_set_value(kim_gdata->nshutdown, GPIO_HIGH);
 	mdelay(1);
 	gpio_set_value(kim_gdata->nshutdown, GPIO_LOW);
+
 	return err;
 }
 
@@ -603,6 +632,10 @@ void st_kim_ref(struct st_data_s **core_data, int id)
 	struct kim_data_s	*kim_gdata;
 	/* get kim_gdata reference from platform device */
 	pdev = st_get_plat_device(id);
+	if (!pdev) {
+		*core_data = NULL;
+		return;
+	}
 	kim_gdata = dev_get_drvdata(&pdev->dev);
 	*core_data = kim_gdata->core_data;
 }
@@ -644,6 +677,9 @@ static int kim_probe(struct platform_device *pdev)
 	long status;
 	struct kim_data_s	*kim_gdata;
 	struct ti_st_plat_data	*pdata = pdev->dev.platform_data;
+
+	if (pdata->set_power)
+		pdata->set_power(1);
 
 	if ((pdev->id != -1) && (pdev->id < MAX_ST_DEVICES)) {
 		/* multiple devices could exist */
@@ -738,15 +774,24 @@ static int kim_remove(struct platform_device *pdev)
 
 	kfree(kim_gdata);
 	kim_gdata = NULL;
+
+	if (pdata->set_power)
+		pdata->set_power(0);
+
 	return 0;
 }
 
 int kim_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct ti_st_plat_data	*pdata = pdev->dev.platform_data;
+	int ret;
 
-	if (pdata->suspend)
-		return pdata->suspend(pdev, state);
+	if (pdata->suspend) {
+		ret = pdata->suspend(pdev, state);
+		if (pdata->set_power)
+			pdata->set_power(0);
+		return ret;
+	}
 
 	return -EOPNOTSUPP;
 }
@@ -755,8 +800,11 @@ int kim_resume(struct platform_device *pdev)
 {
 	struct ti_st_plat_data	*pdata = pdev->dev.platform_data;
 
-	if (pdata->resume)
+	if (pdata->resume) {
+		if (pdata->set_power)
+			pdata->set_power(1);
 		return pdata->resume(pdev);
+	}
 
 	return -EOPNOTSUPP;
 }

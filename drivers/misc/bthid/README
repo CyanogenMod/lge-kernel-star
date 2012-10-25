@@ -1,0 +1,22 @@
+Broadcom bthid driver for Broadcom stack (BTL-A)
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+Copyright (C) 2009-2011 Broadcom Corporation
+
+Compilation
+===========
+
+In order to compile Broadcom bthid driver for Broadcom stack (BTL-A) you need to have the Android build system setup on your linux PC.
+
+To compile run:
+    $ ./make_bthid
+bthid.ko will be available as ./bthid.ko
+
+Information
+===========
+
+For information about Android build system, please visit:
+    http://developer.android.com
+
+For information about Android Open Source Project (AOSP) source code, please visit
+    http://android.git.kernel.org/

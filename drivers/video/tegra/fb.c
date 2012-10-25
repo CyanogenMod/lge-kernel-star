@@ -51,7 +51,9 @@ struct tegra_fb_info {
 	struct nvhost_device	*ndev;
 	struct fb_info		*info;
 	bool			valid;
-
+#if defined (CONFIG_PANICRPT)   
+        atomic_t                in_use; //20111018 pyocool.cho@lge.com  "for kernel panic"
+#endif /* CONFIG_PANICRPT */
 	struct resource		*fb_mem;
 
 	int			xres;
@@ -60,6 +62,14 @@ struct tegra_fb_info {
 
 /* palette array used by the fbcon */
 static u32 pseudo_palette[16];
+/*
+ * 2011.07.27 pyocool.cho@lge.com "for kernel panic"
+ */
+#if defined (CONFIG_PANICRPT)    
+static int panicrpt_status = -4;
+extern int panicrpt_ispanic (void);
+extern void panicrpt_ready(bool flag);
+#endif /* CONFIG_PANICRPT */
 
 static int tegra_fb_check_var(struct fb_var_screeninfo *var,
 			      struct fb_info *info)
@@ -83,6 +93,8 @@ static int tegra_fb_set_par(struct fb_info *info)
 		/* we only support RGB ordering for now */
 		switch (var->bits_per_pixel) {
 		case 32:
+		// LGE_CHANGE [beobki.chung@lge.com] 2012-01-20 [LGE_AP20]
+		case 24:
 			var->red.offset = 0;
 			var->red.length = 8;
 			var->green.offset = 8;
@@ -162,12 +174,29 @@ static int tegra_fb_setcmap(struct fb_cmap *cmap, struct fb_info *info)
 	if (info->fix.visual == FB_VISUAL_TRUECOLOR ||
 	    info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
 		for (i = 0; i < cmap->len; i++) {
+//LGE_CHANGE_S            
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE
+                       /* update palette for fbcon */
+                       if (start+i < 16) {
+                               ((u32 *) info->pseudo_palette)[start+i] =
+                                       ((*red >> 8) << info->var.red.offset) |
+                                       ((*green >> 8) << info->var.green.offset) |
+                                       ((*blue >> 8) << info->var.blue.offset);
+                       }
+#endif
+//LGE_CHANGE_E
 			dc->fb_lut.r[start+i] = *red++ >> 8;
 			dc->fb_lut.g[start+i] = *green++ >> 8;
 			dc->fb_lut.b[start+i] = *blue++ >> 8;
 		}
 
-		tegra_dc_update_lut(dc, -1, -1);
+//LGE_CHANGE_S 
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE
+               tegra_dc_update_lut(dc, -1, 1);
+#else
+               tegra_dc_update_lut(dc, -1, -1);
+#endif		
+//LGE_CHANGE_E
 	}
 
 	return 0;
@@ -209,7 +238,30 @@ static int tegra_fb_pan_display(struct fb_var_screeninfo *var,
 	char __iomem *flush_end;
 	u32 addr;
 
+/*
+ * 2011.07.27 pyocool.cho@lge.com "for kernel panic"
+ */
+#if defined(CONFIG_PANICRPT)    
+    /*
+     * when tegra_fb->in_use is 1, it was just opened console
+     * we have to wait when the surfaceflinger open fb
+     */
+    if ((atomic_read (&tegra_fb->in_use) == 1) && !panicrpt_ispanic ()) {
+	    return 0;
+    }
+    if (panicrpt_ispanic () || !tegra_fb->win->cur_handle) {
+	    /*
+         * when tegra_fb is in sleep(maybe early suspended), don't display report
+         */
+        if (tegra_fb->win->dc->suspended || !tegra_fb->win->dc->enabled) {
+	        return 0;
+        }
+        if (!(tegra_fb->win->flags & TEGRA_WIN_FLAG_ENABLED)) {
+            tegra_fb->win->flags = TEGRA_WIN_FLAG_ENABLED;
+        }
+#else
 	if (!tegra_fb->win->cur_handle) {
+#endif /* CONFIG_PANICRPT */
 		flush_start = info->screen_base + (var->yoffset * info->fix.line_length);
 		flush_end = flush_start + (var->yres * info->fix.line_length);
 
@@ -222,12 +274,38 @@ static int tegra_fb_pan_display(struct fb_var_screeninfo *var,
 		tegra_fb->win->phys_addr = addr;
 		/* TODO: update virt_addr */
 
+
+#if defined (CONFIG_PANICRPT)
+		
+		if( panicrpt_status >= 0 ) {
+			tegra_dc_update_windows(&tegra_fb->win, 1);
+			tegra_dc_sync_windows(&tegra_fb->win, 1);
+		}
+		else{
+			panicrpt_status++;
+		}
+
+		if( panicrpt_ispanic () ) {
+			//printk ( KERN_INFO " beobki.chung : PANIC STATUS ENABLE \n" );
+			panicrpt_status = 1;
+		}
+
+#else
 		tegra_dc_update_windows(&tegra_fb->win, 1);
-		tegra_dc_sync_windows(&tegra_fb->win, 1);
+		tegra_dc_sync_windows(&tegra_fb->win, 1);		
+#endif
 	}
 
 	return 0;
 }
+
+
+#if defined (CONFIG_PANICRPT)   
+int panicrpt_status_check( void )
+{
+	return panicrpt_status;
+}
+#endif
 
 static void tegra_fb_fillrect(struct fb_info *info,
 			      const struct fb_fillrect *rect)
@@ -472,11 +550,53 @@ struct tegra_fb_info *tegra_fb_register(struct nvhost_device *ndev,
 
 	dev_info(&ndev->dev, "probed\n");
 
+
+#if defined (CONFIG_PANICRPT)  
+	if ( panicrpt_status > 0) {
+		if (fb_data->flags & TEGRA_FB_FLIP_ON_PROBE) {
+			tegra_dc_update_windows(&tegra_fb->win, 1);
+			tegra_dc_sync_windows(&tegra_fb->win, 1);
+		}
+	}
+	else {
+		//tegra_dc_update_windows(&tegra_fb->win, 1);
+		//tegra_dc_sync_windows(&tegra_fb->win, 1);
+		panicrpt_status++;
+	}
+
+	if( panicrpt_status == 0 )
+		panicrpt_ready(true);
+	
+#else
 	if (fb_data->flags & TEGRA_FB_FLIP_ON_PROBE) {
 		tegra_dc_update_windows(&tegra_fb->win, 1);
 		tegra_dc_sync_windows(&tegra_fb->win, 1);
 	}
 
+	if (dc->mode.pclk > 1000) {
+		struct tegra_dc_mode *mode = &dc->mode;
+
+		if (dc->out->flags & TEGRA_DC_OUT_ONE_SHOT_MODE)
+#if defined (CONFIG_MACH_STAR) || (CONFIG_MACH_BSSQ)
+		{
+			//WAR rated_pclk is h_width_pixels*v_width_lines*60 in bssq and star project
+			info->var.pixclock = KHZ2PICOS(
+			((mode->h_back_porch + mode->h_front_porch + mode->h_sync_width + mode->h_active)*
+			(mode->v_back_porch + mode->v_front_porch + mode->v_sync_width + mode->v_active) * 60) / 1000);
+		}
+#else
+			info->var.pixclock = KHZ2PICOS(mode->rated_pclk / 1000);
+#endif
+		else
+			info->var.pixclock = KHZ2PICOS(mode->pclk / 1000);
+		info->var.left_margin = mode->h_back_porch;
+		info->var.right_margin = mode->h_front_porch;
+		info->var.upper_margin = mode->v_back_porch;
+		info->var.lower_margin = mode->v_front_porch;
+		info->var.hsync_len = mode->h_sync_width;
+		info->var.vsync_len = mode->v_sync_width;
+	}
+#endif
 	return tegra_fb;
 
 err_iounmap_fb:

@@ -1685,4 +1685,4 @@ static void __exit sh532u_exit(void)
 
 module_init(sh532u_init);
 module_exit(sh532u_exit);
-
+MODULE_LICENSE("GPL");

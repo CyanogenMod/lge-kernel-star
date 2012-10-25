@@ -60,12 +60,23 @@ static LIST_HEAD(codec_list);
 
 static int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num);
 
+#if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
+extern bool in_call_state();  
+#endif
 /*
  * This is a timeout to do a DAPM powerdown after a stream is closed().
  * It can be used to eliminate pops between different playback streams, e.g.
  * between two audio tracks.
  */
+
+// MOBII_S [shhong@mobii.co.kr] 2012-07-02: Audio Closing Delay Modified.
+#if defined(CONFIG_MACH_STAR)
+static int pmdown_time = 100;
+#else
 static int pmdown_time = 5000;
+#endif
+// MOBII_S [shhong@mobii.co.kr] 2012-07-02: Audio Closing Delay Modified.
+
 module_param(pmdown_time, int, 0);
 MODULE_PARM_DESC(pmdown_time, "DAPM stream powerdown time (msecs)");
 
@@ -1045,9 +1056,14 @@ int snd_soc_suspend(struct device *dev)
 	struct snd_soc_codec *codec;
 	int i;
 
+#if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
+	if(in_call_state())
+	    return 0;
+#endif
 	/* If the initialization of this soc device failed, there is no codec
 	 * associated with it. Just bail out in this case.
 	 */
+
 	if (list_empty(&card->codec_dev_list))
 		return 0;
 
@@ -1262,13 +1278,38 @@ static void soc_resume_deferred(struct work_struct *work)
 int snd_soc_resume(struct device *dev)
 {
 	struct snd_soc_card *card = dev_get_drvdata(dev);
+// MOBII_S [shhong@mobii.co.kr] 2012-08-22: Fix For Resume Kernel Failure
+#if defined(CONFIG_MACH_STAR)
+	int i, ac97_control = 0;
+#else
 	int i;
+#endif
+// MOBII_E [shhong@mobii.co.kr] 2012-08-22: Fix For Resume Kernel Failure
 
+#if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
+	if(in_call_state())
+	    return 0;
+#endif
 	/* AC97 devices might have other drivers hanging off them so
 	 * need to resume immediately.  Other drivers don't have that
 	 * problem and may take a substantial amount of time to resume
 	 * due to I/O costs and anti-pop so handle them out of line.
 	 */
+// MOBII_S [shhong@mobii.co.kr] 2012-08-22: Fix For Resume Kernel Failure
+#if defined(CONFIG_MACH_STAR)
+ 	for (i = 0; i < card->num_rtd; i++) {
+ 		struct snd_soc_dai *cpu_dai = card->rtd[i].cpu_dai;
+		ac97_control |= cpu_dai->driver->ac97_control;
+	}
+	if (ac97_control) {
+		dev_dbg(dev, "Resuming AC97 immediately\n");
+		soc_resume_deferred(&card->deferred_resume_work);
+	} else {
+		dev_dbg(dev, "Scheduling resume work\n");
+		if (!schedule_work(&card->deferred_resume_work))
+			dev_err(dev, "resume work item may be lost\n");
+ 	}
+#else
 	for (i = 0; i < card->num_rtd; i++) {
 		struct snd_soc_dai *cpu_dai = card->rtd[i].cpu_dai;
 		if (cpu_dai->driver->ac97_control) {
@@ -1280,7 +1321,15 @@ int snd_soc_resume(struct device *dev)
 				dev_err(dev, "resume work item may be lost\n");
 		}
 	}
+#endif
+// MOBII_E [shhong@mobii.co.kr] 2012-08-22: Fix For Resume Kernel Failure
 
+
+// MOBII_CHANGE_S [shhong@mobii.co.kr] 2012.04.26 STAR Feature Added.
+#if defined (CONFIG_MACH_BSSQ) || defined (CONFIG_MACH_STAR)
+	headset_enable();
+#endif	
+// MOBII_CHANGE_E [shhong@mobii.co.kr] 2012.04.26 STAR Feature Added.
 	return 0;
 }
 EXPORT_SYMBOL_GPL(snd_soc_resume);
@@ -2124,7 +2173,13 @@ static int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num)
 		printk(KERN_ERR "asoc: platform pcm constructor failed\n");
 		return ret;
 	}
-
+// MOBII_S [shhong@mobii.co.kr] 2012-05-22 : TD Issue #6871
+//LGE_CHANGE_S [jung.chanmin@lge.com] 2012.04.15 Enable Headset Detect on Power on
+#if defined (CONFIG_MACH_BSSQ) || (CONFIG_MACH_STAR)
+	headset_enable();
+#endif
+//LGE_CHANGE_E [jung.chanmin@lge.com] 2012.04.15 Enable Headset Detect on Power on
+// MOBII_E [shhong@mobii.co.kr] 2012-05-22 : TD Issue #6871
 	pcm->private_free = platform->driver->pcm_free;
 	printk(KERN_INFO "asoc: %s <-> %s mapping ok\n", codec_dai->name,
 		cpu_dai->name);

@@ -1,0 +1,119 @@
+#drivers/bssq/Kconfig
+
+menu "LGE BSSQ device driver"
+
+config BSSQ_FUELGAUGE
+	bool "Fuel gauge MAX17043"
+	depends on I2C && MACH_BSSQ
+	default y
+	help
+		Support for MAX17043 fuel gauge driver.
+
+config BSSQ_MUIC_TI
+	bool "MUIC TS5USBA33402"
+	depends on MACH_BSSQ
+	default y
+	help
+		Support for TS5USBA33402 MUIC driver.
+
+config BSSQ_CHARGER_RT
+	bool "Charger ic RT9524"
+	depends on (LU6500 || SU880 || KU8800)
+	default n
+	help
+		Support for RT9524 charger ic driver.
+		
+config BSSQ_CHARGER_MAX
+	bool "Charger IC MAX8971"
+	depends on (KS1001 || KS1103)
+	default n
+	help
+		Support for MAX8971 charger IC driver.
+
+config BSSQ_HW_REV
+	bool "LGE HW PCB Revision"
+	depends on MACH_BSSQ
+	default y
+	help
+		Read HW PCB Revision.
+config BSSQ_PROXIMITY
+	bool "BSSQ Proximity Sensor"
+	depends on MACH_BSSQ
+	default y
+	help
+		BSSQ Proximity Sensor
+
+config SUBPMIC_LP8720
+	bool "SUB PMIC LP8720"
+	default n
+	help
+		Support for LP8720 SUB PMIC driver.
+
+#config CAM_PMIC
+#	bool "CAM_PMIC"
+#	default n
+#	help
+#		Support for CAM PMIC driver.
+
+config BSSQ_TOUCH_LED
+	bool "Bssq TouchLED Driver"
+	depends on (LU6500 )
+	default y
+	help
+		Touch LED driver
+config BSSQ_QWERTY_LED
+	bool "Bssq QWERTY LED Driver - MAX8907C WLED Port"
+	default y
+	help
+		Qwerty LED driver
+
+config BSSQ_RIL
+	bool "Star RIL Driver"
+	default y
+	help
+		Suport for IFX MUX & SPI.
+
+config SPI_MDM6600
+	bool "SPI MDM6600 from Qualcomm"
+	default y
+	help
+	Enable this driver to support MDM6600 Modem
+	
+config RINETWORK_DRIVER
+	bool "Raw ip network driver"
+	default y
+	help
+	  Support for raw ip network driver.
+	  
+config BSSQ_CPWATCHER
+	bool "Star CP Status Watcher Driver"
+	default y
+	help
+	 Suport for CP Status Watcher driver.
+
+config DUAL_SPI	 
+	bool "DUAL SPI SUPPORT"
+	default n
+	help
+	 Suport for DUAL SPI.
+
+# 20110505 hyeongwon.oh@lge.com add battery driver [S]
+config BSSQ_BATTERY
+	bool "Bssq Battery driver"
+	depends on MACH_BSSQ
+	default y
+	help
+		Support for BSSQ Battery driver.
+# 20110505 hyeongwon.oh@lge.com add battery driver [E]
+
+# 20110427 unyou.shim@lge.com added vibrator [S]
+#config BSSQ_VIBRATOR
+#    bool "Bssq PWM Vibrator"
+#    depends on MACH_BSSQ
+#    default y
+#    select TEGRA_PWM
+#    help
+#      PWM Vibrator
+# 20110427 unyou.shim@lge.com added vibrator [E]
+
+endmenu

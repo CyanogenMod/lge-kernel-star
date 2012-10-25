@@ -182,9 +182,15 @@
 #define MXT_VOLTAGE_DEFAULT	2700000
 #define MXT_VOLTAGE_STEP	10000
 
-/* Defines for MXT_TOUCH_CTRL */
-#define MXT_TOUCH_DISABLE	0
-#define MXT_TOUCH_ENABLE	0x83
+/* Defines for Suspend/Resume */
+#define MXT_SUSPEND_STATIC	0
+#define MXT_SUSPEND_DYNAMIC	1
+#define MXT_T7_IDLEACQ_DISABLE	0
+#define MXT_T7_ACTVACQ_DISABLE	0
+#define MXT_T7_ACTV2IDLE_DISABLE 0
+#define MXT_T9_DISABLE		0
+#define MXT_T9_ENABLE		0x83
+#define MXT_T22_DISABLE		0
 
 /* Define for MXT_GEN_COMMAND_T6 */
 #define MXT_BOOT_VALUE		0xa5
@@ -279,6 +285,15 @@ struct mxt_finger {
 	int area;
 };
 
+/* This structure is used to save/restore values during suspend/resume */
+struct mxt_suspend {
+	u8 suspend_obj;
+	u8 suspend_reg;
+	u8 suspend_val;
+	u8 suspend_flags;
+	u8 restore_val;
+};
+
 /* Each client has this additional data */
 struct mxt_data {
 	struct i2c_client *client;
@@ -311,6 +326,14 @@ struct mxt_data {
 	u8 slowscan_shad_actv_cycle_time;
 	u8 slowscan_shad_idle_cycle_time;
 	u8 slowscan_shad_actv2idle_timeout;
+};
+
+static struct mxt_suspend mxt_save[] = {
+	{MXT_TOUCH_MULTI_T9, MXT_TOUCH_CTRL, MXT_T9_DISABLE, MXT_SUSPEND_DYNAMIC, 0},
+	{MXT_PROCG_NOISE_T22, MXT_NOISE_CTRL, MXT_T22_DISABLE, MXT_SUSPEND_DYNAMIC, 0},
+	{MXT_GEN_POWER_T7, MXT_POWER_IDLEACQINT, MXT_T7_IDLEACQ_DISABLE, MXT_SUSPEND_DYNAMIC, 0},
+	{MXT_GEN_POWER_T7, MXT_POWER_ACTVACQINT, MXT_T7_ACTVACQ_DISABLE, MXT_SUSPEND_DYNAMIC, 0},
+	{MXT_GEN_POWER_T7, MXT_POWER_ACTV2IDLETO, MXT_T7_ACTV2IDLE_DISABLE, MXT_SUSPEND_DYNAMIC, 0}
 };
 
 #if defined(CONFIG_HAS_EARLYSUSPEND)
@@ -1516,7 +1539,8 @@ static const struct attribute_group mxt_attr_group = {
 
 static void mxt_start(struct mxt_data *data)
 {
-	int error;
+	int error = 0;
+	int cnt;
 	struct device *dev = &data->client->dev;
 
 	dev_info(dev, "mxt_start:  is_stopped = %d\n", data->is_stopped);
@@ -1524,7 +1548,11 @@ static void mxt_start(struct mxt_data *data)
 		return;
 
 	/* Touch enable */
-	error = mxt_write_object(data, MXT_TOUCH_MULTI_T9, MXT_TOUCH_CTRL, MXT_TOUCH_ENABLE);
+	cnt = ARRAY_SIZE(mxt_save);
+	while (cnt--)
+		error |= mxt_write_object(data, mxt_save[cnt].suspend_obj,
+						mxt_save[cnt].suspend_reg,
+						mxt_save[cnt].restore_val);
 
 	if (!error)
 		dev_info(dev, "MXT started\n");
@@ -1534,7 +1562,8 @@ static void mxt_start(struct mxt_data *data)
 
 static void mxt_stop(struct mxt_data *data)
 {
-	int error;
+	int error = 0;
+	int i, cnt;
 	struct device *dev = &data->client->dev;
 
 	dev_info(dev, "mxt_stop:  is_stopped = %d\n", data->is_stopped);
@@ -1542,7 +1571,17 @@ static void mxt_stop(struct mxt_data *data)
 		return;
 
 	/* Touch disable */
-	error = mxt_write_object(data, MXT_TOUCH_MULTI_T9, MXT_TOUCH_CTRL, MXT_TOUCH_DISABLE);
+	cnt = ARRAY_SIZE(mxt_save);
+	for (i = 0; i < cnt; i++) {
+		if (mxt_save[i].suspend_flags == MXT_SUSPEND_DYNAMIC)
+			error |= mxt_read_object(data,
+						mxt_save[i].suspend_obj,
+						mxt_save[i].suspend_reg,
+						&mxt_save[i].restore_val);
+		error |= mxt_write_object(data, mxt_save[i].suspend_obj,
+						mxt_save[i].suspend_reg,
+						mxt_save[i].suspend_val);
+	}
 
 	if (!error)
 		dev_info(dev, "MXT suspended\n");

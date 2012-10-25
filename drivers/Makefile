@@ -118,5 +118,11 @@ obj-y				+= platform/
 obj-y				+= ieee802154/
 #common clk code
 obj-y				+= clk/
-
+obj-$(CONFIG_PANICRPT)				+= kpd/
 obj-$(CONFIG_HWSPINLOCK)	+= hwspinlock/
+#1Seg
+obj-$(CONFIG_LGE_BROADCAST_1SEG) += broadcast/
+#TDMB
+obj-$(CONFIG_LGE_BROADCAST_TDMB) += broadcast/
+obj-$(CONFIG_MACH_BSSQ)		+= bssq/
+subdir-ccflags-$(CONFIG_MACH_BSSQ)	+= -Iarch/arm/mach-tegra/lge/bssq/include

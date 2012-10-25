@@ -17,13 +17,17 @@
 
 static struct mfd_cell cells[] = {
 	{.name = "max8907-regulator",},
-	{.name = "max8907c-rtc",},
+	{.name = "max8907c-rtc",},  	
+//LGE_CHANGE_S  euikyeom.kim@lge.com	
+	{.name = "max8907c-adc",},
+//LGE_CHANGE_E  euikyeom.kim@lge.com	
 };
 
+#define RETRY_CNT    5		
 static int max8907c_i2c_read(struct i2c_client *i2c, u8 reg, u8 count, u8 *dest)
 {
 	struct i2c_msg xfer[2];
-	int ret = 0;
+	int ret = 0, ret_cnt = 0 ;
 
 	xfer[0].addr = i2c->addr;
 	xfer[0].flags = I2C_M_NOSTART;
@@ -35,7 +39,18 @@ static int max8907c_i2c_read(struct i2c_client *i2c, u8 reg, u8 count, u8 *dest)
 	xfer[1].len = count;
 	xfer[1].buf = dest;
 
-	ret = i2c_transfer(i2c->adapter, xfer, 2);
+	// +Evan workaround 
+	while(ret_cnt < RETRY_CNT )
+	{
+		ret = i2c_transfer(i2c->adapter, xfer, 2);
+		if (ret >= 0 )
+			break;
+
+        printk("max8907c_i2c_read Fail Error code(0x%x) retry cnt=%d ", ret, ret_cnt);
+		ret_cnt++;
+	} 
+	// -Evan workaround 
+
 	if (ret < 0)
 		return ret;
 	if (ret != 2)
@@ -47,12 +62,23 @@ static int max8907c_i2c_read(struct i2c_client *i2c, u8 reg, u8 count, u8 *dest)
 static int max8907c_i2c_write(struct i2c_client *i2c, u8 reg, u8 count, const u8 *src)
 {
 	u8 msg[0x100 + 1];
-	int ret = 0;
+	int ret = 0, ret_cnt = 0 ;
 
 	msg[0] = reg;
 	memcpy(&msg[1], src, count);
 
-	ret = i2c_master_send(i2c, msg, count + 1);
+	// +Evan workaround 
+	while(ret_cnt < RETRY_CNT )
+	{
+		ret = i2c_master_send(i2c, msg, count + 1);
+		if (ret >= 0 )
+			break;
+		
+        printk("max8907c_i2c_write Fail Error code(0x%x) retry cnt=%d ", ret, ret_cnt);
+		ret_cnt++;
+	}
+	// -Evan workaround
+
 	if (ret < 0)
 		return ret;
 	if (ret != count + 1)
@@ -60,6 +86,23 @@ static int max8907c_i2c_write(struct i2c_client *i2c, u8 reg, u8 count, const u8
 
 	return 0;
 }
+
+
+#if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
+int max8907c_send_cmd(struct i2c_client *i2c, u8 cmd)
+{
+        int ret = 0;
+
+        ret = i2c_master_send(i2c, &cmd, 1);
+        if (ret < 0)
+                return ret;
+        if (ret != 1)
+                return -EIO;
+
+        return 0;
+}
+#endif
+
 
 int max8907c_reg_read(struct i2c_client *i2c, u8 reg)
 {
@@ -152,13 +195,45 @@ int max8907c_set_bits(struct i2c_client *i2c, u8 reg, u8 mask, u8 val)
 EXPORT_SYMBOL_GPL(max8907c_set_bits);
 
 static struct i2c_client *max8907c_client = NULL;
+
 int max8907c_power_off(void)
 {
 	if (!max8907c_client)
 		return -EINVAL;
 
-	return max8907c_set_bits(max8907c_client, MAX8907C_REG_RESET_CNFG,
-						MAX8907C_MASK_POWER_OFF, 0x40);
+    // 20110718 hyokmin.kwon@lge.com Power off regulators [S]
+#if defined (CONFIG_MACH_STAR) || defined (CONFIG_MACH_BSSQ)
+
+        // Disable WLED (Qwerty LED or touch LED)
+        max8907c_reg_write(max8907c_client, MAX8907C_REG_ILED_CNTL, 0x00);
+    
+        // Disable all regulators i2c controlled, set value as i2c_enabled, discharge res connected, output disabled
+        max8907c_reg_write(max8907c_client, MAX8907C_REG_LDOCTL3, 0x1e);
+        max8907c_reg_write(max8907c_client, MAX8907C_REG_LDOCTL4, 0x1e);
+        max8907c_reg_write(max8907c_client, MAX8907C_REG_LDOCTL6, 0x1e);
+        max8907c_reg_write(max8907c_client, MAX8907C_REG_LDOCTL7, 0x1e);
+        max8907c_reg_write(max8907c_client, MAX8907C_REG_LDOCTL8, 0x1e);
+        max8907c_reg_write(max8907c_client, MAX8907C_REG_LDOCTL9, 0x1e);
+        max8907c_reg_write(max8907c_client, MAX8907C_REG_LDOCTL10, 0x1e);
+        max8907c_reg_write(max8907c_client, MAX8907C_REG_LDOCTL11, 0x1e);
+        max8907c_reg_write(max8907c_client, MAX8907C_REG_LDOCTL12, 0x1e);
+        max8907c_reg_write(max8907c_client, MAX8907C_REG_LDOCTL13, 0x1e);
+        max8907c_reg_write(max8907c_client, MAX8907C_REG_LDOCTL14, 0x1e);
+        max8907c_reg_write(max8907c_client, MAX8907C_REG_LDOCTL15, 0x1e);
+        max8907c_reg_write(max8907c_client, MAX8907C_REG_LDOCTL16, 0x1e);
+        max8907c_reg_write(max8907c_client, MAX8907C_REG_LDOCTL17, 0x1e);
+        max8907c_reg_write(max8907c_client, MAX8907C_REG_LDOCTL18, 0x1e);
+        max8907c_reg_write(max8907c_client, MAX8907C_REG_LDOCTL19, 0x1e);
+        max8907c_reg_write(max8907c_client, MAX8907C_REG_LDOCTL20, 0x1e);
+    
+        // Disable PWREN, SW Power off SEQ1, SFT reset
+        return max8907c_set_bits(max8907c_client, MAX8907C_REG_RESET_CNFG,
+                            0xe0, 0x60);
+#else
+        return max8907c_set_bits(max8907c_client, MAX8907C_REG_RESET_CNFG,
+                            MAX8907C_MASK_POWER_OFF, 0x40);
+#endif
+    // 20110718 hyokmin.kwon@lge.com Power off regulators [E]
 }
 
 void max8907c_deep_sleep(int enter)
@@ -271,6 +346,8 @@ int max8907c_pwr_en_attach(void)
 static int max8907c_i2c_probe(struct i2c_client *i2c,
 			      const struct i2c_device_id *id)
 {
+	printk(KERN_WARNING "[MAX8907C] probe called.");
+
 	struct max8907c *max8907c;
 	struct max8907c_platform_data *pdata = i2c->dev.platform_data;
 	int ret;
@@ -288,6 +365,11 @@ static int max8907c_i2c_probe(struct i2c_client *i2c,
 
 	max8907c->i2c_rtc = i2c_new_dummy(i2c->adapter, RTC_I2C_ADDR);
 	i2c_set_clientdata(max8907c->i2c_rtc, max8907c);
+
+      // 20110505 hyeongwon.oh@lge.com add battery driver [S]
+      max8907c->i2c_adc = i2c_new_dummy(i2c->adapter, ADC_I2C_ADDR);
+      i2c_set_clientdata(max8907c->i2c_adc, max8907c);
+      // 20110505 hyeongwon.oh@lge.com add battery driver [E]
 
 	mutex_init(&max8907c->io_lock);
 
@@ -310,6 +392,15 @@ static int max8907c_i2c_probe(struct i2c_client *i2c,
 
 	if (pdata->max8907c_setup)
 		return pdata->max8907c_setup();
+    // 20110621 hyeongwon.oh@lge.com shutdown core1.2V when entering sleep [S]
+        else{
+            int ret;
+            ret = max8907c_set_bits(max8907c_client, MAX8907C_REG_RESET_CNFG,
+                        MAX8907C_MASK_PWR_EN, MAX8907C_PWR_EN);
+            if (ret != 0)
+                return ret;
+        }
+    // 20110621 hyeongwon.oh@lge.com shutdown core1.2V when entering sleep [E]    
 
 	return ret;
 }
@@ -320,6 +411,7 @@ static int max8907c_i2c_remove(struct i2c_client *i2c)
 
 	max8907c_remove_subdevs(max8907c);
 	i2c_unregister_device(max8907c->i2c_rtc);
+
 	mfd_remove_devices(max8907c->dev);
 	max8907c_irq_free(max8907c);
 	kfree(max8907c);
@@ -356,7 +448,6 @@ static int __init max8907c_i2c_init(void)
 
 	return ret;
 }
-
 subsys_initcall(max8907c_i2c_init);
 
 static void __exit max8907c_i2c_exit(void)

@@ -870,7 +870,13 @@ static inline void snd_soc_initialize_card_lists(struct snd_soc_card *card)
 	INIT_LIST_HEAD(&card->paths);
 	INIT_LIST_HEAD(&card->dapm_list);
 }
-
+// MOBII_CHANGE_S [shhong@mobii.co.kr] 2012.04.26 STAR Feature Added. 
+//LGE_CHANGE_S [jung.chanmin@lge.com] 2012.04.17 Enable Headset Detect in Sleep Mode
+#if defined (CONFIG_MACH_BSSQ) || defined (CONFIG_MACH_STAR)
+void headset_enable();
+#endif
+//LGE_CHANGE_E [jung.chanmin@lge.com] 2012.04.17 Enable Headset Detect in Sleep Mode
+// MOBII_CHANGE_E [shhong@mobii.co.kr] 2012.04.26 STAR Feature Added. 
 #include <sound/soc-dai.h>
 
 #ifdef CONFIG_DEBUG_FS

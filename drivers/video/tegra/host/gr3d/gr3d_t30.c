@@ -22,8 +22,8 @@
 
 #include "nvhost_hwctx.h"
 #include "dev.h"
-#include "t20/hardware_t20.h"
-#include "t20/syncpt_t20.h"
+#include "host1x/host1x_hardware.h"
+#include "host1x/host1x_syncpt.h"
 #include "gr3d.h"
 
 #include <mach/gpufuse.h>
@@ -73,6 +73,7 @@ static const struct hwctx_reginfo ctxsave_regs_3d_global[] = {
 	HWCTX_REGINFO(0xa02,   10, DIRECT),
 	HWCTX_REGINFO(0xb04,    1, DIRECT),
 	HWCTX_REGINFO(0xb06,   13, DIRECT),
+	HWCTX_REGINFO(0xe42,    2, DIRECT), /* HW bug workaround */
 };
 
 static const struct hwctx_reginfo ctxsave_regs_3d_perset[] = {
@@ -385,7 +386,7 @@ int __init nvhost_gr3d_t30_ctxhandler_init(struct nvhost_hwctx_handler *h)
 	u32 *save_ptr;
 
 	ch = container_of(h, struct nvhost_channel, ctxhandler);
-	nvmap = ch->dev->nvmap;
+	nvmap = nvhost_get_host(ch->dev)->nvmap;
 
 	register_sets = tegra_gpu_register_sets();
 	BUG_ON(register_sets == 0 || register_sets > 2);

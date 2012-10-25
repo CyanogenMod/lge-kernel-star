@@ -14,7 +14,6 @@
 
 #include "rtc-core.h"
 
-
 /* device attributes */
 
 /*
@@ -152,6 +151,7 @@ rtc_sysfs_show_wakealarm(struct device *dev, struct device_attribute *attr,
 	return retval;
 }
 
+
 static ssize_t
 rtc_sysfs_set_wakealarm(struct device *dev, struct device_attribute *attr,
 		const char *buf, size_t n)
@@ -163,6 +163,7 @@ rtc_sysfs_set_wakealarm(struct device *dev, struct device_attribute *attr,
 	char *buf_ptr;
 	int adjust = 0;
 
+	printk("rtc_sysfs_set_wakealarm() called\n");
 	/* Only request alarms that trigger in the future.  Disable them
 	 * by writing another time, e.g. 0 meaning Jan 1 1970 UTC.
 	 */
@@ -190,8 +191,8 @@ rtc_sysfs_set_wakealarm(struct device *dev, struct device_attribute *attr,
 			return retval;
 		if (alm.enabled)
 			return -EBUSY;
-
-		alm.enabled = 1;
+		
+		alm.enabled = 1;		
 	} else {
 		alm.enabled = 0;
 
@@ -226,9 +227,13 @@ void rtc_sysfs_add_device(struct rtc_device *rtc)
 {
 	int err;
 
+//LGE_CHANGE_S	euikyeom.kim@lge.com for PM_CYCLE Test
+#if !defined(CONFIG_MACH_LGE) && !defined(CONFIG_MACH_STAR)	
 	/* not all RTCs support both alarms and wakeup */
 	if (!rtc_does_wakealarm(rtc))
 		return;
+#endif
+//LGE_CHANGE_E	euikyeom.kim@lge.com for PM_CYCLE Test
 
 	err = device_create_file(&rtc->dev, &dev_attr_wakealarm);
 	if (err)

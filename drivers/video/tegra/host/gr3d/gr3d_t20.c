@@ -22,9 +22,9 @@
 
 #include "nvhost_hwctx.h"
 #include "dev.h"
-#include "t20/channel_t20.h"
-#include "t20/hardware_t20.h"
-#include "t20/syncpt_t20.h"
+#include "host1x/host1x_channel.h"
+#include "host1x/host1x_hardware.h"
+#include "host1x/host1x_syncpt.h"
 #include "gr3d.h"
 
 #include <linux/slab.h>
@@ -215,7 +215,7 @@ static u32 *save_regs_v0(u32 *ptr, unsigned int *pending,
 			ptr += RESTORE_INDIRECT_SIZE;
 			break;
 		}
-		drain_result = nvhost_drain_read_fifo(chan_regs,
+		drain_result = host1x_drain_read_fifo(chan_regs,
 			ptr, count, pending);
 		BUG_ON(drain_result < 0);
 		ptr += count;
@@ -340,7 +340,8 @@ static void ctx3d_save_service(struct nvhost_hwctx *ctx)
 			ARRAY_SIZE(ctxsave_regs_3d_global));
 
 	wmb();
-	nvhost_syncpt_cpu_incr(&ctx->channel->dev->syncpt, NVSYNCPT_3D);
+	nvhost_syncpt_cpu_incr(&nvhost_get_host(ctx->channel->dev)->syncpt,
+			NVSYNCPT_3D);
 }
 
 int __init nvhost_gr3d_t20_ctxhandler_init(struct nvhost_hwctx_handler *h)
@@ -350,7 +351,7 @@ int __init nvhost_gr3d_t20_ctxhandler_init(struct nvhost_hwctx_handler *h)
 	u32 *save_ptr;
 
 	ch = container_of(h, struct nvhost_channel, ctxhandler);
-	nvmap = ch->dev->nvmap;
+	nvmap = nvhost_get_host(ch->dev)->nvmap;
 
 	setup_save(NULL);
 

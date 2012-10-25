@@ -179,5 +179,7 @@ source "drivers/staging/gma500/Kconfig"
 
 source "drivers/staging/altera-stapl/Kconfig"
 
+source "drivers/staging/ramzswap/Kconfig"
+
 endif # !STAGING_EXCLUDE_BUILD
 endif # STAGING

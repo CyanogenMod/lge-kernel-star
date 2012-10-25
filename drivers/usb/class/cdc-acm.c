@@ -69,6 +69,7 @@
 #include <linux/usb/cdc.h>
 #include <asm/byteorder.h>
 #include <asm/unaligned.h>
+#include <asm/cacheflush.h>
 #include <linux/list.h>
 
 #include "cdc-acm.h"
@@ -189,6 +190,13 @@ static int acm_start_wb(struct acm *acm, struct acm_wb *wb)
 	wb->urb->transfer_dma = wb->dmah;
 	wb->urb->transfer_buffer_length = wb->len;
 	wb->urb->dev = acm->dev;
+
+	/* flush tx buffer from cache */
+	if (wb->len) {
+		dmac_flush_range(wb->buf, wb->buf + wb->len);
+		outer_flush_range(__pa(wb->buf), __pa(wb->buf+wb->len));
+	}
+
 	rc = usb_submit_urb(wb->urb, GFP_ATOMIC);
 	if (rc < 0) {
 		dbg("usb_submit_urb(write bulk) failed: %d", rc);
@@ -202,6 +210,9 @@ static int acm_write_start(struct acm *acm, int wbn)
 	unsigned long flags;
 	struct acm_wb *wb = &acm->wb[wbn];
 	int rc;
+#ifdef CONFIG_PM
+	struct urb *res;
+#endif
 
 	spin_lock_irqsave(&acm->write_lock, flags);
 	if (!acm->dev) {
@@ -214,23 +225,34 @@ static int acm_write_start(struct acm *acm, int wbn)
 	usb_autopm_get_interface_async(acm->control);
 	if (acm->susp_count) {
 #ifdef CONFIG_PM
-		printk("%s buffer urb\n", __func__);
 		acm->transmitting++;
 		wb->urb->transfer_buffer = wb->buf;
 		wb->urb->transfer_dma = wb->dmah;
 		wb->urb->transfer_buffer_length = wb->len;
 		wb->urb->dev = acm->dev;
 		usb_anchor_urb(wb->urb, &acm->deferred);
-#endif
+#else
 		if (!acm->delayed_wb)
 			acm->delayed_wb = wb;
 		else
 			usb_autopm_put_interface_async(acm->control);
+#endif
 		spin_unlock_irqrestore(&acm->write_lock, flags);
 		return 0;	/* A white lie */
 	}
 	usb_mark_last_busy(acm->dev);
-
+#ifdef CONFIG_PM
+	while ((res = usb_get_from_anchor(&acm->deferred))) {
+		/* decrement ref count*/
+		usb_put_urb(res);
+		rc = usb_submit_urb(res, GFP_ATOMIC);
+		if (rc < 0) {
+			dbg("usb_submit_urb(pending request) failed: %d", rc);
+			usb_unanchor_urb(res);
+			acm_write_done(acm, res->context);
+		}
+	}
+#endif
 	rc = acm_start_wb(acm, wb);
 	spin_unlock_irqrestore(&acm->write_lock, flags);
 
@@ -373,6 +395,13 @@ static void acm_read_bulk(struct urb *urb)
 
 	buf = rcv->buffer;
 	buf->size = urb->actual_length;
+
+	if (unlikely(status != 0) && urb->actual_length > 0) {
+		/* we force urb->status to success, do not drop the buffer */
+		pr_info("%s: rx urb was canceled but received a buffer %d\n",
+			__func__, urb->actual_length);
+		status = 0;
+	}
 
 	if (likely(status == 0)) {
 		spin_lock(&acm->read_lock);
@@ -583,6 +612,11 @@ static int acm_tty_open(struct tty_struct *tty, struct file *filp)
 	int i;
 	dbg("Entering acm_tty_open.");
 
+	if (!tty) {
+		pr_err("%s: !tty\n", __func__);
+		return -EINVAL;
+	}
+
 	mutex_lock(&open_mutex);
 
 	acm = acm_table[tty->index];
@@ -608,6 +642,15 @@ static int acm_tty_open(struct tty_struct *tty, struct file *filp)
 		goto out;
 	}
 
+	INIT_LIST_HEAD(&acm->spare_read_urbs);
+	INIT_LIST_HEAD(&acm->spare_read_bufs);
+	INIT_LIST_HEAD(&acm->filled_read_bufs);
+
+	for (i = 0; i < acm->rx_buflimit; i++)
+		list_add(&(acm->ru[i].list), &acm->spare_read_urbs);
+	for (i = 0; i < acm->rx_buflimit; i++)
+		list_add(&(acm->rb[i].list), &acm->spare_read_bufs);
+
 	acm->ctrlurb->dev = acm->dev;
 	if (usb_submit_urb(acm->ctrlurb, GFP_KERNEL)) {
 		dbg("usb_submit_urb(ctrl irq) failed");
@@ -619,15 +662,6 @@ static int acm_tty_open(struct tty_struct *tty, struct file *filp)
 		goto full_bailout;
 
 	usb_autopm_put_interface(acm->control);
-
-	INIT_LIST_HEAD(&acm->spare_read_urbs);
-	INIT_LIST_HEAD(&acm->spare_read_bufs);
-	INIT_LIST_HEAD(&acm->filled_read_bufs);
-
-	for (i = 0; i < acm->rx_buflimit; i++)
-		list_add(&(acm->ru[i].list), &acm->spare_read_urbs);
-	for (i = 0; i < acm->rx_buflimit; i++)
-		list_add(&(acm->rb[i].list), &acm->spare_read_bufs);
 
 	acm->throttle = 0;
 
@@ -643,6 +677,11 @@ out:
 full_bailout:
 	usb_kill_urb(acm->ctrlurb);
 bail_out:
+	for (i = 0; i < acm->rx_buflimit; i++)
+		list_del(&(acm->ru[i].list));
+	for (i = 0; i < acm->rx_buflimit; i++)
+		list_del(&(acm->rb[i].list));
+
 	acm->port.count--;
 	mutex_unlock(&acm->mutex);
 	usb_autopm_put_interface(acm->control);
@@ -674,7 +713,6 @@ static int acm_tty_chars_in_buffer(struct tty_struct *tty);
 static void acm_port_down(struct acm *acm)
 {
 	int i, nr = acm->rx_buflimit;
-	mutex_lock(&open_mutex);
 	if (acm->dev) {
 		usb_autopm_get_interface(acm->control);
 		acm_set_control(acm, acm->ctrlout = 0);
@@ -688,14 +726,23 @@ static void acm_port_down(struct acm *acm)
 		acm->control->needs_remote_wakeup = 0;
 		usb_autopm_put_interface(acm->control);
 	}
-	mutex_unlock(&open_mutex);
 }
 
 static void acm_tty_hangup(struct tty_struct *tty)
 {
-	struct acm *acm = tty->driver_data;
+	struct acm *acm;
+
+	mutex_lock(&open_mutex);
+	acm = tty->driver_data;
+
+	if (!acm)
+		goto out;
+
 	tty_port_hangup(&acm->port);
 	acm_port_down(acm);
+
+out:
+	mutex_unlock(&open_mutex);
 }
 
 static void acm_tty_close(struct tty_struct *tty, struct file *filp)
@@ -706,8 +753,8 @@ static void acm_tty_close(struct tty_struct *tty, struct file *filp)
 	   shutdown */
 	if (!acm)
 		return;
+	mutex_lock(&open_mutex);
 	if (tty_port_close_start(&acm->port, tty, filp) == 0) {
-		mutex_lock(&open_mutex);
 		if (!acm->dev) {
 			tty_port_tty_set(&acm->port, NULL);
 			acm_tty_unregister(acm);
@@ -719,6 +766,7 @@ static void acm_tty_close(struct tty_struct *tty, struct file *filp)
 	acm_port_down(acm);
 	tty_port_close_end(&acm->port, tty);
 	tty_port_tty_set(&acm->port, NULL);
+	mutex_unlock(&open_mutex);
 }
 
 static int acm_tty_write(struct tty_struct *tty,
@@ -1334,9 +1382,10 @@ skip_countries:
 	usb_set_intfdata(data_interface, acm);
 
 	usb_get_intf(control_interface);
-	tty_register_device(acm_tty_driver, minor, &control_interface->dev);
 
 	acm_table[minor] = acm;
+
+	tty_register_device(acm_tty_driver, minor, &control_interface->dev);
 
 	return 0;
 alloc_fail8:
@@ -1361,6 +1410,11 @@ alloc_fail:
 static void stop_data_traffic(struct acm *acm)
 {
 	int i;
+
+	if (!acm) {
+		pr_err("%s: !acm\n", __func__);
+		return;
+	}
 	dbg("Entering stop_data_traffic");
 
 	tasklet_disable(&acm->urb_task);
@@ -1381,6 +1435,7 @@ static void acm_disconnect(struct usb_interface *intf)
 	struct acm *acm = usb_get_intfdata(intf);
 	struct usb_device *usb_dev = interface_to_usbdev(intf);
 	struct tty_struct *tty;
+	struct urb *res;
 
 	/* sibling interface is already cleaning up */
 	if (!acm)
@@ -1399,6 +1454,10 @@ static void acm_disconnect(struct usb_interface *intf)
 	usb_set_intfdata(acm->data, NULL);
 
 	stop_data_traffic(acm);
+
+	/* decrement ref count of anchored urbs */
+	while ((res = usb_get_from_anchor(&acm->deferred)))
+		usb_put_urb(res);
 
 	acm_write_buffers_free(acm);
 	usb_free_coherent(usb_dev, acm->ctrlsize, acm->ctrl_buffer,
@@ -1428,6 +1487,11 @@ static int acm_suspend(struct usb_interface *intf, pm_message_t message)
 {
 	struct acm *acm = usb_get_intfdata(intf);
 	int cnt;
+
+	if (!acm) {
+		pr_err("%s: !acm\n", __func__);
+		return -ENODEV;
+	}
 
 	if (message.event & PM_EVENT_AUTO) {
 		int b;
@@ -1465,14 +1529,27 @@ static int acm_suspend(struct usb_interface *intf, pm_message_t message)
 static int acm_resume(struct usb_interface *intf)
 {
 	struct acm *acm = usb_get_intfdata(intf);
-	struct acm_wb *wb;
 	int rv = 0;
-	struct urb *res;
 	int cnt;
+#ifdef CONFIG_PM
+	struct urb *res;
+#else
+	struct acm_wb *wb;
+#endif
+
+	if (!acm) {
+		pr_err("%s: !acm\n", __func__);
+		return -ENODEV;
+	}
 
 	spin_lock_irq(&acm->read_lock);
-	acm->susp_count -= 1;
-	cnt = acm->susp_count;
+	if (acm->susp_count > 0) {
+		acm->susp_count -= 1;
+		cnt = acm->susp_count;
+	} else {
+		spin_unlock_irq(&acm->read_lock);
+		return 0;
+	}
 	spin_unlock_irq(&acm->read_lock);
 
 	if (cnt)
@@ -1481,19 +1558,23 @@ static int acm_resume(struct usb_interface *intf)
 
 	mutex_lock(&acm->mutex);
 
-#ifdef CONFIG_PM
-	while ((res = usb_get_from_anchor(&acm->deferred))) {
-		printk("%s process buffered request \n", __func__);
-		rv = usb_submit_urb(res, GFP_ATOMIC);
-		if (rv < 0) {
-			dbg("usb_submit_urb(pending request) failed: %d", rv);
-		}
-	}
-#endif
-
 	if (acm->port.count) {
 		rv = usb_submit_urb(acm->ctrlurb, GFP_NOIO);
 		spin_lock_irq(&acm->write_lock);
+#ifdef CONFIG_PM
+		while ((res = usb_get_from_anchor(&acm->deferred))) {
+			/* decrement ref count*/
+			usb_put_urb(res);
+			rv = usb_submit_urb(res, GFP_ATOMIC);
+			if (rv < 0) {
+				dbg("usb_submit_urb(pending request)"
+					" failed: %d", rv);
+				usb_unanchor_urb(res);
+				acm_write_done(acm, res->context);
+			}
+		}
+		spin_unlock_irq(&acm->write_lock);
+#else
 		if (acm->delayed_wb) {
 			wb = acm->delayed_wb;
 			acm->delayed_wb = NULL;
@@ -1502,7 +1583,7 @@ static int acm_resume(struct usb_interface *intf)
 		} else {
 			spin_unlock_irq(&acm->write_lock);
 		}
-
+#endif
 
 		/*
 		 * delayed error checking because we must
@@ -1523,6 +1604,11 @@ static int acm_reset_resume(struct usb_interface *intf)
 {
 	struct acm *acm = usb_get_intfdata(intf);
 	struct tty_struct *tty;
+
+	if (!acm) {
+		pr_err("%s: !acm\n", __func__);
+		return -ENODEV;
+	}
 
 	mutex_lock(&acm->mutex);
 	if (acm->port.count) {

@@ -42,13 +42,18 @@
 #include <linux/wait.h>
 #include <linux/uaccess.h>
 #include <linux/io.h>
+#ifdef CONFIG_MACH_BSSQ
+#include <../gpio-names.h>
+#endif
 
 #include "mpuirq.h"
 #include "slaveirq.h"
 #include "mlsl.h"
 #include "mldl_cfg.h"
 #include <linux/mpu.h>
-
+#ifdef CONFIG_MACH_BSSQ
+#include <linux/delay.h>
+#endif
 
 /* Platform data for the MPU */
 struct mpu_private_data {
@@ -1220,8 +1225,81 @@ static struct i2c_driver mpu_driver = {
 
 };
 
+#ifdef CONFIG_MACH_BSSQ
+#include <linux/regulator/consumer.h>
+
+static void mpu3050_power_init(void)
+{
+
+	struct regulator *regulator1 = NULL;
+	struct regulator *regulator2 = NULL;
+	unsigned int gyro_int_gpio;
+
+#ifdef CONFIG_MACH_STAR
+	printk(KERN_INFO "[BCH][mpu-dev.c] enter [%s()] CONFIG_MACH_STAR \n", __func__);
+	gyro_int_gpio = TEGRA_GPIO_PQ5
+#else
+#if defined (CONFIG_KS1001) 
+	if(get_lge_pcb_revision() >= REV_C)
+		gyro_int_gpio = TEGRA_GPIO_PF6;
+	else
+		gyro_int_gpio = TEGRA_GPIO_PB3;
+#elif defined (CONFIG_KS1103)
+	printk(KERN_INFO "[BCH][mpu-dev.c] enter [%s()] CONFIG_KS1103 \n", __func__);
+	gyro_int_gpio = TEGRA_GPIO_PF6;
+#else
+	gyro_int_gpio = TEGRA_GPIO_PB3;
+#endif	
+#endif
+
+	printk(KERN_INFO "mpu3050_power_init.. \n");
+
+#ifdef CONFIG_MACH_BSSQ
+	// 20110618 hyokmin.kwon@lge.com Gyro sensor power sequence (OFF in BL -> ON in init)
+	// Set GYRO_INT as input and LOW for 1.5s
+	gpio_request(TEGRA_GPIO_PE1, "i2c_sw");
+	tegra_gpio_enable(TEGRA_GPIO_PE1);
+	gpio_direction_output(TEGRA_GPIO_PE1, 0);
+#endif
+
+	gpio_request(gyro_int_gpio, "gyro_int");
+	tegra_gpio_enable(gyro_int_gpio);
+	gpio_direction_output(gyro_int_gpio, 0);
+
+	mdelay(1500);
+
+	regulator1 = regulator_get(NULL, "vcc_sensor_3v0");
+	if (!regulator1) {
+		printk(KERN_INFO "mpu3050: vcc_sensor_3v0 failed\n");
+	}
+	regulator_set_voltage(regulator1, 3000000, 3000000);
+	regulator2 = regulator_get(NULL, "vcc_sensor_1v8");
+	if (!regulator2) {
+		printk(KERN_INFO "mpu3050: vcc_sensor_1v8 failed\n");
+	}
+	regulator_set_voltage(regulator2, 1800000, 1800000);
+
+	regulator_enable(regulator1);
+	mdelay(10);
+	regulator_enable(regulator2);
+	mdelay(10); // deukgi.shin@lge.com // HW req.
+#ifdef CONFIG_MACH_BSSQ
+	gpio_direction_output(TEGRA_GPIO_PE1, 1);
+#endif
+	gpio_direction_input(gyro_int_gpio);
+
+	mdelay(1);
+}
+#endif
+
 static int __init mpu_init(void)
 {
+#ifdef CONFIG_MACH_BSSQ
+// LGE_CHANGE_S [dongjin73.kim@lge.com] 2011-01-19, [LGE_AP20] Sensor integration
+	mpu3050_power_init();
+// LGE_CHANGE_E [dongjin73.kim@lge.com] 2011-01-19, [LGE_AP20] Sensor integration
+#endif
+
 	int res = i2c_add_driver(&mpu_driver);
 	pr_info("%s: Probe name %s\n", __func__, MPU_NAME);
 	if (res)

@@ -94,6 +94,12 @@ int usb_add_function(struct usb_configuration *config,
 {
 	int	value = -EINVAL;
 
+
+	printk(KERN_INFO "adding '%s'/%p to config '%s'/%p\n",
+			function->name, function,
+			config->label, config);
+
+
 	DBG(config->cdev, "adding '%s'/%p to config '%s'/%p\n",
 			function->name, function,
 			config->label, config);
@@ -127,6 +133,8 @@ int usb_add_function(struct usb_configuration *config,
 done:
 	if (value)
 		DBG(config->cdev, "adding '%s'/%p --> %d\n",
+				function->name, function, value);
+	printk(KERN_INFO "adding '%s'/%p --> %d\n",
 				function->name, function, value);
 	return value;
 }
@@ -1235,6 +1243,7 @@ composite_suspend(struct usb_gadget *gadget)
 
 	cdev->suspended = 1;
 
+	printk("[composite] composite_suspend2\n"); 	
 	usb_gadget_vbus_draw(gadget, 2);
 }
 

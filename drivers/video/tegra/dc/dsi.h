@@ -17,6 +17,13 @@
 #ifndef __DRIVERS_VIDEO_TEGRA_DC_DSI_H__
 #define __DRIVERS_VIDEO_TEGRA_DC_DSI_H__
 
+#if defined (CONFIG_MACH_BSSQ)
+#if defined(CONFIG_LU6500)
+#define USE_NEW_EXPRESSION	0
+#else
+#define USE_NEW_EXPRESSION	1
+#endif
+#endif
 /* source of video data */
 enum{
 	TEGRA_DSI_VIDEO_DRIVEN_BY_DC,
@@ -141,11 +148,19 @@ enum {
 #define DSI_VIDEO_FIFO_DEPTH    480
 #define DSI_READ_FIFO_DEPTH	(32 << 2)
 
-#define NUMOF_BIT_PER_BYTE			8
-#define DEFAULT_LP_CMD_MODE_CLK_KHZ		10000
-#define DEFAULT_MAX_DSI_PHY_CLK_KHZ		(500*1000)
-#define DEFAULT_PANEL_RESET_TIMEOUT		2
-#define DEFAULT_PANEL_BUFFER_BYTE		512
+#if defined (CONFIG_MACH_BSSQ)
+	#define NUMOF_BIT_PER_BYTE				8
+	#define DEFAULT_LP_CMD_MODE_CLK_KHZ		10000
+	#define DEFAULT_MAX_DSI_PHY_CLK_KHZ		(500*1000)
+	#define DEFAULT_PANEL_RESET_TIMEOUT		202
+	#define DEFAULT_PANEL_BUFFER_BYTE		512
+#else
+	#define NUMOF_BIT_PER_BYTE				8
+	#define DEFAULT_LP_CMD_MODE_CLK_KHZ		10000
+	#define DEFAULT_MAX_DSI_PHY_CLK_KHZ		(500*1000)
+	#define DEFAULT_PANEL_RESET_TIMEOUT		2
+	#define DEFAULT_PANEL_BUFFER_BYTE		512
+#endif
 
 /*
  * TODO: are DSI_HOST_DSI_CONTROL_CRC_RESET(RESET_CRC) and
@@ -167,6 +182,12 @@ enum {
 			DSI_HOST_DSI_CONTROL_HOST_TX_TRIG_SRC(IMMEDIATE))
 
 #define HOST_DSI_CTRL_DC_DRIVEN 0
+
+#define HOST_DSI_CTRL_VIDEO_MODE \
+			(DSI_HOST_DSI_CONTROL_PKT_WR_FIFO_SEL(VIDEO_HOST))
+
+#define HOST_DSI_CTRL_CMD_MODE \
+			(DSI_HOST_DSI_CONTROL_PKT_WR_FIFO_SEL(HOST_ONLY))
 
 #define DSI_CTRL_HOST_DRIVEN	(DSI_CONTROL_VID_ENABLE(TEGRA_DSI_DISABLE) | \
 				DSI_CONTROL_HOST_ENABLE(TEGRA_DSI_ENABLE))
@@ -228,30 +249,51 @@ enum {
 
 #define NUMOF_PKT_SEQ	12
 
+#define DSI_CYCLE_COUNTER_VALUE		512
 
 /* Macros for calculating the phy timings */
-#define T_HSEXIT_DEFAULT(clkns)		(100 / ((clkns) * 8) + 1)
-#define T_HSTRAIL_DEFAULT(clkns)	(3 + max((8 * (clkns)), \
-					(60 + 4 * (clkns))) / ((clkns) * 8) + 1)
-#define T_HSPREPR_ORG(clkns)		((65 + 5 * (clkns)) / ((clkns) * 8))
-#define T_HSPREPR_DEFAULT(clkns)	((T_HSPREPR_ORG(clkns) == 0) ? \
-					         1 : T_HSPREPR_ORG(clkns))
-#define T_DATZERO_DEFAULT(clkns)	((145 + 5 * (clkns)) / ((clkns) * 8) +1)
+#if (USE_NEW_EXPRESSION)
+	#define DSI_NO_OF_BITS_PER_BYTE 8
+	#define DSI_TBIT_MS(Freq)    (((1000) * (1000))/(Freq))
+	
+	// Period of one byte time in nano seconds
+	#define DSI_TBYTE_MS(Freq)    ((DSI_TBIT_MS(Freq)) * (DSI_NO_OF_BITS_PER_BYTE))
+	#define DSI_PHY_TIMING_DIV(X, Freq) ((X) / (DSI_TBYTE_MS(Freq)))
+	// As per Mipi spec (3 + NV_MAX(8 * DSI_TBIT, 60 + 4 * DSI_TBIT) /
+	//    DSI_TBYTE) min
+	#define DSI_THSTRAIL_VAL(Freq)	(max(((8) * (DSI_TBIT_MS(Freq))), ((60*1000) + ((4) * (DSI_TBIT_MS(Freq))))))
 
-#define T_CLKTRAIL_DEFAULT(clkns)	(60 / ((clkns) * 8) + 1)
-#define T_CLKPOST_DEFAULT(clkns)	((60 + 52 * (clkns)) / ((clkns) * 8) +1)
-#define T_CLKZERO_DEFAULT(clkns)	(170 / ((clkns) * 8) + 1)
-#define T_TLPX_ORG(clkns)		(50 / ((clkns) * 8) + 1)
-#define T_TLPX_DEFAULT(clkns)		((T_TLPX_ORG(clkns) == 0) ? \
-							1 : T_TLPX_ORG(clkns))
+	#define T_HSEXIT_DEFAULT(Freq)		DSI_PHY_TIMING_DIV(120*1000, Freq);
+	#define T_HSTRAIL_DEFAULT(Freq)		3 + (DSI_PHY_TIMING_DIV(DSI_THSTRAIL_VAL(Freq), Freq));
+	#define T_DATZERO_DEFAULT(Freq)		(DSI_PHY_TIMING_DIV(145*1000 + (5 * DSI_TBIT_MS(Freq)), Freq));
+	#define T_HSPREPR_DEFAULT(Freq)		(DSI_PHY_TIMING_DIV(65*1000 + (5 * DSI_TBIT_MS(Freq)), Freq));
 
-#define T_CLKPRE_DEFAULT(clkns)		1
-#define T_CLKPREPARE_DEFAULT(clkns)	4
+	#define T_CLKTRAIL_DEFAULT(Freq)	DSI_PHY_TIMING_DIV(80*1000, Freq);
+	#define T_CLKPOST_DEFAULT(Freq)		DSI_PHY_TIMING_DIV(70*1000 + (52 * DSI_TBIT_MS(Freq)), Freq);
+	#define T_CLKZERO_DEFAULT(Freq)		(DSI_PHY_TIMING_DIV(260*1000, Freq));
+	#define T_TLPX_DEFAULT(Freq)		(DSI_PHY_TIMING_DIV(60*1000, Freq));
 
-/* Minimum ULPM wakeup time as per the spec is 1msec */
-#define T_WAKEUP_DEFAULT(clkns)		(2*1000*1000 / (clkns))
+	#define T_CLKPRE_DEFAULT(Freq)		1
+	#define T_CLKPREPARE_DEFAULT(Freq)	4
 
-#define DSI_CYCLE_COUNTER_VALUE		512
+	#define T_WAKEUP_DEFAULT(clkns)		(2*1000*1000 / (clkns))
+#else
+	#define T_HSEXIT_DEFAULT(clkns)		( 100 / ((clkns)*8) ) //
+	#define T_HSTRAIL_DEFAULT(clkns)	( 3 + max( 8*(clkns), 60 + 4*(clkns) ) / ((clkns)*8) )	//
+	#define T_HSPREPR_DEFAULT(clkns)	(3)
+	#define T_DATZERO_DEFAULT(clkns)	( ((55 + 6 * (clkns)) / (clkns * 8)) - 1 ) //
+
+	#define T_CLKTRAIL_DEFAULT(clkns)	( (60 / ((clkns) * 8)) + 1 ) //
+	#define T_CLKPOST_DEFAULT(clkns)	( (60 + 52 * (clkns)) / ((clkns) * 8) ) + 1//
+	#define T_CLKZERO_DEFAULT(clkns)	( 170 / ((clkns) * 8) )  + 1//
+
+	#define T_TLPX_DEFAULT(clkns)		(4) //
+
+	#define T_CLKPRE_DEFAULT(clkns)		1
+	#define T_CLKPREPARE_DEFAULT(clkns)	4
+
+	#define T_WAKEUP_DEFAULT(clkns)		( (2* ((1000*1000) / ((clkns) * 8))) / DSI_CYCLE_COUNTER_VALUE )
+#endif
 
 /* Defines the DSI phy timing parameters */
 struct dsi_phy_timing_inclk

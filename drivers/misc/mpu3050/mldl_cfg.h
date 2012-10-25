@@ -31,7 +31,7 @@
 /* ------------------ */
 /* - Include Files. - */
 /* ------------------ */
-
+#include <linux/platform_device.h>
 #include "mlsl.h"
 #include "mpu.h"
 
@@ -89,11 +89,17 @@
 /* -    Variables.     - */
 /* --------------------- */
 
+/*exteded variables for only kernel*/
+struct mldl_ext_cfg {
+	
+	void* mpuacc_data; /*Mpu-Accel Data*/
+};
+
+
 /* Platform data for the MPU */
 struct mldl_cfg {
 	/* MPU related configuration */
 	unsigned long requested_sensors;
-	unsigned char ignore_system_suspend;
 	unsigned char addr;
 	unsigned char int_config;
 	unsigned char ext_sync;
@@ -131,6 +137,12 @@ struct mldl_cfg {
 
 	/* Platform Data */
 	struct mpu3050_platform_data *pdata;
+
+	/*---------------------------------------------------*/
+	/*KERNEL ONLY VARIABLES                              */
+	/*---------------------------------------------------*/
+	struct mldl_ext_cfg ext;
+	struct mutex mutex;  // 20110825 sangki.hyun@lge.com Sensor I2C Error
 };
 
 

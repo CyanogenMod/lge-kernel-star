@@ -23,6 +23,9 @@
 #ifndef __TEGRA_ASOC_UTILS_H__
 #define __TEGRA_ASOC_UTILS_H_
 
+
+#define TEGRA30_I2S_MASTER_PLAYBACK 1
+
 struct clk;
 struct device;
 
@@ -32,6 +35,8 @@ struct tegra_asoc_utils_data {
 	struct clk *clk_pll_a_out0;
 	struct clk *clk_cdev1;
 	struct clk *clk_out1;
+	struct clk *clk_m;
+	struct clk *clk_pll_p_out1;
 	int set_baseclock;
 	int set_mclk;
 	int lock_count;

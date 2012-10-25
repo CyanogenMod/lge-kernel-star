@@ -58,6 +58,13 @@ static int report_trace(struct stackframe *frame, void *d)
 	return *depth == 0;
 }
 
+#ifdef CONFIG_ANDROID
+/* Android has a different stack frame than Linux */
+struct frame_tail {
+	unsigned long fp;
+	unsigned long lr;
+} __attribute__((packed));
+#else
 /*
  * The registers we're interested in are at the end of the variable
  * length saved register structure. The fp points at the end of this
@@ -69,6 +76,7 @@ struct frame_tail {
 	unsigned long sp;
 	unsigned long lr;
 } __attribute__((packed));
+#endif
 
 static struct frame_tail* user_backtrace(struct frame_tail *tail)
 {
@@ -84,15 +92,29 @@ static struct frame_tail* user_backtrace(struct frame_tail *tail)
 
 	/* frame pointers should strictly progress back up the stack
 	 * (towards higher addresses) */
+#ifdef CONFIG_ANDROID
+	if (tail >= (struct frame_tail *) buftail[0].fp)
+#else
 	if (tail + 1 >= buftail[0].fp)
+#endif
 		return NULL;
 
+#ifdef CONFIG_ANDROID
+	/* Android has a different stack frame than Linux */
+	return (struct frame_tail *) (buftail[0].fp - sizeof(unsigned long));
+#else
 	return buftail[0].fp-1;
+#endif
 }
 
 static void arm_backtrace(struct pt_regs * const regs, unsigned int depth)
 {
+#ifdef CONFIG_ANDROID
+	struct frame_tail *tail = (struct frame_tail *)
+	                          (regs->ARM_fp - sizeof(unsigned long));
+#else
 	struct frame_tail *tail = ((struct frame_tail *) regs->ARM_fp) - 1;
+#endif
 
 	if (!user_mode(regs)) {
 		struct stackframe frame;

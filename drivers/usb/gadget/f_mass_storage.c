@@ -296,8 +296,22 @@
 #include <linux/usb/composite.h>
 
 #include "gadget_chips.h"
+/* MOBII_CHNANGE_S 20120413 mg.chang@mobii.co.kr : apply Internal SD & UMS From P2 */
+#define VENDOR_NAME_LGE	"LGE"
 
 
+#define PRODUCT_NAME_ANDROID	"SU660"
+#define PRODUCT_NAME_EXTERNAL 	"SU660 SD Card"
+static const char vendor_name[] = VENDOR_NAME_LGE;
+static const char product_name[] = PRODUCT_NAME_ANDROID;
+static const char product_name_external[] = PRODUCT_NAME_EXTERNAL;
+
+enum
+{
+	INTERNAL_MASS_STORAGE = 0,
+	EXTERNAL_MASS_STORAGE = 1
+};
+/* MOBII_CHNANGE_E 20120413 mg.chang@mobii.co.kr : apply Internal SD & UMS From P2 */
 /*------------------------------------------------------------------------*/
 
 #define FSG_DRIVER_DESC		"Mass Storage Function"
@@ -404,7 +418,7 @@ struct fsg_common {
 	 * Vendor (8 chars), product (16 chars), release (4
 	 * hexadecimal digits) and NUL byte
 	 */
-	char inquiry_string[8 + 16 + 4 + 1];
+	char inquiry_string[FSG_MAX_LUNS][8 + 16 + 4 + 1]; //P2 GB Sync  /* MOBII_CHNANGE 20120413 mg.chang@mobii.co.kr : apply Internal SD & UMS From P2 */
 
 	struct kref		ref;
 };
@@ -625,8 +639,20 @@ static int fsg_setup(struct usb_function *f,
 		if (ctrl->bRequestType !=
 		    (USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE))
 			break;
+/* MOBII_CHNANGE 20120413 mg.chang@mobii.co.kr : apply Internal SD & UMS From P2 */
+//P2 GB Sync start
+			
+		//!![S] 2011-08-04 by pilsu.kim@lge.com :  for mode switch ( multi to single )
+		VDBG(fsg, "fsg->interface_number = %d \n",fsg->interface_number);		
+		#if(1)
+		if (w_value != 0)
+			return -EDOM;	
+		#else
 		if (w_index != fsg->interface_number || w_value != 0)
 			return -EDOM;
+		#endif
+		//!![E] 2011-08-04 by pilsu.kim@lge.com : 
+//P2 GB Sync end
 
 		/*
 		 * Raise an exception to stop the current operation
@@ -640,8 +666,21 @@ static int fsg_setup(struct usb_function *f,
 		if (ctrl->bRequestType !=
 		    (USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE))
 			break;
+/* MOBII_CHNANGE 20120413 mg.chang@mobii.co.kr : apply Internal SD & UMS From P2 */
+//P2 GB Sync start
+
+		//!![S] 2011-08-04 by pilsu.kim@lge.com : for mode switch ( multi to single )
+		VDBG(fsg, "fsg->interface_number = %d \n",fsg->interface_number);		
+		#if(1)
+		if (w_value != 0)
+			return -EDOM;	
+		#else
 		if (w_index != fsg->interface_number || w_value != 0)
 			return -EDOM;
+		#endif
+		//!![E] 2011-08-04 by pilsu.kim@lge.com : 
+//P2 GB Sync end
+
 		VDBG(fsg, "get max LUN\n");
 		*(u8 *)req->buf = fsg->common->nluns - 1;
 
@@ -1217,7 +1256,7 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 	buf[5] = 0;		/* No special options */
 	buf[6] = 0;
 	buf[7] = 0;
-	memcpy(buf + 8, common->inquiry_string, sizeof common->inquiry_string);
+	memcpy(buf + 8, common->inquiry_string[common->lun], sizeof common->inquiry_string[0]); /* MOBII_CHNANGE 20120413 mg.chang@mobii.co.kr : apply Internal SD & UMS From P2 */
 	return 36;
 }
 
@@ -1385,10 +1424,13 @@ static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
 
 	/* No block descriptors */
 
-	/*
-	 * The mode pages, in numerical order.  The only page we support
-	 * is the Caching page.
+/* MOBII_CHNANGE 20120413 mg.chang@mobii.co.kr : apply Internal SD & UMS From P2 */
+// LGE_UPDATE_S 20110225 [jaejoong.kim@lge.com] disable this code
+	/* Disabled to workaround USB reset problems with a Vista host.
 	 */
+#if 0
+	/* The mode pages, in numerical order.  The only page we support
+	 * is the Caching page. */
 	if (page_code == 0x08 || all_pages) {
 		valid_page = 1;
 		buf[0] = 0x08;		/* Page code */
@@ -1409,7 +1451,10 @@ static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
 		}
 		buf += 12;
 	}
-
+#else
+	valid_page = 1;
+#endif
+// LGE_UPDATE_E 20110225 [jaejoong.kim@lge.com] disable this code
 	/*
 	 * Check that a valid page was requested and the mode data length
 	 * isn't too long.
@@ -1707,6 +1752,11 @@ static int finish_reply(struct fsg_common *common)
 	case DATA_DIR_TO_HOST:
 		if (common->data_size == 0) {
 			/* Nothing to send */
+
+/* MOBII_CHNANGE 20120413 mg.chang@mobii.co.kr : apply Internal SD & UMS From P2 */
+		/* Don't know what to do if common->fsg is NULL */
+		} else if (!fsg_is_set(common)) {
+			rc = -EIO;
 
 		/* If there's no residue, simply send the last buffer */
 		} else if (common->residue == 0) {
@@ -2757,6 +2807,18 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 	struct fsg_lun_config *lcfg;
 	int nluns, i, rc;
 	char *pathbuf;
+/* MOBII_CHNANGE 20120413 mg.chang@mobii.co.kr : apply Internal SD & UMS From P2 */
+//P2 GB Sync start
+
+	int j;
+
+	cfg->nluns = 2;
+	for (i = 0; i < cfg->nluns; i++)
+		cfg->luns[i].removable = 1;	
+	cfg->vendor_name = VENDOR_NAME_LGE;	
+//P2 GB Sync end
+	cfg->product_name =PRODUCT_NAME_ANDROID; //internel memory inquiry 
+
 
 	/* Find out how many LUNs there should be */
 	nluns = cfg->nluns;
@@ -2809,6 +2871,7 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 	for (i = 0, lcfg = cfg->luns; i < nluns; ++i, ++curlun, ++lcfg) {
 		curlun->cdrom = !!lcfg->cdrom;
 		curlun->ro = lcfg->cdrom || lcfg->ro;
+		curlun->initially_ro = curlun->ro; /* MOBII_CHNANGE 20120413 mg.chang@mobii.co.kr : apply Internal SD & UMS From P2 */
 		curlun->removable = lcfg->removable;
 		curlun->dev.release = fsg_lun_release;
 		curlun->dev.parent = &gadget->dev;
@@ -2879,14 +2942,26 @@ buffhds_first_it:
 			i = 0x0399;
 		}
 	}
-	snprintf(common->inquiry_string, sizeof common->inquiry_string,
-		 "%-8s%-16s%04x", cfg->vendor_name ?: "Linux",
-		 /* Assume product name dependent on the first LUN */
-		 cfg->product_name ?: (common->luns->cdrom
+/* MOBII_CHNANGE_S 20120413 mg.chang@mobii.co.kr : apply Internal SD & UMS From P2 */
+	#define OR(x, y) ((x) ? (x) : (y))
+
+	for (j = 0 ; j < nluns; ++j) {
+
+		if( j == EXTERNAL_MASS_STORAGE)	{
+			sprintf(common->inquiry_string[j], "%-8s%-16s%04x", OR(cfg->vendor_name, "Linux   "), product_name_external, i);
+
+		} else {
+			snprintf(common->inquiry_string[j], sizeof common->inquiry_string[j],
+				 "%-8s%-16s%04x",
+				 OR(cfg->vendor_name, "Linux   "),
+				 ///* Assume product name dependent on the first LUN */
+				 OR(cfg->product_name, common->luns->cdrom
 				     ? "File-Stor Gadget"
 				     : "File-CD Gadget"),
 		 i);
-
+		}	
+	}
+/* MOBII_CHNANGE_E 20120413 mg.chang@mobii.co.kr : apply Internal SD & UMS From P2 */
 	/*
 	 * Some peripheral controllers are known not to be able to
 	 * halt bulk endpoints correctly.  If one of them is present,
@@ -2908,6 +2983,7 @@ buffhds_first_it:
 	}
 	init_completion(&common->thread_notifier);
 	init_waitqueue_head(&common->fsg_wait);
+#undef OR
 
 	/* Information */
 	INFO(common, FSG_DRIVER_DESC ", version: " FSG_DRIVER_VERSION "\n");

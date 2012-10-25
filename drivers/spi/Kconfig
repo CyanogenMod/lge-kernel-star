@@ -40,7 +40,7 @@ config SPI_DEBUG
 #
 
 config SPI_MASTER
-#	boolean "SPI Master Support"
+	boolean "SPI Master Support"
 	boolean
 	default SPI
 	help
@@ -475,4 +475,31 @@ endif # SPI_MASTER
 
 # (slave support would go here)
 
+#
+# MUX & RINDRV Configuration	// 20120202 jisil.park@lge.com
+#
+
+
+
+config SPI_MUX
+	bool "Star MUX Driver"
+	default y
+	help
+		Suport for IFX MUX & SPI.
+	
+config SPI_RINDRV
+	bool "Raw ip network driver"
+	default y
+	help
+	  Support for raw ip network driver.
+
+
+config CP_WATCHER
+	bool "CP Status Watcher Driver"
+	default y
+	help
+	 Suport for CP Status Watcher driver.
+
+
 endif # SPI
+

@@ -1574,6 +1574,14 @@ config HW_PERF_EVENTS
 	  Enable hardware performance counter support for perf events. If
 	  disabled, perf events will use software events only.
 
+config ARCH_HAS_SUSPEND_PAGETABLE
+	bool
+	help
+	  This option indicates the platform architecture installs its own
+	  1:1 pagetable during CPU suspend/resume codepaths. This means the
+	  patching of the pagetable as part of reenabling the MMU isn't
+	  needed in the ARM common CPU resume codepath. If in doubt, say N.
+
 source "mm/Kconfig"
 
 config FORCE_MAX_ZONEORDER
@@ -1707,6 +1715,15 @@ config DEPRECATED_PARAM_STRUCT
 	help
 	  This was deprecated in 2001 and announced to live on for 5 years.
 	  Some old boot loaders still use this way.
+
+config ARM_FLUSH_CONSOLE_ON_RESTART
+	bool "Force flush the console on restart"
+	help
+	  If the console is locked while the system is rebooted, the messages
+	  in the temporary logbuffer would not have propogated to all the
+	  console drivers. This option forces the console lock to be
+	  released if it failed to be acquired, which will cause all the
+	  pending messages to be flushed.
 
 endmenu
 

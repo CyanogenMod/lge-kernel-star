@@ -1,7 +1,7 @@
 /*
  * linux/sound/soc/codecs/tlv320aic326x_mini-dsp.c
  *
- * Copyright (C) 2011 Mistral Solutions Pvt Ltd.
+ * Copyright (C) 2012 Texas Instruments, Inc.
  *
  * This package is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -16,13 +16,13 @@
  *
  * History:
  *
- * Rev 0.1   Added the miniDSP Support     Mistral         01-03-2011
+ * Rev 0.1   Added the miniDSP Support	 01-03-2011
  *
  * Rev 0.2   Updated the code-base for miniDSP switching and
- *     mux control update.    Mistral         21-03-2011
+ *	 mux control update.	21-03-2011
  *
  * Rev 0.3   Updated the code-base to support Multi-Configuration feature
- *           of PPS GDE
+ *		   of PPS GDE
  */
 
 /*
@@ -51,9 +51,9 @@
 #include "tlv320aic326x.h"
 #include "tlv320aic326x_mini-dsp.h"
 
-#include "first_rate_pps_driver.h"
+#include "base_main_Rate48_pps_driver.h"
 #include "second_rate_pps_driver.h"
-
+//#include "one_mic_aec_nc_latest.h"
 #ifdef CONFIG_MINI_DSP
 
 #ifdef REG_DUMP_MINIDSP
@@ -66,11 +66,11 @@ static void aic3262_dump_page(struct i2c_client *i2c, u8 page);
  *****************************************************************************
  */
 static int m_control_info(struct snd_kcontrol *kcontrol,
-			      struct snd_ctl_elem_info *uinfo);
+				  struct snd_ctl_elem_info *uinfo);
 static int m_control_get(struct snd_kcontrol *kcontrol,
-			     struct snd_ctl_elem_value *ucontrol);
+				 struct snd_ctl_elem_value *ucontrol);
 static int m_control_put(struct snd_kcontrol *kcontrol,
-			     struct snd_ctl_elem_value *ucontrol);
+				 struct snd_ctl_elem_value *ucontrol);
 
 /*
  *****************************************************************************
@@ -80,6 +80,7 @@ static int m_control_put(struct snd_kcontrol *kcontrol,
 /* The below variable is used to maintain the I2C Transactions
  * to be carried out during miniDSP switching.
  */
+ #if 1
 minidsp_parser_data dsp_parse_data[MINIDSP_PARSER_ARRAY_SIZE*2];
 
 struct i2c_msg i2c_transaction[MINIDSP_PARSER_ARRAY_SIZE * 2];
@@ -91,6 +92,19 @@ int i2c_count;
  */
 minidsp_i2c_page i2c_page_array[MINIDSP_PARSER_ARRAY_SIZE];
 int i2c_page_count;
+#else
+minidsp_parser_data dsp_parse_data;
+
+struct i2c_msg i2c_transaction;
+/* Total count of I2C Messages are stored in the i2c_count */
+int i2c_count;
+
+/* The below array is used to store the burst array for I2C Multibyte
+ * Operations
+ */
+minidsp_i2c_page i2c_page_array;
+int i2c_page_count;
+#endif
 
 /* kcontrol structure used to register with ALSA Core layer */
 static struct snd_kcontrol_new snd_mux_controls[MAX_MUX_CONTROLS];
@@ -164,8 +178,8 @@ static void aic3262_dump_page(struct i2c_client *i2c, u8 page)
  *----------------------------------------------------------------------------
  * Function : update_kcontrols
  * Purpose  : Given the miniDSP process flow, this function reads the
- *            corresponding Page Numbers and then performs I2C Read for those
- *            Pages.
+ *			corresponding Page Numbers and then performs I2C Read for those
+ *			Pages.
  *----------------------------------------------------------------------------
  */
 void update_kcontrols(struct snd_soc_codec *codec, int process_flow)
@@ -174,15 +188,17 @@ void update_kcontrols(struct snd_soc_codec *codec, int process_flow)
 	char **knames;
 	control *cntl;
 
+#if 0
 	if (process_flow == 1) {
 		knames = Second_Rate_MUX_control_names;
 		cntl = Second_Rate_MUX_controls;
 		array_size = ARRAY_SIZE(Second_Rate_MUX_controls);
 	} else {
+#endif
 		knames = main44_MUX_control_names;
 		cntl = main44_MUX_controls;
 		array_size = ARRAY_SIZE(main44_MUX_controls);
-	}
+//	}
 
 	DBG(KERN_INFO "%s: ARRAY_SIZE = %d\tmode=%d\n", __func__,
 			array_size, process_flow);
@@ -199,10 +215,11 @@ void update_kcontrols(struct snd_soc_codec *codec, int process_flow)
  *----------------------------------------------------------------------------
  * Function : byte_i2c_array_transfer
  * Purpose  : Function used only for debugging purpose. This function will
- *            be used while switching miniDSP Modes register by register.
- *            This needs to be used only during development.
+ *			be used while switching miniDSP Modes register by register.
+ *			This needs to be used only during development.
  *-----------------------------------------------------------------------------
  */
+ #if 1
 int byte_i2c_array_transfer(struct snd_soc_codec *codec,
 				reg_value *program_ptr,
 				int size)
@@ -236,15 +253,39 @@ int byte_i2c_array_transfer(struct snd_soc_codec *codec,
 			return -EIO;
 		}
 	}
+	aic3262_change_book(codec, 0);
 	return 0;
 }
 
+#else
+int byte_i2c_array_transfer(struct snd_soc_codec *codec,
+				reg_value *program_ptr,
+				int size)
+{
+	int j;
+	u8 buf[3];
+	printk(KERN_INFO "%s: started with array size %d\n", __func__, size);
+	for (j = 0; j < size; j++) {
+		/* Check if current Reg offset is zero */
+		buf[AIC3262_REG_OFFSET_INDEX] = program_ptr[j].reg_off % 128;
+		buf[AIC3262_REG_DATA_INDEX] =
+				program_ptr[j].reg_val & AIC3262_8BITS_MASK;
+
+		if (codec->hw_write(codec->control_data, buf, 2) != 2) {
+			printk(KERN_ERR "Error in i2c write\n");
+			return -EIO;
+		}
+	}
+	printk(KERN_INFO "%s: ended\n", __func__);
+	return 0;
+}
+#endif
 /*
  *----------------------------------------------------------------------------
  * Function : byte_i2c_array_read
  * Purpose  : This function is used to perform Byte I2C Read. This is used
- *            only for debugging purposes to read back the Codec Page
- *            Registers after miniDSP Configuration.
+ *			only for debugging purposes to read back the Codec Page
+ *			Registers after miniDSP Configuration.
  *----------------------------------------------------------------------------
  */
 int byte_i2c_array_read(struct snd_soc_codec *codec,
@@ -278,9 +319,13 @@ int byte_i2c_array_read(struct snd_soc_codec *codec,
 		if (val1 < 0)
 			printk(KERN_ERR "Error in smbus read\n");
 
+		if(val1 != program_ptr[j].reg_val)
+			/*printk(KERN_INFO "mismatch [%d][%d][%d] = %x %x\n",
+			cur_book, cur_page, program_ptr[j].reg_off, val1, program_ptr[j].reg_val);*/
 		DBG(KERN_INFO "[%d][%d][%d]= %x\n",
 			cur_book, cur_page, program_ptr[j].reg_off, val1);
 	}
+	aic3262_change_book(codec, 0);
 	return 0;
 }
 
@@ -288,8 +333,8 @@ int byte_i2c_array_read(struct snd_soc_codec *codec,
  *----------------------------------------------------------------------------
  * Function : minidsp_get_burst
  * Purpose  : Format one I2C burst for transfer from mini dsp program array.
- *            This function will parse the program array and get next burst
- *            data for doing an I2C bulk transfer.
+ *			This function will parse the program array and get next burst
+ *			data for doing an I2C bulk transfer.
  *----------------------------------------------------------------------------
  */
 static void
@@ -348,9 +393,10 @@ finish_out:
  *----------------------------------------------------------------------------
  * Function : minidsp_i2c_multibyte_transfer
  * Purpose  : Function used to perform multi-byte I2C Writes. Used to configure
- *            the miniDSP Pages.
+ *			the miniDSP Pages.
  *----------------------------------------------------------------------------
  */
+ #if 1
 int
 minidsp_i2c_multibyte_transfer(struct snd_soc_codec *codec,
 					reg_value *program_ptr,
@@ -417,189 +463,347 @@ minidsp_i2c_multibyte_transfer(struct snd_soc_codec *codec,
 			parse_data.book_change = 0;
 		}
 	} while (parse_data.current_loc != MINIDSP_PARSING_END);
+	aic3262_change_book(codec, 0);
+	return 0;
+}
+#else
+int
+minidsp_i2c_multibyte_transfer(struct snd_soc_codec *codec,
+					reg_value *program_ptr,
+					int program_size)
+{
+	struct i2c_client *client = codec->control_data;
+
+	minidsp_parser_data parse_data;
+	int count = 1;
+
+#ifdef DEBUG_MINIDSP_LOADING
+	int i = 0, j = 0;
+#endif
+	/* point the current location to start of program array */
+	parse_data.current_loc = 0;
+	parse_data.page_num = 0;
+	parse_data.book_change = 0;
+	parse_data.book_no = 0;
+
+	DBG(KERN_INFO "size is : %d", program_size);
+
+	do {
+		/* Get first burst data */
+		minidsp_get_burst(program_ptr, program_size,
+				&parse_data);
+
+		dsp_parse_data = parse_data;
+
+		i2c_transaction.addr = client->addr;
+		i2c_transaction.flags =
+			client->flags & I2C_M_TEN;
+		i2c_transaction.len =
+			dsp_parse_data.burst_size;
+		i2c_transaction.buf =
+			dsp_parse_data.burst_array;
+
+#ifdef DEBUG_MINIDSP_LOADING
+			DBG(KERN_INFO
+			"i: %d\taddr: %d\tflags: %d\tlen: %d\tbuf:",
+			i, client->addr, client->flags & I2C_M_TEN,
+			dsp_parse_data.burst_size);
+
+			for (j = 0; j <= dsp_parse_data.burst_size; j++)
+				printk( "%x ",
+					dsp_parse_data.burst_array[j]);
+
+			DBG(KERN_INFO "\n\n");
+			i++;
+#endif
+
+		if (i2c_transfer(client->adapter,
+			&i2c_transaction, count) != count) {
+			printk(KERN_ERR "Write burst i2c data error!\n");
+		}
+		if (parse_data.book_change == 1) {
+			aic3262_change_book(codec, parse_data.book_no);
+			parse_data.book_change = 0;
+		}
+		/* Proceed to the next burst reg_addr_incruence */
+	} while (parse_data.current_loc != MINIDSP_PARSING_END);
 
 	return 0;
 }
-
+#endif
 /*
- *----------------------------------------------------------------------------
- * Function : set_minidsp_mode
- * Purpose  : Switch to the first minidsp mode.
- *----------------------------------------------------------------------------
- */
+* Process_Flow Structure
+* Structure used to maintain the mapping of each PFW like the miniDSP_A
+* miniDSP_D array values and sizes. It also contains information about
+* the patches required for each patch.
+*/
+struct process_flow{
+	int init_size;
+	reg_value *miniDSP_init;
+	int A_size;
+	reg_value *miniDSP_A_values;
+	int D_size;
+	reg_value *miniDSP_D_values;
+	int post_size;
+	reg_value *miniDSP_post;
+	struct minidsp_config {
+		int a_patch_size;
+		reg_value *a_patch;
+		int d_patch_size;
+		reg_value *d_patch;
+	} configs[MAXCONFIG];
+
+} miniDSP_programs[]  = {
+  	{
+	ARRAY_SIZE(main44_REG_Section_init_program), main44_REG_Section_init_program,
+  	ARRAY_SIZE(main44_miniDSP_A_reg_values),main44_miniDSP_A_reg_values,
+  	ARRAY_SIZE(main44_miniDSP_D_reg_values),main44_miniDSP_D_reg_values,
+  	ARRAY_SIZE(main44_REG_Section_post_program),main44_REG_Section_post_program,
+  	{
+
+		{ 0, 0, 0, 0},
+		{ 0, 0, 0, 0},
+		{ 0, 0, 0, 0},
+		{ 0, 0, 0, 0},
+
+
+	},
+},
+	{
+	ARRAY_SIZE(base_speaker_SRS_REG_init_Section_program),base_speaker_SRS_REG_init_Section_program,
+  	ARRAY_SIZE(base_speaker_SRS_miniDSP_A_reg_values),base_speaker_SRS_miniDSP_A_reg_values,
+  	ARRAY_SIZE(base_speaker_SRS_miniDSP_D_reg_values),base_speaker_SRS_miniDSP_D_reg_values,
+  	ARRAY_SIZE(base_speaker_SRS_REG_post_Section_program),base_speaker_SRS_REG_post_Section_program,
+
+	{
+			{0, 0,	ARRAY_SIZE(SRS_ON_miniDSP_D_reg_values), SRS_ON_miniDSP_D_reg_values},
+			{0, 0,	ARRAY_SIZE(SRS_OFF_miniDSP_D_reg_values),SRS_OFF_miniDSP_D_reg_values},
+			{0, 0, 0, 0},
+			{0, 0, 0, 0},
+		},
+},
+#if 0
+	{ARRAY_SIZE(spkr_srs_REG_Section_init_program),spkr_srs_REG_Section_init_program,
+  	ARRAY_SIZE(spkr_srs_miniDSP_A_reg_values),spkr_srs_miniDSP_A_reg_values,
+  	ARRAY_SIZE(spkr_srs_miniDSP_D_reg_values),spkr_srs_miniDSP_D_reg_values,
+  	ARRAY_SIZE(spkr_srs_REG_Section_post_program),spkr_srs_REG_Section_post_program,
+	{
+  		{ 0, 0, 0, 0},
+		{ 0, 0, 0, 0},
+		{ 0, 0, 0, 0},
+		{ 0, 0, 0, 0},
+
+	},
+},
+#endif
+};
+
 int
-set_minidsp_mode(struct snd_soc_codec *codec, int new_mode)
+set_minidsp_mode(struct snd_soc_codec *codec, int new_mode, int new_config)
 {
+
+	if (codec == NULL) {
+	printk(KERN_INFO "%s codec is NULL\n",__func__);
+	}
 	struct aic3262_priv *aic326x = snd_soc_codec_get_drvdata(codec);
+	struct snd_soc_dapm_context *dapm = &codec->dapm;
+	struct process_flow *  pflows = &miniDSP_programs[new_mode];
+	u8 reg63, reg81, pll_pow, ndac_pow, mdac_pow, nadc_pow, madc_pow;
 
-	DBG("%s: switch  mode start\n", __func__);
-	aic3262_reset_cache(codec);
-	reg_def_conf(codec);
+	u8 adc_status,dac_status;
+	u8 reg, val;
+	u8 shift;
+	volatile u16 counter;
 
-	if (new_mode == 0) {
+	int (*ptransfer)(struct snd_soc_codec *codec,
+				reg_value *program_ptr,
+				int size);
 
-		/*	General Programming	*/
-		DBG(KERN_INFO "$Writing reg_section_init_program\n");
-		if (ARRAY_SIZE(main44_REG_Section_init_program) > 0) {
+	printk("%s:New Switch mode = %d New Config= %d\n", __func__, new_mode,new_config);
+	if (new_mode >= ARRAY_SIZE(miniDSP_programs))
+		return 0; //  error condition
+		if (new_config > MAXCONFIG)
+			return 0;
 #ifndef MULTIBYTE_I2C
-			byte_i2c_array_transfer(codec,
-				main44_REG_Section_init_program,
-				ARRAY_SIZE(main44_REG_Section_init_program));
+		ptransfer = byte_i2c_array_transfer;
 #else
-			minidsp_i2c_multibyte_transfer(codec,
-				main44_REG_Section_init_program,
-				ARRAY_SIZE(main44_REG_Section_init_program));
+		ptransfer = minidsp_i2c_multibyte_transfer;
 #endif
+	if (new_mode !=  aic326x->process_flow) {
 
-		} else {
-			printk(KERN_ERR
-			"_CODEC_REGS: Insufficient data for programming\n");
-		}
+		printk("== From PFW %d to PFW %d==\n", aic326x->process_flow , new_mode);
 
-		/*	minidsp A programming	*/
-		DBG(KERN_INFO "#Writing minidsp_A_reg_values\n");
+		/* Change to book 0 page 0 and turn off the DAC and snd_soc_dapm_disable_piADC,
+		* while turning them down, poll for the power down completion.
+		*/
+		   aic3262_change_page(codec, 0);
+		   aic3262_change_book(codec, 0);
 
-		if ((main44_miniDSP_A_reg_values_COEFF_SIZE +
-			main44_miniDSP_A_reg_values_INST_SIZE) > 0) {
-#ifndef MULTIBYTE_I2C
-			byte_i2c_array_transfer(codec,
-				main44_miniDSP_A_reg_values,
-				(main44_miniDSP_A_reg_values_COEFF_SIZE +
-				main44_miniDSP_A_reg_values_INST_SIZE));
-#else
-			minidsp_i2c_multibyte_transfer(codec,
-				main44_miniDSP_A_reg_values,
-				(main44_miniDSP_A_reg_values_COEFF_SIZE +
-				main44_miniDSP_A_reg_values_INST_SIZE));
+#if 0
+		reg63 = aic3262_read(codec, PASI_DAC_DP_SETUP);
+		aic3262_write(codec, PASI_DAC_DP_SETUP, (reg63 & ~0xC0));/*dac power down*/
+		mdelay (5);
+		counter = 0;
+		reg = DAC_FLAG_R1;
+
+   		  dac_status = aic3262_read(codec, reg);
+
+		do {
+			dac_status = snd_soc_read(codec, reg);
+			counter++;struct snd_soc_dapm_context *dapm
+			mdelay(5);
+		} while ((counter < 200) && ((dac_status & 0x88) == 1));
+		printk (KERN_INFO  "#%s: Polled Register %d Bits set 0x%X counter %d\n",
+				__func__, reg, dac_status, counter);snd_soc_dapm_disable_pi
+		struct snd_soc_dapm_context *dapm
+		   reg81= aic3262_read(codec, ADC_CHANNEL_POW);
+		aic3262_write(codec, ADC_CHANNEL_POW, (reg81 & ~0xC0));/*adc power down*/
+		mdelay (5);
+
+		adc_status=aic3262_read(codec,ADC_FLAG_R1);
+		counter = 0;
+		reg = ADC_FLAG_R1;
+		do {
+			adc_status = snd_soc_read(codec, reg);
+			counter++;
+			mdelay(5);
+		} while ((counter < 200) && ((adc_status & 0x44) == 1));
+
+		printk (KERN_INFO  "#%s: Polled Register %d Bits set 0x%X counter %d\n",
+				__func__, reg, adc_status, counter);
+
+		dac_status = snd_soc_read(codec, DAC_FLAG_R1);
+		adc_status = snd_soc_read (codec, ADC_FLAG_R1);
+
+		printk (KERN_INFO "#%s: Initial DAC_STATUS 0x%x ADC_STATUS 0x%X\n",
+			__func__, dac_status, adc_status);
+
 #endif
-		} else {
-			printk(KERN_ERR
-		"MINI_DSP_A_second: Insufficient data for programming\n");
-		}
-		/*	minidsp D programming	*/
-		DBG(KERN_INFO "#Writing minidsp_D_reg_values\n");
-		if ((main44_miniDSP_D_reg_values_COEFF_SIZE +
-			main44_miniDSP_D_reg_values_INST_SIZE) > 0) {
+		/* Instead of hard-coding the switching off DAC and ADC, we will use the DAPM
+		* to switch off the Playback Paths and the ADC
+		*/
+		snd_soc_dapm_disable_pin( dapm, "Headphone Jack");
+		snd_soc_dapm_disable_pin( dapm, "EarPiece");
+		snd_soc_dapm_disable_pin( dapm, "Int Spk");
+		snd_soc_dapm_disable_pin( dapm, "SPK out");
+		snd_soc_dapm_disable_pin( dapm, "Line Out");
 
-#ifdef MULTIBYTE_CONFIG_SUPPORT
-			/*Multibyte for DAC */
+		snd_soc_dapm_disable_pin( dapm, "Mic Jack");
+		snd_soc_dapm_disable_pin( dapm, "Linein");
+		snd_soc_dapm_disable_pin( dapm, "Int Mic");
+
+		//snd_soc_dapm_disable_pin (codec, "Left DAC");
+		//snd_soc_dapm_disable_pin (codec, "Right DAC");
+		//snd_soc_dapm_disable_pin (codec, "Left ADC");
+		//snd_soc_dapm_disable_pin (codec, "Right ADC");
+		snd_soc_dapm_sync(dapm);
+		mdelay(10);
+
+		mdac_pow = aic3262_read(codec, MDAC_DIV_POW_REG);
+		aic3262_write(codec, MDAC_DIV_POW_REG, (mdac_pow & ~0x80));/*mdac power down*/
+		mdelay(5);
+		nadc_pow = aic3262_read(codec, MADC_DIV_POW_REG);
+		aic3262_write(codec, MADC_DIV_POW_REG, (nadc_pow & ~0x80));/*madc power down*/
+		mdelay(5);
+		pll_pow = aic3262_read(codec, PLL_PR_POW_REG);
+		aic3262_write(codec, PLL_PR_POW_REG, (pll_pow & ~0x80));/*pll power down*/
+		mdelay(5);
+		ndac_pow = aic3262_read(codec, NDAC_DIV_POW_REG);
+		aic3262_write(codec, NDAC_DIV_POW_REG, (ndac_pow & ~0x80)); /*ndac power down*/
+		mdelay(5);
+
+		dac_status = snd_soc_read(codec, DAC_FLAG_R1);
+		adc_status = snd_soc_read (codec, ADC_FLAG_R1);
+
+		printk (KERN_INFO "#%s: Before Switching DAC_STATUS 0x%x ADC_STATUS 0x%X\n",
+			__func__, dac_status, adc_status);
+
+		mdelay (10);
+	 	ptransfer(codec, pflows->miniDSP_init,		   pflows->init_size);
+		   ptransfer(codec, pflows->miniDSP_A_values,  pflows->A_size);
+		   ptransfer(codec, pflows->miniDSP_D_values,  pflows->D_size);
+		   ptransfer(codec, pflows->miniDSP_post,		 pflows->post_size);
+
+
+		aic326x->process_flow = new_mode;
+
+		aic3262_change_page(codec, 0);
+		   	aic3262_change_book(codec, 0);
+#if 0
+
+		/* After the miniDSP Programming is completed, power up the DAC and ADC
+		* and poll for its power up operation.
+		*/
+
+		aic3262_write(codec, PASI_DAC_DP_SETUP, reg63);/*reverting the old DAC values */
+		mdelay(5);
+
+		/* Poll for DAC Power-up first */
+		/* For DAC Power-up and Power-down event, we will poll for
+		* Book0 Page0 Register 37
+		*/
+		reg = DAC_FLAG_R1;
+		counter = 0;
+		do {
+			dac_status = snd_soc_read(codec, reg);
+			counter++;
+			mdelay(5);
+		} while ((counter < 200) && ((dac_status & 0x88) == 0));
+
+		printk (KERN_INFO  "#%s: Polled Register %d Bits set 0x%X counter %d\n",
+				__func__, reg, dac_status, counter);
+
+		aic3262_write(codec, ADC_CHANNEL_POW, reg81);/*reverting the old ADC values*/
+		mdelay (5);
+		/* For ADC Power-up and Power-down event, we will poll for
+		* Book0 Page0 Register 36
+		*/
+		reg = ADC_FLAG_R1;
+		counter = 0;
+		do {
+			adc_status = snd_soc_read(codec, reg);
+			counter++;
+			mdelay(5);
+		} while ((counter < 200) && ((adc_status & 0x44) == 0));
+
+		printk (KERN_INFO  "#%s: Polled Register %d Bits set 0x%X counter %d\n",
+				__func__, reg, adc_status, counter);
+		aic3262_write(codec, PLL_PR_POW_REG, pll_pow);/*reverting the old pll values*/
+		mdelay(10);
+
+		aic3262_write(codec, MDAC_DIV_POW_REG, mdac_pow);/*reverting the old mdac values*/
+		mdelay(5);
+		aic3262_write(codec, MADC_DIV_POW_REG, madc_pow);/*reverting the old madc values*/
+		mdelay(5);
+		aic3262_write(codec, NDAC_DIV_POW_REG, ndac_pow);/*reverting the old ndac values*/
+		mdelay(5);
+
+		/*if (new_config == 0) {
+			aic326x->current_config = 0;
+			return 0;
+		}
+		aic326x->current_config =  -1;*/
+
+		//aic3262_change_book(codec, 0);
+		//aic3262_change_page(codec, 0);
 #endif
-
-#ifndef MULTIBYTE_I2C
-			byte_i2c_array_transfer(codec,
-				main44_miniDSP_D_reg_values,
-				(main44_miniDSP_D_reg_values_COEFF_SIZE +
-				main44_miniDSP_D_reg_values_INST_SIZE));
-#else
-			minidsp_i2c_multibyte_transfer(codec,
-				main44_miniDSP_D_reg_values,
-				(main44_miniDSP_D_reg_values_COEFF_SIZE +
-				main44_miniDSP_D_reg_values_INST_SIZE));
-#endif
-
-		} else {
-			printk(KERN_ERR
-		"MINI_DSP_D_second: Insufficient data for programming\n");
-		}
-		DBG(KERN_INFO "#Writing reg_section_post_program\n");
-		if (ARRAY_SIZE(main44_REG_Section_post_program) > 0) {
-			#ifndef MULTIBYTE_I2C
-			byte_i2c_array_transfer(codec,
-				main44_REG_Section_post_program,
-				ARRAY_SIZE(REG_Section_post_program));
-			#else
-			minidsp_i2c_multibyte_transfer(codec,
-				main44_REG_Section_post_program,
-				ARRAY_SIZE(main44_REG_Section_post_program));
-			#endif
-		} else {
-			printk(KERN_ERR
-		"second_CODEC_REGS: Insufficient data for programming\n");
-		}
 	}
 
-	if (new_mode == 1) {
-		/*	General Programming	*/
-		DBG(KERN_INFO "#Writing reg_section_init_program\n");
-		if (ARRAY_SIZE(Second_Rate_REG_Section_init_program) > 0) {
-#ifndef MULTIBYTE_I2C
-			byte_i2c_array_transfer(codec,
-			Second_Rate_REG_Section_init_program,
-			ARRAY_SIZE(Second_Rate_REG_Section_init_program));
-#else
-			minidsp_i2c_multibyte_transfer(codec,
-			Second_Rate_REG_Section_init_program,
-			ARRAY_SIZE(Second_Rate_REG_Section_init_program));
+#ifdef MULTICONFIG_SUPPORT
+	if (new_config < 0 )
+		return 0; // No configs supported in this pfw
+	if (new_config == aic326x->current_config)
+		return 0;
+	   if (pflows->configs[new_config].a_patch_size || pflows->configs[new_config].d_patch_size)
+		minidsp_multiconfig(codec,
+			pflows->configs[new_config].a_patch, pflows->configs[new_config].a_patch_size,
+			pflows->configs[new_config].d_patch,  pflows->configs[new_config].d_patch_size);
 #endif
 
-		} else {
-			printk(KERN_ERR
-			 "_CODEC_REGS: Insufficient data for programming\n");
-		}
-		/*	minidsp A programming	*/
-		DBG(KERN_INFO "#Writing minidsp_A_reg_values\n");
+	aic326x->current_config = new_config;
+	aic3262_change_book( codec, 0);
 
-		if ((Second_Rate_miniDSP_A_reg_values_COEFF_SIZE +
-			Second_Rate_miniDSP_A_reg_values_INST_SIZE) > 0) {
-#ifndef MULTIBYTE_I2C
-			byte_i2c_array_transfer(codec,
-				Second_Rate_miniDSP_A_reg_values,
-				(Second_Rate_miniDSP_A_reg_values_COEFF_SIZE +
-				Second_Rate_miniDSP_A_reg_values_INST_SIZE));
-#else
-			minidsp_i2c_multibyte_transfer(codec,
-				Second_Rate_miniDSP_A_reg_values,
-				(Second_Rate_miniDSP_A_reg_values_COEFF_SIZE +
-				Second_Rate_miniDSP_A_reg_values_INST_SIZE));
-#endif
-		} else {
-			printk(KERN_ERR
-		"MINI_DSP_A_second: Insufficient data for programming\n");
-		}
-
-		/*	minidsp D programming	*/
-		DBG(KERN_INFO "#Writing minidsp_D_reg_values\n");
-
-		if ((Second_Rate_miniDSP_D_reg_values_COEFF_SIZE +
-			Second_Rate_miniDSP_D_reg_values_INST_SIZE) > 0) {
-#ifndef MULTIBYTE_I2C
-			byte_i2c_array_transfer(codec,
-				Second_Rate_miniDSP_D_reg_values,
-				(Second_Rate_miniDSP_D_reg_values_COEFF_SIZE +
-				Second_Rate_miniDSP_D_reg_values_INST_SIZE));
-#else
-			minidsp_i2c_multibyte_transfer(codec,
-				Second_Rate_miniDSP_D_reg_values,
-				(Second_Rate_miniDSP_D_reg_values_COEFF_SIZE +
-				Second_Rate_miniDSP_D_reg_values_INST_SIZE));
-#endif
-		} else {
-			printk(KERN_ERR
-		"MINI_DSP_D_second: Insufficient data for programming\n");
-		}
-		DBG(KERN_INFO "Writing reg_section_post_program\n");
-		if (ARRAY_SIZE(Second_Rate_REG_Section_post_program) > 0) {
-#ifndef MULTIBYTE_I2C
-			byte_i2c_array_transfer(codec,
-				Second_Rate_REG_Section_post_program,
-				ARRAY_SIZE(REG_Section_post_program));
-#else
-			minidsp_i2c_multibyte_transfer(codec,
-			Second_Rate_REG_Section_post_program,
-			ARRAY_SIZE(Second_Rate_REG_Section_post_program));
-#endif
-		} else {
-			printk(KERN_ERR
-		 "second_CODEC_REGS: Insufficient data for programming\n");
-		}
-	}
-
-#ifdef MULTIBYTE_CONFIG_SUPPORT
-	/*Multibyte for DAC */
-	aic326x->process_flow = new_mode;
-	config_multibyte_for_mode(codec, new_mode);
-#endif
-	DBG("%s: switch mode finished\n", __func__);
+	DBG(KERN_INFO "%s: switch mode finished\n", __func__);
 	return 0;
 }
 
@@ -634,169 +838,119 @@ int i2c_verify(struct snd_soc_codec *codec)
 	byte_i2c_array_read(codec, main44_REG_Section_post_program,
 		ARRAY_SIZE(main44_REG_Section_post_program));
 
+	aic3262_change_book(codec, 0);
+
 	DBG(KERN_INFO "i2c_verify completed\n");
 	return 0;
 }
 
+
+int change_codec_power_status(struct snd_soc_codec * codec, int off_restore, int power_mask)
+{
+	int minidsp_power_mask;
+	u8 dac_status;
+	u8 adc_status;
+
+	minidsp_power_mask = 0;
+
+	aic3262_change_page (codec, 0);
+	aic3262_change_book (codec, 0);
+
+
+	switch (off_restore) {
+
+		case 0: /* Power-off the Codec */
+			dac_status = snd_soc_read (codec, DAC_FLAG_R1);
+
+			if(dac_status & 0x88) {
+				minidsp_power_mask |= 0x1;
+				snd_soc_update_bits(codec, PASI_DAC_DP_SETUP, 0xC0, 0x0);
+
+				poll_dac(codec, 0x0, 0x0);
+				poll_dac(codec, 0x1, 0x0);
+			}
+
+			adc_status = snd_soc_read (codec, ADC_FLAG_R1);
+
+			if(adc_status & 0x44) {
+				minidsp_power_mask |= 0x2;
+				snd_soc_update_bits(codec, ADC_CHANNEL_POW, 0xC0, 0x0);
+
+				poll_adc(codec, 0x0, 0x0);
+				poll_adc(codec, 0x1, 0x0);
+			}
+		break;
+		case 1: /* For Restoring Codec to Previous Power State */
+
+			if(power_mask & 0x1) {
+
+				snd_soc_update_bits(codec, PASI_DAC_DP_SETUP, 0xC0, 0xC0);
+
+				poll_dac(codec, 0x0, 0x1);
+				poll_dac(codec, 0x1, 0x1);
+			}
+
+			if(power_mask & 0x2) {
+
+				snd_soc_update_bits(codec, ADC_CHANNEL_POW, 0xC0, 0xC0);
+
+				poll_adc(codec, 0x0, 0x1);
+				poll_adc(codec, 0x1, 0x1);
+			}
+		break;
+		default:
+			printk(KERN_ERR "#%s: Unknown Power State Requested..\n",
+				__func__);
+	}
+
+	return minidsp_power_mask;
+
+}
+
 /*
  *----------------------------------------------------------------------------
- * Function : set_minidsp_mode1
+ * Function  : boot_minidsp
  * Purpose  : for laoding the default minidsp mode for the first time .
  *----------------------------------------------------------------------------
  */
 int
-set_minidsp_mode1(struct snd_soc_codec *codec, int new_mode)
+boot_minidsp(struct snd_soc_codec *codec, int new_mode)
 {
-	DBG("#%s: switch  mode start\n", __func__);
-	aic3262_reset_cache(codec);
+	struct aic3262_priv *aic326x = snd_soc_codec_get_drvdata(codec);
+	struct process_flow *  pflows = &miniDSP_programs[new_mode];
+	int minidsp_stat;
 
-	if (new_mode == 0) {
-		/*	General Programming	*/
-		DBG(KERN_INFO "#Writing reg_section_init_program\n");
-		if (ARRAY_SIZE(main44_REG_Section_init_program) > 0) {
+	int (*ptransfer)(struct snd_soc_codec *codec,
+				reg_value *program_ptr,
+				int size);
+
+	DBG("%s: switch  mode start\n", __func__);
+	if (new_mode >= ARRAY_SIZE(miniDSP_programs))
+		return 0; //  error condition
+	if (new_mode == aic326x->process_flow)
+		return 0;
+
+
 #ifndef MULTIBYTE_I2C
-			byte_i2c_array_transfer(codec,
-				main44_REG_Section_init_program,
-				ARRAY_SIZE(main44_REG_Section_init_program));
+	ptransfer = byte_i2c_array_transfer;
 #else
-			minidsp_i2c_multibyte_transfer(codec,
-				main44_REG_Section_init_program,
-				ARRAY_SIZE(main44_REG_Section_init_program));
+	ptransfer = minidsp_i2c_multibyte_transfer;
 #endif
 
-		} else {
-			printk(KERN_ERR
-			"_CODEC_REGS: Insufficient data for programming\n");
-		}
-		/*	minidsp A programming	*/
-		DBG(KERN_INFO "#Writing minidsp_A_reg_values\n");
-		if ((main44_miniDSP_A_reg_values_COEFF_SIZE +
-		     main44_miniDSP_A_reg_values_INST_SIZE) > 0) {
-#ifndef MULTIBYTE_I2C
-			byte_i2c_array_transfer(codec,
-				main44_miniDSP_A_reg_values,
-				(main44_miniDSP_A_reg_values_COEFF_SIZE +
-				main44_miniDSP_A_reg_values_INST_SIZE));
-#else
-			minidsp_i2c_multibyte_transfer(codec,
-				main44_miniDSP_A_reg_values,
-				(main44_miniDSP_A_reg_values_COEFF_SIZE +
-				main44_miniDSP_A_reg_values_INST_SIZE));
-#endif
-		} else {
-			printk(KERN_ERR
-		"MINI_DSP_A_second: Insufficient data for programming\n");
-		}
+	minidsp_stat = change_codec_power_status (codec, 0x0, 0x3);
 
-		/*	minidsp D programming	*/
-		DBG(KERN_INFO "#Writing minidsp_D_reg_values\n");
-		if ((main44_miniDSP_D_reg_values_COEFF_SIZE +
-		     main44_miniDSP_D_reg_values_INST_SIZE) > 0) {
-#ifndef MULTIBYTE_I2C
-			byte_i2c_array_transfer(codec,
-				main44_miniDSP_D_reg_values,
-				(main44_miniDSP_D_reg_values_COEFF_SIZE +
-				main44_miniDSP_D_reg_values_INST_SIZE));
-#else
-			minidsp_i2c_multibyte_transfer(codec,
-				main44_miniDSP_D_reg_values,
-				(main44_miniDSP_D_reg_values_COEFF_SIZE +
-				main44_miniDSP_D_reg_values_INST_SIZE));
-#endif
-		} else {
-			printk(KERN_ERR
-		"MINI_DSP_D_second: Insufficient data for programming\n");
-		}
+	ptransfer(codec, pflows->miniDSP_init,		   pflows->init_size);
+	ptransfer(codec, pflows->miniDSP_A_values,  pflows->A_size);
+	ptransfer(codec, pflows->miniDSP_D_values,  pflows->D_size);
+	ptransfer(codec, pflows->miniDSP_post,		 pflows->post_size);
 
-		DBG(KERN_INFO "#Writing reg_section_post_program\n");
-		if (ARRAY_SIZE(main44_REG_Section_post_program) > 0) {
-#ifndef MULTIBYTE_I2C
-			byte_i2c_array_transfer(codec,
-			main44_REG_Section_post_program,
-			ARRAY_SIZE(REG_Section_post_program));
-#else
-			minidsp_i2c_multibyte_transfer(codec,
-			main44_REG_Section_post_program,
-			ARRAY_SIZE(main44_REG_Section_post_program));
-#endif
-		} else {
-			printk(KERN_ERR
-		"second_CODEC_REGS: Insufficient data for programming\n");
-		}
-	}
+	aic326x->process_flow = new_mode;
 
-	if (new_mode == 1) {
-		/*	General Programming	*/
-		DBG(KERN_INFO "#Writing reg_section_init_program\n");
-		if (ARRAY_SIZE(Second_Rate_REG_Section_init_program) > 0) {
-#ifndef MULTIBYTE_I2C
-			byte_i2c_array_transfer(codec,
-			second_Rate_REG_Section_init_program,
-			ARRAY_SIZE(Second_Rate_REG_Section_init_program));
-#else
-			minidsp_i2c_multibyte_transfer(codec,
-			Second_Rate_REG_Section_init_program,
-			ARRAY_SIZE(Second_Rate_REG_Section_init_program));
-#endif
-		} else {
-			printk(KERN_ERR
-			"_CODEC_REGS: Insufficient data for programming\n");
-		}
-		/*	minidsp A programming	*/
-		DBG(KERN_INFO "#Writing minidsp_A_reg_values\n");
-		if ((Second_Rate_miniDSP_A_reg_values_COEFF_SIZE +
-			Second_Rate_miniDSP_A_reg_values_INST_SIZE) > 0) {
-#ifndef MULTIBYTE_I2C
-			byte_i2c_array_transfer(codec,
-			Second_Rate_miniDSP_A_reg_values,
-			(Second_Rate_miniDSP_A_reg_values_COEFF_SIZE +
-			Second_Rate_miniDSP_A_reg_values_INST_SIZE));
-#else
-			minidsp_i2c_multibyte_transfer(codec,
-			Second_Rate_miniDSP_A_reg_values,
-			(Second_Rate_miniDSP_A_reg_values_COEFF_SIZE +
-			Second_Rate_miniDSP_A_reg_values_INST_SIZE));
-#endif
-		} else {
-			printk(KERN_ERR\
-		"MINI_DSP_A_second: Insufficient data for programming\n");
-		}
-		/*	minidsp D programming	*/
-		DBG(KERN_INFO "#Writing minidsp_D_reg_values\n");
-		if ((Second_Rate_miniDSP_D_reg_values_COEFF_SIZE +
-			Second_Rate_miniDSP_D_reg_values_INST_SIZE) > 0) {
-#ifndef MULTIBYTE_I2C
-			byte_i2c_array_transfer(codec,
-			Second_Rate_miniDSP_D_reg_values,
-			(Second_Rate_miniDSP_D_reg_values_COEFF_SIZE +
-			Second_Rate_miniDSP_D_reg_values_INST_SIZE));
-#else
-			minidsp_i2c_multibyte_transfer(codec,
-			Second_Rate_miniDSP_D_reg_values,
-			(Second_Rate_miniDSP_D_reg_values_COEFF_SIZE +
-			Second_Rate_miniDSP_D_reg_values_INST_SIZE));
-#endif
-		} else
-			printk(KERN_ERR "MINI_DSP_D_second: Insufficient data for programming\n");
+	change_codec_power_status(codec, 1, minidsp_stat);
 
-		DBG(KERN_INFO "#Writing reg_section_post_program\n");
-		if (ARRAY_SIZE(Second_Rate_REG_Section_post_program) > 0) {
-#ifndef MULTIBYTE_I2C
-			byte_i2c_array_transfer(codec,
-			Second_Rate_REG_Section_post_program,
-			ARRAY_SIZE(REG_Section_post_program));
-#else
-			minidsp_i2c_multibyte_transfer(codec,
-			Second_Rate_REG_Section_post_program,
-			ARRAY_SIZE(Second_Rate_REG_Section_post_program));
-#endif
-		} else
-			printk(KERN_ERR\
-		"second_CODEC_REGS: Insufficient data for programming\n");
+	aic3262_change_page( codec,0);
+	aic3262_change_book( codec,0);
 
-	}
-
-	DBG("#%s: switch mode completed\n", __func__);
 	return 0;
 }
 
@@ -810,6 +964,7 @@ set_minidsp_mode1(struct snd_soc_codec *codec, int new_mode)
  */
 int aic3262_minidsp_program(struct snd_soc_codec *codec)
 {
+	struct aic3262_priv *aic326x = snd_soc_codec_get_drvdata(codec);
 	DBG(KERN_INFO "#AIC3262: programming mini dsp\n");
 
 #if defined(PROGRAM_MINI_DSP_first)
@@ -818,7 +973,8 @@ int aic3262_minidsp_program(struct snd_soc_codec *codec)
 	i2c_verify_book0(codec);
 #endif
 	aic3262_change_book(codec, 0);
-	set_minidsp_mode1(codec, 0);
+	boot_minidsp(codec, 1);
+	aic326x->process_flow = 0;
 	aic3262_change_book(codec, 0);
 #ifdef DEBUG
 	DBG("#verifying book 0\n");
@@ -828,12 +984,13 @@ int aic3262_minidsp_program(struct snd_soc_codec *codec)
 #if defined(PROGRAM_MINI_DSP_second)
 #ifdef DEBUG
 	DBG("#Verifying book 0\n");
-	i2c_verify_book0(codec);
+	aic3262_change_book(codec, 0);
 #endif
-	set_minidsp_mode1(codec, 1);
+	boot_minidsp(codec, 0);
+	aic326x->process_flow = 1;
 #ifdef DEBUG
 	DBG("#verifying book 0\n");
-	i2c_verify_book0(codec);
+	aic3262_change_book(codec, 0);
 #endif
 #endif
 	return 0;
@@ -842,12 +999,12 @@ int aic3262_minidsp_program(struct snd_soc_codec *codec)
  *----------------------------------------------------------------------------
  * Function : m_control_info
  * Purpose  : This function is to initialize data for new control required to
- *            program the AIC3262 registers.
+ *			program the AIC3262 registers.
  *
  *----------------------------------------------------------------------------
  */
 static int m_control_info(struct snd_kcontrol *kcontrol,
-			      struct snd_ctl_elem_info *uinfo)
+				  struct snd_ctl_elem_info *uinfo)
 {
 	uinfo->count = 1;
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
@@ -860,12 +1017,12 @@ static int m_control_info(struct snd_kcontrol *kcontrol,
  *----------------------------------------------------------------------------
  * Function : m_control_get
  * Purpose  : This function is to read data of new control for
- *            program the AIC3262 registers.
+ *			program the AIC3262 registers.
  *
  *----------------------------------------------------------------------------
  */
 static int m_control_get(struct snd_kcontrol *kcontrol,
-			     struct snd_ctl_elem_value *ucontrol)
+				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
 	struct aic3262_priv *aic3262 = snd_soc_codec_get_drvdata(codec);
@@ -882,12 +1039,14 @@ static int m_control_get(struct snd_kcontrol *kcontrol,
 		val1 = i2c_smbus_read_byte_data(codec->control_data, 1);
 		ucontrol->value.integer.value[0] = ((val1>>1)&0x01);
 		DBG(KERN_INFO "control get : mode=%d\n", aic3262->process_flow);
+		aic3262_change_book(codec,0);
 	}
 	if (!strcmp(kcontrol->id.name, "ADC Adaptive mode Enable")) {
 		aic3262_change_book(codec, 40);
 		val1 = i2c_smbus_read_byte_data(codec->control_data, 1);
 		ucontrol->value.integer.value[0] = ((val1>>1)&0x01);
 		DBG(KERN_INFO "control get : mode=%d\n", dmode);
+		aic3262_change_book(codec,0);
 	}
 
 	return 0;
@@ -897,12 +1056,12 @@ static int m_control_get(struct snd_kcontrol *kcontrol,
  *----------------------------------------------------------------------------
  * Function : m_new_control_put
  * Purpose  : new_control_put is called to pass data from user/application to
- *            the driver.
+ *			the driver.
  *
  *----------------------------------------------------------------------------
  */
 static int m_control_put(struct snd_kcontrol *kcontrol,
-			     struct snd_ctl_elem_value *ucontrol)
+				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
 	struct aic3262_priv *aic3262 = snd_soc_codec_get_drvdata(codec);
@@ -920,7 +1079,7 @@ static int m_control_put(struct snd_kcontrol *kcontrol,
 			if (aic3262->mute_codec == 1) {
 				i2c_verify_book0(codec);
 				aic3262_change_book(codec, 0);
-				set_minidsp_mode(codec, val);
+				boot_minidsp(codec, val);
 
 				aic3262_change_book(codec, 0);
 				i2c_verify_book0(codec);
@@ -939,6 +1098,7 @@ static int m_control_put(struct snd_kcontrol *kcontrol,
 			aic3262_change_book(codec, 80);
 			val1 = i2c_smbus_read_byte_data(codec->control_data, 1);
 			aic3262_write(codec, 1, (val1&0xfb)|(val<<1));
+			aic3262_change_book(codec,0);
 		}
 		amode = val;
 	}
@@ -950,6 +1110,7 @@ static int m_control_put(struct snd_kcontrol *kcontrol,
 			aic3262_change_book(codec, 40);
 			val1 = i2c_smbus_read_byte_data(codec->control_data, 1);
 			aic3262_write(codec, 1, (val1&0xfb)|(val<<1));
+			aic3262_change_book(codec,0);
 		}
 		dmode = val;
 	}
@@ -957,8 +1118,9 @@ static int m_control_put(struct snd_kcontrol *kcontrol,
 	if (!strcmp(kcontrol->id.name, "Dump Regs Book0"))
 		i2c_verify_book0(codec);
 
-
+#if 0
 	if (!strcmp(kcontrol->id.name, "Verify minidsp program")) {
+
 		if (mode == 0) {
 			DBG("Current mod=%d\nVerifying minidsp_D_regs", mode);
 			byte_i2c_array_read(codec,  main44_miniDSP_D_reg_values,
@@ -966,11 +1128,16 @@ static int m_control_put(struct snd_kcontrol *kcontrol,
 				main44_miniDSP_D_reg_values_INST_SIZE));
 		} else {
 			byte_i2c_array_read(codec,
+				Second_Rate_miniDSP_A_reg_values,
+				(Second_Rate_miniDSP_A_reg_values_COEFF_SIZE +
+				Second_Rate_miniDSP_A_reg_values_INST_SIZE));
+			byte_i2c_array_read(codec,
 				Second_Rate_miniDSP_D_reg_values,
 				(Second_Rate_miniDSP_D_reg_values_COEFF_SIZE +
 				Second_Rate_miniDSP_D_reg_values_INST_SIZE));
 		}
 	}
+#endif
 	DBG("\nmode = %d\n", mode);
 	return mode;
 }
@@ -985,21 +1152,44 @@ static int m_control_put(struct snd_kcontrol *kcontrol,
 static int __new_control_info_minidsp_mux(struct snd_kcontrol *kcontrol,
 					  struct snd_ctl_elem_info *uinfo)
 {
-	int index;
+	int index,index2;
 	int ret_val = -1;
+
 
 	for (index = 0; index < ARRAY_SIZE(main44_MUX_controls); index++) {
 		if (strstr(kcontrol->id.name, main44_MUX_control_names[index]))
 			break;
 	}
-
-	if (index < ARRAY_SIZE(main44_MUX_controls)) {
+	if (index < ARRAY_SIZE(main44_MUX_controls))
+		{
 		uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
 		uinfo->count = 1;
 		uinfo->value.integer.min = MIN_MUX_CTRL;
 		uinfo->value.integer.max = MAX_MUX_CTRL;
 		ret_val = 0;
 	}
+
+	#if 1
+	else{
+		printk(" The second rate kcontrol id name is====== %s\n",kcontrol->id.name);
+
+
+	for (index2 = 0; index < ARRAY_SIZE(base_speaker_SRS_MUX_controls); index2++) {
+		if (strstr(kcontrol->id.name, base_speaker_SRS_MUX_control_names[index2]))
+			break;
+		}
+		if (index < ARRAY_SIZE(base_speaker_SRS_MUX_controls))
+		{
+		uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+		uinfo->count = 1;
+		uinfo->value.integer.min = MIN_MUX_CTRL;
+		uinfo->value.integer.max = MAX_MUX_CTRL;
+		ret_val = 0;
+		}
+	}
+
+	#endif
+
 	return ret_val;
 }
 
@@ -1015,6 +1205,7 @@ static int __new_control_info_minidsp_mux(struct snd_kcontrol *kcontrol,
 static int __new_control_get_minidsp_mux(struct snd_kcontrol *kcontrol,
 					 struct snd_ctl_elem_value *ucontrol)
 {
+
 	ucontrol->value.integer.value[0] = kcontrol->private_value;
 	return 0;
 }
@@ -1024,7 +1215,7 @@ static int __new_control_get_minidsp_mux(struct snd_kcontrol *kcontrol,
  * Function : __new_control_put_minidsp_mux
  *
  * Purpose  : put routine for amixer kcontrols, write user values to registers
- *            values. Used for for mini dsp 'MUX control' amixer controls.
+ *			values. Used for for mini dsp 'MUX control' amixer controls.
  *----------------------------------------------------------------------------
  */
 static int __new_control_put_minidsp_mux(struct snd_kcontrol *kcontrol,
@@ -1040,9 +1231,11 @@ static int __new_control_put_minidsp_mux(struct snd_kcontrol *kcontrol,
 	int ret_val = -1, array_size;
 	control *array;
 	char **array_names;
-	char *control_name, *control_name1;
+	char *control_name, *control_name1, *control_name2;
 	struct aic3262_priv *aic326x = snd_soc_codec_get_drvdata(codec);
 	i2c = codec->control_data;
+
+
 
 	if (aic326x->process_flow == 0) {
 		DBG("#the current process flow is %d", aic326x->process_flow);
@@ -1051,23 +1244,29 @@ static int __new_control_put_minidsp_mux(struct snd_kcontrol *kcontrol,
 		array_names = main44_MUX_control_names;
 		control_name = "Stereo_Mux_TwoToOne_1";
 		control_name1 = "Mono_Mux_1_1";
+		}
+
+#if 0
 
 		/* Configure only for process flow  1 controls */
 		if (strcmp(kcontrol->id.name, control_name) &&
-		    strcmp(kcontrol->id.name, control_name1))
+			strcmp(kcontrol->id.name, control_name1))
 			return 0;
 	} else {
 		array = Second_Rate_MUX_controls;
 		array_size = ARRAY_SIZE(Second_Rate_MUX_controls);
 		array_names = Second_Rate_MUX_control_names;
 		control_name = "Stereo_Mux_TwoToOne_1_Second";
-		control_name1 = "Mono_Mux_1_1_Second";
+		control_name1 = "Mono_Mux_1_Second";
+		control_name2 = "Mono_Mux_4_Second";
 
 		/* Configure only for process flow 2 controls */
-		if (strcmp(kcontrol->id.name, control_name) &&
-		    strcmp(kcontrol->id.name, control_name1))
+		if (strcmp(kcontrol->id.name, control_name1) &&
+			strcmp(kcontrol->id.name, control_name2))
 			return 0;
 	}
+
+#endif
 
 	page = array[index].control_page;
 
@@ -1081,9 +1280,9 @@ static int __new_control_put_minidsp_mux(struct snd_kcontrol *kcontrol,
 			array[index].control_page);
 
 		aic3262_change_book(codec,
-				    array[index].control_book);
+					array[index].control_book);
 		aic3262_change_page(codec,
-				    array[index].control_page);
+					array[index].control_page);
 
 		if (!strcmp(array_names[index], control_name)) {
 			if (user_value > 0) {
@@ -1099,10 +1298,10 @@ static int __new_control_put_minidsp_mux(struct snd_kcontrol *kcontrol,
 			if (user_value > 0) {
 				data[1] =
 					(u8) ((user_value >> 16) &
-					      AIC3262_8BITS_MASK);
+						  AIC3262_8BITS_MASK);
 				data[2] =
 					(u8) ((user_value >> 8) &
-					      AIC3262_8BITS_MASK);
+						  AIC3262_8BITS_MASK);
 				data[3] =
 					(u8)((user_value) & AIC3262_8BITS_MASK);
 			}
@@ -1157,7 +1356,7 @@ static int __new_control_put_minidsp_mux(struct snd_kcontrol *kcontrol,
 			printk(KERN_ERR "Can not read codec registers\n");
 
 		if ((swap_reg_pre == 4 && swap_reg_post == 6)
-		    || (swap_reg_pre == 6 && swap_reg_post == 4))
+			|| (swap_reg_pre == 6 && swap_reg_post == 4))
 			DBG("Buffer swap success\n");
 		else
 			printk(KERN_ERR
@@ -1189,8 +1388,7 @@ static int minidsp_mux_ctrl_mixer_controls(struct snd_soc_codec *codec,
 	int i, err;
 	int val1;
 
-	/* DBG("%d mixer controls for mini dsp MUX\n", no_mux_controls);*/
-
+	printk("%d mixer controls for mini dsp MUX\n", size);
 	if (size) {
 		for (i = 0; i < size; i++) {
 
@@ -1227,7 +1425,7 @@ static int minidsp_mux_ctrl_mixer_controls(struct snd_soc_codec *codec,
 
 			err = snd_ctl_add(codec->card->snd_card,
 				snd_ctl_new1(&snd_mux_controls[i],
-					       codec));
+						   codec));
 			if (err < 0)
 				printk(KERN_ERR
 					"%s:Invalid control %s\n", __FILE__,
@@ -1318,18 +1516,21 @@ __new_control_info_minidsp_volume(struct snd_kcontrol *kcontrol,
 
 	for (index = 0; index < ARRAY_SIZE(main44_VOLUME_controls); index++) {
 		if (strstr
-		    (kcontrol->id.name, main44_VOLUME_control_names[index]))
+			(kcontrol->id.name, main44_VOLUME_control_names[index]))
 			break;
 	}
-	for (index8 = 0; index8 < ARRAY_SIZE(Second_Rate_VOLUME_controls);
+
+	for (index8 = 0; index8 < ARRAY_SIZE(base_speaker_SRS_VOLUME_controls);
 			index8++) {
 		if (strstr
-		    (kcontrol->id.name,
-		    Second_Rate_VOLUME_control_names[index]))
+			(kcontrol->id.name,
+			base_speaker_SRS_VOLUME_control_names[index]))
 			break;
 	}
+
 	if ((index < ARRAY_SIZE(main44_VOLUME_controls))
-	    || (index8 < ARRAY_SIZE(Second_Rate_VOLUME_controls))) {
+
+		|| (index8 < ARRAY_SIZE(base_speaker_SRS_VOLUME_controls))) {
 		uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
 		uinfo->count = 1;
 		uinfo->value.integer.min = MIN_VOLUME;
@@ -1343,7 +1544,7 @@ __new_control_info_minidsp_volume(struct snd_kcontrol *kcontrol,
  *----------------------------------------------------------------------------
  * Function : __new_control_get_main44_minidsp_vol
  * Purpose  : get routine for amixer kcontrols, read current register
- *         values. Used for for mini dsp 'VolumeLite' amixer controls.
+ *		 values. Used for for mini dsp 'VolumeLite' amixer controls.
  *----------------------------------------------------------------------------
  */
 static int
@@ -1358,7 +1559,7 @@ __new_control_get_minidsp_volume(struct snd_kcontrol *kcontrol,
  *----------------------------------------------------------------------------
  * Function : __new_control_put_main44_minidsp_volume
  * Purpose  : put routine for amixer kcontrols, write user values to registers
- *        values. Used for for mini dsp 'VolumeLite' amixer controls.
+ *		values. Used for for mini dsp 'VolumeLite' amixer controls.
  *----------------------------------------------------------------------------
  */
 static int
@@ -1379,8 +1580,10 @@ __new_control_put_minidsp_volume(struct snd_kcontrol *kcontrol,
 
 	if (aic3262->process_flow == 0)
 		volume_controls = main44_VOLUME_controls;
+
 	else
-		volume_controls = Second_Rate_VOLUME_controls;
+		volume_controls = base_speaker_SRS_VOLUME_controls;
+
 
 	aic3262_change_book(codec, volume_controls->control_book);
 	aic3262_change_page(codec, volume_controls->control_page);
@@ -1430,7 +1633,7 @@ __new_control_put_minidsp_volume(struct snd_kcontrol *kcontrol,
 		printk(KERN_ERR "Can not read codec registers\n");
 
 	if ((swap_reg_pre == 4 && swap_reg_post == 6)
-	    || (swap_reg_pre == 6 && swap_reg_post == 4))
+		|| (swap_reg_pre == 6 && swap_reg_post == 4))
 		DBG("Buffer swap success\n");
 	else
 		DBG("Buffer swap...FAILED\nswap_reg_pre=%x, swap_reg_post=%x\n",
@@ -1457,7 +1660,7 @@ static int minidsp_volume_mixer_controls(struct snd_soc_codec *codec)
 	int i, err, no_volume_controls;
 	static char volume_control_name[MAX_VOLUME_CONTROLS][40];
 
-	/*      ADD first process volume controls       */
+	/*	  ADD first process volume controls	   */
 	no_volume_controls = ARRAY_SIZE(main44_VOLUME_controls);
 
 	printk(KERN_INFO " %d mixer controls for mini dsp 'volumeLite'\n",
@@ -1467,7 +1670,7 @@ static int minidsp_volume_mixer_controls(struct snd_soc_codec *codec)
 
 		for (i = 0; i < no_volume_controls; i++) {
 			strcpy(volume_control_name[i],
-			       main44_VOLUME_control_names[i]);
+				   main44_VOLUME_control_names[i]);
 			strcat(volume_control_name[i], VOLUME_KCONTROL_NAME);
 
 			printk(KERN_ERR "Volume controls: %s\n",
@@ -1484,14 +1687,14 @@ static int minidsp_volume_mixer_controls(struct snd_soc_codec *codec)
 			snd_vol_controls[i].put =
 				__new_control_put_minidsp_volume;
 			/*
-			 *      TBD: read volume reg and update the index number
+			 *	  TBD: read volume reg and update the index number
 			 */
 			snd_vol_controls[i].private_value = 0;
 			snd_vol_controls[i].count = 0;
 
 			err = snd_ctl_add(codec->card->snd_card,
 					  snd_ctl_new1(&snd_vol_controls[i],
-						       codec));
+							   codec));
 			if (err < 0) {
 				printk(KERN_ERR
 					"%s:Invalid control %s\n", __FILE__,
@@ -1499,8 +1702,10 @@ static int minidsp_volume_mixer_controls(struct snd_soc_codec *codec)
 			}
 		}
 	}
-	/*      ADD second process volume controls      */
-	no_volume_controls = ARRAY_SIZE(Second_Rate_VOLUME_controls);
+
+
+	/*	  ADD second process volume controls	  */
+	no_volume_controls = ARRAY_SIZE(base_speaker_SRS_VOLUME_controls);
 
 	printk(KERN_ERR " %d mixer controls for mini dsp 'volumeLite'\n",
 		no_volume_controls);
@@ -1509,7 +1714,7 @@ static int minidsp_volume_mixer_controls(struct snd_soc_codec *codec)
 
 		for (i = 0; i < no_volume_controls; i++) {
 			strcpy(volume_control_name[i],
-			       Second_Rate_VOLUME_control_names[i]);
+				   base_speaker_SRS_VOLUME_control_names[i]);
 			strcat(volume_control_name[i], VOLUME_KCONTROL_NAME);
 
 			printk(KERN_ERR "Volume controls: %s\n",
@@ -1526,21 +1731,22 @@ static int minidsp_volume_mixer_controls(struct snd_soc_codec *codec)
 			snd_vol_controls[i].put =
 				__new_control_put_minidsp_volume;
 			/*
-			 *      TBD: read volume reg and update the index number
+			 *	  TBD: read volume reg and update the index number
 			 */
 			snd_vol_controls[i].private_value = 0;
 			snd_vol_controls[i].count = 0;
 
 			err = snd_ctl_add(codec->card->snd_card,
 					  snd_ctl_new1(&snd_vol_controls[i],
-						       codec));
+							   codec));
 			if (err < 0) {
 				printk(KERN_ERR
 					"%s:Invalid control %s\n", __FILE__,
-				       snd_vol_controls[i].name);
+					   snd_vol_controls[i].name);
 			}
 		}
 	}
+
 	return 0;
 }
 
@@ -1548,14 +1754,14 @@ static int minidsp_volume_mixer_controls(struct snd_soc_codec *codec)
  *--------------------------------------------------------------------------
  * Function : aic3262_add_minidsp_controls
  * Purpose :  Configures the AMIXER Control Interfaces that can be exercised by
- *            the user at run-time. Utilizes the  the snd_adaptive_controls[]
- *            array to specify two run-time controls.
+ *			the user at run-time. Utilizes the  the snd_adaptive_controls[]
+ *			array to specify two run-time controls.
  *---------------------------------------------------------------------------
  */
 int aic3262_add_minidsp_controls(struct snd_soc_codec *codec)
 {
 #ifdef ADD_MINI_DSP_CONTROLS
-	int i, err, no_mux_controls;
+	int i, err, no_mux_controls,no_mux_controls1;
 	/* add mode k control */
 	for (i = 0; i < ARRAY_SIZE(aic3262_minidsp_controls); i++) {
 		err = snd_ctl_add(codec->card->snd_card,
@@ -1566,14 +1772,17 @@ int aic3262_add_minidsp_controls(struct snd_soc_codec *codec)
 		}
 	}
 
+
 	/* add mux controls */
 	no_mux_controls = ARRAY_SIZE(main44_MUX_controls);
 	minidsp_mux_ctrl_mixer_controls(codec, no_mux_controls,
 		main44_MUX_controls, main44_MUX_control_names);
 
-	no_mux_controls = ARRAY_SIZE(Second_Rate_MUX_controls);
-	minidsp_mux_ctrl_mixer_controls(codec, no_mux_controls,
-		Second_Rate_MUX_controls, Second_Rate_MUX_control_names);
+
+	no_mux_controls1 = ARRAY_SIZE(base_speaker_SRS_MUX_controls);
+	minidsp_mux_ctrl_mixer_controls(codec, no_mux_controls1,
+		base_speaker_SRS_MUX_controls, base_speaker_SRS_MUX_control_names);
+
 
 	/* add volume controls*/
 	minidsp_volume_mixer_controls(codec);

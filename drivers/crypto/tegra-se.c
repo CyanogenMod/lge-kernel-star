@@ -622,9 +622,9 @@ static int tegra_se_count_sgs(struct scatterlist *sl, u32 total_bytes)
 		return 0;
 
 	do {
-		total_bytes -= sl[i].length;
+		total_bytes -= min(sl[i].length, total_bytes);
 		i++;
-	} while (total_bytes > 0);
+	} while (total_bytes);
 
 	return i;
 }
@@ -723,11 +723,11 @@ static int tegra_se_setup_ablk_req(struct tegra_se_dev *se_dev,
 
 		WARN_ON(src_sg->length != dst_sg->length);
 		src_ll->addr = sg_dma_address(src_sg);
-		src_ll->data_len = src_sg->length;
+		src_ll->data_len = min(src_sg->length, total);
 		dst_ll->addr = sg_dma_address(dst_sg);
-		dst_ll->data_len = dst_sg->length;
+		dst_ll->data_len = min(dst_sg->length, total);
+		total -= min(src_sg->length, total);
 
-		total -= src_sg->length;
 		src_sg = sg_next(src_sg);
 		dst_sg = sg_next(dst_sg);
 		dst_ll++;
@@ -750,7 +750,7 @@ static void tegra_se_dequeue_complete_req(struct tegra_se_dev *se_dev,
 		while (total) {
 			dma_unmap_sg(se_dev->dev, dst_sg, 1, DMA_FROM_DEVICE);
 			dma_unmap_sg(se_dev->dev, src_sg, 1, DMA_TO_DEVICE);
-			total -= src_sg->length;
+			total -= min(src_sg->length, total);
 			src_sg = sg_next(src_sg);
 			dst_sg = sg_next(dst_sg);
 		}
@@ -1073,11 +1073,13 @@ static int tegra_se_rng_get_random(struct crypto_rng *tfm, u8 *rdata, u32 dlen)
 	struct tegra_se_ll *src_ll, *dst_ll;
 	unsigned char *dt_buf = (unsigned char *)rng_ctx->dt_buf;
 	u8 *rdata_addr;
-	int ret = 0, i, j, num_blocks;
+	int ret = 0, i, j, num_blocks, data_len = 0;
 
-	if (dlen < TEGRA_SE_RNG_DT_SIZE)
-		return -EINVAL;
 	num_blocks = (dlen / TEGRA_SE_RNG_DT_SIZE);
+
+	data_len = (dlen % TEGRA_SE_RNG_DT_SIZE);
+	if (data_len == 0)
+		num_blocks = num_blocks - 1;
 
 	/* take access to the hw */
 	mutex_lock(&se_hw_lock);
@@ -1096,14 +1098,19 @@ static int tegra_se_rng_get_random(struct crypto_rng *tfm, u8 *rdata, u32 dlen)
 		TEGRA_SE_KEY_128_SIZE);
 	tegra_se_config_crypto(se_dev, SE_AES_OP_MODE_RNG_X931, true,
 				rng_ctx->slot->slot_num, rng_ctx->use_org_iv);
-	for (j = 0; j < num_blocks; j++) {
+	for (j = 0; j <= num_blocks; j++) {
 		ret = tegra_se_start_operation(se_dev,
 				TEGRA_SE_RNG_DT_SIZE, false);
 
 		if (!ret) {
 			rdata_addr = (rdata + (j * TEGRA_SE_RNG_DT_SIZE));
-			memcpy(rdata_addr,
-				rng_ctx->rng_buf, TEGRA_SE_RNG_DT_SIZE);
+
+			if (data_len && num_blocks == j) {
+				memcpy(rdata_addr, rng_ctx->rng_buf, data_len);
+			} else {
+				memcpy(rdata_addr,
+					rng_ctx->rng_buf, TEGRA_SE_RNG_DT_SIZE);
+			}
 
 			/* update DT vector */
 			for (i = TEGRA_SE_RNG_DT_SIZE - 1; i >= 0; i--) {

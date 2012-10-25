@@ -121,6 +121,7 @@
 
 #define UART_LSR	5	/* In:  Line Status Register */
 #define UART_LSR_TEMT		0x40 /* Transmitter empty */
+#define UART_LSR_FIFOE          0x80 /* Fifo error */
 #define UART_LSR_THRE		0x20 /* Transmit-hold-register empty */
 #define UART_LSR_BI		0x10 /* Break interrupt indicator */
 #define UART_LSR_FE		0x08 /* Frame error indicator */

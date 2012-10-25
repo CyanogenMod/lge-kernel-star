@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Syncpoints
  *
- * Copyright (c) 2010-2011, NVIDIA Corporation.
+ * Copyright (c) 2010-2012, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
  */
 
 #include <linux/nvhost_ioctl.h>
+#include <linux/platform_device.h>
 #include "nvhost_syncpt.h"
 #include "dev.h"
 
@@ -77,9 +78,9 @@ u32 nvhost_syncpt_read(struct nvhost_syncpt *sp, u32 id)
 {
 	u32 val;
 	BUG_ON(!syncpt_op(sp).update_min);
-	nvhost_module_busy(&syncpt_to_dev(sp)->mod);
+	nvhost_module_busy(syncpt_to_dev(sp)->dev);
 	val = syncpt_op(sp).update_min(sp, id);
-	nvhost_module_idle(&syncpt_to_dev(sp)->mod);
+	nvhost_module_idle(syncpt_to_dev(sp)->dev);
 	return val;
 }
 
@@ -90,10 +91,10 @@ u32 nvhost_syncpt_read_wait_base(struct nvhost_syncpt *sp, u32 id)
 {
 	u32 val;
 	BUG_ON(!syncpt_op(sp).read_wait_base);
-	nvhost_module_busy(&syncpt_to_dev(sp)->mod);
+	nvhost_module_busy(syncpt_to_dev(sp)->dev);
 	syncpt_op(sp).read_wait_base(sp, id);
 	val = sp->base_val[id];
-	nvhost_module_idle(&syncpt_to_dev(sp)->mod);
+	nvhost_module_idle(syncpt_to_dev(sp)->dev);
 	return val;
 }
 
@@ -112,10 +113,11 @@ void nvhost_syncpt_cpu_incr(struct nvhost_syncpt *sp, u32 id)
  */
 void nvhost_syncpt_incr(struct nvhost_syncpt *sp, u32 id)
 {
-	nvhost_syncpt_incr_max(sp, id, 1);
-	nvhost_module_busy(&syncpt_to_dev(sp)->mod);
+	if (client_managed(id))
+		nvhost_syncpt_incr_max(sp, id, 1);
+	nvhost_module_busy(syncpt_to_dev(sp)->dev);
 	nvhost_syncpt_cpu_incr(sp, id);
-	nvhost_module_idle(&syncpt_to_dev(sp)->mod);
+	nvhost_module_idle(syncpt_to_dev(sp)->dev);
 }
 
 /**
@@ -150,7 +152,7 @@ int nvhost_syncpt_wait_timeout(struct nvhost_syncpt *sp, u32 id,
 	}
 
 	/* keep host alive */
-	nvhost_module_busy(&syncpt_to_dev(sp)->mod);
+	nvhost_module_busy(syncpt_to_dev(sp)->dev);
 
 	if (client_managed(id) || !nvhost_syncpt_min_eq_max(sp, id)) {
 		/* try to read from register */
@@ -226,13 +228,35 @@ int nvhost_syncpt_wait_timeout(struct nvhost_syncpt *sp, u32 id,
 	nvhost_intr_put_ref(&(syncpt_to_dev(sp)->intr), ref);
 
 done:
-	nvhost_module_idle(&syncpt_to_dev(sp)->mod);
+	nvhost_module_idle(syncpt_to_dev(sp)->dev);
 	return err;
 }
 
 void nvhost_syncpt_debug(struct nvhost_syncpt *sp)
 {
 	syncpt_op(sp).debug(sp);
+}
+
+int nvhost_mutex_try_lock(struct nvhost_syncpt *sp, int idx)
+{
+	struct nvhost_master *host = syncpt_to_dev(sp);
+	u32 reg;
+
+	nvhost_module_busy(host->dev);
+	reg = syncpt_op(sp).mutex_try_lock(sp, idx);
+	if (reg) {
+		nvhost_module_idle(host->dev);
+		return -EBUSY;
+	}
+	atomic_inc(&sp->lock_counts[idx]);
+	return 0;
+}
+
+void nvhost_mutex_unlock(struct nvhost_syncpt *sp, int idx)
+{
+	syncpt_op(sp).mutex_unlock(sp, idx);
+	nvhost_module_idle(syncpt_to_dev(sp)->dev);
+	atomic_dec(&sp->lock_counts[idx]);
 }
 
 /* check for old WAITs to be removed (avoiding a wrap) */

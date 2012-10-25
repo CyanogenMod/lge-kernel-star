@@ -206,7 +206,7 @@ config TEGRA_WATCHDOG
 	  module will be called tegra_wdt.
 
 config TEGRA_WATCHDOG_ENABLE_ON_PROBE
-	tristate "Tegra watchdog"
+	tristate "Turn on Tegra watchdog at system start up"
 	depends on ARCH_TEGRA && TEGRA_WATCHDOG
 	help
 	  Say Y here to enable the tegra watchdog at driver

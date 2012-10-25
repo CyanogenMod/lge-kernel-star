@@ -35,6 +35,12 @@
 
 #include "signal.h"
 
+// LGE_UPDATE_S write power cause
+#if defined(CONFIG_MACH_LGE) && defined(CONFIG_MACH_STAR)	
+#include "../arch/arm/mach-tegra/lge/star/include/lge/board-star-nv.h"
+#endif
+// LGE_UPDATE_S write power cause
+
 static const char *handler[]= { "prefetch abort", "data abort", "address exception", "interrupt" };
 
 void *vectors_page;
@@ -52,10 +58,29 @@ __setup("user_debug=", user_debug_setup);
 
 static void dump_mem(const char *, const char *, unsigned long, unsigned long);
 
+/*
+ * 2011.07.27 pyocool.cho@lge.com "for kernel panic"
+*/
+#if defined (CONFIG_PANICRPT)     
+static char *pcpanicmsg = (char*)0;
+#endif /* CONFIG_PANICRPT */    
+
 void dump_backtrace_entry(unsigned long where, unsigned long from, unsigned long frame)
 {
 #ifdef CONFIG_KALLSYMS
 	printk("[<%08lx>] (%pS) from [<%08lx>] (%pS)\n", where, (void *)where, from, (void *)from);
+/*
+ * 2011.07.27 pyocool.cho@lge.com "for kernel panic"
+ */
+#if defined (CONFIG_PANICRPT)     
+	char sym1[KSYM_SYMBOL_LEN], sym2[KSYM_SYMBOL_LEN];
+	sprint_symbol(sym1, where);
+	sprint_symbol(sym2, from);
+    if (pcpanicmsg != (char*)0) {
+        sprintf (pcpanicmsg + strlen (pcpanicmsg),
+                 "[<%08lx>] (%s) from [<%08lx>] (%s)\n", where, sym1, from, sym2);
+    }
+#endif /* CONFIG_PANICRPT */
 #else
 	printk("Function entered at [<%08lx>] from [<%08lx>]\n", where, from);
 #endif
@@ -226,6 +251,49 @@ void show_stack(struct task_struct *tsk, unsigned long *sp)
 #define S_SMP ""
 #endif
 
+/*                                                                                                  
+ * 2011.07.27 pyocool.cho@lge.com "for kernel panic"                                                
+ */                                                                                                 
+#if defined (CONFIG_PANICRPT)                                                                       
+#define strcat0(a)       do{strcat(perrstr,a);}while(0)                                             
+#define strcat1(a,b)     do{sprintf(temp,a,b);strcat(perrstr,temp);}while(0)                        
+#define strcat2(a,b,c)   do{sprintf(temp,a,b,c);strcat(perrstr,temp);}while(0)                      
+#define strcat3(a,b,c,d) do{sprintf(temp,a,b,c,d);strcat(perrstr,temp);}while(0)                    
+#define strcatsym(a,b)   do{strcat(perrstr,a);sprint_symbol(temp,b);strcat(perrstr,temp);}while(0)  
+extern int  panicrpt_geterrbuff (char** pperrbuf);                                                  
+extern int  panicrpt_goinpanic (int epanicpos, char *pbuf);                                         
+static void ____die (struct thread_info *thread, struct pt_regs *regs)                              
+{                                                                                                   
+    struct task_struct *tsk = thread->task;                                                         
+    char               *perrstr;                                                                    
+                                                                                                    
+    if (panicrpt_geterrbuff (&perrstr)) {                                                           
+        char temp[100];                                                                             
+                                                                                                    
+        pcpanicmsg = perrstr;                                                                       
+        strcat0   ("--------------------------------\n");                                           
+        strcat0   ("Linux Kernel Panic\n");                                                         
+        strcat2   ("Process %s (pid: %d)\n", tsk->comm, task_pid_nr(tsk));                          
+        strcat0   ("--------------------------------\n");                                           
+        strcatsym ("PC: ", instruction_pointer(regs)); strcat0 ("\n");                              
+        strcatsym ("LR: ", regs->ARM_lr); strcat0 ("\n");                                           
+        strcat2   ("pc : [<%08lx>]    lr : [<%08lx>]\n", regs->ARM_pc, regs->ARM_lr);               
+        strcat2   ("psr: %08lx  sp : %08lx\n", regs->ARM_cpsr, regs->ARM_sp);                       
+        strcat2   ("ip : %08lx  fp : %08lx\n", regs->ARM_ip, regs->ARM_fp);                         
+        strcat2   ("r10: %08lx  r9 : %08lx\n", regs->ARM_r10, regs->ARM_r9);                        
+        strcat2   ("r8 : %08lx  r7 : %08lx\n", regs->ARM_r8, regs->ARM_r7);                         
+        strcat2   ("r6 : %08lx  r5 : %08lx\n", regs->ARM_r6,regs->ARM_r5);                          
+        strcat2   ("r4 : %08lx  r3 : %08lx\n",regs->ARM_r4, regs->ARM_r3);                          
+        strcat2   ("r2 : %08lx  r1 : %08lx\n",regs->ARM_r2,regs->ARM_r1);                           
+        strcat1   ("r0 : %08lx\n", regs->ARM_r0);                                                   
+        strcat0   ("---------<Call Stack>-----------\n");                                           
+        dump_backtrace (regs, tsk);                                                                 
+        dump_instr (KERN_EMERG, regs);                                                              
+        panicrpt_goinpanic (0, perrstr);                                                            
+    }                                                                                               
+}                                                                                                   
+#endif /* CONFIG_PANICRPT */                                                                        
+
 static int __die(const char *str, int err, struct thread_info *thread, struct pt_regs *regs)
 {
 	struct task_struct *tsk = thread->task;
@@ -253,6 +321,13 @@ static int __die(const char *str, int err, struct thread_info *thread, struct pt
 		dump_instr(KERN_EMERG, regs);
 	}
 
+/*
+ * 2011.07.27 pyocool.cho@lge.com "for kernel panic"
+ */
+#if defined (CONFIG_PANICRPT)     
+    ____die (thread, regs);
+#endif /* CONFIG_PANICRPT */
+
 	return ret;
 }
 
@@ -279,6 +354,14 @@ void die(const char *str, struct pt_regs *regs, int err)
 	bust_spinlocks(0);
 	add_taint(TAINT_DIE);
 	spin_unlock_irq(&die_lock);
+
+// LGE_UPDATE_S write power cause
+#if defined(CONFIG_MACH_LGE) && defined(CONFIG_MACH_STAR)	
+	unsigned char bootcause[1] = {LGE_NVDATA_RESET_CAUSE_VAL_USER_RESET};
+	lge_nvdata_write(LGE_NVDATA_RESET_CAUSE_OFFSET, bootcause,1);
+#endif	
+// LGE_UPDATE_E write power cause
+	
 	oops_exit();
 
 	if (in_interrupt())

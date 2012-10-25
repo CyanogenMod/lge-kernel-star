@@ -6097,13 +6097,13 @@ wl_iw_set_cscan(
 
 	if (g_onoff == G_WLAN_SET_OFF) {
 		WL_TRACE(("%s: driver is not up yet after START\n", __FUNCTION__));
-		return -1;
+		goto exit_proc;
 	}
 
 	if (wrqu->data.length < (strlen(CSCAN_COMMAND) + sizeof(cscan_tlv_t))) {
 		WL_ERROR(("%s argument=%d  less %d\n", __FUNCTION__,
 		          wrqu->data.length, (int)(strlen(CSCAN_COMMAND) + sizeof(cscan_tlv_t))));
-		return -1;
+		goto exit_proc;
 	}
 
 #ifdef TLV_DEBUG
@@ -6235,7 +6235,7 @@ wl_iw_set_cscan(
 			else {
 				WL_ERROR(("%s Ignoring CSCAN : First Scan is not done yet %d\n",
 					__FUNCTION__, g_first_counter_scans));
-				return -EBUSY;
+				goto exit_proc;
 			}
 		}
 #endif 
@@ -8147,7 +8147,7 @@ wl_iw_event(struct net_device *dev, wl_event_msg_t *e, void* data)
 	case WLC_E_ROAM:
 		if (status == WLC_E_STATUS_SUCCESS) {
 			WL_ASSOC((" WLC_E_ROAM : success \n"));
-			return;
+			goto wl_iw_event_end;
 		}
 	break;
 

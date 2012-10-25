@@ -314,9 +314,19 @@ SOC_SINGLE_TLV("SPKR Output Volume", WM8993_SPKMIXR_ATTENUATION,
 SOC_DOUBLE_R_TLV("Speaker Mixer Volume",
 		 WM8993_SPKMIXL_ATTENUATION, WM8993_SPKMIXR_ATTENUATION,
 		 0, 3, 1, spkmixout_tlv),
+//LGE_CHANGE_S [jung.chanmin@lge.com] 2012-04-25, [LGE_AP20] audio wm8994
+#if defined(CONFIG_MACH_BSSQ)
+SOC_SINGLE_TLV("Speaker Volume L", WM8993_SPEAKER_VOLUME_LEFT,
+		 0, 63, 0, outpga_tlv),
+
+SOC_SINGLE_TLV("Speaker Volume R", WM8993_SPEAKER_VOLUME_RIGHT,
+		 0, 63, 0, outpga_tlv),
+#else
 SOC_DOUBLE_R_TLV("Speaker Volume",
 		 WM8993_SPEAKER_VOLUME_LEFT, WM8993_SPEAKER_VOLUME_RIGHT,
 		 0, 63, 0, outpga_tlv),
+#endif
+//LGE_CHANGE_E [jung.chanmin@lge.com] 2011-04-25, [LGE_AP20] audio wm8994
 SOC_DOUBLE_R("Speaker Switch",
 	     WM8993_SPEAKER_VOLUME_LEFT, WM8993_SPEAKER_VOLUME_RIGHT,
 	     6, 1, 0),
@@ -341,6 +351,38 @@ SOC_ENUM("Speaker Mode", speaker_mode),
 		.shift = 0, .max = 63
 	},
 },
+
+#if defined(CONFIG_MACH_BSSQ)
+//LGE_CHANGE_S [jung.chanmin@lge.com] 2012-03-28 headset left/right gain balance */
+// 20110627 mint.choi@lge.com Ear L/R seperate add for X2,BQ[S]
+{
+        .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = "Headphone left Volume",
+        .access = SNDRV_CTL_ELEM_ACCESS_TLV_READ |
+                 SNDRV_CTL_ELEM_ACCESS_READWRITE,
+        .tlv.p = outpga_tlv,
+        .info = snd_soc_info_volsw,
+        .get = snd_soc_get_volsw, .put = snd_soc_put_volsw,
+        .private_value = (unsigned long)&(struct soc_mixer_control) {
+                .reg = WM8993_LEFT_OUTPUT_VOLUME,
+                .shift = 0, .max = 63
+        },
+},
+{
+        .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = "Headphone right Volume",
+        .access = SNDRV_CTL_ELEM_ACCESS_TLV_READ |
+             SNDRV_CTL_ELEM_ACCESS_READWRITE,
+        .tlv.p = outpga_tlv,
+        .info = snd_soc_info_volsw,
+        .get = snd_soc_get_volsw, .put = snd_soc_put_volsw,
+        .private_value = (unsigned long)&(struct soc_mixer_control) {
+            .reg = WM8993_RIGHT_OUTPUT_VOLUME,
+            .shift = 0, .max = 63
+        },
+},
+// 20110627 mint.choi@lge.com Ear L/R seperate add for X2,BQ[E]
+//LGE_CHANGE_E [jung.chanmin@lge.com] 2012-03-28 headset left/right gain balance */
+#endif
+
 SOC_DOUBLE_R("Headphone Switch", WM8993_LEFT_OUTPUT_VOLUME,
 	     WM8993_RIGHT_OUTPUT_VOLUME, 6, 1, 0),
 SOC_DOUBLE_R("Headphone ZC Switch", WM8993_LEFT_OUTPUT_VOLUME,
@@ -841,19 +883,52 @@ int wm_hubs_add_analogue_controls(struct snd_soc_codec *codec)
 	snd_soc_update_bits(codec, WM8993_SPEAKER_VOLUME_RIGHT,
 			    WM8993_SPKOUT_VU, WM8993_SPKOUT_VU);
 
+// MOBII_S [shhong@mobii.co.kr] 2012-06-12 : Zero Crossing Disable.
+#if defined(CONFIG_MACH_STAR)
+	snd_soc_update_bits(codec, WM8993_LEFT_OUTPUT_VOLUME,
+			    WM8993_HPOUT1_VU,
+			    WM8993_HPOUT1_VU);
+	snd_soc_update_bits(codec, WM8993_RIGHT_OUTPUT_VOLUME,
+			    WM8993_HPOUT1_VU,
+			    WM8993_HPOUT1_VU);
+#else
 	snd_soc_update_bits(codec, WM8993_LEFT_OUTPUT_VOLUME,
 			    WM8993_HPOUT1_VU | WM8993_HPOUT1L_ZC,
 			    WM8993_HPOUT1_VU | WM8993_HPOUT1L_ZC);
 	snd_soc_update_bits(codec, WM8993_RIGHT_OUTPUT_VOLUME,
 			    WM8993_HPOUT1_VU | WM8993_HPOUT1R_ZC,
 			    WM8993_HPOUT1_VU | WM8993_HPOUT1R_ZC);
+#endif
+// MOBII_E [shhong@mobii.co.kr] 2012-06-12 : Zero Crossing Disable.
 
 	snd_soc_update_bits(codec, WM8993_LEFT_OPGA_VOLUME,
+/* LGE_CHANGE_S [jung.chanmin@lge.com] 2012.04.25, HW tunnung delete WM8993_MIXOUT_VU */		
+#if defined(CONFIG_MACH_BSSQ)
+			    WM8993_MIXOUTL_ZC ,
+			    WM8993_MIXOUTL_ZC);
+// MOBII_S [shhong@mobii.co.kr] 2012-06-12 : Zero Crossing Disable.
+#elif defined(CONFIG_MACH_STAR)
+			    WM8993_MIXOUT_VU,
+			    WM8993_MIXOUT_VU);
+// MOBII_E [shhong@mobii.co.kr] 2012-06-12 : Zero Crossing Disable.
+#else
 			    WM8993_MIXOUTL_ZC | WM8993_MIXOUT_VU,
 			    WM8993_MIXOUTL_ZC | WM8993_MIXOUT_VU);
+#endif
+/* LGE_CHANGE_E [jung.chanmin@lge.com] 2012.04.25, HW tunnung delete WM8993_MIXOUT_VU */		
+
+
+// MOBII_S [shhong@mobii.co.kr] 2012-06-12 : Zero Crossing Disable.
+#if defined(CONFIG_MACH_STAR)
+	snd_soc_update_bits(codec, WM8993_RIGHT_OPGA_VOLUME,
+			    WM8993_MIXOUT_VU,
+			    WM8993_MIXOUT_VU);
+#else
 	snd_soc_update_bits(codec, WM8993_RIGHT_OPGA_VOLUME,
 			    WM8993_MIXOUTR_ZC | WM8993_MIXOUT_VU,
 			    WM8993_MIXOUTR_ZC | WM8993_MIXOUT_VU);
+#endif
+// MOBII_E [shhong@mobii.co.kr] 2012-06-12 : Zero Crossing Disable.
 
 	snd_soc_add_controls(codec, analogue_snd_controls,
 			     ARRAY_SIZE(analogue_snd_controls));

@@ -183,6 +183,15 @@ config CPU_FREQ_GOV_INTERACTIVE
 	  'interactive' - This driver adds a dynamic cpufreq policy governor
 	  designed for latency-sensitive workloads.
 
+config DYNAMIC_FREQ_MODE
+	bool "dyncmic frequency mode (EXPERIMENTAL)"
+	depends on CPU_FREQ_GOV_INTERACTIVE
+	default n
+	help
+	  In dynamic frequency mode, all parameters are managed for each
+	  frequency and the cpufreq governor can control system more fair
+	  for all frequencies.
+
 config CPU_FREQ_GOV_CONSERVATIVE
 	tristate "'conservative' cpufreq governor"
 	depends on CPU_FREQ

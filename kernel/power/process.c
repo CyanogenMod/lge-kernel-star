@@ -17,6 +17,11 @@
 #include <linux/delay.h>
 #include <linux/workqueue.h>
 #include <linux/wakelock.h>
+/* LGE_CHANGE_S, ryu.seeyeol@lge.com, 2012-02-24, repair sys_sync() func in early_suspend or suspend. Merge from IS11LG GB */
+#if 0
+#include "power.h"
+#endif
+/* LGE_CHANGE_E, ryu.seeyeol@lge.com, 2012-02-24, repair sys_sync() func in early_suspend or suspend. Merge from IS11LG GB */
 
 /* 
  * Timeout for stopping processes
@@ -157,6 +162,14 @@ int freeze_processes(void)
 	if (error)
 		goto Exit;
 	printk("done.\n");
+
+/* LGE_CHANGE_S, ryu.seeyeol@lge.com, 2012-02-24, repair sys_sync() func in early_suspend or suspend. Merge from IS11LG GB */
+#if 0
+	error = suspend_sys_sync_wait();
+	if (error)
+		goto Exit;
+#endif
+/* LGE_CHANGE_E, ryu.seeyeol@lge.com, 2012-02-24, repair sys_sync() func in early_suspend or suspend. Merge from IS11LG GB */
 
 	printk("Freezing remaining freezable tasks ... ");
 	error = try_to_freeze_tasks(false);

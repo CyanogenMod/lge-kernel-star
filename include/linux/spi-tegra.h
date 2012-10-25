@@ -47,4 +47,11 @@ struct tegra_spi_device_controller_data {
 	int cs_hold_clk_count;
 };
 
+//20110721 ws.yang@lge.com add to check suspend of  ifx_n721_spi.c [S]
+extern bool spi_tegra_is_suspend(struct spi_device *spi);
+//20110721 ws.yang@lge.com add to check suspend of  ifx_n721_spi.c [E]
+//20111101 ws.yang@lge.com .. to test
+extern bool spi_tegra_suspend_failed(struct spi_device *spi);
+// 20110628 youngjin.yoo@lge.com added spi control function [E]
+
 #endif /* _LINUX_SPI_TEGRA_H */

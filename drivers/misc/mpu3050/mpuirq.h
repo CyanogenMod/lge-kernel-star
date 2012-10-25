@@ -22,15 +22,16 @@
 
 #ifdef __KERNEL__
 #include <linux/i2c-dev.h>
-#include <linux/time.h>
-#else
-#include <sys/time.h>
 #endif
 
-#define MPUIRQ_SET_TIMEOUT           _IOW(MPU_IOCTL, 0x40, unsigned long)
-#define MPUIRQ_GET_INTERRUPT_CNT     _IOR(MPU_IOCTL, 0x41, unsigned long)
-#define MPUIRQ_GET_IRQ_TIME          _IOR(MPU_IOCTL, 0x42, struct timeval)
-#define MPUIRQ_SET_FREQUENCY_DIVIDER _IOW(MPU_IOCTL, 0x43, unsigned long)
+#define MPUIRQ_ENABLE_DEBUG          (1)
+#define MPUIRQ_GET_INTERRUPT_CNT     (2)
+#define MPUIRQ_GET_IRQ_TIME          (3)
+#define MPUIRQ_GET_LED_VALUE         (4)
+#define MPUIRQ_SET_TIMEOUT           (5)
+#define MPUIRQ_SET_ACCEL_INFO        (6)
+#define MPUIRQ_SET_FREQUENCY_DIVIDER (7)
+#define MPUIRQ_SET_WAKE_UP           (8)
 
 #ifdef __KERNEL__
 

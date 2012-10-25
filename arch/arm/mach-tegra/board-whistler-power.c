@@ -238,6 +238,18 @@ static struct i2c_board_info __initdata whistler_regulators[] = {
 	},
 };
 
+static void whistler_board_suspend(int lp_state, enum suspend_stage stg)
+{
+	if ((lp_state == TEGRA_SUSPEND_LP1) && (stg == TEGRA_SUSPEND_BEFORE_CPU))
+		tegra_console_uart_suspend();
+}
+
+static void whistler_board_resume(int lp_state, enum resume_stage stg)
+{
+	if ((lp_state == TEGRA_SUSPEND_LP1) && (stg == TEGRA_RESUME_AFTER_CPU))
+		tegra_console_uart_resume();
+}
+
 static struct tegra_suspend_platform_data whistler_suspend_data = {
 	.cpu_timer	= 2000,
 	.cpu_off_timer	= 1000,
@@ -247,6 +259,8 @@ static struct tegra_suspend_platform_data whistler_suspend_data = {
 	.corereq_high	= true,
 	.sysclkreq_high	= true,
 	.combined_req   = true,
+	.board_suspend = whistler_board_suspend,
+	.board_resume = whistler_board_resume,
 };
 
 int __init whistler_regulator_init(void)

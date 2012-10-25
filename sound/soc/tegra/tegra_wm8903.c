@@ -30,6 +30,7 @@
 
 #include <asm/mach-types.h>
 
+#include <linux/clk.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
@@ -73,6 +74,7 @@ struct tegra_wm8903 {
 #ifdef CONFIG_SWITCH
 	int jack_status;
 #endif
+	enum snd_soc_bias_level bias_level;
 };
 
 static int tegra_wm8903_hw_params(struct snd_pcm_substream *substream,
@@ -86,6 +88,8 @@ static int tegra_wm8903_hw_params(struct snd_pcm_substream *substream,
 	struct tegra_wm8903 *machine = snd_soc_card_get_drvdata(card);
 	int srate, mclk, i2s_daifmt;
 	int err;
+	struct clk *clk_m;
+	int rate;
 
 	srate = params_rate(params);
 	switch (srate) {
@@ -98,9 +102,32 @@ static int tegra_wm8903_hw_params(struct snd_pcm_substream *substream,
 		mclk = 256 * srate;
 		break;
 	}
+
+
+
+	clk_m = clk_get_sys(NULL, "clk_m");
+	if (IS_ERR(clk_m)) {
+		dev_err(card->dev, "Can't retrieve clk clk_m\n");
+		err = PTR_ERR(clk_m);
+		return err;
+	}
+	rate = clk_get_rate(clk_m);
+	printk("extern1 rate=%d\n",rate);
+
+#if TEGRA30_I2S_MASTER_PLAYBACK
 	/* FIXME: Codec only requires >= 3MHz if OSR==0 */
 	while (mclk < 6000000)
 		mclk *= 2;
+
+	i2s_daifmt = SND_SOC_DAIFMT_NB_NF |
+		     SND_SOC_DAIFMT_CBS_CFS;
+#else
+	mclk = rate;
+
+	i2s_daifmt = SND_SOC_DAIFMT_NB_NF |
+		     SND_SOC_DAIFMT_CBM_CFM;
+#endif
+
 
 	err = tegra_asoc_utils_set_rate(&machine->util_data, srate, mclk);
 	if (err < 0) {
@@ -113,9 +140,6 @@ static int tegra_wm8903_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	tegra_asoc_utils_lock_clk_rate(&machine->util_data, 1);
-
-	i2s_daifmt = SND_SOC_DAIFMT_NB_NF |
-		     SND_SOC_DAIFMT_CBS_CFS;
 
 	/* Use DSP mode for mono on Tegra20 */
 	if ((params_channels(params) != 2) &&
@@ -557,6 +581,8 @@ static int tegra_wm8903_init(struct snd_soc_pcm_runtime *rtd)
 	struct tegra_wm8903_platform_data *pdata = machine->pdata;
 	int ret;
 
+	machine->bias_level = SND_SOC_BIAS_STANDBY;
+
 	if (gpio_is_valid(pdata->gpio_spkr_en)) {
 		ret = gpio_request(pdata->gpio_spkr_en, "spkr_en");
 		if (ret) {
@@ -702,6 +728,32 @@ static int tegra_wm8903_init(struct snd_soc_pcm_runtime *rtd)
 	return 0;
 }
 
+static int tegra30_soc_set_bias_level(struct snd_soc_card *card,
+					enum snd_soc_bias_level level)
+{
+	struct tegra_wm8903 *machine = snd_soc_card_get_drvdata(card);
+
+	if (machine->bias_level == SND_SOC_BIAS_OFF &&
+		level != SND_SOC_BIAS_OFF)
+		tegra_asoc_utils_clk_enable(&machine->util_data);
+
+	return 0;
+}
+
+static int tegra30_soc_set_bias_level_post(struct snd_soc_card *card,
+					enum snd_soc_bias_level level)
+{
+	struct tegra_wm8903 *machine = snd_soc_card_get_drvdata(card);
+
+	if (machine->bias_level != SND_SOC_BIAS_OFF &&
+		level == SND_SOC_BIAS_OFF)
+		tegra_asoc_utils_clk_disable(&machine->util_data);
+
+	machine->bias_level = level;
+
+	return 0 ;
+}
+
 static struct snd_soc_dai_link tegra_wm8903_dai[] = {
 	{
 		.name = "WM8903",
@@ -733,10 +785,35 @@ static struct snd_soc_dai_link tegra_wm8903_dai[] = {
 	},
 };
 
+void tegra_wm8903_suspend_post(struct snd_soc_card *card)
+{
+	struct snd_soc_jack_gpio *gpio = &tegra_wm8903_hp_jack_gpio;
+
+	if (gpio_is_valid(gpio->gpio))
+		disable_irq(gpio_to_irq(gpio->gpio));
+}
+
+void tegra_wm8903_resume_pre(struct snd_soc_card *card)
+{
+	int val;
+	struct snd_soc_jack_gpio *gpio = &tegra_wm8903_hp_jack_gpio;
+
+	if (gpio_is_valid(gpio->gpio)) {
+		val = gpio_get_value(gpio->gpio);
+		val = gpio->invert ? !val : val;
+		snd_soc_jack_report(gpio->jack, val, gpio->report);
+		enable_irq(gpio_to_irq(gpio->gpio));
+	}
+}
+
 static struct snd_soc_card snd_soc_tegra_wm8903 = {
 	.name = "tegra-wm8903",
 	.dai_link = tegra_wm8903_dai,
 	.num_links = ARRAY_SIZE(tegra_wm8903_dai),
+	.suspend_post = tegra_wm8903_suspend_post,
+	.resume_pre = tegra_wm8903_resume_pre,
+	//.set_bias_level = tegra30_soc_set_bias_level,
+	//.set_bias_level_post = tegra30_soc_set_bias_level_post,
 };
 
 static __devinit int tegra_wm8903_driver_probe(struct platform_device *pdev)
@@ -803,8 +880,17 @@ static __devinit int tegra_wm8903_driver_probe(struct platform_device *pdev)
 		goto err_unregister_switch;
 	}
 
+	if (!card->instantiated) {
+		ret = -ENODEV;
+		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n",
+			ret);
+		goto err_unregister_card;
+	}
+
 	return 0;
 
+err_unregister_card:
+	snd_soc_unregister_card(card);
 err_unregister_switch:
 #ifdef CONFIG_SWITCH
 	switch_dev_unregister(&tegra_wm8903_headset_switch);

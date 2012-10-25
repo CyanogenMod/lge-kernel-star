@@ -4,7 +4,7 @@
  * Tegra I/O VMM implementation for GART devices in Tegra and Tegra 2 series
  * systems-on-a-chip.
  *
- * Copyright (c) 2010-2011, NVIDIA Corporation.
+ * Copyright (c) 2010-2012, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -40,8 +40,9 @@
 #define VMM_NAME "iovmm-gart"
 #define DRIVER_NAME "tegra_gart"
 
-#define GART_PAGE_SHIFT (12)
-#define GART_PAGE_MASK (~((1<<GART_PAGE_SHIFT)-1))
+#define GART_PAGE_SHIFT		12
+#define GART_PAGE_SIZE		(1 << GART_PAGE_SHIFT)
+#define GART_PAGE_MASK		(~(GART_PAGE_SIZE - 1))
 
 struct gart_device {
 	void __iomem		*regs;
@@ -53,6 +54,20 @@ struct gart_device {
 	struct tegra_iovmm_domain domain;
 	bool			enable;
 };
+
+/*
+ * Any interaction between any block on PPSB and a block on APB or AHB
+ * must have these read-back to ensure the APB/AHB bus transaction is
+ * complete before initiating activity on the PPSB block.
+ */
+#define FLUSH_GART_REGS(gart)	(void)readl((gart)->regs + GART_CONFIG)
+
+static inline void gart_set_pte(struct gart_device *gart,
+				tegra_iovmm_addr_t offs, u32 pte)
+{
+	writel(offs, gart->regs + GART_ENTRY_ADDR);
+	writel(pte, gart->regs + GART_ENTRY_DATA);
+}
 
 static int gart_map(struct tegra_iovmm_domain *, struct tegra_iovmm_area *);
 static void gart_unmap(struct tegra_iovmm_domain *,
@@ -102,8 +117,7 @@ static int gart_suspend(struct tegra_iovmm_device *dev)
 	for (i = 0; i < gart->page_count; i++) {
 		writel(reg, gart->regs + GART_ENTRY_ADDR);
 		gart->savedata[i] = readl(gart->regs + GART_ENTRY_DATA);
-		dmb();
-		reg += 1 << GART_PAGE_SHIFT;
+		reg += GART_PAGE_SIZE;
 	}
 	spin_unlock(&gart->pte_lock);
 	return 0;
@@ -114,15 +128,13 @@ static void do_gart_setup(struct gart_device *gart, const u32 *data)
 	unsigned long reg;
 	unsigned int i;
 
-	writel(1, gart->regs + GART_CONFIG);
-
 	reg = gart->iovmm_base;
 	for (i = 0; i < gart->page_count; i++) {
-		writel(reg, gart->regs + GART_ENTRY_ADDR);
-		writel((data) ? data[i] : 0, gart->regs + GART_ENTRY_DATA);
-		wmb();
-		reg += 1 << GART_PAGE_SHIFT;
+		gart_set_pte(gart, reg, data ? data[i] : 0);
+		reg += GART_PAGE_SIZE;
 	}
+	writel(1, gart->regs + GART_CONFIG);
+	FLUSH_GART_REGS(gart);
 }
 
 static void gart_resume(struct tegra_iovmm_device *dev)
@@ -189,7 +201,7 @@ static int gart_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	gart_regs = ioremap_wc(res->start, res->end - res->start + 1);
+	gart_regs = ioremap(res->start, res->end - res->start + 1);
 	if (!gart_regs) {
 		pr_err(DRIVER_NAME ": failed to remap GART registers\n");
 		e = -ENXIO;
@@ -249,7 +261,7 @@ static void __exit gart_exit(void)
 	platform_driver_unregister(&tegra_iovmm_gart_drv);
 }
 
-#define GART_PTE(_pfn) (0x80000000ul | ((_pfn)<<PAGE_SHIFT))
+#define GART_PTE(_pfn) (0x80000000ul | ((_pfn) << PAGE_SHIFT))
 
 
 static int gart_map(struct tegra_iovmm_domain *domain,
@@ -272,10 +284,9 @@ static int gart_map(struct tegra_iovmm_domain *domain,
 
 		spin_lock(&gart->pte_lock);
 
-		writel(gart_page, gart->regs + GART_ENTRY_ADDR);
-		writel(GART_PTE(pfn), gart->regs + GART_ENTRY_DATA);
-		wmb();
-		gart_page += 1 << GART_PAGE_SHIFT;
+		gart_set_pte(gart, gart_page, GART_PTE(pfn));
+		FLUSH_GART_REGS(gart);
+		gart_page += GART_PAGE_SIZE;
 
 		spin_unlock(&gart->pte_lock);
 	}
@@ -286,11 +297,10 @@ fail:
 	spin_lock(&gart->pte_lock);
 	while (i--) {
 		iovma->ops->release(iovma, i << PAGE_SHIFT);
-		gart_page -= 1 << GART_PAGE_SHIFT;
-		writel(gart_page, gart->regs + GART_ENTRY_ADDR);
-		writel(0, gart->regs + GART_ENTRY_DATA);
-		wmb();
+		gart_page -= GART_PAGE_SIZE;
+		gart_set_pte(gart, gart_page, 0);
 	}
+	FLUSH_GART_REGS(gart);
 	spin_unlock(&gart->pte_lock);
 
 	return -ENOMEM;
@@ -312,11 +322,10 @@ static void gart_unmap(struct tegra_iovmm_domain *domain,
 		if (iovma->ops && iovma->ops->release)
 			iovma->ops->release(iovma, i << PAGE_SHIFT);
 
-		writel(gart_page, gart->regs + GART_ENTRY_ADDR);
-		writel(0, gart->regs + GART_ENTRY_DATA);
-		wmb();
-		gart_page += 1 << GART_PAGE_SHIFT;
+		gart_set_pte(gart, gart_page, 0);
+		gart_page += GART_PAGE_SIZE;
 	}
+	FLUSH_GART_REGS(gart);
 	spin_unlock(&gart->pte_lock);
 }
 
@@ -329,9 +338,8 @@ static void gart_map_pfn(struct tegra_iovmm_domain *domain,
 
 	BUG_ON(!pfn_valid(pfn));
 	spin_lock(&gart->pte_lock);
-	writel(offs, gart->regs + GART_ENTRY_ADDR);
-	writel(GART_PTE(pfn), gart->regs + GART_ENTRY_DATA);
-	wmb();
+	gart_set_pte(gart, offs, GART_PTE(pfn));
+	FLUSH_GART_REGS(gart);
 	spin_unlock(&gart->pte_lock);
 }
 

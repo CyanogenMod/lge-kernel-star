@@ -22,11 +22,14 @@
 #include <linux/gpio.h>
 #include <linux/regulator/consumer.h>
 #include <linux/resource.h>
+
 #include <asm/mach-types.h>
+
 #include <linux/platform_device.h>
 #include <linux/earlysuspend.h>
 #include <linux/pwm_backlight.h>
 #include <linux/nvhost.h>
+
 #include <mach/nvmap.h>
 #include <mach/irqs.h>
 #include <mach/iomap.h>
@@ -36,6 +39,7 @@
 #include "devices.h"
 #include "gpio-names.h"
 #include "board.h"
+#include "cpu-tegra.h"
 
 #define ventana_pnl_pwr_enb	TEGRA_GPIO_PC6
 #define ventana_bl_enb		TEGRA_GPIO_PD4
@@ -348,25 +352,39 @@ struct early_suspend ventana_panel_early_suspender;
 
 static void ventana_panel_early_suspend(struct early_suspend *h)
 {
-	unsigned i;
-
 	/* power down LCD, add use a black screen for HDMI */
 	if (num_registered_fb > 0)
 		fb_blank(registered_fb[0], FB_BLANK_POWERDOWN);
+
 	if (num_registered_fb > 1)
 		fb_blank(registered_fb[1], FB_BLANK_NORMAL);
+
 #ifdef CONFIG_TEGRA_CONVSERVATIVE_GOV_ON_EARLYSUPSEND
 	cpufreq_save_default_governor();
 	cpufreq_set_conservative_governor();
-	cpufreq_set_conservative_governor_param(
-		SET_CONSERVATIVE_GOVERNOR_UP_THRESHOLD,
-		SET_CONSERVATIVE_GOVERNOR_DOWN_THRESHOLD);
+        cpufreq_set_conservative_governor_param("up_threshold",
+			SET_CONSERVATIVE_GOVERNOR_UP_THRESHOLD);
+
+	cpufreq_set_conservative_governor_param("down_threshold",
+			SET_CONSERVATIVE_GOVERNOR_DOWN_THRESHOLD);
+
+	cpufreq_set_conservative_governor_param("freq_step",
+		SET_CONSERVATIVE_GOVERNOR_FREQ_STEP);
+#endif
+
+#ifdef CONFIG_TEGRA_AUTO_HOTPLUG
+	tegra2_enable_autoplug();
 #endif
 }
 
 static void ventana_panel_late_resume(struct early_suspend *h)
 {
 	unsigned i;
+
+#ifdef CONFIG_TEGRA_AUTO_HOTPLUG
+	tegra2_disable_autoplug();
+#endif
+
 #ifdef CONFIG_TEGRA_CONVSERVATIVE_GOV_ON_EARLYSUPSEND
 	cpufreq_restore_default_governor();
 #endif

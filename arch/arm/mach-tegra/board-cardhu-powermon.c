@@ -249,8 +249,11 @@ int __init cardhu_pmon_init(void)
 			&power_mon_info[VDD_CORE_IN];
 	}
 
-	i2c_register_board_info(0, cardhu_i2c0_ina219_board_info,
-		ARRAY_SIZE(cardhu_i2c0_ina219_board_info));
+	if (bi.board_id != BOARD_PM269) {
+		i2c_register_board_info(0, cardhu_i2c0_ina219_board_info,
+			ARRAY_SIZE(cardhu_i2c0_ina219_board_info));
+	}
+
 	return 0;
 }
 

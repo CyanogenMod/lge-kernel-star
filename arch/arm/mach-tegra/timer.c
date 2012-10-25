@@ -217,6 +217,15 @@ static struct syscore_ops tegra_timer_syscore_ops = {
 };
 
 #ifdef CONFIG_HAVE_ARM_TWD
+int tegra_twd_get_state(struct tegra_twd_context *context)
+{
+	context->twd_ctrl = readl(twd_base + TWD_TIMER_CONTROL);
+	context->twd_load = readl(twd_base + TWD_TIMER_LOAD);
+	context->twd_cnt = readl(twd_base + TWD_TIMER_COUNTER);
+
+	return 0;
+}
+
 void tegra_twd_suspend(struct tegra_twd_context *context)
 {
 	context->twd_ctrl = readl(twd_base + TWD_TIMER_CONTROL);

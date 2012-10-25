@@ -190,10 +190,14 @@ static int regulator_check_current_limit(struct regulator_dev *rdev,
 		return -EPERM;
 	}
 
+/* LGE_CHANGE_S [beobki.chung@lge.com] 2012-01-27, [LGE_AP20] touch led */
+#if 0
 	if (*max_uA > rdev->constraints->max_uA)
 		*max_uA = rdev->constraints->max_uA;
 	if (*min_uA < rdev->constraints->min_uA)
 		*min_uA = rdev->constraints->min_uA;
+#endif
+/* LGE_CHANGE_E [beobki.chung@lge.com] 2012-01-27, [LGE_AP20] */
 
 	if (*min_uA > *max_uA)
 		return -EINVAL;
@@ -1376,7 +1380,7 @@ int regulator_enable(struct regulator *regulator)
 	ret = _regulator_enable(rdev);
 	mutex_unlock(&rdev->mutex);
 
-	if (ret != 0)
+	if (ret != 0 && rdev->supply)
 		regulator_disable(rdev->supply);
 
 	return ret;
@@ -2606,6 +2610,14 @@ struct regulator_dev *regulator_register(struct regulator_desc *regulator_desc,
 		ret = set_supply(rdev, r);
 		if (ret < 0)
 			goto scrub;
+
+		/* Enable supply if rail is enabled */
+		if (rdev->desc->ops->is_enabled &&
+				rdev->desc->ops->is_enabled(rdev)) {
+			ret = regulator_enable(rdev->supply);
+			if (ret < 0)
+				goto scrub;
+		}
 	}
 
 	if (init_data->supply_regulator_dev) {

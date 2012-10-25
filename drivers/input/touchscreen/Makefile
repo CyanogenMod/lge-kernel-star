@@ -61,3 +61,11 @@ obj-$(CONFIG_TOUCHSCREEN_WM97XX_MAINSTONE)	+= mainstone-wm97xx.o
 obj-$(CONFIG_TOUCHSCREEN_WM97XX_ZYLONITE)	+= zylonite-wm97xx.o
 obj-$(CONFIG_TOUCHSCREEN_W90X900)	+= w90p910_ts.o
 obj-$(CONFIG_TOUCHSCREEN_TPS6507X)	+= tps6507x-ts.o
+obj-$(CONFIG_TOUCHSCREEN_TEGRA_BSSQ)	+= lge_touch_synaptics.o
+obj-$(CONFIG_TOUCHSCREEN_TEGRA_BSSQ)	+= lge_touch_driver.o
+obj-$(CONFIG_TOUCHSCREEN_TEGRA_STAR)	+= LGE_touch_synaptics.o
+obj-$(CONFIG_TOUCHSCREEN_TEGRA_STAR)	+= LGE_touch_driver.o
+# MOBII_CHANGE_E [jg.noh@mobii.co.kr] 2012-02-01
+obj-$(CONFIG_ONETOUCHSCREEN_TEGRA_STAR)	+= onetouch_synaptics.o
+obj-$(CONFIG_TOUCHSCREEN_RM31080A)	+= rm31080a_ts.o
+obj-$(CONFIG_TOUCHSCREEN_SYN_RMI4_SPI)  += rmi4/

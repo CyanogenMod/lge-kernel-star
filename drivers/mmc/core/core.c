@@ -67,6 +67,11 @@ MODULE_PARM_DESC(
 	removable,
 	"MMC/SD cards are removable and may be removed during suspend");
 
+#ifdef CONFIG_MACH_BSSQ
+// 20111015 youngjin.yoo@lge.com blocking SDcard re-init LGE SDCard_Task [S]
+struct mmc_ios ios_backup;
+// 20111015 youngjin.yoo@lge.com blocking SDcard re-init LGE SDCard_Task [E]
+#endif
 /*
  * Internal function. Schedule delayed work in the MMC work queue.
  */
@@ -1941,7 +1946,15 @@ int mmc_suspend_host(struct mmc_host *host)
 		}
 	}
 	mmc_bus_put(host);
-
+#ifdef CONFIG_MACH_BSSQ
+// 20111015 youngjin.yoo@lge.com blocking SDcard re-init LGE SDCard_Task [S]
+	if(!strncmp(mmc_hostname(host),"mmc1",4))
+	{
+		memcpy(&ios_backup,&host->ios,sizeof(struct mmc_ios));
+		printk("\n(IOS backup)\n%s: clock %uHz busmode %u powermode %u cs %u Vdd %u width %u timing %u\n",mmc_hostname(host), ios_backup.clock, ios_backup.bus_mode,ios_backup.power_mode, ios_backup.chip_select, ios_backup.vdd,ios_backup.bus_width, ios_backup.timing);
+	}
+// 20111015 youngjin.yoo@lge.com blocking SDcard re-init LGE SDCard_Task [E]
+#endif
 	if (!err && !(host->pm_flags & MMC_PM_KEEP_POWER))
 		mmc_power_off(host);
 
@@ -1991,6 +2004,16 @@ int mmc_resume_host(struct mmc_host *host)
 			err = 0;
 		}
 	}
+#ifdef CONFIG_MACH_BSSQ
+// 20111015 youngjin.yoo@lge.com blocking SDcard re-init LGE SDCard_Task [S]
+	if(!strncmp(mmc_hostname(host),"mmc1",4))
+	{
+		memcpy(&host->ios,&ios_backup,sizeof(struct mmc_ios));
+		mmc_set_ios(host);
+		printk("\n(IOS restore)\n%s: clock %uHz busmode %u powermode %u cs %u Vdd %u  width %u timing %u\n",mmc_hostname(host), ios_backup.clock, ios_backup.bus_mode,ios_backup.power_mode, ios_backup.chip_select, ios_backup.vdd,ios_backup.bus_width, ios_backup.timing);
+	}
+// 20111015 youngjin.yoo@lge.com blocking SDcard re-init LGE SDCard_Task [E]
+#endif
 	mmc_bus_put(host);
 
 	return err;

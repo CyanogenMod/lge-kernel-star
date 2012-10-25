@@ -2,7 +2,7 @@
  * linux/sound/soc/codecs/tlv320aic3262.h
  *
  *
- * Copyright (C) 2011 Mistral Solutions Pvt Ltd.
+ * Copyright (C) 2012 Texas Instruments, Inc.
  *
  * This package is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -13,7 +13,7 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
  * History:
- *  Rev 0.1   ASoC driver support    Mistral         20-01-2011
+ *  Rev 0.1   ASoC driver support          20-01-2011
  *
  * The AIC3262 ASoC driver is ported for the codec AIC3262.
  *
@@ -21,13 +21,17 @@
 
 #ifndef _TLV320AIC3262_H
 #define _TLV320AIC3262_H
-
+#include <linux/input.h>
 #define AUDIO_NAME "aic3262"
 #define AIC3262_VERSION "1.1"
+
+//#define AIC3262_ASI2_MASTER 1
 
 /* Enable this macro allow for different ASI formats */
 /*#define ASI_MULTI_FMT*/
 #undef ASI_MULTI_FMT
+
+#define  INT_FLAG2_BUTTN_PRESSBIT 0x20
 
 /* Enable register caching on write */
 #define EN_REG_CACHE 1
@@ -39,6 +43,10 @@
 result some issue with cache. Common code doesnot support
 page, so fix that before commenting this line*/
 #define LOCAL_REG_ACCESS 1
+
+/* Macro to enable the inclusion of tiload kernel driver */
+#define AIC3262_TiLoad
+
 
 /* Macro enables or disables support for miniDSP in the driver */
 /* Enable the AIC3262_TiLoad macro first before enabling these macros */
@@ -63,7 +71,7 @@ page, so fix that before commenting this line*/
 #define AIC3262_MULTI_I2S	1
 
 /* Driver Debug Messages Enabled */
-/*#define DEBUG*/
+//#define DEBUG
 
 #ifdef DEBUG
 	#define DBG(x...)	printk(x)
@@ -115,6 +123,7 @@ page, so fix that before commenting this line*/
 /* Total number of ASI Ports */
 #define MAX_ASI_COUNT			3
 
+
 /* AIC3262 register space */
 /* Updated from 256 to support Page 3 registers */
 #define	AIC3262_CACHEREGNUM		1024
@@ -135,6 +144,13 @@ page, so fix that before commenting this line*/
 #define DAC_FLAG_R1_NOHS	0
 #define DAC_FLAG_R1_MONOHS	1
 #define DAC_FLAG_R1_STEREOHS	2
+
+/*mask patterns for DAC and ADC polling logic*/
+#define LDAC_POW_FLAG_MASK	0x80
+#define RDAC_POW_FLAG_MASK	0x08
+#define LADC_POW_FLAG_MASK	0x40
+#define RADC_POW_FLAG_MASK	0x04
+
 /* ****************** Book 0 Registers **************************************/
 
 /* ****************** Page 0 Registers **************************************/
@@ -171,12 +187,14 @@ page, so fix that before commenting this line*/
 #define HF_CLK_TRIM_R2		30
 #define HF_CLK_TRIM_R3		31
 #define HF_CLK_TRIM_R4		32
+#define ADC_FLAG_R1		36
 #define DAC_FLAG_R1		37
 #define DAC_FLAG_R2		38
 
 #define STICKY_FLAG1		42
 #define INT_FLAG1		43
 #define STICKY_FLAG2		44
+#define STICKY_FLAG3		45
 #define INT_FLAG2		46
 #define INT1_CNTL		48
 #define INT2_CNTL		49
@@ -246,7 +264,10 @@ page, so fix that before commenting this line*/
 #define INT1_SEL_L		(PAGE_1 + 34)
 #define RAMP_CNTL_R1		(PAGE_1 + 36)
 #define RAMP_CNTL_R2		(PAGE_1 + 37)
-#define INT1_SEL_RM		(PAGE_1 + 39)
+//#define INT1_SEL_RM		(PAGE_1 + 39)
+#define IN1L_SEL_RM		(PAGE_1 + 39)
+#define IN1R_SEL_RM		(PAGE_1 + 39)
+
 #define REC_AMP_CNTL_R5		(PAGE_1 + 40)
 #define RAMPR_VOL		(PAGE_1 + 41)
 #define RAMP_TIME_CNTL		(PAGE_1 + 42)
@@ -304,6 +325,7 @@ page, so fix that before commenting this line*/
 #define ASI3_ADC_INPUT_CNTL	(PAGE_4 + 39)
 #define ASI3_DAC_OUT_CNTL	(PAGE_4 + 40)
 #define ASI3_BWCLK_CNTL_REG	(PAGE_4 + 42)
+#define ASI3_BCLK_N_CNTL	(PAGE_4 + 43)
 #define ASI3_BCLK_N             (PAGE_4 + 44)
 #define ASI3_WCLK_N             (PAGE_4 + 45)
 #define ASI3_BWCLK_OUT_CNTL	(PAGE_4 + 46)
@@ -413,11 +435,20 @@ enum ASI_DAC_OUTPUT_OPTION {
 	DAC_PATH_RIGHT,		/* 02 DAC Datapath Right Data */
 };
 
+#define AIC3262_READ_COMMAND_WORD(addr)   ((1 << 15) | (addr << 5))
+#define AIC3262_WRITE_COMMAND_WORD(addr)  ((0 << 15) | (addr << 5))
+
 /* Shift the above options by so many bits */
 #define AIC3262_ASI_LDAC_PATH_SHIFT	6
 #define AIC3262_ASI_LDAC_PATH_MASK	(BIT5 | BIT4)
 #define AIC3262_ASI_RDAC_PATH_SHIFT	4
 #define AIC3262_ASI_RDAC_PATH_MASK	(BIT7 | BIT6)
+
+
+#define DAC_LR_MUTE_MASK	0xc
+#define DAC_LR_MUTE		0xc
+#define ENABLE_CLK_MASK		0x80
+#define ENABLE_CLK		0x80
 
 /* ASI specific ADC Input Control Options */
 enum ASI_ADC_INPUT_OPTION {
@@ -509,6 +540,7 @@ struct aic3262_asi_data {
 struct aic3262_priv {
 	enum snd_soc_control_type control_type;
 	struct aic326x_pdata *pdata;
+	struct snd_soc_codec codec;
 	u32 sysclk;
 	s32 master;
 	u8 book_no;
@@ -519,12 +551,23 @@ struct aic3262_priv {
 	u32 active_count;
 	int current_dac_config[MAX_ASI_COUNT];
 	int current_adc_config[MAX_ASI_COUNT];
+	int current_config;
 	struct aic3262_asi_data asiCtxt[MAX_ASI_COUNT];
 	enum AIC3262_PLL_OPTION aic3262_pllclkin_option;
 	u8 dac_clkin_option;
 	u8 adc_clkin_option;
 	int irq;
+	u8 dac_reg;
+	u8 adc_gain;
+	u8 hpl;
+	u8 hpr;
+	u8 rec_amp;
+	u8 rampr;
+	u8 spk_amp;
+	struct spi_device *spi;
 	struct snd_soc_jack *headset_jack;
+	struct input_dev *button_dev;
+	int codec_audio_mode;
 #if defined(LOCAL_REG_ACCESS)
 	void *control_data;
 #endif
@@ -611,7 +654,8 @@ struct aic3262_rate_divs {
  */
 extern int aic326x_headset_detect(struct snd_soc_codec *codec,
 	struct snd_soc_jack *jack, int jack_type);
-
+extern int aic326x_headset_button_init(struct snd_soc_codec *codec,
+	struct snd_soc_jack *jack, int jack_type);
 
 extern u8 aic3262_read(struct snd_soc_codec *codec, u16 reg);
 extern u16 aic3262_read_2byte(struct snd_soc_codec *codec, u16 reg);
@@ -623,6 +667,8 @@ extern void aic3262_write_reg_cache(struct snd_soc_codec *codec,
 extern int aic3262_change_book(struct snd_soc_codec *codec, u8 new_book);
 extern int reg_def_conf(struct snd_soc_codec *codec);
 extern int i2c_verify_book0(struct snd_soc_codec *codec);
+extern int poll_dac(struct snd_soc_codec *codec, int left_right, int on_off);
+extern int poll_adc(struct snd_soc_codec *codec, int left_right, int on_off);
 
 #ifdef CONFIG_MINI_DSP
 extern int aic3262_minidsp_program(struct snd_soc_codec *codec);

@@ -416,23 +416,6 @@ static int __devinit tps6236x_probe(struct i2c_client *client,
 
 	i2c_set_clientdata(client, tps);
 
-	/* Read version number and compare with chipid */
-	chip_id = tps6236x_read(tps, REG_CHIPID);
-	if (chip_id < 0) {
-		err = chip_id;
-		dev_err(tps->dev, "Error in reading device %d\n", err);
-		goto fail;
-	}
-	part_id = (chip_id >> 2) & 0x3;
-	if (((part_id == 0) && (tps->chip_id != TPS62360)) ||
-		((part_id == 1) && (tps->chip_id != TPS62361B)) ||
-		(part_id == 2) || (part_id == 3)) {
-		dev_err(tps->dev, "Err: Mismatch of partid and driver chip-id"
-				  " 0x%x\n", chip_id);
-		err = -ENODEV;
-		goto fail;
-	}
-
 	err = tps6236x_init_dcdc(client, pdata, tps);
 	if (err < 0) {
 		dev_err(tps->dev, "TPS6236X init fails with = %d\n", err);

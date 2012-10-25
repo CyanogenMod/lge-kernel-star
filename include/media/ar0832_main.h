@@ -28,6 +28,10 @@
 
 #define AR0832_IOCTL_GET_SENSOR_ID		_IOR('o', 0x12, __u16)
 
+#define AR0832_FOCUSER_IOCTL_SET_MODE		_IOW('o', 0x13, __u32) //x2 gb
+
+#define AR0832_IOCTL_SENSOR_RESET		_IOW('o', 0x14, __u32) //x2 gb .20111006 calvin.hwang@lge.com Camsensor sync with X2
+
 #define AR0832_SENSOR_ID_8141			0x1006
 #define AR0832_SENSOR_ID_8140			0x3006
 
@@ -85,15 +89,24 @@ struct ar0832_stereo_region {
 	struct ar0832_point image_end;
 };
 
+// LGE_CHANGE_S X2_ICS [byun.youngki@lge.com], 2012-05-03, < recover to GB version >
+// recover GB version 20120503
 struct ar0832_focuser_config {
 	__u32 settle_time;
 	__u32 actuator_range;
 	__u32 pos_low;
 	__u32 pos_high;
+#if 0  // [byun.youngki@lge.com] 2012-06-09 : fix CTS issue
 	__u32 focal_length;
 	__u32 fnumber;
 	__u32 max_aperture;
+#else
+	float focal_length;
+	float fnumber;
+	float max_aperture;
+#endif
 };
+// LGE_CHANGE_E X2_ICS [byun.youngki@lge.com], 2012-05-03, < recover to GB version >
 
 #ifdef __KERNEL__
 struct ar0832_platform_data {

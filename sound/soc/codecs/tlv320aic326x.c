@@ -1,7 +1,7 @@
 /*
 * linux/sound/soc/codecs/tlv320aic3262.c
 *
-* Copyright (C) 2011 Mistral Solutions Pvt Ltd.
+* Copyright (C) 2012 Texas Instruments, Inc.
 *
 * Based on sound/soc/codecs/tlv320aic3262.c
 *
@@ -18,16 +18,16 @@
 *
 * History:
 *
-* Rev 0.1   ASoC driver support    Mistral         20-01-2011
+* Rev 0.1   ASoC driver support       20-01-2011
 *
 *		The AIC325x ASoC driver is ported for the codec AIC3262.
-* Rev 0.2   ASoC driver support    Mistral         21-03-2011
+* Rev 0.2   ASoC driver support      21-03-2011
 *		The AIC326x ASoC driver is updated abe changes.
 *
-* Rev 0.3   ASoC driver support    Mistral         12.09.2011
+* Rev 0.3   ASoC driver support      12.09.2011
 *		fixed the compilation issues for Whistler support
 *
-* Rev 0.4   ASoC driver support    Mistral         27.09.2011
+* Rev 0.4   ASoC driver support     27.09.2011
 *              The AIC326x driver ported for Nvidia cardhu.
 *
 * Rev 0.5   Modified to support Multiple ASI Ports  08-Nov-2011
@@ -54,14 +54,16 @@
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
+#include <sound/soc-dapm.h>
 #include <sound/initval.h>
 #include <sound/tlv.h>
 #include <asm/div64.h>
 #include <sound/tlv320aic326x.h>
 #include <sound/jack.h>
+#include <linux/spi/spi.h>
 
 #include "tlv320aic326x.h"
-
+#include <linux/gpio.h>
 /*
  *****************************************************************************
  * Global Variable
@@ -69,13 +71,20 @@
  */
 static u8 aic3262_reg_ctl;
 
-u8 dac_reg = 0, adc_gain = 0, hpl = 0, hpr = 0;
-u8 rec_amp = 0, rampr = 0, spk_amp = 0;
+#ifdef AIC3262_TiLoad
+	extern int aic3262_driver_init(struct snd_soc_codec *codec);
+#endif
+
+
+
 /* whenever aplay/arecord is run, aic3262_hw_params() function gets called.
  * This function reprograms the clock dividers etc. this flag can be used to
  * disable this when the clock dividers are programmed by pps config file
  */
 static int soc_static_freq_config = 1;
+static struct aic3262_priv *aic3262_priv_data;
+static struct i2c_client *i2c_pdev;
+static struct snd_soc_codec *aic3262_codec;
 
 /*
  *****************************************************************************
@@ -158,6 +167,7 @@ static int aic3262_multi_i2s_asi2_mute(struct snd_soc_dai *dai, int mute);
 
 static int aic3262_multi_i2s_asi3_mute(struct snd_soc_dai *dai, int mute);
 
+#if 0
 static const char *wclk1_pincontrol[] = {
 	"ASI1 Word Clock Input/Output", "CLKOUT output"};
 static const char *dout1_pincontrol[] = {
@@ -203,22 +213,7 @@ static const char *clkin[] = {
 	"mclk1", "bclk1", "gpio1", "pll_clk", "bclk2", "gpi1",
 	"hf_ref_clk", "hf_osc_clk", "mclk2", "gpio2", "gpi2"};
 
-/* List of SOC_ENUM structures for the AIC3262 PIN Control Amixer Controls */
-static const struct soc_enum aic326x_enum[] = {
-	SOC_ENUM_SINGLE(WCLK1_PIN_CNTL_REG, 2, 2, wclk1_pincontrol),
-	SOC_ENUM_SINGLE(DOUT1_PIN_CNTL_REG, 1, 7, dout1_pincontrol),
-	SOC_ENUM_SINGLE(DIN1_PIN_CNTL_REG,  5, 2, din1_pincontrol),
-	SOC_ENUM_SINGLE(WCLK2_PIN_CNTL_REG, 2, 10, wclk2_pincontrol),
-	SOC_ENUM_SINGLE(BCLK2_PIN_CNTL_REG, 2, 10, bclk2_pincontrol),
-	SOC_ENUM_SINGLE(DOUT2_PIN_CNTL_REG, 1, 8, dout2_pincontrol),
-	SOC_ENUM_SINGLE(DIN2_PIN_CNTL_REG,  5, 2, din2_pincontrol),
-	SOC_ENUM_SINGLE(WCLK3_PIN_CNTL_REG, 2, 5, wclk3_pincontrol),
-	SOC_ENUM_SINGLE(BCLK3_PIN_CNTL_REG, 2, 5, bclk3_pincontrol),
-	SOC_ENUM_SINGLE(DOUT3_PIN_CNTL_REG, 1, 5, dout3_pincontrol),
-	SOC_ENUM_SINGLE(DIN3_PIN_CNTL_REG,  5, 2, din3_pincontrol),
-	SOC_ENUM_DOUBLE(DAC_ADC_CLKIN_REG,  0, 4, 11, clkin),
-};
-
+#endif
 #ifdef DAC_INDEPENDENT_VOL
 /*
  *----------------------------------------------------------------------------
@@ -267,14 +262,14 @@ static int n_control_get(struct snd_kcontrol *kcontrol,
 	if (!strcmp(kcontrol->id.name, "Left DAC Volume")) {
 		mask = AIC3262_8BITS_MASK;
 		shift = 0;
-		val = aic3262_read(codec, mc->reg);
+		val = snd_soc_read(codec, mc->reg);
 		ucontrol->value.integer.value[0] =
 		    (val <= 48) ? (val + 127) : (val - 129);
 	}
 	if (!strcmp(kcontrol->id.name, "Right DAC Volume")) {
 		mask = AIC3262_8BITS_MASK;
 		shift = 0;
-		val = aic3262_read(codec, mc->reg);
+		val = snd_soc_read(codec, mc->reg);
 		ucontrol->value.integer.value[0] =
 		    (val <= 48) ? (val + 127) : (val - 129);
 	}
@@ -404,8 +399,8 @@ int snd_soc_get_volsw_2r_n(struct snd_kcontrol *kcontrol,
 	}
 
 	/* Read, update the corresponding Registers */
-	val = (aic3262_read(codec, reg) >> shift) & mask;
-	val2 = (aic3262_read(codec, reg2) >> shift) & mask;
+	val = (snd_soc_read(codec, reg) >> shift) & mask;
+	val2 = (snd_soc_read(codec, reg2) >> shift) & mask;
 
 	if (!strcmp(kcontrol->id.name, "PCM Playback Volume")) {
 		ucontrol->value.integer.value[0] =
@@ -565,11 +560,11 @@ static int __new_control_info(struct snd_kcontrol *kcontrol,
  *----------------------------------------------------------------------------
  */
 static int __new_control_get(struct snd_kcontrol *kcontrol,
-			     struct snd_ctl_elem_value *ucontrol)
+		struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
 	u32 val;
-	val = aic3262_read(codec, aic3262_reg_ctl);
+	val = snd_soc_read(codec, aic3262_reg_ctl);
 	ucontrol->value.integer.value[0] = val;
 	return 0;
 }
@@ -583,7 +578,7 @@ static int __new_control_get(struct snd_kcontrol *kcontrol,
  *----------------------------------------------------------------------------
  */
 static int __new_control_put(struct snd_kcontrol *kcontrol,
-			     struct snd_ctl_elem_value *ucontrol)
+		struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
 	struct aic3262_priv *aic3262 = snd_soc_codec_get_drvdata(codec);
@@ -618,30 +613,60 @@ static int __new_control_put(struct snd_kcontrol *kcontrol,
  * Structure Initialization
  *****************************************************************************
  */
+static const DECLARE_TLV_DB_SCALE(dac_vol_tlv, -6350, 50, 0);
+static const DECLARE_TLV_DB_SCALE(adc_vol_tlv, -1200, 50, 0);
+static const DECLARE_TLV_DB_SCALE(spk_gain_tlv, 600, 600, 0);
+static const DECLARE_TLV_DB_SCALE(output_gain_tlv, -600, 100, 0);
+static const DECLARE_TLV_DB_SCALE(micpga_gain_tlv, 0, 50, 0);
+static const DECLARE_TLV_DB_SCALE(adc_fine_gain_tlv, -40, 10, 0);
+static const DECLARE_TLV_DB_SCALE(beep_gen_volume_tlv, -6300, 100, 0);
+
+/* Chip-level Input and Output CM Mode Controls */
+static const char *input_common_mode_text[] = {
+	"0.9v", "0.75v" };
+
+static const char *output_common_mode_text[] = {
+	"Input CM", "1.25v", "1.5v", "1.65v" };
+
+static const struct soc_enum input_cm_mode =
+	SOC_ENUM_SINGLE(CM_REG, 2, 2, input_common_mode_text);
+
+static const struct soc_enum output_cm_mode =
+	SOC_ENUM_SINGLE(CM_REG, 0, 4, output_common_mode_text);
+
+/*
+ *****************************************************************************
+ * Structure Initialization
+ *****************************************************************************
+ */
 static const struct snd_kcontrol_new aic3262_snd_controls[] = {
 	/* Output */
-	#ifndef DAC_INDEPENDENT_VOL
+#ifndef DAC_INDEPENDENT_VOL
 	/* sound new kcontrol for PCM Playback volume control */
-	SOC_DOUBLE_R_N("PCM Playback Volume", DAC_LVOL, DAC_RVOL, 0, 0xAf, 0),
-	#endif
-	/* sound new kcontrol for HP driver gain */
-	SOC_DOUBLE_R_N("HP Driver Gain", HPL_VOL, HPR_VOL, 0, 21, 0),
-	/* sound new kcontrol for SPK driver gain*/
-	SOC_DOUBLE("SPK Driver Gain", SPK_AMP_CNTL_R4, 0, 4, 5, 0),
-	/* Reveiver driver Gain volume*/
-	SOC_DOUBLE_R_N("REC Driver Volume",
-			REC_AMP_CNTL_R5, RAMPR_VOL, 0, 36, 0),
-	/* sound new kcontrol for PGA capture volume */
-	SOC_DOUBLE_R_N("PGA Capture Volume", LADC_VOL, RADC_VOL, 0, 0x3F,
-			     0),
-	SOC_DOUBLE("ADC Fine Gain ", ADC_FINE_GAIN, 4, 0, 4, 1),
-	SOC_DOUBLE_R("PGA MIC Volume", MICL_PGA, MICR_PGA, 0, 95, 0),
 
-	SOC_DOUBLE_R("LO to REC Volume", RAMP_CNTL_R1, RAMP_CNTL_R2, 0, 116, 1),
-	SOC_DOUBLE_R_N("LO to HP Volume",
-		 HP_AMP_CNTL_R2, HP_AMP_CNTL_R3, 0, 117, 0),
-	SOC_DOUBLE_R("LO to SPK Volume",
-		 SPK_AMP_CNTL_R2, SPK_AMP_CNTL_R3, 0, 116, 1),
+	SOC_DOUBLE_R_SX_TLV("PCM Playback Volume",
+			DAC_LVOL, DAC_RVOL, 8,0xffffff81, 0x30, dac_vol_tlv),
+#endif
+	/*HP Driver Gain Control*/
+	SOC_DOUBLE_R_SX_TLV("HeadPhone Driver Amplifier Volume",
+			HPL_VOL, HPR_VOL, 6, 0xfffffffa, 0xe, output_gain_tlv),
+
+	/*LO Driver Gain Control*/
+	SOC_DOUBLE_TLV("Speaker Amplifier Volume",
+				SPK_AMP_CNTL_R4, 4, 0, 5, 0, spk_gain_tlv),
+
+	SOC_DOUBLE_R_SX_TLV("Receiver Amplifier Volume",
+	REC_AMP_CNTL_R5, RAMPR_VOL, 6, 0xfffffffa, 0x1d, output_gain_tlv),
+
+	SOC_DOUBLE_R_SX_TLV("PCM Capture Volume",
+		LADC_VOL, RADC_VOL, 7,0xffffff68, 0x24, adc_vol_tlv),
+
+
+	SOC_DOUBLE_R_TLV ("MicPGA Volume Control",
+		MICL_PGA, MICR_PGA, 0, 0x5F, 0, micpga_gain_tlv),
+	SOC_DOUBLE_TLV("PCM Capture Fine Gain Volume",
+		ADC_FINE_GAIN, 4, 0, 5, 1, adc_fine_gain_tlv),
+
 	SOC_DOUBLE("ADC channel mute", ADC_FINE_GAIN, 7, 3, 1, 0),
 
 	SOC_DOUBLE("DAC MUTE", DAC_MVOL_CONF, 2, 3, 1, 1),
@@ -649,22 +674,21 @@ static const struct snd_kcontrol_new aic3262_snd_controls[] = {
 	/* sound new kcontrol for Programming the registers from user space */
 	SOC_SINGLE_AIC3262("Program Registers"),
 
-	SOC_SINGLE("RESET", RESET_REG, 0 , 1, 0),
+	SOC_SINGLE("RESET", RESET_REG, 0,1,0),
 
 	SOC_SINGLE("DAC VOL SOFT STEPPING", DAC_MVOL_CONF, 0, 2, 0),
 
-	#ifdef DAC_INDEPENDENT_VOL
-	SOC_SINGLE_N("Left DAC Volume", DAC_LVOL, 0, 0xAF, 0),
-	SOC_SINGLE_N("Right DAC Volume", DAC_RVOL, 0, 0xAF, 0),
-	#endif
+#ifdef DAC_INDEPENDENT_VOL
+	/*SOC_SINGLE_N("Left DAC Volume", DAC_LVOL, 0, 0xAF, 0),
+	SOC_SINGLE_N("Right DAC Volume", DAC_RVOL, 0, 0xAF, 0),*/
+#endif
 
 	SOC_SINGLE("DAC AUTO MUTE CONTROL", DAC_MVOL_CONF, 4, 7, 0),
 	SOC_SINGLE("RIGHT MODULATOR SETUP", DAC_MVOL_CONF, 7, 1, 0),
 
 	SOC_SINGLE("ADC Volume soft stepping", ADC_CHANNEL_POW, 0, 3, 0),
 
-	SOC_DOUBLE_R_N("MA Volume",
-		 LADC_PGA_MAL_VOL, RADC_PGA_MAR_VOL, 0, 42, 0),
+	SOC_DOUBLE_R("MICPGA enable/disable",MICL_PGA,MICR_PGA,7, 1, 0),
 
 	SOC_SINGLE("Mic Bias ext independent enable", MIC_BIAS_CNTL, 7, 1, 0),
 	SOC_SINGLE("MICBIAS_EXT ON", MIC_BIAS_CNTL, 6, 1, 0),
@@ -691,80 +715,30 @@ static const struct snd_kcontrol_new aic3262_snd_controls[] = {
 
 	SOC_DOUBLE_R("AGC_GAIN_HYSTERESIS", LAGC_CNTL, RAGC_CNTL, 0, 3, 0),
 	SOC_DOUBLE_R("AGC_HYSTERESIS", LAGC_CNTL_R2, RAGC_CNTL_R2, 6, 3, 0),
-	SOC_DOUBLE_R("AGC_NOISE_THRESHOLD",
-		 LAGC_CNTL_R2, RAGC_CNTL_R2, 1, 31, 1),
+	SOC_DOUBLE_R("AGC_NOISE_THRESHOLD", LAGC_CNTL_R2,
+						RAGC_CNTL_R2, 1, 31, 1),
 
 	SOC_DOUBLE_R("AGC_MAX_GAIN", LAGC_CNTL_R3, RAGC_CNTL_R3, 0, 116, 0),
 	SOC_DOUBLE_R("AGC_ATCK_TIME", LAGC_CNTL_R4, RAGC_CNTL_R4, 3, 31, 0),
 	SOC_DOUBLE_R("AGC_ATCK_SCALE_FACTOR",
-		 LAGC_CNTL_R4, RAGC_CNTL_R4, 0, 7, 0),
+				LAGC_CNTL_R4, RAGC_CNTL_R4, 0, 7, 0),
 
 	SOC_DOUBLE_R("AGC_DECAY_TIME", LAGC_CNTL_R5, RAGC_CNTL_R5, 3, 31, 0),
 	SOC_DOUBLE_R("AGC_DECAY_SCALE_FACTOR",
-		 LAGC_CNTL_R5, RAGC_CNTL_R5, 0, 7, 0),
-	SOC_DOUBLE_R("AGC_NOISE_DEB_TIME",
-		 LAGC_CNTL_R6, RAGC_CNTL_R6, 0, 31, 0),
+				LAGC_CNTL_R5, RAGC_CNTL_R5, 0, 7, 0),
+	SOC_DOUBLE_R("AGC_NOISE_DEB_TIME", LAGC_CNTL_R6,
+						RAGC_CNTL_R6, 0, 31, 0),
 
-	SOC_DOUBLE_R("AGC_SGL_DEB_TIME",
-		 LAGC_CNTL_R7, RAGC_CNTL_R7, 0, 0x0F, 0),
-	SOC_SINGLE("DAC PRB Selection", DAC_PRB, 0, 25, 0),
+	SOC_DOUBLE_R("AGC_SGL_DEB_TIME", LAGC_CNTL_R7,
+					RAGC_CNTL_R7, 0, 0x0F, 0),
 
-	SOC_SINGLE("INTERRUPT FLAG - Read only", 46, 0, 255, 0),
-	SOC_SINGLE("INTERRUPT STICKY FLAG - Read only", 44, 0, 255, 0),
-	SOC_SINGLE("INT1 CONTROL", 48, 0, 255, 0),
-	SOC_SINGLE("GPIO1 CONTROL", (PAGE_4 + 86), 0, 255, 0),
-	SOC_SINGLE("HP_DEPOP", HP_DEPOP, 0, 255, 0),
-
-	#if defined(FULL_IN_CNTL)
-
-	SOC_SINGLE("IN1L_2_LMPGA_P_CTL", LMIC_PGA_PIN, 6, 3, 0),
-	SOC_SINGLE("IN2L_2_LMPGA_P_CTL", LMIC_PGA_PIN, 4, 3, 0),
-	SOC_SINGLE("IN3L_2_LMPGA_P_CTL", LMIC_PGA_PIN, 2, 3, 0),
-	SOC_SINGLE("IN1R_2_LMPGA_P_CTL", LMIC_PGA_PIN, 0, 3, 0),
-
-	SOC_SINGLE("IN4L_2_LMPGA_P_CTL", LMIC_PGA_PM_IN4, 5, 1, 0),
-	SOC_SINGLE("IN4R_2_LMPGA_M_CTL", LMIC_PGA_PM_IN4, 4, 1, 0),
-
-	SOC_SINGLE("CM1_2_LMPGA_M_CTL", LMIC_PGA_MIN, 6, 3, 0),
-	SOC_SINGLE("IN2R_2_LMPGA_M_CTL", LMIC_PGA_MIN, 4, 3, 0),
-	SOC_SINGLE("IN3R_2_LMPGA_M_CTL", LMIC_PGA_MIN, 2, 3, 0),
-	SOC_SINGLE("CM2_2_LMPGA_M_CTL", LMIC_PGA_MIN, 0, 3, 0),
-
-	SOC_SINGLE("IN1R_2_RMPGA_P_CTL", RMIC_PGA_PIN, 6, 3, 0),
-	SOC_SINGLE("IN2R_2_RMPGA_P_CTL", RMIC_PGA_PIN, 4, 3, 0),
-	SOC_SINGLE("IN3R_2_RMPGA_P_CTL", RMIC_PGA_PIN, 2, 3, 0),
-	SOC_SINGLE("IN2L_2_RMPGA_P_CTL", RMIC_PGA_PIN, 0, 3, 0),
-
-	SOC_SINGLE("IN4R_2_RMPGA_P_CTL", RMIC_PGA_PM_IN4, 5, 1, 0),
-	SOC_SINGLE("IN4L_2_RMPGA_M_CTL", RMIC_PGA_PM_IN4, 4, 1, 0),
-
-	SOC_SINGLE("CM1_2_RMPGA_M_CTL", RMIC_PGA_MIN, 6, 3, 0),
-	SOC_SINGLE("IN1L_2_RMPGA_M_CTL", RMIC_PGA_MIN, 4, 3, 0),
-	SOC_SINGLE("IN3L_2_RMPGA_M_CTL", RMIC_PGA_MIN, 2, 3, 0),
-	SOC_SINGLE("CM2_2_RMPGA_M_CTL", RMIC_PGA_MIN, 0, 3, 0),
-
-	#endif
-
-	SOC_DOUBLE("MA_EN_CNTL", MA_CNTL, 3, 2, 1, 0),
-	SOC_DOUBLE("IN1 LO DIRECT BYPASS", MA_CNTL, 5, 4, 1, 0),
+	SOC_SINGLE("DAC PRB Selection",DAC_PRB, 0, 25, 0),
+	SOC_SINGLE("HP_DEPOP", HP_DEPOP, 0, 255,0),
 	SOC_DOUBLE("IN1 LO BYPASS VOLUME" , LINE_AMP_CNTL_R2, 3, 0, 3, 1),
-	SOC_DOUBLE("MA LO BYPASS EN",  LINE_AMP_CNTL_R2, 7, 6, 1, 0),
-
-	/* Pin control Macros */
-	SOC_ENUM("DOUT1 Pin Control", aic326x_enum[DOUT1_ENUM]),
-	SOC_ENUM("DIN1 Pin Control",  aic326x_enum[DIN1_ENUM]),
-	SOC_ENUM("WCLK2 Pin Control", aic326x_enum[WCLK2_ENUM]),
-	SOC_ENUM("BCLK2 Pin Control", aic326x_enum[BCLK2_ENUM]),
-	SOC_ENUM("DOUT2 Pin Control", aic326x_enum[DOUT2_ENUM]),
-	SOC_ENUM("DIN2 Pin Control",  aic326x_enum[DIN2_ENUM]),
-	SOC_ENUM("WCLK3 Pin Control", aic326x_enum[WCLK3_ENUM]),
-	SOC_ENUM("BCLK3 Pin Control", aic326x_enum[BCLK3_ENUM]),
-	SOC_ENUM("DOUT3 Pin Control", aic326x_enum[DOUT3_ENUM]),
-	SOC_ENUM("DIN3 Pin Control",  aic326x_enum[DIN3_ENUM]),
-	SOC_ENUM("DAC CLK IN", aic326x_enum[CLKIN_ENUM]),
-	SOC_ENUM("ADC CLK IN", aic326x_enum[CLKIN_ENUM]),
-
+	SOC_ENUM("Input CM mode", input_cm_mode),
+	SOC_ENUM("Output CM mode", output_cm_mode),
 };
+
 
 /* the sturcture contains the different values for mclk */
 static const struct aic3262_rate_divs aic3262_divs[] = {
@@ -795,6 +769,8 @@ static const struct aic3262_rate_divs aic3262_divs[] = {
 	/* 16k rate */
 #ifdef CONFIG_MINI_DSP
 	{12000000, 16000, 1, 8, 1920, 384, 4, 4, 128, 4, 12, 12,
+		{{0, 60, 0}, {0, 61, 0} } },
+	{12288000, 16000, 1, 9, 0, 216, 2, 16, 72, 2, 48, 27,
 		{{0, 60, 0}, {0, 61, 0} } },
 #else
 	{12000000, 16000, 1, 8, 1920, 128, 8, 6, 128, 8, 6, 4,
@@ -837,6 +813,8 @@ static const struct aic3262_rate_divs aic3262_divs[] = {
 #ifdef CONFIG_MINI_DSP
 	{12288000, 48000, 1, 8, 52, 128, 2, 8, 128, 2, 8, 4,
 		{{0, 60, 0}, {0, 61, 0} } },
+	{12000000, 48000, 1, 8, 1920, 128, 2, 8, 128, 2, 8, 4,
+         {{0, 60, 0}, {0, 61, 0}}},
 #else
 	/* 48k rate */
 	{12000000, 48000, 1, 8, 1920, 128, 8, 2, 128, 8, 2, 4,
@@ -883,19 +861,19 @@ static void aic3262_multi_i2s_dump_regs(struct snd_soc_dai *dai)
 	DBG(KERN_INFO "#Page0 REGS..\n");
 	for (counter = 0; counter < 85; counter++) {
 		DBG(KERN_INFO "#%2d -> 0x%x\n", counter,
-			aic3262_read(codec, counter));
+			snd_soc_read(codec, counter));
 	}
 
 	DBG(KERN_INFO "#Page1 REGS..\n");
 	for (counter = 128; counter < 176; counter++) {
 		DBG(KERN_INFO "#%2d -> 0x%x\n", (counter % 128),
-			aic3262_read(codec, counter));
+			snd_soc_read(codec, counter));
 	}
 
 	DBG(KERN_INFO "#Page4 REGS..\n");
 	for (counter = 512; counter < 631; counter++) {
 		DBG(KERN_INFO "#%2d -> 0x%x\n",
-			(counter % 128), aic3262_read(codec, counter));
+			(counter % 128), snd_soc_read(codec, counter));
 	}
 
 	for (counter = 0; counter < MAX_ASI_COUNT; counter++) {
@@ -969,19 +947,11 @@ static int aic3262_multi_i2s_asi1_mute(struct snd_soc_dai *dai, int mute)
 
 	DBG(KERN_INFO "#%s : mute %d started\n", __func__, mute);
 
-	if (mute) {
+	if (mute && !aic3262->asiCtxt[0].port_muted ) {
 		DBG(KERN_INFO "Mute if part\n");
 
-		if (!aic3262->asiCtxt[0].port_muted) {
-			dac_reg = aic3262_read(codec, DAC_MVOL_CONF);
-			adc_gain = aic3262_read(codec, ADC_FINE_GAIN);
-			hpl = aic3262_read(codec, HPL_VOL);
-			hpr = aic3262_read(codec, HPR_VOL);
-			rec_amp = aic3262_read(codec, REC_AMP_CNTL_R5);
-			rampr = aic3262_read(codec, RAMPR_VOL);
-			spk_amp = aic3262_read(codec, SPK_AMP_CNTL_R4);
-		}
-		DBG(KERN_INFO "spk_reg = %2x\n\n", spk_amp);
+
+	snd_soc_update_bits(codec, DAC_MVOL_CONF, DAC_LR_MUTE_MASK,DAC_LR_MUTE);
 
 		/* First check if both Playback and Recording is going on
 		* this interface.
@@ -989,48 +959,28 @@ static int aic3262_multi_i2s_asi1_mute(struct snd_soc_dai *dai, int mute)
 		if (aic3262->asiCtxt[0].asi_active > 1) {
 			DBG("#%s Cannot Mute the ASI Now..\n", __func__);
 		} else if (!(aic3262->asiCtxt[1].playback_mode) &&
-			    !(aic3262->asiCtxt[2].playback_mode)) {
+			!(aic3262->asiCtxt[2].playback_mode)) {
 			/* Before Muting, please check if any other
 			* ASI is active. if so, we cannot simply mute the
 			* DAC and ADC Registers.
 			*/
-			aic3262_write(codec, DAC_MVOL_CONF,
-				((dac_reg & 0xF3) | 0x0C));
-			aic3262_write(codec, ADC_FINE_GAIN,
-				((adc_gain & 0x77) | 0x88));
-			aic3262_write(codec, HPL_VOL, 0xB9);
-			aic3262_write(codec, HPR_VOL, 0xB9);
-			aic3262_write(codec, REC_AMP_CNTL_R5, 0x39);
-			aic3262_write(codec, RAMPR_VOL, 0x39);
-			aic3262_write(codec, SPK_AMP_CNTL_R4, 0x00);
+		DBG("#%s None of the ASI's are active now..\n", __func__);
+			snd_soc_write(codec, DAC_MVOL_CONF,
+				((aic3262->dac_reg & 0xF3) | 0x0C));
+			snd_soc_write(codec, ADC_FINE_GAIN,
+				((aic3262->adc_gain & 0x77) | 0x88));
+			snd_soc_write(codec, HPL_VOL, 0xB9);
+			snd_soc_write(codec, HPR_VOL, 0xB9);
+			snd_soc_write(codec, REC_AMP_CNTL_R5, 0x39);
+			snd_soc_write(codec, RAMPR_VOL, 0x39);
+			snd_soc_write(codec, SPK_AMP_CNTL_R4, 0x00);
 			aic3262->asiCtxt[0].port_muted = 1;
-		} else {
-			DBG(KERN_INFO
-			"#%s: Other ASI Active. Cannot MUTE Codec..\n",
-				__func__);
 		}
 	} else {
 		DBG(KERN_INFO "Mute else part\n");
-		aic3262_write(codec, DAC_MVOL_CONF, (dac_reg & 0xF3));
-		mdelay(5);
-		aic3262_write(codec, ADC_FINE_GAIN, (adc_gain & 0x77));
-		mdelay(5);
-		aic3262_write(codec, HPL_VOL, hpl);
-		mdelay(5);
-		aic3262_write(codec, HPR_VOL, hpr);
-		mdelay(5);
-		aic3262_write(codec, REC_AMP_CNTL_R5, rec_amp);
-		mdelay(5);
-		aic3262_write(codec, RAMPR_VOL, rampr);
-		mdelay(5);
-		aic3262_write(codec, SPK_AMP_CNTL_R4, spk_amp);
-		mdelay(5);
-
-		/* Basic hack */
-		aic3262_write(codec, LINE_AMP_CNTL_R1, 0xc3);
-		aic3262_write(codec, HP_AMP_CNTL_R1, 0x33);
-
-		aic3262->asiCtxt[0].port_muted = 0;
+		snd_soc_update_bits(codec, DAC_MVOL_CONF,
+						DAC_LR_MUTE_MASK, 0x0);
+		snd_soc_write(codec, ADC_FINE_GAIN,(0X00 & 0x77) | 0x0);
 		aic3262_multi_i2s_dump_regs(dai);
 	}
 
@@ -1042,7 +992,7 @@ static int aic3262_multi_i2s_asi1_mute(struct snd_soc_dai *dai, int mute)
 /*
 *----------------------------------------------------------------------------
 * Function : aic3262_multi_i2s_asi2_maic3262_asi3_clk_configute
-* Purpose  : This function is to mute or unmute the left and right DAC
+* Purpose : This function is to mute or unmute the left and right DAC
 *
 *----------------------------------------------------------------------------
 */
@@ -1053,19 +1003,9 @@ static int aic3262_multi_i2s_asi2_mute(struct snd_soc_dai *dai, int mute)
 
 	DBG(KERN_INFO "#%s : mute %d started\n", __func__, mute);
 
-	if (mute) {
+	if (mute && !aic3262->asiCtxt[1].port_muted ) {
 		DBG(KERN_INFO "Mute if part\n");
-
-		if (!aic3262->asiCtxt[1].port_muted) {
-			dac_reg = aic3262_read(codec, DAC_MVOL_CONF);
-			adc_gain = aic3262_read(codec, ADC_FINE_GAIN);
-			hpl = aic3262_read(codec, HPL_VOL);
-			hpr = aic3262_read(codec, HPR_VOL);
-			rec_amp = aic3262_read(codec, REC_AMP_CNTL_R5);
-			rampr = aic3262_read(codec, RAMPR_VOL);
-			spk_amp = aic3262_read(codec, SPK_AMP_CNTL_R4);
-			DBG(KERN_INFO "spk_reg = %2x\n\n", spk_amp);
-		}
+	snd_soc_update_bits(codec, DAC_MVOL_CONF, DAC_LR_MUTE_MASK,DAC_LR_MUTE);
 
 		/* First check if both Playback and Recording is going on
 		* this interface.
@@ -1073,58 +1013,39 @@ static int aic3262_multi_i2s_asi2_mute(struct snd_soc_dai *dai, int mute)
 		if (aic3262->asiCtxt[1].asi_active > 1) {
 			DBG("#%s Cannot Mute the ASI Now..\n", __func__);
 		} else if (!(aic3262->asiCtxt[0].playback_mode) &&
-			    !(aic3262->asiCtxt[2].playback_mode)) {
+			!(aic3262->asiCtxt[2].playback_mode)) {
 			/* Before Muting, please check if any other
 			* ASI is active. if so, we cannot simply mute the
 			* DAC and ADC Registers.
 			*/
-			aic3262_write(codec, DAC_MVOL_CONF,
-				((dac_reg & 0xF3) | 0x0C));
-			aic3262_write(codec, ADC_FINE_GAIN,
-				((adc_gain & 0x77) | 0x88));
-			aic3262_write(codec, HPL_VOL, 0xB9);
-			aic3262_write(codec, HPR_VOL, 0xB9);
-			aic3262_write(codec, REC_AMP_CNTL_R5, 0x39);
-			aic3262_write(codec, RAMPR_VOL, 0x39);
-			aic3262_write(codec, SPK_AMP_CNTL_R4, 0x00);
+			snd_soc_write(codec, DAC_MVOL_CONF,
+				((aic3262->dac_reg & 0xF3) | 0x0C));
+			snd_soc_write(codec, ADC_FINE_GAIN,
+				((aic3262->adc_gain & 0x77) | 0x88));
+			snd_soc_write(codec, HPL_VOL, 0xB9);
+			snd_soc_write(codec, HPR_VOL, 0xB9);
+			snd_soc_write(codec, REC_AMP_CNTL_R5, 0x39);
+			snd_soc_write(codec, RAMPR_VOL, 0x39);
+			snd_soc_write(codec, SPK_AMP_CNTL_R4, 0x00);
 			aic3262->asiCtxt[1].port_muted = 1;
-		} else {
-			DBG("#%s: Other ASI Active. Cannot MUTE Codec..\n",
-				__func__);
 		}
 	} else {
 		DBG(KERN_INFO "Mute else part\n");
-		aic3262_write(codec, DAC_MVOL_CONF, (dac_reg & 0xF3));
-		mdelay(5);
-		aic3262_write(codec, ADC_FINE_GAIN, (adc_gain & 0x77));
-		mdelay(5);
-		aic3262_write(codec, HPL_VOL, hpl);
-		mdelay(5);
-		aic3262_write(codec, HPR_VOL, hpr);
-		mdelay(5);
-		aic3262_write(codec, REC_AMP_CNTL_R5, rec_amp);
-		mdelay(5);
-		aic3262_write(codec, RAMPR_VOL, rampr);
-		mdelay(5);
-		aic3262_write(codec, SPK_AMP_CNTL_R4, spk_amp);
-		mdelay(5);
+		snd_soc_update_bits(codec, DAC_MVOL_CONF,
+						DAC_LR_MUTE_MASK, 0x0);
 
-		/* Basic hack */
-		aic3262_write(codec, LINE_AMP_CNTL_R1, 0xc3);
-		aic3262_write(codec, HP_AMP_CNTL_R1, 0x33);
-
-		aic3262->asiCtxt[1].port_muted = 0;
-		aic3262_multi_i2s_dump_regs(dai);
+		/*aic3262_multi_i2s_dump_regs(dai);*/
 	}
 
 	DBG(KERN_INFO "#%s : mute %d ended\n", __func__, mute);
 
 	return 0;
 }
+
 /*
 *----------------------------------------------------------------------------
 * Function : aic3262_multi_i2s_asi3_mute
-* Purpose  : This function is to mute or unmute the left and right DAC
+* Purpose : This function is to mute or unmute the left and right DAC
 *
 *----------------------------------------------------------------------------
 */
@@ -1135,19 +1056,9 @@ static int aic3262_multi_i2s_asi3_mute(struct snd_soc_dai *dai, int mute)
 
 	DBG(KERN_INFO "#%s : mute %d started\n", __func__, mute);
 
-	if (mute) {
+	if (mute && !aic3262->asiCtxt[2].port_muted) {
 		DBG("Mute if part\n");
-
-		if (!aic3262->asiCtxt[2].port_muted) {
-			dac_reg = aic3262_read(codec, DAC_MVOL_CONF);
-			adc_gain = aic3262_read(codec, ADC_FINE_GAIN);
-			hpl = aic3262_read(codec, HPL_VOL);
-			hpr = aic3262_read(codec, HPR_VOL);
-			rec_amp = aic3262_read(codec, REC_AMP_CNTL_R5);
-			rampr = aic3262_read(codec, RAMPR_VOL);
-			spk_amp = aic3262_read(codec, SPK_AMP_CNTL_R4);
-		}
-		DBG("spk_reg = %2x\n\n", spk_amp);
+	snd_soc_update_bits(codec, DAC_MVOL_CONF, DAC_LR_MUTE_MASK,DAC_LR_MUTE);
 
 		/* First check if both Playback and Recording is going on
 		* this interface.
@@ -1155,48 +1066,29 @@ static int aic3262_multi_i2s_asi3_mute(struct snd_soc_dai *dai, int mute)
 		if (aic3262->asiCtxt[2].asi_active > 1) {
 			DBG("#%s Cannot Mute the ASI Now..\n", __func__);
 		} else if (!(aic3262->asiCtxt[0].playback_mode) &&
-			    !(aic3262->asiCtxt[1].playback_mode)) {
+			!(aic3262->asiCtxt[1].playback_mode)) {
 			/* Before Muting, please check if any other
 			* ASI is active. if so, we cannot simply mute the
 			* DAC and ADC Registers.
 			*/
-			aic3262_write(codec, DAC_MVOL_CONF,
-				((dac_reg & 0xF3) | 0x0C));
-			aic3262_write(codec, ADC_FINE_GAIN,
-				((adc_gain & 0x77) | 0x88));
-			aic3262_write(codec, HPL_VOL, 0xB9);
-			aic3262_write(codec, HPR_VOL, 0xB9);
-			aic3262_write(codec, REC_AMP_CNTL_R5, 0x39);
-			aic3262_write(codec, RAMPR_VOL, 0x39);
-			aic3262_write(codec, SPK_AMP_CNTL_R4, 0x00);
+			snd_soc_write(codec, DAC_MVOL_CONF,
+				((aic3262->dac_reg & 0xF3) | 0x0C));
+			snd_soc_write(codec, ADC_FINE_GAIN,
+				((aic3262->adc_gain & 0x77) | 0x88));
+			snd_soc_write(codec, HPL_VOL, 0xB9);
+			snd_soc_write(codec, HPR_VOL, 0xB9);
+			snd_soc_write(codec, REC_AMP_CNTL_R5, 0x39);
+			snd_soc_write(codec, RAMPR_VOL, 0x39);
+			snd_soc_write(codec, SPK_AMP_CNTL_R4, 0x00);
 			aic3262->asiCtxt[2].port_muted = 1;
-		} else {
-			DBG("#%s: Other ASI Active. Cannot MUTE Codec..\n",
-				__func__);
 		}
 	} else {
 		DBG("Mute else part\n");
-		aic3262_write(codec, DAC_MVOL_CONF, (dac_reg & 0xF3));
-		mdelay(5);
-		aic3262_write(codec, ADC_FINE_GAIN, (adc_gain & 0x77));
-		mdelay(5);
-		aic3262_write(codec, HPL_VOL, hpl);
-		mdelay(5);
-		aic3262_write(codec, HPR_VOL, hpr);
-		mdelay(5);
-		aic3262_write(codec, REC_AMP_CNTL_R5, rec_amp);
-		mdelay(5);
-		aic3262_write(codec, RAMPR_VOL, rampr);
-		mdelay(5);
-		aic3262_write(codec, SPK_AMP_CNTL_R4, spk_amp);
-		mdelay(5);
+		snd_soc_update_bits(codec, DAC_MVOL_CONF,
+						DAC_LR_MUTE_MASK, 0x0);
 
-		/* Basic hack */
-		aic3262_write(codec, LINE_AMP_CNTL_R1, 0xc3);
-		aic3262_write(codec, HP_AMP_CNTL_R1, 0x33);
+		/*aic3262_multi_i2s_dump_regs(dai);*/
 
-		aic3262->asiCtxt[2].port_muted = 0;
-		aic3262_multi_i2s_dump_regs(dai);
 	}
 
 	DBG(KERN_INFO "#%s : mute %d ended\n", __func__, mute);
@@ -1258,8 +1150,8 @@ static int aic3262_multi_i2s_asi1_set_dai_fmt(struct snd_soc_dai *codec_dai,
 	/* Read the B0_P4_R4 and B0_P4_R10 Registers to configure the
 	* ASI1 Bus and Clock Formats depending on the PCM Format.
 	*/
-	iface_reg = aic3262_read(codec, ASI1_BUS_FMT);
-	clk_reg   = aic3262_read(codec, ASI1_BWCLK_CNTL_REG);
+	iface_reg = snd_soc_read(codec, ASI1_BUS_FMT);
+	clk_reg   = snd_soc_read(codec, ASI1_BWCLK_CNTL_REG);
 
 	/* set master/slave audio interface */
 	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
@@ -1311,7 +1203,7 @@ static int aic3262_multi_i2s_asi1_set_dai_fmt(struct snd_soc_dai *codec_dai,
 			__func__, codec_dai->id);
 		iface_reg = (iface_reg & 0x1f) | 0x80;
 		/* voice call need data offset in 1 bitclock */
-		aic3262_write(codec, ASI1_LCH_OFFSET, 1);
+		snd_soc_write(codec, ASI1_LCH_OFFSET, 1);
 	break;
 	default:
 		printk(KERN_ERR
@@ -1325,21 +1217,21 @@ static int aic3262_multi_i2s_asi1_set_dai_fmt(struct snd_soc_dai *codec_dai,
 	/* Configure B0_P4_R65_D[5:2] to 001 This configures the
 	* WCLK1 Pin to ASI1
 	*/
-	regvalue = aic3262_read(codec, WCLK1_PIN_CNTL_REG);
-	aic3262_write(codec, WCLK1_PIN_CNTL_REG, (regvalue | BIT2));
+	regvalue = snd_soc_read(codec, WCLK1_PIN_CNTL_REG);
+	snd_soc_write(codec, WCLK1_PIN_CNTL_REG, (regvalue | BIT2));
 
 	/* Configure B0_P4_R68_d[6:5] = 01 and B0_P4_R67_D[4:1] to 0001
 	* to ensure that the DIN1 and DOUT1 Pins are configured
 	* correctly
 	*/
-	regvalue = aic3262_read(codec, DIN1_PIN_CNTL_REG);
-	aic3262_write(codec, DIN1_PIN_CNTL_REG, (regvalue | BIT5));
-	regvalue = aic3262_read(codec, DOUT1_PIN_CNTL_REG);
-	aic3262_write(codec, DOUT1_PIN_CNTL_REG, (regvalue | BIT1));
+	regvalue = snd_soc_read(codec, DIN1_PIN_CNTL_REG);
+	snd_soc_write(codec, DIN1_PIN_CNTL_REG, (regvalue | BIT5));
+	regvalue = snd_soc_read(codec, DOUT1_PIN_CNTL_REG);
+	snd_soc_write(codec, DOUT1_PIN_CNTL_REG, (regvalue | BIT1));
 
-	aic3262_write(codec, ASI1_BWCLK_CNTL_REG, clk_reg);
+	snd_soc_write(codec, ASI1_BWCLK_CNTL_REG, clk_reg);
 
-	aic3262_write(codec, ASI1_BUS_FMT, iface_reg);
+	snd_soc_write(codec, ASI1_BUS_FMT, iface_reg);
 
 	return 0;
 }
@@ -1366,8 +1258,8 @@ static int aic3262_multi_i2s_asi2_set_dai_fmt(struct snd_soc_dai *codec_dai,
 	/* Read the B0_P4_R17 and B0_P4_R26 Registers to configure the
 	* ASI1 Bus and Clock Formats depending on the PCM Format.
 	*/
-	iface_reg = aic3262_read(codec, ASI2_BUS_FMT);
-	clk_reg   = aic3262_read(codec, ASI2_BWCLK_CNTL_REG);
+	iface_reg = snd_soc_read(codec, ASI2_BUS_FMT);
+	clk_reg   = snd_soc_read(codec, ASI2_BWCLK_CNTL_REG);
 
 	/* set master/slave audio interface */
 	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
@@ -1420,7 +1312,7 @@ static int aic3262_multi_i2s_asi2_set_dai_fmt(struct snd_soc_dai *codec_dai,
 			__func__, codec_dai->id);
 		iface_reg = (iface_reg & 0x1f) | 0x80;
 		/* voice call need data offset in 1 bitclock */
-		aic3262_write(codec, ASI2_LCH_OFFSET, 1);
+		snd_soc_write(codec, ASI2_LCH_OFFSET, 1);
 	break;
 	default:
 		printk(KERN_ERR "#%s:Invalid DAI interface format\n", __func__);
@@ -1435,25 +1327,25 @@ static int aic3262_multi_i2s_asi2_set_dai_fmt(struct snd_soc_dai *codec_dai,
 	* WCLK2 Pin to ASI2
 	*/
 
-	regvalue = aic3262_read(codec, WCLK2_PIN_CNTL_REG);
-	aic3262_write(codec, WCLK2_PIN_CNTL_REG, (regvalue | BIT2));
+	regvalue = snd_soc_read(codec, WCLK2_PIN_CNTL_REG);
+	snd_soc_write(codec, WCLK2_PIN_CNTL_REG, (regvalue | BIT2));
 
-	regvalue = aic3262_read(codec, BCLK2_PIN_CNTL_REG);
-	aic3262_write(codec, BCLK2_PIN_CNTL_REG, (regvalue | BIT2));
+	regvalue = snd_soc_read(codec, BCLK2_PIN_CNTL_REG);
+	snd_soc_write(codec, BCLK2_PIN_CNTL_REG, (regvalue | BIT2));
 
 	/* Configure B0_P4_R72_d[6:5] = 01 and B0_P4_R71_D[4:1] to 0001
 	 * to ensure that the DIN2 and DOUT2 Pins are configured
 	 * correctly
 	 */
-	regvalue = aic3262_read(codec, DIN2_PIN_CNTL_REG);
-	aic3262_write(codec, DIN2_PIN_CNTL_REG, (regvalue | BIT5));
+	regvalue = snd_soc_read(codec, DIN2_PIN_CNTL_REG);
+	snd_soc_write(codec, DIN2_PIN_CNTL_REG, (regvalue | BIT5));
 
-	regvalue = aic3262_read(codec, DOUT2_PIN_CNTL_REG);
-	aic3262_write(codec, DOUT2_PIN_CNTL_REG, (regvalue | BIT5 | BIT1));
+	regvalue = snd_soc_read(codec, DOUT2_PIN_CNTL_REG);
+	snd_soc_write(codec, DOUT2_PIN_CNTL_REG, (regvalue | BIT5 | BIT1));
 
-	aic3262_write(codec, ASI2_BWCLK_CNTL_REG, clk_reg);
+	snd_soc_write(codec, ASI2_BWCLK_CNTL_REG, clk_reg);
 
-	aic3262_write(codec, ASI2_BUS_FMT, iface_reg);
+	snd_soc_write(codec, ASI2_BUS_FMT, iface_reg);
 
 	return 0;
 }
@@ -1479,8 +1371,8 @@ static int aic3262_multi_i2s_asi3_set_dai_fmt(struct snd_soc_dai *codec_dai,
 	/* Read the B0_P4_R33 and B0_P4_R42 Registers to configure the
 	* ASI1 Bus and Clock Formats depending on the PCM Format.
 	*/
-	iface_reg = aic3262_read(codec, ASI3_BUS_FMT);
-	clk_reg   = aic3262_read(codec, ASI3_BWCLK_CNTL_REG);
+	iface_reg = snd_soc_read(codec, ASI3_BUS_FMT);
+	clk_reg   = snd_soc_read(codec, ASI3_BWCLK_CNTL_REG);
 
 	/* set master/slave audio interface */
 	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
@@ -1531,7 +1423,7 @@ static int aic3262_multi_i2s_asi3_set_dai_fmt(struct snd_soc_dai *codec_dai,
 			__func__, codec_dai->id);
 		iface_reg = (iface_reg & 0x1f) | 0x80;
 		/* voice call need data offset in 1 bitclock */
-		aic3262_write(codec, ASI3_LCH_OFFSET, 1);
+		snd_soc_write(codec, ASI3_LCH_OFFSET, 1);
 	break;
 	default:
 		printk(KERN_ERR
@@ -1545,24 +1437,24 @@ static int aic3262_multi_i2s_asi3_set_dai_fmt(struct snd_soc_dai *codec_dai,
 	/* Configure B0_P4_R73_D[5:2] to 0001 This configures the
 	* WCLK1 Pin to ASI1
 	*/
-	regvalue = aic3262_read(codec, WCLK3_PIN_CNTL_REG);
-	aic3262_write(codec, WCLK3_PIN_CNTL_REG, (regvalue | BIT2));
+	regvalue = snd_soc_read(codec, WCLK3_PIN_CNTL_REG);
+	snd_soc_write(codec, WCLK3_PIN_CNTL_REG, (regvalue | BIT2));
 
-	regvalue = aic3262_read(codec, BCLK3_PIN_CNTL_REG);
-	aic3262_write(codec, BCLK3_PIN_CNTL_REG, (regvalue | BIT2));
+	regvalue = snd_soc_read(codec, BCLK3_PIN_CNTL_REG);
+	snd_soc_write(codec, BCLK3_PIN_CNTL_REG, (regvalue | BIT2));
 
 	/* Configure B0_P4_R76_d[6:5] = 01 and B0_P4_R75_D[4:1] to 0001
 	* to ensure that the DIN1 and DOUT1 Pins are configured
 	* correctly
 	*/
-	regvalue = aic3262_read(codec, DIN3_PIN_CNTL_REG);
-	aic3262_write(codec, DIN3_PIN_CNTL_REG, (regvalue | BIT5));
-	regvalue = aic3262_read(codec, DOUT3_PIN_CNTL_REG);
-	aic3262_write(codec, DOUT3_PIN_CNTL_REG, (regvalue | BIT1));
+	regvalue = snd_soc_read(codec, DIN3_PIN_CNTL_REG);
+	snd_soc_write(codec, DIN3_PIN_CNTL_REG, (regvalue | BIT5));
+	regvalue = snd_soc_read(codec, DOUT3_PIN_CNTL_REG);
+	snd_soc_write(codec, DOUT3_PIN_CNTL_REG, (regvalue | BIT1));
 
-	aic3262_write(codec, ASI3_BWCLK_CNTL_REG, clk_reg);
+	snd_soc_write(codec, ASI3_BWCLK_CNTL_REG, clk_reg);
 
-	aic3262_write(codec, ASI3_BUS_FMT, iface_reg);
+	snd_soc_write(codec, ASI3_BUS_FMT, iface_reg);
 
 	return 0;
 }
@@ -1600,9 +1492,6 @@ static int aic3262_multi_i2s_set_dai_pll(struct snd_soc_dai *codec_dai,
 		int pll_id, int source, unsigned int freq_in,
 		unsigned int freq_out)
 {
-	/*u16 reg, enable;
-	int offset;
-	struct snd_soc_codec *codec = codec_dai->codec;*/
 
 	printk(KERN_INFO "%s: DAI ID %d PLL_ID %d InFreq %d OutFreq %d\n",
 		__func__, pll_id, codec_dai->id, freq_in, freq_out);
@@ -1630,35 +1519,36 @@ static int aic3262_asi1_clk_config(struct snd_soc_codec *codec,
 
 	DBG(KERN_INFO "%s: Invoked\n",  __func__);
 
-	if (aic3262->asiCtxt[0].master == 1) {
-		DBG(KERN_INFO
-		"#%s: Codec Master on ASI1 Port. Enabling BCLK WCLK Divider.\n",
-			__func__);
-		bclk_N_value = aic3262->asiCtxt[0].bclk_div;
-		aic3262_write(codec, ASI1_BCLK_N, (bclk_N_value | 0x80));
-
-		wclk_N_value = aic3262_read(codec, ASI1_WCLK_N);
-		aic3262_write(codec, ASI1_WCLK_N, (wclk_N_value | 0xA0));
-	}
 	/* Configure the BCLK and WCLK Output Mux Options */
-	regval = aic3262_read(codec, ASI1_BWCLK_OUT_CNTL);
+	regval = snd_soc_read(codec, ASI1_BWCLK_OUT_CNTL);
 	regval &= ~(AIC3262_ASI_BCLK_MUX_MASK | AIC3262_ASI_WCLK_MUX_MASK);
 
 	regval |= (aic3262->asiCtxt[0].bclk_output <<
 			AIC3262_ASI_BCLK_MUX_SHIFT);
 	regval |= aic3262->asiCtxt[0].wclk_output;
-	aic3262_write(codec, ASI1_BWCLK_OUT_CNTL, regval);
+	snd_soc_write(codec, ASI1_BWCLK_OUT_CNTL, regval);
 
 	/* Configure the corresponding miniDSP Data Ports */
-	minidspD_data = aic3262_read(codec, MINIDSP_PORT_CNTL_REG);
+	minidspD_data = snd_soc_read(codec, MINIDSP_PORT_CNTL_REG);
 	minidspD_data &= ~(BIT5 | BIT4);
-	aic3262_write(codec, MINIDSP_PORT_CNTL_REG, minidspD_data);
+	snd_soc_write(codec, MINIDSP_PORT_CNTL_REG, minidspD_data);
 
-	minidspA_data = aic3262_read(codec, ASI1_ADC_INPUT_CNTL);
+	minidspA_data = snd_soc_read(codec, ASI1_ADC_INPUT_CNTL);
 	minidspA_data &= ~(BIT2 | BIT1 | BIT0);
 	minidspA_data |= aic3262->asiCtxt[0].adc_input;
-	aic3262_write(codec, ASI1_ADC_INPUT_CNTL, minidspA_data);
+	snd_soc_write(codec, ASI1_ADC_INPUT_CNTL, minidspA_data);
 
+
+	if (aic3262->asiCtxt[0].master == 1) {
+		DBG(KERN_INFO
+		"#%s: Codec Master on ASI1 Port. Enabling BCLK WCLK Divider.\n",
+			__func__);
+		bclk_N_value = aic3262->asiCtxt[0].bclk_div;
+		snd_soc_write(codec, ASI1_BCLK_N, (bclk_N_value | 0x80));
+
+		wclk_N_value = snd_soc_read(codec, ASI1_WCLK_N);
+		snd_soc_write(codec, ASI1_WCLK_N, (wclk_N_value | 0xA0));
+	}
 	return 0;
 
 }
@@ -1682,33 +1572,38 @@ static int aic3262_asi2_clk_config(struct snd_soc_codec *codec,
 
 	DBG(KERN_INFO "%s: Invoked\n",  __func__);
 
-	if (aic3262->asiCtxt[1].master == 1) {
-		DBG(KERN_INFO
-		"#%s: Codec Master on ASI2 Port. Enabling BCLK WCLK Divider.\n",
-			__func__);
-		bclk_N_value = aic3262->asiCtxt[1].bclk_div;
-		aic3262_write(codec, ASI2_BCLK_N, (bclk_N_value | 0x80));
 
-		wclk_N_value = aic3262_read(codec, ASI2_WCLK_N);
-		aic3262_write(codec, ASI2_WCLK_N, (wclk_N_value | 0xA0));
-	}
 	/* Configure the BCLK and WCLK Output Mux Options */
-	regval = aic3262_read(codec, ASI2_BWCLK_OUT_CNTL);
+	regval = snd_soc_read(codec, ASI2_BWCLK_OUT_CNTL);
 	regval &= ~(AIC3262_ASI_BCLK_MUX_MASK | AIC3262_ASI_WCLK_MUX_MASK);
 	regval |= (aic3262->asiCtxt[1].bclk_output <<
 			AIC3262_ASI_BCLK_MUX_SHIFT);
 	regval |= aic3262->asiCtxt[1].wclk_output;
 
-	aic3262_write(codec, ASI2_BWCLK_OUT_CNTL, regval);
+	snd_soc_write(codec, ASI2_BWCLK_OUT_CNTL, regval);
 	/* Configure the corresponding miniDSP Data Ports */
-	minidspD_data = aic3262_read(codec, MINIDSP_PORT_CNTL_REG);
+	minidspD_data = snd_soc_read(codec, MINIDSP_PORT_CNTL_REG);
 	minidspD_data |= (BIT2);
-	aic3262_write(codec, MINIDSP_PORT_CNTL_REG, minidspD_data);
+	snd_soc_write(codec, MINIDSP_PORT_CNTL_REG, minidspD_data);
 
-	minidspA_data = aic3262_read(codec, ASI2_ADC_INPUT_CNTL);
+	minidspA_data = snd_soc_read(codec, ASI2_ADC_INPUT_CNTL);
 	minidspA_data &= ~(BIT2 | BIT1 | BIT0);
 	minidspA_data |= aic3262->asiCtxt[1].adc_input;
-	aic3262_write(codec, ASI2_ADC_INPUT_CNTL, minidspA_data);
+	snd_soc_write(codec, ASI2_ADC_INPUT_CNTL, minidspA_data);
+
+	/* NO Manual configuration of WCLK and BCLK for Master Mode.
+	* DAPM Handles all the required modifications.
+	*/
+	if (aic3262->asiCtxt[1].master == 1) {
+		DBG(KERN_INFO
+		"#%s: Codec Master on ASI2 Port. Enabling BCLK WCLK Divider.\n",
+			__func__);
+		bclk_N_value = aic3262->asiCtxt[1].bclk_div;
+		snd_soc_write(codec, ASI2_BCLK_N, (bclk_N_value | 0x80));
+
+		wclk_N_value = snd_soc_read(codec, ASI2_WCLK_N);
+		snd_soc_write(codec, ASI2_WCLK_N, (wclk_N_value | 0xA0));
+	}
 
 	return 0;
 
@@ -1733,34 +1628,34 @@ static int aic3262_asi3_clk_config(struct snd_soc_codec *codec,
 
 	DBG(KERN_INFO "%s:\n",  __func__);
 
-	if (aic3262->asiCtxt[2].master == 1) {
-		DBG(KERN_INFO
-		"#%s: Codec Master on ASI3 Port. Enabling BCLK WCLK Divider.\n",
-			__func__);
-		bclk_N_value = aic3262->asiCtxt[2].bclk_div;
-		aic3262_write(codec, ASI2_BCLK_N, (bclk_N_value | 0x80));
-
-		wclk_N_value = aic3262_read(codec, ASI3_WCLK_N);
-		aic3262_write(codec, ASI3_WCLK_N, (wclk_N_value | 0xA0));
-	}
 
 	/* Configure the BCLK and WCLK Output Mux Options */
-	regval = aic3262_read(codec, ASI3_BWCLK_OUT_CNTL);
+	regval = snd_soc_read(codec, ASI3_BWCLK_OUT_CNTL);
 	regval &= ~(AIC3262_ASI_BCLK_MUX_MASK | AIC3262_ASI_WCLK_MUX_MASK);
 	regval |= (aic3262->asiCtxt[2].bclk_output <<
 			AIC3262_ASI_BCLK_MUX_SHIFT);
 	regval |= aic3262->asiCtxt[2].wclk_output;
-	aic3262_write(codec, ASI3_BWCLK_OUT_CNTL, regval);
+	snd_soc_write(codec, ASI3_BWCLK_OUT_CNTL, regval);
 
-	minidspD_data = aic3262_read(codec, MINIDSP_PORT_CNTL_REG);
+	minidspD_data = snd_soc_read(codec, MINIDSP_PORT_CNTL_REG);
 	minidspD_data |= (BIT1);
-	aic3262_write(codec, MINIDSP_PORT_CNTL_REG, minidspD_data);
+	snd_soc_write(codec, MINIDSP_PORT_CNTL_REG, minidspD_data);
 
-	minidspA_data = aic3262_read(codec, ASI3_ADC_INPUT_CNTL);
+	minidspA_data = snd_soc_read(codec, ASI3_ADC_INPUT_CNTL);
 	minidspA_data &= ~(BIT2 | BIT1 | BIT0);
 	minidspA_data |= aic3262->asiCtxt[2].adc_input;
-	aic3262_write(codec, ASI3_ADC_INPUT_CNTL, minidspA_data);
+	snd_soc_write(codec, ASI3_ADC_INPUT_CNTL, minidspA_data);
 
+		if (aic3262->asiCtxt[2].master == 1) {
+		DBG(KERN_INFO
+		"#%s: Codec Master on ASI3 Port. Enabling BCLK WCLK Divider.\n",
+			__func__);
+		bclk_N_value = aic3262->asiCtxt[2].bclk_div;
+		snd_soc_write(codec, ASI2_BCLK_N, (bclk_N_value | 0x80));
+
+		wclk_N_value = snd_soc_read(codec, ASI3_WCLK_N);
+		snd_soc_write(codec, ASI3_WCLK_N, (wclk_N_value | 0xA0));
+	}
 	return 0;
 
 }
@@ -1807,7 +1702,7 @@ static int aic3262_multi_i2s_hw_params(struct snd_pcm_substream *substream,
 	/* Configure the PLL J, R D values only if none of the ASI
 	* Interfaces are Active.
 	*/
-	/*if (!(AIC3262_MULTI_ASI_ACTIVE(aic3262))) {*/
+
 	if (1) {
 		DBG(KERN_INFO "#%s: None of the ASIs active yet...\n",
 			__func__);
@@ -1815,58 +1710,58 @@ static int aic3262_multi_i2s_hw_params(struct snd_pcm_substream *substream,
 		/* Setting P & R values are set to 1 and 1 at init*/
 
 		/* J value */
-		aic3262_write(codec, PLL_J_REG, aic3262_divs[i].pll_j);
+		snd_soc_write(codec, PLL_J_REG, aic3262_divs[i].pll_j);
 
 		/* MSB & LSB for D value */
 
-		aic3262_write(codec, PLL_D_MSB, (aic3262_divs[i].pll_d >> 8));
-		aic3262_write(codec, PLL_D_LSB,
+		snd_soc_write(codec, PLL_D_MSB, (aic3262_divs[i].pll_d >> 8));
+		snd_soc_write(codec, PLL_D_LSB,
 			      (aic3262_divs[i].pll_d & AIC3262_8BITS_MASK));
 
 		/* NDAC divider value */
-		data = aic3262_read(codec, NDAC_DIV_POW_REG);
+		data = snd_soc_read(codec, NDAC_DIV_POW_REG);
 		DBG(KERN_INFO "# reading NDAC = %d , NDAC_DIV_POW_REG = %x\n",
 			aic3262_divs[i].ndac, data);
-		aic3262_write(codec, NDAC_DIV_POW_REG,
+		snd_soc_write(codec, NDAC_DIV_POW_REG,
 			 ((data & 0x80)|(aic3262_divs[i].ndac)));
 		DBG(KERN_INFO "# writing NDAC = %d , NDAC_DIV_POW_REG = %x\n",
 			aic3262_divs[i].ndac,
 			((data & 0x80)|(aic3262_divs[i].ndac)));
 
 		/* MDAC divider value */
-		data = aic3262_read(codec, MDAC_DIV_POW_REG);
+		data = snd_soc_read(codec, MDAC_DIV_POW_REG);
 		DBG(KERN_INFO "# reading MDAC = %d , MDAC_DIV_POW_REG = %x\n",
 			aic3262_divs[i].mdac, data);
-		aic3262_write(codec, MDAC_DIV_POW_REG,
+		snd_soc_write(codec, MDAC_DIV_POW_REG,
 			((data & 0x80)|(aic3262_divs[i].mdac)));
 		DBG(KERN_INFO "# writing MDAC = %d , MDAC_DIV_POW_REG = %x\n",
 		aic3262_divs[i].mdac, ((data & 0x80)|(aic3262_divs[i].mdac)));
 
 		/* DOSR MSB & LSB values */
-		aic3262_write(codec, DOSR_MSB_REG, aic3262_divs[i].dosr >> 8);
+		snd_soc_write(codec, DOSR_MSB_REG, aic3262_divs[i].dosr >> 8);
 		DBG(KERN_INFO "# writing DOSR_MSB_REG = %d\n",
 			(aic3262_divs[i].dosr >> 8));
-		aic3262_write(codec, DOSR_LSB_REG,
+		snd_soc_write(codec, DOSR_LSB_REG,
 			aic3262_divs[i].dosr & AIC3262_8BITS_MASK);
 		DBG(KERN_INFO "# writing DOSR_LSB_REG = %d\n",
 			(aic3262_divs[i].dosr & AIC3262_8BITS_MASK));
 
 		/* NADC divider value */
-		data = aic3262_read(codec, NADC_DIV_POW_REG);
-		aic3262_write(codec, NADC_DIV_POW_REG,
+		data = snd_soc_read(codec, NADC_DIV_POW_REG);
+		snd_soc_write(codec, NADC_DIV_POW_REG,
 			((data & 0x80)|(aic3262_divs[i].nadc)));
 		DBG(KERN_INFO "# writing NADC_DIV_POW_REG = %d\n",
 			aic3262_divs[i].nadc);
 
 		/* MADC divider value */
-		data = aic3262_read(codec, MADC_DIV_POW_REG);
-		aic3262_write(codec, MADC_DIV_POW_REG,
+		data = snd_soc_read(codec, MADC_DIV_POW_REG);
+		snd_soc_write(codec, MADC_DIV_POW_REG,
 			((data & 0x80)|(aic3262_divs[i].madc)));
 		DBG(KERN_INFO "# writing MADC_DIV_POW_REG = %d\n",
 			aic3262_divs[i].madc);
 
 		/* AOSR value */
-		aic3262_write(codec, AOSR_REG, aic3262_divs[i].aosr);
+		snd_soc_write(codec, AOSR_REG, aic3262_divs[i].aosr);
 		DBG(KERN_INFO "# writing AOSR = %d\n", aic3262_divs[i].aosr);
 	} else {
 		DBG(KERN_INFO "#Atleast 1 ASI Active. Cannot Program PLL..\n");
@@ -1884,7 +1779,7 @@ static int aic3262_multi_i2s_hw_params(struct snd_pcm_substream *substream,
 			/* Read the DAC Control Register and configure it
 			* as per the ASIContext Structure Settings.
 			*/
-			dacpath = aic3262_read(codec, ASI1_DAC_OUT_CNTL);
+			dacpath = snd_soc_read(codec, ASI1_DAC_OUT_CNTL);
 			dacpath &= ~(AIC3262_ASI_LDAC_PATH_MASK |
 				AIC3262_ASI_RDAC_PATH_MASK);
 			dacpath |= (aic3262->asiCtxt[0].left_dac_output
@@ -1892,7 +1787,7 @@ static int aic3262_multi_i2s_hw_params(struct snd_pcm_substream *substream,
 
 			dacpath |= (aic3262->asiCtxt[0].right_dac_output
 				<< AIC3262_ASI_RDAC_PATH_SHIFT);
-			aic3262_write(codec, ASI1_DAC_OUT_CNTL, dacpath);
+			snd_soc_write(codec, ASI1_DAC_OUT_CNTL, dacpath);
 
 			aic3262->asiCtxt[0].playback_mode = 1;
 			aic3262->asiCtxt[0].bclk_div =
@@ -1901,11 +1796,11 @@ static int aic3262_multi_i2s_hw_params(struct snd_pcm_substream *substream,
 			/* For Recording, Configure the DOUT Pin as per
 			 * ASIContext Structure Settings.
 			 */
-			adcpath = aic3262_read(codec, ASI1_DATA_OUT);
+			adcpath = snd_soc_read(codec, ASI1_DATA_OUT);
 			adcpath &= ~(AIC3262_ASI_DOUT_MASK);
 
 			adcpath |= aic3262->asiCtxt[0].dout_option;
-			aic3262_write(codec, ASI1_DATA_OUT, adcpath);
+			snd_soc_write(codec, ASI1_DATA_OUT, adcpath);
 
 			aic3262->asiCtxt[0].capture_mode = 1;
 		}
@@ -1923,7 +1818,7 @@ static int aic3262_multi_i2s_hw_params(struct snd_pcm_substream *substream,
 			/* Read the DAC Control Register and configure it
 			 * as per theASIContext Structure Settings.
 			 */
-			dacpath = aic3262_read(codec, ASI2_DAC_OUT_CNTL);
+			dacpath = snd_soc_read(codec, ASI2_DAC_OUT_CNTL);
 			dacpath &= ~(AIC3262_ASI_LDAC_PATH_MASK |
 				AIC3262_ASI_RDAC_PATH_MASK);
 			dacpath |= (aic3262->asiCtxt[1].left_dac_output
@@ -1931,7 +1826,7 @@ static int aic3262_multi_i2s_hw_params(struct snd_pcm_substream *substream,
 
 			dacpath |= (aic3262->asiCtxt[1].right_dac_output
 				<< AIC3262_ASI_RDAC_PATH_SHIFT);
-			aic3262_write(codec, ASI2_DAC_OUT_CNTL, dacpath);
+			snd_soc_write(codec, ASI2_DAC_OUT_CNTL, dacpath);
 			aic3262->asiCtxt[1].playback_mode = 1;
 
 			aic3262->asiCtxt[1].bclk_div =
@@ -1940,10 +1835,10 @@ static int aic3262_multi_i2s_hw_params(struct snd_pcm_substream *substream,
 			/* For Recording, Configure the DOUT Pin as per
 			 * ASIContext Structure Settings.
 			 */
-			adcpath = aic3262_read(codec, ASI2_DATA_OUT);
+			adcpath = snd_soc_read(codec, ASI2_DATA_OUT);
 			adcpath &= ~(AIC3262_ASI_DOUT_MASK);
 			adcpath |= aic3262->asiCtxt[1].dout_option;
-			aic3262_write(codec, ASI2_DATA_OUT, adcpath);
+			snd_soc_write(codec, ASI2_DATA_OUT, adcpath);
 
 			aic3262->asiCtxt[1].capture_mode = 1;
 		}
@@ -1960,14 +1855,14 @@ static int aic3262_multi_i2s_hw_params(struct snd_pcm_substream *substream,
 			/* Read the DAC Control Register and configure
 			* it as per the ASIContext Structure Settings.
 			*/
-			dacpath = aic3262_read(codec, ASI3_DAC_OUT_CNTL);
+			dacpath = snd_soc_read(codec, ASI3_DAC_OUT_CNTL);
 			dacpath &= ~(AIC3262_ASI_LDAC_PATH_MASK |
 					AIC3262_ASI_RDAC_PATH_MASK);
 			dacpath |= (aic3262->asiCtxt[2].left_dac_output
 					<< AIC3262_ASI_LDAC_PATH_SHIFT);
 			dacpath |= (aic3262->asiCtxt[2].right_dac_output
 				<< AIC3262_ASI_RDAC_PATH_SHIFT);
-			aic3262_write(codec,
+			snd_soc_write(codec,
 				ASI3_DAC_OUT_CNTL, dacpath);
 
 			aic3262->asiCtxt[2].playback_mode = 1;
@@ -1980,7 +1875,7 @@ static int aic3262_multi_i2s_hw_params(struct snd_pcm_substream *substream,
 			 */
 			adcpath &= ~(AIC3262_ASI_DOUT_MASK);
 			adcpath |= aic3262->asiCtxt[2].dout_option;
-			aic3262_write(codec, ASI3_DATA_OUT, adcpath);
+			snd_soc_write(codec, ASI3_DATA_OUT, adcpath);
 
 			aic3262->asiCtxt[2].capture_mode = 1;
 		}
@@ -1994,7 +1889,7 @@ static int aic3262_multi_i2s_hw_params(struct snd_pcm_substream *substream,
 		__func__, (regoffset/128),  (regoffset % 128));
 
 	/* Read the correspondig ASI DAI Interface Register */
-	data = aic3262_read(codec, regoffset);
+	data = snd_soc_read(codec, regoffset);
 
 	data = data & 0xe7;
 
@@ -2024,10 +1919,10 @@ static int aic3262_multi_i2s_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	/* configure the respective Registers for the above configuration */
-	aic3262_write(codec, regoffset, data);
+	snd_soc_write(codec, regoffset, data);
 
 	for (j = 0; j < NO_FEATURE_REGS; j++) {
-		aic3262_write(codec,
+		snd_soc_write(codec,
 			aic3262_divs[i].codec_specific_regs[j].reg_offset,
 			aic3262_divs[i].codec_specific_regs[j].reg_val);
 	}
@@ -2070,7 +1965,7 @@ static int aic3262_multi_i2s_hw_params(struct snd_pcm_substream *substream,
 * We can use this function to disable the DAC and ADC specific inputs from the
 * individual ASI Ports of the Audio Codec.
 */
-static int aic3262_multi_i2s_hw_free(struct snd_pcm_substream *substream,
+static int aic3262_multi_i2s_shutdown(struct snd_pcm_substream *substream,
 			struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -2113,11 +2008,11 @@ static int aic3262_multi_i2s_hw_free(struct snd_pcm_substream *substream,
 			* going on this ASI Interface
 			*/
 
-			value = aic3262_read(codec, ASI1_BCLK_N);
-			aic3262_write(codec, ASI1_BCLK_N, (value & 0x7f));
+			value = snd_soc_read(codec, ASI1_BCLK_N);
+			snd_soc_write(codec, ASI1_BCLK_N, (value & 0x7f));
 
-			value = aic3262_read(codec, ASI1_WCLK_N);
-			aic3262_write(codec, ASI1_WCLK_N, (value & 0x7f));
+			value = snd_soc_read(codec, ASI1_WCLK_N);
+			snd_soc_write(codec, ASI1_WCLK_N, (value & 0x7f));
 		}
 
 		dacregoffset = ASI1_DAC_OUT_CNTL;
@@ -2128,11 +2023,11 @@ static int aic3262_multi_i2s_hw_free(struct snd_pcm_substream *substream,
 		* the Bit Clock Divider and Word Clock Dividers
 		*/
 		if (aic3262->asiCtxt[1].master == 1) {
-			value = aic3262_read(codec, ASI2_BCLK_N);
-			aic3262_write(codec, ASI2_BCLK_N, (value & 0x7f));
+			value = snd_soc_read(codec, ASI2_BCLK_N);
+			snd_soc_write(codec, ASI2_BCLK_N, (value & 0x7f));
 
-			value = aic3262_read(codec, ASI2_WCLK_N);
-			aic3262_write(codec, ASI2_WCLK_N, (value & 0x7f));
+			value = snd_soc_read(codec, ASI2_WCLK_N);
+			snd_soc_write(codec, ASI2_WCLK_N, (value & 0x7f));
 		}
 		dacregoffset = ASI2_DAC_OUT_CNTL;
 		adcregoffset = ASI2_ADC_INPUT_CNTL;
@@ -2142,11 +2037,11 @@ static int aic3262_multi_i2s_hw_free(struct snd_pcm_substream *substream,
 		* the Bit Clock Divider and Word Clock Dividers
 		*/
 		if (aic3262->asiCtxt[2].master == 1) {
-			value = aic3262_read(codec, ASI3_BCLK_N);
-			aic3262_write(codec, ASI3_BCLK_N, (value & 0x7f));
+			value = snd_soc_read(codec, ASI3_BCLK_N);
+			snd_soc_write(codec, ASI3_BCLK_N, (value & 0x7f));
 
-			value = aic3262_read(codec, ASI3_WCLK_N);
-			aic3262_write(codec, ASI3_WCLK_N, (value & 0x7f));
+			value = snd_soc_read(codec, ASI3_WCLK_N);
+			snd_soc_write(codec, ASI3_WCLK_N, (value & 0x7f));
 		}
 		dacregoffset = ASI3_DAC_OUT_CNTL;
 		adcregoffset = ASI3_ADC_INPUT_CNTL;
@@ -2162,8 +2057,8 @@ static int aic3262_multi_i2s_hw_free(struct snd_pcm_substream *substream,
 		DBG(KERN_INFO "#%s: Disabling Pg %d Reg %d DAC Inputs ..\n",
 			__func__, (dacregoffset/128), (dacregoffset % 128));
 
-		dacpath = aic3262_read(codec, dacregoffset);
-		aic3262_write(codec, dacregoffset, (dacpath & ~(BIT6 | BIT4)));
+		dacpath = snd_soc_read(codec, dacregoffset);
+		snd_soc_write(codec, dacregoffset, (dacpath & ~(BIT6 | BIT4)));
 
 		aic3262->asiCtxt[dai->id - 1].playback_mode = 0;
 	} else {
@@ -2171,8 +2066,8 @@ static int aic3262_multi_i2s_hw_free(struct snd_pcm_substream *substream,
 		DBG(KERN_INFO "#%s: Disabling Pg %d Reg %d for ADC Inputs..\n",
 			__func__, (adcregoffset/128), (adcregoffset % 128));
 
-		adcpath =  aic3262_read(codec, adcregoffset);
-		aic3262_write(codec, adcregoffset,
+		adcpath =  snd_soc_read(codec, adcregoffset);
+		snd_soc_write(codec, adcregoffset,
 			(adcpath & ~(BIT2 | BIT1 | BIT0)));
 
 		aic3262->asiCtxt[dai->id - 1].capture_mode = 0;
@@ -2184,21 +2079,21 @@ static int aic3262_multi_i2s_hw_free(struct snd_pcm_substream *substream,
 	switch (dai->id) {
 	case 1:
 		if (aic3262->asiCtxt[0].pcm_format == SND_SOC_DAIFMT_DSP_B) {
-			aic3262_write(codec, ASI1_LCH_OFFSET, 0x00);
-			aic3262_write(codec, ASI1_RCH_OFFSET, 0x00);
+			snd_soc_write(codec, ASI1_LCH_OFFSET, 0x00);
+			snd_soc_write(codec, ASI1_RCH_OFFSET, 0x00);
 		}
 	break;
 	case 2:
 		if (aic3262->asiCtxt[1].pcm_format == SND_SOC_DAIFMT_DSP_B) {
-			aic3262_write(codec, ASI2_LCH_OFFSET, 0x00);
-			aic3262_write(codec, ASI2_RCH_OFFSET, 0x00);
+			snd_soc_write(codec, ASI2_LCH_OFFSET, 0x00);
+			snd_soc_write(codec, ASI2_RCH_OFFSET, 0x00);
 		}
 
 	break;
 	case 3:
 		if (aic3262->asiCtxt[2].pcm_format == SND_SOC_DAIFMT_DSP_B) {
-			aic3262_write(codec, ASI3_LCH_OFFSET, 0x00);
-			aic3262_write(codec, ASI3_RCH_OFFSET, 0x00);
+			snd_soc_write(codec, ASI3_LCH_OFFSET, 0x00);
+			snd_soc_write(codec, ASI3_RCH_OFFSET, 0x00);
 		}
 	break;
 	}
@@ -2213,6 +2108,51 @@ static int aic3262_multi_i2s_hw_free(struct snd_pcm_substream *substream,
 err:
 	return 0;
 }
+
+
+/*
+*
+* aic3262_multi_i2s_set_clkdiv
+*
+*/
+static int aic3262_multi_i2s_set_clkdiv(struct snd_soc_dai *codec_dai, int div_id, int div)
+{
+	int value;
+	struct snd_soc_codec *codec = codec_dai->codec;
+	struct aic3262_priv *aic3262 = snd_soc_codec_get_drvdata(codec);
+
+
+	value = snd_soc_read(codec, div_id);
+	snd_soc_write(codec, div_id, (value | div));
+
+	printk(KERN_INFO "#%s: DAI ID %d Page %d Register %d Divider_Val %d Final_Value 0x%x\n",
+			__func__, codec_dai->id, (div_id /128), (div_id%128), div,
+			(value | div));
+
+	/* Store the Clock Divider inside the Private Structure */
+	switch(codec_dai->id) {
+	case 1:
+		if (div_id == ASI1_BCLK_N)
+		aic3262->asiCtxt[0].bclk_div = div;
+		if (div_id == ASI1_WCLK_N)
+		aic3262->asiCtxt[0].wclk_div = div;
+	break;
+	case 2:
+		if (div_id == ASI2_BCLK_N)
+		aic3262->asiCtxt[1].bclk_div = div;
+		if (div_id == ASI2_WCLK_N)
+		aic3262->asiCtxt[1].wclk_div = div;
+	break;
+	case 3:
+		if (div_id == ASI3_BCLK_N)
+		aic3262->asiCtxt[2].bclk_div = div;
+		if (div_id == ASI3_WCLK_N)
+		aic3262->asiCtxt[2].wclk_div = div;
+	break;
+	}
+	return 0;
+}
+
 
 /*
  *----------------------------------------------------------------------------
@@ -2230,7 +2170,8 @@ struct snd_soc_dai_ops aic3262_multi_i2s_dai_ops = {
 	.set_fmt        = aic3262_multi_i2s_set_dai_fmt,
 	.set_pll        = aic3262_multi_i2s_set_dai_pll,
 	.set_sysclk     = aic3262_multi_i2s_set_dai_sysclk,
-	.hw_free        = aic3262_multi_i2s_hw_free,
+	.shutdown        = aic3262_multi_i2s_shutdown,
+	.set_clkdiv      = aic3262_multi_i2s_set_clkdiv,
 };
 
 
@@ -2240,13 +2181,13 @@ static struct snd_soc_dai_driver tlv320aic3262_dai[] = {
 	.name = "aic3262-asi1",
 	.id = 1,
 	.playback = {
-		.stream_name = "Playback",
+		.stream_name = "ASI1 Playback",
 		.channels_min = 1,
 		.channels_max = 2,
 		.rates = AIC3262_RATES,
 		.formats = AIC3262_FORMATS},
 	.capture = { /* dummy for fast DAI switching */
-		.stream_name = "Capture",
+		.stream_name = "ASI1 Capture",
 		.channels_min = 1,
 		.channels_max = 2,
 		.rates = AIC3262_RATES,
@@ -2258,13 +2199,13 @@ static struct snd_soc_dai_driver tlv320aic3262_dai[] = {
 	.name = "aic3262-asi2",
 	.id = 2,
 	.playback = {
-		.stream_name = "Playback",
+		.stream_name = "ASI2 Playback",
 		.channels_min = 1,
 		.channels_max = 2,
 		.rates = AIC3262_RATES,
 		.formats = AIC3262_FORMATS,},
 	.capture = {
-		.stream_name = "Capture",
+		.stream_name = "ASI2 Capture",
 		.channels_min = 1,
 		.channels_max = 2,
 		.rates = AIC3262_RATES,
@@ -2277,13 +2218,13 @@ static struct snd_soc_dai_driver tlv320aic3262_dai[] = {
 	.name = "aic3262-asi3",
 	.id = 3,
 	.playback = {
-		.stream_name = "Playback",
+		.stream_name = "ASI3 Playback",
 		.channels_min = 1,
 		.channels_max = 2,
 		.rates = AIC3262_RATES,
 		.formats = AIC3262_FORMATS, },
 	.capture = {
-		.stream_name = "Capture",
+		.stream_name = "ASI3 Capture",
 		.channels_min = 1,
 		.channels_max = 2,
 		.rates = AIC3262_RATES,
@@ -2492,8 +2433,8 @@ static const struct aic3262_configs aic3262_reg_init[] = {
 	/* set default volumes */
 	{0, DAC_LVOL, 0x01},
 	{0, DAC_RVOL, 0x01},
-	{0, HPL_VOL,  0x3a},
-	{0, HPR_VOL,  0x3a},
+	{0, HPL_VOL,  0x80},
+	{0, HPR_VOL,  0x80},
 	{0, SPK_AMP_CNTL_R2, 0x14},
 	{0, SPK_AMP_CNTL_R3, 0x14},
 	{0, SPK_AMP_CNTL_R4, 0x33},
@@ -2524,42 +2465,45 @@ static const struct aic3262_configs aic3262_reg_init[] = {
 	{0, PLL_PR_POW_REG, 0x11},	/*PLL Power=0-down, P=1, R=1 vals*/
 	{0, 0x3d, 1},
 
-	{0, LMIC_PGA_PIN, 0x55},	/*IN1_L select - - 10k -LMICPGA_P*/
+	{0, LMIC_PGA_PIN, 0x0},	/*IN1_L select - - 10k -LMICPGA_P*/
 	{0, LMIC_PGA_MIN, 0x40},	/*CM to LMICPGA-M*/
-	{0, RMIC_PGA_PIN, 0x55},	/*IN1_R select - - 10k -RMIC_PGA_P*/
-	{0, RMIC_PGA_MIN, 0x40},	/*CM to RMICPGA_M*/
-	{0, (PAGE_1 + 0x79), 33},	/*LMIC-PGA-POWERUP-DELAY - default*/
-	{0, (PAGE_1 + 0x7a), 1},	/*FIXMELATER*/
+	{0, RMIC_PGA_PIN, 0x0},	/*IN1_R select - - 10k -RMIC_PGA_P*/
+	{0, RMIC_PGA_MIN, 0x0},	/*CM to RMICPGA_M*/
+	{0, MIC_PWR_DLY , 33},	/*LMIC-PGA-POWERUP-DELAY - default*/
+	{0, REF_PWR_DLY, 1},	/*FIXMELATER*/
 
 
-	{0, ADC_CHANNEL_POW, 0xc2}, /*ladc, radc ON , SOFT STEP disabled*/
+	{0, ADC_CHANNEL_POW, 0x0}, /*ladc, radc ON , SOFT STEP disabled*/
 	{0, ADC_FINE_GAIN, 0x00},   /*ladc - unmute, radc - unmute*/
-	{0, MICL_PGA, 0x4f},
-	{0, MICR_PGA, 0x4f},
-	{0, MIC_BIAS_CNTL, 0xFC},
+	{0, MICL_PGA, 0x3f},
+	{0, MICR_PGA, 0x3f},
+	/*controls MicBias ext power based on B0_P1_R51_D6*/
+	{0, MIC_BIAS_CNTL, 0x80},
 	/*   ASI1 Configuration */
 	{0, ASI1_BUS_FMT, 0},
 	{0, ASI1_BWCLK_CNTL_REG, 0x00},		/* originaly 0x24*/
 	{0, ASI1_BCLK_N_CNTL, 1},
-	{0, ASI1_BCLK_N, 0x84},
+	{0, ASI1_BCLK_N, 0x04},
 
 	{0, MA_CNTL, 0},			/* Mixer Amp disabled */
 	{0, LINE_AMP_CNTL_R2, 0x00},		/* Line Amp Cntl disabled */
 
 	/* ASI2 Configuration */
 	{0, ASI2_BUS_FMT, 0},
-	{0, ASI2_BCLK_N_CNTL, 1},
-	{0, ASI2_BCLK_N, 0x84},
+	{0, ASI2_BCLK_N_CNTL, 0x01},
+	{0, ASI2_BCLK_N, 0x04},
 	{0, ASI2_BWCLK_OUT_CNTL, 0x20},
 
 	{0, BEEP_CNTL_R1, 0x05},
 	{0, BEEP_CNTL_R2, 0x04},
 
 	/* Interrupt config for headset detection */
-	{0, INT1_CNTL, 0x80},
+	{0,HEADSET_TUNING1_REG,0x7f},
+	{0, INT1_CNTL, 0x40},
+	/*{0, TIMER_REG, 0x8c},*/
 	{0, INT_FMT, 0x40},
 	{0, GPIO1_IO_CNTL, 0x14},
-	{0, HP_DETECT, 0x94},
+	{0, HP_DETECT, 0x96},
 
 #if defined(CONFIG_MINI_DSP)
 	{0, 60, 0},
@@ -2576,55 +2520,604 @@ static const struct aic3262_configs aic3262_reg_init[] = {
 static int reg_init_size =
 	sizeof(aic3262_reg_init) / sizeof(struct aic3262_configs);
 
-static const struct snd_kcontrol_new aic3262_snd_controls2[] = {
-
-	SOC_DOUBLE_R("IN1 MPGA Route", LMIC_PGA_PIN, RMIC_PGA_PIN, 6, 3, 0),
-	SOC_DOUBLE_R("IN2 MPGA Route", LMIC_PGA_PIN, RMIC_PGA_PIN, 4, 3, 0),
-	SOC_DOUBLE_R("IN3 MPGA Route", LMIC_PGA_PIN, RMIC_PGA_PIN, 2, 3, 0),
-	SOC_DOUBLE_R("IN4 MPGA Route",
-		 LMIC_PGA_PM_IN4, RMIC_PGA_PM_IN4, 5, 1, 0),
+static const unsigned int adc_ma_tlv[] = {
+TLV_DB_RANGE_HEAD(4),
+	0, 29, TLV_DB_SCALE_ITEM(-1450, 500, 0),
+	30, 35, TLV_DB_SCALE_ITEM(-2060, 1000, 0),
+	36, 38, TLV_DB_SCALE_ITEM(-2660, 2000, 0),
+	39, 40, TLV_DB_SCALE_ITEM(-3610, 5000, 0),
 };
+static const DECLARE_TLV_DB_SCALE(lo_hp_tlv, -7830, 50, 0);
+
+static const struct snd_kcontrol_new mal_pga_mixer_controls[] = {
+	SOC_DAPM_SINGLE("IN1L Switch", MA_CNTL, 5, 1, 0),
+	SOC_DAPM_SINGLE_TLV("Left MicPGA Volume", LADC_PGA_MAL_VOL, 0,
+							0x3f, 1, adc_ma_tlv),
+
+};
+
+static const struct snd_kcontrol_new mar_pga_mixer_controls[] = {
+	SOC_DAPM_SINGLE("IN1R Switch", MA_CNTL, 4, 1, 0),
+	SOC_DAPM_SINGLE_TLV("Right MicPGA Volume", RADC_PGA_MAR_VOL, 0,
+							0x3f, 1, adc_ma_tlv),
+};
+
+/* Left HPL Mixer */
+static const struct snd_kcontrol_new hpl_output_mixer_controls[] = {
+	SOC_DAPM_SINGLE("MAL Switch", HP_AMP_CNTL_R1, 7, 1, 0),
+	SOC_DAPM_SINGLE("LDAC Switch", HP_AMP_CNTL_R1, 5, 1, 0),
+	SOC_DAPM_SINGLE_TLV("LOL-B1 Volume", HP_AMP_CNTL_R2, 0,
+							0x7f, 1, lo_hp_tlv),
+};
+
+/* Right HPR Mixer */
+static const struct snd_kcontrol_new hpr_output_mixer_controls[] = {
+	SOC_DAPM_SINGLE_TLV("LOR-B1 Volume", HP_AMP_CNTL_R3, 0,
+							0x7f, 1, lo_hp_tlv),
+	SOC_DAPM_SINGLE("LDAC Switch", HP_AMP_CNTL_R1,	 2, 1, 0),
+	SOC_DAPM_SINGLE("RDAC Switch", HP_AMP_CNTL_R1, 4, 1, 0),
+	SOC_DAPM_SINGLE("MAR Switch", HP_AMP_CNTL_R1, 6, 1, 0),
+};
+
+/* Left LOL Mixer */
+static const struct snd_kcontrol_new lol_output_mixer_controls[] = {
+	SOC_DAPM_SINGLE("MAL Switch", LINE_AMP_CNTL_R2, 7, 1, 0),
+	SOC_DAPM_SINGLE("IN1L-B Switch", LINE_AMP_CNTL_R2, 3, 1,0),
+	SOC_DAPM_SINGLE("LDAC Switch", LINE_AMP_CNTL_R1, 7, 1, 0),
+	SOC_DAPM_SINGLE("RDAC Switch", LINE_AMP_CNTL_R1, 5, 1, 0),
+};
+
+/* Right LOR Mixer */
+static const struct snd_kcontrol_new lor_output_mixer_controls[] = {
+	SOC_DAPM_SINGLE("LOL Switch", LINE_AMP_CNTL_R1, 2, 1, 0),
+	SOC_DAPM_SINGLE("RDAC Switch", LINE_AMP_CNTL_R1, 6, 1, 0),
+	SOC_DAPM_SINGLE("MAR Switch", LINE_AMP_CNTL_R2, 6, 1, 0),
+	SOC_DAPM_SINGLE("IN1R-B Switch", LINE_AMP_CNTL_R2, 0, 1,0),
+};
+
+/* Left SPKL Mixer */
+static const struct snd_kcontrol_new spkl_output_mixer_controls[] = {
+	SOC_DAPM_SINGLE("MAL Switch", SPK_AMP_CNTL_R1, 7, 1, 0),
+	SOC_DAPM_SINGLE_TLV("LOL Volume", SPK_AMP_CNTL_R2, 0, 0x7f,0,
+								lo_hp_tlv),
+	SOC_DAPM_SINGLE("SPR_IN Switch", SPK_AMP_CNTL_R1, 2, 1, 0),
+};
+
+/* Right SPKR Mixer */
+static const struct snd_kcontrol_new spkr_output_mixer_controls[] = {
+	SOC_DAPM_SINGLE_TLV("LOR Volume", SPK_AMP_CNTL_R3, 0, 0x7f, 0,
+								lo_hp_tlv),
+	SOC_DAPM_SINGLE("MAR Switch", SPK_AMP_CNTL_R1, 6, 1, 0),
+};
+
+/* REC Mixer */
+static const struct snd_kcontrol_new rec_output_mixer_controls[] = {
+	SOC_DAPM_SINGLE_TLV("LOL-B2 Volume", RAMP_CNTL_R1, 0, 0x7f,0,
+							lo_hp_tlv),
+	SOC_DAPM_SINGLE_TLV("IN1L Volume", IN1L_SEL_RM, 0, 0x7f, 1, lo_hp_tlv),
+	SOC_DAPM_SINGLE_TLV("IN1R Volume", IN1R_SEL_RM, 0, 0x7f, 1, lo_hp_tlv),
+	SOC_DAPM_SINGLE_TLV("LOR-B2 Volume", RAMP_CNTL_R2, 0,0x7f, 0,lo_hp_tlv),
+};
+
+/* Left Input Mixer */
+static const struct snd_kcontrol_new left_input_mixer_controls[] = {
+	SOC_DAPM_SINGLE("IN1L Switch", LMIC_PGA_PIN, 6, 1, 0),
+	SOC_DAPM_SINGLE("IN2L Switch", LMIC_PGA_PIN, 4, 1, 0),
+	SOC_DAPM_SINGLE("IN3L Switch", LMIC_PGA_PIN, 2, 1, 0),
+	SOC_DAPM_SINGLE("IN4L Switch", LMIC_PGA_PM_IN4, 5, 1, 0),
+	SOC_DAPM_SINGLE("IN1R Switch", LMIC_PGA_PIN, 0, 1, 0),
+	SOC_DAPM_SINGLE("IN2R Switch", LMIC_PGA_MIN, 4, 1, 0),
+	SOC_DAPM_SINGLE("IN3R Switch", LMIC_PGA_MIN, 2, 1, 0),
+	SOC_DAPM_SINGLE("IN4R Switch", LMIC_PGA_PM_IN4, 4, 1, 0),
+	SOC_DAPM_SINGLE("CM2L Switch", LMIC_PGA_MIN, 0, 1, 0),
+	SOC_DAPM_SINGLE("CM1L Switch", LMIC_PGA_MIN, 6, 1, 0),
+};
+
+/* Right Input Mixer */
+static const struct snd_kcontrol_new right_input_mixer_controls[] = {
+	SOC_DAPM_SINGLE("IN1R Switch", RMIC_PGA_PIN, 6, 1, 0),
+	SOC_DAPM_SINGLE("IN2R Switch", RMIC_PGA_PIN, 4, 1, 0),
+	SOC_DAPM_SINGLE("IN3R Switch", RMIC_PGA_PIN, 2, 1, 0),
+	SOC_DAPM_SINGLE("IN4R Switch", RMIC_PGA_PM_IN4, 5, 1, 0),
+	SOC_DAPM_SINGLE("IN2L Switch", RMIC_PGA_PIN, 0, 1, 0),
+	SOC_DAPM_SINGLE("IN1L Switch", RMIC_PGA_MIN, 4, 1, 0),
+	SOC_DAPM_SINGLE("IN3L Switch", RMIC_PGA_MIN, 2, 1, 0),
+	SOC_DAPM_SINGLE("IN4L Switch", RMIC_PGA_PM_IN4, 4, 1, 0),
+	SOC_DAPM_SINGLE("CM1R Switch", RMIC_PGA_MIN, 6, 1, 0),
+	SOC_DAPM_SINGLE("CM2R Switch", RMIC_PGA_MIN, 0, 1, 0),
+};
+
+
+static const char *asi1lin_text[] = {
+	"Off", "ASI1 Left In","ASI1 Right In","ASI1 MonoMix In"
+};
+
+SOC_ENUM_SINGLE_DECL(asi1lin_enum, ASI1_DAC_OUT_CNTL, 6, asi1lin_text);
+
+static const struct snd_kcontrol_new asi1lin_control =
+	SOC_DAPM_ENUM("ASI1LIN Route", asi1lin_enum);
+
+
+static const char *asi1rin_text[] = {
+	"Off", "ASI1 Right In","ASI1 Left In","ASI1 MonoMix In"
+};
+
+SOC_ENUM_SINGLE_DECL(asi1rin_enum, ASI1_DAC_OUT_CNTL, 4, asi1rin_text);
+
+static const struct snd_kcontrol_new asi1rin_control =
+	SOC_DAPM_ENUM("ASI1RIN Route", asi1rin_enum);
+
+static const char *asi2lin_text[] = {
+	"Off", "ASI2 Left In","ASI2 Right In","ASI2 MonoMix In"
+};
+
+SOC_ENUM_SINGLE_DECL(asi2lin_enum, ASI2_DAC_OUT_CNTL, 6, asi2lin_text);
+static const struct snd_kcontrol_new asi2lin_control =
+	SOC_DAPM_ENUM("ASI2LIN Route", asi2lin_enum);
+
+static const char *asi2rin_text[] = {
+	"Off", "ASI2 Right In","ASI2 Left In","ASI2 MonoMix In"
+};
+
+
+SOC_ENUM_SINGLE_DECL(asi2rin_enum, ASI2_DAC_OUT_CNTL, 4, asi2rin_text);
+
+static const struct snd_kcontrol_new asi2rin_control =
+	SOC_DAPM_ENUM("ASI2RIN Route", asi2rin_enum);
+
+static const char *asi3lin_text[] = {
+	"Off", "ASI3 Left In","ASI3 Right In","ASI3 MonoMix In"
+};
+
+
+SOC_ENUM_SINGLE_DECL(asi3lin_enum, ASI3_DAC_OUT_CNTL, 6, asi3lin_text);
+static const struct snd_kcontrol_new asi3lin_control =
+			SOC_DAPM_ENUM("ASI3LIN Route", asi3lin_enum);
+
+
+static const char *asi3rin_text[] = {
+	"Off", "ASI3 Right In","ASI3 Left In","ASI3 MonoMix In"
+};
+
+
+SOC_ENUM_SINGLE_DECL(asi3rin_enum, ASI3_DAC_OUT_CNTL, 4, asi3rin_text);
+static const struct snd_kcontrol_new asi3rin_control =
+	SOC_DAPM_ENUM("ASI3RIN Route", asi3rin_enum);
+
+
+static const char *dacminidspin1_text[] = {
+	"ASI1 In", "ASI2 In","ASI3 In","ADC MiniDSP Out"
+};
+
+SOC_ENUM_SINGLE_DECL(dacminidspin1_enum, MINIDSP_PORT_CNTL_REG, 4, dacminidspin1_text);
+static const struct snd_kcontrol_new dacminidspin1_control =
+	SOC_DAPM_ENUM("DAC MiniDSP IN1 Route", dacminidspin1_enum);
+
+static const char *dacminidspin2_text[] = {
+	"ASI1 In", "ASI2 In","ASI3 In"
+};
+
+//static const struct soc_enum dacminidspin1_enum =
+//       SOC_ENUM_SINGLE(MINIDSP_DATA_PORT_CNTL, 5, 2, dacminidspin1_text);
+SOC_ENUM_SINGLE_DECL(dacminidspin2_enum, MINIDSP_PORT_CNTL_REG, 2, dacminidspin2_text);
+
+static const struct snd_kcontrol_new dacminidspin2_control =
+	SOC_DAPM_ENUM("DAC MiniDSP IN2 Route", dacminidspin2_enum);
+
+static const char *dacminidspin3_text[] = {
+	"ASI1 In", "ASI2 In","ASI3 In"
+};
+
+//static const struct soc_enum dacminidspin1_enum =
+//       SOC_ENUM_SINGLE(MINIDSP_DATA_PORT_CNTL, 5, 2, dacminidspin1_text);
+SOC_ENUM_SINGLE_DECL(dacminidspin3_enum, MINIDSP_PORT_CNTL_REG, 0, dacminidspin3_text);
+
+static const struct snd_kcontrol_new dacminidspin3_control =
+SOC_DAPM_ENUM("DAC MiniDSP IN3 Route", dacminidspin3_enum);
+
+static const char *asi1out_text[] = {
+	"Off",
+	"ASI1 Out",
+	"ASI1In Bypass",
+	"ASI2In Bypass",
+	"ASI3In Bypass",
+};
+SOC_ENUM_SINGLE_DECL(asi1out_enum, ASI1_ADC_INPUT_CNTL, 0, asi1out_text);
+static const struct snd_kcontrol_new asi1out_control =
+	SOC_DAPM_ENUM("ASI1OUT Route", asi1out_enum);
+
+static const char *asi2out_text[] = {
+	"Off",
+	"ASI1 Out",
+	"ASI1In Bypass",
+	"ASI2In Bypass",
+	"ASI3In Bypass",
+	"ASI2 Out",
+};
+SOC_ENUM_SINGLE_DECL(asi2out_enum, ASI2_ADC_INPUT_CNTL, 0, asi2out_text);
+static const struct snd_kcontrol_new asi2out_control =
+	SOC_DAPM_ENUM("ASI2OUT Route", asi2out_enum);
+static const char *asi3out_text[] = {
+	"Off",
+	"ASI1 Out",
+	"ASI1In Bypass",
+	"ASI2In Bypass",
+	"ASI3In Bypass",
+	"ASI3 Out",
+};
+SOC_ENUM_SINGLE_DECL(asi3out_enum, ASI3_ADC_INPUT_CNTL, 0, asi3out_text);
+static const struct snd_kcontrol_new asi3out_control =
+	SOC_DAPM_ENUM("ASI3OUT Route", asi3out_enum);
+
+static const char *asi1bclk_text[] = {
+	"DAC_CLK",
+	"DAC_MOD_CLK",
+	"ADC_CLK",
+	"ADC_MOD_CLK",
+};
+
+SOC_ENUM_SINGLE_DECL(asi1bclk_enum, ASI1_BCLK_N_CNTL, 0, asi1bclk_text);
+static const struct snd_kcontrol_new asi1bclk_control =
+	SOC_DAPM_ENUM("ASI1_BCLK Route", asi1bclk_enum);
+
+static const char *asi2bclk_text[] = {
+	"DAC_CLK",
+	"DAC_MOD_CLK",
+	"ADC_CLK",
+	"ADC_MOD_CLK",
+};
+SOC_ENUM_SINGLE_DECL(asi2bclk_enum, ASI2_BCLK_N_CNTL, 0, asi2bclk_text);
+static const struct snd_kcontrol_new asi2bclk_control =
+	SOC_DAPM_ENUM("ASI2_BCLK Route", asi2bclk_enum);
+static const char *asi3bclk_text[] = {
+	"DAC_CLK",
+	"DAC_MOD_CLK",
+	"ADC_CLK",
+	"ADC_MOD_CLK",
+};
+SOC_ENUM_SINGLE_DECL(asi3bclk_enum, ASI3_BCLK_N_CNTL, 0, asi3bclk_text);
+static const struct snd_kcontrol_new asi3bclk_control =
+	SOC_DAPM_ENUM("ASI3_BCLK Route", asi3bclk_enum);
+
+static int aic326x_hp_event(struct snd_soc_dapm_widget *w,
+		struct snd_kcontrol *kcontrol, int event)
+{
+	return 0;
+}
+static int pll_power_on_event(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *kcontrol, int event)
+{
+	if (event == SND_SOC_DAPM_POST_PMU)
+	{
+		mdelay(10);
+	}
+	return 0;
+}
+
+static int polling_loop(struct snd_soc_codec *codec, unsigned int reg,
+			int mask, int on_off)
+{
+	unsigned int counter, status;
+
+	counter = 0;
+	switch(on_off) {
+		case 0: /*off*/
+			do {
+				status = snd_soc_read(codec, reg);
+				counter++;
+			} while ((counter < 500) && ((status & mask) == mask));
+		break;
+		case 1: /*on*/
+			do {
+				status = snd_soc_read(codec, reg);
+				counter++;
+			} while ((counter < 500) && ((status & mask) != mask));
+		break;
+		default:
+			printk("%s: unknown arguement\n", __func__);
+			break;
+	}
+
+	printk("%s: exiting with count value %d \n", __func__, counter);
+	if(counter >= 500)
+		return -1;
+	return 0;
+}
+
+int poll_dac(struct snd_soc_codec *codec, int left_right, int on_off)
+{
+	int ret = 0;
+
+	aic3262_change_page(codec, 0);
+	aic3262_change_book(codec, 0);
+
+	switch(on_off) {
+
+		case 0:/*power off polling*/
+			/*DAC power polling logic*/
+			switch(left_right) {
+				case 0: /*left dac polling*/
+					ret = polling_loop(codec, DAC_FLAG_R1, LDAC_POW_FLAG_MASK, 0);
+					break;
+				case 1:/*right dac polling*/
+					ret = polling_loop(codec, DAC_FLAG_R1, RDAC_POW_FLAG_MASK, 0);
+					break;
+			}
+			break;
+		case 1:/*power on polling*/
+			/*DAC power polling logic*/
+			switch(left_right) {
+				case 0: /*left dac polling*/
+					ret = polling_loop(codec, DAC_FLAG_R1, LDAC_POW_FLAG_MASK, 1);
+					break;
+				case 1:/*right dac polling*/
+					ret = polling_loop(codec, DAC_FLAG_R1, RDAC_POW_FLAG_MASK, 1);
+					break;
+			}
+		break;
+		default:
+			printk("%s:unknown arguement\n", __func__);
+			break;
+		}
+	if(ret)
+		printk("%s: power %s %s failure", __func__, left_right?"right":"left", on_off?"on":"off");
+	return ret;
+}
+
+int poll_adc(struct snd_soc_codec *codec, int left_right, int on_off)
+{
+	int ret = 0;
+
+	aic3262_change_page(codec, 0);
+	aic3262_change_book(codec, 0);
+
+	switch(on_off) {
+
+		case 0:/*power off polling*/
+			/*DAC power polling logic*/
+			switch(left_right) {
+				case 0: /*left dac polling*/
+					ret = polling_loop(codec, ADC_FLAG_R1, LADC_POW_FLAG_MASK, 0);
+					break;
+				case 1:/*right dac polling*/
+					ret = polling_loop(codec, ADC_FLAG_R1, RADC_POW_FLAG_MASK, 0);
+					break;
+	}
+			break;
+		case 1:/*power on polling*/
+			/*DAC power polling logic*/
+			switch(left_right) {
+				case 0: /*left dac polling*/
+					ret = polling_loop(codec, ADC_FLAG_R1, LADC_POW_FLAG_MASK, 1);
+					break;
+				case 1:/*right dac polling*/
+					ret = polling_loop(codec, ADC_FLAG_R1, RADC_POW_FLAG_MASK, 1);
+					break;
+		}
+			break;
+		default:
+			printk("%s:unknown arguement\n", __func__);
+			break;
+	}
+
+	if(ret)
+		printk("%s: power %s %s failure", __func__, left_right?"right":"left", on_off?"on":"off");
+	return ret;
+}
+
+static int  slave_dac_event(struct snd_soc_dapm_widget *w,
+			       struct snd_kcontrol *kcontrol, int event)
+
+{
+	struct snd_soc_codec *codec = w->codec;
+
+	if (event & SND_SOC_DAPM_POST_PMU) {
+		/* Poll for DAC Power-up first */
+		poll_dac(codec, 0, 1);
+		poll_dac(codec, 1, 1);
+	}
+
+	if (event & SND_SOC_DAPM_POST_PMD) {
+		poll_dac(codec, 0, 0);
+		poll_dac(codec, 1, 0);
+	}
+	return 0;
+}
+
+
+static int  slave_adc_event(struct snd_soc_dapm_widget *w,
+			       struct snd_kcontrol *kcontrol, int event)
+
+{
+	struct snd_soc_codec *codec = w->codec;
+
+	if (event & SND_SOC_DAPM_POST_PMU) {
+
+		/* Poll for ADC Power-up first */
+		poll_adc(codec, 0, 1);
+		poll_adc(codec, 1, 1);
+	}
+
+
+	if (event & SND_SOC_DAPM_POST_PMD) {
+		poll_adc(codec, 0, 0);
+		poll_adc(codec, 1, 0);
+	}
+
+	return 0;
+}
+
 static const struct snd_soc_dapm_widget aic3262_dapm_widgets[] = {
-	SND_SOC_DAPM_DAC("Left DAC", "Playback", PASI_DAC_DP_SETUP, 7, 0),
-	SND_SOC_DAPM_DAC("Right DAC", "Playback", PASI_DAC_DP_SETUP, 6, 0),
+	/* TODO: Can we switch these off ? */
+	SND_SOC_DAPM_AIF_IN("ASI1IN", "ASI1 Playback", 0, SND_SOC_NOPM, 0, 0),
+	SND_SOC_DAPM_AIF_IN("ASI2IN", "ASI2 Playback", 0, SND_SOC_NOPM, 0, 0),
+	SND_SOC_DAPM_AIF_IN("ASI3IN", "ASI3 Playback", 0, SND_SOC_NOPM, 0, 0),
 
-	SND_SOC_DAPM_SWITCH_N("LDAC_2_HPL", HP_AMP_CNTL_R1, 5, 0),
-	SND_SOC_DAPM_SWITCH_N("RDAC_2_HPR", HP_AMP_CNTL_R1, 4, 0),
 
-	SND_SOC_DAPM_PGA("HPL Driver", HP_AMP_CNTL_R1, 1, 0, NULL, 0),
-	SND_SOC_DAPM_PGA("HPR Driver", HP_AMP_CNTL_R1, 0, 0, NULL, 0),
+	SND_SOC_DAPM_DAC_E("Left DAC", NULL, PASI_DAC_DP_SETUP, 7, 0,
+			slave_dac_event, SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD |
+			SND_SOC_DAPM_PRE_PMD),
+	SND_SOC_DAPM_DAC_E("Right DAC", NULL, PASI_DAC_DP_SETUP, 6, 0,
+			slave_dac_event, SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD |
+			SND_SOC_DAPM_PRE_PMD),
 
-	SND_SOC_DAPM_SWITCH_N("LDAC_2_LOL", LINE_AMP_CNTL_R1, 7, 0),
-	SND_SOC_DAPM_SWITCH_N("RDAC_2_LOR", LINE_AMP_CNTL_R1, 6, 0),
+	/* dapm widget (path domain) for HPL Output Mixer */
+	SND_SOC_DAPM_MIXER("HPL Output Mixer", SND_SOC_NOPM, 0, 0,
+		 &hpl_output_mixer_controls[0],
+		ARRAY_SIZE(hpl_output_mixer_controls)),
+
+	/* dapm widget (path domain) for HPR Output Mixer */
+	SND_SOC_DAPM_MIXER("HPR Output Mixer", SND_SOC_NOPM, 0, 0,
+			&hpr_output_mixer_controls[0],
+			ARRAY_SIZE(hpr_output_mixer_controls)),
+
+
+	SND_SOC_DAPM_PGA_E("HPL Driver", HP_AMP_CNTL_R1, 1, 0, NULL, 0,
+				aic326x_hp_event, SND_SOC_DAPM_POST_PMU),
+	SND_SOC_DAPM_PGA_E("HPR Driver", HP_AMP_CNTL_R1, 0, 0, NULL, 0,
+				aic326x_hp_event, SND_SOC_DAPM_POST_PMU),
+
+
+	/* dapm widget (path domain) for LOL Output Mixer */
+	SND_SOC_DAPM_MIXER("LOL Output Mixer", SND_SOC_NOPM, 0, 0,
+			&lol_output_mixer_controls[0],
+			ARRAY_SIZE(lol_output_mixer_controls)),
+
+	/* dapm widget (path domain) for LOR Output Mixer mixer */
+	SND_SOC_DAPM_MIXER("LOR Output Mixer", SND_SOC_NOPM, 0, 0,
+			&lor_output_mixer_controls[0],
+			ARRAY_SIZE(lor_output_mixer_controls)),
 
 	SND_SOC_DAPM_PGA("LOL Driver", LINE_AMP_CNTL_R1, 1, 0, NULL, 0),
 	SND_SOC_DAPM_PGA("LOR Driver", LINE_AMP_CNTL_R1, 0, 0, NULL, 0),
 
+
+	/* dapm widget (path domain) for SPKL Output Mixer */
+	SND_SOC_DAPM_MIXER("SPKL Output Mixer", SND_SOC_NOPM, 0, 0,
+			&spkl_output_mixer_controls[0],
+			ARRAY_SIZE(spkl_output_mixer_controls)),
+
+	/* dapm widget (path domain) for SPKR Output Mixer */
+	SND_SOC_DAPM_MIXER("SPKR Output Mixer", SND_SOC_NOPM, 0, 0,
+			&spkr_output_mixer_controls[0],
+			ARRAY_SIZE(spkr_output_mixer_controls)),
+
 	SND_SOC_DAPM_PGA("SPKL Driver", SPK_AMP_CNTL_R1, 1, 0, NULL, 0),
 	SND_SOC_DAPM_PGA("SPKR Driver", SPK_AMP_CNTL_R1, 0, 0, NULL, 0),
 
-	SND_SOC_DAPM_PGA("RECL Driver", REC_AMP_CNTL_R5, 7, 0, NULL, 0),
-	SND_SOC_DAPM_PGA("RECR Driver", REC_AMP_CNTL_R5, 6, 0, NULL, 0),
 
-	SND_SOC_DAPM_ADC("Left ADC", "Capture", ADC_CHANNEL_POW, 7, 0),
-	SND_SOC_DAPM_ADC("Right ADC", "Capture", ADC_CHANNEL_POW, 6, 0),
+	/* dapm widget (path domain) for SPKR Output Mixer */
+	SND_SOC_DAPM_MIXER("REC Output Mixer", SND_SOC_NOPM, 0, 0,
+			&rec_output_mixer_controls[0],
+			ARRAY_SIZE(rec_output_mixer_controls)),
 
-	SND_SOC_DAPM_SWITCH("IN1L Route",
-		 LMIC_PGA_PIN, 6, 0, &aic3262_snd_controls2[0]),
-	SND_SOC_DAPM_SWITCH("IN2L Route",
-		 LMIC_PGA_PIN, 4, 0, &aic3262_snd_controls2[1]),
-	SND_SOC_DAPM_SWITCH("IN3L Route",
-		 LMIC_PGA_PIN, 2, 0, &aic3262_snd_controls2[2]),
-	SND_SOC_DAPM_SWITCH("IN4L Route",
-		 LMIC_PGA_PM_IN4, 5, 0, &aic3262_snd_controls2[3]),
-	SND_SOC_DAPM_SWITCH("IN1R Route",
-		 RMIC_PGA_PIN, 6, 0, &aic3262_snd_controls2[4]),
-	SND_SOC_DAPM_SWITCH("IN2R Route",
-		 RMIC_PGA_PIN, 4, 0, &aic3262_snd_controls2[5]),
-	SND_SOC_DAPM_SWITCH("IN3R Route",
-		 RMIC_PGA_PIN, 2, 0, &aic3262_snd_controls2[6]),
-	SND_SOC_DAPM_SWITCH("IN4R Route",
-		 RMIC_PGA_PM_IN4, 5, 0, &aic3262_snd_controls2[7]),
+	SND_SOC_DAPM_PGA("RECP Driver", REC_AMP_CNTL_R5, 7, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("RECM Driver", REC_AMP_CNTL_R5, 6, 0, NULL, 0),
+
+
+	SND_SOC_DAPM_MUX("ASI1LIN Route",
+		SND_SOC_NOPM, 0, 0, &asi1lin_control),
+	SND_SOC_DAPM_MUX("ASI1RIN Route",
+		SND_SOC_NOPM, 0, 0, &asi1rin_control),
+	SND_SOC_DAPM_MUX("ASI2LIN Route",
+		SND_SOC_NOPM, 0, 0, &asi2lin_control),
+	SND_SOC_DAPM_MUX("ASI2RIN Route",
+		SND_SOC_NOPM, 0, 0, &asi2rin_control),
+	SND_SOC_DAPM_MUX("ASI3LIN Route",
+		SND_SOC_NOPM, 0, 0, &asi3lin_control),
+	SND_SOC_DAPM_MUX("ASI3RIN Route",
+		SND_SOC_NOPM, 0, 0, &asi3rin_control),
+
+	SND_SOC_DAPM_PGA("ASI1LIN", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("ASI1RIN", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("ASI2LIN", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("ASI2RIN", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("ASI3LIN", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("ASI3RIN", SND_SOC_NOPM, 0, 0, NULL, 0),
+
+	SND_SOC_DAPM_PGA("ASI1LOUT", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("ASI1ROUT", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("ASI2LOUT", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("ASI2ROUT", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("ASI3LOUT", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("ASI3ROUT", SND_SOC_NOPM, 0, 0, NULL, 0),
+
+	SND_SOC_DAPM_PGA("ASI1MonoMixIN", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("ASI2MonoMixIN", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("ASI3MonoMixIN", SND_SOC_NOPM, 0, 0, NULL, 0),
+	/* TODO: Can we switch the ASIxIN off? */
+	SND_SOC_DAPM_PGA("ASI1IN Port", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("ASI2IN Port", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("ASI3IN Port", SND_SOC_NOPM, 0, 0, NULL, 0),
+
+
+	SND_SOC_DAPM_MUX("DAC MiniDSP IN1 Route",
+			SND_SOC_NOPM, 0, 0, &dacminidspin1_control),
+SND_SOC_DAPM_MUX("DAC MiniDSP IN2 Route",
+			SND_SOC_NOPM, 0, 0, &dacminidspin2_control),
+	SND_SOC_DAPM_MUX("DAC MiniDSP IN3 Route",
+			SND_SOC_NOPM, 0, 0, &dacminidspin3_control),
+
+	SND_SOC_DAPM_PGA("CM", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("CM1L", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("CM2L", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("CM1R", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("CM2R", SND_SOC_NOPM, 0, 0, NULL, 0),
+
+	/* TODO: Can we switch these off ? */
+	SND_SOC_DAPM_AIF_OUT("ASI1OUT","ASI1 Capture", 0, SND_SOC_NOPM, 0, 0),
+	SND_SOC_DAPM_AIF_OUT("ASI2OUT", "ASI2 Capture",0, SND_SOC_NOPM, 0, 0),
+	SND_SOC_DAPM_AIF_OUT("ASI3OUT", "ASI3 Capture",0, SND_SOC_NOPM, 0, 0),
+
+	SND_SOC_DAPM_MUX("ASI1OUT Route",
+		SND_SOC_NOPM, 0, 0, &asi1out_control),
+	SND_SOC_DAPM_MUX("ASI2OUT Route",
+		SND_SOC_NOPM, 0, 0, &asi2out_control),
+	SND_SOC_DAPM_MUX("ASI3OUT Route",
+		SND_SOC_NOPM, 0, 0, &asi3out_control),
+
+	/* TODO: Will be used during MINIDSP programming */
+	/* TODO: Can we switch them off? */
+	SND_SOC_DAPM_PGA("ADC MiniDSP OUT1", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("ADC MiniDSP OUT2", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("ADC MiniDSP OUT3", SND_SOC_NOPM, 0, 0, NULL, 0),
+
+
+
+	SND_SOC_DAPM_ADC_E("Left ADC", NULL, ADC_CHANNEL_POW, 7, 0,
+			slave_adc_event, SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD |
+			SND_SOC_DAPM_PRE_PMD),
+	SND_SOC_DAPM_ADC_E("Right ADC", NULL, ADC_CHANNEL_POW, 6, 0,
+			slave_adc_event, SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD |
+			SND_SOC_DAPM_PRE_PMD),
+
+	SND_SOC_DAPM_PGA("Left MicPGA",MICL_PGA, 7, 1, NULL, 0),
+	SND_SOC_DAPM_PGA("Right MicPGA",MICR_PGA, 7, 1, NULL, 0),
+
+	SND_SOC_DAPM_PGA("MAL PGA", MA_CNTL, 3, 0, NULL, 0),
+	SND_SOC_DAPM_PGA("MAR PGA", MA_CNTL, 2, 0, NULL, 0),
+
+
+	/* dapm widget for MAL PGA Mixer*/
+	SND_SOC_DAPM_MIXER("MAL PGA Mixer", SND_SOC_NOPM, 0, 0,
+			 &mal_pga_mixer_controls[0],
+			 ARRAY_SIZE(mal_pga_mixer_controls)),
+
+	/* dapm widget for MAR PGA Mixer*/
+	SND_SOC_DAPM_MIXER("MAR PGA Mixer", SND_SOC_NOPM, 0, 0,
+			&mar_pga_mixer_controls[0],
+			ARRAY_SIZE(mar_pga_mixer_controls)),
+
+	/* dapm widget for Left Input Mixer*/
+	SND_SOC_DAPM_MIXER("Left Input Mixer", SND_SOC_NOPM, 0, 0,
+			&left_input_mixer_controls[0],
+			ARRAY_SIZE(left_input_mixer_controls)),
+
+	/* dapm widget for Right Input Mixer*/
+	SND_SOC_DAPM_MIXER("Right Input Mixer", SND_SOC_NOPM, 0, 0,
+			&right_input_mixer_controls[0],
+			ARRAY_SIZE(right_input_mixer_controls)),
+
 
 	SND_SOC_DAPM_OUTPUT("HPL"),
 	SND_SOC_DAPM_OUTPUT("HPR"),
@@ -2632,59 +3125,345 @@ static const struct snd_soc_dapm_widget aic3262_dapm_widgets[] = {
 	SND_SOC_DAPM_OUTPUT("LOR"),
 	SND_SOC_DAPM_OUTPUT("SPKL"),
 	SND_SOC_DAPM_OUTPUT("SPKR"),
-	SND_SOC_DAPM_OUTPUT("RECL"),
-	SND_SOC_DAPM_OUTPUT("RECR"),
+	SND_SOC_DAPM_OUTPUT("RECP"),
+	SND_SOC_DAPM_OUTPUT("RECM"),
 
 	SND_SOC_DAPM_INPUT("IN1L"),
 	SND_SOC_DAPM_INPUT("IN2L"),
 	SND_SOC_DAPM_INPUT("IN3L"),
 	SND_SOC_DAPM_INPUT("IN4L"),
-
 	SND_SOC_DAPM_INPUT("IN1R"),
 	SND_SOC_DAPM_INPUT("IN2R"),
 	SND_SOC_DAPM_INPUT("IN3R"),
 	SND_SOC_DAPM_INPUT("IN4R"),
+
+
+	SND_SOC_DAPM_MICBIAS("Mic Bias Ext", MIC_BIAS_CNTL, 6, 0),
+	SND_SOC_DAPM_MICBIAS("Mic Bias Int", MIC_BIAS_CNTL, 2, 0),
+
+	SND_SOC_DAPM_SUPPLY("PLLCLK",PLL_PR_POW_REG,7,0,pll_power_on_event,
+						SND_SOC_DAPM_POST_PMU),
+	SND_SOC_DAPM_SUPPLY("DACCLK",NDAC_DIV_POW_REG,7,0, NULL, 0),
+	SND_SOC_DAPM_SUPPLY("CODEC_CLK_IN",SND_SOC_NOPM,0,0, NULL, 0),
+	SND_SOC_DAPM_SUPPLY("DAC_MOD_CLK",MDAC_DIV_POW_REG,7,0, NULL, 0),
+	SND_SOC_DAPM_SUPPLY("ADCCLK",NADC_DIV_POW_REG,7,0, NULL, 0),
+	SND_SOC_DAPM_SUPPLY("ADC_MOD_CLK",MADC_DIV_POW_REG,7,0, NULL, 0),
+	SND_SOC_DAPM_SUPPLY("ASI1_BCLK",ASI1_BCLK_N,7,0, NULL, 0),
+	SND_SOC_DAPM_SUPPLY("ASI1_WCLK",ASI1_WCLK_N,7,0, NULL, 0),
+	SND_SOC_DAPM_SUPPLY("ASI2_BCLK",ASI2_BCLK_N,7,0, NULL, 0),
+	SND_SOC_DAPM_SUPPLY("ASI2_WCLK",ASI2_WCLK_N,7,0, NULL, 0),
+	SND_SOC_DAPM_SUPPLY("ASI3_BCLK",ASI3_BCLK_N,7,0, NULL, 0),
+	SND_SOC_DAPM_SUPPLY("ASI3_WCLK",ASI3_WCLK_N,7,0, NULL, 0),
+	SND_SOC_DAPM_MUX("ASI1_BCLK Route",
+		SND_SOC_NOPM, 0, 0, &asi1bclk_control),
+	SND_SOC_DAPM_MUX("ASI2_BCLK Route", SND_SOC_NOPM, 0, 0, &asi2bclk_control),
+	SND_SOC_DAPM_MUX("ASI3_BCLK Route", SND_SOC_NOPM, 0, 0, &asi3bclk_control),
 };
 
-static const struct snd_soc_dapm_route aic3262_dapm_routes[] = {
-	{"LDAC_2_HPL", NULL, "Left DAC"},
-	{"HPL Driver", NULL, "LDAC_2_HPL"},
-	{"HPL", NULL, "HPL Driver"},
-	{"RDAC_2_HPR", NULL, "Right DAC"},
-	{"HPR Driver", NULL, "RDAC_2_HPR"},
-	{"HPR", NULL, "HPR Driver"},
+static const struct snd_soc_dapm_route aic3262_dapm_routes[] ={
+	/* TODO: Do we need only DACCLK for ASIIN's and ADCCLK for ASIOUT??? */
+	/* Clock portion */
+	{"CODEC_CLK_IN", NULL, "PLLCLK"},
+	{"DACCLK", NULL, "CODEC_CLK_IN"},
+	{"ADCCLK", NULL, "CODEC_CLK_IN"},
+	{"DAC_MOD_CLK", NULL, "DACCLK"},
+#ifdef AIC3262_SYNC_MODE
+	{"ADC_MOD_CLK", NULL,"DACCLK"},
+#else
+	{"ADC_MOD_CLK", NULL, "ADCCLK"},
+#endif
 
-	{"LDAC_2_LOL", NULL, "Left DAC"},
-	{"LOL Driver", NULL, "LDAC_2_LOL"},
-	{"LOL", NULL, "LOL Driver"},
-	{"RDAC_2_LOR", NULL, "Right DAC"},
-	{"LOR Driver", NULL, "RDAC_2_LOR"},
-	{"LOR", NULL, "LOR Driver"},
+	{"ASI1_BCLK Route","DAC_CLK","DACCLK"},
+	{"ASI1_BCLK Route","DAC_MOD_CLK","DAC_MOD_CLK"},
+	{"ASI1_BCLK Route","ADC_CLK","ADCCLK"},
+	{"ASI1_BCLK Route","ADC_MOD_CLK","ADC_MOD_CLK"},
 
-	{"SPKL Driver", NULL, "LOL"},
-	{"SPKL", NULL, "SPKL Driver"},
-	{"SPKR Driver", NULL, "LOR"},
-	{"SPKR", NULL, "SPKR Driver"},
+	{"ASI2_BCLK Route","DAC_CLK","DACCLK"},
+	{"ASI2_BCLK Route","DAC_MOD_CLK","DAC_MOD_CLK"},
+	{"ASI2_BCLK Route","ADC_CLK","ADCCLK"},
+	{"ASI2_BCLK Route","ADC_MOD_CLK","ADC_MOD_CLK"},
 
-	{"RECL Driver", NULL, "LOL"},
-	{"RECL", NULL, "RECL Driver"},
-	{"RECR Driver", NULL, "LOR"},
-	{"RECR", NULL, "RECR Driver"},
+	{"ASI3_BCLK Route","DAC_CLK","DACCLK"},
+	{"ASI3_BCLK Route","DAC_MOD_CLK","DAC_MOD_CLK"},
+	{"ASI3_BCLK Route","ADC_CLK","ADCCLK"},
+	{"ASI3_BCLK Route","ADC_MOD_CLK","ADC_MOD_CLK"},
 
-	{"Left ADC", "IN1L Route", "IN1L"},
-	{"Left ADC", "IN2L Route", "IN2L"},
-	{"Left ADC", "IN3L Route", "IN3L"},
-	{"Left ADC", "IN4L Route", "IN4L"},
+	{"ASI1_BCLK", NULL, "ASI1_BCLK Route"},
+	{"ASI2_BCLK", NULL, "ASI2_BCLK Route"},
+	{"ASI3_BCLK", NULL, "ASI3_BCLK Route"},
 
-	{"Right ADC", "IN1R Route", "IN1R"},
-	{"Right ADC", "IN2R Route", "IN2R"},
-	{"Right ADC", "IN3R Route", "IN3R"},
-	{"Right ADC", "IN4R Route", "IN4R"},
-/*
-	{"LOL Driver", NULL, "IN1L"},
-	{"LOR Driver", NULL, "IN1R"},
-*/
+
+	{"ASI1IN", NULL , "PLLCLK"},
+	{"ASI1IN", NULL , "DACCLK"},
+	{"ASI1IN", NULL , "ADCCLK"},
+	{"ASI1IN", NULL , "DAC_MOD_CLK"},
+	{"ASI1IN", NULL , "ADC_MOD_CLK"},
+
+	{"ASI1OUT", NULL , "PLLCLK"},
+	{"ASI1OUT", NULL , "DACCLK"},
+	{"ASI1OUT", NULL , "ADCCLK"},
+	{"ASI1OUT", NULL , "DAC_MOD_CLK"},
+	{"ASI1OUT", NULL , "ADC_MOD_CLK"},
+#ifdef AIC3262_ASI1_MASTER
+	{"ASI1IN", NULL , "ASI1_BCLK"},
+	{"ASI1OUT", NULL , "ASI1_BCLK"},
+	{"ASI1IN", NULL , "ASI1_WCLK"},
+	{"ASI1OUT", NULL , "ASI1_WCLK"},
+#else
+
+#endif
+
+	{"ASI2IN", NULL , "PLLCLK"},
+	{"ASI2IN", NULL , "DACCLK"},
+	{"ASI2IN", NULL , "ADCCLK"},
+	{"ASI2IN", NULL , "DAC_MOD_CLK"},
+	{"ASI2IN", NULL , "ADC_MOD_CLK"},
+
+	{"ASI2OUT", NULL , "PLLCLK"},
+	{"ASI2OUT", NULL , "DACCLK"},
+	{"ASI2OUT", NULL , "ADCCLK"},
+	{"ASI2OUT", NULL , "DAC_MOD_CLK"},
+	{"ASI2OUT", NULL , "ADC_MOD_CLK"},
+
+#ifdef AIC3262_ASI2_MASTER
+	{"ASI2IN", NULL , "ASI2_BCLK"},
+	{"ASI2OUT", NULL , "ASI2_BCLK"},
+	{"ASI2IN", NULL , "ASI2_WCLK"},
+	{"ASI2OUT", NULL , "ASI2_WCLK"},
+#else
+
+#endif
+	{"ASI3IN", NULL , "PLLCLK"},
+	{"ASI3IN", NULL , "DACCLK"},
+	{"ASI3IN", NULL , "ADCCLK"},
+	{"ASI3IN", NULL , "DAC_MOD_CLK"},
+	{"ASI3IN", NULL , "ADC_MOD_CLK"},
+
+
+	{"ASI3OUT", NULL , "PLLCLK"},
+	{"ASI3OUT", NULL , "DACCLK"},
+	{"ASI3OUT", NULL , "ADCCLK"},
+	{"ASI3OUT", NULL , "DAC_MOD_CLK"},
+	{"ASI3OUT", NULL , "ADC_MOD_CLK"},
+
+#ifdef AIC3262_ASI3_MASTER
+	{"ASI3IN", NULL , "ASI3_BCLK"},
+	{"ASI3OUT", NULL , "ASI3_BCLK"},
+	{"ASI3IN", NULL , "ASI3_WCLK"},
+	{"ASI3OUT", NULL , "ASI3_WCLK"},
+#else
+#endif
+
+/* Playback (DAC) Portion */
+	{"HPL Output Mixer","LDAC Switch","Left DAC"},
+	{"HPL Output Mixer","MAL Switch","MAL PGA"},
+	{"HPL Output Mixer","LOL-B1 Volume","LOL"},
+
+	{"HPR Output Mixer","LOR-B1 Volume","LOR"},
+	{"HPR Output Mixer","LDAC Switch","Left DAC"},
+	{"HPR Output Mixer","RDAC Switch","Right DAC"},
+	{"HPR Output Mixer","MAR Switch","MAR PGA"},
+
+	{"HPL Driver",NULL,"HPL Output Mixer"},
+	{"HPR Driver",NULL,"HPR Output Mixer"},
+
+	{"HPL",NULL,"HPL Driver"},
+	{"HPR",NULL,"HPR Driver"},
+
+	{"LOL Output Mixer","MAL Switch","MAL PGA"},
+	{"LOL Output Mixer","IN1L-B Switch","IN1L"},
+	{"LOL Output Mixer","LDAC Switch","Left DAC"},
+	{"LOL Output Mixer","RDAC Switch","Right DAC"},
+
+	{"LOR Output Mixer","LOL Switch","LOL"},
+	{"LOR Output Mixer","RDAC Switch","Right DAC"},
+	{"LOR Output Mixer","MAR Switch","MAR PGA"},
+	{"LOR Output Mixer","IN1R-B Switch","IN1R"},
+
+	{"LOL Driver",NULL,"LOL Output Mixer"},
+	{"LOR Driver",NULL,"LOR Output Mixer"},
+
+	{"LOL",NULL,"LOL Driver"},
+	{"LOR",NULL,"LOR Driver"},
+
+	{"REC Output Mixer","LOL-B2 Volume","LOL"},
+	{"REC Output Mixer","IN1L Volume","IN1L"},
+	{"REC Output Mixer","IN1R Volume","IN1R"},
+	{"REC Output Mixer","LOR-B2 Volume","LOR"},
+
+	{"RECP Driver",NULL,"REC Output Mixer"},
+	{"RECM Driver",NULL,"REC Output Mixer"},
+
+	{"RECP",NULL,"RECP Driver"},
+	{"RECM",NULL,"RECM Driver"},
+
+	{"SPKL Output Mixer","MAL Switch","MAL PGA"},
+	{"SPKL Output Mixer","LOL Volume","LOL"},
+	{"SPKL Output Mixer","SPR_IN Switch","SPKR Output Mixer"},
+
+	{"SPKR Output Mixer", "LOR Volume","LOR"},
+	{"SPKR Output Mixer", "MAR Switch","MAR PGA"},
+
+
+	{"SPKL Driver",NULL,"SPKL Output Mixer"},
+	{"SPKR Driver",NULL,"SPKR Output Mixer"},
+
+	{"SPKL",NULL,"SPKL Driver"},
+	{"SPKR",NULL,"SPKR Driver"},
+/* ASI Input routing */
+	{"ASI1LIN", NULL, "ASI1IN"},
+	{"ASI1RIN", NULL, "ASI1IN"},
+	{"ASI2LIN", NULL, "ASI2IN"},
+	{"ASI2RIN", NULL, "ASI2IN"},
+	{"ASI3LIN", NULL, "ASI3IN"},
+	{"ASI3RIN", NULL, "ASI3IN"},
+
+	{"ASI1MonoMixIN", NULL, "ASI1IN"},
+	{"ASI2MonoMixIN", NULL, "ASI2IN"},
+	{"ASI3MonoMixIN", NULL, "ASI3IN"},
+
+	{"ASI1LIN Route","ASI1 Left In","ASI1LIN"},
+	{"ASI1LIN Route","ASI1 Right In","ASI1RIN"},
+	{"ASI1LIN Route","ASI1 MonoMix In","ASI1MonoMixIN"},
+
+	{"ASI1RIN Route", "ASI1 Right In","ASI1RIN"},
+	{"ASI1RIN Route","ASI1 Left In","ASI1LIN"},
+	{"ASI1RIN Route","ASI1 MonoMix In","ASI1MonoMixIN"},
+
+
+	{"ASI2LIN Route","ASI2 Left In","ASI2LIN"},
+	{"ASI2LIN Route","ASI2 Right In","ASI2RIN"},
+	{"ASI2LIN Route","ASI2 MonoMix In","ASI2MonoMixIN"},
+
+	{"ASI2RIN Route","ASI2 Right In","ASI2RIN"},
+	{"ASI2RIN Route","ASI2 Left In","ASI2LIN"},
+	{"ASI2RIN Route","ASI2 MonoMix In","ASI2MonoMixIN"},
+
+
+	{"ASI3LIN Route","ASI3 Left In","ASI3LIN"},
+	{"ASI3LIN Route","ASI3 Right In","ASI3RIN"},
+	{"ASI3LIN Route","ASI3 MonoMix In","ASI3MonoMixIN"},
+
+	{"ASI3RIN Route","ASI3 Right In","ASI3RIN"},
+	{"ASI3RIN Route","ASI3 Left In","ASI3LIN"},
+	{"ASI3RIN Route","ASI3 MonoMix In","ASI3MonoMixIN"},
+
+	{"ASI1IN Port", NULL, "ASI1LIN Route"},
+	{"ASI1IN Port", NULL, "ASI1RIN Route"},
+	{"ASI2IN Port", NULL, "ASI2LIN Route"},
+	{"ASI2IN Port", NULL, "ASI2RIN Route"},
+	{"ASI3IN Port", NULL, "ASI3LIN Route"},
+	{"ASI3IN Port", NULL, "ASI3RIN Route"},
+
+	{"DAC MiniDSP IN1 Route", "ASI1 In","ASI1IN Port"},
+	{"DAC MiniDSP IN1 Route","ASI2 In","ASI2IN Port"},
+	{"DAC MiniDSP IN1 Route","ASI3 In","ASI3IN Port"},
+	{"DAC MiniDSP IN1 Route","ADC MiniDSP Out","ADC MiniDSP OUT1"},
+
+	{"DAC MiniDSP IN2 Route","ASI1 In","ASI1IN Port"},
+	{"DAC MiniDSP IN2 Route","ASI2 In","ASI2IN Port"},
+	{"DAC MiniDSP IN2 Route","ASI3 In","ASI3IN Port"},
+
+	{"DAC MiniDSP IN3 Route","ASI1 In","ASI1IN Port"},
+	{"DAC MiniDSP IN3 Route","ASI2 In","ASI2IN Port"},
+	{"DAC MiniDSP IN3 Route","ASI3 In","ASI3IN Port"},
+
+	{"Left DAC", "NULL", "DAC MiniDSP IN1 Route"},
+	{"Right DAC", "NULL", "DAC MiniDSP IN1 Route"},
+
+	{"Left DAC", "NULL","DAC MiniDSP IN2 Route"},
+	{"Right DAC", "NULL","DAC MiniDSP IN2 Route"},
+
+	{"Left DAC", "NULL","DAC MiniDSP IN3 Route"},
+	{"Right DAC", "NULL","DAC MiniDSP IN3 Route"},
+
+
+/* Mixer Amplifier */
+
+	{"MAL PGA Mixer", "IN1L Switch","IN1L"},
+	{"MAL PGA Mixer", "Left MicPGA Volume","Left MicPGA"},
+
+	{"MAL PGA", NULL, "MAL PGA Mixer"},
+
+
+	{"MAR PGA Mixer", "IN1R Switch","IN1R"},
+	{"MAR PGA Mixer", "Right MicPGA Volume","Right MicPGA"},
+
+	{"MAR PGA", NULL, "MAR PGA Mixer"},
+
+
+/* Capture (ADC) portions */
+	/* Left Positive PGA input */
+	{"Left Input Mixer","IN1L Switch","IN1L"},
+	{"Left Input Mixer","IN2L Switch","IN2L"},
+	{"Left Input Mixer","IN3L Switch","IN3L"},
+	{"Left Input Mixer","IN4L Switch","IN4L"},
+	{"Left Input Mixer","IN1R Switch","IN1R"},
+	/* Left Negative PGA input */
+	{"Left Input Mixer","IN2R Switch","IN2R"},
+	{"Left Input Mixer","IN3R Switch","IN3R"},
+	{"Left Input Mixer","IN4R Switch","IN4R"},
+	{"Left Input Mixer","CM2L Switch","CM2L"},
+	{"Left Input Mixer","CM1L Switch","CM1L"},
+
+	/* Right Positive PGA Input */
+	{"Right Input Mixer","IN1R Switch","IN1R"},
+	{"Right Input Mixer","IN2R Switch","IN2R"},
+	{"Right Input Mixer","IN3R Switch","IN3R"},
+	{"Right Input Mixer","IN4R Switch","IN4R"},
+	{"Right Input Mixer","IN2L Switch","IN2L"},
+
+	/* Right Negative PGA Input */
+	{"Right Input Mixer","IN1L Switch","IN1L"},
+	{"Right Input Mixer","IN3L Switch","IN3L"},
+	{"Right Input Mixer","IN4L Switch","IN4L"},
+	{"Right Input Mixer","CM1R Switch","CM1R"},
+	{"Right Input Mixer","CM2R Switch","CM2R"},
+
+	{"CM1L", NULL, "CM"},
+	{"CM2L", NULL, "CM"},
+	{"CM1R", NULL, "CM"},
+	{"CM2R", NULL, "CM"},
+
+	{"Left MicPGA",NULL,"Left Input Mixer"},
+	{"Right MicPGA",NULL,"Right Input Mixer"},
+
+	{"Left ADC", NULL, "Left MicPGA"},
+	{"Right ADC", NULL, "Right MicPGA"},
+
+/* ASI Output Routing */
+	{"ADC MiniDSP OUT1", NULL, "Left ADC"},
+	{"ADC MiniDSP OUT1", NULL, "Right ADC"},
+	{"ADC MiniDSP OUT2", NULL, "Left ADC"},
+	{"ADC MiniDSP OUT2", NULL, "Right ADC"},
+	{"ADC MiniDSP OUT3", NULL, "Left ADC"},
+	{"ADC MiniDSP OUT3", NULL, "Right ADC"},
+
+	{"ASI1OUT Route", "ASI1 Out","ADC MiniDSP OUT1"},// Port 1
+	{"ASI1OUT Route", "ASI1In Bypass","ASI1IN Port"},
+	{"ASI1OUT Route", "ASI2In Bypass","ASI2IN Port"},
+	{"ASI1OUT Route", "ASI3In Bypass","ASI3IN Port"},
+
+	{"ASI2OUT Route", "ASI1 Out","ADC MiniDSP OUT1"},// Port 1
+	{"ASI2OUT Route", "ASI1In Bypass","ASI1IN Port"},
+	{"ASI2OUT Route", "ASI2In Bypass","ASI2IN Port"},
+	{"ASI2OUT Route", "ASI3In Bypass","ASI3IN Port"},
+	{"ASI2OUT Route", "ASI2 Out","ADC MiniDSP OUT2"},// Port 2
+
+	{"ASI3OUT Route", "ASI1 Out","ADC MiniDSP OUT1"},// Port 1
+	{"ASI3OUT Route", "ASI1In Bypass","ASI1IN Port"},
+	{"ASI3OUT Route", "ASI2In Bypass","ASI2IN Port"},
+	{"ASI3OUT Route", "ASI3In Bypass","ASI3IN Port"},
+	{"ASI3OUT Route", "ASI3 Out","ADC MiniDSP OUT3"},// Port 3
+
+	{"ASI1OUT",NULL,"ASI1OUT Route"},
+	{"ASI2OUT",NULL,"ASI2OUT Route"},
+	{"ASI3OUT",NULL,"ASI3OUT Route"},
+
 };
+
+
+#define AIC3262_DAPM_ROUTE_NUM (sizeof(aic3262_dapm_routes)/sizeof(struct snd_soc_dapm_route))
 
 /*
  *****************************************************************************
@@ -2785,25 +3564,52 @@ void aic3262_write_reg_cache(struct snd_soc_codec *codec,
  *
  *----------------------------------------------------------------------------
  */
+
 u8 aic3262_read(struct snd_soc_codec *codec, u16 reg)
 {
 	struct aic3262_priv *aic3262 = snd_soc_codec_get_drvdata(codec);
 	u8 value;
 	u8 page = reg / 128;
-
+	u16 *cache = codec->reg_cache;
+	u16 cmd;
+	u8 buffer[2];
+	int rc;
 	reg = reg % 128;
 
-	if (aic3262->page_no != page)
-		aic3262_change_page(codec, page);
+	if (reg >= AIC3262_CACHEREGNUM) {
+		return 0;
+	}
 
-#if defined(LOCAL_REG_ACCESS)
-	i2c_master_send(codec->control_data, (char *)&reg, 1);
-	i2c_master_recv(codec->control_data, &value, 1);
-#else
-	value = snd_soc_read(codec, reg);
-#endif
-	/*DBG("r %2x %02x\r\n", reg, value);*/
+	if (aic3262->control_type == SND_SOC_I2C) {
+		if (aic3262->page_no != page) {
+		aic3262_change_page(codec, page);
+		}
+		i2c_master_send(codec->control_data, (char *)&reg, 1);
+		i2c_master_recv(codec->control_data, &value, 1);
+		/*DBG("r %2x %02x\r\n", reg, value); */
+	} else if (aic3262->control_type == SND_SOC_SPI) {
+		u16 value;
+
+		/* Do SPI transfer; first 16bits are command; remaining is
+		 * register contents */
+		cmd = AIC3262_READ_COMMAND_WORD(reg);
+		buffer[0] = (cmd >> 8) & 0xff;
+		buffer[1] = cmd & 0xff;
+		//rc = spi_write_then_read(aic3262->spi, buffer, 2, buffer, 2);
+
+		if (rc) {
+			dev_err(&aic3262->spi->dev, "AIC26 reg read error\n");
+			return -EIO;
+		}
+		value = (buffer[0] << 8) | buffer[1];
+	} else {
+		printk(KERN_ERR "Unknown Interface Type in aic3262_read\n");
+	}
+
+	/* Update the cache before returning with the value */
+	cache[reg] = value;
 	return value;
+
 }
 
 /*
@@ -2932,44 +3738,6 @@ static inline int aic3262_get_divs(int mclk, int rate)
 
 /*
  *----------------------------------------------------------------------------
- * Function : aic3262_add_controls
- * Purpose  : This function is to add non dapm kcontrols.  The different
- *            controls are in "aic3262_snd_controls" table.
- *            The following different controls are supported
- *                # PCM Playback volume control
- *				  # PCM Playback Volume
- *				  # HP Driver Gain
- *				  # HP DAC Playback Switch
- *				  # PGA Capture Volume
- *				  # Program Registers
- *
- *----------------------------------------------------------------------------
- */
-static int aic3262_add_controls(struct snd_soc_codec *codec)
-{
-	int err;
-
-	DBG("%s++\n", __func__);
-
-	err = snd_soc_add_controls(codec, aic3262_snd_controls,
-			     ARRAY_SIZE(aic3262_snd_controls));
-	if (err < 0) {
-		printk(KERN_ERR "Invalid control\n");
-		return err;
-	}
-
-	err = snd_soc_add_controls(codec, aic3262_snd_controls2,
-			     ARRAY_SIZE(aic3262_snd_controls2));
-	if (err < 0) {
-		printk(KERN_ERR "Invalid control\n");
-		return err;
-	}
-
-	return 0;
-}
-
-/*
- *----------------------------------------------------------------------------
  * Function : aic3262_add_widgets
  * Purpose  : This function is to add the dapm widgets
  *            The following are the main widgets supported
@@ -3002,7 +3770,7 @@ static int aic3262_add_widgets(struct snd_soc_codec *codec)
 	snd_soc_dapm_add_routes(dapm, aic3262_dapm_routes,
 				ARRAY_SIZE(aic3262_dapm_routes));
 	DBG("#Completed adding DAPM routes\n");
-	/*snd_soc_dapm_new_widgets(codec);*/
+	snd_soc_dapm_new_widgets(dapm);
 	DBG("#Completed updating dapm\n");
 	return 0;
 }
@@ -3028,7 +3796,7 @@ int reg_def_conf(struct snd_soc_codec *codec)
 
 	/* Configure the Codec with the default Initialization Values */
 	for (i = 0; i < reg_init_size; i++) {
-		ret = aic3262_write(codec, aic3262_reg_init[i].reg_offset,
+		ret = snd_soc_write(codec, aic3262_reg_init[i].reg_offset,
 			aic3262_reg_init[i].reg_val);
 		if (ret)
 			break;
@@ -3083,131 +3851,47 @@ int i2c_verify_book0(struct snd_soc_codec *codec)
  *
  *----------------------------------------------------------------------------
  */
-static int aic3262_set_bias_level(struct snd_soc_codec *codec,
-				  enum snd_soc_bias_level level)
-{
-	u8 value;
-	struct aic3262_priv *aic3262 = snd_soc_codec_get_drvdata(codec);
 
-	DBG(KERN_INFO "#%s: Codec Active %d[%d]\n",
-		__func__, codec->active, aic3262->active_count);
+static int aic3262_set_bias_level(struct snd_soc_codec *codec,
+			enum snd_soc_bias_level level)
+{
+	struct aic3262_priv *aic3262 = snd_soc_codec_get_drvdata(codec);
+	u8 value;
 	switch (level) {
 		/* full On */
 	case SND_SOC_BIAS_ON:
-		DBG(KERN_INFO "#aic3262 codec : set_bias_on started\n");
-	case SND_SOC_BIAS_PREPARE:
+
 		/* all power is driven by DAPM system */
-		DBG(KERN_INFO "#aic3262 codec : set_bias_prepare started\n");
+		dev_dbg(codec->dev, "set_bias_on\n");
+		break;
 
-		/* Switch on PLL */
-		value = aic3262_read(codec, PLL_PR_POW_REG);
-		aic3262_write(codec, PLL_PR_POW_REG, ((value | 0x80)));
+		/* partial On */
+	case SND_SOC_BIAS_PREPARE:
 
-		/* Switch on NDAC Divider */
-		value = aic3262_read(codec, NDAC_DIV_POW_REG);
-		aic3262_write(codec, NDAC_DIV_POW_REG,
-			((value & 0x7f) | (0x80)));
-
-		/* Switch on MDAC Divider */
-		value = aic3262_read(codec, MDAC_DIV_POW_REG);
-		aic3262_write(codec, MDAC_DIV_POW_REG,
-			((value & 0x7f) | (0x80)));
-
-		/* Switch on NADC Divider */
-		value = aic3262_read(codec, NADC_DIV_POW_REG);
-		aic3262_write(codec, NADC_DIV_POW_REG,
-			((value & 0x7f) | (0x80)));
-
-		/* Switch on MADC Divider */
-		value = aic3262_read(codec, MADC_DIV_POW_REG);
-		aic3262_write(codec, MADC_DIV_POW_REG,
-			((value & 0x7f) | (0x80)));
-
-
-		aic3262_write(codec, ADC_CHANNEL_POW, 0xc2);
-		aic3262_write(codec, ADC_FINE_GAIN, 0x00);
-
-		DBG("#aic3262 codec : set_bias_on complete\n");
+		dev_dbg(codec->dev, "set_bias_prepare\n");
 
 		break;
 
-
-		/* Off, with power */
+	/* Off, with power */
 	case SND_SOC_BIAS_STANDBY:
 		/*
 		 * all power is driven by DAPM system,
 		 * so output power is safe if bypass was set
 		 */
+		 dev_dbg(codec->dev, "set_bias_stby\n");
 
-		DBG("#aic3262 codec : set_bias_stby inside if condn\n");
-
-		if (!aic3262->active_count) {
-			/* Switch off NDAC Divider */
-			value = aic3262_read(codec, NDAC_DIV_POW_REG);
-			aic3262_write(codec, NDAC_DIV_POW_REG,
-				(value & 0x7f));
-
-			/* Switch off MDAC Divider */
-			value = aic3262_read(codec, MDAC_DIV_POW_REG);
-			aic3262_write(codec, MDAC_DIV_POW_REG,
-				(value & 0x7f));
-
-			/* Switch off NADC Divider */
-			value = aic3262_read(codec, NADC_DIV_POW_REG);
-			aic3262_write(codec, NADC_DIV_POW_REG,
-				(value & 0x7f));
-
-			/* Switch off MADC Divider */
-			value = aic3262_read(codec, MADC_DIV_POW_REG);
-			aic3262_write(codec, MADC_DIV_POW_REG,
-				(value & 0x7f));
-
-			/* Switch off PLL */
-			value = aic3262_read(codec, PLL_PR_POW_REG);
-			aic3262_write(codec, PLL_PR_POW_REG, (value & 0x7f));
-
-			DBG("#%s: set_bias_stby complete\n", __func__);
-		} else
-			DBG(KERN_INFO
-			"#%s: Another Stream Active. No STANDBY\n", __func__);
 		break;
-
-		/* Off, without power */
+	/* Off, without power */
 	case SND_SOC_BIAS_OFF:
-		/* force all power off */
-
-		/* Switch off PLL */
-		value = aic3262_read(codec, PLL_PR_POW_REG);
-		aic3262_write(codec,
-			PLL_PR_POW_REG, (value & ~(0x01 << 7)));
-
-		/* Switch off NDAC Divider */
-		value = aic3262_read(codec, NDAC_DIV_POW_REG);
-		aic3262_write(codec, NDAC_DIV_POW_REG,
-			(value & ~(0x01 << 7)));
-
-		/* Switch off MDAC Divider */
-		value = aic3262_read(codec, MDAC_DIV_POW_REG);
-		aic3262_write(codec, MDAC_DIV_POW_REG,
-			(value & ~(0x01 << 7)));
-
-		/* Switch off NADC Divider */
-		value = aic3262_read(codec, NADC_DIV_POW_REG);
-		aic3262_write(codec, NADC_DIV_POW_REG,
-			(value & ~(0x01 << 7)));
-
-		/* Switch off MADC Divider */
-		value = aic3262_read(codec, MADC_DIV_POW_REG);
-		aic3262_write(codec, MADC_DIV_POW_REG,
-			(value & ~(0x01 << 7)));
-		value = aic3262_read(codec, ASI1_BCLK_N);
+		 dev_dbg(codec->dev, "set_bias_off\n");
 
 		break;
 	}
-	codec->dapm.bias_level = level;
-	DBG(KERN_INFO "#aic3262 codec : set_bias exiting\n");
+	codec->dapm.bias_level=level;
+
 	return 0;
 }
+
 
 /*
  *----------------------------------------------------------------------------
@@ -3301,52 +3985,49 @@ static irqreturn_t aic3262_jack_handler(int irq, void *data)
 	struct aic3262_priv *aic3262 = snd_soc_codec_get_drvdata(codec);
 	unsigned int value;
 	unsigned int micbits, hsbits = 0;
-
-	DBG("%s++\n", __func__);
+	DBG(KERN_INFO "%s++\n", __func__);
 
 	aic3262_change_page(codec, 0);
 
 	/* Read the Jack Status Register*/
-	value = aic3262_read(codec, STICKY_FLAG2);
+	value = snd_soc_read(codec, STICKY_FLAG2);
 	DBG(KERN_INFO "reg44 0x%x\n", value);
 
-	value = aic3262_read(codec, INT_FLAG2);
-	DBG("reg46 0x%x\n", value);
 
-	value = aic3262_read(codec, DAC_FLAG_R1);
-	DBG("reg37 0x%x\n", value);
+	value = snd_soc_read(codec, INT_FLAG2);
+	DBG(KERN_INFO "reg46 0x%x\n", value);
+
+	value = snd_soc_read(codec, DAC_FLAG_R1);
+	DBG(KERN_INFO "reg37 0x%x\n", value);
 
 	micbits = value & DAC_FLAG_MIC_MASKBITS;
-	DBG("micbits 0x%x\n", micbits);
+	DBG(KERN_INFO "micbits 0x%x\n", micbits);
 
 	hsbits = value & DAC_FLAG_HS_MASKBITS;
-	DBG("hsbits 0x%x\n", hsbits);
+	DBG(KERN_INFO "hsbits 0x%x\n", hsbits);
 
-	/* sleep for debounce time */
-	/*msleep(aic3262->pdata->debounce_time_ms);*/
 
 	/* No Headphone or Headset*/
 	if (!micbits && !hsbits) {
-		DBG("no headset/headphone\n");
+		DBG(KERN_INFO "no headset/headphone\n");
 		snd_soc_jack_report(aic3262->headset_jack,
 				0, SND_JACK_HEADSET);
 	}
 
 	/* Headphone Detected */
 	if ((micbits == DAC_FLAG_R1_NOMIC) || (hsbits)) {
-		DBG("headphone\n");
+		DBG(KERN_INFO "headphone\n");
 		snd_soc_jack_report(aic3262->headset_jack,
 				SND_JACK_HEADPHONE, SND_JACK_HEADSET);
 	}
 
 	/* Headset Detected - only with capless */
 	if (micbits == DAC_FLAG_R1_MIC) {
-		DBG("headset\n");
+		DBG(KERN_INFO "headset\n");
 		snd_soc_jack_report(aic3262->headset_jack,
 				SND_JACK_HEADSET, SND_JACK_HEADSET);
 	}
-
-	DBG("%s--\n", __func__);
+	DBG(KERN_INFO "%s--\n", __func__);
 	return IRQ_HANDLED;
 }
 
@@ -3359,16 +4040,34 @@ int aic326x_headset_detect(struct snd_soc_codec *codec,
 	struct snd_soc_jack *jack, int jack_type)
 {
 	struct aic3262_priv *aic3262 = snd_soc_codec_get_drvdata(codec);
-	aic3262->headset_jack = jack;
 
-	/*TODO*/
-	aic3262_jack_handler(aic3262->irq, codec);
+	aic3262->headset_jack = jack;
+	/*Enable the Headset Interrupts*/
+	snd_soc_write(codec, INT1_CNTL, 0x80);
 
 	return 0;
 }
 EXPORT_SYMBOL_GPL(aic326x_headset_detect);
 
+int aic326x_headset_button_init(struct snd_soc_codec *codec,
+	struct snd_soc_jack *jack, int jack_type)
+{
+	struct aic3262_priv *aic3262 = snd_soc_codec_get_drvdata(codec);
 
+	aic3262->button_dev = input_allocate_device();
+	aic3262->button_dev->name = "aic326x_headset_button";
+       aic3262->button_dev->phys = "codec/input0";
+	aic3262->button_dev->dev.parent = snd_card_get_device_link(codec->card->snd_card);
+	input_set_capability(aic3262->button_dev, EV_KEY, KEY_MEDIA);
+
+	if (input_register_device(aic3262->button_dev))
+	{
+	   printk( "Unable to register input device headset button");
+	}
+
+	aic3262_jack_handler(aic3262->irq, codec);
+	return 0;
+}
 #ifdef AIC3262_MULTI_I2S
 /*
 * aic3262_asi_default_config
@@ -3419,7 +4118,6 @@ static void aic3262_asi_default_config(struct snd_soc_codec *codec)
 	aic3262->asiCtxt[2].right_dac_output = DAC_PATH_LEFT;
 	aic3262->asiCtxt[2].adc_input        = ADC_PATH_MINIDSP_3;
 	aic3262->asiCtxt[2].dout_option      = ASI2_INPUT;
-
 	return;
 }
 
@@ -3432,6 +4130,7 @@ static void aic3262_asi_default_config(struct snd_soc_codec *codec)
  *
  *----------------------------------------------------------------------------
  */
+
 static int aic3262_probe(struct snd_soc_codec *codec)
 {
 	struct aic3262_priv *aic3262 = snd_soc_codec_get_drvdata(codec);
@@ -3497,10 +4196,24 @@ static int aic3262_probe(struct snd_soc_codec *codec)
 	/* off, with power on */
 	aic3262_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
 
-	aic3262_add_controls(codec);
+	ret = snd_soc_add_controls(codec, aic3262_snd_controls,
+					ARRAY_SIZE(aic3262_snd_controls));
+	if(ret)
+	{
+		printk(KERN_INFO "%s failed\n", __func__);
+	}
+
 	aic3262_add_widgets(codec);
 	/*TODO*/
-	aic3262_write(codec, MIC_BIAS_CNTL, 0x66);
+	snd_soc_write(codec, MIC_BIAS_CNTL, 0x66);
+
+#ifdef AIC3262_TiLoad
+	ret = aic3262_driver_init(codec);
+	if (ret < 0)
+		printk(KERN_ERR
+	"\nAIC3262 CODEC: aic3262_probe :TiLoad Initialization failed\n");
+#endif
+
 
 #ifdef CONFIG_MINI_DSP
 	/* Program MINI DSP for ADC and DAC */
@@ -3516,6 +4229,8 @@ static int aic3262_probe(struct snd_soc_codec *codec)
 	DBG(KERN_INFO "#%s: done..\n", __func__);
 	return ret;
 }
+
+
 
 /*
  *----------------------------------------------------------------------------
@@ -3645,7 +4360,7 @@ static __devexit int aic3262_i2c_remove(struct i2c_client *i2c)
 }
 
 static const struct i2c_device_id tlv320aic3262_id[] = {
-	{"tlv320aic3262", 0},
+	{"aic3262-codec", 0},
 	{}
 };
 MODULE_DEVICE_TABLE(i2c, tlv320aic3262_id);
@@ -3661,18 +4376,142 @@ static struct i2c_driver tlv320aic3262_i2c_driver = {
 };
 #endif /*#if defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE)*/
 
+#if defined(CONFIG_SPI_MASTER)
+static int aic3262_spi_write(struct spi_device *spi, const char *data, int len)
+{
+	struct spi_transfer t;
+	struct spi_message m;
+	u8 msg[2];
+
+	if (len <= 0)
+		return 0;
+
+	msg[0] = data[0];
+	msg[1] = data[1];
+
+	spi_message_init(&m);
+	memset(&t, 0, (sizeof t));
+	t.tx_buf = &msg[0];
+	t.len = len;
+
+	spi_message_add_tail(&t, &m);
+	spi_sync(spi, &m);
+
+	return len;
+}
+
+/*
+ * This function forces any delayed work to be queued and run.
+ */
+static int run_delayed_work(struct delayed_work *dwork)
+{
+	int ret;
+
+	/* cancel any work waiting to be queued. */
+	ret = cancel_delayed_work(dwork);
+
+	/* if there was any work waiting then we run it now and
+	 * wait for it's completion */
+	if (ret) {
+		schedule_delayed_work(dwork, 0);
+		flush_scheduled_work();
+	}
+	return ret;
+}
+static int __devinit aic3262_spi_probe(struct spi_device *spi)
+{
+	int ret;
+	struct snd_soc_codec *codec;
+	struct aic3262_priv *aic3262;
+	printk(KERN_INFO "%s entering\n",__func__);
+	aic3262 = kzalloc(sizeof(struct aic3262_priv), GFP_KERNEL);
+
+	if (!aic3262) {
+		printk(KERN_ERR "#%s: Unable to Allocate Priv struct..\n",
+			__func__);
+		return -ENOMEM;
+	}
+	codec = &aic3262->codec;
+	codec->control_data = spi;
+	aic3262->control_type = SND_SOC_SPI;
+	codec->hw_write = (hw_write_t)aic3262_spi_write;
+	codec->dev = &spi->dev;
+
+	aic3262->pdata = spi->dev.platform_data;
+
+	/* The Configuration Support will be by default to 3 which
+	* holds the MAIN Patch Configuration.
+	*/
+	aic3262->current_dac_config[0] = -1;
+	aic3262->current_dac_config[1] = -1;
+	aic3262->current_adc_config[0] = -1;
+	aic3262->current_adc_config[1] = -1;
+
+	aic3262->mute_codec = 1;
+
+	aic3262->page_no = 0;
+	aic3262->book_no = 0;
+	aic3262->active_count = 0;
+	aic3262->dac_clkin_option = 3;
+	aic3262->adc_clkin_option = 3;
+	dev_set_drvdata(&spi->dev, aic3262);
+	spi_set_drvdata(spi, aic3262);
+	ret = snd_soc_register_codec(&spi->dev,
+		&soc_codec_dev_aic3262,
+		tlv320aic3262_dai, ARRAY_SIZE(tlv320aic3262_dai));
+
+	if (ret < 0) {
+		printk(KERN_INFO "%s codec registeration failed\n",__func__);
+		kfree(aic3262);
+	}
+	else {
+		printk(KERN_INFO "%s registered\n",__func__);
+	}
+	printk(KERN_INFO "#%s: Done ret %d\n", __func__, ret);
+	return ret;
+}
+
+static int __devexit aic3262_spi_remove(struct spi_device *spi)
+{
+	struct aic3262_priv *aic3262 = dev_get_drvdata(&spi->dev);
+	aic3262_set_bias_level(&aic3262->codec, SND_SOC_BIAS_OFF);
+	snd_soc_unregister_codec(&spi->dev);
+	kfree(aic3262);
+	aic3262_codec = NULL;
+	return 0;
+
+}
+
+static struct spi_driver aic3262_spi_driver = {
+	.driver = {
+		.name	= "aic3262-codec",
+		.bus	= &spi_bus_type,
+		.owner	= THIS_MODULE,
+	},
+	.probe		= aic3262_spi_probe,
+	.remove		= __devexit_p(aic3262_spi_remove),
+};
+#endif
 static int __init tlv320aic3262_modinit(void)
 {
 	int ret = 0;
+	printk(KERN_INFO "In %s\n",__func__);
 #if defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE)
 	ret = i2c_add_driver(&tlv320aic3262_i2c_driver);
 	if (ret != 0)
 		printk(KERN_ERR "Failed to register aic326x i2c driver %d\n",
 			ret);
 #endif
+#if defined(CONFIG_SPI_MASTER)
+	printk(KERN_INFO "Inside config_spi_master\n");
+	ret = spi_register_driver(&aic3262_spi_driver);
+	if (ret != 0)
+		printk(KERN_ERR "Failed to register aic3262 SPI driver: %d\n", ret);
+#endif
 	return ret;
 
 }
+
 module_init(tlv320aic3262_modinit);
 
 static void __exit tlv320aic3262_exit(void)

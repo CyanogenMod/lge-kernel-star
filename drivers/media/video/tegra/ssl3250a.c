@@ -983,4 +983,4 @@ static void __exit ssl3250a_exit(void)
 
 module_init(ssl3250a_init);
 module_exit(ssl3250a_exit);
-
+MODULE_LICENSE("GPL");

@@ -2,8 +2,8 @@
  * drivers/regulator/max77663-regulator.c
  * Maxim LDO and Buck regulators driver
  *
- * Copyright 2011 Maxim Integrated Products, Inc.
- * Copyright (C) 2011 NVIDIA Corporation
+ * Copyright 2011-2012 Maxim Integrated Products, Inc.
+ * Copyright (C) 2011-2012 NVIDIA Corporation
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -64,6 +64,7 @@
 #define MAX77663_REG_LDO7_CFG2		0x32
 #define MAX77663_REG_LDO8_CFG		0x33
 #define MAX77663_REG_LDO8_CFG2		0x34
+#define MAX77663_REG_LDO_CFG3		0x35
 
 /* Power Mode */
 #define POWER_MODE_NORMAL		3
@@ -90,6 +91,10 @@
 /* SD Failling slew rate Active-Discharge Mode */
 #define SD_FSRADE_MASK			0x01
 #define SD_FSRADE_SHIFT		0
+
+/* LDO Configuration 3 */
+#define TRACK4_MASK			0x20
+#define TRACK4_SHIFT			5
 
 /* Voltage */
 #define SDX_VOLT_MASK			0xFF
@@ -448,7 +453,8 @@ static int max77663_regulator_enable(struct regulator_dev *rdev)
 {
 	struct max77663_regulator *reg = rdev_get_drvdata(rdev);
 	struct max77663_regulator_platform_data *pdata = _to_pdata(reg);
-	int power_mode = POWER_MODE_NORMAL;
+	int power_mode = (pdata->flags & GLPM_ENABLE) ?
+			 POWER_MODE_GLPM : POWER_MODE_NORMAL;
 
 	if (reg->fps_src != FPS_SRC_NONE) {
 		dev_dbg(&rdev->dev, "enable: Regulator %s using %s\n",
@@ -523,11 +529,13 @@ static int max77663_regulator_set_mode(struct regulator_dev *rdev,
 				       unsigned int mode)
 {
 	struct max77663_regulator *reg = rdev_get_drvdata(rdev);
+	struct max77663_regulator_platform_data *pdata = _to_pdata(reg);
 	u8 power_mode;
 	int ret;
 
 	if (mode == REGULATOR_MODE_NORMAL)
-		power_mode = POWER_MODE_NORMAL;
+		power_mode = (pdata->flags & GLPM_ENABLE) ?
+			     POWER_MODE_GLPM : POWER_MODE_NORMAL;
 	else if (mode == REGULATOR_MODE_STANDBY)
 		power_mode = POWER_MODE_LPM;
 	else
@@ -619,7 +627,9 @@ static int max77663_regulator_preinit(struct max77663_regulator *reg)
 	 * from SRC_0, SRC_1 and SRC_2. */
 	if ((reg->fps_src != FPS_SRC_NONE) && (pdata->fps_src == FPS_SRC_NONE)
 			&& (reg->power_mode != POWER_MODE_NORMAL)) {
-		ret = max77663_regulator_set_power_mode(reg, POWER_MODE_NORMAL);
+		val = (pdata->flags & GLPM_ENABLE) ?
+		      POWER_MODE_GLPM : POWER_MODE_NORMAL;
+		ret = max77663_regulator_set_power_mode(reg, val);
 		if (ret < 0) {
 			dev_err(reg->dev, "preinit: Failed to "
 				"set power mode to POWER_MODE_NORMAL\n");
@@ -655,7 +665,8 @@ static int max77663_regulator_preinit(struct max77663_regulator *reg)
 	}
 
 	if (pdata->init_enable)
-		val = POWER_MODE_NORMAL;
+		val = (pdata->flags & GLPM_ENABLE) ?
+		      POWER_MODE_GLPM : POWER_MODE_NORMAL;
 	else
 		val = POWER_MODE_DISABLE;
 
@@ -721,6 +732,18 @@ skip_init_apply:
 					"for EN2_CTRL_SD0\n");
 				return ret;
 			}
+		}
+	}
+
+	if ((reg->id == MAX77663_REGULATOR_ID_LDO4)
+			&& (pdata->flags & LDO4_EN_TRACKING)) {
+		val = TRACK4_MASK;
+		ret = max77663_write(_to_parent(reg), MAX77663_REG_LDO_CFG3, &val, 1, 0);
+		if (ret < 0) {
+			dev_err(reg->dev, "preinit: "
+				"Failed to set register 0x%x\n",
+				MAX77663_REG_LDO_CFG3);
+			return ret;
 		}
 	}
 

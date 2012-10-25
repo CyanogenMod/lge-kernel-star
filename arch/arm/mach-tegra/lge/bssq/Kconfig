@@ -1,0 +1,239 @@
+#config MACH_LGE
+#	bool
+
+#menu "LGE Device-Specific Changes"
+
+menu "LGE Board Selection"
+
+#config MACH_BSSQ
+#	depends on ARCH_TEGRA
+#	select MACH_LGE
+#	select MACH_HAS_SND_SOC_TEGRA_WM8994 if SND_SOC
+#	bool "TEGRA BSSQ"
+#	help
+#	  Support for the LGE BSSQ
+	
+choice
+	depends on MACH_BSSQ
+	prompt "BSSQ Board Selection"
+	default KS1103
+		  
+config KS1103
+	bool "TEGRA BSSQ KS1103"
+	help
+	  Support for the LGE BSSQ KS1103
+
+config LU6500
+	bool "TEGRA BSSQ LU6500"
+	help
+	  Support for the LGE BSSQ LU6500
+
+config SU880
+	bool "TEGRA BSSQ SU880"
+	help
+	  Support for the LGE BSSQ SU880
+	  
+endchoice
+		  	  
+endmenu
+
+menu "LGE LCD / Backlight Selection"    	  	  
+
+#config LCD_HITACHI
+#	tristate "Hitachi LCD Driver on Star Smartphone Platform"
+#	depends on GENERIC_GPIO
+#	help
+#	  If you have a Hitachi LCD Panel(480x800) on Star Smartphone
+#	  Platform, say Y to enable the LCD contrl driver.
+	  
+#config BACKLIGHT_AAT2870
+#	tristate "AnalogicTech AAT2870 Backlight Driver"
+#	depends on BACKLIGHT_CLASS_DEVICE && I2C && GENERIC_GPIO
+#	help
+#	  If you have a AnalogicTech AAT2870 say Y to enable the
+#	  backlight driver.
+
+config BACKLIGHT_BD6084
+	tristate "ROHM BD6084 Backlight Driver"
+	depends on BACKLIGHT_CLASS_DEVICE && I2C && GENERIC_GPIO
+	help
+	  If you have a ROHM BD6084 say Y to enable the
+
+#config STAR_TOUCH_LED 
+#	bool " Keypad or TOUCH LED Driver "
+#	depends on MACH_STAR
+#	default y
+#	help
+#	  If you want to enable touch led , then say Y
+endmenu
+
+#comment "Bluetooth driver Selection"
+# LG_BTUI : X3_BT_bringup - kukdong.bae@lge.com [S] 
+#config BCM4330_RFKILL
+#    bool "Enable BCM4330 RFKILL driver"
+#    depends on RFKILL
+#    default n
+#    ---help---
+#    Adds BCM4330 RFKILL driver for Broadcom BCM4330 chipset
+#
+#config BD_ADDRESS
+#    bool "BD Read / Write Driver"
+#    default n
+#    ---help---
+#    LGE added: It supports Bluetooth address Read / Write functionality on user mode.
+# LG_BTUI : X3_BT_bringup - kukdong.bae@lge.com [E]
+
+comment "Battery / Charger / Muic driver Selection"
+
+config BATTERY_CHARGER
+    bool "LG Battery Driver"
+    help
+      Say Y to enable support for battery driver.
+
+config MAX14526
+	bool "MAX14526 MUIC"
+	help
+	  Support for MUIC Driver
+
+comment "Touch driver Selection"
+
+#config TOUCHSCREEN_TEGRA_STAR
+#    tristate "Touch touchscreen for STAR"
+#    depends on I2C
+#    help
+#      This enables support for Synaptics STAR over I2C based touchscreens.
+
+config TOUCHSCREEN_TEGRA_BSSQ
+    tristate "Touch touchscreen for BSSQ"
+    depends on I2C
+    help
+      This enables support for Synaptics BSSQ over I2C based touchscreens.
+
+#config ONETOUCHSCREEN_TEGRA_STAR
+#	tristate " Onetouchscreen for KR STAR  "
+#	depends on I2C && MACH_STAR_SU660 
+#	help
+#          This enables support for Onetouch Synaptics KR STAR over I2C based touchscreens.
+
+comment "Sensor driver Selection"
+
+config SENSOR_GP2A
+    bool "Proximity gp2a"
+    depends on I2C
+    default y
+    help
+      Support for Proximity gp2a driver
+
+comment "Misc driver Selection"
+
+
+config TSPDRV
+        bool "Immersion Touchsense tspdrv"
+		depends on TEGRA_PWM
+		default y
+        help
+           Immersion TSP Driver.
+
+#config STAR_VIBRATOR
+#        bool "Bssq PWM Vibrator"
+#		depends on TEGRA_PWM
+#		default n
+#        help
+#          Support for Bssq PWM Vibrator Driver.
+
+
+config BSSQ_VIBRATOR
+    bool "BSSQ PWM Vibrator"
+    depends on MACH_BSSQ
+    default y
+	select TEGRA_PWM
+    help
+      Support for Bssq PWM Vibrator Driver.
+
+comment "Camera driver Selection"
+
+#20110518 jinkwan.kim@lge.com Camsensor 1st merge [S]
+config VIDEO_HI702
+#    tristate "HI702 camera sensor support"
+    bool "HI702 camera sensor support"
+    depends on I2C && ARCH_TEGRA
+    default y
+    ---help---
+        This is a driver for Hynix HI702 camera sensor
+        for uses with tegra isp.
+#20110518 jinkwan.kim@lge.com Camsensor 1st merge [E]
+
+#20110629 younjung.park VGA parsing[S]
+config VTCAM_SD_IMAGE_TUNNING
+    bool "SD Card Image Tuning for HI702"
+    depends on (VIDEO_HI702 && KS1103)
+    default y
+    ---help---
+        SD Card Image Tuning for HI702
+#20110629 younjung.park VGA parsing[E]
+
+#20110525 calvin.hwang@lge.com Camsensor ks1001 merge [S]
+config VIDEO_AR8032
+#    tristate "AR0832 camera sensor support"
+    bool "AR0832 camera sensor support"
+    depends on I2C && ARCH_TEGRA && KS1103
+    default y
+    ---help---
+        This is a driver for Aptina AR0832camera sensor
+        for uses with tegra isp.
+#20110525 calvin.hwang@lge.com Camsensor ks1001 merge [E]
+
+#MOBII_CHANGE dk.han : lu6500 camera [
+config VIDEO_IMX072
+	bool "IMX072 camera sensor support"
+	depends on I2C && ARCH_TEGRA && (LU6500 || SU880 || KU8800)
+	default y
+	---help---
+	This is a driver for Sony IMX072 camera sensor
+	for uses with tegra isp.
+#MOBII_CHANGE dk.han : lu6500 camera ]
+
+config TEGRA_CPU_FREQ_LOCK
+    bool "tegra cpu freq lock"
+    default n
+    ---help---
+        x2 ics
+
+config CAM_PMIC
+    bool "CAM_PMIC"
+    depends on KS1103
+    default y
+    ---help---
+        Support for CAM PMIC driver.
+
+#MOBII_CHANGE dk.han : lu6500 camera [
+config SUBPMIC_LP8720
+	bool "SUB PMIC LP8720"
+	depends on (LU6500 || SU880 || KU8800)
+	default y
+	help
+	Support for LP8720 SUB PMIC driver.
+#MOBII_CHANGE dk.han : lu6500 camera ]
+
+
+# 20110611 changbum.kim@lge.com add mtc_eta_log driver [S]
+config LGE_MTC_ETA
+	bool "Support LGE MTC_ETA Event (Key, Touch) Logging"
+	depends on MACH_BSSQ
+	default y
+	help
+		Support for LGE MTC/ETA driver.
+config BSSQ_REBOOT_MONITOR
+      depends on (MACH_BSSQ && ANDROID_RAM_CONSOLE)
+      default n
+      bool "Support BSSQ Reboot Monitor"
+      help
+       Panic and System Reboot Monitoring for Hidden Reset and log service	
+        	
+config PANICRPT
+    bool " Enable Kernel Panic Dump Tool "
+    depends on MACH_BSSQ
+    default y
+    help
+      If you want to enable kernel panic dump tool , then say Y
+#endmenu

@@ -29,7 +29,7 @@ struct tegra_utmip_config {
 	u8 idle_wait_delay;
 	u8 term_range_adj;
 	u8 xcvr_setup;
-	u8 xcvr_setup_offset;
+	signed char xcvr_setup_offset;
 	u8 xcvr_use_fuses;
 	u8 xcvr_lsfslew;
 	u8 xcvr_lsrslew;
@@ -162,5 +162,9 @@ bool tegra_usb_phy_charger_detect(struct tegra_usb_phy *phy);
 int __init tegra_usb_phy_init(struct usb_phy_plat_data *pdata, int size);
 
 bool tegra_usb_phy_is_remotewake_detected(struct tegra_usb_phy *phy);
+
+void tegra_usb_phy_memory_prefetch_on(struct tegra_usb_phy *phy);
+
+void tegra_usb_phy_memory_prefetch_off(struct tegra_usb_phy *phy);
 
 #endif /* __MACH_USB_PHY_H */

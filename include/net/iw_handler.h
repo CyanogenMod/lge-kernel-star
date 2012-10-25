@@ -330,7 +330,7 @@ struct iw_handler_def {
 	 * last defined handler + 1) */
 	__u16			num_standard;
 
-#ifdef CONFIG_WEXT_PRIV
+/*#ifdef CONFIG_WEXT_PRIV*/
 	__u16			num_private;
 	/* Number of private arg description */
 	__u16			num_private_args;
@@ -343,7 +343,7 @@ struct iw_handler_def {
 	 * can put it in any order you want and should not leave holes...
 	 * We will automatically export that to user space... */
 	const struct iw_priv_args *	private_args;
-#endif
+/*#endif*/
 
 	/* New location of get_wireless_stats, to de-bloat struct net_device.
 	 * The old pointer in struct net_device will be gradually phased

@@ -25,8 +25,9 @@
 #include <mach/nvmap.h>
 #include <linux/slab.h>
 #include "t20/t20.h"
-#include "t20/hardware_t20.h"
-#include "t20/syncpt_t20.h"
+#include "host1x/host1x_channel.h"
+#include "host1x/host1x_hardware.h"
+#include "host1x/host1x_syncpt.h"
 #include "nvhost_hwctx.h"
 #include "dev.h"
 #include "gr3d.h"
@@ -76,7 +77,7 @@ void nvhost_3dctx_restore_end(u32 *ptr)
 struct nvhost_hwctx *nvhost_3dctx_alloc_common(struct nvhost_channel *ch,
 					bool map_restore)
 {
-	struct nvmap_client *nvmap = ch->dev->nvmap;
+	struct nvmap_client *nvmap = nvhost_get_host(ch->dev)->nvmap;
 	struct nvhost_hwctx *ctx;
 
 	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
@@ -129,7 +130,7 @@ void nvhost_3dctx_get(struct nvhost_hwctx *ctx)
 void nvhost_3dctx_free(struct kref *ref)
 {
 	struct nvhost_hwctx *ctx = container_of(ref, struct nvhost_hwctx, ref);
-	struct nvmap_client *nvmap = ctx->channel->dev->nvmap;
+	struct nvmap_client *nvmap = nvhost_get_host(ctx->channel->dev)->nvmap;
 
 	if (ctx->restore_virt) {
 		nvmap_munmap(ctx->restore, ctx->restore_virt);
@@ -147,7 +148,7 @@ void nvhost_3dctx_put(struct nvhost_hwctx *ctx)
 	kref_put(&ctx->ref, nvhost_3dctx_free);
 }
 
-int nvhost_gr3d_prepare_power_off(struct nvhost_module *mod)
+int nvhost_gr3d_prepare_power_off(struct nvhost_device *dev)
 {
-	return nvhost_t20_save_context(mod, NVSYNCPT_3D);
+	return host1x_save_context(dev, NVSYNCPT_3D);
 }

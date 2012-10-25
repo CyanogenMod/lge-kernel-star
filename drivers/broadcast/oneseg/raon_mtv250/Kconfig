@@ -1,0 +1,14 @@
+#
+# LG2102_DEVICE subsystem configuration
+#
+
+#menu "MTV250 support"
+
+config MTV250_ISDB_T
+	default n
+	---help---
+	  This driver implements the front-end of the Xen virtual
+	  keyboard and mouse device driver.  It communicates with a back-end
+	  in another domain.
+  
+#endmenu

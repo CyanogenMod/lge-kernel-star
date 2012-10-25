@@ -99,6 +99,16 @@
 #define TPS80031_PREQ3_RES_ASS_A	0xDD
 #define TPS80031_PHOENIX_MSK_TRANSITION 0x20
 
+#define TPS80031_CFG_INPUT_PUPD1 0xF0
+#define TPS80031_CFG_INPUT_PUPD2 0xF1
+#define TPS80031_CFG_INPUT_PUPD3 0xF2
+#define TPS80031_CFG_INPUT_PUPD4 0xF3
+
+struct tps80031_pupd_data {
+	u8	reg;
+	u8	pullup_bit;
+	u8	pulldown_bit;
+};
 
 static u8 pmc_ext_control_base[] = {
 	REGEN1_BASE_ADD,
@@ -180,6 +190,31 @@ static const struct tps80031_irq_data tps80031_irqs[] = {
 						MFAULT_WDG,	FAULT_WDG),
 	[TPS80031_INT_LINCH_GATED]	= TPS80031_IRQ_SEC(C, 4, CHRG_CTRL,
 						MLINCH_GATED,	LINCH_GATED),
+};
+
+#define PUPD_DATA(_reg, _pulldown_bit, _pullup_bit)	\
+	{						\
+		.reg = TPS80031_CFG_INPUT_PUPD##_reg,	\
+		.pulldown_bit = _pulldown_bit,		\
+		.pullup_bit = _pullup_bit,		\
+	}
+
+static const struct tps80031_pupd_data tps80031_pupds[] = {
+	[TPS80031_PREQ1]		= PUPD_DATA(1, 1 << 0,	1 << 1	),
+	[TPS80031_PREQ2A]		= PUPD_DATA(1, 1 << 2,	1 << 3	),
+	[TPS80031_PREQ2B]		= PUPD_DATA(1, 1 << 4,	1 << 5	),
+	[TPS80031_PREQ2C]		= PUPD_DATA(1, 1 << 6,	1 << 7	),
+	[TPS80031_PREQ3]		= PUPD_DATA(2, 1 << 0,	1 << 1	),
+	[TPS80031_NRES_WARM]		= PUPD_DATA(2, 0,	1 << 2	),
+	[TPS80031_PWM_FORCE]		= PUPD_DATA(2, 1 << 5,	0	),
+	[TPS80031_CHRG_EXT_CHRG_STATZ]	= PUPD_DATA(2, 0,	1 << 6	),
+	[TPS80031_SIM]			= PUPD_DATA(3, 1 << 0,	1 << 1	),
+	[TPS80031_MMC]			= PUPD_DATA(3, 1 << 2,	1 << 3	),
+	[TPS80031_GPADC_START]		= PUPD_DATA(3, 1 << 4,	0	),
+	[TPS80031_DVSI2C_SCL]		= PUPD_DATA(4, 0,	1 << 0	),
+	[TPS80031_DVSI2C_SDA]		= PUPD_DATA(4, 0,	1 << 1	),
+	[TPS80031_CTLI2C_SCL]		= PUPD_DATA(4, 0,	1 << 2	),
+	[TPS80031_CTLI2C_SDA]		= PUPD_DATA(4, 0,	1 << 3	),
 };
 
 static const int controller_stat1_irq_nr[] = {
@@ -508,6 +543,30 @@ int tps80031_power_off(void)
 	return __tps80031_write(tps->client, TPS80031_PHOENIX_DEV_ON, DEVOFF);
 }
 
+static void tps80031_pupd_init(struct tps80031 *tps80031,
+			       struct tps80031_platform_data *pdata)
+{
+	struct tps80031_pupd_init_data *pupd_init_data = pdata->pupd_init_data;
+	int data_size = pdata->pupd_init_data_size;
+	int i;
+
+	for (i = 0; i < data_size; ++i) {
+		struct tps80031_pupd_init_data *pupd_init = &pupd_init_data[i];
+		const struct tps80031_pupd_data *pupd =
+			&tps80031_pupds[pupd_init->input_pin];
+		u8 update_value = 0;
+		u8 update_mask = pupd->pulldown_bit | pupd->pullup_bit;
+
+		if (pupd_init->setting == TPS80031_PUPD_PULLDOWN)
+			update_value = pupd->pulldown_bit;
+		else if (pupd_init->setting == TPS80031_PUPD_PULLUP)
+			update_value = pupd->pullup_bit;
+
+		tps80031_update(tps80031->dev, SLAVE_ID1, pupd->reg,
+				update_value, update_mask);
+	}
+}
+
 static void tps80031_init_ext_control(struct tps80031 *tps80031,
 			struct tps80031_platform_data *pdata) {
 	int ret;
@@ -814,8 +873,8 @@ static irqreturn_t tps80031_irq(int irq, void *data)
 	acks = (tmp[2] << 16) | (tmp[1] << 8) | tmp[0];
 
 	if (acks) {
-		ret = tps80031_writes(tps80031->dev, SLAVE_ID2,
-				      TPS80031_INT_STS_A, 3, tmp);
+		ret = tps80031_write(tps80031->dev, SLAVE_ID2,
+				      TPS80031_INT_STS_A, 0);
 		if (ret < 0) {
 			dev_err(tps80031->dev, "failed to write "
 						"interrupt status\n");
@@ -1196,6 +1255,9 @@ static int __devinit tps80031_i2c_probe(struct i2c_client *client,
 			goto fail;
 		}
 	}
+
+	tps80031_pupd_init(tps80031, pdata);
+
 	tps80031_init_ext_control(tps80031, pdata);
 
 	ret = tps80031_add_subdevs(tps80031, pdata);

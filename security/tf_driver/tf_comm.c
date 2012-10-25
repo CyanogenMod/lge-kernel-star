@@ -208,6 +208,7 @@ struct tf_coarse_page_table *tf_alloc_coarse_page_table(
 		}
 
 		array->type = type;
+		array->ref_count = 0;
 		INIT_LIST_HEAD(&(array->list));
 
 		/* now allocate the actual page the page descriptor describes */
@@ -455,12 +456,11 @@ u32 tf_get_l2_descriptor_common(u32 vaddr, struct mm_struct *mm)
 			/*
 			 * Linux's pte doesn't keep track of TEX value.
 			 * Have to jump to hwpte see include/asm/pgtable.h
-			 * (-2k before 2.6.38, then +2k)
 			 */
 #ifdef PTE_HWTABLE_SIZE
-			hwpte = (u32 *) (ptep+PTE_HWTABLE_PTRS);
+			hwpte = (u32 *) (ptep + PTE_HWTABLE_PTRS);
 #else
-			hwpte = (u32 *) (ptep-PTRS_PER_PTE);
+			hwpte = (u32 *) (ptep - PTRS_PER_PTE);
 #endif
 			if (((*hwpte) & L2_DESCRIPTOR_ADDR_MASK) !=
 					((*ptep) & L2_DESCRIPTOR_ADDR_MASK))
@@ -839,52 +839,28 @@ int tf_fill_descriptor_table(
 					goto error;
 				}
 			}
-		} else if (is_vmalloc_addr((void *)buffer_offset_vaddr)) {
-			/* Kernel-space memory obtained through vmalloc */
+		} else {
+			/* Kernel-space memory */
 			dprintk(KERN_INFO
 				"tf_fill_descriptor_table: "
-				"vmalloc'ed buffer starting at %p\n",
+				"buffer starting at %p\n",
 			       (void *)buffer_offset_vaddr);
 			for (j = page_shift; j < pages_to_get; j++) {
 				struct page *page;
 				void *addr =
 					(void *)(buffer_offset_vaddr +
 						(j - page_shift) * PAGE_SIZE);
-				page = vmalloc_to_page(addr);
+
+				if (is_vmalloc_addr(
+						(void *) buffer_offset_vaddr))
+					page = vmalloc_to_page(addr);
+				else
+					page = virt_to_page(addr);
+
 				if (page == NULL) {
 					dprintk(KERN_ERR
 						"tf_fill_descriptor_table: "
 						"cannot map %p (vmalloc) "
-						"to page\n",
-						addr);
-					ret = -EFAULT;
-					goto error;
-				}
-				coarse_pg_table->descriptors[j] = (u32)page;
-				get_page(page);
-
-				/* change coarse page "page address" */
-				tf_get_l2_page_descriptor(
-					&coarse_pg_table->descriptors[j],
-					flags,
-					&init_mm);
-			}
-		} else {
-			/* Kernel-space memory given by a virtual address */
-			dprintk(KERN_INFO
-				"tf_fill_descriptor_table: "
-				"buffer starting at virtual address %p\n",
-			       (void *)buffer_offset_vaddr);
-			for (j = page_shift; j < pages_to_get; j++) {
-				struct page *page;
-				void *addr =
-					(void *)(buffer_offset_vaddr +
-						(j - page_shift) * PAGE_SIZE);
-				page = virt_to_page(addr);
-				if (page == NULL) {
-					dprintk(KERN_ERR
-						"tf_fill_descriptor_table: "
-						"cannot map %p (virtual) "
 						"to page\n",
 						addr);
 					ret = -EFAULT;
@@ -1255,10 +1231,6 @@ static int tf_send_recv(struct tf_comm *comm,
 #endif
 	dprintk(KERN_INFO "[pid=%d] tf_send_recv(%p)\n",
 		 current->pid, command);
-
-#ifdef CONFIG_TF_ZEBRA
-	tf_clock_timer_start();
-#endif
 
 #ifdef CONFIG_FREEZER
 	saved_flags = current->flags;

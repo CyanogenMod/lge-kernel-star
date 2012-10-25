@@ -1033,51 +1033,37 @@ static int ov5650_set_mode(struct ov5650_info *info, struct ov5650_mode *mode)
 
 static int ov5650_set_frame_length(struct ov5650_info *info, u32 frame_length)
 {
-	struct ov5650_reg reg_list[2];
-	int i = 0;
 	int ret;
+	struct ov5650_reg reg_list[2];
+	u8 *b_ptr = info->i2c_trans_buf;
 
 	ov5650_get_frame_length_regs(reg_list, frame_length);
 
-	for (i = 0; i < 2; i++)	{
-		ret = ov5650_write_reg_helper(info, reg_list[i].addr,
-			reg_list[i].val);
-		if (ret)
-			return ret;
-	}
+	*b_ptr++ = reg_list[0].addr >> 8;
+	*b_ptr++ = reg_list[0].addr & 0xff;
+	*b_ptr++ = reg_list[0].val & 0xff;
+	*b_ptr++ = reg_list[1].val & 0xff;
+	ret = ov5650_write_bulk_reg_helper(info, 4);
 
-	return 0;
+	return ret;
 }
 
 static int ov5650_set_coarse_time(struct ov5650_info *info, u32 coarse_time)
 {
 	int ret;
-
 	struct ov5650_reg reg_list[3];
-	int i = 0;
+	u8 *b_ptr = info->i2c_trans_buf;
 
 	ov5650_get_coarse_time_regs(reg_list, coarse_time);
 
-	ret = ov5650_write_reg_helper(info, 0x3212, 0x01);
-	if (ret)
-		return ret;
+	*b_ptr++ = reg_list[0].addr >> 8;
+	*b_ptr++ = reg_list[0].addr & 0xff;
+	*b_ptr++ = reg_list[0].val & 0xff;
+	*b_ptr++ = reg_list[1].val & 0xff;
+	*b_ptr++ = reg_list[2].val & 0xff;
+	ret = ov5650_write_bulk_reg_helper(info, 5);
 
-	for (i = 0; i < 3; i++)	{
-		ret = ov5650_write_reg_helper(info, reg_list[i].addr,
-			reg_list[i].val);
-		if (ret)
-			return ret;
-	}
-
-	ret = ov5650_write_reg_helper(info, 0x3212, 0x11);
-	if (ret)
-		return ret;
-
-	ret = ov5650_write_reg_helper(info, 0x3212, 0xa1);
-	if (ret)
-		return ret;
-
-	return 0;
+	return ret;
 }
 
 static int ov5650_set_gain(struct ov5650_info *info, u16 gain)
@@ -1086,11 +1072,52 @@ static int ov5650_set_gain(struct ov5650_info *info, u16 gain)
 	struct ov5650_reg reg_list;
 
 	ov5650_get_gain_reg(&reg_list, gain);
-
 	ret = ov5650_write_reg_helper(info, reg_list.addr, reg_list.val);
 
 	return ret;
 }
+
+static int ov5650_set_group_hold(struct ov5650_info *info, struct ov5650_ae *ae)
+{
+	int ret;
+	int count = 0;
+	bool groupHoldEnabled = false;
+
+	if (ae->gain_enable)
+		count++;
+	if (ae->coarse_time_enable)
+		count++;
+	if (ae->frame_length_enable)
+		count++;
+	if (count >= 2)
+		groupHoldEnabled = true;
+
+	if (groupHoldEnabled) {
+		ret = ov5650_write_reg_helper(info, 0x3212, 0x01);
+		if (ret)
+			return ret;
+	}
+
+	if (ae->gain_enable)
+		ov5650_set_gain(info, ae->gain);
+	if (ae->coarse_time_enable)
+		ov5650_set_coarse_time(info, ae->coarse_time);
+	if (ae->frame_length_enable)
+		ov5650_set_frame_length(info, ae->frame_length);
+
+	if (groupHoldEnabled) {
+		ret = ov5650_write_reg_helper(info, 0x3212, 0x11);
+		if (ret)
+			return ret;
+
+		ret = ov5650_write_reg_helper(info, 0x3212, 0xa1);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
 
 static int ov5650_set_binning(struct ov5650_info *info, u8 enable)
 {
@@ -1305,6 +1332,17 @@ static long ov5650_ioctl(struct file *file,
 		if (err)
 			pr_err("%s %d %d\n", __func__, __LINE__, err);
 		return err;
+	}
+	case OV5650_IOCTL_SET_GROUP_HOLD:
+	{
+		struct ov5650_ae ae;
+		if (copy_from_user(&ae,
+				(const void __user *)arg,
+				sizeof(struct ov5650_ae))) {
+			pr_info("%s %d\n", __func__, __LINE__);
+			return -EFAULT;
+		}
+		return ov5650_set_group_hold(info, &ae);
 	}
 	default:
 		return -EINVAL;

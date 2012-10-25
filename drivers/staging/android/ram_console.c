@@ -26,6 +26,15 @@
 #include <linux/rslib.h>
 #endif
 
+//LGE_CHNAGE_S  euikyeom.kim@lge.com from sunghoon.kim@lge.com
+#if defined (CONFIG_STAR_REBOOT_MONITOR) || defined (CONFIG_BSSQ_REBOOT_MONITOR)
+#define RAM_RESERVED_SIZE 100*1024
+void *reserved_buffer;
+#else
+#define RAM_RESERVED_SIZE 0
+#endif
+//LGE_CHNAGE_E  euikyeom.kim@lge.com from sunghoon.kim@lge.com
+
 struct ram_console_buffer {
 	uint32_t    sig;
 	uint32_t    start;
@@ -333,14 +342,56 @@ static int ram_console_driver_probe(struct platform_device *pdev)
 	start = res->start;
 	printk(KERN_INFO "ram_console: got buffer at %zx, size %zx\n",
 	       start, buffer_size);
+    
+//LGE_CHNAGE_S  euikyeom.kim@lge.com from sunghoon.kim@lge.com    
+#if defined (CONFIG_STAR_REBOOT_MONITOR) || defined (CONFIG_BSSQ_REBOOT_MONITOR)
+       buffer = ioremap(res->start, (buffer_size+RAM_RESERVED_SIZE));
+#else
 	buffer = ioremap(res->start, buffer_size);
+#endif
+//LGE_CHNAGE_E  euikyeom.kim@lge.com from sunghoon.kim@lge.com
+
 	if (buffer == NULL) {
 		printk(KERN_ERR "ram_console: failed to map memory\n");
 		return -ENOMEM;
 	}
 
+//LGE_CHNAGE_S  euikyeom.kim@lge.com from sunghoon.kim@lge.com
+#if defined (CONFIG_STAR_REBOOT_MONITOR) || defined (CONFIG_BSSQ_REBOOT_MONITOR)
+        reserved_buffer = buffer + buffer_size;
+        printk ("ram console: ram_console virtual addr = 0x%x \n", buffer);
+        printk ("ram console: reserved_buffer virtual = 0x%x \n", reserved_buffer);
+        printk ("ram console: reserved_buffer physical= 0x%x \n", start+buffer_size);
+#endif
+//LGE_CHNAGE_E  euikyeom.kim@lge.com from sunghoon.kim@lge.com
+
 	return ram_console_init(buffer, buffer_size, NULL/* allocate */);
 }
+
+//LGE_CHNAGE_S  euikyeom.kim@lge.com from sunghoon.kim@lge.com
+#if defined (CONFIG_STAR_REBOOT_MONITOR) || defined (CONFIG_BSSQ_REBOOT_MONITOR)
+void write_cmd_reserved_buffer(unsigned char *buf, size_t len)
+{
+    memcpy(reserved_buffer, buf, len);
+     
+}
+void read_cmd_reserved_buffer(unsigned char *buf, size_t len)
+{
+	memcpy(buf, reserved_buffer, len);
+}
+EXPORT_SYMBOL_GPL(write_cmd_reserved_buffer);
+EXPORT_SYMBOL_GPL(read_cmd_reserved_buffer);
+#else
+void write_cmd_reserved_buffer(unsigned char *buf, size_t len)
+{
+}
+void read_cmd_reserved_buffer(unsigned char *buf, size_t len)
+{
+}
+EXPORT_SYMBOL_GPL(write_cmd_reserved_buffer);
+EXPORT_SYMBOL_GPL(read_cmd_reserved_buffer);
+#endif
+//LGE_CHNAGE_E  euikyeom.kim@lge.com from sunghoon.kim@lge.com
 
 static struct platform_driver ram_console_driver = {
 	.probe = ram_console_driver_probe,

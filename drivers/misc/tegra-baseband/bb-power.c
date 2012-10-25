@@ -24,6 +24,7 @@
 #include <linux/workqueue.h>
 #include <linux/delay.h>
 #include <linux/fs.h>
+#include <linux/usb.h>
 #include <linux/uaccess.h>
 #include <linux/platform_data/tegra_usb.h>
 #include <mach/usb_phy.h>
@@ -32,6 +33,7 @@
 
 static struct tegra_bb_callback *callback;
 static int attr_load_val;
+static struct tegra_bb_power_mdata *mdata;
 static bb_get_cblist get_cblist[] = {
 	NULL,
 	NULL,
@@ -90,11 +92,14 @@ static int tegra_bb_power_gpio_init(struct tegra_bb_power_gdata *gdata)
 								, __func__);
 				return ret;
 			}
-			ret = enable_irq_wake(irq);
-			if (ret) {
-				pr_err("%s: Error: enable_irq_wake failed.\n",
+
+			if (gpioirq->wake_capable) {
+				ret = enable_irq_wake(irq);
+				if (ret) {
+					pr_err("%s: Error: irqwake req fail.\n",
 								__func__);
-				return ret;
+					return ret;
+				}
 			}
 		}
 	}
@@ -147,10 +152,56 @@ static ssize_t tegra_bb_attr_read(struct device *dev,
 static DEVICE_ATTR(load, S_IRUSR | S_IWUSR | S_IRGRP,
 		tegra_bb_attr_read, tegra_bb_attr_write);
 
+static void tegra_usbdevice_added(struct usb_device *udev)
+{
+	const struct usb_device_descriptor *desc = &udev->descriptor;
+
+	if (desc->idVendor == mdata->vid &&
+	    desc->idProduct == mdata->pid) {
+		pr_debug("%s: Device %s added.\n", udev->product, __func__);
+
+		if (mdata->wake_capable)
+			device_set_wakeup_enable(&udev->dev, true);
+		if (mdata->autosuspend_ready)
+			usb_enable_autosuspend(udev);
+		if (mdata->reg_cb)
+			mdata->reg_cb(udev);
+	}
+}
+
+static void tegra_usbdevice_removed(struct usb_device *udev)
+{
+	const struct usb_device_descriptor *desc = &udev->descriptor;
+
+	if (desc->idVendor == mdata->vid &&
+	    desc->idProduct == mdata->pid) {
+		pr_debug("%s: Device %s removed.\n", udev->product, __func__);
+	}
+}
+
+static int tegra_usb_notify(struct notifier_block *self, unsigned long action,
+		      void *dev)
+{
+	switch (action) {
+	case USB_DEVICE_ADD:
+		tegra_usbdevice_added((struct usb_device *)dev);
+		break;
+	case USB_DEVICE_REMOVE:
+		tegra_usbdevice_removed((struct usb_device *)dev);
+		break;
+	}
+	return NOTIFY_OK;
+}
+
+static struct notifier_block tegra_usb_nb = {
+	.notifier_call = tegra_usb_notify,
+};
+
 static int tegra_bb_power_probe(struct platform_device *device)
 {
 	struct device *dev = &device->dev;
 	struct tegra_bb_pdata *pdata;
+	struct tegra_bb_power_data *data;
 	struct tegra_bb_power_gdata *gdata;
 	int err;
 	unsigned int bb_id;
@@ -166,9 +217,10 @@ static int tegra_bb_power_probe(struct platform_device *device)
 	if (get_cblist[bb_id] != NULL) {
 		callback = (struct tegra_bb_callback *) get_cblist[bb_id]();
 		if (callback && callback->init) {
-			gdata = (struct tegra_bb_power_gdata *)
+			data = (struct tegra_bb_power_data *)
 			callback->init((void *)pdata);
 
+			gdata = data->gpio_data;
 			if (!gdata) {
 				pr_err("%s - Error: Gpio data is empty.\n",
 								__func__);
@@ -177,6 +229,11 @@ static int tegra_bb_power_probe(struct platform_device *device)
 
 			/* Initialize gpio as required */
 			tegra_bb_power_gpio_init(gdata);
+
+			mdata = data->modem_data;
+			if (mdata && mdata->vid && mdata->pid)
+				/* Register to notifications from usb core */
+				usb_register_notify(&tegra_usb_nb);
 		} else {
 			pr_err("%s - Error: init callback is empty.\n",
 								__func__);
@@ -201,20 +258,27 @@ static int tegra_bb_power_probe(struct platform_device *device)
 static int tegra_bb_power_remove(struct platform_device *device)
 {
 	struct device *dev = &device->dev;
+	struct tegra_bb_power_data *data;
 	struct tegra_bb_power_gdata *gdata;
 
 	/* BB specific callback */
 	if (callback && callback->deinit) {
-		gdata = (struct tegra_bb_power_gdata *)
+		data = (struct tegra_bb_power_data *)
 		callback->deinit();
 
 		/* Deinitialize gpios */
+		gdata = data->gpio_data;
 		if (gdata)
 			tegra_bb_power_gpio_deinit(gdata);
 		else {
 			pr_err("%s - Error: Gpio data is empty.\n", __func__);
 			return -ENODEV;
 		}
+
+		mdata = data->modem_data;
+		if (mdata && mdata->vid && mdata->pid)
+			/* Register to notifications from usb core */
+			usb_unregister_notify(&tegra_usb_nb);
 	}
 
 	/* Remove the control sysfs node */

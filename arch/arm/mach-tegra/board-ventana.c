@@ -174,6 +174,7 @@ static struct tegra_ehci_platform_data ventana_ehci2_ulpi_platform_data = {
 	.power_down_on_bus_suspend = 1,
 	.phy_config = &ventana_ehci2_ulpi_phy_config,
 	.phy_type = TEGRA_USB_PHY_TYPE_LINK_ULPI,
+	.default_enable = true,
 };
 
 static struct tegra_i2c_platform_data ventana_i2c1_platform_data = {
@@ -518,18 +519,21 @@ static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
 			.phy_config = &utmi_phy_config[0],
 			.operating_mode = TEGRA_USB_HOST,
 			.power_down_on_bus_suspend = 1,
+			.default_enable = true,
 	},
 	[1] = {
 			.phy_config = &ulpi_phy_config,
 			.operating_mode = TEGRA_USB_HOST,
 			.power_down_on_bus_suspend = 1,
 			.phy_type = TEGRA_USB_PHY_TYPE_LINK_ULPI,
+			.default_enable = true,
 	},
 	[2] = {
 			.phy_config = &utmi_phy_config[1],
 			.operating_mode = TEGRA_USB_HOST,
 			.power_down_on_bus_suspend = 1,
 			.hotplug = 1,
+			.default_enable = true,
 	},
 };
 
@@ -591,7 +595,7 @@ static void __init tegra_ventana_init(void)
 	tegra_ehci2_device.dev.platform_data
 		= &ventana_ehci2_ulpi_platform_data;
 	platform_add_devices(ventana_devices, ARRAY_SIZE(ventana_devices));
-
+	tegra_ram_console_debug_init();
 	ventana_sdhci_init();
 	ventana_charge_init();
 	ventana_regulator_init();
@@ -640,6 +644,7 @@ void __init tegra_ventana_reserve(void)
 		pr_warn("Cannot reserve first 4K of memory for safety\n");
 
 	tegra_reserve(SZ_256M, SZ_8M + SZ_1M, SZ_16M);
+	tegra_ram_console_debug_reserve(SZ_1M);
 }
 
 MACHINE_START(VENTANA, "ventana")

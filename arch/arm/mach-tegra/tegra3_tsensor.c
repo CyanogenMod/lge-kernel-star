@@ -16,16 +16,18 @@
 
 #include <linux/kernel.h>
 #include <linux/init.h>
-
-#ifdef CONFIG_SENSORS_TEGRA_TSENSOR
-#include <mach/tsensor.h>
-#include <mach/tegra_fuse.h>
-#include <devices.h>
-#include <mach/iomap.h>
-#include <mach/thermal.h>
 #include <linux/io.h>
 #include <linux/ioport.h>
 #include <linux/slab.h>
+
+#include <mach/tsensor.h>
+#include <mach/tegra_fuse.h>
+#include <mach/iomap.h>
+#include <mach/thermal.h>
+#include <mach/tsensor.h>
+
+#include "devices.h"
+#include "tegra3_tsensor.h"
 
 /* fuse revision constants used for tsensor */
 #define TSENSOR_FUSE_REVISION_DECIMAL 8
@@ -116,12 +118,9 @@ static void tegra3_tsensor_probe_callback(struct tegra_tsensor_data *data)
 	if (tegra_thermal_set_device(thermal_device)) /* This should not fail */
 		BUG();
 }
-#endif
 
 static struct tegra_tsensor_platform_data tsensor_data = {
-#ifdef CONFIG_TEGRA_INTERNAL_TSENSOR_EDP_SUPPORT
 	.probe_callback = tegra3_tsensor_probe_callback,
-#endif
 };
 
 void __init tegra3_tsensor_init(struct tegra_tsensor_pmu_data *data)
@@ -187,8 +186,8 @@ labelSkipPowerOff:
 labelEnd:
 	return;
 }
-
 #else
-void __init tegra3_tsensor_init(void) { }
+void __init tegra3_tsensor_init(struct tegra_tsensor_pmu_data *data)
+{
+}
 #endif
-

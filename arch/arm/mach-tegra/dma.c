@@ -290,7 +290,7 @@ int tegra_dma_dequeue_req(struct tegra_dma_channel *ch,
 	}
 	if (!found) {
 		spin_unlock_irqrestore(&ch->lock, irq_flags);
-		return 0;
+		return -ENOENT;
 	}
 
 	if (!stop)
@@ -570,10 +570,16 @@ static void tegra_dma_update_hw(struct tegra_dma_channel *ch,
 	case TEGRA_DMA_REQ_SEL_APBIF_CH3:
 #endif
 	case TEGRA_DMA_REQ_SEL_SPI:
+		/* dtv interface has fixed burst size of 4 */
+		if (req->fixed_burst_size) {
+			ahb_seq |= AHB_SEQ_BURST_4;
+			break;
+		}
 		/* For spi/slink the burst size based on transfer size
-		 * i.e. if multiple of 32 bytes then busrt is
-		 * 8 word else if multiple of 16 bytes then burst is
-		 * 4 word else burst size is 1 word */
+		 * i.e. if multiple of 32 bytes then busrt is 8
+		 * word(8x32bits) else if multiple of 16 bytes then
+		 * burst is 4 word(4x32bits) else burst size is 1
+		 * word(1x32bits) */
 		if (req->size & 0xF)
 			ahb_seq |= AHB_SEQ_BURST_1;
 		else if ((req->size >> 4) & 0x1)
@@ -581,7 +587,6 @@ static void tegra_dma_update_hw(struct tegra_dma_channel *ch,
 		else
 			ahb_seq |= AHB_SEQ_BURST_8;
 		break;
-
 #if defined(CONFIG_ARCH_TEGRA_2x_SOC)
 	case TEGRA_DMA_REQ_SEL_I2S_2:
 	case TEGRA_DMA_REQ_SEL_I2S_1:

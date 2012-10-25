@@ -28,6 +28,11 @@ struct tegra_sdhci_platform_data {
 	unsigned int max_clk_limit;
 	unsigned int tap_delay;
 	struct mmc_platform_data mmc_data;
+	// LGE_CHANGE [dojip.kim@lge.com] 2010-12-31, [LGE_AP20] from Star
+#ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
+	unsigned int startoffset;
+#endif
+
 };
 
 #endif

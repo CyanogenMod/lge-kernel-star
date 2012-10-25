@@ -27,7 +27,7 @@
  * 02110-1301 USA
  *
  */
-
+#include <asm/mach-types.h>
 #include <linux/clk.h>
 #include <linux/module.h>
 #include <linux/debugfs.h>
@@ -222,7 +222,7 @@ static int tegra20_i2s_hw_params(struct snd_pcm_substream *substream,
 	i2sclock = srate * params_channels(params) * sample_size * 2;
 
 	/* Additional "* 2" is needed for DSP mode */
-	if (i2s->reg_ctrl & TEGRA20_I2S_CTRL_BIT_FORMAT_DSP)
+	if (i2s->reg_ctrl & TEGRA20_I2S_CTRL_BIT_FORMAT_DSP && !machine_is_whistler())
 		i2sclock *= 2;
 
 	ret = clk_set_rate(i2s->clk_i2s, i2sclock);
@@ -249,9 +249,14 @@ static int tegra20_i2s_hw_params(struct snd_pcm_substream *substream,
 
 	tegra20_i2s_write(i2s, TEGRA20_I2S_TIMING, reg);
 
-	tegra20_i2s_write(i2s, TEGRA20_I2S_FIFO_SCR,
-		TEGRA20_I2S_FIFO_SCR_FIFO2_ATN_LVL_FOUR_SLOTS |
-		TEGRA20_I2S_FIFO_SCR_FIFO1_ATN_LVL_FOUR_SLOTS);
+	if (sample_size * params_channels(params) >= 32)
+		tegra20_i2s_write(i2s, TEGRA20_I2S_FIFO_SCR,
+			TEGRA20_I2S_FIFO_SCR_FIFO2_ATN_LVL_FOUR_SLOTS |
+			TEGRA20_I2S_FIFO_SCR_FIFO1_ATN_LVL_FOUR_SLOTS);
+	else
+		tegra20_i2s_write(i2s, TEGRA20_I2S_FIFO_SCR,
+			TEGRA20_I2S_FIFO_SCR_FIFO2_ATN_LVL_EIGHT_SLOTS |
+			TEGRA20_I2S_FIFO_SCR_FIFO1_ATN_LVL_EIGHT_SLOTS);
 
 	i2s->reg_ctrl &= ~TEGRA20_I2S_CTRL_FIFO_FORMAT_MASK;
 	reg = tegra20_i2s_read(i2s, TEGRA20_I2S_PCM_CTRL);
@@ -263,12 +268,17 @@ static int tegra20_i2s_hw_params(struct snd_pcm_substream *substream,
 		else
 			i2s->reg_ctrl |= TEGRA20_I2S_CTRL_FIFO_FORMAT_32;
 
+		i2s->capture_dma_data.width = sample_size;
+		i2s->playback_dma_data.width = sample_size;
+
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 			reg |= TEGRA20_I2S_PCM_CTRL_TRM_MODE_EN;
 		else
 			reg |= TEGRA20_I2S_PCM_CTRL_RCV_MODE_EN;
 	} else {
 		i2s->reg_ctrl |= TEGRA20_I2S_CTRL_FIFO_FORMAT_PACKED;
+		i2s->capture_dma_data.width = 32;
+		i2s->playback_dma_data.width = 32;
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 			reg &= ~TEGRA20_I2S_PCM_CTRL_TRM_MODE_EN;
 		else
@@ -365,6 +375,11 @@ static int tegra20_i2s_probe(struct snd_soc_dai *dai)
 }
 
 #ifdef CONFIG_PM
+int tegra20_i2s_suspend(struct snd_soc_dai *cpu_dai)
+{
+	tegra20_das_suspend();
+}
+
 int tegra20_i2s_resume(struct snd_soc_dai *cpu_dai)
 {
 	struct tegra20_i2s *i2s = snd_soc_dai_get_drvdata(cpu_dai);
@@ -403,6 +418,7 @@ struct snd_soc_dai_driver tegra20_i2s_dai[] = {
 		.name = DRV_NAME ".0",
 		.probe = tegra20_i2s_probe,
 		.resume = tegra20_i2s_resume,
+		.suspend = tegra20_i2s_suspend,
 		.playback = {
 			.channels_min = 1,
 			.channels_max = 2,
@@ -422,6 +438,7 @@ struct snd_soc_dai_driver tegra20_i2s_dai[] = {
 		.name = DRV_NAME ".1",
 		.probe = tegra20_i2s_probe,
 		.resume = tegra20_i2s_resume,
+		.suspend = tegra20_i2s_suspend,
 		.playback = {
 			.channels_min = 1,
 			.channels_max = 2,

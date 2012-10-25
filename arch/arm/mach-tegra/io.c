@@ -76,6 +76,12 @@ static struct map_desc tegra_io_desc[] __initdata = {
 		.length = IO_SDMMC_SIZE,
 		.type = MT_DEVICE,
 	},
+	{
+		.virtual = IO_PPCS_VIRT,
+		.pfn = __phys_to_pfn(IO_PPCS_PHYS),
+		.length = IO_PPCS_SIZE,
+		.type = MT_DEVICE,
+	}
 };
 
 void __init tegra_map_common_io(void)

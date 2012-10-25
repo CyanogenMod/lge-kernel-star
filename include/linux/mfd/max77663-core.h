@@ -110,6 +110,11 @@ enum max77663_gpio_alt {
 	GPIO_ALT_DISABLE,
 };
 
+/*
+ * Flags
+ */
+#define SLP_LPM_ENABLE		0x01
+
 struct max77663_gpio_config {
 	int gpio;	/* gpio number */
 	enum max77663_gpio_dir dir;
@@ -129,6 +134,8 @@ struct max77663_platform_data {
 
 	int num_subdevs;
 	struct mfd_cell *sub_devices;
+
+	unsigned int flags;
 };
 
 #if defined(CONFIG_MFD_MAX77663)

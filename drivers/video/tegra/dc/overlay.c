@@ -28,7 +28,7 @@
 #include <linux/tegra_overlay.h>
 #include <linux/uaccess.h>
 #include <drm/drm_fixed.h>
-
+#include <video/tegrafb.h>     //2011.07.27 pyocool.cho@lge.com "for kernel panic"
 #include <asm/atomic.h>
 
 #include <mach/dc.h>
@@ -274,6 +274,12 @@ static void tegra_overlay_blend_reorder(struct tegra_dc_blend *blend,
 	windows[below]->flags |= blend->flags[idx];
 }
 
+/*
+ * 2011.07.27 pyocool.cho@lge.com "for kernel panic"
+ */
+#if defined (CONFIG_PANICRPT)    
+extern int panicrpt_ispanic (void);
+#endif /* CONFIG_PANICRPT */
 static int tegra_overlay_flip_didim(struct tegra_overlay_flip_data *data)
 {
 	mutex_lock(&tegra_flip_lock);
@@ -355,6 +361,13 @@ static void tegra_overlay_flip_worker(struct work_struct *work)
 	struct nvmap_handle_ref *unpin_handles[TEGRA_FB_FLIP_N_WINDOWS];
 	int i, nr_win = 0, nr_unpin = 0;
 
+/*
+ * 2011.07.27 pyocool.cho@lge.com "for kernel panic"
+ */
+#if defined (CONFIG_PANICRPT)    
+    if (panicrpt_ispanic ())
+        return;
+#endif /* CONFIG_PANICRPT */
 	data = container_of(work, struct tegra_overlay_flip_data, work);
 
 	for (i = 0; i < TEGRA_FB_FLIP_N_WINDOWS; i++) {

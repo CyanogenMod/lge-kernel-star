@@ -153,3 +153,18 @@ bool fsl_udc_charger_detect(void)
 {
 	return tegra_usb_phy_charger_detect(phy);
 }
+
+void fsl_udc_dtd_prepare(void)
+{
+	/* When we are programming two DTDs very close to each other,
+	 * the second DTD is being prefetched before it is actually written
+	 * to DDR. To prevent this, we disable prefetcher before programming
+	 * any new DTD and re-enable it before priming endpoint.
+	 */
+	tegra_usb_phy_memory_prefetch_off(phy);
+}
+
+void fsl_udc_ep_barrier(void)
+{
+	tegra_usb_phy_memory_prefetch_on(phy);
+}

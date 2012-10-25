@@ -6,7 +6,7 @@
  * Author:
  *	Colin Cross <ccross@google.com>
  *
- * Copyright (C) 2010-2011, NVIDIA Corporation.
+ * Copyright (C) 2010-2012, NVIDIA Corporation.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -48,11 +48,12 @@
 #define PLLX			(1 << 15)
 #define MUX_PWM			(1 << 16)
 #define MUX8			(1 << 17)
-#define DIV_U71_UART		(1 << 18)
+#define DIV_U151_UART		(1 << 18)
 #define MUX_CLK_OUT		(1 << 19)
 #define PLLM			(1 << 20)
 #define DIV_U71_INT		(1 << 21)
 #define DIV_U71_IDLE		(1 << 22)
+#define DIV_U151		(1 << 23)
 #define ENABLE_ON_INIT		(1 << 28)
 #define PERIPH_ON_APB		(1 << 29)
 #define PERIPH_ON_CBUS		(1 << 30)
@@ -169,14 +170,21 @@ struct clk {
 			unsigned long			fixed_rate;
 		} pll;
 		struct {
+			unsigned long			default_rate;
+		} pll_div;
+		struct {
 			u32				sel;
 			u32				reg_mask;
 		} mux;
 		struct {
 			struct clk			*main;
 			struct clk			*backup;
+			unsigned long			backup_rate;
 			enum cpu_mode			mode;
 		} cpu;
+		struct {
+			u32				div71;
+		} cclk;
 		struct {
 			struct clk			*pclk;
 			struct clk			*hclk;
@@ -232,12 +240,20 @@ unsigned long clk_get_min_rate(struct clk *c);
 unsigned long clk_get_rate_locked(struct clk *c);
 int clk_set_rate_locked(struct clk *c, unsigned long rate);
 int clk_set_parent_locked(struct clk *c, struct clk *parent);
+long clk_round_rate_locked(struct clk *c, unsigned long rate);
 int tegra_clk_shared_bus_update(struct clk *c);
 void tegra2_sdmmc_tap_delay(struct clk *c, int delay);
+void tegra3_set_cpu_skipper_delay(int delay);
 int tegra_emc_set_rate(unsigned long rate);
 long tegra_emc_round_rate(unsigned long rate);
 struct clk *tegra_emc_predict_parent(unsigned long rate, u32 *div_value);
 void tegra_emc_timing_invalidate(void);
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+static inline bool tegra_clk_is_parent_allowed(struct clk *c, struct clk *p)
+{ return true; }
+#else
+bool tegra_clk_is_parent_allowed(struct clk *c, struct clk *p);
+#endif
 
 static inline bool clk_is_auto_dvfs(struct clk *c)
 {
@@ -289,6 +305,12 @@ struct tegra_cpufreq_table_data {
 };
 struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void);
 unsigned long tegra_emc_to_cpu_ratio(unsigned long cpu_rate);
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+static inline int tegra_update_mselect_rate(unsigned long cpu_rate)
+{ return 0; }
+#else
+int tegra_update_mselect_rate(unsigned long cpu_rate);
+#endif
 #endif
 
 #endif

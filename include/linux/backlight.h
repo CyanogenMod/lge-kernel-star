@@ -55,6 +55,12 @@ struct backlight_ops {
 	/* Check if given framebuffer device is the one bound to this backlight;
 	   return 0 if not, !=0 if it is. If NULL, backlight always matches the fb. */
 	int (*check_fb)(struct backlight_device *, struct fb_info *);
+	
+// MOBII_S [shhong@mobii.co.kr] 2012-05-07 : Auto Brightness Setting From P990.
+#if defined (CONFIG_MACH_STAR_P990) || (CONFIG_MACH_STAR_SU660)
+	int (*update_modestatus)(struct backlight_device *);
+#endif
+// MOBII_E [shhong@mobii.co.kr] 2012-05-07 : Auto Brightness Setting From P990.
 };
 
 /* This structure defines all the properties of a backlight */
@@ -74,6 +80,12 @@ struct backlight_properties {
 	/* Flags used to signal drivers of state changes */
 	/* Upper 4 bits are reserved for driver internal use */
 	unsigned int state;
+	
+// MOBII_S [shhong@mobii.co.kr] 2012-05-07 : Auto Brightness Setting From P990.
+#if defined (CONFIG_MACH_STAR_P990) || (CONFIG_MACH_STAR_SU660)
+	int brightness_mode;
+#endif
+// MOBII_E [shhong@mobii.co.kr] 2012-05-07 : Auto Brightness Setting From P990.
 
 #define BL_CORE_SUSPENDED	(1 << 0)	/* backlight is suspended */
 #define BL_CORE_FBBLANK		(1 << 1)	/* backlight is under an fb blank event */
@@ -102,6 +114,18 @@ struct backlight_device {
 
 	struct device dev;
 };
+
+// MOBII_S [shhong@mobii.co.kr] 2012-05-07 : Auto Brightness Setting From P990.
+#if defined (CONFIG_MACH_STAR_P990) || (CONFIG_MACH_STAR_SU660)
+static inline void backlight_update_modestatus(struct backlight_device *bd)
+{
+	mutex_lock(&bd->update_lock);
+	if (bd->ops && bd->ops->update_modestatus)
+		bd->ops->update_modestatus(bd);
+	mutex_unlock(&bd->update_lock);
+}
+#endif
+// MOBII_E [shhong@mobii.co.kr] 2012-05-07 : Auto Brightness Setting From P990.
 
 static inline void backlight_update_status(struct backlight_device *bd)
 {

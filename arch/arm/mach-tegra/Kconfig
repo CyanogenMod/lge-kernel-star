@@ -2,6 +2,8 @@ if ARCH_TEGRA
 
 comment "NVIDIA Tegra options"
 
+config MACH_LGE
+	bool
 config ARCH_TEGRA_2x_SOC
 	bool "Tegra 2 family SOC"
 	default y
@@ -19,6 +21,7 @@ config ARCH_TEGRA_2x_SOC
 	select USB_ULPI_VIEWPORT if USB_SUPPORT
 	select ARCH_SUPPORTS_MSI if TEGRA_PCI
 	select PCI_MSI if TEGRA_PCI
+	select ARCH_HAS_SUSPEND_PAGETABLE
 	help
 	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
@@ -31,7 +34,7 @@ config ARCH_TEGRA_3x_SOC
 	select ARCH_TEGRA_HAS_DUAL_CPU_CLUSTERS
 	select CPU_V7
 	select ARM_GIC
-	select GIC_SET_MULTIPLE_CPUS
+	select GIC_SET_MULTIPLE_CPUS if SMP
 	select ARCH_REQUIRE_GPIOLIB
 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
 	select USB_EHCI_TEGRA if USB_SUPPORT
@@ -40,6 +43,8 @@ config ARCH_TEGRA_3x_SOC
 	select REPORT_PRESENT_CPUS if TEGRA_AUTO_HOTPLUG
 	select ARCH_SUPPORTS_MSI if TEGRA_PCI
 	select PCI_MSI if TEGRA_PCI
+	select ARM_ERRATA_754322
+	select ARCH_HAS_SUSPEND_PAGETABLE
 	help
 	  Support for NVIDIA Tegra 3 family of SoCs, based upon the
 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
@@ -64,6 +69,8 @@ config TEGRA_PCI
 	  Adds PCIe Host controller driver for tegra based systems
 
 comment "Tegra board type"
+
+#source "arch/arm/mach-tegra/lge/star/Kconfig"
 
 config MACH_HARMONY
        bool "Harmony board"
@@ -123,6 +130,35 @@ config MACH_WHISTLER
        select MACH_HAS_SND_SOC_TEGRA_TLV320AIC326X if SND_SOC
        help
          Support for NVIDIA Whistler development platform
+menuconfig MACH_BSSQ
+	depends on ARCH_TEGRA_2x_SOC
+	select MACH_LGE
+	select MACH_HAS_SND_SOC_TEGRA_WM8994 if SND_SOC
+	bool "TEGRA BSSQ"
+	help
+	  Support for the LGE BSSQ
+
+if MACH_BSSQ
+source "arch/arm/mach-tegra/lge/bssq/Kconfig"
+endif #MACH_BSSQ
+
+menuconfig MACH_STAR
+	depends on ARCH_TEGRA_2x_SOC
+	select MACH_LGE
+	select MACH_HAS_SND_SOC_TEGRA_WM8994 if SND_SOC
+	bool "TEGRA STAR"
+	help
+	  Support for the LGE STAR 
+
+if MACH_STAR
+source "arch/arm/mach-tegra/lge/star/Kconfig"
+endif #MACH_STAR
+
+
+# hyun.seungjin@lge.com Fix Me Later for Machine BSSQ and STAR S
+source "drivers/misc/mpu3050/Kconfig"
+# hyun.seungjin@lge.com Fix Me Later for Machine BSSQ and STAR E
+
 
 config MACH_ARUBA
        bool "Aruba board"
@@ -135,15 +171,33 @@ config MACH_CARDHU
        bool "Cardhu board"
        depends on ARCH_TEGRA_3x_SOC
        select MACH_HAS_SND_SOC_TEGRA_WM8903 if SND_SOC
+       select MACH_HAS_SND_SOC_TEGRA_RT5640 if SND_SOC
+       select MACH_HAS_SND_SOC_TEGRA_MAX98095 if SND_SOC
+       select MACH_HAS_SND_SOC_TEGRA_TLV320AIC326X if SND_SOC
        help
          Support for NVIDIA Cardhu development platform
+
+config MACH_P1852
+       bool "P1852 board"
+       depends on ARCH_TEGRA_3x_SOC
+       help
+         Support for NVIDIA P1852 development platform
 
 config MACH_TEGRA_ENTERPRISE
        bool "Enterprise board"
        depends on ARCH_TEGRA_3x_SOC
        select MACH_HAS_SND_SOC_TEGRA_MAX98088 if SND_SOC
+       select TEGRA_SLOW_CSITE
        help
          Support for NVIDIA Enterprise development platform
+
+config MACH_KAI
+       bool "Kai board"
+       depends on ARCH_TEGRA_3x_SOC
+       select MACH_HAS_SND_SOC_TEGRA_RT5639 if SND_SOC
+       select MACH_HAS_SND_SOC_TEGRA_RT5640 if SND_SOC
+       help
+         Support for NVIDIA KAI development platform
 
 choice
        prompt "Tegra platform type"
@@ -168,8 +222,6 @@ config TEGRA_FPGA_PLATFORM
           Select this only if you are an NVIDIA developer working
           on a FPGA platform.
 endchoice
-
-source "arch/arm/mach-tegra/p852/Kconfig"
 
 choice
         prompt "Low-level debug console UART"
@@ -324,7 +376,7 @@ config TEGRA_CLUSTER_CONTROL
 
 config TEGRA_AUTO_HOTPLUG
 	bool "Enable automatic CPU hot-plugging"
-	depends on HOTPLUG_CPU && CPU_FREQ && !ARCH_CPU_PROBE_RELEASE && !ARCH_TEGRA_2x_SOC
+	depends on HOTPLUG_CPU && CPU_FREQ && !ARCH_CPU_PROBE_RELEASE
 	default y
 	help
 	  This option enables turning CPUs off/on and switching tegra
@@ -386,6 +438,17 @@ config TEGRA_STAT_MON
 config USB_HOTPLUG
 	bool "Enabling the USB hotplug"
 	default n
+
+config TEGRA_GADGET_BOOST_CPU_FREQ
+	int "Boost cpu frequency for tegra usb gadget (0-1300 mhz)"
+	range 0 1300
+	default 0
+	help
+	  Devices need to boost frequency of CPU when they are connected
+	  to host pc through usb cable for better performance. This value
+	  is the amount of the frequency (in mhz) to be boosted. If it is
+	  zero boosting frequency will not be enabled. This value will be
+	  used only by usb gadget driver.
 
 config TEGRA_DYNAMIC_PWRDET
 	bool "Enable dynamic activation of IO level auto-detection"
@@ -449,5 +512,12 @@ config TEGRA_WDT_RECOVERY
 	help
 	  Enables watchdog recovery mechanism to protect against
 	  suspend/resume hangs.
+
 endif
 
+config TEGRA_SLOW_CSITE
+	bool "lower csite clock to 1 Mhz to reduce its power consumption"
+	default n
+	help
+	  When enabled, csite will be running at 1 Mhz and the performance of
+	  jtag, lauterbach and other debugger will be extremely slow.

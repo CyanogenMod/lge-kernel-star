@@ -14,35 +14,34 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
  * History:
- * Rev 0.1   Added the multiconfig support      Mistral         17-08-2011
+ * Rev 0.1   Added the multiconfig support     17-08-2011
  *
  * Rev 0.2   Migrated for aic3262 nVidia
- *     Mistral         21-10-2011
+ *        21-10-2011
  */
 
 #ifndef _TLV320AIC3262_MINI_DSP_H
 #define _TLV320AIC3262_MINI_DSP_H
 
-
-#define MULTIBYTE_CONFIG_SUPPORT
-/*#undef MULTIBYTE_CONFIG_SUPPORT*/
-
-
 /* defines */
 
+#define MAXCONFIG 4
+
+//#define DEBUG_MINIDSP_LOADING
+
 /* Select the functionalities to be used in mini dsp module */
-/*#define PROGRAM_MINI_DSP_first*/
-#define PROGRAM_MINI_DSP_second
+#define PROGRAM_MINI_DSP_first
+//#define PROGRAM_MINI_DSP_second
 #define PROGRAM_CODEC_REG_SECTIONS
 #define ADD_MINI_DSP_CONTROLS
 
 /* use the following macros to select between burst and byte mode of i2c
- * Byte mode uses standard read & write as provides debugging information
+ * Byte mode uses standard read & write as provides debugging information if enabled
  * if enabled.
  * Multibyte should be used for production codes where performance is priority
  */
-#define MULTIBYTE_I2C
-/*#undef MULTIBYTE_I2C*/
+//#define MULTIBYTE_I2C
+#undef MULTIBYTE_I2C
 
 typedef struct {
 	u8 reg_off;
@@ -104,7 +103,7 @@ typedef struct {
 	char burst_array[129];
 	int burst_size;
 	int current_loc;
-	int book_change;
+	int book_change;CONFIG_MINI_DSP
 	u8 book_no;
 } minidsp_parser_data;
 
@@ -118,10 +117,12 @@ typedef struct {
  * The total memory requirement will be around
  * sizeof(minidsp_parser_data) * 48 = 138 * 32 = 4416 bytes
  */
-#define MINIDSP_PARSER_ARRAY_SIZE           80
+#define MINIDSP_PARSER_ARRAY_SIZE           200
 
 extern int
 minidsp_i2c_multibyte_transfer(struct snd_soc_codec *, reg_value *, int);
 extern int byte_i2c_array_transfer(struct snd_soc_codec *, reg_value *, int);
-extern void config_multibyte_for_mode(struct snd_soc_codec *, int);
+extern void minidsp_multiconfig(struct snd_soc_codec *,reg_value *, int ,reg_value *, int );
+extern int reg_def_conf(struct snd_soc_codec *);
+
 #endif

@@ -535,6 +535,26 @@ config BCM4329_RFKILL
 	---help---
 	Adds BCM4329 RFKILL driver for Broadcom BCM4329 chipset
 
+#//LGE_CHANGE_S [munho2.lee@lge.com] 2012-02-23 BT Bring-up
+config BRCM_LPM
+    bool "BRCM LPM - Low Power Mode"
+    depends on BCM4329_RFKILL
+
+config BRCM_BT_WAKE
+    bool "BRCM BT Wakeup"
+    depends on BRCM_LPM
+
+config BRCM_HOST_WAKE
+    bool "BRCM Host Wakeup"
+    depends on BRCM_LPM
+
+config BD_ADDRESS
+    bool "Read/Write Bluetooth Address"
+    default n
+    ---help---
+    LGE added: It supports Bluetooth address Read / Write functionality on user mode.
+#//LGE_CHANGE_E
+
 config TEGRA_CRYPTO_DEV
 	bool "Device node to access tegra aes hardware"
 	---help---
@@ -554,7 +574,6 @@ source "drivers/misc/cb710/Kconfig"
 source "drivers/misc/iwmc3200top/Kconfig"
 source "drivers/misc/ti-st/Kconfig"
 source "drivers/misc/lis3lv02d/Kconfig"
-source "drivers/misc/inv_mpu/Kconfig"
+#source "drivers/misc/inv_mpu/Kconfig"
 source "drivers/misc/tegra-baseband/Kconfig"
-
 endif # MISC_DEVICES

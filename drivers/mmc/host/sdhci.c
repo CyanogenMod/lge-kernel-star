@@ -39,6 +39,8 @@
 #define SDHCI_USE_LEDS_CLASS
 #endif
 
+#define MAX_TUNING_LOOP 40
+
 static unsigned int debug_quirks = 0;
 
 static void sdhci_prepare_data(struct sdhci_host *, struct mmc_data *);
@@ -931,7 +933,18 @@ static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 
 	sdhci_prepare_data(host, cmd->data);
 
+	// LGE_CHANGE [dojip.kim@lge.com] 2010-12-31, [LGE_AP20] from Star 
+#ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
+	if (cmd->data) {
+		/* It is assumed that the device is block addressed. */
+		sdhci_writel(host, cmd->arg + (host->start_offset >> 9),
+			SDHCI_ARGUMENT);
+	} else {
+		sdhci_writel(host, cmd->arg, SDHCI_ARGUMENT);
+	}
+#else
 	sdhci_writel(host, cmd->arg, SDHCI_ARGUMENT);
+#endif
 
 	sdhci_set_transfer_mode(host, cmd->data);
 
@@ -956,7 +969,9 @@ static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 		flags |= SDHCI_CMD_CRC;
 	if (cmd->flags & MMC_RSP_OPCODE)
 		flags |= SDHCI_CMD_INDEX;
-	if (cmd->data)
+
+	/* CMD19 is special in that the Data Present Select should be set */
+	if (cmd->data || (cmd->opcode == MMC_SEND_TUNING_BLOCK))
 		flags |= SDHCI_CMD_DATA;
 
 	sdhci_writew(host, SDHCI_MAKE_CMD(cmd->opcode, flags), SDHCI_COMMAND);
@@ -1148,7 +1163,7 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 
 	/* If polling, assume that the card is always present. */
 	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
-		present = true;
+			present = true;
 	else
 		present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
 				SDHCI_CARD_PRESENT;
@@ -1246,11 +1261,12 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		u16 clk, ctrl_2;
 
 		/* In case of UHS-I modes, set High Speed Enable */
-		if ((ios->timing == MMC_TIMING_UHS_SDR50) ||
+		if (((ios->timing == MMC_TIMING_UHS_SDR50) ||
 		    (ios->timing == MMC_TIMING_UHS_SDR104) ||
 		    (ios->timing == MMC_TIMING_UHS_DDR50) ||
 		    (ios->timing == MMC_TIMING_UHS_SDR25) ||
 		    (ios->timing == MMC_TIMING_UHS_SDR12))
+		    && !(host->quirks & SDHCI_QUIRK_NO_HISPD_BIT))
 			ctrl |= SDHCI_CTRL_HISPD;
 
 		ctrl_2 = sdhci_readw(host, SDHCI_HOST_CONTROL2);
@@ -1524,6 +1540,167 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
 		return 0;
 }
 
+// LGE_CHANGE [dojip.kim@lge.com] 2010-12-31, [LGE_AP20] from Star 
+#ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
+static unsigned int sdhci_get_host_offset(struct mmc_host *mmc) {
+	struct sdhci_host *host;
+	host = mmc_priv(mmc);
+	return host->start_offset;
+}
+#endif
+
+static int sdhci_execute_tuning(struct mmc_host *mmc)
+{
+	struct sdhci_host *host;
+	u16 ctrl;
+	u32 ier;
+	int tuning_loop_counter = MAX_TUNING_LOOP;
+	unsigned long timeout;
+	int err = 0;
+
+	host = mmc_priv(mmc);
+
+	disable_irq(host->irq);
+	spin_lock(&host->lock);
+
+	if ((host->quirks & SDHCI_QUIRK_NON_STANDARD_TUNING) &&
+		host->ops->execute_freq_tuning) {
+		err = host->ops->execute_freq_tuning(host);
+		spin_unlock(&host->lock);
+		enable_irq(host->irq);
+		return err;
+	}
+
+	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+
+	/*
+	 * Host Controller needs tuning only in case of SDR104 mode
+	 * and for SDR50 mode when Use Tuning for SDR50 is set in
+	 * Capabilities register.
+	 */
+	if (((ctrl & SDHCI_CTRL_UHS_MASK) == SDHCI_CTRL_UHS_SDR104) ||
+	    (((ctrl & SDHCI_CTRL_UHS_MASK) == SDHCI_CTRL_UHS_SDR50) &&
+	    (host->flags & SDHCI_SDR50_NEEDS_TUNING)))
+		ctrl |= SDHCI_CTRL_EXEC_TUNING;
+	else {
+		spin_unlock(&host->lock);
+		enable_irq(host->irq);
+		return 0;
+	}
+
+	sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
+
+	/*
+	 * As per the Host Controller spec v3.00, tuning command
+	 * generates Buffer Read Ready interrupt, so enable that.
+	 *
+	 * Note: The spec clearly says that when tuning sequence
+	 * is being performed, the controller does not generate
+	 * interrupts other than Buffer Read Ready interrupt. But
+	 * to make sure we don't hit a controller bug, we _only_
+	 * enable Buffer Read Ready interrupt here.
+	 */
+	ier = sdhci_readl(host, SDHCI_INT_ENABLE);
+	sdhci_clear_set_irqs(host, ier, SDHCI_INT_DATA_AVAIL);
+
+	/*
+	 * Issue CMD19 repeatedly till Execute Tuning is set to 0 or the number
+	 * of loops reaches 40 times or a timeout of 150ms occurs.
+	 */
+	timeout = 150;
+	do {
+		struct mmc_command cmd = {0};
+		struct mmc_request mrq = {0};
+
+		if (!tuning_loop_counter && !timeout)
+			break;
+
+		cmd.opcode = MMC_SEND_TUNING_BLOCK;
+		cmd.arg = 0;
+		cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
+		cmd.retries = 0;
+		cmd.data = NULL;
+		cmd.error = 0;
+
+		mrq.cmd = &cmd;
+		host->mrq = &mrq;
+
+		/*
+		 * In response to CMD19, the card sends 64 bytes of tuning
+		 * block to the Host Controller. So we set the block size
+		 * to 64 here.
+		 */
+		sdhci_writew(host, SDHCI_MAKE_BLKSZ(7, 64), SDHCI_BLOCK_SIZE);
+
+		/*
+		 * The tuning block is sent by the card to the host controller.
+		 * So we set the TRNS_READ bit in the Transfer Mode register.
+		 * This also takes care of setting DMA Enable and Multi Block
+		 * Select in the same register to 0.
+		 */
+		sdhci_writew(host, SDHCI_TRNS_READ, SDHCI_TRANSFER_MODE);
+
+		sdhci_send_command(host, &cmd);
+
+		host->cmd = NULL;
+		host->mrq = NULL;
+
+		spin_unlock(&host->lock);
+		enable_irq(host->irq);
+
+		/* Wait for Buffer Read Ready interrupt */
+		wait_event_interruptible_timeout(host->buf_ready_int,
+					(host->tuning_done == 1),
+					msecs_to_jiffies(50));
+		disable_irq(host->irq);
+		spin_lock(&host->lock);
+
+		if (!host->tuning_done) {
+			printk(KERN_INFO DRIVER_NAME ": Timeout waiting for "
+				"Buffer Read Ready interrupt during tuning "
+				"procedure, falling back to fixed sampling "
+				"clock\n");
+			ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+			ctrl &= ~SDHCI_CTRL_TUNED_CLK;
+			ctrl &= ~SDHCI_CTRL_EXEC_TUNING;
+			sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
+
+			err = -EIO;
+			goto out;
+		}
+
+		host->tuning_done = 0;
+
+		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+		tuning_loop_counter--;
+		timeout--;
+		mdelay(1);
+	} while (ctrl & SDHCI_CTRL_EXEC_TUNING);
+
+	/*
+	 * The Host Driver has exhausted the maximum number of loops allowed,
+	 * so use fixed sampling frequency.
+	 */
+	if (!tuning_loop_counter || !timeout) {
+		ctrl &= ~SDHCI_CTRL_TUNED_CLK;
+		sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
+	} else {
+		if (!(ctrl & SDHCI_CTRL_TUNED_CLK)) {
+			printk(KERN_INFO DRIVER_NAME ": Tuning procedure"
+				" failed, falling back to fixed sampling"
+				" clock\n");
+			err = -EIO;
+		}
+	}
+
+out:
+	sdhci_clear_set_irqs(host, SDHCI_INT_DATA_AVAIL, ier);
+	spin_unlock(&host->lock);
+	enable_irq(host->irq);
+
+	return err;
+}
+
 static const struct mmc_host_ops sdhci_ops = {
 	.request	= sdhci_request,
 	.set_ios	= sdhci_set_ios,
@@ -1532,6 +1709,11 @@ static const struct mmc_host_ops sdhci_ops = {
 	.disable	= sdhci_disable,
 	.enable_sdio_irq = sdhci_enable_sdio_irq,
 	.start_signal_voltage_switch	= sdhci_start_signal_voltage_switch,
+	// LGE_CHANGE [dojip.kim@lge.com] 2010-12-31, [LGE_AP20] from Star 
+#ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
+	.get_host_offset = sdhci_get_host_offset,
+#endif
+	.execute_tuning			= sdhci_execute_tuning,
 };
 
 /*****************************************************************************\
@@ -1751,6 +1933,16 @@ static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
 {
 	BUG_ON(intmask == 0);
 
+	/* CMD19 generates _only_ Buffer Read Ready interrupt */
+	if (intmask & SDHCI_INT_DATA_AVAIL) {
+		if (SDHCI_GET_CMD(sdhci_readw(host, SDHCI_COMMAND)) ==
+		    MMC_SEND_TUNING_BLOCK) {
+			host->tuning_done = 1;
+			wake_up(&host->buf_ready_int);
+			return;
+		}
+	}
+
 	if (!host->data) {
 		/*
 		 * The "data complete" interrupt is also used to
@@ -1913,7 +2105,7 @@ int sdhci_suspend_host(struct sdhci_host *host, pm_message_t state)
 	if (mmc->card && (mmc->card->type != MMC_TYPE_SDIO))
 		ret = mmc_suspend_host(host->mmc);
 
-	if (host->flags & MMC_PM_KEEP_POWER)
+	if (mmc->pm_flags & MMC_PM_KEEP_POWER)
 		host->card_int_set = sdhci_readl(host, SDHCI_INT_ENABLE) &
 			SDHCI_INT_CARD_INT;
 
@@ -2114,6 +2306,16 @@ int sdhci_add_host(struct sdhci_host *host)
 		host->max_clk = (caps[0] & SDHCI_CLOCK_BASE_MASK)
 			>> SDHCI_CLOCK_BASE_SHIFT;
 
+// LGE_CHANGE [dojip.kim@lge.com] 2010-12-31, [LGE_AP20] from Star 
+#ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
+	if (host->ops->get_startoffset)
+		host->start_offset = host->ops->get_startoffset(host);
+	else
+		host->start_offset = 0;
+	printk(KERN_INFO "sdhci_add_host: host->start_offset: %d\n", host->start_offset);
+#endif
+
+
 	host->max_clk *= 1000000;
 	if (host->max_clk == 0 || host->quirks &
 			SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN) {
@@ -2184,6 +2386,10 @@ int sdhci_add_host(struct sdhci_host *host)
 
 	if (caps[1] & SDHCI_SUPPORT_DDR50)
 		mmc->caps |= MMC_CAP_UHS_DDR50;
+
+	/* Does the host needs tuning for SDR50? */
+	if (caps[1] & SDHCI_USE_SDR50_TUNING)
+		host->flags |= SDHCI_SDR50_NEEDS_TUNING;
 
 	/* Driver Type(s) (A, C, D) supported by the host */
 	if (caps[1] & SDHCI_DRIVER_TYPE_A)
@@ -2327,6 +2533,9 @@ int sdhci_add_host(struct sdhci_host *host)
 		sdhci_tasklet_finish, (unsigned long)host);
 
 	setup_timer(&host->timer, sdhci_timeout_timer, (unsigned long)host);
+
+	if (host->version >= SDHCI_SPEC_300)
+		init_waitqueue_head(&host->buf_ready_int);
 
 	ret = request_irq(host->irq, sdhci_irq, IRQF_SHARED,
 		mmc_hostname(mmc), host);

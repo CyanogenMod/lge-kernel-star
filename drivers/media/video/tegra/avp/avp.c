@@ -2,7 +2,7 @@
  * Copyright (C) 2010 Google, Inc.
  * Author: Dima Zavin <dima@android.com>
  *
- * Copyright (C) 2010-2011 NVIDIA Corporation
+ * Copyright (C) 2010-2012 NVIDIA Corporation
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -1082,7 +1082,11 @@ static void avp_uninit(struct tegra_avp_info *avp)
 	unsigned long flags;
 	struct rb_node *n;
 	struct remote_info *rinfo;
-
+// MOBII_S [shhong@mobii.co.kr] 2012-08-30: Nvidia AVP Uninit Patch for 100mA Over current in Call.
+#if defined(CONFIG_MACH_STAR)
+	unsigned int reg;
+#endif
+// MOBII_E [shhong@mobii.co.kr] 2012-08-30: Nvidia AVP Uninit Patch for 100mA Over current in Call.
 	spin_lock_irqsave(&avp->state_lock, flags);
 	avp->initialized = false;
 	avp->shutdown = true;
@@ -1119,6 +1123,22 @@ static void avp_uninit(struct tegra_avp_info *avp)
 	avp->shutdown = false;
 	smp_wmb();
 	pr_info("%s: avp teardown done\n", __func__);
+
+// MOBII_S [shhong@mobii.co.kr] 2012-08-30: Nvidia AVP Uninit Patch for 100mA Over current in Call.
+#if defined(CONFIG_MACH_STAR)
+#define TIMER_TMR_PCR_0	4
+	// turn off the periodic interrupt and the timer temporarily
+	reg = readl(IO_ADDRESS(TEGRA_TMR2_BASE));
+	reg &= ~(0xC0000000);
+	writel( reg, IO_ADDRESS(TEGRA_TMR2_BASE));
+	
+	/* write a 1 to the intr_clr field to clear the interrupt */
+	reg = 0x40000000;
+	writel( reg, IO_ADDRESS(TEGRA_TMR2_BASE + TIMER_TMR_PCR_0));
+#undef	TIMER_TMR_PCR_0
+#endif
+// MOBII_E [shhong@mobii.co.kr] 2012-08-30: Nvidia AVP Uninit Patch for 100mA Over current in Call.
+
 }
 
 /* returns the remote lib handle in lib->handle */
@@ -1173,9 +1193,9 @@ static int _load_lib(struct tegra_avp_info *avp, struct tegra_avp_lib *lib,
 	}
 
 	lib_phys = nvmap_pin(avp->nvmap_libs, lib_handle);
-	if (IS_ERR_OR_NULL((void *)lib_phys)) {
+	if (IS_ERR_VALUE(lib_phys)) {
 		pr_err("avp_lib: can't nvmap pin for lib '%s'\n", lib->name);
-		ret = PTR_ERR(lib_handle);
+		ret = lib_phys;
 		goto err_nvmap_pin;
 	}
 
@@ -1637,9 +1657,9 @@ static int tegra_avp_probe(struct platform_device *pdev)
 
 		avp->kernel_phys =
 			nvmap_pin(avp->nvmap_drv, avp->kernel_handle);
-		if (IS_ERR_OR_NULL((void *)avp->kernel_phys)) {
+		if (IS_ERR_VALUE(avp->kernel_phys)) {
 			pr_err("%s: cannot pin kernel handle\n", __func__);
-			ret = PTR_ERR((void *)avp->kernel_phys);
+			ret = avp->kernel_phys;
 			goto err_nvmap_pin;
 		}
 
@@ -1665,9 +1685,9 @@ static int tegra_avp_probe(struct platform_device *pdev)
 
 		avp->kernel_phys = nvmap_pin(avp->nvmap_drv,
 					avp->kernel_handle);
-		if (IS_ERR_OR_NULL((void *)avp->kernel_phys)) {
+		if (IS_ERR_VALUE(avp->kernel_phys)) {
 			pr_err("%s: cannot pin kernel handle\n", __func__);
-			ret = PTR_ERR((void *)avp->kernel_phys);
+			ret = avp->kernel_phys;
 			goto err_nvmap_pin;
 		}
 
@@ -1694,9 +1714,9 @@ static int tegra_avp_probe(struct platform_device *pdev)
 	}
 	avp->iram_backup_phys = nvmap_pin(avp->nvmap_drv,
 					  avp->iram_backup_handle);
-	if (IS_ERR_OR_NULL((void *)avp->iram_backup_phys)) {
+	if (IS_ERR_VALUE(avp->iram_backup_phys)) {
 		pr_err("%s: cannot pin iram backup handle\n", __func__);
-		ret = PTR_ERR((void *)avp->iram_backup_phys);
+		ret = avp->iram_backup_phys;
 		goto err_iram_nvmap_pin;
 	}
 

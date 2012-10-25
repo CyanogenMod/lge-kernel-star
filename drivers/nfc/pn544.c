@@ -111,6 +111,10 @@ static ssize_t pn544_dev_read(struct file *filp, char __user *buf,
 
 	mutex_unlock(&pn544_dev->read_mutex);
 
+	/* pn544 seems to be slow in handling I2C read requests
+	 * so add 1ms delay after recv operation */
+	udelay(1000);
+
 	if (ret < 0) {
 		pr_err("%s: i2c_master_recv returned %d\n", __func__, ret);
 		return ret;
@@ -155,6 +159,10 @@ static ssize_t pn544_dev_write(struct file *filp, const char __user *buf,
 		pr_err("%s : i2c_master_send returned %d\n", __func__, ret);
 		ret = -EIO;
 	}
+
+	/* pn544 seems to be slow in handling I2C write requests
+	 * so add 1ms delay after I2C send oparation */
+	udelay(1000);
 
 	return ret;
 }

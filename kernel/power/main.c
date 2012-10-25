@@ -313,6 +313,37 @@ power_attr(wake_lock);
 power_attr(wake_unlock);
 #endif
 
+// [LGE_CHANGE] 20120201 jh.ahn@lge.com : log service UTC time stamp [Start]
+// /sys/power/lge_logstart
+#include <linux/rtc.h>
+
+static ssize_t lge_logstart_show(struct kobject *kobj,
+				       struct kobj_attribute *attr, char *buf)
+{
+    printk("lge_logstart_show() invoked\n");
+    return 0;
+}
+
+static ssize_t lge_logstart_store(struct kobject *kobj,
+				       struct kobj_attribute *attr, const char *buf, size_t n)
+{
+    struct timespec ts;
+    struct rtc_time tm;
+
+    printk("lge_logstart_store() invoked\n");
+
+    getnstimeofday(&ts);
+    rtc_time_to_tm(ts.tv_sec, &tm);
+    printk(KERN_UTC_START "%d-%02d-%02d %02d:%02d:%02d.%06lu\n",
+        tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+        tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec/1000);
+
+    return n;
+}
+
+power_attr(lge_logstart);
+// [LGE_CHANGE] 20120201 jh.ahn@lge.com : log service UTC time stamp [End]
+
 static struct attribute * g[] = {
 	&state_attr.attr,
 #ifdef CONFIG_PM_TRACE
@@ -330,6 +361,7 @@ static struct attribute * g[] = {
 	&wake_unlock_attr.attr,
 #endif
 #endif
+    &lge_logstart_attr.attr, // [LGE_CHANGE] 20120201 jh.ahn@lge.com : log service UTC time stamp
 	NULL,
 };
 

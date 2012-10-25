@@ -57,7 +57,7 @@ static DEFINE_MUTEX(block_mutex);
 #define INAND_CMD38_ARG_SECTRIM1 0x81
 #define INAND_CMD38_ARG_SECTRIM2 0x88
 
-#define MMC_CMD_RETRIES 3
+#define MMC_CMD_RETRIES 10
 /*
  * The defaults come from config options but can be overriden by module
  * or bootarg options.
@@ -367,6 +367,11 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
 	struct mmc_card *card = md->queue.card;
 	struct mmc_blk_request brq;
 	int ret = 1, disable_multi = 0;
+#ifdef CONFIG_MACH_BSSQ
+// 20110409 youngjin.yoo@lge.com if retryCount is 3, goto cmd_err [S]
+	static int retryCount = 0;
+// 20110409 youngjin.yoo@lge.com if retryCount is 3, goto cmd_err [E]
+#endif
 
 	mmc_claim_host(card->host);
 
@@ -462,7 +467,20 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
 		 * until later as we need to wait for the card to leave
 		 * programming mode even when things go wrong.
 		 */
+#ifdef CONFIG_MACH_BSSQ
+        if (brq.cmd.error == -ENOMEDIUM) {
+            goto cmd_err;
+        }
+#endif
 		if (brq.cmd.error || brq.data.error || brq.stop.error) {
+#ifdef CONFIG_MACH_BSSQ
+			if (retryCount >= 100) {
+				printk(KERN_WARNING "retryCount is over 20times+++---\n");
+				goto cmd_err;
+			} else {
+				retryCount++;
+			}
+#endif
 			if (brq.data.blocks > 1 && rq_data_dir(req) == READ) {
 				/* Redo read one sector at a time */
 				printk(KERN_WARNING "%s: retrying using single "
@@ -559,10 +577,19 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
 		mmc_card_set_need_bkops(card);
 
 	mmc_release_host(card->host);
-
+#ifdef CONFIG_MACH_BSSQ
+	// 20110409 youngjin.yoo@lge.com if retryCount is 3, goto cmd_err [S]
+	retryCount = 0;
+	// 20110409 youngjin.yoo@lge.com if retryCount is 3, goto cmd_err [E]
+#endif
 	return 1;
 
  cmd_err:
+#ifdef CONFIG_MACH_BSSQ
+	// 20110409 youngjin.yoo@lge.com if retryCount is 3, goto cmd_err [S]
+	retryCount = 0;
+	// 20110409 youngjin.yoo@lge.com if retryCount is 3, goto cmd_err [E]
+#endif
  	/*
  	 * If this is an SD card and we're writing, we can first
  	 * mark the known good sectors as ok.
@@ -589,8 +616,18 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
 	mmc_release_host(card->host);
 
 	spin_lock_irq(&md->lock);
+#ifdef CONFIG_MACH_BSSQ
+    /*
+     * 20110123, jxwolf@lge.com, supressed the error message
+     */
+	while (ret) {
+        req->cmd_flags |= REQ_QUIET;
+		ret = __blk_end_request(req, -EIO, blk_rq_cur_bytes(req));
+    }
+#else
 	while (ret)
 		ret = __blk_end_request(req, -EIO, blk_rq_cur_bytes(req));
+#endif
 	spin_unlock_irq(&md->lock);
 
 	return 0;

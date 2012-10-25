@@ -38,12 +38,16 @@ void __init tegra3_init_timer(u32 *offset, int *irq);
 struct tegra_twd_context {
 	u32 twd_ctrl;
 	u32 twd_load;
+	u32 twd_cnt;
 };
 
 #ifdef CONFIG_HAVE_ARM_TWD
+int tegra_twd_get_state(struct tegra_twd_context *context);
 void tegra_twd_suspend(struct tegra_twd_context *context);
 void tegra_twd_resume(struct tegra_twd_context *context);
 #else
+static inline int tegra_twd_get_state(struct tegra_twd_context *context)
+{ return -ENODEV; }
 static inline void tegra_twd_suspend(struct tegra_twd_context *context) {}
 static inline void tegra_twd_resume(struct tegra_twd_context *context) {}
 #endif

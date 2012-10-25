@@ -25,6 +25,17 @@
 #include <linux/mfd/wm8994/core.h>
 #include <linux/mfd/wm8994/pdata.h>
 #include <linux/mfd/wm8994/registers.h>
+#include <linux/gpio.h>  // [heejeong.seo@lge.com] 2011-01-08, [LGE_AP20] audio enable
+
+#ifdef CONFIG_MACH_STAR
+#define GPIO_WM8994_LDO_EN	83 /* TEGRA_GPIO_PK3 */ // [heejeong.seo@lge.com] 2011-01-08, [LGE_AP20] audio enable
+#else
+#define GPIO_WM8994_LDO_EN	47 /* TEGRA_GPIO_PF7 */
+#endif
+
+#if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
+extern bool in_call_state();  
+#endif // MOBII LP1 sleep
 
 static int wm8994_read(struct wm8994 *wm8994, unsigned short reg,
 		       int bytes, void *dest)
@@ -244,6 +255,8 @@ static struct mfd_cell wm8994_devs[] = {
  * management.
  */
 static const char *wm8994_main_supplies[] = {
+//LGE_CHANGE_S [chahee.kim@lge.com] 2012-01-30 
+#if 0
 	"DBVDD",
 	"DCVDD",
 	"AVDD1",
@@ -251,6 +264,8 @@ static const char *wm8994_main_supplies[] = {
 	"CPVDD",
 	"SPKVDD1",
 	"SPKVDD2",
+#endif
+//LGE_CHANGE_E [chahee.kim@lge.com] 2012-01-30 
 };
 
 static const char *wm8958_main_supplies[] = {
@@ -271,15 +286,23 @@ static int wm8994_suspend(struct device *dev)
 	struct wm8994 *wm8994 = dev_get_drvdata(dev);
 	int ret;
 
+#if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
+	if(in_call_state())
+	    return 0;
+#endif /* MOBII LP1 sleep */
 	/* Don't actually go through with the suspend if the CODEC is
 	 * still active (eg, for audio passthrough from CP. */
+//LGE_CHANGE_S [chahee.kim@lge.com] 2012-03-23 
+#if 0
 	ret = wm8994_reg_read(wm8994, WM8994_POWER_MANAGEMENT_1);
 	if (ret < 0) {
-		dev_err(dev, "Failed to read power status: %d\n", ret);
+		printk("[chahee.kim] Failed to read power status: %d\n", ret);
 	} else if (ret & WM8994_VMID_SEL_MASK) {
-		dev_dbg(dev, "CODEC still active, ignoring suspend\n");
+		printk("[chahee.kim] CODEC still active, ignoring suspend\n");
 		return 0;
 	}
+#endif
+//LGE_CHANGE_E [chahee.kim@lge.com] 2012-03-23 
 
 	/* GPIO configuration state is saved here since we may be configuring
 	 * the GPIO alternate functions even if we're not using the gpiolib
@@ -288,13 +311,13 @@ static int wm8994_suspend(struct device *dev)
 	ret = wm8994_read(wm8994, WM8994_GPIO_1, WM8994_NUM_GPIO_REGS * 2,
 			  &wm8994->gpio_regs);
 	if (ret < 0)
-		dev_err(dev, "Failed to save GPIO registers: %d\n", ret);
+		printk("Failed to save GPIO registers: %d\n", ret);
 
 	/* For similar reasons we also stash the regulator states */
 	ret = wm8994_read(wm8994, WM8994_LDO_1, WM8994_NUM_LDO_REGS * 2,
 			  &wm8994->ldo_regs);
 	if (ret < 0)
-		dev_err(dev, "Failed to save LDO registers: %d\n", ret);
+		printk("Failed to save LDO registers: %d\n", ret);
 
 	/* Explicitly put the device into reset in case regulators
 	 * don't get disabled in order to ensure consistent restart.
@@ -302,6 +325,11 @@ static int wm8994_suspend(struct device *dev)
 	wm8994_reg_write(wm8994, WM8994_SOFTWARE_RESET, 0x8994);
 
 	wm8994->suspended = true;
+
+//LGE_CHANGE_S [chahee.kim@lge.com] 2012-02-07 
+	printk("[chahee.kim] wm8994_suspend in wm8994-core.c END !!\n");
+
+//LGE_CHANGE_E [chahee.kim@lge.com] 2012-02-07 
 
 	ret = regulator_bulk_disable(wm8994->num_supplies,
 				     wm8994->supplies);
@@ -318,6 +346,11 @@ static int wm8994_resume(struct device *dev)
 	struct wm8994 *wm8994 = dev_get_drvdata(dev);
 	int ret;
 
+#if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
+	if(in_call_state())
+	    return 0;
+#endif /* MOBII LP1 sleep */
+
 	/* We may have lied to the PM core about suspending */
 	if (!wm8994->suspended)
 		return 0;
@@ -325,25 +358,25 @@ static int wm8994_resume(struct device *dev)
 	ret = regulator_bulk_enable(wm8994->num_supplies,
 				    wm8994->supplies);
 	if (ret != 0) {
-		dev_err(dev, "Failed to enable supplies: %d\n", ret);
+		printk("Failed to enable supplies: %d\n", ret);
 		return ret;
 	}
 
 	ret = wm8994_write(wm8994, WM8994_INTERRUPT_STATUS_1_MASK,
 			   WM8994_NUM_IRQ_REGS * 2, &wm8994->irq_masks_cur);
 	if (ret < 0)
-		dev_err(dev, "Failed to restore interrupt masks: %d\n", ret);
+		printk("Failed to restore interrupt masks: %d\n", ret);
 
 	ret = wm8994_write(wm8994, WM8994_LDO_1, WM8994_NUM_LDO_REGS * 2,
 			   &wm8994->ldo_regs);
 	if (ret < 0)
-		dev_err(dev, "Failed to restore LDO registers: %d\n", ret);
+		printk("Failed to restore LDO registers: %d\n", ret);
 
 	ret = wm8994_write(wm8994, WM8994_GPIO_1, WM8994_NUM_GPIO_REGS * 2,
 			   &wm8994->gpio_regs);
 	if (ret < 0)
-		dev_err(dev, "Failed to restore GPIO registers: %d\n", ret);
-
+		printk("Failed to restore GPIO registers: %d\n", ret);
+	printk("[chahee.kim] wm8994_resume in wm8994-core.c END !!\n");
 	wm8994->suspended = false;
 
 	return 0;
@@ -384,6 +417,28 @@ static int wm8994_device_init(struct wm8994 *wm8994, int irq)
 	mutex_init(&wm8994->io_lock);
 	dev_set_drvdata(wm8994->dev, wm8994);
 
+// LGE_CHANGE_S [heejeong.seo@lge.com] 2011-01-08, [LGE_AP20] audio enable : WM8994 codec LDO enable
+	ret = gpio_request(GPIO_WM8994_LDO_EN, "wm8994_ldo");
+	if (ret < 0) {
+		printk(KERN_ERR "Can't request gpio%d for wm8994_ldo: %d\n",
+			GPIO_WM8994_LDO_EN, ret);
+		goto err;
+	}
+	tegra_gpio_enable(GPIO_WM8994_LDO_EN);
+
+	ret = gpio_direction_output(GPIO_WM8994_LDO_EN, 1);
+	if (ret < 0) {
+		printk(KERN_ERR "Can't set gpio%d direction to output: %d\n",
+			GPIO_WM8994_LDO_EN, ret);
+		goto err;
+	}
+
+	gpio_set_value(GPIO_WM8994_LDO_EN, 1);
+	msleep(10);
+	
+	// 20110618 hyokmin.kwon@lge.com Don't control I2C SW here
+
+// LGE_CHANGE_E [heejeong.seo@lge.com] 2011-01-08, [LGE_AP20] audio enable : WM8994 codec LDO enable
 	/* Add the on-chip regulators first for bootstrapping */
 	ret = mfd_add_devices(wm8994->dev, -1,
 			      wm8994_regulator_devs,
@@ -504,6 +559,7 @@ static int wm8994_device_init(struct wm8994 *wm8994, int irq)
 		}
 	}
 
+
 	/* In some system designs where the regulators are not in use,
 	 * we can achieve a small reduction in leakage currents by
 	 * floating LDO outputs.  This bit makes no difference if the
@@ -529,8 +585,10 @@ static int wm8994_device_init(struct wm8994 *wm8994, int irq)
 		goto err_irq;
 	}
 
+#if !defined(CONFIG_ARCH_TEGRA)
 	pm_runtime_enable(wm8994->dev);
-	pm_runtime_resume(wm8994->dev);
+	pm_runtime_resume(wm8994->dev);  	
+#endif
 
 	return 0;
 
@@ -585,6 +643,22 @@ static int wm8994_i2c_read_device(struct wm8994 *wm8994, unsigned short reg,
 static int wm8994_i2c_write_device(struct wm8994 *wm8994, unsigned short reg,
 				   int bytes, const void *src)
 {
+// LGE_CHANGE_S [heejeong.seo@lge.com] 2011-12-19 [LGE_AP20] i2c write
+#if 1
+	struct i2c_client *i2c = wm8994->control_data;
+	unsigned char msg[bytes + 2];
+	int ret;
+
+	reg = cpu_to_be16(reg);
+	memcpy(&msg[0], &reg, 2);
+	memcpy(&msg[2], src, bytes);
+
+	ret = i2c_master_send(i2c, msg, bytes + 2);
+	if (ret < 0)
+		return ret;
+	if (ret < bytes + 2)
+		return -EIO;
+#else
 	struct i2c_client *i2c = wm8994->control_data;
 	struct i2c_msg xfer[2];
 	int ret;
@@ -606,7 +680,8 @@ static int wm8994_i2c_write_device(struct wm8994 *wm8994, unsigned short reg,
 		return ret;
 	if (ret != 2)
 		return -EIO;
-
+#endif
+// LGE_CHANGE_E [heejeong.seo@lge.com] 2011-12-19 [LGE_AP20] i2c write
 	return 0;
 }
 
@@ -634,10 +709,66 @@ static int wm8994_i2c_remove(struct i2c_client *i2c)
 {
 	struct wm8994 *wm8994 = i2c_get_clientdata(i2c);
 
+// LGE_CHANGE_S [heejeong.seo@lge.com] 2011-01-08, [LGE_AP20] audio
+#if defined(CONFIG_ARCH_TEGRA)
+	tegra_gpio_disable(GPIO_WM8994_LDO_EN);
+	gpio_free(GPIO_WM8994_LDO_EN);
+#endif /* defined(CONFIG_ARCH_TEGRA) */
+// LGE_CHANGE_E [heejeong.seo@lge.com] 2011-01-08, [LGE_AP20] audio 
 	wm8994_device_exit(wm8994);
 
 	return 0;
 }
+#ifdef CONFIG_PM
+//20110626 seki.park@lge.com LP1 sleep [S]
+//extern bool in_call_state(void);
+//20110626 seki.park@lge.com LP1 sleep [E]
+static int wm8994_i2c_suspend(struct i2c_client *i2c, pm_message_t state)
+{
+  //20110626 seki.park@lge.com LP1 sleep [s]
+//	if (in_call_state())
+//		return 0;
+  //20110626 seki.park@lge.com LP1 sleep [E]
+ //LGE_CHANGE_S [chahee.kim@lge.com] 2012-02-07 
+#if 0
+#if defined(CONFIG_ARCH_TEGRA)
+	tegra_gpio_enable(GPIO_WM8994_LDO_EN);
+	gpio_set_value(GPIO_WM8994_LDO_EN, 0);
+#endif /* defined(CONFIG_ARCH_TEGRA) */
+#endif
+//LGE_CHANGE_E [chahee.kim@lge.com] 2012-02-07 
+	pr_err(" wm8994-core.c [%s] \n", __func__);
+	return wm8994_suspend(&i2c->dev);
+}
+
+static int wm8994_i2c_resume(struct i2c_client *i2c)
+{
+  //20110626 seki.park@lge.com LP1 sleep [s]
+//	if (in_call_state())
+//		return 0;
+  //20110626 seki.park@lge.com LP1 sleep [E]
+#if 0//defined(CONFIG_ARCH_TEGRA)
+	int ret;
+
+	tegra_gpio_enable(GPIO_WM8994_LDO_EN);
+	ret = gpio_direction_output(GPIO_WM8994_LDO_EN, 1);
+	if (ret < 0) {
+		printk(KERN_ERR "Can't set gpio direction to output %d: %d\n",
+			GPIO_WM8994_LDO_EN, ret);
+		return ret;
+	}
+
+	gpio_set_value(GPIO_WM8994_LDO_EN, 1);
+	msleep(10);
+#endif /* defined(CONFIG_ARCH_TEGRA) */
+	pr_err(" wm8994-core.c [%s] \n", __func__);
+	return wm8994_resume(&i2c->dev);
+}
+#else
+#define wm8994_i2c_suspend NULL
+#define wm8994_i2c_resume NULL
+#endif
+
 
 static const struct i2c_device_id wm8994_i2c_id[] = {
 	{ "wm8994", WM8994 },
@@ -653,10 +784,16 @@ static struct i2c_driver wm8994_i2c_driver = {
 	.driver = {
 		.name = "wm8994",
 		.owner = THIS_MODULE,
+#if defined(CONFIG_ARCH_TEGRA)
 		.pm = &wm8994_pm_ops,
+#endif
 	},
 	.probe = wm8994_i2c_probe,
 	.remove = wm8994_i2c_remove,
+#if !defined(CONFIG_ARCH_TEGRA)
+	.suspend = wm8994_i2c_suspend,
+	.resume = wm8994_i2c_resume,
+#endif
 	.id_table = wm8994_i2c_id,
 };
 

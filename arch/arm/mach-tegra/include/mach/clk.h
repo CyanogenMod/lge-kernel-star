@@ -66,4 +66,6 @@ void tegra_unregister_clk_rate_notifier(
  */
 int tegra_is_clk_enabled(struct clk *clk);
 
+void tegra_cpu_user_cap_set(unsigned int speed_khz);
+
 #endif

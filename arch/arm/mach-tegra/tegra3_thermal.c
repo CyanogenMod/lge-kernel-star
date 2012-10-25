@@ -158,10 +158,8 @@ static struct thermal_zone_device_ops tegra_thermal_zone_ops = {
 static void tegra_therm_throttle(bool enable)
 {
 	if (throttle_enb != enable) {
-		mutex_lock(&thermal_state.mutex);
 		tegra_throttling_enable(enable);
 		throttle_enb = enable;
-		mutex_unlock(&thermal_state.mutex);
 	}
 }
 #endif

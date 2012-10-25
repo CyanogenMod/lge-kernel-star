@@ -610,6 +610,7 @@ struct cea_sad {
 struct hdmi_eld {
 	bool	monitor_present;
 	bool	eld_valid;
+	bool	lpcm_sad_ready;
 	int	eld_size;
 	int	baseline_len;
 	int	eld_ver;

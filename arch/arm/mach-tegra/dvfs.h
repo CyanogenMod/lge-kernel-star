@@ -73,6 +73,12 @@ struct dvfs_rail {
 	struct rail_stats stats;
 };
 
+enum dvfs_alt_freqs {
+	ALT_FREQS_NOT_SUPPORTED = 0,
+	ALT_FREQS_DISABLED,
+	ALT_FREQS_ENABLED,
+};
+
 struct dvfs {
 	/* Used only by tegra2_clock.c */
 	const char *clk_name;
@@ -82,9 +88,11 @@ struct dvfs {
 	/* Must be initialized before tegra_dvfs_init */
 	int freqs_mult;
 	unsigned long freqs[MAX_DVFS_FREQS];
+	unsigned long alt_freqs[MAX_DVFS_FREQS];
 	const int *millivolts;
 	struct dvfs_rail *dvfs_rail;
 	bool auto_dvfs;
+	enum dvfs_alt_freqs alt_freqs_state;
 
 	/* Filled in by tegra_dvfs_init */
 	int max_millivolts;
@@ -116,6 +124,8 @@ struct dvfs_rail *tegra_dvfs_get_rail_by_name(const char *reg_id);
 int tegra_dvfs_predict_millivolts(struct clk *c, unsigned long rate);
 void tegra_dvfs_core_cap_enable(bool enable);
 void tegra_dvfs_core_cap_level_set(int level);
+int tegra_dvfs_alt_freqs_set(struct dvfs *d, bool enable);
+void tegra_cpu_dvfs_alter(int edp_thermal_index, bool before_clk_update);
 #else
 static inline void tegra_soc_init_dvfs(void)
 {}
@@ -149,6 +159,11 @@ static inline int tegra_dvfs_predict_millivolts(struct clk *c, unsigned long rat
 static inline void tegra_dvfs_core_cap_enable(bool enable)
 {}
 static inline void tegra_dvfs_core_cap_level_set(int level)
+{}
+static inline int tegra_dvfs_alt_freqs_set(struct dvfs *d, bool enable)
+{ return 0; }
+static inline void tegra_cpu_dvfs_alter(int edp_thermal_index,
+					bool before_clk_update)
 {}
 #endif
 

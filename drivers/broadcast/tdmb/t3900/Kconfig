@@ -1,0 +1,14 @@
+#
+# INC_T3900DEVICE subsystem configuration
+#
+
+#menu "T3900 support"
+
+config T3900_TDMB
+	default n
+	---help---
+	  This driver implements the front-end of the Xen virtual
+	  keyboard and mouse device driver.  It communicates with a back-end
+	  in another domain.
+  
+#endmenu

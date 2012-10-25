@@ -22,6 +22,35 @@
 #include "board-whistler.h"
 #include "gpio-names.h"
 
+/* Setting the drive strength of pins
+ * hsm: Enable High speed mode (ENABLE/DISABLE)
+ * Schimit: Enable/disable schimit (ENABLE/DISABLE)
+ * drive: low power mode (DIV_1, DIV_2, DIV_4, DIV_8)
+ * pulldn_drive - drive down (falling edge) - Driver Output Pull-Down drive
+ *                strength code. Value from 0 to 31.
+ * pullup_drive - drive up (rising edge)  - Driver Output Pull-Up drive
+ *                strength code. Value from 0 to 31.
+ * pulldn_slew -  Driver Output Pull-Up slew control code  - 2bit code
+ *                code 11 is least slewing of signal. code 00 is highest
+ *                slewing of the signal.
+ *                Value - FASTEST, FAST, SLOW, SLOWEST
+ * pullup_slew -  Driver Output Pull-Down slew control code -
+ *                code 11 is least slewing of signal. code 00 is highest
+ *                slewing of the signal.
+ *                Value - FASTEST, FAST, SLOW, SLOWEST
+ */
+#define SET_DRIVE(_name, _hsm, _schmitt, _drive, _pulldn_drive, _pullup_drive, _pulldn_slew, _pullup_slew) \
+	{                                               \
+		.pingroup = TEGRA_DRIVE_PINGROUP_##_name,   \
+		.hsm = TEGRA_HSM_##_hsm,                    \
+		.schmitt = TEGRA_SCHMITT_##_schmitt,        \
+		.drive = TEGRA_DRIVE_##_drive,              \
+		.pull_down = TEGRA_PULL_##_pulldn_drive,    \
+		.pull_up = TEGRA_PULL_##_pullup_drive,		\
+		.slew_rising = TEGRA_SLEW_##_pulldn_slew,   \
+		.slew_falling = TEGRA_SLEW_##_pullup_slew,	\
+	}
+
 #define DEFAULT_DRIVE(_name)					\
 	{							\
 		.pingroup = TEGRA_DRIVE_PINGROUP_##_name,	\
@@ -34,13 +63,16 @@
 		.slew_falling = TEGRA_SLEW_SLOWEST,		\
 	}
 
-
 static __initdata struct tegra_drive_pingroup_config whistler_drive_pinmux[] = {
-	DEFAULT_DRIVE(DBG),
-	DEFAULT_DRIVE(DDC),
 	DEFAULT_DRIVE(VI1),
-	DEFAULT_DRIVE(VI2),
 	DEFAULT_DRIVE(SDIO1),
+	SET_DRIVE(DAP2, DISABLE, ENABLE, DIV_1, 46, 46, SLOWEST, SLOWEST),
+	SET_DRIVE(DAP3, DISABLE, ENABLE, DIV_1, 46, 46, SLOWEST, SLOWEST),
+	SET_DRIVE(DBG, DISABLE, ENABLE, DIV_1, 31, 31, FASTEST, FASTEST),  /* I2C1 */
+	SET_DRIVE(DDC, DISABLE, ENABLE, DIV_1, 31, 31, FASTEST, FASTEST),  /* I2C2-1 */
+	SET_DRIVE(AT1, DISABLE, ENABLE, DIV_1, 31, 31, FASTEST, FASTEST),  /* I2C2-2 */
+	SET_DRIVE(VI2, DISABLE, ENABLE, DIV_1, 31, 31, FASTEST, FASTEST),  /* I2C3 */
+	SET_DRIVE(AO1, DISABLE, ENABLE, DIV_1, 31, 31, FASTEST, FASTEST),  /* DVC */
 };
 
 static __initdata struct tegra_pingroup_config whistler_pinmux[] = {
@@ -63,17 +95,17 @@ static __initdata struct tegra_pingroup_config whistler_pinmux[] = {
 	{TEGRA_PINGROUP_DTC,   TEGRA_MUX_VI,            TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
 	{TEGRA_PINGROUP_DTD,   TEGRA_MUX_VI,            TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
 	{TEGRA_PINGROUP_DTE,   TEGRA_MUX_RSVD1,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
-	{TEGRA_PINGROUP_DTF,   TEGRA_MUX_I2C3,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
+	{TEGRA_PINGROUP_DTF,   TEGRA_MUX_I2C3,          TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
 	{TEGRA_PINGROUP_GMA,   TEGRA_MUX_GMI,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
 	{TEGRA_PINGROUP_GMB,   TEGRA_MUX_GMI,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
 	{TEGRA_PINGROUP_GMC,   TEGRA_MUX_GMI,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
 	{TEGRA_PINGROUP_GMD,   TEGRA_MUX_GMI,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
-	{TEGRA_PINGROUP_GME,   TEGRA_MUX_DAP5,          TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
+	{TEGRA_PINGROUP_GME,   TEGRA_MUX_DAP5,          TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
 	{TEGRA_PINGROUP_GPU,   TEGRA_MUX_GMI,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
 	{TEGRA_PINGROUP_GPU7,  TEGRA_MUX_RTCK,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
 	{TEGRA_PINGROUP_GPV,   TEGRA_MUX_PCIE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
 	{TEGRA_PINGROUP_HDINT, TEGRA_MUX_HDMI,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
-	{TEGRA_PINGROUP_I2CP,  TEGRA_MUX_I2C,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
+	{TEGRA_PINGROUP_I2CP,  TEGRA_MUX_I2C,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
 	{TEGRA_PINGROUP_IRRX,  TEGRA_MUX_UARTB,         TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
 	{TEGRA_PINGROUP_IRTX,  TEGRA_MUX_UARTB,         TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
 	{TEGRA_PINGROUP_KBCA,  TEGRA_MUX_KBC,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
@@ -125,7 +157,7 @@ static __initdata struct tegra_pingroup_config whistler_pinmux[] = {
 	{TEGRA_PINGROUP_OWC,   TEGRA_MUX_OWR,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
 	{TEGRA_PINGROUP_PMC,   TEGRA_MUX_PWR_ON,        TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
 	{TEGRA_PINGROUP_PTA,   TEGRA_MUX_HDMI,          TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
-	{TEGRA_PINGROUP_RM,    TEGRA_MUX_I2C,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
+	{TEGRA_PINGROUP_RM,    TEGRA_MUX_I2C,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
 	{TEGRA_PINGROUP_SDB,   TEGRA_MUX_SDIO3,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
 	{TEGRA_PINGROUP_SDC,   TEGRA_MUX_SDIO3,         TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
 	{TEGRA_PINGROUP_SDD,   TEGRA_MUX_SDIO3,         TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},

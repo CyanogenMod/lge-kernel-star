@@ -37,7 +37,7 @@
 
 /* Globals */
 static int zram_major;
-struct zram *devices;
+struct zram *zram_devices;
 
 /* Module params (documentation at end) */
 unsigned int num_devices;
@@ -537,7 +537,7 @@ int zram_init_device(struct zram *zram)
 
 	set_capacity(zram->disk, zram->disksize >> SECTOR_SHIFT);
 
-	/* zram devices sort of resembles non-rotational disks */
+	/* zram zram_devices sort of resembles non-rotational disks */
 	queue_flag_set_unlocked(QUEUE_FLAG_NONROT, zram->disk->queue);
 
 	zram->mem_pool = xv_create_pool();
@@ -677,15 +677,15 @@ static int __init zram_init(void)
 	}
 
 	/* Allocate the device array and initialize each one */
-	pr_info("Creating %u devices ...\n", num_devices);
-	devices = kzalloc(num_devices * sizeof(struct zram), GFP_KERNEL);
-	if (!devices) {
+	pr_info("Creating %u zram_devices ...\n", num_devices);
+	zram_devices = kzalloc(num_devices * sizeof(struct zram), GFP_KERNEL);
+	if (!zram_devices) {
 		ret = -ENOMEM;
 		goto unregister;
 	}
 
 	for (dev_id = 0; dev_id < num_devices; dev_id++) {
-		ret = create_device(&devices[dev_id], dev_id);
+		ret = create_device(&zram_devices[dev_id], dev_id);
 		if (ret)
 			goto free_devices;
 	}
@@ -694,8 +694,8 @@ static int __init zram_init(void)
 
 free_devices:
 	while (dev_id)
-		destroy_device(&devices[--dev_id]);
-	kfree(devices);
+		destroy_device(&zram_devices[--dev_id]);
+	kfree(zram_devices);
 unregister:
 	unregister_blkdev(zram_major, "zram");
 out:
@@ -708,7 +708,7 @@ static void __exit zram_exit(void)
 	struct zram *zram;
 
 	for (i = 0; i < num_devices; i++) {
-		zram = &devices[i];
+		zram = &zram_devices[i];
 
 		destroy_device(zram);
 		if (zram->init_done)
@@ -717,12 +717,12 @@ static void __exit zram_exit(void)
 
 	unregister_blkdev(zram_major, "zram");
 
-	kfree(devices);
+	kfree(zram_devices);
 	pr_debug("Cleanup done!\n");
 }
 
 module_param(num_devices, uint, 0);
-MODULE_PARM_DESC(num_devices, "Number of zram devices");
+MODULE_PARM_DESC(num_devices, "Number of zram zram_devices");
 
 module_init(zram_init);
 module_exit(zram_exit);

@@ -49,6 +49,10 @@ extern "C" {
  * You can modify this (for example with "#define MPL_LOG_NDEBUG 0"
  * at the top of your source file) to change that behavior.
  */
+#if defined(CONFIG_MACH_BSSQ)
+#define MPL_LOG_NDEBUG 1
+#endif
+
 #ifndef MPL_LOG_NDEBUG
 #ifdef NDEBUG
 #define MPL_LOG_NDEBUG 1
@@ -70,14 +74,14 @@ extern "C" {
 #else
 	/* Based off the log priorities in android
 	   /system/core/include/android/log.h */
-#define MPL_LOG_UNKNOWN		(0)
-#define MPL_LOG_DEFAULT		(1)
-#define MPL_LOG_VERBOSE		(2)
-#define MPL_LOG_DEBUG		(3)
-#define MPL_LOG_INFO		(4)
-#define MPL_LOG_WARN		(5)
-#define MPL_LOG_ERROR		(6)
-#define MPL_LOG_SILENT		(8)
+#define MPL_LOG_UNKNOWN (0)
+#define MPL_LOG_DEFAULT (1)
+#define MPL_LOG_VERBOSE (2)
+#define MPL_LOG_DEBUG (3)
+#define MPL_LOG_INFO (4)
+#define MPL_LOG_WARN (5)
+#define MPL_LOG_ERROR (6)
+#define MPL_LOG_SILENT (8)
 #endif
 
 
@@ -101,13 +105,9 @@ extern "C" {
  */
 #ifndef MPL_LOGV
 #if MPL_LOG_NDEBUG
-#define MPL_LOGV(fmt, ...)						\
-	do {								\
-		if (0)							\
-			MPL_LOG(LOG_VERBOSE, MPL_LOG_TAG, fmt, ##__VA_ARGS__);\
-	} while (0)
+#define MPL_LOGV(...) ((void)0)
 #else
-#define MPL_LOGV(fmt, ...) MPL_LOG(LOG_VERBOSE, MPL_LOG_TAG, fmt, ##__VA_ARGS__)
+#define MPL_LOGV(...) ((void)MPL_LOG(LOG_VERBOSE, MPL_LOG_TAG, __VA_ARGS__))
 #endif
 #endif
 
@@ -117,12 +117,11 @@ extern "C" {
 
 #ifndef MPL_LOGV_IF
 #if MPL_LOG_NDEBUG
-#define MPL_LOGV_IF(cond, fmt, ...)  \
-	do { if (0) MPL_LOG(fmt, ##__VA_ARGS__); } while (0)
+#define MPL_LOGV_IF(cond, ...)   ((void)0)
 #else
-#define MPL_LOGV_IF(cond, fmt, ...) \
+#define MPL_LOGV_IF(cond, ...) \
 	((CONDITION(cond))						\
-		? MPL_LOG(LOG_VERBOSE, MPL_LOG_TAG, fmt, ##__VA_ARGS__) \
+		? ((void)MPL_LOG(LOG_VERBOSE, MPL_LOG_TAG, __VA_ARGS__)) \
 		: (void)0)
 #endif
 #endif
@@ -131,13 +130,13 @@ extern "C" {
  * Simplified macro to send a debug log message using the current MPL_LOG_TAG.
  */
 #ifndef MPL_LOGD
-#define MPL_LOGD(fmt, ...) MPL_LOG(LOG_DEBUG, MPL_LOG_TAG, fmt, ##__VA_ARGS__)
+#define MPL_LOGD(...) ((void)MPL_LOG(LOG_DEBUG, MPL_LOG_TAG, __VA_ARGS__))
 #endif
 
 #ifndef MPL_LOGD_IF
-#define MPL_LOGD_IF(cond, fmt, ...) \
+#define MPL_LOGD_IF(cond, ...) \
 	((CONDITION(cond))					       \
-		? MPL_LOG(LOG_DEBUG, MPL_LOG_TAG, fmt, ##__VA_ARGS__)  \
+		? ((void)MPL_LOG(LOG_DEBUG, MPL_LOG_TAG, __VA_ARGS__)) \
 		: (void)0)
 #endif
 
@@ -145,13 +144,13 @@ extern "C" {
  * Simplified macro to send an info log message using the current MPL_LOG_TAG.
  */
 #ifndef MPL_LOGI
-#define MPL_LOGI(fmt, ...) MPL_LOG(LOG_INFO, MPL_LOG_TAG, fmt, ##__VA_ARGS__)
+#define MPL_LOGI(...) ((void)MPL_LOG(LOG_INFO, MPL_LOG_TAG, __VA_ARGS__))
 #endif
 
 #ifndef MPL_LOGI_IF
-#define MPL_LOGI_IF(cond, fmt, ...) \
+#define MPL_LOGI_IF(cond, ...) \
 	((CONDITION(cond))                                              \
-		? MPL_LOG(LOG_INFO, MPL_LOG_TAG, fmt, ##__VA_ARGS__)   \
+		? ((void)MPL_LOG(LOG_INFO, MPL_LOG_TAG, __VA_ARGS__))   \
 		: (void)0)
 #endif
 
@@ -159,17 +158,13 @@ extern "C" {
  * Simplified macro to send a warning log message using the current MPL_LOG_TAG.
  */
 #ifndef MPL_LOGW
-#ifdef __KERNEL__
-#define MPL_LOGW(fmt, ...) printk(KERN_WARNING MPL_LOG_TAG fmt, ##__VA_ARGS__)
-#else
-#define MPL_LOGW(fmt, ...) MPL_LOG(LOG_WARN, MPL_LOG_TAG, fmt, ##__VA_ARGS__)
-#endif
+#define MPL_LOGW(...) ((void)MPL_LOG(LOG_WARN, MPL_LOG_TAG, __VA_ARGS__))
 #endif
 
 #ifndef MPL_LOGW_IF
-#define MPL_LOGW_IF(cond, fmt, ...) \
+#define MPL_LOGW_IF(cond, ...) \
 	((CONDITION(cond))					       \
-		? MPL_LOG(LOG_WARN, MPL_LOG_TAG, fmt, ##__VA_ARGS__)   \
+		? ((void)MPL_LOG(LOG_WARN, MPL_LOG_TAG, __VA_ARGS__))  \
 		: (void)0)
 #endif
 
@@ -177,17 +172,13 @@ extern "C" {
  * Simplified macro to send an error log message using the current MPL_LOG_TAG.
  */
 #ifndef MPL_LOGE
-#ifdef __KERNEL__
-#define MPL_LOGE(fmt, ...) printk(KERN_ERR MPL_LOG_TAG fmt, ##__VA_ARGS__)
-#else
-#define MPL_LOGE(fmt, ...) MPL_LOG(LOG_ERROR, MPL_LOG_TAG, fmt, ##__VA_ARGS__)
-#endif
+#define MPL_LOGE(...) ((void)MPL_LOG(LOG_ERROR, MPL_LOG_TAG, __VA_ARGS__))
 #endif
 
 #ifndef MPL_LOGE_IF
-#define MPL_LOGE_IF(cond, fmt, ...) \
+#define MPL_LOGE_IF(cond, ...) \
 	((CONDITION(cond))					       \
-		? MPL_LOG(LOG_ERROR, MPL_LOG_TAG, fmt, ##__VA_ARGS__)  \
+		? ((void)MPL_LOG(LOG_ERROR, MPL_LOG_TAG, __VA_ARGS__)) \
 		: (void)0)
 #endif
 
@@ -199,43 +190,35 @@ extern "C" {
  * It is NOT stripped from release builds.  Note that the condition test
  * is -inverted- from the normal assert() semantics.
  */
-#define MPL_LOG_ALWAYS_FATAL_IF(cond, fmt, ...) \
+#define MPL_LOG_ALWAYS_FATAL_IF(cond, ...) \
 	((CONDITION(cond))					   \
-		? ((void)android_printAssert(#cond, MPL_LOG_TAG,   \
-						fmt, ##__VA_ARGS__))	\
+		? ((void)android_printAssert(#cond, MPL_LOG_TAG, __VA_ARGS__)) \
 		: (void)0)
 
-#define MPL_LOG_ALWAYS_FATAL(fmt, ...) \
-	(((void)android_printAssert(NULL, MPL_LOG_TAG, fmt, ##__VA_ARGS__)))
+#define MPL_LOG_ALWAYS_FATAL(...) \
+	(((void)android_printAssert(NULL, MPL_LOG_TAG, __VA_ARGS__)))
 
 /*
  * Versions of MPL_LOG_ALWAYS_FATAL_IF and MPL_LOG_ALWAYS_FATAL that
  * are stripped out of release builds.
  */
 #if MPL_LOG_NDEBUG
-#define MPL_LOG_FATAL_IF(cond, fmt, ...)				\
-	do {								\
-		if (0)							\
-			MPL_LOG_ALWAYS_FATAL_IF(cond, fmt, ##__VA_ARGS__); \
-	} while (0)
-#define MPL_LOG_FATAL(fmt, ...)						\
-	do {								\
-		if (0)							\
-			MPL_LOG_ALWAYS_FATAL(fmt, ##__VA_ARGS__)	\
-	} while (0)
+
+#define MPL_LOG_FATAL_IF(cond, ...) ((void)0)
+#define MPL_LOG_FATAL(...)          ((void)0)
+
 #else
-#define MPL_LOG_FATAL_IF(cond, fmt, ...) \
-	MPL_LOG_ALWAYS_FATAL_IF(cond, fmt, ##__VA_ARGS__)
-#define MPL_LOG_FATAL(fmt, ...) \
-	MPL_LOG_ALWAYS_FATAL(fmt, ##__VA_ARGS__)
+
+#define MPL_LOG_FATAL_IF(cond, ...) MPL_LOG_ALWAYS_FATAL_IF(cond, __VA_ARGS__)
+#define MPL_LOG_FATAL(...)          MPL_LOG_ALWAYS_FATAL(__VA_ARGS__)
+
 #endif
 
 /*
  * Assertion that generates a log message when the assertion fails.
  * Stripped out of release builds.  Uses the current MPL_LOG_TAG.
  */
-#define MPL_LOG_ASSERT(cond, fmt, ...)			\
-	MPL_LOG_FATAL_IF(!(cond), fmt, ##__VA_ARGS__)
+#define MPL_LOG_ASSERT(cond, ...) MPL_LOG_FATAL_IF(!(cond), __VA_ARGS__)
 
 /* --------------------------------------------------------------------- */
 
@@ -248,8 +231,8 @@ extern "C" {
  * The second argument may be NULL or "" to indicate the "global" tag.
  */
 #ifndef MPL_LOG
-#define MPL_LOG(priority, tag, fmt, ...)		\
-	MPL_LOG_PRI(priority, tag, fmt, ##__VA_ARGS__)
+#define MPL_LOG(priority, tag, ...) \
+    MPL_LOG_PRI(priority, tag, __VA_ARGS__)
 #endif
 
 /*
@@ -257,14 +240,14 @@ extern "C" {
  */
 #ifndef MPL_LOG_PRI
 #ifdef ANDROID
-#define MPL_LOG_PRI(priority, tag, fmt, ...) \
-	LOG(priority, tag, fmt, ##__VA_ARGS__)
+#define MPL_LOG_PRI(priority, tag, ...) \
+	LOG(priority, tag, __VA_ARGS__)
 #elif defined __KERNEL__
-#define MPL_LOG_PRI(priority, tag, fmt, ...) \
-	pr_debug(MPL_##priority tag fmt, ##__VA_ARGS__)
+#define MPL_LOG_PRI(priority, tag, ...) \
+	printk(MPL_##priority tag __VA_ARGS__)
 #else
-#define MPL_LOG_PRI(priority, tag, fmt, ...) \
-	_MLPrintLog(MPL_##priority, tag, fmt, ##__VA_ARGS__)
+#define MPL_LOG_PRI(priority, tag, ...) \
+	_MLPrintLog(MPL_##priority, tag, __VA_ARGS__)
 #endif
 #endif
 
@@ -276,7 +259,8 @@ extern "C" {
 #define MPL_LOG_PRI_VA(priority, tag, fmt, args) \
     android_vprintLog(priority, NULL, tag, fmt, args)
 #elif defined __KERNEL__
-/* not allowed in the Kernel because there is no dev_dbg that takes a va_list */
+#define MPL_LOG_PRI_VA(priority, tag, fmt, args) \
+    vprintk(MPL_##priority tag fmt, args)
 #else
 #define MPL_LOG_PRI_VA(priority, tag, fmt, args) \
     _MLPrintVaLog(priority, NULL, tag, fmt, args)

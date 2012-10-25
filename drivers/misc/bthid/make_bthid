@@ -1,0 +1,39 @@
+#  Copyright (C) 2009-2011 Broadcom Corporation
+#
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License, version 2, as published by
+#  the Free Software Foundation (the "GPL").
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  A copy of the GPL is available at http://www.broadcom.com/licenses/GPLv2.php,
+#  or by writing to the Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+#  Boston, MA  02111-1307, USA.
+#
+#!/bin/bash
+
+# Start fresh
+make clean
+
+# Fetch AOSP kernel and prebuilt source
+echo "Fetching kernel ..."
+git clone -q git://android.git.kernel.org/kernel/msm ../kernel/msm
+echo "Fetching prebuilt toolchain binaries ..."
+git clone -q git://android.git.kernel.org/platform/prebuilt ../prebuilt
+
+# We use GRI40 (Gingerbread android-2.3.3_r1) kernel configuration
+echo "Configuring kernel ..."
+gunzip config.gz; mv config ../kernel/msm/.config
+cd ../kernel/msm; git checkout -q 08607d4; cd - &> /dev/null
+
+# Build the kernel
+echo "Building kernel ..."
+cd ../kernel/msm; make ARCH=arm CROSS_COMPILE=../../prebuilt/linux-x86/toolchain/arm-eabi-4.4.0/bin/arm-eabi-; cd - &> /dev/null
+
+# Build Broadcom bthid driver
+echo "Building bthid driver ..."
+make
+echo "Building bthid driver done"; echo

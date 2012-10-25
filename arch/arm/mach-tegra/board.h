@@ -43,6 +43,8 @@ void __init tegra_init_clock(void);
 void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 	unsigned long fb2_size);
 void tegra_init_cache(bool init);
+void __init tegra_ram_console_debug_reserve(unsigned long ram_console_size);
+void __init tegra_ram_console_debug_init(void);
 void __init tegra_release_bootloader_fb(void);
 void __init tegra_protected_aperture_init(unsigned long aperture);
 void tegra_move_framebuffer(unsigned long to, unsigned long from,
@@ -98,13 +100,14 @@ void tegra_get_pmu_board_info(struct board_info *bi);
 void tegra_get_display_board_info(struct board_info *bi);
 void tegra_get_camera_board_info(struct board_info *bi);
 #ifdef CONFIG_TEGRA_CONVSERVATIVE_GOV_ON_EARLYSUPSEND
-#define SET_CONSERVATIVE_GOVERNOR_UP_THRESHOLD 95
-#define SET_CONSERVATIVE_GOVERNOR_DOWN_THRESHOLD 50
+#define SET_CONSERVATIVE_GOVERNOR_UP_THRESHOLD 		95
+#define SET_CONSERVATIVE_GOVERNOR_DOWN_THRESHOLD 	50
+#define SET_CONSERVATIVE_GOVERNOR_FREQ_STEP 		3
 
 void cpufreq_save_default_governor(void);
 void cpufreq_restore_default_governor(void);
 void cpufreq_set_conservative_governor(void);
-void cpufreq_set_conservative_governor_param(int up_th, int down_th);
+void cpufreq_set_conservative_governor_param(char *name, int value);
 #endif
 int get_core_edp(void);
 enum panel_type get_panel_type(void);

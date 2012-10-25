@@ -57,6 +57,7 @@
 #define MAX77663_REG_GPIO_PD		0x3F
 #define MAX77663_REG_GPIO_ALT		0x40
 #define MAX77663_REG_ONOFF_CFG1		0x41
+#define MAX77663_REG_ONOFF_CFG2		0x42
 
 #define IRQ_TOP_GLBL_MASK		(1 << 7)
 #define IRQ_TOP_GLBL_SHIFT		7
@@ -113,6 +114,8 @@
 
 #define ONOFF_SFT_RST_MASK		(1 << 7)
 #define ONOFF_SLPEN_MASK		(1 << 2)
+
+#define ONOFF_SLP_LPM_MASK		(1 << 5)
 
 enum {
 	CACHE_IRQ_LBT,
@@ -366,12 +369,25 @@ int max77663_power_off(void)
 }
 EXPORT_SYMBOL(max77663_power_off);
 
-static int max77663_sleep_enable(struct max77663_chip *chip)
+static int max77663_sleep(struct max77663_chip *chip, bool on)
 {
+	int ret = 0;
+
+	if (chip->pdata->flags & SLP_LPM_ENABLE) {
+		/* Put the power rails into Low-Power mode during sleep mode,
+		 * if the power rail's power mode is GLPM. */
+		ret = max77663_set_bits(chip->dev, MAX77663_REG_ONOFF_CFG2,
+					ONOFF_SLP_LPM_MASK,
+					on ? ONOFF_SLP_LPM_MASK : 0, 0);
+		if (ret < 0)
+			return ret;
+	}
+
 	/* Enable sleep that AP can be placed into sleep mode
 	 * by pulling EN1 low */
 	return max77663_set_bits(chip->dev, MAX77663_REG_ONOFF_CFG1,
-				 ONOFF_SLPEN_MASK, ONOFF_SLPEN_MASK, 0);
+				 ONOFF_SLPEN_MASK,
+				 on ? ONOFF_SLPEN_MASK : 0, 0);
 }
 
 static inline int max77663_cache_write(struct device *dev, u8 addr, u8 mask,
@@ -1287,11 +1303,15 @@ static int max77663_probe(struct i2c_client *client,
 	max77663_gpio_init(chip);
 	max77663_irq_init(chip);
 	max77663_debugfs_init(chip);
-	max77663_sleep_enable(chip);
+	ret = max77663_sleep(chip, false);
+	if (ret < 0) {
+		dev_err(&client->dev, "probe: Failed to disable sleep\n");
+		goto out_exit;
+	}
 
 	ret = mfd_add_devices(&client->dev, 0, pdata->sub_devices,
 			      pdata->num_subdevs, NULL, 0);
-	if (ret  != 0) {
+	if (ret != 0) {
 		dev_err(&client->dev, "probe: Failed to add subdev: %d\n", ret);
 		goto out_exit;
 	}
@@ -1334,7 +1354,7 @@ static int max77663_suspend(struct device *dev)
 	if (client->irq)
 		disable_irq(client->irq);
 
-	ret = max77663_sleep_enable(chip);
+	ret = max77663_sleep(chip, true);
 	if (ret < 0)
 		dev_err(dev, "suspend: Failed to enable sleep\n");
 
@@ -1347,9 +1367,9 @@ static int max77663_resume(struct device *dev)
 	struct max77663_chip *chip = i2c_get_clientdata(client);
 	int ret;
 
-	ret = max77663_sleep_enable(chip);
+	ret = max77663_sleep(chip, false);
 	if (ret < 0) {
-		dev_err(dev, "resume: Failed to enable sleep\n");
+		dev_err(dev, "resume: Failed to disable sleep\n");
 		return ret;
 	}
 
@@ -1389,7 +1409,7 @@ static int __init max77663_init(void)
 {
 	return i2c_add_driver(&max77663_driver);
 }
-arch_initcall(max77663_init);
+subsys_initcall(max77663_init);
 
 static void __exit max77663_exit(void)
 {

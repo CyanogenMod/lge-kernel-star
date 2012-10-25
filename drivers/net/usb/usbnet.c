@@ -1394,6 +1394,9 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 		/* WWAN devices should always be named "wwan%d" */
 		if ((dev->driver_info->flags & FLAG_WWAN) != 0)
 			strcpy(net->name, "wwan%d");
+		/* RMNET devices should always be named "rmnet%d" */
+		if ((dev->driver_info->flags & FLAG_RMNET) != 0)
+			strcpy(net->name, "rmnet%d");
 
 		/* maybe the remote can't receive an Ethernet MTU */
 		if (net->mtu > (dev->hard_mtu - net->hard_header_len))

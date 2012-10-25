@@ -33,6 +33,7 @@
 
 #include <mach/iomap.h>
 #include "pm-irq.h"
+#include "pm.h"
 #include <mach/pinmux.h>
 
 #define GPIO_BANK(x)		((x) >> 5)
@@ -79,6 +80,17 @@
 #define GPIO_INT_LVL_LEVEL_HIGH		0x000001
 #define GPIO_INT_LVL_LEVEL_LOW		0x000000
 
+#if defined(CONFIG_MACH_BSSQ) || defined(CONFIG_MACH_STAR)
+#define REG_CNF			0
+#define REG_OE			1
+#define REG_OUT			2
+#define REG_INT_ENB		3
+#define REG_INT_LVL		4
+#define DBG_BUF_SIZE	64
+int get_gpio_reg_data(int port, int pin, int gpio, int reg);
+extern int gpio_get_pinmux_group(int gpio_nr);
+#endif
+
 struct tegra_gpio_bank {
 	int bank;
 	int irq;
@@ -104,6 +116,243 @@ static struct tegra_gpio_bank tegra_gpio_banks[] = {
 	{.bank = 7, .irq = INT_GPIO8},
 #endif
 };
+
+#if defined(CONFIG_MACH_BSSQ) || defined(CONFIG_MACH_STAR)
+typedef enum tegra_pin_group_conf {
+	ATA = 0x00000000,
+	ATB,
+	ATC,
+	ATD,
+	CDEV1,
+	CDEV2,
+	CSUS,
+	DAP1,
+	DAP2,
+	DAP3,
+	DAP4,
+	DTA,
+	DTB,
+	DTC,
+	DTD,
+	DTE,
+	GPU,
+	GPV,
+	I2CP,
+	IRTX,
+	IRRX,
+	KBCB,
+	KBCA,
+	PMC,
+	PTA,
+	RM,
+	KBCE,
+	KBCF,
+	GMA,
+	GMC,
+	SDIO1,
+	OWC,
+	GME = 0x00010000,
+	SDC,
+	SDD,
+	SLXA,
+	UNUSED_1_4,
+	SLXC,
+	SLXD,
+	SLXK,
+	SPDI,
+	SPDO,
+	SPIA,
+	SPIB,
+	SPIC,
+	SPID,
+	SPIE,
+	SPIF,
+	SPIG,
+	SPIH,
+	UAA,
+	UAB,
+	UAC,
+	UAD,
+	UCA,
+	UCB,
+	UNUSED_1_24,
+	ATE,
+	KBCC,
+	UNUSED_1_27,
+	UNUSED_1_28,
+	GMB,
+	GMD,
+	DDC,
+	LD0 = 0x00020000,
+	LD1,
+	LD2,
+	LD3,
+	LD4,
+	LD5,
+	LD6,
+	LD7,
+	LD8,
+	LD9,
+	LD10,
+	LD11,
+	LD12,
+	LD13,
+	LD14,
+	LD15,
+	LD16,
+	LD17,
+	LHP0,
+	LHP1,
+	LHP2,
+	LVP0,
+	LVP1,
+	HDINT,
+	LM0,
+	LM1,
+	LVS,
+	LSC0,
+	LSC1,
+	LSCK,
+	LDC,
+	LCSN,
+	LSPI = 0x00030000,
+	LSDA,
+	LSDI,
+	LPW0,
+	LPW1,
+	LPW2,
+	LDI,
+	LHS,
+	LPP,
+	KBCD,
+	GPU7,
+	DTF,
+	UDA,
+	CRTP,
+	SDB,
+	UNUSED_3_16,
+	UNUSED_3_17,
+	UNUSED_3_18,
+	UNUSED_3_19,
+	UNUSED_3_20,
+	UNUSED_3_21,
+	UNUSED_3_22,
+	UNUSED_3_23,
+	UNUSED_3_24,
+	UNUSED_3_25,
+	UNUSED_3_26,
+	UNUSED_3_27,
+	UNUSED_3_28,
+	UNUSED_3_29,
+	UNUSED_3_30,
+	UNUSED_3_31,
+	TRISTATE_SKIP = 0xffffffff,
+} tegra_pin_group_conf_t;
+
+// GPIO, SFIO configure
+typedef enum tegra_gpio_sfio_confg {
+	SFIO_ENABLE = 0,
+	GPIO_ENABLE,
+} tegra_gpio_sfio_confg_t;
+
+// Input, output configure
+typedef enum tegra_gpio_oe_confg {
+	GPIO_INPUT = 0,
+	GPIO_OUTPUT,
+} tegra_gpio_oe_confg_t;
+
+// out enable configure
+typedef enum tegra_gpio_out_confg {
+	GPIO_SLEEP_LOW = 0x00000000,
+	GPIO_SLEEP_HIGH,
+	GPIO_INIT_ONLY_LOW = 0x00010000,
+	GPIO_INIT_ONLY_HIGH,
+} tegra_gpio_out_confg_t;
+
+struct tegra_init_gpio_info {
+	u8 port;
+	u8 pin;
+	tegra_gpio_sfio_confg_t cnf;
+	tegra_gpio_oe_confg_t   oe;
+	tegra_gpio_out_confg_t  out;
+	tegra_pin_group_conf_t  group;
+};
+
+#if defined (CONFIG_KS1103)
+#include <lge/gpio_ks1103.h>
+#elif defined(CONFIG_LU6500)
+#include <lge/gpio_lu6500.h>
+#elif defined(CONFIG_SU880) || defined(CONFIG_KU8800)
+#include <lge/gpio_sku880.h>
+#elif defined(CONFIG_MACH_STAR_SU660) || defined(CONFIG_MACH_STAR_P990) || defined(CONFIG_MACH_STAR_P999)
+#include "lge/star/include/lge/board_star_su660_gpio.h"
+#endif
+
+#if defined(CONFIG_MACH_STAR) && (defined(CONFIG_MACH_STAR_SU660) || defined(CONFIG_MACH_STAR_P990) || defined(CONFIG_MACH_STAR_P999))
+static struct tegra_gpio_bank tegra_sleep_gpio_banks[] = {
+	//	PORT 0	 ,	PORT 1	 ,	 PORT2	 ,	 PORT3		  
+	//	A, B, C, D		  
+	{.bank = 0, .irq = INT_GPIO1, 
+		.cnf		= {0x00000000, 0x00000008, 0x00000000, 0x00000001},
+		.out		= {0x00000000, 0x00000008, 0x00000000, 0x00000000}, 
+		.oe 		= {0x00000000, 0x00000008, 0x00000000, 0x00000001},  
+		.int_enb	= {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
+		.int_lvl	= {0x00000000, 0x00000000, 0x00000000, 0x00000000}}, 
+	//	E, F, G, H
+	{.bank = 1, .irq = INT_GPIO2, 
+		.cnf		= {0x000000ff, 0x00000000, 0x0000000b, 0x00000000},
+		.out		= {0x0000001f, 0x00000000, 0x00000000, 0x00000000}, 
+		.oe 		= {0x000000ff, 0x00000000, 0x00000000, 0x00000000},  
+		.int_enb	= {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
+		.int_lvl	= {0x00000000, 0x00000000, 0x00080800, 0x00000000}},   
+	//	I, J, K, L
+	{.bank = 2, .irq = INT_GPIO3, 
+		.cnf		= {0x000000a1, 0x00000005, 0x00000038, 0x00000000},
+		.out		= {0x00000080, 0x00000001, 0x00000018, 0x00000000}, 
+		.oe 		= {0x00000080, 0x00000005, 0x00000038, 0x00000000},  
+		.int_enb	= {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
+		.int_lvl	= {0x00202000, 0x00000000, 0x00000000, 0x00000000}},   
+	//	M, N, O, P
+	{.bank = 3, .irq = INT_GPIO4, 
+		.cnf		= {0x00000000, 0x00000050, 0x00000021, 0x00000000},
+		.out		= {0x00000000, 0x00000050, 0x00000000, 0x00000000}, 
+		.oe 		= {0x00000000, 0x00000050, 0x00000001, 0x00000000},  
+		.int_enb	= {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
+		.int_lvl	= {0x00000000, 0x00080800, 0x00002020, 0x00000000}},   
+	//	Q, R, S, T	
+	{.bank = 4, .irq = INT_GPIO5, 
+		.cnf		= {0x0000001b, 0x000000FB, 0x00000007, 0x00000011},
+		.out		= {0x00000003, 0x00000000, 0x00000002, 0x00000000}, 
+		.oe 		= {0x0000001b, 0x000000C9, 0x00000002, 0x00000011},  
+		.int_enb	= {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
+		.int_lvl	= {0x00000000, 0x00008000, 0x00000000, 0x00000000}},   
+	//	U, V, W, X	   
+	{.bank = 5, .irq = INT_GPIO6, 
+		.cnf		= {0x0000003f, 0x00000081, 0x00000000, 0x00000060},
+		.out		= {0x00000000, 0x00000001, 0x00000000, 0x00000040}, 
+		.oe 		= {0x0000001e, 0x00000081, 0x00000000, 0x00000000},  
+		.int_enb	= {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
+		.int_lvl	= {0x00000100, 0x00000000, 0x00000000, 0x00004000}},   
+	// Y, Z, AA, AB    
+	{.bank = 6, .irq = INT_GPIO7, 
+		.cnf		= {0x00000000, 0x00000000, 0x00000000, 0x00000001},
+		.out		= {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
+		.oe 		= {0x00000000, 0x00000000, 0x00000000, 0x00000001},  
+		.int_enb	= {0x00000000, 0x00000000, 0x00000000, 0x00000000}, 
+		.int_lvl	= {0x00000000, 0x00000000, 0x00000000, 0x00000000}},   
+};	
+#else	
+static struct tegra_gpio_bank tegra_sleep_gpio_banks[] = {
+	{.bank = 0, .irq = INT_GPIO1},
+	{.bank = 1, .irq = INT_GPIO2},
+	{.bank = 2, .irq = INT_GPIO3},
+	{.bank = 3, .irq = INT_GPIO4},
+	{.bank = 4, .irq = INT_GPIO5},
+	{.bank = 5, .irq = INT_GPIO6},
+	{.bank = 6, .irq = INT_GPIO7},
+};
+#endif
+#endif
 
 static int tegra_gpio_compose(int bank, int port, int bit)
 {
@@ -138,6 +387,23 @@ int tegra_gpio_get_bank_int_nr(int gpio)
 	irq = tegra_gpio_banks[bank].irq;
 	return irq;
 }
+
+#if defined(CONFIG_MACH_BSSQ)
+static int tegra_gpio_request(struct gpio_chip *chip, unsigned offset)
+{
+	//WARN_ON(tegra_gpio_io_power_config(offset, 1) != 0);
+	tegra_gpio_enable(offset);
+	//tegra_set_gpio_tristate(offset, TEGRA_TRI_NORMAL);
+	return 0;
+}
+
+static void tegra_gpio_free(struct gpio_chip *chip, unsigned offset)
+{
+	tegra_gpio_disable(offset);
+	//tegra_set_gpio_tristate(offset, TEGRA_TRI_TRISTATE);
+	//WARN_ON(tegra_gpio_io_power_config(offset, 0) != 0);
+}
+#endif
 
 void tegra_gpio_enable(int gpio)
 {
@@ -216,6 +482,10 @@ static struct gpio_chip tegra_gpio_chip = {
 	.get			= tegra_gpio_get,
 	.direction_output	= tegra_gpio_direction_output,
 	.set			= tegra_gpio_set,
+#if defined(CONFIG_MACH_BSSQ)
+	.request			= tegra_gpio_request,
+	.free				= tegra_gpio_free,
+#endif
 	.base			= 0,
 	.ngpio			= TEGRA_NR_GPIOS,
 };
@@ -258,6 +528,14 @@ static int tegra_gpio_irq_set_type(struct irq_data *d, unsigned int type)
 	int lvl_type;
 	int val;
 	unsigned long flags;
+
+#if defined(CONFIG_MACH_BSSQ) || defined(CONFIG_MACH_STAR)
+	if (NULL == bank) {
+		printk("GPIO: %s() failed to get irq chip data\n", __func__);
+		return -EINVAL;
+	}
+#endif
+
 
 	switch (type & IRQ_TYPE_SENSE_MASK) {
 	case IRQ_TYPE_EDGE_RISING:
@@ -334,6 +612,11 @@ static void tegra_gpio_resume(void)
 	int b;
 	int p;
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	if (tegra_get_current_suspend_mode() != TEGRA_SUSPEND_LP0)
+		return;
+#endif
+
 	local_irq_save(flags);
 
 	for (b = 0; b < ARRAY_SIZE(tegra_gpio_banks); b++) {
@@ -352,11 +635,28 @@ static void tegra_gpio_resume(void)
 	local_irq_restore(flags);
 }
 
+//LGE_CHANGE_S  euikyeom.kim@lge.com
+#if defined(CONFIG_MACH_STAR_DUMP_GPIO)	
+extern char gpio_regs_buf_suspend[PAGE_SIZE];
+#endif
+//LGE_CHANGE_E  euikyeom.kim@lge.com
+
 static int tegra_gpio_suspend(void)
 {
 	unsigned long flags;
 	int b;
 	int p;
+
+//LGE_CHANGE_S  euikyeom.kim@lge.com
+#if defined(CONFIG_MACH_STAR_DUMP_GPIO)	
+        ssize_t count = 0; 
+#endif
+//LGE_CHANGE_E  euikyeom.kim@lge.com
+
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	if (tegra_get_current_suspend_mode() != TEGRA_SUSPEND_LP0)
+		return 0;
+#endif
 
 	local_irq_save(flags);
 	for (b = 0; b < ARRAY_SIZE(tegra_gpio_banks); b++) {
@@ -370,7 +670,68 @@ static int tegra_gpio_suspend(void)
 			bank->int_enb[p] = __raw_readl(GPIO_INT_ENB(gpio));
 			bank->int_lvl[p] = __raw_readl(GPIO_INT_LVL(gpio));
 		}
+
+//LGE_CHANGE_S  euikyeom.kim@lge.com
+#if defined(CONFIG_MACH_STAR_DUMP_GPIO)
+                    count += snprintf(gpio_regs_buf_suspend + count,         
+                            PAGE_SIZE - count,                       
+                            "%4d:%4d %3x %2x %3x\n", b, p,           
+                            bank->cnf[p], bank->oe[p], bank->out[p]);
+#endif
+//LGE_CHANGE_E  euikyeom.kim@lge.com
 	}
+
+#if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
+	pr_info("\n[HAVE2RUN] <<< Suspend GPIO Setting value (before) [END] >>>  \n");
+	for (b=0; b<ARRAY_SIZE(tegra_sleep_gpio_banks); b++) {
+		struct tegra_gpio_bank *bank = &tegra_sleep_gpio_banks[b];
+
+		for (p=0; p<ARRAY_SIZE(bank->oe); p++) {
+			unsigned int gpio = (b<<5) | (p<<3);
+			__raw_writel(bank->cnf[p], GPIO_CNF(gpio));
+			__raw_writel(bank->oe[p], GPIO_OE(gpio));
+			#if 1   // masked bit should be maintained current out status.
+			if(bank->out[p] >> 16)
+			{
+				u32 expected_out = bank->out[p] & 0xFFFF;
+				u32 current_out = __raw_readl(GPIO_OUT(gpio));
+				current_out  &= (bank->out[p] >> 16);
+				expected_out &= ~(bank->out[p] >> 16);
+				expected_out |= current_out;
+				__raw_writel(expected_out, GPIO_OUT(gpio));
+			}else{
+				__raw_writel((bank->out[p] & 0xFFFF), GPIO_OUT(gpio));
+			}
+			#else
+				__raw_writel(bank->out[p], GPIO_OUT(gpio));
+			#endif
+			__raw_writel(bank->int_lvl[p], GPIO_INT_LVL(gpio));
+			__raw_writel(bank->int_enb[p], GPIO_INT_ENB(gpio));
+#if defined(SLEEP_GPIO_LOG)				
+			pr_info("%d:%d %02x %02x %02x %02x %06x\n", b, p, bank->cnf[p], bank->out[p],
+				bank->oe[p], bank->int_enb[p], bank->int_lvl[p]);
+#endif
+		}
+	}
+
+	pr_info("[HAVE2RUN] <<< Suspend GPIO Setting value (after) [START] >>>  \n");
+#if defined(SLEEP_GPIO_LOG)	
+	for (b=0; b<ARRAY_SIZE(tegra_gpio_banks); b++) {
+		struct tegra_gpio_bank *bank = &tegra_gpio_banks[b];
+
+		for (p=0; p<ARRAY_SIZE(bank->oe); p++) {
+			unsigned int gpio = (b<<5) | (p<<3);
+			pr_info("%d:%d %02x %02x %02x %02x %06x\n", b, p, __raw_readl(GPIO_CNF(gpio)), 
+				__raw_readl(GPIO_OUT(gpio)), __raw_readl(GPIO_OE(gpio)), __raw_readl(GPIO_INT_ENB(gpio)),
+				__raw_readl(GPIO_INT_LVL(gpio))	);
+			}
+	}
+#endif	
+	pr_info("\n[POWER] <<< Suspend GPIO Setting value (after) [END] >>>  \n");
+#else
+	 //LGE_CHANGE_S bae.cheolhwan@lge.com 2012-02-23. Issue that can't play sound after deep sleep.
+#endif
+
 	local_irq_restore(flags);
 
 	return 0;
@@ -432,6 +793,66 @@ static int __init tegra_gpio_init(void)
 	struct tegra_gpio_bank *bank;
 	int i;
 	int j;
+	int b, p;
+
+#if defined(CONFIG_MACH_BSSQ) || defined(CONFIG_MACH_STAR)
+	for (i = 0; i < ARRAY_SIZE(tegra_gpio_banks); i++) {
+		for (j = 0; j < 4; j++) {
+			tegra_sleep_gpio_banks[i].cnf[j] = 0;
+			tegra_sleep_gpio_banks[i].oe[j] = 0;
+			tegra_sleep_gpio_banks[i].out[j] = 0;
+			tegra_sleep_gpio_banks[i].int_enb[j] = 0;
+			tegra_sleep_gpio_banks[i].int_lvl[j] = 0;
+		}
+	}
+
+	for (i=0; i<ARRAY_SIZE(tegra_sleep_gpio_info_array); i++) {
+		// disable tristate group
+		if( tegra_sleep_gpio_info_array[i].port == 0xFF ||
+			tegra_sleep_gpio_info_array[i].oe == GPIO_OUTPUT)
+		{
+			u32 tristate_reg_num = tegra_sleep_gpio_info_array[i].group >> 16;
+			u32 tristate_reg_bit = tegra_sleep_gpio_info_array[i].group & 0xFFFF;
+			//sleep_pinmux_reg[tristate_reg_num] &= ~((u32)(0x1 << tristate_reg_bit));
+		}
+
+		// It's not GPIO pin, just set tristate.
+		if(tegra_sleep_gpio_info_array[i].port != 0xFF){
+			b = (tegra_sleep_gpio_info_array[i].port) >> 2;
+			p = (tegra_sleep_gpio_info_array[i].port) & 0x3;
+
+			tegra_sleep_gpio_banks[b].cnf[p] |= (tegra_sleep_gpio_info_array[i].cnf)<<(tegra_sleep_gpio_info_array[i].pin);
+			tegra_sleep_gpio_banks[b].oe[p] |= (tegra_sleep_gpio_info_array[i].oe) <<(tegra_sleep_gpio_info_array[i].pin);
+			tegra_sleep_gpio_banks[b].out[p] |= (tegra_sleep_gpio_info_array[i].out)<<(tegra_sleep_gpio_info_array[i].pin);
+		}
+	}
+
+#if defined(CONFIG_MACH_BSSQ)
+
+	for (i=0; i<ARRAY_SIZE(tegra_init_gpio_info_array); i++) {
+		unsigned int gpio = (tegra_init_gpio_info_array[i].port<<3);
+		u32 current_val;
+		u32 expect_bit;
+		current_val = __raw_readl(GPIO_CNF(gpio));
+		expect_bit = (tegra_init_gpio_info_array[i].cnf)<<(tegra_init_gpio_info_array[i].pin);
+		current_val &= ~expect_bit;
+		current_val |= expect_bit;
+		__raw_writel(current_val, GPIO_CNF(gpio));
+
+		current_val = __raw_readl(GPIO_OE(gpio));
+		expect_bit = (tegra_init_gpio_info_array[i].oe)<<(tegra_init_gpio_info_array[i].pin);
+		current_val &= ~expect_bit;
+		current_val |= expect_bit;
+		__raw_writel(current_val, GPIO_OE(gpio));
+
+		current_val = __raw_readl(GPIO_OUT(gpio));
+		expect_bit = (tegra_init_gpio_info_array[i].out)<<(tegra_init_gpio_info_array[i].pin);
+		current_val &= ~expect_bit;
+		current_val |= expect_bit;
+		__raw_writel(current_val, GPIO_OUT(gpio));
+	}
+#endif	
+#endif
 
 	for (i = 0; i < ARRAY_SIZE(tegra_gpio_banks); i++) {
 		for (j = 0; j < 4; j++) {

@@ -278,10 +278,24 @@ static int fbcon_get_rotate(struct fb_info *info)
 	return (ops) ? ops->rotate : 0;
 }
 
+/*
+ * 2011.07.27 pyocool.cho@lge.com "for kernel panic"
+ */
+#if defined (CONFIG_PANICRPT)     
+extern int panicrpt_ispanic (void);
+#endif /* CONFIG_PANICRPT */
 static inline int fbcon_is_inactive(struct vc_data *vc, struct fb_info *info)
 {
 	struct fbcon_ops *ops = info->fbcon_par;
 
+/*
+ * 2011.07.27 pyocool.cho@lge.com "for kernel panic"
+ */
+#if defined (CONFIG_PANICRPT)     
+    if (panicrpt_ispanic ()) {
+        return 0;
+    }
+#endif /* CONFIG_PANICRPT */
 	return (info->state != FBINFO_STATE_RUNNING ||
 		vc->vc_mode != KD_TEXT || ops->graphics) &&
 		!vt_force_oops_output(vc);
@@ -1195,6 +1209,38 @@ finished:
 
 	return;
 }
+
+/*
+ * 2011.07.27 pyocool.cho@lge.com "for kernel panic" start
+ */
+#if defined(CONFIG_PANICRPT)     
+void fbcon_putcs_panicerr (struct vc_data *vc, const unsigned short *s,
+			int count, int ypos, int xpos)
+{
+    struct fb_info *info;
+    struct display *p;
+    struct fbcon_ops *ops;
+
+    info = registered_fb[con2fb_map[vc->vc_num]];
+    p    = &fb_display[vc->vc_num];
+    ops  = info->fbcon_par;
+    ops->putcs(vc, info, s, count, real_y(p, ypos), xpos, 2, 0);
+}
+
+void fbcon_update_panicerr (struct vc_data *vc)
+{
+    struct fb_info *info;
+    struct fbcon_ops *ops;
+
+    info = registered_fb[con2fb_map[vc->vc_num]];
+    ops  = info->fbcon_par;
+
+    ops->update_start(info);
+}
+#endif /* CONFIG_PANICRPT */
+/*
+ * 2011.07.27 pyocool.cho@lge.com "for kernel panic" end
+ */
 
 /* ====================================================================== */
 

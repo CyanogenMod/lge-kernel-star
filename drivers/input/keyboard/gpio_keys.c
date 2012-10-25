@@ -28,6 +28,18 @@
 #include <linux/workqueue.h>
 #include <linux/gpio.h>
 
+// 20110712 youngjin.yoo@lge.com bug fix when gpio-keys interrupted [S]
+#if defined (CONFIG_KS1103) || defined(CONFIG_LU6500) || defined(CONFIG_SU880)|| defined(CONFIG_KU8800)	//20120517 youngmin.kim@lge.com
+#define CONFIG_POWERKEY_LP1
+#endif
+static bool is_suspend = false;
+// 20110712 youngjin.yoo@lge.com bug fix when gpio-keys interrupted [E]
+//MOBII_CHNANGE_S 20120716 jd.park@mobii.co.kr : FOTA UA Upgrade for ICS
+#if defined(CONFIG_MACH_STAR_SU660)
+static bool is_ua_mode = false;
+#endif
+//MOBII_CHNANGE_E 20120716 jd.park@mobii.co.kr : FOTA UA Upgrade for ICS
+
 struct gpio_button_data {
 	struct gpio_keys_button *button;
 	struct input_dev *input;
@@ -35,6 +47,11 @@ struct gpio_button_data {
 	struct work_struct work;
 	int timer_debounce;	/* in msecs */
 	bool disabled;
+// 20110712 youngjin.yoo@lge.com bug fix when gpio-keys interrupted [S]
+#if defined(CONFIG_POWERKEY_LP1)
+	int button_state;
+#endif
+// 20110712 youngjin.yoo@lge.com bug fix when gpio-keys interrupted [E]
 };
 
 struct gpio_keys_drvdata {
@@ -45,6 +62,119 @@ struct gpio_keys_drvdata {
 	void (*disable)(struct device *dev);
 	struct gpio_button_data data[0];
 };
+
+// MOBII_S [shhong@mobii.co.kr] 2012-07-09 : From X2_KDDI Release Git.
+#if defined(CONFIG_MACH_STAR_SU660)
+extern bool in_call_state();
+bool islp1checkon = false;
+#endif
+// MOBII_E [shhong@mobii.co.kr] 2012-07-09 : From X2_KDDI Release Git.
+
+#ifdef CONFIG_MACH_STAR
+extern void write_cmd_reserved_buffer(unsigned char *buf, size_t len);
+extern 	void read_cmd_reserved_buffer(unsigned char *buf, size_t len);
+extern void emergency_restart(void);
+static ssize_t star_reset_show(struct device *dev, 
+		struct device_attribute *attr, char *buf)
+{
+
+	unsigned char tmpbuf[3];
+	int ret;
+	int tag;
+
+	read_cmd_reserved_buffer(tmpbuf, 3);
+	printk(" power key reserved_buffer = %c%c%c\n",tmpbuf[0],tmpbuf[1],tmpbuf[2]);
+
+#define _COLDBOOT          0   
+#define _NORMAL_WARMBOOT   1
+#define _HIDDEN_RESET      2
+
+	if (('p' == tmpbuf[0])||('z' == tmpbuf[0]))
+	{
+		printk("star_powekey : hidden reset detected\n");
+		tag = _HIDDEN_RESET;
+		ret = sprintf(buf,"%d\n",tag);
+		tmpbuf[1] = NULL; tmpbuf[2] = NULL;
+		write_cmd_reserved_buffer(tmpbuf,3);
+		return ret;
+	}
+
+	if ('w' == tmpbuf[0])
+	{
+		switch (tmpbuf[1])
+		{
+			case 'm': // reboot immediately
+			case 'a': // panic
+				printk("star_powekey : hidden reset detected\n");
+				tag = _HIDDEN_RESET;
+				tmpbuf[2] = NULL;
+				break;
+			case 'e': //recovery
+				printk("star_powekey : factory reset detected\n");
+				tag = _NORMAL_WARMBOOT;
+				tmpbuf[2] = NULL;
+				break;
+			default : // reboot other case (ex adb)
+				printk("star_powekey : warm boot detected\n");
+				tag = _NORMAL_WARMBOOT;
+				tmpbuf[1] = NULL; tmpbuf[2] = NULL;
+				break;
+		}
+	}
+	else
+	{
+		printk("star_powekey : cold boot detected\n");
+		tag = _COLDBOOT; 
+		memset(tmpbuf,NULL,3);
+	}    
+	ret = sprintf(buf,"%d\n",tag);
+	write_cmd_reserved_buffer(tmpbuf,3);
+	printk("star_powekey : hidden----\n");
+	return ret;
+}
+
+static ssize_t star_reset_store(struct device *dev, 
+		struct device_attribute *attr, char *buf, size_t count)
+{
+
+	unsigned char tmpbuf[3] = { NULL, };
+	tmpbuf[0] = 'w'; // index for warm-boot
+	write_cmd_reserved_buffer(tmpbuf,3);
+	emergency_restart();
+	return count;
+}
+
+DEVICE_ATTR(reset, S_IRUGO | S_IWUGO, star_reset_show, star_reset_store);
+#endif
+
+//MOBII_CHNANGE_S 20120716 jd.park@mobii.co.kr : FOTA UA Upgrade for ICS
+#if defined(CONFIG_MACH_STAR_SU660)
+static ssize_t ignore_key_event_show(struct device *dev, 
+		struct device_attribute *attr, char *buf)
+{
+    printk("%s() : is_ua_mode = %d", __FUNCTION__, is_ua_mode);
+
+    return sprintf(buf, "%d\n", is_ua_mode);
+}
+
+static ssize_t ignore_key_event_store(struct device *dev, 
+		struct device_attribute *attr, char *buf, size_t count)
+{
+    unsigned long value = simple_strtoul(buf, NULL, 10);
+
+    printk("%s() : value = %d", __FUNCTION__, value);
+
+    if(value == 1) {
+        is_ua_mode = true;
+    } else if(value == 0) {
+        is_ua_mode = false;
+    }
+
+	return count;
+}
+DEVICE_ATTR(ignore_key_event, S_IRUGO|S_IWUSR|S_IWGRP, ignore_key_event_show, ignore_key_event_store);
+#endif
+//MOBII_CHNANGE_E 20120716 jd.park@mobii.co.kr : FOTA UA Upgrade for ICS
 
 /*
  * SYSFS interface for enabling/disabling keys and switches:
@@ -93,6 +223,17 @@ static inline int get_n_events_by_type(int type)
 
 	return (type == EV_KEY) ? KEY_CNT : SW_CNT;
 }
+
+// 20110712 youngjin.yoo@lge.com bug fix when gpio-keys interrupted [S]
+#if defined(CONFIG_POWERKEY_LP1)
+static inline void send_events_power_key_forcely(struct input_dev* input)
+{
+	input_event(input, EV_KEY, KEY_POWER, 1);
+	input_event(input, EV_KEY, KEY_POWER, 0);
+	input_sync(input);
+}
+#endif
+// 20110712 youngjin.yoo@lge.com bug fix when gpio-keys interrupted [E]
 
 /**
  * gpio_keys_disable_button() - disables given GPIO button
@@ -154,8 +295,8 @@ static void gpio_keys_enable_button(struct gpio_button_data *bdata)
  * errno on failure.
  */
 static ssize_t gpio_keys_attr_show_helper(struct gpio_keys_drvdata *ddata,
-					  char *buf, unsigned int type,
-					  bool only_disabled)
+		char *buf, unsigned int type,
+		bool only_disabled)
 {
 	int n_events = get_n_events_by_type(type);
 	unsigned long *bits;
@@ -198,7 +339,7 @@ static ssize_t gpio_keys_attr_show_helper(struct gpio_keys_drvdata *ddata,
  * on failure.
  */
 static ssize_t gpio_keys_attr_store_helper(struct gpio_keys_drvdata *ddata,
-					   const char *buf, unsigned int type)
+		const char *buf, unsigned int type)
 {
 	int n_events = get_n_events_by_type(type);
 	unsigned long *bits;
@@ -221,7 +362,7 @@ static ssize_t gpio_keys_attr_store_helper(struct gpio_keys_drvdata *ddata,
 			continue;
 
 		if (test_bit(bdata->button->code, bits) &&
-		    !bdata->button->can_disable) {
+				!bdata->button->can_disable) {
 			error = -EINVAL;
 			goto out;
 		}
@@ -249,15 +390,15 @@ out:
 }
 
 #define ATTR_SHOW_FN(name, type, only_disabled)				\
-static ssize_t gpio_keys_show_##name(struct device *dev,		\
-				     struct device_attribute *attr,	\
-				     char *buf)				\
+	static ssize_t gpio_keys_show_##name(struct device *dev,		\
+			struct device_attribute *attr,	\
+			char *buf)				\
 {									\
 	struct platform_device *pdev = to_platform_device(dev);		\
 	struct gpio_keys_drvdata *ddata = platform_get_drvdata(pdev);	\
-									\
+	\
 	return gpio_keys_attr_show_helper(ddata, buf,			\
-					  type, only_disabled);		\
+			type, only_disabled);		\
 }
 
 ATTR_SHOW_FN(keys, EV_KEY, false);
@@ -275,21 +416,66 @@ static DEVICE_ATTR(keys, S_IRUGO, gpio_keys_show_keys, NULL);
 static DEVICE_ATTR(switches, S_IRUGO, gpio_keys_show_switches, NULL);
 
 #define ATTR_STORE_FN(name, type)					\
-static ssize_t gpio_keys_store_##name(struct device *dev,		\
-				      struct device_attribute *attr,	\
-				      const char *buf,			\
-				      size_t count)			\
+	static ssize_t gpio_keys_store_##name(struct device *dev,		\
+			struct device_attribute *attr,	\
+			const char *buf,			\
+			size_t count)			\
 {									\
 	struct platform_device *pdev = to_platform_device(dev);		\
 	struct gpio_keys_drvdata *ddata = platform_get_drvdata(pdev);	\
 	ssize_t error;							\
-									\
+	\
 	error = gpio_keys_attr_store_helper(ddata, buf, type);		\
 	if (error)							\
-		return error;						\
-									\
+	return error;						\
+	\
 	return count;							\
 }
+//20110717 deukgi.shin@lge.com // sleep on/off for diag test mode[S]
+int slide_state = 0; //20110805 deukgi.shin@lge.com // slide open/close state check.
+EXPORT_SYMBOL(slide_state);
+
+static ssize_t pwrbutton_test_mode_store(struct device *dev,  struct device_attribute *attr,  const char *buf, size_t count)
+{
+	struct gpio_keys_drvdata *ddata = dev_get_drvdata(dev);
+	
+	input_report_key(ddata->input, KEY_POWER, 1);	
+	input_sync(ddata->input);
+	mdelay(100);
+	input_report_key(ddata->input, KEY_POWER, 0);
+	input_sync(ddata->input);
+	mdelay(100);
+	printk("Diag SLEEP Mode.\n");
+}
+//20110805 deukgi.shin@lge.com // slide open/close state check.[S]
+#if defined (CONFIG_LU6500) || (CONFIG_KS1001)
+static ssize_t slide_state_show(struct device *dev,  struct device_attribute *attr,  const char *buf)
+{
+	printk("%s, %s, %d",__FILE__, __FUNCTION__, slide_state);
+	return sprintf(buf, "%d\n", slide_state);
+}
+static ssize_t slide_state_store(struct device *dev,  struct device_attribute *attr,  const char *buf, size_t count)
+{
+	unsigned long value = simple_strtoul(buf, NULL, 10);		
+	struct gpio_keys_drvdata *ddata = dev_get_drvdata(dev);
+
+	if(value == 2)
+	{
+		input_event(ddata->input, EV_SW, SW_LID, slide_state);
+		input_sync(ddata->input);
+	}
+	else if((value==0)||(value==1)){
+		input_event(ddata->input, EV_SW, SW_LID, value);
+		input_sync(ddata->input);
+	}
+}
+#endif
+//20110805 deukgi.shin@lge.com // slide open/close state check.[E]
+static DEVICE_ATTR(pwrbutton_test_mode, S_IRUGO|S_IWUSR|S_IWGRP, NULL, pwrbutton_test_mode_store);
+#if defined (CONFIG_LU6500) || (CONFIG_KS1001)
+static DEVICE_ATTR(slide_state, S_IRUGO|S_IWUSR|S_IWGRP, slide_state_show, slide_state_store);
+#endif
+// 20110717 deukgi.shin@lge.com // sleep on/off for diag test mode[E]
 
 ATTR_STORE_FN(disabled_keys, EV_KEY);
 ATTR_STORE_FN(disabled_switches, EV_SW);
@@ -301,17 +487,26 @@ ATTR_STORE_FN(disabled_switches, EV_SW);
  * /sys/devices/platform/gpio-keys/disables_switches [rw]
  */
 static DEVICE_ATTR(disabled_keys, S_IWUSR | S_IRUGO,
-		   gpio_keys_show_disabled_keys,
-		   gpio_keys_store_disabled_keys);
+		gpio_keys_show_disabled_keys,
+		gpio_keys_store_disabled_keys);
 static DEVICE_ATTR(disabled_switches, S_IWUSR | S_IRUGO,
-		   gpio_keys_show_disabled_switches,
-		   gpio_keys_store_disabled_switches);
+		gpio_keys_show_disabled_switches,
+		gpio_keys_store_disabled_switches);
 
 static struct attribute *gpio_keys_attrs[] = {
 	&dev_attr_keys.attr,
 	&dev_attr_switches.attr,
 	&dev_attr_disabled_keys.attr,
 	&dev_attr_disabled_switches.attr,
+	&dev_attr_pwrbutton_test_mode.attr,//20110717 deukgi.shin@lge.com // sleep on/off for diag test mode
+#if defined (CONFIG_LU6500) || (CONFIG_KS1001)
+	&dev_attr_slide_state.attr,//20110805 deukgi.shin@lge.com // slide open/close state check.
+#endif
+//MOBII_CHNANGE_S 20120716 jd.park@mobii.co.kr : FOTA UA Upgrade for ICS
+#if defined(CONFIG_MACH_STAR_SU660)
+   	&dev_attr_ignore_key_event.attr,
+#endif
+//MOBII_CHNANGE_E 20120716 jd.park@mobii.co.kr : FOTA UA Upgrade for ICS
 	NULL,
 };
 
@@ -324,18 +519,56 @@ static void gpio_keys_report_event(struct gpio_button_data *bdata)
 	struct gpio_keys_button *button = bdata->button;
 	struct input_dev *input = bdata->input;
 	unsigned int type = button->type ?: EV_KEY;
+	// 20110712 youngjin.yoo@lge.com bug fix when gpio-keys interrupted [S]
+#if !defined(CONFIG_POWERKEY_LP1)
 	int state = (gpio_get_value_cansleep(button->gpio) ? 1 : 0) ^ button->active_low;
-
 	input_event(input, type, button->code, !!state);
+#else
+	bdata->button_state = (gpio_get_value(button->gpio) ? 1 : 0) ^ button->active_low;
+
+	printk("GPIO_KEY %s KEY : %d, STATE : %d\n", __FUNCTION__, button->code, bdata->button_state);
+#if defined (CONFIG_LU6500) || (CONFIG_KS1001)
+	if(button->code == SW_LID)
+	{
+		slide_state = !!bdata->button_state;
+		printk("SLIDE STAT IS : %d\n", slide_state);
+	}
+#endif	
+	input_event(input, type, button->code, !!bdata->button_state);
+#endif
 	input_sync(input);
+	// LGE_CHANGE_S [yehan.ahn@lge.com] 2011-01-05, [LGE_AP20] GPIO_KEY DEBUG
+#if !defined(CONFIG_POWERKEY_LP1)
+	printk(KERN_INFO "GPIO_KEY EVENT OCCUR[%u] : %d", button->code, state);
+#endif
+	// LGE_CHANGE_E [yehan.ahn@lge.com] 2011-01-05, [LGE_AP20] GPIO_KEY DEBUG
 }
 
 static void gpio_keys_work_func(struct work_struct *work)
 {
 	struct gpio_button_data *bdata =
 		container_of(work, struct gpio_button_data, work);
-
+	// 20110712 youngjin.yoo@lge.com bug fix when gpio-keys interrupted [S]
+#if !defined(CONFIG_POWERKEY_LP1)
 	gpio_keys_report_event(bdata);
+#else
+	struct gpio_keys_button *button = bdata->button;
+	struct input_dev *input = bdata->input;
+	unsigned int type = button->type ?: EV_KEY;
+	bdata->button_state = (gpio_get_value(button->gpio) ? 1 : 0) ^ button->active_low;
+
+	printk("ENTER %s KEY : %d, STATE : %d\n", __FUNCTION__, button->code, bdata->button_state);
+#if defined (CONFIG_LU6500) || (CONFIG_KS1001)
+	if(button->code == SW_LID)
+	{
+		slide_state = !!bdata->button_state;
+		printk("SLIDE STAT IS : %d\n", slide_state);
+	}
+#endif	
+	input_event(input, type, button->code, !!bdata->button_state);
+	input_sync(input);
+#endif
+	// 20110712 youngjin.yoo@lge.com bug fix when gpio-keys interrupted [E]
 }
 
 static void gpio_keys_timer(unsigned long _data)
@@ -350,20 +583,44 @@ static irqreturn_t gpio_keys_isr(int irq, void *dev_id)
 	struct gpio_button_data *bdata = dev_id;
 	struct gpio_keys_button *button = bdata->button;
 
+//MOBII_CHNANGE_S 20120716 jd.park@mobii.co.kr : FOTA UA Upgrade for ICS
+#if defined(CONFIG_MACH_STAR_SU660)
+    if(is_ua_mode)
+    {
+        return IRQ_HANDLED;
+    }
+#endif
+//MOBII_CHNANGE_E 20120716 jd.park@mobii.co.kr : FOTA UA Upgrade for ICS
+
 	BUG_ON(irq != gpio_to_irq(button->gpio));
-
-	if (bdata->timer_debounce)
-		mod_timer(&bdata->timer,
-			jiffies + msecs_to_jiffies(bdata->timer_debounce));
+	// 20110712 youngjin.yoo@lge.com bug fix when gpio-keys interrupted [S]
+#if defined(CONFIG_POWERKEY_LP1)
+	if(is_suspend)
+	{
+		printk("ENTER : %s, KEYCODE = %d, STATE = 1\n", __FUNCTION__, button->code);
+		bdata->button_state = 1;
+		input_event(bdata->input, EV_KEY, button->code, 1);
+		input_sync(bdata->input);
+		is_suspend = false;
+	}
 	else
-		schedule_work(&bdata->work);
-
+	{
+#endif	
+		if (bdata->timer_debounce)
+			mod_timer(&bdata->timer,
+					jiffies + msecs_to_jiffies(bdata->timer_debounce));
+		else
+			schedule_work(&bdata->work);
+#if defined(CONFIG_POWERKEY_LP1)            
+	}
+#endif    
+	// 20110712 youngjin.yoo@lge.com bug fix when gpio-keys interrupted [E]
 	return IRQ_HANDLED;
 }
 
 static int __devinit gpio_keys_setup_key(struct platform_device *pdev,
-					 struct gpio_button_data *bdata,
-					 struct gpio_keys_button *button)
+		struct gpio_button_data *bdata,
+		struct gpio_keys_button *button)
 {
 	char *desc = button->desc ? button->desc : "gpio_keys";
 	struct device *dev = &pdev->dev;
@@ -376,21 +633,21 @@ static int __devinit gpio_keys_setup_key(struct platform_device *pdev,
 	error = gpio_request(button->gpio, desc);
 	if (error < 0) {
 		dev_err(dev, "failed to request GPIO %d, error %d\n",
-			button->gpio, error);
+				button->gpio, error);
 		goto fail2;
 	}
 
 	error = gpio_direction_input(button->gpio);
 	if (error < 0) {
 		dev_err(dev, "failed to configure"
-			" direction for GPIO %d, error %d\n",
-			button->gpio, error);
+				" direction for GPIO %d, error %d\n",
+				button->gpio, error);
 		goto fail3;
 	}
 
 	if (button->debounce_interval) {
 		error = gpio_set_debounce(button->gpio,
-					  button->debounce_interval * 1000);
+				button->debounce_interval * 1000);
 		/* use timer if gpiolib doesn't provide debounce */
 		if (error < 0)
 			bdata->timer_debounce = button->debounce_interval;
@@ -400,7 +657,7 @@ static int __devinit gpio_keys_setup_key(struct platform_device *pdev,
 	if (irq < 0) {
 		error = irq;
 		dev_err(dev, "Unable to get irq number for GPIO %d, error %d\n",
-			button->gpio, error);
+				button->gpio, error);
 		goto fail3;
 	}
 
@@ -415,7 +672,7 @@ static int __devinit gpio_keys_setup_key(struct platform_device *pdev,
 	error = request_any_context_irq(irq, gpio_keys_isr, irqflags, desc, bdata);
 	if (error < 0) {
 		dev_err(dev, "Unable to claim irq %d; error %d\n",
-			irq, error);
+				irq, error);
 		goto fail3;
 	}
 
@@ -450,6 +707,10 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 	struct input_dev *input;
 	int i, error;
 	int wakeup = 0;
+
+	// LGE_CHANGE_S [yehan.ahn@lge.com] 2011-01-05, [LGE_AP20] GPIO_KEY DEBUG
+	printk(KERN_INFO "gpio_keys: gpio_keys_probe( ) is called\n");
+	// LGE_CHANGE_E [yehan.ahn@lge.com] 2011-01-05, [LGE_AP20] GPIO_KEY DEBUG
 
 	ddata = kzalloc(sizeof(struct gpio_keys_drvdata) +
 			pdata->nbuttons * sizeof(struct gpio_button_data),
@@ -492,7 +753,11 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 
 		bdata->input = input;
 		bdata->button = button;
-
+		// 20110712 youngjin.yoo@lge.com bug fix when gpio-keys interrupted [S]
+#if defined(CONFIG_POWERKEY_LP1)
+		bdata->button_state = 0;
+#endif
+		// 20110712 youngjin.yoo@lge.com bug fix when gpio-keys interrupted [E]
 		error = gpio_keys_setup_key(pdev, bdata, button);
 		if (error)
 			goto fail2;
@@ -502,33 +767,49 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 
 		input_set_capability(input, type, button->code);
 	}
+	
+	input_set_capability(input, EV_KEY, KEY_TESTMODE_UNLOCK);// MOBII_CHNANGE 20120703 jslee@mobii.co.kr - AT%PTNCLR
 
 	error = sysfs_create_group(&pdev->dev.kobj, &gpio_keys_attr_group);
 	if (error) {
 		dev_err(dev, "Unable to export keys/switches, error: %d\n",
-			error);
+				error);
 		goto fail2;
 	}
 
 	error = input_register_device(input);
 	if (error) {
 		dev_err(dev, "Unable to register input device, error: %d\n",
-			error);
+				error);
 		goto fail3;
 	}
 
 	/* get current state of buttons */
+#if defined (CONFIG_LU6500) || (CONFIG_KS1001)	
+	input_event(input, EV_SW, SW_LID, 1); // deukgi.shin@lge.com //20110805 // change slide state.
+	input_sync(input);
+#endif
 	for (i = 0; i < pdata->nbuttons; i++)
 		gpio_keys_report_event(&ddata->data[i]);
 	input_sync(input);
 
 	device_init_wakeup(&pdev->dev, wakeup);
-
+#ifdef CONFIG_MACH_STAR
+	int ret;
+	ret = device_create_file(&pdev->dev, &dev_attr_reset);
+	if (ret) {
+		goto dev_attr_reset_file_create_fail;
+	}
+#endif
 	return 0;
 
- fail3:
+#ifdef CONFIG_MACH_STAR
+dev_attr_reset_file_create_fail:
+	device_remove_file(&pdev->dev, &dev_attr_reset);
+#endif
+fail3:
 	sysfs_remove_group(&pdev->dev.kobj, &gpio_keys_attr_group);
- fail2:
+fail2:
 	while (--i >= 0) {
 		free_irq(gpio_to_irq(pdata->buttons[i].gpio), &ddata->data[i]);
 		if (ddata->data[i].timer_debounce)
@@ -538,7 +819,7 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, NULL);
- fail1:
+fail1:
 	input_free_device(input);
 	kfree(ddata);
 
@@ -553,7 +834,9 @@ static int __devexit gpio_keys_remove(struct platform_device *pdev)
 	int i;
 
 	sysfs_remove_group(&pdev->dev.kobj, &gpio_keys_attr_group);
-
+#ifdef	CONFIG_MACH_STAR
+	device_remove_file(&pdev->dev, &dev_attr_reset);
+#endif
 	device_init_wakeup(&pdev->dev, 0);
 
 	for (i = 0; i < pdata->nbuttons; i++) {
@@ -585,9 +868,24 @@ static int gpio_keys_suspend(struct device *dev)
 				int irq = gpio_to_irq(button->gpio);
 				enable_irq_wake(irq);
 			}
+// MOBII_S [shhong@mobii.co.kr] 2012-07-09 : From X2_KDDI Release Git.
+#if defined(CONFIG_MACH_STAR_SU660)
+			else
+			{
+				printk(KERN_ERR "GPIO_KEYS: Suspend Setting for Non-wakeup keys .\n");
+				if(in_call_state())
+				{
+					int irq = gpio_to_irq(button->gpio);
+					enable_irq_wake(irq);
+					islp1checkon = true;
+					printk(KERN_ERR "GPIO_KEYS: IRQ[0x%x] enable_irq_wake'd.\n", irq);
+				}
+			}
+#endif
+// MOBII_E [shhong@mobii.co.kr] 2012-07-09 : From X2_KDDI Release Git.
 		}
 	}
-
+	is_suspend = true;	//LGE_CHANGE
 	return 0;
 }
 
@@ -599,6 +897,8 @@ static int gpio_keys_resume(struct device *dev)
 	int wakeup_key = KEY_RESERVED;
 	int i;
 
+// 20110712 youngjin.yoo@lge.com bug fix when gpio-keys interrupted [S]
+#if !defined(CONFIG_POWERKEY_LP1)
 	if (pdata->wakeup_key)
 		wakeup_key = pdata->wakeup_key();
 
@@ -617,10 +917,47 @@ static int gpio_keys_resume(struct device *dev)
 				input_sync(ddata->input);
 			}
 		}
+// MOBII_S [shhong@mobii.co.kr] 2012-07-09 : From X2_KDDI Release Git.
+#if defined(CONFIG_MACH_STAR_SU660)
+		else
+		{
+			printk(KERN_ERR "GPIO_KEYS: Resume Setting for Non-wakeup keys .\n");
+			if(islp1checkon == true)
+			{
+				int irq = gpio_to_irq(button->gpio);
+				disable_irq_wake(irq);
+				printk(KERN_ERR "GPIO_KEYS: IRQ[0x%x] disable_irq_wake'd.\n", irq);
+			}
+		}
+#endif
+// MOBII_E [shhong@mobii.co.kr] 2012-07-09 : From X2_KDDI Release Git.
+
+		gpio_keys_report_event(&ddata->data[i]);
+	}
+// MOBII_S [shhong@mobii.co.kr] 2012-07-19 : Make 2 GPIO_KEY Disable(Up/Down).
+#if defined(CONFIG_MACH_STAR_SU660)
+	if(islp1checkon == true) {
+		islp1checkon = false;
+		printk(KERN_ERR "GPIO_KEYS: islp1checkon flag disabled.");
+	}
+#endif 
+// MOBII_E [shhong@mobii.co.kr] 2012-07-19 : Make 2 GPIO_KEY Disable(Up/Down).
+	input_sync(ddata->input);
+#else
+	for (i = 0; i < pdata->nbuttons; i++) {
+
+		struct gpio_keys_button *button = &pdata->buttons[i];
+		if (button->wakeup && device_may_wakeup(&pdev->dev)) {
+			int irq = gpio_to_irq(button->gpio);
+			disable_irq_wake(irq);
+		}
 
 		gpio_keys_report_event(&ddata->data[i]);
 	}
 	input_sync(ddata->input);
+	is_suspend = false;
+#endif
+// 20110712 youngjin.yoo@lge.com bug fix when gpio-keys interrupted [E]
 
 	return 0;
 }
@@ -645,6 +982,9 @@ static struct platform_driver gpio_keys_device_driver = {
 
 static int __init gpio_keys_init(void)
 {
+	// LGE_CHANGE_S [yehan.ahn@lge.com] 2011-01-05, [LGE_AP20] GPIO_KEY DEBUG
+	printk(KERN_INFO "gpio_keys: gpio_keys_init(void) is called\n");
+	// LGE_CHANGE_E [yehan.ahn@lge.com] 2011-01-05, [LGE_AP20] GPIO_KEY DEBUG
 	return platform_driver_register(&gpio_keys_device_driver);
 }
 

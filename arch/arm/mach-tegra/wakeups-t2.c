@@ -36,17 +36,25 @@ static int tegra_wake_event_irq[] = {
 	[9]  = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PS2),
 	[10] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PAA1),
 	[11] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PW3),
-	[12] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PW2),
-	[13] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PY6),
+	[12] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PW2), // PROX LP1 wake
+//	[13] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PY6), // 2012-07-16 hyeondug.yeo@lge.com, Fix the "WLAN_HOST_WAKEUP" problem.
+	[13] = INT_SDMMC1,	
 	[14] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PV6),
 	[15] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PJ7),
 	[16] = INT_RTC,
 	[17] = INT_KBC,
 	[18] = INT_EXTERNAL_PMU,
+#if defined(CONFIG_MACH_STAR) 
+	[19] = INT_USB, /* TEGRA_USB1_VBUS, */
+	[20] = -EINVAL, /* TEGRA_USB3_VBUS, */
+	[21] = -EINVAL, /* TEGRA_USB1_ID, */
+	[22] = -EINVAL, /* TEGRA_USB3_ID, */
+#else
 	[19] = -EINVAL, /* TEGRA_USB1_VBUS, */
 	[20] = -EINVAL, /* TEGRA_USB3_VBUS, */
 	[21] = -EINVAL, /* TEGRA_USB1_ID, */
 	[22] = -EINVAL, /* TEGRA_USB3_ID, */
+#endif
 	[23] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PI5),
 	[24] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PV2),
 	[25] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PS4),
@@ -55,6 +63,23 @@ static int tegra_wake_event_irq[] = {
 	[28] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PQ6),
 	[29] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PQ7),
 	[30] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PN2),
+// MOBII_S [shhong@mobii.co.kr] 2012-07-09 : Arrange Wake up Register.
+#if defined(CONFIG_MACH_STAR_SU660)
+	[31] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PN5), // WAR for HOOK LP1 wake
+	[32] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PG0), // LP1 wake : Volume Key Up
+	[33] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PG1), // LP1 wake : Volume Key Down
+	[34] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PG3), // LP1 wake : HP DET 
+#else
+#if defined(CONFIG_MACH_BSSQ)
+	[31] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PX5), // WAR for PROX LP1 wake
+	[32] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PB3), // WAR for HP DET LP1 wake
+#elif (defined(CONFIG_MACH_STAR_P990) || defined(CONFIG_MACH_STAR_P999))
+	[31] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PW2), // WAR for PROX LP1 wake
+	[32] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PG3), // WAR for HP DET LP1 wake
+	[33] = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PD3), // WAR for HOOK LP1 wake
+#endif  // defined(CONFIG_MACH_BSSQ)
+#endif  // defined(CONFIG_MACH_STAR_SU660)
+// MOBII_E [shhong@mobii.co.kr] 2012-07-09 : Arrange Wake up Register.
 };
 
 int tegra_irq_to_wake(int irq)

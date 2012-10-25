@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/board-enterprise.c
  *
- * Copyright (c) 2011, NVIDIA Corporation.
+ * Copyright (c) 2011-2012, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -177,21 +177,21 @@ static __initdata struct tegra_clk_init_table enterprise_clk_init_table[] = {
 	{ "hda2codec_2x","pll_p",	48000000,	false},
 	{ "pwm",	"clk_32k",	32768,		false},
 	{ "blink",	"clk_32k",	32768,		true},
-	{ "pll_a",	NULL,		564480000,	false},
-	{ "pll_a_out0",	NULL,		11289600,	false},
 	{ "i2s0",	"pll_a_out0",	0,		false},
 	{ "i2s1",	"pll_a_out0",	0,		false},
 	{ "i2s2",	"pll_a_out0",	0,		false},
 	{ "i2s3",	"pll_a_out0",	0,		false},
 	{ "spdif_out",	"pll_a_out0",	0,		false},
-	{ "d_audio",	"pll_a_out0",	0,		false},
-	{ "dam0",	"pll_a_out0",	0,		false},
-	{ "dam1",	"pll_a_out0",	0,		false},
-	{ "dam2",	"pll_a_out0",	0,		false},
+	{ "d_audio",	"clk_m",	12000000,	false},
+	{ "dam0",	"clk_m",	12000000,	false},
+	{ "dam1",	"clk_m",	12000000,	false},
+	{ "dam2",	"clk_m",	12000000,	false},
 	{ "audio0",	"i2s0_sync",	0,		false},
 	{ "audio1",	"i2s1_sync",	0,		false},
 	{ "audio2",	"i2s2_sync",	0,		false},
 	{ "audio3",	"i2s3_sync",	0,		false},
+	{ "vi",		"pll_p",	0,		false},
+	{ "vi_sensor",	"pll_p",	0,		false},
 	{ NULL,		NULL,		0,		0},
 };
 
@@ -217,7 +217,7 @@ static struct tegra_i2c_platform_data enterprise_i2c2_platform_data = {
 static struct tegra_i2c_platform_data enterprise_i2c3_platform_data = {
 	.adapter_nr	= 2,
 	.bus_count	= 1,
-	.bus_clk_rate	= { 100000, 0 },
+	.bus_clk_rate	= { 271000, 0 },
 	.scl_gpio		= {TEGRA_GPIO_PBB1, 0},
 	.sda_gpio		= {TEGRA_GPIO_PBB2, 0},
 	.arb_recovery = arb_lost_recovery,
@@ -388,11 +388,14 @@ static struct uart_clk_parent uart_parent_clk[] = {
 #endif
 };
 static struct tegra_uart_platform_data enterprise_uart_pdata;
+static struct tegra_uart_platform_data enterprise_loopback_uart_pdata;
 
 static void __init uart_debug_init(void)
 {
 	unsigned long rate;
 	struct clk *c;
+
+	tegra_init_debug_uart_rate();
 
 	/* UARTD is the debug port. */
 	pr_info("Selecting UARTD as the debug console\n");
@@ -438,11 +441,16 @@ static void __init enterprise_uart_init(void)
 	}
 	enterprise_uart_pdata.parent_clk_list = uart_parent_clk;
 	enterprise_uart_pdata.parent_clk_count = ARRAY_SIZE(uart_parent_clk);
+	enterprise_loopback_uart_pdata.parent_clk_list = uart_parent_clk;
+	enterprise_loopback_uart_pdata.parent_clk_count =
+						ARRAY_SIZE(uart_parent_clk);
+	enterprise_loopback_uart_pdata.is_loopback = true;
 	tegra_uarta_device.dev.platform_data = &enterprise_uart_pdata;
 	tegra_uartb_device.dev.platform_data = &enterprise_uart_pdata;
 	tegra_uartc_device.dev.platform_data = &enterprise_uart_pdata;
 	tegra_uartd_device.dev.platform_data = &enterprise_uart_pdata;
-	tegra_uarte_device.dev.platform_data = &enterprise_uart_pdata;
+	/* UARTE is used for loopback test purpose */
+	tegra_uarte_device.dev.platform_data = &enterprise_loopback_uart_pdata;
 
 	/* Register low speed only if it is selected */
 	if (!is_tegra_debug_uartport_hs())
@@ -504,19 +512,6 @@ static struct platform_device enterprise_audio_device = {
 	},
 };
 
-static struct resource ram_console_resources[] = {
-	{
-		.flags = IORESOURCE_MEM,
-	},
-};
-
-static struct platform_device ram_console_device = {
-	.name 		= "ram_console",
-	.id 		= -1,
-	.num_resources	= ARRAY_SIZE(ram_console_resources),
-	.resource	= ram_console_resources,
-};
-
 static struct platform_device *enterprise_devices[] __initdata = {
 	&tegra_pmu_device,
 	&tegra_rtc_device,
@@ -538,7 +533,6 @@ static struct platform_device *enterprise_devices[] __initdata = {
 #if defined(CONFIG_CRYPTO_DEV_TEGRA_AES)
 	&tegra_aes_device,
 #endif
-	&ram_console_device,
 };
 
 #define MXT_CONFIG_CRC 0x62F903
@@ -661,6 +655,7 @@ static struct tegra_ehci_platform_data tegra_ehci_uhsic_pdata = {
 	.phy_config = &uhsic_phy_config,
 	.operating_mode = TEGRA_USB_HOST,
 	.power_down_on_bus_suspend = 1,
+	.default_enable = true,
 };
 
 static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
@@ -668,16 +663,19 @@ static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
 			.phy_config = &utmi_phy_config[0],
 			.operating_mode = TEGRA_USB_HOST,
 			.power_down_on_bus_suspend = 1,
+			.default_enable = false,
 	},
 	[1] = {
 			.phy_config = &utmi_phy_config[1],
 			.operating_mode = TEGRA_USB_HOST,
 			.power_down_on_bus_suspend = 1,
+			.default_enable = false,
 	},
 	[2] = {
 			.phy_config = &utmi_phy_config[2],
 			.operating_mode = TEGRA_USB_HOST,
 			.power_down_on_bus_suspend = 1,
+			.default_enable = false,
 	},
 };
 
@@ -689,7 +687,6 @@ static struct tegra_otg_platform_data tegra_otg_pdata = {
 struct platform_device *tegra_usb_hsic_host_register(void)
 {
 	struct platform_device *pdev;
-	void *platform_data;
 	int val;
 
 	pdev = platform_device_alloc(tegra_ehci2_device.name,
@@ -705,23 +702,17 @@ struct platform_device *tegra_usb_hsic_host_register(void)
 	pdev->dev.dma_mask =  tegra_ehci2_device.dev.dma_mask;
 	pdev->dev.coherent_dma_mask = tegra_ehci2_device.dev.coherent_dma_mask;
 
-	platform_data = kmalloc(sizeof(struct tegra_ehci_platform_data),
-		GFP_KERNEL);
-	if (!platform_data)
+	val = platform_device_add_data(pdev, &tegra_ehci_uhsic_pdata,
+			sizeof(struct tegra_ehci_platform_data));
+	if (val)
 		goto error;
-
-	memcpy(platform_data, &tegra_ehci_uhsic_pdata,
-				sizeof(struct tegra_ehci_platform_data));
-	pdev->dev.platform_data = platform_data;
 
 	val = platform_device_add(pdev);
 	if (val)
-		goto error_add;
+		goto error;
 
 	return pdev;
 
-error_add:
-	kfree(platform_data);
 error:
 	pr_err("%s: failed to add the host contoller device\n", __func__);
 	platform_device_put(pdev);
@@ -915,6 +906,7 @@ static void enterprise_baseband_init(void)
 		break;
 #ifdef CONFIG_TEGRA_BB_M7400
 	case TEGRA_BB_M7400: /* M7400 HSIC */
+		tegra_ehci_uhsic_pdata.power_down_on_bus_suspend = 0;
 		tegra_ehci2_device.dev.platform_data
 			= &tegra_ehci_uhsic_pdata;
 		platform_device_register(&tegra_baseband_m7400_device);
@@ -939,6 +931,7 @@ static void __init tegra_enterprise_init(void)
 	enterprise_usb_init();
 	enterprise_tsensor_init();
 	platform_add_devices(enterprise_devices, ARRAY_SIZE(enterprise_devices));
+	tegra_ram_console_debug_init();
 	enterprise_regulator_init();
 	enterprise_sdhci_init();
 #ifdef CONFIG_TEGRA_EDP_LIMITS
@@ -959,26 +952,6 @@ static void __init tegra_enterprise_init(void)
 	enterprise_nfc_init();
 }
 
-static void __init tegra_enterprise_ramconsole_reserve(unsigned long size)
-{
-	struct resource *res;
-	long ret;
-
-	res = platform_get_resource(&ram_console_device, IORESOURCE_MEM, 0);
-	if (!res) {
-		pr_err("Failed to find memory resource for ram console\n");
-		return;
-	}
-	res->start = memblock_end_of_DRAM() - size;
-	res->end = res->start + size - 1;
-	ret = memblock_remove(res->start, size);
-	if (ret) {
-		ram_console_device.resource = NULL;
-		ram_console_device.num_resources = 0;
-		pr_err("Failed to reserve memory block for ram console\n");
-	}
-}
-
 static void __init tegra_enterprise_reserve(void)
 {
 #if defined(CONFIG_NVMAP_CONVERT_CARVEOUT_TO_IOVMM)
@@ -986,7 +959,7 @@ static void __init tegra_enterprise_reserve(void)
 #else
 	tegra_reserve(SZ_128M, SZ_4M, SZ_8M);
 #endif
-	tegra_enterprise_ramconsole_reserve(SZ_1M);
+	tegra_ram_console_debug_reserve(SZ_1M);
 }
 
 MACHINE_START(TEGRA_ENTERPRISE, "tegra_enterprise")

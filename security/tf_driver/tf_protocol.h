@@ -659,6 +659,10 @@ struct tf_l1_shared_buffer {
 	#ifdef CONFIG_TF_ZEBRA
 	u8  rpc_trace_buffer[140];
 	u8  rpc_cus_buffer[180];
+	#elif CONFIG_SECURE_TRACES
+	u32 traces_status;
+	u8  traces_buffer[140];
+	u8  reserved3[176];
 	#else
 	u8  reserved3[320];
 	#endif

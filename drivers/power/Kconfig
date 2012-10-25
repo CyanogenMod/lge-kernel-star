@@ -156,6 +156,11 @@ config BATTERY_GAUGE_TPS8003X
 	help
 	 Say Y here to enable support for battery gauge for TPS80031x chips.
 
+config CHARGER_SMB349
+	tristate "SMB349 battery charger driver"
+	depends on I2C
+	help
+	  Say Y here to enable support for battery charging with SMB349 chips.
 
 config BATTERY_DA9030
 	tristate "DA9030 battery driver"
@@ -181,6 +186,15 @@ config BATTERY_MAX17042
 	  to operate with a single lithium cell. MAX8997 and MAX8966 are
 	  multi-function devices that include fuel gauages that are compatible
 	  with MAX17042.
+
+config BATTERY_MAX17048
+	tristate "Maxim MAX17048/17049 Fuel Gauge"
+	depends on I2C
+	help
+	  MAX17048 is fuel-gauge systems for lithium-ion (Li+) batteries
+	  in handheld and portable equipment. The MAX17048 is configured
+	  to operate with a single lithium cell, and MAX17049 for two lithium
+	  cells.
 
 config BATTERY_Z2
 	tristate "Z2 battery driver"

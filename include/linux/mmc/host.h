@@ -137,6 +137,13 @@ struct mmc_host_ops {
 	void	(*init_card)(struct mmc_host *host, struct mmc_card *card);
 
 	int	(*start_signal_voltage_switch)(struct mmc_host *host, struct mmc_ios *ios);
+	// LGE_CHANGE [dojip.kim@lge.com] 2010-12-31, [LGE_AP20] from Star
+#ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
+	unsigned int (*get_host_offset)(struct mmc_host *host);
+#endif
+	int	(*execute_tuning)(struct mmc_host *host);
+	int	(*select_drive_strength)(unsigned int max_dtr,
+		int host_drv, int card_drv);
 };
 
 struct mmc_card;

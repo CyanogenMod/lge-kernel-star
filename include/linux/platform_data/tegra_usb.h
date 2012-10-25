@@ -35,6 +35,7 @@ struct tegra_ehci_platform_data {
 	/* power down the phy on bus suspend */
 	int power_down_on_bus_suspend;
 	int hotplug;
+	int default_enable;
 	void *phy_config;
 	enum tegra_usb_phy_type phy_type;
 };

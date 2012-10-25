@@ -32,6 +32,8 @@
 #include <mach/pinmux.h>
 #include <mach/usb_phy.h>
 #include <mach/tegra_usb_modem_power.h>
+#include "board.h"
+#include "board-enterprise.h"
 #include "devices.h"
 #include "gpio-names.h"
 
@@ -93,6 +95,63 @@ static struct tegra_ehci_platform_data ehci2_null_ulpi_platform_data = {
 	.phy_type = TEGRA_USB_PHY_TYPE_NULL_ULPI,
 };
 
+static struct regulator *enterprise_hsic_reg;
+
+int tegra_baseband_rail_on(void)
+{
+	int ret;
+	struct board_info bi;
+	tegra_get_board_info(&bi);
+
+	/* only applicable to enterprise */
+	if ((bi.board_id != BOARD_E1197) && (bi.board_id != BOARD_E1205))
+		return 0;
+
+	if (enterprise_hsic_reg == NULL) {
+		enterprise_hsic_reg = regulator_get(NULL, "avdd_hsic");
+		if (IS_ERR_OR_NULL(enterprise_hsic_reg)) {
+			pr_err("xmm: could not get regulator vddio_hsic\n");
+			enterprise_hsic_reg = NULL;
+			return PTR_ERR(enterprise_hsic_reg);
+		}
+		ret = regulator_enable(enterprise_hsic_reg);
+		if (ret < 0) {
+			pr_err("xmm: failed to enable regulator\n");
+			return ret;
+		}
+	}
+	return 0;
+}
+EXPORT_SYMBOL(tegra_baseband_rail_on);
+
+int tegra_baseband_rail_off(void)
+{
+	int ret;
+	struct board_info bi;
+	tegra_get_board_info(&bi);
+
+	/* only applicable to enterprise */
+	if ((bi.board_id != BOARD_E1197) && (bi.board_id != BOARD_E1205))
+		return 0;
+
+	if (enterprise_hsic_reg == NULL) {
+		enterprise_hsic_reg = regulator_get(NULL, "avdd_hsic");
+		if (IS_ERR_OR_NULL(enterprise_hsic_reg)) {
+			pr_err("xmm: could not get regulator vddio_hsic\n");
+			enterprise_hsic_reg = NULL;
+			return PTR_ERR(enterprise_hsic_reg);
+		}
+	}
+	ret = regulator_disable(enterprise_hsic_reg);
+	if (ret < 0) {
+		pr_err("xmm: failed to disable regulator\n");
+		return ret;
+	}
+	enterprise_hsic_reg = NULL;
+	return 0;
+}
+EXPORT_SYMBOL(tegra_baseband_rail_off);
+
 static int __init tegra_null_ulpi_init(void)
 {
 	tegra_ehci2_device.dev.platform_data = &ehci2_null_ulpi_platform_data;
@@ -106,9 +165,10 @@ static irqreturn_t mdm_start_thread(int irq, void *data)
 		pr_info("BB_RST_OUT high\n");
 	} else {
 		pr_info("BB_RST_OUT low\n");
-		/* hold wait lock to complete the enumeration */
-		wake_lock_timeout(&mdm_wake_lock, HZ * 10);
 	}
+
+	/* hold wait lock to complete the enumeration */
+	wake_lock_timeout(&mdm_wake_lock, HZ * 10);
 
 	return IRQ_HANDLED;
 }

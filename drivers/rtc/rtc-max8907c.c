@@ -15,6 +15,10 @@
 #include <linux/rtc.h>
 #include <linux/platform_device.h>
 #include <linux/mfd/max8907c.h>
+#if defined(CONFIG_MACH_STAR)
+#include "../../arch/arm/mach-tegra/lge/star/include/lge/board-star-nv.h"
+#endif
+
 
 enum {
 	RTC_SEC = 0,
@@ -207,6 +211,32 @@ static const struct rtc_class_ops max8907c_rtc_ops = {
 	.set_alarm	= max8907c_rtc_set_alarm,
 };
 
+#ifdef CONFIG_MACH_STAR
+static ssize_t max8907c_rtc_show_smplcount(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	char smplcount = 0;
+	lge_nvdata_read(LGE_NVDATA_SMPL_COUNT_OFFSET, &smplcount,1);
+	return sprintf(buf, "%d\n", smplcount);
+}
+
+static ssize_t max8907c_rtc_store_smplcount(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	unsigned long val = simple_strtoul(buf, NULL, 10);
+	int ret;
+
+	if(val == 0)
+	{
+		char smplcount = 0;
+		lge_nvdata_write(LGE_NVDATA_SMPL_COUNT_OFFSET, &smplcount,1);		
+	}
+
+	return count;
+}
+
+static DEVICE_ATTR(smplcount, 0660, max8907c_rtc_show_smplcount,  max8907c_rtc_store_smplcount);
+#endif
 static int __devinit max8907c_rtc_probe(struct platform_device *pdev)
 {
 	struct max8907c *chip = dev_get_drvdata(pdev->dev.parent);
@@ -243,7 +273,15 @@ static int __devinit max8907c_rtc_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, info);
 
 	device_init_wakeup(&pdev->dev, 1);
+#ifdef CONFIG_MACH_STAR
+ret = device_create_file(&pdev->dev, &dev_attr_smplcount);
+if (ret < 0) {
+	dev_err(&pdev->dev,
+		 "%s: failed to add smplcount sysfs: %d\n",
+		 __func__, ret);	
+}
 
+#endif
 	return 0;
 out_rtc:
 	free_irq(chip->irq_base + MAX8907C_IRQ_RTC_ALARM0, info);

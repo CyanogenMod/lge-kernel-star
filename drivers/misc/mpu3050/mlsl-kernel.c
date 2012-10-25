@@ -96,8 +96,7 @@ tMLError MLSLSerialWriteSingle(void *sl_handle,
  */
 tMLError MLSLSerialWrite(void *sl_handle,
 			 unsigned char slaveAddr,
-			 unsigned short length,
-			 unsigned char const *data)
+			 unsigned short length, unsigned char const *data)
 {
 	tMLError result;
 	const unsigned short dataLength = length - 1;
@@ -188,9 +187,10 @@ tMLError MLSLSerialWriteMem(void *sl_handle,
 	unsigned short bytesWritten = 0;
 
 	if ((memAddr & 0xFF) + length > MPU_MEM_BANK_SIZE) {
-		pr_err("memory read length (%d B) extends beyond its"
-			" limits (%d) if started at location %d\n", length,
-			MPU_MEM_BANK_SIZE, memAddr & 0xFF);
+		printk
+		    ("memory read length (%d B) extends beyond its limits (%d) "
+		     "if started at location %d\n", length,
+		     MPU_MEM_BANK_SIZE, memAddr & 0xFF);
 		return ML_ERROR_INVALID_PARAMETER;
 	}
 	while (bytesWritten < length) {

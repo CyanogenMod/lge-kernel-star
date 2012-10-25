@@ -28,10 +28,12 @@
 #include <linux/slab.h>
 #include <linux/io.h>
 #include <mach/iomap.h>
+#include <mach/pinmux.h>
 #include <sound/soc.h>
 #include "tegra20_das.h"
 
 #define DRV_NAME "tegra20-das"
+#define DAS_PM_DEBUG 0
 
 static struct tegra20_das *das;
 
@@ -49,22 +51,83 @@ static inline u32 tegra20_das_read(u32 reg)
 }
 
 #ifdef CONFIG_PM
+int tegra20_das_suspend()
+{
+	int i, reg;
+
+	for (i = 0; i <= TEGRA20_DAS_DAP_ID_5; i++) {
+		das->reg_cache[i] = tegra20_das_read(i << 2);
+		if (DAS_PM_DEBUG)
+			printk(KERN_ERR "%s: reg DAP%d, idx:0x%02x, reg_cache:0x%08x\n",
+				__func__, i, i, das->reg_cache[i]);
+	}
+
+	for (i = 0; i <= TEGRA20_DAS_DAC_ID_3; i++) {
+		reg = TEGRA20_DAS_DAC_INPUT_DATA_CLK_SEL +
+			(i * TEGRA20_DAS_DAC_INPUT_DATA_CLK_SEL_STRIDE);
+		das->reg_cache[reg >> 2] = tegra20_das_read(reg);
+		if (DAS_PM_DEBUG)
+			printk(KERN_ERR "%s: reg DAC%d, idx:0x%02x, reg_cache:0x%08x\n",
+				__func__, i, (reg >> 2), das->reg_cache[reg >> 2]);
+	}
+
+	return 0;
+}
+
 int tegra20_das_resume()
 {
 	int i, reg;
 
-	for (i = 0; i <= TEGRA20_DAS_DAP_ID_5; i++)
+	for (i = 0; i <= TEGRA20_DAS_DAP_ID_5; i++) {
 		tegra20_das_write(i << 2, das->reg_cache[i]);
+		if (DAS_PM_DEBUG)
+			printk(KERN_ERR "%s: reg DAP%d, idx:0x%02x, reg_cache:0x%08x\n",
+				__func__, i, i, das->reg_cache[i]);
+	}
 
 	for (i = 0; i <= TEGRA20_DAS_DAC_ID_3; i++) {
 		reg = TEGRA20_DAS_DAC_INPUT_DATA_CLK_SEL +
 			(i * TEGRA20_DAS_DAC_INPUT_DATA_CLK_SEL_STRIDE);
 		tegra20_das_write(reg, das->reg_cache[reg >> 2]);
+		if (DAS_PM_DEBUG)
+			printk(KERN_ERR "%s: reg DAC%d, idx:0x%02x, reg_cache:0x%08x\n",
+				__func__, i, reg>>2, das->reg_cache[reg>>2]);
 	}
 
 	return 0;
 }
 #endif
+
+int tegra20_das_set_tristate(int dap_id, int is_tristate)
+{
+	enum tegra_pingroup pin;
+	enum tegra_tristate tristate;
+
+	switch (dap_id) {
+	case TEGRA20_DAS_DAP_ID_1:
+		pin = TEGRA_PINGROUP_DAP1;
+		break;
+	case TEGRA20_DAS_DAP_ID_2:
+		pin = TEGRA_PINGROUP_DAP2;
+		break;
+	case TEGRA20_DAS_DAP_ID_3:
+		pin = TEGRA_PINGROUP_DAP3;
+		break;
+	case TEGRA20_DAS_DAP_ID_4:
+		pin = TEGRA_PINGROUP_DAP4;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	if (is_tristate)
+		tristate = TEGRA_TRI_TRISTATE;
+	else
+		tristate = TEGRA_TRI_NORMAL;
+
+	tegra_pinmux_set_tristate(pin, tristate);
+}
+EXPORT_SYMBOL_GPL(tegra20_das_set_tristate);
 
 int tegra20_das_connect_dap_to_dac(int dap, int dac)
 {

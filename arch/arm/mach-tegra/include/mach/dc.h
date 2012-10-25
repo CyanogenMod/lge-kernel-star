@@ -124,6 +124,7 @@ struct tegra_dsi_out {
 	u8		n_data_lanes;			/* required */
 	u8		pixel_format;			/* required */
 	u8		refresh_rate;			/* required */
+	u8		rated_refresh_rate;
 	u8		panel_reset;			/* required */
 	u8		virtual_channel;		/* required */
 	u8		dsi_instance;
@@ -132,6 +133,19 @@ struct tegra_dsi_out {
 
 	bool		panel_has_frame_buffer;	/* required*/
 
+#ifdef CONFIG_MACH_BSSQ
+	struct tegra_dsi_cmd*	dsi_init_cmd;		/* required*/
+	u16		n_init_cmd;			/* required*/
+
+	struct tegra_dsi_cmd*	dsi_suspend_cmd;		/* required*/
+	u16		n_suspend_cmd;			/* required*/
+
+	struct tegra_dsi_cmd*	dsi_sleep_in_cmd;		/* required*/
+	u16		n_sleep_in_cmd;			/* required*/
+
+	struct tegra_dsi_cmd*	dsi_sleep_out_cmd;		/* required*/
+	u16		n_sleep_out_cmd;			/* required*/
+#else // nvidia fix : pinmux and i2c
 	struct tegra_dsi_cmd*	dsi_init_cmd;		/* required */
 	u16		n_init_cmd;			/* required */
 
@@ -143,6 +157,7 @@ struct tegra_dsi_out {
 
 	struct tegra_dsi_cmd*	dsi_suspend_cmd;	/* required */
 	u16		n_suspend_cmd;			/* required */
+#endif
 
 	u8		video_data_type;		/* required */
 	u8		video_clock_mode;
@@ -189,6 +204,7 @@ struct tegra_stereo_out {
 
 struct tegra_dc_mode {
 	int	pclk;
+	int	rated_pclk;
 	int	h_ref_to_sync;
 	int	v_ref_to_sync;
 	int	h_sync_width;
@@ -208,6 +224,9 @@ struct tegra_dc_mode {
 
 enum {
 	TEGRA_DC_OUT_RGB,
+	// LGE_CHANGE_S [youngseok.jeong@lge.com] 2011-01-11 [LGE_AP20] add cpu interface
+	TEGRA_DC_OUT_CPU,
+	// LGE_CHANGE_E [youngseok.jeong@lge.com] 2011-01-11 [LGE_AP20] add cpu interface
 	TEGRA_DC_OUT_HDMI,
 	TEGRA_DC_OUT_DSI,
 };
@@ -324,6 +343,7 @@ struct tegra_dc_out {
 	int				dcc_bus;
 	int				hotplug_gpio;
 	const char			*parent_clk;
+	const char			*parent_clk_backup;
 
 	unsigned			max_pixclock;
 	unsigned			order;
@@ -351,6 +371,7 @@ struct tegra_dc_out {
 	int	(*enable)(void);
 	int	(*postpoweron)(void);
 	int	(*disable)(void);
+	int	(*poweron)(void);
 
 	int	(*hotplug_init)(void);
 	int	(*postsuspend)(void);

@@ -273,6 +273,12 @@ static inline int max77663_rtc_do_irq(struct max77663_rtc *rtc)
 	u8 irq_status;
 	int ret;
 
+	ret = max77663_rtc_update_buffer(rtc, 0);
+	if (ret < 0) {
+		dev_err(rtc->dev, "rtc_irq: Failed to get rtc update buffer\n");
+		return ret;
+	}
+
 	ret = max77663_read(parent, MAX77663_RTC_IRQ, &irq_status, 1, 1);
 	if (ret < 0) {
 		dev_err(rtc->dev, "rtc_irq: Failed to get rtc irq status\n");
@@ -438,10 +444,10 @@ static int max77663_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	int ret;
 
 	dev_dbg(rtc->dev, "rtc_set_alarm: "
-		"tm: %d-%02d-%02d %02d:%02d:%02d, wday=%d\n",
+		"tm: %d-%02d-%02d %02d:%02d:%02d, wday=%d [%s]\n",
 		alrm->time.tm_year, alrm->time.tm_mon, alrm->time.tm_mday,
 		alrm->time.tm_hour, alrm->time.tm_min, alrm->time.tm_sec,
-		alrm->time.tm_wday);
+		alrm->time.tm_wday, alrm->enabled?"enable":"disable");
 
 	ret = max77663_rtc_tm_to_reg(rtc, buf, &alrm->time, 1);
 	if (ret < 0) {
@@ -463,7 +469,7 @@ static int max77663_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 		return ret;
 	}
 
-	ret = max77663_rtc_alarm_irq_enable(dev, 1);
+	ret = max77663_rtc_alarm_irq_enable(dev, alrm->enabled);
 	if (ret < 0) {
 		dev_err(rtc->dev,
 			"rtc_set_alarm: Failed to enable rtc alarm\n");

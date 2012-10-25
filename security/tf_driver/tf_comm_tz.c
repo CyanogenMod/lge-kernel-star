@@ -194,6 +194,20 @@ static inline void tf_smc_nyield(void)
 	tf_smc_generic_call(&generic_smc);
 }
 
+#ifdef CONFIG_SECURE_TRACES
+static void tf_print_secure_traces(struct tf_comm *comm)
+{
+	spin_lock(&(comm->lock));
+	if (comm->l1_buffer->traces_status != 0) {
+		if (comm->l1_buffer->traces_status > 1)
+			pr_info("TF : traces lost...\n");
+		pr_info("TF : %s", comm->l1_buffer->traces_buffer);
+		comm->l1_buffer->traces_status = 0;
+	}
+	spin_unlock(&(comm->lock));
+}
+#endif
+
 /* Yields the Secure World */
 int tf_schedule_secure_world(struct tf_comm *comm)
 {
@@ -201,6 +215,10 @@ int tf_schedule_secure_world(struct tf_comm *comm)
 
 	/* yield to the Secure World */
 	tf_smc_nyield();
+
+#ifdef CONFIG_SECURE_TRACES
+	tf_print_secure_traces(comm);
+#endif
 
 	return 0;
 }

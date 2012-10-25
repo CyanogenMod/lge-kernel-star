@@ -394,7 +394,7 @@ static int mediasrv_update_block_info(
 )
 {
 	struct tegra_mediasrv_block *entry = NULL;
-	struct tegra_mediasrv_block *block;
+	struct tegra_mediasrv_block *block = NULL;
 	int e;
 
 	list_for_each_entry(entry, &node->blocks, entry) {
@@ -470,6 +470,7 @@ static long mediasrv_unlocked_ioctl(struct file *file, unsigned int cmd,
 copy_fail:
 	e = -EFAULT;
 fail:
+	mutex_unlock(&mediasrv->lock);
 	return e;
 }
 

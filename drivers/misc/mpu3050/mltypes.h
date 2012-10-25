@@ -136,13 +136,13 @@ typedef int_fast8_t bool;
 /* - ML Errors. - */
 #define ERROR_NAME(x)   (#x)
 #define ERROR_CHECK(x)                                                  \
-	do {								\
+	{								\
 		if (ML_SUCCESS != x) {					\
 			MPL_LOGE("%s|%s|%d returning %d\n",		\
 				__FILE__, __func__, __LINE__, x);	\
 			return x;					\
 		}							\
-	} while (0)
+	}
 
 #define ERROR_CHECK_FIRST(first, x)                                     \
 	{ if (ML_SUCCESS == first) first = x; }

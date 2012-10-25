@@ -25,6 +25,8 @@
 #include <linux/moduleparam.h>
 #include <linux/seq_file.h>
 #include <linux/syscore_ops.h>
+#include <linux/pm.h>
+#include <linux/platform_device.h>
 
 #include <mach/iomap.h>
 
@@ -142,9 +144,16 @@ static inline void clear_pmc_sw_wake_status(void)
 #endif
 }
 
+#if defined (CONFIG_MACH_BSSQ) || (CONFIG_MACH_STAR)
+#include <mach/gpio.h>
+#include "gpio-names.h"
+#endif
+
 int tegra_pm_irq_set_wake(int irq, int enable)
 {
-	int wake = tegra_irq_to_wake(irq);
+	int wake;
+
+	wake = tegra_irq_to_wake(irq);
 
 	if (wake == -EALREADY) {
 		/* EALREADY means wakeup event already accounted for */
@@ -152,6 +161,7 @@ int tegra_pm_irq_set_wake(int irq, int enable)
 	} else if (wake == -ENOTSUPP) {
 		/* ENOTSUPP means LP0 not supported with this wake source */
 		WARN(enable && warn_prevent_lp0, "irq %d prevents lp0\n", irq);
+		printk("irq %d prevents lp0\n", irq);
 		if (enable)
 			tegra_prevent_lp0++;
 		else if (!WARN_ON(tegra_prevent_lp0 == 0))
@@ -161,6 +171,13 @@ int tegra_pm_irq_set_wake(int irq, int enable)
 		return -EINVAL;
 	}
 
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+#if defined (CONFIG_MACH_BSSQ) || (CONFIG_MACH_STAR)
+	if(wake > 30)
+		return 0;
+#endif
+#endif
+
 	if (enable) {
 		tegra_lp0_wake_enb |= 1ull << wake;
 		pr_info("Enabling wake%d\n", wake);
@@ -168,7 +185,7 @@ int tegra_pm_irq_set_wake(int irq, int enable)
 		tegra_lp0_wake_enb &= ~(1ull << wake);
 		pr_info("Disabling wake%d\n", wake);
 	}
-
+	
 	return 0;
 }
 
@@ -234,17 +251,33 @@ static void tegra_pm_irq_syscore_resume_helper(
 	}
 }
 
+static u32 saved_wake_status_lo;
+static u32 saved_wake_status_hi;
+
 static void tegra_pm_irq_syscore_resume(void)
 {
 	unsigned long long wake_status = read_pmc_wake_status();
 
 	pr_info(" legacy wake status=0x%x\n", (u32)wake_status);
-	tegra_pm_irq_syscore_resume_helper((unsigned long)wake_status, 0);
+	saved_wake_status_lo = (u32)wake_status;
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	pr_info(" tegra3 wake status=0x%x\n", (u32)(wake_status >> 32));
-	tegra_pm_irq_syscore_resume_helper(
-		(unsigned long)(wake_status >> 32), 1);
+	saved_wake_status_hi = (u32)(wake_status >> 32);
+#else
+	saved_wake_status_hi = 0;
 #endif
+}
+
+static void tegra_pm_irq_resume_on_complete(struct device *dev)
+{
+	local_irq_disable();
+	tegra_pm_irq_syscore_resume_helper(
+		(unsigned long)saved_wake_status_lo, 0);
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	tegra_pm_irq_syscore_resume_helper(
+		(unsigned long)saved_wake_status_hi, 1);
+#endif
+	local_irq_enable();
 }
 
 /* set up lp0 wake sources */
@@ -363,4 +396,32 @@ static int __init tegra_pm_irq_debug_init(void)
 }
 
 late_initcall(tegra_pm_irq_debug_init);
+
+static const struct dev_pm_ops irq_pm_ops = {
+	.complete = tegra_pm_irq_resume_on_complete,
+};
+
+static struct platform_driver pm_irq_resume_complete_driver = {
+	.driver = {
+		.name = "pm_irq_pm_ops",
+#ifdef CONFIG_PM
+		.pm   = &irq_pm_ops,
+#endif
+	},
+};
+
+static int __init pm_irq_resume_complete_init(void)
+{
+	return platform_driver_register(&pm_irq_resume_complete_driver);
+}
+late_initcall(pm_irq_resume_complete_init);
+
+static void __exit pm_irq_resume_complete_exit(void)
+{
+	platform_driver_unregister(&pm_irq_resume_complete_driver);
+}
+
+module_init(pm_irq_resume_complete_init)
+module_exit(pm_irq_resume_complete_exit)
+
 #endif

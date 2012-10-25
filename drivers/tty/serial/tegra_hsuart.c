@@ -90,8 +90,6 @@ const int dma_req_sel[] = {
 #define TEGRA_UART_TX_TRIG_4B  0x20
 #define TEGRA_UART_TX_TRIG_1B  0x30
 
-#define TX_EMPTY_TIMEOUT_CNT	10000
-
 struct tegra_uart_port {
 	struct uart_port	uport;
 	char			port_name[32];
@@ -270,6 +268,8 @@ static void tegra_start_tx(struct uart_port *u)
 static int tegra_start_dma_rx(struct tegra_uart_port *t)
 {
 	wmb();
+	dma_sync_single_for_device(t->uport.dev, t->rx_dma_req.dest_addr,
+			t->rx_dma_req.size, DMA_TO_DEVICE);
 	if (tegra_dma_enqueue_req(t->rx_dma, &t->rx_dma_req)) {
 		dev_err(t->uport.dev, "Could not enqueue Rx DMA req\n");
 		return -EINVAL;
@@ -314,6 +314,8 @@ static void tegra_rx_dma_complete_callback(struct tegra_dma_req *req)
 		req->status);
 	if (req->bytes_transferred) {
 		t->uport.icount.rx += req->bytes_transferred;
+		dma_sync_single_for_cpu(t->uport.dev, req->dest_addr,
+				req->size, DMA_FROM_DEVICE);
 		copied = tty_insert_flip_string(tty,
 			((unsigned char *)(req->virt_addr)),
 			req->bytes_transferred);
@@ -323,6 +325,8 @@ static void tegra_rx_dma_complete_callback(struct tegra_dma_req *req)
 				"to tty layer Req %d and coped %d\n",
 				req->bytes_transferred, copied);
 		}
+		dma_sync_single_for_device(t->uport.dev, req->dest_addr,
+				req->size, DMA_TO_DEVICE);
 	}
 
 	do_handle_rx_pio(t);
@@ -342,7 +346,7 @@ static void do_handle_rx_dma(struct tegra_uart_port *t)
 	struct uart_port *u = &t->uport;
 	if (t->rts_active)
 		set_rts(t, false);
-	tegra_dma_dequeue(t->rx_dma);
+	tegra_dma_dequeue_req(t->rx_dma, &t->rx_dma_req);
 	tty_flip_buffer_push(u->state->port.tty);
 	/* enqueue the request again */
 	tegra_start_dma_rx(t);
@@ -617,7 +621,7 @@ static void tegra_stop_rx(struct uart_port *u)
 		t->rx_in_progress = 0;
 
 		if (t->use_rx_dma && t->rx_dma)
-			tegra_dma_dequeue(t->rx_dma);
+			tegra_dma_dequeue_req(t->rx_dma, &t->rx_dma_req);
 		else
 			do_handle_rx_pio(t);
 
@@ -631,16 +635,40 @@ static void tegra_uart_hw_deinit(struct tegra_uart_port *t)
 {
 	unsigned long flags;
 	int retry = 0;
+	unsigned long char_time = DIV_ROUND_UP(10000000, t->baud);
+	unsigned long fifo_empty_time = t->uport.fifosize * char_time;
+	unsigned long wait_time;
+	unsigned char lsr;
+	unsigned char msr;
+	unsigned char mcr;
 
 	/* Disable interrupts */
 	uart_writeb(t, 0, UART_IER);
 
-	while ((uart_readb(t, UART_LSR) & UART_LSR_TEMT) != UART_LSR_TEMT) {
-		udelay(200);
-		if (retry++ > TX_EMPTY_TIMEOUT_CNT) {
-			dev_err(t->uport.dev, "%s: Tx Empty timeout! (%d)\n",
-					__func__, TX_EMPTY_TIMEOUT_CNT);
-			break;
+	lsr = uart_readb(t, UART_LSR);
+	if ((lsr & UART_LSR_TEMT) != UART_LSR_TEMT) {
+		msr = uart_readb(t, UART_MSR);
+		mcr = uart_readb(t, UART_MCR);
+		if ((mcr & UART_MCR_CTS_EN) && (msr & UART_MSR_CTS))
+			dev_err(t->uport.dev, "%s: Tx fifo not empty and "
+				"slave disabled CTS, Waiting for slave to"
+				" be ready\n", __func__);
+
+		/* Wait for Tx fifo to be empty */
+		while ((lsr & UART_LSR_TEMT) != UART_LSR_TEMT) {
+			wait_time = min(fifo_empty_time, 100);
+			udelay(wait_time);
+			fifo_empty_time -= wait_time;
+			if (!fifo_empty_time) {
+				msr = uart_readb(t, UART_MSR);
+				mcr = uart_readb(t, UART_MCR);
+				if ((mcr & UART_MCR_CTS_EN) &&
+					(msr & UART_MSR_CTS))
+					dev_err(t->uport.dev, "%s: Slave is "
+					"still not ready!\n", __func__);
+				break;
+			}
+			lsr = uart_readb(t, UART_LSR);
 		}
 	}
 
@@ -825,6 +853,7 @@ static int tegra_startup(struct uart_port *u)
 	struct tegra_uart_port *t = container_of(u,
 		struct tegra_uart_port, uport);
 	int ret = 0;
+	struct tegra_uart_platform_data *pdata;
 
 	t = container_of(u, struct tegra_uart_port, uport);
 	sprintf(t->port_name, "tegra_uart_%d", u->line);
@@ -867,6 +896,9 @@ static int tegra_startup(struct uart_port *u)
 	if (ret)
 		goto fail;
 
+	pdata = u->dev->platform_data;
+	if (pdata->is_loopback)
+		t->mcr_shadow |= UART_MCR_LOOP;
 	dev_dbg(u->dev, "Requesting IRQ %d\n", u->irq);
 	msleep(1);
 
@@ -1233,6 +1265,12 @@ static void tegra_set_termios(struct uart_port *u, struct ktermios *termios,
 	if (t->rts_active)
 		set_rts(t, false);
 
+	/* Clear all interrupts as configuration is going to be change */
+	uart_writeb(t, t->ier_shadow | UART_IER_RDI, UART_IER);
+	uart_readb(t, UART_IER);
+	uart_writeb(t, 0, UART_IER);
+	uart_readb(t, UART_IER);
+
 	/* Parity */
 	lcr = t->lcr_shadow;
 	lcr &= ~UART_LCR_PARITY;
@@ -1304,6 +1342,13 @@ static void tegra_set_termios(struct uart_port *u, struct ktermios *termios,
 
 	/* update the port timeout based on new settings */
 	uart_update_timeout(u, termios->c_cflag, baud);
+
+	/* Make sure all write has completed */
+	uart_readb(t, UART_IER);
+
+	/* Reenable interrupt */
+	uart_writeb(t, t->ier_shadow, UART_IER);
+	uart_readb(t, UART_IER);
 
 	spin_unlock_irqrestore(&u->lock, flags);
 	dev_vdbg(t->uport.dev, "-tegra_set_termios\n");

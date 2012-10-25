@@ -22,6 +22,7 @@
 #include "board-whistler.h"
 #include "tegra2_emc.h"
 #include "board.h"
+#include "fuse.h"
 
 static const struct tegra_emc_table whistler_emc_tables_elpida_300Mhz[] = {
 	{
@@ -59,11 +60,11 @@ static const struct tegra_emc_table whistler_emc_tables_elpida_300Mhz[] = {
 			0x00000006,   /* TCLKSTABLE */
 			0x00000002,   /* TCLKSTOP */
 			0x00000068,   /* TREFBW */
-			0x00000003,   /* QUSE_EXTRA */
+			0x00000000,   /* QUSE_EXTRA */
 			0x00000003,   /* FBIO_CFG6 */
 			0x00000000,   /* ODT_WRITE */
 			0x00000000,   /* ODT_READ */
-			0x00000082,   /* FBIO_CFG5 */
+			0x00000282,   /* FBIO_CFG5 */
 			0xa06a04ae,   /* CFG_DIG_DLL */
 			0x0001f000,   /* DLL_XFORM_DQS */
 			0x00000000,   /* DLL_XFORM_QUSE */
@@ -110,11 +111,11 @@ static const struct tegra_emc_table whistler_emc_tables_elpida_300Mhz[] = {
 			0x00000006,   /* TCLKSTABLE */
 			0x00000002,   /* TCLKSTOP */
 			0x000000d0,   /* TREFBW */
-			0x00000004,   /* QUSE_EXTRA */
+			0x00000000,   /* QUSE_EXTRA */
 			0x00000000,   /* FBIO_CFG6 */
 			0x00000000,   /* ODT_WRITE */
 			0x00000000,   /* ODT_READ */
-			0x00000082,   /* FBIO_CFG5 */
+			0x00000282,   /* FBIO_CFG5 */
 			0xa06a04ae,   /* CFG_DIG_DLL */
 			0x0001f000,   /* DLL_XFORM_DQS */
 			0x00000000,   /* DLL_XFORM_QUSE */
@@ -161,11 +162,11 @@ static const struct tegra_emc_table whistler_emc_tables_elpida_300Mhz[] = {
 			0x00000006,   /* TCLKSTABLE */
 			0x00000002,   /* TCLKSTOP */
 			0x00000138,   /* TREFBW */
-			0x00000004,   /* QUSE_EXTRA */
+			0x00000000,   /* QUSE_EXTRA */
 			0x00000000,   /* FBIO_CFG6 */
 			0x00000000,   /* ODT_WRITE */
 			0x00000000,   /* ODT_READ */
-			0x00000082,   /* FBIO_CFG5 */
+			0x00000282,   /* FBIO_CFG5 */
 			0xa06a04ae,   /* CFG_DIG_DLL */
 			0x0001f000,   /* DLL_XFORM_DQS */
 			0x00000000,   /* DLL_XFORM_QUSE */
@@ -216,7 +217,7 @@ static const struct tegra_emc_table whistler_emc_tables_elpida_300Mhz[] = {
 			0x00000001,   /* FBIO_CFG6 */
 			0x00000000,   /* ODT_WRITE */
 			0x00000000,   /* ODT_READ */
-			0x00000082,   /* FBIO_CFG5 */
+			0x00000282,   /* FBIO_CFG5 */
 			0xA04C04AE,   /* CFG_DIG_DLL */
 			0x007FC010,   /* DLL_XFORM_DQS */
 			0x00000000,   /* DLL_XFORM_QUSE */
@@ -281,7 +282,7 @@ static const struct tegra_emc_table whistler_emc_tables_elpida_300Mhz[] = {
 	}
 };
 
-static const struct tegra_emc_table whistler_emc_tables_elpida_400Mhz[] = {
+static const struct tegra_emc_table whistler_emc_tables_elpida_380Mhz[] = {
 	{
 		.rate = 23750,   /* SDRAM frquency */
 		.regs = {
@@ -317,11 +318,11 @@ static const struct tegra_emc_table whistler_emc_tables_elpida_400Mhz[] = {
 			0x00000008,   /* TCLKSTABLE */
 			0x00000002,   /* TCLKSTOP */
 			0x00000060,   /* TREFBW */
-			0x00000004,   /* QUSE_EXTRA */
+			0x00000000,   /* QUSE_EXTRA */
 			0x00000003,   /* FBIO_CFG6 */
 			0x00000000,   /* ODT_WRITE */
 			0x00000000,   /* ODT_READ */
-			0x00000082,   /* FBIO_CFG5 */
+			0x00000282,   /* FBIO_CFG5 */
 			0xa0ae04ae,   /* CFG_DIG_DLL */
 			0x0001f800,   /* DLL_XFORM_DQS */
 			0x00000000,   /* DLL_XFORM_QUSE */
@@ -334,7 +335,7 @@ static const struct tegra_emc_table whistler_emc_tables_elpida_400Mhz[] = {
 		}
 	},
 	{
-		.rate = 63333,   /* SDRAM frquency */
+		.rate = 63334,   /* SDRAM frquency */
 		.regs = {
 			0x00000004,   /* RC */
 			0x00000009,   /* RFC */
@@ -368,11 +369,11 @@ static const struct tegra_emc_table whistler_emc_tables_elpida_400Mhz[] = {
 			0x00000008,   /* TCLKSTABLE */
 			0x00000002,   /* TCLKSTOP */
 			0x00000107,   /* TREFBW */
-			0x00000005,   /* QUSE_EXTRA */
+			0x00000000,   /* QUSE_EXTRA */
 			0x00000000,   /* FBIO_CFG6 */
 			0x00000000,   /* ODT_WRITE */
 			0x00000000,   /* ODT_READ */
-			0x00000082,   /* FBIO_CFG5 */
+			0x00000282,   /* FBIO_CFG5 */
 			0xa0ae04ae,   /* CFG_DIG_DLL */
 			0x0001f800,   /* DLL_XFORM_DQS */
 			0x00000000,   /* DLL_XFORM_QUSE */
@@ -419,11 +420,11 @@ static const struct tegra_emc_table whistler_emc_tables_elpida_400Mhz[] = {
 			0x00000008,   /* TCLKSTABLE */
 			0x00000002,   /* TCLKSTOP */
 			0x0000018c,   /* TREFBW */
-			0x00000005,   /* QUSE_EXTRA */
+			0x00000000,   /* QUSE_EXTRA */
 			0x00000001,   /* FBIO_CFG6 */
 			0x00000000,   /* ODT_WRITE */
 			0x00000000,   /* ODT_READ */
-			0x00000082,   /* FBIO_CFG5 */
+			0x00000282,   /* FBIO_CFG5 */
 			0xa0ae04ae,   /* CFG_DIG_DLL */
 			0x0001f000,   /* DLL_XFORM_DQS */
 			0x00000000,   /* DLL_XFORM_QUSE */
@@ -470,16 +471,67 @@ static const struct tegra_emc_table whistler_emc_tables_elpida_400Mhz[] = {
 			0x00000008,   /* TCLKSTABLE */
 			0x00000002,   /* TCLKSTOP */
 			0x00000317,   /* TREFBW */
-			0x00000005,   /* QUSE_EXTRA */
+			0x00000000,   /* QUSE_EXTRA */
 			0x00000002,   /* FBIO_CFG6 */
 			0x00000000,   /* ODT_WRITE */
 			0x00000000,   /* ODT_READ */
-			0x00000082,   /* FBIO_CFG5 */
+			0x00000282,   /* FBIO_CFG5 */
 			0xa06204ae,   /* CFG_DIG_DLL */
 			0x007f7010,   /* DLL_XFORM_DQS */
 			0x00000000,   /* DLL_XFORM_QUSE */
 			0x00000000,   /* ZCAL_REF_CNT */
 			0x00000012,   /* ZCAL_WAIT_CNT */
+			0x00000000,   /* AUTO_CAL_INTERVAL */
+			0x00000000,   /* CFG_CLKTRIM_0 */
+			0x00000000,   /* CFG_CLKTRIM_1 */
+			0x00000000,   /* CFG_CLKTRIM_2 */
+		}
+	},
+	{
+		.rate = 300000,   /* SDRAM frquency */
+		.regs = {
+			0x00000012,   /* RC */
+			0x00000027,   /* RFC */
+			0x0000000d,   /* RAS */
+			0x00000006,   /* RP */
+			0x00000007,   /* R2W */
+			0x00000005,   /* W2R */
+			0x00000003,   /* R2P */
+			0x0000000b,   /* W2P */
+			0x00000006,   /* RD_RCD */
+			0x00000006,   /* WR_RCD */
+			0x00000003,   /* RRD */
+			0x00000003,   /* REXT */
+			0x00000003,   /* WDV */
+			0x00000007,   /* QUSE */
+			0x00000004,   /* QRST */
+			0x00000009,   /* QSAFE */
+			0x0000000d,   /* RDV */
+			0x0000045f,   /* REFRESH */
+			0x00000000,   /* BURST_REFRESH_NUM */
+			0x00000004,   /* PDEX2WR */
+			0x00000004,   /* PDEX2RD */
+			0x00000006,   /* PCHG2PDEN */
+			0x00000008,   /* ACT2PDEN */
+			0x00000001,   /* AR2PDEN */
+			0x0000000f,   /* RW2PDEN */
+			0x0000002a,   /* TXSR */
+			0x00000003,   /* TCKE */
+			0x0000000f,   /* TFAW */
+			0x00000007,   /* TRPAB */
+			0x00000007,   /* TCLKSTABLE */
+			0x00000002,   /* TCLKSTOP */
+			0x000004e0,   /* TREFBW */
+			0x00000006,   /* QUSE_EXTRA */
+			0x00000002,   /* FBIO_CFG6 */
+			0x00000000,   /* ODT_WRITE */
+			0x00000000,   /* ODT_READ */
+			0x00000282,   /* FBIO_CFG5 */
+			0xe05e048b,   /* CFG_DIG_DLL */
+			0x007f2010,   /* DLL_XFORM_DQS */
+			0x00000000,   /* DLL_XFORM_QUSE */
+			0x00000000,   /* ZCAL_REF_CNT */
+			0x0000001b,   /* ZCAL_WAIT_CNT */
 			0x00000000,   /* AUTO_CAL_INTERVAL */
 			0x00000000,   /* CFG_CLKTRIM_0 */
 			0x00000000,   /* CFG_CLKTRIM_1 */
@@ -543,27 +595,38 @@ static const struct tegra_emc_chip whistler_emc_chips[] = {
 	{
 		.description = "Elpida 300MHz",
 		.mem_manufacturer_id = 0x0303,
-		.mem_revision_id1 = 0,
-		.mem_revision_id2 = 0,
-		.mem_pid = 0x1414,
-		.table = whistler_emc_tables_elpida_300Mhz,
-		.table_size = ARRAY_SIZE(whistler_emc_tables_elpida_300Mhz)
-	},
-	{
-		.description = "Elpida 300MHz",
-		.mem_manufacturer_id = 0x0303,
-		.mem_revision_id1 = 0,
-		.mem_revision_id2 = 0,
-		.mem_pid = 0x5454,
+		.mem_revision_id1 = -1,
+		.mem_revision_id2 = -1,
+		.mem_pid = -1,
 		.table = whistler_emc_tables_elpida_300Mhz,
 		.table_size = ARRAY_SIZE(whistler_emc_tables_elpida_300Mhz)
 	},
 };
 
+static const struct tegra_emc_chip whistler_ap25_emc_chips[] = {
+	{
+		.description = "Elpida 380MHz",
+		.mem_manufacturer_id = 0x0303,
+		.mem_revision_id1 = -1,
+		.mem_revision_id2 = -1,
+		.mem_pid = -1,
+		.table = whistler_emc_tables_elpida_380Mhz,
+		.table_size = ARRAY_SIZE(whistler_emc_tables_elpida_380Mhz)
+	},
+};
+
+#define TEGRA25_SKU 0x17
+
 int __init whistler_emc_init(void)
 {
-	tegra_init_emc(whistler_emc_chips,
-		ARRAY_SIZE(whistler_emc_chips));
+	int sku_id = tegra_sku_id();
+
+	if (sku_id == TEGRA25_SKU)
+		tegra_init_emc(whistler_ap25_emc_chips,
+				ARRAY_SIZE(whistler_ap25_emc_chips));
+	else
+		tegra_init_emc(whistler_emc_chips,
+				ARRAY_SIZE(whistler_emc_chips));
 
 	return 0;
 }

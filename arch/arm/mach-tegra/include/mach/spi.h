@@ -39,4 +39,12 @@ typedef int	(*callback)(void *client_data);
 int spi_tegra_register_callback(struct spi_device *spi, callback func,
 	void *client_data);
 
+#ifdef CONFIG_MACH_BSSQ
+// 20110628 youngjin.yoo@lge.com added spi control function [S]
+void spi_tegra_abort_transfer(struct spi_device *spi);
+bool spi_tegra_is_suspended(struct spi_device *spi);
+//extern bool spi_tegra_suspend_failed(struct spi_device *spi);
+// 20110628 youngjin.yoo@lge.com added spi control function [E]
+#endif
+
 #endif

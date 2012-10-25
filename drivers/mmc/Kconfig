@@ -19,6 +19,19 @@ config MMC_DEBUG
 	  This is an option for use by developers; most people should
 	  say N here.  This enables MMC core and driver debugging.
 
+# LGE_CHAGNE [dojip.kim@lge.com] 2010-12-31, [LGE_AP20] from Star
+config EMBEDDED_MMC_START_OFFSET
+    bool "MMC start sector offset"
+    depends on MMC != n
+    help
+      This enables a per-controller fixed offset in sectors / bytes to
+      the location of the master boot record in the device, and reduces
+      the capacity of the device by a corresponding amount.  This is
+      primarily used by embedded systems with embedded MMC storage where
+      the initial sectors are used by boot firmware.  If you do not know
+      if this applies to your system, say N here.
+
+
 if MMC
 
 source "drivers/mmc/core/Kconfig"

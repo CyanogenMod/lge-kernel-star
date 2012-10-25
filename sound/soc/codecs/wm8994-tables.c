@@ -62,8 +62,13 @@ const struct wm8994_access_mask wm8994_access_masks[WM8994_CACHE_SIZE] = {
 	{ 0x00FF, 0x00FF }, /* R58    - MICBIAS */
 	{ 0x000F, 0x000F }, /* R59    - LDO 1 */
 	{ 0x0007, 0x0007 }, /* R60    - LDO 2 */
+#if defined(CONFIG_MACH_BSSQ) //LGE_CHANGE_S, bae.cheolhwan@lge.com. 2012-03-20. Merge from GB.
+	{ 0x0000, 0x0000 }, /* R61 */
+	{ 0x0000, 0x0000 }, /* R62 */
+#else
 	{ 0xFFFF, 0xFFFF }, /* R61 */
 	{ 0xFFFF, 0xFFFF }, /* R62 */
+#endif
 	{ 0x0000, 0x0000 }, /* R63 */
 	{ 0x0000, 0x0000 }, /* R64 */
 	{ 0x0000, 0x0000 }, /* R65 */
@@ -209,9 +214,15 @@ const struct wm8994_access_mask wm8994_access_masks[WM8994_CACHE_SIZE] = {
 	{ 0x0000, 0x0000 }, /* R205 */
 	{ 0x0000, 0x0000 }, /* R206 */
 	{ 0x0000, 0x0000 }, /* R207 */
+#if defined(CONFIG_MACH_BSSQ) //LGE_CHANGE_S, bae.cheolhwan@lge.com. 2012-03-20. Merge from GB.
+	{ 0x0000, 0x0000 }, /* R208 */
+	{ 0x0000, 0x0000 }, /* R209 */
+	{ 0x0000, 0x0000 }, /* R210 */
+#else
 	{ 0xFFFF, 0xFFFF }, /* R208 */
 	{ 0xFFFF, 0xFFFF }, /* R209 */
 	{ 0xFFFF, 0xFFFF }, /* R210 */
+#endif
 	{ 0x0000, 0x0000 }, /* R211 */
 	{ 0x0000, 0x0000 }, /* R212 */
 	{ 0x0000, 0x0000 }, /* R213 */
@@ -2118,10 +2129,10 @@ const u16 wm8994_reg_defaults[WM8994_CACHE_SIZE] = {
 	0x0000,     /* R541 */
 	0x0000,     /* R542 */
 	0x0000,     /* R543 */
-	0x0000,     /* R544   - FLL1 Control (1) */
-	0x0000,     /* R545   - FLL1 Control (2) */
+	0x0001,     /* R544   - FLL1 Control (1) */ /* LGE_CHANGE [jung.chanmin@lge.com] 2012.05.10 HW tunning 0 -> 1 */
+	0x0700,     /* R545   - FLL1 Control (2) */  /* LGE_CHANGE [jung.chanmin@lge.com] 2012.05.10 HW tunning 0 -> 700 */
 	0x0000,     /* R546   - FLL1 Control (3) */
-	0x0000,     /* R547   - FLL1 Control (4) */
+	0x0100,     /* R547   - FLL1 Control (4) */  /* LGE_CHANGE [jung.chanmin@lge.com] 2012.05.10 HW tunning 0 -> 100 */
 	0x0C80,     /* R548   - FLL1 Control (5) */
 	0x0000,     /* R549 */
 	0x0000,     /* R550 */
@@ -2348,8 +2359,8 @@ const u16 wm8994_reg_defaults[WM8994_CACHE_SIZE] = {
 	0x0040,     /* R771   - AIF1 BCLK */
 	0x0040,     /* R772   - AIF1ADC LRCLK */
 	0x0040,     /* R773   - AIF1DAC LRCLK */
-	0x0004,     /* R774   - AIF1DAC Data */
-	0x0100,     /* R775   - AIF1ADC Data */
+	0x0000,     /* R774   - AIF1DAC Data */  /* LGE_CHANGE [jung.chanmin@lge.com] 2012.05.10 HW tunning 4 -> 0 */
+	0x0000,     /* R775   - AIF1ADC Data */  /* LGE_CHANGE [jung.chanmin@lge.com] 2012.05.10 HW tunning 100 -> 0 */
 	0x0000,     /* R776 */
 	0x0000,     /* R777 */
 	0x0000,     /* R778 */

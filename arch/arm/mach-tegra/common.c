@@ -2,7 +2,7 @@
  * arch/arm/mach-tegra/common.c
  *
  * Copyright (C) 2010 Google, Inc.
- * Copyright (C) 2010-2011 NVIDIA Corporation
+ * Copyright (C) 2010-2012 NVIDIA Corporation
  *
  * Author:
  *	Colin Cross <ccross@android.com>
@@ -58,6 +58,10 @@
 #define   ENB_FAST_REARBITRATE	BIT(2)
 #define   DONT_SPLIT_AHB_WR     BIT(7)
 
+#define   RECOVERY_MODE	BIT(31)
+#define   BOOTLOADER_MODE	BIT(30)
+#define   FORCED_RECOVERY_MODE	BIT(1)
+
 #define AHB_GIZMO_USB		0x1c
 #define AHB_GIZMO_USB2		0x78
 #define AHB_GIZMO_USB3		0x7c
@@ -112,6 +116,23 @@ void tegra_assert_system_reset(char mode, const char *cmd)
 	void __iomem *reset = IO_ADDRESS(TEGRA_PMC_BASE + 0x00);
 	u32 reg;
 
+	reg = readl_relaxed(reset + PMC_SCRATCH0);
+	/* Writing recovery kernel or Bootloader mode in SCRATCH0 31:30:1 */
+	if (cmd) {
+		if (!strcmp(cmd, "recovery"))
+			reg |= RECOVERY_MODE;
+		else if (!strcmp(cmd, "bootloader"))
+			reg |= BOOTLOADER_MODE;
+		else if (!strcmp(cmd, "forced-recovery"))
+			reg |= FORCED_RECOVERY_MODE;
+		else
+			reg &= ~(BOOTLOADER_MODE | RECOVERY_MODE | FORCED_RECOVERY_MODE);
+	}
+	else {
+		/* Clearing SCRATCH0 31:30:1 on default reboot */
+		reg &= ~(BOOTLOADER_MODE | RECOVERY_MODE | FORCED_RECOVERY_MODE);
+	}
+	writel_relaxed(reg, reset + PMC_SCRATCH0);
 	/* use *_related to avoid spinlock since caches are off */
 	reg = readl_relaxed(reset);
 	reg |= 0x10;
@@ -119,6 +140,7 @@ void tegra_assert_system_reset(char mode, const char *cmd)
 #endif
 }
 static int modem_id;
+static int sku_override;
 static int debug_uart_port_id;
 static enum audio_codec_type audio_codec_name;
 static int max_cpu_current;
@@ -133,9 +155,9 @@ static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 	{ "pll_p",	NULL,		216000000,	true },
 	{ "pll_p_out1",	"pll_p",	28800000,	true },
-	{ "pll_p_out2",	"pll_p",	48000000,	true },
+	{ "pll_p_out2",	"pll_p",	48000000,	false },
 	{ "pll_p_out3",	"pll_p",	72000000,	true },
-	{ "pll_p_out4",	"pll_p",	108000000,	true },
+	{ "pll_p_out4",	"pll_p",	108000000,	false },
 	{ "pll_m",	"clk_m",	0,		true },
 	{ "pll_m_out1",	"pll_m",	120000000,	true },
 	{ "sclk",	"pll_c_out1",	40000000,	true },
@@ -148,30 +170,41 @@ static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 	{ "2d",		"pll_c",	0,		false },
 	{ "3d",		"pll_c",	0,		false },
 #else
-	{ "pll_p",	NULL,		408000000,	true },
-	{ "pll_p_out1",	"pll_p",	9600000,	true },
-	{ "pll_p_out2",	"pll_p",	48000000,	true },
-	{ "pll_p_out3",	"pll_p",	102000000,	true },
+	{ "pll_p",	NULL,		0,		true },
+	{ "pll_p_out1",	"pll_p",	0,		false },
+	{ "pll_p_out2",	"pll_p",	48000000,	false },
+	{ "pll_p_out3",	"pll_p",	0,		true },
 	{ "pll_m_out1",	"pll_m",	275000000,	false },
 	{ "pll_p_out4",	"pll_p",	102000000,	true },
 	{ "sclk",	"pll_p_out4",	102000000,	true },
 	{ "hclk",	"sclk",		102000000,	true },
 	{ "pclk",	"hclk",		51000000,	true },
+	{ "wake.sclk",	NULL,		40000000,	true },
+	{ "sbc5.sclk",	NULL,		40000000,	false},
+	{ "sbc6.sclk",	NULL,		40000000,	false},
 #endif
+	{ "sbc1.sclk",	NULL,		40000000,	false},
+	{ "sbc2.sclk",	NULL,		40000000,	false},
+	{ "sbc3.sclk",	NULL,		40000000,	false},
+	{ "sbc4.sclk",	NULL,		40000000,	false},
 #else
 	{ "pll_p",	NULL,		216000000,	true },
-	{ "pll_p_out1",	"pll_p",	28800000,	true },
-	{ "pll_p_out2",	"pll_p",	48000000,	true },
+	{ "pll_p_out1",	"pll_p",	28800000,	false },
+	{ "pll_p_out2",	"pll_p",	48000000,	false },
 	{ "pll_p_out3",	"pll_p",	72000000,	true },
 	{ "pll_m_out1",	"pll_m",	275000000,	true },
 	{ "pll_c",	NULL,		ULONG_MAX,	false },
 	{ "pll_c_out1",	"pll_c",	208000000,	false },
-	{ "pll_p_out4",	"pll_p",	108000000,	true },
+	{ "pll_p_out4",	"pll_p",	108000000,	false },
 	{ "sclk",	"pll_p_out4",	108000000,	true },
 	{ "hclk",	"sclk",		108000000,	true },
 	{ "pclk",	"hclk",		54000000,	true },
 #endif
-	{ "csite",	NULL,		0,		true },
+#ifdef CONFIG_TEGRA_SLOW_CSITE
+	{ "csite",	"clk_m",	1000000, 	true },
+#else
+	{ "csite",      NULL,           0,              true },
+#endif
 	{ "emc",	NULL,		0,		true },
 	{ "cpu",	NULL,		0,		true },
 	{ "kfuse",	NULL,		0,		true },
@@ -179,10 +212,17 @@ static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
 	{ "pll_u",	NULL,		480000000,	false },
 	{ "sdmmc1",	"pll_p",	48000000,	false},
 	{ "sdmmc3",	"pll_p",	48000000,	false},
+#ifdef CONFIG_MACH_BSSQ
+	{ "sdmmc4",	"pll_p",	48000000,	true},
+#else
 	{ "sdmmc4",	"pll_p",	48000000,	false},
+#endif
+	{ "pll_a",	"pll_p_out1",	0,		false},
+	{ "pll_a_out0",	"pll_a",	0,		false},
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
 	{ "cbus",	"pll_c",	416000000,	false },
 	{ "pll_c_out1",	"pll_c",	208000000,	false },
+	{ "mselect",	"pll_p",	102000000,	true },
 #endif
 	{ NULL,		NULL,		0,		0},
 };
@@ -293,7 +333,8 @@ void tegra_init_cache(bool init)
 	} else {
 		/* relax l2-cache latency for speedos 4,5,6 (T33's chips) */
 		speedo = tegra_cpu_speedo_id();
-		if (speedo == 4 || speedo == 5 || speedo == 6) {
+		if (speedo == 4 || speedo == 5 || speedo == 6 ||
+		    speedo == 12 || speedo == 13) {
 			writel(0x442, p + L2X0_TAG_LATENCY_CTRL);
 			writel(0x552, p + L2X0_DATA_LATENCY_CTRL);
 		} else {
@@ -322,6 +363,11 @@ void tegra_init_cache(bool init)
 #endif
 #endif
 }
+
+static struct platform_device tegra_pm_irq_resume_complete_device = {
+	.name = "pm_irq_pm_ops",
+	.id = -1,
+};
 
 static void __init tegra_init_power(void)
 {
@@ -389,39 +435,8 @@ static void __init tegra_init_ahb_gizmo_settings(void)
 	gizmo_writel(val, AHB_MEM_PREFETCH_CFG4);
 }
 
-static bool console_flushed;
-
-static void tegra_pm_flush_console(void)
-{
-	if (console_flushed)
-		return;
-	console_flushed = true;
-
-	pr_emerg("Restarting %s\n", linux_banner);
-	if (console_trylock()) {
-		console_unlock();
-		return;
-	}
-
-	mdelay(50);
-
-	local_irq_disable();
-	if (!console_trylock())
-		pr_emerg("%s: Console was locked! Busting\n", __func__);
-	else
-		pr_emerg("%s: Console was locked!\n", __func__);
-	console_unlock();
-}
-
-static void tegra_pm_restart(char mode, const char *cmd)
-{
-	tegra_pm_flush_console();
-	arm_machine_restart(mode, cmd);
-}
-
 void __init tegra_init_early(void)
 {
-	arm_pm_restart = tegra_pm_restart;
 #ifndef CONFIG_SMP
 	/* For SMP system, initializing the reset handler here is too
 	   late. For non-SMP systems, the function that calls the reset
@@ -468,6 +483,21 @@ static int __init tegra_bootloader_fb_arg(char *options)
 	return 0;
 }
 early_param("tegra_fbmem", tegra_bootloader_fb_arg);
+
+static int __init tegra_sku_override(char *id)
+{
+	char *p = id;
+
+	sku_override = memparse(p, &p);
+
+	return 0;
+}
+early_param("sku_override", tegra_sku_override);
+
+int tegra_get_sku_override(void)
+{
+	return sku_override;
+}
 
 static int __init tegra_vpr_arg(char *options)
 {
@@ -671,8 +701,6 @@ int tegra_get_modem_id(void)
 }
 
 __setup("modem_id=", tegra_modem_id);
-
-
 
 /*
  * Tegra has a protected aperture that prevents access by most non-CPU
@@ -896,6 +924,62 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 #endif
 }
 
+static struct resource ram_console_resources[] = {
+	{
+		.flags = IORESOURCE_MEM,
+	},
+};
+
+static struct platform_device ram_console_device = {
+	.name 		= "ram_console",
+	.id 		= -1,
+	.num_resources	= ARRAY_SIZE(ram_console_resources),
+	.resource	= ram_console_resources,
+};
+
+void __init tegra_ram_console_debug_reserve(unsigned long ram_console_size)
+{
+	struct resource *res;
+	long ret;
+
+	res = platform_get_resource(&ram_console_device, IORESOURCE_MEM, 0);
+	if (!res)
+		goto fail;
+	res->start = memblock_end_of_DRAM() - ram_console_size;
+	res->end = res->start + ram_console_size - 1;
+	ret = memblock_remove(res->start, ram_console_size);
+	if (ret)
+		goto fail;
+
+//LGE_CHNAGE_S  euikyeom.kim@lge.com from sunghoon.kim@lge.com
+#ifdef CONFIG_STAR_REBOOT_MONITOR
+            res->end = res->start + ram_console_size/2 -1;
+ #endif
+//LGE_CHNAGE_E  euikyeom.kim@lge.com from sunghoon.kim@lge.com
+
+	return;
+
+fail:
+	ram_console_device.resource = NULL;
+	ram_console_device.num_resources = 0;
+	pr_err("Failed to reserve memory block for ram console\n");
+}
+
+void __init tegra_ram_console_debug_init(void)
+{
+	int err;
+
+	err = platform_device_register(&ram_console_device);
+	if (err) {
+		pr_err("%s: ram console registration failed (%d)!\n", __func__, err);
+	}
+	err = platform_device_register(
+		&tegra_pm_irq_resume_complete_device);
+	if (err)
+		pr_err("%s: pm_irq_resume_complete registration "
+		"failed (%d)!\n", __func__, err);
+}
+
 void __init tegra_release_bootloader_fb(void)
 {
 	/* Since bootloader fb is reserved in common.c, it is freed here. */
@@ -931,9 +1015,7 @@ static void cpufreq_set_governor(char *governor)
 	{
 		sprintf(buf, cpufreq_sysfs_place_holder, i);
 		scaling_gov = filp_open(buf, O_RDWR, 0);
-		if (IS_ERR_OR_NULL(scaling_gov)) {
-			pr_err("%s. Can't open %s\n", __func__, buf);
-		} else {
+		if (scaling_gov != NULL) {
 			if (scaling_gov->f_op != NULL &&
 				scaling_gov->f_op->write != NULL)
 				scaling_gov->f_op->write(scaling_gov,
@@ -944,6 +1026,8 @@ static void cpufreq_set_governor(char *governor)
 				pr_err("f_op might be null\n");
 
 			filp_close(scaling_gov, NULL);
+		} else {
+			pr_err("%s. Can't open %s\n", __func__, buf);
 		}
 	}
 	set_fs(old_fs);
@@ -963,9 +1047,7 @@ void cpufreq_save_default_governor(void)
 	buf[127] = 0;
 	sprintf(buf, cpufreq_sysfs_place_holder,0);
 	scaling_gov = filp_open(buf, O_RDONLY, 0);
-	if (IS_ERR_OR_NULL(scaling_gov)) {
-		pr_err("%s. Can't open %s\n", __func__, buf);
-	} else {
+	if (scaling_gov != NULL) {
 		if (scaling_gov->f_op != NULL &&
 			scaling_gov->f_op->read != NULL)
 			scaling_gov->f_op->read(scaling_gov,
@@ -976,6 +1058,8 @@ void cpufreq_save_default_governor(void)
 			pr_err("f_op might be null\n");
 
 		filp_close(scaling_gov, NULL);
+	} else {
+		pr_err("%s. Can't open %s\n", __func__, buf);
 	}
 	set_fs(old_fs);
 }
@@ -985,57 +1069,33 @@ void cpufreq_restore_default_governor(void)
 	cpufreq_set_governor(cpufreq_gov_default);
 }
 
-void cpufreq_set_conservative_governor_param(int up_th, int down_th)
+void cpufreq_set_conservative_governor_param(char *name, int value)
 {
 	struct file *gov_param = NULL;
-	static char buf[128],parm[8];
-	loff_t offset = 0;
 	mm_segment_t old_fs;
-
-	if (up_th <= down_th) {
-		printk(KERN_ERR "%s: up_th(%d) is lesser than down_th(%d)\n",
-			__func__, up_th, down_th);
-		return;
-	}
+	static char buf[128], param_value[8];
+	loff_t offset = 0;
 
 	/* change to KERNEL_DS address limit */
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 
-	sprintf(parm, "%d", up_th);
-	sprintf(buf, cpufreq_gov_conservative_param ,"up_threshold");
-	gov_param = filp_open(buf, O_RDONLY, 0);
-	if (IS_ERR_OR_NULL(gov_param)) {
-		pr_err("%s. Can't open %s\n", __func__, buf);
-	} else {
+	sprintf(param_value, "%d", value);
+	sprintf(buf, cpufreq_gov_conservative_param, name);
+	gov_param = filp_open(buf, O_RDWR, 0);
+	if (gov_param != NULL) {
 		if (gov_param->f_op != NULL &&
 			gov_param->f_op->write != NULL)
 			gov_param->f_op->write(gov_param,
-					parm,
-					strlen(parm),
+					param_value,
+					strlen(param_value),
 					&offset);
 		else
 			pr_err("f_op might be null\n");
 
 		filp_close(gov_param, NULL);
-	}
-
-	sprintf(parm, "%d", down_th);
-	sprintf(buf, cpufreq_gov_conservative_param ,"down_threshold");
-	gov_param = filp_open(buf, O_RDONLY, 0);
-	if (IS_ERR_OR_NULL(gov_param)) {
-		pr_err("%s. Can't open %s\n", __func__, buf);
 	} else {
-		if (gov_param->f_op != NULL &&
-			gov_param->f_op->write != NULL)
-			gov_param->f_op->write(gov_param,
-					parm,
-					strlen(parm),
-					&offset);
-		else
-			pr_err("f_op might be null\n");
-
-		filp_close(gov_param, NULL);
+		pr_err("%s. Can't open %s\n", __func__, buf);
 	}
 	set_fs(old_fs);
 }

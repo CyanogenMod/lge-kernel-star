@@ -42,6 +42,7 @@ int tegra_package_id(void);
 int tegra_cpu_speedo_id(void);
 int tegra_cpu_speedo_mv(void);
 int tegra_core_speedo_mv(void);
+int tegra_get_sku_override(void);
 #else
 static inline int tegra_package_id(void) { return -1; }
 static inline int tegra_cpu_speedo_id(void) { return 0; }

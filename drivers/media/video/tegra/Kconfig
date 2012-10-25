@@ -11,6 +11,22 @@ config TEGRA_CAMERA
 
           If unsure, say Y
 
+config VIDEO_IMX073
+        tristate "IMX073 camera sensor support"
+        depends on I2C && ARCH_TEGRA
+        ---help---
+          This is a driver for the Sony IMX073 camera sensor
+          for use with the tegra isp.
+
+config TEGRA_DTV
+        bool "Enable support for tegra dtv interface"
+        depends on ARCH_TEGRA
+        default y
+        help
+          Enables support for the Tegra dtv interface
+
+          If unsure, say Y
+
 config VIDEO_OV5650
         tristate "OV5650 camera sensor support"
         depends on I2C && ARCH_TEGRA
@@ -54,6 +70,13 @@ config VIDEO_SOC380
           This is a driver for the Semco soc380 camera sensor
           for use with the tegra isp.
 
+config VIDEO_MT9M113
+        tristate "MT9M113 camera sensor support"
+        depends on I2C && ARCH_TEGRA
+        ---help---
+          This is a driver for the Omnivision MT9M113 camera sensor
+          for use with the tegra isp.
+
 config TORCH_SSL3250A
         tristate "SSL3250A flash/torch support"
         depends on I2C && ARCH_TEGRA
@@ -79,3 +102,25 @@ config VIDEO_AD5820
         ---help---
           This is a driver for the AD5820 focuser
           for use with the tegra isp.
+
+config VIDEO_DW9714
+        tristate "DW9714 focuser support"
+        depends on I2C && ARCH_TEGRA
+        ---help---
+          This is a driver for the DW9714 focuser
+          for use with the tegra isp.
+
+config VIDEO_DW9712
+        tristate "DW9712 focuser support"
+        depends on I2C && ARCH_TEGRA
+        ---help---
+          This is a driver for the DW9712 focuser
+          for use with the tegra isp.
+
+config TORCH_AAT1270
+        bool "AAT1270 FLASH LED"
+        depends on ARCH_TEGRA
+        default y
+        ---help---
+          This is a driver for the aat1270 flash/torch camera device
+

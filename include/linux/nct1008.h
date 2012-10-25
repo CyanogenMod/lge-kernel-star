@@ -25,74 +25,19 @@
 
 #include <linux/types.h>
 
-#include <mach/edp.h>
-
-#define MAX_ZONES	16
-
-struct nct1008_data;
-
 struct nct1008_platform_data {
 	bool supported_hwrev;
 	bool ext_range;
 	u8 conv_rate;
 	u8 offset;
 	u8 hysteresis;
-	s8 shutdown_ext_limit;
-	s8 shutdown_local_limit;
-	s8 throttling_ext_limit;
-	s8 thermal_zones[MAX_ZONES];
-	u8 thermal_zones_sz;
+	u8 shutdown_ext_limit;
+	u8 shutdown_local_limit;
+	u8 throttling_ext_limit;
 	void (*alarm_fn)(bool raised);
-	void (*probe_callback)(struct nct1008_data *);
 };
 
-struct nct1008_data {
-	struct work_struct work;
-	struct i2c_client *client;
-	struct nct1008_platform_data plat_data;
-	struct mutex mutex;
-	struct dentry *dent;
-	u8 config;
-	s8 *limits;
-	u8 limits_sz;
-	void (*alarm_fn)(bool raised);
-	struct regulator *nct_reg;
-	long current_lo_limit;
-	long current_hi_limit;
-
-	void (*alert_func)(void *);
-	void *alert_data;
-};
-
-#ifdef CONFIG_SENSORS_NCT1008
-int nct1008_thermal_get_temp(struct nct1008_data *data, long *temp);
-int nct1008_thermal_get_temp_low(struct nct1008_data *data, long *temp);
-int nct1008_thermal_set_limits(struct nct1008_data *data,
-				long lo_limit_milli,
-				long hi_limit_milli);
-int nct1008_thermal_set_alert(struct nct1008_data *data,
-				void (*alert_func)(void *),
-				void *alert_data);
-int nct1008_thermal_set_shutdown_temp(struct nct1008_data *data,
-					long shutdown_temp);
-#else
-static inline int nct1008_thermal_get_temp(struct nct1008_data *data,
-						long *temp)
-{ return -EINVAL; }
-static inline int nct1008_thermal_get_temp_low(struct nct1008_data *data,
-						long *temp)
-{ return -EINVAL; }
-static inline int nct1008_thermal_set_limits(struct nct1008_data *data,
-				long lo_limit_milli,
-				long hi_limit_milli)
-{ return -EINVAL; }
-static inline int nct1008_thermal_set_alert(struct nct1008_data *data,
-				void (*alert_func)(void *),
-				void *alert_data)
-{ return -EINVAL; }
-static inline int nct1008_thermal_set_shutdown_temp(struct nct1008_data *data,
-					long shutdown_temp)
-{ return -EINVAL; }
-#endif
+extern int	nct1008_get_temp_local(void);
+extern int nct1008_get_temp_ext(void);
 
 #endif /* _LINUX_NCT1008_H */

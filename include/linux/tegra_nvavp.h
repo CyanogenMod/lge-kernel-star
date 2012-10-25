@@ -64,6 +64,15 @@ struct nvavp_clock_args {
 	__u32 rate;
 };
 
+enum nvavp_clock_stay_on_state {
+	NVAVP_CLOCK_STAY_ON_DISABLED = 0,
+	NVAVP_CLOCK_STAY_ON_ENABLED
+};
+
+struct nvavp_clock_stay_on_state_args {
+	enum nvavp_clock_stay_on_state	state;
+};
+
 #define NVAVP_IOCTL_MAGIC		'n'
 
 #define NVAVP_IOCTL_SET_NVMAP_FD	_IOW(NVAVP_IOCTL_MAGIC, 0x60, \
@@ -76,9 +85,10 @@ struct nvavp_clock_args {
 					struct nvavp_clock_args)
 #define NVAVP_IOCTL_GET_CLOCK		_IOR(NVAVP_IOCTL_MAGIC, 0x65, \
 					struct nvavp_clock_args)
-
+#define NVAVP_IOCTL_FORCE_CLOCK_STAY_ON	_IOW(NVAVP_IOCTL_MAGIC, 0x67, \
+					struct nvavp_clock_stay_on_state_args)
 
 #define NVAVP_IOCTL_MIN_NR		_IOC_NR(NVAVP_IOCTL_SET_NVMAP_FD)
-#define NVAVP_IOCTL_MAX_NR		_IOC_NR(NVAVP_IOCTL_GET_CLOCK)
+#define NVAVP_IOCTL_MAX_NR		_IOC_NR(NVAVP_IOCTL_FORCE_CLOCK_STAY_ON)
 
 #endif /* __LINUX_TEGRA_NVAVP_H */

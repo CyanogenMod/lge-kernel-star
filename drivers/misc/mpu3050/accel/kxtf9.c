@@ -263,6 +263,9 @@ static int kxtf9_set_odr(void *mlsl_handle,
 		bits = 0;
 	}
 
+	if (odr != 0)
+		config->ctrl_reg1 |= 0x80;
+
 	config->reg_odr = bits;
 	kxtf9_set_dur(mlsl_handle, pdata,
 		config, apply, config->dur);
@@ -323,6 +326,9 @@ static int kxtf9_suspend(void *mlsl_handle,
 			 struct ext_slave_platform_data *pdata)
 {
 	int result;
+
+#ifndef MPL_IKR_BUILD //TSKIM_20110601:remove because of Accel power consumption on sleep.
+
 	unsigned char data;
 	struct kxtf9_private_data *private_data = pdata->private_data;
 
@@ -358,6 +364,10 @@ static int kxtf9_suspend(void *mlsl_handle,
 	result = MLSLSerialRead(mlsl_handle, pdata->address,
 				KXTF9_INT_REL, 1, &data);
 	ERROR_CHECK(result);
+#else    
+    result = MLSLSerialWriteSingle(mlsl_handle, pdata->address,
+                KXTF9_CTRL_REG1, 0x0);
+#endif
 
 	return result;
 }
@@ -495,8 +505,6 @@ static int kxtf9_config(void *mlsl_handle,
 			struct ext_slave_platform_data *pdata,
 			struct ext_slave_config *data)
 {
-	int retval;
-	long odr;
 	struct kxtf9_private_data *private_data = pdata->private_data;
 	if (!data->data)
 		return ML_ERROR_INVALID_PARAMETER;
@@ -508,15 +516,10 @@ static int kxtf9_config(void *mlsl_handle,
 					data->apply,
 					*((long *)data->data));
 	case MPU_SLAVE_CONFIG_ODR_RESUME:
-		odr = *((long *)data->data);
-		if (odr != 0)
-			private_data->resume.ctrl_reg1 |= 0x80;
-
-		retval = kxtf9_set_odr(mlsl_handle, pdata,
-				&private_data->resume,
-				data->apply,
-				odr);
-		return retval;
+		return kxtf9_set_odr(mlsl_handle, pdata,
+					&private_data->resume,
+					data->apply,
+					*((long *)data->data));
 	case MPU_SLAVE_CONFIG_FSR_SUSPEND:
 		return kxtf9_set_fsr(mlsl_handle, pdata,
 					&private_data->suspend,
@@ -621,12 +624,33 @@ static int kxtf9_get_config(void *mlsl_handle,
 	return ML_SUCCESS;
 }
 
+// 20110725 deukgi.shin@lge.com accel calibration. [S]
+#define GET12BIT(a,b)		(short)((((unsigned short)(*(b)))<<4) + (unsigned short)((*(a))>>4))
+#define SET12BIT(a,b,c)		(*(c))=(a>>4); (*(b))=((a&0x0F)<<4)
+#define TWOS_CMPLT(a)	(-1 * ((~(a) & 0x0FFF)+1))
+
+typedef struct accel_cal_value_type
+{
+    int value_x;
+    int value_y;
+    int value_z;
+} accel_cal_value_type;
+
+extern bool accel_cal_complete;
+extern accel_cal_value_type accel_cal_value;
+// 20110725 deukgi.shin@lge.com accel calibration. [E]
+
 static int kxtf9_read(void *mlsl_handle,
 		      struct ext_slave_descr *slave,
 		      struct ext_slave_platform_data *pdata,
 		      unsigned char *data)
 {
 	int result;
+	int temp[3];
+	int i = 0;
+
+#ifndef MPL_IKR_BUILD //TSKIM_20110601 : remove to implement mpu-accel
+
 	unsigned char reg;
 	result = MLSLSerialRead(mlsl_handle, pdata->address,
 				KXTF9_INT_SRC_REG2, 1, &reg);
@@ -634,10 +658,27 @@ static int kxtf9_read(void *mlsl_handle,
 
 	if (!(reg & 0x10))
 		return ML_ERROR_ACCEL_DATA_NOT_READY;
+#endif
 
 	result = MLSLSerialRead(mlsl_handle, pdata->address,
 				slave->reg, slave->len, data);
 	ERROR_CHECK(result);
+// 20110725 duekgi.shin@lge.com  accel calibration. [S]
+	for(i=0; i<3; i++)
+	{
+		temp[i] = GET12BIT(data+(i*2), data+((i*2)+1));
+	}	
+	if(accel_cal_complete == true)
+	{
+		temp[0] += accel_cal_value.value_x;
+		temp[1] += accel_cal_value.value_y;
+		temp[2] += accel_cal_value.value_z;
+
+		for(i=0; i<3; i++){
+			SET12BIT(temp[i], data+(i*2), data+((i*2)+1));
+		}				
+	}
+// 20110725 deukgi.shin@lge.com accel calibration. [E]
 	return result;
 }
 
@@ -667,3 +708,4 @@ EXPORT_SYMBOL(kxtf9_get_slave_descr);
 /**
  *  @}
 **/
+

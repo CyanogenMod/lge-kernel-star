@@ -247,6 +247,15 @@ static inline void suspend_thaw_processes(void)
 extern struct workqueue_struct *suspend_work_queue;
 extern struct wake_lock main_wake_lock;
 extern suspend_state_t requested_suspend_state;
+/* LGE_CHANGE_S, ryu.seeyeol@lge.com, 2012-02-24, repair sys_sync() func in early_suspend or suspend. Merge from IS11LG GB */
+/*
+extern void suspend_sys_sync_queue(void);
+extern int suspend_sys_sync_wait(void);
+#else
+static inline void suspend_sys_sync_queue(void) {}
+static inline int suspend_sys_sync_wait(void) { return 0; }
+*/
+/* LGE_CHANGE_E, ryu.seeyeol@lge.com, 2012-02-24, repair sys_sync() func in early_suspend or suspend. Merge from IS11LG GB */
 #endif
 
 #ifdef CONFIG_USER_WAKELOCK

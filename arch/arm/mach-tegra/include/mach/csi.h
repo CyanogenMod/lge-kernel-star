@@ -23,6 +23,8 @@
 #define CSI_CILB_MIPI_CAL_CONFIG_0 0x22b
 #define  MIPI_CAL_TERMOSB(x)		(((x) & 0x1f) << 0)
 
+#define CSI_CIL_PAD_CONFIG 0x229
+#define  PAD_CIL_PDVREG(x)		(((x) & 0x01) << 1)
 
 #define CSI_DSI_MIPI_CAL_CONFIG	0x234
 #define  MIPI_CAL_HSPDOSD(x)		(((x) & 0x1f) << 16)

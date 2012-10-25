@@ -94,6 +94,7 @@ struct tegra_dc_hdmi_data {
 	bool				clk_enabled;
 	unsigned			audio_freq;
 	unsigned			audio_source;
+	bool				audio_inject_null;
 
 	bool				dvi;
 };
@@ -674,21 +675,18 @@ static int tegra_dc_calc_clock_per_frame(const struct fb_videomode *mode)
 static bool tegra_dc_hdmi_mode_equal(const struct fb_videomode *mode1,
 					const struct fb_videomode *mode2)
 {
-	int clock_per_frame = tegra_dc_calc_clock_per_frame(mode1);
+	int clock_per_frame1 = tegra_dc_calc_clock_per_frame(mode1);
+	int clock_per_frame2 = tegra_dc_calc_clock_per_frame(mode2);
 
 	/* allows up to 1Hz of pixclock difference */
-	if (mode1->pixclock != mode2->pixclock) {
-		return (mode1->xres == mode2->xres &&
+	return (clock_per_frame1 == clock_per_frame2 &&
+			mode1->xres == mode2->xres &&
 			mode1->yres == mode2->yres &&
 			mode1->vmode == mode2->vmode &&
+			(mode1->pixclock == mode2->pixclock ||
 			(abs(PICOS2KHZ(mode1->pixclock) -
 			PICOS2KHZ(mode2->pixclock)) *
-			1000 / clock_per_frame <= 1));
-	} else {
-		return (mode1->xres == mode2->xres &&
-			mode1->yres == mode2->yres &&
-			mode1->vmode == mode2->vmode);
-	}
+			1000 / clock_per_frame1 <= 1)));
 }
 
 static bool tegra_dc_hdmi_valid_pixclock(const struct tegra_dc *dc,
@@ -777,7 +775,7 @@ bool tegra_dc_hdmi_detect_test(struct tegra_dc *dc, unsigned char *edid_ptr)
 	struct fb_monspecs specs;
 	struct tegra_dc_hdmi_data *hdmi = tegra_dc_get_outdata(dc);
 
-	if (!dc || !hdmi || !edid_ptr) {
+	if (!hdmi || !edid_ptr) {
 		dev_err(&dc->ndev->dev, "HDMI test failed to get arguments.\n");
 		return false;
 	}
@@ -1266,6 +1264,9 @@ static int tegra_dc_hdmi_setup_audio(struct tegra_dc *dc, unsigned audio_freq,
 		a_source = AUDIO_CNTRL0_SOURCE_SELECT_SPDIF;
 
 #if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+	if (hdmi->audio_inject_null)
+		a_source |= AUDIO_CNTRL0_INJECT_NULLSMPL;
+
 	tegra_hdmi_writel(hdmi,a_source,
 			  HDMI_NV_PDISP_SOR_AUDIO_CNTRL0_0);
 	tegra_hdmi_writel(hdmi,
@@ -1369,6 +1370,31 @@ int tegra_hdmi_setup_audio_freq_source(unsigned audio_freq, unsigned audio_sourc
 EXPORT_SYMBOL(tegra_hdmi_setup_audio_freq_source);
 
 #if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+int tegra_hdmi_audio_null_sample_inject(bool on)
+{
+	struct tegra_dc_hdmi_data *hdmi = dc_hdmi;
+	unsigned int val = 0;
+
+	if (!hdmi)
+		return -EAGAIN;
+
+	if (hdmi->audio_inject_null != on) {
+		hdmi->audio_inject_null = on;
+		if (hdmi->clk_enabled) {
+			val = tegra_hdmi_readl(hdmi,
+				HDMI_NV_PDISP_SOR_AUDIO_CNTRL0_0);
+			val &= ~AUDIO_CNTRL0_INJECT_NULLSMPL;
+			if (on)
+				val |= AUDIO_CNTRL0_INJECT_NULLSMPL;
+			tegra_hdmi_writel(hdmi,val,
+				HDMI_NV_PDISP_SOR_AUDIO_CNTRL0_0);
+		}
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(tegra_hdmi_audio_null_sample_inject);
+
 int tegra_hdmi_setup_hda_presence()
 {
 	struct tegra_dc_hdmi_data *hdmi = dc_hdmi;

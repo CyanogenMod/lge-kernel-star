@@ -66,6 +66,12 @@ struct led_classdev {
 	struct timer_list	 blink_timer;
 	int			 blink_brightness;
 
+// MOBII_S [shhong@mobii.co.kr] 2012-06-25: Add LED Retain Function.
+#if defined(CONFIG_MACH_STAR)
+	int br_maintain_trigger;
+#endif
+// MOBII_E [shhong@mobii.co.kr] 2012-06-25: Add LED Retain Function.
+
 #ifdef CONFIG_LEDS_TRIGGERS
 	/* Protects the trigger data below */
 	struct rw_semaphore	 trigger_lock;

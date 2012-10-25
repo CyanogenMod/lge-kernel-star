@@ -24,8 +24,49 @@
  */
 
 #include <sound/core.h>
+//LGE_CHANGE_S [chahee.kim@lge.com] 2011-11-14 
+#include <linux/switch.h>
+#include <linux/input.h>
+#include <sound/soc.h>
+//LGE_CHANGE_E [chahee.kim@lge.com] 2011-11-14 
 
 struct input_dev;
+
+//LGE_CHANGE_S [chahee.kim@lge.com] 2011-11-14 
+extern struct headset_switch_data	*headset_sw_data;
+typedef enum {
+	STAR_NONE,
+	STAR_HEADSET,
+	STAR_HEADPHONE,
+} headset_type_enum;
+
+typedef enum {
+	HOOK_PRESSED,
+	HOOK_RELEASED
+} hook_status_enum;
+//LGE_CHANGE_E [chahee.kim@lge.com] 2011-11-14 
+
+struct headset_switch_data {
+	struct switch_dev sdev;
+	unsigned gpio;
+	unsigned hook_gpio;
+	unsigned ear_mic;
+	const char *name_on;
+	const char *name_off;
+	const char *state_on;
+	const char *state_off;
+	int irq;
+	int hook_irq;
+	struct work_struct work;
+	struct delayed_work delayed_work;
+    struct delayed_work *pdelayed_work;
+	struct delayed_work hook_delayed_work;
+	struct input_dev *ip_dev;	//20100421 bergkamp.cho@lge.com for headset driver [LGE]
+
+#ifdef CONFIG_GPIOLIB
+    struct snd_soc_jack_gpio *jack_gpio;
+#endif
+};
 
 /**
  * Jack types which can be reported.  These values are used as a

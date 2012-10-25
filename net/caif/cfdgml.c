@@ -26,13 +26,10 @@ static int cfdgml_transmit(struct cflayer *layr, struct cfpkt *pkt);
 
 struct cflayer *cfdgml_create(u8 channel_id, struct dev_info *dev_info)
 {
-	struct cfsrvl *dgm = kmalloc(sizeof(struct cfsrvl), GFP_ATOMIC);
-	if (!dgm) {
-		pr_warn("Out of memory\n");
+	struct cfsrvl *dgm = kzalloc(sizeof(struct cfsrvl), GFP_ATOMIC);
+	if (!dgm)
 		return NULL;
-	}
 	caif_assert(offsetof(struct cfsrvl, layer) == 0);
-	memset(dgm, 0, sizeof(struct cfsrvl));
 	cfsrvl_init(dgm, channel_id, dev_info, true);
 	dgm->layer.receive = cfdgml_receive;
 	dgm->layer.transmit = cfdgml_transmit;
@@ -108,10 +105,5 @@ static int cfdgml_transmit(struct cflayer *layr, struct cfpkt *pkt)
 	 */
 	info->hdr_len = 4;
 	info->dev_info = &service->dev_info;
-	ret = layr->dn->transmit(layr->dn, pkt);
-	if (ret < 0) {
-		u32 tmp32;
-		cfpkt_extr_head(pkt, &tmp32, 4);
-	}
-	return ret;
+	return layr->dn->transmit(layr->dn, pkt);
 }

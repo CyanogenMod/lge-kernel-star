@@ -1,0 +1,181 @@
+#config MACH_LGE
+#	bool
+
+#menu "LGE Device-Specific Changes"
+
+menu "LGE Board Selection"
+
+#config MACH_STAR
+#	depends on ARCH_TEGRA
+#	select MACH_LGE
+#	select MACH_HAS_SND_SOC_TEGRA_WM8994 if SND_SOC
+#	bool "TEGRA STAR"
+#	help
+#	  Support for the LGE STAR 
+	
+choice
+	depends on MACH_STAR
+	prompt "STAR Board Selection"
+	default MACH_STAR_SU660
+		  
+config MACH_STAR_SU660
+	bool "TEGRA STAR SU660"
+	help
+	  Support for the LGE STAR SU660
+	  
+config MACH_STAR_P990
+	bool "TEGRA STAR P990"
+	help
+	  Support for the LGE STAR P990	  
+
+config MACH_STAR_P999
+	bool "TEGRA STAR P999"
+	help
+	  Support for the LGE STAR P999
+endchoice
+		  	  
+endmenu
+
+menu "LGE LCD / Backlight Selection"    	  	  
+
+config LCD_HITACHI
+	tristate "Hitachi LCD Driver on Star Smartphone Platform"
+	depends on GENERIC_GPIO
+	help
+	  If you have a Hitachi LCD Panel(480x800) on Star Smartphone
+	  Platform, say Y to enable the LCD contrl driver.
+	  
+config BACKLIGHT_AAT2870
+	tristate "AnalogicTech AAT2870 Backlight Driver"
+	depends on BACKLIGHT_CLASS_DEVICE && I2C && GENERIC_GPIO
+	help
+	  If you have a AnalogicTech AAT2870 say Y to enable the
+	  backlight driver.
+
+config STAR_TOUCH_LED 
+	bool " Keypad or TOUCH LED Driver "
+	depends on MACH_STAR
+	default y
+	help
+	  If you want to enable touch led , then say Y
+endmenu
+
+#comment "Bluetooth driver Selection"
+# LG_BTUI : X3_BT_bringup - kukdong.bae@lge.com [S] 
+#config BCM4330_RFKILL
+#    bool "Enable BCM4330 RFKILL driver"
+#    depends on RFKILL
+#    default n
+#    ---help---
+#    Adds BCM4330 RFKILL driver for Broadcom BCM4330 chipset
+#
+#config BD_ADDRESS
+#    bool "BD Read / Write Driver"
+#    default n
+#    ---help---
+#    LGE added: It supports Bluetooth address Read / Write functionality on user mode.
+# LG_BTUI : X3_BT_bringup - kukdong.bae@lge.com [E]
+
+comment "Battery / Charger / Muic driver Selection"
+
+config BATTERY_CHARGER
+    bool "LG Battery Driver"
+    help
+      Say Y to enable support for battery driver.
+
+config MAX14526
+	bool "MAX14526 MUIC"
+	help
+	  Support for MUIC Driver
+
+comment "Touch driver Selection"
+
+config TOUCHSCREEN_TEGRA_STAR
+    tristate "Touch touchscreen for STAR"
+    depends on I2C
+    help
+      This enables support for Synaptics STAR over I2C based touchscreens.
+
+
+config ONETOUCHSCREEN_TEGRA_STAR
+	tristate " Onetouchscreen for KR STAR  "
+	depends on I2C && MACH_STAR_SU660 
+	help
+          This enables support for Onetouch Synaptics KR STAR over I2C based touchscreens.
+
+comment "Camera driver Selection"
+
+config REGULATOR_LP8720
+    bool "SUB PMIC LP8720"
+    depends on I2C 
+    default y
+    help
+      Support for LP8720 SUB PMIC driver
+
+comment "Sensor driver Selection"
+
+config SENSOR_GP2A
+    bool "Proximity gp2a"
+    depends on I2C 
+    default y
+    help
+      Support for Proximity gp2a driver
+
+#source "drivers/misc/mpu3050/Kconfig
+
+comment "Misc driver Selection"
+
+#choice
+#	depends on TEGRA_PWM
+#	prompt "STAR Vibrator Selection"
+#	default TSPDRV
+
+config TSPDRV
+	bool "Immersion Touchsense tspdrv"
+	help
+	   Immersion TSP Driver.
+	
+config STAR_VIBRATOR
+	bool "Star PWM Vibrator"
+	help
+	  Support for Star PWM Vibrator Driver.
+
+#endchoice
+
+config TEGRA_CPU_FREQ_LOCK
+    bool "tegra cpu freq lock"
+    default n
+    ---help---
+        x2 ics
+
+config STAR_HALL
+    bool "Star Hall Driver"
+	default y
+	depends on MACH_STAR
+	help
+	  driver for hall ic
+
+config STAR_REBOOT_MONITOR
+      depends on (MACH_STAR && ANDROID_RAM_CONSOLE)
+      default n
+      bool "Support STAR Reboot Monitor"
+      help
+       Panic and System Reboot Monitoring for Hidden Reset and log service
+       
+config MACH_STAR_DUMP_GPIO
+	depends on MACH_STAR
+	bool "GPIO Dump to debug sleep current"
+	help
+	  Support for the LGE STAR GPIO DUMP	  
+
+
+comment " Kernel Debug Selection  "    	  	  
+
+config PANICRPT
+	bool " Enable Kernel Panic Dump Tool "
+	depends on MACH_STAR
+	default y
+	help
+	  If you want to enable kernel panic dump tool , then say Y
+
+#endmenu

@@ -64,6 +64,15 @@ config REGULATOR_USERSPACE_CONSUMER
 
           If unsure, say no.
 
+config REGULATOR_GPIO
+	tristate "GPIO regulator support"
+	help
+	  This driver provides support for regulators that can be
+	  controlled via gpios.
+	  It is capable of supporting current and voltage regulators
+	  and the platform has to provide a mapping of GPIO-states
+	  to target volts/amps.
+
 config REGULATOR_BQ24022
 	tristate "TI bq24022 Dual Input 1-Cell Li-Ion Charger IC"
 	help
@@ -171,7 +180,7 @@ config REGULATOR_WM8400
 
 config REGULATOR_WM8994
 	tristate "Wolfson Microelectronics WM8994 CODEC"
-	depends on MFD_WM8994
+#	depends on MFD_WM8994
 	help
 	  This driver provides support for the voltage regulators on the
 	  WM8994 CODEC.
@@ -312,6 +321,12 @@ config REGULATOR_TPS6591X
 	default n
 	help
 	  This driver supports TPS6591X voltage regulator chips.
+
+config REGULATOR_TPS65090
+	tristate "TI TPS65090 Power regulators"
+	depends on MFD_TPS65090
+	help
+	  This driver supports TPS65090 voltage regulator chips.
 
 config REGULATOR_TPS6236X
 	tristate "TI TPS6236X DC-DC core power suply regulators"

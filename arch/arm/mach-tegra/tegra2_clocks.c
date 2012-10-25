@@ -37,6 +37,7 @@
 #include "fuse.h"
 #include "tegra2_emc.h"
 #include "tegra2_statmon.h"
+#include "pm.h"
 
 #define RST_DEVICES			0x004
 #define RST_DEVICES_SET			0x300
@@ -468,13 +469,13 @@ static int tegra2_cpu_clk_set_rate(struct clk *c, unsigned long rate)
 		goto out;
 	}
 
+out:
 	/* We can't parent the twd to directly to the CPU complex because
 	   the TWD frequency update notifier is called in an atomic context
 	   and the CPU frequency update requires a mutex. Update the twd
 	   clock rate with the new CPU complex rate. */
 	clk_set_rate(&tegra2_clk_twd, clk_get_rate_locked(c));
 
-out:
 	clk_disable(c->u.cpu.main);
 	return ret;
 }
@@ -1660,6 +1661,11 @@ static struct clk tegra_clk_m = {
 };
 
 static struct clk_pll_freq_table tegra_pll_c_freq_table[] = {
+//20110706 chan.jeong@lge.com use pll_c for hdmi clock [S]
+#if defined(CONFIG_MACH_BSSQ)
+	{ 12000000, 445500000, 594,  8, 2, 8}, //HDMI
+#endif
+//20110706 chan.jeong@lge.com: use pll_c for hdmi closk [E]
 	{ 12000000, 522000000, 348, 8, 1, 8},
 	{ 13000000, 522000000, 522, 13, 1, 8},
 	{ 19200000, 522000000, 435, 16, 1, 8},
@@ -1856,8 +1862,19 @@ static struct clk_pll_freq_table tegra_pll_d_freq_table[] = {
 
 	{ 12000000,   5000000, 10, 24, 1, 4},
 	{ 12000000,  10000000, 10, 12, 1, 4},
+	{ 12000000,  20000000, 20, 12, 1, 4},
 	{ 12000000, 161500000, 323, 24, 1, 4},
 	{ 12000000, 162000000, 162, 12, 1, 4},
+
+	{ 12000000, 321000000, 107, 4, 1, 4},
+	{ 12000000, 326000000, 326, 12, 1, 4},
+	{ 12000000, 327000000, 327, 12, 1, 4},
+	{ 12000000, 354000000, 354, 12, 1, 4},
+	{ 12000000, 355000000, 355, 12, 1, 4},
+	{ 12000000, 348000000, 348, 12, 1, 4},
+	{ 12000000, 349000000, 349, 12, 1, 4},
+	{ 12000000, 388000000, 388, 12, 1, 4},
+	{ 12000000, 389000000, 389, 12, 1, 4},
 
 	{ 12000000, 594000000, 594, 12, 1, 8},
 	{ 13000000, 594000000, 594, 13, 1, 8},
@@ -2376,6 +2393,8 @@ struct clk tegra_list_periph_clks[] = {
 	PERIPH_CLK("timer",	"timer",		NULL,	5,	0,	0x31E,	26000000,  mux_clk_m,			0),
 	PERIPH_CLK("i2s1",	"tegra20-i2s.0",	NULL,	11,	0x100,	0x31E,	26000000,  mux_pllaout0_audio2x_pllp_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
 	PERIPH_CLK("i2s2",	"tegra20-i2s.1",	NULL,	18,	0x104,	0x31E,	26000000,  mux_pllaout0_audio2x_pllp_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
+	PERIPH_CLK("fuse",	"fuse-tegra",		"fuse",	39,	0,	0x31E,	26000000,  mux_clk_m,			PERIPH_ON_APB),
+	PERIPH_CLK("fuse_burn",	"fuse-tegra",		"fuse_burn",	39,	0,	0x31E,	26000000,  mux_clk_m,		PERIPH_ON_APB),
 	PERIPH_CLK("kfuse",	"kfuse-tegra",		NULL,	40,	0,	0x31E,  26000000,  mux_clk_m,			0),
 	PERIPH_CLK("spdif_out",	"tegra20-spdif",	"spdif_out",	10,	0x108,	0x31E,	100000000, mux_pllaout0_audio2x_pllp_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
 	PERIPH_CLK("spdif_in",	"tegra20-spdif",	"spdif_in",	10,	0x10c,	0x31E,	100000000, mux_pllp_pllc_pllm,		MUX | DIV_U71 | PERIPH_ON_APB),
@@ -2383,10 +2402,19 @@ struct clk tegra_list_periph_clks[] = {
 	PERIPH_CLK("spi",	"spi",			NULL,	43,	0x114,	0x31E,	40000000,  mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
 	PERIPH_CLK("xio",	"xio",			NULL,	45,	0x120,	0x31E,	150000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
 	PERIPH_CLK("twc",	"twc",			NULL,	16,	0x12c,	0x31E,	150000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
-	PERIPH_CLK("sbc1",	"spi_tegra.0",		NULL,	41,	0x134,	0x31E,	160000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
-	PERIPH_CLK("sbc2",	"spi_tegra.1",		NULL,	44,	0x118,	0x31E,	160000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
-	PERIPH_CLK("sbc3",	"spi_tegra.2",		NULL,	46,	0x11c,	0x31E,	160000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
-	PERIPH_CLK("sbc4",	"spi_tegra.3",		NULL,	68,	0x1b4,	0x31E,	160000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
+//20110502 youngjin.yoo@lge.com add clocks for spi master/slave [S]
+#if defined (CONFIG_LU6500) ||defined (CONFIG_LU8800) || defined(CONFIG_KS1001) || defined(CONFIG_KS1103)
+#ifdef CONFIG_SPI_SLAVE_TEGRA
+	PERIPH_CLK("sbc1",	"spi_slave_tegra.0",NULL,	41,	0x134,	0x31E,	160000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
+	PERIPH_CLK("sbc2",	"spi_slave_tegra.1",NULL,	44,	0x118,	0x31E,	160000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
+#endif
+#else
+	PERIPH_CLK("sbc1",	"spi_tegra.0",		"spi",	41,	0x134,	0x31E,	160000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
+	PERIPH_CLK("sbc2",	"spi_tegra.1",		"spi",	44,	0x118,	0x31E,	160000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
+#endif
+	PERIPH_CLK("sbc3",	"spi_tegra.2",		"spi",	46,	0x11c,	0x31E,	160000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
+	PERIPH_CLK("sbc4",	"spi_tegra.3",		"spi",	68,	0x1b4,	0x31E,	160000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
+//20110502 youngjin.yoo@lge.com add clocks for spi master/slave [E]
 	PERIPH_CLK("ide",	"ide",			NULL,	25,	0x144,	0x31E,	100000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71), /* requires min voltage */
 	PERIPH_CLK("ndflash",	"tegra_nand",		NULL,	13,	0x160,	0x31E,	164000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71), /* scales with voltage */
 	PERIPH_CLK("vfir",	"vfir",			NULL,	7,	0x168,	0x31E,	72000000,  mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
@@ -2447,6 +2475,10 @@ struct clk tegra_list_shared_clks[] = {
 	SHARED_CLK("usb1.sclk",	"tegra-ehci.0",		"sclk",	&tegra_clk_virtual_sclk),
 	SHARED_CLK("usb2.sclk",	"tegra-ehci.1",		"sclk",	&tegra_clk_virtual_sclk),
 	SHARED_CLK("usb3.sclk",	"tegra-ehci.2",		"sclk",	&tegra_clk_virtual_sclk),
+	SHARED_CLK("sbc1.sclk",	"spi_tegra.0",		"sclk",	&tegra_clk_virtual_sclk),
+	SHARED_CLK("sbc2.sclk",	"spi_tegra.1",		"sclk",	&tegra_clk_virtual_sclk),
+	SHARED_CLK("sbc3.sclk",	"spi_tegra.2",		"sclk",	&tegra_clk_virtual_sclk),
+	SHARED_CLK("sbc4.sclk",	"spi_tegra.3",		"sclk",	&tegra_clk_virtual_sclk),
 	SHARED_CLK("avp.emc",	"tegra-avp",		"emc",	&tegra_clk_emc),
 	SHARED_CLK("cpu.emc",	"cpu",			"emc",	&tegra_clk_emc),
 	SHARED_CLK("disp1.emc",	"tegradc.0",		"emc",	&tegra_clk_emc),
@@ -2459,6 +2491,7 @@ struct clk tegra_list_shared_clks[] = {
 	SHARED_CLK("usb1.emc",	"tegra-ehci.0",		"emc",	&tegra_clk_emc),
 	SHARED_CLK("usb2.emc",	"tegra-ehci.1",		"emc",	&tegra_clk_emc),
 	SHARED_CLK("usb3.emc",	"tegra-ehci.2",		"emc",	&tegra_clk_emc),
+	SHARED_CLK("camera.emc",	"tegra_camera",		"emc",	&tegra_clk_emc),
 };
 
 #define CLK_DUPLICATE(_name, _dev, _con)		\
@@ -2688,7 +2721,9 @@ struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void)
 unsigned long tegra_emc_to_cpu_ratio(unsigned long cpu_rate)
 {
 	/* Vote on memory bus frequency based on cpu frequency */
-	if (cpu_rate >= 816000)
+	if (cpu_rate > 1000000000)
+		return 760000000;
+	else if (cpu_rate >= 816000)
 		return 600000000;	/* cpu 816 MHz, emc max */
 	else if (cpu_rate >= 608000)
 		return 300000000;	/* cpu 608 MHz, emc 150Mhz */
@@ -2709,6 +2744,9 @@ static int tegra_clk_suspend(void)
 {
 	unsigned long off, i;
 	u32 *ctx = clk_rst_suspend;
+
+	if (tegra_get_current_suspend_mode() != TEGRA_SUSPEND_LP0)
+		return 0;
 
 	*ctx++ = clk_readl(OSC_CTRL) & OSC_CTRL_MASK;
 	*ctx++ = clk_readl(tegra_pll_c.reg + PLL_BASE);
@@ -2763,6 +2801,9 @@ static void tegra_clk_resume(void)
 	unsigned long off, i;
 	const u32 *ctx = clk_rst_suspend;
 	u32 val;
+
+	if (tegra_get_current_suspend_mode() != TEGRA_SUSPEND_LP0)
+		return;
 
 	val = clk_readl(OSC_CTRL) & ~OSC_CTRL_MASK;
 	val |= *ctx++;

@@ -41,11 +41,15 @@ static struct tegra_bb_gpio_data m7400_gpios[] = {
 	{ { GPIO_INVALID, GPIOF_OUT_INIT_LOW, "MDM_USB_AWR" }, false },
 	{ { GPIO_INVALID, GPIOF_IN, "MDM_USB_CWR" }, false },
 	{ { GPIO_INVALID, GPIOF_IN, "MDM_RESOUT2" }, true },
+	{ { GPIO_INVALID, GPIOF_OUT_INIT_LOW, "MDM_USB_ARR" }, false },
 	{ { GPIO_INVALID, 0, NULL }, false },	/* End of table */
 };
 static bool ehci_registered;
+static int modem_status;
 static int gpio_awr;
 static int gpio_cwr;
+static int gpio_arr;
+static struct usb_device *m7400_usb_device;
 
 static int gpio_wait_timeout(int gpio, int value, int timeout_msec)
 {
@@ -62,15 +66,16 @@ static int m7400_enum_handshake(void)
 {
 	int retval = 0;
 
-	/* Wait for CP to indicate ready - by driving USB_CWR high. */
+	/* Wait for CP to indicate ready - by driving CWR high. */
 	if (gpio_wait_timeout(gpio_cwr, 1, 10) != 0) {
 			pr_info("%s: Error: timeout waiting for modem resume.\n",
 							__func__);
 			retval = -1;
 	}
 
-	/* Signal AP ready - Drive USB_AWR high. */
+	/* Signal AP ready - Drive AWR and ARR high. */
 	gpio_set_value(gpio_awr, 1);
+	gpio_set_value(gpio_arr, 1);
 
 	return retval;
 }
@@ -79,11 +84,12 @@ static int m7400_apup_handshake(bool checkresponse)
 {
 	int retval = 0;
 
-	/* Signal AP ready - Drive USB_AWR high. */
+	/* Signal AP ready - Drive AWR and ARR high. */
 	gpio_set_value(gpio_awr, 1);
+	gpio_set_value(gpio_arr, 1);
 
 	if (checkresponse) {
-		/* Wait for CP ack - by driving USB_CWR high. */
+		/* Wait for CP ack - by driving CWR high. */
 		if (gpio_wait_timeout(gpio_cwr, 1, 10) != 0) {
 			pr_info("%s: Error: timeout waiting for modem ack.\n",
 							__func__);
@@ -95,37 +101,77 @@ static int m7400_apup_handshake(bool checkresponse)
 
 static void m7400_apdown_handshake(void)
 {
-	/* Signal AP going down to modem - Drive USB_AWR low. */
+	/* Signal AP going down to modem - Drive AWR low. */
 	/* No need to wait for a CP response */
 	gpio_set_value(gpio_awr, 0);
 }
 
 static int m7400_l2_suspend(void)
 {
+	/* Gets called for two cases :
+		a) Port suspend.
+		b) Bus suspend. */
+	if (modem_status == BBSTATE_L2)
+		return 0;
+
+	/* Post bus suspend: Drive ARR low. */
+	gpio_set_value(gpio_arr, 0);
+	modem_status = BBSTATE_L2;
 	return 0;
 }
 
 static int m7400_l2_resume(void)
 {
+	/* Gets called for two cases :
+		a) L2 resume.
+		b) bus resume phase of L3 resume. */
+	if (modem_status == BBSTATE_L0)
+		return 0;
+
+	/* Pre bus resume: Drive ARR high. */
+	gpio_set_value(gpio_arr, 1);
+
+	/* If host initiated resume - Wait for CP ack (CWR goes high). */
+	/* If device initiated resume - CWR will be already high. */
+	if (gpio_wait_timeout(gpio_cwr, 1, 10) != 0) {
+		pr_info("%s: Error: timeout waiting for modem ack.\n",
+						__func__);
+		return -1;
+	}
+	modem_status = BBSTATE_L0;
 	return 0;
 }
 
 static void m7400_l3_suspend(void)
 {
 	m7400_apdown_handshake();
+	modem_status = BBSTATE_L3;
 }
 
 static void m7400_l3_resume(void)
 {
 	m7400_apup_handshake(true);
+	modem_status = BBSTATE_L0;
 }
 
 static irqreturn_t m7400_wake_irq(int irq, void *dev_id)
 {
-	pr_info("%s called.\n", __func__);
+	struct usb_interface *intf;
 
-	/* Resume usb host activity. */
-	/* TBD */
+	switch (modem_status) {
+	case BBSTATE_L2:
+		/* Resume usb host activity. */
+		if (m7400_usb_device) {
+			usb_lock_device(m7400_usb_device);
+			intf = usb_ifnum_to_if(m7400_usb_device, 0);
+			usb_autopm_get_interface(intf);
+			usb_autopm_put_interface(intf);
+			usb_unlock_device(m7400_usb_device);
+		}
+		break;
+	default:
+		break;
+	}
 
 	return IRQ_HANDLED;
 }
@@ -208,15 +254,35 @@ static int m7400_attrib_write(struct device *dev, int value)
 	return 0;
 }
 
+static int m7400_registered(struct usb_device *udev)
+{
+	m7400_usb_device = udev;
+	modem_status = BBSTATE_L0;
+	return 0;
+}
+
 static struct tegra_bb_gpio_irqdata m7400_gpioirqs[] = {
 	{ GPIO_INVALID, "tegra_bb_wake", m7400_wake_irq,
-					IRQF_TRIGGER_FALLING, NULL },
+				IRQF_TRIGGER_RISING, true, NULL },
 	{ GPIO_INVALID, NULL, NULL, 0, NULL },	/* End of table */
 };
 
 static struct tegra_bb_power_gdata m7400_gdata = {
 	.gpio = m7400_gpios,
 	.gpioirq = m7400_gpioirqs,
+};
+
+static struct tegra_bb_power_mdata m7400_mdata = {
+	.vid = 0x04cc,
+	.pid = 0x230f,
+	.wake_capable = true,
+	.autosuspend_ready = true,
+	.reg_cb = m7400_registered,
+};
+
+static struct tegra_bb_power_data m7400_data = {
+	.gpio_data = &m7400_gdata,
+	.modem_data = &m7400_mdata,
 };
 
 static void *m7400_init(void *pdata)
@@ -231,6 +297,7 @@ static void *m7400_init(void *pdata)
 	m7400_gpios[3].data.gpio = id->m7400.usb_awr;
 	m7400_gpios[4].data.gpio = id->m7400.usb_cwr;
 	m7400_gpios[5].data.gpio = id->m7400.resout2;
+	m7400_gpios[6].data.gpio = id->m7400.uart_awr;
 	m7400_gpioirqs[0].id = id->m7400.usb_cwr;
 
 	if (!platdata->ehci_register || !platdata->ehci_unregister) {
@@ -241,18 +308,21 @@ static void *m7400_init(void *pdata)
 
 	gpio_awr = m7400_gpios[3].data.gpio;
 	gpio_cwr = m7400_gpios[4].data.gpio;
-	if (gpio_awr == GPIO_INVALID || gpio_cwr == GPIO_INVALID) {
+	gpio_arr = m7400_gpios[6].data.gpio;
+	if (gpio_awr == GPIO_INVALID || gpio_cwr == GPIO_INVALID
+			|| gpio_arr == GPIO_INVALID) {
 		pr_info("%s - Error: Invalid gpio data.\n", __func__);
 		return 0;
 	}
 
 	ehci_registered = false;
-	return (void *) &m7400_gdata;
+	modem_status = BBSTATE_UNKNOWN;
+	return (void *) &m7400_data;
 }
 
 static void *m7400_deinit(void)
 {
-	return (void *) &m7400_gdata;
+	return (void *) &m7400_data;
 }
 
 static struct tegra_bb_callback m7400_callbacks = {

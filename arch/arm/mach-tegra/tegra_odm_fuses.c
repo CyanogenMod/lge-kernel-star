@@ -81,7 +81,7 @@ static struct kobj_attribute jtagdis_attr =
 	__ATTR(jtag_disable, 0440, fuse_show, fuse_store);
 
 static struct kobj_attribute odm_prod_mode_attr =
-	__ATTR(odm_production_mode, 0440, fuse_show, fuse_store);
+	__ATTR(odm_production_mode, 0444, fuse_show, fuse_store);
 
 static struct kobj_attribute sec_boot_dev_cfg_attr =
 	__ATTR(sec_boot_dev_cfg, 0440, fuse_show, fuse_store);
@@ -303,20 +303,6 @@ static void fuse_cmd_sense(void)
 	wait_for_idle();
 }
 
-static void fuse_reg_hide(void)
-{
-	u32 reg = tegra_fuse_readl(0x48);
-	reg &= ~(1 << 28);
-	tegra_fuse_writel(reg, 0x48);
-}
-
-static void fuse_reg_unhide(void)
-{
-	u32 reg = tegra_fuse_readl(0x48);
-	reg |= (1 << 28);
-	tegra_fuse_writel(reg, 0x48);
-}
-
 static void get_fuse(enum fuse_io_param io_param, u32 *out)
 {
 	int start_bit = fuse_info_tbl[io_param].start_bit;
@@ -373,7 +359,6 @@ int tegra_fuse_read(enum fuse_io_param io_param, u32 *data, int size)
 	mutex_lock(&fuse_lock);
 
 	clk_enable(clk_fuse);
-	fuse_reg_unhide();
 	fuse_cmd_sense();
 
 	if (io_param == SBK_DEVKEY_STATUS) {
@@ -390,7 +375,6 @@ int tegra_fuse_read(enum fuse_io_param io_param, u32 *data, int size)
 		get_fuse(io_param, data);
 	}
 
-	fuse_reg_hide();
 	clk_disable(clk_fuse);
 	mutex_unlock(&fuse_lock);
 
@@ -636,16 +620,12 @@ int tegra_fuse_program(struct fuse_data *pgm_data, u32 flags)
 
 	clk_enable(clk_fuse);
 
-	/* make all the fuse registers visible */
-	fuse_reg_unhide();
-
 	/* check that fuse options write access hasn't been disabled */
 	mutex_lock(&fuse_lock);
 	reg = tegra_fuse_readl(FUSE_DIS_PGM);
 	mutex_unlock(&fuse_lock);
 	if (reg) {
 		pr_err("fuse programming disabled");
-		fuse_reg_hide();
 		clk_disable(clk_fuse);
 		return -EACCES;
 	}
@@ -695,9 +675,6 @@ int tegra_fuse_program(struct fuse_data *pgm_data, u32 flags)
 
 	/* disable software writes to the fuse registers */
 	tegra_fuse_writel(1, FUSE_WRITE_ACCESS);
-
-	/* make all the fuse registers invisible */
-	fuse_reg_hide();
 
 	/* apply the fuse values immediately instead of resetting the chip */
 	fuse_cmd_sense();
@@ -900,14 +877,13 @@ static int __init tegra_fuse_program_init(void)
 	{
 		devkey_attr.attr.mode = 0640;
 		jtagdis_attr.attr.mode = 0640;
-		odm_prod_mode_attr.attr.mode = 0640;
 		sec_boot_dev_cfg_attr.attr.mode = 0640;
 		sec_boot_dev_sel_attr.attr.mode = 0640;
 		sbk_attr.attr.mode = 0640;
 		sw_rsvd_attr.attr.mode = 0640;
 		ignore_dev_sel_straps_attr.attr.mode = 0640;
 		odm_rsvd_attr.attr.mode = 0640;
-		odm_prod_mode_attr.attr.mode = 0640;
+		odm_prod_mode_attr.attr.mode = 0644;
 	}
 
 	CHK_ERR(sysfs_create_file(fuse_kobj, &odm_prod_mode_attr.attr));
@@ -927,7 +903,6 @@ static void __exit tegra_fuse_program_exit(void)
 {
 
 	fuse_power_disable();
-	fuse_reg_hide();
 
 	if (!IS_ERR_OR_NULL(vdd_fuse))
 		regulator_put(vdd_fuse);

@@ -266,7 +266,8 @@ static struct fsg_lun *fsg_lun_from_dev(struct device *dev)
 #define FSG_NUM_BUFFERS	2
 
 /* Default size of buffer length. */
-#define FSG_BUFLEN	((u32)16384)
+//#define FSG_BUFLEN	((u32)16384)
+#define FSG_BUFLEN	((u32)32768)
 
 /* Maximal number of LUNs supported in mass storage function */
 #define FSG_MAX_LUNS	8
@@ -760,7 +761,7 @@ static ssize_t fsg_store_file(struct device *dev, struct device_attribute *attr,
 	int		rc = 0;
 
 
-#ifndef CONFIG_USB_ANDROID_MASS_STORAGE
+#ifndef CONFIG_USB_G_ANDROID
 	/* disabled in android because we need to allow closing the backing file
 	 * if the media was removed
 	 */

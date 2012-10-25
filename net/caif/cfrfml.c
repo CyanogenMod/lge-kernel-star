@@ -31,9 +31,9 @@ struct cfrfml {
 	spinlock_t sync;
 };
 
-static void cfrfml_release(struct kref *kref)
+static void cfrfml_release(struct cflayer *layer)
 {
-	struct cfsrvl *srvl = container_of(kref, struct cfsrvl, ref);
+	struct cfsrvl *srvl = container_of(layer, struct cfsrvl, layer);
 	struct cfrfml *rfml = container_obj(&srvl->layer);
 
 	if (rfml->incomplete_frm)
@@ -46,13 +46,10 @@ struct cflayer *cfrfml_create(u8 channel_id, struct dev_info *dev_info,
 					int mtu_size)
 {
 	int tmp;
-	struct cfrfml *this =
-		kzalloc(sizeof(struct cfrfml), GFP_ATOMIC);
+	struct cfrfml *this = kzalloc(sizeof(struct cfrfml), GFP_ATOMIC);
 
-	if (!this) {
-		pr_warn("Out of memory\n");
+	if (!this)
 		return NULL;
-	}
 
 	cfsrvl_init(&this->serv, channel_id, dev_info, false);
 	this->serv.release = cfrfml_release;

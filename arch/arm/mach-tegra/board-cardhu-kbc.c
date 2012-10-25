@@ -159,6 +159,7 @@ static struct gpio_keys_button cardhu_keys_e1291_a04[] = {
 	[3] = GPIO_KEY(KEY_SEARCH, PQ3, 0),
 	[4] = GPIO_KEY(KEY_VOLUMEUP, PQ0, 0),
 	[5] = GPIO_KEY(KEY_VOLUMEDOWN, PQ1, 0),
+	[6] = GPIO_KEY(KEY_POWER, PV0, 1),
 };
 
 static struct gpio_keys_platform_data cardhu_keys_e1291_platform_data = {
@@ -265,7 +266,7 @@ int __init cardhu_keys_init(void)
 					ARRAY_SIZE(cardhu_pm299_int_keys);
 	}
 
-	if ((board_info.board_id == BOARD_E1291) ||
+	if (((board_info.board_id == BOARD_E1291) && board_info.fab < BOARD_FAB_A04) ||
 		(board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1257) ||
 		(board_info.board_id == BOARD_E1186) ||

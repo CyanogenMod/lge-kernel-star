@@ -62,21 +62,48 @@ static int dapm_up_seq[] = {
 	[snd_soc_dapm_dac] = 6,
 	[snd_soc_dapm_mixer] = 7,
 	[snd_soc_dapm_mixer_named_ctl] = 7,
+// LGE_CHANGE_S [heejeong.seo@lge.com] 2011-12-14 [LGE_AP20]
+#if defined (CONFIG_MACH_STAR) || defined (CONFIG_MACH_BSSQ)
+//LGE_CHANGE_S [heejeong.seo@lge.com] 2011-01-19, [LGE_AP20] wm8994
+#if 0 /* Wolfson Mark patch */
 	[snd_soc_dapm_pga] = 8,
 	[snd_soc_dapm_adc] = 9,
 	[snd_soc_dapm_out_drv] = 10,
 	[snd_soc_dapm_hp] = 10,
 	[snd_soc_dapm_spk] = 10,
 	[snd_soc_dapm_post] = 11,
+#else
+	[snd_soc_dapm_adc] = 8,
+	[snd_soc_dapm_pga] = 10,
+	[snd_soc_dapm_hp] = 11,
+	[snd_soc_dapm_spk] = 11,
+	[snd_soc_dapm_post] = 12,
+#endif
+//LGE_CHANGE_E [heejeong.seo@lge.com] 2011-01-19, [LGE_AP20] wm8994
+#endif
+// LGE_CHANGE_E [heejeong.seo@lge.com] 2011-12-14 [LGE_AP20]
 };
 
 static int dapm_down_seq[] = {
 	[snd_soc_dapm_pre] = 0,
+// LGE_CHANGE_S [heejeong.seo@lge.com] 2011-12-14 [LGE_AP20]
+#if defined (CONFIG_MACH_STAR) || defined (CONFIG_MACH_BSSQ)
+//LGE_CHANGE_S [heejeong.seo@lge.com] 2011-01-19, [LGE_AP20] wm8994
+#if 0 /* Wolfson Mark patch */
 	[snd_soc_dapm_adc] = 1,
 	[snd_soc_dapm_hp] = 2,
 	[snd_soc_dapm_spk] = 2,
 	[snd_soc_dapm_out_drv] = 2,
 	[snd_soc_dapm_pga] = 4,
+#else
+	[snd_soc_dapm_hp] = 1,
+	[snd_soc_dapm_spk] = 1,
+	[snd_soc_dapm_pga] = 2,
+	[snd_soc_dapm_adc] = 4,
+#endif
+//LGE_CHANGE_E [heejeong.seo@lge.com] 2011-01-19, [LGE_AP20] wm8994
+#endif
+// LGE_CHANGE_E [heejeong.seo@lge.com] 2011-12-14 [LGE_AP20]
 	[snd_soc_dapm_mixer_named_ctl] = 5,
 	[snd_soc_dapm_mixer] = 5,
 	[snd_soc_dapm_dac] = 6,
@@ -90,7 +117,11 @@ static int dapm_down_seq[] = {
 	[snd_soc_dapm_supply] = 11,
 	[snd_soc_dapm_post] = 12,
 };
-
+//LGE_CHANGE_S [jung.chanmin@lge.com] fix BT call lock up
+//20110902 mikyoung.chang@lge.com [start]
+static DEFINE_MUTEX(soc_dapm_seq_mutex); 
+//20110902 mikyoung.chang@lge.com [end]
+//LGE_CHANGE_E [jung.chanmin@lge.com] fix BT call lock up
 static void pop_wait(u32 pop_time)
 {
 	if (pop_time)
@@ -1124,6 +1155,11 @@ static int dapm_power_widgets(struct snd_soc_dapm_context *dapm, int event)
 	LIST_HEAD(down_list);
 	LIST_HEAD(async_domain);
 	int power;
+//LGE_CHANGE_S [jung.chanmin@lge.com] fix BT call lock up	
+	//20110902 mikyoung.chang@lge.com [start]
+	mutex_lock(&soc_dapm_seq_mutex); 
+	//20110902 mikyoung.chang@lge.com [end]
+//LGE_CHANGE_E [jung.chanmin@lge.com] fix BT call lock up	
 
 	trace_snd_soc_dapm_start(card);
 
@@ -1219,6 +1255,11 @@ static int dapm_power_widgets(struct snd_soc_dapm_context *dapm, int event)
 		async_schedule_domain(dapm_post_sequence_async, d,
 					&async_domain);
 	async_synchronize_full_domain(&async_domain);
+//LGE_CHANGE_S [jung.chanmin@lge.com] fix BT call lock up	
+	//20110902 mikyoung.chang@lge.com [start]
+	mutex_unlock(&soc_dapm_seq_mutex); 
+	//20110902 mikyoung.chang@lge.com [end]
+//LGE_CHANGE_E [jung.chanmin@lge.com] fix BT call lock up	
 
 	pop_dbg(dapm->dev, card->pop_time,
 		"DAPM sequencing finished, waiting %dms\n", card->pop_time);
@@ -1426,6 +1467,7 @@ static ssize_t dapm_widget_show(struct device *dev,
 		case snd_soc_dapm_mixer:
 		case snd_soc_dapm_mixer_named_ctl:
 		case snd_soc_dapm_supply:
+
 			if (w->name)
 				count += sprintf(buf + count, "%s: %s\n",
 					w->name, w->power ? "On":"Off");

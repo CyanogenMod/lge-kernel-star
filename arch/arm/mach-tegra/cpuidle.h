@@ -98,6 +98,16 @@ static inline bool tegra_lp2_is_allowed(struct cpuidle_device *dev,
 #endif
 }
 
+static inline void tegra_lp2_set_global_latency(struct cpuidle_state *state)
+{
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+	state->exit_latency = tegra_lp2_exit_latency;
+#endif
+	/* Tegra3 does not use global exit latency */
+}
+
+void tegra_lp2_update_target_residency(struct cpuidle_state *state);
+
 #ifdef CONFIG_DEBUG_FS
 static inline int tegra_lp2_debug_show(struct seq_file *s, void *data)
 {

@@ -47,7 +47,7 @@
 
 /* Select LVDS panel resolution. 13X7 is default */
 #define PM313_LVDS_PANEL_19X12			1
-#define PM313_LVDS_PANEL_BPP			1 /* 0:24bpp, 1:18bpp */
+#define PM313_LVDS_PANEL_BPP			0 /* 0:24bpp, 1:18bpp */
 
 /* PM313 display board specific pins */
 #define pm313_R_FDE			TEGRA_GPIO_PW0
@@ -229,13 +229,7 @@ static int cardhu_backlight_notify(struct device *unused, int brightness)
 	if (brightness > 255) {
 		pr_info("Error: Brightness > 255!\n");
 	} else {
-		/* This value depends on the panel.
-		  Current 19X12 panel with PM313 gets
-		  full brightness when the output is 0. */
-		if (display_board_info.board_id == BOARD_DISPLAY_PM313)
-			brightness = 255 - bl_output[brightness];
-		else
-			brightness = bl_output[brightness];
+		brightness = bl_output[brightness];
 	}
 
 	return brightness;
@@ -939,6 +933,8 @@ static struct tegra_dc_out cardhu_disp1_out = {
 	.parent_clk	= "pll_p",
 
 #ifndef CONFIG_TEGRA_CARDHU_DSI
+	.parent_clk_backup = "pll_d2_out0",
+
 	.type		= TEGRA_DC_OUT_RGB,
 	.depth		= 18,
 	.dither		= TEGRA_DC_ORDERED_DITHER,

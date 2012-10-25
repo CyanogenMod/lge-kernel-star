@@ -1,0 +1,11 @@
+#
+# pyocool.cho@lge.com
+#
+# driver/kpd/Kconfig
+#
+config PANICRPT
+	bool "Panic report driver"
+	#depends on (DUMMY_CONSOLE && FRAMEBUFFER_CONSOLE)
+	default y
+	help
+		support for panic report driver.

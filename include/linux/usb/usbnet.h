@@ -98,7 +98,7 @@ struct driver_info {
 
 #define FLAG_LINK_INTR	0x0800		/* updates link (carrier) status */
 
-#define FLAG_POINTTOPOINT 0x1000	/* possibly use "usb%d" names */
+#define FLAG_POINTTOPOINT	0x1000	/* possibly use "usb%d" names */
 
 /*
  * Indicates to usbnet, that USB driver accumulates multiple IP packets.
@@ -106,6 +106,7 @@ struct driver_info {
  */
 #define FLAG_MULTI_PACKET	0x2000
 #define FLAG_RX_ASSEMBLE	0x4000	/* rx packets may span >1 frames */
+#define FLAG_RMNET		0x8000	/* use "rmnet%d" names */
 
 	/* init device ... can sleep, or cause probe() failure */
 	int	(*bind)(struct usbnet *, struct usb_interface *);

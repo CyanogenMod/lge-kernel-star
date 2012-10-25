@@ -43,7 +43,7 @@
 #include <mach/nvmap.h>
 
 #include "../../../../video/tegra/nvmap/nvmap.h"
-#include "../../../../video/tegra/host/t20/syncpt_t20.h"
+#include "../../../../video/tegra/host/host1x/host1x_syncpt.h"
 #include "../../../../video/tegra/host/dev.h"
 #include "../../../../video/tegra/host/nvhost_acm.h"
 
@@ -89,6 +89,7 @@ struct nvavp_info {
 
 	struct mutex			open_lock;
 	int				refcount;
+	int				initialized;
 
 	struct work_struct		clock_disable_work;
 
@@ -116,6 +117,7 @@ struct nvavp_info {
 
 	struct nvhost_device		*nvhost_dev;
 	struct miscdevice		misc_dev;
+	atomic_t				clock_stay_on_refcount;
 };
 
 struct nvavp_clientctx {
@@ -125,6 +127,7 @@ struct nvavp_clientctx {
 	struct nvmap_handle_ref *gather_mem;
 	int num_relocs;
 	struct nvavp_info *nvavp;
+	int clock_stay_on;
 };
 
 static struct clk *nvavp_clk_get(struct nvavp_info *nvavp, int id)
@@ -145,6 +148,7 @@ static struct clk *nvavp_clk_get(struct nvavp_info *nvavp, int id)
 static void nvavp_clk_ctrl(struct nvavp_info *nvavp, u32 clk_en)
 {
 	if (clk_en && !nvavp->clk_enabled) {
+		nvhost_module_busy(nvhost_get_host(nvavp->nvhost_dev)->dev);
 		clk_enable(nvavp->bsev_clk);
 		clk_enable(nvavp->vde_clk);
 		clk_set_rate(nvavp->emc_clk, nvavp->emc_clk_rate);
@@ -159,6 +163,7 @@ static void nvavp_clk_ctrl(struct nvavp_info *nvavp, u32 clk_en)
 		clk_disable(nvavp->vde_clk);
 		clk_set_rate(nvavp->emc_clk, 0);
 		clk_set_rate(nvavp->sclk, 0);
+		nvhost_module_idle(nvhost_get_host(nvavp->nvhost_dev)->dev);
 		nvavp->clk_enabled = 0;
 		dev_dbg(&nvavp->nvhost_dev->dev, "%s: resetting emc_clk "
 				"and sclk\n", __func__);
@@ -168,7 +173,8 @@ static void nvavp_clk_ctrl(struct nvavp_info *nvavp, u32 clk_en)
 static u32 nvavp_check_idle(struct nvavp_info *nvavp)
 {
 	struct nv_e276_control *control = nvavp->os_control;
-	return (control->put == control->get) ? 1 : 0;
+	return ((control->put == control->get)
+		&& (!atomic_read(&nvavp->clock_stay_on_refcount))) ? 1 : 0;
 }
 
 static void clock_disable_handler(struct work_struct *work)
@@ -289,12 +295,16 @@ static void nvavp_halt_vde(struct nvavp_info *nvavp)
 		clk_disable(nvavp->bsev_clk);
 		tegra_periph_reset_assert(nvavp->vde_clk);
 		clk_disable(nvavp->vde_clk);
+		nvhost_module_idle(nvhost_get_host(nvavp->nvhost_dev)->dev);
 		nvavp->clk_enabled = 0;
 	}
 }
 
 static int nvavp_reset_vde(struct nvavp_info *nvavp)
 {
+	if (!nvavp->clk_enabled)
+		nvhost_module_busy(nvhost_get_host(nvavp->nvhost_dev)->dev);
+
 	clk_enable(nvavp->bsev_clk);
 	tegra_periph_reset_assert(nvavp->bsev_clk);
 	udelay(2);
@@ -696,6 +706,9 @@ static int nvavp_init(struct nvavp_info *nvavp)
 	char fw_os_file[32];
 	int ret = 0;
 
+	if (nvavp->initialized)
+		return ret;
+
 #if defined(CONFIG_TEGRA_AVP_KERNEL_ON_MMU) /* Tegra2 with AVP MMU */
 	/* paddr is any address returned from nvmap_pin */
 	/* vaddr is AVP_KERNEL_VIRT_BASE */
@@ -767,12 +780,17 @@ static int nvavp_init(struct nvavp_info *nvavp)
 	nvavp_reset_avp(nvavp, nvavp->os_info.reset_addr);
 	enable_irq(nvavp->mbox_from_avp_pend_irq);
 
+	nvavp->initialized = 1;
+
 err_exit:
 	return ret;
 }
 
 static void nvavp_uninit(struct nvavp_info *nvavp)
 {
+	if (!nvavp->initialized)
+		return;
+
 	disable_irq(nvavp->mbox_from_avp_pend_irq);
 
 	cancel_work_sync(&nvavp->clock_disable_work);
@@ -784,6 +802,8 @@ static void nvavp_uninit(struct nvavp_info *nvavp)
 
 	clk_disable(nvavp->sclk);
 	clk_disable(nvavp->emc_clk);
+
+	nvavp->initialized = 0;
 }
 
 static int nvavp_set_clock_ioctl(struct file *filp, unsigned int cmd,
@@ -996,6 +1016,40 @@ err_cmdbuf_mmap:
 	return ret;
 }
 
+static int nvavp_force_clock_stay_on_ioctl(struct file *filp, unsigned int cmd,
+							unsigned long arg)
+{
+	struct nvavp_clientctx *clientctx = filp->private_data;
+	struct nvavp_info *nvavp = clientctx->nvavp;
+	struct nvavp_clock_stay_on_state_args clock;
+
+	if (copy_from_user(&clock, (void __user *)arg,
+			sizeof(struct nvavp_clock_stay_on_state_args)))
+		return -EFAULT;
+
+	dev_dbg(&nvavp->nvhost_dev->dev, "%s: state=%d\n",
+		__func__, clock.state);
+
+	if (clock.state != NVAVP_CLOCK_STAY_ON_DISABLED &&
+		clock.state !=  NVAVP_CLOCK_STAY_ON_ENABLED) {
+		dev_err(&nvavp->nvhost_dev->dev, "%s: invalid argument=%d\n",
+			__func__, clock.state);
+		return -EINVAL;
+	}
+
+	if (clientctx->clock_stay_on == clock.state)
+		return 0;
+
+	clientctx->clock_stay_on = clock.state;
+
+	if (clientctx->clock_stay_on == NVAVP_CLOCK_STAY_ON_ENABLED)
+		atomic_inc(&nvavp->clock_stay_on_refcount);
+	else if (clientctx->clock_stay_on == NVAVP_CLOCK_STAY_ON_DISABLED)
+		atomic_dec(&nvavp->clock_stay_on_refcount);
+
+	return 0;
+}
+
 static int tegra_nvavp_open(struct inode *inode, struct file *filp)
 {
 	struct miscdevice *miscdev = filp->private_data;
@@ -1021,10 +1075,10 @@ static int tegra_nvavp_open(struct inode *inode, struct file *filp)
 
 	clientctx->nvmap = nvavp->nvmap;
 	clientctx->nvavp = nvavp;
+	clientctx->clock_stay_on = NVAVP_CLOCK_STAY_ON_DISABLED;
 
 	filp->private_data = clientctx;
 
-	nvhost_module_busy(&nvavp->nvhost_dev->host->mod);
 	mutex_unlock(&nvavp->open_lock);
 
 	return ret;
@@ -1039,7 +1093,6 @@ static int tegra_nvavp_release(struct inode *inode, struct file *filp)
 	dev_dbg(&nvavp->nvhost_dev->dev, "%s: ++\n", __func__);
 
 	filp->private_data = NULL;
-	nvhost_module_idle(&nvavp->nvhost_dev->host->mod);
 
 	mutex_lock(&nvavp->open_lock);
 
@@ -1050,12 +1103,15 @@ static int tegra_nvavp_release(struct inode *inode, struct file *filp)
 		goto out;
 	}
 
+	if (clientctx->clock_stay_on ==  NVAVP_CLOCK_STAY_ON_ENABLED)
+		atomic_dec(&nvavp->clock_stay_on_refcount);
 	if (nvavp->refcount > 0)
 		nvavp->refcount--;
 	if (!nvavp->refcount)
 		nvavp_uninit(nvavp);
 
 out:
+	nvmap_client_put(clientctx->nvmap);
 	mutex_unlock(&nvavp->open_lock);
 	kfree(clientctx);
 	return ret;
@@ -1086,6 +1142,9 @@ static long tegra_nvavp_ioctl(struct file *filp, unsigned int cmd,
 		break;
 	case NVAVP_IOCTL_GET_CLOCK:
 		ret = nvavp_get_clock_ioctl(filp, cmd, arg);
+		break;
+	case NVAVP_IOCTL_FORCE_CLOCK_STAY_ON:
+		ret = nvavp_force_clock_stay_on_ioctl(filp, cmd, arg);
 		break;
 	default:
 		ret = -EINVAL;
@@ -1124,7 +1183,7 @@ static int tegra_nvavp_probe(struct nvhost_device *ndev)
 
 	memset(nvavp, 0, sizeof(*nvavp));
 
-	nvavp->nvhost_syncpt = &ndev->host->syncpt;
+	nvavp->nvhost_syncpt = &nvhost_get_host(ndev)->syncpt;
 	if (!nvavp->nvhost_syncpt) {
 		dev_err(&ndev->dev, "cannot get syncpt handle\n");
 		ret = -ENOENT;
@@ -1357,18 +1416,33 @@ static int tegra_nvavp_remove(struct nvhost_device *ndev)
 static int tegra_nvavp_suspend(struct nvhost_device *ndev, pm_message_t state)
 {
 	struct nvavp_info *nvavp = nvhost_get_drvdata(ndev);
+	int ret = 0;
 
-	if (nvavp->refcount)
-		nvhost_module_idle(&ndev->host->mod);
-	return 0;
+	mutex_lock(&nvavp->open_lock);
+
+	if (nvavp->refcount) {
+		if (nvavp_check_idle(nvavp))
+			nvavp_uninit(nvavp);
+		else
+			ret = -EBUSY;
+	}
+
+	mutex_unlock(&nvavp->open_lock);
+
+	return ret;
 }
 
 static int tegra_nvavp_resume(struct nvhost_device *ndev)
 {
 	struct nvavp_info *nvavp = nvhost_get_drvdata(ndev);
 
+	mutex_lock(&nvavp->open_lock);
+
 	if (nvavp->refcount)
-		nvhost_module_busy(&ndev->host->mod);
+		nvavp_init(nvavp);
+
+	mutex_unlock(&nvavp->open_lock);
+
 	return 0;
 }
 #endif

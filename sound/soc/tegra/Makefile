@@ -24,10 +24,16 @@ obj-$(CONFIG_SND_SOC_TEGRA30_SPDIF) += snd-soc-tegra30-spdif.o
 # Tegra machine Support
 snd-soc-tegra-wm8903-objs := tegra_wm8903.o
 snd-soc-tegra-wm8753-objs := tegra_wm8753.o
+snd-soc-tegra-wm8994-objs := tegra_wm8994.o
 snd-soc-tegra-max98088-objs := tegra_max98088.o
 snd-soc-tegra-aic326x-objs := tegra_aic326x.o
+snd-soc-tegra-rt5640-objs := tegra_rt5640.o
+snd-soc-tegra-max98095-objs := tegra_max98095.o
 
 obj-$(CONFIG_SND_SOC_TEGRA_WM8903) += snd-soc-tegra-wm8903.o
 obj-$(CONFIG_SND_SOC_TEGRA_WM8753) += snd-soc-tegra-wm8753.o
+obj-$(CONFIG_SND_SOC_TEGRA_WM8994) += snd-soc-tegra-wm8994.o
 obj-$(CONFIG_SND_SOC_TEGRA_MAX98088) += snd-soc-tegra-max98088.o
 obj-$(CONFIG_SND_SOC_TEGRA_TLV320AIC326X) += snd-soc-tegra-aic326x.o
+obj-$(CONFIG_SND_SOC_TEGRA_RT5640) += snd-soc-tegra-rt5640.o
+obj-$(CONFIG_SND_SOC_TEGRA_MAX98095) += snd-soc-tegra-max98095.o

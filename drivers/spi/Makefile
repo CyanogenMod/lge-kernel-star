@@ -46,6 +46,11 @@ obj-$(CONFIG_SPI_S3C24XX_GPIO)		+= spi_s3c24xx_gpio.o
 obj-$(CONFIG_SPI_S3C24XX)		+= spi_s3c24xx_hw.o
 obj-$(CONFIG_SPI_S3C64XX)		+= spi_s3c64xx.o
 obj-$(CONFIG_SPI_TEGRA)			+= spi_tegra.o
+ifeq ($(CONFIG_MACH_STAR),y)
+obj-$(CONFIG_SPI_TEGRA)			+= ifx_n721_spi.o
+endif
+obj-$(CONFIG_SPI_MUX)			+= ts0710mux/
+obj-$(CONFIG_SPI_RINDRV)		+= rindrv.o
 obj-$(CONFIG_SPI_SLAVE_TEGRA)		+= spi_slave_tegra.o
 obj-$(CONFIG_SPI_TI_SSP)		+= ti-ssp-spi.o
 obj-$(CONFIG_SPI_TOPCLIFF_PCH)		+= spi_topcliff_pch.o
@@ -73,3 +78,4 @@ obj-$(CONFIG_SPI_TLE62X0)	+= tle62x0.o
 
 # SPI slave drivers (protocol for that link)
 # 	... add above this line ...
+obj-$(CONFIG_CP_WATCHER)       += cpwatcher.o

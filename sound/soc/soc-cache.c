@@ -1605,7 +1605,13 @@ int snd_soc_cache_sync(struct snd_soc_codec *codec)
 	int ret;
 	const char *name;
 
+//LGE_CHANGE_S [chahee.kim@lge.com] 2012-03-23 
+#if 1
+	if (codec->cache_sync) {
+#else
 	if (!codec->cache_sync) {
+#endif
+//LGE_CHANGE_E [chahee.kim@lge.com] 2012-03-23 
 		return 0;
 	}
 

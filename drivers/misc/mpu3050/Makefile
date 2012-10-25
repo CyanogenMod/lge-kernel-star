@@ -1,7 +1,7 @@
 
 # Kernel makefile for motions sensors
 #
-#
+# 
 
 # MPU
 obj-$(CONFIG_MPU_SENSORS_MPU3050)	+= mpu3050.o
@@ -9,6 +9,7 @@ mpu3050-objs += mpuirq.o \
 	slaveirq.o \
 	mpu-dev.o \
 	mpu-i2c.o \
+	mpu-accel.o \
 	mlsl-kernel.o \
 	mlos-kernel.o \
 	$(MLLITE_DIR)mldl_cfg.o
@@ -26,6 +27,10 @@ endif
 
 ifdef CONFIG_MPU_SENSORS_BMA222
 mpu3050-objs += $(MLLITE_DIR)accel/bma222.o
+endif
+
+ifdef CONFIG_MPU_SENSORS_BMA250
+mpu3050-objs += $(MLLITE_DIR)accel/bma250.o
 endif
 
 ifdef CONFIG_MPU_SENSORS_KXSD9
@@ -67,10 +72,6 @@ ifdef CONFIG_MPU_SENSORS_AMI30X
 mpu3050-objs += $(MLLITE_DIR)compass/ami30x.o
 endif
 
-ifdef CONFIG_MPU_SENSORS_AMI306
-mpu3050-objs += $(MLLITE_DIR)compass/ami306.o
-endif
-
 ifdef CONFIG_MPU_SENSORS_HMC5883
 mpu3050-objs += $(MLLITE_DIR)compass/hmc5883.o
 endif
@@ -81,6 +82,10 @@ endif
 
 ifdef CONFIG_MPU_SENSORS_MMC314X
 mpu3050-objs += $(MLLITE_DIR)compass/mmc314x.o
+endif
+
+ifdef CONFIG_MPU_SENSORS_MMC328X
+mpu3050-objs += $(MLLITE_DIR)compass/mmc328x.o
 endif
 
 ifdef CONFIG_MPU_SENSORS_YAS529
@@ -98,6 +103,11 @@ endif
 ifdef CONFIG_MPU_SENSORS_HSCDTD004A
 mpu3050-objs += $(MLLITE_DIR)compass/hscdtd004a.o
 endif
+
+ifdef CONFIG_MPU_SENSORS_AMS0303
+mpu3050-objs += $(MLLITE_DIR)compass/ams0303.o
+endif
+
 #
 # Pressure options
 #
@@ -105,10 +115,19 @@ ifdef CONFIG_MPU_SENSORS_BMA085
 mpu3050-objs += $(MLLITE_DIR)pressure/bma085.o
 endif
 
+ifdef CONFIG_MACH_BSSQ
 EXTRA_CFLAGS += -I$(M)/$(MLLITE_DIR) \
                 -I$(M)/../../include \
-		-Idrivers/misc/mpu3050 \
-                -Iinclude/linux
+                -Idrivers/misc/mpu3050 \
+                -Iinclude/linux \
+                -Iarch/arm/mach-tegra/lge/bssq/include
+else
+EXTRA_CFLAGS += -I$(M)/$(MLLITE_DIR) \
+                -I$(M)/../../include \
+                -Idrivers/misc/mpu3050 \
+                -Iinclude/linux \
+                -Iarch/arm/mach-tegra/lge/star/include
+endif
 
 obj-$(CONFIG_MPU_SENSORS_MPU6000)+= mpu6000.o
 mpu6000-objs += mpuirq.o \
@@ -129,4 +148,8 @@ EXTRA_CFLAGS += -DM_HW
 endif
 
 obj-$(CONFIG_MPU_SENSORS_TIMERIRQ)+= timerirq.o
+
+ifdef CONFIG_MPU_SENSORS_DEBUG
+EXTRA_CFLAGS += -DDEBUG 
+endif
 

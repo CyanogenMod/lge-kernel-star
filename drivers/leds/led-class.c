@@ -64,6 +64,8 @@ static ssize_t led_brightness_store(struct device *dev,
 	return ret;
 }
 
+// MOBII_S [shhong@mobii.co.kr] 2012-06-25: Add Led Retain Code.
+#if defined(CONFIG_MACH_STAR)
 static ssize_t led_max_brightness_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -72,9 +74,42 @@ static ssize_t led_max_brightness_show(struct device *dev,
 	return sprintf(buf, "%u\n", led_cdev->max_brightness);
 }
 
+static ssize_t led_br_maintain_on_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	int	state	=	simple_strtol(buf, NULL, 10);
+	if (state){
+		printk(KERN_ERR "[pwr_led]: SYSFS_LED br_maintain_on trigger is 1!\n");
+		led_set_brightness(led_cdev, 255);
+		led_cdev->br_maintain_trigger = 1;
+	} else{
+		printk(KERN_ERR "[pwr_led]: SYSFS_LED br_maintain_on trigger is 0!\n");
+		led_cdev->br_maintain_trigger = 0;
+		led_set_brightness(led_cdev, 0);
+	}
+
+	return size;
+}
+
+static ssize_t led_br_maintain_on_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%u\n", led_cdev->br_maintain_trigger);
+}
+#endif
+// MOBII_E [shhong@mobii.co.kr] 2012-06-25: Add Led Retain Code.
+
 static struct device_attribute led_class_attrs[] = {
-	__ATTR(brightness, 0644, led_brightness_show, led_brightness_store),
+	__ATTR(brightness, 0666 /*0644*/, led_brightness_show, led_brightness_store),
+// MOBII_S [shhong@mobii.co.kr] 2012-06-25: Add Led Retain Code.
+#if defined(CONFIG_MACH_STAR)
 	__ATTR(max_brightness, 0444, led_max_brightness_show, NULL),
+	__ATTR(br_maintain_on, 0660, led_br_maintain_on_show, led_br_maintain_on_store),
+#endif
+// MOBII_E [shhong@mobii.co.kr] 2012-06-25: Add Led Retain Code.
 #ifdef CONFIG_LEDS_TRIGGERS
 	__ATTR(trigger, 0644, led_trigger_show, led_trigger_store),
 #endif

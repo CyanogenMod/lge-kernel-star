@@ -57,5 +57,13 @@ obj-$(CONFIG_WL12XX_PLATFORM_DATA)	+= wl12xx/
 
 obj-$(CONFIG_IWM)	+= iwmc3200wifi/
 
+# LGE_CHANGE_S, [WiFi][ella.hwang@lge.com, moon-wifi@lge.com], 20120319, for X2-KDDI(KS1103) ICS
+ifeq ($(CONFIG_MACH_BSSQ), y)
+obj-$(CONFIG_BCM4329)	+= bcm4329.lge/
+obj-$(CONFIG_BRCM_USE_STATIC_BUF)       += bcm4329.lge/
+else
 obj-$(CONFIG_BCM4329)	+= bcm4329/
-obj-$(CONFIG_BCMDHD)	+= bcmdhd/
+obj-$(CONFIG_BRCM_USE_STATIC_BUF)       += bcm4329/
+endif
+# LGE_CHANGE_E, [WiFi][ella.hwang@lge.com, moon-wifi@lge.com], 20120319, for X2-KDDI(KS1103) ICS
+#obj-$(CONFIG_BCMDHD)	+= bcmdhd/

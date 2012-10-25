@@ -485,6 +485,20 @@ static struct sh532u_platform_data sh532u_right_pdata = {
 	.gpio_reset	= TEGRA_GPIO_PBB0,
 };
 
+static struct sh532u_platform_data pm269_sh532u_left_pdata = {
+	.num		= 1,
+	.sync		= 2,
+	.dev_name	= "focuser",
+	.gpio_reset	= CAM1_RST_L_GPIO,
+};
+
+static struct sh532u_platform_data pm269_sh532u_right_pdata = {
+	.num		= 2,
+	.sync		= 1,
+	.dev_name	= "focuser",
+	.gpio_reset	= CAM2_RST_L_GPIO,
+};
+
 static struct nvc_torch_pin_state cardhu_tps61050_pinstate = {
 	.mask		= 0x0008, /*VGP3*/
 	.values		= 0x0008,
@@ -521,6 +535,28 @@ static struct i2c_board_info cardhu_i2c7_board_info[] = {
 	{
 		I2C_BOARD_INFO("sh532u", 0x72),
 		.platform_data = &sh532u_right_pdata,
+	},
+};
+
+static struct i2c_board_info pm269_i2c6_board_info[] = {
+	{
+		I2C_BOARD_INFO("ov5650L", 0x36),
+		.platform_data = &cardhu_left_ov5650_data,
+	},
+	{
+		I2C_BOARD_INFO("sh532u", 0x72),
+		.platform_data = &pm269_sh532u_left_pdata,
+	},
+};
+
+static struct i2c_board_info pm269_i2c7_board_info[] = {
+	{
+		I2C_BOARD_INFO("ov5650R", 0x36),
+		.platform_data = &cardhu_right_ov5650_data,
+	},
+	{
+		I2C_BOARD_INFO("sh532u", 0x72),
+		.platform_data = &pm269_sh532u_right_pdata,
 	},
 };
 
@@ -619,7 +655,7 @@ static struct i2c_board_info cardhu_i2c4_nct1008_board_info[] = {
 static int cardhu_nct1008_init(void)
 {
 	int nct1008_port = -1;
-	int ret;
+	int ret = 0;
 
 	if ((board_info.board_id == BOARD_E1198) ||
 		(board_info.board_id == BOARD_E1291) ||
@@ -835,12 +871,23 @@ int __init cardhu_sensors_init(void)
 #else
 	/* Left  camera is on PCA954x's I2C BUS0, Right camera is on BUS1 &
 	 * Front camera is on BUS2 */
-	i2c_register_board_info(PCA954x_I2C_BUS0, cardhu_i2c6_board_info,
-		ARRAY_SIZE(cardhu_i2c6_board_info));
+	if (board_info.board_id != BOARD_PM269) {
+		i2c_register_board_info(PCA954x_I2C_BUS0,
+					cardhu_i2c6_board_info,
+					ARRAY_SIZE(cardhu_i2c6_board_info));
 
-	i2c_register_board_info(PCA954x_I2C_BUS1, cardhu_i2c7_board_info,
-		ARRAY_SIZE(cardhu_i2c7_board_info));
+		i2c_register_board_info(PCA954x_I2C_BUS1,
+					cardhu_i2c7_board_info,
+					ARRAY_SIZE(cardhu_i2c7_board_info));
+	} else {
+		i2c_register_board_info(PCA954x_I2C_BUS0,
+					pm269_i2c6_board_info,
+					ARRAY_SIZE(pm269_i2c6_board_info));
 
+		i2c_register_board_info(PCA954x_I2C_BUS1,
+					pm269_i2c7_board_info,
+					ARRAY_SIZE(pm269_i2c7_board_info));
+	}
 	i2c_register_board_info(PCA954x_I2C_BUS2, cardhu_i2c8_board_info,
 		ARRAY_SIZE(cardhu_i2c8_board_info));
 

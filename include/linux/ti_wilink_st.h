@@ -140,12 +140,12 @@ extern long st_unregister(struct st_proto_s *);
  */
 struct st_data_s {
 	unsigned long st_state;
-	struct tty_struct *tty;
 	struct sk_buff *tx_skb;
 #define ST_TX_SENDING	1
 #define ST_TX_WAKEUP	2
 	unsigned long tx_state;
 	struct st_proto_s *list[ST_MAX_CHANNELS];
+	bool is_registered[ST_MAX_CHANNELS];
 	unsigned long rx_state;
 	unsigned long rx_count;
 	struct sk_buff *rx_skb;
@@ -155,6 +155,7 @@ struct st_data_s {
 	unsigned char	protos_registered;
 	unsigned long ll_state;
 	void *kim_data;
+	struct tty_struct *tty;
 };
 
 /*
@@ -385,7 +386,12 @@ void st_ll_disable(struct st_data_s *);
  * various funcs used by ST core to set/get the various PM states
  * of the chip.
  */
+
+#ifdef CONFIG_TI_ST
 unsigned long st_ll_getstate(struct st_data_s *);
+#else
+static inline unsigned long st_ll_getstate(struct st_data_s *ll){ return 0; }
+#endif
 unsigned long st_ll_sleep_state(struct st_data_s *, unsigned char);
 void st_ll_wakeup(struct st_data_s *);
 
@@ -409,7 +415,28 @@ struct gps_event_hdr {
 	u16 plen;
 } __attribute__ ((packed));
 
-/* platform data */
+/**
+ * struct ti_st_plat_data - platform data shared between ST driver and
+ *	platform specific board file which adds the ST device.
+ * @nshutdown_gpio: Host's GPIO line to which chip's BT_EN is connected.
+ * @dev_name: The UART/TTY name to which chip is interfaced. (eg: /dev/ttyS1)
+ * @flow_cntrl: Should always be 1, since UART's CTS/RTS is used for PM
+ *	purposes.
+ * @baud_rate: The baud rate supported by the Host UART controller, this will
+ *	be shared across with the chip via a HCI VS command from User-Space Init
+ *	Mgr application.
+ * @suspend:
+ * @resume: legacy PM routines hooked to platform specific board file, so as
+ *	to take chip-host interface specific action.
+ * @chip_enable:
+ * @chip_disable: Platform/Interface specific mux mode setting, GPIO
+ *	configuring, Host side PM disabling etc.. can be done here.
+ * @chip_asleep:
+ * @chip_awake: Chip specific deep sleep states is communicated to Host
+ *	specific board-xx.c to take actions such as cut UART clocks when chip
+ *	asleep or run host faster when chip awake etc..
+ *
+ */
 struct ti_st_plat_data {
 	long nshutdown_gpio;
 	unsigned char dev_name[UART_DEV_NAME_LEN]; /* uart name */
@@ -417,6 +444,11 @@ struct ti_st_plat_data {
 	unsigned long baud_rate;
 	int (*suspend)(struct platform_device *, pm_message_t);
 	int (*resume)(struct platform_device *);
+	int (*chip_enable) (struct kim_data_s *);
+	int (*chip_disable) (struct kim_data_s *);
+	int (*chip_asleep) (struct kim_data_s *);
+	int (*chip_awake) (struct kim_data_s *);
+	int (*set_power)(int);
 };
 
 #endif /* TI_WILINK_ST_H */

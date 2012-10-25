@@ -215,7 +215,7 @@ static int __init max8907c_charger_init(void)
 {
 	return platform_driver_register(&max8907c_charger_driver);
 }
-module_init(max8907c_charger_init);
+subsys_initcall(max8907c_charger_init);
 
 static void __exit max8907c_charger_exit(void)
 {

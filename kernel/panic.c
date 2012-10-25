@@ -60,6 +60,10 @@ EXPORT_SYMBOL(panic_blink);
  *
  *	This function never returns.
  */
+
+//gangmin.park@lge.com 20110817. Set VDD_CPU to 1.1V during emergency restart.
+extern int emg_max8952_shutdown(void);
+ 
 NORET_TYPE void panic(const char * fmt, ...)
 {
 	static char buf[1024];
@@ -72,6 +76,10 @@ NORET_TYPE void panic(const char * fmt, ...)
 	 * not have preempt disabled. Some functions called from here want
 	 * preempt to be disabled. No point enabling it later though...
 	 */
+
+  //gangmin.park@lge.com 20110817. Set VDD_CPU to 1.1V during emergency restart.
+  emg_max8952_shutdown(); 
+
 	preempt_disable();
 
 	console_verbose();

@@ -1278,9 +1278,9 @@ static int wm8903_set_dai_fmt(struct snd_soc_dai *codec_dai,
 		aif1 |= 0x2;
 		break;
 	case SND_SOC_DAIFMT_RIGHT_J:
-		aif1 |= 0x1;
 		break;
 	case SND_SOC_DAIFMT_LEFT_J:
+		aif1 |= 0x1;
 		break;
 	default:
 		return -EINVAL;
@@ -1467,6 +1467,7 @@ static int wm8903_hw_params(struct snd_pcm_substream *substream,
 	int fs = params_rate(params);
 	int bclk;
 	int bclk_div;
+	int real_bclk_div;
 	int i;
 	int dsp_config;
 	int clk_config;
@@ -1503,7 +1504,7 @@ static int wm8903_hw_params(struct snd_pcm_substream *substream,
 	clock1 |= sample_rates[dsp_config].value;
 
 	aif1 &= ~WM8903_AIF_WL_MASK;
-	bclk = 2 * fs;
+	bclk = 4 * fs;
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
 		bclk *= 16;
@@ -1571,27 +1572,22 @@ static int wm8903_hw_params(struct snd_pcm_substream *substream,
 	 * higher than the target (we need to ensure that there enough
 	 * BCLKs to clock out the samples).
 	 */
-	bclk_div = 0;
-	best_val = ((clk_sys * 10) / bclk_divs[0].ratio) - bclk;
-	i = 1;
-	while (i < ARRAY_SIZE(bclk_divs)) {
-		cur_val = ((clk_sys * 10) / bclk_divs[i].ratio) - bclk;
-		if (cur_val < 0) /* BCLK table is sorted */
-			break;
-		bclk_div = i;
-		best_val = cur_val;
-		i++;
-	}
 
 	aif2 &= ~WM8903_BCLK_DIV_MASK;
 	aif3 &= ~WM8903_LRCLK_RATE_MASK;
 
-	dev_dbg(codec->dev, "BCLK ratio %d for %dHz - actual BCLK = %dHz\n",
-		bclk_divs[bclk_div].ratio / 10, bclk,
-		(clk_sys * 10) / bclk_divs[bclk_div].ratio);
-
-	aif2 |= bclk_divs[bclk_div].div;
-	aif3 |= bclk / fs;
+	bclk_div = real_bclk_div = 0;
+	cur_val = clk_sys;
+	best_val = clk_sys;
+	while(!(best_val % fs) &&
+			(cur_val >= bclk)){
+		real_bclk_div = bclk_div;
+		bclk_div++;
+		cur_val = best_val;
+		best_val /= 2;
+	}
+	aif2 |= (real_bclk_div ? 1<<real_bclk_div : 0);
+	aif3 |= cur_val / fs;
 
 	wm8903->fs = params_rate(params);
 	wm8903_set_deemph(codec);

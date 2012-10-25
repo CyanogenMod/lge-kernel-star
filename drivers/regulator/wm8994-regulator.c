@@ -309,6 +309,7 @@ static int __init wm8994_ldo_init(void)
 
 	return ret;
 }
+#if 0
 subsys_initcall(wm8994_ldo_init);
 
 static void __exit wm8994_ldo_exit(void)
@@ -316,7 +317,7 @@ static void __exit wm8994_ldo_exit(void)
 	platform_driver_unregister(&wm8994_ldo_driver);
 }
 module_exit(wm8994_ldo_exit);
-
+#endif
 /* Module information */
 MODULE_AUTHOR("Mark Brown <broonie@opensource.wolfsonmicro.com>");
 MODULE_DESCRIPTION("WM8994 LDO driver");

@@ -2339,23 +2339,6 @@ static int rt5640_remove(struct snd_soc_codec *codec)
 	return 0;
 }
 
-#ifdef CONFIG_PM
-static int rt5640_suspend(struct snd_soc_codec *codec, pm_message_t state)
-{
-	rt5640_set_bias_level(codec, SND_SOC_BIAS_OFF);
-	return 0;
-}
-
-static int rt5640_resume(struct snd_soc_codec *codec)
-{
-	rt5640_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
-	return 0;
-}
-#else
-#define rt5640_suspend NULL
-#define rt5640_resume NULL
-#endif
-
 #define RT5640_STEREO_RATES SNDRV_PCM_RATE_8000_96000
 #define RT5640_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S20_3LE | \
 			SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S8)
@@ -2434,8 +2417,6 @@ struct snd_soc_dai_driver rt5640_dai[] = {
 static struct snd_soc_codec_driver soc_codec_dev_rt5640 = {
 	.probe = rt5640_probe,
 	.remove = rt5640_remove,
-	.suspend = rt5640_suspend,
-	.resume = rt5640_resume,
 	.set_bias_level = rt5640_set_bias_level,
 	.reg_cache_size = RT5640_VENDOR_ID2 + 1,
 	.reg_word_size = sizeof(u16),

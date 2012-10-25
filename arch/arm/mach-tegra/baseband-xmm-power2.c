@@ -73,12 +73,13 @@ static irqreturn_t baseband_xmm_power2_ver_lt_1130_ipc_ap_wake_irq2
 	if (!baseband_power2_driver_data)
 		return IRQ_HANDLED;
 
+	value = gpio_get_value(baseband_power2_driver_data->
+		    modem.xmm.ipc_ap_wake);
+
 	/* IPC_AP_WAKE state machine */
 	if (ipc_ap_wake_state < IPC_AP_WAKE_IRQ_READY) {
 		pr_err("%s - spurious irq\n", __func__);
 	} else if (ipc_ap_wake_state == IPC_AP_WAKE_IRQ_READY) {
-		value = gpio_get_value(baseband_power2_driver_data->
-			modem.xmm.ipc_ap_wake);
 		if (!value) {
 			pr_debug("%s - IPC_AP_WAKE_INIT1"
 				" - got falling edge\n",
@@ -96,8 +97,6 @@ static irqreturn_t baseband_xmm_power2_ver_lt_1130_ipc_ap_wake_irq2
 				__func__);
 		}
 	} else if (ipc_ap_wake_state == IPC_AP_WAKE_INIT1) {
-		value = gpio_get_value(baseband_power2_driver_data->
-			modem.xmm.ipc_ap_wake);
 		if (!value) {
 			pr_debug("%s - IPC_AP_WAKE_INIT2"
 				" - wait for rising edge\n",
@@ -115,8 +114,6 @@ static irqreturn_t baseband_xmm_power2_ver_lt_1130_ipc_ap_wake_irq2
 				baseband_xmm_power2_work);
 		}
 	} else {
-		value = gpio_get_value(baseband_power2_driver_data->
-			modem.xmm.ipc_ap_wake);
 		if (!value) {
 			pr_debug("%s - falling\n", __func__);
 			ipc_ap_wake_state = IPC_AP_WAKE_L;
@@ -141,12 +138,13 @@ static irqreturn_t baseband_xmm_power2_ver_ge_1130_ipc_ap_wake_irq2
 	if (!baseband_power2_driver_data)
 		return IRQ_HANDLED;
 
+	value = gpio_get_value(baseband_power2_driver_data->
+		    modem.xmm.ipc_ap_wake);
+
 	/* IPC_AP_WAKE state machine */
 	if (ipc_ap_wake_state < IPC_AP_WAKE_IRQ_READY) {
 		pr_err("%s - spurious irq\n", __func__);
 	} else if (ipc_ap_wake_state == IPC_AP_WAKE_IRQ_READY) {
-		value = gpio_get_value(baseband_power2_driver_data->
-			modem.xmm.ipc_ap_wake);
 		if (!value) {
 			pr_debug("%s - IPC_AP_WAKE_INIT1"
 				" - got falling edge\n",
@@ -164,8 +162,6 @@ static irqreturn_t baseband_xmm_power2_ver_ge_1130_ipc_ap_wake_irq2
 				__func__);
 		}
 	} else {
-		value = gpio_get_value(baseband_power2_driver_data->
-			modem.xmm.ipc_ap_wake);
 		if (!value) {
 			pr_debug("%s - falling\n", __func__);
 			ipc_ap_wake_state = IPC_AP_WAKE_L;
@@ -476,8 +472,10 @@ static void baseband_xmm_power2_work_func(struct work_struct *work)
 		pr_debug("BBXMM_WORK_INIT\n");
 		/* request baseband irq(s) */
 		ipc_ap_wake_state = IPC_AP_WAKE_UNINIT;
-		err = request_irq(gpio_to_irq(baseband_power2_driver_data
-			->modem.xmm.ipc_ap_wake),
+		err = request_threaded_irq(
+			gpio_to_irq(baseband_power2_driver_data->
+			    modem.xmm.ipc_ap_wake),
+			NULL,
 			(modem_ver < XMM_MODEM_VER_1130)
 			? baseband_xmm_power2_ver_lt_1130_ipc_ap_wake_irq2
 			: baseband_xmm_power2_ver_ge_1130_ipc_ap_wake_irq2,
@@ -611,7 +609,10 @@ static int baseband_xmm_power2_driver_remove(struct platform_device *device)
 	}
 
 	/* free work structure */
-	destroy_workqueue(workqueue);
+	if (workqueue) {
+		cancel_work_sync(baseband_xmm_power2_work);
+		destroy_workqueue(workqueue);
+	}
 	kfree(baseband_xmm_power2_work);
 	baseband_xmm_power2_work = (struct baseband_xmm_power_work_t *) 0;
 

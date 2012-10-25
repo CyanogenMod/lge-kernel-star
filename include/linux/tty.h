@@ -48,8 +48,13 @@
 #define N_PPS		18	/* Pulse per Second */
 #define N_V253		19	/* Codec control over voice modem */
 #define N_CAIF		20      /* CAIF protocol for talking to modems */
-#define N_GSM0710	21	/* GSM 0710 Mux */
+#ifdef CONFIG_MACH_BSSQ
+#define N_GSM0710      21      /* GSM 0710 Mux */ // seokjae.yoon@lge.com, 2012-02-13, restore the definition for KS1103
+#else
+#define N_TS2710	21	/* GSM 0710 Mux */ //jisil.park@lge.com
+#endif
 #define N_TI_WL		22	/* for TI's WL BT, FM, GPS combo chips */
+#define N_RIN 		23	//jisil.park@lge.com
 
 /*
  * This character is the same as _POSIX_VDISABLE: it cannot be used as

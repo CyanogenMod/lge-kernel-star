@@ -154,6 +154,12 @@ static int mmc_decode_csd(struct mmc_card *card)
 	e = UNSTUFF_BITS(resp, 47, 3);
 	m = UNSTUFF_BITS(resp, 62, 12);
 	csd->capacity	  = (1 + m) << (e + 2);
+	// LGE_CHANGE [dojip.kim@lge.com] 2010-12-31, [LGE_AP20] from Star K32
+#ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
+	/* for sector-addressed cards, this will cause csd->capacity to wrap */
+	if (mmc_card_blockaddr(card))
+		csd->capacity -= card->host->ops->get_host_offset(card->host);
+#endif
 
 	csd->read_blkbits = UNSTUFF_BITS(resp, 80, 4);
 	csd->read_partial = UNSTUFF_BITS(resp, 79, 1);
@@ -254,8 +260,31 @@ static int mmc_read_ext_csd(struct mmc_card *card)
 			ext_csd[EXT_CSD_SEC_CNT + 3] << 24;
 
 		/* Cards with density > 2GiB are sector addressed */
-		if (card->ext_csd.sectors > (2u * 1024 * 1024 * 1024) / 512)
+		if (card->ext_csd.sectors > (2u * 1024 * 1024 * 1024) / 512) {
+			// LGE_CHANGE [dojip.kim@lge.com] 2010-12-31, 
+			// [LGE_AP20] from Star K32
+#ifdef CONFIG_EMBEDDED_MMC_START_OFFSET
+			unsigned offs;
+			offs = card->host->ops->get_host_offset(card->host);
+			offs >>= 9;
+			BUG_ON(offs >= card->ext_csd.sectors);
+			card->ext_csd.sectors -= offs;
+
+			// LGE_CHANGE [dojip.kim@lge.com] 2011-01-04,
+			// [LGE_AP20] fix to report correct disk space in case of
+			// emmc 4.3+ cards (from Star K32)
+			offs = ext_csd[EXT_CSD_BOOT_SIZE_MULTI] * 512;
+			card->ext_csd.sectors -= offs;
+#else /* original codes */
+#ifndef CONFIG_MACH_BSSQ
+			unsigned boot_sectors;
+			/* size is in 256K chunks, i.e. 512 sectors each */
+			boot_sectors = ext_csd[EXT_CSD_BOOT_SIZE_MULTI] * 512;
+			card->ext_csd.sectors -= boot_sectors;
+#endif //#ifndef CONFIG_MACH_BSSQ
+#endif
 			mmc_card_set_blockaddr(card);
+		}
 	}
 
 	switch (ext_csd[EXT_CSD_CARD_TYPE] & EXT_CSD_CARD_TYPE_MASK) {

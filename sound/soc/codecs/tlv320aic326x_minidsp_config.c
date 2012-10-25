@@ -1,7 +1,7 @@
 /*
  * linux/sound/soc/codecs/tlv320aic326x_minidsp_config.c
  *
- * Copyright (C) 2011 Mistral Solutions Pvt Ltd.
+ * Copyright (C) 2012 Texas Instruments, Inc.
  *
  * This package is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -16,10 +16,10 @@
  *
  * History:
  *
- * Rev 0.1   Added the multiconfig support      Mistral         17-08-2011
+ * Rev 0.1   Added the multiconfig support           17-08-2011
  *
  * Rev 0.2   Migrated for aic3262 nVidia
- *     Mistral         21-10-2011
+ *           21-10-2011
  */
 
 /*
@@ -48,10 +48,12 @@
 #include "tlv320aic326x.h"
 #include "tlv320aic326x_mini-dsp.h"
 
+#if 0
 #include "Patch_base_jazz_Rate48_pps_driver.h"
 #include "Patch_base_main_Rate48_pps_driver.h"
 #include "Patch_base_pop_Rate48_pps_driver.h"
 #include "Patch_base_rock_Rate48_pps_driver.h"
+#endif
 
 #ifdef CONFIG_MINI_DSP
 
@@ -132,6 +134,8 @@ static const struct snd_kcontrol_new aic3262_minidsp_controls1[] = {
  * and the Instruction Sizes.
  * This has to be replicated for both miniDSP_A and miniDSP_D
  */
+
+#if 0
 struct multibyte_config {
 	reg_value *regs;
 	unsigned int d_coeff_start;
@@ -170,6 +174,44 @@ struct multibyte_config {
 #endif
 	},
 };
+
+#else
+struct multibyte_config {
+	reg_value *regs;
+	unsigned int d_coeff_start;
+	unsigned int d_coeff_size;
+	unsigned int d_inst_start;
+	unsigned int d_inst_size;
+	unsigned int a_coeff_start;
+	unsigned int a_coeff_size;
+	unsigned int a_inst_start;
+	unsigned int a_inst_size;
+} config_array[][2][MAX_CONFIG_ARRAYS] = {
+	/* Process flow 1 */
+	{
+		{
+			/* DAC */
+				{},
+		},
+		/* ADC */
+		{},
+	},
+
+	/* Process flow 2 */
+	{
+#if 0
+		{
+			{main, 0, 0, 0, 0, 0, 0, 0, 0},
+			{pop, 0, 0, 0, 0, 0, 0, 0, 0},
+			{jazz, 0, 0, 0, 0, 0, 0, 0, 0},
+			{rock, 0, 0, 0, 0, 0, 0, 0, 0},
+		},
+		/* ADC */
+		{},
+#endif
+	},
+};
+#endif
 
 /*
  *----------------------------------------------------------------------------
@@ -298,48 +340,83 @@ int aic3262_add_multiconfig_controls(struct snd_soc_codec *codec)
 
 /*
  *--------------------------------------------------------------------------
- * Function : config_multibyte_for_mode
+ * Function : minidsp_multiconfig
  * Purpose :  Function which is invoked when user changes the configuration
  *            at run-time. Internally configures/switches both
  *            miniDSP_D and miniDSP_A Coefficient arrays.
  *---------------------------------------------------------------------------
  */
-void config_multibyte_for_mode(struct snd_soc_codec *codec, int mode)
+void minidsp_multiconfig(struct snd_soc_codec *codec,
+									reg_value *a_patch, int a_size,
+									reg_value *d_patch, int d_size)
 {
-	int val;
-	int pf = mode;
 	struct aic3262_priv *aic326x = snd_soc_codec_get_drvdata(codec);
-	struct multibyte_config *array;
+	int val1,val2;
+	int adc_status,dac_status;
+	int (*ptransfer)(struct snd_soc_codec *codec,
+				reg_value *program_ptr,
+				int size);
 
-	DBG(KERN_INFO "#%s: Invoked for miniDSP Mode %d\n", __func__, mode);
+printk("======in the config_multiconfiguration function==== \n");
+#ifndef MULTIBYTE_I2C
+		ptransfer = byte_i2c_array_transfer;
+#else
+		ptransfer = minidsp_i2c_multibyte_transfer;
+#endif
+	//DBG(KERN_INFO "#%s: Invoked for miniDSP Mode %d\n", __func__, mode);
 
-	array = config_array[pf][MINIDSP_DMODE];
-	  if ((aic326x->current_dac_config[pf] >= 0) &&
-		(aic326x->current_dac_config[pf] < MAX_CONFIG_ARRAYS)) {
-			val = aic326x->current_dac_config[pf];
-			array = &config_array[pf][MINIDSP_DMODE][val];
-			byte_i2c_array_transfer(codec,
-				array->regs,
-				(array->d_inst_size +
-				array->d_coeff_size));
-	} else {
-		DBG(KERN_INFO "#%s: Invalid Configuration ID %d specified.\n",
-			__func__, aic326x->current_dac_config[pf]);
-	}
+	adc_status=aic3262_read(codec,ADC_FLAG_R1);
+	printk("ADC STATUS = %x", adc_status);
 
-	array = config_array[pf][MINIDSP_AMODE];
-	if ((aic326x->current_adc_config[pf] >= 0) &&
-		(aic326x->current_adc_config[pf] < MAX_CONFIG_ARRAYS)) {
-		val = aic326x->current_adc_config[pf];
-		minidsp_i2c_multibyte_transfer(codec,
-				array[val].regs,
-				array[val].a_inst_size +
-				array[val].a_coeff_size);
-	} else {
-		DBG(KERN_INFO "#%s: Invalid Configuration ID %d specified.\n",
-			__func__, aic326x->current_dac_config[pf]);
-	}
-	return;
+	dac_status=aic3262_read(codec,DAC_FLAG_R1);
+	printk("DAC STATUS = %x", dac_status);
+
+	#if 0
+	/* Switching off the adaptive filtering for loading the patch file*/
+	aic3262_change_book(codec, 40);
+	val1 = i2c_smbus_read_byte_data(codec->control_data, 1);
+	aic3262_write(codec, 1, (val1&0xfb));
+
+	aic3262_change_book(codec, 80);
+	val2 = i2c_smbus_read_byte_data(codec->control_data, 1);
+	aic3262_write(codec, 1, (val2&0xfb));
+
+	#endif
+
+	/*apply patches to both pages (mirrored coeffs). this works when DSP are stopped*/
+	/* to apply patches when DSPs are runnig, the 'buffer swap' has to be executed, which is
+	    done in the buffer swap section below*/
+
+	if (a_size)
+		ptransfer	(codec, a_patch, a_size);
+	if (d_size)
+		ptransfer	(codec, d_patch, d_size);
+
+
+		/*swap buffers for both a&d only if DSPs are running*/
+              if((dac_status & 0x80) || (dac_status & 0x8))
+              {
+  		   multibyte_coeff_change(codec, 0x50);/*swap DSP D Buffer*/
+		   if (d_size)
+		   ptransfer(codec, d_patch, d_size); /*apply patch after swapping buffer*/
+              }
+
+              if((adc_status & 0x40) || (adc_status & 0x4))
+              {
+		  multibyte_coeff_change(codec, 0x28);/*swap DSP A Buffer*/
+		  if (a_size)
+		  ptransfer(codec, a_patch, a_size); /*apply patch after swapping buffer*/
+              }
+
+	#if 0
+	if (a_size)
+		ptransfer	(codec, a_patch, a_size);
+	if (d_size)
+		ptransfer	(codec, d_patch, d_size);
+	#endif
+
+
+	return ;
 }
 
 /*
@@ -358,6 +435,7 @@ static int multibyte_coeff_change(struct snd_soc_codec *codec, int bk)
 	i2c = codec->control_data;
 
 	aic3262_change_book(codec, bk);
+	aic3262_change_page(codec, 0);
 
 	value[0] = 1;
 
@@ -380,6 +458,9 @@ static int multibyte_coeff_change(struct snd_soc_codec *codec, int bk)
 			printk(KERN_ERR "Can not write register address\n");
 			goto err;
 		}
+              /*before verifying for buffer_swap, make sure we give one
+              frame delay, because the buffer swap happens at the end of the frame */
+              mdelay(5);
 		value[0] = 1;
 		/* verify buffer swap */
 		if (i2c_master_send(i2c, value, 1) != 1)
@@ -392,16 +473,20 @@ static int multibyte_coeff_change(struct snd_soc_codec *codec, int bk)
 
 		if ((swap_reg_pre == 4 && swap_reg_post == 6)
 			|| (swap_reg_pre == 6 && swap_reg_post == 4))
-			DBG(KERN_INFO "Buffer swap success\n");
+			printk(KERN_INFO "Buffer swap success\n");
 		else
 			printk(KERN_ERR
 			"Buffer swap...FAILED\nswap_reg_pre=%x, swap_reg_post=%x\n",
 			swap_reg_pre, swap_reg_post);
+
+		aic3262_change_book(codec, 0x00);
 	}
 
 err:
 	return 0;
 }
+
+
 
 #endif
 

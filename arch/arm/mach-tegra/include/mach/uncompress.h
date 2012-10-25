@@ -7,7 +7,7 @@
  *	Colin Cross <ccross@google.com>
  *	Erik Gilling <konkers@google.com>
  *
- * Copyright (C) 2010-2011 NVIDIA Corporation
+ * Copyright (C) 2010-2012 NVIDIA Corporation
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -65,12 +65,16 @@
 #define DEBUG_UART_RST_CLR_REG		0
 #define DEBUG_UART_RST_CLR_BIT		0
 #endif
+#define PLLP_BASE			(TEGRA_CLK_RESET_BASE + 0x0a0)
+#define PLLP_BASE_OVERRIDE		(1 << 28)
+#define PLLP_BASE_DIVP_SHIFT		20
+#define PLLP_BASE_DIVP_MASK		(0x7 << 20)
+#define PLLP_BASE_DIVN_SHIFT		8
+#define PLLP_BASE_DIVN_MASK		(0x3FF << 8)
 
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-#define DEBUG_UART_DLL			0x75
-#else
-#define DEBUG_UART_DLL			0xdd
-#endif
+#define DEBUG_UART_DLL_216		0x75
+#define DEBUG_UART_DLL_408		0xdd
+#define DEBUG_UART_DLL_204		0x6f
 
 static void putc(int c)
 {
@@ -104,6 +108,8 @@ static inline void arch_decomp_setup(void)
 	volatile u8 *uart = (volatile u8 *)TEGRA_DEBUG_UART_BASE;
 	int shift = 2;
 	volatile u32 *addr;
+	u8 uart_dll = DEBUG_UART_DLL_216;
+	u32 val;
 
 	if (uart == NULL)
 		return;
@@ -124,9 +130,37 @@ static inline void arch_decomp_setup(void)
 
 	konk_delay(5);
 
+	/*
+	 * On Tegra2 platforms PLLP always run at 216MHz
+	 * On Tegra3 platforms PLLP can run at 216MHz, 204MHz, or 408MHz
+	 * Discrimantion algorithm below assumes that PLLP is configured
+	 * according to h/w recomendations with update rate 1MHz or 1.2MHz
+	 * depending on oscillator frequency
+	 */
+	addr = (volatile u32 *)PLLP_BASE;
+	val = *addr;
+	if (val & PLLP_BASE_OVERRIDE) {
+		u32 p = (val & PLLP_BASE_DIVP_MASK) >> PLLP_BASE_DIVP_SHIFT;
+		val = (val & PLLP_BASE_DIVN_MASK) >> (PLLP_BASE_DIVN_SHIFT + p);
+		switch (val) {
+		case 170:
+		case 204:
+			uart_dll = DEBUG_UART_DLL_204;
+			break;
+		case 340:
+		case 408:
+			uart_dll = DEBUG_UART_DLL_408;
+			break;
+		case 180:
+		case 216:
+		default:
+			break;
+		}
+	}
+
 	/* Set up debug UART. */
 	uart[UART_LCR << shift] |= UART_LCR_DLAB;
-	uart[UART_DLL << shift] = DEBUG_UART_DLL;
+	uart[UART_DLL << shift] = uart_dll;
 	uart[UART_DLM << shift] = 0x0;
 	uart[UART_LCR << shift] = 3;
 }

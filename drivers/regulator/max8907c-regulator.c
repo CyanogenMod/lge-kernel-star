@@ -16,6 +16,8 @@
 #include <linux/regulator/driver.h>
 #include <linux/mfd/max8907c.h>
 #include <linux/regulator/max8907c-regulator.h>
+// LGE_CHANGE [dojip.kim@lge.com] 2011-01-05, [LGE_AP20] regulation_constraints
+#include <linux/regulator/machine.h>
 
 #define MAX8907C_II2RR_VERSION_MASK	0xF0
 #define MAX8907C_II2RR_VERSION_REV_A	0x00
@@ -109,8 +111,30 @@ struct max8907c_regulator_info {
 		}, \
 	}
 
+
+//LGE_CHANGE_S[beobki.chung@lge.com] 2012-02-08, [LGE_AP20] Touch LED enable
+#define REG_LDO_TOUCHLED(ids, base, min, max, step) \
+        { \
+                .min_uV = (min), \
+                .max_uV = (max), \
+                .step_uV = (step), \
+                .reg_base = (base), \
+                .desc = { \
+                        .name = #ids, \
+                        .id = MAX8907C_##ids, \
+                        .n_voltages = ((max) - (min)) / (step) + 1, \
+                        .ops = &max8907c_ldo_touchled_ops, \
+                        .type = REGULATOR_VOLTAGE, \
+                        .owner = THIS_MODULE, \
+                }, \
+        }
+//LGE_CHANGE_E[beobki.chung@lge.com] 2012-02-08, [LGE_AP20] Touch LED enable
+
+
 #define LDO_750_50(id, base) REG_LDO(id, (base), 750000, 3900000, 50000)
 #define LDO_650_25(id, base) REG_LDO(id, (base), 650000, 2225000, 25000)
+#define LDO_TOUCHLED(id, base) REG_LDO_TOUCHLED(id, (base), 650000, 2225000, 25000)  //[heejeong.seo@lge.com] 2011-01-14, [LGE_AP20] audio enable
+
 
 static int max8907c_regulator_list_voltage(struct regulator_dev *dev,
 					   unsigned index);
@@ -131,6 +155,14 @@ static int max8907c_regulator_ldo_disable(struct regulator_dev *dev);
 static int max8907c_regulator_out5v_disable(struct regulator_dev *dev);
 static int max8907c_regulator_ldo_is_enabled(struct regulator_dev *dev);
 static int max8907c_regulator_out5v_is_enabled(struct regulator_dev *dev);
+//LGE_CHANGE_S [beobki.chung@lge.com] 2012-02-08, [LGE_AP20] TouchLED enable
+static int max8907c_regulator_ldo_touchled_set_voltage(struct regulator_dev *dev,int min_uV, int max_uV);
+static int max8907c_regulator_ldo_touchled_get_voltage(struct regulator_dev *dev);
+static int max8907c_regulator_ldo_touchled_enable(struct regulator_dev *dev);
+static int max8907c_regulator_ldo_touchled_disable(struct regulator_dev *dev);
+static int max8907c_regulator_ldo_touchled_is_enabled(struct regulator_dev *dev);
+//LGE_CHANGE_E [heejeong.seo@lge.com] 2012-02-08, [LGE_AP20] touchLED enable
+
 
 static struct regulator_ops max8907c_ldo_ops = {
 	.list_voltage = max8907c_regulator_list_voltage,
@@ -167,6 +199,17 @@ static struct regulator_ops max8907c_wled_ops = {
 	.get_voltage = max8907c_regulator_fixed_get_voltage,
 };
 
+//LGE_CHANGE_S [beobki.chung@lge.com] 2012-02-08, [LGE_AP20] TouchLED Enable
+static struct regulator_ops max8907c_ldo_touchled_ops = {
+	.list_voltage = max8907c_regulator_list_voltage,
+	.set_voltage = max8907c_regulator_ldo_touchled_set_voltage,
+	.get_voltage = max8907c_regulator_ldo_touchled_get_voltage,
+	.enable = max8907c_regulator_ldo_touchled_enable,
+	.disable = max8907c_regulator_ldo_touchled_disable,
+	.is_enabled = max8907c_regulator_ldo_touchled_is_enabled,
+};
+//LGE_CHANGE_E [beobki.chung@lge.com] 2012-02-08, [LGE_AP20] TouchLED Enable
+
 static struct max8907c_regulator_info max8907c_regulators[] = {
 	REG_LDO(SD1, MAX8907C_REG_SDCTL1, 650000, 2225000, 25000),
 	REG_LDO(SD2, MAX8907C_REG_SDCTL2, 637500, 1425000, 12500),
@@ -191,12 +234,20 @@ static struct max8907c_regulator_info max8907c_regulators[] = {
 	LDO_650_25(LDO18, MAX8907C_REG_LDOCTL18),
 	LDO_750_50(LDO19, MAX8907C_REG_LDOCTL19),
 	LDO_750_50(LDO20, MAX8907C_REG_LDOCTL20),
+	LDO_TOUCHLED(TOUCHLED, 0),
+#if defined(CONFIG_STAR_TOUCH_LED) || defined (CONFIG_MACH_BSSQ)
+	REG_WLED(WLED, MAX8907C_REG_ILED_CNTL, 3000000),//[sungyel.bae@lge.com] 2011-01-22, [LGE_AP20] touch led enable
+#endif
 	REG_OUT5V(OUT5V, MAX8907C_REG_OUT5VEN, 5000000),
 	REG_OUT5V(OUT33V, MAX8907C_REG_OUT33VEN, 3300000),
 	REG_BBAT(BBAT, MAX8907C_REG_BBAT_CNFG, 2400000, 3000000, 200000),
 	REG_FIXED(SDBY, 1200000),
 	REG_FIXED(VRTC, 3300000),
+#if !defined(CONFIG_MACH_BSSQ)
+#if !defined(CONFIG_STAR_TOUCH_LED)
 	REG_WLED(WLED, MAX8907C_REG_ILED_CNTL, 0),
+#endif
+#endif
 };
 
 static int max8907c_regulator_list_voltage(struct regulator_dev *rdev,
@@ -272,7 +323,45 @@ static int max8907c_regulator_wled_set_current_limit(struct regulator_dev *rdev,
 	if (min_uA > 25500)
 		return -EDOM;
 
+/* LGE_CHANGE_S [sungyel.bae@lge.com] 2011-01-24, [LGE_AP20] touch led */	
+#if defined(CONFIG_STAR_TOUCH_LED) || defined(CONFIG_MACH_BSSQ)
+	
+#if defined(CONFIG_LU6500) || defined(CONFIG_SU880) || defined(CONFIG_KU8800)
+	if ( min_uA == 0)
+	{
+	  max8907c_reg_write(info->i2c, info->reg_base+1, 90);
+		schedule_timeout_interruptible(msecs_to_jiffies(50));
+
+	  max8907c_reg_write(info->i2c, info->reg_base+1, 30);
+		schedule_timeout_interruptible(msecs_to_jiffies(50));
+
+	  max8907c_reg_write(info->i2c, info->reg_base+1, 0);
+		schedule_timeout_interruptible(msecs_to_jiffies(50));
+
+	  return max8907c_reg_write(info->i2c, info->reg_base, 0x00);	//disable wled 
+	}
+	else{	
+#if defined (CONFIG_SU880) || defined (CONFIG_KU8800) || defined (CONFIG_LU8800) || defined (CONFIG_KS1103)
+		max8907c_reg_write(info->i2c, info->reg_base, 0x01);	//enable wled 1 Port
+#else
+		max8907c_reg_write(info->i2c, info->reg_base, 0x03);	//enable wled 2 Port
+#endif
+		schedule_timeout_interruptible(msecs_to_jiffies(50));
+
+		return max8907c_reg_write(info->i2c, info->reg_base+1, min_uA); // set current..
+        }
+#else	
+	if ( min_uA == 0)
+		max8907c_reg_write(info->i2c, info->reg_base, 0x00);	//disable wled 
+	else	
+		max8907c_reg_write(info->i2c, info->reg_base, 0x01);	//enable wled 
+
+	return max8907c_reg_write(info->i2c, info->reg_base+1, min_uA); // set current..
+#endif
+#else /* original code */
 	return max8907c_reg_write(info->i2c, info->reg_base, min_uA / 100);
+#endif
+/* LGE_CHANGE_E [sungyel.bae@lge.com] 2011-01-24, [LGE_AP20] */
 }
 
 static int max8907c_regulator_wled_get_current_limit(struct regulator_dev *rdev)
@@ -355,12 +444,42 @@ static int max8907c_regulator_out5v_is_enabled(struct regulator_dev *rdev)
 	return 0;
 }
 
+
+//LGE_CHANGE_S [heejeong.seo@lge.com] 2011-01-14, [LGE_AP20] audio enable
+static int max8907c_regulator_ldo_touchled_set_voltage(struct regulator_dev *dev,int min_uV, int max_uV)
+{
+        return 0;
+}
+static int max8907c_regulator_ldo_touchled_get_voltage(struct regulator_dev *dev)
+{
+        return 1250;
+}
+static int max8907c_regulator_ldo_touchled_enable(struct regulator_dev *dev)
+{
+        return 0;
+}
+static int max8907c_regulator_ldo_touchled_disable(struct regulator_dev *dev)
+{
+        return 0;
+}
+static int max8907c_regulator_ldo_touchled_is_enabled(struct regulator_dev *dev)
+{
+        return 1;
+}
+//LGE_CHANGE_E [heejeong.seo@lge.com] 2011-01-14, [LGE_AP20] audio enable
+
+
 static int max8907c_regulator_probe(struct platform_device *pdev)
 {
 	struct max8907c *max8907c = dev_get_drvdata(pdev->dev.parent);
 	struct max8907c_regulator_info *info;
 	struct regulator_dev *rdev;
 	u8 version;
+	// LGE_CHANGE [dojip.kim@lge.com] 2011-01-04 [LGE_AP20] constraints
+#if defined(CONFIG_MACH_STAR)
+	struct regulator_init_data *initdata;
+	struct regulation_constraints *c;
+#endif
 
 	/* Backwards compatibility with max8907b, SD1 uses different voltages */
 	version = max8907c_reg_read(max8907c->i2c_power, MAX8907C_REG_II2RR);
@@ -372,6 +491,20 @@ static int max8907c_regulator_probe(struct platform_device *pdev)
 
 	info = &max8907c_regulators[pdev->id];
 	info->i2c = max8907c->i2c_power;
+
+	// LGE_CHANGE [dojip.kim@lge.com] 2011-01-04 [LGE_AP20] constraints
+#if defined(CONFIG_MACH_STAR)
+	initdata = (struct regulator_init_data *)pdev->dev.platform_data;
+	if (!initdata)
+		return -EINVAL;
+
+	c = &initdata->constraints;
+
+	if(pdev->id == MAX8907C_LDO5) 
+      {
+		c->always_on = true;
+	}
+#endif
 
 	rdev = regulator_register(&info->desc,
 				  &pdev->dev, pdev->dev.platform_data, info);

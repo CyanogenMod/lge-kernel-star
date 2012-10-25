@@ -1,0 +1,285 @@
+
+// star project does not use tegra_init_gpio_info_array in tegra_gpio_init().
+#if 0
+const struct tegra_init_gpio_info tegra_init_gpio_info_array[] = {
+
+	// VDDIO_BB
+	{ 'o'-'a',		5,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_LOW, 		UAB},	// IPC_SRDY1
+	{ 'o'-'a',		6,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_LOW, 		UAB},	// 1SEG_INT
+	{ 'o'-'a',		7,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		UAB},	// NC
+	{ 'o'-'a',		0,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		UAB},	// IPC_MRDY1
+	{ 'v'-'a',		0,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		UAC},	// CP_RESET
+	{ 'v'-'a',		1,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		UAC},	// CP_PWRON
+	{ 'v'-'a',		2,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_HIGH,			UAC},	// AP_PWN_ON_N
+	{ 'v'-'a',		3,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_LOW, 		UAC},	// CP_RESET_FLAG
+
+	// VDDIO_LCD
+	{ 'c'-'a',		1,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		LPW1},	// NC
+	{ 'z'-'a',		2,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_HIGH,		LSDI},	// GAUGE_LOW_INT_N
+	{ 'n'-'a',		5,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_HIGH,		LSDA},	// PMIC_LOW_INT
+	{ 'n'-'a',		6,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		LDC},	// NC
+	{ 'z'-'a',		4,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		LSCK},	// NC
+	{ 'v'-'a',		7,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		LVP0},	// NC
+	{ 'w'-'a',		1,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		LM1},	// NC
+	{ 'b'-'a',		3,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_LOW, 		LSC0},	// EARJACK_SENSE
+	{ 'j'-'a',		3,	GPIO_ENABLE,	GPIO_OUTPUT, 	GPIO_SLEEP_HIGH,			LHS},	// BL_DCDC_SCL
+	{ 'j'-'a',		4,	GPIO_ENABLE,	GPIO_OUTPUT, 	GPIO_SLEEP_HIGH,			LVS},	// BL_DCDC_SDA
+	{ 'e'-'a',		0,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		LD0},	// NC
+	{ 'e'-'a',		1,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW,			LD1},	// I2C2_SW
+	{ 'e'-'a',		2,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_HIGH,			LD2},	// AUDIO_INT_N
+	{ 'e'-'a',		3,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		LD3},	// LCD_CP_EN
+	{ 'e'-'a',		4,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		LD4},	// NC
+	{ 'e'-'a',		5,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		LD5},	// NC
+	{ 'e'-'a',		6,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		LD6},	// NC
+	{ 'e'-'a',		7,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		LD7},	// LCD_RESET_N
+	{ 'f'-'a',		0,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_LOW, 		LD8},	// COM_INT
+	{ 'f'-'a',		1,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_HIGH,			LD9},	// CP_USB_VBUS_EN
+	{ 'f'-'a',		2,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		LD10},	// 1SEG_A_1.2V_EN
+	{ 'f'-'a',		3,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		LD11},	// 1SEG_EN
+	{ 'f'-'a',		4,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_HIGH,		LD12},	// MOTION_INT_N
+	{ 'f'-'a',		5,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		LD13},	// NC
+	{ 'f'-'a',		6,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_HIGH,		LD14},	// GYRO_INT_N
+	{ 'f'-'a',		7,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		LD15},	// WM_LDO_EN
+	{ 'm'-'a',		0,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		LD16},	// NC
+	{ 'm'-'a',		1,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_LOW, 		LD17},	// TOUCH_ID
+	{ 'm'-'a',		2,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_INIT_ONLY_LOW, 	LHP1},	// BT_EN
+	{ 'm'-'a',		3,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_INIT_ONLY_LOW, 	LHP2},	// WLAN_EN
+	{ 'm'-'a',		4,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_LOW, 		LVP1},	// LCD_MAKER_ID
+	{ 'm'-'a',		5,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_LOW, 		LHP0},	// AP_STATE (Not used)
+	{ 'm'-'a',		6,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_LOW, 		LDI},	// CP_STATE (Not_used)
+	{ 'm'-'a',		7,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		LPP},	// NC
+	{ 'n'-'a',		7,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_LOW, 		HDINT}, // HDMI_INT
+
+	// VDDIO_VI
+	{ 't'-'a',		4,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 	DTA},	// NC
+	{ 'd'-'a',		5,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 	DTA},	// VT_CAM_PWDN
+	{ 't'-'a',		2,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 	DTB},	// VT_RESET_N
+	{ 't'-'a',		3,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 	DTB},	// 8M_RESET_N
+	{ 'z'-'a' + 2,	1,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 	DTE},	// NC
+	{ 'z'-'a' + 2,	4,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 	DTE},	// NC
+	{ 'z'-'a' + 2,	5,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 	DTE},	// NC
+	{ 'd'-'a',		2,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 	DTE},	// NC
+	{ 'a'-'a',		0,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 	DTE},	// NC
+
+	// VDDIO_UART
+	{ 'j'-'a',		6,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 	IRRX},	// IPC_MRDY2
+	{ 'j'-'a',		5,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 	IRTX},	// NC
+	{ 'u'-'a',		0,	GPIO_ENABLE,	GPIO_INPUT,		GPIO_SLEEP_HIGH, 	GPU},	// INT_N_MUIC
+	{ 'u'-'a',		1,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_HIGH,	GPU},	// WLAN_WAKEUP_N
+	{ 'u'-'a',		2,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_HIGH,		GPU},	// MUIC_UART_SW
+//	{ 'u'-'a',		3,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 	GPU},	// VIBE_PWM
+	{ 'u'-'a',		4,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 	GPU},	// VIBE_EN
+	{ 'u'-'a',		5,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_LOW,		GPU},	// HALL_INT
+	{ 'u'-'a',		6,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_LOW, 	GPU},	// IPC_SRDY2
+
+	// VDDIO_SYS
+	{ 'r'-'a',		0,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCA},	// NC
+	{ 'r'-'a',		1,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCA},	// NC
+	{ 'r'-'a',		2,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCA},	// NC
+	{ 'r'-'a',		3,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCD},	// NC
+	{ 'r'-'a',		4,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCD},	// NC
+	{ 'r'-'a',		5,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCD},	// NC
+	{ 'r'-'a',		6,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCD},	// NC
+	{ 'r'-'a',		7,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCB},	// NC
+	{ 's'-'a',		0,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_HIGH,			KBCB},	// WLAN_HOST_WAKEUP_N
+	{ 's'-'a',		1,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCB},	// NC
+	{ 's'-'a',		2,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCB},	// NC
+	{ 's'-'a',		3,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCB},	// NC
+	{ 's'-'a',		4,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCB},	// NC
+	{ 's'-'a',		5,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCB},	// NC
+	{ 's'-'a',		6,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCB},	// NC
+	{ 's'-'a',		7,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCB},	// NC
+	{ 'q'-'a',		0,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCC},	// NC
+	{ 'q'-'a',		1,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCC},	// NC
+	{ 'q'-'a',		2,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCF},	// NC
+	{ 'q'-'a',		3,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCF},	// NC
+	{ 'q'-'a',		4,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCF},	// NC
+	{ 'q'-'a',		5,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCF},	// NC
+	{ 'q'-'a',		6,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCF},	// NC
+	{ 'q'-'a',		7,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		KBCE},	// NC
+
+	// VDDIO_AUDIO
+	{ 'k'-'a',		5,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		SPDO},	// HDMI_REG_EN
+	{ 'k'-'a',		6,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		SPDI},	// TOUCH_RESET_N
+	{ 'w'-'a',		5,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		CDEV2}, // NC
+	{ 'x'-'a',		4,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW,			SPID},	// BT_WAKEUP
+	{ 'x'-'a',		5,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_LOW, 		SPIE},	// PROX_OUT
+	{ 'x'-'a',		6,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_HIGH,		SPIE},	// TOUCH_INT_N
+	{ 'x'-'a',		7,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		SPIF},	// EAR_BIAS_EN
+	{ 'w'-'a',		2,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_HIGH,			SPIG},	// CHARGER_IRQB
+	{ 'w'-'a',		3,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_HIGH,			SPIH},	// BATT_LOW_INT_N
+
+	// VDDIO_SDIO
+	{ 'd'-'a',		1,	GPIO_ENABLE,	GPIO_INPUT,		GPIO_SLEEP_LOW, 		SLXA},	// NC
+	{ 'd'-'a',		0,	GPIO_ENABLE,	GPIO_INPUT,		GPIO_SLEEP_LOW, 		SLXK},	// NC
+	{ 'd'-'a',		3,	GPIO_ENABLE,	GPIO_INPUT,		GPIO_SLEEP_LOW, 		SLXC},	// NC
+	{ 'd'-'a',		4,	GPIO_ENABLE,	GPIO_INPUT,		GPIO_SLEEP_LOW, 		SLXD},	// NC
+	{ 'v'-'a',		4,	GPIO_ENABLE,	GPIO_INPUT,		GPIO_SLEEP_LOW, 		GPV},	// NC
+	{ 'v'-'a',		5,	GPIO_ENABLE,	GPIO_INPUT,		GPIO_SLEEP_LOW, 		GPV},	// NC
+	{ 'v'-'a',		6,	GPIO_ENABLE,	GPIO_INPUT,		GPIO_SLEEP_LOW, 		GPV},	// NC
+
+	// VDDIO_NAND
+	{ 'i'-'a',		5,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_HIGH,			ATB},	// MICROSD_DET_N
+	{ 'i'-'a',		7,	GPIO_ENABLE,	GPIO_OUTPUT, 	GPIO_SLEEP_HIGH,			ATC},	// MUIC_GAUGE_SCL
+	{ 'k'-'a',		0,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_HIGH,			ATC},	// GMI_ADV_N
+	{ 'k'-'a',		1,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_LOW, 		ATC},	// PULL_DOWN
+	{ 'j'-'a',		0,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		GMD},	// NC
+	{ 'j'-'a',		2,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		GMD},	// NC
+	{ 'k'-'a',		3,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		ATC},	// NC
+	{ 'k'-'a',		4,	GPIO_ENABLE,	GPIO_OUTPUT, 	GPIO_SLEEP_HIGH,			ATC},	// MUIC_GAUGE_SDA
+	{ 'k'-'a',		2,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_HIGH,		ATC},	// THERMAL_IRQ_N
+	{ 'i'-'a',		3,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		ATA},	// NC
+	{ 'i'-'a',		6,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		ATA},	// NC
+	{ 'g'-'a',		0,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_HIGH,			ATC},	// VOL_KEY_UP
+	{ 'g'-'a',		1,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_HIGH,			ATC},	// VOL_KEY_DOWN
+	{ 'g'-'a',		2,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		ATC},	// NC
+	{ 'g'-'a',		3,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		ATC},	// NC
+	{ 'g'-'a',		4,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_LOW, 		ATC},	// PULL_DOWN
+	{ 'g'-'a',		5,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_LOW, 		ATC},	// PULL_DOWN
+	{ 'g'-'a',		6,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_LOW, 		ATC},	// PULL_DOWN
+	{ 'g'-'a',		7,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_LOW, 		ATC},	// PULL_DOWN
+	{ 'h'-'a',		0,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		ATD},	// NC
+	{ 'h'-'a',		1,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		ATD},	// NC
+	{ 'h'-'a',		2,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		ATD},	// NC
+	{ 'h'-'a',		3,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		ATD},	// NC
+	{ 'h'-'a',		4,	GPIO_ENABLE,	GPIO_INPUT, 		GPIO_SLEEP_LOW, 		ATE},	// PULL DOWN(DNI)
+	{ 'h'-'a',		5,	GPIO_ENABLE,	GPIO_INPUT, 		GPIO_SLEEP_LOW, 		ATE},	// PULL DOWN
+	{ 'h'-'a',		6,	GPIO_ENABLE,	GPIO_INPUT, 		GPIO_SLEEP_LOW, 		ATE},	// PULL DOWN
+	{ 'h'-'a',		7,	GPIO_ENABLE,	GPIO_INPUT, 		GPIO_SLEEP_LOW, 		ATE},	// PULL DOWN
+	{ 'j'-'a',		7,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_HIGH,			GMC},	// HOOK_DET_N
+	{ 'b'-'a',		0,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		GMC},	// NC
+	{ 'b'-'a',		1,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		GMC},	// NC
+	{ 'k'-'a',		7,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		GMC},	// NC
+	{ 'i'-'a',		0,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		ATC},	// NC
+	{ 'i'-'a',		1,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_HIGH,			ATC},	// GMI_OE_N
+	{ 'i'-'a',		4,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW, 		ATA},	// NC
+	{ 'c'-'a',		7,	GPIO_ENABLE,	GPIO_INPUT, 	GPIO_SLEEP_HIGH,		GMB},	// BT_HOST_WAKEUP_N
+
+};
+#endif
+
+const struct tegra_init_gpio_info tegra_sleep_gpio_info_array[] = {
+    /* tristate off */
+    { 0xFF,         0, SFIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   PMC},     // PMC
+    //{ 0xFF,         0, SFIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   I2CP},    // power i2c 
+
+    /* Keep gpio output level */
+    { 'w'-'a',      1, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_INIT_ONLY_LOW,   LM1},  // WLAN_EN
+    { 'z'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_INIT_ONLY_LOW,   LSDI},  // BT_EN
+    { 's'-'a',      1, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_INIT_ONLY_HIGH,    KBCB},  // CHG_EN_SET_N_AP20
+    { 'v'-'a',      0, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_INIT_ONLY_LOW,     UAC},   // IFX_RESET_1.8V
+    { 'v'-'a',      1, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_INIT_ONLY_LOW,     UAC},   // IFX_PWRON_1.8V high½Ã 300uA¹ß»ý.
+    
+    /* All GPIO output pins should be defined here */
+    //{ 'h'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW/*GPIO_SLEEP_HIGH*/,  ATD},   // TEST_GPIO2(Sleep status)(P999BN)
+    { 't'-'a',      4, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   DTA},   // 8MN_CAM_VCM_EN
+    { 'd'-'a',      5, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   DTA},   // VT_CAM_PWDN 
+    { 't'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   DTB},   // FLASH_LED_TOURCH
+    { 't'-'a',      3, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   DTB},   // FLASH_LED_INH
+    { 'z'-'a' + 2,  1, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   DTE},   // VT_RESET_N 
+    { 'z'-'a' + 2,  4, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   DTE},   // FLASH_LED_EN 
+    { 'd'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   DTE},   // 8M_RESET_N
+    { 'u'-'a',      1, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   GPU},   // AP20_UART_SW
+    { 'u'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,  GPU},   // MDM_UART_SW
+    { 'u'-'a',      4, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   GPU},   // VIBE_EN
+    //{ 'j'-'a',      6, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   IRRX},  // IPC_MRDY1 (P999bn)
+#if defined(CONFIG_MACH_STAR_P990)
+    { 'r'-'a',      7, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_HIGH,   KBCB}, // IFX_VBUS_EN
+#elif defined(CONFIG_MACH_STAR_SU660)
+    { 'r'-'a',      7, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   KBCB},  // DMB_EN
+#else
+	#error
+#endif
+    { 'r'-'a',      3, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   KBCD},  // BL_DCDC_RST_N
+    { 'r'-'a',      6, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   KBCD},  // CAM_SUBPM_EN
+    { 'v'-'a',      7, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   LVP0},  // LCD_RESET_N
+    { 'k'-'a',      5, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   SPDO},  // HDMI_REG_EN
+    { 'x'-'a',      4, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   SPID},  // BT_WAKEUP
+    { 'o'-'a',      0, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   UAB},   // IPC_MRDY
+    { 'i'-'a',      7, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_HIGH,  ATC},   // MUIC_SCL ?
+    { 'k'-'a',      4, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_HIGH,  ATC},   // MUIC_SDA ?
+    { 'k'-'a',      3, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_HIGH,  ATC},   // WM_LDO_EN
+    { 'g'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   ATC},   // WLAN_WAKEUP 
+    { 'u'-'a',      3, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   GPU},   // USIF1_SW (LGP90)
+    { 'r'-'a',      0, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   KBCA},  // IFX1_AP20 (sleep_status) (LGP990)
+    { 'j'-'a',      0, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_HIGH,  GMD},   // GPS_RESET_N (LGP90) dynamic??
+    { 'j'-'a',      2, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_LOW,   GMD},   // GPS_PWR_ON (LGP90) dynamic??
+
+    /* All wakeup pins should be defined here : gpio input enable */
+    { 'o'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   UAB},   //  IPC_SRDY
+    { 'z'-'a' + 2,  5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   DTE},   //  NC  +
+    { 'a'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   DTE},   // PROXI_OUT(NC) +
+    { 'c'-'a',      7, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GMB},   // BT_HOST_WAKEUP
+    { 's'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCB},  // WLAN_HOST_WAKEUP
+    { 's'-'a',      2, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCB},  // CHG_STATUS_N_AP20
+    { 'v'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   UAC},   // MDM_RESET_FLAG +
+    { 'v'-'a',      2, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   UAC},   // AP_PWR_ON(powerkey)    
+    //{ 'w'-'a',      2, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   SPIG},  // AUDIO_INT_N
+    { 'w'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   SPIH},  // BATT_LOW_INT
+    { 'n'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   LSDA},  //  HOOK_DET
+    //{ 'i'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATB},   // MICROSD_DET_N
+
+    /* input pins */
+    //{ 'h'-'a',      1, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATD},   // TEST_GPIO1(P999BN)
+    //{ 'h'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATD},   // NC
+    //{ 'h'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATD},   // NC
+    { 'u'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GPU},   // HALL_INT
+    //{ 'u'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GPU},   // VIBE_PWM(P999BN)
+    { 'u'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GPU},   // INT_N_MUIC
+    { 'u'-'a',      6, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GPU},   // VIBE_PMW(LGP990), IPC_SRDY1(P999BN)
+    { 'r'-'a',      4, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCD},  // COM_INT
+#if defined(CONFIG_MACH_STAR_P990)
+	{ 'r'-'a',		5,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW,		KBCD},  // NC
+#elif defined(CONFIG_MACH_STAR_SU660)
+	{ 'r'-'a',		5,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_HIGH,	KBCD},  // IFX_VBUS_EN
+#else
+	#error
+	//{ 'r'-'a',	5,	GPIO_ENABLE,	GPIO_INPUT,		GPIO_SLEEP_LOW,		KBCD},  // BATT_ID(P999BN)??
+#endif
+	{ 'q'-'a',		5,	GPIO_ENABLE,	GPIO_INPUT,		GPIO_SLEEP_LOW,	KBCF},  // GYRO_INT_N
+    { 'q'-'a',      2, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCF},  // CHG_PGB_N
+    { 'o'-'a',      6, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   UAB},   // SPI2_MISO
+    { 'o'-'a',      7, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   UAB},   // SPI2_CLK
+    { 'k'-'a',      2, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATC},   // THERMAL_IRQ
+    { 'g'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_HIGH,  ATC},   // VOL_KEY_UP
+    { 'g'-'a',      1, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_HIGH,  ATC},   // VOL_KEY_DOWN
+    { 'g'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATC},   // EARJACK_SENSE
+	{ 'i'-'a',		0,	GPIO_ENABLE,	GPIO_INPUT,		GPIO_SLEEP_LOW,	ATC},  // MOTION_INT
+    { 'x'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   SPIE},  // TOUCH_MAKER_ID
+	{ 'x'-'a',		6,	GPIO_ENABLE,	GPIO_INPUT,		GPIO_SLEEP_LOW,	SPIE},  // TOUCH_INT
+    { 'r'-'a',      1, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCA},  // IFX2_AP20 (LGP990)
+    { 'r'-'a',      2, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   KBCA},  // PROXI_OUT
+#if defined(CONFIG_MACH_STAR_SU660)
+	{ 'j'-'a',		6,	GPIO_ENABLE,	GPIO_INPUT,		GPIO_SLEEP_LOW,	IRRX},  // LOWER_TOUCH_INT/ (SU660)
+#else
+	{ 'j'-'a',		6,	GPIO_ENABLE,	GPIO_OUTPUT,	GPIO_SLEEP_LOW,		IRRX},  // NC
+#endif
+
+    { 'j'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   IRTX},  // LCD_MAKER_ID
+    //{ 'q'-'a',      0, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_HIGH,  KBCC},  // BL_DCDC_SDA
+    //{ 'q'-'a',      1, GPIO_ENABLE, GPIO_OUTPUT,    GPIO_SLEEP_HIGH,  KBCC},  // BL_DCDC_SOL
+    { 't'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   DTD},   //  VT_PCLK
+    { 't'-'a',      1, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   CSUS},  //  VT_MCLK
+
+	{ 'w'-'a',		4,	GPIO_ENABLE,	GPIO_INPUT,	GPIO_SLEEP_LOW,	CDEV1},	// AUDIO_MCLK
+	{ 'w'-'a',		5,	GPIO_ENABLE,	GPIO_INPUT,	GPIO_SLEEP_LOW,	CDEV2},	// AUDIO_MCLK2
+{ 'v'-'a',      6, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GPV},  // HomeKey (SU660)
+	{ 'n'-'a',		0,	GPIO_ENABLE, GPIO_INPUT,	GPIO_SLEEP_LOW,	 		DAP1}, 	// DAP1
+	{ 'n'-'a',		1,	GPIO_ENABLE, GPIO_INPUT,	GPIO_SLEEP_LOW,	 		DAP1}, 	// DAP1
+	{ 'n'-'a',		2,	GPIO_ENABLE, GPIO_INPUT,	GPIO_SLEEP_LOW,	 		DAP1}, 	// DAP1
+	{ 'n'-'a',		3,	GPIO_ENABLE, GPIO_INPUT,	GPIO_SLEEP_LOW,	 		DAP1}, 	// DAP1
+	{ 'a'-'a',		2,	GPIO_ENABLE, GPIO_INPUT,	GPIO_SLEEP_LOW,	 		DAP2}, 	// DAP2
+	{ 'a'-'a',		3,	GPIO_ENABLE, GPIO_INPUT,	GPIO_SLEEP_LOW,	 		DAP2}, 	// DAP2
+	{ 'a'-'a',		4,	GPIO_ENABLE, GPIO_INPUT,	GPIO_SLEEP_LOW,	 		DAP2}, 	// DAP2
+	{ 'a'-'a',		5,	GPIO_ENABLE, GPIO_INPUT,	GPIO_SLEEP_LOW,	 		DAP2}, 	// DAP2
+ 
+   /* voice call ?? */
+    //{ 0xFF        0, SFIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   CDEV1},   // AUDIO MCLK
+    //{ 0xFF        0, SFIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   CDEV2},   // AUDIO MCLK2
+    //{ 0xFF        0, SFIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATC},     // GMI_ADV_N, GMI_OE **    
+    //{ 0xFF        0, SFIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   DAP1},    // DAP1
+    //{ 0xFF        0, SFIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   DAP2},    // DAP2
+    //{ 0xFF        0, SFIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   DAP4},    // BT DAP
+    //{ 0xFF        0, SFIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   DAP3},    // DAP 
+};
+

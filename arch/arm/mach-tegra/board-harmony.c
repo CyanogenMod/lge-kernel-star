@@ -55,6 +55,7 @@
 #include "clock.h"
 #include "devices.h"
 #include "gpio-names.h"
+#include "pm.h"
 
 /* NVidia bootloader tags */
 #define ATAG_NVIDIA		0x41000801
@@ -163,20 +164,6 @@ struct platform_device tegra_nand_device = {
 		},
 };
 
-static struct plat_serial8250_port debug_uart_platform_data[] = {
-	{
-		.membase	= IO_ADDRESS(TEGRA_UARTD_BASE),
-		.mapbase	= TEGRA_UARTD_BASE,
-		.irq		= INT_UARTD,
-		.flags		= UPF_BOOT_AUTOCONF,
-		.iotype		= UPIO_MEM,
-		.regshift	= 2,
-		.uartclk	= 216000000,
-	}, {
-		.flags		= 0
-	}
-};
-
 static struct gpio_keys_button harmony_gpio_keys_buttons[] = {
 	{
 		.code		= KEY_POWER,
@@ -199,14 +186,6 @@ static struct platform_device harmony_gpio_keys_device = {
 	.dev		= {
 		.platform_data = &harmony_gpio_keys,
 	}
-};
-
-static struct platform_device debug_uart = {
-	.name = "serial8250",
-	.id = PLAT8250_DEV_PLATFORM,
-	.dev = {
-		.platform_data = debug_uart_platform_data,
-	},
 };
 
 static void harmony_keys_init(void)
@@ -351,8 +330,34 @@ static struct platform_device pda_power_device = {
 	},
 };
 
+static void harmony_debug_uart_init(void)
+{
+	struct clk *c;
+
+	debug_uart_clk = clk_get_sys("serial8250.0", "uartd");
+	debug_uart_port_base = ((struct plat_serial8250_port *)(
+		debug_uartd_device.dev.platform_data))->mapbase;
+
+	if (!IS_ERR_OR_NULL(debug_uart_clk)) {
+		pr_info("The debug console clock name is %s\n",
+			debug_uart_clk->name);
+		c = tegra_get_clock_by_name("pll_p");
+		if (IS_ERR_OR_NULL(c))
+			pr_err("Not getting the parent clock pll_p\n");
+		else
+			clk_set_parent(debug_uart_clk, c);
+
+		clk_enable(debug_uart_clk);
+		clk_set_rate(debug_uart_clk, clk_get_rate(c));
+	} else {
+		pr_err("Not getting the clock %s for debug console\n",
+					debug_uart_clk->name);
+	}
+	return;
+}
+
 static struct platform_device *harmony_devices[] __initdata = {
-	&debug_uart,
+	&debug_uartd_device,
 	&tegra_sdhci_device1,
 	&tegra_sdhci_device2,
 	&tegra_sdhci_device4,
@@ -477,6 +482,8 @@ static void __init tegra_harmony_init(void)
 
 	harmony_keys_init();
 
+	harmony_debug_uart_init();
+
 	tegra_sdhci_device1.dev.platform_data = &sdhci_pdata1;
 	tegra_sdhci_device2.dev.platform_data = &sdhci_pdata2;
 	tegra_sdhci_device4.dev.platform_data = &sdhci_pdata4;
@@ -500,7 +507,7 @@ void __init tegra_harmony_reserve(void)
 	if (memblock_reserve(0x0, 4096) < 0)
 		pr_warn("Cannot reserve first 4K of memory for safety\n");
 
-	tegra_reserve(SZ_128M, SZ_8M, 0);
+	tegra_reserve(SZ_128M, SZ_8M, SZ_16M);
 }
 
 MACHINE_START(HARMONY, "harmony")

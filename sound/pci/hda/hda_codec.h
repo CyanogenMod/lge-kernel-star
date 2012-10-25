@@ -866,6 +866,7 @@ struct hda_codec {
 	unsigned long power_jiffies;
 #endif
 
+	unsigned int recv_dec_cap;
 	/* codec-specific additional proc output */
 	void (*proc_widget_hook)(struct snd_info_buffer *buffer,
 				 struct hda_codec *codec, hda_nid_t nid);

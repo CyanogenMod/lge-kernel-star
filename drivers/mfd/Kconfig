@@ -702,6 +702,18 @@ config MFD_TPS6591X
 	  additional drivers must be enabled in order to use the
 	  functionality of the device.
 
+config MFD_TPS65090
+	bool "TPS65090 Power Management chips"
+	depends on I2C && GENERIC_HARDIRQS
+	select MFD_CORE
+	select REGMAP_I2C
+	help
+	  If you say yes here you get support for the TPS65090 series of
+	  Power Management chips.
+	  This driver provides common support for accessing the device,
+	  additional drivers must be enabled in order to use the
+	  functionality of the device.
+
 config MFD_AAT2870_CORE
 	bool "Support for the AnalogicTech AAT2870"
 	select MFD_CORE

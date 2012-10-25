@@ -438,6 +438,11 @@ struct input_keymap_entry {
 #define KEY_WIMAX		246
 #define KEY_RFKILL		247	/* Key that controls all radios */
 
+#define KEY_HOOK        248             //LGE_CHANGE_S [chahee.kim@lge.com] 2011-11-03
+
+#ifdef CONFIG_MACH_BSSQ
+#define KEY_RIL_RECOVERY 254   
+#endif
 /* Code 255 is reserved for special needs of AT keyboard driver */
 
 #define BTN_MISC		0x100
@@ -673,6 +678,11 @@ struct input_keymap_entry {
 #define KEY_CAMERA_LEFT		0x219
 #define KEY_CAMERA_RIGHT	0x21a
 
+//#ifdef CONFIG_MACH_BSSQ
+#if defined (CONFIG_MACH_BSSQ) || defined(CONFIG_MACH_STAR)
+//#define KEY_TESTMODE_UNLOCK		0x21b	/* PATTETN LOCK CLEAR */ // 20110724 deukgi.shin@lge.com ADD TESTMODE UNLOCK KEY 
+#define KEY_TESTMODE_UNLOCK		0x2FD	/* PATTETN LOCK CLEAR */ // 20110724 deukgi.shin@lge.com ADD TESTMODE UNLOCK KEY 
+#endif
 #define BTN_TRIGGER_HAPPY		0x2c0
 #define BTN_TRIGGER_HAPPY1		0x2c0
 #define BTN_TRIGGER_HAPPY2		0x2c1

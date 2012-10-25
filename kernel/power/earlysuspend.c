@@ -102,7 +102,14 @@ static void early_suspend(struct work_struct *work)
 	if (debug_mask & DEBUG_SUSPEND)
 		pr_info("early_suspend: sync\n");
 
-	sys_sync();
+/* LGE_CHANGE_S, ryu.seeyeol@lge.com, 2012-02-24, repair sys_sync() func in early_suspend or suspend. Merge from IS11LG GB */
+#if 0
+	// org sys_sync();
+	suspend_sys_sync_queue();
+#else
+    sys_sync();
+#endif
+/* LGE_CHANGE_E, ryu.seeyeol@lge.com, 2012-02-24, repair sys_sync() func in early_suspend or suspend. Merge from IS11LG GB */
 abort:
 	spin_lock_irqsave(&state_lock, irqflags);
 	if (state == SUSPEND_REQUESTED_AND_SUSPENDED)

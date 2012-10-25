@@ -487,6 +487,7 @@ static int __devinit tegra30_ahub_probe(struct platform_device *pdev)
 #ifdef CONFIG_PM
 	int i = 0, cache_idx_rsvd;
 #endif
+	int clkm_rate;
 
 	if (ahub)
 		return -ENODEV;
@@ -505,6 +506,11 @@ static int __devinit tegra30_ahub_probe(struct platform_device *pdev)
 		ret = PTR_ERR(ahub->clk_d_audio);
 		goto err_free;
 	}
+	clkm_rate = clk_get_rate(clk_get_parent(ahub->clk_d_audio));
+	while (clkm_rate > 12000000)
+		clkm_rate >>= 1;
+
+	clk_set_rate(ahub->clk_d_audio,clkm_rate);
 
 	ahub->clk_apbif = clk_get(&pdev->dev, "apbif");
 	if (IS_ERR(ahub->clk_apbif)) {

@@ -244,6 +244,17 @@ struct spi_tegra_data {
 	int			min_div;
 };
 
+#ifdef CONFIG_MACH_BSSQ
+//20110808 ws.yang@lge.com add to debug [S]
+#define SPI_SLAVE_TEGRA_ERROR
+#ifdef SPI_SLAVE_TEGRA_ERROR
+#define TEGRA_ERR_LOG(format, args...) printk("[TEGRA SLAVE SPI] : %s (%d line): " format "\n", __FUNCTION__, __LINE__, ## args)
+#else
+#define TEGRA_ERR_LOG(format, args...) 
+#endif
+//20110808 ws.yang@lge.com add to debug [E]
+#endif
+
 static inline unsigned long spi_tegra_readl(struct spi_tegra_data *tspi,
 		    unsigned long reg)
 {
@@ -272,6 +283,44 @@ int spi_tegra_register_callback(struct spi_device *spi, callback func,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(spi_tegra_register_callback);
+
+#ifdef CONFIG_MACH_BSSQ
+void spi_tegra_abort_transfer(struct spi_device *spi)
+{
+	struct spi_tegra_data *tspi = spi_master_get_devdata(spi->master);
+	struct spi_message *m;
+	unsigned long flags;
+
+	spin_lock_irqsave(&tspi->lock, flags);
+	TEGRA_ERR_LOG("tspi->rx_complete=%d, tspi->tx_complete=%d", tspi->rx_complete, tspi->tx_complete);	
+	if (((tspi->rx_complete) != 0) || ((tspi->tx_complete) != 0))
+	{
+		TEGRA_ERR_LOG("tspi tx or rx is complete !!!!!!");
+		spin_unlock_irqrestore(&tspi->lock, flags);
+		return; //20111101 ws.yang@lge.com ..to fix spin_unlock_irqrestore
+	}
+
+//	tspi->abort_happen = true; //x2ics
+	spin_unlock_irqrestore(&tspi->lock, flags);
+
+	m = list_first_entry(&tspi->queue, struct spi_message, queue);
+	m->status = -EIO;
+	if (m->status == (-EIO))	//20110725 ws.yang@lge.com add to debug when error..
+		TEGRA_ERR_LOG("m->status = %d(-EIO)\n", m->status);
+
+	tegra_dma_dequeue(tspi->tx_dma);
+	tegra_dma_dequeue(tspi->rx_dma);
+}
+EXPORT_SYMBOL(spi_tegra_abort_transfer);
+
+bool spi_tegra_is_suspended(struct spi_device *spi)
+{
+	struct spi_tegra_data *tspi = spi_master_get_devdata(spi->master);
+
+	return tspi->is_suspended;
+}
+EXPORT_SYMBOL(spi_tegra_is_suspended);
+#endif
 
 static void spi_tegra_clear_status(struct spi_tegra_data *tspi)
 {

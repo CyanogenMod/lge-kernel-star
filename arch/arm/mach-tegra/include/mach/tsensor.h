@@ -25,24 +25,11 @@
 
 #define MAX_ZONES	16
 
-struct tegra_tsensor_pmu_data {
-	u8 poweroff_reg_data;
-	u8 poweroff_reg_addr;
-	u8 reset_tegra;
-	u8 controller_type;
-	u8 i2c_controller_id;
-	u8 pinmux;
-	u8 pmu_16bit_ops;
-	u8 pmu_i2c_addr;
-};
-
 struct tegra_tsensor_data;
 
 struct tegra_tsensor_platform_data {
 	void (*probe_callback)(struct tegra_tsensor_data *);
 };
-
-void __init tegra3_tsensor_init(struct tegra_tsensor_pmu_data *);
 
 int tsensor_thermal_get_temp(struct tegra_tsensor_data *data,
 				long *milli_temp);

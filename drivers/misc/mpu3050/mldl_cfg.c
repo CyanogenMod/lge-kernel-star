@@ -38,6 +38,8 @@
 #include "mlos.h"
 
 #include "log.h"
+#include "mpu-accel.h"
+
 #undef MPL_LOG_TAG
 #define MPL_LOG_TAG "mldl_cfg:"
 
@@ -56,6 +58,18 @@
 #define RESET   1
 #define STANDBY 1
 #endif
+
+// 20110825 sangki.hyun@lge.com Sensor I2C Error [S]
+#define ERROR_CHECK_WITH_MUTEX_UNLOCK(x,y)                                                  \
+	{								\
+		if (ML_SUCCESS != x) {					\
+			MPL_LOGE("%s|%s|%d returning %d\n",		\
+				__FILE__, __func__, __LINE__, x);	\
+			mutex_unlock(y);				\
+			return x;					\
+		}							\
+	}
+// 20110825 sangki.hyun@lge.com Sensor I2C Error [E]
 
 /*---------------------*/
 /*-    Prototypes.    -*/
@@ -297,7 +311,7 @@ static int MLDLGetSiliconRev(struct mldl_cfg *pdata,
 
 	result = MLSLSerialReadMem(mlsl_handle, pdata->addr,
 				   memAddr, 1, &index);
-	ERROR_CHECK(result);
+	ERROR_CHECK(result)
 	if (result)
 		return result;
 	index >>= 2;
@@ -306,7 +320,7 @@ static int MLDLGetSiliconRev(struct mldl_cfg *pdata,
 	result =
 	    MLSLSerialWriteSingle(mlsl_handle, pdata->addr,
 				  MPUREG_BANK_SEL, 0);
-	ERROR_CHECK(result);
+	ERROR_CHECK(result)
 	if (result)
 		return result;
 
@@ -330,28 +344,20 @@ static int MLDLGetSiliconRev(struct mldl_cfg *pdata,
 }
 
 /**
- *  @brief  Enable / Disable the use MPU's secondary I2C interface level
- *          shifters.
- *          When enabled the secondary I2C interface to which the external
- *          device is connected runs at VDD voltage (main supply).
- *          When disabled the 2nd interface runs at VDDIO voltage.
- *          See the device specification for more details.
+ *  @brief      Enable/Disable the use MPU's VDDIO level shifters.
+ *              When enabled the voltage interface with AUX or other external
+ *              accelerometer is using Vlogic instead of VDD (supply).
  *
- *  @note   using this API may produce unpredictable results, depending on how
- *          the MPU and slave device are setup on the target platform.
- *          Use of this API should entirely be restricted to system
- *          integrators. Once the correct value is found, there should be no
- *          need to change the level shifter at runtime.
+ *  @note       Must be called after MLSerialOpen().
+ *  @note       Typically be called before MLDmpOpen().
+ *              If called after MLDmpOpen(), must be followed by a call to
+ *              MLDLApplyLevelShifterBit() to write the setting on the hw.
  *
- *  @pre    Must be called after MLSerialOpen().
- *  @note   Typically called before MLDmpOpen().
+ *  @param[in]  enable
+ *                  1 to enable, 0 to disable
  *
- *  @param[in]  enable:
- *                  0 to run at VDDIO (default),
- *                  1 to run at VDD.
- *
- *  @return ML_SUCCESS if successfull, a non-zero error code otherwise.
- */
+ *  @return     ML_SUCCESS if successfull, a non-zero error code otherwise.
+**/
 static int MLDLSetLevelShifterBit(struct mldl_cfg *pdata,
 				  void *mlsl_handle,
 				  unsigned char enable)
@@ -366,9 +372,9 @@ static int MLDLSetLevelShifterBit(struct mldl_cfg *pdata,
 		return ML_ERROR_INVALID_PARAMETER;
 
 	/*-- on parts before B6 the VDDIO bit is bit 7 of ACCEL_BURST_ADDR --
-	NOTE: this is incompatible with ST accelerometers where the VDDIO
-	bit MUST be set to enable ST's internal logic to autoincrement
-	the register address on burst reads --*/
+	  NOTE: this is incompatible with ST accelerometers where the VDDIO
+		bit MUST be set to enable ST's internal logic to autoincrement
+		the register address on burst reads --*/
 	if ((pdata->silicon_revision & 0xf) < MPU_SILICON_REV_B6) {
 		reg = MPUREG_ACCEL_BURST_ADDR;
 		mask = 0x80;
@@ -1131,7 +1137,6 @@ int mpu3050_open(struct mldl_cfg *mldl_cfg,
 {
 	int result;
 	/* Default is Logic HIGH, pushpull, latch disabled, anyread to clear */
-	mldl_cfg->ignore_system_suspend = FALSE;
 	mldl_cfg->int_config = BIT_INT_ANYRD_2CLEAR | BIT_DMP_INT_EN;
 	mldl_cfg->clk_src = MPU_CLK_SEL_PLLGYROZ;
 	mldl_cfg->lpf = MPU_FILTER_42HZ;
@@ -1208,6 +1213,7 @@ int mpu3050_open(struct mldl_cfg *mldl_cfg,
 		result = mldl_cfg->accel->init(accel_handle,
 					       mldl_cfg->accel,
 					       &mldl_cfg->pdata->accel);
+		MPL_LOGE("mldl_cfg->accel->init returned %d\n",result);
 		ERROR_CHECK(result);
 	}
 
@@ -1215,6 +1221,7 @@ int mpu3050_open(struct mldl_cfg *mldl_cfg,
 		result = mldl_cfg->compass->init(compass_handle,
 						 mldl_cfg->compass,
 						 &mldl_cfg->pdata->compass);
+		MPL_LOGE("mldl_cfg->compass->init returned %d\n",result);
 		if (ML_SUCCESS != result) {
 			MPL_LOGE("mldl_cfg->compass->init returned %d\n",
 				result);
@@ -1225,6 +1232,7 @@ int mpu3050_open(struct mldl_cfg *mldl_cfg,
 		result = mldl_cfg->pressure->init(pressure_handle,
 						  mldl_cfg->pressure,
 						  &mldl_cfg->pdata->pressure);
+		MPL_LOGE("mldl_cfg->pressure->init returned %d\n",result);
 		if (ML_SUCCESS != result) {
 			MPL_LOGE("mldl_cfg->pressure->init returned %d\n",
 				result);
@@ -1361,7 +1369,8 @@ int mpu3050_resume(struct mldl_cfg *mldl_cfg,
 		   bool resume_pressure)
 {
 	int result = ML_SUCCESS;
-
+	
+	mutex_lock(&mldl_cfg->mutex);
 #ifdef CONFIG_MPU_SENSORS_DEBUG
 	mpu_print_cfg(mldl_cfg);
 #endif
@@ -1378,19 +1387,25 @@ int mpu3050_resume(struct mldl_cfg *mldl_cfg,
 
 	if (resume_gyro && mldl_cfg->gyro_is_suspended) {
 		result = gyro_resume(mldl_cfg, gyro_handle);
-		ERROR_CHECK(result);
+		ERROR_CHECK_WITH_MUTEX_UNLOCK(result,&mldl_cfg->mutex);
 	}
 
 	if (resume_accel && mldl_cfg->accel_is_suspended) {
 		if (!mldl_cfg->gyro_is_suspended &&
 		    EXT_SLAVE_BUS_SECONDARY == mldl_cfg->pdata->accel.bus) {
 			result = MLDLSetI2CBypass(mldl_cfg, gyro_handle, TRUE);
-			ERROR_CHECK(result);
+			ERROR_CHECK_WITH_MUTEX_UNLOCK(result,&mldl_cfg->mutex);
 		}
-		result = mldl_cfg->accel->resume(accel_handle,
+
+#ifdef FEATURE_USES_MPU_ACCEL 
+        result = mpu_accel_resume(mldl_cfg);
+
+#else
+	    result = mldl_cfg->accel->resume(accel_handle,
 						 mldl_cfg->accel,
 						 &mldl_cfg->pdata->accel);
-		ERROR_CHECK(result);
+#endif
+       ERROR_CHECK_WITH_MUTEX_UNLOCK(result,&mldl_cfg->mutex);
 		mldl_cfg->accel_is_suspended = FALSE;
 	}
 
@@ -1400,20 +1415,20 @@ int mpu3050_resume(struct mldl_cfg *mldl_cfg,
 				gyro_handle,
 				mldl_cfg->accel,
 				&mldl_cfg->pdata->accel);
-		ERROR_CHECK(result);
+		ERROR_CHECK_WITH_MUTEX_UNLOCK(result,&mldl_cfg->mutex);
 	}
 
 	if (resume_compass && mldl_cfg->compass_is_suspended) {
 		if (!mldl_cfg->gyro_is_suspended &&
 		    EXT_SLAVE_BUS_SECONDARY == mldl_cfg->pdata->compass.bus) {
 			result = MLDLSetI2CBypass(mldl_cfg, gyro_handle, TRUE);
-			ERROR_CHECK(result);
+			ERROR_CHECK_WITH_MUTEX_UNLOCK(result,&mldl_cfg->mutex);
 		}
 		result = mldl_cfg->compass->resume(compass_handle,
 						   mldl_cfg->compass,
 						   &mldl_cfg->pdata->
 						   compass);
-		ERROR_CHECK(result);
+		ERROR_CHECK_WITH_MUTEX_UNLOCK(result,&mldl_cfg->mutex);
 		mldl_cfg->compass_is_suspended = FALSE;
 	}
 
@@ -1423,20 +1438,20 @@ int mpu3050_resume(struct mldl_cfg *mldl_cfg,
 				gyro_handle,
 				mldl_cfg->compass,
 				&mldl_cfg->pdata->compass);
-		ERROR_CHECK(result);
+		ERROR_CHECK_WITH_MUTEX_UNLOCK(result,&mldl_cfg->mutex);
 	}
 
 	if (resume_pressure && mldl_cfg->pressure_is_suspended) {
 		if (!mldl_cfg->gyro_is_suspended &&
 		    EXT_SLAVE_BUS_SECONDARY == mldl_cfg->pdata->pressure.bus) {
 			result = MLDLSetI2CBypass(mldl_cfg, gyro_handle, TRUE);
-			ERROR_CHECK(result);
+			ERROR_CHECK_WITH_MUTEX_UNLOCK(result,&mldl_cfg->mutex);
 		}
 		result = mldl_cfg->pressure->resume(pressure_handle,
 						    mldl_cfg->pressure,
 						    &mldl_cfg->pdata->
 						    pressure);
-		ERROR_CHECK(result);
+		ERROR_CHECK_WITH_MUTEX_UNLOCK(result,&mldl_cfg->mutex);
 		mldl_cfg->pressure_is_suspended = FALSE;
 	}
 
@@ -1446,15 +1461,16 @@ int mpu3050_resume(struct mldl_cfg *mldl_cfg,
 				gyro_handle,
 				mldl_cfg->pressure,
 				&mldl_cfg->pdata->pressure);
-		ERROR_CHECK(result);
+		ERROR_CHECK_WITH_MUTEX_UNLOCK(result,&mldl_cfg->mutex);
 	}
 
 	/* Now start */
 	if (resume_gyro) {
 		result = dmp_start(mldl_cfg, gyro_handle);
-		ERROR_CHECK(result);
+		ERROR_CHECK_WITH_MUTEX_UNLOCK(result,&mldl_cfg->mutex);
 	}
-
+	
+	mutex_unlock(&mldl_cfg->mutex);
 	return result;
 }
 
@@ -1504,18 +1520,19 @@ int mpu3050_suspend(struct mldl_cfg *mldl_cfg,
 {
 	int result = ML_SUCCESS;
 
+	mutex_lock(&mldl_cfg->mutex);
 	if (suspend_gyro && !mldl_cfg->gyro_is_suspended) {
 #ifdef M_HW
 		return ML_SUCCESS;
 		/* This puts the bus into bypass mode */
 		result = MLDLSetI2CBypass(mldl_cfg, gyro_handle, 1);
-		ERROR_CHECK(result);
+		ERROR_CHECK_WITH_MUTEX_UNLOCK(result,&mldl_cfg->mutex);
 		result = mpu60xx_pwr_mgmt(mldl_cfg, gyro_handle, 0, SLEEP);
 #else
 		result = MLDLPowerMgmtMPU(mldl_cfg, gyro_handle,
 					0, SLEEP, 0, 0, 0);
 #endif
-		ERROR_CHECK(result);
+		ERROR_CHECK_WITH_MUTEX_UNLOCK(result,&mldl_cfg->mutex);
 	}
 
 	if (!mldl_cfg->accel_is_suspended && suspend_accel &&
@@ -1524,12 +1541,17 @@ int mpu3050_suspend(struct mldl_cfg *mldl_cfg,
 		    EXT_SLAVE_BUS_SECONDARY == mldl_cfg->pdata->accel.bus) {
 			result = mpu_set_slave(mldl_cfg, gyro_handle,
 					       NULL, NULL);
-			ERROR_CHECK(result);
+			ERROR_CHECK_WITH_MUTEX_UNLOCK(result,&mldl_cfg->mutex);
 		}
+
+#ifdef FEATURE_USES_MPU_ACCEL	
+        result = mpu_accel_suspend(mldl_cfg);
+#else
 		result = mldl_cfg->accel->suspend(accel_handle,
-						  mldl_cfg->accel,
-						  &mldl_cfg->pdata->accel);
-		ERROR_CHECK(result);
+        			 mldl_cfg->accel,
+        			 &mldl_cfg->pdata->accel);
+#endif
+		ERROR_CHECK_WITH_MUTEX_UNLOCK(result,&mldl_cfg->mutex);
 		mldl_cfg->accel_is_suspended = TRUE;
 	}
 
@@ -1539,13 +1561,13 @@ int mpu3050_suspend(struct mldl_cfg *mldl_cfg,
 		    EXT_SLAVE_BUS_SECONDARY == mldl_cfg->pdata->compass.bus) {
 			result = mpu_set_slave(mldl_cfg, gyro_handle,
 					       NULL, NULL);
-			ERROR_CHECK(result);
+			ERROR_CHECK_WITH_MUTEX_UNLOCK(result,&mldl_cfg->mutex);
 		}
 		result = mldl_cfg->compass->suspend(compass_handle,
 						    mldl_cfg->compass,
 						    &mldl_cfg->
 						    pdata->compass);
-		ERROR_CHECK(result);
+		ERROR_CHECK_WITH_MUTEX_UNLOCK(result,&mldl_cfg->mutex);
 		mldl_cfg->compass_is_suspended = TRUE;
 	}
 
@@ -1555,15 +1577,17 @@ int mpu3050_suspend(struct mldl_cfg *mldl_cfg,
 		    EXT_SLAVE_BUS_SECONDARY == mldl_cfg->pdata->pressure.bus) {
 			result = mpu_set_slave(mldl_cfg, gyro_handle,
 					       NULL, NULL);
-			ERROR_CHECK(result);
+			ERROR_CHECK_WITH_MUTEX_UNLOCK(result,&mldl_cfg->mutex);
 		}
 		result = mldl_cfg->pressure->suspend(pressure_handle,
 						    mldl_cfg->pressure,
 						    &mldl_cfg->
 						    pdata->pressure);
-		ERROR_CHECK(result);
+		ERROR_CHECK_WITH_MUTEX_UNLOCK(result,&mldl_cfg->mutex);
 		mldl_cfg->pressure_is_suspended = TRUE;
 	}
+	
+	mutex_unlock(&mldl_cfg->mutex);
 	return result;
 }
 

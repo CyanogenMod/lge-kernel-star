@@ -124,4 +124,8 @@ source "drivers/hwspinlock/Kconfig"
 
 source "drivers/clocksource/Kconfig"
 
+source "drivers/broadcast/Kconfig"
+if MACH_BSSQ
+source "drivers/bssq/Kconfig"
+endif
 endmenu

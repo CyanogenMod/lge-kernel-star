@@ -26,6 +26,9 @@
 #include <linux/gpio.h>
 #include <linux/usb.h>
 #include <linux/err.h>
+#include <linux/pm_runtime.h>
+#include <linux/suspend.h>
+#include <linux/slab.h>
 #include <linux/wakelock.h>
 #include <mach/tegra_usb_modem_power.h>
 
@@ -43,17 +46,18 @@ struct tegra_usb_modem {
 	struct delayed_work recovery_work;	/* modem recovery work */
 	const struct tegra_modem_operations *ops;	/* modem operations */
 	unsigned int capability;	/* modem capability */
+	int system_suspend;	/* system suspend flag */
+	struct notifier_block pm_notifier;	/* pm event notifier */
+	struct notifier_block usb_notifier;	/* usb event notifier */
 };
-
-static struct tegra_usb_modem tegra_mdm;
 
 /* supported modems */
 static const struct usb_device_id modem_list[] = {
 	{USB_DEVICE(0x1983, 0x0310),	/* Icera 450 rev1 */
-	 .driver_info = 0,
+	 .driver_info = TEGRA_MODEM_AUTOSUSPEND,
 	 },
 	{USB_DEVICE(0x1983, 0x0321),	/* Icera 450 rev2 */
-	 .driver_info = 0,
+	 .driver_info = TEGRA_MODEM_AUTOSUSPEND,
 	 },
 	{}
 };
@@ -65,11 +69,14 @@ static irqreturn_t tegra_usb_modem_wake_thread(int irq, void *data)
 	wake_lock_timeout(&modem->wake_lock, HZ);
 	mutex_lock(&modem->lock);
 	if (modem->udev) {
-		usb_lock_device(modem->udev);
 		pr_info("modem wake (%u)\n", ++(modem->wake_cnt));
-		if (usb_autopm_get_interface(modem->intf) == 0)
-			usb_autopm_put_interface_async(modem->intf);
-		usb_unlock_device(modem->udev);
+
+		if (!modem->system_suspend) {
+			usb_lock_device(modem->udev);
+			if (usb_autopm_get_interface(modem->intf) == 0)
+				usb_autopm_put_interface_async(modem->intf);
+			usb_unlock_device(modem->udev);
+		}
 	}
 	mutex_unlock(&modem->lock);
 
@@ -89,154 +96,231 @@ static void tegra_usb_modem_recovery(struct work_struct *ws)
 	mutex_unlock(&modem->lock);
 }
 
-static void device_add_handler(struct usb_device *udev)
+static void device_add_handler(struct tegra_usb_modem *modem,
+			       struct usb_device *udev)
 {
 	const struct usb_device_descriptor *desc = &udev->descriptor;
 	struct usb_interface *intf = usb_ifnum_to_if(udev, 0);
 	const struct usb_device_id *id = usb_match_id(intf, modem_list);
 
 	if (id) {
+		/* hold wakelock to ensure ril has enough time to restart */
+		wake_lock_timeout(&modem->wake_lock, HZ * 10);
+
 		pr_info("Add device %d <%s %s>\n", udev->devnum,
 			udev->manufacturer, udev->product);
 
-		mutex_lock(&tegra_mdm.lock);
-		tegra_mdm.udev = udev;
-		tegra_mdm.intf = intf;
-		tegra_mdm.vid = desc->idVendor;
-		tegra_mdm.pid = desc->idProduct;
-		tegra_mdm.wake_cnt = 0;
-		tegra_mdm.capability = id->driver_info;
-		mutex_unlock(&tegra_mdm.lock);
+		mutex_lock(&modem->lock);
+		modem->udev = udev;
+		modem->intf = intf;
+		modem->vid = desc->idVendor;
+		modem->pid = desc->idProduct;
+		modem->wake_cnt = 0;
+		modem->capability = id->driver_info;
+		mutex_unlock(&modem->lock);
 
 		pr_info("persist_enabled: %u\n", udev->persist_enabled);
 
-		if (tegra_mdm.capability & TEGRA_MODEM_AUTOSUSPEND) {
+#ifdef CONFIG_PM
+		if (modem->capability & TEGRA_MODEM_AUTOSUSPEND) {
+			pm_runtime_set_autosuspend_delay(&udev->dev, 2000);
 			usb_enable_autosuspend(udev);
 			pr_info("enable autosuspend for %s %s\n",
 				udev->manufacturer, udev->product);
 		}
+#endif
 	}
 }
 
-static void device_remove_handler(struct usb_device *udev)
+static void device_remove_handler(struct tegra_usb_modem *modem,
+				  struct usb_device *udev)
 {
 	const struct usb_device_descriptor *desc = &udev->descriptor;
 
-	if (desc->idVendor == tegra_mdm.vid &&
-	    desc->idProduct == tegra_mdm.pid) {
+	if (desc->idVendor == modem->vid &&
+	    desc->idProduct == modem->pid) {
 		pr_info("Remove device %d <%s %s>\n", udev->devnum,
 			udev->manufacturer, udev->product);
 
-		mutex_lock(&tegra_mdm.lock);
-		tegra_mdm.udev = NULL;
-		tegra_mdm.intf = NULL;
-		tegra_mdm.vid = 0;
-		mutex_unlock(&tegra_mdm.lock);
+		mutex_lock(&modem->lock);
+		modem->udev = NULL;
+		modem->intf = NULL;
+		modem->vid = 0;
+		mutex_unlock(&modem->lock);
 
-		if (tegra_mdm.capability & TEGRA_MODEM_RECOVERY)
-			queue_delayed_work(tegra_mdm.wq,
-					   &tegra_mdm.recovery_work, HZ * 10);
+		if (modem->capability & TEGRA_MODEM_RECOVERY)
+			queue_delayed_work(modem->wq,
+					   &modem->recovery_work, HZ * 10);
 	}
 }
 
-static int usb_notify(struct notifier_block *self, unsigned long action,
-		      void *blob)
+static int mdm_usb_notifier(struct notifier_block *notifier,
+			    unsigned long usb_event,
+			    void *udev)
 {
-	switch (action) {
+	struct tegra_usb_modem *modem =
+		container_of(notifier, struct tegra_usb_modem, usb_notifier);
+
+	switch (usb_event) {
 	case USB_DEVICE_ADD:
-		device_add_handler(blob);
+		device_add_handler(modem, udev);
 		break;
 	case USB_DEVICE_REMOVE:
-		device_remove_handler(blob);
+		device_remove_handler(modem, udev);
 		break;
 	}
-
 	return NOTIFY_OK;
 }
 
-static struct notifier_block usb_nb = {
-	.notifier_call = usb_notify,
-};
+static int mdm_pm_notifier(struct notifier_block *notifier,
+			   unsigned long pm_event,
+			   void *unused)
+{
+	struct tegra_usb_modem *modem =
+		container_of(notifier, struct tegra_usb_modem, pm_notifier);
 
-static int tegra_usb_modem_probe(struct platform_device *pdev)
+	mutex_lock(&modem->lock);
+	if (!modem->udev) {
+		mutex_unlock(&modem->lock);
+		return NOTIFY_DONE;
+	}
+
+	pr_info("%s: event %ld\n", __func__, pm_event);
+	switch (pm_event) {
+	case PM_SUSPEND_PREPARE:
+		if (wake_lock_active(&modem->wake_lock)) {
+			pr_warn("%s: wakelock was active, aborting suspend\n",
+				__func__);
+			return NOTIFY_STOP;
+		}
+
+		modem->system_suspend = 1;
+		mutex_unlock(&modem->lock);
+		return NOTIFY_OK;
+	case PM_POST_SUSPEND:
+		modem->system_suspend = 0;
+		mutex_unlock(&modem->lock);
+		return NOTIFY_OK;
+	}
+
+	mutex_unlock(&modem->lock);
+	return NOTIFY_DONE;
+}
+
+static int mdm_init(struct tegra_usb_modem *modem, struct platform_device *pdev)
 {
 	struct tegra_usb_modem_power_platform_data *pdata =
 	    pdev->dev.platform_data;
-	int ret;
-
-	if (!pdata) {
-		dev_dbg(&pdev->dev, "platform_data not available\n");
-		return -EINVAL;
-	}
+	int ret = 0;
 
 	/* get modem operations from platform data */
-	tegra_mdm.ops = (const struct tegra_modem_operations *)pdata->ops;
+	modem->ops = (const struct tegra_modem_operations *)pdata->ops;
 
-	if (tegra_mdm.ops) {
+	if (modem->ops) {
 		/* modem init */
-		if (tegra_mdm.ops->init) {
-			ret = tegra_mdm.ops->init();
+		if (modem->ops->init) {
+			ret = modem->ops->init();
 			if (ret)
 				return ret;
 		}
 
 		/* start modem */
-		if (tegra_mdm.ops->start)
-			tegra_mdm.ops->start();
+		if (modem->ops->start)
+			modem->ops->start();
 	}
 
-	mutex_init(&(tegra_mdm.lock));
-	wake_lock_init(&(tegra_mdm.wake_lock), WAKE_LOCK_SUSPEND,
+	mutex_init(&(modem->lock));
+	wake_lock_init(&modem->wake_lock, WAKE_LOCK_SUSPEND,
 		       "tegra_usb_mdm_lock");
 
-	/* create work queue */
-	tegra_mdm.wq = create_workqueue("tegra_usb_mdm_queue");
-	INIT_DELAYED_WORK(&(tegra_mdm.recovery_work), tegra_usb_modem_recovery);
+	/* create work queue platform_driver_registe*/
+	modem->wq = create_workqueue("tegra_usb_mdm_queue");
+	INIT_DELAYED_WORK(&(modem->recovery_work), tegra_usb_modem_recovery);
 
 	/* create threaded irq for remote wakeup */
-	if (pdata->wake_gpio) {
+	if (gpio_is_valid(pdata->wake_gpio)) {
 		/* get remote wakeup gpio from platform data */
-		tegra_mdm.wake_gpio = pdata->wake_gpio;
+		modem->wake_gpio = pdata->wake_gpio;
 
-		ret = gpio_request(tegra_mdm.wake_gpio, "usb_mdm_wake");
+		ret = gpio_request(modem->wake_gpio, "usb_mdm_wake");
 		if (ret)
 			return ret;
 
-		tegra_gpio_enable(tegra_mdm.wake_gpio);
+		tegra_gpio_enable(modem->wake_gpio);
 
 		/* enable IRQ for remote wakeup */
-		tegra_mdm.irq = gpio_to_irq(tegra_mdm.wake_gpio);
+		modem->irq = gpio_to_irq(modem->wake_gpio);
 
 		ret =
-		    request_threaded_irq(tegra_mdm.irq, NULL,
+		    request_threaded_irq(modem->irq, NULL,
 					 tegra_usb_modem_wake_thread,
 					 pdata->flags, "tegra_usb_mdm_wake",
-					 &tegra_mdm);
+					 modem);
 		if (ret < 0) {
 			dev_err(&pdev->dev, "%s: request_threaded_irq error\n",
 				__func__);
 			return ret;
 		}
 
-		ret = enable_irq_wake(tegra_mdm.irq);
+		ret = enable_irq_wake(modem->irq);
 		if (ret) {
 			dev_err(&pdev->dev, "%s: enable_irq_wake error\n",
 				__func__);
-			free_irq(tegra_mdm.irq, &tegra_mdm);
+			free_irq(modem->irq, modem);
 			return ret;
 		}
 	}
 
-	usb_register_notify(&usb_nb);
-	dev_info(&pdev->dev, "Initialized tegra_usb_modem_power\n");
+	modem->pm_notifier.notifier_call = mdm_pm_notifier;
+	modem->usb_notifier.notifier_call = mdm_usb_notifier;
 
-	return 0;
+	usb_register_notify(&modem->usb_notifier);
+	register_pm_notifier(&modem->pm_notifier);
+
+	return ret;
+}
+
+static int tegra_usb_modem_probe(struct platform_device *pdev)
+{
+	struct tegra_usb_modem_power_platform_data *pdata =
+	    pdev->dev.platform_data;
+	struct tegra_usb_modem *modem;
+	int ret = 0;
+
+	if (!pdata) {
+		dev_dbg(&pdev->dev, "platform_data not available\n");
+		return -EINVAL;
+	}
+
+	modem = kzalloc(sizeof(struct tegra_usb_modem), GFP_KERNEL);
+	if (!modem) {
+		dev_dbg(&pdev->dev, "failed to allocate memory\n");
+		return -ENOMEM;
+	}
+
+	ret = mdm_init(modem, pdev);
+	if (ret) {
+		kfree(modem);
+		return ret;
+	}
+
+	dev_set_drvdata(&pdev->dev, modem);
+
+	return ret;
 }
 
 static int __exit tegra_usb_modem_remove(struct platform_device *pdev)
 {
-	usb_unregister_notify(&usb_nb);
-	free_irq(tegra_mdm.irq, &tegra_mdm);
+	struct tegra_usb_modem *modem = platform_get_drvdata(pdev);
+
+	unregister_pm_notifier(&modem->pm_notifier);
+	usb_unregister_notify(&modem->usb_notifier);
+
+	if (modem->irq) {
+		disable_irq_wake(modem->irq);
+		free_irq(modem->irq, modem);
+	}
+	kfree(modem);
 	return 0;
 }
 
@@ -244,17 +328,21 @@ static int __exit tegra_usb_modem_remove(struct platform_device *pdev)
 static int tegra_usb_modem_suspend(struct platform_device *pdev,
 				   pm_message_t state)
 {
+	struct tegra_usb_modem *modem = platform_get_drvdata(pdev);
+
 	/* send L3 hint to modem */
-	if (tegra_mdm.ops && tegra_mdm.ops->suspend)
-		tegra_mdm.ops->suspend();
+	if (modem->ops && modem->ops->suspend)
+		modem->ops->suspend();
 	return 0;
 }
 
 static int tegra_usb_modem_resume(struct platform_device *pdev)
 {
+	struct tegra_usb_modem *modem = platform_get_drvdata(pdev);
+
 	/* send L3->L0 hint to modem */
-	if (tegra_mdm.ops && tegra_mdm.ops->resume)
-		tegra_mdm.ops->resume();
+	if (modem->ops && modem->ops->resume)
+		modem->ops->resume();
 	return 0;
 }
 #endif

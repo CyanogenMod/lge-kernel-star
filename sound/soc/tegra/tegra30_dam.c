@@ -532,6 +532,7 @@ static int __devinit tegra30_dam_probe(struct platform_device *pdev)
 #ifdef CONFIG_PM
 	int i;
 #endif
+	int clkm_rate;
 
 	if ((pdev->id < 0) ||
 		(pdev->id >= TEGRA30_NR_DAM_IFC)) {
@@ -555,6 +556,11 @@ static int __devinit tegra30_dam_probe(struct platform_device *pdev)
 		ret = PTR_ERR(dam->dam_clk);
 		goto err_free;
 	}
+	clkm_rate = clk_get_rate(clk_get_parent(dam->dam_clk));
+	while (clkm_rate > 12000000)
+		clkm_rate >>= 1;
+
+	clk_set_rate(dam->dam_clk,clkm_rate);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {

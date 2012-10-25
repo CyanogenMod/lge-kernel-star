@@ -24,9 +24,12 @@
 #include <linux/gpio.h>
 #include <linux/init.h>
 #include <linux/io.h>
+#include <linux/module.h>
 
 #include <mach/iomap.h>
 #include <mach/irqs.h>
+
+#include "pm.h"
 
 #define PMC_SCRATCH3	0x5c
 #define PMC_SCRATCH5	0x64
@@ -353,3 +356,21 @@ void __init tegra2_lp0_suspend_init(void)
 	}
 	wmb();
 }
+
+struct tegra_io_dpd *tegra_io_dpd_get(struct device *dev)
+{
+	return NULL;
+}
+EXPORT_SYMBOL(tegra_io_dpd_get);
+
+void tegra_io_dpd_enable(struct tegra_io_dpd *hnd)
+{
+	return;
+}
+EXPORT_SYMBOL(tegra_io_dpd_enable);
+
+void tegra_io_dpd_disable(struct tegra_io_dpd *hnd)
+{
+	return;
+}
+EXPORT_SYMBOL(tegra_io_dpd_disable);

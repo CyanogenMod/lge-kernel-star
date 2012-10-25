@@ -27,6 +27,12 @@
 
 #include "power.h"
 
+// 20111024 cs77.ha@lge.com : log service UTC time stamp [Start]
+#include <linux/rtc.h>
+
+static int sleepEnter = 0;
+// 20111024 cs77.ha@lge.com : log service UTC time stamp [End]
+
 const char *const pm_states[PM_SUSPEND_MAX] = {
 #ifdef CONFIG_EARLYSUSPEND
 	[PM_SUSPEND_ON]		= "on",
@@ -179,6 +185,11 @@ static int suspend_enter(suspend_state_t state)
 		}
 		syscore_resume();
 		sysdev_resume();
+
+        // 20111024 cs77.ha@lge.com : log service UTC time stamp [Start]
+        sleepEnter = 1;
+        // 20111024 cs77.ha@lge.com : log service UTC time stamp [End]
+
 	}
 
 	arch_suspend_enable_irqs();
@@ -234,6 +245,20 @@ int suspend_devices_and_enter(suspend_state_t state)
  Resume_devices:
 	suspend_test_start();
 	dpm_resume_end(PMSG_RESUME);
+
+    // 20111024 cs77.ha@lge.com : log service UTC time stamp [Start]
+    if(sleepEnter == 1){
+        struct timespec ts;
+        struct rtc_time tm;
+        getnstimeofday(&ts);
+        rtc_time_to_tm(ts.tv_sec, &tm);
+        printk(KERN_UTC_WAKEUP "%d-%02d-%02d %02d:%02d:%02d.%06lu\n",
+            tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+            tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec/1000);
+        sleepEnter = 0;
+    }
+    // 20111024 cs77.ha@lge.com : log service UTC time stamp [End]
+
 	suspend_test_finish("resume devices");
 	resume_console();
  Close:
@@ -282,9 +307,22 @@ int enter_state(suspend_state_t state)
 	if (!mutex_trylock(&pm_mutex))
 		return -EBUSY;
 
+/*LGE_CHANGE_S sungmin.kwon@lge.com*/
+#if 1
 	printk(KERN_INFO "PM: Syncing filesystems ... ");
-	sys_sync();
+/* LGE_CHANGE_S, ryu.seeyeol@lge.com, 2012-02-24, repair sys_sync() func in early_suspend or suspend. Merge from IS11LG GB */
+#if 0
+	// org sys_sync();
+	suspend_sys_sync_queue();
+#else
+    sys_sync();
+#endif
+/* LGE_CHANGE_E, ryu.seeyeol@lge.com, 2012-02-24, repair sys_sync() func in early_suspend or suspend. Merge from IS11LG GB */
 	printk("done.\n");
+#else
+	suspend_sys_sync_queue();
+#endif
+/*LGE_CHANGE_E sungmin.kwon@lge.com*/
 
 	pr_debug("PM: Preparing system for %s sleep\n", pm_states[state]);
 	error = suspend_prepare();

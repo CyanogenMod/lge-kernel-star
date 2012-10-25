@@ -2,7 +2,7 @@
  * arch/arm/mach-tegra/include/mach/pm.h
  *
  * Copyright (C) 2010 Google, Inc.
- * Copyright (C) 2010-2011 NVIDIA Corporation
+ * Copyright (C) 2010-2012 NVIDIA Corporation
  *
  * Author:
  *	Colin Cross <ccross@google.com>
@@ -28,6 +28,10 @@
 #include <linux/clkdev.h>
 
 #include <mach/iomap.h>
+
+#define PMC_SCRATCH0		0x50
+#define PMC_SCRATCH1		0x54
+#define PMC_SCRATCH4		0x60
 
 enum tegra_suspend_mode {
 	TEGRA_SUSPEND_NONE = 0,
@@ -60,6 +64,14 @@ struct tegra_suspend_platform_data {
 	void (*board_suspend)(int lp_state, enum suspend_stage stg);
 	/* lp_state = 0 for LP0 state, 1 for LP1 state, 2 for LP2 state */
 	void (*board_resume)(int lp_state, enum resume_stage stg);
+	unsigned int cpu_resume_boost;	/* CPU frequency resume boost in kHz */
+};
+
+/* Tegra io dpd entry - for each supported driver */
+struct tegra_io_dpd {
+	const char *name;	/* driver name */
+	u8 io_dpd_reg_index;	/* io dpd register index */
+	u8 io_dpd_bit;		/* bit position for driver in dpd register */
 };
 
 unsigned long tegra_cpu_power_good_time(void);
@@ -204,5 +216,6 @@ extern unsigned long  debug_uart_port_base;
 extern struct clk *debug_uart_clk;
 void tegra_console_uart_suspend(void);
 void tegra_console_uart_resume(void);
+int tegra_get_current_suspend_mode(void);
 
 #endif /* _MACH_TEGRA_PM_H_ */
