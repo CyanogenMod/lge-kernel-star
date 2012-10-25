@@ -358,7 +358,13 @@ static int ram_console_driver_probe(struct platform_device *pdev)
 
 //LGE_CHNAGE_S  euikyeom.kim@lge.com from sunghoon.kim@lge.com
 #if defined (CONFIG_STAR_REBOOT_MONITOR) || defined (CONFIG_BSSQ_REBOOT_MONITOR)
+#ifndef CONFIG_CM_BOOTLOADER_COMPAT
         reserved_buffer = buffer + buffer_size;
+#else
+        /* Force the reserved_buffer to be at its old (Froyo/GB) location
+           for reboot to work with the older bootloader */
+        reserved_buffer = ioremap(0x17f80000, RAM_RESERVED_SIZE);
+#endif
         printk ("ram console: ram_console virtual addr = 0x%x \n", buffer);
         printk ("ram console: reserved_buffer virtual = 0x%x \n", reserved_buffer);
         printk ("ram console: reserved_buffer physical= 0x%x \n", start+buffer_size);
