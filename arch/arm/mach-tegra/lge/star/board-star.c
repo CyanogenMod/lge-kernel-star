@@ -365,6 +365,10 @@ static void star_dmb_init(void)
 }
 #endif /* CONFIG_LGE_BROADCAST */
 
+#if !defined(CONFIG_BRCM_LPM)
+extern void star_setup_bluesleep(void);
+#endif
+
 static void __init tegra_star_init(void)
 {
 	star_setup_reboot();
@@ -392,8 +396,8 @@ static void __init tegra_star_init(void)
 	star_power_off_init();
 	star_emc_init();
 	star_baseband_init();
-#ifdef CONFIG_BT_BLUESLEEP
-	tegra_setup_bluesleep();
+#if !defined(CONFIG_BRCM_LPM)
+	star_setup_bluesleep();
 #endif
 	tegra_release_bootloader_fb();
 #if defined(CONFIG_LGE_BROADCAST_TDMB)
