@@ -1575,6 +1575,7 @@ out:
 int mmc_erase(struct mmc_card *card, unsigned int from, unsigned int nr,
 	      unsigned int arg)
 {
+#if 0
 	unsigned int rem, to = from + nr;
 
 	if (!(card->host->caps & MMC_CAP_ERASE) ||
@@ -1627,6 +1628,9 @@ int mmc_erase(struct mmc_card *card, unsigned int from, unsigned int nr,
 	to -= 1;
 
 	return mmc_do_erase(card, from, to, arg);
+#else
+        return -EOPNOTSUPP;
+#endif
 }
 EXPORT_SYMBOL(mmc_erase);
 
