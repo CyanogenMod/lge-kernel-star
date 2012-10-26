@@ -863,7 +863,6 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 	}
 #endif
 
-#ifndef CONFIG_CM_BOOTLOADER_COMPAT
 	if (tegra_lp0_vec_size &&
 	   (tegra_lp0_vec_start < memblock_end_of_DRAM())) {
 		if (memblock_reserve(tegra_lp0_vec_start, tegra_lp0_vec_size)) {
@@ -874,7 +873,6 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 		}
 		tegra_lp0_vec_relocate = false;
 	} else
-#endif
 		tegra_lp0_vec_relocate = true;
 
 	/*
