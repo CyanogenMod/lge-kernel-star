@@ -1435,7 +1435,6 @@ static s32 __devexit muic_remove(struct i2c_client *client)
 
 static s32 muic_suspend(struct i2c_client *client, pm_message_t state)
 {
-#ifdef CONFIG_MACH_STAR_SU660
 	unsigned long flags;
 
 
@@ -1448,7 +1447,6 @@ static s32 muic_suspend(struct i2c_client *client, pm_message_t state)
 	spin_unlock_irqrestore(&muic_spin_lock, flags);
 #endif
 
-#endif
 	client->dev.power.power_state = state;
 if(muic_device == MAX14526)
 	muic_i2c_write_byte(CONTROL_2, 0);
@@ -1469,7 +1467,6 @@ static s32 muic_resume(struct i2c_client *client)
 	printk("[MUIC] UIC : Resume , MUIC_GPIO level %d, muic_irq_already_run %d\n", gpio_get_value(MUIC_GPIO), muic_irq_already_run);
 #endif
 	client->dev.power.power_state = PMSG_ON;
-#ifdef CONFIG_MACH_STAR_SU660
 	if(muic_device == MAX14526)
 		muic_i2c_write_byte(CONTROL_2, INT_EN);
 
@@ -1481,7 +1478,6 @@ static s32 muic_resume(struct i2c_client *client)
 	spin_unlock_irqrestore(&muic_spin_lock, flags);
 #endif
 
-#endif
 
 #if 0	//[gieseo.park@lge.com] - why suspend?
 	//	DBG("[MUIC] COSMO MUIC : Resume \n");
