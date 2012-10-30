@@ -32,9 +32,11 @@ static struct cmdline_parameter cmdline_parameters[] __initdata = {
         {"mem", "512M@0M", 1},
         {"vmalloc", "128M", 1},
         {"androidboot.mode", "normal", 1},
+#if 0 // replaced by the nvidia atag parser
         {"lp0_vec", "8192@0x1fe5eff0", 1}, // This *needs* to match the
                                            // OLD PMC_SCRATCH1 address (0xd7802960)
         {"tegra_fbmem", "1548288@0x1fe86000", 1},
+#endif
         {"androidboot.hardware", "star", 1},
 };
 

@@ -16,3 +16,4 @@ obj-${CONFIG_MACH_STAR}             		+= board-star-nv.o
 obj-$(CONFIG_STAR_REBOOT_MONITOR)		+= board-star-reboot.o
 obj-${CONFIG_MACH_STAR}		             	+= board-star-gps.o
 obj-${CONFIG_CM_BOOTLOADER_COMPAT}             	+= lge_cmdline.o
+obj-${CONFIG_CM_BOOTLOADER_COMPAT}             	+= star_bootloader_parse.o

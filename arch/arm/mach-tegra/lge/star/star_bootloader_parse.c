@@ -206,7 +206,7 @@ struct NVBOOTARGS
 	struct NVBOOTARGS_PreservedMemHandle 	MemHandleArgs[ATAG_NVIDIA_PRESERVED_MEM_N];
 };
 
-static struct NVBOOTARGS NvBootArgs = { {0}, {0}, {0}, {0}, {0}, {0}, {{0}} }; 
+static __initdata struct NVBOOTARGS NvBootArgs = { {0}, {0}, {0}, {0}, {0}, {0}, {{0}} }; 
 
 static int __init get_cfg_from_tags(void)
 {
@@ -221,10 +221,7 @@ static int __init get_cfg_from_tags(void)
 		tegra_bootloader_fb_start = NvBootArgs.MemHandleArgs[NvBootArgs.FramebufferArgs.MemHandleKey - ATAG_NVIDIA_PRESERVED_MEM_0].Address;
 		tegra_bootloader_fb_size  = NvBootArgs.MemHandleArgs[NvBootArgs.FramebufferArgs.MemHandleKey - ATAG_NVIDIA_PRESERVED_MEM_0].Size;
 
-		pr_debug("Nvidia TAG: framebuffer: %lu @ 0x%08lx\n",tegra_bootloader_fb_size,tegra_bootloader_fb_start);
-
-		/* disable bootloader screen copying ... */
-		/*tegra_bootloader_fb_size = tegra_bootloader_fb_start = 0;*/
+		pr_info("Nvidia ATAG: framebuffer: %lu @ 0x%08lx\n",tegra_bootloader_fb_size,tegra_bootloader_fb_start);
 	}
 
 	/* If the LP0 vector is found, use it */
@@ -237,11 +234,7 @@ static int __init get_cfg_from_tags(void)
 		tegra_lp0_vec_start = NvBootArgs.MemHandleArgs[NvBootArgs.WarmbootArgs.MemHandleKey - ATAG_NVIDIA_PRESERVED_MEM_0].Address;
 		tegra_lp0_vec_size  = NvBootArgs.MemHandleArgs[NvBootArgs.WarmbootArgs.MemHandleKey - ATAG_NVIDIA_PRESERVED_MEM_0].Size;
 
-		pr_debug("Nvidia TAG: LP0: %lu @ 0x%08lx\n",tegra_lp0_vec_size,tegra_lp0_vec_start);		
-
-		/* Until we find out if the bootloader supports the workaround required to implement
-		   LP0, disable it */
-		/*tegra_lp0_vec_start = tegra_lp0_vec_size = 0;*/
+		pr_info("Nvidia ATAG: LP0: %lu @ 0x%08lx\n",tegra_lp0_vec_size,tegra_lp0_vec_start);
 
 	}
 
@@ -277,37 +270,6 @@ static int __init parse_tag_nvidia(const struct tag *tag)
 	}
 
 	switch (nvtag->bootarg_key) {
-		case ATAG_NVIDIA_CHIPSHMOO:
-			{
-				struct NVBOOTARGS_ChipShmoo *dst = 
-					&NvBootArgs.ChipShmooArgs;
-				const struct NVBOOTARGS_ChipShmoo *src = 
-					(const struct NVBOOTARGS_ChipShmoo *)nvtag->bootarg;
-
-				if (nvtag->bootarg_len != sizeof(*dst)) {
-					pr_err("Unexpected preserved memory handle tag length (expected: %d, got: %d!\n",
-							sizeof(*dst), nvtag->bootarg_len);
-				} else {
-					pr_debug("Shmoo tag with 0x%08x handle\n", src->MemHandleKey);
-					memcpy(dst,src,sizeof(*dst));
-				}
-				return get_cfg_from_tags();
-			}
-		case ATAG_NVIDIA_DISPLAY:
-			{
-				struct NVBOOTARGS_Display *dst = 
-					&NvBootArgs.DisplayArgs;
-				const struct NVBOOTARGS_Display *src = 
-					(const struct NVBOOTARGS_Display *)nvtag->bootarg;
-
-				if (nvtag->bootarg_len != sizeof(*dst)) {
-					pr_err("Unexpected display tag length (expected: %d, got: %d!\n",
-							sizeof(*dst), nvtag->bootarg_len);
-				} else {
-					memcpy(dst,src,sizeof(*dst));
-				}
-				return get_cfg_from_tags();
-			}
 		case ATAG_NVIDIA_FRAMEBUFFER:
 			{
 				struct NVBOOTARGS_Framebuffer *dst = 
@@ -321,39 +283,6 @@ static int __init parse_tag_nvidia(const struct tag *tag)
 				} else {
 					pr_debug("Framebuffer tag with 0x%08x handle, size: %d\n",
 							src->MemHandleKey,src->Size);
-					memcpy(dst,src,sizeof(*dst));
-				}
-				return get_cfg_from_tags();
-			}
-		case ATAG_NVIDIA_RM:
-			{
-				struct NVBOOTARGS_Rm *dst = 
-					&NvBootArgs.RmArgs;
-				const struct NVBOOTARGS_Rm *src = 
-					(const struct NVBOOTARGS_Rm *)nvtag->bootarg;
-
-				if (nvtag->bootarg_len != sizeof(*dst)) {
-					pr_err("Unexpected RM tag length (expected: %d, got: %d!\n",
-							sizeof(*dst), nvtag->bootarg_len);
-				} else {
-					memcpy(dst,src,sizeof(*dst));
-				}
-
-				return get_cfg_from_tags();
-			}
-		case ATAG_NVIDIA_CHIPSHMOOPHYS:
-			{
-				struct NVBOOTARGS_ChipShmooPhys *dst = 
-					&NvBootArgs.ChipShmooPhysArgs;
-				const struct NVBOOTARGS_ChipShmooPhys *src =
-					(const struct NVBOOTARGS_ChipShmooPhys *)nvtag->bootarg;
-
-				if (nvtag->bootarg_len != sizeof(*dst)) {
-					pr_err("Unexpected phys shmoo tag length (expected: %d, got: %d!\n",
-							sizeof(*dst), nvtag->bootarg_len);
-				} else {
-					pr_debug("Phys shmoo tag with pointer 0x%x and length %u\n",
-							src->PhysShmooPtr, src->Size);
 					memcpy(dst,src,sizeof(*dst));
 				}
 				return get_cfg_from_tags();
@@ -376,8 +305,9 @@ static int __init parse_tag_nvidia(const struct tag *tag)
 			}
 
 		default:
-			return get_cfg_from_tags();
+			pr_info("Ignoring irrelevant nvidia tag 0x%04x!\n", nvtag->bootarg_key);
+			break;
 	} 
-	return get_cfg_from_tags();
+	return 0;
 }
 __tagtable(ATAG_NVIDIA, parse_tag_nvidia);
