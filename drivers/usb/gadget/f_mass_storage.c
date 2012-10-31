@@ -300,8 +300,16 @@
 #define VENDOR_NAME_LGE	"LGE"
 
 
-#define PRODUCT_NAME_ANDROID	"SU660"
+#ifdef CONFIG_MACH_STAR_SU660
+#define PRODUCT_NAME_ANDROID	"SU660 Storage"
 #define PRODUCT_NAME_EXTERNAL 	"SU660 SD Card"
+#elif defined(CONFIG_MACH_STAR_P990)
+#define PRODUCT_NAME_ANDROID	"P990 Storage"
+#define PRODUCT_NAME_EXTERNAL 	"P990 SD Card"
+#else
+#define PRODUCT_NAME_ANDROID	"LG Star Storage"
+#define PRODUCT_NAME_EXTERNAL 	"LG Star SD Card"
+#endif
 static const char vendor_name[] = VENDOR_NAME_LGE;
 static const char product_name[] = PRODUCT_NAME_ANDROID;
 static const char product_name_external[] = PRODUCT_NAME_EXTERNAL;
