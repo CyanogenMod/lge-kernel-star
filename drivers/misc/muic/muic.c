@@ -1139,7 +1139,8 @@ static void muic_wq_func(struct work_struct *muic_wq)
 	{
 		muic_mdelay(250);
 
-		ret = i2c_smbus_read_byte_data(muic_client, INT_STAT);
+		ret = muic_detect_accessory(UPON_IRQ);
+	//	ret = i2c_smbus_read_byte_data(muic_client, INT_STAT);
 		if (muic_mode == MUIC_CP_USB)
 			muic_proc_set_cp_usb();
 		check_charging_mode();

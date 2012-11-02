@@ -77,7 +77,7 @@ void muic_init_max14526(TYPE_RESET reset)
   	 */
 	muic_i2c_write_byte(CONTROL_1, ID_200 | ADC_EN);
 	muic_i2c_write_byte(CONTROL_2, INT_EN);
-#ifdef CONFIG_MACH_STAR_SU660
+#ifdef CONFIG_MACH_STAR
     dp3t_switch_ctrl(DP3T_NC);
     usif_switch_ctrl(USIF_AP);	
 #endif	
@@ -238,7 +238,7 @@ void set_max14526_muic_mode(unsigned char int_stat_value)
 			charging_mode = CHARGING_USB;
 #endif
 		} else if (int_stat_value & CHGDET) {
-#ifdef CONFIG_MACH_STAR_SU660
+#ifdef CONFIG_MACH_STAR
 			printk("[****MUIC****] Detect Charger CHGDET!!!!");
 			muic_i2c_write_byte(SW_CONTROL, COMP2_TO_HZ | COMN1_TO_HZ);
 			
@@ -256,8 +256,8 @@ void set_max14526_muic_mode(unsigned char int_stat_value)
 			muic_i2c_read_byte(STATUS, &reg_value);
 
 			if (reg_value & C1COMP) {
-#ifdef CONFIG_MACH_STAR_SU660
-				printk("[****MUIC****] Detect Charger C1COMP!!!!");
+#ifdef CONFIG_MACH_STAR
+			//	printk("[****MUIC****] Detect Charger C1COMP!!!!");
 					muic_i2c_write_byte(SW_CONTROL, COMP2_TO_HZ | COMN1_TO_HZ);
 				
 				muic_i2c_write_byte(CONTROL_1,ID_200 | ADC_EN  | CP_EN );
