@@ -216,7 +216,11 @@ const struct tegra_init_gpio_info tegra_sleep_gpio_info_array[] = {
     { 'v'-'a',      2, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   UAC},   // AP_PWR_ON(powerkey)    
     //{ 'w'-'a',      2, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   SPIG},  // AUDIO_INT_N
     { 'w'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   SPIH},  // BATT_LOW_INT
+#if (defined(CONFIG_MACH_STAR_P990) || defined(CONFIG_MACH_STAR_P999))
+    { 'd'-'a',      3, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   SLXC},  //  HOOK_DET
+#else
     { 'n'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   LSDA},  //  HOOK_DET
+#endif
     //{ 'i'-'a',      5, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   ATB},   // MICROSD_DET_N
 
     /* input pins */
@@ -261,9 +265,11 @@ const struct tegra_init_gpio_info tegra_sleep_gpio_info_array[] = {
     { 't'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   DTD},   //  VT_PCLK
     { 't'-'a',      1, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   CSUS},  //  VT_MCLK
 
+#if defined(CONFIG_MACH_STAR_SU660)
 	{ 'w'-'a',		4,	GPIO_ENABLE,	GPIO_INPUT,	GPIO_SLEEP_LOW,	CDEV1},	// AUDIO_MCLK
 	{ 'w'-'a',		5,	GPIO_ENABLE,	GPIO_INPUT,	GPIO_SLEEP_LOW,	CDEV2},	// AUDIO_MCLK2
 { 'v'-'a',      6, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GPV},  // HomeKey (SU660)
+#endif
 	{ 'n'-'a',		0,	GPIO_ENABLE, GPIO_INPUT,	GPIO_SLEEP_LOW,	 		DAP1}, 	// DAP1
 	{ 'n'-'a',		1,	GPIO_ENABLE, GPIO_INPUT,	GPIO_SLEEP_LOW,	 		DAP1}, 	// DAP1
 	{ 'n'-'a',		2,	GPIO_ENABLE, GPIO_INPUT,	GPIO_SLEEP_LOW,	 		DAP1}, 	// DAP1
