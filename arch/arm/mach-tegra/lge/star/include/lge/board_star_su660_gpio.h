@@ -265,9 +265,9 @@ const struct tegra_init_gpio_info tegra_sleep_gpio_info_array[] = {
     { 't'-'a',      0, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   DTD},   //  VT_PCLK
     { 't'-'a',      1, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   CSUS},  //  VT_MCLK
 
-#if defined(CONFIG_MACH_STAR_SU660)
 	{ 'w'-'a',		4,	GPIO_ENABLE,	GPIO_INPUT,	GPIO_SLEEP_LOW,	CDEV1},	// AUDIO_MCLK
 	{ 'w'-'a',		5,	GPIO_ENABLE,	GPIO_INPUT,	GPIO_SLEEP_LOW,	CDEV2},	// AUDIO_MCLK2
+#if defined(CONFIG_MACH_STAR_SU660)
 { 'v'-'a',      6, GPIO_ENABLE, GPIO_INPUT,     GPIO_SLEEP_LOW,   GPV},  // HomeKey (SU660)
 #endif
 	{ 'n'-'a',		0,	GPIO_ENABLE, GPIO_INPUT,	GPIO_SLEEP_LOW,	 		DAP1}, 	// DAP1
