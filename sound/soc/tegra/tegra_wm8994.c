@@ -234,7 +234,7 @@ static int tegra_voice_call_hw_params(struct snd_pcm_substream *substream,
 	struct tegra_wm8994 *machine = snd_soc_card_get_drvdata(card);
 	int srate, mclk, i2s_daifmt;
 	int err;
-    unsigned long cdev_srate;  //heejeong.seo@lge.com 20111128 ICS ap20 wm8994
+    //unsigned long cdev_srate;  //heejeong.seo@lge.com 20111128 ICS ap20 wm8994
 	
 
 	srate = params_rate(params);
@@ -258,6 +258,7 @@ static int tegra_voice_call_hw_params(struct snd_pcm_substream *substream,
 		mclk = 12000000;
 		break;
 	}
+	printk(KERN_ERR "tegra_soc_wm8994.c tegra_voice_call_hw_params mclk=%d from %d\n",mclk, srate); 
 
 	err = tegra_asoc_utils_set_rate(&machine->util_data, srate, mclk);
 	if (err < 0) {
@@ -310,8 +311,10 @@ static int tegra_voice_call_hw_params(struct snd_pcm_substream *substream,
 		return err;
 	}
 */
+#if 0
 	cdev_srate = clk_get_rate(machine->util_data.clk_cdev1);
 	printk(KERN_ERR "tegra_soc_wm8994.c tegra_voice_call_hw_params sys_clk=%d\n",cdev_srate); 
+#endif
 #if 0
 	err = snd_soc_dai_set_pll(codec_dai, WM8994_FLL1, WM8994_FLL_SRC_MCLK1, cdev_srate, 11289600/* I2S1_CLK*/);
 	if (err < 0) {
@@ -329,11 +332,11 @@ static int tegra_voice_call_hw_params(struct snd_pcm_substream *substream,
 		return err;
 	}
 
-#if 1
+#if 0
 	err = snd_soc_dai_set_sysclk(codec_dai, WM8994_SYSCLK_MCLK1, /*I2S1_CLK*/cdev_srate, SND_SOC_CLOCK_IN);
 #else
-	err = snd_soc_dai_set_pll(codec_dai, WM8994_FLL2, WM8994_FLL_SRC_MCLK1 ,cdev_srate, cdev_srate); 
-	err = snd_soc_dai_set_sysclk(codec_dai, WM8994_SYSCLK_FLL2, cdev_srate, SND_SOC_CLOCK_IN);
+	err = snd_soc_dai_set_pll(codec_dai, WM8994_FLL2, WM8994_FLL_SRC_MCLK1 ,mclk, mclk); 
+	err = snd_soc_dai_set_sysclk(codec_dai, WM8994_SYSCLK_FLL2, mclk, SND_SOC_CLOCK_IN);
 
 	if (err < 0) {
 		pr_err("codec_dai sysclk not set\n");
@@ -873,7 +876,7 @@ static const struct snd_kcontrol_new tegra_wm8994_controls[] = {
 static ssize_t switch_gpio_print_state(struct switch_dev *sdev, char *buf)
 {
 
-	printk(KERN_ERR "##(Headset_det.c)## switch_gpio_print_state() => sdev->state(%d), headset_sw_data->state_on(%s)/state_off(%s)\n",sdev->state,headset_sw_data->state_on,headset_sw_data->state_off);
+	//printk(KERN_ERR "##(Headset_det.c)## switch_gpio_print_state() => sdev->state(%d), headset_sw_data->state_on(%s)/state_off(%s)\n",sdev->state,headset_sw_data->state_on,headset_sw_data->state_off);
 
 	const char *state;
 	if (switch_get_state(sdev))
