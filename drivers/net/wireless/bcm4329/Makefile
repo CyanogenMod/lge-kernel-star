@@ -73,6 +73,7 @@ EXTRA_CFLAGS = \
 	-DCONFIG_FIRST_SCAN \
 
 #	\
+	-DCSCAN \
 	-fshort-wchar \
 	-D__KERNEL__ \
 	-Iinclude \
