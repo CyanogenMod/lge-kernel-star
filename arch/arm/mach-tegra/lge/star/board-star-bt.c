@@ -105,10 +105,14 @@ void star_bt_rfkill(void)
 {
     tegra_gpio_enable(GPIO_BT_RESET);
     printk(KERN_DEBUG "%s : tegra_gpio_enable(reset) [%d]", __func__, GPIO_BT_RESET);
+#ifdef CONFIG_BRCM_BT_WAKE
     tegra_gpio_enable(GPIO_BT_WAKE);
     printk(KERN_DEBUG "%s : tegra_gpio_enable(btwake) [%d]", __func__, GPIO_BT_WAKE);
+#endif
+#ifdef CONFIG_BRCM_HOST_WAKE
     tegra_gpio_enable(GPIO_BT_HOSTWAKE);
     printk(KERN_DEBUG "%s : tegra_gpio_enable(hostwake) [%d]", __func__, GPIO_BT_HOSTWAKE);
+#endif
 
     if (platform_device_register(&lbee9qmb_device))
         printk(KERN_DEBUG "%s: lbee9qmb_device registration failed \n", __func__);
@@ -118,6 +122,8 @@ void star_bt_rfkill(void)
     return;
 }
 #endif /* CONFIG_BCM4329_RFKILL */
+
+extern void bluesleep_setup_uart_port(struct platform_device *uart_dev);
 
 void __init star_setup_bluesleep(void)
 {
@@ -137,18 +143,18 @@ void __init star_setup_bluesleep(void)
 	}
 
 	res[0].name   = "gpio_host_wake";
-	res[0].start  = TEGRA_GPIO_PS4;
-	res[0].end	  = TEGRA_GPIO_PS4;
+	res[0].start  = GPIO_BT_HOSTWAKE;
+	res[0].end	  = GPIO_BT_HOSTWAKE;
 	res[0].flags  = IORESOURCE_IO;
 
 	res[1].name   = "gpio_ext_wake";
-	res[1].start  = TEGRA_GPIO_PS3;
-	res[1].end	  = TEGRA_GPIO_PS3;
+	res[1].start  = GPIO_BT_WAKE;
+	res[1].end	  = GPIO_BT_WAKE;
 	res[1].flags  = IORESOURCE_IO;
 
 	res[2].name   = "host_wake";
-	res[2].start  = gpio_to_irq(TEGRA_GPIO_PS4);
-	res[2].end	  = gpio_to_irq(TEGRA_GPIO_PS4);
+	res[2].start  = gpio_to_irq(GPIO_BT_HOSTWAKE);
+	res[2].end	  = gpio_to_irq(GPIO_BT_HOSTWAKE);
 	res[2].flags  = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE ;
 
 	if (platform_device_add_resources(pdev, res, 3)) {
@@ -160,8 +166,11 @@ void __init star_setup_bluesleep(void)
 		pr_err("unable to add bluesleep device\n");
 		goto err_free_res;
 	}
-	tegra_gpio_enable(TEGRA_GPIO_PS4);
-	tegra_gpio_enable(TEGRA_GPIO_PS3);
+
+	bluesleep_setup_uart_port(&tegra_uartc_device);
+
+	tegra_gpio_enable(GPIO_BT_WAKE);
+	tegra_gpio_enable(TEGRA_GPIO_PC7);
 
 	return;
 
