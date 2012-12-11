@@ -2682,7 +2682,6 @@ static int wm8994_hw_params(struct snd_pcm_substream *substream,
 	snd_soc_update_bits(codec, rate_reg, WM8994_AIF1_SR_MASK |
 			    WM8994_AIF1CLK_RATE_MASK, rate_val);
 
-#define LGE_CHANGE_I2S_FOR_VOICE_CALL
 #if defined (CONFIG_SU880) || defined (CONFIG_KU8800) || defined (CONFIG_MACH_STAR)  || defined (CONFIG_MACH_BSSQ)// 110816 taehyun.lim bt vt ap slave //[heejeong.seo@lge.com] 2011-12-07 [LGE_AP20]
 // 110903 taehyun.lim voice call nxp i2s_master_slave_change [S] 
 #ifndef LGE_CHANGE_I2S_FOR_VOICE_CALL
