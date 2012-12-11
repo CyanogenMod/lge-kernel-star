@@ -446,6 +446,12 @@ static struct regulator_consumer_supply max8952_MODE1_supply[] = {
 #if defined( CONFIG_MACH_STAR) && defined(CONFIG_MACH_STAR_SU660)
 	REGULATOR_SUPPLY("vdd_cpu", NULL),	
 #endif	
+#if defined( CONFIG_MACH_STAR) && defined(CONFIG_MACH_STAR_P990)
+	REGULATOR_SUPPLY("vdd_cpu", NULL),	
+#endif
+#if defined( CONFIG_MACH_STAR) && defined(CONFIG_MACH_STAR_P999)
+	REGULATOR_SUPPLY("vdd_cpu", NULL),	
+#endif
 };
 
 static struct regulator_consumer_supply max8952_MODE2_supply[] = {

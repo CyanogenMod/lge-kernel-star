@@ -271,15 +271,15 @@ static inline void spi_tegra_writel(struct spi_tegra_data *tspi,
 	writel(val, tspi->base + reg);
 }
 
-int spi_tegra_register_callback(struct spi_device *spi, callback func,
-			void *client_data)
+int spi_tegra_register_callback(struct spi_device *device, callback func)
 {
-	struct spi_tegra_data *tspi = spi_master_get_devdata(spi->master);
+	struct spi_tegra_data *tspi = spi_master_get_devdata(device->master);
 
 	if (!tspi || !func)
 		return -EINVAL;
+
 	tspi->client_slave_ready_cb = func;
-	tspi->client_data = client_data;
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(spi_tegra_register_callback);
@@ -305,7 +305,7 @@ void spi_tegra_abort_transfer(struct spi_device *spi)
 
 	m = list_first_entry(&tspi->queue, struct spi_message, queue);
 	m->status = -EIO;
-	if (m->status == (-EIO))	//20110725 ws.yang@lge.com add to debug when error..
+	if (m->status == (-EIO))	//                                                  
 		TEGRA_ERR_LOG("m->status = %d(-EIO)\n", m->status);
 
 	tegra_dma_dequeue(tspi->tx_dma);
@@ -783,7 +783,7 @@ static void spi_tegra_start_transfer(struct spi_device *spi,
 	WARN_ON(ret < 0);
 
 	if (tspi->client_slave_ready_cb)
-		tspi->client_slave_ready_cb(tspi->client_data);
+		tspi->client_slave_ready_cb(tspi->cur_spi);
 }
 
 static void spi_tegra_start_message(struct spi_device *spi,

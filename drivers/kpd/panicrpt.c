@@ -159,6 +159,12 @@ static int panicrpt_waitinput (void)
 #if defined(CONFIG_MACH_STAR_SU660)
 	up = TEGRA_GPIO_PG0;
 	down = TEGRA_GPIO_PG1;
+#elif defined(CONFIG_MACH_STAR_P990)
+	up = TEGRA_GPIO_PG1;
+	down = TEGRA_GPIO_PG0;
+#elif defined(CONFIG_MACH_STAR_P999)
+	up = TEGRA_GPIO_PG1;
+	down = TEGRA_GPIO_PG0;
 #elif defined(CONFIG_MACH_BSSQ)
 	up = TEGRA_GPIO_PO7; // need to change
 	down = TEGRA_GPIO_PO4; // need to change

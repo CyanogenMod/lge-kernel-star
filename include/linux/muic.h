@@ -31,7 +31,9 @@
 //LGE_CHANGE_S, 2012-03-20, seokjae.yoon@lge.com, not using these modules on KS1103
 #ifndef CONFIG_MACH_BSSQ
 #define CONFIG_LGE_MUIC_DP3T 1
+#ifndef CONFIG_MACH_STAR_P999
 #define CONFIG_USIF          1
+#endif
 #endif
 //LGE_CHANGE_E, 2012-03-20, seokjae.yoon@lge.com, not using these modules on KS1103
 #if defined (CONFIG_MACH_BSSQ) || defined(CONFIG_MACH_STAR)
@@ -118,7 +120,7 @@
 
 #define IDNO_MHL      0x10 /* 0x3b -> 0x10 */ 
 
-//changseok.kim@lge.com
+//                     
 /* IDNO */
 #define IDNO_0000     0x00
 #define IDNO_0001     0x01
@@ -216,7 +218,7 @@ typedef enum {
 	RETAIN_MAX,
 } TYPE_RETAIN_MODE;
 
-#if 0 //[gieseo.park@lge.com] - Cosmo retain definition
+#if 0 //                                               
 typedef enum {
 	NO_RETAIN,
 	RETAIN,

@@ -3944,6 +3944,8 @@ wl_iw_set_scan(
 				WL_ERROR(("%s Ignoring SC %s first BC is not done = %d\n", \
 						__FUNCTION__, req->essid, \
 						g_first_broadcast_scan));
+				if(g_first_broadcast_scan !=BROADCAST_SCAN_FIRST_IDLE)  //hanzo.jung test
+				   g_first_broadcast_scan = BROADCAST_SCAN_FIRST_RESULT_CONSUMED;
 					return -EBUSY;
 			}
 #endif	

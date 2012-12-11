@@ -23,7 +23,29 @@
 
 #include <linux/types.h>
 #include <linux/spi/spi.h>
+#if defined(CONFIG_MACH_STAR_P999)
+typedef void	(*callback)(struct spi_device *spi);
 
+/**
+ * register_spi_slave_callback - registers notification callback provided by
+ * the client.
+ * This callback indicate that the controller is all set to receive/transfer
+ * data.
+ * @spi: struct spi_device - refer to linux/spi/spi.h
+ * @func: Callback function
+ * Context: can not sleep
+ */
+int spi_tegra_register_callback(struct spi_device *spi, callback func);
+
+#if defined(CONFIG_MACH_BSSQ) || defined(CONFIG_MACH_STAR_P999)
+//                                                             
+void spi_tegra_abort_transfer(struct spi_device *spi);
+bool spi_tegra_is_suspended(struct spi_device *spi);
+//extern bool spi_tegra_suspend_failed(struct spi_device *spi);
+//                                                             
+#endif
+
+#else
 typedef int	(*callback)(void *client_data);
 
 /**
@@ -39,12 +61,16 @@ typedef int	(*callback)(void *client_data);
 int spi_tegra_register_callback(struct spi_device *spi, callback func,
 	void *client_data);
 
-#ifdef CONFIG_MACH_BSSQ
-// 20110628 youngjin.yoo@lge.com added spi control function [S]
+#if defined(CONFIG_MACH_BSSQ) || defined(CONFIG_MACH_STAR_P999)
+//                                                             
 void spi_tegra_abort_transfer(struct spi_device *spi);
 bool spi_tegra_is_suspended(struct spi_device *spi);
 //extern bool spi_tegra_suspend_failed(struct spi_device *spi);
-// 20110628 youngjin.yoo@lge.com added spi control function [E]
+//                                                             
 #endif
+
+#endif
+
+
 
 #endif

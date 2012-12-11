@@ -52,7 +52,22 @@
 /* define for spi1 port gpio information */
 static int IFX_SRDY;
 static int IFX_MRDY;
-//20110607 ws.yang@lge.com add to ifx modem [E]
+//                                             
+
+//                                            
+#include <linux/input.h>
+#define EVENT_KEY KEY_IPC_RECOVERY /* 197 */
+
+typedef struct  spi_WatcherDeviceRec{
+    struct input_dev *input;
+
+} spi_WatcherDevice;
+
+static spi_WatcherDevice  spi_watcher;
+
+int spi_retry_cnt = 0;
+//                                            
+
 
 #ifdef CONFIG_PM
 //Hold wake-lock for cp interrupt
@@ -160,8 +175,7 @@ struct tty_driver 	*ifx_spi_tty_driver;
 
 int spi_err_flag=0;
 
-//#define LGE_DUMP_SPI_BUFFER
-#ifdef LGE_DUMP_SPI_BUFFER
+//                           
 #define COL_SIZE 50
 static void dump_spi_buffer(const unsigned char *txt, const unsigned char *buf, int count)
 {
@@ -193,7 +207,6 @@ static void dump_spi_buffer(const unsigned char *txt, const unsigned char *buf, 
         printk("%s: buffer is NULL\n", txt);                 
     }
 }
-#endif
 
 #ifdef IFX_SPI_DUMP_LOG
 void ifx_dump_atcmd(char *data) 
@@ -239,7 +252,6 @@ void ifx_dump_atcmd(char *data)
 }
 #endif
 
-#ifdef LGE_DUMP_SPI_BUFFER
 #define COL_SIZE 20
 static void ifx_dump_spi_buffer(const unsigned char *txt, const unsigned char *buf, int count)
 {
@@ -275,7 +287,6 @@ static void ifx_dump_spi_buffer(const unsigned char *txt, const unsigned char *b
 
     }
 }
-#endif
 
 
 /* ################################################################################################################ */
@@ -437,15 +448,34 @@ static int ifx_spi_write(struct tty_struct *tty, const unsigned char *buf, int c
 		IFX_SPI_PRINTK("ifx_master_initiated_transfer : %d, is_suspended : %d, tegra_suspend : %d",
 		spi_data->ifx_master_initiated_transfer,spi_data->is_suspended,spi_tegra_is_suspend(spi_data->spi));
 
-#ifdef LGE_DUMP_SPI_BUFFER		
 		ifx_dump_spi_buffer("ifx_spi_write -- fail()", buf, count);		
-#endif
 
 		init_completion(&spi_data->ifx_read_write_completion);
 
-		return -2; /* To Check error */
+//                                            
+	    spi_retry_cnt++;
+        IFX_SPI_PRINTK("SPI Retry Count is .. %d \n", spi_retry_cnt);
 
+        if(spi_retry_cnt >= 4)
+        {
+           IFX_SPI_PRINTK("SPI Retry Count is %d !! Go to the IPC Recovery!! \n", spi_retry_cnt);
+
+            input_report_key(spi_watcher.input, EVENT_KEY, 1);
+            input_report_key(spi_watcher.input, EVENT_KEY, 0);
+            input_sync(spi_watcher.input);
+			IFX_SPI_PRINTK("input_report_key() : %d\n", EVENT_KEY);
+	        spi_retry_cnt = 0;
+
+            return -3; /* IPC timeout */
+        }
+
+		return -2; /* To Check error */
 	}
+	else
+	{
+	    spi_retry_cnt = 0;
+	}
+//                                            
 
 #ifdef IFX_SPI_SPEED_MEASUREMENT
 	//ulEnd = getuSecTime() - ulStart;
@@ -605,6 +635,29 @@ static int ifx_spi_probe(struct spi_device *spi)
 
 	enable_irq_wake(gpio_to_irq(IFX_SRDY)); //wake irq...	
 	
+//                                            
+    int err = 0;
+    memset(&spi_watcher, 0x00, sizeof(spi_watcher));
+
+    /* Input */
+    spi_watcher.input = input_allocate_device();
+    if (!spi_watcher.input)
+    {
+        printk(" input_allocate_device  is error !!!\n");
+    }
+
+    spi_watcher.input->name = "spi_watcher";
+    set_bit(EV_KEY, spi_watcher.input->evbit);
+    set_bit(EV_SYN, spi_watcher.input->evbit);
+    set_bit(EVENT_KEY, spi_watcher.input->keybit);
+
+    err = input_register_device(spi_watcher.input);
+    if (err)
+    {
+        printk(" input_register_device is error !!!\n");
+    }
+//                                            
+
 	IFX_SPI_PRINTK(" end !!!  ");
 	return status;
 }

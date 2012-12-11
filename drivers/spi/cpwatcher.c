@@ -39,7 +39,9 @@
 #include <linux/slab.h>
 
 
+#ifndef CONFIG_MACH_STAR_P999
 #define IFX_CP_CRASH
+#endif
 #ifdef IFX_CP_CRASH
 #define GPIO_IFX_CP_CRASH       TEGRA_GPIO_PR1
 #endif
@@ -133,7 +135,7 @@ static ssize_t ifx_status_store(struct device *dev, struct device_attribute *stt
     return err ?: count;
 }
 
-//20110621 ws.yang@lge.com 
+//                         
 /* /sys/devices/platform/cpwatcher/ifx_stat 
  0664 is read by user ..but 0666 is read or write by user */
 static DEVICE_ATTR(ifx_stat, 0664, ifx_status_show, ifx_status_store);
@@ -177,11 +179,13 @@ static void ifx_reset_delayed_work(struct work_struct *wq)
         input_sync(s_cpwatcher.input);     
         CPW_PRINTK( "input_report_key(): %d\n", EVENT_KEY);
     } 
+#ifdef IFX_CP_CRASH 
     else 
     {
         CPW_DEBUG( ">>>>IFX modem reset = %d, cp_crash = %d\n", is_cp_reset, is_cp_crash);
         CPW_DEBUG( ">>>>IFX modem was reset!\n");
     }
+#endif
 
     CPW_DEBUG("end.. \n");  
 }
@@ -211,16 +215,16 @@ static irqreturn_t ifx_cp_crash_interrupt_handler(int irq, void *dev_id)
 
 static irqreturn_t ifx_reset_interrupt_handler(int irq, void *dev_id)
 {
-#ifdef CPW_IFX_TEGRA_EDGE_TRIGGER
-    int is_cp_reset = 0;
-
     CPW_DEBUG(" start \n");
 
-    is_cp_reset = gpio_get_value(GPIO_IFX_CP_RESET);
+#if defined(CPW_IFX_TEGRA_EDGE_TRIGGER) && !defined(CONFIG_MACH_STAR_P999)
+    {
+        int is_cp_reset = gpio_get_value(GPIO_IFX_CP_RESET);
     if (is_cp_reset == 1)  //IRQF_TRIGGER_RISING case is ignore !!!
     {
         CPW_DEBUG(" IRQF_TRIGGER_RISING irq is ignored\n");
         return IRQ_HANDLED;
+    }
     }
 #endif  
     schedule_delayed_work(&work, msecs_to_jiffies(5));
@@ -267,11 +271,19 @@ static int __init cpw_probe(struct platform_device *pdev)
     s_cpwatcher.ifx_cp_reset_irq = gpio_to_irq(GPIO_IFX_CP_RESET);   
  
 #ifdef CPW_IFX_TEGRA_EDGE_TRIGGER     //nvidia dependency
+#ifdef CONFIG_MACH_STAR_P999
+    err = request_irq(s_cpwatcher.ifx_cp_reset_irq, 
+                     ifx_reset_interrupt_handler, 
+                                     (IRQF_TRIGGER_RISING), 
+                                     "ifx_reset_int_n", 
+                                     (void*)&s_cpwatcher);
+#else
     err = request_irq(s_cpwatcher.ifx_cp_reset_irq, 
                      ifx_reset_interrupt_handler, 
                                      (IRQF_TRIGGER_FALLING|IRQF_TRIGGER_RISING), 
                                      "ifx_reset_int_n", 
                                      (void*)&s_cpwatcher);
+#endif
 #else
     err = request_irq(s_cpwatcher.ifx_cp_reset_irq, 
                      ifx_reset_interrupt_handler, 

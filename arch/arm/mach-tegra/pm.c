@@ -1034,12 +1034,17 @@ static struct kobject *suspend_kobj;
 
 #if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
 extern bool in_call_state();
+extern bool is_fmradio_state();
 #endif // MOBII LP1 sleep
 
 static int tegra_pm_enter_suspend(void)
 {
 #if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ) // nVidia patch
-	if (in_call_state())
+	if(in_call_state()
+//                                                                                                            
+	|| is_fmradio_state()
+//                                                                                                            
+	)
 		current_suspend_mode = TEGRA_SUSPEND_LP1;
 	else
 		current_suspend_mode = pdata->suspend_mode;

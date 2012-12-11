@@ -47,11 +47,17 @@ obj-$(CONFIG_SPI_S3C24XX)		+= spi_s3c24xx_hw.o
 obj-$(CONFIG_SPI_S3C64XX)		+= spi_s3c64xx.o
 obj-$(CONFIG_SPI_TEGRA)			+= spi_tegra.o
 ifeq ($(CONFIG_MACH_STAR),y)
+ifneq ($(CONFIG_MACH_STAR_P999),y)
 obj-$(CONFIG_SPI_TEGRA)			+= ifx_n721_spi.o
 endif
+endif
+ifeq ($(CONFIG_MACH_STAR_P999),y)
+obj-$(CONFIG_SPI_MUX)			+= ts0710mux_mdm/
+else
 obj-$(CONFIG_SPI_MUX)			+= ts0710mux/
-obj-$(CONFIG_SPI_RINDRV)		+= rindrv.o
 obj-$(CONFIG_SPI_SLAVE_TEGRA)		+= spi_slave_tegra.o
+endif
+obj-$(CONFIG_SPI_RINDRV)		+= rindrv.o
 obj-$(CONFIG_SPI_TI_SSP)		+= ti-ssp-spi.o
 obj-$(CONFIG_SPI_TOPCLIFF_PCH)		+= spi_topcliff_pch.o
 obj-$(CONFIG_SPI_TXX9)			+= spi_txx9.o
@@ -61,6 +67,11 @@ obj-$(CONFIG_SPI_SH_SCI)		+= spi_sh_sci.o
 obj-$(CONFIG_SPI_SH_MSIOF)		+= spi_sh_msiof.o
 obj-$(CONFIG_SPI_STMP3XXX)		+= spi_stmp.o
 obj-$(CONFIG_SPI_NUC900)		+= spi_nuc900.o
+ifeq ($(CONFIG_MACH_STAR),y)
+ifeq ($(CONFIG_MACH_STAR_P999),y)
+obj-$(CONFIG_SPI_MDM6600)		+= spi_mdm6600.o
+endif
+endif
 
 # special build for s3c24xx spi driver with fiq support
 spi_s3c24xx_hw-y			:= spi_s3c24xx.o

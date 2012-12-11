@@ -77,7 +77,7 @@ void muic_init_max14526(TYPE_RESET reset)
   	 */
 	muic_i2c_write_byte(CONTROL_1, ID_200 | ADC_EN);
 	muic_i2c_write_byte(CONTROL_2, INT_EN);
-#ifdef CONFIG_MACH_STAR_SU660
+#if defined(CONFIG_MACH_STAR_P990) || defined(CONFIG_MACH_STAR_SU660) || defined(CONFIG_MACH_STAR_P999)
     dp3t_switch_ctrl(DP3T_NC);
     usif_switch_ctrl(USIF_AP);	
 #endif	
@@ -232,13 +232,13 @@ void set_max14526_muic_mode(unsigned char int_stat_value)
 			muic_mode = MUIC_CP_UART;
 			charging_mode = CHARGING_FACTORY;
 #if defined(CONFIG_MHL_TX_SII9244)
-		} else if ((int_stat_value & IDNO) == IDNO_0000) {	//[gieseo.park@lge.com] - added MHL to Cosmo base
+		} else if ((int_stat_value & IDNO) == IDNO_0000) {	//                                               
 			muic_set_mhl_mode_detect();
 			muic_mode = MUIC_MHL;
 			charging_mode = CHARGING_USB;
 #endif
 		} else if (int_stat_value & CHGDET) {
-#ifdef CONFIG_MACH_STAR_SU660
+#if defined(CONFIG_MACH_STAR_P990) || defined(CONFIG_MACH_STAR_SU660) || defined(CONFIG_MACH_STAR_P999)
 			printk("[****MUIC****] Detect Charger CHGDET!!!!");
 			muic_i2c_write_byte(SW_CONTROL, COMP2_TO_HZ | COMN1_TO_HZ);
 			
@@ -256,7 +256,7 @@ void set_max14526_muic_mode(unsigned char int_stat_value)
 			muic_i2c_read_byte(STATUS, &reg_value);
 
 			if (reg_value & C1COMP) {
-#ifdef CONFIG_MACH_STAR_SU660
+#if defined(CONFIG_MACH_STAR_P990) || defined(CONFIG_MACH_STAR_SU660) || defined(CONFIG_MACH_STAR_P999)
 				printk("[****MUIC****] Detect Charger C1COMP!!!!");
 					muic_i2c_write_byte(SW_CONTROL, COMP2_TO_HZ | COMN1_TO_HZ);
 				

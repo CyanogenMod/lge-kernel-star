@@ -21,7 +21,7 @@
 
 /* Input Device Event Type */
 #define	EVENT_TYPE_LIGHT	ABS_HAT2Y
-
+#define FEATURE_ALC_TABLE_SELECTION //                                                     
 /*
  * Debug Level
  *	2 : Print all debug messages
@@ -132,11 +132,136 @@ static struct aat2870_ctl_tbl_t aat2870bl_normal_tbl[] = {
 	{ 0x0F, 0x06 },  /* SBIAS=2.6V, SBIAS=off */
 	{ 0xFF, 0xFE }	 /* end of command */
 };
+#if defined(FEATURE_ALC_TABLE_SELECTION) //                                                                  
+/* Set to ALC mode HW-high gain mode*/
+static struct aat2870_ctl_tbl_t aat2870bl_alc_tbl[][21] = {
+    /* ALC table 0~15 20101218 tunning ver. */
+    {
+    	//Hitachi
+	    {0x12,0x19},  /* ALS current setting 5.6mA */
+	    {0x13,0x1C},  /* ALS current setting 6.53mA */
+	    {0x14,0x1E},  /* ALS current setting 7.20mA */
+	    {0x15,0x20},  /* ALS current setting 7.65mA */
+	    {0x16,0x22},  /* ALS current setting 7.88mA */
+	    {0x17,0x23},  /* ALS current setting 8.33mA */
+	    {0x18,0x25},  /* ALS current setting 9.0mA */
+	    {0x19,0x27},  /* ALS current setting 9.45mA */
+	    {0x1A,0x29},  /* ALS current setting 9.68mA */
+	    {0x1B,0x2A},  /* ALS current setting 10.13mA */
+	    {0x1C,0x2C},  /* ALS current setting 10.58mA */
+	    {0x1D,0x30},  /* ALS current setting 11.48mA */
+	    {0x1E,0x33},  /* ALS current setting 12.15mA */
+	    {0x1F,0x36},  /* ALS current setting 12.83mA */
+	    {0x20,0x39},  /* ALS current setting 13.50mA */
+	    {0x21,0x3C},  /* ALS current setting 14.18mA */	    
+		{0x0E,0x73},  /* SNSR_LIN_LOG=linear, ALSOUT_LIN_LOG=log, RSET=16k~64k,
+									   * GAIN=low, GM=man gain, ALS_EN=on */
+		{0x0F,0x01},  /* SBIAS=3.0V, SBIAS=on */
+		{0x10,0x90},  /* pwm inactive, auto polling, 1sec, +0% */
+		{0x00,0xFF},  /* Channel Enable : ALL */
+		{0xFF,0xFE}	  /* end or command */
+	 },
+	 {
+		//Lgd
+		{0x12,0x14},  /* 22 ALS current setting 5.0mA */  
+		{0x13,0x14},  /* 25 ALS current setting 5.63mA */
+		{0x14,0x15},  /* 27 ALS current setting 7.43mA */
+		{0x15,0x17},  /* 29 ALS current setting 7.88mA */
+		{0x16,0x19},  /* ALS current setting 8.10mA */
+		{0x17,0x1a},  /* ALS current setting 8.33mA */
+		{0x18,0x1b},  /* ALS current setting 8.78mA */
+		{0x19,0x1d},  /* ALS current setting 9.0mA */
+		{0x1A,0x1e},  /* ALS current setting 9.23mA */
+		{0x1B,0x1f},  /* ALS current setting 9.45mA */
+		{0x1C,0x21},  /* ALS current setting 10.58mA */
+		{0x1D,0x23},  /* ALS current setting 10.80mA */
+		{0x1E,0x26},  /* ALS current setting 11.25mA */
+		{0x1F,0x29},  /* ALS current setting 11.93mA */
+		{0x20,0x2c},  /* ALS current setting 12.15mA */
+		{0x21,0x2f},  /* ALS current setting 12.38mA */
+	    {0x0E,0x73},  /* SNSR_LIN_LOG=linear, ALSOUT_LIN_LOG=log, RSET=16k~64k,
+	                                   * GAIN=low, GM=man gain, ALS_EN=on */
+	    {0x0F,0x01},  /* SBIAS=3.0V, SBIAS=on */
+	    {0x10,0x90},  /* pwm inactive, auto polling, 1sec, +0% */
+	    {0x00,0xFF},  /* Channel Enable : ALL */
+	    {0xFF,0xFE}   /* end or command */
+	}
+};
 
+
+static struct aat2870_lux_tbl_t  aat2870_lux_tbl[] = {
+	{0x00,	0},
+	{0x01,	50},
+	{0x02,	100},
+	{0x03,	130},
+	{0x04,	160},
+	{0x05,	200},
+	{0x06,	250},
+	{0x07,	300},
+	{0x08,	400},
+	{0x09,	500},
+	{0x0a,	650},
+	{0x0b,	800},
+	{0x0c,	1000},
+	{0x0d,	1400},
+	{0x0e,	2000},
+	{0x0f,	3000},
+
+	{0x1f,	0x00},
+	{0x20,	0x00}
+};
+
+// initial ALC current Setting
+static struct aat2870_bl_command init_alc_currents[][17] =
+{
+    //Hitachi
+    {
+		{0x12,0x19},    /* 25 ALS current setting  5.0mA */
+		{0x13,0x1C},	/* 28 ALS current setting  6.0mA */
+		{0x14,0x1E},	/* 30 ALS current setting  7.0mA */
+		{0x15,0x20},	/* 32 ALS current setting  8.0mA */
+		{0x16,0x22},	/* 34 ALS current setting  9.0mA */
+		{0x17,0x23},	/* 35 ALS current setting 10.0mA */
+		{0x18,0x25},	/* 37 ALS current setting 11.0mA */
+		{0x19,0x27},	/* 39 ALS current setting 12.0mA */
+		{0x1A,0x29},	/* 41 ALS current setting 13.0mA */
+		{0x1B,0x2A},	/* 42 ALS current setting 14.0mA */
+		{0x1C,0x2C},	/* 44 ALS current setting 15.0mA */
+		{0x1D,0x30},	/* 48 ALS current setting 16.0mA */
+		{0x1E,0x33},	/* 51 ALS current setting 17.0mA */
+		{0x1F,0x36},	/* 54 ALS current setting 18.0mA */
+		{0x20,0x39},	/* 57 ALS current setting 19.0mA */
+		{0x21,0x3C},	/* 60 ALS current setting 20.0mA */
+		{0xFF,0x00},	/* End of array */
+	},
+    {
+        //Lgd
+	{0x12,0x14},  /* 22 ALS current setting 5.0mA */  
+	{0x13,0x14},  /* 25 ALS current setting 5.63mA */
+	{0x14,0x15},  /* 27 ALS current setting 7.43mA */
+	{0x15,0x17},  /* 29 ALS current setting 7.88mA */
+	{0x16,0x19},  /* ALS current setting 8.10mA */
+	{0x17,0x1a},  /* ALS current setting 8.33mA */
+	{0x18,0x1b},  /* ALS current setting 8.78mA */
+	{0x19,0x1d},  /* ALS current setting 9.0mA */
+	{0x1A,0x1e},  /* ALS current setting 9.23mA */
+	{0x1B,0x1f},  /* ALS current setting 9.45mA */
+	{0x1C,0x21},  /* ALS current setting 10.58mA */
+	{0x1D,0x23},  /* ALS current setting 10.80mA */
+	{0x1E,0x26},  /* ALS current setting 11.25mA */
+	{0x1F,0x29},  /* ALS current setting 11.93mA */
+	{0x20,0x2c},  /* ALS current setting 12.15mA */
+	{0x21,0x2f},  /* ALS current setting 12.38mA */
+		{0xFF,0x00},    /* End of array */
+	}
+};
+
+#else
 /* Set to ALC mode HW-high gain mode*/
 static struct aat2870_ctl_tbl_t aat2870bl_alc_tbl[] = {
     /* ALC table 0~15 20101218 tunning ver. */
 //MOBII_CHNANGE 20120819 ih.han@mobii.co.kr : Modify ALS table value
+#if 0    //                                                 
     {0x12,0x19},  /* ALS current setting 5.6mA */
     {0x13,0x1C},  /* ALS current setting 6.53mA */
     {0x14,0x1E},  /* ALS current setting 7.20mA */
@@ -153,6 +278,24 @@ static struct aat2870_ctl_tbl_t aat2870bl_alc_tbl[] = {
     {0x1F,0x36},  /* ALS current setting 12.83mA */
     {0x20,0x39},  /* ALS current setting 13.50mA */
     {0x21,0x3C},  /* ALS current setting 14.18mA */
+#else
+	{0x12,0x14},  /* 22 ALS current setting 5.0mA */  
+	{0x13,0x14},  /* 25 ALS current setting 5.63mA */
+	{0x14,0x15},  /* 27 ALS current setting 7.43mA */
+	{0x15,0x17},  /* 29 ALS current setting 7.88mA */
+	{0x16,0x19},  /* ALS current setting 8.10mA */
+	{0x17,0x1a},  /* ALS current setting 8.33mA */
+	{0x18,0x1b},  /* ALS current setting 8.78mA */
+	{0x19,0x1d},  /* ALS current setting 9.0mA */
+	{0x1A,0x1e},  /* ALS current setting 9.23mA */
+	{0x1B,0x1f},  /* ALS current setting 9.45mA */
+	{0x1C,0x21},  /* ALS current setting 10.58mA */
+	{0x1D,0x23},  /* ALS current setting 10.80mA */
+	{0x1E,0x26},  /* ALS current setting 11.25mA */
+	{0x1F,0x29},  /* ALS current setting 11.93mA */
+	{0x20,0x2c},  /* ALS current setting 12.15mA */
+	{0x21,0x2f},  /* ALS current setting 12.38mA */
+#endif //                                                 
 
     { 0x0E, 0x73 },  /* SNSR_LIN_LOG=linear, ALSOUT_LIN_LOG=log, RSET=16k~64k,
                                    * GAIN=low, GM=man gain, ALS_EN=on */
@@ -189,24 +332,45 @@ static struct aat2870_lux_tbl_t  aat2870_lux_tbl[] = {
 static struct aat2870_bl_command init_alc_currents[] =
 {
 //MOBII_CHNANGE 20120819 ih.han@mobii.co.kr : Modify ALS table value
-	{0x12,0x19},	/* ALS current setting  5.0mA */
-	{0x13,0x1C},	/* ALS current setting  6.0mA */
-	{0x14,0x1E},	/* ALS current setting  7.0mA */
-	{0x15,0x20},	/* ALS current setting  8.0mA */
-	{0x16,0x22},	/* ALS current setting  9.0mA */
-	{0x17,0x23},	/* ALS current setting 10.0mA */
-	{0x18,0x25},	/* ALS current setting 11.0mA */
-	{0x19,0x27},	/* ALS current setting 12.0mA */
-	{0x1A,0x29},	/* ALS current setting 13.0mA */
-	{0x1B,0x2A},	/* ALS current setting 14.0mA */
-	{0x1C,0x2C},	/* ALS current setting 15.0mA */
-	{0x1D,0x30},	/* ALS current setting 16.0mA */
-	{0x1E,0x33},	/* ALS current setting 17.0mA */
-	{0x1F,0x36},	/* ALS current setting 18.0mA */
-	{0x20,0x39},	/* ALS current setting 19.0mA */
-	{0x21,0x3C},	/* ALS current setting 20.0mA */
+#if 0    //                                                  
+    //SU660
+	{0x12,0x19},	/* 25 ALS current setting  5.0mA */
+	{0x13,0x1C},	/* 28 ALS current setting  6.0mA */
+	{0x14,0x1E},	/* 30 ALS current setting  7.0mA */
+	{0x15,0x20},	/* 32 ALS current setting  8.0mA */
+	{0x16,0x22},	/* 34 ALS current setting  9.0mA */
+	{0x17,0x23},	/* 35 ALS current setting 10.0mA */
+	{0x18,0x25},	/* 37 ALS current setting 11.0mA */
+	{0x19,0x27},	/* 39 ALS current setting 12.0mA */
+	{0x1A,0x29},	/* 41 ALS current setting 13.0mA */
+	{0x1B,0x2A},	/* 42 ALS current setting 14.0mA */
+	{0x1C,0x2C},	/* 44 ALS current setting 15.0mA */
+	{0x1D,0x30},	/* 48 ALS current setting 16.0mA */
+	{0x1E,0x33},	/* 51 ALS current setting 17.0mA */
+	{0x1F,0x36},	/* 54 ALS current setting 18.0mA */
+	{0x20,0x39},	/* 57 ALS current setting 19.0mA */
+	{0x21,0x3C},	/* 60 ALS current setting 20.0mA */
+#else    
+	{0x12,0x14},  /* 22 ALS current setting 5.0mA */  
+	{0x13,0x14},  /* 25 ALS current setting 5.63mA */
+	{0x14,0x15},  /* 27 ALS current setting 7.43mA */
+	{0x15,0x17},  /* 29 ALS current setting 7.88mA */
+	{0x16,0x19},  /* ALS current setting 8.10mA */
+	{0x17,0x1a},  /* ALS current setting 8.33mA */
+	{0x18,0x1b},  /* ALS current setting 8.78mA */
+	{0x19,0x1d},  /* ALS current setting 9.0mA */
+	{0x1A,0x1e},  /* ALS current setting 9.23mA */
+	{0x1B,0x1f},  /* ALS current setting 9.45mA */
+	{0x1C,0x21},  /* ALS current setting 10.58mA */
+	{0x1D,0x23},  /* ALS current setting 10.80mA */
+	{0x1E,0x26},  /* ALS current setting 11.25mA */
+	{0x1F,0x29},  /* ALS current setting 11.93mA */
+	{0x20,0x2c},  /* ALS current setting 12.15mA */
+	{0x21,0x2f},  /* ALS current setting 12.38mA */
+#endif	 //                                                 
 	{0xFF,0x00},	/* End of array */
 };
+#endif /* FEATURE_ALC_TABLE_DUAL */
 #endif
 // LGE_CHANGE_E [youngseok.jeong@lge.com] 2011-01-17 [LGE_AP20] back-light
 
@@ -218,6 +382,17 @@ static void aat2870_bl_switch_mode(int op_mode);
 static unsigned int aat2870_bl_conv_to_lux(int lev);
 static int aat2870_bl_brightness_linearized(int intensity, int *level);
 static int calc_brightness(struct backlight_device *bd, int brightness);
+
+#if defined(FEATURE_ALC_TABLE_SELECTION) //                                                                  
+//return 0: Hitachi
+//return 1: Lgd
+static int get_panel_info(void)
+{	
+	tegra_gpio_enable(77);
+	gpio_direction_input(77);
+	return gpio_get_value(/*STAR_LCD_MARKED_ID*/77);
+}
+#endif /* FEATURE_ALC_TABLE_SELECTION */
 
 /* Static sysfs Functions Here */
 static int calc_brightness(struct backlight_device *bd, int brightness)
@@ -308,11 +483,20 @@ static void aat2870_bl_enable(struct backlight_device *bd)
 			// which does not perform magnitude setting
 
 		} else {	/* Auto Brightness Mode */
+#if defined(FEATURE_ALC_TABLE_SELECTION)//                               
+			int marked_id = get_panel_info();
+			for (i=0 ; init_alc_currents[marked_id][i].addr != 0xFF ; i++) {
+				aat2870_bl_write(bd,
+					init_alc_currents[marked_id][i].addr,
+					init_alc_currents[marked_id][i].data);
+				udelay(10);
+#else
 			for (i=0 ; init_alc_currents[i].addr != 0xFF ; i++) {
 				aat2870_bl_write(bd,
 					init_alc_currents[i].addr,
 					init_alc_currents[i].data);
 				udelay(10);
+#endif /* FEATURE_ALC_TABLE_SELECTION */				
 			}
 
 			/* ALS Function, Log Scale, Rset 4K/16K, High gain input setting */
@@ -439,7 +623,7 @@ static int aat2870_bl_get_brightness(struct backlight_device *bd)
 }
 
 // MOBII_S [shhong@mobii.co.kr] 2012-05-07 : Auto Brightness Setting From P990.
-#if defined (CONFIG_MACH_STAR_P990) || (CONFIG_MACH_STAR_SU660)
+#if defined(CONFIG_MACH_STAR_P990) || defined(CONFIG_MACH_STAR_SU660)
 static int aat2870_bl_update_modestatus(struct backlight_device *bd)
 {
 //MOBII_CHNANGE_S 20120819 ih.han@mobii.co.kr : Modify ALS table value
@@ -542,7 +726,7 @@ static const struct backlight_ops aat2870_bl_ops = {
 	.get_brightness = aat2870_bl_get_brightness,
 	.update_status  = aat2870_bl_update_status,
 // MOBII_S [shhong@mobii.co.kr] 2012-05-07 : Auto Brightness Setting From P990.
-#if defined (CONFIG_MACH_STAR_P990) || (CONFIG_MACH_STAR_SU660)
+#if defined(CONFIG_MACH_STAR_P990) || defined(CONFIG_MACH_STAR_SU660)
 	.update_modestatus  = aat2870_bl_update_modestatus,
 #endif
 // MOBII_E [shhong@mobii.co.kr] 2012-05-07 : Auto Brightness Setting From P990.
@@ -909,7 +1093,7 @@ static ssize_t aat2870_bl_store_onoff(struct device *dev, struct device_attribut
 }
 
 // MOBII_S [shhong@mobii.co.kr] 2012-05-10 : Rollbacked Sysfs Recovery
-#if defined(CONFIG_MACH_STAR_SU660)
+#if defined(CONFIG_MACH_STAR_P990) || defined(CONFIG_MACH_STAR_SU660)
 static ssize_t aat2870_bl_store_foff(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
 	int onoff;
@@ -969,7 +1153,7 @@ static DEVICE_ATTR(onoff,     0666, aat2870_bl_show_onoff, aat2870_bl_store_onof
 static DEVICE_ATTR(hwdim,     0666, aat2870_bl_show_hwdim, aat2870_bl_store_hwdim);
 static DEVICE_ATTR(lsensor_onoff, 0666, aat2870_bl_show_lsensor_onoff, aat2870_bl_store_lsensor_onoff);
 // MOBII_S [shhong@mobii.co.kr] 2012-05-10 : Rollbacked Sysfs Recovery
-#if defined(CONFIG_MACH_STAR_SU660)
+#if defined(CONFIG_MACH_STAR_P990) || defined(CONFIG_MACH_STAR_SU660)
 static DEVICE_ATTR(panel_info,0666, aat2870_bl_show_panel_info, aat2870_bl_store_panel_info);
 static DEVICE_ATTR(foff,      0666, aat2870_bl_show_onoff, aat2870_bl_store_foff);
 #endif
@@ -984,7 +1168,7 @@ static struct attribute *aat2870_bl_attributes[] = {
         &dev_attr_hwdim.attr,
         &dev_attr_lsensor_onoff.attr,
 // MOBII_S [shhong@mobii.co.kr] 2012-05-10 : Rollbacked Sysfs Recovery
-#if defined(CONFIG_MACH_STAR_SU660)
+#if defined(CONFIG_MACH_STAR_P990) || defined(CONFIG_MACH_STAR_SU660)
 	&dev_attr_panel_info.attr,
 	&dev_attr_foff.attr,
 #endif
@@ -1021,7 +1205,9 @@ static int aat2870_bl_probe(struct i2c_client *client,
 	struct backlight_device *bd;
 	struct backlight_properties props;
 	int ret = 0;
-
+#if defined(FEATURE_ALC_TABLE_SELECTION)//                               
+    int marked_id = get_panel_info();
+#endif /* FEATURE_ALC_TABLE_SELECTION */
 	dev_info(&client->dev, "probe\n");
 
 	if (!pdata) {
@@ -1081,7 +1267,11 @@ static int aat2870_bl_probe(struct i2c_client *client,
 
 	/* Driver Data Information */
 	drvdata->cmds.normal = aat2870bl_normal_tbl;
+#if defined(FEATURE_ALC_TABLE_SELECTION)//                               
+        drvdata->cmds.alc = aat2870bl_alc_tbl[marked_id];
+#else
         drvdata->cmds.alc = aat2870bl_alc_tbl;
+#endif /* FEATURE_ALC_TABLE_SELECTION */        
         drvdata->cmds.sleep = aat2870bl_sleep_tbl;
         drvdata->op_mode = AAT2870_OP_MODE_NORMAL;
         drvdata->dim_status = DIMMING_NONE;

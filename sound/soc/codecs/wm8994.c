@@ -57,6 +57,7 @@ static struct snd_soc_codec *wm8994_codec;
 
 #if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
 extern bool in_call_state();
+extern bool is_fmradio_state();
 #endif // MOBII LP1 sleep
 
 struct fll_config {
@@ -1196,7 +1197,8 @@ static int aif1clk_ev(struct snd_soc_dapm_widget *w,
 		wm8994->aif1clk_enable = 1;
 		break;
 	case SND_SOC_DAPM_POST_PMD:
-		wm8994->aif1clk_disable = 1;
+		wm8994->aif1clk_enable = 1;    /* iknoh 121025 for AIF1 clock switch test */
+		//wm8994->aif1clk_disable = 1;  
 		break;
 	}
 
@@ -2911,7 +2913,11 @@ static int wm8994_suspend(struct snd_soc_codec *codec, pm_message_t state)
 	int i, ret;
 
 #if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
-	if(in_call_state())
+	if(in_call_state()
+//                                                                                                            
+	|| is_fmradio_state()
+//                                                                                                            
+	)
 	    return 0;
 #endif /* MOBII LP1 sleep */
 
@@ -2943,7 +2949,11 @@ static int wm8994_resume(struct snd_soc_codec *codec)
 	unsigned int val, mask;
 
 #if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
-	if(in_call_state())
+	if(in_call_state()
+//                                                                                                            
+	|| is_fmradio_state()
+//                                                                                                            
+	)
 	    return 0;
 #endif /* MOBII LP1 sleep */
 

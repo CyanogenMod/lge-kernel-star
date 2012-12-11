@@ -13,8 +13,7 @@
 #ifndef __MACH_TEGRA_X2_NV_H
 #define __MACH_TEGRA_X2_NV_H
 
-//#define LGE_NVDATA_PARTITION			"/dev/block/platform/sdhci-tegra.3/by-num/p3"
-#define LGE_NVDATA_PARTITION			"/dev/block/mmcblk0p5"
+#define LGE_NVDATA_PARTITION			"/dev/block/mmcblk0p3"
 
 
 // modify this file and /android/vendor/lge/tegra/core/system/fastboot/lge_boot/inc/lge_boot_utils.h
@@ -28,19 +27,19 @@ typedef enum{
 
 	LGE_NVDATA_FACTORY_RESET_STATUS_OFFSET 	= 518,  // used size 1 byte, for at%frst & at%frstatus
 	LGE_NVDATA_FBOOT_OFFSET 	= 520,  // used size 1 byte, for at%fboot
-	//LGE_NVDATA_FRSTSTATUS_OFFSET    = 522,// at%frststatus //moves to static nv area.
+	//                                                                                 
 
 // CHEOLGWAK  2011-2-26 CP_CRASH_COUNT
 	LGE_NVDATA_CP_CRASH_COUNT_OFFSET = 523,  // used size 1 byte
 // CHEOLGWAK  2011-2-26 	CP_CRASH_COUNT
 
-	//LGE_ChangeS jaesung.woo@lge.com 20110131 CIQ [START]
+	//                                                    
 	LGE_NVDATA_CIQ_NVDATA_RESET_OFFSET = 524, // used size 2 byte //RESET SIDE & CAUSE
-	//LGE_ChangeS jaesung.woo@lge.com 20110131 CIQ [END]
+	//                                                  
 
-	//LGE_S woosock.yang@lge.com 20110512
+	//                                   
 	LGE_NVDATA_HARD_RESET_OFFSET = 526, 
-	//LGE_E
+	//     
 
 	LGE_NVDATA_RTC_INIT_OFFSET = 528,
 	LGE_NVDATA_FRSTSTATUS3_OFFSET = 530,//11.07.23 if set, must jump to recovery mode.

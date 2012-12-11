@@ -2402,8 +2402,8 @@ struct clk tegra_list_periph_clks[] = {
 	PERIPH_CLK("spi",	"spi",			NULL,	43,	0x114,	0x31E,	40000000,  mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
 	PERIPH_CLK("xio",	"xio",			NULL,	45,	0x120,	0x31E,	150000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
 	PERIPH_CLK("twc",	"twc",			NULL,	16,	0x12c,	0x31E,	150000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
-//20110502 youngjin.yoo@lge.com add clocks for spi master/slave [S]
-#if defined (CONFIG_LU6500) ||defined (CONFIG_LU8800) || defined(CONFIG_KS1001) || defined(CONFIG_KS1103)
+//                                                                 
+#if defined (CONFIG_LU6500) ||defined (CONFIG_LU8800) || defined(CONFIG_KS1001) || defined(CONFIG_KS1103) || defined(CONFIG_MACH_STAR_P999)
 #ifdef CONFIG_SPI_SLAVE_TEGRA
 	PERIPH_CLK("sbc1",	"spi_slave_tegra.0",NULL,	41,	0x134,	0x31E,	160000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),
 	PERIPH_CLK("sbc2",	"spi_slave_tegra.1",NULL,	44,	0x118,	0x31E,	160000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71 | PERIPH_ON_APB),

@@ -35,6 +35,9 @@
 
 #if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
 extern bool in_call_state();  
+//                                                                                                            
+extern bool is_fmradio_state();
+//                                                                                                            
 #endif // MOBII LP1 sleep
 
 static int wm8994_read(struct wm8994 *wm8994, unsigned short reg,
@@ -287,7 +290,11 @@ static int wm8994_suspend(struct device *dev)
 	int ret;
 
 #if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
-	if(in_call_state())
+	if(in_call_state()
+//                                                                                                            
+	|| is_fmradio_state()
+//                                                                                                            
+	)
 	    return 0;
 #endif /* MOBII LP1 sleep */
 	/* Don't actually go through with the suspend if the CODEC is
@@ -347,7 +354,11 @@ static int wm8994_resume(struct device *dev)
 	int ret;
 
 #if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
-	if(in_call_state())
+	if(in_call_state()
+//                                                                                                            
+	|| is_fmradio_state()
+//                                                                                                            
+	)
 	    return 0;
 #endif /* MOBII LP1 sleep */
 

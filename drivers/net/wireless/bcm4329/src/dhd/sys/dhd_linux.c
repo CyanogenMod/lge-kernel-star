@@ -2845,6 +2845,7 @@ dhd_module_init(void)
 		error = -EINVAL;
 		DHD_ERROR(("%s: sdio_register_driver timeout\n", __FUNCTION__));
 		dhd_bus_unregister();
+		goto faild;
 	}
 #endif
 	return error;

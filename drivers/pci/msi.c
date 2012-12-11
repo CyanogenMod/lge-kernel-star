@@ -260,6 +260,7 @@ void get_cached_msi_msg(unsigned int irq, struct msi_msg *msg)
 
 void __write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
 {
+	BUG_ON(entry->dev->current_state != PCI_D0);//sahoon.kim 20121017 WBT
 	if (entry->dev->current_state != PCI_D0) {
 		/* Don't touch the hardware now */
 	} else if (entry->msi_attrib.is_msix) {

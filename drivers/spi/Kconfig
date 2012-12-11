@@ -493,6 +493,11 @@ config SPI_RINDRV
 	help
 	  Support for raw ip network driver.
 
+config SPI_MDM6600
+	bool "SPI MDM6600 from Qualcomm"
+        depends on ARCH_TEGRA
+	help
+	Enable this driver to support MDM6600 Modem
 
 config CP_WATCHER
 	bool "CP Status Watcher Driver"

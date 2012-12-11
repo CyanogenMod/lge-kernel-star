@@ -125,7 +125,8 @@
 #define MPU_COMPASS_ADDR	0x0E
 #define MPU_COMPASS_BUS_NUM	2
 
-#if (defined(CONFIG_MACH_STAR_P990) || defined(CONFIG_MACH_STAR_P999))
+// P990 Compass Sensor change 2012.11.02
+#if 0//(defined(CONFIG_MACH_STAR_P990) || defined(CONFIG_MACH_STAR_P999)) 
 #define MPU_COMPASS_ORIENTATION { 0, -1, 0,  1, 0, 0,   0, 0, -1 }
 #else
 #define MPU_COMPASS_ORIENTATION	{ 0, -1, 0,  -1, 0, 0,   0, 0, -1 }

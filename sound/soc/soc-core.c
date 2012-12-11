@@ -62,6 +62,7 @@ static int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num);
 
 #if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
 extern bool in_call_state();  
+extern bool is_fmradio_state();
 #endif
 /*
  * This is a timeout to do a DAPM powerdown after a stream is closed().
@@ -1057,7 +1058,11 @@ int snd_soc_suspend(struct device *dev)
 	int i;
 
 #if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
-	if(in_call_state())
+	if(in_call_state()
+//                                                                                                            
+	|| is_fmradio_state()
+//                                                                                                            
+	)
 	    return 0;
 #endif
 	/* If the initialization of this soc device failed, there is no codec
@@ -1287,7 +1292,11 @@ int snd_soc_resume(struct device *dev)
 // MOBII_E [shhong@mobii.co.kr] 2012-08-22: Fix For Resume Kernel Failure
 
 #if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
-	if(in_call_state())
+	if(in_call_state()
+//                                                                                                            
+	|| is_fmradio_state()
+//                                                                                                            
+	)
 	    return 0;
 #endif
 	/* AC97 devices might have other drivers hanging off them so

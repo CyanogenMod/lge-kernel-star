@@ -19,19 +19,26 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/tegra_caif.h>
-#include <lge/board-star-baseband.h>	// 20120202 jisil.park@lge.com
+#include <lge/board-star-baseband.h>	//                            
 
-// 20120202 jisil.park@lge.com Add SPI [START]
+//                                            
 /****************************************************************************************************
 *                                       SPI devices
 ****************************************************************************************************/
 static struct spi_board_info __initdata spi_bus1_devices_info[] = {
 	{
+#ifdef CONFIG_MACH_STAR_P999
+		.modalias = "mdm6600",
+#else
 		.modalias = "ifxn721",
+#endif
 		.bus_num = 0,
 		.chip_select = 0,
 		.mode = SPI_MODE_1,
 		.max_speed_hz = 24000000,
+#ifdef CONFIG_MACH_STAR_P999
+		.controller_data = &tegra_spi_slave_device1,  
+#endif
 		//.controller_data = &tegra_spi_device1,  
 		.irq = 0, // 277 ? GPIO_IRQ(TEGRA_GPIO_PO5),
 		.platform_data = 0,
@@ -39,16 +46,49 @@ static struct spi_board_info __initdata spi_bus1_devices_info[] = {
 
 };
 
+
+#ifdef CONFIG_MACH_STAR_P999
+#ifdef CONFIG_DUAL_SPI
+static struct spi_board_info __initdata spi_bus2_devices_info[] = {
+	{
+		.modalias = "mdm6600",
+		.bus_num = 1,
+		.chip_select = 1,
+		.mode = SPI_MODE_1,
+		.max_speed_hz = 24000000,
+		.controller_data = &tegra_spi_slave_device2,  
+		.irq = 0,
+		.platform_data = 0,
+	},
+};
+#endif
+#endif
+
+
 static int spi_init(void)
 {
+#ifdef CONFIG_MACH_STAR_P999
+	platform_device_register(&tegra_spi_slave_device1);
+
+#ifdef CONFIG_DUAL_SPI
+	platform_device_register(&tegra_spi_slave_device2);
+#endif
+
+	spi_register_board_info(spi_bus1_devices_info, ARRAY_SIZE(spi_bus1_devices_info));
+
+#ifdef CONFIG_DUAL_SPI
+	spi_register_board_info(spi_bus2_devices_info, ARRAY_SIZE(spi_bus2_devices_info));
+#endif
+#else
 	platform_device_register(&tegra_spi_device1);
 	//platform_device_register(&tegra_spi_device3);
 
 	spi_register_board_info(spi_bus1_devices_info, ARRAY_SIZE(spi_bus1_devices_info));
+#endif
 	return 0;
 }
 
-// 20120202 jisil.park@lge.com Add SPI [END]
+//                                          
 
 
 unsigned long baseband_type = BOARD_WHISTLER_BASEBAND_U3XX;

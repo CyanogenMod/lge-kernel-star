@@ -75,12 +75,16 @@ extern unsigned long clk_get_rate(struct clk *c);
 
 struct headset_switch_data	*headset_sw_data;	//LGE_CHANGE_S [chahee.kim@lge.com] 2011-11-14 
 
-extern struct wake_lock headset_wake_lock;  //20111017 heejeong.seo@lge.com Problem that no wake up when disconn headset in calling
+extern struct wake_lock headset_wake_lock;  //                                                                                     
 
 #if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
 static bool is_call_mode; 
 bool in_call_state();
 #endif // MOBII LP1 sleep
+
+//                                                                                                            
+static int is_fmradio_mode;
+//                                                                                                            
 
 struct tegra_wm8994 {
 	struct tegra_asoc_utils_data util_data;
@@ -667,8 +671,62 @@ struct snd_kcontrol_new tegra_call_mode_control = {
 };
 
 //LGE_CHANGE_E [chahee.kim@lge.com] 2012-02-16 
+static int tegra_fmradio_mode_info(struct snd_kcontrol *kcontrol,
+		struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+		uinfo->count = 1;
+		uinfo->value.integer.min = 0;
+		uinfo->value.integer.max = 1;
+		return 0;
+}
 
-//LGE_CHANGE_S [chahee.kim@lge.com] 2012-01-21 
+static int tegra_fmradio_mode_get(struct snd_kcontrol *kcontrol,
+		struct snd_ctl_elem_value *ucontrol)
+{
+	struct tegra_wm8994 *machine = snd_kcontrol_chip(kcontrol);
+		
+		printk(KERN_ERR "tegra_fmradio_mode_get() is_fmradio_mode=%d\n", is_fmradio_mode); 
+		ucontrol->value.integer.value[0] = is_fmradio_mode;
+		
+		return 0;
+}
+
+static int tegra_fmradio_mode_put(struct snd_kcontrol *kcontrol,
+		struct snd_ctl_elem_value *ucontrol)
+{
+	struct tegra_wm8994 *machine = snd_kcontrol_chip(kcontrol);
+		int is_fmradio_mode_new = ucontrol->value.integer.value[0];
+		
+		printk(KERN_ERR "tegra_fmradio_mode_put() is_fmradio_mode=%d\n", is_fmradio_mode); 
+		printk(KERN_ERR "tegra_fmradio_mode_put() is_fmradio_mode_new=%d\n", is_fmradio_mode_new); 
+		if (is_fmradio_mode == is_fmradio_mode_new)
+			return 0;
+				
+				is_fmradio_mode = is_fmradio_mode_new;
+				printk(KERN_ERR "tegra_fmradio_mode_put() is_fmradio_mode=%d\n", is_fmradio_mode); 
+				
+				return 1;
+}
+
+struct snd_kcontrol_new tegra_fmradio_mode_control = {
+	.access = SNDRV_CTL_ELEM_ACCESS_READWRITE,
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "FMRadio Mode Switch",
+		.private_value = 0xffff,
+		.info = tegra_fmradio_mode_info,
+		.get = tegra_fmradio_mode_get,
+		.put = tegra_fmradio_mode_put
+};
+
+bool is_fmradio_state(void)
+{
+	if (!is_fmradio_mode)
+		return false;
+	else
+		return true;
+}
+//                                             
 #if 0
 //LGE_CHANGE_S [heejeong.seo@lge.com] 2011-12-20 [LGE_AP20] set dynamic pull up
 int tegra_codec_startup(struct snd_pcm_substream *substream)
@@ -1012,6 +1070,10 @@ static int tegra_wm8994_init(struct snd_soc_pcm_runtime *rtd)
 		return ret;
 //LGE_CHANGE_E [chahee.kim@lge.com] 2012-02-16 
 
+  ret = snd_ctl_add(codec->card->snd_card, snd_ctl_new1(&tegra_fmradio_mode_control, machine));
+  if (ret < 0)
+    return ret;
+//                 
 // LGE_CHANGE_S [heejeong.seo@lge.com] 2011-12-20 [LGE_AP20]
 #if defined (CONFIG_MACH_STAR) || defined (CONFIG_MACH_BSSQ)
     if (gpio_is_valid(pdata->gpio_hp_det)) 

@@ -184,6 +184,23 @@ static struct platform_device bd_address_device = {
 #endif
 //LGE_CHANGE_E
 
+
+#if defined(CONFIG_MACH_STAR)
+static struct i2c_board_info __initdata star_i2c6_board_info[] = {
+	{
+		I2C_BOARD_INFO("max14526", 0x44), // MUIC(R:0x88)
+		.platform_data = NULL,
+	},
+};
+
+static int __init star_muic_init(void)
+{
+
+	i2c_register_board_info(6, star_i2c6_board_info, ARRAY_SIZE(star_i2c6_board_info));
+	return 0;
+}
+#endif
+ 
 static struct tegra_i2c_platform_data star_i2c1_platform_data = {
 	.adapter_nr	= 0,
 	.bus_count	= 1,
@@ -242,13 +259,23 @@ static struct i2c_gpio_platform_data star_gpioi2c1_platform_data = {
 	.sda_pin = TEGRA_GPIO_PQ0, 
 	.scl_pin = TEGRA_GPIO_PQ1, 
 };
-
+#if defined(CONFIG_MACH_STAR)
+// MUIC - FUEL GAUGE
+static struct i2c_gpio_platform_data star_gpioi2c2_platform_data = {
+	.sda_pin = TEGRA_GPIO_PK4,
+	.scl_pin = TEGRA_GPIO_PI7,
+	.udelay	= 5, /* (500 / udelay) kHz */
+	.timeout = 100, /* jiffies */
+};
+#else
 static struct i2c_gpio_platform_data star_gpioi2c2_platform_data = {
 	.udelay = 2,
 	.scl_is_output_only = 1,
 	.sda_pin = TEGRA_GPIO_PK4, 
 	.scl_pin = TEGRA_GPIO_PI7, 
 };
+#endif
+
 
 static void star_i2c_init(void)
 {
@@ -265,6 +292,10 @@ static void star_i2c_init(void)
 
 static void star_gpioi2c_init(void)
 {
+#if defined(CONFIG_MACH_STAR)
+	tegra_gpio_enable(TEGRA_GPIO_PK4);
+	tegra_gpio_enable(TEGRA_GPIO_PI7);
+#endif	
 	tegra_gpioi2c_device2.dev.platform_data = &star_gpioi2c2_platform_data;
 	platform_device_register(&tegra_gpioi2c_device2);
 }
@@ -363,7 +394,7 @@ static void star_dmb_init(void)
 	platform_device_register(&tegra_spi_device2);
 	spi_register_board_info(spi_bus2_devices_info, ARRAY_SIZE(spi_bus2_devices_info));
 }
-#endif /* CONFIG_LGE_BROADCAST */
+#endif /*                      */
 
 #if !defined(CONFIG_BRCM_LPM)
 extern void star_setup_bluesleep(void);
@@ -402,7 +433,10 @@ static void __init tegra_star_init(void)
 	tegra_release_bootloader_fb();
 #if defined(CONFIG_LGE_BROADCAST_TDMB)
 	star_dmb_init();
-#endif /* CONFIG_LGE_BROADCAST */
+#endif /*                      */
+#if defined(CONFIG_MACH_STAR)
+	star_muic_init();
+#endif
 }
 
 int __init tegra_star_protected_aperture_init(void)

@@ -28,14 +28,14 @@
 #include <linux/workqueue.h>
 #include <linux/gpio.h>
 
-// 20110712 youngjin.yoo@lge.com bug fix when gpio-keys interrupted [S]
-#if defined (CONFIG_KS1103) || defined(CONFIG_LU6500) || defined(CONFIG_SU880)|| defined(CONFIG_KU8800)	//20120517 youngmin.kim@lge.com
+//                                                                     
+#if defined (CONFIG_KS1103) || defined(CONFIG_LU6500) || defined(CONFIG_SU880)|| defined(CONFIG_KU8800)	//                             
 #define CONFIG_POWERKEY_LP1
 #endif
 static bool is_suspend = false;
-// 20110712 youngjin.yoo@lge.com bug fix when gpio-keys interrupted [E]
+//                                                                     
 //MOBII_CHNANGE_S 20120716 jd.park@mobii.co.kr : FOTA UA Upgrade for ICS
-#if defined(CONFIG_MACH_STAR_SU660)
+#if 1 //[Foat È®ÀÎ ¿ä¸Á] defined(CONFIG_MACH_STAR_SU660)
 static bool is_ua_mode = false;
 #endif
 //MOBII_CHNANGE_E 20120716 jd.park@mobii.co.kr : FOTA UA Upgrade for ICS
@@ -64,9 +64,13 @@ struct gpio_keys_drvdata {
 };
 
 // MOBII_S [shhong@mobii.co.kr] 2012-07-09 : From X2_KDDI Release Git.
-#if defined(CONFIG_MACH_STAR_SU660)
+#if defined(CONFIG_MACH_STAR_SU660) || defined(CONFIG_MACH_STAR_P990) || defined(CONFIG_MACH_STAR_P999)//sahoon.kim
 extern bool in_call_state();
 bool islp1checkon = false;
+#endif
+
+#if defined(CONFIG_MACH_STAR_P990)
+extern is_fmradio_state();
 #endif
 // MOBII_E [shhong@mobii.co.kr] 2012-07-09 : From X2_KDDI Release Git.
 
@@ -148,7 +152,7 @@ DEVICE_ATTR(reset, S_IRUGO | S_IWUGO, star_reset_show, star_reset_store);
 #endif
 
 //MOBII_CHNANGE_S 20120716 jd.park@mobii.co.kr : FOTA UA Upgrade for ICS
-#if defined(CONFIG_MACH_STAR_SU660)
+#if 1 //[Foat È®ÀÎ ¿ä¸Á] defined(CONFIG_MACH_STAR_SU660)
 static ssize_t ignore_key_event_show(struct device *dev, 
 		struct device_attribute *attr, char *buf)
 {
@@ -498,12 +502,12 @@ static struct attribute *gpio_keys_attrs[] = {
 	&dev_attr_switches.attr,
 	&dev_attr_disabled_keys.attr,
 	&dev_attr_disabled_switches.attr,
-	&dev_attr_pwrbutton_test_mode.attr,//20110717 deukgi.shin@lge.com // sleep on/off for diag test mode
+	&dev_attr_pwrbutton_test_mode.attr,//                                                               
 #if defined (CONFIG_LU6500) || (CONFIG_KS1001)
-	&dev_attr_slide_state.attr,//20110805 deukgi.shin@lge.com // slide open/close state check.
+	&dev_attr_slide_state.attr,//                                                             
 #endif
 //MOBII_CHNANGE_S 20120716 jd.park@mobii.co.kr : FOTA UA Upgrade for ICS
-#if defined(CONFIG_MACH_STAR_SU660)
+#if  1//[Foat È®ÀÎ ¿ä¸Á] defined(CONFIG_MACH_STAR_SU660)
    	&dev_attr_ignore_key_event.attr,
 #endif
 //MOBII_CHNANGE_E 20120716 jd.park@mobii.co.kr : FOTA UA Upgrade for ICS
@@ -869,11 +873,15 @@ static int gpio_keys_suspend(struct device *dev)
 				enable_irq_wake(irq);
 			}
 // MOBII_S [shhong@mobii.co.kr] 2012-07-09 : From X2_KDDI Release Git.
-#if defined(CONFIG_MACH_STAR_SU660)
+#if defined(CONFIG_MACH_STAR_SU660) || defined(CONFIG_MACH_STAR_P990) || defined(CONFIG_MACH_STAR_P999)//sahoon.kim
 			else
 			{
 				printk(KERN_ERR "GPIO_KEYS: Suspend Setting for Non-wakeup keys .\n");
-				if(in_call_state())
+				if(in_call_state()
+#if defined(CONFIG_MACH_STAR_P990)
+					|| is_fmradio_state()
+#endif
+					)
 				{
 					int irq = gpio_to_irq(button->gpio);
 					enable_irq_wake(irq);
@@ -918,7 +926,7 @@ static int gpio_keys_resume(struct device *dev)
 			}
 		}
 // MOBII_S [shhong@mobii.co.kr] 2012-07-09 : From X2_KDDI Release Git.
-#if defined(CONFIG_MACH_STAR_SU660)
+#if defined(CONFIG_MACH_STAR_SU660) || defined(CONFIG_MACH_STAR_P990) || defined(CONFIG_MACH_STAR_P999)//sahoon.kim
 		else
 		{
 			printk(KERN_ERR "GPIO_KEYS: Resume Setting for Non-wakeup keys .\n");
@@ -935,7 +943,7 @@ static int gpio_keys_resume(struct device *dev)
 		gpio_keys_report_event(&ddata->data[i]);
 	}
 // MOBII_S [shhong@mobii.co.kr] 2012-07-19 : Make 2 GPIO_KEY Disable(Up/Down).
-#if defined(CONFIG_MACH_STAR_SU660)
+#if defined(CONFIG_MACH_STAR_SU660) || defined(CONFIG_MACH_STAR_P990) || defined(CONFIG_MACH_STAR_P999)//sahoon.kim
 	if(islp1checkon == true) {
 		islp1checkon = false;
 		printk(KERN_ERR "GPIO_KEYS: islp1checkon flag disabled.");

@@ -54,7 +54,6 @@ static int star_wakeup_key(void);
 		.wakeup = _iswake,		\
 		.debounce_interval = 10,	\
 	}
-
 static struct gpio_keys_button star_keys[] = {    
 #if defined(CONFIG_MACH_STAR_SU660)
 	GPIO_KEY(KEY_HOME, PV6, 1),
@@ -85,10 +84,13 @@ static int star_wakeup_key(void)
 	status = readl(IO_ADDRESS(TEGRA_PMC_BASE) + PMC_WAKE_STATUS);
 
 	printk("star_wakeup_key : status %lu\n", status);
-
+// HONGIK JE.PARK HOME KEY remove
+#if defined(CONFIG_MACH_STAR_P990) || defined(CONFIG_MACH_STAR_P999)
+	return status & TEGRA_WAKE_GPIO_PV2 ? KEY_POWER : KEY_RESERVED;
+#else
 	return (status & TEGRA_WAKE_GPIO_PV2) ? KEY_POWER : 
                     (status & TEGRA_WAKE_GPIO_PV6) ? KEY_HOME : KEY_RESERVED;
-                
+#endif        
 //	return status & TEGRA_WAKE_GPIO_PV2 ? KEY_POWER : KEY_RESERVED;
 }
 

@@ -567,6 +567,7 @@ static ssize_t muic_proc_write(struct file *filp, const char *buf, size_t len, l
 #endif		
 	
 #ifdef CONFIG_MACH_STAR
+#if defined (CONFIG_USIF)
 			case 'y':
 					//NvOdmGpioSetState(s_hMuicHandle.hGpio, s_hMuicHandle.h_USIF1_SW, DISABLE);
 				printk("AP <==> CP uart connection\n");
@@ -578,6 +579,7 @@ static ssize_t muic_proc_write(struct file *filp, const char *buf, size_t len, l
 				printk("AP =\\= CP uart disconnection\n");
 				gpio_set_value(USIF_IN_1_GPIO, 1);
 				break;
+#endif				
 			case 'n':
 				printk("TA <==> DEVICE charger connection [%d] [%d]\n",g_half_charging_control,charging_mode);
 					switch (g_half_charging_control) {
@@ -1231,8 +1233,8 @@ static s32 __devinit muic_probe(struct i2c_client *client, const struct i2c_devi
 		 */
 		return -ENOSYS;
 	}
-#if 0 // dongho70.kim@lge.com
-	ret = gpio_direction_output(USIF_IN_1_GPIO, 0);
+#if 0
+	ret = gpio_direction_output(USIF_IN_1_GPIO, 0); // USIF_IN_1 ==> GPIO_PU3 not use in P999
 #else
      ret = gpio_direction_output(USIF_IN_1_GPIO, 1);
 #endif

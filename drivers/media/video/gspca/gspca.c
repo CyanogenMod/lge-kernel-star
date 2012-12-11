@@ -252,6 +252,7 @@ static void gspca_input_create_urb(struct gspca_dev *gspca_dev)
 
 	if (gspca_dev->sd_desc->int_pkt_scan)  {
 		intf = usb_ifnum_to_if(gspca_dev->dev, gspca_dev->iface);
+	if (!intf)return;//sahoon.kim 20121017 WBT 
 		intf_desc = intf->cur_altsetting;
 		for (i = 0; i < intf_desc->desc.bNumEndpoints; i++) {
 			ep = &intf_desc->endpoint[i].desc;

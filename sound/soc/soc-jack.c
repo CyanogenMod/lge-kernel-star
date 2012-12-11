@@ -25,7 +25,11 @@
 
 #include <linux/wakelock.h>
 
+#if defined(CONFIG_MACH_STAR)//jongik2.kim 20100910 i2c_fix 
+#define HOOK_USE_ADC 1
+#else
 #define HOOK_USE_ADC 0
+#endif
 #if defined(CONFIG_MACH_STAR)
 #define HEADSET_CONNECTED 1
 #define HEADSET_DISCONNECTED 0
@@ -440,6 +444,9 @@ static void hook_det_work(struct work_struct *work)
     //gpio_headset = gpio_get_value(headset_sw_data->gpio);
 #if HOOK_USE_ADC
     hookkey_gpio_status = max8907c_adc_read_hook_adc();
+    msleep(10);
+    hookkey_gpio_status = max8907c_adc_read_hook_adc();
+	    printk(KERN_ERR "##(hook_det_work)## Hmax8907c_adc_read_hook_adc: %d\n", hookkey_gpio_status);
 #else
     hookkey_gpio_status = gpio_get_value(headset_sw_data->hook_gpio);
     printk(KERN_ERR "##(hook_det_work) hook_gpio=%d headset_type=%d hook_status=%d hookkey_gpio_status=%d\n", 
@@ -614,8 +621,10 @@ static void gpio_work(struct work_struct *work)
 
 #if HOOK_USE_ADC
         hook_value = max8907c_adc_read_hook_adc();
+        msleep(10);
+        hook_value = max8907c_adc_read_hook_adc();
 
-        printk(KERN_ERR "##(gpio_work)## max8907c_adc_read_hook_adc() : hook_value(%d) \n", hook_value);
+        printk(KERN_INFO "##(gpio_work)## max8907c_adc_read_hook_adc() : hook_value(%d) \n", hook_value);
         
         if(hook_value > 350) //20101127 seki.par@lge.com detect adc 1200==>350[LGE_LAB1]
         {

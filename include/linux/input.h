@@ -440,6 +440,8 @@ struct input_keymap_entry {
 
 #define KEY_HOOK        248             //LGE_CHANGE_S [chahee.kim@lge.com] 2011-11-03
 
+#define KEY_IPC_RECOVERY 197
+
 #ifdef CONFIG_MACH_BSSQ
 #define KEY_RIL_RECOVERY 254   
 #endif

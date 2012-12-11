@@ -39,24 +39,24 @@
 #include <mach-tegra/devices.h>
 #include <mach-tegra/gpio-names.h>
 
-/* LGE_CHANGE_S youngseok@lge.com
-모델 회로도에서 GPS가 사용하는 RESET/ POWERON(STANDBY) 를 확인, LNA는 추후 확인. 
-B2(P940)'   ( kernel manager :엄주관 J)
-	GPS_PWR_ON  :	KB_ROW6 / GPIO_PJ2  
-	GPS_RESET_N :	KB_ROW7 / GPIO_PJ0
+/*                               
 	
 
-	GPS_UART_TXD :	UART4
-	GPS_UART_RXD :	UART4
-	GPS_UART_RTS_N :	UART4
-	GPS_UART_CTS_N :	UART4
 
-LGE_CHANGE_E youngseok@lge.com */
 
-/* LGE_CHANGE_S  20111104  gsd5xp dongseon.kim@lge.com
-26MHz_GPS_REF_EN : GMI_AD8 / GPIO_H00
 
- LGE_CHANGE_S  20111104  gsd5xp dongseon.kim@lge.com */
+
+                     
+                     
+                       
+                       
+
+                               */
+
+/*                                                    
+                                     
+
+                                                     */
 
 struct gps_gpio_platform_data gps_pdata = {
 	.pwron  = TEGRA_GPIO_PJ2,

@@ -758,7 +758,7 @@ static void misalignment_MOV_Lcc(struct pt_regs *regs, uint32_t opcode)
 		if (!((epsw & EPSW_FLAG_Z) | NxorV))
 			goto take_the_loop;
 		return;
-	case 0x2: /* MOV_LGE: ~(N^V) */
+	case 0x2: /*                 */
 		if (!NxorV)
 			goto take_the_loop;
 		return;
