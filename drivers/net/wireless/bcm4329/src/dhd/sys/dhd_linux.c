@@ -553,86 +553,117 @@ static void dhd_set_packet_filter(int value, dhd_pub_t *dhd)
 }
 
 
+
 #if defined(CONFIG_HAS_EARLYSUSPEND)
+#if defined(CONFIG_BRCM_LGE_WL_ARPOFFLOAD)	/*Setting dtim.	20110120*/
+extern uint wl_dtim_val;
+#endif
 static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 {
-
-//bill.jung@lge.com - Don't set up filter and Power save mode
-#if 0
+#if 0 //                                                                                               
 	int power_mode = PM_MAX;
-#endif
-//bill.jung@lge.com - Don't set up filter and Power save mode
-
 	/* wl_pkt_filter_enable_t	enable_parm; */
 	char iovbuf[32];
 	int bcn_li_dtim = 3;
+#endif
+#if defined(CONFIG_BRCM_LGE_WL_ARPOFFLOAD)	/*Setting dtim.	20110120*/
+	char iovbuf[32];
+	int bcn_li_dtim = 0;
+#endif
+//                                                                                                                                                                 
+#if 1
 	uint roamvar = 1;
+	//char iovbuf[32];
+#endif /* if 1 */
 
-	DHD_TRACE(("%s: enter, value = %d in_suspend=%d\n",
-		__FUNCTION__, value, dhd->in_suspend));
+	DHD_TRACE(("%s: enter, value = %d in_suspend=%d\n", \
+			__FUNCTION__, value, dhd->in_suspend));
 
-	if (dhd && dhd->up) {
+	if (dhd && dhd->up) {  //                                                                                    
+//	if (dhd ) {
 		if (value && dhd->in_suspend) {
 
 				/* Kernel suspended */
-				DHD_ERROR(("%s: force extra Suspend setting \n", __FUNCTION__));
-				
-//bill.jung@lge.com - Don't set up filter and Power save mode
-#if 0
-                                dhdcdc_set_ioctl(dhd, 0, WLC_SET_PM, (char *)&power_mode,
-                                        sizeof(power_mode));
+				DHD_TRACE(("%s: force extra Suspend setting \n", __FUNCTION__));
+
+#if 0 //                                                                                               
+				dhdcdc_set_ioctl(dhd, 0, WLC_SET_PM,
+					(char *)&power_mode, sizeof(power_mode));
+#endif
 
 				/* Enable packet filter, only allow unicast packet to send up */
 				dhd_set_packet_filter(1, dhd);
-#endif
-//bill.jung@lge.com - Don't set up filter and Power save mode
+
 #if defined(CONFIG_LGE_BCM432X_PATCH)	//20110121
 				if(ap_priv_running == TRUE)
 					ap_suspend_status = 1;
 #endif
-
-				/* If DTIM skip is set up as default, force it to wake
-				 * each third DTIM for better power savings.  Note that
-				 * one side effect is a chance to miss BC/MC packet.
-				 */
+				/* if dtim skip setup as default force it to wake each thrid dtim
+				 *  for better power saving.
+				 *  Note that side effect is chance to miss BC/MC packet
+				*/
+#if 0 //                                                                                               
 				bcn_li_dtim = dhd_get_dtim_skip(dhd);
 				bcm_mkiovar("bcn_li_dtim", (char *)&bcn_li_dtim,
 					4, iovbuf, sizeof(iovbuf));
-                                dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
-
-				/* Disable firmware roaming during suspend */
-				bcm_mkiovar("roam_off", (char *)&roamvar, 4,
+				dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
+#endif
+#if defined(CONFIG_BRCM_LGE_WL_ARPOFFLOAD)	/*Setting dtim.	20110120 */
+				bcn_li_dtim = wl_dtim_val;
+				printk("%s:%d wl_dtim_val = %d\n",__func__,__LINE__,wl_dtim_val);
+				if(bcn_li_dtim > 0){
+					bcm_mkiovar("bcn_li_dtim", (char *)&bcn_li_dtim,
+							4, iovbuf, sizeof(iovbuf));
+					dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
+				}
+#endif
+//                                                                                                                                                                 
+#if 1
+				/* Disable build-in roaming during suspend */
+				bcm_mkiovar("roam_off", (char *)&roamvar, 4, \
 					iovbuf, sizeof(iovbuf));
-                                dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
+				dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
+#endif /* if 1 */
+
 			} else {
 
 				/* Kernel resumed  */
 				DHD_TRACE(("%s: Remove extra suspend setting \n", __FUNCTION__));
-				
-//bill.jung@lge.com - Don't set up filter and Power save mode
-#if 0
+
+#if 0 //                                                                                               
 				power_mode = PM_FAST;
-                                dhdcdc_set_ioctl(dhd, 0, WLC_SET_PM, (char *)&power_mode,
-                                        sizeof(power_mode));
+				dhdcdc_set_ioctl(dhd, 0, WLC_SET_PM, (char *)&power_mode,
+					sizeof(power_mode));
+#endif
 
 				/* disable pkt filter */
 				dhd_set_packet_filter(0, dhd);
-#endif
-//bill.jung@lge.com - Don't set up filter and Power save mode
+
 #if defined(CONFIG_LGE_BCM432X_PATCH)	//20110121
 				if(ap_priv_running == TRUE)
 					ap_suspend_status = 0;
 #endif
-
+#if 0 //                                                                                               
 				/* restore pre-suspend setting for dtim_skip */
 				bcm_mkiovar("bcn_li_dtim", (char *)&dhd->dtim_skip,
 					4, iovbuf, sizeof(iovbuf));
 
-                                dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
-                                roamvar = 0; /* default - roaming enabled */
-				bcm_mkiovar("roam_off", (char *)&roamvar, 4, iovbuf,
-					sizeof(iovbuf));
-                                dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
+				dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
+#endif
+#if defined(CONFIG_BRCM_LGE_WL_ARPOFFLOAD)	/*Setting dtim.	20110120*/
+				bcn_li_dtim = 0;
+				bcm_mkiovar("bcn_li_dtim", (char *)&bcn_li_dtim,
+					4, iovbuf, sizeof(iovbuf));
+
+				dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
+#endif
+//                                                                                                                                                                 
+#if 1
+				roamvar = 0; /* default - roaming enabled */
+				bcm_mkiovar("roam_off", (char *)&roamvar, 4, iovbuf, \
+						 sizeof(iovbuf));
+				dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
+#endif /* if 1 */
 			}
 	}
 

@@ -1864,11 +1864,13 @@ wl_iw_control_wl_off(
 			dev_wlc_ioctl(dev, WLC_SET_VAR, buf, len);
 
 		} while(0);
-#endif //CONFIG_BRCM_LGE_WL_ARPOFFLOAD
-// 20110413 mingi.sung@lge.com [Wi-Fi] Patch for BELKIN AP - to succeed DHCP procedure after wakeup [END]
-
+#endif //                             
+//                                                                                                       
+//                                                                                                               
+	#if !defined(CONFIG_LGE_BCM432X_PATCH)
 		wl_iw_send_priv_event(dev, "STOP");
-
+	#endif
+//                                                                                                               
 	}
 
 	dhd_os_start_unlock(iw->pub);
@@ -8070,10 +8072,14 @@ static int wl_iw_set_priv(
 		}
 	} else if(strnicmp(extra, "START", strlen("START")) == 0) {
 			/* if g_onoff is G_WLAN_SET_ON, then notify wl_iw_send_priv_event unconditionly */	
+//                                                                                                               
+	#if !defined(CONFIG_LGE_BCM432X_PATCH)
 			wl_iw_send_priv_event(dev, "START");
+	#endif
+//                                                                                                               
 			WL_TRACE(("wl_iw_send_priv_event response to START PRIVATE command\n"));
 	}
-#else /* CONFIG_LGE_BCM432X_PATCH */
+#else /*                          */
 		if (g_onoff == G_WLAN_SET_OFF) {
 			if (strnicmp(extra, "START", strlen("START")) != 0) {
 					WL_ERROR(("%s First IOCTL after stop is NOT START \n", \
