@@ -21,6 +21,8 @@ config ARCH_TEGRA_2x_SOC
 	select USB_ULPI_VIEWPORT if USB_SUPPORT
 	select ARCH_SUPPORTS_MSI if TEGRA_PCI
 	select PCI_MSI if TEGRA_PCI
+	select ARM_ERRATA_716044
+	select ARM_ERRATA_764369 if SMP
 	select ARCH_HAS_SUSPEND_PAGETABLE
 	help
 	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
@@ -44,6 +46,7 @@ config ARCH_TEGRA_3x_SOC
 	select ARCH_SUPPORTS_MSI if TEGRA_PCI
 	select PCI_MSI if TEGRA_PCI
 	select ARM_ERRATA_754322
+	select ARM_ERRATA_764369 if SMP
 	select ARCH_HAS_SUSPEND_PAGETABLE
 	help
 	  Support for NVIDIA Tegra 3 family of SoCs, based upon the
@@ -148,7 +151,7 @@ menuconfig MACH_STAR
 	select MACH_HAS_SND_SOC_TEGRA_WM8994 if SND_SOC
 	bool "TEGRA STAR"
 	help
-	  Support for the LGE STAR 
+	  Support for the LGE STAR
 
 if MACH_STAR
 source "arch/arm/mach-tegra/lge/star/Kconfig"
