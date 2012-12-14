@@ -1444,7 +1444,7 @@ static int battery_get_property(struct power_supply *psy,
 			break;
 
 		case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-			val->intval = batt_info->voltage;
+			val->intval = batt_info->voltage * 1000;
 			break;
 
 		case POWER_SUPPLY_PROP_CAPACITY:
