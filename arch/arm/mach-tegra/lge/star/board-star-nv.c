@@ -54,16 +54,17 @@ int lge_nvdata_raw_read(int offset, char* buf, int size)
 
 	if(h_file >= 0)
 	{
-		printk("read NV size = %d, offset = %d\n",size, offset);	
+		printk("read NV size = %d, offset = %d\n",size, offset);
 		sys_lseek( h_file, offset, 0 );
 
 		ret = sys_read( h_file, buf, size);
-		
-		printk("read NV ret = %d\n",ret);	
-		
+
+		printk("read NV ret = %d\n",ret);
+
 		if( ret != size )
 		{
 			printk("Can't read  NVDATA.\n");
+			set_fs(oldfs);
 			return ret;
 		}
 
@@ -77,9 +78,9 @@ int lge_nvdata_raw_read(int offset, char* buf, int size)
 	set_fs(oldfs);
 	if (size > 1)
 	       printk("read NV offset = %d, message = %s(%x)[%d]\n", offset, buf, *buf, *buf);
-	else	
+	else
        	printk("read NV offset = %d, message = %x[%d]\n", offset, *buf, *buf);
-	   
+
 	return size;
 }
 
@@ -97,16 +98,18 @@ int lge_nvdata_raw_write(int offset, char* buf, int size)
 
 	if(h_file >= 0)
 	{
-		printk("write NV size = %d, offset = %d\n",size, offset);	
+		printk("write NV size = %d, offset = %d\n",size, offset);
 		sys_lseek( h_file, offset, 0 );
 
 		ret = sys_write( h_file, buf, size);
-		
-		printk("write NV ret = %d\n",ret);	
-		
+
+		printk("write NV ret = %d\n",ret);
+
 		if( ret != size )
 		{
 			printk("Can't write  NVDATA.\n");
+			set_fs(oldfs);
+			sys_sync();
 			return ret;
 		}
 
@@ -120,12 +123,12 @@ int lge_nvdata_raw_write(int offset, char* buf, int size)
 	set_fs(oldfs);
 
 	sys_sync();
-	
+
 	if (size > 1)
        	printk("write NV offset = %d, message = %s(%x)[%d]\n", offset, buf, *buf, *buf);
 	else
 	       printk("write NV offset = %d, message = %x[%d]\n", offset, *buf, *buf);
-	   
+
 	return size;
 }
 
