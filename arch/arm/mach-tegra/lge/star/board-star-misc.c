@@ -69,7 +69,11 @@ static int __init tegra_hw_rev_setup(char *line)
 	return 1;
 }
 
+#ifdef CONFIG_CM_BOOTLOADER_COMPAT
+__setup("brdrev=", tegra_hw_rev_setup);
+#else
 __setup("hw_rev=", tegra_hw_rev_setup);
+#endif
 
 #if defined( CONFIG_STAR_VIBRATOR)
 #include <mach/vibrator.h>
