@@ -73,18 +73,18 @@ extern unsigned long clk_get_rate(struct clk *c);
 #define GPIO_INT_MIC_EN BIT(2)
 #define GPIO_EXT_MIC_EN BIT(3)
 
-struct headset_switch_data	*headset_sw_data;	//LGE_CHANGE_S [chahee.kim@lge.com] 2011-11-14 
+struct headset_switch_data	*headset_sw_data;	//LGE_CHANGE_S [chahee.kim@lge.com] 2011-11-14
 
-extern struct wake_lock headset_wake_lock;  //                                                                                     
+extern struct wake_lock headset_wake_lock;  //
 
 #if defined(CONFIG_MACH_STAR) || defined(CONFIG_MACH_BSSQ)
-static bool is_call_mode; 
+static bool is_call_mode;
 bool in_call_state();
 #endif // MOBII LP1 sleep
 
-//                                                                                                            
+//
 static int is_fmradio_mode;
-//                                                                                                            
+//
 
 struct tegra_wm8994 {
 	struct tegra_asoc_utils_data util_data;
@@ -114,7 +114,7 @@ static int tegra_wm8994_hw_params(struct snd_pcm_substream *substream,
 	int srate, mclk, i2s_daifmt;
 	int err;
     unsigned long cdev_srate;  //heejeong.seo@lge.com 20111128 ICS ap20 wm8994
-	
+
 
 	srate = params_rate(params);
 	switch (srate) {
@@ -172,7 +172,7 @@ static int tegra_wm8994_hw_params(struct snd_pcm_substream *substream,
 	}
 #if 1 //heejeong.seo@lge.com 20111128 for ICS ap20 wm8994
 //function in tegra_i2s.c(ap25+k36), but no function in tegra20_i2s.c(k39)-- Need check
-/* 
+/*
       err = snd_soc_dai_set_sysclk(cpu_dai, 1, params_rate(params), SND_SOC_CLOCK_IN);
 	if (err < 0) {
 		pr_err("cpu_dai sysclk not set\n");
@@ -180,7 +180,7 @@ static int tegra_wm8994_hw_params(struct snd_pcm_substream *substream,
 	}
 */
 	cdev_srate = clk_get_rate(machine->util_data.clk_cdev1);
-	printk(KERN_ERR "tegra_soc_wm8994.c tegra_wm8994_hw_params sys_clk=%d\n",cdev_srate); 
+	printk(KERN_ERR "tegra_soc_wm8994.c tegra_wm8994_hw_params sys_clk=%d\n",cdev_srate);
 #if 0
 	err = snd_soc_dai_set_pll(codec_dai, WM8994_FLL1, WM8994_FLL_SRC_MCLK1, cdev_srate, 11289600/* I2S1_CLK*/);
 	if (err < 0) {
@@ -226,7 +226,7 @@ static int tegra_wm8994_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-//LGE_CHANGE_S [chahee.kim@lge.com] 2012-01-30 
+//LGE_CHANGE_S [chahee.kim@lge.com] 2012-01-30
 static int tegra_voice_call_hw_params(struct snd_pcm_substream *substream,
 					struct snd_pcm_hw_params *params)
 {
@@ -239,7 +239,7 @@ static int tegra_voice_call_hw_params(struct snd_pcm_substream *substream,
 	int srate, mclk, i2s_daifmt;
 	int err;
     unsigned long cdev_srate;  //heejeong.seo@lge.com 20111128 ICS ap20 wm8994
-	
+
 
 	srate = params_rate(params);
 	switch (srate) {
@@ -280,7 +280,7 @@ static int tegra_voice_call_hw_params(struct snd_pcm_substream *substream,
 		     SND_SOC_DAIFMT_CBM_CFM;
 #elif defined(CONFIG_MACH_BSSQ)
   //LGE_CHANGE_S, bae.cheolhwan@lge.com. 2012-02-27. Modify for call sound.
-	i2s_daifmt = SND_SOC_DAIFMT_IB_NF | 
+	i2s_daifmt = SND_SOC_DAIFMT_IB_NF |
 		     SND_SOC_DAIFMT_CBS_CFS;
   //LGE_CHANGE_E, bae.cheolhwan@lge.com. 2012-02-27. Modify for call sound.
 #endif
@@ -307,7 +307,7 @@ static int tegra_voice_call_hw_params(struct snd_pcm_substream *substream,
 	}*/
 #if 1 //heejeong.seo@lge.com 20111128 for ICS ap20 wm8994
 //function in tegra_i2s.c(ap25+k36), but no function in tegra20_i2s.c(k39)-- Need check
-/* 
+/*
       err = snd_soc_dai_set_sysclk(cpu_dai, 1, params_rate(params), SND_SOC_CLOCK_IN);
 	if (err < 0) {
 		pr_err("cpu_dai sysclk not set\n");
@@ -315,7 +315,7 @@ static int tegra_voice_call_hw_params(struct snd_pcm_substream *substream,
 	}
 */
 	cdev_srate = clk_get_rate(machine->util_data.clk_cdev1);
-	printk(KERN_ERR "tegra_soc_wm8994.c tegra_voice_call_hw_params sys_clk=%d\n",cdev_srate); 
+	printk(KERN_ERR "tegra_soc_wm8994.c tegra_voice_call_hw_params sys_clk=%d\n",cdev_srate);
 #if 0
 	err = snd_soc_dai_set_pll(codec_dai, WM8994_FLL1, WM8994_FLL_SRC_MCLK1, cdev_srate, 11289600/* I2S1_CLK*/);
 	if (err < 0) {
@@ -336,7 +336,7 @@ static int tegra_voice_call_hw_params(struct snd_pcm_substream *substream,
 #if 1
 	err = snd_soc_dai_set_sysclk(codec_dai, WM8994_SYSCLK_MCLK1, /*I2S1_CLK*/cdev_srate, SND_SOC_CLOCK_IN);
 #else
-	err = snd_soc_dai_set_pll(codec_dai, WM8994_FLL2, WM8994_FLL_SRC_MCLK1 ,cdev_srate, cdev_srate); 
+	err = snd_soc_dai_set_pll(codec_dai, WM8994_FLL2, WM8994_FLL_SRC_MCLK1 ,cdev_srate, cdev_srate);
 	err = snd_soc_dai_set_sysclk(codec_dai, WM8994_SYSCLK_FLL2, cdev_srate, SND_SOC_CLOCK_IN);
 
 	if (err < 0) {
@@ -354,12 +354,12 @@ static int tegra_voice_call_hw_params(struct snd_pcm_substream *substream,
 	}
 #endif
 
-//LGE_CHANGE_S [chahee.kim@lge.com] 2012-02-16 
+//LGE_CHANGE_S [chahee.kim@lge.com] 2012-02-16
 	machine->is_device_bt = 0;
-//LGE_CHANGE_E [chahee.kim@lge.com] 2012-02-16 
+//LGE_CHANGE_E [chahee.kim@lge.com] 2012-02-16
 	return 0;
 }
-//LGE_CHANGE_E [chahee.kim@lge.com] 2012-01-30 
+//LGE_CHANGE_E [chahee.kim@lge.com] 2012-01-30
 
 static int tegra_bt_sco_hw_params(struct snd_pcm_substream *substream,
 					struct snd_pcm_hw_params *params)
@@ -421,7 +421,7 @@ static int tegra_bt_sco_hw_params(struct snd_pcm_substream *substream,
 			dev_err(card->dev, "failed to set dac-dap path\n");
 			return err;
 		}
-	
+
 		err = tegra20_das_connect_dap_to_dac(TEGRA20_DAS_DAP_ID_4,
 						TEGRA20_DAS_DAP_SEL_DAC2);
 		if (err < 0) {
@@ -482,7 +482,7 @@ static int tegra_bt_call_hw_params(struct snd_pcm_substream *substream,
 
 	machine->is_device_bt = 1;
 
-	
+
 		err = snd_soc_dai_set_fmt(cpu_dai,
 						SND_SOC_DAIFMT_DSP_A |
 						SND_SOC_DAIFMT_NB_NF |
@@ -491,7 +491,7 @@ static int tegra_bt_call_hw_params(struct snd_pcm_substream *substream,
 			dev_err(card->dev, "cpu_dai fmt not set\n");
 			return err;
 		}
-	
+
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 			err = tegra20_das_connect_dac_to_dap(TEGRA20_DAS_DAP_SEL_DAC2,
 							TEGRA20_DAS_DAP_ID_4);
@@ -499,7 +499,7 @@ static int tegra_bt_call_hw_params(struct snd_pcm_substream *substream,
 				dev_err(card->dev, "failed to set dac-dap path\n");
 				return err;
 			}
-		
+
 			err = tegra20_das_connect_dap_to_dac(TEGRA20_DAS_DAP_ID_4,
 							TEGRA20_DAS_DAP_SEL_DAC2);
 			if (err < 0) {
@@ -562,13 +562,13 @@ static int tegra_hw_free(struct snd_pcm_substream *substream)
 
 	tegra_asoc_utils_lock_clk_rate(&machine->util_data, 0);
 
-//LGE_CHANGE_S [chahee.kim@lge.com] 2012-02-16 
+//LGE_CHANGE_S [chahee.kim@lge.com] 2012-02-16
 	machine->is_device_bt = 0;
-//LGE_CHANGE_E [chahee.kim@lge.com] 2012-02-16 
+//LGE_CHANGE_E [chahee.kim@lge.com] 2012-02-16
 	return 0;
 }
 
-//LGE_CHANGE_S [chahee.kim@lge.com] 2012-02-16 
+//LGE_CHANGE_S [chahee.kim@lge.com] 2012-02-16
 static int tegra_call_mode_info(struct snd_kcontrol *kcontrol,
 			struct snd_ctl_elem_info *uinfo)
 {
@@ -621,7 +621,7 @@ static int tegra_call_mode_put(struct snd_kcontrol *kcontrol,
 			bb_dap_sel, 1, 0, 0);
 		tegra20_das_connect_dap_to_dap(bb_dap_id,
 			codec_dap_sel, 0, 0, 0);
-#elif defined(CONFIG_MACH_BSSQ) 
+#elif defined(CONFIG_MACH_BSSQ)
 //LGE_CHANGE_S, bae.cheolhwan@lge.com. 2012-02-27. Modify for call sound.
 		tegra20_das_connect_dap_to_dap(codec_dap_id,
 			bb_dap_sel, 0, 0, 0);
@@ -670,7 +670,7 @@ struct snd_kcontrol_new tegra_call_mode_control = {
 	.put = tegra_call_mode_put
 };
 
-//LGE_CHANGE_E [chahee.kim@lge.com] 2012-02-16 
+//LGE_CHANGE_E [chahee.kim@lge.com] 2012-02-16
 static int tegra_fmradio_mode_info(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_info *uinfo)
 {
@@ -685,10 +685,10 @@ static int tegra_fmradio_mode_get(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
 	struct tegra_wm8994 *machine = snd_kcontrol_chip(kcontrol);
-		
-		printk(KERN_ERR "tegra_fmradio_mode_get() is_fmradio_mode=%d\n", is_fmradio_mode); 
+
+		printk(KERN_ERR "tegra_fmradio_mode_get() is_fmradio_mode=%d\n", is_fmradio_mode);
 		ucontrol->value.integer.value[0] = is_fmradio_mode;
-		
+
 		return 0;
 }
 
@@ -697,15 +697,15 @@ static int tegra_fmradio_mode_put(struct snd_kcontrol *kcontrol,
 {
 	struct tegra_wm8994 *machine = snd_kcontrol_chip(kcontrol);
 		int is_fmradio_mode_new = ucontrol->value.integer.value[0];
-		
-		printk(KERN_ERR "tegra_fmradio_mode_put() is_fmradio_mode=%d\n", is_fmradio_mode); 
-		printk(KERN_ERR "tegra_fmradio_mode_put() is_fmradio_mode_new=%d\n", is_fmradio_mode_new); 
+
+		printk(KERN_ERR "tegra_fmradio_mode_put() is_fmradio_mode=%d\n", is_fmradio_mode);
+		printk(KERN_ERR "tegra_fmradio_mode_put() is_fmradio_mode_new=%d\n", is_fmradio_mode_new);
 		if (is_fmradio_mode == is_fmradio_mode_new)
 			return 0;
-				
+
 				is_fmradio_mode = is_fmradio_mode_new;
-				printk(KERN_ERR "tegra_fmradio_mode_put() is_fmradio_mode=%d\n", is_fmradio_mode); 
-				
+				printk(KERN_ERR "tegra_fmradio_mode_put() is_fmradio_mode=%d\n", is_fmradio_mode);
+
 				return 1;
 }
 
@@ -726,7 +726,7 @@ bool is_fmradio_state(void)
 	else
 		return true;
 }
-//                                             
+//
 #if 0
 //LGE_CHANGE_S [heejeong.seo@lge.com] 2011-12-20 [LGE_AP20] set dynamic pull up
 int tegra_codec_startup(struct snd_pcm_substream *substream)
@@ -742,24 +742,24 @@ void tegra_codec_shutdown(struct snd_pcm_substream *substream)
 }
 //LGE_CHANGE_E [heejeong.seo@lge.com] 2011-12-20 [LGE_AP20] set dynamic pull up
 #endif
-//LGE_CHANGE_E [chahee.kim@lge.com] 2012-01-21 
+//LGE_CHANGE_E [chahee.kim@lge.com] 2012-01-21
 
 static struct snd_soc_ops tegra_wm8994_ops = {
 	.hw_params = tegra_wm8994_hw_params,
 	.hw_free = tegra_hw_free,
 //LGE_CHANGE_S [heejeong.seo@lge.com] 2011-12-20 [LGE_AP20] set dynamic pull up
-//	.startup = tegra_codec_startup,		
+//	.startup = tegra_codec_startup,
 //	.shutdown = tegra_codec_shutdown,
 //LGE_CHANGE_E [heejeong.seo@lge.com] 2011-12-20 [LGE_AP20] set dynamic pull up
 
 };
 
-//LGE_CHANGE_S [chahee.kim@lge.com] 2012-01-30 
+//LGE_CHANGE_S [chahee.kim@lge.com] 2012-01-30
 static struct snd_soc_ops tegra_voice_call_ops = {
 	.hw_params = tegra_voice_call_hw_params,
 	.hw_free = tegra_hw_free,
 };
-//LGE_CHANGE_E [chahee.kim@lge.com] 2012-01-30 
+//LGE_CHANGE_E [chahee.kim@lge.com] 2012-01-30
 
 static struct snd_soc_ops tegra_bt_sco_ops = {
 	.hw_params = tegra_bt_sco_hw_params,
@@ -894,7 +894,7 @@ static const struct snd_soc_dapm_widget tegra_wm8994_dapm_widgets[] = {
 };
 
 static const struct snd_soc_dapm_route tegra_wm8994_audio_map[] = {
-	
+
 	/* speaker conntected to SPKOUTLN, SPKOUTLP, SPKOUTRN and SPKOUTRP */
 	{"Int Spk", NULL, "SPKOUTLN"},
 	{"Int Spk", NULL, "SPKOUTLP"},
@@ -913,7 +913,7 @@ static const struct snd_soc_dapm_route tegra_wm8994_audio_map[] = {
 
 	/* sub mic is connected to IN1RN */
 	{"MICBIAS2", NULL, "Line Jack"},
-	{"IN1RN", NULL, "MICBIAS2" },		
+	{"IN1RN", NULL, "MICBIAS2" },
 
 };
 
@@ -927,7 +927,7 @@ static const struct snd_kcontrol_new tegra_wm8994_controls[] = {
 	SOC_DAPM_PIN_SWITCH("LineIn Jack"),
 };
 
-//LGE_CHANGE_S [chahee.kim@lge.com] 2011-11-14 
+//LGE_CHANGE_S [chahee.kim@lge.com] 2011-11-14
 static ssize_t switch_gpio_print_state(struct switch_dev *sdev, char *buf)
 {
 
@@ -943,7 +943,7 @@ static ssize_t switch_gpio_print_state(struct switch_dev *sdev, char *buf)
 		return sprintf(buf, "%s\n", state);
 	return -1;
 }
-//LGE_CHANGE_E [chahee.kim@lge.com] 2011-11-14 
+//LGE_CHANGE_E [chahee.kim@lge.com] 2011-11-14
 
 static int tegra_wm8994_init(struct snd_soc_pcm_runtime *rtd)
 {
@@ -953,9 +953,9 @@ static int tegra_wm8994_init(struct snd_soc_pcm_runtime *rtd)
 	struct tegra_wm8994 *machine = snd_soc_card_get_drvdata(card);
 	struct tegra_wm8994_platform_data *pdata = machine->pdata;
 	int ret;
-    //LGE_CHANGE_S [chahee.kim@lge.com] 2011-11-14 
+    //LGE_CHANGE_S [chahee.kim@lge.com] 2011-11-14
     struct headset_switch_data *switch_data;
-    struct input_dev *ip_dev; 
+    struct input_dev *ip_dev;
 
     printk(KERN_ERR "tegra_wm8994_init - start \n");
 
@@ -969,22 +969,22 @@ static int tegra_wm8994_init(struct snd_soc_pcm_runtime *rtd)
     switch_data->sdev.print_state = switch_gpio_print_state;
     switch_data->hook_gpio = pdata->gpio_hook;
     switch_data->ear_mic = pdata->gpio_ear_mic;
-    
+
     ret = switch_dev_register(&switch_data->sdev);
 
     ip_dev = input_allocate_device();
     switch_data->ip_dev = ip_dev;
     set_bit(EV_SYN, switch_data->ip_dev->evbit);
     set_bit(EV_KEY, switch_data->ip_dev->evbit);
-    set_bit(KEY_HOOK, switch_data->ip_dev->keybit); 
+    set_bit(KEY_HOOK, switch_data->ip_dev->keybit);
 
     switch_data->ip_dev->name = "tegra-snd-wm8994";
-    input_register_device(switch_data->ip_dev);  
+    input_register_device(switch_data->ip_dev);
     //switch_data->jack_gpio = &tegra_wm8994_hp_jack_gpio;
-    headset_sw_data = switch_data;   
+    headset_sw_data = switch_data;
 
     wake_lock_init(&headset_wake_lock, WAKE_LOCK_SUSPEND, "headset_wlock"); //20111017 heejeong.seo@lge.com Problem that no wake up when disconn headset in calling
-//LGE_CHANGE_E [chahee.kim@lge.com] 2011-11-14 
+//LGE_CHANGE_E [chahee.kim@lge.com] 2011-11-14
 
 	if (machine_is_whistler()) {
 		machine->audio_reg = regulator_get(NULL, "avddio_audio");
@@ -1004,6 +1004,7 @@ static int tegra_wm8994_init(struct snd_soc_pcm_runtime *rtd)
 	}
 
 	machine->pcard = card; // nVidia patch
+	machine->bias_level = SND_SOC_BIAS_STANDBY;
 
 	if (gpio_is_valid(pdata->gpio_spkr_en)) {
 		ret = gpio_request(pdata->gpio_spkr_en, "spkr_en");
@@ -1062,24 +1063,24 @@ static int tegra_wm8994_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_add_routes(dapm, tegra_wm8994_audio_map,
 					ARRAY_SIZE(tegra_wm8994_audio_map));
 
-//LGE_CHANGE_S [chahee.kim@lge.com] 2012-02-16 
+//LGE_CHANGE_S [chahee.kim@lge.com] 2012-02-16
 	   /* Add call mode switch control */
 	ret = snd_ctl_add(codec->card->snd_card,
 			snd_ctl_new1(&tegra_call_mode_control, machine));
 	if (ret < 0)
 		return ret;
-//LGE_CHANGE_E [chahee.kim@lge.com] 2012-02-16 
+//LGE_CHANGE_E [chahee.kim@lge.com] 2012-02-16
 
   ret = snd_ctl_add(codec->card->snd_card, snd_ctl_new1(&tegra_fmradio_mode_control, machine));
   if (ret < 0)
     return ret;
-//                 
+//
 // LGE_CHANGE_S [heejeong.seo@lge.com] 2011-12-20 [LGE_AP20]
 #if defined (CONFIG_MACH_STAR) || defined (CONFIG_MACH_BSSQ)
-    if (gpio_is_valid(pdata->gpio_hp_det)) 
+    if (gpio_is_valid(pdata->gpio_hp_det))
     {
         printk(KERN_ERR "(0x%x) \n", pdata->gpio_hp_det);
-        
+
         tegra_wm8994_hp_jack_gpio.gpio = pdata->gpio_hp_det;
         snd_soc_jack_new(codec, "Headphone Jack", SND_JACK_HEADPHONE,
                 &tegra_wm8994_hp_jack);
@@ -1159,7 +1160,7 @@ static struct snd_soc_dai_link tegra_wm8994_dai[] = {
 		.ops = &tegra_bt_sco_ops,
 	},
 #endif
-//LGE_CHANGE_S [chahee.kim@lge.com] 2012-01-30 
+//LGE_CHANGE_S [chahee.kim@lge.com] 2012-01-30
 	{
 		.name = "VOICE CALL",
 		.stream_name = "VOICE CALL PCM",
@@ -1169,7 +1170,7 @@ static struct snd_soc_dai_link tegra_wm8994_dai[] = {
 		.codec_dai_name = "wm8994-aif2",
 		.ops = &tegra_voice_call_ops,
 	},
-//LGE_CHANGE_E [chahee.kim@lge.com] 2012-01-30 
+//LGE_CHANGE_E [chahee.kim@lge.com] 2012-01-30
 	{
 		.name = "BT VOICE CALL",
 		.stream_name = "BT VOICE CALL PCM",
@@ -1181,10 +1182,36 @@ static struct snd_soc_dai_link tegra_wm8994_dai[] = {
 	},
 };
 
+static int tegra20_soc_set_bias_level(struct snd_soc_card *card,
+					enum snd_soc_bias_level level)
+{
+	struct tegra_wm8994 *machine = snd_soc_card_get_drvdata(card);
+
+	if (machine->bias_level == SND_SOC_BIAS_OFF && level != SND_SOC_BIAS_OFF)
+		tegra_asoc_utils_clk_enable(&machine->util_data);
+
+	return 0;
+}
+
+static int tegra20_soc_set_bias_level_post(struct snd_soc_card *card,
+					enum snd_soc_bias_level level)
+{
+	struct tegra_wm8994 *machine = snd_soc_card_get_drvdata(card);
+
+	if (machine->bias_level != SND_SOC_BIAS_OFF && level == SND_SOC_BIAS_OFF)
+		tegra_asoc_utils_clk_disable(&machine->util_data);
+
+	machine->bias_level = level;
+
+	return 0 ;
+}
+
 static struct snd_soc_card snd_soc_tegra_wm8994 = {
 	.name = "tegra-wm8994",
 	.dai_link = tegra_wm8994_dai,
 	.num_links = ARRAY_SIZE(tegra_wm8994_dai),
+	.set_bias_level = tegra20_soc_set_bias_level,
+	.set_bias_level_post = tegra20_soc_set_bias_level_post,
 };
 
 static __devinit int tegra_wm8994_driver_probe(struct platform_device *pdev)
