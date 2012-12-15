@@ -1216,7 +1216,8 @@ static int aif2clk_ev(struct snd_soc_dapm_widget *w,
 		wm8994->aif2clk_enable = 1;
 		break;
 	case SND_SOC_DAPM_POST_PMD:
-		wm8994->aif2clk_disable = 1;
+		wm8994->aif2clk_enable = 1; /* Leave the AIF2 clock alone */
+		//wm8994->aif2clk_disable = 1;
 		break;
 	}
 
