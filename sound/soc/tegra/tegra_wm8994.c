@@ -1004,6 +1004,7 @@ static int tegra_wm8994_init(struct snd_soc_pcm_runtime *rtd)
 	}
 
 	machine->pcard = card; // nVidia patch
+	machine->bias_level = SND_SOC_BIAS_STANDBY;
 
 	if (gpio_is_valid(pdata->gpio_spkr_en)) {
 		ret = gpio_request(pdata->gpio_spkr_en, "spkr_en");
@@ -1181,10 +1182,36 @@ static struct snd_soc_dai_link tegra_wm8994_dai[] = {
 	},
 };
 
+static int tegra20_soc_set_bias_level(struct snd_soc_card *card,
+					enum snd_soc_bias_level level)
+{
+	struct tegra_wm8994 *machine = snd_soc_card_get_drvdata(card);
+
+	if (machine->bias_level == SND_SOC_BIAS_OFF && level != SND_SOC_BIAS_OFF)
+		tegra_asoc_utils_clk_enable(&machine->util_data);
+
+	return 0;
+}
+
+static int tegra20_soc_set_bias_level_post(struct snd_soc_card *card,
+					enum snd_soc_bias_level level)
+{
+	struct tegra_wm8994 *machine = snd_soc_card_get_drvdata(card);
+
+	if (machine->bias_level != SND_SOC_BIAS_OFF && level == SND_SOC_BIAS_OFF)
+		tegra_asoc_utils_clk_disable(&machine->util_data);
+
+	machine->bias_level = level;
+
+	return 0 ;
+}
+
 static struct snd_soc_card snd_soc_tegra_wm8994 = {
 	.name = "tegra-wm8994",
 	.dai_link = tegra_wm8994_dai,
 	.num_links = ARRAY_SIZE(tegra_wm8994_dai),
+	.set_bias_level = tegra20_soc_set_bias_level,
+	.set_bias_level_post = tegra20_soc_set_bias_level_post,
 };
 
 static __devinit int tegra_wm8994_driver_probe(struct platform_device *pdev)
