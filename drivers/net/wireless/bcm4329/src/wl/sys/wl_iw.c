@@ -2007,13 +2007,11 @@ wl_iw_control_wl_off_softap(
 
 #if defined(WL_IW_USE_ISCAN)
 		
-#if  !defined(CSCAN)
 		wl_iw_free_ss_cache();
 		wl_iw_run_ss_cache_timer(0);
 		memset(g_scan, 0, G_SCAN_RESULTS);
 		
 		g_ss_cache_ctrl.m_link_down = 1;
-#endif
 		g_scan_specified_ssid = 0;
 
 #if defined(CONFIG_FIRST_SCAN)
