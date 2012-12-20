@@ -47,11 +47,13 @@ static struct wm8994_drc_cfg wm8994_drc_data[] = {
 
 struct wm8994_pdata wm8994_data = {
 	/* configure gpio1 function: 0x0001(Logic level input/output) */
-	.gpio_defaults[0] = 0x0001,
+	.gpio_defaults[0] = 0xa101,
+	.gpio_defaults[1] = 0xa101,
 	/* configure gpio3/4/5/7 function for AIF2 voice */
 	.gpio_defaults[2] = 0x8100,
 	.gpio_defaults[3] = 0x8100,
 	.gpio_defaults[4] = 0x8100,
+	.gpio_defaults[5] = 0xa101,
 	.gpio_defaults[6] = 0x0100,
 	/* configure gpio8/9/10/11 function for AIF3 BT */
 	.gpio_defaults[7] = 0x8100,
