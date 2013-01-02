@@ -315,13 +315,13 @@ static int wm8994_suspend(struct device *dev)
 	 * the GPIO alternate functions even if we're not using the gpiolib
 	 * driver for them.
 	 */
-	ret = wm8994_read(wm8994, WM8994_GPIO_1, WM8994_NUM_GPIO_REGS * 2,
+	ret = wm8994_bulk_read(wm8994, WM8994_GPIO_1, WM8994_NUM_GPIO_REGS,
 			  &wm8994->gpio_regs);
 	if (ret < 0)
 		printk("Failed to save GPIO registers: %d\n", ret);
 
 	/* For similar reasons we also stash the regulator states */
-	ret = wm8994_read(wm8994, WM8994_LDO_1, WM8994_NUM_LDO_REGS * 2,
+	ret = wm8994_bulk_read(wm8994, WM8994_LDO_1, WM8994_NUM_LDO_REGS,
 			  &wm8994->ldo_regs);
 	if (ret < 0)
 		printk("Failed to save LDO registers: %d\n", ret);
@@ -373,17 +373,17 @@ static int wm8994_resume(struct device *dev)
 		return ret;
 	}
 
-	ret = wm8994_write(wm8994, WM8994_INTERRUPT_STATUS_1_MASK,
-			   WM8994_NUM_IRQ_REGS * 2, &wm8994->irq_masks_cur);
+	ret = wm8994_bulk_write(wm8994, WM8994_INTERRUPT_STATUS_1_MASK,
+			   WM8994_NUM_IRQ_REGS, &wm8994->irq_masks_cur);
 	if (ret < 0)
 		printk("Failed to restore interrupt masks: %d\n", ret);
 
-	ret = wm8994_write(wm8994, WM8994_LDO_1, WM8994_NUM_LDO_REGS * 2,
+	ret = wm8994_bulk_write(wm8994, WM8994_LDO_1, WM8994_NUM_LDO_REGS,
 			   &wm8994->ldo_regs);
 	if (ret < 0)
 		printk("Failed to restore LDO registers: %d\n", ret);
 
-	ret = wm8994_write(wm8994, WM8994_GPIO_1, WM8994_NUM_GPIO_REGS * 2,
+	ret = wm8994_bulk_write(wm8994, WM8994_GPIO_1, WM8994_NUM_GPIO_REGS,
 			   &wm8994->gpio_regs);
 	if (ret < 0)
 		printk("Failed to restore GPIO registers: %d\n", ret);
