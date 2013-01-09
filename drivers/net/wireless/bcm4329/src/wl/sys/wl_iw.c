@@ -8162,7 +8162,7 @@ static int wl_iw_set_priv(
 	    else if (strnicmp(extra, "POWERMODE", strlen("POWERMODE")) == 0)
 			ret = wl_iw_set_btcoex_dhcp(dev, info, (union iwreq_data *)dwrq, extra);
 #else
-		else if (strnicmp(extra, "POWERMODE", 9) == 0)
+		else if (strnicmp(extra, "BTCOEXMODE", 9) == 0)
 			ret = wl_iw_set_powermode(dev, info,
 					(union iwreq_data *)dwrq, extra);
 		else if (strnicmp(extra, "SCAN-CHANNELS", 13) == 0)
