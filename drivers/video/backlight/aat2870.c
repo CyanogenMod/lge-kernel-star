@@ -695,7 +695,7 @@ static int aat2870_bl_update_status(struct backlight_device *bd)
 		}
 
 		if (aat2870_bl_write(bd, AAT2870_BL_BLM,
-				     calc_brightness(bd, brightness)) < 0) {
+				     /*calc_brightness(bd, brightness)*/drvdata->intensity) < 0) {
 			ret = -EIO;
 			goto out;
 		}
