@@ -66,8 +66,8 @@ static int tegra_rtc_read_time(struct device *dev, struct rtc_time *tm)
 
 static int tegra_rtc_set_time(struct device *dev, struct rtc_time *tm)
 {
-	unsigned long prevTime;	
-	unsigned long now;
+	NvU32 prevTime;		// NvBool NvOdmPmuReadRtc(NvOdmPmuDeviceHandle, NvU32*)
+	unsigned long now;	// int rtc_tm_to_time(struct rtc_time*, unsigned long*)
 	int ret;
 
 	if (hPmu == NULL)
@@ -86,12 +86,12 @@ static int tegra_rtc_set_time(struct device *dev, struct rtc_time *tm)
 	down_interruptible(&drm_mutex);
 	if( now < prevTime )
 	{
-		drm_diffTime = prevTime - now;
+		drm_diffTime = (unsigned long)prevTime - now;
 		drm_sign = 1;
 	}	
 	else
 	{
-		drm_diffTime = now - prevTime;
+		drm_diffTime = now - (unsigned long)prevTime;
 		drm_sign = -1;
 	}
 	

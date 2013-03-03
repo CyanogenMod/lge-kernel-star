@@ -829,6 +829,7 @@ NvU32 NvOdmServicesPmuGetHookValue(
     NvU32 value =0;
     NvRmDeviceHandle hRmDev = (NvRmDeviceHandle)handle;
     value = NvRmPmuGetHookAdc(hRmDev);
+    return value;
 }
 #endif
 
