@@ -231,7 +231,7 @@ config BSSQ_REBOOT_MONITOR
        Panic and System Reboot Monitoring for Hidden Reset and log service	
         	
 config PANICRPT
-    bool " Enable Kernel Panic Dump Tool "
+    bool "Enable Kernel Panic Dump Tool "
     depends on MACH_BSSQ
     default y
     help
